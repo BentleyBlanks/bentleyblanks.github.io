@@ -57,6 +57,26 @@ try {
   assert.deepEqual(mapToggle.hiddenAgain, { on: false, display: "none", ariaHidden: "true" });
   assert.equal(await page.locator(".hudIdentity").count(), 0);
 
+  const markers = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    const project = () => ({x:400,y:200,dist:25,visible:true});
+    T.hud.UpdateMarkers([{name:"Marker fixture",x:0,z:0,progress:0,owner:"nra"}],T.camera,project);
+    const shown = document.querySelectorAll(".hudMarker").length;
+    T.hud.UpdateMarkers([],T.camera,project);
+    return {shown,cleared:document.querySelectorAll(".hudMarker").length};
+  });
+  assert.deepEqual(markers,{shown:1,cleared:0},"empty scene markers must remove previously visible DOM nodes");
+  const identity=await page.evaluate(()=>{
+    const T=window.Taierzhuang,card={key:"s2",kind:"friend",faction:"nra",title:"罗班长",meta:"25 岁 · 3m",health:null};
+    T.hud.SetTarget(card,{targetDistance:false});
+    const understated={meta:document.querySelector(".hudTarget .tMeta")?.textContent,state:T.hud.TargetState()};
+    T.hud.SetTarget(card);
+    return {understated,normal:T.hud.TargetState()};
+  });
+  assert.equal(identity.understated.state.meta,"25 岁","P012 name card carries no distance navigation");
+  assert.equal(identity.understated.meta,"25 岁","rendered DOM agrees with the presentation state");
+  assert.equal(identity.normal.meta,"25 岁 · 3m","normal chapter identity display is unchanged");
+
   const prompts = await page.evaluate(() => {
     const T = window.Taierzhuang;
     T.editor.TogglePanel(false);
@@ -70,6 +90,7 @@ try {
     T.player.bandages = 1;
     T.state.slots.primary = "HanYang";
     T.state.slots.secondary = "Mauser96";
+    T.state.ammo = 5;
     T.StepFrames(12);
     return {
       prompts: T.Debug.Prompts(),
@@ -80,13 +101,12 @@ try {
       on: document.querySelector(".hudActions")?.classList.contains("on"),
     };
   });
-  // 刺刀那一条是刺刀系统那一批加的（X 上/收刺刀），这份期望当时漏了跟着改，
-  // 于是这条测试从那时起一直是红的 —— 2026-08-26 补上。
+  // 可装刺刀不构成眼前操作，X 不再常驻；其余提示保持既有条件。
   assert.deepEqual(prompts.prompts.map((prompt) => prompt.kind),
-    ["bandage", "bayonet", "switchWeapon"]);
+    ["bandage", "switchWeapon"]);
   assert.equal(prompts.on, true);
-  assert.deepEqual(prompts.rows, ["B", "X", "1 / 2"]);
-  assert.equal(prompts.icons, 3);
+  assert.deepEqual(prompts.rows, ["B", "1 / 2"]);
+  assert.equal(prompts.icons, 2);
   assert.ok(prompts.titles.some((title) => title === "包扎止血"));
 
   const combatHud = await page.evaluate(() => {
@@ -241,10 +261,8 @@ try {
     const T = window.Taierzhuang;
     T.player.bleeding = 0;
     T.player.bandages = 0;
-    T.state.slots.secondary = null;
-    // 手里那支枪也得换成装不了刺刀的（捷克式），否则「X 上刺刀」是**该在**的 ——
-    // 这一段验的是"条件没了提示就没了"，不是"提示可以凭空消失"。
-    T.interact.hooks.TakeWeapon("Zb26", 2);
+    // 装得上刺刀的步枪在手，闲时依然不显示 X。
+    T.interact.hooks.TakeWeapon("HanYang", 2);
     for (const soldier of T.ai.soldiers) {
       if (!soldier.alive && soldier.drop) soldier.drop.taken = true;
     }

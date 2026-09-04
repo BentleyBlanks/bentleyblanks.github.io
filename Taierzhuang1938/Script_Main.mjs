@@ -39,6 +39,8 @@ import {
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
 import { FirstLevelP012Runtime } from "./Script_FirstLevelP012Runtime.mjs";
+import { FirstLevelP012Resting } from "./Script_FirstLevelP012Resting.mjs";
+import { AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload, RestoreP012ManualReload } from "./Script_FirstLevelP012Opening.mjs";
 import { FirstLevelP012Binoculars, P012BinocularLensContains } from "./Script_FirstLevelP012Binoculars.mjs";
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
 import { ApplyP012CastAppearance, InstallP012OpeningPose } from "./Script_FirstLevelP012CastAppearance.mjs";
@@ -594,6 +596,7 @@ let companion = null;
 let checkpoint = null;
 let p012Flow = null;
 let p012Runtime = null;
+let p012Resting = null;
 let p012Binoculars = null;
 let p012BinocularRaised = false;
 
@@ -620,8 +623,12 @@ const wheel = new RadialWheel(hudRoot);
 const debugOptions = new DebugOptions();
 
 /** 调试补给只补当前已有的装备，不会凭空给本关没有的枪或特殊投掷物。 */
+function EffectiveInfiniteAmmo() {
+  return AllowP012InfiniteAmmo({ enabled: debugOptions.Enabled("infiniteAmmo"),
+    isP012: !!p012Runtime, manualReloadCompleted: p012Runtime?.manualReloadCompleted === true });
+}
 function EnsureDebugInventory() {
-  if (debugOptions.Enabled("infiniteAmmo")) {
+  if (EffectiveInfiniteAmmo()) {
     const weapon = WEAPONS[currentWeapon];
     if (weapon?.magazine) {
       state.ammo = Math.max(state.ammo, weapon.magazine);
@@ -1168,6 +1175,7 @@ async function Boot() {
       ammo: state.ammo, clips: state.clips,
       grenades: state.grenades, bundles: state.bundles,
       p012: p012Flow?.Snapshot() || null,
+      p012Opening: p012Flow ? { manualReloadCompleted: p012Runtime?.manualReloadCompleted === true } : null,
       p012Carry: p012Flow ? carry?.KindId : null,
       p012Story: p012Flow ? { index: story.index, pushed: [...story.pushed], cued: [...story.cued], fired: [...story.fired],
         levelTime: story.levelTime, sinceLast: story.sinceLast, beatWait: story.beatWait, immediate: story.P012Snapshot?.() } : null,
@@ -1183,6 +1191,10 @@ async function Boot() {
       if (Number.isFinite(sample.bandages)) player.bandages = sample.bandages;
       if (Number.isFinite(sample.ammo)) state.ammo = sample.ammo;
       if (Number.isFinite(sample.clips)) state.clips = sample.clips;
+      if (sample.p012) {
+        RestoreP012ManualReload(p012Runtime, sample.p012Opening);
+        SyncP012ActiveMagazine(state);
+      }
       if (Number.isFinite(sample.grenades)) state.grenades = sample.grenades;
       if (Number.isFinite(sample.bundles)) state.bundles = sample.bundles;
       // 重来的那一下手上不该还抬着担架（担架已经翻了），也不该还架着机枪。
@@ -2049,7 +2061,7 @@ async function Boot() {
       P012: () => p012Flow?.State() || null,
       P012Environment: () => ({externalCount:battlefield?.externalProps?.count || 0,pcgCount:battlefield?.externalProps?.pcgCount || 0,trimCount:battlefield?.trimProps?.count || 0,
         roots:scene.children.filter(root=>root.userData?.externalProps || /^(ExternalProps_|TrimProps_)/.test(root.name)).map(root=>root.name)}),
-      P012Scene: () => p012Runtime ? { ...p012Runtime.Sample(), airColumnEnteredRoad:AirColumnEnteredRoad(setpieces?.mem?.column,player.position,PHASE_TABLE[state.phaseIndex]?.whitebox?.activities), columnPosition: setpieces?.mem?.column?.HeadPosition(), columnRouteIndex: setpieces?.mem?.column?.legIndex,
+      P012Scene: () => p012Runtime ? { ...p012Runtime.Sample(), resting:{count:p012Resting?.entries.length||0,people:p012Resting?.Snapshot()||[]}, airColumnEnteredRoad:AirColumnEnteredRoad(setpieces?.mem?.column,player.position,PHASE_TABLE[state.phaseIndex]?.whitebox?.activities), columnPosition: setpieces?.mem?.column?.HeadPosition(), columnRouteIndex: setpieces?.mem?.column?.legIndex,
         woundedDragDelivered: !!setpieces?.mem?.p012WoundedDrag?.delivered, woundedDragDistance: setpieces?.mem?.p012WoundedDrag?.distance || 0,
         carryDistance: setpieces?.mem?.p012CarryDistance || 0, litterOverturned: !!setpieces?.mem?.p012LitterOverturned,
         litterRecovered: !!setpieces?.mem?.p012LitterRecovered, lastLitterArrived: LastLitterArrived(setpieces?.mem?.column),
@@ -2944,6 +2956,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     ai.insideWalls = levelBounds;
   }
 
+  // Extra unloading recruits and two children belong only to this test scene.
+  ai.maxAlive=SCALE.maxAlive+(phase.whitebox?.p012?(phase.whitebox.activities.trainColumn?.extraCount||0)+2:0);
   state.phaseTime = 0;
   state.objectiveIndex = 0;
   state.objectiveBlockedReason = null;
@@ -3025,8 +3039,21 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   }
   interact.Clear("P012");
   p012Binoculars?.Dispose();
-  p012Binoculars = phase.whitebox?.p012 ? new FirstLevelP012Binoculars({camera,scene}) : null;
+  p012Binoculars = null; // Removed from this scenario: the leader supplies the route.
   p012BinocularRaised = false;
+  p012Resting?.Dispose();
+  p012Resting = phase.whitebox?.p012 ? new FirstLevelP012Resting({
+    Spawn: (spec) => {
+      const actor = actorFactory.Create("civilian", {seed:HashString(spec.id),variant:spec.variant,weapon:null});
+      actor.root.position.set(spec.x,battlefield.GroundHeight(spec.x,spec.z),spec.z);
+      actor.root.rotation.y=spec.yaw; scene.add(actor.root);
+      return actor;
+    },
+    Position: (actor) => ({x:actor.root.position.x,y:actor.root.position.y,z:actor.root.position.z}),
+    HoldPose: (actor,pose,dt) => actor.Update(dt,{...pose,elapsed:state.elapsed}),
+    Remove: (actor) => {scene.remove(actor.root);actor.Dispose?.();},
+  }) : null;
+  p012Resting?.Start();
   p012Runtime = phase.whitebox?.p012 ? new FirstLevelP012Runtime({
     SpawnEnemy: (spec) => {
       const actor = ai.Spawn("ija", spec.x, spec.z, spec);
@@ -3038,7 +3065,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       }
       return actor;
     },
-    GuideActor: () => companion?.Handle("luo"), Position: (actor) => actor?.position ? { x: actor.position.x, z: actor.position.z } : null,
+    GuideActor: () => companion?.Handle("luo"), Position: (actor) => actor?.position ? { x: actor.position.x, y:actor.position.y, z: actor.position.z } : null,
     GuideYaw: (actor) => actor.yaw,
     FaceGuide: (actor, yaw) => {
       actor.yaw = yaw; actor.lookYaw = 0;
@@ -3092,7 +3119,13 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     FriendlyMgFired: (since) => ai.soldiers.some((actor) => actor.side === "nra" && actor.weaponId === "Zb26" && actor.lastFire > since),
     DeploySmoke: (point) => vfx.SmokeSource(new THREE.Vector3(point.x, 0.2, point.z), { kind: "screen", rate: 12, radius: 7.5, rise: 0.4, sizeStart: 3, sizeEnd: 6, life: 10 }),
     ClearSmoke: (handle) => vfx.RemoveSmokeSource(handle),
-    FriendlyActors: () => ai.soldiers.filter((actor) => actor.side === "nra" && actor.alive && !actor.unarmed),
+    FriendlyActors: () => ai.soldiers.filter((actor) => actor.side === "nra" && actor.alive && !actor.unarmed && !actor.p012TrainExtra),
+    SpawnRecruit: (spec) => {
+      const actor=ai.Spawn("nra",spec.x,spec.z,{identity:{...MakeSoldierIdentity(HashString(`P012Train:${spec.carIndex}:${spec.slot}`)),name:"下车集结的士兵"},
+        weapon:"HanYang",unarmed:true,scriptedNoncombatant:true,escortRole:"trainRecruit",squadId:`P012Train${spec.carIndex}`});
+      if(actor)actor.p012TrainExtra=true;
+      return actor;
+    },
     InitializeOpeningActor: (actor, point) => {
       const y = battlefield.GroundHeight(point.x, point.z);
       actor.position.set(point.x, y, point.z); actor.body?.Teleport(point.x, y, point.z);
@@ -3107,6 +3140,12 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       actor.unarmed = stage === "empty";
       actor.actor?.SetWeapon(stage === "empty" ? null : actor.weaponId);
       actor.ammo = stage === "ammo" ? (actor.weapon.magazine || 5) : 0;
+    },
+    SetOpeningShelter: (actor, durationS) => { if(actor?.alive)ai.SetStance(actor,2,durationS,true); },
+    SetGuideStance: (actor, stance) => {
+      if (!actor?.alive) return;
+      ai.SetStance(actor, stance, .5, true);
+      actor.stanceUntil = ai.time + .5;
     },
     RetreatPosition: () => setpieces?.mem?.column?.Bearers?.[0]?.handle?.position || null,
     FireDiscipline: (actor, doctrine) => {
@@ -3177,9 +3216,15 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     WarnShell: (point, damaging, OnImpact) => {
       const at = new THREE.Vector3(point.x, battlefield.GroundHeight(point.x, point.z), point.z);
       if (damaging) { const impact = combat.CallIncoming("launcher", at, { OnImpact }); return { x: impact.x, z: impact.z }; }
-      vfx.IncomingMarker(at, 1.6); audio.Play("shellIncoming", { position: at }); return point;
+      // No glowing predictive marker during the surprise: only the incoming sound.
+      audio.Play("shellIncoming", { position: at }); return point;
     },
-    ImpactShell: (point) => { const at = new THREE.Vector3(point.x, battlefield.GroundHeight(point.x, point.z), point.z); vfx.Explosion(at, { radius: 4, kind: "shell" }); audio.Play("explosionNear", { position: at }); },
+    ImpactShell: (point) => {
+      const at = new THREE.Vector3(point.x, battlefield.GroundHeight(point.x, point.z), point.z);
+      vfx.Explosion(at, { radius: 4, kind: "shell" }); audio.Play("explosionNear", { position: at });
+      player.Suppress(Math.max(0,1-at.distanceTo(player.position)/28)*.65);
+      p012Resting?.OnImpact({event:"P012NorthNearMissImpact",position:point});
+    },
   }, phase.whitebox) : null;
   p012Runtime?.SaveSafePoint("Start",phase.spawn,"stand",phase.spawn.ry || 0);
   p012Flow = phase.whitebox?.p012 ? new FirstLevelP012Director({
@@ -3229,7 +3274,6 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     },
     SpawnEnemy: (spec) => p012Runtime.SpawnEnemy(spec),
     Guide: (spec) => p012Runtime.Guide(spec),
-    SetBinocularsOwned: (owned) => { p012Runtime.binocularOwned = owned; if (!owned) p012BinocularRaised = false; },
     ShelteredFromImpact: (point) => {
       const origin = new THREE.Vector3(point.x, battlefield.GroundHeight(point.x, point.z) + 0.35, point.z);
       const direction = player.EyePosition.clone().sub(origin), distance = direction.length();
@@ -3258,6 +3302,15 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       } else { delete soldier.p012ScoutDirected; delete soldier.scriptMoveSpeedMps; }
     },
     EnemyCombatState: (soldier) => soldier ? {lastFire:soldier.lastFire,suppression:soldier.suppression} : null,
+    EnemyBodyRadius: (soldier) => soldier?.body?.radius,
+    EnemyRejoin: (soldier, point) => {
+      if (!soldier) return;
+      soldier.p012RouteRejoining = !!point;
+      if (point) {
+        soldier.manualGoalUntil = ai.time + 3;
+        soldier.goal.set(point.x, 0, point.z);
+      }
+    },
     EnemyStaging: (soldier, staging) => {
       if (!soldier?.alive) return;
       soldier.scriptedNoncombatant = !!staging;
@@ -4900,14 +4953,20 @@ function Reload() {
   const w = WEAPONS[currentWeapon];
   if (p012Runtime && w && state.ammo >= (w.magazine ?? 5)) {
     viewmodel.TriggerReload(); audio.Play("bolt", { volume: 0.7 });
-    p012Runtime.weaponActionPending = true; return true;
+    p012Runtime.weaponActionPending = true;
+    p012Runtime.manualReloadPending = false; return true;
   }
-  const infiniteAmmo = debugOptions.Enabled("infiniteAmmo");
+  const infiniteAmmo = EffectiveInfiniteAmmo();
   if (!w || (!infiniteAmmo && state.clips <= 0) || state.ammo >= (w.magazine ?? 5)) return false;
+  const hadReserve = state.clips > 0;
   if (!infiniteAmmo) state.clips -= 1;
   state.ammo = w.magazine ?? 5;
   viewmodel.TriggerReload();
-  if (p012Runtime) p012Runtime.weaponActionPending = true;
+  if (p012Runtime) {
+    p012Runtime.weaponActionPending = true;
+    p012Runtime.manualReloadPending = hadReserve;
+    SyncP012ActiveMagazine(state);
+  }
   audio.Play(w.reloadKind === "topMag" ? "magIn" : "stripperLoad", { volume: 0.75 });
   return true;
 }
@@ -5101,9 +5160,7 @@ function UpdateContextualActionPrompts() {
     bleeding: player.bleeding,
     bandages: player.bandages,
     slots: state.slots,
-    bayonet: gunInHand && WEAPONS[currentWeapon]?.bayonet
-      ? { fixed: state.bayonetFixed } : null,
-    ammoEmpty: gunInHand && state.ammo <= 0 && !!WEAPONS[currentWeapon]?.magazine,
+    ammoEmpty: !(p012Flow && p012Flow.beat < 6) && gunInHand && state.ammo <= 0 && !!WEAPONS[currentWeapon]?.magazine,
   });
   // 抬着东西的时候提示条已经被负重接管（只剩放下/扔下），别再往前面插一条处决 ——
   // 那一下 F 的实际结果是「放下担架」，提示与因果就分叉了。
@@ -5408,7 +5465,7 @@ function TryFire(dt) {
   // 按下开始蓄，松手出招（松手判在 Frame 里，见 meleeCharge 步进）。
   // 这一支同样必须排在冲刺闸前面 —— 拼刺冲锋本来就是端着枪跑着捅的。
   if ((state.activeSlot === "primary" || state.activeSlot === "secondary")
-      && state.ammo <= 0 && !debugOptions.Enabled("infiniteAmmo")
+      && state.ammo <= 0 && !EffectiveInfiniteAmmo()
       && WEAPONS[currentWeapon]?.magazine) {
     if (fireEdge && !state.meleeCharge) {
       // 空膛的"咔"保留：它是第二条弹药信息通道（见下方那段账），现在作为
@@ -5431,7 +5488,7 @@ function TryFire(dt) {
   }
   const weapon = WEAPONS[currentWeapon];
   if (!weapon) return;
-  const infiniteAmmo = debugOptions.Enabled("infiniteAmmo");
+  const infiniteAmmo = EffectiveInfiniteAmmo();
   // 开镜播完之前不给开枪：ER2 的枪举到位才打得出去，
   // 否则"右键 + 左键一起按"永远比先瞄再打划算，开镜就没有意义了。
   if (input.ads && player.ads < 0.9) return;
@@ -6164,9 +6221,13 @@ function Frame(dt, render = true) {
 
   profiler.B("story");
   if (p012Flow) {
+    p012Resting?.Update(dt);
     p012Runtime.Update(dt);
     p012Runtime.TryDitchDodge(player.position, player.stance, strafe?.View());
-    if (p012Runtime.weaponActionPending && !viewmodel.IsBusy?.()) { p012Runtime.weaponActionPending = false; p012Runtime.weaponActionCount++; }
+    if (p012Runtime.weaponActionPending && !viewmodel.IsBusy?.()) {
+      p012Runtime.weaponActionPending = false; p012Runtime.weaponActionCount++;
+      CompleteP012ManualReload(p012Runtime);
+    }
     const column = setpieces?.mem?.column;
     const columnActor = column?.Bearers?.[0]?.handle || column?.Alive?.[0]?.handle;
     const columnPosition = columnActor?.position || column?.HeadPosition() || null;
@@ -6183,8 +6244,6 @@ function Frame(dt, render = true) {
     p012Flow.Update(dt, {
       ...p012Runtime.Sample(),
       binocularRaised:p012BinocularRaised,
-      northSubjectVisible:p012Runtime.traffic.some(entry=>!entry.retired&&entry.side===0&&entry.actor.position.z<player.position.z-5&&p012Runtime.host.TrafficVisible(entry.actor,{binocular:true})),
-      southSubjectVisible:p012Runtime.traffic.some(entry=>!entry.retired&&entry.role==="walking"&&entry.actor.position.z>player.position.z+3&&p012Runtime.host.TrafficVisible(entry.actor,{binocular:true})),
       position: player.position, yaw: player.yaw, stance: player.stance, sprint: player.sprint,
       zone: zone?.id || null, enemyDeaths: ai.deaths.ija || 0,
       scoutAlarm: ai.soldiers.some((soldier) => soldier.side === "ija" && state.elapsed - soldier.lastFire < 1),
@@ -6356,7 +6415,7 @@ function Frame(dt, render = true) {
     detail: player.Alive && !state.ordersOpen && !state.cutscene && !meleeQte?.Active
       ? (DIFFICULTY.targetInfo ?? "basic") : false,
     spreadDeg,
-  }));
+  }), phase.hud);
   hud.SetSuppression(player.suppression);
   hud.SetMeleeQte(meleeQte?.View() || null);
   // 按住型交互的进度环 + 负重条。两者都只读脱敏快照，HUD 不认识规则层的结构。
@@ -6377,10 +6436,7 @@ function Frame(dt, render = true) {
     yaw: player.yaw,
   });
   PlayHurtCues();
-  const p012Target = p012Flow?.CurrentObjective().target;
-  const markerObjectives = p012Target ? battlefield.objectives.map((item, index) =>
-    index === state.objectiveIndex ? { ...item, x: p012Target.x, z: p012Target.z } : item)
-    : battlefield.objectives;
+  const markerObjectives = phase.hud?.objectiveMarkers === false ? [] : battlefield.objectives;
   hud.UpdateMarkers(markerObjectives, camera, (x, y, z) => {
     _proj.set(x, y, z);
     const dist = _proj.distanceTo(camera.position);

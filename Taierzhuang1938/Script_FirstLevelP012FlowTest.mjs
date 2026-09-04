@@ -1,7 +1,7 @@
 // P012实际状态机的纯Node宿主测试：用注册交互回调/玩家动作/正式信号驱动，不写beat跳关。
 import assert from "node:assert/strict";
 import { P012Point } from "./Data_FirstLevelP012Space.mjs";
-import { FirstLevelP012Director, P012_WAVES } from "./Script_FirstLevelP012Flow.mjs";
+import { FirstLevelP012Director, P012_WAVES, P012EastEnemyRejoinPath } from "./Script_FirstLevelP012Flow.mjs";
 import { FIRST_LEVEL_P012_WHITEBOX_PHASE as phase } from "./Data_FirstLevelP012Whitebox.mjs";
 import { CarrySystem } from "./Script_Carry.mjs";
 import { AllowAutonomousBark } from "./Script_FirstLevelWhiteboxFlow.mjs";
@@ -9,8 +9,92 @@ import { StoryDirector } from "./Script_Story.mjs";
 import { EscortColumn, StepP012RoadCover } from "./Script_MissionSetpieces.mjs";
 import { VOICE_LINES as CH1_VOICES, CHAPTER as CH1_CHAPTER } from "./Data_MissionCh1.mjs";
 import { existsSync, readFileSync } from "node:fs";
+import { openingStoryBeats } from "./Data_FirstLevelP012Opening.mjs";
+import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
+{
+ const config=phase.whitebox,blocks=config.layout.blocks;
+ const start={x:39.36023830793246,z:-136.07995752133593},target={x:32,z:-132};
+ const actor={position:{...start},health:100,ammo:3,alive:true};let radius=.34,command=null;
+ const calls=[];
+ const director=new FirstLevelP012Director({EnemyBodyRadius:()=>radius,
+  EnemyGoal:(handle,point)=>{assert.equal(handle,actor);command={...point};calls.push('goal');},
+  EnemyRejoin:(handle,point)=>{assert.equal(handle,actor);calls.push(point?'rejoin':'release');},
+ },config);
+ const route={handle:actor,index:4,encounterBeat:9,points:config.routes.eastEnemy};
+ const before={health:actor.health,ammo:actor.ammo,index:route.index};
+ assert.equal(P012SegmentClear(blocks,start,target,radius),false,'recorded B09 actor is across the real east wall');
+ const path=P012EastEnemyRejoinPath(config,start,target,radius,route.points);
+ assert.ok(path?.length>1,'recorded coordinate requires a physical corner route');
+ let at=start;for(const point of path){assert.ok(P012SegmentClear(blocks,at,point,radius));at=point;}
+ assert.equal(P012EastEnemyRejoinPath(config,start,target,.42,route.points),null,'standing clearance cannot be claimed for prone capsule touching the wall');
+ assert.equal(P012EastEnemyRejoinPath(config,start,target,undefined,route.points),null,'missing measured capsule is not guessed');
+ assert.equal(director.StepEastEnemyRejoin({...route,encounterBeat:8},start),false,'other encounters are unaffected');
+ let traveled=0,returned=false;
+ for(let frame=0;frame<3000;frame++){
+  if(!director.StepEastEnemyRejoin(route,actor.position)){returned=true;break;}
+  assert.deepEqual(calls.slice(-2),['goal','rejoin'],'local hold goal is written before rejoin override');
+  assert.ok(P012SegmentClear(blocks,actor.position,command,radius),'every issued leg uses the actual capsule');
+  const distance=Math.hypot(command.x-actor.position.x,command.z-actor.position.z),step=Math.min(distance,2.6/30);
+  actor.position.x+=(command.x-actor.position.x)*step/(distance||1);actor.position.z+=(command.z-actor.position.z)*step/(distance||1);traveled+=step;
+ }
+ assert.ok(returned&&traveled>DistanceForTest(start,target),'walks around the wall instead of through it');
+ assert.equal(calls.at(-1),'release');assert.equal(route.rejoin,null);
+ assert.deepEqual({health:actor.health,ammo:actor.ammo,index:route.index},before,'same actor, resources and route cursor survive reconnect');
+ radius=.42;actor.position={...start};director.StepEastEnemyRejoin(route,actor.position);
+ assert.equal(route.rejoin.blocked,true);assert.deepEqual(command,start,'insufficient clearance issues standstill, never a through-wall command');
+ console.log('PASS B09 recorded east-wall reconnect preserves actor and facts with measured capsule clearance');
+ function DistanceForTest(a,b){return Math.hypot(a.x-b.x,a.z-b.z);}
+}
 
 const points = new Map();
+{
+ const cues=phase.whitebox.storyBeats.filter(beat=>beat.voice?.startsWith("p012_text_Guide"));
+ assert.equal(cues.length,4);
+ for(const cue of cues){
+  const shown=[],voices=[];
+  const story=new StoryDirector({hud:{Say:(who,text)=>shown.push(text),Title(){}}});
+  story.AttachVoice(({key})=>{voices.push(key);return 1;});
+  story.BeginLevel(phase.contentId,{beats:cues,actualEventsOnly:true});
+  story.Update(120,{p012Beat:23});
+  assert.equal(shown.length,0,"elapsed time or chapter progress cannot invent guide arrival");
+  story.Signal(cue.p012Immediate.event);story.Update(.01,{p012Beat:23});
+  assert.deepEqual(shown,[cue.text],"actual guide arrival reaches the subtitle sink");
+  story.Signal(cue.p012Immediate.event);story.Update(20,{p012Beat:23});
+  assert.equal(shown.length,1,"arrival subtitle does not repeat every frame");
+  assert.deepEqual(voices,[],"new guide cues are subtitle-only, never generated or borrowed voice");
+ }
+}
+// Recorded VillageFrontlineCampaign failure: CP03 retry preserved B14 cursor5
+// but the old public goal aimed straight through the ruin to the third nest.
+{
+ const config=phase.whitebox,blocks=config.layout.blocks,destination=config.routes.flank[5];
+ const stuck={x:120.24068,z:38.25004};
+ assert.equal(P012SegmentClear(blocks,stuck,destination,.42),false,"recorded stuck-to-goal ray still crosses real ruin walls");
+ for(const initial of [config.activities.evacStagingPosition,{x:95,z:18}]){
+  const actor={position:{...config.activities.ambushGroups[2].positions[0]}};
+  const director=new FirstLevelP012Director({EnemyPosition:handle=>handle.position},config);
+  director.beat=14;director.routeIndex=5;director.ambushEntryIndex=2;
+  director.enemyRoutes=[{handle:actor,ambushGroup:2}];director.spawnedTotal=21;
+  director.facts.add("volunteer");director.frontlineAmmoRemaining=4;
+  const before={facts:[...director.facts],spawned:director.spawnedTotal,ammo:director.frontlineAmmoRemaining};
+  const player={...initial};let travelled=0,started=false,finished=false;
+  for(let frame=0;frame<2400;frame++){
+   director.lastSample={position:player};director.StepAmbushRejoin(player);
+   if(started&&!director.ambushRejoin){finished=true;break;}
+   assert.ok(director.ambushRejoin,"checkpoint or non-death detour starts physical re-entry");started=true;
+   const target=director.CurrentObjective().target;
+   assert.ok(P012SegmentClear(blocks,player,target,.42),`public re-entry target must not cross a wall: ${JSON.stringify({player,target})}`);
+   const distance=Math.hypot(target.x-player.x,target.z-player.z),step=Math.min(distance,3.05/60);
+   player.x+=(target.x-player.x)*step/(distance||1);player.z+=(target.z-player.z)*step/(distance||1);travelled+=step;
+   assert.equal(director.routeIndex,5);assert.equal(director.ambushEntryIndex,2);
+   assert.deepEqual({facts:[...director.facts],spawned:director.spawnedTotal,ammo:director.frontlineAmmoRemaining},before);
+  }
+  assert.ok(finished&&Math.hypot(player.x-destination.x,player.z-destination.z)<=director.RouteArrivalRadius());
+  assert.ok(travelled>Math.hypot(initial.x-destination.x,initial.z-destination.z),"physically rounds the walls, not a shortcut or teleport");
+ }
+ const direct=new FirstLevelP012Director({},config);direct.beat=14;direct.routeIndex=5;
+ direct.StepAmbushRejoin(config.routes.flank[4]);assert.equal(direct.ambushRejoin,null,"normal visible next leg is unchanged");
+}
 // Execute the production Blast method with a deterministic wall raycast seam.
 // This is a logic fixture, not a claim of a full browser grenade trajectory.
 {
@@ -121,7 +205,23 @@ const issueCalls=checkWeaponCalls;
 assert.equal(points.get("p012_ammoIssue").OnComplete(),false,"stale repeated ammunition completion is rejected");
 assert.equal(checkWeaponCalls,issueCalls,"repeat completion cannot refill ammunition");
 Tick({weaponActionCount:0,position:phase.whitebox.activities.weaponIssuePosition});
-assert.equal(flow.State().beat,"B02","issued ammunition permits departure without an obligatory reload or inspection trip");
+assert.equal(flow.State().beat,"B01","ammunition alone cannot skip the actual muster briefing");
+const briefing=phase.whitebox.activities.briefing;
+Tick({position:briefing.position,guidePosition:briefing.position,briefingReadyCount:2},120);
+assert.equal(signals.has("P012BriefingStarted"),false,"elapsed time and gathered actors cannot replace the displayed muster call");
+signals.add("P012MusterCalled");
+Tick({briefingReadyCount:1});assert.equal(signals.has("P012BriefingStarted"),false,"one equipped teammate is insufficient");
+Tick({briefingReadyCount:2,position:{x:briefing.position.x+30,z:briefing.position.z}});
+assert.equal(signals.has("P012BriefingStarted"),false,"remote player cannot trigger briefing");
+Tick({position:briefing.position,guidePosition:{x:briefing.position.x+5,z:briefing.position.z}});
+assert.equal(signals.has("P012BriefingStarted"),false,"guide must actually reach muster location");
+Tick({guidePosition:briefing.position});assert.equal(signals.has("P012BriefingStarted"),true);
+Tick({},120);assert.equal(flow.State().beat,"B01","no timer fallback invents subtitle completion");
+signals.add("P012MissionExplained");Tick();assert.equal(flow.State().beat,"B01");
+signals.add("P012BriefingRouteExplained");Tick();assert.equal(flow.State().beat,"B01");
+signals.add("P012BriefingComplete");Tick();
+assert.equal(flow.State().beat,"B02","actual briefing completion permits departure with no obligatory R");
+assert.equal(sample.weaponActionCount,0);
 assert.equal(flow.State().checkpointId, "CP00");
 const villageRoute = phase.whitebox.activities.villageRoute;
 Tick({zone:"Z01",position:P012Point(70,100),guidePosition:villageRoute[2],guideRouteIndex:3,trafficReady:false});
@@ -134,21 +234,30 @@ for (let i=0;i<villageRoute.length;i++) {
 assert.equal(flow.State().beat,"B03","following the physical village route proceeds without a hidden requirement to spot both traffic streams");
 assert.equal(sample.trafficReady,false,"progress does not fabricate an opposing-traffic observation");
 const issuedBeforeHub=checkWeaponCalls;
-At("Z02"); Tick({yaw:1.4});
+Tick({position:{x:12,z:0},guidePosition:{x:0,z:0},yaw:1.4});
 assert.equal(points.has("p012_hubSupply"),false,"B03 does not register a second ammunition issue");
 assert.equal(checkWeaponCalls,issuedBeforeHub,"entering the village cannot mint more clips");
-assert.equal(flow.CurrentObjective().interactionId,"p012_binocularTake");
-Tick({binocularRaised:true,northSubjectVisible:true,southSubjectVisible:true},1);
-assert.equal(flow.orientationIndex,0,"without borrowing binoculars visible subjects cannot complete observation");
-Use("p012_binocularTake");assert.equal(binocularOwned,true);
-Tick({northSubjectVisible:false,southSubjectVisible:true},.5);
-assert.equal(flow.orientationIndex,1,"south may be recognized first");
-Tick({binocularRaised:false,northSubjectVisible:true},1);assert.equal(flow.orientationIndex,1);
-Tick({binocularRaised:true,northSubjectVisible:false,southSubjectVisible:false,pitch:1.4},1);
-assert.equal(flow.orientationIndex,1,"sky or occluded subjects do not count");
-Tick({northSubjectVisible:true,pitch:0},.5);assert.equal(flow.orientationIndex,2);
-assert.equal(flow.CurrentObjective().progress,null);assert.equal(flow.State().beat,"B03");
-Use("p012_binocularReturn");assert.equal(binocularOwned,false);Tick();
+assert.equal(flow.State().beat,"B03","elapsed time cannot substitute for joining the real guide");
+assert.equal(points.has("p012_binocularTake"),false);
+assert.equal(points.has("p012_binocularReturn"),false);
+assert.equal(flow.CurrentObjective().interactionId,null);
+assert.equal(flow.orientationIndex,0);
+assert.equal(binocularOwned,false,"no binocular equipment is granted");
+const hub=villageRoute.at(-1),exit=phase.whitebox.activities.shellCoverRoute[0];
+assert.equal(P012SegmentClear(phase.whitebox.layout.blocks,hub,exit,.42),true,"production north exit is physically clear");
+{
+ const wall={x:0,z:-8,w:8,d:1,h:2,solid:true};
+ const blocked=new FirstLevelP012Director({}, {...phase.whitebox,layout:{...phase.whitebox.layout,blocks:[...phase.whitebox.layout.blocks,wall]}});
+ blocked.beat=3;
+ blocked.Update(120,{position:hub,guidePosition:hub,guideAlive:true});
+ assert.equal(blocked.State().beat,"B03","blocked exit cannot be bypassed by elapsed time or recognition flags");
+ const remote=new FirstLevelP012Director({},phase.whitebox);remote.beat=3;
+ remote.Update(120,{position:{x:12,z:0},guidePosition:hub,guideAlive:true,binocularRaised:true,northSubjectVisible:true,southSubjectVisible:true});
+ assert.equal(remote.State().beat,"B03");assert.equal(remote.orientationIndex,0);
+}
+Tick({position:hub,guidePosition:hub,guideAlive:true,zone:"Z02"});
+assert.ok(signals.has("P012VillageNorthDeparture"));
+assert.equal(signals.has("P012NorthApproachChat"),false,"departure and roadside chat do not fire in the same update");
 assert.equal(flow.State().beat,"B04");assert.equal(shelling,0);
 assert.equal(flow.CurrentObjective().text,"跟随班长北上");
 const northRoute=phase.whitebox.activities.shellCoverRoute;
@@ -250,7 +359,7 @@ assert.equal(flow.State().beat,"B11","wounded check cannot replace reloading");
 Tick({weaponActionCount:sample.weaponActionCount+1}); At("Z04");
 assert.equal(flow.State().beat,"B11","checking and loading do not replace physically dragging the wounded");
 Walk(phase.whitebox.activities.woundedDragRoute,{carryKind:"wounded"});
-Tick({carryKind:null,woundedDragDelivered:true,woundedDragDistance:34});
+Tick({carryKind:null,woundedDragDelivered:true,woundedDragDistance:34,guideAlive:false});
 assert.equal(flow.State().beat,"B12","arrival cannot volunteer automatically");
 assert.equal(signals.has("EscortCall"),false,"column is not released before the player volunteers");
 assert.equal(points.get("p012_volunteer").Enabled(),false,"volunteer cannot target a moving or missing guide");
@@ -492,6 +601,26 @@ assert.equal(CH1_CHAPTER.beats.some(beat=>beat.p012CompleteSignal),false,"formal
   assert.equal(ordinary.p012PendingCompletion,null);
 }
 const openingStory=new StoryDirector({hud:{Say(){},Title(){}}});
+{
+  const shown=[],story=new StoryDirector({hud:{Say(who,text,seconds){shown.push({text,seconds});},Title(){}}});
+  story.BeginLevel(phase.contentId,{beats:openingStoryBeats,actualEventsOnly:true});
+  for(let i=0;i<1200;i++)story.Update(.1,{p012Beat:1});
+  assert.equal(shown.length,0);assert.equal(story.Signalled("P012MusterCalled"),false);
+  story.Signal("P012AmmoIssued");
+  for(let i=0;i<100&&!story.Signalled("P012MusterCalled");i++)story.Update(.1,{p012Beat:1});
+  assert.equal(shown.length,1);assert.equal(story.Signalled("P012MusterCalled"),true);
+  assert.equal(story.Signalled("P012BriefingComplete"),false);
+  story.Signal("P012BriefingStarted");
+  const completed=[];
+  for(let i=0;i<240;i++){
+    story.Update(.1,{p012Beat:1});
+    for(const signal of ["P012MissionExplained","P012BriefingRouteExplained","P012BriefingComplete"])
+      if(story.Signalled(signal)&&!completed.includes(signal))completed.push(signal);
+  }
+  assert.equal(shown.length,4,"muster, mission, route and reply actually reach the subtitle sink");
+  assert.deepEqual(completed,["P012MissionExplained","P012BriefingRouteExplained","P012BriefingComplete"]);
+  assert.deepEqual(shown.map(cue=>cue.seconds),[5,6.5,6,4],"each real completion follows its own displayed subtitle duration");
+}
 openingStory.AttachVoice(({key})=>{spoken.push(key);return 0.1;});
 openingStory.BeginLevel(phase.contentId,{beats:phase.whitebox.storyBeats,actualEventsOnly:true});
 openingStory.Update(100,{p012Beat:0});
@@ -499,10 +628,11 @@ assert.equal(spoken.length,0,"opening speech requires actual arrival rather than
 for(const event of ["P012Arrival","P012TrainDoor","P012WeaponReceived","P012AmmoIssued"]){
   openingStory.Signal(event);openingStory.Update(10,{p012Beat:1});
 }
-assert.deepEqual(spoken,["ch0_junguan_04","ch0_luo_11","ch0_luo_08","ch1_luo_01"],"arrival and weapon dialogue is not trapped behind B05");
+assert.deepEqual(spoken,["ch0_junguan_04","ch0_luo_11","ch0_luo_08"],"arrival and weapon recordings remain available; ammo issue now starts the actual subtitle muster instead of premature frontline dialogue");
 openingStory.Signal("P012AmmoTask");
 for(let i=0;i<4;i++)openingStory.Update(10,{p012Beat:5});
-for(const voice of ["ch1_luo_01","ch1_heyoutian_01","ch1_shunzi_01","ch1_luo_05"]){
+assert.equal(phase.whitebox.storyBeats.filter(beat=>beat.voice==="ch1_luo_01").length,0,"old one-line ammo departure is replaced by the actual muster briefing");
+for(const voice of ["ch1_heyoutian_01","ch1_shunzi_01","ch1_luo_05"]){
   assert.equal(phase.whitebox.storyBeats.filter(beat=>beat.voice===voice).length,1,`${voice} was moved, never duplicated`);
   assert.equal(spoken.filter(key=>key===voice).length,1,`${voice} plays once at the actual task`);
 }
@@ -553,9 +683,8 @@ const formalStory=new StoryDirector({hud:{Say(){},Title(){}}});
  audition.AttachVoice(({key})=>{voices.push(key);return 12;});
  audition.BeginLevel(phase.contentId,{beats:phase.whitebox.storyBeats,actualEventsOnly:true});
  audition.Update(.016,{p012Beat:4});assert.equal(said.length,0,"no chat or impact before real event");
- audition.Signal("P012NorthRecognized");audition.Update(.016,{p012Beat:3});
- assert.match(said.at(-1),/添人/);
- audition.Signal("P012SouthRecognized");audition.Signal("P012BinocularReturned");
+ audition.Signal("P012VillageNorthDeparture");audition.Update(.016,{p012Beat:3});
+ assert.match(said.at(-1),/北口/);
  audition.Signal("P012NorthApproachChat");audition.Update(1/60,{p012Beat:4});
  assert.match(said.at(-1),/子弹捂好/,"actual chat replaces stale recognition subtitle within one frame");
  const count=said.length;audition.Update(.1,{p012Beat:4});assert.equal(said.length,count,"impact is not predicted by time");
@@ -593,7 +722,7 @@ formalStory.BeginLevel(phase.contentId);
  const snapshot=savedApproval.P012Snapshot();
  const restored=new StoryDirector({hud:{Say:(who,text)=>said.push(text),Title(){}}});
  restored.BeginLevel(phase.contentId,{beats:phase.whitebox.storyBeats,actualEventsOnly:true});
- restored.levelTime=100;restored.Signal("P012NorthRecognized");restored.Update(.016,{p012Beat:3});
+ restored.levelTime=100;restored.Signal("P012VillageNorthDeparture");restored.Update(.016,{p012Beat:3});
  assert.ok(restored.p012SubtitleActiveUntil>100,"real old-clock subtitle is still on screen");
  restored.levelTime=0;restored.P012Restore(snapshot);
  assert.equal(restored.p012SubtitleActiveUntil,0,"rewind discards the old absolute subtitle deadline");

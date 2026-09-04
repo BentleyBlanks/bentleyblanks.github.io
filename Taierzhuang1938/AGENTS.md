@@ -265,8 +265,15 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   兵站包使用显式 `P012StationPoint`，不加入自动区域分类；连续主轨保持世界坐标拼接。
 - `Data_FirstLevelP012Station.mjs` / `Data_FirstLevelP012Horizon.mjs` 是已编译世界坐标的兵站与远景体块；
   台阶顶面由 `Script_FirstLevelWhiteboxField.mjs` 与可见体块对账，共用地表采样，不能再做坐标变换。
-- `Data_FirstLevelP012Opening.mjs` 管开场两向人流和纯字幕；`Script_FirstLevelP012Binoculars.mjs`
-  管借还、举镜、视野与武器互斥；不恢复四向计时看路、村口重复领弹或炮击发生前的避炮目标。
+- `Data_FirstLevelP012Opening.mjs` 管开场两向人流和纯字幕；班长直接带队接防，不再使用借镜／辨路／还镜流程。
+  不恢复四向计时看路、村口重复领弹或炮击发生前的避炮目标；镜子模块仅保留独立测试，不在本关装配。
+- `Data_FirstLevelP012TrainColumn.mjs` / `Script_FirstLevelP012TrainColumn.mjs` 管三车有限下车、发枪发弹与实际集结；额外士兵不进入战斗。
+  `Script_FirstLevelP012March.mjs` 管可见目标直达、宽处松散并行与窄口收队；家庭/儿童只沿可走道路连续移动。
+  `Script_FirstLevelP012Opening.mjs` 保护开场库存不被持久化无限弹药自动填满；训话跟随真实字幕完成信号，不强制装弹。
+  `Data_FirstLevelP012Resting.mjs` / `Script_FirstLevelP012Resting.mjs` 管有限路边坐姿百姓与座凳；脚底留地面，独立演员仍纳入原始人口取证。
+  原同班六人沿 `openingMarchRoute` 连续到前沿各侧位后才交防守；炮击反应须晚于真实弹着。
+  本关 `hud.objectiveMarkers` 关闭全程悬浮地点和米数；跟随段由真实班长带路、停等与字幕引导，不能把内部测试目标重新画成玩家导航。
+  B11/B14/B23 的局部指南经 `P012GuideApproach` 检查实体净空，到位才发字幕；实际拖拽／点烟幕后交接，不占伤员身体、不代替玩家战斗。
 - 与旧 `?whitebox=1`、正式第一关并存，不覆盖它们。这个版本按用户要求使用
   灰地面、黄跨步、橙翻越、紫攀爬、蓝掩体、黑边界、红危险、绿任务路、青担架路。
   环境仍是程序化无贴图体块，人物及已烘焙声音复用现有配置。

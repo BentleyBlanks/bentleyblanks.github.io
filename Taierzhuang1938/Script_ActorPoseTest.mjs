@@ -74,6 +74,59 @@ try {
 
     const actor = factory.Create("nra", { seed: 90210, weapon: null });
     const armed = factory.Create("nra", { seed: 90211, weapon: "ZhongZheng" });
+    // Inspect actual merged vertices, not source spelling or a logic-only flag.
+    const VertexCount = (geometries) => [...geometries.values()]
+      .reduce((sum, geometry) => sum + geometry.getAttribute("position").count, 0);
+    const WeaponVertices = (candidate) => candidate.weaponGroup.children
+      .reduce((sum, mesh) => sum + mesh.geometry.getAttribute("position").count, 0);
+    const bareVertices = WeaponVertices(armed);
+    const bareGroup = armed.weaponGroup;
+    const bareRevision = armed.partsRevision;
+    check(armed.bayonetFixed === false, "NRA must default to an unfixed bayonet");
+    armed.Update(.016, { bayonetFixed: false });
+    check(armed.weaponGroup === bareGroup, "unchanged bayonet state rebuilt the weapon");
+    armed.Update(.016, { bayonetFixed: true });
+    check(WeaponVertices(armed) > bareVertices, "fixing bayonet did not add actual weapon mesh");
+    check(armed.partsRevision > bareRevision, "ActorBatch cannot detect the fixed weapon mesh");
+    const fixedRevision = armed.partsRevision;
+    armed.Update(.016, { bayonetFixed: false });
+    check(WeaponVertices(armed) === bareVertices, "unfixing bayonet left blade geometry attached");
+    check(armed.partsRevision > fixedRevision, "ActorBatch cannot detect the bare weapon mesh");
+    const savedWeaponState = { quality: factory.quality, meshDocs: factory.meshDocs, weaponCache: factory.weaponCache };
+    const bayonetMeshes = [];
+    try {
+      for (const quality of ["high", "medium", "low"]) {
+        for (const modeled of [true, false]) {
+          factory.quality = quality;
+          factory.meshDocs = modeled ? savedWeaponState.meshDocs : new Map();
+          factory.weaponCache = new Map();
+          for (const weaponId of ["ZhongZheng", "HanYang", "Type38"]) {
+          const bare = factory.WeaponGeometry(weaponId);
+          const fixed = factory.WeaponGeometry(weaponId, 0, { includeBayonet: true });
+          check((bare.source === "model") === modeled, `${weaponId}: wrong geometry source tested`);
+          const bareCount = VertexCount(bare.geometries);
+          check(VertexCount(fixed.geometries) > bareCount,
+            `${quality}/${modeled}: fixed bayonet has no additional vertices`);
+          const Bounds = (built) => {
+            const box = new THREE.Box3();
+            for (const geometry of built.geometries.values()) {
+              geometry.computeBoundingBox(); box.union(geometry.boundingBox);
+            }
+            return box;
+          };
+          check(Bounds(fixed).min.z < Bounds(bare).min.z - .1,
+            `${quality}/${modeled}: blade does not extend in front of the muzzle`);
+          check(Bounds(bare).min.z >= bare.muzzle.z - .15,
+            `${quality}/${modeled}/${weaponId}: bare source still contains a blade ahead of its muzzle`);
+          check(VertexCount(factory.WeaponGeometry(weaponId).geometries) === bareCount,
+            `${quality}/${modeled}: fixed variant contaminated shared bare geometry`);
+          bayonetMeshes.push(`${quality}/${modeled ? "model" : "procedural"}/${weaponId}:${bareCount}->${VertexCount(fixed.geometries)}`);
+          }
+        }
+      }
+    } finally {
+      Object.assign(factory, savedWeaponState);
+    }
     for (const name of ["handL", "handR", "back", "kneeL", "kneeR", "footL", "footR", "footEdgeL", "eyes"]) {
       const first = actor.GetMount(name);
       check(first && first === actor.GetMount(name.toUpperCase()) && first === actor.GetMount(` ${name} `),
@@ -210,6 +263,19 @@ try {
       explicit.Dispose();
     }
     for (const [variant, civilian] of civilianVariants) {
+      if(variant==="male")for(const childVariant of ["childBoy","childGirl"]){
+        const child=factory.Create("civilian",{seed:880,variant:childVariant,weapon:"Type38"});
+        child.Update(.016,{elapsed:.5,speed:.8});
+        check(child.kind==="civilian"&&child.isChild&&child.meshSource==="box"&&!child.characterRig,"child uses independent procedural civilian anatomy");
+        check(child.height>1.05&&child.height<1.2&&child.bodyRadius===.24,"child exposes correctly sized physics contract");
+        check(child.dims.headH/child.dims.height>civilian.dims.headH/civilian.dims.height&&child.dims.hipY/child.dims.height<civilian.dims.hipY/civilian.dims.height,"child is not uniformly scaled adult");
+        child.SetWeapon("ZhongZheng");check(!child.weaponGroup&&!child.weaponData,"child cannot acquire a weapon even through later equipment changes");
+        child.root.updateMatrixWorld(true);const box=new THREE.Box3();
+        child.root.traverse(node=>{if(node.isMesh&&node.visible)box.expandByObject(node);});
+        check(box.max.y-box.min.y>1&&box.max.y-box.min.y<1.3,"actual child geometry has child-sized bounds");
+        check(child.GetBoneHitboxes().length===13,"child has anatomy-derived hitboxes");
+        child.Dispose();
+      }
       check(civilian.meshSource === "model",
         `civilian ${variant} fell back to ${civilian.meshSource} instead of the tzm model`);
       const hitboxes = civilian.GetBoneHitboxes();
@@ -298,7 +364,7 @@ try {
       && seatedArmed.gripL.distanceTo(leftGripCenter) > 0.025,
     "seated weapon palms no longer clear the gun centerline");
     for (const item of [actor, armed, ija, baselineA, baselineB, seatTest, seatedArmed]) item.Dispose();
-    return "10 套军人蒙皮 GLB, 16 动作, 11 骨骼命中体, 主角国军 01, 程序化动作兼容, 百姓男女分身, seated legs, weapon-palm clearance";
+    return "10 套军人蒙皮 GLB, 16 动作, 11 骨骼命中体, 主角国军 01, 程序化动作兼容, 百姓男女分身, seated legs, weapon-palm clearance; bayonet vertices " + bayonetMeshes.join(", ");
   });
   console.log(`ActorPoseTest: PASS (${result})`);
 } finally {

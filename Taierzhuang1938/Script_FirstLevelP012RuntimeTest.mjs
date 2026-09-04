@@ -2,7 +2,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
-import { FirstLevelP012Runtime } from "./Script_FirstLevelP012Runtime.mjs";
+import { FirstLevelP012Runtime, P012GuideApproach } from "./Script_FirstLevelP012Runtime.mjs";
+import {P012SegmentClear} from "./Script_FirstLevelP012March.mjs";
 import { SETPIECES, EscortColumn, LastLitterArrived } from "./Script_MissionSetpieces.mjs";
 import P012Phase from "./Data_FirstLevelP012Whitebox.mjs";
 import {FirstLevelP012Director} from "./Script_FirstLevelP012Flow.mjs";
@@ -19,17 +20,101 @@ function FootY(layout,p) {
  return y;
 }
 assert.ok(openingStoryBeats.length>0);
+{
+ const config=P012Phase.whitebox,activity=config.activities,blocks=config.layout.blocks;
+ const Make=(beat,start)=>{
+  const actor={...start},player={...start},events=[],signals=new Set();let releases=0;
+  const runtime=new FirstLevelP012Runtime({GuideActor:()=>actor,Position:a=>a,PlayerPosition:()=>player,
+   Signalled:event=>signals.has(event),Signal:event=>{events.push(event);signals.add(event);},ReleaseGuide:()=>{releases++;},
+   Move:(a,target,speed)=>{assert.ok(P012SegmentClear(blocks,a,target,.42),'every guide command has body clearance');
+    const distance=Math.hypot(target.x-a.x,target.z-a.z),step=Math.min(distance,speed*.05);
+    a.x+=(target.x-a.x)*step/(distance||1);a.z+=(target.z-a.z)*step/(distance||1);},
+  },config);
+  const flow=new FirstLevelP012Director({Guide:spec=>runtime.Guide(spec)},config);flow.beat=beat;
+  flow.lastSample={position:player,guidePosition:actor};flow.StartGuide();
+  const Step=(count=1,follow=true)=>{for(let i=0;i<count;i++){if(follow)Object.assign(player,actor);runtime.StepSafeGuide(runtime.guide,actor,.05);}};
+  return {actor,player,flow,runtime,events,Step,Released:()=>releases};
+ };
+ const wounded=Make(11,activity.woundedGuideRoute[0]);
+ assert.deepEqual(wounded.events,[],'stage entry is not an arrival');
+ wounded.Step(500);
+ const injuryGap=Math.hypot(wounded.actor.x-activity.woundedDragFrom.x,wounded.actor.z-activity.woundedDragFrom.z);
+ assert.ok(injuryGap>.8&&injuryGap<2.1,'guide stands beside the casualty, not on the body/interaction');
+ assert.deepEqual(wounded.events,['P012GuideAtWounded']);
+ const waiting={...wounded.actor};wounded.flow.facts.add('wounded');wounded.Step(100);
+ assert.deepEqual(wounded.actor,waiting,'checking alone cannot release the guide before actual dragging');
+ wounded.flow.lastSample.carryKind='wounded';wounded.Step(50);
+ assert.ok(Math.hypot(wounded.actor.x-waiting.x,wounded.actor.z-waiting.z)>2);
+ wounded.flow.lastSample.carryKind=null;const dropped={...wounded.actor};wounded.Step(30);
+ assert.deepEqual(wounded.actor,dropped,'guide waits if the casualty is set down');
+ wounded.flow.lastSample.carryKind='wounded';Object.assign(wounded.player,waiting);wounded.player.z-=20;wounded.Step(20,false);
+ assert.deepEqual(wounded.actor,dropped,'guide waits for lagging casualty carrier');
+ wounded.Step(500);
+ assert.ok(Math.hypot(wounded.actor.x-activity.woundedDragTo.x,wounded.actor.z-activity.woundedDragTo.z)<.6);
+ const flank=Make(14,config.routes.flank[0]);flank.Step(200);const cover={...flank.actor};flank.Step(200);
+ assert.deepEqual(flank.actor,cover,'guide remains at safe entry, never follows the combat flank');
+ assert.ok(Math.hypot(cover.x-activity.ambushEntryRoute[0].x,cover.z-activity.ambushEntryRoute[0].z)<.6);
+ assert.deepEqual(flank.events,['P012GuideAtFlankEntry']);
+ assert.equal(flank.actor.stance,1,'safe low cover uses crouched posture without immunity');
+ assert.equal(flank.flow.facts.size,0,'guidance does not complete combat facts');
+ flank.runtime.Guide({beat:15,route:[]});assert.equal(flank.actor.stance,0,'leaving flank restores the prior posture');
+ const smoke=Make(23,activity.southAssemblyRoute[0]);smoke.player.z+=25;const smokeStart={...smoke.actor};smoke.Step(20,false);
+ assert.equal(smoke.actor.x,smokeStart.x);assert.equal(smoke.actor.z,smokeStart.z,'approach also waits for a lagging player');
+ smoke.Step(1000);
+ assert.ok(Math.hypot(smoke.actor.x-activity.retreatSmokeUse.x,smoke.actor.z-activity.retreatSmokeUse.z)<.6);
+ assert.deepEqual(smoke.events,['P012GuideAtSmoke']);
+ assert.equal(smoke.Released(),0);smoke.flow.facts.add('retreatSmokeDeployed');smoke.runtime.Update(.05);smoke.runtime.Update(.05);
+ assert.equal(smoke.Released(),1);assert.deepEqual(smoke.events,['P012GuideAtSmoke','P012GuideSmokeHandoff']);
+ assert.equal(P012GuideApproach([{x:0,z:0,w:2,d:20,h:3,y:1.5,ry:0}],{x:-3,z:0},{x:3,z:0}),null,'no safe known path returns failure, not a through-wall command');
+ console.log('PASS physical casualty/flank/smoke guides: swept clearance, actual arrival cues, waits and handoff');
+}
+{
+ const guide={x:0,z:0},actors=Array.from({length:6},(_,i)=>({id:`march${i}`,x:0,z:6+i,alive:true}));
+ const signals=new Set(),stances=[],releases=[],defenses=[],orders=[];
+ const route=[{x:0,z:20},{x:0,z:0},{x:0,z:-20},{x:0,z:-40}];
+ const positions=actors.map((_,i)=>({x:4+i*2,z:-39}));
+ const runtime=new FirstLevelP012Runtime({GuideActor:()=>guide,Position:a=>a,Signalled:s=>signals.has(s),
+  SetOpeningShelter:(a,duration)=>stances.push({a,duration}),ReleaseGuide:a=>releases.push(a),Defend:(a,p)=>defenses.push({a,p}),
+  Move:(a,p,speed)=>{orders.push({a,speed});const d=Math.hypot(p.x-a.x,p.z-a.z);if(d>.3){const f=Math.min(d-.3,speed*.05)/d;a.x+=(p.x-a.x)*f;a.z+=(p.z-a.z)*f;}},
+ },{layout:{blocks:[]},activities:{openingMarch:true,villageRoute:route.slice(0,2),openingMarchRoute:route,openingMarchDefensePositions:positions}});
+ runtime.openingCast=actors.map((actor,slot)=>({actor,slot,ammoIssued:true,issueComplete:true,parking:{...actor}}));
+ for(const beat of [2,3,4]){runtime.beat=beat;guide.z=beat===4?-20:0;for(let i=0;i<180;i++){runtime.time+=.05;runtime.StepMarch(.05);}}
+ assert.equal(releases.length,0,'B03 village arrival does not discard the six companions');assert.equal(stances.length,0,'no low posture before actual impact');
+ assert.ok(actors.every(a=>a.z<-8),'B04 continues real northward walking beyond the village');
+ signals.add('P012NorthNearMissImpact');runtime.guideReactionUntil=runtime.time+2.4;const before=actors.map(a=>({x:a.x,z:a.z}));
+ for(let i=0;i<47;i++){runtime.StepMarch(.05);runtime.time+=.05;}
+ assert.equal(stances.length,6);assert.deepEqual(actors.map(a=>({x:a.x,z:a.z})),before,'actual impact stops all six without changing positions');
+ runtime.time+=.1;runtime.beat=5;guide.z=-40;
+ for(let i=0;i<600;i++){runtime.time+=.05;runtime.StepMarch(.05);}
+ assert.equal(releases.length,6);assert.equal(defenses.length,6);assert.ok(runtime.openingCast.every(e=>e.marchComplete&&e.stage==='frontline'));
+ for(const [i,a] of actors.entries())assert.ok(Math.hypot(a.x-positions[i].x,a.z-positions[i].z)<.45,'defense handover follows actual individual arrival');
+ console.log('PASS six companions retain B03-B05 march and react only after actual shell impact');
+}
+{
+ const route=P012Phase.whitebox.activities.ammoRoute,actor={...route.at(-2)},orders=[];
+ const runtime=new FirstLevelP012Runtime({GuideActor:()=>actor,Position:a=>a,Signalled:()=>false,
+  Move:(a,point,speed)=>orders.push({point,speed})},{activities:{},layout:{blocks:[]}});
+ runtime.Guide({beat:5,route,startIndex:route.length-2,speed:3.05});runtime.Update(.05);
+ assert.equal(runtime.guide.index,route.length-1);
+ assert.ok(!runtime.guide.clearGunport,'advancing past the penultimate point must not clear the gunport early');
+ assert.deepEqual(orders.at(-1).point,route.at(-1),'leader must physically reach the actual gunport before stepping aside');
+ Object.assign(actor,route.at(-1));runtime.Update(.05);
+ assert.equal(runtime.guide.clearGunport,true);
+ assert.deepEqual(orders.at(-1).point,{x:route.at(-1).x-5,z:route.at(-1).z+2});
+ console.log('PASS B05 waypoint advance cannot skip physical frontline arrival');
+}
 assert.ok(openingStoryBeats.every(cue=>cue.p012SubtitleOnly===true&&cue.voice.startsWith("p012_text_")),"all new opening cues are subtitle-only");
 assert.ok(openingStoryBeats.every(cue=>!/hubSupply/i.test(JSON.stringify(cue))),"removed hub supply is not reintroduced by opening dialogue");
 {
- assert.equal(openingActivities.traffic.filter(e=>e.role==="civilian").length,11);
+ assert.equal(openingActivities.traffic.filter(e=>e.role==="civilian"&&!e.child).length,11);
+ assert.equal(openingActivities.traffic.filter(e=>e.child).length,2);
  const openingUnarmed=openingActivities.traffic.filter(e=>e.side===1).length;
- assert.equal(openingUnarmed+2,15,"include two pre-created rescuers, not only traffic actors");
- assert.equal(openingUnarmed-7+8,14,"seven physical retirements free room for eight escort actors");
+ assert.equal(openingUnarmed+2,17,"13 civilians, two walking wounded and two rescuers; explicit added children, not hidden budget");
+ assert.equal(openingUnarmed+2-11+8,14,"eleven physical family retirements free room for eight escort actors");
  assert.equal(openingActivities.traffic.filter(e=>e.role==="walking").length,2);
- assert.equal(openingActivities.traffic.filter(e=>e.retireWhenHidden).length,7);
+ assert.equal(openingActivities.traffic.filter(e=>e.retireWhenHidden).length,11);
  assert.equal(openingActivities.traffic.filter(e=>e.side===0).length,3);
- assert.equal(new Set(openingActivities.traffic.map(e=>JSON.stringify(e.route[0]))).size,16);
+ assert.equal(new Set(openingActivities.traffic.map(e=>JSON.stringify(e.route[0]))).size,18);
  const actor={x:0,z:0},orders=[];let player={x:0,z:2};
  const runtime=new FirstLevelP012Runtime({GuideActor:()=>actor,Position:a=>a,PlayerPosition:()=>player,
    Signalled:()=>false,Move:(a,p,speed)=>orders.push(speed)}, {activities:openingActivities});
@@ -61,7 +146,7 @@ assert.ok(openingStoryBeats.every(cue=>!/hubSupply/i.test(JSON.stringify(cue))),
      if(block.solid===false||block.y-block.h/2>foot+1.8||block.y+block.h/2<foot+.1)continue;
      const dx=px-block.x,dz=pz-block.z,c=Math.cos(block.ry),s=Math.sin(block.ry);
      const gap=Math.hypot(Math.max(0,Math.abs(dx*c-dz*s)-block.w/2),Math.max(0,Math.abs(dx*s+dz*c)-block.d/2));
-     assert.ok(gap>=.6,`opening crowd ${entry.slot} intersects ${block.id}`);
+   assert.ok(gap>=.6,`opening crowd ${entry.role}/${entry.slot} intersects ${block.id} at ${px},${pz}, gap ${gap}`);
    }
  }
 }
@@ -255,19 +340,62 @@ assert.equal(runtime.traffic.length, 6, "repeated Guide does not duplicate traff
 }
 const ai = readFileSync(new URL("./Script_Ai.mjs", import.meta.url), "utf8");
 {
+ // Execute the production Ai.Act defence override, not a reimplementation of
+ // its condition. DOM, perception and Rapier are outside this pure regression.
+ const start=ai.indexOf('    // Scripted defence can fire in place');
+ const end=ai.indexOf('    // 移动：',start);
+ assert.ok(start>=0&&end>start);
+ const Override=vm.runInNewContext(`(function(s,desired,speed){${ai.slice(start,end)};return {desired,speed};})`);
+ const guide={x:79.42825739632826,z:4.633856495656801,alive:true,scriptDefensive:true};guide.position=guide;
+ const ally={x:74,z:6,alive:true};ally.position=ally;
+ const released=[],signals=new Set(),orders=[];
+ const context={tmpD:{set:(x,y,z)=>({x,y,z})}};
+ const blocked=Override.call(context,guide,{x:102.5,z:24},3.05);
+ assert.equal(blocked.desired,null,'actual AI override reproduces guide freeze when defence remains set');
+ const runtime=new FirstLevelP012Runtime({GuideActor:()=>guide,Position:a=>({x:a.x,z:a.z}),FriendlyActors:()=>[guide,ally],
+  PlayerPosition:()=>({x:guide.x,z:guide.z}),Signalled:s=>signals.has(s),Signal:s=>signals.add(s),
+  Defend:(actor,point)=>{actor.scriptDefensive=true;actor.holdZone={...point};},
+  ReleaseDefense:actor=>{released.push(actor);actor.scriptDefensive=false;actor.holdZone=null;},
+  ReleaseGuide:actor=>{actor.p012Guided=false;},
+  Move:(actor,point,speed)=>{actor.p012Guided=true;actor.holdZone=null;
+   const resolved=Override.call(context,actor,point,speed);orders.push(resolved);
+   if(!resolved.desired||resolved.speed<=0)return;
+   const distance=Math.hypot(point.x-actor.x,point.z-actor.z),step=Math.min(distance,resolved.speed*.05);
+   assert.ok(P012SegmentClear(P012Phase.whitebox.layout.blocks,actor,point,.42));
+   actor.x+=(point.x-actor.x)*step/(distance||1);actor.z+=(point.z-actor.z)*step/(distance||1);},
+ },{...P012Phase.whitebox,activities:{frontlineDoctrine:{}}});
+ const director=new FirstLevelP012Director({Guide:spec=>runtime.Guide(spec)},P012Phase.whitebox);
+ director.beat=14;director.StartGuide();
+ for(let i=0;i<300;i++)runtime.Update(.05);
+ assert.deepEqual(released,[guide],'only the controlled guide relinquishes old defence');
+ assert.equal(ally.scriptDefensive,true,'other friendly actors keep their combat defence');
+ assert.ok(!runtime.defenders.includes(guide)&&runtime.defenders.includes(ally));
+ assert.ok(signals.has('P012GuideAtFlankEntry'),'actual AI defence override no longer prevents arrival');
+ assert.ok(Math.hypot(guide.x-102.5,guide.z-24)<.6);
+ runtime.Guide({beat:15,route:[]});runtime.Update(.05);
+ assert.equal(guide.p012Guided,false,'next stage returns guide movement to the normal host');
+ runtime.Guide({beat:20,route:[]});runtime.Update(.05);
+ assert.equal(guide.scriptDefensive,true,'later ordinary defensive stage can recruit the guide again');
+ console.log('PASS guide-only defence handoff against production Ai.Act movement override');
+}
+{
  const issue=P012Phase.whitebox.activities.openingIssue,actors=issue.spawns.map(p=>({...p})),receipts=[];
+ // Legacy six-person adapter fixture, not the current player entry. The new
+ // 40-person TrainColumnTest owns the complete production recruitment layout.
+ // Keep the old fallback's real movement/issue receipts against its own geometry.
+ const legacyBlocks=openingLayout.blocks.filter(block=>!block.id?.startsWith("StationRecruit"));
  const runtime=new FirstLevelP012Runtime({GuideActor:()=>null,FriendlyActors:()=>actors,Position:a=>a,
   InitializeOpeningActor:(a,p)=>Object.assign(a,p),SetOpeningEquipment:(a,kind)=>receipts.push({slot:actors.indexOf(a),kind}),
   PlayerPosition:()=>P012Phase.whitebox.anchors.trainSpawn,
   Move:(a,p,speed)=>{const d=Math.hypot(p.x-a.x,p.z-a.z);if(d<=.3)return;
    const step=Math.min(speed*.025,d);a.x+=(p.x-a.x)/d*step;a.z+=(p.z-a.z)/d*step;}
- },P012Phase.whitebox);
+ },{...P012Phase.whitebox,activities:{...P012Phase.whitebox.activities,trainColumn:null}});
  runtime.beat=0;
  for(let frame=0;frame<14400&&!runtime.openingCast?.every(e=>e.issueComplete);frame++){
   runtime.StepOpeningCast(.025);
   for(const actor of actors){
    const foot=FootY(openingLayout,actor);
-   for(const b of openingLayout.blocks){
+   for(const b of legacyBlocks){
     if(b.solid===false||b.y+b.h/2<=foot+.05||b.y-b.h/2>=foot+1.8)continue;
     const dx=actor.x-b.x,dz=actor.z-b.z,c=Math.cos(b.ry||0),s=Math.sin(b.ry||0);
     assert.ok(Math.hypot(Math.max(0,Math.abs(dx*c-dz*s)-b.w/2),Math.max(0,Math.abs(dx*s+dz*c)-b.d/2))>=.42,`actual issue body ${actors.indexOf(actor)} hits ${b.id} at ${actor.x},${actor.z}`);
@@ -318,12 +446,12 @@ const ai = readFileSync(new URL("./Script_Ai.mjs", import.meta.url), "utf8");
  const walkers=[];let door=false,visible=false;const player={...P012Phase.whitebox.anchors.trainDoor};
  const run=new FirstLevelP012Runtime({GuideActor:()=>null,Position:a=>a,PlayerPosition:()=>player,Signalled:name=>name==="P012TrainDoor"&&door,
   TrafficVisible:()=>visible,RetireTraffic:a=>{a.retired=true;return true;},
-  TrafficActor:(side,slot,p,entry)=>{const actor={...p,alive:true,side,slot,role:entry.role};walkers.push(actor);return actor;},
-  Move:(a,p,speed)=>{const d=Math.hypot(p.x-a.x,p.z-a.z);if(d<=1.2)return;const k=Math.min(1,speed*.1/d);a.x+=(p.x-a.x)*k;a.z+=(p.z-a.z)*k;},ReleaseGuide:()=>{}
+  TrafficActor:(side,slot,p,entry)=>{const actor={...p,alive:true,side,slot,role:entry.role,child:!!entry.child};walkers.push(actor);return actor;},
+  Move:(a,p,speed)=>{const d=Math.hypot(p.x-a.x,p.z-a.z);if(d<=(a.scriptArrivalRadius??1.2))return;const k=Math.min(1,speed*.1/d);a.x+=(p.x-a.x)*k;a.z+=(p.z-a.z)*k;},ReleaseGuide:()=>{}
  },P012Phase.whitebox);
- run.Update(.1);assert.equal(walkers.length,16,"three armed and thirteen unarmed traffic; two existing rescuers bring total unarmed to fifteen");
+ run.Update(.1);assert.equal(walkers.length,18,"three soldiers plus thirteen civilians and two walking wounded; two rescuers remain separately counted");
  assert.equal(walkers.filter(w=>w.side===0).length,3);
- assert.equal(walkers.filter(w=>w.role==="civilian").length,11);
+ assert.equal(walkers.filter(w=>w.role==="civilian").length,13);
  assert.equal(walkers.filter(w=>w.role==="walking").length,2);
  for(let i=0;i<600;i++)run.Update(.1);
  assert.ok(run.traffic.filter(w=>w.pauseIndex!==undefined).every(w=>w.index<=w.pauseIndex));
@@ -332,7 +460,7 @@ const ai = readFileSync(new URL("./Script_Ai.mjs", import.meta.url), "utf8");
  for(let i=0;i<1400;i++){
   run.Update(.1);
   const active=walkers.filter(w=>!w.retired);
-  for(let a=0;a<active.length;a++)for(let b=a+1;b<active.length;b++)assert.ok(Math.hypot(active[a].x-active[b].x,active[a].z-active[b].z)>.84,"finite crossing routes preserve two capsule radii");
+  for(let a=0;a<active.length;a++)for(let b=a+1;b<active.length;b++)assert.ok(Math.hypot(active[a].x-active[b].x,active[a].z-active[b].z)>(active[a].child?.24:.34)+(active[b].child?.24:.34),"finite crossing routes preserve actual child/adult standing capsule radii");
  }
  const reserved=run.traffic.filter(w=>w.role==="walking");
  assert.ok(reserved.every(w=>!w.proximityReleased),"B02 cannot release the binocular subjects");
@@ -342,23 +470,58 @@ const ai = readFileSync(new URL("./Script_Ai.mjs", import.meta.url), "utf8");
  visible=true;for(let i=0;i<1000;i++)run.Update(.1);
  assert.ok(reserved.every(w=>w.proximityReleased&&w.arrived));
  visible=false;for(let i=0;i<1000;i++)run.Update(.1);
- assert.equal(run.traffic.filter(w=>w.retireWhenHidden&&w.retired).length,7,JSON.stringify(run.traffic.filter(w=>w.retireWhenHidden).map(w=>({slot:w.slot,index:w.index,at:w.actor,arrived:w.arrived}))));
+ assert.equal(run.traffic.filter(w=>w.retireWhenHidden&&w.retired).length,11,JSON.stringify(run.traffic.filter(w=>w.retireWhenHidden).map(w=>({slot:w.slot,index:w.index,at:w.actor,arrived:w.arrived}))));
  assert.ok(run.traffic.filter(w=>w.retired).every(w=>w.arrived),"retirement never replaces physical arrival");
- assert.equal(walkers.length,16,"no replacement spawn loop");
+ assert.equal(walkers.length,18,"no replacement spawn loop");
 }
 assert.match(ai,/s\.scriptArrivalRadius\) : 1\.2/ ,"ordinary traffic retains production AI stopping radius");
 {
  const actors=[0,1,2].map(slot=>({x:0,z:-15-slot*3,alive:true})),defended=[];
  const runtime=new FirstLevelP012Runtime({GuideActor:()=>null,Position:a=>a,Signalled:()=>false,
-  FriendlyActors:()=>actors,ReleaseGuide:a=>{a.released=true;},Defend:(a,p)=>defended.push({a,p}),
-  Move:(a,p,speed)=>{const d=Math.hypot(p.x-a.x,p.z-a.z);if(d>1.2){const f=Math.min(d-1.2,speed*.1)/d;a.x+=(p.x-a.x)*f;a.z+=(p.z-a.z)*f;}}
+  FriendlyActors:()=>actors,ReleaseGuide:a=>{a.released=true;delete a.scriptArrivalRadius;},Defend:(a,p,doctrine)=>defended.push({a,p,doctrine}),
+  Move:(a,p,speed)=>{const d=Math.hypot(p.x-a.x,p.z-a.z),stop=a.scriptArrivalRadius??1.2;if(d>stop){const f=Math.min(d-stop,speed*.1)/d;a.x+=(p.x-a.x)*f;a.z+=(p.z-a.z)*f;}}
  },{...P012Phase.whitebox,activities:{...P012Phase.whitebox.activities,traffic:undefined}});
  runtime.traffic=actors.map((actor,slot)=>({actor,side:0,slot,path:[{...actor}],index:0,parking:{...actor},arrived:true,speedMps:3.05}));
  runtime.beat=4;runtime.Update(.1);
  assert.ok(actors.every(a=>!a.released),"B04 starts physical transfer instead of releasing stale squad goals");
- runtime.beat=6;for(let i=0;i<1200;i++)runtime.Update(.1);
+ runtime.beat=5;
+ for(let i=0;i<1200;i++){
+  if(i===600)runtime.beat=6;
+  runtime.Update(.1);
+  for(const actor of actors)for(const block of openingLayout.blocks){
+   if(block.solid===false||block.y-block.h/2>1.8||block.y+block.h/2<.1)continue;
+   const dx=actor.x-block.x,dz=actor.z-block.z,c=Math.cos(block.ry||0),s=Math.sin(block.ry||0);
+   const gap=Math.hypot(Math.max(0,Math.abs(dx*c-dz*s)-block.w/2),Math.max(0,Math.abs(dx*s+dz*c)-block.d/2));
+   assert.ok(gap>=.42,`north supply path intersects ${block.id} at ${JSON.stringify(actor)}`);
+  }
+  for(let a=0;a<3;a++)for(let b=a+1;b<3;b++)assert.ok(Math.hypot(actors[a].x-actors[b].x,actors[a].z-actors[b].z)>=1.5,`supply soldiers keep separate physical bodies ${i}: ${JSON.stringify(actors)}`);
+ }
  assert.ok(runtime.traffic.every(w=>w.retired&&w.frontlineTransfer&&w.arrived));
- assert.equal(defended.length,3,"same three actors join defence only after physical arrival");
+ assert.ok(defended.length>=3,"same three actors join defence only after physical arrival");
+ const supply=P012Phase.whitebox.activities.frontlineSupply;
+ assert.deepEqual(supply.positions,[{x:11,z:-102},{x:15,z:-103},{x:19,z:-104}],"supply coordinates undergo the north transform exactly once");
+ for(const center of supply.positions)for(let n=0;n<72;n++){
+  const point={x:center.x+Math.cos(n*Math.PI/36)*supply.holdRadiusM,z:center.z+Math.sin(n*Math.PI/36)*supply.holdRadiusM};
+  for(const block of openingLayout.blocks){
+   if(block.solid===false||block.y-block.h/2>1.8||block.y+block.h/2<.1)continue;
+   const dx=point.x-block.x,dz=point.z-block.z,c=Math.cos(block.ry||0),s=Math.sin(block.ry||0);
+   assert.ok(Math.hypot(Math.max(0,Math.abs(dx*c-dz*s)-block.w/2),Math.max(0,Math.abs(dx*s+dz*c)-block.d/2))>=.42,`entire supply hold circle clears ${block.id}`);
+  }
+  const route=P012Phase.whitebox.activities.ammoRoute;
+  for(let j=1;j<route.length;j++){
+   const a=route[j-1],b=route[j],dx=b.x-a.x,dz=b.z-a.z,t=Math.max(0,Math.min(1,((point.x-a.x)*dx+(point.z-a.z)*dz)/(dx*dx+dz*dz)));
+   assert.ok(Math.hypot(point.x-a.x-t*dx,point.z-a.z-t*dz)>3,"full hold circle stays outside all ammo route segments");
+  }
+ }
+ for(const order of defended){
+  assert.deepEqual(order.p,supply.positions[actors.indexOf(order.a)]);
+  assert.equal(order.doctrine.holdRadiusM,supply.holdRadiusM);
+ }
+ for(const [index,actor] of actors.entries()){
+  assert.ok(Math.hypot(actor.x-supply.positions[index].x,actor.z-supply.positions[index].z)<.4);
+  for(const port of P012Phase.whitebox.anchors.gunports)assert.ok(Math.hypot(actor.x-port.x,actor.z-port.z)-supply.holdRadiusM>3,"entire defensive slot stays outside player gunport space");
+  for(const point of P012Phase.whitebox.activities.ammoRoute)assert.ok(Math.hypot(actor.x-point.x,actor.z-point.z)-supply.holdRadiusM>3,"no terminal supply body in delivery route");
+ }
  assert.ok(actors.every(a=>a.z<-99),"all three actually reached the northern position");
 }
 assert.match(ai, /if \(Number\.isFinite\(s\.scriptMoveSpeedMps\)\) speed = s\.p012Guided && desired/);
@@ -434,7 +597,7 @@ assert.match(main, /p012Flow && interact\?\.Query\(player\)\?\.point\?\.id === "
 console.log("PASS P012 runtime finite actors, guide speed, shell warning, delivery input routing");
 {
   let impact;
-  const runtime = new FirstLevelP012Runtime({ GuideActor: () => null, Position: () => null,
+  const runtime = new FirstLevelP012Runtime({ GuideActor: () => null, Position: () => null, Signalled: () => false,
     WarnShell: (point, damaging, callback) => { impact = callback; return { x: point.x + 1, z: point.z }; } }, {});
   runtime.Shelling({ x: 5, z: 6 }, true);
   assert.deepEqual(runtime.Sample().mortarWarningPosition, { x: 6, z: 6 });

@@ -7,6 +7,7 @@ import { FIRST_LEVEL_P012_LAYOUT, P012_ZONES, P012_SEMANTIC_COLORS,
   P012_BLUEPRINT_ANCHORS, P012_BLUEPRINT_ROUTES } from "./Data_FirstLevelP012Layout.mjs";
 import { P012MapPoints, P012RailPoint, P012StationPoint } from "./Data_FirstLevelP012Space.mjs";
 import { openingActivities, openingStoryBeats } from "./Data_FirstLevelP012Opening.mjs";
+import { trainColumn } from "./Data_FirstLevelP012TrainColumn.mjs";
 export { FIRST_LEVEL_P012_LAYOUT, P012_SEMANTIC_COLORS };
 export const FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID = "FirstLevelP012Whitebox";
 
@@ -81,13 +82,23 @@ function ExistingPrologueVoice(key, event) {
 function MovedFirstChapterVoice(key, event) {
   return Object.freeze({ ...FIRST_CHAPTER.beats.find((beat) => beat.voice === key), at: `event:${event}` });
 }
+// Speak only on the guide's actual arrival, not on a remote objective change.
+// Audition subtitles only: no new recording or autonomous soldier chatter.
+const guidanceCues = Object.freeze([
+  ["Wounded", "P012GuideAtWounded", "先停一下，伤员在这里。你帮他挪进掩蔽部，我在前头看着路。"],
+  ["FlankEntry", "P012GuideAtFlankEntry", "靠我这边的胸墙过来。别走正面，从这个拐角绕到破屋侧面，我在这里接应。"],
+  ["Smoke", "P012GuideAtSmoke", "烟幕在这儿。点上，等烟起来，咱们带着担架走西边的沟。"],
+  ["SmokeHandoff", "P012GuideSmokeHandoff", "沿西沟往回走。前后照应着担架，别落下伤员。"],
+].map(([id,event,text])=>Object.freeze({at:`event:${event}`,type:"line",who:"luo",text,tier:"虚构",
+  voice:`p012_text_Guide${id}`,p012SubtitleOnly:true,p012SubtitleSeconds:5.5,
+  p012Immediate:Object.freeze({event,maxAgeS:12})})));
 const storyBeats = Object.freeze([
   ...openingStoryBeats,
+  ...guidanceCues,
   ...aircraftCues,
   ExistingPrologueVoice("ch0_junguan_04", "P012Arrival"),
   ExistingPrologueVoice("ch0_luo_11", "P012TrainDoor"),
   ExistingPrologueVoice("ch0_luo_08", "P012WeaponReceived"),
-  MovedFirstChapterVoice("ch1_luo_01", "P012AmmoIssued"),
   ...["ch1_heyoutian_01", "ch1_shunzi_01", "ch1_luo_05"].map((key) => MovedFirstChapterVoice(key, "P012AmmoTask")),
   ...FIRST_CHAPTER.beats.filter((beat) => !movedVoices.has(beat.voice)
   && !(beat.type === "env" && (["event:AtDitch", "event:AircraftTurnCrowd", "event:SouthCut"].includes(beat.at)
@@ -118,6 +129,9 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
   metaText: Object.freeze(["颜色语义白盒", "正式第一章人物与玩法", "节奏校准中"]),
   level: FIRST_CHAPTER, roster: FIRST_CHAPTER.roster, mechanics: FIRST_CHAPTER.mechanics,
   objectives: Object.freeze(zones.map((zone) => zone.name)), mechanic: "跟随小队，完成当前行动。",
+  // Luo and the actual squad lead the route. Internal targets remain available
+  // to rules/tests, but this scene never paints a floating destination or metres.
+  hud: Object.freeze({ objectiveMarkers: false, targetDistance: false }),
   nraPool: FIRST_CHAPTER.pool.start, poolGain: 0, ijaPool: 37, ijaPressure: 0.72,
   ijaSpawn: FIRST_CHAPTER.tuning.ijaSpawn, ijaSupport: [],
   ijaForce: FIRST_CHAPTER.tuning.ijaForce,
@@ -133,6 +147,11 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       guideSpeedMps: 3.05, guideRangeM: 12, routeRadiusM: 3, ambushRouteRadiusM: 0.6, observationConeRad: 0.42,
       guideSpeedByBeat: Object.freeze({ 0: 3.05, 2: 3.05, 4: 3.05, 5: 1.1, 11: 2 }),
       frontlineDoctrine: Object.freeze({ accuracyScale: 0.22, fireIntervalScale: 2.5, holdRadiusM: 2 }),
+      frontlineSupply: Object.freeze({
+        approach: Object.freeze([{x:5,z:-60},{x:10,z:-61}]),
+        positions: Object.freeze([{x:11,z:-62},{x:15,z:-63},{x:19,z:-64}]),
+        arrivalRadiusM:.3, holdRadiusM:.4,
+      }),
       frontlineAmmo: Object.freeze({ stockClips: 12, carryCapClips: 4, takeSeconds: 2.4 }),
       observationSeconds: 6.5, shellObservationSeconds: 3, shellGuideRangeM: 6,
       orientations: Object.freeze([]),
@@ -222,6 +241,16 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
     }),
       ...stationActivities,
       ...openingActivities,
+      openingMarch:true,
+      openingMarchRoute:Object.freeze([{x:-51,z:90},{x:-43,z:94},...P012_ROUTES.village.slice(1),
+        ...P012_ROUTES.approach,{x:5,z:-92},{x:5,z:-99},{x:5,z:-104}]),
+      openingMarchDefensePositions:Object.freeze([
+        {x:-17,z:-103},{x:-13,z:-103},{x:-9,z:-103},{x:-5,z:-103},{x:-1,z:-103},{x:9,z:-102},
+      ]),
+      openingMarchHoldRadiusM:.4,
+      trainColumn,
+      briefing:Object.freeze({position:{x:-51,z:90},route:[{x:-55,z:93},{x:-51,z:93},{x:-51,z:90}],playerRadiusM:8,readyCount:2}),
+      villageInspections:Object.freeze([{index:3,event:"P012VillageCheck0"},{index:5,event:"P012VillageCheck1"},{index:7,event:"P012VillageCheck2"}]),
       initialEquipment:Object.freeze({weapon:"HanYang",clips:3,grenades:6}),
       openingIssue:Object.freeze({
         spawns:Object.freeze(Array.from({length:6},(_,slot)=>P012StationPoint(-67.2,62+slot*1.7))),
@@ -231,15 +260,13 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
         musterRoute:Object.freeze([P012StationPoint(-51,34),P012StationPoint(-51,48)]),
         musterPoints:stationActivities.openingCastParking,weaponSeconds:1,ammoSeconds:.8,
       }),
-      trainRoute:P012_ROUTES.trainExit,villageRoute:P012_ROUTES.village,
+      trainRoute:P012_ROUTES.trainExit,villageRoute:Object.freeze([{x:-51,z:90},{x:-43,z:94},...P012_ROUTES.village.slice(1)]),
       openingCastRoute:Object.freeze([P012StationPoint(-29,48),P012StationPoint(-29,40),
         ...P012_ROUTES.village.slice(1).map(point=>({x:point.x-1.4,z:point.z}))]),
       shellCoverRoute:P012_ROUTES.approach,
-      binoculars:Object.freeze({guidePosition:{x:2,z:0}, recognitionSeconds:0.45,
-        northSubjectPoint:{x:0,z:-17},southSubjectPoint:{x:30,z:10}}),
       northApproachChatPosition:P012_ROUTES.approach[0], northNearMissAfterM:10,
       shellObservationIndices:Object.freeze([3,4,5,6]),
-      // The cancelled four-landmark task is replaced by live binocular subjects.
+      // The squad leader knows the route; there is no look-direction minigame.
       orientations: Object.freeze([]),
       // Pursuers follow the newly connected physical return road; they do not
       // run to the coordinates of the removed compact-map western ditch.

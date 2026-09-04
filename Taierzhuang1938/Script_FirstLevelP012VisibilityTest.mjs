@@ -4,7 +4,7 @@ import fs from "node:fs";
 import vm from "node:vm";
 import {P012MapPoints} from "./Data_FirstLevelP012Space.mjs";
 import {AircraftStrafeDirector} from "./Script_AircraftStrafe.mjs";
-import {FIRST_LEVEL_P012_LAYOUT as layout} from "./Data_FirstLevelP012Layout.mjs";
+import {FIRST_LEVEL_P012_LAYOUT as layout,P012_ANCHORS as anchors} from "./Data_FirstLevelP012Layout.mjs";
 import phase from "./Data_FirstLevelP012Whitebox.mjs";
 import {MissionSetpieceDirector} from "./Script_MissionSetpieces.mjs";
 import {FirstLevelP012Runtime} from "./Script_FirstLevelP012Runtime.mjs";
@@ -171,49 +171,44 @@ function ObservationRaycast(origin,direction,maxDistance){
  }return nearest<=maxDistance?{t:nearest}:null;
 }
 const observationField={Raycast:ObservationRaycast};
-const binocularUrl=`data:text/javascript;base64,${Buffer.from(Source("./vendor/three/build/three.core.js")).toString("base64")}`;
-const binocularSource=Source("./Script_FirstLevelP012Binoculars.mjs")
- .replace('from "three"',`from "${binocularUrl}"`)
- .replace('import { MarkForegroundPrepass } from "./Script_Post.mjs";',"const MarkForegroundPrepass = root => root;");
-const {P012BinocularLensContains}=await import(`data:text/javascript;base64,${Buffer.from(binocularSource).toString("base64")}`);
 const mainSource=Source("./Script_Main.mjs");
 const hostSource=mainSource.slice(mainSource.indexOf("    TrafficVisible:"),mainSource.indexOf("    RetireTraffic:"));
 const player={EyePosition:observationCamera.position};
-const visible=Function("camera","player","battlefield","P012BinocularLensContains",`return ({${hostSource}}).TrafficVisible;`)(observationCamera,player,observationField,P012BinocularLensContains);
-const hub=phase.whitebox.activities.binoculars.guidePosition;
+const visible=Function("camera","player","battlefield","P012BinocularLensContains",`return ({${hostSource}}).TrafficVisible;`)(observationCamera,player,observationField,()=>{throw new Error("P012 ordinary sight must never request binocular lenses");});
+const hub=anchors.supplyPoint;
 observationCamera.position.set(hub.x,1.62,hub.z);
-observationCamera.fov=25;observationCamera.updateProjectionMatrix();
+observationCamera.fov=55;observationCamera.updateProjectionMatrix();
 const subjects=phase.whitebox.activities.traffic.filter(entry=>entry.side===0||entry.role==="walking")
  .map(entry=>({alive:true,position:new THREE.Vector3((entry.side===0?entry.route.at(-1):entry.route[0]).x,0,(entry.side===0?entry.route.at(-1):entry.route[0]).z)}));
 assert.equal(subjects.length,5,"three real northbound soldiers and two southbound wounded");
 for(const actor of subjects){
  const Aim=()=>{observationCamera.lookAt(actor.position.x,1.15,actor.position.z);observationCamera.updateMatrixWorld(true);};
- Aim();assert.equal(visible(actor,{binocular:true}),true,"actual traffic actor visible through centred lenses and scene geometry");
+ Aim();assert.equal(visible(actor),true,"actual northbound/wounded actor visible at normal 55 degree FOV and real hub geometry");
  for(const pitch of [-1.4,1.4]){
   Aim();observationCamera.rotateX(pitch);observationCamera.updateMatrixWorld(true);
-  assert.equal(visible(actor,{binocular:true}),false,"sky or feet are not actor recognition");
+  assert.equal(visible(actor),false,"sky or feet are not actor recognition");
  }
  Aim();observationField.Raycast=()=>({t:1});
- assert.equal(visible(actor,{binocular:true}),false,"real callback rejects intervening geometry");
+ assert.equal(visible(actor),false,"real callback rejects intervening geometry");
  observationField.Raycast=ObservationRaycast;
  Aim();
- // Move the camera aim until the actual actor projects inside the screen but
- // on the production mask's black side rim. Do not duplicate the lens formula.
- const centre=actor.position.clone();centre.y=1.15;
- let foundRim=false;
- for(let angle=.001;angle<.4;angle+=.001){
-  Aim();observationCamera.rotateY(angle);observationCamera.updateMatrixWorld(true);
-  const projected=centre.clone().project(observationCamera);
-  if(Math.abs(projected.x)>.72&&Math.abs(projected.x)<.85){
-   assert.equal(visible(actor),true,"actor remains visible without binocular mask");
-   assert.equal(visible(actor,{binocular:true}),false,"black lens rim is not recognition");
-   foundRim=true;break;
-  }
- }
- assert.ok(foundRim);
- actor.alive=false;Aim();assert.equal(visible(actor,{binocular:true}),false);actor.alive=true;
+ observationCamera.rotateY(Math.PI);observationCamera.updateMatrixWorld(true);
+ assert.equal(visible(actor),false,"actors behind the actual camera are not recognized");
+ actor.alive=false;Aim();assert.equal(visible(actor),false);actor.alive=true;
 }
 assert.deepEqual(phase.whitebox.activities.orientations,[],"removed four-landmark task has no targets");
 const noLandmarkRuntime=new FirstLevelP012Runtime({ObservationVisible:()=>{throw new Error("obsolete landmark raycast");},GuideActor:()=>null,Position:()=>null,Alive:()=>false},phase.whitebox);
 for(const beat of [3,4]){noLandmarkRuntime.beat=beat;assert.deepEqual(noLandmarkRuntime.Sample().orientationVisible,[]);}
-console.log("PASS live northbound/wounded binocular subjects: actual Main callback, production lens, sky/feet/wall/black-rim rejection");
+// Fixed real impact stays in the forward horizontal view while the player keeps
+// moving through the 1.6s warning. This is projection, not a claim that every
+// particle is visible through foreground actors or that the camera is forced.
+const activity=phase.whitebox.activities,[a,b]=activity.shellCoverRoute;
+const direction=new THREE.Vector3(b.x-a.x,0,b.z-a.z).normalize();
+for(const speed of [activity.openingGuideWalkMps,activity.openingGuideCatchupMps]){
+ const distance=activity.northNearMissAfterM+speed*1.6;
+ const p=new THREE.Vector3(a.x,1.62,a.z).addScaledVector(direction,distance);
+ observationCamera.position.copy(p);observationCamera.lookAt(p.clone().add(direction));observationCamera.updateMatrixWorld(true);
+ const target=new THREE.Vector3(activity.northNearMissImpactPosition.x,.35,activity.northNearMissImpactPosition.z).project(observationCamera);
+ assert.ok(target.z>-1&&target.z<1&&Math.abs(target.x)<.95,"production fixed impact lies inside normal horizontal FOV after real walk/run advance");
+}
+console.log("PASS normal 55FOV village traffic: actual Main callback, sky/feet/wall/behind-camera rejection and fixed-impact projection");

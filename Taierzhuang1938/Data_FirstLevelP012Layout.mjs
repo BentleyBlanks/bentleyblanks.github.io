@@ -2,8 +2,9 @@
 // Planar ground is deliberate: trench banks provide relative shelter without a second height source.
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { P012Point, P012MapPoints, P012SouthPoint, P012RailPoint, P012StationPoint, P012_SPACE_BOUNDS } from "./Data_FirstLevelP012Space.mjs";
-import { P012_STATION_BLOCKS, P012_STATION_SURFACES, P012_STATION_GATES, P012_STATION_REMOVE_IDS } from "./Data_FirstLevelP012Station.mjs";
+import { P012_STATION_BLOCKS, P012_STATION_SURFACES, P012_STATION_GATES, P012_STATION_REMOVE_IDS, P012_STATION_HEIGHTS } from "./Data_FirstLevelP012Station.mjs";
 import { P012_HORIZON_GROUND, P012_HORIZON_BLOCKS, P012_HORIZON_REMOVE_IDS } from "./Data_FirstLevelP012Horizon.mjs";
+import { P012_RESTING_BLOCKS } from "./Data_FirstLevelP012Resting.mjs";
 
 export const P012_SEMANTIC_COLORS = Object.freeze({ ground:0xb8b8b0, structure:0xc9c9c3, step:0xf1cf45, vault:0xe58b2f, mantle:0xb75bd6, cover:0x3977c8, boundary:0x24272c, danger:0xc83232, missionRoute:0x35b86b, stretcherRoute:0x2dcbd0 });
 function Point(x,z) { return Object.freeze({x,z}); }
@@ -174,17 +175,34 @@ const worldBlocks = blocks.filter(block=>!discarded.test(block.id)).map(block=>{
   // The hub-facing court is an orientation landmark; add its moved counterpart
   // separately. Telegraphs follow the continuous railway, not the north island.
   if(block.id==="EvacEastCourtyard"||block.id.startsWith("RailTelegraph"))return block;
-  if(/^(StationStep|StationVault|StationMantle|WeaponCheckTable|WeaponIssueCrate|WeaponInspectBench)$/.test(block.id))return {...block,...P012StationPoint(block.x,block.z)};
+  if(/^(StationStep|StationVault|StationMantle|WeaponCheckTable|WeaponIssueCrate|WeaponInspectBench)$/.test(block.id)){
+    const point=P012StationPoint(block.x,block.z);
+    return {...block,...point,y:block.y+(point.x>=-62&&point.x<=-30&&point.z>=98&&point.z<=151?P012_STATION_HEIGHTS.platformTop:0)};
+  }
   return {...block,...P012Point(block.x,block.z)};
 });
 worldBlocks.push({...blocks.find(block=>block.id==="EvacEastCourtyard"),...P012SouthPoint(40,9),id:"EvacDestinationCourtyard"});
 // Separate buildings and open courts, not a continuous tunnel. The broad centre
 // corridor admits opposing foot traffic without shrinking people or cover.
-worldBlocks.push(Box("StationNorthWestHouse",-49,85,10,12,3.5,"structure"),
+worldBlocks.push(Box("StationNorthWestHouse",-81,85,10,12,3.5,"structure"),
  Box("VillageSouthEastHouse",-18,73,12,14,3.2,"structure"),
  Box("VillageMiddleWestHouse",-45,57,9,10,3.2,"structure"),
  Box("VillageWaitingBenchSouth",-40,90,2,1,.65,"cover"),
  Box("VillageWaitingBenchNorth",-23,60,2,1,.65,"cover"));
+// Three staggered, finite courts shape the authored bends. Inner corner houses
+// interrupt long diagonal shortcuts; short walls leave lateral court openings,
+// rather than forming a continuous narrow tunnel or four enclosing walls.
+worldBlocks.push(Box("VillageBendWestHouse",-38.6,77,10,10,3.3,"structure"),
+ Box("VillageBendEastHouse",-25.9,46,8,10,3.1,"structure"),
+ Box("VillageNorthGateHouse",-21,23,8,8,3.4,"structure"),
+ Box("VillageWestCourtWall",-33,68,.4,6,1.4,"structure"),
+ Box("VillageEastCourtWall",-27,75,.4,6,1.4,"structure"),
+ Box("VillageSouthCourtReturn",-46,89,5,.4,1.15,"cover"),
+ Box("VillageMiddleCourtReturn",-39,52,5,.4,1.4,"structure"),
+ Box("VillageNorthCourtReturn",-36,27,4,.4,1.4,"structure"));
+// Readable four-metre grey lane, below existing route paint. Branch/court ground
+// remains open; these strips have no collision or separate support surface.
+for(let index=1;index<worldVillage.length;index++)worldBlocks.push(Strip(`VillageRoadBed${index}`,worldVillage[index-1],worldVillage[index],4,"ground",.012));
 for(let index=1;index<P012_ROUTES.villageEvacuation.length;index++)worldBlocks.push(Strip(`VillageEvacuationPaint${index}`,P012_ROUTES.villageEvacuation[index-1],P012_ROUTES.villageEvacuation[index],1.3,"stretcherRoute",.045));
 worldBlocks.push(Box("VillageEvacuationWaitingBench",-16,108,2,1,.65,"cover"),Box("StationEastWaitingBench",-11,153,2,1,.65,"cover"));
 for(const [name,route] of Object.entries({North:worldNorth,South:worldSouth,Retreat:worldRetreat,Flank:P012_ROUTES.flank,TrainExit:P012_ROUTES.trainExit})) {
@@ -200,7 +218,7 @@ worldBlocks.push(Box("WestBoundary",-109,-27.5,2,373,8),Box("EastBoundary",184,-
   Box("NorthLinkWestBank",-21,-39,3,35,3.2),Box("NorthLinkEastShoulder",8,-43,13,19,3.8),
   // A real low ditch bank separates the first near miss from the crouched
   // refuge. Both ends are open; it does not span or pinch the escort route.
-  Box("NorthNearMissDitchBank",-15.6,-40,.8,19,1.1,"cover"),
+  Box("NorthNearMissDitchBank",-15.6,-43.15,.8,12.7,1.1,"cover"),
   Box("EastLinkNorthCourt",48,13,12,4,3.1),Box("EastLinkEastCourt",58,40,15,14,3.2),
   Box("EastLinkWestCourt",28,54,10,25,3),Box("EastLinkSouthCourt",66,-1,22,5,3),
   Box("EastLinkEastShoulder",91,73,12,15,3.5),
@@ -244,8 +262,15 @@ const worldGates = blueprintGates.map(gate=>gate.id.startsWith("HubEscortGate")?
 const stationReplacements=P012_STATION_REMOVE_IDS.map(pattern=>new RegExp(pattern));
 const KeepBlock=block=>!P012_HORIZON_REMOVE_IDS.includes(block.id)&&!stationReplacements.some(pattern=>pattern.test(block.id));
 const stationBlocks=P012_STATION_BLOCKS;
+// Recruits from each carriage use a visible gun rack followed by a separate
+// ammunition table. Leave the interaction side clear, not a target inside a box.
+const recruitIssueBlocks=[101.8,121,139].flatMap((z,index)=>[
+  ...(index===0?[]:[Box(`StationRecruitGunRack${index}`,-56.7,z+1.4,1.2,.55,1.2,"missionRoute",{y:P012_STATION_HEIGHTS.platformTop+.6}),
+    ...[-.4,0,.4].map((offset,rifle)=>Box(`StationRecruitRifle${index}_${rifle}`,-56.7+offset,z+1.4,.09,.12,1.35,"boundary",{y:P012_STATION_HEIGHTS.platformTop+.675}))]),
+  ...(index===0?[]:[Box(`StationRecruitAmmoTable${index}`,-51,z+1.4,2,.7,.8,"missionRoute",{y:P012_STATION_HEIGHTS.platformTop+.4})]),
+]);
 export const FIRST_LEVEL_P012_LAYOUT=Object.freeze({scenario:Object.freeze({replaceBlockIds:Object.freeze(["HubBrokenWallTall","HubBrokenWallLow"]),states:hubStates}),
   bounds:P012_SPACE_BOUNDS,ground:P012_HORIZON_GROUND,walkableSurfaces:P012_STATION_SURFACES,
-  blocks:Object.freeze([...worldBlocks.filter(KeepBlock),...stationBlocks,...P012_HORIZON_BLOCKS]),
+  blocks:Object.freeze([...worldBlocks.filter(KeepBlock),...stationBlocks,...recruitIssueBlocks,...P012_RESTING_BLOCKS,...P012_HORIZON_BLOCKS]),
   gates:Object.freeze([...worldGates.filter(KeepBlock),...P012_STATION_GATES]),
   sections:Object.freeze(P012_ZONES.map(zone=>Object.freeze({id:zone.id,pressure:zone.name}))),semanticColors:P012_SEMANTIC_COLORS});

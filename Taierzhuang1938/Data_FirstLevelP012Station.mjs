@@ -18,26 +18,25 @@ function Surface(id,x,z,w,d,top,semantic="ground",thickness=.2){
   const block=Box(id,x,z,w,d,thickness,semantic,{y:top-thickness/2,solid:false});
   surfaces.push(block);blocks.push(block);return block;
 }
-const floorTop=1.25,stepRise=floorTop/5;
+const floorTop=1.25,platformTop=.5,stepRise=(floorTop-platformTop)/5;
+export const P012_STATION_HEIGHTS=Object.freeze({floorTop,platformTop,stepRise,exitTops:Object.freeze(Array.from({length:5},(_,i)=>Number((floorTop-stepRise*(i+1)).toFixed(2))))});
 if(stepRise>TRAVERSAL.stepMax)throw new Error("Station stairs exceed automatic step threshold");
 
-// Three aligned carriages; the middle car owns the unchanged player/Luo anchors.
-// Window strips are genuinely open above the solid waist, admitting exterior light.
+// Three aligned open freight wagons; the middle car owns player/Luo anchors.
+// High side boards and external ribs replace passenger roofs/window strips.
 for(const [index,z] of [47,65,83].entries()){
-  const id=`StationCar${index}`,near=index===1;
+  const id=`StationCar${index}`,doorZ=z-4;
   Surface(`${id}Floor`,-66,z,4.8,14,floorTop);
-  Add(Box(`${id}Roof`,-66,z,5.1,14.4,.22,"ground",{y:4.15}),
-    Box(`${id}NorthEnd`,-66,z-7,4.8,.22,2.7,"ground",{y:2.7}),
-    Box(`${id}SouthEnd`,-66,z+7,4.8,.22,2.7,"ground",{y:2.7}),
-    Box(`${id}WestWaist`,-68.4,z,.22,14,1.15,"ground",{y:1.825}),
-    Box(`${id}WestHeader`,-68.4,z,.22,14,.3,"ground",{y:3.9}));
-  const spans=near?[[58,58.8],[63.2,72]]:[[z-7,z+7]];
+  Add(Box(`${id}NorthEnd`,-66,z-7,4.8,.22,1.4,"structure",{y:1.95}),
+    Box(`${id}SouthEnd`,-66,z+7,4.8,.22,1.4,"structure",{y:1.95}),
+    Box(`${id}WestWaist`,-68.4,z,.22,14,1.4,"structure",{y:1.95}));
+  for(let at=z-6.5,n=0;at<z+7;at+=1.5,n++)Add(Box(`${id}WestRib${n}`,-68.56,at,.12,.16,1.5,"boundary",{y:1.95}));
+  const spans=[[z-7,doorZ-2.2],[doorZ+2.2,z+7]];
   for(const [part,[a,b]] of spans.entries()){
-    Add(Box(`${id}EastWaist${part}`,-63.6,(a+b)/2,.22,b-a,1.15,"ground",{y:1.825}),
-      Box(`${id}EastHeader${part}`,-63.6,(a+b)/2,.22,b-a,.3,"ground",{y:3.9}));
-    for(let at=a+.15,n=0;at<b;at+=1.5,n++)Add(Box(`${id}WindowPost${part}_${n}`,-63.6,at,.22,.14,1.5,"ground",{y:3.05}));
+    Add(Box(`${id}EastWaist${part}`,-63.6,(a+b)/2,.22,b-a,1.4,"structure",{y:1.95}));
+    for(let at=a+.15,n=0;at<b;at+=1.5,n++)Add(Box(`${id}EastRib${part}_${n}`,-63.44,at,.12,.14,1.5,"boundary",{y:1.95}));
   }
-  for(const side of [-1,1])for(const offset of (near?[-6,-5.5,4.5,5.5]:[-4.5,-3,3,4.5])){
+  for(const side of [-1,1])for(const offset of [-6,-5.5,4.5,5.5]){
     // Wide box-wheel/axle assemblies span rail contact to the visible body edge.
     // The occupied car's front bogie sits outside the east stair opening.
     Add(Box(`${id}Wheel${side}_${offset}`,-66+side*1.55,z+offset,2,.85,.85,"boundary",{y:.68}));
@@ -45,13 +44,24 @@ for(const [index,z] of [47,65,83].entries()){
   Add(Box(`${id}Underframe`,-66,z,3.6,13,.3,"boundary",{y:1.05}));
   if(index<2)Add(Box(`${id}Coupler`,-66,z+9,.4,3.7,.35,"boundary",{y:1.05}));
 }
-// East-side descending stair: five 0.25m risers, 0.6m tread, 3m clear width.
-// The final flush tread is visual only; analytic ground owns its contact plane.
-for(let index=0;index<5;index++){
-  const top=floorTop-stepRise*(index+1),x=-63.3+index*.6;
-  if(top>0)Surface(`StationExitStep${index}`,x,61,.6,3,top,"step",top);
-  else Add(Box(`StationExitStep${index}`,x,61,.6,3,.006,"step",{y:0,solid:false}));
+// East-side descending stair: five 0.15m risers, 0.6m tread, 3m clear width.
+// The last tread meets the raised platform at 0.5m; all five are real supports.
+for(const [carIndex,doorZ] of [43,61,79].entries())for(let index=0;index<5;index++){
+  const id=carIndex===1?`StationExitStep${index}`:`StationCar${carIndex}ExitStep${index}`;
+  const top=P012_STATION_HEIGHTS.exitTops[index],x=-63.3+index*.6;
+  if(top>0)Surface(id,x,doorZ,.6,3,top,"step",top);
+  else Add(Box(id,x,doorZ,.6,3,.006,"step",{y:0,solid:false}));
 }
+// Raised platform: track remains at zero. Northern and eastern public exits
+// descend through real discrete support boxes, never an invisible height ramp.
+Surface("StationRaisedPlatform",-46,64.5,32,53,platformTop,"ground",platformTop);
+for(const [index,top] of [.25,0].entries()){
+ Surface(`StationPlatformNorthStep${index}`,-46,37.6-index*.8,32,.8,top,"step",.1);
+ Surface(`StationPlatformEastStep${index}`,-29.6+index*.8,64.5,.8,53,top,"step",.1);
+}
+// Open long canopy. No wall panels or columns across carriage doors / issue lanes.
+for(const [index,x] of [-59.375,-56.125,-52.875,-49.625].entries())Add(Box(`StationLongCanopyRoof${index}`,x,64.5,3.35,53,.16,"structure",{y:4.8-Math.abs(x+54.5)*.018}));
+for(const x of [-59,-49])for(const z of [52,73,89])Add(Box(`StationLongCanopyPost${Math.abs(x)}_${z}`,x,z,.28,.28,4.1,"structure",{y:2.55}));
 
 // Box-built steam locomotive ahead of the carriages: cab, boiler stack, chimney,
 // paired wheel rows and side rods, not a featureless rectangular train proxy.
@@ -84,7 +94,7 @@ Add(Box("StationLoadingSidingBallast",-72,144,5.6,42,.06,"ground",{y:.015,solid:
 for(const side of [-1,1])Add(Box(`StationLoadingSidingBufferPost${side}`,-72+side*1.3,165.5,.35,.65,1.3,"structure"));
 Add(Box("StationRailBallast",-66,-2.5,5.6,375,.06,"ground",{y:.015,solid:false}),
  // Apron paint stays below the green 0.025m route paint; never coplanar.
- Box("StationPlatformApron",-57,62,10,17,.01,"ground",{y:.005,solid:false}));
+ Box("StationPlatformApron",-46,64.5,32,53,.01,"ground",{y:platformTop+.005,solid:false}));
 
 // Existing equipment tables/interaction anchors remain untouched. Cargo is
 // grouped south of the walking lanes, leaving the eastern muster ground empty.
@@ -109,13 +119,24 @@ for(const [i,x] of [-48,-44].entries())Add(Box(`StationWoundedBed${i}`,x,83,1.2,
 
 // Keep the continuous mainline in world space; move only the station package.
 // Shared support records must remain identical to their rendered block records.
-const compiled=new Map(blocks.map(block=>[block,Object.freeze(/^Station(?:Rail-?1|Sleeper\d+|RailBallast)$/.test(block.id)
- ? block : {...block,...P012StationPoint(block.x,block.z)})]));
+const compiled=new Map(blocks.map(block=>{
+ const lifted=/^Station(?:Cargo|House|Unload|Wounded)/.test(block.id);
+ return [block,Object.freeze(/^Station(?:Rail-?1|Sleeper\d+|RailBallast)$/.test(block.id)
+ ? block : {...block,...P012StationPoint(block.x,block.z),y:block.y+(lifted?platformTop:0)})];
+}));
 export const P012_STATION_BLOCKS=Object.freeze([...compiled.values()]);
 export const P012_STATION_SURFACES=Object.freeze(surfaces.map(surface=>compiled.get(surface)));
 export const P012_STATION_GATES=Object.freeze([
- Box("TrainDoor",-63.6,121,.22,4.4,2.7,"ground",{y:2.6,signal:"P012TrainDoor"}),
+ Box("StationCar0TrainDoor",-63.6,103,.22,4.4,1.4,"structure",{y:1.95,signal:"P012TrainDoor"}),
+ Box("TrainDoor",-63.6,121,.22,4.4,1.4,"structure",{y:1.95,signal:"P012TrainDoor"}),
+ Box("StationCar2TrainDoor",-63.6,139,.22,4.4,1.4,"structure",{y:1.95,signal:"P012TrainDoor"}),
 ]);
+// WORLD routes: interior start, interior doorway, last tread, clear apron.
+// Consumers must not apply P012StationPoint a second time.
+export const P012_STATION_EXITS=Object.freeze([103,121,139].map((z,index)=>Object.freeze({
+ carIndex:index,gateId:index===1?"TrainDoor":`StationCar${index}TrainDoor`,
+ route:Object.freeze([{x:-66,z:z+4},{x:-66,z},{x:-60.9,z},...(index===0?[{x:-60,z:101.8},{x:-55,z:101.8}]:[{x:-55,z}])].map(Object.freeze)),
+})));
 // Regex strings anchored to exact OLD families. Never use /^Station/ after
 // appending this module, which would erase the new assets and traversal fixtures.
 export const P012_STATION_REMOVE_IDS=Object.freeze([

@@ -209,6 +209,17 @@ function Dimensions(height) {
     footLen: 0.148 * H, footW: 0.056 * H, footH: 0.055 * H,
   };
 }
+// Opt-in procedural children; adult model joints and seeded adult variants stay
+// unchanged. Larger head share and shorter legs are authored proportions, not
+// an adult root scaled down. Physics consumers use the actual actor.height.
+function ChildDimensions() {
+  const H=1.12,d=Dimensions(H);
+  return {...d,ankleY:.05*H,kneeY:.24*H,hipY:.46*H,waistY:.55*H,
+    shoulderY:.76*H,neckY:.80*H,headCenterY:.90*H,
+    thighLen:.22*H,shinLen:.19*H,upperArmLen:.15*H,forearmLen:.14*H,
+    shoulderHalf:.105*H,headW:.145*H,headH:.20*H,headD:.16*H,
+    footH:.05*H,footLen:.13*H};
+}
 
 /**
  * 九〇式钢盔真正喂给材质的 albedo。**不是** HEX.ijaHelmet ——
@@ -765,7 +776,7 @@ function BuildDadao(buckets, d, quality) {
 // 全部建在「右手握把 = 原点、枪管沿 -Z、膛线轴在 y=+0.035」这个规范坐标系里。
 // 换枪只换一个 Group，据枪姿势 / 枪口位置 / 拉栓点全都不用跟着改。
 // ---------------------------------------------------------------------------
-function BuildWeaponGeometry(id, quality) {
+function BuildWeaponGeometry(id, quality, includeBayonet = false) {
   const data = WEAPONS[id];
   const buckets = new Map();
   // 枪的木/钢两桶不合并（全木或全钢的剪影一眼就错），只合小件（刀柄缠布、红布条）
@@ -841,7 +852,7 @@ function BuildWeaponGeometry(id, quality) {
           { x: s * 0.05, y: bore - 0.11, z: muzzleZ * 0.8, rz: s * 0.3 });
       }
     }
-    if (data.bayonet && quality === "high") {
+    if (includeBayonet && data.bayonet) {
       const bl = data.bayonetLengthM || 0.395;
       Add(buckets, "steel", GunSteelBox(0.016, 0.024, bl, "bayonet"), { y: bore - 0.006, z: muzzleZ - bl * 0.5 });
     }
@@ -1184,6 +1195,7 @@ export class Actor {
     const rnd = Mulberry32(HashString(seedText));
 
     this.factory = factory;
+    this.bayonetFixed = options.bayonetFixed === true;
     // 分件表的版本号。合批层按它判断要不要重扫这个人的网格 ——
     // 换枪、掏手榴弹、挂日军 GLB 皮肤都会在原地增删网格。
     this.partsRevision = 0;
@@ -1197,19 +1209,22 @@ export class Actor {
     // AI、伤害、误伤判定都只认 kind，分身纯粹是显示层的事。用 seed 抽，
     // 所以同一个人重开一局还是同一个人。
     const variantNames = spec.variants ? Object.keys(spec.variants) : null;
-    this.variant = variantNames
+    this.isChild = kind==="civilian" && ["childBoy","childGirl"].includes(options.variant);
+    this.variant = this.isChild ? options.variant : variantNames
       ? (variantNames.includes(options.variant) ? options.variant : variantNames[HashString(`${seedText}|variant`) % variantNames.length])
       : null;
 
     // 身高 ±4% 的个体差走整体缩放，手持武器再乘 1/scale 抵消 —— 枪长是史实数据
     this.sizeScale = (1 + (rnd() - 0.5) * 0.08)
-      * (this.variant ? spec.variants[this.variant] : 1);
+      * (this.isChild ? 1 : this.variant ? spec.variants[this.variant] : 1);
     this.weaponScale = 1 / this.sizeScale;
     this.height = spec.height * this.sizeScale;
 
     const build = factory.KindGeometry(kind, this.variant);
     const d = build.dims;
     this.dims = d;
+    this.height = d.height * this.sizeScale;
+    this.bodyRadius = this.isChild ? .24 : .42;
     this.materials = factory.ActorMaterials(kind, rnd, options);
     // "box" = Blender 模型没读到，退回了程序化方块几何。别把这个字段藏起来：
     // 换模最容易的失败方式就是**静默**退回，画面看着还行、其实一个模型都没用上。
@@ -1365,7 +1380,7 @@ export class Actor {
 
     // 军人可见模型在所有程序化控制节点建完以后接入：旧节点继续算移动、死亡与
     // 编辑器驱动量，但它们的网格会全部隐藏；蒙皮模型、动作、挂点和命中体只走 GLB。
-    this.characterRig = factory.CreateCharacterRig(kind, options, spec.height);
+    this.characterRig = this.isChild ? null : factory.CreateCharacterRig(kind, options, spec.height);
     this.usingRiggedCharacter = !!this.characterRig;
     this.modelVariant = this.characterRig ? this.characterRig.variantIndex : null;
     this.modelId = this.characterRig ? this.characterRig.modelId : null;
@@ -1622,6 +1637,7 @@ export class Actor {
 
   /** 换手持模型。几何在工厂里按 id 缓存，这里只换 Group。 */
   SetWeapon(weaponId) {
+    if(this.isChild)weaponId=null;
     if (this.weaponGroup) {
       if (this.weaponGroup.parent) this.weaponGroup.parent.remove(this.weaponGroup);
       this.weaponGroup = null;
@@ -1631,7 +1647,7 @@ export class Actor {
     this.weaponVariant = weaponId ? this._WeaponVariant(weaponId) : 0;
     this.partsRevision += 1;
     if (!weaponId) { this.weaponTwoHanded = false; return this; }
-    const built = this.factory.WeaponGeometry(weaponId, this.weaponVariant);
+    const built = this.factory.WeaponGeometry(weaponId, this.weaponVariant, { includeBayonet: this.bayonetFixed });
     const group = new THREE.Group();
     for (const [key, geometry] of built.geometries) {
       const mesh = new THREE.Mesh(geometry, this.materials[key] || this.materials.steel);
@@ -1742,6 +1758,10 @@ export class Actor {
 
   Update(dt, state = {}) {
     if (this.disposed) return;
+    if (typeof state.bayonetFixed === "boolean" && state.bayonetFixed !== this.bayonetFixed) {
+      this.bayonetFixed = state.bayonetFixed;
+      if (this.weaponData?.bayonet) this.SetWeapon(this.weaponId);
+    }
     const d = this.dims;
     const H = d.height;
     const s = state;
@@ -3282,8 +3302,9 @@ export class ActorFactory {
     const cached = this.kindCache.get(cacheKey);
     if (cached) return cached;
     const spec = KIND_SPEC[kind];
-    const dims = Dimensions(spec.height);
-    const fromModel = this._ModelKindGeometry(kind, spec, dims, variant);
+    const child=kind==="civilian"&&["childBoy","childGirl"].includes(variant);
+    const dims = child ? ChildDimensions() : Dimensions(spec.height);
+    const fromModel = child ? null : this._ModelKindGeometry(kind, spec, dims, variant);
     const entry = fromModel
       ? { dims, bones: fromModel.bones, mounts: fromModel.mounts, source: "model", meshId: fromModel.meshId }
       : { dims, bones: this._BoxKindGeometry(spec, dims), mounts: null, source: "box", meshId: null };
@@ -3382,12 +3403,12 @@ export class ActorFactory {
    * 返回的形状两条路完全一致：{ geometries, muzzle, gripFront, bolt, twoHanded }，
    * 所以 Actor.SetWeapon 一行都不用改。
    */
-  WeaponGeometry(weaponId, variant = 0, { includeBayonet = true } = {}) {
+  WeaponGeometry(weaponId, variant = 0, { includeBayonet = false } = {}) {
     const key = `${weaponId}|${variant}|${this.quality}|${includeBayonet ? "bayonet" : "bare"}`;
     let built = this.weaponCache.get(key);
     if (!built) {
       built = this._ModelWeaponGeometry(weaponId, variant, includeBayonet)
-        || BuildWeaponGeometry(weaponId, this.quality);
+        || BuildWeaponGeometry(weaponId, this.quality, includeBayonet);
       this.weaponCache.set(key, built);
     }
     return built;
@@ -3402,12 +3423,13 @@ export class ActorFactory {
    * 于是把一把好好的模型枪报成"退回方块"，红得毫无道理。
    */
   WeaponSource(weaponId, variant = 0) {
-    const built = this.weaponCache.get(`${weaponId}|${variant}|${this.quality}|bayonet`);
+    const built = this.weaponCache.get(`${weaponId}|${variant}|${this.quality}|bare`)
+      || this.weaponCache.get(`${weaponId}|${variant}|${this.quality}|bayonet`);
     return built ? built.source : null;
   }
 
   /** 从 TZM 模型取一把枪。挂点全部读模型的 muzzle / gripL，不再自己猜枪口在哪。 */
-  _ModelWeaponGeometry(weaponId, variant = 0, includeBayonet = true) {
+  _ModelWeaponGeometry(weaponId, variant = 0, includeBayonet = false) {
     const id = WeaponMeshId(weaponId, variant);
     if (!id || !this.meshDocs.has(id)) return null;
     const data = WEAPONS[weaponId];
@@ -3447,13 +3469,11 @@ export class ActorFactory {
     const gripFront = Mount("gripL")
       || (upright ? new THREE.Vector3(0, 0.12, 0) : new THREE.Vector3(0, -0.012, -0.30));
 
-    // 可上刺刀的枪（bayonet: true）在人物手里**常态带刀**：滕县攻防的白刃密度
-    // 就是这么高，AI 冲锋态（bayonetFixed）不用再临时换几何。只在 high 档并：
-    // medium/low 的观看距离读不出那一条刀，白花两千三角。
+    // 装刀状态由演员显式传入；低画质/缺模型用轻量刀片，不能把裸枪画成上刀。
     // 刀的 socket 挂点（枪口环中心）对到枪的 muzzle 上，环再往后坐 12 mm。
-    if (includeBayonet && data?.bayonet && this.quality === "high" && muzzle) {
+    if (includeBayonet && data?.bayonet && muzzle) {
       const bayonetId = BAYONET_MESH_BY_WEAPON[weaponId];
-      const bayonetBuilt = bayonetId && this.meshDocs.has(bayonetId)
+      const bayonetBuilt = this.quality === "high" && bayonetId && this.meshDocs.has(bayonetId)
         ? this._InstantiateMesh(bayonetId) : null;
       if (bayonetBuilt) {
         const socketNode = bayonetBuilt.nodes.get("socket");
@@ -3473,6 +3493,12 @@ export class ActorFactory {
             geometries.set(bucket, child.geometry);
           }
         });
+      } else {
+        const length = data.bayonetLengthM || 0.395;
+        const blade = GunSteelBox(0.016, 0.024, length, "bayonet");
+        blade.translate(muzzle.x, muzzle.y - 0.006, muzzle.z - length * 0.5);
+        geometries.set("steel", geometries.has("steel")
+          ? MergeGeometries([geometries.get("steel"), blade]) : blade);
       }
     }
     // 拉栓的抓握点：模型没有这个挂点（栓在钢件里烘死了），沿用规范坐标系里的常量。

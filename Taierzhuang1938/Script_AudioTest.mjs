@@ -348,8 +348,8 @@ const listener = await page.evaluate(async () => {
   // 第一章（城外原野）：切片离世界原点五百多米，听者钉住不动一眼看得出来。
   // **不能用序章**：那是过场承载章，JumpToPhase 对它不重建场、不 Respawn，
   // 相机停在上一关哪儿就还在哪儿，这条断言就测不到东西了。
-  T.JumpToPhase(1);
-  await sleep(400);
+  // EnterLevel rebuilds physics asynchronously; a fixed sleep can step freed bodies.
+  await T.JumpToPhase(1);
   T.StepFrames(30);
   await sleep(200);
   const cam = T.camera.position;
@@ -438,8 +438,7 @@ const shell = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const entry = a.sfxManifest && a.sfxManifest.cues.shellDrop;
   // 得先站到一章里，手上还得有枪有子弹 —— 前面那条听者断言把关卡跳到了第一章。
-  T.JumpToPhase(2);
-  await sleep(900);
+  await T.JumpToPhase(2);
   T.StepFrames(30);
   const before = {
     drop: a.RequestedCount("shellDrop"),

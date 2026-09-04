@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { CONTROL_GUIDE } from "./Script_Input.mjs";
 import {
-  AmmoReadout, ContextualActionPrompts, CrosshairGeometry, ShowTelegraphPaper,
+  AmmoReadout, ContextualActionPrompts, CrosshairGeometry, ShowTelegraphPaper, TargetCardPresentation,
 } from "./Script_Hud.mjs";
 import { IdentifySystem, TargetCard, IDENTIFY } from "./Script_Identify.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
@@ -14,6 +14,12 @@ assert.match(guideText, /F 拾枪、换枪/);
 assert.match(guideText, /B 有绷带且流血时包扎止血/);
 
 assert.deepEqual(ContextualActionPrompts(), []);
+const identityCard={key:"s2",title:"罗班长",meta:"25 岁 · 3m",kind:"friend"};
+assert.strictEqual(TargetCardPresentation(identityCard),identityCard,"normal scene identity detail is unchanged");
+assert.equal(TargetCardPresentation(identityCard,{targetDistance:false}).meta,"25 岁");
+assert.equal(TargetCardPresentation({...identityCard,meta:"45m"},{targetDistance:false}).meta,"");
+assert.equal(TargetCardPresentation(null,{targetDistance:false}),null);
+assert.equal(identityCard.meta,"25 岁 · 3m","presentation must not mutate identity data");
 assert.deepEqual(ContextualActionPrompts({ bleeding: 1, bandages: 0 }), []);
 assert.deepEqual(ContextualActionPrompts({ bleeding: 0, bandages: 2 }), []);
 
@@ -48,6 +54,11 @@ const twoGuns = ContextualActionPrompts({
 assert.deepEqual(twoGuns[0], {
   keys: "1 / 2", label: "切换长枪 / 短枪", kind: "switchWeapon",
 });
+for (const fixed of [false, true]) {
+  assert.deepEqual(ContextualActionPrompts({
+    bayonet: { fixed }, slots: { primary: "HanYang", secondary: null },
+  }), [], "可装或已装刺刀的步枪都不常驻 X，闲时提示条保持为空");
+}
 
 const soldier = {
   alive: false,

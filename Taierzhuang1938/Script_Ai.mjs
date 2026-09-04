@@ -495,15 +495,37 @@ export class AiDirector {
     // 埋进墙里的人再也走不出来（运动学角色控制器没有脱困能力），
     // 所以放人之前先问一句「这儿站得下吗」。
     const physics = this.ctx.physics;
+    const soldier = new Soldier(side, { ...options, x, z });
+    soldier.unarmed = options.unarmed === true || options.actorKind === "civilian";
+    const kind = options.actorKind || (side === "nra" ? (options.towel ? "nraDare" : "nra") : "ija");
+    // Child geometry is seeded by ActorFactory. Resolve it before any physical
+    // placement so free-space tests, initial capsule and later stance agree.
+    soldier.actor = this.ctx.actorFactory.Create(kind, {
+      seed: soldier.id * 131 + 7,
+      weapon: soldier.unarmed ? null : soldier.weaponId,
+      variant: options.actorVariant,
+    });
+    if (kind === "civilian" && ["childBoy", "childGirl"].includes(options.actorVariant)
+      && soldier.actor.isChild && Number.isFinite(soldier.actor.height) && soldier.actor.height > 0
+      && Number.isFinite(soldier.actor.bodyRadius) && soldier.actor.bodyRadius > 0) {
+      soldier.childCapsules = CAPSULE.map(cap => {
+        const height = soldier.actor.height * cap.height / CAPSULE[0].height;
+        // Rapier's minimum capsule half-segment is .02; keep actual total
+        // height equal to the requested child posture, including prone.
+        return { radius: Math.min(soldier.actor.bodyRadius * cap.radius / CAPSULE[0].radius,
+          height * .5 - .02), height };
+      });
+    }
+    const standingCapsule = soldier.childCapsules?.[0] || CAPSULE[0];
     let y;
     if (physics) {
-      const free = physics.FindFreeSpot(x, z, CAPSULE[0].radius, CAPSULE[0].height);
+      const free = physics.FindFreeSpot(x, z, standingCapsule.radius, standingCapsule.height);
       x = free.x; z = free.z; y = free.y;
     } else {
       y = this.ctx.battlefield.GroundHeight(x, z);
     }
-    const soldier = new Soldier(side, { ...options, x, z });
-    soldier.unarmed = options.unarmed === true || options.actorKind === "civilian";
+    soldier.position.x = x; soldier.position.z = z;
+    if (soldier.goal) { soldier.goal.x = x; soldier.goal.z = z; }
     soldier.scriptedNoncombatant = options.scriptedNoncombatant === true;
     soldier.escortRole = options.escortRole || null;
     const serial = this.spawnSerial[side]++;
@@ -536,15 +558,9 @@ export class AiDirector {
     soldier.position.y = y;
     if (physics) {
       soldier.body = physics.MakeCharacter({
-        radius: CAPSULE[0].radius, height: CAPSULE[0].height, position: soldier.position,
+        radius: standingCapsule.radius, height: standingCapsule.height, position: soldier.position,
       });
     }
-    const kind = options.actorKind || (side === "nra" ? (options.towel ? "nraDare" : "nra") : "ija");
-    soldier.actor = this.ctx.actorFactory.Create(kind, {
-      seed: soldier.id * 131 + 7,
-      weapon: soldier.unarmed ? null : soldier.weaponId,
-      variant: options.actorVariant,
-    });
     soldier.actorKind = soldier.actor.kind || kind;
     soldier.actorVariant = soldier.actor.variant || null;
     if (soldier.unarmed) soldier.tacticalRole = "noncombatant";
@@ -982,7 +998,10 @@ export class AiDirector {
   }
 
   /** 姿态对应的枪眼高度。站 1.5 / 蹲 1.0 / 卧 0.5 —— 卧倒的人本来就该更难被看见。 */
-  static StanceEye(stance) { return stance === 2 ? 0.5 : stance === 1 ? 1.0 : 1.5; }
+  static StanceEye(stance, subject = null) {
+    const heightScale = (subject?.ref || subject)?.childCapsules?.[0]?.height / CAPSULE[0].height;
+    return (stance === 2 ? 0.5 : stance === 1 ? 1.0 : 1.5) * (Number.isFinite(heightScale) ? heightScale : 1);
+  }
 
   /**
    * 某个姿态**现在**的被发现距离。三处判定（玩家、友邻、旧目标复核）共读这一条，
@@ -1366,9 +1385,9 @@ export class AiDirector {
       if (entry.id === id && this.time - entry.time < 0.25) return entry.clear;
     }
     const from = this.tmpA.set(s.position.x,
-      s.position.y + AiDirector.StanceEye(s.stance), s.position.z);
+      s.position.y + AiDirector.StanceEye(s.stance, s), s.position.z);
     const to = this.tmpB.set(cand.position.x,
-      cand.position.y + AiDirector.StanceEye(cand.stance), cand.position.z);
+      cand.position.y + AiDirector.StanceEye(cand.stance, cand), cand.position.z);
     if (this.ctx.BlocksSight?.(from, to)) return false;
     const dir = this.tmpC.subVectors(to, from);
     const dist = dir.length();
@@ -1499,7 +1518,11 @@ export class AiDirector {
     // 就通的城里够用，而且比 A* 便宜两个数量级。
     // P012 route followers use an explicit metres/second pace, not a cap on the
     // ordinary 2.6m/s advance state. Scouts still perceive and fire normally.
-    if (s.p012ScoutDirected) { desired = this.tmpD.copy(s.goal); speed = 2.6; }
+    const scriptedPathFollower = s.p012Guided === true && Number.isFinite(s.scriptMoveSpeedMps);
+    // P012 has already swept its corridor and owns queue waits. A stale random
+    // detour must not turn a resumed walker out of that corridor or vault a desk.
+    if (scriptedPathFollower) { s.detourTime = 0; s.stuckTime = 0; }
+    if (s.p012ScoutDirected || s.p012RouteRejoining) { desired = this.tmpD.copy(s.goal); speed = 2.6; }
     if (Number.isFinite(s.scriptMoveSpeedMps)) speed = s.p012Guided && desired
       ? Math.max(0, s.scriptMoveSpeedMps) : Math.min(speed, Math.max(0, s.scriptMoveSpeedMps));
     if (desired && speed > 0) {
@@ -1518,7 +1541,7 @@ export class AiDirector {
           navigated = this.ctx.nav.Steer(s.position.x, s.position.z, desired.x, desired.z, this.navOut);
           if (navigated) { nx = this.navOut.x; nz = this.navOut.z; s.detourTime = 0; s.stuckTime = 0; }
         }
-        if (!navigated && s.detourTime > 0) {
+        if (!scriptedPathFollower && !navigated && s.detourTime > 0) {
           s.detourTime -= dt;
           const c = Math.cos(s.detourYaw), sn = Math.sin(s.detourYaw);
           const rx = nx * c - nz * sn, rz = nx * sn + nz * c;
@@ -1538,11 +1561,11 @@ export class AiDirector {
           s.stuckTime += dt;
           // 挡在前面的要是一堵翻得过去的墙，就翻过去 —— 别沿着院墙兜半圈找门洞。
           // 门槛比"卡住就绕"的 0.8 s 早一点：能翻就不该先绕。
-          if (s.stuckTime > 0.3 && this.TryVault(s, nx, nz)) return;
+          if (!scriptedPathFollower && s.stuckTime > 0.3 && this.TryVault(s, nx, nz)) return;
           // 绕着还是不动就**翻到另一面**再绕。这一条不能写成"只有不在绕行时才重掷"：
           // 那样一旦直奔方向与拐 99° 的方向同时被挡就是死锁，实跑量到位置整整
           // 两百四十秒一帧都不动。翻面 + 每次重掷都带一点抖动才出得来。
-          if (s.stuckTime > 0.8) {
+          if (!scriptedPathFollower && s.stuckTime > 0.8) {
             s.stuckTime = 0;
             if (s.detourTime > 0) s.detourSign = -s.detourSign;
             s.detourTime = 2.0 + s.rnd() * 1.2;
@@ -1621,6 +1644,7 @@ export class AiDirector {
       const cadence = ActorAnimationCadence(s);
       if (s.actor.root.visible && (this.tickIndex + s.id) % cadence === 0) s.actor.Update(dt * cadence, {
         moveSpeed: s.moveSpeed,
+        bayonetFixed: s.bayonetFixed,
         aim: s.aimBlend,
         crouch: s.crouchBlend,
         prone: s.proneBlend,
@@ -1663,6 +1687,7 @@ export class AiDirector {
       moveSpeed: 0, aim: 0, crouch: 0, prone: 0,
       grounded: s.grounded, verticalVelocity: s.velocityY,
       melee: inputThrust, meleeQte: qte, elapsed: this.time,
+      bayonetFixed: s.bayonetFixed,
       lookYaw: 0, lookPitch: 0,
     });
   }
@@ -1747,6 +1772,7 @@ export class AiDirector {
       const cadence = ActorAnimationCadence(s);
       if (s.actor.root.visible && (this.tickIndex + s.id) % cadence === 0) s.actor.Update(dt * cadence, {
         moveSpeed: 1, aim: 0, crouch: 0, prone: 0, firing: false,
+        bayonetFixed: s.bayonetFixed,
         grounded: false,
         verticalVelocity: Math.cos(Math.PI * k) * Math.PI
           * Math.max(0, s.vaultApexY - Math.max(from.y, to.y)) / s.vaultDuration,
@@ -1934,8 +1960,9 @@ export class AiDirector {
     const body = s.body;
     if (!body) {
       const bf = this.ctx.battlefield;
-      if (!this.Blocked(s.position.x + dx, s.position.z, s.position.y)) s.position.x += dx;
-      if (!this.Blocked(s.position.x, s.position.z + dz, s.position.y)) s.position.z += dz;
+      const cap = s.childCapsules?.[s.stance] || s.childCapsules?.[0];
+      if (!this.Blocked(s.position.x + dx, s.position.z, s.position.y, cap)) s.position.x += dx;
+      if (!this.Blocked(s.position.x, s.position.z + dz, s.position.y, cap)) s.position.z += dz;
       s.position.y = bf.StandHeight(s.position.x, s.position.z, s.position.y);
       return;
     }
@@ -1943,7 +1970,8 @@ export class AiDirector {
     // 不对账的话表现很怪：把人挪到某处，下一帧他自己"弹"回胶囊所在的老位置 ——
     // 通关冒烟里「圈里留一个敌人」那一条就是这么失效的（人被弹回去，圈里没人了）。
     body.ReconcileTo(s.position.x, s.position.y, s.position.z);
-    const cap = CAPSULE[s.stance] || CAPSULE[0];
+    const capsules = s.childCapsules || CAPSULE;
+    const cap = capsules[s.stance] || capsules[0];
     body.SetSize(cap.radius, cap.height);
     s.velocityY = s.grounded ? -0.6 : s.velocityY - 19.6 * dt;   // 贴地那一点向下的力保证 grounded 稳定
     const r = body.Move(dx, s.velocityY * dt, dz);
@@ -1952,12 +1980,14 @@ export class AiDirector {
     if (r.grounded) s.velocityY = 0;
   }
 
-  Blocked(x, z, y) {
+  Blocked(x, z, y, capsule = null) {
+    const radius = capsule?.radius ?? .35;
+    const height = capsule?.height ?? 1.6;
     const list = this.ctx.battlefield.NearbyColliders(x, z, 1.2);
     for (const b of list) {
-      if (x < b.min[0] - 0.35 || x > b.max[0] + 0.35) continue;
-      if (z < b.min[2] - 0.35 || z > b.max[2] + 0.35) continue;
-      if (y + 1.6 < b.min[1] || y > b.max[1]) continue;
+      if (x < b.min[0] - radius || x > b.max[0] + radius) continue;
+      if (z < b.min[2] - radius || z > b.max[2] + radius) continue;
+      if (y + height < b.min[1] || y > b.max[1]) continue;
       if (b.max[1] - y < TRAVERSAL.stepMax) continue;  // 矮的东西自动抬腿跨过去
       return true;
     }

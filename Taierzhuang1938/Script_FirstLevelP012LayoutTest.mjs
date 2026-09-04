@@ -5,8 +5,11 @@ import vm from "node:vm";
 import {P012Point,P012NorthPoint,P012SouthPoint,P012StationPoint,P012MapPoints} from "./Data_FirstLevelP012Space.mjs";
 import {FIRST_LEVEL_P012_LAYOUT as layout,P012_ROUTES as routes,P012_ZONES as zones,P012_ANCHORS as anchors,P012_SEMANTIC_COLORS as colors,P012_ENEMY_LANES as lanes} from "./Data_FirstLevelP012Layout.mjs";
 import {TRAVERSAL,TraversalKind} from "./Data_Traversal.mjs";
+import {P012_STATION_EXITS,P012_STATION_GATES,P012_STATION_HEIGHTS} from "./Data_FirstLevelP012Station.mjs";
+import {trainColumn} from "./Data_FirstLevelP012TrainColumn.mjs";
 import {FirstLevelP012Director} from "./Script_FirstLevelP012Flow.mjs";
 import {FIRST_LEVEL_P012_WHITEBOX_PHASE as phase} from "./Data_FirstLevelP012Whitebox.mjs";
+assert.equal(phase.hud.objectiveMarkers,false,"P012 follows actual people, never floating destinations or metre labels");
 function FootY(layout,p) {
  let y=0;
  for(const b of layout.walkableSurfaces||[]){
@@ -72,16 +75,27 @@ for(const point of routes.villageEvacuationWaiting)assert.ok(!layout.blocks.some
 for(const [key,blueprint] of Object.entries({trainSpawn:{x:-66,z:65},trainDoor:{x:-60,z:61},weaponCheck:{x:-55,z:44},ammoIssue:{x:-55,z:34},weaponInspect:{x:-45,z:34}}))assert.deepEqual(anchors[key],P012StationPoint(blueprint.x,blueprint.z),`${key} moves exactly once with station`);
 assert.deepEqual(P012Point(-55,55),{x:-55,z:55},"station transform is never automatic");
 Audit("CarriageDoorToEquipment",routes.trainExit,layout.blocks,0.4);
-for(const [index,entry] of phase.whitebox.activities.traffic.entries())Audit(`OpeningTraffic${index}`,entry.route,layout.blocks,0.42);
+for(const [index,entry] of phase.whitebox.activities.traffic.entries())Audit(`OpeningTraffic${index}`,entry.route,layout.blocks,0.6);
 assert.ok(!layout.blocks.some(b=>Hits(anchors.trainSpawn,b,0.4)));
 assert.equal(FootY(layout,anchors.trainSpawn),1.25,"spawn stands on the occupied middle carriage floor");
 const occupiedFloor=layout.blocks.find(b=>b.id==="StationCar1Floor");
 assert.ok(Math.abs(anchors.trainSpawn.x-occupiedFloor.x)<occupiedFloor.w/2&&Math.abs(anchors.trainSpawn.z-occupiedFloor.z)<occupiedFloor.d/2);
 const stairPoints=[P012StationPoint(occupiedFloor.x,61),...Array.from({length:5},(_,i)=>layout.blocks.find(b=>b.id===`StationExitStep${i}`))];
 const stairHeights=stairPoints.map(p=>FootY(layout,p));
-assert.deepEqual(stairHeights,[1.25,1,.75,.5,.25,0],"all actual descending tread heights are sampled, not the carriage roof");
+assert.deepEqual(stairHeights,[P012_STATION_HEIGHTS.floorTop,...P012_STATION_HEIGHTS.exitTops],"all actual descending tread heights are sampled, not the carriage roof");
 for(let i=1;i<stairHeights.length;i++)assert.ok(stairHeights[i-1]-stairHeights[i]<=TRAVERSAL.stepMax);
 Audit("ActualEastStairDescent",stairPoints,layout.blocks,.4);
+for(const exit of P012_STATION_EXITS){
+ const z=exit.route[1].z,index=exit.carIndex;
+ const steps=Array.from({length:5},(_,i)=>layout.blocks.find(b=>b.id===(index===1?`StationExitStep${i}`:`StationCar${index}ExitStep${i}`)));
+ assert.deepEqual([{x:-66,z},...steps].map(p=>FootY(layout,p)),[P012_STATION_HEIGHTS.floorTop,...P012_STATION_HEIGHTS.exitTops],`car ${index} samples every real descending support`);
+ assert.ok(steps.every(step=>step.d===3&&step.w===.6),"each carriage has full-width noncompressed treads");
+ assert.equal(FootY(layout,exit.route[0]),1.25);
+ Audit(`AllCarriageExit${index}`,exit.route,layout.blocks,.42);
+ const gate=P012_STATION_GATES.find(gate=>gate.id===exit.gateId);
+ assert.equal(gate.signal,"P012TrainDoor");
+ assert.ok(Hits({x:gate.x,z},gate,.42),"closed door physically bars its exit before the common signal");
+}
 const openingIssue=phase.whitebox.activities.openingIssue;
 assert.equal(openingIssue.spawns.length,6,"six existing squad members begin aboard");
 for(const [index,spawn] of openingIssue.spawns.entries()){
@@ -93,12 +107,26 @@ for(const [index,muster] of openingIssue.musterPoints.entries())Audit(`SquadIssu
  [openingIssue.weaponPoint,openingIssue.ammoPoint,...openingIssue.musterRoute,muster],layout.blocks,.42);
 const stationApron=layout.blocks.find(block=>block.id==="StationPlatformApron");
 const civilians=phase.whitebox.activities.traffic.filter(actor=>actor.role==="civilian");
-assert.equal(civilians.length,11,"the eleven civilians remain one finite village column");
+assert.equal(civilians.filter(actor=>!actor.child).length,11,"eleven adults remain finite");
+assert.equal(civilians.filter(actor=>actor.child).length,2,"two procedural children accompany their families");
 // Temporarily use the apron rectangle as a solid exclusion zone only in this
 // audit: its production paint remains non-solid. Sweep includes the spawn point.
 for(const [index,actor] of civilians.entries())Audit(`CivilianAvoidsPlatform${index}`,actor.route,
  [{...stationApron,solid:true,y:.9,h:1.8}],.42);
-assert.ok(stationApron.y+stationApron.h/2<.025-.005,"grey station apron cannot z-fight the green route paint");
+assert.equal(stationApron.y-stationApron.h/2,P012_STATION_HEIGHTS.platformTop,"apron paint follows the real raised platform");
+assert.ok(!layout.blocks.some(b=>/^StationCar\d(?:Roof|EastHeader|WestHeader|WindowPost)/.test(b.id)),"freight cars have open tops and no passenger window strips");
+assert.deepEqual([98.1,97.6,96.8,96].map(z=>FootY(layout,{x:-55,z})),[.5,.25,0,0],"north issue route descends actual platform stairs");
+Audit("PlatformNorthDescent",[{x:-55,z:104},{x:-55,z:94}],layout.blocks,.42);
+const canopy=layout.blocks.filter(block=>/^StationLongCanopyRoof/.test(block.id));
+assert.equal(canopy.length,4);
+const canopyWidth=Math.max(...canopy.map(block=>block.x+block.w/2))-Math.min(...canopy.map(block=>block.x-block.w/2));
+assert.ok(canopyWidth>=12&&canopyWidth<=13.2&&canopy.every(block=>block.d===53),"long narrow trackside canopy does not roof over the whole station court");
+assert.ok(canopy.every(block=>block.x+block.w/2<-47.9),"station house and east yard remain outside the long canopy");
+for(const car of trainColumn.cars){
+ Audit(`TrainCanopyExit${car.carIndex}`,car.exitRoute,layout.blocks,.42);
+ Audit(`TrainCanopyIssue${car.carIndex}`,[car.exitRoute.at(-1),car.weaponPoint,car.ammoPoint,...car.onward],layout.blocks,.62);
+}
+for(const id of ["WeaponCheckTable","StationHouseBack","StationCargoLower0","StationWoundedBed0"])assert.equal(layout.blocks.find(b=>b.id===id).y-layout.blocks.find(b=>b.id===id).h/2,.5,`${id} stands on platform, not buried under it`);
 const sidingRails=layout.blocks.filter(block=>/^StationLoadingSidingRail-?1$/.test(block.id));
 assert.equal(sidingRails.length,2);
 assert.equal((sidingRails[0].x+sidingRails[1].x)/2,-72);
@@ -258,9 +286,9 @@ function SightClear(a,b,height){
   assert.ok(!layout.blocks.some(block=>block.solid!==false&&block.y-block.h/2<height&&block.y+block.h/2>height&&Hits(p,{...block,y:0.5,h:1},0.01)),`sight blocked at ${JSON.stringify(p)}`);
  }
 }
-function SegmentBlocked(from,to){
+function SegmentBlocked(from,to,allowedTargetId=null){
  return layout.blocks.some(b=>{
-  if(b.solid===false)return false;
+  if(b.solid===false||b.id===allowedTargetId)return false;
   const c=Math.cos(b.ry),s=Math.sin(b.ry),local=p=>[(p.x-b.x)*c-(p.z-b.z)*s,p.y-b.y,(p.x-b.x)*s+(p.z-b.z)*c];
   const a=local(from),end=local(to),half=[b.w/2,b.h/2,b.d/2];let low=0,high=1;
   for(let axis=0;axis<3;axis++){
@@ -270,6 +298,20 @@ function SegmentBlocked(from,to){
   }
   return true;
  });
+}
+// Village bends screen cross-courtyard shortcuts while the unchanged road
+// reveals its next leg. Check physical eye-height rays, not block counts.
+{
+ const eye=p=>({...p,y:1.62});
+ for(const [from,to] of [
+  [{x:-36,z:95},{x:-30,z:62}],
+  [{x:-29.5,z:62},{x:-29.5,z:30}],
+  [{x:-30,z:30},{x:0,z:0}],
+ ])assert.ok(SegmentBlocked(eye(from),eye(to)),"staggered village buildings screen distant cross-courtyard sightlines");
+ for(let index=1;index<routes.village.length;index++)assert.ok(!SegmentBlocked(eye(routes.village[index-1]),eye(routes.village[index])),"each actual village road leg remains visually readable");
+ assert.ok(!SegmentBlocked(eye({x:-17,z:12}),eye({x:0,z:0})),"north village mouth reveals the hub rather than another enclosing wall");
+ assert.ok(!SegmentBlocked(eye({x:-55,z:104}),{x:-66,y:4.8,z:86},"StationEngineChimney"),"station north exit retains a sightline to the locomotive chimney (target itself may be hit)");
+ assert.deepEqual(routes.village.map(({x,z})=>[x,z]),[[-43,100],[-36,95],[-30,80],[-30,62],[-34,46],[-30,30],[-30,19],[-17,12],[0,0]],"village shaping must not alter the public route");
 }
 // These are real visibility pockets, not merely HUD group indices. Later
 // shooters remain damageable but their bodies are behind solid partitions.
@@ -499,7 +541,7 @@ for(const [kind,p] of Object.entries(anchors.traversal)){
  // Sweep the whole horizontal capsule footprint against the full apex+standing
  // envelope, including overhead decks that ground-only tests deliberately skip.
  const reach=kind==="mantle"?TRAVERSAL.mantleReachM:TRAVERSAL.vaultReachM;
- const apex=box.h+(kind==="mantle"?TRAVERSAL.mantleApexOverM:TRAVERSAL.vaultApexOverM);
+ const apex=box.y+box.h/2+(kind==="mantle"?TRAVERSAL.mantleApexOverM:TRAVERSAL.vaultApexOverM);
  for(let i=0;i<=100;i++){
   const sample={x:p.x,z:p.z+0.9-reach*i/100};
   for(const obstacle of layout.blocks){

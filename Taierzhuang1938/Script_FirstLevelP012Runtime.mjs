@@ -1,5 +1,7 @@
 // P012 physical actors and pressure adapters. Pure rules; geometry/audio remain host-owned.
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
+import { FirstLevelP012March, P012SegmentClear, P012NextVisiblePoint, P012RouteProjection, P012RoutePoint } from "./Script_FirstLevelP012March.mjs";
+import { FirstLevelP012TrainColumn } from "./Script_FirstLevelP012TrainColumn.mjs";
 function TrafficPoint(path, distance) {
   for(let i=1;i<path.length;i++){
     const a=path[i-1],b=path[i],length=Math.hypot(b.x-a.x,b.z-a.z);
@@ -9,14 +11,34 @@ function TrafficPoint(path, distance) {
   return {...path[path.length-1]};
 }
 function TrafficLength(path){return path.slice(1).reduce((sum,p,i)=>sum+Math.hypot(p.x-path[i].x,p.z-path[i].z),0);}
+/** Local guide reconnect: only known corridor vertices and body-clear edges; never teleport. */
+export function P012GuideApproach(blocks, start, target, points = []) {
+  if (!start || !target) return null;
+  const nodes=[start,target,...points.filter(Boolean)], costs=nodes.map(()=>Infinity), previous=[], visited=new Set();
+  costs[0]=0;
+  while(visited.size<nodes.length){
+    let at=-1;
+    for(let i=0;i<nodes.length;i++)if(!visited.has(i)&&(at<0||costs[i]<costs[at]))at=i;
+    if(at<0||!Number.isFinite(costs[at]))return null;
+    if(at===1){const route=[];for(let index=1;index!==0;index=previous[index])route.unshift({...nodes[index]});return route;}
+    visited.add(at);
+    for(let i=1;i<nodes.length;i++)if(!visited.has(i)&&P012SegmentClear(blocks,nodes[at],nodes[i],.42)){
+      const cost=costs[at]+Math.hypot(nodes[i].x-nodes[at].x,nodes[i].z-nodes[at].z);
+      if(cost<costs[i]){costs[i]=cost;previous[i]=at;}
+    }
+  }
+  return null;
+}
 export class FirstLevelP012Runtime {
   constructor(host, config) {
     this.host = host; this.config = config; this.guide = null; this.near = []; this.far = [];
     this.weaponActionCount = 0; this.mortarImpactCount = 0; this.mortarImpactPosition = null;
     this.pendingShells = []; this.time = 0; this.traffic = [];
+    if(config.activities?.openingMarch)this.march=new FirstLevelP012March(config.layout.blocks,config.activities.openingMarchRoute||config.activities.villageRoute);
     if(config.anchors?.trainSpawn)this.SaveSafePoint("Start",config.anchors.trainSpawn,"stand",0);
   }
   Guide(spec) {
+    if(this.guide?.heldStance!==undefined){const actor=this.host.GuideActor();if(actor)this.ApplyGuideStance(actor,this.guide.heldStance);}
     if (spec.beat === 8 && this.beat !== 8) { this.mgSuppressedAt = null; this.friendlyMgResponse = false; }
     this.beat = spec.beat;
     // Finish the casualty route physically before holding the volunteer rendezvous.
@@ -33,6 +55,15 @@ export class FirstLevelP012Runtime {
     }
     if (Number.isInteger(spec.startIndex)) index = Math.max(0, Math.min(route.length - 1, spec.startIndex));
     this.guide = { ...spec, route, index };
+    if(spec.safeRoute && route.length){
+      // This actor's local guide task owns movement until handoff. Leaving the
+      // defence flag set lets Ai.Act replace the commanded goal with standstill.
+      const actor=this.host.GuideActor();
+      if(actor?.scriptDefensive)this.host.ReleaseDefense?.(actor);
+      if(this.defenders)this.defenders=this.defenders.filter(defender=>defender!==actor);
+      this.guide.approach=P012GuideApproach(this.config.layout?.blocks||[],position,route[0],spec.approachPoints);
+      this.guide.approachIndex=0;
+    }
     if (!this.config.activities?.traffic && spec.beat === 2 && !this.traffic.length) {
       const routes = [route.map((point) => ({ x: point.x - 2, z: point.z })),
         [...route].reverse().map((point) => ({ x: point.x + 2, z: point.z }))];
@@ -158,6 +189,26 @@ export class FirstLevelP012Runtime {
   }
   StepOpeningCast(dt = .1) {
     const activity=this.config.activities,parking=activity?.openingCastParking;
+    if(activity?.trainColumn&&this.host.SpawnRecruit){
+      if(!this.trainColumn){
+        const originalActors=(this.host.FriendlyActors?.()||[]).filter(actor=>actor!==this.host.GuideActor()&&!this.traffic.some(entry=>entry.actor===actor)).slice(0,6);
+        this.trainColumn=new FirstLevelP012TrainColumn({
+          ExistingRecruits:()=>originalActors,SpawnRecruit:spec=>this.host.SpawnRecruit(spec),
+          Initialize:(actor,point)=>{this.host.InitializeOpeningActor(actor,point);actor.scriptedNoncombatant=true;actor.p012Guided=true;actor.scriptArrivalRadius=.1;},
+          SetEquipment:(actor,stage)=>this.host.SetOpeningEquipment(actor,stage),
+          Position:actor=>this.host.Position(actor),Move:(actor,point,speed)=>this.host.Move(actor,point,speed),
+          Release:actor=>{actor.scriptArrivalRadius=.3;},Visible:actor=>this.host.TrafficVisible(actor),Retire:actor=>this.host.RetireTraffic(actor),
+          DoorOpen:()=>this.host.Signalled("P012TrainDoor"),
+          Obstacles:()=>[this.host.PlayerPosition?.(),this.host.Position(this.host.GuideActor())].filter(Boolean),
+        },activity.trainColumn);
+      }
+      this.trainColumn.Update(dt,this.beat||0);
+      const entries=this.trainColumn.Entries().filter(entry=>entry.original);
+      if(!this.openingCast)this.openingCast=entries.map((entry,slot)=>({...entry,marchSlot:slot,parking:activity.trainColumn.originalMuster[slot]}));
+      for(const entry of this.openingCast){const source=entries.find(other=>other.actor===entry.actor);
+        if(source){for(const key of ["weaponIssued","ammoIssued","released","index","stage"])if(key!=="stage"||!entry.marchComplete)entry[key]=source[key];entry.issueComplete=source.released;}}
+      return;
+    }
     if(!parking?.length)return;
     if(!this.openingCast){
       const guide=this.host.GuideActor();
@@ -216,6 +267,140 @@ export class FirstLevelP012Runtime {
       else this.host.Move(entry.actor,target,speed);
     }
   }
+  DefendSupplyWalker(walker) {
+    const supply=this.config.activities?.frontlineSupply;
+    // ReleaseGuide clears guided arrival state; restore the bounded supply slot
+    // before handing this same actor to normal defensive fire.
+    if(supply)walker.actor.scriptArrivalRadius=supply.arrivalRadiusM;
+    this.host.Defend?.(walker.actor,walker.parking,{...this.config.activities?.frontlineDoctrine,
+      ...(supply?{holdRadiusM:supply.holdRadiusM}:{})});
+  }
+  StepMarch(dt) {
+    if(!this.march)return;
+    const guide=this.host.Position(this.host.GuideActor());if(!guide)return;
+    const marchEnd=this.march.route.at(-1);
+    if(this.beat>=5&&Math.hypot(guide.x-marchEnd.x,guide.z-marchEnd.z)<3)this.marchFrontlineReached=true;
+    for(const entry of this.openingCast||[]){
+      if(!entry.ammoIssued||entry.marchComplete||(!entry.issueComplete&&!entry.released))continue;
+      const at=this.host.Position(entry.actor);if(!at)continue;
+      if((this.beat??0)<2){this.host.Move(entry.actor,entry.parking,Math.hypot(at.x-entry.parking.x,at.z-entry.parking.z)>.5?3.05:0);continue;}
+      if(this.host.Signalled?.("P012NorthNearMissImpact")&&!entry.shellReacted){
+        entry.shellReacted=true;entry.shellReactionUntil=Math.max(this.guideReactionUntil||0,this.time+2.4);
+        this.host.SetOpeningShelter?.(entry.actor,entry.shellReactionUntil-this.time);
+      }
+      if(this.time<(entry.shellReactionUntil||0)){this.host.Move(entry.actor,at,0);continue;}
+      entry.actor.scriptedNoncombatant=true;entry.actor.scriptArrivalRadius=.3;
+      const activity=this.config.activities,end=this.march.route.at(-1),slot=entry.marchSlot??entry.slot;
+      const defense=activity.openingMarchDefensePositions?.[slot];
+      if(this.beat>=5&&defense&&this.marchFrontlineReached){
+        const projection=P012RouteProjection(this.march.route,at);
+        const remaining=this.march.route.slice(projection.index);remaining.push(defense);
+        const next=P012NextVisiblePoint(this.config.layout.blocks,at,remaining,0,.46);
+        entry.marchPlan={point:next.point,speed:next.blocked?0:3.05,blocked:!!next.blocked};
+        if(Math.hypot(at.x-defense.x,at.z-defense.z)<.45){
+          entry.marchComplete=true;entry.stage="frontline";entry.marchDefensePoint=defense;
+          entry.actor.scriptedNoncombatant=false;this.host.ReleaseGuide?.(entry.actor);this.DefendMarchEntry(entry);
+          if(this.defenders&&!this.defenders.includes(entry.actor))this.defenders.push(entry.actor);
+        }else this.host.Move(entry.actor,next.point,next.blocked?0:3.05);
+        continue;
+      }
+      const plan=this.march.Plan(entry.actor.id,at,guide,entry.marchSlot??entry.slot,this.time);
+      entry.marchPlan=plan;entry.stage="march";
+      this.host.Move(entry.actor,plan.point,plan.speed);
+    }
+  }
+  DefendMarchEntry(entry){
+    entry.actor.scriptArrivalRadius=.3;
+    this.host.Defend?.(entry.actor,entry.marchDefensePoint,{...this.config.activities.frontlineDoctrine,holdRadiusM:this.config.activities.openingMarchHoldRadiusM??.5});
+  }
+  FaceToward(actor,position,target,dt) {
+    if(!target||Math.hypot(target.x-position.x,target.z-position.z)<.05)return;
+    const current=this.host.GuideYaw?.(actor)||0,wanted=Math.atan2(-(target.x-position.x),-(target.z-position.z));
+    const delta=Math.atan2(Math.sin(wanted-current),Math.cos(wanted-current));
+    this.host.FaceGuide?.(actor,current+Math.max(-3.4*dt,Math.min(3.4*dt,delta)));
+  }
+  ApplyGuideStance(actor,stance) {
+    if(this.host.SetGuideStance)this.host.SetGuideStance(actor,stance);
+    else actor.stance=stance;
+  }
+  StepSafeGuide(guide,actor,dt) {
+    const position=this.host.Position(actor), player=this.host.PlayerPosition?.(), blocks=this.config.layout?.blocks||[];
+    if(!position)return;
+    actor.scriptArrivalRadius=.3;
+    const Stop=()=>this.host.Move(actor,position,0);
+    if(!guide.approach){Stop();return;}
+    const near=point=>Math.hypot(position.x-point.x,position.z-point.z)<.6;
+    while(guide.approachIndex<guide.approach.length && near(guide.approach[guide.approachIndex]))guide.approachIndex++;
+    if(guide.approachIndex<guide.approach.length){
+      const target=guide.approach[guide.approachIndex];
+      const lagging=player&&guide.waitDistance&&Math.hypot(player.x-position.x,player.z-position.z)>guide.waitDistance
+        &&Math.hypot(player.x-target.x,player.z-target.z)>Math.hypot(position.x-target.x,position.z-target.z);
+      if(!lagging&&P012SegmentClear(blocks,position,target,.42))this.host.Move(actor,target,guide.speed);else {Stop();this.FaceToward(actor,position,player,dt);}
+      return;
+    }
+    let target=guide.route[guide.index];
+    if(near(target)){
+      const event=guide.beat===11&&guide.index===0?"P012GuideAtWounded":guide.beat===14?"P012GuideAtFlankEntry":guide.beat===23?"P012GuideAtSmoke":null;
+      if(event && !this.host.Signalled(event))this.host.Signal?.(event);
+      const wait=guide.WaitAt?.(guide.index);
+      if(wait || guide.index===guide.route.length-1){
+        if(guide.holdStance!==undefined){guide.heldStance??=actor.stance??0;this.ApplyGuideStance(actor,guide.holdStance);}
+        Stop();this.FaceToward(actor,position,guide.FaceAt?.(guide.index)||player,dt);return;
+      }
+      target=guide.route[++guide.index];
+    }
+    const lagging=player&&guide.waitDistance&&Math.hypot(player.x-position.x,player.z-position.z)>guide.waitDistance;
+    if(guide.Hold?.() || lagging || !P012SegmentClear(blocks,position,target,.42)){Stop();this.FaceToward(actor,position,player,dt);return;}
+    this.host.Move(actor,target,guide.speed);
+  }
+  StepGuideInspection(guide,actor,position,player,dt) {
+    if(guide.beat!==2||!this.config.activities?.villageInspections)return false;
+    this.inspectedCorners ||= new Set();
+    const corner=this.config.activities.villageInspections.find(entry=>entry.index===guide.index);
+    if(corner&&!this.inspectedCorners.has(corner.index)&&Math.hypot(position.x-guide.route[guide.index].x,position.z-guide.route[guide.index].z)<2){
+      this.inspectedCorners.add(corner.index);this.guideInspection={index:corner.index,startedAt:this.time,endedAt:null};
+      this.host.Signal?.(corner.event);
+    }
+    const inspection=this.guideInspection;if(!inspection||inspection.endedAt!=null)return false;
+    const tail=(this.openingCast||[]).filter(entry=>entry.ammoIssued&&!entry.marchComplete)
+      .map(entry=>this.host.Position(entry.actor)).filter(Boolean).sort((a,b)=>Math.hypot(b.x-position.x,b.z-position.z)-Math.hypot(a.x-position.x,a.z-position.z))[0];
+    const lagging=tail&&Math.hypot(tail.x-position.x,tail.z-position.z)>15;
+    const playerBehind=player&&Math.hypot(player.x-position.x,player.z-position.z)>8;
+    if(this.time-inspection.startedAt>=2.2&&!lagging&&!playerBehind){inspection.endedAt=this.time;return false;}
+    this.FaceToward(actor,position,lagging?tail:player,dt);return true;
+  }
+  StepFamilyWalker(walker,dt) {
+    if(!walker.familyId||!this.config.activities?.civilianRoute||walker.arrived)return false;
+    const at=this.host.Position(walker.actor),route=this.config.activities.civilianRoute,blocks=this.config.layout?.blocks||[];
+    const guardian=this.traffic.find(other=>other.side===1&&other.role==="civilian"&&other.slot===walker.guardianSlot);
+    if(!at||!guardian)return false;
+    const lead=this.host.Position(guardian.actor),self=P012RouteProjection(route,at),leadAt=P012RouteProjection(route,lead);
+    const isLeader=guardian===walker,member=walker.memberIndex||0;
+    const lag=[0,.1,1.6,2.1][member]||0;
+    const endDistance=P012RouteProjection(route,walker.parking).along;
+    const progress=Math.min(endDistance,isLeader?self.along+2.3:Math.max(0,leadAt.along-lag));
+    const center=P012RoutePoint(route,progress),radius=walker.child?.26:.46;
+    const desired=P012RoutePoint(route,progress,walker.lateralM||0);
+    const target=P012SegmentClear(blocks,center,desired,radius)?desired:center;
+    const waypoints=[];let along=0;
+    for(let index=1;index<route.length;index++){
+      along+=Math.hypot(route[index].x-route[index-1].x,route[index].z-route[index-1].z);
+      if(along>self.along+.1&&along<progress)waypoints.push(route[index]);
+    }
+    waypoints.push(target);
+    let next=P012NextVisiblePoint(blocks,at,waypoints,0,radius);
+    if(next.blocked&&P012SegmentClear(blocks,at,center,radius))next={point:center};
+    const child=this.traffic.find(other=>other.familyId===walker.familyId&&other.child&&!other.retired);
+    const childAt=child&&this.host.Position(child.actor);
+    const childBehind=isLeader&&childAt&&Math.hypot(childAt.x-at.x,childAt.z-at.z)>5;
+    const gap=Math.hypot(next.point.x-at.x,next.point.z-at.z);
+    const speed=(walker.speedMps||1.2)*(1+.045*Math.sin(this.time*.3+walker.guardianSlot));
+    walker.actualSpeedMps=childBehind?0:Math.min(speed+(isLeader?0:.35),gap*1.6);
+    walker.familyTarget=next.point;walker.actor.scriptArrivalRadius=.15;
+    this.host.Move(walker.actor,next.point,walker.actualSpeedMps);
+    if(endDistance-self.along<.5){walker.arrived=true;this.host.Move(walker.actor,at,0);}
+    return true;
+  }
   Update(dt) {
     // One finite pool, present from the opening; never recycle people by teleport.
     if (!this.trafficInitialized && this.config.activities?.traffic) {
@@ -228,6 +413,7 @@ export class FirstLevelP012Runtime {
       }
     }
     this.StepOpeningCast(dt);
+    this.StepMarch(dt);
     this.time += dt;
     if (this.smoke && this.time >= this.smoke.until && !this.smoke.cleared) { this.host.ClearSmoke?.(this.smoke.handle); this.smoke.cleared = true; }
     if (this.beat === 8) {
@@ -238,13 +424,19 @@ export class FirstLevelP012Runtime {
     const defensive = (this.beat >= 6 && this.beat <= 10) || escortDefense;
     if (defensive && !this.defenders) {
       const ports = this.config.anchors?.gunports || [];
-      this.defenders = (this.host.FriendlyActors?.() || []).filter(actor=>!this.traffic.some(w=>w.side===0&&!w.retired&&w.actor===actor));
+      this.defenders = (this.host.FriendlyActors?.() || []).filter(actor=>!this.traffic.some(w=>w.side===0&&!w.retired&&w.actor===actor)
+        &&!(this.guide?.safeRoute&&this.guide.route.length&&actor===this.host.GuideActor())
+        &&!this.openingCast?.some(e=>this.march&&e.actor===actor&&!e.marchComplete));
       for (const [index, actor] of this.defenders.entries()) {
         if (escortDefense) {
           const point = this.host.Position(actor);
           if (point) this.host.Defend?.(actor, point, { ...this.config.activities?.frontlineDoctrine, holdRadiusM: 2 });
           continue;
         }
+        const marched=this.openingCast?.find(e=>e.actor===actor&&e.marchComplete&&e.marchDefensePoint);
+        if(marched){this.DefendMarchEntry(marched);continue;}
+        const supplyWalker=this.traffic.find(w=>w.actor===actor&&w.frontlineTransfer&&w.retired);
+        if(supplyWalker){this.DefendSupplyWalker(supplyWalker);continue;}
         const port = ports[index % ports.length];
         if (port) this.host.Defend?.(actor, { x: port.x + (index % 2 ? 2 : -2), z: port.z + 2 + Math.floor(index / ports.length) * 2 }, this.config.activities?.frontlineDoctrine);
       }
@@ -272,13 +464,24 @@ export class FirstLevelP012Runtime {
       this.host.ImpactShell(shell.point); this.RecordShellImpact(shell, shell.point);
     }
     const guide = this.guide, actor = this.host.GuideActor();
-    if (guide && actor && guide.route.length) {
+    if(guide?.ReleaseWhen?.()){
+      if(guide.beat===23&&!this.host.Signalled("P012GuideSmokeHandoff"))this.host.Signal?.("P012GuideSmokeHandoff");
+      this.host.ReleaseGuide?.(actor);this.guide=null;
+    }
+    if (this.guide && guide && actor && guide.route.length) {
+      if(guide.safeRoute){
+        this.StepSafeGuide(guide,actor,dt);
+      } else {
       const point = guide.route[guide.index]; const position = this.host.Position(actor);
       const nearPoint=position && Math.hypot(position.x-point.x,position.z-point.z)<(guide.beat===0||guide.beat===1?1.3:2);
       const reacting=this.time<(this.guideReactionUntil??0);
-      const waiting=reacting || (nearPoint && !!guide.WaitAt?.(guide.index));
+      const inspecting=position&&this.StepGuideInspection(guide,actor,position,this.host.PlayerPosition?.(),dt);
+      const waiting=reacting || inspecting || (nearPoint && !!guide.WaitAt?.(guide.index));
       if (nearPoint && guide.index < guide.route.length - 1 && !waiting) guide.index++;
-      if (guide.beat === 5 && guide.index === guide.route.length - 1 && position && Math.hypot(position.x - point.x, position.z - point.z) < 2) guide.clearGunport = true;
+      // Incrementing the cursor is not arrival at the final gunport. Test the
+      // actual destination, not the previous waypoint captured above.
+      const gunport = guide.route.at(-1);
+      if (guide.beat === 5 && guide.index === guide.route.length - 1 && position && Math.hypot(position.x - gunport.x, position.z - gunport.z) < 2) guide.clearGunport = true;
       const target = guide.clearGunport ? { x: guide.route.at(-1).x - 5, z: guide.route.at(-1).z + 2 } : guide.route[guide.index];
       const opening=[0,2].includes(guide.beat),player=this.host.PlayerPosition?.();
       const distance=player&&position?Math.hypot(player.x-position.x,player.z-position.z):0;
@@ -287,7 +490,7 @@ export class FirstLevelP012Runtime {
       const waitForPlayer=opening&&!ahead&&distance>(activity.openingGuideWaitDistanceM??10);
       const speed=opening?(ahead&&distance>3?(activity.openingGuideCatchupMps??5.246):(activity.openingGuideWalkMps??3.05)):guide.speed;
       this.host.Move(actor, waiting||waitForPlayer ? position : target, waiting||waitForPlayer ? 0 : speed);
-      if(waiting && guide.FaceAt) {
+      if(waiting && guide.FaceAt && !inspecting) {
         const facing=guide.FaceAt(guide.index);
         if(facing && Math.hypot(facing.x-position.x,facing.z-position.z)>.05){
           const current=this.host.GuideYaw?.(actor) ?? 0;
@@ -296,6 +499,7 @@ export class FirstLevelP012Runtime {
           const turn=Math.max(-3.4*dt,Math.min(3.4*dt,delta));
           this.host.FaceGuide?.(actor,current+turn);
         }
+      }
       }
     }
     if (this.host.Signalled("P012SouthVerified") && this.far.length < 4) {
@@ -307,20 +511,24 @@ export class FirstLevelP012Runtime {
     this.StepRetreatPursuit();
     for (const walker of this.traffic) {
       if(walker.retired)continue;
-      if(walker.arrived&&walker.retireWhenHidden&&this.host.TrafficVisible?.(walker.actor)===false
+      const family=walker.familyId?this.traffic.filter(other=>other.familyId===walker.familyId):[walker];
+      if(walker.arrived&&walker.retireWhenHidden&&family.every(other=>other.arrived&&this.host.TrafficVisible?.(other.actor)===false)
         &&this.host.RetireTraffic?.(walker.actor)===true){walker.retired=true;walker.retiredAt=this.time;continue;}
       if(walker.arrived&&walker.side===0&&(this.beat??0)>3){
         if(!walker.frontlineTransfer){
           const activity=this.config.activities||{},shell=activity.shellCoverRoute||[],ammo=activity.ammoRoute||[];
           if(shell.length&&ammo.length){
-            const end=ammo.at(-1);
-            walker.path=[...shell,...ammo.slice(-3,-1),{x:end.x,z:end.z+(2-walker.slot)*2.2}];
+            const supply=activity.frontlineSupply,end=ammo.at(-1);
+            const start=this.host.Position(walker.actor);
+            const onward=supply&&start.z<shell[0].z?shell.slice(1):shell;
+            walker.path=[...onward,...ammo.slice(-3,-1),...(supply?.approach||[]),supply?.positions?.[walker.slot]||{x:end.x,z:end.z+(2-walker.slot)*2.2}];
+            if(supply)walker.actor.scriptArrivalRadius=supply.arrivalRadiusM;
             walker.index=0;walker.parking=walker.path.at(-1);walker.arrived=false;walker.frontlineTransfer=true;
             delete walker.pauseIndex;delete walker.proximityRelease;
           }else {this.host.Move(walker.actor,this.host.Position(walker.actor),0);continue;}
         }else{
           walker.retired=true;walker.actor.scriptedNoncombatant=false;this.host.ReleaseGuide?.(walker.actor);
-          this.host.Defend?.(walker.actor,walker.parking,this.config.activities?.frontlineDoctrine);
+          this.DefendSupplyWalker(walker);
           if(this.defenders&&!this.defenders.includes(walker.actor))this.defenders.push(walker.actor);
           continue;
         }
@@ -328,6 +536,7 @@ export class FirstLevelP012Runtime {
       const point = walker.path[walker.index], position = this.host.Position(walker.actor);
       if (!position) continue;
       if(walker.lastPosition){walker.travelM+=Math.hypot(position.x-walker.lastPosition.x,position.z-walker.lastPosition.z);walker.lastPosition={x:position.x,z:position.z};}
+      if(this.StepFamilyWalker(walker,dt))continue;
       const gate=walker.proximityRelease;
       if(gate&&!walker.proximityReleased&&walker.index===gate.index&&Math.hypot(position.x-point.x,position.z-point.z)<2){
         const observer=this.host.PlayerPosition?.();
@@ -342,9 +551,10 @@ export class FirstLevelP012Runtime {
       const leader=this.traffic.find(other=>other.side===walker.side&&other.slot===walker.slot+1&&!other.arrived&&!other.retired);
       const ahead=leader&&this.host.Position(leader.actor);
       if(ahead&&Math.hypot(position.x-ahead.x,position.z-ahead.z)<2.2){this.host.Move(walker.actor,position,0);continue;}
-      if (position && Math.hypot(position.x - point.x, position.z - point.z) < 2 && walker.index < walker.path.length - 1) walker.index++;
+      const arrival=walker.frontlineTransfer&&this.config.activities?.frontlineSupply?.arrivalRadiusM;
+      if (position && Math.hypot(position.x - point.x, position.z - point.z) < (arrival ? arrival+.1 : 2) && walker.index < walker.path.length - 1) walker.index++;
       // AI Act stops moving at 1.2 m; arrival needs a small tolerance beyond that radius.
-      walker.arrived=walker.index===walker.path.length-1&&Math.hypot(position.x-walker.parking.x,position.z-walker.parking.z)<1.3;
+      walker.arrived=walker.index===walker.path.length-1&&Math.hypot(position.x-walker.parking.x,position.z-walker.parking.z)<(arrival ? arrival+.1 : 1.3);
       const destination=walker.path[walker.index], distance=Math.hypot(destination.x-position.x,destination.z-position.z);
       // These lanes have swept-clear segments. Keep the AI's immediate goal
       // local so its coarse long-distance nav grid cannot send a passer-by
@@ -374,13 +584,20 @@ export class FirstLevelP012Runtime {
       retreatPursuit: (this.pursuit || []).map(entry=>({index:entry.index,alive:!!this.host.Alive(entry.actor),position:this.host.Position(entry.actor),target:entry.route[entry.index]})),
       weaponActionCount: this.weaponActionCount,
       guidePosition: this.host.Position(this.host.GuideActor()), guideRouteIndex: this.guide?.index || 0,
+      trainColumn:(this.trainColumn?.Entries()||[]).map(({actor,steps,...entry})=>entry),
+      guideInspection:this.guideInspection||null,
+      briefingStage:this.host.Signalled?.("P012BriefingComplete")?"complete":this.host.Signalled?.("P012BriefingStarted")?"briefing":this.host.Signalled?.("P012AmmoIssued")?"gathering":"issuing",
+      briefingReadyCount:(this.openingCast||[]).filter(entry=>entry.ammoIssued&&this.host.Position(entry.actor)&&this.host.Position(this.host.GuideActor())
+        &&Math.hypot(this.host.Position(entry.actor).x-this.host.Position(this.host.GuideActor()).x,this.host.Position(entry.actor).z-this.host.Position(this.host.GuideActor()).z)<10).length,
       openingCast: (this.openingCast || []).map(entry=>({actorId:entry.actor.id,position:this.host.Position(entry.actor),parking:entry.parking,index:entry.index,released:!!entry.released,
-        stage:entry.stage||"muster",weaponIssued:!!entry.weaponIssued,ammoIssued:!!entry.ammoIssued})),
+        stage:entry.stage||"muster",weaponIssued:!!entry.weaponIssued,ammoIssued:!!entry.ammoIssued,marchPlan:entry.marchPlan||null,
+        marchComplete:!!entry.marchComplete,marchDefensePoint:entry.marchDefensePoint||null})),
       guideAlive: !!this.host.GuideActor() && !!this.host.Alive(this.host.GuideActor()),
       guideHealth: this.host.GuideActor()?.health ?? null, guideOrder: this.host.GuideActor()?.order ?? null,
       binocularOwned:!!this.binocularOwned,
       trafficReady: this.config.activities?.traffic ? !!this.trafficPassedNearPlayer : this.traffic.length === 6 && this.traffic.every((walker) => walker.index > 0),
       traffic: this.traffic.map((walker) => ({ side: walker.side, slot:walker.slot, role:walker.role, travelM:walker.travelM||0,
+        actorId:walker.actor.id,child:!!walker.child,familyId:walker.familyId,guardianSlot:walker.guardianSlot,lateralM:walker.lateralM,speedMps:walker.actualSpeedMps??walker.speedMps,familyTarget:walker.familyTarget,
         index: walker.index, arrived:walker.arrived,retired:!!walker.retired,retiredAt:walker.retiredAt,parking:walker.parking,position: this.host.Position(walker.actor) })),
       nearEnemyDeaths: this.near.filter((actor) => !this.host.Alive(actor)).length,
       blockadeVisible: this.far.some((actor) => this.host.Alive(actor) && this.host.Visible?.(actor)),

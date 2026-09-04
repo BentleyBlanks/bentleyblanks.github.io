@@ -8,6 +8,7 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 import { P012_ANCHORS, P012_ROUTES, FIRST_LEVEL_P012_LAYOUT } from "./Data_FirstLevelP012Layout.mjs";
 import { P012SouthPoint, P012StationPoint } from "./Data_FirstLevelP012Space.mjs";
 import { openingActivities } from "./Data_FirstLevelP012Opening.mjs";
+import { P012_STATION_HEIGHTS } from "./Data_FirstLevelP012Station.mjs";
 import { VOICE_LINES as chapterVoices } from "./Data_MissionCh1.mjs";
 import { VOICE_LINES as prologueVoices } from "./Data_MissionCh0.mjs";
 
@@ -24,9 +25,12 @@ if (perceptionName && !perceptionProfiles[perceptionName]) throw new Error(`Unkn
 const perceptionProfile = perceptionProfiles[perceptionName] || null;
 const runLabel = process.argv.find(arg => arg.startsWith("--run-label="))?.split("=")[1] || "";
 const orientationReview = process.argv.includes("--orientation");
-const openingCausalityReview = process.argv.includes("--opening-causality");
+const savedInfiniteAmmo = process.argv.includes("--saved-infinite-ammo");
+const openingCausalityReview = process.argv.includes("--opening-causality") || savedInfiniteAmmo;
 const openingGuidanceReview = process.argv.includes("--opening-guidance");
-const stationReview = process.argv.includes("--station-review");
+const trainReview = process.argv.includes("--train-review");
+const stationReview = process.argv.includes("--station-review") || trainReview;
+const spatialReview = process.argv.includes("--spatial-review");
 if (runLabel && !/^[A-Za-z0-9_]+$/.test(runLabel)) throw new Error("Run label must contain only English letters, digits, or underscores");
 const outputDir = process.env.P012_SCREENSHOT_DIR || path.join(os.tmpdir(),
   perceptionProfile ? `P012WhiteboxPerception_${perceptionProfile.name}${runLabel ? `_${runLabel}` : ""}`
@@ -57,8 +61,9 @@ function Check(condition, label, detail = "") {
 async function PlayPrelude() {
   let result;
   const orientations = [];
+  const spatialCaptures = [];
   for (let chunk = 0; chunk < 36; chunk += 1) {
-    result = await page.evaluate(({ orientationReview, openingCausalityReview, northShelter, northShelterRadius }) => {
+    result = await page.evaluate(({ orientationReview, openingCausalityReview, savedInfiniteAmmo, northShelter, northShelterRadius }) => {
       const game = window.Tengxian;
       const bot = window.p012ReviewBot ||= { held: {}, trace: [], frame: 0, lastProgress: 0, progressKey: "" };
       const DitchEvidence=()=>{
@@ -78,14 +83,77 @@ async function PlayPrelude() {
           northCovered:flow.facts.includes("northCovered"),distanceToShelter:Math.hypot(p.x-northShelter.x,p.z-northShelter.z),
           shelter:northShelter,shelterRadius:northShelterRadius,ray};
       };
+      const NorthSceneEvidence=()=>{
+        const scene=game.Debug.P012Scene(),flow=game.Debug.P012(),eye=game.camera.position;
+        const people=(scene.openingCast||[]).map(entry=>{
+          const actor=game.ai.soldiers.find(actor=>actor.id===entry.actorId);
+          return {...entry,alive:!!actor?.alive,stance:actor?.stance,scriptDefensive:!!actor?.scriptDefensive,
+            actualPosition:actor?.position.toArray(),goal:actor?.goal.toArray(),
+            distanceToPlayer:actor?actor.position.distanceTo(game.player.position):null};
+        });
+        const impact=scene.mortarImpactPosition;
+        let projection=null,cameraRay=null;
+        if(impact){
+          const point=eye.clone().set(impact.x,game.battlefield.GroundHeight(impact.x,impact.z)+.35,impact.z);
+          const direction=point.clone().sub(eye),distance=direction.length(),hit=game.battlefield.Raycast(eye,direction.normalize(),distance);
+          projection=point.clone().project(game.camera).toArray();
+          cameraRay={from:eye.toArray(),to:point.toArray(),distance,blocked:!!hit&&hit.t<distance-.1,
+            hit:hit?{t:hit.t,block:hit.box?.id||hit.box?.tag||null}:null};
+        }
+        return {at:flow.elapsed,beat:flow.beat,player:game.player.position.toArray(),camera:eye.toArray(),
+          yaw:game.player.yaw,pitch:game.player.pitch,people,resting:scene.resting||null,
+          impact,projection,cameraRay,ditch:DitchEvidence(),scope:"ordinary live player camera, no camera or actor placement"};
+      };
       const Key = (code, down) => {
         if (!!bot.held[code] === down) return;
         game.Debug.Key(code, down); bot.held[code] = down;
       };
       for (let frame = 0; frame < 600; frame += 1) {
         const flow = game.Debug.P012();
+        if(flow.beatIndex>=3&&flow.beatIndex<=5){
+          const scene=game.Debug.P012Scene();
+          if(scene.binocularOwned||game.interact.Point("p012_binocularTake")||game.interact.Point("p012_binocularReturn"))
+            throw new Error("Removed binocular equipment or interaction remains in the live opening");
+          if(!bot.lastNorthSample||flow.elapsed-bot.lastNorthSample>=.25){
+            (bot.northEscortTrace||=[]).push(NorthSceneEvidence());bot.lastNorthSample=flow.elapsed;
+          }
+          if(flow.beatIndex===3&&!bot.departureCaptured){
+            bot.departureCaptured=true;bot.pendingOrientation={index:0,...NorthSceneEvidence()};break;
+          }
+          if(scene.resting?.count===3&&!bot.restingCaptured){
+            bot.restingCaptured=true;bot.pendingCausality={id:"NorthRoadResting",...NorthSceneEvidence()};break;
+          }
+        }
+        const pendingSpeech=game.story.p012PendingCompletion;
+        if(pendingSpeech&&["p012_text_BriefingMission","p012_text_BriefingRoute","p012_text_BriefingReply"].includes(pendingSpeech.key)
+          &&!(bot.briefingCaptured||[]).includes(pendingSpeech.key)){
+          (bot.briefingCaptured||=[]).push(pendingSpeech.key);
+          const guide=game.ai.soldiers.find(actor=>actor.castId==="luo"),subtitle=document.querySelector(".hudSubtitle");
+          const visibleActor=guide?.actor,model=visibleActor?.characterRig?.root;
+          visibleActor?.root.updateMatrixWorld(true);
+          const Forward=(node,z)=>node?guide.position.clone().set(0,0,z).transformDirection(node.matrixWorld).toArray():null;
+          bot.pendingBriefing={id:pendingSpeech.key,at:flow.elapsed,speech:{...pendingSpeech},
+            guide:guide?{position:guide.position.toArray(),yaw:guide.yaw}:null,
+            guideActorRootYaw:visibleActor?.root.rotation.y??null,localModelYaw:model?.rotation.y??null,
+            bodyForwardWorld:Forward(visibleActor?.body,-1),modelAuthoredForwardWorld:Forward(model,1),
+            forwardConvention:"body local -Z; GLB authored local +Z transformed by its actual matrix; face readability requires screenshot review",
+            player:game.player.position.toArray(),playerEye:game.player.EyePosition.toArray(),
+            yaw:game.player.yaw,pitch:game.player.pitch,rawSay:subtitle?.textContent||"",subtitleClass:subtitle?.className,
+            scope:"actual in-progress subtitle and ordinary player camera; no actor/camera placement"};break;
+        }
+        if(flow.beatIndex===2){
+          const inspection=game.Debug.P012Scene().guideInspection;
+          if(inspection&&(!bot.firstInspection||bot.firstInspection.startedAt===inspection.startedAt)){
+            bot.firstInspection ||= {...inspection};
+            const guide=game.ai.soldiers.find(actor=>actor.castId==="luo");
+            if(guide)(bot.inspectionTrace||=[]).push({at:flow.elapsed,inspection:{...inspection},
+              guide:guide.position.toArray(),yaw:guide.yaw,player:game.player.position.toArray()});
+          }
+        }
         if (window.p012PendingStationView) break;
         if (window.p012PendingTrafficView) break;
+        if (window.p012PendingSpatialView) break;
+        if (window.p012PendingTrainView) break;
         const objective = flow.objective;
         if (flow.beatIndex >= 6 || !game.player.Alive) break;
         if(openingCausalityReview&&!bot.emptyHandsTested&&!flow.facts.includes("weapon")){
@@ -117,6 +185,11 @@ async function PlayPrelude() {
           bot.unloadedMovementCaptured=true;bot.pendingCausality={id:"UnloadedVillageDeparture",at:flow.elapsed,
             ammo:game.state.ammo,clips:game.state.clips,routeIndex:flow.routeIndex,position:game.player.position.toArray()};break;
         }
+        if(savedInfiniteAmmo&&bot.unloadedMovementCaptured&&!bot.savedReloadInput){
+          bot.savedReloadInput={at:flow.elapsed,ammo:game.state.ammo,clips:game.state.clips};
+          game.Debug.Key("KeyR",true);game.Debug.Key("KeyR",false);
+        }
+        if(bot.savedReloadInput&&game.state.ammo>0&&!bot.savedReloadResult)bot.savedReloadResult={at:flow.elapsed,ammo:game.state.ammo,clips:game.state.clips,weaponActionCount:game.Debug.P012Scene().weaponActionCount};
         if(openingCausalityReview&&flow.beatIndex===4){
           const ditch=DitchEvidence();
           if(!bot.lastDitch?.northCovered&&ditch.northCovered){
@@ -134,6 +207,15 @@ async function PlayPrelude() {
             bot.chatCaptured=true;bot.pendingCausality={id:"NorthChatBeforeShell",at:flow.elapsed,impacts,objective};break;
           }
           if(flow.facts.includes("northNearMissImpact")&&!bot.impactCaptured){
+            bot.impactStartedAt??=flow.elapsed;
+            const age=flow.elapsed-bot.impactStartedAt;
+            const capture=[0,.12,.4,1].find(offset=>age+1e-6>=offset&&!(bot.impactOffsets||[]).includes(offset));
+            if(capture!==undefined){
+              (bot.impactOffsets||=[]).push(capture);
+              bot.pendingCausality={id:`NorthImpact${Math.round(capture*1000)}ms`,offsetRequested:capture,
+                actualOffset:age,...NorthSceneEvidence()};break;
+            }
+            if(age>=1){
             Key("KeyW",false);Key("ShiftLeft",false);Key("KeyF",false);
             if(game.player.stance!=="prone")game.Debug.Key("KeyZ");
             game.StepFrames(18,1/30,false);
@@ -145,16 +227,8 @@ async function PlayPrelude() {
             if(early.northCovered)throw new Error("Early road prone incorrectly completed ditch entry");
             bot.earlyDitchNegative=early;
             bot.impactCaptured=true;bot.pendingCausality={id:"NorthActualImpactProne",at:game.Debug.P012().elapsed,impacts,baseline:bot.preShellImpacts,stance:game.player.stance,guideStance:leader.stance,objective,earlyDitchNegative:early};break;
+            }
           }
-        }
-        // Return an actual gameplay frame while the landmark is being observed.
-        // No camera override or stage initialization is used for these captures.
-        if (flow.beatIndex === 3 && flow.orientationIndex > 0
-          && !(bot.capturedOrientations || []).includes(flow.orientationIndex)) {
-          (bot.capturedOrientations ||= []).push(flow.orientationIndex);
-          bot.pendingOrientation = { index: flow.orientationIndex, at: flow.elapsed,
-            text: objective.text, facts:[...flow.facts], fov:game.camera.fov };
-          break;
         }
         const progressKey = [flow.beat, flow.routeIndex, flow.orientationIndex, flow.facts.join(",")].join("|");
         if (bot.progressKey !== progressKey) {
@@ -163,20 +237,6 @@ async function PlayPrelude() {
             routeIndex: flow.routeIndex, orientationIndex: flow.orientationIndex });
         }
         if (flow.elapsed - bot.lastProgress > 65) break;
-        if (objective.requiredAction === "binoculars") {
-          Key("KeyW",false);Key("KeyF",false);Key("ShiftLeft",false);
-          const north=!flow.facts.includes("northRecognized");
-          const subject=game.Debug.P012Scene().traffic.find(actor=>!actor.retired
-            && (north?actor.side===0&&actor.position.z<0:actor.role==="walking"));
-          game.Debug.Mouse(2,true);
-          if(subject){
-            const point=subject.position,eye=game.player.EyePosition;
-            game.player.yaw=Math.atan2(-(point.x-eye.x),-(point.z-eye.z));
-            game.player.pitch=Math.atan2(1.2-eye.y,Math.hypot(point.x-eye.x,point.z-eye.z));
-          }
-          game.StepFrames(1,1/30,false);bot.frame++;
-          continue;
-        }
         game.Debug.Mouse(2,false);
         const target = objective.target;
         if (!target) break;
@@ -189,7 +249,7 @@ async function PlayPrelude() {
         const arrive = interactionId ? flow.beatIndex === 1 ? 0.35 : 1.6
           // Respect the public opening follow radius instead of deliberately
           // walking into the leader's backpack. Later carry/escort stays unchanged.
-          : following ? [0,2,4].includes(flow.beatIndex) ? objective.arrivalRadiusM : 1.2 : flow.beatIndex === 4 ? 2 : 0.8;
+          : following ? [0,1,2,4].includes(flow.beatIndex) ? objective.arrivalRadiusM : 1.2 : flow.beatIndex === 4 ? 2 : 0.8;
         const move = distance > arrive && !bot.held.KeyF;
         Key("KeyW", move);
         Key("ShiftLeft", move && objective.requiredAction === "sprint" && !crouching);
@@ -205,57 +265,50 @@ async function PlayPrelude() {
           game.player.yaw = Math.atan2(-(anchor.x - game.player.position.x), -(anchor.z - game.player.position.z));
           if (game.interact.Query(game.player)?.point?.id === interactionId) {
             Key("KeyW", false);
-            if(openingCausalityReview&&interactionId==="p012_binocularTake"&&!bot.borrowNegatives){
-              Key("KeyF",false);Key("ShiftLeft",false);
-              // V is a real held input; never cook/throw a live grenade near NPCs.
-              Key("KeyV",true);game.StepFrames(3,1/30,false);
-              if(!game.state.meleeCharge)throw new Error("V negative fixture failed to enter actual charge");
-              const charge={...game.state.meleeCharge};
-              Key("KeyF",true);game.StepFrames(24,1/30,false);
-              if(game.Debug.P012().facts.includes("binocularTaken"))throw new Error("Borrow succeeded during held melee charge");
-              Key("KeyF",false);
-              const yaw=game.player.yaw,pitch=game.player.pitch;
-              // Release the actual charge facing clear sky, not Luo's body.
-              game.player.pitch=1.4;Key("KeyV",false);game.StepFrames(45,1/30,false);
-              game.player.yaw=yaw;game.player.pitch=pitch;
-              if(game.state.meleeCharge)throw new Error("V charge did not release normally");
-              Key("KeyF",true);game.StepFrames(6,1/30,false);
-              const partial=game.Debug.Interact();
-              if(partial.hold?.id!=="p012_binocularTake"||!(partial.hold.t>0&&partial.hold.t<1))throw new Error("Blur fixture did not start a real partial borrow hold");
-              if(game.Debug.P012().facts.includes("binocularTaken"))throw new Error("Borrow finished before hold duration");
-              window.dispatchEvent(new Event("blur"));bot.held.KeyF=false;
-              game.StepFrames(24,1/30,false);
-              if(game.Debug.P012().facts.includes("binocularTaken"))throw new Error("Blur allowed abandoned F hold to finish");
-              if(game.Debug.Interact().hold||game.Debug.Interact().cancels<=partial.cancels)throw new Error("Blur did not cancel the actual interaction hold");
-              window.dispatchEvent(new Event("focus"));
-              bot.borrowNegatives=true;bot.pendingCausality={id:"BinocularBorrowCancelled",at:game.Debug.P012().elapsed,charge,partial,after:game.Debug.Interact(),cooking:!!game.state.cooking};
-              break;
-            }
             Key("KeyF", true);
           }
         } else Key("KeyF", false);
         if (flow.beatIndex !== 1 && objective.requiredAction === "reload" && distance < 2.7 && bot.frame % 60 === 0) game.Debug.Key("KeyR");
-        game.StepFrames(1, 1 / 30, false);
+        game.StepFrames(1, 1 / 30, openingCausalityReview&&flow.beatIndex===4);
         bot.frame += 1;
       }
       for (const code of Object.keys(bot.held)) Key(code, false);
-      game.StepFrames(1);
+      // Impact captures use the already rendered actual frame, not a later dust state.
+      if(!/^NorthImpact\d+ms$/.test(bot.pendingCausality?.id||""))game.StepFrames(1);
       const orientation = bot.pendingOrientation ? { ...bot.pendingOrientation,
         player: game.player.position.toArray(), yaw: game.player.yaw, pitch: game.player.pitch,
         camera: game.camera.position.toArray() } : null;
       bot.pendingOrientation = null;
       const causality=bot.pendingCausality||null;bot.pendingCausality=null;
       const stationView=window.p012PendingStationView||null;window.p012PendingStationView=null;
+      const spatialView=window.p012PendingSpatialView||null;window.p012PendingSpatialView=null;
+      const trainView=window.p012PendingTrainView||null;window.p012PendingTrainView=null;
+      const briefingView=bot.pendingBriefing||null;bot.pendingBriefing=null;
       const trafficView = window.p012PendingTrafficView || null;
       if(trafficView)trafficView.openingCast=game.Debug.P012Scene?.().openingCast;
       window.p012PendingTrafficView = null;
       return { flow: game.Debug.P012(), scene: game.Debug.P012Scene?.(),
-        orientation, trafficView, causality, stationView,
+        orientation, trafficView, causality, stationView, spatialView, trainView, briefingView,
         position: game.player.position.toArray(), health: game.player.health, alive: game.player.Alive,
         trace: bot.trace, stalled: game.Debug.P012().elapsed - bot.lastProgress > 65,
         weapons: game.Debug.Slots(), carry: game.carry.KindId, ammo: game.state.ammo, interact: game.Debug.Interact() };
-    }, { orientationReview, openingCausalityReview,northShelter:openingActivities.northShelterPosition,northShelterRadius:openingActivities.northShelterRadiusM });
+    }, { orientationReview, openingCausalityReview,savedInfiniteAmmo,northShelter:openingActivities.northShelterPosition,northShelterRadius:openingActivities.northShelterRadiusM });
     if(result.stationView) await CaptureStationView(result.stationView);
+    if(result.briefingView){
+      await fs.writeFile(path.join(outputDir,`Data_P012_${result.briefingView.id}.json`),JSON.stringify(result.briefingView,null,2));
+      await page.screenshot({path:path.join(outputDir,`Scene_P012_${result.briefingView.id}.png`)});
+      Check(result.briefingView.subtitleClass?.includes("on")&&result.briefingView.rawSay.includes(result.briefingView.speech.text),
+        "训话正在实际HUD显示而非仅事件已触发",result.briefingView.id);
+    }
+    if(result.trainView){
+      await fs.writeFile(path.join(outputDir,`Data_P012Train_${result.trainView.id}.json`),JSON.stringify(result.trainView,null,2));
+      await page.screenshot({path:path.join(outputDir,`Scene_P012Train_${result.trainView.id}.png`)});
+    }
+    if(result.spatialView){
+      spatialCaptures.push(result.spatialView.id);
+      await fs.writeFile(path.join(outputDir,`Data_P012Village_${result.spatialView.id}.json`),JSON.stringify(result.spatialView,null,2));
+      await page.screenshot({path:path.join(outputDir,`Scene_P012Village_${result.spatialView.id}.png`)});
+    }
     if(result.causality){
       await fs.writeFile(path.join(outputDir,`Data_P012${result.causality.id}.json`),JSON.stringify(result.causality,null,2));
       await page.screenshot({path:path.join(outputDir,`Scene_P012${result.causality.id}.png`)});
@@ -273,10 +326,45 @@ async function PlayPrelude() {
       guide: result.scene?.guidePosition, trafficReady: result.scene?.trafficReady }));
     if (result.stalled || !result.alive || result.flow.beatIndex >= 6) break;
   }
-  Check(result.flow.beatIndex >= 6, "真实移动、领取枪弹、观察与搬弹完成开场",
+  Check(result.flow.beatIndex >= 6, "真实移动、领取枪弹、跟队与搬弹完成开场",
     result.flow.beatIndex >= 6 ? `${result.flow.elapsed.toFixed(1)}s` : JSON.stringify(result));
   Check(result.carry === null, "弹药实际交付后释放双手，能够拔枪");
+  const briefingEvidence=await page.evaluate(()=>({captured:window.p012ReviewBot.briefingCaptured||[],inspection:window.p012ReviewBot.inspectionTrace||[]}));
+  await fs.writeFile(path.join(outputDir,"Data_P012BriefingInspection.json"),JSON.stringify(briefingEvidence,null,2));
+  Check(["p012_text_BriefingMission","p012_text_BriefingRoute","p012_text_BriefingReply"].every(key=>briefingEvidence.captured.includes(key)),"三段训话各有实际在播截图");
+  const stopped=briefingEvidence.inspection.filter(row=>row.inspection.endedAt==null),resumed=briefingEvidence.inspection.filter(row=>row.inspection.endedAt!=null);
+  Check(stopped.length>2&&resumed.length>2,"路口检查有实际停步阶段与继续阶段");
+  const distance=(a,b)=>Math.hypot(a[0]-b[0],a[2]-b[2]);
+  Check(stopped.some((row,index)=>index>0&&row.at-stopped[index-1].at>0&&distance(row.guide,stopped[index-1].guide)<.015),"班长检查中实际停步");
+  Check(resumed.some(row=>distance(row.guide,resumed[0].guide)>1),"检查结束后班长实际继续前进超过1m");
+  Check(stopped.some(row=>{const dx=row.player[0]-row.guide[0],dz=row.player[2]-row.guide[2],length=Math.hypot(dx,dz);return length>.5&&(-Math.sin(row.yaw)*dx-Math.cos(row.yaw)*dz)/length>.7;}),"停步期间班长实际转向后方玩家（不是只记录检查信号）");
+  if(spatialReview) Check(["SouthBend","MiddleCourt","NorthBend","HubReveal"].every(id=>spatialCaptures.includes(id)),
+    "村路四处分段机位均来自正常行走，无摆拍替代");
   if(openingCausalityReview){
+    const northEvidence=await page.evaluate(()=>({trace:window.p012ReviewBot.northEscortTrace||[],
+      offsets:window.p012ReviewBot.impactOffsets||[],resting:!!window.p012ReviewBot.restingCaptured}));
+    await fs.writeFile(path.join(outputDir,"Data_P012NorthEscort.json"),JSON.stringify(northEvidence,null,2));
+    for(const beat of ["B03","B04","B05"]){
+      const rows=northEvidence.trace.filter(row=>row.beat===beat);
+      Check(rows.length>0&&rows.every(row=>row.people.length===6&&row.people.every(person=>person.alive)),
+        "北上原六名队友真实存在并存活",beat);
+      Check(rows.some(row=>row.people.every(person=>person.distanceToPlayer<=25)),"北上阶段六人实际在同行范围内",beat);
+    }
+    const first=northEvidence.trace[0],last=northEvidence.trace.at(-1);
+    Check(first.people.every(person=>{
+      const end=last.people.find(other=>other.actorId===person.actorId);
+      return end&&Math.hypot(end.actualPosition[0]-person.actualPosition[0],end.actualPosition[2]-person.actualPosition[2])>10;
+    }),"同一原六人从村口真实行进到前线，不用新演员替换");
+    Check(northEvidence.resting&&northEvidence.trace.some(row=>row.resting?.count===3
+      &&row.resting.people.length===3&&row.resting.people.every(person=>person.sit)),"路边三人实际坐姿快照");
+    Check([0,.12,.4,1].every(offset=>northEvidence.offsets.includes(offset)),"近爆当帧及0.12/0.4/1秒真实相机取证齐全");
+    const impact400=JSON.parse(await fs.readFile(path.join(outputDir,"Data_P012NorthImpact400ms.json"),"utf8"));
+    const impact1000=JSON.parse(await fs.readFile(path.join(outputDir,"Data_P012NorthImpact1000ms.json"),"utf8"));
+    Check(impact400.people.length===6&&impact1000.people.length===6&&impact400.people.every(person=>{
+      const later=impact1000.people.find(other=>other.actorId===person.actorId);
+      return person.stance===2&&later?.stance===2
+        &&Math.hypot(later.actualPosition[0]-person.actualPosition[0],later.actualPosition[2]-person.actualPosition[2])<=.05;
+    }),"近爆后0.4至1秒同六名队友实际卧倒并停步（不要求首帧瞬时完成动画）");
     const trafficEvidence=await page.evaluate(()=>({views:window.p012TrafficViews,captured:window.p012TrafficCapturedBeats}));
     await fs.writeFile(path.join(outputDir,"Data_P012OpeningTrafficEvidence.json"),JSON.stringify(trafficEvidence,null,2));
     Check(trafficEvidence.views.length>0&&trafficEvidence.views.every(view=>view.platformCivilians.length===0),
@@ -289,22 +377,38 @@ async function PlayPrelude() {
     }),"独立观察验收：至少三名实际移动百姓形成远近纵列，不作为B02隐藏完成门");
     Check(["StationPlatform","StationNorthExit","VillageGroup"].every(id=>trafficEvidence.captured.includes(id)),
       "真实步行取得站台、兵站北口、村路群体玩家视角");
-    const evidence=await page.evaluate(()=>({borrow:!!window.p012ReviewBot.borrowNegatives,chat:!!window.p012ReviewBot.chatCaptured,impact:!!window.p012ReviewBot.impactCaptured,
+    const evidence=await page.evaluate(()=>({departure:!!window.p012ReviewBot.departureCaptured,chat:!!window.p012ReviewBot.chatCaptured,impact:!!window.p012ReviewBot.impactCaptured,
       ditch:!!window.p012ReviewBot.ditchCaptured,earlyProne:window.p012ReviewBot.earlyDitchNegative,
       emptyHands:!!window.p012ReviewBot.emptyHandsTested,rifle:!!window.p012ReviewBot.rifleCaptured,
       issued:!!window.p012ReviewBot.issueDepartureCaptured,unloadedMovement:!!window.p012ReviewBot.unloadedMovementCaptured}));
     Check(evidence.emptyHands&&evidence.rifle&&evidence.issued&&evidence.unloadedMovement,
       "空手封火、实际领枪领弹及不强制装弹的真实出发取证齐全");
-    Check(evidence.borrow&&evidence.chat&&evidence.impact&&evidence.ditch&&evidence.earlyProne&&!evidence.earlyProne.northCovered,
-      "真实借镜、炮击、早路点低姿不算入沟及实际沟岸遮挡取证齐全",JSON.stringify(evidence));
+    Check(evidence.departure&&evidence.chat&&evidence.impact&&evidence.ditch&&evidence.earlyProne&&!evidence.earlyProne.northCovered,
+      "真实跟队北上、炮击、早路点低姿不算入沟及实际沟岸遮挡取证齐全",JSON.stringify(evidence));
   }
   if (orientationReview) {
-    Check(orientations.length === 2, "主动举镜观察两类真实人物，记录第一人称帧（可读性另行人工看图）");
+    Check(orientations.length === 1, "村口真实跟随出发，无借镜或辨路门（可读性另行人工看图）");
     await fs.writeFile(path.join(outputDir, "Data_P012OrientationTrace.json"), JSON.stringify(orientations, null, 2));
   }
   await fs.writeFile(path.join(outputDir, "Data_P012OpeningTrace.json"), JSON.stringify(result, null, 2));
   if(stationReview) await VerifyStationDescent();
   await page.screenshot({ path: path.join(outputDir, "Scene_P012FirstContact.png") });
+  const arrival = await page.evaluate(() => {
+    const game=window.Tengxian,p=game.player.position,eye=game.player.EyePosition;
+    const actors=game.ai.soldiers.filter(actor=>actor.alive&&actor.side==="nra").map(actor=>{
+      const body=actor.position.clone().add({x:0,y:1.2,z:0}),screen=body.clone().project(game.camera);
+      const dx=actor.position.x-p.x,dz=actor.position.z-p.z,distance=Math.hypot(dx,dz);
+      const forward=(-Math.sin(game.player.yaw)*dx-Math.cos(game.player.yaw)*dz)/Math.max(distance,.001);
+      return {id:actor.id,castId:actor.castId||null,position:actor.position.toArray(),goal:actor.goal.toArray(),
+        distance,forward,screen:screen.toArray(),trafficSide:actor.p012TrafficSide??null,holdZone:actor.holdZone};
+    });
+    return {at:game.Debug.P012().elapsed,player:p.toArray(),eye:eye.toArray(),yaw:game.player.yaw,pitch:game.player.pitch,actors,
+      scope:"first actual arrival after ammunition delivery; no actor/player/camera reposition or settle delay"};
+  });
+  await fs.writeFile(path.join(outputDir,"Data_P012FirstContactClearance.json"),JSON.stringify(arrival,null,2));
+  Check(!arrival.actors.some(actor=>actor.distance<1.5&&actor.forward>.5),
+    "首次交付后的正前方近距离没有友军身体堵住观察镜头",
+    JSON.stringify(arrival.actors.filter(actor=>actor.distance<3)));
   console.log("P012 opening activity trace", JSON.stringify(result.trace));
 }
 
@@ -335,6 +439,7 @@ async function PlayFrontline() {
       for (let frame = 0; frame < 600; frame += 1) {
         const flow = game.Debug.P012();
         if(bot.pendingScavengeCapture)break;
+        if(window.p012PendingGuideView)break;
         if (window.p012JointAirView && !bot.jointAirViewCaptured) {
           bot.jointAirViewCaptured = true;
           break;
@@ -756,6 +861,7 @@ async function PlayFrontline() {
         prematureEscortMovement: window.p012PrematureEscortMovement || [],
         southGrenadeExplosions: window.p012SouthGrenadeExplosions || [],
         scavenging: bot.scavenge?.log || [],
+        guideView:window.p012PendingGuideView?(()=>{const view=window.p012PendingGuideView;window.p012PendingGuideView=null;return view;})():null,
         scavengeCapture:bot.pendingScavengeCapture?(()=>{const capture=bot.pendingScavengeCapture;bot.pendingScavengeCapture=null;return capture;})():null,
         salvageActions: bot.salvageActions || [],
         jointAirView: window.p012JointAirView || null,
@@ -778,6 +884,10 @@ async function PlayFrontline() {
     if(result.scavengeCapture){
       await fs.writeFile(path.join(outputDir,"Data_P012Scavenging.json"),JSON.stringify(result.scavenging,null,2));
       await page.screenshot({path:path.join(outputDir,`Scene_P012Scavenge${result.scavengeCapture.id}_${Math.round(result.flow.elapsed*10)}.png`)});
+    }
+    if(result.guideView){
+      await fs.writeFile(path.join(outputDir,`Data_P012${result.guideView.id}.json`),JSON.stringify(result.guideView,null,2));
+      await page.screenshot({path:path.join(outputDir,`Scene_P012${result.guideView.id}.png`)});
     }
     console.log("P012 frontline", JSON.stringify({ at: result.flow.elapsed, beat: result.flow.beat,
       health: result.health, ammo: result.ammo, clips: result.clips, position: result.position,
@@ -848,6 +958,13 @@ async function PlayFrontline() {
   Check(result.flow.beatIndex >= (fullCampaign ? 25 : 11), fullCampaign ? "整关真实输入顺序通关" : "有限前线五波可由真实操作完成",
     `${result.flow.beat} at ${result.flow.elapsed.toFixed(1)}s; health ${result.health}; ${path.join(outputDir, "Data_P012GameplayTrace.json")}`);
   Check(result.firstShotAt !== null, "玩家实际参与射击而非全靠友军清场", String(result.firstShotAt));
+  const northHandoff=await page.evaluate(()=>window.p012GuidanceHudTrace.filter(sample=>/^B0[5-9]$|^B10$/.test(sample.beat)));
+  const marchIds=[...new Set(northHandoff.flatMap(sample=>sample.cast.map(entry=>entry.actorId)))];
+  Check(marchIds.length===6&&marchIds.every(id=>northHandoff.some(sample=>sample.cast.some(entry=>
+    entry.actorId===id&&entry.marchComplete&&entry.stage==="frontline"&&entry.defense
+      &&Math.hypot(entry.position.x-entry.defense.x,entry.position.z-entry.defense.z)<.9))),
+    "原六名同班军人实际抵达各自前沿侧位并交接防守，不在村口或交通壕消失",
+    JSON.stringify(northHandoff.at(-1)?.cast));
   Check(result.flow.frontlineAmmo.remainingClips >= 0 && result.flow.spawnedTotal <= 33,
     "弹药与近敌保持有限预算");
   const tacticalPressures = result.flow.pressureHistory.filter(entry => ["machineGun", "mortar", "culvert"].includes(entry.kind));
@@ -1167,10 +1284,10 @@ async function VerifyStationDescent() {
   const samples=evidence.samples||[],first=samples[0];
   const spawn=P012_ANCHORS.trainSpawn,door=P012_ANCHORS.trainDoor;
   Check(first&&Math.hypot(first.player.x-spawn.x,first.player.z-spawn.z)<.1
-    &&Math.abs(first.player.y-1.25)<.08&&Math.abs(first.groundAt-1.25)<.001,
+    &&Math.abs(first.player.y-P012_STATION_HEIGHTS.floorTop)<.08&&Math.abs(first.groundAt-P012_STATION_HEIGHTS.floorTop)<.001,
     "兵站出生脚底真实位于车厢1.25m地板",JSON.stringify(first));
   let cursor=0;
-  for(const height of [1,.75,.5,.25,0]) {
+  for(const height of P012_STATION_HEIGHTS.exitTops) {
     const index=samples.findIndex((sample,i)=>i>cursor&&sample.player.x>-63.7&&sample.player.x<-59.5
       &&Math.abs(sample.player.z-door.z)<1.5&&Math.abs(sample.groundAt-height)<.001
       &&Math.abs(sample.player.y-height)<.1);
@@ -1297,6 +1414,101 @@ async function VerifyOpeningDiscovery() {
   await page.evaluate(() => { window.Tengxian.Debug.Key("KeyF", false); window.Tengxian.Debug.Key("KeyW", false); });
 }
 
+// Explicit local guide fixtures: stage/positions are initialized once per case.
+// Thereafter the real Runtime, AI and Rapier move the existing leader, and the
+// player follows his sampled footsteps with normal input. Not campaign evidence.
+async function VerifyGuideHandoffs() {
+  for (const beat of [14, 23]) {
+    const setup=await page.evaluate(async beat=>{
+      const game=window.Tengxian;
+      const {FirstLevelP012Director}=await import("./Script_FirstLevelP012Flow.mjs");
+      const {FirstLevelP012Runtime}=await import("./Script_FirstLevelP012Runtime.mjs");
+      const {P012NextVisiblePoint}=await import("./Script_FirstLevelP012March.mjs");
+      let flow,runtime;
+      const original=FirstLevelP012Runtime.prototype.Update;
+      FirstLevelP012Runtime.prototype.Update=function(...args){runtime=this;return original.apply(this,args);};
+      // Freeze only automatic stage/wave progression in this isolated fixture.
+      // Actual interaction callbacks and actor update/physics remain production.
+      FirstLevelP012Director.prototype.Update=function(dt,sample){flow=this;this.elapsed+=dt;this.lastSample=sample;};
+      game.StepFrames(1);
+      FirstLevelP012Runtime.prototype.Update=original;
+      const guide=runtime.host.GuideActor();
+      const start=beat===14?{x:79.42825739632826,z:4.633856495656801}:{x:94,z:105};
+      const playerStart=beat===14?{x:76.3,z:2.1}:{x:91,z:105};
+      const y=game.battlefield.GroundHeight(start.x,start.z);
+      guide.position.set(start.x,y,start.z);guide.body.Teleport(start.x,y,start.z);guide.goal.copy(guide.position);
+      game.player.Spawn(playerStart.x,playerStart.z,0);
+      runtime.host.ReleaseGuide(guide);
+      runtime.host.Defend(guide,start,flow.config.activities.frontlineDoctrine);
+      const hadDefense=guide.scriptDefensive;
+      flow.beat=beat;flow.lastSample={position:game.player.position,guidePosition:guide.position};flow.StartGuide();
+      window.p012GuideFixture={flow,runtime,guide,trail:[{...start}],P012NextVisiblePoint,trace:[],frames:0,
+        event:beat===14?"P012GuideAtFlankEntry":"P012GuideAtSmoke",start:{...start}};
+      return {beat,start,playerStart,hadDefense,scope:"explicit local stage fixture; only initial placement, no campaign or balance claim"};
+    },beat);
+    let result;
+    for(let chunk=0;chunk<60;chunk++){
+      result=await page.evaluate(()=>{
+        const g=window.Tengxian,f=window.p012GuideFixture;
+        for(let i=0;i<120;i++){
+          const at=f.guide.position,last=f.trail.at(-1);
+          if(Math.hypot(at.x-last.x,at.z-last.z)>.4)f.trail.push({x:at.x,z:at.z});
+          while(f.trail.length>1&&Math.hypot(g.player.position.x-f.trail[0].x,g.player.position.z-f.trail[0].z)<1)f.trail.shift();
+          const next=f.P012NextVisiblePoint(f.flow.config.layout.blocks,g.player.position,[...f.trail,{x:at.x,z:at.z}],0,.42);
+          const gap=Math.hypot(at.x-g.player.position.x,at.z-g.player.position.z);
+          const look=next.blocked?at:next.point;
+          g.player.yaw=Math.atan2(-(look.x-g.player.position.x),-(look.z-g.player.position.z));g.player.pitch=0;
+          g.Debug.Key("KeyW",gap>2.4&&!next.blocked);
+          g.StepFrames(1,1/30,false);f.frames++;
+          if(f.frames%15===0)f.trace.push({at:f.frames/30,player:g.player.position.toArray(),guide:at.toArray(),
+            defensive:!!f.guide.scriptDefensive,gap});
+          if(g.story.Signalled(f.event)&&gap<3)break;
+        }
+        g.Debug.Key("KeyW",false);g.StepFrames(1);
+        return {arrived:g.story.Signalled(f.event),gap:f.guide.position.distanceTo(g.player.position),
+          guide:f.guide.position.toArray(),player:g.player.position.toArray(),stance:f.guide.stance,
+          defensive:!!f.guide.scriptDefensive,trace:f.trace,
+          views:window.p012GuideArrivalViews,elapsed:f.frames/30};
+      });
+      if(result.arrived&&result.gap<3)break;
+    }
+    await fs.writeFile(path.join(outputDir,`Data_P012GuideFixtureB${beat}.json`),JSON.stringify({setup,result},null,2));
+    await page.screenshot({path:path.join(outputDir,`Scene_P012GuideFixtureB${beat}.png`)});
+    Check(setup.hadDefense&&result.arrived&&result.gap<3&&!result.defensive,
+      `B${beat} 实际班长解除旧防守并通过真实AI/碰撞抵达，玩家跟随脚步`,JSON.stringify({elapsed:result.elapsed,guide:result.guide,gap:result.gap}));
+    if(beat===14)Check(result.stance===1,"侧路引导抵达后蹲候，不替玩家继续侧绕");
+    if(beat===23){
+      const smoke=await page.evaluate(()=>{
+        const g=window.Tengxian,f=window.p012GuideFixture;
+        const before={fact:f.flow.facts.has("retreatSmokeDeployed"),guide:g.story.Signalled("P012GuideAtSmoke"),released:!f.runtime.guide};
+        g.StepFrames(90,1/30,false);
+        const stillWaiting=!!f.runtime.guide&&!f.flow.facts.has("retreatSmokeDeployed");
+        g.player.pitch=-.2;
+        // Arrival at the leader is not automatically within arm's reach of
+        // the prop. Continue toward the visible leader until the real prompt
+        // appears; do not read the hidden objective coordinate or widen reach.
+        let query=g.interact.Query(g.player)?.point?.id,approachFrames=0;
+        while(query!=="p012_retreatSmoke"&&approachFrames<90){
+          const at=f.guide.position,player=g.player.position;
+          g.player.yaw=Math.atan2(-(at.x-player.x),-(at.z-player.z));
+          g.Debug.Key("KeyW",Math.hypot(at.x-player.x,at.z-player.z)>1);
+          g.StepFrames(1,1/30,false);approachFrames++;
+          query=g.interact.Query(g.player)?.point?.id;
+        }
+        g.Debug.Key("KeyW",false);
+        g.Debug.Key("KeyF",true);g.StepFrames(120,1/30,false);g.Debug.Key("KeyF",false);g.StepFrames(1);
+        return {before,stillWaiting,query,approachFrames,fact:f.flow.facts.has("retreatSmokeDeployed"),smoke:f.runtime.Sample().retreatSmokeActive,
+          released:!f.runtime.guide,handoff:g.story.Signalled("P012GuideSmokeHandoff"),views:window.p012GuideArrivalViews};
+      });
+      await fs.writeFile(path.join(outputDir,"Data_P012GuideFixtureSmoke.json"),JSON.stringify(smoke,null,2));
+      await page.screenshot({path:path.join(outputDir,"Scene_P012GuideFixtureSmoke.png")});
+      Check(!smoke.before.fact&&smoke.before.guide&&!smoke.before.released&&smoke.stillWaiting
+        &&smoke.query==="p012_retreatSmoke"&&smoke.fact&&smoke.smoke&&smoke.released&&smoke.handoff,
+        "烟幕点真实F完成后才释放班长引导并交接",JSON.stringify(smoke));
+    }
+  }
+}
+
 // 独立物理夹具可重置出生位置；不计入顺序通关或节奏证据。
 async function VerifyTraversalFixtures() {
   for (const [kind, point] of Object.entries(P012_ANCHORS.traversal)) {
@@ -1409,16 +1621,18 @@ async function VerifyAudioPlayback() {
 }
 
 try {
+  if(savedInfiniteAmmo)await page.addInitScript(()=>localStorage.setItem("tengxian1938_debug_options_v1",JSON.stringify({infiniteAmmo:true})));
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&${audioSmoke ? "audio=1" : "shot=1"}&manual=1&quality=low&scale=small`,
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 180000 });
   if (audioSmoke) await page.click("#bootStart");
+  await page.evaluate(enabled=>{window.p012TrainReview=enabled;},trainReview);
   await page.evaluate(async ({openingPhotoPoints,platformBounds}) => {
     const game = window.Tengxian, originalHit = game.player.TakeHit;
     const {FirstLevelP012Runtime}=await import("./Script_FirstLevelP012Runtime.mjs");
-    const originalIssue=FirstLevelP012Runtime.prototype.StepOpeningIssue;
-    window.p012EquipmentCallbacks=[];window.p012OpeningIssueTrace=[];
-    FirstLevelP012Runtime.prototype.StepOpeningIssue=function(...args){
+    const originalIssue=FirstLevelP012Runtime.prototype.StepOpeningCast;
+    window.p012EquipmentCallbacks=[];window.p012OpeningIssueTrace=[];window.p012TrainTrace=[];window.p012TrainCaptures=[];
+    FirstLevelP012Runtime.prototype.StepOpeningCast=function(...args){
       if(!this.host.p012TestIssueObserved){
         this.host.p012TestIssueObserved=true;
         const original=this.host.SetOpeningEquipment;
@@ -1432,11 +1646,13 @@ try {
       return originalIssue.apply(this,args);
     };
     window.p012DamageTrace = [];
+    window.p012GuidanceHudTrace = [];
+    window.p012GuideArrivalViews = [];
     window.p012ActivityTrace = [];
     window.p012AirViews = [];
     window.p012TrafficViews = [];
     window.p012TrafficCapturedBeats = [];
-    window.p012PopulationMax = { armed: 0, unarmed: 0,rawUnarmed:0,temporaryUnissuedSoldiers:0,civilianWounded:0 };
+    window.p012PopulationMax = { armed: 0, unarmed: 0,rawArmed:0,aiRawUnarmed:0,rawUnarmed:0,resting:0,trainExtras:0,children:0,temporaryUnissuedSoldiers:0,civilianWounded:0 };
     window.p012CrowdFireCues = [];
     window.p012AirGroundShots = [];
     window.p012AirImpacts = [];
@@ -1472,6 +1688,16 @@ try {
     const originalStoryPlay = game.story.Play;
     game.story.Play = function (beat, ...args) {
       const result = originalStoryPlay.call(this, beat, ...args);
+      if(beat.p012SubtitleOnly&&beat.voice?.startsWith("p012_text_Guide")){
+        const guide=game.ai.soldiers.find(actor=>actor.castId==="luo");
+        const view={id:beat.voice.slice("p012_text_".length),at:game.Debug.P012().elapsed,text:beat.text,
+          beat:game.Debug.P012().beat,player:game.player.position.toArray(),camera:game.camera.position.toArray(),
+          guide:guide?{id:guide.id,alive:guide.alive,position:guide.position.toArray(),stance:guide.stance}:null,
+          scope:window.p012GuideFixture
+            ?"explicit stage fixture with initial placement; actual played subtitle and subsequent live player camera"
+            :"actual played subtitle and ordinary live player camera; no placement or delayed settling"};
+        window.p012GuideArrivalViews.push(view);window.p012PendingGuideView=view;
+      }
       if (beat.voice === "ch1_luo_08") {
         const voice = this.voiceLog.at(-1);
         window.p012EscortApproval.push({ at: game.Debug.P012().elapsed, event: "LuoApprovalStarted",
@@ -1531,15 +1757,56 @@ try {
         }
         if (after.elapsed <= before.elapsed) continue;
         const friendly = game.ai.soldiers.filter(actor => actor.alive && actor.side === "nra");
-        const openingCast=game.Debug.P012Scene().openingCast||[];
+        const openingScene=game.Debug.P012Scene(),openingCast=openingScene.openingCast||[];
+        const trainColumn=(openingScene.trainColumn||[]).map(({actor,...entry})=>entry);
+        const extraIds=new Set(trainColumn.filter(entry=>entry.extra).map(entry=>entry.actorId));
         const temporaryIds=new Set(openingCast.filter(entry=>!entry.weaponIssued).map(entry=>entry.actorId));
         const temporary=friendly.filter(actor=>actor.unarmed&&temporaryIds.has(actor.id)).length;
-        const rawUnarmed=friendly.filter(actor=>actor.unarmed).length;
-        window.p012PopulationMax.armed = Math.max(window.p012PopulationMax.armed, friendly.filter(actor => !actor.unarmed).length);
-        window.p012PopulationMax.unarmed = Math.max(window.p012PopulationMax.unarmed,rawUnarmed-temporary);
+        const aiRawUnarmed=friendly.filter(actor=>actor.unarmed).length;
+        const resting=openingScene.resting?.count||0;
+        const rawUnarmed=aiRawUnarmed+resting;
+        window.p012PopulationMax.armed = Math.max(window.p012PopulationMax.armed, friendly.filter(actor => !actor.unarmed&&!extraIds.has(actor.id)).length);
+        window.p012PopulationMax.unarmed = Math.max(window.p012PopulationMax.unarmed,friendly.filter(actor=>actor.unarmed&&!actor.actor?.isChild&&!temporaryIds.has(actor.id)&&!extraIds.has(actor.id)).length);
+        window.p012PopulationMax.rawArmed=Math.max(window.p012PopulationMax.rawArmed,friendly.filter(actor=>!actor.unarmed).length);
+        window.p012PopulationMax.trainExtras=Math.max(window.p012PopulationMax.trainExtras,friendly.filter(actor=>extraIds.has(actor.id)).length);
+        window.p012PopulationMax.children=Math.max(window.p012PopulationMax.children,friendly.filter(actor=>actor.actor?.isChild).length);
         window.p012PopulationMax.civilianWounded=window.p012PopulationMax.unarmed;
+        window.p012PopulationMax.aiRawUnarmed=Math.max(window.p012PopulationMax.aiRawUnarmed,aiRawUnarmed);
+        window.p012PopulationMax.resting=Math.max(window.p012PopulationMax.resting,resting);
         window.p012PopulationMax.rawUnarmed=Math.max(window.p012PopulationMax.rawUnarmed,rawUnarmed);
         window.p012PopulationMax.temporaryUnissuedSoldiers=Math.max(window.p012PopulationMax.temporaryUnissuedSoldiers,temporary);
+        if(after.elapsed-(window.p012LastTrainAt??-1)>=.5){
+          window.p012LastTrainAt=after.elapsed;
+          const hudSample={at:after.elapsed,beat:after.beat,
+            markerCount:document.querySelectorAll(".hudMarker").length,
+            promptKeys:game.Debug.Prompts().map(prompt=>prompt.keys),
+            promptKinds:game.Debug.Prompts().map(prompt=>prompt.kind),
+            targetMeta:game.hud.TargetState()?.meta||"",
+            targetDomMeta:document.querySelector(".hudTarget .tMeta")?.textContent||"",
+            guidePosition:openingScene.guidePosition,guideAlive:openingScene.guideAlive,
+            cast:openingCast.map(entry=>({actorId:entry.actorId,stage:entry.stage,marchComplete:entry.marchComplete,
+              position:entry.position,defense:entry.marchDefensePoint}))};
+          window.p012GuidanceHudTrace.push(hudSample);
+          if(hudSample.markerCount||hudSample.promptKeys.includes("X")||/\d+m\b/.test(hudSample.targetMeta)||/\d+m\b/.test(hudSample.targetDomMeta)
+            ||(after.beatIndex<6&&hudSample.promptKinds.includes("melee")))
+            throw new Error(`Unexpected floating destination or permanent X prompt: ${JSON.stringify(hudSample)}`);
+          const record={at:after.elapsed,beat:after.beat,player:game.player.position.toArray(),trainColumn,
+            rawActors:game.ai.soldiers.map(actor=>({id:actor.id,alive:actor.alive,side:actor.side,unarmed:actor.unarmed,
+              kind:actor.actor?.kind,variant:actor.actor?.variant,height:actor.actor?.height,
+              position:actor.position.toArray(),state:actor.state,shots:actor.fireSequence||0,scriptedNoncombatant:actor.scriptedNoncombatant})),
+            rawPopulation:{aiTotal:game.ai.soldiers.length,total:game.ai.soldiers.length+resting,
+              aiFriendly:friendly.length,friendly:friendly.length+resting,armed:friendly.filter(actor=>!actor.unarmed).length,
+              aiRawUnarmed,unarmed:rawUnarmed,resting,
+              adultCivilianWounded:friendly.filter(actor=>actor.unarmed&&!actor.actor?.isChild&&!temporaryIds.has(actor.id)&&!extraIds.has(actor.id)).length}};
+          window.p012TrainTrace.push(record);
+          if(window.p012TrainReview&&!window.p012PendingTrainView)for(const carIndex of [0,1,2]){
+            const car=trainColumn.filter(entry=>entry.carIndex===carIndex),id=`Car${carIndex}Exited`;
+            if(car.length&&car.every(entry=>entry.exitDone)&&!window.p012TrainCaptures.includes(id)){
+              window.p012TrainCaptures.push(id);window.p012PendingTrainView={id,...record,
+                scope:"actual player camera at physical car exit completion, not a guaranteed view of every actor"};break;
+            }
+          }
+        }
         if (after.beatIndex <= 2 && after.elapsed - lastTrafficViewAt >= .5) {
           lastTrafficViewAt = after.elapsed;
           window.p012OpeningIssueTrace.push({at:after.elapsed,player:game.player.position.toArray(),cast:openingCast});
@@ -1549,7 +1816,11 @@ try {
             const hit = game.battlefield.Raycast(game.player.EyePosition, delta.normalize(), distance);
             const previous = previousTraffic.get(actor.id);
             previousTraffic.set(actor.id, { at: after.elapsed, x: actor.position.x, z: actor.position.z });
+            const walker=openingScene.traffic?.find(entry=>entry.actorId===actor.id);
             return { id: actor.id, side: actor.p012TrafficSide, role: actor.escortRole,
+              kind:actor.actor?.kind,variant:actor.actor?.variant,height:actor.actor?.height,bodyRadius:actor.body?.radius,
+              unarmed:actor.unarmed,familyId:walker?.familyId,guardianSlot:walker?.guardianSlot,slot:walker?.slot,
+              plannedSpeedMps:walker?.speedMps,lateralM:walker?.lateralM,
               position: actor.position.toArray(), distance,
               speedX: previous ? (actor.position.x - previous.x) / (after.elapsed - previous.at) : 0,
               speedZ: previous ? (actor.position.z - previous.z) / (after.elapsed - previous.at) : 0,
@@ -1645,7 +1916,23 @@ try {
     {id:"StationNorthExit",...P012StationPoint(-43,35),beat:2,radius:4},
     {id:"VillageGroup",x:-30,z:62,beat:2,radius:4},
   ],platformBounds:FIRST_LEVEL_P012_LAYOUT.blocks.find(block=>block.id==="StationPlatformApron")});
-  if(stationReview) await page.evaluate(({platformLimit,door})=>{
+  if(spatialReview) await page.evaluate(()=>{
+    const game=window.Tengxian,original=game.StepFrames,captured=new Set();
+    game.StepFrames=function(count=1,dt=1/60,render=true){
+      for(let i=0;i<count;i++){
+        original(1,dt,render);
+        const flow=game.Debug.P012(),p=game.player.position;
+        if(flow.beatIndex!==2||window.p012PendingSpatialView)continue;
+        for(const [id,z] of [["SouthBend",80],["MiddleCourt",46],["NorthBend",24],["HubReveal",12]]){
+          if(p.z>z||captured.has(id))continue;
+          captured.add(id);window.p012PendingSpatialView={id,at:flow.elapsed,position:p.toArray(),
+            yaw:game.player.yaw,pitch:game.player.pitch,routeIndex:flow.routeIndex,
+            scope:"normal prelude walking camera; screenshot capture does not move player or actors"};break;
+        }
+      }
+    };
+  });
+  if(stationReview) await page.evaluate(({platformLimit,door,heights})=>{
     const game=window.Tengxian,originalStep=game.StepFrames;
     window.p012StationTrace=[];window.p012StationViews=[];
     const captures=new Set();
@@ -1668,10 +1955,10 @@ try {
       // unrequested step or reposition the player just for a photograph.
       const target=flow.objective.target;
       const platformReached=flow.beatIndex===2&&flow.facts.includes("issuedAmmo")&&target
-        &&p.x>platformLimit.x&&p.z<platformLimit.z&&Math.abs(p.y)<.1&&Math.abs(sample.groundAt)<.001
+        &&p.x>platformLimit.x&&p.z<platformLimit.z&&Math.abs(p.y-sample.groundAt)<.1
         &&Math.hypot(p.x-target.x,p.z-target.z)<=Math.max(.9,flow.objective.arrivalRadiusM||0);
-      const id=p.x>-63.7&&p.x<-60&&Math.abs(p.z-door.z)<1.5&&Math.abs(sample.groundAt-.75)<.001
-        &&Math.abs(p.y-.75)<.1?"Descent":platformReached?"Platform":null;
+      const id=p.x>-63.7&&p.x<-60&&Math.abs(p.z-door.z)<1.5&&Math.abs(sample.groundAt-heights.exitTops[2])<.001
+        &&Math.abs(p.y-heights.exitTops[2])<.1?"Descent":platformReached?"Platform":null;
       if(id&&!captures.has(id)&&!window.p012PendingStationView){
         captures.add(id);window.p012PendingStationView={id,sample};
       }
@@ -1680,7 +1967,7 @@ try {
     game.StepFrames=function(count=1,dt=1/60,render=true){
       for(let i=0;i<count;i++){originalStep(1,dt,render);Record();}
     };
-  },{platformLimit:P012StationPoint(-50,43),door:P012_ANCHORS.trainDoor});
+  },{platformLimit:P012StationPoint(-50,43),door:P012_ANCHORS.trainDoor,heights:P012_STATION_HEIGHTS});
   if (process.argv.includes("--voice-timing")) {
     const durations = Object.fromEntries([...prologueVoices, ...chapterVoices].map(line => [line.key, line.dur]));
     const count = await page.evaluate(durations => {
@@ -1722,6 +2009,7 @@ try {
   if (openingGuidanceReview) await VerifyOpeningDiscovery();
   if (stationReview || openingCausalityReview || orientationReview || process.argv.includes("--prelude") || process.argv.includes("--pacing") || process.argv.includes("--frontline") || process.argv.includes("--campaign")) await PlayPrelude();
   if (process.argv.includes("--frontline") || process.argv.includes("--campaign") || process.argv.includes("--pacing")) await PlayFrontline();
+  if (process.argv.includes("--guide-handoffs")) await VerifyGuideHandoffs();
   if (process.argv.includes("--geometry")) await VerifyTraversalFixtures();
   if (process.argv.includes("--south-recovery")) await VerifySouthRouteRecoveryFixtures();
   if (process.argv.includes("--front-recovery")) await VerifyFrontlineRecoveryFixtures();
@@ -1731,7 +2019,68 @@ try {
   if (process.argv.includes("--overview")) await CaptureLayoutOverview();
   if (audioSmoke) await VerifyAudioPlayback();
   const traffic = await page.evaluate(() => ({ views: window.p012TrafficViews, population: window.p012PopulationMax }));
+  const guidanceHud=await page.evaluate(()=>window.p012GuidanceHudTrace);
+  await fs.writeFile(path.join(outputDir,"Data_P012GuidanceHud.json"),JSON.stringify(guidanceHud,null,2));
+  Check(guidanceHud.length>0&&guidanceHud.every(sample=>sample.markerCount===0&&!sample.promptKeys.includes("X")&&!/\d+m\b/.test(sample.targetMeta)),
+    "真实运行所有采样均无悬浮目标米数和常驻X；保留近处交互与字幕",`${guidanceHud.length} samples`);
+  if(savedInfiniteAmmo){
+    const ammoEvidence=await page.evaluate(()=>({saved:JSON.parse(localStorage.getItem("tengxian1938_debug_options_v1")),
+      rifle:window.p012ReviewBot.rifleCaptured,issued:window.p012ReviewBot.issueDepartureCaptured,
+      unloadedMovement:window.p012ReviewBot.unloadedMovementCaptured,
+      input:window.p012ReviewBot.savedReloadInput,result:window.p012ReviewBot.savedReloadResult}));
+    await fs.writeFile(path.join(outputDir,"Data_P012SavedInfiniteAmmo.json"),JSON.stringify(ammoEvidence,null,2));
+    Check(ammoEvidence.saved?.infiniteAmmo&&ammoEvidence.rifle&&ammoEvidence.issued&&ammoEvidence.unloadedMovement,
+      "持久无限弹开启仍实际经历空枪0/0、领弹0/15及未装弹出发");
+    Check(ammoEvidence.input?.ammo===0&&ammoEvidence.input?.clips===3&&ammoEvidence.result?.ammo>0
+      &&ammoEvidence.result.at>=ammoEvidence.input.at,"只有真实R之后才装弹；调试补充储备不冒充正常弹药消耗",JSON.stringify(ammoEvidence));
+  }
+  if(trainReview){
+    const families=traffic.views.flatMap(view=>view.actors.filter(actor=>actor.role==="civilian"));
+    const people=new Map(families.map(actor=>[actor.id,actor]));
+    const children=[...people.values()].filter(actor=>["childBoy","childGirl"].includes(actor.variant));
+    Check(people.size===13&&children.length===2,"实际疏散演员11成人加2儿童，不以配置人数代替实例");
+    Check(children.every(actor=>actor.kind==="civilian"&&actor.unarmed&&actor.height>1.05&&actor.height<1.2),"实际儿童kind、身高与无枪属性正确");
+    const familyViews=traffic.views.flatMap(view=>view.actors.filter(actor=>actor.familyId).map(actor=>({view,actor})));
+    Check(new Set(familyViews.map(({actor})=>actor.familyId)).size===4,"四个家庭身份进入真实运行取证");
+    Check(familyViews.some(({view,actor})=>view.actors.some(other=>other.id!==actor.id&&other.familyId===actor.familyId
+      &&Math.abs(other.position[0]-actor.position[0])>.55&&Math.hypot(other.position[0]-actor.position[0],other.position[2]-actor.position[2])<3)),"宽处家庭实际横向展开而非永远单列");
+    const moving=familyViews.filter(({actor})=>Math.hypot(actor.speedX,actor.speedZ)>.3).map(({actor})=>Math.hypot(actor.speedX,actor.speedZ));
+    Check(moving.length>10&&Math.max(...moving)-Math.min(...moving)>.15,"实际家庭行走速度有差异而非统一速度");
+    for(const child of children){
+      const distances=familyViews.filter(({actor})=>actor.id===child.id).map(({view,actor})=>{
+        const guardian=view.actors.find(other=>other.side===1&&other.slot===actor.guardianSlot);
+        return guardian?Math.hypot(guardian.position[0]-actor.position[0],guardian.position[2]-actor.position[2]):Infinity;
+      });
+      Check(distances.length>0&&distances.every(distance=>distance<8),"儿童持续跟随真实守护者，不丢在身后",JSON.stringify({id:child.id,max:Math.max(...distances)}));
+    }
+  }
   const issue=await page.evaluate(()=>({trace:window.p012OpeningIssueTrace,callbacks:window.p012EquipmentCallbacks}));
+  const trains=await page.evaluate(()=>({trace:window.p012TrainTrace,captures:window.p012TrainCaptures}));
+  await fs.writeFile(path.join(outputDir,"Data_P012TrainColumn.json"),JSON.stringify(trains,null,2));
+  const trainRows=trains.trace.flatMap(sample=>sample.trainColumn||[]);
+  const extras=new Set(trainRows.filter(entry=>entry.extra).map(entry=>entry.actorId));
+  if(extras.size){
+    Check(extras.size===34,"额外下车军人明确独立统计34人，未隐藏原始人口");
+    Check(trains.trace.every(sample=>sample.rawActors.filter(actor=>extras.has(actor.id)).every(actor=>actor.shots===0
+      &&!['fire','charge','bayonet','melee'].includes(String(actor.state).toLowerCase()))),"34名额外军人全程没有射击或进入战斗状态");
+  }
+  if(trainReview){
+    const ids=[...new Set(trainRows.map(entry=>entry.actorId))];
+    Check(ids.length===40&&new Set(trainRows.filter(entry=>entry.original).map(entry=>entry.actorId)).size===6,"三车40人含原6名，不是额外再造40人");
+    for(const [carIndex,count] of [[0,8],[1,24],[2,8]]){
+      const carIds=ids.filter(id=>trainRows.some(entry=>entry.actorId===id&&entry.carIndex===carIndex));
+      Check(carIds.length===count,`车${carIndex}实际演员数${count}`);
+      for(const id of carIds){
+        const rows=trainRows.filter(entry=>entry.actorId===id),first=rows[0];
+        Check(first.position.x<-63.6&&Math.abs(first.position.y-P012_STATION_HEIGHTS.floorTop)<.12,`演员${id}实际从车内开始`);
+        Check(rows.some(entry=>entry.exitDone&&entry.position.x>-60.5&&Math.abs(entry.position.y-P012_STATION_HEIGHTS.platformTop)<.15),`演员${id}真正下到站台而非只spawn`);
+        Check(rows.some(entry=>entry.weaponIssued&&entry.ammoIssued&&entry.weaponIssueCount===1&&entry.ammoIssueCount===1),`演员${id}枪弹各领取一次`);
+        const callbacks=issue.callbacks.filter(entry=>entry.id===id&&['weapon','ammo'].includes(entry.stage));
+        Check(callbacks.length===2&&callbacks[0].stage==='weapon'&&callbacks[1].stage==='ammo',`演员${id}真实发放回调先枪后弹各一次`);
+      }
+    }
+    Check([0,1,2].every(index=>trains.captures.includes(`Car${index}Exited`)),"三车下车完成事件各有真实玩家视角截图");
+  }
   await fs.writeFile(path.join(outputDir,"Data_P012OpeningIssue.json"),JSON.stringify(issue,null,2));
   if(openingCausalityReview){
     Check(issue.callbacks.length>0&&issue.callbacks.every((row,index,all)=>
@@ -1740,11 +2089,17 @@ try {
   }
   await fs.writeFile(path.join(outputDir, "Data_P012TrafficViews.json"), JSON.stringify(traffic, null, 2));
   Check(traffic.population.armed <= 12 && traffic.population.unarmed <= 15,
-    "实际全程友军战斗角色不超12、无枪群众伤员不超15", JSON.stringify(traffic.population));
+    "战斗角色不超12、成人群众伤员不超15；另列34训练队军人/2儿童与原始总人数", JSON.stringify(traffic.population));
   Check(errors.length === 0, "浏览器没有脚本或控制台错误", errors.join(" | "));
   console.log(`P012 screenshots: ${outputDir}`);
   console.log(process.argv.includes("--campaign") ? "FirstLevelP012BrowserTest campaign PASS" : "FirstLevelP012BrowserTest partial PASS (not a full campaign playthrough)");
 } catch (error) {
+  const guidanceHud=await page.evaluate(()=>window.p012GuidanceHudTrace||[]).catch(()=>[]);
+  await fs.writeFile(path.join(outputDir,"Data_P012GuidanceHud.json"),JSON.stringify(guidanceHud,null,2));
+  const briefing=await page.evaluate(()=>({captured:window.p012ReviewBot?.briefingCaptured||[],inspection:window.p012ReviewBot?.inspectionTrace||[],incomplete:true})).catch(()=>null);
+  await fs.writeFile(path.join(outputDir,"Data_P012BriefingInspection.json"),JSON.stringify(briefing,null,2));
+  const trains=await page.evaluate(()=>({trace:window.p012TrainTrace||[],captures:window.p012TrainCaptures||[]})).catch(()=>null);
+  await fs.writeFile(path.join(outputDir,"Data_P012TrainColumn.json"),JSON.stringify(trains,null,2));
   if(stationReview){
     const station=await page.evaluate(()=>({samples:window.p012StationTrace||[],views:window.p012StationViews||[],error:"incomplete station review; inspect failure trace"})).catch(()=>null);
     await fs.writeFile(path.join(outputDir,"Data_P012StationDescent.json"),JSON.stringify(station,null,2));

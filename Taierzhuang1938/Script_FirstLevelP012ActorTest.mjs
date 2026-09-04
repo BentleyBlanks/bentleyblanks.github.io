@@ -134,3 +134,71 @@ defender.ammo=0;methods.ApplyScriptDefense(defender);assert.equal(defender.state
 assert.equal(methods.ScriptFireFactors({}).accuracy,1);assert.equal(methods.ScriptFireFactors({}).interval,1);
 assert.equal(methods.ScriptFireFactors({scriptAccuracyScale:0.2}).accuracy,0.2);assert.equal(methods.ScriptFireFactors({scriptFireIntervalScale:3}).interval,3);
 console.log("PASS P012 actual spawn identity forwarding, no visual gun, combat hard guards, unchanged armed defaults");
+
+// Run the production spawn and stance-body seams: physics receives the same
+// seeded Actor dimensions at free-space search, construction and every resize.
+context.CAPSULE.push({ radius: .34, height: 1.21 }, { radius: .42, height: .58 });
+const bodyMethods = vm.runInNewContext(`({${Method("StepBody")},${Method("Blocked")}})`,
+  { ...context, TRAVERSAL: { stepMax: .55 } });
+const eye = vm.runInNewContext(`({${Method("static StanceEye").replace("static ", "")}})`, context).StanceEye;
+for (const variant of ["male", "female", "childBoy", "childGirl"]) {
+  for (const height of [1.075, 1.165]) {
+    const child = variant.startsWith("child"), observed = [];
+    const childHost = { ...host, soldiers: [], spawnSerial: { nra: 0, ija: 0 }, ctx: { ...host.ctx,
+      physics: {
+        FindFreeSpot(x,z,r,h) { observed.push(["find",r,h]); return {x:x+1,z,y:2}; },
+        MakeCharacter(spec) { observed.push(["make",spec.radius,spec.height]); return {
+          ReconcileTo() {}, SetSize(r,h) { observed.push(["resize",r,h]); },
+          Move() { return {x:1,y:2,z:0,grounded:true}; },
+        }; },
+      },
+      actorFactory: { Create(kind, options) { return { kind, variant: options.variant,
+        isChild: child, height, bodyRadius:.24, root:{position:{copy(){}}} }; } },
+    } };
+    const actor = methods.Spawn.call(childHost,"nra",0,0,{actorKind:"civilian",actorVariant:variant});
+    assert.deepEqual(observed.slice(0,2), [["find",child?.24:.34,child?height:1.78],["make",child?.24:.34,child?height:1.78]]);
+    assert.equal(actor.position.x,1,"resolved free-space point reaches the actor, not its original blocked point");
+    actor.position = new THREE.Vector3(1,2,0); actor.grounded=true;
+    for (const stance of [0,1,2]) {
+      actor.stance=stance; bodyMethods.StepBody.call(childHost,actor,0,0,1/60);
+      const cap=actor.childCapsules?.[stance] || context.CAPSULE[stance];
+      assert.deepEqual(observed.at(-1),["resize",cap.radius,cap.height]);
+      if(child) assert.ok(Math.abs(2*Math.max(.02,cap.height/2-cap.radius)+2*cap.radius-cap.height)<1e-9,"Rapier actual capsule height matches child stance");
+      const expectedEye=([1.5,1,.5][stance])*(child?height/1.78:1);
+      assert.equal(eye(stance,actor),expectedEye); assert.equal(eye(stance,{ref:actor}),expectedEye);
+    }
+  }
+}
+const overhead={ctx:{battlefield:{NearbyColliders:()=>[{min:[-.5,1.3,-.5],max:[.5,2,.5]}]}}};
+assert.equal(bodyMethods.Blocked.call(overhead,0,0,0),true,"adult fallback still blocks under adult-height obstruction");
+assert.equal(bodyMethods.Blocked.call(overhead,0,0,0,{radius:.24,height:1.1}),false,"child fallback uses the same shorter clearance");
+console.log("PASS child seeded capsule search/create/three stances, true total height, LOS eyes and unchanged adult defaults");
+
+// Execute the actual Act movement block, including blocked body feedback. A
+// physical stop stays a stop; neither this fixture nor the policy teleports.
+const movement=source.slice(source.indexOf("    // P012 route followers"),source.indexOf("    let targetYaw = null;"));
+assert.ok(movement.includes("this.StepBody"));
+const ActMovement=vm.runInNewContext(`(function(s,dt){let desired=s.goal,speed=2.6,stepped=false,wantedYaw=0;${movement}return {stepped,wantedYaw};})`,
+ {Clamp01:value=>Math.max(0,Math.min(1,value))});
+function FollowMovement(guided,configuredSpeed){
+ let blocked=true,randomCalls=0,vaultCalls=0;
+ const actor={p012Guided:guided,scriptMoveSpeedMps:configuredSpeed,position:new THREE.Vector3(),goal:new THREE.Vector3(0,0,-8),
+  scriptArrivalRadius:.1,stance:0,detourTime:2,detourYaw:Math.PI/2,detourSign:1,stuckTime:0,rnd:()=>{randomCalls++;return .5;}};
+ const moves=[],host={ctx:{nav:null},StepBody(s,dx,dz){moves.push({dx,dz,blocked});if(!blocked){s.position.x+=dx;s.position.z+=dz;}},TryVault(){vaultCalls++;return false;}};
+ for(let i=0;i<20;i++)ActMovement.call(host,actor,.05);
+ assert.equal(actor.position.length(),0,"blocked body never bypassed");
+ blocked=false;for(let i=0;i<10;i++)ActMovement.call(host,actor,.05);
+ return {actor,randomCalls,vaultCalls,moves};
+}
+const guided=FollowMovement(true,1);
+assert.equal(guided.randomCalls,0);assert.equal(guided.vaultCalls,0);assert.equal(guided.actor.detourTime,0);
+assert.ok(guided.moves.every(move=>Math.abs(move.dx)<1e-12&&move.dz<0));
+assert.ok(guided.actor.position.z<-.49&&Math.abs(guided.actor.position.x)<1e-12,"resume toward same visible goal, never sideways detour");
+for(const [flag,speed] of [[false,1],[true,undefined]]){
+ const ordinary=FollowMovement(flag,speed);
+ assert.ok(ordinary.randomCalls>0&&ordinary.vaultCalls>0,"ordinary or incompletely opted-in actor keeps random detour and vault attempts");
+ assert.ok(ordinary.moves.some(move=>Math.abs(move.dx)>.001));
+}
+const waiting=FollowMovement(true,0);
+assert.equal(waiting.actor.position.length(),0);assert.equal(waiting.actor.detourTime,0);
+console.log("PASS actual AI Act: P012 swept follower stops/resumes without stale/random detour or vault; default actors retain both");

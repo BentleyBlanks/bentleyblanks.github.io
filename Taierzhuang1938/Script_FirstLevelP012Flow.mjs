@@ -2,15 +2,42 @@
 // 动作驱动阶段；新战术压力常态40秒、快清最短30秒。侦察→同轴步枪增援是明确例外，不代表全部波次达标。
 import { PickUpLoadInteraction, GiveSupplyInteraction } from "./Script_Interact.mjs";
 import { P012Point } from "./Data_FirstLevelP012Space.mjs";
+import { P012NextVisiblePoint, P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 
 const Distance = (a, b) => a && b ? Math.hypot(a.x - b.x, a.z - b.z) : Infinity;
 const Clone = (value) => JSON.parse(JSON.stringify(value));
+
+/** Reconnect the finite east-lane encounter using its real walls and capsule. */
+export function P012EastEnemyRejoinPath(config, position, target, radius, points = []) {
+  if(!Number.isFinite(radius)||radius<=0||!position||!target)return null;
+  const blocks=config.layout?.blocks||[];
+  const corners=[];
+  for(const block of blocks.filter(block=>['EastEnemyWall','EnemySpawnScreenEast'].includes(block.id))){
+    const c=Math.cos(block.ry||0),s=Math.sin(block.ry||0),margin=radius+.2;
+    for(const x of [-block.w/2-margin,block.w/2+margin])for(const z of [-block.d/2-margin,block.d/2+margin])
+      corners.push({x:block.x+x*c+z*s,z:block.z-x*s+z*c,y:position.y||0});
+  }
+  const nodes=[position,target,...points,...corners],costs=nodes.map(()=>Infinity),visited=new Set(),previous=[];
+  costs[0]=0;
+  while(visited.size<nodes.length){
+    let at=-1;
+    for(let i=0;i<nodes.length;i++)if(!visited.has(i)&&(at<0||costs[i]<costs[at]))at=i;
+    if(at<0||!Number.isFinite(costs[at]))return null;
+    if(at===1){const result=[];for(let i=1;i!==0;i=previous[i])result.unshift({...nodes[i]});return result;}
+    visited.add(at);
+    for(let i=1;i<nodes.length;i++)if(!visited.has(i)&&P012SegmentClear(blocks,nodes[at],nodes[i],radius)){
+      const cost=costs[at]+Distance(nodes[at],nodes[i]);
+      if(cost<costs[i]){costs[i]=cost;previous[i]=at;}
+    }
+  }
+  return null;
+}
 
 export const P012_BEATS = Object.freeze([
   ["B00", "跟随罗班长下车", "Z00", 0, "door"],
   ["B01", "领取步枪和子弹", "Z00", 40, "weapon"],
   ["B02", "跟随小队穿过集结村路", "Z01", 85, "village"],
-  ["B03", "向班长借望远镜", "Z02", 140, "orient"],
+  ["B03", "在村口跟上班长，继续北上接防", "Z02", 140, "depart"],
   ["B04", "跟随班长北上", "Z03", 185, "shelling"],
   ["B05", "把弹药送到机枪阵位", "Z04", 230, "ammo"],
   ["B06", "观察前方田地", "Z05", 285, "scouts"],
@@ -61,6 +88,7 @@ export class FirstLevelP012Director {
     this.sprintM = 0;
     this.airSprintM = 0;
     this.ambushEntryIndex = 0;
+    this.ambushRejoin = null;
     this.closePressureReleased = false;
     this.lookRad = 0;
     this.last = null;
@@ -121,7 +149,7 @@ export class FirstLevelP012Director {
   }
   ActivityRoute() {
     const a = this.config.activities || {};
-    return ({ 0: a.trainRoute, 1: a.weaponGuideRoute, 2: a.villageRoute, 3:[a.binoculars?.guidePosition], 4: a.shellCoverRoute,
+    return ({ 0: a.trainRoute, 1: a.weaponGuideRoute, 2: a.villageRoute, 3:[a.villageRoute?.at(-1)], 4: a.shellCoverRoute,
       5: a.ammoRoute, 11: a.woundedDragRoute, 12: [a.woundedDragTo || this.config.anchors.shelter], 14: this.config.routes?.flank,
       16: a.airRoadRoute, 17: a.airCoverRoute,
       18: a.stretcherCarryRoute, 20: a.closeFightRoute, 21: a.southRoomRoute, 22: a.southAssemblyRoute })[this.beat] || [];
@@ -135,8 +163,26 @@ export class FirstLevelP012Director {
       ...(this.beat === 1 ? { startIndex: 0,
         WaitAt: index => index === 0 ? !this.facts.has("weapon") : index === 1 ? !this.facts.has("issuedAmmo") : true,
         FaceAt: index => this.config.activities.weaponGuideFacing[index] } : {}),
-      ...(this.beat === 11 ? { route: this.config.activities.woundedGuideRoute, startIndex: 0 } : {}),
+      ...(this.beat === 11 ? {
+        route: [{x:this.config.activities.woundedDragFrom.x-1.4,z:this.config.activities.woundedDragFrom.z},...this.config.activities.woundedDragRoute.slice(1)], startIndex: 0, safeRoute: true,
+        approachPoints: this.config.activities.woundedGuideRoute, waitDistance: 6,
+        WaitAt: index => index === 0 && this.lastSample.carryKind !== "wounded" && !this.lastSample.woundedDragDelivered,
+        Hold: () => Distance(this.lastSample.guidePosition,this.config.activities.woundedDragFrom)>2
+          && this.facts.has("wounded") && this.lastSample.carryKind !== "wounded" && !this.lastSample.woundedDragDelivered,
+        FaceAt: () => this.lastSample.position,
+      } : {}),
       ...([14, 16, 17, 20, 21, 22].includes(this.beat) ? { route: [] } : {}),
+      ...(this.beat === 14 ? {
+        route: this.config.activities.ambushEntryRoute?.slice(0,1) || [], startIndex: 0, safeRoute: true,
+        approachPoints: this.config.routes?.south?.slice(0,this.config.routes.south.findIndex(point=>Distance(point,this.config.routes.flank[0])<.1)+1),
+        WaitAt: () => true, FaceAt: () => this.config.routes?.flank?.[1], holdStance: 1,
+      } : {}),
+      ...(this.beat === 23 ? {
+        route: [this.config.activities.retreatSmokeUse], startIndex: 0, safeRoute: true, waitDistance: 8,
+        approachPoints: [...(this.config.activities.southRoomRoute || []),...(this.config.activities.southAssemblyRoute || []),...(this.config.routes?.retreat?.slice(0,2)||[])],
+        WaitAt: () => true, FaceAt: () => this.lastSample.position,
+        ReleaseWhen: () => this.facts.has("retreatSmokeDeployed"),
+      } : {}),
       ...(this.beat === 3 ? {startIndex:0,WaitAt:()=>true,FaceAt:()=>this.lastSample.position} : {}),
       ...(this.beat === 4 ? { startIndex: 0, WaitAt: () => Distance(this.lastSample.position,this.lastSample.guidePosition)>8 } : {}),
       ...(this.beat === 12 ? { startIndex: 0, WaitAt: () => this.beat === 12 } : {}),
@@ -144,16 +190,6 @@ export class FirstLevelP012Director {
   }
 
   InstallInteractions() {
-    this.host.Register?.({id:"p012_binocularTake",kind:"supply",label:"向班长借望远镜",gesture:"hold",seconds:0.6,
-      Anchor:()=>this.lastSample.guidePosition||this.config.activities.binoculars.guidePosition,
-      Enabled:()=>this.beat===3&&!this.facts.has("binocularTaken"),once:false,
-      OnComplete:()=>{if(this.beat!==3||this.facts.has("binocularTaken"))return false;
-        this.Mark("binocularTaken");this.Emit("P012BinocularTaken");this.host.SetBinocularsOwned?.(true);return true;}});
-    this.host.Register?.({id:"p012_binocularReturn",kind:"supply",label:"把望远镜交还班长",gesture:"hold",seconds:0.6,
-      Anchor:()=>this.lastSample.guidePosition||this.config.activities.binoculars.guidePosition,
-      Enabled:()=>this.beat===3&&this.facts.has("northRecognized")&&this.facts.has("southRecognized")&&!this.facts.has("binocularReturned"),once:false,
-      OnComplete:()=>{if(this.beat!==3||!this.facts.has("northRecognized")||!this.facts.has("southRecognized")||this.facts.has("binocularReturned"))return false;
-        this.Mark("binocularReturned");this.Emit("P012BinocularReturned");this.host.SetBinocularsOwned?.(false);return true;}});
     const Register = (spec) => this.host.Register?.(spec);
     Register({ id: "p012_weaponCheck", kind: "supply", label: "领取步枪，前往弹药分发点",
       gesture: "hold", seconds: 2.4, position: this.config.activities.weaponReceiveAnchor,
@@ -167,7 +203,10 @@ export class FirstLevelP012Director {
       Enabled: () => this.beat === 1 && this.facts.has("weapon") && !this.facts.has("issuedAmmo"), once: false,
       OnComplete: () => {
         if(this.beat!==1||!this.facts.has("weapon")||this.facts.has("issuedAmmo"))return false;
-        this.Mark("issuedAmmo"); this.Emit("P012AmmoIssued"); this.host.CheckWeapon?.(); return true;
+        this.Mark("issuedAmmo"); this.Emit("P012AmmoIssued"); this.host.CheckWeapon?.();
+        if(this.config.activities?.briefing)this.host.Guide?.({beat:1,route:this.config.activities.briefing.route,startIndex:0,
+          WaitAt:index=>index===this.config.activities.briefing.route.length-1,FaceAt:()=>this.lastSample.position,speed:3.05});
+        return true;
       } });
     Register({ id: "p012_woundedCheck", kind: "bandage", label: "查看伤员，整理弹药并补充1包绷带",
       gesture: "hold", seconds: 2.2, position: this.config.activities?.woundedDragFrom || this.Point("shelter", P012Point(-7, -52)),
@@ -373,7 +412,51 @@ export class FirstLevelP012Director {
     }
     return null;
   }
+  StepAmbushRejoin(position) {
+    if(this.beat!==14){this.ambushRejoin=null;return;}
+    const activity=this.config.activities||{},route=this.ActivityRoute(),blocks=this.config.layout?.blocks;
+    if(!position||!blocks||!route.length)return;
+    if(this.ambushRejoin&&Distance(position,this.ambushRejoin.destination)<=this.RouteArrivalRadius()){
+      this.ambushRejoin=null;return;
+    }
+    if(!this.ambushRejoin){
+      const destination=this.AmbushThreat()?.cover||route[this.routeIndex];
+      const entry=activity.ambushEntryRoute||[];
+      // A world-preserving retry or ordinary detour can put the player back
+      // outside the ruin while the combat cursor correctly stays inside it.
+      // This is geometry-based, not a death flag or a checkpoint teleport hook.
+      if(!destination||this.routeIndex===0||Distance(position,destination)<=12
+        ||!entry.some(point=>Distance(position,point)<30)
+        ||P012SegmentClear(blocks,position,destination,.42))return;
+      const points=[...entry,...route.slice(0,Math.min(route.length,this.routeIndex+1))];
+      if(Distance(points.at(-1),destination)>.01)points.push(destination);
+      const plan=P012NextVisiblePoint(blocks,position,points,0,.42);
+      if(plan.blocked)return;
+      this.ambushRejoin={destination:{...destination},points,index:plan.index,target:{...plan.point}};
+    }
+    const rejoin=this.ambushRejoin;
+    // Re-evaluate the entire already-travelled prefix: another retry may move
+    // the player behind the navigation cursor, without rolling back any facts.
+    const next=P012NextVisiblePoint(blocks,position,rejoin.points,0,.42);
+    rejoin.index=next.index;rejoin.target={...next.point};rejoin.blocked=!!next.blocked;
+  }
 
+  StepEastEnemyRejoin(route, position) {
+    if(route.encounterBeat!==9)return false;
+    const target=route.points[route.index],radius=this.host.EnemyBodyRadius?.(route.handle);
+    if(!target||!Number.isFinite(radius)||radius<=0)return false;
+    if(P012SegmentClear(this.config.layout?.blocks||[],position,target,radius)){
+      if(route.rejoin){this.host.EnemyRejoin?.(route.handle,null);route.rejoin=null;}
+      return false;
+    }
+    const path=P012EastEnemyRejoinPath(this.config,position,target,radius,route.points);
+    // Failure is explicit: do not teleport, enlarge the passage or move the cursor.
+    const point=path?.[0]||position;
+    route.rejoin={target:{...point},destination:{...target},blocked:!path,radius};
+    this.host.EnemyGoal?.(route.handle,point,.3);
+    this.host.EnemyRejoin?.(route.handle,point);
+    return true;
+  }
   LateThreat() {
     const groups = this.beat === 20 ? this.config.activities?.closeFightGroups
       : this.beat === 21 ? this.config.activities?.southFightGroups : null;
@@ -468,6 +551,12 @@ export class FirstLevelP012Director {
     if (this.beat === 9 && this.unlockedWaves.includes(3) && sample.mortarWarningActive && sample.mortarWarningPosition)
       this.mortarEscapeFrom = { ...sample.mortarWarningPosition };
     if (this.beat === 0) this.Emit("P012Arrival");
+    if(this.beat===1&&this.facts.has("issuedAmmo")&&activity.briefing){
+      const briefing=activity.briefing;
+      if(!this.Signalled("P012BriefingStarted")&&this.Signalled("P012MusterCalled")
+        &&Distance(sample.guidePosition,briefing.position)<1.5&&Distance(p,sample.guidePosition)<=briefing.playerRadiusM
+        &&sample.briefingReadyCount>=briefing.readyCount)this.Emit("P012BriefingStarted");
+    }
     if (!this.guideStarted) this.StartGuide();
     if (this.last && p) {
       const moved = Math.min(3, Distance(p, this.last.position));
@@ -475,12 +564,11 @@ export class FirstLevelP012Director {
       if (this.beat === 24 && sample.carryKind === "stretcher" && this.last.carryKind === "stretcher") this.carryTravelM += moved;
       if (sample.sprint > 0.5) this.sprintM += moved;
       if (this.beat === 16 && sample.sprint > 0.5) this.airSprintM += moved;
-      const delta = Math.atan2(Math.sin((sample.yaw || 0) - this.last.yaw), Math.cos((sample.yaw || 0) - this.last.yaw));
-      if (this.beat === 3) this.lookRad += Math.abs(delta);
     }
     if (p) this.last = { position: { x: p.x, z: p.z }, yaw: sample.yaw || 0, carryKind: sample.carryKind };
     const route = this.ActivityRoute();
-    if (this.beat === 14 && Distance(p, activity.ambushEntryRoute?.[this.ambushEntryIndex]) <= this.RouteArrivalRadius())
+    this.StepAmbushRejoin(p);
+    if (this.beat === 14 && !this.ambushRejoin && Distance(p, activity.ambushEntryRoute?.[this.ambushEntryIndex]) <= this.RouteArrivalRadius())
       this.ambushEntryIndex += 1;
     const guideNear = Distance(p, sample.guidePosition) <= (activity.guideRangeM || 12);
     // Follow goals belong to the moving guide, not invisible circles left behind him.
@@ -498,7 +586,7 @@ export class FirstLevelP012Director {
       : this.beat === 4 ? !this.facts.has("northNearMissImpact") || this.facts.has("northCovered") || sample.stance !== "stand"
       : this.beat === 5 ? sample.carryKind === "ammoCrate" && sample.stance === "crouch"
       : this.beat === 11 ? sample.carryKind === "wounded"
-      : this.beat === 14 ? !this.AmbushThreat()
+      : this.beat === 14 ? !this.ambushRejoin && !this.AmbushThreat()
       : this.beat === 16 ? Distance(p, sample.columnPosition) < 12
       : this.beat === 17 ? this.routeIndex < route.length - 1 || sample.stance !== "stand"
       : this.beat === 18 ? sample.carryKind === "stretcher"
@@ -509,20 +597,6 @@ export class FirstLevelP012Director {
       this.routeIndex += 1;
     }
     if (this.beat === 0 && this.routeIndex >= 2 && guideNear) this.Emit("P012TrainDoor");
-    if (this.beat === 3) {
-      this.binocularRecognition ||= {north:0,south:0};
-      for(const direction of ["north","south"]){
-        const fact=`${direction}Recognized`;
-        if(this.facts.has(fact))continue;
-        const visible=this.facts.has("binocularTaken")&&!this.facts.has("binocularReturned")
-          &&sample.binocularRaised===true&&sample[`${direction}SubjectVisible`]===true;
-        this.binocularRecognition[direction]=visible?this.binocularRecognition[direction]+Math.max(0,dt):0;
-        if(this.binocularRecognition[direction]>=(activity.binoculars?.recognitionSeconds||.45)){
-          this.Mark(fact);this.Emit(direction==="north"?"P012NorthRecognized":"P012SouthRecognized");
-        }
-      }
-      this.orientationIndex=Number(this.facts.has("northRecognized"))+Number(this.facts.has("southRecognized"));
-    }
     if(this.beat===4){
       const chat=activity.northApproachChatPosition||route[0];
       if(!this.facts.has("northApproachChat")&&Distance(p,chat)<=3){
@@ -659,6 +733,7 @@ export class FirstLevelP012Director {
         continue;
       }
       if (route.index >= route.points.length) { this.StepEnemyBound(route, p); continue; }
+      if(this.StepEastEnemyRejoin(route,point))continue;
       if (Distance(point, route.points[route.index]) < (route.relocation ? 0.6 : 2)) route.index += 1;
       if (route.staging && route.index > route.stagingStopIndex) continue;
       const goal = route.points[route.index];
@@ -677,11 +752,19 @@ export class FirstLevelP012Director {
     let ready = false;
     switch (this.beat) {
       case 0: ready = this.routeIndex >= route.length && this.Signalled("P012TrainDoor"); break;
-      case 1: ready = Has("weapon") && Has("issuedAmmo"); break;
+      case 1: ready = Has("weapon") && Has("issuedAmmo")
+        &&(!activity.briefing||this.Signalled("P012BriefingComplete")); break;
       // Passing people are scene information, not a hidden "spot both groups"
       // objective. Reaching the hub must not depend on a crowd visibility bit.
       case 2: ready = this.routeIndex >= route.length; break;
-      case 3: ready = Has("binocularReturned"); break;
+      case 3: {
+        const hub=activity.villageRoute?.at(-1),exit=activity.shellCoverRoute?.[0];
+        ready=sample.guideAlive!==false && Distance(p,sample.guidePosition)<=4
+          &&Distance(sample.guidePosition,hub)<=4 && !!exit
+          &&P012SegmentClear(this.config.layout?.blocks||[],sample.guidePosition,exit,.42);
+        if(ready)this.Emit("P012VillageNorthDeparture");
+        break;
+      }
       case 4: ready = At("Z04") && this.routeIndex >= route.length && Has("northNearMissImpact") && Has("northCovered"); break;
       case 5: ready = Has("ammo") && this.gunports.size > 0; break;
       case 6: ready = dead >= 2 || (this.unlockedWaves.includes(0) && sample.scoutAlarm); break;
@@ -711,7 +794,7 @@ export class FirstLevelP012Director {
           if (roadActors.length === 2 && roadActors.every((entry) => !this.host.EnemyPosition?.(entry.handle))
             && !this.pendingEnemies.some((entry) => entry.ambushGroup === 0)) this.Emit("P012RoadGunSilenced");
         }
-        if (Distance(p, this.config.activities?.ambushGroups?.[2]?.cover || P012Point(72, 43)) < 7) this.Mark("flanked");
+        if (!this.ambushRejoin && Distance(p, this.config.activities?.ambushGroups?.[2]?.cover || P012Point(72, 43)) < 7) this.Mark("flanked");
         ready = dead >= 21 && Has("flanked") && this.ambushEntryIndex >= (activity.ambushEntryRoute?.length || 0) && this.routeIndex >= route.length
           && Distance(p, sample.columnPosition) < 18; break;
       case 15: ready = Has("regroup") && Has("roadWounded") && Distance(p, sample.columnPosition) < 12; break;
@@ -859,17 +942,12 @@ export class FirstLevelP012Director {
       target = this.facts.has("issuedAmmo") ? activity.villageRoute[0] : activity.weaponIssuePosition;
       text = this.facts.has("issuedAmmo") ? "跟随小队穿过村路" : "到弹药桌领取子弹";
       interactionId = this.facts.has("issuedAmmo") ? null : "p012_ammoIssue";
+      if(this.facts.has("issuedAmmo")&&activity.briefing){target=this.lastSample.guidePosition||activity.briefing.position;
+        text=this.Signalled("P012BriefingStarted")?"听罗班长交代接防任务":"随班长集结，准备前往北面阵地";requiredAction="follow";}
     }
     if (this.beat === 3) {
-      target=this.lastSample.guidePosition||activity.binoculars.guidePosition;
-      interactionId="p012_binocularTake";
-      if(this.facts.has("binocularTaken")){
-        text="按住右键举镜，看看北面阵地和南面后送队";requiredAction="binoculars";interactionId=null;target=null;
-      }
-      if(this.facts.has("northRecognized")&&this.facts.has("southRecognized")){
-        text="把望远镜交还班长";requiredAction="move";interactionId="p012_binocularReturn";
-        target=this.lastSample.guidePosition||activity.binoculars.guidePosition;
-      }
+      target=this.lastSample.guidePosition||activity.villageRoute?.at(-1);
+      interactionId=null;requiredAction="follow";text="跟上班长，穿过北口去接防";
     }
     if(this.beat===4){
       if(this.routeIndex>=route.length)target=this.Point("ammoPickup",P012Point(-7,-52));
@@ -969,6 +1047,10 @@ export class FirstLevelP012Director {
         text = this.lastSample.bleeding > 0 && this.lastSample.bandages > 0
           ? "卧倒在蓝色胸墙后，流血时按 B 包扎；装填后起身压制道路火力"
           : "在蓝色胸墙后卧倒装填，起身压制道路火力；随后继续侧绕残屋";
+      }
+      if(this.ambushRejoin){
+        target=this.ambushRejoin.target;lookAt=null;requiredAction="move";requiredStance=null;
+        text="沿原入口重新接回残屋侧翼，不要穿越院墙；现场敌情和剩余补给保持不变";
       }
     }
     if (this.beat === 16) {
@@ -1104,7 +1186,7 @@ export class FirstLevelP012Director {
     pressureHistory: this.pressureHistory,
     stageVisits: this.stageVisits, retreatPoint: this.retreatPoint, retreatRejoining: !!this.retreatRejoining,
     routeIndex: this.routeIndex, orientationIndex: this.orientationIndex, carryTravelM: this.carryTravelM,
-    observationTime: this.observationTime, binocularRecognition:this.binocularRecognition, mortarImpactStart: this.mortarImpactStart,
+    observationTime: this.observationTime, mortarImpactStart: this.mortarImpactStart,
     shellObservationTime: this.shellObservationTime, shellImpactStart: this.shellImpactStart, shellTarget: this.shellTarget,
     cleanupWeaponStart: this.cleanupWeaponStart,
     frontlineAmmoRemaining: this.frontlineAmmoRemaining, frontlineAmmoDispensed: this.frontlineAmmoDispensed,
@@ -1135,7 +1217,7 @@ export class FirstLevelP012Director {
     this.supplyReceipts = new Set(next.supplyReceipts);
     for (const receipt of this.supplyReceipts) this.facts.add(receipt);
     this.last = null;
-    this.host.SetBinocularsOwned?.(this.facts.has("binocularTaken")&&!this.facts.has("binocularReturned"));
+    this.ambushRejoin = null;
     this.guideStarted = false;
     this.action = P012_BEATS[this.beat].objective;
     this.host.RestoreSignals?.([...this.signals]);
@@ -1151,6 +1233,7 @@ export class FirstLevelP012Director {
     southEnemiesCleared: this.SouthEnemiesCleared(),
     completionReasons: { ...this.completionReasons },
     elapsed: this.elapsed, airSprintM: this.airSprintM, ambushEntryIndex: this.ambushEntryIndex,
+    ambushRejoin:this.ambushRejoin?{target:{...this.ambushRejoin.target},destination:{...this.ambushRejoin.destination},index:this.ambushRejoin.index,blocked:!!this.ambushRejoin.blocked}:null,
     closePressureReleased: this.closePressureReleased, stagedCloseEnemies: this.enemyRoutes.filter(entry=>entry.staging).length,
     enemyBudget: this.EnemyBudget(), spawnedTotal: this.spawnedTotal,
     scouts: this.enemyRoutes.filter(entry=>entry.scout).map(entry=>({ alive: !!this.host.EnemyPosition?.(entry.handle),

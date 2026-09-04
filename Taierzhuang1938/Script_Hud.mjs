@@ -146,14 +146,20 @@ const ACTION_ICONS = {
 };
 ACTION_ICONS.action = ACTION_ICONS.interact;
 
+/** Scene-owned presentation; identity queries and normal scenes stay unchanged. */
+export function TargetCardPresentation(card, { targetDistance = true } = {}) {
+  if (!card || targetDistance) return card;
+  return { ...card, meta: String(card.meta || "").split(" · ").filter(bit => !/^\d+m$/.test(bit)).join(" · ") };
+}
+
 /**
- * 从真实玩法状态生成情境操作提示。只要条件不成立就不返回那一项：
- * 没有第二支枪不提示换枪，够不着尸体不提示拾枪，没有绷带或没流血不提示包扎。
- * 保持纯函数，浏览器冒烟可以直接把三组边界状态喂进来验证。
+ * 从真实玩法状态生成情境操作提示。够不着尸体不提示拾枪，没有绷带或没流血不提示包扎。
+ * 上/收刺刀是通用键位，留在操作说明；仅仅持有可装刺刀的枪不构成情境提示。
+ * 保持纯函数，浏览器冒烟可以直接喂入边界状态。
  */
 export function ContextualActionPrompts({
   interaction = null, bleeding = 0, bandages = 0, slots = {},
-  bayonet = null, ammoEmpty = false, carry = null,
+  ammoEmpty = false, carry = null,
 } = {}) {
   const prompts = [];
   /**
@@ -178,9 +184,6 @@ export function ContextualActionPrompts({
   // 空枪时先教"这一下还能捅出去"，再教装填 —— 白刃是贴脸时唯一来得及的选项
   if (ammoEmpty) {
     prompts.push({ keys: "左键", label: "白刃（按住蓄力劈刺）", kind: "melee" });
-  }
-  if (bayonet) {
-    prompts.push({ keys: "X", label: bayonet.fixed ? "收刺刀" : "上刺刀", kind: "bayonet" });
   }
   const firearms = [
     ["primary", "1", "长枪"],
@@ -615,7 +618,8 @@ export class Hud {
    *
    * @param {object|null} card Script_Identify.TargetCard 的返回值
    */
-  SetTarget(card) {
+  SetTarget(card, presentation = {}) {
+    card = TargetCardPresentation(card, presentation);
     const e = this.el.target;
     // 准心指着自己人时整个准心转蓝。**只给自己人上色**：
     // 敌人也上色的话准心就成了"确认是敌人"的开关，玩家会照着颜色扣扳机；
@@ -1152,6 +1156,9 @@ export class Hud {
   /** 屏幕空间的占领点图标。ER2：交叉刀剑＝待打，旗帜＝已占。 */
   UpdateMarkers(objectives, camera, project, currentIndex = 0, showAll = false) {
     const box = this.el.markers;
+    // A scene may intentionally have no HUD destinations. Remove old nodes as
+    // well, so a restored/replaced objective list cannot leave stale markers.
+    while (box.children.length > objectives.length) box.lastElementChild.remove();
     while (box.children.length < objectives.length) {
       const m = document.createElement("div");
       m.className = "hudMarker";
