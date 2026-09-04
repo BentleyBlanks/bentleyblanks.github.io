@@ -240,6 +240,18 @@ function SegmentBlocked(from,to){
 }
 // These are real visibility pockets, not merely HUD group indices. Later
 // shooters remain damageable but their bodies are behind solid partitions.
+{
+ const activity=phase.whitebox.activities,shelter=activity.northShelterPosition;
+ const impact={...activity.northNearMissImpactPosition,y:.35};
+ Audit("NorthNearMissDitchEntry",[routes.approach[1],shelter,routes.approach[2]],layout.blocks,1.3);
+ for(let ring=0;ring<=5;ring++)for(let angle=0;angle<72;angle++){
+  const radius=activity.northShelterRadiusM*ring/5,theta=angle*Math.PI/36;
+  const point={x:shelter.x+radius*Math.cos(theta),z:shelter.z+radius*Math.sin(theta)};
+  assert.ok(!layout.blocks.some(box=>Hits(point,box,.42)),"ditch refuge is not inside its bank");
+  for(const y of [.42,1.1])assert.ok(SegmentBlocked(impact,{...point,y}),"real ditch bank blocks near-miss ray at low posture");
+ }
+ assert.ok(!SegmentBlocked(impact,{...routes.approach[0],y:1.1}),"crouching on the exposed road is not shelter");
+}
 const southGroups=phase.whitebox.activities.southFightGroups;
 const sideShotCases=[
  {name:"B14",center:{x:99,z:25.5},radius:1,actual:{x:99.708,z:25.066},enemy:{x:129.5,y:1.5,z:35.5}},

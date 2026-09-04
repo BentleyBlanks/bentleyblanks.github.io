@@ -183,6 +183,9 @@ worldBlocks.push(Box("WestBoundary",-109,-27.5,2,373,8),Box("EastBoundary",184,-
   Box("NorthBoundary",37.5,-214,295,2,8),Box("SouthBoundary",37.5,159,295,2,7),
   Box("RailEmbankment",-72,-32.5,7,315,2.5),
   Box("NorthLinkWestBank",-21,-39,3,35,3.2),Box("NorthLinkEastShoulder",8,-43,13,19,3.8),
+  // A real low ditch bank separates the first near miss from the crouched
+  // refuge. Both ends are open; it does not span or pinch the escort route.
+  Box("NorthNearMissDitchBank",-15.6,-40,.8,19,1.1,"cover"),
   Box("EastLinkNorthCourt",48,13,12,4,3.1),Box("EastLinkEastCourt",58,40,15,14,3.2),
   Box("EastLinkWestCourt",28,54,10,25,3),Box("EastLinkSouthCourt",66,-1,22,5,3),
   Box("EastLinkEastShoulder",91,73,12,15,3.5),

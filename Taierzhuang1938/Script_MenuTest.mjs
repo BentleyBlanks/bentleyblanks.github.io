@@ -57,10 +57,81 @@ try {
 const Url = (query = "") => `http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small${query}`;
 
 // Explicit lethal-hit fixture, not campaign or balance evidence.
-if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-voice-only") || process.argv.includes("--p012-enemy-bound-only") || process.argv.includes("--p012-approval-only") || process.argv.includes("--p012-grenade-only")){
+if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-voice-only") || process.argv.includes("--p012-enemy-bound-only") || process.argv.includes("--p012-approval-only") || process.argv.includes("--p012-grenade-only") || process.argv.includes("--p012-salvage-only")){
  try{
   await page.goto(Url("&whitebox=p012&shot=1&manual=1"),{timeout:120000});
   await page.waitForFunction(()=>window.Tengxian?.Debug?.P012?.(),null,{timeout:240000});
+  if(process.argv.includes("--p012-salvage-only")){
+    // Explicit local range initialization on the real P012 outer ground. This
+    // proves input/inventory/projectile/drop contracts, NOT sequential B21 play.
+    const setup=await page.evaluate(async()=>{
+      const g=window.Tengxian,{FirstLevelP012Director,P012_WAVES}=await import("./Script_FirstLevelP012Flow.mjs");
+      let flow;FirstLevelP012Director.prototype.Update=function(){flow=this;};g.StepFrames(1);
+      flow.beat=21;flow.routeIndex=2;
+      const index=P012_WAVES.findIndex(w=>w.beat===21);flow.SpawnWave(P012_WAVES[index],index);
+      const actors=flow.enemyRoutes.filter(e=>e.encounterBeat===21).map(e=>e.handle);
+      actors.forEach((a,i)=>{const x=i?212+i*4:203,z=i?0:-4;
+        a.position.set(x,0,z);a.body?.Teleport(x,0,z);a.goal.copy(a.position);a.holdZone={x,z,radius:.3};a.dummy=true;a.target=null;
+      });
+      actors[0].Kill(null); // Normal Soldier death creates the genuine weapon drop.
+      g.player.Spawn(200,0,0);g.player.yaw=-Math.PI/2;g.player.pitch=-.15;
+      g.state.ammo=0;g.state.clips=0;g.state.mags.primary.ammo=0;g.state.mags.primary.clips=0;g.state.grenades=2;
+      g.StepFrames(90);
+      window.p012SalvageFixture={flow,actors,corpse:actors[0]};
+      return {scope:"explicit local fixture; no campaign/tactical balance claim",player:g.player.position.toArray(),
+        ammo:g.state.ammo,clips:g.state.clips,grenades:g.state.grenades,
+        actors:actors.map(a=>({id:a.id,health:a.health,position:a.position.toArray()})),drop:{...actors[0].drop}};
+    });
+    await page.screenshot({path:path.join(os.tmpdir(),"Scene_P012SalvageBefore.png")});
+    const grenade=await page.evaluate(()=>{
+      const g=window.Tengxian,f=window.p012SalvageFixture,before=f.actors.map(a=>({id:a.id,health:a.health}));
+      g.Debug.Key("KeyG",true);g.StepFrames(36);g.Debug.Key("KeyG",false);
+      const projectile=g.combat.projectiles.find(p=>p.owner==="player"&&p.kind==="Grenade"),trajectory=[];
+      for(let i=0;i<360;i++){g.StepFrames(1);if(projectile&&i%6===0)trajectory.push({t:i/60,position:projectile.position.toArray(),fuse:projectile.fuse});}
+      return {before,after:f.actors.map(a=>({id:a.id,health:a.health})),trajectory,projectile:!!projectile,
+        grenades:g.state.grenades,effect:f.flow.State().lastSouthGrenadeEffect,
+        detonated:!!projectile&&!g.combat.projectiles.includes(projectile)&&projectile.fuse<=0};
+    });
+    await page.screenshot({path:path.join(os.tmpdir(),"Scene_P012SalvageGrenade.png")});
+    const pickup=await page.evaluate(()=>{
+      const g=window.Tengxian,{corpse}=window.p012SalvageFixture,walk=[];
+      const before={weapon:g.Debug.Interact().weapon,ammo:g.state.ammo,clips:g.state.clips,pickups:g.interact.pickups,taken:corpse.drop.taken};
+      for(let i=0;i<360;i++){
+        const delta=corpse.position.clone().sub(g.player.position),distance=Math.hypot(delta.x,delta.z);
+        g.player.yaw=Math.atan2(-delta.x,-delta.z);g.player.pitch=-.5;
+        if(distance<1.5)break;
+        g.Debug.Key("KeyW",true);g.StepFrames(1);walk.push(g.player.position.toArray());
+      }
+      g.Debug.Key("KeyW",false);g.StepFrames(1);
+      const eye=g.player.EyePosition,target=corpse.position.clone();target.y+=.35;
+      const delta=target.clone().sub(eye),distance=delta.length(),hit=g.battlefield.Raycast(eye,delta.normalize(),distance);
+      const query=g.interact.Query(g.player),clear=!hit||hit.t>=distance-.05;
+      if(clear&&query?.kind==="pickup"&&query.soldier===corpse){g.Debug.Key("KeyF",true);g.Debug.Key("KeyF",false);}
+      g.StepFrames(1);
+      const after={weapon:g.Debug.Interact().weapon,ammo:g.state.ammo,clips:g.state.clips,pickups:g.interact.pickups,taken:corpse.drop.taken};
+      g.Debug.Key("KeyF",true);g.Debug.Key("KeyF",false);g.StepFrames(1);
+      return {before,after,secondPickups:g.interact.pickups,secondAmmo:g.state.ammo,secondClips:g.state.clips,corpse:corpse.position.toArray(),drop:{...corpse.drop},
+        player:g.player.position.toArray(),walk,clear,query:query?.kind,label:query?.label};
+    });
+    await page.screenshot({path:path.join(os.tmpdir(),"Scene_P012SalvagePickedUp.png")});
+    const shot=await page.evaluate(()=>{
+      const g=window.Tengxian;g.StepFrames(120);g.player.pitch=.65;
+      const before={ammo:g.state.ammo,shots:g.state.playerShots};
+      g.Debug.Mouse(0,true);g.StepFrames(18);g.Debug.Mouse(0,false);g.StepFrames(1);
+      return {before,after:{ammo:g.state.ammo,shots:g.state.playerShots},shot:g.Debug.LastShot()};
+    });
+    const result={setup,grenade,pickup,shot,problems};
+    fs.writeFileSync(path.join(os.tmpdir(),"Data_P012SalvageFixture.json"),JSON.stringify(result,null,2));
+    Check("空步枪仍可真实G投雷伤敌",setup.ammo===0&&setup.clips===0&&grenade.grenades===1&&grenade.detonated
+      &&grenade.after.some(a=>a.health<grenade.before.find(b=>b.id===a.id).health),JSON.stringify(grenade.effect));
+    Check("真实走近可见尸体F缴获同一把枪",pickup.walk.length>0&&pickup.clear&&pickup.after.taken
+      &&pickup.after.weapon===pickup.drop.weaponId&&pickup.after.ammo>0&&pickup.after.pickups===pickup.before.pickups+1);
+    Check("尸体单次领取，不复刷弹药",pickup.secondPickups===pickup.after.pickups
+      &&pickup.secondAmmo===pickup.after.ammo&&pickup.secondClips===pickup.after.clips);
+    Check("缴枪后实际左键扣弹射击",shot.after.ammo<shot.before.ammo&&shot.after.shots>shot.before.shots,JSON.stringify(shot));
+    Check("无浏览器错误",problems.length===0,problems.join("\n"));
+    await browser.close();await server.close();process.exit(failed?1:0);
+  }
   if(process.argv.includes("--p012-grenade-only")){
     // Explicit B21 local initialization, not sequential campaign evidence.
     const result=await page.evaluate(async()=>{

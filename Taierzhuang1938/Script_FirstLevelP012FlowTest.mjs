@@ -82,6 +82,8 @@ const flow = new FirstLevelP012Director({
   EnemyPosition: (actor) => actor.alive ? actor.position : null,
   EnemyGoal: (actor, goal) => { actor.goal = goal; }, Shelling: () => { shelling += 1; },
 }, phase.whitebox);
+let shelteredFromImpact=false;
+flow.host.ShelteredFromImpact=()=>shelteredFromImpact;
 let sample = { position: phase.spawn, yaw: 0, stance: "stand", sprint: 0,
   zone: "Z00", enemyDeaths: 0, carryKind: null, columnArrived: false,
   weaponActionCount: 0, trafficReady: true };
@@ -150,6 +152,19 @@ Tick({position:{x:a.x+(b.x-a.x)*11/length,z:a.z+(b.z-a.z)*11/length}});assert.eq
 assert.equal(northReactions,0);assert.equal(flow.CurrentObjective().text,"跟随班长北上","request is not an actual explosion");
 Tick({mortarImpactCount:1});assert.equal(northReactions,1);
 assert.ok(flow.CurrentObjective().text.includes("炮弹落在路旁"));
+assert.equal(flow.CurrentObjective().requiredAction,"sprint","the cover goal is not overwritten by a generic crouch action");
+Tick({position:northRoute[1],stance:"crouch"});
+assert.equal(flow.facts.has("northCovered"),false,"crouching on the exposed route is not entering a ditch");
+const shelter=phase.whitebox.activities.northShelterPosition;
+Tick({position:shelter,stance:"crouch"});
+assert.equal(flow.facts.has("northCovered"),false,"the right location without a real blocked ray is not cover");
+assert.equal(flow.CurrentObjective().requiredAction,"crouch");
+shelteredFromImpact=true;
+Tick({position:shelter,stance:"stand"});
+assert.equal(flow.facts.has("northCovered"),false,"standing in the refuge does not complete low-posture teaching");
+Tick({position:shelter,stance:"crouch"});
+assert.equal(flow.facts.has("northCovered"),true);
+assert.ok(signals.has("P012NorthDitchEntered"));
 for(const p of northRoute.slice(1))Tick({position:p,zone:"Z03",stance:"crouch",guidePosition:p});
 At("Z04");assert.equal(shelling,1);assert.equal(northReactions,1);
 assert.equal(flow.State().beat,"B05");
@@ -832,15 +847,23 @@ for(const beat of [14,20,21]) {
   director.Restore({...director.Snapshot(),beat});
   director.lastSample={position:P012Point(44,62),ammo:0,clips:1,carryKind:null};
   const normal=director.CurrentObjective();
-  assert.ok(!normal.text.includes("弹药耗尽"));
+  assert.ok(!normal.text.includes("步枪打空"));
   director.lastSample.clips=0;
   const saved=director.Snapshot(),empty=director.CurrentObjective();
-  assert.ok(empty.text.endsWith("弹药耗尽：到已清掩体旁靠近地上枪械，按 F 缴获（会替换当前枪弹）"));
+  assert.ok(empty.text.endsWith("步枪打空：留意倒下士兵的枪械，靠近按 F 缴获（替换当前枪弹）"));
   assert.deepEqual(empty.target,normal.target,"loot hint never directs the player to a hidden corpse");
   assert.equal(empty.interactionId,normal.interactionId);assert.equal(empty.requiredAction,normal.requiredAction);
   assert.deepEqual(director.Snapshot(),saved,"reading a low-ammo hint cannot mutate resource or mission state");
-  director.lastSample.carryKind="stretcher";assert.ok(!director.CurrentObjective().text.includes("弹药耗尽"));
-  director.lastSample.carryKind=null;director.lastSample.ammo=1;assert.ok(!director.CurrentObjective().text.includes("弹药耗尽"));
+  director.lastSample.grenades=6;
+  const withGrenades=director.CurrentObjective();
+  assert.ok(withGrenades.text.endsWith("步枪打空，尚有6枚手榴弹：按住 G 准备，松开投出"));
+  assert.ok(!withGrenades.text.includes("按 F 缴获"),"available throwables take precedence over an unseen pickup");
+  assert.deepEqual(withGrenades.target,normal.target,"resource advice never invents a new destination");
+  assert.equal(withGrenades.requiredAction,normal.requiredAction);
+  assert.deepEqual(director.Snapshot(),saved,"throwable advice cannot create resources or advance the encounter");
+  director.lastSample.grenades=0;assert.ok(director.CurrentObjective().text.endsWith("（替换当前枪弹）"));
+  director.lastSample.carryKind="stretcher";assert.ok(!director.CurrentObjective().text.includes("步枪打空"));
+  director.lastSample.carryKind=null;director.lastSample.ammo=1;assert.ok(!director.CurrentObjective().text.includes("步枪打空"));
   assert.equal(resourceWrites,0);
 }
 points.get("p012_woundedCheck").OnComplete();

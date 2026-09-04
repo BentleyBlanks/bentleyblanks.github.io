@@ -3210,6 +3210,12 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     SpawnEnemy: (spec) => p012Runtime.SpawnEnemy(spec),
     Guide: (spec) => p012Runtime.Guide(spec),
     SetBinocularsOwned: (owned) => { p012Runtime.binocularOwned = owned; if (!owned) p012BinocularRaised = false; },
+    ShelteredFromImpact: (point) => {
+      const origin = new THREE.Vector3(point.x, battlefield.GroundHeight(point.x, point.z) + 0.35, point.z);
+      const direction = player.EyePosition.clone().sub(origin), distance = direction.length();
+      const hit = battlefield.Raycast(origin, direction.normalize(), distance);
+      return !!hit && hit.t < distance - 0.1;
+    },
     NorthNearMissReaction: () => {
       const actor = companion?.Handle("luo");
       if (actor?.alive) {

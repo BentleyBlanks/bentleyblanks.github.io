@@ -7,6 +7,7 @@ import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { P012_ANCHORS, P012_ROUTES } from "./Data_FirstLevelP012Layout.mjs";
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
+import { openingActivities } from "./Data_FirstLevelP012Opening.mjs";
 import { VOICE_LINES as chapterVoices } from "./Data_MissionCh1.mjs";
 import { VOICE_LINES as prologueVoices } from "./Data_MissionCh0.mjs";
 
@@ -57,9 +58,26 @@ async function PlayPrelude() {
   let result;
   const orientations = [];
   for (let chunk = 0; chunk < 36; chunk += 1) {
-    result = await page.evaluate(({ orientationReview, openingCausalityReview }) => {
+    result = await page.evaluate(({ orientationReview, openingCausalityReview, northShelter, northShelterRadius }) => {
       const game = window.Tengxian;
       const bot = window.p012ReviewBot ||= { held: {}, trace: [], frame: 0, lastProgress: 0, progressKey: "" };
+      const DitchEvidence=()=>{
+        const flow=game.Debug.P012(),scene=game.Debug.P012Scene(),p=game.player.position;
+        const impact=scene.mortarImpactPosition,eye=game.player.EyePosition;
+        let ray=null;
+        if(impact){
+          const from=eye.clone().set(impact.x,game.battlefield.GroundHeight(impact.x,impact.z)+.35,impact.z);
+          const direction=eye.clone().sub(from),distance=direction.length();
+          const hit=game.battlefield.Raycast(from,direction.normalize(),distance);
+          ray={from:from.toArray(),to:eye.toArray(),distance,blocked:!!hit&&hit.t<distance-.1,
+            hit:hit?{t:hit.t,normal:hit.normal,block:hit.box?.id||hit.box?.tag||null,
+              box:hit.box?{x:hit.box.x,z:hit.box.z,w:hit.box.w,d:hit.box.d,h:hit.box.h}:null}:null};
+        }
+        return {at:flow.elapsed,position:p.toArray(),stance:game.player.stance,impact,
+          impactCount:scene.mortarImpactCount,impactFact:flow.facts.includes("northNearMissImpact"),
+          northCovered:flow.facts.includes("northCovered"),distanceToShelter:Math.hypot(p.x-northShelter.x,p.z-northShelter.z),
+          shelter:northShelter,shelterRadius:northShelterRadius,ray};
+      };
       const Key = (code, down) => {
         if (!!bot.held[code] === down) return;
         game.Debug.Key(code, down); bot.held[code] = down;
@@ -71,6 +89,14 @@ async function PlayPrelude() {
         const objective = flow.objective;
         if (flow.beatIndex >= 6 || !game.player.Alive) break;
         if(openingCausalityReview&&flow.beatIndex===4){
+          const ditch=DitchEvidence();
+          if(!bot.lastDitch?.northCovered&&ditch.northCovered){
+            if(!ditch.impactFact||ditch.distanceToShelter>northShelterRadius||ditch.stance==="stand"||!ditch.ray?.blocked)
+              throw new Error(`northCovered without actual ditch shelter: ${JSON.stringify(ditch)}`);
+            bot.ditchCaptured=true;bot.pendingCausality={id:"NorthDitchEntered",before:bot.lastDitch,after:ditch};
+            bot.lastDitch=ditch;break;
+          }
+          bot.lastDitch=ditch;
           const impacts=game.Debug.P012Scene().mortarImpactCount;
           if(bot.preShellImpacts===undefined)bot.preShellImpacts=impacts;
           if(!flow.facts.includes("northNearMissImpact")&&objective.requiredAction==="sprint")throw new Error("Shell sprint objective preceded actual impact");
@@ -85,7 +111,11 @@ async function PlayPrelude() {
             if(game.player.stance!=="prone")throw new Error("Actual prone input did not change player stance");
             const leader=game.ai.soldiers.find(actor=>actor.castId==="luo");
             if(leader?.stance!==2)throw new Error("Luo did not physically go prone after impact");
-            bot.impactCaptured=true;bot.pendingCausality={id:"NorthActualImpactProne",at:game.Debug.P012().elapsed,impacts,baseline:bot.preShellImpacts,stance:game.player.stance,guideStance:leader.stance,objective};break;
+            const early=DitchEvidence();
+            if(early.distanceToShelter<=northShelterRadius)throw new Error("Early-prone negative fixture is already in the real ditch");
+            if(early.northCovered)throw new Error("Early road prone incorrectly completed ditch entry");
+            bot.earlyDitchNegative=early;
+            bot.impactCaptured=true;bot.pendingCausality={id:"NorthActualImpactProne",at:game.Debug.P012().elapsed,impacts,baseline:bot.preShellImpacts,stance:game.player.stance,guideStance:leader.stance,objective,earlyDitchNegative:early};break;
           }
         }
         // Return an actual gameplay frame while the landmark is being observed.
@@ -195,7 +225,7 @@ async function PlayPrelude() {
         position: game.player.position.toArray(), health: game.player.health, alive: game.player.Alive,
         trace: bot.trace, stalled: game.Debug.P012().elapsed - bot.lastProgress > 65,
         weapons: game.Debug.Slots(), carry: game.carry.KindId, ammo: game.state.ammo, interact: game.Debug.Interact() };
-    }, { orientationReview, openingCausalityReview });
+    }, { orientationReview, openingCausalityReview,northShelter:openingActivities.northShelterPosition,northShelterRadius:openingActivities.northShelterRadiusM });
     if(result.stationView) await CaptureStationView(result.stationView);
     if(result.causality){
       await fs.writeFile(path.join(outputDir,`Data_P012${result.causality.id}.json`),JSON.stringify(result.causality,null,2));
@@ -218,8 +248,10 @@ async function PlayPrelude() {
     result.flow.beatIndex >= 6 ? `${result.flow.elapsed.toFixed(1)}s` : JSON.stringify(result));
   Check(result.carry === null, "弹药实际交付后释放双手，能够拔枪");
   if(openingCausalityReview){
-    const evidence=await page.evaluate(()=>({borrow:!!window.p012ReviewBot.borrowNegatives,chat:!!window.p012ReviewBot.chatCaptured,impact:!!window.p012ReviewBot.impactCaptured}));
-    Check(evidence.borrow&&evidence.chat&&evidence.impact,"真实借镜负例、炮前聊天与落弹后卧倒取证齐全",JSON.stringify(evidence));
+    const evidence=await page.evaluate(()=>({borrow:!!window.p012ReviewBot.borrowNegatives,chat:!!window.p012ReviewBot.chatCaptured,impact:!!window.p012ReviewBot.impactCaptured,
+      ditch:!!window.p012ReviewBot.ditchCaptured,earlyProne:window.p012ReviewBot.earlyDitchNegative}));
+    Check(evidence.borrow&&evidence.chat&&evidence.impact&&evidence.ditch&&evidence.earlyProne&&!evidence.earlyProne.northCovered,
+      "真实借镜、炮击、早路点低姿不算入沟及实际沟岸遮挡取证齐全",JSON.stringify(evidence));
   }
   if (orientationReview) {
     Check(orientations.length === 2, "主动举镜观察两类真实人物，记录第一人称帧（可读性另行人工看图）");
@@ -243,12 +275,21 @@ async function PlayFrontline() {
     result = await page.evaluate(({ ports, fullCampaign, anchors, routes, retryDive, perception, spatial }) => {
       const game = window.Tengxian;
       const bot = window.p012CombatReview ||= { frame: 0, firstShotAt: null, trace: [], oldBeat: -1, shots: [], targetId: null, aimFrames: 0, held: {}, cleanupPoint: 0, lastProgress: 0, progressKey: "" };
+      const TurnSalvage=(yaw,pitch)=>{
+        const limit=(perception?.turnRadPerSecond ?? 1.5)/30;
+        const delta=Math.atan2(Math.sin(yaw-game.player.yaw),Math.cos(yaw-game.player.yaw));
+        game.player.yaw+=Math.max(-limit,Math.min(limit,delta));
+        game.player.pitch+=Math.max(-limit,Math.min(limit,pitch-game.player.pitch));
+        return Math.abs(Math.atan2(Math.sin(yaw-game.player.yaw),Math.cos(yaw-game.player.yaw)))<.025
+          &&Math.abs(pitch-game.player.pitch)<.025;
+      };
       const Key = (code, down) => {
         if (!!bot.held[code] === down) return;
         game.Debug.Key(code, down); bot.held[code] = down;
       };
       for (let frame = 0; frame < 600; frame += 1) {
         const flow = game.Debug.P012();
+        if(bot.pendingScavengeCapture)break;
         if (window.p012JointAirView && !bot.jointAirViewCaptured) {
           bot.jointAirViewCaptured = true;
           break;
@@ -304,6 +345,75 @@ async function PlayFrontline() {
           continue;
         }
         if (game.player.bleeding > 0 && game.player.bandages > 0) game.Debug.Key("KeyB");
+        if(bot.salvageGrenade){
+          Key("KeyW",false);Key("ShiftLeft",false);
+          if(flow.elapsed>=bot.salvageGrenade.releaseAt){
+            Key("KeyG",false);
+            (bot.salvageActions ||= []).push({event:"grenadeReleased",at:flow.elapsed,
+              from:game.player.position.toArray(),before:bot.salvageGrenade.before,after:game.state.grenades});
+            bot.salvageGrenade=null;
+          }
+          game.StepFrames(1,1/30,false);bot.frame++;continue;
+        }
+        // Empty magazines are not a reason to repeat R forever. Discover only
+        // nearby visible bodies, then walk and press the same contextual F as a
+        // player. No item/weapon state or corpse coordinates are changed here.
+        if (flow.beatIndex===21 && game.state.ammo===0 && game.state.clips===0 && !game.carry.Active) {
+          const scav=bot.scavenge ||= {log:[],blocked:{},target:null,lastScan:-99};
+          const eye=game.player.EyePosition;
+          const bodies=game.ai.soldiers.filter(s=>!s.alive&&!s.unarmed&&s.drop&&!s.drop.taken&&s.weapon?.kind!=="melee");
+          const Visible=s=>{
+            const point=s.position.clone();point.y=game.battlefield.GroundHeight(point.x,point.z)+.35;
+            const screen=point.clone().project(game.camera),delta=point.clone().sub(eye),distance=delta.length();
+            if(distance>18||screen.z< -1||screen.z>1||Math.abs(screen.x)>.95||Math.abs(screen.y)>.95)return false;
+            const hit=game.battlefield.Raycast(eye,delta.normalize(),distance);
+            return !hit||hit.t>=distance-.05;
+          };
+          let corpse=bodies.find(s=>s.id===scav.target);
+          if(!corpse){
+            corpse=bodies.filter(s=>(scav.blocked[s.id]||-99)<flow.elapsed&&Visible(s))
+              .sort((a,b)=>a.position.distanceTo(eye)-b.position.distanceTo(eye))[0];
+            if(corpse){scav.target=corpse.id;scav.started=flow.elapsed;scav.lastSeen=flow.elapsed;scav.confirmFrames=0;
+              scav.log.push({event:"discovered",at:flow.elapsed,id:corpse.id,weapon:corpse.drop.weaponId,
+                corpse:corpse.position.toArray(),player:game.player.position.toArray()});}
+          }
+          if(corpse){
+            const delta=corpse.position.clone().sub(game.player.position),distance=Math.hypot(delta.x,delta.z);
+            const visible=Visible(corpse);
+            if(visible){scav.lastSeen=flow.elapsed;scav.confirmFrames++;}else scav.confirmFrames=0;
+            game.Debug.Mouse(2,false);Key("ShiftLeft",false);Key("KeyF",false);
+            const linedUp=TurnSalvage(Math.atan2(-delta.x,-delta.z),-.45);
+            if(game.player.stance!=="crouch")game.Debug.Key(game.player.stance==="prone"?"KeyZ":"KeyC");
+            const query=game.interact.Query(game.player);
+            if(query?.kind==="pickup"&&query.soldier===corpse&&visible&&linedUp
+              &&scav.confirmFrames>=(perception?.confirmationFrames??23)&&!game.viewmodel.IsBusy?.()){
+              Key("KeyW",false);
+              const before={ammo:game.state.ammo,clips:game.state.clips,pickups:game.interact.pickups,taken:corpse.drop.taken};
+              Key("KeyF",true);Key("KeyF",false);
+              scav.log.push({event:"pickupInput",at:flow.elapsed,id:corpse.id,label:query.label,
+                player:game.player.position.toArray(),corpse:corpse.position.toArray(),before,
+                after:{ammo:game.state.ammo,clips:game.state.clips,pickups:game.interact.pickups,taken:corpse.drop.taken}});
+              bot.pendingScavengeCapture=scav.log.at(-1);
+              scav.target=null;
+            }else if(flow.elapsed-scav.started>8||flow.elapsed-scav.lastSeen>4){
+              Key("KeyW",false);scav.blocked[corpse.id]=flow.elapsed+30;scav.target=null;
+              scav.log.push({event:"approachBlocked",at:flow.elapsed,id:corpse.id,distance,
+                player:game.player.position.toArray(),corpse:corpse.position.toArray(),query:query?.kind||null,
+                visible,confirmedFrames:scav.confirmFrames,reason:visible?"approachTimeout":"occludedOrMemoryExpired"});
+            }else Key("KeyW",distance>1.25&&linedUp);
+            game.StepFrames(1,1/30,false);bot.frame++;continue;
+          }
+          // Short, ordinary look scan; afterwards continue the public room route
+          // rather than using knowledge of unseen corpse locations.
+          if(flow.elapsed-scav.lastScan>6){scav.lastScan=flow.elapsed;scav.scanUntil=flow.elapsed+2;
+            scav.log.push({event:"scan",at:flow.elapsed,player:game.player.position.toArray(),availableBodies:bodies.length,
+              bodies:bodies.map(s=>({id:s.id,weapon:s.drop.weaponId,position:s.position.toArray(),visible:Visible(s)}))});}
+          if(flow.elapsed<scav.scanUntil){
+            Key("KeyW",false);Key("KeyF",false);Key("ShiftLeft",false);game.Debug.Mouse(2,false);
+            TurnSalvage(game.player.yaw+(perception?.turnRadPerSecond??1.5)/30,-.35);
+            game.StepFrames(1,1/30,false);bot.frame++;continue;
+          }
+        }
         // An actual window glance after clearing the interior firing pair.
         // Observe the moving litter through real collision/LOS; do not advance its path or facts.
         if (flow.beatIndex === 14 && flow.routeIndex >= 3 && !bot.windowView
@@ -451,7 +561,7 @@ async function PlayFrontline() {
         } else {
           game.Debug.Key("KeyW", false);
           const behindCover = (flow.beatIndex <= 10 || [14, 20, 21].includes(flow.beatIndex))
-            && (game.viewmodel.IsBusy?.() || game.state.ammo === 0);
+            && (game.viewmodel.IsBusy?.() || (game.state.ammo === 0 && !(flow.beatIndex===21&&game.state.clips===0)));
           const noLiveThreats = !game.ai.soldiers.some(soldier => soldier.alive && soldier.side === "ija");
           const stance = behindCover ? "prone" : noLiveThreats && flow.objective.requiredStance
             ? flow.objective.requiredStance : "stand";
@@ -489,6 +599,27 @@ async function PlayFrontline() {
           }
           candidates.sort((a, b) => a.distance - b.distance);
           const chosen = candidates[0];
+          if(flow.beatIndex===21&&game.state.ammo===0&&game.state.clips===0&&chosen
+            &&chosen.distance>=5&&chosen.distance<18&&game.state.grenades>0&&!game.viewmodel.IsBusy?.()
+            &&flow.elapsed-(bot.lastSalvageGrenadeAt||-99)>10){
+            // A genuinely visible live target, not the stale generic grenade
+            // marker. G holds/releases the production fuse and trajectory.
+            const delta=chosen.aim.clone().sub(eye);
+            game.Debug.Mouse(2,false);Key("ShiftLeft",false);Key("KeyW",false);
+            if(bot.salvageAimTarget!==chosen.soldier.id){bot.salvageAimTarget=chosen.soldier.id;bot.salvageAimFrames=0;}
+            bot.salvageAimFrames++;
+            const linedUp=TurnSalvage(Math.atan2(-delta.x,-delta.z),-.15);
+            if(!linedUp||bot.salvageAimFrames<(perception?.confirmationFrames??23)){
+              game.StepFrames(1,1/30,false);bot.frame++;continue;
+            }
+            Key("KeyG",true);
+            if(game.state.cooking){bot.salvageGrenade={releaseAt:flow.elapsed+.45,before:game.state.grenades};
+              bot.lastSalvageGrenadeAt=flow.elapsed;
+              (bot.salvageActions ||= []).push({event:"grenadeHeld",at:flow.elapsed,target:chosen.soldier.id,
+                targetPosition:chosen.soldier.position.toArray(),from:game.player.position.toArray(),distance:chosen.distance});}
+            game.StepFrames(1,1/30,false);bot.frame++;continue;
+          }
+          bot.salvageAimTarget=null;bot.salvageAimFrames=0;
           if (perception) {
             // LOS-visible enemies inside the current view may be remembered only
             // while visible. Public objectives tell us where to scan, not where to hit.
@@ -579,6 +710,9 @@ async function PlayFrontline() {
         escortApproval: window.p012EscortApproval || [],
         prematureEscortMovement: window.p012PrematureEscortMovement || [],
         southGrenadeExplosions: window.p012SouthGrenadeExplosions || [],
+        scavenging: bot.scavenge?.log || [],
+        scavengeCapture:bot.pendingScavengeCapture?(()=>{const capture=bot.pendingScavengeCapture;bot.pendingScavengeCapture=null;return capture;})():null,
+        salvageActions: bot.salvageActions || [],
         jointAirView: window.p012JointAirView || null,
         windowView: bot.windowView || null,
         damageTrace: window.p012DamageTrace || [],
@@ -596,6 +730,10 @@ async function PlayFrontline() {
     }, { ports: P012_ANCHORS.gunports, fullCampaign, anchors: P012_ANCHORS, routes: P012_ROUTES,
       retryDive: process.argv.includes("--retry"), perception: perceptionProfile,
       spatial:{window:P012SouthPoint(68,24),airRoad:P012SouthPoint(50,68),southBlockade:P012SouthPoint(42,98)} });
+    if(result.scavengeCapture){
+      await fs.writeFile(path.join(outputDir,"Data_P012Scavenging.json"),JSON.stringify(result.scavenging,null,2));
+      await page.screenshot({path:path.join(outputDir,`Scene_P012Scavenge${result.scavengeCapture.id}_${Math.round(result.flow.elapsed*10)}.png`)});
+    }
     console.log("P012 frontline", JSON.stringify({ at: result.flow.elapsed, beat: result.flow.beat,
       health: result.health, ammo: result.ammo, clips: result.clips, position: result.position,
       enemies: result.enemies.length, dead: result.scene.nearEnemyDeaths, firstShotAt: result.firstShotAt,
@@ -691,6 +829,11 @@ async function PlayFrontline() {
       const menu = document.querySelector("#menu.p012Complete");
       return menu && getComputedStyle(menu).backgroundColor === "rgb(0, 0, 0)"
         && Number(getComputedStyle(menu).opacity) >= .99
+        && [".mnTitle", ".mnList"].every(selector => {
+          const element = menu.querySelector(selector);
+          return element && getComputedStyle(element).visibility === "visible"
+            && Number(getComputedStyle(element).opacity) >= .99;
+        })
         && menu.innerText.includes("重新测试");
     }, null, { timeout: 6000 });
     const ending = await page.evaluate(() => {

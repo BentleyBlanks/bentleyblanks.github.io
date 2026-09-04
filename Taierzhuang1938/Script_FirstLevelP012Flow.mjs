@@ -500,7 +500,6 @@ export class FirstLevelP012Director {
       : this.beat === 21 ? this.routeIndex < (activity.southSupplyRouteIndex || 0)
         || !this.LateThreat() : true;
     if (routeAllowed && Distance(p, route[this.routeIndex]) <= this.RouteArrivalRadius()) {
-      if(this.beat===4&&this.facts.has("northNearMissImpact")&&sample.stance!=="stand")this.Mark("northCovered");
       this.routeIndex += 1;
     }
     if (this.beat === 0 && this.routeIndex >= 2 && guideNear) this.Emit("P012TrainDoor");
@@ -531,13 +530,21 @@ export class FirstLevelP012Director {
         this.Mark("northNearMissRequested");this.shellImpactStart=sample.mortarImpactCount||0;
         // A near miss ahead and off the road remains in a forward-looking
         // player's view; no forced camera turn or invisible blast behind them.
-        this.shellTarget={x:p.x+(dx*9+dz*3)/length,z:p.z+(dz*9-dx*3)/length};
+        this.shellTarget=activity.northNearMissImpactPosition
+          ? {...activity.northNearMissImpactPosition}
+          : {x:p.x+(dx*9+dz*3)/length,z:p.z+(dz*9-dx*3)/length};
         this.Emit("P012NorthNearMissIncoming");this.host.Shelling?.(this.shellTarget);
       }
       if(this.facts.has("northNearMissRequested")&&!this.facts.has("northNearMissImpact")
         &&sample.mortarImpactCount>this.shellImpactStart){
         this.Mark("northNearMissImpact");this.Emit("P012NorthNearMissImpact");this.Emit("P012Shelling");
         this.host.NorthNearMissReaction?.(this.shellTarget);
+      }
+      if(this.facts.has("northNearMissImpact")&&!this.facts.has("northCovered")
+        &&["crouch","prone"].includes(sample.stance)
+        &&Distance(p,activity.northShelterPosition)<=(activity.northShelterRadiusM||2.4)
+        &&this.host.ShelteredFromImpact?.(sample.mortarImpactPosition||this.shellTarget)===true){
+        this.Mark("northCovered");this.Emit("P012NorthDitchEntered");
       }
     }
     if (this.beat === 23) {
@@ -864,7 +871,10 @@ export class FirstLevelP012Director {
       else{
         text=this.facts.has("northCovered")?"沿交通壕继续跟上班长":"炮弹落在路旁！冲进前面的路沟，压低身子";
         requiredAction=this.facts.has("northCovered")?"follow":"sprint";
-        if(!this.facts.has("northCovered")&&Distance(this.lastSample.position,target)<=4)requiredStance="crouch";
+        if(!this.facts.has("northCovered"))target=activity.northShelterPosition;
+        if(!this.facts.has("northCovered")&&Distance(this.lastSample.position,target)<=4){
+          requiredStance="crouch";requiredAction="crouch";
+        }
       }
     }
     if (this.beat === 5) target = this.facts.has("ammo") ? anchors.gunports?.[1]
@@ -1050,9 +1060,9 @@ export class FirstLevelP012Director {
     if (this.beat >= 24) target = this.lastSample.carryKind === "stretcher" ? anchors.shelter
       : this.lastSample.regripPosition || activity.regripPosition;
     if (this.beat === 24 && this.lastSample.carryKind !== "stretcher") interactionId = "ch1_regrip";
-    if (this.beat === 4 || this.beat === 19 ||
+    if (this.beat === 19 ||
       (this.beat === 23 && (activity.retreatCoverIndices || []).includes(this.retreatPoint))) {
-      if (!([4, 23].includes(this.beat) && requiredAction === "follow")) requiredAction = "crouch";
+      if (!(this.beat === 23 && requiredAction === "follow")) requiredAction = "crouch";
     }
     if (this.beat >= 6 && this.beat <= 10 && this.frontlineAmmoRemaining > 0
       && Number(this.host.CurrentClips?.() ?? this.lastSample.clips) <= 0) {
@@ -1061,7 +1071,13 @@ export class FirstLevelP012Director {
     }
     if ([14, 20, 21].includes(this.beat) && !this.lastSample.carryKind
       && Number(this.lastSample.ammo) === 0 && Number(this.lastSample.clips) === 0) {
-      text += "；弹药耗尽：到已清掩体旁靠近地上枪械，按 F 缴获（会替换当前枪弹）";
+      // Describe resources the player actually owns, not an assumed corpse or
+      // supply location hidden behind a wall. This does not change the objective
+      // target, grant ammunition, or require scavenging to finish the encounter.
+      const grenades = Math.max(0, Math.floor(Number(this.lastSample.grenades) || 0));
+      text += grenades > 0
+        ? `；步枪打空，尚有${grenades}枚手榴弹：按住 G 准备，松开投出`
+        : "；步枪打空：留意倒下士兵的枪械，靠近按 F 缴获（替换当前枪弹）";
     }
     let frontlineApproach = null;
     if (this.beat >= 6 && this.beat <= 10 && interactionId !== "p012_frontlineAmmo") {

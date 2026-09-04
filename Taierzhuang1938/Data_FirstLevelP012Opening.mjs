@@ -13,6 +13,8 @@ const civilians=Array.from({length:11},(_,slot)=>{
 });
 export const openingActivities=Object.freeze({
   openingGuideWalkMps:3.05,openingGuideCatchupMps:5.246,openingGuideWaitDistanceM:10,
+  northNearMissImpactPosition:Point(-19,-29),
+  northShelterPosition:Point(-12,-38),northShelterRadiusM:2.4,
   traffic:[...soldiers,...civilians,...[0,1].map(index=>({side:1,slot:12+index,role:"walking",releaseBeat:3,
     proximityRelease:{index:0,beat:3,radius:22,requireVisible:true},
     route:[Point(16+index*2,8+index*2),Point(16,20),Point(16,35),Point(16,50+index*3)]}))],

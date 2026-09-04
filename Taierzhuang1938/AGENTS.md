@@ -260,6 +260,10 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Data_FirstLevelP012Whitebox.mjs` 管独立 phase、现有角色/对白适配和节奏参数。
 - `Data_FirstLevelP012Space.mjs` 只在配置初始化时把原稿点位编译到扩展战场；
   北／东南战术区刚性平移，跨区连接另写世界路线，禁止二次变换或缩放角色／掩体／速度。
+- `Data_FirstLevelP012Station.mjs` / `Data_FirstLevelP012Horizon.mjs` 是已编译世界坐标的兵站与远景体块；
+  台阶顶面由 `Script_FirstLevelWhiteboxField.mjs` 与可见体块对账，共用地表采样，不能再做坐标变换。
+- `Data_FirstLevelP012Opening.mjs` 管开场两向人流和纯字幕；`Script_FirstLevelP012Binoculars.mjs`
+  管借还、举镜、视野与武器互斥；不恢复四向计时看路、村口重复领弹或炮击发生前的避炮目标。
 - 与旧 `?whitebox=1`、正式第一关并存，不覆盖它们。这个版本按用户要求使用
   灰地面、黄跨步、橙翻越、紫攀爬、蓝掩体、黑边界、红危险、绿任务路、青担架路。
   环境仍是程序化无贴图体块，人物及已烘焙声音复用现有配置。
