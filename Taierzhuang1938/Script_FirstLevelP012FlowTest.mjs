@@ -46,6 +46,16 @@ import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
  function DistanceForTest(a,b){return Math.hypot(a.x-b.x,a.z-b.z);}
 }
 
+{
+ let guideSpec=null;
+ const director=new FirstLevelP012Director({Guide:spec=>{guideSpec=spec;}},phase.whitebox);
+ director.beat=22;director.StartGuide();
+ assert.deepEqual(guideSpec.route,phase.whitebox.activities.blockadeGuideRoute,
+  "B22 gives Luo the authored forward ditch route, not the reversed litter route");
+ assert.equal(guideSpec.WaitAt(0),false,"Luo does not stop permanently at the first safe bend");
+ assert.equal(guideSpec.WaitAt(guideSpec.route.length-1),true,"Luo waits at the visible blockade decision position");
+}
+
 const points = new Map();
 {
  const cues=phase.whitebox.storyBeats.filter(beat=>beat.voice?.startsWith("p012_text_Guide"));

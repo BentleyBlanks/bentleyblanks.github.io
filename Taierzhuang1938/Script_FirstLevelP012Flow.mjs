@@ -175,7 +175,8 @@ export class FirstLevelP012Director {
       ...([14, 16, 17, 20, 21].includes(this.beat) ? { route: [] } : {}),
       ...(this.beat === 22 ? { route: this.config.activities.blockadeGuideRoute,
         safeRoute: true, approachPoints: this.config.activities.blockadeGuideRoute,
-        WaitAt: () => true, FaceAt: () => this.config.anchors.blockadePositions?.[1] } : {}),
+        WaitAt: index => index === this.config.activities.blockadeGuideRoute.length - 1,
+        FaceAt: () => this.config.anchors.blockadePositions?.[1] } : {}),
       ...(this.beat === 14 ? {
         route: this.config.activities.ambushEntryRoute?.slice(0,1) || [], startIndex: 0, safeRoute: true,
         approachPoints: this.config.routes?.south?.slice(0,this.config.routes.south.findIndex(point=>Distance(point,this.config.routes.flank[0])<.1)+1),
