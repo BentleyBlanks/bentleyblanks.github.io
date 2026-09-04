@@ -39,6 +39,7 @@ import {
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
 import { FirstLevelP012Runtime } from "./Script_FirstLevelP012Runtime.mjs";
+import { FirstLevelP012Binoculars, P012BinocularLensContains } from "./Script_FirstLevelP012Binoculars.mjs";
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
 import { ApplyP012CastAppearance } from "./Script_FirstLevelP012CastAppearance.mjs";
 import { CAST } from "./Data_TengxianScript.mjs";
@@ -593,6 +594,8 @@ let companion = null;
 let checkpoint = null;
 let p012Flow = null;
 let p012Runtime = null;
+let p012Binoculars = null;
+let p012BinocularRaised = false;
 
 // 章节摆点（集成批 INT2）。「哪一章在哪一拍做什么」是**数据**，在 Script_MissionSetpieces
 // 的 SETPIECES 里一章一条；装配层只建一次、每帧推一下、换关告诉它换到哪儿去了。
@@ -3021,6 +3024,9 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     setpieces.BeginLevel(contentId, phase);
   }
   interact.Clear("P012");
+  p012Binoculars?.Dispose();
+  p012Binoculars = phase.whitebox?.p012 ? new FirstLevelP012Binoculars({camera,scene}) : null;
+  p012BinocularRaised = false;
   p012Runtime = phase.whitebox?.p012 ? new FirstLevelP012Runtime({
     SpawnEnemy: (spec) => {
       const actor = ai.Spawn("ija", spec.x, spec.z, spec);
@@ -3117,6 +3123,19 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     },
     ReleaseGuide: (actor) => { if (actor) { actor.p012Guided = false; delete actor.scriptMoveSpeedMps; actor.manualGoalUntil = ai.time; } },
     PlayerPosition: () => player.position,
+    TrafficVisible: (actor, {binocular=false}={}) => {
+      if (!actor?.alive) return false;
+      return [0.8,1.5].some(height => {
+        const at = actor.position.clone(); at.y += height;
+        const projected = at.clone().project(camera);
+        if (projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > .95 || Math.abs(projected.y) > .95) return false;
+        if (binocular && !P012BinocularLensContains(projected.x,projected.y,camera.aspect)) return false;
+        const ray = at.sub(player.EyePosition), distance = ray.length();
+        const hit = battlefield.Raycast(player.EyePosition, ray.normalize(), distance);
+        return !hit || hit.t >= distance - .3;
+      });
+    },
+    RetireTraffic: (actor) => { if (!actor || !ai.soldiers.includes(actor)) return false; ai.Remove(actor); return true; },
     TrafficActor: (side, slot, point, entry = {}) => {
       let actor;
       if (side === 0) {
@@ -3140,7 +3159,12 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     Signalled: (name) => story.Signalled(name),
     Dodge: (reason) => strafe?.Dodge(reason),
     ReleaseForDodge: () => { carry?.ForceRelease("diveAttempt"); if (setpieces) setpieces.mem.p012ReleaseAt = { ...player.position }; },
-    Move: (actor, point, speed) => { actor.p012Guided = true; actor.scriptMoveSpeedMps = speed; actor.order = "advance"; actor.holdZone = null; actor.manualGoalUntil = ai.time + 3; actor.goal.set(point.x, 0, point.z); },
+    Move: (actor, point, speed) => {
+      actor.p012Guided = true; actor.scriptMoveSpeedMps = speed; actor.order = "advance";
+      actor.holdZone = null; actor.manualGoalUntil = ai.time + 3;
+      const distance = Math.hypot(point.x-actor.position.x,point.z-actor.position.z), fraction = distance>10?8/distance:1;
+      actor.goal.set(actor.position.x+(point.x-actor.position.x)*fraction,0,actor.position.z+(point.z-actor.position.z)*fraction);
+    },
     WarnShell: (point, damaging, OnImpact) => {
       const at = new THREE.Vector3(point.x, battlefield.GroundHeight(point.x, point.z), point.z);
       if (damaging) { const impact = combat.CallIncoming("launcher", at, { OnImpact }); return { x: impact.x, z: impact.z }; }
@@ -3150,7 +3174,12 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   }, phase.whitebox) : null;
   p012Runtime?.SaveSafePoint("Start",player.position,player.stance,player.yaw);
   p012Flow = phase.whitebox?.p012 ? new FirstLevelP012Director({
-    Register: (spec) => interact.Register({ ...spec, tag: "P012" }),
+    Register: (spec) => interact.Register({ ...spec, tag: "P012",
+      // Both Query and the held interaction recheck Enabled: starting a charge
+      // during the handover cannot leave a live grenade/melee state in binocular use.
+      Enabled: (context) => spec.Enabled?.(context) !== false
+        && (spec.id !== "p012_binocularTake" || (!state.cooking && !state.meleeCharge)),
+    }),
     Carry: () => carry,
     Signal: (name) => story.Signal(name),
     Signalled: (name) => story.Signalled(name),
@@ -3165,6 +3194,9 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     },
     GiveGrenades: (request) => { const granted = Number.isFinite(request) ? Math.max(0, Math.floor(request)) : 0; state.grenades += granted; return granted; },
     DeployRetreatSmoke: (point) => p012Runtime.DeployRetreatSmoke(point),
+    HoldRetreatForCover: (hold) => {
+      if (p012Flow?.beat === 23 && setpieces?.mem?.column) setpieces.mem.column.scriptPaused = !!hold;
+    },
     GiveClips: (request) => {
       const granted = Number.isFinite(request) ? Math.max(0, Math.floor(request)) : 0;
       state.clips += granted;
@@ -3177,7 +3209,28 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     },
     SpawnEnemy: (spec) => p012Runtime.SpawnEnemy(spec),
     Guide: (spec) => p012Runtime.Guide(spec),
+    SetBinocularsOwned: (owned) => { p012Runtime.binocularOwned = owned; if (!owned) p012BinocularRaised = false; },
+    NorthNearMissReaction: () => {
+      const actor = companion?.Handle("luo");
+      if (actor?.alive) {
+        p012Runtime.guideReactionUntil = p012Runtime.time + 2.4;
+        ai.SetStance(actor, 2, 2.4, true);
+      }
+    },
     EnemyPosition: (soldier) => soldier?.alive ? soldier.position : null,
+    EnemyScoutState: (soldier) => ({
+      detectedPlayer: !!soldier?.targetVisible && !!soldier?.target?.isPlayer,
+      hit: soldier?.health < (soldier?.p012ScoutInitialHealth ?? soldier?.health),
+      alarmed: ai.soldiers.some(other => other !== soldier && other.alive && other.squadId === soldier?.squadId && other.fireSequence > 0),
+    }),
+    EnemyScoutMode: (soldier, mode) => {
+      if (!soldier) return;
+      if (mode) {
+        soldier.p012ScoutInitialHealth ??= soldier.health;
+        soldier.p012ScoutDirected = true; soldier.scriptMoveSpeedMps = mode.speedMps;
+        soldier.manualGoalUntil = ai.time + 3;
+      } else { delete soldier.p012ScoutDirected; delete soldier.scriptMoveSpeedMps; }
+    },
     EnemyCombatState: (soldier) => soldier ? {lastFire:soldier.lastFire,suppression:soldier.suppression} : null,
     EnemyStaging: (soldier, staging) => {
       if (!soldier?.alive) return;
@@ -4425,6 +4478,8 @@ function OpenMenu() {
   if (!menu) return;
   state.running = false;
   state.menu = true;
+  p012BinocularRaised = false;
+  p012Binoculars?.Update({owned:false,raised:false},0);
   ReleasePointerLock();
   // 主菜单背后是活场景，环境床照响（ER2 的菜单也是有声音的）。
   // 「暂停 -> 回主菜单」这条路要显式解一次暂停，不解的话菜单是哑的。
@@ -4580,6 +4635,9 @@ function PlaceMenuGarrison(anchor) {
  */
 function ShowPauseMenu() {
   state.running = false;
+  interact?.CancelHold("pause");
+  p012BinocularRaised = false;
+  p012Binoculars?.Update({owned:false,raised:false},0);
   ReleasePointerLock();
   // 背景枪声也得停。玩法停靠 Frame() 提前返回，而环境床与音乐是一张自己在跑的
   // WebAudio 节点图 —— Frame() 返不返回它们都照响（见 Script_Audio.SetPaused）。
@@ -4667,6 +4725,8 @@ const router = new InputRouter({
     // 编辑器开着就把整张键位表闸掉。不闸的话在编辑器里按 R 会真的去装填、
     // 滚滚轮会真的切枪 —— 而这两件事在暂停的世界里做，退出编辑器时状态已经错了。
     if (editor && editor.Capturing) return;
+    if (p012Runtime?.binocularOwned && (action.startsWith("slot:") || action.startsWith("cook:")
+      || ["reload","melee","bayonet","bipod","cycleSlot"].includes(action))) return;
     switch (action) {
       case "crouch": input.crouchPressed = true; p012Runtime?.RecordDodgeIntent(player.position, strafe?.View(), carry?.KindId); return;
       case "prone": input.pronePressed = true; p012Runtime?.RecordDodgeIntent(player.position, strafe?.View(), carry?.KindId); return;
@@ -4987,6 +5047,14 @@ function UpdateContextualActionPrompts() {
     return;
   }
   const interaction = interact?.Query(player) || null;
+  if (p012Runtime?.binocularOwned) {
+    const prompts = [{keys:"右键",label:"按住举起望远镜",kind:"interact"}];
+    if (interaction?.point?.id === "p012_binocularReturn") {
+      prompts.unshift({keys:"F",label:interaction.label,kind:"interact"});
+    }
+    hud.SetActionPrompts(prompts);
+    return;
+  }
   const gunInHand = state.activeSlot === "primary" || state.activeSlot === "secondary";
   const prompts = ContextualActionPrompts({
     // 抬着东西时这一条会把提示条整段接管（只剩「放下 / 扔下」），见 ContextualActionPrompts。
@@ -5270,6 +5338,7 @@ function ConfirmHit(died) {
 
 function TryFire(dt) {
   fireCooldown -= dt;
+  if (p012Runtime?.binocularOwned) return;
   // 架着机枪：左键交给机枪那条射速与过热闸（Script_Emplacement.Update 里排），
   // 步枪链整条短路 —— 手上那支枪这会儿背在背上。
   // `debugEmplacedFire` 是冒烟用的「一直扣着扳机」：真人按住鼠标时 input.fire 每帧
@@ -5335,6 +5404,7 @@ function TryFire(dt) {
   // 分开）也搬过去了 —— 它现在是白刃起手的第一声。走到这里 ammo 一定 > 0。
   if (infiniteAmmo) state.ammo = Math.max(1, state.ammo);
   else state.ammo -= 1;
+  const aimAtTrigger = player.AimDirection(_aimDir).clone();
   state.playerShots += 1;
   p012Runtime?.RecordAircraftShot(player.EyePosition, player.AimDirection(_aimDir), strafe?.View());
   fireCooldown = weapon.fireIntervalS ?? 1.2;
@@ -5347,6 +5417,12 @@ function TryFire(dt) {
   // 这里取走并交给 player：顶上去 100%、只回落 70%，剩 30% 要玩家自己压。
   viewmodel.ConsumeCameraKick(_kick);
   player.ApplyRecoil(_kick.x, _kick.y, weapon.recoil?.recoverS ?? 0.4, weapon.recoil?.recoverFrac ?? 1.0);
+
+  // P012 tests readable 60–80 m engagements: discharge along the aim the
+  // player had when pressing the trigger, then retain the full camera kick.
+  // The older chapters/range keep their existing post-kick sampling contract.
+  const shotAimDirection = PHASE_TABLE[state.phaseIndex]?.whitebox?.triggerAimBeforeRecoil
+    ? aimAtTrigger : player.AimDirection(_aimDir).clone();
 
   viewmodel.MuzzleWorld(_muzzle);
   audio.Play(currentWeapon === "Zb26" ? "zb26" : "rifleNra",
@@ -5380,14 +5456,14 @@ function TryFire(dt) {
   // 枪种必须传下去：过去所有玩家武器都落进默认 rifle 配方，驳壳枪、捷克式与
   // 栓动步枪喷出完全相同的焰和烟。ER2 的枪感并不靠把所有枪都抖得更厉害，
   // 而是让每一类武器在同一套输入下仍有自己的出膛节奏。
-  vfx.MuzzleFlash(_muzzle, player.AimDirection(_aimDir), {
+  vfx.MuzzleFlash(_muzzle, shotAimDirection, {
     scale: 1.0,
     kind: weapon.kind,
   });
 
   // 散布：没有准星，散布决定落点。移动、压制、带伤都会把它撑大。
   const spread = THREE.MathUtils.degToRad(player.SpreadDeg(weapon));
-  const dir = player.AimDirection(_aimDir).clone();
+  const dir = shotAimDirection.clone();
   const rnd = Mulberry32(state.frame * 2654435761);
   const ax = (rnd() - 0.5) * spread, ay = (rnd() - 0.5) * spread;
   dir.applyAxisAngle(_yAxis, ax);
@@ -5401,8 +5477,8 @@ function TryFire(dt) {
   // 真正决定"近距离要不要心里修正"的是这条垂距。
   const eye = player.EyePosition;
   _rel.set(from.x - eye.x, from.y - eye.y, from.z - eye.z);
-  const along = _rel.dot(_aimDir);
-  _rel.addScaledVector(_aimDir, -along);          // 现在 _rel 就是那条垂距向量
+  const along = _rel.dot(shotAimDirection);
+  _rel.addScaledVector(shotAimDirection, -along); // 现在 _rel 就是那条垂距向量
   let muzzleOffset = _rel.length();
   // 上刺刀之后的"刺杀预备"是**视觉**姿态（Script_Viewmodel.BAYONET_CARRY：把枪
   // 斜端在身前，刀身才读得出来）。视觉可以斜，弹道不该跟着斜：实测垂距会从
@@ -5432,6 +5508,10 @@ function TryFire(dt) {
     muzzleOffsetM: muzzleOffset,
     hitKind: shot.soldier ? "soldier" : shot.wall ? "wall" : "none",
     fromY: from.y, endY: _hitPoint.y,
+    // Read-only trigger/ballistic evidence. Keep spread and recoil separate:
+    // aimDirection excludes random dispersion; direction is the fired ray.
+    aimAtTrigger: aimAtTrigger.toArray(), aimDirection: shotAimDirection.toArray(), direction: dir.toArray(),
+    spreadRad: spread, recoilKick: [_kick.x, _kick.y], weapon: currentWeapon,
   };
 
   if (shot.soldier) {
@@ -5761,6 +5841,8 @@ function Frame(dt, render = true) {
   profiler.B("input");
   const firePrev = input.fire;
   ReadKeys();
+  p012BinocularRaised = !!p012Runtime?.binocularOwned && !!input.ads;
+  if (p012Runtime?.binocularOwned) { input.fire = false; input.ads = false; }
   EnsureDebugInventory();
   if (meleeQte?.Active) {
     input.forward = 0; input.strafe = 0; input.sprint = false;
@@ -5810,7 +5892,7 @@ function Frame(dt, render = true) {
   // 负重与架设机枪都要收枪（两只手都占着 / 枪背在背上）。**只在边沿写 visible**：
   // 过场、菜单、倒地镜头三处也在切同一个字段，每帧写会互相盖掉。
   // 抬着东西的人被打死时负重会在同一帧卸掉，不挡住的话枪会在尸体镜头里冒出来。
-  const handsBusy = !!carry?.Blocking || !!emplacement?.Blocking;
+  const handsBusy = !!carry?.Blocking || !!emplacement?.Blocking || !!p012Runtime?.binocularOwned;
   if (viewmodel?.root && carryHidGun !== handsBusy) {
     carryHidGun = handsBusy;
     if (!state.cutscene && !state.menu && player.Alive) viewmodel.root.visible = !carryHidGun;
@@ -5900,11 +5982,12 @@ function Frame(dt, render = true) {
     firePunch = Math.max(0, firePunch - dt / FIRE_PUNCH_DECAY_S);
   }
   const punch = firePunch * firePunch;
-  const targetFov = baseFov + punch * FIRE_PUNCH_FOV_DEG;
+  const targetFov = p012BinocularRaised ? 25 : baseFov + punch * FIRE_PUNCH_FOV_DEG;
   if (Math.abs(camera.fov - targetFov) > 0.001) {
     camera.fov = targetFov;
     camera.updateProjectionMatrix();
   }
+  p012Binoculars?.Update({owned:!!p012Runtime?.binocularOwned,raised:p012BinocularRaised},dt);
 
   // 枪感方子 4 的另一半：记下松开冲刺的时刻（TryFire 读它）
   const sprintOn = player.sprint > 0.35;
@@ -6061,6 +6144,9 @@ function Frame(dt, render = true) {
       Math.hypot(player.position.x - item.x, player.position.z - item.z) < item.radius);
     p012Flow.Update(dt, {
       ...p012Runtime.Sample(),
+      binocularRaised:p012BinocularRaised,
+      northSubjectVisible:p012Runtime.traffic.some(entry=>!entry.retired&&entry.side===0&&entry.actor.position.z<player.position.z-5&&p012Runtime.host.TrafficVisible(entry.actor,{binocular:true})),
+      southSubjectVisible:p012Runtime.traffic.some(entry=>!entry.retired&&entry.role==="walking"&&entry.actor.position.z>player.position.z+3&&p012Runtime.host.TrafficVisible(entry.actor,{binocular:true})),
       position: player.position, yaw: player.yaw, stance: player.stance, sprint: player.sprint,
       zone: zone?.id || null, enemyDeaths: ai.deaths.ija || 0,
       scoutAlarm: ai.soldiers.some((soldier) => soldier.side === "ija" && state.elapsed - soldier.lastFire < 1),
@@ -6213,7 +6299,7 @@ function Frame(dt, render = true) {
     // 抬着东西时准心收掉：枪不在手上，画一个散布锥就是在骗人。
     // 架着机枪反过来**要**留着：弹道收敛到准心指着的那个点上（EMPLACED_CONVERGE_M）。
     visible: DIFFICULTY.showCrosshair !== false && player.Alive
-      && !state.ordersOpen && !state.cutscene && !meleeQte?.Active && !carry?.Blocking,
+      && !state.ordersOpen && !state.cutscene && !meleeQte?.Active && !carry?.Blocking && !p012Runtime?.binocularOwned,
     spreadDeg,
     fovDeg: camera.fov,
     viewportHeight: window.innerHeight,
@@ -6454,6 +6540,7 @@ function StepFrames(count = 1, dt = 1 / 60, render = true) {
 document.addEventListener("pointerlockchange", OnPointerLockChange);
 window.addEventListener("blur", () => {
   altMouseFree = false;
+  interact?.CancelHold("blur");
   ReleasePointerLock();
   // 预览没有玩家控制权；失焦时直接走一次与 Esc 相同的收口路径，避免
   // 标签页隐藏后留下一个永远占着相机/字幕层的 Promise。
@@ -6466,7 +6553,9 @@ window.addEventListener("pagehide", ReleasePointerLock);
 // 标签页切到后台也放掉：blur 管的是窗口失焦，visibilitychange 管的是标签切换 /
 // 最小化；两条并不总是一起来。锁挂在一个看不见的标签上，等于把鼠标夹在一个
 // 用户看不见的矩形里（Windows 上指针锁就是 ClipCursor，见 FAKE_POINTER_LOCK 注释）。
-document.addEventListener("visibilitychange", () => { if (document.hidden) ReleasePointerLock(); });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { interact?.CancelHold("hidden"); ReleasePointerLock(); }
+});
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   // 过场里 Esc 是"跳过"，交给 CutsceneDirector 自己的监听；这里只管游戏中的退出

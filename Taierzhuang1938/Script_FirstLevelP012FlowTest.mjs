@@ -62,6 +62,7 @@ let checkWeaponCalls = 0;
 let currentGrenades = 0;
 let smokeDeployments = 0;
 let bandagesIssued = 0;
+let binocularOwned=false,northReactions=0;
 const flow = new FirstLevelP012Director({
   Register: (spec) => points.set(spec.id, spec), Carry: () => carry,
   Signal: (name) => signals.add(name), Signalled: (name) => signals.has(name),
@@ -70,6 +71,7 @@ const flow = new FirstLevelP012Director({
   GiveClips: (request) => { currentClips += request; return request; },
   GiveBandages: (request) => { bandagesIssued += request; return request; },
   CheckWeapon: () => { checkWeaponCalls++; },
+  SetBinocularsOwned:owned=>{binocularOwned=owned;},NorthNearMissReaction:()=>{northReactions++;},
   GiveGrenades: (request) => { currentGrenades += request; return request; },
   DeployRetreatSmoke: () => { smokeDeployments++; return true; },
   SpawnEnemy: (spec) => {
@@ -121,43 +123,35 @@ for (let i=0;i<villageRoute.length;i++) {
 assert.equal(flow.State().routeIndex,villageRoute.length,"following 1.2m behind guide acknowledges nodes outside old 3m circle");
 assert.equal(flow.State().beat,"B02","route alone does not fabricate opposing village traffic");
 Tick({trafficReady:true});
-At("Z02"); Use("p012_hubSupply"); Tick({yaw:1.4});
-const issuedAtHub=checkWeaponCalls;
-assert.equal(points.get("p012_hubSupply").Enabled(),false,"hub supply is single issue at its own stage");
-points.get("p012_hubSupply").OnComplete();
-assert.equal(checkWeaponCalls,issuedAtHub,"repeating the supply callback cannot mint more clips");
-assert.equal(flow.State().beat, "B03", "turning in place does not identify three landmarks");
-for (const observation of phase.whitebox.activities.orientations) {
-  if (observation.via) Tick({position:observation.via});
-  const p=observation.position,l=observation.lookAt;
-  const yaw=Math.atan2(-(l.x-p.x),-(l.z-p.z)),index=flow.orientationIndex;
-  for(const pitch of [-1.4,1.4]){
-    Tick({position:p,yaw,pitch,orientationVisible:[false,false,false,false]},phase.whitebox.activities.observationSeconds+0.1);
-    assert.equal(flow.orientationIndex,index,"looking up/down with correct yaw does not consume a landmark");
-  }
-  Tick({position:p,yaw,pitch:0,orientationVisible:[false,false,false,false]},phase.whitebox.activities.observationSeconds+0.1);
-  assert.equal(flow.orientationIndex,index,"occluded landmark with correct yaw does not count");
-  Tick({position:p,yaw,orientationVisible:[true,true,true,true]},phase.whitebox.activities.observationSeconds/2);
-  Tick({orientationVisible:[false,false,false,false]},.1);
-  assert.equal(flow.observationTime,0,"losing real visibility resets continuous observation");
-  Tick({position:p,yaw,orientationVisible:[true,true,true,true]},phase.whitebox.activities.observationSeconds+0.1);
-}
-assert.equal(flow.State().beat, "B04");
-At("Z03"); Tick({position:P012Point(0,-31),sprint:1}); Tick({position:P012Point(0,-34),sprint:1});
-Tick({position:P012Point(0,-37),sprint:1,stance:"crouch"});
-for(const [leg,p] of phase.whitebox.activities.shellCoverRoute.entries()) {
-  Tick({position:p,zone:"Z03",stance:"crouch",guidePosition:p});
-  if(!phase.whitebox.activities.shellObservationIndices.includes(leg)) {
-    assert.equal(flow.routeIndex,leg+1,"a connecting-road corner does not invent another mandatory explosion observation");
-    continue;
-  }
-  const index=flow.routeIndex;
-  Tick({yaw:Math.atan2(7,3)},3.1);
-  assert.equal(flow.routeIndex,index,"looking without the real impact does not complete a cover leg");
-  Tick({mortarImpactCount:(sample.mortarImpactCount||0)+1},3.1);
-}
-At("Z04");
-assert.equal(shelling,4,"four cover legs produce four actual impact events");
+const issuedBeforeHub=checkWeaponCalls;
+At("Z02"); Tick({yaw:1.4});
+assert.equal(points.has("p012_hubSupply"),false,"B03 does not register a second ammunition issue");
+assert.equal(checkWeaponCalls,issuedBeforeHub,"entering the village cannot mint more clips");
+assert.equal(flow.CurrentObjective().interactionId,"p012_binocularTake");
+Tick({binocularRaised:true,northSubjectVisible:true,southSubjectVisible:true},1);
+assert.equal(flow.orientationIndex,0,"without borrowing binoculars visible subjects cannot complete observation");
+Use("p012_binocularTake");assert.equal(binocularOwned,true);
+Tick({northSubjectVisible:false,southSubjectVisible:true},.5);
+assert.equal(flow.orientationIndex,1,"south may be recognized first");
+Tick({binocularRaised:false,northSubjectVisible:true},1);assert.equal(flow.orientationIndex,1);
+Tick({binocularRaised:true,northSubjectVisible:false,southSubjectVisible:false,pitch:1.4},1);
+assert.equal(flow.orientationIndex,1,"sky or occluded subjects do not count");
+Tick({northSubjectVisible:true,pitch:0},.5);assert.equal(flow.orientationIndex,2);
+assert.equal(flow.CurrentObjective().progress,null);assert.equal(flow.State().beat,"B03");
+Use("p012_binocularReturn");assert.equal(binocularOwned,false);Tick();
+assert.equal(flow.State().beat,"B04");assert.equal(shelling,0);
+assert.equal(flow.CurrentObjective().text,"跟随班长北上");
+const northRoute=phase.whitebox.activities.shellCoverRoute;
+Tick({position:northRoute[0],zone:"Z03",stance:"stand",guidePosition:northRoute[0]});
+assert.ok(signals.has("P012NorthApproachChat"));assert.equal(shelling,0);
+const a=northRoute[0],b=northRoute[1],length=Math.hypot(b.x-a.x,b.z-a.z);
+Tick({position:{x:a.x+(b.x-a.x)*8/length,z:a.z+(b.z-a.z)*8/length}});assert.equal(shelling,0);
+Tick({position:{x:a.x+(b.x-a.x)*11/length,z:a.z+(b.z-a.z)*11/length}});assert.equal(shelling,1);
+assert.equal(northReactions,0);assert.equal(flow.CurrentObjective().text,"跟随班长北上","request is not an actual explosion");
+Tick({mortarImpactCount:1});assert.equal(northReactions,1);
+assert.ok(flow.CurrentObjective().text.includes("炮弹落在路旁"));
+for(const p of northRoute.slice(1))Tick({position:p,zone:"Z03",stance:"crouch",guidePosition:p});
+At("Z04");assert.equal(shelling,1);assert.equal(northReactions,1);
 assert.equal(flow.State().beat,"B05");
 Use("p012_ammoPickup"); assert.equal(carry.KindId,"ammoCrate");
 carry.load.canDrop=false;
@@ -181,7 +175,7 @@ assert.equal(ammoPoint.label,"弹药箱已空");
 assert.equal(ammoPoint.OnComplete({point:ammoPoint}),false,"empty stock cannot produce ammunition");
 flow.Restore(beforeSpawn);
 assert.equal(flow.State().frontlineAmmo.remainingClips,0,"rewinding before a withdrawal never replenishes finite stock");
-assert.ok(flow.facts.has("supply"),"one-time issued supply retains its completion fact after rewind");
+assert.equal(flow.facts.has("supply"),false,"rewind does not invent the removed village supply fact");
 acceptSpawns=false; Tick();
 assert.equal(flow.State().pendingEnemies,2,"failed spawns stay in finite pending budget");
 acceptSpawns=true; Tick();
@@ -530,7 +524,66 @@ staleStory.Update(0.1,{p012Beat:18});
 assert.deepEqual(staleVoices,["ch1_yaowa_06"],"late callbacks discard expired vehicle/egress cues rather than playing them over the crowd");
 assert.equal(staleStory.p012CueLog.filter(cue=>cue.expired).length,4);
 const formalStory=new StoryDirector({hud:{Say(){},Title(){}}});
+{
+ const said=[],voices=[];
+ const audition=new StoryDirector({hud:{Say:(who,text)=>said.push(text),Title(){}}});
+ audition.AttachVoice(({key})=>{voices.push(key);return 12;});
+ audition.BeginLevel(phase.contentId,{beats:phase.whitebox.storyBeats,actualEventsOnly:true});
+ audition.Update(.016,{p012Beat:4});assert.equal(said.length,0,"no chat or impact before real event");
+ audition.Signal("P012NorthRecognized");audition.Update(.016,{p012Beat:3});
+ assert.match(said.at(-1),/添人/);
+ audition.Signal("P012SouthRecognized");audition.Signal("P012BinocularReturned");
+ audition.Signal("P012NorthApproachChat");audition.Update(1/60,{p012Beat:4});
+ assert.match(said.at(-1),/子弹捂好/,"actual chat replaces stale recognition subtitle within one frame");
+ const count=said.length;audition.Update(.1,{p012Beat:4});assert.equal(said.length,count,"impact is not predicted by time");
+ audition.Signal("P012NorthNearMissImpact");audition.Update(1/60,{p012Beat:4});
+ assert.match(said.at(-1),/卧倒/,"actual impact immediately interrupts active chat");
+ for(let i=0;i<20;i++)audition.Update(1,{p012Beat:4});
+ assert.equal(said.length,count+1,"expired north/south/return subtitles never replay after impact");
+ assert.equal(voices.length,0,"audition interruption never calls voice playback");
+ const exchange=[];
+ const chatStory=new StoryDirector({hud:{Say:(who,text)=>exchange.push(text),Title(){}}});
+ chatStory.AttachVoice(()=>{throw new Error("subtitle exchange must not request audio");});
+ chatStory.BeginLevel(phase.contentId,{beats:phase.whitebox.storyBeats,actualEventsOnly:true});
+ chatStory.Signal("P012NorthApproachChat");chatStory.Update(.016,{p012Beat:4});
+ chatStory.Update(2.79,{p012Beat:4});assert.equal(exchange.length,1,"first line retains its 2.8 second reading time");
+ chatStory.Update(.02,{p012Beat:4});assert.match(exchange.at(-1),/家当/,"reply follows normally without a gameplay wait");
+ chatStory.Update(2.87,{p012Beat:4});assert.equal(exchange.length,2);
+ chatStory.Signal("P012NorthNearMissImpact");chatStory.Update(1/60,{p012Beat:4});
+ assert.match(exchange.at(-1),/卧倒/,"5.7-second physical impact interrupts the still-visible reply");
+ for(let i=0;i<8;i++)chatStory.Update(1,{p012Beat:4});assert.equal(exchange.length,3);
+ const recorded=new StoryDirector({hud:{Say:(who,text)=>said.push(text),Title(){}}});
+ recorded.AttachVoice(()=>12);
+ recorded.BeginLevel(phase.contentId,{beats:phase.whitebox.storyBeats,actualEventsOnly:true});
+ recorded.Play({type:"line",text:"recorded dialogue",voice:"existing"},false);
+ recorded.Signal("P012NorthApproachChat");recorded.Update(1/60,{p012Beat:4});
+ assert.equal(said.at(-1),"recorded dialogue","subtitle override cannot interrupt a real recording");
+}
 formalStory.BeginLevel(phase.contentId);
+{
+ const said=[];
+ const savedApproval=new StoryDirector({hud:{Say(){},Title(){}}});
+ savedApproval.AttachVoice(()=>4);
+ savedApproval.BeginLevel(phase.contentId,{beats:phase.whitebox.storyBeats,actualEventsOnly:true});
+ savedApproval.Play({type:"line",text:"required approval",voice:"ch1_luo_08",p012CompleteSignal:"P012EscortApproved"},false);
+ savedApproval.Update(1,{p012Beat:12});
+ const snapshot=savedApproval.P012Snapshot();
+ const restored=new StoryDirector({hud:{Say:(who,text)=>said.push(text),Title(){}}});
+ restored.BeginLevel(phase.contentId,{beats:phase.whitebox.storyBeats,actualEventsOnly:true});
+ restored.levelTime=100;restored.Signal("P012NorthRecognized");restored.Update(.016,{p012Beat:3});
+ assert.ok(restored.p012SubtitleActiveUntil>100,"real old-clock subtitle is still on screen");
+ restored.levelTime=0;restored.P012Restore(snapshot);
+ assert.equal(restored.p012SubtitleActiveUntil,0,"rewind discards the old absolute subtitle deadline");
+ assert.equal(said.at(-1),"required approval");
+ restored.Signal("P012NorthApproachChat");restored.Update(.016,{p012Beat:12});
+ assert.equal(said.at(-1),"required approval","interruptible chat cannot replace restored approval");
+ assert.equal(restored.Signalled("P012EscortApproved"),false);
+ restored.Update(2.97,{p012Beat:12});
+ assert.equal(restored.Signalled("P012EscortApproved"),false,"restored approval retains its remaining duration");
+ restored.Update(.02,{p012Beat:12});
+ assert.equal(restored.Signalled("P012EscortApproved"),true);
+ assert.match(said.at(-1),/子弹捂好/,"queued chat may play after the approval completes");
+}
 assert.equal(formalStory.p012Immediate.length,0,"formal story has no whitebox event lane");
 assert.equal(formalStory.queue.length,CH1_CHAPTER.beats.length,"formal story order and count remain unchanged");
 assert.equal(formalStory.P012Snapshot(),null);
@@ -676,8 +729,38 @@ assert.equal(returnVoices.filter(key=>key==="ch1_shunzi_07").length,1);
   director.Restore({...director.Snapshot(),retreatPoint:retreat.length-1,retreatRejoining:true});
   director.Update(.1,{position:P012Point(4.98,-42.25),columnPosition:phase.whitebox.activities.regripPosition,lastLitterArrived:true,stance:"stand",zone:"Z10"});
   assert.equal(director.retreatRejoining,false,"parked litters cannot keep calling the player back");
-  assert.deepEqual(director.CurrentObjective().target,retreat.at(-1),"terminal route objective is restored after actual litter parking");
-  assert.notEqual(director.CurrentObjective().requiredAction,"follow");
+  assert.notDeepEqual(director.CurrentObjective().target,retreat[2],"parked column never sends the player to a missed historical cover");
+  assert.equal(director.CurrentObjective().requiredAction,"follow");
+}
+{
+  const holds=[];
+  const director=new FirstLevelP012Director({HoldRetreatForCover:value=>holds.push(value)},phase.whitebox);
+  const route=phase.whitebox.routes.retreat,cover=route[2];
+  director.Restore({...director.Snapshot(),beat:23,retreatPoint:1,facts:["retreatSmokeDeployed","retreatSmokeObserved"]});
+  const sample={position:route[0],columnPosition:cover,stance:"stand",zone:"Z10"};
+  director.Update(.1,sample);
+  assert.equal(holds.at(-1),true,"real column waits at its first pending cover while player rejoins");
+  assert.deepEqual(director.retreatCovers,[],"waiting creates no cover facts");
+  director.Update(.1,{...sample,position:cover});
+  assert.equal(director.CurrentObjective().requiredAction,"crouch","at actual stopped column, follow gives way to low cover action");
+  assert.deepEqual(director.retreatCovers,[],"standing cannot complete cover");
+  director.Update(.1,{...sample,position:cover,stance:"crouch"});
+  assert.deepEqual(director.retreatCovers,[2]);
+  assert.equal(holds.at(-1),false,"actual cover immediately releases the physical column");
+  const saved=director.Snapshot();director.Restore(saved);
+  assert.equal(holds.at(-1),false,"restore releases stale world hold before recomputation");
+  const parked=phase.whitebox.activities.regripPosition;
+  director.Update(.1,{...sample,columnPosition:parked,lastLitterArrived:true,columnArrived:true});
+  assert.equal(director.beat,23,"arrival alone cannot invent the missing cover or guard action");
+  assert.deepEqual(director.retreatCovers,[2]);
+  assert.equal(holds.at(-1),false);
+  director.Update(.1,{...sample,position:parked,columnPosition:parked,lastLitterArrived:true,columnArrived:true,zone:"Z04"});
+  assert.equal(director.beat,23,"standing at parked litter cannot complete recovery");
+  director.Update(.1,{...sample,position:parked,columnPosition:parked,lastLitterArrived:true,columnArrived:true,zone:"Z04",stance:"crouch"});
+  assert.equal(director.beat,24);
+  assert.deepEqual(director.retreatCovers,[2],"safe arrival recovery does not backfill historical cover events");
+  assert.equal(director.completionReasons[23],"escortArrivedBeforeCover");
+  assert.equal(holds.at(-1),false,"exit releases hold");
 }
 for(const index of [2,3,4]) {
   const pressures=[],actors=[];
@@ -762,4 +845,53 @@ for(const beat of [14,20,21]) {
 }
 points.get("p012_woundedCheck").OnComplete();
 assert.equal(bandagesIssued,1,"repeated wounded callbacks cannot duplicate bandages");
+{
+ const actors=[],modes=[],goals=[];
+ const director=new FirstLevelP012Director({
+  SpawnEnemy:spec=>{const actor={...spec,alive:true,position:{x:spec.x,z:spec.z},perception:{}};actors.push(actor);return actor;},
+  EnemyPosition:actor=>actor.alive?actor.position:null,
+  EnemyScoutState:actor=>actor.perception,
+  EnemyScoutMode:(actor,mode)=>{actor.mode=mode;modes.push(mode);},
+  EnemyGoal:(actor,goal)=>{actor.goal=goal;goals.push({...goal});},
+ },phase.whitebox);
+ director.beat=6;director.unlockedWaves=[0];director.SpawnWave(P012_WAVES[0],0);
+ const beforeContact=director.Snapshot(),search=phase.whitebox.firstContact.scoutSearch;
+ assert.equal(actors.length,2,"scout search owns exactly the existing two finite actors");
+ const gunport=phase.whitebox.anchors.gunports[1];
+ for(let frame=0;frame<600;frame++)for(const route of director.enemyRoutes){
+  const actor=route.handle;assert.equal(director.StepScoutSearch(route,actor.position),true);
+  const dx=actor.goal.x-actor.position.x,dz=actor.goal.z-actor.position.z,d=Math.hypot(dx,dz),step=Math.min(d,actor.mode.speedMps*.1);
+  if(d){actor.position.x+=dx/d*step;actor.position.z+=dz/d*step;}
+  const range=Math.hypot(actor.position.x-gunport.x,actor.position.z-gunport.z);
+  assert.ok(range>=45&&range<=60,"unalerted search never approaches inside the first-contact distance band");
+ }
+ assert.ok(actors.every(actor=>actor.mode.searching&&actor.mode.speedMps===search.speedMps));
+ assert.ok(director.enemyRoutes.every(route=>!route.scout.alerted),"elapsed time alone cannot alert scouts");
+ actors[0].perception={detectedPlayer:true};
+ assert.equal(director.StepScoutSearch(director.enemyRoutes[0],actors[0].position),false);
+ assert.equal(director.State().scouts[0].reason,"detectedPlayer");
+ assert.equal(actors[0].mode.speedMps,search.approachSpeedMps);
+ assert.ok(director.enemyRoutes[0].points.at(-1).z>actors[0].position.z,"actual detection connects to the approach lane");
+ actors[1].perception={hit:true};director.StepScoutSearch(director.enemyRoutes[1],actors[1].position);
+ assert.equal(director.State().scouts[1].reason,"hit");
+ actors[0].alive=false;director.Restore(beforeContact);
+ director.Update(.1,{position:gunport,enemyDeaths:1});
+ assert.equal(actors.length,2);assert.equal(actors[0].alive,false,"checkpoint never replaces a killed scout");
+ assert.equal(director.State().scouts[1].reason,"hit","world alert state survives a player-only rewind");
+ const alarmRoute={handle:actors[1],points:search.entries[1].points,index:0,scout:{approach:[gunport],alerted:false}};
+ actors[1].perception={alarmed:true};director.StepScoutSearch(alarmRoute,actors[1].position);
+ assert.equal(alarmRoute.scout.reason,"alarmed","real squad alarm is an independent transition");
+ const {FIRST_LEVEL_P012_LAYOUT:layout}=await import("./Data_FirstLevelP012Layout.mjs");
+ function Blocked(point,radius=.42){return layout.blocks.some(box=>{
+  if(box.solid===false||box.y-box.h/2>1.8||box.y+box.h/2<=.05)return false;
+  const dx=point.x-box.x,dz=point.z-box.z,c=Math.cos(box.ry),s=Math.sin(box.ry);
+  return Math.hypot(Math.max(0,Math.abs(dx*c-dz*s)-box.w/2),Math.max(0,Math.abs(dx*s+dz*c)-box.d/2))<radius;
+ });}
+ for(const entry of search.entries){const path=[entry.spawn,...entry.points];
+  for(let leg=1;leg<path.length;leg++)for(let sample=0;sample<=100;sample++){
+   const a=path[leg-1],b=path[leg],point={x:a.x+(b.x-a.x)*sample/100,z:a.z+(b.z-a.z)*sample/100};
+   assert.equal(Blocked(point),false,"scout reveal/search is a real collision-clear lateral walk");
+  }
+ }
+}
 console.log("FirstLevelP012FlowTest PASS: actions, ordered escort, flank, finite waves, aircraft facts and checkpoint replay");

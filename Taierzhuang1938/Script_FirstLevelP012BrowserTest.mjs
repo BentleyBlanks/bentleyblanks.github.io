@@ -23,7 +23,9 @@ if (perceptionName && !perceptionProfiles[perceptionName]) throw new Error(`Unkn
 const perceptionProfile = perceptionProfiles[perceptionName] || null;
 const runLabel = process.argv.find(arg => arg.startsWith("--run-label="))?.split("=")[1] || "";
 const orientationReview = process.argv.includes("--orientation");
+const openingCausalityReview = process.argv.includes("--opening-causality");
 const openingGuidanceReview = process.argv.includes("--opening-guidance");
+const stationReview = process.argv.includes("--station-review");
 if (runLabel && !/^[A-Za-z0-9_]+$/.test(runLabel)) throw new Error("Run label must contain only English letters, digits, or underscores");
 const outputDir = process.env.P012_SCREENSHOT_DIR || path.join(os.tmpdir(),
   perceptionProfile ? `P012WhiteboxPerception_${perceptionProfile.name}${runLabel ? `_${runLabel}` : ""}`
@@ -55,7 +57,7 @@ async function PlayPrelude() {
   let result;
   const orientations = [];
   for (let chunk = 0; chunk < 36; chunk += 1) {
-    result = await page.evaluate(({ orientationReview }) => {
+    result = await page.evaluate(({ orientationReview, openingCausalityReview }) => {
       const game = window.Tengxian;
       const bot = window.p012ReviewBot ||= { held: {}, trace: [], frame: 0, lastProgress: 0, progressKey: "" };
       const Key = (code, down) => {
@@ -64,16 +66,35 @@ async function PlayPrelude() {
       };
       for (let frame = 0; frame < 600; frame += 1) {
         const flow = game.Debug.P012();
+        if (window.p012PendingStationView) break;
         if (window.p012PendingTrafficView) break;
         const objective = flow.objective;
         if (flow.beatIndex >= 6 || !game.player.Alive) break;
+        if(openingCausalityReview&&flow.beatIndex===4){
+          const impacts=game.Debug.P012Scene().mortarImpactCount;
+          if(bot.preShellImpacts===undefined)bot.preShellImpacts=impacts;
+          if(!flow.facts.includes("northNearMissImpact")&&objective.requiredAction==="sprint")throw new Error("Shell sprint objective preceded actual impact");
+          if(flow.facts.includes("northNearMissImpact")&&!(impacts>bot.preShellImpacts))throw new Error("Near-miss fact without actual mortar impact growth");
+          if(flow.facts.includes("northApproachChat")&&!flow.facts.includes("northNearMissRequested")&&!bot.chatCaptured){
+            bot.chatCaptured=true;bot.pendingCausality={id:"NorthChatBeforeShell",at:flow.elapsed,impacts,objective};break;
+          }
+          if(flow.facts.includes("northNearMissImpact")&&!bot.impactCaptured){
+            Key("KeyW",false);Key("ShiftLeft",false);Key("KeyF",false);
+            if(game.player.stance!=="prone")game.Debug.Key("KeyZ");
+            game.StepFrames(18,1/30,false);
+            if(game.player.stance!=="prone")throw new Error("Actual prone input did not change player stance");
+            const leader=game.ai.soldiers.find(actor=>actor.castId==="luo");
+            if(leader?.stance!==2)throw new Error("Luo did not physically go prone after impact");
+            bot.impactCaptured=true;bot.pendingCausality={id:"NorthActualImpactProne",at:game.Debug.P012().elapsed,impacts,baseline:bot.preShellImpacts,stance:game.player.stance,guideStance:leader.stance,objective};break;
+          }
+        }
         // Return an actual gameplay frame while the landmark is being observed.
         // No camera override or stage initialization is used for these captures.
-        if (orientationReview && flow.beatIndex === 3 && objective.progress?.value >= 1
+        if (flow.beatIndex === 3 && flow.orientationIndex > 0
           && !(bot.capturedOrientations || []).includes(flow.orientationIndex)) {
           (bot.capturedOrientations ||= []).push(flow.orientationIndex);
           bot.pendingOrientation = { index: flow.orientationIndex, at: flow.elapsed,
-            text: objective.text, progress: { ...objective.progress }, lookAt: objective.lookAt };
+            text: objective.text, facts:[...flow.facts], fov:game.camera.fov };
           break;
         }
         const progressKey = [flow.beat, flow.routeIndex, flow.orientationIndex, flow.facts.join(",")].join("|");
@@ -83,21 +104,36 @@ async function PlayPrelude() {
             routeIndex: flow.routeIndex, orientationIndex: flow.orientationIndex });
         }
         if (flow.elapsed - bot.lastProgress > 65) break;
+        if (objective.requiredAction === "binoculars") {
+          Key("KeyW",false);Key("KeyF",false);Key("ShiftLeft",false);
+          const north=!flow.facts.includes("northRecognized");
+          const subject=game.Debug.P012Scene().traffic.find(actor=>!actor.retired
+            && (north?actor.side===0&&actor.position.z<0:actor.role==="walking"));
+          game.Debug.Mouse(2,true);
+          if(subject){
+            const point=subject.position,eye=game.player.EyePosition;
+            game.player.yaw=Math.atan2(-(point.x-eye.x),-(point.z-eye.z));
+            game.player.pitch=Math.atan2(1.2-eye.y,Math.hypot(point.x-eye.x,point.z-eye.z));
+          }
+          game.StepFrames(1,1/30,false);bot.frame++;
+          continue;
+        }
+        game.Debug.Mouse(2,false);
         const target = objective.target;
         if (!target) break;
         const dx = target.x - game.player.position.x, dz = target.z - game.player.position.z;
         const distance = Math.hypot(dx, dz);
         const interactionId = objective.interactionId;
         const following = objective.requiredAction === "follow";
-        const crouching = flow.beatIndex === 4 ? distance < 3.1 : objective.requiredStance === "crouch";
-        if (game.player.stance !== (crouching ? "crouch" : "stand")) game.Debug.Key("KeyC");
+        const crouching = objective.requiredStance === "crouch";
+        if (game.player.stance !== (crouching ? "crouch" : "stand")) game.Debug.Key(game.player.stance==="prone"?"KeyZ":"KeyC");
         const arrive = interactionId ? flow.beatIndex === 1 ? 0.35 : 1.6
           // Respect the public opening follow radius instead of deliberately
           // walking into the leader's backpack. Later carry/escort stays unchanged.
-          : following ? [0,2].includes(flow.beatIndex) ? objective.arrivalRadiusM : 1.2 : flow.beatIndex === 4 ? 2 : 0.8;
+          : following ? [0,2,4].includes(flow.beatIndex) ? objective.arrivalRadiusM : 1.2 : flow.beatIndex === 4 ? 2 : 0.8;
         const move = distance > arrive && !bot.held.KeyF;
         Key("KeyW", move);
-        Key("ShiftLeft", move && flow.beatIndex === 4 && !crouching);
+        Key("ShiftLeft", move && objective.requiredAction === "sprint" && !crouching);
         if (distance > 0.15) game.player.yaw = Math.atan2(-dx, -dz);
         if (objective.lookAt && distance <= 2.8) {
           game.player.yaw = Math.atan2(-(objective.lookAt.x - game.player.position.x),
@@ -110,6 +146,32 @@ async function PlayPrelude() {
           game.player.yaw = Math.atan2(-(anchor.x - game.player.position.x), -(anchor.z - game.player.position.z));
           if (game.interact.Query(game.player)?.point?.id === interactionId) {
             Key("KeyW", false);
+            if(openingCausalityReview&&interactionId==="p012_binocularTake"&&!bot.borrowNegatives){
+              Key("KeyF",false);Key("ShiftLeft",false);
+              // V is a real held input; never cook/throw a live grenade near NPCs.
+              Key("KeyV",true);game.StepFrames(3,1/30,false);
+              if(!game.state.meleeCharge)throw new Error("V negative fixture failed to enter actual charge");
+              const charge={...game.state.meleeCharge};
+              Key("KeyF",true);game.StepFrames(24,1/30,false);
+              if(game.Debug.P012().facts.includes("binocularTaken"))throw new Error("Borrow succeeded during held melee charge");
+              Key("KeyF",false);
+              const yaw=game.player.yaw,pitch=game.player.pitch;
+              // Release the actual charge facing clear sky, not Luo's body.
+              game.player.pitch=1.4;Key("KeyV",false);game.StepFrames(45,1/30,false);
+              game.player.yaw=yaw;game.player.pitch=pitch;
+              if(game.state.meleeCharge)throw new Error("V charge did not release normally");
+              Key("KeyF",true);game.StepFrames(6,1/30,false);
+              const partial=game.Debug.Interact();
+              if(partial.hold?.id!=="p012_binocularTake"||!(partial.hold.t>0&&partial.hold.t<1))throw new Error("Blur fixture did not start a real partial borrow hold");
+              if(game.Debug.P012().facts.includes("binocularTaken"))throw new Error("Borrow finished before hold duration");
+              window.dispatchEvent(new Event("blur"));bot.held.KeyF=false;
+              game.StepFrames(24,1/30,false);
+              if(game.Debug.P012().facts.includes("binocularTaken"))throw new Error("Blur allowed abandoned F hold to finish");
+              if(game.Debug.Interact().hold||game.Debug.Interact().cancels<=partial.cancels)throw new Error("Blur did not cancel the actual interaction hold");
+              window.dispatchEvent(new Event("focus"));
+              bot.borrowNegatives=true;bot.pendingCausality={id:"BinocularBorrowCancelled",at:game.Debug.P012().elapsed,charge,partial,after:game.Debug.Interact(),cooking:!!game.state.cooking};
+              break;
+            }
             Key("KeyF", true);
           }
         } else Key("KeyF", false);
@@ -123,15 +185,22 @@ async function PlayPrelude() {
         player: game.player.position.toArray(), yaw: game.player.yaw, pitch: game.player.pitch,
         camera: game.camera.position.toArray() } : null;
       bot.pendingOrientation = null;
+      const causality=bot.pendingCausality||null;bot.pendingCausality=null;
+      const stationView=window.p012PendingStationView||null;window.p012PendingStationView=null;
       const trafficView = window.p012PendingTrafficView || null;
       if(trafficView)trafficView.openingCast=game.Debug.P012Scene?.().openingCast;
       window.p012PendingTrafficView = null;
       return { flow: game.Debug.P012(), scene: game.Debug.P012Scene?.(),
-        orientation, trafficView,
+        orientation, trafficView, causality, stationView,
         position: game.player.position.toArray(), health: game.player.health, alive: game.player.Alive,
         trace: bot.trace, stalled: game.Debug.P012().elapsed - bot.lastProgress > 65,
         weapons: game.Debug.Slots(), carry: game.carry.KindId, ammo: game.state.ammo, interact: game.Debug.Interact() };
-    }, { orientationReview });
+    }, { orientationReview, openingCausalityReview });
+    if(result.stationView) await CaptureStationView(result.stationView);
+    if(result.causality){
+      await fs.writeFile(path.join(outputDir,`Data_P012${result.causality.id}.json`),JSON.stringify(result.causality,null,2));
+      await page.screenshot({path:path.join(outputDir,`Scene_P012${result.causality.id}.png`)});
+    }
     if (result.orientation) {
       orientations.push(result.orientation);
       await page.screenshot({ path: path.join(outputDir, `Scene_P012Orientation${result.orientation.index + 1}.png`) });
@@ -148,11 +217,16 @@ async function PlayPrelude() {
   Check(result.flow.beatIndex >= 6, "真实移动、观察、验枪与搬弹完成开场",
     result.flow.beatIndex >= 6 ? `${result.flow.elapsed.toFixed(1)}s` : JSON.stringify(result));
   Check(result.carry === null, "弹药实际交付后释放双手，能够拔枪");
+  if(openingCausalityReview){
+    const evidence=await page.evaluate(()=>({borrow:!!window.p012ReviewBot.borrowNegatives,chat:!!window.p012ReviewBot.chatCaptured,impact:!!window.p012ReviewBot.impactCaptured}));
+    Check(evidence.borrow&&evidence.chat&&evidence.impact,"真实借镜负例、炮前聊天与落弹后卧倒取证齐全",JSON.stringify(evidence));
+  }
   if (orientationReview) {
-    Check(orientations.length === 4, "四处方位观察均记录真实第一人称帧（可读性另行人工看图）");
+    Check(orientations.length === 2, "主动举镜观察两类真实人物，记录第一人称帧（可读性另行人工看图）");
     await fs.writeFile(path.join(outputDir, "Data_P012OrientationTrace.json"), JSON.stringify(orientations, null, 2));
   }
   await fs.writeFile(path.join(outputDir, "Data_P012OpeningTrace.json"), JSON.stringify(result, null, 2));
+  if(stationReview) await VerifyStationDescent();
   await page.screenshot({ path: path.join(outputDir, "Scene_P012FirstContact.png") });
   console.log("P012 opening activity trace", JSON.stringify(result.trace));
 }
@@ -476,8 +550,9 @@ async function PlayFrontline() {
               game.Debug.Key("KeyG"); bot.lastGrenadeAt = flow.elapsed;
             }
             game.player.yaw = Math.atan2(-aim.x, -aim.z) - game.player.aimYaw;
-            // 靶场同口径：射击会先顶起准星；只调整瞄点，不绕过散布/弹道/命中。
-            game.player.pitch = Math.atan2(aim.y, Math.hypot(aim.x, aim.z)) - game.player.aimPitch - (chosen.part === "head" ? 0.014 : 0.005);
+            // Precision follows the actual aim axis, with no compensation for
+            // recoil from a shot that has not yet left the muzzle.
+            game.player.pitch = Math.atan2(aim.y, Math.hypot(aim.x, aim.z)) - game.player.aimPitch;
             // After lining up a close-range peek, shoot when the production
             // weapon is ready; do not stand exposed waiting for a test clock.
             if ((flow.beatIndex <= 10 ? bot.frame % 60 === 0 : true)
@@ -569,15 +644,27 @@ async function PlayFrontline() {
   }
   result.ordinaryDeaths = deaths;
   await fs.writeFile(path.join(outputDir, "Data_P012GameplayTrace.json"), JSON.stringify(result, null, 2));
+  // Save the evidence before assertions: a failed distance/camera gate must not
+  // discard pacing and idle-time diagnostics from a completed playthrough.
+  if (fullCampaign) {
+    const totals = {};
+    for (const span of result.activity) totals[span.kind] = (totals[span.kind] || 0) + span.to - span.from;
+    const stationaryOverEightSeconds = result.activity.filter(span => span.kind === "stationary" && span.to - span.from > 8);
+    console.log("P012 measured activity (observational, not a first-player pacing verdict)", JSON.stringify({totals, stationaryOverEightSeconds}));
+    await fs.writeFile(path.join(outputDir, "Data_P012ActivityTrace.json"), JSON.stringify({
+      definitions: { combat: "Actual shot within 3 seconds by player, or enemy firing at player/ally within 12m; not merely a living enemy.",
+        moving: "Actual horizontal displacement while not actively engaged.",
+        interaction: "Production interaction hold while stationary and not engaged.",
+        weaponAction: "Production weapon busy cycle (bolt/reload) while stationary and not engaged.",
+        observation: "An actual increase of the same public observation progress counter; a look target alone is not evidence.",
+        milestone: "A production beat, fact or signal changed while otherwise inactive.",
+        stationary: "No measured movement, engagement, interaction, weapon cycle or objective progress; includes narration and requires manual review." },
+      totals, stationaryOverEightSeconds, spans: result.activity,
+    }, null, 2));
+  }
   Check(result.flow.beatIndex >= (fullCampaign ? 25 : 11), fullCampaign ? "整关真实输入顺序通关" : "有限前线五波可由真实操作完成",
     `${result.flow.beat} at ${result.flow.elapsed.toFixed(1)}s; health ${result.health}; ${path.join(outputDir, "Data_P012GameplayTrace.json")}`);
   Check(result.firstShotAt !== null, "玩家实际参与射击而非全靠友军清场", String(result.firstShotAt));
-  // P0's explicit acceptance window (4:30–5:30) takes precedence over the
-  // illustrative 4:45 start in P1's table. Do not pad walking to hit that start.
-  Check(result.firstShotAt >= 270 && result.firstShotAt <= 330,
-    "实际第一枪落在 P0 四分半至五分半窗口", `${result.firstShotAt.toFixed(1)}s`);
-  Check(result.shots[0]?.distance >= 44 && result.shots[0]?.distance <= 61,
-    "中央枪眼首次交火距离约 45–60 米（含角色与枪眼边缘容差）", `${result.shots[0]?.distance?.toFixed(2)}m`);
   Check(result.flow.frontlineAmmo.remainingClips >= 0 && result.flow.spawnedTotal <= 33,
     "弹药与近敌保持有限预算");
   const tacticalPressures = result.flow.pressureHistory.filter(entry => ["machineGun", "mortar", "culvert"].includes(entry.kind));
@@ -603,6 +690,7 @@ async function PlayFrontline() {
     await page.waitForFunction(() => {
       const menu = document.querySelector("#menu.p012Complete");
       return menu && getComputedStyle(menu).backgroundColor === "rgb(0, 0, 0)"
+        && Number(getComputedStyle(menu).opacity) >= .99
         && menu.innerText.includes("重新测试");
     }, null, { timeout: 6000 });
     const ending = await page.evaluate(() => {
@@ -666,23 +754,16 @@ async function PlayFrontline() {
     await fs.writeFile(path.join(outputDir, "Data_P012EndingTrace.json"), JSON.stringify(ending, null, 2));
     await page.screenshot({ path: path.join(outputDir, "Scene_P012Ending.png") });
   }
+  // Keep the P0 gates strict, but run them after the functional evidence has
+  // been saved: a rhythm failure must not hide a later escort/camera regression.
+  // Never pad player movement or lower these bounds to make this test green.
+  Check(result.firstShotAt >= 270 && result.firstShotAt <= 330,
+    "实际第一枪落在 P0 四分半至五分半窗口", `${result.firstShotAt.toFixed(1)}s`);
+  Check(result.shots[0]?.distance >= 44 && result.shots[0]?.distance <= 61,
+    "中央枪眼首次交火距离约 45–60 米（含角色与枪眼边缘容差）", `${result.shots[0]?.distance?.toFixed(2)}m`);
   if (fullCampaign && process.argv.includes("--pacing")) {
     Check(result.flow.elapsed >= 23 * 60 && result.flow.elapsed <= 26 * 60,
       "整关实际时长落在 P0 目标", `${(result.flow.elapsed / 60).toFixed(2)}min`);
-  }
-  if (fullCampaign) {
-    const totals = {};
-    for (const span of result.activity) totals[span.kind] = (totals[span.kind] || 0) + span.to - span.from;
-    console.log("P012 measured activity (observational, not a first-player pacing verdict)", JSON.stringify(totals));
-    await fs.writeFile(path.join(outputDir, "Data_P012ActivityTrace.json"), JSON.stringify({
-      definitions: { combat: "Actual shot within 3 seconds by player, or enemy firing at player/ally within 12m; not merely a living enemy.",
-        moving: "Actual horizontal displacement while not actively engaged.",
-        interaction: "Production interaction hold while stationary and not engaged.",
-        weaponAction: "Production weapon busy cycle (bolt/reload) while stationary and not engaged.",
-        observation: "Public objective look target while stationary; may include narration.",
-        stationary: "Unclassified stationary time; needs manual review, not automatically forced waiting." },
-      totals, spans: result.activity,
-    }, null, 2));
   }
   await page.screenshot({ path: path.join(outputDir, "Scene_P012FrontlineAftermath.png") });
 }
@@ -821,6 +902,96 @@ async function VerifyCastClothing() {
     }, { castId: entry.castId, before: placement });
   }
   await fs.writeFile(path.join(outputDir, "Data_P012CastClothing.json"), JSON.stringify(cast, null, 2));
+}
+
+// Isolated real-trigger timing fixture, not a campaign or hit-rate measurement.
+// It retains weapon spread and full recoil and never compensates aim for the
+// shot that has not happened yet. The unspread axis must match the visible
+// trigger-time aim; recoil must still move the camera after discharge.
+async function VerifyTriggerAim() {
+  const shots = await page.evaluate(() => {
+    const game = window.Tengxian, records = [];
+    game.player.Spawn(-103, 130, 0);
+    game.player.pitch = 0.1;
+    for (const ads of [false, true, true]) {
+      game.Debug.Mouse(2, ads);
+      game.StepFrames(180, 1 / 60, false);
+      const before = { count: game.state.playerShots, pitch: game.player.pitch, yaw: game.player.yaw,
+        aim: game.player.AimDirection().toArray(), ads: game.player.ads };
+      game.Debug.Fire();
+      const shot = game.Debug.LastShot();
+      records.push({ ads, before, shot, fired: game.state.playerShots === before.count + 1,
+        after: { pitch: game.player.pitch, yaw: game.player.yaw, pending: { ...game.player.recoilPending } } });
+    }
+    game.Debug.Mouse(2, false);
+    return records;
+  });
+  const Angle = (a, b) => Math.acos(Math.max(-1, Math.min(1, a.reduce((sum, value, index) => sum + value * b[index], 0))));
+  for (const record of shots) {
+    record.triggerErrorRad = Angle(record.shot.aimAtTrigger, record.shot.aimDirection);
+    record.postShotKickRad = Math.hypot(record.after.pitch - record.before.pitch, record.after.yaw - record.before.yaw);
+    record.seventyMetreOffsetM = Math.tan(record.triggerErrorRad) * 70;
+  }
+  await fs.writeFile(path.join(outputDir, "Data_P012TriggerAim.json"), JSON.stringify(shots, null, 2));
+  console.log("P012 trigger-time evidence", JSON.stringify(shots));
+  Check(shots.every(record => record.fired), "腰射与开镜样本均走真实扳机，正常扣除弹药");
+  Check(shots.every(record => record.postShotKickRad > 0.001), "本发射出后相机仍承受完整后坐");
+  Check(shots.every(record => record.triggerErrorRad < 0.000001),
+    "P012 本发散布中心与扣扳机前实际瞄准轴一致，不先吃尚未显示的后坐",
+    shots.map(record => `${record.ads ? "ADS" : "hip"}: ${(record.triggerErrorRad * 180 / Math.PI).toFixed(4)}deg`).join(", "));
+}
+
+// Observation only: movement remains PlayPrelude's ordinary keyboard driver.
+// Supplemental stair/platform photographs use an explicitly chosen player look.
+async function CaptureStationView(view) {
+  if(view.id==="Descent") {
+    await page.screenshot({path:path.join(outputDir,"Scene_P012StationDescent.png")});
+  }
+  const saved=await page.evaluate(()=>({yaw:window.Tengxian.player.yaw,pitch:window.Tengxian.player.pitch}));
+  const views=view.id==="Descent"
+    ? [["DescentLookDown",null]]
+    : [["TrainLookBack",{x:-66,y:2,z:59}],["StationDistricts",{x:-42,y:1.2,z:68}],
+      ["TrainEngine",{x:-66,y:2.3,z:31}]];
+  try {
+    for(const [id,point] of views) {
+      const evidence=await page.evaluate(({id,point})=>{
+        const game=window.Tengxian,eye=game.player.EyePosition;
+        const look=point||{x:game.player.position.x+1.1,z:game.player.position.z,
+          y:game.battlefield.GroundHeight(game.player.position.x+1.1,game.player.position.z)};
+        game.player.yaw=Math.atan2(-(look.x-eye.x),-(look.z-eye.z));
+        game.player.pitch=Math.atan2(look.y-eye.y,Math.hypot(look.x-eye.x,look.z-eye.z));
+        game.StepFrames(1);
+        return {id,at:game.Debug.P012().elapsed,player:game.player.position.toArray(),
+          yaw:game.player.yaw,pitch:game.player.pitch,lookAt:look,scope:"player-controlled look only; no position/fact writes"};
+      },{id,point});
+      await page.screenshot({path:path.join(outputDir,`Scene_P012${id.startsWith("Station")?id:`Station${id}`}.png`)});
+      await page.evaluate(evidence=>window.p012StationViews.push(evidence),evidence);
+    }
+  } finally {
+    await page.evaluate(saved=>{const game=window.Tengxian;game.player.yaw=saved.yaw;game.player.pitch=saved.pitch;game.StepFrames(1);},saved);
+  }
+}
+
+async function VerifyStationDescent() {
+  const evidence=await page.evaluate(()=>({samples:window.p012StationTrace,views:window.p012StationViews,
+    scope:"cold start and normal PlayPrelude input; photographs are observations, not production camera control"}));
+  await fs.writeFile(path.join(outputDir,"Data_P012StationDescent.json"),JSON.stringify(evidence,null,2));
+  const samples=evidence.samples||[],first=samples[0];
+  Check(first&&Math.hypot(first.player.x+66,first.player.z-65)<.1
+    &&Math.abs(first.player.y-1.25)<.08&&Math.abs(first.groundAt-1.25)<.001,
+    "兵站出生脚底真实位于车厢1.25m地板",JSON.stringify(first));
+  let cursor=0;
+  for(const height of [1,.75,.5,.25,0]) {
+    const index=samples.findIndex((sample,i)=>i>cursor&&sample.player.x>-63.7&&sample.player.x<-59.5
+      &&Math.abs(sample.player.z-61)<1.5&&Math.abs(sample.groundAt-height)<.001
+      &&Math.abs(sample.player.y-height)<.1);
+    Check(index>cursor,`真实脚底依次接触下车台阶${height}m`);
+    cursor=index;
+  }
+  Check(samples.every((sample,i)=>!i||Math.hypot(sample.player.x-samples[i-1].player.x,
+    sample.player.z-samples[i-1].player.z)<.6),"下车逐帧轨迹无位置跳变");
+  Check(samples.some(sample=>sample.doorOpen)&&evidence.views.some(view=>view.id==="TrainLookBack")
+    &&evidence.views.some(view=>view.id==="StationDistricts"),"真实开门、列车回看及兵站分区取证齐全");
 }
 
 // Physical scale audit: isolated straight corridor, no plot gating or combat.
@@ -1218,9 +1389,16 @@ try {
           && game.ai.time - soldier.lastFire < 3 && soldier.target
           && (soldier.target.isPlayer || soldier.target.position?.distanceTo?.(game.player.position) < 12));
         const moving = Math.hypot(game.player.position.x - position.x, game.player.position.z - position.z) > 0.002;
+        const observationProgress = before.beat === after.beat
+          && before.objective.requiredAction === "observe"
+          && Number.isFinite(before.objective.progress?.value)
+          && Number.isFinite(after.objective.progress?.value)
+          && after.objective.progress.value > before.objective.progress.value;
+        const milestone = before.beat !== after.beat || before.facts.length !== after.facts.length
+          || before.signals.length !== after.signals.length;
         const kind = enemyFire || after.elapsed - lastShotAt < 3 ? "combat" : moving ? "moving"
           : game.Debug.Interact().hold ? "interaction" : game.viewmodel.IsBusy?.() ? "weaponAction"
-            : before.objective.lookAt ? "observation" : "stationary";
+            : observationProgress ? "observation" : milestone ? "milestone" : "stationary";
         const last = spans.at(-1);
         if (last && last.kind === kind && last.beat === before.beat && Math.abs(last.to - before.elapsed) < 0.001) last.to = after.elapsed;
         else spans.push({ from: before.elapsed, to: after.elapsed, beat: before.beat, kind });
@@ -1234,6 +1412,42 @@ try {
         part: args[1], from: args[3]?.from?.toArray?.() || null,
         bullet: !!args[3]?.bullet, blast: !!args[3]?.blast });
       return result;
+    };
+  });
+  if(stationReview) await page.evaluate(()=>{
+    const game=window.Tengxian,originalStep=game.StepFrames;
+    window.p012StationTrace=[];window.p012StationViews=[];
+    const captures=new Set();
+    const Record=()=>{
+      const flow=game.Debug.P012();
+      if(flow.beatIndex>1)return;
+      const leader=game.ai.soldiers.find(actor=>actor.castId==="luo");
+      const scene=game.Debug.P012Scene(),p=game.player.position;
+      const sample={at:flow.elapsed,beat:flow.beat,player:{x:p.x,y:p.y,z:p.z},
+        groundAt:game.battlefield.GroundHeight(p.x,p.z),
+        luo:leader?{x:leader.position.x,y:leader.position.y,z:leader.position.z}:null,
+        luoGroundAt:leader?game.battlefield.GroundHeight(leader.position.x,leader.position.z):null,
+        doorOpen:game.story.Signalled("P012TrainDoor"),routeIndex:flow.routeIndex,
+        guideRouteIndex:scene.guideRouteIndex,guidePosition:scene.guidePosition,
+        objectiveTarget:flow.objective.target};
+      window.p012StationTrace.push(sample);
+      // The ordinary driver stops inside the public arrival radius (observed
+      // x=-47.59 for target -47), not beyond the target's world X coordinate.
+      // Capture the actual reached platform objective, never demand an extra
+      // unrequested step or reposition the player just for a photograph.
+      const target=flow.objective.target;
+      const platformReached=flow.beatIndex===1&&flow.routeIndex>=1&&target
+        &&p.x>-50&&p.z<43&&Math.abs(p.y)<.1&&Math.abs(sample.groundAt)<.001
+        &&Math.hypot(p.x-target.x,p.z-target.z)<=Math.max(.9,flow.objective.arrivalRadiusM||0);
+      const id=p.x>-63.7&&p.x<-60&&Math.abs(sample.groundAt-.75)<.001
+        &&Math.abs(p.y-.75)<.1?"Descent":platformReached?"Platform":null;
+      if(id&&!captures.has(id)&&!window.p012PendingStationView){
+        captures.add(id);window.p012PendingStationView={id,sample};
+      }
+    };
+    Record();
+    game.StepFrames=function(count=1,dt=1/60,render=true){
+      for(let i=0;i<count;i++){originalStep(1,dt,render);Record();}
     };
   });
   if (process.argv.includes("--voice-timing")) {
@@ -1273,14 +1487,16 @@ try {
   Check(initial.state.field.externalAssets === 0 && initial.externalProps === 0 && initial.trimProps === 0 && initial.colliders > 15,
     "程序体块环境具有实际碰撞且不加载正式环境资产");
   await page.screenshot({ path: path.join(outputDir, "Scene_P012Arrival.png") });
+  if(stationReview)await page.screenshot({path:path.join(outputDir,"Scene_P012StationCarInterior.png")});
   if (openingGuidanceReview) await VerifyOpeningDiscovery();
-  if (orientationReview || process.argv.includes("--prelude") || process.argv.includes("--pacing") || process.argv.includes("--frontline") || process.argv.includes("--campaign")) await PlayPrelude();
+  if (stationReview || openingCausalityReview || orientationReview || process.argv.includes("--prelude") || process.argv.includes("--pacing") || process.argv.includes("--frontline") || process.argv.includes("--campaign")) await PlayPrelude();
   if (process.argv.includes("--frontline") || process.argv.includes("--campaign") || process.argv.includes("--pacing")) await PlayFrontline();
   if (process.argv.includes("--geometry")) await VerifyTraversalFixtures();
   if (process.argv.includes("--south-recovery")) await VerifySouthRouteRecoveryFixtures();
   if (process.argv.includes("--front-recovery")) await VerifyFrontlineRecoveryFixtures();
   if (process.argv.includes("--cast-colors")) await VerifyCastClothing();
   if (process.argv.includes("--scale-review")) await VerifyMapScale();
+  if (process.argv.includes("--shot-alignment")) await VerifyTriggerAim();
   if (process.argv.includes("--overview")) await CaptureLayoutOverview();
   if (audioSmoke) await VerifyAudioPlayback();
   const traffic = await page.evaluate(() => ({ views: window.p012TrafficViews, population: window.p012PopulationMax }));
@@ -1291,6 +1507,10 @@ try {
   console.log(`P012 screenshots: ${outputDir}`);
   console.log(process.argv.includes("--campaign") ? "FirstLevelP012BrowserTest campaign PASS" : "FirstLevelP012BrowserTest partial PASS (not a full campaign playthrough)");
 } catch (error) {
+  if(stationReview){
+    const station=await page.evaluate(()=>({samples:window.p012StationTrace||[],views:window.p012StationViews||[],error:"incomplete station review; inspect failure trace"})).catch(()=>null);
+    await fs.writeFile(path.join(outputDir,"Data_P012StationDescent.json"),JSON.stringify(station,null,2));
+  }
   await page.evaluate(() => window.Tengxian?.StepFrames(1)).catch(() => {});
   await page.screenshot({ path: path.join(outputDir, "Scene_P012Failure.png") }).catch(() => {});
   const failureState = await page.evaluate(() => {

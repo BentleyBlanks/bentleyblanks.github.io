@@ -2,8 +2,10 @@
 // Planar ground is deliberate: trench banks provide relative shelter without a second height source.
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { P012Point, P012MapPoints, P012SouthPoint, P012RailPoint, P012_SPACE_BOUNDS } from "./Data_FirstLevelP012Space.mjs";
+import { P012_STATION_BLOCKS, P012_STATION_SURFACES, P012_STATION_GATES, P012_STATION_REMOVE_IDS } from "./Data_FirstLevelP012Station.mjs";
+import { P012_HORIZON_GROUND, P012_HORIZON_BLOCKS, P012_HORIZON_REMOVE_IDS } from "./Data_FirstLevelP012Horizon.mjs";
 
-export const P012_SEMANTIC_COLORS = Object.freeze({ ground:0xb8b8b0, step:0xf1cf45, vault:0xe58b2f, mantle:0xb75bd6, cover:0x3977c8, boundary:0x24272c, danger:0xc83232, missionRoute:0x35b86b, stretcherRoute:0x2dcbd0 });
+export const P012_SEMANTIC_COLORS = Object.freeze({ ground:0xb8b8b0, structure:0xc9c9c3, step:0xf1cf45, vault:0xe58b2f, mantle:0xb75bd6, cover:0x3977c8, boundary:0x24272c, danger:0xc83232, missionRoute:0x35b86b, stretcherRoute:0x2dcbd0 });
 function Point(x,z) { return Object.freeze({x,z}); }
 function Route(points) { return Object.freeze(points.map(([x,z])=>Point(x,z))); }
 const blueprintZones = Object.freeze([
@@ -98,6 +100,7 @@ Add(Box("FrontlineRearWest",-13,-69,8,0.8,0.9,"cover"),Box("FrontlineRearEast",1
 // Deck bottom is above standing clearance; its piers are outside the swept stretcher corridor.
 Add(Box("ReturnRailSpurDeck",-40,50,64,5,0.5,"boundary",{y:3.25}),Box("ReturnRailSpurWestPier",-30,50,2,5,3),Box("ReturnRailSpurEastPier",-8,50,2,5,3));
 Add(Box("EvacWestCourtyard",22,18,5,15,2.5),Box("EvacEastCourtyard",40,9,5,16,2.5),Box("EvacWaitingCover",41,29,3,4,1,"cover"));
+Add(Box("EvacWaitingSideCover",50,29.5,.4,4,1.05,"cover"));
 // Single-storey ruin: open north entrance and east breach, real window towards waiting stretcher.
 Add(Box("RuinWestNorth",61,28,1,4,2.8),Box("RuinWestSouth",61,42,1,7,2.8),Box("RuinWindowSill",61,34,1,8,0.85,"cover"),Box("RuinWindowLintel",61,34,1,8,0.6,"boundary",{y:2.5}),Box("RuinEast",76,35,1,26,2.8),Box("RuinNorth",69,20,15,1,2.8),Box("RuinSouth",67,52,12,1,2.8),Box("RuinBrokenRoof",68,28,8,8,0.35,"boundary",{y:3.1}),Box("AmbushGunShield",55,40,1,3,1,"cover"));
 // B14 firing corners: standing fire clears the top; prone heads and crouched
@@ -114,6 +117,11 @@ Add(Box("EvacWindowScreen",45,22.9,0.5,3,2.2,"boundary"));
 for(const [i,p] of P012_BLUEPRINT_ANCHORS.strafeSlots.entries()) Add(Box(`Ditch${i}OuterBank`,p.x-2,p.z,0.8,7,1,"cover"),Box(`Ditch${i}InnerBank`,p.x+2,p.z,0.8,4,1,"cover"));
 Add(Box("SouthDangerRoad",42,110,14,14,0.06,"danger",{solid:false}),Box("SouthHouseWest",24,106,1,14,2.8),Box("SouthHouseBack",30,112,13,1,2.8),Box("SouthHouseEast",36,109,1,6,2.8),Box("SouthGunCover",48,109,5,1,1,"cover"),Box("SouthFarBlockade",52,116,26,1,2.5));
 Add(Box("SouthRoadFightCover",45,98,0.4,4,1.05,"cover"),Box("SouthNorthFightCover",38.5,101.8,0.4,2.4,1.05,"cover"),Box("SouthRoomFightCover",31.5,106.7,6,0.4,1.05,"cover"));
+// Blueprint coordinates: compile these tactical partitions exactly once below.
+Add(Box("SouthHouseNorthPartition",31.75,102,15.5,.5,2.8),
+ Box("SouthCourtSightPartition",36,96.85,.5,3.3,2.8),
+ Box("SouthCourtFightCover",39.4,100,.4,2,1.05,"cover"));
+Add(Box("SouthRoadSideCover",35.5,95.4,.4,1.2,1.05,"cover"));
 Add(Box("DitchRearguardInnerBank",46,64,0.8,4,1.05,"cover"),Box("RearguardArrivalScreen",66,60,1,20,2.8,"boundary"));
 // Return drainage banks sit outside the entire swept route, with chamfered open joints.
 for(let i=1;i<6;i++) {
@@ -185,10 +193,13 @@ worldBlocks.push(Box("WestBoundary",-109,-27.5,2,373,8),Box("EastBoundary",184,-
   Box("DepthSouthTerrace",-10,142,44,18,4.6),Box("DepthSouthFarm",42,142,36,20,5.7),Box("DepthSouthEast",161,135,18,25,4.8),
   Box("MachineGunSpawnScreen",35,-197,10,1,3),
   Box("MachineGunPositionCover",23,-176.5,4,.7,1,"cover"),
-  Box("ReturnRailSpurDeck",-11,40,122,5,.5,"boundary",{y:3.25}),
-  Box("ReturnRailSpurWestPier",23,40,2,5,3),Box("ReturnRailSpurEastPier",44,40,2,5,3),
-  Box("ReturnRailSpurBasePier",-62,40,2,5,3),Box("ReturnRailSpurStationPier",-24,40,2,5,3),Box("ReturnRailSpurMiddlePier",0,40,2,5,3),
-  Box("ReturnRailSpurNorthRail",-11,39.25,122,.12,.18,"boundary",{y:3.6}),Box("ReturnRailSpurSouthRail",-11,40.75,122,.12,.18,"boundary",{y:3.6}));
+  // A short damaged farm-road bridge spans the return drainage channel. The
+  // legacy identifier remains stable, but this is NOT a railway suspended at
+  // carriage-roof height across the station. The actual railway stays west.
+  Box("ReturnRailSpurDeck",33.5,40,23,5,.5,"structure",{y:3.25}),
+  Box("ReturnRailSpurWestPier",23,40,2,5,3,"structure"),Box("ReturnRailSpurEastPier",44,40,2,5,3,"structure"),
+  Box("ReturnBridgeNorthParapet",33.5,37.7,23,.4,.5,"structure",{y:3.75}),
+  Box("ReturnBridgeSouthParapet",33.5,42.3,23,.4,.5,"structure",{y:3.75}));
 // The real retreat uses the western culvert and revisits the same hub. Banks
 // preserve a swept stretcher corridor, with open chamfered joints at corners.
 for(let i=1;i<6;i++) {
@@ -212,7 +223,11 @@ const returnClosure=Strip("ReturnGate",
   .8,"boundary",3,true);
 const worldGates = blueprintGates.map(gate=>gate.id.startsWith("HubEscortGate")?gate:
   gate.id==="ReturnGate"?{...returnClosure,signal:gate.signal}:({...gate,...P012Point(gate.x,gate.z)}));
+const stationReplacements=P012_STATION_REMOVE_IDS.map(pattern=>new RegExp(pattern));
+const KeepBlock=block=>!P012_HORIZON_REMOVE_IDS.includes(block.id)&&!stationReplacements.some(pattern=>pattern.test(block.id));
+const stationBlocks=P012_STATION_BLOCKS;
 export const FIRST_LEVEL_P012_LAYOUT=Object.freeze({scenario:Object.freeze({replaceBlockIds:Object.freeze(["HubBrokenWallTall","HubBrokenWallLow"]),states:hubStates}),
-  bounds:P012_SPACE_BOUNDS,ground:Object.freeze({x:37.5,z:-27.5,w:295,d:375,h:.5,y:-.25,semantic:"ground"}),
-  blocks:Object.freeze(worldBlocks),gates:Object.freeze(worldGates),
+  bounds:P012_SPACE_BOUNDS,ground:P012_HORIZON_GROUND,walkableSurfaces:P012_STATION_SURFACES,
+  blocks:Object.freeze([...worldBlocks.filter(KeepBlock),...stationBlocks,...P012_HORIZON_BLOCKS]),
+  gates:Object.freeze([...worldGates.filter(KeepBlock),...P012_STATION_GATES]),
   sections:Object.freeze(P012_ZONES.map(zone=>Object.freeze({id:zone.id,pressure:zone.name}))),semanticColors:P012_SEMANTIC_COLORS});

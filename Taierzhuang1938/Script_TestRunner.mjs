@@ -89,6 +89,8 @@ export const testDefs = {
   RoadPathTest: { file: "Script_RoadPathTest.mjs", desc: "样条道路中心线契约：过点/弧长/切向/缺口/采样（纯 Node，毫秒级）" },
   FirstLevelWhiteboxTest: { file: "Script_FirstLevelWhiteboxTest.mjs",
     desc: "首关纯白盒体、变截面路线、事实门与正式第一章内容复用（纯 Node）" },
+  FirstLevelWhiteboxSurfaceTest: { file: "Script_FirstLevelWhiteboxSurfaceTest.mjs",
+    desc: "白盒车厢地板与逐级台阶统一高度、屋顶排除与旧平地兼容（纯 Node）" },
   FirstLevelWhiteboxBrowserTest: { file: "Script_FirstLevelWhiteboxBrowserTest.mjs", timeoutMs: 5 * 60 * 1000,
     desc: "首关纯白受光场地、具名同伴、实体剧情门与简洁 HUD 真浏览器接线" },
   FirstLevelP012LayoutTest: { file: "Script_FirstLevelP012LayoutTest.mjs",
@@ -99,6 +101,8 @@ export const testDefs = {
     desc: "P012导游、有限远敌与炮击警告接线（纯 Node）" },
   FirstLevelP012ActorTest: { file: "Script_FirstLevelP012ActorTest.mjs",
     desc: "P012平民身份与无枪战斗隔离（纯 Node）" },
+  FirstLevelP012BinocularsTest: { file: "Script_FirstLevelP012BinocularsTest.mjs",
+    desc: "P012望远镜简模、遮罩、相机不夺控与资源释放（纯 Node）" },
   FirstLevelP012VisibilityTest: { file: "Script_FirstLevelP012VisibilityTest.mjs",
     desc: "P012剧情门恢复与飞机有意入场、旧模式兼容（纯 Node）" },
   FirstLevelP012BrowserTest: { file: "Script_FirstLevelP012BrowserTest.mjs", args: ["--prelude", "--geometry"], timeoutMs: 8 * 60 * 1000,
@@ -236,7 +240,7 @@ export const tier2 = [
 export const domains = {
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
-    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "PhysicsTest", "JumpTest", "DestructionTest"],
+    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxSurfaceTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "PhysicsTest", "JumpTest", "DestructionTest"],
   },
   physics: {
     label: "物理/移动/破坏（共享底座，下游成串跑）",
@@ -271,7 +275,7 @@ export const domains = {
   hud: {
     label: "HUD/交互提示/目标识别",
     // 报码纸是 HUD 面板，改 Script_Hud 要连着它一起跑（TelegraphTest 有一段扫 HUD 源码）。
-    tests: ["HudPromptTest", "HudPromptBrowserTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxBrowserTest", "TargetInfoTest", "TelegraphTest"],
+    tests: ["HudPromptTest", "HudPromptBrowserTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012BinocularsTest", "TargetInfoTest", "TelegraphTest"],
   },
   interact: {
     label: "交互框架/负重/架设机枪/发报（担架·搬运·救护交互点·机枪位·电键）",

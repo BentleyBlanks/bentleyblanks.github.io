@@ -422,6 +422,7 @@ export class StoryDirector {
     const level = FindLevel(levelId);
     const beats = Array.isArray(options.beats) ? options.beats : level?.beats || [];
     this.actualEventsOnly = options.actualEventsOnly === true;
+    this.p012SubtitleActiveUntil = 0;
     this.p012Immediate = this.actualEventsOnly
       ? beats.filter((beat) => beat.p012Immediate).map((beat) => ({ ...beat, level: levelId, done: false })) : [];
     this.p012SignalTimes = new Map();
@@ -509,6 +510,9 @@ export class StoryDirector {
     this.p012CueLog = log;
     // Retry cancels the old in-flight recording before freeing its channel.
     if (this.voiceStop) { try { this.voiceStop(); } catch { /* optional audio host */ } }
+    // This absolute deadline belongs to the cancelled channel/old clock. A
+    // restored approval is protected semantic occupancy, not interruptible chat.
+    this.p012SubtitleActiveUntil = 0;
     this.sinceLast = MIN_GAP;
     this.p012PendingCompletion = pending && !this.p012CompletedSignals.has(pending.signal) ? { ...pending } : null;
     if (this.p012PendingCompletion) {
@@ -588,6 +592,26 @@ export class StoryDirector {
     }
     if (this.fightCooldown > 0) this.fightCooldown -= dt;
 
+    // P012 audition-only subtitles may be superseded by the real chat/impact.
+    // Expire their semantic windows even while a previous subtitle occupies the
+    // channel; obsolete binocular lines must never drain out after the explosion.
+    for (const beat of this.p012Immediate || []) {
+      const cue=beat.p012Immediate;
+      if(!beat.done && cue.until && this.Signalled(cue.until)){
+        beat.done=true;
+        if(this.p012SignalTimes.has(cue.event))this.p012CueLog.push({key:beat.voice,time:this.levelTime,expired:true});
+      }
+    }
+    const interruption=(this.p012Immediate || []).find(beat=>!beat.done
+      &&beat.p012SubtitleOnly===true&&beat.p012Immediate.interruptSubtitle===true
+      &&this.p012SignalTimes.has(beat.p012Immediate.event)
+      &&(!Number.isFinite(beat.p012Immediate.maxAgeS)||this.levelTime-this.p012SignalTimes.get(beat.p012Immediate.event)<=beat.p012Immediate.maxAgeS));
+    if(interruption && !this.p012PendingCompletion
+      && (this.sinceLast>=MIN_GAP || this.p012SubtitleActiveUntil>this.levelTime)){
+      interruption.done=true;this.Play(interruption,false);
+      this.p012CueLog.push({key:interruption.voice,time:this.levelTime,expired:false});
+      return;
+    }
     // 一帧最多播一条：台词叠在一起谁都读不清
     if (this.sinceLast < MIN_GAP) return;
     // P012 alone: scene cues share the normal voice occupancy, never interrupt
@@ -706,14 +730,17 @@ export class StoryDirector {
    * 没有语音时这个函数与改造前逐字等价（默认时长、MIN_GAP 照旧）。
    */
   _Speech(speaker, beat, seconds, variant = "") {
-    const dur = this._Speak(beat);
+    const subtitleOnly = this.actualEventsOnly && beat.p012SubtitleOnly === true;
+    const dur = subtitleOnly ? 0 : this._Speak(beat);
     const silentSeconds = this.actualEventsOnly && beat.p012SubtitleSeconds || seconds;
     const shown = dur > 0 ? Math.min(SUBTITLE_MAX, Math.max(seconds, dur + SUBTITLE_TAIL)) : silentSeconds;
     this.hud.Say(speaker, beat.text, shown, variant);
+    this.p012SubtitleActiveUntil = subtitleOnly ? this.levelTime + shown : 0;
     // sinceLast 是**倒扣**的：置成负数就等于让下一条多等这么久
     //（Update 里的闸是 sinceLast < MIN_GAP 就不放行）。
     const hold = dur > 0 ? Math.min(VOICE_HOLD_MAX, dur + VOICE_HOLD_TAIL) : 0;
     this.sinceLast = hold > MIN_GAP ? MIN_GAP - hold : 0;
+    if (subtitleOnly) this.sinceLast = MIN_GAP - shown;
     if (this.actualEventsOnly && beat.p012CompleteSignal) {
       const remaining = dur > 0 ? dur : shown;
       this.p012PendingCompletion = { signal: beat.p012CompleteSignal, key: beat.voice,

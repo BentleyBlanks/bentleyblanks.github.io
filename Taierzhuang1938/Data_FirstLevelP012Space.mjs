@@ -7,9 +7,7 @@
 // Boundary points belong to their semantic region: use the explicit transforms
 // below when automatic classification would select the neighbouring region.
 
-export const P012_SPACE_BOUNDS = Object.freeze({
-  minX: -110, maxX: 185, minZ: -215, maxZ: 160,
-});
+export { P012_HORIZON_BOUNDS as P012_SPACE_BOUNDS } from "./Data_FirstLevelP012Horizon.mjs";
 
 export function P012NorthPoint(x, z) { return { x, z: z - 40 }; }
 export function P012SouthPoint(x, z) { return { x: x + 60, z }; }

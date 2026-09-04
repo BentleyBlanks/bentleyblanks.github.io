@@ -7,8 +7,17 @@ import {FIRST_LEVEL_P012_LAYOUT as layout,P012_ROUTES as routes,P012_ZONES as zo
 import {TRAVERSAL,TraversalKind} from "./Data_Traversal.mjs";
 import {FirstLevelP012Director} from "./Script_FirstLevelP012Flow.mjs";
 import {FIRST_LEVEL_P012_WHITEBOX_PHASE as phase} from "./Data_FirstLevelP012Whitebox.mjs";
+function FootY(layout,p) {
+ let y=0;
+ for(const b of layout.walkableSurfaces||[]){
+  const dx=p.x-b.x,dz=p.z-b.z,c=Math.cos(b.ry||0),s=Math.sin(b.ry||0);
+  if(Math.abs(dx*c-dz*s)<=b.w/2&&Math.abs(dx*s+dz*c)<=b.d/2)y=Math.max(y,b.y+b.h/2);
+ }
+ return y;
+}
 function Hits(p,b,r=1.3) {
- if(b.solid===false||b.y-b.h/2>1.8||b.y+b.h/2<=0.05)return false;
+ const foot=FootY(layout,p);
+ if(b.solid===false||b.y-b.h/2>foot+1.8||b.y+b.h/2<=foot+0.05)return false;
  const dx=p.x-b.x,dz=p.z-b.z,c=Math.cos(b.ry),s=Math.sin(b.ry);
  const x=dx*c-dz*s,z=dx*s+dz*c;
  return Math.hypot(Math.max(0,Math.abs(x)-b.w/2),Math.max(0,Math.abs(z)-b.d/2))<r;
@@ -42,7 +51,7 @@ assert.equal(layout.ground.y+layout.ground.h/2,0);
 // Rapier spawn overlap rejection eject the player from the carriage.
 for(const block of layout.blocks.filter(b=>b.semantic==="ground"&&b.y+b.h/2===0))assert.equal(block.solid,false,`${block.id} duplicates analytic floor collision`);
 for(const b of layout.blocks)assert.ok(colors[b.semantic]!==undefined,`${b.id} semantic`);
-assert.equal(layout.blocks.find(b=>b.id==="StationWindowSill").semantic,"cover","barred carriage window must not advertise a vault exit");
+assert.ok(!layout.blocks.some(b=>b.id==="StationWindowSill"),"obsolete carriage window removed");
 const ruinSill=layout.blocks.find(b=>b.id==="RuinWindowSill"),ruinLintel=layout.blocks.find(b=>b.id==="RuinWindowLintel");
 assert.equal(ruinSill.semantic,"cover","low-headroom window must not advertise a guaranteed vault");
 assert.ok(ruinLintel.y-ruinLintel.h/2-(ruinSill.y+ruinSill.h/2)<1.78,"window cannot fit the standing vault capsule above its sill");
@@ -57,6 +66,32 @@ assert.ok(Audit("NorthInitial",routes.north,[...layout.blocks,...layout.gates])>
 Audit("CarriageDoorToEquipment",routes.trainExit,layout.blocks,0.4);
 for(const [index,entry] of phase.whitebox.activities.traffic.entries())Audit(`OpeningTraffic${index}`,entry.route,layout.blocks,0.42);
 assert.ok(!layout.blocks.some(b=>Hits(anchors.trainSpawn,b,0.4)));
+assert.equal(FootY(layout,anchors.trainSpawn),1.25,"spawn stands on the occupied middle carriage floor");
+const occupiedFloor=layout.blocks.find(b=>b.id==="StationCar1Floor");
+assert.ok(Math.abs(anchors.trainSpawn.x-occupiedFloor.x)<occupiedFloor.w/2&&Math.abs(anchors.trainSpawn.z-occupiedFloor.z)<occupiedFloor.d/2);
+const stairPoints=[{x:occupiedFloor.x,z:61},...Array.from({length:5},(_,i)=>layout.blocks.find(b=>b.id===`StationExitStep${i}`))];
+const stairHeights=stairPoints.map(p=>FootY(layout,p));
+assert.deepEqual(stairHeights,[1.25,1,.75,.5,.25,0],"all actual descending tread heights are sampled, not the carriage roof");
+for(let i=1;i<stairHeights.length;i++)assert.ok(stairHeights[i-1]-stairHeights[i]<=TRAVERSAL.stepMax);
+Audit("ActualEastStairDescent",stairPoints,layout.blocks,.4);
+const stationApron=layout.blocks.find(block=>block.id==="StationPlatformApron");
+assert.ok(stationApron.y+stationApron.h/2<.025-.005,"grey station apron cannot z-fight the green route paint");
+const sidingRails=layout.blocks.filter(block=>/^StationLoadingSidingRail-?1$/.test(block.id));
+assert.equal(sidingRails.length,2);
+assert.equal((sidingRails[0].x+sidingRails[1].x)/2,-72);
+assert.ok(sidingRails.every(rail=>Math.abs(rail.z-rail.d/2-123)<.001),"turnout has a continuous loading siding after its southern end");
+assert.ok(layout.blocks.some(block=>block.id==="StationLoadingSidingBuffer"&&block.z>165),"loading siding has a visible terminal buffer");
+const stationRails=layout.blocks.filter(b=>/^StationRail-?1$/.test(b.id));
+assert.equal(stationRails.length,2);
+assert.equal((stationRails[0].x+stationRails[1].x)/2,occupiedFloor.x,"railway axis matches all carriages");
+for(const floor of layout.blocks.filter(b=>/^StationCar\dFloor$/.test(b.id)))assert.equal(floor.x,occupiedFloor.x);
+const outerLips=layout.blocks.filter(b=>/^Horizon(West|East|North|South)Lip\d+$/.test(b.id));
+assert.ok(outerLips.length>=4,"distant earth edges exist on all sides");
+for(const b of outerLips){
+ const dx=anchors.trainSpawn.x-b.x,dz=anchors.trainSpawn.z-b.z,c=Math.cos(b.ry||0),s=Math.sin(b.ry||0);
+ const distance=Math.hypot(Math.max(0,Math.abs(dx*c-dz*s)-b.w/2),Math.max(0,Math.abs(dx*s+dz*c)-b.d/2));
+ assert.ok(distance>200,`${b.id} is a distant earth edge, not a wall beside the station (${distance.toFixed(1)}m)`);
+}
 assert.ok(Audit("StretcherSouth",routes.south,layout.blocks)>310,"south route includes the long cross-region connection");
 const returnLength=Audit("StretcherReturn",routes.retreat,layout.blocks);assert.ok(returnLength>150);
 const activityRoutes={weaponIssue:[P012MapPoints({x:-55,z:44}),P012MapPoints({x:-55,z:34}),P012MapPoints({x:-45,z:34}),P012MapPoints({x:-43,z:40})],
@@ -86,9 +121,9 @@ assert.ok(Math.hypot(42.5-45,24-26)>cornerRadius,"actual early-turn position is 
 Audit("PublicB14ArrivalEnvelope",[P012MapPoints({x:42.5,z:24}),...routes.flank],layout.blocks,.42+cornerRadius);
 Audit("HouseFightCoverBypassPlayerEnvelope",routes.flank.slice(0,-3),layout.blocks,.42+cornerRadius);
 const ruinFights=[{at:P012MapPoints({x:58,z:24}),enemies:[P012MapPoints({x:58,z:39}),P012MapPoints({x:57,z:41})]},{at:P012MapPoints({x:68,z:24}),enemies:[P012MapPoints({x:68,z:34}),P012MapPoints({x:70,z:36})]},{at:P012MapPoints({x:72,z:43}),enemies:[P012MapPoints({x:67,z:49}),P012MapPoints({x:70,z:49})]}];
-const lateFights=[{at:P012MapPoints({x:44,z:62}),enemies:[P012MapPoints({x:58,z:52}),P012MapPoints({x:62,z:55}),P012MapPoints({x:58,z:58}),P012MapPoints({x:62,z:62}),P012MapPoints({x:58,z:65}),P012MapPoints({x:61,z:69})]},{at:P012MapPoints({x:42,z:94}),enemies:[P012MapPoints({x:49,z:104}),P012MapPoints({x:53,z:108})]},{at:P012MapPoints({x:41,z:104.4}),enemies:[P012MapPoints({x:28,z:97}),P012MapPoints({x:35,z:99})]},{at:P012MapPoints({x:34,z:105}),enemies:[P012MapPoints({x:27,z:109}),P012MapPoints({x:33,z:109.5})]}];
+const lateFights=[{at:P012MapPoints({x:44,z:62}),enemies:phase.whitebox.activities.closeFightGroups.flatMap(group=>group.positions)},...phase.whitebox.activities.southFightGroups.map(group=>({at:group.cover,enemies:group.positions}))];
 Audit("LateFightSupplyLink",[P012MapPoints({x:44,z:62}),P012MapPoints({x:44,z:66}),P012MapPoints({x:47,z:80}),P012MapPoints({x:42,z:94})],layout.blocks,1.3);
-Audit("SouthRoomClearRoute",[P012MapPoints({x:42,z:94}),P012MapPoints({x:41,z:98}),P012MapPoints({x:41,z:104.4}),P012MapPoints({x:34,z:104.4}),P012MapPoints({x:34,z:105}),P012MapPoints({x:30,z:105})],layout.blocks,1.3);
+Audit("SouthRoomClearRoute",phase.whitebox.activities.southRoomRoute,layout.blocks,1.3);
 const southApproach=[phase.whitebox.activities.closeFightRoute[0],...phase.whitebox.activities.southRoomRoute];
 const frontlineRetry=P012MapPoints({x:3.32966,z:-43.11849});
 assert.ok(Array.from({length:501},(_,i)=>({x:frontlineRetry.x+(anchors.gunports[0].x-frontlineRetry.x)*i/500,z:frontlineRetry.z+(anchors.gunports[0].z-frontlineRetry.z)*i/500}))
@@ -203,6 +238,38 @@ function SegmentBlocked(from,to){
   return true;
  });
 }
+// These are real visibility pockets, not merely HUD group indices. Later
+// shooters remain damageable but their bodies are behind solid partitions.
+const southGroups=phase.whitebox.activities.southFightGroups;
+const sideShotCases=[
+ {name:"B14",center:{x:99,z:25.5},radius:1,actual:{x:99.708,z:25.066},enemy:{x:129.5,y:1.5,z:35.5}},
+ {name:"B21",center:{x:102,z:94},radius:.6,actual:{x:102.124,z:93.635},enemy:{x:86.221,y:1.5,z:97.445}},
+];
+for(const scenario of sideShotCases){
+ const points=[scenario.actual,scenario.center];
+ for(let ring=1;ring<=5;ring++)for(let angle=0;angle<72;angle++)points.push({
+  x:scenario.center.x+scenario.radius*ring/5*Math.cos(angle*Math.PI/36),
+  z:scenario.center.z+scenario.radius*ring/5*Math.sin(angle*Math.PI/36)});
+ const currentEnemies=scenario.name==="B14"?phase.whitebox.activities.ambushGroups[0].positions:southGroups[0].positions;
+ for(const point of points){
+  assert.ok(!layout.blocks.some(box=>Hits(point,box,.42)),`${scenario.name} arrival capsule is clear`);
+  assert.ok(SegmentBlocked({...point,y:.42},scenario.enemy),`${scenario.name} actual side-fire arrival shelter at ${point.x},${point.z}`);
+  for(const enemy of currentEnemies)assert.ok(!SegmentBlocked({...point,y:1.62},{...enemy,y:1.5}),`${scenario.name} current group remains shootable across arrival tolerance`);
+ }
+}
+// This is the player's side excursion, not the convoy route (audited above at 1.3m).
+Audit("B14WaitingExitArrivalEnvelope",[P012SouthPoint(39,25.5),P012SouthPoint(45,26)],layout.blocks,1.02);
+assert.equal(southGroups.reduce((total,group)=>total+group.positions.length,0),6);
+for(const [index,group] of southGroups.entries()) {
+ assert.deepEqual(phase.whitebox.activities.southRoomRoute[group.routeIndex],group.cover);
+ for(const enemy of [...group.positions,...group.relocations]) {
+  assert.ok(!SegmentBlocked({...group.cover,y:1.62},{...enemy,y:1.5}),`B21 pocket ${index} standing fire is open`);
+  assert.ok(SegmentBlocked({...group.cover,y:.42},{...enemy,y:1.5}),`B21 pocket ${index} prone body is sheltered`);
+ }
+ for(const later of southGroups.slice(index+1))for(const enemy of [...later.positions,...later.relocations])
+  assert.ok(SegmentBlocked({...group.cover,y:1.62},{...enemy,y:1.5}),`B21 pocket ${index} screens later groups`);
+}
+Audit("B21ReturnToAssembly",phase.whitebox.activities.southAssemblyRoute,layout.blocks,1.3);
 Audit("InjuredRoadCoverAccess",[P012MapPoints({x:42.5,z:24}),P012MapPoints({x:39,z:25.5}),P012MapPoints({x:45,z:26})],layout.blocks,1.02);
 for(let i=0;i<360;i++){
  const point=P012SouthPoint(39+.6*Math.cos(i*Math.PI/180),25.5+.6*Math.sin(i*Math.PI/180));
@@ -349,8 +416,10 @@ for(const [index,goal] of lanes.west.terminalGoals.entries()){
  for(const other of lanes.west.terminalGoals.slice(index+1))assert.ok(Math.hypot(goal.x-other.x,goal.z-other.z)>=1.2,"culvert terminal capsules cannot share a single goal");
 }
 const bridge=layout.blocks.find(b=>b.id==="ReturnRailSpurDeck");
-assert.ok(routes.retreat.some(p=>Math.abs(p.x-bridge.x)+1.3<bridge.w/2&&Math.abs(p.z-bridge.z)+1.3<bridge.d/2),"whole stretcher corridor actually passes under the railway deck, not along its outer edge");
+assert.ok(routes.retreat.some(p=>Math.abs(p.x-bridge.x)+1.3<bridge.w/2&&Math.abs(p.z-bridge.z)+1.3<bridge.d/2),"whole stretcher corridor actually passes under the drainage bridge, not along its outer edge");
 assert.ok(bridge.y-bridge.h/2>=2.6);
+assert.ok(bridge.x-bridge.w/2>20,"return bridge cannot extend over the station or intersect the locomotive");
+assert.ok(!layout.blocks.some(block=>/^ReturnRailSpur(?:BasePier|StationPier|MiddlePier|NorthRail|SouthRail)$/.test(block.id)),"no obsolete elevated railway across the station skyline");
 assert.ok(layout.gates.filter(g=>g.signal==="EscortCall").some(g=>Hits(P012MapPoints({x:23,z:7.2}),g)));
 const returnGate=layout.gates.find(g=>g.signal==="SouthCut");
 assert.equal(returnGate.id,"ReturnGate");assert.equal(returnGate.solid,true);
@@ -394,8 +463,7 @@ for(const [kind,p] of Object.entries(anchors.traversal)){
   }
  }
 }
-assert.ok(layout.blocks.some(b=>b.id==="RailEmbankment"&&b.h>=2&&b.h<=3));
-assert.ok(TRAVERSAL.mantleMax<layout.blocks.find(b=>b.id==="WestBoundary").h);
+assert.ok(!layout.blocks.some(b=>["RailEmbankment","WestBoundary","EastBoundary","NorthBoundary","SouthBoundary"].includes(b.id)),"obsolete railway wall and four close boundary walls removed");
 console.log("PASS P012 layout geometry");
 // Execute the production reconciliation method with a minimal field host; no WebGL needed.
 const fieldSource=fs.readFileSync(new URL("./Script_FirstLevelWhiteboxField.mjs",import.meta.url),"utf8").replace(/\r/g,"");

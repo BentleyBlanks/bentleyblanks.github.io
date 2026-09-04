@@ -1497,7 +1497,11 @@ export class AiDirector {
     // 两边各自站在自己的院子里 —— 「仗根本没在打」有一半是这么来的。
     // 这不是寻路，是"摸着墙走"：拐九十度走一两秒再回头奔目标。在一座街巷本来
     // 就通的城里够用，而且比 A* 便宜两个数量级。
-    if (Number.isFinite(s.scriptMoveSpeedMps)) speed = Math.min(speed, Math.max(0, s.scriptMoveSpeedMps));
+    // P012 route followers use an explicit metres/second pace, not a cap on the
+    // ordinary 2.6m/s advance state. Scouts still perceive and fire normally.
+    if (s.p012ScoutDirected) { desired = this.tmpD.copy(s.goal); speed = 2.6; }
+    if (Number.isFinite(s.scriptMoveSpeedMps)) speed = s.p012Guided && desired
+      ? Math.max(0, s.scriptMoveSpeedMps) : Math.min(speed, Math.max(0, s.scriptMoveSpeedMps));
     if (desired && speed > 0) {
       const dx = desired.x - s.position.x, dz = desired.z - s.position.z;
       const d = Math.hypot(dx, dz);

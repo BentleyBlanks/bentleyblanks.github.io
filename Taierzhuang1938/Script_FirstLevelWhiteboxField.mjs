@@ -4,8 +4,8 @@
 // 城、城外、道路、植被、贴图或外部资产生成器。所有静态体块先进入 BuildSink 合批；
 // 两扇剧情门保留为独立 Mesh，收到正式第一章信号后升起并同步移除 Rapier 碰撞体。
 //
-// GroundHeight 恒为 0，视觉地皮是一只顶面恰好落在 y=0 的白盒。因而看到的地、
-// 玩家踩的地、AI 导航问的地三者天然一致。
+// GroundHeight 默认0；显式 walkableSurfaces 仅允许引用同一布局实体的顶面。
+// 车厢地板/逐级台阶可走解析支撑，屋顶不会因为是Box就自动成为地面。
 
 import * as THREE from "three";
 import { Clamp } from "./Script_Noise.mjs";
@@ -17,6 +17,26 @@ import {
 
 const GRID_SIZE = 12;
 const CAMERA_FAR = 430;
+
+export function CompileWhiteboxWalkableSurfaces(layout) {
+  return (layout.walkableSurfaces || []).map(surface=>{
+    const block=layout.blocks.find(item=>item.id===surface.id);
+    if(!block || ["x","y","z","w","h","d"].some(key=>!Number.isFinite(block[key])||block[key]!==surface[key])
+      || (block.ry||0)!==(surface.ry||0) || block.w<=0||block.h<=0||block.d<=0)
+      throw new Error(`Walkable surface must match a layout block: ${surface.id}`);
+    return {...block};
+  });
+}
+
+export function SampleWhiteboxSurface(surfaces,x,z) {
+  let height=0;
+  for(const surface of surfaces){
+    const dx=x-surface.x,dz=z-surface.z,c=Math.cos(surface.ry||0),s=Math.sin(surface.ry||0);
+    if(Math.abs(dx*c-dz*s)<=surface.w/2 && Math.abs(dx*s+dz*c)<=surface.d/2)
+      height=Math.max(height,surface.y+surface.h/2);
+  }
+  return height;
+}
 
 function MakeWhiteMaterial(name = "FirstLevelWhiteboxWhite") {
   const material = new THREE.MeshStandardMaterial({
@@ -59,6 +79,7 @@ export class FirstLevelWhiteboxField {
     this.scene = scene;
     this.levelId = levelId;
     this.layout = whiteboxLayout || FIRST_LEVEL_WHITEBOX_LAYOUT;
+    this.walkableSurfaces = CompileWhiteboxWalkableSurfaces(this.layout);
     this.bounds = bounds
       ? { minX: bounds.minX, maxX: bounds.maxX, minZ: bounds.minZ, maxZ: bounds.maxZ }
       : { ...this.layout.bounds };
@@ -98,7 +119,7 @@ export class FirstLevelWhiteboxField {
     };
   }
 
-  GroundHeight(_x, _z) { return 0; }
+  GroundHeight(x, z) { return SampleWhiteboxSurface(this.walkableSurfaces,x,z); }
 
   BuildWhiteBoxes() {
     const sink = new BuildSink();
@@ -248,8 +269,9 @@ export class FirstLevelWhiteboxField {
     const coordinateTitle = document.createElement("summary"); coordinateTitle.textContent = "坐标约定"; coordinates.appendChild(coordinateTitle);
     coordinates.appendChild(document.createTextNode("世界坐标：北 −Z，南 +Z，东 +X；不随镜头转动。"));
     coordinates.style.cssText = "font-size:10px;color:#b7c3d0;margin:3px 0"; legend.appendChild(coordinates);
-    const labels = {ground:"通行/奔跑",step:"跨步",vault:"翻越",mantle:"攀爬",cover:"掩体",boundary:"不可通行",danger:"危险区域",missionRoute:"任务路线",stretcherRoute:"担架通道"};
+    const labels = {ground:"通行/奔跑",structure:"车体/建筑结构",step:"跨步/台阶",vault:"翻越",mantle:"攀爬",cover:"掩体",boundary:"不可通行",danger:"危险区域",missionRoute:"任务路线",stretcherRoute:"担架通道"};
     for (const [semantic, label] of Object.entries(labels)) {
+      if(this.layout.semanticColors[semantic]===undefined)continue;
       const row = document.createElement("div"); row.style.cssText = "display:inline-flex;align-items:center;gap:5px;width:50%;white-space:nowrap";
       const chip = document.createElement("span"); chip.style.cssText = `display:inline-block;width:10px;height:10px;border:1px solid #aaa;background:#${this.layout.semanticColors[semantic].toString(16).padStart(6,"0")}`;
       row.appendChild(chip); row.appendChild(document.createTextNode(label)); legend.appendChild(row);

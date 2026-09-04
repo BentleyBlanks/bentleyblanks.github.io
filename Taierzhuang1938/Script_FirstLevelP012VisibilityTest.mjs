@@ -171,49 +171,49 @@ function ObservationRaycast(origin,direction,maxDistance){
  }return nearest<=maxDistance?{t:nearest}:null;
 }
 const observationField={Raycast:ObservationRaycast};
-const hostSource=Source("./Script_Main.mjs").match(/    ObservationVisible: \(target\) => \{[\s\S]*?\n    \},/)[0];
-const observe=Function("THREE","camera","battlefield",`return ({${hostSource}}).ObservationVisible;`)(THREE,observationCamera,observationField);
-const observationRuntime=new FirstLevelP012Runtime({ObservationVisible:observe,GuideActor:()=>null,Position:()=>null,Alive:()=>false},phase.whitebox);
-observationRuntime.beat=3; // Unit fixture activates the real B03 sampling scope.
-let orientationSamples=0;
-for(const [index,observation] of phase.whitebox.activities.orientations.entries()){
- const target=observation.visibleTarget;
- assert.ok(initialGeometry.some(b=>b.id===target.blockId),`${target.id} names actual geometry`);
- const landmark=initialGeometry.find(b=>b.id===target.blockId),point=target.point;
- const surfaceCoordinates=[Math.abs(point.x-landmark.x)-landmark.w/2,Math.abs(point.y-landmark.y)-landmark.h/2,Math.abs(point.z-landmark.z)-landmark.d/2];
- assert.ok(surfaceCoordinates.every(value=>value<=1e-6)&&surfaceCoordinates.some(value=>Math.abs(value)<1e-6),`${target.id} point is on its real exterior surface, not an invented air target`);
- for(const roadPoint of target.requiredPoints || [])assert.ok(layout.blocks.some(b=>{
-  if(b.semantic!=="stretcherRoute")return false;
-  const dx=roadPoint.x-b.x,dz=roadPoint.z-b.z,c=Math.cos(b.ry),s=Math.sin(b.ry);
-  return Math.abs(dx*c-dz*s)<=b.w/2&&Math.abs(dx*s+dz*c)<=b.d/2&&Math.abs(roadPoint.y-(b.y+b.h/2))<.03;
- }),"required road samples are on actual cyan route paint");
- for(let i=0;i<=360;i++){
-  const radius=i===360?0:phase.whitebox.activities.routeRadiusM,angle=i*Math.PI/180;
-  observationCamera.position.set(observation.position.x+radius*Math.cos(angle),1.62,observation.position.z+radius*Math.sin(angle));
-  observationCamera.lookAt(observation.lookAt.x,1.62,observation.lookAt.z);
-  assert.equal(observe(target),true,`${target.id} visible throughout allowed observation circle at sample ${i}`);
-  orientationSamples++;
- }
- assert.equal(observationRuntime.Sample().orientationVisible[index],true,"runtime forwards real camera visibility");
+const binocularUrl=`data:text/javascript;base64,${Buffer.from(Source("./vendor/three/build/three.core.js")).toString("base64")}`;
+const binocularSource=Source("./Script_FirstLevelP012Binoculars.mjs")
+ .replace('from "three"',`from "${binocularUrl}"`)
+ .replace('import { MarkForegroundPrepass } from "./Script_Post.mjs";',"const MarkForegroundPrepass = root => root;");
+const {P012BinocularLensContains}=await import(`data:text/javascript;base64,${Buffer.from(binocularSource).toString("base64")}`);
+const mainSource=Source("./Script_Main.mjs");
+const hostSource=mainSource.slice(mainSource.indexOf("    TrafficVisible:"),mainSource.indexOf("    RetireTraffic:"));
+const player={EyePosition:observationCamera.position};
+const visible=Function("camera","player","battlefield","P012BinocularLensContains",`return ({${hostSource}}).TrafficVisible;`)(observationCamera,player,observationField,P012BinocularLensContains);
+const hub=phase.whitebox.activities.binoculars.guidePosition;
+observationCamera.position.set(hub.x,1.62,hub.z);
+observationCamera.fov=25;observationCamera.updateProjectionMatrix();
+const subjects=phase.whitebox.activities.traffic.filter(entry=>entry.side===0||entry.role==="walking")
+ .map(entry=>({alive:true,position:new THREE.Vector3((entry.side===0?entry.route.at(-1):entry.route[0]).x,0,(entry.side===0?entry.route.at(-1):entry.route[0]).z)}));
+assert.equal(subjects.length,5,"three real northbound soldiers and two southbound wounded");
+for(const actor of subjects){
+ const Aim=()=>{observationCamera.lookAt(actor.position.x,1.15,actor.position.z);observationCamera.updateMatrixWorld(true);};
+ Aim();assert.equal(visible(actor,{binocular:true}),true,"actual traffic actor visible through centred lenses and scene geometry");
  for(const pitch of [-1.4,1.4]){
-  observationCamera.lookAt(observation.lookAt.x,1.62,observation.lookAt.z);observationCamera.rotateX(pitch);
-  assert.equal(observe(target),false,`${target.id} cannot be observed while looking at sky/feet`);
+  Aim();observationCamera.rotateX(pitch);observationCamera.updateMatrixWorld(true);
+  assert.equal(visible(actor,{binocular:true}),false,"sky or feet are not actor recognition");
  }
- observationCamera.lookAt(observation.lookAt.x,1.62,observation.lookAt.z);
- observationField.Raycast=()=>({t:1});
- assert.equal(observe(target),false,"an intervening wall blocks observation even with correct camera yaw");
- observationField.Raycast=(origin,direction,distance)=>({t:distance});
- assert.equal(observe(target),true,"landmark surface endpoint hit is accepted without collider ids");
+ Aim();observationField.Raycast=()=>({t:1});
+ assert.equal(visible(actor,{binocular:true}),false,"real callback rejects intervening geometry");
  observationField.Raycast=ObservationRaycast;
+ Aim();
+ // Move the camera aim until the actual actor projects inside the screen but
+ // on the production mask's black side rim. Do not duplicate the lens formula.
+ const centre=actor.position.clone();centre.y=1.15;
+ let foundRim=false;
+ for(let angle=.001;angle<.4;angle+=.001){
+  Aim();observationCamera.rotateY(angle);observationCamera.updateMatrixWorld(true);
+  const projected=centre.clone().project(observationCamera);
+  if(Math.abs(projected.x)>.72&&Math.abs(projected.x)<.85){
+   assert.equal(visible(actor),true,"actor remains visible without binocular mask");
+   assert.equal(visible(actor,{binocular:true}),false,"black lens rim is not recognition");
+   foundRim=true;break;
+  }
+ }
+ assert.ok(foundRim);
+ actor.alive=false;Aim();assert.equal(visible(actor,{binocular:true}),false);actor.alive=true;
 }
-const noVisibilityRuntime=new FirstLevelP012Runtime({GuideActor:()=>null,Position:()=>null,Alive:()=>false},phase.whitebox);
-noVisibilityRuntime.beat=3;
-assert.ok(noVisibilityRuntime.Sample().orientationVisible.every(value=>value===false),"missing host evidence fails closed");
-observationRuntime.beat=4;
-observationRuntime.host.ObservationVisible=()=>{throw new Error("observation raycast outside B03");};
-assert.deepEqual(observationRuntime.Sample().orientationVisible,[],"no observation camera work outside B03");
-const fourth=phase.whitebox.activities.orientations.find(item=>item.visibleTarget.id==="EvacuationEntrance");
-observationCamera.position.set(fourth.position.x,1.62,fourth.position.z);observationCamera.lookAt(fourth.lookAt.x,1.62,fourth.lookAt.z);
-observationField.Raycast=(origin,direction,distance)=>direction.y<-.03?{t:1}:null;
-assert.equal(observe(fourth.visibleTarget),false,"seeing the courtyard wall without the cyan road is insufficient");
-console.log(`PASS B03 actual camera/closed-gate visibility: ${orientationSamples} circle samples, sky/feet/wall/road counterexamples`);
+assert.deepEqual(phase.whitebox.activities.orientations,[],"removed four-landmark task has no targets");
+const noLandmarkRuntime=new FirstLevelP012Runtime({ObservationVisible:()=>{throw new Error("obsolete landmark raycast");},GuideActor:()=>null,Position:()=>null,Alive:()=>false},phase.whitebox);
+for(const beat of [3,4]){noLandmarkRuntime.beat=beat;assert.deepEqual(noLandmarkRuntime.Sample().orientationVisible,[]);}
+console.log("PASS live northbound/wounded binocular subjects: actual Main callback, production lens, sky/feet/wall/black-rim rejection");

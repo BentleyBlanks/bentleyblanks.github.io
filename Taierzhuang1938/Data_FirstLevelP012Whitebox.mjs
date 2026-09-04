@@ -6,6 +6,7 @@ import { FIRST_LEVEL_P012_LAYOUT, P012_ZONES, P012_SEMANTIC_COLORS,
   P012_ANCHORS, P012_ROUTES, P012_ENEMY_LANES,
   P012_BLUEPRINT_ANCHORS, P012_BLUEPRINT_ROUTES } from "./Data_FirstLevelP012Layout.mjs";
 import { P012MapPoints, P012RailPoint } from "./Data_FirstLevelP012Space.mjs";
+import { openingActivities, openingStoryBeats } from "./Data_FirstLevelP012Opening.mjs";
 export { FIRST_LEVEL_P012_LAYOUT, P012_SEMANTIC_COLORS };
 export const FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID = "FirstLevelP012Whitebox";
 
@@ -81,6 +82,7 @@ function MovedFirstChapterVoice(key, event) {
   return Object.freeze({ ...FIRST_CHAPTER.beats.find((beat) => beat.voice === key), at: `event:${event}` });
 }
 const storyBeats = Object.freeze([
+  ...openingStoryBeats,
   ...aircraftCues,
   ExistingPrologueVoice("ch0_junguan_04", "P012Arrival"),
   ExistingPrologueVoice("ch0_luo_11", "P012TrainDoor"),
@@ -99,7 +101,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
   id: FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID, contentId: FIRST_CHAPTER.id,
   sandbox: true, sandboxKey: "firstLevelP012Whitebox", sandboxGlyph: "012",
   date: "P0/P1/P2 场景白盒", label: "第一关 · P0/P1/P2 场景白盒",
-  place: "临时兵站", sky: "p012WhiteboxDay", ambience: "smokyDay", music: null, minutes: 26,
+  place: "铁路兵站", sky: "p012WhiteboxDay", ambience: "smokyDay", music: null, minutes: 26,
   brief: Object.freeze(["跟随罗班长下车，领取子弹并检查步枪。",
     "灰：地面；黄：跨过；橙：翻越；紫：攀爬；蓝：掩体；黑：边界；红：危险；绿：任务路；青：担架路。"]),
   metaText: Object.freeze(["颜色语义白盒", "正式第一章人物与玩法", "节奏校准中"]),
@@ -108,10 +110,10 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
   nraPool: FIRST_CHAPTER.pool.start, poolGain: 0, ijaPool: 37, ijaPressure: 0.72,
   ijaSpawn: FIRST_CHAPTER.tuning.ijaSpawn, ijaSupport: [],
   ijaForce: FIRST_CHAPTER.tuning.ijaForce, loadoutOverride: FIRST_CHAPTER.tuning.loadoutOverride,
-  bounds: FIRST_LEVEL_P012_LAYOUT.bounds, cameraFar: 500, zones,
+  bounds: FIRST_LEVEL_P012_LAYOUT.bounds, cameraFar: 1100, zones,
   spawn: Object.freeze({ ...P012_ANCHORS.trainSpawn, ry: 0 }),
   whitebox: Object.freeze({
-    p012: true, layout: FIRST_LEVEL_P012_LAYOUT, anchors: P012_ANCHORS, routes: P012_ROUTES,
+    p012: true, triggerAimBeforeRecoil: true, layout: FIRST_LEVEL_P012_LAYOUT, anchors: P012_ANCHORS, routes: P012_ROUTES,
     enemyLanes: P012_ENEMY_LANES, friendlyLimit: 12,
     // Activity lengths are calibration inputs, never mandatory waiting clocks.
     activities: Object.freeze({...P012MapPoints({
@@ -129,8 +131,8 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
           proximityRelease:slot===0?{index:1,beat:2,radius:18}:undefined,
           route:[{x:-28,z:19+slot*3},{x:-28,z:30},{x:-34,z:40},{x:-43,z:42},{x:-50,z:42},{x:-50,z:52},{x:-52,z:54},{x:-52,z:56+slot*3}]})),
       ]),
-      guideSpeedMps: 1.3, guideRangeM: 12, routeRadiusM: 3, ambushRouteRadiusM: 0.6, observationConeRad: 0.42,
-      guideSpeedByBeat: Object.freeze({ 0: 0.6, 2: 0.685, 4: 1.5, 5: 0.85, 11: 2 }),
+      guideSpeedMps: 3.05, guideRangeM: 12, routeRadiusM: 3, ambushRouteRadiusM: 0.6, observationConeRad: 0.42,
+      guideSpeedByBeat: Object.freeze({ 0: 3.05, 2: 3.05, 4: 3.05, 5: 1.1, 11: 2 }),
       frontlineDoctrine: Object.freeze({ accuracyScale: 0.22, fireIntervalScale: 2.5, holdRadiusM: 2 }),
       frontlineAmmo: Object.freeze({ stockClips: 12, carryCapClips: 4, takeSeconds: 2.4 }),
       weaponReceivePosition: { x: -57.2, z: 45.8 }, weaponReceiveAnchor: { x: -57.2, z: 44.75 },
@@ -140,19 +142,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       weaponGuideFacing: [{x:-57.2,z:44},{x:-57,z:34},{x:-47,z:36}],
       observationSeconds: 6.5, shellObservationSeconds: 3, shellGuideRangeM: 6,
       trainRoute: P012_BLUEPRINT_ROUTES.trainExit, villageRoute: P012_BLUEPRINT_ROUTES.north.slice(2, 8),
-      orientations: Object.freeze([
-        { position: { x: 7, z: 6 }, lookAt: { x: -30, z: 30 }, label: "辨认西南侧兵站后路",
-          visibleTarget: { id: "SouthStation", blockId: "StationWindowSill", point: { x: -63.3, y: 0.7, z: 51 } } },
-        { position: { x: 2, z: -12 }, lookAt: { x: 5, z: -65 }, label: "观察北面的阵地入口",
-          visibleTarget: { id: "NorthFrontline", blockId: "Gunport1Cover", point: { x: 5, y: 0.7, z: -67 } } },
-        { position: { x: -3, z: 0 }, lookAt: { x: -72, z: 0 }, label: "看向西侧铁路路基",
-          visibleTarget: { id: "WestRailway", blockId: "RailEmbankment", point: { x: -68.5, y: 1.6, z: 0 } } },
-        { position: { x: 16, z: 5 }, via: { x: 0, z: 0 }, lookAt: { x: 30, z: 10 }, label: "记住东南侧的伤员后送道路",
-          visibleTarget: { id: "EvacuationEntrance", blockId: "EvacEastCourtyard", point: { x: 37.5, y: 1.4, z: 9 },
-            points: [3,6,12,15].map(z=>({x:37.5,y:1.4,z})),
-            requiredPoints: [{x:28,z:9.3},{x:29,z:9.65},{x:30,z:10},{x:31,z:12.2}]
-              .flatMap(point=>[-.6,0,.6].map(offset=>({x:point.x+offset,y:.06,z:point.z}))) } },
-      ]),
+      orientations: Object.freeze([]),
       shellCoverRoute: Object.freeze([{ x: 0, z: -22 }, { x: 3, z: -30 }, { x: 5, z: -38 }, { x: 5, z: -42 }]),
       ammoRoute: Object.freeze([{ x: -7, z: -52 }, { x: 0, z: -52 }, { x: 5, z: -46 }, { x: 5, z: -59 }, { x: 5, z: -65 }]),
       roadWoundedPosition: { x: 50, z: 47 }, regripPosition: { x: -7, z: -37 },
@@ -211,17 +201,17 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
         { routeIndex: 2, cover: { x: 42, z: 94 }, label: "从路沟掩体清除南路道路火力",
           relocations: [{ x: 51, z: 103 }, { x: 55, z: 108 }],
           positions: [{ x: 49, z: 104 }, { x: 53, z: 108 }] },
-        { routeIndex: 5, cover: { x: 41, z: 104.4 }, label: "注意民房北侧，清除屋外射手",
-          relocations: [{ x: 26, z: 96 }, { x: 33, z: 98 }],
-          positions: [{ x: 28, z: 97 }, { x: 35, z: 99 }] },
-        { routeIndex: 6, cover: { x: 34, z: 105 }, label: "从门口掩护位置观察室内，清除残敌再进屋",
+        { routeIndex: 4, cover: { x: 41, z: 100 }, label: "绕过院墙，在胸墙后清除屋外射手",
+          relocations: [{ x: 26, z: 97.5 }, { x: 32.5, z: 98 }],
+          positions: [{ x: 28, z: 97 }, { x: 34.5, z: 99 }] },
+        { routeIndex: 7, cover: { x: 34, z: 105 }, label: "从门口掩护位置观察室内，清除残敌再进屋",
           relocations: [{ x: 29, z: 109 }, { x: 31, z: 109.5 }],
           positions: [{ x: 27, z: 109 }, { x: 33, z: 109.5 }] },
       ]),
       stretcherCarryRoute: Object.freeze([{ x: 44, z: 66 }, { x: 44, z: 60 }]),
       southGrenadeSupply: { x: 42, z: 94 }, southGrenadeStock: 2,
       southRoom: { x: 30, z: 105 }, southGrenadeAim: { x: 49, z: 104 }, southSupplyRouteIndex: 2,
-      southRoomRoute: Object.freeze([{ x: 44, z: 66 }, { x: 47, z: 80 }, { x: 42, z: 94 }, { x: 41, z: 98 }, { x: 41, z: 104.4 },
+      southRoomRoute: Object.freeze([{ x: 44, z: 66 }, { x: 47, z: 80 }, { x: 42, z: 94 }, { x: 41, z: 98 }, { x: 41, z: 100 }, { x: 41, z: 104.4 },
         { x: 34, z: 104.4 }, { x: 34, z: 105 }, { x: 30, z: 105 }]),
       southAssemblyRoute: Object.freeze([{ x: 34, z: 105 }, { x: 34, z: 104.4 },
         { x: 41, z: 104.4 }, { x: 41, z: 98 }, { x: 42, z: 94 }]),
@@ -237,23 +227,14 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       southAssemblyPosition:{x:42,z:94}, airCoverEntryPosition:{x:44,z:66},
       ditchContinuationRoute:[{x:44,z:66},{x:47,z:80},{x:42,z:94}],
     }),
+      ...openingActivities,
       shellCoverRoute:P012_ROUTES.approach,
+      binoculars:Object.freeze({guidePosition:{x:2,z:0}, recognitionSeconds:0.45,
+        northSubjectPoint:{x:0,z:-17},southSubjectPoint:{x:30,z:10}}),
+      northApproachChatPosition:P012_ROUTES.approach[0], northNearMissAfterM:10,
       shellObservationIndices:Object.freeze([3,4,5,6]),
-      // Hub observations describe the near entrances, not invisible destination
-      // coordinates on the far side of the expanded route. North's tall marker
-      // remains in the direction of the front, behind the first road bend.
-      orientations:Object.freeze([
-        {position:{x:7,z:6},lookAt:{x:-30,z:30},label:"辨认西南侧兵站后路",
-          visibleTarget:{id:"SouthStation",blockId:"StationWindowSill",point:{x:-63.3,y:.7,z:51}}},
-        {position:{x:2,z:-12},lookAt:{x:-12,z:-32},label:"观察通向北面阵地的道路",
-          visibleTarget:{id:"NorthFrontline",blockId:"NorthLinkWestBank",point:{x:-19.5,y:2.8,z:-24}}},
-        {position:{x:-3,z:0},lookAt:{x:-72,z:0},label:"看向西侧铁路路基",
-          visibleTarget:{id:"WestRailway",blockId:"RailEmbankment",point:{x:-68.5,y:1.6,z:0}}},
-        {position:{x:16,z:5},via:{x:0,z:0},lookAt:{x:30,z:10},label:"记住东南侧的伤员后送道路",
-          visibleTarget:{id:"EvacuationEntrance",blockId:"EvacEastCourtyard",point:{x:37.5,y:1.4,z:9},
-            points:[3,6,12,15].map(z=>({x:37.5,y:1.4,z})),requiredPoints:[{x:28,z:9.3},{x:29,z:9.65},{x:30,z:10},{x:31,z:12.2}]
-              .flatMap(point=>[-.6,0,.6].map(offset=>({x:point.x+offset,y:.06,z:point.z})))}}
-      ]),
+      // The cancelled four-landmark task is replaced by live binocular subjects.
+      orientations: Object.freeze([]),
       // Pursuers follow the newly connected physical return road; they do not
       // run to the coordinates of the removed compact-map western ditch.
       retreatPursuitRoutes:Object.freeze([
@@ -264,6 +245,11 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
     }),
     storyBeats, actualEventsOnly: true,
     firstContact: Object.freeze({ atS: 285, fullWaveAtS: 330,
+      scoutSearch: Object.freeze(P012MapPoints({ speedMps: 0.65, approachSpeedMps: 0.9,
+        entries: [
+          { spawn: {x:14,z:-118}, points: [{x:5,z:-118},{x:-2,z:-118}] },
+          { spawn: {x:14,z:-120}, points: [{x:5,z:-120},{x:-4,z:-120}] },
+        ] })),
       scout: Object.freeze({ ...P012_ANCHORS.scout, weapon: "Type38" }),
       wave: Object.freeze({ minDistanceM: 45, maxDistanceM: 60, lateralSpanM: 18, deepShare: 0 }) }),
     timing: Object.freeze({ targetMinutes: [23,26], combatShare: 0.55, escortShare: 0.45,
