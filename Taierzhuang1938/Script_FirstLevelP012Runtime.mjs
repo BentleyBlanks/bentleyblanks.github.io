@@ -359,7 +359,7 @@ export class FirstLevelP012Runtime {
     }
     let target=guide.route[guide.index];
     if(near(target)){
-      const event=guide.beat===11&&guide.index===0?"P012GuideAtWounded":guide.beat===14?"P012GuideAtFlankEntry":guide.beat===23?"P012GuideAtSmoke":null;
+      const event=guide.beat===11&&guide.index===0?"P012GuideAtWounded":guide.beat===14?"P012GuideAtFlankEntry":guide.beat===22&&guide.index===guide.route.length-1?"P012GuideAtBlockade":guide.beat===23?"P012GuideAtSmoke":null;
       if(event && !this.host.Signalled(event))this.host.Signal?.(event);
       const wait=guide.WaitAt?.(guide.index);
       if(wait || guide.index===guide.route.length-1){
@@ -444,12 +444,15 @@ export class FirstLevelP012Runtime {
     if (defensive && !this.defenders) {
       const ports = this.config.anchors?.gunports || [];
       this.defenders = (this.host.FriendlyActors?.() || []).filter(actor=>!this.traffic.some(w=>w.side===0&&!w.retired&&w.actor===actor)
+        &&!this.host.IsStretcherBearer?.(actor)
         &&!(this.guide?.safeRoute&&this.guide.route.length&&actor===this.host.GuideActor())
         &&!this.openingCast?.some(e=>this.march&&e.actor===actor&&!e.marchComplete));
       for (const [index, actor] of this.defenders.entries()) {
         if (escortDefense) {
-          const point = this.host.Position(actor);
+          const slots=this.config.activities?.southDefenseSlots||[];
+          const point = this.beat>=20&&slots.length ? slots[index] : this.host.Position(actor);
           if (point) this.host.Defend?.(actor, point, { ...this.config.activities?.frontlineDoctrine, holdRadiusM: 2 });
+          else this.host.ReleaseDefense?.(actor);
           continue;
         }
         const marched=this.openingCast?.find(e=>e.actor===actor&&e.marchComplete&&e.marchDefensePoint);

@@ -235,7 +235,15 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
         { x: 34, z: 104.4 }, { x: 34, z: 105 }, { x: 30, z: 105 }]),
       southAssemblyRoute: Object.freeze([{ x: 34, z: 105 }, { x: 34, z: 104.4 },
         { x: 41, z: 104.4 }, { x: 41, z: 98 }, { x: 42, z: 94 }]),
-      blockadeDecisionPosition: { x: 42, z: 94 }, blockadeDecisionRangeM: 8,
+      // Ground slots keep the rifle squad off blue bank tops, the player's
+      // sightline and the 1.3 m stretcher corridor. Actors walk here normally.
+      southDefenseSlots: Object.freeze([{ x: 36, z: 58 }, { x: 36, z: 63 },
+        { x: 38, z: 72 }, { x: 53, z: 55 }, { x: 56, z: 77 }]),
+      // Luo follows the open ditch, rather than reversing through the house
+      // assembly route. The last bend reads both him and the red blockade.
+      blockadeGuideRoute: Object.freeze([{ x: 44, z: 66 }, { x: 43.5, z: 64.5 },
+        { x: 38.5, z: 68 }, { x: 41, z: 74 }, { x: 45, z: 80 }]),
+      blockadeDecisionPosition: { x: 45, z: 80 }, blockadeDecisionRangeM: 8,
       retreatSmokeUse: { x: 28, z: 96 }, retreatSmokeAt: { x: 40, z: 99 },
       finalCarryMinM: 10, retreatCoverIndices: Object.freeze([2, 5, 8]), farEnemyBudget: 4,
       retreatColumnSpeedMps: 2.05,

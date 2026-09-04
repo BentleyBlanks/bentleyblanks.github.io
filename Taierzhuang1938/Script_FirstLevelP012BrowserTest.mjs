@@ -1433,7 +1433,7 @@ async function VerifyOpeningDiscovery() {
 // Thereafter the real Runtime, AI and Rapier move the existing leader, and the
 // player follows his sampled footsteps with normal input. Not campaign evidence.
 async function VerifyGuideHandoffs() {
-  for (const beat of [14, 23]) {
+  for (const beat of [14, 22, 23]) {
     const setup=await page.evaluate(async beat=>{
       const game=window.Tengxian;
       const {FirstLevelP012Director}=await import("./Script_FirstLevelP012Flow.mjs");
@@ -1448,18 +1448,28 @@ async function VerifyGuideHandoffs() {
       game.StepFrames(1);
       FirstLevelP012Runtime.prototype.Update=original;
       const guide=runtime.host.GuideActor();
-      const start=beat===14?{x:79.42825739632826,z:4.633856495656801}:{x:94,z:105};
-      const playerStart=beat===14?{x:76.3,z:2.1}:{x:91,z:105};
+      const start=beat===14?{x:79.42825739632826,z:4.633856495656801}:beat===22?{x:105.575,z:68.092}:{x:94,z:105};
+      const playerStart=beat===14?{x:76.3,z:2.1}:beat===22?{x:104,z:66}:{x:91,z:105};
       const y=game.battlefield.GroundHeight(start.x,start.z);
       guide.position.set(start.x,y,start.z);guide.body.Teleport(start.x,y,start.z);guide.goal.copy(guide.position);
       game.player.Spawn(playerStart.x,playerStart.z,0);
       runtime.host.ReleaseGuide(guide);
       runtime.host.Defend(guide,start,flow.config.activities.frontlineDoctrine);
       const hadDefense=guide.scriptDefensive;
+      let b20=null;
+      if(beat===22){
+        runtime.Guide({beat:20,route:[]});game.StepFrames(360,1/30,false);
+        const target=flow.config.activities.closeFightRoute[1],player=game.player.position;
+        b20=runtime.host.FriendlyActors().filter(actor=>!runtime.host.IsStretcherBearer?.(actor)).map(actor=>{
+          const dx=actor.position.x-player.x,dz=actor.position.z-player.z,tx=target.x-player.x,tz=target.z-player.z;
+          return {position:actor.position.toArray(),groundError:Math.abs(actor.position.y-game.battlefield.GroundHeight(actor.position.x,actor.position.z)),
+            crosshairAngle:Math.acos(Math.max(-1,Math.min(1,(dx*tx+dz*tz)/(Math.hypot(dx,dz)*Math.hypot(tx,tz)||1))))};
+        });
+      }
       flow.beat=beat;flow.lastSample={position:game.player.position,guidePosition:guide.position};flow.StartGuide();
       window.p012GuideFixture={flow,runtime,guide,trail:[{...start}],P012NextVisiblePoint,trace:[],frames:0,
-        event:beat===14?"P012GuideAtFlankEntry":"P012GuideAtSmoke",start:{...start}};
-      return {beat,start,playerStart,hadDefense,scope:"explicit local stage fixture; only initial placement, no campaign or balance claim"};
+        event:beat===14?"P012GuideAtFlankEntry":beat===22?"P012GuideAtBlockade":"P012GuideAtSmoke",start:{...start}};
+      return {beat,start,playerStart,hadDefense,b20,scope:"explicit local stage fixture; only initial placement, no campaign or balance claim"};
     },beat);
     let result;
     for(let chunk=0;chunk<60;chunk++){
@@ -1480,10 +1490,20 @@ async function VerifyGuideHandoffs() {
           if(g.story.Signalled(f.event)&&gap<3)break;
         }
         g.Debug.Key("KeyW",false);g.StepFrames(1);
+        const decision=f.flow.config.activities.blockadeDecisionPosition,blockade=f.flow.config.anchors.blockadePositions?.[1];
+        let view=null;
+        if(f.flow.beat===22&&decision&&blockade){
+          g.camera.fov=55;g.camera.updateProjectionMatrix();
+          const eye=g.player.EyePosition,look=f.guide.position.clone().add({x:0,y:1.25,z:0});
+          g.player.yaw=Math.atan2(-(blockade.x-g.player.position.x),-(blockade.z-g.player.position.z));g.player.pitch=0;g.StepFrames(2);
+          const guideScreen=look.project(g.camera).toArray(),blockadePoint=f.guide.position.clone().set(blockade.x,g.battlefield.GroundHeight(blockade.x,blockade.z)+1,blockade.z);
+          const blockadeScreen=blockadePoint.project(g.camera).toArray(),direction=g.camera.getWorldDirection(f.guide.position.clone()),hit=g.battlefield.Raycast(eye,direction,3);
+          view={fov:g.camera.fov,guideScreen,blockadeScreen,nearCenterWall:!!hit};
+        }
         return {arrived:g.story.Signalled(f.event),gap:f.guide.position.distanceTo(g.player.position),
           guide:f.guide.position.toArray(),player:g.player.position.toArray(),stance:f.guide.stance,
           defensive:!!f.guide.scriptDefensive,trace:f.trace,
-          views:window.p012GuideArrivalViews,elapsed:f.frames/30};
+          views:window.p012GuideArrivalViews,elapsed:f.frames/30,view};
       });
       if(result.arrived&&result.gap<3)break;
     }
@@ -1491,6 +1511,16 @@ async function VerifyGuideHandoffs() {
     await page.screenshot({path:path.join(outputDir,`Scene_P012GuideFixtureB${beat}.png`)});
     Check(setup.hadDefense&&result.arrived&&result.gap<3&&!result.defensive,
       `B${beat} 实际班长解除旧防守并通过真实AI/碰撞抵达，玩家跟随脚步`,JSON.stringify({elapsed:result.elapsed,guide:result.guide,gap:result.gap}));
+    if(beat===22){
+      Check(setup.b20?.every(actor=>actor.groundError<.08&&actor.crosshairAngle>.08),
+        "B20 友军实体走到平地槽且不盖玩家准星",JSON.stringify(setup.b20));
+      const maxStill=result.trace.reduce((state,sample)=>{const moved=Math.hypot(sample.guide[0]-state.point[0],sample.guide[2]-state.point[2]);return moved>.25?{point:sample.guide,at:sample.at,max:state.max}:{...state,max:Math.max(state.max,sample.at-state.at)};},{point:result.trace[0].guide,at:result.trace[0].at,max:0}).max;
+      Check(maxStill<8,"B22 正常连续跟随没有超过 8 秒无位移",`${maxStill.toFixed(2)}s`);
+      Check(result.view?.fov===55&&Math.abs(result.view.guideScreen[0])<1&&Math.abs(result.view.guideScreen[1])<1
+        &&Math.abs(result.view.blockadeScreen[0])<1&&Math.abs(result.view.blockadeScreen[1])<1,
+        "B22 正常 55° 视角同帧读到班长和截断线",JSON.stringify(result.view));
+      Check(!result.view?.nearCenterWall,"B22 正常视角中心没有被近墙遮满");
+    }
     if(beat===14)Check(result.stance===1,"侧路引导抵达后蹲候，不替玩家继续侧绕");
     if(beat===23){
       const smoke=await page.evaluate(()=>{

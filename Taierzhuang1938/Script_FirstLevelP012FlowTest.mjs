@@ -1016,6 +1016,10 @@ for(const index of [2,3,4]) {
     assert.ok(P012SegmentClear(phase.whitebox.layout.blocks,phase.whitebox.activities.closeFightRoute[index-1],
       phase.whitebox.activities.closeFightRoute[index],.42),"each delaying relocation is physically clear for the player capsule");
   assert.ok(Number.isFinite(phase.whitebox.activities.blockadeDecisionPosition.x));
+  assert.deepEqual(phase.whitebox.activities.blockadeGuideRoute.at(-1),phase.whitebox.activities.blockadeDecisionPosition,
+    "B22 leader reaches the visible decision position on a dedicated route");
+  assert.notDeepEqual(phase.whitebox.activities.blockadeGuideRoute,
+    [...phase.whitebox.activities.southAssemblyRoute].reverse(),"B22 never reverses the stretcher assembly route");
   const actors=[0,1].map(x=>({position:{x,z:0},alive:true,lastFire:0,suppression:0}));
   const director=new FirstLevelP012Director({EnemyPosition:a=>a.alive?a.position:null,
     EnemyCombatState:a=>({lastFire:a.lastFire,suppression:a.suppression}),EnemyGoal:(a,p)=>{a.goal=p;}},phase.whitebox);

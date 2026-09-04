@@ -288,6 +288,14 @@ const guide = { x: 0, z: 0 }, actors = [], moves = [], impacts = [], signals = n
  point={x:0,z:51};r.Update(.1);assert.equal(discipline.at(-1),null,"actual route midpoint releases covering-fire limits");
 }
 {
+ const guide={id:"guide"},bearer={id:"bearer"},rifle={id:"rifle"},orders=[];
+ const activities={southDefenseSlots:[{x:96,z:58}],frontlineDoctrine:{accuracyScale:.22}};
+ const runtime=new FirstLevelP012Runtime({GuideActor:()=>guide,Position:a=>a,FriendlyActors:()=>[bearer,rifle],IsStretcherBearer:a=>a===bearer,
+  Defend:(actor,point)=>orders.push({actor,point}),Signalled:()=>false},{activities});
+ runtime.Guide({beat:20,route:[]});runtime.Update(.1);
+ assert.deepEqual(orders,[{actor:rifle,point:activities.southDefenseSlots[0]}],"B20 walks armed escorts to authored ground slots and never requisitions stretcher bearers");
+}
+{
  const actor={x:0,z:0,alive:true,health:1,order:"advance"};let released=0;
  const r=new FirstLevelP012Runtime({GuideActor:()=>actor,Position:a=>a,Alive:a=>a.alive,Move(){},Signalled:()=>false,ReleaseDefense:()=>released++},{});
  r.defenders=[actor];r.Guide({beat:11,startIndex:0,route:[{x:0,z:0},{x:0,z:8},{x:8,z:8}],speed:1});r.Update(.1);

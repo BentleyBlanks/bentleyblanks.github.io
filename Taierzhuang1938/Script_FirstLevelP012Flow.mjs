@@ -173,8 +173,8 @@ export class FirstLevelP012Director {
         FaceAt: () => this.lastSample.position,
       } : {}),
       ...([14, 16, 17, 20, 21].includes(this.beat) ? { route: [] } : {}),
-      ...(this.beat === 22 ? { route: [this.config.activities.blockadeDecisionPosition],
-        safeRoute: true, approachPoints: [...(this.config.activities.southAssemblyRoute || [])].reverse(),
+      ...(this.beat === 22 ? { route: this.config.activities.blockadeGuideRoute,
+        safeRoute: true, approachPoints: this.config.activities.blockadeGuideRoute,
         WaitAt: () => true, FaceAt: () => this.config.anchors.blockadePositions?.[1] } : {}),
       ...(this.beat === 14 ? {
         route: this.config.activities.ambushEntryRoute?.slice(0,1) || [], startIndex: 0, safeRoute: true,

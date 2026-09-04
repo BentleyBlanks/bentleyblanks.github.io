@@ -3096,6 +3096,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     DeploySmoke: (point) => vfx.SmokeSource(new THREE.Vector3(point.x, 0.2, point.z), { kind: "screen", rate: 12, radius: 7.5, rise: 0.4, sizeStart: 3, sizeEnd: 6, life: 10 }),
     ClearSmoke: (handle) => vfx.RemoveSmokeSource(handle),
     FriendlyActors: () => ai.soldiers.filter((actor) => actor.side === "nra" && actor.alive && !actor.unarmed && !actor.p012TrainExtra),
+    IsStretcherBearer: (actor) => (setpieces?.mem?.column?.Bearers || []).some((member) => member.handle === actor),
     SpawnRecruit: (spec) => {
       const actor=ai.Spawn("nra",spec.x,spec.z,{identity:{...MakeSoldierIdentity(HashString(`P012Train:${spec.carIndex}:${spec.slot}`)),name:"下车集结的士兵"},
         weapon:"HanYang",unarmed:true,scriptedNoncombatant:true,escortRole:"trainRecruit",squadId:`P012Train${spec.carIndex}`});

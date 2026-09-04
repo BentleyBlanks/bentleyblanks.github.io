@@ -365,6 +365,12 @@ for(const [index,group] of southGroups.entries()) {
   assert.ok(SegmentBlocked({...group.cover,y:1.62},{...enemy,y:1.5}),`B21 pocket ${index} screens later groups`);
 }
 Audit("B21ReturnToAssembly",phase.whitebox.activities.southAssemblyRoute,layout.blocks,1.3);
+Audit("B22BlockadeGuide",phase.whitebox.activities.blockadeGuideRoute,layout.blocks,.42);
+for(const slot of phase.whitebox.activities.southDefenseSlots){
+ assert.ok(!layout.blocks.some(block=>Hits(slot,block,.42)),`south defender ground slot ${slot.x},${slot.z} is not on cover`);
+ for(const point of [...phase.whitebox.activities.stretcherCarryRoute,...phase.whitebox.activities.closeFightRoute])
+  assert.ok(Math.hypot(slot.x-point.x,slot.z-point.z)>=1.3,"south defender slots preserve stretcher/player clearance");
+}
 Audit("InjuredRoadCoverAccess",[P012MapPoints({x:42.5,z:24}),P012MapPoints({x:39,z:25.5}),P012MapPoints({x:45,z:26})],layout.blocks,1.02);
 for(let i=0;i<360;i++){
  const point=P012SouthPoint(39+.6*Math.cos(i*Math.PI/180),25.5+.6*Math.sin(i*Math.PI/180));
