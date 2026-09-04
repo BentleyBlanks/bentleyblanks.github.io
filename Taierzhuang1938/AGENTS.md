@@ -481,7 +481,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - `Data_MocapPipeline.md`（视频转骨骼动画流水线：素材要求 / 提取 / 反解 / 接线点名单）。
 - `Data_TengxianIntegration.md`（模块契约索引）、`Data_TengxianDesign.md`、`Data_CutsceneRedo.md`、
   `Data_CityWallPbr.md`、`Data_ExternalPropSources.md`、`Data_TaierzhuangHeightmap.md`、
-  `Data_TestRange.md`（?range=1）、`Data_MeleeQte.md`（?melee=1）、`Data_RoadSpline.md`、
+  `Data_TestRange.md`（?range=1）、`Data_ExplosionRange.md`（爆炸测试场、通用炮坑与返掷现状）、
+  `Data_MeleeQte.md`（?melee=1）、`Data_RoadSpline.md`、
   `Data_WallSpline.md`（样条道路/围墙 + 未迁移例外清单）。
 
 **史实考据底本（三档可信度：信史 / 主流记载 / 流传待考；台词只建立在前两档上）**：
