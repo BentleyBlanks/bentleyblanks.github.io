@@ -239,6 +239,17 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - 木桩兵 = `soldier.dummy`（Script_Ai 跳过 Think）；取证口 `Debug.Range`（State/GoTo/AimAt/Reset）。
 - 回归口 `Script_RangeTest.mjs`（combat 域）。先读：`docs/Data_TestRange.md`（弹道两条账必读）。
 
+### 爆炸测试场（?explosions=1）与通用炮坑 / 返掷
+- `Data_ExplosionRange.mjs` / `Script_ExplosionRangeField.mjs` / `Script_ExplosionRange.mjs`
+  管桌面库存、并列战车、远程炮击和飞机召唤；飞机只在召唤时进场，默认不盘旋。
+- `Data_Explosives.mjs` 是爆炸物响应、深度与返掷参数的唯一目录；
+  `Script_TerrainDeformation.mjs` 是纯高度差规则，`Script_TerrainDeformationView.mjs`
+  将脏块同时交给渲染和 Rapier。主画面、碰撞、角色和弹道共用同一三角高度采样。
+- `Script_GrenadeReturn.mjs` 给所有关卡注册 F 返掷，沿用同一枚手雷的原引信，不补库存。
+  炮坑不能登记成导航障碍；建筑分类看 `BaseGroundHeight`，通行 / IK 看 `GroundHeight`。
+- 回归口 `Script_ExplosionRulesTest.mjs` / `Script_ExplosionRangeTest.mjs`（explosives 域）；
+  入口、史料与估计边界、地表覆盖层和清理契约见 `docs/Data_ExplosionRange.md`。
+
 ### 白刃 QTE 测试章（?melee=1，六式共用正片规则）
 - `Data_MeleeQte.mjs`（六 pattern / 触发数值 / 工位）与 `Script_MeleeQte.mjs`（纯规则）是唯一判定源；
   AI 刺刀、F 处决、HUD、Actor 与 Viewmodel 只能接 `Begin* / View*`，不得另算一套成功条件。

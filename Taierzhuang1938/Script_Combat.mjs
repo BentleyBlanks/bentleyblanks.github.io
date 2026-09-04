@@ -19,6 +19,8 @@ import { WEAPONS, GUN_MELEE } from "./Data_Weapons.mjs";
 import { SUPPORT, COMBAT } from "./Data_Battle.mjs";
 import { Mulberry32, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
+import { FindReturnableGrenade } from "./Script_GrenadeReturn.mjs";
+import { GRENADE_RETURN, ExplosiveIdFor } from "./Data_Explosives.mjs";
 
 const GRAVITY = 19.6;
 
@@ -50,6 +52,15 @@ export class CombatSystem {
     this.host = host;
     this.projectiles = [];
     this.incoming = [];               // 日军掷弹筒/重炮的在途弹
+    this.shells = [];
+    this.shellSerial = 0;
+    this.returnCount = 0;
+    this.shellGeometry = new THREE.SphereGeometry(0.14, 8, 6);
+    this.shellMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(10, 5.8, 1.6), toneMapped: false });
+    this.trailGeometry = new THREE.CylinderGeometry(0.06, 0.32, 1, 6);
+    this.trailGeometry.rotateX(Math.PI / 2);
+    this.trailMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 2.1, 0.3), transparent: true,
+      opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
     this.rnd = Mulberry32(19380324);
     this.time = 0;
     this.launcherTimer = 8;
@@ -134,6 +145,82 @@ export class CombatSystem {
     this.projectiles.push(p);
     if (this.host.audio) this.host.audio.Play("grenadeThrow", { position: start.clone(), volume: 0.8 });
     return p;
+  }
+
+  get Returning() { return this.projectiles.some((p) => p.returning); }
+
+  ReturnCandidate() {
+    if (this.Returning) return null;
+    const player = this.host.player;
+    return FindReturnableGrenade(this.projectiles, player, (p) => {
+      const eye = player.EyePosition.clone(), delta = p.position.clone().sub(eye), distance = delta.length();
+      const hit = this.host.battlefield.Raycast(eye, delta.normalize(), distance, { terrain: true });
+      return !hit || hit.t >= distance - 0.14;
+    });
+  }
+
+  BeginReturn() {
+    const p = this.ReturnCandidate();
+    if (!p) return false;
+    this.Detach(p); p.returning = true; p.pickupLeft = GRENADE_RETURN.pickupS;
+    return true;
+  }
+
+  StepReturn(p, dt) {
+    const player = this.host.player;
+    const direction = player.AimDirection(new THREE.Vector3()).clone();
+    p.position.copy(player.EyePosition).addScaledVector(direction, 0.42); p.position.y -= 0.23;
+    if (p.mesh) p.mesh.position.copy(p.position);
+    p.pickupLeft -= dt;
+    if (p.pickupLeft > 0 && player.Alive) return;
+    p.returning = false;
+    if (!player.Alive) { p.velocity.set(0, 0, 0); this.Attach(p); return; }
+    const speed = p.weapon.throwSpeedMin + (p.weapon.throwSpeedMax - p.weapon.throwSpeedMin) * GRENADE_RETURN.power;
+    p.velocity.copy(direction).multiplyScalar(speed); p.velocity.y += speed * 0.26;
+    p.owner = "player"; p.age = 0; p.returned = true;
+    this.Attach(p); this.returnCount++;
+    this.host.audio?.Play("grenadeThrow", { position: p.position.clone(), volume: 0.8 });
+  }
+
+  /** Shared visible ballistic shell: no delayed explosion disconnected from a projectile. */
+  FireShell(from, target, { flight = 1.2, kind = "Shell75", radius = 6, damage = 120,
+    OnImpact = null, byPlayer = false } = {}) {
+    const velocity = target.clone().sub(from).divideScalar(flight);
+    velocity.y += GRAVITY * flight * 0.5;
+    const root = new THREE.Group(), core = new THREE.Mesh(this.shellGeometry, this.shellMaterial);
+    core.scale.set(1, 1, 2.5);
+    const trail = new THREE.Mesh(this.trailGeometry, this.trailMaterial);
+    trail.scale.z = 8; trail.position.z = 4;
+    root.add(core, trail); root.position.copy(from); this.host.scene.add(root);
+    const shell = { id: ++this.shellSerial, from: from.clone(), target: target.clone(), position: from.clone(),
+      velocity, initialVelocity: velocity.clone(), age: 0, flight, kind: ExplosiveIdFor(kind), radius, damage, root, OnImpact, byPlayer };
+    this.shells.push(shell); return shell;
+  }
+
+  StepShells(dt) {
+    for (let i = this.shells.length - 1; i >= 0; i--) {
+      const shell = this.shells[i]; let impact = null;
+      const steps = Math.max(1, Math.ceil(dt * 120)), step = dt / steps;
+      for (let j = 0; j < steps && !impact; j++) {
+        const previous = shell.position.clone();
+        shell.age += step;
+        shell.velocity.copy(shell.initialVelocity); shell.velocity.y -= GRAVITY * shell.age;
+        const next = shell.from.clone().addScaledVector(shell.initialVelocity, shell.age);
+        next.y -= GRAVITY * shell.age * shell.age * 0.5;
+        const delta = next.sub(previous), distance = delta.length();
+        const hit = this.host.battlefield.Raycast(previous, delta.clone().normalize(), distance, { terrain: true });
+        if (hit) impact = previous.addScaledVector(delta.normalize(), hit.t);
+        else shell.position.add(delta);
+        const ground = this.host.battlefield.GroundHeight(shell.position.x, shell.position.z);
+        if (!impact && shell.position.y <= ground) impact = shell.position.clone().setY(ground);
+        if (!impact && shell.age > shell.flight + 3) impact = shell.position.clone().setY(ground);
+      }
+      shell.root.position.copy(shell.position);
+      shell.root.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), shell.velocity.clone().normalize());
+      if (!impact) continue;
+      this.Blast(impact, shell.radius, shell.damage, "shell", null, shell.byPlayer, null, shell.kind);
+      shell.OnImpact?.(impact); this.host.scene.remove(shell.root); this.shells.splice(i, 1);
+    }
   }
 
   /**
@@ -236,7 +323,10 @@ export class CombatSystem {
     at.z += (this.rnd() - 0.5) * jitter;
     at.y = this.host.battlefield.GroundHeight(at.x, at.z);
     const flight = kind === "artillery" ? 2.6 : 1.6;
-    this.incoming.push({ at, t: 0, flight, spec, kind, OnImpact: options.OnImpact });
+    const angle = this.rnd() * Math.PI * 2;
+    const from = at.clone().add(new THREE.Vector3(Math.cos(angle) * 120, 24, Math.sin(angle) * 120));
+    this.FireShell(from, at, { flight, kind, radius: spec.radius, damage: spec.damage,
+      OnImpact: (point) => { options.OnImpact?.(point); this.host.story?.Signal("shelling"); } });
     if (this.host.vfx) this.host.vfx.IncomingMarker(at, flight);
     if (this.host.audio) {
       this.host.audio.Play("shellIncoming", { position: at.clone(), volume: kind === "artillery" ? 1 : 0.7 });
@@ -256,7 +346,8 @@ export class CombatSystem {
     at.x += (this.rnd() - 0.5) * 5;
     at.z += (this.rnd() - 0.5) * 5;
     at.y = this.host.battlefield.GroundHeight(at.x, at.z);
-    this.mortarInFlight.push({ at, t: 0, flight: spec.delayS, spec });
+    this.FireShell(at.clone().add(new THREE.Vector3(-90, 10, 100)), at,
+      { flight: spec.delayS, kind: "Shell82", radius: spec.radius, damage: spec.damage, byPlayer: true });
     return { ok: true, at, left: this.support.mortar };
   }
 
@@ -266,6 +357,7 @@ export class CombatSystem {
     if (this.runnerCooldown > 0) this.runnerCooldown -= dt;
 
     this.StepProjectiles(dt);
+    this.StepShells(dt);
     this.StepIncoming(dt, ctx);
     this.StepIjaSupport(dt, ctx);
     return null;
@@ -278,12 +370,14 @@ export class CombatSystem {
       const p = this.projectiles[i];
       p.age += dt;
       p.fuse -= dt;
-      if (p.body) {
+      if (p.returning) {
+        this.StepReturn(p, dt);
+      } else if (p.body) {
         // 刚体版：飞行、撞墙、弹跳、滚动全归引擎。这里只补一件引擎不知道的事 ——
         // 地表是解析式的（不在物理世界里），落到土地上那一下要手写。
+        physics.ClampToGround(p.body, dt);
         const t = p.body.translation();
         p.position.set(t.x, t.y, t.z);
-        physics.ClampToGround(p.body, dt);
         const q = p.body.rotation();
         if (p.mesh) {
           p.mesh.position.copy(p.position);
@@ -319,6 +413,7 @@ export class CombatSystem {
         }
       }
       if (p.fuse <= 0) {
+        p.alive = false;
         this.Detonate(p);
         if (p.mesh) p.mesh.visible = false;
         this.Detach(p);
@@ -344,7 +439,7 @@ export class CombatSystem {
       if (shell.t < shell.flight) continue;
       // 迫击炮是玩家自己呼的，落点炸到人一样要给回执 —— 这一发在两百米外，
       // 那边的血雾和倒地声一个都传不回来，没有回执就等于不知道打没打着。
-      this.Blast(shell.at, shell.spec.radius, shell.spec.damage, "shell", null, true);
+      this.Blast(shell.at, shell.spec.radius, shell.spec.damage, "shell", null, true, null, "Shell82");
       this.mortarInFlight.splice(i, 1);
     }
   }
@@ -384,7 +479,7 @@ export class CombatSystem {
   Detonate(p) {
     const isBundle = p.kind === "GrenadeBundle";
     this.Blast(p.position, p.weapon.radiusM, p.weapon.damage, isBundle ? "tank" : "grenade",
-      p.owner === "player" ? "ija" : "nra", p.owner === "player", p.OnHit);
+      p.owner === "player" ? "ija" : "nra", p.owner === "player", p.OnHit, p.kind);
   }
 
   /**
@@ -392,7 +487,7 @@ export class CombatSystem {
    * 伤害按距离平方衰减，并且**被墙挡住就不吃伤害** —— 隔一堵墙互相扔手榴弹是
    * 台儿庄巷战的标准打法，如果墙不挡弹片，那堵墙就白存在了。
    */
-  Blast(position, radius, damage, kind, hurtSide = null, byPlayer = false, onHit = null) {
+  Blast(position, radius, damage, kind, hurtSide = null, byPlayer = false, onHit = null, explosiveId = kind) {
     if (this.host.vfx) this.host.vfx.Explosion(position, { radius, kind });
     if (this.host.audio) {
       // 近/远两条**不同的录音**（城区爆炸 vs 远处爆炸），按**听者的距离**挑，
@@ -410,6 +505,7 @@ export class CombatSystem {
     if (this.host.destruction) {
       this.host.destruction.Blast(position, radius, damage, { kind });
     }
+    this.host.battlefield.deformation?.ApplyBlast(position, explosiveId);
     const bf = this.host.battlefield;
     const ai = this.host.ai;
     const from = position.clone();
@@ -508,15 +604,21 @@ export class CombatSystem {
       if (p.mesh) p.mesh.visible = false;
     }
     this.projectiles.length = 0;
+    for (const shell of this.shells) this.host.scene.remove(shell.root);
+    this.shells.length = 0;
+    this.incoming.length = 0;
+    this.mortarInFlight.length = 0;
   }
 
   Dispose() {
     this.ClearProjectiles();
     for (const m of this.pool) {
       this.host.scene.remove(m);
-      for (const child of m.children) child.geometry.dispose();
+      m.traverse((child) => child.geometry?.dispose());
     }
     this.pool.length = 0;
     this.incoming.length = 0;
+    this.shellGeometry.dispose(); this.shellMaterial.dispose();
+    this.trailGeometry.dispose(); this.trailMaterial.dispose();
   }
 }

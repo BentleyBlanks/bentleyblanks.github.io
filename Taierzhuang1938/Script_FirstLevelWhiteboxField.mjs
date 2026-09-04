@@ -127,6 +127,12 @@ export class FirstLevelWhiteboxField {
     const ground = this.layout.ground;
     sink.Add(ground.semantic || "Whitebox", PlaceGeometry(MakeBox(ground.w, ground.h, ground.d, 1,
       "FirstLevelWhiteboxGround"), { x: ground.x, y: ground.y, z: ground.z }));
+    // Keep the physical soil separate from structural boxes so the shared crater
+    // adapter can replace its surface without touching walls or elevated floors.
+    for (const mesh of sink.Flush(this.scene, { Get: (key) => this.materials.get(key) || this.whiteMaterial })) {
+      mesh.name = "FirstLevelWhitebox_Ground"; mesh.userData.deformableTerrain = true;
+      this.meshes.push(mesh);
+    }
     this.stats.groundChunks = 1;
     this.stats.groundTris = 12;
 

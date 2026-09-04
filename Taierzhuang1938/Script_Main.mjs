@@ -24,6 +24,11 @@ import { TengxianField } from "./Script_TengxianField.mjs";
 import { InitPhysics, PhysicsWorld } from "./Script_Physics.mjs";
 import { JieheField, JIEHE_LEVEL_ID, JIEHE_CAMERA_FAR } from "./Script_JieheField.mjs";
 import { RangeField } from "./Script_RangeField.mjs";
+import { ExplosionRangeField } from "./Script_ExplosionRangeField.mjs";
+import { ExplosionRange } from "./Script_ExplosionRange.mjs";
+import { EXPLOSION_RANGE_PHASE, EXPLOSION_RANGE_ID } from "./Data_ExplosionRange.mjs";
+import { TerrainDeformationView } from "./Script_TerrainDeformationView.mjs";
+import { RegisterGrenadeReturn } from "./Script_GrenadeReturn.mjs";
 import {
   RANGE_PHASE, RANGE_LEVEL_ID, RANGE_TARGETS, RANGE_STATIONS, RANGE_RESPAWN_S,
 } from "./Data_Range.mjs";
@@ -170,6 +175,7 @@ const PREVIEW_AUTOPLAY = PREVIEW && params.get("autoplay") === "1";
  * 正片的 PHASES（七关、菜单、进度、BootTest 的口径）一概不知道靶场存在。
  */
 const RANGE = params.get("range") === "1";
+const EXPLOSION_TEST = params.get("explosions") === "1";
 const MELEE_TEST = params.get("melee") === "1";
 /** 第一关策划白盒（?whitebox=1）：独立纯白方盒场地，复用正式 CH1_NanLu 内容。 */
 const FIRST_LEVEL_WHITEBOX = params.get("whitebox") === "1";
@@ -202,8 +208,8 @@ const FULL_SCENE = PHASE_PARAM === "fullscene" || LEGACY_FULL_SCENE_CARRIAGE;
 const FULL_SCENE_VIEW = FULL_SCENE
   && (LEGACY_FULL_SCENE_CARRIAGE || params.get("fullSceneView") === "carriage")
   ? "carriage" : "county";
-const SANDBOX = RANGE || MELEE_TEST || FIRST_LEVEL_WHITEBOX || FIRST_LEVEL_P012_WHITEBOX || JIEHE;
-const PHASE_TABLE = RANGE ? [RANGE_PHASE]
+const SANDBOX = EXPLOSION_TEST || RANGE || MELEE_TEST || FIRST_LEVEL_WHITEBOX || FIRST_LEVEL_P012_WHITEBOX || JIEHE;
+const PHASE_TABLE = EXPLOSION_TEST ? [EXPLOSION_RANGE_PHASE] : RANGE ? [RANGE_PHASE]
   : MELEE_TEST ? [MELEE_QTE_PHASE]
     : FIRST_LEVEL_WHITEBOX ? [FIRST_LEVEL_WHITEBOX_PHASE]
       : FIRST_LEVEL_P012_WHITEBOX ? [FIRST_LEVEL_P012_WHITEBOX_PHASE]
@@ -544,6 +550,7 @@ const state = {
 };
 
 let battlefield = null;
+let explosionRange = null;
 /**
  * 物理世界（Rapier）。**与 battlefield 一一对应，换关一起换。**
  * 静态几何在 BuildField 末尾一次性灌进去；玩家、AI、抛掷物、布娃娃都挂在它上面。
@@ -2203,6 +2210,17 @@ async function Boot() {
   // 人机共用：agent 用 State/Targets 断言、GoTo/AimAt 摆位，真人在旁边看同一片场。
   // 输入不在这里另开门：开枪/开镜/上刺刀/投弹照旧走 Debug.Fire / Key / Mouse / Throw
   // 的真事件链 —— 测的是键位与玩法，不是函数。
+  window.Taierzhuang.Debug.TerrainDeformation = {
+    State: () => battlefield.deformation?.State(),
+    Height: (x, z) => battlefield.GroundHeight(x, z),
+    BaseHeight: (x, z) => battlefield.BaseGroundHeight(x, z),
+    Reset: () => battlefield.deformation?.Reset(),
+  };
+  window.Taierzhuang.Debug.Explosions = {
+    State: () => explosionRange?.State() || null,
+    GoTo: (id) => explosionRange?.GoTo(id),
+    Reset: () => explosionRange?.Reset(),
+  };
   if (RANGE) {
     const RangeTargetSnapshot = (entry) => {
       const s = entry.soldier;
@@ -2486,9 +2504,9 @@ async function Boot() {
       // 携行与七关口径一起翻一遍，重载一次比那条路诚实得多。
       // 玩家可见的测试场景只保留四条核心玩法入口。界河与过场仍可通过
       // ?jiehe=1 / ?preview=... 直达，供自动化与内部验收使用，不再混入选章。
-      sandboxes: [RANGE_PHASE, MELEE_QTE_PHASE, FIRST_LEVEL_WHITEBOX_PHASE,
+      sandboxes: [RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE, FIRST_LEVEL_WHITEBOX_PHASE,
         FIRST_LEVEL_P012_WHITEBOX_PHASE],
-      sandboxMode: RANGE ? "range" : MELEE_TEST ? "melee"
+      sandboxMode: EXPLOSION_TEST ? "explosions" : RANGE ? "range" : MELEE_TEST ? "melee"
         : FIRST_LEVEL_WHITEBOX ? "firstLevelWhitebox"
           : FIRST_LEVEL_P012_WHITEBOX ? "firstLevelP012Whitebox" : JIEHE ? "jiehe" : false,
       PlaySandbox: (key) => GoToSandbox(key),
@@ -2572,6 +2590,7 @@ async function Boot() {
 const WORLD_CLASSES = {
   [JIEHE_LEVEL_ID]: JieheField,
   [RANGE_LEVEL_ID]: RangeField,
+  [EXPLOSION_RANGE_ID]: ExplosionRangeField,
   [MELEE_QTE_LEVEL_ID]: RangeField,
   [FIRST_LEVEL_WHITEBOX_LEVEL_ID]: FirstLevelWhiteboxField,
   [FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID]: FirstLevelWhiteboxField,
@@ -2589,10 +2608,12 @@ function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField;
 function GoToSandbox(key) {
   const url = new URL(window.location.href);
   url.searchParams.delete("range");
+  url.searchParams.delete("explosions");
   url.searchParams.delete("melee");
   url.searchParams.delete("whitebox");
   url.searchParams.delete("jiehe");
   if (key === "range") url.searchParams.set("range", "1");
+  else if (key === "explosions") url.searchParams.set("explosions", "1");
   else if (key === "melee") url.searchParams.set("melee", "1");
   else if (key === "firstLevelWhitebox") url.searchParams.set("whitebox", "1");
   else if (key === "firstLevelP012Whitebox") url.searchParams.set("whitebox", "p012");
@@ -2619,9 +2640,10 @@ function FieldIdFor(phase) { return phase.fieldFrom || phase.id; }
 async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   aircraft?.SetPhase(phase);
   if (destruction) destruction.Clear();
+  explosionRange?.Dispose(); explosionRange = null;
   ClearExternalProps();
   if(phase.whitebox?.p012)ClearTrimProps(scene);
-  if (battlefield) { battlefield.Dispose(); battlefield = null; }
+  if (battlefield) { battlefield.deformation?.Dispose(); battlefield.Dispose(); battlefield = null; }
   levelBounds = MakeLevelBounds(phase.bounds, phase.whitebox?.p012 ? 1 : 10);
   const World = WorldClassFor(phase);
   battlefield = new World(scene, library, {
@@ -2647,11 +2669,12 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
     setStep(step.label, base + span * step.progress);
     await yieldFrame();
   }
+  await battlefield.LoadVehicles?.();
   // PCG 的净空真相必须冻结在“外部布设加入之前”。否则编辑器重跑生成时会拿
   // 上一轮 PCG 自己的碰撞盒挡自己，所有候选都被判成重叠。
   battlefield.propPcgBlockers = battlefield.colliders.slice();
   // TownDressing is bounds-based, not phase-based: independent IDs alone do not isolate it.
-  const external = phase.whitebox?.p012 ? {count:0,generatedCount:0,pcgCount:0,pcgStats:null,pcgErrors:[],failed:[],colliders:[],streamer:null} : await AddExternalProps({
+  const external = phase.whitebox?.p012 || phase.id === EXPLOSION_RANGE_ID ? {count:0,generatedCount:0,pcgCount:0,pcgStats:null,pcgErrors:[],failed:[],colliders:[],streamer:null} : await AddExternalProps({
     scene, library, phaseId: FieldIdFor(phase), bounds: phase.bounds,
     groundAt: (x, z) => battlefield.GroundHeight(x, z),
     blockers: battlefield.propPcgBlockers,
@@ -2679,7 +2702,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   }
   // tzm 饰件层（信号机/站灯/窗花/门五金…）：与外部 GLB 布景同一个异步槽位，
   // 但物理契约不同（多数无碰撞、可悬空安装），所以是平行的一层，见 Script_TrimProps 文件头。
-  const trim = phase.whitebox?.p012 ? {count:0,failed:[],colliders:[]} : await AddTrimProps({ scene, library, phaseId: FieldIdFor(phase) });
+  const trim = phase.whitebox?.p012 || phase.id === EXPLOSION_RANGE_ID ? {count:0,failed:[],colliders:[]} : await AddTrimProps({ scene, library, phaseId: FieldIdFor(phase) });
   battlefield.trimProps = trim;
   if (trim.colliders?.length) {
     battlefield.colliders.push(...trim.colliders);
@@ -2690,6 +2713,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   if (gi) gi.SetWorld(battlefield);
   setStep("砌墙（物理）……", base + span);
   await yieldFrame();
+  new TerrainDeformationView(battlefield, scene, library);
   BuildPhysics();
   if (destruction) destruction.SetWorld(battlefield, physics, null);
 }
@@ -2711,6 +2735,7 @@ function BuildPhysics() {
   });
   const n = physics.BuildStatic(battlefield.colliders);
   battlefield.physics = physics;
+  battlefield.deformation?.AttachPhysics(physics);
   if (player) player.AttachPhysics(physics);
   return n;
 }
@@ -2864,6 +2889,7 @@ function ClearSetpieceProps() {
 
 function ClearRuntime() {
   p012StageZero?.Dispose(); p012StageZero = null;
+  explosionRange?.Dispose(); explosionRange = null;
   meleeQte?.Cancel("levelChange");
   // 摆点层：交互点、后送队、计时器与运行时道具全按关摆，一律清掉。
   // **缺席宣告不在这里清**（那在 companion 手里，是剧情事实不是关卡状态）。
@@ -3016,7 +3042,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // CountSide("nra") 都会把他们数进去，于是撒兵自动少撒同样多 ——
   // 场上活人总数一个没多，开机红线（drawCalls / triangles）不受影响。
   // 名册默认从本章 beats 的 who 推导（该章说过话的战斗员自动在场），INT2 按章精修。
-  if (!RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && companion) {
+  if (!EXPLOSION_TEST && !RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && companion) {
     companion.BeginLevel(contentId, {
       // 名册**优先走章节数据点名**（INT2 起七章都写了 roster）；没写才由 beats 推。
       // 推导只收「该章说过话的战斗员」—— 军医、参谋、师长这些 combatant:false 的人
@@ -3041,7 +3067,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // 章节摆点：**排在具名同伴之后**（罗班长要先站出来，摆点层才拿得到他的句柄），
   // 也排在 SeedSoldiers 之前（后送队要从 nra 名额里出人，撒兵才会自动少撒同样多）。
   // 靶场／白刃训练场／预览／过场承载章都不摆；第一关白盒有正式第一章内容。
-  if (!RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && setpieces) {
+  if (!EXPLOSION_TEST && !RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && setpieces) {
     setpieces.BeginLevel(contentId, phase);
   }
   interact.Clear("P012");
@@ -3229,6 +3255,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     },
     ImpactShell: (point) => {
       const at = new THREE.Vector3(point.x, battlefield.GroundHeight(point.x, point.z), point.z);
+      battlefield.deformation?.ApplyBlast(at, "Shell75");
       vfx.Explosion(at, { radius: 4, kind: "shell" }); audio.Play("explosionNear", { position: at });
       player.Suppress(Math.max(0,1-at.distanceTo(player.position)/28)*.65);
       p012Resting?.OnImpact({event:"P012NorthNearMissImpact",position:point});
@@ -3343,7 +3370,20 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   }, phase.whitebox) : null;
   if (p012Flow) state.storyObjective = p012Flow.CurrentObjective().text;
   // 靶场撒的是木桩兵，不是战线；同时钉住本关 —— 站遍三个工位不许触发换关结算。
-  if (RANGE) { state.pinned = true; SeedRangeTargets(); }
+  RegisterGrenadeReturn(interact, combat, player, {
+    CanUse: () => !state.cooking && !carry?.Active && !emplacement?.Mounted && !meleeQte?.Active
+      && !p012Runtime?.binocularOwned && !player.Busy,
+    OnPickup: () => viewmodel.TriggerThrow?.(0.72),
+  });
+  if (EXPLOSION_TEST) {
+    state.pinned = true;
+    explosionRange?.Dispose();
+    explosionRange = new ExplosionRange({ battlefield, combat, interact, player, ai, hud, aircraft,
+      GiveGrenade: (kind) => { if (kind === "GrenadeBundle") state.bundles++; else state.grenades++;
+        state.slots.throwable = kind; },
+    });
+  }
+  else if (RANGE) { state.pinned = true; SeedRangeTargets(); }
   else if (MELEE_TEST) { state.pinned = true; SeedMeleeTargets(); }
   else if (FIRST_LEVEL_WHITEBOX || FIRST_LEVEL_P012_WHITEBOX) { state.pinned = true; SeedSoldiers(phase); }
   else if (!PREVIEW && !cutsceneOnly) SeedSoldiers(phase);
@@ -4849,6 +4889,7 @@ const router = new InputRouter({
       // confirm 型立刻清零）。按下那一侧的分流顺序与改之前完全一样。
       case "interact":
         if (detail.down === false) { interact?.Release(); return; }
+        if (interact?.Query(player)?.point?.id === "LiveGrenadeReturn") { DoInteract(); return; }
         if (meleeQte?.TryBeginExecution()) return;
         // 架着机枪时 F 的语义就只剩「离位」（枪废了就是「弃枪」）。
         // **离位永远是玩家自己按的这一下** —— 脚本没有替他下枪位的口子。
@@ -4986,7 +5027,7 @@ function Reload() {
 
 /** 按住蓄力：手榴弹可以攥着数几秒再扔，落地即炸。 */
 function BeginCook(kind) {
-  if (!player.Alive || state.cooking) return;
+  if (!player.Alive || state.cooking || combat.Returning) return;
   const infiniteGrenades = debugOptions.Enabled("infiniteGrenades");
   if (kind === "Grenade" && !infiniteGrenades && state.grenades <= 0) { hud.Hint("没有手榴弹了", 2); return; }
   if (kind === "GrenadeBundle" && state.bundles <= 0) { hud.Hint("没有集束了", 2); return; }
@@ -5446,6 +5487,7 @@ function ConfirmHit(died) {
 
 function TryFire(dt) {
   fireCooldown -= dt;
+  if (combat.Returning) return;
   if (p012Runtime?.binocularOwned) return;
   // 架着机枪：左键交给机枪那条射速与过热闸（Script_Emplacement.Update 里排），
   // 步枪链整条短路 —— 手上那支枪这会儿背在背上。
@@ -6170,6 +6212,7 @@ function Frame(dt, render = true) {
   profiler.E("vfx");
   profiler.B("combat");
   combat.Update(dt, { phase: PHASE_TABLE[state.phaseIndex] });
+  explosionRange?.Update(dt);
   // 日机扫射：弹着线推进、白名单结算、玩家躲避窗口。**必须排在下面那条
   // 死亡判定之前** —— 它打得倒玩家，排在后面那一类死法会被整帧吞掉
   // （与手榴弹/掷弹筒同一笔账，见死亡判定那段注释）。
@@ -6372,7 +6415,7 @@ function Frame(dt, render = true) {
     profiler.B("spawn");
     if (RANGE) MaintainRangeTargets();
     else if (MELEE_TEST) MaintainMeleeTargets();
-    else SeedSoldiers(phase);
+    else if (!EXPLOSION_TEST) SeedSoldiers(phase);
     profiler.E("spawn");
   }
 

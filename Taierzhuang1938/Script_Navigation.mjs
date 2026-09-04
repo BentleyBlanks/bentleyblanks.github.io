@@ -94,7 +94,7 @@ export class NavGrid {
       if (!box || box.destroyed) continue;
       const cx = (box.min[0] + box.max[0]) * 0.5;
       const cz = (box.min[2] + box.max[2]) * 0.5;
-      const ground = battlefield.GroundHeight(cx, cz);
+      const ground = (battlefield.BaseGroundHeight || battlefield.GroundHeight).call(battlefield, cx, cz);
       if (box.max[1] - ground < stepOver) continue;          // 矮，跨得过去
       if (box.min[1] > ground + 1.6) continue;               // 悬在头顶（屋檐、二层）
       const x0 = this._Cx(box.min[0] - margin);

@@ -75,13 +75,14 @@ export class AircraftFlight {
     /** 归队前的静默计时；> 0 时那一架不画。 */
     this.rejoinT = 0;
     this.lastElapsed = 0;
+    this.manualPose = null;
   }
 
   async Load() {
     const settled = await Promise.allSettled(AIRCRAFT_ASSETS.map(async (spec) => {
       const gltf = await LOADER.loadAsync(spec.url);
       const root = PrepareAircraft(gltf, spec);
-      if (this.phase?.whitebox?.p012) root.visible = false;
+      if (this.phase?.whitebox?.p012 || this.phase?.ambientAircraft === false) root.visible = false;
       this.group.add(root);
       this.forms.push({ spec, root });
     }));
@@ -90,7 +91,8 @@ export class AircraftFlight {
 
   SetPhase(phase) {
     this.phase = phase;
-    if (phase.whitebox?.p012) for (const { root } of this.forms) root.visible = false;
+    this.manualPose = null;
+    if (phase.whitebox?.p012 || phase.ambientAircraft === false) for (const { root } of this.forms) root.visible = false;
     this.anchor.set(
       (phase.bounds.minX + phase.bounds.maxX) * 0.5,
       (phase.bounds.minZ + phase.bounds.maxZ) * 0.5,
@@ -115,9 +117,10 @@ export class AircraftFlight {
 
     for (const form of this.forms) {
       const { spec, root } = form;
+      if (this.manualPose?.id === spec.id) { ApplyStrafePose(root, this.manualPose.pose); root.visible = true; continue; }
       if (form === taken) { ApplyStrafePose(root, strafe.aircraft); root.visible = true; continue; }
       // P012 has a deliberate first railway pass: background orbiters never pre-empt it.
-      if (this.phase.whitebox?.p012) { root.visible = false; continue; }
+      if (this.phase.whitebox?.p012 || this.phase.ambientAircraft === false) { root.visible = false; continue; }
       // 航线刚走完的那一架：先藏着，别让它从航线末端瞬移回圆周上。
       if (form === this.strafeForm) { root.visible = false; continue; }
       root.visible = true;
@@ -140,12 +143,26 @@ export class AircraftFlight {
     return this.forms.find((f) => f.spec.id === id) || this.forms[0];
   }
 
+  /** A scripted call-in owns one aircraft until it leaves. Idle orbiters remain disabled. */
+  SetManualPose(id, pose) {
+    if (!pose) {
+      const old = this.forms.find((form) => form.spec.id === this.manualPose?.id);
+      if (old) old.root.visible = false;
+      this.manualPose = null; return;
+    }
+    const form = this.FormFor(id);
+    if (!form) return;
+    this.manualPose = { id: form.spec.id, pose };
+    ApplyStrafePose(form.root, pose); form.root.visible = true;
+  }
+
   Dispose() {
     for (const { root } of this.forms) DisposeObject(root);
     this.group.removeFromParent();
     this.forms.length = 0;
     this.strafeForm = null;
     this.rejoinT = 0;
+    this.manualPose = null;
   }
 }
 

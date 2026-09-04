@@ -21,15 +21,12 @@
 //   · **人**（玩家与 AI 士兵）→ Rapier 的运动学角色控制器（胶囊 + 自动上台阶 +
 //     贴地吸附 + 坡度限制）。爬墙、卡墙、瞬移这三类问题由引擎负责，不再打补丁。
 //   · **抛掷物 / 碎块 / 布娃娃** → 真刚体。
-//   · **地形**仍然是解析式的 `GroundHeight(x,z)`（见下面 groundAt 那一段注释），
-//     不做高度场。
+//   · **地形**由 `GroundHeight(x,z)` 统一采样：未破坏区沿用关卡高度，爆炸区
+//     叠加稀疏高度差；局部渲染网格与 Rapier trimesh 使用完全相同的顶点/索引。
 //
-// 地形为什么不进 Rapier：
-//   地表在 Script_TengxianCity 里是**解析函数**，视觉网格也是照它采样出来的。
-//   转成高度场就要选一个分辨率，而任何分辨率都会与视觉网格差一点 ——
-//   差值的表现是人浮在地上或陷进地里。解析式查询本身只有几次乘加，
-//   比查高度场还便宜，也永远与画面严丝合缝。所以地形走 groundAt 兜底：
-//   角色解算完与地面取高者，射线另外解析求交（RaycastTerrain）。
+// 未破坏区继续走 groundAt 兜底，不把整幅世界重建为细网格。炮坑由
+// Script_TerrainDeformationView 调 SetTerrainTile 局部更新；groundAt 在这些块内
+// 与网格使用同一个三角插值。角色、刚体、子弹和脚部 IK 因而读到同一处坑底。
 
 import * as THREE from "three";
 import RAPIER from "./vendor/rapier/build/rapier.module.mjs";
@@ -134,6 +131,7 @@ export class PhysicsWorld {
     this.staticBody = this.world.createRigidBody(R.RigidBodyDesc.fixed());
     /** collider.handle -> 建关时那条碰撞盒记录（子弹要读 tag 判材质音效）。 */
     this.recordByHandle = new Map();
+    this.terrainTiles = new Map();
 
     this.controller = this.world.createCharacterController(0.02);
     // 自动上台阶：马道的八级台阶、门槛、瓦砾堆全靠它。
@@ -304,7 +302,8 @@ export class PhysicsWorld {
     const groups = (options && options.groups) || IG_RAY_WORLD;
     this._ray.origin.x = origin.x; this._ray.origin.y = origin.y; this._ray.origin.z = origin.z;
     this._ray.dir.x = direction.x; this._ray.dir.y = direction.y; this._ray.dir.z = direction.z;
-    const hit = this.world.castRayAndGetNormal(this._ray, maxDist, true, undefined, groups);
+    const hit = this.world.castRayAndGetNormal(this._ray, maxDist, true, undefined, groups,
+      undefined, undefined, (collider) => terrain || !this.recordByHandle.get(collider.handle)?.terrain);
     let best = null;
     if (hit) {
       const n = hit.normal;
@@ -321,10 +320,29 @@ export class PhysicsWorld {
     return best;
   }
 
+  /** Dirty crater tiles use the renderer's exact vertices. They are physical
+   * ground, never obstacle boxes, so they cannot invalidate the navigation grid. */
+  SetTerrainTile(key, positions, indices) {
+    this.RemoveTerrainTile(key);
+    if (this.disposed) return;
+    const collider = this.world.createCollider(R.ColliderDesc.trimesh(
+      new Float32Array(positions), new Uint32Array(indices), R.TriMeshFlags?.FIX_INTERNAL_EDGES || 0)
+      .setCollisionGroups(IG_WORLD).setFriction(0.8), this.staticBody);
+    this.terrainTiles.set(key, collider);
+    this.recordByHandle.set(collider.handle, { tag: "dirt", terrain: true, tile: key });
+  }
+
+  RemoveTerrainTile(key) {
+    const collider = this.terrainTiles.get(key);
+    if (!collider) return;
+    if (!this.disposed) { this.recordByHandle.delete(collider.handle); this.world.removeCollider(collider, true); }
+    this.terrainTiles.delete(key);
+  }
+
   /**
    * 射线 vs 解析地表。
    *
-   * 地形没有网格可打，只能沿射线找「射线低于地面」的那一步再二分。
+   * 未分配形变网格的地形沿射线找「射线低于地面」的那一步再二分。
    * 步长 0.6 m：这张地表最陡的起伏是荆河河槽与津浦路路基，尺度都在 3 m 以上，
    * 0.6 m 不会跨过去。**起点已经在地下时一律返回 null** ——
    * 那多半是站在某块碰撞体顶上（地表在脚下更深处），
@@ -592,6 +610,7 @@ export class PhysicsWorld {
     for (const c of this.characters) c._Detach();
     this.characters.clear();
     this.dynamics.clear();
+    this.terrainTiles.clear();
     this.recordByHandle.clear();
     this.world.free();
     this.world = null;

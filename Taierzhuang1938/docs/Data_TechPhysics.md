@@ -14,7 +14,7 @@ vendor 在 `vendor/rapier/build/rapier.module.mjs`（2.8 MB，wasm 用 base64 �
 | 墙、房、垛口、路基、桥、道具 | Rapier 静态长方体，**带绕 Y 的朝向** | `BuildSink.Solid(...,tag, ry)` |
 | 下载来的 .glb 布景 | 同上，一件一只盒 | `Script_ExternalProps`；见下面「布景也是实物」 |
 | 缸／篮／板凳／条案／晾衣架／梯子／木箱 | 同上 | `Script_LivedInProps`；矮件不进导航图 |
-| 地表 | 仍是解析式 `GroundHeight(x,z)` | 见下面「地形为什么不进引擎」 |
+| 地表 | `GroundHeight(x,z)`；爆炸脏块同时生成 Rapier trimesh | 见下面「地表与爆炸形变」 |
 | 玩家、AI 士兵 | Rapier 运动学角色控制器（胶囊） | 两边同一套解算、同一套尺寸 |
 | 手雷、集束手榴弹 | 动态刚体（球） | 会撞墙弹回、会在地上滚 |
 | 尸体 | 锁旋转的动态胶囊 | 姿势归动画、位移归物理 |
@@ -177,13 +177,14 @@ vendor 在 `vendor/rapier/build/rapier.module.mjs`（2.8 MB，wasm 用 base64 �
 于是打柴垛出砖灰、打沙袋工事按砖墙算血量、连 tag 就叫 `dirt` 的土坎也出砖灰。
 两张表的键现在是同一套，新加 tag 时两边一起加。
 
-## 地形为什么不进引擎
+## 地表与爆炸形变
 
-地表在 `Script_TengxianCity` 里是**解析函数**，视觉网格也是照它采样出来的。
-转成高度场就要选一个分辨率，而任何分辨率都会与视觉网格差一点，
-差值的表现就是人浮在地上或者陷进地里。解析式查询本身只有几次乘加，比查高度场还便宜。
+未受破坏的地表沿用场景原有高度函数；爆炸区通过 `TerrainDeformation`
+叠加稀疏高度差。渲染块与 `PhysicsWorld.SetTerrainTile` 使用相同的顶点 / 索引，
+`GroundHeight` 在这些块内使用同一三角插值，避免画面与碰撞各取一份高度图。
+地表薄覆盖层也随网格细分下降，不能用完整路面盖住坑口。
 
-于是地形以三种方式补进来：
+整幅世界不必转换为细网格。已有兜底仍消费形变后的 `groundAt`：
 
 - 角色解算完与 `groundAt` 取高者（`CharacterBody.Move` 末尾）；
 - 射线另外解析求交（`PhysicsWorld.RaycastTerrain`：沿射线找符号变化再二分）；
@@ -191,6 +192,10 @@ vendor 在 `vendor/rapier/build/rapier.module.mjs`（2.8 MB，wasm 用 base64 �
 
 **射线的 `terrain` 选项默认关**。子弹与抛掷物打开（子弹要打得中土坎与河堤），
 **AI 视线判据一律不开** —— 那会一次性改掉整套交战节奏，是另一件事。
+局部地形碰撞体也遵循该过滤选项。炮坑不进障碍盒或导航刷新；
+`NavGrid.Refresh` 的建筑高度分类读取 `BaseGroundHeight`，避免土层下陷后矮物变成堵路高墙。
+新建脏块后由 `RefreshStaticQueries` 零时间提交查询拓扑，不额外积分一个玩法帧。
+响应目录、叠加与坡度上限、地基保护和测试入口见 [爆炸与地形形变](Data_ExplosionRange.md)。
 
 ## 角色 IK
 

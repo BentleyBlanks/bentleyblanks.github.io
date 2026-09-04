@@ -32,6 +32,7 @@ const NS = "http://www.w3.org/2000/svg";
  * key 与 Script_Main 的 `?range=1 / ?melee=1 / ?jiehe=1` 一一对应。
  */
 const SANDBOX_NAMES = {
+  explosions: { where: "爆炸测试场", exit: "退出爆炸测试场" },
   range: { where: "靶场", exit: "退出靶场" },
   melee: { where: "白刃测试场", exit: "退出白刃测试场" },
   firstLevelWhitebox: { where: "第一关策划白盒", exit: "退出第一关白盒" },
