@@ -12,6 +12,7 @@ import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 export class FirstLevelP012StageZero {
   constructor(host) {
     this.host = host; this.elapsed = 0; this.people = new Set();
+    this.approachOffset = 0; this.approachReferences = this.BuildApproachReferences();
     this.arrivalView = new FirstLevelP012ArrivalView();
     this.villageView = new FirstLevelP012VillageLifeView(host.scene, (x,z)=>host.battlefield.GroundHeight(x,z));
     this.arrival = new FirstLevelP012Arrival({
@@ -28,6 +29,7 @@ export class FirstLevelP012StageZero {
       PlaySfx: cue => host.audio.Play(cue,{volume:.55,position:host.Guide()?.position}),
       RenderArrival: view => {
         this.arrivalView.Render(view);
+        this.UpdateApproachReferences(view);
         if(view.steam>0&&!this.steam) this.steam=host.vfx.SmokeSource(new THREE.Vector3(-66,2.1,88),
           {kind:"screen",rate:5,radius:.3,rise:1.2,sizeStart:.45,sizeEnd:2.8,life:3,opacity:.15});
         if(view.steam===0&&this.steam){host.vfx.RemoveSmokeSource(this.steam);this.steam=null;}
@@ -72,6 +74,24 @@ export class FirstLevelP012StageZero {
       Remove: entry => {if(!entry)return;entry.workPose?.Dispose();entry.body?.Remove();entry.actor.root.removeFromParent();entry.actor.Dispose();this.people.delete(entry);},
     });
   }
+  BuildApproachReferences() {
+    const group=new THREE.Group();group.name='P012ApproachReferences';
+    const white=new THREE.MeshStandardMaterial({color:0xe8e6dc,roughness:1});
+    const dark=new THREE.MeshStandardMaterial({color:0x35383a,roughness:1});
+    for(let i=0;i<8;i++){
+      const post=new THREE.Mesh(new THREE.BoxGeometry(.16,2.8,.16),white);post.position.set(-76,1.4,52+i*8);group.add(post);
+      const sleeper=new THREE.Mesh(new THREE.BoxGeometry(3.8,.08,.22),dark);sleeper.position.set(-73,.08,52+i*8);group.add(sleeper);
+    }
+    this.host.scene?.add?.(group);return group;
+  }
+  UpdateApproachReferences(view) {
+    if(!this.approachReferences)return;
+    this.approachOffset=(view.referenceTravelM||0)%64;
+    for(const object of this.approachReferences.children){
+      const base=Number(object.userData.p012BaseZ ?? object.position.z);object.userData.p012BaseZ=base;
+      object.position.z=52+((base-52+this.approachOffset)%64);
+    }
+  }
   IsVisible(position) {
     if(!position)return false;
     const {camera,battlefield}=this.host;
@@ -102,5 +122,8 @@ export class FirstLevelP012StageZero {
   Dispose() {
     this.arrival.Dispose();this.arrivalView.Dispose();this.village.Dispose();this.villageView.Dispose();
     if(this.steam)this.host.vfx.RemoveSmokeSource(this.steam);this.steam=null;
+    this.approachReferences?.removeFromParent();
+    for(const child of this.approachReferences?.children||[]){child.geometry?.dispose();child.material?.dispose();}
+    this.approachReferences=null;
   }
 }

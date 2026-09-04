@@ -13,12 +13,18 @@ function Clamp(value, max = 1) { return Math.max(0, Math.min(max, Number(value) 
 export class FirstLevelP012Arrival {
   constructor(host = {}, config = P012_ARRIVAL) {
     this.host = host; this.config = config; this.audioHandle = null;
-    this.phase = 'idle'; this.elapsed = 0; this.skipped = false; this.released = false;
+    this.phase = 'idle'; this.elapsed = 0; this.skipped = false; this.released = false; this.brakeBeat = -1; this.referenceTravelM = 0;
   }
   Start() {
     if (this.phase !== 'idle') return false;
-    this.phase = 'braking'; this.StartAudio(); this.host.Subtitle?.(this.config.muster);
+    this.phase = 'braking'; this.StartAudio(); this.EmitBrakeBeats();
     this.host.PlaySfx?.(this.config.audio.brake); this.Render(); return true;
+  }
+  EmitBrakeBeats() {
+    const beats = this.config.brakeBeats || [];
+    while (this.brakeBeat + 1 < beats.length && beats[this.brakeBeat + 1].second <= this.elapsed) {
+      this.brakeBeat++; this.host.Subtitle?.(beats[this.brakeBeat].text);
+    }
   }
   StartAudio() {
     if (this.audioHandle === null) this.audioHandle = this.host.StartAudio?.(this.config.audio.bed) ?? null;
@@ -41,7 +47,10 @@ export class FirstLevelP012Arrival {
     if (this.phase === 'idle') return this.View();
     // Deliberately do not consume a huge background-tab delta across several
     // beats: returning to the tab cannot silently swallow the opening action.
-    this.elapsed += Clamp(dt, .25);
+    const step=Clamp(dt, .25);
+    if(this.phase==='braking')this.referenceTravelM+=this.View().referenceSpeedMps*step;
+    this.elapsed += step;
+    if (this.phase === 'braking') this.EmitBrakeBeats();
     if (this.phase === 'braking' && (this.skipped || this.elapsed >= this.config.brakeSeconds)) this.Enter('guide');
     if (this.phase === 'guide') {
       this.host.GuideArrival?.();
@@ -65,15 +74,20 @@ export class FirstLevelP012Arrival {
     const titleVisible = p === 'blackout' || (p === 'complete' && !this.skipped && this.elapsed < c.titleSeconds);
     return { phase: p, doorProgress, fade, title: titleVisible ? c.title : '', date: titleVisible ? c.date : '',
       deceleration: p === 'braking' ? 1 - Clamp(this.elapsed / c.brakeSeconds) : 0,
+      referenceSpeedMps: p === 'braking' ? c.referenceSpeedMps * Math.pow(1 - Clamp(this.elapsed / c.brakeSeconds), 1.65) : 0,
+      referenceTravelM: this.referenceTravelM,
       steam: p === 'idle' ? 0 : p === 'complete' ? .25 * (1 - Clamp(this.elapsed / c.titleSeconds)) : .65,
       canDisembark: this.released, controlsLocked: false };
   }
   Render() { const view = this.View(); this.host.SetDoorProgress?.(view.doorProgress); this.host.RenderArrival?.(view); }
-  Snapshot() { return { version: 1, phase: this.phase, elapsed: this.elapsed, skipped: this.skipped }; }
+  Snapshot() { return { version: 2, phase: this.phase, elapsed: this.elapsed, skipped: this.skipped, brakeBeat:this.brakeBeat, referenceTravelM:this.referenceTravelM }; }
   Restore(snapshot) {
     this.StopAudio();
-    this.phase = snapshot?.version === 1 && phases.includes(snapshot.phase) ? snapshot.phase : 'idle';
+    this.phase = (snapshot?.version === 1 || snapshot?.version === 2) && phases.includes(snapshot.phase) ? snapshot.phase : 'idle';
     this.elapsed = Clamp(snapshot?.elapsed, 3600); this.skipped = snapshot?.skipped === true;
+    this.brakeBeat = snapshot?.version === 2 ? Math.max(-1, Math.floor(snapshot.brakeBeat ?? -1)) :
+      (this.phase === 'braking' ? (this.config.brakeBeats || []).findLastIndex(beat=>beat.second<=this.elapsed) : (this.config.brakeBeats?.length||0)-1);
+    this.referenceTravelM=Clamp(snapshot?.referenceTravelM,10000);
     this.released = this.phase === 'complete';
     // Restoring synchronizes facts but never replays subtitles, one-shots or the
     // one-time ReleaseColumn callback. Host restores its queue snapshot itself.
@@ -81,7 +95,7 @@ export class FirstLevelP012Arrival {
     this.Render(); return this.View();
   }
   Dispose() {
-    this.StopAudio(); this.phase = 'idle'; this.elapsed = 0; this.skipped = false; this.released = false;
+    this.StopAudio(); this.phase = 'idle'; this.elapsed = 0; this.skipped = false; this.released = false; this.brakeBeat = -1; this.referenceTravelM=0;
     this.host.RenderArrival?.(this.View());
   }
 }
