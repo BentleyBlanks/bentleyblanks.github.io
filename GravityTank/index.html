@@ -13,21 +13,72 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/GravityTank/">
   <title>GRAVITY TANK BATTLE</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-  <link rel="preload" href="./assets/Font_FusionPixel12ZhHans.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="./assets/Font_FusionPixel12Latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="./Style_Game.css?v=gravityTank010">
+  <style>
+    #bootOverlay { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:24px; background:#080e16; color:#edf4fa; font:16px/1.6 system-ui,sans-serif; }
+    #bootOverlay[hidden] { display:none; }
+    .boot-card { width:min(100%,360px); padding:28px; border:1px solid #546371; border-top:3px solid #f1cf73; background:#101b27; }
+    .boot-kicker { color:#f1cf73; font:12px/1.4 monospace; letter-spacing:3px; }
+    .boot-card h1 { margin:12px 0 20px; font-size:24px; }
+    .boot-track { height:10px; background:#263445; overflow:hidden; }
+    #bootFill { height:100%; width:0; background:#f1cf73; }
+    .boot-readout { display:flex; justify-content:space-between; margin-top:10px; font-size:14px; }
+    #bootHint { color:#a8b8c9; font-size:13px; }
+    #bootRetry { min-height:44px; padding:8px 18px; color:#fff; border:1px solid #76899a; background:#23384c; cursor:pointer; }
+  </style>
+  <link rel="stylesheet" href="./Style_Game.css?v=gravityTank11a">
 </head>
 <body>
+  <div id="bootOverlay" role="status" aria-live="polite">
+    <div class="boot-card">
+      <div class="boot-kicker">GRAVITY TANK / PREPARE</div>
+      <h1>准备出击</h1>
+      <div id="bootProgress" class="boot-track" role="progressbar" aria-label="开局准备进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="bootFill"></div></div>
+      <div class="boot-readout"><span id="bootStatus">正在读取游戏程序…</span><b id="bootPercent">0%</b></div>
+      <p id="bootHint">资源准备完成后，即可选择你的坦克涂装。</p>
+      <button id="bootRetry" type="button" hidden>重新加载</button>
+      <noscript>请启用 JavaScript 后重新加载游戏。</noscript>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const overlay = document.getElementById("bootOverlay");
+      const status = document.getElementById("bootStatus");
+      const hint = document.getElementById("bootHint");
+      const retry = document.getElementById("bootRetry");
+      let failed = false;
+      retry.addEventListener("click", () => location.reload());
+      const slowTimer = setTimeout(() => {
+        hint.textContent = "首次加载或网络较慢，请稍候；也可重新加载。";
+        retry.hidden = false;
+      }, 12000);
+      window.GravityTankLoading = {
+        Update(completed, total, detail) {
+          if (failed) return;
+          const percent = Math.round(completed / total * 100);
+          document.getElementById("bootFill").style.width = `${percent}%`;
+          document.getElementById("bootPercent").textContent = `${percent}%`;
+          document.getElementById("bootProgress").setAttribute("aria-valuenow", String(percent));
+          status.textContent = `${detail} · ${completed}/${total}`;
+        },
+        Finish() { clearTimeout(slowTimer); overlay.hidden = true; },
+        Fail(error) {
+          failed = true;
+          clearTimeout(slowTimer);
+          status.textContent = "准备未完成";
+          hint.textContent = "必要资源加载失败，请检查网络后重新加载。";
+          retry.hidden = false;
+          console.error(error);
+        },
+      };
+    })();
+  </script>
   <div id="app">
     <header class="hero">
       <div class="hero-logo">
         <img class="title-banner" id="titleBanner" src="./assets/Texture_UiTitleBanner.png" width="480" height="160" alt="GRAVITY TANK BATTLE" title="点击打开 Debug">
         <span class="title-gravity-cover" aria-hidden="true"></span>
         <span class="title-gravity-art" aria-hidden="true"></span>
-        <span class="game-version" id="gameVersion" aria-label="版本">v0.10</span>
+        <span class="game-version" id="gameVersion" aria-label="版本">v0.11</span>
       </div>
       <p class="tagline">9 个任务 · 3 幕战役 · 重力弹道与物理转轮</p>
     </header>
@@ -76,8 +127,13 @@
           <label><input type="radio" name="difficulty" value="standard"> 标准模式</label>
         </fieldset>
         <p class="diff-hint" id="difficultyHint">简易：自己的炮弹不会击中自己</p>
+        <fieldset class="paint-picker">
+          <legend>选择车体颜色</legend>
+          <div class="paint-preview"><canvas id="paintPreview" width="64" height="64" aria-label="所选坦克预览"></canvas><div><strong id="paintName">经典金</strong><small>涂装不影响属性 · 自动记住选择</small></div></div>
+          <div id="paintOptions" class="paint-options" role="group" aria-label="坦克预设颜色"></div>
+        </fieldset>
         <div class="start-actions">
-          <button id="startButton" class="primary" type="button">NEW CAMPAIGN</button>
+          <button id="startButton" class="primary" type="button" disabled>NEW CAMPAIGN</button>
           <button id="continueButton" class="primary continue-action" type="button" hidden>CONTINUE</button>
         </div>
         <p id="checkpointHint" class="checkpoint-hint" hidden></p>
@@ -204,9 +260,11 @@
         </ul>
       </div>
 
-      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.10</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
+      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.11</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
     </aside>
   </div>
-  <script type="module" src="./Script_Game.mjs?v=gravityTank010"></script>
+  <script type="module">
+    import("./Script_Game.mjs?v=gravityTank11a").catch((error) => window.GravityTankLoading.Fail(error));
+  </script>
 </body>
 </html>

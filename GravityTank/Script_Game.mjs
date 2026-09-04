@@ -28,8 +28,10 @@ import {
 } from "./Data_Upgrades.mjs";
 
 /** Player-facing build id — keep in sync with index.html `#gameVersion`. */
-export const GAME_VERSION = "0.10";
+export const GAME_VERSION = "0.11";
 export const GAME_VERSION_LABEL = `v${GAME_VERSION}`;
+
+import { playerPaints, GetPlayerPaint, ReadPlayerPaint, SavePlayerPaint } from "./Script_PlayerPaint.mjs?v=gravityTank11a";
 
 const PIXEL_FONT = '"Fusion Pixel 12", monospace';
 const TILE = 16;
@@ -94,11 +96,6 @@ const ARMOR_HP_PALETTE = {
   3: { mid: [230, 180, 40], dark: [120, 90, 10], light: [255, 240, 170], flash: [240, 240, 240] }, // yellow↔white
   2: { mid: [0, 168, 72], dark: [0, 90, 40], light: [200, 255, 220], flash: [230, 180, 40] }, // green↔yellow
   1: { mid: [200, 200, 200], dark: [70, 70, 80], light: [255, 255, 255], flash: [200, 200, 200] }, // white/gray
-};
-
-/** Fixed gold player hull; lives are the only player health counter. */
-const PLAYER_PALETTE = {
-  mid: [232, 188, 36], dark: [96, 64, 8], light: [255, 244, 170],
 };
 
 const TILE_EMPTY = 0;
@@ -617,10 +614,24 @@ function SnapToGrid(v, grid = 4) {
 function LoadImage(src) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
+    const timer = setTimeout(() => {
+      img.onload = img.onerror = null;
+      img.src = "";
+      reject(new Error(`Image timeout: ${src}`));
+    }, 12000);
+    img.onload = () => { clearTimeout(timer); resolve(img); };
+    img.onerror = () => { clearTimeout(timer); reject(new Error(`Image failed: ${src}`)); };
     img.src = src;
   });
+}
+
+async function WithTimeout(promise, ms) {
+  let timer;
+  try {
+    return await Promise.race([promise, new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("Resource timeout")), ms);
+    })]);
+  } finally { clearTimeout(timer); }
 }
 
 class AudioBus {
@@ -641,6 +652,12 @@ class AudioBus {
   }
 
   async LoadAll() {
+    if (this.loading) return this.loading;
+    this.loading = this.LoadPack();
+    return this.loading;
+  }
+
+  async LoadPack() {
     const list = {
       shoot: "assets/AudioSfx_Shoot.wav",
       brick: "assets/AudioSfx_BrickHit.wav",
@@ -659,13 +676,22 @@ class AudioBus {
     const ctx = this.Ensure();
     if (!ctx) return;
     this.EnsureGraph();
-    await Promise.all(Object.entries(list).map(async ([key, src]) => {
-      try {
-        const res = await fetch(src);
-        const buf = await res.arrayBuffer();
-        this.buffers[key] = await ctx.decodeAudioData(buf.slice(0));
-      } catch (err) {
-        console.warn("SFX load failed", key, err);
+    const pending = Object.entries(list);
+    // Limit concurrent decoding on phones; none of this gates the title or campaign.
+    await Promise.all(Array.from({ length: 3 }, async () => {
+      while (pending.length) {
+        const [key, src] = pending.shift();
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 12000);
+        try {
+          const res = await fetch(src, { signal: controller.signal });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const buf = await res.arrayBuffer();
+          this.buffers[key] = await WithTimeout(ctx.decodeAudioData(buf), 12000);
+          if (key === "bgm" && this.bgmWanted) this.StartBgm();
+        } catch (err) {
+          console.warn("SFX load failed", key, err);
+        } finally { clearTimeout(timer); }
       }
     }));
     this.ready = true;
@@ -677,7 +703,7 @@ class AudioBus {
       if (!AC) return null;
       this.ctx = new AC();
     }
-    if (this.ctx.state === "suspended") this.ctx.resume();
+    if (this.ctx.state === "suspended") this.ctx.resume().catch(() => {});
     return this.ctx;
   }
 
@@ -793,9 +819,11 @@ class AudioBus {
   StageStart() { this.Play("stage", { gain: 0.5 }); }
   StartBgm() {
     this.StopBgm();
+    this.bgmWanted = true;
     this.bgmNode = this.Play("bgm", { gain: 0.55, loop: true, bus: "bgm" });
   }
   StopBgm() {
+    this.bgmWanted = false;
     try { this.bgmNode?.src?.stop(); } catch (_) { /* already stopped */ }
     this.bgmNode = null;
   }
@@ -882,6 +910,8 @@ class Game {
 
     this.audio = new AudioBus();
     this.images = {};
+    this.playerPaint = ReadPlayerPaint();
+    this.playerTintCache = new Map();
     this.keys = new Set();
     this.touchDir = null;
     this.touchFire = false;
@@ -999,15 +1029,21 @@ class Game {
 
   async Init() {
     await this.LoadAssets();
-    await this.audio.LoadAll().catch((err) => console.warn("SFX pack load", err));
     this.SyncVersionUi();
     this.BindUi();
+    this.BindPaintPicker();
     this.state = "ready";
     this.stageCheckpoint = this.ReadStageCheckpoint();
     this.RefreshContinueUi();
     this.UpdateHud();
     this.RenderEnemyIcons();
     this.DrawBootFrame();
+    document.getElementById("startButton").disabled = false;
+    window.GravityTankLoading?.Update(7, 7, "准备完成");
+    // Let the completed progress paint before revealing the title.
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    window.GravityTankLoading?.Finish();
+    void this.LoadOptionalAssets();
     if (new URLSearchParams(location.search).has("autostart")) {
       this.StartCampaign();
     }
@@ -1198,38 +1234,83 @@ class Game {
   }
 
   async LoadAssets() {
-    const load = (src) => LoadImage(src).catch((err) => {
-      console.warn("asset miss", src, err);
-      return null;
-    });
-    // Ensure pixel CJK is ready before first canvas text (stage intro / HUD).
-    if (document.fonts?.load) {
-      await Promise.all([
-        document.fonts.load(`12px ${PIXEL_FONT}`),
-        document.fonts.load(`24px ${PIXEL_FONT}`),
-      ]).catch(() => {});
-    }
-    this.images = {
-      sheet: await load("assets/Texture_ClassicSheet.png"),
-      powerToken: await load("assets/Texture_PowerToken.png"),
-      rouletteWheel: await load("assets/Texture_UiRouletteWheel.png"),
-      rouletteNeedle: await load("assets/Texture_UiRouletteNeedle.png"),
-      powerNuke: await load("assets/Texture_PowerNuke.png"),
-      powerOverdrive: await load("assets/Texture_PowerOverdrive.png"),
-      powerApocalypse: await load("assets/Texture_PowerApocalypse.png"),
-      powerJuggernaut: await load("assets/Texture_PowerJuggernaut.png"),
-      powerSpawnExtra: await load("assets/Texture_PowerSpawnExtra.png"),
-      powerEnemyShield: await load("assets/Texture_PowerEnemyShield.png"),
-      powerHeavyCurse: await load("assets/Texture_PowerHeavyCurse.png"),
-      powerEnemyRage: await load("assets/Texture_PowerEnemyRage.png"),
-      barricadeWood: await load("assets/Texture_BarricadeWood.png"),
-      barricadeMetal: await load("assets/Texture_BarricadeMetal.png"),
-      barrelPlayer: await load("assets/Texture_BarrelPlayer.png"),
-      barrelEnemy: await load("assets/Texture_BarrelEnemy.png"),
-      barrelPower: await load("assets/Texture_BarrelPower.png"),
-      barrelPrism: await load("assets/Texture_BarrelPrism.png"),
-      muzzle: await load("assets/Texture_Muzzle.png"),
+    const core = {
+      sheet: ["Texture_ClassicSheet.png", "坦克与战场"],
+      powerToken: ["Texture_PowerToken.png", "转轮代币"],
+      barrelPlayer: ["Texture_BarrelPlayer.png", "玩家炮管"],
+      barrelEnemy: ["Texture_BarrelEnemy.png", "敌军炮管"],
+      muzzle: ["Texture_Muzzle.png", "开火效果"],
     };
+    let completed = 1;
+    window.GravityTankLoading?.Update(completed, 7, "游戏程序已就绪");
+    await Promise.all(Object.entries(core).map(async ([key, [file, label]]) => {
+      // All five are required: a failed resource leaves a visible retry, never an invisible tank.
+      this.images[key] = await LoadImage(`assets/${file}`);
+      window.GravityTankLoading?.Update(++completed, 7, label);
+    }));
+  }
+
+  async LoadOptionalAssets() {
+    // Fetch the full CJK face only once the game is usable; fallback text stays readable.
+    document.fonts?.load(`12px ${PIXEL_FONT}`, "重力 TANK").then(() => {
+      document.documentElement.classList.add("has-pixel-font");
+    }).catch(() => {});
+    const optional = {
+      rouletteWheel: "Texture_RouletteArcadeRim.webp",
+      powerNuke: "Texture_PowerNuke.png",
+      powerOverdrive: "Texture_PowerOverdrive.png",
+      powerApocalypse: "Texture_PowerApocalypse.png",
+      powerJuggernaut: "Texture_PowerJuggernaut.png",
+      powerSpawnExtra: "Texture_PowerSpawnExtra.png",
+      powerEnemyShield: "Texture_PowerEnemyShield.png",
+      powerHeavyCurse: "Texture_PowerHeavyCurse.png",
+      powerEnemyRage: "Texture_PowerEnemyRage.png",
+      barricadeWood: "Texture_BarricadeWood.png",
+      barricadeMetal: "Texture_BarricadeMetal.png",
+      barrelPower: "Texture_BarrelPower.png",
+      barrelPrism: "Texture_BarrelPrism.png",
+    };
+    await Promise.all(Object.entries(optional).map(async ([key, file]) => {
+      try { this.images[key] = await LoadImage(`assets/${file}`); }
+      catch (error) { console.warn("Optional art unavailable", file, error); }
+    }));
+  }
+
+  BindPaintPicker() {
+    const options = document.getElementById("paintOptions");
+    for (const paint of playerPaints) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "paint-option";
+      button.dataset.paint = paint.id;
+      button.setAttribute("aria-label", paint.label);
+      button.title = paint.label;
+      button.style.setProperty("--paint", paint.color);
+      button.appendChild(document.createElement("span"));
+      button.addEventListener("click", () => {
+        this.playerPaint = paint.id;
+        this.playerTintCache.clear();
+        SavePlayerPaint(paint.id);
+        this.RefreshPaintPreview();
+      });
+      options.appendChild(button);
+    }
+    this.RefreshPaintPreview();
+  }
+
+  RefreshPaintPreview() {
+    const paint = GetPlayerPaint(this.playerPaint);
+    document.getElementById("paintName").textContent = paint.label;
+    document.querySelectorAll("[data-paint]").forEach((button) => {
+      const selected = button.dataset.paint === paint.id;
+      button.setAttribute("aria-pressed", String(selected));
+      button.firstElementChild.textContent = selected ? "✓" : "";
+    });
+    const canvas = document.getElementById("paintPreview");
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    this.BlitPlayerTinted(ctx, 0, 0, 8, 8, 48, 48);
+    this.DrawTankBarrel(ctx, { x: 8, y: 8, w: 48, h: 48, dir: "up" }, true);
   }
 
   /** Draw a power icon (custom texture or classic sheet cell) centered at (cx,cy). */
@@ -1327,7 +1408,7 @@ class Game {
     this.canvas.addEventListener("pointercancel", (ev) => this.OnCanvasPointerUp(ev));
 
     window.addEventListener("keydown", (e) => {
-      if (e.target?.matches?.('input[name="difficulty"]')) return;
+      if (e.target.closest?.("button, input, select, textarea") && !["p", "escape"].includes(e.key.toLowerCase())) return;
       const k = e.key.toLowerCase();
       if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "w", "a", "s", "d", "j", "k"].includes(k) || e.code === "Space") {
         e.preventDefault();
@@ -2306,6 +2387,7 @@ class Game {
     saveCheckpoint = true,
   } = {}) {
     const prevStageKey = this.isTutorial ? 0 : this.stage;
+    void this.audio.LoadAll().catch((error) => console.warn("Audio unavailable", error));
     this.ApplyStageMeta(stage);
     this.SetGravityDirection("down");
     const newStageKey = this.isTutorial ? 0 : this.stage;
@@ -5751,9 +5833,9 @@ class Game {
       resultT: 0,
       segments,
       // Leave room on the right for the pinball-style pull arc.
-      cx: CANVAS_W / 2 - (touch ? 22 : 28),
-      cy: CANVAS_H / 2 + (touch ? 40 : 28),
-      radius: touch ? 148 : 120,
+      cx: 182,
+      cy: 222,
+      radius: touch ? 124 : 120,
     };
     this.SyncTouchControlsVisibility();
     const nBad = segments.filter((s) => s.tier === "bad").length;
@@ -5781,7 +5863,7 @@ class Game {
   RoulettePlungerGeom(r = this.roulette) {
     if (!r) return null;
     const touch = this.isTouchDevice;
-    const arcR = r.radius * (touch ? 1.08 : 1.12);
+    const arcR = r.radius * 1.25;
     const arcCx = r.cx + r.radius * 0.22;
     const arcCy = r.cy;
     const ang0 = -0.95; // rest (upper-right)
@@ -7529,19 +7611,29 @@ class Game {
   }
 
   /**
-   * Keep the player hull gold. Power tier still picks the sprite sheet row.
+   * Remap the hull into the chosen paint. Cache each tiny
+   * sprite once so the render loop avoids getImageData/readback on every frame.
    */
   BlitPlayerTinted(ctx, gx, gy, dx, dy, dw, dh) {
     const sheet = this.images.sheet;
     if (!sheet) return;
     const sw = 2 * SHEET_CELL;
     const sh = 2 * SHEET_CELL;
-    const { tc, tctx } = this.EnsureTintScratch(sw, sh);
+    const cacheKey = `${this.playerPaint}:${gx}:${gy}`;
+    const cached = this.playerTintCache.get(cacheKey);
+    if (cached) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(cached, dx, dy, dw, dh);
+      return;
+    }
+    const tc = document.createElement("canvas");
+    tc.width = sw; tc.height = sh;
+    const tctx = tc.getContext("2d", { willReadFrequently: true });
     tctx.clearRect(0, 0, sw, sh);
     tctx.drawImage(sheet, gx * SHEET_CELL, gy * SHEET_CELL, sw, sh, 0, 0, sw, sh);
     const img = tctx.getImageData(0, 0, sw, sh);
     const data = img.data;
-    const pal = PLAYER_PALETTE;
+    const pal = GetPlayerPaint(this.playerPaint);
     const useMid = pal.mid;
     const useDark = pal.dark;
     const useLight = pal.light;
@@ -7566,6 +7658,7 @@ class Game {
       }
     }
     tctx.putImageData(img, 0, 0);
+    this.playerTintCache.set(cacheKey, tc);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(tc, 0, 0, sw, sh, dx, dy, dw, dh);
   }
@@ -8119,30 +8212,29 @@ class Game {
     const under = segs[needleIdx] || segs[0];
     const focus = r.result || under;
     const wheelImg = this.images.rouletteWheel;
-    const needle = this.images.rouletteNeedle;
     const rad = r.radius;
-    const bannerH = touch ? 44 : 28;
-    const bannerY = touch ? 8 : 10;
-    const labelPx = touch ? 18 : 14;
-    const bannerPx = touch ? 18 : 13;
-    const hintPx = touch ? 14 : 11;
-    const legendPx = touch ? 13 : 10;
-    const hubR = touch ? 22 : 16;
-    const hubPx = touch ? 15 : 11;
+    const bannerH = 46;
+    const bannerY = 10;
+    const labelPx = touch ? 15 : 14;
+    const bannerPx = 17;
+    const hintPx = 12;
+    const legendPx = 11;
+    const hubR = 23;
+    const hubPx = 13;
     const ox = 0;
     const oy = motion.offsetY;
     const sc = motion.scale;
     const alpha = motion.alpha;
 
     const muted = (tier, focusSeg) => {
-      if (tier === "good") return focusSeg ? "rgba(48,140,88,0.97)" : "rgba(28,88,52,0.94)";
-      if (tier === "ultra") return focusSeg ? "rgba(188,148,40,0.97)" : "rgba(120,88,24,0.94)";
-      return focusSeg ? "rgba(168,56,56,0.97)" : "rgba(112,36,36,0.94)";
+      if (tier === "good") return focusSeg ? "#388b69" : "#204c41";
+      if (tier === "ultra") return focusSeg ? "#ba8d34" : "#6d5126";
+      return focusSeg ? "#b55358" : "#672e3b";
     };
 
     ctx.imageSmoothingEnabled = false;
     ctx.save();
-    ctx.fillStyle = `rgba(0,0,0,${Clamp(motion.dim, 0, 0.85)})`;
+    ctx.fillStyle = `rgba(0,0,0,${Clamp(motion.dim * 1.35, 0, 0.92)})`;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
     ctx.restore();
 
@@ -8163,29 +8255,31 @@ class Game {
     ctx.font = `${bannerPx}px ${PIXEL_FONT}`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    const tag = focus.tier === "ultra" ? "超 " : focus.tier === "bad" ? "负 " : "好 ";
-    ctx.fillText(`${tag}${focus.label}`, iconCx + iconSize / 2 + 10, iconCy);
+    const tag = focus.tier === "ultra" ? "强力" : focus.tier === "bad" ? "风险" : "增益";
+    ctx.fillText(`${r.result ? "获得" : "重力转轮"} · ${focus.label}`, iconCx + iconSize / 2 + 10, iconCy - 7);
+    ctx.font = `10px ${PIXEL_FONT}`;
+    ctx.fillStyle = "#c3cfda";
+    ctx.fillText(`${tag} / 4 增益 · 2 强力 · 1 风险`, iconCx + iconSize / 2 + 10, iconCy + 11);
     ctx.textBaseline = "alphabetic";
 
     ctx.save();
     ctx.translate(r.cx + ox, r.cy + oy);
     ctx.scale(sc, sc);
 
-    // Soft shadow only
+    // Machined housing behind the moving prize disk.
     ctx.beginPath();
-    ctx.arc(2, 3, rad + 2, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.arc(0, 5, rad + 24, 0, Math.PI * 2);
+    ctx.fillStyle = "#030609";
     ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, 0, rad + 19, 0, Math.PI * 2);
+    ctx.fillStyle = "#22323c";
+    ctx.fill();
+    ctx.strokeStyle = "#c7a76d";
+    ctx.lineWidth = 3;
+    ctx.stroke();
 
     ctx.rotate(r.angle);
-
-    // Rim texture underlay (aligned 10-slice bake); segment fills overwrite colors to match prizes.
-    if (wheelImg) {
-      const diam = rad * 2 + 10;
-      ctx.globalAlpha = alpha * 0.35;
-      ctx.drawImage(wheelImg, -diam / 2, -diam / 2, diam, diam);
-      ctx.globalAlpha = alpha;
-    }
 
     // Source-of-truth wedges from live segments — always match needle + labels.
     for (let i = 0; i < n; i++) {
@@ -8198,8 +8292,14 @@ class Game {
       ctx.closePath();
       ctx.fillStyle = muted(seg.tier, i === needleIdx);
       ctx.fill();
-      ctx.strokeStyle = "rgba(12,12,16,0.7)";
-      ctx.lineWidth = 1;
+      const sheen = ctx.createRadialGradient(0, 0, 24, 0, 0, rad);
+      sheen.addColorStop(0, "#ffffff20");
+      sheen.addColorStop(0.6, "#ffffff00");
+      sheen.addColorStop(1, "#00000060");
+      ctx.fillStyle = sheen;
+      ctx.fill();
+      ctx.strokeStyle = "#d7c6a255";
+      ctx.lineWidth = 2;
       ctx.stroke();
     }
 
@@ -8220,97 +8320,107 @@ class Game {
       const seg = segs[i];
       const mid = i * slice + slice * 0.5;
       const isFocus = i === needleIdx;
-      const dist = rad * (touch ? 0.62 : 0.64);
+      const dist = rad * 0.63;
       const lx = Math.cos(mid) * dist;
       const ly = Math.sin(mid) * dist;
       ctx.save();
       ctx.translate(lx, ly);
       // Cancel wheel rotation so glyph baselines stay horizontal on screen.
       ctx.rotate(-r.angle);
+      this.DrawPowerIcon(ctx, seg.kind, 0, -17, 19);
       ctx.font = `bold ${labelPx}px ${PIXEL_FONT}`;
       const textW = ctx.measureText(seg.label).width;
-      const padX = touch ? 8 : 6;
+      const padX = 4;
       const tw = Math.max(touch ? 44 : 32, textW + padX * 2);
-      const th = touch ? 24 : 18;
-      ctx.fillStyle = isFocus ? "rgba(0,0,0,0.92)" : "rgba(0,0,0,0.84)";
-      ctx.fillRect(-tw / 2, -th / 2, tw, th);
-      ctx.strokeStyle = isFocus ? (seg.rim || seg.color) : "rgba(255,255,255,0.35)";
+      const th = 21;
+      ctx.fillStyle = isFocus ? "#091219" : "#0a131bbd";
+      ctx.fillRect(-tw / 2, -th / 2 + 5, tw, th);
+      ctx.strokeStyle = isFocus ? (seg.rim || seg.color) : "#d7c6a233";
       ctx.lineWidth = isFocus ? 2 : 1;
-      ctx.strokeRect(-tw / 2 + 0.5, -th / 2 + 0.5, tw - 1, th - 1);
+      ctx.strokeRect(-tw / 2 + 0.5, -th / 2 + 5.5, tw - 1, th - 1);
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       // Hard black outline then bright fill — readable on green/gold/red wedges.
       ctx.lineWidth = touch ? 4 : 3;
       ctx.strokeStyle = "#000";
       ctx.lineJoin = "round";
-      ctx.strokeText(seg.label, 0, 1);
+      ctx.strokeText(seg.label, 0, 6);
       ctx.fillStyle = isFocus ? "#fff8d0" : "#ffffff";
-      ctx.fillText(seg.label, 0, 1);
+      ctx.fillText(seg.label, 0, 6);
       ctx.restore();
     }
 
     // Hub
+    ctx.rotate(-r.angle);
     ctx.beginPath();
     ctx.arc(0, 0, hubR, 0, Math.PI * 2);
-    ctx.fillStyle = "#141820";
+    const hubMetal = ctx.createLinearGradient(-hubR, -hubR, hubR, hubR);
+    hubMetal.addColorStop(0, "#657c86");
+    hubMetal.addColorStop(0.5, "#233540");
+    hubMetal.addColorStop(1, "#101a22");
+    ctx.fillStyle = hubMetal;
     ctx.fill();
-    ctx.strokeStyle = focus.rim || "#a09050";
+    ctx.strokeStyle = "#e0bb75";
     ctx.lineWidth = touch ? 3 : 2;
     ctx.stroke();
     ctx.fillStyle = focus.color;
     ctx.font = `${hubPx}px ${PIXEL_FONT}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(focus.tier === "bad" ? "负" : focus.tier === "ultra" ? "超" : "好", 0, 1);
+    ctx.fillText(r.result ? "★" : "?", 0, 1);
+
+    // Imagegen housing: clip the generated ring so no baked pixels can cover live prizes.
+    if (wheelImg) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, 0, rad + 24, 0, Math.PI * 2);
+      ctx.arc(0, 0, rad - 12, 0, Math.PI * 2, true);
+      ctx.clip("evenodd");
+      const diameter = (rad + 23) * 2;
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(wheelImg, -diameter / 2, -diameter / 2, diameter, diameter);
+      ctx.restore();
+    }
     ctx.restore();
 
     // Slim needle — tip lands on rim at top (follow wheel transform).
     const needleCx = r.cx + ox;
     const needleCy = r.cy + oy;
     const ny = needleCy - rad * sc;
-    const needleW = (touch ? 28 : 20) * sc;
-    const needleH = (touch ? 40 : 32) * sc;
-    if (needle) {
-      ctx.drawImage(needle, needleCx - needleW / 2, ny - needleH + 4 * sc, needleW, needleH);
-    } else {
-      ctx.fillStyle = "#e0c060";
-      ctx.beginPath();
-      ctx.moveTo(needleCx, ny + 2 * sc);
-      ctx.lineTo(needleCx - 7 * sc, ny - 16 * sc);
-      ctx.lineTo(needleCx + 7 * sc, ny - 16 * sc);
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    ctx.strokeStyle = "rgba(160,168,176,0.45)";
-    ctx.lineWidth = 2;
+    ctx.fillStyle = "#fff0b0";
+    ctx.strokeStyle = "#382714";
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(needleCx, needleCy, rad * sc + 3, 0, Math.PI * 2);
+    ctx.moveTo(needleCx, ny + 10 * sc);
+    ctx.lineTo(needleCx - 11 * sc, ny - 23 * sc);
+    ctx.lineTo(needleCx + 11 * sc, ny - 23 * sc);
+    ctx.closePath();
+    ctx.fill();
     ctx.stroke();
 
     this.DrawRoulettePlunger(ctx, r, motion);
 
     if (r.phase === "spin" || r.phase === "enter") {
-      const footY = CANVAS_H - (touch ? 28 : 18);
-      const legendY = CANVAS_H - (touch ? 10 : 6);
+      const footY = 388;
+      const legendY = 406;
       ctx.fillStyle = "#a8b0b8";
       ctx.font = `${hintPx}px ${PIXEL_FONT}`;
       ctx.textAlign = "center";
       let hint = "转轮就位…";
       if (r.phase === "spin") {
         if (Math.abs(r.omega) > ROULETTE_STOP) hint = "减速中…";
-        else if (r.pulling || r.pull > 0.05) hint = "松手发射！";
-        else hint = "右边下拉蓄力 · 松手转 / 空格";
+        else if (r.pulling || r.pull > 0.05) hint = `蓄力 ${Math.round(r.pull * 100)}% · 松手发射！`;
+        else hint = touch ? "向下拉动右侧手柄 · 松手转动" : "下拉右侧手柄 / 按空格转动";
       }
       ctx.fillText(hint, r.cx, footY);
       ctx.textAlign = "left";
       ctx.font = `${legendPx}px ${PIXEL_FONT}`;
       ctx.fillStyle = TIER_PALETTE.good.color;
-      ctx.fillText("绿=好", 16, legendY);
+      ctx.fillText("绿 增益", 45, legendY);
       ctx.fillStyle = TIER_PALETTE.ultra.color;
-      ctx.fillText("金=超", touch ? 90 : 70, legendY);
+      ctx.fillText("金 强力", 150, legendY);
       ctx.fillStyle = TIER_PALETTE.bad.color;
-      ctx.fillText("红=负", touch ? 170 : 120, legendY);
+      ctx.fillText("红 风险", 255, legendY);
     }
     ctx.restore();
   }
@@ -8797,7 +8907,5 @@ class Game {
 
 const game = new Game();
 game.Init().catch((err) => {
-  console.error(err);
-  document.getElementById("startOverlay").querySelector("p").textContent =
-    "资源加载失败，请检查 assets 目录。";
+  window.GravityTankLoading?.Fail(err);
 });

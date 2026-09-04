@@ -39,6 +39,9 @@ Bump constant + visible `vX.Y` text **together** when cutting a player-facing ve
 | `index.html` | Shell UI, RULE copy, logo/version, easy/standard mode selector, cache-bust `?v=` |
 | `Style_Game.css` | Layout, RULE list, logo badge, touch HUD, overlays |
 | `Script_Game.mjs` | Runtime loop, tanks, bullets, roulette, bosses, FX, HUD |
+| `Script_PlayerPaint.mjs` | Six cosmetic paints and saved preference |
+| `Script_LaunchSmokeTest.mjs` | Browser checks for loading, paints and mouse/touch roulette |
+| `Data_LaunchAudit.md` | v0.11 startup findings, art prompt and local validation |
 | `Data_Stages.mjs` | Stage maps, enemy counts, barricade teach, HQ flip helpers |
 | `Data_Upgrades.mjs` | Upgrade card pools + recommend flags |
 | `Script_GenerateUpgradeArt.mjs` | Offline icon generator (not loaded by the game page) |
@@ -67,7 +70,14 @@ Bump constant + visible `vX.Y` text **together** when cutting a player-facing ve
 
 The title screen defaults to **简易模式**: player shells pass through the player and their carried shield without consuming armor, including shells left over from an earlier life. **标准模式** retains armed-shell self-hits; its `noSelfHit` upgrade remains available. Easy mode excludes this redundant upgrade from card offers. Enemy fire and HQ damage are unchanged.
 
-Player hulls keep the fixed gold `PLAYER_PALETTE` via `BlitPlayerTinted`. There are no hull HP pips, HP-based colors, or separate player HP counter. Desktop and mobile LIFE show only the remaining life count. Power tier still picks the sprite row via `TankSheetOrigin`; enemy armor HP rendering remains separate.
+Player hulls use one of six cosmetic paints (gold, pink, blue, green, purple, white)
+via `GetPlayerPaint` / `BlitPlayerTinted`. The title picker previews the actual sprite
+and stores `gravitytank_player_paint_v1` independently of checkpoints. Missing or
+invalid preferences default to gold. Tint frames are cached by paint/frame. There
+are no hull HP pips, HP-based colors, or separate player HP counter. Desktop and
+mobile LIFE show only the remaining life count. Power tier still picks the sprite
+row via `TankSheetOrigin`; enemy armor HP rendering remains separate. Paint never
+changes stats, enemy colors, modes, checkpoint progression or award probabilities.
 
 `SetDifficulty` / `SyncStageLabels` keep the selector and mode explanation aligned. A checkpoint records `difficulty`; retry/CONTINUE restore it. Older saves without a mode use easy and discard old player HP. The campaign starts at mission 1; the old tutorial remains legacy/debug-only. There is no free first-death revive.
 
@@ -100,6 +110,16 @@ Pool: `ROULETTE_POOL` via `MakeSeg(kind, label, tier)`. Tier colors: green=good 
 Other labels should stay short plain Chinese (what it does). `fortress` display is **加钢墙** (not a misleading「铁壁」that reads like HQ door break).
 
 Spin UX: right-side **pinball pull-arc** (`RouletteReleasePlunger`) — not wheel-drag. Flow: fly-in → spin → resolve → fly-out → fullscreen FX when applicable (`OpenRoulette`, `ResolveRoulette`, `ApplyPowerup`, `POWER_FX`, `DrawRoulette`).
+
+v0.11 uses `Texture_RouletteArcadeRim.webp` (built-in imagegen) for the fixed metal housing. Live wedges, labels, icons and the pointer stay procedural and use the real seven-choice pool. The housing is optional background art; absent art must not prevent play.
+
+## Startup contract
+
+- Inline `GravityTankLoading` UI paints before the game module, with actual completed tasks (program + five core images + battlefield = 7), slow-network hint and retry.
+- `LoadAssets` downloads the five core images in parallel. Required asset/module failure keeps the loader visible and NEW CAMPAIGN disabled; image timeout is 12 seconds.
+- Fonts use one local Fusion Pixel face with `font-display: swap`; never await fonts or external font CSS on the critical path.
+- `LoadOptionalAssets` starts after the title is usable. Audio starts on the campaign user gesture, runs at most three fetch/decode workers, and never gates play. `bgmWanted` ensures late music starts only if it is still wanted, including pause/resume.
+- Run local preview, then `node GravityTank/Script_LaunchSmokeTest.mjs http://127.0.0.1:8080/GravityTank/` (playwright-core + Edge, or `GRAVITY_TANK_BROWSER=chrome`). Screenshots go to ignored `tmp/GravityTankQa/`.
 
 Drop contract: at most **2 roulette tokens per mission**, mission 1 guarantees one carrier, and every seven-wedge wheel contains exactly **4 green + 2 gold + 1 red** choices. Boss-safe filtering may change prize identities, never the tier counts.
 

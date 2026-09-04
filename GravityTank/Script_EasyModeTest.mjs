@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import * as stages from './Data_Stages.mjs';
 import * as upgrades from './Data_Upgrades.mjs';
+import * as paints from './Script_PlayerPaint.mjs';
 
 // Exercise the actual game class without loading assets or starting its animation loop.
 const source = fs.readFileSync(new URL('./Script_Game.mjs', import.meta.url), 'utf8')
@@ -17,7 +18,7 @@ function GetNode(id) {
   return nodes.get(id);
 }
 const sandbox = {
-  ...stages, ...upgrades, console, URLSearchParams,
+  ...stages, ...upgrades, ...paints, console, URLSearchParams,
   document: { getElementById: GetNode, querySelectorAll: () => radios },
   localStorage: {
     getItem: (key) => storage.get(key) ?? null,
