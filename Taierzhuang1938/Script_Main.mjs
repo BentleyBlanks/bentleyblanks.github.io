@@ -1686,7 +1686,7 @@ async function Boot() {
       Throw: (kind, power) => {
         state.cooking = kind; state.cook = (power ?? 0.8) * 1.1; ReleaseCook();
       },
-      Fire: () => { input.fire = true; fireEdge = true; TryFire(1); input.fire = false; fireEdge = false; },
+      Fire: () => { input.fire = true; fireEdge = true; TryFire(1, combat.Returning); input.fire = false; fireEdge = false; },
       // 键位路由：合成一次键盘事件走完整条链路（KEYMAP -> 上下文 -> OnAction），
       // 不许直接调 SwitchSlot —— 那样测的是函数，不是键位表。
       // 不给 down 就是"点按"：按下**并且松开**。
@@ -5485,9 +5485,9 @@ function ConfirmHit(died) {
   if (DIFFICULTY.hitMarker !== false) hud.Hitmark(died ? "kill" : "hit");
 }
 
-function TryFire(dt) {
+function TryFire(dt, returningGrenade = false) {
   fireCooldown -= dt;
-  if (combat.Returning) return;
+  if (returningGrenade) return;
   if (p012Runtime?.binocularOwned) return;
   // 架着机枪：左键交给机枪那条射速与过热闸（Script_Emplacement.Update 里排），
   // 步枪链整条短路 —— 手上那支枪这会儿背在背上。
@@ -6079,7 +6079,7 @@ function Frame(dt, render = true) {
     profiler.E("hud");
   }
 
-  if (player.Alive) TryFire(dt);
+  if (player.Alive) TryFire(dt, combat.Returning);
   // 松开左键时把攥着的手榴弹扔出去（投掷物槽里左键 = G 键的等价物）
   if (state.activeSlot === "throwable" && state.cooking && !input.fire) ReleaseCook();
   // 白刃蓄力步进。鼠标那条的"松手"在这里判（键盘那条走 OnAction 的 up 边沿）；
