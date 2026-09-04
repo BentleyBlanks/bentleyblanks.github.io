@@ -116,7 +116,9 @@ export class FirstLevelP012StageZero {
   Snapshot() {
     const village=this.village.Snapshot();
     village.workerPoses=[...this.people].filter(entry=>entry.role==="worker").map(entry=>({id:entry.id,position:{x:entry.position.x,z:entry.position.z},pose:entry.workPose?.Snapshot()||null}));
-    return {arrival:{...this.arrival.Snapshot(),...this.arrival.View()},village};
+    const approach={visible:!!this.approachReferences?.visible,offset:this.approachOffset,
+      references:(this.approachReferences?.children||[]).map(object=>({x:object.position.x,y:object.position.y,z:object.position.z}))};
+    return {arrival:{...this.arrival.Snapshot(),...this.arrival.View()},approach,village};
   }
   RestoreArrival(snapshot) {
     const view=this.arrival.Restore(snapshot);

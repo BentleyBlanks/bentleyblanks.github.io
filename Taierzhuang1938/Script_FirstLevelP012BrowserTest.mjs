@@ -1951,6 +1951,7 @@ try {
         const snapshot=game.Debug.P012Scene()?.stageZero;if(!snapshot)continue;
         const arrival=snapshot.arrival,village=snapshot.village,speech=game.story.p012PendingCompletion;
         const ids=[];
+        if(arrival.phase==="braking"&&arrival.referenceTravelM>50&&snapshot.approach?.visible)ids.push("ArrivalApproach");
         if(arrival.phase==="door"&&arrival.doorProgress>.3)ids.push("ArrivalDoor");
         if(arrival.fade>.7)ids.push("ArrivalTitle");
         for(const item of village.vignettes.filter(item=>item.visible)) {
@@ -2063,7 +2064,7 @@ try {
   if (openingGuidanceReview) await VerifyOpeningDiscovery();
   if (stationReview || openingCausalityReview || orientationReview || process.argv.includes("--prelude") || process.argv.includes("--pacing") || process.argv.includes("--frontline") || process.argv.includes("--campaign")) await PlayPrelude();
   if(process.argv.includes("--stage-zero-review")){
-    const captures=await page.evaluate(()=>window.p012StageZeroCaptures||[]),required=["ArrivalDoor","ArrivalTitle","WaitingWounded","DoorLowering","Telephone","MuleAmmo","FamilyCart","p012_text_HubRail","p012_text_HubFront","p012_text_HubVillage","p012_text_HubSouth"];
+    const captures=await page.evaluate(()=>window.p012StageZeroCaptures||[]),required=["ArrivalApproach","ArrivalDoor","ArrivalTitle","WaitingWounded","DoorLowering","Telephone","MuleAmmo","FamilyCart","p012_text_HubRail","p012_text_HubFront","p012_text_HubVillage","p012_text_HubSouth"];
     Check(required.every(id=>captures.includes(id)),"普通跟队实跑依次看见到站、村路生活与四向口头交代",JSON.stringify(captures));
   }
   if (process.argv.includes("--frontline") || process.argv.includes("--campaign") || process.argv.includes("--pacing")) await PlayFrontline();
