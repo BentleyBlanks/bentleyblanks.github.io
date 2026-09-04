@@ -15,7 +15,10 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on("pageerror", (error) => errors.push(String(error)));
 page.on("console", (message) => {
-  if (message.type() === "error") errors.push(message.text());
+  if (message.type() === "error") {
+    const sourceUrl = message.location()?.url;
+    errors.push(`${message.text()}${sourceUrl ? ` @ ${sourceUrl}` : ""}`);
+  }
 });
 
 const results = [];

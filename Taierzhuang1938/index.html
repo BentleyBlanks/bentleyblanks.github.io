@@ -244,13 +244,29 @@
       }
     }
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- Google Fonts 走异步换装（media=print 先不参与渲染，到货再换 all）：
        它是唯一的外网样式表，同步写法会在它挂住时把首屏和内联脚本一起卡死；
-       异步写法下先用后备字体开机，字体到了自然换上（display=swap 本来就是这个观感）。 -->
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap"
-        media="print" onload="this.media='all'">
+       异步写法下先用后备字体开机，字体到了自然换上（display=swap 本来就是这个观感）。
+       本地预览与浏览器门禁不访问外网，避免把字体网络策略误报成游戏脚本错误。 -->
+  <script>
+    if (!/^(?:localhost|127(?:\.\d+){3})$/i.test(location.hostname)) {
+      const fontPreconnect = document.createElement("link");
+      fontPreconnect.rel = "preconnect";
+      fontPreconnect.href = "https://fonts.googleapis.com";
+      document.head.appendChild(fontPreconnect);
+      const fontAssetPreconnect = document.createElement("link");
+      fontAssetPreconnect.rel = "preconnect";
+      fontAssetPreconnect.href = "https://fonts.gstatic.com";
+      fontAssetPreconnect.crossOrigin = "anonymous";
+      document.head.appendChild(fontAssetPreconnect);
+      const fontStylesheet = document.createElement("link");
+      fontStylesheet.rel = "stylesheet";
+      fontStylesheet.href = "https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap";
+      fontStylesheet.media = "print";
+      fontStylesheet.addEventListener("load", () => { fontStylesheet.media = "all"; }, { once: true });
+      document.head.appendChild(fontStylesheet);
+    }
+  </script>
   <link rel="stylesheet" href="./Style_Game.css?v=25">
   <!-- 主菜单与选章。颜色与字距沿用 Style_Game.css 的 :root，所以必须排在它后面。 -->
   <link rel="stylesheet" href="./Style_Menu.css?v=7">
