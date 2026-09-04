@@ -1078,7 +1078,7 @@ const BUILDERS = {
 const MODEL_FP = new Set([
   "Dadao",
   "ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96", "ServicePistol",
-  "Type11", "WaltherP38", "Karabiner98k", "UnidentifiedBoltActionRifle",
+  "Type11", "Type92Hmg", "WaltherP38", "Karabiner98k", "UnidentifiedBoltActionRifle",
   "OfficerSwordSet", "RingPommelDagger", "UnidentifiedAntiaircraftGun",
 ]);
 
@@ -1095,6 +1095,86 @@ const VM_MATERIAL_BY_MESH = {
   lqType11BodyAlt: "lqType11BodyAlt", lqType11Fore: "lqType11Fore", lqMauser96: "lqMauser96",
   lqMediumMortar: "lqMediumMortar", lqKarabiner98k: "lqKarabiner98k", lqWeaponPlain: "lqWeaponPlain",
 };
+
+// Physical iron sight repairs for source meshes whose authored mount sits above
+// the actual front blade. Each post extends from its existing metal base; the
+// rear has a real open notch. Both share one horizontal sight plane, so aiming
+// does not depend on a HUD dot or a made-up invisible mount.
+const IRON_SIGHT_REPAIRS = {
+  ZhongZheng: { x: 0, y: 0.072, frontZ: -0.8355, frontBase: 0.048, rearZ: -0.2804, rearBase: 0.048 },
+  HanYang: { x: 0, y: 0.072, frontZ: -0.9603, frontBase: 0.049, rearZ: -0.3506, rearBase: 0.057 },
+  Type38: { x: 0, y: 0.070, frontZ: -0.9882, frontBase: 0.052, rearZ: -0.310, rearBase: 0.050 },
+  Zb26: { x: -0.0234, y: 0.095, frontZ: -0.7616, frontBase: 0.060, rearZ: -0.205, rearBase: 0.061 },
+  Mauser96: { x: 0, y: 0.055, frontZ: -0.2274, frontBase: 0.038, rearZ: -0.0415, rearBase: 0.043 },
+  ServicePistol: { replaceBlade: true, x: 0, y: 0.084, frontZ: -0.136, frontBase: 0.070, rearZ: 0.022, rearBase: 0.065 },
+  WaltherP38: { x: 0, y: 0.055, frontZ: -0.161, frontBase: 0.037, rearZ: 0.021, rearBase: 0.037 },
+  Karabiner98k: { x: 0, y: 0.074, frontZ: -0.8321, frontBase: 0.050, sourceCeiling: 0.060, rearZ: -0.270, rearBase: 0.049 },
+  UnidentifiedBoltActionRifle: { x: 0, y: 0.074, frontZ: -0.840, frontBase: 0.046, rearZ: -0.260, rearBase: 0.036 },
+  Type11: { x: 0.00145, y: 0.157, frontZ: -0.7426, frontBase: 0.102, rearZ: -0.2022, rearBase: 0.129 },
+  Type92Hmg: { replaceBlade: true, x: 0, y: 0.104, frontZ: -0.5901, frontBase: 0.076, rearZ: -0.1718, rearBase: 0.080 },
+};
+
+function RepairIronSights(group, materials, key, sight) {
+  const spec = IRON_SIGHT_REPAIRS[key];
+  if (!spec || !sight) return null;
+  const width = key === "Type11" ? 0.004 : 0.003;
+  const AddPart = (name, x, y, z, sx, sy, sz) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), materials.steel);
+    mesh.name = `VmIronSight_${name}`;
+    mesh.position.set(x, y, z);
+    group.add(mesh);
+    return mesh;
+  };
+  const sourceFront = [];
+  let sourceTop = -Infinity;
+  group.traverse((mesh) => {
+    if (!mesh.isMesh || !mesh.geometry?.attributes.position) return;
+    const pos = mesh.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i += 1) {
+      if (Math.abs(pos.getX(i) - spec.x) <= 0.004
+        && Math.abs(pos.getZ(i) - spec.frontZ) <= 0.016
+        && pos.getY(i) > spec.frontBase && pos.getY(i) < (spec.sourceCeiling || Infinity)) {
+        sourceTop = Math.max(sourceTop, pos.getY(i));
+        sourceFront.push({ mesh, index: i });
+      }
+    }
+  });
+  const frontMeshes = new Set();
+  const topXs = sourceFront.filter(({ mesh, index }) => mesh.geometry.attributes.position.getY(index) >= sourceTop - 0.00005)
+    .map(({ mesh, index }) => mesh.geometry.attributes.position.getX(index));
+  const bladeCenter = topXs.length ? (Math.min(...topXs) + Math.max(...topXs)) / 2 : spec.x;
+  if (!spec.replaceBlade && sourceFront.length && sourceTop > spec.frontBase + 0.001) {
+    // Stretch only the authored blade above its metal foot. Private geometry
+    // keeps third-person instances and their shared loader cache untouched.
+    for (const { mesh, index } of sourceFront) {
+      if (!frontMeshes.has(mesh)) { mesh.geometry = mesh.geometry.clone(); frontMeshes.add(mesh); }
+      const pos = mesh.geometry.attributes.position;
+      const heightFraction = pos.getY(index) >= sourceTop - 0.00005 ? 1
+        : (pos.getY(index) - spec.frontBase) / (sourceTop - spec.frontBase);
+      pos.setX(index, pos.getX(index) + (spec.x - bladeCenter) * heightFraction);
+      pos.setY(index, spec.frontBase + heightFraction * (spec.y - spec.frontBase));
+      pos.needsUpdate = true;
+    }
+    for (const mesh of frontMeshes) { mesh.geometry.computeVertexNormals(); mesh.geometry.computeBoundingBox(); mesh.geometry.computeBoundingSphere(); }
+  } else {
+    // ServicePistol / Type92 have no solid central blade in the imported
+    // sight crown. Complete that missing surface with a post on its metal foot.
+    frontMeshes.add(AddPart("FrontBlade", spec.x, (spec.y + spec.frontBase) / 2, spec.frontZ,
+      width, spec.y - spec.frontBase, 0.004));
+  }
+  const front = [...frontMeshes];
+  // A narrow notch lets the front blade and daylight on both sides remain visible.
+  const gap = 0.0045;
+  const rearWidth = 0.005;
+  const rear = [-1, 1].map((side) => AddPart(side < 0 ? "RearLeft" : "RearRight",
+    spec.x + side * (gap + rearWidth) / 2, (spec.y + spec.rearBase) / 2,
+    spec.rearZ, rearWidth, spec.y - spec.rearBase, 0.005));
+  const notchDepth = 0.003;
+  AddPart("RearBase", spec.x, (spec.rearBase + spec.y - notchDepth) / 2, spec.rearZ,
+    gap + rearWidth * 2, spec.y - spec.rearBase - notchDepth, 0.009);
+  sight.set(spec.x, spec.y, sight.z);
+  return { front, rear, frontRegion: { x: spec.x, z: spec.frontZ, base: spec.frontBase } };
+}
 
 /**
  * 拿一个 TZM 文档搭第一人称的 rig。契约与 BuildBoltRifle 那几个完全一致，
@@ -1137,6 +1217,64 @@ function BuildFromModel(materials, weapon, key, doc) {
   const gripR = Mount("gripR", new THREE.Vector3());
   const gripL = Mount("gripL", gripR.clone());
   const sight = Mount("sight", null);
+  if (key === "UnidentifiedBoltActionRifle") {
+    // The imported MA1 stock is 27 mm left of the bore, and a disconnected
+    // 747-triangle exhibition lever/knob survives the source object's assembled-state filter.
+    // Repair only this private first-person geometry; retain the real bolt,
+    // trigger, barrel and stock instead of masking the assembled gun.
+    built.root.traverse((mesh) => {
+      if (!mesh.isMesh || !mesh.geometry?.attributes.position) return;
+      mesh.geometry = mesh.geometry.clone();
+      if (mesh.name.includes("lqUnidentifiedBoltActionRifle")) {
+        mesh.geometry.translate(0.027055, 0, 0);
+      } else {
+        const pos = mesh.geometry.attributes.position;
+        const index = mesh.geometry.index;
+        const retained = [];
+        for (let i = 0; i < index.count; i += 3) {
+          const tri = [index.getX(i), index.getX(i + 1), index.getX(i + 2)];
+          // Quantized-coordinate edge analysis finds the whole display assembly
+          // in three connected islands, all wholly left of x=-24 mm.  The real
+          // receiver, bolt body and sights cross that boundary or remain centred.
+          const exhibitionLever = tri.every((v) => pos.getX(v) < -0.024);
+          if (!exhibitionLever) retained.push(...tri);
+        }
+        mesh.geometry.setIndex(retained);
+      }
+      mesh.geometry.computeBoundingBox();
+      mesh.geometry.computeBoundingSphere();
+    });
+  }
+  if (key === "Type11") {
+    // Imported source was offset from its grip/bore mounts: measure the muzzle
+    // ring centre, then move only the private mesh geometry back onto that frame.
+    built.root.traverse((mesh) => {
+      if (!mesh.isMesh || !mesh.geometry) return;
+      mesh.geometry = mesh.geometry.clone();
+      mesh.geometry.translate(-0.06315, -0.146, 0);
+    });
+  }
+  if (key === "Type92Hmg") {
+    // Lower the upright range ladder to its folded battle-sight position.
+    built.root.traverse((mesh) => {
+      if (!mesh.isMesh || !mesh.geometry?.attributes.position) return;
+      mesh.geometry = mesh.geometry.clone();
+      const pos = mesh.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i += 1) {
+        if (pos.getY(i) > 0.100 && pos.getZ(i) > -0.190 && pos.getZ(i) < -0.070
+          && Math.abs(pos.getX(i)) < 0.040) {
+          const height = pos.getY(i) - 0.100;
+          pos.setY(i, 0.084 + (pos.getZ(i) + 0.130) * 0.12);
+          pos.setZ(i, -0.130 - height);
+        }
+      }
+      pos.needsUpdate = true;
+      mesh.geometry.computeVertexNormals();
+      mesh.geometry.computeBoundingBox();
+      mesh.geometry.computeBoundingSphere();
+    });
+  }
+  const ironSights = RepairIronSights(group, materials, key, sight);
   const magazine = Mount("magazine", new THREE.Vector3(0, 0, -0.08));
   // Imported historical guns normally merge every steel/wood face per
   // material.  Some assets expose an `adsNear` node for the rear receiver and
@@ -1184,6 +1322,7 @@ function BuildFromModel(materials, weapon, key, doc) {
     },
     boltHandle,
     adsHide,
+    ironSights,
     source: "model",
   };
 }
@@ -1295,9 +1434,15 @@ export class Viewmodel {
     this.swayPivot = new THREE.Group();        // 鼠标摇摆（滞后 + 过冲）
     this.bobPivot = new THREE.Group();         // 步伐晃动
     this.statePivot = new THREE.Group();       // 落地 / 腾空 / 掏枪 / 蹲
-    this.actionPivot = new THREE.Group();      // 拉栓 / 装填 / 突刺 / 投弹的整枪位移
+    this.actionPivot = new THREE.Group();      // 拉栓 / 突刺 / 投弹的整枪位移
     this.recoilPivot = new THREE.Group();      // 后坐
     this.weaponMount = new THREE.Group();      // 腰射↔开镜↔冲刺的姿态插值
+    // Reload is articulated around the hand still supporting the gun, below
+    // its holding pose. The camera-origin action layer would orbit the entire
+    // gun and both shoulders left when yawing to expose the loading port.
+    this.reloadPivot = new THREE.Group();
+    this.reloadPivot.name = "ReloadSupportPivot";
+    this.reloadAnchor = new THREE.Vector3();
     // 绕**握把**转的那一层。上面每一层的原点都在相机原点，绕它们转只会把武器
     // 整个平移过屏幕、朝向几乎不变 —— 那是"端着枪走位"，不是"抡刀"。
     // 挥刀要的是刀身自己绕手转过一百多度，只有原点落在握把上的这一层能做到
@@ -1319,7 +1464,8 @@ export class Viewmodel {
     this.actionPivot.add(this.recoilPivot);
     this.recoilPivot.add(this.weaponMount);
     this.recoilPivot.add(this.armAnchor);
-    this.weaponMount.add(this.swingPivot);
+    this.weaponMount.add(this.reloadPivot);
+    this.reloadPivot.add(this.swingPivot);
 
     // --- 弹簧 ---------------------------------------------------------------
     // 阻尼比 0.42：明显欠阻尼，鼠标停下后枪还会甩过去一点再回来 —— 这就是"重量"
@@ -1430,7 +1576,7 @@ export class Viewmodel {
     // --- 桥夹道具（装填用）---------------------------------------------------
     this.clipProp = this._BuildClipProp();
     this.clipProp.visible = false;
-    this.weaponMount.add(this.clipProp);
+    this.reloadPivot.add(this.clipProp);
 
     this._geometries = new Set();
     this._tmpVec = new THREE.Vector3();
@@ -2246,7 +2392,8 @@ export class Viewmodel {
     this._StepDebris(step);
     if (this.riggedArms) {
       this.armAnchor.quaternion.identity();
-      this.riggedArms.SetPoseState({ ads: Clamp01(ads), sprint: Clamp01(sprintValue) });
+      this.riggedArms.SetPoseState({ ads: Clamp01(ads), sprint: Clamp01(sprintValue),
+        reload: this.action?.kind === "reload", reloadBlend: this.reloadBlend });
       this.riggedArms.Update(step);
     }
     this._UpdateSleeves();
@@ -2375,6 +2522,9 @@ export class Viewmodel {
   _ResetAnimatedParts() {
     this.actionPivot.position.set(0, 0, 0);
     this.actionPivot.rotation.set(0, 0, 0);
+    this.reloadPivot.position.set(0, 0, 0);
+    this.reloadPivot.rotation.set(0, 0, 0);
+    this.reloadBlend = 0;
     this.swingPivot.rotation.set(0, 0, 0);
     this.carryOverride = null;   // 装/卸刺刀动画每帧自己写，见 _AnimFixBayonet
     if (!this.rig) return;
@@ -2456,6 +2606,21 @@ export class Viewmodel {
     return this._AnimReloadStripper(t);
   }
 
+  /** Rotate the weapon around its supporting palm, keeping shoulders stable. */
+  _PoseReload(support, weight, x, y, z, rx, ry, rz) {
+    this.reloadBlend = weight;
+    const pivot = this.reloadPivot;
+    const anchor = this.handBase[support];
+    pivot.rotation.set(rx * weight, ry * weight, rz * weight, "YXZ");
+    // R(v - anchor) + anchor + authored lift. This is a real pivot change,
+    // not a screen-space clamp; long and short guns retain their own geometry.
+    this.reloadAnchor.copy(anchor).applyQuaternion(pivot.quaternion);
+    pivot.position.copy(anchor).sub(this.reloadAnchor);
+    pivot.position.x += x * weight;
+    pivot.position.y += y * weight;
+    pivot.position.z += z * weight;
+  }
+
   /**
    * 桥夹装填（中正式 / 汉阳造 / 三八式 / 驳壳枪）：
    * 开栓 → 右手从腰间取桥夹 → 插进桥夹导槽 → **拇指一推 5 发** → 抽出空夹丢掉 → 闭栓。
@@ -2466,10 +2631,9 @@ export class Viewmodel {
     const bolt = rig.parts.bolt;
     const travel = rig.boltTravel;
 
-    // 枪抬到胸前偏左，机匣朝上 —— 真人装填就是这个角度，也让玩家看得见弹仓
+    // 左掌支撑护木，枪围绕它抬起露出机匣；肩膀不随枪绕相机横移。
     const raise = Ease.InOut(Ease.Seg(t, 0.00, 0.18)) - Ease.InOut(Ease.Seg(t, 0.88, 1.00));
-    this.actionPivot.position.set(-0.055 * raise, 0.045 * raise, 0.055 * raise);
-    this.actionPivot.rotation.set(0.10 * raise, 0.40 * raise, -0.55 * raise, "YXZ");
+    this._PoseReload("left", raise, -0.055, 0.045, 0.055, 0.10, 0.40, -0.55);
 
     if (bolt) {
       const open = this.boltOpen ? 1 : Ease.InOut(Ease.Seg(t, 0.10, 0.26));
@@ -2531,8 +2695,7 @@ export class Viewmodel {
     const seat = rig.clipSeat;
 
     const tilt = Ease.InOut(Ease.Seg(t, 0.00, 0.15)) - Ease.InOut(Ease.Seg(t, 0.88, 1.00));
-    this.actionPivot.position.set(-0.045 * tilt, 0.030 * tilt, 0.050 * tilt);
-    this.actionPivot.rotation.set(0.06 * tilt, 0.34 * tilt, -0.42 * tilt, "YXZ");
+    this._PoseReload("left", tilt, -0.045, 0.030, 0.050, 0.06, 0.34, -0.42);
 
     if (mag) {
       const outUp = Ease.In(Ease.Seg(t, 0.15, 0.32));       // 空匣往上拔
@@ -2576,20 +2739,21 @@ export class Viewmodel {
   _AnimReloadBoxMag(t) {
     const seat = this.rig.clipSeat || this._tmpVec.set(0, -0.04, -0.02);
     const tilt = Ease.InOut(Ease.Seg(t, 0.00, 0.16)) - Ease.InOut(Ease.Seg(t, 0.84, 1.00));
-    this.actionPivot.position.set(-0.025 * tilt, 0.025 * tilt, 0.035 * tilt);
-    this.actionPivot.rotation.set(0.08 * tilt, 0.22 * tilt, -0.28 * tilt, "YXZ");
+    this._PoseReload("right", tilt, -0.025, 0.025, 0.035, 0.08, 0.22, -0.28);
     const leave = Ease.InOut(Ease.Seg(t, 0.08, 0.25));
     const returnHome = Ease.InOut(Ease.Seg(t, 0.78, 0.98));
     const off = Clamp01(leave - returnHome);
     const insert = Ease.InOut(Ease.Seg(t, 0.48, 0.72));
     const target = this._tmpVec2.set(seat.x - 0.018, seat.y - 0.055 + insert * 0.050, seat.z + 0.020);
-    target.lerp(this.handBase.right, 0.45);
-    this.handRight.group.position.lerpVectors(this.handBase.right, target, off);
-    this.handRight.group.rotation.set(
-      Mix(this.handBaseRot.right.x, -0.34, off),
-      Mix(this.handBaseRot.right.y, 0.18, off),
-      Mix(this.handBaseRot.right.z, -0.92, off), "YXZ");
-    this.riggedArms?.SetContactWeight("r", 1 - off);
+    // The firing hand keeps the pistol grip; the support hand leaves for the
+    // magazine well. C96 remains in its separate right-hand stripper family.
+    target.lerp(this.handBase.left, 0.45);
+    this.handLeft.group.position.lerpVectors(this.handBase.left, target, off);
+    this.handLeft.group.rotation.set(
+      Mix(this.handBaseRot.left.x, -0.34, off),
+      Mix(this.handBaseRot.left.y, -0.18, off),
+      Mix(this.handBaseRot.left.z, 0.92, off), "YXZ");
+    this.riggedArms?.SetContactWeight("l", 1 - off);
     const rack = Ease.Pulse(Ease.Seg(t, 0.78, 0.96));
     if (this.rig.parts.bolt) this.rig.parts.bolt.position.z = rack * this.rig.boltTravel;
   }
@@ -2597,8 +2761,7 @@ export class Viewmodel {
   /** 十一年式漏斗：把 6 个桥夹压进左侧弹斗、盖上压弹板。玩家一般用不到，留给 AI 展示。 */
   _AnimReloadHopper(t) {
     const raise = Ease.Pulse(t);
-    this.actionPivot.position.set(-0.05 * raise, 0.03 * raise, 0.05 * raise);
-    this.actionPivot.rotation.set(0.05 * raise, 0.5 * raise, -0.5 * raise, "YXZ");
+    this._PoseReload("left", raise, -0.05, 0.03, 0.05, 0.05, 0.5, -0.5);
     const off = Ease.Pulse(Ease.Seg(t, 0.1, 0.9));
     this.riggedArms?.SetContactWeight("r", 1 - off);
     this.handRight.group.position.x = this.handBase.right.x - off * 0.045;

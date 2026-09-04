@@ -159,9 +159,11 @@ export const testDefs = {
   FixedCenterAimTest: { file: "Script_FixedCenterAimTest.mjs", desc: "HUD/弹道/照门三心归一回归" },
   ReticleCalibrationTest: { file: "Script_ReticleCalibrationTest.mjs", desc: "ADS 放大准心校准与退出还原" },
   SprintCrosshairTest: { file: "Script_SprintCrosshairTest.mjs", desc: "动态准心＝真实散布投影（真 Shift+W 路径）" },
-  AdsSightTest: { file: "Script_AdsSightTest.mjs", desc: "开镜视野：五支枪的瞄准点不许被枪身糊住" },
+  AdsSightTest: { file: "Script_AdsSightTest.mjs", desc: "全部枪械的实体准星与照门对齐、前景无遮挡" },
   BayonetTest: { file: "Script_BayonetTest.mjs", desc: "刺刀：装卸、空枪白刃、蓄力分挥砍/劈刺" },
   RangeTest: { file: "Script_RangeTest.mjs", desc: "玩法测试靶场（?range=1）：木桩兵 + 枪/镜/刀/刺刀/手榴弹全链路" },
+  WeaponRangeTest: { file: "Script_WeaponRangeTest.mjs", timeoutMs: 20 * 60 * 1000,
+    desc: "全枪械白盒：桌面 F 拾取、无限弹药/换弹、10–200米静动靶与真实命中" },
   MeleeQteTest: { file: "Script_MeleeQteTest.mjs", desc: "白刃 QTE（?melee=1）：三格挡 + 三处决 + 慢动作/HUD/骨骼/辅助输入全链" },
   TownDressingTest: { file: "Script_TownDressingTest.mjs", desc: "城内每户布设的硬规则（纯 Node，秒级）" },
   PropPcgTest: { file: "Script_PropPcgTest.mjs", desc: "生活用具/工事 PCG：确定性、跨切片、碰撞/坡度/间距裁决（纯 Node）" },
@@ -222,7 +224,7 @@ export const browserTests = new Set([
   "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MenuTest",
   "PerformanceTest", "PhysicsTest", "PlayLateStagesTest", "PlayTest", "PostTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
-  "RangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
+  "RangeTest", "WeaponRangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
   "SprintViewmodelTest", "TargetInfoTest", "VisibilityTest", "VoiceTest",
   "FirstLevelWhiteboxBrowserTest",
   "FirstLevelP012BrowserTest",
@@ -273,7 +275,7 @@ export const domains = {
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsGripEditorTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "MeleeQteTest",
+      "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsGripEditorTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "MeleeQteTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest",
       // 负重会封掉开火/开镜/冲刺三条（Player 的 carrySpeedScale + TryFire 的闸），
       // 碰这三样的改动要连着枪感串一起跑，所以它同时挂在 combat 与 interact 两个域。

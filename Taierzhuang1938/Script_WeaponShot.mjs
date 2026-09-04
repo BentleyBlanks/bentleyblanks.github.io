@@ -15,6 +15,7 @@
 //   --flat 换成无贴图纯色材质出一份对照 —— 「贴图到底有没有比纯色强」只能这么比。
 //   --fp   拍第一人称那一份（腰射 / 开镜 / 开火 / 拉栓）。第一人称与台架是**两套
 //          几何**（见 Script_EditorWeapon 抬头），台架改好了不等于手里那把也对。
+//   --reload 拍全枪械换弹：腰射/ADS起手两行，各四个机械关键帧；附同名JSON投影轨迹。
 // 默认输出到 Taierzhuang1938/_shots/（已 gitignore）。
 
 import path from "node:path";
@@ -22,6 +23,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { WEAPONS as weaponDefinitions } from "./Data_Weapons.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -31,6 +33,8 @@ const onlyArg = args.find((a) => a.startsWith("--only="));
 const only = onlyArg ? onlyArg.slice(7).split(",") : null;
 const flat = args.includes("--flat");
 const firstPerson = args.includes("--fp");
+// Repeatable reload review: four mechanical keyframes, hip and ADS entry rows.
+const reloadSheet = args.includes("--reload");
 const debugArg = args.find((a) => a.startsWith("--debug="));
 const debugView = debugArg ? debugArg.slice(8) : "final";
 const DEBUG_MODES = { final: 0, normal: 0, baseColor: 6, roughness: 7, metalness: 8 };
@@ -91,7 +95,7 @@ page.on("console", (message) => {
 
 // menu=0：跳过主菜单直接进关。菜单是一整层盖在 canvas 上的 DOM，
 // 出图要的是台架那一帧，不是菜单的运镜。
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=high&scale=small&phase=0&menu=0`,
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=high&scale=small&${reloadSheet ? "range=1&shot=1" : "phase=0"}&menu=0`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
 await page.evaluate(() => window.Taierzhuang.StepFrames(30));
@@ -215,20 +219,62 @@ const FpSheet = async (entry) => page.evaluate(async ({ w }) => {
   return sheet.toDataURL("image/png");
 }, { w: entry });
 
+const ReloadSheet = async (entry) => page.evaluate(async ({ w }) => {
+  const T = window.Taierzhuang, editor = T.editor.active;
+  editor.SetMode("fp");
+  const src = document.getElementById("view");
+  const cw = 640, ch = 360;
+  const sheet = document.createElement("canvas");
+  sheet.width = cw * 4; sheet.height = ch * 2;
+  const ctx = sheet.getContext("2d");
+  const times = [0.18, 0.40, 0.62, 0.90];
+  const samples = [];
+  for (let row = 0; row < 2; row += 1) {
+    editor.SetWeapon(w.id, w.variant || 0);
+    editor.ads = row;
+    T.StepFrames(90);
+    editor.Trigger("reload");
+    // Exercise leaving ADS before reload. The editor pins its calibration FOV
+    // to this switch, unlike runtime's action-aware FOV suppression.
+    editor.ads = 0;
+    if (T.viewmodel.weaponId !== w.id || T.viewmodel.action?.kind !== "reload") {
+      throw new Error(`Reload preview did not equip and start ${w.id}`);
+    }
+    for (let col = 0; col < times.length; col += 1) {
+      let guard = 0;
+      while (T.viewmodel.action && T.viewmodel.action.t < times[col] && guard++ < 300) T.StepFrames(1);
+      const vm = T.viewmodel;
+      const origin = vm.rig.group.getWorldPosition(new (vm.handBase.right.constructor)()).project(T.camera);
+      samples.push({ entry: row ? "ads" : "hip", t: vm.action?.t, originNdc: origin.toArray(),
+        actionRotation: vm.actionPivot.rotation.toArray(), reloadRotation: vm.reloadPivot?.rotation.toArray(),
+        contactWeight: vm.riggedArms ? { ...vm.riggedArms.contactWeight } : null });
+      const x = col * cw, y = row * ch;
+      ctx.drawImage(src, 0, 0, src.width, src.height, x, y, cw, ch);
+      ctx.fillStyle = "rgba(0,0,0,.8)"; ctx.fillRect(x + 5, y + 5, 285, 25);
+      ctx.fillStyle = "#fff"; ctx.font = "15px sans-serif";
+      ctx.fillText(`${w.id} / ${row ? "ADS entry" : "Hip entry"} / ${times[col]}`, x + 12, y + 23);
+    }
+  }
+  return { image: sheet.toDataURL("image/png"), samples };
+}, { w: entry });
+
 let list = only
   ? WEAPONS.filter((w) => only.includes(w.id) || only.includes(w.shotId))
   : WEAPONS;
+if (reloadSheet) list = list.filter(entry => weaponDefinitions[entry.id]?.ammo && weaponDefinitions[entry.id]?.magazine);
 for (const entry of list) {
   await page.evaluate(({ view, materialMode }) => {
     const T = window.Taierzhuang;
     if (T.library?.gi) T.library.gi.debugView.value = materialMode;
     T.post.SetDebugView(view, T.gi, !!T.library?.gi);
   }, { view: debugView, materialMode: DEBUG_MODES[debugView] });
-  const dataUrl = firstPerson ? await FpSheet(entry) : await Sheet(entry);
+  const reload = reloadSheet ? await ReloadSheet(entry) : null;
+  const dataUrl = reload ? reload.image : firstPerson ? await FpSheet(entry) : await Sheet(entry);
   const file = path.join(outDir,
-    `Weapon_${entry.shotId || entry.id}${firstPerson ? "_Fp" : ""}${flat ? "_Flat" : ""}`
+    `Weapon_${entry.shotId || entry.id}${reloadSheet ? "_Reload" : firstPerson ? "_Fp" : ""}${flat ? "_Flat" : ""}`
     + `${debugView === "final" ? "" : `_Debug${debugView[0].toUpperCase()}${debugView.slice(1)}`}.png`);
   fs.writeFileSync(file, Buffer.from(dataUrl.split(",")[1], "base64"));
+  if (reload) fs.writeFileSync(file.replace(/\.png$/, ".json"), JSON.stringify(reload.samples, null, 2));
   console.log(`ok   ${path.basename(file)}  ${(fs.statSync(file).size / 1024).toFixed(0)} KB`);
 }
 

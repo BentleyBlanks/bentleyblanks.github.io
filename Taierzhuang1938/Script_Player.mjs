@@ -474,7 +474,7 @@ export class PlayerController {
     return { planarSpeed: 0 };
   }
 
-  Update(dt, input, weapon) {
+  Update(dt, input, weapon, aiming = null) {
     if (!this.alive) {
       this.deadTime += dt;
       this.SyncDeathCamera();
@@ -610,7 +610,7 @@ export class PlayerController {
     // --- 开镜 / 冲刺 / 侧身 --------------------------------------------------
     // ER2 的规矩：架式武器不架起两脚架就不许开镜（MG42/白朗宁/反坦克枪都是）。
     // 捷克式套这条正好 —— 全班就这一挺，架起来才有 800 m 有效射程。
-    const bipodBlocked = !!(weapon && weapon.bipod) && !this.bipod;
+    const bipodBlocked = !!(weapon && weapon.bipod) && !this.bipod && !aiming?.allowUndeployedAds;
     // 抬着东西时枪根本不在手上（视图模型也收了），开镜与冲刺一并封掉。
     const loaded = this.carrySpeedScale < 1;
     const wantAds = input.ads && !bipodBlocked && this.grounded && !loaded ? 1 : 0;

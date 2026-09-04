@@ -92,15 +92,16 @@ const EQUIPMENT_ICONS = {
 };
 
 /** 把内部的“剩余弹夹数”换成玩家真正需要判断的剩余弹数。 */
-export function AmmoReadout({ ammo = 0, clips = 0, magazine = 0, armed = true } = {}) {
+export function AmmoReadout({ ammo = 0, clips = 0, magazine = 0, armed = true,
+  infiniteAmmo = false, infiniteReserve = false } = {}) {
   const current = Math.max(0, Math.floor(Number(ammo) || 0));
   const capacity = Math.max(0, Math.floor(Number(magazine) || 0));
   const reserve = Math.max(0, Math.floor(Number(clips) || 0)) * capacity;
   return {
-    current: armed ? String(current).padStart(2, "0") : "—",
-    reserve: armed ? String(reserve).padStart(2, "0") : "—",
-    low: armed && current > 0 && current <= Math.max(1, Math.ceil(capacity * 0.2)),
-    empty: armed && current <= 0,
+    current: armed ? infiniteAmmo ? "∞" : String(current).padStart(2, "0") : "—",
+    reserve: armed ? infiniteReserve ? "∞" : String(reserve).padStart(2, "0") : "—",
+    low: armed && !infiniteAmmo && current > 0 && current <= Math.max(1, Math.ceil(capacity * 0.2)),
+    empty: armed && !infiniteAmmo && current <= 0,
   };
 }
 
@@ -664,6 +665,7 @@ export class Hud {
   /** 右下是姿态、弹药和装备；文字状态栏只保留伤情、屏息与命令。 */
   SetState({ stance = "stand", wounded, bleeding, bandages, breath, order,
     ammo = 0, clips = 0, magazine = 0, armed = true,
+    infiniteAmmo = false, infiniteReserve = false,
     grenades = 0, bundles = 0, mortar = 0, cooking = 0 }) {
     const stanceKey = STANCE_LABELS[stance] ? stance : "stand";
     this.el.combatStance.dataset.stance = stanceKey;
@@ -672,7 +674,7 @@ export class Hud {
       button.setAttribute("aria-pressed", String(button.dataset.playerStance === stanceKey));
     }
 
-    const rounds = AmmoReadout({ ammo, clips, magazine, armed });
+    const rounds = AmmoReadout({ ammo, clips, magazine, armed, infiniteAmmo, infiniteReserve });
     this.el.ammoCurrent.textContent = rounds.current;
     this.el.ammoReserve.textContent = rounds.reserve;
     this.el.combat.classList.toggle("lowAmmo", rounds.low);

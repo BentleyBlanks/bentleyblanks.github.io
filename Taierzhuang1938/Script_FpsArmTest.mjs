@@ -1,6 +1,9 @@
 // 第一人称共享双臂的人体闸：覆盖全部逐枪姿势、状态和机械动作。
 
 import path from "node:path";
+import { WEAPONS } from "./Data_Weapons.mjs";
+const onlyIds = process.argv.find((arg) => arg.startsWith("--only="))?.slice(7).split(",") || null;
+const expectedIds = Object.values(WEAPONS).filter((weapon) => (weapon.ammo && weapon.magazine) || ["throwable", "melee"].includes(weapon.kind)).map((weapon) => weapon.id);
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
@@ -18,7 +21,7 @@ await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?shot
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
 
-const report = await page.evaluate(async () => {
+const report = await page.evaluate(async (onlyIds) => {
   const THREE = await import("./vendor/three/build/three.module.js");
   const { FPS_ARM_POSES, FPS_ARM_LIMITS } = await import("./Data_FpsArmPoses.mjs");
   const T = window.Taierzhuang;
@@ -94,11 +97,12 @@ const report = await page.evaluate(async () => {
     skinMaxEdgeM: SkinMaxEdgeM(),
   });
   const out = {
+    reloadCases: [],
     cases: [], weaponIds: Object.keys(FPS_ARM_POSES), limits: FPS_ARM_LIMITS,
     source: arms?.report?.source, chains: arms?.report?.chains, bones: arms?.report?.bones,
     skinnedMeshes: arms?.report?.skinnedMeshes, profiles: arms?.report?.profiles || [],
   };
-  for (const weapon of out.weaponIds) {
+  for (const weapon of out.weaponIds.filter((id) => !onlyIds || onlyIds.includes(id))) {
     for (const [state, input] of [["hip", {}], ["ads", { ads: 1 }], ["sprintIn", { sprint: 1 }]]) {
       Equip(weapon);
       Step(90, input);
@@ -124,13 +128,43 @@ const report = await page.evaluate(async () => {
       while (vm.action && vm.action.t < 0.5 && guard++ < 150) Step(1);
       out.cases.push(Metrics(weapon, action));
     }
+    if (spec.actions.reload) for (const adsEntry of [0, 1]) {
+      Equip(weapon); Step(90, { ads: adsEntry }); vm.TriggerReload();
+      const support = spec.actions.reload.family === "boxMag" ? "right" : "left";
+      const working = support === "right" ? "left" : "right";
+      for (const targetT of [0.18, 0.40, 0.62, 0.90]) {
+        let guard = 0;
+        while (vm.action && vm.action.t < targetT && guard++ < 300) Step(1, { ads: adsEntry });
+        vm.root.updateWorldMatrix(true, true);
+        const hand = support === "right" ? vm.handRight.group : vm.handLeft.group;
+        const actual = vm.statePivot.worldToLocal(hand.getWorldPosition(new THREE.Vector3()));
+        // Compare against this frame's unchanged holding pose; ADS suppression
+        // may legitimately move the base, but rotating about the camera may not.
+        const expected = vm.handBase[support].clone().applyMatrix4(vm.rig.group.matrix)
+          .applyMatrix4(vm.swingPivot.matrix).applyMatrix4(vm.weaponMount.matrix)
+          .applyMatrix4(vm.recoilPivot.matrix);
+        const workingHand = working === "right" ? vm.handRight.group : vm.handLeft.group;
+        out.reloadCases.push({ weapon, adsEntry, t: targetT,
+          supportTravelM: actual.distanceTo(expected),
+          cameraLayerRotation: Math.hypot(vm.actionPivot.rotation.x, vm.actionPivot.rotation.y, vm.actionPivot.rotation.z),
+          workingHandTravelM: workingHand.position.distanceTo(vm.handBase[working]),
+          supportWeight: arms.contactWeight[support === "right" ? "r" : "l"],
+          action: vm.action?.kind, pivotRotation: vm.reloadPivot
+            ? Math.hypot(vm.reloadPivot.rotation.x, vm.reloadPivot.rotation.y, vm.reloadPivot.rotation.z) : 0,
+        });
+      }
+      Step(180, { ads: adsEntry });
+      out.reloadCases.push({ weapon, adsEntry, t: 1, action: vm.action?.kind || null,
+        neutral: !!vm.reloadPivot && vm.reloadPivot.position.length() < 1e-8
+          && Math.abs(vm.reloadPivot.quaternion.w - 1) < 1e-8 });
+    }
   }
   red.dispose();
   return out;
-});
+}, onlyIds);
 
 const checks = [];
-checks.push(["完整逐枪姿势数据", report.weaponIds.length === 15, `${report.weaponIds.length} 件装备`]);
+checks.push(["完整逐枪姿势数据", report.weaponIds.length === expectedIds.length && expectedIds.every((id) => report.weaponIds.includes(id)), `${report.weaponIds.length} 件装备`]);
 checks.push(["国军 01 骨骼双臂接入", report.source === "LugouNra01Skeletal" && report.chains === 2
   && report.skinnedMeshes === 1 && report.bones >= 45, `${report.bones} bones / ${report.chains} chains`]);
 checks.push(["五类源动作只提供手指基础姿态", ["rifle", "lmg", "pistol", "throwable", "melee"]
@@ -163,6 +197,19 @@ for (const entry of report.cases) {
   }
 }
 checks.push(["页面无运行时错误", errors.length === 0, errors.slice(0, 2).join(" | ")]);
+for (const entry of report.reloadCases) {
+  const label = `${entry.weapon} ${entry.adsEntry ? "ADS" : "hip"} reload ${entry.t}`;
+  if (entry.t === 1) {
+    checks.push([`${label} 动作完整收回`, entry.action === null && entry.neutral, JSON.stringify(entry)]);
+    continue;
+  }
+  checks.push([`${label} 支撑手不随相机轴横飞`, entry.supportTravelM < 0.11
+    && entry.cameraLayerRotation < 1e-8 && entry.supportWeight > 0.99,
+  `travel=${entry.supportTravelM.toFixed(4)}m cameraRotation=${entry.cameraLayerRotation.toFixed(4)}`]);
+  checks.push([`${label} 保留真实取弹动作`, entry.action === "reload" && entry.pivotRotation > 0.01
+    && (entry.t !== 0.62 || entry.workingHandTravelM > 0.015),
+  `hand=${entry.workingHandTravelM.toFixed(4)}m tilt=${entry.pivotRotation.toFixed(4)}`]);
+}
 
 let failed = 0;
 for (const [name, ok, detail] of checks) {

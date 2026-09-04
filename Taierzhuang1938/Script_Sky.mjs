@@ -136,6 +136,22 @@ void main() {
  * 数值单位是"线性 HDR"，配合 PostPipeline 的 exposure 一起看。
  */
 export const SKY_PRESETS = {
+  // Firearm/sight inspection uses clear air across the whole measured range.
+  // The overcast combat preset would erase a 200 m target beneath 95% fog.
+  // Neutral daylight keeps steel, wood, uniforms and painted lanes distinct.
+  weaponRangeDay: {
+    sunElevation: 52, sunAzimuth: 222,
+    zenith: [0.38, 0.52, 0.72], horizon: [0.68, 0.76, 0.86], ground: [0.30, 0.32, 0.34],
+    sunColor: [1.0, 0.98, 0.95], sunIntensity: 40, sunSize: 0.000012, glow: 0.18, glowSpread: 10,
+    smoke: 0, smokeColor: [0.67, 0.70, 0.75], smokeHeight: 0.10, stars: 0,
+    lightColor: 0xfffaf0, lightIntensity: 3.8,
+    hemiSky: 0x9bb6d1, hemiGround: 0x747b80, hemiIntensity: 0.55,
+    envIntensity: 0.70, shProbeIntensity: 0.25, ambientIntensity: 0.10,
+    fog: { density: 0, falloff: 30, max: 0,
+      sky: [0.50, 0.56, 0.65], ground: [0.42, 0.44, 0.47], sunGain: 0,
+      desat: 0, flatten: 0 },
+    exposure: 0.52, godStrength: 0, bloom: 0, saturation: 1, contrast: 1.06,
+  },
   // P012 是颜色语义审读场：照亮背光人物与可通行体块，不借正片的烟尘掩盖空间。
   // 独立预设，不改变旧白盒与正式章节。低对比保留蓝/紫/黑等类别的可辨性。
   p012WhiteboxDay: {

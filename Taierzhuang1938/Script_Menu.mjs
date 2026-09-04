@@ -33,6 +33,7 @@ const NS = "http://www.w3.org/2000/svg";
  */
 const SANDBOX_NAMES = {
   explosions: { where: "爆炸测试场", exit: "退出爆炸测试场" },
+  weapons: { where: "枪械射击白盒", exit: "退出枪械靶场" },
   range: { where: "靶场", exit: "退出靶场" },
   melee: { where: "白刃测试场", exit: "退出白刃测试场" },
   firstLevelWhitebox: { where: "第一关策划白盒", exit: "退出第一关白盒" },

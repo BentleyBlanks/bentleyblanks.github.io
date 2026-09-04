@@ -233,6 +233,11 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - `Script_Ai.mjs`（士兵 AI 与战斗结算）、`Script_Navigation.mjs`（「哪儿站得住」位图 + 下坡场）。
 - 先读：`docs/Data_TechPhysics.md`（角色 IK 部分）。
 
+### 枪械射击白盒（?weapons=1，全枪械专项）
+- `Data_WeaponRange.mjs` 动态收集枪表并定义精确距离/圆弧移动靶；`Script_WeaponRangeField.mjs` 管合批白盒、长桌和距离牌。
+- `Script_WeaponRangeRuntime.mjs` 管桌面拾取、移靶、无限弹/换弹测试和 `Debug.WeaponRange`；射击、装填、伤害仍走正式链路。
+- 回归口 `Script_WeaponRangeTest.mjs`（combat 域）；逐枪实体瞄具对齐由 `Script_AdsSightTest.mjs` 验证。现状与接口见 `docs/Data_WeaponRange.md`。
+
 ### 玩法测试靶场（?range=1，人机共同测试）
 - `Data_Range.mjs` —— 靶场配置（工位/靶位/携行，纯数据）；`Script_RangeField.mjs` ——
   独立场景（战场接口的第三个实现）。装配层在 `?range=1` 时整表替换关卡表，正片不知道它存在。

@@ -599,9 +599,10 @@ for (let i = 0; i < 3; i += 1) {
   Check("选章分成「正式章节」与「测试场景」两组",
     panel.groups.length === 2 && panel.groups[0] === "正式章节" && panel.groups[1] === "测试场景",
     panel.groups.join(" / "));
-  Check("测试场景包含玩法靶场、爆炸场、白刃 QTE 与策划白盒",
-    panel.levels === 12 && panel.previews === 0 && !panel.prologue
-      && panel.sandboxes.length === 5
+  Check("测试场景包含枪械、玩法、爆炸、白刃 QTE 与策划白盒",
+    panel.levels === 13 && panel.previews === 0 && !panel.prologue
+      && panel.sandboxes.length === 6
+      && panel.sandboxes.some((entry) => entry.includes("枪械白盒靶场"))
       && panel.sandboxes.some((entry) => entry.includes("玩法测试靶场"))
       && panel.sandboxes.some((entry) => entry.includes("爆炸测试场"))
       && panel.sandboxes.some((entry) => entry.includes("白刃战 QTE 测试场"))
@@ -1086,17 +1087,18 @@ for (let i = 0; i < 3; i += 1) {
     };
   });
   Check("靶场条目排在七章之后，标「沙盒」",
-    brief.selected === 7 && brief.mark === "沙盒" && brief.no === "靶",   // 七章 0..6，沙盒是第 7 条
+    brief.selected === 8 && brief.mark === "沙盒" && brief.no === "靶",   // 枪械专项后保留原玩法靶场
     `selected=${brief.selected} mark=${brief.mark} no=${brief.no}`);
-  Check("选章列出玩法靶场、爆炸场、白刃 QTE 与第一关策划白盒",
-    brief.sandboxes.length === 5
-      && brief.sandboxes.map((entry) => entry.no).join(",") === "靶,爆,刃,白,012"
+  Check("选章列出枪械、玩法、爆炸、白刃 QTE 与第一关策划白盒",
+    brief.sandboxes.length === 6
+      && brief.sandboxes.map((entry) => entry.no).join(",") === "枪,靶,爆,刃,白,012"
       && brief.sandboxes.every((entry) => entry.mark === "沙盒")
-      && brief.sandboxes[1].name.includes("爆炸测试场")
-      && brief.sandboxes[2].name.includes("白刃战 QTE")
-      && brief.sandboxes[3].name.includes("第一关 · 全新策划白盒")
-      && brief.sandboxes[0].name.includes("玩法测试靶场")
-      && brief.sandboxes[4].name.includes("第一关 · P0/P1/P2 场景白盒")
+      && brief.sandboxes[0].name.includes("枪械白盒靶场")
+      && brief.sandboxes[1].name.includes("玩法测试靶场")
+      && brief.sandboxes[2].name.includes("爆炸测试场")
+      && brief.sandboxes[3].name.includes("白刃战 QTE")
+      && brief.sandboxes[4].name.includes("第一关 · 全新策划白盒")
+      && brief.sandboxes[5].name.includes("第一关 · P0/P1/P2 场景白盒")
       && brief.sandboxes.every((entry) => !entry.name.includes("界河")),
     JSON.stringify(brief.sandboxes));
   Check("靶场预览只留一句目标、没有二次确认按钮，且**不画**滕县全图",

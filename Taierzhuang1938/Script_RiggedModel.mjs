@@ -408,7 +408,8 @@ export class FpsArmRig {
     return this;
   }
 
-  SetPoseState({ ads = 0, sprint = 0 } = {}) {
+  SetPoseState({ ads = 0, sprint = 0, reload = false, reloadBlend = 0 } = {}) {
+    this.poseState.reload = reload;
     this.poseState.ads = THREE.MathUtils.clamp(ads, 0, 1);
     this.poseState.sprint = THREE.MathUtils.clamp(sprint, 0, 1);
     if (this.poseSpec && this.contactTargets) {
@@ -425,6 +426,12 @@ export class FpsArmRig {
         this._e0.set(Sprint[0], Sprint[1], Sprint[2], "YXZ");
         this._q1.setFromEuler(this._e0);
         this.contactTargets[side].quaternion.copy(this._q0.slerp(this._q1, this.poseState.sprint));
+        const reloadRotation = reload && this.poseSpec.actions?.reload?.contacts?.[key];
+        if (reloadRotation) {
+          this._e0.set(reloadRotation[0], reloadRotation[1], reloadRotation[2], "YXZ");
+          this._q1.setFromEuler(this._e0);
+          this.contactTargets[side].quaternion.slerp(this._q1, THREE.MathUtils.clamp(reloadBlend, 0, 1));
+        }
       }
     }
     return this;
@@ -642,6 +649,13 @@ export class FpsArmRig {
       .sub(this._InAnchor(chain.forearm, this._v1)).normalize();
     let current = this._InAnchorBasisQuaternion(marker, this._q0);
     const desired = this.gripGoalAnchorQuaternion[side];
+    // A released loading hand follows the forearm frame AFTER position IK.
+    // Keeping its pre-IK palm frame would ask the wrist to undo the reach and
+    // concentrate twist there. Blend contact back in as the hand grips again.
+    if (this.poseState.reload && this.contactWeight[side] < 0.999) {
+      this._InAnchorTransform(this.contactTargets[side], this._v2, this._q1, this._v4);
+      desired.copy(current).slerp(this._q1, this.contactWeight[side]);
+    }
     let delta = this._q1.copy(desired).multiply(this._q2.copy(current).invert()).normalize();
     let remainingTwist = this._TwistAngle(delta, axis);
 

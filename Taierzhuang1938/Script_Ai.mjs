@@ -1404,6 +1404,10 @@ export class AiDirector {
 
   // ---------------------------------------------------------------- 执行
   Act(s, dt, player) {
+    // The firearm laboratory supplies exact positions before Ai.Update. Keep its
+    // animation and crowd LOD inside the normal AI scheduling contract, but do
+    // not let gravity, navigation or idle collision steps move the measured rig.
+    if (s.weaponRangeTargetId) { this.StepWeaponRange(s, dt); return; }
     let desired = null;
     let speed = 0;
     let wantedYaw = s.yaw;
@@ -1661,6 +1665,28 @@ export class AiDirector {
         woundedWalk: s.woundedWalk || 0,
       });
     }
+  }
+
+  /** Exact-distance firearm fixtures; only this explicit laboratory flag enters. */
+  StepWeaponRange(s, dt) {
+    s.moveSpeed = Clamp01(s.weaponRangeMoveSpeed || 0);
+    s.aimBlend = 0;
+    s.lookYaw = 0;
+    s.crouchBlend = 0;
+    s.proneBlend = 0;
+    s.stance = 0;
+    s.grounded = true;
+    s.velocityY = 0;
+    if (!s.actor) return;
+    s.actor.root.position.copy(s.position);
+    s.actor.root.rotation.y = s.yaw;
+    const cadence = ActorAnimationCadence(s);
+    if (s.actor.root.visible && (this.tickIndex + s.id) % cadence === 0) {
+      s.actor.Update(dt * cadence, { moveSpeed: s.moveSpeed, aim: 0, crouch: 0,
+        prone: 0, grounded: true, elapsed: this.time, lookYaw: 0, lookPitch: 0 });
+    }
+    // RaycastHitboxes refreshes world matrices on demand, including detached
+    // far actors, so roots stay exact without solving forty skeletons per frame.
   }
 
   /** QTE 对手原地面向玩家，正式 Actor 仍走同一份骨架、贴地和 LOD 链。 */

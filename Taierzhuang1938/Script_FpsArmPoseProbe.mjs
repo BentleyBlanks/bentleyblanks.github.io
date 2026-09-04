@@ -1,5 +1,7 @@
 // Developer calibration probe: derive the weapon-local palm frame produced by
 // the natural source skeleton after analytic position IK, without wrist forcing.
+// Usage: node Taierzhuang1938/Script_FpsArmPoseProbe.mjs Zb26 --reload
+// --reload samples the half-way mechanical pose instead of hip/ADS/sprint.
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,7 +18,8 @@ await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?shot
 await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
 
 const onlyWeapon = process.argv[2] || null;
-const result = await page.evaluate(async (onlyWeapon) => {
+const reload = process.argv.includes("--reload");
+const result = await page.evaluate(async ({ onlyWeapon, reload }) => {
   const THREE = await import("./vendor/three/build/three.module.js");
   const { FPS_ARM_POSES } = await import("./Data_FpsArmPoses.mjs");
   const T = window.Taierzhuang;
@@ -41,11 +44,16 @@ const result = await page.evaluate(async (onlyWeapon) => {
     moveSpeed: state === "sprint" ? 4 : 0, grounded: true, crouch: 0, strafe: 0,
     lookDeltaYaw: 0, lookDeltaPitch: 0, elapsed: 0, lowAmmo: false });
   const entries = {};
-  for (const weapon of Object.keys(FPS_ARM_POSES).filter((id) => !onlyWeapon || id === onlyWeapon)) {
+  for (const weapon of Object.keys(FPS_ARM_POSES).filter((id) => !onlyWeapon || onlyWeapon.split(",").includes(id))) {
+    if (reload && !FPS_ARM_POSES[weapon].actions.reload) continue;
     entries[weapon] = {};
-    for (const state of ["hip", "ads", "sprint"]) {
+    for (const state of reload ? ["reload"] : ["hip", "ads", "sprint"]) {
       vm.Equip(weapon);
       for (let frame = 0; frame < 90; frame += 1) vm.Update(1 / 60, Input(state));
+      if (state === "reload") {
+        vm.TriggerReload();
+        while (vm.action?.t < 0.5) vm.Update(1 / 60, Input(state));
+      }
       const targets = { r: vm.gripContactRight, l: vm.gripContactLeft };
       for (let iteration = 0; iteration < 16; iteration += 1) {
         for (const side of ["r", "l"]) targets[side].quaternion.copy(LocalMarkerQuaternion(side));
@@ -64,7 +72,7 @@ const result = await page.evaluate(async (onlyWeapon) => {
     }
   }
   return entries;
-}, onlyWeapon);
+}, { onlyWeapon, reload });
 
 console.log(JSON.stringify(result, null, 2));
 await browser.close();
