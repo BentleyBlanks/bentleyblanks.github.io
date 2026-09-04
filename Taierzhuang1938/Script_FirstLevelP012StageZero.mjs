@@ -79,17 +79,20 @@ export class FirstLevelP012StageZero {
     const white=new THREE.MeshStandardMaterial({color:0xe8e6dc,roughness:1});
     const dark=new THREE.MeshStandardMaterial({color:0x35383a,roughness:1});
     for(let i=0;i<8;i++){
-      const post=new THREE.Mesh(new THREE.BoxGeometry(.16,2.8,.16),white);post.position.set(-76,1.4,52+i*8);group.add(post);
-      const sleeper=new THREE.Mesh(new THREE.BoxGeometry(3.8,.08,.22),dark);sleeper.position.set(-73,.08,52+i*8);group.add(sleeper);
+      const baseZ=94+i*10;
+      const post=new THREE.Mesh(new THREE.BoxGeometry(.16,2.8,.16),white);post.position.set(-73.2,1.4,baseZ);post.userData.p012BaseZ=baseZ;group.add(post);
+      const sleeper=new THREE.Mesh(new THREE.BoxGeometry(3.8,.08,.22),dark);sleeper.position.set(-72,.08,baseZ);sleeper.userData.p012BaseZ=baseZ;group.add(sleeper);
     }
+    group.visible=false;
     this.host.scene?.add?.(group);return group;
   }
   UpdateApproachReferences(view) {
     if(!this.approachReferences)return;
-    this.approachOffset=(view.referenceTravelM||0)%64;
+    this.approachReferences.visible=view.phase==='braking';
+    this.approachOffset=(view.referenceTravelM||0)%80;
     for(const object of this.approachReferences.children){
-      const base=Number(object.userData.p012BaseZ ?? object.position.z);object.userData.p012BaseZ=base;
-      object.position.z=52+((base-52+this.approachOffset)%64);
+      const base=Number(object.userData.p012BaseZ);
+      object.position.z=94+((base-94+this.approachOffset)%80);
     }
   }
   IsVisible(position) {
@@ -123,7 +126,9 @@ export class FirstLevelP012StageZero {
     this.arrival.Dispose();this.arrivalView.Dispose();this.village.Dispose();this.villageView.Dispose();
     if(this.steam)this.host.vfx.RemoveSmokeSource(this.steam);this.steam=null;
     this.approachReferences?.removeFromParent();
-    for(const child of this.approachReferences?.children||[]){child.geometry?.dispose();child.material?.dispose();}
+    const materials=new Set();
+    for(const child of this.approachReferences?.children||[]){child.geometry?.dispose();if(child.material)materials.add(child.material);}
+    for(const material of materials)material.dispose?.();
     this.approachReferences=null;
   }
 }
