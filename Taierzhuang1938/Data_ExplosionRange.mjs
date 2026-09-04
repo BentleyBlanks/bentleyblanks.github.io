@@ -23,8 +23,8 @@ export const EXPLOSION_AIRSTRIKE = { aircraftId: "MitsubishiKi30", radiusM: 16, 
   intervalS: 0.2, approachS: 3.5, egressS: 10.5, altitudeM: 36, speedMps: 32 };
 export const EXPLOSION_PATROL = { minX: 2564, maxX: 2636, z: 2614, count: 3 };
 export const EXPLOSION_RANGE_PHASE = {
-  ...RANGE_PHASE, id: EXPLOSION_RANGE_ID, sandboxKey: "explosions",
-  date: "爆炸测试", label: "手榴弹与战车炮弹白盒", place: "爆炸 · 返掷 · 地形形变",
+  ...RANGE_PHASE, id: EXPLOSION_RANGE_ID, sandboxKey: "explosions", glyph: "爆",
+  date: "爆炸测试", label: "爆炸测试场", place: "爆炸 · 返掷 · 地形形变",
   story: EXPLOSION_RANGE_ID, sky: "p012WhiteboxDay", ambience: "overcast", cameraFar: 360, ambientAircraft: false,
   bounds: { minX: 2545, maxX: 2655, minZ: 2495, maxZ: 2700 },
   spawn: { x: 2600, z: 2692, ry: 0 },
