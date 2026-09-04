@@ -6,6 +6,7 @@ import {AircraftStrafeDirector} from "./Script_AircraftStrafe.mjs";
 import {FIRST_LEVEL_P012_LAYOUT as layout} from "./Data_FirstLevelP012Layout.mjs";
 import phase from "./Data_FirstLevelP012Whitebox.mjs";
 import {MissionSetpieceDirector} from "./Script_MissionSetpieces.mjs";
+import {FirstLevelP012Runtime} from "./Script_FirstLevelP012Runtime.mjs";
 function Source(file){return fs.readFileSync(new URL(file,import.meta.url),"utf8").replace(/\r/g,"");}
 function Method(source,name){return source.match(new RegExp(`  (?:async )?${name}\\([^\\n]*[\\s\\S]*?\\n  }\\n`))[0];}
 const field=Source("./Script_FirstLevelWhiteboxField.mjs");
@@ -148,3 +149,70 @@ while(dive.Active){
 }
 assert.ok(diveVisibleSamples>=299,"visibility audit covers 2.5 seconds of strafe, not exit");
 console.log(`PASS expanded dive: ${diveVisibleSamples} real strafe sky-LOS samples`);
+
+// Execute the actual Main host callback with a real Three perspective camera.
+// Include closed gates and the initial scenario, not only static layout.blocks.
+const THREE=await import(`data:text/javascript;base64,${Buffer.from(Source("./vendor/three/build/three.core.js")).toString("base64")}`);
+const observationCamera=new THREE.PerspectiveCamera(55,16/9,.06,620);
+const initialGeometry=[...layout.blocks.filter(b=>!layout.scenario.replaceBlockIds.includes(b.id)),...layout.scenario.states[0].blocks,...layout.gates];
+function ObservationRaycast(origin,direction,maxDistance){
+ let nearest=maxDistance+1;
+ for(const b of initialGeometry){
+  if(b.solid===false)continue;
+  const c=Math.cos(b.ry),s=Math.sin(b.ry),a=[(origin.x-b.x)*c-(origin.z-b.z)*s,origin.y-b.y,(origin.x-b.x)*s+(origin.z-b.z)*c];
+  const d=[direction.x*c-direction.z*s,direction.y,direction.x*s+direction.z*c],half=[b.w/2,b.h/2,b.d/2];
+  let low=0,high=maxDistance;
+  for(let axis=0;axis<3;axis++){
+   if(Math.abs(d[axis])<1e-9){if(Math.abs(a[axis])>half[axis]){high=-1;break;}}
+   else{const t=(-half[axis]-a[axis])/d[axis],u=(half[axis]-a[axis])/d[axis];low=Math.max(low,Math.min(t,u));high=Math.min(high,Math.max(t,u));}
+  }
+  if(low<=high)nearest=Math.min(nearest,low);
+ }return nearest<=maxDistance?{t:nearest}:null;
+}
+const observationField={Raycast:ObservationRaycast};
+const hostSource=Source("./Script_Main.mjs").match(/    ObservationVisible: \(target\) => \{[\s\S]*?\n    \},/)[0];
+const observe=Function("THREE","camera","battlefield",`return ({${hostSource}}).ObservationVisible;`)(THREE,observationCamera,observationField);
+const observationRuntime=new FirstLevelP012Runtime({ObservationVisible:observe,GuideActor:()=>null,Position:()=>null,Alive:()=>false},phase.whitebox);
+observationRuntime.beat=3; // Unit fixture activates the real B03 sampling scope.
+let orientationSamples=0;
+for(const [index,observation] of phase.whitebox.activities.orientations.entries()){
+ const target=observation.visibleTarget;
+ assert.ok(initialGeometry.some(b=>b.id===target.blockId),`${target.id} names actual geometry`);
+ const landmark=initialGeometry.find(b=>b.id===target.blockId),point=target.point;
+ const surfaceCoordinates=[Math.abs(point.x-landmark.x)-landmark.w/2,Math.abs(point.y-landmark.y)-landmark.h/2,Math.abs(point.z-landmark.z)-landmark.d/2];
+ assert.ok(surfaceCoordinates.every(value=>value<=1e-6)&&surfaceCoordinates.some(value=>Math.abs(value)<1e-6),`${target.id} point is on its real exterior surface, not an invented air target`);
+ for(const roadPoint of target.requiredPoints || [])assert.ok(layout.blocks.some(b=>{
+  if(b.semantic!=="stretcherRoute")return false;
+  const dx=roadPoint.x-b.x,dz=roadPoint.z-b.z,c=Math.cos(b.ry),s=Math.sin(b.ry);
+  return Math.abs(dx*c-dz*s)<=b.w/2&&Math.abs(dx*s+dz*c)<=b.d/2&&Math.abs(roadPoint.y-(b.y+b.h/2))<.03;
+ }),"required road samples are on actual cyan route paint");
+ for(let i=0;i<=360;i++){
+  const radius=i===360?0:phase.whitebox.activities.routeRadiusM,angle=i*Math.PI/180;
+  observationCamera.position.set(observation.position.x+radius*Math.cos(angle),1.62,observation.position.z+radius*Math.sin(angle));
+  observationCamera.lookAt(observation.lookAt.x,1.62,observation.lookAt.z);
+  assert.equal(observe(target),true,`${target.id} visible throughout allowed observation circle at sample ${i}`);
+  orientationSamples++;
+ }
+ assert.equal(observationRuntime.Sample().orientationVisible[index],true,"runtime forwards real camera visibility");
+ for(const pitch of [-1.4,1.4]){
+  observationCamera.lookAt(observation.lookAt.x,1.62,observation.lookAt.z);observationCamera.rotateX(pitch);
+  assert.equal(observe(target),false,`${target.id} cannot be observed while looking at sky/feet`);
+ }
+ observationCamera.lookAt(observation.lookAt.x,1.62,observation.lookAt.z);
+ observationField.Raycast=()=>({t:1});
+ assert.equal(observe(target),false,"an intervening wall blocks observation even with correct camera yaw");
+ observationField.Raycast=(origin,direction,distance)=>({t:distance});
+ assert.equal(observe(target),true,"landmark surface endpoint hit is accepted without collider ids");
+ observationField.Raycast=ObservationRaycast;
+}
+const noVisibilityRuntime=new FirstLevelP012Runtime({GuideActor:()=>null,Position:()=>null,Alive:()=>false},phase.whitebox);
+noVisibilityRuntime.beat=3;
+assert.ok(noVisibilityRuntime.Sample().orientationVisible.every(value=>value===false),"missing host evidence fails closed");
+observationRuntime.beat=4;
+observationRuntime.host.ObservationVisible=()=>{throw new Error("observation raycast outside B03");};
+assert.deepEqual(observationRuntime.Sample().orientationVisible,[],"no observation camera work outside B03");
+const fourth=phase.whitebox.activities.orientations.find(item=>item.visibleTarget.id==="EvacuationEntrance");
+observationCamera.position.set(fourth.position.x,1.62,fourth.position.z);observationCamera.lookAt(fourth.lookAt.x,1.62,fourth.lookAt.z);
+observationField.Raycast=(origin,direction,distance)=>direction.y<-.03?{t:1}:null;
+assert.equal(observe(fourth.visibleTarget),false,"seeing the courtyard wall without the cyan road is insufficient");
+console.log(`PASS B03 actual camera/closed-gate visibility: ${orientationSamples} circle samples, sky/feet/wall/road counterexamples`);

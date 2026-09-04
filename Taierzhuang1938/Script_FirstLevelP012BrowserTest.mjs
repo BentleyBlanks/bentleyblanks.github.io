@@ -21,10 +21,12 @@ const perceptionProfiles = {
 if (perceptionName && !perceptionProfiles[perceptionName]) throw new Error(`Unknown perception profile: ${perceptionName}`);
 const perceptionProfile = perceptionProfiles[perceptionName] || null;
 const runLabel = process.argv.find(arg => arg.startsWith("--run-label="))?.split("=")[1] || "";
+const orientationReview = process.argv.includes("--orientation");
 if (runLabel && !/^[A-Za-z0-9_]+$/.test(runLabel)) throw new Error("Run label must contain only English letters, digits, or underscores");
 const outputDir = process.env.P012_SCREENSHOT_DIR || path.join(os.tmpdir(),
   perceptionProfile ? `P012WhiteboxPerception_${perceptionProfile.name}${runLabel ? `_${runLabel}` : ""}`
-    : process.argv.includes("--campaign") ? `P012WhiteboxCampaign${runLabel ? `_${runLabel}` : ""}` : "P012WhiteboxReview");
+    : process.argv.includes("--campaign") ? `P012WhiteboxCampaign${runLabel ? `_${runLabel}` : ""}`
+      : `P012WhiteboxReview${runLabel ? `_${runLabel}` : ""}`);
 await fs.mkdir(outputDir, { recursive: true });
 const server = await ServeRoot(rootDir, 0);
 const browser = await LaunchBrowser();
@@ -49,8 +51,9 @@ function Check(condition, label, detail = "") {
 // 只驱动移动与交互输入，不改任务阶段，不传送，不把完成标志直接写进导演。
 async function PlayPrelude() {
   let result;
-  for (let chunk = 0; chunk < 30; chunk += 1) {
-    result = await page.evaluate(() => {
+  const orientations = [];
+  for (let chunk = 0; chunk < 36; chunk += 1) {
+    result = await page.evaluate(({ orientationReview }) => {
       const game = window.Tengxian;
       const bot = window.p012ReviewBot ||= { held: {}, trace: [], frame: 0, lastProgress: 0, progressKey: "" };
       const Key = (code, down) => {
@@ -61,10 +64,20 @@ async function PlayPrelude() {
         const flow = game.Debug.P012();
         const objective = flow.objective;
         if (flow.beatIndex >= 6 || !game.player.Alive) break;
+        // Return an actual gameplay frame while the landmark is being observed.
+        // No camera override or stage initialization is used for these captures.
+        if (orientationReview && flow.beatIndex === 3 && objective.progress?.value >= 1
+          && !(bot.capturedOrientations || []).includes(flow.orientationIndex)) {
+          (bot.capturedOrientations ||= []).push(flow.orientationIndex);
+          bot.pendingOrientation = { index: flow.orientationIndex, at: flow.elapsed,
+            text: objective.text, progress: { ...objective.progress }, lookAt: objective.lookAt };
+          break;
+        }
         const progressKey = [flow.beat, flow.routeIndex, flow.orientationIndex, flow.facts.join(",")].join("|");
         if (bot.progressKey !== progressKey) {
           bot.progressKey = progressKey; bot.lastProgress = flow.elapsed;
-          bot.trace.push({ at: flow.elapsed, beat: flow.beat, action: flow.action, routeIndex: flow.routeIndex });
+          bot.trace.push({ at: flow.elapsed, beat: flow.beat, action: flow.action,
+            routeIndex: flow.routeIndex, orientationIndex: flow.orientationIndex });
         }
         if (flow.elapsed - bot.lastProgress > 65) break;
         const target = objective.target;
@@ -100,11 +113,20 @@ async function PlayPrelude() {
       }
       for (const code of Object.keys(bot.held)) Key(code, false);
       game.StepFrames(1);
+      const orientation = bot.pendingOrientation ? { ...bot.pendingOrientation,
+        player: game.player.position.toArray(), yaw: game.player.yaw, pitch: game.player.pitch,
+        camera: game.camera.position.toArray() } : null;
+      bot.pendingOrientation = null;
       return { flow: game.Debug.P012(), scene: game.Debug.P012Scene?.(),
+        orientation,
         position: game.player.position.toArray(), health: game.player.health, alive: game.player.Alive,
         trace: bot.trace, stalled: game.Debug.P012().elapsed - bot.lastProgress > 65,
         weapons: game.Debug.Slots(), carry: game.carry.KindId, ammo: game.state.ammo, interact: game.Debug.Interact() };
-    });
+    }, { orientationReview });
+    if (result.orientation) {
+      orientations.push(result.orientation);
+      await page.screenshot({ path: path.join(outputDir, `Scene_P012Orientation${result.orientation.index + 1}.png`) });
+    }
     console.log("P012 opening", JSON.stringify({ at: result.flow.elapsed, beat: result.flow.beat,
       route: result.flow.routeIndex, action: result.flow.action, position: result.position,
       guide: result.scene?.guidePosition, trafficReady: result.scene?.trafficReady }));
@@ -113,6 +135,10 @@ async function PlayPrelude() {
   Check(result.flow.beatIndex >= 6, "真实移动、观察、验枪与搬弹完成开场",
     result.flow.beatIndex >= 6 ? `${result.flow.elapsed.toFixed(1)}s` : JSON.stringify(result));
   Check(result.carry === null, "弹药实际交付后释放双手，能够拔枪");
+  if (orientationReview) {
+    Check(orientations.length === 4, "四处方位观察均记录真实第一人称帧（可读性另行人工看图）");
+    await fs.writeFile(path.join(outputDir, "Data_P012OrientationTrace.json"), JSON.stringify(orientations, null, 2));
+  }
   await fs.writeFile(path.join(outputDir, "Data_P012OpeningTrace.json"), JSON.stringify(result, null, 2));
   await page.screenshot({ path: path.join(outputDir, "Scene_P012FirstContact.png") });
   console.log("P012 opening activity trace", JSON.stringify(result.trace));
@@ -903,7 +929,7 @@ try {
   Check(initial.state.field.externalAssets === 0 && initial.externalProps === 0 && initial.trimProps === 0 && initial.colliders > 15,
     "程序体块环境具有实际碰撞且不加载正式环境资产");
   await page.screenshot({ path: path.join(outputDir, "Scene_P012Arrival.png") });
-  if (process.argv.includes("--prelude") || process.argv.includes("--pacing") || process.argv.includes("--frontline") || process.argv.includes("--campaign")) await PlayPrelude();
+  if (orientationReview || process.argv.includes("--prelude") || process.argv.includes("--pacing") || process.argv.includes("--frontline") || process.argv.includes("--campaign")) await PlayPrelude();
   if (process.argv.includes("--frontline") || process.argv.includes("--campaign") || process.argv.includes("--pacing")) await PlayFrontline();
   if (process.argv.includes("--geometry")) await VerifyTraversalFixtures();
   if (process.argv.includes("--overview")) await CaptureLayoutOverview();

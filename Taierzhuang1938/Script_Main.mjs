@@ -3028,6 +3028,27 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     GuideActor: () => companion?.Handle("luo"), Position: (actor) => actor?.position ? { x: actor.position.x, z: actor.position.z } : null,
     RestorePlayer: (point) => { player.Spawn(point.x,point.z,point.yaw);player.stance=point.stance;return true; },
     Signal: (name) => story.Signal(name),
+    ObservationVisible: (target) => {
+      if (!target?.point) return false;
+      camera.updateWorldMatrix(true, false);
+      const origin = camera.getWorldPosition(new THREE.Vector3());
+      const visible = (point) => {
+        if (![point.x, point.y, point.z].every(Number.isFinite)) return false;
+        const position = new THREE.Vector3(point.x, point.y, point.z);
+        const screen = position.clone().project(camera);
+        if (![screen.x, screen.y, screen.z].every(Number.isFinite)
+          || Math.abs(screen.x) > 0.95 || Math.abs(screen.y) > 0.95 || screen.z < -1 || screen.z > 1) return false;
+        const ray = position.sub(origin), distance = ray.length();
+        if (distance < 0.1) return false;
+        const hit = battlefield.Raycast(origin, ray.normalize(), distance);
+        // Data points lie on the visible surface, not at a box centre. Thus
+        // an endpoint hit is the landmark itself; no nonexistent collider id
+        // is needed, and intervening walls/gates are never ignored.
+        return !hit || hit.t >= distance - 0.08;
+      };
+      return [target.point, ...(target.points || [])].some(visible)
+        && (!target.requiredPoints?.length || target.requiredPoints.some(visible));
+    },
     VisibleAircraft: (origin, air) => {
       const target = new THREE.Vector3(air.x, air.y, air.z), screen = target.clone().project(camera);
       if (Math.abs(screen.x) > 1 || Math.abs(screen.y) > 1 || screen.z < -1 || screen.z > 1) return false;

@@ -60,6 +60,12 @@ for (const [name,route] of Object.entries({North:north,South:south,Retreat:retre
 Add(Box("WestBoundary",-79,1,2,236,4),Box("EastBoundary",79,1,2,236,4),Box("NorthBoundary",0,-117,160,2,4),Box("SouthBoundary",0,119,160,2,4));
 // Western railway: a strong long-lived silhouette, not a line across the hub.
 Add(Box("RailEmbankment",-72,-10,7,206,2.5),Box("StationTrainB",-66,79,5,20,4),Box("StationSouthCargo",-51,71,26,3,3),Box("StationEastShed",-35,62,5,16,3));
+// Raised crossarms make the west railway distinguishable from the perimeter
+// at standing eye height. These remain untextured solid whitebox primitives.
+for(const [index,z] of [-60,-30,0,30,60].entries()) {
+ Add(Box(`RailTelegraphPost${index}`,-72,z,0.35,0.35,6.3),
+   Box(`RailTelegraphCrossarm${index}`,-72,z,0.35,4,0.3,"boundary",{y:5.8}));
+}
 // Walkable carriage shell, not a solid model proxy. East-side door gap is a real opening.
 Add(Box("StationTrainAFloor",-66,56,5,24,0.1,"ground",{y:-0.05,solid:false}),Box("StationTrainAWest",-68.5,56,0.4,24,3.8),Box("StationTrainAEastSouth",-63.5,65.5,0.4,5,3.8),Box("StationTrainANorth",-66,44,5,0.4,3.8),Box("StationTrainASouth",-66,68,5,0.4,3.8),Box("StationTrainARoof",-66,56,5.4,24,0.3,"boundary",{y:3.95}));
 // Actual aperture frames the station outside; no see-through wall collider spans the window.
@@ -75,6 +81,10 @@ Add(Box("HubBrokenWallTall",-13,-7,10,1,4),Box("HubBrokenWallLow",-6,-7,4,1,2.5)
 Add(Box("ApproachWestCover",-5,-25,3,5,1,"cover"),Box("ApproachEastCover",8,-30,3,5,1,"cover"),Box("ApproachDitchBank",10,-39,1,10,1,"cover"));
 // Dogleg cuts direct sight between preparation trench and enemy field.
 Add(Box("ReverseSlopeWest",-9,-60,14,3,2.8),Box("ReverseSlopeEast",16,-57,19,3,2.8),Box("AmmoBayBack",-9,-55,7,1,2.3),Box("AmmoBaySide",-12,-51,1,8,2.3));
+// A red danger marker identifies the northern fighting entrance above its
+// low silhouette; it is not a national flag or a HUD direction arrow.
+Add(Box("FrontEntranceMarkerPost",-3,-49,0.25,0.25,4.8),
+ Box("FrontEntranceDangerMarker",-1.8,-49,2.4,0.15,1.1,"danger",{y:4.1}));
 for (const [i,p] of P012_ANCHORS.gunports.entries()) Add(Box(`Gunport${i}Cover`,p.x,p.z-2.5,5,1,1,"cover",{cover:{faceX:0,faceZ:-1}}));
 // Continuous communication breastwork: the southern edge remains walkable even
 // at the close firing position (port.z - 1.2). Standing eyes clear the 1.05m top.
@@ -115,7 +125,11 @@ const hubStates=Object.freeze([
  Object.freeze({id:"Abandoned",signal:"SouthCut",blocks:Object.freeze([Box("HubStateWall",-16,-7,4,1,2.5),Box("HubStateWallLow",-9,-7,10,1,0.8,"cover"),Box("HubFallenMasonry",-13,-10,5,3,0.45,"step"),Box("HubAbandonedCrate",-15,0,3,1,0.45,"step",{ry:0.4}),Box("HubAbandonedFrame",12,10,4,1,0.5,"step",{ry:-0.35})])}),
 ]);
 export const FIRST_LEVEL_P012_LAYOUT=Object.freeze({scenario:Object.freeze({replaceBlockIds:Object.freeze(["HubBrokenWallTall","HubBrokenWallLow"]),states:hubStates}),bounds:Object.freeze({minX:-80,maxX:80,minZ:-118,maxZ:120}),ground:Object.freeze({x:0,z:1,w:160,d:238,h:0.5,y:-0.25,semantic:"ground"}),blocks:Object.freeze(blocks),gates:Object.freeze([
-  Object.freeze({...Box("HubEscortGate",23,7.2,1,7,3),signal:"EscortCall"}),
+  // Open sight between real bars, not an invisible solid wall. The 0.35m
+  // gaps are narrower than every player capsule, including prone.
+  ...Array.from({length:15},(_,index)=>Object.freeze({
+   ...Box(index===0?"HubEscortGate":`HubEscortGateBar${index}`,23,3.77+index*0.49,0.3,0.14,3),signal:"EscortCall",
+  })),
   Object.freeze({...Box("TrainDoor",-63.5,60.5,0.4,5,3.8),signal:"P012TrainDoor"}),
   Object.freeze({...Box("ReturnGate",22,92,1,9,3),signal:"SouthCut"}),
 ]),sections:Object.freeze(P012_ZONES.map(zone=>Object.freeze({id:zone.id,pressure:zone.name}))),semanticColors:P012_SEMANTIC_COLORS});

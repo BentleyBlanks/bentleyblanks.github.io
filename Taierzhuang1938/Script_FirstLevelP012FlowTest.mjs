@@ -128,7 +128,17 @@ assert.equal(flow.State().beat, "B03", "turning in place does not identify three
 for (const observation of phase.whitebox.activities.orientations) {
   if (observation.via) Tick({position:observation.via});
   const p=observation.position,l=observation.lookAt;
-  Tick({position:p,yaw:Math.atan2(-(l.x-p.x),-(l.z-p.z))},phase.whitebox.activities.observationSeconds+0.1);
+  const yaw=Math.atan2(-(l.x-p.x),-(l.z-p.z)),index=flow.orientationIndex;
+  for(const pitch of [-1.4,1.4]){
+    Tick({position:p,yaw,pitch,orientationVisible:[false,false,false,false]},phase.whitebox.activities.observationSeconds+0.1);
+    assert.equal(flow.orientationIndex,index,"looking up/down with correct yaw does not consume a landmark");
+  }
+  Tick({position:p,yaw,pitch:0,orientationVisible:[false,false,false,false]},phase.whitebox.activities.observationSeconds+0.1);
+  assert.equal(flow.orientationIndex,index,"occluded landmark with correct yaw does not count");
+  Tick({position:p,yaw,orientationVisible:[true,true,true,true]},phase.whitebox.activities.observationSeconds/2);
+  Tick({orientationVisible:[false,false,false,false]},.1);
+  assert.equal(flow.observationTime,0,"losing real visibility resets continuous observation");
+  Tick({position:p,yaw,orientationVisible:[true,true,true,true]},phase.whitebox.activities.observationSeconds+0.1);
 }
 assert.equal(flow.State().beat, "B04");
 At("Z03"); Tick({position:{x:0,z:-31},sprint:1}); Tick({position:{x:0,z:-34},sprint:1});

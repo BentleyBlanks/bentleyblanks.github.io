@@ -25,6 +25,17 @@ function Audit(name,route,obstacles,r=1.3){
  console.log(`${name}: ${length.toFixed(1)}m, ${samples} swept samples, radius ${r}m clear`);return length;
 }
 assert.equal(zones.length,11);assert.deepEqual(zones[2].x,0);assert.equal(zones[5].z,-80);
+const escortGateBars=layout.gates.filter(b=>b.id.startsWith("HubEscortGate"));
+assert.equal(escortGateBars.length,15,"escort gate is a see-through physical grille");
+for(let index=1;index<escortGateBars.length;index++) {
+ const left=escortGateBars[index-1],right=escortGateBars[index];
+ const gap=right.z-right.d/2-(left.z+left.d/2);
+ assert.ok(gap>0.3&&gap<0.68,"grille admits sight but not the narrowest player capsule");
+ assert.equal(right.signal,"EscortCall","every bar opens and restores with the same story signal");
+}
+// Sweep all three actual stance radii across the closed former solid panel.
+for(const radius of [0.34,0.42])for(let z=3.77;z<=10.63;z+=0.05)
+ assert.ok(escortGateBars.some(b=>Hits({x:23,z},b,radius)),"no stance-sized passage through closed grille");
 assert.equal(layout.ground.y+layout.ground.h/2,0);
 // Analytic GroundHeight owns flat-floor contact. A second solid at y=0 makes
 // Rapier spawn overlap rejection eject the player from the carriage.
@@ -47,7 +58,7 @@ assert.ok(!layout.blocks.some(b=>Hits(anchors.trainSpawn,b,0.4)));
 Audit("StretcherSouth",routes.south,layout.blocks);
 const returnLength=Audit("StretcherReturn",routes.retreat,layout.blocks);assert.ok(returnLength>150);
 const activityRoutes={weaponIssue:[{x:-55,z:44},{x:-55,z:34},{x:-45,z:34},{x:-43,z:40}],
- orientations:[{x:-3,z:0},{x:7,z:6},{x:2,z:-12},{x:0,z:0},{x:16,z:5}],
+ orientations:phase.whitebox.activities.orientations.flatMap(point=>point.via?[point.via,point.position]:[point.position]),
  shellCover:[{x:0,z:-22},{x:3,z:-30},{x:5,z:-38},{x:5,z:-42}],
  ammo:[{x:-7,z:-52},{x:0,z:-52},{x:5,z:-46},{x:5,z:-59},{x:5,z:-65}],
  finalCarry:[{x:-7,z:-37},{x:-7,z:-45},{x:-7,z:-52}]};
@@ -269,7 +280,7 @@ for(const [index,goal] of lanes.west.terminalGoals.entries()){
 const bridge=layout.blocks.find(b=>b.id==="ReturnRailSpurDeck");
 assert.ok(routes.retreat.some(p=>Math.abs(p.x-bridge.x)<bridge.w/2&&Math.abs(p.z-bridge.z)<bridge.d/2));
 assert.ok(bridge.y-bridge.h/2>=2.6);
-assert.ok(Hits({x:23,z:7.2},layout.gates.find(g=>g.signal==="EscortCall")));
+assert.ok(layout.gates.filter(g=>g.signal==="EscortCall").some(g=>Hits({x:23,z:7.2},g)));
 assert.ok(Hits({x:22,z:92},layout.gates.find(g=>g.signal==="SouthCut")));
 // Standing and takeoff / landing space around each traversal obstacle is physically clear.
 for(const [kind,p] of Object.entries(anchors.traversal)){
@@ -292,7 +303,7 @@ assert.ok(layout.blocks.some(b=>b.id==="RailEmbankment"&&b.h>=2&&b.h<=3));
 assert.ok(TRAVERSAL.mantleMax<layout.blocks.find(b=>b.id==="WestBoundary").h);
 console.log("PASS P012 layout geometry");
 // Execute the production reconciliation method with a minimal field host; no WebGL needed.
-const fieldSource=fs.readFileSync(new URL("./Script_FirstLevelWhiteboxField.mjs",import.meta.url),"utf8");
+const fieldSource=fs.readFileSync(new URL("./Script_FirstLevelWhiteboxField.mjs",import.meta.url),"utf8").replace(/\r/g,"");
 const syncMethod=fieldSource.match(/  SyncScenario\(\{[\s\S]*?\n  }\n/)[0];
 const sync=vm.runInNewContext(`({${syncMethod}})`).SyncScenario;
 const host={layout,gates:new Map([["a",{open:false,spec:{signal:"EscortCall"}}],["b",{open:false,spec:{signal:"SouthCut"}}]]),scenarioState:"Ordered",

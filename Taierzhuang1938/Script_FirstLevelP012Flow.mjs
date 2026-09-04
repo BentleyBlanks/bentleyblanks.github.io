@@ -444,7 +444,8 @@ export class FirstLevelP012Director {
       if (observation && arrivedVia && Distance(p, observation.position) <= (activity.routeRadiusM || 3)) {
         const desired = Math.atan2(-(observation.lookAt.x - p.x), -(observation.lookAt.z - p.z));
         const delta = Math.atan2(Math.sin((sample.yaw || 0) - desired), Math.cos((sample.yaw || 0) - desired));
-        if (Math.abs(delta) <= (activity.observationConeRad || 0.42)) {
+        if (Math.abs(delta) <= (activity.observationConeRad || 0.42)
+          && sample.orientationVisible?.[this.orientationIndex] === true) {
           this.observationTime += Math.max(0, dt);
           if (this.observationTime >= (activity.observationSeconds || 2)) { this.orientationIndex += 1; this.observationTime = 0; }
         } else this.observationTime = 0;

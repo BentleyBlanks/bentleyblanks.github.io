@@ -34,7 +34,21 @@ P2 给定的 Z09、Z02、Z04 坐标意味着回撤中心线的几何下界已经
 
 功能链路已通过完整实跑；总体首玩节奏尚未最终验收。数据中的目标时长、敌军预算或视角窗口只是设计目标，不是验收证据。
 
-### 当前完整实跑（Main146 / Setpieces21 / Data12 / Layout11 / Flow15 / Story8 / Combat8）
+### 方位辨认复验（Main147 / Data13 / Layout12 / Flow16 / Runtime18）
+
+根代理逐张检查了真实开场输入产生的四幅第一人称画面。旧版第四点虽然通过 yaw/时间检查，实际画面却被关闭的后送门遮住；此前只查静态 blocks 的射线遗漏了剧情门。铁路路基和北侧入口也缺少不同的高处轮廓。
+
+修正后，B03 只有具名地标在实际相机视野内、场地射线无前方遮挡时才连续累计 `observationSeconds`；仰天、低头和只看见后送墙面但没有看见青色道路均不计时。检查仅在 B03 执行。门改成真实有缝的竖向栅格，所有柱体仍随同一剧情信号开关；净缝小于角色最窄胶囊，未用透明墙或关闭碰撞替代。西侧铁路横担和北侧红色危险标记均为简单纯色方块，不含正式环境资源。
+
+教学顺序改为南、北、西、东南，优先建立 P0 要求的南北关系，每点观察时长不减。`OrientationAfter` 实跑在 178.967 秒完成南北实际可见观察，284.050 秒完成搬弹交付，288.067 秒第一次开枪。截图与相机/位置记录来自自然行进中的观察动作，没有为截图传送或重设镜头。根代理确认新第四幅中能透过栅格看见青色道路，新西/北两幅可辨认各自的高处轮廓；这不等于证明首次玩家已理解方向。
+
+四个观察圆共 1444 个实际透视投影/几何射线正例通过，几何包含初始枢纽状态和关闭剧情门；另有视角、遮挡、道路可见性反例。栅格站/蹲/卧宽度封闭、所有南北及担架路线扫掠回归通过；quick 36/36 通过。开场图与轨迹存于系统临时目录 `P012WhiteboxCampaign_OrientationAfter`；旧问题画面保留在 `P012WhiteboxReview_OrientationBefore`。总体首玩时长与战斗占比仍以本页剩余边界为准。
+
+同一最终源码的完整 `OrientationAfter` 实跑通过：1059.200 秒（17.65 分钟），一次普通 B21 死亡后通过已有菜单恢复，一次故意扑救回退；最终生命 30.119。真实批准先于队列移动、全部栅格柱开启后的通行、窗外担架、自由镜头中的飞机/平民/担架同屏、实际空地火力重叠、两副担架回撤、原对象重抬和终局冻结均通过，浏览器零错误。窄口径近期交火为 240.867 秒，仍不代表 P0 全部战斗体验或首次玩家比例。本轮仍为步枪清除南路敌军，手雷回执为 null，未冒称新增整关投掷证据。
+
+本轮另运行 `prepush --fail-fast`：25 项通过，包含旧白盒浏览器、P012 开场及真实跨步/翻越/攀爬；随后在 PhysicsTest 的“正式场景下载摆件缺少碰撞体”断言停止，与下文已对照的旧问题一致。本轮没有继续跑剩余 52 项，不报告整套 prepush 全绿；完整 P012 通关是上述独立实跑证据。
+
+### 已有完整实跑（Main146 / Setpieces21 / Data12 / Layout11 / Flow15 / Story8 / Combat8）
 
 | 操作配置 | 结果 | 游戏内时长 | 普通死亡／故意扑救重试 |
 | --- | --- | --- | --- |
@@ -79,6 +93,8 @@ B21 的手雷事实只由实际爆炸对本段六名敌人造成正伤害触发�
 
 ```text
 node Taierzhuang1938/Script_FirstLevelP012BrowserTest.mjs --prelude --geometry
+node Taierzhuang1938/Script_FirstLevelP012BrowserTest.mjs --orientation --voice-timing --run-label=OrientationReview
+node Taierzhuang1938/Script_FirstLevelP012BrowserTest.mjs --campaign --orientation --retry --voice-timing --recover-deaths --run-label=OrientationAfter
 node Taierzhuang1938/Script_FirstLevelP012BrowserTest.mjs --campaign --retry
 node Taierzhuang1938/Script_FirstLevelP012BrowserTest.mjs --campaign --retry --voice-timing
 node Taierzhuang1938/Script_FirstLevelP012BrowserTest.mjs --campaign --retry --voice-timing --recover-deaths --run-label=Approval

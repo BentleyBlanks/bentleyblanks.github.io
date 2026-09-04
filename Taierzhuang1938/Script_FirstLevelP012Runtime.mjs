@@ -193,6 +193,10 @@ export class FirstLevelP012Runtime {
   }
   Sample() {
     return {
+      // Host evaluates the real rendering camera and current scene raycast.
+      // Missing visibility evidence fails closed; yaw alone is not observation.
+      orientationVisible: this.beat === 3 ? (this.config.activities?.orientations || []).map(observation =>
+        !!observation.visibleTarget && this.host.ObservationVisible?.(observation.visibleTarget) === true) : [],
       friendlyMgFiredAfterSuppression: !!this.friendlyMgResponse,
       enemyMgDestroyed: this.near.some((actor) => actor.weaponId === "Type11" && !this.host.Alive(actor)),
       grenadeThrows: this.grenadeThrows || 0, lastGrenadePosition: this.lastGrenadePosition || null,
