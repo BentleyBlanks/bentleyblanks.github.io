@@ -109,6 +109,8 @@ export class FirstLevelP012Director {
     this.routeIndex = 0;
     this.orientationIndex = 0;
     this.observationTime = 0;
+    this.blockadeObservationIndex = 0;
+    this.blockadeObservationTime = 0;
     this.mortarImpactStart = 0;
     this.shellObservationTime = 0;
     this.shellImpactStart = 0;
@@ -583,6 +585,8 @@ export class FirstLevelP012Director {
     if (this.beat === 14 && !this.ambushRejoin && Distance(p, activity.ambushEntryRoute?.[this.ambushEntryIndex]) <= this.RouteArrivalRadius())
       this.ambushEntryIndex += 1;
     const guideNear = Distance(p, sample.guidePosition) <= (activity.guideRangeM || 12);
+    if (this.beat === 20 && !this.LateThreat() && this.routeIndex < route.length - 1)
+      this.Emit(`P012DelayPosition${this.routeIndex + 1}`);
     // Follow goals belong to the moving guide, not invisible circles left behind him.
     // The actor advances its target within 2m; a player following 1–2m behind can
     // legitimately never enter a 3m circle. Consume only guide-traversed segments
@@ -687,6 +691,22 @@ export class FirstLevelP012Director {
     if (this.beat === 23 && sample.lastLitterArrived) this.Emit("P012LastLitterArrived");
     if (zone && this.visits[this.visits.length - 1] !== zone) this.visits.push(zone);
     if (zone && this.stageVisits[this.stageVisits.length - 1] !== zone) this.stageVisits.push(zone);
+    // A glance or a remote gunshot cannot decide the route. The player must
+    // occupy both existing cover posts, stay low, and keep the finite blockade
+    // in view. Losing sight pauses progress instead of resetting it.
+    if (this.beat === 22) {
+      const observation = activity.blockadeObservation;
+      const post = observation?.posts?.[this.blockadeObservationIndex];
+      if (post && Distance(p, post) <= 2.5 && sample.stance !== "stand"
+        && (sample.blockadeVisible || sample.blockadeDestroyed)) {
+        this.blockadeObservationTime += Math.max(0, dt);
+        if (this.blockadeObservationTime >= (observation.secondsPerPost || 6)) {
+          this.Emit(`P012BlockadeObserved${this.blockadeObservationIndex}`);
+          this.blockadeObservationIndex += 1;
+          this.blockadeObservationTime = 0;
+        }
+      }
+    }
     if (this.beat === 4 && sample.stance === "crouch") this.Mark("crouch");
     for (const [index, port] of (this.config.anchors?.gunports || []).entries()) {
       if (Distance(p, port) < 6) this.gunports.add(index);
@@ -836,6 +856,7 @@ export class FirstLevelP012Director {
       case 22: {
         const cleared = sample.farSpawned === 4 && sample.farDeaths === 4;
         ready = At("Z09") && sample.columnAtSouthAssembly === true && this.routeIndex >= route.length
+          && this.blockadeObservationIndex >= (activity.blockadeObservation?.posts?.length || 0)
           && ((sample.blockadeVisible && sample.blockadePressure) || cleared);
         if (ready) this.completionReasons[22] = cleared ? "blockadeCleared" : "blockadeObservedFiring";
         break;
@@ -1145,11 +1166,14 @@ export class FirstLevelP012Director {
       text = threat?.label || "守住沟边伤员，确认接近的敌人已被清除";
     }
     if (this.beat === 22) {
-      target = route[this.routeIndex] || activity.southGrenadeSupply;
-      requiredAction = this.routeIndex < route.length ? "move" : "observe";
-      lookAt = this.routeIndex < route.length ? null : anchors.blockadePositions?.[1] || this.Point("southGunpoint");
+      const observation = activity.blockadeObservation;
+      const post = observation?.posts?.[this.blockadeObservationIndex];
+      target = route[this.routeIndex] || post || activity.southGrenadeSupply;
+      requiredAction = this.routeIndex < route.length || !this.lastSample.columnAtSouthAssembly ? "move" : "observe";
+      lookAt = post?.lookAt || anchors.blockadePositions?.[1] || this.Point("southGunpoint");
       text = this.routeIndex < route.length ? "沿原来的安全入口回到路沟，接应两副担架"
-        : this.lastSample.columnAtSouthAssembly ? "观察南路断障与远处警戒线，确认后送道路" : "掩护两副担架到南路沟内集合，确认无人掉队";
+        : !this.lastSample.columnAtSouthAssembly ? "掩护两副担架到南路沟内集合，确认无人掉队"
+        : post ? post.label : "两处观察结论一致：南路被远哨与断障封死，准备改走西沟";
     }
     if ([20, 21].includes(this.beat) && requiredAction === "fight") {
       const moving = this.enemyRoutes.find((entry) => entry.encounterBeat === this.beat
@@ -1205,6 +1229,8 @@ export class FirstLevelP012Director {
     pressureHistory: this.pressureHistory,
     stageVisits: this.stageVisits, retreatPoint: this.retreatPoint, retreatRejoining: !!this.retreatRejoining,
     routeIndex: this.routeIndex, orientationIndex: this.orientationIndex, carryTravelM: this.carryTravelM,
+    blockadeObservationIndex: this.blockadeObservationIndex,
+    blockadeObservationTime: this.blockadeObservationTime,
     observationTime: this.observationTime, mortarImpactStart: this.mortarImpactStart,
     shellObservationTime: this.shellObservationTime, shellImpactStart: this.shellImpactStart, shellTarget: this.shellTarget,
     cleanupWeaponStart: this.cleanupWeaponStart,
@@ -1260,6 +1286,8 @@ export class FirstLevelP012Director {
     pendingEnemies: this.pendingEnemies.length,
     totalEnemyBudget: P012_WAVES.reduce((n,w)=>n+w.count,0) + (this.config.activities?.farEnemyBudget || 0),
     routeIndex: this.routeIndex, orientationIndex: this.orientationIndex, carryTravelM: this.carryTravelM,
+    blockadeObservationIndex: this.blockadeObservationIndex,
+    blockadeObservationTime: this.blockadeObservationTime,
     retreatPoint: this.retreatPoint, retreatRejoining: !!this.retreatRejoining, retreatCovers: this.retreatCovers.slice(),
     waves: this.unlockedWaves.map((index)=>({ ...P012_WAVES[index] })), checkpointId: this.checkpointId,
     pressureHistory: this.pressureHistory.map((entry) => ({ ...entry })),

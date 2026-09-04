@@ -89,6 +89,8 @@ const guidanceCues = Object.freeze([
   ["FlankEntry", "P012GuideAtFlankEntry", "靠我这边的胸墙过来。别走正面，从这个拐角绕到破屋侧面，我在这里接应。"],
   ["Smoke", "P012GuideAtSmoke", "烟幕在这儿。点上，等烟起来，咱们带着担架走西边的沟。"],
   ["SmokeHandoff", "P012GuideSmokeHandoff", "沿西沟往回走。前后照应着担架，别落下伤员。"],
+  ["DelayMiddle", "P012DelayPosition1", "这边压住了。顺着蓝色沟岸换到中段，别离伤员太远。"],
+  ["DelaySouth", "P012DelayPosition2", "最后一组从南端缺口来。到折角后再开火，别站在路面上。"],
 ].map(([id,event,text])=>Object.freeze({at:`event:${event}`,type:"line",who:"luo",text,tier:"虚构",
   voice:`p012_text_Guide${id}`,p012SubtitleOnly:true,p012SubtitleSeconds:5.5,
   p012Immediate:Object.freeze({event,maxAgeS:12})})));
@@ -186,13 +188,18 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       ]),
       ambushEntryRoute: Object.freeze([{ x: 42.5, z: 24 }, { x: 39, z: 25.5 }]),
       ambushColumnCoverRoute: Object.freeze([{ x: 32, z: 14.4 }, { x: 34, z: 18.8 }]),
-      closeFightRoute: Object.freeze([{ x: 44, z: 62 }]),
+      // Three bounded delaying positions use the existing ditch/bank geometry.
+      // Clearing a pair earns the next move; no timer, respawn or health padding.
+      closeFightRoute: Object.freeze([{ x: 44, z: 62 }, { x: 45, z: 69 }, { x: 45, z: 78 }]),
       closeFightGroups: Object.freeze([
         [{ x: 58, z: 52 }, { x: 62, z: 55 }],
         [{ x: 58, z: 58 }, { x: 62, z: 62 }],
         [{ x: 58, z: 65 }, { x: 61, z: 69 }],
-      ].map((positions, group) => ({ routeIndex: 0, cover: { x: 44, z: 62 },
-        label: "守住伤员所在路沟，注意东北与东南两路逼近",
+      ].map((positions, group) => ({ routeIndex: group,
+        cover: [{ x: 44, z: 62 }, { x: 45, z: 69 }, { x: 45, z: 78 }][group],
+        label: ["伏在第一段沟岸后，截住从残屋逼近的两人",
+          "前一组已退；沿蓝色沟岸转到中段，盯住东侧缺口",
+          "再转到南端折角，挡住最后两人接近担架"][group],
         positions, spawns: positions.map((_, index) => {
           const slot = group * 2 + index;
           return { x: 72, z: slot < 3 ? 28 + slot * 2 : 61.5 + (slot - 3) * 2.5 };
@@ -226,6 +233,21 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
         { x: 34, z: 104.4 }, { x: 34, z: 105 }, { x: 30, z: 105 }]),
       southAssemblyRoute: Object.freeze([{ x: 34, z: 105 }, { x: 34, z: 104.4 },
         { x: 41, z: 104.4 }, { x: 41, z: 98 }, { x: 42, z: 94 }]),
+      blockadeObservation: Object.freeze({
+        secondsPerPost: 6,
+        posts: Object.freeze([
+          Object.freeze({ x: 40.5, z: 99.5, lookAt: { x: 70, z: 115 }, label: "在院墙缺口低姿观察远哨火力方向" }),
+          Object.freeze({ x: 43.5, z: 94.5, lookAt: { x: 74, z: 116 }, label: "转到路沟折角复核封锁线与断障" }),
+        ]),
+      }),
+      // Review budget only, never read as a clock gate. Each range is earned by
+      // finite contact, threatened relocation, or visible reconnaissance.
+      southDelayTempoBudget: Object.freeze({
+        closeDelaySeconds: Object.freeze([60, 75]),
+        houseClearSeconds: Object.freeze([65, 80]),
+        blockadeReconSeconds: Object.freeze([25, 35]),
+        totalSeconds: Object.freeze([150, 190]),
+      }),
       retreatSmokeUse: { x: 28, z: 96 }, retreatSmokeAt: { x: 40, z: 99 },
       finalCarryMinM: 10, retreatCoverIndices: Object.freeze([2, 5, 8]), farEnemyBudget: 4,
       retreatColumnSpeedMps: 2.05,

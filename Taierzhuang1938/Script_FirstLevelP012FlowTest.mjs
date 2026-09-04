@@ -49,7 +49,7 @@ import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 const points = new Map();
 {
  const cues=phase.whitebox.storyBeats.filter(beat=>beat.voice?.startsWith("p012_text_Guide"));
- assert.equal(cues.length,4);
+ assert.equal(cues.length,6);
  for(const cue of cues){
   const shown=[],voices=[];
   const story=new StoryDirector({hud:{Say:(who,text)=>shown.push(text),Title(){}}});
@@ -538,7 +538,13 @@ assert.equal(flow.State().beat,"B22","far shooting cannot abandon litters back a
 Walk(phase.whitebox.activities.southAssemblyRoute,{zone:"Z09"});
 Tick({farSpawned:3,farDeaths:3,blockadeVisible:false,blockadePressure:false,columnAtSouthAssembly:true});
 assert.equal(flow.State().beat,"B22","partial far spawn cannot impersonate the finite four being cleared");
-Tick({farSpawned:4,farDeaths:4});
+for(const [index,post] of phase.whitebox.activities.blockadeObservation.posts.entries()){
+  Tick({position:post,zone:"Z09",stance:"stand",farSpawned:4,farDeaths:4,blockadeDestroyed:true,columnAtSouthAssembly:true},8);
+  assert.equal(flow.State().blockadeObservationIndex,index,"standing at an observation post records nothing");
+  Tick({position:post,zone:"Z09",stance:"crouch",farSpawned:4,farDeaths:4,blockadeDestroyed:true,columnAtSouthAssembly:true},5);
+  assert.equal(flow.State().blockadeObservationIndex,index,"a quick glance cannot certify the blockade");
+  Tick({position:post,zone:"Z09",stance:"crouch",farSpawned:4,farDeaths:4,blockadeDestroyed:true,columnAtSouthAssembly:true},1);
+}
 assert.equal(flow.State().beat,"B23");
 assert.equal(flow.State().completionReasons[22],"blockadeCleared");
 assert.match(flow.CurrentObjective().text,/四名远哨已清除/);
@@ -980,6 +986,20 @@ for(const index of [2,3,4]) {
       assert.ok(distance>=2&&distance<2.3,"each existing actor receives only one short physical reposition");
     });
   }
+  assert.deepEqual(phase.whitebox.activities.closeFightGroups.map(group=>group.routeIndex),[0,1,2],
+    "each finite delaying pair belongs to a later physical cover position");
+  assert.deepEqual(phase.whitebox.activities.closeFightGroups.map(group=>group.cover),phase.whitebox.activities.closeFightRoute,
+    "the three delaying phases use the authored ditch cover route rather than a repeated point");
+  for(let index=1;index<phase.whitebox.activities.closeFightRoute.length;index++)
+    assert.ok(P012SegmentClear(phase.whitebox.layout.blocks,phase.whitebox.activities.closeFightRoute[index-1],
+      phase.whitebox.activities.closeFightRoute[index],.42),"each delaying relocation is physically clear for the player capsule");
+  assert.equal(phase.whitebox.activities.blockadeObservation.posts.length,2);
+  assert.notDeepEqual(phase.whitebox.activities.blockadeObservation.posts[0].lookAt,
+    phase.whitebox.activities.blockadeObservation.posts[1].lookAt,"the two posts inspect distinct parts of the blockade");
+  const budget=phase.whitebox.activities.southDelayTempoBudget;
+  assert.deepEqual([budget.closeDelaySeconds,budget.houseClearSeconds,budget.blockadeReconSeconds]
+    .reduce((sum,range)=>sum.map((value,index)=>value+range[index]),[0,0]),budget.totalSeconds,
+    "the 150-190 second extension is fully attributed to causal play, never an idle timer");
   const actors=[0,1].map(x=>({position:{x,z:0},alive:true,lastFire:0,suppression:0}));
   const director=new FirstLevelP012Director({EnemyPosition:a=>a.alive?a.position:null,
     EnemyCombatState:a=>({lastFire:a.lastFire,suppression:a.suppression}),EnemyGoal:(a,p)=>{a.goal=p;}},phase.whitebox);
