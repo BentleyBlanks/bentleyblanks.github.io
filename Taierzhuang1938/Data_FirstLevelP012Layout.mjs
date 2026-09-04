@@ -1,7 +1,7 @@
 // P2 spatial blueprint, pure data. Runtime +Z is south (Notion +Z north inverted).
 // Planar ground is deliberate: trench banks provide relative shelter without a second height source.
 import { TRAVERSAL } from "./Data_Traversal.mjs";
-import { P012Point, P012MapPoints, P012SouthPoint, P012RailPoint, P012_SPACE_BOUNDS } from "./Data_FirstLevelP012Space.mjs";
+import { P012Point, P012MapPoints, P012SouthPoint, P012RailPoint, P012StationPoint, P012_SPACE_BOUNDS } from "./Data_FirstLevelP012Space.mjs";
 import { P012_STATION_BLOCKS, P012_STATION_SURFACES, P012_STATION_GATES, P012_STATION_REMOVE_IDS } from "./Data_FirstLevelP012Station.mjs";
 import { P012_HORIZON_GROUND, P012_HORIZON_BLOCKS, P012_HORIZON_REMOVE_IDS } from "./Data_FirstLevelP012Horizon.mjs";
 
@@ -149,29 +149,44 @@ const blueprintGates=Object.freeze([
 const mappedRoutes = P012MapPoints(P012_BLUEPRINT_ROUTES);
 const northLink = Route([[0,-17],[-12,-32],[-12,-50],[0,-62]]);
 const eastLink = Route([[30,10],[44,28],[64,28],[74,6],[84,6]]);
-const worldNorth = Object.freeze([...mappedRoutes.north.slice(0,8),...northLink,...mappedRoutes.north.slice(9)]);
+const worldVillage=Route([[-43,100],[-36,95],[-30,80],[-30,62],[-34,46],[-30,30],[-30,19],[-17,12],[0,0]]);
+const worldNorth = Object.freeze([Point(-55,115),Point(-55,104),...worldVillage,...northLink,...mappedRoutes.north.slice(9)]);
 const worldSouth = Object.freeze([...mappedRoutes.south.slice(0,6),...northLink.slice().reverse(),
   ...mappedRoutes.south.slice(7,9),...eastLink,...mappedRoutes.south.slice(9)]);
 const worldRetreat = Route([[102,98],[85,83],[68,68],[42,48],[34.6666666667,40],[20,24],
   [0,0],[0,-17],[-12,-32],[-12,-50],[0,-62],[0,-70],[5,-78],[5,-86],[0,-90]]);
 const machineGunEnemy = Route([[35,-201],[23,-201],[23,-195],[23,-178]]);
-export const P012_ROUTES = Object.freeze({...mappedRoutes,north:worldNorth,south:worldSouth,retreat:worldRetreat,
+export const P012_ROUTES = Object.freeze({...mappedRoutes,north:worldNorth,village:worldVillage,trainExit:Object.freeze(P012MapPoints(P012_BLUEPRINT_ROUTES.trainExit,P012StationPoint)),south:worldSouth,retreat:worldRetreat,
+  villageWaiting:Route([[-39,94],[-26,60]]),
+  villageEvacuation:Route([[-28.6,80],[-23,91],[-23,110],[-18,132],[-18,155]]),
+  villageEvacuationWaiting:Route([[-19,108],[-14,153]]),
   approach:Object.freeze([...northLink,Point(3,-70),Point(5,-78),Point(5,-82)]),machineGunEnemy});
 export const P012_ENEMY_LANES = Object.freeze({...P012MapPoints(blueprintEnemyLanes),
   machineGun:Object.freeze({spawn:machineGunEnemy[0],reveal:machineGunEnemy[2],goal:machineGunEnemy.at(-1),waypoints:machineGunEnemy})});
 export const P012_ANCHORS = Object.freeze({...P012MapPoints(P012_BLUEPRINT_ANCHORS),hub:Point(0,0),
+  ...Object.fromEntries(["trainSpawn","trainDoor","weaponCheck","ammoIssue","weaponInspect","traversal"].map(key=>[key,P012MapPoints(P012_BLUEPRINT_ANCHORS[key],P012StationPoint)])),
   railPassFrom:P012RailPoint(-72,0),railPassTo:P012RailPoint(-72,110)});
 export const P012_ZONES = Object.freeze(blueprintZones.map(zone=>Object.freeze({...zone,
-  ...(zone.id==="Z10"?{x:42,z:48,d:100}:P012Point(zone.x,zone.z))})));
+  ...(zone.id==="Z00"?P012StationPoint(zone.x,zone.z):zone.id==="Z10"?{x:42,z:48,d:100}:P012Point(zone.x,zone.z))})));
 
 const discarded = /^(WestBoundary|EastBoundary|NorthBoundary|SouthBoundary|RailEmbankment|ReturnRailSpur.*|ReturnBank.*|(North|South|Retreat|Flank|TrainExit)Route\d+)$/;
 const worldBlocks = blocks.filter(block=>!discarded.test(block.id)).map(block=>{
   // The hub-facing court is an orientation landmark; add its moved counterpart
   // separately. Telegraphs follow the continuous railway, not the north island.
   if(block.id==="EvacEastCourtyard"||block.id.startsWith("RailTelegraph"))return block;
+  if(/^(StationStep|StationVault|StationMantle|WeaponCheckTable|WeaponIssueCrate|WeaponInspectBench)$/.test(block.id))return {...block,...P012StationPoint(block.x,block.z)};
   return {...block,...P012Point(block.x,block.z)};
 });
 worldBlocks.push({...blocks.find(block=>block.id==="EvacEastCourtyard"),...P012SouthPoint(40,9),id:"EvacDestinationCourtyard"});
+// Separate buildings and open courts, not a continuous tunnel. The broad centre
+// corridor admits opposing foot traffic without shrinking people or cover.
+worldBlocks.push(Box("StationNorthWestHouse",-49,85,10,12,3.5,"structure"),
+ Box("VillageSouthEastHouse",-18,73,12,14,3.2,"structure"),
+ Box("VillageMiddleWestHouse",-45,57,9,10,3.2,"structure"),
+ Box("VillageWaitingBenchSouth",-40,90,2,1,.65,"cover"),
+ Box("VillageWaitingBenchNorth",-23,60,2,1,.65,"cover"));
+for(let index=1;index<P012_ROUTES.villageEvacuation.length;index++)worldBlocks.push(Strip(`VillageEvacuationPaint${index}`,P012_ROUTES.villageEvacuation[index-1],P012_ROUTES.villageEvacuation[index],1.3,"stretcherRoute",.045));
+worldBlocks.push(Box("VillageEvacuationWaitingBench",-16,108,2,1,.65,"cover"),Box("StationEastWaitingBench",-11,153,2,1,.65,"cover"));
 for(const [name,route] of Object.entries({North:worldNorth,South:worldSouth,Retreat:worldRetreat,Flank:P012_ROUTES.flank,TrainExit:P012_ROUTES.trainExit})) {
   const stretcher=name==="South"||name==="Retreat";
   for(let i=1;i<route.length;i++)worldBlocks.push(Strip(`${name}Route${i}`,route[i-1],route[i],name==="Flank"?1.4:2.8,
@@ -190,10 +205,10 @@ worldBlocks.push(Box("WestBoundary",-109,-27.5,2,373,8),Box("EastBoundary",184,-
   Box("EastLinkWestCourt",28,54,10,25,3),Box("EastLinkSouthCourt",66,-1,22,5,3),
   Box("EastLinkEastShoulder",91,73,12,15,3.5),
   Box("DepthNorthFarm",-51,-170,22,34,6),Box("DepthEastFarm",160,51,26,46,7),
-  Box("DepthSouthVillage",110,145,49,15,6),Box("DepthSouthWest",-52,130,26,42,5),
+  Box("DepthSouthVillage",110,145,49,15,6),Box("DepthSouthWest",-110,150,26,42,5),
   Box("DepthWestTerrace",-91,-35,16,42,5),Box("DepthWestOutbuildings",-91,95,16,32,4.5),
   Box("DepthEastTerrace",150,-20,26,35,4.3),Box("DepthNorthEastVillage",145,-100,25,48,6),
-  Box("DepthSouthTerrace",-10,142,44,18,4.6),Box("DepthSouthFarm",42,142,36,20,5.7),Box("DepthSouthEast",161,135,18,25,4.8),
+  Box("DepthSouthTerrace",20,155,30,12,4.6),Box("DepthSouthFarm",42,142,36,20,5.7),Box("DepthSouthEast",161,135,18,25,4.8),
   Box("MachineGunSpawnScreen",35,-197,10,1,3),
   Box("MachineGunPositionCover",23,-176.5,4,.7,1,"cover"),
   // A short damaged farm-road bridge spans the return drainage channel. The

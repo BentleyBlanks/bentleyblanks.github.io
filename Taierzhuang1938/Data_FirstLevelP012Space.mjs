@@ -12,6 +12,8 @@ export { P012_HORIZON_BOUNDS as P012_SPACE_BOUNDS } from "./Data_FirstLevelP012H
 export function P012NorthPoint(x, z) { return { x, z: z - 40 }; }
 export function P012SouthPoint(x, z) { return { x: x + 60, z }; }
 export function P012RailPoint(x, z) { return { x, z }; }
+// Explicit station package only. Never add this to automatic point classification.
+export function P012StationPoint(x, z) { return { x, z: z + 60 }; }
 
 export function P012Point(x, z) {
   if (z <= -20) return P012NorthPoint(x, z);

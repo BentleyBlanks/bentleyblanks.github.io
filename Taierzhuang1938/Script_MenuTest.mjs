@@ -67,6 +67,9 @@ if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-v
     const setup=await page.evaluate(async()=>{
       const g=window.Tengxian,{FirstLevelP012Director,P012_WAVES}=await import("./Script_FirstLevelP012Flow.mjs");
       let flow;FirstLevelP012Director.prototype.Update=function(){flow=this;};g.StepFrames(1);
+      // This isolated post-opening fixture needs an already issued, empty
+      // rifle; the real level now correctly starts without any weapon.
+      flow.host.ReceiveWeapon();
       flow.beat=21;flow.routeIndex=2;
       const index=P012_WAVES.findIndex(w=>w.beat===21);flow.SpawnWave(P012_WAVES[index],index);
       const actors=flow.enemyRoutes.filter(e=>e.encounterBeat===21).map(e=>e.handle);
@@ -79,7 +82,7 @@ if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-v
       g.StepFrames(90);
       window.p012SalvageFixture={flow,actors,corpse:actors[0]};
       return {scope:"explicit local fixture; no campaign/tactical balance claim",player:g.player.position.toArray(),
-        ammo:g.state.ammo,clips:g.state.clips,grenades:g.state.grenades,
+        weapon:g.Debug.Slots().weapon,ammo:g.state.ammo,clips:g.state.clips,grenades:g.state.grenades,
         actors:actors.map(a=>({id:a.id,health:a.health,position:a.position.toArray()})),drop:{...actors[0].drop}};
     });
     await page.screenshot({path:path.join(os.tmpdir(),"Scene_P012SalvageBefore.png")});
@@ -122,7 +125,7 @@ if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-v
     });
     const result={setup,grenade,pickup,shot,problems};
     fs.writeFileSync(path.join(os.tmpdir(),"Data_P012SalvageFixture.json"),JSON.stringify(result,null,2));
-    Check("空步枪仍可真实G投雷伤敌",setup.ammo===0&&setup.clips===0&&grenade.grenades===1&&grenade.detonated
+    Check("空步枪仍可真实G投雷伤敌",setup.weapon==="HanYang"&&setup.ammo===0&&setup.clips===0&&grenade.grenades===1&&grenade.detonated
       &&grenade.after.some(a=>a.health<grenade.before.find(b=>b.id===a.id).health),JSON.stringify(grenade.effect));
     Check("真实走近可见尸体F缴获同一把枪",pickup.walk.length>0&&pickup.clear&&pickup.after.taken
       &&pickup.after.weapon===pickup.drop.weaponId&&pickup.after.ammo>0&&pickup.after.pickups===pickup.before.pickups+1);

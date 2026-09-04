@@ -5,7 +5,7 @@ import { VOICE_LINES as PROLOGUE_VOICE_LINES } from "./Data_MissionCh0.mjs";
 import { FIRST_LEVEL_P012_LAYOUT, P012_ZONES, P012_SEMANTIC_COLORS,
   P012_ANCHORS, P012_ROUTES, P012_ENEMY_LANES,
   P012_BLUEPRINT_ANCHORS, P012_BLUEPRINT_ROUTES } from "./Data_FirstLevelP012Layout.mjs";
-import { P012MapPoints, P012RailPoint } from "./Data_FirstLevelP012Space.mjs";
+import { P012MapPoints, P012RailPoint, P012StationPoint } from "./Data_FirstLevelP012Space.mjs";
 import { openingActivities, openingStoryBeats } from "./Data_FirstLevelP012Opening.mjs";
 export { FIRST_LEVEL_P012_LAYOUT, P012_SEMANTIC_COLORS };
 export const FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID = "FirstLevelP012Whitebox";
@@ -97,19 +97,32 @@ const storyBeats = Object.freeze([
     ...(voiceGate[beat.voice] !== undefined ? { p012Beat: voiceGate[beat.voice] } : {}),
   }))]);
 
+// Station records are compiled explicitly, once. Moving the station does not
+// move the village hub, north tactical island or wounded coming from the east.
+const stationActivities = P012MapPoints({
+  openingCastParking:Array.from({length:6},(_,slot)=>({x:-30-slot*3,z:48})),
+  weaponReceivePosition:{x:-57.2,z:45.8},weaponReceiveAnchor:{x:-57.2,z:44.75},
+  weaponIssuePosition:{x:-57,z:35.7},weaponIssueAnchor:{x:-57,z:34.6},
+  weaponInspectPosition:{x:-47,z:37.5},
+  weaponGuideRoute:[{x:-55,z:43},{x:-55,z:33}],
+  weaponGuideFacing:[{x:-57.2,z:44},{x:-57,z:34}],
+}, P012StationPoint);
+
 export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
   id: FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID, contentId: FIRST_CHAPTER.id,
   sandbox: true, sandboxKey: "firstLevelP012Whitebox", sandboxGlyph: "012",
   date: "P0/P1/P2 场景白盒", label: "第一关 · P0/P1/P2 场景白盒",
   place: "铁路兵站", sky: "p012WhiteboxDay", ambience: "smokyDay", music: null, minutes: 26,
-  brief: Object.freeze(["跟随罗班长下车，领取子弹并检查步枪。",
+  brief: Object.freeze(["跟随罗班长下车，领取枪弹后随队出发。",
     "灰：地面；黄：跨过；橙：翻越；紫：攀爬；蓝：掩体；黑：边界；红：危险；绿：任务路；青：担架路。"]),
   metaText: Object.freeze(["颜色语义白盒", "正式第一章人物与玩法", "节奏校准中"]),
   level: FIRST_CHAPTER, roster: FIRST_CHAPTER.roster, mechanics: FIRST_CHAPTER.mechanics,
   objectives: Object.freeze(zones.map((zone) => zone.name)), mechanic: "跟随小队，完成当前行动。",
   nraPool: FIRST_CHAPTER.pool.start, poolGain: 0, ijaPool: 37, ijaPressure: 0.72,
   ijaSpawn: FIRST_CHAPTER.tuning.ijaSpawn, ijaSupport: [],
-  ijaForce: FIRST_CHAPTER.tuning.ijaForce, loadoutOverride: FIRST_CHAPTER.tuning.loadoutOverride,
+  ijaForce: FIRST_CHAPTER.tuning.ijaForce,
+  loadoutOverride:Object.freeze({primary:null,secondary:null,melee:null,
+    throwables:Object.freeze({Grenade:0,GrenadeBundle:0}),spareClips:0}),
   bounds: FIRST_LEVEL_P012_LAYOUT.bounds, cameraFar: 1100, zones,
   spawn: Object.freeze({ ...P012_ANCHORS.trainSpawn, ry: 0 }),
   whitebox: Object.freeze({
@@ -117,31 +130,11 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
     enemyLanes: P012_ENEMY_LANES, friendlyLimit: 12,
     // Activity lengths are calibration inputs, never mandatory waiting clocks.
     activities: Object.freeze({...P012MapPoints({
-      openingCastParking:[{x:-52,z:62},{x:-49,z:62},{x:-46,z:62},{x:-43,z:62},{x:-49,z:65},{x:-46,z:65}],
-      openingCastRoute:[{x:-52,z:62},{x:-52,z:40},{x:-43,z:38},{x:-34,z:38},{x:-32,z:30},{x:-32,z:19},{x:-17,z:12},{x:0,z:0}],
-      traffic: Object.freeze([
-        ...[0,1,2].map(slot=>({side:0,slot,role:"soldier",releaseBeat:0,
-          proximityRelease:slot===0?{index:3,beat:2,radius:18}:undefined,
-          route:[{x:-54,z:66-slot*3},{x:-54,z:49-slot*3},{x:-54,z:40},{x:-43,z:38},{x:-34,z:38},{x:-32,z:30},{x:-32,z:18-slot*3}],pauseIndex:1})),
-        ...[0,1,2,3,4].map(slot=>({side:1,slot,role:"civilian",variant:slot%2?"female":"male",releaseBeat:0,
-          route:[{x:-59,z:8+slot*3},{x:-59,z:46+slot*3},...(slot<3
-            ? [{x:-59,z:58},{x:-56,z:62},{x:-52,z:62+slot*3}]
-            : [{x:-59,z:64+(slot-3)*3}])],pauseIndex:1})),
-        ...[0,1].map(slot=>({side:1,slot:5+slot,role:"walking",releaseBeat:1,
-          proximityRelease:slot===0?{index:1,beat:2,radius:18}:undefined,
-          route:[{x:-28,z:19+slot*3},{x:-28,z:30},{x:-34,z:40},{x:-43,z:42},{x:-50,z:42},{x:-50,z:52},{x:-52,z:54},{x:-52,z:56+slot*3}]})),
-      ]),
       guideSpeedMps: 3.05, guideRangeM: 12, routeRadiusM: 3, ambushRouteRadiusM: 0.6, observationConeRad: 0.42,
       guideSpeedByBeat: Object.freeze({ 0: 3.05, 2: 3.05, 4: 3.05, 5: 1.1, 11: 2 }),
       frontlineDoctrine: Object.freeze({ accuracyScale: 0.22, fireIntervalScale: 2.5, holdRadiusM: 2 }),
       frontlineAmmo: Object.freeze({ stockClips: 12, carryCapClips: 4, takeSeconds: 2.4 }),
-      weaponReceivePosition: { x: -57.2, z: 45.8 }, weaponReceiveAnchor: { x: -57.2, z: 44.75 },
-      weaponIssuePosition: { x: -57, z: 35.7 }, weaponIssueAnchor: { x: -57, z: 34.6 },
-      weaponInspectPosition: { x: -47, z: 37.5 },
-      weaponGuideRoute: [{x:-55,z:43},{x:-55,z:33},{x:-45,z:35}],
-      weaponGuideFacing: [{x:-57.2,z:44},{x:-57,z:34},{x:-47,z:36}],
       observationSeconds: 6.5, shellObservationSeconds: 3, shellGuideRangeM: 6,
-      trainRoute: P012_BLUEPRINT_ROUTES.trainExit, villageRoute: P012_BLUEPRINT_ROUTES.north.slice(2, 8),
       orientations: Object.freeze([]),
       shellCoverRoute: Object.freeze([{ x: 0, z: -22 }, { x: 3, z: -30 }, { x: 5, z: -38 }, { x: 5, z: -42 }]),
       ammoRoute: Object.freeze([{ x: -7, z: -52 }, { x: 0, z: -52 }, { x: 5, z: -46 }, { x: 5, z: -59 }, { x: 5, z: -65 }]),
@@ -227,7 +220,20 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       southAssemblyPosition:{x:42,z:94}, airCoverEntryPosition:{x:44,z:66},
       ditchContinuationRoute:[{x:44,z:66},{x:47,z:80},{x:42,z:94}],
     }),
+      ...stationActivities,
       ...openingActivities,
+      initialEquipment:Object.freeze({weapon:"HanYang",clips:3,grenades:6}),
+      openingIssue:Object.freeze({
+        spawns:Object.freeze(Array.from({length:6},(_,slot)=>P012StationPoint(-67.2,62+slot*1.7))),
+        exitRoute:Object.freeze([P012StationPoint(-66,61),P012StationPoint(-60,61),
+          P012StationPoint(-55,55),P012StationPoint(-55,44)]),
+        weaponPoint:P012StationPoint(-55,44),ammoPoint:P012StationPoint(-55,34),
+        musterRoute:Object.freeze([P012StationPoint(-51,34),P012StationPoint(-51,48)]),
+        musterPoints:stationActivities.openingCastParking,weaponSeconds:1,ammoSeconds:.8,
+      }),
+      trainRoute:P012_ROUTES.trainExit,villageRoute:P012_ROUTES.village,
+      openingCastRoute:Object.freeze([P012StationPoint(-29,48),P012StationPoint(-29,40),
+        ...P012_ROUTES.village.slice(1).map(point=>({x:point.x-1.4,z:point.z}))]),
       shellCoverRoute:P012_ROUTES.approach,
       binoculars:Object.freeze({guidePosition:{x:2,z:0}, recognitionSeconds:0.45,
         northSubjectPoint:{x:0,z:-17},southSubjectPoint:{x:30,z:10}}),

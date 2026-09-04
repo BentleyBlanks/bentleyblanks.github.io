@@ -12,6 +12,41 @@ export const P012_CAST_CLOTH_COLORS = Object.freeze({
 });
 export const P012_UNIFORM_MATERIAL_NAME = "Material #1721585337";
 
+// Opt-in for the six existing recruits only. Restore last sampled rotations
+// before mixer evaluation, so the temporary FK never accumulates into a clip.
+export function InstallP012OpeningPose(soldier) {
+  const actor=soldier?.actor,rig=actor?.characterRig;
+  if(!rig?.root||typeof rig.Update!=="function"||rig.p012OpeningPose)return false;
+  const arms=["L","R"].map(side=>[rig.bones?.[`upperArm${side}`],rig.bones?.[`forearm${side}`],rig.bones?.[`hand${side}`]]);
+  if(arms.some(chain=>chain.some(bone=>!bone)))return false;
+  const original=rig.Update,saved=new Map();let time=0;
+  rig.p012OpeningPose=true;
+  rig.Update=function UpdateP012OpeningPose(dt,state={}) {
+    for(const [bone,rotation] of saved)bone.quaternion.copy(rotation);
+    saved.clear();
+    const result=original.call(this,dt,state);
+    if(!soldier.p012AwaitingWeapon)return result;
+    time+=Math.max(0,dt);
+    const basis=actor.root||rig.root,world=basis.getWorldQuaternion(basis.quaternion.clone());
+    const moving=Math.min(1,Math.max(0,Number(state.moveSpeed??0)/3.05));
+    for(const [index,chain] of arms.entries())for(let joint=0;joint<2;joint++){
+      const bone=chain[joint],child=chain[joint+1];saved.set(bone,bone.quaternion.clone());
+      rig.root.updateWorldMatrix(true,true);
+      const start=bone.getWorldPosition(bone.position.clone()),end=child.getWorldPosition(child.position.clone());
+      const current=end.sub(start).normalize();
+      const desired=bone.position.clone().set(index===0?.12:-.12,-1,
+        .06+Math.sin(time*5+index*Math.PI)*.13*moving+(joint?.06:0)).normalize().applyQuaternion(world);
+      const correction=bone.quaternion.clone().setFromUnitVectors(current,desired);
+      const rotation=bone.getWorldQuaternion(bone.quaternion.clone()).premultiply(correction);
+      const parent=bone.parent.getWorldQuaternion(bone.quaternion.clone()).invert();
+      bone.quaternion.copy(parent.multiply(rotation));
+    }
+    rig.root.updateWorldMatrix(true,true);
+    return result;
+  };
+  return true;
+}
+
 export function ApplyP012CastAppearance(soldier, materialLibrary) {
   const color = P012_CAST_CLOTH_COLORS[soldier?.castId];
   const actor = soldier?.actor;

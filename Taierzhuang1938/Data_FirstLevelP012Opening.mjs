@@ -1,15 +1,21 @@
 // Opening-only world-space traffic and escort tuning. No scaled people or clocks.
+import { P012StationPoint } from "./Data_FirstLevelP012Space.mjs";
+import { P012_ROUTES } from "./Data_FirstLevelP012Layout.mjs";
 const Point = (x,z) => ({x,z});
 const soldiers=[0,1,2].map(slot=>({side:0,slot,role:"soldier",speedMps:3.05,releaseBeat:0,pauseIndex:1,
-  route:[Point(-54,66-slot*3),Point(-54,49-slot*3),Point(-54,40),Point(-43,38),
-    Point(-34,38),Point(-32,30),Point(-32,18-slot*3),Point(-17,12),Point(0,0),Point(0,-15-slot*3)]}));
+  route:[P012StationPoint(-54,66-slot*3),P012StationPoint(-54,49-slot*3),P012StationPoint(-54,40),
+    ...P012_ROUTES.village.map(point=>Point(point.x-1.4,point.z)),Point(0,-15-slot*3)]}));
+// A finite, sparse rearward column along the village road. Nobody uses the
+// military unloading platform or gun/ammo queue as a civilian thoroughfare.
+const southbound=[Point(1.4,-6),...P012_ROUTES.village.slice(2).reverse().map(point=>Point(point.x+1.4,point.z)),
+  ...P012_ROUTES.villageEvacuation.slice(1)];
 const civilians=Array.from({length:11},(_,slot)=>{
-  const lane=slot%2,row=Math.floor(slot/2),start=Point(-59+lane*3,36+row*3);
-  const retreat=slot<7;
+  const z=[-6,1,8,15,22,30,38,46,54,62,70][slot];
+  const next=southbound.findIndex(point=>point.z>z),a=southbound[Math.max(0,next-1)],b=southbound[next];
+  const start=Point(a.x+(b.x-a.x)*(z-a.z)/(b.z-a.z),z);
   return {side:1,slot,role:"civilian",variant:slot%2?"female":"male",releaseBeat:0,
-    retireWhenHidden:retreat,
-    route:[start,Point(start.x,54),Point(-59,54),Point(-59,52),Point(-52,52),Point(-52,50),
-      Point(-30,50),Point(-30,76),Point(-40-slot*2,76)]};
+    retireWhenHidden:slot<7,
+    route:[start,...southbound.slice(next,-1),Point(-18,155+slot*2.8)]};
 });
 export const openingActivities=Object.freeze({
   openingGuideWalkMps:3.05,openingGuideCatchupMps:5.246,openingGuideWaitDistanceM:10,

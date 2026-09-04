@@ -5,8 +5,8 @@ import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
-import { P012_ANCHORS, P012_ROUTES } from "./Data_FirstLevelP012Layout.mjs";
-import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
+import { P012_ANCHORS, P012_ROUTES, FIRST_LEVEL_P012_LAYOUT } from "./Data_FirstLevelP012Layout.mjs";
+import { P012SouthPoint, P012StationPoint } from "./Data_FirstLevelP012Space.mjs";
 import { openingActivities } from "./Data_FirstLevelP012Opening.mjs";
 import { VOICE_LINES as chapterVoices } from "./Data_MissionCh1.mjs";
 import { VOICE_LINES as prologueVoices } from "./Data_MissionCh0.mjs";
@@ -88,6 +88,35 @@ async function PlayPrelude() {
         if (window.p012PendingTrafficView) break;
         const objective = flow.objective;
         if (flow.beatIndex >= 6 || !game.player.Alive) break;
+        if(openingCausalityReview&&!bot.emptyHandsTested&&!flow.facts.includes("weapon")){
+          const before={...game.Debug.Slots(),ammo:game.state.ammo,clips:game.state.clips,shots:game.state.playerShots};
+          game.Debug.Mouse(0,true);game.StepFrames(2,1/30,false);game.Debug.Mouse(0,false);
+          const after={...game.Debug.Slots(),ammo:game.state.ammo,clips:game.state.clips,shots:game.state.playerShots};
+          if(before.weapon!==null||before.viewmodel!==null||before.ammo!==0||before.clips!==0)
+            throw new Error(`Rifle visible or ammunition present before issue: ${JSON.stringify(before)}`);
+          if(after.shots!==before.shots)throw new Error("Unissued rifle fired before actual pickup");
+          bot.emptyHandsTested=true;bot.pendingCausality={id:"BeforeRifleIssue",before,after};break;
+        }
+        if(openingCausalityReview&&flow.facts.includes("weapon")&&!bot.rifleCaptured){
+          const slots=game.Debug.Slots();
+          if(slots.weapon!=="HanYang"||slots.viewmodel!=="HanYang"||game.state.ammo!==0||game.state.clips!==0)
+            throw new Error(`Rifle issue did not produce the empty HanYang: ${JSON.stringify({slots,ammo:game.state.ammo,clips:game.state.clips})}`);
+          bot.rifleCaptured=true;bot.pendingCausality={id:"RifleReceived",at:flow.elapsed,
+            slots,ammo:game.state.ammo,clips:game.state.clips};break;
+        }
+        if(openingCausalityReview&&flow.beatIndex===2&&!bot.issueDepartureCaptured){
+          if(game.state.ammo!==0||game.state.clips!==3||game.Debug.P012Scene().weaponActionCount!==0)
+            throw new Error(`B02 departure wrongly requires loading or duplicates ammunition: ${JSON.stringify({ammo:game.state.ammo,clips:game.state.clips,scene:game.Debug.P012Scene().weaponActionCount})}`);
+          bot.issueDepartureCaptured=true;bot.pendingCausality={id:"AmmoIssueDeparture",at:flow.elapsed,
+            slots:game.Debug.Slots(),ammo:game.state.ammo,clips:game.state.clips,
+            weaponActionCount:game.Debug.P012Scene().weaponActionCount,position:game.player.position.toArray()};break;
+        }
+        if(openingCausalityReview&&flow.beatIndex===2&&flow.routeIndex>=1&&!bot.unloadedMovementCaptured){
+          if(game.state.ammo!==0||game.state.clips!==3||game.Debug.P012Scene().weaponActionCount!==0)
+            throw new Error("Ordinary departure movement unexpectedly loaded or changed issued ammunition");
+          bot.unloadedMovementCaptured=true;bot.pendingCausality={id:"UnloadedVillageDeparture",at:flow.elapsed,
+            ammo:game.state.ammo,clips:game.state.clips,routeIndex:flow.routeIndex,position:game.player.position.toArray()};break;
+        }
         if(openingCausalityReview&&flow.beatIndex===4){
           const ditch=DitchEvidence();
           if(!bot.lastDitch?.northCovered&&ditch.northCovered){
@@ -205,7 +234,7 @@ async function PlayPrelude() {
             Key("KeyF", true);
           }
         } else Key("KeyF", false);
-        if (objective.requiredAction === "reload" && distance < 2.7 && bot.frame % 60 === 0) game.Debug.Key("KeyR");
+        if (flow.beatIndex !== 1 && objective.requiredAction === "reload" && distance < 2.7 && bot.frame % 60 === 0) game.Debug.Key("KeyR");
         game.StepFrames(1, 1 / 30, false);
         bot.frame += 1;
       }
@@ -244,12 +273,28 @@ async function PlayPrelude() {
       guide: result.scene?.guidePosition, trafficReady: result.scene?.trafficReady }));
     if (result.stalled || !result.alive || result.flow.beatIndex >= 6) break;
   }
-  Check(result.flow.beatIndex >= 6, "真实移动、观察、验枪与搬弹完成开场",
+  Check(result.flow.beatIndex >= 6, "真实移动、领取枪弹、观察与搬弹完成开场",
     result.flow.beatIndex >= 6 ? `${result.flow.elapsed.toFixed(1)}s` : JSON.stringify(result));
   Check(result.carry === null, "弹药实际交付后释放双手，能够拔枪");
   if(openingCausalityReview){
+    const trafficEvidence=await page.evaluate(()=>({views:window.p012TrafficViews,captured:window.p012TrafficCapturedBeats}));
+    await fs.writeFile(path.join(outputDir,"Data_P012OpeningTrafficEvidence.json"),JSON.stringify(trafficEvidence,null,2));
+    Check(trafficEvidence.views.length>0&&trafficEvidence.views.every(view=>view.platformCivilians.length===0),
+      "百姓不进入真实兵站站台矩形，不以全局零百姓代替空间验收");
+    Check(trafficEvidence.views.some(view=>view.actors.some(actor=>actor.side===0&&actor.visible
+      &&Math.hypot(actor.speedX,actor.speedZ)>.2)),"独立观察验收：北行军需组实际移动且进入玩家视野");
+    Check(trafficEvidence.views.some(view=>{
+      const visible=view.actors.filter(actor=>actor.role==="civilian"&&actor.visible&&Math.hypot(actor.speedX,actor.speedZ)>.2);
+      return visible.length>=3&&Math.max(...visible.map(actor=>actor.distance))-Math.min(...visible.map(actor=>actor.distance))>=10;
+    }),"独立观察验收：至少三名实际移动百姓形成远近纵列，不作为B02隐藏完成门");
+    Check(["StationPlatform","StationNorthExit","VillageGroup"].every(id=>trafficEvidence.captured.includes(id)),
+      "真实步行取得站台、兵站北口、村路群体玩家视角");
     const evidence=await page.evaluate(()=>({borrow:!!window.p012ReviewBot.borrowNegatives,chat:!!window.p012ReviewBot.chatCaptured,impact:!!window.p012ReviewBot.impactCaptured,
-      ditch:!!window.p012ReviewBot.ditchCaptured,earlyProne:window.p012ReviewBot.earlyDitchNegative}));
+      ditch:!!window.p012ReviewBot.ditchCaptured,earlyProne:window.p012ReviewBot.earlyDitchNegative,
+      emptyHands:!!window.p012ReviewBot.emptyHandsTested,rifle:!!window.p012ReviewBot.rifleCaptured,
+      issued:!!window.p012ReviewBot.issueDepartureCaptured,unloadedMovement:!!window.p012ReviewBot.unloadedMovementCaptured}));
+    Check(evidence.emptyHands&&evidence.rifle&&evidence.issued&&evidence.unloadedMovement,
+      "空手封火、实际领枪领弹及不强制装弹的真实出发取证齐全");
     Check(evidence.borrow&&evidence.chat&&evidence.impact&&evidence.ditch&&evidence.earlyProne&&!evidence.earlyProne.northCovered,
       "真实借镜、炮击、早路点低姿不算入沟及实际沟岸遮挡取证齐全",JSON.stringify(evidence));
   }
@@ -1093,8 +1138,8 @@ async function CaptureStationView(view) {
   const saved=await page.evaluate(()=>({yaw:window.Tengxian.player.yaw,pitch:window.Tengxian.player.pitch}));
   const views=view.id==="Descent"
     ? [["DescentLookDown",null]]
-    : [["TrainLookBack",{x:-66,y:2,z:59}],["StationDistricts",{x:-42,y:1.2,z:68}],
-      ["TrainEngine",{x:-66,y:2.3,z:31}]];
+    : [["TrainLookBack",{...P012StationPoint(-66,59),y:2}],["StationDistricts",{...P012StationPoint(-42,68),y:1.2}],
+      ["TrainEngine",{...P012StationPoint(-66,31),y:2.3}]];
   try {
     for(const [id,point] of views) {
       const evidence=await page.evaluate(({id,point})=>{
@@ -1120,13 +1165,14 @@ async function VerifyStationDescent() {
     scope:"cold start and normal PlayPrelude input; photographs are observations, not production camera control"}));
   await fs.writeFile(path.join(outputDir,"Data_P012StationDescent.json"),JSON.stringify(evidence,null,2));
   const samples=evidence.samples||[],first=samples[0];
-  Check(first&&Math.hypot(first.player.x+66,first.player.z-65)<.1
+  const spawn=P012_ANCHORS.trainSpawn,door=P012_ANCHORS.trainDoor;
+  Check(first&&Math.hypot(first.player.x-spawn.x,first.player.z-spawn.z)<.1
     &&Math.abs(first.player.y-1.25)<.08&&Math.abs(first.groundAt-1.25)<.001,
     "兵站出生脚底真实位于车厢1.25m地板",JSON.stringify(first));
   let cursor=0;
   for(const height of [1,.75,.5,.25,0]) {
     const index=samples.findIndex((sample,i)=>i>cursor&&sample.player.x>-63.7&&sample.player.x<-59.5
-      &&Math.abs(sample.player.z-61)<1.5&&Math.abs(sample.groundAt-height)<.001
+      &&Math.abs(sample.player.z-door.z)<1.5&&Math.abs(sample.groundAt-height)<.001
       &&Math.abs(sample.player.y-height)<.1);
     Check(index>cursor,`真实脚底依次接触下车台阶${height}m`);
     cursor=index;
@@ -1367,14 +1413,30 @@ try {
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 180000 });
   if (audioSmoke) await page.click("#bootStart");
-  await page.evaluate(() => {
+  await page.evaluate(async ({openingPhotoPoints,platformBounds}) => {
     const game = window.Tengxian, originalHit = game.player.TakeHit;
+    const {FirstLevelP012Runtime}=await import("./Script_FirstLevelP012Runtime.mjs");
+    const originalIssue=FirstLevelP012Runtime.prototype.StepOpeningIssue;
+    window.p012EquipmentCallbacks=[];window.p012OpeningIssueTrace=[];
+    FirstLevelP012Runtime.prototype.StepOpeningIssue=function(...args){
+      if(!this.host.p012TestIssueObserved){
+        this.host.p012TestIssueObserved=true;
+        const original=this.host.SetOpeningEquipment;
+        this.host.SetOpeningEquipment=function(actor,stage){
+          const result=original?.call(this,actor,stage);
+          window.p012EquipmentCallbacks.push({at:game.Debug.P012().elapsed,id:actor.id,stage,
+            unarmed:actor.unarmed,ammo:actor.ammo,weapon:actor.weaponId,position:actor.position.toArray()});
+          return result;
+        };
+      }
+      return originalIssue.apply(this,args);
+    };
     window.p012DamageTrace = [];
     window.p012ActivityTrace = [];
     window.p012AirViews = [];
     window.p012TrafficViews = [];
     window.p012TrafficCapturedBeats = [];
-    window.p012PopulationMax = { armed: 0, unarmed: 0 };
+    window.p012PopulationMax = { armed: 0, unarmed: 0,rawUnarmed:0,temporaryUnissuedSoldiers:0,civilianWounded:0 };
     window.p012CrowdFireCues = [];
     window.p012AirGroundShots = [];
     window.p012AirImpacts = [];
@@ -1469,10 +1531,18 @@ try {
         }
         if (after.elapsed <= before.elapsed) continue;
         const friendly = game.ai.soldiers.filter(actor => actor.alive && actor.side === "nra");
+        const openingCast=game.Debug.P012Scene().openingCast||[];
+        const temporaryIds=new Set(openingCast.filter(entry=>!entry.weaponIssued).map(entry=>entry.actorId));
+        const temporary=friendly.filter(actor=>actor.unarmed&&temporaryIds.has(actor.id)).length;
+        const rawUnarmed=friendly.filter(actor=>actor.unarmed).length;
         window.p012PopulationMax.armed = Math.max(window.p012PopulationMax.armed, friendly.filter(actor => !actor.unarmed).length);
-        window.p012PopulationMax.unarmed = Math.max(window.p012PopulationMax.unarmed, friendly.filter(actor => actor.unarmed).length);
+        window.p012PopulationMax.unarmed = Math.max(window.p012PopulationMax.unarmed,rawUnarmed-temporary);
+        window.p012PopulationMax.civilianWounded=window.p012PopulationMax.unarmed;
+        window.p012PopulationMax.rawUnarmed=Math.max(window.p012PopulationMax.rawUnarmed,rawUnarmed);
+        window.p012PopulationMax.temporaryUnissuedSoldiers=Math.max(window.p012PopulationMax.temporaryUnissuedSoldiers,temporary);
         if (after.beatIndex <= 2 && after.elapsed - lastTrafficViewAt >= .5) {
           lastTrafficViewAt = after.elapsed;
+          window.p012OpeningIssueTrace.push({at:after.elapsed,player:game.player.position.toArray(),cast:openingCast});
           const actors = friendly.filter(actor => actor.p012TrafficSide !== undefined).map(actor => {
             const at = actor.position.clone(); at.y += 1.2;
             const screen = at.clone().project(game.camera), delta = at.sub(game.player.EyePosition), distance = delta.length();
@@ -1487,7 +1557,10 @@ try {
                 && (!hit || hit.t >= distance - .3) };
           });
           const view = { at: after.elapsed, beat: after.beat, player: game.player.position.toArray(),
-            yaw: game.player.yaw, pitch: game.player.pitch, actors, population: { ...window.p012PopulationMax } };
+            yaw: game.player.yaw, pitch: game.player.pitch, actors, population: { ...window.p012PopulationMax },
+            platformBounds,platformCivilians:actors.filter(actor=>actor.role==="civilian"
+              &&Math.abs(actor.position[0]-platformBounds.x)<=platformBounds.w/2
+              &&Math.abs(actor.position[2]-platformBounds.z)<=platformBounds.d/2).map(actor=>actor.id) };
           window.p012TrafficViews.push(view);
           const movingVisible = actors.filter(actor => actor.visible && actor.distance < 24
             && Math.hypot(actor.speedX, actor.speedZ) > .2);
@@ -1499,6 +1572,17 @@ try {
           if (!window.p012TrafficCapturedBeats.includes(view.captureId) && opposed) {
             window.p012TrafficCapturedBeats.push(view.captureId);
             window.p012PendingTrafficView = view;
+          }
+          // Capture the actual player's unmodified view at three spatial
+          // milestones even when the crowd is not yet visible; never select
+          // a flattering camera or turn a missing crowd into a passing fact.
+          const place=openingPhotoPoints.find(point=>after.beatIndex===point.beat
+            &&Math.hypot(game.player.position.x-point.x,game.player.position.z-point.z)<point.radius
+            &&!window.p012TrafficCapturedBeats.includes(point.id));
+          if(place&&!window.p012PendingTrafficView){
+            window.p012TrafficCapturedBeats.push(place.id);
+            window.p012PendingTrafficView={...view,captureId:place.id,
+              scope:"actual prelude player viewpoint; no position, camera or fact writes"};
           }
         }
         if (after.beatIndex >= 15 && after.beatIndex <= 20 && after.elapsed - lastAirViewAt >= 0.25) {
@@ -1556,14 +1640,18 @@ try {
         bullet: !!args[3]?.bullet, blast: !!args[3]?.blast });
       return result;
     };
-  });
-  if(stationReview) await page.evaluate(()=>{
+  },{openingPhotoPoints:[
+    {id:"StationPlatform",...P012StationPoint(-56,55),beat:0,radius:3},
+    {id:"StationNorthExit",...P012StationPoint(-43,35),beat:2,radius:4},
+    {id:"VillageGroup",x:-30,z:62,beat:2,radius:4},
+  ],platformBounds:FIRST_LEVEL_P012_LAYOUT.blocks.find(block=>block.id==="StationPlatformApron")});
+  if(stationReview) await page.evaluate(({platformLimit,door})=>{
     const game=window.Tengxian,originalStep=game.StepFrames;
     window.p012StationTrace=[];window.p012StationViews=[];
     const captures=new Set();
     const Record=()=>{
       const flow=game.Debug.P012();
-      if(flow.beatIndex>1)return;
+      if(flow.beatIndex>2)return;
       const leader=game.ai.soldiers.find(actor=>actor.castId==="luo");
       const scene=game.Debug.P012Scene(),p=game.player.position;
       const sample={at:flow.elapsed,beat:flow.beat,player:{x:p.x,y:p.y,z:p.z},
@@ -1579,10 +1667,10 @@ try {
       // Capture the actual reached platform objective, never demand an extra
       // unrequested step or reposition the player just for a photograph.
       const target=flow.objective.target;
-      const platformReached=flow.beatIndex===1&&flow.routeIndex>=1&&target
-        &&p.x>-50&&p.z<43&&Math.abs(p.y)<.1&&Math.abs(sample.groundAt)<.001
+      const platformReached=flow.beatIndex===2&&flow.facts.includes("issuedAmmo")&&target
+        &&p.x>platformLimit.x&&p.z<platformLimit.z&&Math.abs(p.y)<.1&&Math.abs(sample.groundAt)<.001
         &&Math.hypot(p.x-target.x,p.z-target.z)<=Math.max(.9,flow.objective.arrivalRadiusM||0);
-      const id=p.x>-63.7&&p.x<-60&&Math.abs(sample.groundAt-.75)<.001
+      const id=p.x>-63.7&&p.x<-60&&Math.abs(p.z-door.z)<1.5&&Math.abs(sample.groundAt-.75)<.001
         &&Math.abs(p.y-.75)<.1?"Descent":platformReached?"Platform":null;
       if(id&&!captures.has(id)&&!window.p012PendingStationView){
         captures.add(id);window.p012PendingStationView={id,sample};
@@ -1592,7 +1680,7 @@ try {
     game.StepFrames=function(count=1,dt=1/60,render=true){
       for(let i=0;i<count;i++){originalStep(1,dt,render);Record();}
     };
-  });
+  },{platformLimit:P012StationPoint(-50,43),door:P012_ANCHORS.trainDoor});
   if (process.argv.includes("--voice-timing")) {
     const durations = Object.fromEntries([...prologueVoices, ...chapterVoices].map(line => [line.key, line.dur]));
     const count = await page.evaluate(durations => {
@@ -1643,6 +1731,13 @@ try {
   if (process.argv.includes("--overview")) await CaptureLayoutOverview();
   if (audioSmoke) await VerifyAudioPlayback();
   const traffic = await page.evaluate(() => ({ views: window.p012TrafficViews, population: window.p012PopulationMax }));
+  const issue=await page.evaluate(()=>({trace:window.p012OpeningIssueTrace,callbacks:window.p012EquipmentCallbacks}));
+  await fs.writeFile(path.join(outputDir,"Data_P012OpeningIssue.json"),JSON.stringify(issue,null,2));
+  if(openingCausalityReview){
+    Check(issue.callbacks.length>0&&issue.callbacks.every((row,index,all)=>
+      all.findIndex(other=>other.id===row.id&&other.stage===row.stage)===index),
+      "同批军人真实领取回调每人每类仅一次",JSON.stringify(issue.callbacks));
+  }
   await fs.writeFile(path.join(outputDir, "Data_P012TrafficViews.json"), JSON.stringify(traffic, null, 2));
   Check(traffic.population.armed <= 12 && traffic.population.unarmed <= 15,
     "实际全程友军战斗角色不超12、无枪群众伤员不超15", JSON.stringify(traffic.population));
@@ -1663,6 +1758,8 @@ try {
       trace: window.p012CombatReview?.trace, diveTrace: window.p012CombatReview?.diveTrace,
       rewindCount: window.p012CombatReview?.rewindCount,
       damageTrace: window.p012DamageTrace || [],
+      trafficViews:window.p012TrafficViews||[],population:window.p012PopulationMax,
+      openingIssue:{trace:window.p012OpeningIssueTrace||[],callbacks:window.p012EquipmentCallbacks||[]},
       interact: game?.Debug.Interact(), strafe: game?.Debug.Strafe.State(),
       story: { fired: game?.story.fired, signals: [...(game?.story.signals || [])],
         immediate: game?.story.p012Immediate, cueLog: game?.story.p012CueLog } };

@@ -1,10 +1,12 @@
-// P012 station replacement, WORLD coordinates; do not run P012MapPoints on this.
+// P012 station replacement: local authored points compile once at export through
+// P012StationPoint. Exported records are WORLD coordinates; do not remap them.
 // Pure BoxGrammar: y is box centre, top=y+h/2; no rx/rz, assets or textures.
 // BLOCKS includes the identical SURFACES objects; render BLOCKS once and register
 // SURFACES as layout.walkableSurfaces for the shared height contract. Do not retain
 // the old analytic y=0 spawn assumption inside the carriage or on its steps.
 // Ground-painted aprons are non-solid; train floors/steps are actual support.
 import { TRAVERSAL } from "./Data_Traversal.mjs";
+import { P012StationPoint } from "./Data_FirstLevelP012Space.mjs";
 const blocks=[],surfaces=[];
 function Box(id,x,z,w,d,h,semantic="boundary",extra={}){
   // Solid grey shells are structures, never advertised as walkable ground.
@@ -68,8 +70,8 @@ for(const side of [-1,1]){
 }
 // Continuous paired rails visibly coincide with wheels; sleepers break the old
 // black-wall silhouette. They are under the car and do not raise public lanes.
-for(const side of [-1,1])Add(Box(`StationRail${side}`,-66+side*.75,-32.5,.13,315,.14,"boundary",{y:.07,solid:false}));
-for(let z=-189,index=0;z<=125;z+=1.8,index++)Add(Box(`StationSleeper${index}`,-66,z,3.3,.28,.08,"boundary",{y:.04,solid:false}));
+for(const side of [-1,1])Add(Box(`StationRail${side}`,-66+side*.75,-2.5,.13,375,.14,"boundary",{y:.07,solid:false}));
+for(let z=-189,index=0;z<=185;z+=1.8,index++)Add(Box(`StationSleeper${index}`,-66,z,3.3,.28,.08,"boundary",{y:.04,solid:false}));
 // The through line stays at x=-66. A southern turnout branches into a short
 // loading siding at x=-72; it is not a second, disconnected horizon mainline.
 const turnoutYaw=Math.atan2(-6,18);
@@ -80,7 +82,7 @@ for(let z=124.8,index=0;z<=165;z+=1.8,index++)Add(Box(`StationLoadingSidingSleep
 Add(Box("StationLoadingSidingBallast",-72,144,5.6,42,.06,"ground",{y:.015,solid:false}),
  Box("StationLoadingSidingBuffer",-72,165.5,3.6,.5,1,"structure"));
 for(const side of [-1,1])Add(Box(`StationLoadingSidingBufferPost${side}`,-72+side*1.3,165.5,.35,.65,1.3,"structure"));
-Add(Box("StationRailBallast",-66,-32.5,5.6,315,.06,"ground",{y:.015,solid:false}),
+Add(Box("StationRailBallast",-66,-2.5,5.6,375,.06,"ground",{y:.015,solid:false}),
  // Apron paint stays below the green 0.025m route paint; never coplanar.
  Box("StationPlatformApron",-57,62,10,17,.01,"ground",{y:.005,solid:false}));
 
@@ -105,10 +107,14 @@ for(const [id,x,z,w,d] of [["Unload",-35,57,6,7],["Wounded",-45,83,10,7]]){
 // Blue low beds distinguish the separate rearward casualty shelter without text.
 for(const [i,x] of [-48,-44].entries())Add(Box(`StationWoundedBed${i}`,x,83,1.2,2.6,.5,"cover"));
 
-export const P012_STATION_BLOCKS=Object.freeze(blocks);
-export const P012_STATION_SURFACES=Object.freeze(surfaces);
+// Keep the continuous mainline in world space; move only the station package.
+// Shared support records must remain identical to their rendered block records.
+const compiled=new Map(blocks.map(block=>[block,Object.freeze(/^Station(?:Rail-?1|Sleeper\d+|RailBallast)$/.test(block.id)
+ ? block : {...block,...P012StationPoint(block.x,block.z)})]));
+export const P012_STATION_BLOCKS=Object.freeze([...compiled.values()]);
+export const P012_STATION_SURFACES=Object.freeze(surfaces.map(surface=>compiled.get(surface)));
 export const P012_STATION_GATES=Object.freeze([
- Box("TrainDoor",-63.6,61,.22,4.4,2.7,"ground",{y:2.6,signal:"P012TrainDoor"}),
+ Box("TrainDoor",-63.6,121,.22,4.4,2.7,"ground",{y:2.6,signal:"P012TrainDoor"}),
 ]);
 // Regex strings anchored to exact OLD families. Never use /^Station/ after
 // appending this module, which would erase the new assets and traversal fixtures.

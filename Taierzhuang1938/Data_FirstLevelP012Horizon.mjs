@@ -58,10 +58,10 @@ for(const [cluster,x,z] of [["West",-218,38],["North",113,-310],["East",315,86],
       Box(`${cluster}Roof${i}`,px,pz,9+i%2*3,12,.45,"structure",{y:h+.225}));
   }
 }
-// Match Station's ground-level axis/gauge and exact z=-190..125 endpoints.
+// Match Station's ground-level axis/gauge and exact z=-190..185 endpoints.
 // The elevated return spur stays untouched. Track vanishes into a remote earth
 // cutting, never a ground hole or a sudden raised embankment.
-for(const [id,from,to] of [["North",-412,-190],["South",125,352]]) {
+for(const [id,from,to] of [["North",-412,-190],["South",185,352]]) {
   blocks.push(Box(`Rail${id}Bed`,-66,(from+to)/2,5.6,to-from,.06,"ground",{y:.015,solid:false}));
   for(const x of [-66.75,-65.25]) blocks.push(Box(`Rail${id}${x< -66?"West":"East"}`,
     x,(from+to)/2,.13,to-from,.14,"boundary",{y:.07,solid:false}));

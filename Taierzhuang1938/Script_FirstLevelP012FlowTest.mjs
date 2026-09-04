@@ -62,7 +62,7 @@ let checkWeaponCalls = 0;
 let currentGrenades = 0;
 let smokeDeployments = 0;
 let bandagesIssued = 0;
-let binocularOwned=false,northReactions=0;
+let binocularOwned=false,northReactions=0,riflesReceived=0;
 const flow = new FirstLevelP012Director({
   Register: (spec) => points.set(spec.id, spec), Carry: () => carry,
   Signal: (name) => signals.add(name), Signalled: (name) => signals.has(name),
@@ -71,6 +71,7 @@ const flow = new FirstLevelP012Director({
   GiveClips: (request) => { currentClips += request; return request; },
   GiveBandages: (request) => { bandagesIssued += request; return request; },
   CheckWeapon: () => { checkWeaponCalls++; },
+  ReceiveWeapon: () => { riflesReceived++; return true; },
   SetBinocularsOwned:owned=>{binocularOwned=owned;},NorthNearMissReaction:()=>{northReactions++;},
   GiveGrenades: (request) => { currentGrenades += request; return request; },
   DeployRetreatSmoke: () => { smokeDeployments++; return true; },
@@ -110,9 +111,17 @@ assert.equal(flow.State().beat, "B00", "door proximity alone does not replace tr
 Walk(phase.whitebox.activities.trainRoute);
 assert.equal(flow.State().beat, "B01");
 Use("p012_weaponCheck"); Tick();
-assert.equal(flow.State().beat, "B01", "supply interaction alone does not complete weapon handling");
+assert.equal(flow.State().beat, "B01", "receiving a rifle still requires the single ammunition issue");
+assert.equal(points.get("p012_weaponCheck").Enabled(),false,"rifle issue cannot be repeated");
+assert.equal(points.get("p012_weaponCheck").OnComplete(),false,"stale repeated rifle completion is rejected");
+assert.equal(riflesReceived,1,"exactly one rifle reaches the inventory host");
 Use("p012_ammoIssue");
-Tick({weaponActionCount:1,position:phase.whitebox.activities.weaponInspectPosition});
+assert.equal(points.get("p012_ammoIssue").Enabled(),false,"ammunition issue cannot be repeated");
+const issueCalls=checkWeaponCalls;
+assert.equal(points.get("p012_ammoIssue").OnComplete(),false,"stale repeated ammunition completion is rejected");
+assert.equal(checkWeaponCalls,issueCalls,"repeat completion cannot refill ammunition");
+Tick({weaponActionCount:0,position:phase.whitebox.activities.weaponIssuePosition});
+assert.equal(flow.State().beat,"B02","issued ammunition permits departure without an obligatory reload or inspection trip");
 assert.equal(flow.State().checkpointId, "CP00");
 const villageRoute = phase.whitebox.activities.villageRoute;
 Tick({zone:"Z01",position:P012Point(70,100),guidePosition:villageRoute[2],guideRouteIndex:3,trafficReady:false});
@@ -122,9 +131,8 @@ for (let i=0;i<villageRoute.length;i++) {
   Tick({zone:"Z01",position:{x:point.x+3.1,z:point.z},guidePosition:{x:point.x+1.9,z:point.z},
     guideRouteIndex:Math.min(i+1,villageRoute.length-1),trafficReady:false});
 }
-assert.equal(flow.State().routeIndex,villageRoute.length,"following 1.2m behind guide acknowledges nodes outside old 3m circle");
-assert.equal(flow.State().beat,"B02","route alone does not fabricate opposing village traffic");
-Tick({trafficReady:true});
+assert.equal(flow.State().beat,"B03","following the physical village route proceeds without a hidden requirement to spot both traffic streams");
+assert.equal(sample.trafficReady,false,"progress does not fabricate an opposing-traffic observation");
 const issuedBeforeHub=checkWeaponCalls;
 At("Z02"); Tick({yaw:1.4});
 assert.equal(points.has("p012_hubSupply"),false,"B03 does not register a second ammunition issue");

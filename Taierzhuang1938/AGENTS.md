@@ -260,6 +260,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Data_FirstLevelP012Whitebox.mjs` 管独立 phase、现有角色/对白适配和节奏参数。
 - `Data_FirstLevelP012Space.mjs` 只在配置初始化时把原稿点位编译到扩展战场；
   北／东南战术区刚性平移，跨区连接另写世界路线，禁止二次变换或缩放角色／掩体／速度。
+  兵站包使用显式 `P012StationPoint`，不加入自动区域分类；连续主轨保持世界坐标拼接。
 - `Data_FirstLevelP012Station.mjs` / `Data_FirstLevelP012Horizon.mjs` 是已编译世界坐标的兵站与远景体块；
   台阶顶面由 `Script_FirstLevelWhiteboxField.mjs` 与可见体块对账，共用地表采样，不能再做坐标变换。
 - `Data_FirstLevelP012Opening.mjs` 管开场两向人流和纯字幕；`Script_FirstLevelP012Binoculars.mjs`
@@ -271,6 +272,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   适配真实演员、人流、防守、炮击与扑沟输入。不能以目标时刻或虚拟队头替代真实完成。
 - `Script_FirstLevelP012CastAppearance.mjs` 只在本白盒给具名同伴的衣服使用私有纯色材质；
   不修改人物源资产、肤色或武器，不把临时识别色带入正式关卡。ActorTest 验共享材质隔离。
+  同批军人在 `openingIssue` 中实际下车、领械后出发；未领枪的局部空手姿态通过
+  `InstallP012OpeningPose` 适配，领枪后恢复原动作，不改正式角色的全局姿态表。
 - 几何、Flow、Runtime、Actor 均有同名 `Test`；`Script_FirstLevelP012BrowserTest.mjs`
   的 `--prelude --geometry` 验证实际开场和通行，`--campaign` 驱动整关真实移动/射击/交互。
   测试夹具的传送不计入通关时长；验收证据与设计来源见 `docs/Data_FirstLevelP012Acceptance.md`。

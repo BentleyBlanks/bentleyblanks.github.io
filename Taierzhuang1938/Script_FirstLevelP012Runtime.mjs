@@ -122,32 +122,88 @@ export class FirstLevelP012Runtime {
     if (shell.done) return;
     shell.done = true; this.mortarImpactPosition = { x: point.x, z: point.z }; this.mortarImpactCount++;
   }
-  StepOpeningCast() {
+  StepOpeningIssue(entry, dt) {
+    const issue=this.config.activities.openingIssue,at=this.host.Position(entry.actor);
+    if(!at)return;
+    const steps=entry.issueSteps;
+    let step=steps[entry.issueIndex];
+    if(!step){entry.stage="muster";entry.issueComplete=true;return;}
+    entry.stage=step.stage;
+    if(Math.hypot(at.x-step.point.x,at.z-step.point.z)<.4){
+      entry.issueHold=(entry.issueHold||0)+Math.max(0,dt);
+      if(entry.issueHold<(step.seconds||0)){this.host.Move(entry.actor,at,0);return;}
+      if(step.equipment&&!entry[`${step.equipment}Issued`]){
+        entry[`${step.equipment}Issued`]=true;this.host.SetOpeningEquipment?.(entry.actor,step.equipment);
+      }
+      entry.issueIndex++;entry.issueHold=0;step=steps[entry.issueIndex];
+      if(!step){entry.stage="muster";entry.issueComplete=true;this.host.Move(entry.actor,at,0);return;}
+    }else entry.issueHold=0;
+    this.MoveOpeningQueued(entry,step.point,issue.speedMps||3.05,dt);
+  }
+  MoveOpeningQueued(entry,point,speed,dt) {
+    const at=this.host.Position(entry.actor),dx=point.x-at.x,dz=point.z-at.z,distance=Math.hypot(dx,dz);
+    if(distance<.001){this.host.Move(entry.actor,at,0);return;}
+    let travel=Math.min(distance,8);
+    // Test the whole proposed forward segment against the actual bodies ahead,
+    // not a shared route cursor which could let followers pass a waiting man.
+    for(const other of this.openingCast){
+      if(other===entry||other.actor.alive===false)continue;
+      const p=this.host.Position(other.actor);if(!p)continue;
+      const x=p.x-at.x,z=p.z-at.z,along=(x*dx+z*dz)/distance;
+      const lateral=Math.abs(x*dz-z*dx)/distance;
+      if(along>0&&lateral<1.5)travel=Math.min(travel,Math.max(0,along-Math.sqrt(2.25-lateral*lateral)));
+    }
+    speed=Math.min(speed,travel/Math.max(dt,.001));
+    this.host.Move(entry.actor,travel>.01?{x:at.x+dx/distance*travel,z:at.z+dz/distance*travel}:at,travel>.01?speed:0);
+  }
+  StepOpeningCast(dt = .1) {
     const activity=this.config.activities,parking=activity?.openingCastParking;
     if(!parking?.length)return;
     if(!this.openingCast){
       const guide=this.host.GuideActor();
       this.openingCast=(this.host.FriendlyActors?.()||[]).filter(actor=>actor!==guide&&!this.traffic.some(entry=>entry.actor===actor)).slice(0,parking.length).map((actor,slot)=>{
         // This is initial scene assembly, not a later movement or a respawn loop.
-        this.host.InitializeOpeningActor?.(actor,parking[slot]);
+        const issue=activity.openingIssue;
+        this.host.InitializeOpeningActor?.(actor,issue?.spawns?.[slot]||parking[slot]);
         const route=[parking[slot]];
         actor.scriptedNoncombatant=true;
-        return {actor,parking:parking[slot],route,index:0,slot};
+        const entry={actor,parking:issue?.musterPoints?.[slot]||parking[slot],route,index:0,slot};
+        if(issue){
+          this.host.SetOpeningEquipment?.(actor,"empty");
+          entry.issueIndex=0;entry.stage="exit";entry.weaponIssued=false;entry.ammoIssued=false;
+          const spawn=issue.spawns[slot];
+          let closest=1,best=Infinity;
+          for(let i=1;i<issue.exitRoute.length;i++){
+            const a=issue.exitRoute[i-1],b=issue.exitRoute[i],dx=b.x-a.x,dz=b.z-a.z;
+            const t=Math.max(0,Math.min(1,((spawn.x-a.x)*dx+(spawn.z-a.z)*dz)/(dx*dx+dz*dz||1)));
+            const distance=Math.hypot(spawn.x-a.x-t*dx,spawn.z-a.z-t*dz);
+            if(distance<best){best=distance;closest=t<=0?i-1:i;}
+          }
+          entry.issueSteps=[...issue.exitRoute.slice(closest).map(point=>({point,stage:"exit"})),
+            {point:issue.weaponPoint,stage:"weapon",seconds:issue.weaponSeconds,equipment:"weapon"},
+            {point:issue.ammoPoint,stage:"ammo",seconds:issue.ammoSeconds,equipment:"ammo"},
+            ...(issue.musterRoute||[]).map(point=>({point,stage:"muster"})),
+            {point:entry.parking,stage:"muster"}];
+          entry.route=[entry.parking];
+        }
+        return entry;
       });
     }
     for(const entry of this.openingCast){
       if(entry.released)continue;
-      if((this.beat??0)>2){entry.released=true;entry.actor.scriptedNoncombatant=false;this.host.ReleaseGuide?.(entry.actor);continue;}
+      if(entry.issueSteps&&!entry.issueComplete){this.StepOpeningIssue(entry,dt);continue;}
+      if((this.beat??0)>2&&(!entry.issueSteps||Math.hypot(this.host.Position(entry.actor).x-activity.openingCastRoute.at(-1).x,this.host.Position(entry.actor).z-activity.openingCastRoute.at(-1).z)<3)){
+        entry.released=true;entry.stage="released";entry.actor.scriptedNoncombatant=false;this.host.ReleaseGuide?.(entry.actor);continue;}
       const at=this.host.Position(entry.actor);if(!at)continue;
       const point=entry.route[entry.index];
       if(Math.hypot(at.x-point.x,at.z-point.z)<1.3&&entry.index<entry.route.length-1)entry.index++;
       let target=entry.route[entry.index];
-      if(this.beat===2&&entry.index===entry.route.length-1&&Math.hypot(at.x-target.x,at.z-target.z)<1.3)entry.following=true;
+      if(this.beat>=2&&entry.index===entry.route.length-1&&Math.hypot(at.x-target.x,at.z-target.z)<1.3)entry.following=true;
       if(entry.following){
         const route=activity.openingCastRoute,player=this.host.PlayerPosition?.();
         if(player){let best=Infinity,along=0,progress=0;
           for(let i=1;i<route.length;i++){const a=route[i-1],b=route[i],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz),t=Math.max(0,Math.min(1,((player.x-a.x)*dx+(player.z-a.z)*dz)/(len*len||1))),distance=Math.hypot(player.x-a.x-t*dx,player.z-a.z-t*dz);if(distance<best){best=distance;progress=along+t*len;}along+=len;}
-          const limit=Math.max(0,progress-6-entry.slot*3);
+          const limit=this.beat>2&&entry.issueSteps?TrafficLength([entry.parking,...route]):Math.max(0,progress-6-entry.slot*3);
           entry.followDistance??=0;
           const followRoute=[entry.parking,...route];
           const current=TrafficPoint(followRoute,entry.followDistance);
@@ -155,7 +211,9 @@ export class FirstLevelP012Runtime {
           target=TrafficPoint(followRoute,Math.min(limit,entry.followDistance));
         }
       }
-      this.host.Move(entry.actor,target,Math.hypot(at.x-target.x,at.z-target.z)<1.25?0:2.2);
+      const speed=Math.hypot(at.x-target.x,at.z-target.z)<1.25?0:2.2;
+      if(entry.issueSteps)this.MoveOpeningQueued(entry,target,speed,dt);
+      else this.host.Move(entry.actor,target,speed);
     }
   }
   Update(dt) {
@@ -169,7 +227,7 @@ export class FirstLevelP012Runtime {
         this.traffic.push({...entry,actor,path:entry.route,index:0,parking:entry.route.at(-1),arrived:false,travelM:0,lastPosition:{...entry.route[0]}});
       }
     }
-    this.StepOpeningCast();
+    this.StepOpeningCast(dt);
     this.time += dt;
     if (this.smoke && this.time >= this.smoke.until && !this.smoke.cleared) { this.host.ClearSmoke?.(this.smoke.handle); this.smoke.cleared = true; }
     if (this.beat === 8) {
@@ -316,7 +374,8 @@ export class FirstLevelP012Runtime {
       retreatPursuit: (this.pursuit || []).map(entry=>({index:entry.index,alive:!!this.host.Alive(entry.actor),position:this.host.Position(entry.actor),target:entry.route[entry.index]})),
       weaponActionCount: this.weaponActionCount,
       guidePosition: this.host.Position(this.host.GuideActor()), guideRouteIndex: this.guide?.index || 0,
-      openingCast: (this.openingCast || []).map(entry=>({position:this.host.Position(entry.actor),parking:entry.parking,index:entry.index,released:!!entry.released})),
+      openingCast: (this.openingCast || []).map(entry=>({actorId:entry.actor.id,position:this.host.Position(entry.actor),parking:entry.parking,index:entry.index,released:!!entry.released,
+        stage:entry.stage||"muster",weaponIssued:!!entry.weaponIssued,ammoIssued:!!entry.ammoIssued})),
       guideAlive: !!this.host.GuideActor() && !!this.host.Alive(this.host.GuideActor()),
       guideHealth: this.host.GuideActor()?.health ?? null, guideOrder: this.host.GuideActor()?.order ?? null,
       binocularOwned:!!this.binocularOwned,

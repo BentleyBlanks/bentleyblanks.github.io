@@ -8,7 +8,7 @@ const Clone = (value) => JSON.parse(JSON.stringify(value));
 
 export const P012_BEATS = Object.freeze([
   ["B00", "跟随罗班长下车", "Z00", 0, "door"],
-  ["B01", "领取子弹并检查枪栓", "Z00", 40, "weapon"],
+  ["B01", "领取步枪和子弹", "Z00", 40, "weapon"],
   ["B02", "跟随小队穿过集结村路", "Z01", 85, "village"],
   ["B03", "向班长借望远镜", "Z02", 140, "orient"],
   ["B04", "跟随班长北上", "Z03", 185, "shelling"],
@@ -157,12 +157,18 @@ export class FirstLevelP012Director {
     const Register = (spec) => this.host.Register?.(spec);
     Register({ id: "p012_weaponCheck", kind: "supply", label: "领取步枪，前往弹药分发点",
       gesture: "hold", seconds: 2.4, position: this.config.activities.weaponReceiveAnchor,
-      Enabled: () => this.beat <= 3, once: false,
-      OnComplete: () => { this.Mark("weapon"); this.Emit("P012WeaponReceived"); } });
-    Register({ id: "p012_ammoIssue", kind: "supply", label: "领取子弹，再到旁边检查步枪",
+      Enabled: () => this.beat <= 1 && !this.facts.has("weapon"), once: false,
+      OnComplete: () => {
+        if(this.beat>1||this.facts.has("weapon")||this.host.ReceiveWeapon?.()===false)return false;
+        this.Mark("weapon"); this.Emit("P012WeaponReceived"); return true;
+      } });
+    Register({ id: "p012_ammoIssue", kind: "supply", label: "领取子弹，随后跟队出发",
       gesture: "hold", seconds: 1.8, position: this.config.activities?.weaponIssueAnchor,
       Enabled: () => this.beat === 1 && this.facts.has("weapon") && !this.facts.has("issuedAmmo"), once: false,
-      OnComplete: () => { this.Mark("issuedAmmo"); this.Emit("P012AmmoIssued"); this.weaponActionStart = this.lastSample.weaponActionCount || 0; this.host.CheckWeapon?.(); } });
+      OnComplete: () => {
+        if(this.beat!==1||!this.facts.has("weapon")||this.facts.has("issuedAmmo"))return false;
+        this.Mark("issuedAmmo"); this.Emit("P012AmmoIssued"); this.host.CheckWeapon?.(); return true;
+      } });
     Register({ id: "p012_woundedCheck", kind: "bandage", label: "查看伤员，整理弹药并补充1包绷带",
       gesture: "hold", seconds: 2.2, position: this.config.activities?.woundedDragFrom || this.Point("shelter", P012Point(-7, -52)),
       Enabled: () => this.beat === 11 && !this.supplyReceipts.has("wounded"), once: false,
@@ -671,9 +677,10 @@ export class FirstLevelP012Director {
     let ready = false;
     switch (this.beat) {
       case 0: ready = this.routeIndex >= route.length && this.Signalled("P012TrainDoor"); break;
-      case 1: ready = Has("weapon") && Has("issuedAmmo") && sample.weaponActionCount > this.weaponActionStart
-        && Distance(p, activity.weaponInspectPosition) <= (activity.routeRadiusM || 3); break;
-      case 2: ready = this.routeIndex >= route.length && sample.trafficReady; break;
+      case 1: ready = Has("weapon") && Has("issuedAmmo"); break;
+      // Passing people are scene information, not a hidden "spot both groups"
+      // objective. Reaching the hub must not depend on a crowd visibility bit.
+      case 2: ready = this.routeIndex >= route.length; break;
       case 3: ready = Has("binocularReturned"); break;
       case 4: ready = At("Z04") && this.routeIndex >= route.length && Has("northNearMissImpact") && Has("northCovered"); break;
       case 5: ready = Has("ammo") && this.gunports.size > 0; break;
@@ -849,10 +856,9 @@ export class FirstLevelP012Director {
     if ([0, 2].includes(this.beat) && this.lastSample.guidePosition) target = this.lastSample.guidePosition;
     if (this.beat === 1) { target = activity.weaponReceivePosition; interactionId = "p012_weaponCheck"; }
     if (this.beat === 1 && this.facts.has("weapon")) {
-      target = this.facts.has("issuedAmmo") ? activity.weaponInspectPosition : activity.weaponIssuePosition;
-      text = this.facts.has("issuedAmmo") ? "到检查位按 R 检查步枪并完成装填" : "到弹药桌领取子弹";
+      target = this.facts.has("issuedAmmo") ? activity.villageRoute[0] : activity.weaponIssuePosition;
+      text = this.facts.has("issuedAmmo") ? "跟随小队穿过村路" : "到弹药桌领取子弹";
       interactionId = this.facts.has("issuedAmmo") ? null : "p012_ammoIssue";
-      if (this.facts.has("issuedAmmo")) requiredAction = "reload";
     }
     if (this.beat === 3) {
       target=this.lastSample.guidePosition||activity.binoculars.guidePosition;

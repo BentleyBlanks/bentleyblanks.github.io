@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
-import {P012Point,P012NorthPoint,P012SouthPoint,P012MapPoints} from "./Data_FirstLevelP012Space.mjs";
+import {P012Point,P012NorthPoint,P012SouthPoint,P012StationPoint,P012MapPoints} from "./Data_FirstLevelP012Space.mjs";
 import {FIRST_LEVEL_P012_LAYOUT as layout,P012_ROUTES as routes,P012_ZONES as zones,P012_ANCHORS as anchors,P012_SEMANTIC_COLORS as colors,P012_ENEMY_LANES as lanes} from "./Data_FirstLevelP012Layout.mjs";
 import {TRAVERSAL,TraversalKind} from "./Data_Traversal.mjs";
 import {FirstLevelP012Director} from "./Script_FirstLevelP012Flow.mjs";
@@ -63,28 +63,61 @@ for(const paint of routePaint){
 for(const kind of ["step","vault","mantle"]){const b=layout.blocks.find(b=>b.semantic===kind);assert.equal(TraversalKind(b.h),kind);}
 for(const p of [anchors.weaponCheck,anchors.ammoPickup,anchors.ammoDrop,...anchors.gunports,anchors.scout,anchors.stretcher])assert.ok(!layout.blocks.some(b=>Hits(p,b,0.4)),`anchor ${JSON.stringify(p)} buried`);
 assert.ok(Audit("NorthInitial",routes.north,[...layout.blocks,...layout.gates])>190,"north route has actual expanded depth");
+const hubIndex=routes.north.findIndex(point=>point.x===0&&point.z===0);
+assert.ok(Audit("SeparatedStationToHub",routes.north.slice(0,hubIndex+1),layout.blocks,1.3)>130,"station separation adds real walking distance, not timing gates");
+for(const side of [-1.4,1.4])Audit(`VillageOpposingLane${side}`,routes.village.map(point=>({x:point.x+side,z:point.z})),layout.blocks,.42);
+for(const point of routes.villageWaiting)assert.ok(!layout.blocks.some(block=>Hits(point,block,1.3)),"roadside waiting place has actual clear standing room");
+Audit("EastCivilianEvacuation",routes.villageEvacuation,layout.blocks,.42);
+for(const point of routes.villageEvacuationWaiting)assert.ok(!layout.blocks.some(block=>Hits(point,block,1.3)),"east evacuation waiting space stays separate from station equipment");
+for(const [key,blueprint] of Object.entries({trainSpawn:{x:-66,z:65},trainDoor:{x:-60,z:61},weaponCheck:{x:-55,z:44},ammoIssue:{x:-55,z:34},weaponInspect:{x:-45,z:34}}))assert.deepEqual(anchors[key],P012StationPoint(blueprint.x,blueprint.z),`${key} moves exactly once with station`);
+assert.deepEqual(P012Point(-55,55),{x:-55,z:55},"station transform is never automatic");
 Audit("CarriageDoorToEquipment",routes.trainExit,layout.blocks,0.4);
 for(const [index,entry] of phase.whitebox.activities.traffic.entries())Audit(`OpeningTraffic${index}`,entry.route,layout.blocks,0.42);
 assert.ok(!layout.blocks.some(b=>Hits(anchors.trainSpawn,b,0.4)));
 assert.equal(FootY(layout,anchors.trainSpawn),1.25,"spawn stands on the occupied middle carriage floor");
 const occupiedFloor=layout.blocks.find(b=>b.id==="StationCar1Floor");
 assert.ok(Math.abs(anchors.trainSpawn.x-occupiedFloor.x)<occupiedFloor.w/2&&Math.abs(anchors.trainSpawn.z-occupiedFloor.z)<occupiedFloor.d/2);
-const stairPoints=[{x:occupiedFloor.x,z:61},...Array.from({length:5},(_,i)=>layout.blocks.find(b=>b.id===`StationExitStep${i}`))];
+const stairPoints=[P012StationPoint(occupiedFloor.x,61),...Array.from({length:5},(_,i)=>layout.blocks.find(b=>b.id===`StationExitStep${i}`))];
 const stairHeights=stairPoints.map(p=>FootY(layout,p));
 assert.deepEqual(stairHeights,[1.25,1,.75,.5,.25,0],"all actual descending tread heights are sampled, not the carriage roof");
 for(let i=1;i<stairHeights.length;i++)assert.ok(stairHeights[i-1]-stairHeights[i]<=TRAVERSAL.stepMax);
 Audit("ActualEastStairDescent",stairPoints,layout.blocks,.4);
+const openingIssue=phase.whitebox.activities.openingIssue;
+assert.equal(openingIssue.spawns.length,6,"six existing squad members begin aboard");
+for(const [index,spawn] of openingIssue.spawns.entries()){
+ assert.equal(FootY(layout,spawn),1.25,`issue actor ${index} stands on carriage floor`);
+ assert.ok(!layout.blocks.some(block=>Hits(spawn,block,.42)),`issue actor ${index} spawn capsule is clear`);
+ Audit(`SquadCarriageExit${index}`,[spawn,...openingIssue.exitRoute],layout.blocks,.4);
+}
+for(const [index,muster] of openingIssue.musterPoints.entries())Audit(`SquadIssueMuster${index}`,
+ [openingIssue.weaponPoint,openingIssue.ammoPoint,...openingIssue.musterRoute,muster],layout.blocks,.42);
 const stationApron=layout.blocks.find(block=>block.id==="StationPlatformApron");
+const civilians=phase.whitebox.activities.traffic.filter(actor=>actor.role==="civilian");
+assert.equal(civilians.length,11,"the eleven civilians remain one finite village column");
+// Temporarily use the apron rectangle as a solid exclusion zone only in this
+// audit: its production paint remains non-solid. Sweep includes the spawn point.
+for(const [index,actor] of civilians.entries())Audit(`CivilianAvoidsPlatform${index}`,actor.route,
+ [{...stationApron,solid:true,y:.9,h:1.8}],.42);
 assert.ok(stationApron.y+stationApron.h/2<.025-.005,"grey station apron cannot z-fight the green route paint");
 const sidingRails=layout.blocks.filter(block=>/^StationLoadingSidingRail-?1$/.test(block.id));
 assert.equal(sidingRails.length,2);
 assert.equal((sidingRails[0].x+sidingRails[1].x)/2,-72);
-assert.ok(sidingRails.every(rail=>Math.abs(rail.z-rail.d/2-123)<.001),"turnout has a continuous loading siding after its southern end");
+assert.ok(sidingRails.every(rail=>Math.abs(rail.z-rail.d/2-P012StationPoint(0,123).z)<.001),"turnout has a continuous loading siding after its southern end");
 assert.ok(layout.blocks.some(block=>block.id==="StationLoadingSidingBuffer"&&block.z>165),"loading siding has a visible terminal buffer");
 const stationRails=layout.blocks.filter(b=>/^StationRail-?1$/.test(b.id));
 assert.equal(stationRails.length,2);
+for(const rail of stationRails){assert.equal(rail.z-rail.d/2,-190);assert.equal(rail.z+rail.d/2,185);}
+const southRailBed=layout.blocks.find(block=>block.id==="HorizonRailSouthBed");
+assert.equal(southRailBed.z-southRailBed.d/2,185,"Horizon joins rather than overlaps station track");
 assert.equal((stationRails[0].x+stationRails[1].x)/2,occupiedFloor.x,"railway axis matches all carriages");
 for(const floor of layout.blocks.filter(b=>/^StationCar\dFloor$/.test(b.id)))assert.equal(floor.x,occupiedFloor.x);
+assert.equal(occupiedFloor.z,125,"occupied carriage shares the station's single translation");
+for(const wheel of layout.blocks.filter(block=>/^StationCar1Wheel/.test(block.id))){
+ assert.ok(Math.abs(wheel.z-occupiedFloor.z)<=6,"wheel groups move longitudinally with occupied car");
+ const railX=occupiedFloor.x+Math.sign(wheel.x-occupiedFloor.x)*.75;
+ assert.ok(Math.abs(railX-wheel.x)<=wheel.w/2,"visible wheel assembly still spans the actual rail");
+}
+assert.ok(layout.walkableSurfaces.every(surface=>layout.blocks.includes(surface)&&!surface.solid),"station compilation preserves shared support identity and single collision owner");
 const outerLips=layout.blocks.filter(b=>/^Horizon(West|East|North|South)Lip\d+$/.test(b.id));
 assert.ok(outerLips.length>=4,"distant earth edges exist on all sides");
 for(const b of outerLips){
@@ -94,7 +127,7 @@ for(const b of outerLips){
 }
 assert.ok(Audit("StretcherSouth",routes.south,layout.blocks)>310,"south route includes the long cross-region connection");
 const returnLength=Audit("StretcherReturn",routes.retreat,layout.blocks);assert.ok(returnLength>150);
-const activityRoutes={weaponIssue:[P012MapPoints({x:-55,z:44}),P012MapPoints({x:-55,z:34}),P012MapPoints({x:-45,z:34}),P012MapPoints({x:-43,z:40})],
+const activityRoutes={weaponIssue:[P012StationPoint(-55,44),P012StationPoint(-55,34),P012StationPoint(-45,34),P012StationPoint(-43,40)],
  orientations:phase.whitebox.activities.orientations.flatMap(point=>point.via?[point.via,point.position]:[point.position]),
  shellCover:phase.whitebox.activities.shellCoverRoute,
  ammo:phase.whitebox.activities.ammoRoute,

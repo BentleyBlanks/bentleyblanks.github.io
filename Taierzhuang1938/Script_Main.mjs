@@ -41,7 +41,7 @@ import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
 import { FirstLevelP012Runtime } from "./Script_FirstLevelP012Runtime.mjs";
 import { FirstLevelP012Binoculars, P012BinocularLensContains } from "./Script_FirstLevelP012Binoculars.mjs";
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
-import { ApplyP012CastAppearance } from "./Script_FirstLevelP012CastAppearance.mjs";
+import { ApplyP012CastAppearance, InstallP012OpeningPose } from "./Script_FirstLevelP012CastAppearance.mjs";
 import { CAST } from "./Data_TengxianScript.mjs";
 import {
   PhaseContentId, ContentZoneId, AllowAutonomousBark, EvaluateFirstLevelObjectiveGate,
@@ -3012,7 +3012,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       }
       const guide = companion.Handle("luo");
       if (guide) {
-        const x = -66, z = 61, y = battlefield.GroundHeight(x, z);
+        const {x,z} = phase.whitebox.activities.trainRoute[1], y = battlefield.GroundHeight(x, z);
         guide.position.set(x, y, z); guide.body?.Teleport(x, y, z); guide.goal.set(x, 0, z);
       }
     }
@@ -3097,7 +3097,16 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       const y = battlefield.GroundHeight(point.x, point.z);
       actor.position.set(point.x, y, point.z); actor.body?.Teleport(point.x, y, point.z);
       actor.goal.set(point.x, 0, point.z);
+      actor.scriptArrivalRadius = .3;
+      InstallP012OpeningPose(actor);
       if (actor.actor) actor.actor.root.position.copy(actor.position);
+    },
+    SetOpeningEquipment: (actor, stage) => {
+      if (!actor) return;
+      actor.p012AwaitingWeapon = stage === "empty";
+      actor.unarmed = stage === "empty";
+      actor.actor?.SetWeapon(stage === "empty" ? null : actor.weaponId);
+      actor.ammo = stage === "ammo" ? (actor.weapon.magazine || 5) : 0;
     },
     RetreatPosition: () => setpieces?.mem?.column?.Bearers?.[0]?.handle?.position || null,
     FireDiscipline: (actor, doctrine) => {
@@ -3121,7 +3130,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       return Math.abs(screen.x) < 0.95 && Math.abs(screen.y) < 0.95 && screen.z > -1 && screen.z < 1
         && HasLineOfSight(actor.position.x, actor.position.z);
     },
-    ReleaseGuide: (actor) => { if (actor) { actor.p012Guided = false; delete actor.scriptMoveSpeedMps; actor.manualGoalUntil = ai.time; } },
+    ReleaseGuide: (actor) => { if (actor) { actor.p012Guided = false; delete actor.scriptMoveSpeedMps; delete actor.scriptArrivalRadius; actor.manualGoalUntil = ai.time; } },
     PlayerPosition: () => player.position,
     TrafficVisible: (actor, {binocular=false}={}) => {
       if (!actor?.alive) return false;
@@ -3172,7 +3181,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     },
     ImpactShell: (point) => { const at = new THREE.Vector3(point.x, battlefield.GroundHeight(point.x, point.z), point.z); vfx.Explosion(at, { radius: 4, kind: "shell" }); audio.Play("explosionNear", { position: at }); },
   }, phase.whitebox) : null;
-  p012Runtime?.SaveSafePoint("Start",player.position,player.stance,player.yaw);
+  p012Runtime?.SaveSafePoint("Start",phase.spawn,"stand",phase.spawn.ry || 0);
   p012Flow = phase.whitebox?.p012 ? new FirstLevelP012Director({
     Register: (spec) => interact.Register({ ...spec, tag: "P012",
       // Both Query and the held interaction recheck Enabled: starting a charge
@@ -3184,7 +3193,18 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     Signal: (name) => story.Signal(name),
     Signalled: (name) => story.Signalled(name),
     Objective: (text) => { state.storyObjective = text; },
-    CheckWeapon: () => { state.clips = Math.max(state.clips, 3); if (!p012Runtime.weaponActionCount) state.ammo = 0; },
+    ReceiveWeapon: () => {
+      const equipment = phase.whitebox.activities.initialEquipment;
+      if (!PickUpWeapon(equipment.weapon, 0)) return false;
+      state.ammo = 0; state.clips = 0; state.mags.primary = {ammo:0,clips:0};
+      return true;
+    },
+    CheckWeapon: () => {
+      const equipment = phase.whitebox.activities.initialEquipment;
+      state.clips = equipment.clips; state.mags.primary = {ammo:state.ammo,clips:state.clips};
+      state.grenades = equipment.grenades; state.slots.throwable = state.grenades ? "Grenade" : null;
+      hud.Hint("已领子弹，按 R 装弹；可以边走边装", 4);
+    },
     CurrentClips: () => state.clips,
     GiveBandages: (request) => {
       const granted = Number.isFinite(request) ? Math.max(0, Math.floor(request)) : 0;

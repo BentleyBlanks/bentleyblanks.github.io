@@ -8,7 +8,7 @@ import P012Phase from "./Data_FirstLevelP012Whitebox.mjs";
 import {FirstLevelP012Director} from "./Script_FirstLevelP012Flow.mjs";
 import {InteractSystem} from "./Script_Interact.mjs";
 import {FIRST_LEVEL_P012_LAYOUT as openingLayout} from "./Data_FirstLevelP012Layout.mjs";
-import {P012SouthPoint} from "./Data_FirstLevelP012Space.mjs";
+import {P012SouthPoint,P012StationPoint} from "./Data_FirstLevelP012Space.mjs";
 import {openingActivities,openingStoryBeats} from "./Data_FirstLevelP012Opening.mjs";
 function FootY(layout,p) {
  let y=0;
@@ -80,14 +80,14 @@ assert.ok(openingStoryBeats.every(cue=>!/hubSupply/i.test(JSON.stringify(cue))),
  director.lastSample.position=config.anchors.trainDoor;runtime.Update(.1);
  assert.equal(runtime.guide.index,3,"approaching the real door releases the guide");
  director.beat=1;director.StartGuide();
- for(let index=0;index<3;index++){
+ for(let index=0;index<a.weaponGuideRoute.length;index++){
   Object.assign(actor,a.weaponGuideRoute[index]);
   for(let i=0;i<120;i++)runtime.Update(.1);
   assert.equal(runtime.guide.index,index,"B01 does not leave an unfinished physical operation");
   assert.equal(orders.at(-1).speed,0);
   const facing=a.weaponGuideFacing[index],wanted=Math.atan2(-(facing.x-actor.x),-(facing.z-actor.z));
   assert.ok(Math.abs(Math.atan2(Math.sin(faces.at(-1)-wanted),Math.cos(faces.at(-1)-wanted)))<1e-9,"waiting guide faces the real table");
-  if(index<2){points.get(index===0?"p012_weaponCheck":"p012_ammoIssue").OnComplete();runtime.Update(.1);assert.equal(runtime.guide.index,index+1);}
+  if(index<a.weaponGuideRoute.length-1){points.get(index===0?"p012_weaponCheck":"p012_ammoIssue").OnComplete();runtime.Update(.1);assert.equal(runtime.guide.index,index+1);}
  }
  const interaction=new InteractSystem({});
  for(const [id,stand,boxId] of [["p012_weaponCheck",a.weaponReceivePosition,"WeaponCheckTable"],["p012_ammoIssue",a.weaponIssuePosition,"WeaponIssueCrate"]]){
@@ -96,7 +96,7 @@ assert.ok(openingStoryBeats.every(cue=>!/hubSupply/i.test(JSON.stringify(cue))),
   assert.notEqual(interaction.Reach(point,{position:stand,yaw:0}),null,"looking at the actual box from its front gives a reachable F interaction");
   assert.equal(interaction.Reach(point,{position:{x:stand.x,z:stand.z+4},yaw:0}),null,"no remote interaction extension");
  }
- const route=[{x:-55,z:44},...a.weaponGuideRoute],stands=[a.weaponReceivePosition,a.weaponIssuePosition,a.weaponInspectPosition];
+ const route=[P012StationPoint(-55,44),...a.weaponGuideRoute],stands=[a.weaponReceivePosition,a.weaponIssuePosition,a.weaponInspectPosition];
  function Hits(point,box){
   const foot=FootY(openingLayout,point);
   if(box.solid===false||box.y-box.h/2>foot+1.8||box.y+box.h/2<=foot+.05)return false;
@@ -106,7 +106,8 @@ assert.ok(openingStoryBeats.every(cue=>!/hubSupply/i.test(JSON.stringify(cue))),
  for(const point of stands)assert.ok(!openingLayout.blocks.some(box=>Hits(point,box)),"player work position is outside solid furniture");
  for(let leg=1;leg<route.length;leg++)for(let i=0;i<=100;i++){
   const point={x:route[leg-1].x+(route[leg].x-route[leg-1].x)*i/100,z:route[leg-1].z+(route[leg].z-route[leg-1].z)*i/100};
-  assert.ok(!openingLayout.blocks.some(box=>Hits(point,box)),"guide physically walks between tables without entering a collider");
+  const collision=openingLayout.blocks.find(box=>Hits(point,box));
+  assert.ok(!collision,`guide physically walks between tables without entering a collider: ${JSON.stringify({point,block:collision?.id})}`);
  }
  console.log("PASS opening door/operation-driven guide waits, facing requests, real furniture reach and capsule paths");
  for(const parking of a.openingCastParking){
@@ -254,20 +255,67 @@ assert.equal(runtime.traffic.length, 6, "repeated Guide does not duplicate traff
 }
 const ai = readFileSync(new URL("./Script_Ai.mjs", import.meta.url), "utf8");
 {
- const guide={castId:"luo",x:-55,z:53},cast=[guide,...[0,1,2,3,4,5].map(i=>({castId:i<4?`cast${i}`:null,x:-76+i*2,z:60}))];
- const traffic=[{x:-54,z:50},{x:-54,z:47},{x:-54,z:44}];cast.push(...traffic);let initialized=0;
- const player={x:-56,z:55};
+ const issue=P012Phase.whitebox.activities.openingIssue,actors=issue.spawns.map(p=>({...p})),receipts=[];
+ const runtime=new FirstLevelP012Runtime({GuideActor:()=>null,FriendlyActors:()=>actors,Position:a=>a,
+  InitializeOpeningActor:(a,p)=>Object.assign(a,p),SetOpeningEquipment:(a,kind)=>receipts.push({slot:actors.indexOf(a),kind}),
+  PlayerPosition:()=>P012Phase.whitebox.anchors.trainSpawn,
+  Move:(a,p,speed)=>{const d=Math.hypot(p.x-a.x,p.z-a.z);if(d<=.3)return;
+   const step=Math.min(speed*.025,d);a.x+=(p.x-a.x)/d*step;a.z+=(p.z-a.z)/d*step;}
+ },P012Phase.whitebox);
+ runtime.beat=0;
+ for(let frame=0;frame<14400&&!runtime.openingCast?.every(e=>e.issueComplete);frame++){
+  runtime.StepOpeningCast(.025);
+  for(const actor of actors){
+   const foot=FootY(openingLayout,actor);
+   for(const b of openingLayout.blocks){
+    if(b.solid===false||b.y+b.h/2<=foot+.05||b.y-b.h/2>=foot+1.8)continue;
+    const dx=actor.x-b.x,dz=actor.z-b.z,c=Math.cos(b.ry||0),s=Math.sin(b.ry||0);
+    assert.ok(Math.hypot(Math.max(0,Math.abs(dx*c-dz*s)-b.w/2),Math.max(0,Math.abs(dx*s+dz*c)-b.d/2))>=.42,`actual issue body ${actors.indexOf(actor)} hits ${b.id} at ${actor.x},${actor.z}`);
+   }
+  }
+  for(let a=0;a<6;a++)for(let b=a+1;b<6;b++)assert.ok(Math.hypot(actors[a].x-actors[b].x,actors[a].z-actors[b].z)>=1.5-1e-6,"production six-man queue body spacing");
+ }
+ assert.ok(runtime.openingCast.every(e=>e.issueComplete),`production issue queue must finish: ${JSON.stringify(runtime.openingCast.map(e=>({stage:e.stage,index:e.issueIndex,at:e.actor})))}`);
+ assert.equal(receipts.length,18,"six existing actors each receive empty/weapon/ammo once");
+}
+{
+ const actors=Array.from({length:6},(_,i)=>({x:0,z:-i*1.8})),equipment=[],moves=[];
+ const spawns=actors.map(a=>({...a})),parking=actors.map((_,i)=>({x:12+i*1.8,z:14}));
+ const issue={spawns,exitRoute:[{x:0,z:-12},{x:0,z:2},{x:4,z:2},{x:4,z:8}],
+  weaponPoint:{x:4,z:10},ammoPoint:{x:4,z:14},musterPoints:parking,weaponSeconds:1,ammoSeconds:.8};
+ const runtime=new FirstLevelP012Runtime({GuideActor:()=>null,FriendlyActors:()=>actors,Position:a=>a,
+  InitializeOpeningActor:(a,p)=>Object.assign(a,p),SetOpeningEquipment:(a,kind)=>equipment.push({a,kind,at:{...a}}),
+  PlayerPosition:()=>({x:35,z:14}),ReleaseGuide:a=>{a.released=true;},
+  Move:(a,p,speed)=>{const d=Math.hypot(p.x-a.x,p.z-a.z);moves.push(d);if(d<=.3)return;
+   const step=Math.min(speed*.05,d);a.x+=(p.x-a.x)/d*step;a.z+=(p.z-a.z)/d*step;}
+ },{activities:{openingIssue:issue,openingCastParking:parking,openingCastRoute:[{x:25,z:14},{x:35,z:14}]}});
+ runtime.beat=3;
+ for(let i=0;i<4000&&!runtime.openingCast?.every(e=>e.issueComplete);i++){
+  runtime.StepOpeningCast(.05);
+  for(let a=0;a<6;a++)for(let b=a+1;b<6;b++)assert.ok(Math.hypot(actors[a].x-actors[b].x,actors[a].z-actors[b].z)>=1.5-1e-6,`physical issue queue keeps body spacing ${i} ${a}/${b}: ${JSON.stringify(actors)}`);
+ }
+ assert.ok(runtime.openingCast.every(e=>e.issueComplete&&e.weaponIssued&&e.ammoIssued),"early B03 never skips six actual handovers");
+ for(const a of actors){
+  assert.deepEqual(equipment.filter(e=>e.a===a).map(e=>e.kind),["empty","weapon","ammo"]);
+  for(const e of equipment.filter(e=>e.a===a&&e.kind!=="empty"))assert.ok(Math.hypot(e.at.x-issue[`${e.kind}Point`].x,e.at.z-issue[`${e.kind}Point`].z)<.4);
+ }
+ assert.ok(moves.every(distance=>distance<=8+1e-6),"issue movement uses short actual goals");
+}
+{
+ const guide={castId:"luo",...P012StationPoint(-55,53)},cast=[guide,...[0,1,2,3,4,5].map(i=>({castId:i<4?`cast${i}`:null,...P012StationPoint(-76+i*2,60)}))];
+ const traffic=[50,47,44].map(z=>P012StationPoint(-54,z));cast.push(...traffic);let initialized=0;
+ const player=P012StationPoint(-56,55);
  const r=new FirstLevelP012Runtime({GuideActor:()=>guide,FriendlyActors:()=>cast,Position:a=>a,PlayerPosition:()=>player,
   InitializeOpeningActor:(a,p)=>{Object.assign(a,p);initialized++;},
   Move:(a,p,speed)=>{const d=Math.hypot(p.x-a.x,p.z-a.z);if(d<=1.2)return;const k=Math.min(1,speed*.1/d);a.x+=(p.x-a.x)*k;a.z+=(p.z-a.z)*k;},ReleaseGuide:a=>{a.released=true;}
- },P012Phase.whitebox);
+ },{...P012Phase.whitebox,activities:{...P012Phase.whitebox.activities,openingIssue:undefined}});
  r.traffic=traffic.map(actor=>({actor}));r.beat=0;for(let i=0;i<300;i++)r.StepOpeningCast();
- assert.equal(r.openingCast.length,6);assert.equal(initialized,6,"safe initial assembly happens once, never a teleport loop");assert.deepEqual(traffic[0],{x:-54,z:50},"traffic pool is excluded");assert.deepEqual(guide,{castId:"luo",x:-55,z:53},"opening spacing never changes Luo pacing");
- assert.ok(r.openingCast.every(e=>Math.hypot(e.actor.x-e.parking.x,e.actor.z-e.parking.z)<1.3&&e.actor.z>player.z+5),"cast physically wait behind the exiting player, not in the forward view");
+ assert.equal(r.openingCast.length,6);assert.equal(initialized,6,"safe initial assembly happens once, never a teleport loop");assert.deepEqual(traffic[0],P012StationPoint(-54,50),"traffic pool is excluded");assert.deepEqual(guide,{castId:"luo",...P012StationPoint(-55,53)},"opening spacing never changes Luo pacing");
+ assert.ok(r.openingCast.every(e=>Math.hypot(e.actor.x-e.parking.x,e.actor.z-e.parking.z)<1.3),"without issue configuration, cast retain the configured initial parking contract");
  r.beat=3;r.StepOpeningCast();assert.ok(r.openingCast.every(e=>e.released&&e.actor.released&&!e.actor.scriptedNoncombatant),"only opening beats own this formation");
 }
 {
- const walkers=[];let door=false,visible=false;const player={x:-60,z:61};
+ const walkers=[];let door=false,visible=false;const player={...P012Phase.whitebox.anchors.trainDoor};
  const run=new FirstLevelP012Runtime({GuideActor:()=>null,Position:a=>a,PlayerPosition:()=>player,Signalled:name=>name==="P012TrainDoor"&&door,
   TrafficVisible:()=>visible,RetireTraffic:a=>{a.retired=true;return true;},
   TrafficActor:(side,slot,p,entry)=>{const actor={...p,alive:true,side,slot,role:entry.role};walkers.push(actor);return actor;},

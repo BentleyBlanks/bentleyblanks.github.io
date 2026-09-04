@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
-import { ApplyP012CastAppearance, P012_CAST_CLOTH_COLORS, P012_UNIFORM_MATERIAL_NAME } from "./Script_FirstLevelP012CastAppearance.mjs";
+import { ApplyP012CastAppearance, InstallP012OpeningPose, P012_CAST_CLOTH_COLORS, P012_UNIFORM_MATERIAL_NAME } from "./Script_FirstLevelP012CastAppearance.mjs";
 const threeSource = fs.readFileSync(new URL("./vendor/three/build/three.core.js", import.meta.url), "utf8");
 const THREE = await import(`data:text/javascript;base64,${Buffer.from(threeSource).toString("base64")}`);
 
@@ -61,6 +61,46 @@ for (let variant = 1; variant <= 5; variant++) {
   ordinary.characterRig.root.children.forEach((object) => assert.ok(shared.includes(object.material)));
 }
 console.log("PASS P012 five real roster colours, all five GLB uniform partitions, private material/disposal and unchanged skin/guns/defaults");
+// Reconstruct the real GLB hierarchy and sample its actual animation accessors.
+// No invented joint axes or T-pose is substituted for the rifle animations.
+for(let variant=1;variant<=5;variant++){
+ const bytes=fs.readFileSync(new URL(`./Model/Character/Model_LugouNra0${variant}.glb`,import.meta.url));
+ const jsonLength=bytes.readUInt32LE(12),g=JSON.parse(bytes.subarray(20,20+jsonLength).toString()),binary=20+jsonLength+8;
+ const nodes=g.nodes.map(spec=>{const node=new THREE.Bone();node.name=spec.name||"";
+  if(spec.translation)node.position.fromArray(spec.translation);if(spec.rotation)node.quaternion.fromArray(spec.rotation);
+  if(spec.scale)node.scale.fromArray(spec.scale);if(spec.matrix){node.matrix.fromArray(spec.matrix);node.matrix.decompose(node.position,node.quaternion,node.scale);}return node;});
+ g.nodes.forEach((spec,i)=>(spec.children||[]).forEach(child=>nodes[i].add(nodes[child])));
+ const root=new THREE.Group();g.scenes[g.scene||0].nodes.forEach(i=>root.add(nodes[i]));
+ const bones={};for(const side of ["L","R"])for(const [role,label] of [["upperArm","UpperArm"],["forearm","Forearm"],["hand","Hand"]])bones[role+side]=nodes.find(n=>n.name===`Bip002 ${side} ${label}`);
+ const Read=index=>{const a=g.accessors[index],v=g.bufferViews[a.bufferView],size={SCALAR:1,VEC3:3,VEC4:4}[a.type];assert.equal(a.componentType,5126);
+  return Array.from({length:a.count*size},(_,i)=>bytes.readFloatLE(binary+(v.byteOffset||0)+(a.byteOffset||0)+Math.floor(i/size)*(v.byteStride||size*4)+(i%size)*4));};
+ let tracks=[],sampleTime=0;
+ const rig={root,bones,Update(){for(const {node,path,interpolant} of tracks)node[path].fromArray(interpolant.evaluate(sampleTime));root.updateWorldMatrix(true,true);}};
+ const soldier={actor:{root,characterRig:rig},p012AwaitingWeapon:false};
+ assert.equal(InstallP012OpeningPose(soldier),true);assert.equal(InstallP012OpeningPose(soldier),false);
+ const changed=new Set([bones.upperArmL,bones.forearmL,bones.upperArmR,bones.forearmR]);
+ for(const clipName of ["AdvanceFire","RifleRun"]){
+  const clip=g.animations.find(a=>a.name===clipName);
+  tracks=clip.channels.map(channel=>{const s=clip.samplers[channel.sampler],path={rotation:"quaternion",translation:"position",scale:"scale"}[channel.target.path];
+   const track=new (path==="quaternion"?THREE.QuaternionKeyframeTrack:THREE.VectorKeyframeTrack)("fixture",Read(s.input),Read(s.output));
+   return {node:nodes[channel.target.node],path,interpolant:track.createInterpolant()};});
+  for(sampleTime of [0,.2,.5]){
+   soldier.p012AwaitingWeapon=false;rig.Update(.016,{});
+   const baseline=nodes.map(n=>({q:n.quaternion.toArray(),p:n.position.toArray(),s:n.scale.toArray(),world:n.matrixWorld.toArray()}));
+   soldier.p012AwaitingWeapon=true;rig.Update(.016,{moveSpeed:3.05});
+   nodes.forEach((n,i)=>{assert.deepEqual(n.position.toArray(),baseline[i].p);assert.deepEqual(n.scale.toArray(),baseline[i].s);
+    if(!changed.has(n))assert.deepEqual(n.quaternion.toArray(),baseline[i].q,"only four arm joints are modified");
+    if(/Pelvis|Thigh|Calf|Foot|Toe/.test(n.name))assert.deepEqual(n.matrixWorld.toArray(),baseline[i].world,"hips, legs and actual feet remain unchanged");});
+   for(const side of ["L","R"])for(const [a,b] of [[bones[`upperArm${side}`],bones[`forearm${side}`]],[bones[`forearm${side}`],bones[`hand${side}`]]]){
+    const direction=b.getWorldPosition(new THREE.Vector3()).sub(a.getWorldPosition(new THREE.Vector3())).normalize();
+    assert.ok(direction.y<-.95,`${variant}/${clipName}: real empty arm points naturally downward`);
+   }
+   soldier.p012AwaitingWeapon=false;rig.Update(.016,{});
+   nodes.forEach((n,i)=>assert.deepEqual(n.quaternion.toArray(),baseline[i].q,"issuing the rifle restores untouched animation without a pose residue"));
+  }
+ }
+}
+console.log("PASS P012 opening empty arms: five real GLBs/two actual clips, untouched pelvis/legs/feet and exact equipped pose restoration");
 const mainAppearanceSource = fs.readFileSync(new URL("./Script_Main.mjs", import.meta.url), "utf8").replace(/\r/g, "");
 assert.match(mainAppearanceSource, /if \(phase\.whitebox\?\.p012\) \{\n\s+for \(const actor of ai\.soldiers\)[\s\S]*?ApplyP012CastAppearance\(actor, library\);/);
 assert.equal((mainAppearanceSource.match(/ApplyP012CastAppearance\(actor, library\)/g) || []).length, 1, "only the P012 setup opts in");
