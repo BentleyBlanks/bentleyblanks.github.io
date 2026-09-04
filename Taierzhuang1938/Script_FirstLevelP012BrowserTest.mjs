@@ -441,6 +441,9 @@ async function PlayFrontline() {
         activity: window.p012ActivityTrace || [],
         airViews: window.p012AirViews || [], airGroundShots: window.p012AirGroundShots || [],
         airImpacts: window.p012AirImpacts || [],
+        escortApproval: window.p012EscortApproval || [],
+        prematureEscortMovement: window.p012PrematureEscortMovement || [],
+        southGrenadeExplosions: window.p012SouthGrenadeExplosions || [],
         jointAirView: window.p012JointAirView || null,
         windowView: bot.windowView || null,
         damageTrace: window.p012DamageTrace || [],
@@ -520,6 +523,20 @@ async function PlayFrontline() {
   if (fullCampaign && process.argv.includes("--retry")) Check(result.rewindCount >= 1,
     "故意错过首次扑救后真实回退并继续通关", `${result.rewindCount}次`);
   if (fullCampaign) {
+    const requested = result.escortApproval.find(entry => entry.event === "P012EscortRequested");
+    const spoken = result.escortApproval.find(entry => entry.event === "LuoApprovalStarted");
+    const approved = result.escortApproval.find(entry => entry.event === "P012EscortApproved");
+    const departed = result.escortApproval.find(entry => entry.event === "EscortCall");
+    Check(requested && spoken && approved && departed && requested.at <= spoken.at
+      && approved.at >= spoken.at + (spoken.duration || 0) - 0.04 && approved.at <= departed.at
+      && result.prematureEscortMovement.length === 0,
+    "实际请求、批准语音时长／字幕占用结束、担架启程按因果先后发生", JSON.stringify(result.escortApproval));
+    const grenadeEffect = result.flow.lastSouthGrenadeEffect;
+    Check(!result.flow.facts.includes("southGrenadeThrown") || (grenadeEffect?.damage > 0
+      && result.southGrenadeExplosions.some(entry => entry.effect?.targetId === grenadeEffect.targetId
+        && entry.effect.damage > 0)),
+    "南路手雷事实只由真实爆炸作用产生；步枪清场不冒称投掷成功",
+    JSON.stringify({ effect: grenadeEffect, explosions: result.southGrenadeExplosions }));
     await page.waitForFunction(() => {
       const menu = document.querySelector("#menu.p012Complete");
       return menu && getComputedStyle(menu).backgroundColor === "rgb(0, 0, 0)"
@@ -717,6 +734,41 @@ try {
     window.p012AirViews = [];
     window.p012AirGroundShots = [];
     window.p012AirImpacts = [];
+    window.p012EscortApproval = [];
+    window.p012PrematureEscortMovement = [];
+    window.p012SouthGrenadeExplosions = [];
+    const originalDetonate = game.combat.Detonate;
+    game.combat.Detonate = function (projectile) {
+      const before = game.Debug.P012();
+      const result = originalDetonate.call(this, projectile);
+      if (before.beatIndex === 21 && projectile.owner === "player") {
+        const after = game.Debug.P012();
+        window.p012SouthGrenadeExplosions.push({ at: after.elapsed,
+          position: projectile.position.toArray(), kind: projectile.kind,
+          effect: JSON.stringify(before.lastSouthGrenadeEffect) !== JSON.stringify(after.lastSouthGrenadeEffect)
+            ? after.lastSouthGrenadeEffect || null : null });
+      }
+      return result;
+    };
+    const originalSignal = game.story.Signal;
+    game.story.Signal = function (name, ...args) {
+      const result = originalSignal.call(this, name, ...args);
+      if (["P012EscortRequested", "P012EscortApproved", "EscortCall"].includes(name)) {
+        window.p012EscortApproval.push({ at: game.Debug.P012().elapsed, event: name,
+          column: game.Debug.P012Scene().columnPosition });
+      }
+      return result;
+    };
+    const originalStoryPlay = game.story.Play;
+    game.story.Play = function (beat, ...args) {
+      const result = originalStoryPlay.call(this, beat, ...args);
+      if (beat.voice === "ch1_luo_08") {
+        const voice = this.voiceLog.at(-1);
+        window.p012EscortApproval.push({ at: game.Debug.P012().elapsed, event: "LuoApprovalStarted",
+          played: voice?.key === beat.voice && voice.played, duration: voice?.key === beat.voice ? voice.dur || 0 : 0 });
+      }
+      return result;
+    };
     const originalAirImpact = game.strafe.EmitImpact;
     game.strafe.EmitImpact = function (...args) {
       const before = this.stats.impacts;
@@ -749,8 +801,15 @@ try {
     game.StepFrames = function (count = 1, dt = 1 / 60, render = true) {
       for (let frame = 0; frame < count; frame += 1) {
         const before = game.Debug.P012(), position = game.player.position.clone();
+        const waitingApproval = before.beatIndex === 12 && !game.story.Signalled("P012EscortApproved");
+        const waitingColumn = waitingApproval ? game.Debug.P012Scene().columnPosition : null;
         originalStep(1, dt, render);
         const after = game.Debug.P012(), spans = window.p012ActivityTrace;
+        if (waitingColumn && !game.story.Signalled("P012EscortApproved")) {
+          const column = game.Debug.P012Scene().columnPosition;
+          if (Math.hypot(column.x - waitingColumn.x, column.z - waitingColumn.z) > 0.01)
+            window.p012PrematureEscortMovement.push({ at: after.elapsed, before: waitingColumn, after: column });
+        }
         if (after.elapsed < before.elapsed) {
           while (spans.length && spans.at(-1).from >= after.elapsed) spans.pop();
           if (spans.length) spans.at(-1).to = Math.min(spans.at(-1).to, after.elapsed);

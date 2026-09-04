@@ -7,9 +7,49 @@ import { AllowAutonomousBark } from "./Script_FirstLevelWhiteboxFlow.mjs";
 import { StoryDirector } from "./Script_Story.mjs";
 import { EscortColumn, StepP012RoadCover } from "./Script_MissionSetpieces.mjs";
 import { VOICE_LINES as CH1_VOICES, CHAPTER as CH1_CHAPTER } from "./Data_MissionCh1.mjs";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const points = new Map();
+// Execute the production Blast method with a deterministic wall raycast seam.
+// This is a logic fixture, not a claim of a full browser grenade trajectory.
+{
+  class Vec {
+    constructor(x=0,y=0,z=0){Object.assign(this,{x,y,z});}
+    clone(){return new Vec(this.x,this.y,this.z);}
+    copy(v){Object.assign(this,{x:v.x,y:v.y,z:v.z});return this;}
+    subVectors(a,b){this.x=a.x-b.x;this.y=a.y-b.y;this.z=a.z-b.z;return this;}
+    length(){return Math.hypot(this.x,this.y,this.z);}
+    divideScalar(n){this.x/=n;this.y/=n;this.z/=n;return this;}
+    distanceTo(v){return Math.hypot(this.x-v.x,this.y-v.y,this.z-v.z);}
+  }
+  const source=readFileSync(new URL("./Script_Combat.mjs",import.meta.url),"utf8");
+  const method=source.slice(source.indexOf("  Blast(position"),source.indexOf("  get MortarLeft"));
+  const blast=Function("Clamp01",`return ({${method}}).Blast;`)(v=>Math.max(0,Math.min(1,v)));
+  const director=new FirstLevelP012Director({EnemyPosition:actor=>actor.alive?actor.position:null},phase.whitebox);
+  director.beat=21;
+  const enemies=Array.from({length:6},(_,id)=>({id,alive:true,side:"ija",suppression:0,position:new Vec(2+id,0,0),TakeHit(damage){this.health=(this.health??100)-damage;return false;}}));
+  director.enemyRoutes=enemies.map(handle=>({encounterBeat:21,handle}));
+  const before=director.Snapshot();
+  let wall=true;
+  const host={host:{battlefield:{Raycast:()=>wall?{t:.1}:null},ai:{soldiers:enemies}},tmp:new Vec(),tmpB:new Vec()};
+  const receipt=(target,damage,position)=>director.RecordSouthGrenadeEffect(target,damage,position);
+  blast.call(host,new Vec(),4,100,"grenade","ija",true,receipt);
+  assert.equal(director.State().lastSouthGrenadeEffect,null,"solid wall blocks both damage and receipt");
+  wall=false;
+  blast.call(host,new Vec(100,0,100),4,100,"grenade","ija",true,receipt);
+  assert.equal(director.State().lastSouthGrenadeEffect,null,"unrelated explosion gives no receipt");
+  assert.equal(receipt({},100,new Vec()),false,"other encounter target is not a B21 effect");
+  assert.equal(receipt(enemies[0],0,new Vec()),false);
+  blast.call(host,new Vec(),4,100,"grenade","ija",true,receipt);
+  assert.ok(enemies[0].health<100);
+  assert.ok(director.State().lastSouthGrenadeEffect.damage>0);
+  const actual=director.State().lastSouthGrenadeEffect;
+  director.Restore(before);
+  assert.deepEqual(director.State().lastSouthGrenadeEffect,actual,"world-preserving retry retains actual explosion receipt");
+  assert.ok(director.facts.has("southGrenadeThrown"));
+  assert.equal(new FirstLevelP012Director({},phase.whitebox).State().lastSouthGrenadeEffect,null,"new test starts clean");
+  assert.match(source,/p\.owner === "player", p\.OnHit/);
+}
 const signals = new Set();
 const carry = new CarrySystem();
 const spawned = [];
@@ -184,6 +224,10 @@ assert.equal(points.get("p012_volunteer").Enabled(),false,"volunteer cannot targ
 Tick({guideAlive:true,guidePosition:phase.whitebox.activities.woundedDragTo});
 assert.deepEqual(flow.ActivityRoute(),[phase.whitebox.activities.woundedDragTo]);
 Use("p012_volunteer"); Tick();
+assert.equal(flow.State().beat,"B12","a request is not the commander's approval");
+assert.equal(signals.has("EscortCall"),false);
+assert.equal(signals.has("P012EscortRequested"),true);
+signals.add("P012EscortApproved"); Tick();
 assert.equal(flow.State().beat,"B13");
 At("Z06"); assert.equal(flow.State().beat,"B13","outbound history does not satisfy reverse escort");
 for(const id of ["Z04","Z03","Z02","Z06"]) At(id);
@@ -305,14 +349,16 @@ Tick({},40);
 const southActors=spawned.slice(-6);
 assert.equal(new Set(southActors.map(actor=>`${actor.x},${actor.z}`)).size,6,"south combat has six separated indoor/outdoor actors");
 KillWave(); At("Z09");
-assert.equal(flow.State().beat,"B21","kills and zone arrival do not replace grenade use and room entry");
+assert.equal(flow.State().beat,"B21","kills and zone arrival do not replace the room entrance route");
 Use("p012_southGrenades"); assert.equal(currentGrenades,2);
 Tick({grenades:currentGrenades,grenadeThrows:1});
+assert.equal(flow.facts.has("southGrenadeThrown"),false,"an unrelated throw never fabricates an effective explosion");
 assert.equal(flow.State().beat,"B21","grenade use still requires entering the cleared house");
 At("Z09",phase.whitebox.activities.southRoom);
 assert.equal(flow.State().beat,"B21","room destination cannot bypass the visible entrance route");
 Walk(phase.whitebox.activities.southRoomRoute,{zone:"Z09"});
 assert.equal(flow.State().beat,"B22"); Tick({},40);
+assert.equal(flow.facts.has("southGrenadeThrown"),false,"six actually cleared enemies allow entry without pretending a grenade hit");
 assert.equal(flow.State().beat,"B22","time does not fabricate the southern blockade");
 Tick({blockadeVisible:true,blockadePressure:true});
 assert.equal(flow.State().beat,"B22","far shooting cannot abandon litters back at the old ditch");
@@ -354,6 +400,60 @@ assert.equal(AllowAutonomousBark(phase,()=>true),true);
 assert.equal(AllowAutonomousBark({},()=>false),true,"normal chapters are unchanged");
 assert.deepEqual(P012_WAVES.slice(0,5).map(w=>w.kind),["scouts","rifles","machineGun","mortar","culvert"]);
 const spoken=[];
+// Production Story -> Flow approval chain, with recorded duration and silent
+// subtitle fallback. Restoring midway keeps the remaining occupancy, not a
+// second recording or an instantly completed permission.
+for (const voiced of [true, false]) {
+  const heard=[]; const subtitles=[]; const registrations=new Map();
+  const approvalStory=new StoryDirector({hud:{Say(...args){subtitles.push(args);},Title(){}}});
+  const duration=CH1_VOICES.find(voice=>voice.key==="ch1_luo_08").dur;
+  approvalStory.AttachVoice(({key})=>{heard.push(key);return voiced ? duration : 0;});
+  approvalStory.BeginLevel(phase.contentId,{beats:phase.whitebox.storyBeats,actualEventsOnly:true});
+  approvalStory.Signal("P012EscortRequestOpen");
+  const director=new FirstLevelP012Director({Register:spec=>registrations.set(spec.id,spec),
+    Signal:name=>approvalStory.Signal(name),Signalled:name=>approvalStory.Signalled(name)},phase.whitebox);
+  director.beat=12;
+  director.Update(.01,{position:phase.whitebox.activities.woundedDragTo,guideAlive:true,
+    guidePosition:phase.whitebox.activities.woundedDragTo});
+  const before=approvalStory.P012Snapshot();
+  registrations.get("p012_volunteer").OnComplete();
+  director.Update(.01,{});
+  assert.equal(director.beat,12);assert.equal(approvalStory.Signalled("EscortCall"),false);
+  for(let i=0;i<401 && !heard.includes("ch1_luo_08");i++) approvalStory.Update(.01,{p012Beat:12});
+  assert.deepEqual(heard.slice(0,3),["ch1_junguan_01","ch1_shunzi_02","ch1_luo_08"],"recruitment, request and approval keep their causal order");
+  const full=voiced ? duration : 2;
+  approvalStory.Update(full/2,{p012Beat:12});
+  const middle=approvalStory.P012Snapshot();
+  assert.equal(approvalStory.Signalled("P012EscortApproved"),false);
+  approvalStory.P012Restore(before);
+  assert.ok(Math.abs(approvalStory.p012PendingCompletion.remaining-full/2)<1e-6);
+  approvalStory.Update(full/2-.01,{p012Beat:12});
+  director.Update(.01,{});assert.equal(director.beat,12);
+  approvalStory.Update(.02,{p012Beat:12});director.Update(.01,{});
+  assert.equal(director.beat,13);assert.equal(approvalStory.Signalled("EscortCall"),true);
+  assert.ok(approvalStory.levelTime<8,"even an immediate request has no eight-second approval-only wait");
+  approvalStory.P012Restore(middle);
+  approvalStory.Signal("P012EscortRequested");
+  for(let i=0;i<20;i++)approvalStory.Update(.5,{p012Beat:13});
+  assert.equal(heard.filter(key=>key==="ch1_luo_08").length,1);
+  assert.equal(approvalStory.Signalled("P012EscortApproved"),true);
+  assert.equal(approvalStory.p012PendingCompletion,null);
+  assert.ok(heard.includes("ch1_luo_09"),"return instruction can follow while the column moves");
+  // Fresh instance recovery also completes the saved remaining subtitle.
+  const recovered=new StoryDirector({hud:{Say(){},Title(){}}});
+  recovered.BeginLevel(phase.contentId,{beats:phase.whitebox.storyBeats,actualEventsOnly:true});
+  recovered.P012Restore(middle);recovered.Update(full/2+.01,{p012Beat:12});
+  assert.equal(recovered.Signalled("P012EscortApproved"),true);
+}
+assert.equal(CH1_CHAPTER.beats.some(beat=>beat.p012CompleteSignal),false,"formal chapter has no completion gates");
+{
+  const ordinary=new StoryDirector({hud:{Say(){},Title(){}}});
+  ordinary.BeginLevel(phase.contentId);
+  ordinary.Play(phase.whitebox.storyBeats.find(beat=>beat.voice==="ch1_luo_08"),false);
+  ordinary.Update(10,{});
+  assert.equal(ordinary.Signalled("P012EscortApproved"),false,"completion opt-in cannot affect a normal chapter");
+  assert.equal(ordinary.p012PendingCompletion,null);
+}
 const openingStory=new StoryDirector({hud:{Say(){},Title(){}}});
 openingStory.AttachVoice(({key})=>{spoken.push(key);return 0.1;});
 openingStory.BeginLevel(phase.contentId,{beats:phase.whitebox.storyBeats,actualEventsOnly:true});

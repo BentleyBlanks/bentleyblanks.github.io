@@ -384,7 +384,7 @@ export class CombatSystem {
   Detonate(p) {
     const isBundle = p.kind === "GrenadeBundle";
     this.Blast(p.position, p.weapon.radiusM, p.weapon.damage, isBundle ? "tank" : "grenade",
-      p.owner === "player" ? "ija" : "nra", p.owner === "player");
+      p.owner === "player" ? "ija" : "nra", p.owner === "player", p.OnHit);
   }
 
   /**
@@ -392,7 +392,7 @@ export class CombatSystem {
    * 伤害按距离平方衰减，并且**被墙挡住就不吃伤害** —— 隔一堵墙互相扔手榴弹是
    * 台儿庄巷战的标准打法，如果墙不挡弹片，那堵墙就白存在了。
    */
-  Blast(position, radius, damage, kind, hurtSide = null, byPlayer = false) {
+  Blast(position, radius, damage, kind, hurtSide = null, byPlayer = false, onHit = null) {
     if (this.host.vfx) this.host.vfx.Explosion(position, { radius, kind });
     if (this.host.audio) {
       // 近/远两条**不同的录音**（城区爆炸 vs 远处爆炸），按**听者的距离**挑，
@@ -442,6 +442,7 @@ export class CombatSystem {
         // 于是**日军炮弹炸死中国兵扣的是日军的票**（实跑 ijaPool 700→696 / nraPool 600→600）。
         // 扣票统一由 Soldier.Kill() 发的阵亡事件负责，这里只管伤害与压制。
         const died = s.TakeHit(dmg, "torso", dir);
+        onHit?.(s, dmg, position);
         s.suppression = Clamp01(s.suppression + 0.8);
         // 只数日军。玩家的手榴弹也炸得到自己人，而给误伤发一记"击杀确认"
         // 是这套反馈能犯的最难看的错。

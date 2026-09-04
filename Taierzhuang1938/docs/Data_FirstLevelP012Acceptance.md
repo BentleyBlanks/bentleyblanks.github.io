@@ -34,15 +34,23 @@ P2 给定的 Z09、Z02、Z04 坐标意味着回撤中心线的几何下界已经
 
 功能链路已通过完整实跑；总体首玩节奏尚未最终验收。数据中的目标时长、敌军预算或视角窗口只是设计目标，不是验收证据。
 
-### 当前完整实跑（Main145 / Setpieces21 / Data11 / Layout11 / Flow13）
+### 当前完整实跑（Main146 / Setpieces21 / Data12 / Layout11 / Flow15 / Story8 / Combat8）
 
 | 操作配置 | 结果 | 游戏内时长 | 普通死亡／故意扑救重试 |
 | --- | --- | --- | --- |
 | 精确瞄准，首轮 | B21 阵亡，保留失败记录 | 788.1 秒截止 | 未使用普通恢复／1 |
 | 精确瞄准，允许现有检查点恢复 | 所有完整门禁通过 | 913.05 秒（15.22 分） | 实际 0／1 |
 | 预先定义的 deliberate 受限瞄准 | 所有完整门禁通过 | 1226.97 秒（20.45 分） | 4／1 |
+| 增加实际护送批准门禁后的精确复验 | 所有完整门禁通过 | 916.10 秒（15.27 分） | 实际 0／1 |
+| 增加有效手雷回执后的精确复验 | 所有完整门禁通过；本轮为步枪清场 | 927.95 秒（15.47 分） | 1／1 |
 
-两次通过均实际完成自由相机飞机转向／担架员／百姓同屏、同一次俯冲的航空弹着与地面射击重叠、有限敌军、搬运、侧翻恢复、真实追击、原担架重新抬起、黑屏结束及终局冻结。普通死亡不重置弹药和敌人；没有为了通过而改命中、生命或剧情事实。
+通过记录均实际完成自由相机飞机转向／担架员／百姓同屏、同一次俯冲的航空弹着与地面射击重叠、有限敌军、搬运、侧翻恢复、真实追击、原担架重新抬起、黑屏结束及终局冻结。普通死亡不重置弹药和敌人；没有为了通过而改命中、生命或剧情事实。
+
+前三行是 Data11 / Flow13 的记录；第四行是 Flow14 批准链修正后的 `Approval` 复验，最后一行为当前版 `GrenadeEffect`。B12 依次发出招募、顺子报名、罗班长批准，批准语音时长／静音字幕占用结束后才启动队列。报名在 489.367 秒，批准语音开始 491.400 秒，时长 1.110 秒，批准事件 492.533 秒，担架启程 492.567 秒；此前列头没有移动。实际有声、静音及半句恢复四分支另有浏览器夹具通过，恢复不重播批准音频、玩家仍可自由移动。生产机制采用解码时长对应的游戏时钟，不是音频 `onended` 回调；加速整关不充当真实听感验收。
+
+B21 的手雷事实只由实际爆炸对本段六名敌人造成正伤害触发，按钮计数、隔墙无伤与无关爆炸不算。手雷是当前火力点的战术选项，不再用已清空的固定落点锁住行进；六敌实际清除并完成进屋路线才结束此段。`GrenadeEffect` 这一轮没有在 B21 投雷，有效回执为 null，诚实记录为步枪清场，不能把这次全程通过用作手雷正向端到端证据。最终 quick 36/36、正式 DamageTest 24/24 通过。
+
+另有 `--p012-grenade-only` 真实局部夹具通过：显式初始化 B21 六敌并冻结阶段推进，从实际战位按 G 持握 36 帧后释放，经过真实飞行、碰撞与引信产生爆炸，敌人 14 从 100 降至 89.563774，有效回执为 10.436226，库存 2→1，零浏览器错误。爆点为 (58.2904, 0.0266, 115.0763)，完整 60 个轨迹采样和前后状态保存在系统临时目录 `Data_P012GrenadeFixture.json`。没有直接调用爆炸或写入任务回执；这证明局部端到端接线，不冒充整关投掷经历。
 
 空地压力采用同六名敌人的真实提前接近／遮挡待机，在实际俯冲入场后释放。待机测试零枪；P012 独立白盒比例下的速度为 32m/s，沿 80 米道路产生 2.5 秒真实扫射，正式关卡速度不变。完整实跑中的枪响与真实航空弹着相隔不超过 0.25 秒；该容差覆盖既有 0.18 秒连射间隙，记录仍保留真实 `burstOn`，不声称每发步枪都与航空机枪在同一帧开火。离场段不计入该门禁。
 
@@ -73,6 +81,8 @@ P2 给定的 Z09、Z02、Z04 坐标意味着回撤中心线的几何下界已经
 node Taierzhuang1938/Script_FirstLevelP012BrowserTest.mjs --prelude --geometry
 node Taierzhuang1938/Script_FirstLevelP012BrowserTest.mjs --campaign --retry
 node Taierzhuang1938/Script_FirstLevelP012BrowserTest.mjs --campaign --retry --voice-timing
+node Taierzhuang1938/Script_FirstLevelP012BrowserTest.mjs --campaign --retry --voice-timing --recover-deaths --run-label=Approval
+node Taierzhuang1938/Script_FirstLevelP012BrowserTest.mjs --campaign --retry --voice-timing --recover-deaths --run-label=GrenadeEffect
 node Taierzhuang1938/Script_FirstLevelP012BrowserTest.mjs --campaign --retry --voice-timing --perception=bounded --recover-deaths --run-label=Review
 node Taierzhuang1938/Script_FirstLevelP012BrowserTest.mjs --campaign --retry --voice-timing --perception=deliberate --recover-deaths --run-label=Review
 node Taierzhuang1938/Script_FirstLevelP012BrowserTest.mjs --overview
@@ -80,6 +90,8 @@ node Taierzhuang1938/Script_FirstLevelP012BrowserTest.mjs --audio-smoke
 node Taierzhuang1938/Script_MenuTest.mjs --p012-retry-only
 node Taierzhuang1938/Script_MenuTest.mjs --p012-voice-only
 node Taierzhuang1938/Script_MenuTest.mjs --p012-enemy-bound-only
+node Taierzhuang1938/Script_MenuTest.mjs --p012-approval-only
+node Taierzhuang1938/Script_MenuTest.mjs --p012-grenade-only
 node Taierzhuang1938/Script_MenuTest.mjs
 node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=prepush
 ```
@@ -108,4 +120,4 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=pre
 
 这些对照不代表整套回归全绿，也不豁免 P012 自身的真实通行与顺序通关验收。
 
-本次完整 `prepush` 选择共 78 项：74 项通过；上表三项失败与干净 master 一致；`PlayTest` 在 2400 秒运行上限处超时，尚未得到最终断言汇总，不能归入历史基线通过。此前的七章切换、剧情派发、过场与长跑段已执行，但不替代整套 PlayTest 结果。最后的 BootTest 通过。本批新增的敌军短换位与到达半径修正还需单独复验。
+本次完整 `prepush` 选择共 78 项：74 项通过；上表三项失败与干净 master 一致；`PlayTest` 在 2400 秒运行上限处超时，尚未得到最终断言汇总，不能归入历史基线通过。此前的七章切换、剧情派发、过场与长跑段已执行，但不替代整套 PlayTest 结果。最后的 BootTest 通过。后续敌军短换位、到达半径及审批链已分别追加真实浏览器夹具与完整实跑，AiBehaviorTest 通过、VoiceTest 30/30 通过，批准链后的 quick 再次 36/36 通过。

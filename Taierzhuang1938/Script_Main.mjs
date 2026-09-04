@@ -4782,6 +4782,7 @@ function ReleaseCook() {
   const dir = player.AimDirection(_aimDir).clone();
   const projectile = combat.Throw(kind, power, player.EyePosition.clone(), dir, cooked);
   if (projectile && kind === "Grenade") p012Runtime?.RecordGrenade(player.position);
+  if (projectile && kind === "Grenade" && p012Flow) projectile.OnHit = (target, damage, position) => p012Flow.RecordSouthGrenadeEffect(target, damage, position);
   // 夹到 0：BeginCook 已经挡过"没货就别拔弦"，但调试口（Debug.Throw）是直接
   // 塞 state.cooking 的，绕开了那道闸。库存变负之后 HUD 会显示 −1 枚手榴弹，
   // 而且下一次 BeginCook 的 <= 0 判断照样过 —— 一个负数会一直负下去。

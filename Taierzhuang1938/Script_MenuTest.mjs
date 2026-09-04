@@ -11,6 +11,7 @@
 
 import path from "node:path";
 import fs from "node:fs";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
@@ -56,10 +57,71 @@ try {
 const Url = (query = "") => `http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small${query}`;
 
 // Explicit lethal-hit fixture, not campaign or balance evidence.
-if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-voice-only") || process.argv.includes("--p012-enemy-bound-only")){
+if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-voice-only") || process.argv.includes("--p012-enemy-bound-only") || process.argv.includes("--p012-approval-only") || process.argv.includes("--p012-grenade-only")){
  try{
   await page.goto(Url("&whitebox=p012&shot=1&manual=1"),{timeout:120000});
   await page.waitForFunction(()=>window.Tengxian?.Debug?.P012?.(),null,{timeout:240000});
+  if(process.argv.includes("--p012-grenade-only")){
+    // Explicit B21 local initialization, not sequential campaign evidence.
+    const result=await page.evaluate(async()=>{
+      const g=window.Tengxian,{FirstLevelP012Director,P012_WAVES}=await import("./Script_FirstLevelP012Flow.mjs");
+      let flow;const update=FirstLevelP012Director.prototype.Update;
+      FirstLevelP012Director.prototype.Update=function(){flow=this;};g.StepFrames(1);
+      flow.beat=21;flow.routeIndex=2;
+      const waveIndex=P012_WAVES.findIndex(w=>w.beat===21);flow.SpawnWave(P012_WAVES[waveIndex],waveIndex);
+      const actors=flow.enemyRoutes.filter(e=>e.encounterBeat===21).map(e=>e.handle);
+      g.player.Spawn(42,94,0);g.player.yaw=Math.atan2(-7,-10);g.player.pitch=.15;g.state.grenades=2;
+      const before=actors.map(a=>({id:a.id,health:a.health,position:a.position.toArray()}));
+      g.Debug.Key("KeyG",true);g.StepFrames(36);g.Debug.Key("KeyG",false);
+      const projectile=g.combat.projectiles.find(p=>p.owner==="player"&&p.kind==="Grenade");
+      const trajectory=[];
+      for(let i=0;i<360;i++){g.StepFrames(1);if(projectile&&i%6===0)trajectory.push({time:i/60,position:projectile.position.toArray(),fuse:projectile.fuse,alive:projectile.alive});}
+      const effect=flow.State().lastSouthGrenadeEffect;
+      const after=actors.map(a=>({id:a.id,health:a.health,alive:a.alive,position:a.position.toArray()}));
+      FirstLevelP012Director.prototype.Update=update;
+      return {before,after,effect,trajectory,grenades:g.state.grenades,projectile:!!projectile,
+        detonated:!!projectile&&projectile.fuse<=0&&!g.combat.projectiles.includes(projectile)};
+    });
+    fs.writeFileSync(path.join(os.tmpdir(),"Data_P012GrenadeFixture.json"),JSON.stringify(result,null,2));
+    Check("真实 G 投掷、飞行、引信与 Blast 产生 B21 有效伤害回执",result.projectile&&result.grenades===1&&!!result.effect&&result.before.length===6&&result.after.some(a=>a.id===result.effect.targetId&&a.health<result.before.find(b=>b.id===a.id).health),JSON.stringify(result));
+    Check("引信耗尽且实际生命损失匹配回执",result.detonated&&result.after.some(a=>a.id===result.effect?.targetId&&Math.abs(result.before.find(b=>b.id===a.id).health-a.health-result.effect.damage)<1e-6));
+    Check("无浏览器错误",problems.length===0,problems.join("\n"));await browser.close();await server.close();process.exit(failed?1:0);
+  }
+  if(process.argv.includes("--p012-approval-only")){
+    const results=await page.evaluate(async()=>{
+      const g=window.Tengxian,{StoryDirector}=await import("./Script_Story.mjs"),{FirstLevelP012Director}=await import("./Script_FirstLevelP012Flow.mjs"),{EscortColumn}=await import("./Script_MissionSetpieces.mjs"),{default:phase}=await import("./Data_FirstLevelP012Whitebox.mjs"),{VOICE_LINES,VOICE_BASE}=await import("./Data_Voice.mjs");
+      const audio=new AudioContext();await audio.resume();const entry=VOICE_LINES.find(e=>e.key==="ch1_luo_08"),buffer=await audio.decodeAudioData(await(await fetch(VOICE_BASE+entry.file)).arrayBuffer()),results=[];
+      for(const audible of [true,false])for(const rewind of [false,true]){
+        let source=null,plays=0,ended=false,time=0,restored=false;const points=new Map();
+        const story=new StoryDirector({hud:{Say(){},Title(){}}});
+        story.AttachVoice({play:()=>{if(!audible)return 0;plays++;source=audio.createBufferSource();source.buffer=buffer;source.connect(audio.destination);source.onended=()=>{ended=true;};source.start();return buffer.duration;},stop:()=>source?.stop()});
+        story.BeginLevel("CH1_NanLu",{beats:phase.whitebox.storyBeats.filter(b=>b.voice==="ch1_luo_08"),actualEventsOnly:true});
+        const column=new EscortColumn(g.setpieces.host,{waypoints:[{x:-7,z:-52},{x:0,z:-52}],followRouteBodies:true,members:[{role:"bearer"},{role:"bearer"}],tuning:{columnSpeedMS:1.35}});
+        g.setpieces.mem.column=column;g.setpieces.once.delete("p012_columnStart");g.story.pushed.delete("EscortCall");
+        const flow=new FirstLevelP012Director({Register:p=>points.set(p.id,p),Carry:()=>g.carry,Signal:name=>{story.Signal(name);g.story.Signal(name);},Signalled:name=>story.Signalled(name)},phase.whitebox);
+        flow.beat=12;g.player.Spawn(-7,-52,0);const sample={position:g.player.position,guidePosition:{x:-7,z:-52},guideAlive:true,zone:"Z04",stance:"stand",enemyDeaths:15};flow.Update(.01,sample);
+        g.interact.Clear("P012");g.interact.Register({...points.get("p012_volunteer"),tag:"P012"});
+        const held=g.interact.Press(g.player);for(let i=0;i<100;i++)g.interact.Update(1/60,g.player);
+        let premature=false,approvedAt=null;const start=g.player.position.clone();
+        while(time<7&&!story.Signalled("P012EscortApproved")){
+          await new Promise(resolve=>setTimeout(resolve,16));time+=.016;story.Update(.016,{});flow.Update(.016,sample);g.setpieces.Update(.016);
+          if(!story.Signalled("P012EscortApproved")&&column.started)premature=true;
+          if(time<.5)g.player.Update(.016,{forward:1,strafe:0,lookX:0,lookY:0,ads:false},g.state.weapon);
+          if(rewind&&!restored&&time>1){const snap=story.P012Snapshot();restored=story.P012Restore(snap);}
+        }
+        approvedAt=time;flow.Update(.016,sample);g.setpieces.Update(.016);const before=column.Bearers[0]?.handle.position.clone();
+        for(let i=0;i<120;i++){g.state.elapsed+=1/60;g.setpieces.Update(1/60);for(const member of column.Alive)g.ai.Act(member.handle,1/60,g.player);g.ai.ctx.physics?.Step(1/60);}
+        const moved=before?column.Bearers[0].handle.position.distanceTo(before):0;
+        const saved=story.P012Snapshot();story.P012Restore(saved);story.Update(.1,{});
+        results.push({audible,rewind,restored,held:held?.point?.id,plays,ended,premature,approved:story.Signalled("P012EscortApproved"),approvedAt,started:column.started,moved,playerMoved:g.player.position.distanceTo(start),duration:buffer.duration});
+        for(const member of column.Alive)member.handle.Kill();source?.stop();
+      }
+      await audio.close();return results;
+    });
+    Check("真实语音/静音批准及恢复均先批准后开列",results.every(r=>r.held==="p012_volunteer"&&(!r.rewind||r.restored)&&!r.premature&&r.approved&&r.started&&r.moved>.1&&r.approvedAt<8&&r.playerMoved>.1&&r.plays<2),JSON.stringify(results));
+    Check("有声非恢复案例自然播完",results.filter(r=>r.audible&&!r.rewind).every(r=>r.ended&&r.approvedAt>=r.duration));
+    Check("无浏览器错误",problems.length===0,problems.join("\n"));await browser.close();await server.close();process.exit(failed?1:0);
+  }
   if(process.argv.includes("--p012-enemy-bound-only")){
     const rows=await page.evaluate(async()=>{
       const g=window.Tengxian,{default:phase}=await import("./Data_FirstLevelP012Whitebox.mjs"),rows=[];

@@ -426,6 +426,8 @@ export class StoryDirector {
       ? beats.filter((beat) => beat.p012Immediate).map((beat) => ({ ...beat, level: levelId, done: false })) : [];
     this.p012SignalTimes = new Map();
     this.p012CueLog = [];
+    this.p012PendingCompletion = null;
+    this.p012CompletedSignals = new Set();
     this.levelId = levelId;
     // sameAsPrev：连着几条写同一个 at 的，作者的意思是「这几句一起来」。
     // 不标出来的话每一条都要各等一遍自己的兜底 —— 实测 L0 那 12 条里有 6 条
@@ -480,17 +482,26 @@ export class StoryDirector {
       cues: this.p012Immediate.map((beat) => ({ key: beat.voice, done: beat.done })),
       signalAges: [...this.p012SignalTimes].map(([name, time]) => [name, Math.max(0, this.levelTime - time)]),
       log: this.p012CueLog.map((entry) => ({ ...entry })),
+      pendingCompletion: this.p012PendingCompletion ? { ...this.p012PendingCompletion } : null,
+      completedSignals: [...this.p012CompletedSignals],
     };
   }
 
   P012Restore(snapshot) {
     if (!this.p012Immediate?.length || !snapshot) return false;
+    const pending = this.p012PendingCompletion || snapshot.pendingCompletion;
+    this.p012CompletedSignals = new Set([...this.p012CompletedSignals, ...(snapshot.completedSignals || [])]);
     const delivered = new Set([...this.p012CueLog, ...(snapshot.log || [])]
       .filter((entry) => !entry.expired).map((entry) => entry.key));
     const saved = new Map((snapshot.cues || []).map((entry) => [entry.key, entry.done]));
     for (const beat of this.p012Immediate) beat.done = delivered.has(beat.voice) || saved.get(beat.voice) === true;
-    this.p012SignalTimes = new Map((snapshot.signalAges || []).map(([name, age]) =>
-      [name, this.levelTime - Math.max(0, Number(age) || 0)]));
+    // Only this non-replayed permission chain retains later world events.
+    // Aircraft semantic-window rewind rules remain unchanged.
+    const approvalEvents = [...this.p012SignalTimes].filter(([name]) =>
+      ["P012EscortRequestOpen", "P012EscortRequested", "P012EscortApproved", "EscortCall"].includes(name));
+    this.p012SignalTimes = new Map([...approvalEvents,
+      ...(snapshot.signalAges || []).map(([name, age]) =>
+        [name, this.levelTime - Math.max(0, Number(age) || 0)])]);
     const log = [...(snapshot.log || [])];
     for (const entry of this.p012CueLog) {
       if (!entry.expired && !log.some((savedEntry) => savedEntry.key === entry.key && !savedEntry.expired)) log.push({ ...entry });
@@ -499,6 +510,15 @@ export class StoryDirector {
     // Retry cancels the old in-flight recording before freeing its channel.
     if (this.voiceStop) { try { this.voiceStop(); } catch { /* optional audio host */ } }
     this.sinceLast = MIN_GAP;
+    this.p012PendingCompletion = pending && !this.p012CompletedSignals.has(pending.signal) ? { ...pending } : null;
+    if (this.p012PendingCompletion) {
+      // The recording was stopped on rewind. Resume its remaining semantic
+      // occupancy as a subtitle, never restart or silently skip an approval.
+      const cue = this.p012PendingCompletion;
+      this.hud.Say(cue.speaker, cue.text, cue.remaining);
+      this.sinceLast = MIN_GAP - cue.remaining;
+    }
+    for (const signal of this.p012CompletedSignals) this.Signal(signal);
     return true;
   }
 
@@ -557,6 +577,15 @@ export class StoryDirector {
     this.levelTime += dt;
     this.sinceLast += dt;
     this.beatWait += dt;
+    if (this.p012PendingCompletion) {
+      this.p012PendingCompletion.remaining -= Math.max(0, dt);
+      if (this.p012PendingCompletion.remaining <= 0) {
+        const signal = this.p012PendingCompletion.signal;
+        this.p012PendingCompletion = null;
+        this.p012CompletedSignals.add(signal);
+        this.Signal(signal);
+      }
+    }
     if (this.fightCooldown > 0) this.fightCooldown -= dt;
 
     // 一帧最多播一条：台词叠在一起谁都读不清
@@ -678,12 +707,19 @@ export class StoryDirector {
    */
   _Speech(speaker, beat, seconds, variant = "") {
     const dur = this._Speak(beat);
-    const shown = dur > 0 ? Math.min(SUBTITLE_MAX, Math.max(seconds, dur + SUBTITLE_TAIL)) : seconds;
+    const silentSeconds = this.actualEventsOnly && beat.p012SubtitleSeconds || seconds;
+    const shown = dur > 0 ? Math.min(SUBTITLE_MAX, Math.max(seconds, dur + SUBTITLE_TAIL)) : silentSeconds;
     this.hud.Say(speaker, beat.text, shown, variant);
     // sinceLast 是**倒扣**的：置成负数就等于让下一条多等这么久
     //（Update 里的闸是 sinceLast < MIN_GAP 就不放行）。
     const hold = dur > 0 ? Math.min(VOICE_HOLD_MAX, dur + VOICE_HOLD_TAIL) : 0;
     this.sinceLast = hold > MIN_GAP ? MIN_GAP - hold : 0;
+    if (this.actualEventsOnly && beat.p012CompleteSignal) {
+      const remaining = dur > 0 ? dur : shown;
+      this.p012PendingCompletion = { signal: beat.p012CompleteSignal, key: beat.voice,
+        remaining, speaker, text: beat.text };
+      this.sinceLast = Math.min(this.sinceLast, MIN_GAP - remaining);
+    }
     return dur;
   }
 

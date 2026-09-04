@@ -22,6 +22,10 @@ const movedVoices = new Set(["ch1_luo_01", "ch1_heyoutian_01", "ch1_shunzi_01", 
 // Scene-critical voices bypass only this whitebox's sequential backlog. Expired
 // observations are discarded, never replayed over a later aircraft manoeuvre.
 const aircraftCues = [
+  ["ch1_junguan_01", "P012EscortRequestOpen", null, null],
+  ["ch1_shunzi_02", "P012EscortRequested", null, null],
+  ["ch1_luo_08", "P012EscortRequested", null, null],
+  ["ch1_luo_09", "EscortCall", null, null],
   ["ch1_yaowa_05", "P012AircraftApproach", "P012AircraftRailFire", 4],
   ["ch1_luo_13", "P012AircraftApproach", "P012AircraftRailFire", 6],
   ["ch1_liuwencai_02", "P012AircraftRailFire", "P012AircraftRailExit", 0.4],
@@ -47,6 +51,8 @@ const aircraftCues = [
 ].map(([key, event, until, maxAgeS]) => Object.freeze({
   ...FIRST_CHAPTER.beats.find((beat) => beat.voice === key),
   at: `event:${event}`, p012Immediate: Object.freeze({ event, until, maxAgeS }),
+  ...(key === "ch1_luo_08" ? { p012CompleteSignal: "P012EscortApproved" } : {}),
+  ...(["ch1_junguan_01", "ch1_shunzi_02", "ch1_luo_08"].includes(key) ? { p012SubtitleSeconds: 2 } : {}),
 }));
 for (const cue of aircraftCues) movedVoices.add(cue.voice);
 function ExistingPrologueVoice(key, event) {
@@ -79,7 +85,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
   place: "临时兵站", sky: "p012WhiteboxDay", ambience: "smokyDay", music: null, minutes: 26,
   brief: Object.freeze(["跟随罗班长下车，领取子弹并检查步枪。",
     "灰：地面；黄：跨过；橙：翻越；紫：攀爬；蓝：掩体；黑：边界；红：危险；绿：任务路；青：担架路。"]),
-  metaText: Object.freeze(["颜色语义白盒", "正式第一章人物与玩法", "P0 / P1 / P2"]),
+  metaText: Object.freeze(["颜色语义白盒", "正式第一章人物与玩法", "节奏校准中"]),
   level: FIRST_CHAPTER, roster: FIRST_CHAPTER.roster, mechanics: FIRST_CHAPTER.mechanics,
   objectives: Object.freeze(zones.map((zone) => zone.name)), mechanic: "跟随小队，完成当前行动。",
   nraPool: FIRST_CHAPTER.pool.start, poolGain: 0, ijaPool: 37, ijaPressure: 0.72,

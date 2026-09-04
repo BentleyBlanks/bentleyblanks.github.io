@@ -156,9 +156,9 @@ export class FirstLevelP012Director {
         this.Emit("P012WoundedChecked"); return issued; } });
     Register({ id: "p012_volunteer", kind: "supply", label: "向罗班长主动申请护送伤员",
       gesture: "hold", seconds: 1.5, position: this.config.activities.woundedDragTo,
-      Enabled: () => this.beat === 12 && this.lastSample.guideAlive === true
+      Enabled: () => this.beat === 12 && !this.facts.has("volunteer") && this.lastSample.guideAlive === true
         && Distance(this.lastSample.guidePosition, this.config.activities.woundedDragTo) < 3, once: false,
-      OnComplete: () => { this.Mark("volunteer"); this.Emit("EscortCall"); } });
+      OnComplete: () => { this.Mark("volunteer"); this.Emit("P012EscortRequested"); } });
     Register({ id: "p012_roadSupply", kind: "supply", label: "检查担架并补充弹药",
       gesture: "hold", seconds: 2.2, position: this.Point("stretcher", { x: 45, z: 26 }),
       Enabled: () => this.beat === 15 && !this.supplyReceipts.has("regroup"), once: false,
@@ -349,6 +349,7 @@ export class FirstLevelP012Director {
     if (next === 9) { this.mortarImpactStart = this.lastSample.mortarImpactCount || 0;
       this.mortarEscapeFrom = null; }
     if (next === 11) this.cleanupWeaponStart = this.lastSample.weaponActionCount || 0;
+    if (next === 12) this.Emit("P012EscortRequestOpen");
     if (next === 21) { this.grenadeStart = this.lastSample.grenadeThrows || 0; this.Emit("P012DitchClear"); }
     this.action = P012_BEATS[next].objective;
     this.host.Objective?.(this.action);
@@ -412,7 +413,7 @@ export class FirstLevelP012Director {
       : this.beat === 18 ? sample.carryKind === "stretcher"
       : this.beat === 20 ? !this.LateThreat()
       : this.beat === 21 ? this.routeIndex < (activity.southSupplyRouteIndex || 0)
-        || (!this.LateThreat() && (this.facts.has("southGrenadeThrown") || (!(sample.grenades > 0) && this.southGrenadesRemaining === 0))) : true;
+        || !this.LateThreat() : true;
     if (routeAllowed && Distance(p, route[this.routeIndex]) <= this.RouteArrivalRadius()) {
       const reachedPoint = route[this.routeIndex];
       if (this.beat === 4) {
@@ -468,7 +469,7 @@ export class FirstLevelP012Director {
       }
     }
     const zone = sample.zone;
-    if (this.beat === 21 && sample.grenadeThrows > this.grenadeStart) this.Mark("southGrenadeThrown");
+    // A button press or an unrelated explosion does not complete the room assault.
     if (this.beat === 21 && Distance(p, activity.southRoom) < 3) this.Mark("southRoomEntered");
     if (this.beat === 23 && this.facts.has("retreatSmokeDeployed") && sample.retreatSmokeActive) this.Mark("retreatSmokeObserved");
     if (this.beat === 23 && sample.lastLitterArrived) this.Emit("P012LastLitterArrived");
@@ -572,7 +573,10 @@ export class FirstLevelP012Director {
       case 11: ready = Has("wounded") && sample.woundedDragDelivered
         && sample.woundedDragDistance >= (activity.woundedDragMinM || 10)
         && this.routeIndex >= route.length && sample.weaponActionCount > this.cleanupWeaponStart; break;
-      case 12: ready = Has("volunteer"); break;
+      case 12:
+        ready = Has("volunteer") && this.host.Signalled?.("P012EscortApproved");
+        if (ready) this.Emit("EscortCall");
+        break;
       case 13: ready = At("Z06") && Followed(["Z04", "Z03", "Z02", "Z06"])
         && sample.columnAtEscortEnd && Distance(p, sample.columnPosition) < 18; break;
       case 14:
@@ -600,7 +604,7 @@ export class FirstLevelP012Director {
       case 20: ready = dead >= 27; break;
       case 21: ready = dead >= 33 && At("Z09") && Has("southRoomEntered")
         && this.routeIndex >= route.length
-        && (Has("southGrenadeThrown") || (!(sample.grenades > 0) && this.southGrenadesRemaining === 0)); break;
+        && this.SouthEnemiesCleared(); break;
       case 22: {
         const cleared = sample.farSpawned === 4 && sample.farDeaths === 4;
         ready = At("Z09") && sample.columnAtSouthAssembly === true && this.routeIndex >= route.length
@@ -623,6 +627,17 @@ export class FirstLevelP012Director {
   }
 
   EnemyBudget() { return this.unlockedWaves.reduce((n, index) => n + P012_WAVES[index].count, 0); }
+  SouthEnemiesCleared() {
+    const enemies=this.enemyRoutes.filter(entry=>entry.encounterBeat===21);
+    return enemies.length===6 && !this.pendingEnemies.some(entry=>entry.encounterBeat===21)
+      && enemies.every(entry=>!this.host.EnemyPosition?.(entry.handle));
+  }
+  RecordSouthGrenadeEffect(target, damage, position) {
+    if(this.beat!==21 || !(damage>0) || !this.enemyRoutes.some(entry=>entry.encounterBeat===21&&entry.handle===target))return false;
+    this.Mark("southGrenadeThrown");
+    this.lastSouthGrenadeEffect={position:{x:position.x,y:position.y,z:position.z},targetId:target.id ?? null,damage};
+    return true;
+  }
   SpawnWave(wave, waveIndex) {
     const name = wave.lane === "westEnemy" ? "west" : wave.lane === "eastEnemy" ? "east" : "center";
     const lane = this.config.enemyLanes?.[name];
@@ -761,6 +776,9 @@ export class FirstLevelP012Director {
       } else { target = activity.woundedDragTo; interactionId = null; requiredAction = "reload"; text = "安置伤员后重新装填步枪"; }
     }
     if (this.beat === 12) { target = activity.woundedDragTo || anchors.shelter; interactionId = "p012_volunteer"; }
+    if (this.beat === 12 && this.facts.has("volunteer")) {
+      interactionId = null; text = "已报名护送；听清罗班长的接应地点，准备随担架出发";
+    }
     if (this.beat === 15 && !this.facts.has("regroup")) { target = anchors.stretcher; interactionId = "p012_roadSupply"; }
     if (this.beat === 15 && this.facts.has("regroup") && !this.facts.has("roadWounded")) {
       target = this.lastSample.roadWoundedPosition || this.lastSample.columnPosition;
@@ -851,15 +869,10 @@ export class FirstLevelP012Director {
     if (this.beat === 21) {
       if (this.routeIndex < (activity.southSupplyRouteIndex || 0)) {
         target = route[this.routeIndex]; text = "掩护担架沿已清路沟向南推进"; requiredAction = "move";
-      } else if (!this.facts.has("southGrenadeThrown") && !(this.lastSample.grenades > 0) && this.southGrenadesRemaining > 0) {
-        target = activity.southGrenadeSupply; interactionId = "p012_southGrenades";
-        text = "从路沟补给点领取有限手榴弹";
-      } else if (!this.facts.has("southGrenadeThrown") && this.lastSample.grenades > 0) {
-        target = activity.southGrenadeSupply; lookAt = activity.southGrenadeAim; requiredAction = "grenade";
-        text = "向截路火力点投掷手榴弹，再进入民房清理";
       } else { target = route[this.routeIndex] || activity.southRoom; text = "沿沟口绕进南路民房，清除近处日军";
         const threat = this.LateThreat();
         if (threat) { target = threat.cover; lookAt = threat.lookAt; requiredAction = "fight"; text = threat.label; }
+        if (threat && this.lastSample.grenades > 0) text += "；可向当前火力点投掷手榴弹";
       }
     }
     if (this.beat === 20) {
@@ -912,6 +925,7 @@ export class FirstLevelP012Director {
     frontlineAmmoRemaining: this.frontlineAmmoRemaining, frontlineAmmoDispensed: this.frontlineAmmoDispensed,
     supplyReceipts: [...this.supplyReceipts],
     southGrenadesRemaining: this.southGrenadesRemaining, grenadeStart: this.grenadeStart,
+    lastSouthGrenadeEffect: this.lastSouthGrenadeEffect || null,
     completionReasons: this.completionReasons,
     mortarEscapeFrom: this.mortarEscapeFrom,
     weaponActionStart: this.weaponActionStart, retreatCovers: this.retreatCovers,
@@ -926,6 +940,10 @@ export class FirstLevelP012Director {
     next.frontlineAmmoDispensed = Math.max(this.frontlineAmmoDispensed, next.frontlineAmmoDispensed || 0);
     next.supplyReceipts = [...new Set([...this.supplyReceipts, ...(next.supplyReceipts || [])])];
     next.southGrenadesRemaining = Math.min(this.southGrenadesRemaining, next.southGrenadesRemaining ?? this.southGrenadesRemaining);
+    // 爆炸与敌人伤亡属于保留的现场；旧任务检查点不能抹掉真实命中回执。
+    next.lastSouthGrenadeEffect = Clone(this.lastSouthGrenadeEffect || next.lastSouthGrenadeEffect || null);
+    next.facts = next.facts.filter(fact => fact !== "southGrenadeThrown");
+    if (next.lastSouthGrenadeEffect) next.facts.push("southGrenadeThrown");
     Object.assign(this, next);
     this.facts = new Set(next.facts); this.signals = new Set(next.signals); this.gunports = new Set(next.gunports);
     this.supplyReceipts = new Set(next.supplyReceipts);
@@ -942,6 +960,8 @@ export class FirstLevelP012Director {
     frontlineAmmo: { remainingClips: this.frontlineAmmoRemaining, dispensedClips: this.frontlineAmmoDispensed,
       label: this.FrontlineAmmoLabel() },
     southGrenadesRemaining: this.southGrenadesRemaining,
+    lastSouthGrenadeEffect: Clone(this.lastSouthGrenadeEffect || null),
+    southEnemiesCleared: this.SouthEnemiesCleared(),
     completionReasons: { ...this.completionReasons },
     elapsed: this.elapsed, airSprintM: this.airSprintM, ambushEntryIndex: this.ambushEntryIndex,
     closePressureReleased: this.closePressureReleased, stagedCloseEnemies: this.enemyRoutes.filter(entry=>entry.staging).length,
