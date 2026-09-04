@@ -91,6 +91,7 @@ const guidanceCues = Object.freeze([
   ["SmokeHandoff", "P012GuideSmokeHandoff", "沿西沟往回走。前后照应着担架，别落下伤员。"],
   ["DelayMiddle", "P012DelayPosition1", "这边压住了。顺着蓝色沟岸换到中段，别离伤员太远。"],
   ["DelaySouth", "P012DelayPosition2", "最后一组从南端缺口来。到折角后再开火，别站在路面上。"],
+  ["BlockadeDecision", "P012BlockadeDecision", "路障封死，南路走不通。点烟，改走西沟。"],
 ].map(([id,event,text])=>Object.freeze({at:`event:${event}`,type:"line",who:"luo",text,tier:"虚构",
   voice:`p012_text_Guide${id}`,p012SubtitleOnly:true,p012SubtitleSeconds:5.5,
   p012Immediate:Object.freeze({event,maxAgeS:12})})));
@@ -233,13 +234,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
         { x: 34, z: 104.4 }, { x: 34, z: 105 }, { x: 30, z: 105 }]),
       southAssemblyRoute: Object.freeze([{ x: 34, z: 105 }, { x: 34, z: 104.4 },
         { x: 41, z: 104.4 }, { x: 41, z: 98 }, { x: 42, z: 94 }]),
-      blockadeObservation: Object.freeze({
-        secondsPerPost: 6,
-        posts: Object.freeze([
-          Object.freeze({ x: 40.5, z: 99.5, lookAt: { x: 70, z: 115 }, label: "在院墙缺口低姿观察远哨火力方向" }),
-          Object.freeze({ x: 43.5, z: 94.5, lookAt: { x: 74, z: 116 }, label: "转到路沟折角复核封锁线与断障" }),
-        ]),
-      }),
+      blockadeDecisionPosition: { x: 42, z: 94 }, blockadeDecisionRangeM: 8,
       // Review budget only, never read as a clock gate. Each range is earned by
       // finite contact, threatened relocation, or visible reconnaissance.
       southDelayTempoBudget: Object.freeze({

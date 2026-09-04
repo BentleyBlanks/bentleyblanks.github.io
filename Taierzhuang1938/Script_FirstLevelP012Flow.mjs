@@ -90,6 +90,7 @@ export class FirstLevelP012Director {
     this.ambushEntryIndex = 0;
     this.ambushRejoin = null;
     this.closePressureReleased = false;
+    this.closeReleasedGroup = -1;
     this.lookRad = 0;
     this.last = null;
     this.gunports = new Set();
@@ -109,8 +110,6 @@ export class FirstLevelP012Director {
     this.routeIndex = 0;
     this.orientationIndex = 0;
     this.observationTime = 0;
-    this.blockadeObservationIndex = 0;
-    this.blockadeObservationTime = 0;
     this.mortarImpactStart = 0;
     this.shellObservationTime = 0;
     this.shellImpactStart = 0;
@@ -173,7 +172,10 @@ export class FirstLevelP012Director {
           && this.facts.has("wounded") && this.lastSample.carryKind !== "wounded" && !this.lastSample.woundedDragDelivered,
         FaceAt: () => this.lastSample.position,
       } : {}),
-      ...([14, 16, 17, 20, 21, 22].includes(this.beat) ? { route: [] } : {}),
+      ...([14, 16, 17, 20, 21].includes(this.beat) ? { route: [] } : {}),
+      ...(this.beat === 22 ? { route: [this.config.activities.blockadeDecisionPosition],
+        safeRoute: true, approachPoints: [...(this.config.activities.southAssemblyRoute || [])].reverse(),
+        WaitAt: () => true, FaceAt: () => this.config.anchors.blockadePositions?.[1] } : {}),
       ...(this.beat === 14 ? {
         route: this.config.activities.ambushEntryRoute?.slice(0,1) || [], startIndex: 0, safeRoute: true,
         approachPoints: this.config.routes?.south?.slice(0,this.config.routes.south.findIndex(point=>Distance(point,this.config.routes.flank[0])<.1)+1),
@@ -691,22 +693,6 @@ export class FirstLevelP012Director {
     if (this.beat === 23 && sample.lastLitterArrived) this.Emit("P012LastLitterArrived");
     if (zone && this.visits[this.visits.length - 1] !== zone) this.visits.push(zone);
     if (zone && this.stageVisits[this.stageVisits.length - 1] !== zone) this.stageVisits.push(zone);
-    // A glance or a remote gunshot cannot decide the route. The player must
-    // occupy both existing cover posts, stay low, and keep the finite blockade
-    // in view. Losing sight pauses progress instead of resetting it.
-    if (this.beat === 22) {
-      const observation = activity.blockadeObservation;
-      const post = observation?.posts?.[this.blockadeObservationIndex];
-      if (post && Distance(p, post) <= 2.5 && sample.stance !== "stand"
-        && (sample.blockadeVisible || sample.blockadeDestroyed)) {
-        this.blockadeObservationTime += Math.max(0, dt);
-        if (this.blockadeObservationTime >= (observation.secondsPerPost || 6)) {
-          this.Emit(`P012BlockadeObserved${this.blockadeObservationIndex}`);
-          this.blockadeObservationIndex += 1;
-          this.blockadeObservationTime = 0;
-        }
-      }
-    }
     if (this.beat === 4 && sample.stance === "crouch") this.Mark("crouch");
     for (const [index, port] of (this.config.anchors?.gunports || []).entries()) {
       if (Distance(p, port) < 6) this.gunports.add(index);
@@ -721,10 +707,21 @@ export class FirstLevelP012Director {
     }
     if (this.Signalled("P012CloseEnemiesStaged") && this.Signalled("P012DiveApproach") && !this.closePressureReleased) {
       this.closePressureReleased = true;
+      this.closeReleasedGroup = 0;
       this.pressureHistory.push({ kind: "closeFight", at: this.elapsed, interval: this.elapsed - this.lastWaveAt,
         mechanism: "groundReleaseOnDive", reason: "actualDiveApproach" });
       this.lastWaveAt = this.elapsed;
       this.host.Pressure?.(P012_WAVES[closeWaveIndex]);
+    }
+    if (this.beat === 20 && this.closeReleasedGroup >= 0 && this.closeReleasedGroup < 2) {
+      const previous = this.closeReleasedGroup;
+      const previousCleared = this.enemyRoutes.filter(entry => entry.encounterBeat === 20
+        && entry.encounterGroup === previous).every(entry => !this.host.EnemyPosition?.(entry.handle));
+      const next = previous + 1, cover = activity.closeFightGroups?.[next]?.cover;
+      if (previousCleared && cover && Distance(p, cover) <= this.RouteArrivalRadius()) {
+        this.closeReleasedGroup = next;
+        this.Emit(`P012CloseGroupReleased${next}`);
+      }
     }
     for (const [index, wave] of P012_WAVES.entries()) {
       // Scouts may call same-axis rifle reinforcements immediately. New MG,
@@ -759,7 +756,7 @@ export class FirstLevelP012Director {
       const point = this.host.EnemyPosition?.(route.handle);
       if (!point) continue;
       if (this.StepScoutSearch(route, point)) continue;
-      if (route.staging && this.closePressureReleased) {
+      if (route.staging && route.encounterBeat === 20 && route.encounterGroup <= this.closeReleasedGroup) {
         route.staging = false; this.host.EnemyStaging?.(route.handle, false);
       }
       if (route.staging && route.index > route.stagingStopIndex) {
@@ -849,16 +846,18 @@ export class FirstLevelP012Director {
         && this.routeIndex >= route.length && Distance(p, activity.stretcherCarryTo) < 3;
         if (ready) this.Emit("P012CarryReady"); break;
       case 19: ready = this.Signalled("P012Dived") && sample.stance !== "stand"; break;
-      case 20: ready = dead >= 27; break;
+      case 20: ready = dead >= 27 && this.closeReleasedGroup >= 2
+        && this.routeIndex >= (activity.closeFightRoute?.length || 0); break;
       case 21: ready = dead >= 33 && At("Z09") && Has("southRoomEntered")
         && this.routeIndex >= route.length
         && this.SouthEnemiesCleared(); break;
       case 22: {
         const cleared = sample.farSpawned === 4 && sample.farDeaths === 4;
         ready = At("Z09") && sample.columnAtSouthAssembly === true && this.routeIndex >= route.length
-          && this.blockadeObservationIndex >= (activity.blockadeObservation?.posts?.length || 0)
+          && sample.guideAlive === true && Distance(p, sample.guidePosition) <= (activity.blockadeDecisionRangeM || 8)
           && ((sample.blockadeVisible && sample.blockadePressure) || cleared);
-        if (ready) this.completionReasons[22] = cleared ? "blockadeCleared" : "blockadeObservedFiring";
+        if (ready) { this.completionReasons[22] = cleared ? "blockadeCleared" : "blockadeObservedFiring";
+          this.Emit("P012BlockadeDecision"); }
         break;
       }
       case 23: ready = At("Z04") && sample.columnArrived && sample.lastLitterArrived
@@ -911,6 +910,7 @@ export class FirstLevelP012Director {
     return true;
   }
   SpawnWave(wave, waveIndex) {
+    if (wave.kind === "closeFight") this.Emit("P012CloseEnemiesStaged");
     const name = wave.lane === "machineGunEnemy" ? "machineGun" : wave.lane === "westEnemy" ? "west" : wave.lane === "eastEnemy" ? "east" : "center";
     const lane = this.config.enemyLanes?.[name];
     const late = wave.beat >= 14;
@@ -937,7 +937,7 @@ export class FirstLevelP012Director {
         weapon, p012Near: true, p012MachineGun: wave.kind === "machineGun", squadId: `P012_${waveIndex}`, order: wave.kind === "scouts" || wave.kind === "machineGun" || ambushPosition ? "hold" : "attack" }, points, ambushGroup, encounterGroup, encounterBeat: wave.beat,
         scout: scout ? { approach: points.slice(1), search: scout.points } : null,
         encounterSlot: index % 2, relocation: encounter?.relocations?.[index % 2] || null,
-        staging: wave.kind === "closeFight" && this.beat < 20 && !this.closePressureReleased,
+        staging: wave.kind === "closeFight" && encounterGroup > this.closeReleasedGroup,
         stagingStopIndex: encounter?.stagingStopIndices?.[index % 2] ?? -1 });
     }
     this.SpawnPending();
@@ -952,9 +952,9 @@ export class FirstLevelP012Director {
       this.enemyRoutes.push({ handle, points: pending.scout?.search || pending.points, index: 0, scout, ambushGroup: pending.ambushGroup,
         encounterGroup: pending.encounterGroup, encounterBeat: pending.encounterBeat,
         encounterSlot: pending.encounterSlot, relocation: pending.relocation,
-        staging: pending.staging && !this.closePressureReleased, stagingStopIndex: pending.stagingStopIndex,
+        staging: pending.staging, stagingStopIndex: pending.stagingStopIndex,
         spawnPoint: { x: pending.spec.x, z: pending.spec.z } });
-      const staged = pending.staging && !this.closePressureReleased;
+      const staged = pending.staging;
       if (scout) this.host.EnemyScoutMode?.(handle, { searching: true, speedMps: this.config.firstContact.scoutSearch.speedMps });
       if (staged) this.host.EnemyStaging?.(handle, true);
       const initialGoal = pending.scout?.search[0] || (staged && pending.stagingStopIndex < 0 ? pending.spec : pending.points[0]);
@@ -1166,14 +1166,12 @@ export class FirstLevelP012Director {
       text = threat?.label || "守住沟边伤员，确认接近的敌人已被清除";
     }
     if (this.beat === 22) {
-      const observation = activity.blockadeObservation;
-      const post = observation?.posts?.[this.blockadeObservationIndex];
-      target = route[this.routeIndex] || post || activity.southGrenadeSupply;
-      requiredAction = this.routeIndex < route.length || !this.lastSample.columnAtSouthAssembly ? "move" : "observe";
-      lookAt = post?.lookAt || anchors.blockadePositions?.[1] || this.Point("southGunpoint");
+      target = route[this.routeIndex] || this.lastSample.guidePosition || activity.blockadeDecisionPosition;
+      requiredAction = this.routeIndex < route.length || !this.lastSample.columnAtSouthAssembly ? "move" : "follow";
+      lookAt = anchors.blockadePositions?.[1] || this.Point("southGunpoint");
       text = this.routeIndex < route.length ? "沿原来的安全入口回到路沟，接应两副担架"
         : !this.lastSample.columnAtSouthAssembly ? "掩护两副担架到南路沟内集合，确认无人掉队"
-        : post ? post.label : "两处观察结论一致：南路被远哨与断障封死，准备改走西沟";
+        : "跟班长到南路实体掩体后，确认阻滞线是否仍在交火";
     }
     if ([20, 21].includes(this.beat) && requiredAction === "fight") {
       const moving = this.enemyRoutes.find((entry) => entry.encounterBeat === this.beat
@@ -1229,8 +1227,7 @@ export class FirstLevelP012Director {
     pressureHistory: this.pressureHistory,
     stageVisits: this.stageVisits, retreatPoint: this.retreatPoint, retreatRejoining: !!this.retreatRejoining,
     routeIndex: this.routeIndex, orientationIndex: this.orientationIndex, carryTravelM: this.carryTravelM,
-    blockadeObservationIndex: this.blockadeObservationIndex,
-    blockadeObservationTime: this.blockadeObservationTime,
+    closeReleasedGroup: this.closeReleasedGroup,
     observationTime: this.observationTime, mortarImpactStart: this.mortarImpactStart,
     shellObservationTime: this.shellObservationTime, shellImpactStart: this.shellImpactStart, shellTarget: this.shellTarget,
     cleanupWeaponStart: this.cleanupWeaponStart,
@@ -1279,15 +1276,14 @@ export class FirstLevelP012Director {
     completionReasons: { ...this.completionReasons },
     elapsed: this.elapsed, airSprintM: this.airSprintM, ambushEntryIndex: this.ambushEntryIndex,
     ambushRejoin:this.ambushRejoin?{target:{...this.ambushRejoin.target},destination:{...this.ambushRejoin.destination},index:this.ambushRejoin.index,blocked:!!this.ambushRejoin.blocked}:null,
-    closePressureReleased: this.closePressureReleased, stagedCloseEnemies: this.enemyRoutes.filter(entry=>entry.staging).length,
+    closePressureReleased: this.closePressureReleased, closeReleasedGroup: this.closeReleasedGroup,
+    stagedCloseEnemies: this.enemyRoutes.filter(entry=>entry.staging).length,
     enemyBudget: this.EnemyBudget(), spawnedTotal: this.spawnedTotal,
     scouts: this.enemyRoutes.filter(entry=>entry.scout).map(entry=>({ alive: !!this.host.EnemyPosition?.(entry.handle),
       alerted: entry.scout.alerted, reason: entry.scout.reason, routeIndex: entry.index })),
     pendingEnemies: this.pendingEnemies.length,
     totalEnemyBudget: P012_WAVES.reduce((n,w)=>n+w.count,0) + (this.config.activities?.farEnemyBudget || 0),
     routeIndex: this.routeIndex, orientationIndex: this.orientationIndex, carryTravelM: this.carryTravelM,
-    blockadeObservationIndex: this.blockadeObservationIndex,
-    blockadeObservationTime: this.blockadeObservationTime,
     retreatPoint: this.retreatPoint, retreatRejoining: !!this.retreatRejoining, retreatCovers: this.retreatCovers.slice(),
     waves: this.unlockedWaves.map((index)=>({ ...P012_WAVES[index] })), checkpointId: this.checkpointId,
     pressureHistory: this.pressureHistory.map((entry) => ({ ...entry })),

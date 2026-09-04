@@ -49,7 +49,7 @@ import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 const points = new Map();
 {
  const cues=phase.whitebox.storyBeats.filter(beat=>beat.voice?.startsWith("p012_text_Guide"));
- assert.equal(cues.length,6);
+ assert.equal(cues.length,7);
  for(const cue of cues){
   const shown=[],voices=[];
   const story=new StoryDirector({hud:{Say:(who,text)=>shown.push(text),Title(){}}});
@@ -508,7 +508,7 @@ assert.equal(flow.State().beat,"B18","picking up alone does not replace carrying
 Tick({position:phase.whitebox.activities.stretcherCarryTo,carryDistance:10});
 assert.equal(flow.State().beat,"B18","carry destination cannot bypass the open ditch entrance");
 Walk(phase.whitebox.activities.stretcherCarryRoute,{carryKind:"stretcher",carryDistance:20});
-signals.add("P012Dived"); Tick({carryKind:null,stance:"crouch"});
+signals.add("P012DiveApproach");signals.add("P012Dived"); Tick({carryKind:null,stance:"crouch"});
 Tick({},40);
 const closeActors=spawned.slice(-6);
 assert.deepEqual(closeActors.map(actor=>[actor.x,actor.z]),[[72,28],[72,30],[72,32],[72,61.5],[72,64],[72,66.5]].map(([x,z])=>Object.values(P012Point(x,z))),"six finite enemies start on screened northeast and southeast approaches");
@@ -517,7 +517,11 @@ assert.deepEqual(flow.enemyRoutes.slice(-6).map(entry=>entry.points[0]),[
 assert.deepEqual(flow.enemyRoutes.slice(-6).map(entry=>entry.encounterGroup),[0,0,1,1,2,2]);
 assert.equal(flow.CurrentObjective().requiredAction,"fight");
 assert.deepEqual(flow.CurrentObjective().target,P012Point(44,62));
-KillWave(); assert.ok(signals.has("P012DitchClear"),"only cleared ditch combat releases actual litters");
+KillWave();
+assert.equal(flow.State().beat,"B20","even remote early deaths cannot replace all three physical cover moves");
+Walk(phase.whitebox.activities.closeFightRoute,{zone:"Z08"});
+Tick({position:phase.whitebox.activities.closeFightRoute.at(-1),zone:"Z08"});
+assert.ok(signals.has("P012DitchClear"),"only cleared ditch combat plus all three cover positions release actual litters");
 Tick({},40);
 const southActors=spawned.slice(-6);
 assert.equal(new Set(southActors.map(actor=>`${actor.x},${actor.z}`)).size,6,"south combat has six separated indoor/outdoor actors");
@@ -533,19 +537,20 @@ Walk(phase.whitebox.activities.southRoomRoute,{zone:"Z09"});
 assert.equal(flow.State().beat,"B22"); Tick({},40);
 assert.equal(flow.facts.has("southGrenadeThrown"),false,"six actually cleared enemies allow entry without pretending a grenade hit");
 assert.equal(flow.State().beat,"B22","time does not fabricate the southern blockade");
-Tick({blockadeVisible:true,blockadePressure:true});
+Tick({blockadeVisible:true,blockadePressure:true,guideAlive:true,guidePosition:phase.whitebox.activities.blockadeDecisionPosition});
 assert.equal(flow.State().beat,"B22","far shooting cannot abandon litters back at the old ditch");
 Walk(phase.whitebox.activities.southAssemblyRoute,{zone:"Z09"});
 Tick({farSpawned:3,farDeaths:3,blockadeVisible:false,blockadePressure:false,columnAtSouthAssembly:true});
 assert.equal(flow.State().beat,"B22","partial far spawn cannot impersonate the finite four being cleared");
-for(const [index,post] of phase.whitebox.activities.blockadeObservation.posts.entries()){
-  Tick({position:post,zone:"Z09",stance:"stand",farSpawned:4,farDeaths:4,blockadeDestroyed:true,columnAtSouthAssembly:true},8);
-  assert.equal(flow.State().blockadeObservationIndex,index,"standing at an observation post records nothing");
-  Tick({position:post,zone:"Z09",stance:"crouch",farSpawned:4,farDeaths:4,blockadeDestroyed:true,columnAtSouthAssembly:true},5);
-  assert.equal(flow.State().blockadeObservationIndex,index,"a quick glance cannot certify the blockade");
-  Tick({position:post,zone:"Z09",stance:"crouch",farSpawned:4,farDeaths:4,blockadeDestroyed:true,columnAtSouthAssembly:true},1);
-}
+Tick({position:phase.whitebox.activities.blockadeDecisionPosition,zone:"Z09",stance:"stand",
+  farSpawned:4,farDeaths:4,blockadeDestroyed:true,columnAtSouthAssembly:true,guideAlive:false,
+  guidePosition:phase.whitebox.activities.blockadeDecisionPosition},30);
+assert.equal(flow.State().beat,"B22","a hidden coordinate and elapsed time cannot replace the living squad leader");
+Tick({position:phase.whitebox.activities.blockadeDecisionPosition,zone:"Z09",stance:"stand",
+  farSpawned:4,farDeaths:4,blockadeDestroyed:true,columnAtSouthAssembly:true,guideAlive:true,
+  guidePosition:phase.whitebox.activities.blockadeDecisionPosition});
 assert.equal(flow.State().beat,"B23");
+assert.ok(signals.has("P012BlockadeDecision"));
 assert.equal(flow.State().completionReasons[22],"blockadeCleared");
 assert.match(flow.CurrentObjective().text,/四名远哨已清除/);
 Use("p012_retreatSmoke"); assert.equal(smokeDeployments,1);
@@ -885,7 +890,19 @@ assert.equal(returnVoices.filter(key=>key==="ch1_shunzi_07").length,1);
   for(let index=3;index<6;index++)assert.deepEqual(actors[index].goal,director.enemyRoutes[index].spawnPoint);
   assert.deepEqual(pressure,[],"elapsed time cannot release staged enemies");
   actors[0].alive=false;events.add("P012DiveApproach");director.Update(.1,sample);
-  assert.ok(actors.slice(1).every(actor=>!actor.staging));assert.equal(actors[0].alive,false,"a killed staged actor is never restored");
+  assert.ok(actors.slice(1,2).every(actor=>!actor.staging));
+  assert.ok(actors.slice(2).every(actor=>actor.staging),"dive releases group zero only");
+  director.beat=20;
+  actors[1].alive=false;
+  director.Update(.1,{...sample,position:phase.whitebox.activities.closeFightGroups[2].cover});
+  assert.ok(actors.slice(2).every(actor=>actor.staging),"remote movement to a later cover cannot skip group one");
+  director.Update(.1,{...sample,position:phase.whitebox.activities.closeFightGroups[1].cover});
+  assert.ok(actors.slice(2,4).every(actor=>!actor.staging));assert.ok(actors.slice(4).every(actor=>actor.staging));
+  actors[2].alive=false;actors[3].alive=false;
+  director.Update(.1,{...sample,position:phase.whitebox.activities.closeFightGroups[0].cover});
+  assert.ok(actors.slice(4).every(actor=>actor.staging),"clearing at range still requires reaching the next authored cover");
+  director.Update(.1,{...sample,position:phase.whitebox.activities.closeFightGroups[2].cover});
+  assert.ok(actors.slice(4).every(actor=>!actor.staging));assert.equal(actors[0].alive,false,"a killed staged actor is never restored");
   assert.deepEqual(pressure,["closeFight"]);assert.equal(director.State().pressureHistory.at(-1).reason,"actualDiveApproach");
   director.Restore(before);director.Update(.1,sample);
   assert.equal(actors.length,6,"checkpoint rollback cannot duplicate the early finite wave receipt");
@@ -993,9 +1010,7 @@ for(const index of [2,3,4]) {
   for(let index=1;index<phase.whitebox.activities.closeFightRoute.length;index++)
     assert.ok(P012SegmentClear(phase.whitebox.layout.blocks,phase.whitebox.activities.closeFightRoute[index-1],
       phase.whitebox.activities.closeFightRoute[index],.42),"each delaying relocation is physically clear for the player capsule");
-  assert.equal(phase.whitebox.activities.blockadeObservation.posts.length,2);
-  assert.notDeepEqual(phase.whitebox.activities.blockadeObservation.posts[0].lookAt,
-    phase.whitebox.activities.blockadeObservation.posts[1].lookAt,"the two posts inspect distinct parts of the blockade");
+  assert.ok(Number.isFinite(phase.whitebox.activities.blockadeDecisionPosition.x));
   const budget=phase.whitebox.activities.southDelayTempoBudget;
   assert.deepEqual([budget.closeDelaySeconds,budget.houseClearSeconds,budget.blockadeReconSeconds]
     .reduce((sum,range)=>sum.map((value,index)=>value+range[index]),[0,0]),budget.totalSeconds,
