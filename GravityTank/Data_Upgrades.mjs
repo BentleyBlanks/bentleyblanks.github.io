@@ -1,6 +1,6 @@
 /** Stage / run upgrade card pools for GravityTank. */
 
-import { GetNextCampaignStageId } from "./Data_Stages.mjs";
+import { GetNextCampaignStageId } from "./Data_Stages.mjs?v=gravityTank012";
 
 function IconPath(id) {
   return `./assets/Icon_Upgrade${id[0].toUpperCase()}${id.slice(1)}.png`;
@@ -52,29 +52,11 @@ const BEFORE_BOSS_IDS = new Set([
   "noSelfHit", "moveSpeed", "turboTreads", "hitPlates", "longerShield", "pierceShell", "lightGravity",
 ]);
 
-/** Extra highlight before trap / barricade stages. */
-const BEFORE_TRAP_IDS = new Set([
-  "noSelfHit", "moveSpeed", "turboTreads", "pierceShell", "hitPlates", "bounceShell", "multiShot",
-]);
-
 /** Peek the stage the pending perk will apply to. */
 export function PeekNextStageId(current) {
   if (current === 0 || current === "tutorial") return 1;
-  if (current === "barricadeTeach" || current === "teach" || current === -1) return 7;
-  if (current === 6) return "barricadeTeach";
   if (typeof current === "number") return GetNextCampaignStageId(current);
   return null;
-}
-
-const NO_FIRE_INACTIVE_IDS = new Set([
-  "noSelfHit", "rapidFire", "multiShot", "bulletSpeed", "lightGravity", "bounceShell", "pierceShell",
-]);
-
-/** Remove cards whose mechanics are hard-disabled by the upcoming mission. */
-export function IsUpgradeApplicable(card, nextStageData = null) {
-  if (!card || !nextStageData) return true;
-  if (nextStageData.specialKind === "noFire") return !NO_FIRE_INACTIVE_IDS.has(card.id);
-  return true;
 }
 
 /**
@@ -87,7 +69,6 @@ export function IsUpgradeRecommended(card, ctx = {}) {
   if (ctx.tutorial) return !!card.recommend;
   const next = ctx.nextStage;
   if (next === 3 || next === 6 || next === 9 || next === 12 || next === 15) return BEFORE_BOSS_IDS.has(card.id);
-  if (next === 7 || next === 8 || next === "barricadeTeach") return BEFORE_TRAP_IDS.has(card.id);
   return !!card.recommend;
 }
 

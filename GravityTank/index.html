@@ -25,7 +25,7 @@
     #bootHint { color:#a8b8c9; font-size:13px; }
     #bootRetry { min-height:44px; padding:8px 18px; color:#fff; border:1px solid #76899a; background:#23384c; cursor:pointer; }
   </style>
-  <link rel="stylesheet" href="./Style_Game.css?v=gravityTank11a">
+  <link rel="stylesheet" href="./Style_Game.css?v=gravityTank012">
 </head>
 <body>
   <div id="bootOverlay" role="status" aria-live="polite">
@@ -78,7 +78,7 @@
         <img class="title-banner" id="titleBanner" src="./assets/Texture_UiTitleBanner.png" width="480" height="160" alt="GRAVITY TANK BATTLE" title="点击打开 Debug">
         <span class="title-gravity-cover" aria-hidden="true"></span>
         <span class="title-gravity-art" aria-hidden="true"></span>
-        <span class="game-version" id="gameVersion" aria-label="版本">v0.11</span>
+        <span class="game-version" id="gameVersion" aria-label="版本">v0.12</span>
       </div>
       <p class="tagline">9 个任务 · 3 幕战役 · 重力弹道与物理转轮</p>
     </header>
@@ -188,7 +188,6 @@
     <div id="touchActionsWrap" class="touch-actions-wrap" hidden>
       <div class="touch-actions">
         <button id="touchFire" class="touch-fire" type="button" aria-label="开火">FIRE</button>
-        <button id="touchCarry" class="touch-carry" type="button" aria-label="扛起路障" hidden>扛</button>
         <button id="touchPause" class="touch-pause" type="button" aria-label="暂停">PAUSE</button>
       </div>
     </div>
@@ -244,7 +243,7 @@
             ·
             <strong class="rule-bad">红=风险</strong>。
           </li>
-          <li>普通升级只影响下一任务；Boss 能力永久到通关。路障按 <kbd>K</kbd>（触屏「扛」）举起作盾，再按放下封路。</li>
+          <li>普通升级只影响下一任务；Boss 能力永久到通关。</li>
         </ul>
       </div>
 
@@ -253,18 +252,17 @@
         <ul class="controls">
           <li class="desktop-hint"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> / <kbd>WASD</kbd></li>
           <li class="desktop-hint"><kbd>SPACE</kbd> / <kbd>J</kbd> FIRE</li>
-          <li class="desktop-hint"><kbd>K</kbd> 扛起/放下路障（护盾）</li>
           <li class="desktop-hint"><kbd>P</kbd> / <kbd>Esc</kbd> PAUSE</li>
-          <li class="mobile-hint">左摇杆 · 右开火 · 「扛」路障</li>
+          <li class="mobile-hint">左摇杆 · 右开火</li>
           <li class="mobile-hint">竖屏 / 横屏均可</li>
         </ul>
       </div>
 
-      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.11</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
+      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.12</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
     </aside>
   </div>
   <script type="module">
-    import("./Script_Game.mjs?v=gravityTank11a").catch((error) => window.GravityTankLoading.Fail(error));
+    import("./Script_Game.mjs?v=gravityTank012").catch((error) => window.GravityTankLoading.Fail(error));
   </script>
 </body>
 </html>

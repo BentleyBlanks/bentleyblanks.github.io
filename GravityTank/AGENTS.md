@@ -42,14 +42,14 @@ Bump constant + visible `vX.Y` text **together** when cutting a player-facing ve
 | `Script_PlayerPaint.mjs` | Six cosmetic paints and saved preference |
 | `Script_LaunchSmokeTest.mjs` | Browser checks for loading, paints and mouse/touch roulette |
 | `Data_LaunchAudit.md` | v0.11 startup findings, art prompt and local validation |
-| `Data_Stages.mjs` | Stage maps, enemy counts, barricade teach, HQ flip helpers |
+| `Data_Stages.mjs` | Stage maps, stable stage ids, enemy counts, HQ flip helpers |
 | `Data_Upgrades.mjs` | Upgrade card pools + recommend flags |
 | `Script_GenerateUpgradeArt.mjs` | Offline icon generator (not loaded by the game page) |
 | `Script_GenerateCardFrames.mjs` | Offline card-frame generator |
 | `assets/` | `Texture_*`, `Icon_*`, `Audio*`, fonts — naming per root `AGENTS.md` |
 
 **Do:** `rg` / grep a symbol or stage id before reading large chunks of `Script_Game.mjs`.  
-**Don’t:** casually split `Script_Game.mjs` mid-hotfix — splits need import wiring + Pages smoke. Optional future seams (behavior-identical extract only): `Script_Roulette.mjs`, `Script_Bosses.mjs`, `Script_Barricade.mjs`, `Script_PowerFx.mjs`.
+**Don’t:** casually split `Script_Game.mjs` mid-hotfix — splits need import wiring + Pages smoke. Optional future seams (behavior-identical extract only): `Script_Roulette.mjs`, `Script_Bosses.mjs`, `Script_PowerFx.mjs`.
 
 ---
 
@@ -68,7 +68,7 @@ Bump constant + visible `vX.Y` text **together** when cutting a player-facing ve
 
 ### Mode and life display
 
-The title screen defaults to **简易模式**: player shells pass through the player and their carried shield without consuming armor, including shells left over from an earlier life. **标准模式** retains armed-shell self-hits; its `noSelfHit` upgrade remains available. Easy mode excludes this redundant upgrade from card offers. Enemy fire and HQ damage are unchanged.
+The title screen defaults to **简易模式**: player shells pass through the player without consuming armor, including shells left over from an earlier life. **标准模式** retains armed-shell self-hits; its `noSelfHit` upgrade remains available. Easy mode excludes this redundant upgrade from card offers. Enemy fire and HQ damage are unchanged.
 
 Player hulls use one of six cosmetic paints (gold, pink, blue, green, purple, white)
 via `GetPlayerPaint` / `BlitPlayerTinted`. The title picker previews the actual sprite
@@ -81,9 +81,9 @@ changes stats, enemy colors, modes, checkpoint progression or award probabilitie
 
 `SetDifficulty` / `SyncStageLabels` keep the selector and mode explanation aligned. A checkpoint records `difficulty`; retry/CONTINUE restore it. Older saves without a mode use easy and discard old player HP. The campaign starts at mission 1; the old tutorial remains legacy/debug-only. There is no free first-death revive.
 
-Focused campaign progression: **9 missions in 3 acts**, with data ids `[1, 2, 3, 4, 5, 6, 7, 8, 15]` (`CAMPAIGN_STAGE_IDS`). Stage 6 flows through `barricadeTeach`, then stage 7. All 15 legacy definitions remain selectable through Debug, but ids 9–14 are not on the default route. Main-route Bosses are ids 3, 6, and 15.
+Focused campaign progression: **9 missions in 3 acts**, with data ids `[1, 2, 3, 4, 5, 6, 7, 8, 15]` (`CAMPAIGN_STAGE_IDS`). Stage 6 advances directly to stage 7. Stages 7 and 8 are ordinary combat maps with open spawn lanes and no preparation timer. Debug retains 14 definitions with stable ids 1–13 and 15; ids 9–13 are outside the default route. Stage 14 and the barricade interlude were removed in v0.12; old interlude checkpoints migrate to mission 7 with their build intact. Main-route Bosses are ids 3, 6, and 15.
 
-Every normal mission supports continuous firing through the standard active-bullet cap. There is no ammo pickup, shell recovery, enemy ammo theft, front-hit immunity, or mission-specific shell mode. Stage 14 `noFire` / `enemyOnlyCrossfire` intentionally locks the player cannon and retires its last survivor so it cannot softlock. Anchor tanks (`anchorTank`) ignore bullet gravity and push carryable barricades.
+Every normal mission supports continuous firing through the standard active-bullet cap. There is no ammo pickup, shell recovery, enemy ammo theft, front-hit immunity, or mission-specific shell mode. There are no carryable barricades, carry controls, preparation phases, or no-fire missions. Anchor tanks (`anchorTank`) retain gravity-free shells.
 
 Enemy friendly fire is active throughout ordinary play. Enemy-caused kills increment `stageCrossfireKills` but never grant player score. `BuildStageClearReport` scores HQ durability, player kills, and clear time.
 
@@ -140,11 +140,10 @@ Grep these first:
 | Roulette | `ROULETTE_POOL`, `OpenRoulette`, `ResolveRoulette`, `DrawRoulette`, `DrawRoulettePlunger`, `ApplyPowerup`, `POWER_FX` |
 | Fort / HQ | `DamageBase`, `DestroyBase`, `FortifyBase`, `BreakBaseFort`, `GetBaseFortCells`, `StartEagleAlly`, `StartEagleStroll` |
 | Eagle ally | `steelShield`, `BulletHitEagleAlly`, `DrawEagleAlly` — enemy shells deflect; never destroy HQ |
-| Barricades | `carryBlocks`, `carriedBlock`, `WantsInteract`, barricade teach stage id |
 | Bosses | `UpdateBoss`, `UpdateTankKing`, `RecoverBossMovement`, `UpdateTankMan`, `UpdatePrismTank`, `UpdateGravityWarden`, `ArmBossSkill`; route HP scaling is `stageData.bossHpMul` |
 | Campaign | `CAMPAIGN_STAGE_IDS`, `GetCampaignStagePosition`, `GetNextCampaignStageId`, `IsFinalCampaignStage` |
 | Checkpoint | `ReadStageCheckpoint`, `SaveStageCheckpoint`, `ContinueCampaign`, `RestoreStageCheckpoint` |
-| Legacy stages | `STAGE_COUNT` (15), `BuildStageMap`, `Data_Stages.mjs`; Debug retains every definition |
+| Legacy stages | `STAGE_IDS`, `STAGE_COUNT` (14), `GetNextStageId`, `GetPreviousStageId`, `Data_Stages.mjs`; stage ids are non-contiguous |
 
 ---
 
@@ -179,3 +178,6 @@ Grep these first:
 
 ### Easy mode / lives regression
 Run `node GravityTank/Script_EasyModeTest.mjs` after changes to self-hit collision, lives, damage, or mode checkpoint handling. Also preview the title selector and gameplay at desktop and mobile sizes.
+
+### Campaign combat regression
+Run `node GravityTank/Script_CampaignTest.mjs` after changing routes, stage spawning, or checkpoint migration. It verifies direct mission 6 → 7 progression, combat in missions 7/8, stable Debug navigation past the removed id, and old-save continuation.

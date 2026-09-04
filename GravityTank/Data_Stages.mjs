@@ -2,7 +2,6 @@
  *  Source maps: StefanBS/battle-city-clone (MIT).
  *  Tile codes: 0 empty, 1 brick, 2 steel, 3 water, 4 grass, 5 ice, 6 base.
  */
-export const STAGE_COUNT = 15;
 /** Focused three-act route. Legacy stages stay available through Debug. */
 export const CAMPAIGN_STAGE_IDS = Object.freeze([1, 2, 3, 4, 5, 6, 7, 8, 15]);
 export const CAMPAIGN_STAGE_COUNT = CAMPAIGN_STAGE_IDS.length;
@@ -301,26 +300,16 @@ export const STAGES = [
   },
   {
     id: 7,
-    title: "封喉陷阱",
-    prepSeconds: 14,
+    title: "三路交锋",
     enemies: { basic: 4, fast: 4, power: 3, armor: 2, anchor: 1 },
     enemySpawns: [[2, 1], [12, 1], [22, 1]],
     playerSpawns: [[12, 20]],
-    carryBlocks: [
-      { x: 6, y: 18, kind: "wood" }, { x: 8, y: 18, kind: "wood" },
-      { x: 10, y: 18, kind: "wood" }, { x: 14, y: 18, kind: "wood" },
-      { x: 16, y: 18, kind: "wood" }, { x: 18, y: 18, kind: "wood" },
-      { x: 7, y: 16, kind: "metal" }, { x: 9, y: 16, kind: "metal" },
-      { x: 15, y: 16, kind: "metal" }, { x: 17, y: 16, kind: "metal" },
-      { x: 11, y: 14, kind: "wood" }, { x: 13, y: 14, kind: "wood" },
-      { x: 4, y: 12, kind: "wood" }, { x: 20, y: 12, kind: "wood" },
-    ],
     map: [
-      [2,2,2,2,2,2,0,0,2,2,2,2,0,0,2,2,2,2,0,0,2,2,2,2,2,2],
-      [2,0,0,0,0,2,0,0,2,0,0,2,0,0,2,0,0,2,0,0,2,0,0,0,0,2],
-      [2,0,0,0,0,2,0,0,2,0,0,2,0,0,2,0,0,2,0,0,2,0,0,0,0,2],
-      [2,0,0,0,0,2,0,0,2,0,0,2,0,0,2,0,0,2,0,0,2,0,0,0,0,2],
-      [2,2,2,0,0,2,2,2,2,2,0,0,0,0,0,0,2,2,2,2,2,0,0,2,2,2],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [1,1,0,0,1,1,0,0,0,0,1,1,0,0,1,1,0,0,0,0,1,1,0,0,1,1],
@@ -346,28 +335,16 @@ export const STAGES = [
   },
   {
     id: 8,
-    title: "瓮中捉鳖",
-    prepSeconds: 16,
+    title: "钢甲攻势",
     enemies: { basic: 4, fast: 5, power: 4, armor: 4, anchor: 1 },
     enemySpawns: [[1, 2], [24, 2], [12, 1]],
     playerSpawns: [[12, 21]],
-    carryBlocks: [
-      { x: 5, y: 19, kind: "wood" }, { x: 7, y: 19, kind: "wood" },
-      { x: 9, y: 19, kind: "metal" }, { x: 15, y: 19, kind: "metal" },
-      { x: 17, y: 19, kind: "wood" }, { x: 19, y: 19, kind: "wood" },
-      { x: 6, y: 17, kind: "wood" }, { x: 8, y: 17, kind: "wood" },
-      { x: 16, y: 17, kind: "wood" }, { x: 18, y: 17, kind: "wood" },
-      { x: 11, y: 15, kind: "metal" }, { x: 13, y: 15, kind: "metal" },
-      { x: 3, y: 13, kind: "wood" }, { x: 21, y: 13, kind: "wood" },
-      { x: 10, y: 11, kind: "wood" }, { x: 14, y: 11, kind: "wood" },
-      { x: 4, y: 9, kind: "metal" }, { x: 20, y: 9, kind: "metal" },
-    ],
     map: [
-      [2,2,2,2,2,2,2,0,0,2,2,0,0,0,0,2,2,0,0,2,2,2,2,2,2,2],
-      [2,0,0,0,0,0,2,0,0,2,0,0,0,0,0,0,2,0,0,2,0,0,0,0,0,2],
-      [2,0,0,0,0,0,2,0,0,2,0,0,0,0,0,0,2,0,0,2,0,0,0,0,0,2],
-      [2,0,0,0,0,0,2,0,0,2,2,0,0,0,0,2,2,0,0,2,0,0,0,0,0,2],
-      [2,2,2,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,2,2,2],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       [0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0],
       [0,0,1,1,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,1,1,0,0],
@@ -567,15 +544,6 @@ function BuildExtendedMap(style = 0) {
     paintPair(8, 17, 10);
     paintPair(3, 20, 5, 2);
     paintPair(18, 20, 5, 2);
-  } else if (style === 2) {
-    paintPair(3, 5, 6, 2);
-    paintPair(17, 5, 6, 2);
-    paintPair(2, 9, 4, 1);
-    paintPair(20, 9, 4, 1);
-    paintPair(6, 12, 14, 2);
-    paintPair(2, 16, 6, 2);
-    paintPair(18, 16, 6, 2);
-    paintPair(9, 19, 8, 2, 2);
   } else {
     paintPair(3, 5, 6, 1);
     paintPair(17, 5, 6, 1);
@@ -605,18 +573,6 @@ STAGES.push(
     map: BuildExtendedMap(1),
   },
   {
-    id: 14,
-    specialStage: true,
-    specialKind: "noFire",
-    noFireRule: "enemyOnlyCrossfire",
-    title: "一枪不开",
-    prepSeconds: 5,
-    enemies: { basic: 10, fast: 8, power: 8, armor: 4, anchor: 2 },
-    enemySpawns: [[1, 1], [12, 1], [23, 1]],
-    playerSpawns: [[8, 20]],
-    map: BuildExtendedMap(2),
-  },
-  {
     id: 15,
     bossStage: true,
     title: "重力看守者",
@@ -631,55 +587,6 @@ STAGES.push(
 );
 
 
-/** After stage-6 boss: teach pick-up barricades (carry = shield, place = wall). */
-export const BARRICADE_TEACH_STAGE = {
-  id: "barricadeTeach",
-  barricadeTeach: true,
-  title: "路障教学",
-  prepSeconds: 12,
-  enemies: { basic: 4, fast: 0, power: 0, armor: 0 },
-  // Top pens — single exits players can seal with carried blocks.
-  enemySpawns: [[2, 1], [12, 1], [22, 1]],
-  playerSpawns: [[12, 20]],
-  carryBlocks: [
-    { x: 8, y: 18, kind: "wood" },
-    { x: 10, y: 18, kind: "wood" },
-    { x: 14, y: 18, kind: "wood" },
-    { x: 16, y: 18, kind: "wood" },
-    { x: 11, y: 16, kind: "metal" },
-    { x: 13, y: 16, kind: "metal" },
-  ],
-  map: [
-    [2,2,2,2,2,2,0,0,2,2,2,2,0,0,2,2,2,2,0,0,2,2,2,2,2,2],
-    [2,0,0,0,0,2,0,0,2,0,0,2,0,0,2,0,0,2,0,0,2,0,0,0,0,2],
-    [2,0,0,0,0,2,0,0,2,0,0,2,0,0,2,0,0,2,0,0,2,0,0,0,0,2],
-    [2,0,0,0,0,2,0,0,2,0,0,2,0,0,2,0,0,2,0,0,2,0,0,0,0,2],
-    [2,2,2,0,0,2,2,2,2,2,0,0,0,0,0,0,2,2,2,2,2,0,0,2,2,2],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,1,1,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,1,1,0,0],
-    [0,0,1,1,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,1,1,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0],
-    [0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0],
-    [0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,2,6,6,2,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,2,6,6,2,0,0,0,0,0,0,0,0,0,0,0],
-  ],
-};
-
-
 // Stages 1–3: eagle nest at the top so early enemies travel farther before hitting HQ.
 STAGES[0] = FlipStageVertical(STAGES[0]);
 STAGES[1] = FlipStageVertical(STAGES[1]);
@@ -689,13 +596,20 @@ export function IsTutorialStage(stageId) {
   return stageId === 0 || stageId === "tutorial";
 }
 
-export function IsBarricadeTeachStage(stageId) {
-  return stageId === "barricadeTeach" || stageId === "teach" || stageId === -1;
+export const STAGE_IDS = Object.freeze(STAGES.map((stage) => stage.id));
+export const STAGE_COUNT = STAGE_IDS.length;
+
+export function GetNextStageId(stageId) {
+  return STAGE_IDS.find((id) => id > Number(stageId)) ?? null;
 }
 
-export function GetStage(index1Based) {
-  if (IsTutorialStage(index1Based)) return TUTORIAL_STAGE;
-  if (IsBarricadeTeachStage(index1Based)) return BARRICADE_TEACH_STAGE;
-  const i = Math.max(1, Math.min(STAGE_COUNT, index1Based | 0)) - 1;
-  return STAGES[i];
+export function GetPreviousStageId(stageId) {
+  return STAGE_IDS.filter((id) => id < Number(stageId)).at(-1) ?? null;
+}
+
+export function GetStage(stageId) {
+  if (IsTutorialStage(stageId)) return TUTORIAL_STAGE;
+  // Keep authored ids stable for saves and debug links after removing stage 14.
+  const requested = Math.max(1, Number(stageId) || 1);
+  return STAGES.find((stage) => stage.id >= requested) ?? STAGES.at(-1);
 }

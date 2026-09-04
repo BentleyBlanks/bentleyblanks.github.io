@@ -30,7 +30,7 @@ vm.runInNewContext(source, sandbox, { filename: 'Script_Game.mjs' });
 function CreateGame() {
   const game = new sandbox.Game();
   game.audio = new Proxy({}, { get: () => () => {} });
-  for (const method of ['SpawnExplosion', 'StartIncidentReport', 'ClearGiantForm', 'DropCarriedBlock']) game[method] = () => {};
+  for (const method of ['SpawnExplosion', 'StartIncidentReport', 'ClearGiantForm']) game[method] = () => {};
   game.EndGame = (won) => { game.state = won ? 'won' : 'lost'; };
   game.SpawnPlayer(true);
   game.player.protect = 0;
