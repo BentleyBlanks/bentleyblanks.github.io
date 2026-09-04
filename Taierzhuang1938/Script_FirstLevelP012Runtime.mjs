@@ -314,9 +314,17 @@ export class FirstLevelP012Runtime {
     if(this.beat===4&&this.host.Signalled?.("P012NorthDitchEntered")&&!this.host.Signalled?.("P012NorthSquadRegrouped")){
       const squad=(this.openingCast||[]).filter(entry=>entry.ammoIssued&&entry.actor?.alive!==false);
       const regroup=this.config.activities?.shellCoverRoute?.at(-1),range=this.config.activities?.northRegroupRangeM??10;
-      if(squad.length===6&&regroup&&Math.hypot(guide.x-regroup.x,guide.z-regroup.z)<2.5
-        &&squad.every(entry=>entry.shellReacted&&this.time>=(entry.shellReactionUntil||0)
-          &&Math.hypot(this.host.Position(entry.actor).x-guide.x,this.host.Position(entry.actor).z-guide.z)<=range))
+      const player=this.host.PlayerPosition?.();
+      const membersReady=squad.map(entry=>{
+        const point=this.host.Position(entry.actor);
+        return !!entry.shellReacted&&this.time>=(entry.shellReactionUntil||0)&&!!point
+          &&Math.hypot(point.x-guide.x,point.z-guide.z)<=range;
+      });
+      this.northRegroupGate={squadCount:squad.length,regroup:!!regroup,
+        guideReady:!!regroup&&Math.hypot(guide.x-regroup.x,guide.z-regroup.z)<2.5,
+        playerReady:!!player&&Math.hypot(player.x-guide.x,player.z-guide.z)<=range,membersReady};
+      if(squad.length===6&&this.northRegroupGate.guideReady&&this.northRegroupGate.playerReady
+        &&membersReady.every(Boolean))
         this.host.Signal?.("P012NorthSquadRegrouped");
     }
   }
@@ -575,7 +583,8 @@ export class FirstLevelP012Runtime {
     }
     const observer=this.host.PlayerPosition?.();
     if(this.beat===2&&!this.villageRoadCued){this.villageRoadCued=true;this.host.Signal?.("P012VillageRoad");}
-    if(!this.villageTrafficCued&&this.traffic.filter(w=>!w.retired&&w.role==="civilian"&&this.host.TrafficVisible?.(w.actor)).length>=4){
+    if(this.beat===2&&!this.villageTrafficCued
+      &&this.traffic.filter(w=>!w.retired&&w.role==="civilian"&&this.host.TrafficVisible?.(w.actor)).length>=4){
       this.villageTrafficCued=true;this.host.Signal?.("P012VillageTrafficSeen");
     }
     if(observer)for(const north of this.traffic.filter(w=>w.side===0))for(const south of this.traffic.filter(w=>w.side===1)){
@@ -585,6 +594,21 @@ export class FirstLevelP012Runtime {
     }
   }
   Sample() {
+    const sampledGuide=this.host.Position(this.host.GuideActor()),sampledPlayer=this.host.PlayerPosition?.();
+    const sampledRegroup=this.config.activities?.shellCoverRoute?.at(-1);
+    const sampledSquad=(this.openingCast||[]).filter(entry=>entry.ammoIssued&&entry.actor?.alive!==false);
+    const northRegroup=this.beat===4?{
+      time:this.time,squadCount:sampledSquad.length,
+      ditchEntered:!!this.host.Signalled?.("P012NorthDitchEntered"),
+      gate:this.northRegroupGate||null,
+      guideDistance:sampledGuide&&sampledRegroup?Math.hypot(sampledGuide.x-sampledRegroup.x,sampledGuide.z-sampledRegroup.z):null,
+      playerDistance:sampledGuide&&sampledPlayer?Math.hypot(sampledPlayer.x-sampledGuide.x,sampledPlayer.z-sampledGuide.z):null,
+      members:sampledSquad.map(entry=>{
+        const point=this.host.Position(entry.actor);
+        return {actorId:entry.actor.id,shellReacted:!!entry.shellReacted,reactionUntil:entry.shellReactionUntil||0,
+          distance:point&&sampledGuide?Math.hypot(point.x-sampledGuide.x,point.z-sampledGuide.z):null};
+      }),
+    }:null;
     return {
       // Compatibility only; live binocular subjects are evaluated by Main.
       orientationVisible: [],
@@ -594,7 +618,8 @@ export class FirstLevelP012Runtime {
       retreatSmokeActive: !!this.smoke && this.time < this.smoke.until,
       retreatPursuit: (this.pursuit || []).map(entry=>({index:entry.index,alive:!!this.host.Alive(entry.actor),position:this.host.Position(entry.actor),target:entry.route[entry.index]})),
       weaponActionCount: this.weaponActionCount,
-      guidePosition: this.host.Position(this.host.GuideActor()), guideRouteIndex: this.guide?.index || 0,
+      guidePosition: sampledGuide, guideRouteIndex: this.guide?.index || 0,
+      northRegroup,
       trainColumn:(this.trainColumn?.Entries()||[]).map(({actor,steps,...entry})=>entry),
       guideInspection:this.guideInspection||null,
       briefingStage:this.host.Signalled?.("P012BriefingComplete")?"complete":this.host.Signalled?.("P012BriefingStarted")?"briefing":this.host.Signalled?.("P012AmmoIssued")?"gathering":"issuing",

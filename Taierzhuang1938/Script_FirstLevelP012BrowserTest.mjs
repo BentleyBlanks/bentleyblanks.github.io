@@ -142,6 +142,12 @@ async function PlayPrelude() {
             yaw:game.player.yaw,pitch:game.player.pitch,rawSay:subtitle?.textContent||"",subtitleClass:subtitle?.className,
             scope:"actual in-progress subtitle and ordinary player camera; no actor/camera placement"};break;
         }
+        if(flow.beatIndex===4&&pendingSpeech?.key==="p012_text_RegroupCheck"&&!bot.regroupCaptured){
+          bot.regroupCaptured=true;bot.pendingCausality={id:"NorthRegroupCount",subtitle:pendingSpeech.text,...NorthSceneEvidence()};break;
+        }
+        if(flow.beatIndex===5&&flow.routeIndex>=4&&!bot.ammoDoglegCaptured){
+          bot.ammoDoglegCaptured=true;bot.pendingCausality={id:"AmmoDogleg",...NorthSceneEvidence(),objective:flow.objective};break;
+        }
         if(flow.beatIndex===2){
           const inspection=game.Debug.P012Scene().guideInspection;
           if(inspection&&(!bot.firstInspection||bot.firstInspection.startedAt===inspection.startedAt)){
@@ -336,6 +342,8 @@ async function PlayPrelude() {
   Check(result.flow.beatIndex >= 6, "真实移动、领取枪弹、跟队与搬弹完成开场",
     result.flow.beatIndex >= 6 ? `${result.flow.elapsed.toFixed(1)}s` : JSON.stringify(result));
   Check(result.carry === null, "弹药实际交付后释放双手，能够拔枪");
+  Check(await page.evaluate(()=>!!window.p012ReviewBot.regroupCaptured&&!!window.p012ReviewBot.ammoDoglegCaptured),
+    "实际玩家位置经历炮后全班报数与唯一一次狗腿沟搬弹");
   const briefingEvidence=await page.evaluate(()=>({captured:window.p012ReviewBot.briefingCaptured||[],inspection:window.p012ReviewBot.inspectionTrace||[]}));
   await fs.writeFile(path.join(outputDir,"Data_P012BriefingInspection.json"),JSON.stringify(briefingEvidence,null,2));
   Check(["p012_text_BriefingMission","p012_text_BriefingRoute","p012_text_BriefingReply"].every(key=>briefingEvidence.captured.includes(key)),"三段训话各有实际在播截图");
@@ -1793,6 +1801,7 @@ try {
             targetMeta:game.hud.TargetState()?.meta||"",
             targetDomMeta:document.querySelector(".hudTarget .tMeta")?.textContent||"",
             guidePosition:openingScene.guidePosition,guideAlive:openingScene.guideAlive,
+            northRegroup:openingScene.northRegroup,
             cast:openingCast.map(entry=>({actorId:entry.actorId,stage:entry.stage,marchComplete:entry.marchComplete,
               position:entry.position,defense:entry.marchDefensePoint}))};
           window.p012GuidanceHudTrace.push(hudSample);

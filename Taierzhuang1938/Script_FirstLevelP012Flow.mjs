@@ -780,7 +780,10 @@ export class FirstLevelP012Director {
         if(ready)this.Emit("P012VillageNorthDeparture");
         break;
       }
-      case 4: ready = At("Z04") && this.routeIndex >= route.length && Has("northNearMissImpact") && Has("northCovered")
+      // The route ends at Luo's actual regroup stop, between the broad zone
+      // radii. Do not require the player to abandon him for an invisible zone
+      // centre after the squad has physically arrived and finished the count.
+      case 4: ready = this.routeIndex >= route.length && Has("northNearMissImpact") && Has("northCovered")
         && this.Signalled("P012NorthContinue"); break;
       case 5: ready = Has("ammo") && this.gunports.size > 0; break;
       case 6: ready = dead >= 2 || (this.unlockedWaves.includes(0) && sample.scoutAlarm); break;
@@ -966,7 +969,7 @@ export class FirstLevelP012Director {
       interactionId=null;requiredAction="follow";text=this.Signalled("P012HubBriefingStarted")?"听班长交代前沿位置与后送路":"跟班长到村口集合";
     }
     if(this.beat===4){
-      if(this.routeIndex>=route.length)target=this.Point("ammoPickup",P012Point(-7,-52));
+      if(this.routeIndex>=route.length&&!this.Signalled("P012NorthContinue"))target=this.lastSample.guidePosition||route.at(-1);
       if(!this.facts.has("northNearMissImpact")){text="跟随班长北上";requiredAction="follow";}
       else{
         text=this.facts.has("northCovered")?"沿交通壕继续跟上班长":"炮弹落在路旁！冲进前面的路沟，压低身子";

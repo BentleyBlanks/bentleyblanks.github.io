@@ -69,11 +69,11 @@ assert.ok(openingStoryBeats.length>0);
  console.log('PASS physical casualty/flank/smoke guides: swept clearance, actual arrival cues, waits and handoff');
 }
 {
- const guide={x:0,z:0},actors=Array.from({length:6},(_,i)=>({id:`march${i}`,x:0,z:6+i,alive:true}));
+ const guide={x:0,z:0},player={x:0,z:0},actors=Array.from({length:6},(_,i)=>({id:`march${i}`,x:0,z:6+i,alive:true}));
  const signals=new Set(),stances=[],releases=[],defenses=[],orders=[];
  const route=[{x:0,z:20},{x:0,z:0},{x:0,z:-20},{x:0,z:-40}];
  const positions=actors.map((_,i)=>({x:4+i*2,z:-39}));
- const runtime=new FirstLevelP012Runtime({GuideActor:()=>guide,Position:a=>a,Signalled:s=>signals.has(s),
+ const runtime=new FirstLevelP012Runtime({GuideActor:()=>guide,Position:a=>a,PlayerPosition:()=>player,Signalled:s=>signals.has(s),
   Signal:s=>signals.add(s),
   SetOpeningShelter:(a,duration)=>stances.push({a,duration}),ReleaseGuide:a=>releases.push(a),Defend:(a,p)=>defenses.push({a,p}),
   Move:(a,p,speed)=>{orders.push({a,speed});const d=Math.hypot(p.x-a.x,p.z-a.z);if(d>.3){const f=Math.min(d-.3,speed*.05)/d;a.x+=(p.x-a.x)*f;a.z+=(p.z-a.z)*f;}},
@@ -86,6 +86,9 @@ assert.ok(openingStoryBeats.length>0);
  for(let i=0;i<47;i++){runtime.StepMarch(.05);runtime.time+=.05;}
  assert.equal(stances.length,6);assert.deepEqual(actors.map(a=>({x:a.x,z:a.z})),before,'actual impact stops all six without changing positions');
  signals.add('P012NorthDitchEntered');guide.z=-40;
+ player.z=0;for(let i=0;i<400;i++){runtime.time+=.05;runtime.StepMarch(.05);}
+ assert.equal(signals.has('P012NorthSquadRegrouped'),false,'the squad cannot report to an absent player through a wall');
+ player.z=-35;
  for(let i=0;i<400&&!signals.has('P012NorthSquadRegrouped');i++){runtime.time+=.05;runtime.StepMarch(.05);}
  assert.ok(signals.has('P012NorthSquadRegrouped'),'all six physically finish reaction and close on Luo before the count begins');
  assert.ok(runtime.openingCast.every(entry=>entry.shellReacted&&runtime.time>=entry.shellReactionUntil));
@@ -448,8 +451,9 @@ const ai = readFileSync(new URL("./Script_Ai.mjs", import.meta.url), "utf8");
  r.beat=3;r.StepOpeningCast();assert.ok(r.openingCast.every(e=>e.released&&e.actor.released&&!e.actor.scriptedNoncombatant),"only opening beats own this formation");
 }
 {
- const walkers=[];let door=false,visible=false;const player={...P012Phase.whitebox.anchors.trainDoor};
+ const walkers=[],signals=[];let door=false,visible=false;const player={...P012Phase.whitebox.anchors.trainDoor};
  const run=new FirstLevelP012Runtime({GuideActor:()=>null,Position:a=>a,PlayerPosition:()=>player,Signalled:name=>name==="P012TrainDoor"&&door,
+  Signal:name=>signals.push(name),
   TrafficVisible:()=>visible,RetireTraffic:a=>{a.retired=true;return true;},
   TrafficActor:(side,slot,p,entry)=>{const actor={...p,alive:true,side,slot,role:entry.role,child:!!entry.child};walkers.push(actor);return actor;},
   Move:(a,p,speed)=>{const d=Math.hypot(p.x-a.x,p.z-a.z);if(d<=(a.scriptArrivalRadius??1.2))return;const k=Math.min(1,speed*.1/d);a.x+=(p.x-a.x)*k;a.z+=(p.z-a.z)*k;},ReleaseGuide:()=>{}
@@ -458,10 +462,11 @@ const ai = readFileSync(new URL("./Script_Ai.mjs", import.meta.url), "utf8");
  assert.equal(walkers.filter(w=>w.side===0).length,3);
  assert.equal(walkers.filter(w=>w.role==="civilian").length,13);
  assert.equal(walkers.filter(w=>w.role==="walking").length,2);
+ visible=true;run.Update(.1);assert.equal(signals.includes("P012VillageTrafficSeen"),false,"civilians glimpsed from the braking train cannot trigger later village dialogue");visible=false;
  for(let i=0;i<600;i++)run.Update(.1);
  assert.ok(run.traffic.filter(w=>w.pauseIndex!==undefined).every(w=>w.index<=w.pauseIndex));
  assert.ok(run.traffic.filter(w=>w.role==="walking").every(w=>w.travelM===0));
- door=true;run.beat=2;
+ door=true;run.beat=2;visible=true;run.Update(.1);assert.equal(signals.includes("P012VillageTrafficSeen"),true,"the same visible civilian flow cues dialogue only while walking through the village");visible=false;
  for(let i=0;i<1400;i++){
   run.Update(.1);
   const active=walkers.filter(w=>!w.retired);

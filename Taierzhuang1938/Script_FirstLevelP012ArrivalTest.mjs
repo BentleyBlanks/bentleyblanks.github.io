@@ -9,7 +9,7 @@ const arrival = new FirstLevelP012Arrival({
   StartAudio: () => ++starts, StopAudio: () => stops++, PlaySfx: cue => cues.push(cue), Subtitle: line => lines.push(line),
 });
 assert.equal(arrival.Start(), true); assert.equal(arrival.Start(), false);
-for (let n = 0; n < 280; n++) arrival.Update(.1);
+for (let n = 0; n < 300; n++) arrival.Update(.1);
 assert.equal(arrival.phase, 'guide'); assert.equal(door, 0); assert.equal(releases, 0);
 near = true; arrival.Update(.1); assert.equal(arrival.phase, 'door');
 arrival.Update(.25); assert(door > 0 && door < 1); assert.equal(releases, 0);

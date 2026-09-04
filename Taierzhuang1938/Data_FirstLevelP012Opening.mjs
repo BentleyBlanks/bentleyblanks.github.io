@@ -65,8 +65,9 @@ export const openingStoryBeats=Object.freeze([
   ["ChatReply", "P012NorthApproachChat", "yaowa", "这点家当，我攥得比命还紧。", 10],
   ["Impact", "P012NorthNearMissImpact", "luo", "卧倒！进沟！别站在路中央！", 6],
   ["RegroupCall", "P012NorthSquadRegrouped", "luo", "靠沟边收拢，报数。", null,4,"P012NorthCountCalled"],
-  ["RegroupAnswer", "P012NorthCountCalled", "yaowa", "一个不少，都在！", null,3,"P012NorthCounted"],
-  ["RegroupContinue", "P012NorthCounted", "luo", "后头齐了。沿沟继续，去接机枪位。", null,3,"P012NorthContinue"],
+  ["RegroupCheck", "P012NorthCountCalled", "heyoutian", "顺子、幺娃都在，后头也跟上来了。", null,4,"P012NorthNamesChecked"],
+  ["RegroupAnswer", "P012NorthNamesChecked", "yaowa", "一个不少，都在！", null,3,"P012NorthCounted"],
+  ["RegroupContinue", "P012NorthCounted", "luo", "后头齐了。沿沟继续，去接机枪位。", null,4,"P012NorthContinue"],
   ["AmmoDogleg", "P012AmmoDoglegEntered", "luo", "弹药箱走狗腿沟，贴着沟壁跟我转。", 8,3.2],
   ["AmmoGunline", "P012AmmoGunlineNear", "luo", "前头就是机枪位，送到枪眼后边。", 8,3.2],
 ].map(([id,event,who,text,maxAgeS,seconds,completeSignal])=>Object.freeze({

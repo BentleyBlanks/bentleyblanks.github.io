@@ -1,7 +1,7 @@
 // Pure data. Playable final approach: the wagon, player and camera never move as
 // a fake platform; disposable exterior references provide the braking parallax.
 export const P012_ARRIVAL = Object.freeze({
-  brakeSeconds: 28, doorSeconds: 1.1, blackoutSeconds: 1.4,
+  brakeSeconds: 30, doorSeconds: 1.1, blackoutSeconds: 1.4,
   titleSeconds: 4, gateSignal: 'P012TrainDoor',
   referenceSpeedMps: 13,
   brakeBeats: Object.freeze([
