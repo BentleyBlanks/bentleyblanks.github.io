@@ -7,12 +7,13 @@ import { P012NextVisiblePoint, P012SegmentClear, P012RouteProjection } from "./S
 const Distance = (a, b) => a && b ? Math.hypot(a.x - b.x, a.z - b.z) : Infinity;
 const Clone = (value) => JSON.parse(JSON.stringify(value));
 
-/** Reconnect the finite east-lane encounter using its real walls and capsule. */
-export function P012EastEnemyRejoinPath(config, position, target, radius, points = []) {
+/** Reconnect finite eastern and culvert encounters using real walls and capsule. */
+export function P012EnemyRejoinPath(config, position, target, radius, points = []) {
   if(!Number.isFinite(radius)||radius<=0||!position||!target)return null;
   const blocks=config.layout?.blocks||[];
   const corners=[];
-  for(const block of blocks.filter(block=>['EastEnemyWall','EnemySpawnScreenEast'].includes(block.id))){
+  for(const block of blocks.filter(block=>['EastEnemyWall','EnemySpawnScreenEast','EnemySpawnScreenWest',
+    'CulvertWestPier','CulvertEastPier','CulvertEastApproachScreen'].includes(block.id))){
     const c=Math.cos(block.ry||0),s=Math.sin(block.ry||0),margin=radius+.2;
     for(const x of [-block.w/2-margin,block.w/2+margin])for(const z of [-block.d/2-margin,block.d/2+margin])
       corners.push({x:block.x+x*c+z*s,z:block.z-x*s+z*c,y:position.y||0});
@@ -520,15 +521,15 @@ export class FirstLevelP012Director {
     rejoin.index=next.index;rejoin.target={...next.point};rejoin.blocked=!!next.blocked;
   }
 
-  StepEastEnemyRejoin(route, position) {
-    if(route.encounterBeat!==9)return false;
+  StepEnemyRejoin(route, position) {
+    if(![9,10].includes(route.encounterBeat))return false;
     const target=route.points[route.index],radius=this.host.EnemyBodyRadius?.(route.handle);
     if(!target||!Number.isFinite(radius)||radius<=0)return false;
     if(P012SegmentClear(this.config.layout?.blocks||[],position,target,radius)){
       if(route.rejoin){this.host.EnemyRejoin?.(route.handle,null);route.rejoin=null;}
       return false;
     }
-    const path=P012EastEnemyRejoinPath(this.config,position,target,radius,route.points);
+    const path=P012EnemyRejoinPath(this.config,position,target,radius,route.points);
     // Failure is explicit: do not teleport, enlarge the passage or move the cursor.
     const point=path?.[0]||position;
     route.rejoin={target:{...point},destination:{...target},blocked:!path,radius};
@@ -870,11 +871,13 @@ export class FirstLevelP012Director {
         continue;
       }
       if (route.index >= route.points.length) { this.StepEnemyBound(route, p); continue; }
-      if(this.StepEastEnemyRejoin(route,point))continue;
-      if (Distance(point, route.points[route.index]) < (route.relocation ? 0.6 : 2)) route.index += 1;
+      if(this.StepEnemyRejoin(route,point))continue;
+      const tightArrival = !!route.relocation || route.encounterBeat === 10;
+      if (Distance(point, route.points[route.index]) < (tightArrival ? 0.6 : 2)) route.index += 1;
       if (route.staging && route.index > route.stagingStopIndex) continue;
+      if(this.StepEnemyRejoin(route,point))continue;
       const goal = route.points[route.index];
-      if (goal) this.host.EnemyGoal?.(route.handle, goal, route.relocation ? 0.6 : undefined);
+      if (goal) this.host.EnemyGoal?.(route.handle, goal, tightArrival ? 0.6 : undefined);
       else this.StepEnemyBound(route, p);
     }
     this.SpawnPending();

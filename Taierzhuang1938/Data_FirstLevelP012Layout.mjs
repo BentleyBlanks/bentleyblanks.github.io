@@ -101,7 +101,7 @@ Add(Box("FrontlineRearWest",-13,-69,8,0.8,0.9,"cover"),Box("FrontlineRearEast",1
 // Join the west spawn screen to the east culvert pier. The finite flankers use
 // the open tunnel between the piers; the screen removes the long diagonal shot
 // from the east gunport without closing the western firing lane.
-Add(Box("CulvertEastApproachScreen",-20.5,-98,1,12,3));
+Add(Box("CulvertEastApproachScreen",-20.5,-89.5,1,29,3));
 // A visible rail spur joins the western embankment and crosses the actual Z10 drainage route.
 // Deck bottom is above standing clearance; its piers are outside the swept stretcher corridor.
 Add(Box("ReturnRailSpurDeck",-40,50,64,5,0.5,"boundary",{y:3.25}),Box("ReturnRailSpurWestPier",-30,50,2,5,3),Box("ReturnRailSpurEastPier",-8,50,2,5,3));

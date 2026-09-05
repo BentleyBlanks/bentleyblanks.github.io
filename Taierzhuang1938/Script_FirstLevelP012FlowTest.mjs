@@ -1,7 +1,7 @@
 // P012实际状态机的纯Node宿主测试：用注册交互回调/玩家动作/正式信号驱动，不写beat跳关。
 import assert from "node:assert/strict";
 import { P012Point } from "./Data_FirstLevelP012Space.mjs";
-import { FirstLevelP012Director, P012_WAVES, P012EastEnemyRejoinPath } from "./Script_FirstLevelP012Flow.mjs";
+import { FirstLevelP012Director, P012_WAVES, P012EnemyRejoinPath } from "./Script_FirstLevelP012Flow.mjs";
 import { FIRST_LEVEL_P012_WHITEBOX_PHASE as phase } from "./Data_FirstLevelP012Whitebox.mjs";
 import { CarrySystem } from "./Script_Carry.mjs";
 import { AllowAutonomousBark } from "./Script_FirstLevelWhiteboxFlow.mjs";
@@ -23,15 +23,15 @@ import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
  const route={handle:actor,index:4,encounterBeat:9,points:config.routes.eastEnemy};
  const before={health:actor.health,ammo:actor.ammo,index:route.index};
  assert.equal(P012SegmentClear(blocks,start,target,radius),false,'recorded B09 actor is across the real east wall');
- const path=P012EastEnemyRejoinPath(config,start,target,radius,route.points);
+ const path=P012EnemyRejoinPath(config,start,target,radius,route.points);
  assert.ok(path?.length>1,'recorded coordinate requires a physical corner route');
  let at=start;for(const point of path){assert.ok(P012SegmentClear(blocks,at,point,radius));at=point;}
- assert.equal(P012EastEnemyRejoinPath(config,start,target,.42,route.points),null,'standing clearance cannot be claimed for prone capsule touching the wall');
- assert.equal(P012EastEnemyRejoinPath(config,start,target,undefined,route.points),null,'missing measured capsule is not guessed');
- assert.equal(director.StepEastEnemyRejoin({...route,encounterBeat:8},start),false,'other encounters are unaffected');
+ assert.equal(P012EnemyRejoinPath(config,start,target,.42,route.points),null,'standing clearance cannot be claimed for prone capsule touching the wall');
+ assert.equal(P012EnemyRejoinPath(config,start,target,undefined,route.points),null,'missing measured capsule is not guessed');
+ assert.equal(director.StepEnemyRejoin({...route,encounterBeat:8},start),false,'other encounters are unaffected');
  let traveled=0,returned=false;
  for(let frame=0;frame<3000;frame++){
-  if(!director.StepEastEnemyRejoin(route,actor.position)){returned=true;break;}
+  if(!director.StepEnemyRejoin(route,actor.position)){returned=true;break;}
   assert.deepEqual(calls.slice(-2),['goal','rejoin'],'local hold goal is written before rejoin override');
   assert.ok(P012SegmentClear(blocks,actor.position,command,radius),'every issued leg uses the actual capsule');
   const distance=Math.hypot(command.x-actor.position.x,command.z-actor.position.z),step=Math.min(distance,2.6/30);
@@ -40,10 +40,34 @@ import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
  assert.ok(returned&&traveled>DistanceForTest(start,target),'walks around the wall instead of through it');
  assert.equal(calls.at(-1),'release');assert.equal(route.rejoin,null);
  assert.deepEqual({health:actor.health,ammo:actor.ammo,index:route.index},before,'same actor, resources and route cursor survive reconnect');
- radius=.42;actor.position={...start};director.StepEastEnemyRejoin(route,actor.position);
+ radius=.42;actor.position={...start};director.StepEnemyRejoin(route,actor.position);
  assert.equal(route.rejoin.blocked,true);assert.deepEqual(command,start,'insufficient clearance issues standstill, never a through-wall command');
  console.log('PASS B09 recorded east-wall reconnect preserves actor and facts with measured capsule clearance');
  function DistanceForTest(a,b){return Math.hypot(a.x-b.x,a.z-b.z);}
+}
+
+{
+ const config=phase.whitebox,blocks=config.layout.blocks,radius=.34;
+ const start={x:-30.367376912385225,z:-145.35977846206697};
+ const target={x:-33,z:-140},actor={position:{...start},health:100};
+ let command=null;
+ const director=new FirstLevelP012Director({EnemyBodyRadius:()=>radius,
+  EnemyGoal:(_handle,point)=>{command={...point};},EnemyRejoin:()=>{}},config);
+ const route={handle:actor,index:2,encounterBeat:10,points:config.routes.westEnemy};
+ assert.equal(P012SegmentClear(blocks,start,target,radius),false,'recorded culvert actor is trapped behind the real spawn screen');
+ let returned=false,traveled=0;
+ for(let frame=0;frame<3000;frame++){
+  if(!director.StepEnemyRejoin(route,actor.position)){returned=true;break;}
+  assert.ok(!route.rejoin.blocked&&P012SegmentClear(blocks,actor.position,command,radius));
+  const distance=Math.hypot(command.x-actor.position.x,command.z-actor.position.z),step=Math.min(distance,2.6/30);
+  actor.position.x+=(command.x-actor.position.x)*step/(distance||1);
+  actor.position.z+=(command.z-actor.position.z)*step/(distance||1);traveled+=step;
+ }
+ assert.ok(returned&&actor.position.x < -32-radius
+  &&P012SegmentClear(blocks,actor.position,target,radius),
+  'same culvert actor physically clears the western screen edge before resuming its waypoint');
+ assert.equal(actor.health,100);assert.equal(route.index,2);
+ console.log('PASS B10 recorded culvert corner reconnect uses actual capsule and preserves live actor');
 }
 
 {

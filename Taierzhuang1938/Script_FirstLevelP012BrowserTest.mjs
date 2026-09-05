@@ -581,6 +581,18 @@ async function PlayFrontline() {
         const progressKey = [flow.beat, flow.routeIndex, flow.retreatPoint, flow.spawnedTotal,
           game.Debug.P012Scene().nearEnemyDeaths, game.Debug.P012Scene().columnRouteIndex, flow.facts.join(",")].join("|");
         if (bot.progressKey !== progressKey) { bot.progressKey = progressKey; bot.lastProgress = flow.elapsed; }
+        // An injured crawl toward the same public gunport is measurable progress.
+        // Only a new closest distance counts; circling or walking away cannot
+        // keep resetting the unchanged 180-second deadlock watchdog.
+        const moveTarget = flow.beatIndex <= 10 && flow.objective.target;
+        if (moveTarget) {
+          const key = `${flow.beat}|${moveTarget.x}|${moveTarget.z}`;
+          const distance = Math.hypot(moveTarget.x-game.player.position.x,moveTarget.z-game.player.position.z);
+          if (bot.movementProgress?.key !== key) bot.movementProgress = {key,closest:distance};
+          else if (distance <= bot.movementProgress.closest-.5) {
+            bot.movementProgress.closest=distance;bot.lastProgress=flow.elapsed;
+          }
+        }
         if (flow.elapsed - bot.lastProgress > 180) break;
         if (retryDive && flow.beatIndex === 19 && !bot.forceMissDone) {
           game.Debug.Mouse(2, false); Key("KeyW", false); Key("KeyF", false); Key("ShiftLeft", false);

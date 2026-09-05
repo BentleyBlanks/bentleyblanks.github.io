@@ -91,6 +91,12 @@ for(const terminal of lanes.west.terminalGoals){
   assert.equal(Occluded(westGunportEye,{...terminal,y}),false,"west gunport sees every culvert terminal at chest and head height");
  }
 }
+for(const y of [1.2,1.55]){
+ const exposed={x:-25.502366723487285,z:-117.50035717290447,y};
+ assert.equal(Occluded({x:22.758186492532534,z:-107.87391001842246,y:1.57},exposed),true,
+  'recorded terminal-edge body remains concealed from the actual eastern camera');
+ assert.equal(Occluded(westGunportEye,exposed),false,'western gunport still sees the terminal-edge body');
+}
 const airCfg=phase.whitebox.aircraftRoutes.crowdTurn;
 assert.ok(airCfg.turnControl2,"P012 uses a two-tangent continuous turn");
 assert.ok(airCfg.to.z<airCfg.from.z,"attack enters from the south, not same-direction pursuit");
