@@ -117,6 +117,12 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
   Object.freeze({
+    id: "GongxianGrenade", name: "国产木柄手榴弹", pack: "Model_Type24Grenade.glb",
+    sourceTriangles: 4480, actualTriangles: 4480, targetTriangles: 4480,
+    sourceTexture: "内置 imagegen 底色 / Blender 程序表面", runtimeTexture: "共用 UV + 专用 Base / Normal / ORM",
+    policy: "source", note: "BlenderMCP 自建外观；与 TZM 同源，具体历史批次未确证。",
+  }),
+  Object.freeze({
     id: "ChineseRuralHouse", name: "乡村房屋", pack: "Model_ChineseRuralHouse.glb",
     sourceTriangles: 236434, actualTriangles: 58812, targetTriangles: 58812,
     sourceTexture: "有（2 张源 BaseColor）", runtimeTexture: "源 UV + 项目房屋 BaseColor / Normal",

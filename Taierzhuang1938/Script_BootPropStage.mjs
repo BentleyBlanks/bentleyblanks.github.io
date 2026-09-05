@@ -57,6 +57,7 @@ const PALETTE = {
   grip: { color: 0x503524, roughness: 0.7, metalness: 0.0 },
   // Dadao normally gets replaced by its authored PBR set before LoadModel.
   // Keep a sane fallback for offline/partial-cache loading instead of neutral grey.
+  grenade: { color: 0x514536, roughness: 0.78, metalness: 0.15 },
   dadao: { color: 0x77736f, roughness: 0.58, metalness: 0.72 },
   red: { color: 0x8e2f27, roughness: 0.66, metalness: 0.0 },
   // 摄影测量源偶有单层薄片；展示台必须双面绘制，避免绕到反面时履带/挡泥板消失。
@@ -125,6 +126,21 @@ async function LoadBitmapTexture(url, { srgb = false } = {}) {
   texture.magFilter = THREE.LinearFilter;
   texture.needsUpdate = true;
   return texture;
+}
+
+async function LoadGrenadeMaterial() {
+  const [map, normalMap, orm] = await Promise.all([
+    LoadBitmapTexture("./Texture/Texture_GrenadeBase.webp?v=grenade20260906", { srgb: true }),
+    LoadBitmapTexture("./Texture/Texture_GrenadeNormal.webp?v=grenade20260906"),
+    LoadBitmapTexture("./Texture/Texture_GrenadeOrm.webp?v=grenade20260906"),
+  ]);
+  return new THREE.MeshStandardMaterial({
+    map, normalMap, roughnessMap: orm, metalnessMap: orm,
+    // This isolated display has no reflection environment. Lift the albedo
+    // slightly so the blackened head remains readable while rotating.
+    color: new THREE.Color(1.35, 1.35, 1.35),
+    roughness: 1, metalness: 0.65, normalScale: new THREE.Vector2(0.85, 0.85),
+  });
 }
 
 async function LoadDadaoMaterial() {
@@ -241,7 +257,18 @@ export class PropStage {
   async Load(entry) {
     const url = MeshUrl(entry.id);
     if (!url) return null;
+    // Worker dependencies do not use the page import map; an older mesh catalog
+    // must not keep the replaced grenade payload alive in the browser cache.
+    const modelUrl = entry.id === "Grenade" ? `${url}&asset=grenade20260906` : url;
     const token = (this.token += 1);
+    if (entry.id === "Grenade" && !this.grenadePbrReady) {
+      try {
+        this.materialBank.set("grenade", await LoadGrenadeMaterial());
+        this.grenadePbrReady = true;
+      } catch (error) {
+        console.warn("[BootProp] 木柄弹 PBR 加载失败：" + String(error).slice(0, 160));
+      }
+    }
     if (entry.id === "Dadao" && !this.dadaoPbrReady) {
       try {
         this.materialBank.set("dadao", await LoadDadaoMaterial());
@@ -273,7 +300,7 @@ export class PropStage {
         console.warn(`[BootProp] Type89 textures: ${String(error).slice(0, 160)}`);
       }
     }
-    const root = await LoadModel(url, {
+    const root = await LoadModel(modelUrl, {
       materials: this.materials, batch: true, castShadow: false, receiveShadow: false,
     });
     if (!root || this.disposed || token !== this.token) return null;

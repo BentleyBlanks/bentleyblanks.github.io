@@ -523,31 +523,9 @@ def BuildServicePistol():
 # ---------------------------------------------------------------------------
 
 def BuildGrenade():
-    """改良后全长 220 mm：弹体 φ58 × 92、木柄 φ29 × 125。
-    第 31 师一役用掉三十万余枚，这不是装饰品。"""
-    root = Node("root")
-    body = root.Child("body")
-    # 弹体在 -Z（朝前扔出去的方向），木柄从原点往 +Z。
-    # 弹体尾端原来收在 z=-0.083、木柄头到 -0.080，中间空 3 mm ——
-    # 台架上是"弹体和柄各飘各的"。现在弹体往回伸到 -0.068，套住柄 12 mm。
-    body.Add("steel", LoftZ([
-        Ring(-0.068, rx=0.0175, rz=0.0175, power=2.2),     # 收颈：套在木柄上的那一小段
-        Ring(-0.083, rx=0.029, rz=0.029, power=2.2),
-        Ring(-0.120, rx=0.029, rz=0.029, power=2.2),
-        Ring(-0.170, rx=0.028, rz=0.028, power=2.2),
-        Ring(-0.175, rx=0.022, rz=0.022, power=2.2),
-    ], 10), tile=T_STEEL)
-    body.Add("wood", LoftZ([
-        Ring(0.045, rx=0.0165, rz=0.0165, power=2.2),      # 柄尾（拉火绳藏在这里）
-        Ring(0.036, rx=0.0145, rz=0.0145, power=2.2),
-        Ring(-0.080, rx=0.0145, rz=0.0145, power=2.2),
-    ], 8), tile=T_WOOD)
-    # 柄尾的铁盖
-    body.Add("steel", LoftZ([Ring(0.050, rx=0.0170, rz=0.0170, power=2.2),
-                           Ring(0.038, rx=0.0170, rz=0.0170, power=2.2)], 8), tile=T_STEEL)
-    body.Child("muzzle", t=(0.0, 0.0, -0.175))
-    body.Child("gripR", t=(0.0, 0.0, 0.0))
-    return root
+    """Shared authored exterior, preserving the same TZM hand-grip coordinates."""
+    from Script_GrenadeDetail import BuildGeometry, JoinGeometry, TzmRoot
+    return TzmRoot([JoinGeometry(BuildGeometry())])
 
 
 # ---------------------------------------------------------------------------

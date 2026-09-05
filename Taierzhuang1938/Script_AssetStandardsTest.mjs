@@ -99,9 +99,9 @@ Check(Math.abs(magazine[1] - servicePistol.bounds.min[1]) < 0.012
 
 Check(MESHES.Type95HaGo.triangles === 82142,
   "九五式到 80k 仅降 2.6%，保留 82,142 原始三角", String(MESHES.Type95HaGo.triangles));
-Check(EXTERNAL_GLB_STANDARDS.length === 50
+Check(EXTERNAL_GLB_STANDARDS.length === 51
   && EXTERNAL_GLB_STANDARDS.every((record) => record.actualTriangles > 0 && record.targetTriangles > 0),
-  "外部 GLB 分类登记既有资产与六件滕县自制构件，共 50 项");
+  "外部 GLB 分类登记既有资产、六件滕县构件与木柄弹，共 51 项");
 
 const groupIds = new Set(ASSET_STANDARD_GROUPS.map((entry) => entry.id));
 Check(["firearm", "assembly", "melee", "vehicle", "procedural", "external", "texture"]

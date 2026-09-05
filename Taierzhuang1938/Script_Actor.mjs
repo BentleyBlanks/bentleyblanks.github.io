@@ -3622,6 +3622,9 @@ export class ActorFactory {
         () => lib.Get("DadaoPbr", {
           roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1,
         })),
+      grenade: this.Material("grenade", () => lib.Get("GrenadePbr", {
+        roughness: 1, metalness: 1, normalScale: 0.85,
+      })),
       // 卢沟桥合集保留源 UV 与逐件贴图；这里的 key 必须与 TZM 材质桶逐字一致。
       lqOfficerSword: this.Material("lqOfficerSword", () => lib.Get("LugouqiaoOfficerSword")),
       lqType11AmmoBox: this.Material("lqType11AmmoBox", () => lib.Get("LugouqiaoType11AmmoBox")),

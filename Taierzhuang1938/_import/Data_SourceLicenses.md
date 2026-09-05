@@ -69,7 +69,7 @@ CC-BY-4.0 署名原文，文件头都有完整 credit 文本，发布时按 CC-B
 
 | 游戏内资产 | 源文件 | 作者 | 许可 | 处理方式 |
 |---|---|---|---|---|
-| 普通木柄手榴弹 `Model_Type24Grenade.glb` | `Source/Model_SketchfabType24Grenade/scene.gltf` | [KleenStudio — Stick Grenade Type 24 (Stielhandgranate)](https://sketchfab.com/3d-models/stick-grenade-type-24-stielhandgranate-ad344e190dff4943ba6f739a550dbef4) | CC-BY-4.0 | 原包许可文本保留在同目录 `license.txt`。`Script_Type24GrenadeBake.py` 把 3,260 三角的源几何归一为 0.220 m、中心原点、弹头朝 local -Z，并把 2K PBR 压为 1K GLB；`Script_GrenadeAsset.mjs` 预载一次，供第一人称与飞行池共享，读取失败自动退回旧程序化木柄弹。 |
+| 旧版木柄手榴弹（2026-09-06已替换） | `Source/Model_SketchfabType24Grenade/scene.gltf` | [KleenStudio — Stick Grenade Type 24 (Stielhandgranate)](https://sketchfab.com/3d-models/stick-grenade-type-24-stielhandgranate-ad344e190dff4943ba6f739a550dbef4) | CC-BY-4.0 | 保留原包及其 `license.txt` 的历史归属。当前 `Model_Type24Grenade.glb` 已由独立建模的巩式外观资产完整替换，不再使用此源几何或贴图；新资产为4,480三角，imagegen底色与Blender程序表面，来源和重建入口见[资产说明](../docs/Data_GrenadeAsset.md)。旧文件名只为运行时兼容保留。 |
 
 补充的机枪来源与构建策略：
 

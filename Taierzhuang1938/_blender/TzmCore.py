@@ -66,7 +66,7 @@ TILE_METERS["track"] = 0.30
 # 别等到运行时才发现半个人是黑的。
 MATERIAL_NAMES = {
     "uniform", "accessory", "shoe", "skin", "helmet", "steel", "blade", "grip", "wood",
-    "leather", "towel", "red", "accentA", "accentB", "dadao",
+    "leather", "towel", "red", "accentA", "accentB", "dadao", "grenade",
     # 百姓：裤子与上衣是两块布（默认同色，过场可以分别指定），头发露在头巾外面。
     # 两个桶 ActorMaterials 早就返回了，只是以前没有模型用到它们。
     "trouser", "hair",

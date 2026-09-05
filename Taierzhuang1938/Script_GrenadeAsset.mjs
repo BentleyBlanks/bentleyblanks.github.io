@@ -1,4 +1,4 @@
-// Type 24 stick-grenade runtime asset.
+// Authored pre-1938 Chinese stick-grenade exterior; legacy filename retained.
 //
 // The Blender bake normalises its long axis to local Z, keeps the explosive
 // head at -Z, and centres the geometry at the origin. Those are the same
@@ -8,7 +8,7 @@
 
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 
-const URL = "./Model/Model_Type24Grenade.glb";
+const URL = "./Model/Model_Type24Grenade.glb?v=grenade20260906";
 const loader = new GLTFLoader();
 let pending = null;
 

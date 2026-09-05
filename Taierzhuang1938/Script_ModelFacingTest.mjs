@@ -176,5 +176,23 @@ const singleBodies = (importer.match(/"singleBody":\s*True/g) || []).length;
 const declaredNoses = (importer.match(/"sourceNose":\s*"[+-]Y"/g) || []).length;
 Check(declaredNoses >= singleBodies, "ImportVehicles 每个 singleBody 源件都声明了 sourceNose", `${declaredNoses}/${singleBodies}`);
 
+// The loading display / actor use TZM; the held and thrown prop use GLB.
+// Measure both finished payloads so a glTF axis conversion cannot silently diverge.
+const grenadeDoc = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", MESHES.Grenade.file), "utf8"));
+const grenadeClouds = [
+  ["Grenade TZM", grenadeDoc.meshes.flatMap((_, i) => TzmMeshPoints(grenadeDoc, i))],
+  ["Grenade GLB", GlbPoints(path.join(projectDir, "Model", "Model_Type24Grenade.glb"))],
+];
+for (const [name, points] of grenadeClouds) {
+  const lo = Math.min(...points.map((p) => p[2])), hi = Math.max(...points.map((p) => p[2]));
+  const mid = (lo + hi) / 2;
+  const frontRadius = Math.max(...points.filter((p) => p[2] < mid - 0.04).map((p) => Math.hypot(p[0], p[1])));
+  const rearRadius = Math.max(...points.filter((p) => p[2] > mid + 0.04).map((p) => Math.hypot(p[0], p[1])));
+  Check(frontRadius > rearRadius * 1.5, `${name} 宽弹体在 -Z、木柄在 +Z`, `${frontRadius.toFixed(4)} / ${rearRadius.toFixed(4)}`);
+  Check(Math.abs(hi - lo - 0.22) < 0.0001, `${name} 保留 0.22 m 动画包络`);
+}
+Check(grenadeDoc.triangles === MESHES.Grenade.triangles && grenadeDoc.meshes.length === 1,
+  "木柄弹展示清单与实物面数一致，单材质合批");
+
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
 console.log("PASS ModelFacingTest: 飞机机首与战车车头全部按几何复量落在 -Z");

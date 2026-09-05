@@ -18,7 +18,7 @@ export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
 // 士兵预览必须把模型文件与角色/加载器模块当作同一份发布物。单独换模型而
 // 浏览器仍命中旧模块缓存，会造成面板写着 model、骨架却按旧布局拆散的假成功。
-const MESH_REV = "type89-20260906";
+const MESH_REV = "grenade-type89-20260906";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -179,11 +179,11 @@ export const MESHES = {
   },
   Grenade: {
     file: "Grenade.tzm.json", category: "weapon",
-    triangles: 168, meshBlocks: 2, nodes: 4, joints: 0,
-    materials: ["steel", "wood"], mounts: ["muzzle", "gripR"],
-    span: [0.0580, 0.0554, 0.2250], lengthM: 0.220,
-    draws: { high: 2, medium: 2, low: 2 },
-    note: "木柄手榴弹。弹体 φ58×92、木柄 φ29×125。第 31 师一役用掉三十万余枚。",
+    triangles: 4480, meshBlocks: 1, nodes: 4, joints: 0,
+    materials: ["grenade"], mounts: ["muzzle", "gripR"],
+    span: [0.0501,0.0501,0.22], lengthM: 0.220,
+    draws: { high: 1, medium: 1, low: 1 },
+    note: "战前国产巩式木柄手榴弹的外观复原。滕县守军使用手榴弹的记载明确，具体生产批次尚未确证。",
   },
   Dadao: {
     file: "Dadao.tzm.json", category: "weapon",

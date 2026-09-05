@@ -178,14 +178,13 @@
    "name": "Grenade",
    "category": "weapon",
    "file": "Grenade.tzm.json",
-   "triangles": 168,
-   "meshBlocks": 2,
+   "triangles": 4480,
+   "meshBlocks": 1,
    "nodes": 4,
    "joints": 0,
-   "bytes": 5730,
+   "bytes": 85066,
    "materials": [
-    "steel",
-    "wood"
+    "grenade"
    ],
    "mounts": [
     "root",
@@ -194,14 +193,14 @@
    ],
    "bounds": {
     "min": [
-     -0.029,
-     -0.02771,
-     -0.175
+     -0.025,
+     -0.02504,
+     -0.145
     ],
     "max": [
-     0.029,
-     0.02771,
-     0.05
+     0.0251,
+     0.02506,
+     0.075
     ]
    }
   },
