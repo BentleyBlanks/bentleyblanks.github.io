@@ -1511,6 +1511,41 @@ async function VerifyHubGuideView() {
   Check(!result.hits.some(hit=>hit.ancestors.includes("P012VillageLife")),"村口讲解站位与班长之间没有停放的村路物流道具",JSON.stringify(result.hits.slice(0,4)));
 }
 
+async function VerifyAircraftModel() {
+  await page.waitForFunction(()=>window.Tengxian.scene.getObjectByName("Aircraft_MitsubishiKi30")?.children.length>0,null,{timeout:120000});
+  const result=await page.evaluate(async()=>{
+    const THREE=await import("three"),g=window.Tengxian;
+    const model=g.scene.getObjectByName("Aircraft_MitsubishiKi30").clone(true);
+    model.position.set(0,0,0);model.rotation.set(0,0,0);model.visible=true;model.updateMatrixWorld(true);
+    const bounds=new THREE.Box3().setFromObject(model),center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
+    const meshes=[];model.traverse(node=>{if(node.isMesh){const box=new THREE.Box3().setFromObject(node);meshes.push({name:node.name,size:box.getSize(new THREE.Vector3()).toArray(),center:box.getCenter(new THREE.Vector3()).toArray()});}});
+    const scene=new THREE.Scene();scene.background=new THREE.Color(0x54616d);scene.add(model);
+    scene.add(new THREE.AmbientLight(0xffffff,2));const light=new THREE.DirectionalLight(0xffffff,3);light.position.set(-5,10,5);scene.add(light);
+    const radius=size.x*.65,camera=new THREE.OrthographicCamera(-radius*1.6,radius*1.6,radius,-radius,.1,100);
+    camera.position.set(0,20,0);camera.up.set(0,0,-1);camera.lookAt(0,0,0);camera.updateMatrixWorld(true);
+    g.renderer.setRenderTarget(null);g.renderer.render(scene,camera);
+    const {AircraftFlight}=await import("./Script_Aircraft.mjs");
+    const {AIRCRAFT_ASSETS}=await import("./Data_AircraftAssets.mjs");
+    const flight=new AircraftFlight(scene);flight.group.add(model);
+    flight.forms=[{spec:AIRCRAFT_ASSETS.find(spec=>spec.id==="MitsubishiKi30"),root:model}];
+    flight.SetManualPose("MitsubishiKi30",{x:10,y:120,z:20,dirX:1,dirZ:0,climb:.2,bank:.15});
+    model.updateMatrixWorld(true);
+    const propeller=new THREE.Box3().setFromObject(model.getObjectByName("Cube_Material_0")).getCenter(new THREE.Vector3());
+    const nose=propeller.sub(model.position).normalize();
+    const forward=new THREE.Vector3(Math.cos(.2),Math.sin(.2),0);
+    return {size:size.toArray(),center:center.toArray(),meshes,declaredWingspan:model.userData.wingspan,
+      forwardDot:nose.dot(forward),actualNoseDirection:nose.toArray(),expectedFlightDirection:forward.toArray(),
+      scope:"explicit top-down isolated clone of the actual loaded flight model; screen top is -Z, bottom is +Z; no campaign visibility claim"};
+  });
+  await page.screenshot({path:path.join(outputDir,"Scene_P012AircraftModelTop.png")});
+  await fs.writeFile(path.join(outputDir,"Data_P012AircraftModel.json"),JSON.stringify(result,null,2));
+  Check(result.size.every(value=>Number.isFinite(value)&&value>0),"实际飞机模型具有有限尺寸",JSON.stringify(result));
+  Check(Math.abs(result.size[0]-14.55)<.001&&result.center.every(value=>Math.abs(value)<.001),"Ki-30实际翼展校正为14.55米，缩放后仍以编队根节点为中心");
+  Check(result.meshes.find(mesh=>mesh.name==="Cube_Material_0")?.center[2]<-4&&result.forwardDot>.99,
+    "真实螺旋桨位于局部-Z机首，带爬升和滚转的飞行姿态仍朝实际航向");
+  await page.evaluate(()=>window.Tengxian.StepFrames(1));
+}
+
 async function VerifyAirRouteHandoff(choice) {
   Check(["open","ditch"].includes(choice),"空袭局部夹具使用有效路线",choice);
   await page.waitForFunction(()=>window.Tengxian.scene.getObjectByName("Aircraft_MitsubishiKi30")?.children.length>0,null,{timeout:120000});
@@ -1567,12 +1602,19 @@ async function VerifyAirRouteHandoff(choice) {
         if(f.frames%15===0)f.trace.push({at:f.frames/30,beat:f.flow.State().beat,choice:f.flow.airRouteChoice,
           player:game.player.position.toArray(),head:f.column.HeadPosition(),paused:f.column.scriptPaused,
           air:air?{preset:air.presetId,phase:air.phase}:null,facts:[...f.flow.facts]});
+        if(air?.presetId==="crowdTurn"&&air.phase==="approach"&&f.lastAirPhoto!==Math.floor(air.t)){
+          f.lastAirPhoto=Math.floor(air.t);f.pendingAirPhoto=f.lastAirPhoto;break;
+        }
         if(game.story.Signalled("P012AirObstacleCreated"))break;
       }
       game.Debug.Key("KeyW",false);game.StepFrames(1);
       return {beat:f.flow.State().beat,choice:f.flow.airRouteChoice,obstacle:game.story.Signalled("P012AirObstacleCreated"),
-        frames:f.frames,trace:f.trace,views:window.p012AirViews,scene:game.Debug.P012Scene(),members:f.column.Count,props:game.Debug.SetpieceProps()};
+        frames:f.frames,trace:f.trace,views:window.p012AirViews,scene:game.Debug.P012Scene(),members:f.column.Count,props:game.Debug.SetpieceProps(),photo:f.pendingAirPhoto??null};
     });
+    if(result.photo!==null){
+      await page.screenshot({path:path.join(outputDir,`Scene_P012AirTurn_${choice}_${result.photo}.png`)});
+      await page.evaluate(()=>{window.p012AirFixture.pendingAirPhoto=null;});
+    }
     if(result.obstacle)break;
   }
   result.airTurnEvidence=AirTurnEvidence(result.views);
@@ -2581,6 +2623,7 @@ try {
   }
   const airRouteFixture=process.argv.find(arg=>arg.startsWith("--air-route="))?.split("=")[1];
   if(process.argv.includes("--hub-view"))await VerifyHubGuideView();
+  if(process.argv.includes("--air-model"))await VerifyAircraftModel();
   if(process.argv.includes("--machine-gun-crew"))await VerifyMachineGunCrew();
   if(process.argv.includes("--frontline-rejoin"))await VerifyFrontlineRejoin();
   if(process.argv.includes("--wounded-guide"))await VerifyWoundedGuide();

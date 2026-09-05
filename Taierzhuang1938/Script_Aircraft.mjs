@@ -31,23 +31,20 @@ function PrepareAircraft(gltf, spec) {
     node.frustumCulled = true;
   });
 
-  // 源模型的原点各不相同；把模型重心收回编队根节点，航迹的高度才稳定。
-  _box.setFromObject(model);
+  // Preserve the source GLB transforms; normalize heading and metre scale in
+  // a separate adapter. Ki-30 was authored nose +Z and with a 4.933m wingspan.
+  const aligned = new THREE.Group();
+  aligned.name = `AircraftAsset_${spec.id}`;
+  aligned.rotation.y = NoseYaw(spec.noseDir);
+  aligned.add(model);
+  _box.setFromObject(aligned);
   _box.getCenter(_center);
-  model.position.copy(_center).multiplyScalar(-spec.scale);
-  model.scale.setScalar(spec.scale);
-  // 源模型机首朝向各不相同（AGENTS 硬规矩 4：外部 GLB 先查源朝向再经桥接层对齐）。
-  // 按 Data_AircraftAssets 量出的 noseDir 把机首转到局部 -Z；根节点上的 yaw/climb/bank
-  // 换算从此只认这一个约定。三件源模型没有一件天生朝 -Z。
-  const align = new THREE.Group();
-  align.name = "NoseAlign";
-  align.rotation.y = NoseYaw(spec.noseDir);
-  align.add(model);
-  root.add(align);
-  root.updateMatrixWorld(true);
-  _box.setFromObject(align);
   _box.getSize(_size);
-  root.userData.wingspan = _size.x;
+  const scale = spec.wingspanM && _size.x > 0 ? spec.wingspanM / _size.x : spec.scale;
+  aligned.scale.setScalar(scale);
+  aligned.position.copy(_center).multiplyScalar(-scale);
+  root.add(aligned);
+  root.userData.wingspan = _size.x * scale;
   return root;
 }
 

@@ -14,6 +14,7 @@ export const AIRCRAFT_ASSETS = Object.freeze([
     url: "./Model/Model_MitsubishiKi30.glb?v=1",
     noseDir: { x: 0, z: 1 },
     scale: 1,
+    wingspanM: 14.55,
     altitude: 165,
     orbitRadius: 260,
     speed: 0.18,
