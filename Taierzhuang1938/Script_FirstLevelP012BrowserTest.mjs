@@ -1682,6 +1682,45 @@ async function VerifyAirRouteHandoff(choice) {
   }
 }
 
+async function VerifyFrontlineRejoin() {
+  const result=await page.evaluate(async()=>{
+    const g=window.Tengxian;
+    const {FirstLevelP012Director}=await import("./Script_FirstLevelP012Flow.mjs");
+    FirstLevelP012Director.prototype.Update=function(dt,sample){this.elapsed+=dt;this.lastSample=sample;};
+    const impact=g.player.position.clone().set(3.5283382354584543,0,-104.75711415617816);
+    g.battlefield.deformation?.ApplyBlast(impact,"launcher");
+    g.StepFrames(2);
+    g.player.Spawn(5,-94,0);
+    g.Debug.Key("KeyZ");
+    const body=g.player.body,move=body.Move;
+    let lastMove=null;
+    body.Move=function(...args){
+      const moved=move.apply(this,args),cc=this.pw.controller,hits=[];
+      for(let i=0;i<cc.numComputedCollisions();i++){
+        const hit=cc.computedCollision(i),collider=hit?.collider;
+        hits.push({handle:collider?.handle,record:this.pw.recordByHandle.get(collider?.handle),
+          normal:hit?.normal1,point:hit?.witness1,position:collider?.translation?.()});
+      }
+      lastMove={requested:args,moved,hits};return moved;
+    };
+    const trace=[];
+    g.Debug.Key("KeyW",true);
+    for(let frame=0;frame<600;frame++){
+      g.StepFrames(1,1/30,false);
+      if(frame%15===0)trace.push({at:frame/30,position:g.player.position.toArray(),
+        velocity:g.player.velocity.toArray(),stance:g.player.stance,grounded:g.player.grounded,
+        radius:body.radius,height:body.height,lastMove});
+      if(g.player.position.z<-100)break;
+    }
+    g.Debug.Key("KeyW",false);g.StepFrames(1);body.Move=move;
+    return {scope:"local prone traversal across the recorded B07 launcher crater tile; explicit blast setup, production collision and ordinary W/Z input, no campaign or combat claim",trace,
+      arrived:g.player.position.z<-100,position:g.player.position.toArray()};
+  });
+  await fs.writeFile(path.join(outputDir,"Data_P012FrontlineRejoin.json"),JSON.stringify(result,null,2));
+  await page.screenshot({path:path.join(outputDir,"Scene_P012FrontlineRejoin.png")});
+  Check(result.arrived,"局部复现：卧姿实际穿过反斜面交通壕",JSON.stringify(result.position));
+}
+
 async function VerifyWoundedGuide() {
   const setup=await page.evaluate(async()=>{
     const game=window.Tengxian;
@@ -2470,7 +2509,7 @@ try {
   if (stationReview || openingCausalityReview || orientationReview || process.argv.includes("--prelude") || process.argv.includes("--pacing") || process.argv.includes("--frontline") || process.argv.includes("--campaign")) await PlayPrelude();
   if(process.argv.includes("--stage-zero-review")){
     const captures=await page.evaluate(()=>window.p012StageZeroCaptures||[]),required=["ArrivalApproach","ArrivalDoor","ArrivalTitle","WaitingWounded","DoorLowering","Telephone","MuleAmmo","FamilyCart"];
-    Check(required.every(id=>captures.includes(id)),"普通跟队实跑依次看见到站、村路生活与四向口头交代",JSON.stringify(captures));
+    Check(required.every(id=>captures.includes(id)),"普通跟队实跑依次看见到站、村路作业与家庭疏散",JSON.stringify(captures));
   }
   if (process.argv.includes("--frontline") || process.argv.includes("--campaign") || process.argv.includes("--pacing")) await PlayFrontline();
   if(process.argv.includes("--cast-review")) {
@@ -2497,6 +2536,7 @@ try {
   }
   const airRouteFixture=process.argv.find(arg=>arg.startsWith("--air-route="))?.split("=")[1];
   if(process.argv.includes("--hub-view"))await VerifyHubGuideView();
+  if(process.argv.includes("--frontline-rejoin"))await VerifyFrontlineRejoin();
   if(process.argv.includes("--wounded-guide"))await VerifyWoundedGuide();
   else if(process.argv.includes("--road-cover"))await VerifyRoadCover();
   if(airRouteFixture)await VerifyAirRouteHandoff(airRouteFixture);
@@ -2601,6 +2641,10 @@ try {
     const game = window.Tengxian;
     return { flow: game?.Debug.P012(), scene: game?.Debug.P012Scene(),
       player: game?.player.position.toArray(), health: game?.player.health,
+      movement: game ? {velocity:game.player.velocity.toArray(),stance:game.player.stance,
+        grounded:game.player.grounded,wounds:game.player.wounds,legPenalty:game.player.LegPenalty(),
+        carrySpeedScale:game.player.carrySpeedScale,radius:game.player.body?.radius,
+        hitCount:game.player.body?.hitCount,bodyPosition:game.player.body?.position.toArray()} : null,
       trace: window.p012CombatReview?.trace, diveTrace: window.p012CombatReview?.diveTrace,
       rewindCount: window.p012CombatReview?.rewindCount,
       damageTrace: window.p012DamageTrace || [],

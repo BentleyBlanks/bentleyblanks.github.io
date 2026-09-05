@@ -96,6 +96,7 @@ const AUTOSTEP_PROBE_M = 0.14;
 // Rapier 的 snapToGround 只认识灌进物理世界的实体；解析地形不在 Rapier 里。
 // 同样给解析地表 0.45 m 的吸附距离，才不会走下坡时逐帧「离地—落下」。
 const ANALYTIC_GROUND_SNAP_M = 0.45;
+const CHARACTER_CONTACT_SKIN_M = 0.02;
 
 const _q = { x: 0, y: 0, z: 0, w: 1 };
 /** 绕 Y 轴 ry 的四元数（这座城里所有旋转都只有偏航）。 */
@@ -133,7 +134,7 @@ export class PhysicsWorld {
     this.recordByHandle = new Map();
     this.terrainTiles = new Map();
 
-    this.controller = this.world.createCharacterController(0.02);
+    this.controller = this.world.createCharacterController(CHARACTER_CONTACT_SKIN_M);
     // 自动上台阶：马道的八级台阶、门槛、瓦砾堆全靠它。
     // minWidth 给 0.15 —— 太大的话窄台阶（马道每级踏面 0.3 m）会被判成
     //「站不下」而爬不上去。
@@ -775,8 +776,13 @@ export class CharacterBody {
     // 这样 0.3 m 高的实体台子不会被错误拉穿，玩家起跳也不会被吸回地上。
     const g = pw.groundAt(this.position.x, this.position.z);
     const analyticGap = this.position.y - g;
-    const snapAnalytic = !hasPhysicsGround && wasGrounded && dy <= 0 && my <= 1e-4
-      && analyticGap >= 0 && analyticGap <= ANALYTIC_GROUND_SNAP_M;
+    // At the outer edge of a sparse crater mesh Rapier can report an edge hit,
+    // lift the capsule by its contact skin, and still report airborne. The
+    // authoritative analytic surface remains immediately beneath the feet.
+    // Accept that skin-sized landing too; otherwise gravity accumulates while
+    // the capsule is resting on the edge and cancels slow prone movement.
+    const snapAnalytic = !hasPhysicsGround && dy <= 0 && my <= 1e-4
+      && analyticGap >= 0 && analyticGap <= (wasGrounded ? ANALYTIC_GROUND_SNAP_M : CHARACTER_CONTACT_SKIN_M);
     if (this.position.y < g || snapAnalytic) {
       this.position.y = g;
       this.grounded = true;

@@ -178,6 +178,26 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(60));
     `抽 ${r.n} 个落点，最大偏差 ${r.worst.toFixed(3)} m`);
 }
 
+// Landing on analytic ground consumes only the controller's 2 cm contact skin.
+// A sparse crater edge must not cause permanent airborne gravity accumulation;
+// a higher falling body or an upward jump must remain airborne.
+{
+  const r = await page.evaluate(() => {
+    const PhysicsWorld=window.Taierzhuang.physics.constructor;
+    const world=new PhysicsWorld({groundAt:()=>0,bounds:{minX:-10,maxX:10,minZ:-10,maxZ:10}});
+    const body=world.MakeCharacter({radius:.42,height:.62,position:{x:0,y:.02,z:0}});
+    const Probe=(height,dy)=>{
+      body.Teleport(0,height,0);body.grounded=false;
+      world.Step(1/60);return body.Move(0,dy,0);
+    };
+    const skin=Probe(.0191,-.0001),above=Probe(.0211,-.0001),rising=Probe(.001,.001);
+    world.Dispose();return {skin,above,rising};
+  });
+  Check("解析面接触皮范围可落地，范围外和上升阶段不吸地",
+    r.skin.grounded&&Math.abs(r.skin.y)<1e-6&&!r.above.grounded&&r.above.y>.02
+      &&!r.rising.grounded&&r.rising.y>.001,JSON.stringify(r));
+}
+
 // --- 3b. 台阶走得上去，**而且不依赖"整帧"** ---------------------------------
 // 两件事一起验：
 //   · 自动上台阶（autostep）在真场景里管用 —— 马道那一级一级的踏面靠它；
