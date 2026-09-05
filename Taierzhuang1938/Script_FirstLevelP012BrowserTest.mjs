@@ -486,6 +486,9 @@ async function PlayPrelude() {
   Check(!arrival.actors.some(actor=>actor.distance<1.5&&actor.forward>.5),
     "首次交付后的正前方近距离没有友军身体堵住观察镜头",
     JSON.stringify(arrival.actors.filter(actor=>actor.distance<3)));
+  const salvo=await page.evaluate(()=>({shells:window.Tengxian.Debug.P012Scene().ambientShells,count:window.Tengxian.Debug.P012Scene().mortarImpactCount}));
+  Check(salvo.shells.length===4&&salvo.shells.every(shell=>shell.launched&&shell.impacted)&&salvo.count===1,
+    "首发与四处错开弹着均真实完成，环境弹着未替代避炮事实",JSON.stringify(salvo));
   console.log("P012 opening activity trace", JSON.stringify(result.trace));
 }
 
@@ -2697,7 +2700,7 @@ try {
         const snapshot=game.Debug.P012Scene()?.stageZero;if(!snapshot)continue;
         const arrival=snapshot.arrival,village=snapshot.village,speech=game.story.p012PendingCompletion;
         const ids=[];
-        if(arrival.phase==="braking"&&arrival.referenceTravelM>50&&snapshot.approach?.visible)ids.push("ArrivalApproach");
+        if(arrival.phase==="braking"&&arrival.trainOffsetM>5&&arrival.trainOffsetM<18&&snapshot.approach?.trainMoving)ids.push("ArrivalApproach");
         if(arrival.phase==="door"&&arrival.doorProgress>.3)ids.push("ArrivalDoor");
         if(arrival.fade>.7)ids.push("ArrivalTitle");
         for(const item of village.vignettes.filter(item=>item.visible)) {

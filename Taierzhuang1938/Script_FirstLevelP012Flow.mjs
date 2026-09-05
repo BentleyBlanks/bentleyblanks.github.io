@@ -1122,7 +1122,7 @@ export class FirstLevelP012Director {
       }
       if(!this.facts.has("northNearMissImpact")){text="跟随班长北上";requiredAction="follow";}
       else{
-        text=this.facts.has("northCovered")?"沿交通壕继续跟上班长":"炮弹落在路旁！冲进前面的路沟，压低身子";
+        text=this.facts.has("northCovered")?"已进入掩护：沿交通壕跟上班长，等小队收拢后继续":"炮弹落在路旁！进入蓝色沟沿内侧，按 C 蹲下（或 Z 趴下）";
         requiredAction=this.facts.has("northCovered")?"follow":"sprint";
         if(!this.facts.has("northCovered"))target=activity.northShelterPosition;
         if(!this.facts.has("northCovered")&&Distance(this.lastSample.position,target)<=4){

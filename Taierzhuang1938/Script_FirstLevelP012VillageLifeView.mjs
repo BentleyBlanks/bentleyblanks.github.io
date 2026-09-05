@@ -31,5 +31,21 @@ export class FirstLevelP012VillageLifeView {
   points.forEach((point,index)=>this.wirePositions.setXYZ(index,point.x,this.groundAt(point.x,point.z)+.055,point.z));
   this.wirePositions.needsUpdate=true;this.wireGeometry.setDrawRange(0,points.length);this.wireGeometry.computeBoundingSphere();
  }
- Dispose(){this.root.traverse(object=>object.geometry?.dispose());this.material.dispose();this.dark.dispose();this.wireMaterial.dispose();this.root.removeFromParent();}
+ SyncColliders(physics){
+  this.physics=physics;this.colliders||=[];
+  const specs=this.mule.visible?[[0,1.02,0,.55,.55,1.15],[0,1.45,-.8,.38,.65,.8],[0,.98,1.95,1.55,.68,1.55]]:[];
+  let changed=false;
+  specs.forEach(([x,y,z,w,h,d],index)=>{
+   const yaw=this.mule.rotation.y,c=Math.cos(yaw),s=Math.sin(yaw),p=this.mule.position;
+   const center=[p.x+x*c+z*s,p.y+y,p.z-x*s+z*c],half=[w/2,h/2,d/2],ax=Math.abs(c)*half[0]+Math.abs(s)*half[2],az=Math.abs(s)*half[0]+Math.abs(c)*half[2];
+   const record=this.colliders[index]||{tag:"householdCart"};
+   if(record.c&&record.c.every((value,i)=>Math.abs(value-center[i])<1e-6)&&record.ry===yaw)return;
+   Object.assign(record,{c:center,h:half,ry:yaw,min:[center[0]-ax,center[1]-half[1],center[2]-az],max:[center[0]+ax,center[1]+half[1],center[2]+az]});
+   if(record._physicsHandle==null){physics.AddSolid(record);this.colliders[index]=record;}else physics.MoveSolid(record);
+   changed=true;
+  });
+  while(this.colliders.length>specs.length){physics.RemoveSolid(this.colliders.pop()._physicsHandle);changed=true;}
+  if(changed)physics.RefreshStaticQueries();
+ }
+ Dispose(){for(const record of this.colliders||[])this.physics?.RemoveSolid(record._physicsHandle);this.root.traverse(object=>object.geometry?.dispose());this.material.dispose();this.dark.dispose();this.wireMaterial.dispose();this.root.removeFromParent();}
 }

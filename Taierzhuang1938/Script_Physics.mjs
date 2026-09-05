@@ -237,6 +237,15 @@ export class PhysicsWorld {
     return collider.handle;
   }
 
+  /** Move an existing prop collider without recreating its handle. Caller updates the record and refreshes queries once per batch. */
+  MoveSolid(box) {
+    const collider = this.world.getCollider(box._physicsHandle);
+    if (!collider) return false;
+    collider.setTranslation({ x: box.c[0], y: box.c[1], z: box.c[2] });
+    collider.setRotation(YawQuat(box.ry || 0));
+    return true;
+  }
+
   RemoveSolid(handle) {
     if (handle === null || handle === undefined) return;
     const collider = this.world.getCollider(handle);

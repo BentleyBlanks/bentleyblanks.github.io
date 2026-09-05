@@ -337,7 +337,7 @@ const changedDomainRules = [
   { domain: "editor", pattern: /Script_EditorWorldInfo|Script_WorldInfoEditorTest/i },
   { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },
   { domain: 'animation', pattern: /BackRifleRun|Melee.*Animation|MeleeAnimation|Infantry/i },
-  { domain: "ai", pattern: /FirstLevelP012(TrainColumn|March|Family|Resting|Arrival|VillageLife|StageZero|Cast)/i },
+  { domain: "ai", pattern: /FirstLevelP012(BackRifle|TrainColumn|March|Family|Resting|Arrival|VillageLife|StageZero|Cast)/i },
   { domain: "explosives", pattern: /(Explosion|Explosives|CraterSurface|GrenadeReturn|TerrainDeformation|ShellVisual|Script_Combat|Script_Physics|Script_Vfx)/i },
   { domain: "terrain", pattern: /(Heightmap|JieheHeight|JieheField|TengxianField|FarLand|Terrain|Battlefield|Outfield|Ground|Water|WestSuburbBlocks|Whitebox|P012|Data_Levels)/i },
   { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },

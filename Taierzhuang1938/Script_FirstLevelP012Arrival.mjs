@@ -1,4 +1,4 @@
-// Pure arrival controller. Never moves a player, replaces a cast, or owns a camera.
+// Pure arrival timeline; host applies train travel without taking camera control.
 // Host contract:
 // GuideArrival() continuously guides EXISTING Luo to the existing door; NearDoor()
 // is actual arrival, not a timer. SetDoorProgress(p) synchronizes dynamic panel and
@@ -6,7 +6,7 @@
 // ReleaseColumn() permits the existing finite queues, without reinitializing them.
 // StartAudio(cue) returns an owned handle; StopAudio(handle) must stop ONLY that
 // handle. PlaySfx(cue) is existing SFX only. Subtitle(text) never routes to voice.
-// RenderArrival receives view/steam/brake envelope; no train body translation.
+// RenderArrival receives absolute trainOffsetM; geometry and riders share this displacement.
 import { P012_ARRIVAL } from './Data_FirstLevelP012Arrival.mjs';
 const phases = ['idle', 'braking', 'guide', 'door', 'blackout', 'complete'];
 function Clamp(value, max = 1) { return Math.max(0, Math.min(max, Number(value) || 0)); }
@@ -75,6 +75,9 @@ export class FirstLevelP012Arrival {
     return { phase: p, doorProgress, fade, title: titleVisible ? c.title : '', date: titleVisible ? c.date : '',
       deceleration: p === 'braking' ? 1 - Clamp(this.elapsed / c.brakeSeconds) : 0,
       referenceSpeedMps: p === 'braking' ? c.referenceSpeedMps * Math.pow(1 - Clamp(this.elapsed / c.brakeSeconds), 1.65) : 0,
+      // Analytic integration ends exactly at the station, independent of frame size.
+      trainOffsetM: ['idle','braking'].includes(p)
+        ? c.referenceSpeedMps*c.brakeSeconds/2.65*Math.pow(1-Clamp(this.elapsed/c.brakeSeconds),2.65) : 0,
       referenceTravelM: this.referenceTravelM,
       steam: p === 'idle' ? 0 : p === 'complete' ? .25 * (1 - Clamp(this.elapsed / c.titleSeconds)) : .65,
       canDisembark: this.released, controlsLocked: false };

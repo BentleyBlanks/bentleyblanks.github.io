@@ -204,6 +204,9 @@ export class FirstLevelP012Runtime {
     const shell = { point: { ...point }, damaging, done: false };
     shell.point = this.host.WarnShell(point, damaging, (at) => this.RecordShellImpact(shell, at));
     this.pendingShells.push(shell);
+    if(!damaging&&!this.ambientShells){
+      this.ambientShells=(this.config.activities?.northAmbientShells||[]).map(spec=>({...spec,at:this.time+spec.delayS,launched:false}));
+    }
     if (damaging) this.mortarWarningPosition = { ...shell.point };
   }
   RecordShellImpact(shell, point) {
@@ -252,7 +255,7 @@ export class FirstLevelP012Runtime {
         this.trainColumn=new FirstLevelP012TrainColumn({
           ExistingRecruits:()=>originalActors,SpawnRecruit:spec=>this.host.SpawnRecruit(spec),
           Initialize:(actor,point)=>{this.host.InitializeOpeningActor(actor,point);actor.scriptedNoncombatant=true;actor.p012Guided=true;actor.scriptArrivalRadius=.1;},
-          SetEquipment:(actor,stage)=>this.host.SetOpeningEquipment(actor,stage),
+          SetEquipment:(actor,stage)=>{actor.p012BackRifle=stage!=="empty";this.host.SetOpeningEquipment(actor,stage);},
           Position:actor=>this.host.Position(actor),Move:(actor,point,speed)=>this.host.Move(actor,point,speed),
           Release:actor=>{actor.scriptArrivalRadius=.3;},Visible:actor=>this.host.TrafficVisible(actor),Retire:actor=>this.host.RetireTraffic(actor),
           DoorOpen:()=>this.host.Signalled("P012TrainDoor"),
@@ -471,6 +474,21 @@ export class FirstLevelP012Runtime {
     if(this.time-inspection.startedAt>=2.2&&!lagging&&!playerBehind){inspection.endedAt=this.time;return false;}
     this.FaceToward(actor,position,lagging?tail:player,dt);return true;
   }
+  StepApproachShells() {
+    const specs=this.config.activities?.approachShells,player=this.host.PlayerPosition?.();
+    if(!specs||!player||!this.host.WarnShell||!(this.beat>=2&&this.beat<=4))return;
+    this.approachShells ||= specs.map(spec=>({...spec,at:null,launched:false,impacted:false}));
+    for(const shell of this.approachShells){
+      if(shell.at===null&&player.z<=shell.gateZ)shell.at=this.time+shell.delayS;
+      if(shell.at===null||shell.launched||this.time<shell.at)continue;
+      shell.launched=true;shell.launchedAt=this.time;
+      this.host.WarnShell(shell.point,false,()=>{
+        shell.impacted=true;shell.impactedAt=this.time;
+        if(!this.civilianAlarm){this.civilianAlarm=true;this.host.Signal?.("P012DistantShellImpact");}
+        if(shell.stage==="approaching"&&!this.approachAlarm){this.approachAlarm=true;this.host.Signal?.("P012ApproachShellImpact");}
+      });
+    }
+  }
   StepFamilyWalker(walker,dt) {
     if(!walker.familyId||!this.config.activities?.civilianRoute||walker.arrived)return false;
     const at=this.host.Position(walker.actor),route=this.config.activities.civilianRoute,blocks=this.config.layout?.blocks||[];
@@ -496,7 +514,7 @@ export class FirstLevelP012Runtime {
     const childAt=child&&this.host.Position(child.actor);
     const childBehind=isLeader&&childAt&&Math.hypot(childAt.x-at.x,childAt.z-at.z)>5;
     const gap=Math.hypot(next.point.x-at.x,next.point.z-at.z);
-    const speed=(walker.speedMps||1.2)*(1+.045*Math.sin(this.time*.3+walker.guardianSlot));
+    const speed=(walker.speedMps||1.2)*(this.civilianAlarm?(this.config.activities.civilianAlarmSpeedScale||1.85):1)*(1+.045*Math.sin(this.time*.3+walker.guardianSlot));
     walker.actualSpeedMps=childBehind?0:Math.min(speed+(isLeader?0:.35),gap*1.6);
     walker.familyTarget=next.point;walker.actor.scriptArrivalRadius=.15;
     this.host.Move(walker.actor,next.point,walker.actualSpeedMps);
@@ -517,6 +535,10 @@ export class FirstLevelP012Runtime {
     this.StepOpeningCast(dt);
     this.StepMarch(dt);
     this.time += dt;
+    this.StepApproachShells();
+    for(const shell of this.ambientShells||[])if(!shell.launched&&this.time>=shell.at){
+      shell.launched=true;this.host.WarnShell(shell.point,false,()=>{shell.impacted=true;});
+    }
     if (this.smoke && this.time >= this.smoke.until && !this.smoke.cleared) { this.host.ClearSmoke?.(this.smoke.handle); this.smoke.cleared = true; }
     // The MG may be released on the frontline pressure clock before B08 is the
     // labelled objective. Preserve the real suppression/return-fire receipt.
@@ -580,11 +602,13 @@ export class FirstLevelP012Runtime {
       this.retreatGuards=null;
     }
     const guide = this.guide, actor = this.host.GuideActor();
+    if(this.beat>=5){if(actor)actor.p012BackRifle=false;for(const entry of this.openingCast||[])entry.actor.p012BackRifle=false;}
     if(guide?.ReleaseWhen?.()){
       if(guide.beat===23&&!this.host.Signalled("P012GuideSmokeHandoff"))this.host.Signal?.("P012GuideSmokeHandoff");
       this.host.ReleaseGuide?.(actor);this.guide=null;
     }
-    if (this.guide && guide && actor && guide.route.length) {
+    if(this.trainMoving&&actor)this.host.Move(actor,this.host.Position(actor),0);
+    if (!this.trainMoving && this.guide && guide && actor && guide.route.length) {
       if(guide.safeRoute){
         this.StepSafeGuide(guide,actor,dt);
       } else {
@@ -604,7 +628,7 @@ export class FirstLevelP012Runtime {
       const ahead=player&&position?(player.x-position.x)*(target.x-position.x)+(player.z-position.z)*(target.z-position.z)>0:false;
       const activity=this.config.activities || {};
       const waitForPlayer=(opening||guide.beat===13)&&!ahead&&distance>(activity.openingGuideWaitDistanceM??10);
-      const speed=opening?(ahead&&distance>3?(activity.openingGuideCatchupMps??5.246):(activity.openingGuideWalkMps??3.05)):guide.speed;
+      const speed=opening?(ahead&&distance>3?(activity.openingGuideCatchupMps??5.246):(this.civilianAlarm&&guide.beat===2?(activity.openingUrgentGuideMps??3.8):(activity.openingGuideWalkMps??3.05))):guide.speed;
       this.host.Move(actor, waiting||waitForPlayer ? position : target, waiting||waitForPlayer ? 0 : speed);
       if(waiting && guide.FaceAt && !inspecting) {
         const facing=guide.FaceAt(guide.index);
@@ -742,6 +766,9 @@ export class FirstLevelP012Runtime {
       blockadeDestroyed: this.far.length === 4 && this.far.every((actor) => !this.host.Alive(actor)),
       farSpawned: this.far.length, farDeaths: this.far.filter((actor) => !this.host.Alive(actor)).length,
       mortarImpactPosition: this.mortarImpactPosition, mortarImpactCount: this.mortarImpactCount,
+      civilianAlarm:!!this.civilianAlarm,
+      approachShells:(this.approachShells||[]).map(({stage,point,launched,impacted,launchedAt,impactedAt})=>({stage,point,launched,impacted,launchedAt,impactedAt})),
+      ambientShells:(this.ambientShells||[]).map(shell=>({point:shell.point,launched:shell.launched,impacted:!!shell.impacted})),
       mortarWarningPosition: this.mortarWarningPosition || null,
       mortarWarningActive: this.pendingShells.some((shell) => shell.damaging && !shell.done),
       regripPosition: this.config.activities?.regripPosition,

@@ -33,9 +33,25 @@ const children=[CivilianEntry(11,openingFamilies[0],3,true),CivilianEntry(12,ope
 export const openingActivities=Object.freeze({
   civilianRoute:[...southbound.slice(0,-1),Point(-18,190)],
   openingGuideWalkMps:3.05,openingGuideCatchupMps:5.246,openingGuideWaitDistanceM:10,
+  openingUrgentGuideMps:3.8,civilianAlarmSpeedScale:1.85,
+  // Finite salvos advance with the player along the northbound road, never a camera-relative blast.
+  approachShells:Object.freeze([
+    {stage:"distant",gateZ:110,delayS:0,point:Point(-22,-20)},
+    {stage:"distant",gateZ:110,delayS:3.8,point:Point(25,-27)},
+    {stage:"village",gateZ:70,delayS:0,point:Point(-27,25)},
+    {stage:"village",gateZ:70,delayS:2.8,point:Point(24,15)},
+    {stage:"approaching",gateZ:40,delayS:0,point:Point(-21,0)},
+    {stage:"approaching",gateZ:40,delayS:2.1,point:Point(23,-10)},
+    {stage:"near",gateZ:12,delayS:0,point:Point(-25,-22)},
+    {stage:"near",gateZ:12,delayS:1.8,point:Point(25,-34)},
+  ].map(Object.freeze)),
   // Fixed world impact ahead of both a walking and sprinting approach after the
   // incoming shell's flight, west of the real ditch bank. Never camera-anchored.
   northNearMissImpactPosition:Point(-19,-40),
+  northAmbientShells:Object.freeze([
+    {delayS:2.8,point:Point(-28,-54)}, {delayS:5.2,point:Point(19,-62)},
+    {delayS:8.6,point:Point(-31,-87)}, {delayS:12.5,point:Point(28,-99)},
+  ].map(Object.freeze)),
   northShelterPosition:Point(-12,-38),northShelterRadiusM:2.4,
   traffic:[...soldiers,...civilians,...children,...[0,1].map(index=>({side:1,slot:13+index,role:"walking",releaseBeat:3,
     proximityRelease:{index:0,beat:3,radius:22,requireVisible:true},
@@ -55,7 +71,9 @@ export const openingStoryBeats=Object.freeze([
   ["VillageReply", "P012BackRouteQuestion", "shunzi", "认路。", null,2,"P012BackRouteReply"],
   ["VillageAhead", "P012BackRouteReply", "yaowa", "前头才是我们去的地方。", null,3.4,"P012BackRouteAhead"],
   ["VillageRetort", "P012BackRouteAhead", "shunzi", "老子又没说不去。", null,3],
-  ["NorthDeparture", "P012VillageNorthDeparture", "luo", "跟上我，穿过北口去接防。", 8, 2.8],
+  ["DistantAlarm", "P012DistantShellImpact", "luo", "北边阵地挨炮了！乡亲们往后撤，咱们靠边加快，赶去接防！", 8,5],
+  ["ApproachAlarm", "P012ApproachShellImpact", "luo", "炮火顺着路压过来了！拉开些，跟紧我，前头有沟！", 6,4],
+  ["NorthDeparture", "P012VillageNorthDeparture", "luo", "前头还在挨炮。跟上，穿过北口进沟！", 8, 2.8],
   ["Chat", "P012NorthApproachChat", "heyoutian", "刚领的子弹捂好，别一跑全撒路上。", 8],
   ["ChatReply", "P012NorthApproachChat", "yaowa", "这点家当，我攥得比命还紧。", 10],
   ["Impact", "P012NorthNearMissImpact", "luo", "卧倒！进沟！别站在路中央！", 6],
@@ -69,6 +87,6 @@ export const openingStoryBeats=Object.freeze([
   p012SubtitleOnly:true,p012SubtitleSeconds:seconds||(id==="Chat"?2.8:3.4),
   ...(completeSignal?{p012CompleteSignal:completeSignal}:{}),
   p012Immediate:Object.freeze({event,maxAgeS,
-    interruptSubtitle:id==="Chat"||id==="Impact"||id==="MusterCall",
-    until:id==="Impact"||id.startsWith("Regroup")?undefined:id.startsWith("Chat")?"P012NorthNearMissImpact":"P012NorthApproachChat"}),
+    interruptSubtitle:id.endsWith("Alarm")||id==="Chat"||id==="Impact"||id==="MusterCall",
+    until:id.endsWith("Alarm")?"P012NorthNearMissImpact":id==="Impact"||id.startsWith("Regroup")?undefined:id.startsWith("Chat")?"P012NorthNearMissImpact":"P012NorthApproachChat"}),
 })));

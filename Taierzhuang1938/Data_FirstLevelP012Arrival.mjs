@@ -1,9 +1,8 @@
-// Pure data. Playable final approach: the wagon, player and camera never move as
-// a fake platform; disposable exterior references provide the braking parallax.
+// Final low-speed approach. The entire train and onboard bodies travel along -Z.
 export const P012_ARRIVAL = Object.freeze({
   brakeSeconds: 30, doorSeconds: 1.1, blackoutSeconds: 1.4,
   titleSeconds: 4, gateSignal: 'P012TrainDoor',
-  referenceSpeedMps: 13,
+  referenceSpeedMps: 2.12,
   brakeBeats: Object.freeze([
     Object.freeze({ second: 0, text: '列车员：滕县快到了——都坐稳！' }),
     Object.freeze({ second: 6, text: '幺娃：顺哥，坐一路了，腿都麻了。' }),

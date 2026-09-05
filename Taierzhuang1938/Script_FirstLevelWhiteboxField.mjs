@@ -16,6 +16,7 @@ import {
   FIRST_LEVEL_WHITEBOX_LAYOUT,
 } from "./Data_FirstLevelWhitebox.mjs";
 
+export function IsP012TrainBlock(id) { return /^Station(?:Car\d|Engine|ExitStep)/.test(id); }
 const GRID_SIZE = 12;
 const CAMERA_FAR = 430;
 
@@ -107,6 +108,7 @@ export class FirstLevelWhiteboxField {
     for (const [semantic, color] of Object.entries(this.layout.semanticColors || {})) {
       this.materials.set(semantic, MakeSemanticMaterial(`FirstLevelWhitebox_${semantic}`, color));
     }
+    this.trainOffsetM = 0; this.trainMeshes = []; this.trainColliders = [];
     this.gates = new Map();
     this.scenarioMeshes = [];
     this.scenarioColliders = [];
@@ -152,20 +154,22 @@ export class FirstLevelWhiteboxField {
     }
     sink.SetSector("FirstLevelWhitebox");
 
+    const trainSink = new BuildSink();
     for (const block of this.layout.blocks) {
+      const targetSink = this.layout.terrain === "P012Heightfield" && IsP012TrainBlock(block.id) ? trainSink : sink;
       if (this.layout.scenario?.replaceBlockIds.includes(block.id)) continue;
-      sink.Add(block.semantic || "Whitebox", PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), {
+      targetSink.Add(block.semantic || "Whitebox", PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), {
         x: block.x,
         y: block.y,
         z: block.z,
         ry: block.ry || 0,
       }));
       if (block.solid !== false) {
-        sink.Solid(block.x, block.y, block.z, block.w * 0.5, block.h * 0.5,
+        targetSink.Solid(block.x, block.y, block.z, block.w * 0.5, block.h * 0.5,
           block.d * 0.5, block.tag, block.ry || 0);
       }
       if (block.cover) {
-        sink.Cover(block.x, block.z, block.h, block.cover.faceX, block.cover.faceZ);
+        targetSink.Cover(block.x, block.z, block.h, block.cover.faceX, block.cover.faceZ);
       }
       this.stats.whiteBoxes += 1;
       this.stats.structures += 1;
@@ -177,8 +181,30 @@ export class FirstLevelWhiteboxField {
       mesh.receiveShadow = true;
       this.meshes.push(mesh);
     }
-    this.colliders = sink.colliders;
+    this.trainMeshes = trainSink.Flush(this.scene, { Get: key => this.materials.get(key) || this.whiteMaterial });
+    for (const mesh of this.trainMeshes) { mesh.name="P012MovingTrain"; mesh.castShadow=true; mesh.receiveShadow=true; this.meshes.push(mesh); }
+    this.trainColliders = trainSink.colliders;
+    this.colliders = [...sink.colliders, ...this.trainColliders];
     this.covers = sink.covers.slice();
+  }
+
+  TrainContains(position, offset = this.trainOffsetM) {
+    return this.layout.walkableSurfaces?.some(surface => /^StationCar\dFloor$/.test(surface.id)
+      && Math.abs(position.x-surface.x)<surface.w/2 && Math.abs(position.z-surface.z-offset)<surface.d/2
+      && position.y>=surface.y+surface.h/2-.25 && position.y<surface.y+surface.h/2+3);
+  }
+
+  SetTrainOffset(offset) {
+    const delta=offset-this.trainOffsetM;if(Math.abs(delta)<1e-9)return;
+    this.trainOffsetM=offset;
+    for(const mesh of this.trainMeshes)mesh.position.z=offset;
+    for(const surface of this.walkableSurfaces)if(IsP012TrainBlock(surface.id))surface.z+=delta;
+    const records=[...this.trainColliders];
+    for(const gate of this.gates.values())if(gate.spec.signal==="P012TrainDoor"){
+      gate.mesh.position.z+=delta;if(!gate.open)records.push(gate.collider);
+    }
+    for(const record of records){record.c[2]+=delta;record.min[2]+=delta;record.max[2]+=delta;this.physics?.MoveSolid(record);}
+    this.BuildCollisionGrid();this.physics?.RefreshStaticQueries();
   }
 
   BuildGates() {
@@ -212,6 +238,7 @@ export class FirstLevelWhiteboxField {
     this.BuildGates();
     this.SetScenarioState(this.layout.scenario?.states[0]);
     this.BuildLegend();
+    this.BuildSupplyLabels();
     yield { label: "策划白盒：碰撞与掩体", progress: 0.88 };
     this.BuildCollisionGrid();
     yield { label: "策划白盒就绪", progress: 1 };
@@ -265,6 +292,26 @@ export class FirstLevelWhiteboxField {
     return true;
   }
 
+  BuildSupplyLabels() {
+    if(this.layout.terrain!=="P012Heightfield"||typeof document==="undefined")return;
+    this.labelTextures=[];
+    const labels=this.layout.blocks.flatMap(block=>{
+      const gun=block.id==="WeaponCheckTable";
+      const ammo=block.id==="WeaponIssueCrate";
+      return gun||ammo?[{...block,label:gun?"领取步枪":"领取弹药",color:gun?"#f0cf79":"#a4dfd0"}]:[];
+    });
+    for(const spec of labels){
+      const canvas=document.createElement("canvas");canvas.width=512;canvas.height=160;
+      const ctx=canvas.getContext("2d");ctx.fillStyle="#182326";ctx.fillRect(0,0,512,160);
+      ctx.strokeStyle=spec.color;ctx.lineWidth=10;ctx.strokeRect(5,5,502,150);
+      ctx.fillStyle=spec.color;ctx.font="bold 68px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(spec.label,256,82);
+      const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;this.labelTextures.push(texture);
+      const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:true}));
+      sprite.name="P012SupplyLabel_"+spec.id;sprite.position.set(spec.x,spec.y+spec.h/2+.7,spec.z);sprite.scale.set(2.4,.75,1);
+      this.scene.add(sprite);this.meshes.push(sprite);
+    }
+  }
+
   BuildLegend() {
     if (!this.layout.scenario || typeof document === "undefined" || this.legend) return;
     const legend = document.createElement("details");
@@ -314,7 +361,7 @@ export class FirstLevelWhiteboxField {
     const handle=gate.collider?._physicsHandle;
     if(this.physics&&handle!=null)this.physics.RemoveSolid(handle);
     const index=this.colliders.indexOf(gate.collider);if(index>=0)this.colliders.splice(index,1);
-    gate.mesh.visible=true;gate.mesh.position.set(gate.spec.x,gate.spec.y,gate.spec.z+value*(gate.spec.d+.15));
+    gate.mesh.visible=true;gate.mesh.position.set(gate.spec.x,gate.spec.y,gate.spec.z+(gate.spec.signal==="P012TrainDoor"?this.trainOffsetM:0)+value*(gate.spec.d+.15));
     gate.open=value===1;
     if(!gate.open){gate.collider=ColliderRecord({...gate.spec,z:gate.mesh.position.z});this.colliders.push(gate.collider);if(this.physics)this.physics.AddSolid(gate.collider);}
     this.BuildCollisionGrid();
@@ -481,6 +528,7 @@ export class FirstLevelWhiteboxField {
 
   Dispose() {
     this.legend?.remove(); this.legend = null;
+    for(const texture of this.labelTextures||[])texture.dispose();
     const disposedMaterials = new Set();
     for (const mesh of this.meshes) {
       this.scene.remove(mesh);

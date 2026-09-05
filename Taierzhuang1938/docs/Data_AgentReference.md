@@ -134,7 +134,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   素材要求、坐标口径、偏航硬夹与遮挡回退的账全在 `docs/Data_MocapPipeline.md`，
   改流水线前先读它。首批三条 clip：CarryStretcherFront/Rear、WoundedLimp。
 
-- 独立背枪跑步审查包：`Animation/BackRifleRun/`（不接入生产动作）；契约见该目录 `Data_BackRifleRun.md`，烘焙入口 `_import/Script_BackRifleRunBake.py`，验收 `Script_BackRifleRunTest`（animation 域）。
+- 背枪跑步源包：`Animation/BackRifleRun/`（P012 的 `Script_FirstLevelP012BackRifle` 在领械后行军使用，其他关卡仍用原动作）；契约见该目录 `Data_BackRifleRun.md`，烘焙入口 `_import/Script_BackRifleRunBake.py`，验收 `Script_BackRifleRunTest`（animation 域）。
 - 五种视频步兵动作已接入两军 01–04 模型；运行时、重建与验收见 [步兵动作说明](Data_InfantryAnimations.md)。
 
 ### 人物 / AI / 合批
@@ -218,7 +218,9 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - `Script_FirstLevelP012CastAppearance.mjs` 只在本白盒给具名同伴的衣服使用私有纯色材质；
   不修改人物源资产、肤色或武器，不把临时识别色带入正式关卡。ActorTest 验共享材质隔离。
   同批军人在 `openingIssue` 中实际下车、领械后出发；未领枪的局部空手姿态通过
-  `InstallP012OpeningPose` 适配，领枪后恢复原动作，不改正式角色的全局姿态表。
+  `InstallP012OpeningPose` 适配；领枪后行军播放原骨名绑定的 BackRifleRun，实际枪械挂到胸椎背枪点，低姿与战斗切回原手持链。
+  到站以绝对减速行程驱动车头、三车、门板碰撞与车内乘员；地表支撑随车同步，站台和铁轨保持世界坐标。
+  驴车给动物与车斗注册同步实体碰撞，遇人停让；只在玩家可交互的两个补给桌显示领枪、领弹牌子，NPC 发放点不挂牌。
 - 几何、Flow、Runtime、Actor 均有同名 `Test`；`Script_FirstLevelP012BrowserTest.mjs`
   的 `--prelude --geometry` 验证实际开场和通行，`--campaign` 驱动整关真实移动/射击/交互。
   测试夹具的传送不计入通关时长；验收证据与设计来源见 `docs/Data_FirstLevelP012Acceptance.md`。

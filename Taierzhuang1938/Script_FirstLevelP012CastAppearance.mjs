@@ -62,6 +62,7 @@ export function InstallP012ActorMotion(soldier) {
   let previous=null,lastElapsed=null,previousAction=null;
   const phase=((Number(soldier.id)||0)*.61803398875)%1;
   rig.p012ActorMotion=true;
+  rig.p012BackRifleReady=import("./Script_FirstLevelP012BackRifle.mjs").then(module=>module.InstallP012BackRifle(soldier)).catch(error=>{rig.p012BackRifleError=String(error);console.warn("[P012BackRifle]",error);});
   rig.Update=function UpdateP012ActorMotion(dt,state={}) {
     const at=actor.root.position;
     const elapsed=Number.isFinite(state.elapsed)?state.elapsed:null;
@@ -69,10 +70,11 @@ export function InstallP012ActorMotion(soldier) {
     const distance=previous?Math.hypot(at.x-previous.x,at.z-previous.z):0;
     const speed=previous&&step>0&&distance<Math.max(2,step*8)
       ? Math.min(6,distance/step):0;
+    this.p012ActualSpeedMps=soldier.p012OnMovingTrain?0:speed;
     // Zero-dt pose reads (including stretcher sockets) must not consume motion.
     if(dt>0){previous={x:at.x,z:at.z};lastElapsed=elapsed;}
     if(this.forcedClip){this.currentAction?.setEffectiveTimeScale(1);return original.call(this,dt,state);}
-    const next={...state,moveSpeed:dt>0?speed/3.6:state.moveSpeed};
+    const next={...state,moveSpeed:dt>0?this.p012ActualSpeedMps/3.6:state.moveSpeed};
     const emptyIdle=soldier.p012AwaitingWeapon&&next.moveSpeed<.025
       &&!state.firing&&!state.carryRole&&!(state.prone>.35||state.crouch>.35)
       &&!state.meleeCombat;
@@ -95,6 +97,7 @@ export function InstallP012ActorMotion(soldier) {
       else if(id==='CarryStretcherFront'||id==='CarryStretcherRear')rate=speed<.08?0:Math.min(1.6,speed/1.35);
       else if(id==='WoundedLimp')rate=Math.min(1.5,speed/1.1);
       else if(id==='RifleRun')rate=Math.min(1.6,speed/3.6);
+      else if(id==='BackRifleRun')rate=speed/(this.p012BackRifleReferenceMps*actor.root.scale.y*this.root.scale.y);
       else if(id==='AdvanceFire'&&next.moveSpeed<.025&&!state.firing&&!(state.aim>.1))rate=0;
       action.setEffectiveTimeScale(rate);
       previousAction=action;

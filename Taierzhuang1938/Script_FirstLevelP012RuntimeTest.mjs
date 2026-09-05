@@ -1019,3 +1019,37 @@ console.log("PASS P012 runtime finite actors, guide speed, shell warning, delive
 
 assert.equal(P012Phase.whitebox.activities.guideSpeedMps,3.05,"ordinary guide movement speed remains unchanged");
 assert.equal(P012Phase.whitebox.activities.guideSpeedByBeat[13],undefined,"B13 has no slow-speed override");
+
+{
+ const launched=[];const runtime=new FirstLevelP012Runtime({GuideActor:()=>null,Position:()=>null,Signalled:()=>false,
+   WarnShell:(point,damaging,impact)=>{launched.push({point,damaging,impact});return point;}},{activities:{northAmbientShells:openingActivities.northAmbientShells}});
+ runtime.Shelling(openingActivities.northNearMissImpactPosition);assert.equal(launched.length,1);
+ launched[0].impact(launched[0].point);runtime.Update(2);assert.equal(launched.length,1);
+ for(let i=0;i<60;i++)runtime.Update(.25);
+ assert.equal(launched.length,5);for(const shell of launched.slice(1))shell.impact(shell.point);
+ assert.equal(runtime.mortarImpactCount,1,'ambient hits cannot complete or replace the primary shelter trigger');
+ assert.equal(new Set(launched.map(shell=>JSON.stringify(shell.point))).size,5);
+ runtime.Update(60);assert.equal(launched.length,5,'finite salvo never respawns');
+ console.log('PASS five staggered shell impacts and isolated primary gameplay fact');
+}
+
+{
+ const launched=[],signals=new Set(),player={x:0,z:100};
+ const runtime=new FirstLevelP012Runtime({GuideActor:()=>null,Position:a=>a?.position,PlayerPosition:()=>player,
+   Signalled:name=>signals.has(name),Signal:name=>signals.add(name),Move:(actor,target,speed)=>{actor.speed=speed;},
+   WarnShell:(point,damaging,impact)=>{launched.push({point,damaging,impact});return point;}},
+   {activities:{approachShells:openingActivities.approachShells,civilianRoute:openingActivities.civilianRoute,
+     civilianAlarmSpeedScale:openingActivities.civilianAlarmSpeedScale},layout:{blocks:[]}});
+ runtime.beat=1;runtime.Update(30);assert.equal(launched.length,0,'equipment stage remains usable');
+ runtime.beat=2;runtime.Update(.1);assert.equal(launched.length,1);assert.equal(runtime.civilianAlarm,undefined);
+ const walker={...openingActivities.traffic.find(w=>w.role==='civilian'),actor:{position:{x:1.4,z:5}}};
+ runtime.traffic=[walker];runtime.StepFamilyWalker(walker,.1);const calmSpeed=walker.actualSpeedMps;
+ launched[0].impact(launched[0].point);runtime.StepFamilyWalker(walker,.1);
+ assert.ok(walker.actualSpeedMps>calmSpeed*1.5,'families accelerate only after a real audible impact');
+ assert.ok(signals.has('P012DistantShellImpact'));runtime.Update(30);assert.equal(launched.length,2,'waiting cannot consume later road salvos');
+ for(const z of [70,40,12]){player.z=z;runtime.Update(.1);runtime.Update(4);}
+ assert.equal(launched.length,8);for(const shell of launched)shell.impact(shell.point);
+ assert.ok(signals.has('P012ApproachShellImpact'));assert.equal(runtime.mortarImpactCount,0);
+ runtime.Update(100);assert.equal(launched.length,8);assert.ok(launched.every(shell=>shell.damaging===false));
+ console.log('PASS progress-gated approaching shellfire, impact-led civilian acceleration and finite salvo');
+}

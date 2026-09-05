@@ -41,3 +41,13 @@ const parent = document.createElement(); const view = new FirstLevelP012ArrivalV
 view.Render({ fade: 1, title: P012_ARRIVAL.title, date: P012_ARRIVAL.date }); assert.equal(root.style.display, 'block');
 view.Dispose(); view.Dispose(); assert.equal(root.removed, true);
 console.log('PASS P012 arrival: physical guide gate, continuous audio, short fade, skip, restore and cleanup');
+
+// The absolute movement curve must survive frame rate changes and restored saves.
+for(const step of [1/30,1/60,.17]){
+ const train=new FirstLevelP012Arrival();train.Start();const start=train.View().trainOffsetM;let previous=start;
+ while(train.phase==='braking'){train.Update(step);const offset=train.View().trainOffsetM;assert(offset<=previous&&offset>=0);previous=offset;}
+ assert.equal(train.View().trainOffsetM,0);assert(Math.abs(start-24)<1e-8);train.Dispose();
+}
+const restored=new FirstLevelP012Arrival();restored.Restore({version:2,phase:'braking',elapsed:12});
+assert(Math.abs(restored.View().trainOffsetM-24*Math.pow(.6,2.65))<1e-8);restored.Dispose();
+console.log('PASS real train: monotonic 24m travel, exact stop, frame-rate independence and restored position');

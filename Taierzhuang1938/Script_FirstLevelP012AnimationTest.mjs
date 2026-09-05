@@ -15,7 +15,10 @@ try{
  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=high`,{timeout:120000});
  await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:180000});
  const train=await page.evaluate(()=>{
-  const t=window.Tengxian;t.StepFrames(180,1/30,true);
+  const t=window.Tengxian;t.StepFrames(1,1/30,false);
+   const before={offset:t.Debug.P012Scene().stageZero.approach.offset,z:t.player.position.z};
+   t.StepFrames(180,1/30,true);
+   window.p012TrainMotion={before,after:{offset:t.Debug.P012Scene().stageZero.approach.offset,z:t.player.position.z,y:t.player.position.y},labels:t.scene.children.filter(o=>o.name.startsWith('P012SupplyLabel_')).length};
   return t.ai.soldiers.filter(s=>s.p012AwaitingWeapon).map(s=>({id:s.id,installed:s.actor.characterRig?.p012ActorMotion,
    clip:s.actor.characterRig?.currentPlaybackId,rate:s.actor.characterRig?.currentAction?.getEffectiveTimeScale(),visible:s.actor.root.visible,forced:s.actor.characterRig?.forcedClip,move:s.moveSpeed}));
  });
@@ -23,6 +26,41 @@ try{
  assert.equal(train.length,40);
  assert.ok(train.every(s=>s.installed&&s.clip==='AttackCommand'&&s.rate===0));
  await page.screenshot({path:path.join(out,'Train_Player.png')});
+ const transport=await page.evaluate(()=>window.p012TrainMotion);
+ assert.ok(transport.before.offset-transport.after.offset>8);
+ assert.ok(Math.abs((transport.before.z-transport.after.z)-(transport.before.offset-transport.after.offset))<.001);
+ assert.equal(transport.after.y,1.25);assert.equal(transport.labels,2);
+ const collision=await page.evaluate(()=>{
+   const t=window.Tengxian,pw=t.player.body.pw,p=t.Debug.P012Scene().stageZero.village.mule.position;
+   const Sweep=z=>{const body=pw.MakeCharacter({radius:.34,height:1.78,position:{x:p.x-3,y:0,z}});
+     for(let i=0;i<120;i++){body.Move(.05,-.01,0);pw.Step(1/60);}const x=body.position.x;body.Remove();return x;};
+   return {x:p.x,animal:Sweep(p.z),cart:Sweep(p.z+2),clear:Sweep(p.z-3)};
+ });
+ assert.ok(collision.animal<collision.x-.5);assert.ok(collision.cart<collision.x-.9);assert.ok(collision.clear>collision.x+2);
+ console.log('PASS real train movement/rider support, two player-interactable supply labels and mule/cart blocking with clear bypass',transport,collision);
+ const backRifle=await page.evaluate(async()=>{
+   const t=window.Tengxian,THREE=await import('three'),{InstallP012ActorMotion}=await import('./Script_FirstLevelP012CastAppearance.mjs');
+   const results=[];t.actorFactory.SetBatcher(null);
+   for(const variant of [0,1,3]){
+     const actor=t.actorFactory.Create('nra',{seed:400+variant,weapon:'HanYang',modelVariant:variant});
+     const soldier={id:400+variant,actor,p012BackRifle:true};InstallP012ActorMotion(soldier);await actor.characterRig.p012BackRifleReady;
+     const rig=actor.characterRig;let elapsed=0,min=Infinity,max=-Infinity;
+     for(let i=0;i<100;i++){
+       elapsed+=1/60;actor.root.position.z-=3.05/60;actor.Update(1/60,{elapsed,moveSpeed:3.05/3.6});
+       if(i<50)continue;actor.root.updateMatrixWorld(true);let sole=Infinity;
+       actor.root.traverse(mesh=>{if(!mesh.isSkinnedMesh)return;mesh.skeleton.update();const v=new THREE.Vector3();
+         for(let j=0;j<mesh.geometry.attributes.position.count;j++){mesh.getVertexPosition(j,v);v.applyMatrix4(mesh.matrixWorld);sole=Math.min(sole,v.y);}});
+       min=Math.min(min,sole);max=Math.max(max,sole);
+     }
+     const running={clip:rig.currentId,parent:actor.weaponGroup.parent.name,rate:rig.currentAction.getEffectiveTimeScale()};
+     actor.Update(1/60,{elapsed:elapsed+1/60,prone:1});const prone={clip:rig.currentId,parent:actor.weaponGroup.parent.name};
+     actor.Update(1/60,{elapsed:elapsed+2/60,firing:true});const fire={clip:rig.currentId,parent:actor.weaponGroup.parent.name};
+     results.push({variant,min,max,running,prone,fire});actor.Dispose();
+   }
+   return results;
+ });
+ for(const result of backRifle){assert.equal(result.running.clip,'BackRifleRun');assert.equal(result.running.parent,'P012BackRifleMount');assert.ok(result.running.rate>1);assert.ok(result.min>=-.015&&result.min<.015);assert.ok(result.max<.12);for(const state of [result.prone,result.fire]){assert.notEqual(state.clip,'BackRifleRun');assert.equal(state.parent,'SocketAttachment_WeaponR');}}
+ console.log('PASS supplied back-rifle clip, NRA01/02/04 skin contact and combat handoff',backRifle);
  const result=await page.evaluate(async()=>{
   const t=window.Tengxian,THREE=await import('/Taierzhuang1938/vendor/three/build/three.module.js');
   const {InstallP012ActorMotion}=await import('/Taierzhuang1938/Script_FirstLevelP012CastAppearance.mjs');

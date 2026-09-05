@@ -12,7 +12,6 @@ import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 export class FirstLevelP012StageZero {
   constructor(host) {
     this.host = host; this.elapsed = 0; this.people = new Set();
-    this.approachOffset = 0; this.approachReferences = this.BuildApproachReferences();
     this.arrivalView = new FirstLevelP012ArrivalView();
     this.villageView = new FirstLevelP012VillageLifeView(host.scene, (x,z)=>host.battlefield.GroundHeight(x,z));
     this.arrival = new FirstLevelP012Arrival({
@@ -29,8 +28,8 @@ export class FirstLevelP012StageZero {
       PlaySfx: cue => host.audio.Play(cue,{volume:.55,position:host.Guide()?.position}),
       RenderArrival: view => {
         this.arrivalView.Render(view);
-        this.UpdateApproachReferences(view);
-        if(view.steam>0&&!this.steam) this.steam=host.vfx.SmokeSource(new THREE.Vector3(-66,2.1,88),
+        this.UpdateTrain(view);
+        if(view.steam>0&&!this.steam) this.steam=host.vfx.SmokeSource(new THREE.Vector3(-66,5,86+(view.trainOffsetM||0)),
           {kind:"screen",rate:5,radius:.3,rise:1.2,sizeStart:.45,sizeEnd:2.8,life:3,opacity:.15});
         if(view.steam===0&&this.steam){host.vfx.RemoveSmokeSource(this.steam);this.steam=null;}
       },
@@ -60,6 +59,12 @@ export class FirstLevelP012StageZero {
       },
       MoveProp: (from,to,radius,{fromYaw,toYaw}) => {
         // Translation AND rotation arcs: a cart tail can hit a wall while its nose is stationary.
+        const bodies=[host.Player()?.position,host.Guide()?.position,...host.runtime.traffic.filter(entry=>!entry.retired).map(entry=>entry.actor?.position),...[...this.people].map(entry=>entry.position)].filter(Boolean);
+        for(const offset of [0,1.1,2.2])for(const body of bodies){
+          const before=Math.hypot(body.x-from.x-Math.sin(fromYaw)*offset,body.z-from.z-Math.cos(fromYaw)*offset);
+          const after=Math.hypot(body.x-to.x-Math.sin(toYaw)*offset,body.z-to.z-Math.cos(toYaw)*offset);
+          if(after<radius+.42&&after<before-1e-6)return {...from,yaw:fromYaw};
+        }
         const delta=Math.atan2(Math.sin(toYaw-fromYaw),Math.cos(toYaw-fromYaw));
         const steps=Math.max(1,Math.ceil(Math.abs(delta)/.03));
         for(const offset of [0,1.1,2.2])for(let i=0;i<steps;i++) {
@@ -74,26 +79,23 @@ export class FirstLevelP012StageZero {
       Remove: entry => {if(!entry)return;entry.workPose?.Dispose();entry.body?.Remove();entry.actor.root.removeFromParent();entry.actor.Dispose();this.people.delete(entry);},
     });
   }
-  BuildApproachReferences() {
-    const group=new THREE.Group();group.name='P012ApproachReferences';
-    const white=new THREE.MeshStandardMaterial({color:0xe8e6dc,roughness:1});
-    const dark=new THREE.MeshStandardMaterial({color:0x35383a,roughness:1});
-    for(let i=0;i<8;i++){
-      const baseZ=94+i*10;
-      const post=new THREE.Mesh(new THREE.BoxGeometry(.16,2.8,.16),white);post.position.set(-73.2,1.4,baseZ);post.userData.p012BaseZ=baseZ;group.add(post);
-      const sleeper=new THREE.Mesh(new THREE.BoxGeometry(3.8,.08,.22),dark);sleeper.position.set(-72,.08,baseZ);sleeper.userData.p012BaseZ=baseZ;group.add(sleeper);
+  UpdateTrain(view) {
+    if(this.disposed)return;
+    const field=this.host.battlefield,offset=view.trainOffsetM||0,previous=field.trainOffsetM||0,delta=offset-previous;
+    this.host.runtime.trainMoving=offset>0;
+    for(const entry of this.host.runtime.trainColumn?.entries||[])entry.actor.p012OnMovingTrain=offset>0;
+    const guide=this.host.Guide();if(guide){guide.p012OnMovingTrain=offset>0;if((this.host.runtime.beat||0)<5)guide.p012BackRifle=true;}
+    if(Math.abs(delta)<1e-9)return;
+    const player=this.host.Player(),actors=[this.host.Guide(),...(this.host.runtime.trainColumn?.entries||[]).map(entry=>entry.actor)];
+    const passengers=[...(this.restoringPlayer?[]:[player]),...actors].filter(actor=>actor?.position&&field.TrainContains(actor.position,previous));
+    field.SetTrainOffset(offset);
+    for(const actor of passengers){
+      actor.position.z+=delta;actor.body?.Teleport(actor.position.x,actor.position.y,actor.position.z);
+      if(actor.goal)actor.goal.z+=delta;
+      if(actor.actor)actor.actor.root.position.copy(actor.position);
     }
-    group.visible=false;
-    this.host.scene?.add?.(group);return group;
-  }
-  UpdateApproachReferences(view) {
-    if(!this.approachReferences)return;
-    this.approachReferences.visible=view.phase==='braking';
-    this.approachOffset=(view.referenceTravelM||0)%80;
-    for(const object of this.approachReferences.children){
-      const base=Number(object.userData.p012BaseZ);
-      object.position.z=94+((base-94+this.approachOffset)%80);
-    }
+    if(passengers.includes(player))player.SyncCamera(0);
+    if(this.steam?.position)this.steam.position.z=86+offset;
   }
   IsVisible(position) {
     if(!position)return false;
@@ -110,27 +112,25 @@ export class FirstLevelP012StageZero {
   }
   Update(dt) {
     this.elapsed+=dt;
+    if(!this.trainInitialized){this.host.runtime.StepOpeningCast(0);this.trainInitialized=true;}
     this.arrival.Start();this.arrival.Update(dt);
     this.village.Start();this.village.Update(dt);this.villageView.Update(this.village.Snapshot());
+    this.villageView.SyncColliders(this.host.physics);
   }
   Snapshot() {
     const village=this.village.Snapshot();
     village.workerPoses=[...this.people].filter(entry=>entry.role==="worker").map(entry=>({id:entry.id,position:{x:entry.position.x,z:entry.position.z},pose:entry.workPose?.Snapshot()||null}));
-    const approach={visible:!!this.approachReferences?.visible,offset:this.approachOffset,
-      references:(this.approachReferences?.children||[]).map(object=>({x:object.position.x,y:object.position.y,z:object.position.z}))};
+    const approach={offset:this.host.battlefield.trainOffsetM,trainMoving:!!this.host.runtime.trainMoving};
     return {arrival:{...this.arrival.Snapshot(),...this.arrival.View()},approach,village};
   }
   RestoreArrival(snapshot) {
-    const view=this.arrival.Restore(snapshot);
+    this.restoringPlayer=true;
+    let view;try{view=this.arrival.Restore(snapshot);}finally{this.restoringPlayer=false;}
     if(view.canDisembark)this.host.Signal("P012TrainDoor");
   }
   Dispose() {
+    this.disposed=true;
     this.arrival.Dispose();this.arrivalView.Dispose();this.village.Dispose();this.villageView.Dispose();
     if(this.steam)this.host.vfx.RemoveSmokeSource(this.steam);this.steam=null;
-    this.approachReferences?.removeFromParent();
-    const materials=new Set();
-    for(const child of this.approachReferences?.children||[]){child.geometry?.dispose();if(child.material)materials.add(child.material);}
-    for(const material of materials)material.dispose?.();
-    this.approachReferences=null;
   }
 }
