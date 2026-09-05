@@ -503,6 +503,7 @@ export class AiDirector {
       variant: options.actorVariant,
       modelVariant: options.modelVariant,
     });
+    this.ctx.onActorSpawn?.(soldier);
     if (kind === "civilian" && ["childBoy", "childGirl"].includes(options.actorVariant)
       && soldier.actor.isChild && Number.isFinite(soldier.actor.height) && soldier.actor.height > 0
       && Number.isFinite(soldier.actor.bodyRadius) && soldier.actor.bodyRadius > 0) {

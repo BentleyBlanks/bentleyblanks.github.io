@@ -95,6 +95,11 @@ for(let variant=1;variant<=5;variant++){
     const direction=b.getWorldPosition(new THREE.Vector3()).sub(a.getWorldPosition(new THREE.Vector3())).normalize();
     assert.ok(direction.y<-.95,`${variant}/${clipName}: real empty arm points naturally downward`);
    }
+   for(const side of ['L','R']){
+    const shoulder=root.worldToLocal(bones[`upperArm${side}`].getWorldPosition(new THREE.Vector3()));
+    const hand=root.worldToLocal(bones[`hand${side}`].getWorldPosition(new THREE.Vector3()));
+    assert.ok(Math.abs(hand.x)>Math.abs(shoulder.x)+.05,'empty hands hang outside the shoulder line, not inside the torso');
+   }
    soldier.p012AwaitingWeapon=false;rig.Update(.016,{});
    nodes.forEach((n,i)=>assert.deepEqual(n.quaternion.toArray(),baseline[i].q,"issuing the rifle restores untouched animation without a pose residue"));
   }

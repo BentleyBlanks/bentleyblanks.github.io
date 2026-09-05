@@ -66,6 +66,7 @@ const playTestExpectedFailures = [
 ];
 
 export const testDefs = {
+  FirstLevelP012AnimationTest: {file:'Script_FirstLevelP012AnimationTest.mjs',desc:'P012实际GLB车厢待机、位移步频、担架停走与路边动作出图'},
   TrainLibraryTest: { file: "Script_TrainLibraryTest.mjs", desc: "火车构件库：点击懒载、原 PBR、完整轮组绑定、缓存隔离与实际显示" },
   BackRifleRunTest: { file: 'Script_BackRifleRunTest.mjs', desc: '独立背枪跑步 GLB：原骨架、循环接缝、真实蒙皮接地、速度与挂点浏览器验收' },
   ExplosionRulesTest: { file: "Script_ExplosionRulesTest.mjs", desc: "爆炸配置、稀疏地形叠加/坡度/上限、返掷窗口与完整资产目录（纯 Node）" },
@@ -223,6 +224,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  'FirstLevelP012AnimationTest',
   "TrainLibraryTest",
   'BackRifleRunTest', 'MeleeAnimationTest', 'InfantryAnimationTest',
   "ActorBatchTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
@@ -308,7 +310,7 @@ export const domains = {
     // 具名同伴（罗班长、幺娃…）是从 nra 名额里出的人，goal 直接写进 AiDirector，
     // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
     tests: ["AiBehaviorTest", "VisibilityTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
-      "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest", "FirstLevelP012ArrivalTest", "FirstLevelP012VillageLifeTest", "FirstLevelP012CastTest"],
+      "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012AnimationTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest", "FirstLevelP012ArrivalTest", "FirstLevelP012VillageLifeTest", "FirstLevelP012CastTest"],
   },
   hud: {
     label: "HUD/交互提示/目标识别",

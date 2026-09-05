@@ -49,7 +49,7 @@ import { FirstLevelP012CarryView, CreateP012StretcherGeometry } from "./Script_F
 import { AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload, RestoreP012ManualReload } from "./Script_FirstLevelP012Opening.mjs";
 import { FirstLevelP012Binoculars, P012BinocularLensContains } from "./Script_FirstLevelP012Binoculars.mjs";
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
-import { ApplyP012CastAppearance, InstallP012OpeningPose } from "./Script_FirstLevelP012CastAppearance.mjs";
+import { ApplyP012CastAppearance, InstallP012OpeningPose, InstallP012ActorMotion } from "./Script_FirstLevelP012CastAppearance.mjs";
 import { SelectP012CompanionCast, SelectP012RecruitCast } from "./Data_FirstLevelP012Cast.mjs";
 import { FirstLevelP012StageZero } from "./Script_FirstLevelP012StageZero.mjs";
 import { CAST } from "./Data_TengxianScript.mjs";
@@ -1059,6 +1059,9 @@ async function Boot() {
   destruction.SetWorld(battlefield, physics, navGrid);
   ai = new AiDirector({
     battlefield, actorFactory, scene, vfx, audio, player, nav, physics, destruction,
+    onActorSpawn: (soldier) => {
+      if(PHASE_TABLE[state.phaseIndex]?.whitebox?.p012)InstallP012ActorMotion(soldier);
+    },
     BlocksSight: (from, to) => p012Runtime?.BlocksSight(from, to) || false,
     // 票池 = 兵力池：**谁死了扣谁的**。
     // 以前只有玩家的命和玩家的战绩会动票池，而 Combat.Blast 的 onKill 不带 side，
@@ -3046,7 +3049,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       return actor;
     },
     Position: (actor) => ({x:actor.root.position.x,y:actor.root.position.y,z:actor.root.position.z}),
-    HoldPose: (actor,pose,dt) => actor.Update(dt,{...pose,elapsed:state.elapsed}),
+    HoldPose: (actor,pose,dt) => actor.Update(dt,{...pose,elapsed:pose.elapsed??state.elapsed}),
     Remove: (actor) => {scene.remove(actor.root);actor.Dispose?.();},
   }) : null;
   p012Resting?.Start();
@@ -3140,6 +3143,9 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       actor.unarmed = stage === "empty";
       actor.actor?.SetWeapon(stage === "empty" ? null : actor.weaponId);
       actor.ammo = stage === "ammo" ? (actor.weapon.magazine || 5) : 0;
+      // Seed the empty stance even for recruits outside the animation LOD cone.
+      // Turning around must not expose their previous armed spawn pose for a frame.
+      if(stage === "empty")actor.actor?.Update(0,{moveSpeed:0,aim:0,crouch:0,prone:0,elapsed:ai.time});
     },
     SetOpeningShelter: (actor, durationS) => { if(actor?.alive)ai.SetStance(actor,2,durationS,true); },
     SetGuideStance: (actor, stance) => {

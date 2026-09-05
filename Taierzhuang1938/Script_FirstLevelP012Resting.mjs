@@ -9,7 +9,7 @@ export class FirstLevelP012Resting {
  Start(){
   if(this.started||this.disposed)return false;
   this.started=true;
-  this.entries=this.people.map(spec=>({spec,actor:this.host.Spawn({...spec,weapon:null}),sit:1,brace:0,alert:false}));
+  this.entries=this.people.map(spec=>({spec,actor:this.host.Spawn({...spec,weapon:null}),sit:1,brace:0,alert:false,time:spec.phaseOffset||0}));
   return true;
  }
  OnImpact({event,position}={}){
@@ -25,9 +25,18 @@ export class FirstLevelP012Resting {
   if(!this.started||this.disposed)return;
   const step=Math.max(0,Math.min(.1,Number.isFinite(dt)?dt:0));
   for(const entry of this.entries){
+   entry.time+=step;
    if(entry.alert)entry.brace=Math.min(1,entry.brace+step*P012_RESTING_REACTION.blendPerSecond);
+   // A few seconds tending a shoe / warming hands, then a quiet rest. Distinct
+   // offsets keep the pair from moving in unison. A nearby real impact interrupts
+   // the hand activity instead of leaving someone calmly sewing under shellfire.
+   const cycle=entry.time%16;
+   const busy=Math.min(1,cycle/1.5,Math.max(0,(9-cycle)/1.5))*(1-entry.brace);
+   const lifePose={sit:1,warmHands:(entry.spec.lifePose?.warmHands||0)*busy,
+    repairShoe:(entry.spec.lifePose?.repairShoe||0)*busy};
    this.host.HoldPose(entry.actor,{moveSpeed:0,aim:0,firing:false,yaw:entry.spec.yaw,
-    crouch:0,lookYaw:0,lookPitch:-.45*entry.brace,lifePose:{sit:1,warmHands:.35}},step);
+    crouch:0,lookYaw:(entry.spec.lookYaw||0)*(1-busy)*(1-entry.brace),
+    lookPitch:-.45*entry.brace,lifePose,elapsed:entry.time},step);
   }
  }
  Snapshot(){return this.entries.map(({spec,actor,sit,brace,alert})=>({id:spec.id,position:this.host.Position(actor),sit,brace,alert,lookPitch:-.45*brace}));}
