@@ -601,7 +601,6 @@ export const RECIPES = {
   LugouqiaoType11Body: (s) => BakeSteel(s ?? 256, { seed: 640 }),
   LugouqiaoType11BodyAlt: (s) => BakeSteel(s ?? 256, { seed: 641 }),
   LugouqiaoType11Fore: (s) => BakeWood(s ?? 256, { seed: 642, planks: 1 }),
-  LugouqiaoMauser96: (s) => BakeSteel(s ?? 256, { seed: 643 }),
   SteelHelmet: (s) => BakeSteel(s ?? 256, { seed: 617, base: [64, 66, 60], polish: 0.2, rust: 0.35 }),
   Ground: (s) => BakeRubbleGround(s ?? 512, { seed: 701 }),
   // 东门外翻耕土的 ImageGen BaseColor + Normal 会在启动时覆盖；404 时仍保留

@@ -108,12 +108,6 @@ export const FPS_ARM_POSES = Freeze({
     bodyHip: RifleBody(-0.590), bodyAds: RifleAdsBody(-0.565), bodySprint: RifleSprintBody(-0.510),
     actions: { reload: { family: "hopper", timing: V(0.28, 0.62, 0.86) } },
   }),
-  Mauser96: WeaponPose({
-    family: "pistol", hip: FixedPose(V(0.045, -0.105, -0.235), V(0.040, -0.035, 0.015)), ads: Sight(0.335), sprint: PistolSprint,
-    right: Contact(V(0.01200, -0.03600, 0.01500), V(-0.252242458, 3.141592654, 1.570796327), CLOSED, TRIGGER), left: Contact(V(-0.03000, -0.03900, -0.03000), V(-0.357235309, 3.013269426, -1.478705144), SUPPORT),
-    bodyHip: PistolBody(), bodyAds: PistolAdsBody(), bodySprint: PistolBody(),
-    actions: { reload: { family: "c96Stripper", timing: V(0.48, 0.63, 0.77) } },
-  }),
   ServicePistol: WeaponPose({
     family: "pistol", hip: FixedPose(V(0.040, -0.120, -0.320), V(0.035, -0.030, 0.012)), ads: Sight(0.400), sprint: PistolSprint,
     // Measured on the corrected A-state grip. The firing palm wraps the right

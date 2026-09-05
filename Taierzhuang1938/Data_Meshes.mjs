@@ -167,15 +167,6 @@ export const MESHES = {
     note: "三八式。几何来自 CC-BY Type 38 Arisaka rifle（Sketchfab / Snijboer）："
       + "机匣上方的防尘滑盖、近乎水平的直拉机柄、护翼准星、两道箍与通条齐备。",
   },
-  Mauser96: {
-    file: "Mauser96.tzm.json", category: "weapon",
-    triangles: 1123, meshBlocks: 1, nodes: 7, joints: 0,
-    materials: ["lqMauser96"], mounts: WEAPON_MOUNTS,
-    span: [0.02412, 0.13300, 0.28800], lengthM: 0.288,
-    draws: { high: 1, medium: 1, low: 1 },
-    note: "卢沟桥资源包源节点 Sphere001：毛瑟 C96。保留原 UV、maose_d 漫反射与"
-      + "maose_s 高光源图；项目原 CC-BY C96 源文件继续保留在 _import 作对比参考。",
-  },
   ServicePistol: {
     file: "ServicePistol.tzm.json", category: "weapon",
     triangles: 7263, meshBlocks: 2, nodes: 7, joints: 0,
@@ -432,7 +423,7 @@ export function AllMeshUrls() {
 /** 武器 id → Data_Weapons.mjs 的武器 id。两边同名，这层只是把约定写死。 */
 export const WEAPON_MESH_BY_ID = {
   ZhongZheng: "ZhongZheng", HanYang: "HanYang", Zb26: "Zb26", Type38: "Type38",
-  Mauser96: "Mauser96", ServicePistol: "ServicePistol", Type11: "Type11", Type92Hmg: "Type92Hmg",
+  ServicePistol: "ServicePistol", Type11: "Type11", Type92Hmg: "Type92Hmg",
   Grenade: "Grenade", GrenadeBundle: "Grenade", Dadao: "Dadao",
   // 掷弹筒走武器规范系（右手握点 = 原点、筒口朝 -Z），人物能直接拿着它；
   // 三辆车走车辆规范系，只有台架/摆场景用得上，人物拿不了

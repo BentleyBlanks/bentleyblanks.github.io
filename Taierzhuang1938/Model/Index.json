@@ -939,42 +939,6 @@
    "triangleLimit": 30000
   },
   {
-   "name": "Mauser96",
-   "category": "weapon",
-   "file": "Mauser96.tzm.json",
-   "triangles": 1123,
-   "meshBlocks": 1,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 44893,
-   "materials": [
-    "lqMauser96"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.01208,
-     -0.08266,
-     -0.242
-    ],
-    "max": [
-     0.01204,
-     0.05034,
-     0.046
-    ]
-   },
-   "sourceTriangles": 1123,
-   "targetTriangles": 1123,
-   "triangleLimit": 30000
-  },
-  {
    "name": "MediumMortar",
    "category": "weapon",
    "file": "MediumMortar.tzm.json",

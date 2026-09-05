@@ -654,7 +654,7 @@ export class LugouCharacterRig {
       if (selected) return selected;
     } else this.infantry.Cancel();
     if (state.firing) {
-      if (weaponId === "Mauser96") return POSE_CLIPS.pistolFire;
+      if (this.actor?.weaponData?.kind === "pistol") return POSE_CLIPS.pistolFire;
       // 机枪手无论卧倒还是蹲着都走机枪那一段（它自带的就是低姿），
       // 这一条比姿态优先 —— 换成匍匐据枪，手里那挺枪就飞了。
       if (this.actor?.weaponData?.rpm) return POSE_CLIPS.machineGunFire;

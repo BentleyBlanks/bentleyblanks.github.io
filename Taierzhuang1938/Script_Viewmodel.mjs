@@ -344,7 +344,6 @@ function BuildMaterials(library) {
     lqType11Body: SafeMaterial(library, "LugouqiaoType11Body", {}, 0x575a55),
     lqType11BodyAlt: SafeMaterial(library, "LugouqiaoType11BodyAlt", {}, 0x575a55),
     lqType11Fore: SafeMaterial(library, "LugouqiaoType11Fore", {}, 0x67513a),
-    lqMauser96: SafeMaterial(library, "LugouqiaoMauser96", {}, 0x5a4c3e),
     lqMediumMortar: SafeMaterial(library, "Steel", {}, 0x555960),
     lqWeaponPlain: SafeMaterial(library, "Steel", {}, 0x555960),
     // 刀柄缠的红布：全场唯二的高饱和点之一（另一个是青天白日帽徽）
@@ -842,31 +841,29 @@ function BuildZb26(materials, weapon, key) {
   };
 }
 
-function BuildMauser96(materials, weapon, key) {
+function BuildServicePistol(materials, weapon, key) {
   const bore = 0.045;
   const steel = [];
   const wood = [];
 
-  // 方机匣 —— C96 最醒目的形
-  steel.push(Box(0.030, 0.056, 0.180, VM_TILE.steel, `${key}rec`, { x: 0, y: bore, z: -0.058 }));
-  steel.push(Box(0.026, 0.026, 0.070, VM_TILE.steel, `${key}recTop`, { x: 0, y: bore + 0.030, z: -0.020 }));
+  // 军用手枪的简化机匣；正式显示使用导入模型。
+  steel.push(Box(0.030, 0.038, 0.180, VM_TILE.steel, `${key}rec`, { x: 0, y: bore, z: -0.058 }));
+  steel.push(Box(0.030, 0.026, 0.180, VM_TILE.steel, `${key}recTop`, { x: 0, y: bore + 0.030, z: -0.020 }));
   // 枪管
-  steel.push(Tube(0.0068, 0.0090, 0.140, 10, VM_TILE.steel, { x: 0, y: bore, z: -0.202 }));
-  // 弹仓在扳机**前方** —— C96 的结构特征，做到扳机后面就成了普通手枪
-  steel.push(Box(0.028, 0.064, 0.036, VM_TILE.steel, `${key}magbox`, { x: 0, y: bore - 0.048, z: -0.052 }));
+  steel.push(Tube(0.0068, 0.0090, 0.025, 10, VM_TILE.steel, { x: 0, y: bore, z: -0.154 }));
   steel.push(Box(0.030, 0.010, 0.058, VM_TILE.steel, `${key}tg`, { x: 0, y: bore - 0.036, z: -0.008 }));
   steel.push(Box(0.008, 0.020, 0.008, VM_TILE.steel, `${key}trig`, { x: 0, y: bore - 0.028, z: -0.004 }));
   // 击锤（外露）
   steel.push(Box(0.010, 0.024, 0.014, VM_TILE.steel, `${key}hammer`, { x: 0, y: bore + 0.032, z: 0.024, rx: -0.25 }));
 
-  // 扫帚把握把
+  // 握把，弹匣位于握把内
   wood.push(Box(0.032, 0.098, 0.048, VM_TILE.wood, `${key}grip`, { x: 0, y: bore - 0.072, z: 0.026, rx: 0.22 }));
-  wood.push(Box(0.036, 0.024, 0.036, VM_TILE.wood, `${key}gripCap`, { x: 0, y: bore - 0.120, z: 0.038, rx: 0.22 }));
+  wood.push(Box(0.032, 0.014, 0.048, VM_TILE.wood, `${key}gripCap`, { x: 0, y: bore - 0.120, z: 0.038, rx: 0.22 }));
 
   // 表尺照门 + 准星
   const sightY = bore + 0.030;
   steel.push(Box(0.018, 0.014, 0.048, VM_TILE.steel, `${key}rs`, { x: 0, y: bore + 0.020, z: -0.100 }));
-  steel.push(Box(0.005, 0.012, 0.006, VM_TILE.steel, `${key}fs`, { x: 0, y: sightY - 0.004, z: -0.264 }));
+  steel.push(Box(0.005, 0.012, 0.006, VM_TILE.steel, `${key}fs`, { x: 0, y: sightY - 0.004, z: -0.164 }));
 
   const group = new THREE.Group();
   AddPart(group, MakePart(steel, materials.steel));
@@ -883,11 +880,11 @@ function BuildMauser96(materials, weapon, key) {
     boltTravel: 0.020,
     ejectAt: new THREE.Vector3(0.014, bore + 0.026, -0.070),
     clipSeat: new THREE.Vector3(0, bore + 0.040, -0.060),
-    muzzle: new THREE.Vector3(0, bore, -0.276),
+    muzzle: new THREE.Vector3(0, bore, -0.176),
     sight: new THREE.Vector3(0, sightY, -0.100),
     hands: {
       right: { x: 0.004, y: bore - 0.060, z: 0.024, rx: 0.22, ry: 0, rz: -1.52 },
-      // 驳壳枪单手打是真的（敢死队近战就这么用），但双手托更稳也更好看
+      // 双手托握手枪
       left: { x: -0.030, y: bore - 0.066, z: -0.010, rx: 0.20, ry: 0.35, rz: 1.35 },
     },
     boltHandle: new THREE.Vector3(0.020, bore + 0.026, -0.078),
@@ -1059,8 +1056,7 @@ const BUILDERS = {
   HanYang: BuildBoltRifle,
   Type38: BuildBoltRifle,
   Zb26: BuildZb26,
-  Mauser96: BuildMauser96,
-  ServicePistol: BuildMauser96,
+  ServicePistol: BuildServicePistol,
   Grenade: BuildGrenade,
   GrenadeBundle: BuildGrenadeBundle,
   Dadao: BuildDadao,
@@ -1072,16 +1068,16 @@ const BUILDERS = {
 // **哪些枪能换、哪些不能，是由模型的结构决定的，不是懒。**
 // _blender 出的武器模型 joints 全是 0（见 Data_Meshes 的 MESHES 表），也就是说
 // 整把枪烘成一块静态几何，拉机柄是**焊死在钢件里**的。第一人称的栓动步枪
-// （中正式 / 汉阳造 / 三八式）、捷克式、驳壳枪都有一个会动的枪机：每打一发，
+// （中正式 / 汉阳造 / 三八式）、捷克式、手枪都有一个会动的枪机：每打一发，
 // bolt 这个 Group 要后拉 boltTravel、从 ejectAt 抛一枚壳出去，三八式还要滑开防尘盖。
 // 换成模型 = 这些全没了，而且模型自带的那个拉机柄还会跟我们的枪机重叠成两个手柄。
 // 大刀没有可动件，换过去零损失。普通手榴弹改走 Script_GrenadeAsset 的 CC-BY
 // GLB（加载失败才退回 BuildGrenade 的程序化形），不能再被旧 Grenade.tzm 覆盖。
-// 中正式 / 汉阳造 / 驳壳枪走导入的
+// 中正式 / 汉阳造 / 手枪走导入的
 // 历史枪模：剪影对了，拉栓动画暂时没有（模型 joints 仍是 0）。
 const MODEL_FP = new Set([
   "Dadao",
-  "ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96", "ServicePistol",
+  "ZhongZheng", "HanYang", "Type38", "Zb26", "ServicePistol",
   "Type11", "Type92Hmg", "OfficerSwordSet", "RingPommelDagger",
 ]);
 
@@ -1093,7 +1089,7 @@ const VM_MATERIAL_BY_MESH = {
   lqBrowningTripod: "lqBrowningTripod", lqUnidentifiedMunition: "lqUnidentifiedMunition",
   lqOfficerSword: "lqOfficerSword", lqRingPommelDagger: "lqRingPommelDagger",
   lqType11AmmoBox: "lqType11AmmoBox", lqType11Body: "lqType11Body",
-  lqType11BodyAlt: "lqType11BodyAlt", lqType11Fore: "lqType11Fore", lqMauser96: "lqMauser96",
+  lqType11BodyAlt: "lqType11BodyAlt", lqType11Fore: "lqType11Fore",
   lqMediumMortar: "lqMediumMortar", lqWeaponPlain: "lqWeaponPlain",
 };
 
@@ -1106,7 +1102,6 @@ const IRON_SIGHT_REPAIRS = {
   HanYang: { x: 0, y: 0.072, frontZ: -0.9603, frontBase: 0.049, rearZ: -0.3506, rearBase: 0.057 },
   Type38: { x: 0, y: 0.070, frontZ: -0.9882, frontBase: 0.052, rearZ: -0.310, rearBase: 0.050 },
   Zb26: { x: -0.0234, y: 0.095, frontZ: -0.7616, frontBase: 0.060, rearZ: -0.205, rearBase: 0.061 },
-  Mauser96: { x: 0, y: 0.055, frontZ: -0.2274, frontBase: 0.038, rearZ: -0.0415, rearBase: 0.043 },
   ServicePistol: { x: 0, y: 0.052, frontZ: -0.164, frontBase: 0.044, rearZ: 0.014, rearBase: 0.046 },
   Type11: { x: 0.00145, y: 0.157, frontZ: -0.7426, frontBase: 0.102, rearZ: -0.2022, rearBase: 0.129 },
   Type92Hmg: { replaceBlade: true, x: 0, y: 0.104, frontZ: -0.5901, frontBase: 0.076, rearZ: -0.1718, rearBase: 0.080 },
@@ -2625,7 +2620,7 @@ export class Viewmodel {
   }
 
   /**
-   * 桥夹装填（中正式 / 汉阳造 / 三八式 / 驳壳枪）：
+   * 桥夹装填（中正式 / 汉阳造 / 三八式）：
    * 开栓 → 右手从腰间取桥夹 → 插进桥夹导槽 → **拇指一推 5 发** → 抽出空夹丢掉 → 闭栓。
    * 一发一发往里塞是错的（史料明确写了是桥夹压入）。
    */
@@ -2738,7 +2733,7 @@ export class Viewmodel {
     if (rig.parts.bolt) rig.parts.bolt.position.z = charge * rig.boltTravel;
   }
 
-  /** 驳壳枪以外的手枪：底部退匣 → 腰间取新匣 → 插匣 → 拉套筒。 */
+  /** 盒式弹匣手枪：底部退匣 → 腰间取新匣 → 插匣 → 拉套筒。 */
   _AnimReloadBoxMag(t) {
     const seat = this.rig.clipSeat || this._tmpVec.set(0, -0.04, -0.02);
     const tilt = Ease.InOut(Ease.Seg(t, 0.00, 0.16)) - Ease.InOut(Ease.Seg(t, 0.84, 1.00));
@@ -2750,7 +2745,7 @@ export class Viewmodel {
     const insert = Ease.InOut(Ease.Seg(t, 0.48, 0.72));
     const target = this._tmpVec2.set(seat.x - 0.018, seat.y - 0.055 + insert * 0.050, seat.z + 0.020);
     // The firing hand keeps the pistol grip; the support hand leaves for the
-    // magazine well. C96 remains in its separate right-hand stripper family.
+    // magazine well. Box magazines are seated through the grip.
     if (handPath?.length) {
       let next = handPath.findIndex((point) => point.at >= t);
       if (next < 0) next = handPath.length - 1;

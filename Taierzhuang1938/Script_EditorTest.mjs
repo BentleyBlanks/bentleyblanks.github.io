@@ -970,7 +970,7 @@ const actor = await page.evaluate(() => {
     && active.actors.slice(0, 4).every((previewActor) => previewActor.kind === "ija"
       && previewActor.weaponId === "Type38")
     && active.actors[4]?.kind === "ijaOfficer"
-    && active.actors[4]?.weaponId === "Mauser96";
+    && active.actors[4]?.weaponId === "Type38";
   // 当前阵营五套军人全部走新的蒙皮 GLB，且必须进入法线/深度预通道；主材质须至少有一份
   // 不透明、写深度的主体材质。头发/帽带的 alpha 卡允许透明且不写深度。
   // 静默退回旧 model/box 也会让这一条红。

@@ -109,7 +109,7 @@ Report(sandalNodesOk && /露趾草鞋/.test(nraDoc.notes || ""),
 const lugouqiaoWeaponIds = [
   "BrowningTripodAssembly", "UnidentifiedMunition",
   "OfficerSwordSet", "RingPommelDagger",
-  "Type11", "Mauser96", "MediumMortar",
+  "Type11", "MediumMortar",
 ];
 const AuditCompressedMesh = (mesh) => {
   const pos = Buffer.from(mesh.pos, "base64");

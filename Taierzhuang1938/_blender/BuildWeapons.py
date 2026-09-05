@@ -487,65 +487,6 @@ def BuildType38():
 
 
 # ---------------------------------------------------------------------------
-# 驳壳枪（毛瑟 C96）0.288 m
-# ---------------------------------------------------------------------------
-
-def BuildMauser96():
-    root = Node("root")
-    body = root.Child("body")
-    muzzleZ = -0.242            # 击锤后端到枪口 = 全长 0.288
-
-    # 扫帚柄握把：这把枪叫「驳壳」就是因为它那个木壳枪盒兼枪托，
-    # 握把本身是**圆头的一根扫帚柄**（C96 的绰号就是从这来的）。竖着放样。
-    grip = Loft([
-        Ring(0.014, rx=0.017, rz=0.021, power=2.4),
-        Ring(-0.036, rx=0.019, rz=0.023, power=2.2),
-        Ring(-0.076, rx=0.017, rz=0.021, power=2.2),
-        Ring(-0.092, rx=0.011, rz=0.014, power=2.2),
-    ], 8)
-    Transform(grip, rx=0.10)
-    Transform(grip, y=0.006, z=0.004)
-    body.Add("wood", grip, tile=T_WOOD)
-
-    frame = Box(0.026, 0.042, 0.120, bevel=0.003)
-    Transform(frame, y=BORE - 0.008, z=-0.030)
-    body.Add("steel", frame, tile=T_STEEL)
-    # 固定弹仓在扳机**前方** —— C96 的识别点，摆到握把里就成了勃朗宁。
-    # 匣顶抬 4 mm：原来正好顶在节套底面上（重叠 0），那是一条会闪的共面缝。
-    mag = Box(0.022, 0.038, 0.042, bevel=0.003)
-    Transform(mag, y=BORE - 0.026, z=-0.062)
-    body.Add("steel", mag, tile=T_STEEL)
-    body.Add("steel", TriggerGuard(-0.004, -0.034, 0.010, drop=0.022, width=0.009), tile=T_STEEL)
-    trigger = Box(0.004, 0.014, 0.007)
-    Transform(trigger, y=0.000, z=-0.018)
-    body.Add("steel", trigger, tile=T_STEEL)
-
-    # **枪管节套**：C96 的枪管不是从机匣前脸直接冒出来的，前面有一段粗的节套。
-    # 原来枪管的起点正好落在机匣前脸上（重叠 0），整支枪从那里裂成
-    # "机匣一团 + 枪管一团"两个互不相连的块 —— 这是自检报出来的第二条。
-    extension = Box(0.020, 0.022, 0.052, bevel=0.002)
-    Transform(extension, y=BORE, z=-0.098)
-    body.Add("steel", extension, tile=T_STEEL)
-    body.Add("steel", TubeAlongZ(-0.090, muzzleZ, 0.0072, 0.0066), tile=T_STEEL)
-
-    # 击锤：原来摆在 z=+0.036，机匣后脸只到 +0.030，靠 1 mm 挂着。
-    # 连同后面的枪机尾一起往回压。
-    boltTail = LoftZ([Ring(0.038, rx=0.011, rz=0.011, cz=BORE + 0.006, power=2.2),
-                      Ring(0.010, rx=0.012, rz=0.012, cz=BORE + 0.006, power=2.2)], 8)
-    body.Add("steel", boltTail, tile=T_STEEL)
-    hammer = Box(0.008, 0.026, 0.014, bevel=0.002)
-    Transform(hammer, y=BORE + 0.022, z=0.030, rx=-0.25)
-    body.Add("steel", hammer, tile=T_STEEL)
-    body.Add("steel", FrontSight(muzzleZ + 0.014), tile=T_STEEL)
-    rear = Box(0.018, 0.014, 0.030, bevel=0.002)
-    Transform(rear, y=BORE + 0.012, z=-0.078)
-    body.Add("steel", rear, tile=T_STEEL)
-
-    Mounts(body, muzzleZ - 0.006, -0.055, -0.078, magY=BORE - 0.040, magZ=-0.062, both=True)
-    return root
-
-
-# ---------------------------------------------------------------------------
 # 外购军用自动手枪 0.222 m（Poly Haven 源缺失时的轻量兜底）
 # ---------------------------------------------------------------------------
 
@@ -724,7 +665,6 @@ WEAPON_BUILDERS = {
     "HanYang": BuildHanYang,
     "Zb26": BuildZb26,
     "Type38": BuildType38,
-    "Mauser96": BuildMauser96,
     "ServicePistol": BuildServicePistol,
     "Grenade": BuildGrenade,
     "Dadao": BuildDadao,

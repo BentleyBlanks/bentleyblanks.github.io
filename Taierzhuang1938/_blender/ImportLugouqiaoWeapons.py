@@ -47,8 +47,6 @@ SOURCES = {
                    # opposite to muzzle/gripL in both actor and viewmodel rigs.
                    "forceFlip": True,
                    "note": "十一年式轻机枪；源节点 QEDQD，保留 body/body2/fore/ammobox 四张原贴图。源文件中的分解展示件保留在独立 Blend，运行时只取装配态枪体。"},
-    "Mauser96": {"lengthM": 0.288, "kind": "pistol", "side": "nra",
-                   "note": "毛瑟 C96；源节点 Sphere001，保留 maose_d 与 maose_s。"},
     "MediumMortar": {"lengthM": 1.444, "kind": "assembly", "side": "neutral",
                    "note": "源节点 sphere3；中型迫击炮，具体型号未明。"},
 }
@@ -57,7 +55,7 @@ RUNTIME_MATERIALS = {
     "lqBrowningTripod", "lqUnidentifiedMunition",
     "lqOfficerSword", "lqRingPommelDagger",
     "lqType11AmmoBox", "lqType11Body", "lqType11BodyAlt", "lqType11Fore",
-    "lqMauser96", "lqMediumMortar", "lqWeaponPlain",
+    "lqMediumMortar", "lqWeaponPlain",
 }
 MATERIAL_NAMES.update(RUNTIME_MATERIALS)
 
@@ -88,7 +86,6 @@ def _material_for(asset, material_name, object_name):
         if "body" in value: return "lqType11Body"
         if "fore" in value: return "lqType11Fore"
         return TYPE11_OBJECT_MATERIAL.get(object_name, "lqWeaponPlain")
-    if asset == "Mauser96": return "lqMauser96"
     if asset == "MediumMortar": return "lqMediumMortar"
     return "lqWeaponPlain"
 

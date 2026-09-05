@@ -80,7 +80,7 @@ export const KEYMAP = [
   { code: "KeyC", action: "crouch", mode: "press", context: "any" },
   { code: "KeyZ", action: "prone", mode: "press", context: "any" },
 
-  // --- 武器槽：ER2 的 1/2/3/4 = 长枪 / 驳壳枪 / 大刀 / 投掷物 ------------------
+  // --- 武器槽：ER2 的 1/2/3/4 = 长枪 / 短枪 / 大刀 / 投掷物 ------------------
   // 只在 world 上下文吃；Tab 按住时同样四个键是「下令」。
   { code: "Digit1", action: "slot:primary", mode: "press", context: "world" },
   { code: "Digit2", action: "slot:secondary", mode: "press", context: "world" },

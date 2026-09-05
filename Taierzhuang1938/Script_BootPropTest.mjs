@@ -11,6 +11,7 @@
 
 import assert from "node:assert/strict";
 import path from "node:path";
+import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
@@ -76,6 +77,16 @@ try {
   assert.ok(card.note.length > 0, "卡片上应当有注记");
   assert.equal(card.hint, false, "「拖动可转动」那行提示已经删掉了，不许回来");
   console.log(`ok   卡片：${card.name}`);
+
+  const showcaseIds = await worker.evaluate(async () => {
+    const stage = await import(new URL(`./Script_BootPropStage.mjs${location.search}`, location.href).href);
+    return Array.from({ length: 1000 }, (_, index) => stage.PickShowcase(null, () => index / 1000).id);
+  });
+  assert.equal(showcaseIds.includes("Mauser96"), false, "C96 不再进入加载展示池");
+
+  const shotDir = path.join(projectDir, "_shots", "C96Removal");
+  mkdirSync(shotDir, { recursive: true });
+  await page.screenshot({ path: path.join(shotDir, "Scene_Boot.png") });
 
   assert.deepEqual(errors, []);
   console.log("ok  加载画面展示台冒烟通过");

@@ -93,7 +93,7 @@ export const RANGE_PHASE = {
   spawn: { x: 1400, z: 1466, ry: 0 },
   loadoutOverride: {
     primary: "HanYang",           // bayonet: true —— X 上刺刀在这支枪上验
-    secondary: "Mauser96",
+    secondary: null,
     melee: "Dadao",
     throwables: { Grenade: 12 },
     spareClips: 12,

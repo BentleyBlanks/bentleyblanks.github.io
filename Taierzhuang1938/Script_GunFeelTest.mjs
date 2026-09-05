@@ -90,7 +90,7 @@ const report = await page.evaluate(() => {
   // 四、全部五支火器必须走 TZM 并保留 sight；三支栓动步枪还要有动作代理。
   const sights = {};
   let type38AdsNear = null;
-  for (const id of ["ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96"]) {
+  for (const id of ["ZhongZheng", "HanYang", "Type38", "Zb26", "ServicePistol"]) {
     T.viewmodel.Equip(id);
     T.StepFrames(120);
     const vm = T.viewmodel;

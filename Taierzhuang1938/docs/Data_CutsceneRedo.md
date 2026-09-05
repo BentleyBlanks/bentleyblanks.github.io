@@ -60,7 +60,7 @@ export const CS_X = {
 ### 1.3 cast（演员）
 
 ```js
-{ id, kind: "nra"|"nraOfficer"|"nraDare"|"ija"|"ijaOfficer"|"civilian", weapon: "HanYang"|"ZhongZheng"|"Mauser96"|null, seed,
+{ id, kind: "nra"|"nraOfficer"|"nraDare"|"ija"|"ijaOfficer"|"civilian", weapon: "HanYang"|"ZhongZheng"|null, seed,
   track: [ { t, pos:[x,y,z], ry, state:{...} }, ... ] }
 ```
 

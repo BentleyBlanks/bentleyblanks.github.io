@@ -53,7 +53,7 @@ const BLOCKED_LIMIT = 60;
 const AXIS_TOLERANCE = 0.020;                        // NDC，1600 宽上约 16 px
 const AXIS_EXPECT = {
   // 2026-08-26 实测（依次）：0.0004 / 0.0002 / 0.0000 / 0.0000 / 0.0000 —— 对称面就压在瞄准线上。
-  ZhongZheng: 0, HanYang: 0, Type38: 0, Mauser96: 0, ServicePistol: 0,
+  ZhongZheng: 0, HanYang: 0, Type38: 0, ServicePistol: 0,
   Type11: 0, Type92Hmg: 0,
   // 捷克式的瞄具史实左偏，枪身因此必须落在瞄准点**右边**：实测 +0.032。
   // 这不是容差放宽 —— 它偏得比容差多得多，写 0 一样会红。
@@ -200,8 +200,7 @@ try {
             if (!o.isMesh || !o.visible || !o.geometry || !o.geometry.attributes.position) return;
             const name = o.name || "";
             if (name.indexOf("Bayonet") === 0) return;
-            // C96 的源模把金属与木握把画在同一张 maose_d 图里，不能为了迎合测试
-            // 强拆 UV/材质槽；把这个已核验的混合材质桶纳入枪口轴采样。
+            // Imported source material buckets also participate in muzzle-axis sampling.
             if (name.indexOf("steel") < 0 && name.indexOf("lq") < 0) return;
             const pos = o.geometry.attributes.position;
             const v = new Vec3();

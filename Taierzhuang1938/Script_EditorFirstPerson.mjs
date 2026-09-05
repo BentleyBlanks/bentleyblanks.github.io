@@ -28,7 +28,7 @@ const MOUNT_STYLE = Object.freeze({
 
 const PREFERRED_ORDER = Object.freeze([
   "ZhongZheng", "HanYang", "Type38", "Zb26", "Type11",
-  "Mauser96", "ServicePistol", "Grenade", "GrenadeBundle",
+  "ServicePistol", "Grenade", "GrenadeBundle",
   "Dadao", "OfficerSwordSet", "RingPommelDagger",
 ]);
 

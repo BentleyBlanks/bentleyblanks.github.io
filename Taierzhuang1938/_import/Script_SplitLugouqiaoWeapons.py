@@ -44,7 +44,6 @@ ASSETS = {
     "OfficerSwordSet": ("Group146", APPLY_BLEND),
     "RingPommelDagger": ("Mesh_0300", APPLY_BLEND),
     "Type11": ("QEDQD", APPLY_BLEND),
-    "Mauser96": ("Sphere001", APPLY_BLEND),
     "MediumMortar": ("sphere3", APPLY_BLEND),
 }
 
@@ -75,7 +74,6 @@ RUNTIME = {
     "LugouqiaoType11Body": "body.dds",
     "LugouqiaoType11BodyAlt": "body2.dds",
     "LugouqiaoType11Fore": "fore.dds",
-    "LugouqiaoMauser96": "maose_d.tga",
 }
 
 
@@ -198,7 +196,6 @@ def bake_runtime_textures():
     solid_runtime_image("Texture_LugouqiaoFlatNormal.png", (0.5, 0.5, 1.0, 1.0))
     solid_runtime_image("Texture_LugouqiaoMetalOrm.png", (1.0, 0.42, 0.88, 1.0))
     solid_runtime_image("Texture_LugouqiaoWoodOrm.png", (1.0, 0.78, 0.0, 1.0))
-    bake_specular_orm("maose_s.tga", "Texture_LugouqiaoMauser96Orm.png")
 
 
 copy_source_textures()

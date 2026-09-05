@@ -89,7 +89,7 @@ try {
     T.player.bleeding = 0.4;
     T.player.bandages = 1;
     T.state.slots.primary = "HanYang";
-    T.state.slots.secondary = "Mauser96";
+    T.state.slots.secondary = "ServicePistol";
     T.state.ammo = 5;
     T.StepFrames(12);
     return {

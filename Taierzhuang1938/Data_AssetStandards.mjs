@@ -52,8 +52,6 @@ export const SOURCE_ASSET_STANDARDS = Object.freeze({
   Type11: { name: "十一年式轻机枪", group: "firearm", sourceTriangles: 8255,
     sourceTexture: "有（4 张）", runtimeTexture: SourceUv,
     note: "分解展示件排除，保留装配态枪体；退化面清理不属于减面。" },
-  Mauser96: { name: "毛瑟 C96", group: "firearm", sourceTriangles: 1123,
-    sourceTexture: "有（漫反射 + 高光）", runtimeTexture: SourceUv },
   Type92Hmg: { name: "九二式重机枪", group: "firearm", sourceTriangles: null,
     sourceTexture: "无", runtimeTexture: SharedWeaponPbr,
     note: "本机重建源当前缺席；已提交成品 20,065 三角，仅排除两个展示 Cube。" },

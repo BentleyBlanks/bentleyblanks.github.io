@@ -44,7 +44,7 @@ BUDGET = {
 # 顺带把那一段的面全朝里翻了的 bug。容差 20 mm 留给准星护翼和枪托底板的圆角。
 WEAPON_LENGTH = {
     "ZhongZheng": 1.110, "HanYang": 1.250, "Zb26": 1.165, "Type38": 1.276,
-    "Mauser96": 0.288, "ServicePistol": 0.222,
+    "ServicePistol": 0.222,
     "Grenade": 0.220, "Dadao": 0.900, "Type89Launcher": 0.413,
     "Type11": 1.100, "Type92Hmg": 1.156,
     "BrowningTripodAssembly": 2.273, "UnidentifiedMunition": 0.253,
@@ -138,7 +138,7 @@ def main():
         if optional_builder:
             jobs.append((optional_name, "weapon", optional_builder,
                          ImportWeapons.SOURCES[optional_name]["note"]))
-    # 卢沟桥资源包的同名枪（Type11 / Mauser96）在这里排到旧导入器之后：
+    # 卢沟桥资源包的同名枪（Type11）在这里排到旧导入器之后：
     # 新资源存在时覆盖同名 job，旧模型仍留在仓库作为对比参考，不删除。
     lugouqiao_jobs = []
     for name, spec in ImportLugouqiaoWeapons.SOURCES.items():

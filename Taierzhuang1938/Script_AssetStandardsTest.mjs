@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { WEAPONS, LOADOUTS } from "./Data_Weapons.mjs";
 import { MESHES } from "./Data_Meshes.mjs";
 import { FPS_ARM_POSES } from "./Data_FpsArmPoses.mjs";
 import {
@@ -65,9 +66,14 @@ for (const [id, record] of Object.entries(SOURCE_ASSET_STANDARDS)) {
     }
   }
 }
-// 2026-09-05 删掉五件不合 1938 年 3 月时代的卢沟桥资源包武器后，清单为 20 项。
-Check(Object.keys(SOURCE_ASSET_STANDARDS).length >= 20 && missing.length === 0,
+// 2026-09-05 删掉五件不合 1938 年 3 月时代的卢沟桥资源包武器后，再移除 C96，清单为 19 项。
+Check(Object.keys(SOURCE_ASSET_STANDARDS).length === 19 && missing.length === 0,
   "现有源模型均进入资产规范清单", missing.join("、"));
+Check(!WEAPONS.Mauser96 && Object.values(LOADOUTS).every((loadout) =>
+  [loadout.primary, loadout.secondary, loadout.melee].every((id) => !id || WEAPONS[id]))
+  && !MESHES.Mauser96 && !SOURCE_ASSET_STANDARDS.Mauser96
+  && !FPS_ARM_POSES.Mauser96 && !fs.existsSync(path.join(projectDir, "Model", "Mauser96.tzm.json")),
+  "已移除的 C96 不再登记或随游戏发布");
 Check(drift.length === 0, "实际面数与 Model/Index.json 一致", drift.join("、"));
 Check(sourceDrift.length === 0, "原始选定面数与 Blender 构建元数据一致", sourceDrift.join("、"));
 Check(complianceBad.length === 0, "全部有源资产符合特例或分类阈值", complianceBad.join("、"));
@@ -106,8 +112,8 @@ Check(/原始面数/.test(editorSource) && /实际面数/.test(editorSource)
 Check(/ExternalRows/.test(editorSource) && /EXTERNAL_GLB_STANDARDS/.test(editorSource),
   "外部 GLB 分类使用逐资产审计表而非仅显示通用卡片");
 Check(/AssetStandardsEditor/.test(suiteSource)
-  && /Script_EditorAssetStandards\.mjs\?v=3/.test(html)
-  && /Data_AssetStandards\.mjs\?v=5/.test(html),
+  && /Script_EditorAssetStandards\.mjs\?v=\d+/.test(html)
+  && /Data_AssetStandards\.mjs\?v=6/.test(html),
 "资产规范编辑器已注册到套件与 import map");
 
 if (failed) {

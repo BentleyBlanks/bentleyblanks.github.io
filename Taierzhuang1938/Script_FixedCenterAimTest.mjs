@@ -49,7 +49,7 @@ const report = await page.evaluate(() => {
   };
 
   document.dispatchEvent(new MouseEvent("mousedown", { button: 2, bubbles: true }));
-  const firearms = ["ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96"];
+  const firearms = ["ZhongZheng", "HanYang", "Type38", "Zb26", "ServicePistol"];
   const sights = {};
   for (const id of firearms) {
     T.player.aimYaw = 0;

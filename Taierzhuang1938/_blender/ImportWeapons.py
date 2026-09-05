@@ -217,21 +217,6 @@ SOURCES = {
         "note": "CC-BY-4.0 ZB26（Sketchfab / Larkien）→ 捷克式。保留上置弹匣、"
                 "两脚架、木托与机匣的来源轮廓；排除重复枪管壳后低于 30k，不做通用减面。",
     },
-    "Mauser96": {
-        "file": os.path.join("Model_SketchfabMauserC96Maxence", "scene.gltf"),
-        "lengthM": 0.288,
-        "kind": "pistol",
-        # 整枪共用一套 PBR；金属度贴图比漫反射颜色可靠（旧钢也会是棕色），
-        # 用它把木握把面拆到 gunWood 桶。原模同样是 Z-up。
-        "metalSplit": True,
-        "metalMask": os.path.join("Model_SketchfabMauserC96Maxence", "Texture_MetalMask.png"),
-        "roll": -1.0,
-        "noDetails": True,
-        "autoSmooth": 34.0,
-        "mounts": {"sightY": 0.062},
-        "note": "CC-BY-4.0 Mauser C96（Sketchfab / Maxence Rouillet）。"
-                "保留来源模型的机匣、弹仓与扫帚柄轮廓；全长按史实 0.288 m。",
-    },
     "Dadao": {
         # **付费素材，源文件不在仓库里**（见 _ExternalRoot 与 Data_SourceLicenses.md）。
         # 没有这份源就自动退回 BuildWeapons.BuildDadao 的程序化几何。
@@ -928,21 +913,6 @@ def _AddHistoricalDetails(name, steel, wood, length_m):
                                           segments=12, y=BORE))
         steel_parts.append(TubeAlongZ(-0.250, muzzle_z + 0.095, 0.0018, 0.0018,
                                       segments=8, y=BORE - 0.022))
-
-    elif name == "Mauser96":
-        # C96: long right-side extractor, rear sight base and lanyard boss.  The
-        # source model has the major silhouette; these small forms supply the
-        # recognisable machined planes at first-person distance.
-        SteelBox(0.006, 0.006, 0.072, x=0.014, y=BORE + 0.024, z=-0.090)
-        SteelBox(0.022, 0.012, 0.020, y=BORE + 0.022, z=-0.042)
-        SteelBox(0.012, 0.010, 0.012, y=-0.082, z=0.018)
-        if wood is not None:
-            panels = []
-            for side in (-1.0, 1.0):
-                panel = Box(0.0038, 0.056, 0.060, bevel=0.0010, segments=2)
-                Transform(panel, x=side * 0.0185, y=-0.042, z=-0.010, rz=0.10)
-                panels.append(panel)
-            wood = Join(wood, *panels)
 
     if steel_parts:
         steel = Join(steel, *steel_parts)

@@ -303,7 +303,7 @@ const KIND_SPEC = {
   },
   ijaOfficer: {
     height: 1.64, clothRecipe: "ClothIja", clothHex: HEX.ijaCloth,
-    headgear: "peakCap", shoe: "boot", gear: "ija", defaultWeapon: "Mauser96",
+    headgear: "peakCap", shoe: "boot", gear: "ija", defaultWeapon: "Type38",
   },
   civilian: {
     height: 1.60, clothRecipe: "ClothNra", clothHex: HEX.civilCloth,
@@ -858,14 +858,13 @@ function BuildWeaponGeometry(id, quality, includeBayonet = false) {
       Add(buckets, "steel", GunSteelBox(0.016, 0.024, bl, "bayonet"), { y: bore - 0.006, z: muzzleZ - bl * 0.5 });
     }
   } else if (data.kind === "pistol") {
-    // 驳壳枪：方机匣 + 前伸的固定弹仓 + 细枪管。单手武器。
+    // 军用手枪兜底：握把与套筒，弹匣位于握把内。
     result.muzzle.set(0, 0.030, -0.19);
     result.gripFront.set(0, -0.02, -0.06);
     result.bolt.set(0.02, 0.05, -0.01);
     result.twoHanded = false;
     Add(buckets, "wood", GunWoodBox(0.030, 0.115, 0.042, "grip"), { y: -0.05, z: 0.012, rx: -0.12 });
     Add(buckets, "steel", GunSteelBox(0.028, 0.062, 0.145, "frame"), { y: 0.024, z: -0.055 });
-    Add(buckets, "steel", GunSteelBox(0.026, 0.050, 0.048, "mag"), { y: -0.012, z: -0.058 });
     Add(buckets, "steel", TubeZ(0.0065, 0.0065, 0.088, 6, GUN_TILE.steel), { y: 0.032, z: -0.148 });
   } else if (data.kind === "melee") {
     // 大刀：刀身朝 +Y（劈砍时挂点自己会把它抡下来）
@@ -2929,7 +2928,7 @@ export class Actor {
     if (leftFollows) {
       SolveTwoBone(L.shoulder, L.elbow, this.gripL, lenA, lenB, rollL);
     } else {
-      // 单手武器（驳壳枪）或正在投弹：左手自然垂着摆
+      // 单手武器（手枪）或正在投弹：左手自然垂着摆
       const swing = Math.cos(this.gaitPhase * Math.PI * 2) * (0.2 + moveSpeed * 0.5);
       L.shoulder.rotation.set(-swing, 0, -0.16);
       L.elbow.rotation.set(-0.35 - moveSpeed * 0.4, 0, 0);
@@ -3632,7 +3631,6 @@ export class ActorFactory {
       lqType11Body: this.Material("lqType11Body", () => lib.Get("LugouqiaoType11Body")),
       lqType11BodyAlt: this.Material("lqType11BodyAlt", () => lib.Get("LugouqiaoType11BodyAlt")),
       lqType11Fore: this.Material("lqType11Fore", () => lib.Get("LugouqiaoType11Fore")),
-      lqMauser96: this.Material("lqMauser96", () => lib.Get("LugouqiaoMauser96")),
       lqMediumMortar: this.Material("lqMediumMortar", () => lib.Get("Steel")),
       lqWeaponPlain: this.Material("lqWeaponPlain", () => lib.Get("Steel")),
       wood: this.Material("wood",

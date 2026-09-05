@@ -537,7 +537,7 @@ const state = {
   // --- 武器槽 ---------------------------------------------------------------
   // LOADOUTS 六套携行躺在 Data_Weapons 里一行没接：玩家永远只有 identity.weapon
   // 给的那一支长枪，大刀只在按 V 时凭空出现一下（硬编码 fallback，背包里根本没刀）。
-  // 现在四个槽是真的：1 长枪 / 2 驳壳枪 / 3 大刀 / 4 投掷物，滚轮循环。
+  // 现在四个槽是真的：1 长枪 / 2 手枪 / 3 大刀 / 4 投掷物，滚轮循环。
   slots: { primary: null, secondary: null, melee: null, throwable: "Grenade" },
   // 外观变体随槽位走。大刀拾取后必须保留尸体上那一把，不能在玩家手里变样。
   weaponVariants: { primary: 0, secondary: 0, melee: 0, throwable: 0 },
@@ -879,10 +879,6 @@ async function Boot() {
     { name: "LugouqiaoType11Fore", fallback: "LugouqiaoType11Fore",
       albedo: "./Texture/Texture_LugouqiaoType11ForeBase.jpg?v=lq2",
       normal: "./Texture/Texture_LugouqiaoFlatNormal.png?v=lq2" },
-    { name: "LugouqiaoMauser96",
-      albedo: "./Texture/Texture_LugouqiaoMauser96Base.jpg?v=lq2",
-      normal: "./Texture/Texture_LugouqiaoFlatNormal.png?v=lq2",
-      orm: "./Texture/Texture_LugouqiaoMauser96Orm.png?v=lq2" },
   ];
   /**
    * 同时在路上的套数。
@@ -2320,7 +2316,9 @@ async function Boot() {
         player.bleeding = false;
         const loadout = RANGE_PHASE.loadoutOverride;
         state.mags.primary = { ammo: WEAPONS[loadout.primary].magazine, clips: loadout.spareClips };
-        state.mags.secondary = { ammo: WEAPONS[loadout.secondary].magazine, clips: 2 };
+        state.mags.secondary = loadout.secondary
+          ? { ammo: WEAPONS[loadout.secondary].magazine, clips: 2 }
+          : { ammo: 0, clips: 0 };
         const mag = state.mags[state.activeSlot];
         if (mag) { state.ammo = mag.ammo; state.clips = mag.clips; }
         state.grenades = loadout.throwables.Grenade;
@@ -5724,7 +5722,7 @@ function TryFire(dt, returningGrenade = false) {
   // 在拉栓，也听不出这是最后一发。
   // 0.24 s 是枪响之后手真的去够枪机的时间；0.62 s 是弹壳落地。
   // 判据是 kind === "boltRifle"（Data_Weapons 里每支枪都有），
-  // 不是"有没有 rpm" —— 驳壳枪与捷克式自己上膛，没有手拉的那一下。
+  // 不是"有没有 rpm" —— 手枪与捷克式自己上膛，没有手拉的那一下。
   if (weapon.kind === "boltRifle") {
     audio.Play("bolt", { position: _muzzle.clone(), volume: 0.42, delay: 0.24 });
   }
@@ -5742,7 +5740,7 @@ function TryFire(dt, returningGrenade = false) {
   audio.Play("shellDrop", {
     volume: 0.55, pan: 0.35, delay: weapon.kind === "boltRifle" ? 0.62 : 0.38,
   });
-  // 枪种必须传下去：过去所有玩家武器都落进默认 rifle 配方，驳壳枪、捷克式与
+  // 枪种必须传下去：过去所有玩家武器都落进默认 rifle 配方，手枪、捷克式与
   // 栓动步枪喷出完全相同的焰和烟。ER2 的枪感并不靠把所有枪都抖得更厉害，
   // 而是让每一类武器在同一套输入下仍有自己的出膛节奏。
   vfx.MuzzleFlash(_muzzle, shotAimDirection, {
@@ -6263,7 +6261,7 @@ function Frame(dt, render = true) {
   // 一、**FOV 过渡是固定 150 ms 的，跟哪支枪无关。** BFV 全部 82 支枪的
   //    AimingFovTransitionTime 都是 0.15 s —— 枪的轻重差异**全在视图模型的动画里**，
   //    不在相机上。我们原来是「每枪不同的 ads 速度」再串一层 dt*9 的指数平滑
-  //    （≈231 ms 才到位），两层滞后叠在一起，结果驳壳枪和捷克式在相机上反应几乎
+  //    （≈231 ms 才到位），两层滞后叠在一起，结果手枪和捷克式在相机上反应几乎
   //    一样糊 —— 分不出轻重，方向正好做反了。
   //    现在相机走自己那条 150 ms 的线性过渡，枪的轻重仍由 adsTimeS 在动画上体现。
   //

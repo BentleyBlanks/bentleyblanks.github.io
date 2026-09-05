@@ -36,7 +36,6 @@ const SHOWCASE = [
   { id: "ZhongZheng", name: "中正式 步骑枪" },
   { id: "Zb26", name: "ZB-26 轻机枪" },
   { id: "Type38", name: "三八式 步枪" },
-  { id: "Mauser96", name: "驳壳枪 毛瑟 C96" },
   { id: "ServicePistol", name: "外购九毫米 军用手枪" },
   { id: "Grenade", name: "木柄手榴弹" },
   { id: "Dadao", name: "大刀" },

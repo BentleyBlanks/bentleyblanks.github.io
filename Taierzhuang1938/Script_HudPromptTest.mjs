@@ -49,7 +49,7 @@ assert.equal(bandageOnly[0].keys, "B");
 const oneGun = ContextualActionPrompts({ slots: { primary: "HanYang", secondary: null } });
 assert.equal(oneGun.some((prompt) => prompt.kind === "switchWeapon"), false);
 const twoGuns = ContextualActionPrompts({
-  slots: { primary: "HanYang", secondary: "Mauser96" },
+  slots: { primary: "HanYang", secondary: "ServicePistol" },
 });
 assert.deepEqual(twoGuns[0], {
   keys: "1 / 2", label: "切换长枪 / 短枪", kind: "switchWeapon",
@@ -78,7 +78,7 @@ const stacked = ContextualActionPrompts({
   interaction: swap,
   bleeding: 0.5,
   bandages: 2,
-  slots: { primary: "HanYang", secondary: "Mauser96" },
+  slots: { primary: "HanYang", secondary: "ServicePistol" },
 });
 assert.deepEqual(stacked.map((prompt) => prompt.kind), ["pickup", "bandage", "switchWeapon"]);
 
@@ -104,7 +104,7 @@ const hauling = ContextualActionPrompts({
   carry: CarryAt("ammoCrate"),
   interaction: { label: "拾起 三八式步枪", kind: "pickup" },
   bleeding: 0.5, bandages: 2,
-  slots: { primary: "HanYang", secondary: "Mauser96" },
+  slots: { primary: "HanYang", secondary: "ServicePistol" },
   bayonet: { fixed: false }, ammoEmpty: true,
 });
 assert.deepEqual(hauling.map((prompt) => prompt.kind), ["carry", "carry"]);

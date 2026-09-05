@@ -27,7 +27,6 @@ export const AMMO = {
   Mauser792: { label: "七九", caliber: "7.92×57mm", muzzle: 810 },
   Arisaka65: { label: "六五", caliber: "6.5×50mm", muzzle: 762 },
   Arisaka77: { label: "七七", caliber: "7.7×58mm", muzzle: 800 },
-  Mauser763: { label: "驳壳", caliber: "7.63×25mm", muzzle: 425 },
   Service9: { label: "九毫米", caliber: "9×19mm", muzzle: 350 },
 };
 
@@ -112,22 +111,6 @@ export const WEAPONS = {
     spreadHipDeg: 4.2, spreadAdsDeg: 0.55, bipod: true,
     note: "全班就这一挺，弹匣从上面插。抛壳口在下方。第 2 集团军每班 0—1 挺。",
   },
-  Mauser96: {
-    id: "Mauser96",
-    name: "驳壳枪",
-    fullName: "毛瑟军用手枪 C96",
-    side: "nra",
-    kind: "pistol",
-    ammo: "Mauser763",
-    lengthM: 0.288, massKg: 1.13,
-    magazine: 10, reloadKind: "stripper",
-    damage: 42, headMultiplier: 2.2, effectiveRangeM: 60,
-    fireIntervalS: 0.16, reloadTimeS: 2.6,
-    recoil: { pitch: 1.5, yaw: 0.8, kick: 0.03, recoverS: 0.13, recoverFrac: 1.0 },
-    swayScale: 0.75, adsTimeS: 0.18, adsFovScale: 0.86,
-    spreadHipDeg: 3.4, spreadAdsDeg: 0.9,
-    note: "敢死队标配「一支长枪、一支短枪」里的短枪。近战自动火力全靠它。",
-  },
   ServicePistol: {
     id: "ServicePistol",
     name: "军用手枪",
@@ -188,7 +171,7 @@ export const WEAPONS = {
   },
 
   // --- 卢沟桥资源包 ---------------------------------------------------------
-  // 这几项是新增；Mauser96 / Type11 则沿用原 id，只替换模型与材质。模型节点没给出
+  // 这几项是新增；Type11 则沿用原 id，只替换模型与材质。模型节点没给出
   // 可靠制式名的条目一律标作“型号尚待考证”，不从外形硬猜成史实型号。
   // 2026-09-05 按考据删掉五件不属于 1938 年 3 月的东西：Walther P38（1939 年才交付德军）、
   // Karabiner98k 与 MK98 系「待考证栓动步枪」（中国 5 万支 K98k 合同 1938 年 3 月才签、
@@ -340,9 +323,9 @@ export const LOADOUTS = {
   L2_RoomWar: { primary: "HanYang", secondary: null, melee: "Dadao",
     throwables: { Grenade: 6, GrenadeBundle: 2 }, spareClips: 4,
     note: "中正式打坏了，换了支汉阳造 —— 杂牌部队就是这么换枪的。" },
-  L3_WhiteTowel: { primary: "HanYang", secondary: "Mauser96", melee: "Dadao",
+  L3_WhiteTowel: { primary: "HanYang", secondary: null, melee: "Dadao",
     throwables: { Grenade: 8 }, spareClips: 3,
-    note: "敢死队标准携行：一支长枪、一支短枪、肩背大刀、腰间挂满手榴弹。" },
+    note: "携行：汉阳造、大刀和手榴弹。" },
   L4_LastFiveMinutes: { primary: "HanYang", secondary: "ServicePistol", melee: "Dadao",
     throwables: { Grenade: 4 }, spareClips: 2, scavenge: true,
     note: "打到这儿，子弹得从倒下的人身上取；短枪换成捡来的外购九毫米手枪。" },

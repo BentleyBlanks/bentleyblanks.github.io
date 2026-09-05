@@ -49,7 +49,6 @@ const WEAPONS = [
   { id: "HanYang", len: 1.25 },
   { id: "Type38", len: 1.276 },
   { id: "Zb26", len: 1.165 },
-  { id: "Mauser96", len: 0.288, closeAt: -0.03 },
   // 外购九毫米。**这一支曾经漏在名单外**，于是它在加载画面上碎成一堆尖片、
   // 枪口挂点长在握把底下，谁都没看见 —— 名单漏一把，等于那把枪没人验收。
   { id: "ServicePistol", len: 0.222, closeAt: -0.02 },

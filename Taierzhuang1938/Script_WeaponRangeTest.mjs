@@ -10,7 +10,7 @@ import { WEAPONS } from "./Data_Weapons.mjs";
 import { WEAPON_RANGE_TARGETS, WEAPON_RANGE_FIRING_ORIGIN, WEAPON_RANGE_VIEWS } from "./Data_WeaponRange.mjs";
 
 // --smoke runs one representative firearm without full-magazine, repeated death or menu reload checks.
-// --only=HanYang,Mauser96 selects weapons; catalog completeness is always checked against the full table.
+// --only=HanYang,ServicePistol selects weapons; catalog completeness is always checked against the full table.
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
 const shotDir = path.join(projectDir, "_shots", "WeaponRange");
@@ -206,7 +206,7 @@ try {
     const filled = game.state.ammo;
     const lastBefore = game.state.playerShots; debug.Fire();
     return { initial, empty, fired, action, filled, afterReloadFired: game.state.playerShots > lastBefore };
-  }, allFirearms.find((weapon) => weapon.id === "Mauser96") || allFirearms[0]);
+  }, allFirearms.find((weapon) => weapon.id === "ServicePistol") || allFirearms[0]);
   Check("Reload mode consumes a complete magazine, reloads with R, and fires again", evidence.reload.initial > 0 && evidence.reload.empty === 0 && evidence.reload.fired === evidence.reload.initial && evidence.reload.action === "reload" && evidence.reload.filled === evidence.reload.initial && evidence.reload.afterReloadFired, evidence.reload);
 
   }

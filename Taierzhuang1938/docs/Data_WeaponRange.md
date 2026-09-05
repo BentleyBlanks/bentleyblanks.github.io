@@ -52,7 +52,7 @@
 node Taierzhuang1938/Script_WeaponRangeTest.mjs
 node Taierzhuang1938/Script_WeaponRangeTest.mjs --shot
 node Taierzhuang1938/Script_WeaponRangeTest.mjs --smoke
-node Taierzhuang1938/Script_WeaponRangeTest.mjs --only=HanYang,Mauser96
+node Taierzhuang1938/Script_WeaponRangeTest.mjs --only=HanYang,ServicePistol
 node Taierzhuang1938/Script_FpsArmTest.mjs --only=HanYang,Zb26,ServicePistol,Type11
 node Taierzhuang1938/Script_WeaponShot.mjs --reload
 ```
