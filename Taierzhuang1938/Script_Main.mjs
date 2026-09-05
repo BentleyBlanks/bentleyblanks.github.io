@@ -16,6 +16,7 @@
 import * as THREE from "three";
 import { MaterialLibrary } from "./Script_Materials.mjs";
 import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
+import { NormalizeGraphicsDetails } from "./Script_EditorSettings.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "./Script_Gi.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
@@ -401,7 +402,7 @@ const profiler = new FrameProfiler(renderer, { post });
  *
  * 与天光预设**分工分明**：预设（SKY_PRESETS）决定这一关「长什么样」——
  * 曝光、雾色、泛光阈值全是美术意图，不许被设置面板改掉；
- * 这张表只决定「画多重」，一律以**倍率**的形式乘在预设算出来的那几项上。
+ * 后处理强度以倍率乘在预设上；TAA、GI 和阴影的细化参数单独应用，不改天光预设。
  * 混在一张表里的下场是玩家把画质调低之后夜战关变成纯黑（预设 exposure 3.6 被当成
  * 画质项一起压了）。
  *
@@ -430,6 +431,7 @@ const graphics = {
   gi: params.get("gi") === "1", giStrength: 1,
   fov: BASE_FOV,
 };
+NormalizeGraphicsDetails(graphics, post);
 // 探针体（GI）。默认关到底：ProbeVolume 不构造（省掉图集/靶与每帧 Update），
 // 材质也**不编入**探针采样代码 —— GI_SAMPLE_GLSL 占着采样器与寄存器，
 // 即使 uGiEnabled 恒为 0 也让整帧贵 ~2.7 ms（2026-08-26 FrameProfileTest 实测）。
@@ -7102,14 +7104,25 @@ requestAnimationFrame(Loop);
  * 重编译是一次性的（几百毫秒），而这是个设置动作，不是每帧的事。
  */
 function ApplyGraphics() {
+  NormalizeGraphicsDetails(graphics, post);
   const scale = Clamp(graphics.renderScale, 0.4, 1.6);
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight, false);
-  post.SetSize(Math.round(window.innerWidth * scale), Math.round(window.innerHeight * scale));
+  const width = Math.round(window.innerWidth * scale), height = Math.round(window.innerHeight * scale);
+  if (post.width !== width || post.height !== height) post.SetSize(width, height);
   // 排在 SetSize 之后：SetSize 按当前的 taaEnabled 建靶，这一行才是改它的人。
   // 反过来的话，刚打开 TAA 的那一次 SetSize 会漏建历史靶（要等下一次改分辨率才补）。
   post.SetTaaEnabled(graphics.taa !== false);
+  post.uniformsTaa.uCurrentWeight.value = graphics.taaCurrentWeight;
+  if (post.taaJitterScale !== graphics.taaJitterScale) post.hasTaaHistory = false;
+  post.taaJitterScale = graphics.taaJitterScale;
+  post.sharpenStrength = graphics.sharpen;
+  lights.sun.shadow.bias = graphics.shadowBias;
+  lights.sun.shadow.normalBias = graphics.shadowNormalBias;
+  lights.shadowExtent = graphics.shadowExtent;
+  giUniforms.normalBias.value = graphics.giNormalBias;
+  giUniforms.specularOcclusion.value = graphics.giSpecularOcclusion;
 
   // 玩家可单关第一人称自阴影，但「阴影」总闸关闭时它也必须一起停：否则面板说
   // 阴影已关，枪上却还留着一层独立阴影，会成为两套互相矛盾的设置语义。
@@ -7153,13 +7166,16 @@ function ApplyGraphics() {
     }
     if (gi) {
       gi.enabled = wantGi;
+      gi.irradianceHistory = graphics.giIrradianceHistory;
+      gi.distanceHistory = graphics.giDistanceHistory;
       if (!gi.enabled) { gi.blend = 0; gi.SyncUniforms(); lights.SetGiActive(0); }
       const preset = SKY_PRESETS[PHASE_TABLE[state.phaseIndex].sky];
       if (preset) gi.ApplyPreset(preset, graphics.giStrength);
     }
   }
-  if (graphics.shadowSize && lights.sun.shadow.mapSize.x !== graphics.shadowSize) {
-    lights.sun.shadow.mapSize.set(graphics.shadowSize, graphics.shadowSize);
+  const shadowSize = graphics.shadowSize || lights.defaultShadowSize;
+  if (lights.sun.shadow.mapSize.x !== shadowSize) {
+    lights.sun.shadow.mapSize.set(shadowSize, shadowSize);
     // 换分辨率必须把旧的那张扔掉，three 才会按新尺寸重建
     if (lights.sun.shadow.map) {
       lights.sun.shadow.map.dispose();

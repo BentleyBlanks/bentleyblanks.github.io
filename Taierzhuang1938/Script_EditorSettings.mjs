@@ -2,9 +2,9 @@
 // 但它们不是编辑器 —— 不接管相机、不藏世界，改的是**玩家自己的偏好**，
 // 所以要落盘（localStorage），下次进来还在。
 //
-// ## 画质这一栏为什么只有倍率
+// ## 画质参数与天光预设的分工
 // 天光预设（SKY_PRESETS）决定这一关长什么样：曝光、雾色、泛光阈值，全是美术意图。
-// 画质设置只决定「画多重」，一律以倍率的形式乘上去（见 Script_Main 的 graphics）。
+// 后处理强度以倍率相乘（见 Script_Main 的 graphics）；TAA、GI 与阴影另提供算法参数。
 // 两件事混在一张表里的下场是玩家把画质调低之后夜战关变成纯黑 ——
 // 那一关的 exposure 是 3.6，被当成画质项一起压掉了。
 //
@@ -23,6 +23,37 @@
 
 import { Panel, Section, Slider, Chips, Toggle, ButtonRow, Facts, Note } from "./Script_EditorUi.mjs";
 import { CONTROL_GUIDE } from "./Script_Input.mjs";
+
+
+// 可热调参数的范围、标签和默认值共用；旧存档缺项时沿用默认值。
+export function GraphicsDetailControls(post) {
+  return {
+    shadow: [
+      { key: "shadowBias", label: "深度偏移", min: -0.003, max: 0.003, step: 0.0001, value: -0.0004, digits: 4 },
+      { key: "shadowNormalBias", label: "法线偏移", min: 0, max: 0.15, step: 0.005, value: 0.035, digits: 3 },
+      { key: "shadowExtent", label: "覆盖半径", min: 30, max: 100, step: 1, value: 66, unit: " m", digits: 0 },
+    ],
+    gi: [
+      { key: "giNormalBias", label: "采样偏移", min: 0, max: 1.5, step: 0.05, value: 0.4, unit: " m" },
+      { key: "giSpecularOcclusion", label: "反射遮蔽", min: 0, max: 1, step: 0.05, value: 0.7 },
+      { key: "giIrradianceHistory", label: "光照历史权重", min: 0, max: 0.99, step: 0.01, value: 0.93 },
+      { key: "giDistanceHistory", label: "遮挡历史权重", min: 0, max: 0.99, step: 0.01, value: 0.90 },
+    ],
+    taa: [
+      { key: "taaCurrentWeight", label: "当前帧权重", min: 0.01, max: 1, step: 0.01, value: 0.04 },
+      { key: "taaJitterScale", label: "抖动幅度", min: 0, max: 1.5, step: 0.05, value: 1, prefix: "×" },
+      { key: "sharpen", label: "锐化强度", min: 0, max: 1, step: 0.02, value: post?.preset.sharpen ?? 0.22 },
+    ],
+  };
+}
+
+export function NormalizeGraphicsDetails(gfx, post, reset = false) {
+  for (const control of Object.values(GraphicsDetailControls(post)).flat()) {
+    const value = reset ? control.value : gfx[control.key];
+    gfx[control.key] = Number.isFinite(value)
+      ? Math.min(control.max, Math.max(control.min, value)) : control.value;
+  }
+}
 
 const KEY_GFX = "tengxian1938_graphics_v1";
 const KEY_SFX = "tengxian1938_audio_v1";
@@ -111,6 +142,17 @@ export class GraphicsSettings {
   BuildUi(body) {
     const gfx = this.gfx;
 
+    const controls = GraphicsDetailControls(this.host.post);
+    const Details = (parent, group) => {
+      for (const control of controls[group]) {
+        const slider = Slider(parent, {
+          ...control, value: gfx[control.key],
+          format: (v) => (control.prefix ?? "") + v.toFixed(control.digits ?? 2) + (control.unit ?? ""),
+          onInput: (v) => { gfx[control.key] = v; this.Apply(); },
+        });
+        slider.root.lastElementChild.style.whiteSpace = "nowrap";
+      }
+    };
     const perf = Section(body, "分辨率与阴影");
     this.resSlider = Slider(perf, {
       label: "渲染分辨率", min: 0.4, max: 1.6, step: 0.05, value: gfx.renderScale,
@@ -136,7 +178,9 @@ export class GraphicsSettings {
       { value: 1024, label: "1k" }, { value: 2048, label: "2k" }, { value: 4096, label: "4k" },
     ], gfx.shadowSize, (v) => { gfx.shadowSize = Number(v); this.Apply(); });
 
-    const giBox = Section(body, "光照");
+    Details(perf, "shadow");
+
+    const giBox = Section(body, "全局光照 GI");
     const giRow = document.createElement("div");
     giRow.className = "edBtns";
     giBox.appendChild(giRow);
@@ -147,7 +191,10 @@ export class GraphicsSettings {
       onInput: (v) => { gfx.giStrength = v; this.Apply(); },
     });
 
-    const aa = Section(body, "抗锯齿");
+    Details(giBox, "gi");
+    if (this.host.post?.quality === "low") Note(giBox, "GI 需 medium 及以上档位。");
+
+    const aa = Section(body, "抗锯齿 TAA");
     const aaRow = document.createElement("div");
     aaRow.className = "edBtns";
     aa.appendChild(aaRow);
@@ -155,6 +202,8 @@ export class GraphicsSettings {
       gfx.taa = on;
       this.Apply();
     });
+
+    Details(aa, "taa");
 
     const post = Section(body, "后处理强度（倍率）");
     const godBox = document.createElement("div");
@@ -210,6 +259,7 @@ export class GraphicsSettings {
     gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
     gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;
     gfx.gi = false; gfx.giStrength = 1;
+    NormalizeGraphicsDetails(gfx, this.host.post, true);
     // TAA 的出厂值跟画质档走（medium 及以上开），不是固定的 true/false ——
     // 在 low 档上按「恢复出厂」应该回到关，而不是给它按上一份历史靶。
     gfx.taa = this.host.post ? !!this.host.post.preset.taa : true;

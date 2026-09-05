@@ -602,6 +602,8 @@ export class ProbeVolume {
     this.warmed = 0;          // 建关以来累计更新过多少个探针
     this.blend = 0;           // 0→1 的淡入：图集没收敛之前不许接管画面
     this.frameSeed = 0;
+    this.irradianceHistory = 0.93;
+    this.distanceHistory = 0.90;
 
     const [cx, cy, cz] = config.counts;
     this.counts = new THREE.Vector3(cx, cy, cz);
@@ -1066,7 +1068,7 @@ export class ProbeVolume {
     renderer.render(this.copyScene, QUAD_CAMERA);
     this.FillTiles(this.irrGeometry, batch);
     this.irrMaterial.uniforms.uPrevious.value = this.irradiance[src].texture;
-    this.SetHysteresis(this.irrMaterial, batch, 0.93);
+    this.SetHysteresis(this.irrMaterial, batch, this.irradianceHistory);
     renderer.render(this.irrScene, QUAD_CAMERA);
 
     // [4][5] 距离矩
@@ -1075,7 +1077,7 @@ export class ProbeVolume {
     renderer.render(this.copyScene, QUAD_CAMERA);
     this.FillTiles(this.distGeometry, batch);
     this.distMaterial.uniforms.uPrevious.value = this.distanceMoments[src].texture;
-    this.SetHysteresis(this.distMaterial, batch, 0.90);
+    this.SetHysteresis(this.distMaterial, batch, this.distanceHistory);
     renderer.render(this.distScene, QUAD_CAMERA);
 
     this.pingPong = dst;

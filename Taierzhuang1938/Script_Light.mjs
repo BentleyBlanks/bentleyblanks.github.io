@@ -26,6 +26,7 @@ export class LightRig {
     this.sun = new THREE.DirectionalLight(0xffffff, 3.0);
     this.sun.castShadow = quality !== "low";
     const mapSize = SHADOW_SIZE[quality] ?? 2048;
+    this.defaultShadowSize = mapSize;
     this.sun.shadow.mapSize.set(mapSize, mapSize);
     this.sun.shadow.camera.near = 0.5;
     this.sun.shadow.camera.far = 260;

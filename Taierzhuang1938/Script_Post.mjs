@@ -1145,6 +1145,8 @@ export class PostPipeline {
     // 出厂值来自画质档，但**运行时状态是这一位**（画质面板走 SetTaaEnabled 改它）。
     // 历史靶按它建，不按 preset 建 —— 否则 low 档打开开关也没有靶可写。
     this.taaEnabled = !!this.preset.taa;
+    this.taaJitterScale = 1;
+    this.sharpenStrength = this.preset.sharpen;
     this.taaFlip = false;
     this.hasTaaHistory = false;
     this.taaWasActive = false;
@@ -1584,8 +1586,8 @@ export class PostPipeline {
     let jitterX = 0, jitterY = 0;
     if (taaActive) {
       const jitter = TAA_JITTER[frame % TAA_SAMPLES];
-      jitterX = jitter[0];
-      jitterY = jitter[1];
+      jitterX = jitter[0] * this.taaJitterScale;
+      jitterY = jitter[1] * this.taaJitterScale;
       const pe = camera.projectionMatrix.elements;
       this.savedProj8 = pe[8];
       this.savedProj9 = pe[9];
@@ -1865,7 +1867,7 @@ export class PostPipeline {
     } else {
       this.uniformsFxaa.uSource.value = T.ldr.texture;
       this.uniformsFxaa.uTexel.value.set(1 / this.width, 1 / this.height);
-      this.uniformsFxaa.uSharpen.value = options.sharpen ?? this.preset.sharpen;
+      this.uniformsFxaa.uSharpen.value = options.sharpen ?? this.sharpenStrength;
       this.uniformsFxaa.uFxaa.value = taaActive ? 0 : 1;
       this._Blit(this.matFxaa, null);
     }

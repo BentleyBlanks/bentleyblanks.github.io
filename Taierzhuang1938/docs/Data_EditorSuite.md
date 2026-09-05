@@ -50,6 +50,9 @@ Esc 关面板；过场正在播时 Esc 归过场（跳过），不会顺手把�
 
 ### 画质 `Script_EditorSettings.GraphicsSettings`
 
+TAA 开放当前帧权重、抖动幅度和锐化；GI 开放采样偏移、反射遮蔽及光照/遮挡历史权重；太阳阴影开放深度偏移、法线偏移和覆盖半径。面板仅用短标签与数值，全部即时应用并随偏好保存，恢复出厂同时恢复这些参数与当前档位的阴影分辨率。GI 仍需 medium 及以上档位；low 面板给出一行提示。
+
+
 存 `localStorage` 键 `tengxian1938_graphics_v1`，**开机时装回去**
 （`ApplySavedSettings`，`EditorSuite` 的构造函数调）——只在打开面板时才生效的
 设置不叫设置，那叫开关。
