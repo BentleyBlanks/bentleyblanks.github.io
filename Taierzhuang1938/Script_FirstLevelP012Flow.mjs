@@ -52,7 +52,7 @@ export const P012_BEATS = Object.freeze([
   ["B15", "检查担架伤员，随班长到墙后收队", "Z08", 910, "regroup"],
   ["B16", "从墙后观察航迹，选择护送路线", "Z08", 980, "railPass"],
   ["B17", "处理扫射造成的道路阻碍", "Z08", 1030, "crowdTurn"],
-  ["B18", "接住同一副担架后端，送入实体掩蔽", "Z08", 1100, "stretcher"],
+  ["B18", "接住同一副担架后端，沿沟边搬运", "Z08", 1100, "stretcher"],
   ["B19", "扑入路沟", "Z08", 1140, "dive"],
   ["B20", "守住沟边，阻止日军接近伤员", "Z08", 1185, "closeFight"],
   ["B21", "清除近处敌人，尝试打开南路", "Z09", 1250, "southFight"],
@@ -627,7 +627,10 @@ export class FirstLevelP012Director {
       &&Distance(p,activity.airObservationPosition)<=(activity.airObservationRangeM||4)){
       if(!this.facts.has("airObserved")){this.Mark("airObserved");this.Emit("P012AirObserved");}
     }
-    if(this.beat===16&&this.facts.has("airObserved")&&!this.airRouteChoice){
+    // Rail fire is a world event; a missed free-camera glance cannot strand
+    // the player at a route entrance after that one finite pass has gone.
+    // Keep airObserved as honest observation evidence, never invent it here.
+    if(this.beat===16&&this.Signalled("P012AircraftRailFire")&&!this.airRouteChoice){
       const choices=activity.airRouteChoices||{};
       for(const [name,points] of Object.entries(choices))if(points?.[0]&&Distance(p,points[0])<=this.RouteArrivalRadius()){
         this.airRouteChoice=name;this.routeIndex=0;this.Mark("airRouteChosen");this.Emit("P012AirRouteChosen");break;
@@ -906,7 +909,8 @@ export class FirstLevelP012Director {
         && Distance(sample.guidePosition,activity.airObservationPosition)<=3
         &&Distance(p,activity.airObservationPosition)<=(activity.airObservationRangeM||4); break;
       case 16:
-        if (this.airRouteChoice && this.routeIndex>=route.length && Distance(p, sample.columnPosition) < 18
+        if (this.airRouteChoice && this.routeIndex>=route.length && sample.airColumnEnteredRoad === true
+          && Distance(p, sample.columnPosition) < 18
           && !this.Signalled("P012AirReady")) {
           this.SaveCheckpoint("CP04"); this.Emit("P012AirReady");
         }

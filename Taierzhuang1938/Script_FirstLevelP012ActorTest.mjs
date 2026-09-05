@@ -184,7 +184,7 @@ function FollowMovement(guided,configuredSpeed){
  let blocked=true,randomCalls=0,vaultCalls=0;
  const actor={p012Guided:guided,scriptMoveSpeedMps:configuredSpeed,position:new THREE.Vector3(),goal:new THREE.Vector3(0,0,-8),
   scriptArrivalRadius:.1,stance:0,detourTime:2,detourYaw:Math.PI/2,detourSign:1,stuckTime:0,rnd:()=>{randomCalls++;return .5;}};
- const moves=[],host={ctx:{nav:null},StepBody(s,dx,dz){moves.push({dx,dz,blocked});if(!blocked){s.position.x+=dx;s.position.z+=dz;}},TryVault(){vaultCalls++;return false;}};
+ const moves=[],host={ctx:{nav:null},tmpD:new THREE.Vector3(),StepBody(s,dx,dz){moves.push({dx,dz,blocked});if(!blocked){s.position.x+=dx;s.position.z+=dz;}},TryVault(){vaultCalls++;return false;}};
  for(let i=0;i<20;i++)ActMovement.call(host,actor,.05);
  assert.equal(actor.position.length(),0,"blocked body never bypassed");
  blocked=false;for(let i=0;i<10;i++)ActMovement.call(host,actor,.05);

@@ -447,7 +447,36 @@ const ai = readFileSync(new URL("./Script_Ai.mjs", import.meta.url), "utf8");
  assert.equal(guide.p012Guided,false,'next stage returns guide movement to the normal host');
  runtime.Guide({beat:20,route:[]});runtime.Update(.05);
  assert.equal(guide.scriptDefensive,true,'later ordinary defensive stage can recruit the guide again');
- console.log('PASS guide-only defence handoff against production Ai.Act movement override');
+  console.log('PASS guide-only defence handoff against production Ai.Act movement override');
+}
+{
+ // Reproduce the B13 combat-cover diversion with the actual state switch and
+ // movement arbitration. Ordinary combat and defensive actors keep ownership.
+ const start=ai.indexOf('    switch (s.state) {',ai.indexOf('  Act(s, dt, player) {'));
+ const end=ai.indexOf('    if (desired && speed > 0) {',start);
+ assert.ok(start>=0&&end>start);
+ const Resolve=vm.runInNewContext(`(function(s,dt){let desired=null,speed=0;const strayed=false,player={};
+  const STATE={SUPPRESSED:'suppressed',RELOAD:'reload',FIRE:'fire',CHARGE:'charge',ADVANCE:'advance',IDLE:'idle'};
+  ${ai.slice(start,end)};return {desired:desired?{x:desired.x,z:desired.z}:null,speed};})`);
+ const context={time:0,shots:0,tmpD:{set(x,y,z){Object.assign(this,{x,y,z});return this;},copy(p){return this.set(p.x,p.y||0,p.z);}},
+  TryFire(){this.shots++;},TryBayonet(){}};
+ const actor={position:{x:90,z:10},goal:{x:92,z:12},cover:{x:91.78160882438247,z:19.055415581231244},
+  state:'fire',order:'advance',p012Guided:false,scriptMoveSpeedMps:3.05,detourTime:2,stuckTime:1};
+ const ordinary=Resolve.call(context,actor,.1);
+ assert.equal(ordinary.desired.z,actor.cover.z,'ordinary FIRE actor still seeks its cover');
+ actor.p012Guided=true;
+ const guided=Resolve.call(context,actor,.1);
+ assert.equal(guided.desired.x,actor.goal.x);assert.equal(guided.desired.z,actor.goal.z);
+ assert.equal(guided.speed,3.05);assert.equal(actor.detourTime,0);assert.equal(actor.stuckTime,0);
+ assert.equal(context.shots,2,'guided FIRE still executes the same shooting update');
+ actor.scriptMoveSpeedMps=0;
+ assert.equal(Resolve.call(context,actor,.1).speed,0,'leader queue wait still stops movement');
+ actor.scriptMoveSpeedMps=3.05;actor.state='reload';actor.reloadTimer=2;actor.weapon={magazine:5};
+ const reload=Resolve.call(context,actor,.1);
+ assert.equal(reload.desired.z,actor.goal.z);assert.equal(reload.speed,3.05);assert.equal(actor.reloadTimer,1.9);
+ actor.scriptDefensive=true;actor.holdZone={...actor.position};
+ assert.equal(Resolve.call(context,actor,.1).desired,null,'defensive actor still holds its anchor');
+ console.log('PASS production combat state preserves P012 guide route, firing, reload and waits');
 }
 {
  const issue=P012Phase.whitebox.activities.openingIssue,actors=issue.spawns.map(p=>({...p})),receipts=[];
@@ -636,6 +665,28 @@ assert.match(main,/state\.playerShots \+= 1;\s*p012Runtime\?\.RecordAircraftShot
 assert.doesNotMatch(main,/story\.fired\s*=\s*\[\.\.\.sample\.p012Story\.fired\]/,"P012 rewind must not shorten the live setpiece event ledger");
 assert.match(main,/story\.P012Restore\?\.\(sample\.p012Story\.immediate\)/,"P012 immediate cue ledger is restored separately");
 assert.match(main, /p012Flow && interact\?\.Query\(player\)\?\.point\?\.id === "p012_ammoDrop"/);
+{
+ const signals=new Set(['P012AirObserveOpen']),once=new Set(),runs=[],props=[];
+ const column={Update(){},scriptPaused:false,Bearers:[],Civilians:[],Alive:[],HeadPosition:()=>({x:110,z:53})};
+ const context={phase:{whitebox:P012Phase.whitebox},mem:{column},d:{host:{Story:()=>({Signalled:name=>signals.has(name)})}},
+  strafe:{Active:false,StrafeRun:spec=>runs.push(spec)},Once(name,fn){if(!once.has(name)){once.add(name);fn(this);}},
+  Signal:name=>signals.add(name),Prop:spec=>{props.push(spec);return spec.id;},Time:()=>100,PlayerPos:()=>({x:105,z:53}),Spoken:()=>false};
+ SETPIECES.CH1_NanLu.Update(context,.1);
+ assert.equal(runs.length,1);assert.equal(runs[0].preset,'railPass');assert.equal(column.scriptPaused,true);
+ runs[0].OnPhase('exit');
+ SETPIECES.CH1_NanLu.Update(context,.1);
+ assert.equal(runs.length,1,'rail exit alone cannot launch the crowd attack while player is still choosing');
+ signals.add('P012AirRouteChosen');SETPIECES.CH1_NanLu.Update(context,.1);
+ assert.equal(column.scriptPaused,false,'actual route choice releases waiting litters');
+ assert.equal(runs.length,1,'choice alone is not actual arrival in the exposed road');
+ signals.add('P012CrowdReady');SETPIECES.CH1_NanLu.Update(context,.1);
+ assert.equal(runs.length,2);assert.equal(runs[1].preset,'crowdTurn');
+ runs[1].OnPhase('fire');SETPIECES.CH1_NanLu.Update(context,.1);
+ assert.equal(column.scriptPaused,true,'earlier choice release cannot clear the later strafe pause');
+ assert.ok(props.length===2&&props.every(prop=>Array.isArray(prop.size)&&prop.size.length===3&&prop.size.every(Number.isFinite)),
+  'air obstruction props satisfy the production BoxGeometry size-array contract');
+ console.log('PASS real rail pass, physical route choice and road arrival own finite aircraft/column handoffs');
+}
 {
   const runs = [], emitted = [], moved = []; let rewinds = 0, aborted = 0, ready = false;
   const context = {

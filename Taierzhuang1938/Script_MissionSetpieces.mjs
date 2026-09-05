@@ -1607,6 +1607,12 @@ export const SETPIECES = {
       // observation wall, never after the column is already exposed.
       if (p012 && HasSignal("P012AirObserveOpen")) {
         BeginCh1RailPass(s);
+        // Keep the actual litters behind the wall while the player decides.
+        // The one-shot release must not undo later crowd-fire/dive pauses.
+        if(!s.mem.p012AirRouteReleased&&s.mem.column){
+          s.mem.column.scriptPaused=!HasSignal("P012AirRouteChosen");
+          if(HasSignal("P012AirRouteChosen"))s.mem.p012AirRouteReleased=true;
+        }
       }
       if (p012 && HasSignal("SouthCut")) s.Once("p012_columnReturn", (ss) => {
         ss.mem.column.scriptPaused = false;
@@ -1690,7 +1696,7 @@ export const SETPIECES = {
       // ⑥ 转向人群。第一轮走完 9 秒后拐回来 —— 「拉起、转弯、降高」那一下
       //    必须在玩家的自由视角里看得见（§2 不设开场过场就是为了这一眼）。
       if (s.mem.railPassDone && !s.mem.crowdTurnAt && !s.strafe?.Active
-        && (p012 || s.Time() - s.mem.railPassDone > 9)) {
+        && (p012 ? HasSignal("P012CrowdReady") : s.Time() - s.mem.railPassDone > 9)) {
         s.mem.crowdTurnAt = s.Time();
         const column = s.mem.column;
         // **点名，不掷骰子**：谁倒下由脚本决定（Script_AircraftStrafe 的白名单）。
@@ -1720,9 +1726,9 @@ export const SETPIECES = {
                 // choices. Collision is the matching layout gate and opens on
                 // the shared resolution signal.
                 s.mem.p012AirCartProp=s.Prop?.({id:"P012AirOverturnedCart",kind:"crate",position:cart,
-                  size:{x:2.1,y:.9,z:1.1},color:0xe58b2f,rotationY:.18});
+                  size:[2.1,.9,1.1],color:0xe58b2f,rotationY:.18});
                 s.mem.p012AirCivilianProp=s.Prop?.({id:"P012AirFallenCivilian",kind:"sandbag",position:civilianAt,
-                  size:{x:.65,y:.35,z:1.7},color:0x9b5b45,rotationY:1.2});
+                  size:[.65,.35,1.7],color:0x9b5b45,rotationY:1.2});
                 s.Signal("P012CrowdFire"); s.Signal("P012AircraftCrowdFire"); s.Signal("P012AirObstacleCreated"); s.Signal("StretcherHandoff");
               }
             }

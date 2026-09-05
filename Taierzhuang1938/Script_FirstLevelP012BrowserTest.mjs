@@ -58,6 +58,24 @@ function Check(condition, label, detail = "") {
   console.log(`ok  ${label}${detail ? ` — ${detail}` : ""}`);
 }
 
+function AirTurnEvidence(views) {
+  const spans=[];
+  let span=null,previous=null;
+  for(const view of views){
+    const visible=view.preset==="crowdTurn"&&view.phase==="approach"&&view.airVisible;
+    const continuous=visible&&span&&previous&&view.runId===previous.runId
+      &&view.flightTime>previous.flightTime&&view.at>previous.at&&view.at-previous.at<=.35;
+    if(!visible)span=null;
+    else if(continuous){span.to=view.at;span.flightTo=view.flightTime;span.samples++;}
+    else {span={runId:view.runId??null,from:view.at,to:view.at,flightFrom:view.flightTime,flightTo:view.flightTime,samples:1};spans.push(span);}
+    previous=view;
+  }
+  return {spans,longestVisibleS:Math.max(0,...spans.map(span=>span.to-span.from)),
+    jointViews:views.filter(view=>view.preset==="crowdTurn"&&view.phase==="approach"
+      &&view.airVisible&&view.bearersVisible>=2&&view.civiliansVisible>=1).length,
+    definition:"Uninterrupted actual free-camera aircraft visibility before crowd fire; no stitching across occlusion, runs or retries."};
+}
+
 // 只驱动移动与交互输入，不改任务阶段，不传送，不把完成标志直接写进导演。
 async function PlayPrelude() {
   let result;
@@ -952,6 +970,7 @@ async function PlayFrontline() {
     if (result.flow.beatIndex >= (fullCampaign ? 25 : 11) || result.health <= 0 || result.stalled) break;
   }
   result.ordinaryDeaths = deaths;
+  result.airTurnEvidence = AirTurnEvidence(result.airViews);
   await fs.writeFile(path.join(outputDir, "Data_P012GameplayTrace.json"), JSON.stringify(result, null, 2));
   // Save the evidence before assertions: a failed distance/camera gate must not
   // discard pacing and idle-time diagnostics from a completed playthrough.
@@ -1056,6 +1075,8 @@ async function PlayFrontline() {
     Check(result.airViews.some(view => view.preset === "crowdTurn" && view.phase === "approach"
       && view.airVisible && view.bearersVisible >= 2 && view.civiliansVisible >= 1),
     "自由视角实际同屏看见飞机转向、担架员与平民道路");
+    Check(result.airTurnEvidence.longestVisibleS>=4,
+      "主动转向开火前，自由视角连续看见至少四秒真实航迹",JSON.stringify(result.airTurnEvidence));
     Check(result.trace.some(entry=>entry.beat==="B17"&&entry.airRouteChoice),
       "玩家从实体观察墙看完有限航迹后，以真实移动选择开放路或沟边路",JSON.stringify(result.trace));
     Check(result.trace.some(entry=>entry.beat==="B18"&&entry.facts.includes("airObstacleResolved")),
@@ -1432,6 +1453,114 @@ async function VerifyOpeningDiscovery() {
 // Explicit local guide fixtures: stage/positions are initialized once per case.
 // Thereafter the real Runtime, AI and Rapier move the existing leader, and the
 // player follows his sampled footsteps with normal input. Not campaign evidence.
+async function VerifyHubGuideView() {
+  const result=await page.evaluate(async()=>{
+    const {Raycaster,Vector3}=await import("three"),game=window.Tengxian;
+    const {FirstLevelP012StageZero}=await import("./Script_FirstLevelP012StageZero.mjs");
+    const {P012_VILLAGE_LIFE}=await import("./Data_FirstLevelP012VillageLife.mjs");
+    let stageZero;const update=FirstLevelP012StageZero.prototype.Update;
+    FirstLevelP012StageZero.prototype.Update=function(...args){stageZero=this;return update.apply(this,args);};
+    game.StepFrames(1);FirstLevelP012StageZero.prototype.Update=update;
+    // Explicit authored parking-state fixture; the movement/swept footprint
+    // of the whole route is checked in VillageLifeTest and the actual prelude.
+    stageZero.village.mule={...P012_VILLAGE_LIFE.muleRoute.at(-1)};
+    stageZero.village.muleIndex=P012_VILLAGE_LIFE.muleRoute.length;stageZero.village.muleYaw=-.9565598624652331;
+    const guide=game.ai.soldiers.find(actor=>actor.castId==="luo");
+    const at={x:-1.565917751147751,z:1.1024933000095132};
+    guide.position.set(at.x,0,at.z);guide.body.Teleport(at.x,0,at.z);guide.goal.copy(guide.position);
+    game.player.Spawn(-4.435162958310432,3.1225865355250804,-.9573578971224107);game.player.pitch=0;
+    game.StepFrames(1);
+    const eye=game.player.EyePosition,target=guide.position.clone().add(new Vector3(0,1.35,0)),direction=target.clone().sub(eye),distance=direction.length();
+    const ray=new Raycaster(eye,direction.normalize(),0,distance);
+    const Descends=(object,root)=>{for(let node=object;node;node=node.parent)if(node===root)return true;return false;};
+    const hits=ray.intersectObjects(game.scene.children,true).filter(hit=>{
+      if(hit.object.isSprite||Descends(hit.object,game.viewmodel.root))return false;
+      for(let node=hit.object;node;node=node.parent)if(!node.visible)return false;
+      return true;
+    }).map(hit=>({distance:hit.distance,point:hit.point.toArray(),object:hit.object.name,
+      guide:Descends(hit.object,guide.actor.root),ancestors:(()=>{const names=[];for(let node=hit.object;node;node=node.parent)names.push(node.name||node.type);return names;})()}));
+    return {player:game.player.position.toArray(),camera:game.camera.position.toArray(),guide:guide.position.toArray(),mule:stageZero.village.Snapshot().mule,hits,
+      scope:"explicit recorded B03 placement for visual collision review; no opening-playthrough claim"};
+  });
+  await fs.writeFile(path.join(outputDir,"Data_P012HubGuideView.json"),JSON.stringify(result,null,2));
+  await page.screenshot({path:path.join(outputDir,"Scene_P012HubGuideView.png")});
+  Check(!result.hits.some(hit=>hit.ancestors.includes("P012VillageLife")),"村口讲解站位与班长之间没有停放的村路物流道具",JSON.stringify(result.hits.slice(0,4)));
+}
+
+async function VerifyAirRouteHandoff(choice) {
+  Check(["open","ditch"].includes(choice),"空袭局部夹具使用有效路线",choice);
+  await page.waitForFunction(()=>window.Tengxian.scene.getObjectByName("Aircraft_MitsubishiKi30")?.children.length>0,null,{timeout:120000});
+  const setup=await page.evaluate(async choice=>{
+    const game=window.Tengxian;
+    const {FirstLevelP012Director}=await import("./Script_FirstLevelP012Flow.mjs");
+    const {FirstLevelP012Runtime}=await import("./Script_FirstLevelP012Runtime.mjs");
+    const {SETPIECES}=await import("./Script_MissionSetpieces.mjs");
+    let flow,runtime,setpiece;
+    const updateFlow=FirstLevelP012Director.prototype.Update,updateRuntime=FirstLevelP012Runtime.prototype.Update,updateSetpiece=SETPIECES.CH1_NanLu.Update;
+    FirstLevelP012Director.prototype.Update=function(...args){flow=this;return updateFlow.apply(this,args);};
+    FirstLevelP012Runtime.prototype.Update=function(...args){runtime=this;return updateRuntime.apply(this,args);};
+    SETPIECES.CH1_NanLu.Update=function(s,...args){setpiece=s;return updateSetpiece.call(this,s,...args);};
+    game.StepFrames(1);
+    FirstLevelP012Director.prototype.Update=updateFlow;FirstLevelP012Runtime.prototype.Update=updateRuntime;SETPIECES.CH1_NanLu.Update=updateSetpiece;
+    // Explicit local fixture initialization. Once started, only player input is
+    // driven: production actors, collision, signals and aircraft keep updating.
+    const activity=flow.config.activities,at=activity.airObservationPosition,column=setpiece.mem.column;
+    setpiece.mem.prepWounded.Reset();column.Reset();
+    column.waypoints=[{x:110,z:53},{x:112.8,z:54},{x:114,z:57},{x:110,z:68},{x:107,z:80}];
+    column.Start();column.scriptPaused=true;
+    const guide=runtime.host.GuideActor();runtime.host.ReleaseDefense(guide);runtime.host.ReleaseGuide(guide);
+    guide.position.set(at.x,0,at.z);guide.body.Teleport(at.x,0,at.z);guide.goal.copy(guide.position);
+    game.player.Spawn(at.x+2,at.z,0);
+    flow.Restore({...flow.Snapshot(),beat:16,unlockedWaves:[0,1,2,3,4,5,6],spawnedTotal:25,routeIndex:0,
+      facts:["regroup","roadWounded"],signals:["P012AirObserveOpen"]});
+    flow.Emit("P012AirObserveOpen");
+    window.p012AirFixture={choice,flow,runtime,setpiece,column,trace:[],frames:0,initialHead:column.HeadPosition()};
+    return {choice,player:game.player.position.toArray(),head:column.HeadPosition(),members:column.Count,
+      scope:"explicit B16 setup; new local column placement, no sequential campaign or first-play claim"};
+  },choice);
+  let result;
+  for(let chunk=0;chunk<60;chunk++){
+    result=await page.evaluate(()=>{
+      const game=window.Tengxian,f=window.p012AirFixture;
+      for(let frame=0;frame<90;frame++){
+        const state=f.flow.State(),air=game.Debug.Strafe.State().run,objective=state.objective;
+        const choosing=!state.airRouteChoice;
+        const target=choosing&&game.story.Signalled("P012AircraftRailFire")
+          ? f.flow.config.activities.airRouteChoices[f.choice][0] : objective.target;
+        const dx=target?target.x-game.player.position.x:0,dz=target?target.z-game.player.position.z:0,distance=Math.hypot(dx,dz);
+        let walk=!!target&&distance>.7;
+        game.player.yaw=Math.atan2(-dx,-dz);game.player.pitch=0;
+        // Deliberately miss the first aircraft glance: there must be no hidden
+        // look flag after the public goal already asks the player to choose.
+        if(choosing&&!game.story.Signalled("P012AircraftRailFire")){walk=false;game.player.yaw=0;}
+        if(air?.presetId==="crowdTurn"&&air.phase==="approach"){
+          const eye=game.player.EyePosition,plane=air.aircraft;
+          game.player.yaw=Math.atan2(-(plane.x-eye.x),-(plane.z-eye.z));
+          game.player.pitch=Math.atan2(plane.y-eye.y,Math.hypot(plane.x-eye.x,plane.z-eye.z));walk=false;
+        }
+        game.Debug.Key("KeyW",walk);game.StepFrames(1,1/30,false);f.frames++;
+        if(f.frames%15===0)f.trace.push({at:f.frames/30,beat:f.flow.State().beat,choice:f.flow.airRouteChoice,
+          player:game.player.position.toArray(),head:f.column.HeadPosition(),paused:f.column.scriptPaused,
+          air:air?{preset:air.presetId,phase:air.phase}:null,facts:[...f.flow.facts]});
+        if(game.story.Signalled("P012AirObstacleCreated"))break;
+      }
+      game.Debug.Key("KeyW",false);game.StepFrames(1);
+      return {beat:f.flow.State().beat,choice:f.flow.airRouteChoice,obstacle:game.story.Signalled("P012AirObstacleCreated"),
+        frames:f.frames,trace:f.trace,views:window.p012AirViews,scene:game.Debug.P012Scene(),members:f.column.Count,props:game.Debug.SetpieceProps()};
+    });
+    if(result.obstacle)break;
+  }
+  result.airTurnEvidence=AirTurnEvidence(result.views);
+  await fs.writeFile(path.join(outputDir,`Data_P012AirRoute_${choice}.json`),JSON.stringify({setup,result},null,2));
+  await page.screenshot({path:path.join(outputDir,`Scene_P012AirRoute_${choice}.png`)});
+  Check(result.choice===choice&&result.beat==="B17"&&result.obstacle,"实际选路后才在道路触发转向扫射与阻碍",JSON.stringify({beat:result.beat,choice:result.choice,elapsed:result.frames/30}));
+  Check(!result.trace.some(entry=>entry.beat==="B16"&&entry.air?.preset==="crowdTurn"),"第二轮攻击不越过真实选路与道路到达");
+  Check(!result.trace.some(entry=>entry.facts.includes("airObserved")),"错过首轮航迹不伪造已观察事实");
+  Check(setup.members===10&&result.members===10,"局部初始十人队列在空袭交接中不重复生成");
+  Check(result.airTurnEvidence.longestVisibleS>=4,"转向开火前真实自由视角连续可见至少四秒",JSON.stringify(result.airTurnEvidence));
+  Check(result.airTurnEvidence.jointViews>0,"转向时真实同屏可辨认飞机、担架员和平民");
+}
+
 async function VerifyGuideHandoffs() {
   for (const beat of [14, 15, 22, 23]) {
     const setup=await page.evaluate(async beat=>{
@@ -1907,7 +2036,7 @@ try {
         }
         if (after.beatIndex >= 15 && after.beatIndex <= 20 && after.elapsed - lastAirViewAt >= 0.25) {
           lastAirViewAt = after.elapsed;
-          const air = game.Debug.Strafe.State().run;
+          const airState = game.Debug.Strafe.State(),air=airState.run;
           if (air?.active) {
             const Visible = (point) => {
               const at = game.player.position.clone().set(point.x, point.y, point.z);
@@ -1919,9 +2048,10 @@ try {
             };
             const members = game.Debug.P012Scene().columnActors;
             const visible = members.filter(member => Visible({ x: member.x, y: 1.2, z: member.z }));
-            const view = { at: after.elapsed, beat: after.beat, preset: air.presetId, phase: air.phase,
+            const view = { at: after.elapsed, beat: after.beat, runId: air.id, preset: air.presetId, phase: air.phase,
               objectiveText: after.objective.text, crowdFire: game.story.Signalled("P012CrowdFire"),
-              flightTime: air.t, airVisible: Visible(air.aircraft), airPosition: air.aircraft,
+              flightTime: air.t, airVisible: airState.modelVisible===true&&!!airState.modelAt&&Visible(airState.modelAt),
+              modelVisible:airState.modelVisible,modelAt:airState.modelAt,airPosition: air.aircraft,
               player: game.player.position.toArray(), yaw: game.player.yaw, pitch: game.player.pitch,
               bearersVisible: visible.filter(member => member.role === "bearer").length,
               civiliansVisible: visible.filter(member => member.role === "civilian").length };
@@ -2130,6 +2260,9 @@ try {
     }
     await fs.writeFile(path.join(outputDir,"Data_P012CastReview.json"),JSON.stringify({scope:"explicit close-up portrait fixture; actual existing named actors, no model replacement",cast},null,2));
   }
+  const airRouteFixture=process.argv.find(arg=>arg.startsWith("--air-route="))?.split("=")[1];
+  if(process.argv.includes("--hub-view"))await VerifyHubGuideView();
+  if(airRouteFixture)await VerifyAirRouteHandoff(airRouteFixture);
   if (process.argv.includes("--guide-handoffs")) await VerifyGuideHandoffs();
   if (process.argv.includes("--geometry")) await VerifyTraversalFixtures();
   if (process.argv.includes("--south-recovery")) await VerifySouthRouteRecoveryFixtures();
@@ -2209,7 +2342,7 @@ try {
       "同批军人真实领取回调每人每类仅一次",JSON.stringify(issue.callbacks));
   }
   await fs.writeFile(path.join(outputDir, "Data_P012TrafficViews.json"), JSON.stringify(traffic, null, 2));
-  Check(traffic.population.armed <= 12 && traffic.population.unarmed <= 15,
+  if(!airRouteFixture)Check(traffic.population.armed <= 12 && traffic.population.unarmed <= 15,
     "原有战斗/群众预算独立统计；另列训练队、儿童、坐姿百姓及新增5名村路作业人员，全部计入原始人数", JSON.stringify(traffic.population));
   Check(errors.length === 0, "浏览器没有脚本或控制台错误", errors.join(" | "));
   console.log(`P012 screenshots: ${outputDir}`);

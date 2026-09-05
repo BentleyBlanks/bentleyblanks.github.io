@@ -527,12 +527,25 @@ for(const zone of ["Z07",null]) {
   assert.equal(director.State().beat,"B16","actual inspection and nearby column do not depend on a region-circle label");
 }
 assert.ok(signals.has("P012AirObserveOpen"));
+{
+  const localSignals=new Set(),director=new FirstLevelP012Director({Signalled:name=>localSignals.has(name)},phase.whitebox);
+  const entry=phase.whitebox.activities.airRouteChoices.ditch[0];
+  director.Restore({...flow.Snapshot()});
+  director.Update(.1,{position:entry,columnPosition:entry,aircraftVisible:false});
+  assert.equal(director.airRouteChoice,null,'before real rail fire no route choice is consumed');
+  localSignals.add('P012AircraftRailFire');localSignals.add('P012RailComplete');
+  director.Update(.1,{position:entry,columnPosition:entry,aircraftVisible:false});
+  assert.equal(director.airRouteChoice,'ditch','a player who missed the finite pass can still enter a real route');
+  assert.equal(director.facts.has('airObserved'),false,'missed aircraft is never rewritten as seen');
+}
 Tick({},200); assert.equal(flow.State().beat,"B16","time cannot pretend the finite aircraft passed or choose a route");
 signals.add("P012AircraftRailFire");Tick({position:phase.whitebox.activities.airObservationPosition,columnPosition:P012Point(50,47),aircraftVisible:true});
 assert.equal(flow.airRouteChoice,null,"seeing the aircraft does not choose a road for the player");
 const chosen=phase.whitebox.activities.airRouteChoices.ditch;
 Tick({position:chosen[0],columnPosition:chosen[0]});assert.equal(flow.airRouteChoice,"ditch");
 Walk(chosen,{columnPosition:chosen.at(-1)});
+assert.equal(signals.has("P012AirReady"),false,"route cursor alone cannot claim both actual litters reached the road");
+Tick({position:chosen.at(-1),columnPosition:chosen.at(-1),airColumnEnteredRoad:true});
 assert.ok(signals.has("P012AirReady"));
 signals.add("P012RailComplete"); Tick();
 assert.equal(flow.State().beat,"B17","actual rail exit plus the player's physical route choice releases B17");

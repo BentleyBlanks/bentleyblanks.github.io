@@ -1533,7 +1533,13 @@ export class AiDirector {
     const scriptedPathFollower = s.p012Guided === true && Number.isFinite(s.scriptMoveSpeedMps);
     // P012 has already swept its corridor and owns queue waits. A stale random
     // detour must not turn a resumed walker out of that corridor or vault a desk.
-    if (scriptedPathFollower) { s.detourTime = 0; s.stuckTime = 0; }
+    if (scriptedPathFollower) {
+      s.detourTime = 0; s.stuckTime = 0;
+      // Combat still owns aiming, firing, reloading and damage above. The
+      // checked corridor owns movement: FIRE's cached cover must not pull the
+      // leader away from the escort, and RELOAD must not cancel his next step.
+      if (!s.scriptDefensive) desired = this.tmpD.copy(s.goal);
+    }
     if (s.p012ScoutDirected || s.p012RouteRejoining) { desired = this.tmpD.copy(s.goal); speed = 2.6; }
     if (Number.isFinite(s.scriptMoveSpeedMps)) speed = s.p012Guided && desired
       ? Math.max(0, s.scriptMoveSpeedMps) : Math.min(speed, Math.max(0, s.scriptMoveSpeedMps));
