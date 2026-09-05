@@ -106,7 +106,7 @@ Check(/原始面数/.test(editorSource) && /实际面数/.test(editorSource)
 Check(/ExternalRows/.test(editorSource) && /EXTERNAL_GLB_STANDARDS/.test(editorSource),
   "外部 GLB 分类使用逐资产审计表而非仅显示通用卡片");
 Check(/AssetStandardsEditor/.test(suiteSource)
-  && /Script_EditorAssetStandards\.mjs\?v=2/.test(html)
+  && /Script_EditorAssetStandards\.mjs\?v=3/.test(html)
   && /Data_AssetStandards\.mjs\?v=5/.test(html),
 "资产规范编辑器已注册到套件与 import map");
 

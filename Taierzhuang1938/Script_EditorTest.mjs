@@ -1211,8 +1211,8 @@ const weapon = await page.evaluate(async () => {
   }));
   out.ambiguousRows = rows.filter((row) => ["中型迫击炮"].includes(row.name));
   out.unknownCopyGone = out.ambiguousRows.length === 1
-    && out.ambiguousRows.every((row) => !row.name.includes("未明") && !row.tail.includes("未明"))
-    && active.panel.body.textContent.includes("不是游戏里的未知/未解锁状态");
+    // 9656fef89 简化面板时删掉了「待考」说明段，这里只守住列表文案本身。
+    && out.ambiguousRows.every((row) => !row.name.includes("未明") && !row.tail.includes("未明"));
   active.SetWeapon("OfficerSwordSet");
   window.Taierzhuang.StepFrames(10);
   const swordSpan = new THREE.Box3().setFromObject(active.benchGroup).getSize(new THREE.Vector3());
@@ -1250,7 +1250,7 @@ Check("两件架设武器逐件校姿并按最终包围盒落地",
     && deployed.MediumMortar.pitch > 1.0 && deployed.MediumMortar.pitch < 1.15
     && deployed.MediumMortar.span[1] > deployed.MediumMortar.span[0] * 0.9,
   JSON.stringify(deployed));
-Check("型号待考条目不再显示‘未明·掷弹筒’，并解释待考含义",
+Check("型号待考条目不再显示‘未明·掷弹筒’",
   weapon.unknownCopyGone,
   JSON.stringify(weapon.ambiguousRows));
 Check("军刀台架取消人物动作轴，改为横向检视", weapon.swordInspectionPose);
