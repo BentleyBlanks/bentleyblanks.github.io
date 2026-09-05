@@ -190,22 +190,77 @@ function ConfigureCraterSurface(material, source, soil) {
       uniform sampler2D uCraterNormal;
       varying float vTerrainDelta;
       varying float vTerrainWear;
-      varying vec2 vSoilUv;`)
+      varying vec2 vSoilUv;
+      vec2 CraterHash(vec2 p) {
+        vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+        q += dot(q, q.yzx + 33.33);
+        return fract((q.xx + q.yz) * q.zy);
+      }
+      float CraterNoise(vec2 p) {
+        vec2 cell = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(CraterHash(cell).x, CraterHash(cell + vec2(1.0, 0.0)).x, f.x),
+          mix(CraterHash(cell + vec2(0.0, 1.0)).x, CraterHash(cell + 1.0).x, f.x), f.y);
+      }
+      // Sparse buried clods, separated by loose fines rather than a tiled crack
+      // network. World anchoring also keeps road and tile boundaries continuous.
+      float CraterClods(vec2 p) {
+        vec2 cell = floor(p), f = fract(p);
+        float height = 0.0;
+        for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+          vec2 offset = vec2(float(x), float(y));
+          vec2 seed = CraterHash(cell + offset);
+          vec2 at = offset + seed - f;
+          float d = length(at * mix(vec2(0.8, 1.5), vec2(1.4, 0.85), seed.y));
+          float radius = mix(0.22, 0.55, seed.x);
+          float clod = (1.0 - smoothstep(radius * 0.25, radius, d))
+            * smoothstep(0.28, 0.68, seed.y);
+          height = max(height, clod);
+        }
+        return height;
+      }`)
       .replace("#include <color_fragment>", `#include <color_fragment>
         vec3 soil = texture2D(uCraterSoil, vSoilUv).rgb;
         vec3 fineSoil = texture2D(uCraterSoil, mat2(0.8, 0.6, -0.6, 0.8) * vSoilUv * 3.7).rgb;
+        vec2 soilMeters = vSoilUv * 2.4;
+        float macro = CraterNoise(soilMeters * 0.73);
+        float breakup = CraterNoise(soilMeters * 7.0 + 13.2);
+        float clods = CraterClods(soilMeters * 3.4 + vec2(macro, breakup) * 0.8);
         float grain = clamp(dot(fineSoil, vec3(0.333)) * 3.0, 0.0, 1.0);
-        float exposed = smoothstep(0.001, 0.06, vTerrainWear * mix(0.65, 1.45, grain));
-        float cavity = smoothstep(0.02, 0.7, vTerrainDelta);
-        vec3 earth = mix(soil, fineSoil, 0.25) * mix(1.12, 0.72, cavity);
-        diffuseColor.rgb = mix(diffuseColor.rgb, earth, exposed);`)
+        float exposed = smoothstep(0.004, 0.045,
+          vTerrainWear * mix(0.22, 1.8, breakup) * mix(0.65, 1.3, macro));
+        float cavity = smoothstep(0.035, 0.85, vTerrainDelta);
+        float lip = smoothstep(0.015, 0.12, -vTerrainDelta);
+        float fissure = (1.0 - smoothstep(0.15, 0.45, breakup)) * (1.0 - clods);
+        vec3 earth = mix(soil, fineSoil, 0.18);
+        // Fresh compact earth below, lighter broken dry soil on the ejected lip.
+        // Color is soil composition; cavity occlusion is applied to INDIRECT light below.
+        earth *= mix(vec3(0.82, 0.67, 0.51), vec3(1.06, 0.93, 0.77), macro);
+        earth *= mix(1.05, 0.57, cavity) * mix(0.72, 1.12, breakup) * mix(0.9, 1.22, clods);
+        earth *= 1.0 + lip * 0.12;
+        diffuseColor.rgb = mix(diffuseColor.rgb, earth, exposed);
+        float soilRelief = (clods * 0.032 + breakup * 0.009 + grain * 0.003)
+          * exposed * mix(1.0, 0.6, cavity);`)
       .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
-        roughnessFactor = mix(roughnessFactor, 0.96, exposed);`)
+        roughnessFactor = mix(roughnessFactor, mix(0.98, 0.84, cavity) - clods * 0.035, exposed);`)
+      .replace("#include <metalnessmap_fragment>", `#include <metalnessmap_fragment>
+        metalnessFactor = mix(metalnessFactor, 0.0, exposed);`)
       .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
+        // Screen derivatives turn the same clod relief into a surface gradient;
+        // unlike an added up-vector this follows the actual inclined pit wall.
+        normal = normalize(mix(normal, nonPerturbedNormal, exposed));
+        vec3 soilDx = dFdx(-vViewPosition), soilDy = dFdy(-vViewPosition);
+        vec3 soilR1 = cross(soilDy, normal), soilR2 = cross(normal, soilDx);
+        float soilDet = dot(soilDx, soilR1);
+        vec3 soilGradient = sign(soilDet) * (dFdx(soilRelief) * soilR1 + dFdy(soilRelief) * soilR2);
+        normal = normalize(max(abs(soilDet), 1e-8) * normal - soilGradient);
         vec2 soilSlope = texture2D(uCraterNormal, vSoilUv).xy * 2.0 - 1.0;
-        normal = normalize(normal + mat3(viewMatrix) * vec3(soilSlope.x, 0.0, -soilSlope.y) * exposed * 0.42);`);
+        normal = normalize(normal + mat3(viewMatrix) * vec3(soilSlope.x, 0.0, -soilSlope.y) * exposed * 0.28);`)
+      .replace("#include <aomap_fragment>", `#include <aomap_fragment>
+        float earthOcclusion = mix(1.0, (1.0 - fissure * 0.36) * mix(1.0, 0.76, cavity), exposed);
+        reflectedLight.indirectDiffuse *= earthOcclusion;
+        reflectedLight.indirectSpecular *= earthOcclusion;`);
   };
-  material.customProgramCacheKey = () => `${SourceKey()}|CraterSoilV1`;
+  material.customProgramCacheKey = () => `${SourceKey()}|CraterSoilV2`;
 }
 
 export class TerrainDeformationView {

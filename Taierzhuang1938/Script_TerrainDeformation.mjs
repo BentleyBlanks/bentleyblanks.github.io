@@ -207,13 +207,18 @@ export class TerrainDeformation {
       this.SetNode(ix, iz, next); queue.push(ix, iz);
       if (!changedKeys.has(key)) { changedKeys.add(key); changed.push(ix, iz); }
     };
-    for (let iz = Math.floor((position.z - radius * 1.1) / s); iz <= Math.ceil((position.z + radius * 1.1) / s); iz++) {
-      for (let ix = Math.floor((position.x - radius * 1.1) / s); ix <= Math.ceil((position.x + radius * 1.1) / s); ix++) {
+    const phase = ValueNoise2(position.x * 0.71, position.z * 0.71, 8317) * Math.PI * 2;
+    for (let iz = Math.floor((position.z - radius * 1.2) / s); iz <= Math.ceil((position.z + radius * 1.2) / s); iz++) {
+      for (let ix = Math.floor((position.x - radius * 1.2) / s); ix <= Math.ceil((position.x + radius * 1.2) / s); ix++) {
         const dx = ix * s - position.x, dz = iz * s - position.z;
-        const contour = 0.9 + 0.2 * ValueNoise2(ix * s * 1.3, iz * s * 1.3, 8317);
+        // Broad asymmetric breakouts survive slope relaxation; fine noise alone
+        // disappeared into a smooth circular bowl after a few overlapping shells.
+        const angle = Math.atan2(dz, dx);
+        const contour = 0.96 + 0.1 * Math.sin(angle * 3 + phase) + 0.055 * Math.sin(angle * 7 - phase)
+          + 0.07 * (ValueNoise2(ix * s * 1.3, iz * s * 1.3, 8317) - 0.5);
         const r = Math.hypot(dx, dz) / (radius * contour);
         if (r >= 1) continue;
-        const rough = 0.94 + 0.06 * ValueNoise2(ix * 0.26, iz * 0.26, 1938);
+        const rough = 0.88 + 0.12 * ValueNoise2(ix * 0.51, iz * 0.51, 1938);
         Lower(ix, iz, this.Node(ix, iz) + depth * (1 - r * r) ** 2 * rough);
       }
     }
@@ -251,7 +256,7 @@ export class TerrainDeformation {
     }
     const rim = [...entries.values()];
     for (const entry of rim) {
-      const rough = 0.65 + 0.35 * ValueNoise2(entry.x * s * 2.3, entry.z * s * 2.3, 6319);
+      const rough = 0.35 + 0.65 * ValueNoise2(entry.x * s * 2.3, entry.z * s * 2.3, 6319);
       entry.old = -this.Node(entry.x, entry.z);
       entry.height = Math.max(entry.old, Math.min(maxRimM, blastDepth * 0.36)
         * Math.sin(Math.PI * entry.distance / rimWidthM) ** 2 * rough);
