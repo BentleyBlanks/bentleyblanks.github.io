@@ -340,12 +340,14 @@
         clear: () => { try { sessionStorage.removeItem(AUTO_KEY); } catch {} },
       };
       let shown = false;
-      const Fail = (reason, transient) => {
+      let waiting = false;
+      const Fail = (reason, transient, pending = false) => {
         if (!BootVisible()) return;
         if (transient && !Store.get()) { Store.set(); location.reload(); return; }
         const step = document.getElementById("bootStep");
         if (!step) return;
-        if (!shown) step.textContent = "启动失败：" + reason;
+        if (!shown || waiting) step.textContent = (pending ? "加载较慢：" : "启动失败：") + reason;
+        waiting = pending;
         shown = true;
         if (document.getElementById("bootRetry")) return;
         const button = document.createElement("button");
@@ -361,6 +363,7 @@
       window.__bootGuardDismiss = () => {
         Store.clear();
         shown = false;
+        waiting = false;
         const button = document.getElementById("bootRetry");
         if (button) button.remove();
       };
@@ -376,7 +379,7 @@
         if (event.message) Fail(event.message, /webgl/i.test(event.message));
       }, true);
       setTimeout(() => {
-        if (!window.__bootMainAlive) Fail("主程序迟迟没跑起来，网络可能断了（可以再等等，或点重试）", false);
+        if (!window.__bootMainAlive) Fail("主程序仍在下载，请稍候；长时间没有变化时可重试", false, true);
       }, 25000);
     })();
   </script>

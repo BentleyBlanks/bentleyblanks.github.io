@@ -25,11 +25,20 @@ try {
     page.on('pageerror', error => errors.push(String(error)));
     page.on('request', request => { if (/\.m?js(?:\?|$)/.test(request.url())) modules.add(new URL(request.url()).pathname); });
     await page.route('**/Taierzhuang1938/?*', route => route.fulfill({contentType:'text/html',body:result.html}));
-    await page.route('**/Script_BrowserBundle.mjs?*', route => route.fulfill({contentType:'text/javascript',body:result.code}));
+    let releaseBundle;
+    const bundleGate = fixture.name === 'Whitebox' ? new Promise(resolve => {releaseBundle=resolve;}) : Promise.resolve();
+    await page.route('**/Script_BrowserBundle.mjs?*', async route => { await bundleGate; await route.fulfill({contentType:'text/javascript',body:result.code}); });
     const started = Date.now();
     await page.goto('http://127.0.0.1:' + server.address().port + '/Taierzhuang1938/?' + fixture.query + '&quality=low&scale=small', {waitUntil:'commit',timeout:60000});
+    if (releaseBundle) {
+      try {
+        await page.waitForFunction(() => document.getElementById('bootStep')?.textContent.startsWith('加载较慢：'), null, {timeout:40000});
+        assert.equal(await page.locator('#bootRetry').count(), 1, 'slow downloads offer an optional retry without reporting failure');
+      } finally { releaseBundle(); }
+    }
     await page.waitForFunction(() => window.Tengxian?.state?.ready, null, {timeout:180000});
     if (fixture.name === 'Whitebox') {
+      assert.equal(await page.locator('#bootRetry').count(), 0, 'normal boot clears the slow-download notice');
       assert.ok(await page.locator('#bootStart').isEnabled());
       await page.locator('#bootStart').click();
       await page.waitForFunction(() => window.Tengxian.state.running && document.getElementById('boot').classList.contains('gone'), null, {timeout:10000});
