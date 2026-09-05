@@ -16,7 +16,7 @@ try {
   const page = await browser.newPage({viewport:{width:1280,height:720}});
   const errors=[];
   page.on("pageerror",e=>errors.push(String(e)));
-  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?weapons=1&shot=1&quality=medium&scale=small`,{timeout:120000});
+  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?weapons=1&shot=1&manual=1&quality=medium&scale=small`,{timeout:120000});
   await page.waitForFunction(()=>window.Taierzhuang?.state?.ready,null,{timeout:180000});
   await page.addStyleTag({content:"#hud,.hud,.edPanel,.edGear{display:none!important}"});
   const report=await page.evaluate(async()=>{
@@ -96,21 +96,43 @@ try {
   await page.evaluate(()=>{
     const T=window.Taierzhuang;
     T.Debug.Key("KeyW",false);T.Debug.Key("ShiftLeft",false);
+    T.player.position.z+=4; // Clear the weapon table for unobstructed look-down evidence.
+    T.viewmodel.Equip("HanYang");
   });
   for(const [name,crouch,prone] of [["Stand",0,0],["Crouch",1,0],["Prone",0,1]]){
-    const body=await page.evaluate(({crouch,prone})=>{
+    const body=await page.evaluate(async({crouch,prone})=>{
       const T=window.Taierzhuang;
-      T.player.pitch=-1.32;
+      const THREE=await import("./vendor/three/build/three.module.js");
+      T.player.pitch=-1.35;
       T.player.stance=prone?"prone":crouch?"crouch":"stand";
       T.StepFrames(45);
       const body=T.viewmodel.body;
-
-      return {visible:body.root.visible,pitch:body.root.rotation.x,roll:body.root.rotation.z,position:body.root.position.toArray(),player:T.player.position.toArray(),prone:T.player.stanceBlend.prone};
+      const vertices=[],point=new THREE.Vector3();
+      body.root.traverse(node=>{
+        if(!node.isSkinnedMesh)return;
+        node.skeleton.update();
+        for(let i=0;i<node.geometry.attributes.position.count;i++){
+          node.getVertexPosition(i,point);point.applyMatrix4(node.matrixWorld);
+          vertices.push(point.clone());
+        }
+      });
+      const top=Math.max(...vertices.map(v=>v.y));
+      const nearDistance=Math.min(...vertices.map(v=>v.distanceTo(T.camera.position)));
+      // The cropped top of the jacket must stay below the screen or behind
+      // the eye. Area alone passed while the camera looked into this opening.
+      const exposedCollar=prone?0:vertices.filter(v=>v.y>top-0.035).filter(v=>{
+        const local=v.clone().applyMatrix4(T.camera.matrixWorldInverse);
+        const ndc=v.clone().project(T.camera);
+        return local.z < -T.camera.near && Math.abs(ndc.x)<1 && ndc.y>-1 && ndc.y<1;
+      }).length;
+      return {visible:body.root.visible,pitch:body.root.rotation.x,roll:body.root.rotation.z,position:body.root.position.toArray(),player:T.player.position.toArray(),nearDistance,exposedCollar};
     },{crouch,prone});
     assert.ok(body.visible,"body remains visible");
     assert.equal(body.pitch,0,"looking down never pitches the body");
     assert.equal(body.roll,0,"camera roll never tilts legs");
-    assert.ok(Math.abs(Math.hypot(body.position[0]-body.player[0],body.position[2]-body.player[2])-(0.18+body.prone*0.65))<0.001,"body stays behind the collar");
+    assert.equal(body.position[1],body.player[1],"body offset preserves the authored foot height");
+    assert.ok(body.nearDistance>0.18,`${name} camera has body clearance (${body.nearDistance} m)`);
+    assert.equal(body.exposedCollar,0,`${name} cropped collar stays outside the view`);
     await page.screenshot({path:path.join(output,`Scene_LookDown${name}.png`)});
     const fraction=await page.evaluate(async()=>{
       const T=window.Taierzhuang;
@@ -132,7 +154,49 @@ try {
     if(!prone)assert.ok(fraction>0.02,`${name} look-down shows the actual body mesh`);
     assert.ok(fraction<0.4,`${name} body never occludes the entire view`);
   }
+  report.bodyTransitions=await page.evaluate(async()=>{
+    const T=window.Taierzhuang;
+    const THREE=await import("./vendor/three/build/three.module.js");
+    const point=new THREE.Vector3(),body=T.viewmodel.body;
+    let minClearance=Infinity,maxExtraStep=0,samples=0,worst=null;
+    for(const yaw of [0,Math.PI/2,Math.PI,-Math.PI/2]){
+      T.player.yaw=yaw;T.player.stance="stand";T.player.pitch=0;T.StepFrames(45,1/60,false);
+      let previous=body.root.position.clone().sub(T.player.position);
+      const previousEye=T.camera.position.clone();
+      for(const stance of ["crouch","prone","stand"])for(let frame=0;frame<60;frame++){
+        T.player.stance=stance;
+        T.player.pitch=-1.35*Math.sin(Math.PI*frame/59);
+        T.StepFrames(1,1/60,false);
+        const offset=body.root.position.clone().sub(T.player.position);
+        // The existing prone transition moves both body and eyes quickly.
+        // Bound any extra visual jump beyond that continuous camera movement,
+        // rather than treating the normal stance transition as a new pop.
+        maxExtraStep=Math.max(maxExtraStep,offset.distanceTo(previous)-T.camera.position.distanceTo(previousEye));
+        previous=offset;previousEye.copy(T.camera.position);
+        if(frame%6)continue;
+        // Match the render pass: SkinnedMesh.updateMatrixWorld refreshes its
+        // attached bind inverse, which updateWorldMatrix alone does not do.
+        body.root.updateMatrixWorld(true);
+        body.root.traverse(node=>{
+          if(!node.isSkinnedMesh)return;
+          node.skeleton.update();
+          for(let i=0;i<node.geometry.attributes.position.count;i++){
+            node.getVertexPosition(i,point);point.applyMatrix4(node.matrixWorld);
+            const distance=point.distanceTo(T.camera.position);
+            if(distance<minClearance){
+              minClearance=distance;
+              worst={stance,frame,yaw,pitch:T.player.pitch,blend:{...T.player.stanceBlend},eye:T.camera.position.toArray(),vertex:point.toArray()};
+            }
+          }
+        });
+        samples++;
+      }
+    }
+    return {minClearance,maxExtraStep,samples,worst};
+  });
   fs.writeFileSync(path.join(output,"Data_Acceptance.json"),JSON.stringify({...report,errors},null,2));
+  assert.ok(report.bodyTransitions.minClearance>0.12,`changing stance and looking down keeps the eye outside the body: ${JSON.stringify(report.bodyTransitions)}`);
+  assert.ok(report.bodyTransitions.maxExtraStep<0.02,"looking down adds no abrupt body jump beyond the stance motion");
   assert.ok(await page.evaluate(()=>{
     const T=window.Taierzhuang;
     T.viewmodel.root.visible=false;T.StepFrames(1);
