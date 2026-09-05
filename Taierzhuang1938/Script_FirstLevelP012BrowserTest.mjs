@@ -495,6 +495,16 @@ async function PlayFrontline() {
           bot.forceMissDone = true;
         }
         bot.previousElapsed = flow.elapsed;
+        if (flow.beatIndex >= 18) {
+          const carry = game.carry.View(), hands = game.Debug.P012CarryView();
+          const signature = [carry?.serial, carry?.phase, hands?.visible, hands?.releasing].join("|");
+          if (bot.frame % 15 === 0 || bot.carryHandsSignature !== signature) {
+            (bot.carryHands ||= []).push({ at: flow.elapsed, beat: flow.beat, attempt: bot.rewindCount || 0,
+              carry: carry ? { kindId: carry.kindId, serial: carry.serial, phase: carry.phase, t: carry.t } : null,
+              alive: game.player.Alive, hands });
+          }
+          bot.carryHandsSignature = signature;
+        }
         // A broken retry must produce bounded, actionable evidence instead of repeating the whole beat forever.
         if ((bot.rewindCount || 0) >= 3) break;
         if (flow.beatIndex === 19 && bot.frame % 3 === 0) {
@@ -905,6 +915,7 @@ async function PlayFrontline() {
       game.Debug.Key("KeyW", false); game.Debug.Mouse(2, false); game.StepFrames(1);
       return { flow: game.Debug.P012(), scene: game.Debug.P012Scene(), health: game.player.health,
         activity: window.p012ActivityTrace || [],
+        carryHands: bot.carryHands || [],
         airViews: window.p012AirViews || [], crowdFireCues: window.p012CrowdFireCues || [], airGroundShots: window.p012AirGroundShots || [],
         airImpacts: window.p012AirImpacts || [],
         escortApproval: window.p012EscortApproval || [],
@@ -1113,6 +1124,19 @@ async function PlayFrontline() {
     Check(result.diveTrace.some(entry => entry.carry === "stretcher") && ending.scene.litterOverturned,
       "同一副担架抬在手里迎来俯冲，真实松手后侧翻，不能预先安全停放",
       JSON.stringify({dive:result.diveTrace,overturned:ending.scene.litterOverturned}));
+    const heldHands=result.carryHands.filter(sample=>sample.alive&&sample.carry?.kindId==="stretcher"
+      &&sample.carry.phase==="carry"&&sample.hands?.gripWeight>=.999);
+    const originalId=ending.scene.litters.find(litter=>litter.originalCarried)?.id;
+    Check(heldHands.some(sample=>sample.beat==="B18")&&heldHands.some(sample=>sample.beat==="B24")
+      &&new Set(heldHands.map(sample=>sample.carry.serial)).size>=2
+      &&heldHands.every(sample=>sample.hands.visible&&sample.hands.litterId===originalId
+        &&["r","l"].every(side=>sample.hands.reachable[side]&&sample.hands.gripError[side]<=.006
+          &&sample.hands.handTranslation[side]<=.006)),
+      "真实搬运和结尾重新握持均抓住同一担架，两手连续可达且无断腕纠偏",
+      JSON.stringify({samples:heldHands.length,originalId,maxError:Math.max(0,...heldHands.flatMap(sample=>Object.values(sample.hands.gripError)))}));
+    Check(result.carryHands.every(sample=>sample.alive||!sample.hands?.visible)
+      &&result.carryHands.some(sample=>sample.beat==="B20"&&!sample.carry&&!sample.hands?.visible),
+      "死亡冻结及俯冲松手后双臂正确隐藏，不保留悬空握持");
     // A rifle shot during the aviation gun's existing 0.18s burst gap is still
     // overlapping pressure. Require real impacts within 0.25s in the same run;
     // merely seeing an egress aircraft, or a phase label without bullets, fails.
@@ -1654,7 +1678,7 @@ async function VerifyAirRouteHandoff(choice) {
         const civilian=game.Debug.P012Scene().airCivilian;
         if(f.rescueFrames%15===0)f.rescueTrace.push({at:f.rescueFrames/30,beat:f.flow.State().beat,position:game.player.position.toArray(),
           target,interaction:point?.id,query:query?.id,carry:game.carry.KindId,carriedS:game.carry.View()?.carriedS,
-          civilian,litters:game.Debug.P012Scene().litters,facts:[...f.flow.facts]});
+          civilian,litters:game.Debug.P012Scene().litters,carryHands:game.Debug.P012CarryView(),facts:[...f.flow.facts]});
         if(civilian?.carried&&game.carry.View()?.carriedS>2&&!f.civilianCarryCaptured){
           f.civilianCarryCaptured=true;capture="CarriedCivilian";break;
         }
@@ -1698,6 +1722,26 @@ async function VerifyAirRouteHandoff(choice) {
     await page.evaluate(()=>{const g=window.Tengxian;g.viewmodel.root.visible=window.p012CarryViewmodelVisible;g.StepFrames(1);});
     if(process.argv.includes("--air-carry")||process.argv.includes("--air-dive"))Check(rescue.flow.beat==="B19"&&rescue.carry==="stretcher",
       "仍抬着同一担架到达沟边后才迎来俯冲",JSON.stringify({beat:rescue.flow.beat,distance:rescue.scene.carryDistance,seconds:rescue.trace.at(-1)?.carriedS}));
+    if(process.argv.includes("--air-carry")||process.argv.includes("--air-dive")){
+      const before=await page.evaluate(()=>({yaw:window.Tengxian.player.yaw,pitch:window.Tengxian.player.pitch}));
+      const hands=[];
+      for(const [name,turn,pitch] of [["LookDown",0,-1.15],["LookLeft",.8,-.85],["LookBack",Math.PI,0]]){
+        const sample=await page.evaluate(({turn,pitch})=>{
+          const g=window.Tengxian,view=g.Debug.P012CarryView();
+          g.player.yaw=view.bodyYaw+turn;g.player.pitch=pitch;g.StepFrames(1);
+          return {hands:g.Debug.P012CarryView(),gunVisible:g.viewmodel.root.visible,bodyVisible:g.viewmodel.body?.root.visible,
+            carry:g.carry.KindId,litterId:g.Debug.P012Scene().litters.find(litter=>litter.originalCarried)?.id};
+        },{turn,pitch});
+        hands.push({name,...sample});
+        await page.screenshot({path:path.join(outputDir,`Scene_P012CarryHands${name}.png`)});
+      }
+      await page.evaluate(before=>{const g=window.Tengxian;g.player.yaw=before.yaw;g.player.pitch=before.pitch;g.StepFrames(1);},before);
+      await fs.writeFile(path.join(outputDir,"Data_P012CarryHands.json"),JSON.stringify({views:hands,travel:rescue.trace.filter(sample=>sample.carry==="stretcher")},null,2));
+      Check(hands.every(sample=>sample.hands?.visible&&sample.bodyVisible&&!sample.gunVisible
+        &&sample.hands.litterId===sample.litterId&&["r","l"].every(side=>sample.hands.reachable[side]
+          &&sample.hands.gripError[side]<=.006&&sample.hands.handTranslation[side]<=.006)),
+        "真实双手握住原担架；低头和回看均保持世界握点，身体可见且枪收起",JSON.stringify(hands));
+    }
     if(process.argv.includes("--air-dive")){
       const dive=await page.evaluate(()=>{
         const game=window.Tengxian,f=window.p012AirFixture,trace=[];
@@ -1712,7 +1756,7 @@ async function VerifyAirRouteHandoff(choice) {
           if(open&&game.player.stance!=="prone")game.Debug.Key("KeyZ");
           game.Debug.Key("KeyW",Math.hypot(dx,dz)>.2);
           game.StepFrames(1,1/30,false);
-          if(frame%3===0)trace.push({at:f.flow.elapsed,carry:view?.kindId,carriedS:view?.carriedS,open,stance:game.player.stance,position:game.player.position.toArray(),run:air?.presetId,phase:air?.phase});
+          if(frame%3===0)trace.push({at:f.flow.elapsed,carry:view?.kindId,carriedS:view?.carriedS,open,stance:game.player.stance,position:game.player.position.toArray(),run:air?.presetId,phase:air?.phase,carryHands:game.Debug.P012CarryView()});
           if(f.flow.State().beatIndex>=20)break;
         }
         game.Debug.Key("KeyW",false);game.StepFrames(1);
@@ -1724,6 +1768,9 @@ async function VerifyAirRouteHandoff(choice) {
         &&dive.scene.litters.find(litter=>litter.originalCarried)?.id===dive.original,
         "真实危险窗按键扑沟，原担架松手侧翻，进入沟内交火",JSON.stringify({beat:dive.flow.beat,original:dive.original,carriedS:dive.carriedS}));
       Check(dive.carriedS>=20&&dive.carriedS<=30,"正常搬运到俯冲之间实际握住担架20至30秒",String(dive.carriedS));
+      Check(dive.trace.some(sample=>sample.carryHands?.releasing)
+        &&dive.trace.some(sample=>sample.carryHands&&!sample.carryHands.visible),
+        "实际强制松手后双臂撤回并隐藏，侧翻后不继续抓住空中握点");
     }
   }
 }

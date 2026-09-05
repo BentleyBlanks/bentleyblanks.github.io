@@ -373,7 +373,7 @@ const changedDomainRules = [
   { domain: "menu", pattern: /(Menu|Style_Interface|BootProp|index\.html)/i },
   { domain: "editor", pattern: /(Editor|Style_Interface|AssetStandards|Pcg|Data_Levels|SamplePoint|Data_Dressing|Data_ExternalAssets|WestSuburbBlocks|_import)/i },
   { domain: "cutscene", pattern: /(Cutscene|Story|Data_Script|TengxianScript|Mission|ActorPose|Train|Data_MissionCh|Companion|Checkpoint)/i },
-  { domain: "render", pattern: /(Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|Vfx|Post|Light|Gi|GlobalShProbe|FirstPersonSelfShadow|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Pcg|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|Mocap|EscortLitter|TexBake|Pbr|PropBatch|PropStreaming|Profiler|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },
+  { domain: "render", pattern: /(Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|FirstLevelP012CarryView|Vfx|Post|Light|Gi|GlobalShProbe|FirstPersonSelfShadow|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Pcg|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|Mocap|EscortLitter|TexBake|Pbr|PropBatch|PropStreaming|Profiler|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },
   { domain: "perf", pattern: /(Performance|FrameProfile|GodRays|Lod|Visibility|ActorBatch|Smoke)/i },
   { domain: "physics", pattern: /vendor\/rapier/i },
   { domain: "infra", pattern: /(Script_TestRunner|Script_DevServer)/i },

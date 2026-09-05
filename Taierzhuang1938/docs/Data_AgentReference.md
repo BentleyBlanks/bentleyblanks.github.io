@@ -203,6 +203,9 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   环境仍是程序化无贴图体块，人物及已烘焙声音复用现有配置。
 - `Script_FirstLevelP012Flow.mjs` 是纯任务事实编排；`Script_FirstLevelP012Runtime.mjs`
   适配真实演员、人流、防守、炮击与扑沟输入。不能以目标时刻或虚拟队头替代真实完成。
+- `Script_FirstLevelP012CarryView.mjs` 复用已加载的双臂骨骼，读取原担架与真实负重状态。
+  握点固定在世界中的担架把手，身体朝向担架，镜头仍可自由回看；不另造担架或改任务事实。
+  `Debug.P012CarryView()` 与浏览器 `--air-dive` 记录握点、松手和实际画面。
 - `Script_FirstLevelP012CastAppearance.mjs` 只在本白盒给具名同伴的衣服使用私有纯色材质；
   不修改人物源资产、肤色或武器，不把临时识别色带入正式关卡。ActorTest 验共享材质隔离。
   同批军人在 `openingIssue` 中实际下车、领械后出发；未领枪的局部空手姿态通过

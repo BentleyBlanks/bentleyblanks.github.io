@@ -45,6 +45,7 @@ import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
 import { FirstLevelP012Runtime } from "./Script_FirstLevelP012Runtime.mjs";
 import { FirstLevelP012Resting } from "./Script_FirstLevelP012Resting.mjs";
+import { FirstLevelP012CarryView, CreateP012StretcherGeometry } from "./Script_FirstLevelP012CarryView.mjs";
 import { AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload, RestoreP012ManualReload } from "./Script_FirstLevelP012Opening.mjs";
 import { FirstLevelP012Binoculars, P012BinocularLensContains } from "./Script_FirstLevelP012Binoculars.mjs";
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
@@ -611,6 +612,7 @@ let checkpoint = null;
 let p012Flow = null;
 let p012Runtime = null;
 let p012Resting = null;
+let p012CarryView = null;
 let p012StageZero = null;
 let p012Binoculars = null;
 let p012BinocularRaised = false;
@@ -2082,6 +2084,7 @@ async function Boot() {
        */
       Setpieces: () => (setpieces ? setpieces.State() : null),
       P012: () => p012Flow?.State() || null,
+      P012CarryView: () => p012CarryView?.Debug() || null,
       P012Environment: () => ({externalCount:battlefield?.externalProps?.count || 0,pcgCount:battlefield?.externalProps?.pcgCount || 0,trimCount:battlefield?.trimProps?.count || 0,
         roots:scene.children.filter(root=>root.userData?.externalProps || /^(ExternalProps_|TrimProps_)/.test(root.name)).map(root=>root.name)}),
       P012Scene: () => p012Runtime ? { ...p012Runtime.Sample(), stageZero:p012StageZero?.Snapshot(), cast:ai.soldiers.filter(actor=>actor.castId).map(actor=>({castId:actor.castId,age:actor.identity?.age,modelVariant:actor.actor?.modelVariant,position:{...actor.position}})), resting:{count:p012Resting?.entries.length||0,people:p012Resting?.Snapshot()||[]}, airColumnEnteredRoad:AirColumnEnteredRoad(setpieces?.mem?.column,player.position,PHASE_TABLE[state.phaseIndex]?.whitebox?.activities), columnPosition: setpieces?.mem?.column?.HeadPosition(), columnRouteIndex: setpieces?.mem?.column?.legIndex,
@@ -2781,7 +2784,8 @@ function MakeSetpieceProp(spec = {}) {
       || (kind === "shroudedBody" ? [0.62, 0.26, 1.92]
         : kind === "stretcher" ? [0.58, 0.14, 1.85]
           : kind === "debris" ? [0.9, 0.22, 0.7] : [0.72, 0.42, 0.48]);
-    const geometry = new THREE.BoxGeometry(size[0], size[1], size[2]);
+    const geometry = whiteboxColors && kind === "stretcher" ? CreateP012StretcherGeometry()
+      : new THREE.BoxGeometry(size[0], size[1], size[2]);
     const material = new THREE.MeshStandardMaterial({
       color: whiteboxColors && kind !== "shroudedBody" && kind !== "stretcher"
         ? whiteboxColors[kind === "debris" ? "ground" : "missionRoute"]
@@ -3019,6 +3023,9 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     setpieces.BeginLevel(contentId, phase);
   }
   interact.Clear("P012");
+  p012CarryView?.Dispose();
+  p012CarryView = phase.whitebox?.p012 && viewmodel?.riggedArms
+    ? new FirstLevelP012CarryView({ scene, sourceRig: viewmodel.riggedArms, bodyRoot: viewmodel.body?.root, camera }) : null;
   p012StageZero?.Dispose(); p012StageZero = null;
   p012Binoculars?.Dispose();
   p012Binoculars = null; // Removed from this scenario: the leader supplies the route.
@@ -4377,6 +4384,9 @@ function OnPlayerDown() {
   }
   if(p012Runtime){
     p012Runtime.failed=true;state.pendingRespawn=false;state.deathTimer=0;
+    // Failure freezes the frame before the ordinary carry-view update runs.
+    p012CarryView?.Update(0, { alive: false });
+    if (viewmodel?.body) viewmodel.body.root.visible = false;
     p012Runtime.retryAtLoad=carry?.Active?{x:player.position.x,z:player.position.z,yaw:player.yaw,stance:player.stance}:null;
     // An active load stays at the death location; only an empty-handed retry returns to a checkpoint.
     audio.Play("bodyFall",{volume:.9});ShowPauseMenu();menu.OpenSandboxFailure(!!p012Runtime.retryAtLoad);return;
@@ -6129,7 +6139,8 @@ function Frame(dt, render = true) {
   // 负重与架设机枪都要收枪（两只手都占着 / 枪背在背上）。**只在边沿写 visible**：
   // 过场、菜单、倒地镜头三处也在切同一个字段，每帧写会互相盖掉。
   // 抬着东西的人被打死时负重会在同一帧卸掉，不挡住的话枪会在尸体镜头里冒出来。
-  const handsBusy = !!carry?.Blocking || !!emplacement?.Blocking || !!p012Runtime?.binocularOwned;
+  const handsBusy = !!carry?.Blocking || !!p012CarryView?.rig.root.visible
+    || !!emplacement?.Blocking || !!p012Runtime?.binocularOwned;
   if (viewmodel?.root && carryHidGun !== handsBusy) {
     carryHidGun = handsBusy;
     if (!state.cutscene && !state.menu && player.Alive) viewmodel.root.visible = !carryHidGun;
@@ -6251,6 +6262,8 @@ function Frame(dt, render = true) {
   profiler.B("viewmodel");
   viewmodel.Update(dt, {
     playerPosition: player.position, playerYaw: player.yaw,
+    carryBodyVisible: !!p012CarryView?.rig.root.visible && !state.cutscene && !state.menu && player.Alive,
+    carryBodyYaw: p012CarryView?.bodyYaw,
     meleeCameraDrop: player.meleeCameraDrop,
     prone: player.stanceBlend.prone, alive: player.Alive,
     dt, moveSpeed: Clamp01(Math.hypot(player.velocity.x, player.velocity.z) / 3.2),
@@ -6456,6 +6469,11 @@ function Frame(dt, render = true) {
   // 排在前面的话每一拍都要慢一帧 —— 「顺子喊完『老子回去压住！』就播转身那一场」
   // 这种同拍的事会看得出来差一帧。
   setpieces?.Update(dt);
+  if (p012CarryView) {
+    const litterId = setpieces?.mem?.p012CarriedLitter?.propLitter;
+    p012CarryView.Update(dt, { litter: setpieceProps.get(String(litterId))?.root,
+      player, carry: carry?.View(), alive: player.Alive && !state.cutscene && !state.menu });
+  }
   // 事件先改变白盒，再让玩家从改变后的世界里读到结果：护送队喊走后开院门，
   // 南路被切断后开归路。不存在悬浮解释卡，也不存在隐形空气墙。
   const openedScenarioGates = battlefield?.SyncScenario?.({
