@@ -673,6 +673,9 @@ function EnsureDebugInventory() {
 
 function ApplyDebugOptions() {
   const options = debugOptions.Get();
+  // 爆炸测试场里玩家一律无敌：这一场的用途是站在坑边看炮坑与弹道，被自己
+  // 召来的炮击炸死再换人，只会把着色器重编那三秒和一张阵亡卡塞进测试里。
+  if (EXPLOSION_TEST) options.invincible = true;
   player?.SetDebugOptions(options);
   EnsureDebugInventory();
   return options;
@@ -2653,7 +2656,8 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   if (gi) gi.SetWorld(battlefield);
   setStep("砌墙（物理）……", base + span);
   await yieldFrame();
-  new TerrainDeformationView(battlefield, scene, library);
+  // 炮坑材质在这里就编译：第一颗手榴弹落地那一帧才建 program 会冻 400 ms。
+  new TerrainDeformationView(battlefield, scene, library).Warm(renderer, camera);
   BuildPhysics();
   if (destruction) destruction.SetWorld(battlefield, physics, null);
 }

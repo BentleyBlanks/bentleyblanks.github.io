@@ -894,6 +894,8 @@ export class DestructionSystem {
     replaceList(this.battlefield.colliders);
     if (this.battlefield.city) replaceList(this.battlefield.city.colliders);
     if (this.battlefield.outfield) replaceList(this.battlefield.outfield.colliders);
+    // 炮坑的「地基保护」掩码是按碰撞盒表记忆的；墙塌了，它脚下的土才准挖。
+    this.battlefield.deformation?.InvalidateDeformMask?.();
 
     if (typeof this.battlefield.BuildCollisionGrid === "function") {
       const grid = this.battlefield.BuildCollisionGrid();

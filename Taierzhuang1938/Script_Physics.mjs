@@ -22,11 +22,12 @@
 //     贴地吸附 + 坡度限制）。爬墙、卡墙、瞬移这三类问题由引擎负责，不再打补丁。
 //   · **抛掷物 / 碎块 / 布娃娃** → 真刚体。
 //   · **地形**由 `GroundHeight(x,z)` 统一采样：未破坏区沿用关卡高度，爆炸区
-//     叠加稀疏高度差；局部渲染网格与 Rapier trimesh 使用完全相同的顶点/索引。
+//     叠加稀疏高度差；局部渲染网格与 Rapier heightfield 使用完全相同的格点高度。
 //
 // 未破坏区继续走 groundAt 兜底，不把整幅世界重建为细网格。炮坑由
-// Script_TerrainDeformationView 调 SetTerrainTile 局部更新；groundAt 在这些块内
-// 与网格使用同一个三角插值。角色、刚体、子弹和脚部 IK 因而读到同一处坑底。
+// Script_TerrainDeformationView 调 SetTerrainTile 局部更新（每块一个 Rapier
+// heightfield，格点与对角线同渲染网格）；groundAt 在这些块内与网格使用同一个
+// 三角插值。角色、刚体、子弹和脚部 IK 因而读到同一处坑底。
 
 import * as THREE from "three";
 import RAPIER from "./vendor/rapier/build/rapier.module.mjs";
@@ -321,14 +322,31 @@ export class PhysicsWorld {
     return best;
   }
 
-  /** Dirty crater tiles use the renderer's exact vertices. They are physical
-   * ground, never obstacle boxes, so they cannot invalidate the navigation grid. */
-  SetTerrainTile(key, positions, indices) {
+  /**
+   * Dirty crater tiles use the renderer's exact lattice. They are physical
+   * ground, never obstacle boxes, so they cannot invalidate the navigation grid.
+   *
+   * The tile is a Rapier heightfield, not a trimesh: building a 2048-triangle
+   * trimesh (BVH + internal-edge fixing) cost ~1.3 ms per tile and a single
+   * grenade touches up to four tiles; a heightfield of the same lattice is
+   * ~0.03 ms. Parry splits every cell along the same anti-diagonal
+   * (x0,z1)-(x1,z0) that `TerrainDeformation.GroundHeight` and the render tile
+   * use, so the collision surface is still bit-for-bit the visible one
+   * (Script_ExplosionRangeTest checks all four sub-cell quadrants).
+   *
+   * @param {string} key   tile key
+   * @param {object} tile  { x0, z0, sizeM, cells, heights }
+   *   heights  Float32Array((cells+1)^2) in Rapier's column-major layout:
+   *            heights[z + x * (cells + 1)] is the corner at lattice (x, z).
+   */
+  SetTerrainTile(key, { x0, z0, sizeM, cells, heights }) {
     this.RemoveTerrainTile(key);
     if (this.disposed) return;
-    const collider = this.world.createCollider(R.ColliderDesc.trimesh(
-      new Float32Array(positions), new Uint32Array(indices), R.TriMeshFlags?.FIX_INTERNAL_EDGES || 0)
-      .setCollisionGroups(IG_WORLD).setFriction(0.8), this.staticBody);
+    const desc = R.ColliderDesc.heightfield(cells, cells, heights, { x: sizeM, y: 1, z: sizeM },
+      R.HeightFieldFlags?.FIX_INTERNAL_EDGES || 0)
+      .setTranslation(x0 + sizeM * 0.5, 0, z0 + sizeM * 0.5)
+      .setCollisionGroups(IG_WORLD).setFriction(0.8);
+    const collider = this.world.createCollider(desc, this.staticBody);
     this.terrainTiles.set(key, collider);
     this.recordByHandle.set(collider.handle, { tag: "dirt", terrain: true, tile: key });
   }

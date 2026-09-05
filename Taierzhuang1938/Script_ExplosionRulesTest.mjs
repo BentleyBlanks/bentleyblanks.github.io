@@ -84,4 +84,49 @@ assert.deepEqual(EXPLOSION_GRENADES.map((g) => g.id).sort(), Object.values(WEAPO
 assert.deepEqual(EXPLOSION_VEHICLES.map((g) => g.id).sort(), Object.values(WEAPONS).filter((w) => w.kind === "vehicle" && w.side === "ija").map((w) => w.id).sort());
 assert.equal(new Set(EXPLOSION_VEHICLES.map((v) => v.z)).size, 1, "lineup is horizontal");
 assert.ok(EXPLOSION_VEHICLES.every((v) => EXPLOSIVES[v.explosive]));
-console.log("PASS ExplosionRulesTest: inventory, ordnance response, stacking/depth/slope, seams, reset, foundations, live-grenade reach/fuse/priority");
+// The four-corner fast path of GroundHeight must equal per-node interpolation
+// everywhere inside allocated tiles, page seams included.
+const seams = new TerrainDeformation({ bounds: { minX: -60, maxX: 60, minZ: -60, maxZ: 60 },
+  GroundHeight: (x, z) => Math.sin(x * 0.7) * 0.3 + Math.cos(z * 0.5) * 0.2 });
+for (const [x, z] of [[8, 8], [7.9, 8.1], [0.2, -0.1], [15.8, 16.2]]) seams.ApplyBlast({ x, y: seams.GroundHeight(x, z), z }, "Shell75");
+const Reference = (x, z) => {
+  const s = TERRAIN_DEFORMATION.cellM, gx = x / s, gz = z / s, ix = Math.floor(gx), iz = Math.floor(gz), u = gx - ix, v = gz - iz;
+  const a = seams.NodeHeight(ix, iz), b = seams.NodeHeight(ix + 1, iz), c = seams.NodeHeight(ix, iz + 1), d = seams.NodeHeight(ix + 1, iz + 1);
+  return u + v <= 1 ? a + u * (b - a) + v * (c - a) : d + (1 - u) * (c - d) + (1 - v) * (b - d);
+};
+let fastChecked = 0;
+for (let z = -4; z <= 20; z += 0.0625) for (let x = -4; x <= 20; x += 0.0625) {
+  if (!seams.HasTile(x, z)) continue;
+  fastChecked++;
+  assert.ok(Math.abs(seams.GroundHeight(x, z) - Reference(x, z)) < 1e-12, `fast GroundHeight matches lattice interpolation at ${x},${z}`);
+}
+assert.ok(fastChecked > 10000, "seam sweep actually covered allocated tiles");
+{
+  // FillTile hands the view the same lattice: one tile plus a one-cell halo.
+  const n = TERRAIN_DEFORMATION.tileCells, w = n + 3, heights = new Float64Array(w * w), deltas = new Float32Array(w * w);
+  assert.equal(seams.FillTile(1, 1, 1, heights, deltas), w);
+  for (let z = 0; z < w; z++) for (let x = 0; x < w; x++) {
+    const ix = n - 1 + x, iz = n - 1 + z;
+    assert.equal(heights[z * w + x], seams.NodeHeight(ix, iz)); assert.equal(deltas[z * w + x], seams.Node(ix, iz));
+  }
+}
+{
+  // The protected-soil memo is a cache, not a rule: it is reused while the
+  // colliders stand and re-asks CanDeform once invalidated.
+  let wall = true, asked = 0, askedFresh = 0;
+  const memo = new TerrainDeformation({ bounds, CanDeform: (x) => { asked++; return !(wall && x > 1.5); } });
+  const fresh = new TerrainDeformation({ bounds, CanDeform: (x) => { askedFresh++; return !(wall && x > 1.5); } });
+  for (let i = 0; i < 8; i++) {
+    memo.ApplyBlast({ x: 0, y: memo.GroundHeight(0, 0), z: 0 }, "Shell75");
+    fresh.InvalidateAllowed(); fresh.ApplyBlast({ x: 0, y: fresh.GroundHeight(0, 0), z: 0 }, "Shell75");
+  }
+  assert.ok(asked < askedFresh * 0.5, `stacked blasts reuse the mask memo (${asked} asks vs ${askedFresh} without it)`);
+  assert.equal(memo.GroundHeight(0, 0), fresh.GroundHeight(0, 0), "memo changes cost, never the crater");
+  assert.equal(memo.GroundHeight(2, 0), 0, "protected while the wall stands");
+  wall = false; memo.ApplyBlast({ x: 1.5, y: memo.GroundHeight(1.5, 0), z: 0 }, "Shell75");
+  assert.equal(memo.GroundHeight(2, 0), 0, "stale memo keeps protecting until told the wall fell");
+  memo.InvalidateAllowed();
+  for (let i = 0; i < 4; i++) memo.ApplyBlast({ x: 1.5, y: memo.GroundHeight(1.5, 0), z: 0 }, "Shell75");
+  assert.ok(memo.GroundHeight(2, 0) < -0.05, "after invalidation the soil under the fallen wall deforms");
+}
+console.log("PASS ExplosionRulesTest: inventory, ordnance response, stacking/depth/slope, seams, reset, foundations, live-grenade reach/fuse/priority, fast lattice path, mask memo");

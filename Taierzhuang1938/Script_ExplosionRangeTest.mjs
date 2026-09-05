@@ -22,10 +22,16 @@ try {
     const t = window.Taierzhuang; t.StepFrames(250);
     return { level: t.Debug.Level().id, pinned: t.state.pinned, snapshot: t.Debug.Explosions.State(),
       models: t.scene.children.filter((c) => c.name.startsWith("ExplosionVehicle_")).map((m) => ({ name: m.name, x: m.position.x, z: m.position.z })),
-      ground: t.scene.children.filter((c) => c.userData.deformableTerrain).length };
+      ground: t.scene.children.filter((c) => c.userData.deformableTerrain).length, invincible: t.player.debug.invincible };
   });
   assert.equal(result.boot.level, "ExplosionRange"); assert.equal(result.boot.models.length, EXPLOSION_VEHICLES.length);
   assert.ok(result.boot.pinned && result.boot.ground > 0);
+  assert.ok(result.boot.invincible, "the explosion range forces the invincible debug option");
+  // The proxies retire through a microtask after their first rendered frame, so
+  // read them from a fresh evaluate rather than the one that stepped the frames.
+  result.warm = await page.evaluate(() => ({ proxies: window.Taierzhuang.Debug.Explosions.State().terrain.warmProxies,
+    inScene: window.Taierzhuang.scene.children.filter((c) => c.userData.terrainWarm).length }));
+  assert.deepEqual(result.warm, { proxies: 0, inScene: 0 }, "crater shader warm-up proxies remove themselves after the first frame");
   assert.equal(await page.evaluate(() => window.Taierzhuang.scene.children.filter((m) =>
     m.material?.isMeshBasicMaterial && /^Static_ExplosionStations/.test(m.name) && m.castShadow).length), 0,
   "instruction boards do not cast bands over crater inspection surfaces");
@@ -53,15 +59,31 @@ try {
       const before = id === "Grenade" ? t.state.grenades : t.state.bundles;
       t.Debug.Key(key, true); t.StepFrames(30); t.Debug.Key(key, false); t.StepFrames(1);
       const launched = t.combat.projectiles.some((p) => p.kind === id);
+      const programs = t.renderer.info.programs.length;
       t.StepFrames(285);
-      return { before, after: id === "Grenade" ? t.state.grenades : t.state.bundles, launched, terrain: field.deformation.State() };
+      return { before, after: id === "Grenade" ? t.state.grenades : t.state.bundles, launched, terrain: field.deformation.State(),
+        programs: [programs, t.renderer.info.programs.length] };
     }, { id, key });
     assert.ok(sample.launched && sample.terrain.lastImpact?.id === id, `${id}: real throw detonates into soil`);
     assert.equal(sample.after, sample.before - 1);
+    assert.equal(sample.programs[1], sample.programs[0], `${id}: the first crater frame compiles no new shader program`);
+    const updateMs = sample.terrain.lastUpdateMs.rules + sample.terrain.lastUpdateMs.surface;
+    assert.ok(updateMs < 60, `${id}: rules + surface rebuild stay far below a frame (${updateMs.toFixed(1)} ms)`);
     result.throws.push(sample);
   }
   assert.ok(result.throws[1].terrain.lastImpact.depth > result.throws[0].terrain.lastImpact.depth);
-  console.log("PASS G/H throws / differentiated physical craters");
+  console.log(`PASS G/H throws / differentiated physical craters / no lazy shader compile (updateMs=${result.throws.map((s) => (s.terrain.lastUpdateMs.rules + s.terrain.lastUpdateMs.surface).toFixed(1)).join("/")})`);
+  result.invincible = await page.evaluate(() => {
+    const t = window.Taierzhuang; t.player.Spawn(2600, 2600, 0); t.StepFrames(2);
+    const before = t.player.health, at = t.player.position.clone();
+    t.combat.Blast(at, 6.5, 130, "grenade", null, false, null, "Grenade");
+    const suppression = t.player.suppression; t.StepFrames(30);
+    return { before, after: t.player.health, alive: t.player.alive, suppression, bleeding: t.player.bleeding };
+  });
+  assert.ok(result.invincible.alive && result.invincible.after === result.invincible.before && result.invincible.bleeding === 0,
+    `point-blank blast leaves the invincible tester untouched: ${JSON.stringify(result.invincible)}`);
+  assert.ok(result.invincible.suppression > 0, "suppression still lands so the blast is felt");
+  console.log("PASS explosion range tester is invincible");
   result.vehicles = [];
   for (const vehicle of EXPLOSION_VEHICLES) {
     const sample = await page.evaluate((id) => {
@@ -210,6 +232,39 @@ try {
   assert.ok(result.traversal.depth > 2.3); assert.ok(Math.abs(result.traversal.rayY - result.traversal.height) < 0.05);
   assert.ok(result.traversal.physicalTerrain && Math.abs(result.traversal.physicalY - result.traversal.height) < 0.02, "real Rapier terrain surface matches mesh/height");
   assert.equal(result.traversal.navBefore, result.traversal.navAfter);
+  result.lattice = await page.evaluate(async () => {
+    const t = window.Taierzhuang, field = t.combat.host.battlefield, view = field.deformation, physics = t.player.physics;
+    const { Raycaster, Vector3 } = await import("three");
+    const s = view.model.config.cellM, meshes = [...view.tileMeshes.values()], down = new Vector3(0, -1, 0);
+    t.scene.updateMatrixWorld(true);
+    // Every quadrant of every cell across the pit walls: a transposed lattice or
+    // the other diagonal would miss by centimetres on these slopes.
+    let samples = 0, worstCollider = 0, worstVisual = 0, otherDiagonal = 0;
+    const model = view.model, Other = (x, z) => {
+      const gx = x / s, gz = z / s, ix = Math.floor(gx), iz = Math.floor(gz), u = gx - ix, v = gz - iz;
+      const a = model.NodeHeight(ix, iz), b = model.NodeHeight(ix + 1, iz), c = model.NodeHeight(ix, iz + 1), d = model.NodeHeight(ix + 1, iz + 1);
+      return u >= v ? a + u * (b - a) + v * (d - b) : a + v * (c - a) + u * (d - c);
+    };
+    for (let z = 2607; z <= 2621; z += s) for (let x = 2593; x <= 2607; x += s) for (const [u, v] of [[0.25, 0.25], [0.75, 0.75], [0.25, 0.75], [0.75, 0.25]]) {
+      const px = x + u * s, pz = z + v * s, expect = field.GroundHeight(px, pz);
+      physics._ray.origin.x = px; physics._ray.origin.y = 10; physics._ray.origin.z = pz;
+      physics._ray.dir.x = 0; physics._ray.dir.y = -1; physics._ray.dir.z = 0;
+      const hit = physics.world.castRayAndGetNormal(physics._ray, 30, true, undefined, undefined, undefined, undefined,
+        (collider) => !!physics.recordByHandle.get(collider.handle)?.terrain);
+      if (!hit) continue;
+      samples++;
+      worstCollider = Math.max(worstCollider, Math.abs(10 - hit.timeOfImpact - expect));
+      const visual = new Raycaster(new Vector3(px, 10, pz), down, 0, 30).intersectObjects(meshes, false)[0];
+      worstVisual = Math.max(worstVisual, visual ? Math.abs(visual.point.y - expect) : Infinity);
+      otherDiagonal = Math.max(otherDiagonal, Math.abs(Other(px, pz) - expect));
+    }
+    return { samples, worstCollider, worstVisual, otherDiagonal, colliderTiles: view.State().colliderTiles, meshes: view.State().meshes };
+  });
+  assert.ok(result.lattice.samples > 2000 && result.lattice.worstCollider < 1e-4 && result.lattice.worstVisual < 1e-4,
+    `heightfield collider and crater mesh reproduce GroundHeight in every sub-cell quadrant: ${JSON.stringify(result.lattice)}`);
+  assert.ok(result.lattice.otherDiagonal > 0.005, "the check can tell the diagonals apart on these slopes");
+  assert.equal(result.lattice.colliderTiles, result.lattice.meshes);
+  console.log(`PASS heightfield lattice/diagonal parity over ${result.lattice.samples} samples`);
   result.npc = await page.evaluate(() => {
     const t = window.Taierzhuang;
     const id = t.Debug.Explosions.State().patrols[0].id;

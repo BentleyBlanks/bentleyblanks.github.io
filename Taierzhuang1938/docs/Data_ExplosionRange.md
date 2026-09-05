@@ -16,6 +16,10 @@
 | 紫色台 | 召唤飞机进场，从机腹释放测试弹，然后爬升飞离；散布读 `EXPLOSION_AIRSTRIKE.radiusM` |
 | 蓝色台 | 取消炮击与空袭，清除在途弹、尾迹、预警粒子、炮坑与土沿；将坑内人物抬回恢复的地面 |
 
+本场玩家**无敌**（装配层在 `ApplyDebugOptions` 里强制 `invincible`，与调试面板的开关
+无关）：压制、屏幕晃动照常，血量与流血不动。它是看坑与弹道的场地，被自己召来的炮击
+炸死再换人，只会把换人时重编着色器的几秒卡顿和一张阵亡卡塞进测试里。
+
 飞机默认不盘旋。只有紫色台呼叫后才出现一架已有轰炸机模型；飞离后重新允许呼叫。
 它从场地远端（-Z）压过来、机头朝飞行方向、掠过玩家头顶后爬升离场；机头朝向由
 `Data_AircraftAssets.mjs` 的 `noseDir` 对齐，见 docs/Data_AircraftAssets.md「朝向」。
@@ -56,8 +60,11 @@
   `SampleJieheHeight`，没有第二套地形公式。基础节点缓存随 Reset / 换关清除。
 - 各场景的 `GroundHeight` 在已分配块内使用同一格点和三角对角线插值；渲染、
   Rapier、玩家、NPC、子弹与 IK 共用。`BaseGroundHeight` 只用于原始地形 / 建筑分类。
-- `TerrainDeformationView` 只重建脏块，裁掉原地表覆盖部分，再提交局部网格与同顶点
-  的 Rapier trimesh。洞在主画面、阴影和深度通道都存在。保留原地表几何以供复原。
+- `TerrainDeformationView` 只重建脏块，裁掉原地表覆盖部分，再提交局部网格与同一组
+  格点高度的 Rapier heightfield（对角线一致，见 `Data_TechPhysics.md`「地表与爆炸形变」）。
+  洞在主画面、阴影和深度通道都存在。保留原地表几何以供复原。
+  炮坑材质在建关时由 `Warm(renderer, camera)` 预编译：一枚代理片提交 `renderer.compile`
+  后放进场景深处画一帧再自行移除；第一颗手榴弹落地那一帧不再同步等驱动链接程序。
 - 土路、耕地与薄地表层按同一格网局部细分，保持原 UV 与边界，随坑底下降。
   识别名单在 `GROUND_OVERLAYS`；新增地表材质须登记并补可见表面 / 碰撞对账。
 - 连续爆炸只加深或扩大已有坑，不会把旧坑填平。深度上限、格距和坡度约束都读
@@ -72,6 +79,24 @@
 - 建筑地基、实体路基、桥、工位与水面受保护；土层方案不负责掏空建筑基础或开挖洞穴。
   静态导航分类读基础地面，避免地面下降把矮物重新认成堵路高墙。
 - 换关或重新载入会清除炮坑。当前没有跨会话炮坑存档；蓝色台提供本关即时复原。
+
+## 爆炸帧预算
+
+一次爆炸是**同一帧内**完成的：伤害、破坏、形变规则、脏块网格、碰撞体、粒子。
+2026-09-05 在爆炸测试场实测（RTX 4070 SUPER / Edge，`Script_ExplosionRangeTest` 的 JSON
+保留 `lastUpdateMs` 供复查），改前后：
+
+| 项 | 改前 | 改后 | 做法 |
+| --- | --- | --- | --- |
+| 首颗手榴弹落地的下一帧 | ~400 ms（编译 `CraterSoilV1`） | 无新 program | 建关时 `Warm()` 预编译 |
+| 每颗手榴弹的爆炸帧（规则 + 网格 + 碰撞） | 10–30 ms | 2–4 ms | 格点改整数键、单次填充带光环的平面数组、heightfield 代替 trimesh、地基掩码记忆 |
+| 正片开新块（城内道路 / 界河） | 160–440 ms | 见下 | 同一帧新开的多块只扫一遍地表三角（`CutTerrainRectangles`）、覆盖层磨损查同一块格点、不再每爆零时间 step |
+| 炮坑块内的 `GroundHeight` | 慢约 100 倍（每次八个字符串键） | 慢约 5 倍 | 同页四角直接读数组 |
+| 阵亡换人 | 约 3 s（换人重编 9 个 program） | 本场不再阵亡 | 场内无敌 |
+
+规则层的数值与旧实现逐节点一致（`Node`/`GroundHeight`/脏块集合全等，旧版留在 git 历史里可复核）。
+`TerrainDeformation.Allowed` 的记忆在碰撞盒表变化时由 `Destruction._Commit` 与
+`TerrainDeformationView.ApplyBlast`（按 `colliders.length`）作废，墙塌后脚下的土才准挖。
 
 ## 考据与调参边界
 
@@ -115,6 +140,8 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=pre
 以及真实土沿高度、重叠爆炸不回填旧坑、堆积沿两面的坡度与地基保护。
 浏览器测试通过正式 F / G / H 输入验证库存、单发战车、持续引信、两种召唤、飞机退场、
 真实网格 / Rapier 射线、玩家和 NPC 穿坑，并在正片道路与界河高程上再做表面对账。
+另核对 heightfield 与 `GroundHeight` 在每个子格四象限一致、首爆不新建 program、
+预热代理片已自行移除、玩家在贴脸爆炸下血量不动，以及单颗手榴弹的形变耗时上限。
 另检查尾迹与真实弹道一致、撞墙截断、空中超时、同时取消炮击与空袭后无延迟爆炸、
 尾迹和预警粒子清理、真实土沿表面对账、坑内人物即时复位。
 截图和 JSON 报告落在 `_shots/ExplosionRange/`；JSON 同时保留形变耗时供性能复查。

@@ -14,7 +14,7 @@ vendor 在 `vendor/rapier/build/rapier.module.mjs`（2.8 MB，wasm 用 base64 �
 | 墙、房、垛口、路基、桥、道具 | Rapier 静态长方体，**带绕 Y 的朝向** | `BuildSink.Solid(...,tag, ry)` |
 | 下载来的 .glb 布景 | 同上，一件一只盒 | `Script_ExternalProps`；见下面「布景也是实物」 |
 | 缸／篮／板凳／条案／晾衣架／梯子／木箱 | 同上 | `Script_LivedInProps`；矮件不进导航图 |
-| 地表 | `GroundHeight(x,z)`；爆炸脏块同时生成 Rapier trimesh | 见下面「地表与爆炸形变」 |
+| 地表 | `GroundHeight(x,z)`；爆炸脏块同时生成 Rapier heightfield | 见下面「地表与爆炸形变」 |
 | 玩家、AI 士兵 | Rapier 运动学角色控制器（胶囊） | 两边同一套解算、同一套尺寸 |
 | 手雷、集束手榴弹 | 动态刚体（球） | 会撞墙弹回、会在地上滚 |
 | 尸体 | 锁旋转的动态胶囊 | 姿势归动画、位移归物理 |
@@ -180,9 +180,13 @@ vendor 在 `vendor/rapier/build/rapier.module.mjs`（2.8 MB，wasm 用 base64 �
 ## 地表与爆炸形变
 
 未受破坏的地表沿用场景原有高度函数；爆炸区通过 `TerrainDeformation`
-叠加稀疏高度差。渲染块与 `PhysicsWorld.SetTerrainTile` 使用相同的顶点 / 索引，
-`GroundHeight` 在这些块内使用同一三角插值，避免画面与碰撞各取一份高度图。
-地表薄覆盖层也随网格细分下降，不能用完整路面盖住坑口。
+叠加稀疏高度差。渲染块与 `PhysicsWorld.SetTerrainTile` 使用同一组格点高度：
+碰撞体是每块一个 Rapier **heightfield**（不是 trimesh —— 2048 三角的 trimesh 建 BVH
+要 1.3 ms/块，一颗手榴弹最多碰四块；heightfield 是 0.03 ms），parry 把每个格子
+沿 (x0,z1)–(x1,z0) 这条反对角线切开，与 `GroundHeight` 的三角插值和渲染块的索引
+完全一致，`Script_ExplosionRangeTest` 对四个子格象限逐点核对。
+高度数组按 Rapier 的列主序填（`heights[z + x * (cells + 1)]`），平移到块中心、
+xz 缩放为块边长、y 缩放 1。地表薄覆盖层也随网格细分下降，不能用完整路面盖住坑口。
 
 整幅世界不必转换为细网格。已有兜底仍消费形变后的 `groundAt`：
 
@@ -194,7 +198,10 @@ vendor 在 `vendor/rapier/build/rapier.module.mjs`（2.8 MB，wasm 用 base64 �
 **AI 视线判据一律不开** —— 那会一次性改掉整套交战节奏，是另一件事。
 局部地形碰撞体也遵循该过滤选项。炮坑不进障碍盒或导航刷新；
 `NavGrid.Refresh` 的建筑高度分类读取 `BaseGroundHeight`，避免土层下陷后矮物变成堵路高墙。
-新建脏块后由 `RefreshStaticQueries` 零时间提交查询拓扑，不额外积分一个玩法帧。
+新建脏块**不再每次**都调 `RefreshStaticQueries`（城里一次零时间 step 约 5 ms）：正常玩法
+下一帧的 `Step` 就把新碰撞体送进 broad phase，其间的高度查询本来就以解析地表兜底；
+只有自上次交付以来物理**没有步进过**（编辑器暂停、同一帧连炸两发）才立即零时间提交。
+只在**格点高度真的变了**的块上重建碰撞体：只因法线光环被标脏的邻块，原碰撞体仍然精确。
 响应目录、叠加与坡度上限、地基保护和测试入口见 [爆炸与地形形变](Data_ExplosionRange.md)。
 
 ## 角色 IK

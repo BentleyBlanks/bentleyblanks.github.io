@@ -30,7 +30,7 @@ export const EXPLOSION_RANGE_PHASE = {
   spawn: { x: 2600, z: 2692, ry: 0 },
   zones: [{ id: "ExplosionTest", name: "爆炸测试场", x: 2600, z: 2668, radius: 5 }],
   objectives: ["F 交互 · G/H 投弹 · 橙色台炮击 · 紫色台召唤飞机"],
-  brief: ["桌上备齐木柄与集束手榴弹。按 F 领取，G/H 按住蓄力、松开投出；靠近活手雷按 F 返掷，引信继续倒计时。",
+  brief: ["桌上备齐木柄与集束手榴弹。按 F 领取，G/H 按住蓄力、松开投出；靠近活手雷按 F 返掷，引信继续倒计时。本场玩家无敌，只吃压制不掉血。",
     "三辆战车依次为八九式、九五式、九七式。走到车尾按 F 向前开一炮。橙色台呼叫远程炮击，紫色台召唤飞机投弹；蓝色台恢复地形并结束空袭。"],
   loadoutOverride: { primary: "HanYang", secondary: "Mauser96", melee: "Dadao", throwables: { Grenade: 0, GrenadeBundle: 0 }, spareClips: 12 },
 };

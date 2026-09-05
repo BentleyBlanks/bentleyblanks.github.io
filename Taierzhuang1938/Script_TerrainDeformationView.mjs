@@ -1,8 +1,9 @@
 // Sparse dirty-tile adapter. Original terrain triangles are clipped out once per
 // allocated tile, so the crater is a real hole in every render pass (including
 // depth, shadow and SSAO), with no coplanar overlay or special discard shader.
-// Each tile's mesh and Rapier trimesh share one position/index buffer. Baseline
-// ground sampling remains owned by the field (including SampleJieheHeight).
+// Each tile's mesh and Rapier heightfield are filled from one lattice pass with
+// the same corner heights and diagonal. Baseline ground sampling remains owned
+// by the field (including SampleJieheHeight).
 import * as THREE from "three";
 import { TerrainDeformation } from "./Script_TerrainDeformation.mjs";
 import { TERRAIN_DEFORMATION } from "./Data_Explosives.mjs";
@@ -24,12 +25,27 @@ function ClipPolygon(polygon, axis, edge, sign) {
   return ClipByDistance(polygon, (v) => (v[axis] - edge) * sign);
 }
 
-export function CutTerrainRectangle(mesh, rect, { AllowTriangle = null, OnCut = null } = {}) {
+export function CutTerrainRectangle(mesh, rect, options = {}) { return CutTerrainRectangles(mesh, [rect], options); }
+
+/**
+ * Remove the parts of a terrain mesh that fall inside any of `rects` (one per
+ * freshly allocated crater tile), re-triangulating the remainder. All rects are
+ * handled in a single pass over the triangles: a blast that opens four tiles used
+ * to scan the whole ground mesh four times, and on the river map that scan was
+ * most of the blast frame. OnCut receives the index of the rect a piece fell in.
+ */
+export function CutTerrainRectangles(mesh, rects, { AllowTriangle = null, OnCut = null } = {}) {
+  if (!rects.length) return false;
   const geometry = mesh.geometry, pos = geometry.attributes.position;
   if (!geometry.boundingBox) geometry.computeBoundingBox();
   mesh.updateMatrixWorld(true);
   const worldBox = geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld);
-  if (worldBox.max.x <= rect.minX || worldBox.min.x >= rect.maxX || worldBox.max.z <= rect.minZ || worldBox.min.z >= rect.maxZ) return false;
+  const union = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+  for (const r of rects) {
+    union.minX = Math.min(union.minX, r.minX); union.maxX = Math.max(union.maxX, r.maxX);
+    union.minZ = Math.min(union.minZ, r.minZ); union.maxZ = Math.max(union.maxZ, r.maxZ);
+  }
+  if (worldBox.max.x <= union.minX || worldBox.min.x >= union.maxX || worldBox.max.z <= union.minZ || worldBox.min.z >= union.maxZ) return false;
   const attrs = Object.entries(geometry.attributes).filter(([, a]) => a.itemSize <= 4);
   const index = geometry.index, count = index?.count || pos.count;
   const offsets = []; let stride = 0;
@@ -42,14 +58,36 @@ export function CutTerrainRectangle(mesh, rect, { AllowTriangle = null, OnCut = 
   const worldPositions = identity ? pos.array : new Float32Array(pos.count * 3);
   if (!identity) for (let i = 0; i < pos.count; i++) temp.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld).toArray(worldPositions, i * 3);
   const Emit = (polygon) => { for (let k = 1; k < polygon.length - 1; k++) data.push(...polygon[0], ...polygon[k], ...polygon[k + 1]); };
+  const overlapping = [];
+  let up = 0, cutAny = false;
+  // Pieces outside one rect may still fall inside the next; pieces outside all
+  // of them are what survives.
+  const Cut = (polygon, r) => {
+    if (polygon.length < 3) return;
+    if (r === overlapping.length) { Emit(polygon); return; }
+    const rect = rects[overlapping[r]];
+    let inside = polygon;
+    for (const [axis, edge, sign] of [[pOffset, rect.minX, 1], [pOffset, rect.maxX, -1], [pOffset + 2, rect.minZ, 1], [pOffset + 2, rect.maxZ, -1]]) {
+      if (inside.length < 3) break;
+      const clipped = ClipPolygon(inside, axis, edge, sign);
+      Cut(clipped.outside, r + 1); inside = clipped.inside;
+    }
+    if (inside.length >= 3) { cutAny = true; OnCut?.(inside, offsets, pOffset, up, overlapping[r]); }
+  };
   for (let i = 0; i < count; i += 3) {
     const ai = index ? index.getX(i) : i, bi = index ? index.getX(i + 1) : i + 1, ci = index ? index.getX(i + 2) : i + 2;
     const ax = worldPositions[ai * 3], az = worldPositions[ai * 3 + 2];
     const bx = worldPositions[bi * 3], bz = worldPositions[bi * 3 + 2];
     const cx = worldPositions[ci * 3], cz = worldPositions[ci * 3 + 2];
-    if (Math.max(ax, bx, cx) <= rect.minX || Math.min(ax, bx, cx) >= rect.maxX
-      || Math.max(az, bz, cz) <= rect.minZ || Math.min(az, bz, cz) >= rect.maxZ) { kept.push(ai, bi, ci); continue; }
-    const up = (bz - az) * (cx - ax) - (bx - ax) * (cz - az);
+    const minX = Math.min(ax, bx, cx), maxX = Math.max(ax, bx, cx), minZ = Math.min(az, bz, cz), maxZ = Math.max(az, bz, cz);
+    if (maxX <= union.minX || minX >= union.maxX || maxZ <= union.minZ || minZ >= union.maxZ) { kept.push(ai, bi, ci); continue; }
+    overlapping.length = 0;
+    for (let r = 0; r < rects.length; r++) {
+      const rect = rects[r];
+      if (!(maxX <= rect.minX || minX >= rect.maxX || maxZ <= rect.minZ || minZ >= rect.maxZ)) overlapping.push(r);
+    }
+    if (!overlapping.length) { kept.push(ai, bi, ci); continue; }
+    up = (bz - az) * (cx - ax) - (bx - ax) * (cz - az);
     if (!AllowTriangle && up <= 1e-9) { kept.push(ai, bi, ci); continue; }
     const tri = [];
     for (const at of [ai, bi, ci]) {
@@ -60,13 +98,9 @@ export function CutTerrainRectangle(mesh, rect, { AllowTriangle = null, OnCut = 
     }
     if (AllowTriangle && !AllowTriangle(tri, pOffset, up)) { kept.push(ai, bi, ci); continue; }
     const start = data.length;
-    let polygon = tri;
-    for (const [axis, edge, sign] of [[pOffset, rect.minX, 1], [pOffset, rect.maxX, -1], [pOffset + 2, rect.minZ, 1], [pOffset + 2, rect.maxZ, -1]]) {
-      if (!polygon.length) break;
-      const cut = ClipPolygon(polygon, axis, edge, sign);
-      Emit(cut.outside); polygon = cut.inside;
-    }
-    if (polygon.length >= 3) { removed = true; OnCut?.(polygon, offsets, pOffset, up); }
+    cutAny = false;
+    Cut(tri, 0);
+    if (cutAny) removed = true;
     else { data.length = start; kept.push(ai, bi, ci); }
   }
   if (!removed) return false;
@@ -190,11 +224,19 @@ export class TerrainDeformationView {
     this.material = (this.sources[0]?.material || groundMaterial).clone();
     const sourceMaterial = this.sources[0]?.material || groundMaterial;
     ConfigureCraterSurface(this.material, sourceMaterial, this.soilMaterial);
+    // Overlay materials are cloned up front, not at the first crater on a road:
+    // Warm() has to compile every crater program the level can ever need.
+    for (const source of this.overlaySources) this.OverlayMaterial(source);
     this.model = new TerrainDeformation({ GroundHeight: this.originalHeight, bounds: field.bounds,
       CanDeform: (x, z) => this.CanDeform(x, z) });
     field.BaseGroundHeight = this.originalHeight;
     field.GroundHeight = (x, z) => this.model.GroundHeight(x, z);
     field.deformation = this;
+    this.maskColliders = field.colliders?.length ?? 0;
+    this.warmProxies = [];
+    const w = this.model.config.tileCells + 3;
+    this._heights = new Float64Array(w * w); this._deltas = new Float32Array(w * w); this._wear = new Float32Array(w * w);
+    this.lastUpdateMs = null; this.lastStepSerial = -1;
   }
   CanDeform(x, z) {
     if (!this.sources.length) return false;
@@ -209,7 +251,63 @@ export class TerrainDeformationView {
     }
     return true;
   }
+  /** The collider table changed under the memoised deform mask (destruction, editor). */
+  InvalidateDeformMask() { this.maskColliders = this.field.colliders?.length ?? 0; this.model.InvalidateAllowed(); }
   AttachPhysics(physics) { this.physics = physics; }
+  OverlayMaterial(source) {
+    let material = this.overlayMaterials.get(source.material);
+    if (!material) {
+      material = source.material.clone(); material.vertexColors = true;
+      ConfigureCraterSurface(material, source.material, this.soilMaterial);
+      this.overlayMaterials.set(source.material, material);
+    }
+    return material;
+  }
+  /**
+   * Build the crater programs before the first blast needs them.
+   *
+   * three compiles lazily: the first frame that drew a crater tile blocked
+   * ~400 ms in the driver's link/getUniforms while the grenade smoke was still
+   * rising. One one-cell proxy per crater material is submitted through
+   * renderer.compile (translation now, linking on the driver's thread) and
+   * parked in the scene far below the level with culling off, so the level's
+   * own first frame is the first use. Each proxy removes itself after that
+   * frame; nothing stays behind.
+   */
+  Warm(renderer, camera) {
+    this.RemoveWarmProxies();
+    if (!renderer || !camera || !this.sources.length) return this.warmProxies;
+    const b = this.field.bounds, materials = [this.material, ...new Set(this.overlayMaterials.values())];
+    const group = new THREE.Group();
+    for (const [i, material] of materials.entries()) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1], 3));
+      geometry.setAttribute("normal", new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0], 3));
+      geometry.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, 0, 1, 1, 0, 1, 1], 2));
+      geometry.setAttribute("color", new THREE.Float32BufferAttribute([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 3));
+      geometry.setAttribute("terrainDelta", new THREE.BufferAttribute(new Float32Array(8), 2));
+      geometry.setIndex([0, 1, 2, 2, 1, 3]);
+      const mesh = new THREE.Mesh(geometry, material); mesh.name = `TerrainWarm_${i}`;
+      mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
+      mesh.position.set((b.minX + b.maxX) * 0.5, -500, (b.minZ + b.maxZ) * 0.5);
+      mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.userData.terrainWarm = true;
+      mesh.onAfterRender = () => {
+        if (mesh.userData.warmed) return;
+        mesh.userData.warmed = true;
+        // Not inside the render: the other passes of this frame still draw it.
+        queueMicrotask(() => this.RemoveWarmProxies());
+      };
+      group.add(mesh); this.warmProxies.push(mesh);
+    }
+    try { renderer.compile(group, camera, this.scene); }
+    catch (error) { console.warn("[TerrainDeformationView] crater shader precompile failed", error); }
+    for (const mesh of this.warmProxies) this.scene.add(mesh);
+    return this.warmProxies;
+  }
+  RemoveWarmProxies() {
+    for (const mesh of this.warmProxies) { this.scene.remove(mesh); mesh.geometry.dispose(); }
+    this.warmProxies.length = 0;
+  }
   SoilWear(x, z) {
     const ix = Math.round(x / this.model.config.cellM), iz = Math.round(z / this.model.config.cellM);
     let wear = Math.abs(this.model.Node(ix, iz));
@@ -221,62 +319,76 @@ export class TerrainDeformationView {
     }
     return wear;
   }
-  CutSource(source, rect, options) {
+  /** Cut every rect of this Flush out of one source in a single triangle pass. */
+  CutSource(source, rects, options) {
     const before = source.geometry;
-    if (!CutTerrainRectangle(source, rect, options)) return false;
+    if (!CutTerrainRectangles(source, rects, options)) return false;
     if (!this.originalGeometry.has(source)) this.originalGeometry.set(source, before);
     else before.dispose();
     return true;
   }
-  MakeOverlays(key, rect) {
-    const meshes = [];
+  /** `keys[i]` is the tile whose rect is `rects[i]`; all are freshly allocated. */
+  MakeOverlays(keys, rects) {
+    const meshesByTile = keys.map(() => []);
     for (const source of this.overlaySources) {
-      const polygons = [];
-      this.CutSource(source, rect, {
+      const polygonsByTile = keys.map(() => []);
+      this.CutSource(source, rects, {
         AllowTriangle: (tri, p) => tri.every((v) => Math.abs(v[p + 1] - this.originalHeight(v[p], v[p + 2])) < 1),
-        OnCut: (polygon, attrs, p, up) => { if (up > 1e-9) polygons.push({ polygon, attrs, p }); },
+        OnCut: (polygon, attrs, p, up, tile) => { if (up > 1e-9) polygonsByTile[tile].push({ polygon, attrs, p }); },
       });
-      if (!polygons.length) continue;
-      const geometry = MakeOverlayGeometry(polygons, this.model.config.cellM);
-      if (!geometry) continue;
-      const original = geometry.userData.basePositions, baseHeights = new Float64Array(original.length / 3);
-      for (let i = 0; i < baseHeights.length; i++) baseHeights[i] = this.model.BaseHeight(original[i * 3], original[i * 3 + 2]);
-      geometry.userData.baseHeights = baseHeights;
-      geometry.setAttribute("terrainDelta", new THREE.BufferAttribute(new Float32Array(baseHeights.length * 2), 2).setUsage(THREE.DynamicDrawUsage));
-      let material = this.overlayMaterials.get(source.material);
-      if (!material) {
-        material = source.material.clone(); material.vertexColors = true;
-        ConfigureCraterSurface(material, source.material, this.soilMaterial);
-        this.overlayMaterials.set(source.material, material);
+      for (let tile = 0; tile < keys.length; tile++) {
+        const polygons = polygonsByTile[tile];
+        if (!polygons.length) continue;
+        const geometry = MakeOverlayGeometry(polygons, this.model.config.cellM);
+        if (!geometry) continue;
+        const original = geometry.userData.basePositions, baseHeights = new Float64Array(original.length / 3);
+        for (let i = 0; i < baseHeights.length; i++) baseHeights[i] = this.model.BaseHeight(original[i * 3], original[i * 3 + 2]);
+        geometry.userData.baseHeights = baseHeights;
+        geometry.setAttribute("terrainDelta", new THREE.BufferAttribute(new Float32Array(baseHeights.length * 2), 2).setUsage(THREE.DynamicDrawUsage));
+        const mesh = new THREE.Mesh(geometry, this.OverlayMaterial(source)); mesh.name = `TerrainSurface_${keys[tile]}_${source.name}`;
+        mesh.receiveShadow = source.receiveShadow; mesh.castShadow = source.castShadow;
+        mesh.onBeforeRender = source.onBeforeRender; mesh.onAfterRender = source.onAfterRender;
+        mesh.customDepthMaterial = source.customDepthMaterial;
+        this.scene.add(mesh); meshesByTile[tile].push(mesh);
       }
-      const mesh = new THREE.Mesh(geometry, material); mesh.name = `TerrainSurface_${key}_${source.name}`;
-      mesh.receiveShadow = source.receiveShadow; mesh.castShadow = source.castShadow;
-      mesh.onBeforeRender = source.onBeforeRender; mesh.onAfterRender = source.onAfterRender;
-      mesh.customDepthMaterial = source.customDepthMaterial;
-      this.scene.add(mesh); meshes.push(mesh);
     }
-    this.overlayTiles.set(key, meshes);
+    for (let tile = 0; tile < keys.length; tile++) this.overlayTiles.set(keys[tile], meshesByTile[tile]);
   }
-  UpdateOverlays(key) {
+  /**
+   * Re-drape a tile's surface overlays. `wear` is the soil-wear lattice the tile
+   * pass just filled (width w, local index (lz + 1) * w + lx + 1); overlay
+   * vertices were clipped to the tile so they round onto it, and the 9-node
+   * lookup per vertex that SoilWear() does is then a single array read.
+   */
+  UpdateOverlays(key, tx = null, tz = null, wear = null, w = 0) {
+    const s = this.model.config.cellM, n = this.model.config.tileCells;
     for (const mesh of this.overlayTiles.get(key) || []) {
-      const geo = mesh.geometry, pos = geo.attributes.position, color = geo.attributes.color;
-      const original = geo.userData.basePositions, baseColor = geo.userData.baseColors;
-      for (let i = 0; i < pos.count; i++) {
-        const x = original[i * 3], z = original[i * 3 + 2], baseline = geo.userData.baseHeights[i];
-        const ground = this.model.GroundHeight(x, z), delta = baseline - ground, depth = Math.abs(delta);
+      const geo = mesh.geometry, pos = geo.attributes.position.array, color = geo.attributes.color.array, delta = geo.attributes.terrainDelta.array;
+      const original = geo.userData.basePositions, baseColor = geo.userData.baseColors, baseHeights = geo.userData.baseHeights;
+      const count = geo.attributes.position.count;
+      for (let i = 0; i < count; i++) {
+        const x = original[i * 3], z = original[i * 3 + 2], baseline = baseHeights[i];
+        const ground = this.model.GroundHeight(x, z), d = baseline - ground, depth = Math.abs(d);
         // Intact surface retains its old crown. Exposed deep soil converges on
         // the shared collision surface with only a subpixel rendering offset.
         const crown = original[i * 3 + 1] - baseline;
-        pos.setY(i, ground + crown * Math.max(0, 1 - depth / 0.18) + (depth > 0 ? 0.003 : 0));
-        color.setXYZ(i, baseColor[i * 3], baseColor[i * 3 + 1], baseColor[i * 3 + 2]);
-        geo.attributes.terrainDelta.setXY(i, delta, this.SoilWear(x, z));
+        pos[i * 3 + 1] = ground + crown * Math.max(0, 1 - depth / 0.18) + (depth > 0 ? 0.003 : 0);
+        color[i * 3] = baseColor[i * 3]; color[i * 3 + 1] = baseColor[i * 3 + 1]; color[i * 3 + 2] = baseColor[i * 3 + 2];
+        let soil;
+        if (wear) {
+          const lx = Math.round(x / s) - tx * n + 1, lz = Math.round(z / s) - tz * n + 1;
+          soil = lx >= 1 && lx <= n + 1 && lz >= 1 && lz <= n + 1 ? wear[lz * w + lx] : this.SoilWear(x, z);
+        } else soil = this.SoilWear(x, z);
+        delta[i * 2] = d; delta[i * 2 + 1] = soil;
       }
-      pos.needsUpdate = true; color.needsUpdate = true;
+      geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true;
       geo.attributes.terrainDelta.needsUpdate = true;
       geo.computeVertexNormals(); geo.computeBoundingBox(); geo.computeBoundingSphere();
     }
   }
   ApplyBlast(position, kind) {
+    const colliders = this.field.colliders?.length ?? 0;
+    if (colliders !== this.maskColliders) this.InvalidateDeformMask();
     const start = performance.now();
     const hit = this.model.ApplyBlast(position, kind);
     const rulesEnd = performance.now();
@@ -285,15 +397,16 @@ export class TerrainDeformationView {
     return hit;
   }
   Flush() {
-    const { cellM: s, tileCells: n } = this.model.config, width = n + 1;
-    const dirty = this.model.TakeDirty();
-    for (const key of dirty) {
-      const [tx, tz] = key.split(",").map(Number), x0 = tx * n * s, z0 = tz * n * s;
-      let mesh = this.tileMeshes.get(key);
-      if (!mesh) {
-        const rect = { minX: x0, maxX: x0 + n * s, minZ: z0, maxZ: z0 + n * s };
-        for (const source of this.sources) this.CutSource(source, rect);
-        this.MakeOverlays(key, rect);
+    const { cellM: s, tileCells: n } = this.model.config, width = n + 1, w = n + 3, sizeM = n * s;
+    const dirty = this.model.TakeDirty(), heights = this._heights, deltas = this._deltas, wear = this._wear;
+    // Fresh tiles first: cut all of their rects out of every source in one pass.
+    const tiles = dirty.map((key) => { const [tx, tz] = key.split(",").map(Number); return { key, tx, tz, x0: tx * sizeM, z0: tz * sizeM }; });
+    const fresh = tiles.filter((tile) => !this.tileMeshes.has(tile.key));
+    if (fresh.length) {
+      const rects = fresh.map((tile) => ({ minX: tile.x0, maxX: tile.x0 + sizeM, minZ: tile.z0, maxZ: tile.z0 + sizeM }));
+      for (const source of this.sources) this.CutSource(source, rects);
+      this.MakeOverlays(fresh.map((tile) => tile.key), rects);
+      for (const { key, tx, tz, x0, z0 } of fresh) {
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(width * width * 3), 3).setUsage(THREE.DynamicDrawUsage));
         geometry.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(width * width * 3), 3).setUsage(THREE.DynamicDrawUsage));
@@ -305,28 +418,60 @@ export class TerrainDeformationView {
           if (x < n && z < n) indices.push(at, at + width, at + 1, at + 1, at + width, at + width + 1);
         }
         geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2)); geometry.setIndex(indices);
-        mesh = new THREE.Mesh(geometry, this.material); mesh.name = `TerrainCrater_${tx}_${tz}`;
-        mesh.receiveShadow = true; mesh.castShadow = true; mesh.userData.terrainTile = key;
+        const mesh = new THREE.Mesh(geometry, this.material); mesh.name = `TerrainCrater_${tx}_${tz}`;
+        mesh.receiveShadow = true; mesh.castShadow = true; mesh.userData.terrainTile = key; mesh.userData.fresh = true;
         this.scene.add(mesh); this.tileMeshes.set(key, mesh);
       }
-      const geo = mesh.geometry, position = geo.attributes.position, color = geo.attributes.color, normals = geo.attributes.normal;
-      for (let z = 0; z <= n; z++) for (let x = 0; x <= n; x++) {
-        const ix = tx * n + x, iz = tz * n + z, at = z * width + x;
-        const y = this.model.NodeHeight(ix, iz), depth = this.model.Node(ix, iz);
-        position.setXYZ(at, ix * s, y, iz * s);
-        const nx = this.model.NodeHeight(ix - 1, iz) - this.model.NodeHeight(ix + 1, iz);
-        const nz = this.model.NodeHeight(ix, iz - 1) - this.model.NodeHeight(ix, iz + 1);
-        const norm = Math.hypot(nx, 2 * s, nz); normals.setXYZ(at, nx / norm, 2 * s / norm, nz / norm);
-        color.setXYZ(at, 1, 1, 1);
-        geo.attributes.terrainDelta.setXY(at, depth, this.SoilWear(ix * s, iz * s));
-      }
-      position.needsUpdate = true; normals.needsUpdate = true; color.needsUpdate = true;
-      geo.attributes.terrainDelta.needsUpdate = true;
-      geo.computeBoundingBox(); geo.computeBoundingSphere();
-      this.physics?.SetTerrainTile(key, position.array, geo.index.array);
-      this.UpdateOverlays(key);
     }
-    if (dirty.length) this.physics?.RefreshStaticQueries();
+    let rebuilt = 0;
+    for (const { key, tx, tz, x0, z0 } of tiles) {
+      const mesh = this.tileMeshes.get(key), isFresh = mesh.userData.fresh === true;
+      mesh.userData.fresh = false;
+      // One pass over the lattice with a one-cell halo: heights, normals and
+      // soil wear all come from the same two flat arrays instead of a string-
+      // keyed lookup per neighbour (that lookup used to be the blast frame).
+      this.model.FillTile(tx, tz, 1, heights, deltas);
+      const geo = mesh.geometry, attributes = geo.attributes;
+      const pos = attributes.position.array, nrm = attributes.normal.array, col = attributes.color.array, del = attributes.terrainDelta.array;
+      const field = new Float32Array(width * width);
+      let moved = isFresh;
+      for (let z = 0; z <= n; z++) {
+        for (let x = 0; x <= n; x++) {
+          const at = z * width + x, local = (z + 1) * w + x + 1, y = heights[local];
+          if (pos[at * 3 + 1] !== y) moved = true;
+          pos[at * 3] = (tx * n + x) * s; pos[at * 3 + 1] = y; pos[at * 3 + 2] = (tz * n + z) * s;
+          const nx = heights[local - 1] - heights[local + 1], nz = heights[local - w] - heights[local + w];
+          const norm = Math.hypot(nx, 2 * s, nz);
+          nrm[at * 3] = nx / norm; nrm[at * 3 + 1] = 2 * s / norm; nrm[at * 3 + 2] = nz / norm;
+          col[at * 3] = 1; col[at * 3 + 1] = 1; col[at * 3 + 2] = 1;
+          let soil = Math.abs(deltas[local]);
+          for (let dz = -w; dz <= w; dz += w) for (let dx = -1; dx <= 1; dx++) {
+            const v = Math.abs(deltas[local + dz + dx]) * 0.85;
+            if (v > soil) soil = v;
+          }
+          del[at * 2] = deltas[local]; del[at * 2 + 1] = soil; wear[local] = soil;
+          // Rapier heightfield layout: column-major, rows along z.
+          field[z + x * width] = y;
+        }
+      }
+      attributes.position.needsUpdate = true; attributes.normal.needsUpdate = true;
+      attributes.color.needsUpdate = true; attributes.terrainDelta.needsUpdate = true;
+      geo.computeBoundingBox(); geo.computeBoundingSphere();
+      // A halo tile only re-lights its seam; its surface did not move, so the
+      // collider it already has is still exact.
+      if (this.physics && (moved || !this.physics.terrainTiles.has(key))) {
+        this.physics.SetTerrainTile(key, { x0, z0, sizeM, cells: n, heights: field }); rebuilt++;
+      }
+      this.UpdateOverlays(key, tx, tz, wear, w);
+    }
+    if (rebuilt && this.physics) {
+      // Gameplay steps the world every frame and the next Step publishes the new
+      // colliders (height queries fall back to the analytic surface meanwhile).
+      // Only when nothing has stepped since the last hand-off (paused editor,
+      // same-frame double impact) is a zero-dt step worth its ~5 ms in the city.
+      if (this.physics.stepSerial === this.lastStepSerial) this.physics.RefreshStaticQueries();
+      this.lastStepSerial = this.physics.stepSerial;
+    }
   }
   Reset() {
     for (const [source, original] of this.originalGeometry) { source.geometry.dispose(); source.geometry = original; }
@@ -335,14 +480,15 @@ export class TerrainDeformationView {
     for (const meshes of this.overlayTiles.values()) for (const mesh of meshes) { this.scene.remove(mesh); mesh.geometry.dispose(); }
     this.overlayTiles.clear();
     this.tileMeshes.clear(); this.model.Clear();
+    this.maskColliders = this.field.colliders?.length ?? 0;
     this.physics?.RefreshStaticQueries();
   }
   State() { return { ...this.model.State(), meshes: this.tileMeshes.size,
-    lastUpdateMs: this.lastUpdateMs || null,
+    lastUpdateMs: this.lastUpdateMs || null, warmProxies: this.warmProxies.length,
     overlays: [...this.overlayTiles.values()].reduce((sum, meshes) => sum + meshes.length, 0),
     colliderTiles: this.physics?.terrainTiles.size || 0 }; }
   Dispose() {
-    this.Reset(); this.material.dispose();
+    this.RemoveWarmProxies(); this.Reset(); this.material.dispose();
     for (const material of this.overlayMaterials.values()) material.dispose();
     this.overlayMaterials.clear(); this.field.GroundHeight = this.originalHeight; this.field.deformation = null;
   }
