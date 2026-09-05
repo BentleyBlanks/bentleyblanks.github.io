@@ -85,7 +85,7 @@ export class GraphicsSettings {
 
   Enter(root) {
     this.panel = Panel({
-      title: "画质设置", sub: "Script_Post",
+      title: "画质设置", sub: "",
       variant: "work", onClose: () => this.host.Close(),
     });
     root.appendChild(this.panel.root);
@@ -117,8 +117,6 @@ export class GraphicsSettings {
       format: (v) => `${Math.round(v * 100)}%`,
       onInput: (v) => { gfx.renderScale = v; this.Apply(); },
     });
-    Note(perf, "整条合成链都按这个尺寸走：减到 70% 大约省掉一半的合成开销，"
-      + "而画面只是软一点（最后一 pass 会拉回屏幕分辨率）。这是唯一真正省时间的一根。");
 
     const shadowBox = document.createElement("div");
     shadowBox.className = "edBtns";
@@ -128,27 +126,22 @@ export class GraphicsSettings {
       gfx.firstPersonSelfShadow = on;
       this.Apply();
     });
-    Chips(perf, [
-      { value: 0, label: "出厂" }, { value: 512, label: "512" },
+    const shadowSize = Section(perf, "阴影分辨率");
+    Chips(shadowSize, [
+      { value: 0, label: "默认" }, { value: 512, label: "512" },
       { value: 1024, label: "1k" }, { value: 2048, label: "2k" }, { value: 4096, label: "4k" },
     ], gfx.shadowSize, (v) => { gfx.shadowSize = Number(v); this.Apply(); });
-    Note(perf, "阴影是编译期 #define：开关它要重编译全场材质，卡几百毫秒。"
-      + "「第一人称自阴影（First Person Self-Shadow）」另画一张只含手臂与武器的小阴影图，"
-      + "不会把镜头前的枪影投到墙上；它服从阴影总闸。", true);
 
-    const giBox = Section(body, "全局光照（实时探针体）");
+    const giBox = Section(body, "光照");
     const giRow = document.createElement("div");
     giRow.className = "edBtns";
     giBox.appendChild(giRow);
-    Toggle(giRow, "探针体 GI（默认关）", gfx.gi === true, (on) => { gfx.gi = on; this.Apply(); });
+    Toggle(giRow, "实时全局光照", gfx.gi === true, (on) => { gfx.gi = on; this.Apply(); });
     Slider(giBox, {
       label: "间接光强度", min: 0, max: 2, step: 0.05, value: gfx.giStrength ?? 1,
       format: (v) => `×${v.toFixed(2)}`,
       onInput: (v) => { gfx.giStrength = v; this.Apply(); },
     });
-    Note(giBox, "默认：通用 SH Probe + 冷灰蓝环境光，无实时 GI pass。打开才启用半实时探针，"
-      + "走动或换时段要一两秒收敛（low 档不建探针体，此栏无效）。"
-      + "「间接光强度」是整份间接漫反射的倍率，只整体变亮。", true);
 
     const aa = Section(body, "抗锯齿");
     const aaRow = document.createElement("div");
@@ -158,19 +151,13 @@ export class GraphicsSettings {
       gfx.taa = on;
       this.Apply();
     });
-    Note(aa, "照搬 UE 的缺省方案：Halton 八相位子像素抖动 + 邻域裁剪的历史累积，"
-      + "跑在泛光之前的线性 HDR 域。开着时最后一趟的 FXAA 自动让位 —— 两层叠加"
-      + "只会把画面糊软一层，而锐化两种路子都保留。");
-    Note(aa, "关掉退回 FXAA：便宜不拖影，但细长边（屋脊、电线、枪管）移动时会爬。"
-      + "出厂 low 档关、medium 及以上开，可热切。", true);
 
     const post = Section(body, "后处理强度（倍率）");
     const godBox = document.createElement("div");
     godBox.className = "edBtns";
     post.appendChild(godBox);
-    Toggle(godBox, "体积光（临时默认关）", gfx.godEnabled === true,
+    Toggle(godBox, "体积光", gfx.godEnabled === true,
       (on) => { gfx.godEnabled = on; this.Save(); });
-    Note(post, "出厂关着（在看它对帧率的影响）。这是总闸：关掉连径向模糊都不跑，比强度拉 0 更省。", true);
     const Mul = (key, label) => Slider(post, {
       label, min: 0, max: 2, step: 0.05, value: gfx[key],
       format: (v) => `×${v.toFixed(2)}`,
@@ -182,28 +169,21 @@ export class GraphicsSettings {
     Mul("motionBlur", "运动模糊");
     Mul("grain", "颗粒");
     Mul("vignette", "暗角");
-    Note(post, "这些是乘在**天光预设**算出来的值上的。预设决定这一关长什么样"
-      + "（曝光、雾色、泛光阈值是美术意图），设置只决定画多重 —— 两者不许混。");
 
     const view = Section(body, "视场");
     Slider(view, {
-      label: "FOV", min: 40, max: 90, step: 1, value: gfx.fov,
+      label: "视野角度", min: 40, max: 90, step: 1, value: gfx.fov,
       format: (v) => `${v.toFixed(0)}°`,
       onInput: (v) => { gfx.fov = v; this.Save(); },
     });
-    Note(view, "出厂 55°：Easy Red 2 那种「周围很远、人很小但看得清」的观感靠窄视场。"
-      + "70° 以上会把巷战拉成鱼眼，远处的人缩成一个点，尺度感全没了。开镜倍率是"
-      + "按武器的 adsFovScale 乘在这上面的，改这里不会影响瞄准倍率。");
 
-    const level = Section(body, "画质档（要重开页面）");
+    const level = Section(body, "画质档位（切换将刷新）");
     ButtonRow(level, [
       { label: "low", onClick: () => this.Reload("low") },
       { label: "medium", onClick: () => this.Reload("medium") },
       { label: "high", onClick: () => this.Reload("high") },
       { label: "ultra", onClick: () => this.Reload("ultra") },
     ]);
-    Note(level, "MSAA 采样数、AO 靶比例、泛光级数是 PostPipeline **建靶时**定死的，"
-      + "热切不了。所以这一栏老老实实带 ?quality= 刷新，不假装能实时换。");
 
     const stat = Section(body, "读数");
     this.facts = Facts(stat);
