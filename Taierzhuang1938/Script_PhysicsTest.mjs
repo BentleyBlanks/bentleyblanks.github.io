@@ -512,7 +512,24 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
   const r = await page.evaluate(() => {
     const T = window.Taierzhuang;
     const p = T.player;
-    const spot = T.physics.FindFreeSpot(p.position.x + 8, p.position.z - 6, 0.6, 1.9, 24);
+    const bf = T.battlefield;
+    // Keep the platform and its exit area clear. A character-sized free spot
+    // does not guarantee that a larger test platform fits beside existing walls.
+    let spot = null;
+    for (let ring = 0; ring <= 24 && !spot; ring += 3) {
+      for (let index = 0; index < 12 && !spot; index += 1) {
+        const angle = index * Math.PI / 6;
+        const x = p.position.x + 8 + Math.cos(angle) * ring;
+        const z = p.position.z - 6 + Math.sin(angle) * ring;
+        const y = bf.GroundHeight(x, z), clearance = 2.4;
+        const blocked = bf.colliders.some(box => box.max[1] > y + .05 && box.min[1] < y + 2
+          && box.min[0] < x + clearance && box.max[0] > x - clearance
+          && box.min[2] < z + clearance && box.max[2] > z - clearance);
+        const flat = [[-2,-2],[-2,2],[2,-2],[2,2]].every(([dx,dz]) => Math.abs(bf.GroundHeight(x+dx,z+dz)-y) < .03);
+        if (!blocked && flat && !T.physics.Overlaps(x, y + .03, z, .35, 1.9)) spot = { x, y, z, clearance };
+      }
+    }
+    if (!spot) return { fixtureFailed: "no clear platform and exit area" };
     const maxAlive = T.ai.maxAlive; let s;
     try {
       T.ai.maxAlive = Math.max(maxAlive, T.ai.aliveCount + 1);
@@ -529,10 +546,18 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
     const box = { c: [spot.x, g0 + 0.7, spot.z], h: [0.8, 0.7, 0.8], ry: 0, tag: "testGrave",
       min: [spot.x - 0.8, g0, spot.z - 0.8], max: [spot.x + 0.8, g0 + 1.4, spot.z + 0.8] };
     const handle = T.physics.AddSolid(box);
-    const bf = T.battlefield;
-    const key = Math.floor(spot.x / bf.gridSize) * 100003 + Math.floor(spot.z / bf.gridSize);
-    if (!bf.grid.has(key)) bf.grid.set(key, []);
-    bf.grid.get(key).push(box);
+    const keys = [];
+    for (let x = Math.floor(box.min[0] / bf.gridSize); x <= Math.floor(box.max[0] / bf.gridSize); x++) {
+      for (let z = Math.floor(box.min[2] / bf.gridSize); z <= Math.floor(box.max[2] / bf.gridSize); z++) {
+        const key = x * 100003 + z;
+        if (!bf.grid.has(key)) bf.grid.set(key, []);
+        bf.grid.get(key).push(box); keys.push(key);
+      }
+    }
+    const support = [[0,0],[0,.75],[0,-.75],[.35,0],[-.35,0]].map(([dx,dz]) => ({
+      dx, dz, indexed: bf.BoxesNear(spot.x+dx,spot.z+dz).includes(box),
+      height: bf.StandHeight(spot.x+dx,spot.z+dz,g0+1.4),
+    }));
     T.StepFrames(2);
     s.body.Teleport(spot.x, g0 + 1.4, spot.z);
     s.position.set(spot.x, g0 + 1.4, spot.z);
@@ -544,18 +569,23 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
       if (s.actor.ragdollState) maxDroop = Math.max(maxDroop, s.actor.ragdollState.droopArms || 0);
     }
     T.physics.RemoveSolid(handle);
-    const cell = bf.grid.get(key); const at = cell.indexOf(box); if (at >= 0) cell.splice(at, 1);
+    for (const key of keys) {
+      const cell = bf.grid.get(key), at = cell?.indexOf(box) ?? -1;
+      if (at >= 0) cell.splice(at, 1);
+    }
     const ground = bf.GroundHeight(s.position.x, s.position.z);
     const out = {
       off: Math.hypot(s.position.x - spot.x, s.position.z - spot.z),
       rest: s.position.y - ground, top: g0 + 1.4, maxDroop, settled: s.corpseSettled,
-      tiltX: s.actor.root.rotation.x, tiltZ: s.actor.root.rotation.z,
+      tiltX: s.actor.root.rotation.x, tiltZ: s.actor.root.rotation.z, fixture: { spot, keys, support },
     };
     T.ai.Remove(s);
     return out;
   });
   if (r.fixtureFailed) Check("台顶的尸体滑到地上", false, `夹具失败：${r.fixtureFailed}`);
   else {
+    Check("小平台在完整网格登记，初始五个支撑采样均命中台顶",
+      r.fixture.support.every(sample => sample.indexed && Math.abs(sample.height-r.top) < .001), JSON.stringify(r.fixture));
     Check("台顶的尸体滑到地上并落定",
       r.off > 1.0 && Math.abs(r.rest) < 0.2 && r.settled,
       `滑出 ${r.off.toFixed(2)} m，离地 ${r.rest.toFixed(2)} m（台顶原高 1.4 m），落定=${r.settled}`);

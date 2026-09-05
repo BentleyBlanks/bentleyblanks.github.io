@@ -2415,7 +2415,8 @@ export class Viewmodel {
       this.riggedArms.Update(step);
     }
     if (!this.weapon && !this.riggedArms) this._UpdateUnarmedHands(gait, sprint, grounded ? 1 : 0);
-    this.body?.Update(step, input.carryBodyVisible ? { ...input, playerYaw: input.carryBodyYaw ?? input.playerYaw } : input,
+    this.body?.Update(step, input.carryBodyVisible ? { ...input, playerYaw: input.carryBodyYaw ?? input.playerYaw,
+      crouch: Math.max(input.crouch || 0, input.carryBodyCrouch || 0) } : input,
       parent, (this.root.visible || !!input.carryBodyVisible) && !(input.meleeCameraDrop > 0.05));
     this._UpdateSleeves();
   }

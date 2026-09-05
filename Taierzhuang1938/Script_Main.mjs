@@ -6264,6 +6264,7 @@ function Frame(dt, render = true) {
     playerPosition: player.position, playerYaw: player.yaw,
     carryBodyVisible: !!p012CarryView?.rig.root.visible && !state.cutscene && !state.menu && player.Alive,
     carryBodyYaw: p012CarryView?.bodyYaw,
+    carryBodyCrouch: p012CarryView?.BodyCrouch || 0,
     meleeCameraDrop: player.meleeCameraDrop,
     prone: player.stanceBlend.prone, alive: player.Alive,
     dt, moveSpeed: Clamp01(Math.hypot(player.velocity.x, player.velocity.z) / 3.2),

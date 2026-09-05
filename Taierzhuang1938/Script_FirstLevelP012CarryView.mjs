@@ -21,6 +21,7 @@ export const P012_STRETCHER_GRIPS = Object.freeze({
 const ARM_ANCHOR_HEIGHT_M = 1.68;
 const LIFT_SECONDS = 0.24;
 const RELEASE_SECONDS = 0.18;
+const LOAD_CROUCH = 0.12;
 
 const Clamp01 = value => Math.max(0, Math.min(1, value));
 const Smooth = value => value * value * (3 - 2 * value);
@@ -200,6 +201,10 @@ export class FirstLevelP012CarryView {
     this._yawQuaternion.setFromAxisAngle(this._up, this.anchor.rotation.y).invert();
     target.quaternion.copy(this._yawQuaternion).multiply(this.lastWorldRotation[side]).multiply(this.gripQuaternion[side]);
   }
+
+  // A small knee/hip flex supports the low handles. Blend the existing body
+  // pose with the load, leaving camera clearance, feet and collision unchanged.
+  get BodyCrouch() { return LOAD_CROUCH * Smooth(this.weight); }
 
   Debug() {
     return {
