@@ -18,11 +18,13 @@ import bpy
 from mathutils import Matrix, Vector
 
 BACK_RIFLE_CONFIG = {
-    'clip': 'BackRifleRun', 'fps': 60, 'cycleFrames': 44,
-    'referenceSpeedMps': 2.6, 'stanceFraction': 0.38,
-    'pelvisHeight': 0.862, 'pelvisBounce': 0.025,
-    'flightLift': 0.29, 'torsoLeanRadians': 0.19,
-    'armSwingRadians': 0.65, 'armFlexRadians': 1.48,
+    'clip': 'BackRifleRun', 'fps': 120, 'cycleFrames': 88,
+    'referenceSpeedMps': 2.6, 'stanceFraction': 0.35,
+    'revision': 'NaturalRunV2',
+    'pelvisHeight': 0.884, 'pelvisBounce': 0.027,
+    'flightLift': 0.30, 'torsoLeanRadians': 0.15,
+    'armSwingRadians': 0.51, 'armFlexRadians': 1.46,
+    'footTravelBiasMeters': 0.08, 'toeOffPitchRadians': 0.60,
     'slingWidthMeters': 0.027,
 }
 root = Path(globals().get('BACK_RIFLE_ROOT', Path.cwd()))
@@ -104,20 +106,28 @@ def FootPath(phase):
         y = -travel / 2 + speed * cycle * phase
         lift = 0
         # Heel rises into toe-off; midstance remains flat and locked.
-        u = max(0, (phase - stance + 0.08) / 0.08)
-        pitch = 0.52 * u*u*(3-2*u)
+        u = max(0, (phase - stance + 0.13) / 0.13)
+        pitch = BACK_RIFLE_CONFIG['toeOffPitchRadians'] * u*u*u*(10-15*u+6*u*u)
     else:
         u = (phase - stance) / (1-stance)
         # Hermite endpoints preserve backward support velocity across both seams.
-        h00 = 2*u**3 - 3*u*u + 1
-        h10 = u**3 - 2*u*u + u
-        h01 = -2*u**3 + 3*u*u
-        h11 = u**3 - u*u
         tangent = speed * cycle * (1-stance)
-        y = h00*travel/2 + h10*tangent - h01*travel/2 + h11*tangent
-        lift = BACK_RIFLE_CONFIG['flightLift'] * math.sin(math.pi*u)**1.35
-        pitch = 0.52*(1-u)**2 - 0.20*math.sin(math.pi*u)
-    return y, lift, pitch
+        y = Hermite(u, [(0,travel/2,tangent),(0.13,travel/2+0.04,0),(0.60,-travel/2+0.06,-1.5),(0.84,-travel/2-0.035,0),(1,-travel/2,tangent)])
+        # Early heel recovery, then unfolding under the knee. Unlike a symmetric
+        # sine arc this does not hold the shoe high in front of the body.
+        # Keep clearance through terminal swing so the extending knee never
+        # pulls a low shoe beyond the leg's anatomical reach.
+        lift = BACK_RIFLE_CONFIG['flightLift'] * Hermite(u, [(0,0,0),(0.24,0.85,3),(0.38,1,0),(0.66,0.53,-2),(0.85,0.25,-1.8),(1,0,0)])
+        pitch = Hermite(u, [(0,0.60,0), (0.23,0.85,0), (0.62,-0.12,0), (1,0,0)])
+    return y + BACK_RIFLE_CONFIG['footTravelBiasMeters'], lift, pitch
+
+def Hermite(t, keys):
+    """Value/derivative keys, derivatives measured per full gait cycle."""
+    for (a,x,dx),(b,y,dy) in zip(keys,keys[1:]):
+        if t <= b:
+            u=max(0,(t-a)/(b-a));span=b-a
+            return (2*u**3-3*u*u+1)*x+(u**3-2*u*u+u)*dx*span+(-2*u**3+3*u*u)*y+(u**3-u*u)*dy*span
+    return keys[-1][1]
 
 # Shoe vertices are measured from the evaluated skin, not a bone tail heuristic.
 shoeIndices = {}
@@ -135,14 +145,21 @@ def ShoeMinima():
 def Pose(phase, corrections=None):
     corrections = corrections or {'L':0, 'R':0}
     theta = 2*math.pi*phase
-    pelvis = Vector((0.016*math.sin(theta), pelvisRest.y, BACK_RIFLE_CONFIG['pelvisHeight']-BACK_RIFLE_CONFIG['pelvisBounce']*math.cos(2*theta-0.8)))
-    pelvisRotation = Rotation('Z', 0.075*math.sin(theta)) @ Rotation('Y', 0.022*math.cos(theta))
+    # Weight drops after contact, rises through push-off, peaks during flight.
+    # Matching derivatives at the half-cycle seam avoid a landing pop.
+    heightOffset=Hermite(phase%0.5, [(0,0,-22.22),(0.10,-1,0),(0.25,-0.04,11.85),(0.38,1.15,7.40),(0.43,1.33,0),(0.5,0,-22.22)])
+    # The boundary derivatives above are in height units, like the interior keys.
+    pelvis = Vector((0.010*math.sin(theta-0.25), pelvisRest.y, BACK_RIFLE_CONFIG['pelvisHeight']+BACK_RIFLE_CONFIG['pelvisBounce']*heightOffset))
+    pelvisRotation = Rotation('Z', 0.065*math.sin(theta-0.12)) @ Rotation('X',0.025) @ Rotation('Y', 0.022*math.cos(theta-0.25))
     PutBone(BoneName('Pelvis'), pelvis, pelvisRotation)
-    torsoRotation = Rotation('Z', -0.085*math.sin(theta)) @ Rotation('X', BACK_RIFLE_CONFIG['torsoLeanRadians'] + 0.018*math.cos(2*theta)) @ Rotation('Y', -0.025*math.cos(theta))
-    for part in ['Spine', 'Spine1', 'Spine2', 'Neck', 'Head']:
-        p = pelvis + torsoRotation.to_3x3() @ (head[BoneName(part)]-pelvisRest)
-        r = torsoRotation if part not in ['Head','Neck'] else Rotation('Z', -0.025*math.sin(theta)) @ Rotation('X', 0.065)
+    parentPart='Pelvis';parentPoint=pelvis;parentRotation=pelvisRotation
+    for part,fraction in [('Spine',0.35),('Spine1',0.72),('Spine2',1),('Neck',0.35),('Head',0.25)]:
+        p=parentPoint+parentRotation.to_3x3()@(head[BoneName(part)]-head[BoneName(parentPart)])
+        twist=0.065*(1-fraction)*math.sin(theta-0.12)-0.065*fraction*math.sin(theta-0.30)
+        r=Rotation('Z',twist)@Rotation('X',BACK_RIFLE_CONFIG['torsoLeanRadians']*fraction+0.010*fraction*math.sin(2*theta-0.5))@Rotation('Y',-0.016*fraction*math.cos(theta-0.10))
         PutBone(BoneName(part), p, r)
+        if part=='Spine2': chestPoint=p.copy();torsoRotation=r.copy()
+        parentPart=part;parentPoint=p;parentRotation=r
     for side, offset, sign in [('L',0,1),('R',0.5,-1)]:
         footPhase = (phase+offset)%1
         y, lift, pitch = FootPath(footPhase)
@@ -151,7 +168,13 @@ def Pose(phase, corrections=None):
         # Toe pivot prevents the heel roll from driving the toe through the floor.
         toeDelta = head[BoneName(side+' Toe0')]-head[BoneName(side+' Foot')]
         footRotation = Rotation('X',pitch)
-        ankle.z += max(0, toeDelta.z-(footRotation.to_3x3()@toeDelta).z)
+        # Roll around the metatarsal, with a fixed ground contact during push-off.
+        # Fade out the pivot correction only after the foot has left the ground.
+        pivotWeight=1 if footPhase<=stance else max(0,1-((footPhase-stance)/0.20))
+        pivotWeight=pivotWeight*pivotWeight*(3-2*pivotWeight)
+        pivotDelta=toeDelta-footRotation.to_3x3()@toeDelta
+        ankle.y += pivotDelta.y*pivotWeight
+        ankle.z += max(0,pivotDelta.z)
         upperLength=(head[BoneName(side+' Calf')]-head[BoneName(side+' Thigh')]).length
         lowerLength=(head[BoneName(side+' Foot')]-head[BoneName(side+' Calf')]).length
         knee=SolveKnee(hip,ankle,upperLength,lowerLength)
@@ -159,14 +182,16 @@ def Pose(phase, corrections=None):
         AimBone(BoneName(side+' Calf'),BoneName(side+' Foot'),knee,ankle)
         PutBone(BoneName(side+' Foot'),ankle,footRotation)
         toe=ankle+footRotation.to_3x3()@toeDelta
-        PutBone(BoneName(side+' Toe0'),toe,footRotation)
-        clavicle=pelvis+torsoRotation.to_3x3()@(head[BoneName(side+' Clavicle')]-pelvisRest)
+        # The toes stay on the floor as the heel rises, then relax in flight.
+        toeRotation=Rotation('X',pitch*(1-pivotWeight))
+        PutBone(BoneName(side+' Toe0'),toe,toeRotation)
+        clavicle=chestPoint+torsoRotation.to_3x3()@(head[BoneName(side+' Clavicle')]-head[BoneName('Spine2')])
         PutBone(BoneName(side+' Clavicle'),clavicle,torsoRotation)
-        shoulder=pelvis+torsoRotation.to_3x3()@(head[BoneName(side+' UpperArm')]-pelvisRest)
-        armTheta=BACK_RIFLE_CONFIG['armSwingRadians']*math.cos(2*math.pi*footPhase)
-        armFlex=BACK_RIFLE_CONFIG['armFlexRadians']+0.13*math.sin(2*math.pi*footPhase-0.3)
-        upperDirection=Vector((sign*0.12, math.sin(armTheta), -math.cos(armTheta))).normalized()
-        lowerDirection=Vector((sign*0.035,math.sin(armTheta-armFlex),-math.cos(armTheta-armFlex))).normalized()
+        shoulder=chestPoint+torsoRotation.to_3x3()@(head[BoneName(side+' UpperArm')]-head[BoneName('Spine2')])
+        armTheta=0.05+BACK_RIFLE_CONFIG['armSwingRadians']*math.cos(2*math.pi*footPhase-0.13)
+        armFlex=BACK_RIFLE_CONFIG['armFlexRadians']-0.14*math.cos(2*math.pi*footPhase-0.45)
+        upperDirection=torsoRotation.to_3x3()@Vector((sign*0.09, math.sin(armTheta), -math.cos(armTheta))).normalized()
+        lowerDirection=torsoRotation.to_3x3()@Vector((-sign*0.04,math.sin(armTheta-armFlex),-math.cos(armTheta-armFlex))).normalized()
         elbow=shoulder+upperDirection*(head[BoneName(side+' Forearm')]-head[BoneName(side+' UpperArm')]).length
         wrist=elbow+lowerDirection*(head[BoneName(side+' Hand')]-head[BoneName(side+' Forearm')]).length
         AimBone(BoneName(side+' UpperArm'),BoneName(side+' Forearm'),shoulder,elbow)
@@ -187,7 +212,9 @@ for bone in arm.pose.bones:
         fingerDirection=rest[bone.name].to_3x3().col[0].normalized()
         palmNormal=rest[BoneName(side+' Hand')].to_3x3().col[1].normalized()
         curlAxis=rest[bone.name].to_3x3().inverted()@fingerDirection.cross(palmNormal)
-        curlAngle=0.32 if 'Finger0' in bone.name else (0.70 if len(bone.name.rsplit('Finger',1)[1])==1 else 0.85)
+        digit=bone.name.rsplit('Finger',1)[1]
+        joint=0 if len(digit)==1 else int(digit[-1])
+        curlAngle=([0.88,0.65,0.45][joint] if digit.startswith('0') else [1.30,1.10,0.70][joint])
         bone.rotation_quaternion = Matrix.Rotation(curlAngle,4,curlAxis).to_quaternion()
 
 samples=[]

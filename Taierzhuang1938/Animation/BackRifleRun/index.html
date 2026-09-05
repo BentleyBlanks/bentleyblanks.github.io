@@ -9,23 +9,24 @@
 <script type="importmap">{"imports":{"three":"../../vendor/three/build/three.module.js"}}</script>
 </head>
 <body>
-<header><div><div class="eyebrow">TAIERZHUANG 1938 / ANIMATION STUDY</div><h1>国军 · 背枪跑步</h1><p>同一循环的侧面与背面。可暂停、拖动帧，并调整移动速度检查脚底滑动。</p></div><div class="badge">独立审查资产 · 未接入生产跑步</div></header>
+<header><div><div class="eyebrow">TAIERZHUANG 1938 / ANIMATION STUDY</div><h1>国军 · 背枪跑步</h1><p>同一循环的侧面与背面。落地缓冲、后蹬收腿与肩胯反向摆动。可逐帧检查，也可切换半速和斜前视角。</p></div><div class="badge">独立审查资产 · 未接入生产跑步</div></header>
 <div class="views"><div class="view"><label>侧面 / SIDE</label><canvas id="side"></canvas></div><div class="view"><label>背面 / BACK</label><canvas id="back"></canvas></div></div>
-<div class="controls"><button id="play">暂停</button><label>速度 <input id="speed" type="range" min="1.8" max="4.2" step="0.1" value="2.6"> <output id="speedValue">2.6 m/s</output></label><label class="scrub">帧 <input id="phase" type="range" min="0" max="44" step="1" value="0"> <output id="frameValue">01 / 44</output></label><label><input id="travel" type="checkbox" checked> 地面位移参照</label></div>
+<div class="controls"><button id="play">暂停</button><label>速度 <input id="speed" type="range" min="1.8" max="4.2" step="0.1" value="2.6"> <output id="speedValue">2.6 m/s</output></label><label><input id="slow" type="checkbox"> 半速审查</label><button id="angle">斜前视角</button><label class="scrub">帧 <input id="phase" type="range" min="0" max="88" step="1" value="0"> <output id="frameValue">01 / 88</output></label><label><input id="travel" type="checkbox" checked> 地面位移参照</label></div>
 <div class="facts"><div><span>动作 / 骨架</span><strong>BackRifleRun · LugouNra01</strong></div><div><span>循环 / 步频</span><strong id="timing">正在读取资产…</strong></div><div><span>步枪 / 挂点</span><strong>中正式 · Socket_BackRifle</strong></div><div><span>根运动</span><strong>原地循环 · 位移由游戏提供</strong></div></div>
 <p id="status" role="status">正在加载独立 GLB…</p>
-<div class="downloads"><a class="download" href="Animation_LugouNraBackRifleRun.blend" download>Blender 源工程</a><a class="download" href="Animation_LugouNraBackRifleRun.glb" download>独立 GLB 动画</a><a class="download" href="Animation_BackRifleRunSide.webp" download>侧面循环 WebP</a><a class="download" href="Animation_BackRifleRunBack.webp" download>背面循环 WebP</a><a class="download" href="Data_BackRifleRun.json">动作参数</a></div>
+<div class="downloads"><a class="download" href="Animation_LugouNraBackRifleRun.blend?v=NaturalRunV2" download>Blender 源工程</a><a class="download" href="Animation_LugouNraBackRifleRun.glb?v=NaturalRunV2" download>独立 GLB 动画</a><a class="download" href="Animation_BackRifleRunSide.webp?v=NaturalRunV2" download>侧面循环 WebP</a><a class="download" href="Animation_BackRifleRunBack.webp?v=NaturalRunV2" download>背面循环 WebP</a><a class="download" href="Data_BackRifleRun.json?v=NaturalRunV2">动作参数</a></div>
 <details><summary>导入与审查约定</summary><p>保留原国军骨名与蒙皮，使用胸椎 <code>Bip002 Spine2</code> 的独立背枪挂点。枪和连续跨肩绑带随胸椎约束。GLB 源朝 +Z；将来接入游戏时沿用 <code>MODEL_FORWARD_YAW</code>，只翻转一次。播放倍率为真实移动速度除以资产基准速度；若导入时做了整体缩放，还需再除以缩放倍率。规范步幅在基准速度下验收，高低速度用于兼容检查。</p><p>本页不载入游戏逻辑，不替换现有 <code>RifleRun</code>。这一资产的完成与技术验证不代表已获生产替换批准。</p></details>
 <footer>BlenderMCP 制作 · 原国军人物与中正式几何 · 新步态与摆臂曲线</footer>
 <script type="module">
 import * as THREE from 'three';
 import {GLTFLoader} from '../../vendor/three/examples/jsm/loaders/GLTFLoader.js';
 import {clone as CloneSkeleton} from '../../vendor/three/examples/jsm/utils/SkeletonUtils.js';
-let playing=true,phaseSeconds=0,previous=performance.now(),rate=1;
+let playing=true,phaseSeconds=0,previous=performance.now(),rate=1,travelMeters=0;
+const assetRevision='NaturalRunV2';
 const views=[];const scratch=new THREE.Vector3();
 const Get=(id)=>document.getElementById(id);
 try {
-const [asset,config]=await Promise.all([new GLTFLoader().loadAsync('./Animation_LugouNraBackRifleRun.glb'),fetch('./Data_BackRifleRun.json').then(r=>r.json())]);
+const [asset,config]=await Promise.all([new GLTFLoader().loadAsync('./Animation_LugouNraBackRifleRun.glb?v='+assetRevision),fetch('./Data_BackRifleRun.json?v='+assetRevision).then(r=>r.json())]);
 const clip=asset.animations.find(a=>a.name===config.clip);if(!clip)throw new Error('Missing BackRifleRun clip');
 function MakeView(id,position){
  const renderer=new THREE.WebGLRenderer({canvas:Get(id),antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(640,640,false);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -34,23 +35,25 @@ function MakeView(id,position){
  const fill=new THREE.DirectionalLight(0xb8d5ff,1.1);fill.position.set(3,3,-3);scene.add(fill);
  const character=CloneSkeleton(asset.scene);scene.add(character);character.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;}});
  const floor=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x37444d,roughness:1}));floor.rotation.x=-Math.PI/2;floor.position.y=-0.002;floor.receiveShadow=true;scene.add(floor);
- const grid=new THREE.GridHelper(12,24,0x56616a,0x46515a);grid.position.y=0.001;scene.add(grid);
+ const grid=new THREE.GridHelper(config.strideMeters*6,24,0x46515a,0x46515a);grid.position.y=0.001;scene.add(grid);
  const camera=new THREE.OrthographicCamera(-1.12,1.12,1.12,-1.12,0.01,40);camera.position.set(...position);camera.lookAt(0,0.94,0);
  const mixer=new THREE.AnimationMixer(character);const action=mixer.clipAction(clip);action.setLoop(THREE.LoopOnce,1);action.clampWhenFinished=true;action.play();
  const view={renderer,scene,character,camera,mixer,action,grid};views.push(view);return view;
 }
 MakeView('side',[4,1.20,0]);MakeView('back',[0,1.20,-4]);
-function SetTime(seconds){phaseSeconds=Math.max(0,Math.min(clip.duration,seconds));for(const v of views){v.action.reset().play();v.mixer.setTime(phaseSeconds);v.character.updateMatrixWorld(true);v.character.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.update();});v.grid.position.z=Get('travel').checked ? -((phaseSeconds*config.referenceSpeedMps)%0.5):0;v.renderer.render(v.scene,v.camera);}Get('phase').value=Math.round(phaseSeconds*config.fps);Get('frameValue').value=String(Math.min(config.cycleFrames,Math.floor(phaseSeconds*config.fps)+1)).padStart(2,'0')+' / '+config.cycleFrames;}
+function SetTime(seconds,distanceMeters=null){phaseSeconds=Math.max(0,Math.min(clip.duration,seconds));travelMeters=distanceMeters??phaseSeconds*config.referenceSpeedMps;for(const v of views){v.action.reset().play();v.mixer.setTime(phaseSeconds);v.character.updateMatrixWorld(true);v.character.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.update();});v.grid.position.z=Get('travel').checked ? -(travelMeters%(config.strideMeters/4)):0;v.renderer.render(v.scene,v.camera);}Get('phase').value=Math.round(phaseSeconds*config.fps);Get('frameValue').value=String(Math.min(config.cycleFrames,Math.floor(phaseSeconds*config.fps)+1)).padStart(2,'0')+' / '+config.cycleFrames;}
 function Pause(){playing=false;Get('play').textContent='播放';}
 function Sample(){const v=views[0],bones={};v.character.traverse(o=>{if(o.isBone||o.name==='Socket_BackRifle'){o.getWorldPosition(scratch);bones[o.name.startsWith('Bip')?o.name.replaceAll('_',' '):o.name]=scratch.toArray();}});const soles={L:Infinity,R:Infinity};v.character.traverse(o=>{if(!o.isSkinnedMesh)return;const weights=o.geometry.attributes.skinWeight,indices=o.geometry.attributes.skinIndex;for(let i=0;i<weights.count;i++){for(const side of ['L','R']){let weight=0;for(let j=0;j<4;j++){const bone=o.skeleton.bones[indices.getComponent(i,j)];if(bone?.name.replaceAll('_',' ')===`Bip002 ${side} Foot`||bone?.name.replaceAll('_',' ')===`Bip002 ${side} Toe0`)weight+=weights.getComponent(i,j);}if(weight>0.55){o.getVertexPosition(i,scratch).applyMatrix4(o.matrixWorld);soles[side]=Math.min(soles[side],scratch.y);}}}});return {bones,soles,drawCalls:v.renderer.info.render.calls,triangles:v.renderer.info.render.triangles,glError:v.renderer.getContext().getError()};}
+Get('phase').max=config.cycleFrames;
 window.BackRifleReview={ready:true,config,clip,views,SetTime,Pause,Sample};
 Get('play').onclick=()=>{playing=!playing;Get('play').textContent=playing?'暂停':'播放';previous=performance.now();};
 Get('phase').oninput=()=>{Pause();SetTime(Number(Get('phase').value)/config.fps);};
 Get('speed').oninput=()=>{rate=Number(Get('speed').value)/config.referenceSpeedMps;Get('speedValue').value=Number(Get('speed').value).toFixed(1)+' m/s';};
-Get('travel').onchange=()=>SetTime(phaseSeconds);
+Get('travel').onchange=()=>SetTime(phaseSeconds,travelMeters);
+let frontAngle=false;Get('angle').onclick=()=>{frontAngle=!frontAngle;const camera=views[1].camera;camera.position.set(...(frontAngle?[-3,1.4,4]:[0,1.20,-4]));camera.lookAt(0,0.94,0);Get('back').previousElementSibling.textContent=frontAngle?'斜前 / FRONT THREE QUARTER':'背面 / BACK';Get('angle').textContent=frontAngle?'恢复背面':'斜前视角';SetTime(phaseSeconds,travelMeters);};
 Get('timing').textContent=clip.duration.toFixed(3)+' s · '+Math.round(120/clip.duration)+' 步/分';
-Get('status').textContent='独立 GLB 已载入。支撑、腾空、反向摆臂与背枪随动可逐帧检查。';
-function Tick(now){const dt=Math.min((now-previous)/1000,0.05);previous=now;if(playing)SetTime((phaseSeconds+dt*rate)%clip.duration);requestAnimationFrame(Tick);}SetTime(0);requestAnimationFrame(Tick);
+Get('status').textContent='独立 GLB 已载入。精修版：脚尖支点后蹬、屈膝回收、落地缓冲与放松握拳。';
+function Tick(now){const dt=Math.min((now-previous)/1000,0.05);previous=now;if(playing){const step=dt*rate*(Get('slow').checked?0.5:1);SetTime((phaseSeconds+step)%clip.duration,travelMeters+step*config.referenceSpeedMps);}requestAnimationFrame(Tick);}SetTime(0);requestAnimationFrame(Tick);
 }catch(error){Get('status').textContent='加载失败：'+error.message;Get('status').className='error';console.error(error);}
 </script>
 </body></html>

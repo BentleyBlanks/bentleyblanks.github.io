@@ -26,7 +26,11 @@ for obj in loaded.objects:
     if obj:scene.collection.objects.link(obj)
 assert {o.name for o in scene.objects}==assetNames,'Source object whitelist must be complete'
 scene.world=loaded.worlds[0];scene.camera=scene.objects['Scene_BackRifleSide']
-scene.frame_start=1;scene.frame_end=1+config['cycleFrames'];scene.render.fps=config['fps'];scene.render.fps_base=1
+# The matching endpoint remains keyed at cycleFrames+1, but is not played twice.
+scene.frame_start=1;scene.frame_end=config['cycleFrames'];scene.render.fps=config['fps'];scene.render.fps_base=1
+for side,offset in [('Left',0),('Right',0.5)]:
+    for label,phase in [('Contact',0),('Compression',0.10),('ToeOff',config['stanceFraction']),('Flight',0.43)]:
+        scene.timeline_markers.new(side+label,frame=1+round((phase+offset)*config['cycleFrames']))
 scene.render.engine='BLENDER_EEVEE';scene.render.resolution_x=640;scene.render.resolution_y=640;scene.render.resolution_percentage=100;scene.view_settings.view_transform='AgX'
 scene.unit_settings.system='METRIC';scene['clipContract']=json.dumps({k:v for k,v in config.items() if k!='samples'});scene['productionIntegration']='Standalone review; production RifleRun is unchanged'
 arm=scene.objects['Rig_LugouCharacter'];arm.select_set(True);bpy.context.view_layer.objects.active=arm;scene.frame_set(1);bpy.context.view_layer.update()

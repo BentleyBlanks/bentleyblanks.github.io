@@ -7,7 +7,7 @@
 - `Animation_LugouNraBackRifleRun.blend`：可编辑动作、原骨架与蒙皮、胸椎背枪挂点、连续跨肩绑带、灯光及侧/后视相机。内嵌烘焙脚本。
 - `Animation_LugouNraBackRifleRun.glb`：可独立导入的完整角色与动作，唯一 clip 为 `BackRifleRun`。
 - `Animation_BackRifleRunSide.webp` / `Animation_BackRifleRunBack.webp`：从真实导出 GLB 捕获的无限循环预览。
-- `index.html`：同屏侧/后视、播放/暂停、逐帧与移动速度审查。
+- `index.html`：同屏侧/后视、斜前视角、播放/暂停、半速、逐帧与移动速度审查。
 - `Data_BackRifleRun.json`：时长、帧率、步幅、来源哈希、挂点矩阵、原生身高和逐帧烘焙测量。
 - `Data_BackRifleRunVerification.json`：浏览器重新载入最终 GLB 的验收结果。
 
@@ -18,6 +18,14 @@
 `Socket_BackRifle` 固定在 `Bip002 Spine2`，步枪和绑带是该挂点子节点。步枪几何解码自项目现有 `Model/ZhongZheng.tzm.json`，尺寸与枪托/枪口方向保留；没有替换生产枪模。新挂点独立于 `Socket_BackBlade` 和双手武器挂点。绑带用可编辑带状网格表示，从上枪带环跨右肩，沿胸腹绕左肋连接枪托带环，与胸椎保持相同约束。枪体不在运行中换父节点，也不使用逐帧世界坐标纠偏。
 
 独立 GLB 的制服/皮肤非金属设置对齐 `Script_CharacterModel` 的 `ConfigureExternalPbr` 规则；原始生产材质文件保持不变。
+
+## NaturalRunV2 精修
+
+在原审查包的骨架、枪械、绑带与制作脚本上继续调整。落地后骨盆先下沉缓冲，后蹬期间伸展，腾空时达到高点；脚尖保留支点，脚跟滚动抬起，摆动腿先收后展。缩短前伸距离，保留膝盖弯曲，避免原解析 IK 在极限姿态拉长小腿。
+
+脊柱逐段承担前倾和转动，肩胯错相反扭，头部相对稳定；减小摆臂幅度，肘部随前后摆动松紧变化，手指和拇指收成放松的握拳。沿用原基准速度和循环时长，提高关键帧采样密度以改善慢放及帧间插值。
+
+Blender 时间轴标出左右脚的接触、缓冲、离地与腾空阶段。首尾相同的末端关键帧保留在 `cycleFrames + 1`，源工程播放范围在 `cycleFrames` 截止，避免重复播放末帧。网页地面参照使用连续行程，循环结束时不会倒跳。
 
 ## 时序、方向与移动
 
@@ -50,6 +58,6 @@ node Taierzhuang1938/Script_BackRifleRunTest.mjs --capture
 node Taierzhuang1938/Script_TestRunner.mjs --profile=prepush --domain=animation --fail-fast
 ```
 
-测试通过现有 BrowserTestKit 与 ServeRoot，直接重测最终 GLB：原文件哈希、原关节集、唯一动作、通道首尾、世界坐标接缝、骨盆起伏、逐半帧真实蒙皮鞋底、支撑足世界滑动、胸椎挂点相对矩阵、WebGL 错误及移动端布局。截图落入 `_shots/BackRifleRun/`，不发布整套中间截图。
+测试通过现有 BrowserTestKit 与 ServeRoot，直接重测最终 GLB：原文件哈希、原关节集、唯一动作、通道首尾、世界坐标接缝、骨盆起伏、逐半帧真实蒙皮鞋底、平掌支撑和脚尖后蹬的世界滑动、四肢长度相对原绑定骨架的误差、膝盖屈曲范围、根节点漂移、循环边界速度变化、胸椎挂点相对矩阵、WebGL 错误及移动端布局。实测结果见 `Data_BackRifleRunVerification.json`；源工程重开结果见 `Data_BackRifleRunSourceVerification.json`。截图落入 `_shots/BackRifleRun/`，不发布整套中间截图。
 
-视觉审查采用真实 GLB 侧/后视全周期联系图与循环预览。技术验证通过与独立资产发布均不代表批准替换生产跑步。
+视觉审查采用真实 GLB 侧/后视全周期联系图、斜前方关键姿势、循环预览以及 Blender 源工程渲染。技术验证通过与独立资产发布均不代表批准替换生产跑步。

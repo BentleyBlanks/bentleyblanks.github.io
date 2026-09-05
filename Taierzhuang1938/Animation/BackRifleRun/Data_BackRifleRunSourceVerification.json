@@ -3,9 +3,20 @@
   "objects": 19,
   "bones": 53,
   "clip": "BackRifleRun",
-  "fps": 60,
+  "fps": 120,
   "frameStart": 1,
-  "frameEnd": 45,
+  "frameEnd": 88,
+  "keyedLoopEndpoint": 89,
+  "timelineMarkers": [
+    "LeftContact",
+    "LeftCompression",
+    "LeftToeOff",
+    "LeftFlight",
+    "RightContact",
+    "RightCompression",
+    "RightToeOff",
+    "RightFlight"
+  ],
   "missingExternalFiles": [],
   "reopenedSuccessfully": true
 }
