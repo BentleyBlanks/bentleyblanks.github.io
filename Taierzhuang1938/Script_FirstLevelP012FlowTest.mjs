@@ -1140,6 +1140,31 @@ for(const index of [2,3,4]) {
   objective=director.CurrentObjective();assert.equal(objective.interactionId,"p012_frontlineAmmo",
     "finite supply guidance returns after the real warning ends");
 }
+for (const origin of [phase.whitebox.anchors.gunports[1],phase.whitebox.anchors.gunports[2]]) {
+  let clips=2;
+  const mortarActors=Array.from({length:2},()=>({alive:true,position:P012Point(32,-92),suppression:0,suppressed:false}));
+  const director=new FirstLevelP012Director({CurrentClips:()=>clips,
+    EnemyPosition:actor=>actor.alive?actor.position:null,
+    EnemyCombatState:actor=>({suppression:actor.suppression,suppressed:actor.suppressed})},phase.whitebox);
+  director.Restore({...director.Snapshot(),beat:9,elapsed:100,lastWaveAt:100,unlockedWaves:[0,1,2,3],
+    mortarImpactStart:0,mortarEscapeFrom:origin,facts:["ammo"],frontlineAmmoRemaining:3});
+  director.enemyRoutes=mortarActors.map(handle=>({handle,encounterBeat:9,points:[],index:0}));
+  const safePort=[phase.whitebox.anchors.gunports[1],phase.whitebox.anchors.gunports[0],phase.whitebox.anchors.gunports[2]]
+    .find(point=>Math.hypot(point.x-origin.x,point.z-origin.z)>=8);
+  director.lastSample={position:origin,mortarWarningActive:true,mortarImpactCount:0,clips};
+  assert.equal(director.CurrentObjective().requiredAction,"sprint","active B09 danger retains immediate escape guidance");
+  director.lastSample={position:safePort,mortarWarningActive:false,mortarImpactCount:1,mortarImpactPosition:origin,clips};
+  let objective=director.CurrentObjective();assert.deepEqual(objective.target,safePort);
+  assert.equal(objective.requiredStance,null,"unresolved mortar soldiers can still be engaged standing after the warning ends");
+  clips=0;director.lastSample.clips=0;
+  assert.equal(director.CurrentObjective().interactionId,"p012_frontlineAmmo","safe B09 permits finite resupply after impact");
+  clips=2;director.lastSample.clips=2;
+  for(const actor of mortarActors){actor.suppression=.5;actor.suppressed=true;}
+  objective=director.CurrentObjective();assert.deepEqual(objective.target,safePort);assert.equal(objective.requiredStance,"prone",
+    "resolved mortar pressure explicitly requests the final low move at the safe port");
+  director.Update(.1,{...director.lastSample,position:safePort,stance:"prone",zone:"Z05"});
+  assert.equal(director.beat,10,"central/east historical impact positions both permit factual B09 completion at a different safe gunport");
+}
 {
   const actors=[],pressures=[];
   const director=new FirstLevelP012Director({

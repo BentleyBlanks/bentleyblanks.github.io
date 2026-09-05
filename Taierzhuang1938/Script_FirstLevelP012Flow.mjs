@@ -1079,6 +1079,10 @@ export class FirstLevelP012Director {
     let progress = null;
     const mortarDangerActive = this.beat >= 7 && this.beat <= 9 && !!this.mortarEscapeFrom
       && this.lastSample.mortarWarningActive === true;
+    const mortarSafePort = this.mortarEscapeFrom
+      ? [anchors.gunports?.[1], anchors.gunports?.[0], anchors.gunports?.[2]]
+        .find((point) => point && Distance(point, this.mortarEscapeFrom) >= 8) || anchors.gunports?.[1]
+      : anchors.gunports?.[1];
     if ([0, 2, 13].includes(this.beat)) requiredAction = "follow";
     if ([0, 2, 4, 14].includes(this.beat)) target = route[this.routeIndex] || route.at(-1);
     if ([0, 2].includes(this.beat) && this.lastSample.guidePosition) target = this.lastSample.guidePosition;
@@ -1117,7 +1121,14 @@ export class FirstLevelP012Director {
       ? "p012_ammoPickup" : this.routeIndex >= route.length ? "p012_ammoDrop" : null;
     if (this.beat === 5 && this.lastSample.carryKind === "ammoCrate") text = "沿狗腿交通壕搬运弹药，送到机枪阵位";
     if (this.beat === 8) { target = anchors.gunports?.[2]; text = "低姿移到东侧枪眼，压制村墙边的机枪"; }
-    if (this.beat === 9) { target = anchors.gunports?.[1]; text = `${this.completionReasons[8] === "threatCleared" ? "机枪威胁已清除" : "友军机枪已恢复射击"}；听掷弹筒预警，低姿离开旧落点，转移到中央枪眼`; }
+    if (this.beat === 9) {
+      target = mortarSafePort;
+      const mortarCleared = this.WaveState(3).resolved;
+      const mortarResolved = mortarCleared || this.WaveState(3, true).resolved;
+      requiredStance = mortarResolved ? "prone" : null;
+      text = mortarResolved ? `掷弹筒组已${mortarCleared ? "清除" : "受压制"}；卧倒转移到远离旧弹着点的安全枪眼`
+        : "转到远离旧弹着点的安全枪眼，继续压制掷弹筒组";
+    }
     if (this.beat === 10) { target = anchors.gunports?.[0]; text = "转向西侧枪眼，封锁铁路涵洞"; }
     if ([8, 10].includes(this.beat) && Distance(this.lastSample.position, target) > 3) {
       requiredStance = "prone";
@@ -1128,8 +1139,7 @@ export class FirstLevelP012Director {
     if (mortarDangerActive) {
       const origin = this.mortarEscapeFrom;
       const mgStatus = this.beat < 9 ? "" : this.completionReasons[8] === "threatCleared" ? "机枪威胁已清除；" : "友军机枪已恢复射击；";
-      const safePort = [anchors.gunports?.[1], anchors.gunports?.[0], anchors.gunports?.[2]]
-        .find((point) => point && Distance(point, origin) >= 8) || anchors.gunports?.[1];
+      const safePort = mortarSafePort;
       if (Distance(this.lastSample.position, origin) < 6 && safePort) {
         const length = Distance(origin, safePort) || 1;
         target = { x: origin.x + (safePort.x - origin.x) * Math.min(1, 8 / length),
@@ -1362,7 +1372,8 @@ export class FirstLevelP012Director {
     }
     let frontlineApproach = null;
     if (!mortarDangerActive && this.beat >= 6 && this.beat <= 10 && interactionId !== "p012_frontlineAmmo") {
-      const port = anchors.gunports?.[this.beat === 8 ? 2 : this.beat === 10 ? 0 : 1];
+      const port = this.beat === 9 ? mortarSafePort
+        : anchors.gunports?.[this.beat === 8 ? 2 : this.beat === 10 ? 0 : 1];
       frontlineApproach = this.FrontlineApproachTarget(port);
       if (frontlineApproach) {
         target = frontlineApproach; lookAt = null; requiredAction = "move"; requiredStance = "prone";
