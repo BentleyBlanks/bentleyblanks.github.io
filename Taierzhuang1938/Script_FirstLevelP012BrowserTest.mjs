@@ -671,7 +671,7 @@ async function PlayFrontline() {
           const distance = destination ? Math.hypot(destination.x - game.player.position.x, destination.z - game.player.position.z) : Infinity;
           if (![13, 14, 18, 20, 21].includes(flow.beatIndex) || point || objective.requiredAction === "grenade" || objective.requiredAction === "follow") {
             game.Debug.Mouse(2, false);
-            const arrive = point ? 1.5 : objective.requiredAction === "follow"
+            const arrive = flow.beatIndex===19 ? .2 : point ? 1.5 : objective.requiredAction === "follow"
               ? Math.max(0.1, Math.min(2.4, (objective.arrivalRadiusM ?? 2.45) - 0.05))
               : Math.min(0.9, (objective.arrivalRadiusM ?? 0.95) - 0.05);
             Key("KeyW", !!destination && distance > arrive && !bot.held.KeyF);
@@ -1557,6 +1557,8 @@ async function VerifyAirRouteHandoff(choice) {
   Check(!result.trace.some(entry=>entry.beat==="B16"&&entry.air?.preset==="crowdTurn"),"第二轮攻击不越过真实选路与道路到达");
   Check(!result.trace.some(entry=>entry.facts.includes("airObserved")),"错过首轮航迹不伪造已观察事实");
   Check(setup.members===10&&result.members===10,"局部初始十人队列在空袭交接中不重复生成");
+  Check(result.views.filter(view=>!view.crowdFire).every(view=>view.cartObstacle?.open
+    && !view.cartObstacle.visible && !view.cartObstacle.colliding),"扫射前道路没有翻车外观或碰撞，担架员无需翻越未来障碍");
   Check(result.airTurnEvidence.longestVisibleS>=4,"转向开火前真实自由视角连续可见至少四秒",JSON.stringify(result.airTurnEvidence));
   Check(result.airTurnEvidence.jointViews>0,"转向时真实同屏可辨认飞机、担架员和平民");
   if(process.argv.includes("--air-rescue")||process.argv.includes("--air-carry")||process.argv.includes("--air-dive")){
@@ -2101,12 +2103,14 @@ try {
             };
             const members = game.Debug.P012Scene().columnActors;
             const visible = members.filter(member => Visible({ x: member.x, y: 1.2, z: member.z }));
+            const cart=game.battlefield.gates.get("AirRoadCartObstacle");
             const view = { at: after.elapsed, beat: after.beat, runId: air.id, preset: air.presetId, phase: air.phase,
               objectiveText: after.objective.text, crowdFire: game.story.Signalled("P012CrowdFire"),
               flightTime: air.t, airVisible: airState.modelVisible===true&&!!airState.modelAt&&Visible(airState.modelAt),
               modelVisible:airState.modelVisible,modelAt:airState.modelAt,airPosition: air.aircraft,
               player: game.player.position.toArray(), yaw: game.player.yaw, pitch: game.player.pitch,
               members:members.map(member=>({...member,visible:visible.includes(member)})),
+              cartObstacle:cart?{open:cart.open,visible:cart.mesh.visible,colliding:game.battlefield.colliders.includes(cart.collider)}:null,
               bearersVisible: visible.filter(member => member.role === "bearer").length,
               civiliansVisible: visible.filter(member => member.role === "civilian").length };
             window.p012AirViews.push(view);

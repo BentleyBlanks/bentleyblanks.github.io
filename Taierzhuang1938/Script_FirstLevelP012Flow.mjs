@@ -931,7 +931,9 @@ export class FirstLevelP012Director {
         && this.SouthEnemiesCleared(); break;
       case 22: {
         const cleared = sample.farSpawned === 4 && sample.farDeaths === 4;
-        ready = At("Z09") && sample.columnAtSouthAssembly === true && this.routeIndex >= route.length
+        ready = Distance(p,activity.blockadeDecisionPosition)<=(activity.blockadeDecisionRangeM||8)
+          &&Distance(sample.guidePosition,activity.blockadeDecisionPosition)<1
+          && sample.columnAtSouthAssembly === true && this.routeIndex >= route.length
           && sample.guideAlive === true && Distance(p, sample.guidePosition) <= (activity.blockadeDecisionRangeM || 8)
           && ((sample.blockadeVisible && sample.blockadePressure) || cleared);
         if (ready) { this.completionReasons[22] = cleared ? "blockadeCleared" : "blockadeObservedFiring";
@@ -1206,7 +1208,8 @@ export class FirstLevelP012Director {
       }
     }
     if (this.beat === 17) {
-      if(!this.Signalled("P012AirObstacleCreated")){target=activity.airObstaclePosition;requiredAction="observe";
+      if(!this.Signalled("P012AirObstacleCreated")){
+        target=activity.airTurnWatchPositions?.[this.airRouteChoice]||activity.airObservationPosition;requiredAction="observe";
         text=this.Signalled("P012CrowdFire")?"扫射刚落下，确认路上伤员和翻倒小车的位置":"飞机正在转向这条路，留意担架队，寻找路沟";}
       else if(this.lastSample.carryKind==="wounded"){
         target=P012NextVisiblePoint(this.config.layout?.blocks||[],this.lastSample.position,

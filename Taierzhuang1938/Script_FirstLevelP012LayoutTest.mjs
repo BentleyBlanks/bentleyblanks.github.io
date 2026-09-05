@@ -589,6 +589,14 @@ const host={layout,gates:new Map([["a",{open:false,spec:{signal:"EscortCall"}}],
 assert.equal(sync.call(host,{signalled:()=>true}),3,"two gates plus changed hub must refresh navigation");
 assert.equal(sync.call(host,{signalled:()=>false,restore:true}),3,"two restored gates plus changed hub must refresh navigation");
 assert.equal(sync.call(host,{signalled:()=>false,restore:true}),0,"stable restore is idempotent");
+const cart=layout.gates.find(gate=>gate.id==='AirRoadCartObstacle');
+const cartHost={...host,layout:{},gates:new Map([[cart.id,{open:true,spec:cart}]])};
+assert.equal(sync.call(cartHost,{signalled:()=>false}),0,'cart obstacle remains absent before actual crowd fire');
+assert.equal(sync.call(cartHost,{signalled:name=>name===cart.appearSignal}),1,'actual air event adds visible cart collision and refreshes navigation');
+assert.equal(cartHost.gates.get(cart.id).open,false);
+assert.equal(sync.call(cartHost,{signalled:name=>name===cart.appearSignal}),0,'air event is idempotent');
+assert.equal(sync.call(cartHost,{signalled:()=>true}),1,'actual rescue or clearing removes cart collision');
+assert.equal(sync.call(cartHost,{signalled:()=>false,restore:true}),0,'rewind to before the strike restores an unobstructed road');
 host.layout={};assert.equal(sync.call(host,{signalled:()=>true}),2,"legacy count remains opened gates only");
 console.log("PASS P012 scenario reconciliation change counts");
 

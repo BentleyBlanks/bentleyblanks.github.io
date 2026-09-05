@@ -171,6 +171,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
         open:Object.freeze([{x:53,z:54},{x:57,z:59},{x:58,z:64},{x:58,z:66}]),
         ditch:Object.freeze([{x:48,z:57},{x:49,z:60},{x:49,z:64},{x:47.5,z:68}]),
       }),
+      airTurnWatchPositions:Object.freeze({ditch:{x:47,z:65},open:{x:58,z:62}}),
       airObstaclePosition:{x:50,z:70},airCivilianPosition:{x:48,z:69.5},airCartPosition:{x:52,z:70.5},
       airRescueCover:{x:44,z:61},
       // Enter through the southern bank opening before approaching the bay.

@@ -617,9 +617,9 @@ Tick({position:phase.whitebox.activities.blockadeDecisionPosition,zone:"Z09",sta
   farSpawned:4,farDeaths:4,blockadeDestroyed:true,columnAtSouthAssembly:true,guideAlive:false,
   guidePosition:phase.whitebox.activities.blockadeDecisionPosition},30);
 assert.equal(flow.State().beat,"B22","a hidden coordinate and elapsed time cannot replace the living squad leader");
-Tick({position:phase.whitebox.activities.blockadeDecisionPosition,zone:"Z09",stance:"stand",
+Tick({position:{x:104.46296071827587,z:79.89479223152942},zone:"Z08",stance:"stand",
   farSpawned:4,farDeaths:4,blockadeDestroyed:true,columnAtSouthAssembly:true,guideAlive:true,
-  guidePosition:phase.whitebox.activities.blockadeDecisionPosition});
+  guidePosition:{x:104.68652168788716,z:79.5110454646285}});
 assert.equal(flow.State().beat,"B23");
 assert.ok(signals.has("P012BlockadeDecision"));
 assert.equal(flow.State().completionReasons[22],"blockadeCleared");

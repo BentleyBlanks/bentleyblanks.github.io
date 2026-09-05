@@ -180,8 +180,9 @@ export class FirstLevelWhiteboxField {
       this.scene.add(mesh);
       this.meshes.push(mesh);
       const collider = ColliderRecord(spec);
-      this.colliders.push(collider);
-      this.gates.set(spec.id, { spec, mesh, material, collider, open: false });
+      const open=!!spec.appearSignal;
+      if(open)mesh.visible=false;else this.colliders.push(collider);
+      this.gates.set(spec.id, { spec, mesh, material, collider, open });
       this.stats.dynamicGates += 1;
       this.stats.whiteBoxes += 1;
       this.stats.structures += 1;
@@ -208,8 +209,10 @@ export class FirstLevelWhiteboxField {
     if (typeof signalled !== "function") return 0;
     let opened = 0;
     for (const [id, gate] of this.gates) {
-      if (!gate.open && signalled(gate.spec.signal) && this.OpenGate(id)) opened += 1;
-      else if (restore && gate.open && !signalled(gate.spec.signal) && this.CloseGate(id)) opened += 1;
+      const absent=!!gate.spec.appearSignal&&!signalled(gate.spec.appearSignal);
+      const open=absent||signalled(gate.spec.signal);
+      if (!gate.open && open && this.OpenGate(id)) opened += 1;
+      else if ((restore||gate.spec.appearSignal) && gate.open && !open && this.CloseGate(id)) opened += 1;
     }
     const states = this.layout.scenario?.states;
     if (states && this.SetScenarioState([...states].reverse().find(state => !state.signal || signalled(state.signal)))) opened += 1;

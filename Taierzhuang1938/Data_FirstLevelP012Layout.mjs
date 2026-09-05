@@ -156,7 +156,7 @@ const blueprintGates=Object.freeze([
   })),
   Object.freeze({...Box("TrainDoor",-63.5,60.5,0.4,5,3.8),signal:"P012TrainDoor"}),
   Object.freeze({...Box("ReturnGate",22,92,1,9,3),signal:"SouthCut"}),
-  Object.freeze({...Box("AirRoadCartObstacle",50,70,4.5,1.4,1,"vault"),signal:"P012AirObstacleResolved"}),
+  Object.freeze({...Box("AirRoadCartObstacle",50,70,4.5,1.4,1,"vault"),appearSignal:"P012AirObstacleCreated",signal:"P012AirObstacleResolved"}),
 ]);
 
 // Tactical islands retain metre-scale collision and sightlines. Only their
