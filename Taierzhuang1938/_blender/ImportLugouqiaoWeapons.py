@@ -36,7 +36,7 @@ SOURCES = {
     "OfficerSwordSet": {"lengthM": 1.000, "kind": "melee", "side": "ija",
                    "decimateBias": 10.000,
                    "decimateBudget": 9400,
-                   "note": "源节点 Group146；军刀与刀鞘组合，具体制式未明。"},
+                   "note": "源节点 Group146；九八式军刀与刀鞘（按形制认领）。"},
     "RingPommelDagger": {"lengthM": 0.450, "kind": "melee", "side": "neutral",
                    "note": "源节点 Mesh_0300；带环首短刃，具体制式未明。"},
     "Type11": {"lengthM": 1.100, "kind": "rifle", "side": "ija",
@@ -48,7 +48,7 @@ SOURCES = {
                    "forceFlip": True,
                    "note": "十一年式轻机枪；源节点 QEDQD，保留 body/body2/fore/ammobox 四张原贴图。源文件中的分解展示件保留在独立 Blend，运行时只取装配态枪体。"},
     "MediumMortar": {"lengthM": 1.444, "kind": "assembly", "side": "neutral",
-                   "note": "源节点 sphere3；中型迫击炮，具体型号未明。"},
+                   "note": "源节点 sphere3；民二十年式八二迫击炮（按 Stokes-Brandt 外形认领）。"},
 }
 
 RUNTIME_MATERIALS = {

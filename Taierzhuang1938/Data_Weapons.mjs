@@ -179,10 +179,10 @@ export const WEAPONS = {
   // 轻机枪（英军 1938 年才列装，7.92 mm 版 1943 年才到华）、带两脚架的 50 mm 级轻迫击炮。
   // 依据见 docs/Data_HistoryMaterial.md「避坑清单」。
   OfficerSwordSet: {
-    id: "OfficerSwordSet", name: "军刀与刀鞘", fullName: "军刀与刀鞘（具体制式尚待考证）",
+    id: "OfficerSwordSet", name: "九八式军刀", fullName: "九八式军刀与刀鞘（按形制认领）",
     side: "ija", kind: "melee", lengthM: 1.0, massKg: 1.3, damage: 210,
     swingTimeS: 0.48, reachM: 1.95, silent: true,
-    note: "源节点 Group146；作为一套保留刀、鞘与原贴图，不冒认具体制式。",
+    note: "源节点 Group146；缠柄、双环刀鞘与约 1 m 全长符合九四/九八式军刀，2026-09-06 按形制认领为九八式（军官佩刀）。",
   },
   RingPommelDagger: {
     id: "RingPommelDagger", name: "环首短刃", fullName: "带环首短刃（具体制式尚待考证）",
@@ -201,10 +201,11 @@ export const WEAPONS = {
     note: "源节点 Cylinder026；保留 WW-100heqdf 原贴图并附识别截图。",
   },
   MediumMortar: {
-    id: "MediumMortar", name: "中型迫击炮", fullName: "中型迫击炮（具体型号尚待考证）",
-    side: "neutral", kind: "mortar", lengthM: 1.444, massKg: 45,
-    damage: 150, radiusM: 7.0, rangeMinM: 80, rangeMaxM: 1500,
-    note: "源节点 sphere3；目前仅按可见结构归类，具体型号尚待考证。",
+    id: "MediumMortar", name: "八二迫击炮", fullName: "民国二十年式八二迫击炮（按 Stokes-Brandt 外形认领）",
+    side: "nra", kind: "mortar", lengthM: 1.444, massKg: 69,
+    damage: 150, radiusM: 7.0, rangeMinM: 100, rangeMaxM: 2850,
+    fireIntervalS: 7.0,
+    note: "源节点 sphere3；Stokes-Brandt 式两脚架 + 圆座钣，2026-09-06 认领为民二十年式八二迫击炮：滕县城内守军有一个迫击炮连（张宣武）。放列全重 69 kg、实际射速 8—9 发/分、最大射程 2.85 km 取自 docs/Data_HistoryMaterial.md §1.6。日方九七式曲射步兵炮同为 Brandt 系，需要时可共用此模型。",
   },
 
   // --- 日方 -----------------------------------------------------------------

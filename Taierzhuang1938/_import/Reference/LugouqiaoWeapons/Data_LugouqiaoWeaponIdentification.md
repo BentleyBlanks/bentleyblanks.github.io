@@ -8,13 +8,13 @@
 | `BROTRIPO009` | `BrowningTripodAssembly` | 勃朗宁式三脚架/机件组合，具体型号未明 | 截图标注后新增 |
 | `Cylinder026` | `UnidentifiedMunition` | 弹体，具体型号未明 | 截图标注后新增 |
 | `FQDQD` | `UnidentifiedBoltActionRifle` | K98 系栓动步枪（源节点 `MK98_*`），机匣带皮卡汀尼导轨 | 截图标注后新增 → **2026-09-05 移除** |
-| `Group146` | `OfficerSwordSet` | 军刀与刀鞘，具体制式未明 | 截图标注后新增 |
+| `Group146` | `OfficerSwordSet` | 军刀与刀鞘；2026-09-06 按缠柄、双环鞘、约 1 m 全长认领为九八式军刀 | 截图标注后新增 |
 | `Mesh_0300` | `RingPommelDagger` | 带环首短刃，具体制式未明 | 截图标注后新增 |
 | `MK1` | `UnidentifiedAntiaircraftGun` | 复核为 Bren Mk I 式轻机枪（先前误读弯弹匣为环形瞄具） | 截图标注后新增 → **2026-09-05 移除** |
 | `PJP` | `LightMortar` | 带两脚架的 50 mm 级轻迫击炮，1938 年 3 月中日双方均无此类 | 截图标注后新增 → **2026-09-05 移除** |
 | `QEDQD` | `Type11` | 十一年式轻机枪（侧置漏斗供弹、散热片与偏置枪托） | 替换同名游戏模型；旧源保留 |
 | `Sphere001` | `Mauser96` | 毛瑟 C96 | 2026-09-06 按用户要求移除游戏资产与生成入口；源文件仅作存档 |
-| `sphere3` | `MediumMortar` | 中型迫击炮，具体型号未明 | 截图标注后新增 |
+| `sphere3` | `MediumMortar` | Stokes-Brandt 式中型迫击炮；2026-09-06 认领为民二十年式八二迫击炮（滕县城内有迫击炮连） | 截图标注后新增 |
 | `Wp_Gun_Karabiner 98 Kurz` | `Karabiner98k` | 源节点直接给出 Karabiner 98 Kurz；机匣带皮卡汀尼导轨 | 新增 → **2026-09-05 移除**（K98k 1938 年 4 月底才首批到华） |
 
 ## 无可靠型号信息的识别截图

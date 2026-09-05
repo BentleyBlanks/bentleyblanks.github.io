@@ -30,7 +30,7 @@ const SIDE_LONG = {
 const KIND_LABEL_BY_ID = {
   BrowningTripodAssembly: "三脚架组件",
   UnidentifiedMunition: "弹体",
-  MediumMortar: "中型迫击炮",
+  MediumMortar: "迫击炮",
 };
 
 function KindLabel(id) {

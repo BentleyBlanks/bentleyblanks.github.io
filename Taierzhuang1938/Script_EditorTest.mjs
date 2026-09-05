@@ -150,8 +150,8 @@ Check("资产规范是独立编辑器入口", assetStandards.active === "assetSt
 Check("资产规范有七个分类", assetStandards.chips.length === 7
   && ["枪械", "架设 / 炮械", "刀剑 / 刺刀", "战车", "程序化 TZM", "外部 GLB", "贴图规范"]
     .every((label) => assetStandards.chips.includes(label)), assetStandards.chips.join(" / "));
-// 枪械分类现有 8 行（P38 / K98k / MK98 栓动步枪按考据删除后）。
-Check("资产表展示原始/实际/限制/降幅/贴图", assetStandards.rows >= 8
+// 枪械分类现有 7 行（P38 / K98k / MK98 栓动步枪按考据删除、C96 按用户要求移除后）。
+Check("资产表展示原始/实际/限制/降幅/贴图", assetStandards.rows >= 7
   && ["原始面数", "实际面数", "限制 / 目标", "面数降幅", "自带贴图", "游戏内贴图"]
     .every((label) => assetStandards.headers.includes(label)));
 Check("枪械表显示捷克式原始 7,811 与实际 7,781", assetStandards.text.includes("7,811")
@@ -1209,7 +1209,7 @@ const weapon = await page.evaluate(async () => {
     name: row.querySelector(".n")?.textContent || "",
     tail: row.querySelector(".t")?.textContent || "",
   }));
-  out.ambiguousRows = rows.filter((row) => ["中型迫击炮"].includes(row.name));
+  out.ambiguousRows = rows.filter((row) => ["八二迫击炮"].includes(row.name));
   out.unknownCopyGone = out.ambiguousRows.length === 1
     // 9656fef89 简化面板时删掉了「待考」说明段，这里只守住列表文案本身。
     && out.ambiguousRows.every((row) => !row.name.includes("未明") && !row.tail.includes("未明"));

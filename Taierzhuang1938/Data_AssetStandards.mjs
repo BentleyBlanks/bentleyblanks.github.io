@@ -66,7 +66,7 @@ export const SOURCE_ASSET_STANDARDS = Object.freeze({
     note: "最终数包含项目补环、环箍与木柄片。" },
   BayonetType38: { name: "三十年式刺刀", group: "melee", sourceTriangles: 265,
     sourceTexture: "有（PSX 漫反射）", runtimeTexture: SharedWeaponPbr },
-  OfficerSwordSet: { name: "军刀与刀鞘", group: "melee", sourceTriangles: 298456,
+  OfficerSwordSet: { name: "九八式军刀", group: "melee", sourceTriangles: 298456,
     sourceTexture: "局部饰带", runtimeTexture: "饰带保留源 UV；刀身/刀鞘使用共享枪钢",
     note: "指定特例：以原成品 3,906 三角为基准翻倍，目标 7,812。" },
   RingPommelDagger: { name: "环首短刃", group: "melee", sourceTriangles: 515,
@@ -77,7 +77,7 @@ export const SOURCE_ASSET_STANDARDS = Object.freeze({
     note: "指定特例：以原成品 4,513 三角为基准翻倍，目标 9,026。" },
   UnidentifiedMunition: { name: "未识别弹体", group: "assembly", sourceTriangles: 128,
     sourceTexture: "有", runtimeTexture: SourceUv },
-  MediumMortar: { name: "中型迫击炮", group: "assembly", sourceTriangles: 70460,
+  MediumMortar: { name: "八二迫击炮", group: "assembly", sourceTriangles: 70460,
     sourceTexture: "无可用成品图", runtimeTexture: SharedWeaponPbr,
     note: "指定特例：以原成品 4,534 三角为基准翻倍，目标 9,068。" },
 

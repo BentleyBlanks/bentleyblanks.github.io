@@ -267,7 +267,7 @@ export const MESHES = {
   MediumMortar: {
     file: "MediumMortar.tzm.json", category: "weapon", triangles: 9064, meshBlocks: 1, nodes: 7, joints: 0,
     materials: ["lqMediumMortar"], mounts: WEAPON_MOUNTS, span: [0.79565, 1.20429, 1.44394], lengthM: 1.444,
-    draws: { high: 1, medium: 1, low: 1 }, note: "源节点 sphere3；中型迫击炮，具体型号未明。",
+    draws: { high: 1, medium: 1, low: 1 }, note: "源节点 sphere3；民二十年式八二迫击炮（按 Stokes-Brandt 外形认领）。",
   },
   Type92Hmg: {
     file: "Type92Hmg.tzm.json", category: "weapon",
