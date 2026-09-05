@@ -38,10 +38,12 @@ for(const p012 of [false,true]){
 function Root(){return {visible:true,position:{set(){}},rotation:{set(){}}};}
 const aircraft=Source("./Script_Aircraft.mjs");
 const specs=[0,1,2].map(id=>({id,orbitRadius:40,speed:1,phaseOffset:0,altitude:30,bank:0}));
-const methods=vm.runInNewContext(`({${["Load","SetPhase","Update","FormFor"].map(n=>Method(aircraft,n)).join(",")}})`,{
+const methods=vm.runInNewContext(`({${["Load","SetPhase","Update","FormFor","_Show"].map(n=>Method(aircraft,n)).join(",")}})`,{
  REJOIN_HIDE_S:2.5,AIRCRAFT_ASSETS:specs,LOADER:{loadAsync:async()=>({})},PrepareAircraft:()=>Root(),ApplyStrafePose:()=>{},
 });
-const host={forms:[],group:{add(){}},phase:null,anchor:{x:0,y:0,set(x,y){this.x=x;this.y=y;}},lastElapsed:0,rejoinT:0,strafeForm:null,FormFor:methods.FormFor};
+// 隐藏的飞机会从 group 摘下（_Show），假 group 要能 add/remove 并维护 parent。
+const group={add(root){root.parent=this;},remove(root){root.parent=null;}};
+const host={forms:[],group,phase:null,anchor:{x:0,y:0,set(x,y){this.x=x;this.y=y;}},lastElapsed:0,rejoinT:0,strafeForm:null,FormFor:methods.FormFor,_Show:methods._Show};
 const bounds={minX:0,maxX:10,minZ:0,maxZ:10};
 methods.SetPhase.call(host,{bounds,whitebox:{p012:true}});
 await methods.Load.call(host);assert.ok(host.forms.every(f=>!f.root.visible),"late-loaded P012 planes must start hidden");

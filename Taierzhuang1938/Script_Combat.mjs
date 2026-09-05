@@ -103,7 +103,8 @@ export class CombatSystem {
       group.userData.visuals = { regular, bundle };
       group.visible = false;
       group.castShadow = false;
-      host.scene.add(group);
+      // 池里的弹**不挂进场景图**，取用时才挂、藏起时摘（见 TakeMesh / HideMesh）：
+      // 十二枚 × 十五个节点，挂着不显示也要被矩阵更新与三趟场景遍历每帧走一遍。
       this.pool.push(group);
     }
   }
@@ -115,7 +116,15 @@ export class CombatSystem {
     m.userData.visuals.regular.visible = !isBundle;
     m.userData.visuals.bundle.visible = isBundle;
     m.visible = true;
+    if (m.parent !== this.host.scene) this.host.scene.add(m);
     return m;
+  }
+
+  /** 与 TakeMesh 成对：藏起来的同时从场景图摘下，池化的壳不再参与每帧遍历。 */
+  HideMesh(m) {
+    if (!m) return;
+    m.visible = false;
+    if (m.parent) m.parent.remove(m);
   }
 
   /**
@@ -415,7 +424,7 @@ export class CombatSystem {
       if (p.fuse <= 0) {
         p.alive = false;
         this.Detonate(p);
-        if (p.mesh) p.mesh.visible = false;
+        this.HideMesh(p.mesh);
         this.Detach(p);
         this.projectiles.splice(i, 1);
       }
@@ -601,7 +610,7 @@ export class CombatSystem {
   ClearProjectiles() {
     for (const p of this.projectiles) {
       this.Detach(p);
-      if (p.mesh) p.mesh.visible = false;
+      this.HideMesh(p.mesh);
     }
     this.projectiles.length = 0;
     this.shellVisuals.Clear(this.shells);

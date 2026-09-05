@@ -520,7 +520,9 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 /* 占领点图标 */
 .hudMarkers { position: absolute; inset: 0; }
 .hudMarker {
-  position: absolute; transform: translate(-50%, -50%);
+  /* 位置由 Script_Hud.UpdateMarkers 每帧写 transform（含 -50% 居中）；
+     will-change 让它独占合成层，挪动时不触发布局与重绘。 */
+  position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); will-change: transform;
   display: flex; flex-direction: column; align-items: center; font-size: 11px;
   opacity: 0.9;
 }
@@ -573,9 +575,12 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   color: #eee9dd; background: rgba(5, 7, 9, 0.42);
   backdrop-filter: grayscale(0.92) saturate(0.38) contrast(0.94) brightness(0.82);
   -webkit-backdrop-filter: grayscale(0.92) saturate(0.38) contrast(0.94) brightness(0.82);
-  transition: opacity 0.32s ease;
+  /* 没在显示时整层不绘制：opacity:0 的 backdrop-filter 合成器照样每帧滤一遍全屏。
+     visibility 延到淡出结束才切，淡入淡出的 0.32 s 不变。 */
+  visibility: hidden;
+  transition: opacity 0.32s ease, visibility 0s linear 0.32s;
 }
-.hudDeathCard.on { opacity: 1; }
+.hudDeathCard.on { opacity: 1; visibility: visible; transition: opacity 0.32s ease, visibility 0s; }
 .hudDeathCard::after {
   content: ""; position: absolute; inset: 0; z-index: 0;
   background:

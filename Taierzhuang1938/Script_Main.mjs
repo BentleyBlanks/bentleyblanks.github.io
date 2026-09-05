@@ -6682,6 +6682,27 @@ function Frame(dt, render = true) {
 }
 
 /**
+ * 蒙皮骨骼矩阵一帧只算一次。
+ *
+ * three 在每次 renderer.render() 里都按 `info.render.frame` 判断「这套骨骼这趟算过没」，
+ * 而这个计数是**每趟 render 加一**，不是每个游戏帧加一：一帧要过预通道、阴影、主场景
+ * 三趟，三具骨骼（敌兵 / 第一人称手臂 / 第一人称身体）就要算九次 boneMatrices、
+ * 传九次骨骼纹理。三趟之间没人动骨头（IK 与姿态都在 RenderScene 之前算完），
+ * 后两趟是白算。只在 RenderScene 的出画窗口内挡：窗口外（CharacterModel 采样脚底、
+ * 测试里连续摆姿势）照旧每调必算。
+ */
+const skeletonUpdate = THREE.Skeleton.prototype.update;
+let skeletonPassStamp = 0;
+let skeletonPassGuard = false;
+THREE.Skeleton.prototype.update = function SkeletonUpdateOncePerFrame() {
+  if (skeletonPassGuard) {
+    if (this.passStamp === skeletonPassStamp) return;
+    this.passStamp = skeletonPassStamp;
+  }
+  skeletonUpdate.call(this);
+};
+
+/**
  * 合成与出画。抽成函数是因为**过场也要走同一条** ——
  * 曝光、雾、泛光、去饱和全按当关的天光预设装配，过场那条分支自己再抄一份
  * 必然抄漏（夜战预设 exposure 是 3.6，抄成 0.5 整帧就是纯黑）。
@@ -6756,6 +6777,9 @@ function RenderScene(dt) {
   profiler.B("matrix");
   scene.updateMatrixWorld();
   profiler.E("matrix");
+  // 从这里到出画结束，骨头不再动：骨骼矩阵按帧只算一次（见 SkeletonUpdateOncePerFrame）。
+  skeletonPassStamp += 1;
+  skeletonPassGuard = true;
   // 视模自阴影是独立 offscreen depth pass：必须等本帧手臂 IK / 枪姿矩阵更新完，
   // 又必须排在主颜色 pass 前，材质才能采到同一帧的手—枪遮挡。
   if (firstPersonSelfShadow?.enabled) {
@@ -6805,6 +6829,7 @@ function RenderScene(dt) {
   });
   profiler.E("post");
   profiler.GpuFrameEnd();
+  skeletonPassGuard = false;
 }
 
 /**

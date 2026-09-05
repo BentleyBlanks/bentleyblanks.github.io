@@ -41,12 +41,14 @@ export class MeleeLab {
     this.root.hidden=!!snapshot.menu;
     const s=MELEE_SCENARIOS.find(s=>s.id===snapshot.scenario);
     if(this.currentScenario!==snapshot.scenario){this.currentScenario=snapshot.scenario;this.select.value=snapshot.scenario;this.select.onchange();}
-    this.root.querySelector('.mlPause').textContent=snapshot.paused?'恢复对手':'暂停对手';
+    // 值没变就不写：每次 textContent 赋值都会让面板重排，空场景里没必要每 6 帧重排一次。
+    const Put=(sel,text)=>{const el=this.root.querySelector(sel);if(el.textContent!==text)el.textContent=text;};
+    Put('.mlPause',snapshot.paused?'恢复对手':'暂停对手');
     const f=snapshot.player, living=snapshot.targets.filter(t=>t.alive&&t.side==='ija');
-    this.root.querySelector('.mlStatus').textContent=!snapshot.alive?'本轮阵亡 · 可重开':!living.length?'本轮完成 · 可重开':`${s?.name||''}　剩余 ${living.length}`;
-    this.root.querySelector('.mlMeters').textContent=`${snapshot.weapon==='Dadao'?'大刀':'刺刀'} · ${StateLabel[f?.phase]||f?.phase||'准备'}${f?.parryActive?'（窗口有效）':''}\n生命 ${Math.round(snapshot.health)} · 体力 ${Math.round(f?.stamina??100)} · 平衡 ${Math.round(f?.poise??100)}`;
-    this.root.querySelector('.mlTargets').textContent=snapshot.targets.map(t=>`${t.side==='nra'?'友军':'日军'} ${t.id} · ${t.alive?`${t.distance.toFixed(2)}m · ${Math.round(t.health)}生命 · ${StateLabel[t.pose?.phase]||'警戒'}${t.pose?.role?' · '+RoleLabel[t.pose.role]:''}`:'已倒下'}`).join('\n');
-    this.root.querySelector('.mlLog').textContent=snapshot.events.slice(-5).reverse().map(e=>`${e.time.toFixed(1)} ${e.kind}${e.target!=null?' → '+e.target:''}`).join('\n');
+    Put('.mlStatus',!snapshot.alive?'本轮阵亡 · 可重开':!living.length?'本轮完成 · 可重开':`${s?.name||''}　剩余 ${living.length}`);
+    Put('.mlMeters',`${snapshot.weapon==='Dadao'?'大刀':'刺刀'} · ${StateLabel[f?.phase]||f?.phase||'准备'}${f?.parryActive?'（窗口有效）':''}\n生命 ${Math.round(snapshot.health)} · 体力 ${Math.round(f?.stamina??100)} · 平衡 ${Math.round(f?.poise??100)}`);
+    Put('.mlTargets',snapshot.targets.map(t=>`${t.side==='nra'?'友军':'日军'} ${t.id} · ${t.alive?`${t.distance.toFixed(2)}m · ${Math.round(t.health)}生命 · ${StateLabel[t.pose?.phase]||'警戒'}${t.pose?.role?' · '+RoleLabel[t.pose.role]:''}`:'已倒下'}`).join('\n'));
+    Put('.mlLog',snapshot.events.slice(-5).reverse().map(e=>`${e.time.toFixed(1)} ${e.kind}${e.target!=null?' → '+e.target:''}`).join('\n'));
   }
   Dispose(){this.root.remove();document.body.classList.remove('meleeLabActive');}
 }

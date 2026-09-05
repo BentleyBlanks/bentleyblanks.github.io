@@ -10,6 +10,9 @@ export const MELEE_QTE_PHASE = Object.freeze({
   nraPool: 9999, poolGain: 0, ijaPool: 9999, ijaPressure: 0, ijaSpawn: [], ijaSupport: [],
   ijaForce: { lmgEvery: 13, hmgTeams: 0, engineers: false, armor: 0, motorTransport: "rearOnly" },
   bounds: { minX: 1387, maxX: 1413, minZ: 1442, maxZ: 1480 }, cameraFar: 100,
+  // 环境机队在 165–250 m 高空绕 220–355 m 的圈，这片场地相机只看 100 m：
+  // 飞机永远画不进画面，却每帧更新 200 多个节点，白刃场不要它。
+  ambientAircraft: false,
   zones: [{ id: "MeleeArena", name: "白刃实验场", x: 1400, z: 1460, radius: 18 }],
   spawn: { x: 1400, z: 1468, ry: 0 },
   loadoutOverride: { primary: "HanYang", secondary: "Mauser96", melee: "Dadao", throwables: { Grenade: 0 }, spareClips: 6, note: "1 刺刀 / 3 大刀；X 卸刀恢复射击" },

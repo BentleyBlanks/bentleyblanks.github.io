@@ -89,17 +89,27 @@ export class AircraftFlight {
     const settled = await Promise.allSettled(AIRCRAFT_ASSETS.map(async (spec) => {
       const gltf = await LOADER.loadAsync(spec.url);
       const root = PrepareAircraft(gltf, spec);
-      if (this.phase?.whitebox?.p012 || this.phase?.ambientAircraft === false) root.visible = false;
-      this.group.add(root);
       this.forms.push({ spec, root });
+      this._Show(root, !(this.phase?.whitebox?.p012 || this.phase?.ambientAircraft === false));
     }));
     return settled.filter((entry) => entry.status === "fulfilled").length;
+  }
+
+  /**
+   * 显示/隐藏一架。隐藏时**从场景图摘下来**而不只是 visible=false：
+   * three 的 updateMatrixWorld 与预通道/阴影/主场景三趟 projectObject 都会递归
+   * 不可见子树，三架轰炸机合计 200 多个节点，在看不见它们的靶场里每帧白走四遍。
+   */
+  _Show(root, on) {
+    root.visible = !!on;
+    if (on) { if (root.parent !== this.group) this.group.add(root); }
+    else if (root.parent) root.parent.remove(root);
   }
 
   SetPhase(phase) {
     this.phase = phase;
     this.manualPose = null;
-    if (phase.whitebox?.p012 || phase.ambientAircraft === false) for (const { root } of this.forms) root.visible = false;
+    if (phase.whitebox?.p012 || phase.ambientAircraft === false) for (const { root } of this.forms) this._Show(root, false);
     this.anchor.set(
       (phase.bounds.minX + phase.bounds.maxX) * 0.5,
       (phase.bounds.minZ + phase.bounds.maxZ) * 0.5,
@@ -124,13 +134,13 @@ export class AircraftFlight {
 
     for (const form of this.forms) {
       const { spec, root } = form;
-      if (this.manualPose?.id === spec.id) { ApplyStrafePose(root, this.manualPose.pose); root.visible = true; continue; }
-      if (form === taken) { ApplyStrafePose(root, strafe.aircraft); root.visible = true; continue; }
+      if (this.manualPose?.id === spec.id) { ApplyStrafePose(root, this.manualPose.pose); this._Show(root, true); continue; }
+      if (form === taken) { ApplyStrafePose(root, strafe.aircraft); this._Show(root, true); continue; }
       // P012 has a deliberate first railway pass: background orbiters never pre-empt it.
-      if (this.phase.whitebox?.p012 || this.phase.ambientAircraft === false) { root.visible = false; continue; }
+      if (this.phase.whitebox?.p012 || this.phase.ambientAircraft === false) { this._Show(root, false); continue; }
       // 航线刚走完的那一架：先藏着，别让它从航线末端瞬移回圆周上。
-      if (form === this.strafeForm) { root.visible = false; continue; }
-      root.visible = true;
+      if (form === this.strafeForm) { this._Show(root, false); continue; }
+      this._Show(root, true);
       const angle = elapsed * spec.speed + spec.phaseOffset;
       const radiusX = spec.orbitRadius;
       const radiusZ = spec.orbitRadius * 0.62;
@@ -154,13 +164,13 @@ export class AircraftFlight {
   SetManualPose(id, pose) {
     if (!pose) {
       const old = this.forms.find((form) => form.spec.id === this.manualPose?.id);
-      if (old) old.root.visible = false;
+      if (old) this._Show(old.root, false);
       this.manualPose = null; return;
     }
     const form = this.FormFor(id);
     if (!form) return;
     this.manualPose = { id: form.spec.id, pose };
-    ApplyStrafePose(form.root, pose); form.root.visible = true;
+    ApplyStrafePose(form.root, pose); this._Show(form.root, true);
   }
 
   Dispose() {

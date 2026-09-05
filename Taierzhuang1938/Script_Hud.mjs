@@ -9,6 +9,30 @@
 
 const NS = "http://www.w3.org/2000/svg";
 
+/**
+ * 每帧调用的 Set* 一律经这四个口子写 DOM：**值没变就不碰节点**。
+ *
+ * 账（2026-09-06 白刃场 3394×1348 实测）：空场景一帧里 HUD 无条件重写
+ * innerHTML / 内联样式 / 属性，浏览器每帧都要走一遍样式重算 + 布局 + 绘制 +
+ * 光栅（主线程约 1.6 ms，GPU 进程再光栅约 1 ms），比整套 AI 还贵。
+ * innerHTML 赋同一串也会整段重建子树，所以 SetState 那一处另外缓存上一次的字符串。
+ */
+function SetText(el, text) {
+  if (el.textContent !== text) el.textContent = text;
+}
+function SetStyle(el, prop, value) {
+  if (el.style[prop] !== value) el.style[prop] = value;
+}
+function SetVar(el, name, value) {
+  if (el.style.getPropertyValue(name) !== value) el.style.setProperty(name, value);
+}
+function SetAttr(el, name, value) {
+  if (el.getAttribute(name) !== value) el.setAttribute(name, value);
+}
+function SetClass(el, name, on) {
+  if (el.classList.contains(name) !== !!on) el.classList.toggle(name, !!on);
+}
+
 /** 章节卡排在简报之后要等多久。0.55 s 让简报那 0.6 s 的淡出先走完。 */
 const TITLE_AFTER_BRIEF_S = 0.55;
 
@@ -587,15 +611,15 @@ export class Hud {
     this.crosshairSpreadDeg = geo.spreadDeg;
     this.crosshairArm = geo.arm;
     this.crosshairOn = shown;
-    e.classList.toggle("on", shown);
-    e.classList.toggle("sprint", shown && sprinting);
-    e.style.setProperty("--gap", `${this.crosshairGap.toFixed(1)}px`);
-    e.style.setProperty("--arm", `${geo.arm.toFixed(1)}px`);
-    e.setAttribute("aria-hidden", String(!shown));
-    e.setAttribute("aria-label", sprinting ? "冲刺扩散准心"
+    SetClass(e, "on", shown);
+    SetClass(e, "sprint", shown && sprinting);
+    SetVar(e, "--gap", `${this.crosshairGap.toFixed(1)}px`);
+    SetVar(e, "--arm", `${geo.arm.toFixed(1)}px`);
+    SetAttr(e, "aria-hidden", String(!shown));
+    SetAttr(e, "aria-label", sprinting ? "冲刺扩散准心"
       : `腰射准心 散布 ${geo.spreadDeg.toFixed(1)} 度`);
     // 识别卡贴着准心下沿走：散布撑大时它跟着让开，不会被四条线压住。
-    this.el.target.style.setProperty("--y", `${(this.crosshairGap + geo.arm + 16).toFixed(1)}px`);
+    SetVar(this.el.target, "--y", `${(this.crosshairGap + geo.arm + 16).toFixed(1)}px`);
   }
 
   /** 准心的运行时真值，给冒烟取证（别去解析 style 字符串）。 */
@@ -670,23 +694,26 @@ export class Hud {
     infiniteAmmo = false, infiniteReserve = false,
     grenades = 0, bundles = 0, mortar = 0, cooking = 0 }) {
     const stanceKey = STANCE_LABELS[stance] ? stance : "stand";
-    this.el.combatStance.dataset.stance = stanceKey;
-    this.el.combatStance.setAttribute("aria-label", STANCE_LABELS[stanceKey]);
-    for (const button of this.el.stanceChoices) {
-      button.setAttribute("aria-pressed", String(button.dataset.playerStance === stanceKey));
+    if (this.el.combatStance.dataset.stance !== stanceKey) {
+      this.el.combatStance.dataset.stance = stanceKey;
+      this.el.combatStance.setAttribute("aria-label", STANCE_LABELS[stanceKey]);
+      for (const button of this.el.stanceChoices) {
+        button.setAttribute("aria-pressed", String(button.dataset.playerStance === stanceKey));
+      }
     }
 
     const rounds = AmmoReadout({ ammo, clips, magazine, armed, infiniteAmmo, infiniteReserve });
-    this.el.ammoCurrent.textContent = rounds.current;
-    this.el.ammoReserve.textContent = rounds.reserve;
-    this.el.combat.classList.toggle("lowAmmo", rounds.low);
-    this.el.combat.classList.toggle("emptyAmmo", rounds.empty);
+    SetText(this.el.ammoCurrent, String(rounds.current));
+    SetText(this.el.ammoReserve, String(rounds.reserve));
+    SetClass(this.el.combat, "lowAmmo", rounds.low);
+    SetClass(this.el.combat, "emptyAmmo", rounds.empty);
 
     for (const [key, value] of Object.entries({ grenades, bundles, mortar })) {
       const count = Math.max(0, Math.floor(Number(value) || 0));
       const item = this.el.equipment[key];
-      item.querySelector("b").textContent = count;
-      item.classList.toggle("empty", count <= 0);
+      if (!item.countEl) item.countEl = item.querySelector("b");
+      SetText(item.countEl, String(count));
+      SetClass(item, "empty", count <= 0);
     }
 
     const bits = [];
@@ -695,11 +722,15 @@ export class Hud {
     if (bandages > 0) bits.push(`<span class="g">绷带 ${bandages}</span>`);
     if (breath) bits.push(`<span class="h">屏息</span>`);
     if (order) bits.push(`<span class="c">${order}</span>`);
-    this.el.state.innerHTML = bits.join("");
-    this.el.state.classList.toggle("on", bits.length > 0);
+    const stateHtml = bits.join("");
+    if (stateHtml !== this.stateHtml) {
+      this.stateHtml = stateHtml;
+      this.el.state.innerHTML = stateHtml;
+      SetClass(this.el.state, "on", bits.length > 0);
+    }
     // 蓄力条：攥着数几秒再扔，扔得远但引信也在烧。这一对取舍要看得见。
-    this.el.cook.style.width = cooking > 0 ? `${Math.round(cooking * 120)}px` : "0";
-    this.el.cook.classList.toggle("on", cooking > 0);
+    SetStyle(this.el.cook, "width", cooking > 0 ? `${Math.round(cooking * 120)}px` : "0px");
+    SetClass(this.el.cook, "on", cooking > 0);
   }
 
   /**
@@ -781,7 +812,8 @@ export class Hud {
   }
 
   SetSuppression(v) {
-    this.el.suppress.style.opacity = String(Math.min(1, v * 1.15));
+    // 千分位截断：压制值指数衰减永远到不了 0，不截断的话尾巴上每帧都是一个新字符串。
+    SetStyle(this.el.suppress, "opacity", Math.min(1, v * 1.15).toFixed(3));
   }
 
   /**
@@ -795,15 +827,15 @@ export class Hud {
   SetHurt({ health = 100, flash = 0, marks = null, yaw = 0 } = {}) {
     const base = Math.pow(Math.max(0, 1 - health / 90), 1.6) * 0.78;
     const v = Math.min(0.92, Math.max(base, flash * 0.85));
-    this.el.damage.style.opacity = v.toFixed(3);
-    this.el.damage.classList.toggle("low", health < 40 && health > 0);
+    SetStyle(this.el.damage, "opacity", v.toFixed(3));
+    SetClass(this.el.damage, "low", health < 40 && health > 0);
 
     const paths = this.hitDirPaths;
     if (!paths) return;
     const list = marks || [];
     for (let i = 0; i < paths.length; i += 1) {
       const m = list[i];
-      if (!m) { paths[i].style.opacity = "0"; continue; }
+      if (!m) { SetStyle(paths[i], "opacity", "0"); continue; }
       // 世界方向 → 屏幕角。存的是世界向量，所以转身之后指示器跟着转 ——
       // 存屏幕角的话你一回头它就指错地方了。
       const sin = Math.sin(yaw), cos = Math.cos(yaw);
@@ -811,9 +843,9 @@ export class Hud {
       const right = m.x * cos + m.z * -sin;
       const deg = Math.atan2(right, fwd) * 180 / Math.PI;
       const life = m.max ? m.life / m.max : 0;
-      paths[i].setAttribute("transform", `rotate(${deg.toFixed(1)})`);
+      SetAttr(paths[i], "transform", `rotate(${deg.toFixed(1)})`);
       // 前 0.25 s 满亮，之后淡出：一眼看得见，但不会在屏幕上挂两秒。
-      paths[i].style.opacity = (Math.min(1, life * 1.35) * 0.92).toFixed(3);
+      SetStyle(paths[i], "opacity", (Math.min(1, life * 1.35) * 0.92).toFixed(3));
     }
   }
 
@@ -1176,16 +1208,17 @@ export class Hud {
       // 线性关卡只显示“下一处去向”。把七个未来路标同时钉在屏上不是帮助，
       // 而是七个同色三角互相争夺注意力；玩家只读眼前的人、通路与下一处目标。
       if (!showAll && i !== Math.min(currentIndex, objectives.length - 1)) {
-        el.style.display = "none";
+        SetStyle(el, "display", "none");
         return;
       }
       const p = project(o.x, o.y ?? 1.6, o.z);
-      if (!p.visible) { el.style.display = "none"; return; }
-      el.style.display = "";
-      el.className = `hudMarker ${o.owner === "nra" ? "ours" : o.contested ? "fight" : "theirs"}`;
-      el.children[0].textContent = o.owner === "nra" ? "▲" : "✕";
-      el.children[1].textContent = `${o.name} ${Math.round(p.dist)}m`;
-      el.children[2].firstChild.style.width = `${Math.round(o.progress * 100)}%`;
+      if (!p.visible) { SetStyle(el, "display", "none"); return; }
+      SetStyle(el, "display", "");
+      const className = `hudMarker ${o.owner === "nra" ? "ours" : o.contested ? "fight" : "theirs"}`;
+      if (el.className !== className) el.className = className;
+      SetText(el.children[0], o.owner === "nra" ? "▲" : "✕");
+      SetText(el.children[1], `${o.name} ${Math.round(p.dist)}m`);
+      SetStyle(el.children[2].firstChild, "width", `${Math.round(o.progress * 100)}%`);
       placed.push({ el, x: p.x, y: p.y, dist: p.dist });
     });
 
@@ -1208,8 +1241,10 @@ export class Hud {
         }
       }
       done.push(m);
-      m.el.style.left = `${m.x}px`;
-      m.el.style.top = `${m.y}px`;
+      // 位置走 transform 而不是 left/top：标签每帧跟着相机呼吸挪半个像素，
+      // 改 left/top 是布局属性（整帧样式重算 + 布局 + 重绘），transform 只动合成层。
+      // 居中那一半（-50%）也合在这里，CSS 里不再单写 translate。
+      SetStyle(m.el, "transform", `translate(calc(-50% + ${m.x.toFixed(1)}px), calc(-50% + ${m.y.toFixed(1)}px))`);
     }
   }
 
