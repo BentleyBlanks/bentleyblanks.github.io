@@ -97,6 +97,9 @@
 .edBtns { display: flex; flex-wrap: wrap; gap: 4px; margin: 5px 0; }
 
 .edChips { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
+/* 碰撞体线框的分类图例：一小段色条 + 名字，颜色与 Script_EditorDebugRendering.COLLIDER_CATEGORIES 同源 */
+.edLegend { display: flex; flex-wrap: wrap; gap: 3px 12px; margin: 4px 0 6px; font-size: 11px; color: var(--ui-muted); }
+.edLegend .edSwatch { display: inline-block; width: 16px; height: 3px; vertical-align: middle; margin-right: 5px; }
 .edChip {
   cursor: pointer; user-select: none; font: 12px/1.5 var(--ui-font); background: transparent;
   padding: 4px 8px; border-radius: 0;

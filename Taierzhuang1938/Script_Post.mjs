@@ -981,6 +981,65 @@ export function MarkForegroundPrepass(root) {
   return root;
 }
 
+/**
+ * 给一份材质的顶点着色器注入「朝相机拉近一点」的深度偏置。
+ *
+ * 线框叠加与碰撞体线框画的都是**贴在实体表面上的线**：三角形的边就在三角形上，
+ * 碰撞盒的棱就在墙面的棱上。按原深度画，线与面的深度逐像素只差舍入误差，
+ * 深度测试一半过一半不过，线是一串虚线。`glPolygonOffset` 对 GL_LINES 无效，
+ * 所以在视空间把顶点整体往眼睛缩 `pull`（默认 0.3%）：屏幕位置不变（透视除法
+ * 抵消），深度在 10 m 处提前 3 cm、100 m 处 30 cm —— 远大于 24 位深度缓冲在
+ * 这些距离上的量化步长，又小到不会把墙后一步远的线漏出来。
+ * 常数 NDC 偏置不行：它在 100 m 处等价于十米，墙后面整条街的线都会透出来。
+ *
+ * 只动 `project_vertex` 这一段，蒙皮/实例化/BatchedMesh 的矩阵链照走 three 自己的。
+ */
+export function InjectDepthPull(material, pull = 0.003) {
+  const scale = (1 - pull).toFixed(5);
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader.replace("#include <project_vertex>", /* glsl */`
+      vec4 mvPosition = vec4( transformed, 1.0 );
+      #ifdef USE_BATCHING
+        mvPosition = batchingMatrix * mvPosition;
+      #endif
+      #ifdef USE_INSTANCING
+        mvPosition = instanceMatrix * mvPosition;
+      #endif
+      mvPosition = modelViewMatrix * mvPosition;
+      mvPosition.xyz *= ${scale};
+      gl_Position = projectionMatrix * mvPosition;`);
+  };
+  material.customProgramCacheKey = () => `depthPull:${scale}`;
+  return material;
+}
+
+/** 着色模式（Unity Scene 视图的 Shading Mode 那三档）。 */
+export const SHADING_MODES = ["shaded", "wireframe", "shadedWireframe"];
+
+/**
+ * 线框覆盖材质：整场共用一份，靠 `scene.overrideMaterial` 换上去。
+ *
+ * 用 MeshBasicMaterial 而不是自写 ShaderMaterial：three 按**对象**决定蒙皮/实例化/
+ * 形变宏（`object.isSkinnedMesh` 等），内置材质当覆盖材质时人物、合批实例、
+ * 第一人称都能正确出线 —— 预通道的 normalDepthMaterial 走的是同一条路。
+ * 线色偏暗、带透明度：叠在正式画面上是「压暗的边」，不是「发光的网」。
+ * 纯线框模式下背景另清成深灰，同一份材质靠 `uniforms.opacity` 不变、
+ * 只换 `color` 提亮（见 SetShadingMode）。
+ */
+function MakeWireframeMaterial() {
+  const material = new THREE.MeshBasicMaterial({
+    wireframe: true, color: 0x000000, transparent: true, opacity: 0.55,
+    depthTest: true, depthWrite: false, toneMapped: false, fog: false,
+  });
+  material.name = "DebugWireframeOverride";
+  return InjectDepthPull(material, 0.002);
+}
+/** 「着色线框」的线色（线性）：接近黑，叠上去是压暗的边。 */
+const WIRE_COLOR_SHADED = new THREE.Color(0.01, 0.012, 0.016);
+/** 「线框」的线色与底色（线性）：走 0-1 直通送屏，不过曝光与调色。 */
+const WIRE_COLOR_PURE = new THREE.Color(0.72, 0.75, 0.70);
+const WIRE_BACKGROUND_PURE = new THREE.Color(0.048, 0.052, 0.060);
+
 const QUALITY_PRESETS = {
   // 抗锯齿分工：taa 是 medium 及以上的**出厂默认**（UE 的默认 AA 也是 TAA），
   // FXAA 只在 taa 关着时兜底。low 出厂不开：两张全分辨率 RGBA16F 历史靶
@@ -1017,6 +1076,18 @@ export class PostPipeline {
     this.normalDepthMaterial = MakeNormalDepthMaterial(destruction);
     this._skipScratch = [];            // _CollectSkipped 的复用数组，别每帧 new
     this._skipWorldPosition = new THREE.Vector3();
+    // 着色模式（Debug Rendering 面板的「着色 / 线框 / 着色线框」）。只改主场景那一趟
+    // 怎么画，不进玩家设置，面板关掉必须还回 shaded。
+    this.shadingMode = "shaded";
+    this.wireframeMaterial = MakeWireframeMaterial();
+    this._wireScratch = [];            // _CollectWireframeHidden 的复用数组
+    /**
+     * 调试叠加层：主场景画完后、TAA 之前，用同一张 hdr 靶（连同它的深度）再画一遍的
+     * Object3D 根节点（碰撞体线框就挂在这里）。与场景图分开：进了 scene 的东西会被
+     * 预通道当几何写法线、被线框覆盖材质换掉、被 SSAO 当遮挡物 —— 全是不想要的。
+     * 根节点可选实现 `userData.PrepareDebugOverlay({ exposure })`，在画之前拿到本帧曝光。
+     */
+    this.debugOverlays = new Set();
     this.quadScene = new THREE.Scene();
     this.quadMesh = new THREE.Mesh(QUAD_GEOMETRY, null);
     this.quadMesh.frustumCulled = false;
@@ -1289,8 +1360,106 @@ export class PostPipeline {
 
   GetDebugView() { return this.debugView; }
 
+  /**
+   * 着色模式：
+   *   shaded          正式画面（默认）；
+   *   shadedWireframe 正式画面上叠一层三角形边线（进 TAA 与合成，是「带线的正片」）；
+   *   wireframe       只画边线：主场景那一趟换成深灰底 + 亮线，`final` 视图改为把
+   *                   hdr 靶 0-1 直通送屏 —— 不过曝光、雾、泛光与调色（Unity 的
+   *                   Wireframe 也没有后处理），TAA 抖动同时停掉，1 px 的线才不爬。
+   * 半透明 / 加性 / 贴片（烟、火、粒子、天空穹）和 `skipNormalDepth` 的东西不进
+   * 线框那一趟：它们的材质 `allowOverride === false`，覆盖材质换不掉，再画一遍只会
+   * 把加性粒子叠亮一倍。第一人称的手与枪照常出线（深度压缩是节点缩放，不在材质里）。
+   */
+  SetShadingMode(mode = "shaded") {
+    this.shadingMode = SHADING_MODES.includes(mode) ? mode : "shaded";
+    const material = this.wireframeMaterial;
+    if (this.shadingMode === "wireframe") {
+      material.color.copy(WIRE_COLOR_PURE);
+      material.opacity = 1;
+    } else {
+      material.color.copy(WIRE_COLOR_SHADED);
+      material.opacity = 0.55;
+    }
+    return this.shadingMode;
+  }
+
+  GetShadingMode() { return this.shadingMode; }
+
+  /** 挂一棵调试叠加层（见构造器里 debugOverlays 的账）。重复挂同一棵是幂等的。 */
+  AddDebugOverlay(root) {
+    if (root) this.debugOverlays.add(root);
+  }
+
+  RemoveDebugOverlay(root) {
+    this.debugOverlays.delete(root);
+  }
+
+  /**
+   * 线框那一趟要藏掉的对象：覆盖材质换不掉的（allowOverride=false：粒子、烟、天空穹、
+   * 水面之类自带着色器的）、显式 skipNormalDepth 的，以及 Points / Sprite / Line ——
+   * 后三类几何属性对不上 MeshBasicMaterial 的顶点着色器（预通道那次事故就是它们）。
+   * 只收当前可见的：本来就藏着的不该被这里"帮忙"打开。
+   */
+  _CollectWireframeHidden(scene) {
+    const list = this._wireScratch;
+    list.length = 0;
+    scene.traverse((object) => {
+      if (!object.visible) return;
+      if (object.userData?.skipNormalDepth) { list.push(object); return; }
+      if (object.isPoints || object.isSprite || object.isLine) { list.push(object); return; }
+      if (!object.isMesh || !object.material) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      if (materials.some((material) => material && material.allowOverride === false)) list.push(object);
+    });
+    return list;
+  }
+
+  /** 用线框覆盖材质把场景再画一遍进当前靶（不清屏，吃主场景留下的深度）。 */
+  _RenderWireframe(scene, camera) {
+    const renderer = this.renderer;
+    const hidden = this._CollectWireframeHidden(scene);
+    for (const object of hidden) object.visible = false;
+    const prevBackground = scene.background;
+    const prevOverride = scene.overrideMaterial;
+    const prevAutoClear = renderer.autoClear;
+    scene.background = null;
+    scene.overrideMaterial = this.wireframeMaterial;
+    renderer.autoClear = false;
+    try {
+      renderer.render(scene, camera);
+    } finally {
+      renderer.autoClear = prevAutoClear;
+      scene.overrideMaterial = prevOverride;
+      scene.background = prevBackground;
+      for (const object of hidden) object.visible = true;
+    }
+  }
+
+  /** 调试叠加层：与主场景同一张 hdr 靶、同一份深度，画在 TAA 之前。 */
+  _RenderDebugOverlays(camera, exposure) {
+    const renderer = this.renderer;
+    const prevAutoClear = renderer.autoClear;
+    renderer.autoClear = false;
+    try {
+      for (const root of this.debugOverlays) {
+        if (!root.visible) continue;
+        root.userData?.PrepareDebugOverlay?.({ exposure });
+        renderer.render(root, camera);
+      }
+    } finally {
+      renderer.autoClear = prevAutoClear;
+    }
+  }
+
   _GetDebugSource() {
     const T = this.targets;
+    // 纯线框：主场景靶里就是「深灰底 + 亮线」，直接 0-1 直通送屏。别走合成 ——
+    // 雾会把远处的线整片抹成雾色、暗角与颗粒叠在线框上只是噪声。
+    // 其它视图（GBuffer / AO / 材质假彩色 …）不受着色模式影响，照常各看各的靶。
+    if (this.debugView === "final" && this.shadingMode === "wireframe") {
+      return { texture: T.hdr.texture, mode: 5 };
+    }
     switch (this.debugView) {
       case "normal": return { texture: T.normalDepth.texture, mode: 0 };
       case "depth": return { texture: T.normalDepth.texture, mode: 1 };
@@ -1406,7 +1575,9 @@ export class PostPipeline {
     // 与运动模糊拿到的都是干净矩阵。
     // options.taa === false 是**逐次调用**的escape hatch（A/B 像素对比测试用），
     // 与面板那一位（taaEnabled）是两回事：前者不动状态，只是这一趟不跑。
-    const taaActive = !!(this.taaEnabled && this.targets.taaA) && options.taa !== false;
+    // 纯线框模式也不抖：那一趟的输出绕过 TAA 解算直接送屏，抖动只会让 1 px 的线逐帧爬。
+    const taaActive = !!(this.taaEnabled && this.targets.taaA) && options.taa !== false
+      && this.shadingMode !== "wireframe";
     // 中断过一趟就丢历史：那几帧没人写历史靶，里面是中断前的旧画面。
     if (!taaActive && this.taaWasActive) this.hasTaaHistory = false;
     this.taaWasActive = taaActive;
@@ -1480,12 +1651,32 @@ export class PostPipeline {
     }
 
     // --- 3) 主场景（HDR，AO 已在材质里注入）---
+    const shading = this.shadingMode;
     if (P) P.GpuPush("main");
     renderer.setRenderTarget(T.hdr);
-    renderer.setClearColor(0x000000, 1);
-    renderer.clear(true, true, false);
-    renderer.render(scene, camera);
+    if (shading === "wireframe") {
+      // 纯线框：不画着色场景，只留深灰底。深度也清掉 —— 线框没有面可写深度，
+      // 所有边全画出来（Unity 的 Wireframe 同样不做隐藏线消除）。
+      renderer.setClearColor(WIRE_BACKGROUND_PURE, 1);
+      renderer.clear(true, true, false);
+    } else {
+      renderer.setClearColor(0x000000, 1);
+      renderer.clear(true, true, false);
+      renderer.render(scene, camera);
+    }
     if (P) P.GpuPop();
+    // --- 3.1) 线框叠加：吃主场景留下的深度，贴在面上的边靠 InjectDepthPull 赢深度测试 ---
+    if (shading !== "shaded") {
+      if (P) P.GpuPush("wireframe");
+      this._RenderWireframe(scene, camera);
+      if (P) P.GpuPop();
+    }
+    // --- 3.2) 调试叠加层（碰撞体线框等）：同一张靶、同一份深度，画在 TAA 之前 ---
+    if (this.debugOverlays.size) {
+      if (P) P.GpuPush("debugOverlay");
+      this._RenderDebugOverlays(camera, options.exposure ?? 1.0);
+      if (P) P.GpuPop();
+    }
 
     // --- 3.5) TAA 时域解算：从这里起下游全部吃解算后的画面 ---
     let sceneColor = T.hdr;
@@ -1690,7 +1881,8 @@ export class PostPipeline {
     for (const rt of this.bloomMips) rt.dispose();
     for (const m of [this.matAo, this.matAoBlur, this.matBright, this.matDown,
       this.matUp, this.matGod, this.matTaa, this.matComposite, this.matFxaa,
-      this.matDebug, this.normalDepthMaterial]) m.dispose();
+      this.matDebug, this.normalDepthMaterial, this.wireframeMaterial]) m.dispose();
+    this.debugOverlays.clear();
   }
 }
 

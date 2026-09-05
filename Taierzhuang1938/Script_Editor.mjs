@@ -120,6 +120,8 @@ export class EditorSuite {
       renderer: host.renderer, scene: host.scene, camera: host.camera, canvas: host.canvas,
       library: host.library, lights: host.lights, post: host.post, vfx: host.vfx,
       gi: host.game.gi, profiler: host.profiler,
+      // 物理走取值器：换关会整个重建 PhysicsWorld，Debug Rendering 的碰撞体层每帧要认的是当前那个
+      get physics() { return host.game.physics ?? null; },
       actorFactory: host.actorFactory, viewmodel: host.viewmodel,
       audio: host.audio, cutscene: host.cutscene, destruction: host.destruction,
       game: host.game,

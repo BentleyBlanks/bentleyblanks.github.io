@@ -271,7 +271,8 @@ const debugRendering = await page.evaluate(() => {
     lit[view] = Brightest();
     // 一次只许亮一格：四组 chips 是四个独立控件，选中态必须集中同步，
     // 否则面板上会同时亮着四个视图，读者判断不出送屏的到底是哪一张。
-    chipsOn[view] = document.querySelectorAll(".edPanel.debugRendering .edChip.on").length;
+    // 只数视图格（.edViewChips）：着色模式那一排是另一个选择，永远亮着自己那一格
+    chipsOn[view] = document.querySelectorAll(".edPanel.debugRendering .edViewChips .edChip.on").length;
   }
   // 「接线对了」不等于「屏幕上看得见」：第一人称以前在 GBuffer 组里就是一片空洞
   // （双臂 skipNormalDepth）或一团噪声（枪写自己的光照颜色）。所以这里真的把枪藏了
@@ -368,6 +369,98 @@ Check("关面板回去打仗时 Debug Rendering 保持开着", !debugKeepOnClose
 JSON.stringify(debugKeepOnClose));
 await page.evaluate(() => window.Taierzhuang.editor.overlays.get("debugRendering").SetView("normal"));
 await Step(2);
+
+// 着色模式与物理碰撞体：两样改的都是「整幅画怎么画」，所以只认像素。
+//   · 着色线框 = 正片上叠边线：与正片比要有一片像素变了、又不能是整屏都变；
+//   · 线框 = 深灰底 + 亮线、hdr 靶直通送屏：与正片比几乎全屏都变，且 GBuffer 视图不受影响；
+//   · 碰撞体线框 = Post 的调试叠加层：Rapier 里一万多只静态盒、几十只角色胶囊，屏幕上要有像素变化，
+//     计数要与物理世界对得上；「透视」（关深度测试）要比贴面模式变得更多；
+//     相机站在里面的那只角色胶囊不画（否则屏幕正中一条竖线，像个坏掉的准星）。
+const debugShading = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const panel = T.editor.overlays.get("debugRendering");
+  const canvas = document.querySelector("canvas");
+  const probe = document.createElement("canvas");
+  probe.width = 96; probe.height = 54;
+  const ctx = probe.getContext("2d", { willReadFrequently: true });
+  const Grab = () => {
+    T.StepFrames(3);
+    ctx.drawImage(canvas, 0, 0, probe.width, probe.height);
+    return ctx.getImageData(0, 0, probe.width, probe.height).data;
+  };
+  const Diff = (a, b) => {
+    let changed = 0;
+    for (let i = 0; i < a.length; i += 4) {
+      if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 24) changed += 1;
+    }
+    return changed / (a.length / 4);
+  };
+  const taaWas = T.post.taaEnabled;
+  T.post.SetTaaEnabled(false);
+  panel.SetView("final");
+  panel.SetShading("shaded");
+  const base = Grab();
+  const out = {};
+  panel.SetShading("shadedWireframe");
+  out.shadedWireframe = { mode: T.post.GetShadingMode(), diff: Diff(base, Grab()) };
+  panel.SetShading("wireframe");
+  const wire = Grab();
+  const source = T.post._GetDebugSource();
+  out.wireframe = {
+    mode: T.post.GetShadingMode(), diff: Diff(base, wire),
+    passThrough: source?.texture === T.post.targets.hdr.texture && source?.mode === 5,
+  };
+  panel.SetView("normal");
+  T.StepFrames(2);
+  out.wireframeNormalView = T.post._GetDebugSource()?.texture === T.post.targets.normalDepth.texture;
+  panel.SetView("final");
+  panel.SetShading("shaded");
+  out.backToShaded = { mode: T.post.GetShadingMode(), diff: Diff(base, Grab()) };
+  out.shadingChipsOn = document.querySelectorAll(".edPanel.debugRendering .edShadingChips .edChip.on").length;
+
+  panel.SetColliders(true);
+  const withColliders = Grab();
+  const stats = { ...panel.colliders.stats };
+  const physicsStats = T.physics.Stats();
+  out.colliders = {
+    overlays: T.post.debugOverlays.size, diff: Diff(base, withColliders), ...stats,
+    physicsSolids: physicsStats.solids, physicsCharacters: physicsStats.characters,
+    // 玩家自己的胶囊不画：一只胶囊 68 条线，动态层至少少这一只
+    playerSkipped: stats.dynamicSegments <= (stats.character - 1) * 68 + stats.dynamic * 68,
+  };
+  panel.SetColliderXray(true);
+  out.xrayDiff = Diff(base, Grab());
+  panel.SetColliderXray(false);
+  T.post.SetTaaEnabled(taaWas);
+  // 留着碰撞体层开着、视图回到法线：下面「切换编辑器时叠加层还在」那一条接着用，
+  // 末尾「关掉之后有没有还干净」那一节要验的正是 Exit 把它们摘干净
+  panel.SetView("normal");
+  T.StepFrames(2);
+  return out;
+});
+Check("Debug Rendering：着色线框在正片上叠出边线（像素变了一片、不是整屏）",
+  debugShading.shadedWireframe.mode === "shadedWireframe"
+  && debugShading.shadedWireframe.diff > 0.02 && debugShading.shadedWireframe.diff < 0.6,
+  JSON.stringify(debugShading.shadedWireframe));
+Check("Debug Rendering：线框模式换成深灰底亮线、hdr 靶直通送屏，GBuffer 视图不受影响",
+  debugShading.wireframe.mode === "wireframe" && debugShading.wireframe.diff > 0.8
+  && debugShading.wireframe.passThrough && debugShading.wireframeNormalView,
+  JSON.stringify({ ...debugShading.wireframe, normalView: debugShading.wireframeNormalView }));
+Check("Debug Rendering：切回着色后画面与原正片一致、着色 chips 只亮一格",
+  debugShading.backToShaded.mode === "shaded" && debugShading.backToShaded.diff < 0.01
+  && debugShading.shadingChipsOn === 1,
+  JSON.stringify({ ...debugShading.backToShaded, chips: debugShading.shadingChipsOn }));
+Check("Debug Rendering：碰撞体线框按 Rapier 世界的形状画到屏幕上（静态盒全数、角色胶囊、玩家自己的不画）",
+  debugShading.colliders.overlays === 1 && debugShading.colliders.diff > 0.003
+  && debugShading.colliders.unsupported === 0
+  && debugShading.colliders.solid + debugShading.colliders.terrain >= debugShading.colliders.physicsSolids
+  && debugShading.colliders.solid > 1000 && debugShading.colliders.staticSegments > 0
+  && debugShading.colliders.character === debugShading.colliders.physicsCharacters
+  && debugShading.colliders.character >= 2 && debugShading.colliders.playerSkipped,
+  JSON.stringify(debugShading.colliders));
+Check("Debug Rendering：透视（关深度测试）比贴面模式画出更多碰撞体",
+  debugShading.xrayDiff > debugShading.colliders.diff,
+  `透视=${debugShading.xrayDiff.toFixed(4)} 贴面=${debugShading.colliders.diff.toFixed(4)}`);
 
 // 点击 range 后浏览器会把键盘焦点留在滑杆上。编辑器不能因为这个焦点
 // 就不再收到 WASD：场景编辑器的飞行镜头仍应继续移动。
@@ -2214,12 +2307,18 @@ const restored = await page.evaluate(() => {
     worldVisible: T.battlefield.meshes.every((m) => m.visible),
     hudHidden: document.body.classList.contains("edHideHud"),
     patched: !!T.battlefield.__editorBaseGroundHeight,
+    // Debug Rendering 的两样全局画法：着色模式要还回着色，碰撞体叠加层要摘干净
+    shading: T.post.GetShadingMode(),
+    debugOverlays: T.post.debugOverlays.size,
   };
 });
 Check("关掉后不再接管", !restored.capturing && restored.active === null);
 Check("「全部关掉」连 keepOnClose 的 Debug Rendering 也收、送屏回到最终画面",
   !restored.debugRendering && restored.debugView === "final" && restored.matMode === 0,
   JSON.stringify({ debugRendering: restored.debugRendering, debugView: restored.debugView, matMode: restored.matMode }));
+Check("Debug Rendering 关掉后着色模式还回着色、调试叠加层清空",
+  restored.shading === "shaded" && restored.debugOverlays === 0,
+  JSON.stringify({ shading: restored.shading, debugOverlays: restored.debugOverlays }));
 Check("世界与 HUD 都放回来了", restored.worldVisible && !restored.hudHidden && restored.viewmodel);
 // 拿当前关的 currentWeapon 比，不拿一开始那次的 —— 中途换过关，
 // 那一关的携行本来就不一样；要验的是「视图模型举的是游戏认为你拿着的那一把」。

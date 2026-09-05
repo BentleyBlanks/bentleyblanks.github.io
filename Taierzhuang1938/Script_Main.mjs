@@ -2365,6 +2365,8 @@ async function Boot() {
       // gi 走取值器：惰性构造后 Debug Rendering 面板才能看见新建的探针体
       state, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics,
       get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },
+      // 物理同理走取值器：换关重建 PhysicsWorld，Debug Rendering 的碰撞体线框要跟着换
+      get physics() { return physics; },
       // 场景编辑器的「序章 · 出川」是一段独立过场，不能用 JumpToLevel(0)
       // 冒充。跳转到稳定预览入口，同时清掉会把编辑器测试/直跳关带过去的
       // query，避免新序章又落到界河战斗切片。

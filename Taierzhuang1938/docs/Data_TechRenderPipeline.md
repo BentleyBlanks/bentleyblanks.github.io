@@ -1093,6 +1093,8 @@ Probe.html?scene=street&preset=smokyDay&gi=1&giDebug=1  # 画探针球（紫色 
 
 同一套假彩色也接进了编辑器的 **Debug Rendering** 浮窗（「材质」「光照」两组：BaseColor / 粗糙度 / 金属度 / 太阳阴影 / GI 辐照度 / GI 置信度）：面板负责把材质 uniform 与送屏视图同帧同步，走 hdr 靶的 0-1 直通显示（不过 Reinhard，读数是准的）。前向管线没有 GBuffer，这些通道都是「让材质把该通道当颜色重画一帧」拿到的；low 档材质没有注入，这两组画不可用斜纹。
 
+同一个浮窗还管两样改「整幅画怎么画」的调试画法（`PostPipeline.SetShadingMode` / `AddDebugOverlay`）：**着色 / 线框 / 着色线框**三档着色模式（线框那趟是主场景之后用 `MeshBasicMaterial({ wireframe })` 覆盖材质再画一遍进 hdr 靶，`allowOverride === false` 与 `skipNormalDepth` 的对象藏掉；纯线框时 hdr 靶清成深灰、`final` 视图把它 0-1 直通送屏并停掉 TAA 抖动），以及 **Rapier 碰撞体线框**（`post.debugOverlays`：主场景之后、TAA 之前用同一张 hdr 靶与深度再画的 Object3D，按 1/曝光预补线色）。两者都不进场景图，预通道 / SSAO / 假彩色重画都看不见它们。贴面的线靠 `InjectDepthPull` 在视空间朝相机缩 0.2%–0.3% 赢深度测试（常数 NDC 偏置在 100 m 处等价于十米，不许用）。细节见 `docs/Data_EditorSuite.md` 的 Debug Rendering 一节。
+
 ### 12.9 已知的近似（都是有意的，别当 bug 修）
 
 - **地面按平面处理**，但平面取体积脚印内的**最低**地面（`ProbeVolume.SampleGroundY`，每次滚动重采样）。曾经取体积中心一点：城内台地没事，界河这种向河槽下降近 2 m 的野外会让整层探针沉到平面之下 —— 朝下的射线打不到平面直接看见天，凹地整片被天光灌成银白，断层正好在地形跌破平面的等值线上。平面放低无光学代价（朗伯地面的出射辐射亮度与距离无关），高于平面的地形起伏仍被忽略。

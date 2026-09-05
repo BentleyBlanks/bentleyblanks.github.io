@@ -253,6 +253,12 @@ vendor 在 `vendor/rapier/build/rapier.module.mjs`（2.8 MB，wasm 用 base64 �
 
 ## 取证
 
+**先用眼睛看**：编辑器（`）→ 渲染调试 → Debug Rendering → 物理 → 「碰撞体线框」，把 Rapier 世界里
+**实际存在**的碰撞体按形状画在正片上（静态盒绿、地形块黄、角色胶囊青、动态刚体橙；「透视」隔墙看）。
+「看得见的洞 + 摸得着的墙」这一类账（见上面「碰撞跟着砖走」）在这里一眼就能对出来，不必先写探针。
+它读的是物理世界不是建关表，所以破坏摘掉的、编辑器新加的都以画面为准。口径在
+`docs/Data_EditorSuite.md` 的 Debug Rendering 一节。
+
 `node Taierzhuang1938/Script_PhysicsTest.mjs` —— 真浏览器里真的去撞墙。
 二十一条断言，每一条都从运行时状态取证（`window.Taierzhuang.Debug.*`），
 不许读源码推断。覆盖：

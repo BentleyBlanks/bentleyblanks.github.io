@@ -400,6 +400,28 @@ NormalDepth 和本帧 Composite uniforms 重算距离雾×高度衰减，`景深
 不另建全分辨率调试靶，避免只为编辑器多占显存；蓝→暖黄的假彩色明确显示 0→最大效果量。
 景深只在阵亡镜头触发，未触发时 CoC 视图保留深蓝底而不是黑屏。
 
+**着色模式**（面板顶部，Unity Scene 视图 Shading Mode 那三档，`PostPipeline.SetShadingMode`）：
+`着色` 是正片；`着色线框` 在主场景画完后用一份 `MeshBasicMaterial({ wireframe })` 覆盖材质把场景
+再画一遍进**同一张** hdr 靶（吃主场景的深度，进 TAA 与合成，是「带线的正片」）；`线框` 不画着色场景，
+hdr 靶清成深灰再画亮线，`final` 视图改为把 hdr 靶 0-1 直通送屏 —— 不过曝光 / 雾 / 泛光 / 调色，
+TAA 抖动同时停掉（1 px 的线会逐帧爬），其它视图不受影响。线框那一趟藏掉 `allowOverride === false`
+的材质（烟、火、粒子、天空穹、水面）、`skipNormalDepth` 的对象与 Points / Sprite / Line ——
+覆盖材质换不掉它们，再画一遍只会把加性粒子叠亮一倍；第一人称照常出线（深度压缩是节点缩放，
+不在材质里）。贴在面上的线靠 `Script_Post.InjectDepthPull`（视空间朝相机缩 0.2%–0.3%）赢过面的深度；
+**别改成常数 NDC 偏置**，那在 100 m 处等价于十米，墙后整条街的线都会透出来。
+
+**物理 · 碰撞体线框**（`ColliderWireframe`，挂成 `post.debugOverlays` 里的一棵 Object3D，主场景之后、
+TAA 之前用同一张 hdr 靶与深度再画一遍）：画的是 Rapier 世界里**实际存在**的碰撞体 —— 逐只读
+`collider.shape`（长方体 / 胶囊 / 球 / 三角网）与世界位姿，按刚体类型与形状分五类着色（静态实体绿、
+地形块黄、角色胶囊青、动态刚体橙、传感器品红；图例与 `COLLIDER_CATEGORIES` 同源）。破坏摘掉的不画、
+编辑器新加的会出现、地形炸出来的 trimesh 也在。静态层只在成员变化时重建（碰撞体总数一变或每 60 帧
+全扫一遍 `world.colliders` 对账缓存句柄），动态层每帧直接走 `physics.characters / dynamics`。
+相机所在的那只角色胶囊不画：第一人称时它前面那根竖棱正好是一条贯穿屏幕正中的竖线，像个坏掉的准星；
+自由飞行镜头离开身体后照常出现。「透视」关掉深度测试隔墙看，五个分类各有开关。不用
+`world.debugRender()`：它每帧把一万多只静态盒整份拷出 wasm，而且只按刚体类型给色。
+叠加层不进场景图，预通道 / SSAO / 假彩色重画都看不见它。Exit 必须把着色模式还回 `shaded`、
+摘掉叠加层并 dispose 几何 —— 冒烟末尾「关掉之后有没有还干净」那一节盯着这两项。
+
 正式军人与编辑器摄影棚里的十套蒙皮人物也必须走同一条材质注入链：GLB 自带的
 `MeshStandardMaterial` 在接入时明确把军装、皮肤、头发的金属度归零，并保留作者的
 粗糙度标量/贴图；BaseColor、粗糙度、金属度、太阳阴影和四路光照分量视图都要覆盖人物，
@@ -532,7 +554,7 @@ node Taierzhuang1938/Script_EditorTest.mjs
 node Taierzhuang1938/Script_DestructionEditorTest.mjs
 ```
 
-编辑器套件 71 条断言，另有破坏预览专项取证；退出码即成败。重点不是「能不能打开」，
+编辑器套件 169 条断言（2026-09-05 计），另有破坏预览专项取证；退出码即成败。重点不是「能不能打开」，
 而是**关掉之后有没有还干净** ——
 编辑器是这个项目里唯一会去动运行时状态的一批代码（藏世界、换相机、包 `GroundHeight`、
 往 `city.colliders` 里塞盒子、给 viewmodel 换枪），有一处没还回去，症状会在很远的地方
