@@ -42,6 +42,55 @@ function MakeClod(seed) {
   return geometry;
 }
 
+// Fill one final geometry per tile/material. Cloning BufferGeometry and then
+// transforming/copying it again in BuildSink cost more than the terrain itself
+// during overlapping impacts. Source templates remain immutable and shared.
+function BakeFragments(fragments) {
+  let vertexCount = 0, indexCount = 0;
+  for (const { source } of fragments) {
+    vertexCount += source.attributes.position.count;
+    indexCount += source.index?.count || source.attributes.position.count;
+  }
+  const positions = new Float32Array(vertexCount * 3), normals = new Float32Array(vertexCount * 3);
+  const colors = new Float32Array(vertexCount * 3), uvs = new Float32Array(vertexCount * 2);
+  const indices = vertexCount > 65535 ? new Uint32Array(indexCount) : new Uint16Array(indexCount);
+  const normalMatrix = new THREE.Matrix3();
+  let vertexOffset = 0, indexOffset = 0;
+  for (const { source, transform, brightness } of fragments) {
+    const pos = source.attributes.position.array, normal = source.attributes.normal.array;
+    const m = transform.elements, n = normalMatrix.getNormalMatrix(transform).elements;
+    const count = source.attributes.position.count;
+    for (let i = 0; i < count; i++) {
+      const at = i * 3, out = (vertexOffset + i) * 3, uv = (vertexOffset + i) * 2;
+      const x = pos[at], y = pos[at + 1], z = pos[at + 2];
+      const px = m[0] * x + m[4] * y + m[8] * z + m[12];
+      const py = m[1] * x + m[5] * y + m[9] * z + m[13];
+      const pz = m[2] * x + m[6] * y + m[10] * z + m[14];
+      positions[out] = px; positions[out + 1] = py; positions[out + 2] = pz;
+      const nx = normal[at], ny = normal[at + 1], nz = normal[at + 2];
+      const ax = n[0] * nx + n[3] * ny + n[6] * nz;
+      const ay = n[1] * nx + n[4] * ny + n[7] * nz;
+      const az = n[2] * nx + n[5] * ny + n[8] * nz;
+      const length = Math.hypot(ax, ay, az) || 1;
+      normals[out] = ax / length; normals[out + 1] = ay / length; normals[out + 2] = az / length;
+      uvs[uv] = px / 1.3 + py * 0.21; uvs[uv + 1] = -pz / 1.3 + py * 0.33;
+      colors[out] = brightness * 1.10; colors[out + 1] = brightness; colors[out + 2] = brightness * 0.86;
+    }
+    const index = source.index?.array;
+    const countIndices = index?.length || count;
+    for (let i = 0; i < countIndices; i++) indices[indexOffset++] = vertexOffset + (index ? index[i] : i);
+    vertexOffset += count;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
 export class CraterDebris {
   constructor(view, library) {
     this.view = view; this.library = library; this.tiles = new Map();
@@ -59,8 +108,7 @@ export class CraterDebris {
     this.Remove(key);
     const { model } = this.view, sizeM = model.config.cellM * model.config.tileCells;
     const x0 = tx * sizeM, z0 = tz * sizeM;
-    const sink = new BuildSink().SetSector(`CraterDebris_${key}`);
-    const colorsByMaterial = new Map();
+    const batches = new Map();
     const matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0), normal = new THREE.Vector3();
     const yaw = new THREE.Quaternion(), position = new THREE.Vector3(), scale = new THREE.Vector3();
@@ -83,44 +131,25 @@ export class CraterDebris {
           : this.clods[Math.floor(random() * this.clods.length)];
         const width = detailed ? 0.16 + random() * 0.16 : 0.025 + random() ** 2 * 0.19;
         const height = width * (0.25 + random() * 0.26);
-        const geometry = source.clone();
         normal.set(model.GroundHeight(x - 0.12, z) - model.GroundHeight(x + 0.12, z), 0.24,
           model.GroundHeight(x, z - 0.12) - model.GroundHeight(x, z + 0.12)).normalize();
         rotation.setFromUnitVectors(up, normal);
         yaw.setFromAxisAngle(up, random() * Math.PI * 2); rotation.multiply(yaw);
         position.set(x, y - height * 0.24, z);
         scale.set(width, height, width * (0.45 + random() * 0.7));
-        matrix.compose(position, rotation, scale); geometry.applyMatrix4(matrix);
-        // World-scale soil grains; normalized prop UVs would enlarge one tiny
-        // clod to a metre-wide boulder texture.
-        const pos = geometry.attributes.position, uv = new Float32Array(pos.count * 2);
-        for (let i = 0; i < pos.count; i++) {
-          uv[i * 2] = pos.getX(i) / 1.3 + pos.getY(i) * 0.21;
-          uv[i * 2 + 1] = -pos.getZ(i) / 1.3 + pos.getY(i) * 0.33;
-        }
-        geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+        matrix.compose(position, rotation, scale);
         const materialName = detailed ? "CraterStone" : "CraterFragments";
-        if (!colorsByMaterial.has(materialName)) colorsByMaterial.set(materialName, []);
+        if (!batches.has(materialName)) batches.set(materialName, []);
         const brightness = (depth > 0.3 ? 0.62 : 1) * (0.85 + random() * 0.6) * (detailed ? 1 : 1.3);
-        colorsByMaterial.get(materialName).push({ vertices: pos.count, brightness });
-        sink.Add(materialName, geometry); fragments++; if (detailed) stones++;
+        batches.get(materialName).push({ source, transform: matrix.clone(), brightness });
+        fragments++; if (detailed) stones++;
       }
     }
     if (!fragments) return;
+    const sink = new BuildSink().SetSector(`CraterDebris_${key}`);
+    for (const [name, fragments] of batches) sink.Add(name, BakeFragments(fragments));
     const meshes = sink.Flush(this.view.scene, this.library, { resolve: (name) => name === "CraterStone" ? this.stoneMaterial : this.baseMaterial });
-    for (const mesh of meshes) {
-      const pos = mesh.geometry.attributes.position, color = new Float32Array(pos.count * 3);
-      let at = 0;
-      // BuildSink preserves bucket order. One soil-height/tint sample per fragment
-      // replaces thousands of repeated height queries at its individual vertices.
-      for (const { vertices, brightness } of colorsByMaterial.get(mesh.name.split("|").pop())) {
-        for (let i = 0; i < vertices; i++) {
-          color[at++] = brightness * 1.10; color[at++] = brightness; color[at++] = brightness * 0.86;
-        }
-      }
-      mesh.geometry.setAttribute("color", new THREE.BufferAttribute(color, 3));
-      mesh.userData.craterDebris = true;
-    }
+    for (const mesh of meshes) mesh.userData.craterDebris = true;
     this.tiles.set(key, { meshes, fragments, stones });
     while (this.tiles.size > MAX_TILES) this.Remove(this.tiles.keys().next().value);
   }

@@ -231,12 +231,13 @@ function ConfigureCraterSurface(material, source, soil) {
         // the lip. Scorch changes reflectance; cavity AO only affects indirect light.
         earth *= mix(vec3(2.65, 2.12, 1.55), vec3(0.70, 0.53, 0.40), charred);
         earth *= mix(0.8, 1.18, macro) * (1.0 + lip * 0.15);
-        float ash = smoothstep(0.54, 0.82, CraterNoise(soilMeters * 1.6 + 51.7)) * charred;
-        earth = mix(earth, vec3(0.018, 0.012, 0.008) * mix(0.7, 1.3, breakup), ash * 0.42);
+        float ash = smoothstep(0.38, 0.7, CraterNoise(soilMeters * 1.3 + 51.7)) * charred;
+        earth = mix(earth, vec3(0.022, 0.015, 0.009) * mix(0.85, 1.15, breakup), ash * 0.7);
+        fissure *= 1.0 - ash * 0.75;
         float dust = smoothstep(0.005, 0.08, vTerrainBlast.y) * (1.0 - exposed) * 0.38;
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.57, 0.49, 0.4), dust);
         diffuseColor.rgb = mix(diffuseColor.rgb, earth, exposed);
-        float soilRelief = (grain * 0.003 + breakup * 0.001) * exposed;`)
+        float soilRelief = (grain * 0.003 + breakup * 0.001) * exposed * (1.0 - ash * 0.75);`)
       .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
         roughnessFactor = mix(roughnessFactor, mix(0.99, 0.94, cavity), exposed);`)
       .replace("#include <metalnessmap_fragment>", `#include <metalnessmap_fragment>
@@ -251,7 +252,7 @@ function ConfigureCraterSurface(material, source, soil) {
         vec3 soilGradient = sign(soilDet) * (dFdx(soilRelief) * soilR1 + dFdy(soilRelief) * soilR2);
         normal = normalize(max(abs(soilDet), 1e-8) * normal - soilGradient);
         vec2 soilSlope = texture2D(uCraterNormal, vSoilUv).xy * 2.0 - 1.0;
-        normal = normalize(normal + mat3(viewMatrix) * vec3(soilSlope.x, 0.0, soilSlope.y) * exposed * 0.52);`)
+        normal = normalize(normal + mat3(viewMatrix) * vec3(soilSlope.x, 0.0, soilSlope.y) * exposed * 0.52 * (1.0 - ash * 0.7));`)
       .replace("#include <aomap_fragment>", `#include <aomap_fragment>
         float earthOcclusion = mix(1.0, (1.0 - fissure * 0.36) * mix(1.0, 0.76, cavity), exposed);
         reflectedLight.indirectDiffuse *= earthOcclusion;
