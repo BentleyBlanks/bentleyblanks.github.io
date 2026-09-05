@@ -138,6 +138,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - 五种视频步兵动作已接入两军 01–04 模型；运行时、重建与验收见 [步兵动作说明](Data_InfantryAnimations.md)。
 
 ### 人物 / AI / 合批
+- 国军眼球材质与肩线资产修复、独立 Blender 工程和重建入口见 [国军眼睛与肩线修复](Data_NraEyesShoulders.md)。
 - `Script_Actor.mjs` —— 程序化人物（不用 SkinnedMesh：预通道 overrideMaterial 不带 skinning，
   蒙皮会在 SSAO 里塌成原点，见头注）；`Script_ActorBatch.mjs` 收成 InstancedMesh，
   `Script_ActorCrowd.mjs` 管远景人群。

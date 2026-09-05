@@ -1682,7 +1682,7 @@
       "vertices": 4412,
       "triangles": 8450,
       "limitedWeightVertices": 212,
-      "bytes": 5455092,
+      "bytes": 5455120,
       "boneRoles": {
         "head": "Bip002 Head",
         "neck": "Bip002 Neck",
@@ -2004,7 +2004,14 @@
         }
       },
       "pelvisHeightSpreadMeters": 0.843751,
-      "pelvisTrackSource": "3d1f879b"
+      "pelvisTrackSource": "3d1f879b",
+      "appearanceRepair": {
+        "revision": "20260906NraEyesShoulders",
+        "sourceSha256": "2f5ef965581971da9a9ba90e8f17cd96180a390b1f922c73828522ed25703913",
+        "shoulderVertices": 264,
+        "eyeVertices": 0,
+        "maxShoulderDropMeters": 0.04
+      }
     },
     {
       "id": "LugouNra02",
@@ -2016,7 +2023,7 @@
       "vertices": 5221,
       "triangles": 9917,
       "limitedWeightVertices": 298,
-      "bytes": 5911744,
+      "bytes": 6010508,
       "boneRoles": {
         "head": "Bip002 Head",
         "neck": "Bip002 Neck",
@@ -2338,7 +2345,14 @@
         }
       },
       "pelvisHeightSpreadMeters": 0.830437,
-      "pelvisTrackSource": "3d1f879b"
+      "pelvisTrackSource": "3d1f879b",
+      "appearanceRepair": {
+        "revision": "20260906NraEyesShoulders",
+        "sourceSha256": "eefd83935caf62e4195fced7b02edd025570efd1a28c937f1feb625d004b404c",
+        "shoulderVertices": 351,
+        "eyeVertices": 74,
+        "maxShoulderDropMeters": 0.04
+      }
     },
     {
       "id": "LugouNra03",
@@ -2350,7 +2364,7 @@
       "vertices": 5088,
       "triangles": 9485,
       "limitedWeightVertices": 443,
-      "bytes": 5610844,
+      "bytes": 5610880,
       "boneRoles": {
         "head": "Bip002 Head",
         "neck": "Bip002 Neck",
@@ -2672,7 +2686,14 @@
         }
       },
       "pelvisHeightSpreadMeters": 0.830098,
-      "pelvisTrackSource": "3d1f879b"
+      "pelvisTrackSource": "3d1f879b",
+      "appearanceRepair": {
+        "revision": "20260906NraEyesShoulders",
+        "sourceSha256": "6af234581e2c3f2b4492ad69c80df0b8fed734d917f6f925099e085fa236ed42",
+        "shoulderVertices": 275,
+        "eyeVertices": 0,
+        "maxShoulderDropMeters": 0.04
+      }
     },
     {
       "id": "LugouNra04",
@@ -2684,7 +2705,7 @@
       "vertices": 4620,
       "triangles": 8868,
       "limitedWeightVertices": 250,
-      "bytes": 5925056,
+      "bytes": 6023776,
       "boneRoles": {
         "head": "Bip002 Head",
         "neck": "Bip002 Neck",
@@ -3009,7 +3030,14 @@
         }
       },
       "pelvisHeightSpreadMeters": 0.843751,
-      "pelvisTrackSource": "3d1f879b"
+      "pelvisTrackSource": "3d1f879b",
+      "appearanceRepair": {
+        "revision": "20260906NraEyesShoulders",
+        "sourceSha256": "225ba104e2745cf96168c3ad59c90fe5d1c11065a037a8c730e83595e0576ddf",
+        "shoulderVertices": 247,
+        "eyeVertices": 82,
+        "maxShoulderDropMeters": 0.04
+      }
     },
     {
       "id": "LugouNra05",
@@ -3021,7 +3049,7 @@
       "vertices": 4591,
       "triangles": 8683,
       "limitedWeightVertices": 243,
-      "bytes": 5535912,
+      "bytes": 5535944,
       "boneRoles": {
         "head": "Bip002 Head",
         "neck": "Bip002 Neck",
@@ -3343,7 +3371,14 @@
         }
       },
       "pelvisHeightSpreadMeters": 0.843751,
-      "pelvisTrackSource": "3d1f879b"
+      "pelvisTrackSource": "3d1f879b",
+      "appearanceRepair": {
+        "revision": "20260906NraEyesShoulders",
+        "sourceSha256": "198f7a014387e23f600a283cffe04730411eb82d466e3c222b53101f0c60f774",
+        "shoulderVertices": 247,
+        "eyeVertices": 0,
+        "maxShoulderDropMeters": 0.04
+      }
     }
   ],
   "elapsedSeconds": 726.127,

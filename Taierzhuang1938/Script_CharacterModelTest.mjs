@@ -27,7 +27,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { LoadGlb, MeasurePose, MeasureForwardYaw } from "./_import/Script_LugouGlbPose.mjs";
+import { LoadGlb, ReadAccessor, ReadAccessorInt, MeasurePose, MeasureForwardYaw } from "./_import/Script_LugouGlbPose.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const characterDir = path.join(here, "Model", "Character");
@@ -188,6 +188,56 @@ for (const model of manifest.models) {
     assert.equal(recorded[0] <= seen[0] + 0.02 && recorded[1] >= seen[1] - 0.02, true,
       `${model.id}/${actionId} 清单记的骨盆高度 ${recorded} 没包住 GLB 实测 `
       + `[${seen[0].toFixed(3)}, ${seen[1].toFixed(3)}]`);
+  }
+}
+
+// A material can exist yet contain no iris (the white/black eye regression).
+// Check the shipped eye primitive and the UV at each forward-facing corneal pole.
+for (const id of ["LugouNra02", "LugouNra04"]) {
+  const glb = LoadGlb(path.join(characterDir, "Model_" + id + ".glb"));
+  const materialIndex = glb.json.materials.findIndex(material => material.name === "Material_NraEyes");
+  assert.ok(materialIndex >= 0, id + " has a textured eye material");
+  const material = glb.json.materials[materialIndex];
+  assert.equal(material.pbrMetallicRoughness.metallicFactor, 0);
+  assert.equal(material.pbrMetallicRoughness.baseColorFactor, undefined, "no black/grey factor masks the iris");
+  const texture = glb.json.textures[material.pbrMetallicRoughness.baseColorTexture.index];
+  const image = glb.json.images[texture.source ?? texture.extensions.EXT_texture_webp.source];
+  assert.equal(image.name, "Texture_NraEyeAtlas");
+  assert.equal(image.mimeType, "image/webp");
+  assert.ok(glb.json.bufferViews[image.bufferView].byteLength > 50000, "eye atlas is actually embedded");
+  const eye = glb.json.meshes.flatMap(mesh => mesh.primitives).find(p => p.material === materialIndex);
+  const positions = ReadAccessor(glb, eye.attributes.POSITION).data;
+  const uvs = ReadAccessor(glb, eye.attributes.TEXCOORD_0).data;
+  for (const side of [-1, 1]) {
+    let pole = -1;
+    for (let i = 0; i < positions.length / 3; i++) {
+      if (positions[i*3]*side > 0 && (pole < 0 || positions[i*3+2] > positions[pole*3+2])) pole = i;
+    }
+    assert.ok(pole >= 0, id + " contains both eyes");
+    assert.ok(Math.hypot(uvs[pole*2]-.89209, uvs[pole*2+1]-.922852) < .025,
+      id + " forward cornea samples the pupil, not an unrelated skin/sclera patch");
+  }
+}
+
+// Evaluate source landmarks through the actual opening skin palette. A simple
+// bind-space downward edit pushed the rotated relaxed sleeves out sideways.
+const shoulderReference = JSON.parse(fs.readFileSync(new URL("./_blender/Data_NraRelaxedShoulderReference.json", import.meta.url)));
+for (const [id, reference] of Object.entries(shoulderReference)) {
+  const glb = LoadGlb(path.join(characterDir, "Model_" + id + ".glb"));
+  for (const landmark of reference.landmarks) {
+    const primitive = glb.json.meshes[landmark.mesh].primitives[landmark.primitive];
+    const positions = ReadAccessor(glb, primitive.attributes.POSITION).data;
+    const joints = ReadAccessorInt(glb, primitive.attributes.JOINTS_0).data;
+    const weights = ReadAccessor(glb, primitive.attributes.WEIGHTS_0).data;
+    const delta = landmark.sourcePosition.map((value, axis) => positions[landmark.vertex*3+axis]-value);
+    const world = [0, 0, 0];
+    for (let k = 0; k < 4; k++) {
+      const joint = joints[landmark.vertex*4+k], weight = weights[landmark.vertex*4+k];
+      for (let row = 0; row < 3; row++)
+        world[row] += reference.matrices[joint][row].reduce((sum, value, col) => sum+value*delta[col], 0)*weight;
+    }
+    assert.ok(world[1] < -.030 && world[1] > -.050, id + " shoulder cap is relaxed by 3–5 cm");
+    assert.ok(Math.hypot(world[0], world[2]) < .002, id + " relaxed sleeve does not bulge sideways");
   }
 }
 

@@ -248,9 +248,9 @@ const MODEL_FORWARD_YAW = Math.PI;
 // v4 = 2026-08-29 补回骨盆位移轨道的那批 GLB；v5 = 2026-09-02 视频转骨骼三条
 // 新 clip（CarryStretcherFront/Rear、WoundedLimp）。十套模型的二进制都变了，
 // 戳不跟着走就会「新壳配旧芯」：清单是新的，浏览器缓存里的 GLB 还是旧的那批。
-// v6 = Ija03 opaque skin and the spare helmet bound to the backpack/chest.
-const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=6";
-const ASSET_VERSION = "6";
+// NRA eye maps and shoulder silhouettes: keep the manifest and GLBs on one revision.
+const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=202609061026";
+const ASSET_VERSION = "202609061026";
 // 完整蒙皮轮廓必须进入 NormalDepth；但远处占屏很小的头、手和零碎附件不值得
 // 再为预通道提交一遍。每套模型三角最多的主分件始终保留，近景/编辑器则全部保留。
 const NORMAL_DEPTH_DETAIL_MAX_DISTANCE = 4;
