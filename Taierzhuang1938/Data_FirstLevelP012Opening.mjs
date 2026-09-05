@@ -36,7 +36,7 @@ export const openingActivities=Object.freeze({
   openingUrgentGuideMps:3.8,civilianAlarmSpeedScale:1.85,
   // Finite salvos advance with the player along the northbound road, never a camera-relative blast.
   approachShells:Object.freeze([
-    {stage:"distant",gateZ:110,delayS:0,point:Point(-22,-20)},
+    {stage:"distant",gateZ:110,delayS:0,point:Point(-36,-24)},
     {stage:"distant",gateZ:110,delayS:3.8,point:Point(25,-27)},
     {stage:"village",gateZ:70,delayS:0,point:Point(-27,25)},
     {stage:"village",gateZ:70,delayS:2.8,point:Point(24,15)},
@@ -71,7 +71,6 @@ export const openingStoryBeats=Object.freeze([
   ["VillageReply", "P012BackRouteQuestion", "shunzi", "认路。", null,2,"P012BackRouteReply"],
   ["VillageAhead", "P012BackRouteReply", "yaowa", "前头才是我们去的地方。", null,3.4,"P012BackRouteAhead"],
   ["VillageRetort", "P012BackRouteAhead", "shunzi", "老子又没说不去。", null,3],
-  ["DistantAlarm", "P012DistantShellImpact", "luo", "北边阵地挨炮了！乡亲们往后撤，咱们靠边加快，赶去接防！", 8,5],
   ["ApproachAlarm", "P012ApproachShellImpact", "luo", "炮火顺着路压过来了！拉开些，跟紧我，前头有沟！", 6,4],
   ["NorthDeparture", "P012VillageNorthDeparture", "luo", "前头还在挨炮。跟上，穿过北口进沟！", 8, 2.8],
   ["Chat", "P012NorthApproachChat", "heyoutian", "刚领的子弹捂好，别一跑全撒路上。", 8],

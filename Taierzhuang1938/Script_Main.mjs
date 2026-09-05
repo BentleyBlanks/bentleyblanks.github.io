@@ -3230,6 +3230,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       const distance = Math.hypot(point.x-actor.position.x,point.z-actor.position.z), fraction = distance>10?8/distance:1;
       actor.goal.set(actor.position.x+(point.x-actor.position.x)*fraction,0,actor.position.z+(point.z-actor.position.z)*fraction);
     },
+    DistantShellShot: point => p012StageZero?.shellShot.Start(point),
     WarnShell: (point, damaging, OnImpact) => {
       const at = new THREE.Vector3(point.x, battlefield.GroundHeight(point.x, point.z), point.z);
       if (damaging) { const impact = combat.CallIncoming("launcher", at, { OnImpact }); return { x: impact.x, z: impact.z }; }
@@ -3248,6 +3249,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   p012Runtime?.SaveSafePoint("Start",phase.spawn,"stand",phase.spawn.ry || 0);
   if (p012Runtime) p012StageZero = new FirstLevelP012StageZero({scene,actorFactory,physics,battlefield,audio,hud,camera,vfx,
     runtime:p012Runtime, config:phase.whitebox, ambience:phase.ambience||phase.sky,
+    Capture: cut => cutscene.onCapture(cut), Release: () => {input.lookX=0;input.lookY=0;cutscene.onRelease();},
     Player:()=>player, Guide:()=>companion.Handle("luo"), Signal:name=>story.Signal(name), Signalled:name=>story.Signalled(name)});
   p012Flow = phase.whitebox?.p012 ? new FirstLevelP012Director({
     Register: (spec) => interact.Register({ ...spec, tag: "P012",
@@ -5088,6 +5090,7 @@ document.addEventListener("mousemove", (e) => {
     if (cutscene.AllowsLook) cutscene.AddLook(e.movementX, e.movementY);
     return;
   }
+  if (state.cutscene) return;
   // 轮盘开着的时候鼠标是在选格子，不是在转头。
   // 这条**不查指针锁**：轮盘只要一个方向向量，而 movementX/Y 在锁与不锁下都送达
   // （出图/测试模式下根本拿不到指针锁，查了就等于轮盘在那些模式里是死的）。
@@ -6101,6 +6104,15 @@ function Frame(dt, render = true) {
     return;
   }
 
+  if (p012StageZero?.shellShot.active) {
+    p012StageZero.shellShot.Update(dt);
+    sky.Update(state.elapsed);lights.Update(dt,state.elapsed,camera.position);
+    vfx?.Update(dt,camera,state.elapsed);
+    combat?.Update(dt,{phase:PHASE_TABLE[state.phaseIndex]});
+    camera.getWorldDirection(_forward);lights.UpdateShadowFrustum(camera.position,_forward);
+    if(render)RenderScene(dt);
+    return;
+  }
   // 过场期间：只推过场与画面，玩法全停。
   // 不停的话玩家会在看电影的时候被打死，而且 AI 会照常往前走 ——
   // 过场结束时战场已经不是过场开始时那个战场了。

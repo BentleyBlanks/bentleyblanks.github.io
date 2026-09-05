@@ -743,7 +743,6 @@ export class FirstLevelP012Director {
       }
       if(this.facts.has("northNearMissImpact")&&!this.facts.has("northCovered")
         &&["crouch","prone"].includes(sample.stance)
-        &&Distance(p,activity.northShelterPosition)<=(activity.northShelterRadiusM||2.4)
         &&this.host.ShelteredFromImpact?.(sample.mortarImpactPosition||this.shellTarget)===true){
         this.Mark("northCovered");this.Emit("P012NorthDitchEntered");
       }
@@ -1122,11 +1121,15 @@ export class FirstLevelP012Director {
       }
       if(!this.facts.has("northNearMissImpact")){text="跟随班长北上";requiredAction="follow";}
       else{
-        text=this.facts.has("northCovered")?"已进入掩护：沿交通壕跟上班长，等小队收拢后继续":"炮弹落在路旁！进入蓝色沟沿内侧，按 C 蹲下（或 Z 趴下）";
+        text=this.facts.has("northCovered")?"已躲过炮击：跟班长沿沟继续，等小队收拢":"炮弹落在路旁！跟班长躲到蓝色矮墙后，按 C 蹲下或 Z 卧倒（整段都可）";
         requiredAction=this.facts.has("northCovered")?"follow":"sprint";
-        if(!this.facts.has("northCovered"))target=activity.northShelterPosition;
+        if(!this.facts.has("northCovered")){
+          const bank=this.config.layout?.blocks?.find(block=>block.id==="NorthNearMissDitchBank"),p=this.lastSample.position;
+          target=bank&&p?{x:bank.x+bank.w/2+2.4,z:Math.max(bank.z-bank.d/2+1,Math.min(bank.z+bank.d/2-1,p.z))}:activity.northShelterPosition;
+        }
         if(!this.facts.has("northCovered")&&Distance(this.lastSample.position,target)<=4){
           requiredStance="crouch";requiredAction="crouch";
+          text=["crouch","prone"].includes(this.lastSample.stance)?"这里还暴露着：贴近蓝色矮墙靠公路的一侧，蹲下或卧倒":"就在这段蓝色矮墙后，按 C 蹲下或 Z 卧倒即可，无需交互";
         }
       }
     }

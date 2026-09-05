@@ -300,6 +300,8 @@ export class FirstLevelWhiteboxField {
       const ammo=block.id==="WeaponIssueCrate";
       return gun||ammo?[{...block,label:gun?"领取步枪":"领取弹药",color:gun?"#f0cf79":"#a4dfd0"}]:[];
     });
+    const bank=this.layout.blocks.find(block=>block.id==="NorthNearMissDitchBank");
+    if(bank)labels.push({...bank,id:"NorthShelter",x:bank.x+2.8,z:bank.z,label:"避炮处 C / Z",color:"#a5dfff",shelter:true});
     for(const spec of labels){
       const canvas=document.createElement("canvas");canvas.width=512;canvas.height=160;
       const ctx=canvas.getContext("2d");ctx.fillStyle="#182326";ctx.fillRect(0,0,512,160);
@@ -307,7 +309,7 @@ export class FirstLevelWhiteboxField {
       ctx.fillStyle=spec.color;ctx.font="bold 68px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(spec.label,256,82);
       const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;this.labelTextures.push(texture);
       const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:true}));
-      sprite.name="P012SupplyLabel_"+spec.id;sprite.position.set(spec.x,spec.y+spec.h/2+.7,spec.z);sprite.scale.set(2.4,.75,1);
+      sprite.name=(spec.shelter?"P012ShelterLabel_":"P012SupplyLabel_")+spec.id;sprite.position.set(spec.x,spec.y+spec.h/2+.7,spec.z);sprite.scale.set(spec.shelter?3.6:2.4,.75,1);
       this.scene.add(sprite);this.meshes.push(sprite);
     }
   }

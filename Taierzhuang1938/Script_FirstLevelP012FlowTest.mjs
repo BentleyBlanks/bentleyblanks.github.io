@@ -1437,3 +1437,12 @@ assert.equal(bandagesIssued,1,"repeated wounded callbacks cannot duplicate banda
  }
 }
 console.log("FirstLevelP012FlowTest PASS: actions, ordered escort, flank, finite waves, aircraft facts and checkpoint replay");
+
+// The whole real shelter works; no invisible endpoint or small arrival disk.
+for(const z of [-39,-43,-47]){
+ const director=new FirstLevelP012Director({ShelteredFromImpact:()=>true},phase.whitebox);
+ director.beat=4;director.Mark("northNearMissImpact");director.shellTarget={x:-19,z:-40};
+ director.Update(.1,{position:{x:-12,z},stance:"crouch",mortarImpactCount:1});
+ assert.ok(director.facts.has("northCovered"),"any protected part of the ditch passes: "+z);
+ assert.ok(director.CurrentObjective().text.includes("已躲过炮击"));
+}

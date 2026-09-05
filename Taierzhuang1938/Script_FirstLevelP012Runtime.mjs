@@ -482,9 +482,9 @@ export class FirstLevelP012Runtime {
       if(shell.at===null&&player.z<=shell.gateZ)shell.at=this.time+shell.delayS;
       if(shell.at===null||shell.launched||this.time<shell.at)continue;
       shell.launched=true;shell.launchedAt=this.time;
-      this.host.WarnShell(shell.point,false,()=>{
-        shell.impacted=true;shell.impactedAt=this.time;
-        if(!this.civilianAlarm){this.civilianAlarm=true;this.host.Signal?.("P012DistantShellImpact");}
+      this.host.WarnShell(shell.point,false,impact=>{
+        shell.impactPoint={x:impact.x,z:impact.z};shell.impacted=true;shell.impactedAt=this.time;
+        if(!this.civilianAlarm){this.civilianAlarm=true;this.host.Signal?.("P012DistantShellImpact");this.host.DistantShellShot?.(shell.impactPoint);}
         if(shell.stage==="approaching"&&!this.approachAlarm){this.approachAlarm=true;this.host.Signal?.("P012ApproachShellImpact");}
       });
     }
@@ -622,7 +622,8 @@ export class FirstLevelP012Runtime {
       // actual destination, not the previous waypoint captured above.
       const gunport = guide.route.at(-1);
       if (guide.beat === 5 && guide.index === guide.route.length - 1 && position && Math.hypot(position.x - gunport.x, position.z - gunport.z) < 2) guide.clearGunport = true;
-      const target = guide.clearGunport ? { x: guide.route.at(-1).x - 5, z: guide.route.at(-1).z + 2 } : guide.route[guide.index];
+      const sheltering=guide.beat===4&&this.host.Signalled?.("P012NorthNearMissImpact")&&!this.host.Signalled?.("P012NorthDitchEntered");
+      const target = sheltering&&this.config.activities?.northShelterPosition?this.config.activities.northShelterPosition:guide.clearGunport ? { x: guide.route.at(-1).x - 5, z: guide.route.at(-1).z + 2 } : guide.route[guide.index];
       const opening=[0,2].includes(guide.beat),player=this.host.PlayerPosition?.();
       const distance=player&&position?Math.hypot(player.x-position.x,player.z-position.z):0;
       const ahead=player&&position?(player.x-position.x)*(target.x-position.x)+(player.z-position.z)*(target.z-position.z)>0:false;
@@ -630,6 +631,7 @@ export class FirstLevelP012Runtime {
       const waitForPlayer=(opening||guide.beat===13)&&!ahead&&distance>(activity.openingGuideWaitDistanceM??10);
       const speed=opening?(ahead&&distance>3?(activity.openingGuideCatchupMps??5.246):(this.civilianAlarm&&guide.beat===2?(activity.openingUrgentGuideMps??3.8):(activity.openingGuideWalkMps??3.05))):guide.speed;
       this.host.Move(actor, waiting||waitForPlayer ? position : target, waiting||waitForPlayer ? 0 : speed);
+      if(sheltering&&position&&Math.hypot(position.x-target.x,position.z-target.z)<1.5)this.FaceToward(actor,position,this.host.PlayerPosition?.()||position,dt);
       if(waiting && guide.FaceAt && !inspecting) {
         const facing=guide.FaceAt(guide.index);
         if(facing && Math.hypot(facing.x-position.x,facing.z-position.z)>.05){

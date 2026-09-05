@@ -155,6 +155,28 @@ async function PlayPrelude() {
       };
       for (let frame = 0; frame < 600; frame += 1) {
         const flow = game.Debug.P012();
+        const shot=game.Debug.P012Scene().stageZero?.shellShot;
+        if(shot?.active){
+          bot.shellShotBefore ||= {position:game.player.position.toArray(),yaw:game.player.yaw,pitch:game.player.pitch,shots:game.state.playerShots};
+          game.Debug.Key("KeyW",true);game.Debug.Mouse(0,true);game.Debug.Look(180,60);
+          game.StepFrames(1,1/30,true);
+          game.Debug.Key("KeyW",false);game.Debug.Mouse(0,false);
+          const before=bot.shellShotBefore;
+          if(game.player.position.toArray().some((v,i)=>Math.abs(v-before.position[i])>.0001)
+            ||game.player.yaw!==before.yaw||game.player.pitch!==before.pitch||game.state.playerShots!==before.shots)
+            throw new Error("Distant explosion shot leaked movement, aim or fire input");
+          if(shot.time>.4&&!bot.shellShotCaptured){
+            bot.shellShotCaptured=true;bot.pendingCausality={id:"DistantShellShot",shot,
+              position:before.position,camera:game.camera.position.toArray(),subtitle:document.querySelector('[data-p012-shell-shot]')?.textContent};break;
+          }
+          continue;
+        }
+        if(bot.shellShotBefore&&!bot.shellShotRestored){
+          const before=bot.shellShotBefore;
+          if(game.state.cutscene||document.querySelector('[data-p012-shell-shot]')||game.camera.position.distanceTo(game.player.EyePosition)>.25)
+            throw new Error("Explosion shot did not restore first-person camera and input ownership");
+          bot.shellShotRestored=true;bot.held={};
+        }
         if(flow.beatIndex>=3&&flow.beatIndex<=5){
           const scene=game.Debug.P012Scene();
           if(scene.binocularOwned||game.interact.Point("p012_binocularTake")||game.interact.Point("p012_binocularReturn"))
@@ -245,7 +267,7 @@ async function PlayPrelude() {
         if(openingCausalityReview&&flow.beatIndex===4){
           const ditch=DitchEvidence();
           if(!bot.lastDitch?.northCovered&&ditch.northCovered){
-            if(!ditch.impactFact||ditch.distanceToShelter>northShelterRadius||ditch.stance==="stand"||!ditch.ray?.blocked)
+            if(!ditch.impactFact||ditch.stance==="stand"||!ditch.ray?.blocked)
               throw new Error(`northCovered without actual ditch shelter: ${JSON.stringify(ditch)}`);
             bot.ditchCaptured=true;bot.pendingCausality={id:"NorthDitchEntered",before:bot.lastDitch,after:ditch};
             bot.lastDitch=ditch;break;
@@ -486,7 +508,8 @@ async function PlayPrelude() {
   Check(!arrival.actors.some(actor=>actor.distance<1.5&&actor.forward>.5),
     "首次交付后的正前方近距离没有友军身体堵住观察镜头",
     JSON.stringify(arrival.actors.filter(actor=>actor.distance<3)));
-  const salvo=await page.evaluate(()=>({shells:window.Tengxian.Debug.P012Scene().ambientShells,count:window.Tengxian.Debug.P012Scene().mortarImpactCount}));
+  const salvo=await page.evaluate(()=>({shells:window.Tengxian.Debug.P012Scene().ambientShells,approach:window.Tengxian.Debug.P012Scene().approachShells,count:window.Tengxian.Debug.P012Scene().mortarImpactCount,shotRestored:window.p012ReviewBot.shellShotRestored}));
+  Check(salvo.approach.length===8&&salvo.approach.every(shell=>shell.launched&&shell.impacted)&&salvo.shotRestored,"远近八发炮击实际落地、特写封锁输入后交还控制权",JSON.stringify(salvo.approach));
   Check(salvo.shells.length===4&&salvo.shells.every(shell=>shell.launched&&shell.impacted)&&salvo.count===1,
     "首发与四处错开弹着均真实完成，环境弹着未替代避炮事实",JSON.stringify(salvo));
   console.log("P012 opening activity trace", JSON.stringify(result.trace));

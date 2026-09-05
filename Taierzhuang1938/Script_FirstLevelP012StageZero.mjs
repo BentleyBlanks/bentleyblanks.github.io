@@ -1,6 +1,7 @@
 // P012 render/physics adapters only. Story and finite lifecycles remain in the
-// pure Arrival/VillageLife controllers. No player camera/pose/weapon ownership.
+// pure Arrival/VillageLife controllers. ShellShot alone briefly captures the live camera.
 import * as THREE from "three";
+import { FirstLevelP012ShellShot } from "./Script_FirstLevelP012ShellShot.mjs";
 import { HashString } from "./Script_Noise.mjs";
 import { FirstLevelP012Arrival } from "./Script_FirstLevelP012Arrival.mjs";
 import { FirstLevelP012ArrivalView } from "./Script_FirstLevelP012ArrivalView.mjs";
@@ -12,6 +13,7 @@ import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 export class FirstLevelP012StageZero {
   constructor(host) {
     this.host = host; this.elapsed = 0; this.people = new Set();
+    this.shellShot=new FirstLevelP012ShellShot(host);
     this.arrivalView = new FirstLevelP012ArrivalView();
     this.villageView = new FirstLevelP012VillageLifeView(host.scene, (x,z)=>host.battlefield.GroundHeight(x,z));
     this.arrival = new FirstLevelP012Arrival({
@@ -121,7 +123,7 @@ export class FirstLevelP012StageZero {
     const village=this.village.Snapshot();
     village.workerPoses=[...this.people].filter(entry=>entry.role==="worker").map(entry=>({id:entry.id,position:{x:entry.position.x,z:entry.position.z},pose:entry.workPose?.Snapshot()||null}));
     const approach={offset:this.host.battlefield.trainOffsetM,trainMoving:!!this.host.runtime.trainMoving};
-    return {arrival:{...this.arrival.Snapshot(),...this.arrival.View()},approach,village};
+    return {shellShot:this.shellShot.Snapshot(),arrival:{...this.arrival.Snapshot(),...this.arrival.View()},approach,village};
   }
   RestoreArrival(snapshot) {
     this.restoringPlayer=true;
@@ -129,7 +131,7 @@ export class FirstLevelP012StageZero {
     if(view.canDisembark)this.host.Signal("P012TrainDoor");
   }
   Dispose() {
-    this.disposed=true;
+    this.disposed=true;this.shellShot.Dispose();
     this.arrival.Dispose();this.arrivalView.Dispose();this.village.Dispose();this.villageView.Dispose();
     if(this.steam)this.host.vfx.RemoveSmokeSource(this.steam);this.steam=null;
   }
