@@ -16,12 +16,20 @@ CarrySystem、双臂及身体 GLB 骨骼检查 193 帧，低头、首次抬起�
 
 `GoalResumeCarryHands` 实际只执行了开场：启动时漏传 `--air-route`，虽退出 0 却没有进入空袭夹具，
 不能计为担架或扑倒通过。测试入口现会在缺少路线参数时直接失败。真正的实机命令为
-`--air-route=open --air-dive --run-label=GoalResumeCarryHandsLoadPose`，当前仍在共享槽排队，尚无握持截图验收。
+`--air-route=open --air-dive --run-label=GoalResumeCarryHandsLiveLock` 在 `70f721f1` 上实际运行。
+飞机转向连续可见 4.733 秒、10 个担架／百姓同屏采样，但 B17 救援失败，尚未进入握持看图。
+局部夹具让玩家和伤员分处 `DitchDelayEastBank` 两侧，输入却直线朝伤员推进；实际玩家停在
+`(112.945,68.450)`，伤员在 `(108.939,67.591)`，生产胶囊净空检查确认穿过该护岸。
+当前改为沿现有开放路和沟边路选择身体可通行的接近点，继续以真实 W/F 操作救援，
+不改角色位置、墙体或生产关卡事实；需要重跑才能确认后续握持与扑沟。
 合并后的 ModuleGraph、TestRunner、Carry、P012 Flow 与 Runtime 五项通过。后续原 prepush 中不占浏览器的
 10 项已通过（望远镜所有权、电报、程序布设、外部资产、城镇布景、东郊街块、西城覆盖、西郊街块、
-西站与爆炸规则），日志为本地 `P012RemainingWithoutBrowser_20260905.log`；物理专项及另 26 项原 prepush
-尚未完成，新增身体视图还需 FirstPersonEmbodiment 检查。物理夹具另隔离测试时钟与角色，按平台 AABB
-登记全部地形网格，并在平整净空区域取样；保留原性能、落定、下垂等阈值，等待实际运行结果。
+西站与爆炸规则），日志为本地 `P012RemainingWithoutBrowser_20260905.log`。
+随后物理专项通过：含渲染 15.68 毫秒／帧；自有站立与真实移动角色 IK、台阶双脚支撑、
+真实尸体落台／下垂／落定、手雷及换关碰撞均通过。物理夹具隔离测试时钟与角色，按平台 AABB
+登记全部地形网格，并在平整净空区域取样；保留原性能、落定、下垂等阈值。
+FirstPersonEmbodiment 同次通过 44 个持枪姿态、2970 帧切换及三种低头姿态；站立和蹲姿图已查看。
+日志为本地 `P012CarryHandsLiveLock_Physics_Body_20260905.log`。另 26 项原 prepush 尚未完成。
 
 实机入口现在把实际启动版本、源目录、参数、未提交改动及断言结果写入本地 `Data_P012RunContext.json`。
 仅有 `notFinished` 的记录不能作为通过证据，也不能仅凭该文件判断进程仍然存活。

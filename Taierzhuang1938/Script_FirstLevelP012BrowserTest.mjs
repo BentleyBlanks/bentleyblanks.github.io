@@ -1610,6 +1610,7 @@ async function VerifyAirRouteHandoff(choice) {
     const game=window.Tengxian;
     const {FirstLevelP012Director}=await import("./Script_FirstLevelP012Flow.mjs");
     const {FirstLevelP012Runtime}=await import("./Script_FirstLevelP012Runtime.mjs");
+    const {P012NextVisiblePoint}=await import("./Script_FirstLevelP012March.mjs");
     const {SETPIECES}=await import("./Script_MissionSetpieces.mjs");
     let flow,runtime,setpiece;
     const updateFlow=FirstLevelP012Director.prototype.Update,updateRuntime=FirstLevelP012Runtime.prototype.Update,updateSetpiece=SETPIECES.CH1_NanLu.Update;
@@ -1630,7 +1631,7 @@ async function VerifyAirRouteHandoff(choice) {
     flow.Restore({...flow.Snapshot(),beat:16,unlockedWaves:[0,1,2,3,4,5,6],spawnedTotal:25,routeIndex:0,
       facts:["regroup","roadWounded"],signals:["P012AirObserveOpen"]});
     flow.Emit("P012AirObserveOpen");
-    window.p012AirFixture={choice,flow,runtime,setpiece,column,trace:[],frames:0,initialHead:column.HeadPosition()};
+    window.p012AirFixture={choice,flow,runtime,setpiece,column,P012NextVisiblePoint,trace:[],frames:0,initialHead:column.HeadPosition()};
     return {choice,player:game.player.position.toArray(),head:column.HeadPosition(),members:column.Count,
       originalCivilianId:column.Civilians.at(-1)?.handle.id,
       scope:"explicit B16 setup; new local column placement, no sequential campaign or first-play claim"};
@@ -1696,7 +1697,14 @@ async function VerifyAirRouteHandoff(choice) {
         let objective=state.objective;
         if(state.beatIndex===17&&!state.facts.includes("airObstacleResolved")&&!game.carry.Active){
           const casualty=f.setpiece.mem.p012AirCivilian;
-          objective={target:casualty?.position,interactionId:casualty?"p012_airRescue":null};
+          // This fixture deliberately chooses rescue, even if the nearer public
+          // option is the cart. Walk around the bank on the authored roads;
+          // a direct vector to the civilian would repeatedly drive into it.
+          const roads=f.flow.config.activities.airRouteChoices;
+          const approach=casualty&&f.P012NextVisiblePoint(f.flow.config.layout.blocks,game.player.position,
+            [...roads.open.toReversed(),...roads.ditch,casualty.position],0,game.player.body.radius);
+          if(approach?.blocked)throw new Error(`No body-clear rescue approach from ${game.player.position.toArray()}`);
+          objective={target:approach?.point,interactionId:casualty?"p012_airRescue":null};
         }
         const point=objective.interactionId&&game.interact.Point(objective.interactionId);
         const target=objective.target,dx=target?target.x-game.player.position.x:0,dz=target?target.z-game.player.position.z:0,distance=Math.hypot(dx,dz);
