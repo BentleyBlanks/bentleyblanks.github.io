@@ -42,6 +42,7 @@ const server = await ServeRoot(rootDir, 0);
 const browser = await LaunchBrowser();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const errors = [];
+const pacingChecks = [];
 const audioSmoke = process.argv.includes("--audio-smoke");
 if (audioSmoke && ["--campaign", "--frontline", "--prelude", "--pacing", "--voice-timing"].some(flag => process.argv.includes(flag))) {
   throw new Error("--audio-smoke is a separate real-time playback fixture, not accelerated campaign timing");
@@ -555,7 +556,9 @@ async function PlayFrontline() {
         // Empty magazines are not a reason to repeat R forever. Discover only
         // nearby visible bodies, then walk and press the same contextual F as a
         // player. No item/weapon state or corpse coordinates are changed here.
-        if (flow.beatIndex===21 && game.state.ammo===0 && game.state.clips===0 && !game.carry.Active) {
+        const canSalvage = [20, 21].includes(flow.beatIndex)
+          && game.state.ammo === 0 && game.state.clips === 0 && !game.carry.Active;
+        if (canSalvage) {
           const scav=bot.scavenge ||= {log:[],blocked:{},target:null,lastScan:-99};
           const eye=game.player.EyePosition;
           const bodies=game.ai.soldiers.filter(s=>!s.alive&&!s.unarmed&&s.drop&&!s.drop.taken&&s.weapon?.kind!=="melee");
@@ -758,7 +761,7 @@ async function PlayFrontline() {
         } else {
           game.Debug.Key("KeyW", false);
           const behindCover = (flow.beatIndex <= 10 || [13, 14, 18, 20, 21].includes(flow.beatIndex))
-            && (game.viewmodel.IsBusy?.() || (game.state.ammo === 0 && !(flow.beatIndex===21&&game.state.clips===0)));
+            && (game.viewmodel.IsBusy?.() || (game.state.ammo === 0 && !canSalvage));
           const noLiveThreats = !game.ai.soldiers.some(soldier => soldier.alive && soldier.side === "ija");
           const stance = behindCover ? "prone" : noLiveThreats && flow.objective.requiredStance
             ? flow.objective.requiredStance : "stand";
@@ -796,7 +799,7 @@ async function PlayFrontline() {
           }
           candidates.sort((a, b) => a.distance - b.distance);
           const chosen = candidates[0];
-          if(flow.beatIndex===21&&game.state.ammo===0&&game.state.clips===0&&chosen
+          if(canSalvage&&chosen
             &&chosen.distance>=5&&chosen.distance<18&&game.state.grenades>0&&!game.viewmodel.IsBusy?.()
             &&flow.elapsed-(bot.lastSalvageGrenadeAt||-99)>10){
             // A genuinely visible live target, not the stale generic grenade
@@ -894,7 +897,7 @@ async function PlayFrontline() {
               }
             }
           } else { bot.targetId = null; bot.aimFrames = 0; }
-          if (game.state.ammo === 0 && !game.viewmodel.IsBusy?.()) game.Debug.Key("KeyR");
+          if (game.state.ammo === 0 && game.state.clips > 0 && !game.viewmodel.IsBusy?.()) game.Debug.Key("KeyR");
         }
         game.StepFrames(1, 1 / 30, false); bot.frame += 1;
       }
@@ -1121,16 +1124,15 @@ async function PlayFrontline() {
     await fs.writeFile(path.join(outputDir, "Data_P012EndingTrace.json"), JSON.stringify(ending, null, 2));
     await page.screenshot({ path: path.join(outputDir, "Scene_P012Ending.png") });
   }
-  // Keep the P0 gates strict, but run them after the functional evidence has
-  // been saved: a rhythm failure must not hide a later escort/camera regression.
-  // Never pad player movement or lower these bounds to make this test green.
-  Check(result.firstShotAt >= 270 && result.firstShotAt <= 330,
-    "实际第一枪落在 P0 四分半至五分半窗口", `${result.firstShotAt.toFixed(1)}s`);
+  // Keep the same strict P0 bounds. Defer their failures until the outer HUD,
+  // population, issue callbacks and browser-error checks have also run.
+  pacingChecks.push({ passed: result.firstShotAt >= 270 && result.firstShotAt <= 330,
+    label: "实际第一枪落在 P0 四分半至五分半窗口", detail: `${result.firstShotAt.toFixed(1)}s` });
   Check(result.shots[0]?.distance >= 44 && result.shots[0]?.distance <= 61,
     "中央枪眼首次交火距离约 45–60 米（含角色与枪眼边缘容差）", `${result.shots[0]?.distance?.toFixed(2)}m`);
   if (fullCampaign && process.argv.includes("--pacing")) {
-    Check(result.flow.elapsed >= 23 * 60 && result.flow.elapsed <= 26 * 60,
-      "整关实际时长落在 P0 目标", `${(result.flow.elapsed / 60).toFixed(2)}min`);
+    pacingChecks.push({ passed: result.flow.elapsed >= 23 * 60 && result.flow.elapsed <= 26 * 60,
+      label: "整关实际时长落在 P0 目标", detail: `${(result.flow.elapsed / 60).toFixed(2)}min` });
   }
   await page.screenshot({ path: path.join(outputDir, "Scene_P012FrontlineAftermath.png") });
 }
@@ -2714,6 +2716,10 @@ try {
     "原有战斗/群众预算独立统计；另列训练队、儿童、坐姿百姓及新增5名村路作业人员，全部计入原始人数", JSON.stringify(traffic.population));
   Check(errors.length === 0, "浏览器没有脚本或控制台错误", errors.join(" | "));
   console.log(`P012 screenshots: ${outputDir}`);
+  if (pacingChecks.length) {
+    await fs.writeFile(path.join(outputDir, "Data_P012PacingChecks.json"), JSON.stringify(pacingChecks, null, 2));
+    for (const check of pacingChecks) Check(check.passed, check.label, check.detail);
+  }
   console.log(process.argv.includes("--campaign")&&!process.argv.includes("--through-road") ? "FirstLevelP012BrowserTest campaign PASS" : "FirstLevelP012BrowserTest partial PASS (not a full campaign playthrough)");
 } catch (error) {
   const guidanceHud=await page.evaluate(()=>window.p012GuidanceHudTrace||[]).catch(()=>[]);
