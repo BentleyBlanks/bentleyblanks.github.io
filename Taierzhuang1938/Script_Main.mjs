@@ -57,7 +57,7 @@ import {
 } from "./Script_FirstLevelWhiteboxFlow.mjs";
 import { NavGrid } from "./Script_Navigation.mjs";
 import { PlayerController } from "./Script_Player.mjs";
-import { AiDirector, MakeSoldierIdentity } from "./Script_Ai.mjs";
+import { AiDirector, MakeSoldierIdentity, STATE as AI_STATE } from "./Script_Ai.mjs";
 import { ActorFactory } from "./Script_Actor.mjs";
 import { ActorBatcher } from "./Script_ActorBatch.mjs";
 import { Viewmodel } from "./Script_Viewmodel.mjs";
@@ -3301,7 +3301,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
         soldier.manualGoalUntil = ai.time + 3;
       } else { delete soldier.p012ScoutDirected; delete soldier.scriptMoveSpeedMps; }
     },
-    EnemyCombatState: (soldier) => soldier ? {lastFire:soldier.lastFire,suppression:soldier.suppression} : null,
+    EnemyCombatState: (soldier) => soldier ? {lastFire:soldier.lastFire,suppression:soldier.suppression,
+      suppressed:soldier.state===AI_STATE.SUPPRESSED} : null,
     EnemyBodyRadius: (soldier) => soldier?.body?.radius,
     EnemyRejoin: (soldier, point) => {
       if (!soldier) return;

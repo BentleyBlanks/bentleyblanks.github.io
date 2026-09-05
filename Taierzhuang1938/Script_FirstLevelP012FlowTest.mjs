@@ -227,7 +227,7 @@ const flow = new FirstLevelP012Director({
     spawned.push(actor); return actor;
   },
   EnemyPosition: (actor) => actor.alive ? actor.position : null,
-  EnemyCombatState: (actor) => ({ lastFire: actor.lastFire, suppression: actor.suppression || 0 }),
+  EnemyCombatState: (actor) => ({ lastFire: actor.lastFire, suppression: actor.suppression || 0, suppressed: actor.state === "suppressed" }),
   EnemyGoal: (actor, goal) => { actor.goal = goal; }, Shelling: () => { shelling += 1; },
 }, phase.whitebox);
 let shelteredFromImpact=false;
@@ -458,7 +458,7 @@ assert.equal(flow.CurrentObjective().requiredStance,null,"arrival at a safe gunp
 const mortarFightingSample=flow.lastSample;
 flow.lastSample={...mortarFightingSample,nearEnemyDeaths:11,stance:"stand"};
 assert.equal(flow.CurrentObjective().requiredStance,null,"a cumulative death number cannot invent mortar suppression");
-for(const entry of flow.enemyRoutes)if(entry.encounterBeat===9)entry.handle.suppression=.5;
+for(const entry of flow.enemyRoutes)if(entry.encounterBeat===9){entry.handle.suppression=.5;entry.handle.state="suppressed";}
 assert.equal(flow.CurrentObjective().requiredStance,"prone","actual mortar-group suppression requests the low stance needed to finish relocation");
 flow.lastSample=mortarFightingSample;
 Tick({stance:"prone",mortarImpactCount:(sample.mortarImpactCount||0)+1,mortarImpactPosition:P012Point(100,100)});
@@ -1126,7 +1126,7 @@ for(const index of [2,3,4]) {
     Pressure:wave=>pressures.push({kind:wave.kind,at:director.elapsed}),
     SpawnEnemy:spec=>{const actor={...spec,position:{x:spec.x,z:spec.z},alive:true,suppression:0};actors.push(actor);return actor;},
     EnemyPosition:actor=>actor.alive?actor.position:null,
-    EnemyCombatState:actor=>({suppression:actor.suppression}),
+    EnemyCombatState:actor=>({suppression:actor.suppression,suppressed:actor.state==="suppressed"}),
   },phase.whitebox);
   director.Restore({...director.Snapshot(),beat:7,elapsed:100,lastWaveAt:100,unlockedWaves:[0,1]});
   director.enemyRoutes=[
@@ -1149,6 +1149,22 @@ for(const index of [2,3,4]) {
   director.Update(.1,{position:P012Point(5,-65),zone:"Z05"});
   assert.equal(director.pendingEnemies.length,0);assert.equal(director.spawnedTotal,spawnedBefore+1,
     "one freed live slot admits exactly the one finite pending culvert soldier");
+}
+{
+  const actor={alive:true,state:"fire",suppression:.4,position:P012Point(5,-95)};
+  const director=new FirstLevelP012Director({EnemyPosition:a=>a.alive?a.position:null,
+    EnemyCombatState:a=>({suppression:a.suppression,suppressed:a.state==="suppressed"})},phase.whitebox);
+  director.beat=7;director.unlockedWaves=[0,1];
+  director.enemyRoutes=Array.from({length:5},()=>({handle:{...actor},encounterBeat:7,points:[],index:0}));
+  assert.equal(director.WaveState(1,true).resolved,false,"reduced accuracy alone is not the AI's actual suppressed state");
+  for(const entry of director.enemyRoutes)entry.handle.state="suppressed";
+  assert.equal(director.WaveState(1,true).resolved,true,"the real five-person group can be neutralized by native suppression");
+  assert.equal(director.WaveState(1).resolved,false,"suppressed living people are never recorded as cleared casualties");
+  director.beat=8;director.unlockedWaves=[0,1,2,3];director.mortarEscapeFrom={...phase.whitebox.anchors.gunports[2]};
+  director.lastSample={position:phase.whitebox.anchors.gunports[1],mortarWarningActive:false};
+  assert.deepEqual(director.CurrentObjective().target,phase.whitebox.anchors.gunports[2],"after the actual warning ends the original east-gunport action resumes");
+  director.lastSample.mortarWarningActive=true;
+  assert.notDeepEqual(director.CurrentObjective().target,phase.whitebox.anchors.gunports[2],"a renewed live warning still diverts the player away from its actual impact site");
 }
 {
   const old={alive:true,position:P012Point(5,-90)},ambush=Array.from({length:6},()=>({alive:false}));

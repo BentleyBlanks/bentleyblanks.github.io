@@ -157,7 +157,7 @@ export class FirstLevelP012Director {
     const living = entries.filter((entry) => this.host.EnemyPosition?.(entry.handle));
     const resolved = entries.length + pending === wave.count && pending === 0 && living.every((entry) => {
       if (!allowSuppressed) return false;
-      return (this.host.EnemyCombatState?.(entry.handle)?.suppression || 0) > 0.3;
+      return this.host.EnemyCombatState?.(entry.handle)?.suppressed === true;
     });
     return { authored: entries.length + pending, pending, living: living.length, resolved };
   }
@@ -815,11 +815,11 @@ export class FirstLevelP012Director {
       // Scouts may call same-axis rifle reinforcements immediately. New MG,
       // mortar and culvert pressure keeps a 30s floor; existing gunport movement
       // remains active during this transition, not a stationary wait objective.
-      const previous = index > 0 ? this.WaveState(index - 1, true) : null;
-      const previousGroupClear = !!previous?.resolved;
+      const previousGroupClear = index > 0 && this.WaveState(index - 1).resolved;
+      const previousGroupSuppressed = index > 0 && !previousGroupClear && this.WaveState(index - 1, true).resolved;
       const interval = this.elapsed - this.lastWaveAt;
       const newTacticalPressure = index >= 2 && index <= 4;
-      const clearReady = previousGroupClear && (!newTacticalPressure || interval >= 30);
+      const clearReady = (previousGroupClear || previousGroupSuppressed) && (!newTacticalPressure || interval >= 30);
       const actionReached = index <= 1 || index > P012_FRONTLINE_WAVE_LAST ? this.beat >= wave.beat
         : this.unlockedWaves.includes(index - 1) && this.unlockedWaves.includes(0);
       if (actionReached && (interval >= 40 || clearReady)
@@ -827,10 +827,10 @@ export class FirstLevelP012Director {
         this.unlockedWaves.push(index);
         this.pressureHistory.push({ kind: wave.kind, at: this.elapsed,
           interval: Number.isFinite(this.lastWaveAt) && this.lastWaveAt > 0 ? this.elapsed - this.lastWaveAt : null,
-          previousGroupClear,
+          previousGroupClear, previousGroupSuppressed,
           mechanism: index === 0 ? "initialContact" : index === 1 ? "sameAxisReinforcement"
             : newTacticalPressure ? "newTacticalPressure" : "lateEncounter",
-          reason: interval >= 40 ? "normal40" : newTacticalPressure ? "clearMinimum30"
+          reason: interval >= 40 ? "normal40" : newTacticalPressure ? (previousGroupSuppressed ? "suppressedMinimum30" : "clearMinimum30")
             : index === 1 ? "clearReinforcement" : "clearReady" });
         this.lastWaveAt = this.elapsed;
         if (wave.kind === "mortar") {
@@ -1123,7 +1123,8 @@ export class FirstLevelP012Director {
     }
     // A live mortar warning outranks the labelled rifle/MG action. It is a real
     // world hazard and can arrive on the independent frontline pressure clock.
-    if (this.beat >= 7 && this.beat <= 9 && this.mortarEscapeFrom) {
+    if (this.beat >= 7 && this.beat <= 9 && this.mortarEscapeFrom
+      && (this.beat === 9 || this.lastSample.mortarWarningActive)) {
       const origin = this.mortarEscapeFrom;
       const mgStatus = this.beat < 9 ? "" : this.completionReasons[8] === "threatCleared" ? "机枪威胁已清除；" : "友军机枪已恢复射击；";
       const safePort = [anchors.gunports?.[1], anchors.gunports?.[0], anchors.gunports?.[2]]
