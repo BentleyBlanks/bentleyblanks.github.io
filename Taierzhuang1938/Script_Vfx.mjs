@@ -1910,10 +1910,11 @@ export class VfxSystem {
       this.pools.smoke.Spawn(s, this.time);
     }
 
-    // 7) 地面焦痕
-    TMP_C.set(0, 1, 0);
-    this._SpawnDecal({ x: position.x, y: ground + 0.02, z: position.z }, TMP_C,
-      radius * 0.42, VFX_PALETTE.soil, VFX_PALETTE.woodBurnt, 0.5, 0);
+    // Persistent blast discoloration belongs to TerrainDeformationView's soil
+    // material. A horizontal scorch quad stays at the OLD ground elevation:
+    // after excavation its depth tolerance cuts concentric bands into the pit
+    // walls, and repeated blasts stack those slices at successive heights.
+    // Impact() still uses small surface decals for ordinary bullet holes.
   }
 
   /**

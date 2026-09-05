@@ -52,6 +52,8 @@
   内外两面也受相同坡度限制，地基和水面同样不允许堆土。
 - 坑壁与土沿复用已有 Ground 土壤 albedo / normal，以世界坐标采样并逐像素混合。
   土色覆盖使用独立的扰动强度，跨越正负高度差的零点时不能露出一圈白地。
+  持久爆炸痕迹由这层土壤材质承载；Vfx 爆炸不再生成水平焦痕 quad，避免旧高度的
+  贴片被坑壁截成多层同心环。普通子弹命中的小型弹孔继续使用原贴花池。
   白盒悬浮说明牌不投射阴影，避免说明牌的阴影条带盖在被测坡面上。
 - 建筑地基、实体路基、桥、工位与水面受保护；土层方案不负责掏空建筑基础或开挖洞穴。
   静态导航分类读基础地面，避免地面下降把矮物重新认成堵路高墙。
@@ -91,6 +93,7 @@
 ```powershell
 node Taierzhuang1938/Script_ExplosionRulesTest.mjs
 node Taierzhuang1938/Script_ExplosionRangeTest.mjs
+node Taierzhuang1938/Script_CraterSurfaceTest.mjs
 node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=prepush --fail-fast
 ```
 
@@ -101,6 +104,8 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=pre
 另检查尾迹与真实弹道一致、撞墙截断、空中超时、同时取消炮击与空袭后无延迟爆炸、
 尾迹和预警粒子清理、真实土沿表面对账、坑内人物即时复位。
 截图和 JSON 报告落在 `_shots/ExplosionRange/`；JSON 同时保留形变耗时供性能复查。
+表面回归额外通过正式 Blast 连续挖坑，再切换贴花层做 HDR 像素对照：坑壁不能依赖
+悬空贴片，普通子弹弹孔仍须产生可见像素。取证落在 `_shots/CraterSurface/`。
 
 调试入口：`Debug.Explosions.State()` / `GoTo(id)` / `Reset()`，通用查询为
 `Debug.TerrainDeformation.State()` / `Height(x,z)` / `BaseHeight(x,z)` / `Reset()`。

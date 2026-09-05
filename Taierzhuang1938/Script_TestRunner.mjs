@@ -68,6 +68,7 @@ export const testDefs = {
   TrainLibraryTest: { file: "Script_TrainLibraryTest.mjs", desc: "火车构件库：点击懒载、原 PBR、完整轮组绑定、缓存隔离与实际显示" },
   BackRifleRunTest: { file: 'Script_BackRifleRunTest.mjs', desc: '独立背枪跑步 GLB：原骨架、循环接缝、真实蒙皮接地、速度与挂点浏览器验收' },
   ExplosionRulesTest: { file: "Script_ExplosionRulesTest.mjs", desc: "爆炸配置、稀疏地形叠加/坡度/上限、返掷窗口与完整资产目录（纯 Node）" },
+  CraterSurfaceTest: { file: "Script_CraterSurfaceTest.mjs", desc: "真实连续爆炸后无水平焦痕环带，HDR 像素对照及普通弹孔保留" },
   ExplosionRangeTest: { file: "Script_ExplosionRangeTest.mjs", timeoutMs: 8 * 60 * 1000, desc: "爆炸白盒：真实F拾取/返掷/战车/炮击、地形网格/Rapier/人物穿坑与复位" },
   BootTest: {
     file: "Script_BootTest.mjs",
@@ -234,6 +235,7 @@ export const browserTests = new Set([
   "FirstLevelWhiteboxBrowserTest",
   "FirstLevelP012BrowserTest",
   "ExplosionRangeTest",
+  "CraterSurfaceTest",
 ]);
 
 export const tier0Fast = [
@@ -268,7 +270,7 @@ export const tier2 = [
 
 export const domains = {
   animation: { label: '独立动画资产验收', tests: ['BackRifleRunTest','MeleeAnimationTest'] },
-  explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest"] },
+  explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
     tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxSurfaceTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "PhysicsTest", "JumpTest", "DestructionTest"],
@@ -353,7 +355,7 @@ const changedDomainRules = [
   { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },
   { domain: 'animation', pattern: /BackRifleRun|Melee.*Animation|MeleeAnimation/i },
   { domain: "ai", pattern: /FirstLevelP012(TrainColumn|March|Family|Resting|Arrival|VillageLife|StageZero|Cast)/i },
-  { domain: "explosives", pattern: /(Explosion|Explosives|GrenadeReturn|TerrainDeformation|ShellVisual|Script_Combat|Script_Physics)/i },
+  { domain: "explosives", pattern: /(Explosion|Explosives|CraterSurface|GrenadeReturn|TerrainDeformation|ShellVisual|Script_Combat|Script_Physics|Script_Vfx)/i },
   { domain: "terrain", pattern: /(Heightmap|JieheHeight|JieheField|TengxianField|FarLand|Terrain|Battlefield|Outfield|Ground|Water|WestSuburbBlocks|Whitebox|P012|Data_Levels)/i },
   { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
   // Aircraft 挂 combat：绕圈那一层是纯视觉，但同一个文件里的扫射航线打得倒玩家。
