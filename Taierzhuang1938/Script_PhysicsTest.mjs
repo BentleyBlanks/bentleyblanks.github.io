@@ -40,9 +40,18 @@ function Check(name, ok, detail) {
 
 // 十字街（L5）是最密的一关：院墙、马道、瓮城、街垒都在这一片。
 const PHASE = 5;
-const url = `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=${PHASE}&quality=low&scale=small`;
+// StepFrames owns the fixture clock. Real-time rAF between evaluate calls would
+// otherwise change the living actors, combat state and terrain contact history.
+const url = `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&manual=1&phase=${PHASE}&quality=low&scale=small`;
 await page.goto(url, { waitUntil: "load", timeout: 180000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
+const clockEvidence = await page.evaluate(async () => {
+  const T = window.Taierzhuang, before = T.state.elapsed;
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  return { manual: T.Debug.Preview().manualStep, before, after: T.state.elapsed };
+});
+Check("测试时钟由 StepFrames 独占，真实动画帧不偷跑世界",
+  clockEvidence.manual && clockEvidence.after === clockEvidence.before, JSON.stringify(clockEvidence));
 await page.evaluate(() => window.Taierzhuang.StepFrames(60));
 
 // --- 1. 静态几何真的灌进物理世界了 -----------------------------------------
@@ -327,58 +336,58 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(60));
 // 差值应该恰好是一只鞋的高度（ankleY），而不是随地形起伏乱飘。
 {
   const r = await page.evaluate(async () => {
-    const T = window.Taierzhuang;
-    // 可见性由 CullActors 按视锥判断，出图机位下样本仍可能只剩一两个 ——
-    // 样本太薄会让这条断言时灵时不灵。这里把离玩家最近的一批强制显示，
-    // 再跑几帧让脚部 IK 收敛（它是按 14/s 平滑过去的，一帧到不了位）。
-    const near = T.ai.soldiers.filter((s) => s.alive && s.actor)
-      .sort((a, b) => a.position.distanceTo(T.player.position) - b.position.distanceTo(T.player.position))
-      .slice(0, 10);
-    for (const s of near) T.ai._SetDetailedAttached(s.actor, true);
-    for (let i = 0; i < 40; i += 1) {
-      for (const s of near) T.ai._SetDetailedAttached(s.actor, true);
-      T.StepFrames(1);
-    }
-    for (const s of near) T.ai._SetDetailedAttached(s.actor, true);
-    const v = new (Object.getPrototypeOf(T.player.position).constructor)();
-    const rows = [];
-    const why = { total: 0, dead: 0, noActor: 0, hidden: 0, prone: 0, ok: 0 };
-    const Sample = () => {
-      for (const s of T.ai.soldiers) {
-        why.total += 1;
-        if (!s.alive) { why.dead += 1; continue; }
-        if (!s.actor) { why.noActor += 1; continue; }
-        if (!s.actor.root.visible) { why.hidden += 1; continue; }
-        if (s.stance === 2) { why.prone += 1; continue; }   // 趴着的人不做脚贴地
-        why.ok += 1;
-        const a = s.actor;
-        a.root.updateWorldMatrix(true, true);
-        for (const tag of ["L", "R"]) {
-          const ankle = a.legs[tag].ankle;
-          v.setFromMatrixPosition(ankle.matrixWorld);
-          const g = T.Debug.Probe(v.x, v.z, s.position.y);
-          rows.push({ err: v.y - g.y, moving: s.moveSpeed > 0.05 });
-        }
+    const T = window.Taierzhuang, p = T.player;
+    // Own both actors and their physical floor. Battle AI can die, go prone,
+    // leave the frustum or change animation cadence before this sample.
+    const spot = T.physics.FindFreeSpot(p.position.x + 14, p.position.z + 10, 2.5, 1.9, 30);
+    const g0 = T.battlefield.GroundHeight(spot.x, spot.z), TOP = g0 + 0.3;
+    const platform = T.physics.AddSolid({
+      c: [spot.x, g0 + 0.15, spot.z], h: [3, 0.15, 3], ry: 0, tag: "testIkFloor",
+      min: [spot.x - 3, g0, spot.z - 3], max: [spot.x + 3, TOP, spot.z + 3],
+    });
+    T.StepFrames(2);
+    const actors = [4243, 4244, 4245].map((seed, index) => {
+      const actor = T.actorFactory.Create("nra", { seed, weapon: "HanYang" });
+      T.scene.add(actor.root);
+      actor.root.position.set(spot.x + (index - 1) * 0.8, TOP, spot.z);
+      actor.root.rotation.y = 0; actor.root.visible = true;
+      return actor;
+    });
+    const Input = (moveSpeed, elapsed) => ({ moveSpeed, aim: 0, crouch: 0, prone: 0,
+      firing: false, elapsed, lookYaw: 0, lookPitch: 0 });
+    const v = new (Object.getPrototypeOf(p.position).constructor)();
+    const rows = [], movingRows = [];
+    const Sample = (actor, output, moving) => {
+      actor.root.updateWorldMatrix(true, true);
+      for (const tag of ["L", "R"]) {
+        v.setFromMatrixPosition(actor.legs[tag].ankle.matrixWorld);
+        const g = T.physics.GroundProbe(v.x, v.z, actor.root.position.y, 0.6, 2.4);
+        output.push({ err: v.y - g.y, moving, tag: g.tag });
       }
     };
-    // 「站着的人」取决于采样那一瞬有几个人恰好站定 —— 城图重排后 AI 走动更多，
-    // 单瞬采样会薄到 n<4（批次B 集成时抓到 n=2 的假红）。多采几个瞬间累积到够。
-    Sample();
-    for (let round = 0; round < 6 && rows.filter((q) => !q.moving).length < 4; round += 1) {
-      for (let i = 0; i < 24; i += 1) {
-        for (const s of near) T.ai._SetDetailedAttached(s.actor, true);
-        T.StepFrames(1);
-      }
-      Sample();
+    const movingStartX = actors[2].root.position.x;
+    for (let i = 0; i < 90; i += 1) {
+      actors[0].Update(1 / 60, Input(0, i / 60));
+      actors[1].Update(1 / 60, Input(0, i / 60));
+      // Advance across the owned physical surface while sampling several gait
+      // phases; this is real world translation, not a stationary walk clip.
+      actors[2].root.position.x += 1.2 / 90;
+      actors[2].Update(1 / 60, Input(1, i / 60));
+      if (i >= 60 && i % 8 === 4) Sample(actors[2], movingRows, true);
     }
+    Sample(actors[0], rows, false); Sample(actors[1], rows, false);
+    const moved = actors[2].root.position.x - movingStartX;
+    for (const actor of actors) { T.scene.remove(actor.root); actor.Dispose(); }
+    T.physics.RemoveSolid(platform);
     const still = rows.filter((q) => !q.moving).map((q) => q.err);
-    const all = rows.map((q) => q.err);
+    const allRows = [...rows, ...movingRows], all = allRows.map((q) => q.err);
     const stat = (xs) => {
       if (!xs.length) return null;
       const sorted = [...xs].sort((a, b) => a - b);
       return { n: xs.length, med: sorted[Math.floor(sorted.length / 2)], min: sorted[0], max: sorted[sorted.length - 1] };
     };
-    return { still: stat(still), all: stat(all), why };
+    return { still: stat(still), all: stat(all), moving: stat(movingRows.map(row => row.err)),
+      moved, movingTags: movingRows.map(row => row.tag) };
   });
   const st = r.still || r.all;
   // 踝关节应当稳定地高出地面一只鞋的高度（约 0.06—0.16 m），
@@ -387,8 +396,9 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(60));
     st && st.n >= 4 && st.min > -0.06 && st.med > 0.02 && st.med < 0.30,
 st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高=${st.max.toFixed(3)}` : "没取到样本");
   Check("走动中的脚也没穿进地里",
-    r.all && r.all.min > -0.14,
-    r.all ? `n=${r.all.n} 最低=${r.all.min.toFixed(3)} m` : "");
+    r.moving && r.moving.n >= 6 && r.moved > 1 && r.moving.min > -0.14
+      && r.movingTags.every(tag => tag === "testIkFloor"),
+    r.moving ? `真实移动=${r.moved.toFixed(2)} m，n=${r.moving.n}，最低=${r.moving.min.toFixed(3)} m` : "");
 }
 
 // --- 4e. 脚部 IK 真的在"适应"：跨在台阶沿上时两只脚不一样高 ----------------
@@ -452,9 +462,14 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
   const r = await page.evaluate(async () => {
     const T = window.Taierzhuang;
     const p = T.player;
-    const s = T.ai.soldiers.find((q) => q.alive && q.actor);
-    if (!s) return { skipped: true };
     const spot = T.physics.FindFreeSpot(p.position.x - 10, p.position.z + 4, 0.6, 1.9, 24);
+    const maxAlive = T.ai.maxAlive; let s;
+    try {
+      T.ai.maxAlive = Math.max(maxAlive, T.ai.aliveCount + 1);
+      s = T.ai.Spawn("nra", spot.x, spot.z, { weapon: "HanYang", scriptedNoncombatant: true,
+        squadId: "PhysicsCorpseTower" });
+    } finally { T.ai.maxAlive = maxAlive; }
+    if (!s) return { fixtureFailed: "spawn" };
     const g0 = T.battlefield.GroundHeight(spot.x, spot.z);
     const TOP = g0 + 3.0;
     const handle = T.physics.AddSolid({
@@ -474,9 +489,11 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
     for (let i = 0; i < 300; i += 1) T.StepFrames(1);
     const after = { x: s.position.x, y: s.position.y, z: s.position.z };
     const groundBelow = T.battlefield.GroundHeight(after.x, after.z);
-    return { yBefore, after, groundBelow, top: TOP, g0, hasCorpse: !!s.corpse };
+    const out = { yBefore, after, groundBelow, top: TOP, g0, hasCorpse: !!s.corpse };
+    T.ai.Remove(s);
+    return out;
   });
-  if (r.skipped) Check("高处中弹的尸体会掉下来", true, "（场上没有活人，跳过）");
+  if (r.fixtureFailed) Check("高处中弹的尸体会掉下来", false, `夹具失败：${r.fixtureFailed}`);
   else {
     // 掉下来 = 最终高度贴近"落点脚下的地面"，而不是留在 3 m 的半空
     const rest = r.after.y - r.groundBelow;
@@ -495,9 +512,14 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
   const r = await page.evaluate(() => {
     const T = window.Taierzhuang;
     const p = T.player;
-    const s = T.ai.soldiers.find((q) => q.alive && q.actor);
-    if (!s) return { skipped: true };
     const spot = T.physics.FindFreeSpot(p.position.x + 8, p.position.z - 6, 0.6, 1.9, 24);
+    const maxAlive = T.ai.maxAlive; let s;
+    try {
+      T.ai.maxAlive = Math.max(maxAlive, T.ai.aliveCount + 1);
+      s = T.ai.Spawn("nra", spot.x, spot.z, { weapon: "HanYang", scriptedNoncombatant: true,
+        squadId: "PhysicsCorpseGrave" });
+    } finally { T.ai.maxAlive = maxAlive; }
+    if (!s) return { fixtureFailed: "spawn" };
     const g0 = T.battlefield.GroundHeight(spot.x, spot.z);
     // 一座假坟头。物理与战场网格两边都要塞：胶囊靠物理托着，
     // 而 StepCorpse 的采样走 battlefield.StandHeight（读的是战场网格）。
@@ -524,13 +546,15 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
     T.physics.RemoveSolid(handle);
     const cell = bf.grid.get(key); const at = cell.indexOf(box); if (at >= 0) cell.splice(at, 1);
     const ground = bf.GroundHeight(s.position.x, s.position.z);
-    return {
+    const out = {
       off: Math.hypot(s.position.x - spot.x, s.position.z - spot.z),
       rest: s.position.y - ground, top: g0 + 1.4, maxDroop, settled: s.corpseSettled,
       tiltX: s.actor.root.rotation.x, tiltZ: s.actor.root.rotation.z,
     };
+    T.ai.Remove(s);
+    return out;
   });
-  if (r.skipped) Check("台顶的尸体滑到地上", true, "（场上没有活人，跳过）");
+  if (r.fixtureFailed) Check("台顶的尸体滑到地上", false, `夹具失败：${r.fixtureFailed}`);
   else {
     Check("台顶的尸体滑到地上并落定",
       r.off > 1.0 && Math.abs(r.rest) < 0.2 && r.settled,
@@ -550,9 +574,14 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
   const r = await page.evaluate(() => {
     const T = window.Taierzhuang;
     const p = T.player;
-    const s = T.ai.soldiers.find((q) => q.alive && q.actor);
-    if (!s) return { skipped: true };
     const spot = T.physics.FindFreeSpot(p.position.x - 6, p.position.z - 8, 0.6, 1.9, 24);
+    const maxAlive = T.ai.maxAlive; let s;
+    try {
+      T.ai.maxAlive = Math.max(maxAlive, T.ai.aliveCount + 1);
+      s = T.ai.Spawn("nra", spot.x, spot.z, { weapon: "HanYang", scriptedNoncombatant: true,
+        squadId: "PhysicsCorpseFlat" });
+    } finally { T.ai.maxAlive = maxAlive; }
+    if (!s) return { fixtureFailed: "spawn" };
     const g0 = T.battlefield.GroundHeight(spot.x, spot.z);
     s.body.Teleport(spot.x, g0, spot.z);
     s.position.set(spot.x, g0, spot.z);
@@ -560,14 +589,16 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
     const x0 = s.position.x, z0 = s.position.z;
     s.Kill(null);
     for (let i = 0; i < 240; i += 1) T.StepFrames(1);
-    return {
+    const out = {
       drift: Math.hypot(s.position.x - x0, s.position.z - z0),
       tiltX: s.actor.root.rotation.x, tiltZ: s.actor.root.rotation.z,
       droop: (s.actor.ragdollState && s.actor.ragdollState.droopArms) || 0,
       settled: s.corpseSettled,
     };
+    T.ai.Remove(s);
+    return out;
   });
-  if (r.skipped) Check("平地上的尸体不滑不歪", true, "（场上没有活人，跳过）");
+  if (r.fixtureFailed) Check("平地上的尸体不滑不歪", false, `夹具失败：${r.fixtureFailed}`);
   else Check("平地上的尸体不滑不歪",
     r.drift < 0.5 && Math.abs(r.tiltX) < 0.12 && Math.abs(r.tiltZ) < 0.12 && r.droop < 0.15 && r.settled,
     `出溜 ${r.drift.toFixed(2)} m，tiltX=${r.tiltX.toFixed(2)} tiltZ=${r.tiltZ.toFixed(2)}，`

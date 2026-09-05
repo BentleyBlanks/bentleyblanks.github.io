@@ -24,6 +24,14 @@ const perceptionProfiles = {
 };
 if (perceptionName && !perceptionProfiles[perceptionName]) throw new Error(`Unknown perception profile: ${perceptionName}`);
 const perceptionProfile = perceptionProfiles[perceptionName] || null;
+const airRouteFixture = process.argv.find(arg => arg.startsWith("--air-route="))?.split("=")[1];
+const airReview = ["--air-rescue", "--air-carry", "--air-dive", "--air-drop"].some(flag => process.argv.includes(flag));
+if (airReview && !["open", "ditch"].includes(airRouteFixture)) {
+  throw new Error("Air rescue/carry/dive review requires --air-route=open or --air-route=ditch; no scene checks have run");
+}
+if (process.argv.includes("--air-drop") && !["--air-rescue", "--air-carry", "--air-dive"].some(flag => process.argv.includes(flag))) {
+  throw new Error("--air-drop requires --air-rescue, --air-carry or --air-dive");
+}
 const runLabel = process.argv.find(arg => arg.startsWith("--run-label="))?.split("=")[1] || "";
 const orientationReview = process.argv.includes("--orientation");
 const savedInfiniteAmmo = process.argv.includes("--saved-infinite-ammo");
@@ -2672,7 +2680,6 @@ try {
     }
     await fs.writeFile(path.join(outputDir,"Data_P012CastReview.json"),JSON.stringify({scope:"explicit close-up portrait fixture; actual existing named actors, no model replacement",cast},null,2));
   }
-  const airRouteFixture=process.argv.find(arg=>arg.startsWith("--air-route="))?.split("=")[1];
   if(process.argv.includes("--hub-view"))await VerifyHubGuideView();
   if(process.argv.includes("--air-model"))await VerifyAircraftModel();
   if(process.argv.includes("--machine-gun-crew"))await VerifyMachineGunCrew();
