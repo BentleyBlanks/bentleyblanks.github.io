@@ -65,7 +65,8 @@ for (const [id, record] of Object.entries(SOURCE_ASSET_STANDARDS)) {
     }
   }
 }
-Check(Object.keys(SOURCE_ASSET_STANDARDS).length >= 25 && missing.length === 0,
+// 2026-09-05 删掉五件不合 1938 年 3 月时代的卢沟桥资源包武器后，清单为 20 项。
+Check(Object.keys(SOURCE_ASSET_STANDARDS).length >= 20 && missing.length === 0,
   "现有源模型均进入资产规范清单", missing.join("、"));
 Check(drift.length === 0, "实际面数与 Model/Index.json 一致", drift.join("、"));
 Check(sourceDrift.length === 0, "原始选定面数与 Blender 构建元数据一致", sourceDrift.join("、"));
@@ -90,8 +91,6 @@ const magazine = servicePistol.nodes.find((node) => node.name === "magazine").t;
 Check(Math.abs(magazine[1] - servicePistol.bounds.min[1]) < 0.012
   && Math.abs(magazine[2] - gripMean[2]) < 0.025, "军用手枪换匣入口位于握把底部");
 
-Check(MESHES.WaltherP38.triangles === 30362,
-  "P38 到 30k 仅降 3.8%，保留源拓扑并只清理退化面", String(MESHES.WaltherP38.triangles));
 Check(MESHES.Type95HaGo.triangles === 82142,
   "九五式到 80k 仅降 2.6%，保留 82,142 原始三角", String(MESHES.Type95HaGo.triangles));
 Check(EXTERNAL_GLB_STANDARDS.length === 50
@@ -108,7 +107,7 @@ Check(/ExternalRows/.test(editorSource) && /EXTERNAL_GLB_STANDARDS/.test(editorS
   "外部 GLB 分类使用逐资产审计表而非仅显示通用卡片");
 Check(/AssetStandardsEditor/.test(suiteSource)
   && /Script_EditorAssetStandards\.mjs\?v=2/.test(html)
-  && /Data_AssetStandards\.mjs\?v=4/.test(html),
+  && /Data_AssetStandards\.mjs\?v=5/.test(html),
 "资产规范编辑器已注册到套件与 import map");
 
 if (failed) {

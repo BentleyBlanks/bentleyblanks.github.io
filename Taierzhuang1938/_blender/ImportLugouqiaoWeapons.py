@@ -28,33 +28,17 @@ SOURCE_DIR = os.path.abspath(os.path.join(HERE, "..", "_import", "Source", "Mode
 BUILD_STATS = {}
 
 SOURCES = {
-    "WaltherP38": {"lengthM": 0.216, "kind": "pistol", "side": "nra",
-                   "decimateBias": 1.030,
-                   "decimateBudget": 30700,
-                   "note": "瓦尔特 P38；源节点 2#，保留 Lug_reb 原贴图。"},
     "BrowningTripodAssembly": {"lengthM": 2.273, "kind": "assembly", "side": "neutral",
                    "decimateBias": 1.030,
                    "note": "源节点 BROTRIPO009；名称与结构不足以确认具体勃朗宁型号，按识别截图标注。"},
     "UnidentifiedMunition": {"lengthM": 0.253, "kind": "assembly", "side": "neutral",
                    "note": "源节点 Cylinder026；弹体型号未明，保留 WW-100heqdf 原贴图。"},
-    "UnidentifiedBoltActionRifle": {"lengthM": 1.120, "kind": "rifle", "side": "neutral",
-                   # BA2 / LOK 是同场景横向摆开的另外两种分解展示；MA1 木件、
-                   # TRG 钢件与 Object001 枪机共同组成中间那支完整装配态。
-                   "excludeObjects": {"MK98_BA2", "MK98_LOK"},
-                   "note": "源节点 FQDQD / MK98_*；仅能确认栓动步枪，具体型号未明。源文件中的分解展示零件保留在独立 Blend，运行时只取装配态枪体。"},
     "OfficerSwordSet": {"lengthM": 1.000, "kind": "melee", "side": "ija",
                    "decimateBias": 10.000,
                    "decimateBudget": 9400,
                    "note": "源节点 Group146；军刀与刀鞘组合，具体制式未明。"},
     "RingPommelDagger": {"lengthM": 0.450, "kind": "melee", "side": "neutral",
                    "note": "源节点 Mesh_0300；带环首短刃，具体制式未明。"},
-    "UnidentifiedAntiaircraftGun": {"lengthM": 1.100, "kind": "rifle", "side": "neutral",
-                   # MKMTL / MKWOOD 是主件旁边陈列的分解备件，在台架里会悬空。
-                   "excludeObjects": {"MKMTL", "MKWOOD"},
-                   "forceFlip": True,
-                   "note": "源节点 MK1；可确认高射炮形制，具体型号未明。"},
-    "LightMortar": {"lengthM": 0.500, "kind": "assembly", "side": "neutral",
-                   "note": "源节点 PJP；轻型迫击/掷弹器，具体型号未明。"},
     "Type11": {"lengthM": 1.100, "kind": "rifle", "side": "ija",
                    "excludeObjects": {"4"},
                    # This source has no material bucket whose name contains
@@ -67,16 +51,13 @@ SOURCES = {
                    "note": "毛瑟 C96；源节点 Sphere001，保留 maose_d 与 maose_s。"},
     "MediumMortar": {"lengthM": 1.444, "kind": "assembly", "side": "neutral",
                    "note": "源节点 sphere3；中型迫击炮，具体型号未明。"},
-    "Karabiner98k": {"lengthM": 1.110, "kind": "rifle", "side": "neutral",
-                   "note": "Karabiner 98k；源节点名称直接给出型号，保留 diffuse 与 normal。"},
 }
 
 RUNTIME_MATERIALS = {
-    "lqWaltherP38", "lqBrowningTripod", "lqUnidentifiedMunition",
-    "lqUnidentifiedBoltActionRifle", "lqOfficerSword", "lqRingPommelDagger",
-    "lqUnidentifiedAntiaircraftMetal", "lqUnidentifiedAntiaircraftWood", "lqLightMortar",
+    "lqBrowningTripod", "lqUnidentifiedMunition",
+    "lqOfficerSword", "lqRingPommelDagger",
     "lqType11AmmoBox", "lqType11Body", "lqType11BodyAlt", "lqType11Fore",
-    "lqMauser96", "lqMediumMortar", "lqKarabiner98k", "lqWeaponPlain",
+    "lqMauser96", "lqMediumMortar", "lqWeaponPlain",
 }
 MATERIAL_NAMES.update(RUNTIME_MATERIALS)
 
@@ -94,25 +75,13 @@ TYPE11_OBJECT_MATERIAL = {
 def _material_for(asset, material_name, object_name):
     value = (material_name or "").casefold()
     object_value = object_name.casefold()
-    if asset == "WaltherP38":
-        # Lug_reb 只有 12×12，实际是握把占位纹理，不是整枪皮肤。金属槽回项目
-        # 枪钢，带纹理的小槽改用枪托木纹，避免把棋盘噪声铺满套筒。
-        return "wood" if "material #1" in value else "lqWeaponPlain"
     if asset == "BrowningTripodAssembly": return "lqBrowningTripod"
     if asset == "UnidentifiedMunition": return "lqUnidentifiedMunition"
-    if asset == "UnidentifiedBoltActionRifle":
-        return ("lqUnidentifiedBoltActionRifle"
-                if "dl772" in value or object_value == "mk98_ma1" else "lqWeaponPlain")
     if asset == "OfficerSwordSet":
         return ("lqOfficerSword"
                 if "stripe01l" in value or object_value in {"对象142", "对象143"}
                 else "lqWeaponPlain")
     if asset == "RingPommelDagger": return "lqRingPommelDagger"
-    if asset == "UnidentifiedAntiaircraftGun":
-        # MKCRMT 的所谓 base 是纯黑白随机噪点，并非可用的金属漫反射；直接绑它
-        # 会把整件武器刷成斑马纹。保留木件分桶，但统一回项目的枪钢/枪木 PBR。
-        return "wood" if "wood" in value or "wood" in object_value else "lqWeaponPlain"
-    if asset == "LightMortar": return "lqLightMortar"
     if asset == "Type11":
         if "ammobox" in value: return "lqType11AmmoBox"
         if "body2" in value: return "lqType11BodyAlt"
@@ -121,7 +90,6 @@ def _material_for(asset, material_name, object_name):
         return TYPE11_OBJECT_MATERIAL.get(object_name, "lqWeaponPlain")
     if asset == "Mauser96": return "lqMauser96"
     if asset == "MediumMortar": return "lqMediumMortar"
-    if asset == "Karabiner98k": return "lqKarabiner98k"
     return "lqWeaponPlain"
 
 
@@ -255,18 +223,6 @@ def BuildImported(name):
         for mesh in bms:
             Transform(mesh, ry=math.pi)
     _Place(bms, steel, wood, spec["lengthM"], spec["kind"])
-    if name == "UnidentifiedAntiaircraftGun":
-        # 主件枪尾外还有一组完全断开的展示零件；它们在编辑器里悬空成碎片。
-        for mesh in bms:
-            _drop_face_islands_past_z(mesh, 0.05)
-        _Place(bms, steel, wood, spec["lengthM"], spec["kind"])
-    if name == "UnidentifiedBoltActionRifle":
-        # 源 MA1 木件与 TRG 钢件之间缺一段连续枪管，台架上会读成两截悬空模型。
-        # 在规范坐标中补一根 9→7 mm 的钢管，从机匣前缘连续接到枪口。
-        barrel = TubeZ(0.009, 0.007, 0.72, segments=12)
-        Transform(barrel, y=0.035, z=-0.145)
-        material_names.append("lqWeaponPlain")
-        bms.append(barrel)
     source_triangles = sum(sum(max(len(face.verts) - 2, 1) for face in mesh.faces)
                            for mesh in bms)
     target_triangles = TriangleTarget(name, "weapon", source_triangles)

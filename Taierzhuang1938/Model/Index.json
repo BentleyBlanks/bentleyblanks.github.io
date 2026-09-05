@@ -830,43 +830,6 @@
    "triangleLimit": 30000
   },
   {
-   "name": "UnidentifiedBoltActionRifle",
-   "category": "weapon",
-   "file": "UnidentifiedBoltActionRifle.tzm.json",
-   "triangles": 8792,
-   "meshBlocks": 2,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 289628,
-   "materials": [
-    "lqUnidentifiedBoltActionRifle",
-    "lqWeaponPlain"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.07121,
-     -0.10343,
-     -0.865
-    ],
-    "max": [
-     0.01951,
-     0.14544,
-     0.255
-    ]
-   },
-   "sourceTriangles": 8867,
-   "targetTriangles": 8867,
-   "triangleLimit": 30000
-  },
-  {
    "name": "OfficerSwordSet",
    "category": "weapon",
    "file": "OfficerSwordSet.tzm.json",
@@ -933,78 +896,6 @@
    },
    "sourceTriangles": 515,
    "targetTriangles": 515,
-   "triangleLimit": 30000
-  },
-  {
-   "name": "UnidentifiedAntiaircraftGun",
-   "category": "weapon",
-   "file": "UnidentifiedAntiaircraftGun.tzm.json",
-   "triangles": 17955,
-   "meshBlocks": 1,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 654828,
-   "materials": [
-    "lqWeaponPlain"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.16274,
-     -0.2103,
-     -0.845
-    ],
-    "max": [
-     0.16274,
-     0.60183,
-     0.255
-    ]
-   },
-   "sourceTriangles": 18013,
-   "targetTriangles": 18013,
-   "triangleLimit": 30000
-  },
-  {
-   "name": "LightMortar",
-   "category": "weapon",
-   "file": "LightMortar.tzm.json",
-   "triangles": 3124,
-   "meshBlocks": 1,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 139132,
-   "materials": [
-    "lqLightMortar"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.17907,
-     -0.33646,
-     -0.454
-    ],
-    "max": [
-     0.17907,
-     0.16253,
-     0.046
-    ]
-   },
-   "sourceTriangles": 3124,
-   "targetTriangles": 3124,
    "triangleLimit": 30000
   },
   {
@@ -1117,42 +1008,6 @@
    },
    "sourceTriangles": 70460,
    "targetTriangles": 9068,
-   "triangleLimit": 30000
-  },
-  {
-   "name": "Karabiner98k",
-   "category": "weapon",
-   "file": "Karabiner98k.tzm.json",
-   "triangles": 8445,
-   "meshBlocks": 1,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 232737,
-   "materials": [
-    "lqKarabiner98k"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.02542,
-     -0.12659,
-     -0.855
-    ],
-    "max": [
-     0.05689,
-     0.06599,
-     0.255
-    ]
-   },
-   "sourceTriangles": 8445,
-   "targetTriangles": 8445,
    "triangleLimit": 30000
   },
   {
@@ -1331,43 +1186,6 @@
    "sourceTriangles": 3969,
    "targetTriangles": 3969,
    "triangleLimit": 80000
-  },
-  {
-   "name": "WaltherP38",
-   "category": "weapon",
-   "file": "WaltherP38.tzm.json",
-   "triangles": 30362,
-   "meshBlocks": 2,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 889405,
-   "materials": [
-    "lqWeaponPlain",
-    "wood"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.01433,
-     -0.06741,
-     -0.17
-    ],
-    "max": [
-     0.0143,
-     0.04494,
-     0.046
-    ]
-   },
-   "sourceTriangles": 31182,
-   "targetTriangles": 31182,
-   "triangleLimit": 30000
   },
   {
    "name": "Type95HaGo",

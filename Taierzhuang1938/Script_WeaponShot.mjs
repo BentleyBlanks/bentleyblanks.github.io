@@ -61,15 +61,10 @@ const WEAPONS = [
   { id: "Type92Hmg", len: 1.156, upright: true },
   // 用户提供的卢沟桥合集。识别未定的组件也进入固定台架出图，防止“加进表里但
   // 从来没人看过”再发生；它们不进入第一人称玩法时仍可在这里逐件验收贴图。
-  { id: "WaltherP38", len: 0.216, closeAt: -0.02 },
-  { id: "Karabiner98k", len: 1.110 },
-  { id: "UnidentifiedBoltActionRifle", len: 1.120 },
   { id: "OfficerSwordSet", len: 1.000 },
   { id: "RingPommelDagger", len: 0.450, upright: true },
   { id: "BrowningTripodAssembly", len: 2.273, upright: true },
   { id: "UnidentifiedMunition", len: 0.253, upright: true },
-  { id: "UnidentifiedAntiaircraftGun", len: 1.100, upright: true },
-  { id: "LightMortar", len: 0.500, upright: true },
   { id: "MediumMortar", len: 1.444, upright: true },
   { id: "Type11", len: 1.100 },
 ];

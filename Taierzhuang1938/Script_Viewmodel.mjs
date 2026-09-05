@@ -336,22 +336,16 @@ function BuildMaterials(library) {
     // 且这支枪在战场上滚了半个月，抬到物理真值会变成镀铬件；0.20 是「暗但有形」的落点。
     blued: library.Plain("VmBlued", { color: 0x7a7d82, roughness: 0.44, metalness: 0.80 }),
     leather: library.Plain("VmLeather", { color: 0x3a2c22, roughness: 0.86, metalness: 0 }),
-    lqWaltherP38: SafeMaterial(library, "LugouqiaoWaltherP38", {}, 0x595d64),
     lqBrowningTripod: SafeMaterial(library, "Steel", {}, 0x555960),
     lqUnidentifiedMunition: SafeMaterial(library, "LugouqiaoUnidentifiedMunition", {}, 0x68625a),
-    lqUnidentifiedBoltActionRifle: SafeMaterial(library, "LugouqiaoUnidentifiedBoltActionRifle", {}, 0x6b5642),
     lqOfficerSword: SafeMaterial(library, "LugouqiaoOfficerSword", {}, 0x68635c),
     lqRingPommelDagger: SafeMaterial(library, "LugouqiaoRingPommelDagger", {}, 0x605b52),
-    lqUnidentifiedAntiaircraftMetal: SafeMaterial(library, "LugouqiaoUnidentifiedAntiaircraftMetal", {}, 0x565a60),
-    lqUnidentifiedAntiaircraftWood: SafeMaterial(library, "LugouqiaoUnidentifiedAntiaircraftWood", {}, 0x6b4c32),
-    lqLightMortar: SafeMaterial(library, "LugouqiaoLightMortar", {}, 0x5d5e58),
     lqType11AmmoBox: SafeMaterial(library, "LugouqiaoType11AmmoBox", {}, 0x5e5b4e),
     lqType11Body: SafeMaterial(library, "LugouqiaoType11Body", {}, 0x575a55),
     lqType11BodyAlt: SafeMaterial(library, "LugouqiaoType11BodyAlt", {}, 0x575a55),
     lqType11Fore: SafeMaterial(library, "LugouqiaoType11Fore", {}, 0x67513a),
     lqMauser96: SafeMaterial(library, "LugouqiaoMauser96", {}, 0x5a4c3e),
     lqMediumMortar: SafeMaterial(library, "Steel", {}, 0x555960),
-    lqKarabiner98k: SafeMaterial(library, "LugouqiaoKarabiner98k", {}, 0x5d4a38),
     lqWeaponPlain: SafeMaterial(library, "Steel", {}, 0x555960),
     // 刀柄缠的红布：全场唯二的高饱和点之一（另一个是青天白日帽徽）
     redCloth: library.Plain("VmRedCloth", { color: 0x8e2b22, roughness: 0.92, metalness: 0 }),
@@ -1088,8 +1082,7 @@ const BUILDERS = {
 const MODEL_FP = new Set([
   "Dadao",
   "ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96", "ServicePistol",
-  "Type11", "Type92Hmg", "WaltherP38", "Karabiner98k", "UnidentifiedBoltActionRifle",
-  "OfficerSwordSet", "RingPommelDagger", "UnidentifiedAntiaircraftGun",
+  "Type11", "Type92Hmg", "OfficerSwordSet", "RingPommelDagger",
 ]);
 
 /** 模型里的材质名 -> 视图模型这套材质。加载器不造材质，名字得在这里落地。 */
@@ -1097,13 +1090,11 @@ const VM_MATERIAL_BY_MESH = {
   steel: "steel", blade: "blade", grip: "grip", dadao: "dadao", wood: "wood", accessory: "cloth", red: "redCloth",
   leather: "leather", uniform: "cloth", skin: "skin", helmet: "steel",
   accentA: "redCloth", accentB: "brass", shoe: "leather",
-  lqWaltherP38: "lqWaltherP38", lqBrowningTripod: "lqBrowningTripod",
-  lqUnidentifiedMunition: "lqUnidentifiedMunition", lqUnidentifiedBoltActionRifle: "lqUnidentifiedBoltActionRifle",
+  lqBrowningTripod: "lqBrowningTripod", lqUnidentifiedMunition: "lqUnidentifiedMunition",
   lqOfficerSword: "lqOfficerSword", lqRingPommelDagger: "lqRingPommelDagger",
-  lqUnidentifiedAntiaircraftMetal: "lqUnidentifiedAntiaircraftMetal", lqUnidentifiedAntiaircraftWood: "lqUnidentifiedAntiaircraftWood",
-  lqLightMortar: "lqLightMortar", lqType11AmmoBox: "lqType11AmmoBox", lqType11Body: "lqType11Body",
+  lqType11AmmoBox: "lqType11AmmoBox", lqType11Body: "lqType11Body",
   lqType11BodyAlt: "lqType11BodyAlt", lqType11Fore: "lqType11Fore", lqMauser96: "lqMauser96",
-  lqMediumMortar: "lqMediumMortar", lqKarabiner98k: "lqKarabiner98k", lqWeaponPlain: "lqWeaponPlain",
+  lqMediumMortar: "lqMediumMortar", lqWeaponPlain: "lqWeaponPlain",
 };
 
 // Physical iron sight repairs for source meshes whose authored mount sits above
@@ -1117,9 +1108,6 @@ const IRON_SIGHT_REPAIRS = {
   Zb26: { x: -0.0234, y: 0.095, frontZ: -0.7616, frontBase: 0.060, rearZ: -0.205, rearBase: 0.061 },
   Mauser96: { x: 0, y: 0.055, frontZ: -0.2274, frontBase: 0.038, rearZ: -0.0415, rearBase: 0.043 },
   ServicePistol: { x: 0, y: 0.052, frontZ: -0.164, frontBase: 0.044, rearZ: 0.014, rearBase: 0.046 },
-  WaltherP38: { x: 0, y: 0.055, frontZ: -0.161, frontBase: 0.037, rearZ: 0.021, rearBase: 0.037 },
-  Karabiner98k: { x: 0, y: 0.074, frontZ: -0.8321, frontBase: 0.050, sourceCeiling: 0.060, rearZ: -0.270, rearBase: 0.049 },
-  UnidentifiedBoltActionRifle: { x: 0, y: 0.074, frontZ: -0.840, frontBase: 0.046, rearZ: -0.260, rearBase: 0.036 },
   Type11: { x: 0.00145, y: 0.157, frontZ: -0.7426, frontBase: 0.102, rearZ: -0.2022, rearBase: 0.129 },
   Type92Hmg: { replaceBlade: true, x: 0, y: 0.104, frontZ: -0.5901, frontBase: 0.076, rearZ: -0.1718, rearBase: 0.080 },
 };
@@ -1227,34 +1215,6 @@ function BuildFromModel(materials, weapon, key, doc) {
   const gripR = Mount("gripR", new THREE.Vector3());
   const gripL = Mount("gripL", gripR.clone());
   const sight = Mount("sight", null);
-  if (key === "UnidentifiedBoltActionRifle") {
-    // The imported MA1 stock is 27 mm left of the bore, and a disconnected
-    // 747-triangle exhibition lever/knob survives the source object's assembled-state filter.
-    // Repair only this private first-person geometry; retain the real bolt,
-    // trigger, barrel and stock instead of masking the assembled gun.
-    built.root.traverse((mesh) => {
-      if (!mesh.isMesh || !mesh.geometry?.attributes.position) return;
-      mesh.geometry = mesh.geometry.clone();
-      if (mesh.name.includes("lqUnidentifiedBoltActionRifle")) {
-        mesh.geometry.translate(0.027055, 0, 0);
-      } else {
-        const pos = mesh.geometry.attributes.position;
-        const index = mesh.geometry.index;
-        const retained = [];
-        for (let i = 0; i < index.count; i += 3) {
-          const tri = [index.getX(i), index.getX(i + 1), index.getX(i + 2)];
-          // Quantized-coordinate edge analysis finds the whole display assembly
-          // in three connected islands, all wholly left of x=-24 mm.  The real
-          // receiver, bolt body and sights cross that boundary or remain centred.
-          const exhibitionLever = tri.every((v) => pos.getX(v) < -0.024);
-          if (!exhibitionLever) retained.push(...tri);
-        }
-        mesh.geometry.setIndex(retained);
-      }
-      mesh.geometry.computeBoundingBox();
-      mesh.geometry.computeBoundingSphere();
-    });
-  }
   if (key === "Type11") {
     // Imported source was offset from its grip/bore mounts: measure the muzzle
     // ring centre, then move only the private mesh geometry back onto that frame.

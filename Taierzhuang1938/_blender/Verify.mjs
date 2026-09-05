@@ -107,10 +107,9 @@ Report(sandalNodesOk && /露趾草鞋/.test(nraDoc.notes || ""),
 // 浏览器会照常加载这些文件，三角数/包围盒也都合理，所以在真渲染前先直接审计
 // 压缩后的最终产物。面法线与三顶点平均光照法线反向即判坏，不依赖 Blender 环境。
 const lugouqiaoWeaponIds = [
-  "WaltherP38", "BrowningTripodAssembly", "UnidentifiedMunition",
-  "UnidentifiedBoltActionRifle", "OfficerSwordSet", "RingPommelDagger",
-  "UnidentifiedAntiaircraftGun", "LightMortar", "Type11", "Mauser96",
-  "MediumMortar", "Karabiner98k",
+  "BrowningTripodAssembly", "UnidentifiedMunition",
+  "OfficerSwordSet", "RingPommelDagger",
+  "Type11", "Mauser96", "MediumMortar",
 ];
 const AuditCompressedMesh = (mesh) => {
   const pos = Buffer.from(mesh.pos, "base64");
@@ -159,13 +158,6 @@ const MaterialTriangles = (id) => {
   const doc = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", MESHES[id].file), "utf8"));
   return new Map(doc.meshes.map((mesh) => [mesh.material, mesh.idxCount / 3]));
 };
-const p38Buckets = MaterialTriangles("WaltherP38");
-Report(p38Buckets.has("lqWeaponPlain") && p38Buckets.has("wood") && p38Buckets.size === 2,
-  "P38 金属与握把分桶，不再把 12×12 占位贴图铺满整枪");
-const rifleBuckets = MaterialTriangles("UnidentifiedBoltActionRifle");
-Report(rifleBuckets.size === 2 && (rifleBuckets.get("lqUnidentifiedBoltActionRifle") || 0) > 1000
-  && (rifleBuckets.get("lqWeaponPlain") || 0) > 2500,
-  "未识别栓动步枪 MA1 木件与 TRG/补管钢件齐全（不受 material_index=255 影响）");
 const type11Buckets = MaterialTriangles("Type11");
 const type11SourceTriangles = built.get("Type11")?.sourceTriangles || MESHES.Type11.triangles;
 Report(type11Buckets.size === 5
@@ -187,9 +179,6 @@ Report(type11AmmoCenterX < -0.04
 const swordBuckets = MaterialTriangles("OfficerSwordSet");
 Report(swordBuckets.has("lqOfficerSword") && swordBuckets.has("lqWeaponPlain")
   && swordBuckets.size === 2, "军刀仅饰带使用源贴图，刀身/刀鞘回钢材质");
-const antiaircraftBuckets = MaterialTriangles("UnidentifiedAntiaircraftGun");
-Report(antiaircraftBuckets.has("lqWeaponPlain") && antiaircraftBuckets.size === 1,
-  "未明高射炮删除悬空陈列件并禁用噪点伪底色，回枪钢材质");
 
 // 钢盔扣不扣得住颅骨：低多边形的头饰与头是两个独立放样体，**贴着建**的话
 // 分面一削就穿，穿出来的是盔体后半一条肉色折线 —— 只有从后上方（低头看脚边的

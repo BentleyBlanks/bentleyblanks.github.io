@@ -253,11 +253,6 @@ export const MESHES = {
     note: "卢沟桥资源包源节点 QEDQD：十一年式轻机枪。保留 body/body2/fore/ammobox"
       + "四张 DDS 的原 UV 与独立材质槽；项目原 CC-BY 模型仍保留作对比参考。",
   },
-  WaltherP38: {
-    file: "WaltherP38.tzm.json", category: "weapon", triangles: 30362, meshBlocks: 2, nodes: 7, joints: 0,
-    materials: ["lqWeaponPlain", "wood"], mounts: WEAPON_MOUNTS, span: [0.02868, 0.11214, 0.21618], lengthM: 0.216,
-    draws: { high: 2, medium: 2, low: 2 }, note: "源节点 2#，套筒铭文可辨识为 Walther P38；12×12 占位图仅对应握把，不再错误铺满整枪。",
-  },
   BrowningTripodAssembly: {
     file: "BrowningTripodAssembly.tzm.json", category: "weapon", triangles: 9003, meshBlocks: 1, nodes: 7, joints: 0,
     materials: ["lqBrowningTripod"], mounts: WEAPON_MOUNTS, span: [0.73547, 1.43177, 2.27293], lengthM: 2.273,
@@ -267,12 +262,6 @@ export const MESHES = {
     file: "UnidentifiedMunition.tzm.json", category: "weapon", triangles: 128, meshBlocks: 1, nodes: 7, joints: 0,
     materials: ["lqUnidentifiedMunition"], mounts: WEAPON_MOUNTS, span: [0.06568, 0.06906, 0.253], lengthM: 0.253,
     draws: { high: 1, medium: 1, low: 1 }, note: "源节点 Cylinder026；弹体型号未明，识别截图随源归档。",
-  },
-  UnidentifiedBoltActionRifle: {
-    file: "UnidentifiedBoltActionRifle.tzm.json", category: "weapon", triangles: 8792, meshBlocks: 2, nodes: 7, joints: 0,
-    materials: ["lqUnidentifiedBoltActionRifle", "lqWeaponPlain"], mounts: WEAPON_MOUNTS,
-    span: [0.08972, 0.24887, 1.120], lengthM: 1.120, draws: { high: 2, medium: 2, low: 2 },
-    note: "源节点 FQDQD / MK98_MA1+TRG；排除横向陈列的 BA2/LOK，并补齐机匣至枪口的连续钢管，具体型号未明。",
   },
   OfficerSwordSet: {
     file: "OfficerSwordSet.tzm.json", category: "weapon", triangles: 7801, meshBlocks: 2, nodes: 5, joints: 0,
@@ -284,26 +273,10 @@ export const MESHES = {
     materials: ["lqRingPommelDagger"], mounts: ["muzzle", "gripR", "gripL"], span: [0.05430, 0.06812, 0.450], lengthM: 0.450,
     draws: { high: 1, medium: 1, low: 1 }, note: "源节点 Mesh_0300；带环首短刃，具体制式未明。",
   },
-  UnidentifiedAntiaircraftGun: {
-    file: "UnidentifiedAntiaircraftGun.tzm.json", category: "weapon", triangles: 17955, meshBlocks: 1, nodes: 7, joints: 0,
-    materials: ["lqWeaponPlain"], mounts: WEAPON_MOUNTS,
-    span: [0.32552, 0.81215, 1.09980], lengthM: 1.100, draws: { high: 1, medium: 1, low: 1 },
-    note: "源节点 MK1；删除悬空陈列件，纠正枪口朝向；MKCRMT 原图为随机噪点，改用项目枪钢 PBR，具体型号未明。",
-  },
-  LightMortar: {
-    file: "LightMortar.tzm.json", category: "weapon", triangles: 3124, meshBlocks: 1, nodes: 7, joints: 0,
-    materials: ["lqLightMortar"], mounts: WEAPON_MOUNTS, span: [0.35814, 0.49899, 0.500], lengthM: 0.500,
-    draws: { high: 1, medium: 1, low: 1 }, note: "源节点 PJP；轻型迫击/掷弹器，具体型号未明。",
-  },
   MediumMortar: {
     file: "MediumMortar.tzm.json", category: "weapon", triangles: 9064, meshBlocks: 1, nodes: 7, joints: 0,
     materials: ["lqMediumMortar"], mounts: WEAPON_MOUNTS, span: [0.79565, 1.20429, 1.44394], lengthM: 1.444,
     draws: { high: 1, medium: 1, low: 1 }, note: "源节点 sphere3；中型迫击炮，具体型号未明。",
-  },
-  Karabiner98k: {
-    file: "Karabiner98k.tzm.json", category: "weapon", triangles: 8445, meshBlocks: 1, nodes: 7, joints: 0,
-    materials: ["lqKarabiner98k"], mounts: WEAPON_MOUNTS, span: [0.08304, 0.19262, 1.10961], lengthM: 1.110,
-    draws: { high: 1, medium: 1, low: 1 }, note: "源节点直接命名 Karabiner 98 Kurz；保留 diffuse 与 normal 原贴图。",
   },
   Type92Hmg: {
     file: "Type92Hmg.tzm.json", category: "weapon",
@@ -464,11 +437,9 @@ export const WEAPON_MESH_BY_ID = {
   // 掷弹筒走武器规范系（右手握点 = 原点、筒口朝 -Z），人物能直接拿着它；
   // 三辆车走车辆规范系，只有台架/摆场景用得上，人物拿不了
   Type89Launcher: "Type89Launcher",
-  WaltherP38: "WaltherP38", BrowningTripodAssembly: "BrowningTripodAssembly",
-  UnidentifiedMunition: "UnidentifiedMunition", UnidentifiedBoltActionRifle: "UnidentifiedBoltActionRifle",
+  BrowningTripodAssembly: "BrowningTripodAssembly", UnidentifiedMunition: "UnidentifiedMunition",
   OfficerSwordSet: "OfficerSwordSet", RingPommelDagger: "RingPommelDagger",
-  UnidentifiedAntiaircraftGun: "UnidentifiedAntiaircraftGun", LightMortar: "LightMortar",
-  MediumMortar: "MediumMortar", Karabiner98k: "Karabiner98k",
+  MediumMortar: "MediumMortar",
   Type89Tank: "Type89Tank", Type95HaGo: "Type95HaGo", Type97ChiHa: "Type97ChiHa",
 };
 

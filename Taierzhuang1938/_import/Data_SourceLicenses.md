@@ -226,6 +226,6 @@ CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保�
 
 | 游戏内资产 | 来源 | 权利状态 | 处理方式 |
 |---|---|---|---|
-| `WaltherP38`、`BrowningTripodAssembly`、`UnidentifiedMunition`、`UnidentifiedBoltActionRifle`、`OfficerSwordSet`、`RingPommelDagger`、`UnidentifiedAntiaircraftGun`、`LightMortar`、`Type11`、`Mauser96`、`MediumMortar`、`Karabiner98k` | 用户提供的 `武器.max` 与同目录 `texture/` | 用户提供；本仓库未取得也不推断第三方公开许可 | 按 12 个根节点拆成独立 Blend，16 张 DDS/TGA/JPEG 原图逐文件保存在 `_import/Source/Model_LugouqiaoWeapons/Texture_Source/`。运行时 TZM 保留 UV/材质槽，浏览器贴图由 `Script_SplitLugouqiaoWeapons.py` 转换；型号不明的八件附识别截图，不冒认史实制式。 |
+| `BrowningTripodAssembly`、`UnidentifiedMunition`、`OfficerSwordSet`、`RingPommelDagger`、`Type11`、`Mauser96`、`MediumMortar`（另有 `WaltherP38`、`Karabiner98k`、`UnidentifiedBoltActionRifle`、`UnidentifiedAntiaircraftGun`、`LightMortar` 五件于 2026-09-05 按史实考据移除，见 `_import/Reference/LugouqiaoWeapons/Data_LugouqiaoWeaponIdentification.md`） | 用户提供的 `武器.max` 与同目录 `texture/` | 用户提供；本仓库未取得也不推断第三方公开许可 | 按 12 个根节点拆成独立 Blend（现存 7 件），16 张 DDS/TGA/JPEG 原图逐文件保存在 `_import/Source/Model_LugouqiaoWeapons/Texture_Source/`。运行时 TZM 保留 UV/材质槽，浏览器贴图由 `Script_SplitLugouqiaoWeapons.py` 转换；型号不明的八件附识别截图，不冒认史实制式。 |
 
 这批资源不是公开素材库下载项，不应被重新标成 CC0 / CC-BY。若站点公开分发权限后续无法确认，应移除这批源 Blend、原始贴图和运行时派生物，再恢复项目原有武器模型。

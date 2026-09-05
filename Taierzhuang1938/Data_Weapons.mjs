@@ -188,35 +188,13 @@ export const WEAPONS = {
   },
 
   // --- 卢沟桥资源包 ---------------------------------------------------------
-  // 这十项是新增；Mauser96 / Type11 则沿用原 id，只替换模型与材质。模型节点没给出
+  // 这几项是新增；Mauser96 / Type11 则沿用原 id，只替换模型与材质。模型节点没给出
   // 可靠制式名的条目一律标作“型号尚待考证”，不从外形硬猜成史实型号。
-  WaltherP38: {
-    id: "WaltherP38", name: "瓦尔特 P38", fullName: "Walther P38 自动手枪",
-    side: "neutral", kind: "pistol", ammo: "Service9", lengthM: 0.216, massKg: 0.96,
-    magazine: 8, reloadKind: "boxMag", damage: 38, headMultiplier: 2.2, effectiveRangeM: 50,
-    fireIntervalS: 0.18, reloadTimeS: 2.2,
-    recoil: { pitch: 1.35, yaw: 0.72, kick: 0.027, recoverS: 0.12, recoverFrac: 1.0 },
-    swayScale: 0.72, adsTimeS: 0.17, adsFovScale: 0.86, spreadHipDeg: 3.2, spreadAdsDeg: 0.82,
-    note: "源模型套筒铭文可直接识别；玩法参数沿用现有九毫米军用手枪档。",
-  },
-  Karabiner98k: {
-    id: "Karabiner98k", name: "Kar98k", fullName: "Karabiner 98k 栓动步枪",
-    side: "neutral", kind: "boltRifle", ammo: "Mauser792", lengthM: 1.110, massKg: 3.9,
-    magazine: 5, reloadKind: "stripper", damage: 78, headMultiplier: 2.6, effectiveRangeM: 500,
-    boltTimeS: 1.05, fireIntervalS: 1.25, reloadTimeS: 3.4,
-    recoil: { pitch: 2.9, yaw: 0.55, kick: 0.055, recoverS: 0.24, recoverFrac: 1.0 },
-    swayScale: 1.0, adsTimeS: 0.28, adsFovScale: 0.72, spreadHipDeg: 2.6, spreadAdsDeg: 0.18,
-    note: "源节点直接命名 Wp_Gun_Karabiner 98 Kurz；保留原 diffuse/normal。",
-  },
-  UnidentifiedBoltActionRifle: {
-    id: "UnidentifiedBoltActionRifle", name: "栓动步枪", fullName: "栓动步枪（具体型号尚待考证）",
-    side: "neutral", kind: "boltRifle", ammo: "Mauser792", lengthM: 1.120, massKg: 4.0,
-    magazine: 5, reloadKind: "stripper", damage: 76, headMultiplier: 2.6, effectiveRangeM: 450,
-    boltTimeS: 1.10, fireIntervalS: 1.32, reloadTimeS: 3.6,
-    recoil: { pitch: 3.0, yaw: 0.6, kick: 0.058, recoverS: 0.25, recoverFrac: 1.0 },
-    swayScale: 1.08, adsTimeS: 0.31, adsFovScale: 0.74, spreadHipDeg: 2.9, spreadAdsDeg: 0.24,
-    note: "源节点只有 FQDQD / MK98_* 工作名；截图可确认枪类，不能可靠确认制式。",
-  },
+  // 2026-09-05 按考据删掉五件不属于 1938 年 3 月的东西：Walther P38（1939 年才交付德军）、
+  // Karabiner98k 与 MK98 系「待考证栓动步枪」（中国 5 万支 K98k 合同 1938 年 3 月才签、
+  // 首批 4 月底到港，且两把模型机匣带皮卡汀尼导轨）、被误标成「高射炮」的 Bren Mk I 式
+  // 轻机枪（英军 1938 年才列装，7.92 mm 版 1943 年才到华）、带两脚架的 50 mm 级轻迫击炮。
+  // 依据见 docs/Data_HistoryMaterial.md「避坑清单」。
   OfficerSwordSet: {
     id: "OfficerSwordSet", name: "军刀与刀鞘", fullName: "军刀与刀鞘（具体制式尚待考证）",
     side: "ija", kind: "melee", lengthM: 1.0, massKg: 1.3, damage: 210,
@@ -238,17 +216,6 @@ export const WEAPONS = {
     id: "UnidentifiedMunition", name: "弹体", fullName: "弹体（具体型号尚待考证）",
     side: "neutral", kind: "mortar", lengthM: 0.253, massKg: 2.0,
     note: "源节点 Cylinder026；保留 WW-100heqdf 原贴图并附识别截图。",
-  },
-  UnidentifiedAntiaircraftGun: {
-    id: "UnidentifiedAntiaircraftGun", name: "高射炮", fullName: "高射炮（具体型号尚待考证）",
-    side: "neutral", kind: "mortar", lengthM: 1.10, massKg: 20,
-    note: "源节点 MK1；保留 MKCRMT 与 Mkwood 两张原贴图，仅加入台架预览。",
-  },
-  LightMortar: {
-    id: "LightMortar", name: "轻型迫击器", fullName: "轻型迫击/掷弹器（具体型号尚待考证）",
-    side: "neutral", kind: "mortar", lengthM: 0.50, massKg: 3.0,
-    damage: 105, radiusM: 4.5, rangeMinM: 35, rangeMaxM: 500,
-    note: "源节点 PJP；形制可确认类别，具体型号尚待考证。",
   },
   MediumMortar: {
     id: "MediumMortar", name: "中型迫击炮", fullName: "中型迫击炮（具体型号尚待考证）",

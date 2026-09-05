@@ -589,20 +589,14 @@ export const RECIPES = {
   Steel: (s) => BakeSteel(s ?? 256, { seed: 601 }),
   // 卢沟桥武器的外部原贴图若 404，按材质类别退回可用的程序化 PBR；正常路径
   // 会在 Main 启动阶段整套覆盖，因此不会把这些兜底纹理显示到玩家面前。
-  LugouqiaoWaltherP38: (s) => BakeSteel(s ?? 256, { seed: 631 }),
   LugouqiaoUnidentifiedMunition: (s) => BakeSteel(s ?? 256, { seed: 632 }),
-  LugouqiaoUnidentifiedBoltActionRifle: (s) => BakeWood(s ?? 256, { seed: 633, planks: 1 }),
   LugouqiaoOfficerSword: (s) => BakeSteel(s ?? 256, { seed: 634 }),
   LugouqiaoRingPommelDagger: (s) => BakeSteel(s ?? 256, { seed: 635 }),
-  LugouqiaoUnidentifiedAntiaircraftMetal: (s) => BakeSteel(s ?? 256, { seed: 636 }),
-  LugouqiaoUnidentifiedAntiaircraftWood: (s) => BakeWood(s ?? 256, { seed: 637, planks: 1 }),
-  LugouqiaoLightMortar: (s) => BakeSteel(s ?? 256, { seed: 638 }),
   LugouqiaoType11AmmoBox: (s) => BakeSteel(s ?? 256, { seed: 639 }),
   LugouqiaoType11Body: (s) => BakeSteel(s ?? 256, { seed: 640 }),
   LugouqiaoType11BodyAlt: (s) => BakeSteel(s ?? 256, { seed: 641 }),
   LugouqiaoType11Fore: (s) => BakeWood(s ?? 256, { seed: 642, planks: 1 }),
   LugouqiaoMauser96: (s) => BakeSteel(s ?? 256, { seed: 643 }),
-  LugouqiaoKarabiner98k: (s) => BakeWood(s ?? 256, { seed: 644, planks: 1 }),
   SteelHelmet: (s) => BakeSteel(s ?? 256, { seed: 617, base: [64, 66, 60], polish: 0.2, rust: 0.35 }),
   Ground: (s) => BakeRubbleGround(s ?? 512, { seed: 701 }),
   // 东门外翻耕土的 ImageGen BaseColor + Normal 会在启动时覆盖；404 时仍保留

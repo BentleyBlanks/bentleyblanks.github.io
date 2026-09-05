@@ -47,11 +47,9 @@ WEAPON_LENGTH = {
     "Mauser96": 0.288, "ServicePistol": 0.222,
     "Grenade": 0.220, "Dadao": 0.900, "Type89Launcher": 0.413,
     "Type11": 1.100, "Type92Hmg": 1.156,
-    "WaltherP38": 0.216, "BrowningTripodAssembly": 2.273,
-    "UnidentifiedMunition": 0.253, "UnidentifiedBoltActionRifle": 1.120,
+    "BrowningTripodAssembly": 2.273, "UnidentifiedMunition": 0.253,
     "OfficerSwordSet": 1.000, "RingPommelDagger": 0.450,
-    "UnidentifiedAntiaircraftGun": 1.100, "LightMortar": 0.500,
-    "MediumMortar": 1.444, "Karabiner98k": 1.110,
+    "MediumMortar": 1.444,
     # 刺刀是独立模型（挂 socket 到枪口，见 ImportBayonets.py 抬头）。
     # 全长同样是史实数：HY1935 572 mm / 汉阳式 517 mm / 三十年式 514 mm。
     "BayonetZhongZheng": 0.572, "BayonetHanYang": 0.517, "BayonetType38": 0.514,

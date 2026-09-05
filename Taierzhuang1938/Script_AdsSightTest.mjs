@@ -54,7 +54,7 @@ const AXIS_TOLERANCE = 0.020;                        // NDC，1600 宽上约 16 
 const AXIS_EXPECT = {
   // 2026-08-26 实测（依次）：0.0004 / 0.0002 / 0.0000 / 0.0000 / 0.0000 —— 对称面就压在瞄准线上。
   ZhongZheng: 0, HanYang: 0, Type38: 0, Mauser96: 0, ServicePistol: 0,
-  WaltherP38: 0, Karabiner98k: 0, UnidentifiedBoltActionRifle: 0, Type11: 0, Type92Hmg: 0,
+  Type11: 0, Type92Hmg: 0,
   // 捷克式的瞄具史实左偏，枪身因此必须落在瞄准点**右边**：实测 +0.032。
   // 这不是容差放宽 —— 它偏得比容差多得多，写 0 一样会红。
   Zb26: 0.032,
@@ -294,27 +294,7 @@ try {
           const point = new THREE.Vector3(0, top, 0).applyMatrix4(mesh.matrixWorld).project(T.camera);
           return { x: point.x * halfWidth, y: -point.y * halfHeight };
         });
-        let nearClipTriangles = 0, detachedDisplayTriangles = 0;
-        if (["Karabiner98k", "UnidentifiedBoltActionRifle"].includes(id)) {
-          vm.rig.group.traverse((mesh) => {
-            if (!mesh.isMesh || !mesh.name.startsWith(id + "_") || !mesh.geometry.index) return;
-            const pos = mesh.geometry.attributes.position;
-            const index = mesh.geometry.index;
-            const near = new Set();
-            for (let i = 0; i < pos.count; i += 1) {
-              const v = new THREE.Vector3().fromBufferAttribute(pos, i)
-                .applyMatrix4(mesh.matrixWorld).applyMatrix4(T.camera.matrixWorldInverse);
-              if (v.z > -T.camera.near) near.add(i);
-            }
-            for (let i = 0; i < index.count; i += 3) {
-              const tri = [index.getX(i), index.getX(i + 1), index.getX(i + 2)];
-              if (tri.some((v) => near.has(v))) nearClipTriangles += 1;
-              if (id === "UnidentifiedBoltActionRifle" && tri.every((v) => pos.getX(v) < -0.024)) detachedDisplayTriangles += 1;
-            }
-          });
-        }
         rows[id] = {
-          nearClipTriangles, detachedDisplayTriangles,
           frontVisible, frontHit: frontHitLocal && { name: frontHit.object.name, z: frontHitLocal.z },
           rearTops,
           obstruction,
@@ -386,8 +366,6 @@ try {
 
   for (const id of GUNS) {
     const row = report[id];
-    if (id === "UnidentifiedBoltActionRifle") Check(`${id} 无离体展示杆`, row?.detachedDisplayTriangles === 0, `triangles=${row?.detachedDisplayTriangles}`);
-    if (["Karabiner98k", "UnidentifiedBoltActionRifle"].includes(id)) Check(`${id} 完整枪体不穿近裁切面`, row?.nearClipTriangles === 0, `triangles=${row?.nearClipTriangles}`);
     Check(`${id} 前准星真实可见而非被近处枪身遮住`, row?.frontVisible, JSON.stringify(row?.frontHit));
     Check(`${id} 实体照门两肩同高且缺口居中`, row?.rearTops?.length === 2
       && row.rearTops.every((point) => Math.abs(point.y) < 2)

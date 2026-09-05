@@ -30,8 +30,6 @@ const SIDE_LONG = {
 const KIND_LABEL_BY_ID = {
   BrowningTripodAssembly: "三脚架组件",
   UnidentifiedMunition: "弹体",
-  UnidentifiedAntiaircraftGun: "架设武器",
-  LightMortar: "轻型迫击器",
   MediumMortar: "中型迫击炮",
 };
 
@@ -77,18 +75,10 @@ function BenchPose(id) {
   if (id === "OfficerSwordSet" || id === "RingPommelDagger") {
     return { x: -Math.PI / 2, y: 0, z: 0 };
   }
-  if (id === "UnidentifiedAntiaircraftGun") {
-    // 这一件源几何的三脚架已经是落地姿态；再跟迫击炮一起抬角会让枪尾先着地、
-    // 两只脚反而悬空。显式留在表里，防止以后又被并回通用迫击炮角度。
-    return { x: 0, y: 0, z: 0 };
-  }
   if (id === "Type92Hmg") {
     // 九二式的三脚架在源几何里已经水平落地；这里只写死零俯仰并由外层包围盒落地，
     // 不能再沿用手持枪的 1.1 m 展示高度，也不能套迫击炮的抬角。
     return { x: 0, y: 0, z: 0 };
-  }
-  if (id === "LightMortar") {
-    return { x: Math.PI * 0.22, y: 0, z: 0 };
   }
   if (id === "MediumMortar") {
     return { x: Math.PI * 0.34, y: 0, z: 0 };

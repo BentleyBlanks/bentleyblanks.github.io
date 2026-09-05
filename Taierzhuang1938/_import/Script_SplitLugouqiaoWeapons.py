@@ -36,19 +36,16 @@ TEXTURE_DIR = required("TAIERZHUANG_WEAPON_TEXTURE_DIR")
 SOURCE_OUT = required("TAIERZHUANG_WEAPON_SOURCE_OUT")
 RUNTIME_OUT = required("TAIERZHUANG_WEAPON_RUNTIME_OUT")
 
+# 2026-09-05：P38 / K98k / MK98 栓动步枪 / MK1（Bren 式轻机枪，曾误标高射炮）/ PJP 轻迫击炮
+# 五件按考据不属于 1938 年 3 月，已从拆分清单与运行时贴图里移除；原始贴图仍按 TEXTURES 逐文件保存。
 ASSETS = {
-    "WaltherP38": ("2#", APPLY_BLEND),
     "BrowningTripodAssembly": ("BROTRIPO009", APPLY_BLEND),
     "UnidentifiedMunition": ("Cylinder026", APPLY_BLEND),
-    "UnidentifiedBoltActionRifle": ("FQDQD", APPLY_BLEND),
     "OfficerSwordSet": ("Group146", APPLY_BLEND),
     "RingPommelDagger": ("Mesh_0300", APPLY_BLEND),
-    "UnidentifiedAntiaircraftGun": ("MK1", NOAPPLY_BLEND),
-    "LightMortar": ("PJP", APPLY_BLEND),
     "Type11": ("QEDQD", APPLY_BLEND),
     "Mauser96": ("Sphere001", APPLY_BLEND),
     "MediumMortar": ("sphere3", APPLY_BLEND),
-    "Karabiner98k": ("Wp_Gun_Karabiner 98 Kurz", APPLY_BLEND),
 }
 
 TEXTURES = {
@@ -71,20 +68,14 @@ TEXTURES = {
 }
 
 RUNTIME = {
-    "LugouqiaoWaltherP38": "Lug_reb.tga",
     "LugouqiaoUnidentifiedMunition": "WW-100heqdf.jpg",
-    "LugouqiaoUnidentifiedBoltActionRifle": "dl772.jpg",
     "LugouqiaoOfficerSword": "stripe01L.jpg",
     "LugouqiaoRingPommelDagger": "Tex_0155_1.dds",
-    "LugouqiaoUnidentifiedAntiaircraftMetal": "MKCRMT.jpg",
-    "LugouqiaoUnidentifiedAntiaircraftWood": "Mkwood.jpg",
-    "LugouqiaoLightMortar": "PJP.jpg",
     "LugouqiaoType11AmmoBox": "ammobox.dds",
     "LugouqiaoType11Body": "body.dds",
     "LugouqiaoType11BodyAlt": "body2.dds",
     "LugouqiaoType11Fore": "fore.dds",
     "LugouqiaoMauser96": "maose_d.tga",
-    "LugouqiaoKarabiner98k": "Wp_Gun_Karabiner 98 Kurz_d.tga",
 }
 
 
@@ -202,13 +193,6 @@ def bake_runtime_textures():
     RUNTIME_OUT.mkdir(parents=True, exist_ok=True)
     for material, source in RUNTIME.items():
         save_runtime_image(source, f"Texture_{material}Base.jpg")
-    save_runtime_image(
-        "Wp_Gun_Karabiner 98 Kurz_n.tga",
-        "Texture_LugouqiaoKarabiner98kNormal.png",
-        "Non-Color",
-        "PNG",
-        512,
-    )
     # Shared neutral maps keep albedo-only source materials inside the normal
     # PBR loading path without inventing surface detail that was not authored.
     solid_runtime_image("Texture_LugouqiaoFlatNormal.png", (0.5, 0.5, 1.0, 1.0))

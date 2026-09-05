@@ -130,24 +130,6 @@ export const FPS_ARM_POSES = Freeze({
       { at: 0.88, position: V(-0.025, 0.020, 0.035) },
     ] } },
   }),
-  WaltherP38: WeaponPose({
-    family: "pistol", hip: FixedPose(V(0.045, -0.102, -0.230), V(0.035, -0.030, 0.012)), ads: Sight(0.335), sprint: PistolSprint,
-    right: Contact(V(0.01200, -0.03600, 0.01500), V(-0.252242458, 3.141592654, 1.570796327), CLOSED, TRIGGER), left: Contact(V(-0.02900, -0.03800, -0.02700), V(-0.357235309, 3.013269426, -1.478705144), SUPPORT),
-    bodyHip: PistolBody(), bodyAds: PistolAdsBody(), bodySprint: PistolBody(),
-    actions: { reload: { family: "boxMag", timing: V(0.30, 0.56, 0.79) } },
-  }),
-  Karabiner98k: WeaponPose({
-    family: "boltRifle", hip: FixedPose(V(0.100, -0.142, -0.325), V(0.045, -0.055, 0.026)), ads: Sight(0.550), sprint: RifleSprint,
-    right: Contact(V(0.01200, -0.03600, 0.01500), V(-0.523611478, 3.141592654, 1.570796327), CLOSED, TRIGGER), left: Contact(V(0.00000, -0.03500, -0.49938), V(-0.582726784, 2.373142020, -2.817487415), SUPPORT),
-    bodyHip: RifleBody(-0.600), bodyAds: Body(V(0.165, -0.285, -0.185), V(-0.010, -0.325, -0.655), V(0.30, -0.82, 0.12), V(-0.18, -0.86, 0.08)), bodySprint: RifleSprintBody(-0.515),
-    actions: { bolt: { family: "turnBolt", timing: V(0.20, 0.50, 0.81) }, reload: { family: "stripper", timing: V(0.49, 0.63, 0.77) } },
-  }),
-  UnidentifiedBoltActionRifle: WeaponPose({
-    family: "boltRifle", hip: FixedPose(V(0.105, -0.148, -0.330), V(0.050, -0.055, 0.028)), ads: Sight(0.550), sprint: RifleSprint,
-    right: Contact(V(0.01200, -0.03600, 0.01500), V(-0.523611478, 3.141592654, 1.570796327), CLOSED, TRIGGER), left: Contact(V(0.00000, -0.03500, -0.50518), V(-0.582726784, 2.373142020, -2.817487415), SUPPORT),
-    bodyHip: RifleBody(-0.605), bodyAds: Body(V(0.165, -0.285, -0.185), V(-0.010, -0.325, -0.660), V(0.30, -0.82, 0.12), V(-0.18, -0.86, 0.08)), bodySprint: RifleSprintBody(-0.520),
-    actions: { bolt: { family: "turnBolt", timing: V(0.22, 0.53, 0.83) }, reload: { family: "stripper", timing: V(0.51, 0.65, 0.79) } },
-  }),
   Grenade: WeaponPose({
     family: "throwable", hip: FixedPose(V(0.100, -0.140, -0.420), V(0.150, -0.250, 0.100)), ads: FixedPose(V(0.080, -0.100, -0.350), V(0.28, -0.10, 0.05)), sprint: ThrowableSprint,
     right: Contact(V(0, 0, 0), V(0.40576, -2.33420, -2.38987), CLOSED), left: Contact(V(-0.090, -0.035, 0.080), V(-0.85212, 2.76034, -2.50878), SUPPORT),

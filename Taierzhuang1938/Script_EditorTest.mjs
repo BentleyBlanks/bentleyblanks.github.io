@@ -150,11 +150,12 @@ Check("资产规范是独立编辑器入口", assetStandards.active === "assetSt
 Check("资产规范有七个分类", assetStandards.chips.length === 7
   && ["枪械", "架设 / 炮械", "刀剑 / 刺刀", "战车", "程序化 TZM", "外部 GLB", "贴图规范"]
     .every((label) => assetStandards.chips.includes(label)), assetStandards.chips.join(" / "));
-Check("资产表展示原始/实际/限制/降幅/贴图", assetStandards.rows >= 10
+// 枪械分类现有 8 行（P38 / K98k / MK98 栓动步枪按考据删除后）。
+Check("资产表展示原始/实际/限制/降幅/贴图", assetStandards.rows >= 8
   && ["原始面数", "实际面数", "限制 / 目标", "面数降幅", "自带贴图", "游戏内贴图"]
     .every((label) => assetStandards.headers.includes(label)));
-Check("枪械表显示 P38 原始 31,182 与实际 30,362", assetStandards.text.includes("31,182")
-  && assetStandards.text.includes("30,362"));
+Check("枪械表显示捷克式原始 7,811 与实际 7,781", assetStandards.text.includes("7,811")
+  && assetStandards.text.includes("7,781"));
 Check("资产规范当前没有不合规红项", assetStandards.bad === 0, `红项=${assetStandards.bad}`);
 await page.click('[data-editor="assetStandards"]');
 
@@ -1146,7 +1147,7 @@ const weapon = await page.evaluate(async () => {
   const THREE = await import("./vendor/three/build/three.module.js");
   active.SetMode("bench");
   out.deployedPoses = {};
-  for (const id of ["Type92Hmg", "UnidentifiedAntiaircraftGun", "LightMortar", "MediumMortar"]) {
+  for (const id of ["Type92Hmg", "MediumMortar"]) {
     active.SetWeapon(id);
     window.Taierzhuang.StepFrames(10);
     const box = new THREE.Box3().setFromObject(active.benchGroup);
@@ -1161,8 +1162,8 @@ const weapon = await page.evaluate(async () => {
     name: row.querySelector(".n")?.textContent || "",
     tail: row.querySelector(".t")?.textContent || "",
   }));
-  out.ambiguousRows = rows.filter((row) => ["高射炮", "轻型迫击器", "中型迫击炮"].includes(row.name));
-  out.unknownCopyGone = out.ambiguousRows.length === 3
+  out.ambiguousRows = rows.filter((row) => ["中型迫击炮"].includes(row.name));
+  out.unknownCopyGone = out.ambiguousRows.length === 1
     && out.ambiguousRows.every((row) => !row.name.includes("未明") && !row.tail.includes("未明"))
     && active.panel.body.textContent.includes("不是游戏里的未知/未解锁状态");
   active.SetWeapon("OfficerSwordSet");
@@ -1196,11 +1197,9 @@ Check("不支持刺刀 / 投掷的枪不显示无效选项，仍保留有效白�
   weapon.unsupportedBayonetHidden && weapon.unsupportedThrowHidden && weapon.unsupportedMeleeVisible);
 Check("手榴弹只显示投掷，不显示白刃", weapon.grenadeThrowVisible && weapon.grenadeMeleeHidden);
 const deployed = weapon.deployedPoses;
-Check("四件架设武器逐件校姿并按最终包围盒落地",
+Check("两件架设武器逐件校姿并按最终包围盒落地",
   Object.values(deployed).every((entry) => entry.grounded)
     && Math.abs(deployed.Type92Hmg.pitch) < 0.001
-    && Math.abs(deployed.UnidentifiedAntiaircraftGun.pitch) < 0.001
-    && deployed.LightMortar.pitch > 0.6 && deployed.LightMortar.pitch < 0.8
     && deployed.MediumMortar.pitch > 1.0 && deployed.MediumMortar.pitch < 1.15
     && deployed.MediumMortar.span[1] > deployed.MediumMortar.span[0] * 0.9,
   JSON.stringify(deployed));
