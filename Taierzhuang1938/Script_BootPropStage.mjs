@@ -29,7 +29,7 @@ import { MESHES, MeshUrl } from "./Data_Meshes.mjs";
 /**
  * 展示池。**故意不放士兵**：TZM 里的人是静止的绑定姿势（两臂平举），
  * 单独摆出来像具人体模型，与这个游戏对人的态度不合。枪、道具、车都是静物，
- * 摆出来就是它本来的样子。
+ * 摆出来就是它本来的样子。只展示战斗装备，不混入屋脊、门窗等建筑饰件。
  */
 const SHOWCASE = [
   { id: "HanYang", name: "汉阳造 八八式步枪" },
@@ -44,10 +44,6 @@ const SHOWCASE = [
   { id: "Type95HaGo", name: "九五式 轻战车 Ha-Go" },
   { id: "Type97ChiHa", name: "九七式 中战车 Chi-Ha" },
   { id: "Type89Tank", name: "八九式 中战车" },
-  { id: "Dougong", name: "门楼斗拱" },
-  { id: "RidgeBeast", name: "屋脊兽头" },
-  { id: "WindowLattice", name: "格子窗棂" },
-  { id: "DoorPier", name: "门墩石（抱鼓石）" },
 ];
 
 /**
