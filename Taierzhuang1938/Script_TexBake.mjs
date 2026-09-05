@@ -587,6 +587,11 @@ export const RECIPES = {
   ClothNra: (s) => BakeCloth(s ?? 256, { seed: 503, hue: [106, 112, 118] }),
   ClothIja: (s) => BakeCloth(s ?? 256, { seed: 521, hue: [124, 116, 82] }),
   Steel: (s) => BakeSteel(s ?? 256, { seed: 601 }),
+  // Only baked after a failed external download. ActorFactory needs this name in every scene.
+  DadaoPbr: (s) => BakeFlat(s ?? 256, { color: [146, 154, 162], rough: 0.34, metal: 0.95 }),
+  CarriageBenchWood: (s) => BakeWood(s ?? 256, { seed: 647, hue: [98, 72, 48], planks: 4, weathered: 0.45 }),
+  CarriageFloorSteel: (s) => BakeSteel(s ?? 256, { seed: 653, base: [56, 59, 62], polish: 0.15, rust: 0.12 }),
+  CarriageCeilingSteel: (s) => BakeSteel(s ?? 256, { seed: 659, base: [104, 109, 108], polish: 0.2, rust: 0.08 }),
   // 卢沟桥武器的外部原贴图若 404，按材质类别退回可用的程序化 PBR；正常路径
   // 会在 Main 启动阶段整套覆盖，因此不会把这些兜底纹理显示到玩家面前。
   LugouqiaoUnidentifiedMunition: (s) => BakeSteel(s ?? 256, { seed: 632 }),

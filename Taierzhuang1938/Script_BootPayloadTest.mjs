@@ -9,13 +9,15 @@
 // 顺手还逮出一套白下的：`CarriageWallSteel` 在过场数据里一次都没被 mat 引用
 //（端墙渲成纯黑之后早就改走别的配方），却仍旧每次开机下 6.5 MB。
 //
-// 这条测试做四件事，全部离线：
+// 这条测试做五件事，全部离线：
 //   1. `PBR_SETS` 里每个 URL 在 Texture/ 下真的存在（拼错的话浏览器测试要跑完
 //      整个开机才看得见一条 warn，这里一秒就红）；
 //   2. 总字节不超过 BUDGET_BYTES；
 //   3. 单张不超过 SINGLE_LIMIT_BYTES —— 总量还没爆但混进一张巨图时先出声。
 //   4. 首屏预载的 Type 24 手榴弹 GLB 存在且仍在单件预算内；它不是 PBR_SETS
 //      的贴图，所以必须在这里单独守住，避免构建时误把 14 MB 原始包直接上线。
+//
+//   5. 每套外部 PBR 都有同名补烘配方，下载失败后仍能完成共享场景初始化。
 //
 // **红了不要直接抬预算。** 先问这张图凭什么这么大：是不是没走 512px WebP 那条线
 //（`_import/BuildWeaponPbr.py` / `_import/Script_BakeCarriagePbr.py`），
@@ -72,7 +74,12 @@ Check(sets.length > 0 && shapeBad.length === 0,
   `${sets.length} 套 / ${urls.length} 张` + (shapeBad.length
     ? `　形状不对：${shapeBad.map((s) => `${s.name}(${s.images.length})`).join("、")}` : ""));
 
-// fallback 拼错的话，那一套在开机时抛「材质未烘焙」被 catch 掉，静静退回程序化 —— 只剩一条 warn。
+// Every external set is passed to PrepareSteps([set.name]) after a failed download.
+// Missing recipes used to be silently skipped, leaving ActorFactory.Get to crash every scene.
+const missingRecipes = sets.filter((set) => typeof RECIPES[set.name] !== "function");
+Check(missingRecipes.length === 0, "每套外部 PBR 都有同名补烘配方", missingRecipes.map(set => set.name).join("、"));
+
+// Optional fallback sources must also point to an existing recipe.
 const badFallback = sets.filter((s) => s.fallback && !RECIPES[s.fallback]);
 Check(badFallback.length === 0, "fallback 指向的都是真配方",
   badFallback.map((s) => `${s.name} → ${s.fallback}`).join("、"));

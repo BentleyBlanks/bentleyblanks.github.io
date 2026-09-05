@@ -21,7 +21,13 @@ await fs.mkdir(outputDir, {recursive:true});
 try {
   for (const fixture of [{name:'Whitebox',query:'whitebox=p012'}, {name:'MainMenu',query:''}]) {
     const page = await browser.newPage({viewport:{width:1280,height:800}});
-    const errors = [], modules = new Set();
+    const errors = [], modules = new Set(), failedSets = [];
+    page.on('console', message => { const match = message.text().match(/外部 PBR「(\w+)」/); if (match) failedSets.push(match[1]); });
+    if (fixture.name === 'Whitebox') {
+      // The reported DadaoPbr crash needs a real image timeout; carriage failures must be safe too.
+      await page.route('**/Texture_DadaoBase.webp*', () => {});
+      await page.route(/Texture_Carriage(?:BenchWood|FloorSteel|CeilingSteel)Base\.webp/, route => route.fulfill({status:404,body:'missing test texture'}));
+    }
     page.on('pageerror', error => errors.push(String(error)));
     page.on('request', request => { if (/\.m?js(?:\?|$)/.test(request.url())) modules.add(new URL(request.url()).pathname); });
     await page.route('**/Taierzhuang1938/?*', route => route.fulfill({contentType:'text/html',body:result.html}));
@@ -36,8 +42,12 @@ try {
         assert.equal(await page.locator('#bootRetry').count(), 1, 'slow downloads offer an optional retry without reporting failure');
       } finally { releaseBundle(); }
     }
-    await page.waitForFunction(() => window.Tengxian?.state?.ready, null, {timeout:180000});
+    await page.waitForFunction(() => window.Tengxian?.state?.ready || document.getElementById('bootStep')?.textContent.startsWith('启动失败：'), null, {timeout:180000});
+    assert.equal(await page.evaluate(() => window.Tengxian?.state?.ready), true, await page.locator('#bootStep').textContent());
     if (fixture.name === 'Whitebox') {
+      const expectedFallbacks = ['DadaoPbr','CarriageBenchWood','CarriageFloorSteel','CarriageCeilingSteel'];
+      assert.deepEqual(failedSets.sort(), [...expectedFallbacks].sort(), 'only the four interrupted texture sets use fallback materials');
+      assert.ok(await page.evaluate(names => names.every(name => { const material=window.Tengxian.library.Get(name); return material.map && material.normalMap && material.roughnessMap; }), expectedFallbacks), 'each fallback supplies a usable complete PBR material');
       assert.equal(await page.locator('#bootRetry').count(), 0, 'normal boot clears the slow-download notice');
       assert.ok(await page.locator('#bootStart').isEnabled());
       await page.locator('#bootStart').click();
