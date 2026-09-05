@@ -25,7 +25,7 @@ page.on("console", (message) => {
 await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//,
   (route) => route.abort("blockedbyclient"));
 
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&melee=1&quality=medium&scale=small`,
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&manual=1&melee=1&quality=medium&scale=small`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
 
@@ -58,6 +58,9 @@ await page.evaluate(() => {
 async function Swing(sprinting) {
   return page.evaluate((on) => {
     const T = window.Taierzhuang;
+    // 两次比较同一侧斩击；新版连续轻击会交替左右，不能拿两支不同动作比振幅。
+    T.Debug.MeleeCombat.Select("DadaoOne");
+    for (const soldier of [...T.ai.soldiers]) T.ai.Remove(soldier);
     T.Debug.Key("ShiftLeft", !!on);
     T.Debug.Key("KeyW", !!on);
     T.StepFrames(90);              // 冲刺弹簧与体力都到稳态

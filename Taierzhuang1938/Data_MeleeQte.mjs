@@ -1,11 +1,11 @@
-// 白刃实验场入口数据。旧六题与处决工位已移除；只装配一个独立战斗项目。
+// 白刃实验场入口数据：六组实体遭遇与独立动作／战斗专项。
 export const MELEE_QTE_LEVEL_ID = "MeleeQte";
 export const MELEE_QTE_PHASE = Object.freeze({
   id: MELEE_QTE_LEVEL_ID, sandbox: true, sandboxKey: "melee", sandboxGlyph: "刃",
   date: "机制实验场", label: "白刃战 · 大刀与刺刀", place: "独立战斗测试", sky: "testSceneDay", ambience: "overcast", music: null, minutes: 600,
   brief: ["左键轻点攻击，长按松开重击；右键瞬时拨挡；贴身 F 推架。", "僵持与倒地压制时连续按 F。成功后自行移动和攻击。"],
   story: MELEE_QTE_LEVEL_ID, cutsceneIn: null, cutsceneOut: null,
-  objectives: ["在右侧选择独立战斗项目", "看动作、拨挡、争夺距离，再自由攻击"],
+  objectives: ["前排 F 开始，后排靠近开始", "各排从左到右分别为一／二／三名对手"],
   mechanic: "自由白刃战：大刀一对一／二／三、刺刀对刺刀、F推架、站立与倒地抵抗。",
   nraPool: 9999, poolGain: 0, ijaPool: 9999, ijaPressure: 0, ijaSpawn: [], ijaSupport: [],
   ijaForce: { lmgEvery: 13, hmgTeams: 0, engineers: false, armor: 0, motorTransport: "rearOnly" },
@@ -14,6 +14,6 @@ export const MELEE_QTE_PHASE = Object.freeze({
   // 飞机永远画不进画面，却每帧更新 200 多个节点，白刃场不要它。
   ambientAircraft: false,
   zones: [{ id: "MeleeArena", name: "白刃实验场", x: 1400, z: 1460, radius: 18 }],
-  spawn: { x: 1400, z: 1468, ry: 0 },
-  loadoutOverride: { primary: "HanYang", secondary: null, melee: "Dadao", throwables: { Grenade: 0 }, spareClips: 6, note: "1 刺刀 / 3 大刀；X 卸刀恢复射击" },
+  spawn: { x: 1400, z: 1476, ry: 0 },
+  loadoutOverride: { primary: "HanYang", secondary: null, melee: "Dadao", throwables: { Grenade: 0 }, spareClips: 6, note: "1 步枪 / 3 大刀；V 射击／白刃架势，X 装卸刺刀" },
 });

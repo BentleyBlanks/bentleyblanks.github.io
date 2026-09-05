@@ -50,7 +50,7 @@ for role,offset in [('Nra',-1),('Ija',1)]:
     bay,bayDoc=ImportWeapon('BayonetHanYang' if role=='Nra' else 'BayonetType38','Model_'+role+'BayonetBlade')
     muzzle=next(n['t'] for n in doc['nodes'] if n['name']=='muzzle')
     socket=next((n['t'] for n in bayDoc['nodes'] if n['name']=='socket'),[0,0,0]);bay.parent=obj;bay.location=Vector(muzzle)-Vector(socket)
-  for actionId in ['Guard','Advance','Retreat','Light','LightAlt','Charge','Heavy','Parry','Deflected','Push','Pushed','Hit','Bind','BindWin','BindLose','Fall','Ground','GroundWin','GroundLose','Pressure','Rise']:
+  for actionId in ['Guard','Advance','Retreat','Light','LightAlt','Charge','Heavy','Parry','Deflected','Push','Pushed','Hit','Bind','BindWin','BindLose','Fall','Ground','GroundWin','GroundLose','Pressure','Rise','ParryLeft','ParryRight','Compact','CompactAlt','Obstructed','WeaponClash']:
    name=weapon+actionId;arm.animation_data.action=bpy.data.actions['Animation_'+role+name]
    action=bpy.data.actions.get('Animation_'+role+'Weapon'+name)
    if action:bpy.data.actions.remove(action)

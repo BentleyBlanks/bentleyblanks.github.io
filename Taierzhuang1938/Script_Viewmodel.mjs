@@ -2334,7 +2334,9 @@ export class Viewmodel {
     // 只加在腰射上：开镜姿态是解出来让照门落在屏幕正中的，动一个数就歪。
     // 出招那一下压平（见 BAYONET_CARRY_STRIKE）：斜端着的枪要先摆正才谈得上
     // "照着准心捅出去"。蓄力段不压 —— 那一段本来就是把枪往后拉的预备姿态。
-    const striking = !!(this.action && this.action.kind === "melee");
+    // The shared melee director owns complete weapon poses, including the ready stance.
+    // Keep its calibrated base level; legacy full carry would cant every authored thrust.
+    const striking = !!input.meleeCombat || !!(this.action && this.action.kind === "melee");
     // 装/卸刺刀那 0.95 s 里不走这条：那段动画自己就在转枪（ry 0.34），
     // 再叠一份 0.575 等于把枪甩出画面左上角。那段由动画自己给权重（carryOverride），
     // 末段与抬枪交接，读起来正好是"扣上刀之后把枪端稳"。
@@ -2943,6 +2945,7 @@ export class Viewmodel {
     this.actionPivot.position.set(frame[0], frame[1], frame[2]);
     this.actionPivot.rotation.set(frame[3], frame[4], frame[5], "YXZ");
     this.swingPivot.rotation.set(frame[6] || 0, frame[7] || 0, frame[8] || 0, "YXZ");
+    this.actionPivot.rotation.y += THREE.MathUtils.clamp(pose.weaponYawOffset || 0,-1.1,1.1);
     if (pose.state === "qte") {
       const struggle = 1 - pose.progress;
       this.actionPivot.position.z += struggle * 0.12;

@@ -56,7 +56,11 @@ def Joint(start,end,upper,lower,pole):
  bend.normalize()
  return start+axis*along+bend*math.sqrt(max(0,upper*upper-along*along)), start+axis*d
 
+def Canonical(action):
+ return {'ParryLeft':'Parry','ParryRight':'Parry','Compact':'Light','CompactAlt':'LightAlt','Obstructed':'Deflected','WeaponClash':'Parry'}.get(action,action)
+
 def Controls(weapon,action,t):
+ variant=action;action=Canonical(action)
  bayonet=weapon=='Bayonet'
  # Timeline attack active intervals agree with Data_MeleeCombat's normalized action time.
  impact=(.21/.69 if bayonet else .17/.65)
@@ -71,24 +75,33 @@ def Controls(weapon,action,t):
   v=Smooth(t);k.update(handY=.10*v,handZ=(.08 if bayonet else .35)*v,twist=-.18*v,lean=-.03*v)
  if action in ['Light','LightAlt','Heavy']:
   side=-1 if action=='LightAlt' else 1
-  if bayonet:k.update(handY=.09*wind-(.22 if action=='Heavy' else .16)*strike,handZ=.03*strike,lean=.08+.13*strike,step=.08*strike,twist=-.09*wind+.08*strike)
+  if bayonet:k.update(handY=.12*wind-(.42 if action=='Heavy' else .29)*strike,handZ=.025*strike,lean=.08+(.26 if action=='Heavy' else .19)*strike,hipY=-.07*strike,step=-(.26 if action=='Heavy' else .18)*strike,twist=-.13*wind+.13*strike)
   else:k.update(handX=side*(.12*wind+.42*strike),handY=.08*wind-.12*strike,handZ=(.34 if action=='Heavy' else .13)*wind-(.26 if action=='Heavy' else .10)*strike,twist=side*(-.20*wind+.48*strike),lean=.08+.13*strike)
  if action=='Parry':
   v=Envelope(t,0,.18,1);k.update(handX=.24*v,handY=-.07*v,handZ=.18*v,twist=.16*v,guard=v)
  if action in ['Deflected','Hit','Pushed','BindLose']:
   v=1-Smooth(t);k.update(handX=-.27*v,handY=.12*v,handZ=-.10*v,twist=-.32*v,lean=-.18*v,drop=.07+.08*v)
  if action in ['Push','BindWin','GroundWin']:
-  v=Envelope(t,0,.30,1);k.update(handX=.02*v,handY=-.23*v,handZ=.12*v,lean=.08+.20*v,guard=.7*v)
+  v=Envelope(t,0,.30,1);k.update(handX=(.04 if bayonet else .27)*v,handY=(-.23 if bayonet else -.10)*v,handZ=.12*v,lean=.08+.20*v,twist=(.04 if bayonet else .25)*v,guard=.7*v)
  if action in ['Bind','Ground','GroundLose','Pressure']:
   v=.7+.03*math.sin(8*math.pi*t);k.update(handX=.06*v,handY=-.13*v,handZ=.20*v,lean=.15,guard=v,shake=.008*math.sin(10*math.pi*t))
+ if action=='Bind':
+  # Runtime samples t from enemy pressure: retreating shoulders to committed forward bracing.
+  k.update(lean=.04+.25*t,hipY=-.07*t,drop=.045+.045*t,handY=-.02-.12*t,handZ=.25-.14*t)
  if action=='Pressure': k.update(drop=.08,lean=.35,handZ=-.38,handY=-.25)
  if action in ['Fall','Ground','GroundWin','GroundLose','Rise']:
   fall=Smooth(t) if action=='Fall' else 1-Smooth(t) if action=='Rise' else 1
   k.update(fall=fall,drop=.045+.64*fall,hipY=.32*fall,lean=.08-1.40*fall)
+ if variant=='ParryLeft':k['handX']*=-1;k['twist']*=-1
+ if variant in ['Compact','CompactAlt']:
+  k['handX']*=.65;k['handZ']*=.55;k['twist']*=.8;k['lean']+=.06*strike
+ if variant=='Obstructed':k['handZ']+=.12*(1-Smooth(t));k['guard']=.4*(1-Smooth(t))
+ if variant=='WeaponClash':k['handY']+=.05*math.sin(12*math.pi*t)*(1-t);k['guard']=.75*(1-Smooth(t))
  return k
 
 def Pose(weapon,action,t):
  k=Controls(weapon,action,t)
+ action=Canonical(action)
  pelvis=head['Pelvis']+Vector((.012*math.sin(2*math.pi*t) if action in ['Advance','Retreat'] else 0,k['hipY'],-k['drop']))
  pelvisR=Rotation('X',k['lean']*.35)@Rotation('Z',k['twist']*.45)
  Put('Pelvis',pelvis,pelvisR)
@@ -113,6 +126,7 @@ def Pose(weapon,action,t):
    hand=Vector((-.10,.03-.04*t,1.65-.10*t)) if side=='R' else Vector((-.08,-.32-.04*t,.99-.08*t))
   if weapon=='Bayonet' and action in ['Bind','BindWin','BindLose']:
    hand=Vector((-.25,-.38,1.36)) if side=='R' else Vector((.16,-.40,1.35))
+   if action=='Bind':hand+=Vector((0,.06-.12*t,.05-.10*t))
   # A lowered pelvis and supine torso carry arms into the player's overhead struggle.
   if k['fall']>0:hand=pelvis+Rotation('X',-1.2*k['fall']).to_3x3()@(hand-head['Pelvis'])
   # Canonical IJA limbs are shorter: preserve native proportions and height.
@@ -127,7 +141,7 @@ def Pose(weapon,action,t):
   hip=pelvis+pelvisR.to_3x3()@(head[side+' Thigh']-head['Pelvis'])
   foot=head[side+' Foot'].copy();foot.x=sign*.18
   foot.y=(-.17 if side=='L' else .18)+k['step']*(1 if side=='L' else -1)
-  foot.z+=max(0,k['step']*(1 if side=='L' else -1))*.32
+  foot.z+=max(0,k['step']*(-1 if side=='L' else 1))*.32
   if k['fall']>0:foot.y=-.40;foot.z+=.04*k['fall']
   upper=(head[side+' Calf']-head[side+' Thigh']).length;lower=(head[side+' Foot']-head[side+' Calf']).length
   knee,foot=Joint(hip,foot,upper,lower,Vector((0,-1,.1)))
@@ -141,7 +155,7 @@ def Pose(weapon,action,t):
 
 def Fp(weapon,action,t):
  # Nine keyed channels: camera carrier translation/rotation + weapon rotation about its grip.
- bayonet=weapon=='Bayonet';k=Controls(weapon,action,t)
+ variant=action;bayonet=weapon=='Bayonet';k=Controls(weapon,action,t);action=Canonical(action)
  impact=(.35/1.43 if bayonet else .32/1.36) if action=='Heavy' else (.21/.69 if bayonet else .17/.65)
  strike=Envelope(t,impact-.12,impact+.07,.92)
  wind=(1-Segment(t,0,.30)) if action=='Heavy' else Envelope(t,0,.16,.44)
@@ -154,7 +168,7 @@ def Fp(weapon,action,t):
    side=-1 if action=='LightAlt' else 1
    p=[.035*wind-.12*strike,.045*wind-.12*strike,.035*wind-.14*strike]
    r=[0.,0.,-.18*strike*side]
-   s=[-.75*wind+(1.14 if action=='Heavy' else 1.20 if action=='LightAlt' else 1.35)*strike,-.15*wind-.26*strike,.10*wind+.26*strike*side]
+   s=[-.75*wind+(1.14 if action=='Heavy' else 1.20 if action=='LightAlt' else 1.35)*strike,side*(.22*wind-.38*strike),side*(.10*wind+.38*strike)]
  if action=='Charge':
   u=Smooth(t);p=[-.025*u,.02*u,.06*u] if bayonet else [.035*u,.045*u,.035*u]
   r=[.08*u,.06*u,-.05*u] if bayonet else [0.,0.,0.]
@@ -170,7 +184,7 @@ def Fp(weapon,action,t):
   if not bayonet and action in ['Ground','GroundLose','Pressure']:
    p=[-.25,-.25,-.08];r=[0.,0.,1.05];s=[.25,0.,0.]
  if action in ['Push','BindWin','GroundWin']:
-  u=Envelope(t,0,.3,1);p=[-.09*u,.035*u,-.25*u]
+  u=Envelope(t,0,.3,1);p=[(-.09 if bayonet else -.19)*u,.035*u,(-.25 if bayonet else -.10)*u]
   if bayonet:r=[0.,.2*u,.95*u]
   else:s=[.25*u,.18*u,-1.0*u]
  if action in ['Pushed','Hit','Deflected','BindLose']:
@@ -182,11 +196,21 @@ def Fp(weapon,action,t):
   u=1-Smooth(t);p=[-.015*u,-.012*u,.005*u];s=[.18*u,.05*u,.16*u]
  # Melee ready position accommodates the production anatomical wrist/palm frame.
  # Keep both grips readable; this carrier applies only while a bayonet is fixed.
+ if variant=='ParryLeft':
+  p[0]*=-.6;r[1]*=-1
+  if not bayonet:s[1]*=-1;s[2]*=-.8
+ if variant in ['Compact','CompactAlt']:
+  p=[v*.7 for v in p];s=[v*.7 for v in s]
+ if variant=='LightAlt' and not bayonet:
+  s=[v*.78 for v in s]
+ if variant=='WeaponClash':
+  u=1-Smooth(t);p=[-.08*u,.035*u,.04*u];r=[.04*u,.15*u,.5*u] if bayonet else [0.,0.,0.];s=[.2*u,.15*u,-.7*u] if not bayonet else [0.,0.,0.]
+ if variant=='Obstructed':p[2]+=.06*(1-Smooth(t));s[0]+=.2*(1-Smooth(t))
  if bayonet:p[1]+=.055;p[2]-=.12
  return [round(v,6) for v in p+r+s]
 
 
-actions=['Guard','Advance','Retreat','Light','LightAlt','Charge','Heavy','Parry','Deflected','Push','Pushed','Hit','Bind','BindWin','BindLose','Fall','Ground','GroundWin','GroundLose','Pressure','Rise']
+actions=['Guard','Advance','Retreat','Light','LightAlt','Charge','Heavy','Parry','Deflected','Push','Pushed','Hit','Bind','BindWin','BindLose','Fall','Ground','GroundWin','GroundLose','Pressure','Rise','ParryLeft','ParryRight','Compact','CompactAlt','Obstructed','WeaponClash']
 for weapon in ['Dadao','Bayonet']:
  for actionId in globals().get('MELEE_ACTIONS',actions):
   name=weapon+actionId

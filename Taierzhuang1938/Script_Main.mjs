@@ -78,7 +78,7 @@ import { CombatSystem } from "./Script_Combat.mjs";
 import { LoadGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { InputRouter } from "./Script_Input.mjs";
 import { MeleeCombatDirector } from "./Script_MeleeCombat.mjs";
-import { MELEE_SCENARIOS } from "./Data_MeleeCombat.mjs";
+import { MELEE_SCENARIOS, MELEE_ENCOUNTERS } from "./Data_MeleeCombat.mjs";
 import { MeleeLab } from "./Script_MeleeLab.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
@@ -573,10 +573,13 @@ let player = null;
 let ai = null;
 let meleeCombat = null;
 let meleeLab = null;
-let meleeScenario = "DadaoOne";
+let meleeScenario = "EncounterField";
+let meleeEncounter = null;
+const meleeCompleted = new Set();
 let meleePaused = false;
 let meleePreview = null;
 let meleePreviewFrame = null;
+let meleeStance = false;
 let vfx = null;
 let viewmodel = null;
 let firstPersonSelfShadow = null;
@@ -1083,8 +1086,9 @@ async function Boot() {
     Weapon: (entity) => {
       const isPlayer = entity === player;
       const weapon = isPlayer ? WEAPONS[currentWeapon] : entity.weapon;
-      return weapon?.kind === "melee" ? "Dadao" : weapon?.bayonet && (isPlayer ? state.bayonetFixed : entity.bayonetFixed) ? "Bayonet" : null;
+      return weapon?.kind === "melee" ? "Dadao" : weapon?.bayonet && (isPlayer ? state.bayonetFixed && meleeStance : entity.bayonetFixed) ? "Bayonet" : null;
     },
+    MoveIntent: () => ({strafe:input.strafe,forward:input.forward}),
     CanUse: () => !carry?.Active && !emplacement?.Mounted && !state.cooking && !p012Runtime?.binocularOwned && !player?.Busy && !viewmodel?.IsBusy?.(),
     LineClear: (a, b) => {
       const from = new THREE.Vector3(a.position.x, a.position.y + 1.1, a.position.z);
@@ -1092,6 +1096,15 @@ async function Boot() {
       const delta = to.sub(from), distance = delta.length(); delta.normalize();
       const hit = battlefield.Raycast(from, delta, distance);
       return !hit || hit.t >= distance - 0.12;
+    },
+    SweepEnvironment: (_actor,start,end,previous) => {
+      for(const a of [start,previous]) {
+        const from=new THREE.Vector3(a.x,a.y,a.z),to=new THREE.Vector3(end.x,end.y,end.z);
+        const delta=to.sub(from),distance=delta.length();if(distance<.001)continue;
+        const hit=battlefield.Raycast(from,delta.normalize(),distance);
+        if(hit && hit.t<distance) return {x:from.x+delta.x*hit.t,y:from.y+delta.y*hit.t,z:from.z+delta.z*hit.t};
+      }
+      return null;
     },
     Move: (entity, dx, dz) => {
       if (entity === player) {
@@ -1114,7 +1127,7 @@ async function Boot() {
         if (event.progress < .3) audio.Play("hurt", {volume:.2, pitch:.85});
         return;
       }
-      const sound = ["light", "heavy"].includes(event.kind) ? "dadaoSwing" : ["hit", "parry"].includes(event.kind) ? "bayonetHit" : event.kind === "push" ? "bodyFall" : null;
+      const sound = ["light", "heavy"].includes(event.kind) ? "dadaoSwing" : ["parry","weaponBeat","weaponClash","bodyObstruction","tooClose"].includes(event.kind) ? "bayonetHit" : event.kind === "hit" ? "dadaoHit" : ["push","environment"].includes(event.kind) ? "bodyFall" : null;
       if (sound) audio.Play(sound, { position: (target || actor)?.position?.clone?.(), volume: 0.65 });
     },
   }, { assist: params.get("qteAssist") || "tap" });
@@ -2609,7 +2622,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   ClearExternalProps();
   if(phase.whitebox?.p012)ClearTrimProps(scene);
   if (battlefield) { battlefield.deformation?.Dispose(); battlefield.Dispose(); battlefield = null; }
-  levelBounds = MakeLevelBounds(phase.bounds, phase.whitebox?.p012 ? 1 : 10);
+  levelBounds = MakeLevelBounds(phase.bounds, phase.whitebox?.p012 || phase.id === MELEE_QTE_LEVEL_ID ? 1 : 10);
   const World = WorldClassFor(phase);
   battlefield = new World(scene, library, {
     quality: QUALITY,
@@ -3946,10 +3959,14 @@ const meleeTargets = [];
 function StartMeleeScenario(id) {
   const spec = MELEE_SCENARIOS.find(s => s.id === id) || MELEE_SCENARIOS[0];
   meleeScenario = spec.id; meleePaused = false; meleePreview = null;
+  post.hasPrev=false;post.hasTaaHistory=false;
+  for(const sign of battlefield.meleeLabels||[])sign.visible=spec.kind==='field';
+  meleeEncounter=null;meleeCompleted.clear();
   meleeCombat.Reset();
   for (const soldier of [...ai.soldiers]) ai.Remove(soldier);
   meleeTargets.length = 0;
   player.Spawn(1400, spec.kind === "observe" ? 1470 : 1467, 0);
+  if(spec.kind==='field')player.Spawn(1400,1476,0);
   player.spawnGrace = 0; player.debug.invincible = false; player.debug.noCollision = false;
   state.slots.primary = "HanYang"; state.slots.melee = "Dadao";
   viewmodel.action = null; state.meleeCharge = null;
@@ -3958,7 +3975,7 @@ function StartMeleeScenario(id) {
   state.ammo = state.mags[state.activeSlot]?.ammo || 0;
   state.clips = state.mags[state.activeSlot]?.clips || 0;
   viewmodel.Equip(currentWeapon, SlotWeaponVariant(state.activeSlot));
-  state.bayonetFixed = true; SyncBayonet();
+  state.bayonetFixed = true; meleeStance=true; SyncBayonet();
   hud.SetWeaponName(WEAPONS[currentWeapon]?.name || "");
   const centerZ = spec.kind === "observe" ? 1463 : 1467;
   const close = ["push", "ground", "bind"].includes(spec.kind);
@@ -3975,6 +3992,15 @@ function StartMeleeScenario(id) {
     soldier.holdZone = null; soldier.goal.copy(soldier.position);
     meleeTargets.push({ soldier, id: ally ? `Friend${i}` : `Enemy${i + 1}` });
   }
+  if(spec.kind==='field') for(const encounter of MELEE_ENCOUNTERS) {
+    for(let i=0;i<encounter.enemies;i++) {
+      const soldier=ai.Spawn('ija',encounter.x+(i-(encounter.enemies-1)/2)*1.2,encounter.z,{weapon:'Type38',squadId:`Melee_${encounter.id}`});
+      if(!soldier)continue;
+      soldier.dummy=true;soldier.bayonetFixed=true;soldier.yaw=Math.PI;soldier.meleeDormant=true;
+      soldier.meleeTraining={kind:'duel',slot:i,passive:true};soldier.holdZone=null;soldier.goal.copy(soldier.position);
+      meleeTargets.push({soldier,id:`${encounter.id}_${i+1}`,encounterId:encounter.id});
+    }
+  }
   if (spec.kind === "ground") meleeCombat.Fighter(player).poise = 20;
   state.deathTimer = 0; state.pendingRespawn = false; state.playerAliveLast = true;
   player.meleeCameraDrop = 0; player.meleePose = null;
@@ -3984,17 +4010,39 @@ function StartMeleeScenario(id) {
 function MeleePreviewPose(entity, pose) {
   const normalized = meleePreviewFrame ?? (state.elapsed % 2) / 2;
   return {...pose, clip: `${meleeCombat.Weapon(entity)}${meleePreview}`, action: meleePreview,
-    state: "preview", t: normalized, normalized, duration: 1};
+    state: "preview", t: normalized, normalized, animationNormalized:null,transition:null,duration: 1};
 }
 function SeedMeleeTargets() {
-  StartMeleeScenario(meleeScenario); meleePaused = true;
+  StartMeleeScenario(meleeScenario); meleePaused = meleeScenario!=='EncounterField';
   for (const entry of meleeTargets) entry.soldier.meleeTraining.passive = true;
 }
-function MaintainMeleeTargets() { /* End state is stable until explicit restart. */ }
+function NearbyMeleeEncounter() {
+  if(meleeScenario!=='EncounterField' || meleeEncounter || !player.Alive)return null;
+  return MELEE_ENCOUNTERS.find(s=>!meleeCompleted.has(s.id) && Math.hypot(player.position.x-s.x,player.position.z-(s.z+3.2))<1.5) || null;
+}
+function TriggerMeleeEncounter(spec) {
+  if(!spec || meleeEncounter || meleeCompleted.has(spec.id))return false;
+  meleeEncounter=spec.id;meleePaused=false;
+  for(const e of meleeTargets.filter(e=>e.encounterId===spec.id)) {
+    e.soldier.meleeDormant=false;e.soldier.meleeTraining.passive=false;
+    const f=meleeCombat.Fighter(e.soldier);f.nextThink=meleeCombat.time+.65+e.soldier.meleeTraining.slot*.22;
+  }
+  meleeCombat.Log('encounterStart',player,null,{encounter:spec.id});
+  hud.Hint(`${spec.name} · 自由移动、转向与攻击`,2.5);return true;
+}
+function MaintainMeleeTargets() {
+  if(meleeScenario!=='EncounterField')return;
+  if(meleeEncounter && !meleeTargets.some(e=>e.encounterId===meleeEncounter && e.soldier.alive)) {
+    meleeCompleted.add(meleeEncounter);meleeCombat.Log('encounterComplete',player,null,{encounter:meleeEncounter});meleeEncounter=null;
+    hud.Hint('交锋结束 · 可继续前往另一组',3);
+  }
+  const near=NearbyMeleeEncounter();if(near?.trigger==='auto')TriggerMeleeEncounter(near);
+}
 function MeleeSnapshot() {
   const core = meleeCombat.State();
   return { ...core, scenario: meleeScenario, menu: state.menu, health: player.health, alive: player.Alive,
-    weapon: meleeCombat.Weapon(player), preview: meleePreview, paused: meleePaused,
+    weapon: meleeCombat.Weapon(player), stance:meleeStance?'melee':'fire', preview: meleePreview, paused: meleePaused,
+    encounter:meleeEncounter,completed:[...meleeCompleted],nearby:NearbyMeleeEncounter()?.name||null,
     targets: meleeTargets.map(({ soldier: s, id }) => ({ id, runtimeId: s.id, side: s.side, health: s.health, alive: s.alive, x: s.position.x, z: s.position.z, distance: Math.hypot(s.position.x - player.position.x, s.position.z - player.position.z), pose: s.meleeCombat })),
     hud: hud.MeleeQteState(),
   };
@@ -5113,7 +5161,13 @@ const router = new InputRouter({
     return true;
   },
   // 白刃输入先于 KEYMAP；QTE 接管抵抗输入，避免 F 同时触发拾枪。
-  Capture: (_event, detail) => detail.code === "Blur" ? !!meleeCombat?.HandleInput("Blur", false) : state.ready && state.running && !state.menu && !state.cutscene && !(editor && editor.Capturing) && !!meleeCombat?.HandleInput(detail.code, detail.down, detail.repeat),
+  Capture: (_event, detail) => {
+    if(detail.code==='Blur')return !!meleeCombat?.HandleInput('Blur',false);
+    if(!state.ready || !state.running || state.menu || state.cutscene || editor?.Capturing)return false;
+    const encounter=MELEE_TEST && detail.code==='KeyF' && detail.down && !detail.repeat ? NearbyMeleeEncounter() : null;
+    if(encounter?.trigger==='interact')return TriggerMeleeEncounter(encounter);
+    return !!meleeCombat?.HandleInput(detail.code,detail.down,detail.repeat);
+  },
   OnAction: (action, detail) => {
     if (state.cutscene) return; // 过场只由 CutsceneDirector 接收 Look/Esc
     if (!state.ready) return;
@@ -5138,10 +5192,15 @@ const router = new InputRouter({
       case "reload":
         if (emplacement?.Mounted) { emplacement.PullBolt(); return; }
         Reload(); return;
-      // V 是 holdAction：按下开始蓄力，松手按蓄了多久决定挥砍还是劈刺。
-      // 大刀/投掷物在 BeginMeleeCharge 里直接落回一次性出招（它们不蓄力）。
       case "melee":
-        if (detail.down) BeginMeleeCharge("key"); else ReleaseMeleeCharge();
+        if (WEAPONS[currentWeapon]?.bayonet && state.bayonetFixed) {
+          if(detail.down && meleeCombat.CanChangeWeapon() && !viewmodel.IsBusy() && !player.Busy) {
+            meleeCombat.ReleasePlayer();meleeStance=!meleeStance;
+            input.fire=false;input.ads=false;hud.Hint(meleeStance?'白刃架势 · 左键攻击 / 右键拨枪 / F 顶架':'射击架势 · 左键射击 / 右键瞄准',2);
+          }
+        } else if (WEAPONS[currentWeapon]?.kind!=='melee') {
+          if(detail.down)BeginMeleeCharge('key');else ReleaseMeleeCharge();
+        }
         return;
       case "bayonet": ToggleBayonet(); return;
       case "bandage":
@@ -5442,7 +5501,10 @@ function UpdateContextualActionPrompts() {
     return;
   }
   if (MELEE_TEST) {
-    hud.SetActionPrompts(meleeCombat?.CanUse() && meleeCombat.PushCandidate() ? [{keys:"F",label:"近身推架",kind:"push"}] : []);
+    const near=NearbyMeleeEncounter();
+    const prompts=near?.trigger==='interact'?[{keys:'F',label:near.name,kind:'interact'}]:meleeCombat?.CanUse() && meleeCombat.PushCandidate() ? [{keys:"F",label:"近身推架",kind:"push"}] : [];
+    if(WEAPONS[currentWeapon]?.bayonet && state.bayonetFixed)prompts.push({keys:'V',label:meleeStance?'白刃架势 → 射击':'射击架势 → 白刃',kind:'melee'});
+    hud.SetActionPrompts(prompts);
     return;
   }
   // 架着机枪时提示条整段被机枪接管：这会儿能按的就只有扳机、R 和 F。
@@ -6275,6 +6337,7 @@ function Frame(dt, render = true) {
 
   profiler.B("input");
   if (meleeCombat) {
+    if(MELEE_TEST)MaintainMeleeTargets();
     meleeCombat.Update(realDt);
     if (MELEE_TEST && meleePreview) {
       const pose = meleeCombat.ViewPose();

@@ -57,12 +57,19 @@ try {
       active: window.Taierzhuang.Debug.Editor().active,
       title: document.querySelector(".edPanel.work .edTitle")?.textContent || "",
       listCount: document.querySelectorAll(".edPanel.work .edList .it").length,
+      supportedWeapons: window.Taierzhuang.editor.active.Snapshot().supportedWeapons,
     };
   });
   Check("独立第一人称持枪检查入口能打开",
     opened.opened && opened.active === "firstPerson" && opened.title.includes("第一人称持枪检查"),
     `active=${opened.active} / ${opened.title}`);
-  Check("装备表不是单枪特例", opened.listCount >= 12, `可检查 ${opened.listCount} 项`);
+  // C96、匕首及晚于战役的武器已从主干退役；核对实际装备集合，避免陈旧数量门槛。
+  const expectedWeapons = ["ZhongZheng", "HanYang", "Type38", "Zb26", "Type11",
+    "ServicePistol", "Grenade", "GrenadeBundle", "Dadao", "OfficerSwordSet"];
+  Check("装备表完整覆盖当前十种第一人称装备",
+    opened.listCount === expectedWeapons.length
+      && [...opened.supportedWeapons].sort().join(",") === [...expectedWeapons].sort().join(","),
+    `可检查 ${opened.listCount} 项：${opened.supportedWeapons.join(", ")}`);
 
   const reports = await page.evaluate(() => {
     const T = window.Taierzhuang;

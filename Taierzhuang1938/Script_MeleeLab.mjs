@@ -11,7 +11,7 @@ export class MeleeLab {
     this.root.innerHTML=`<div class="mlHeading"><b>白刃战实验场</b><span>大刀与刺刀</span></div>
       <label>独立战斗<select class="mlScenario" aria-label="独立战斗项目">${MELEE_SCENARIOS.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select></label>
       <div class="mlButtons"><button class="mlStart">开始／重开</button><button class="mlPause">暂停对手</button></div>
-      <p class="mlTip"></p><p class="mlControls">左键：轻击／蓄力重击<br>右键：瞬时拨挡 · F：贴身推架<br>僵持／倒地：连按 F · 1／3：切换武器<br><small>按住 Alt 操作面板 · 松开继续战斗</small></p>
+      <p class="mlTip"></p><p class="mlControls">左键：轻击／蓄力重击<br>右键：拨枪 · WASD：移动避刺<br>F：贴身压枪／顶架 · 抵抗时连按 F<br>1／3：步枪／大刀 · V：射击／白刃架势<br><small>按住 Alt 操作面板 · 松开继续战斗</small></p>
       <output class="mlStatus" aria-live="polite"></output><div class="mlMeters"></div><div class="mlTargets"></div>
       <details><summary>动作检查</summary><label>动作<select class="mlAnimation">${MELEE_ANIMATION_ACTIONS.map(a=>`<option>${a}</option>`).join('')}</select></label><div class="mlButtons"><button class="mlPreview">播放敌我动作</button><button class="mlResume">恢复战斗</button></div><label>动作进度<input class="mlTime" type="range" min="0" max="1" step="0.01" value="0" aria-label="动作逐帧进度"></label><p>播放时暂停对手；拖动进度条定格。开始／重开恢复战斗。</p></details>
       <label>QTE 输入<select class="mlAssist"><option value="tap">标准 · 连按 F</option><option value="hold">辅助 · 长按 F</option><option value="auto">辅助 · 自动抵抗</option></select></label>
@@ -45,9 +45,10 @@ export class MeleeLab {
     const Put=(sel,text)=>{const el=this.root.querySelector(sel);if(el.textContent!==text)el.textContent=text;};
     Put('.mlPause',snapshot.paused?'恢复对手':'暂停对手');
     const f=snapshot.player, living=snapshot.targets.filter(t=>t.alive&&t.side==='ija');
-    Put('.mlStatus',!snapshot.alive?'本轮阵亡 · 可重开':!living.length?'本轮完成 · 可重开':`${s?.name||''}　剩余 ${living.length}`);
-    Put('.mlMeters',`${snapshot.weapon==='Dadao'?'大刀':'刺刀'} · ${StateLabel[f?.phase]||f?.phase||'准备'}${f?.parryActive?'（窗口有效）':''}\n生命 ${Math.round(snapshot.health)} · 体力 ${Math.round(f?.stamina??100)} · 平衡 ${Math.round(f?.poise??100)}`);
-    Put('.mlTargets',snapshot.targets.map(t=>`${t.side==='nra'?'友军':'日军'} ${t.id} · ${t.alive?`${t.distance.toFixed(2)}m · ${Math.round(t.health)}生命 · ${StateLabel[t.pose?.phase]||'警戒'}${t.pose?.role?' · '+RoleLabel[t.pose.role]:''}`:'已倒下'}`).join('\n'));
+    Put('.mlStatus',!snapshot.alive?'本轮阵亡 · 可重开':s?.kind==='field'?`已完成 ${snapshot.completed?.length||0}／6 组 · ${snapshot.encounter?'正在交锋':snapshot.nearby||'走近场内标牌选择对手'}`:!living.length?'本轮完成 · 可重开':`${s?.name||''}　剩余 ${living.length}`);
+    Put('.mlMeters',`${snapshot.weapon==='Dadao'?'大刀':snapshot.stance==='melee'?'刺刀 · 白刃架势':'步枪 · 射击架势'} · ${StateLabel[f?.phase]||f?.phase||'准备'}${f?.parryActive?'（窗口有效）':''}\n生命 ${Math.round(snapshot.health)} · 体力 ${Math.round(f?.stamina??100)} · 平衡 ${Math.round(f?.poise??100)}`);
+    const shown=s?.kind==='field'?snapshot.targets.filter(t=>snapshot.encounter&&t.id.startsWith(snapshot.encounter+'_')):snapshot.targets;
+    Put('.mlTargets',shown.length?shown.map(t=>`${t.side==='nra'?'友军':'日军'} ${t.id} · ${t.alive?`${t.distance.toFixed(2)}m · ${Math.round(t.health)}生命 · ${StateLabel[t.pose?.phase]||'警戒'}${t.pose?.role?' · '+RoleLabel[t.pose.role]:''}`:'已倒下'}`).join('\n'):`${living.length} 名对手待命 · 可前往下一组`);
     Put('.mlLog',snapshot.events.slice(-5).reverse().map(e=>`${e.time.toFixed(1)} ${e.kind}${e.target!=null?' → '+e.target:''}`).join('\n'));
   }
   Dispose(){this.root.remove();document.body.classList.remove('meleeLabActive');}

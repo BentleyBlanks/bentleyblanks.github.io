@@ -7,10 +7,19 @@ const v=new THREE.Vector3(),vp=new THREE.Vector3(),vs=new THREE.Vector3(),inv=ne
 function Samples(data,pose) {
   const clip=data.clips[pose.clip]; if(!clip)return null;
   const looping=clip.loop && !['charge','qte'].includes(pose.state);
-  const time=pose.action==='Pressure' && pose.qteKind==='ground' ? 1-pose.progress : looping ? (pose.t%1+1)%1 : pose.state==='charge'?Math.min(1,pose.t/.38):pose.state==='qte'?(pose.qteResolve>0?pose.qteResolve:(pose.t%1+1)%1):pose.normalized;
+  const pressurePose=pose.state==='qte' && (pose.action==='Bind' || pose.action==='Pressure');
+  const time=pressurePose ? 1-pose.progress : looping ? (pose.t%1+1)%1 : pose.state==='charge'?Math.min(1,pose.t/.38):pose.state==='qte'?(pose.qteResolve>0?pose.qteResolve:(pose.t%1+1)%1):(pose.animationNormalized??pose.normalized);
   const frame=Math.max(0,Math.min(1,time||0))*data.frames;
   const index=Math.floor(frame),mix=frame-index;
-  return {a:clip.frames[index],b:clip.frames[Math.min(index+1,data.frames)],mix};
+  const result={a:clip.frames[index],b:clip.frames[Math.min(index+1,data.frames)],mix};
+  if(pose.transition && pose.transition.mix<1) {
+    const previous=Samples(data,pose.transition.from);
+    if(previous) {
+      const values=result.a.map((v,i)=>THREE.MathUtils.lerp(THREE.MathUtils.lerp(previous.a[i],previous.b[i],previous.mix),THREE.MathUtils.lerp(v,result.b[i],mix),pose.transition.mix));
+      return {a:values,b:values,mix:0};
+    }
+  }
+  return result;
 }
 export function SampleMeleeFirstPerson(pose) {
   if(!pose)return null;

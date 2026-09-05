@@ -40,18 +40,19 @@ const result = await page.evaluate(async () => {
     visible: !!T.viewmodel.rig?.parts?.bayonet?.visible,
     source: T.viewmodel.rigSource };
 
-  // --- 2) V 点按 = 短刺，不耗子弹 ------------------------------------
+  // --- 2) V 切白刃架势，左键点按 = 短刺，不耗子弹 ------------------------------------
+  T.Debug.Key("KeyV");T.StepFrames(2,1/60,false);
   const ammoBefore = T.state.ammo;
-  T.Debug.Key("KeyV", true);
+  T.Debug.Mouse(0, true);
   T.StepFrames(3);                         // 50 ms —— 远小于 0.30 s 的蓄力线
-  T.Debug.Key("KeyV", false);
+  T.Debug.Mouse(0, false);
   T.StepFrames(2);
   out.tapMode = T.meleeCombat.State().player?.action;
   out.tapKind = T.meleeCombat.State().player?.state;
   out.tapAmmoKept = T.state.ammo === ammoBefore;
   T.StepFrames(60,1/60,false);                        // 收招
 
-  // --- 3) V 按住 ≥ 0.38 s = 长刺，一刀放倒满血兵 --------------------
+  // --- 3) 左键按住 ≥ 0.38 s = 长刺，一刀放倒满血兵 --------------------
   // 页面没暴露全局 THREE：借一个现成 Vector3 的克隆当出参
   const dir = T.player.AimDirection(T.player.velocity.clone());
   const {WEAPONS}=await import('./Data_Weapons.mjs');
@@ -67,13 +68,13 @@ const result = await page.evaluate(async () => {
     T.player.pitch=0;T.player.aimYaw=0;T.player.aimPitch=0;
     return enemy;
   };
-  T.Debug.Key("KeyV", true);
+  T.Debug.Mouse(0, true);
   T.StepFrames(30,1/60,false);                        // 0.5 s > chargeMinS
   out.windKind = T.meleeCombat.State().player?.state;
   // 靶要在**松手前一刻**才埋：蓄力那 30 帧里 AI 与物理照跑，早埋的靶会被
   // 自己的刚体/寻路拽回原位（直调 Melee 验证过判定本身是对的）。
   const first = PlantTarget();
-  T.Debug.Key("KeyV", false);              // keyup 同步出招，中间不隔帧
+  T.Debug.Mouse(0, false);              // keyup 同步出招，中间不隔帧
   out.thrustMode = T.meleeCombat.State().player?.action;
   out.beforeContact = first.health; T.StepFrames(30,1/60,false);
   out.thrustKilled = !first.alive;
@@ -158,7 +159,7 @@ const checks = [
   ["初始未上刺刀且刀不可见", !result.fixedBefore.state && !result.fixedBefore.visible],
   ["X 上刺刀：状态翻转", result.fixedAfter.state === true],
   ["上刺刀后视图模型有刀件且常显", result.fixedAfter.hasPart && result.fixedAfter.visible],
-  ["V 点按是短刺", result.tapKind === "attack" && ["Light","LightAlt"].includes(result.tapMode)],
+  ["白刃架势左键点按是短刺", result.tapKind === "attack" && ["Light","LightAlt"].includes(result.tapMode)],
   ["短刺不耗子弹", result.tapAmmoKept === true],
   ["按住时进入蓄力", result.windKind === "charge"],
   ["按住 0.5 s 松手是长刺", result.thrustMode === "Heavy"],

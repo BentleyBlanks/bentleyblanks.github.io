@@ -13,7 +13,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
-import { FpsArmPose, FpsArmStateRotation, FPS_ARM_LIMITS } from "./Data_FpsArmPoses.mjs";
+import { FpsArmPose, FpsArmStateRotation, FPS_ARM_LIMITS, FPS_BAYONET_SUPPORT } from "./Data_FpsArmPoses.mjs";
 import { CaptureAnatomy, ApplyAnatomicalFingers, AimAnatomicalBone } from "./Script_FpsAnatomy.mjs";
 
 const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=4", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
@@ -369,6 +369,13 @@ export class FpsArmRig {
         this._e0.set(Sprint[0], Sprint[1], Sprint[2], "YXZ");
         this._q1.setFromEuler(this._e0);
         this.contactTargets[side].quaternion.copy(this._q0.slerp(this._q1, this.poseState.sprint));
+        this.contactTargets[side].position.fromArray(this.poseSpec.contacts[key].position);
+        if (melee && side === "l" && this.poseSpec.actions.bayonet) {
+          this.contactTargets[side].position.y = FPS_BAYONET_SUPPORT.heightM;
+          const r = FPS_BAYONET_SUPPORT.rotation;
+          this._e0.set(r[0], r[1], r[2], "YXZ");
+          this.contactTargets[side].quaternion.setFromEuler(this._e0);
+        }
         const reloadRotation = reload && this.poseSpec.actions?.reload?.contacts?.[key];
         if (reloadRotation) {
           this._e0.set(reloadRotation[0], reloadRotation[1], reloadRotation[2], "YXZ");

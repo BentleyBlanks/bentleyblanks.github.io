@@ -1,7 +1,7 @@
 """Run this Blender Text once to enable the Melee action library sidebar."""
 import bpy
 
-ACTIONS=['Guard','Advance','Retreat','Light','LightAlt','Charge','Heavy','Parry','Deflected','Push','Pushed','Hit','Bind','BindWin','BindLose','Fall','Ground','GroundWin','GroundLose','Pressure','Rise']
+ACTIONS=['Guard','Advance','Retreat','Light','LightAlt','Charge','Heavy','Parry','Deflected','Push','Pushed','Hit','Bind','BindWin','BindLose','Fall','Ground','GroundWin','GroundLose','Pressure','Rise','ParryLeft','ParryRight','Compact','CompactAlt','Obstructed','WeaponClash']
 
 def SelectMeleeAction(role='Nra',weapon='Dadao',action='Guard'):
  scene=bpy.data.scenes['Scene_FirstPersonMelee' if role=='FirstPerson' else 'Scene_MeleeCombat']

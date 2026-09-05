@@ -14,6 +14,12 @@ const BearingFrom = (a, b) => {
   const yaw = a.yaw || 0, dx = b.position.x - a.position.x, dz = b.position.z - a.position.z;
   return Math.atan2(-Math.cos(yaw) * dx + Math.sin(yaw) * dz, -Math.sin(yaw) * dx - Math.cos(yaw) * dz);
 };
+// Finite swept weapon segments; broad centre checks are only a culling stage.
+const PointSegment = (p, a, b) => {
+  const dx = b.x-a.x, dz = b.z-a.z, t = Clamp(((p.x-a.x)*dx+(p.z-a.z)*dz)/(dx*dx+dz*dz || 1),0,1);
+  return Math.hypot(p.x-a.x-dx*t,p.z-a.z-dz*t);
+};
+const Tip = (e, yaw, reach) => ({x:e.position.x-Math.sin(yaw)*reach,y:(e.position.y||0)+1.1,z:e.position.z-Math.cos(yaw)*reach});
 export class MeleeCombatDirector {
   constructor(host = {}, options = {}) {
     this.host = host; this.time = 0; this.fighters = new Map(); this.events = [];
@@ -35,7 +41,8 @@ export class MeleeCombatDirector {
       entity, state: "idle", t: 0, duration: 0, stamina: 100, poise: 100,
       weapon: this.Weapon(entity), actionSerial: 0, nextThink: this.time + 0.65,
       lastParry: -99, lastHit: -99, move: 0, target: null, pressureBy: null,
-      attack: null, hit: false, parryUsed: false,
+      attack: null, hit: false, parryUsed: false, buffer: null, qteCount: 0,
+      qteUntil: -99, beatUntil: -99, pushUntil: -99, interruptUntil: -99,
     });
     return this.fighters.get(entity);
   }
@@ -45,29 +52,44 @@ export class MeleeCombatDirector {
     this.host.Event?.(event, a, b);
   }
   SetState(f, state, duration = 0, clip = null) {
+    const previous=this.Pose(f);
+    if(previous) {delete previous.transition;f.previousPose=previous;f.transitionAt=this.time;}
     f.state = state; f.t = 0; f.duration = duration; f.clip = clip; f.actionSerial++; f.feint = false;
     if (state !== "attack") f.attack = null;
+    if (["qte", "stagger", "fall", "down", "rise", "contact"].includes(state)) f.buffer = null;
   }
   Idle(f) { return f && (f.state === "idle" || f.state === "charge"); }
   AttackDown(entity = this.Player()) {
     const f = this.Fighter(entity);
-    if (!Alive(entity) || !f?.weapon || f.state !== "idle" || this.Active && entity === this.Player()) return false;
+    if (!Alive(entity) || !f?.weapon || this.Active && entity === this.Player()) return false;
+    if (f.state !== "idle") {
+      if (["attack","parry","push"].includes(f.state) && f.duration-f.t <= R.inputBufferS) {
+        f.buffer = {expires:this.time+R.inputBufferS, released:false}; return true;
+      }
+      return false;
+    }
     this.SetState(f, "charge", R.chargeMaxS, "Charge"); return true;
   }
   AttackUp(entity = this.Player()) {
     const f = this.Fighter(entity);
+    if (f?.buffer) { f.buffer.released = true; return true; }
     if (f?.state !== "charge") return false;
-    return this.Attack(entity, f.t >= R.chargeMinS);
+    const held = f.t;
+    return this.Attack(entity, held >= R.chargeMinS, held);
   }
-  Attack(entity, heavy = false) {
+  Attack(entity, heavy = false, held = 0) {
     const f = this.Fighter(entity);
     if (!Alive(entity) || !this.Idle(f) || !W[f.weapon]) return false;
-    const spec = W[f.weapon][heavy ? "heavy" : "light"];
+    const base = W[f.weapon][heavy ? "heavy" : "light"];
+    const spec = { ...base, windup: entity === this.Player() ? base.windup : Math.max(base.windup,R.npcTellS) };
     if (f.stamina < spec.cost) { this.SetState(f, "idle"); this.Log("exhausted", entity); return false; }
     f.stamina -= spec.cost;
     const alternate = !heavy && ((f.swingIndex = (f.swingIndex || 0) + 1) % 2 === 0);
     this.SetState(f, "attack", spec.windup + spec.active + spec.recovery, heavy ? "Heavy" : alternate ? "LightAlt" : "Light");
-    f.attack = { ...spec, heavy, yaw: entity.yaw || 0, connected: false, lungeDone: 0 };
+    if (f.weapon === "Dadao" && !heavy && this.Closest(entity,1.1,.55)) f.clip = alternate ? "CompactAlt" : "Compact";
+    f.t = Math.min(held, Math.max(0,spec.windup-.045));
+    f.buffer = null;
+    f.attack = { ...spec, baseWindup:base.windup, baseDuration:base.windup+base.active+base.recovery, heavy, yaw: entity.yaw || 0, connected: false, lungeDone: 0, previousTip:null, locked:false };
     f.hit = false; this.stats.attacks++; this.Log(heavy ? "heavy" : "light", entity);
     return true;
   }
@@ -82,15 +104,43 @@ export class MeleeCombatDirector {
     const f = this.Fighter(entity);
     if (!Alive(entity) || !this.Idle(f) || !W[f.weapon] || f.stamina < R.parryCost) return false;
     f.stamina -= R.parryCost; f.parryUsed = false;
-    this.SetState(f, "parry", R.parryWindowS + R.parryRecoveryS, "Parry");
+    const intent = this.host.MoveIntent?.(entity) || {strafe:0};
+    const target = this.Closest(entity,W[f.weapon].beatReach,.4);
+    const side = intent.strafe || (target ? Math.sin(BearingFrom(entity,target)) : 1);
+    this.SetState(f, "parry", R.parryWindowS + R.parryRecoveryS, side < 0 ? "ParryLeft" : "ParryRight");
+    f.beatTried = false;
     this.Log("parryStart", entity); return true;
   }
   Opponents(entity) {
     const side = entity === this.Player() ? "nra" : entity.side;
-    return [this.Player(), ...this.Soldiers()].filter((target) => Alive(target) && target !== entity
+    return [this.Player(), ...this.Soldiers()].filter((target) => Alive(target) && !target.meleeDormant && target !== entity
       && (target === this.Player() ? "nra" : target.side) !== side);
   }
   Visible(a, b) { return Math.abs((a.position.y || 0) - (b.position.y || 0)) < 1.35 && this.host.LineClear?.(a, b) !== false; }
+  BodyBlocker(a, b) {
+    return [this.Player(),...this.Soldiers()].find(t => Alive(t) && t!==a && t!==b
+      && Math.abs((t.position.y||0)-(a.position.y||0))<1.35
+      && Distance(a,t)<Distance(a,b)-.12 && PointSegment(t.position,a.position,b.position)<R.bodyRadiusM);
+  }
+  WeaponContact(a,b) {
+    if (!W[this.Weapon(a)] || !W[this.Weapon(b)] || !this.Visible(a,b) || this.BodyBlocker(a,b)) return false;
+    if (Facing(a,b)<.55 || Facing(b,a)<.45) return false;
+    const at = Tip(a,a.yaw||0,Math.min(W[this.Weapon(a)].beatReach,1.35));
+    const bt = Tip(b,b.yaw||0,1.25);
+    return Math.min(PointSegment(at,b.position,bt),PointSegment(bt,a.position,at))<.32;
+  }
+  TryBeat(f) {
+    const e=f.entity;
+    const target=this.Closest(e,W[f.weapon].beatReach,.65);
+    if (!target || !this.WeaponContact(e,target)) return;
+    const tf=this.Fighter(target);
+    // A thrust already committed is handled by the reactive contact window.
+    if (!['idle','charge','attack'].includes(tf.state) || tf.state==='attack' || tf.beatUntil>this.time) return;
+    tf.beatUntil=this.time+R.beatCooldownS; f.parryUsed=true; f.lastParry=this.time;
+    f.duration=f.t+R.parrySuccessRecoveryS;
+    this.Stagger(target,e,'Deflected',R.beatStaggerS,0);
+    this.Log('weaponBeat',e,target);
+  }
   Closest(entity, reach = R.engageM, dot = -1) {
     return this.Opponents(entity).filter((t) => Distance(entity, t) <= reach && Facing(entity, t) >= dot && this.Visible(entity, t))
       .sort((a, b) => Distance(entity, a) - Distance(entity, b))[0] || null;
@@ -120,6 +170,7 @@ export class MeleeCombatDirector {
     f.poise = Math.max(0, f.poise - poise); f.lastHit = this.time; f.pressureBy = from;
     if (f.poise <= 0) { this.SetState(f, "fall", R.knockdownS, "Fall"); this.Log("knockdown", entity, from); }
     else this.SetState(f, "stagger", duration, clip);
+    f.nextThink = Math.max(f.nextThink,this.time+duration+.12);
   }
   KnockDown(entity = this.Player(), attacker = null, reason = "impact") {
     const f = this.Fighter(entity);
@@ -134,6 +185,7 @@ export class MeleeCombatDirector {
   }
   BeginBind(a, b, reason) {
     const player = this.Player();
+    if (Distance(a,b)>R.bindReachM || !this.WeaponContact(a,b)) return false;
     if (a !== player && b !== player) {
       this.Stagger(a, b, "Deflected", R.parryStaggerS, 12);
       this.Stagger(b, a, "Deflected", R.parryStaggerS, 12); this.Log("npcClash", a, b); return true;
@@ -141,17 +193,23 @@ export class MeleeCombatDirector {
     if (this.Active || !this.CanUse()) return false;
     const opponent = a === player ? b : a;
     const pf = this.Fighter(player);
+    const of = this.Fighter(opponent);
+    if (this.time<pf.qteUntil || of.qteCount>=Q.perOpponentLimit || this.ImmediateThreat(opponent)) return false;
     if (!this.qte.Begin("standing", opponent, { stamina: pf.stamina / 100, reason, parried: this.time - pf.lastParry < 1, strength: opponent.meleeTraining?.strength ?? 1 })) return false;
     this.SetState(pf, "qte", Q.windowS, "Bind");
     this.SetState(this.Fighter(opponent), "qte", Q.windowS, "Bind");
+    of.qteCount++; pf.qteUntil=this.time+Q.cooldownS;
     this.stats.standing++; this.Log("standingQte", player, opponent, { reason }); return true;
   }
   BeginGround(opponent) {
     const p = this.Player(), pf = this.Fighter(p);
     if (pf.state !== "down" || !Alive(p) || !Alive(opponent) || !this.CanUse() || this.Active || Distance(p, opponent) > R.bindReachM + 0.3 || !this.Visible(p, opponent)) return false;
+    const of=this.Fighter(opponent);
+    if (this.time<pf.qteUntil || of.qteCount>=Q.perOpponentLimit || this.ImmediateThreat(opponent)) return false;
     if (!this.qte.Begin("ground", opponent, { stamina: pf.stamina / 100, reason: "knockdownPressure" })) return false;
     this.SetState(pf, "qte", Q.windowS, "Ground");
     this.SetState(this.Fighter(opponent), "qte", Q.windowS, "Pressure");
+    of.qteCount++; pf.qteUntil=this.time+Q.cooldownS;
     this.stats.ground++; this.Log("groundQte", p, opponent); return true;
   }
   ResolveQte(a) {
@@ -163,23 +221,43 @@ export class MeleeCombatDirector {
     const p = this.Player(), pf = this.Fighter(p), of = this.Fighter(a.attacker);
     if (!Alive(p)) { if (of) this.SetState(of, "idle"); return; }
     if (a.success) {
-      this.Repel(a.attacker, p, R.pushDistanceM);
-      this.SetState(of, "stagger", Q.successStaggerS, "Pushed");
+      this.Repel(a.attacker, p, W[pf.weapon].pushDistance);
+      this.SetState(of, "stagger", (a.kind==='ground'?R.riseS:0)+Q.recoveryAdvantageS, "Pushed");
       pf.poise = 65;
       this.SetState(pf, a.kind === "ground" ? "rise" : "idle", a.kind === "ground" ? R.riseS : 0, a.kind === "ground" ? "Rise" : "Guard");
     } else {
       this.Repel(p, a.attacker, 0.32);
       this.SetState(of, "idle"); of.nextThink = this.time + 0.8;
       pf.pressureBy = a.attacker;
-      const fall = a.kind === "standing" && pf.poise < 40;
+      const fall = false; // Ordinary standing failure never chains another forced struggle.
       this.SetState(pf, fall ? "fall" : a.kind === "ground" ? "rise" : "stagger", fall ? R.knockdownS : a.kind === "ground" ? R.riseS : R.staggerS, fall ? "Fall" : a.kind === "ground" ? "Rise" : "Pushed");
     }
     this.held.clear();
+  }
+  ImmediateThreat(partner) {
+    const p=this.Player();
+    return this.Opponents(p).find(e=>e!==partner && this.Weapon(e) && !e.meleeTraining?.passive
+      && Distance(e,p)<=W[this.Weapon(e)].light.reach+.55 && this.Visible(e,p) && !this.BodyBlocker(e,p)
+      && !['stagger','fall','down','rise','qte'].includes(this.Fighter(e).state));
+  }
+  EscapeQte(threat) {
+    const a=this.qte.active;if(!a)return;
+    const p=this.Player(),pf=this.Fighter(p),of=this.Fighter(a.attacker);
+    this.qte.Cancel();this.held.clear();
+    this.SetState(pf,a.kind==='ground'?'rise':'idle',a.kind==='ground'?R.riseS:0,a.kind==='ground'?'Rise':'Guard');
+    this.SetState(of,'idle');of.nextThink=this.time+R.npcTellS;
+    // No victory, damage, teleport or partner stagger; a fresh visible tell follows release.
+    for(const e of this.Opponents(p)) {
+      const f=this.Fighter(e);
+      if(f.state==='idle')f.nextThink=Math.max(f.nextThink,this.time+(a.kind==='ground'?R.riseS:0)+.25);
+    }
+    this.Log('qteEscape',p,threat,{qteKind:a.kind});
   }
   HandleInput(code, down, repeat = false) {
     if (code === "Blur") {
       this.held.clear(); this.qte.Press(false);
       const f = this.Fighter(this.Player());
+      if(f)f.buffer=null;
       if (f?.state === "charge") this.SetState(f, "idle");
       return false;
     }
@@ -188,10 +266,10 @@ export class MeleeCombatDirector {
       return !["Escape", "Backquote", "AltLeft", "AltRight"].includes(code);
     }
     if (!this.CanUse()) return false;
-    if (!["Mouse0", "Mouse2", "KeyF", "KeyV"].includes(code)) return this.Blocking && !["Escape", "Backquote", "AltLeft", "AltRight"].includes(code);
+    if (!["Mouse0", "Mouse2", "KeyF"].includes(code)) return this.Blocking && !["Escape", "Backquote", "AltLeft", "AltRight"].includes(code);
     if (!down) {
       this.held.delete(code);
-      if (code === "Mouse0" || code === "KeyV") this.AttackUp();
+      if (code === "Mouse0") this.AttackUp();
       return code !== "KeyF";
     }
     if (repeat || this.held.has(code)) return true;
@@ -211,16 +289,16 @@ export class MeleeCombatDirector {
     if (!target || !spec) return;
     const tf = this.Fighter(target), d = Distance(e, target);
     const yaw = Math.atan2(e.position.x - target.position.x, e.position.z - target.position.z);
-    if (f.state !== "attack") e.yaw = (e.yaw || 0) + Clamp(Wrap(yaw - (e.yaw || 0)), -R.npcTurnRate * dt, R.npcTurnRate * dt);
+    if (f.state !== "attack" || !f.attack.locked) e.yaw = (e.yaw || 0) + Clamp(Wrap(yaw - (e.yaw || 0)), -R.npcTurnRate * dt, R.npcTurnRate * dt);
     if (f.state !== "idle") return;
     const training = e.meleeTraining || {};
-    if (training.passive) return;
+    if (training.passive || e.meleeDormant) return;
     if (target === this.Player() && ["fall", "down"].includes(tf.state)) {
       if (d > 1.05) this.AdvanceNpc(f, target, dt, 1);
       else if (tf.state === "down") this.BeginGround(e);
       return;
     }
-    if (tf.state === "qte") return;
+    if (tf.state === "qte") { this.CircleNpc(f,target,dt,f.role?.angle||45,2.4); return; }
     if (training.kind === "bind") {
       if (tf.state === "attack" && tf.attack?.heavy && d < R.bindReachM && this.time >= f.nextThink) this.Attack(e, true);
       return;
@@ -232,7 +310,8 @@ export class MeleeCombatDirector {
     }
     // 可读动作触发反应；训练时序项目不给额外闪避。无全知百分百拨挡。
     if (!training.kind || training.kind === "duel" || training.kind === "observe") {
-      if (tf.state === "attack" && !tf.attack?.connected && tf.t > tf.attack.windup - 0.10
+      if (tf.actionSerial!==f.observedAction) { f.observedAction=tf.actionSerial; f.observedAt=this.time; }
+      if (tf.state === "attack" && !tf.attack?.connected && this.time-f.observedAt>=R.npcReactionS
         && tf.t < tf.attack.windup && d <= tf.attack.reach && f.actionSerial % 3 === 1) { this.Parry(e); return; }
     }
     const role = f.role && f.role.target === target ? f.role : null;
@@ -243,7 +322,7 @@ export class MeleeCombatDirector {
       if (this.Push(e)) { f.nextThink = this.time + 1.25; return; }
       this.AdvanceNpc(f, target, dt, -1);
     } else if (tf.state === "charge" && d < preferred && training.kind !== "timing") this.AdvanceNpc(f, target, dt, -1);
-    if (this.time >= f.nextThink && d < spec.light.reach + 0.08 && Facing(e, target) > 0.9) {
+    if (this.time >= f.nextThink && d < spec.light.reach + 0.08 && Facing(e, target) > 0.9 && this.CanNpcAttack(f,target)) {
       // 正面牵制者隔几次亮一下起手骗拨挡，给侧翼制造突刺机会（佯攻骗刺）。
       if (role?.kind === "front" && tf.state === "idle" && (f.frontActions = (f.frontActions || 0) + 1) % G.feintEvery === 0) {
         this.Feint(e); f.nextThink = this.time + G.feintS + G.feintRecoveryS; return;
@@ -257,14 +336,25 @@ export class MeleeCombatDirector {
     const e = f.entity, tf = this.Fighter(target), d = Distance(e, target);
     const exposed = Facing(target, e) < G.flankAttackDot;
     const committed = ["attack", "parry", "push", "stagger", "charge"].includes(tf.state);
-    const open = exposed || committed;
+    const open = exposed || committed || this.time>=f.nextThink;
     const radius = spec.light.reach - G.flankRadiusInsetM;
-    if (open && this.time >= f.nextThink && d < spec.light.reach + 0.08 && Facing(e, target) > 0.9) {
+    if (open && this.time >= f.nextThink && d < spec.light.reach + 0.08 && Facing(e, target) > 0.9 && this.CanNpcAttack(f,target)) {
       this.Attack(e, exposed && d > 1.45 && f.actionSerial % 3 === 0);
       f.nextThink = this.time + G.flankAttackCooldownS; return;
     }
     if (!open && d < spec.minReach + 0.35 && this.time >= f.nextThink && this.Push(e)) { f.nextThink = this.time + 1.25; return; }
     this.CircleNpc(f, target, dt, role.angle, open ? radius : radius + G.flankStandoffM);
+  }
+  CanNpcAttack(f,target) {
+    if(this.BodyBlocker(f.entity,target)) { this.CircleNpc(f,target,1/60,f.role?.angle||40,W[f.weapon].light.reach-.2);return false; }
+    // Schedule before launch. Windups may overlap, contact opportunities stay readable.
+    const contactAt=this.time+R.npcTellS;
+    for(const other of this.fighters.values()) {
+      if(other===f || other.entity===this.Player() || other.target!==target || other.state!=='attack')continue;
+      const at=this.time+other.attack.windup-other.t;
+      if(Math.abs(contactAt-at)<.38)return false;
+    }
+    return true;
   }
   /** 沿目标周围的圆弧绕行到 angleDeg 方位（相对目标正面），同时把半径收到 radius；不穿过目标。 */
   CircleNpc(f, target, dt, angleDeg, radius) {
@@ -326,12 +416,35 @@ export class MeleeCombatDirector {
     const e = f.entity;
     if (!Alive(e)) return;
     f.t += dt;
+    if(f.buffer && this.time>f.buffer.expires) f.buffer=null;
+    if(f.state==='idle' && f.buffer) {
+      const released=f.buffer.released;f.buffer=null;
+      this.AttackDown(e);if(released)this.AttackUp(e);
+    }
     if (f.state === "idle") { f.stamina = Math.min(100, f.stamina + R.staminaRecovery * dt); }
     if (this.time - f.lastHit > 1.5 && f.state === "idle") f.poise = Math.min(100, f.poise + R.poiseRecovery * dt);
     if (f.state === "qte") return;
+    if(f.state==='contact' && f.t>=f.duration) {
+      const other=f.contactTarget;
+      if(!Alive(other) || !this.BeginBind(e,other,f.contactReason||'visibleWeaponBrace')) {
+        this.SetState(f,'stagger',.22,'WeaponClash');
+        const tf=this.Fighter(other);if(tf?.state==='contact')this.SetState(tf,'stagger',.22,'WeaponClash');
+      }
+      return;
+    }
+    if(f.state==='charge' && !f.feint && f.t>R.maxHeavyHoldS) {
+      this.SetState(f,'stagger',.45,'Obstructed');this.Log('chargeFatigue',e);return;
+    }
+    if(f.state==='parry' && !f.beatTried && f.t>=R.beatContactS) { f.beatTried=true;this.TryBeat(f); }
     if (f.state === "charge" && f.feint && f.t >= f.duration) { this.SetState(f, "idle"); return; }
     if (f.state === "attack") {
       const a = f.attack;
+      // Plant the NPC's forward foot before the point arrives. Tracking until the
+      // first contact frame made normal walking too slow to clear the body radius.
+      const aimUntil=a.windup-(e===this.Player()?0:R.npcAimCommitLeadS);
+      if(f.t<aimUntil) a.yaw=e.yaw||0;
+      else if(!a.locked) { a.locked=true; a.lockYaw=a.yaw; }
+      else a.yaw=a.lockYaw+Clamp(Wrap((e.yaw||0)-a.lockYaw),-R.attackCorrectionRad,R.attackCorrectionRad);
       if (f.t >= a.windup && f.t <= a.windup + a.active && !a.connected) this.ResolveContact(f);
       if (f.state !== "attack") return;
       const lunge = a.lunge * Clamp((f.t - a.windup) / a.active, 0, 1);
@@ -347,8 +460,14 @@ export class MeleeCombatDirector {
     if (f.state === "push" && !f.hit && f.t >= 0.16) {
       f.hit = true; const t = f.target;
       if (Alive(t) && Distance(e, t) <= W[f.weapon].pushReach + 0.1 && Facing(e, t) > 0.5 && this.Visible(e, t)) {
-        this.Repel(t, e, R.pushDistanceM);
+        const tf=this.Fighter(t);
+        if(tf.pushUntil>this.time || tf.state==='attack' && tf.attack?.heavy && tf.t+dt>=tf.attack.windup && tf.t<tf.attack.windup+tf.attack.active) {
+          this.Log('pushResisted',e,t);return;
+        }
+        tf.pushUntil=this.time+R.pushImmunityS;
+        this.Repel(t, e, W[f.weapon].pushDistance);
         this.Stagger(t, e, "Pushed", R.pushStaggerS, 42);
+        f.duration=f.t+R.pushSuccessRecoveryS;
         this.stats.pushes++; this.Log("push", e, t);
       }
     }
@@ -360,23 +479,52 @@ export class MeleeCombatDirector {
   }
   ResolveContact(f) {
     const e = f.entity, a = f.attack, weapon = W[f.weapon];
-    const targets = this.Opponents(e).filter((t) => Distance(e, t) <= a.reach && Facing(e, t, a.yaw) >= a.arcDot && this.Visible(e, t)).sort((b, c) => Distance(e, b) - Distance(e, c));
+    const u=Clamp((f.t-a.windup)/a.active,0,1), blade=f.weapon==='Dadao';
+    const yaw=a.yaw+(blade?(f.clip.endsWith('Alt')?-1:1)*(.64-1.28*u):0);
+    const end=Tip(e,yaw,blade?a.reach:.66+(a.reach-.66)*Math.sin(u*Math.PI/2));
+    const start=Tip(e,yaw,blade?.42:Math.max(.6,(a.previousReach??.66)));
+    const previous=a.previousTip || end;
+    a.previousTip=end;a.previousReach=.66+(a.reach-.66)*Math.sin(u*Math.PI/2);
+    const environment=this.host.SweepEnvironment?.(e,start,end,previous);
+    if(environment) {
+      a.connected=true;this.SetState(f,'stagger',a.heavy?.55:.3,'Obstructed');this.Log('environment',e,null,{point:environment});return;
+    }
+    const Swept=t=>PointSegment(t.position,start,end)<=R.bodyRadiusM+R.bladeRadiusM || PointSegment(t.position,previous,end)<=R.bodyRadiusM+R.bladeRadiusM;
+    const targets = this.Opponents(e).filter((t) => Distance(e, t) <= a.reach+.1 && Facing(e,t,a.yaw)>.4 && this.Visible(e,t) && Swept(t)).sort((b, c) => Distance(e, b) - Distance(e, c));
+    // When point geometry cannot extend at close range, the stock/blade visibly catches.
+    const cramped=this.Closest(e,weapon.minReach,.8);
+    if(!targets.length && cramped && this.WeaponContact(e,cramped)) {
+      a.connected=true;this.SetState(f,'stagger',.3,'WeaponClash');this.Log('tooClose',e,cramped);return;
+    }
     const target = targets[0]; if (!target) return;
     const tf = this.Fighter(target), distance = Distance(e, target);
+    const blocker=this.BodyBlocker(e,target);
+    if(blocker) {a.connected=true;this.SetState(f,'stagger',.32,'Obstructed');this.Log('bodyObstruction',e,blocker);return;}
     if (tf.state === "qte") return;
     if (tf.state === "parry" && tf.t <= R.parryWindowS && !tf.parryUsed && Facing(target, e) >= R.parryFacingDot) {
       tf.parryUsed = true; tf.lastParry = this.time;
+      tf.duration=tf.t+R.parrySuccessRecoveryS;
       a.connected = true; this.Stagger(e, target, "Deflected", R.parryStaggerS, 17);
       this.stats.parries++; this.Log("parry", target, e); return;
     }
     const hardBrace = a.heavy && ((tf.state === "attack" && tf.attack?.heavy && tf.t < tf.attack.windup + tf.attack.active) || (tf.state === "charge" && tf.t >= R.chargeMinS));
     if (distance <= R.bindReachM && hardBrace && Facing(target, e) > 0.65 && W[tf.weapon]) {
-      a.connected = true; this.BeginBind(e, target, tf.state === "charge" ? "chargedWeaponBrace" : "simultaneousHeavyContact"); return;
+      if(this.WeaponContact(e,target)) {
+        a.connected=true;
+        const reason=tf.state==='charge'?'chargedWeaponBrace':'simultaneousHeavyContact';
+        this.SetState(f,'contact',Q.contactHoldS,'WeaponClash');f.contactTarget=target;f.contactReason=reason;
+        this.SetState(tf,'contact',Q.contactHoldS,'WeaponClash');tf.contactTarget=e;tf.contactReason=reason;this.Log('weaponClash',e,target);return;
+      }
     }
-    if (distance < weapon.minReach) { this.Log("tooClose", e, target); a.connected = true; return; }
+    if (distance < weapon.minReach) { this.Log("tooClose", e, target); a.connected = true; this.SetState(f,'stagger',.3,'WeaponClash'); return; }
     a.connected = true;
     this.Damage(target, e, a.damage, a.heavy ? "heavy" : "light");
-    if (Alive(target)) this.Stagger(target, e, "Hit", a.heavy ? R.staggerS : 0.23, a.poise);
+    if (Alive(target)) {
+      const protectedRecovery=this.time<tf.interruptUntil;
+      this.Stagger(target,e,'Hit',a.heavy?R.staggerS:protectedRecovery?.12:.32,a.poise);
+      tf.interruptUntil=this.time+R.hitInterruptCooldownS;
+      tf.nextThink=Math.max(tf.nextThink,this.time+.45);
+    }
   }
   Update(dt) {
     if (!Number.isFinite(dt) || dt <= 0 || !this.enabled) return;
@@ -387,13 +535,14 @@ export class MeleeCombatDirector {
     this.time += dt;
     const player = this.Player();
     if (this.Active && (!Alive(player) || !Alive(this.qte.active.attacker))) this.Cancel("participantGone");
+    if(this.Active) {const threat=this.ImmediateThreat(this.qte.active.attacker);if(threat)this.EscapeQte(threat);}
     const all = [player, ...this.Soldiers()].filter(Boolean);
     for (const [entity] of this.fighters) if (!all.includes(entity)) this.fighters.delete(entity);
     for (const entity of all) {
       const f = this.Fighter(entity), weapon = this.Weapon(entity);
-      if (weapon !== f.weapon) { this.SetState(f, "idle"); f.weapon = weapon; if (entity === player) this.held.clear(); }
+      if (weapon !== f.weapon) { this.SetState(f, "idle"); f.weapon = weapon; f.buffer=null;if (entity === player) this.held.clear(); }
       const training = entity.meleeTraining;
-      const eligible = entity !== player && Alive(entity) && !!weapon && !entity.unarmed && !entity.scriptDefensive && !entity.scriptedNoncombatant;
+      const eligible = entity !== player && Alive(entity) && !entity.meleeDormant && !!weapon && !entity.unarmed && !entity.scriptDefensive && !entity.scriptedNoncombatant;
       const managed = eligible && (!!training || !!this.Closest(entity) || f.state !== "idle");
       if (entity !== player) entity.meleeCombat = managed ? this.Pose(f) : null;
       if (entity === player || managed) {
@@ -430,8 +579,12 @@ export class MeleeCombatDirector {
       if (a.phase === "resolve") clip = a.kind === "ground" ? (f.entity === this.Player() ? a.success ? "GroundWin" : "GroundLose" : "Pushed") : a.success === (f.entity === this.Player()) ? "BindWin" : "BindLose";
     }
     const phase = f.attack ? f.t < f.attack.windup ? "windup" : f.t < f.attack.windup + f.attack.active ? "active" : "recovery" : f.state;
+    const attackTime=f.attack ? (f.t<f.attack.windup ? f.t/f.attack.windup*f.attack.baseWindup : f.attack.baseWindup+f.t-f.attack.windup) / f.attack.baseDuration : null;
     return { managed: true, weapon: f.weapon, state: f.state, phase, clip: `${f.weapon}${clip}`, action: clip,
       t: f.t, duration: f.duration, normalized: f.duration ? Clamp(f.t / f.duration, 0, 1) : (f.t % 1),
+      animationNormalized:attackTime,
+      transition:f.previousPose && this.time-f.transitionAt<.07 ? {from:f.previousPose,mix:Clamp((this.time-f.transitionAt)/.07,0,1)} : null,
+      weaponYawOffset:f.attack?.locked?Wrap(f.attack.yaw-(f.entity.yaw||0)):0,
       stamina: f.stamina, poise: f.poise, actionSerial: f.actionSerial,
       parryActive: f.state === "parry" && f.t <= R.parryWindowS && !f.parryUsed,
       progress: a?.progress ?? 0.5, pulse: a?.pulse || 0, qteKind: a?.kind || null,
@@ -447,9 +600,9 @@ export class MeleeCombatDirector {
   State() { return { time: this.time, active: this.qte.View(), stats: { ...this.stats }, player: this.Pose(this.Fighter(this.Player())), events: this.events.slice(-14) }; }
   Cancel(reason = "reset") {
     this.qte.Cancel(); this.held.clear();
-    for (const f of this.fighters.values()) { this.SetState(f, "idle"); f.entity.meleeCombat = null; }
+    for (const f of this.fighters.values()) { this.SetState(f, "idle"); f.buffer=null;f.entity.meleeCombat = null; }
     this.Log("cancel", null, null, { reason });
   }
-  ReleasePlayer() { this.held.clear(); const f = this.Fighter(this.Player()); if (f && !this.Active) this.SetState(f, "idle"); }
+  ReleasePlayer() { this.held.clear(); const f = this.Fighter(this.Player()); if(f)f.buffer=null;if (f && !this.Active) this.SetState(f, "idle"); }
   Reset() { this.Cancel(); this.fighters.clear(); this.events.length = 0; this.time = 0; for (const key of Object.keys(this.stats)) this.stats[key] = 0; }
 }

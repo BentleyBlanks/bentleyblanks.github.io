@@ -64,7 +64,7 @@ export class MeleeQteDirector {
     const a = this.active;
     if (!a) return null;
     return { kind: a.kind, serial: a.serial, phase: a.phase, success: a.success,
-      label: a.kind === "ground" ? "倒地抵抗" : "武器僵持", prompt: "快速连按 F · 争夺武器控制",
+      label: a.kind === "ground" ? "倒地抵抗" : "武器僵持", prompt: "快速连按 F · 抵抗",
       keys: ["F"], expected: "F", input: "mash", index: a.accepted,
       progress: a.progress, timeT: a.t / Q.windowS, timeLeft: Math.max(0, Q.windowS - a.t),
       resolveT: a.resolveT / Q.resolveS, pulse: a.pulse, assist: this.assist,

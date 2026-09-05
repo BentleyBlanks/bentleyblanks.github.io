@@ -110,10 +110,11 @@ const result = await page.evaluate((expected) => {
     s.bayonetFixed=true;s.meleeTraining={passive:true};
     return s;
   };
-  T.Debug.Key("KeyV", true);
+  T.Debug.Key("KeyV");T.StepFrames(2,1/60,false);
+  T.Debug.Mouse(0, true);
   T.StepFrames(30);                          // > 0.30 s 的蓄力线 → 劈刺
   const m1 = Plant("M1");                    // 靶在松手前一刻才埋
-  T.Debug.Key("KeyV", false);
+  T.Debug.Mouse(0, false);
   out.thrustMode = T.meleeCombat.State().player?.action;
   out.beforeContact=!!m1&&m1.health;
   T.StepFrames(35,1/60,false);

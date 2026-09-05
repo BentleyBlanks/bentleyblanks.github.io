@@ -155,6 +155,11 @@ export const FPS_ARM_STATE_ROTATIONS = Freeze({
   OfficerSwordSet: Freeze({ ads: StateContacts(V(0.99884, -1.28117, -1.03785), V(-0.11189, 2.30043, 2.79591)), sprint: StateContacts(V(-0.30442, -2.64893, -1.21062), V(0.44444, -2.98694, -0.63058)) }),
 });
 
+// Bayonet work braces the fore-end with the palm facing up. The height matches
+// the three bolt rifles' physical gripL mounts; shooting retains its own contacts.
+export const FPS_BAYONET_SUPPORT = Freeze({ heightM: -0.012,
+  rotation: V(-0.119428926, Math.PI / 2, -Math.PI) });
+
 export const FPS_ARM_LIMITS = Freeze({
   handClosureM: 0.003,
   positionResidualM: 0.006,

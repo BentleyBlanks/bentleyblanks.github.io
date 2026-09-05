@@ -30,7 +30,7 @@ const page=await browser.newPage({viewport:{width:1440,height:900}});
 const errors=[];page.on('pageerror',e=>errors.push(String(e)));
 try {
   await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//,r=>r.abort('blockedbyclient'));
-  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?shot=1&melee=1&quality=medium&scale=small`,{waitUntil:'load',timeout:120000});
+  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?shot=1&manual=1&melee=1&quality=medium&scale=small`,{waitUntil:'load',timeout:120000});
   await page.waitForFunction(()=>window.Taierzhuang?.state?.ready&&window.Taierzhuang?.state?.running&&window.Taierzhuang?.Debug?.MeleeCombat,null,{timeout:120000});
   const data=await page.evaluate(async({actions,bake})=>{
     const THREE=await import('./vendor/three/build/three.module.js');
@@ -86,7 +86,7 @@ try {
     }
     return result;
   },{actions,bake});
-  assert(data.boneNames.length>=50);assert.equal(data.checks.length,42);
+  assert(data.boneNames.length>=50);assert.equal(data.checks.length,actions.length*2);
   const failed=data.checks.find(check=>check.seen<16||check.gripMax>FPS_ARM_LIMITS.positionResidualM||check.wristMax>FPS_ARM_LIMITS.wristBendDeg+.01);
   if(failed){
     await page.evaluate(clip=>{const weapon=clip.startsWith('Dadao')?'Dadao':'Bayonet';Taierzhuang.Debug.MeleeCombat.Select(weapon+'One');Taierzhuang.Debug.MeleeCombat.Preview(clip.slice(weapon.length),.5);Taierzhuang.StepFrames(1,1/60,true);},failed.clip);
@@ -102,5 +102,5 @@ try {
   if(bake){fs.mkdirSync(path.join(project,'_shots'),{recursive:true});fs.writeFileSync(path.join(project,'_shots','Data_MeleeFirstPersonBake.json'),JSON.stringify(data));}
   assert.deepEqual(errors,[]);
   console.log(JSON.stringify({clips:data.checks,bones:data.boneNames.length,bake}));
-  console.log('PASS 84 Blender body clips and 42 real first person clips');
+  console.log(`PASS ${actions.length*4} Blender body clips and ${actions.length*2} real first person clips`);
 }finally{await browser.close();await new Promise(r=>server.close(r));}

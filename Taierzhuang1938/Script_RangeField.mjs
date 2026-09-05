@@ -26,6 +26,7 @@ import {
   RANGE_WORLD, RANGE_CAMERA_FAR, RANGE_STATIONS, RANGE_TARGETS,
 } from "./Data_Range.mjs";
 import { MELEE_QTE_LEVEL_ID } from "./Data_MeleeQte.mjs";
+import { MELEE_ENCOUNTERS } from "./Data_MeleeCombat.mjs";
 
 /** 靶道朝北（-Z）。挡弹墙立在最远靶身后这一线。 */
 const BACKSTOP_Z = 1350;
@@ -101,6 +102,25 @@ export class RangeField {
       for (const [x,z,w,d] of [[1387,1461,0.5,38],[1413,1461,0.5,38],[1400,1442,26,0.5],[1400,1480,26,0.5]]) {
         sink.Add("Stone", PlaceGeometry(MakeBox(w, 1.2, d, 1, "MeleeBoundary"), { x, y: 0.6, z }));
         sink.Solid(x,0.6,z,w/2,0.6,d/2,"wall");
+      }
+      for(const station of MELEE_ENCOUNTERS) {
+        // Low dividers and a door jamb give attacks real environment contacts.
+        for(const side of [-1,1]) {
+          const x=station.x+side*3.45,z=station.z;
+          sink.Add('Stone',PlaceGeometry(MakeBox(.3,1.65,4.4,1,`MeleeDivider${station.id}${side}`),{x,y:.825,z}));
+          sink.Solid(x,.825,z,.15,.825,2.2,'meleeDivider');
+        }
+        sink.Add('WoodBeam',PlaceGeometry(MakeBox(2.4,.025,.12,1,`MeleeThreshold${station.id}`),{x:station.x,y:.015,z:station.z+3.2}));
+        // Scene labels are billboards; physical geometry remains in the shared batch.
+        const canvas=document.createElement('canvas');canvas.width=512;canvas.height=160;
+        const ctx=canvas.getContext('2d');ctx.fillStyle='#232c30';ctx.fillRect(0,0,512,160);
+        ctx.strokeStyle=station.trigger==='auto'?'#cfb36c':'#b1c9ca';ctx.lineWidth=8;ctx.strokeRect(4,4,504,152);
+        ctx.textAlign='center';ctx.fillStyle='#f5f1df';ctx.font='bold 50px sans-serif';ctx.fillText(`1 对 ${station.enemies}`,256,64);
+        ctx.font='32px sans-serif';ctx.fillText(station.trigger==='auto'?'靠近白线开始':'白线前按 F 开始',256,124);
+        const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
+        const material=new THREE.SpriteMaterial({map:texture,depthTest:true,toneMapped:false});
+        const sign=new THREE.Sprite(material);sign.position.set(station.x,2.5,station.z-.8);sign.scale.set(2.8,.875,1);sign.name=`MeleeLabel${station.id}`;
+        this.scene.add(sign);(this.meleeLabels ||= []).push(sign);
       }
       this.stats.structures = 14;
       for (const mesh of sink.Flush(this.scene, this.library)) this.meshes.push(mesh);
@@ -276,6 +296,8 @@ export class RangeField {
   }
 
   Dispose() {
+    for(const sign of this.meleeLabels||[]) {this.scene.remove(sign);sign.material.map.dispose();sign.material.dispose();}
+    this.meleeLabels=[];
     for (const m of this.meshes) {
       this.scene.remove(m);
       if (m.geometry) m.geometry.dispose();
