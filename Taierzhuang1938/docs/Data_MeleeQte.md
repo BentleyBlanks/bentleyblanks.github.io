@@ -1,93 +1,62 @@
-# 白刃 QTE 机制（Data_MeleeQte）
+# 白刃战系统｜大刀与刺刀
 
-## 一句话口径
+依据 [Notion 原设计](https://app.notion.com/p/3d160335331c811e84dadd826f089013)，读取版本 2026-09-04。2026-09-05 重构替换旧六套格挡／处决小游戏，旧处决规则已移除。
 
-日军上刺刀冲到玩家面前时，正片的真实刺刀命中可以被短时慢动作 QTE 接管；格挡成功、敌人重伤或被强压制后，玩家可在贴身正面按 `F` 触发“踹开 → 终结”的处决 QTE。专用沙盒 `?melee=1` 只负责把六种样式并排摆出来，正片与沙盒使用同一规则控制器。
+## 输入与普通战斗
 
-## 文件与依赖方向
+- 左键点按：轻击；按住至少 0.38 秒后松开：重击。V 保留相同快捷输入。
+- 右键：0.25 秒瞬时拨挡，随后 0.34 秒收招。按住不延长窗口，一次只能拨开一名对手；成功后敌人失势，玩家需要自行走位和攻击。
+- F：仅在贴身、正面、有视线时压枪、推架，0.16 秒接触才产生位移与失衡，普通伤害为零。F 不处决，不因敌人残血获得特殊击杀。
+- 大刀短程斜斩交替，重击宽而慢；刺刀短刺射程更长，重刺前跨一步，落空／被拨开有完整恢复。伤害只在有效接触时结算，一次攻击一次伤害；隔墙、背面、过远或过近均不能凭按键伤人。
+- 已装刺刀的长枪，无论弹药是否为空，都使用左／右／F 的白刃输入。X 卸刀恢复射击／开镜。攻击恢复或 QTE 中不能靠换槽、装卸、装填取消惩罚。
 
-- `Data_MeleeQte.mjs`：六套 pattern、时间、距离、失败伤害、六工位和测试章数据；纯数据，不 import three。
-- `Script_MeleeQte.mjs`：输入、进度、成功/失败、慢动作倍率、处决候选和辅助模式；纯规则，不 import three。
-- `Script_Ai.mjs`：刺刀命中前调用 `BeginBlock`，QTE 期间停止 Think / 导航 / 开火，把姿态快照喂给 Actor。
-- `Script_Actor.mjs`：三种敌人枪线、腰肩、腿步与受踹姿态；仍是既有程序化骨骼。
-- `Script_Viewmodel.mjs`：玩家第一人称双臂、大刀/刺刀的六种轨迹。
-- `Script_Hud.mjs` + `Style_Game.css`：按键、完成度、真实时间条、定时亮区和结果卡。
-- `Script_Main.mjs`：真实时间 / 玩法时间双时钟、伤害与死亡桥、F 提示、训练目标和 `Debug.MeleeQte`。
-- `Script_RangeField.mjs`：`MeleeQte` 关卡 id 下构建六工位场地；仍实现与正片相同的战场查询接口。
+## 两种真实触发的抵抗
 
-依赖只能沿上面方向走。Actor、Viewmodel、HUD 只读 `View()` / `ViewPose()`，不得各自重算输入成功条件。
+站立僵持：近距离双方重击相撞，或重击撞上已蓄起的硬架，才进入武器争夺。普通刺刀命中、成功拨挡、低血量都不会自动触发 QTE。
 
-## 触发条件
+倒地抵抗：玩家已经因平衡耗尽、近身撞击或爆炸而倒地，对手走近压制才触发。不是按 F 主动进入的处决。镜头随倒地降至约 0.28 米，对手在上方压枪，双臂震颤、枪尖下压、心跳随失势加急。
 
-### 格挡
+两者均重复按 F 争夺进度；我方位于进度条左端，敌方位于右端，连按使控制点向左移动，不按持续向敌方回落。3 次／秒不足以维持，5 次／秒可推进，7 次／秒达到有效上限，更多输入不增益。长按键盘自动重复不算连击；提供长按 F 和自动抵抗两档辅助，等效 6 次／秒，不改变触发与结果。
 
-1. 日军处于真实刺刀冲锋链：已上刺刀、有玩家目标、距离进入原 `TryBayonet` 的 2 m 命中线；
-2. 玩家活着，当前手持大刀，或当前长枪已经安装刺刀；
-3. 场上没有另一场白刃 QTE。
+成功只推开仍活着的对手，站立恢复自由战斗，倒地经过起身恢复。失败造成受伤／失衡，低平衡可能再次倒地；伤害经现有 Player.TakeHit、出血与阵亡接管系统。测试场阵亡后停留，手动重开恢复。QTE 保持真实时间，无慢动作放大窗口。
 
-满足时原 46 点刺刀命中暂缓，`BeginBlock` 接管。玩家没带可格挡武器、QTE 正忙或规则拒绝时，原命中照常结算，不给免费免伤。
+## 独立白盒
 
-### 处决
+入口 `?melee=1` 或主菜单「白刃战 · 大刀与刺刀」。14 个互相重置的项目：
 
-候选必须同时满足：活着的日军、距离不超过 2.35 m、在玩家正面、玩家当前持大刀或已装刺刀长枪，并命中以下任一特殊条件：
+| 项目 | 目的 |
+| --- | --- |
+| 大刀一对一／二／三 | 跨过刺刀距离、拨挡、自由走位与多敌夹击 |
+| 刺刀一对一／二 | 同类兵器的短刺、长刺与恢复 |
+| 大刀／刺刀贴身推架 | 独立验证 F 无伤害、推开和失衡 |
+| 大刀／刺刀站立僵持 | 真实硬架产生 QTE，成功／失败后续 |
+| 大刀／刺刀倒地抵抗 | 低初始平衡、敌人撞倒后接近压制 |
+| 友军大刀／刺刀 | 友军与日军使用同一攻击、防守、伤害和动画 |
+| 瞬时拨挡时机 | 敌人可读的重刺起手，验证早／准／迟拨挡 |
 
-- 刚被玩家格挡成功，五秒窗口尚未过；
-- 剩余生命不超过 35；
-- 压制不低于 0.80；
-- `?melee=1` 的专用处决训练目标。
+按住 Alt 释放鼠标操作面板。面板提供开始／重开、暂停对手、动作播放／逐帧、生命／体力／平衡／距离／最近事件。只有开局摆位与初始平衡是实验配置；战斗与 QTE 由正式规则驱动。
 
-有候选时情境提示出现 `F`“踹开处决”。`F` 先问处决，再落回既有拾取/分弹等通用交互。
+## 代码与动画源
 
-## 六套输入与动作
+- `Data_MeleeCombat.mjs`：集中时序、距离、伤害、体力、平衡、QTE 和场景配置。Notion 未指定的具体数值是本次可调白盒参数。
+- `Script_MeleeCombat.mjs`：玩家／敌军／友军共同的纯规则状态机，依赖宿主提供物理、视线、伤害。
+- `Script_MeleeQte.mjs`：两类 F 抵抗、速率封顶、辅助输入、结果；不调用 Kill。
+- `Script_Main.mjs`、`Script_Ai.mjs`：真实输入、移动、生命系统和演员桥接。
+- `Script_MeleeAnimation.mjs`：Blender 采样的全身动画重定向及第一人称动作载体。
+- `Script_MeleeLab.mjs`：实验面板。`Data_MeleeQte.mjs` 仅保留旧关卡 id 对应的新入口。
+- Blender 源工程：`C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\MeleeCombat_20260905\Scene_MeleeCombat.blend`，按仓库约定仅存本地。实际国军／日军蒙皮、第一人称双臂及真实武器几何，共 126 段演员动作；游戏仓库只提交烘焙数据与重建脚本。
 
-| 类别 | 样式 | 输入 | 动作区别 |
-|---|---|---|---|
-| 格挡 | 连击顶开 | 快速按 `V` 六次 | 双手正面架牢，顶开刺刀 |
-| 格挡 | 左右拨架 | 交替 `A / D` 六次 | 枪线和腰肩随左右输入换边 |
-| 格挡 | 节奏反击 | `V → F → V → F` | 两次短促接触后反拨 |
-| 处决 | 正踹直劈 | 亮区内按 `V` | 正面踹开，武器从上方直落 |
-| 处决 | 侧踹横斩 | `A → D → V` | 换脚侧踹，横向走刀 |
-| 处决 | 抵枪突刺 | 按住 `V` 0.52 秒后松开 | 抵住枪线，踹开后直刺 |
+两种武器各 21 动作：Guard、Advance、Retreat、Light、LightAlt、Charge、Heavy、Parry、Deflected、Push、Pushed、Hit、Bind、BindWin、BindLose、Fall、Ground、GroundWin、GroundLose、Pressure、Rise。国军／日军各 42 段全身，第一人称 42 段，31 个采样帧。全身每帧 50 根骨骼；第一人称源动作包含 53 根骨骼、武器与可编辑载体轨道。
 
-三套处决的叙事结果一致，但输入、第一人称轨迹和敌人骨架都不同。日军在终结动作 0.48 秒才进入 `Soldier.Kill`，保证“先踹开、再落刀”，随后继续使用既有布娃娃、掉落、阵亡事件和兵员池链。
+在 Blender 的 Text Editor 运行内嵌 `Script_MeleeLibrary.py`，3D 视图侧栏 Melee 选择对象、武器、动作，空格播放，时间轴逐帧检查。源文件包含全身检查和第一人称检查两个 Scene，纹理已打包。
 
-## 双时钟与输入所有权
+每次 Blender MCP 调用先设置 `MELEE_PROJECT_ROOT` 为当前检出的 `Taierzhuang1938` 绝对路径。运行 `_blender/Script_MeleeAnimationBake.py`，分别设置 MELEE_FACTION=Nra/Ija，导出两份 Data_Melee*Animations.mjs。可用 MELEE_ACTIONS 列表只重烘选中动作。运行 `node Taierzhuang1938/Script_MeleeAnimationTest.mjs --bakefp` 采集实际生产握持 IK；再通过 Blender MCP 分别设置 MELEE_WEAPON=Dadao/Bayonet 运行 Script_MeleeFirstPersonBake.py，最后运行 Script_MeleeStudio.py 更新武器轨道、动作面板和打包源工程。脚本会恢复标准原点，检查摄影棚摆位不进入运行时采样。
 
-- QTE 窗口按传入 `Frame` 的真实 `dt` 结算；格挡约 1.95—2.20 秒，处决约 2.20—2.45 秒。
-- 输入阶段玩法时间倍率 `0.28`，结算动作倍率 `0.46`；玩家、AI、弹道、特效与叙事都吃同一份缩放后 `dt`。
-- QTE 活跃时 `A / D / V / F` 在 `InputRouter.Capture` 被独占，移动、开火、开镜、蹲卧清零。不能一边拨架一边横移，也不能按 `F` 同时把尸体上的枪捡起来。
+第一人称使用当前生产版解剖手臂模型与握持 IK，刺刀载体为新版掌腕位置预留空间。倒地低镜头期间隐藏尚无仰卧动作的第一人称躯干，避免站立外套遮住低机位；起身恢复后继续使用正常低头身体与空手动作。
 
-禁止拿缩放后的 `dt` 递减 QTE 时间；否则 1.95 秒窗口会被放大到近七秒。
+## 验证
 
-## 辅助输入
-
-默认 `?qteAssist=tap` 保留原快速输入。两条等价辅助只降低输入负担，不改距离、武器、伤害、动画或死亡链：
-
-- `?qteAssist=hold`：需要连按/序列时，按住当前提示键可按节拍自动推进；定时与蓄力题仍保留各自语义。
-- `?qteAssist=auto`：自动完成输入，供无法快速反复按键的玩家使用。
-
-运行时取证/测试也可调用 `Debug.MeleeQte.SetAssist("tap" | "hold" | "auto")`。
-
-## 专用测试章
-
-- 入口：主菜单“选章”末尾的“刃 · 白刃战 QTE 测试场”，或直接打开 `?melee=1`。
-- 左侧三个工位：连击、拨架、节奏格挡；走到目标约 2 m 内会自动触发指定样式。
-- 右侧三个工位：正踹、侧踹、抵枪处决；面向目标按 `F`。
-- `1 / 3` 可切换已装刺刀的汉阳造与大刀；正式 Actor、正式命中/死亡/布娃娃链不降级。
-- 目标死亡三秒后原位复立；测试章钉住，不进正片七关、进度、继续或史实时间线。
-
-取证口：`Debug.MeleeQte.State / Targets / GoTo / TriggerBlock / TriggerExecution / MakeExecutable / SetAssist / Reset`。
-
-## 动画实现选择
-
-本机制没有引入 Blender 蒙皮资产。现有 `Script_Actor` 是程序化分件骨骼，项目明确不使用战斗 `SkinnedMesh`（SSAO 深度法线预通道的 overrideMaterial 不带 skinning，会让蒙皮塌到原点）。因此六套动作直接在现有 chest / neck / hips / thigh / knee / weaponMount 层完成，第一人称则驱动 Viewmodel 的 actionPivot / swingPivot；这与场上现有 Actor 合批和渲染契约一致。
-
-## 回归
-
-```powershell
-node Taierzhuang1938/Script_MeleeQteTest.mjs
-node Taierzhuang1938/Script_MeleeQteTest.mjs --shot
-node Taierzhuang1938/Script_TestRunner.mjs --domain=combat
-```
-
-`Script_MeleeQteTest` 锁定六具正式 Actor、三格挡、三处决、0.28 慢动作、46 点失败伤害、HUD、敌我骨骼动作与两条辅助输入。截图落在 gitignored 的 `_shots/MeleeQte.png`，进程成功不替代人工看图。
+`Script_MeleeCombatTest.mjs` 检查规则边界、距离、遮挡、时机、F、QTE 速率／结果、多人拨挡和取消闸门。
+`Script_MeleeQteTest.mjs` 用真实输入检查接触、八组 QTE 结果、独立战斗、主动打法及可见演员／手臂，截图在 `_shots/Scene_Melee*.png`。
+`Script_MeleeAnimationTest.mjs` 检查 84 段全身数据、42 段第一人称实际握持、50 根重定向骨骼、画面内手臂；逐帧锁定握点残差不超过 6 毫米、腕关节不超过 65 度。
+正式关卡装卸／输入接线用 `Script_BayonetTest.mjs`，冲刺挥刀用 `Script_SprintMeleeTest.mjs`。发布前按 `Script_TestRunner.mjs --profile=prepush --changed=origin/master` 执行风险门禁。

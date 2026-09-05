@@ -36,7 +36,7 @@ import {
   RANGE_PHASE, RANGE_LEVEL_ID, RANGE_TARGETS, RANGE_STATIONS, RANGE_RESPAWN_S,
 } from "./Data_Range.mjs";
 import {
-  MELEE_QTE_PHASE, MELEE_QTE_LEVEL_ID, MELEE_QTE_TARGETS, MELEE_QTE_STATIONS,
+  MELEE_QTE_PHASE, MELEE_QTE_LEVEL_ID,
 } from "./Data_MeleeQte.mjs";
 import {
   FIRST_LEVEL_P012_WHITEBOX_PHASE, FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,
@@ -70,7 +70,9 @@ import { CutsceneDirector } from "./Script_Cutscene.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
 import { LoadGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { InputRouter } from "./Script_Input.mjs";
-import { MeleeQteDirector } from "./Script_MeleeQte.mjs";
+import { MeleeCombatDirector } from "./Script_MeleeCombat.mjs";
+import { MELEE_SCENARIOS } from "./Data_MeleeCombat.mjs";
+import { MeleeLab } from "./Script_MeleeLab.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
 import { CarrySystem } from "./Script_Carry.mjs";
@@ -557,7 +559,12 @@ let physics = null;
 let navGrid = null;
 let player = null;
 let ai = null;
-let meleeQte = null;
+let meleeCombat = null;
+let meleeLab = null;
+let meleeScenario = "DadaoOne";
+let meleePaused = false;
+let meleePreview = null;
+let meleePreviewFrame = null;
 let vfx = null;
 let viewmodel = null;
 let firstPersonSelfShadow = null;
@@ -1062,61 +1069,48 @@ async function Boot() {
   }, { maxAlive: SCALE.maxAlive, seed: 19380317, insideWalls: levelBounds });
 
   // 白刃规则只拿窄接口；伤害、血雾、声音与朝向仍走装配层现有对象。
-  meleeQte = new MeleeQteDirector({
+  meleeCombat = new MeleeCombatDirector({
     Player: () => player,
     Soldiers: () => ai?.soldiers || [],
-    Time: () => ai?.time || 0,
-    CanBlock: () => {
-      const weapon = WEAPONS[currentWeapon];
-      return !!(weapon && (weapon.kind === "melee" || (weapon.bayonet && state.bayonetFixed)));
+    Weapon: (entity) => {
+      const isPlayer = entity === player;
+      const weapon = isPlayer ? WEAPONS[currentWeapon] : entity.weapon;
+      return weapon?.kind === "melee" ? "Dadao" : weapon?.bayonet && (isPlayer ? state.bayonetFixed : entity.bayonetFixed) ? "Bayonet" : null;
     },
-    CanExecute: () => {
-      const weapon = WEAPONS[currentWeapon];
-      return !!(weapon && (weapon.kind === "melee" || (weapon.bayonet && state.bayonetFixed)));
+    CanUse: () => !carry?.Active && !emplacement?.Mounted && !state.cooking && !p012Runtime?.binocularOwned && !player?.Busy && !viewmodel?.IsBusy?.(),
+    LineClear: (a, b) => {
+      const from = new THREE.Vector3(a.position.x, a.position.y + 1.1, a.position.z);
+      const to = new THREE.Vector3(b.position.x, b.position.y + 1.1, b.position.z);
+      const delta = to.sub(from), distance = delta.length(); delta.normalize();
+      const hit = battlefield.Raycast(from, delta, distance);
+      return !hit || hit.t >= distance - 0.12;
     },
-    DamagePlayer: (amount, attacker, kind) => {
-      if (!player?.Alive) return false;
-      const dx = player.position.x - attacker.position.x;
-      const dz = player.position.z - attacker.position.z;
-      const len = Math.hypot(dx, dz) || 1;
-      return player.TakeHit(amount, "torso", new THREE.Vector3(dx / len, 0, dz / len), {
-        from: attacker.position.clone(), melee: true, qte: kind,
-      });
+    Move: (entity, dx, dz) => {
+      if (entity === player) {
+        const body = player.body;
+        if (body) { body.ReconcileTo(player.position.x, player.position.y, player.position.z); const r = body.Move(dx, -0.006, dz); player.position.set(r.x, r.y, r.z); }
+      } else ai.StepBody(entity, dx, dz, 0.001);
     },
-    KillSoldier: (soldier) => {
-      if (!soldier?.alive) return false;
-      const dx = soldier.position.x - player.position.x;
-      const dz = soldier.position.z - player.position.z;
-      const len = Math.hypot(dx, dz) || 1;
-      const direction = new THREE.Vector3(dx / len, 0, dz / len);
-      const died = soldier.TakeHit(999, "torso", direction);
-      vfx?.Blood(new THREE.Vector3(soldier.position.x, soldier.position.y + 1.05,
-        soldier.position.z), direction, 1);
-      return died;
+    Damage: (target, attacker, amount, kind) => {
+      const delta = new THREE.Vector3().subVectors(target.position, attacker.position); delta.y = 0; delta.normalize();
+      if (target === player) player.TakeHit(kind === "qte" ? amount : amount * COMBAT.player.meleeScale, "torso", delta, { from: attacker.position.clone(), melee: true });
+      else {
+        const died = target.TakeHit(amount, "torso", delta);
+        vfx?.Blood(target.position.clone().add(new THREE.Vector3(0, 1, 0)), delta, died ? 1 : 0.5);
+        if (attacker === player) ConfirmHit(died);
+      }
     },
-    Play: (event, attacker) => {
-      const sound = event === "bayonetRush" || event === "executionStart" ? "dadaoSwing"
-        : event === "blockSuccess" ? "bayonetHit"
-        : event === "executionSuccess" ? "dadaoHit"
-        : event === "blockFail" || event === "executionFail" ? "bayonetHit" : null;
-      if (sound) audio.Play(sound, {
-        position: attacker?.position?.clone?.(), volume: event.includes("Success") ? 0.92 : 0.72,
-      });
-    },
-    Focus: (attacker, realDt) => {
-      if (!attacker || !player?.Alive) return;
-      const dx = attacker.position.x - player.position.x;
-      const dz = attacker.position.z - player.position.z;
-      const target = Math.atan2(-dx, -dz);
-      let delta = target - player.yaw;
-      if (delta > Math.PI) delta -= Math.PI * 2;
-      else if (delta < -Math.PI) delta += Math.PI * 2;
-      player.yaw += Clamp(delta, -realDt * 5.5, realDt * 5.5);
-      player.aimYaw *= Math.max(0, 1 - realDt * 12);
-      player.aimPitch *= Math.max(0, 1 - realDt * 12);
+    Event: (event, actor, target) => {
+      if (event.kind === "struggle") {
+        audio.Play("heartbeat", {volume:.3 + (1-event.progress)*.4, pitch:1+(1-event.progress)*.25});
+        if (event.progress < .3) audio.Play("hurt", {volume:.2, pitch:.85});
+        return;
+      }
+      const sound = ["light", "heavy"].includes(event.kind) ? "dadaoSwing" : ["hit", "parry"].includes(event.kind) ? "bayonetHit" : event.kind === "push" ? "bodyFall" : null;
+      if (sound) audio.Play(sound, { position: (target || actor)?.position?.clone?.(), volume: 0.65 });
     },
   }, { assist: params.get("qteAssist") || "tap" });
-  ai.ctx.meleeQte = meleeQte;
+  ai.ctx.meleeCombat = meleeCombat;
 
   // 叙事层：把 Data_TengxianScript 那本考据过的剧本按关派发。
   // 线性关卡不需要翻译层，剧本的 at 语义就是运行时语义（见 Script_Story 的头注）。
@@ -1679,7 +1673,7 @@ async function Boot() {
     renderer, scene, camera, post, sky, lights, library, profiler,
     get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, actorBatch, input,
-    get meleeQte() { return meleeQte; },
+    get meleeCombat() { return meleeCombat; },
     story, combat, destruction, interact, carry, emplacement, wheel, strafe, flare, telegraph,
     companion, checkpoint, setpieces,
     StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
@@ -2319,94 +2313,19 @@ async function Boot() {
   }
 
   if (MELEE_TEST) {
-    const Snapshot = (entry) => {
-      const soldier = entry.soldier;
-      return {
-        id: entry.spec.id, station: entry.spec.station, kind: entry.spec.kind,
-        pattern: entry.spec.pattern, alive: !!soldier?.alive,
-        health: soldier?.health ?? 0,
-        x: soldier?.position.x ?? entry.spec.x, z: soldier?.position.z ?? entry.spec.z,
-        qte: soldier?.meleeQte ? { ...soldier.meleeQte } : null,
-        executableUntil: soldier?.executionReadyUntil ?? -99,
-      };
+    const api = {
+      State: () => MeleeSnapshot(),
+      Select: (id) => { StartMeleeScenario(id); return MeleeSnapshot(); },
+      Reset: () => { StartMeleeScenario(meleeScenario); return MeleeSnapshot(); },
+      Pause: (value) => { meleePaused = value ?? !meleePaused; for (const e of meleeTargets) e.soldier.meleeTraining.passive = meleePaused; return meleePaused; },
+      Preview: (clip, frame = null) => {
+        if (clip !== meleePreview) meleeCombat.Cancel("animationPreview");
+        meleePreview = clip; meleePreviewFrame = frame; api.Pause(!!clip); return clip;
+      },
+      SetAssist: (mode) => meleeCombat.SetAssist(mode),
     };
-    const Face = (soldier) => {
-      if (!soldier) return null;
-      const dx = soldier.position.x - player.position.x;
-      const dz = soldier.position.z - player.position.z;
-      player.yaw = Math.atan2(-dx, -dz);
-      player.pitch = 0;
-      player.aimYaw = 0;
-      player.aimPitch = 0;
-      return { yaw: player.yaw, distance: Math.hypot(dx, dz) };
-    };
-    window.Taierzhuang.Debug.MeleeQte = {
-      State: () => ({
-        ...meleeQte.State(),
-        stations: MELEE_QTE_STATIONS.map((station) => ({ ...station })),
-        targets: meleeTargets.map(Snapshot),
-        trainingStats: { ...meleeStats },
-        player: {
-          x: player.position.x, z: player.position.z, yaw: player.yaw,
-          health: player.health, alive: player.Alive,
-          slot: state.activeSlot, weapon: currentWeapon, bayonetFixed: state.bayonetFixed,
-        },
-        hud: hud.MeleeQteState(),
-        viewmodel: {
-          x: viewmodel.actionPivot.position.x, y: viewmodel.actionPivot.position.y,
-          z: viewmodel.actionPivot.position.z,
-          rx: viewmodel.actionPivot.rotation.x, ry: viewmodel.actionPivot.rotation.y,
-          rz: viewmodel.actionPivot.rotation.z,
-        },
-      }),
-      Targets: () => meleeTargets.map(Snapshot),
-      GoTo: (stationId) => {
-        meleeQte.Cancel("trainingMove");
-        const station = MELEE_QTE_STATIONS.find((entry) => entry.id === stationId);
-        const target = meleeTargets.find((entry) => entry.spec.station === stationId)?.soldier;
-        if (!station || !target) return null;
-        player.Spawn(station.x, station.z, station.ry ?? 0);
-        // 调试瞬移不是“换人出生”，不能带三秒出生保护；否则在工位故意放弃格挡
-        // 只会亮失败字样却不扣血，测试到的就不是正片失败链。
-        player.spawnGrace = 0;
-        Face(target);
-        return { id: station.id, x: station.x, z: station.z, targetId: target.id };
-      },
-      TriggerBlock: (pattern = 0) => {
-        meleeQte.Cancel("debugTrigger");
-        const entry = meleeTargets.find((item) => item.spec.kind === "block"
-          && item.spec.pattern === Number(pattern));
-        if (!entry?.soldier?.alive) return false;
-        Face(entry.soldier);
-        return meleeQte.BeginBlock(entry.soldier, Number(pattern));
-      },
-      TriggerExecution: (pattern = 0) => {
-        meleeQte.Cancel("debugTrigger");
-        const entry = meleeTargets.find((item) => item.spec.kind === "execution"
-          && item.spec.pattern === Number(pattern));
-        if (!entry?.soldier?.alive) return false;
-        Face(entry.soldier);
-        return meleeQte.TryBeginExecution(Number(pattern), entry.soldier);
-      },
-      MakeExecutable: (targetId = null) => {
-        const entry = targetId ? meleeTargets.find((item) => item.spec.id === targetId) : meleeTargets[0];
-        return !!meleeQte.MakeExecutable(entry?.soldier || null);
-      },
-      SetAssist: (mode) => meleeQte.SetAssist(mode),
-      Reset: () => {
-        meleeQte.Cancel("trainingReset");
-        for (const entry of meleeTargets) if (entry.soldier) ai.Remove(entry.soldier);
-        SeedMeleeTargets();
-        meleeStats.completed = 0;
-        meleeStats.respawned = 0;
-        meleeStats.resets += 1;
-        player.health = 100;
-        player.bleeding = false;
-        state.bayonetFixed = true;
-        SyncBayonet();
-        return window.Taierzhuang.Debug.MeleeQte.State();
-      },
-    };
+    window.Taierzhuang.Debug.MeleeCombat = api;
+    meleeLab = new MeleeLab({ Start: api.Select, Pause: api.Pause, Preview: api.Preview, SetAssist: api.SetAssist, Focus: RequestPointerLock });
   }
 
   // --- 编辑器套件 ---------------------------------------------------------
@@ -2902,7 +2821,7 @@ function ClearRuntime() {
   p012StageZero?.Dispose(); p012StageZero = null;
   explosionRange?.Dispose(); explosionRange = null;
   weaponRange?.Dispose(); weaponRange = null;
-  meleeQte?.Cancel("levelChange");
+  meleeCombat?.Cancel("levelChange");
   // 摆点层：交互点、后送队、计时器与运行时道具全按关摆，一律清掉。
   // **缺席宣告不在这里清**（那在 companion 手里，是剧情事实不是关卡状态）。
   setpieces?.Reset("levelChange");
@@ -3383,7 +3302,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   if (p012Flow) state.storyObjective = p012Flow.CurrentObjective().text;
   // 靶场撒的是木桩兵，不是战线；同时钉住本关 —— 站遍三个工位不许触发换关结算。
   RegisterGrenadeReturn(interact, combat, player, {
-    CanUse: () => !state.cooking && !carry?.Active && !emplacement?.Mounted && !meleeQte?.Active
+    CanUse: () => !state.cooking && !carry?.Active && !emplacement?.Mounted && !meleeCombat?.Active
       && !p012Runtime?.binocularOwned && !player.Busy,
     OnPickup: () => viewmodel.TriggerThrow?.(0.72),
   });
@@ -3798,48 +3717,63 @@ function MaintainRangeTargets() {
 }
 
 // ---------------------------------------------------------------------------
-// 白刃 QTE 测试章（?melee=1）的六具正式 Actor。前三具主动触发指定格挡，后三具
-// 常态满足处决特殊条件；死亡仍走 Soldier.Kill，三秒后原位重建，方便连续比较。
-// ---------------------------------------------------------------------------
+// 白刃实验场：一个项目一组正式 Actor；结束后由玩家重开，避免尸体自动复活干扰结果。
 const meleeTargets = [];
-const meleeStats = { completed: 0, respawned: 0, resets: 0 };
-
-function SpawnMeleeTarget(spec) {
-  const soldier = ai.Spawn("ija", spec.x, spec.z, {
-    weapon: "Type38", squadId: `MeleeQte_${spec.id}`,
-  });
-  if (!soldier) return null;
-  soldier.dummy = true;
-  soldier.bayonetFixed = true;
-  soldier.qteTraining = { kind: spec.kind, pattern: spec.pattern, station: spec.station };
-  soldier.order = "hold";
-  soldier.holdZone = { id: `MeleeQte_${spec.id}`, x: spec.x, z: spec.z, radius: 1.5 };
-  soldier.goal.set(spec.x, 0, spec.z);
-  soldier.yaw = spec.yaw ?? Math.PI;
-  soldier.lookYaw = 0;
-  if (spec.kind === "execution") soldier.suppression = 0.84;
-  return soldier;
-}
-
-function SeedMeleeTargets() {
-  meleeQte?.Cancel("trainingReset");
+function StartMeleeScenario(id) {
+  const spec = MELEE_SCENARIOS.find(s => s.id === id) || MELEE_SCENARIOS[0];
+  meleeScenario = spec.id; meleePaused = false; meleePreview = null;
+  meleeCombat.Reset();
+  for (const soldier of [...ai.soldiers]) ai.Remove(soldier);
   meleeTargets.length = 0;
-  for (const spec of MELEE_QTE_TARGETS) {
-    meleeTargets.push({ spec, soldier: SpawnMeleeTarget(spec), deadCounted: false });
+  player.Spawn(1400, spec.kind === "observe" ? 1470 : 1467, 0);
+  player.spawnGrace = 0; player.debug.invincible = false; player.debug.noCollision = false;
+  state.slots.primary = "HanYang"; state.slots.melee = "Dadao";
+  viewmodel.action = null; state.meleeCharge = null;
+  state.activeSlot = spec.weapon === "Dadao" ? "melee" : "primary";
+  currentWeapon = SlotWeaponId(state.activeSlot);
+  state.ammo = state.mags[state.activeSlot]?.ammo || 0;
+  state.clips = state.mags[state.activeSlot]?.clips || 0;
+  viewmodel.Equip(currentWeapon, SlotWeaponVariant(state.activeSlot));
+  state.bayonetFixed = true; SyncBayonet();
+  hud.SetWeaponName(WEAPONS[currentWeapon]?.name || "");
+  const centerZ = spec.kind === "observe" ? 1463 : 1467;
+  const close = ["push", "ground", "bind"].includes(spec.kind);
+  const separation = close ? (spec.kind === "bind" ? 1.04 : 0.82) : 3.3;
+  for (let i = 0; i < spec.enemies + (spec.allies || 0); i++) {
+    const ally = i >= spec.enemies;
+    const offset = spec.enemies === 1 ? 0 : (i - (spec.enemies - 1) / 2) * 1.65;
+    const soldier = ai.Spawn(ally ? "nra" : "ija", 1400 + (ally ? 0 : offset), ally ? centerZ : centerZ - separation, {
+      weapon: ally && spec.allyWeapon === "Dadao" ? "Dadao" : ally ? "HanYang" : "Type38", squadId: `Melee_${spec.id}_${i}`,
+    });
+    if (!soldier) continue;
+    soldier.dummy = true; soldier.bayonetFixed = true; soldier.yaw = ally ? 0 : Math.PI;
+    soldier.meleeTraining = { kind: spec.kind, slot: i, passive: false };
+    soldier.holdZone = null; soldier.goal.copy(soldier.position);
+    meleeTargets.push({ soldier, id: ally ? `Friend${i}` : `Enemy${i + 1}` });
   }
+  if (spec.kind === "ground") meleeCombat.Fighter(player).poise = 20;
+  state.deathTimer = 0; state.pendingRespawn = false; state.playerAliveLast = true;
+  player.meleeCameraDrop = 0; player.meleePose = null;
+  viewmodel.root.visible = true; hud.HideDeathCard(); hud.Hint("", 0);
+  hud?.SetMeleeQte(null);
 }
-
-function MaintainMeleeTargets() {
-  for (const entry of meleeTargets) {
-    const soldier = entry.soldier;
-    if (soldier?.alive) { entry.deadCounted = false; continue; }
-    if (soldier && !entry.deadCounted) { entry.deadCounted = true; meleeStats.completed += 1; }
-    if (soldier && soldier.deadTime < 3) continue;
-    if (soldier) ai.Remove(soldier);
-    entry.soldier = SpawnMeleeTarget(entry.spec);
-    entry.deadCounted = false;
-    if (entry.soldier) meleeStats.respawned += 1;
-  }
+function MeleePreviewPose(entity, pose) {
+  const normalized = meleePreviewFrame ?? (state.elapsed % 2) / 2;
+  return {...pose, clip: `${meleeCombat.Weapon(entity)}${meleePreview}`, action: meleePreview,
+    state: "preview", t: normalized, normalized, duration: 1};
+}
+function SeedMeleeTargets() {
+  StartMeleeScenario(meleeScenario); meleePaused = true;
+  for (const entry of meleeTargets) entry.soldier.meleeTraining.passive = true;
+}
+function MaintainMeleeTargets() { /* End state is stable until explicit restart. */ }
+function MeleeSnapshot() {
+  const core = meleeCombat.State();
+  return { ...core, scenario: meleeScenario, menu: state.menu, health: player.health, alive: player.Alive,
+    weapon: meleeCombat.Weapon(player), preview: meleePreview, paused: meleePaused,
+    targets: meleeTargets.map(({ soldier: s, id }) => ({ id, runtimeId: s.id, side: s.side, health: s.health, alive: s.alive, x: s.position.x, z: s.position.z, distance: Math.hypot(s.position.x - player.position.x, s.position.z - player.position.z), pose: s.meleeCombat })),
+    hud: hud.MeleeQteState(),
+  };
 }
 
 /**
@@ -4319,6 +4253,7 @@ function RandomWeaponVariant(weaponId, seedText) {
 
 /** 换槽。长枪/短枪各记各的弹仓 —— 切回来不该是满的。 */
 function SwitchSlot(slot) {
+  if (meleeCombat && !meleeCombat.CanChangeWeapon()) return false;
   if (!player?.Alive || !SlotWeaponId(slot)) return false;
   if (slot === state.activeSlot) return false;
   if (viewmodel.IsBusy?.()) return false;          // 拉栓/压弹播到一半不许换手
@@ -4327,6 +4262,7 @@ function SwitchSlot(slot) {
     state.mags[state.activeSlot].clips = state.clips;
   }
   state.activeSlot = slot;
+  meleeCombat?.ReleasePlayer();
   currentWeapon = SlotWeaponId(slot);
   const mag = state.mags[slot];
   state.ammo = mag ? mag.ammo : 0;
@@ -4396,6 +4332,7 @@ function PlayHurtCues() {
   let grunted = false;
   for (const e of events) {
     if (e.kind === "hurt") {
+      if (e.blast && e.damage >= 24 && player.Alive) meleeCombat?.KnockDown(player, null, "blastImbalance");
       // 一帧只哼一声：一发霰射的弹片能同帧结算好几下，全播出来是一片噪音。
       if (grunted) continue;
       grunted = true;
@@ -4407,6 +4344,11 @@ function PlayHurtCues() {
 }
 
 function OnPlayerDown() {
+  if (MELEE_TEST) {
+    state.pendingRespawn = false; state.deathTimer = 0;
+    viewmodel.root.visible = false; audio.Play("bodyFall", {volume:.8});
+    hud.Hint("本轮阵亡 · 在白刃实验面板开始／重开", 30); return;
+  }
   if(p012Runtime){
     p012Runtime.failed=true;state.pendingRespawn=false;state.deathTimer=0;
     p012Runtime.retryAtLoad=carry?.Active?{x:player.position.x,z:player.position.z,yaw:player.yaw,stance:player.stance}:null;
@@ -4800,6 +4742,7 @@ function PlaceMenuGarrison(anchor) {
  * 而且不换关不重生就再也回不来（换槽的 SwitchSlot 不碰 root.visible）。
  */
 function ShowPauseMenu() {
+  meleeCombat?.HandleInput("Blur", false);
   state.running = false;
   interact?.CancelHold("pause");
   p012BinocularRaised = false;
@@ -4882,9 +4825,8 @@ const router = new InputRouter({
     if (!PointerLocked() && !SHOT) { RequestPointerLock(); return false; }
     return true;
   },
-  // QTE 先于 KEYMAP 接管 A/D/V/F 的按下与松开；否则 A/D 会同时让玩家横移，
-  // V 会另起一刀，F 又会顺手捡地上的枪，屏幕提示与实际因果就分叉了。
-  Capture: (_event, detail) => !!meleeQte?.HandleInput(detail.code, detail.down, detail.repeat),
+  // 白刃输入先于 KEYMAP；QTE 接管抵抗输入，避免 F 同时触发拾枪。
+  Capture: (_event, detail) => detail.code === "Blur" ? !!meleeCombat?.HandleInput("Blur", false) : state.ready && state.running && !state.menu && !state.cutscene && !(editor && editor.Capturing) && !!meleeCombat?.HandleInput(detail.code, detail.down, detail.repeat),
   OnAction: (action, detail) => {
     if (state.cutscene) return; // 过场只由 CutsceneDirector 接收 Look/Esc
     if (!state.ready) return;
@@ -4892,7 +4834,7 @@ const router = new InputRouter({
     // 滚滚轮会真的切枪 —— 而这两件事在暂停的世界里做，退出编辑器时状态已经错了。
     if (editor && editor.Capturing) return;
     if (["crouch", "prone", "traverse"].includes(action) || action.startsWith("stance:")) {
-      if (!state.running || state.menu || !player.Alive || meleeQte?.Active || emplacement?.Mounted) return;
+      if (!state.running || state.menu || !player.Alive || meleeCombat?.Active || emplacement?.Mounted) return;
     }
     if (action.startsWith("stance:")) {
       input.stanceRequested = action.slice(7);
@@ -4924,7 +4866,6 @@ const router = new InputRouter({
       case "interact":
         if (detail.down === false) { interact?.Release(); return; }
         if (interact?.Query(player)?.point?.id === "LiveGrenadeReturn") { DoInteract(); return; }
-        if (meleeQte?.TryBeginExecution()) return;
         // 架着机枪时 F 的语义就只剩「离位」（枪废了就是「弃枪」）。
         // **离位永远是玩家自己按的这一下** —— 脚本没有替他下枪位的口子。
         if (emplacement?.Mounted) { emplacement.Vacate("player"); return; }
@@ -5037,6 +4978,7 @@ function AimPoint(maxDist = 120) {
 
 /** 装填。桥夹压入固定弹仓，一次五发；没有备弹就只能去死人身上找。 */
 function Reload() {
+  if (meleeCombat && !meleeCombat.CanChangeWeapon()) return false;
   if (!player.Alive || viewmodel.IsBusy?.()) return false;
   const w = WEAPONS[currentWeapon];
   if (typeof weaponRange !== "undefined" && weaponRange && w?.magazine) {
@@ -5101,29 +5043,16 @@ function ReleaseCook() {
   state.cook = 0;
 }
 
-/**
- * 白刃（一次性出招那条路）：大刀槽的左键、以及大刀/投掷物在手时按 V。
- * 持枪的白刃不走这里 —— 那条是蓄力链（BeginMeleeCharge / ReleaseMeleeCharge）。
- */
+/** 白刃快捷出招也经过统一时序，不保留旧大刀即时伤害旁路。 */
 function DoMelee() {
-  if (!player.Alive || viewmodel.IsBusy?.()) return false;
-  viewmodel.TriggerMelee();
-  const weapon = WEAPONS[currentWeapon];
-  const useGun = !!(weapon?.bayonet && state.bayonetFixed);
-  const result = combat.Melee(useGun ? currentWeapon : "Dadao",
-    player.position.clone(), player.AimDirection(_aimDir).clone(),
-    useGun ? { mode: "thrust", power: 0.5 } : {});
-  // 同上：不在这里扣票，阵亡事件已经扣过了
-  if (result) ConfirmHit(result.died);
-  return !!result;
+  return !!(meleeCombat?.CanUse() && meleeCombat.Attack(player, false));
 }
 
 /**
- * 白刃蓄力入口。source: "key"（V 按下）| "mouse"（空枪左键按下）。
- * 大刀不蓄力（swingTimeS 里自带 90 ms 短蓄）、投掷物没有蓄劈的道理 ——
- * 这两类按下那一刻直接出招。
+ * 大刀与装刀长枪统一蓄力；未装刀长枪保留原枪托动作。
  */
 function BeginMeleeCharge(source) {
+  if (meleeCombat?.Weapon(player)) return meleeCombat.CanUse() && meleeCombat.AttackDown();
   if (!player?.Alive || state.meleeCharge) return false;
   const weapon = WEAPONS[currentWeapon];
   if (!weapon || weapon.kind === "melee" || weapon.kind === "throwable") return DoMelee();
@@ -5133,19 +5062,18 @@ function BeginMeleeCharge(source) {
   return true;
 }
 
-/** 松手出招：按住不足 chargeMinS 是挥砍（cut），够了是劈刺（thrust）。 */
+/** 松手进入统一接触时序；未装刀的武器只能砸枪托。 */
 function ReleaseMeleeCharge() {
+  if (meleeCombat?.Weapon(player)) return meleeCombat.CanUse() && meleeCombat.AttackUp();
   const charge = state.meleeCharge;
   if (!charge) return false;
   state.meleeCharge = null;
   if (!player?.Alive) { viewmodel.CancelMeleeCharge?.(); return false; }
   const weapon = WEAPONS[currentWeapon];
-  const fixed = !!(weapon?.bayonet && state.bayonetFixed);
   const charged = charge.t >= GUN_MELEE.chargeMinS;
   const power = charged ? Clamp01(charge.t / GUN_MELEE.chargeMaxS) : 0;
   // 没上刺刀：不管蓄多久都是枪托砸，蓄力只加力道 —— 拿枪管抡劈是要炸膛的
-  const mode = fixed ? (charged ? "thrust" : "cut") : "bash";
-  return DoMeleeAttack(mode, power);
+  return DoMeleeAttack("bash", power);
 }
 
 /** 持枪白刃出招：判定与动画吃同一份 mode/power。 */
@@ -5159,6 +5087,8 @@ function DoMeleeAttack(mode, power) {
 
 /** 装/卸刺刀（X）。只对 Data_Weapons 里 bayonet: true 的枪有意义。 */
 function ToggleBayonet() {
+  if (meleeCombat && !meleeCombat.CanChangeWeapon()) return false;
+  meleeCombat?.ReleasePlayer();
   if (!player?.Alive || !viewmodel) return false;
   const weapon = WEAPONS[currentWeapon];
   if (!weapon?.bayonet) {
@@ -5216,8 +5146,12 @@ function DoInteract() {
  * 绷带库存，1/2 来自实际槽位。没有可执行动作就传空数组，不用计时器伪造教程窗口。
  */
 function UpdateContextualActionPrompts() {
-  if (!player?.Alive || meleeQte?.Active) {
+  if (!player?.Alive || meleeCombat?.Active) {
     hud.SetActionPrompts([]);
+    return;
+  }
+  if (MELEE_TEST) {
+    hud.SetActionPrompts(meleeCombat?.CanUse() && meleeCombat.PushCandidate() ? [{keys:"F",label:"近身推架",kind:"push"}] : []);
     return;
   }
   // 架着机枪时提示条整段被机枪接管：这会儿能按的就只有扳机、R 和 F。
@@ -5262,10 +5196,10 @@ function UpdateContextualActionPrompts() {
     slots: state.slots,
     ammoEmpty: !(p012Flow && p012Flow.beat < 6) && gunInHand && state.ammo <= 0 && !!WEAPONS[currentWeapon]?.magazine,
   });
-  // 抬着东西的时候提示条已经被负重接管（只剩放下/扔下），别再往前面插一条处决 ——
+  // 抬着东西的时候提示条已经被负重接管（只剩放下/扔下），不插入推架提示。
   // 那一下 F 的实际结果是「放下担架」，提示与因果就分叉了。
-  if (!carry?.Active && meleeQte?.ExecutionCandidate()) {
-    prompts.unshift({ keys: "F", label: "踹开处决", kind: "execution" });
+  if (meleeCombat?.CanUse() && meleeCombat.PushCandidate()) {
+    prompts.unshift({ keys: "F", label: "近身推架", kind: "push" });
   }
   hud.SetActionPrompts(prompts);
 }
@@ -5965,8 +5899,8 @@ function Frame(dt, render = true) {
   const realDt = dt;
   // QTE 窗口走真实时间；下面玩家、AI、弹道、特效和叙事统一吃缩放后的玩法时间。
   // 这句必须在 state.elapsed 之前：否则慢的只有 AI，玩家/故事仍按正常速度飞过去。
-  if (state.ready && meleeQte) meleeQte.Update(realDt);
-  dt *= meleeQte?.TimeScale ?? 1;
+  // Combat is stepped after pause/menu/editor gates, before movement and AI.
+  dt *= meleeCombat?.TimeScale ?? 1;
   state.frame += 1;
   state.elapsed += dt;
   // 叠加层（Debug Rendering）不接管相机也不暂停玩法，所以它的每帧要排在
@@ -6033,18 +5967,27 @@ function Frame(dt, render = true) {
   if (state.deathTimer > 0) {
     state.deathTimer -= dt;
     if (state.deathTimer <= 0 && state.pendingRespawn) {
-      if (state.nraPool > 0) RespawnPlayer();
+      if (MELEE_TEST) { /* Keep the test result until the player restarts. */ }
+      else if (state.nraPool > 0) RespawnPlayer();
       else hud.Say(null, "没有人可以填上去了。", 8);
     }
   }
 
   profiler.B("input");
+  if (meleeCombat) {
+    meleeCombat.Update(realDt);
+    if (MELEE_TEST && meleePreview) {
+      const pose = meleeCombat.ViewPose();
+      for (const entry of meleeTargets) if (entry.soldier.meleeCombat) entry.soldier.meleeCombat = MeleePreviewPose(entry.soldier, entry.soldier.meleeCombat);
+    }
+  }
   const firePrev = input.fire;
   ReadKeys();
   p012BinocularRaised = !!p012Runtime?.binocularOwned && !!input.ads;
   if (p012Runtime?.binocularOwned) { input.fire = false; input.ads = false; }
   EnsureDebugInventory();
-  if (meleeQte?.Active) {
+  if (meleeCombat?.CanUse()) { input.fire = false; input.ads = false; }
+  if (meleeCombat?.Blocking) {
     input.forward = 0; input.strafe = 0; input.sprint = false;
     input.fire = false; input.ads = false;
     input.crouchPressed = false; input.pronePressed = false; input.stanceRequested = null;
@@ -6062,6 +6005,7 @@ function Frame(dt, render = true) {
   carry?.Update(dt, player);
   profiler.B("player");
   input.diveSpeedMps = p012Runtime?.DiveSpeed(strafe?.View());
+  player.meleePose = meleeCombat?.ViewPose();
   player.Update(dt, input, WEAPONS[currentWeapon], WEAPON_RANGE ? WEAPON_RANGE_PHASE.whitebox : null);
   profiler.E("player");
   // 架设机枪同样排在 player.Update **之后**：射界限位要夹的是这一帧的视线，
@@ -6214,6 +6158,7 @@ function Frame(dt, render = true) {
   profiler.B("viewmodel");
   viewmodel.Update(dt, {
     playerPosition: player.position, playerYaw: player.yaw,
+    meleeCameraDrop: player.meleeCameraDrop,
     prone: player.stanceBlend.prone, alive: player.Alive,
     dt, moveSpeed: Clamp01(Math.hypot(player.velocity.x, player.velocity.z) / 3.2),
     strafe: input.strafe, grounded: player.grounded, sprint: player.sprint,
@@ -6227,7 +6172,7 @@ function Frame(dt, render = true) {
     // 枪感方子 1 的另一半：最后一发打完栓停在后面不推回。
     // 即使 HUD 已显示弹药，枪机停后仍是玩家不移开视线就能读到的空仓通道。
     lowAmmo: state.ammo <= 1,
-    meleeQte: meleeQte?.ViewPose() || null,
+    meleeCombat: meleePreview && meleeCombat?.ViewPose() ? MeleePreviewPose(player, meleeCombat.ViewPose()) : meleeCombat?.ViewPose() || null,
   });
   profiler.E("viewmodel");
 
@@ -6509,7 +6454,7 @@ function Frame(dt, render = true) {
     // 抬着东西时准心收掉：枪不在手上，画一个散布锥就是在骗人。
     // 架着机枪反过来**要**留着：弹道收敛到准心指着的那个点上（EMPLACED_CONVERGE_M）。
     visible: DIFFICULTY.showCrosshair !== false && player.Alive
-      && !state.ordersOpen && !state.cutscene && !meleeQte?.Active && !carry?.Blocking && !p012Runtime?.binocularOwned,
+      && !state.ordersOpen && !state.cutscene && !meleeCombat?.Active && !carry?.Blocking && !p012Runtime?.binocularOwned,
     spreadDeg,
     fovDeg: camera.fov,
     viewportHeight: window.innerHeight,
@@ -6519,18 +6464,19 @@ function Frame(dt, render = true) {
     dt,
   });
   // 准心指着谁。写实档（targetInfo=false）整条链短路，不扫也不投射线。
-  hud.SetTarget(identify.Update(dt, {
+  hud.SetTarget(MELEE_TEST ? null : identify.Update(dt, {
     eye: _idEye.copy(player.EyePosition),
     dir: player.AimDirection(_idAim),
     soldiers: ai.soldiers,
     // extras：载具与固定火力点按 Script_Identify 的字段契约挂进来。
     // 战车系统还没进正片（Data_Levels 的 vehicles 仍是设计数据），所以现在是空的。
-    detail: player.Alive && !state.ordersOpen && !state.cutscene && !meleeQte?.Active
+    detail: player.Alive && !state.ordersOpen && !state.cutscene && !meleeCombat?.Active
       ? (WEAPON_RANGE ? false : DIFFICULTY.targetInfo ?? "basic") : false,
     spreadDeg,
   }), phase.hud);
   hud.SetSuppression(player.suppression);
-  hud.SetMeleeQte(meleeQte?.View() || null);
+  hud.SetMeleeQte(meleeCombat?.View() || null);
+  if (MELEE_TEST && state.frame % 6 === 0) meleeLab?.Update(MeleeSnapshot());
   // 按住型交互的进度环 + 负重条。两者都只读脱敏快照，HUD 不认识规则层的结构。
   hud.SetInteractProgress(interact?.View() || null);
   hud.SetCarry(carry?.View() || null);
@@ -6589,7 +6535,7 @@ function Frame(dt, render = true) {
  * 必然抄漏（夜战预设 exposure 是 3.6，抄成 0.5 整帧就是纯黑）。
  */
 function RenderScene(dt) {
-  if (viewmodel?.body) viewmodel.body.root.visible = !!player?.Alive && !state.cutscene && !state.menu && !editor?.Capturing;
+  if (viewmodel?.body) viewmodel.body.root.visible = !!player?.Alive && !(player.meleeCameraDrop > 0.05) && !state.cutscene && !state.menu && !editor?.Capturing;
   const phase = PHASE_TABLE[state.phaseIndex];
   // 剖析：GPU 帧从这里开到 post.Render 之后 —— GI 的几趟探针 pass、阴影烘焙、
   // 整条合成链都在这个窗口里按段计时（剖析器关着时这些调用是空转）。

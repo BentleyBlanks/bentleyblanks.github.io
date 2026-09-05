@@ -40,7 +40,9 @@ export const CONTROL_GUIDE = [
       { keys: "滚轮", label: "循环切换已有武器" },
       { keys: "R / 0", label: "装填 / 切换射击模式" },
       { keys: "T", label: "架两脚架" },
-      { keys: "V", label: "白刃：点按挥砍，按住蓄力劈刺" },
+      { keys: "大刀／已装刺刀", label: "左键轻击／蓄力重击，右键瞬时拨挡，贴身 F 推架" },
+      { keys: "僵持／倒地压制", label: "连续按 F 抵抗；成功后恢复自由战斗" },
+      { keys: "V", label: "白刃攻击备用键" },
       { keys: "X", label: "装 / 卸刺刀（可装刺刀的枪）" },
       { keys: "空枪左键", label: "没子弹时点左键直接白刃" },
       { keys: "G / H", label: "投手榴弹 / 集束手榴弹" },
@@ -200,18 +202,19 @@ export class InputRouter {
     const onMouseDown = (e) => {
       if (this.suppressed) { e.preventDefault?.(); return; }
       if (this.Guard(e) === false) return;
+      if (this.Capture(e, { code: `Mouse${e.button}`, down: true, repeat: this.mouse.has(e.button) })) { e.preventDefault?.(); return; }
       this.mouse.add(e.button);
       const entry = MOUSEMAP.find((m) => m.button === e.button);
       if (entry && entry.mode === "press") this.OnAction(entry.action, { button: e.button });
     };
-    const onMouseUp = (e) => { this.mouse.delete(e.button); };
+    const onMouseUp = (e) => { this.mouse.delete(e.button); this.Capture(e, { code: `Mouse${e.button}`, down: false, repeat: false }); };
     const onWheel = (e) => {
       if (this.suppressed) { e.preventDefault?.(); return; }
       if (this.Context() !== "world") return;
       this.OnAction("cycleSlot", { delta: e.deltaY > 0 ? 1 : -1 });
     };
     const onContextMenu = (e) => e.preventDefault();
-    const onBlur = () => { this.held.clear(); this.mouse.clear(); };
+    const onBlur = () => { this.held.clear(); this.mouse.clear(); this.Capture(null, { code: "Blur", down: false }); };
 
     target.addEventListener("keydown", onKeyDown);
     target.addEventListener("keyup", onKeyUp);

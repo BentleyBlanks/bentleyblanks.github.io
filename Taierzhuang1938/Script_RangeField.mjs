@@ -94,25 +94,15 @@ export class RangeField {
     sink.SetSector("Range");
 
     if (this.levelId === MELEE_QTE_LEVEL_ID) {
-      // 六个 20 m 间隔的白刃工位：前三块用石色标格挡、后三块加砖色横杠标处决。
-      // 所有目标前方都留足无碰撞空地，背后的横墙只负责收住画面与误射。
-      for (const objective of this.objectives) {
-        sink.Add("Stone", PlaceGeometry(MakeBox(8.4, 0.10, 8.0, 1.2, `qte_pad_${objective.id}`),
-          { x: objective.x, y: 0.05, z: objective.z - 1.1 }));
-        sink.Add("WoodBeam", PlaceGeometry(MakeBox(0.18, 2.4, 0.18, 1.2, `qte_sign_${objective.id}`),
-          { x: objective.x - 3.5, y: 1.2, z: objective.z + 2.6 }));
-        sink.Add(objective.kind === "execution" ? "BrickWall" : "WoodBeam",
-          PlaceGeometry(MakeBox(2.6, 0.15, 0.22, 1.2, `qte_mark_${objective.id}`),
-            { x: objective.x - 2.2, y: 1.82, z: objective.z + 2.6,
-              rz: objective.kind === "execution" ? -0.22 : 0.22 }));
-        this.stats.structures += 1;
+      // 灰色开阔战斗白盒：地面不加抬高台阶，边界与距离刻线走合批。
+      for (let d = 1; d <= 10; d++) {
+        sink.Add("Stone", PlaceGeometry(MakeBox(18, 0.015, 0.025, 1, `MeleeLine${d}`), { x: 1400, y: 0.009, z: 1468 - d }));
       }
-      const width = this.bounds.maxX - this.bounds.minX - 10;
-      const centerX = (this.bounds.minX + this.bounds.maxX) * 0.5;
-      sink.Add("BrickWall", PlaceGeometry(MakeBox(width, 3.2, 0.8, 1.2, "qte_backstop"),
-        { x: centerX, y: 1.6, z: 1448 }));
-      sink.Solid(centerX, 1.6, 1448, width * 0.5, 1.6, 0.4, "wall");
-      this.stats.structures += 1;
+      for (const [x,z,w,d] of [[1387,1461,0.5,38],[1413,1461,0.5,38],[1400,1442,26,0.5],[1400,1480,26,0.5]]) {
+        sink.Add("Stone", PlaceGeometry(MakeBox(w, 1.2, d, 1, "MeleeBoundary"), { x, y: 0.6, z }));
+        sink.Solid(x,0.6,z,w/2,0.6,d/2,"wall");
+      }
+      this.stats.structures = 14;
       for (const mesh of sink.Flush(this.scene, this.library)) this.meshes.push(mesh);
       this.colliders = sink.colliders;
       this.covers = sink.covers.slice();

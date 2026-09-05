@@ -125,7 +125,7 @@ const bearer=methods.Spawn.call(host,"nra",0,0,{unarmed:true,escortRole:"bearer"
 const ordinary=methods.Spawn.call(host,"nra",0,0,{});assert.equal(ordinary.unarmed,false);assert.equal(calls.at(-1).weapon,"HanYang");assert.equal(ordinary.actorKind,"nra");
 const unarmed=new Proxy({unarmed:true},{get(target,key){if(key!=="unarmed")throw new Error(`unarmed combat touched ${String(key)}`);return target[key];}});
 methods.TryFire.call({},unarmed,1,null);methods.TryBayonet.call({},unarmed,1,null);
-const soldier={unarmed:false,meleeTimer:2,bayonetFixed:false};methods.TryBayonet.call({},soldier,0.5,null);assert.equal(soldier.meleeTimer,1.5);
+let meleeRequests=0;const meleeHost={ctx:{meleeCombat:{Fighter(){meleeRequests++;}}}};const soldier={unarmed:false,bayonetFixed:false,target:{}};methods.TryBayonet.call(meleeHost,soldier,0.5,null);assert.equal(meleeRequests,0);soldier.bayonetFixed=true;methods.TryBayonet.call(meleeHost,soldier,0.5,null);assert.equal(meleeRequests,1);
 const evacuee={scriptedNoncombatant:true,state:"fire",suppression:1,target:{},cover:{},bayonetFixed:true,aimBlend:1};
 methods.Think.call({},evacuee,0.1,null);assert.equal(evacuee.state,"advance");assert.equal(evacuee.target,null);assert.equal(evacuee.cover,null);assert.equal(evacuee.bayonetFixed,false);
 const defender={state:"charge",order:"charge",cover:{x:100,z:0},bayonetFixed:true,ammo:5,target:{},weapon:{reloadTimeS:3.2}};

@@ -1,14 +1,4 @@
-// 刺刀系统回归：装/卸、空枪左键白刃、V 蓄力分挥砍与劈刺、伤害分层。
-//
-// 这条链的口径（docs/Data_Bayonet.md）：
-//   · X 装/卸刺刀：只对 bayonet: true 的枪生效；装上后视图模型的 bayonet 件常显。
-//   · 空枪左键 = 白刃，不是干壳：按下开始蓄力，松手出招（与 V 完全同一条链）。
-//   · 蓄力分档：按住 < 0.30 s 是挥砍（cut，90 伤），≥ 0.30 s 是劈刺
-//     （thrust，105 + 70·power，一下放倒一个 100 血的兵）。没上刺刀退化成枪托。
-//
-// 测法沿用 Script_SprintMeleeTest 的纪律：输入走 Debug.Key / Debug.Mouse 的
-// 真事件链（不直调函数），采样在同一个 page.evaluate 里同步跑完（rAF 不许插队）。
-
+// 刺刀装卸和正式战场接线：点按短刺、蓄力长刺、接触才伤害、弹药不改变白刃规则。
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
@@ -22,8 +12,9 @@ const browser = await LaunchBrowser();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on("pageerror", (error) => errors.push(String(error)));
-page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+page.on("console", (message) => { if (message.type() === "error" && !/fonts|ERR_BLOCKED_BY_CLIENT/.test(message.text())) errors.push(message.text()); });
 
+await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, r=>r.abort("blockedbyclient"));
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=medium&scale=small`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
@@ -36,69 +27,75 @@ const result = await page.evaluate(async () => {
   // 日军推远：先测装配与蓄力，不许被打断
   for (const s of T.ai.soldiers) if (s.side === "ija") s.position.x += 500;
   T.Debug.Key("Digit1");
-  T.StepFrames(30);
+  T.StepFrames(30,1/60,false);
   out.weapon = T.state.slots.primary;
 
   // --- 1) X 装刺刀：bayonet 件从无/隐着变成常显 -----------------------------
   out.fixedBefore = { state: T.state.bayonetFixed,
     visible: !!T.viewmodel.rig?.parts?.bayonet?.visible };
   T.Debug.Key("KeyX");
-  T.StepFrames(70);                        // 0.95 s 动画播完
+  T.StepFrames(70,1/60,false);                        // 0.95 s 动画播完
   out.fixedAfter = { state: T.state.bayonetFixed,
     hasPart: !!T.viewmodel.rig?.parts?.bayonet,
     visible: !!T.viewmodel.rig?.parts?.bayonet?.visible,
     source: T.viewmodel.rigSource };
 
-  // --- 2) V 点按 = 挥砍（cut），不耗子弹 ------------------------------------
+  // --- 2) V 点按 = 短刺，不耗子弹 ------------------------------------
   const ammoBefore = T.state.ammo;
   T.Debug.Key("KeyV", true);
   T.StepFrames(3);                         // 50 ms —— 远小于 0.30 s 的蓄力线
   T.Debug.Key("KeyV", false);
   T.StepFrames(2);
-  out.tapMode = T.viewmodel.action?.melee ?? null;
-  out.tapKind = T.viewmodel.action?.kind ?? null;
+  out.tapMode = T.meleeCombat.State().player?.action;
+  out.tapKind = T.meleeCombat.State().player?.state;
   out.tapAmmoKept = T.state.ammo === ammoBefore;
-  T.StepFrames(60);                        // 收招
+  T.StepFrames(60,1/60,false);                        // 收招
 
-  // --- 3) V 按住 ≥ 0.3 s = 劈刺（thrust），一刀放倒满血兵 --------------------
+  // --- 3) V 按住 ≥ 0.38 s = 长刺，一刀放倒满血兵 --------------------
   // 页面没暴露全局 THREE：借一个现成 Vector3 的克隆当出参
   const dir = T.player.AimDirection(T.player.velocity.clone());
+  const {WEAPONS}=await import('./Data_Weapons.mjs');
   const PlantTarget = () => {
     const enemy = T.ai.soldiers.find((s) => s.side === "ija");
-    enemy.alive = true; enemy.health = 100;
+    enemy.alive = true; enemy.health = 100; enemy.dummy = true; enemy.bayonetFixed = true;
+    enemy.unarmed=false;enemy.scriptDefensive=false;enemy.scriptedNoncombatant=false;enemy.meleeTraining = {passive:true};
+    enemy.weaponId='Type38';enemy.weapon=WEAPONS.Type38;enemy.holdZone=null;
     enemy.position.copy(T.player.position).addScaledVector(dir, 1.5);
-    enemy.position.y = T.player.position.y;
+    enemy.position.y = T.player.position.y; enemy.body?.Teleport(enemy.position.x,enemy.position.y,enemy.position.z);
+    T.StepFrames(3,1/60,false);
+    T.player.yaw = Math.atan2(T.player.position.x-enemy.position.x,T.player.position.z-enemy.position.z);
+    T.player.pitch=0;T.player.aimYaw=0;T.player.aimPitch=0;
     return enemy;
   };
   T.Debug.Key("KeyV", true);
-  T.StepFrames(30);                        // 0.5 s > chargeMinS
-  out.windKind = T.viewmodel.action?.kind ?? null;
+  T.StepFrames(30,1/60,false);                        // 0.5 s > chargeMinS
+  out.windKind = T.meleeCombat.State().player?.state;
   // 靶要在**松手前一刻**才埋：蓄力那 30 帧里 AI 与物理照跑，早埋的靶会被
   // 自己的刚体/寻路拽回原位（直调 Melee 验证过判定本身是对的）。
   const first = PlantTarget();
   T.Debug.Key("KeyV", false);              // keyup 同步出招，中间不隔帧
-  out.thrustMode = T.viewmodel.action?.melee ?? null;
-  out.thrustPower = T.viewmodel.action?.power ?? -1;
+  out.thrustMode = T.meleeCombat.State().player?.action;
+  out.beforeContact = first.health; T.StepFrames(30,1/60,false);
   out.thrustKilled = !first.alive;
-  T.StepFrames(80);
+  T.StepFrames(80,1/60,false);
 
   // --- 4) 空枪左键 = 白刃蓄力，松手出招；干壳提示不再吞掉这一下 --------------
   T.state.ammo = 0;
   T.Debug.Mouse(0, true);
-  T.StepFrames(30);                        // 按住蓄力 0.5 s
-  out.mouseCharge = !!T.state.meleeCharge;
+  T.StepFrames(30,1/60,false);                        // 按住蓄力 0.5 s
+  out.mouseCharge = T.meleeCombat.State().player?.state === "charge";
   const second = PlantTarget();            // 同上：松手前一刻才埋靶
   T.Debug.Mouse(0, false);
-  T.StepFrames(2);                         // 鼠标那条的松手判在 Frame 里，得走一帧
-  out.mouseMode = T.viewmodel.action?.melee ?? null;
+  T.StepFrames(30,1/60,false);                        // 鼠标那条的松手判在 Frame 里，得走一帧
+  out.mouseMode = T.meleeCombat.State().player?.action;
   out.mouseKilled = !second.alive;
-  T.StepFrames(80);
+  T.StepFrames(80,1/60,false);
 
   // --- 4.5) 画面闸：上了刺刀，刀在腰射姿态下必须真的看得见 -------------------
   //
   // 为什么要量像素而不是量 visible：这条链上"visible = true"曾经全绿了很久，
   // 而玩家在画面上一个刺刀都看不到 —— 刀顺着枪管指出去，整条藏在枪管剪影后面
-  // （实测腰射 1 px、开镜 0、冲刺 0、劈刺 0）。口径与取证见 docs/Data_Bayonet.md
+  // （实测腰射 1 px、开镜 0、冲刺 0、长刺 0）。口径与取证见 docs/Data_Bayonet.md
   // 「上了刺刀就换持枪法」。量法：把刀件涂成纯色、depthTest 照常（枪该挡还挡），
   // 数屏幕上刀真正占住的面积。
   //
@@ -141,16 +138,16 @@ const result = await page.evaluate(async () => {
 
   // --- 5) 换到短枪再换回来：刺刀还装着；X 对不可装刺刀的枪不生效 -------------
   T.Debug.Key("Digit4");                   // 投掷物槽（第二关没有短枪）
-  T.StepFrames(20);
+  T.StepFrames(20,1/60,false);
   const throwableBayonet = T.state.bayonetFixed;   // 状态保留，但视图模型无刀件
   T.Debug.Key("Digit1");
-  T.StepFrames(20);
+  T.StepFrames(20,1/60,false);
   out.backVisible = !!T.viewmodel.rig?.parts?.bayonet?.visible;
   out.keptAcrossSwitch = throwableBayonet && T.state.bayonetFixed;
 
   // --- 6) X 再按一次卸下 ----------------------------------------------------
   T.Debug.Key("KeyX");
-  T.StepFrames(70);
+  T.StepFrames(70,1/60,false);
   out.unfixed = { state: T.state.bayonetFixed,
     visible: !!T.viewmodel.rig?.parts?.bayonet?.visible };
   return out;
@@ -161,14 +158,14 @@ const checks = [
   ["初始未上刺刀且刀不可见", !result.fixedBefore.state && !result.fixedBefore.visible],
   ["X 上刺刀：状态翻转", result.fixedAfter.state === true],
   ["上刺刀后视图模型有刀件且常显", result.fixedAfter.hasPart && result.fixedAfter.visible],
-  ["V 点按是挥砍（cut）", result.tapKind === "melee" && result.tapMode === "cut"],
-  ["挥砍不耗子弹", result.tapAmmoKept === true],
-  ["按住时进入蓄力（meleeWind）", result.windKind === "meleeWind"],
-  ["按住 0.5 s 松手是劈刺（thrust）", result.thrustMode === "thrust"],
-  ["劈刺蓄力量 > 0.3", result.thrustPower > 0.3],
-  ["劈刺一刀放倒满血兵", result.thrustKilled === true],
+  ["V 点按是短刺", result.tapKind === "attack" && ["Light","LightAlt"].includes(result.tapMode)],
+  ["短刺不耗子弹", result.tapAmmoKept === true],
+  ["按住时进入蓄力", result.windKind === "charge"],
+  ["按住 0.5 s 松手是长刺", result.thrustMode === "Heavy"],
+  ["松手时尚未接触，敌人不提前扣血", result.beforeContact === 100],
+  ["长刺一刀放倒满血兵", result.thrustKilled === true],
   ["空枪左键按住进入蓄力", result.mouseCharge === true],
-  ["空枪松手出招且是劈刺", result.mouseMode === "thrust"],
+  ["空枪松手出招且是长刺", result.mouseMode === "Heavy"],
   ["空枪白刃也放得倒人", result.mouseKilled === true],
   [`上刺刀后刀身在画面上读得出（腰射 ${result.bladePixels} px ≥ 60）`,
     result.bladePixels >= 60],

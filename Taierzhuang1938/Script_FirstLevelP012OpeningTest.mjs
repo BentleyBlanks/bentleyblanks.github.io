@@ -22,7 +22,7 @@ const context = vm.createContext({ state, debugOptions, currentWeapon: "HanYang"
   WEAPONS: { HanYang: { magazine: 5 } }, AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload,
   player: { Alive: true, Busy: false, InWater: false }, viewmodel: { IsBusy: () => busy, TriggerReload: () => { busy = true; } },
   audio: { Play() {} }, hud: { Hint() {} }, fireCooldown: 0, fireEdge: true,
-  emplacement: null, carry: null, input: { fire: true }, BeginMeleeCharge: () => { state.meleeCharge = true; },
+  emplacement: null, carry: null, meleeCombat: null, input: { fire: true }, BeginMeleeCharge: () => { state.meleeCharge = true; },
 });
 vm.runInContext(["EffectiveInfiniteAmmo", "EnsureDebugInventory", "Reload", "TryFire"].map(MainFunction).join("\n"), context);
 context.EnsureDebugInventory();

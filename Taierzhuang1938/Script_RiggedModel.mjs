@@ -350,7 +350,8 @@ export class FpsArmRig {
     return this;
   }
 
-  SetPoseState({ ads = 0, sprint = 0, reload = false, reloadBlend = 0 } = {}) {
+  SetPoseState({ ads = 0, sprint = 0, reload = false, reloadBlend = 0, melee = false } = {}) {
+    this.poseState.melee = melee;
     this.poseState.reload = reload;
     this.poseState.ads = THREE.MathUtils.clamp(ads, 0, 1);
     this.poseState.sprint = THREE.MathUtils.clamp(sprint, 0, 1);
@@ -441,6 +442,13 @@ export class FpsArmRig {
     if (this.unarmed) return { shoulders: { right:[0.19,-0.36,-0.07], left:[-0.19,-0.36,-0.07] },
       elbowPoles: {right:[0.3,-0.8,0.15], left:[-0.3,-0.8,0.15]} };
     if (!this.poseSpec) return null;
+    // Two-handed blade work needs the support shoulder behind the grip. The
+    // inspection pose's forward shoulder folds the new anatomical arm across
+    // the camera and cannot accommodate the blade's diagonal follow-through.
+    if (this.poseState.melee && this.poseSpec.family === "melee") {
+      return {shoulders:{right:[0.19,-0.40,-0.15],left:[-0.19,-0.40,-0.10]},
+        elbowPoles:{right:[0.30,-0.80,0.12],left:[-0.30,-0.80,0.12]}};
+    }
     if (["boltRifle", "lmg", "pistol"].includes(this.poseSpec.family)) {
       const pistol = this.poseSpec.family === "pistol";
       const adsShoulder = this.poseSpec.ads.weapon.eyeDistance > 0.45 ? -0.41 : -0.26;

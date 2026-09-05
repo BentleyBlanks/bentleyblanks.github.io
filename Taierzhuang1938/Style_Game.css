@@ -394,8 +394,8 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    让负重条压在上面（它是更急的信息）。 */
 #hud.carrying .hudTelegraph { opacity: 0; }
 
-/* 白刃 QTE：慢动作里唯一留在中央的高优先级信息。宽条是完成度，细条是真实时间；
-   定时处决的亮区直接画在细条上，玩家不必把百分比换算成时机。 */
+/* 白刃抵抗：侧下方显示武器控制进度与剩余时间；
+   中央视野留给双手、交叉的武器与敌人。 */
 .hudMeleeQte {
   position: absolute; left: 50%; top: 54%; z-index: 34;
   width: min(520px, calc(100vw - 34px)); box-sizing: border-box;
@@ -409,10 +409,10 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   transition: opacity 0.10s ease, transform 0.12s ease;
 }
 .hudMeleeQte.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-.hudMeleeQte.execution { border-top-color: rgba(208,82,58,0.94); }
+
 .mqSlow { color: rgba(230,223,205,0.48); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; }
 .mqTitle { margin-top: 3px; color: var(--warn); font: 700 20px/1.35 "Noto Serif SC", serif; letter-spacing: 0.10em; }
-.hudMeleeQte.execution .mqTitle { color: #e18a71; }
+
 .mqPrompt { min-height: 23px; margin-top: 4px; color: rgba(230,223,205,0.86); font-size: 13px; }
 .mqKeys { min-height: 50px; display: flex; align-items: center; justify-content: center; gap: 9px; margin: 7px 0 9px; }
 .mqKeys span { color: rgba(230,223,205,0.30); }
@@ -842,3 +842,14 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudHitmark .t:nth-child(4) { transform: rotate(-45deg)  translateX(var(--spread)); }
 /* 击杀：更长、干血红。不做旋转/放大动画 —— 那是连杀播报的语汇，不是这个游戏的。 */
 .hudHitmark.kill { --len: 13px; --mk: rgba(204, 66, 48, 1); }
+.meleeLab{position:fixed;right:18px;top:85px;z-index:38;width:290px;max-height:calc(100vh - 155px);overflow:auto;background:rgba(19,25,27,.93);color:#e9e6d9;border:1px solid #788280;border-top:3px solid #c5af72;padding:16px;font:13px/1.55 system-ui,sans-serif;box-shadow:0 10px 38px #0007;pointer-events:auto}
+.meleeLab[hidden]{display:none}.mlHeading{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}.mlHeading b{font-size:18px}.mlHeading span{font-size:11px;color:#b2b9b2}.meleeLab label{display:block;color:#adb6ae;font-size:11px}.meleeLab select{width:100%;background:#273034;color:#f7f1df;border:1px solid #65706c;padding:8px;margin:5px 0 10px}.mlButtons{display:flex;gap:7px}.meleeLab button{background:#c7b276;color:#172020;border:0;padding:8px 10px;cursor:pointer;flex:1}.meleeLab button:focus-visible,.meleeLab select:focus-visible{outline:2px solid #fff}.mlTip{color:#e0d3af;margin:12px 0}.mlControls{font-size:12px;color:#b9c2c0;border-top:1px solid #54615a;padding-top:10px}.mlControls small{color:#d8c181}.mlStatus{display:block;color:#cdd9ad;margin-bottom:8px}.mlMeters,.mlTargets,.mlLog{white-space:pre-line;font-variant-numeric:tabular-nums}.mlMeters{padding:9px;background:#ffffff09}.mlTargets{font-size:11px;margin:9px 0;color:#b8c7cb}.mlLog{font-size:11px;color:#a9b4ad}.meleeLab details{border-top:1px solid #52615b;padding-top:8px;margin-top:8px}.meleeLab summary{cursor:pointer}.hudMeleeQte{width:340px;top:64%;padding:12px 18px}.hudMeleeQte .mqSlow{font-size:10px}.hudMeleeQte .mqTitle{font-size:22px}.hudMeleeQte .mqProgress{position:relative}.hudMeleeQte .mqProgress:before{content:'敌方';position:absolute;left:0;top:9px;font-size:10px}.hudMeleeQte .mqProgress:after{content:'我方';position:absolute;right:0;top:9px;font-size:10px}.hudMeleeQte .mqTimeline{margin-top:25px}
+@media(max-width:760px){.meleeLab{top:10px;right:8px;width:220px;padding:10px;max-height:45vh;font-size:11px}.mlHeading b{font-size:14px}.mlControls{font-size:10px}.hudMeleeQte{width:280px;top:65%}}
+
+.hudMeleeQte{top:auto;bottom:18px;transform:translateX(-50%);width:310px;padding:10px 14px}.hudMeleeQte .mqSlow{margin-bottom:2px}.hudMeleeQte .mqTitle{font-size:18px}.hudMeleeQte .mqKeys{margin:4px 0}.hudMeleeQte kbd{width:34px;height:34px;line-height:34px;font-size:20px}.hudMeleeQte .mqTimeline{margin-top:15px}.hudMeleeQte .mqProgress:before,.hudMeleeQte .mqProgress:after{display:none}
+
+.hudMeleeQte,.hudMeleeQte.on{left:22px;top:auto;bottom:22px;transform:none;width:280px}
+@media(max-width:760px){.hudMeleeQte,.hudMeleeQte.on{left:8px;bottom:8px;width:220px;padding:8px}.hudMeleeQte .mqTitle{font-size:16px}.hudMeleeQte .mqPrompt{font-size:11px}.hudMeleeQte .mqKeys{min-height:35px}}
+.meleeLabActive .hudMarkers,.meleeLabActive .hudForceStatus,.meleeLabActive .hudTop{display:none}
+.hudMeleeQte .mqProgress{overflow:visible;background:linear-gradient(90deg,rgba(119,170,184,.45),rgba(199,99,72,.40))}
+.hudMeleeQte .mqProgress i{position:absolute;top:-3px;width:12px;height:12px;border-radius:50%;transform:translateX(-50%);background:var(--warn);box-shadow:0 0 5px #0008;transition:left .04s linear}

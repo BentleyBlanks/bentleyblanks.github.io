@@ -106,13 +106,17 @@ const result = await page.evaluate((expected) => {
     if (!s) return null;
     s.position.copy(T.player.position).addScaledVector(dir, 1.5);
     s.position.y = T.player.position.y;
+    s.body?.Teleport(s.position.x,s.position.y,s.position.z);
+    s.bayonetFixed=true;s.meleeTraining={passive:true};
     return s;
   };
   T.Debug.Key("KeyV", true);
   T.StepFrames(30);                          // > 0.30 s 的蓄力线 → 劈刺
   const m1 = Plant("M1");                    // 靶在松手前一刻才埋
   T.Debug.Key("KeyV", false);
-  out.thrustMode = T.viewmodel.action?.melee ?? null;
+  out.thrustMode = T.meleeCombat.State().player?.action;
+  out.beforeContact=!!m1&&m1.health;
+  T.StepFrames(35,1/60,false);
   out.thrustKilled = !!m1 && !m1.alive;
   T.StepFrames(80);
 
@@ -121,9 +125,10 @@ const result = await page.evaluate((expected) => {
   T.StepFrames(20);
   out.meleeSlot = T.state.activeSlot;
   out.meleeWeapon = T.state.slots.melee;
+  T.Debug.Mouse(0,true);T.StepFrames(30,1/60,false);
   const m2 = Plant("M2");
-  T.Debug.Fire();
-  T.StepFrames(60);
+  T.Debug.Mouse(0,false);
+  T.StepFrames(90,1/60,false);
   out.dadaoKilled = !!m2 && !m2.alive;
 
   // --- 6) 手榴弹：投弹位朝靶带扔一颗，弹数下账、靶带见伤 --------------------
@@ -169,7 +174,7 @@ const checks = [
   ["10 m 靶真掉血", result.rifleDamaged === true],
   ["弹药下账", result.ammoSpent === true],
   ["X 上刺刀：状态翻转且刀件常显", !result.bayonetBefore && result.bayonetFixed && result.bayonetVisible],
-  ["蓄力劈刺一刀放倒木桩", result.thrustMode === "thrust" && result.thrustKilled === true],
+  ["蓄力长刺先起手再接触放倒木桩", result.thrustMode === "Heavy" && result.beforeContact === 100 && result.thrustKilled === true],
   ["3 号槽是大刀且劈得倒人", result.meleeSlot === "melee" && result.meleeWeapon === "Dadao"
     && result.dadaoKilled === true],
   ["手榴弹下账一颗", result.grenadeSpent === true],

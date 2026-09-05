@@ -4,6 +4,7 @@
 // 这里实例化。每名士兵稳定抽取本阵营五个模型之一；第一人称过场主角固定 Nra01。
 
 import * as THREE from "three";
+import { MeleeAnimationPlayer } from "./Script_MeleeAnimation.mjs";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
 import { RaycastCapsule, RaycastEllipsoid, RaycastSphere } from "./Script_CharacterHitboxMath.mjs";
@@ -457,6 +458,7 @@ export class LugouCharacterRig {
     // Socket_HeadGear 是骨尾，不是头盔中心；只拿它的长度作尺，方向由 Head 自己给。
     const headCenter = BuildHeadHitCenter(this.bones.head, this.sockets.headGear);
     this.hitboxNodes = { ...this.bones, headCenter };
+    this.meleeAnimation = new MeleeAnimationPlayer(this.root, kind);
     this.hitboxes = CHARACTER_HITBOX_PROFILE.map((definition) => {
       const isNraHead = definition.id === "head" && String(kind).startsWith("nra");
       return {
@@ -612,8 +614,10 @@ export class LugouCharacterRig {
 
   Update(dt, state = {}) {
     if (this.disposed) return;
+    this.meleeAnimation?.Restore();
     this.Play(this._ActionForState(state));
     this.mixer.update(Math.max(0, dt));
+    this.meleeAnimation?.Apply(state.meleeCombat);
     // First-person cutscenes place the camera at the eye socket.  The source is
     // one combined SkinnedMesh, so there is no detachable head object; collapse
     // the head bone after mixer evaluation instead.  Doing it before mixer.update

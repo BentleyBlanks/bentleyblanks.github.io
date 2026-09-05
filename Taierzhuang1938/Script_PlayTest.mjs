@@ -345,17 +345,24 @@ const melee = await page.evaluate(() => {
   // 不是白刃坏了。先把人等活过来。
   for (let k = 0; k < 8 && !T.player.Alive; k += 1) T.StepFrames(200);
   T.player.health = 100;
-  const enemy = T.ai.soldiers.find((s) => s.alive && s.side === "ija");
+  T.state.slots.melee='Dadao';D.Key('Digit3');T.StepFrames(30,1/60,false);
+  const enemy = T.ai.soldiers.find((s) => s.alive && s.side === "ija" && s.weapon?.bayonet);
   if (!enemy) return { noEnemy: true };
   const busy = T.viewmodel.IsBusy();
   const fwd = { x: -Math.sin(T.player.yaw), z: -Math.cos(T.player.yaw) };
   enemy.position.set(T.player.position.x + fwd.x * 1.2, T.player.position.y,
     T.player.position.z + fwd.z * 1.2);
+  const previous={dummy:enemy.dummy,bayonetFixed:enemy.bayonetFixed,meleeTraining:enemy.meleeTraining};
+  enemy.body?.Teleport(enemy.position.x,enemy.position.y,enemy.position.z);
+  enemy.dummy=true;enemy.bayonetFixed=true;enemy.meleeTraining={passive:true};
   const hpBefore = enemy.health;
   D.DoMelee();
-  return { hpBefore, hpAfter: enemy.health, alive: enemy.alive, busy, playerAlive: T.player.Alive };
+  const beforeContact=enemy.health;T.StepFrames(22,1/60,false);
+  const result={ hpBefore, beforeContact, hpAfter: enemy.health, alive: enemy.alive, busy, playerAlive: T.player.Alive };
+  Object.assign(enemy,previous);T.StepFrames(45,1/60,false);D.Key('Digit1');T.StepFrames(20,1/60,false);
+  return result;
 });
-Check("白刃能砍到人", !melee.noEnemy && melee.hpAfter < melee.hpBefore,
+Check("白刃能砍到人", !melee.noEnemy && melee.beforeContact === melee.hpBefore && melee.hpAfter < melee.hpBefore,
   melee.noEnemy ? "场上没有日军"
     : `${melee.hpBefore} -> ${melee.hpAfter}（挥刀时 busy=${melee.busy} 玩家活=${melee.playerAlive}）`);
 

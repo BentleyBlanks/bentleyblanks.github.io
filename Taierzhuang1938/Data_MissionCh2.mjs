@@ -58,16 +58,10 @@
 //      ③ 将被引爆：掷弹筒命中后冒烟倒计时 4—6 s，拖出 6 m 算救下，否则连锁殉爆。
 //    现在 mechanics.crateHauling 只有旗标没有实现，第一、第三阶段的玩家动作全落空。
 //
-// 3. 白刃 QTE 接入（引擎已有，缺的是正片触发点）
-//    模块：Script_MeleeQte.MeleeQteDirector（BeginBlock / TryBeginExecution，
-//    三套格挡 + 三套处决在 Data_MeleeQte.MELEE_BLOCK_PATTERNS / MELEE_EXECUTION_PATTERNS）。
-//    正片接入方式：
-//      · 触发点＝本章 zone:C2_BackStreet 的坍塌缺口段。日军进入 MELEE_QTE.blockReachM
-//        (2.15 m) 且面朝玩家时由 AI 调 director.BeginBlock(attacker)；玩家反打走
-//        TryBeginExecution（F），与训练场同一套输入与判定，不另写一份。
-//      · 这是全作**第一次**白刃战：第一次 BeginBlock 前 HUD 要给一次按键提示
-//        （之后不再提示）。
-//      · 该段禁用训练场的 trainingResetS 自动复位（正片没有木桩，复位会把敌人变回站桩）。
+// 3. 白刃战接入：Script_MeleeCombat 统一自由战斗、拨挡与 F 推架。
+//    接触同时发力或蓄力强顶才进入站立僵持；真实倒地后敌人压上才进入倒地抵抗。
+//    两类抵抗都连按 F，成功后恢复自由战斗，绝不自动处决。
+//    本章缺口沿用同一机制；上刺刀台词只负责首次提示，战斗不会自动重置敌人。
 //      · 缺口内日军清空时 story.Signal("BayonetDone")（见 ENGINE_REQUEST 4）。
 //
 // 4. LEVEL_CUES 缺 CH2_Shouliudan 表 —— **已解决**（INT2，2026-08-29）
@@ -229,7 +223,7 @@ export const CHAPTER = {
     grenadeRain: true,        // 集中投弹：玩家与背景守军同时投，成「手榴弹雨」
     crateHauling: true,       // 拖弹药箱、清瓦砾、受潮弹单独放、拖走将被引爆的箱子
     bayonetFirst: true,       // 第一次白刃战：突刺、枪托、推挡、体力管理、拾大刀
-    meleeQte: true,           // 白刃走 Script_MeleeQte 的格挡/处决 QTE（见 ENGINE_REQUEST 3）
+    meleeQte: true,           // 白刃走 Script_MeleeCombat 与两类抵抗（见 ENGINE_REQUEST 3）
     coveredWithdrawal: true,  // 交替换防：掩护第一组撤离 → 拆枪机 → 撤到第二街垒
   },
 };

@@ -125,8 +125,8 @@ const ACTION_ICONS = {
   bandage: `<svg viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-45 12 12)"><rect x="3.2" y="9" width="17.6" height="6" rx="3"/><path d="M9 9v6M15 9v6"/></g></svg>`,
   // 双向箭头：换枪
   switchWeapon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h13l-3.4-3.4M20 15H7l3.4 3.4"/></svg>`,
-  // 踢开近身敌人的靴印 + 刀线：特殊条件下的处决
-  execution: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18c3-4 6-4 9-2l3 2 4-1M13 16l3-7m-1 2 5-5M7 19l3 2"/></svg>`,
+  // 推架：顶开近身武器，不表示处决。
+  push: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18c3-4 6-4 9-2l3 2 4-1M13 16l3-7m-1 2 5-5M7 19l3 2"/></svg>`,
   // --- 任务流程重制新增：担架/搬运/救护那一批 ---------------------------------
   // 两根杠加一张布：担架、门板担架、抬起任何重物
   carry: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9h20M2 15h20M6 7.5v9M18 7.5v9"/></svg>`,
@@ -394,11 +394,11 @@ export class Hud {
     this.telegraphPaperKey = "";
     this.el.meleeQte = mk("hudMeleeQte");
     this.el.meleeQte.innerHTML = `
-      <div class="mqSlow">慢动作 · 白刃接触</div>
+      <div class="mqSlow">武器控制 · 我方 ← ● → 敌方</div>
       <div class="mqTitle"></div>
       <div class="mqPrompt"></div>
       <div class="mqKeys"></div>
-      <div class="mqProgress"><i></i></div>
+      <div class="mqProgress" role="progressbar" aria-label="我方武器控制" aria-valuemin="0" aria-valuemax="100"><i></i></div>
       <div class="mqTimeline"><b></b><i></i></div>
       <div class="mqResult"></div>
       <div class="mqAssist"></div>`;
@@ -501,7 +501,7 @@ export class Hud {
     }
   }
 
-  /** 六套白刃 QTE 共用一张中心卡；只读 Script_MeleeQte.View() 的脱敏快照。 */
+  /** 站立和倒地抵抗共用底部进度卡；只读 Script_MeleeQte.View() 的脱敏快照。 */
   SetMeleeQte(view) {
     const root = this.el.meleeQte;
     if (!view) {
@@ -518,7 +518,7 @@ export class Hud {
     root.setAttribute("aria-label", `${view.label}，${view.prompt}`);
     this.el.mqTitle.textContent = view.label;
     this.el.mqPrompt.textContent = view.phase === "resolve"
-      ? (view.success ? (view.kind === "execution" ? "踹开！收刀！" : "拨开刺刀！可按 F 处决") : "失手")
+      ? (view.success ? "推开了！准备恢复自由战斗" : "失势 · 抵抗失败")
       : view.prompt;
     const signature = `${view.serial}|${view.index}|${view.expected}|${view.phase}`;
     if (this.el.mqKeys.dataset.signature !== signature) {
@@ -530,7 +530,9 @@ export class Hud {
         return `<kbd class="${done ? "done" : expected ? "expected" : ""}">${key}</kbd>`;
       }).join(`<span>›</span>`);
     }
-    this.el.mqProgress.style.width = `${Math.round((view.progress || 0) * 100)}%`;
+    const control = Math.round(Math.max(0, Math.min(1, view.progress || 0)) * 100);
+    this.el.mqProgress.style.left = `${100 - control}%`;
+    this.el.mqProgress.parentElement.setAttribute("aria-valuenow", String(control));
     this.el.mqTimeline.style.width = `${Math.round((view.timeT || 0) * 100)}%`;
     const sweet = view.sweetStart == null ? null : {
       left: view.sweetStart * 100, width: (view.sweetEnd - view.sweetStart) * 100,
@@ -543,7 +545,7 @@ export class Hud {
     this.el.mqResult.textContent = view.phase === "resolve"
       ? (view.success ? "成功" : "失败") : `${Math.max(0, view.timeLeft).toFixed(1)} 秒`;
     this.el.mqAssist.textContent = view.assist === "auto" ? "辅助：自动完成"
-      : view.assist === "hold" ? "辅助：长按代替连按" : "快速反应";
+      : view.assist === "hold" ? "辅助：长按代替连按" : "有效连按最多每秒 7 次";
   }
 
   MeleeQteState() { return this.meleeQteState ? { ...this.meleeQteState } : null; }

@@ -1772,7 +1772,7 @@ export class Actor {
     const hurt = Clamp01(s.hurt ?? 0);
     const throwing = Clamp01(s.throwing ?? 0);
     const melee = Clamp01(s.melee ?? 0);
-    const meleeQte = s.meleeQte || null;
+
     const dying = Clamp01(s.dying ?? 0);
     const grounded = s.grounded !== false;
     const verticalVelocity = Clamp(s.verticalVelocity ?? 0, -14, 7);
@@ -2210,7 +2210,7 @@ export class Actor {
       breath, idleSway, prone, bayonet, lifePose);
     this.PoseArms(weaponAim, moveSpeed, boltPhase, throwing, melee, hurt, prone, reach, binoculars,
       lifePose, elapsed);
-    if (meleeQte) this.PoseMeleeQte(meleeQte);
+
 
     // --- 说话 ---------------------------------------------------------------
     // **排在 PoseWeapon / PoseArms 之后**：手已经 IK 到枪上的握点（chest 空间），
@@ -2259,54 +2259,6 @@ export class Actor {
       this.body.position.set(0, d.hipY, 0);
       this.body.rotation.set(0, 0, 0);
     }
-  }
-
-  /**
-   * 白刃对手骨骼覆盖。它排在持枪 IK 后面：胸、胯、腿连同已经握牢的枪一起动，
-   * 不会出现手留在原处而枪从掌心穿过去。三种 style 同时改变躯干、脚步与枪线。
-   */
-  PoseMeleeQte(qte) {
-    const style = Math.max(0, Math.min(2, qte.style | 0));
-    const inputT = Clamp01(qte.inputT || 0);
-    const resolveT = Clamp01(qte.resolveT || 0);
-    const resolve = qte.phase === "resolve" ? SmoothStep(0, 0.38, resolveT) : 0;
-    const recover = qte.phase === "resolve" ? SmoothStep(0.58, 1, resolveT) : 0;
-    const impact = Math.max(0, resolve - recover);
-
-    if (qte.kind === "block") {
-      // 连击顶开：正面硬顶；左右拨架：枪线横摆；节奏反击：腰肩两次短促换边。
-      const side = style === 1 ? (qte.pulse > 0.1 ? -1 : 1)
-        : style === 2 ? Math.sin(inputT * Math.PI * 4) : 0;
-      this.chest.rotation.x -= inputT * 0.15;
-      this.chest.rotation.y += side * 0.22 + impact * (style === 1 ? -0.38 : 0.18);
-      this.neck.rotation.y -= side * 0.14;
-      this.hips.rotation.y -= side * 0.12;
-      this.weaponMount.rotation.z += side * 0.28 + impact * 0.34;
-      this.weaponMount.position.z += impact * 0.18;
-      this.legs.L.thigh.rotation.x += impact * (style === 2 ? 0.38 : 0.18);
-      this.legs.R.thigh.rotation.x -= impact * 0.12;
-      return;
-    }
-
-    // 处决受击者：输入阶段抵住武器；结算前半拍先吃一脚向后折腰，后半拍再吃
-    // 直劈 / 横斩 / 突刺。死亡时 Soldier.Kill 接管为既有布娃娃，不在这里伪造死亡。
-    const brace = qte.phase === "input" ? 0.12 + inputT * 0.10 : 0;
-    const kickSide = style === 1 ? -1 : style === 2 ? 0.35 : 0;
-    this.body.position.z += impact * (0.08 + style * 0.015) * this.dims.height;
-    this.hips.rotation.y += kickSide * impact * 0.34;
-    this.chest.rotation.x += brace + impact * (0.62 + style * 0.10);
-    this.chest.rotation.y += kickSide * impact * 0.42;
-    this.chest.rotation.z += (style === 1 ? 0.32 : style === 2 ? -0.18 : 0) * impact;
-    this.neck.rotation.x -= brace * 0.45 + impact * 0.30;
-    this.neck.rotation.y -= kickSide * impact * 0.26;
-    this.weaponMount.position.z += impact * 0.12;
-    this.weaponMount.rotation.z += (style === 1 ? -0.62 : style === 2 ? 0.22 : 0.38) * impact;
-    // 被踹开的支撑腿打直、另一腿屈膝回收；三式换脚，剪影不会只是同一动作换输入。
-    const kickedLeg = style === 1 ? this.legs.L : this.legs.R;
-    const braceLeg = style === 1 ? this.legs.R : this.legs.L;
-    kickedLeg.thigh.rotation.x += impact * 0.54;
-    kickedLeg.knee.rotation.x -= impact * 0.34;
-    braceLeg.thigh.rotation.x -= impact * 0.22;
   }
 
   /** 把 root 空间的落脚点换算进 hips 的父子链（body 与 hips 都可能有旋转/位移）。 */

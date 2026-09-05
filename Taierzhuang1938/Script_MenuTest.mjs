@@ -1084,14 +1084,14 @@ async function CheckMissionList() {
   Check("靶场条目排在七章之后，标「沙盒」",
     brief.selected === 8 && brief.mark === "沙盒" && brief.no === "靶",   // 枪械专项后保留原玩法靶场
     `selected=${brief.selected} mark=${brief.mark} no=${brief.no}`);
-  Check("选章列出枪械、玩法、爆炸、白刃 QTE 与第一关策划白盒",
+  Check("选章列出枪械、玩法、爆炸、白刃独立战斗与第一关策划白盒",
     brief.sandboxes.length === 5
       && brief.sandboxes.map((entry) => entry.no).join(",") === "枪,靶,爆,刃,012"
       && brief.sandboxes.every((entry) => entry.mark === "沙盒")
       && brief.sandboxes[0].name.includes("枪械白盒靶场")
       && brief.sandboxes[1].name.includes("玩法测试靶场")
       && brief.sandboxes[2].name.includes("爆炸测试场")
-      && brief.sandboxes[3].name.includes("白刃战 QTE")
+      && brief.sandboxes[3].name.includes("白刃战 · 大刀与刺刀")
       && brief.sandboxes[4].name.includes("第一关 · P0/P1/P2 场景白盒")
       && brief.sandboxes.every((entry) => !entry.name.includes("界河")),
     JSON.stringify(brief.sandboxes));

@@ -165,7 +165,9 @@ export const testDefs = {
   RangeTest: { file: "Script_RangeTest.mjs", desc: "玩法测试靶场（?range=1）：木桩兵 + 枪/镜/刀/刺刀/手榴弹全链路" },
   WeaponRangeTest: { file: "Script_WeaponRangeTest.mjs", timeoutMs: 20 * 60 * 1000,
     desc: "全枪械白盒：桌面 F 拾取、无限弹药/换弹、10–200米静动靶与真实命中" },
-  MeleeQteTest: { file: "Script_MeleeQteTest.mjs", desc: "白刃 QTE（?melee=1）：三格挡 + 三处决 + 慢动作/HUD/骨骼/辅助输入全链" },
+  MeleeAnimationTest: { file: "Script_MeleeAnimationTest.mjs", timeoutMs: 15 * 60 * 1000, desc: "Blender 全骨骼与第一人称 42 动作、握持可见性及源工程样本" },
+  MeleeCombatTest: { file: "Script_MeleeCombatTest.mjs", desc: "通用白刃规则、拨挡窗口、F 推架、两类僵持、伤害和多人隔离（纯 Node）" },
+  MeleeQteTest: { file: "Script_MeleeQteTest.mjs", desc: "白刃 QTE（?melee=1）：独立战斗、站立/倒地成功失败、真实输入、接触、骨骼与画面" },
   TownDressingTest: { file: "Script_TownDressingTest.mjs", desc: "城内每户布设的硬规则（纯 Node，秒级）" },
   PropPcgTest: { file: "Script_PropPcgTest.mjs", desc: "生活用具/工事 PCG：确定性、跨切片、碰撞/坡度/间距裁决（纯 Node）" },
   PropPcgEditorTest: { file: "Script_PropPcgEditorTest.mjs", desc: "PCG 编辑器：真实模型预览、GPU 桶取证、JSON 往返与退出还原" },
@@ -218,7 +220,7 @@ export const testDefs = {
 
 export const browserTests = new Set([
   "TrainLibraryTest",
-  'BackRifleRunTest',
+  'BackRifleRunTest', 'MeleeAnimationTest',
   "ActorBatchTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
   "AudioTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
@@ -265,7 +267,7 @@ export const tier2 = [
 ];
 
 export const domains = {
-  animation: { label: '独立动画资产验收', tests: ['BackRifleRunTest'] },
+  animation: { label: '独立动画资产验收', tests: ['BackRifleRunTest','MeleeAnimationTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest"] },
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
@@ -278,7 +280,7 @@ export const domains = {
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsGripEditorTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "MeleeQteTest",
+      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsGripEditorTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "MeleeQteTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest",
       // 负重会封掉开火/开镜/冲刺三条（Player 的 carrySpeedScale + TryFire 的闸），
       // 碰这三样的改动要连着枪感串一起跑，所以它同时挂在 combat 与 interact 两个域。
@@ -349,7 +351,7 @@ export const domains = {
 
 const changedDomainRules = [
   { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },
-  { domain: 'animation', pattern: /BackRifleRun/i },
+  { domain: 'animation', pattern: /BackRifleRun|Melee.*Animation|MeleeAnimation/i },
   { domain: "ai", pattern: /FirstLevelP012(TrainColumn|March|Family|Resting|Arrival|VillageLife|StageZero|Cast)/i },
   { domain: "explosives", pattern: /(Explosion|Explosives|GrenadeReturn|TerrainDeformation|Script_Combat|Script_Physics)/i },
   { domain: "terrain", pattern: /(Heightmap|JieheHeight|JieheField|TengxianField|FarLand|Terrain|Battlefield|Outfield|Ground|Water|WestSuburbBlocks|Whitebox|P012|Data_Levels)/i },

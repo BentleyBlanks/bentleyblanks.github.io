@@ -16,7 +16,7 @@
 // 玩家这边只负责算**想走多远**，走不走得动是引擎的事。
 
 import * as THREE from "three";
-import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
+import { Clamp, Clamp01, Mulberry32, SmoothStep } from "./Script_Noise.mjs";
 import { DIFFICULTY, COMBAT } from "./Data_Battle.mjs";
 import { TRAVERSAL, TraversalPlan, TraversalCurve } from "./Data_Traversal.mjs";
 
@@ -906,10 +906,27 @@ export class PlayerController {
     const vaultDip = this.vault.active
       ? Math.sin(Math.PI * Clamp01(this.vault.t / this.vault.duration)) * this.vault.dip : 0;
     cam.rotation.x = this.pitch - vaultDip;
+    const melee = this.meleePose;
+    const floorTarget = melee?.state === "fall" ? SmoothStep(0, 1, melee.normalized)
+      : melee?.state === "rise" ? 1 - SmoothStep(0, 1, melee.normalized)
+      : melee?.state === "down" || (melee?.state === "qte" && melee.qteKind === "ground") ? 1 : 0;
+    this.meleeCameraDrop = (this.meleeCameraDrop || 0) + (floorTarget - (this.meleeCameraDrop || 0)) * Math.min(1, dt * 16);
+    cam.position.y -= this.meleeCameraDrop * (this.eyeHeight - 0.28);
+    cam.rotation.x += this.meleeCameraDrop * 0.78;
+    const focusing = melee?.state === "qte" && Number.isFinite(melee.focusYaw);
+    this.meleeCameraFocus = (this.meleeCameraFocus || 0) + ((focusing ? 1 : 0) - (this.meleeCameraFocus || 0)) * Math.min(1, dt * 12);
+    if (focusing) {
+      this.meleeFocusYaw = melee.focusYaw; this.meleeFocusPitch = melee.focusPitch;
+      const turn = Math.atan2(Math.sin(melee.focusYaw-this.yaw),Math.cos(melee.focusYaw-this.yaw));
+      this.yaw += turn * Math.min(1, dt * 12); cam.rotation.y = this.yaw;
+    }
+    cam.rotation.x += ((this.meleeFocusPitch || 0) - cam.rotation.x) * this.meleeCameraFocus;
+
     // 受压制时画面轻微抖动 —— 不是特效，是"被按在地上抬不起头"的触感
     const shake = this.suppression * 0.012;
     cam.rotation.z = -this.lean * 0.16
-      + (shake > 0 ? Math.sin(this.stepDistance * 41 + this.suppression * 90) * shake : 0);
+      + (shake > 0 ? Math.sin(this.stepDistance * 41 + this.suppression * 90) * shake : 0)
+      + (focusing ? Math.sin(melee.t * 39) * (1 - melee.progress) * .013 : 0);
   }
 
   /**
@@ -998,7 +1015,7 @@ export class PlayerController {
       this.hitMarks.push({ x: dx / len, z: dz / len, life: 2.2, max: 2.2 });
       if (this.hitMarks.length > 5) this.hitMarks.shift();
     }
-    this.PushHitEvent({ kind: "hurt", part, damage: applied, severity: Clamp01(applied / 55) });
+    this.PushHitEvent({ kind: "hurt", part, damage: applied, severity: Clamp01(applied / 55), blast: !!info?.blast });
 
     if (direction) {
       this.velocity.addScaledVector(direction, 1.2);

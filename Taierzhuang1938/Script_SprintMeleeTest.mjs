@@ -1,15 +1,4 @@
-// 冲刺白刃回归：大刀在跑动中「按得出去」且「看得见」。
-//
-// 这条链上原来有两处断口，一处在输入、一处在视觉，各自都能单独把这一刀吃掉：
-//   1) Script_Main.TryFire 的冲刺闸排在大刀分支**前面** —— 拿刀冲刺时左键完全无反应，
-//      而 V 键（走 OnAction，不过 TryFire）照样能挥。同一个动作两个键两种结果。
-//   2) 冲刺姿态把刀压到画面右下角。实测刀身中点的 NDC 在蓄力顶点冲到 (1.4, −0.9)，
-//      整条刀弧在画面外走完 —— 挥了等于没挥。
-// 所以这里两件都断言，而且**不看函数**：左键走 Debug.Fire（TryFire 全链），
-// 刀在不在画面里靠把刀身中点投影到 NDC 数帧，不靠读姿态数值猜。
-//
-// 判据是"跑动中的这一刀 ≈ 站着的这一刀"：站姿轨迹是基准，冲刺轨迹必须贴着它走。
-
+// 真实鼠标点按：站姿与冲刺中的大刀均按接触时序出刀，并验证屏内轨迹。
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,7 +25,7 @@ page.on("console", (message) => {
 await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//,
   (route) => route.abort("blockedbyclient"));
 
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=medium&scale=small`,
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&melee=1&quality=medium&scale=small`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
 
@@ -45,7 +34,7 @@ await page.evaluate(() => {
   T.player.health = 100;
   T.player.spawnGrace = 99;
   // 日军推远：这条测的是自己手里的刀，不是被人打断的刀
-  for (const soldier of T.ai.soldiers) if (soldier.side === "ija") soldier.position.x += 500;
+  for (const soldier of [...T.ai.soldiers]) T.ai.Remove(soldier);
   T.Debug.Key("Digit3");           // 走键位表切到大刀槽，不直接调 SwitchSlot
   T.StepFrames(10);
   // 取刀身中点而不是刀尖：刀尖离握把 0.74 m，抡起来必然扫出画面，站着也一样。
@@ -76,13 +65,13 @@ async function Swing(sprinting) {
     // 人顶在墙上它照样充到 1。不单独记一笔的话，"出生点前方被院墙堵死"会
     // 伪装成"挥刀打断了跑动"红出来 —— 2026-08-27 就白查了一轮。
     const beforeSpeed = T.player.velocity.length();
-    T.Debug.Fire();                // 左键全链：input.fire -> TryFire -> DoMelee
-    const fired = { action: T.viewmodel.action?.kind ?? null, sprint: T.player.sprint, beforeSpeed };
+    T.Debug.Mouse(0,true);T.StepFrames(3);T.Debug.Mouse(0,false);                // 左键全链：input.fire -> TryFire -> DoMelee
+    const fired = { action: T.meleeCombat.State().player?.state, sprint: T.player.sprint, beforeSpeed };
     const track = [];
     for (let i = 0; i < 34; i += 1) {
       T.StepFrames(1);
       track.push({
-        t: T.viewmodel.action?.t ?? -1,
+        t: T.meleeCombat.State().player?.state === "attack" ? T.meleeCombat.State().player.t : -1,
         speed: T.player.velocity.length(),
         ...window.__bladeNdc(),
       });
@@ -117,8 +106,8 @@ const runSpeed = Math.min(...run.track.map((f) => f.speed));
 const muteBack = await page.evaluate(() => window.Taierzhuang.viewmodel.meleeSprintMute);
 
 const checks = [
-  ["站姿左键挥得出刀（基准）", stand.fired.action === "melee"],
-  ["冲刺中左键挥得出刀", run.fired.action === "melee"],
+  ["站姿左键挥得出刀（基准）", stand.fired.action === "attack"],
+  ["冲刺中左键挥得出刀", run.fired.action === "attack"],
   ["确实在冲刺（不是被减速吃掉的假冲刺）", run.fired.sprint > 0.95],
   ["挥刀前就跑起来了（出生点前方是空地）", run.fired.beforeSpeed > 4.5],
   ["挥刀不打断跑动", runSpeed > 4.5],
