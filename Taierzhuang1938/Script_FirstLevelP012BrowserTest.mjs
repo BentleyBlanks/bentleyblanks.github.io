@@ -486,6 +486,7 @@ async function PlayFrontline() {
         if (flow.beatIndex !== bot.oldBeat) {
           const scene = game.Debug.P012Scene();
           bot.trace.push({ at: flow.elapsed, beat: flow.beat,
+            airRouteChoice:flow.airRouteChoice,facts:flow.facts.slice(),spawnedTotal:flow.spawnedTotal,
             lastLitterArrived: scene.lastLitterArrived, litterRecovered: scene.litterRecovered,
             lastLitterArrivedEvent: flow.signals.includes("P012LastLitterArrived"),
             woundedDragDistance: scene.woundedDragDistance, carryDistance: scene.carryDistance,
@@ -650,7 +651,7 @@ async function PlayFrontline() {
           if (flow.beatIndex === 20 && !destination) destination = anchors.strafeSlots[0];
           if (flow.beatIndex === 22 && !destination) destination = spatial.southBlockade;
           const distance = destination ? Math.hypot(destination.x - game.player.position.x, destination.z - game.player.position.z) : Infinity;
-          if (![13, 14, 20, 21].includes(flow.beatIndex) || point || objective.requiredAction === "grenade") {
+          if (![13, 14, 18, 20, 21].includes(flow.beatIndex) || point || objective.requiredAction === "grenade") {
             game.Debug.Mouse(2, false);
             const arrive = point ? 1.5 : objective.requiredAction === "follow"
               ? Math.max(0.1, Math.min(2.4, (objective.arrivalRadiusM ?? 2.45) - 0.05))
@@ -725,7 +726,7 @@ async function PlayFrontline() {
           if (game.player.stance !== stance) game.Debug.Key(stance === "prone" || game.player.stance === "prone" ? "KeyZ" : "KeyC");
         } else {
           game.Debug.Key("KeyW", false);
-          const behindCover = (flow.beatIndex <= 10 || [13, 14, 20, 21].includes(flow.beatIndex))
+          const behindCover = (flow.beatIndex <= 10 || [13, 14, 18, 20, 21].includes(flow.beatIndex))
             && (game.viewmodel.IsBusy?.() || (game.state.ammo === 0 && !(flow.beatIndex===21&&game.state.clips===0)));
           const noLiveThreats = !game.ai.soldiers.some(soldier => soldier.alive && soldier.side === "ija");
           const stance = behindCover ? "prone" : noLiveThreats && flow.objective.requiredStance
@@ -980,7 +981,7 @@ async function PlayFrontline() {
       &&Math.hypot(entry.position.x-entry.defense.x,entry.position.z-entry.defense.z)<.9))),
     "原六名同班军人实际抵达各自前沿侧位并交接防守，不在村口或交通壕消失",
     JSON.stringify(northHandoff.at(-1)?.cast));
-  Check(result.flow.frontlineAmmo.remainingClips >= 0 && result.flow.spawnedTotal <= 33,
+  Check(result.flow.frontlineAmmo.remainingClips >= 0 && result.flow.spawnedTotal <= 37,
     "弹药与近敌保持有限预算");
   const tacticalPressures = result.flow.pressureHistory.filter(entry => ["machineGun", "mortar", "culvert"].includes(entry.kind));
   Check(tacticalPressures.length === 3 && tacticalPressures.every(entry => entry.interval >= 29.99),
@@ -1055,16 +1056,13 @@ async function PlayFrontline() {
     Check(result.airViews.some(view => view.preset === "crowdTurn" && view.phase === "approach"
       && view.airVisible && view.bearersVisible >= 2 && view.civiliansVisible >= 1),
     "自由视角实际同屏看见飞机转向、担架员与平民道路");
-    const turnPrompts = result.airViews.filter(view => view.beat === "B17" && view.preset === "crowdTurn");
-    const beforeCrowdFire = turnPrompts.filter(view => !view.crowdFire);
-    const afterCrowdFire = turnPrompts.filter(view => view.crowdFire);
-    Check(beforeCrowdFire.length > 0 && beforeCrowdFire.every(view => /留意飞机来向/.test(view.objectiveText)
-      && !/转向道路|向道路开火|扫射/.test(view.objectiveText)),
-    "转向期间提示引导观察，不预告飞机将攻击道路", `${beforeCrowdFire.length} actual frames`);
-    Check(result.crowdFireCues.some(cue => cue.beat === "B17" && /已向道路开火/.test(cue.text))
-      && afterCrowdFire.every(view => /已向道路开火/.test(view.objectiveText)
-        && !/正在转向/.test(view.objectiveText) && view.phase !== "approach"),
-    "真实道路扫射事件立即更新提示；已入沟可直接推进B18", JSON.stringify(result.crowdFireCues));
+    Check(result.trace.some(entry=>entry.beat==="B17"&&entry.airRouteChoice),
+      "玩家从实体观察墙看完有限航迹后，以真实移动选择开放路或沟边路",JSON.stringify(result.trace));
+    Check(result.trace.some(entry=>entry.beat==="B18"&&entry.facts.includes("airObstacleResolved")),
+      "扫射后的真实百姓/小车阻碍必须经救人或清障分支处理",JSON.stringify(result.trace));
+    Check(result.trace.some(entry=>entry.beat==="B19"&&entry.facts.includes("stretcherSheltered")
+      && entry.spawnedTotal===23),
+      "同一副担架实际抬行并先入硬掩体；两名前锋在B18清除，近敌总预算不变",JSON.stringify(result.trace));
     // A rifle shot during the aviation gun's existing 0.18s burst gap is still
     // overlapping pressure. Require real impacts within 0.25s in the same run;
     // merely seeing an egress aircraft, or a phase label without bullets, fails.

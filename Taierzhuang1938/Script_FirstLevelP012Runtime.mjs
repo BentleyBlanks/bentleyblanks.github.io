@@ -110,6 +110,10 @@ export class FirstLevelP012Runtime {
     if (!this.host.VisibleAircraft?.(origin,air)) return false;
     this.host.Signal?.("P012AircraftPlayerFire");return true;
   }
+  AircraftVisible(origin,view){
+    const air=view?.active&&view.aircraft;
+    return !!air&&!!origin&&this.host.VisibleAircraft?.(origin,air)===true;
+  }
   DeployRetreatSmoke(point) {
     if (this.smoke) return false;
     const handle = this.host.DeploySmoke?.(point);

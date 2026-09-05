@@ -372,6 +372,14 @@ for(const slot of phase.whitebox.activities.southDefenseSlots){
   assert.ok(Math.hypot(slot.x-point.x,slot.z-point.z)>=1.3,"south defender slots preserve stretcher/player clearance");
 }
 Audit("InjuredRoadCoverAccess",[P012MapPoints({x:42.5,z:24}),P012MapPoints({x:39,z:25.5}),P012MapPoints({x:45,z:26})],layout.blocks,1.02);
+Audit("AirRegroup",phase.whitebox.activities.airRegroupRoute,layout.blocks,1.02);
+for(const [name,route] of Object.entries(phase.whitebox.activities.airRouteChoices))
+ Audit(`AirRouteChoice_${name}`,route,layout.blocks,1.02);
+Audit("AirObstacleRejoin",phase.whitebox.activities.airRejoinRoute,layout.blocks,1.02);
+Audit("AirStretcherCarry",phase.whitebox.activities.stretcherCarryRoute,layout.blocks,1.02);
+assert.ok(phase.whitebox.activities.stretcherCarryRoute.slice(1).reduce((sum,point,index)=>sum+Math.hypot(
+ point.x-phase.whitebox.activities.stretcherCarryRoute[index].x,point.z-phase.whitebox.activities.stretcherCarryRoute[index].z),0)>=20,
+ "B18 uses a physical route rather than a repeated interaction point");
 for(let i=0;i<360;i++){
  const point=P012SouthPoint(39+.6*Math.cos(i*Math.PI/180),25.5+.6*Math.sin(i*Math.PI/180));
  assert.ok(!layout.blocks.some(b=>Hits(point,b,.42)));
@@ -383,7 +391,7 @@ for(let i=0;i<360;i++){
 let relocationCount=0;
 for(const key of ["closeFightGroups","southFightGroups"]){
  const groups=phase.whitebox.activities[key];
- assert.equal(groups.length,3,`${key} keeps three finite pairs`);
+ assert.equal(groups.length,key==="closeFightGroups"?2:3,`${key} keeps its finite remaining pairs`);
  for(const [groupIndex,group] of groups.entries()){
   assert.equal(group.positions.length,2);assert.equal(group.relocations.length,2);
   for(const [index,to] of group.relocations.entries()){
@@ -398,7 +406,7 @@ for(const key of ["closeFightGroups","southFightGroups"]){
   }
  }
 }
-assert.equal(relocationCount,12,"B20/B21 geometry audits every configured relocation, not a stale copied coordinate list");
+assert.equal(relocationCount,10,"B20/B21 geometry audits every configured relocation after two enemies move into B18");
 for(const [groupIndex,group] of phase.whitebox.activities.closeFightGroups.entries()) {
  for(const [index,approach] of group.approaches.entries()) {
   const route=[group.spawns[index],...approach,group.positions[index]];

@@ -108,6 +108,12 @@ Add(Box("EvacWaitingSideCover",50,29.5,.4,4,1.05,"cover"));
 // the established convoy window or the 1.3 m stretcher lane.
 Add(Box("RoadContactSideFire",36.5,14,.6,4,1.05,"cover",{cover:{faceX:1,faceZ:0}}),
  Box("RoadContactAllyCoverNorth",26,18,3,.6,1.05,"cover"),Box("RoadContactAllyCoverSouth",30,20,3,.6,1.05,"cover"));
+// B15-B19 readable tactical furniture. The wall is Luo's physical regroup/
+// aircraft-observation position; the cart actually closes the exposed road
+// until either rescue branch is completed. The litter bay is hard cover, not
+// a hidden coordinate painted into the objective system.
+Add(Box("AirObservationWall",44,51,6,.5,1.05,"cover"),
+  Box("AirLitterShelterWest",42,61,.8,7,1.1,"cover"));
 // Single-storey ruin: open north entrance and east breach, real window towards waiting stretcher.
 Add(Box("RuinWestNorth",61,28,1,4,2.8),Box("RuinWestSouth",61,42,1,7,2.8),Box("RuinWindowSill",61,34,1,8,0.85,"cover"),Box("RuinWindowLintel",61,34,1,8,0.6,"boundary",{y:2.5}),Box("RuinEast",76,35,1,26,2.8),Box("RuinNorth",69,20,15,1,2.8),Box("RuinSouth",67,52,12,1,2.8),Box("RuinBrokenRoof",68,28,8,8,0.35,"boundary",{y:3.1}),Box("AmbushGunShield",55,40,1,3,1,"cover"));
 // B14 firing corners: standing fire clears the top; prone heads and crouched
@@ -150,6 +156,7 @@ const blueprintGates=Object.freeze([
   })),
   Object.freeze({...Box("TrainDoor",-63.5,60.5,0.4,5,3.8),signal:"P012TrainDoor"}),
   Object.freeze({...Box("ReturnGate",22,92,1,9,3),signal:"SouthCut"}),
+  Object.freeze({...Box("AirRoadCartObstacle",50,70,4.5,1.4,1,"vault"),signal:"P012AirObstacleResolved"}),
 ]);
 
 // Tactical islands retain metre-scale collision and sightlines. Only their

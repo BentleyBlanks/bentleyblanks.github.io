@@ -1600,7 +1600,10 @@ export const SETPIECES = {
         const stop=P012WaypointIndex(route,ss.phase.whitebox.activities.evacStagingPosition || P012SouthPoint(30,10));
         ss.mem.column?.Repath(route.slice(Math.max(0,stop+1)));
       });
-      if (p012 && HasSignal("P012AirReady")) {
+      // The first finite pass is information for a real route decision. It
+      // starts only after Luo has physically collected the player behind the
+      // observation wall, never after the column is already exposed.
+      if (p012 && HasSignal("P012AirObserveOpen")) {
         BeginCh1RailPass(s);
       }
       if (p012 && HasSignal("SouthCut")) s.Once("p012_columnReturn", (ss) => {
@@ -1674,6 +1677,10 @@ export const SETPIECES = {
       if (p012 && HasSignal("P012DitchClear")) s.Once("p012_ditchContinue", (ss) => {
         const column=ss.mem.column;
         if (column) {
+          if(HasSignal("P012StretcherSheltered")&&ss.mem.p012CarriedLitter){
+            ss.mem.p012CarriedLitter.dropped=false;ss.mem.p012LitterRecovered=true;
+            ss.mem.p012RecoveryReason="parkedInHardCoverThenRegripped";ss.Signal("P012LitterRecovered");
+          }
           for(const member of column.Alive) if(member.role==="guard"&&!member.handle.unarmed)member.handle.scriptedNoncombatant=false;
           const actor=ss.mem.p012CarriedLitter?.front?.handle;
           const start=actor && ss.d.host.PositionOf?.(actor);
@@ -1708,7 +1715,18 @@ export const SETPIECES = {
             if (beat === "fire") {
               if (!p012) column?.Scatter(14);
               if (p012 && column) column.scriptPaused = true;
-              if (p012) { s.Signal("P012CrowdFire"); s.Signal("P012AircraftCrowdFire"); s.Signal("StretcherHandoff"); }
+              if (p012) {
+                const activity=s.phase.whitebox.activities,cart=activity.airCartPosition,civilianAt=activity.airCivilianPosition;
+                s.mem.p012AirObstacle={cart:{...cart},civilian:{...civilianAt},resolved:false};
+                // Programmatic whitebox props identify the two different
+                // choices. Collision is the matching layout gate and opens on
+                // the shared resolution signal.
+                s.mem.p012AirCartProp=s.Prop?.({id:"P012AirOverturnedCart",kind:"crate",position:cart,
+                  size:{x:2.1,y:.9,z:1.1},color:0xe58b2f,rotationY:.18});
+                s.mem.p012AirCivilianProp=s.Prop?.({id:"P012AirFallenCivilian",kind:"sandbag",position:civilianAt,
+                  size:{x:.65,y:.35,z:1.7},color:0x9b5b45,rotationY:1.2});
+                s.Signal("P012CrowdFire"); s.Signal("P012AircraftCrowdFire"); s.Signal("P012AirObstacleCreated"); s.Signal("StretcherHandoff");
+              }
             }
             if (beat === "exit") s.mem.crowdTurnDone = s.Time();
           },
@@ -1747,10 +1765,14 @@ export const SETPIECES = {
             TrackTo: () => s.PlayerPos(),
             // 「你的手是先松开的」—— 剧情要求，不是玩家操作失误。
             OnDodge: () => {
+              const wasCarrying=s.carry?.KindId==="stretcher";
               s.carry?.ForceRelease("dive");
               if (p012) {
                 const point = s.PlayerPos(), litter = s.mem.p012CarriedLitter;
-                if (litter) {
+                // The expanded whitebox already asks the player to park the
+                // stretcher in hard cover before engaging the advance pair.
+                // Do not magically pull that parked patient back under him.
+                if (litter && wasCarrying) {
                   s.d.host.MoveProp?.(litter.propLitter, { x: point.x + 1.2, y: 0.35, z: point.z, rotationZ: Math.PI * 0.6 });
                   s.d.host.MoveProp?.(litter.propBody, { x: point.x + 1.7, y: 0.18, z: point.z + 0.4, rotationZ: 0.35 });
                   s.mem.p012LitterOverturned = true;

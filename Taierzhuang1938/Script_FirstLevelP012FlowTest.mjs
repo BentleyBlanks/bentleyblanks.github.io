@@ -59,7 +59,7 @@ import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 const points = new Map();
 {
  const cues=phase.whitebox.storyBeats.filter(beat=>beat.voice?.startsWith("p012_text_Guide"));
- assert.equal(cues.length,9);
+ assert.equal(cues.length,13);
  for(const cue of cues){
   const shown=[],voices=[];
   const story=new StoryDirector({hud:{Say:(who,text)=>shown.push(text),Title(){}}});
@@ -483,64 +483,56 @@ for(const point of phase.whitebox.routes.flank){
   }
 }
 assert.equal(flow.State().beat,"B15");
-Use("p012_roadSupply"); At("Z08");
-assert.equal(flow.State().beat,"B15","supply alone does not replace checking the wounded");
+assert.equal(points.has("p012_roadSupply"),false,"B15 does not invent another ammunition issue");
 assert.equal(points.get("p012_roadWounded").Enabled(),false,"a fixed empty inspection point is not an actual litter");
 assert.equal(points.get("p012_roadWounded").OnComplete(),false,"stale completion cannot check a missing litter");
 const inspectionPoint=P012Point(50,46.3);
 Tick({position:P012Point(50,47),columnPosition:P012Point(50,47),zone:"Z07",roadWoundedPosition:inspectionPoint,roadWoundedAtInspection:true});
 assert.deepEqual(points.get("p012_roadWounded").Anchor(),inspectionPoint);
-Use("p012_roadWounded"); Tick();
+Use("p012_roadWounded"); Tick({position:phase.whitebox.activities.airObservationPosition,columnPosition:phase.whitebox.activities.airObservationPosition,guidePosition:phase.whitebox.activities.airObservationPosition});
 assert.ok(signals.has("P012RoadWoundedChecked"));
-assert.equal(flow.State().beat,"B16","actual inspection releases B16 before the whole column reaches z60");
+assert.equal(flow.State().beat,"B16","one real litter inspection plus Luo's physical wall regroup releases B16");
 for(const zone of ["Z07",null]) {
   const director=new FirstLevelP012Director({},phase.whitebox);
   director.Restore({...director.Snapshot(),beat:15,facts:["regroup","roadWounded"]});
   director.Update(.1,{position:P012Point(50,47),columnPosition:P012Point(50,70),zone});
   assert.equal(director.State().beat,"B15","actual checked facts still require physical proximity to the column");
-  director.Update(.1,{position:P012Point(50,47),columnPosition:P012Point(50,47),zone});
+  director.Update(.1,{position:phase.whitebox.activities.airObservationPosition,columnPosition:phase.whitebox.activities.airObservationPosition,guidePosition:phase.whitebox.activities.airObservationPosition,zone});
   assert.equal(director.State().beat,"B16","actual inspection and nearby column do not depend on a region-circle label");
 }
-assert.equal(signals.has("P012AirReady"),false,"one inspected litter cannot substitute for four bearers entering the road");
-Tick({position:P012Point(54,57),columnPosition:P012Point(50,56),airColumnEnteredRoad:false,airColumnReady:false,sprint:0});
-assert.equal(signals.has("P012AirReady"),false);
-Tick({position:P012Point(54,60),columnPosition:P012Point(50,66),airColumnEnteredRoad:true});
-assert.equal(signals.has("P012AirReady"),false,"four bearers entering does not replace the player's actual acceleration");
-assert.equal(flow.CurrentObjective().requiredAction,"sprint");
-Tick({position:P012Point(50,63),sprint:1});Tick({position:P012Point(50,66),sprint:1});
-assert.ok(signals.has("P012AirReady"),"first attack starts while the complete player road route still remains");
-assert.ok(flow.airSprintM>=4);
-assert.ok(flow.routeIndex<phase.whitebox.activities.airRoadRoute.length);
-Tick({},200); assert.equal(flow.State().beat,"B16","time cannot pretend the aircraft passed");
+assert.ok(signals.has("P012AirObserveOpen"));
+Tick({},200); assert.equal(flow.State().beat,"B16","time cannot pretend the finite aircraft passed or choose a route");
+signals.add("P012AircraftRailFire");Tick({position:phase.whitebox.activities.airObservationPosition,columnPosition:P012Point(50,47),aircraftVisible:true});
+assert.equal(flow.airRouteChoice,null,"seeing the aircraft does not choose a road for the player");
+const chosen=phase.whitebox.activities.airRouteChoices.ditch;
+Tick({position:chosen[0],columnPosition:chosen[0]});assert.equal(flow.airRouteChoice,"ditch");
+Walk(chosen,{columnPosition:chosen.at(-1)});
+assert.ok(signals.has("P012AirReady"));
 signals.add("P012RailComplete"); Tick();
-assert.equal(flow.State().beat,"B17","actual rail exit never waits for unused route points or the old z68 gate");
-assert.match(flow.State().objective.text,/留意飞机来向/);
-assert.doesNotMatch(flow.State().objective.text,/转向道路|向道路开火|扫射/,"cover-seeking prompt does not reveal the aircraft target before its action");
-signals.add("P012CrowdFire"); Tick();
-assert.equal(flow.State().beat,"B17","crowd fire alone cannot complete actual cover-seeking");
-assert.match(flow.State().objective.text,/已向道路开火/,"real crowd fire changes the prompt to a completed observable event");
-assert.doesNotMatch(flow.State().objective.text,/正在转向/,"turn wording cannot linger into the strafe");
+assert.equal(flow.State().beat,"B17","actual rail exit plus the player's physical route choice releases B17");
+signals.add("P012CrowdFire");signals.add("P012AirObstacleCreated"); Tick();
+assert.equal(flow.State().beat,"B17","crowd fire creates a real unresolved obstruction");
+assert.equal(points.get("p012_airRescue").Enabled(),true);assert.equal(points.get("p012_airCartClear").Enabled(),true);
+Use("p012_airCartClear");
 assert.ok(signals.has("P012CrowdReady")&&signals.has("P012SeekAirCover"));
-Walk(phase.whitebox.activities.airCoverRoute,{stance:"stand"});
-assert.equal(flow.State().beat,"B17","standing beside the ditch is not entering low cover");
-Tick({stance:"crouch"});
+Walk(phase.whitebox.activities.airRejoinRoute,{stance:"stand"});
 assert.equal(flow.State().beat,"B18");
-Tick({carryKind:"stretcher"});
+signals.add("P012StretcherLifted");for(let i=0;i<6;i++)carry.Update(.1);assert.equal(carry.Begin("stretcher"),true);Tick({carryKind:"stretcher"});
 assert.equal(flow.State().beat,"B18","picking up alone does not replace carrying to cover");
-Tick({position:phase.whitebox.activities.stretcherCarryTo,carryDistance:10});
-assert.equal(flow.State().beat,"B18","carry destination cannot bypass the open ditch entrance");
 Walk(phase.whitebox.activities.stretcherCarryRoute,{carryKind:"stretcher",carryDistance:20});
+const advanceActors=spawned.slice(-2);assert.equal(flow.State().beat,"B18");
+assert.ok(signals.has("P012AdvanceContact"));
+Use("p012_stretcherShelter");Tick({carryKind:null});
+for(const actor of advanceActors)actor.alive=false;Tick({enemyDeaths:27});
+assert.equal(flow.State().beat,"B19","two real advance enemies clear only after the stretcher is sheltered");
 signals.add("P012DiveApproach");signals.add("P012Dived"); Tick({carryKind:null,stance:"crouch"});
-Tick({},40);
-const closeActors=spawned.slice(-6);
-assert.deepEqual(closeActors.map(actor=>[actor.x,actor.z]),[[72,28],[72,30],[72,32],[72,61.5],[72,64],[72,66.5]].map(([x,z])=>Object.values(P012Point(x,z))),"six finite enemies start on screened northeast and southeast approaches");
-assert.deepEqual(flow.enemyRoutes.slice(-6).map(entry=>entry.points[0]),[
-  P012Point(74,30),P012Point(74,30),P012Point(74,30),P012Point(69,73),P012Point(69,73),P012Point(69,73)],"three actors physically follow each distinct approach without changing pair groups");
-assert.deepEqual(flow.enemyRoutes.slice(-6).map(entry=>entry.encounterGroup),[0,0,1,1,2,2]);
+const closeActors=spawned.slice(-4);
+assert.equal(closeActors.length,4,"the remaining B20 budget is four after two advance enemies moved earlier");
+assert.deepEqual(flow.enemyRoutes.slice(-4).map(entry=>entry.encounterGroup),[0,0,1,1]);
 assert.equal(flow.CurrentObjective().requiredAction,"fight");
 assert.deepEqual(flow.CurrentObjective().target,P012Point(44,62));
 KillWave();
-assert.equal(flow.State().beat,"B20","even remote early deaths cannot replace all three physical cover moves");
+assert.equal(flow.State().beat,"B20","even remote early deaths cannot replace both physical cover moves");
 Walk(phase.whitebox.activities.closeFightRoute,{zone:"Z08"});
 Tick({position:phase.whitebox.activities.closeFightRoute.at(-1),zone:"Z08"});
 assert.ok(signals.has("P012DitchClear"),"only cleared ditch combat plus all three cover positions release actual litters");
@@ -902,37 +894,21 @@ assert.equal(returnVoices.filter(key=>key==="ch1_shunzi_07").length,1);
     EnemyPosition:actor=>actor.alive?actor.position:null,EnemyGoal:(actor,point)=>{actor.goal={x:point.x,z:point.z};},
     EnemyStaging:(actor,value)=>{actor.staging=value;},Pressure:wave=>pressure.push(wave.kind)},phase.whitebox);
   director.Restore({...director.Snapshot(),beat:18,spawnedTotal:25,unlockedWaves:[0,1,2,3,4,5,6]});
-  const before=director.Snapshot(),sample={position:P012Point(47,80),zone:"Z08",carryKind:null};
+  const sample={position:P012Point(47,80),zone:"Z08",carryKind:null,carryDistance:0};
   director.Update(.1,sample);assert.equal(actors.length,0,"being near the wounded does not pre-spawn before real lifting");
-  events.add("P012StretcherLifted");director.Update(.1,sample);
+  events.add("P012StretcherLifted");director.routeIndex=phase.whitebox.activities.stretcherCarryRoute.length;
+  director.Update(.1,{...sample,carryKind:"stretcher",carryDistance:20});
+  assert.equal(actors.length,2);assert.equal(director.spawnedTotal,27);
+  assert.ok(actors.every(actor=>!actor.staging));assert.deepEqual(pressure,[],"advance pair is finite contact, not invisible timed pressure");
+  actors.forEach(actor=>actor.alive=false);director.facts.add("stretcherSheltered");
+  director.Update(.1,{...sample,enemyDeaths:27});assert.equal(director.beat,19);
+  events.add("P012DiveApproach");director.Update(.1,{...sample,stance:"crouch",enemyDeaths:27});
   assert.equal(actors.length,6);assert.equal(director.spawnedTotal,31);
-  assert.ok(actors.every(actor=>actor.staging));assert.deepEqual(pressure,[],"hidden staging is not recorded as active fire pressure");
-  for(let waypoint=0;waypoint<=2;waypoint++){
-    for(let index=0;index<3;index++)actors[index].position={...director.enemyRoutes[index].points[waypoint]};
-    director.Update(.1,sample);
-  }
-  director.Update(.1,sample);director.Update(30,sample);
-  for(let index=0;index<3;index++)assert.deepEqual(actors[index].goal,director.enemyRoutes[index].points[2]);
-  for(let index=3;index<6;index++)assert.deepEqual(actors[index].goal,director.enemyRoutes[index].spawnPoint);
-  assert.deepEqual(pressure,[],"elapsed time cannot release staged enemies");
-  actors[0].alive=false;events.add("P012DiveApproach");director.Update(.1,sample);
-  assert.ok(actors.slice(1,2).every(actor=>!actor.staging));
-  assert.ok(actors.slice(2).every(actor=>actor.staging),"dive releases group zero only");
-  director.beat=20;
-  actors[1].alive=false;
-  director.Update(.1,{...sample,position:phase.whitebox.activities.closeFightGroups[2].cover});
-  assert.ok(actors.slice(2).every(actor=>actor.staging),"remote movement to a later cover cannot skip group one");
-  director.Update(.1,{...sample,position:phase.whitebox.activities.closeFightGroups[1].cover});
   assert.ok(actors.slice(2,4).every(actor=>!actor.staging));assert.ok(actors.slice(4).every(actor=>actor.staging));
-  actors[2].alive=false;actors[3].alive=false;
-  director.Update(.1,{...sample,position:phase.whitebox.activities.closeFightGroups[0].cover});
-  assert.ok(actors.slice(4).every(actor=>actor.staging),"clearing at range still requires reaching the next authored cover");
-  director.Update(.1,{...sample,position:phase.whitebox.activities.closeFightGroups[2].cover});
-  assert.ok(actors.slice(4).every(actor=>!actor.staging));assert.equal(actors[0].alive,false,"a killed staged actor is never restored");
   assert.deepEqual(pressure,["closeFight"]);assert.equal(director.State().pressureHistory.at(-1).reason,"actualDiveApproach");
-  director.Restore(before);director.Update(.1,sample);
-  assert.equal(actors.length,6,"checkpoint rollback cannot duplicate the early finite wave receipt");
-  assert.deepEqual(pressure,["closeFight"],"replayed approach cannot release a second pressure wave");
+  director.beat=20;actors[2].alive=false;actors[3].alive=false;
+  director.Update(.1,{...sample,position:phase.whitebox.activities.closeFightGroups[1].cover,enemyDeaths:29});
+  assert.ok(actors.slice(4).every(actor=>!actor.staging),"clearing first remaining pair plus reaching the next cover releases only the final pair");
 }
 {
   const director=new FirstLevelP012Director({},phase.whitebox);
@@ -1022,18 +998,19 @@ for(const index of [2,3,4]) {
 }
 {
   for(const groups of [phase.whitebox.activities.closeFightGroups,phase.whitebox.activities.southFightGroups]) {
-    assert.equal(groups.flatMap(group=>group.positions).length,6);
-    assert.equal(groups.flatMap(group=>group.relocations).length,6);
+    const expected=groups===phase.whitebox.activities.closeFightGroups?4:6;
+    assert.equal(groups.flatMap(group=>group.positions).length,expected);
+    assert.equal(groups.flatMap(group=>group.relocations).length,expected);
     for(const group of groups) group.positions.forEach((point,index)=>{
       const next=group.relocations[index],distance=Math.hypot(next.x-point.x,next.z-point.z);
       assert.ok(distance>=2&&distance<2.3,"each existing actor receives only one short physical reposition");
     });
   }
-  assert.deepEqual(phase.whitebox.activities.closeFightGroups.map(group=>group.routeIndex),[0,2,3],
+  assert.deepEqual(phase.whitebox.activities.closeFightGroups.map(group=>group.routeIndex),[0,3],
     "each finite delaying pair belongs to a later physical cover position");
   assert.deepEqual(phase.whitebox.activities.closeFightGroups.map(group=>group.cover),
     phase.whitebox.activities.closeFightGroups.map(group=>phase.whitebox.activities.closeFightRoute[group.routeIndex]),
-    "the three delaying phases use the authored ditch cover route rather than a repeated point");
+    "the two remaining delaying phases use the authored ditch cover route rather than a repeated point");
   for(let index=1;index<phase.whitebox.activities.closeFightRoute.length;index++)
     assert.ok(P012SegmentClear(phase.whitebox.layout.blocks,phase.whitebox.activities.closeFightRoute[index-1],
       phase.whitebox.activities.closeFightRoute[index],.42),"each delaying relocation is physically clear for the player capsule");

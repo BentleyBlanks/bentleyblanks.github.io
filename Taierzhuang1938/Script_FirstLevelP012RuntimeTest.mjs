@@ -587,7 +587,7 @@ assert.match(main, /p012Flow && interact\?\.Query\(player\)\?\.point\?\.id === "
     phase: { whitebox: { p012: true } }, mem: { crowdTurnDone: 1, carryStartedAt: 1 },
     d: { host: { Story: () => ({ Signalled: (name) => name === "P012CarryReady" && ready }), MoveProp: (id, at) => moved.push({ id, ...at }) } },
     strafe: { StrafeRun: (spec) => runs.push(spec), Abort: () => aborted++ },
-    carry: { ForceRelease() {} }, checkpoint: { Rewind: () => rewinds++ },
+    carry: { KindId:"stretcher", ForceRelease() { this.KindId=null; } }, checkpoint: { Rewind: () => rewinds++ },
     Time: () => 30, PlayerPos: () => ({ x: 0, z: 0 }), Spoken: () => false,
     Signal: (name) => emitted.push(name), Hint() {},
   };
@@ -596,6 +596,7 @@ assert.match(main, /p012Flow && interact\?\.Query\(player\)\?\.point\?\.id === "
   runs[0].OnPlayerHit(); assert.equal(rewinds, 1); assert.ok(!emitted.includes("P012Dived"));
   SETPIECES.CH1_NanLu.Update(context, 0.1); assert.equal(aborted, 1); assert.equal(runs.length, 2);
   context.mem.p012CarriedLitter = { propLitter: "litter", propBody: "body" };
+  context.carry.KindId="stretcher";
   runs[1].OnDodge(); assert.ok(emitted.includes("P012Dived"));
   assert.ok(moved.some((entry) => entry.id === "litter" && entry.rotationZ > 1));
   const front = { role: "bearer", slot: { back: 0 }, handle: { alive: true, position: { x: 1.2, z: -0.9 } } };

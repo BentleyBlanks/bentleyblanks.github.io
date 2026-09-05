@@ -49,10 +49,10 @@ export const P012_BEATS = Object.freeze([
   ["B12", "到交通壕后送队集合点", "Z04", 565, "volunteer"],
   ["B13", "沿交通壕、村口原路向南护送", "Z06", 600, "escort"],
   ["B14", "侧绕残屋，压制道路机枪再回担架队", "Z07", 740, "ambush"],
-  ["B15", "检查伤员，补充弹药后继续前进", "Z08", 910, "regroup"],
-  ["B16", "观察铁路上方，护送队伍通过道路", "Z08", 980, "railPass"],
-  ["B17", "看清飞机转向，寻找路沟", "Z08", 1030, "crowdTurn"],
-  ["B18", "接住担架后端", "Z08", 1100, "stretcher"],
+  ["B15", "检查担架伤员，随班长到墙后收队", "Z08", 910, "regroup"],
+  ["B16", "从墙后观察航迹，选择护送路线", "Z08", 980, "railPass"],
+  ["B17", "处理扫射造成的道路阻碍", "Z08", 1030, "crowdTurn"],
+  ["B18", "接住同一副担架后端，送入实体掩蔽", "Z08", 1100, "stretcher"],
   ["B19", "扑入路沟", "Z08", 1140, "dive"],
   ["B20", "守住沟边，阻止日军接近伤员", "Z08", 1185, "closeFight"],
   ["B21", "清除近处敌人，尝试打开南路", "Z09", 1250, "southFight"],
@@ -71,7 +71,8 @@ export const P012_WAVES = Object.freeze([
   { beat: 10, atS: 465, count: 4, kind: "culvert", lane: "westEnemy" },
   { beat: 13, atS: 600, count: 4, kind: "roadContact", lane: "roadContact" },
   { beat: 14, atS: 740, count: 6, kind: "ambush", lane: "ambush" },
-  { beat: 20, atS: 1185, count: 6, kind: "closeFight", lane: "closeFight" },
+  { beat: 18, atS: 1100, count: 2, kind: "airAdvance", lane: "closeFight" },
+  { beat: 20, atS: 1185, count: 4, kind: "closeFight", lane: "closeFight" },
   { beat: 21, atS: 1250, count: 6, kind: "southFight", lane: "southFight" },
 ].map(Object.freeze));
 
@@ -92,6 +93,9 @@ export class FirstLevelP012Director {
     this.ambushRejoin = null;
     this.closePressureReleased = false;
     this.closeReleasedGroup = -1;
+    this.airRouteChoice = null;
+    this.airAdvanceSpawned = false;
+    this.airRescueTravelM = 0;
     this.lookRad = 0;
     this.last = null;
     this.gunports = new Set();
@@ -153,10 +157,13 @@ export class FirstLevelP012Director {
     const a = this.config.activities || {};
     return ({ 0: a.trainRoute, 1: a.weaponGuideRoute, 2: a.villageRoute, 3:[a.villageRoute?.at(-1)], 4: a.shellCoverRoute,
       5: a.ammoRoute, 11: a.woundedDragRoute, 12: [a.woundedDragTo || this.config.anchors.shelter], 13: a.roadContactSideRoute, 14: this.config.routes?.flank,
-      16: a.airRoadRoute, 17: a.airCoverRoute,
+      15: a.airRegroupRoute,
+      16: this.airRouteChoice ? (a.airRouteChoices?.[this.airRouteChoice] || []) : a.airRegroupRoute,
+      17: a.airRejoinRoute,
       18: a.stretcherCarryRoute, 20: a.closeFightRoute, 21: a.southRoomRoute, 22: a.southAssemblyRoute })[this.beat] || [];
   }
   StartGuide() {
+    const activity=this.config.activities||{};
     this.guideStarted = true;
     this.host.Guide?.({ beat: this.beat, route: this.ActivityRoute(),
       ...(this.beat === 0 ? { ...(this.config.arrival ? {startIndex:1,arrivalRadius:.45} : {}), WaitAt: index => (this.config.arrival && index === 1 && !this.Signalled("P012TrainDoor")) || (index === 2
@@ -174,6 +181,8 @@ export class FirstLevelP012Director {
         FaceAt: () => this.lastSample.position,
       } : {}),
       ...([14, 16, 17, 20, 21].includes(this.beat) ? { route: [] } : {}),
+      ...(this.beat===15?{route:activity.airRegroupRoute||[],safeRoute:true,
+        approachPoints:this.config.routes?.south||[],WaitAt:()=>true,FaceAt:()=>activity.airObservationPosition}:{}),
       ...(this.beat === 22 ? { route: this.config.activities.blockadeGuideRoute,
         safeRoute: true, approachPoints: this.config.activities.blockadeGuideRoute,
         WaitAt: index => index === this.config.activities.blockadeGuideRoute.length - 1,
@@ -241,10 +250,6 @@ export class FirstLevelP012Director {
       Enabled: () => this.beat === 13 && this.facts.has("roadContactSeen") && !this.facts.has("roadContactHeld"), OnComplete: () => { this.Mark("roadContactHeld"); this.Emit("P012RoadContactHold"); } });
     Register({ id: "p012_roadContactRelease", kind: "supply", label: "从队尾放行担架队", gesture: "hold", seconds: 1.4, position: this.config.activities?.roadContactTailRelease, once: false,
       Enabled: () => this.beat === 13 && this.facts.has("roadContactClear") && this.lastSample.roadContactFriendlyCoverCount >= 2 && !this.facts.has("roadContactReleased"), OnComplete: () => { this.Mark("roadContactReleased"); this.Emit("P012RoadContactRelease"); } });
-    Register({ id: "p012_roadSupply", kind: "supply", label: "检查担架并补充弹药",
-      gesture: "hold", seconds: 2.2, position: this.Point("stretcher", P012Point(45, 26)),
-      Enabled: () => this.beat === 15 && !this.supplyReceipts.has("regroup"), once: false,
-      OnComplete: () => this.SupplyOnce("regroup") });
     Register({ id: "p012_frontlineAmmo", kind: "supply", label: this.FrontlineAmmoLabel(),
       gesture: "hold", seconds: this.config.activities?.frontlineAmmo?.takeSeconds ?? 2.4,
       position: this.Point("ammoDrop"), once: false,
@@ -266,8 +271,27 @@ export class FirstLevelP012Director {
         && !!this.lastSample.roadWoundedPosition && !this.facts.has("roadWounded"), once: false,
       OnComplete: () => {
         if (this.beat !== 15 || this.lastSample.roadWoundedAtInspection !== true || !this.lastSample.roadWoundedPosition) return false;
-        this.Mark("roadWounded"); this.Emit("P012RoadWoundedChecked"); return true;
+        this.Mark("roadWounded"); this.Mark("regroup"); this.Emit("P012RoadWoundedChecked"); return true;
       } });
+    Register({id:"p012_airRescue",kind:"carry",label:"背起扫射中受伤的百姓",gesture:"hold",seconds:1.2,
+      position:this.config.activities?.airCivilianPosition,once:false,
+      Enabled:()=>this.beat===17&&this.Signalled("P012AirObstacleCreated")&&!this.facts.has("airObstacleResolved")&&!carry?.Active,
+      OnComplete:()=>carry?.Begin("wounded",{label:"受伤百姓",payload:{who:"p012AirCivilian"}})!==false});
+    Register({id:"p012_airRescueCover",kind:"carry",label:"把伤员放到蓝色硬掩体后",gesture:"hold",seconds:1,
+      position:this.config.activities?.airRescueCover,once:false,
+      Enabled:()=>this.beat===17&&carry?.KindId==="wounded"&&this.airRescueTravelM>=(this.config.activities?.airRescueMinM||12),
+      OnComplete:()=>{carry?.ForceRelease("airRescue");this.Mark("airObstacleResolved");this.Mark("airRescued");
+        this.Emit("P012AirObstacleResolved");this.host.ResolveAirObstacle?.("rescue");return true;}});
+    Register({id:"p012_airCartClear",kind:"plank",label:"推开翻倒小车，转入沟边",gesture:"hold",seconds:2.2,
+      position:this.config.activities?.airCartPosition,once:false,
+      Enabled:()=>this.beat===17&&this.Signalled("P012AirObstacleCreated")&&!this.facts.has("airObstacleResolved")&&!carry?.Active,
+      OnComplete:()=>{this.Mark("airObstacleResolved");this.Mark("airCartCleared");this.Emit("P012AirObstacleResolved");
+        this.host.ResolveAirObstacle?.("cart");return true;}});
+    Register({id:"p012_stretcherShelter",kind:"carry",label:"把担架平稳放进蓝色硬掩体",gesture:"hold",seconds:1.2,
+      position:this.config.activities?.stretcherCarryTo,once:false,
+      Enabled:()=>this.beat===18&&this.Signalled("P012AdvanceContact")&&carry?.KindId==="stretcher",
+      OnComplete:()=>{carry?.ForceRelease("hardCover");this.Mark("stretcherSheltered");this.Emit("P012StretcherSheltered");
+        this.host.ShelterCarriedLitter?.(this.config.activities?.stretcherCarryTo);return true;}});
     Register({ id: "p012_southGrenades", kind: "supply", label: "领取手榴弹 · 备用2枚",
       gesture: "hold", seconds: 1.8, position: this.config.activities?.southGrenadeSupply,
       Enabled: () => this.beat === 21 && this.southGrenadesRemaining > 0 && !(this.lastSample.grenades > 0), once: false,
@@ -558,6 +582,7 @@ export class FirstLevelP012Director {
     if (contentEvents[next]) this.Emit(contentEvents[next]);
     if (next === 14) { this.Emit("P012AmbushStarted"); this.SaveCheckpoint("CP03"); }
     if (next === 15) this.Emit("P012AmbushClear");
+    if (next === 16) this.Emit("P012AirObserveOpen");
     if (next === 17) { this.Emit("P012CrowdReady"); this.Emit("P012SeekAirCover"); }
     if (next === 20) this.SaveCheckpoint("CP05");
     if (next === 22) this.Emit("P012SouthVerified");
@@ -586,15 +611,27 @@ export class FirstLevelP012Director {
       this.travelM += moved;
       if (this.beat === 24 && sample.carryKind === "stretcher" && this.last.carryKind === "stretcher") this.carryTravelM += moved;
       if (sample.sprint > 0.5) this.sprintM += moved;
+      if(this.beat===17&&sample.carryKind==="wounded"&&this.last.carryKind==="wounded")this.airRescueTravelM+=moved;
       if (this.beat === 16 && sample.sprint > 0.5) this.airSprintM += moved;
     }
     if (p) this.last = { position: { x: p.x, z: p.z }, yaw: sample.yaw || 0, carryKind: sample.carryKind };
     const route = this.ActivityRoute();
+    if(this.beat===16&&this.Signalled("P012AircraftRailFire")&&sample.aircraftVisible===true
+      &&Distance(p,activity.airObservationPosition)<=(activity.airObservationRangeM||4)){
+      if(!this.facts.has("airObserved")){this.Mark("airObserved");this.Emit("P012AirObserved");}
+    }
+    if(this.beat===16&&this.facts.has("airObserved")&&!this.airRouteChoice){
+      const choices=activity.airRouteChoices||{};
+      for(const [name,points] of Object.entries(choices))if(points?.[0]&&Distance(p,points[0])<=this.RouteArrivalRadius()){
+        this.airRouteChoice=name;this.routeIndex=0;this.Mark("airRouteChosen");this.Emit("P012AirRouteChosen");break;
+      }
+    }
     this.StepAmbushRejoin(p);
     if (this.beat === 14 && !this.ambushRejoin && Distance(p, activity.ambushEntryRoute?.[this.ambushEntryIndex]) <= this.RouteArrivalRadius())
       this.ambushEntryIndex += 1;
     const guideNear = Distance(p, sample.guidePosition) <= (activity.guideRangeM || 12);
-    if (this.beat === 20 && !this.LateThreat() && this.closeReleasedGroup >= 0 && this.closeReleasedGroup < 2) {
+    if (this.beat === 20 && !this.LateThreat() && this.closeReleasedGroup >= 0
+      && this.closeReleasedGroup < (activity.closeFightGroups?.length||0)-1) {
       const nextGroup = this.closeReleasedGroup + 1;
       if (this.routeIndex < (activity.closeFightGroups?.[nextGroup]?.routeIndex ?? route.length))
         this.Emit(`P012DelayPosition${nextGroup}`);
@@ -615,8 +652,8 @@ export class FirstLevelP012Director {
       : this.beat === 5 ? sample.carryKind === "ammoCrate"
       : this.beat === 11 ? sample.carryKind === "wounded"
       : this.beat === 14 ? !this.ambushRejoin && !this.AmbushThreat()
-      : this.beat === 16 ? Distance(p, sample.columnPosition) < 12
-      : this.beat === 17 ? this.routeIndex < route.length - 1 || sample.stance !== "stand"
+      : this.beat === 16 ? !!this.airRouteChoice && Distance(p, sample.columnPosition) < 18
+      : this.beat === 17 ? this.facts.has("airObstacleResolved")
       : this.beat === 18 ? sample.carryKind === "stretcher"
       : this.beat === 20 ? !this.LateThreat()
       : this.beat === 21 ? this.routeIndex < (activity.southSupplyRouteIndex || 0)
@@ -714,8 +751,14 @@ export class FirstLevelP012Director {
       if (Distance(p, port) < 6) this.gunports.add(index);
     }
     // 最早首枪窗口 + 每波有限预算。门由 beat 和现场事实共同开，不按时间无限补兵。
+    const advanceWaveIndex=P012_WAVES.findIndex(wave=>wave.kind==="airAdvance");
+    if(this.beat===18&&!this.airAdvanceSpawned&&sample.carryKind==="stretcher"
+      &&sample.carryDistance>=(activity.stretcherCarryMinM||20)&&this.routeIndex>=route.length){
+      this.airAdvanceSpawned=true;this.unlockedWaves.push(advanceWaveIndex);
+      this.SpawnWave(P012_WAVES[advanceWaveIndex],advanceWaveIndex);this.Emit("P012AdvanceContact");
+    }
     const closeWaveIndex = P012_WAVES.findIndex((wave) => wave.kind === "closeFight");
-    if (this.beat >= 18 && this.beat < 20 && this.Signalled("P012StretcherLifted")
+    if (this.beat >= 18 && this.beat < 20 && this.Signalled("P012DiveApproach")
       && !this.unlockedWaves.includes(closeWaveIndex)) {
       this.unlockedWaves.push(closeWaveIndex);
       this.SpawnWave(P012_WAVES[closeWaveIndex], closeWaveIndex);
@@ -740,6 +783,7 @@ export class FirstLevelP012Director {
       }
     }
     for (const [index, wave] of P012_WAVES.entries()) {
+      if(["airAdvance","closeFight"].includes(wave.kind))continue;
       // Scouts may call same-axis rifle reinforcements immediately. New MG,
       // mortar and culvert pressure keeps a 30s floor; existing gunport movement
       // remains active during this transition, not a stationary wait objective.
@@ -849,20 +893,22 @@ export class FirstLevelP012Director {
         if (!this.ambushRejoin && Distance(p, this.config.activities?.ambushGroups?.[2]?.cover || P012Point(72, 43)) < 7) this.Mark("flanked");
         ready = dead >= 25 && Has("flanked") && this.ambushEntryIndex >= (activity.ambushEntryRoute?.length || 0) && this.routeIndex >= route.length
           && Distance(p, sample.columnPosition) < 18; break;
-      case 15: ready = Has("regroup") && Has("roadWounded") && Distance(p, sample.columnPosition) < 12; break;
+      case 15: ready = Has("regroup") && Has("roadWounded") && Distance(p, sample.columnPosition) < 12
+        && Distance(sample.guidePosition,activity.airObservationPosition)<=3
+        &&Distance(p,activity.airObservationPosition)<=(activity.airObservationRangeM||4); break;
       case 16:
-        if (sample.airColumnEnteredRoad === true && this.airSprintM >= (activity.airRoadSprintMinM || 4)
-          && Distance(p, sample.columnPosition) < 12 && !this.Signalled("P012AirReady")) {
+        if (this.airRouteChoice && this.routeIndex>=route.length && Distance(p, sample.columnPosition) < 18
+          && !this.Signalled("P012AirReady")) {
           this.SaveCheckpoint("CP04"); this.Emit("P012AirReady");
         }
         ready = this.Signalled("P012AirReady") && this.Signalled("P012RailComplete"); break;
-      case 17: ready = this.Signalled("P012CrowdFire") && this.routeIndex >= route.length
-        && sample.stance !== "stand"; break;
-      case 18: ready = sample.carryKind === "stretcher" && sample.carryDistance >= (activity.stretcherCarryMinM || 10)
-        && this.routeIndex >= route.length && Distance(p, activity.stretcherCarryTo) < 3;
+      case 17: ready = this.Signalled("P012CrowdFire") && Has("airObstacleResolved")
+        && this.routeIndex >= route.length; break;
+      case 18: ready = Has("stretcherSheltered")&&this.airAdvanceSpawned&&dead>=27
+        &&this.enemyRoutes.filter(entry=>entry.encounterBeat===18).every(entry=>!this.host.EnemyPosition?.(entry.handle));
         if (ready) this.Emit("P012CarryReady"); break;
       case 19: ready = this.Signalled("P012Dived") && sample.stance !== "stand"; break;
-      case 20: ready = dead >= 31 && this.closeReleasedGroup >= 2
+      case 20: ready = dead >= 31 && this.closeReleasedGroup >= (activity.closeFightGroups?.length||1)-1
         && this.routeIndex >= (activity.closeFightRoute?.length || 0); break;
       case 21: ready = dead >= 37 && At("Z09") && Has("southRoomEntered")
         && this.routeIndex >= route.length
@@ -944,16 +990,20 @@ export class FirstLevelP012Director {
       const encounter = encounterGroup !== null ? groups[encounterGroup] : null;
       const encounterPosition = encounter?.positions[index % 2];
       const encounterSpawn = encounter?.spawns?.[index % 2] || encounterPosition;
+      const advancePosition=wave.kind==="airAdvance"?this.config.activities?.airAdvancePositions?.[index]:null;
+      const advanceSpawn=wave.kind==="airAdvance"?this.config.activities?.airAdvanceSpawns?.[index]:null;
       const ambushGroup = wave.kind === "ambush" && this.config.activities?.ambushGroups?.length ? Math.floor(index / 2) : null;
       const ambushPosition = encounterPosition || (ambushGroup !== null ? this.config.activities.ambushGroups[ambushGroup].positions[index % 2] : null);
       const roadContact = wave.kind === "roadContact" ? this.config.activities?.roadContactEnemies?.[index] : null;
       const weapon = index === 0 && ["machineGun", "ambush", "southFight"].includes(wave.kind)
         ? "Type11" : "Type38";
       const terminal = wave.kind === "culvert" ? lane?.terminalGoals?.[index] : null;
-      const points = roadContact ? [roadContact.position] : encounterPosition ? [...(encounter.approaches?.[index % 2] || encounter.approach || []), encounterPosition]
+      const points = roadContact ? [roadContact.position]
+        : advancePosition ? [...(this.config.activities?.airAdvanceApproaches?.[index]||[]),advancePosition]
+        : encounterPosition ? [...(encounter.approaches?.[index % 2] || encounter.approach || []), encounterPosition]
         : ambushPosition ? [ambushPosition] : late ? [fallback] : terminal ? [...(lane?.waypoints || []).slice(0, -1), terminal]
         : [...(lane?.waypoints || []), lane?.goal || fallback];
-      this.pendingEnemies.push({ spec: { x: roadContact?.position.x ?? scout?.spawn.x ?? encounterSpawn?.x ?? ambushPosition?.x ?? source.x, z: roadContact?.position.z ?? scout?.spawn.z ?? encounterSpawn?.z ?? ambushPosition?.z ?? source.z + index * 0.7,
+      this.pendingEnemies.push({ spec: { x: roadContact?.position.x ?? scout?.spawn.x ?? advanceSpawn?.x ?? encounterSpawn?.x ?? ambushPosition?.x ?? source.x, z: roadContact?.position.z ?? scout?.spawn.z ?? advanceSpawn?.z ?? encounterSpawn?.z ?? ambushPosition?.z ?? source.z + index * 0.7,
         weapon, p012RoadContact: wave.kind === "roadContact", p012Near: true, p012MachineGun: wave.kind === "machineGun", squadId: `P012_${waveIndex}`, order: wave.kind === "scouts" || wave.kind === "machineGun" || ambushPosition ? "hold" : "attack" }, points, ambushGroup, encounterGroup, encounterBeat: wave.beat,
         scout: scout ? { approach: points.slice(1), search: scout.points } : null,
         encounterSlot: index % 2, relocation: encounter?.relocations?.[index % 2] || null,
@@ -1073,16 +1123,15 @@ export class FirstLevelP012Director {
       else if(this.facts.has("roadContactHeld")&&!this.facts.has("roadContactClear")){target=route[this.routeIndex]||activity.roadContactFirePosition;lookAt=activity.roadContactEnemies?.[0]?.position;requiredAction="fight";text="沿实体侧墙到射位，清除道路上的四名日军";}
       else if(this.facts.has("roadContactClear")&&!this.facts.has("roadContactReleased")){target=activity.roadContactTailRelease;interactionId="p012_roadContactRelease";requiredAction="move";text="回到担架队尾，确认两处掩体有人后放行";}
     }
-    if (this.beat === 15 && !this.facts.has("regroup")) { target = anchors.stretcher; interactionId = "p012_roadSupply"; }
-    if (this.beat === 15 && this.facts.has("regroup") && !this.facts.has("roadWounded")) {
+    if (this.beat === 15 && !this.facts.has("roadWounded")) {
       target = this.lastSample.roadWoundedPosition || this.lastSample.columnPosition;
       interactionId = this.lastSample.roadWoundedAtInspection ? "p012_roadWounded" : null;
       requiredAction = this.lastSample.roadWoundedAtInspection ? "move" : "follow";
-      text = this.lastSample.roadWoundedAtInspection ? "检查停靠路旁的担架伤员" : "随担架到检查路段，留意伤员状况";
+      text = this.lastSample.roadWoundedAtInspection ? "检查这副真实担架上的伤员" : "随担架到墙边停靠处，留意伤员状况";
     }
-    if (this.beat === 15 && this.facts.has("regroup") && this.facts.has("roadWounded")) {
-      target = this.lastSample.columnPosition; interactionId = null; requiredAction = "follow";
-      text = "随担架队推进到扫射道路，沿队伍侧后警戒";
+    if (this.beat === 15 && this.facts.has("roadWounded")) {
+      target = this.lastSample.guidePosition||activity.airObservationPosition; interactionId = null; requiredAction = "follow";
+      text = "跟班长收到矮墙后；他会面向铁路交代下一步";
     }
     if (this.beat === 13 || (this.beat === 14 && this.routeIndex >= route.length)) target = this.lastSample.columnPosition;
     if (this.beat === 14) {
@@ -1120,32 +1169,45 @@ export class FirstLevelP012Director {
       }
     }
     if (this.beat === 16) {
-      target = route[this.routeIndex] || route.at(-1); requiredAction = "sprint";
-      lookAt = this.Signalled("P012AirReady") ? anchors.railPassFrom : null;
-      text = this.Signalled("P012AirReady") ? "铁路方向有飞机！加速穿过开放道路，留意首轮攻击并照顾担架队"
-        : "随担架加速通过开放道路，途中留意铁路方向";
-      if (this.airSprintM >= (activity.airRoadSprintMinM || 4)) requiredAction = "follow";
-      if (Distance(this.lastSample.position,this.lastSample.columnPosition)>10) {
+      if(!this.Signalled("P012AircraftRailFire")){
+        target=activity.airObservationPosition;lookAt=anchors.railPassFrom;requiredAction="observe";
+        text="留在实体矮墙后，用自由视角观察铁路方向的真实航迹";
+      }else if(!this.airRouteChoice){
+        const choices=activity.airRouteChoices||{};
+        const open=choices.open?.[0],ditch=choices.ditch?.[0];
+        target=Distance(this.lastSample.position,open)<Distance(this.lastSample.position,ditch)?open:ditch;
+        requiredAction="move";text="自己判断：向右走开放路更快，向左贴沟边更稳";
+      }else{
+        target=route[this.routeIndex]||route.at(-1);requiredAction="follow";
+        text=this.airRouteChoice==="open"?"沿选定的开放路接应担架，保持队伍展开":"沿选定的沟边路接应担架，利用蓝色沟岸遮蔽";
+      }
+      if (Distance(this.lastSample.position,this.lastSample.columnPosition)>14) {
         target = this.lastSample.airColumnTailPosition || this.lastSample.columnPosition;
-        requiredAction = "follow"; text = "接应后面的担架，一起通过开放道路";
-      } else if (this.routeIndex >= route.length && this.airSprintM < (activity.airRoadSprintMinM || 4)
-        && Distance(this.lastSample.position,route.at(-1)) < 2) {
-        target = route.at(-2); text = "加速沿已清道路接应担架，再通过弯口";
+        requiredAction = "follow"; text = "后面的担架落开了，回身接住队尾再走";
       }
     }
     if (this.beat === 17) {
-      target = route[this.routeIndex] || route.at(-1); requiredAction = "move";
-      requiredStance = this.routeIndex >= route.length - 1 ? "crouch" : null;
-      // Do not tell an unobservant player the target of the turn in advance,
-      // or keep describing a turn after the actual crowd-fire event.
-      text = this.Signalled("P012CrowdFire")
-        ? "飞机已向道路开火；低姿进入近旁路沟"
-        : "留意飞机来向，照看担架，寻找近旁路沟";
+      if(!this.Signalled("P012AirObstacleCreated")){target=activity.airObstaclePosition;requiredAction="observe";text="扫射刚落下，确认路上伤员和翻倒小车的位置";}
+      else if(this.lastSample.carryKind==="wounded"){
+        target=activity.airRescueCover;interactionId=this.airRescueTravelM>=(activity.airRescueMinM||12)?"p012_airRescueCover":null;
+        requiredAction="carry";text="把受伤百姓拖到蓝色硬掩体后";
+      }else if(!this.facts.has("airObstacleResolved")){
+        const rescue=activity.airCivilianPosition,cart=activity.airCartPosition;
+        const chooseRescue=Distance(this.lastSample.position,rescue)<=Distance(this.lastSample.position,cart);
+        target=chooseRescue?rescue:cart;requiredAction="interact";
+        interactionId=chooseRescue?"p012_airRescue":"p012_airCartClear";text="选择：靠左背起伤员送到蓝墙后，或靠右推开小车转沟边";
+      }else{target=route[this.routeIndex]||route.at(-1);requiredAction="move";
+        text=this.facts.has("airRescued")?"伤员已入掩体；沿沟边回接同一副担架":"小车已推开；从沟边绕过扫射路面";}
     }
     if (this.beat === 18) target = this.lastSample.columnPosition || anchors.stretcher;
-    if (this.beat === 18) interactionId = "ch1_stretcher";
+    if (this.beat === 18 && !this.Signalled("P012StretcherLifted")) interactionId = "ch1_stretcher";
     if (this.beat === 18 && this.lastSample.carryKind === "stretcher") {
-      target = route[this.routeIndex] || activity.stretcherCarryTo; interactionId = null; text = "抬稳担架，从沟口绕入，把伤员送向掩体";
+      target = route[this.routeIndex] || activity.stretcherCarryTo; interactionId = this.Signalled("P012AdvanceContact")?"p012_stretcherShelter":null;
+      text = this.Signalled("P012AdvanceContact")?"前锋出现了；先把担架平稳放入蓝色硬掩体，再交火":"接住同一副担架后端，沿沟边实际抬行到蓝色硬掩体";
+    }else if(this.beat===18&&this.facts.has("stretcherSheltered")){
+      const threat=this.enemyRoutes.find(entry=>entry.encounterBeat===18&&this.host.EnemyPosition?.(entry.handle));
+      target=activity.stretcherCarryTo;lookAt=threat?this.host.EnemyPosition(threat.handle):null;requiredAction=threat?"fight":"move";
+      text=threat?"担架已安置；从硬掩体后清除两名前锋":"确认两名前锋均已清除";
     }
     if (this.beat === 19) {
       const slots = anchors.strafeSlots || [];
@@ -1260,7 +1322,8 @@ export class FirstLevelP012Director {
     pressureHistory: this.pressureHistory,
     stageVisits: this.stageVisits, retreatPoint: this.retreatPoint, retreatRejoining: !!this.retreatRejoining,
     routeIndex: this.routeIndex, orientationIndex: this.orientationIndex, carryTravelM: this.carryTravelM,
-    closeReleasedGroup: this.closeReleasedGroup,
+    closeReleasedGroup: this.closeReleasedGroup,airRouteChoice:this.airRouteChoice,
+    airAdvanceSpawned:this.airAdvanceSpawned,airRescueTravelM:this.airRescueTravelM,
     observationTime: this.observationTime, mortarImpactStart: this.mortarImpactStart,
     shellObservationTime: this.shellObservationTime, shellImpactStart: this.shellImpactStart, shellTarget: this.shellTarget,
     cleanupWeaponStart: this.cleanupWeaponStart,
@@ -1307,7 +1370,8 @@ export class FirstLevelP012Director {
     lastSouthGrenadeEffect: Clone(this.lastSouthGrenadeEffect || null),
     southEnemiesCleared: this.SouthEnemiesCleared(),
     completionReasons: { ...this.completionReasons },
-    elapsed: this.elapsed, airSprintM: this.airSprintM, ambushEntryIndex: this.ambushEntryIndex,
+    elapsed: this.elapsed, airSprintM: this.airSprintM, airRouteChoice:this.airRouteChoice,
+    airAdvanceSpawned:this.airAdvanceSpawned,airRescueTravelM:this.airRescueTravelM,ambushEntryIndex: this.ambushEntryIndex,
     ambushRejoin:this.ambushRejoin?{target:{...this.ambushRejoin.target},destination:{...this.ambushRejoin.destination},index:this.ambushRejoin.index,blocked:!!this.ambushRejoin.blocked}:null,
     closePressureReleased: this.closePressureReleased, closeReleasedGroup: this.closeReleasedGroup,
     stagedCloseEnemies: this.enemyRoutes.filter(entry=>entry.staging).length,

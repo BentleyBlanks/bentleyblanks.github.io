@@ -94,6 +94,10 @@ const guidanceCues = Object.freeze([
   ["BlockadeDecision", "P012BlockadeDecision", "路障封死，南路走不通。点烟，改走西沟。"],
   ["RoadContact", "P012RoadContactSeen", "墙外有四个。先把担架队叫停在墙后，你从右边矮墙过去；我们占住两边。"],
   ["RoadContactClear", "P012RoadContactClear", "四个都压住了。回队尾亲自放行，别让担架散开。"],
+  ["AirObserve", "P012AirObserveOpen", "都到墙后面来。先看清铁路那架飞机怎么走，再挑路带担架过去。"],
+  ["AirRoute", "P012AirRouteChosen", "路看清了就走。开放路快，沟边稳，别让两副担架挤成一串。"],
+  ["AirObstruction", "P012AirObstacleCreated", "扫射把人和小车掀在路上了！救人拖到蓝墙后，或者推开车转进沟边。"],
+  ["AirAdvance", "P012AdvanceContact", "前面有人摸过来。先把担架放进蓝墙里面，再拿枪。"],
 ].map(([id,event,text])=>Object.freeze({at:`event:${event}`,type:"line",who:"luo",text,tier:"虚构",
   voice:`p012_text_Guide${id}`,p012SubtitleOnly:true,p012SubtitleSeconds:5.5,
   p012Immediate:Object.freeze({event,maxAgeS:12})})));
@@ -162,9 +166,23 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       ammoRoute: P012_BLUEPRINT_AMMO_CARRY,
       northRegroupRangeM: 10,
       roadWoundedPosition: { x: 50, z: 47 }, regripPosition: { x: -7, z: -37 },
-      airRoadRoute: Object.freeze([{ x: 54, z: 57 }, { x: 50, z: 68 }, { x: 47, z: 74 }]),
-      airRoadSprintMinM: 4,
-      airCoverRoute: Object.freeze([{ x: 44, z: 66 }, { x: 44, z: 62 }]),
+      airRegroupRoute:Object.freeze([{x:50,z:47},{x:49.5,z:49},{x:49.5,z:53},{x:45,z:53}]),
+      airObservationPosition:{x:45,z:53},airObservationRangeM:4,
+      airRouteChoices:Object.freeze({
+        open:Object.freeze([{x:53,z:54},{x:57,z:59},{x:58,z:64},{x:58,z:66}]),
+        ditch:Object.freeze([{x:48,z:57},{x:49,z:60},{x:49,z:64},{x:47.5,z:68}]),
+      }),
+      airObstaclePosition:{x:50,z:70},airCivilianPosition:{x:48,z:69.5},airCartPosition:{x:52,z:70.5},
+      airRescueCover:{x:44,z:61},airRescueMinM:12,
+      airRejoinRoute:Object.freeze([{x:46,z:72},{x:43,z:69},{x:44,z:66},{x:44,z:61}]),
+      stretcherCarryRoute: Object.freeze([{x:47,z:74},{x:43,z:74},{x:39,z:72},{x:43,z:68},{x:44,z:64},{x:44,z:61}]),
+      stretcherCarryTo:{x:44,z:61},stretcherCarryMinM:20,
+      airAdvancePositions:Object.freeze([{x:58,z:52},{x:62,z:55}]),
+      airAdvanceSpawns:Object.freeze([{x:72,z:28},{x:72,z:30}]),
+      airAdvanceApproaches:Object.freeze([
+        [{x:74,z:30},{x:74,z:38},{x:74,z:45},{x:66.5,z:48},{x:59,z:48},{x:58,z:52}],
+        [{x:74,z:30},{x:74,z:38},{x:74,z:46.5},{x:66.5,z:48},{x:59,z:48},{x:58,z:54},{x:62,z:55}],
+      ]),
       ambushProneSegments: Object.freeze([
         { minX: 56.5, maxX: 58.7, minZ: 23.8, maxZ: 24.5, afterGroup: -1 },
         { minX: 67.3, maxX: 68.7, minZ: 23.8, maxZ: 24.2, afterGroup: 0 },
@@ -176,7 +194,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       ]),
       woundedDragFrom: { x: 5, z: -65 }, woundedDragTo: { x: -7, z: -52 },
       woundedDragRoute: Object.freeze([{ x: 5, z: -65 }, { x: 5, z: -59 }, { x: 5, z: -46 }, { x: 0, z: -52 }, { x: -7, z: -52 }]),
-      woundedDragMinM: 10, stretcherCarryTo: { x: 44, z: 60 }, stretcherCarryMinM: 10,
+      woundedDragMinM: 10,
       woundedGuideRoute: Object.freeze([P012_BLUEPRINT_ANCHORS.gunports[0], P012_BLUEPRINT_ANCHORS.gunports[1],
         { x: 5, z: -59 }, { x: 5, z: -46 }, { x: 0, z: -52 }, { x: -7, z: -52 }]),
       // All six exist before the flank begins: different wall/door sightlines,
@@ -208,28 +226,18 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       closeFightRoute: Object.freeze([{ x: 44, z: 62 }, { x: 43.5, z: 64.5 },
         { x: 38.5, z: 68 }, { x: 47, z: 80 }]),
       closeFightGroups: Object.freeze([
-        [{ x: 58, z: 52 }, { x: 62, z: 55 }],
         [{ x: 58, z: 58 }, { x: 62, z: 62 }],
         [{ x: 58, z: 65 }, { x: 61, z: 69 }],
-      ].map((positions, group) => ({ routeIndex: [0, 2, 3][group],
-        cover: [{ x: 44, z: 62 }, { x: 38.5, z: 68 }, { x: 47, z: 80 }][group],
+      ].map((positions, group) => ({ routeIndex: [0, 3][group],
+        cover: [{ x: 44, z: 62 }, { x: 47, z: 80 }][group],
         label: ["伏在第一段沟岸后，截住从残屋逼近的两人",
-          "前一组已退；沿蓝色沟岸转到中段，盯住东侧缺口",
+          "伏在第一段沟岸后，截住从东侧缺口逼近的两人",
           "再转到南端折角，挡住最后两人接近担架"][group],
-        positions, spawns: positions.map((_, index) => {
-          const slot = group * 2 + index;
-          return { x: 72, z: slot < 3 ? 28 + slot * 2 : 61.5 + (slot - 3) * 2.5 };
-        }),
-        relocations: [[{ x: 56, z: 52 }, { x: 60, z: 55 }],
-          [{ x: 56, z: 58 }, { x: 60, z: 62 }], [{ x: 56, z: 65 }, { x: 63, z: 69 }]][group],
-        stagingStopIndices: positions.map((_, index) => group * 2 + index < 3 ? 2 : -1),
-        approaches: positions.map((_, index) => {
-          const slot = group * 2 + index;
-          return slot < 3 ? [{ x: 74, z: 30 }, { x: 74, z: 38 }, { x: 74, z: 45 + slot * 1.5 },
-            ...(slot < 2 ? [{ x: 74, z: 48 }] : []), { x: 66.5, z: 48 }, { x: 59, z: 48 },
-            ...(slot ? [{ x: 58, z: 54 }] : [])]
-            : [{ x: 69, z: 73 }, { x: 64, z: 73 }, { x: 64, z: 67 }];
-        }),
+        positions, spawns: positions.map((_, index) => ({x:72,z:61.5+(group*2+index)*2.5})),
+        relocations: [[{ x: 56, z: 58 }, { x: 60, z: 62 }],
+          [{ x: 56, z: 65 }, { x: 63, z: 69 }]][group],
+        stagingStopIndices: positions.map(()=>-1),
+        approaches: positions.map(()=>[{ x: 69, z: 73 }, { x: 64, z: 73 }, { x: 64, z: 67 }]),
       }))),
       southFightGroups: Object.freeze([
         { routeIndex: 2, cover: { x: 42, z: 94 }, label: "从路沟掩体清除南路道路火力",
@@ -242,7 +250,6 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
           relocations: [{ x: 29, z: 109 }, { x: 31, z: 109.5 }],
           positions: [{ x: 27, z: 109 }, { x: 33, z: 109.5 }] },
       ]),
-      stretcherCarryRoute: Object.freeze([{ x: 44, z: 66 }, { x: 44, z: 60 }]),
       southGrenadeSupply: { x: 42, z: 94 }, southGrenadeStock: 2,
       southRoom: { x: 30, z: 105 }, southGrenadeAim: { x: 49, z: 104 }, southSupplyRouteIndex: 2,
       southRoomRoute: Object.freeze([{ x: 44, z: 66 }, { x: 47, z: 80 }, { x: 42, z: 94 }, { x: 41, z: 98 }, { x: 41, z: 100 }, { x: 41, z: 104.4 },
@@ -252,7 +259,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       // Ground slots keep the rifle squad off blue bank tops, the player's
       // sightline and the 1.3 m stretcher corridor. Actors walk here normally.
       southDefenseSlots: Object.freeze([{ x: 36, z: 58 }, { x: 36, z: 63 },
-        { x: 38, z: 72 }, { x: 53, z: 55 }, { x: 56, z: 77 }]),
+        { x: 40.5, z: 73 }, { x: 53, z: 55 }, { x: 56, z: 77 }]),
       // Luo follows the open ditch, rather than reversing through the house
       // assembly route. The last bend reads both him and the red blockade.
       blockadeGuideRoute: Object.freeze([{ x: 44, z: 66 }, { x: 43.5, z: 64.5 },

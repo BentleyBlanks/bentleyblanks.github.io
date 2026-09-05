@@ -3240,6 +3240,25 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     },
     GiveGrenades: (request) => { const granted = Number.isFinite(request) ? Math.max(0, Math.floor(request)) : 0; state.grenades += granted; return granted; },
     DeployRetreatSmoke: (point) => p012Runtime.DeployRetreatSmoke(point),
+    ResolveAirObstacle:(mode)=>{
+      const mem=setpieces?.mem;if(!mem?.p012AirObstacle)return false;
+      mem.p012AirObstacle.resolved=true;mem.p012AirObstacle.mode=mode;
+      if(mode==="rescue"){
+        const at=phase.whitebox.activities.airRescueCover;
+        if(mem.p012AirCivilianProp)MoveSetpieceProp(mem.p012AirCivilianProp,{...at,y:.18,rotationY:1.2});
+        if(mem.p012AirCartProp)SetSetpiecePropState(mem.p012AirCartProp,"removed");
+      }else{
+        if(mem.p012AirCartProp)SetSetpiecePropState(mem.p012AirCartProp,"removed");
+        if(mem.p012AirCivilianProp)MoveSetpieceProp(mem.p012AirCivilianProp,{x:phase.whitebox.activities.airCivilianPosition.x-1.5,y:.18,z:phase.whitebox.activities.airCivilianPosition.z,rotationY:1.2});
+      }
+      return true;
+    },
+    ShelterCarriedLitter:(point)=>{
+      const litter=setpieces?.mem?.p012CarriedLitter;if(!litter)return false;
+      litter.dropped=true;setpieces.mem.p012FallenAt={...point};
+      MoveSetpieceProp(litter.propLitter,{...point,y:.1,rotationZ:0});
+      MoveSetpieceProp(litter.propBody,{...point,y:.3,rotationZ:0});return true;
+    },
     HoldRetreatForCover: (hold) => {
       if (p012Flow?.beat === 23 && setpieces?.mem?.column) setpieces.mem.column.scriptPaused = !!hold;
     },
@@ -6386,6 +6405,7 @@ function Frame(dt, render = true) {
       columnPosition, columnAtEscortEnd: columnAtEnd,
       columnAtAirRoad: !!columnPosition && columnPosition.z >= airEntrance.z && Math.abs(columnPosition.x - airEntrance.x) < 8,
       airColumnEnteredRoad: AirColumnEnteredRoad(column, player.position, p012Activities),
+      aircraftVisible:p012Runtime.AircraftVisible(player.EyePosition,strafe?.View()),
       roadWoundedPosition: setpieces?.mem?.p012RoadWoundedPosition || null,
       roadWoundedAtInspection: !!setpieces?.mem?.p012RoadWoundedAtInspection,
       airColumnTailPosition: (column?.litters || []).filter(litter=>litter.front?.handle?.alive&&litter.rear?.handle?.alive).map(litter=>({x:(litter.front.handle.position.x+litter.rear.handle.position.x)/2,z:(litter.front.handle.position.z+litter.rear.handle.position.z)/2})).sort((a,b)=>a.z-b.z)[0] || null,
