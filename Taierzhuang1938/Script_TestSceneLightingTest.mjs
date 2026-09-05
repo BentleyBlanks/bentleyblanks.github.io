@@ -11,7 +11,9 @@ import { EXPLOSION_RANGE_PHASE } from "./Data_ExplosionRange.mjs";
 import { MELEE_QTE_PHASE } from "./Data_MeleeQte.mjs";
 import { FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./Data_FirstLevelP012Whitebox.mjs";
 
-const phases = [WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE, FIRST_LEVEL_P012_WHITEBOX_PHASE];
+import { MOVEMENT_RANGE_PHASE } from "./Data_MovementRange.mjs";
+
+const phases = [MOVEMENT_RANGE_PHASE, WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE, FIRST_LEVEL_P012_WHITEBOX_PHASE];
 for (const phase of phases) assert.equal(phase.sky, "testSceneDay", phase.id);
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const outputDir = path.join(projectDir, "_shots", "TestSceneLighting");
@@ -118,7 +120,7 @@ try {
   await page.evaluate(() => { for (const actor of window.lightingCast) { window.Taierzhuang.scene.remove(actor.root); actor.Dispose(); } });
   if (process.argv.includes("--scenes")) {
     evidence.scenes = [];
-    for (const query of ["range=1", "explosions=1", "melee=1", "whitebox=p012"]) {
+    for (const query of ["movement=1", "range=1", "explosions=1", "melee=1", "whitebox=p012"]) {
       await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?${query}&shot=1&manual=1&quality=medium&scale=small`);
       await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
       const result = await page.evaluate(() => {

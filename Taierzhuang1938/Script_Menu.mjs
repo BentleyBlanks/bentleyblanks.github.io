@@ -26,6 +26,7 @@ import { PRESUMED } from "./Data_Tengxian.mjs";
  * key 与 Script_Main 的 `?range=1 / ?melee=1 / ?jiehe=1` 一一对应。
  */
 const SANDBOX_NAMES = {
+  movement: { where: "操作交互测试场", exit: "退出操作测试场" },
   explosions: { where: "爆炸测试场", exit: "退出爆炸测试场" },
   weapons: { where: "枪械射击白盒", exit: "退出枪械靶场" },
   range: { where: "靶场", exit: "退出靶场" },

@@ -145,7 +145,12 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - 先读：`docs/Data_TechPhysics.md`（角色 IK 部分）。
 
 ### 测试场共享光照
-- 五个测试场共用 `Script_Sky.TEST_SCENE_DAY`；参数、角色比较条件与灰卡/全角色回归见 [测试场光照基准](Data_TestSceneLighting.md)。
+- 六个测试场共用 `Script_Sky.TEST_SCENE_DAY`；参数、角色比较条件与灰卡/全角色回归见 [测试场光照基准](Data_TestSceneLighting.md)。
+
+### 操作交互测试场（?movement=1）
+- `Data_MovementRange.mjs` 定义五区实体与边界档；`Script_MovementRangeField.mjs` 按同一尺寸合批几何、碰撞和米制标尺。
+- `Script_MovementRange.mjs` 观察正式玩家动作，分开记录跳跃、助跑跳、翻越和攀爬；Home 复位，PageUp / PageDown 切区。
+- 回归口 `Script_MovementRangeTest.mjs`（physics 域）；测量口径与维护见 [操作测试场](Data_MovementRange.md)。
 
 ### 枪械射击白盒（?weapons=1，全枪械专项）
 - `Data_WeaponRange.mjs` 动态收集枪表并定义精确距离/圆弧移动靶；`Script_WeaponRangeField.mjs` 管合批白盒、长桌和距离牌。

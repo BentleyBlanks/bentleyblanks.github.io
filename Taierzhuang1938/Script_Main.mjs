@@ -32,6 +32,9 @@ import { RegisterGrenadeReturn } from "./Script_GrenadeReturn.mjs";
 import { WeaponRangeField } from "./Script_WeaponRangeField.mjs";
 import { WEAPON_RANGE_PHASE, WEAPON_RANGE_LEVEL_ID } from "./Data_WeaponRange.mjs";
 import { WeaponRangeRuntime } from "./Script_WeaponRangeRuntime.mjs";
+import { MOVEMENT_RANGE_PHASE, MOVEMENT_RANGE_ID } from "./Data_MovementRange.mjs";
+import { MovementRangeField } from "./Script_MovementRangeField.mjs";
+import { MovementRange } from "./Script_MovementRange.mjs";
 import {
   RANGE_PHASE, RANGE_LEVEL_ID, RANGE_TARGETS, RANGE_STATIONS, RANGE_RESPAWN_S,
 } from "./Data_Range.mjs";
@@ -180,6 +183,7 @@ const PREVIEW_AUTOPLAY = PREVIEW && params.get("autoplay") === "1";
 const RANGE = params.get("range") === "1";
 const EXPLOSION_TEST = params.get("explosions") === "1";
 const WEAPON_RANGE = params.get("weapons") === "1";
+const MOVEMENT_RANGE = params.get("movement") === "1";
 const MELEE_TEST = params.get("melee") === "1";
 const FIRST_LEVEL_P012_WHITEBOX = params.get("whitebox") === "p012";
 /**
@@ -210,8 +214,8 @@ const FULL_SCENE = PHASE_PARAM === "fullscene" || LEGACY_FULL_SCENE_CARRIAGE;
 const FULL_SCENE_VIEW = FULL_SCENE
   && (LEGACY_FULL_SCENE_CARRIAGE || params.get("fullSceneView") === "carriage")
   ? "carriage" : "county";
-const SANDBOX = EXPLOSION_TEST || WEAPON_RANGE || RANGE || MELEE_TEST || FIRST_LEVEL_P012_WHITEBOX || JIEHE;
-const PHASE_TABLE = EXPLOSION_TEST ? [EXPLOSION_RANGE_PHASE] : WEAPON_RANGE ? [WEAPON_RANGE_PHASE] : RANGE ? [RANGE_PHASE]
+const SANDBOX = MOVEMENT_RANGE || EXPLOSION_TEST || WEAPON_RANGE || RANGE || MELEE_TEST || FIRST_LEVEL_P012_WHITEBOX || JIEHE;
+const PHASE_TABLE = MOVEMENT_RANGE ? [MOVEMENT_RANGE_PHASE] : EXPLOSION_TEST ? [EXPLOSION_RANGE_PHASE] : WEAPON_RANGE ? [WEAPON_RANGE_PHASE] : RANGE ? [RANGE_PHASE]
   : MELEE_TEST ? [MELEE_QTE_PHASE]
     : FIRST_LEVEL_P012_WHITEBOX ? [FIRST_LEVEL_P012_WHITEBOX_PHASE]
       : JIEHE ? [JIEHE_SANDBOX_PHASE]
@@ -638,6 +642,7 @@ let menu = null;
 let editorReturnMenuMode = null;
 let currentWeapon = "HanYang";
 let weaponRange = null;
+let movementRange = null;
 // 下令轮盘。HUD 那条静态横排（1跟我来 2向前…）已经撤掉：
 // ER2 的指挥手感是"按住 Tab 推一下鼠标松手"，眼睛不用离开战场。
 const wheel = new RadialWheel(hudRoot);
@@ -1661,7 +1666,7 @@ async function Boot() {
   await EnterLevel(state.phaseIndex, { initial: true, cutscenes: false });
   state.ready = true;
   bootStart.disabled = false;
-  bootStart.textContent = SHOT ? "（出图模式）" : (WEAPON_RANGE ? "进入枪械靶场" : EXPLOSION_TEST ? "进入爆炸测试场" : PREVIEW ? "播放序章" : "进 城");
+  bootStart.textContent = SHOT ? "（出图模式）" : (MOVEMENT_RANGE ? "进入操作测试场" : WEAPON_RANGE ? "进入枪械靶场" : EXPLOSION_TEST ? "进入爆炸测试场" : PREVIEW ? "播放序章" : "进 城");
 
 
   // 各阶段的配置时长，给通关冒烟按出厂配置跑用
@@ -2218,6 +2223,7 @@ async function Boot() {
   // 别名：全局名沿用 Taierzhuang 是为了不动出图脚本与两个冒烟（三处都按它取运行时），
   // 但这个项目现在是滕县，新写的东西一律用 window.Tengxian。**两个名字是同一个对象。**
   window.Tengxian = window.Taierzhuang;
+  if (movementRange) window.Taierzhuang.Debug.MovementRange = movementRange.api;
   if (weaponRange) window.Taierzhuang.Debug.WeaponRange = weaponRange.api;
 
   // --- 靶场取证口（只在 ?range=1 下存在；口径在 docs/Data_TestRange.md） ----
@@ -2445,9 +2451,9 @@ async function Boot() {
       // 携行与七关口径一起翻一遍，重载一次比那条路诚实得多。
       // 玩家可见的测试场景集中保留核心玩法入口。界河与过场仍可通过
       // ?jiehe=1 / ?preview=... 直达，供自动化与内部验收使用，不再混入选章。
-      sandboxes: [WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE,
+      sandboxes: [MOVEMENT_RANGE_PHASE, WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE,
         FIRST_LEVEL_P012_WHITEBOX_PHASE],
-      sandboxMode: WEAPON_RANGE ? "weapons" : EXPLOSION_TEST ? "explosions" : RANGE ? "range" : MELEE_TEST ? "melee"
+      sandboxMode: MOVEMENT_RANGE ? "movement" : WEAPON_RANGE ? "weapons" : EXPLOSION_TEST ? "explosions" : RANGE ? "range" : MELEE_TEST ? "melee"
         : FIRST_LEVEL_P012_WHITEBOX ? "firstLevelP012Whitebox" : JIEHE ? "jiehe" : false,
       PlaySandbox: (key) => GoToSandbox(key),
       // 机位表按**建好的那一片**取，不按「第几章」取：`?phase=overview` 与
@@ -2532,6 +2538,7 @@ const WORLD_CLASSES = {
   [RANGE_LEVEL_ID]: RangeField,
   [EXPLOSION_RANGE_ID]: ExplosionRangeField,
   [WEAPON_RANGE_LEVEL_ID]: WeaponRangeField,
+  [MOVEMENT_RANGE_ID]: MovementRangeField,
   [MELEE_QTE_LEVEL_ID]: RangeField,
   [FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID]: FirstLevelWhiteboxField,
 };
@@ -2547,13 +2554,15 @@ function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField;
  */
 function GoToSandbox(key) {
   const url = new URL(window.location.href);
+  url.searchParams.delete("movement");
   url.searchParams.delete("range");
   url.searchParams.delete("explosions");
   url.searchParams.delete("weapons");
   url.searchParams.delete("melee");
   url.searchParams.delete("whitebox");
   url.searchParams.delete("jiehe");
-  if (key === "weapons") url.searchParams.set("weapons", "1");
+  if (key === "movement") url.searchParams.set("movement", "1");
+  else if (key === "weapons") url.searchParams.set("weapons", "1");
   else if (key === "range") url.searchParams.set("range", "1");
   else if (key === "explosions") url.searchParams.set("explosions", "1");
   else if (key === "melee") url.searchParams.set("melee", "1");
@@ -2579,6 +2588,7 @@ function FieldIdFor(phase) { return phase.fieldFrom || phase.id; }
 
 /** 建一片关卡切片。**换关一定要先把上一片拆掉**，不然七关跑下来会攒七座城。 */
 async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
+  movementRange?.Dispose(); movementRange = null;
   weaponRange?.Dispose();
   weaponRange = null;
   aircraft?.SetPhase(phase);
@@ -2617,7 +2627,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   // 上一轮 PCG 自己的碰撞盒挡自己，所有候选都被判成重叠。
   battlefield.propPcgBlockers = battlefield.colliders.slice();
   // TownDressing is bounds-based, not phase-based: independent IDs alone do not isolate it.
-  const external = phase.whitebox?.p012 || phase.id === EXPLOSION_RANGE_ID ? {count:0,generatedCount:0,pcgCount:0,pcgStats:null,pcgErrors:[],failed:[],colliders:[],streamer:null} : await AddExternalProps({
+  const external = phase.whitebox?.p012 || phase.id === EXPLOSION_RANGE_ID || phase.id === MOVEMENT_RANGE_ID ? {count:0,generatedCount:0,pcgCount:0,pcgStats:null,pcgErrors:[],failed:[],colliders:[],streamer:null} : await AddExternalProps({
     scene, library, phaseId: FieldIdFor(phase), bounds: phase.bounds,
     groundAt: (x, z) => battlefield.GroundHeight(x, z),
     blockers: battlefield.propPcgBlockers,
@@ -2645,7 +2655,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   }
   // tzm 饰件层（信号机/站灯/窗花/门五金…）：与外部 GLB 布景同一个异步槽位，
   // 但物理契约不同（多数无碰撞、可悬空安装），所以是平行的一层，见 Script_TrimProps 文件头。
-  const trim = phase.whitebox?.p012 || phase.id === EXPLOSION_RANGE_ID ? {count:0,failed:[],colliders:[]} : await AddTrimProps({ scene, library, phaseId: FieldIdFor(phase) });
+  const trim = phase.whitebox?.p012 || phase.id === EXPLOSION_RANGE_ID || phase.id === MOVEMENT_RANGE_ID ? {count:0,failed:[],colliders:[]} : await AddTrimProps({ scene, library, phaseId: FieldIdFor(phase) });
   battlefield.trimProps = trim;
   if (trim.colliders?.length) {
     battlefield.colliders.push(...trim.colliders);
@@ -2835,6 +2845,7 @@ function ClearSetpieceProps() {
 function ClearRuntime() {
   p012StageZero?.Dispose(); p012StageZero = null;
   explosionRange?.Dispose(); explosionRange = null;
+  movementRange?.Dispose(); movementRange = null;
   weaponRange?.Dispose(); weaponRange = null;
   meleeCombat?.Cancel("levelChange");
   // 摆点层：交互点、后送队、计时器与运行时道具全按关摆，一律清掉。
@@ -2997,7 +3008,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // CountSide("nra") 都会把他们数进去，于是撒兵自动少撒同样多 ——
   // 场上活人总数一个没多，开机红线（drawCalls / triangles）不受影响。
   // 名册默认从本章 beats 的 who 推导（该章说过话的战斗员自动在场），INT2 按章精修。
-  if (!EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && !deprecated && companion) {
+  if (!MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && !deprecated && companion) {
     companion.BeginLevel(contentId, {
       // 名册**优先走章节数据点名**（INT2 起七章都写了 roster）；没写才由 beats 推。
       // 推导只收「该章说过话的战斗员」—— 军医、参谋、师长这些 combatant:false 的人
@@ -3022,7 +3033,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // 章节摆点：**排在具名同伴之后**（罗班长要先站出来，摆点层才拿得到他的句柄），
   // 也排在 SeedSoldiers 之前（后送队要从 nra 名额里出人，撒兵才会自动少撒同样多）。
   // 靶场／白刃训练场／预览／过场承载章都不摆；第一关白盒有正式第一章内容。
-  if (!EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && !deprecated && setpieces) {
+  if (!MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && !deprecated && setpieces) {
     setpieces.BeginLevel(contentId, phase);
   }
   interact.Clear("P012");
@@ -3360,7 +3371,12 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       && !p012Runtime?.binocularOwned && !player.Busy,
     OnPickup: () => viewmodel.TriggerThrow?.(0.72),
   });
-  if (EXPLOSION_TEST) {
+  if (MOVEMENT_RANGE) {
+    state.pinned = true;
+    movementRange = new MovementRange({ player, scene, battlefield,
+      CanUse: () => state.ready && state.running && !state.menu && !state.cutscene && !editor?.Capturing });
+    if (window.Taierzhuang?.Debug) window.Taierzhuang.Debug.MovementRange = movementRange.api;
+  } else if (EXPLOSION_TEST) {
     state.pinned = true;
     explosionRange?.Dispose();
     explosionRange = new ExplosionRange({ battlefield, combat, interact, player, ai, hud, aircraft,
@@ -3399,7 +3415,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
 
   if (!initial) {
     ShowBoot(false);
-    bootStart.textContent = SHOT ? "（出图模式）" : (WEAPON_RANGE ? "进入枪械靶场" : EXPLOSION_TEST ? "进入爆炸测试场" : PREVIEW ? "播放序章" : "进 城");
+    bootStart.textContent = SHOT ? "（出图模式）" : (MOVEMENT_RANGE ? "进入操作测试场" : WEAPON_RANGE ? "进入枪械靶场" : EXPLOSION_TEST ? "进入爆炸测试场" : PREVIEW ? "播放序章" : "进 城");
   }
   // 这一片切片是哪一章的。菜单靠它决定用哪一组机位，StartLevel 靠它决定要不要重建。
   // **借片的章不改它**：地皮还是上一次建的那一片，改了菜单会去取一组不存在的机位。
@@ -3720,7 +3736,7 @@ const PIN_RELEASE_GRACE_S = 240;
 /** 换下一关。关末过场 -> 下一关关前过场 -> 建切片。 */
 async function AdvanceLevel(opts = {}) {
   // The gun laboratory has no campaign completion, including explicit debug calls.
-  if (WEAPON_RANGE || EXPLOSION_TEST) return state.phaseIndex;
+  if (MOVEMENT_RANGE || WEAPON_RANGE || EXPLOSION_TEST) return state.phaseIndex;
   if (state.advancing) return state.phaseIndex;
   // 走到这里就算这一关过了：菜单的「继续」与选章里的「已通过」都读这条
   Progress.MarkCleared(PHASE_TABLE[state.phaseIndex].id, state.phaseIndex);
@@ -6147,6 +6163,7 @@ function Frame(dt, render = true) {
   input.diveSpeedMps = p012Runtime?.DiveSpeed(strafe?.View());
   player.meleePose = meleeCombat?.ViewPose();
   player.Update(dt, input, WEAPONS[currentWeapon], WEAPON_RANGE ? WEAPON_RANGE_PHASE.whitebox : null);
+  movementRange?.Update(dt);
   profiler.E("player");
   // 架设机枪同样排在 player.Update **之后**：射界限位要夹的是这一帧的视线，
   // 夹晚一帧画面就会先越界再被拉回来。
@@ -6567,7 +6584,8 @@ function Frame(dt, render = true) {
   if (state.spawnAccumulator > 3) {
     state.spawnAccumulator = 0;
     profiler.B("spawn");
-    if (WEAPON_RANGE) { /* WeaponRangeRuntime maintains every fixture each frame. */ }
+    if (MOVEMENT_RANGE) { /* Movement fixtures have no soldiers. */ }
+    else if (WEAPON_RANGE) { /* WeaponRangeRuntime maintains every fixture each frame. */ }
     else if (RANGE) MaintainRangeTargets();
     else if (MELEE_TEST) MaintainMeleeTargets();
     else if (!EXPLOSION_TEST) SeedSoldiers(phase);

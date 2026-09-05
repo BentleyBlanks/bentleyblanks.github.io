@@ -47,6 +47,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  MovementRangeTest: { file: "Script_MovementRangeTest.mjs", timeoutMs: 240000, desc: "操作白盒：实体标尺、真实跳跃跑跳、翻越边界、姿态通行与复位" },
   FirstLevelP012AnimationTest: {file:'Script_FirstLevelP012AnimationTest.mjs',desc:'P012实际GLB车厢待机、位移步频、担架停走与路边动作出图'},
   TrainLibraryTest: { file: "Script_TrainLibraryTest.mjs", desc: "火车构件库：点击懒载、原 PBR、完整轮组绑定、缓存隔离与实际显示" },
   BackRifleRunTest: { file: 'Script_BackRifleRunTest.mjs', desc: '独立背枪跑步 GLB：原骨架、循环接缝、真实蒙皮接地、速度与挂点浏览器验收' },
@@ -195,6 +196,8 @@ export const testDefs = {
 
 export const browserTests = new Set([
   "BrowserBundleTest",
+
+  "MovementRangeTest",
   'FirstLevelP012AnimationTest',
   'FirstLevelP012TerrainBrowserTest',
   "TrainLibraryTest",
@@ -254,7 +257,7 @@ export const domains = {
   },
   physics: {
     label: "物理/移动/破坏（共享底座，下游成串跑）",
-    tests: ["PhysicsTest", "ColliderTest", "JumpTest", "DestructionTest", "FractureBakeTest"],
+    tests: ["MovementRangeTest", "PhysicsTest", "ColliderTest", "JumpTest", "DestructionTest", "FractureBakeTest"],
   },
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
@@ -329,6 +332,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  { domain: "physics", pattern: /MovementRange/i },
   { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },
   { domain: 'animation', pattern: /BackRifleRun|Melee.*Animation|MeleeAnimation|Infantry/i },
   { domain: "ai", pattern: /FirstLevelP012(TrainColumn|March|Family|Resting|Arrival|VillageLife|StageZero|Cast)/i },

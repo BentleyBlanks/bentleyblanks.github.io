@@ -64,6 +64,13 @@ export const STANCE = {
   prone: { eye: 0.42, speed: 0.72, radius: 0.42, sway: 0.30, spread: 0.34, label: "卧" },
 };
 
+/** Read-only measuring references; movement continues to use the constants above. */
+export function PlayerMovementReference() {
+  return { standingRiseM: JUMP_SPEED_MPS ** 2 / (2 * GRAVITY_MPS2),
+    runningRiseM: (JUMP_SPEED_MPS * (1 + JUMP_RUN_RISE)) ** 2 / (2 * GRAVITY_MPS2),
+    runFullMps: JUMP_RUN_FULL_MPS, stances: structuredClone(STANCE) };
+}
+
 export class PlayerController {
   constructor(camera, world, { seed = 1 } = {})
   {

@@ -699,7 +699,7 @@ async function CheckMissionList() {
   });
   Check("全屏任务选择采用七行纵向清单", panel.fullScreen && panel.title === "任务选择"
     && panel.rects.length === 7 && panel.rects.every((r,i)=>r.x===panel.rects[0].x && (!i||r.y>=panel.rects[i-1].y+panel.rects[i-1].h)),JSON.stringify(panel.rects));
-  Check("正式章节、暂时废弃场景与五项测试入口三组，旧白盒已移除",panel.levels===12 && !panel.retired&&panel.groups.join(",")==="正式章节,暂时废弃场景,测试场景",panel.groups.join(","));
+  Check("正式章节、暂时废弃场景与六项测试入口三组，旧白盒已移除",panel.levels===13 && !panel.retired&&panel.groups.join(",")==="正式章节,暂时废弃场景,测试场景",panel.groups.join(","));
   Check("正式章节只剩序章，第一关到终章六条全标「未完成」",panel.official===1&&panel.shelvedMarks.length===6&&panel.shelvedMarks.every(t=>t==="未完成"),JSON.stringify({official:panel.official,marks:panel.shelvedMarks}));
   Check("任务选择不再出现地图、横向时间轴或缩略图卡",!panel.oldMap);
   const images=[];
@@ -755,7 +755,7 @@ async function CheckMissionList() {
       await page.screenshot({path:path.join(outDir,"Scene_MissionList"+name+".png")});
       await page.locator('.mnCampaignBack').focus();
       await page.locator('.mnSandboxLevel').last().focus();
-      Check(name+"最后一个测试入口能滚动到并选中",await page.evaluate(()=>window.Taierzhuang.menu.selected===11));
+      Check(name+"最后一个测试入口能滚动到并选中",await page.evaluate(()=>window.Taierzhuang.menu.selected===window.Taierzhuang.menu.entries.length-1));
       const reopened=await page.evaluate(()=>{
         const menu=window.Taierzhuang.menu;menu.Show('title');menu.Show('levels');
         const row=document.querySelector('.mnLevel.on').getBoundingClientRect();
@@ -810,8 +810,8 @@ async function CheckMissionList() {
 
   // Esc 跳过，别在冒烟里干等三十八秒
   await page.keyboard.press("Escape");
-  await page.waitForFunction(() => window.Taierzhuang.state.running === true, null, { timeout: 180000 })
-    .catch(() => {});
+  await page.waitForFunction(() => window.Taierzhuang.Debug.Menu().open
+    && window.Taierzhuang.Debug.Menu().mode === "title", null, { timeout: 180000 });
   const done = await page.evaluate(() => ({
     running: window.Taierzhuang.state.running,
     level: window.Taierzhuang.Debug.Level().id,
@@ -1239,17 +1239,18 @@ async function CheckMissionList() {
     };
   });
   Check("靶场条目排在七条章节之后，标「沙盒」",
-    brief.selected === 8 && brief.mark === "沙盒" && brief.no === "靶",   // 枪械专项后保留原玩法靶场
+    brief.selected === 9 && brief.mark === "沙盒" && brief.no === "靶",   // 枪械专项后保留原玩法靶场
     `selected=${brief.selected} mark=${brief.mark} no=${brief.no}`);
-  Check("选章列出枪械、玩法、爆炸、白刃独立战斗与第一关策划白盒",
-    brief.sandboxes.length === 5
-      && brief.sandboxes.map((entry) => entry.no).join(",") === "枪,靶,爆,刃,012"
+  Check("选章列出操作、枪械、玩法、爆炸、白刃独立战斗与第一关策划白盒",
+    brief.sandboxes.length === 6
+      && brief.sandboxes.map((entry) => entry.no).join(",") === "跃,枪,靶,爆,刃,012"
       && brief.sandboxes.every((entry) => entry.mark === "沙盒")
-      && brief.sandboxes[0].name.includes("枪械白盒靶场")
-      && brief.sandboxes[1].name.includes("玩法测试靶场")
-      && brief.sandboxes[2].name.includes("爆炸测试场")
-      && brief.sandboxes[3].name.includes("白刃战 · 大刀与刺刀")
-      && brief.sandboxes[4].name.includes("第一关 · P0/P1/P2 场景白盒")
+      && brief.sandboxes[0].name.includes("操作交互测试场")
+      && brief.sandboxes[1].name.includes("枪械白盒靶场")
+      && brief.sandboxes[2].name.includes("玩法测试靶场")
+      && brief.sandboxes[3].name.includes("爆炸测试场")
+      && brief.sandboxes[4].name.includes("白刃战 · 大刀与刺刀")
+      && brief.sandboxes[5].name.includes("第一关 · P0/P1/P2 场景白盒")
       && brief.sandboxes.every((entry) => !entry.name.includes("界河")),
     JSON.stringify(brief.sandboxes));
   Check("靶场预览只留一句目标、没有二次确认按钮，且**不画**滕县全图",
