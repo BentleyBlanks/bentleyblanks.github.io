@@ -21,6 +21,17 @@ function FootY(layout,p) {
 }
 assert.ok(openingStoryBeats.length>0);
 {
+ const guard={id:'escortGuard',x:0,z:0},fighter={id:'companion',x:0,z:0},orders=[];let held=false;
+ const runtime=new FirstLevelP012Runtime({GuideActor:()=>null,Position:actor=>actor,
+  FriendlyActors:()=>[guard,fighter],IsEscortMember:actor=>actor===guard,
+  Signalled:name=>name==='P012RoadContactHold'&&held,Defend:(actor,point)=>orders.push({actor,point}),
+ },{activities:{roadContactFriendlyCovers:[{x:5,z:5}]}});
+ runtime.beat=13;runtime.Update(.05);
+ assert.equal(orders.length,0,'walking south cannot pin the following squad in its northern positions');
+ held=true;runtime.Update(.05);
+ assert.ok(orders.length>0&&orders.every(order=>order.actor===fighter),'road cover orders leave all column-owned guards with their stretchers');
+}
+{
  const config=P012Phase.whitebox,activity=config.activities,blocks=config.layout.blocks;
  const Make=(beat,start)=>{
   const actor={...start},player={...start},events=[],signals=new Set();let releases=0;
@@ -74,6 +85,31 @@ assert.ok(openingStoryBeats.length>0);
  assert.ok(Math.hypot(road.actor.x-activity.roadContactBreach.x,road.actor.z-activity.roadContactBreach.z)<.6,
   'recorded B13 stall reaches the actual breach via the complete world-space road');
  assert.equal(road.flow.facts.size,0,'walking the guide cannot invent contact or kills');
+ const escort=Make(13,{x:-6.430167242887489,z:-91.96949797252844});
+ const roadEnd=config.escortWaypoints.findIndex(point=>point.x===90&&point.z===10);
+ const column=new EscortColumn({PlayerPos:()=>escort.player}, {waypoints:config.escortWaypoints.slice(0,roadEnd+1),members:[]});
+ column.Start();let maxGap=0,waited=false;
+ for(let frame=0;frame<5000&&!column.arrived;frame++){
+  column.Update(.05);escort.flow.lastSample.columnPosition=column.HeadPosition();
+  escort.flow.lastSample.guideRouteIndex=escort.runtime.guide.index;
+  const objective=escort.flow.CurrentObjective(),target=objective.target;
+  const distance=Math.hypot(target.x-escort.player.x,target.z-escort.player.z);
+  if(distance>objective.arrivalRadiusM-.05){
+   const step=Math.min(5*.05,distance),next={x:escort.player.x+(target.x-escort.player.x)*step/distance,
+    z:escort.player.z+(target.z-escort.player.z)*step/distance};
+   assert.ok(P012SegmentClear(blocks,escort.player,next,.42),'ordinary public follow input clears each corner');
+   Object.assign(escort.player,next);
+  }
+  const before={...escort.actor};escort.Step(1,false);
+  maxGap=Math.max(maxGap,Math.hypot(escort.player.x-column.HeadPosition().x,escort.player.z-column.HeadPosition().z));
+  if(frame>20&&before.x===escort.actor.x&&before.z===escort.actor.z)waited=true;
+ }
+ assert.ok(waited,'Luo turns back and waits for the slower stretcher head');
+ assert.ok(column.arrived,`following Luo keeps the actual column controller inside its resume range: ${JSON.stringify({player:escort.player,guide:escort.actor,index:escort.runtime.guide.index,column:column.HeadPosition(),objective:escort.flow.CurrentObjective()})}`);
+ assert.ok(maxGap<column.tuning.columnWaitM,'two independent wait controllers cannot strand the column in the north');
+ escort.flow.lastSample.guidePosition=config.escortWaypoints[7];
+ escort.flow.lastSample.columnPosition=config.escortWaypoints[9];
+ assert.equal(escort.flow.RoadColumnBehind(),false,'a column already ahead cannot stop the guide from catching up');
  console.log('PASS physical casualty/flank/smoke/road guides: swept clearance, actual arrival cues, waits and handoff');
 }
 {
@@ -604,9 +640,12 @@ assert.match(main, /p012Flow && interact\?\.Query\(player\)\?\.point\?\.id === "
   runs[0].OnPlayerHit(); assert.equal(rewinds, 1); assert.ok(!emitted.includes("P012Dived"));
   SETPIECES.CH1_NanLu.Update(context, 0.1); assert.equal(aborted, 1); assert.equal(runs.length, 2);
   context.mem.p012CarriedLitter = { propLitter: "litter", propBody: "body" };
-  context.carry.KindId="stretcher";
+  // The input releases the load before TryDitchDodge reaches OnDodge.
+  context.carry.KindId=null;context.mem.p012ReleaseAt={x:0,z:0};context.PlayerPos=()=>({x:0,z:-.8});
   runs[1].OnDodge(); assert.ok(emitted.includes("P012Dived"));
   assert.ok(moved.some((entry) => entry.id === "litter" && entry.rotationZ > 1));
+  assert.equal(moved.find(entry=>entry.id==='litter'&&entry.rotationZ>1).z,0,'litter falls at release position, not at the end of the dive');
+  assert.equal(context.mem.p012ReleaseAt,null,'the release receipt is consumed by this physical overturn');
   const front = { role: "bearer", slot: { back: 0 }, handle: { alive: true, position: { x: 1.2, z: -0.9 } } };
   const rear = { role: "bearer", slot: { back: 2.2 }, handle: { alive: false } };
   const guard = { role: "guard", handle: { alive: true, position: { x: 20, z: 20 }, actor: { SetWeapon: (value) => { guard.hiddenWeapon = value === null; } } } };
@@ -620,6 +659,11 @@ assert.match(main, /p012Flow && interact\?\.Query\(player\)\?\.point\?\.id === "
   assert.equal(guard.hiddenWeapon, true); assert.ok(!context.mem.p012LitterRecovered, "remote guard cannot instantly recover litter");
   guard.handle.position = { x: 1.2, z: 0.9 };
   SETPIECES.CH1_NanLu.Update(context, 0.1); assert.equal(context.mem.p012LitterRecovered, true);
+  context.d.host.Story=()=>({Signalled:name=>name==="P012RoadContactRelease"});
+  context.mem.column.scriptPaused=true;SETPIECES.CH1_NanLu.Update(context,.1);
+  assert.equal(context.mem.column.scriptPaused,false,'road release resumes the column once');
+  context.mem.column.scriptPaused=true;SETPIECES.CH1_NanLu.Update(context,.1);
+  assert.equal(context.mem.column.scriptPaused,true,'historic road release cannot override a later aircraft or ambush halt');
 }
 console.log("PASS P012 runtime finite actors, guide speed, shell warning, delivery input routing");
 {

@@ -1533,7 +1533,7 @@ export const SETPIECES = {
             if (s.phase?.whitebox?.p012) {
               s.mem.p012CarriedLitter = s.mem.column?.litters?.find((litter) => litter.dropped) || s.mem.column?.litters?.[0];
               if (s.mem.p012CarriedLitter) s.mem.p012CarriedLitter.dropped = true;
-              s.mem.p012CarryDistance = 0; s.mem.p012CarryLast = { ...s.PlayerPos() };
+              s.mem.p012CarryDistance = 0; s.mem.p012CarryLast = { ...s.PlayerPos() };s.mem.p012ReleaseAt=null;
               s.Signal("P012StretcherLifted");
             }
             // 抬起来那一刻打一个检查点：阶段八「不躲则从数秒前重来」退到这儿。
@@ -1587,7 +1587,9 @@ export const SETPIECES = {
         } else if (drag) drag.last = null;
       }
       if(p012&&HasSignal("P012RoadContactHold")&&!HasSignal("P012RoadContactRelease")&&s.mem.column)s.mem.column.scriptPaused=true;
-      if(p012&&HasSignal("P012RoadContactRelease")&&s.mem.column)s.mem.column.scriptPaused=false;
+      if(p012&&HasSignal("P012RoadContactRelease")&&s.mem.column&&!s.mem.p012RoadContactReleased){
+        s.mem.p012RoadContactReleased=true;s.mem.column.scriptPaused=false;
+      }
       if (p012 && HasSignal("EscortCall")) s.Once("p012_columnStart", (ss) => {
         const route = ss.phase.whitebox.escortWaypoints;
         const stop = P012WaypointIndex(route,ss.phase.whitebox.activities.evacStagingPosition || P012SouthPoint(30,10));
@@ -1677,10 +1679,6 @@ export const SETPIECES = {
       if (p012 && HasSignal("P012DitchClear")) s.Once("p012_ditchContinue", (ss) => {
         const column=ss.mem.column;
         if (column) {
-          if(HasSignal("P012StretcherSheltered")&&ss.mem.p012CarriedLitter){
-            ss.mem.p012CarriedLitter.dropped=false;ss.mem.p012LitterRecovered=true;
-            ss.mem.p012RecoveryReason="parkedInHardCoverThenRegripped";ss.Signal("P012LitterRecovered");
-          }
           for(const member of column.Alive) if(member.role==="guard"&&!member.handle.unarmed)member.handle.scriptedNoncombatant=false;
           const actor=ss.mem.p012CarriedLitter?.front?.handle;
           const start=actor && ss.d.host.PositionOf?.(actor);
@@ -1765,17 +1763,17 @@ export const SETPIECES = {
             TrackTo: () => s.PlayerPos(),
             // 「你的手是先松开的」—— 剧情要求，不是玩家操作失误。
             OnDodge: () => {
-              const wasCarrying=s.carry?.KindId==="stretcher";
+              const wasCarrying=s.carry?.KindId==="stretcher" || !!s.mem.p012ReleaseAt;
               s.carry?.ForceRelease("dive");
               if (p012) {
-                const point = s.PlayerPos(), litter = s.mem.p012CarriedLitter;
-                // The expanded whitebox already asks the player to park the
-                // stretcher in hard cover before engaging the advance pair.
-                // Do not magically pull that parked patient back under him.
+                const point = s.mem.p012ReleaseAt || s.PlayerPos(), litter = s.mem.p012CarriedLitter;
+                // The same litter is still in hand, or was just released by
+                // the player's dive input before the physical dodge resolves.
                 if (litter && wasCarrying) {
                   s.d.host.MoveProp?.(litter.propLitter, { x: point.x + 1.2, y: 0.35, z: point.z, rotationZ: Math.PI * 0.6 });
                   s.d.host.MoveProp?.(litter.propBody, { x: point.x + 1.7, y: 0.18, z: point.z + 0.4, rotationZ: 0.35 });
                   s.mem.p012LitterOverturned = true;
+                  s.mem.p012ReleaseAt = null;
                   s.mem.p012FallenAt = { x: point.x + 1.2, z: point.z };
                 }
                 s.Signal("P012Dived");
@@ -1785,6 +1783,7 @@ export const SETPIECES = {
             // 死亡链路之前** —— Script_AircraftStrafe 的 OnPlayerHit 就在那之前调。
             OnPlayerHit: () => {
               s.carry?.ForceRelease("dive");
+              if (p012) s.mem.p012ReleaseAt = null;
               s.checkpoint?.Rewind(4);
               if (p012) s.mem.p012RetryDive = true;
               s.Hint("再来一次 —— 它压下来的时候扑进沟里。", 3.2);

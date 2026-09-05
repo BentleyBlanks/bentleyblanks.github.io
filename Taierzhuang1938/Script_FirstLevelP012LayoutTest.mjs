@@ -391,7 +391,7 @@ for(let i=0;i<360;i++){
 let relocationCount=0;
 for(const key of ["closeFightGroups","southFightGroups"]){
  const groups=phase.whitebox.activities[key];
- assert.equal(groups.length,key==="closeFightGroups"?2:3,`${key} keeps its finite remaining pairs`);
+ assert.equal(groups.length,3,`${key} keeps its finite remaining pairs`);
  for(const [groupIndex,group] of groups.entries()){
   assert.equal(group.positions.length,2);assert.equal(group.relocations.length,2);
   for(const [index,to] of group.relocations.entries()){
@@ -406,7 +406,7 @@ for(const key of ["closeFightGroups","southFightGroups"]){
   }
  }
 }
-assert.equal(relocationCount,10,"B20/B21 geometry audits every configured relocation after two enemies move into B18");
+assert.equal(relocationCount,12,"B20/B21 geometry audits all three finite pairs in each encounter");
 for(const [groupIndex,group] of phase.whitebox.activities.closeFightGroups.entries()) {
  for(const [index,approach] of group.approaches.entries()) {
   const route=[group.spawns[index],...approach,group.positions[index]];

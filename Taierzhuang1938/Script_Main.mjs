@@ -3097,6 +3097,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     ClearSmoke: (handle) => vfx.RemoveSmokeSource(handle),
     FriendlyActors: () => ai.soldiers.filter((actor) => actor.side === "nra" && actor.alive && !actor.unarmed && !actor.p012TrainExtra),
     IsStretcherBearer: (actor) => (setpieces?.mem?.column?.Bearers || []).some((member) => member.handle === actor),
+    IsEscortMember: (actor) => (setpieces?.mem?.column?.members || []).some((member) => member.handle === actor),
     SpawnRecruit: (spec) => {
       const actor=ai.Spawn("nra",spec.x,spec.z,{identity:{...MakeSoldierIdentity(HashString(`P012Train:${spec.carIndex}:${spec.slot}`)),name:"下车集结的士兵"},
         weapon:"HanYang",unarmed:true,scriptedNoncombatant:true,escortRole:"trainRecruit",squadId:`P012Train${spec.carIndex}`});
@@ -3252,12 +3253,6 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
         if(mem.p012AirCivilianProp)MoveSetpieceProp(mem.p012AirCivilianProp,{x:phase.whitebox.activities.airCivilianPosition.x-1.5,y:.18,z:phase.whitebox.activities.airCivilianPosition.z,rotationY:1.2});
       }
       return true;
-    },
-    ShelterCarriedLitter:(point)=>{
-      const litter=setpieces?.mem?.p012CarriedLitter;if(!litter)return false;
-      litter.dropped=true;setpieces.mem.p012FallenAt={...point};
-      MoveSetpieceProp(litter.propLitter,{...point,y:.1,rotationZ:0});
-      MoveSetpieceProp(litter.propBody,{...point,y:.3,rotationZ:0});return true;
     },
     HoldRetreatForCover: (hold) => {
       if (p012Flow?.beat === 23 && setpieces?.mem?.column) setpieces.mem.column.scriptPaused = !!hold;

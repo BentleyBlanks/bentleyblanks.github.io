@@ -651,7 +651,7 @@ async function PlayFrontline() {
           if (flow.beatIndex === 20 && !destination) destination = anchors.strafeSlots[0];
           if (flow.beatIndex === 22 && !destination) destination = spatial.southBlockade;
           const distance = destination ? Math.hypot(destination.x - game.player.position.x, destination.z - game.player.position.z) : Infinity;
-          if (![13, 14, 18, 20, 21].includes(flow.beatIndex) || point || objective.requiredAction === "grenade") {
+          if (![13, 14, 18, 20, 21].includes(flow.beatIndex) || point || objective.requiredAction === "grenade" || objective.requiredAction === "follow") {
             game.Debug.Mouse(2, false);
             const arrive = point ? 1.5 : objective.requiredAction === "follow"
               ? Math.max(0.1, Math.min(2.4, (objective.arrivalRadiusM ?? 2.45) - 0.05))
@@ -1060,9 +1060,9 @@ async function PlayFrontline() {
       "玩家从实体观察墙看完有限航迹后，以真实移动选择开放路或沟边路",JSON.stringify(result.trace));
     Check(result.trace.some(entry=>entry.beat==="B18"&&entry.facts.includes("airObstacleResolved")),
       "扫射后的真实百姓/小车阻碍必须经救人或清障分支处理",JSON.stringify(result.trace));
-    Check(result.trace.some(entry=>entry.beat==="B19"&&entry.facts.includes("stretcherSheltered")
-      && entry.spawnedTotal===23),
-      "同一副担架实际抬行并先入硬掩体；两名前锋在B18清除，近敌总预算不变",JSON.stringify(result.trace));
+    Check(result.diveTrace.some(entry => entry.carry === "stretcher") && ending.scene.litterOverturned,
+      "同一副担架抬在手里迎来俯冲，真实松手后侧翻，不能预先安全停放",
+      JSON.stringify({dive:result.diveTrace,overturned:ending.scene.litterOverturned}));
     // A rifle shot during the aviation gun's existing 0.18s burst gap is still
     // overlapping pressure. Require real impacts within 0.25s in the same run;
     // merely seeing an egress aircraft, or a phase label without bullets, fails.

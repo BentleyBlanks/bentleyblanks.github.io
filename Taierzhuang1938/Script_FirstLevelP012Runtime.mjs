@@ -372,7 +372,8 @@ export class FirstLevelP012Runtime {
       }
       target=guide.route[++guide.index];
     }
-    const lagging=player&&guide.waitDistance&&Math.hypot(player.x-position.x,player.z-position.z)>guide.waitDistance;
+    const lagging=player&&guide.waitDistance&&Math.hypot(player.x-position.x,player.z-position.z)>guide.waitDistance
+      &&Math.hypot(player.x-target.x,player.z-target.z)>Math.hypot(position.x-target.x,position.z-target.z);
     if(guide.Hold?.() || lagging || !P012SegmentClear(blocks,position,target,.42)){Stop();this.FaceToward(actor,position,player,dt);return;}
     this.host.Move(actor,target,guide.speed);
   }
@@ -443,12 +444,14 @@ export class FirstLevelP012Runtime {
       if (this.mgSuppressedAt == null && this.host.EnemyMgSuppressed?.()) this.mgSuppressedAt = this.host.CombatTime?.() ?? this.time;
       if (this.mgSuppressedAt != null && this.host.FriendlyMgFired?.(this.mgSuppressedAt)) this.friendlyMgResponse = true;
     }
-    const escortDefense = this.beat === 13 || this.beat === 14 || (this.beat >= 20 && this.beat <= 22);
+    const escortDefense = (this.beat === 13 && this.host.Signalled?.("P012RoadContactHold"))
+      || this.beat === 14 || (this.beat >= 20 && this.beat <= 22);
     const defensive = (this.beat >= 6 && this.beat <= 10) || escortDefense;
     if (defensive && !this.defenders) {
       const ports = this.config.anchors?.gunports || [];
       this.defenders = (this.host.FriendlyActors?.() || []).filter(actor=>!this.traffic.some(w=>w.side===0&&!w.retired&&w.actor===actor)
         &&!this.host.IsStretcherBearer?.(actor)
+        &&!this.host.IsEscortMember?.(actor)
         &&!(this.guide?.safeRoute&&this.guide.route.length&&actor===this.host.GuideActor())
         &&!this.openingCast?.some(e=>this.march&&e.actor===actor&&!e.marchComplete));
       for (const [index, actor] of this.defenders.entries()) {

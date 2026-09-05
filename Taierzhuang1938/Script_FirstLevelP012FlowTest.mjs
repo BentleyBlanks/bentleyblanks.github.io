@@ -77,7 +77,7 @@ const points = new Map();
 }
 {
  const cues=phase.whitebox.storyBeats.filter(beat=>beat.voice?.startsWith("p012_text_Guide"));
- assert.equal(cues.length,13);
+ assert.equal(cues.length,12);
  for(const cue of cues){
   const shown=[],voices=[];
   const story=new StoryDirector({hud:{Say:(who,text)=>shown.push(text),Title(){}}});
@@ -432,7 +432,7 @@ signals.add("P012EscortApproved"); Tick();
   At("Z06"); assert.equal(flow.State().beat,"B13","outbound history does not satisfy reverse escort");
 for(const id of ["Z04","Z03","Z02","Z06"]) At(id);
   Tick({},40);
-  assert.equal(spawned.filter(actor=>actor.p012RoadContact).length,0,"road contact cannot be killed by the escort before the observation breach");
+  assert.equal(spawned.filter(actor=>actor.p012RoadContact).length,4,"finite contact exists before arrival instead of popping into the observation breach");
   Tick({position:phase.whitebox.activities.roadContactBreach,guidePosition:phase.whitebox.activities.roadContactBreach,roadContactVisibleCount:0});
   const contactActors=spawned.slice(-4);
   assert.equal(contactActors.length,4);assert.ok(contactActors.every(actor=>actor.p012RoadContact),"the first road contact is one finite four-person set");
@@ -546,15 +546,13 @@ assert.equal(flow.State().beat,"B18");
 signals.add("P012StretcherLifted");for(let i=0;i<6;i++)carry.Update(.1);assert.equal(carry.Begin("stretcher"),true);Tick({carryKind:"stretcher"});
 assert.equal(flow.State().beat,"B18","picking up alone does not replace carrying to cover");
 Walk(phase.whitebox.activities.stretcherCarryRoute,{carryKind:"stretcher",carryDistance:20});
-const advanceActors=spawned.slice(-2);assert.equal(flow.State().beat,"B18");
-assert.ok(signals.has("P012AdvanceContact"));
-Use("p012_stretcherShelter");Tick({carryKind:null});
-for(const actor of advanceActors)actor.alive=false;Tick({enemyDeaths:27});
-assert.equal(flow.State().beat,"B19","two real advance enemies clear only after the stretcher is sheltered");
+assert.equal(flow.State().beat,"B19","actual carrying ends with the same stretcher still in hand");
+assert.equal(carry.KindId,"stretcher");
+assert.equal(points.has("p012_stretcherShelter"),false,"no safe parking bypasses the involuntary drop");
 signals.add("P012DiveApproach");signals.add("P012Dived"); Tick({carryKind:null,stance:"crouch"});
-const closeActors=spawned.slice(-4);
-assert.equal(closeActors.length,4,"the remaining B20 budget is four after two advance enemies moved earlier");
-assert.deepEqual(flow.enemyRoutes.slice(-4).map(entry=>entry.encounterGroup),[0,0,1,1]);
+const closeActors=spawned.slice(-6);
+assert.equal(closeActors.length,6);
+assert.deepEqual(flow.enemyRoutes.slice(-6).map(entry=>entry.encounterGroup),[0,0,1,1,2,2]);
 assert.equal(flow.CurrentObjective().requiredAction,"fight");
 assert.deepEqual(flow.CurrentObjective().target,P012Point(44,62));
 KillWave();
@@ -920,21 +918,37 @@ assert.equal(returnVoices.filter(key=>key==="ch1_shunzi_07").length,1);
     EnemyPosition:actor=>actor.alive?actor.position:null,EnemyGoal:(actor,point)=>{actor.goal={x:point.x,z:point.z};},
     EnemyStaging:(actor,value)=>{actor.staging=value;},Pressure:wave=>pressure.push(wave.kind)},phase.whitebox);
   director.Restore({...director.Snapshot(),beat:18,spawnedTotal:25,unlockedWaves:[0,1,2,3,4,5,6]});
-  const sample={position:P012Point(47,80),zone:"Z08",carryKind:null,carryDistance:0};
+  const before=director.Snapshot(),sample={position:P012Point(47,80),zone:"Z08",carryKind:null};
   director.Update(.1,sample);assert.equal(actors.length,0,"being near the wounded does not pre-spawn before real lifting");
-  events.add("P012StretcherLifted");director.routeIndex=phase.whitebox.activities.stretcherCarryRoute.length;
-  director.Update(.1,{...sample,carryKind:"stretcher",carryDistance:20});
-  assert.equal(actors.length,2);assert.equal(director.spawnedTotal,27);
-  assert.ok(actors.every(actor=>!actor.staging));assert.deepEqual(pressure,[],"advance pair is finite contact, not invisible timed pressure");
-  actors.forEach(actor=>actor.alive=false);director.facts.add("stretcherSheltered");
-  director.Update(.1,{...sample,enemyDeaths:27});assert.equal(director.beat,19);
-  events.add("P012DiveApproach");director.Update(.1,{...sample,stance:"crouch",enemyDeaths:27});
+  events.add("P012StretcherLifted");director.Update(.1,sample);
   assert.equal(actors.length,6);assert.equal(director.spawnedTotal,31);
+  assert.ok(actors.every(actor=>actor.staging));assert.deepEqual(pressure,[],"hidden staging is not recorded as active fire pressure");
+  for(let waypoint=0;waypoint<=2;waypoint++){
+    for(let index=0;index<3;index++)actors[index].position={...director.enemyRoutes[index].points[waypoint]};
+    director.Update(.1,sample);
+  }
+  director.Update(.1,sample);director.Update(30,sample);
+  for(let index=0;index<3;index++)assert.deepEqual(actors[index].goal,director.enemyRoutes[index].points[2]);
+  for(let index=3;index<6;index++)assert.deepEqual(actors[index].goal,director.enemyRoutes[index].spawnPoint);
+  assert.deepEqual(pressure,[],"elapsed time cannot release staged enemies");
+  actors[0].alive=false;events.add("P012DiveApproach");director.Update(.1,sample);
+  assert.ok(actors.slice(1,2).every(actor=>!actor.staging));
+  assert.ok(actors.slice(2).every(actor=>actor.staging),"dive releases group zero only");
+  director.beat=20;
+  actors[1].alive=false;
+  director.Update(.1,{...sample,position:phase.whitebox.activities.closeFightGroups[2].cover});
+  assert.ok(actors.slice(2).every(actor=>actor.staging),"remote movement to a later cover cannot skip group one");
+  director.Update(.1,{...sample,position:phase.whitebox.activities.closeFightGroups[1].cover});
   assert.ok(actors.slice(2,4).every(actor=>!actor.staging));assert.ok(actors.slice(4).every(actor=>actor.staging));
+  actors[2].alive=false;actors[3].alive=false;
+  director.Update(.1,{...sample,position:phase.whitebox.activities.closeFightGroups[0].cover});
+  assert.ok(actors.slice(4).every(actor=>actor.staging),"clearing at range still requires reaching the next authored cover");
+  director.Update(.1,{...sample,position:phase.whitebox.activities.closeFightGroups[2].cover});
+  assert.ok(actors.slice(4).every(actor=>!actor.staging));assert.equal(actors[0].alive,false,"a killed staged actor is never restored");
   assert.deepEqual(pressure,["closeFight"]);assert.equal(director.State().pressureHistory.at(-1).reason,"actualDiveApproach");
-  director.beat=20;actors[2].alive=false;actors[3].alive=false;
-  director.Update(.1,{...sample,position:phase.whitebox.activities.closeFightGroups[1].cover,enemyDeaths:29});
-  assert.ok(actors.slice(4).every(actor=>!actor.staging),"clearing first remaining pair plus reaching the next cover releases only the final pair");
+  director.Restore(before);director.Update(.1,sample);
+  assert.equal(actors.length,6,"checkpoint rollback cannot duplicate the early finite wave receipt");
+  assert.deepEqual(pressure,["closeFight"],"replayed approach cannot release a second pressure wave");
 }
 {
   const director=new FirstLevelP012Director({},phase.whitebox);
@@ -1024,7 +1038,7 @@ for(const index of [2,3,4]) {
 }
 {
   for(const groups of [phase.whitebox.activities.closeFightGroups,phase.whitebox.activities.southFightGroups]) {
-    const expected=groups===phase.whitebox.activities.closeFightGroups?4:6;
+    const expected=6;
     assert.equal(groups.flatMap(group=>group.positions).length,expected);
     assert.equal(groups.flatMap(group=>group.relocations).length,expected);
     for(const group of groups) group.positions.forEach((point,index)=>{
@@ -1032,7 +1046,7 @@ for(const index of [2,3,4]) {
       assert.ok(distance>=2&&distance<2.3,"each existing actor receives only one short physical reposition");
     });
   }
-  assert.deepEqual(phase.whitebox.activities.closeFightGroups.map(group=>group.routeIndex),[0,3],
+  assert.deepEqual(phase.whitebox.activities.closeFightGroups.map(group=>group.routeIndex),[0,2,3],
     "each finite delaying pair belongs to a later physical cover position");
   assert.deepEqual(phase.whitebox.activities.closeFightGroups.map(group=>group.cover),
     phase.whitebox.activities.closeFightGroups.map(group=>phase.whitebox.activities.closeFightRoute[group.routeIndex]),

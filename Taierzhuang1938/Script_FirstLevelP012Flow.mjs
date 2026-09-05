@@ -2,7 +2,7 @@
 // 动作驱动阶段；新战术压力常态40秒、快清最短30秒。侦察→同轴步枪增援是明确例外，不代表全部波次达标。
 import { PickUpLoadInteraction, GiveSupplyInteraction } from "./Script_Interact.mjs";
 import { P012Point } from "./Data_FirstLevelP012Space.mjs";
-import { P012NextVisiblePoint, P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
+import { P012NextVisiblePoint, P012SegmentClear, P012RouteProjection } from "./Script_FirstLevelP012March.mjs";
 
 const Distance = (a, b) => a && b ? Math.hypot(a.x - b.x, a.z - b.z) : Infinity;
 const Clone = (value) => JSON.parse(JSON.stringify(value));
@@ -71,8 +71,7 @@ export const P012_WAVES = Object.freeze([
   { beat: 10, atS: 465, count: 4, kind: "culvert", lane: "westEnemy" },
   { beat: 13, atS: 600, count: 4, kind: "roadContact", lane: "roadContact" },
   { beat: 14, atS: 740, count: 6, kind: "ambush", lane: "ambush" },
-  { beat: 18, atS: 1100, count: 2, kind: "airAdvance", lane: "closeFight" },
-  { beat: 20, atS: 1185, count: 4, kind: "closeFight", lane: "closeFight" },
+  { beat: 20, atS: 1185, count: 6, kind: "closeFight", lane: "closeFight" },
   { beat: 21, atS: 1250, count: 6, kind: "southFight", lane: "southFight" },
 ].map(Object.freeze));
 
@@ -94,7 +93,6 @@ export class FirstLevelP012Director {
     this.closePressureReleased = false;
     this.closeReleasedGroup = -1;
     this.airRouteChoice = null;
-    this.airAdvanceSpawned = false;
     this.airRescueTravelM = 0;
     this.lookRad = 0;
     this.last = null;
@@ -206,6 +204,7 @@ export class FirstLevelP012Director {
       ...(this.beat === 12 ? { startIndex: 0, WaitAt: () => this.beat === 12 } : {}),
       ...(this.beat === 13 ? { route: activity.roadContactGuideRoute, startIndex: 0, safeRoute: true,
         approachPoints: activity.woundedDragRoute, waitDistance: 8,
+        Hold: () => this.RoadColumnBehind(),
         WaitAt: index => index === activity.roadContactGuideRoute.length-1,
         FaceAt: () => this.facts.has("roadContactClear") ? this.lastSample.position : activity.roadContactEnemies?.[0]?.position } : {}),
       speed: this.config.activities?.guideSpeedByBeat?.[this.beat] || this.config.activities?.guideSpeedMps || 1.3 });
@@ -290,11 +289,6 @@ export class FirstLevelP012Director {
       Enabled:()=>this.beat===17&&this.Signalled("P012AirObstacleCreated")&&!this.facts.has("airObstacleResolved")&&!carry?.Active,
       OnComplete:()=>{this.Mark("airObstacleResolved");this.Mark("airCartCleared");this.Emit("P012AirObstacleResolved");
         this.host.ResolveAirObstacle?.("cart");return true;}});
-    Register({id:"p012_stretcherShelter",kind:"carry",label:"把担架平稳放进蓝色硬掩体",gesture:"hold",seconds:1.2,
-      position:this.config.activities?.stretcherCarryTo,once:false,
-      Enabled:()=>this.beat===18&&this.Signalled("P012AdvanceContact")&&carry?.KindId==="stretcher",
-      OnComplete:()=>{carry?.ForceRelease("hardCover");this.Mark("stretcherSheltered");this.Emit("P012StretcherSheltered");
-        this.host.ShelterCarriedLitter?.(this.config.activities?.stretcherCarryTo);return true;}});
     Register({ id: "p012_southGrenades", kind: "supply", label: "领取手榴弹 · 备用2枚",
       gesture: "hold", seconds: 1.8, position: this.config.activities?.southGrenadeSupply,
       Enabled: () => this.beat === 21 && this.southGrenadesRemaining > 0 && !(this.lastSample.grenades > 0), once: false,
@@ -329,8 +323,16 @@ export class FirstLevelP012Director {
 
   RouteArrivalRadius() {
     const activity = this.config.activities || {};
-    return [21, 22].includes(this.beat) ? 0.6
+    return [13, 21, 22].includes(this.beat) ? 0.6
       : this.beat === 14 ? (activity.ambushRouteRadiusM || 0.6) : (activity.routeRadiusM || 3);
+  }
+
+  RoadColumnBehind() {
+    const { guidePosition, columnPosition } = this.lastSample;
+    const route = this.config.escortWaypoints;
+    return !!guidePosition && !!columnPosition && !!route?.length && !this.facts.has("roadContactSeen")
+      && Distance(guidePosition, columnPosition) > 10
+      && P012RouteProjection(route, guidePosition).along > P012RouteProjection(route, columnPosition).along;
   }
 
   RetreatRouteProjection(position) {
@@ -760,14 +762,8 @@ export class FirstLevelP012Director {
       if (Distance(p, port) < 6) this.gunports.add(index);
     }
     // 最早首枪窗口 + 每波有限预算。门由 beat 和现场事实共同开，不按时间无限补兵。
-    const advanceWaveIndex=P012_WAVES.findIndex(wave=>wave.kind==="airAdvance");
-    if(this.beat===18&&!this.airAdvanceSpawned&&sample.carryKind==="stretcher"
-      &&sample.carryDistance>=(activity.stretcherCarryMinM||20)&&this.routeIndex>=route.length){
-      this.airAdvanceSpawned=true;this.unlockedWaves.push(advanceWaveIndex);
-      this.SpawnWave(P012_WAVES[advanceWaveIndex],advanceWaveIndex);this.Emit("P012AdvanceContact");
-    }
     const closeWaveIndex = P012_WAVES.findIndex((wave) => wave.kind === "closeFight");
-    if (this.beat >= 18 && this.beat < 20 && this.Signalled("P012DiveApproach")
+    if (this.beat >= 18 && this.beat < 20 && this.Signalled("P012StretcherLifted")
       && !this.unlockedWaves.includes(closeWaveIndex)) {
       this.unlockedWaves.push(closeWaveIndex);
       this.SpawnWave(P012_WAVES[closeWaveIndex], closeWaveIndex);
@@ -792,13 +788,9 @@ export class FirstLevelP012Director {
       }
     }
     for (const [index, wave] of P012_WAVES.entries()) {
-      if(["airAdvance","closeFight"].includes(wave.kind))continue;
-      // Keep the finite road contact out of the world until Luo and the player
-      // actually reach the observation breach. Otherwise the escort's armed
-      // guards can kill part of the group during the long southbound walk and
-      // make the four-person visual confirmation impossible.
-      if (wave.kind === "roadContact" && (Distance(p, activity.roadContactBreach) > 4
-        || Distance(sample.guidePosition, activity.roadContactBreach) > 3)) continue;
+      if(wave.kind === "closeFight")continue;
+      // The finite contact takes position while the escort is still north.
+      // Arrival can reveal surviving enemies without spawning them in view.
       // Scouts may call same-axis rifle reinforcements immediately. New MG,
       // mortar and culvert pressure keeps a 30s floor; existing gunport movement
       // remains active during this transition, not a stationary wait objective.
@@ -919,8 +911,9 @@ export class FirstLevelP012Director {
         ready = this.Signalled("P012AirReady") && this.Signalled("P012RailComplete"); break;
       case 17: ready = this.Signalled("P012CrowdFire") && Has("airObstacleResolved")
         && this.routeIndex >= route.length; break;
-      case 18: ready = Has("stretcherSheltered")&&this.airAdvanceSpawned&&dead>=27
-        &&this.enemyRoutes.filter(entry=>entry.encounterBeat===18).every(entry=>!this.host.EnemyPosition?.(entry.handle));
+      case 18: ready = sample.carryKind === "stretcher"
+        && sample.carryDistance >= (activity.stretcherCarryMinM || 20)
+        && this.routeIndex >= route.length && Distance(p, activity.stretcherCarryTo) < 3;
         if (ready) this.Emit("P012CarryReady"); break;
       case 19: ready = this.Signalled("P012Dived") && sample.stance !== "stand"; break;
       case 20: ready = dead >= 31 && this.closeReleasedGroup >= (activity.closeFightGroups?.length||1)-1
@@ -1005,8 +998,6 @@ export class FirstLevelP012Director {
       const encounter = encounterGroup !== null ? groups[encounterGroup] : null;
       const encounterPosition = encounter?.positions[index % 2];
       const encounterSpawn = encounter?.spawns?.[index % 2] || encounterPosition;
-      const advancePosition=wave.kind==="airAdvance"?this.config.activities?.airAdvancePositions?.[index]:null;
-      const advanceSpawn=wave.kind==="airAdvance"?this.config.activities?.airAdvanceSpawns?.[index]:null;
       const ambushGroup = wave.kind === "ambush" && this.config.activities?.ambushGroups?.length ? Math.floor(index / 2) : null;
       const ambushPosition = encounterPosition || (ambushGroup !== null ? this.config.activities.ambushGroups[ambushGroup].positions[index % 2] : null);
       const roadContact = wave.kind === "roadContact" ? this.config.activities?.roadContactEnemies?.[index] : null;
@@ -1014,11 +1005,10 @@ export class FirstLevelP012Director {
         ? "Type11" : "Type38";
       const terminal = wave.kind === "culvert" ? lane?.terminalGoals?.[index] : null;
       const points = roadContact ? [roadContact.position]
-        : advancePosition ? [...(this.config.activities?.airAdvanceApproaches?.[index]||[]),advancePosition]
         : encounterPosition ? [...(encounter.approaches?.[index % 2] || encounter.approach || []), encounterPosition]
         : ambushPosition ? [ambushPosition] : late ? [fallback] : terminal ? [...(lane?.waypoints || []).slice(0, -1), terminal]
         : [...(lane?.waypoints || []), lane?.goal || fallback];
-      this.pendingEnemies.push({ spec: { x: roadContact?.position.x ?? scout?.spawn.x ?? advanceSpawn?.x ?? encounterSpawn?.x ?? ambushPosition?.x ?? source.x, z: roadContact?.position.z ?? scout?.spawn.z ?? advanceSpawn?.z ?? encounterSpawn?.z ?? ambushPosition?.z ?? source.z + index * 0.7,
+      this.pendingEnemies.push({ spec: { x: roadContact?.position.x ?? scout?.spawn.x ?? encounterSpawn?.x ?? ambushPosition?.x ?? source.x, z: roadContact?.position.z ?? scout?.spawn.z ?? encounterSpawn?.z ?? ambushPosition?.z ?? source.z + index * 0.7,
         weapon, p012RoadContact: wave.kind === "roadContact", p012Near: true, p012MachineGun: wave.kind === "machineGun", squadId: `P012_${waveIndex}`, order: wave.kind === "scouts" || wave.kind === "machineGun" || ambushPosition ? "hold" : "attack" }, points, ambushGroup, encounterGroup, encounterBeat: wave.beat,
         scout: scout ? { approach: points.slice(1), search: scout.points } : null,
         encounterSlot: index % 2, relocation: encounter?.relocations?.[index % 2] || null,
@@ -1135,8 +1125,9 @@ export class FirstLevelP012Director {
     if(this.beat===13){
       const guideRoute=activity.roadContactGuideRoute||[];
       const guideCursor=Math.max(0,Math.min(guideRoute.length-1,Number(this.lastSample.guideRouteIndex)||0));
+      const followRoute=[...guideRoute.slice(0,guideCursor),this.lastSample.guidePosition].filter(Boolean);
       const followPlan=P012NextVisiblePoint(this.config.layout?.blocks||[],this.lastSample.position,
-        guideRoute.slice(0,guideCursor+1),0,.42);
+        followRoute,0,.42);
       target=followPlan.blocked?(this.lastSample.guidePosition||activity.roadContactBreach):followPlan.point;
       requiredAction="follow";
       if(this.facts.has("roadContactSeen")&&!this.facts.has("roadContactHeld")){target=activity.roadContactColumnHold;interactionId="p012_roadContactHold";requiredAction="move";text="敌人已暴露；到院墙后命令担架队停下";}
@@ -1222,12 +1213,8 @@ export class FirstLevelP012Director {
     if (this.beat === 18) target = this.lastSample.columnPosition || anchors.stretcher;
     if (this.beat === 18 && !this.Signalled("P012StretcherLifted")) interactionId = "ch1_stretcher";
     if (this.beat === 18 && this.lastSample.carryKind === "stretcher") {
-      target = route[this.routeIndex] || activity.stretcherCarryTo; interactionId = this.Signalled("P012AdvanceContact")?"p012_stretcherShelter":null;
-      text = this.Signalled("P012AdvanceContact")?"前锋出现了；先把担架平稳放入蓝色硬掩体，再交火":"接住同一副担架后端，沿沟边实际抬行到蓝色硬掩体";
-    }else if(this.beat===18&&this.facts.has("stretcherSheltered")){
-      const threat=this.enemyRoutes.find(entry=>entry.encounterBeat===18&&this.host.EnemyPosition?.(entry.handle));
-      target=activity.stretcherCarryTo;lookAt=threat?this.host.EnemyPosition(threat.handle):null;requiredAction=threat?"fight":"move";
-      text=threat?"担架已安置；从硬掩体后清除两名前锋":"确认两名前锋均已清除";
+      target = route[this.routeIndex] || activity.stretcherCarryTo; interactionId = null;
+      text = "接牢同一副担架后端，和前面的担架员沿沟边走";
     }
     if (this.beat === 19) {
       const slots = anchors.strafeSlots || [];
@@ -1333,7 +1320,9 @@ export class FirstLevelP012Director {
       }
     }
     return { text, zone: beat.zone, target, lookAt, interactionId, requiredAction, requiredStance, progress,
-      routeTarget: route[this.routeIndex] || null, arrivalRadiusM: frontlineApproach || (this.beat === 23 && requiredAction === "follow") ? 0.6 : this.RouteArrivalRadius() };
+      routeTarget: route[this.routeIndex] || null, arrivalRadiusM: this.beat === 13 && requiredAction === "follow"
+        && target === this.lastSample.guidePosition ? 2.4
+        : frontlineApproach || (this.beat === 23 && requiredAction === "follow") ? 0.6 : this.RouteArrivalRadius() };
   }
   Snapshot() { return Clone({ beat: this.beat, elapsed: this.elapsed, enteredAt: this.enteredAt,
     facts: [...this.facts], signals: [...this.signals], visits: this.visits, travelM: this.travelM,
@@ -1343,7 +1332,7 @@ export class FirstLevelP012Director {
     stageVisits: this.stageVisits, retreatPoint: this.retreatPoint, retreatRejoining: !!this.retreatRejoining,
     routeIndex: this.routeIndex, orientationIndex: this.orientationIndex, carryTravelM: this.carryTravelM,
     closeReleasedGroup: this.closeReleasedGroup,airRouteChoice:this.airRouteChoice,
-    airAdvanceSpawned:this.airAdvanceSpawned,airRescueTravelM:this.airRescueTravelM,
+    airRescueTravelM:this.airRescueTravelM,
     observationTime: this.observationTime, mortarImpactStart: this.mortarImpactStart,
     shellObservationTime: this.shellObservationTime, shellImpactStart: this.shellImpactStart, shellTarget: this.shellTarget,
     cleanupWeaponStart: this.cleanupWeaponStart,
@@ -1391,7 +1380,7 @@ export class FirstLevelP012Director {
     southEnemiesCleared: this.SouthEnemiesCleared(),
     completionReasons: { ...this.completionReasons },
     elapsed: this.elapsed, airSprintM: this.airSprintM, airRouteChoice:this.airRouteChoice,
-    airAdvanceSpawned:this.airAdvanceSpawned,airRescueTravelM:this.airRescueTravelM,ambushEntryIndex: this.ambushEntryIndex,
+    airRescueTravelM:this.airRescueTravelM,ambushEntryIndex: this.ambushEntryIndex,
     ambushRejoin:this.ambushRejoin?{target:{...this.ambushRejoin.target},destination:{...this.ambushRejoin.destination},index:this.ambushRejoin.index,blocked:!!this.ambushRejoin.blocked}:null,
     closePressureReleased: this.closePressureReleased, closeReleasedGroup: this.closeReleasedGroup,
     stagedCloseEnemies: this.enemyRoutes.filter(entry=>entry.staging).length,
