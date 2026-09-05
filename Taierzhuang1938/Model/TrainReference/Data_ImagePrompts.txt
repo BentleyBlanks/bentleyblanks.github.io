@@ -1,0 +1,14 @@
+Generator: Tier 1, Codex CLI gpt-5.6-sol invoking built-in image_gen__imagegen.
+No fallback generator. Both generated files preserved byte-for-byte.
+The prompt requested 2048px; the generator returned 1254 x 1254px for each.
+Actual dimensions and source SHA256 are recorded in Data_TrainPbr.json.
+
+WOOD
+Generate one production-quality seamless square 2048px PBR BASE COLOR texture of heavily weathered 1930s freight wagon timber. Surface scan, straight orthographic macro view. Continuous horizontally running fine wood grain, restrained grey-brown desaturated aged oak/pine, black ingrained dirt in hairline splits, small pale exposed fibres and worn grain, sparse tiny knots, subtle tonal weathering. One homogeneous material surface, NO plank seams, NO separate boards, NO nails, NO metal, NO frame, NO text. Absolutely uniform diffuse flat illumination, NO directional light, cast shadows, highlights, ambient occlusion, vignette, depth shading or perspective. Opposite borders must tile seamlessly; similar overall brightness across the tile. Neutral muted wood matching old grey-brown open gondola sideboards.
+
+IRON
+Generate one production-quality seamless square 2048px PBR BASE COLOR texture of aged dark charcoal blackened wrought steel on a 1930s steam freight locomotive. True surface scan, flat orthographic macro view. Very dark warm grey iron, subtle soot speckling, restrained sparse thin scratches exposing dull grey steel, minute brown oxidized pinpricks and scuffed flecks, realistic fine pits. About 90 percent intact dark iron, only 10 percent restrained weathering. One continuous uniform metal material surface. NO large orange rust patches, panels, seams, rivets, bolts, machinery, text, gradients, border or frame. Absolutely neutral evenly diffuse illumination, NO reflections, highlights, directional shadows, ambient occlusion, vignette, baked lighting or perspective. Seamlessly tileable opposite edges and consistent overall brightness. Intended for cylindrical boiler, cab, riveted frames and wheel centres of an old utilitarian locomotive.
+
+Each CLI request required: use only built-in image_gen__imagegen; do not use Lovart, Lovart skill, generate_image_gpt_image_2 or external APIs; copy the generated PNG unmodified to the requested absolute artifact path, verify existence, return only the path; report failure without silently falling back.
+
+PBR data maps: Script_FinishTrainMaterials.py derives matched micro-normal, roughness, metalness and height data from the generated surface features. These channels are inferred, not separately AI-painted or physically measured. Albedo remains unchanged. Clean steel tread, linkage steel, brass, soot, lens and stencil materials use uniform physically defined values where a painted texture is unnecessary.

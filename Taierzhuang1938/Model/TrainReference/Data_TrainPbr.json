@@ -1,0 +1,34 @@
+[
+  {
+    "material": "Wood",
+    "generator": "Codex CLI gpt-5.6-sol / built-in image_gen__imagegen (tier 1)",
+    "albedo": "Texture_TrainWoodAlbedo.png",
+    "albedoSha256": "7a70db360d1f71446cb8ea51952203ebf141b4ae7141cd80d906e2bc7989c0bd",
+    "size": [
+      1254,
+      1254
+    ],
+    "derivedMaps": [
+      "Normal (+Y / OpenGL)",
+      "ORM (R=1, G=roughness, B=metallic)",
+      "Height (inferred micro relief)"
+    ],
+    "albedoModified": false
+  },
+  {
+    "material": "Iron",
+    "generator": "Codex CLI gpt-5.6-sol / built-in image_gen__imagegen (tier 1)",
+    "albedo": "Texture_TrainIronAlbedo.png",
+    "albedoSha256": "1f82e36f906e58a30404e42b3babb62b90925134df013937d7c8a3b49cf7b44d",
+    "size": [
+      1254,
+      1254
+    ],
+    "derivedMaps": [
+      "Normal (+Y / OpenGL)",
+      "ORM (R=1, G=roughness, B=metallic)",
+      "Height (inferred micro relief)"
+    ],
+    "albedoModified": false
+  }
+]

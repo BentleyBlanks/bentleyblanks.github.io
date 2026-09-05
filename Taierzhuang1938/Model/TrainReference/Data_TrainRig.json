@@ -1,0 +1,233 @@
+{
+  "units": "meters",
+  "forward": "+X",
+  "blenderUp": "+Z",
+  "gltfUp": "+Y",
+  "gltfWheelAxis": "-Z",
+  "wheelbaseReferenceInferred": true,
+  "wheels": [
+    {
+      "name": "Model_Driver1Right",
+      "root": "Model_LocomotiveRoot",
+      "radius": 0.73,
+      "phase": 0,
+      "x": 2.5,
+      "side": -1
+    },
+    {
+      "name": "Model_Driver1Left",
+      "root": "Model_LocomotiveRoot",
+      "radius": 0.73,
+      "phase": 1.5707963267948966,
+      "x": 2.5,
+      "side": 1
+    },
+    {
+      "name": "Model_Driver2Right",
+      "root": "Model_LocomotiveRoot",
+      "radius": 0.73,
+      "phase": 0,
+      "x": 0.9,
+      "side": -1
+    },
+    {
+      "name": "Model_Driver2Left",
+      "root": "Model_LocomotiveRoot",
+      "radius": 0.73,
+      "phase": 1.5707963267948966,
+      "x": 0.9,
+      "side": 1
+    },
+    {
+      "name": "Model_Driver3Right",
+      "root": "Model_LocomotiveRoot",
+      "radius": 0.73,
+      "phase": 0,
+      "x": -0.7,
+      "side": -1
+    },
+    {
+      "name": "Model_Driver3Left",
+      "root": "Model_LocomotiveRoot",
+      "radius": 0.73,
+      "phase": 1.5707963267948966,
+      "x": -0.7,
+      "side": 1
+    },
+    {
+      "name": "Model_Driver4Right",
+      "root": "Model_LocomotiveRoot",
+      "radius": 0.73,
+      "phase": 0,
+      "x": -2.3,
+      "side": -1
+    },
+    {
+      "name": "Model_Driver4Left",
+      "root": "Model_LocomotiveRoot",
+      "radius": 0.73,
+      "phase": 1.5707963267948966,
+      "x": -2.3,
+      "side": 1
+    },
+    {
+      "name": "Model_Driver5Right",
+      "root": "Model_LocomotiveRoot",
+      "radius": 0.73,
+      "phase": 0,
+      "x": -3.9,
+      "side": -1
+    },
+    {
+      "name": "Model_Driver5Left",
+      "root": "Model_LocomotiveRoot",
+      "radius": 0.73,
+      "phase": 1.5707963267948966,
+      "x": -3.9,
+      "side": 1
+    },
+    {
+      "name": "Model_LeadingWheelRight",
+      "root": "Model_LocomotiveRoot",
+      "radius": 0.44,
+      "phase": 0,
+      "x": 5.17,
+      "side": -1
+    },
+    {
+      "name": "Model_LeadingWheelLeft",
+      "root": "Model_LocomotiveRoot",
+      "radius": 0.44,
+      "phase": 0,
+      "x": 5.17,
+      "side": 1
+    },
+    {
+      "name": "Model_GondolaWheel1Right",
+      "root": "Model_GondolaRoot",
+      "radius": 0.46,
+      "phase": 0,
+      "x": -2.45,
+      "side": -1
+    },
+    {
+      "name": "Model_GondolaWheel1Left",
+      "root": "Model_GondolaRoot",
+      "radius": 0.46,
+      "phase": 0,
+      "x": -2.45,
+      "side": 1
+    },
+    {
+      "name": "Model_GondolaWheel2Right",
+      "root": "Model_GondolaRoot",
+      "radius": 0.46,
+      "phase": 0,
+      "x": 2.45,
+      "side": -1
+    },
+    {
+      "name": "Model_GondolaWheel2Left",
+      "root": "Model_GondolaRoot",
+      "radius": 0.46,
+      "phase": 0,
+      "x": 2.45,
+      "side": 1
+    }
+  ],
+  "rods": [
+    {
+      "name": "Model_CouplingRodRight1",
+      "kind": "coupling",
+      "length": 1.6,
+      "phase": 0,
+      "axleX": 0.9,
+      "side": -1
+    },
+    {
+      "name": "Model_CouplingRodRight2",
+      "kind": "coupling",
+      "length": 1.6,
+      "phase": 0,
+      "axleX": -0.7,
+      "side": -1
+    },
+    {
+      "name": "Model_CouplingRodRight3",
+      "kind": "coupling",
+      "length": 1.6,
+      "phase": 0,
+      "axleX": -2.3,
+      "side": -1
+    },
+    {
+      "name": "Model_CouplingRodRight4",
+      "kind": "coupling",
+      "length": 1.6,
+      "phase": 0,
+      "axleX": -3.9,
+      "side": -1
+    },
+    {
+      "name": "Model_MainRodRight",
+      "kind": "main",
+      "length": 2.9,
+      "phase": 0,
+      "axleX": 0.9,
+      "side": -1
+    },
+    {
+      "name": "Model_CouplingRodLeft1",
+      "kind": "coupling",
+      "length": 1.6,
+      "phase": 1.5707963267948966,
+      "axleX": 0.9,
+      "side": 1
+    },
+    {
+      "name": "Model_CouplingRodLeft2",
+      "kind": "coupling",
+      "length": 1.6,
+      "phase": 1.5707963267948966,
+      "axleX": -0.7,
+      "side": 1
+    },
+    {
+      "name": "Model_CouplingRodLeft3",
+      "kind": "coupling",
+      "length": 1.6,
+      "phase": 1.5707963267948966,
+      "axleX": -2.3,
+      "side": 1
+    },
+    {
+      "name": "Model_CouplingRodLeft4",
+      "kind": "coupling",
+      "length": 1.6,
+      "phase": 1.5707963267948966,
+      "axleX": -3.9,
+      "side": 1
+    },
+    {
+      "name": "Model_MainRodLeft",
+      "kind": "main",
+      "length": 2.9,
+      "phase": 1.5707963267948966,
+      "axleX": 0.9,
+      "side": 1
+    }
+  ],
+  "sourceViews": [
+    "Reference/Texture_LocomotiveThreeView.png",
+    "Reference/Texture_GondolaThreeView.png"
+  ],
+  "quarteringSource": "https://en.wikisource.org/wiki/Steam_Locomotive_Construction_and_Maintenance/Chapter_VI",
+  "triangles": {
+    "Model_Locomotive": 52528,
+    "Model_Gondola": 29151
+  },
+  "meshObjects": {
+    "Model_Locomotive": 65,
+    "Model_Gondola": 25
+  }
+}

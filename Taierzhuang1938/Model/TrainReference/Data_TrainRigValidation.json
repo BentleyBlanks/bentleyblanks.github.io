@@ -1,0 +1,21 @@
+{
+  "status": "PASS",
+  "signedDistanceSamples": 248,
+  "maxJointErrorMeters": 1.1980385328675377e-06,
+  "maxRollingErrorMeters": 1.0681152318170462e-06,
+  "maxQuarteringErrorRadians": 6.39757837817001e-07,
+  "driverCount": 50,
+  "invalidDrivers": 0,
+  "triangles": {
+    "Model_Locomotive": 52528,
+    "Model_Gondola": 29151
+  },
+  "checks": [
+    "Both rolling directions, repeated stop, full revolution",
+    "Wheel tread at rail level",
+    "Five driver axles in phase on each side",
+    "Left and right cranks quartered",
+    "Main rods and coupling rods fixed length",
+    "Crosshead remains on straight slide guides"
+  ]
+}
