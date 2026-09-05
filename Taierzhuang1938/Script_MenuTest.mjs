@@ -952,6 +952,37 @@ async function CheckMissionList() {
     `visible=${gunBack.visible} viewmodel=${gunBack.viewmodel}`);
   await page.screenshot({ path: path.join(outDir, "Menu_ResumeAfterSettings.png") });
 
+  // 鼠标位移尖刺闸门：锁内正常推鼠标要转头；一个占了小半个窗口的孤立单帧位移
+  //（Chromium on Windows 光标回拉的假 movement）必须整个丢掉，镜头不许跳切。
+  const spikeGate = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    const Move = (dx, dy) => document.dispatchEvent(
+      new MouseEvent("mousemove", { movementX: dx, movementY: dy, bubbles: true }));
+    const yaw0 = T.player.yaw;
+    for (let i = 0; i < 4; i += 1) { Move(6, 0); T.StepFrames(1); }
+    const yaw1 = T.player.yaw;
+    Move(1400, 0); T.StepFrames(1);
+    const yaw2 = T.player.yaw;
+    Move(6, 0); T.StepFrames(1);
+    const yaw3 = T.player.yaw;
+    const lock = T.Debug.PointerLock();
+    // 连着两个大位移是真的在快甩（低帧率下一个事件合并了几十毫秒），第二个必须放行
+    Move(400, 0); T.StepFrames(1);
+    const yaw4 = T.player.yaw;
+    Move(400, 0); T.StepFrames(1);
+    const yaw5 = T.player.yaw;
+    return { yaw0, yaw1, yaw2, yaw3, yaw4, yaw5, dropped: lock.spikesDropped, lastSpike: lock.lastSpike };
+  });
+  Check("连续两个大位移只丢第一个，快甩不会被闸门整段吃掉",
+    Math.abs(spikeGate.yaw4 - spikeGate.yaw3) < 1e-9 && Math.abs(spikeGate.yaw5 - spikeGate.yaw4) > 0.5,
+    `第一个 400 px：${(spikeGate.yaw4 - spikeGate.yaw3).toFixed(6)}，第二个：${(spikeGate.yaw5 - spikeGate.yaw4).toFixed(4)}`);
+  Check("锁内推鼠标能转头（尖刺闸门不误伤正常位移）",
+    Math.abs(spikeGate.yaw1 - spikeGate.yaw0) > 0.02 && Math.abs(spikeGate.yaw3 - spikeGate.yaw2) > 0.004,
+    `yaw ${spikeGate.yaw0.toFixed(4)} -> ${spikeGate.yaw1.toFixed(4)}，尖刺后 ${spikeGate.yaw2.toFixed(4)} -> ${spikeGate.yaw3.toFixed(4)}`);
+  Check("孤立的 1400 px 单帧位移被整个丢掉，镜头不跳切",
+    Math.abs(spikeGate.yaw2 - spikeGate.yaw1) < 1e-9 && spikeGate.dropped >= 1,
+    `尖刺那帧 yaw 变化 ${(spikeGate.yaw2 - spikeGate.yaw1).toFixed(6)}，dropped=${spikeGate.dropped} ${JSON.stringify(spikeGate.lastSpike)}`);
+
   const unlockPause = await page.evaluate(() => {
     window.Taierzhuang.Debug.DropPointerLock();
     return {

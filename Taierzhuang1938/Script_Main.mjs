@@ -2151,6 +2151,9 @@ async function Boot() {
         fake: FAKE_POINTER_LOCK,
         browserLocked: document.pointerLockElement !== null,
         mouseFree: altMouseFree,
+        // raw input 有没有真的要到，以及尖刺闸门丢过几个假位移（见 AcceptLookMotion）
+        rawInput: rawInputActive, rawInputSupported,
+        spikesDropped: lookSpike.dropped, lastSpike: lookSpike.last,
       }),
       ReleasePointerLock,
       // 模拟浏览器吞掉 Esc、只抛 pointerlockchange 的真实路径；菜单冒烟锁死这条回归。
@@ -4408,6 +4411,10 @@ function PointerLocked() {
   return FAKE_POINTER_LOCK ? fakeLocked : document.pointerLockElement === canvas;
 }
 
+// raw input 的可用性只探一次；NotSupportedError 之后所有后续抢锁直接走普通锁。
+let rawInputSupported = true;
+let rawInputActive = false;
+
 /**
  * 抢指针锁。**必须吞掉 NotAllowedError**：用户手势的有效期只有几秒，而
  * 「点开始 -> 播三十八秒关前过场 -> 进游戏」这条路上，过场播完时手势早过期了，
@@ -4424,12 +4431,70 @@ function RequestPointerLock() {
     return;
   }
   const nudge = () => hud?.Hint("点一下画面，接管镜头", 3.0);
+  // **先要 raw input**（unadjustedMovement）。事故：镜头在鼠标往一个方向推到一定
+  // 距离之后会突然跳切到另一个角度。页内链路（mousemove -> lookX -> yaw -> 相机）
+  // 逐帧量过是连续的，跳的是浏览器送来的 movementX/Y 本身：Chromium on Windows
+  // 不开 raw input 时，锁内的隐藏光标仍在按屏幕坐标走，被 ClipCursor 夹到窗口边
+  // 或跨到另一块屏，再被拉回窗口中心，那一下回拉会作为一个上千像素的 movement
+  // 送进来。unadjustedMovement 改读 WM_INPUT 的原始位移，与光标位置无关，
+  // 顺带甩掉系统的「提高指针精确度」加速。不支持（NotSupportedError）就退回普通锁；
+  // 下面 mousemove 里还有一道尖刺闸门兜底。
+  const requestPlain = () => {
+    try {
+      const pending = canvas.requestPointerLock?.();
+      if (pending && typeof pending.catch === "function") pending.catch(nudge);
+    } catch (error) {
+      nudge();
+    }
+  };
+  if (!rawInputSupported) { requestPlain(); return; }
   try {
-    const pending = canvas.requestPointerLock?.();
-    if (pending && typeof pending.catch === "function") pending.catch(nudge);
+    const pending = canvas.requestPointerLock?.({ unadjustedMovement: true });
+    if (pending && typeof pending.then === "function") {
+      pending.then(() => { rawInputActive = true; }, (error) => {
+        if (error && error.name === "NotSupportedError") { rawInputSupported = false; requestPlain(); }
+        else nudge();
+      });
+    }
   } catch (error) {
-    nudge();
+    rawInputSupported = false;
+    requestPlain();
   }
+}
+
+/**
+ * 鼠标位移尖刺闸门（RequestPointerLock 注释里那条事故的第二道保险）。
+ *
+ * 真人的手是连续的：一次甩枪的位移是逐帧攀上去的，不会在前几帧都很小的情况下
+ * 突然来一个占了小半个窗口的单帧位移。而光标回拉那种尖刺正是这个形状 ——
+ * 孤零零一个几百到上千像素的事件，前后都是正常小步。所以两个条件同时成立才丢：
+ * 单帧模长超过窗口短边的三成（至少 200 px），**并且**超过最近四帧峰值的五倍。
+ * 快甩枪只要有起步过程就不会误伤；从静止直接来的极端一帧被丢也只是少转一帧。
+ * **连着两个「尖刺」就放行第二个**：光标回拉是孤立的单个事件，连来两个说明是真的
+ * 在快甩（低帧率下一个事件合并了几十毫秒的位移），不能把整段甩枪都吃掉。
+ * 锁一换（重新抢到、Alt 释放）历史清零，于是 Chromium 那个「锁上后第一个事件
+ * 带一坨旧位移」的老毛病也被这里一并吃掉。
+ */
+const lookSpike = { recent: [0, 0, 0, 0], dropped: 0, last: null, lastWasSpike: false };
+function AcceptLookMotion(dx, dy) {
+  const mag = Math.hypot(dx, dy);
+  const peak = Math.max(16, ...lookSpike.recent);
+  const limit = Math.max(200, 0.3 * Math.min(window.innerWidth || 0, window.innerHeight || 0));
+  const spike = mag > limit && mag > peak * 5;
+  if (spike && !lookSpike.lastWasSpike) {
+    lookSpike.lastWasSpike = true;
+    lookSpike.dropped += 1;
+    lookSpike.last = { dx, dy, peak, limit };
+    return false;
+  }
+  lookSpike.lastWasSpike = false;
+  lookSpike.recent.shift();
+  lookSpike.recent.push(mag);
+  return true;
+}
+function ResetLookSpikeHistory() {
+  lookSpike.recent.fill(0);
+  lookSpike.lastWasSpike = false;
 }
 
 /**
@@ -4466,8 +4531,10 @@ function OnPointerLockChange() {
     // Alt 或编辑器已接管时，晚到的异步 requestPointerLock 也必须立即退回去。
     if (altMouseFree || (editor && editor.Capturing)) { ReleasePointerLock(); return; }
     intentionalPointerUnlock = false;
+    ResetLookSpikeHistory();
     return;
   }
+  rawInputActive = false;
   const intentional = intentionalPointerUnlock;
   intentionalPointerUnlock = false;
   input.fire = false; input.ads = false;
@@ -4920,6 +4987,9 @@ document.addEventListener("keyup", (event) => {
 
 document.addEventListener("mousemove", (e) => {
   if (altMouseFree) return;
+  // 尖刺闸门排在所有消费者之前：过场的 headLook、轮盘的指向、玩法的转头，
+  // 吃到一个上千像素的假位移都会跳（见 AcceptLookMotion 的注释）。
+  if (!AcceptLookMotion(e.movementX || 0, e.movementY || 0)) return;
   // headLook 是过场唯一开放的连续输入；不要求玩家锁住指针，避免 Esc 被浏览器吞掉。
   if (cutscene && cutscene.Playing) {
     if (cutscene.AllowsLook) cutscene.AddLook(e.movementX, e.movementY);
