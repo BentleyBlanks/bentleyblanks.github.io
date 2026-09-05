@@ -842,6 +842,21 @@ RGBA packed depth，并在视模自己的材质克隆里以 3×3 PCF 乘直射�
 材质必须先克隆再注入，不能改 `MaterialLibrary` 的共享底材，否则世界里的同名枪材质也会采到
 相机旁边这张阴影。画质面板的「第一人称自阴影」可热切、落盘，并服从「阴影」总闸。
 
+**2026-09-05 定论：第一人称左手背上那块「黑色阴影状颜色」就是这张靶投出来的**，不是渲染链坏了
+——太阳在玩家身后时，枪托/机匣与右手挡在太阳与左手之间，影子落在左手背；1024 图铺 2.7 m
+（2.6 mm/texel）加 3×3 `step` PCF、强度 0.78，于是是一块硬边、带锯齿、只剩两成直射光的斑。
+排除法：强度归零或 depth pass 后关掉着色器项即消失；bias 抬到 ≈30 cm 仍在（不是 acne）；
+CPU `applyBoneTransform` 投影与深度图剪影重合（depth pass 蒙皮正确）；只留手臂或只留枪当
+caster 各自都投得出。**无头 SwiftShader 下这张靶的结果与真显卡不一致**（右手整只被遮），
+取证要走有头浏览器（`chromium.launch({channel:"msedge", headless:false})`，webdriver 下游戏
+走假指针锁）。Debug Rendering 的「Diffuse Lighting」视图能直接看到它。
+
+为此加了**软化路径**（`SetSoft`，画质面板「自阴影软化」，`graphics.firstPersonSelfShadowSoft`，
+**出厂关**）：靶换 2048、12 点固定 Poisson 盘 × 双线性 PCF（先比较再插值）、receiver-plane
+深度偏置（Isidoro 2006，梯度钳在 1.0）配更小的常数偏置 0.0006。软化是 uniform 分支不是
+define，热切不重编译视模材质；滤波半径按米给（默认 6 mm）再换算成 texel，靶换尺寸半径不变。
+`Script_EditorTest` 点真实按钮验 2048 靶、深度非空、GL 无错、手仍画得出来、关回 1024。
+
 它那趟自阴影 depth pass 会临时把视模材质的 `allowOverride` 打开再还原 —— **还原必须按材质
 去重**：一份钢材同时挂在枪身与刺刀上，第二次记下的是自己刚改成的 `true`，还原时最后一次
 写回就把它永久留在 `true` 上，等于这一趟偷偷改掉了视模的预通道口径。反过来，它也**不许**

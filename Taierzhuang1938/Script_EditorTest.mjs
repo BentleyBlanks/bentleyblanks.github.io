@@ -703,6 +703,53 @@ Check("第一人称自阴影：独立深度靶真有手枪像素且不向世界�
     ? `靶=${firstPersonShadowToggle.depth.size} 非空=${firstPersonShadowToggle.depth.nonClear}`
       + ` caster=${firstPersonShadowToggle.on.casters} 材质=${firstPersonShadowToggle.on.materials}`
     : "系统未构造");
+// 自阴影软化：点真实按钮 → 2048 靶 + 着色器软化分支；关掉回 1024 硬路径。
+// 读回深度靶与一帧像素，防「uniform 接了、靶换了，但着色器分支编译不过整只手变黑/变白」。
+const firstPersonShadowSoft = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const Btn = () => Array.from(document.querySelectorAll(".edPanel.work .edBtn"))
+    .find((b) => (b.textContent || "").includes("自阴影软化"));
+  const button = Btn();
+  if (!button || !T.firstPersonSelfShadow) return { found: false };
+  const before = T.firstPersonSelfShadow.Status();
+  const gl = T.firstPersonSelfShadow.renderer.getContext();
+  gl.getError();
+  button.click();
+  T.StepFrames(4);
+  const soft = T.firstPersonSelfShadow.Status();
+  const depth = T.firstPersonSelfShadow.AuditDepth();
+  const glError = gl.getError();
+  // 手仍然要画得出来：软化分支若编译失败，three 会把整份材质画成黑
+  const canvas = document.querySelector("canvas");
+  const probe = document.createElement("canvas");
+  probe.width = 64; probe.height = 36;
+  const ctx = probe.getContext("2d");
+  ctx.drawImage(canvas, 0, 0, probe.width, probe.height);
+  const data = ctx.getImageData(0, 0, probe.width, probe.height).data;
+  let bright = 0;
+  for (let i = 0; i < data.length; i += 4) if (data[i] + data[i + 1] + data[i + 2] > 90) bright += 1;
+  Btn().click();
+  T.StepFrames(2);
+  const hard = T.firstPersonSelfShadow.Status();
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("tengxian1938_graphics_v1")); } catch (e) { saved = null; }
+  return { found: true, before, soft, hard, depth, glError, bright, pixels: probe.width * probe.height, saved: saved?.firstPersonSelfShadowSoft };
+});
+Check("画质面板：自阴影软化可热切（2048 靶 / 软化分支）并落盘，关回 1024 硬路径",
+  firstPersonShadowSoft.found && firstPersonShadowSoft.before.soft === false
+  && firstPersonShadowSoft.soft.soft === true && firstPersonShadowSoft.soft.size === 2048
+  && firstPersonShadowSoft.soft.radiusTexels > 2 && firstPersonShadowSoft.soft.enabled
+  && firstPersonShadowSoft.depth.size === 2048 && firstPersonShadowSoft.depth.nonClear > 256
+  && firstPersonShadowSoft.glError === 0 && firstPersonShadowSoft.bright > firstPersonShadowSoft.pixels * 0.3
+  && firstPersonShadowSoft.hard.soft === false && firstPersonShadowSoft.hard.size === 1024
+  && firstPersonShadowSoft.saved === false,
+  firstPersonShadowSoft.found
+    ? "软化=" + firstPersonShadowSoft.soft.soft + " 靶=" + firstPersonShadowSoft.soft.size
+      + " 半径texel=" + Number(firstPersonShadowSoft.soft.radiusTexels).toFixed(2)
+      + " 非空=" + firstPersonShadowSoft.depth.nonClear + " gl=" + firstPersonShadowSoft.glError
+      + " 亮像素=" + firstPersonShadowSoft.bright + "/" + firstPersonShadowSoft.pixels
+      + " 关回=" + firstPersonShadowSoft.hard.size + " 落盘=" + firstPersonShadowSoft.saved
+    : "面板上找不到自阴影软化开关");
 // 画质面板整版留一张图：断言只能证明「DOM 里有这个按钮」，证明不了它在版面上
 // 排到哪儿、黄字有没有把面板撑得读不下去。这一栏就是因为「设置里翻不到」才补的，
 // 留张图下一轮直接看。

@@ -27,7 +27,18 @@ uniform vec2 uFirstPersonShadowTexel;
 uniform float uFirstPersonShadowEnabled;
 uniform float uFirstPersonShadowBias;
 uniform float uFirstPersonShadowStrength;
+uniform float uFirstPersonShadowSoft;        // 1 = 软化路径：双线性 Poisson PCF + receiver-plane 偏置
+uniform float uFirstPersonShadowRadius;      // 软化滤波半径（texel）
+uniform float uFirstPersonShadowSoftBias;    // 软化路径的常数偏置；斜率交给平面偏置，所以比硬路径小
+uniform float uFirstPersonShadowPlaneClamp;  // 平面偏置的梯度钳制：掠射角下导数会爆，不钳就是几十厘米的漏光
 varying vec4 vFirstPersonShadowCoord;
+
+// 12 点 Poisson 盘，固定图案不转：转起来的噪点在近距离的手背上比锯齿更显眼。
+const vec2 FIRST_PERSON_POISSON[12] = vec2[12](
+  vec2(-0.326, -0.406), vec2(-0.840, -0.074), vec2(-0.696,  0.457), vec2(-0.203,  0.621),
+  vec2( 0.962, -0.195), vec2( 0.473, -0.480), vec2( 0.519,  0.767), vec2( 0.185, -0.893),
+  vec2( 0.507,  0.064), vec2( 0.896,  0.412), vec2(-0.322, -0.933), vec2(-0.792, -0.598)
+);
 
 const vec4 FIRST_PERSON_DEPTH_UNPACK = vec4(
   1.0 / (256.0 * 256.0 * 256.0),
@@ -40,21 +51,61 @@ float FirstPersonPackedDepth(vec2 uv) {
   return dot(texture2D(uFirstPersonShadowMap, uv), FIRST_PERSON_DEPTH_UNPACK);
 }
 
+float FirstPersonCompare(vec2 uv, float receiver) {
+  return step(receiver, FirstPersonPackedDepth(uv));
+}
+
+// 双线性 PCF：**先比较再插值**。插值深度再比较会在遮挡边缘算出一个不存在的中间深度，
+// 边缘反而更脏；比较结果按小数权重混合才是硬件 PCF 的那种平滑。
+float FirstPersonBilinearCompare(vec2 uv, float receiver) {
+  vec2 texel = uFirstPersonShadowTexel;
+  vec2 grid = uv / texel - 0.5;
+  vec2 f = fract(grid);
+  vec2 base = (floor(grid) + 0.5) * texel;
+  float a = FirstPersonCompare(base, receiver);
+  float b = FirstPersonCompare(base + vec2(texel.x, 0.0), receiver);
+  float c = FirstPersonCompare(base + vec2(0.0, texel.y), receiver);
+  float d = FirstPersonCompare(base + texel, receiver);
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
 float FirstPersonSelfShadow() {
-  if (uFirstPersonShadowEnabled < 0.5) return 1.0;
   vec3 projected = vFirstPersonShadowCoord.xyz / max(vFirstPersonShadowCoord.w, 1e-5);
+  // 导数在任何分支之前取：ES 3.00 只保证一致控制流里的 dFdx/dFdy 有定义。
+  vec3 dpdx = dFdx(projected);
+  vec3 dpdy = dFdy(projected);
+  if (uFirstPersonShadowEnabled < 0.5) return 1.0;
   if (projected.x <= 0.0 || projected.x >= 1.0
       || projected.y <= 0.0 || projected.y >= 1.0
       || projected.z <= 0.0 || projected.z >= 1.0) return 1.0;
-  float receiver = projected.z - uFirstPersonShadowBias;
-  float lit = 0.0;
-  for (int y = -1; y <= 1; y += 1) {
-    for (int x = -1; x <= 1; x += 1) {
-      vec2 uv = projected.xy + vec2(float(x), float(y)) * uFirstPersonShadowTexel;
-      lit += step(receiver, FirstPersonPackedDepth(uv));
+  if (uFirstPersonShadowSoft < 0.5) {
+    // 硬路径（出厂默认）：3×3 step PCF，原样保留。
+    float receiver = projected.z - uFirstPersonShadowBias;
+    float lit = 0.0;
+    for (int y = -1; y <= 1; y += 1) {
+      for (int x = -1; x <= 1; x += 1) {
+        vec2 uv = projected.xy + vec2(float(x), float(y)) * uFirstPersonShadowTexel;
+        lit += FirstPersonCompare(uv, receiver);
+      }
     }
+    return mix(1.0, lit / 9.0, uFirstPersonShadowStrength);
   }
-  return mix(1.0, lit / 9.0, uFirstPersonShadowStrength);
+  // receiver-plane depth bias（Isidoro 2006）：用接收面在阴影图空间的深度梯度，
+  // 给每个 tap 各自的参考深度，这样倾斜的手背不靠一个大常数偏置也不长 acne。
+  float det = dpdx.x * dpdy.y - dpdx.y * dpdy.x;
+  vec2 planeGrad = vec2(0.0);
+  if (abs(det) > 1e-12) {
+    planeGrad = vec2(dpdy.y * dpdx.z - dpdx.y * dpdy.z, dpdx.x * dpdy.z - dpdy.x * dpdx.z) / det;
+    planeGrad = clamp(planeGrad, vec2(-uFirstPersonShadowPlaneClamp), vec2(uFirstPersonShadowPlaneClamp));
+  }
+  vec2 scale = uFirstPersonShadowTexel * uFirstPersonShadowRadius;
+  float lit = 0.0;
+  for (int i = 0; i < 12; i += 1) {
+    vec2 offset = FIRST_PERSON_POISSON[i] * scale;
+    float receiver = projected.z + dot(planeGrad, offset) - uFirstPersonShadowSoftBias;
+    lit += FirstPersonBilinearCompare(projected.xy + offset, receiver);
+  }
+  return mix(1.0, lit / 12.0, uFirstPersonShadowStrength);
 }
 `;
 
@@ -73,12 +124,25 @@ function EnableShadowLayerOnLight(object) {
 }
 
 export class FirstPersonSelfShadow {
-  constructor(renderer, scene, camera, root, { size = 1024, extent = 1.35 } = {}) {
+  /**
+   * @param {object} [options]
+   * @param {number} [options.size=1024]        硬路径（出厂）的阴影图边长
+   * @param {number} [options.extent=1.35]      正交相机半幅面（米）
+   * @param {boolean} [options.soft=false]      软化路径：2048 图 + 双线性 Poisson PCF + receiver-plane 偏置。
+   *                                            出厂关；画质面板「自阴影软化」热切（SetSoft）。
+   * @param {number} [options.softSize=2048]    软化路径的阴影图边长
+   * @param {number} [options.softRadius=0.006] 软化滤波半径（米）；按当前 texel 换算成 uniform
+   */
+  constructor(renderer, scene, camera, root, { size = 1024, extent = 1.35, soft = false, softSize = 2048, softRadius = 0.006 } = {}) {
     this.renderer = renderer;
     this.scene = scene;
     this.camera = camera;
     this.root = root;
-    this.size = Math.max(256, Math.min(2048, Math.round(size) || 1024));
+    this.hardSize = Math.max(256, Math.min(2048, Math.round(size) || 1024));
+    this.softSize = Math.max(512, Math.min(4096, Math.round(softSize) || 2048));
+    this.softRadius = Math.max(0.001, Number(softRadius) || 0.006);
+    this.soft = !!soft;
+    this.size = this.soft ? this.softSize : this.hardSize;
     this.extent = Math.max(0.8, Number(extent) || 1.35);
     this.enabled = false;
     this.renderedFrames = 0;
@@ -90,20 +154,17 @@ export class FirstPersonSelfShadow {
       bias: { value: 0.0018 },
       strength: { value: 0.78 },
       matrix: { value: new THREE.Matrix4() },
+      // 软化路径。soft 是 uniform 而不是 define：切换不重编译整棵视模材质。
+      soft: { value: this.soft ? 1 : 0 },
+      radius: { value: 1 },
+      // 常数偏置只兜住 packed depth 的量化误差；斜率由 receiver-plane 偏置接管
+      softBias: { value: 0.0006 },
+      // 梯度钳在 1.0：5 texel 的 tap 在 2048 图上最多带 ~1.5 cm 的平面偏置
+      planeClamp: { value: 1.0 },
     };
 
-    this.target = new THREE.WebGLRenderTarget(this.size, this.size, {
-      format: THREE.RGBAFormat,
-      type: THREE.UnsignedByteType,
-      minFilter: THREE.NearestFilter,
-      magFilter: THREE.NearestFilter,
-      generateMipmaps: false,
-      depthBuffer: true,
-      stencilBuffer: false,
-    });
-    this.target.texture.name = "FirstPersonSelfShadowDepth";
-    this.target.texture.colorSpace = THREE.NoColorSpace;
-    this.uniforms.map.value = this.target.texture;
+    this.target = null;
+    this._BuildTarget(this.size);
 
     this.depthMaterial = new THREE.MeshDepthMaterial({
       depthPacking: THREE.RGBADepthPacking,
@@ -135,6 +196,44 @@ export class FirstPersonSelfShadow {
     this.Sync();
   }
 
+  _BuildTarget(size) {
+    if (this.target) this.target.dispose();
+    this.size = size;
+    this.target = new THREE.WebGLRenderTarget(size, size, {
+      format: THREE.RGBAFormat,
+      type: THREE.UnsignedByteType,
+      minFilter: THREE.NearestFilter,
+      magFilter: THREE.NearestFilter,
+      generateMipmaps: false,
+      depthBuffer: true,
+      stencilBuffer: false,
+    });
+    this.target.texture.name = "FirstPersonSelfShadowDepth";
+    this.target.texture.colorSpace = THREE.NoColorSpace;
+    this.uniforms.map.value = this.target.texture;
+    this.uniforms.texel.value.set(1 / size, 1 / size);
+    this._UpdateRadius();
+  }
+
+  /** 软化滤波半径按米给，换算成当前图的 texel 数（图换尺寸时半径不变）。 */
+  _UpdateRadius() {
+    const texelMeters = (2 * this.extent) / this.size;
+    this.uniforms.radius.value = this.softRadius / texelMeters;
+  }
+
+  /**
+   * 软化路径热切：换 2048 靶 + 着色器走双线性 Poisson / receiver-plane 分支。
+   * 只动 uniform 与靶，不动 cache key，所以不触发视模材质重编译。
+   */
+  SetSoft(on) {
+    const next = !!on;
+    const size = next ? this.softSize : this.hardSize;
+    this.soft = next;
+    this.uniforms.soft.value = next ? 1 : 0;
+    if (size !== this.size) this._BuildTarget(size);
+    return this.soft;
+  }
+
   _Owned(material) {
     if (!material || !material.isMeshStandardMaterial) return material;
     if (this.patchedMaterials.has(material)) return material;
@@ -161,6 +260,10 @@ export class FirstPersonSelfShadow {
       shader.uniforms.uFirstPersonShadowBias = uniforms.bias;
       shader.uniforms.uFirstPersonShadowStrength = uniforms.strength;
       shader.uniforms.uFirstPersonShadowMatrix = uniforms.matrix;
+      shader.uniforms.uFirstPersonShadowSoft = uniforms.soft;
+      shader.uniforms.uFirstPersonShadowRadius = uniforms.radius;
+      shader.uniforms.uFirstPersonShadowSoftBias = uniforms.softBias;
+      shader.uniforms.uFirstPersonShadowPlaneClamp = uniforms.planeClamp;
       shader.vertexShader = shader.vertexShader
         .replace("#include <common>", `#include <common>
         uniform mat4 uFirstPersonShadowMatrix;
@@ -322,6 +425,8 @@ ${SHADOW_FRAGMENT_GLSL}`)
     return {
       enabled: this.enabled,
       size: this.size,
+      soft: this.soft,
+      radiusTexels: this.uniforms.radius.value,
       renderedFrames: this.renderedFrames,
       meshes: this.meshes.length,
       casters: this.casters.length,

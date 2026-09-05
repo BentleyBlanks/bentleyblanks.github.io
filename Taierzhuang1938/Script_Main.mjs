@@ -409,6 +409,9 @@ const graphics = {
   shadowSize: 0,          // 0 = 用出厂档位
   // 独立小阴影图，只在第一人称手臂/武器材质内部采样；仍服从上面的阴影总闸。
   firstPersonSelfShadow: true,
+  // 自阴影软化：2048 图 + 双线性 Poisson PCF + receiver-plane 偏置。出厂关（2026-09-05），
+  // 手背上的枪托/右手投影默认仍是 1024 图硬 3×3 那块；画质面板热切。
+  firstPersonSelfShadowSoft: false,
   ssao: 1, bloom: 1, god: 1, motionBlur: 1, grain: 1, vignette: 1,
   // 抗锯齿：TAA 开着时末趟的 FXAA 自动让位（两层叠加只会糊）。出厂值跟画质档走
   // （medium 及以上默认开），但这是**布尔开关不是倍率** —— 它不决定"画多重"，
@@ -1016,6 +1019,7 @@ async function Boot() {
   if (viewmodel.markForegroundPrepass) viewmodel.markForegroundPrepass();
   firstPersonSelfShadow = new FirstPersonSelfShadow(renderer, scene, camera, viewmodel.root, {
     size: QUALITY === "low" ? 512 : 1024,
+    soft: graphics.firstPersonSelfShadowSoft === true,
   });
   firstPersonSelfShadow.SetEnabled(graphics.shadows && graphics.firstPersonSelfShadow);
 
@@ -6930,6 +6934,7 @@ function ApplyGraphics() {
   // 玩家可单关第一人称自阴影，但「阴影」总闸关闭时它也必须一起停：否则面板说
   // 阴影已关，枪上却还留着一层独立阴影，会成为两套互相矛盾的设置语义。
   firstPersonSelfShadow?.SetEnabled(!!graphics.shadows && graphics.firstPersonSelfShadow !== false);
+  firstPersonSelfShadow?.SetSoft(graphics.firstPersonSelfShadowSoft === true);
 
   const wantShadow = !!graphics.shadows;
   if (renderer.shadowMap.enabled !== wantShadow) {

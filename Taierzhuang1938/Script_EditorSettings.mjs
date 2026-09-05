@@ -126,6 +126,10 @@ export class GraphicsSettings {
       gfx.firstPersonSelfShadow = on;
       this.Apply();
     });
+    Toggle(shadowBox, "自阴影软化", gfx.firstPersonSelfShadowSoft === true, (on) => {
+      gfx.firstPersonSelfShadowSoft = on;
+      this.Apply();
+    });
     const shadowSize = Section(perf, "阴影分辨率");
     Chips(shadowSize, [
       { value: 0, label: "默认" }, { value: 512, label: "512" },
@@ -202,6 +206,7 @@ export class GraphicsSettings {
     const gfx = this.gfx;
     gfx.renderScale = 1; gfx.shadows = true; gfx.shadowSize = 0;
     gfx.firstPersonSelfShadow = true;
+    gfx.firstPersonSelfShadowSoft = false;
     gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
     gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;
     gfx.gi = false; gfx.giStrength = 1;
@@ -244,7 +249,7 @@ export class GraphicsSettings {
       ? `${this.host.lights.sun.shadow.mapSize.x}${this.host.renderer.shadowMap.enabled ? "" : "（已关）"}`
       : "—");
     const fpShadow = this.host.game?.firstPersonSelfShadow?.Status?.();
-    f.Set("第一人称自阴影", fpShadow?.enabled ? `开（${fpShadow.size}）` : "关");
+    f.Set("第一人称自阴影", fpShadow?.enabled ? `开（${fpShadow.size}${fpShadow.soft ? " · 软化" : " · 硬 3×3"}）` : "关");
   }
 }
 
