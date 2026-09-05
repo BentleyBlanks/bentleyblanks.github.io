@@ -1,267 +1,76 @@
 # Repository Guidelines
 
-## 本地预览（先本地验收，再推 master）
-
-站点 416MB / 2000+ 文件，每次推送都要整站打包上传，Pages 那一轮等好几分钟；**别拿线上当预览环境**。
-
-```bash
-node scripts/Script_LocalPreview.mjs        # 服务本脚本所在的那棵树，默认 8080
-```
+本文件约束全仓协作与交付；具体玩法、接口和验收入口在各项目的 AGENTS.md。目标是让 agent 自主完成任务，同时保护共享工作区、用户资产和已验证的产品契约。
 
-**零 npm 依赖**（只用 node 内置模块），所以新克隆的仓库不必 `npm i` 就能起；有 node 就够。等价入口：`npm start` / `npm run preview`（但见下面 worktree 那条）、Claude Code 里 `preview_start({ name: "preview" })`（配置在受版本控制的 `.claude/launch.json`，固定连 8080）、`node scripts/Script_LocalPreview.mjs --shortcut` 在桌面放一个双击就起服的入口（Win/mac/Linux 都认）。`--help` 列全部参数。
-
-- 索引页 `http://127.0.0.1:8080/__preview/`：按最近改动排序列出所有带 `index.html` 的页面，带筛选框；下面一块能把任意 worktree 一键挂到相邻端口（8081、8082…），每棵树独占一个端口，页面里的绝对路径照旧成立。
-- 路径与线上完全一致（`/Taierzhuang1938/…`），一律 `no-store`，改完刷新即生效；支持 Range（mp4/长 BGM 能拖进度条），MIME 表覆盖 `.mjs/.wasm/.glb/.pck`。
-- 刻意**不**发 COOP/COEP：本地能跑而线上跑不了的东西，本地预览就白做了。
-- 桌面快捷方式：`node scripts/Script_LocalPreview.mjs --shortcut`（从哪份检出跑就绑哪份检出）。双击起服，关掉黑窗口即停服，重复双击不会抢端口。Windows 侧实现是 `scripts/Script_CreateDesktopShortcut.ps1`，也可以直接调它并用 `-Name` 另起名字，这样主检出和某棵 worktree 可以各有一个。
-- **多 agent 并行时注意端口**：8080 被别人占着会自动往上让（8081、8082…），且只有当那份实例服的**正是同一棵树**时才复用——不会把你指到别人的代码上。索引页顶部一行写明当前根目录，验收前扫一眼。要确定性就显式指定端口：`node scripts/Script_LocalPreview.mjs 8090`。
-- **worktree 里不要用 `npm run preview` / `npm start`** —— npm 会把 cwd 换到主检出，你测的是另一棵树。直接 `node scripts/Script_LocalPreview.mjs`。
+## 判断与任务边界
 
-## Generated Audio / Volcengine
+- 当前用户要求优先于仓库中的历史工作约定；运行环境的工具与权限限制仍须遵守。发现冲突时按适用范围处理，并说明会影响结果的差异。
+- 对已授权任务，常规实现、排障和可逆修复自行推进。只有缺失信息会改变目标、授权范围或导致不可恢复的损失时才询问；先完成不依赖答案的工作。
+- 模块地图描述职责与依赖，不是永久的人员分工。只有本次实际约定的并行分工才限制编辑归属；需要跨模块修改时同步接口、消费方和验证。
+- 先读相关项目入口，再按任务查源码、测试与分册。可扩大调查范围以查清因果；不要求通读无关设计书，也不禁止读取其他模块。
+- 保留核心玩法、存档、坐标、性能及资产契约。需要改变契约时，在用户目标范围内同步实现、文档和相应验证，不为让测试变绿而削弱断言。
+- 仓库不固定通用模型、推理强度、代理数量或每步操作顺序；按当前任务和可用工具选择。供应商、成本和运行时兼容性要求见下文。
 
-- All future project-generated music/BGM, ambience, SFX, dialogue, and voice must use Volcengine, never Lovart. A request to generate, replace, revise, or audition any audio must not invoke Lovart, including when the request explicitly says “music”, “BGM”, “song”, “sound effect”, or “audio”.
-- Use Volcengine directly with model `seed-audio-1.0`. For music, start from `Taierzhuang1938/Script_SeedAudioMusicBake.mjs`; for dialogue, voice, and SFX, use the applicable checked-in SeedAudio baker (such as `Script_VoiceBake.mjs`) or add an equivalent Volcengine baker.
-- Read the credential only from the `VOLCENGINE_API_KEY` environment variable. Never place an API key in source, prompts checked into Git, command output, documentation, commits, or GitHub Actions logs.
-- The canonical direct endpoint is `https://openspeech.bytedance.com/api/v3/tts/create`; every baker must send the key through the `X-Api-Key` header at runtime.
-- When a storyboard marks a dialogue range as continuous, send the complete range in one `text_prompt` request and keep the returned audio as one cue. Do not synthesize lines separately and splice them together.
+## Git 与共享工作区
 
-## Generated Images / 生图（三级回退，顺序固定）
+**所有编辑、提交和推送在本任务独占的 worktree 中进行。** 只读审查不必创建 worktree。
 
-任何「画 / 生成图片 / 出概念图 / 做海报、图标、贴图、分镜」的请求，**一律按这个顺序走，
-不许跳级**。只有上一级真的失败（报错、超时、卡在待确认、跑完没落文件）才降到下一级；
-降级了要在回复里说清楚降到第几级、为什么。**这一节只管图**——音频照旧走上面
-「Generated Audio / Volcengine」那一节，与这三级无关。
+1. 用 `git rev-parse --show-toplevel`、`git worktree list --porcelain` 和 `git status --short` 确认实际路径及归属；不要假定主检出位于某个历史绝对路径。
+2. 新的独立任务从最新 `origin/master` 创建新的分支与 worktree：`git fetch origin master` 后执行 `git worktree add -b <branch> <newPath> origin/master`。当前任务的续做可继续使用自己的 worktree；运行环境已为本任务创建且确认独占的 worktree 无需再套一层。
+3. 手动创建的目录沿用 `bentleyblanks_<AgentName>_<Purpose>_<YYYYMMDD>`；分支为 `<agent-lowercase>/<purpose-kebab>-<YYYYMMDD>`。AgentName、Purpose 用 PascalCase；同日重名加目的后缀。不要占用其他任务的目录或分支。
+4. 主检出由多个 agent 共用，不在其中 checkout、switch、reset、stash、提交或清理他人文件。误在主检出提交时先记录提交号和工作区状态，将自己的提交保全到独占 worktree；不要自动 `reset HEAD~1` 改写可能已被他人推进的共享分支。
+5. 发布前 fetch；若 master 前进，在自己的 worktree rebase 并检查受影响部分。用 `git push origin HEAD:master` 快进交付，禁止 force push。推送被并发更新拒绝时重新 fetch/rebase，不覆盖他人提交。
+6. 推送后仅在实际主检出仍处于 `master` 且工作区干净时执行 `git -C <mainPath> pull --ff-only origin master`。否则跳过同步，报告当前占用及本次交付位置。
+7. 交付确认且没有未提交文件、未交付提交或本任务预览进程使用目录后，移除自己的 worktree，并删除已交付的本地任务分支。仍需本地审阅的结果保留路径，不强制提前清理。
 
-### 1）Codex CLI 内置 imagegen（默认，先走这条）
+## 验证与发布
 
-```bash
-codex exec -m gpt-5.6-sol --skip-git-repo-check -s workspace-write -C "<工作目录>" -c model_reasoning_effort="low" -o "<log.txt>" "<任务>"
-```
+- 站点由 [.github/workflows/pages.yml](.github/workflows/pages.yml) 从 **master** 部署。通常直接快进推送；需要评审或分支保护要求时走 PR，无需同时做两套发布流程。
+- 小型文案、平衡、功能修复在验证后自行交付 master；不要把已要求上线的结果留在未合并草稿。用户明确要求仅审查、保留本地或先评审时按该范围交付。
+- **页面变化先本地验收，再推送。** 在本任务 worktree 运行 `node scripts/Script_LocalPreview.mjs`，默认 8080，实际端口以输出为准；`/__preview/` 顶部可核对服务根目录。无需 npm 安装即可启动预览。
+- 直接调用脚本能明确选中检出；若使用 npm，先确认解析到本任务的 package.json。服务支持 `--help`、指定端口、worktree 挂载与 `--shortcut`；保持路径、缓存和 COOP/COEP 行为与 Pages 兼容。
+- 运行与改动相关的现有检查；跨模块、共享基础设施和高风险变化扩大验证。纯指令或文档整理检查链接、命令和 diff，不因此启动所有游戏或浏览器回归；嵌入代码或运行时配置的变化按实际影响选测。
+- 全仓选测入口：`node scripts/Script_TestChangedProjects.mjs --changed=origin/master --dry-run` 查看计划，再按影响范围执行。该脚本按路径选项目，文档路径也可能命中；没有命中不代表无需验证。
+- 脚本、样式或资产变化按项目要求更新 cache-bust，**在提交与推送前完成**。测试通过后，只有新变化、失败或未解疑点才扩大或重复测试。
+- 页面上线要核对对应部署提交及线上内容或版本戳；HTTP 200 只证明可访问。部署仍在排队时区分“已推送”和“已上线”。纯仓库说明变化核对远端提交即可。
+- 最终说明改了什么、验证结果及尚未完成的事项；有可见页面变化时给出地址。
 
-- 提示词里**必须写死**：只许用内置的 `image_gen__imagegen` 工具，不许用 Lovart skill、
-  不许用 `generate_image_gpt_image_2`。不写死的话 codex 会自己挑到 Lovart 那条付费路径，
-  停在 `pending_confirmation` 等确认——**退出码仍然是 0，但没有图**。
-- 提示词里给**绝对输出路径**，并要求它只回这个路径。一张约 2—4 分钟。
-- `-m gpt-5.6-sol` 不能省：全局默认 `gpt-5.6-terra` 长期 `Selected model is at capacity`。
-- `-C` 指到**非 git 目录**（比如临时出图目录）不带 `--skip-git-repo-check` 会一秒退出：
-  `Not inside a trusted directory and --skip-git-repo-check was not specified.`，退出码 1。
-  配 `-s workspace-write` 把它的写权限圈在那个目录里。
-- stderr 恒有噪音（models cache 缺字段、MCP token 失效、刷新模型列表超时），不代表失败；
-  只看退出码和最后一条回复。
-- 命令**以 `codex` 开头单条写**，别用 `$d="..."; codex ...` 复合语句（匹配不上权限前缀规则）。
+## 命名与提交
 
-### 2）Lovart（第 1 级失败了才用）
+- 自有脚本、源码和资产使用英文名；文件词干、函数名和资产描述段用 PascalCase，变量和参数用 lowerCamelCase。文件名需要分隔时用下划线；扩展名小写。
+- 资产形如 `<Category>_<DescriptivePascalCase>.<ext>`。沿用 `Model_`、`Texture_`、`Icon_`、`AudioBgm_`、`AudioSfx_`、`Scene_`、`Script_`、`Shader_`、`Material_`、`Animation_`、`Font_`、`Data_` 及项目已有类别。确需新类别时选择清楚的英文前缀并记录理由，无需为常规命名反复询问。
+- 引擎回调、公共接口、第三方文件、工具约定名称（如 index.html、AGENTS.md、package.json）保留要求的拼写；Git 分支按上文命名。不做无关批量重命名。
+- 提交标题：`<AgentName> <Project>: short change summary`，例如 `Codex GravityTank: correct roulette weights`。不用 Conventional Commit 前缀或句末句号；跨项目基础设施用 `Repository`，游戏变化优先写主要项目。
 
-用户级 skill，绝对路径，任何仓库任何 cwd 都能跑：
+## 音频资产
 
-```bash
-PYTHONUTF8=1 python "C:/Users/Bentl/.claude/skills/lovart/scripts/agent_skill.py" <子命令>
-```
+- 项目离线生成的音乐、BGM、环境音、音效、对白与人声统一使用 Volcengine，禁止使用 Lovart。模型为 `seed-audio-1.0`；音乐参考 `Taierzhuang1938/Script_SeedAudioMusicBake.mjs`，对白和音效使用对应 SeedAudio baker。
+- 密钥只从 `VOLCENGINE_API_KEY` 环境变量读取，在运行时经 `X-Api-Key` 头发送到 `https://openspeech.bytedance.com/api/v3/tts/create`。密钥不得进入源码、提示词文件、输出、日志或 Git。
+- 连续对白范围整段放进同一 `text_prompt`，返回音频保留为一个 cue，不逐句生成后拼接。
+- 子项目明确保留的 WebAudio 现场合成契约继续适用；不要把资产生成规则误读为必须替换现有运行时声音系统。
 
-- `python3` 在 Windows 是 Store 别名会失败；不带 `PYTHONUTF8=1` 读带中文的
-  `~/.lovart/state.json` 会 GBK 解码炸掉，所有子命令一起挂。
-- **按张计费**，别当默认路径刷。
-- 报 `Project ... does not exist` 是服务端项目失效，`create-project` + `project-add` 重建，
-  不是鉴权问题。
+## 生成图片
 
-### 3）即梦 CLI + Seedream 5.0 Pro（前两级都失败才用）
+供应商顺序保留为 **内置 imagegen → Lovart → 即梦 Seedream**，仅适用于生成或生成式编辑位图。已有 SVG、CSS、Canvas 等代码资产按任务正常编辑。
 
-```bash
-dreamina text2image --prompt="<提示词>" --model_version=5.0Pro --resolution_type=2k --ratio=16:9 --poll=180
-```
+1. 首选当前环境直接可用的内置 `image_gen__imagegen`。仅在宿主没有直接入口时用 Codex CLI 调同一内置工具；模型与推理配置按当次可用性选择，不把某次容量故障写成永久型号限制。
+2. 前一级实际不可用、失败、超时或完成却没有有效图片，才使用下一级；说明原因和所用级别。付费入口的确认必须遵守，不能用回退绕过被拒绝的授权。
+3. 核验图片实际生成、能打开并落到目标资产路径；CLI 退出码 0 或工具文本成功不足以证明交付。遵守现有成本约束，不为无关试验批量生图。
+4. 需要 CLI 或付费回退时再读 [生成工具操作参考](docs/Data_AssetGeneration.md)。临时鉴权、容量、编码与项目失效问题按当次错误诊断。
 
-- 模型名写死 `5.0Pro`（不是 `5.0 Pro`、不是 `5.0-Pro`）；只有它同时支持 1k/2k/4k。
-- `--resolution_type` 是必填；`--width/--height` 要成对给，且与 `--ratio` 互斥。
-- 异步任务：`--poll` 等不到就 `dreamina query_result --submit_id=<id>`，
-  `dreamina list_task` 复查；余额看 `dreamina user_credit`。
-- 同样计费。
+## 项目入口
 
-## Git Worktree Workflow（强制 · 优先级最高）
+修改某项目时读取其 AGENTS.md；其中的参考文档按涉及的系统查阅，无需加载全仓。现有入口可用 `rg --files -g AGENTS.md` 查找。
 
-**本仓库的主检出 `C:\Users\Bentl\Documents\Program\bentleyblanks.github.io` 由多个 agent 并发共用**（Claude / Cursor / Codex 各自可能正在其中切分支、留未提交改动）。因此：
+| 范围 | 入口 |
+| --- | --- |
+| 滕县 FPS、界河地形 | [Taierzhuang1938/AGENTS.md](Taierzhuang1938/AGENTS.md) |
+| GravityTank | [GravityTank/AGENTS.md](GravityTank/AGENTS.md) |
+| TaihangDemo 母页与三个策略子页 | [TaihangDemo/AGENTS.md](TaihangDemo/AGENTS.md)（列出子页入口） |
+| 地道战横版 | [TunnelBell1942/AGENTS.md](TunnelBell1942/AGENTS.md) |
+| 双层六角地道战 | [TunnelFront1942/AGENTS.md](TunnelFront1942/AGENTS.md) |
+| BehindTheLines 公开文档 | [BehindTheLines/AGENTS.md](BehindTheLines/AGENTS.md) |
 
-- **任何 agent 的任何改动，一律在自己的独立 git worktree 里完成**：读代码可以在主检出，但**编辑、提交、推送、切分支一律不许在主检出进行**。
-- **每次任务必须新建 worktree 并新建分支**：用 `git worktree add -b <新分支>` 一步同时创建独立 worktree 与专属新分支，本会话所有提交都落在该新分支上。**绝不复用已有分支或已有 worktree 目录**（见「目录与分支命名」）。
-- **绝不碰主检出的分支与工作区**：不 `checkout`、不 `switch`、不 `reset`、不 `stash`、不提交别人的脏文件。主检出停在哪个分支就让它停在哪。
-- 若发现自己已误在主检出提交，用 `git reset --soft HEAD~1` 摘除该提交并还原暂存区，再改用 worktree 重做，不得将错就错。
+## 维护方式
 
-### 目录与分支命名
-
-- Worktree 目录与主仓同级，放在 `C:\Users\Bentl\Documents\Program\` 下，格式：
-  `bentleyblanks_<AgentName>_<Purpose>_<YYYYMMDD>`
-  - `<AgentName>`：Agent 短名，PascalCase（`DeepseekHarness`、`Claude`、`Codex`、`Cursor`、`Grok`）。
-  - `<Purpose>`：本次目的的简短英文 PascalCase，仅字母数字，禁止空格与连字符（如 `TaihangDemoNightOps`、`GravityTankRoulette`）。
-  - `<YYYYMMDD>`：创建当日日期。
-  - 路径已存在时不得复用；换新目的或新会话就换新目录名。
-- 分支名与目的对齐：`<agent-lowercase>/<purpose-kebab>-<YYYYMMDD>`，例如 `claude/taihang-demo-night-ops-20260725`。分支仅服务本会话，不与其他会话共用。
-
-### 创建与交付步骤（PowerShell）
-
-```powershell
-git fetch origin master
-$wt = 'C:\Users\Bentl\Documents\Program\bentleyblanks_Claude_TaihangDemoNightOps_20260725'
-if (Test-Path -LiteralPath $wt) { throw "Worktree path already exists: $wt" }
-git worktree add -b claude/taihang-demo-night-ops-20260725 $wt origin/master
-# 之后所有编辑与提交都在 $wt 内进行
-```
-
-交付（站点只从 `master` 部署）：
-
-1. 在 worktree 内提交（提交信息用「Agent 名 + 项目名」前缀，见 Commit Message Format）。
-2. `git fetch origin master`；若 `origin/master` 已前进，先 rebase 到最新再继续。
-3. `git push origin HEAD:master` 快进推送。**禁止 force push**，禁止覆盖其他会话已推送的提交。
-4. **推完 master，顺手把主检出也同步到最新**（见下条）。
-5. 推送后验证线上生效（`curl -sI https://bentleyblanks.github.io/<Page>/`），再向用户报告完成。
-6. 确认本任务没有未提交内容后，`git worktree remove <path>` 清理本会话 worktree 与任务分支。
-
-### 推完 master 要把主检出也 pull 到最新
-
-**谁最后更新了 `master`，谁负责把主检出同步过去。**
-
-```powershell
-git -C C:\Users\Bentl\Documents\Program\bentleyblanks.github.io pull --ff-only origin master
-```
-
-为什么：**本地预览默认服务的就是主检出那棵树**（`scripts/Script_LocalPreview.mjs` 服务自己所在的检出）。代码推上去了、主检出还停在旧提交，用户开预览看到的就是旧版——症状是「我明明让你加了这个功能，怎么面板上没有」，而人已经在照着一份过期的界面提问了。这一条踩过一次：TAA 开关推上 master 后主检出落后四个提交，用户在预览里翻不到那一栏。
-
-守着它的规矩（**不许为了同步去动主检出的分支状态**，与上面「绝不碰主检出」一致）：
-
-- 只在主检出**当前就在 `master`、且工作区干净**时才 pull，并且只用 `--ff-only`。
-- 主检出停在别人的分支上、或有未提交改动 → **不要 checkout、不要 stash、不要强来**，如实告诉用户主检出被占着、让他自己决定。
-- 用户自己起的预览服可能服的是另一棵树（worktree 也能挂到相邻端口）；报告时说清楚你同步的是哪一棵，页面顶部那行写的才是他正在看的那棵。
-
-### 主检出被占用时的应急路径
-
-主检出停在别的 agent 的分支上、或你的提交需要落到 `master` 而主检出无法快进时：**从 `origin/master` 新建临时 worktree → cherry-pick 你的提交 → 推送 → 删除临时 worktree**。永远不要为了推送而去改动主检出的分支状态。
-
-## Project-wide Naming Conventions
-
-These rules apply to all project-owned files, scripts, functions, and assets in this repository.
-
-- Use English-only names for scripts, source files, and assets. Player-facing text may remain localized.
-- Use PascalCase for file stems, project-owned function names, and descriptive asset-name segments.
-- Use lowerCamelCase for variables, parameters, and local bindings.
-- Do not use hyphens (`-`) in project-owned names. When a separator is necessary, use an underscore (`_`).
-- Asset filenames must expose their category with the form `<Category>_<DescriptivePascalCase>.<ext>`.
-- Use these category prefixes unless a more specific category is agreed first: `Model_`, `Texture_`, `Icon_`, `AudioBgm_`, `AudioSfx_`, `Scene_`, `Script_`, `Shader_`, `Material_`, `Animation_`, `Font_`, and `Data_`.
-- Keep the extension lowercase unless a tool requires otherwise.
-- Before introducing a new asset category, agree on its English prefix and document it here.
-- Engine-mandated callbacks, virtual methods, signal handlers, generated metadata, and third-party/vendor files may retain the exact spelling required by their owner. Do not rename those in a way that breaks engine discovery, imports, or licenses.
-- Apply these conventions to every new name and to any project-owned name being deliberately renamed. Do not perform unrelated bulk renames without validating every reference and import.
-
-## Commit Message Format
-
-Every commit subject must start with `<AgentName> <Project>: ` — the committing agent's own name, one space, the project name, a colon, and one following space — then the summary. This keeps every commit attributable to the agent that authored it.
-
-For a DeepseekHarness agent changing `Taierzhuang1938`, commit subjects must use:
-
-```text
-DeepseekHarness Taierzhuang1938: short change summary
-```
-
-Examples:
-
-```text
-DeepseekHarness Sophia: core-loop refactor - deterministic outcomes, 3 levers, option gates
-DeepseekHarness Sophia: stage-scoped milestone list + center the version tag
-Claude GravityTank: fix roulette symbol weights
-```
-
-Rules:
-
-- Start with `<AgentName> <Project>:` exactly — agent name, one space, project name, colon, one following space.
-  - `<AgentName>`: the committing agent's own name, PascalCase (`DeepseekHarness`, `Claude`, `Codex`, `Cursor`, `Grok`).
-  - `<Project>`: the project prefix being changed (`Sophia`, `GravityTank`, `Taierzhuang1938`, `TaihangDemo`, `TunnelBell1942`, …).
-- Keep the subject concise and action-oriented.
-- Do not use Conventional Commit prefixes such as `feat:` or `fix:`.
-- Do not end the subject with a period.
-- If a commit touches multiple areas, summarize the player-facing or highest-impact change first.
-
-## GravityTank / GitHub Pages
-
-- Site deploys from **`master` only** (`https://bentleyblanks.github.io/GravityTank/`). Draft PR stacks do not ship.
-- GravityTank commit subjects use `<AgentName> GravityTank: short change summary` (same style: agent name + space + `GravityTank:` + space, no Conventional Commit prefixes, no trailing period).
-- Bump `GravityTank/index.html` cache-bust (`Script_Game.mjs?v=…`) whenever game scripts/assets change for Pages.
-
-### Small requests: merge to master yourself
-
-- For small player-facing / copy / balance / bugfix asks (blurbs, RULE text, cache-bust, minor tweaks): **do not leave work sitting in an open draft PR**.
-- Agent workflow: **worktree**（见 Git Worktree Workflow，强制）→ branch → commit → push → open PR → **merge into `master` yourself** → confirm Pages is live (or at least that the merge landed) before treating the task as done.
-- Do not wait for the user to merge “小需求”. Unmerged draft stacks that block Pages have already burned trust—avoid repeating that.
-- Larger multi-feature stacks may still use PRs for review, but unique shippable work must still reach `master` (port/merge) rather than rotting on stacked draft branches.
-
-### Agent guide
-
-- Full GravityTank agent map (ship workflow, file owners, HP/lives contract, roulette names, symbol index): **`GravityTank/AGENTS.md`**
-- Prefer that guide over dumping `Script_Game.mjs`. Keep it updated when contracts change (lives, HP look, prize names, deploy rules).
-
-## TaihangDemo（玩法白盒）
-
-- `TaihangDemo/index.html` 是 BehindTheLines（私有 Godot 仓库）的**玩法白盒测试环境**：单文件、纯 2D 程序化 Canvas、零外部依赖（无 three.js / 无音频 / 无图片资源）。线上地址 `https://bentleyblanks.github.io/TaihangDemo/`。
-- 用途是**先在白盒验证核心玩法循环，再移植回 Godot 生产版**。因此优先保证规则可读、参数可调（Debug 面板已暴露全部 `CFG`），不追求美术表现。
-- 文件内有「白盒同步区」注释块，集中存放与 Godot 版对齐的玩法常量与函数（暴露度账本、终局评级、上级任务、夜袭/夜行、时代规则化）。改这些规则时保持与 Godot 版 `Script_GameModel.gd` 的函数级对应关系，方便双向移植。
-- 不要给这个页面加外部依赖或美术资产；不要与旧页面 `taihang/`（含历史 3D 实验）混用存档键，白盒固定用 `taihangdemo_*`。
-- 提交前至少做一次语法校验（抽出 `<script>` 后 `node --check`），并保持移动端可用（viewport / 触摸拖拽 / 双指缩放 / `@media 640px`）。
-
-### 子页面 `TaihangDemo/EnemyRear1941/`（敌后火种，六角建设型文明白盒）
-
-- 场景是华北敌后综合化县域，不对应单一真实县份；战役固定为 1941 年 9 月至 1942 年 12 月，共 16 回合。
-- 核心是建设型文明循环：读取六角地块产出 → 安排村庄建设队列 → 推进科技与民生双树 → 配置政策 → 组织群众和扩展基层网络 → 应对封锁与反“扫荡”。战斗服务于保存群众、争取时间和建设根据地，不以涂色或歼敌数替代发展。
-- 使用独立存档键 `enemyrear1941_campaign_v1`。平民受难、流离与不可逆损失只进入代价账本，不计分、不转化为资源或奖励。
-- 页面保持零外部运行时依赖；新增脚本、数据与资产继续遵守英文 PascalCase 文件名及项目类别前缀。改动后必须跑 `node TaihangDemo/EnemyRear1941/Script_SmokeTest.mjs`。
-
-### 子页面 `TaihangDemo/Dihou1939/`（敌后 · 1939—1945，类4X 白盒）
-
-- 文明式回合制敌后战场 4X：80 回合（1939.1—1945.8，一回合一个月），一局 40-60 分钟，`localStorage` 每月自动存档（键 `dihou1939_v1`）。前作 NightRaid 因"敌人不可见、无策略纵深"被毙，本作的底线红线是**第 1 回合就看得见敌军部队、够得着攻击目标**（冒烟测试锁死此项）。
-- 系统骨架按史实十条任务映射：组织村庄三级=根据地；缴获=军械主来源；警备度满→大扫荡（提前两月预警+红箭头，扫荡兵力从据点抽走且守备数字可见下降=敌进我进窗口）；困难期蚕食修炮楼（可捣毁）；政策三选一（减租减息/地雷战/地道战/精兵简政/武工队…）；1944 末战略反攻夺县城。
-- 与母页面完全隔离：自己的 `<script>`、自己的存档键；零外部依赖（音效 WebAudio 现场合成，缺失自动降级）。
-- **改动后必须跑 `node TaihangDemo/Dihou1939/Script_SmokeTest.mjs`**（退出码即成败）。套件用桩 DOM 派发合成 pointer/click 断言「点部队→选中 / 点亮格→坐标真变 / 点红圈敌人→攻击真的执行且敌方掉血 / 5px 手抖算点击 / 30px 拖动不误选」，并跑 乱打/会玩/莽撞 三种 bot 各 80 回合，断言分数排序 会玩>莽撞>乱打（防缩头最优解与拼消耗最优解回潮）。
-- 抢修规则是策略核心：断轨旁有我军驻守→修不通；没人守→2-4 个月修通。评级封顶闸门在 `EndGame()`（根据地村<8 封 C，<12 封 A），破交计分有收益递减上限（`ScorePts()`）。
-
-### 子页面 `TaihangDemo/ResistanceCommand1937/`（山河不屈，全国敌后大战略白盒）
-
-- 原创“地图研判 → 方针/生产 → 四令规划 → 同步结算 → 代价账本”大战略循环；8 个固定历史阶段覆盖 1937—1945，约 15 分钟一局。1945 年日本投降是不可改写的史实终点，玩家只改变人民与组织付出的代价、敌后力量保存和战略贡献。
-- 基层网络必须贯穿情报、粮药、疏散和组织恢复；高评价同时要求人民安全、网络连通、抗战韧性与交通牵制。平民受难、流离、粮食被夺和骨干损失只进入代价账本，不得转化为奖励或主要计分。
-- 页面使用独立存档键 `resistancecommand1937_campaign_v1` 与检查点键 `resistancecommand1937_checkpoint_v1`，零外部运行时依赖；地图 Canvas 只绘制态势线，全部地区与命令必须保留可键盘/触控操作的 DOM 按钮。
-- 改动后必须跑 `node TaihangDemo/ResistanceCommand1937/Script_SmokeTest.mjs`。测试锁定固定种子、计划纯函数、敌情/疏散/坚壁的真实因果、方针与生产、存档 round-trip、100 局批量模拟、终局锁定，以及“均衡组织路线 > 消极不作为、莽攻会摧毁人民安全”。
-
-## 子页面 `TunnelBell1942/`（地道战 · 钟声，Three.js 横版叙事冒险白盒）
-
-- 题材是电影《地道战》，形式参考《勇敢的心：世界大战》：正交相机的 2.5D 横版，三幕结构，象形气泡叙事，**没有攻击键**。线上地址 `https://bentleyblanks.github.io/TunnelBell1942/`。
-- 三幕：第一幕「钟声」高老忠地表潜行敲钟报信；第二幕「翻口」高传宝在地道里带乡亲转移；第三幕「转移」地表与地道来回切换，封卡口、引水反制灌烟，带六位乡亲撤出黑风口。第一幕主角不会活着离开，这是叙事支点，不许改成打赢。
-- **模块契约在 `TunnelBell1942/AGENTS.md`，改任何模块前先读它。** 文件所有权、坐标系、关卡/剧情数据格式、Rules/Render/Actor 的 API 都在那份文档里定死。
-- 分层纪律：`Data_Levels.mjs` / `Data_Story.mjs` / `Script_Rules.mjs` **不许 import three.js**（纯 Node 可跑，冒烟测试靠这一点）；`Script_Render.mjs` / `Script_Actor.mjs` **不许写 state**（只读只画）。
-- 三方依赖只有仓库内的 `TunnelBell1942/vendor/three`。美术全部程序化生成（`CanvasTexture` 现场画），音效 WebAudio 现场合成，不加载任何外部图片/音频。
-- 存档键固定 `tunnelbell1942_v1`，与 `TunnelHeart1942/`、`TunnelFront1942/` 完全隔离，不共用任何键。
-- 改动后必须跑 `node TunnelBell1942/Script_SmokeTest.mjs`（纯逻辑，含机器人三幕通关与确定性断言）。动到渲染还要跑 `node TunnelBell1942/Script_RenderHealthTest.mjs`（读 `gl.getError()`、`renderer.info` 与画面像素分布，防"看着在跑其实黑屏"）。截图用 `node TunnelBell1942/Script_Screenshot.mjs`。
-- 页面脚本或资源变更时抬 `index.html` 里的 cache-bust（`?v=…`）。
-
-## Taierzhuang1938 / 序章高度图
-
-- **改 Taierzhuang1938 任何模块前先读 `Taierzhuang1938/AGENTS.md`**：系统→文件路由表、
-  12 条硬规矩（缓存戳、BuildSink、开机红线、坐标契约等）、常用命令与 docs 导读都在那份里。
-- `L0_Jiehe` 的地面唯一入口是 `Taierzhuang1938/Script_JieheHeight.mjs`：真实 SRTM DEM
-  叠加战术土岗、排水沟和界河河槽。渲染、角色、AI、弹道与布设必须共用
-  `SampleJieheHeight(x,z)` / 注入的 `groundAt`，禁止另写高度公式或硬编码绝对 `y`。
-- 高度图与采样数据用 `node Taierzhuang1938/Script_HeightmapCli.mjs download` 同步生成；
-  `Heightmap/_raw/` 不进 Git。来源、坐标、署名和 CLI 用法见
-  `Taierzhuang1938/docs/Data_TaierzhuangHeightmap.md`。
-- 新增离线布设时用 `Script_HeightmapCli.mjs match --input=... --output=...` 批量贴地；
-  改高度图或序章地形后必须跑 `Script_HeightmapCli.mjs verify`、
-  `Script_JieheTerrainTest.mjs` 与 `Script_BootTest.mjs`。
-- 测试按爆炸半径分档，入口 `node Taierzhuang1938/Script_TestRunner.mjs`
-  （默认 quick = 纯 Node 快速基座；编辑循环用 `--changed=origin/master --profile=quick`；
-  推送前用 `--profile=prepush` 按文件风险追加浏览器门禁；集成/终验用 `--profile=full`；
-  `--tier=0/1/2` 保留旧版明确全跑语义，`--list` 查全表）。
-  PlayTest 历史红会显示为 `BASELINE`，只有新增红默认阻断；需要历史红也阻断时加
-  `--strict-baseline`。分级依据、自动映射与当前基线见
-  `Taierzhuang1938/docs/Data_TestTiers.md`；新增测试必须在 runner 的
-  `testDefs` 登记，并通过 `Script_TestRunnerTest.mjs` 的完整性扫描。
-
-## BehindTheLines Documentation
-
-- `BehindTheLines/` is the public documentation namespace for the private BehindTheLines Godot repository. Its canonical URL is `https://bentleyblanks.github.io/BehindTheLines/`.
-- Keep `BehindTheLines/index.html` as the documentation home. Add future topic pages at `BehindTheLines/<EnglishPascalCase>/index.html` and link every new topic from the home page.
-- Publish human-facing manuals as responsive HTML pages, not copied Markdown files from the private repository.
-- Documentation pages must be self-contained or use public-safe assets already tracked in this website repository. Never copy or publish BehindTheLines `assets/audio/` content or any other restricted reference assets.
-- Validate internal links and both desktop and mobile layout before publishing documentation updates.
+规则写清适用范围、要保护的结果和验收依据；操作示例、设计细节与历史事故放在按需参考文档。修改契约时更新对应入口，避免多处复制。此次整理的依据与保留项见 [审查记录](docs/Data_AgentsAudit.md)。

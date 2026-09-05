@@ -52,7 +52,7 @@
 | `Script_SmokeTest.mjs` | node 冒烟 46 项（规则/经济/AI/命名/断点红线） | 测试 |
 | `Script_ClickSmokeTest.mjs` + `Script_RenderHealthTest.mjs` + `Script_BrowserTestKit.mjs` | 浏览器实测：真实鼠标 8 项交互、GL/shader 健康 3 视口 | 测试 |
 
-**并行改动纪律**：一个 agent 只动自己那一栏的文件。跨模块的字段变更必须先改 `Script_Rules.mjs` 的状态契约，再同步各消费方。
+**并行改动纪律**：表中列的是模块职责，编辑归属以本次明确分工为准；独立任务可修改实现所需的相关模块。跨模块的字段变更必须先改 `Script_Rules.mjs` 的状态契约，再同步各消费方。
 
 ## 三、硬性约束（每一条背后都有一次真实翻车）
 
@@ -127,7 +127,9 @@
 - **评级带**：S≥68 / A≥56 / B≥45 / C≥32（按大改后真实分布重标）；八结局门槛为聚落口径
   （治下村占比/聚落群众均值/人口对县域基准比），参照打法可达 B 与正面结局链。
 
-## 六、验证电池（改动后必须全绿才许提交）
+## 六、验证电池（按本次改动影响选测）
+
+运行时变化执行冒烟；交互、UI、渲染及共享基础设施变化追加浏览器验收。纯说明文档整理检查内容、链接和 diff，不触发游戏回归；所选检查必须通过。坐标和随机等地基变更仍做全量回归。
 
 ```bash
 # 1) node 纯逻辑冒烟：66 项（含第九节玩法整改回归 + 全链路集成闸门），分钟级
@@ -136,7 +138,8 @@ node PrairieFire1937/Script_SmokeTest.mjs        # 或 npm run test:prairieFire1
 # 2) 浏览器实测：真实鼠标交互 8 项 + 渲染健康 3 视口
 #    首次准备：npm i -D playwright-core（用本机已装的 Edge/Chrome，不用下载浏览器）
 #    浏览器找不到时：设 PF_BROWSER_PATH=<chrome/msedge 可执行文件路径>
-npm run test:prairieFire1937:browser
+node PrairieFire1937/Script_ClickSmokeTest.mjs
+node PrairieFire1937/Script_RenderHealthTest.mjs
 ```
 
 - 第九节的**玩法整改闸门不得为通过而放宽**：打游击必须领先纯种田 ≥8 分、结局多样且好局

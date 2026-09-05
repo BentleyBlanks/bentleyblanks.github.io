@@ -9,13 +9,7 @@ This file is the agent map for GravityTank. Prefer it over dumping `Script_Game.
 
 ## Ship workflow
 
-1. Create an isolated worktree from current `origin/master`; never edit or switch the shared main checkout.
-2. Commit with `<AgentName> GravityTank: short change summary` (no `feat:`/`fix:`, no trailing period).
-3. Fetch/rebase current `origin/master`, then fast-forward push `HEAD:master` without force.
-4. Bump cache-bust `Script_Game.mjs?v=…` (and CSS `?v=` if style changed) in `index.html`.
-5. Confirm Pages build / live URL, then remove the clean task worktree and branch.
-
-Larger multi-feature stacks may stay on PRs for review, but unique shippable work must still reach `master` (port/merge), not rot on stacked drafts.
+Follow the [repository workflow](../AGENTS.md) for isolated worktrees, local validation and fast-forward delivery to master. Small requested fixes should reach master after validation unless the user requests review first. Update cache-bust and version fields before committing; do not create a second PR flow after a direct push. Commit subjects use `<AgentName> GravityTank: short change summary`.
 
 ---
 
