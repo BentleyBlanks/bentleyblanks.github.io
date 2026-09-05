@@ -2,6 +2,7 @@
 import path from "node:path";
 import os from "node:os";
 import fs from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
@@ -46,6 +47,16 @@ const outputDir = process.env.P012_SCREENSHOT_DIR || path.join(os.tmpdir(),
     : process.argv.includes("--campaign") ? `P012WhiteboxCampaign${runLabel ? `_${runLabel}` : ""}`
       : `P012WhiteboxReview${runLabel ? `_${runLabel}` : ""}`);
 await fs.mkdir(outputDir, { recursive: true });
+const runContext = { startedAt: new Date().toISOString(), sourceRoot: rootDir,
+  arguments: process.argv.slice(2), assertionOutcome: "notFinished" };
+try {
+  runContext.revision = execFileSync("git", ["rev-parse", "HEAD"], { cwd: rootDir, encoding: "utf8" }).trim();
+  runContext.workingTreeChanges = execFileSync("git", ["status", "--short", "--", "Taierzhuang1938"],
+    { cwd: rootDir, encoding: "utf8" }).trim();
+} catch { runContext.revision = null; }
+const runContextPath = path.join(outputDir, "Data_P012RunContext.json");
+await fs.writeFile(runContextPath, JSON.stringify(runContext, null, 2));
+console.log("P012 requested review", JSON.stringify(runContext));
 const server = await ServeRoot(rootDir, 0);
 const browser = await LaunchBrowser();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -2774,8 +2785,11 @@ try {
     await fs.writeFile(path.join(outputDir, "Data_P012PacingChecks.json"), JSON.stringify(pacingChecks, null, 2));
     for (const check of pacingChecks) Check(check.passed, check.label, check.detail);
   }
+  runContext.assertionOutcome = "passed";
   console.log(process.argv.includes("--campaign")&&!process.argv.includes("--through-road") ? "FirstLevelP012BrowserTest campaign PASS" : "FirstLevelP012BrowserTest partial PASS (not a full campaign playthrough)");
 } catch (error) {
+  runContext.assertionOutcome = "failed";
+  runContext.failure = String(error);
   const guidanceHud=await page.evaluate(()=>window.p012GuidanceHudTrace||[]).catch(()=>[]);
   await fs.writeFile(path.join(outputDir,"Data_P012GuidanceHud.json"),JSON.stringify(guidanceHud,null,2));
   const briefing=await page.evaluate(()=>({captured:window.p012ReviewBot?.briefingCaptured||[],inspection:window.p012ReviewBot?.inspectionTrace||[],incomplete:true})).catch(()=>null);
@@ -2812,6 +2826,8 @@ try {
     trace:path.join(outputDir,"Data_P012FailureTrace.json")});
   throw error;
 } finally {
+  runContext.finishedAt = new Date().toISOString();
+  await fs.writeFile(runContextPath, JSON.stringify(runContext, null, 2));
   await browser.close();
   server.close();
 }
