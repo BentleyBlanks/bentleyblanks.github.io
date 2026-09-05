@@ -28,7 +28,14 @@ CarrySystem、双臂及身体 GLB 骨骼检查 193 帧，低头、首次抬起�
 该轮还发现生产道具 ID 冲突：前沿预置和正式后送队均创建 `escortLitter0/escortCasualty0`，
 前沿预置隐藏和撤走后，正式第一副担架及伤员复用了隐藏道具。现在前沿预置使用独立
 `p012PrepWounded` 前缀，正式两副担架保持原 ID。局部夹具开始即检查两副担架和伤员实体都可见。
-此修正需要新的实际握持／扑沟检查；此前局部或整关数字不能证明当时隐藏的原担架可见。
+`GoalResumeVisibleOriginalLitter` 在 `7f0cb133` 上完成同一活人的救援、原担架搬运与实际按键扑沟：
+拾起帧 135、附着帧 136，担架移动 22.018 米，实际握持 20.867 秒后松手侧翻进入 B20，
+123 个 HUD 采样无 X／目标米数，额外军人未开火，浏览器错误为空。
+这些运行断言通过，但实际低头截图未通过视觉验收；此前隐藏原担架的整关记录也不能补足此项。
+随后 `GoalResumeGripProjection` 和 `GoalResumeGripOcclusion` 使用同版源码加本地诊断，
+记录真实握点投影、视线及一个明确标注的外部诊断机位。最大低头角度下两个握点在画幅内，
+遮住画面中央的金色衣袖和步枪来自贴住玩家的罗班长：B18 共用担架路线，B19 距玩家仅约 0.67 米。
+应先修正班长实际路线，再重新看图；不以握点误差为零替代可见双手的验收。
 合并后的 ModuleGraph、TestRunner、Carry、P012 Flow 与 Runtime 五项通过。后续原 prepush 中不占浏览器的
 10 项已通过（望远镜所有权、电报、程序布设、外部资产、城镇布景、东郊街块、西城覆盖、西郊街块、
 西站与爆炸规则），日志为本地 `P012RemainingWithoutBrowser_20260905.log`。
@@ -36,7 +43,13 @@ CarrySystem、双臂及身体 GLB 骨骼检查 193 帧，低头、首次抬起�
 真实尸体落台／下垂／落定、手雷及换关碰撞均通过。物理夹具隔离测试时钟与角色，按平台 AABB
 登记全部地形网格，并在平整净空区域取样；保留原性能、落定、下垂等阈值。
 FirstPersonEmbodiment 同次通过 44 个持枪姿态、2970 帧切换及三种低头姿态；站立和蹲姿图已查看。
-日志为本地 `P012CarryHandsLiveLock_Physics_Body_20260905.log`。另 26 项原 prepush 尚未完成。
+日志为本地 `P012CarryHandsLiveLock_Physics_Body_20260905.log`。随后原 prepush 又有 16 项通过：
+Jump、Destruction、HudPromptBrowser、TargetInfo、Post、ActorDepth、ActorBatch、PropInstancing、Profiler、
+EastSuburbNav、DressingProbe、ActorPose、CutscenePose、BackRifleRun、ExplosionRange、Collider。
+日志为本地 `P012CarryApproachAndRemaining_20260905.log`；BackRifleRun 仅覆盖已集成资产，
+不能代表另一个任务尚未交付的动画。Audio 测试被主动中断以优先检查担架画面，未计为通过。
+原 97 项选测现保留 87 项通过；仍待 Audio、Voice、Menu、BootProp、Editor、PropPcgEditor、
+DestructionEditor、TrainLibrary、Play、Boot 十项。新 P012 修改另需对应专项及新的完整输入验收。
 
 实机入口现在把实际启动版本、源目录、参数、未提交改动及断言结果写入本地 `Data_P012RunContext.json`。
 仅有 `notFinished` 的记录不能作为通过证据，也不能仅凭该文件判断进程仍然存活。

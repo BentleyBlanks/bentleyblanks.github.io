@@ -181,6 +181,10 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       airCrowdCoverSlots:Object.freeze([78.7,80.3,81.9,83.5,85.1,86.7].map(z=>({x:39,z}))),
       airRejoinRoute:Object.freeze([{x:46,z:72},{x:43,z:69},{x:44,z:66},{x:44,z:61}]),
       stretcherCarryRoute: Object.freeze([{x:47,z:74},{x:43,z:74},{x:39,z:72},{x:43,z:68},{x:44,z:64},{x:44,z:61}]),
+      // While the player and the surviving bearer carry the original litter,
+      // Luo takes the clear eastern opening to an existing squad defence slot.
+      // He must not occupy the litter's rear handle at its final ditch point.
+      stretcherGuideRoute: Object.freeze([{x:44,z:64},{x:39,z:72},{x:40.5,z:73}]),
       stretcherCarryTo:{x:44,z:61},stretcherCarryMinM:20,
       ambushProneSegments: Object.freeze([
         { minX: 56.5, maxX: 58.7, minZ: 23.8, maxZ: 24.5, afterGroup: -1 },

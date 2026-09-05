@@ -202,6 +202,12 @@ export class FirstLevelP012Director {
         safeRoute: true, approachPoints: this.config.activities.blockadeGuideRoute,
         WaitAt: index => index === this.config.activities.blockadeGuideRoute.length - 1,
         FaceAt: () => this.config.anchors.blockadePositions?.[1] } : {}),
+      ...([18, 19].includes(this.beat) ? {
+        route: activity.stretcherGuideRoute || [], safeRoute: true,
+        approachPoints: [...(activity.airRejoinRoute || []), ...(activity.stretcherCarryRoute || [])],
+        WaitAt: index => index === (activity.stretcherGuideRoute?.length || 0) - 1,
+        FaceAt: () => this.lastSample.position,
+      } : {}),
       ...(this.beat === 14 ? {
         route: this.config.activities.ambushEntryRoute?.slice(0,1) || [], startIndex: 0, safeRoute: true,
         approachPoints: this.config.routes?.south?.slice(0,this.config.routes.south.findIndex(point=>Distance(point,this.config.routes.flank[0])<.1)+1),

@@ -49,6 +49,14 @@ import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 {
  let guideSpec=null;
  const director=new FirstLevelP012Director({Guide:spec=>{guideSpec=spec;}},phase.whitebox);
+ director.lastSample={position:phase.whitebox.activities.stretcherCarryTo};
+ director.beat=18;director.StartGuide();
+ assert.deepEqual(guideSpec.route,phase.whitebox.activities.stretcherGuideRoute,
+  "B18 sends Luo to the separate ditch defence slot, not along the player's litter route");
+ assert.equal(guideSpec.safeRoute,true);
+ assert.equal(guideSpec.WaitAt(guideSpec.route.length-1),true,"Luo holds clear of the rear handle through the dive");
+ director.beat=19;director.StartGuide();
+ assert.deepEqual(guideSpec.route,phase.whitebox.activities.stretcherGuideRoute,"B19 preserves Luo's physical tactical position");
  director.beat=22;director.StartGuide();
  assert.deepEqual(guideSpec.route,phase.whitebox.activities.blockadeGuideRoute,
   "B22 gives Luo the authored forward ditch route, not the reversed litter route");

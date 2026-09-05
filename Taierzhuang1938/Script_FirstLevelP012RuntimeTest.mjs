@@ -138,6 +138,17 @@ assert.ok(openingStoryBeats.length>0);
  assert.equal(flank.actor.stance,1,'safe low cover uses crouched posture without immunity');
  assert.equal(flank.flow.facts.size,0,'guidance does not complete combat facts');
  flank.runtime.Guide({beat:15,route:[]});assert.equal(flank.actor.stance,0,'leaving flank restores the prior posture');
+ const litterGuide=Make(18,activity.airRejoinRoute.at(-1),.46);litterGuide.Step(700,false);
+ const litterPost=activity.stretcherGuideRoute.at(-1);
+ assert.ok(Math.hypot(litterGuide.actor.x-litterPost.x,litterGuide.actor.z-litterPost.z)<.6,
+  'Luo physically reaches the authored ditch defence slot on body-clear commands');
+ assert.ok(Math.hypot(litterPost.x-activity.stretcherCarryTo.x,litterPost.z-activity.stretcherCarryTo.z)>6,
+  'the tactical post stays clear of the player and the original litter rear handle');
+ const heldPost={...litterGuide.actor};litterGuide.flow.beat=19;litterGuide.flow.StartGuide();litterGuide.Step(100,false);
+ assert.ok(Math.hypot(litterGuide.actor.x-heldPost.x,litterGuide.actor.z-heldPost.z)<.05,
+  'B19 holds Luo at the reached post while the player dives');
+ litterGuide.flow.beat=20;litterGuide.flow.StartGuide();
+ assert.equal(litterGuide.Released(),1,'B20 releases guide ownership for the existing defence assignment');
  const smoke=Make(23,activity.southAssemblyRoute[0]);smoke.player.z+=25;const smokeStart={...smoke.actor};smoke.Step(20,false);
  assert.equal(smoke.actor.x,smokeStart.x);assert.equal(smoke.actor.z,smokeStart.z,'approach also waits for a lagging player');
  smoke.Step(1000);

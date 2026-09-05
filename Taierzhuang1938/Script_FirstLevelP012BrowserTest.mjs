@@ -1732,8 +1732,13 @@ async function VerifyAirRouteHandoff(choice) {
           if(attachment.attachedFrame!==undefined)attachment.maxAttachedOffset=Math.max(attachment.maxAttachedOffset||0,offset);
         }
         f.civilianWasCarried=!!civilian?.carried;
+        const guide=game.ai.soldiers.find(actor=>actor.castId==="luo");
+        const guideDistance=guide?guide.position.distanceTo(game.player.position):null;
+        if(game.carry.KindId==="stretcher"&&Number.isFinite(guideDistance))
+          f.minimumCarryGuideDistance=Math.min(f.minimumCarryGuideDistance??Infinity,guideDistance);
         if(f.rescueFrames%15===0)f.rescueTrace.push({at:f.rescueFrames/30,beat:f.flow.State().beat,position:game.player.position.toArray(),
           target,interaction:point?.id,query:query?.id,carry:game.carry.KindId,carriedS:game.carry.View()?.carriedS,
+          guide:guide?.position.toArray(),guideDistance,
           carryPhase:carryView?.phase,carryProgress:carryView?.t,
           civilian,litters:game.Debug.P012Scene().litters,carryHands:game.Debug.P012CarryView(),facts:[...f.flow.facts]});
         if(civilian?.carried&&game.carry.View()?.carriedS>2&&!f.civilianCarryCaptured){
@@ -1746,6 +1751,7 @@ async function VerifyAirRouteHandoff(choice) {
       }
       game.Debug.Key("KeyW",false);game.Debug.Key("KeyF",false);game.StepFrames(1);
       return {frames:f.rescueFrames,trace:f.rescueTrace,attachments:f.civilianAttachments,held,flow:f.flow.State(),scene:game.Debug.P012Scene(),carry:game.carry.KindId,capture,
+        minimumCarryGuideDistance:f.minimumCarryGuideDistance,
         pickups:game.interact.Point("p012_airRescue")?.count,dropped:!!f.civilianDropped};
       },{carryReview:process.argv.includes("--air-carry")||process.argv.includes("--air-dive"),dropReview:process.argv.includes("--air-drop")});
       if(rescue.capture){
@@ -1790,22 +1796,55 @@ async function VerifyAirRouteHandoff(choice) {
     if(process.argv.includes("--air-carry")||process.argv.includes("--air-dive")){
       const before=await page.evaluate(()=>({yaw:window.Tengxian.player.yaw,pitch:window.Tengxian.player.pitch}));
       const hands=[];
-      for(const [name,turn,pitch] of [["LookDown",0,-1.15],["LookLeft",.8,-.85],["LookBack",Math.PI,0]]){
-        const sample=await page.evaluate(({turn,pitch})=>{
+      for(const [name,turn,pitch] of [["LookDown",0,-1.15],["LookFullyDown",0,-1.35],["LookLeft",.8,-.85],["LookBack",Math.PI,0]]){
+        const sample=await page.evaluate(async({name,turn,pitch})=>{
           const g=window.Tengxian,view=g.Debug.P012CarryView();
           g.player.yaw=view.bodyYaw+turn;g.player.pitch=pitch;g.StepFrames(1);
-          return {hands:g.Debug.P012CarryView(),gunVisible:g.viewmodel.root.visible,bodyVisible:g.viewmodel.body?.root.visible,
+          const hands=g.Debug.P012CarryView();
+          const guide=g.ai.soldiers.find(actor=>actor.castId==="luo");
+          const gripOcclusion={};
+          if(name==="LookFullyDown"){
+            const {Raycaster}=await import("three");
+            for(const [side,at] of Object.entries(hands.worldGrip)){
+              const target=g.player.position.clone().fromArray(at),direction=target.sub(g.camera.position),distance=direction.length();
+              const ray=new Raycaster(g.camera.position,direction.normalize(),0,distance+.03);
+              gripOcclusion[side]=ray.intersectObjects(g.scene.children,true).filter(hit=>{
+                for(let node=hit.object;node;node=node.parent)if(!node.visible)return false;
+                return true;
+              }).slice(0,5).map(hit=>({distance:hit.distance,name:hit.object.name,ancestors:(()=>{
+                const names=[];for(let node=hit.object;node;node=node.parent)names.push(node.name||node.type);return names;
+              })()}));
+            }
+          }
+          return {hands,gunVisible:g.viewmodel.root.visible,bodyVisible:g.viewmodel.body?.root.visible,
+            gripOcclusion,
+            camera:{position:g.camera.position.toArray(),rotation:g.camera.rotation.toArray(),fov:g.camera.fov},
+            player:{position:g.player.position.toArray(),yaw:g.player.yaw,pitch:g.player.pitch,eyeHeight:g.player.eyeHeight},
+            guide:guide?{position:guide.position.toArray(),distance:guide.position.distanceTo(g.player.position)}:null,
+            projectedGrips:Object.fromEntries(Object.entries(hands.worldGrip).map(([side,at])=>[side,g.player.position.clone().fromArray(at).project(g.camera).toArray()])),
             carry:g.carry.KindId,litterId:g.Debug.P012Scene().litters.find(litter=>litter.originalCarried)?.id};
-        },{turn,pitch});
+        },{name,turn,pitch});
         hands.push({name,...sample});
         await page.screenshot({path:path.join(outputDir,`Scene_P012CarryHands${name}.png`)});
       }
       await page.evaluate(before=>{const g=window.Tengxian;g.player.yaw=before.yaw;g.player.pitch=before.pitch;g.StepFrames(1);},before);
+      await page.evaluate(()=>{
+        const g=window.Tengxian,p=g.player.position,camera=g.camera.clone();
+        camera.position.set(p.x+3,p.y+2.5,p.z+3);camera.lookAt(p.x,p.y+.8,p.z-1);camera.updateMatrixWorld(true);
+        g.renderer.setRenderTarget(null);g.renderer.render(g.scene,camera);
+      });
+      await page.screenshot({path:path.join(outputDir,"Scene_P012CarryHandsExternal.png")});
+      await page.evaluate(()=>window.Tengxian.StepFrames(1));
       await fs.writeFile(path.join(outputDir,"Data_P012CarryHands.json"),JSON.stringify({views:hands,travel:rescue.trace.filter(sample=>sample.carry==="stretcher")},null,2));
       Check(hands.every(sample=>sample.hands?.visible&&sample.bodyVisible&&!sample.gunVisible
         &&sample.hands.litterId===sample.litterId&&["r","l"].every(side=>sample.hands.reachable[side]
           &&sample.hands.gripError[side]<=.006&&sample.hands.handTranslation[side]<=.006)),
         "真实双手握住原担架；低头和回看均保持世界握点，身体可见且枪收起",JSON.stringify(hands));
+      Check(hands.every(sample=>sample.guide?.distance>=2),
+        "沟边搬运时班长已走到侧方，不再与玩家挤在同一停靠点",JSON.stringify(hands.map(sample=>({name:sample.name,guide:sample.guide}))));
+      const fullDown=hands.find(sample=>sample.name==="LookFullyDown");
+      Check(["r","l"].every(side=>fullDown.projectedGrips[side].every(value=>Number.isFinite(value)&&Math.abs(value)<1)),
+        "实际最大低头角度下两个原担架握点均在相机画幅内",JSON.stringify(fullDown.projectedGrips));
     }
     if(process.argv.includes("--air-dive")){
       const dive=await page.evaluate(()=>{

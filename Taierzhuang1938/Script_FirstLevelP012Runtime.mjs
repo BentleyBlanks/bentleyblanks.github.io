@@ -53,6 +53,14 @@ export class FirstLevelP012Runtime {
       this.guide = { ...this.guide, beat: 12, WaitAt: (index) => index === this.guide.route.length - 1 };
       return;
     }
+    // B19 is the dive while Luo keeps the tactical post reached during B18.
+    // Preserve the completed physical route instead of reconnecting him to its
+    // first vertex and walking him back through the stretcher corridor.
+    if (spec.beat === 19 && this.guide?.beat === 18 && spec.route === this.guide.route) {
+      this.guide = { ...this.guide, ...spec, route: this.guide.route };
+      this.beat = spec.beat;
+      return;
+    }
     const route = spec.route || [], position = this.host.Position(this.host.GuideActor());
     if (!route.length) this.host.ReleaseGuide?.(this.host.GuideActor());
     let index = 0;
