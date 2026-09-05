@@ -1640,6 +1640,61 @@ async function VerifyAirRouteHandoff(choice) {
   }
 }
 
+async function VerifyRoadCover() {
+  const setup=await page.evaluate(async()=>{
+    const game=window.Tengxian;
+    const {FirstLevelP012Director}=await import("./Script_FirstLevelP012Flow.mjs");
+    const {FirstLevelP012Runtime}=await import("./Script_FirstLevelP012Runtime.mjs");
+    let runtime;
+    const update=FirstLevelP012Runtime.prototype.Update;
+    FirstLevelP012Runtime.prototype.Update=function(...args){runtime=this;return update.apply(this,args);};
+    FirstLevelP012Director.prototype.Update=function(dt,sample){this.elapsed+=dt;this.lastSample=sample;};
+    game.StepFrames(1);FirstLevelP012Runtime.prototype.Update=update;
+    // Local movement fixture only: keep the real actors, AI and all colliders.
+    // Isolate cover deployment from opening/march/wave creation and use the
+    // recorded failure positions once; never place them again during motion.
+    const actors=["yaowa","zhaodegui"].map(id=>game.ai.soldiers.find(actor=>actor.castId===id));
+    const starts=[[88.85585591793972,16.492127169043215],[85.90991836618427,10.001580207664762]];
+    actors.forEach((actor,index)=>{
+      const [x,z]=starts[index],y=game.battlefield.GroundHeight(x,z);
+      actor.position.set(x,y,z);actor.body.Teleport(x,y,z);actor.goal.copy(actor.position);
+      runtime.host.ReleaseGuide(actor);runtime.host.ReleaseDefense(actor);
+    });
+    const guide=runtime.host.GuideActor(),gx=91.59581127273565,gz=11.626881436346338;
+    guide.position.set(gx,game.battlefield.GroundHeight(gx,gz),gz);guide.body.Teleport(...guide.position.toArray());
+    runtime.host.ReleaseGuide(guide);runtime.host.Defend(guide,{x:gx,z:gz},runtime.config.activities.frontlineDoctrine);
+    game.player.Spawn(89.20589224727036,10.527175455117147,Math.PI);
+    game.story.Signal("P012RoadContactHold");runtime.beat=13;runtime.defenders=actors;
+    runtime.Update=function(dt){this.time+=dt;this.StepRoadCover();};
+    window.p012RoadCoverFixture={runtime,actors,frames:0,trace:[]};
+    return {scope:"explicit local B13 cover fixture using recorded initial actor/player positions; no campaign or combat claim",
+      starts,actors:actors.map(actor=>({id:actor.id,radius:actor.body.radius}))};
+  });
+  let result;
+  for(let chunk=0;chunk<6;chunk++){
+    result=await page.evaluate(()=>{
+      const g=window.Tengxian,f=window.p012RoadCoverFixture;
+      for(let frame=0;frame<200;frame++){
+        g.StepFrames(1,1/30,false);f.frames++;
+        if(f.frames%10===0)f.trace.push({at:f.frames/30,actors:f.actors.map(actor=>({id:actor.id,
+          position:actor.position.toArray(),goal:actor.goal.toArray(),guided:actor.p012Guided,
+          defensive:actor.scriptDefensive,state:actor.state}))});
+        if(f.runtime.roadCoverMoves?.every(entry=>entry.arrived))break;
+      }
+      g.StepFrames(1);
+      return {arrived:f.runtime.roadCoverMoves?.every(entry=>entry.arrived),elapsed:f.frames/30,trace:f.trace,
+        actors:f.actors.map((actor,index)=>({id:actor.id,alive:actor.alive,position:actor.position.toArray(),
+          gap:Math.hypot(actor.position.x-f.runtime.config.activities.roadContactFriendlyCovers[index].x,
+            actor.position.z-f.runtime.config.activities.roadContactFriendlyCovers[index].z)}))};
+    });
+    if(result.arrived)break;
+  }
+  await fs.writeFile(path.join(outputDir,"Data_P012RoadCoverFixture.json"),JSON.stringify({setup,result},null,2));
+  await page.screenshot({path:path.join(outputDir,"Scene_P012RoadCoverFixture.png")});
+  Check(result.arrived&&result.actors.every(actor=>actor.alive&&actor.gap<.6),
+    "原两名队友以真实AI和碰撞绕过院墙并实际占住两处掩体",JSON.stringify({elapsed:result.elapsed,actors:result.actors}));
+}
+
 async function VerifyGuideHandoffs() {
   for (const beat of [14, 15, 22, 23]) {
     const setup=await page.evaluate(async beat=>{
@@ -2344,6 +2399,7 @@ try {
   }
   const airRouteFixture=process.argv.find(arg=>arg.startsWith("--air-route="))?.split("=")[1];
   if(process.argv.includes("--hub-view"))await VerifyHubGuideView();
+  if(process.argv.includes("--road-cover"))await VerifyRoadCover();
   if(airRouteFixture)await VerifyAirRouteHandoff(airRouteFixture);
   if (process.argv.includes("--guide-handoffs")) await VerifyGuideHandoffs();
   if (process.argv.includes("--geometry")) await VerifyTraversalFixtures();

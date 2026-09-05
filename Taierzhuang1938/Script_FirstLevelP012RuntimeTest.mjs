@@ -32,7 +32,9 @@ assert.ok(openingStoryBeats.length>0);
   ReleaseGuide:actor=>released.push(actor.id),Defend:(actor,point)=>{defended.push(actor.id);actor.scriptDefensive=true;},
   Move:(actor,target,speed)=>{
     assert.ok(P012SegmentClear(blocks,actor,target,.34),'road defenders use the standing AI capsule through the real courtyard opening on every command');
-    const distance=Math.hypot(target.x-actor.x,target.z-actor.z),step=Math.min(distance,speed*.05);
+    const distance=Math.hypot(target.x-actor.x,target.z-actor.z);
+    if(distance<=(actor.scriptArrivalRadius||.15))return;
+    const step=Math.min(distance,speed*.05);
     actor.x+=(target.x-actor.x)*step/(distance||1);actor.z+=(target.z-actor.z)*step/(distance||1);commands++;
   },
  },config);

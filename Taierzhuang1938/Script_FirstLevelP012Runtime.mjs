@@ -117,12 +117,17 @@ export class FirstLevelP012Runtime {
       const radius=this.GuideBodyRadius(actor);
       if(!entry.path||entry.radius!==radius){
         entry.radius=radius;
-        entry.path=P012GuideApproach(this.config.layout?.blocks||[],at,cover,
-          [...(activity.roadContactGuideRoute||[]),...activity.roadContactFriendlyApproach],radius);
+        const approach=P012GuideApproach(this.config.layout?.blocks||[],at,activity.roadContactFriendlyApproach[0],
+          activity.roadContactGuideRoute||[],radius);
+        // Retain the authored intermediate corners. A shortest graph path
+        // can graze a wall only at its exact vertex, while physical AI stops
+        // just short of that point; the next visible corner must remain usable.
+        entry.path=approach&&[...approach,...activity.roadContactFriendlyApproach.slice(1),cover];
       }
       const next=entry.path&&P012NextVisiblePoint(this.config.layout?.blocks||[],at,entry.path,0,radius);
       if(!next||next.blocked)continue;
       this.host.ReleaseDefense?.(actor);
+      this.host.FireDiscipline?.(actor,activity.frontlineDoctrine);
       actor.scriptArrivalRadius=.15;
       this.host.Move?.(actor,next.point,activity.guideSpeedMps||3.05);
     }
