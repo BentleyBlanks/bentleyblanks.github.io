@@ -95,7 +95,8 @@ try {
           && material.metalnessMap && material.normalMap.colorSpace === THREE.NoColorSpace
           && material.roughnessMap.colorSpace === THREE.NoColorSpace),
         wheels: rig.wheelCount, rods: rig.rodCount, rollingError, isolated,
-        source: active.status.textContent,
+        source: active.Entry(active.paletteId).sourceLabel,
+        status: active.status.textContent,
         glError: active.host.renderer.getContext().getError(),
         clearOfPanel: Math.max(...screenCorners) < panelLeft,
       };
@@ -109,7 +110,10 @@ try {
       `${spec.id}: metre scale, +X length and grounded preview`);
     assert.equal(report.glError, 0, `${spec.id}: WebGL renders without errors`);
     assert.ok(report.clearOfPanel, `${spec.id}: the entire model is framed clear of the library panel`);
-    assert.ok(report.source.includes("本项目 GLB"), `${spec.id}: correct attribution`);
+    // The simplified editor keeps provenance in its catalog and shows collision
+    // behaviour in the panel; do not require the retired implementation label.
+    assert.ok(report.source.includes("本项目 GLB"), `${spec.id}: catalog retains correct attribution`);
+    assert.equal(report.status, "仅视觉，无碰撞", `${spec.id}: preview collision status`);
     reports.push(report);
     await page.screenshot({ path: path.join(outputDir, `Texture_${spec.root}Library.png`) });
     console.log(`ok ${spec.label}: ${report.triangles} triangles, ${report.wheels} wheels, native PBR, isolated rig`);
