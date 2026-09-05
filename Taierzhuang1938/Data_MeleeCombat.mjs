@@ -19,6 +19,15 @@ export const MELEE_WEAPONS = Object.freeze({
     heavy: Object.freeze({ clip: "Heavy", windup: 0.35, active: 0.16, recovery: 0.92, reach: 2.65, damage: 110, poise: 64, arcDot: 0.94, cost: 30, lunge: 0.42 }),
   }),
 });
+// 多打一的围攻分工。史料：日军 3～4 人拼刺小组互相掩护侧翼后方、佯攻骗刺；
+// 平型关老兵王汝林忆几打一「一人佯攻牵制正面，其余从侧方突刺」。见 docs/Data_MeleeQte.md「多打一」。
+export const MELEE_SQUAD = Object.freeze({
+  roleRefreshS: 0.4, roleHysteresis: 0.22,
+  flankSlotsDeg: Object.freeze([-85, 85, -135, 135, -45, 45]),
+  flankRadiusInsetM: 0.30, flankStandoffM: 0.55, flankAttackDot: 0.5,
+  flankAttackCooldownS: 1.55, circleSpeedScale: 0.9,
+  feintS: 0.30, feintEvery: 3, feintRecoveryS: 0.55,
+});
 export const MELEE_QTE_RULES = Object.freeze({
   maxRate: 7, gainPerPress: 0.075, decayPerS: 0.23, windowS: 5.5,
   standingStart: 0.5, groundStart: 0.28, resolveS: 0.6,
@@ -32,10 +41,10 @@ export const MELEE_ANIMATION_ACTIONS = Object.freeze([
 ]);
 export const MELEE_SCENARIOS = Object.freeze([
   { id: "DadaoOne", name: "大刀 · 一对一", weapon: "Dadao", enemies: 1, kind: "duel", tip: "看清枪尖，右键拨开后主动向前斩击。" },
-  { id: "DadaoTwo", name: "大刀 · 一对二", weapon: "Dadao", enemies: 2, kind: "duel", tip: "保持两人在视野内；每次拨挡只带开一支武器。" },
-  { id: "DadaoThree", name: "大刀 · 一对三", weapon: "Dadao", enemies: 3, kind: "duel", tip: "敌人会绕侧和同时出招，用走位争取单独交锋的空间。" },
+  { id: "DadaoTwo", name: "大刀 · 一对二", weapon: "Dadao", enemies: 2, kind: "duel", tip: "一人在正面牵制、另一人绕到侧面；把两人拉回视野内，每次拨挡只带开一支武器。" },
+  { id: "DadaoThree", name: "大刀 · 一对三", weapon: "Dadao", enemies: 3, kind: "duel", tip: "正面一人佯攻牵制，两人绕到左右侧翼夹击；转向谁谁就变正面，用走位争取单独交锋。" },
   { id: "BayonetOne", name: "刺刀 · 对刺刀", weapon: "Bayonet", enemies: 1, kind: "duel", tip: "短刺试探，拨开后反刺；长刺有一步突进和较长收招。" },
-  { id: "BayonetTwo", name: "刺刀 · 一对二", weapon: "Bayonet", enemies: 2, kind: "duel", tip: "控制中线，注意长刺挥空后的恢复。" },
+  { id: "BayonetTwo", name: "刺刀 · 一对二", weapon: "Bayonet", enemies: 2, kind: "duel", tip: "正面佯刺骗你拨挡、侧翼趁机突刺；控制中线，注意长刺挥空后的恢复。" },
   { id: "DadaoPush", name: "大刀 · F 推架", weapon: "Dadao", enemies: 1, kind: "push", tip: "进入刀身无法展开的极近距离，F 压枪顶开；推架不造成伤害。" },
   { id: "BayonetPush", name: "刺刀 · F 推枪", weapon: "Bayonet", enemies: 1, kind: "push", tip: "贴身时枪尖够不到人，F 横推枪身制造短刺空间。" },
   { id: "DadaoBind", name: "大刀 · 站立僵持", weapon: "Dadao", enemies: 1, kind: "bind", tip: "贴近后与对手同时蓄力进攻，刀枪硬架触发僵持；连按 F 顶开。" },

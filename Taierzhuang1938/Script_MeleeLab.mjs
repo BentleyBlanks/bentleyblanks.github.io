@@ -1,5 +1,6 @@
 // 独立战斗实验面板：只配置初始条件和显示规则状态，不代替玩家执行战斗。
 import { MELEE_SCENARIOS, MELEE_ANIMATION_ACTIONS } from './Data_MeleeCombat.mjs';
+const RoleLabel = {front:'正面牵制',flank:'侧翼'};
 const StateLabel = {idle:'警戒',charge:'蓄力',windup:'起手',active:'接触有效',recovery:'收招',parry:'拨挡',push:'推架',stagger:'失衡',fall:'倒地',down:'倒地',rise:'起身',qte:'抵抗'};
 export class MeleeLab {
   constructor(host) {
@@ -44,7 +45,7 @@ export class MeleeLab {
     const f=snapshot.player, living=snapshot.targets.filter(t=>t.alive&&t.side==='ija');
     this.root.querySelector('.mlStatus').textContent=!snapshot.alive?'本轮阵亡 · 可重开':!living.length?'本轮完成 · 可重开':`${s?.name||''}　剩余 ${living.length}`;
     this.root.querySelector('.mlMeters').textContent=`${snapshot.weapon==='Dadao'?'大刀':'刺刀'} · ${StateLabel[f?.phase]||f?.phase||'准备'}${f?.parryActive?'（窗口有效）':''}\n生命 ${Math.round(snapshot.health)} · 体力 ${Math.round(f?.stamina??100)} · 平衡 ${Math.round(f?.poise??100)}`;
-    this.root.querySelector('.mlTargets').textContent=snapshot.targets.map(t=>`${t.side==='nra'?'友军':'日军'} ${t.id} · ${t.alive?`${t.distance.toFixed(2)}m · ${Math.round(t.health)}生命 · ${StateLabel[t.pose?.phase]||'警戒'}`:'已倒下'}`).join('\n');
+    this.root.querySelector('.mlTargets').textContent=snapshot.targets.map(t=>`${t.side==='nra'?'友军':'日军'} ${t.id} · ${t.alive?`${t.distance.toFixed(2)}m · ${Math.round(t.health)}生命 · ${StateLabel[t.pose?.phase]||'警戒'}${t.pose?.role?' · '+RoleLabel[t.pose.role]:''}`:'已倒下'}`).join('\n');
     this.root.querySelector('.mlLog').textContent=snapshot.events.slice(-5).reverse().map(e=>`${e.time.toFixed(1)} ${e.kind}${e.target!=null?' → '+e.target:''}`).join('\n');
   }
   Dispose(){this.root.remove();document.body.classList.remove('meleeLabActive');}

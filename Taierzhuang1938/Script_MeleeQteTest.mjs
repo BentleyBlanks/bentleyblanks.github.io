@@ -107,13 +107,24 @@ try {
     const T=Taierzhuang,L=T.Debug.MeleeCombat;
     const results=[];
     for(const id of ['DadaoOne','DadaoTwo','DadaoThree','BayonetOne','BayonetTwo','AlliedDadao','AlliedBayonet']){
-      L.Select(id);T.StepFrames(60*9,1/60,false);const s=L.State();
-      results.push({id,attacks:s.stats.attacks,hits:s.stats.hits,allies:s.targets.filter(t=>t.side==='nra').length,targets:s.targets.length,health:s.health,alive:s.alive});
+      L.Select(id);T.StepFrames(60*3,1/60,false);
+      // 多打一分工在真实 Soldier/StepBody 上成形：三秒时一人正面、其余侧翼且已离开正面弧。
+      const mid=L.State(),P=T.player;
+      const Bearing=(t)=>Math.atan2(-Math.cos(P.yaw)*(t.x-P.position.x)+Math.sin(P.yaw)*(t.z-P.position.z),-Math.sin(P.yaw)*(t.x-P.position.x)-Math.cos(P.yaw)*(t.z-P.position.z))*180/Math.PI;
+      const squad=mid.targets.filter(t=>t.side==='ija'&&t.alive).map(t=>({role:t.pose?.role||null,bearing:Math.round(Bearing(t)),distance:+t.distance.toFixed(2)}));
+      T.StepFrames(60*6,1/60,false);const s=L.State();
+      results.push({id,attacks:s.stats.attacks,hits:s.stats.hits,allies:s.targets.filter(t=>t.side==='nra').length,targets:s.targets.length,health:s.health,alive:s.alive,squad});
     }
     return results;
   });
   console.log('FIGHTS',JSON.stringify(fights));
-  for(const f of fights){assert(f.attacks>0,f.id);assert(f.hits>0,f.id);}
+  for(const f of fights){assert(f.attacks>0,f.id);assert(f.hits>0,f.id);
+    const ija=f.squad.length;
+    if(ija>=2){assert.equal(f.squad.filter(t=>t.role==='front').length,1,`${f.id}: one front pinner`);
+      const flanks=f.squad.filter(t=>t.role==='flank');assert.equal(flanks.length,ija-1,`${f.id}: the rest flank`);
+      assert(flanks.every(t=>Math.abs(t.bearing)>40),`${f.id}: flankers leave the front arc ${JSON.stringify(f.squad)}`);
+      if(flanks.length===2)assert(Math.sign(flanks[0].bearing)!==Math.sign(flanks[1].bearing),`${f.id}: flankers take both sides`);}
+    else assert(f.squad.every(t=>t.role===null),`${f.id}: no roles without a squad`);}
   const victories=await page.evaluate(()=>{
     const T=Taierzhuang,L=T.Debug.MeleeCombat,out=[];
     for(const id of ['DadaoOne','DadaoTwo','DadaoThree','BayonetOne']){

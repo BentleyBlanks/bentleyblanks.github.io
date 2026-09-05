@@ -1,5 +1,5 @@
 // 通用白刃规则：玩家、敌军、友军同一状态机。纯 Node 可跑，宿主负责物理与伤害。
-import { MELEE_RULES as R, MELEE_WEAPONS as W, MELEE_QTE_RULES as Q } from "./Data_MeleeCombat.mjs";
+import { MELEE_RULES as R, MELEE_WEAPONS as W, MELEE_QTE_RULES as Q, MELEE_SQUAD as G } from "./Data_MeleeCombat.mjs";
 import { MeleeQteDirector } from "./Script_MeleeQte.mjs";
 const Clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const Alive = (entity) => !!entity && (entity.Alive ?? entity.alive) === true;
@@ -8,6 +8,11 @@ const Wrap = (x) => Math.atan2(Math.sin(x), Math.cos(x));
 const Facing = (a, b, yaw = a.yaw || 0) => {
   const d = Distance(a, b) || 1;
   return (-Math.sin(yaw) * (b.position.x - a.position.x) - Math.cos(yaw) * (b.position.z - a.position.z)) / d;
+};
+// b 相对 a 正面的带符号方位角：0 正前、±π/2 左右侧、±π 正后。
+const BearingFrom = (a, b) => {
+  const yaw = a.yaw || 0, dx = b.position.x - a.position.x, dz = b.position.z - a.position.z;
+  return Math.atan2(-Math.cos(yaw) * dx + Math.sin(yaw) * dz, -Math.sin(yaw) * dx - Math.cos(yaw) * dz);
 };
 export class MeleeCombatDirector {
   constructor(host = {}, options = {}) {
@@ -40,7 +45,7 @@ export class MeleeCombatDirector {
     this.host.Event?.(event, a, b);
   }
   SetState(f, state, duration = 0, clip = null) {
-    f.state = state; f.t = 0; f.duration = duration; f.clip = clip; f.actionSerial++;
+    f.state = state; f.t = 0; f.duration = duration; f.clip = clip; f.actionSerial++; f.feint = false;
     if (state !== "attack") f.attack = null;
   }
   Idle(f) { return f && (f.state === "idle" || f.state === "charge"); }
@@ -65,6 +70,13 @@ export class MeleeCombatDirector {
     f.attack = { ...spec, heavy, yaw: entity.yaw || 0, connected: false, lungeDone: 0 };
     f.hit = false; this.stats.attacks++; this.Log(heavy ? "heavy" : "light", entity);
     return true;
+  }
+  /** 佯攻：只亮起手不出刀，骗对手拨挡。短于 chargeMinS，撞不出硬架僵持。 */
+  Feint(entity) {
+    const f = this.Fighter(entity);
+    if (!Alive(entity) || f.state !== "idle" || !W[f.weapon]) return false;
+    this.SetState(f, "charge", G.feintS, "Charge"); f.feint = true;
+    this.Log("feint", entity, f.target); return true;
   }
   Parry(entity = this.Player()) {
     const f = this.Fighter(entity);
@@ -223,20 +235,85 @@ export class MeleeCombatDirector {
       if (tf.state === "attack" && !tf.attack?.connected && tf.t > tf.attack.windup - 0.10
         && tf.t < tf.attack.windup && d <= tf.attack.reach && f.actionSerial % 3 === 1) { this.Parry(e); return; }
     }
+    const role = f.role && f.role.target === target ? f.role : null;
+    if (role?.kind === "flank") { this.FlankNpc(f, target, dt, role, spec); return; }
     const preferred = spec.light.reach - 0.28;
     if (d > preferred + 0.12) this.AdvanceNpc(f, target, dt, 1);
     else if (d < spec.minReach + 0.2 && this.time >= f.nextThink) {
       if (this.Push(e)) { f.nextThink = this.time + 1.25; return; }
       this.AdvanceNpc(f, target, dt, -1);
     } else if (tf.state === "charge" && d < preferred && training.kind !== "timing") this.AdvanceNpc(f, target, dt, -1);
-    // 侧位缓慢绕行，不把敌人传送到玩家背后。
-    if ((training.slot || 0) > 0 && d < 3.4 && d > 1.5) {
-      const side = training.slot % 2 ? 1 : -1;
-      this.Move(e, Math.cos(yaw) * dt * 0.35 * side, -Math.sin(yaw) * dt * 0.35 * side);
-    }
     if (this.time >= f.nextThink && d < spec.light.reach + 0.08 && Facing(e, target) > 0.9) {
+      // 正面牵制者隔几次亮一下起手骗拨挡，给侧翼制造突刺机会（佯攻骗刺）。
+      if (role?.kind === "front" && tf.state === "idle" && (f.frontActions = (f.frontActions || 0) + 1) % G.feintEvery === 0) {
+        this.Feint(e); f.nextThink = this.time + G.feintS + G.feintRecoveryS; return;
+      }
       this.Attack(e, training.kind === "timing" || (f.actionSerial % 4 === 2 && d > 1.45));
       f.nextThink = this.time + 1.5 + (training.slot || 0) * 0.19;
+    }
+  }
+  /** 侧翼：绕到目标侧后方的位置，目标没看着自己或正被牵制时才突刺；被正面盯住就退到够不着的距离。 */
+  FlankNpc(f, target, dt, role, spec) {
+    const e = f.entity, tf = this.Fighter(target), d = Distance(e, target);
+    const exposed = Facing(target, e) < G.flankAttackDot;
+    const committed = ["attack", "parry", "push", "stagger", "charge"].includes(tf.state);
+    const open = exposed || committed;
+    const radius = spec.light.reach - G.flankRadiusInsetM;
+    if (open && this.time >= f.nextThink && d < spec.light.reach + 0.08 && Facing(e, target) > 0.9) {
+      this.Attack(e, exposed && d > 1.45 && f.actionSerial % 3 === 0);
+      f.nextThink = this.time + G.flankAttackCooldownS; return;
+    }
+    if (!open && d < spec.minReach + 0.35 && this.time >= f.nextThink && this.Push(e)) { f.nextThink = this.time + 1.25; return; }
+    this.CircleNpc(f, target, dt, role.angle, open ? radius : radius + G.flankStandoffM);
+  }
+  /** 沿目标周围的圆弧绕行到 angleDeg 方位（相对目标正面），同时把半径收到 radius；不穿过目标。 */
+  CircleNpc(f, target, dt, angleDeg, radius) {
+    const e = f.entity, ty = target.yaw || 0;
+    const r = Distance(e, target) || 1, cur = BearingFrom(target, e);
+    const maxAng = R.npcSpeed * G.circleSpeedScale / Math.max(r, 0.8) * dt;
+    const next = cur + Clamp(Wrap(angleDeg * Math.PI / 180 - cur), -maxAng, maxAng);
+    const nextR = r + Clamp(radius - r, -R.npcSpeed * dt, R.npcSpeed * dt);
+    const nx = target.position.x + (-Math.sin(ty) * Math.cos(next) - Math.cos(ty) * Math.sin(next)) * nextR;
+    const nz = target.position.z + (-Math.cos(ty) * Math.cos(next) + Math.sin(ty) * Math.sin(next)) * nextR;
+    const mx = nx - e.position.x, mz = nz - e.position.z, m = Math.hypot(mx, mz);
+    if (m < 1e-4) return;
+    const cap = Math.min(m, R.npcSpeed * dt);
+    this.Move(e, mx / m * cap, mz / m * cap); f.move = 1;
+  }
+  /**
+   * 多打一分工：同一目标的两名以上 NPC 里，目标正面最对着的那个做「正面牵制」，
+   * 其余按现有方位就近领一个侧翼槽位（±85° 起，人多再往后方展开）。
+   * 目标转向谁，谁就在下一次刷新变成正面，原正面则绕去侧翼——这是围攻压力的来源。
+   */
+  Coordinate() {
+    const player = this.Player(), groups = new Map();
+    for (const f of this.fighters.values()) {
+      const e = f.entity, kind = e.meleeTraining?.kind;
+      if (e === player || !e.meleeCombat || !f.target || !Alive(e) || (kind && !["duel", "observe"].includes(kind))) { f.role = null; continue; }
+      if (!groups.has(f.target)) groups.set(f.target, []);
+      groups.get(f.target).push(f);
+    }
+    for (const [target, group] of groups) {
+      if (group.length < 2) { group[0].role = null; continue; }
+      const tf = this.Fighter(target);
+      if (this.time < (tf.roleRefreshAt || 0) && group.every((f) => f.role?.target === target)) continue;
+      tf.roleRefreshAt = this.time + G.roleRefreshS;
+      const facing = new Map(group.map((f) => [f, Facing(target, f.entity)]));
+      const best = [...group].sort((a, b) => facing.get(b) - facing.get(a))[0];
+      let front = group.find((f) => f.role?.kind === "front" && f.role.target === target) || null;
+      if (!front || facing.get(best) > facing.get(front) + G.roleHysteresis) front = best;
+      if (front.role?.kind !== "front" || front.role.target !== target) this.Log("roleFront", front.entity, target);
+      front.role = { kind: "front", target, angle: 0 };
+      // 槽位成对给（左右各一），单个侧翼也能就近选边，不必绕过整个正面。
+      const free = G.flankSlotsDeg.slice(0, Math.ceil((group.length - 1) / 2) * 2);
+      const AngleGap = (deg, bearing) => Math.abs(Wrap((deg - bearing) * Math.PI / 180));
+      for (const f of group.filter((g) => g !== front).sort((a, b) => Math.abs(BearingFrom(target, b.entity)) - Math.abs(BearingFrom(target, a.entity)))) {
+        const bearing = BearingFrom(target, f.entity) * 180 / Math.PI;
+        const slot = free.reduce((pick, deg) => AngleGap(deg, bearing) < AngleGap(pick, bearing) ? deg : pick, free[0]);
+        free.splice(free.indexOf(slot), 1);
+        if (f.role?.kind !== "flank" || f.role.target !== target) this.Log("roleFlank", f.entity, target, { angle: slot });
+        f.role = { kind: "flank", target, angle: slot };
+      }
     }
   }
   AdvanceNpc(f, target, dt, direction) {
@@ -252,6 +329,7 @@ export class MeleeCombatDirector {
     if (f.state === "idle") { f.stamina = Math.min(100, f.stamina + R.staminaRecovery * dt); }
     if (this.time - f.lastHit > 1.5 && f.state === "idle") f.poise = Math.min(100, f.poise + R.poiseRecovery * dt);
     if (f.state === "qte") return;
+    if (f.state === "charge" && f.feint && f.t >= f.duration) { this.SetState(f, "idle"); return; }
     if (f.state === "attack") {
       const a = f.attack;
       if (f.t >= a.windup && f.t <= a.windup + a.active && !a.connected) this.ResolveContact(f);
@@ -323,6 +401,7 @@ export class MeleeCombatDirector {
         if (managed) this.NpcThink(f, dt);
       }
     }
+    this.Coordinate();
     for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
       const a = all[i], b = all[j];
       if (!Alive(a) || !Alive(b) || !(a.meleeCombat || b.meleeCombat) || !this.Visible(a, b)) continue;
@@ -359,7 +438,7 @@ export class MeleeCombatDirector {
       qteResolve: a?.phase === "resolve" ? a.resolveT / Q.resolveS : 0,
       focusYaw: a && f.entity === this.Player() ? Math.atan2(f.entity.position.x - a.attacker.position.x, f.entity.position.z - a.attacker.position.z) : null,
       focusPitch: a?.kind === "ground" ? .70 : -.28,
-      move: f.move, targetId: f.target?.id ?? null,
+      move: f.move, targetId: f.target?.id ?? null, role: f.role?.kind || null,
     };
   }
   ViewPose() { return this.CanUse() ? this.Pose(this.Fighter(this.Player())) : null; }

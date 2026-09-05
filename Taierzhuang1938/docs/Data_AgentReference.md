@@ -166,7 +166,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   入口、史料与估计边界、地表覆盖层和清理契约见 `docs/Data_ExplosionRange.md`。
 
 ### 白刃战实验场（?melee=1，大刀与刺刀）
-- `Data_MeleeCombat.mjs` 定义招式、参数、动作名与独立战斗；`Script_MeleeCombat.mjs` 是玩家和敌友军共用的纯规则状态机。
+- `Data_MeleeCombat.mjs` 定义招式、参数、动作名与独立战斗；`Script_MeleeCombat.mjs` 是玩家和敌友军共用的纯规则状态机；多打一时 NPC 按 `MELEE_SQUAD` 分「正面牵制／侧翼」（史料与规则见 `docs/Data_MeleeQte.md`「多打一」）。
 - 左键轻击／蓄力重击，右键瞬时拨挡，F 贴身推架（零生命伤害）；`Script_MeleeQte.mjs` 只处理真实僵持与倒地压制的连按 F 抵抗，成功后对手仍活着。
 - `Script_MeleeLab.mjs` 与 `Debug.MeleeCombat` 只配置场景、预览动作和取证；专用章与正片共用 Soldier、Actor、伤害与死亡链。
 - 新源工程按根约定存于 OneDrive 的 `Blender/Taierzhuang1938/MeleeCombat_20260905/Scene_MeleeCombat.blend`，含敌友军和第一人称动作；`_blender/Script_Melee*` 设置 `MELEE_PROJECT_ROOT` 后烘焙到 `Data_Melee{Nra,Ija}Animations.mjs`，经 `Script_MeleeAnimation.mjs`、CharacterModel 与 Viewmodel 播放，详见 `docs/Data_MeleeQte.md`。

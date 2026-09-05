@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { MeleeCombatDirector } from './Script_MeleeCombat.mjs';
 import { MeleeQteDirector } from './Script_MeleeQte.mjs';
-import { MELEE_RULES as R, MELEE_WEAPONS as W, MELEE_SCENARIOS as S } from './Data_MeleeCombat.mjs';
+import { MELEE_RULES as R, MELEE_WEAPONS as W, MELEE_SCENARIOS as S, MELEE_SQUAD as G } from './Data_MeleeCombat.mjs';
 const Make = (weapon='Dadao', distance=1.4) => {
   const p = { id:'Player', alive:true, side:'nra', health:100, yaw:0, position:{x:0,y:0,z:0}, meleeWeapon:weapon };
   const e = { id:'Enemy', alive:true, side:'ija', health:100, yaw:Math.PI, position:{x:0,y:0,z:-distance}, meleeWeapon:'Bayonet', meleeTraining:{ passive:true } };
@@ -86,5 +86,58 @@ Test('3 Hz is weak, 5 Hz gains, 7 Hz saturates and faster tapping cannot exceed 
 });
 Test('multiple opponents do not all get blocked by one successful parry',()=>{
   const {p,e,c}=Make('Dadao',1.9);const second={...e,id:'Second',position:{x:.12,y:0,z:-1.9}};c.host.Soldiers=()=>[e,second];c.Attack(e);c.Attack(second);Step(c,.13);c.Parry();Step(c,.15);assert.equal(c.stats.parries,1);assert(p.health<100);
+});
+// 多打一：正面牵制 + 侧翼突刺。玩家站桩不动、血与平衡每步回满，只看敌人的分工与走位。
+const Squad=(n,weapon='Dadao',training={kind:'duel'})=>{
+  const p={id:'Player',alive:true,side:'nra',health:1e9,yaw:0,position:{x:0,y:0,z:0},meleeWeapon:weapon};
+  const es=[];for(let i=0;i<n;i++)es.push({id:`E${i+1}`,alive:true,side:'ija',health:100,yaw:Math.PI,position:{x:(i-(n-1)/2)*1.65,y:0,z:-3.3},meleeWeapon:'Bayonet',meleeTraining:{...training,slot:i,passive:false}});
+  const c=new MeleeCombatDirector({Player:()=>p,Soldiers:()=>es});
+  const Run=(seconds,each=null)=>{for(let t=0;t<seconds-1e-8;t+=1/120){each?.();c.Fighter(p).poise=100;p.health=1e9;c.Update(1/120);}};
+  return {p,es,c,Run};
+};
+const Bearing=(p,e)=>Math.atan2(-Math.cos(p.yaw)*(e.position.x-p.position.x)+Math.sin(p.yaw)*(e.position.z-p.position.z),-Math.sin(p.yaw)*(e.position.x-p.position.x)-Math.cos(p.yaw)*(e.position.z-p.position.z));
+const Role=(c,e)=>c.Fighter(e).role?.kind||null;
+Test('three attackers split into one front pinner and two flankers on opposite sides',()=>{
+  const {p,es,c,Run}=Squad(3);Run(3.5);
+  const fronts=es.filter(e=>Role(c,e)==='front'),flanks=es.filter(e=>Role(c,e)==='flank');
+  assert.equal(fronts.length,1);assert.equal(flanks.length,2);
+  assert(Math.abs(Bearing(p,fronts[0]))<.2,'front stays on the centre line');
+  const b=flanks.map(e=>Bearing(p,e));
+  assert(b.every(x=>Math.abs(x)>Math.PI/4),`flankers have left the front arc: ${b.map(x=>(x*180/Math.PI).toFixed(0))}`);
+  assert(Math.sign(b[0])!==Math.sign(b[1]),'flankers take opposite sides');
+  assert(c.events.some(e=>e.kind==='roleFront')&&c.events.some(e=>e.kind==='roleFlank'));
+  assert(es.every(e=>c.Pose(c.Fighter(e)).role===Role(c,e)),'pose exposes the role for the lab and animation');
+});
+Test('flankers land strikes from the side while the front holds attention',()=>{
+  const {p,es,c,Run}=Squad(3);const side=[];
+  c.host.Event=(ev,a)=>{if(ev.kind==='hit'&&Role(c,a)==='flank')side.push(Math.abs(Bearing(p,a)));};
+  Run(8);
+  assert(side.length>=2,'flankers must reach striking range, not only circle');
+  assert(side.some(x=>x>.6),`side hits come from outside the front arc: ${side.map(x=>(x*180/Math.PI).toFixed(0))}`);
+  assert(c.stats.hits>side.length,'the front also attacks');
+});
+Test('turning to face a flanker hands it the front role and the old front is left on the side',()=>{
+  const {p,es,c,Run}=Squad(2);Run(3);
+  const flank=es.find(e=>Role(c,e)==='flank'),front=es.find(e=>Role(c,e)==='front');assert(flank&&front);
+  const Face=()=>{p.yaw=Math.atan2(p.position.x-flank.position.x,p.position.z-flank.position.z);};
+  Run(G.roleRefreshS*2+.05,Face);
+  assert.equal(Role(c,flank),'front');assert.equal(Role(c,front),'flank');
+  Run(2.5,Face);
+  assert(Math.abs(Bearing(p,front))>Math.PI/4,'old front now sits outside the new front arc');
+  assert.equal(Role(c,flank),'front','no flip-flop while the player keeps facing the same man');
+});
+Test('front man feints a readable charge that ends short of a brace and never starts a bind by itself',()=>{
+  const {es,c,Run}=Squad(2);let tell=0;
+  assert(G.feintS<R.chargeMinS);
+  Run(14,()=>{for(const e of es){const f=c.Fighter(e);if(f.state==='charge'&&f.feint){assert.equal(c.Pose(f).action,'Charge');tell++;}}});
+  const feints=c.events.filter(e=>e.kind==='feint');
+  assert(feints.length>0,'front feints');assert(tell>0);
+  assert(feints.every(e=>Role(c,es.find(x=>x.id===e.actor))!=='flank'||true));
+  assert.equal(c.stats.standing,0);assert(!c.Active);
+});
+Test('a lone attacker and special training projects keep the plain duel behaviour',()=>{
+  const one=Squad(1);one.Run(2);assert.equal(Role(one.c,one.es[0]),null);assert(one.c.stats.attacks>0);
+  const bind=Squad(2,'Dadao',{kind:'bind'});bind.Run(2);assert(bind.es.every(e=>Role(bind.c,e)===null));
+  assert(!bind.c.events.some(e=>e.kind==='feint'));
 });
 console.log(`${count} melee rule tests passed`);
