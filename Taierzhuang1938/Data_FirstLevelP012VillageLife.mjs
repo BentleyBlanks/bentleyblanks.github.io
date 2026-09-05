@@ -15,6 +15,6 @@ export const P012_VILLAGE_LIFE_BLOCKS=Object.freeze([
 export const P012_VILLAGE_LIFE=Object.freeze({
  door:Point(-36.9,53.7),doorSeconds:12,
  telephoneRoute:Object.freeze([Point(-31.5,79),Point(-31.5,62),Point(-35.5,46),Point(-31.5,30),Point(-31.5,18),Point(-18,10),Point(-2,-2)]),
- muleRoute:Object.freeze([Point(-30,88),Point(-30,80),Point(-30,62),Point(-34,46),Point(-30,30),Point(-30,19),Point(-17,12),Point(0,0),Point(0,-12),Point(6,-14)]),
+ muleRoute:Object.freeze([Point(-30,88),Point(-30,80),Point(-30,62),Point(-34,46),Point(-30,30),Point(-30,19),Point(-17,12),Point(-6,10),Point(6,8),Point(6,-14)]),
  telephoneSpeed:1.15,muleSpeed:1.05,familyId:"VillageFamily2",familySlot:6,
 });

@@ -283,7 +283,9 @@ export class FirstLevelP012Director {
       OnComplete:()=>carry?.Begin("wounded",{label:"受伤百姓",payload:{who:"p012AirCivilian"}})!==false});
     Register({id:"p012_airRescueCover",kind:"carry",label:"把伤员放到蓝色硬掩体后",gesture:"hold",seconds:1,
       position:this.config.activities?.airRescueCover,once:false,
-      Enabled:()=>this.beat===17&&carry?.KindId==="wounded"&&this.airRescueTravelM>=(this.config.activities?.airRescueMinM||12),
+      Enabled:()=>this.beat===17&&carry?.KindId==="wounded"
+        &&Distance(this.lastSample.position,this.config.activities?.airRescueCover)<1.7
+        &&P012SegmentClear(this.config.layout?.blocks||[],this.lastSample.position,this.config.activities?.airRescueCover,this.lastSample.bodyRadius||.42),
       OnComplete:()=>{carry?.ForceRelease("airRescue");this.Mark("airObstacleResolved");this.Mark("airRescued");
         this.Emit("P012AirObstacleResolved");this.host.ResolveAirObstacle?.("rescue");return true;}});
     Register({id:"p012_airCartClear",kind:"plank",label:"推开翻倒小车，转入沟边",gesture:"hold",seconds:2.2,
@@ -1206,8 +1208,10 @@ export class FirstLevelP012Director {
     if (this.beat === 17) {
       if(!this.Signalled("P012AirObstacleCreated")){target=activity.airObstaclePosition;requiredAction="observe";text="扫射刚落下，确认路上伤员和翻倒小车的位置";}
       else if(this.lastSample.carryKind==="wounded"){
-        target=activity.airRescueCover;interactionId=this.airRescueTravelM>=(activity.airRescueMinM||12)?"p012_airRescueCover":null;
-        requiredAction="carry";text="把受伤百姓拖到蓝色硬掩体后";
+        target=P012NextVisiblePoint(this.config.layout?.blocks||[],this.lastSample.position,
+          activity.airRescueRoute||[activity.airRescueCover],0,this.lastSample.bodyRadius||.42).point;
+        interactionId=target===activity.airRescueCover||Distance(target,activity.airRescueCover)<.01?"p012_airRescueCover":null;
+        requiredAction="carry";text="从蓝色沟岸南端开口绕入，把受伤百姓送到墙后";
       }else if(!this.facts.has("airObstacleResolved")){
         const rescue=activity.airCivilianPosition,cart=activity.airCartPosition;
         const chooseRescue=Distance(this.lastSample.position,rescue)<=Distance(this.lastSample.position,cart);
@@ -1328,7 +1332,8 @@ export class FirstLevelP012Director {
     return { text, zone: beat.zone, target, lookAt, interactionId, requiredAction, requiredStance, progress,
       routeTarget: route[this.routeIndex] || null, arrivalRadiusM: this.beat === 13 && requiredAction === "follow"
         && target === this.lastSample.guidePosition ? 2.4
-        : frontlineApproach || (this.beat === 23 && requiredAction === "follow") ? 0.6 : this.RouteArrivalRadius() };
+        : frontlineApproach || (this.beat === 23 && requiredAction === "follow")
+          || (this.beat===17&&requiredAction==="carry") ? 0.6 : this.RouteArrivalRadius() };
   }
   Snapshot() { return Clone({ beat: this.beat, elapsed: this.elapsed, enteredAt: this.enteredAt,
     facts: [...this.facts], signals: [...this.signals], visits: this.visits, travelM: this.travelM,

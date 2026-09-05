@@ -58,6 +58,26 @@ import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 
 const points = new Map();
 {
+ const registered=new Map(),carry={KindId:"wounded"},director=new FirstLevelP012Director({Carry:()=>carry,Register:point=>registered.set(point.id,point)},phase.whitebox);
+ director.InstallInteractions();director.beat=17;director.signals.add("P012AirObstacleCreated");
+ const start={x:106.76010411933754,z:60.99952806131418};
+ director.lastSample={position:start,carryKind:"wounded",bodyRadius:.34};
+ const drop=registered.get("p012_airRescueCover");
+ assert.equal(drop.Enabled(),false,"recorded east side of the bank cannot deliver through the wall");
+ let at={...start},traveled=0;
+ for(let frame=0;frame<1500;frame++){
+   director.lastSample={position:at,carryKind:"wounded",bodyRadius:.34};
+   if(drop.Enabled())break;
+   const goal=director.CurrentObjective(),distance=Math.hypot(goal.target.x-at.x,goal.target.z-at.z);
+   assert.ok(P012SegmentClear(phase.whitebox.layout.blocks,at,goal.target,.34),"rescue objective respects actual bank clearance");
+   assert.ok(distance>0,"rescue route offers a reachable way around the bank");
+   const step=Math.min(distance,1/30);at={x:at.x+(goal.target.x-at.x)*step/distance,z:at.z+(goal.target.z-at.z)*step/distance};traveled+=step;
+ }
+ assert.ok(drop.Enabled()&&traveled>6,"walks through the bank opening to reach the real shelter");
+ assert.equal(director.airRescueTravelM,0,"physical delivery does not demand extra walking to fill an odometer");
+ console.log("PASS B17 civilian rescue reconnects around the actual ditch bank");
+}
+{
  const config=phase.whitebox,at=config.activities.roadContactBreach;
  const actors=Array.from({length:4},(_,index)=>({alive:index===0,position:{...at}}));
  const director=new FirstLevelP012Director({EnemyPosition:actor=>actor.alive?actor.position:null},config);

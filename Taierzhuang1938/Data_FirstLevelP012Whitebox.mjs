@@ -172,7 +172,10 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
         ditch:Object.freeze([{x:48,z:57},{x:49,z:60},{x:49,z:64},{x:47.5,z:68}]),
       }),
       airObstaclePosition:{x:50,z:70},airCivilianPosition:{x:48,z:69.5},airCartPosition:{x:52,z:70.5},
-      airRescueCover:{x:44,z:61},airRescueMinM:12,
+      airRescueCover:{x:44,z:61},
+      // Enter through the southern bank opening before approaching the bay.
+      // This is a body-clear path, never a minimum-distance lap requirement.
+      airRescueRoute:Object.freeze([{x:48,z:67.3},{x:44,z:67.3},{x:44,z:61}]),
       airRejoinRoute:Object.freeze([{x:46,z:72},{x:43,z:69},{x:44,z:66},{x:44,z:61}]),
       stretcherCarryRoute: Object.freeze([{x:47,z:74},{x:43,z:74},{x:39,z:72},{x:43,z:68},{x:44,z:64},{x:44,z:61}]),
       stretcherCarryTo:{x:44,z:61},stretcherCarryMinM:20,

@@ -4953,10 +4953,10 @@ const router = new InputRouter({
         // 架着机枪时 F 的语义就只剩「离位」（枪废了就是「弃枪」）。
         // **离位永远是玩家自己按的这一下** —— 脚本没有替他下枪位的口子。
         if (emplacement?.Mounted) { emplacement.Vacate("player"); return; }
-        // 手上占着东西时，F 的语义就只剩「放下」——不再去查地上有没有枪可捡。
+        // Registered delivery holds take precedence over dropping a carried load.
         if (carry?.Active) {
-          // This mission's non-droppable ammunition must reach its registered delivery gesture.
-          if (p012Flow && interact?.Query(player)?.point?.id === "p012_ammoDrop") { DoInteract(); return; }
+          const delivery = interact?.Query(player)?.point;
+          if (p012Flow && ["p012_ammoDrop", "p012_airRescueCover"].includes(delivery?.id)) { DoInteract(); return; }
           carry.Drop("player"); return;
         }
         DoInteract(); return;
@@ -6386,7 +6386,7 @@ function Frame(dt, render = true) {
     p012Flow.Update(dt, {
       ...p012Runtime.Sample(),
       binocularRaised:p012BinocularRaised,
-      position: player.position, yaw: player.yaw, stance: player.stance, sprint: player.sprint,
+      position: player.position, bodyRadius:player.radius, yaw: player.yaw, stance: player.stance, sprint: player.sprint,
       zone: zone?.id || null, enemyDeaths: ai.deaths.ija || 0,
       scoutAlarm: ai.soldiers.some((soldier) => soldier.side === "ija" && state.elapsed - soldier.lastFire < 1),
       ammoDelivered: setpieces?.mem?.ammoDelivered || 0,

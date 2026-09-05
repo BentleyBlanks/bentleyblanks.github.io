@@ -120,7 +120,7 @@ async function PlayPrelude() {
             hit:hit?{t:hit.t,block:hit.box?.id||hit.box?.tag||null}:null};
         }
         return {at:flow.elapsed,beat:flow.beat,player:game.player.position.toArray(),camera:eye.toArray(),
-          yaw:game.player.yaw,pitch:game.player.pitch,people,resting:scene.resting||null,
+          yaw:game.player.yaw,pitch:game.player.pitch,people,resting:scene.resting||null,stageZero:scene.stageZero,
           impact,projection,cameraRay,ditch:DitchEvidence(),scope:"ordinary live player camera, no camera or actor placement"};
       };
       const Key = (code, down) => {
@@ -1559,6 +1559,29 @@ async function VerifyAirRouteHandoff(choice) {
   Check(setup.members===10&&result.members===10,"局部初始十人队列在空袭交接中不重复生成");
   Check(result.airTurnEvidence.longestVisibleS>=4,"转向开火前真实自由视角连续可见至少四秒",JSON.stringify(result.airTurnEvidence));
   Check(result.airTurnEvidence.jointViews>0,"转向时真实同屏可辨认飞机、担架员和平民");
+  if(process.argv.includes("--air-rescue")){
+    const rescue=await page.evaluate(()=>{
+      const game=window.Tengxian,f=window.p012AirFixture,trace=[];
+      let frames=0,held=false;
+      for(;frames<3600;frames++){
+        const state=f.flow.State();if(state.beatIndex>=18)break;
+        const objective=state.objective,point=objective.interactionId&&game.interact.Point(objective.interactionId);
+        const target=objective.target,dx=target?target.x-game.player.position.x:0,dz=target?target.z-game.player.position.z:0,distance=Math.hypot(dx,dz);
+        game.player.yaw=Math.atan2(-dx,-dz);game.player.pitch=0;
+        const query=game.interact.Query(game.player)?.point,usable=!!point&&query?.id===point.id;
+        game.Debug.Key("KeyW",!!target&&!usable&&distance>.5);game.Debug.Key("KeyF",usable);held=usable;
+        game.StepFrames(1,1/30,false);
+        if(frames%15===0)trace.push({at:frames/30,beat:f.flow.State().beat,position:game.player.position.toArray(),
+          target,interaction:point?.id,query:query?.id,carry:game.carry.KindId,facts:[...f.flow.facts]});
+      }
+      game.Debug.Key("KeyW",false);game.Debug.Key("KeyF",false);game.StepFrames(1);
+      return {frames,trace,held,flow:f.flow.State(),scene:game.Debug.P012Scene(),carry:game.carry.KindId};
+    });
+    await fs.writeFile(path.join(outputDir,"Data_P012AirRescue.json"),JSON.stringify(rescue,null,2));
+    await page.screenshot({path:path.join(outputDir,"Scene_P012AirRescue.png")});
+    Check(rescue.flow.beat==="B18"&&rescue.flow.facts.includes("airRescued")&&rescue.carry===null,
+      "实际按键背起百姓、绕入沟岸、放到硬掩体后并回接担架",JSON.stringify({beat:rescue.flow.beat,seconds:rescue.frames/30,travel:rescue.flow.airRescueTravelM}));
+  }
 }
 
 async function VerifyGuideHandoffs() {

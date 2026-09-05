@@ -664,7 +664,16 @@ assert.match(main,/if \(\(MENU_ON \|\| FIRST_LEVEL_P012_WHITEBOX\) && menuRoot\)
 assert.match(main,/state\.playerShots \+= 1;\s*p012Runtime\?\.RecordAircraftShot/ ,"aircraft reaction occurs only after successful ammunition consumption");
 assert.doesNotMatch(main,/story\.fired\s*=\s*\[\.\.\.sample\.p012Story\.fired\]/,"P012 rewind must not shorten the live setpiece event ledger");
 assert.match(main,/story\.P012Restore\?\.\(sample\.p012Story\.immediate\)/,"P012 immediate cue ledger is restored separately");
-assert.match(main, /p012Flow && interact\?\.Query\(player\)\?\.point\?\.id === "p012_ammoDrop"/);
+{
+ const source=main.match(/case "interact":([\s\S]*?)case "bipod":/)[1],calls=[];
+ let point=null;
+ const context={detail:{down:true},player:{},p012Flow:{},interact:{Query:()=>({point}),Release:()=>calls.push('release')},
+   meleeQte:{TryBeginExecution:()=>false},emplacement:null,carry:{Active:true,Drop:()=>calls.push('drop')},DoInteract:()=>calls.push('deliver')};
+ const Input=vm.runInNewContext(`()=>{${source}}`,context);
+ for(const id of ['p012_ammoDrop','p012_airRescueCover']){point={id};calls.length=0;Input();assert.deepEqual(calls,['deliver'],'production F routing preserves a registered carried delivery hold');}
+ point={id:'p012_airCartClear'};calls.length=0;Input();assert.deepEqual(calls,['drop'],'unrelated interactions do not replace voluntary release');
+ context.detail.down=false;calls.length=0;Input();assert.deepEqual(calls,['release'],'F up still releases the real hold gesture');
+}
 {
  const signals=new Set(['P012AirObserveOpen']),once=new Set(),runs=[],props=[];
  const column={Update(){},scriptPaused:false,Bearers:[],Civilians:[],Alive:[],HeadPosition:()=>({x:110,z:53})};

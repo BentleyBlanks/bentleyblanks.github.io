@@ -376,6 +376,7 @@ Audit("AirRegroup",phase.whitebox.activities.airRegroupRoute,layout.blocks,1.02)
 for(const [name,route] of Object.entries(phase.whitebox.activities.airRouteChoices))
  Audit(`AirRouteChoice_${name}`,route,layout.blocks,1.02);
 Audit("AirObstacleRejoin",phase.whitebox.activities.airRejoinRoute,layout.blocks,1.02);
+Audit("AirCivilianRescue",[phase.whitebox.activities.airCivilianPosition,...phase.whitebox.activities.airRescueRoute],layout.blocks,1.02);
 Audit("AirStretcherCarry",phase.whitebox.activities.stretcherCarryRoute,layout.blocks,1.02);
 assert.ok(phase.whitebox.activities.stretcherCarryRoute.slice(1).reduce((sum,point,index)=>sum+Math.hypot(
  point.x-phase.whitebox.activities.stretcherCarryRoute[index].x,point.z-phase.whitebox.activities.stretcherCarryRoute[index].z),0)>=20,
