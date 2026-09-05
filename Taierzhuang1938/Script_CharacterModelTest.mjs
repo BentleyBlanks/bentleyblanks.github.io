@@ -242,7 +242,7 @@ assert.match(runtime, /LUGOU_MODEL_VARIANTS_BY_KIND/, "runtime records the four-
 assert.match(runtime, /nraOfficer:\s*OFFICER_MODEL_VARIANTS/, "NRA officer selects only the officer source model");
 assert.match(runtime, /ijaOfficer:\s*OFFICER_MODEL_VARIANTS/, "IJA officer selects only the officer source model");
 assert.match(editor, /GetLugouCharacterVariantEntries/, "editor exposes selectable source models");
-assert.match(editor, /function ImportedClipStance\(clipId\)[\s\S]*?"CrouchIdle"[\s\S]*?return 1/,
+assert.match(editor, /function ImportedClipStance\(clipId, action = null\)[\s\S]*?"CrouchIdle"[\s\S]*?return 1/,
   "imported CrouchIdle preview uses the crouched movement capsule");
 assert.match(editor, /姿态校正[\s\S]*?去除 59° 异常前倾/,
   "editor discloses the corrective playback curve in its evidence panel");

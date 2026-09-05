@@ -2048,7 +2048,7 @@ Check("人与枪的模型全部读到（一个都不许静默丢）",
   `读到 ${mesh.status.loaded}/${mesh.status.requested}${mesh.status.missing.length ? "，缺：" + mesh.status.missing.join(",") : ""}`);
 Check("场上的军人用的是卢沟桥蒙皮 GLB，不是旧程序化方块",
   /^glb:Lugou(?:Nra|Ija)0[1-5]$/.test(mesh.source || "")
-    && mesh.importedClips === 19 && mesh.boneHitboxes === 11,
+    && mesh.importedClips === (/0[1-4]$/.test(mesh.source || "") ? 24 : 19) && mesh.boneHitboxes === 11,
   `${mesh.kind} 用的是 ${mesh.source} / ${mesh.importedClips} 动作 / ${mesh.boneHitboxes} 命中体`);
 Check("模型接上了现有骨架：13 根骨头一根不少",
   mesh.joints, mesh.joints ? "hips/chest/neck + 双臂双腿齐全" : "有骨头没接上");

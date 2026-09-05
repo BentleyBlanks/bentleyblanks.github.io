@@ -21,6 +21,7 @@
 //   · 中方子弹带必须大面积瘪着、只有靠身几格鼓 —— 这是一眼读出「缺弹」的美术语言。
 
 import * as THREE from "three";
+import { INFANTRY_RELEASE_SECONDS } from "./Script_InfantryAnimation.mjs";
 import { Mulberry32, HashString, Clamp, Clamp01, SmoothStep } from "./Script_Noise.mjs";
 import { MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
@@ -1567,8 +1568,52 @@ export class Actor {
     SOCKET_FRAME_TARGET.makeBasis(SOCKET_TARGET_RIGHT, SOCKET_TARGET_UP, SOCKET_TARGET_LOCAL);
     SOCKET_AIM_Q.setFromRotationMatrix(
       SOCKET_FRAME_TARGET.multiply(SOCKET_FRAME_SOURCE.invert()));
+    this.weaponGroup.position.set(0, 0, 0);
     this.weaponGroup.quaternion.copy(SOCKET_AIM_Q);
     this.weaponGroup.updateMatrix();
+  }
+
+  /** Queue the existing combat projectile at the recovered hand-release frame. */
+  BeginGrenadeThrow(onRelease) {
+    if (!this.characterRig?.CanPlayInfantry() || this.pendingGrenadeThrow || this.ragdollState
+        || this.characterRig.forcedClip || this.characterRig.infantry.IsThrowing()) return false;
+    this.pendingGrenadeThrow = { onRelease, serial: this.characterRig.infantry.releaseSerial };
+    return true;
+  }
+
+  _ApplyInfantryProp(group, helper, weight = 1) {
+    if (!group || !helper || !group.parent) return;
+    helper.updateWorldMatrix(true, false);
+    group.parent.updateWorldMatrix(true, false);
+    SOCKET_MOUNT_INVERSE.copy(group.parent.matrixWorld).invert().multiply(helper.matrixWorld);
+    SOCKET_MOUNT_INVERSE.decompose(SOCKET_TARGET_LOCAL, SOCKET_AIM_Q, SOCKET_TARGET_UP);
+    group.position.lerp(SOCKET_TARGET_LOCAL, weight);
+    group.quaternion.slerp(SOCKET_AIM_Q, weight);
+    // Weapons keep their real dimensions across character height variations.
+    group.scale.setScalar(this._SocketScaleCompensation(group.parent));
+    group.updateMatrix();
+  }
+
+  _UpdateInfantryProps() {
+    const rig = this.characterRig;
+    if (!rig) return;
+    if (rig.infantryPropWeight > 0 && this.weaponGroup) {
+      this._ApplyInfantryProp(this.weaponGroup, rig.infantryProps.rifle, rig.infantryPropWeight);
+    }
+    const throwing = rig.currentId === "GrenadeThrow";
+    if (throwing) {
+      this.EnsureGrenade();
+      if (this.grenadeGroup && this.grenadeGroup.parent !== rig.root) rig.root.add(this.grenadeGroup);
+      this._ApplyInfantryProp(this.grenadeGroup, rig.infantryProps.grenade);
+    }
+    if (this.grenadeGroup) {
+      this.grenadeGroup.visible = throwing && rig.currentAction.time < INFANTRY_RELEASE_SECONDS;
+    }
+    if (this.pendingGrenadeThrow && rig.infantry.releaseSerial > this.pendingGrenadeThrow.serial) {
+      const request = this.pendingGrenadeThrow; this.pendingGrenadeThrow = null;
+      const from = rig.infantryProps.grenade.getWorldPosition(new THREE.Vector3());
+      request.onRelease?.(from);
+    }
   }
 
   PlayImportedAnimation(actionId) {
@@ -1737,6 +1782,8 @@ export class Actor {
    */
   Ragdoll(dirVec3) {
     if (this.ragdollState) return this;
+    this.pendingGrenadeThrow = null;
+    if (this.grenadeGroup) this.grenadeGroup.visible = false;
     const local = POSE_A.set(0, 0, -1);
     if (dirVec3 && dirVec3.lengthSq() > 1e-8) {
       local.copy(dirVec3);
@@ -1809,6 +1856,7 @@ export class Actor {
     if (this.characterRig) {
       this.characterRig.Update(dt, s);
       this._UpdateRiggedWeaponMount();
+      this._UpdateInfantryProps();
       // 抬担架/跛行时两只手都不在枪上：枪藏起来（视作背在身后），
       // 否则握姿常量会把整支步枪钉在担架杆的位置上。旗一清就还原。
       if (this.weaponGroup) {
@@ -2230,12 +2278,13 @@ export class Actor {
     // 手里的手榴弹：抡过 0.66 就脱手。**要一个门闩**，不能只比大小 ——
     // throwing 是个 0→1→0 的脉冲，光比数值的话，回收段再次路过 0.66 以下，
     // 弹会凭空回到手里再飞一次。门闩到脉冲归零才复位。
-    if (throwing > 0.001) this.EnsureGrenade();
-    if (throwing < 0.02) this.grenadeThrown = false;
-    else if (throwing >= 0.70) this.grenadeThrown = true;
-    if (this.grenadeGroup) {
-      this.grenadeGroup.visible = throwing > 0.02 && !this.grenadeThrown;
+    if (!this.characterRig) {
+      if (throwing > 0.001) this.EnsureGrenade();
+      if (throwing < 0.02) this.grenadeThrown = false;
+      else if (throwing >= 0.70) this.grenadeThrown = true;
+      if (this.grenadeGroup) this.grenadeGroup.visible = throwing > 0.02 && !this.grenadeThrown;
     }
+
 
 
     // --- 覆盖姿势：中弹踉跄 / 濒死下沉 --------------------------------------

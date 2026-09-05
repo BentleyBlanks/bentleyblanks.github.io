@@ -1405,6 +1405,16 @@ export class AiDirector {
     // animation and crowd LOD inside the normal AI scheduling contract, but do
     // not let gravity, navigation or idle collision steps move the measured rig.
     if (s.weaponRangeTargetId) { this.StepWeaponRange(s, dt); return; }
+    if (s.actor?.pendingGrenadeThrow || s.actor?.characterRig?.infantry.IsThrowing()) {
+      if (s.meleeCombat) { s.actor.pendingGrenadeThrow = null; this.StepMeleeCombat(s, dt); return; }
+      s.stance = 0; s.crouchBlend = 0; s.proneBlend = 0; s.moveSpeed = 0;
+      this.StepBody(s, 0, 0, dt);
+      s.actor.root.position.copy(s.position); s.actor.root.rotation.y = s.yaw;
+      s.actor.Update(dt, { throwing: s.actor.pendingGrenadeThrow ? 1 : 0,
+        grounded: s.grounded, elapsed: this.time, moveSpeed: 0 });
+      return;
+    }
+    const animationStartX = s.position.x, animationStartZ = s.position.z;
     let desired = null;
     let speed = 0;
     let wantedYaw = s.yaw;
@@ -1646,6 +1656,7 @@ export class AiDirector {
       const cadence = ActorAnimationCadence(s);
       if (s.actor.root.visible && (this.tickIndex + s.id) % cadence === 0) s.actor.Update(dt * cadence, {
         moveSpeed: s.moveSpeed,
+        moveSpeedMps: Math.hypot(s.position.x - animationStartX, s.position.z - animationStartZ) / Math.max(dt, .0001),
         bayonetFixed: s.bayonetFixed,
         aim: s.aimBlend,
         crouch: s.crouchBlend,

@@ -73,6 +73,7 @@ const CLIPS = [
   { id: "strafe", name: "横移", make: (t) => ({ moveSpeed: 0.42, strafe: Math.sin(t * 1.1) }) },
   { id: "crouch", name: "蹲姿", make: () => ({ crouch: 1 }) },
   { id: "crouchWalk", name: "猫腰前进", make: () => ({ crouch: 1, moveSpeed: 0.26 }) },
+  { id: "kneelSequence", name: "跪下 → 警戒 → 起身", make: (t) => ({ kneel: t % 8 < 4.5 ? 1 : 0 }) },
   { id: "prone", name: "卧倒", make: () => ({ prone: 1 }) },
   { id: "crawl", name: "匍匐前进", make: () => ({ prone: 1, moveSpeed: 0.12 }) },
   { id: "aim", name: "据枪（贴腮）", make: () => ({ aim: 1 }) },
@@ -84,7 +85,7 @@ const CLIPS = [
     },
   },
   { id: "aimProne", name: "卧姿据枪", make: () => ({ prone: 1, aim: 0.9 }) },
-  { id: "throw", name: "投弹", make: (t) => ({ throwing: Pulse(t, 2.6, 0.55, 0.12) }) },
+  { id: "throw", name: "投弹", make: (t) => ({ throwing: Pulse(t, 6.0, 0.55, 0.12) }) },
   { id: "melee", name: "白刃突刺 / 劈砍", make: (t) => ({ melee: Pulse(t, 1.8, 0.22, 0.06) }) },
   { id: "hurt", name: "中弹踉跄", make: (t) => ({ hurt: Pulse(t, 2.2, 0.08, 0.16), moveSpeed: 0.1 }) },
   { id: "dying", name: "濒死下沉", make: (t) => ({ dying: Math.min(1, (t % 4) / 2.2) }) },
@@ -354,11 +355,15 @@ function StanceOf(state) {
 }
 
 /** 导入 clip 没有程序化 crouch/prone 量，姿态档必须按动作语义补上。 */
-function ImportedClipStance(clipId) {
+function ImportedClipStance(clipId, action = null) {
   if (clipId === "StandFireCrouch") return 2;
+  const progress = action ? action.time / action.getClip().duration : 0;
+  if (clipId === "StandToKneel") return progress > .45 ? 1 : 0;
+  if (clipId === "KneelToStand") return progress < .55 ? 1 : 0;
   if ([
     "RifleIdle", "RifleIdleAlt", "CrouchFire", "CrouchFireAlt", "CrouchIdle",
     "MachineGunFire", "EmplacementIdle", "AdvanceKneelFire",
+    "RifleCrouchAdvance", "KneelHold",
   ].includes(clipId)) return 1;
   return 0;
 }
@@ -366,7 +371,7 @@ function ImportedClipStance(clipId) {
 export class ActorEditor {
   static id = "actor";
   static label = "人物动作";
-  static hint = "预览十套模型、16 条骨骼动作与程序化驱动量";
+  static hint = "预览十套原模型、骨骼动作与连续姿态切换";
 
   constructor(host) {
     this.host = host;
@@ -746,7 +751,7 @@ export class ActorEditor {
       if (gizmo) {
         gizmo.root.position.copy(actor.root.position);
         gizmo.SetStance(this.animationMode === "imported" && !this.manual
-          ? ImportedClipStance(this.clipId)
+          ? ImportedClipStance(this.clipId, actor.characterRig?.currentAction)
           : StanceOf(state));
         gizmo.UpdateFromActor(actor);
         if (i === 0) this.stance = gizmo.stance;

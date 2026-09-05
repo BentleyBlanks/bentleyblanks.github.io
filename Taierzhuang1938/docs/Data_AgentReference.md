@@ -134,6 +134,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   改流水线前先读它。首批三条 clip：CarryStretcherFront/Rear、WoundedLimp。
 
 - 独立背枪跑步审查包：`Animation/BackRifleRun/`（不接入生产动作）；契约见该目录 `Data_BackRifleRun.md`，烘焙入口 `_import/Script_BackRifleRunBake.py`，验收 `Script_BackRifleRunTest`（animation 域）。
+- 五种视频步兵动作已接入两军 01–04 模型；运行时、重建与验收见 [步兵动作说明](Data_InfantryAnimations.md)。
 
 ### 人物 / AI / 合批
 - `Script_Actor.mjs` —— 程序化人物（不用 SkinnedMesh：预通道 overrideMaterial 不带 skinning，

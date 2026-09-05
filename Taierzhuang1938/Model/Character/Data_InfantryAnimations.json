@@ -1,0 +1,534 @@
+{
+  "version": 1,
+  "source": "Seedance 2.5 → GVHMR → contact-corrected original rigs",
+  "models": [
+    {
+      "id": "LugouNra01",
+      "file": "Animation_LugouNra01Infantry.glb",
+      "clips": [
+        {
+          "id": "RifleCrouchAdvance",
+          "duration": 3.5,
+          "loop": true,
+          "referenceSpeedMps": 0.2554529916490837,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.00002287309999654541,
+          "uncorrectedFloorRange": [
+            0.0029994166212956937,
+            0.0030006812003305185
+          ]
+        },
+        {
+          "id": "StandToKneel",
+          "duration": 1.7333333333333334,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.00002118490703356679,
+          "uncorrectedFloorRange": [
+            -0.05313376019407988,
+            0.0029998786285901644
+          ]
+        },
+        {
+          "id": "KneelHold",
+          "duration": 0.8666666666666667,
+          "loop": true,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000020166055514192482,
+          "uncorrectedFloorRange": [
+            -0.05028010324002869,
+            -0.04870236680043547
+          ]
+        },
+        {
+          "id": "KneelToStand",
+          "duration": 1.5666666666666667,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000020879063948320287,
+          "uncorrectedFloorRange": [
+            -0.050430635453578405,
+            0.0029997967386122
+          ]
+        },
+        {
+          "id": "GrenadeThrow",
+          "duration": 4.233333333333333,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": 2.15,
+          "maxSegmentErrorMeters": 0.000012829451953078053,
+          "uncorrectedFloorRange": [
+            0.0027905860238182896,
+            0.00383124409917391
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LugouNra02",
+      "file": "Animation_LugouNra02Infantry.glb",
+      "clips": [
+        {
+          "id": "RifleCrouchAdvance",
+          "duration": 3.5,
+          "loop": true,
+          "referenceSpeedMps": 0.2554529916490837,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000022926596019712253,
+          "uncorrectedFloorRange": [
+            -0.0060917365530563615,
+            -0.005972609601516698
+          ]
+        },
+        {
+          "id": "StandToKneel",
+          "duration": 1.7333333333333334,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.00002124621163451801,
+          "uncorrectedFloorRange": [
+            -0.057941615435186,
+            -0.006056975332726612
+          ]
+        },
+        {
+          "id": "KneelHold",
+          "duration": 0.8666666666666667,
+          "loop": true,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.00002020372347968924,
+          "uncorrectedFloorRange": [
+            -0.05528171723829189,
+            -0.05380953525591508
+          ]
+        },
+        {
+          "id": "KneelToStand",
+          "duration": 1.5666666666666667,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000020940627704468806,
+          "uncorrectedFloorRange": [
+            -0.05539762034342306,
+            -0.006057057749554122
+          ]
+        },
+        {
+          "id": "GrenadeThrow",
+          "duration": 4.233333333333333,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": 2.15,
+          "maxSegmentErrorMeters": 0.000012813034882486196,
+          "uncorrectedFloorRange": [
+            -0.0062158026636431165,
+            -0.005287344519976539
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LugouNra03",
+      "file": "Animation_LugouNra03Infantry.glb",
+      "clips": [
+        {
+          "id": "RifleCrouchAdvance",
+          "duration": 3.5,
+          "loop": true,
+          "referenceSpeedMps": 0.2554529916490837,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.00002291792275538329,
+          "uncorrectedFloorRange": [
+            -0.006093386763946596,
+            -0.00599408290721709
+          ]
+        },
+        {
+          "id": "StandToKneel",
+          "duration": 1.7333333333333334,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.00002123369870193903,
+          "uncorrectedFloorRange": [
+            -0.0599046882018598,
+            -0.00605676782878491
+          ]
+        },
+        {
+          "id": "KneelHold",
+          "duration": 0.8666666666666667,
+          "loop": true,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000020219402903531858,
+          "uncorrectedFloorRange": [
+            -0.05698069291633622,
+            -0.05541409881265953
+          ]
+        },
+        {
+          "id": "KneelToStand",
+          "duration": 1.5666666666666667,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000020927839198714437,
+          "uncorrectedFloorRange": [
+            -0.05710405494511038,
+            -0.006056850626435315
+          ]
+        },
+        {
+          "id": "GrenadeThrow",
+          "duration": 4.233333333333333,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": 2.15,
+          "maxSegmentErrorMeters": 0.000012818614389370486,
+          "uncorrectedFloorRange": [
+            -0.006239355775686079,
+            -0.005209319173478694
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LugouNra04",
+      "file": "Animation_LugouNra04Infantry.glb",
+      "clips": [
+        {
+          "id": "RifleCrouchAdvance",
+          "duration": 3.5,
+          "loop": true,
+          "referenceSpeedMps": 0.2554529916490837,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000022738243977860062,
+          "uncorrectedFloorRange": [
+            0.0029994842711266434,
+            0.00300074740161886
+          ]
+        },
+        {
+          "id": "StandToKneel",
+          "duration": 1.7333333333333334,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.00002104384362955347,
+          "uncorrectedFloorRange": [
+            -0.05313379821104705,
+            0.002999946297097299
+          ]
+        },
+        {
+          "id": "KneelHold",
+          "duration": 0.8666666666666667,
+          "loop": true,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000020080035780051242,
+          "uncorrectedFloorRange": [
+            -0.050280140836385934,
+            -0.04870240427502383
+          ]
+        },
+        {
+          "id": "KneelToStand",
+          "duration": 1.5666666666666667,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.00002073845860656176,
+          "uncorrectedFloorRange": [
+            -0.050430673083381776,
+            0.002999864407126756
+          ]
+        },
+        {
+          "id": "GrenadeThrow",
+          "duration": 4.233333333333333,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": 2.15,
+          "maxSegmentErrorMeters": 0.00001283121746248339,
+          "uncorrectedFloorRange": [
+            0.002790653682476333,
+            0.003831310365262123
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LugouIja01",
+      "file": "Animation_LugouIja01Infantry.glb",
+      "clips": [
+        {
+          "id": "RifleCrouchAdvance",
+          "duration": 3.5,
+          "loop": true,
+          "referenceSpeedMps": 0.23864468053263868,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000014110485699159181,
+          "uncorrectedFloorRange": [
+            0.002999900311175795,
+            0.003000595793725982
+          ]
+        },
+        {
+          "id": "StandToKneel",
+          "duration": 1.7333333333333334,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000013201124939715703,
+          "uncorrectedFloorRange": [
+            -0.004490815118900682,
+            0.0030004647181285106
+          ]
+        },
+        {
+          "id": "KneelHold",
+          "duration": 0.8666666666666667,
+          "loop": true,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000013131309416908321,
+          "uncorrectedFloorRange": [
+            -0.004884528550858279,
+            -0.004442348300809328
+          ]
+        },
+        {
+          "id": "KneelToStand",
+          "duration": 1.5666666666666667,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000013131362170432093,
+          "uncorrectedFloorRange": [
+            -0.004490815119199113,
+            0.0030005369524337498
+          ]
+        },
+        {
+          "id": "GrenadeThrow",
+          "duration": 4.233333333333333,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": 2.15,
+          "maxSegmentErrorMeters": 0.000011833754057999357,
+          "uncorrectedFloorRange": [
+            0.002792409806704462,
+            0.0032473356020529583
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LugouIja02",
+      "file": "Animation_LugouIja02Infantry.glb",
+      "clips": [
+        {
+          "id": "RifleCrouchAdvance",
+          "duration": 3.5,
+          "loop": true,
+          "referenceSpeedMps": 0.23864468053263868,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000014046298048686623,
+          "uncorrectedFloorRange": [
+            -0.00046198434019935114,
+            0.004803843412623286
+          ]
+        },
+        {
+          "id": "StandToKneel",
+          "duration": 1.7333333333333334,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000013184879628785895,
+          "uncorrectedFloorRange": [
+            -0.004040039305580736,
+            0.0037569983571654406
+          ]
+        },
+        {
+          "id": "KneelHold",
+          "duration": 0.8666666666666667,
+          "loop": true,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000013114893734261779,
+          "uncorrectedFloorRange": [
+            -0.00452848819407112,
+            -0.004014707471424957
+          ]
+        },
+        {
+          "id": "KneelToStand",
+          "duration": 1.5666666666666667,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000013114943862663209,
+          "uncorrectedFloorRange": [
+            -0.004040039306003159,
+            0.0035060164354628427
+          ]
+        },
+        {
+          "id": "GrenadeThrow",
+          "duration": 4.233333333333333,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": 2.15,
+          "maxSegmentErrorMeters": 0.00001183928372158749,
+          "uncorrectedFloorRange": [
+            0.0027027997683407253,
+            0.008168030920342607
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LugouIja03",
+      "file": "Animation_LugouIja03Infantry.glb",
+      "clips": [
+        {
+          "id": "RifleCrouchAdvance",
+          "duration": 3.5,
+          "loop": true,
+          "referenceSpeedMps": 0.23864468053263868,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000014140933552564405,
+          "uncorrectedFloorRange": [
+            -0.0004626906013460168,
+            0.0047921732106079844
+          ]
+        },
+        {
+          "id": "StandToKneel",
+          "duration": 1.7333333333333334,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000013230895667321052,
+          "uncorrectedFloorRange": [
+            -0.004040687290352712,
+            0.0037730103103208153
+          ]
+        },
+        {
+          "id": "KneelHold",
+          "duration": 0.8666666666666667,
+          "loop": true,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000013161017496654548,
+          "uncorrectedFloorRange": [
+            -0.004533885690254502,
+            -0.00401538807046091
+          ]
+        },
+        {
+          "id": "KneelToStand",
+          "duration": 1.5666666666666667,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000013161067880435029,
+          "uncorrectedFloorRange": [
+            -0.004040687290779868,
+            0.003520964635435412
+          ]
+        },
+        {
+          "id": "GrenadeThrow",
+          "duration": 4.233333333333333,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": 2.15,
+          "maxSegmentErrorMeters": 0.000011838426236865374,
+          "uncorrectedFloorRange": [
+            0.0027083857391939766,
+            0.008143412204768724
+          ]
+        }
+      ]
+    },
+    {
+      "id": "LugouIja04",
+      "file": "Animation_LugouIja04Infantry.glb",
+      "clips": [
+        {
+          "id": "RifleCrouchAdvance",
+          "duration": 3.5,
+          "loop": true,
+          "referenceSpeedMps": 0.23864468053263868,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000014074193060098494,
+          "uncorrectedFloorRange": [
+            -0.00046215933644202134,
+            0.004803597020362206
+          ]
+        },
+        {
+          "id": "StandToKneel",
+          "duration": 1.7333333333333334,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000013176179952084643,
+          "uncorrectedFloorRange": [
+            -0.00404004254663786,
+            0.0037572132267064177
+          ]
+        },
+        {
+          "id": "KneelHold",
+          "duration": 0.8666666666666667,
+          "loop": true,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000013106345912783368,
+          "uncorrectedFloorRange": [
+            -0.004528546452400589,
+            -0.004014711046556757
+          ]
+        },
+        {
+          "id": "KneelToStand",
+          "duration": 1.5666666666666667,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000013106396912682117,
+          "uncorrectedFloorRange": [
+            -0.004040042547060423,
+            0.003506219033490638
+          ]
+        },
+        {
+          "id": "GrenadeThrow",
+          "duration": 4.233333333333333,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": 2.15,
+          "maxSegmentErrorMeters": 0.000011837208115206277,
+          "uncorrectedFloorRange": [
+            0.002702894176730527,
+            0.008167626530403678
+          ]
+        }
+      ]
+    }
+  ]
+}

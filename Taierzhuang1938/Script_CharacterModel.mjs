@@ -4,6 +4,7 @@
 // 这里实例化。每名士兵稳定抽取本阵营五个模型之一；第一人称过场主角固定 Nra01。
 
 import * as THREE from "three";
+import { InfantryAnimationController, INFANTRY_ANIMATION_IDS, INFANTRY_ANIMATION_LABELS, INFANTRY_ONCE_IDS } from "./Script_InfantryAnimation.mjs";
 import { MeleeAnimationPlayer } from "./Script_MeleeAnimation.mjs";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
@@ -42,6 +43,7 @@ export const LUGOU_ANIMATION_LABELS = Object.freeze({
   CarryStretcherFront: "抬担架行走·前位（视频转骨骼）",
   CarryStretcherRear: "抬担架行走·后位（视频转骨骼）",
   WoundedLimp: "伤员跛行（视频转骨骼）",
+  ...INFANTRY_ANIMATION_LABELS,
 });
 
 // 源 `CrouchIdle` 是一条 5.37 s 的静态坏定格：骨盆到头的轴前倾约 59.4°，
@@ -75,7 +77,9 @@ const SOLDIER_ACTION_IDS = Object.freeze([
   "EmplacementIdle", "ProneFire", "StandFireCrouch", "StandFireCrouchAlt",
   "AdvanceKneelFire", "AdvanceFire",
   "CarryStretcherFront", "CarryStretcherRear", "WoundedLimp",
+  ...INFANTRY_ANIMATION_IDS,
 ]);
+const IMPORTED_ANIMATION_IDS = [...LUGOU_ANIMATION_IDS, ...INFANTRY_ANIMATION_IDS];
 const OFFICER_ACTION_IDS = Object.freeze([
   "LeanWallSitPeek", "RifleIdle", "RifleIdleAlt", "CrouchIdle",
   "AttackCommand", "PistolFire",
@@ -288,7 +292,13 @@ function VersionedUrl(url) {
 async function LoadAsset(record) {
   try {
     const gltf = await LOADER.loadAsync(VersionedUrl(record.url));
-    return { record, gltf, error: null };
+    let infantry = null;
+    if (!record.id.endsWith("05")) {
+      try {
+        infantry = await LOADER.loadAsync(`./Model/Character/Animation_${record.id}Infantry.glb?v=202609060201`);
+      } catch (error) { console.warn("[InfantryAnimation] optional library unavailable", record.id, String(error)); }
+    }
+    return { record, gltf, infantry, error: null };
   } catch (error) {
     console.warn(`[CharacterModel] ${record.id} 读取失败：${String(error).slice(0, 180)}`);
     return { record, gltf: null, error: String(error) };
@@ -428,22 +438,46 @@ export class LugouCharacterRig {
     // 一个 Y 位移，绕 Y 转不影响它。见上面 MODEL_FORWARD_YAW 的头注。
     this.root.rotation.y = MODEL_FORWARD_YAW;
 
+    this.infantryProps = {};
+    for (const role of ["Rifle", "Grenade"]) {
+      const source = asset.infantry?.scene.getObjectByName(`Infantry${role}`);
+      if (source) {
+        const helper = source.clone(false);
+        this.root.add(helper); this.infantryProps[role.toLowerCase()] = helper;
+      }
+    }
+    this.infantry = new InfantryAnimationController(this);
     this.clipById = new Map();
-    for (const clip of asset.gltf.animations || []) {
+    for (const clip of [...(asset.gltf.animations || []), ...(asset.infantry?.animations || [])]) {
       const normalized = NormalizeName(clip.name);
       // Exact names first: `CrouchFireAlt` contains `CrouchFire`, so a first-substring
       // match silently collapsed every Alt clip onto its shorter sibling.
-      const id = LUGOU_ANIMATION_IDS.find((candidate) => normalized === NormalizeName(candidate))
-        || [...LUGOU_ANIMATION_IDS]
+      const id = IMPORTED_ANIMATION_IDS.find((candidate) => normalized === NormalizeName(candidate))
+        || [...IMPORTED_ANIMATION_IDS]
           .sort((a, b) => b.length - a.length)
           .find((candidate) => normalized.includes(NormalizeName(candidate)));
       if (id && !this.clipById.has(id)) this.clipById.set(id, clip);
     }
     this.mixer = new THREE.AnimationMixer(this.root);
+    this.infantryPropTracks = new Map((asset.infantry?.animations || []).map(clip => [clip.name,
+      clip.tracks.filter(track => /^Infantry(Rifle|Grenade)\./.test(track.name)).map(track => ({
+        role: track.name.startsWith("InfantryRifle") ? "rifle" : "grenade",
+        property: track.name.split(".").at(-1), sample: track.createInterpolant(),
+      }))]));
+    this.infantryPropWeight = 0;
     this.bones = {};
     for (const [role, boneName] of Object.entries(asset.record.boneRoles || {})) {
       const bone = FindNode(this.root, boneName);
       if (bone) this.bones[role] = bone;
+    }
+    // Ija03's loose helmet was exported beside the armature, so it floated at bind height.
+    // Bind it to the actual head before the first pose is evaluated, retaining its rest transform.
+    if (this.modelId === "LugouIja03" && this.bones.head) {
+      const helmet = FindNode(this.root, "Object005");
+      if (helmet?.isMesh && !helmet.isSkinnedMesh) {
+        this.root.updateWorldMatrix(true, true);
+        this.bones.head.attach(helmet);
+      }
     }
     this.sockets = {
       weaponR: FindNode(this.root, "Socket_WeaponR") || this.bones.handR || null,
@@ -481,6 +515,7 @@ export class LugouCharacterRig {
       };
     });
     const skinnedParts = [];
+    this.infantryGroundProbes = [];
     this.root.traverse((object) => {
       if (!object.isMesh) return;
       // 枪械稍后才会挂进骨骼插槽；保留这个边界标记，让诊断与测试只审计
@@ -498,6 +533,17 @@ export class LugouCharacterRig {
       object.receiveShadow = true;
       object.userData.actorOriginalCastShadow = true;
       if (object.isSkinnedMesh) {
+        const indices = object.geometry.attributes.skinIndex, weights = object.geometry.attributes.skinWeight;
+        const vertices = [];
+        for (let i = 0; i < indices.count; i++) {
+          let influence = 0;
+          for (let k = 0; k < 4; k++) {
+            const bone = object.skeleton.bones[indices.getComponent(i, k)];
+            if (/Thigh|Calf|Foot|Toe/.test(bone?.name || "")) influence += weights.getComponent(i, k);
+          }
+          if (influence > .5) vertices.push(i);
+        }
+        this.infantryGroundProbes.push({ mesh: object, vertices });
         const triangles = (object.geometry.index?.count
           || object.geometry.attributes.position?.count || 0) / 3;
         skinnedParts.push({ object, triangles });
@@ -554,8 +600,15 @@ export class LugouCharacterRig {
     }
     const next = this.mixer.clipAction(clip);
     next.enabled = true;
-    next.reset().setLoop(THREE.LoopRepeat, Infinity).play();
-    if (this.currentAction && fadeSeconds > 0) this.currentAction.crossFadeTo(next, fadeSeconds, true);
+    const once = INFANTRY_ONCE_IDS.includes(playbackId);
+    next.reset().setEffectiveWeight(1).setEffectiveTimeScale(1);
+    next.clampWhenFinished = once;
+    next.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity).play();
+    if ((playbackId === "KneelToStand" && this.currentId === "StandToKneel")
+        || (playbackId === "StandToKneel" && this.currentId === "KneelToStand")) {
+      next.time = (1 - this.currentAction.time / this.currentAction.getClip().duration) * clip.duration;
+    }
+    if (this.currentAction && fadeSeconds > 0) this.currentAction.crossFadeTo(next, fadeSeconds, false);
     else if (this.currentAction) this.currentAction.stop();
     this.currentAction = next;
     this.currentId = id;
@@ -564,8 +617,16 @@ export class LugouCharacterRig {
   }
 
   ForceClip(id) {
-    this.forcedClip = LUGOU_ANIMATION_IDS.includes(id) ? id : null;
-    if (this.forcedClip) this.Play(this.forcedClip, 0.08);
+    const forced = IMPORTED_ANIMATION_IDS.includes(id) ? id : null;
+    if (forced === this.forcedClip) return this;
+    this.forcedClip = forced;
+    this.infantry.Cancel();
+    if (this.forcedClip) {
+      if (this.currentId === id && INFANTRY_ONCE_IDS.includes(id)) {
+        this.currentAction?.stop(); this.currentAction = null;
+      }
+      this.Play(this.forcedClip, 0.08);
+    }
     return this;
   }
 
@@ -592,6 +653,13 @@ export class LugouCharacterRig {
     if (state.carryRole === "rear") return POSE_CLIPS.carryRear;
     const prone = (state.prone || 0) > 0.45;
     const low = !prone && ((state.crouch || 0) > 0.35 || (state.kneel || 0) > 0.35);
+    const infantryAllowed = this.CanPlayInfantry() && !state.meleeCombat
+      && !(state.melee > .08 || state.binoculars > .08 || state.reach > .08)
+      && !(state.woundedWalk > .5) && !state.dead && !this.actor?.ragdollState && state.grounded !== false;
+    if (!prone && infantryAllowed) {
+      const selected = this.infantry.Select(low, (state.moveSpeed || 0) > .10);
+      if (selected) return selected;
+    } else this.infantry.Cancel();
     if (state.firing) {
       if (weaponId === "Mauser96") return POSE_CLIPS.pistolFire;
       // 机枪手无论卧倒还是蹲着都走机枪那一段（它自带的就是低姿），
@@ -612,12 +680,93 @@ export class LugouCharacterRig {
     return POSE_CLIPS.standIdle;
   }
 
+  CanPlayInfantry() {
+    return !!this.asset.infantry && ["ZhongZheng", "Type38", "HanYang"].includes(this.actor?.weaponId);
+  }
+
+  _SampleInfantryProps() {
+    let total = 0;
+    for (const id of INFANTRY_ANIMATION_IDS) {
+      const clip = this.clipById.get(id);
+      const action = clip && this.mixer.existingAction(clip);
+      const weight = action?.isScheduled() ? action.getEffectiveWeight() : 0;
+      if (!(weight > 0)) continue;
+      const alpha = weight / (total + weight);
+      for (const track of this.infantryPropTracks.get(id) || []) {
+        const helper = this.infantryProps[track.role], value = track.sample.evaluate(action.time);
+        if (track.property === "quaternion") {
+          WORLD_QUATERNION.fromArray(value);
+          if (!total) helper.quaternion.copy(WORLD_QUATERNION);
+          else helper.quaternion.slerp(WORLD_QUATERNION, alpha);
+        } else {
+          WORLD_SCALE.fromArray(value);
+          if (!total) helper[track.property].copy(WORLD_SCALE);
+          else helper[track.property].lerp(WORLD_SCALE, alpha);
+        }
+      }
+      total += weight;
+    }
+    this.infantryPropWeight = Math.min(1, total);
+  }
+
+  _GroundInfantryBlend(state) {
+    if (state.dead || this.actor?.ragdollState || state.meleeCombat) return;
+    const weight = this.currentAction.getEffectiveWeight();
+    const standing = this.CanPlayInfantry() && this.currentId === POSE_CLIPS.standIdle && weight >= .99999;
+    if (standing) {
+      const curve = this.asset.infantry.scene.userData.infantryStandFloor;
+      if (!curve) return;
+      const at = this.currentAction.time * curve.fps, lo = Math.min(Math.floor(at), curve.values.length - 1);
+      const hi = Math.min(lo + 1, curve.values.length - 1);
+      const floor = curve.values[lo] + (curve.values[hi] - curve.values[lo]) * (at - lo);
+      this.infantryFloorOffset = Math.max(0, .003 - floor) * this.modelScale;
+      this.root.position.y += this.infantryFloorOffset;
+      return;
+    }
+    if (!(this.infantryPropWeight > 0) || weight >= .99999) return;
+    this.root.updateWorldMatrix(true, true);
+    // SkinnedMesh refreshes bindMatrixInverse in updateMatrixWorld, not updateWorldMatrix.
+    // CPU contact sampling must use this frame's bind inverse, just as the renderer does.
+    this.root.updateMatrixWorld(true);
+    const inverse = new THREE.Matrix4().copy(this.root.matrixWorld).invert();
+    const point = new THREE.Vector3(), transform = new THREE.Matrix4();
+    let floor = Infinity;
+    for (const { mesh, vertices } of this.infantryGroundProbes) {
+      mesh.skeleton.update(); transform.multiplyMatrices(inverse, mesh.matrixWorld);
+      for (const index of vertices) {
+        mesh.getVertexPosition(index, point).applyMatrix4(transform);
+        floor = Math.min(floor, point.y);
+      }
+    }
+    // Local-rotation crossfades can intersect the floor although both baked clips are grounded.
+    // Correct only those few blended frames, against visible leg surfaces, never ankle pivots.
+    this.infantryFloorOffset = Math.max(0, .003 - floor) * this.modelScale;
+    this.root.position.y += this.infantryFloorOffset;
+  }
+
   Update(dt, state = {}) {
     if (this.disposed) return;
+    this.root.position.y -= this.infantryFloorOffset || 0;
+    this.infantryFloorOffset = 0;
     this.meleeAnimation?.Restore();
-    this.Play(this._ActionForState(state));
+    this.infantry.BeginFrame(state);
+    const previousId = this.currentId, previousTime = this.currentAction?.time || 0;
+    const nextId = this._ActionForState(state);
+    this.Play(nextId);
+    if (nextId === "RifleCrouchAdvance" && !this.forcedClip) {
+      const speed = Number.isFinite(state.moveSpeedMps) ? state.moveSpeedMps : (state.moveSpeed || 0) * 3.6;
+      const sourceSpeed = this.kind.startsWith("ija") ? .23864468053263868 : .2554529916490837;
+      this.root.updateWorldMatrix(true, false);
+      const scale = this.root.getWorldScale(WORLD_SCALE).y;
+      this.currentAction.setEffectiveTimeScale(Math.max(0, speed) / (sourceSpeed * scale));
+    }
     this.mixer.update(Math.max(0, dt));
+    // Missing prop tracks in the legacy clips must not fade a rifle towards the scene origin.
+    // Sample the authored prop poses at normalized weights; Actor blends with its live hand grip.
+    this._SampleInfantryProps();
+    this.infantry.AfterUpdate(previousId, previousTime);
     this.meleeAnimation?.Apply(state.meleeCombat);
+    this._GroundInfantryBlend(state);
     // First-person cutscenes place the camera at the eye socket.  The source is
     // one combined SkinnedMesh, so there is no detachable head object; collapse
     // the head bone after mixer evaluation instead.  Doing it before mixer.update

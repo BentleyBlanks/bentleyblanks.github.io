@@ -1472,6 +1472,7 @@ async function Boot() {
       let thrown = 0;
       for (const s of ai.soldiers) {
         if (!s.alive || s.side !== "nra") continue;
+        if (s.actor?.pendingGrenadeThrow || s.actor?.characterRig?.infantry?.IsThrowing()) continue;
         if (Math.hypot(s.position.x - x, s.position.z - z) > radius) continue;
         if (thrown >= max) break;
         const dir = new THREE.Vector3(x - s.position.x, 0, z - s.position.z);
@@ -1480,7 +1481,12 @@ async function Boot() {
         const from = new THREE.Vector3(s.position.x, s.position.y + 1.2, s.position.z);
         // 起手同帧、落点错开：全都同时落地是一声巨响，不是一场雨。
         const jitter = (thrown % 5) / 5 * spreadS;
-        combat.Throw("Grenade", 0.62 + jitter * 0.2, from, dir, jitter);
+        const release = (handPosition) => {
+          if (s.alive) combat.Throw("Grenade", 0.62 + jitter * 0.2, handPosition, dir, jitter);
+        };
+        if (s.actor?.BeginGrenadeThrow(release)) {
+          s.yaw = Math.atan2(-dir.x, -dir.z);
+        } else release(from);
         thrown += 1;
       }
       return thrown;
