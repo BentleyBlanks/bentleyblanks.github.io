@@ -18,6 +18,9 @@
 
 ## 调查与工具
 
+- 视频转骨骼资产统一存放于 `C:\Users\Bentl\OneDrive\Sync\饮河\FPS\视频转骨骼`，沿用 `Blender`、`Models`、`Video`、`Preview` 四目录。此工作流的 Blender 工程使用该专用目录，优先于根规范的通用 Blender 路径。
+- 动作验收必须在本地 `Preview` 实时播放 GLB 内的模型骨骼动画，支持逐帧、视角与版本对比；录制视频只作参考。新增动作以目录数据登记，保留来源、版本、可编辑工程和验收状态。具体流程与验收要求见 [视频转骨骼标准](docs/Data_VideoToSkeletonStandard.md)。
+
 - 检索自有代码默认排除 vendor 大型压缩文件；调查第三方问题时定向读取相关 vendor，避免整行巨量输出。
 - 浏览器验证优先复用 `../PrairieFire1937/Script_BrowserTestKit.mjs` 的 `LaunchBrowser` 和 `Script_DevServer.mjs` 的 `ServeRoot`。需要新诊断时可扩展这些入口，保留浏览器释放及现有并发测试槽。
 - Windows 无头测试不要触发真实指针锁；游戏在 `navigator.webdriver` 下用假锁，测试不以 `pointerLockElement` 作为状态依据。这条保护真实鼠标操作，不能因补探针而绕过。
