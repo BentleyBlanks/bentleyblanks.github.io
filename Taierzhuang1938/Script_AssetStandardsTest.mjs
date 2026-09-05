@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { MESHES } from "./Data_Meshes.mjs";
+import { FPS_ARM_POSES } from "./Data_FpsArmPoses.mjs";
 import {
   ASSET_STANDARD_GROUPS, ComplianceFor, EXTERNAL_GLB_STANDARDS, MIN_DECIMATION_REDUCTION,
   SCENE_RENDER_LIMITS, SOURCE_ASSET_STANDARDS, SPECIAL_TRIANGLE_TARGETS, TRIANGLE_RULES,
@@ -69,6 +70,25 @@ Check(Object.keys(SOURCE_ASSET_STANDARDS).length >= 25 && missing.length === 0,
 Check(drift.length === 0, "实际面数与 Model/Index.json 一致", drift.join("、"));
 Check(sourceDrift.length === 0, "原始选定面数与 Blender 构建元数据一致", sourceDrift.join("、"));
 Check(complianceBad.length === 0, "全部有源资产符合特例或分类阈值", complianceBad.join("、"));
+
+// Measure the shipped geometry, not just its claimed -Z axis or muzzle marker.
+// The old export kept correct mount labels while its wood grip was at the front.
+const servicePistol = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", "ServicePistol.tzm.json"), "utf8"));
+const gripVertices = servicePistol.meshes.filter((mesh) => mesh.material === "wood").flatMap((mesh) => {
+  const bytes = Buffer.from(mesh.pos, "base64");
+  return Array.from({ length: mesh.count }, (_, index) => [0, 1, 2].map((axis) =>
+    mesh.posMin[axis] + bytes.readUInt16LE((index * 3 + axis) * 2) * mesh.posScale[axis]));
+});
+const gripMean = [0, 1, 2].map((axis) => gripVertices.reduce((sum, point) => sum + point[axis], 0) / gripVertices.length);
+const muzzle = servicePistol.nodes.find((node) => node.name === "muzzle").t;
+Check(gripMean[2] > (servicePistol.bounds.min[2] + servicePistol.bounds.max[2]) / 2
+  && gripMean[1] < muzzle[1] - 0.02, "军用手枪真实木握把在枪口后下方");
+const palm = FPS_ARM_POSES.ServicePistol.contacts.right.position;
+const palmGap = Math.min(...gripVertices.map((point) => Math.hypot(...point.map((value, axis) => value - palm[axis]))));
+Check(palmGap < 0.012, "军用手枪右掌接触真实握把表面", `${(palmGap * 1000).toFixed(1)} mm`);
+const magazine = servicePistol.nodes.find((node) => node.name === "magazine").t;
+Check(Math.abs(magazine[1] - servicePistol.bounds.min[1]) < 0.012
+  && Math.abs(magazine[2] - gripMean[2]) < 0.025, "军用手枪换匣入口位于握把底部");
 
 Check(MESHES.WaltherP38.triangles === 30362,
   "P38 到 30k 仅降 3.8%，保留源拓扑并只清理退化面", String(MESHES.WaltherP38.triangles));

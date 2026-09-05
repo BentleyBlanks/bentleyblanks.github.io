@@ -115,10 +115,20 @@ export const FPS_ARM_POSES = Freeze({
     actions: { reload: { family: "c96Stripper", timing: V(0.48, 0.63, 0.77) } },
   }),
   ServicePistol: WeaponPose({
-    family: "pistol", hip: FixedPose(V(0.040, -0.100, -0.240), V(0.035, -0.030, 0.012)), ads: Sight(0.340), sprint: PistolSprint,
-    right: Contact(V(0.01200, -0.03600, 0.01500), V(-0.252242458, 3.141592654, 1.570796327), CLOSED, TRIGGER), left: Contact(V(-0.03000, -0.03900, -0.02800), V(-0.357235309, 3.013269426, -1.478705144), SUPPORT),
+    family: "pistol", hip: FixedPose(V(0.040, -0.120, -0.320), V(0.035, -0.030, 0.012)), ads: Sight(0.400), sprint: PistolSprint,
+    // Measured on the corrected A-state grip. The firing palm wraps the right
+    // panel; the support palm sits ahead of it, outside the curled fingers.
+    right: Contact(V(0.012, -0.020, -0.022), V(-0.400, 3.141592654, 1.570796327), CLOSED, TRIGGER), left: Contact(V(-0.026, -0.028, -0.042), V(-0.450, 3.141592654, -1.570796327), SUPPORT),
     bodyHip: PistolBody(), bodyAds: PistolAdsBody(), bodySprint: PistolBody(),
-    actions: { reload: { family: "boxMag", timing: V(0.32, 0.57, 0.80) } },
+    actions: { reload: { family: "boxMag", timing: V(0.32, 0.57, 0.80), handPath: [
+      { at: 0.10, position: V(-0.026, -0.078, 0.004) },
+      { at: 0.25, position: V(-0.026, -0.145, 0.014) },
+      { at: 0.40, position: V(-0.090, -0.180, 0.050) },
+      { at: 0.52, position: V(-0.026, -0.145, 0.014) },
+      { at: 0.70, position: V(-0.026, -0.078, 0.004) },
+      { at: 0.79, position: V(-0.025, 0.020, 0.008) },
+      { at: 0.88, position: V(-0.025, 0.020, 0.035) },
+    ] } },
   }),
   WaltherP38: WeaponPose({
     family: "pistol", hip: FixedPose(V(0.045, -0.102, -0.230), V(0.035, -0.030, 0.012)), ads: Sight(0.335), sprint: PistolSprint,

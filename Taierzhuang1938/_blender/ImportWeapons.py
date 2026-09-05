@@ -271,7 +271,8 @@ SOURCES = {
         "roll": -1.0,
         "flipForward": True,
         "noDetails": True,
-        "mounts": {"sightY": 0.084, "sightZ": 0.030},
+        "mounts": {"sightY": 0.0503, "sightZ": 0.014,
+                   "magY": -0.075, "magZ": 0.004, "gripZ": -0.028},
         # 选定闭锁状态低于 30k，不减面；源硬表面转折自带真倒角。
         "note": "CC0 Service Pistol（Poly Haven）。保留闭锁状态 A 的枪身、套筒、"
                 "击锤与扳机，移除展示用弹匣、子弹及空仓挂机状态 B；全长 0.222 m。",
@@ -1065,7 +1066,11 @@ def BuildImported(name):
     _AlignLongAxisToZ(bms, spec.get("roll", 1.0))
     if spec.get("flipForward"):
         _Xform(bms, Matrix.Rotation(math.pi, 4, "Y"))
-    _FlipIfStockIsForward(bms, wood)
+    # Explicit source orientation is authoritative. The material-mask split can
+    # leave a grip centroid on the source origin's negative side even when the
+    # muzzle already points forward; that heuristic must not flip it back.
+    if "flipForward" not in spec:
+        _FlipIfStockIsForward(bms, wood)
     if spec["kind"] != "melee":
         # 刀的木件是握把，本来就骑在刀身轴线上，没有"握把该在膛线下方"这回事；
         # 让这条启发式跑，它会绕 Z 转 180° 把刃口翻上天。刃口朝向交给 roll。

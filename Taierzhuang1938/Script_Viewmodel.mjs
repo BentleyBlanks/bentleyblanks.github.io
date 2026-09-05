@@ -1109,7 +1109,7 @@ const IRON_SIGHT_REPAIRS = {
   Type38: { x: 0, y: 0.070, frontZ: -0.9882, frontBase: 0.052, rearZ: -0.310, rearBase: 0.050 },
   Zb26: { x: -0.0234, y: 0.095, frontZ: -0.7616, frontBase: 0.060, rearZ: -0.205, rearBase: 0.061 },
   Mauser96: { x: 0, y: 0.055, frontZ: -0.2274, frontBase: 0.038, rearZ: -0.0415, rearBase: 0.043 },
-  ServicePistol: { replaceBlade: true, x: 0, y: 0.084, frontZ: -0.136, frontBase: 0.070, rearZ: 0.022, rearBase: 0.065 },
+  ServicePistol: { x: 0, y: 0.052, frontZ: -0.164, frontBase: 0.044, rearZ: 0.014, rearBase: 0.046 },
   WaltherP38: { x: 0, y: 0.055, frontZ: -0.161, frontBase: 0.037, rearZ: 0.021, rearBase: 0.037 },
   Karabiner98k: { x: 0, y: 0.074, frontZ: -0.8321, frontBase: 0.050, sourceCeiling: 0.060, rearZ: -0.270, rearBase: 0.049 },
   UnidentifiedBoltActionRifle: { x: 0, y: 0.074, frontZ: -0.840, frontBase: 0.046, rearZ: -0.260, rearBase: 0.036 },
@@ -1160,8 +1160,8 @@ function RepairIronSights(group, materials, key, sight) {
     }
     for (const mesh of frontMeshes) { mesh.geometry.computeVertexNormals(); mesh.geometry.computeBoundingBox(); mesh.geometry.computeBoundingSphere(); }
   } else {
-    // ServicePistol / Type92 have no solid central blade in the imported
-    // sight crown. Complete that missing surface with a post on its metal foot.
+    // Type92 has no solid central blade in the imported sight crown. Complete
+    // a missing surface with a post on its metal foot.
     frontMeshes.add(AddPart("FrontBlade", spec.x, (spec.y + spec.frontBase) / 2, spec.frontZ,
       width, spec.y - spec.frontBase, 0.004));
   }
@@ -1305,7 +1305,8 @@ function BuildFromModel(materials, weapon, key, doc) {
     ? sight.clone().add(new THREE.Vector3(0.026, 0.004, 0.055))
     : new THREE.Vector3(0.026, 0.035, -0.06);
   const clipSeat = magazine.clone();
-  clipSeat.y += 0.045;
+  // Box magazines enter at the grip heel; stripper clips enter above the action.
+  if (!armPose.actions.reload?.handPath) clipSeat.y += 0.045;
   const hr = armPose.contacts.right;
   const hl = armPose.contacts.left;
 
@@ -2773,14 +2774,22 @@ export class Viewmodel {
     const seat = this.rig.clipSeat || this._tmpVec.set(0, -0.04, -0.02);
     const tilt = Ease.InOut(Ease.Seg(t, 0.00, 0.16)) - Ease.InOut(Ease.Seg(t, 0.84, 1.00));
     this._PoseReload("right", tilt, -0.025, 0.025, 0.035, 0.08, 0.22, -0.28);
-    const leave = Ease.InOut(Ease.Seg(t, 0.08, 0.25));
-    const returnHome = Ease.InOut(Ease.Seg(t, 0.78, 0.98));
+    const handPath = this.actionSpec?.reload?.handPath;
+    const leave = Ease.InOut(Ease.Seg(t, handPath ? 0.03 : 0.08, handPath ? 0.12 : 0.25));
+    const returnHome = Ease.InOut(Ease.Seg(t, handPath ? 0.92 : 0.78, handPath ? 1 : 0.98));
     const off = Clamp01(leave - returnHome);
     const insert = Ease.InOut(Ease.Seg(t, 0.48, 0.72));
     const target = this._tmpVec2.set(seat.x - 0.018, seat.y - 0.055 + insert * 0.050, seat.z + 0.020);
     // The firing hand keeps the pistol grip; the support hand leaves for the
     // magazine well. C96 remains in its separate right-hand stripper family.
-    target.lerp(this.handBase.left, 0.45);
+    if (handPath?.length) {
+      let next = handPath.findIndex((point) => point.at >= t);
+      if (next < 0) next = handPath.length - 1;
+      const end = handPath[next];
+      const start = handPath[Math.max(0, next - 1)];
+      target.fromArray(start.position).lerp(this._tmpVec.fromArray(end.position),
+        Ease.InOut(Ease.Seg(t, start.at, end.at)));
+    } else target.lerp(this.handBase.left, 0.45);
     this.handLeft.group.position.lerpVectors(this.handBase.left, target, off);
     this.handLeft.group.rotation.set(
       Mix(this.handBaseRot.left.x, -0.34, off),
