@@ -244,25 +244,10 @@ export const MESHES = {
     note: "卢沟桥资源包源节点 QEDQD：十一年式轻机枪。保留 body/body2/fore/ammobox"
       + "四张 DDS 的原 UV 与独立材质槽；项目原 CC-BY 模型仍保留作对比参考。",
   },
-  BrowningTripodAssembly: {
-    file: "BrowningTripodAssembly.tzm.json", category: "weapon", triangles: 9003, meshBlocks: 1, nodes: 7, joints: 0,
-    materials: ["lqBrowningTripod"], mounts: WEAPON_MOUNTS, span: [0.73547, 1.43177, 2.27293], lengthM: 2.273,
-    draws: { high: 1, medium: 1, low: 1 }, note: "源节点 BROTRIPO009；仅能确认勃朗宁式三脚架/机件组合，具体型号未明。",
-  },
-  UnidentifiedMunition: {
-    file: "UnidentifiedMunition.tzm.json", category: "weapon", triangles: 128, meshBlocks: 1, nodes: 7, joints: 0,
-    materials: ["lqUnidentifiedMunition"], mounts: WEAPON_MOUNTS, span: [0.06568, 0.06906, 0.253], lengthM: 0.253,
-    draws: { high: 1, medium: 1, low: 1 }, note: "源节点 Cylinder026；弹体型号未明，识别截图随源归档。",
-  },
   OfficerSwordSet: {
     file: "OfficerSwordSet.tzm.json", category: "weapon", triangles: 7801, meshBlocks: 2, nodes: 5, joints: 0,
     materials: ["lqOfficerSword", "lqWeaponPlain"], mounts: ["muzzle", "gripR", "gripL"], span: [0.05975, 0.07192, 1.00151], lengthM: 1.000,
     draws: { high: 2, medium: 2, low: 2 }, note: "源节点 Group146；仅刀柄饰带使用 stripe01L，刀身与刀鞘改回枪钢材质，具体制式未明。",
-  },
-  RingPommelDagger: {
-    file: "RingPommelDagger.tzm.json", category: "weapon", triangles: 515, meshBlocks: 1, nodes: 5, joints: 0,
-    materials: ["lqRingPommelDagger"], mounts: ["muzzle", "gripR", "gripL"], span: [0.05430, 0.06812, 0.450], lengthM: 0.450,
-    draws: { high: 1, medium: 1, low: 1 }, note: "源节点 Mesh_0300；带环首短刃，具体制式未明。",
   },
   MediumMortar: {
     file: "MediumMortar.tzm.json", category: "weapon", triangles: 9064, meshBlocks: 1, nodes: 7, joints: 0,
@@ -428,8 +413,7 @@ export const WEAPON_MESH_BY_ID = {
   // 掷弹筒走武器规范系（右手握点 = 原点、筒口朝 -Z），人物能直接拿着它；
   // 三辆车走车辆规范系，只有台架/摆场景用得上，人物拿不了
   Type89Launcher: "Type89Launcher",
-  BrowningTripodAssembly: "BrowningTripodAssembly", UnidentifiedMunition: "UnidentifiedMunition",
-  OfficerSwordSet: "OfficerSwordSet", RingPommelDagger: "RingPommelDagger",
+  OfficerSwordSet: "OfficerSwordSet",
   MediumMortar: "MediumMortar",
   Type89Tank: "Type89Tank", Type95HaGo: "Type95HaGo", Type97ChiHa: "Type97ChiHa",
 };

@@ -107,8 +107,7 @@ Report(sandalNodesOk && /露趾草鞋/.test(nraDoc.notes || ""),
 // 浏览器会照常加载这些文件，三角数/包围盒也都合理，所以在真渲染前先直接审计
 // 压缩后的最终产物。面法线与三顶点平均光照法线反向即判坏，不依赖 Blender 环境。
 const lugouqiaoWeaponIds = [
-  "BrowningTripodAssembly", "UnidentifiedMunition",
-  "OfficerSwordSet", "RingPommelDagger",
+  "OfficerSwordSet",
   "Type11", "MediumMortar",
 ];
 const AuditCompressedMesh = (mesh) => {

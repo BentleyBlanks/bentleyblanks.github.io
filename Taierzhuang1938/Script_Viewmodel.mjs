@@ -336,10 +336,7 @@ function BuildMaterials(library) {
     // 且这支枪在战场上滚了半个月，抬到物理真值会变成镀铬件；0.20 是「暗但有形」的落点。
     blued: library.Plain("VmBlued", { color: 0x7a7d82, roughness: 0.44, metalness: 0.80 }),
     leather: library.Plain("VmLeather", { color: 0x3a2c22, roughness: 0.86, metalness: 0 }),
-    lqBrowningTripod: SafeMaterial(library, "Steel", {}, 0x555960),
-    lqUnidentifiedMunition: SafeMaterial(library, "LugouqiaoUnidentifiedMunition", {}, 0x68625a),
     lqOfficerSword: SafeMaterial(library, "LugouqiaoOfficerSword", {}, 0x68635c),
-    lqRingPommelDagger: SafeMaterial(library, "LugouqiaoRingPommelDagger", {}, 0x605b52),
     lqType11AmmoBox: SafeMaterial(library, "LugouqiaoType11AmmoBox", {}, 0x5e5b4e),
     lqType11Body: SafeMaterial(library, "LugouqiaoType11Body", {}, 0x575a55),
     lqType11BodyAlt: SafeMaterial(library, "LugouqiaoType11BodyAlt", {}, 0x575a55),
@@ -1078,7 +1075,7 @@ const BUILDERS = {
 const MODEL_FP = new Set([
   "Dadao",
   "ZhongZheng", "HanYang", "Type38", "Zb26", "ServicePistol",
-  "Type11", "Type92Hmg", "OfficerSwordSet", "RingPommelDagger",
+  "Type11", "Type92Hmg", "OfficerSwordSet",
 ]);
 
 /** 模型里的材质名 -> 视图模型这套材质。加载器不造材质，名字得在这里落地。 */
@@ -1086,8 +1083,7 @@ const VM_MATERIAL_BY_MESH = {
   steel: "steel", blade: "blade", grip: "grip", dadao: "dadao", wood: "wood", accessory: "cloth", red: "redCloth",
   leather: "leather", uniform: "cloth", skin: "skin", helmet: "steel",
   accentA: "redCloth", accentB: "brass", shoe: "leather",
-  lqBrowningTripod: "lqBrowningTripod", lqUnidentifiedMunition: "lqUnidentifiedMunition",
-  lqOfficerSword: "lqOfficerSword", lqRingPommelDagger: "lqRingPommelDagger",
+  lqOfficerSword: "lqOfficerSword",
   lqType11AmmoBox: "lqType11AmmoBox", lqType11Body: "lqType11Body",
   lqType11BodyAlt: "lqType11BodyAlt", lqType11Fore: "lqType11Fore",
   lqMediumMortar: "lqMediumMortar", lqWeaponPlain: "lqWeaponPlain",

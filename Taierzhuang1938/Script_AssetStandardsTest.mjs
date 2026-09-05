@@ -67,7 +67,7 @@ for (const [id, record] of Object.entries(SOURCE_ASSET_STANDARDS)) {
   }
 }
 // 2026-09-05 删掉五件不合 1938 年 3 月时代的卢沟桥资源包武器后，再移除 C96，清单为 19 项。
-Check(Object.keys(SOURCE_ASSET_STANDARDS).length === 19 && missing.length === 0,
+Check(Object.keys(SOURCE_ASSET_STANDARDS).length === 16 && missing.length === 0,
   "现有源模型均进入资产规范清单", missing.join("、"));
 Check(!WEAPONS.Mauser96 && Object.values(LOADOUTS).every((loadout) =>
   [loadout.primary, loadout.secondary, loadout.melee].every((id) => !id || WEAPONS[id]))

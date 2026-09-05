@@ -758,78 +758,6 @@
    "triangleLimit": 30000
   },
   {
-   "name": "BrowningTripodAssembly",
-   "category": "weapon",
-   "file": "BrowningTripodAssembly.tzm.json",
-   "triangles": 9003,
-   "meshBlocks": 1,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 505262,
-   "materials": [
-    "lqBrowningTripod"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.62156,
-     -0.67306,
-     -2.227
-    ],
-    "max": [
-     0.11391,
-     0.75871,
-     0.04593
-    ]
-   },
-   "sourceTriangles": 54013,
-   "targetTriangles": 9026,
-   "triangleLimit": 30000
-  },
-  {
-   "name": "UnidentifiedMunition",
-   "category": "weapon",
-   "file": "UnidentifiedMunition.tzm.json",
-   "triangles": 128,
-   "meshBlocks": 1,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 5173,
-   "materials": [
-    "lqUnidentifiedMunition"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.03284,
-     0.00047,
-     -0.207
-    ],
-    "max": [
-     0.03284,
-     0.06953,
-     0.046
-    ]
-   },
-   "sourceTriangles": 128,
-   "targetTriangles": 128,
-   "triangleLimit": 30000
-  },
-  {
    "name": "OfficerSwordSet",
    "category": "weapon",
    "file": "OfficerSwordSet.tzm.json",
@@ -862,40 +790,6 @@
    },
    "sourceTriangles": 298456,
    "targetTriangles": 7812,
-   "triangleLimit": 30000
-  },
-  {
-   "name": "RingPommelDagger",
-   "category": "weapon",
-   "file": "RingPommelDagger.tzm.json",
-   "triangles": 515,
-   "meshBlocks": 1,
-   "nodes": 5,
-   "joints": 0,
-   "bytes": 26739,
-   "materials": [
-    "lqRingPommelDagger"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL"
-   ],
-   "bounds": {
-    "min": [
-     -0.02715,
-     -0.03954,
-     -0.18
-    ],
-    "max": [
-     0.02715,
-     0.02858,
-     0.27
-    ]
-   },
-   "sourceTriangles": 515,
-   "targetTriangles": 515,
    "triangleLimit": 30000
   },
   {

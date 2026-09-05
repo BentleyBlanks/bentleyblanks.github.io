@@ -3623,10 +3623,7 @@ export class ActorFactory {
           roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1,
         })),
       // 卢沟桥合集保留源 UV 与逐件贴图；这里的 key 必须与 TZM 材质桶逐字一致。
-      lqBrowningTripod: this.Material("lqBrowningTripod", () => lib.Get("Steel")),
-      lqUnidentifiedMunition: this.Material("lqUnidentifiedMunition", () => lib.Get("LugouqiaoUnidentifiedMunition")),
       lqOfficerSword: this.Material("lqOfficerSword", () => lib.Get("LugouqiaoOfficerSword")),
-      lqRingPommelDagger: this.Material("lqRingPommelDagger", () => lib.Get("LugouqiaoRingPommelDagger")),
       lqType11AmmoBox: this.Material("lqType11AmmoBox", () => lib.Get("LugouqiaoType11AmmoBox")),
       lqType11Body: this.Material("lqType11Body", () => lib.Get("LugouqiaoType11Body")),
       lqType11BodyAlt: this.Material("lqType11BodyAlt", () => lib.Get("LugouqiaoType11BodyAlt")),

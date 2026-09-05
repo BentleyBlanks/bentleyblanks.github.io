@@ -596,9 +596,7 @@ export const RECIPES = {
   CarriageCeilingSteel: (s) => BakeSteel(s ?? 256, { seed: 659, base: [104, 109, 108], polish: 0.2, rust: 0.08 }),
   // 卢沟桥武器的外部原贴图若 404，按材质类别退回可用的程序化 PBR；正常路径
   // 会在 Main 启动阶段整套覆盖，因此不会把这些兜底纹理显示到玩家面前。
-  LugouqiaoUnidentifiedMunition: (s) => BakeSteel(s ?? 256, { seed: 632 }),
   LugouqiaoOfficerSword: (s) => BakeSteel(s ?? 256, { seed: 634 }),
-  LugouqiaoRingPommelDagger: (s) => BakeSteel(s ?? 256, { seed: 635 }),
   LugouqiaoType11AmmoBox: (s) => BakeSteel(s ?? 256, { seed: 639 }),
   LugouqiaoType11Body: (s) => BakeSteel(s ?? 256, { seed: 640 }),
   LugouqiaoType11BodyAlt: (s) => BakeSteel(s ?? 256, { seed: 641 }),

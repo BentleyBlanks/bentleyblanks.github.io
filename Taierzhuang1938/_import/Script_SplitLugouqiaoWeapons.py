@@ -39,10 +39,7 @@ RUNTIME_OUT = required("TAIERZHUANG_WEAPON_RUNTIME_OUT")
 # 2026-09-05：P38 / K98k / MK98 栓动步枪 / MK1（Bren 式轻机枪，曾误标高射炮）/ PJP 轻迫击炮
 # 五件按考据不属于 1938 年 3 月，已从拆分清单与运行时贴图里移除；原始贴图仍按 TEXTURES 逐文件保存。
 ASSETS = {
-    "BrowningTripodAssembly": ("BROTRIPO009", APPLY_BLEND),
-    "UnidentifiedMunition": ("Cylinder026", APPLY_BLEND),
     "OfficerSwordSet": ("Group146", APPLY_BLEND),
-    "RingPommelDagger": ("Mesh_0300", APPLY_BLEND),
     "Type11": ("QEDQD", APPLY_BLEND),
     "MediumMortar": ("sphere3", APPLY_BLEND),
 }
@@ -67,9 +64,7 @@ TEXTURES = {
 }
 
 RUNTIME = {
-    "LugouqiaoUnidentifiedMunition": "WW-100heqdf.jpg",
     "LugouqiaoOfficerSword": "stripe01L.jpg",
-    "LugouqiaoRingPommelDagger": "Tex_0155_1.dds",
     "LugouqiaoType11AmmoBox": "ammobox.dds",
     "LugouqiaoType11Body": "body.dds",
     "LugouqiaoType11BodyAlt": "body2.dds",

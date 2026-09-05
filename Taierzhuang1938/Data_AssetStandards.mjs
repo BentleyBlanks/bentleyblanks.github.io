@@ -28,7 +28,6 @@ export const SCENE_RENDER_LIMITS = Object.freeze({
 
 export const SPECIAL_TRIANGLE_TARGETS = Object.freeze({
   OfficerSwordSet: 7812,
-  BrowningTripodAssembly: 9026,
   MediumMortar: 9068,
 });
 
@@ -69,14 +68,7 @@ export const SOURCE_ASSET_STANDARDS = Object.freeze({
   OfficerSwordSet: { name: "九八式军刀", group: "melee", sourceTriangles: 298456,
     sourceTexture: "局部饰带", runtimeTexture: "饰带保留源 UV；刀身/刀鞘使用共享枪钢",
     note: "指定特例：以原成品 3,906 三角为基准翻倍，目标 7,812。" },
-  RingPommelDagger: { name: "环首短刃", group: "melee", sourceTriangles: 515,
-    sourceTexture: "有", runtimeTexture: SourceUv },
 
-  BrowningTripodAssembly: { name: "勃朗宁三脚架组件", group: "assembly", sourceTriangles: 54013,
-    sourceTexture: "无可用成品图", runtimeTexture: SharedWeaponPbr,
-    note: "指定特例：以原成品 4,513 三角为基准翻倍，目标 9,026。" },
-  UnidentifiedMunition: { name: "未识别弹体", group: "assembly", sourceTriangles: 128,
-    sourceTexture: "有", runtimeTexture: SourceUv },
   MediumMortar: { name: "八二迫击炮", group: "assembly", sourceTriangles: 70460,
     sourceTexture: "无可用成品图", runtimeTexture: SharedWeaponPbr,
     note: "指定特例：以原成品 4,534 三角为基准翻倍，目标 9,068。" },

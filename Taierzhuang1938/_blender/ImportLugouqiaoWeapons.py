@@ -28,17 +28,10 @@ SOURCE_DIR = os.path.abspath(os.path.join(HERE, "..", "_import", "Source", "Mode
 BUILD_STATS = {}
 
 SOURCES = {
-    "BrowningTripodAssembly": {"lengthM": 2.273, "kind": "assembly", "side": "neutral",
-                   "decimateBias": 1.030,
-                   "note": "源节点 BROTRIPO009；名称与结构不足以确认具体勃朗宁型号，按识别截图标注。"},
-    "UnidentifiedMunition": {"lengthM": 0.253, "kind": "assembly", "side": "neutral",
-                   "note": "源节点 Cylinder026；弹体型号未明，保留 WW-100heqdf 原贴图。"},
     "OfficerSwordSet": {"lengthM": 1.000, "kind": "melee", "side": "ija",
                    "decimateBias": 10.000,
                    "decimateBudget": 9400,
                    "note": "源节点 Group146；九八式军刀与刀鞘（按形制认领）。"},
-    "RingPommelDagger": {"lengthM": 0.450, "kind": "melee", "side": "neutral",
-                   "note": "源节点 Mesh_0300；带环首短刃，具体制式未明。"},
     "Type11": {"lengthM": 1.100, "kind": "rifle", "side": "ija",
                    "excludeObjects": {"4"},
                    # This source has no material bucket whose name contains
@@ -52,8 +45,7 @@ SOURCES = {
 }
 
 RUNTIME_MATERIALS = {
-    "lqBrowningTripod", "lqUnidentifiedMunition",
-    "lqOfficerSword", "lqRingPommelDagger",
+    "lqOfficerSword",
     "lqType11AmmoBox", "lqType11Body", "lqType11BodyAlt", "lqType11Fore",
     "lqMediumMortar", "lqWeaponPlain",
 }
@@ -73,13 +65,10 @@ TYPE11_OBJECT_MATERIAL = {
 def _material_for(asset, material_name, object_name):
     value = (material_name or "").casefold()
     object_value = object_name.casefold()
-    if asset == "BrowningTripodAssembly": return "lqBrowningTripod"
-    if asset == "UnidentifiedMunition": return "lqUnidentifiedMunition"
     if asset == "OfficerSwordSet":
         return ("lqOfficerSword"
                 if "stripe01l" in value or object_value in {"对象142", "对象143"}
                 else "lqWeaponPlain")
-    if asset == "RingPommelDagger": return "lqRingPommelDagger"
     if asset == "Type11":
         if "ammobox" in value: return "lqType11AmmoBox"
         if "body2" in value: return "lqType11BodyAlt"
@@ -96,7 +85,7 @@ def _tile_for(material):
         return "gunSteel"
     if material == "wood":
         return "gunWood"
-    if material in {"lqBrowningTripod", "lqMediumMortar"}:
+    if material == "lqMediumMortar":
         return "gunSteel"
     return "sourceUv"
 

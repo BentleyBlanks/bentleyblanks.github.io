@@ -14,7 +14,6 @@ MIN_DECIMATION_REDUCTION = 0.05
 # when the rule was approved: 3906 / 4513 / 4534 triangles respectively.
 SPECIAL_TRIANGLE_TARGETS = {
     "OfficerSwordSet": 7812,
-    "BrowningTripodAssembly": 9026,
     "MediumMortar": 9068,
 }
 

@@ -28,8 +28,6 @@ const SIDE_LONG = {
   neutral: "阵营/来源待考（仅用于资产识别）",
 };
 const KIND_LABEL_BY_ID = {
-  BrowningTripodAssembly: "三脚架组件",
-  UnidentifiedMunition: "弹体",
   MediumMortar: "迫击炮",
 };
 
@@ -72,7 +70,7 @@ function IsGroundedBench(id) {
  * 外层随后统一用最终包围盒落地，所以脚架/底钣不会因转姿态而悬空。
  */
 function BenchPose(id) {
-  if (id === "OfficerSwordSet" || id === "RingPommelDagger") {
+  if (id === "OfficerSwordSet") {
     return { x: -Math.PI / 2, y: 0, z: 0 };
   }
   if (id === "Type92Hmg") {

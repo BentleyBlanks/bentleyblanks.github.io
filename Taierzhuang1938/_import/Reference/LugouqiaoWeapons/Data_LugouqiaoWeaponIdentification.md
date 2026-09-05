@@ -5,11 +5,11 @@
 | 源根节点 | 游戏模型 id | 识别结论 | 处理 |
 |---|---|---|---|
 | `2#` | `WaltherP38` | 套筒铭文可辨识为 Walther P38 | 新增 → **2026-09-05 移除**（1939 年才交付德军） |
-| `BROTRIPO009` | `BrowningTripodAssembly` | 勃朗宁式三脚架/机件组合，具体型号未明 | 截图标注后新增 |
-| `Cylinder026` | `UnidentifiedMunition` | 弹体，具体型号未明 | 截图标注后新增 |
+| `BROTRIPO009` | `BrowningTripodAssembly` | 勃朗宁式高射三脚架，没有枪身 | 截图标注后新增 → **2026-09-06 移除**（无枪身、无对应制式） |
+| `Cylinder026` | `UnidentifiedMunition` | 八角柱弹体，253 mm，无可认领型号 | 截图标注后新增 → **2026-09-06 移除** |
 | `FQDQD` | `UnidentifiedBoltActionRifle` | K98 系栓动步枪（源节点 `MK98_*`），机匣带皮卡汀尼导轨 | 截图标注后新增 → **2026-09-05 移除** |
 | `Group146` | `OfficerSwordSet` | 军刀与刀鞘；2026-09-06 按缠柄、双环鞘、约 1 m 全长认领为九八式军刀 | 截图标注后新增 |
-| `Mesh_0300` | `RingPommelDagger` | 带环首短刃，具体制式未明 | 截图标注后新增 |
+| `Mesh_0300` | `RingPommelDagger` | 环首短刃，不对应任何 1938 年制式 | 截图标注后新增 → **2026-09-06 移除** |
 | `MK1` | `UnidentifiedAntiaircraftGun` | 复核为 Bren Mk I 式轻机枪（先前误读弯弹匣为环形瞄具） | 截图标注后新增 → **2026-09-05 移除** |
 | `PJP` | `LightMortar` | 带两脚架的 50 mm 级轻迫击炮，1938 年 3 月中日双方均无此类 | 截图标注后新增 → **2026-09-05 移除** |
 | `QEDQD` | `Type11` | 十一年式轻机枪（侧置漏斗供弹、散热片与偏置枪托） | 替换同名游戏模型；旧源保留 |
@@ -41,3 +41,13 @@
 | `LightMortar` | 带两脚架的 50 mm 级轻迫击炮；中方 60 迫是 1942 年的民三十一式，日方 50 mm 曲射只有掷弹筒（项目已有八九式）。 |
 
 运行时 TZM、浏览器贴图与拆分 Blend 已删除；`Texture_Source/` 的原始贴图逐文件保留，`TEXTURES` 映射不变。识别截图仍留作档案。依据见 `docs/Data_HistoryMaterial.md`「避坑清单」。
+
+## 2026-09-06 追加移除的三件
+
+| 游戏模型 id | 移除理由 |
+|---|---|
+| `RingPommelDagger` | 短刀身加环首的泛型道具，不对应任何 1938 年中日制式。 |
+| `UnidentifiedMunition` | 八角柱弹体，无任何可认领型号，游戏内无引用。 |
+| `BrowningTripodAssembly` | 2.27 m 高的勃朗宁式高射三脚架，没有枪身；将来做三十节式重机枪时另配 M1917 枪架。 |
+
+同批处理与 2026-09-05 相同：运行时 TZM、浏览器贴图、拆分 Blend 删除，`Texture_Source/` 原图保留。

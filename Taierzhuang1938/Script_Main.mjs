@@ -866,14 +866,8 @@ async function Boot() {
     // 卢沟桥武器合集：每个材质槽继续采样源 UV。只有漫反射图的旧材质用
     // fallback 补 ORM；源漫反射绝不被项目通用钢木纹覆盖。条目刻意显式列出，
     // 让 BootPayloadTest 能逐套核对 URL、单张大小与开机总字节。
-    { name: "LugouqiaoUnidentifiedMunition", fallback: "LugouqiaoUnidentifiedMunition",
-      albedo: "./Texture/Texture_LugouqiaoUnidentifiedMunitionBase.jpg?v=lq2",
-      normal: "./Texture/Texture_LugouqiaoFlatNormal.png?v=lq2" },
     { name: "LugouqiaoOfficerSword", fallback: "LugouqiaoOfficerSword",
       albedo: "./Texture/Texture_LugouqiaoOfficerSwordBase.jpg?v=lq2",
-      normal: "./Texture/Texture_LugouqiaoFlatNormal.png?v=lq2" },
-    { name: "LugouqiaoRingPommelDagger", fallback: "LugouqiaoRingPommelDagger",
-      albedo: "./Texture/Texture_LugouqiaoRingPommelDaggerBase.jpg?v=lq2",
       normal: "./Texture/Texture_LugouqiaoFlatNormal.png?v=lq2" },
     { name: "LugouqiaoType11AmmoBox", fallback: "LugouqiaoType11AmmoBox",
       albedo: "./Texture/Texture_LugouqiaoType11AmmoBoxBase.jpg?v=lq2",

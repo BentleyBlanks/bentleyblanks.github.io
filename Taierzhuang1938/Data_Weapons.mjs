@@ -184,22 +184,6 @@ export const WEAPONS = {
     swingTimeS: 0.48, reachM: 1.95, silent: true,
     note: "源节点 Group146；缠柄、双环刀鞘与约 1 m 全长符合九四/九八式军刀，2026-09-06 按形制认领为九八式（军官佩刀）。",
   },
-  RingPommelDagger: {
-    id: "RingPommelDagger", name: "环首短刃", fullName: "带环首短刃（具体制式尚待考证）",
-    side: "neutral", kind: "melee", lengthM: 0.45, massKg: 0.65, damage: 155,
-    swingTimeS: 0.36, reachM: 1.45, silent: true,
-    note: "源节点 Mesh_0300；按截图特征描述，不推断年代或军种。",
-  },
-  BrowningTripodAssembly: {
-    id: "BrowningTripodAssembly", name: "勃朗宁三脚架组件", fullName: "勃朗宁式三脚架/机件组合（具体型号尚待考证）",
-    side: "neutral", kind: "mortar", lengthM: 2.273, massKg: 30,
-    note: "源节点 BROTRIPO009；仅加入台架预览，识别结论未定。",
-  },
-  UnidentifiedMunition: {
-    id: "UnidentifiedMunition", name: "弹体", fullName: "弹体（具体型号尚待考证）",
-    side: "neutral", kind: "mortar", lengthM: 0.253, massKg: 2.0,
-    note: "源节点 Cylinder026；保留 WW-100heqdf 原贴图并附识别截图。",
-  },
   MediumMortar: {
     id: "MediumMortar", name: "八二迫击炮", fullName: "民国二十年式八二迫击炮（按 Stokes-Brandt 外形认领）",
     side: "nra", kind: "mortar", lengthM: 1.444, massKg: 69,

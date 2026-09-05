@@ -144,11 +144,6 @@ export const FPS_ARM_POSES = Freeze({
     right: Contact(V(0, 0, 0.030), V(-0.25769, -1.95745, -1.61314), CLOSED), left: Contact(V(0, 0, 0.150), V(0.40452, -2.69819, -0.75324), CLOSED),
     bodyHip: BladeBody(-0.485), bodyAds: BladeBody(-0.455), bodySprint: BladeBody(-0.425), actions: { melee: { family: "officerSword", release: 0.20 } },
   }),
-  RingPommelDagger: WeaponPose({
-    family: "melee", hip: FixedPose(V(0.160, -0.145, -0.370), V(0.540, -0.430, 1.390)), ads: FixedPose(V(0.125, -0.125, -0.340), V(0.700, -0.380, -1.500)), sprint: FixedPose(V(0.185, -0.180, -0.350), V(-0.220, -0.340, 1.720)),
-    right: Contact(V(0, 0, 0.030), V(0.24310, 1.71802, 3.00760), CLOSED), left: Contact(V(0, 0, 0.105), V(0.58329, -3.10039, -1.12722), SUPPORT),
-    bodyHip: BladeBody(-0.390), bodyAds: BladeBody(-0.370), bodySprint: BladeBody(-0.350), actions: { melee: { family: "dagger", release: 0.14 } },
-  }),
 });
 
 // 刀具和投掷物保留其状态接触；枪械握持坐标系固定在武器局部，
@@ -158,7 +153,6 @@ export const FPS_ARM_STATE_ROTATIONS = Freeze({
   GrenadeBundle: Freeze({ ads: StateContacts(V(0.27029, -2.14081, -2.48461), V(-1.29617, -0.29859, -2.97260)), sprint: StateContacts(V(-0.53731, 1.84973, -2.48936), V(-0.96956, 1.92130, -0.20501)) }),
   Dadao: Freeze({ ads: StateContacts(V(1.00986, -1.23190, -1.06748), V(0.01292, 2.28903, 2.98643)), sprint: StateContacts(V(-0.03165, -2.61229, -1.31738), V(0.19628, -2.95993, -0.35701)) }),
   OfficerSwordSet: Freeze({ ads: StateContacts(V(0.99884, -1.28117, -1.03785), V(-0.11189, 2.30043, 2.79591)), sprint: StateContacts(V(-0.30442, -2.64893, -1.21062), V(0.44444, -2.98694, -0.63058)) }),
-  RingPommelDagger: Freeze({ ads: StateContacts(V(0.41975, -1.25846, -0.41276), V(-0.21474, 2.61787, 2.92900)), sprint: StateContacts(V(0.49947, 1.81057, -2.59434), V(0.79681, 2.88797, -0.96011)) }),
 });
 
 export const FPS_ARM_LIMITS = Freeze({
