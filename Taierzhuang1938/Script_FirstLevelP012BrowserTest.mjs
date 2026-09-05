@@ -1540,6 +1540,7 @@ async function VerifyAirRouteHandoff(choice) {
     flow.Emit("P012AirObserveOpen");
     window.p012AirFixture={choice,flow,runtime,setpiece,column,trace:[],frames:0,initialHead:column.HeadPosition()};
     return {choice,player:game.player.position.toArray(),head:column.HeadPosition(),members:column.Count,
+      originalCivilianId:column.Civilians.at(-1)?.handle.id,
       scope:"explicit B16 setup; new local column placement, no sequential campaign or first-play claim"};
   },choice);
   let result;
@@ -1586,28 +1587,69 @@ async function VerifyAirRouteHandoff(choice) {
   Check(result.airTurnEvidence.longestVisibleS>=4,"转向开火前真实自由视角连续可见至少四秒",JSON.stringify(result.airTurnEvidence));
   Check(result.airTurnEvidence.jointViews>0,"转向时真实同屏可辨认飞机、担架员和平民");
   if(process.argv.includes("--air-rescue")||process.argv.includes("--air-carry")||process.argv.includes("--air-dive")){
-    const rescue=await page.evaluate(carryReview=>{
-      const game=window.Tengxian,f=window.p012AirFixture,trace=[];
-      let frames=0,held=false;
-      for(;frames<3600;frames++){
+    let rescue;
+    for(let chunk=0;chunk<80;chunk++){
+      rescue=await page.evaluate(({carryReview,dropReview})=>{
+      const game=window.Tengxian,f=window.p012AirFixture;
+      f.rescueTrace||=[];f.rescueFrames||=0;let held=false,capture=null;
+      for(let frame=0;frame<90;frame++,f.rescueFrames++){
         const state=f.flow.State();if(state.beatIndex>=(carryReview?19:18))break;
-        const objective=state.objective,point=objective.interactionId&&game.interact.Point(objective.interactionId);
+        let objective=state.objective;
+        if(state.beatIndex===17&&!state.facts.includes("airObstacleResolved")&&!game.carry.Active){
+          const casualty=f.setpiece.mem.p012AirCivilian;
+          objective={target:casualty?.position,interactionId:casualty?"p012_airRescue":null};
+        }
+        const point=objective.interactionId&&game.interact.Point(objective.interactionId);
         const target=objective.target,dx=target?target.x-game.player.position.x:0,dz=target?target.z-game.player.position.z:0,distance=Math.hypot(dx,dz);
         game.player.yaw=Math.atan2(-dx,-dz);game.player.pitch=0;
         const query=game.interact.Query(game.player)?.point,usable=!!point&&query?.id===point.id;
         game.Debug.Key("KeyW",!!target&&!usable&&distance>.5);game.Debug.Key("KeyF",usable);held=usable;
         game.StepFrames(1,1/30,false);
-        if(frames%15===0)trace.push({at:frames/30,beat:f.flow.State().beat,position:game.player.position.toArray(),
+        const civilian=game.Debug.P012Scene().airCivilian;
+        if(f.rescueFrames%15===0)f.rescueTrace.push({at:f.rescueFrames/30,beat:f.flow.State().beat,position:game.player.position.toArray(),
           target,interaction:point?.id,query:query?.id,carry:game.carry.KindId,carriedS:game.carry.View()?.carriedS,
-          litters:game.Debug.P012Scene().litters,facts:[...f.flow.facts]});
+          civilian,litters:game.Debug.P012Scene().litters,facts:[...f.flow.facts]});
+        if(civilian?.carried&&game.carry.View()?.carriedS>2&&!f.civilianCarryCaptured){
+          f.civilianCarryCaptured=true;capture="CarriedCivilian";break;
+        }
+        if(dropReview&&civilian?.carried&&game.carry.View()?.carriedS>3&&!f.civilianDropped){
+          f.civilianDropped=true;game.Debug.Key("KeyF",false);game.StepFrames(1);
+          game.Debug.Key("KeyF",true);game.StepFrames(1);game.Debug.Key("KeyF",false);
+        }
       }
       game.Debug.Key("KeyW",false);game.Debug.Key("KeyF",false);game.StepFrames(1);
-      return {frames,trace,held,flow:f.flow.State(),scene:game.Debug.P012Scene(),carry:game.carry.KindId};
-    },process.argv.includes("--air-carry")||process.argv.includes("--air-dive"));
+      return {frames:f.rescueFrames,trace:f.rescueTrace,held,flow:f.flow.State(),scene:game.Debug.P012Scene(),carry:game.carry.KindId,capture,
+        pickups:game.interact.Point("p012_airRescue")?.count,dropped:!!f.civilianDropped};
+      },{carryReview:process.argv.includes("--air-carry")||process.argv.includes("--air-dive"),dropReview:process.argv.includes("--air-drop")});
+      if(rescue.capture){
+        await page.evaluate(()=>{
+          const g=window.Tengxian,at=g.player.position,camera=g.camera.clone();
+          camera.position.set(at.x+3,at.y+2.6,at.z+4);camera.lookAt(at.x,at.y+1,at.z);camera.updateMatrixWorld(true);
+          window.p012CarryViewmodelVisible=g.viewmodel.root.visible;g.viewmodel.root.visible=false;
+          g.renderer.setRenderTarget(null);g.renderer.render(g.scene,camera);
+        });
+        await page.screenshot({path:path.join(outputDir,"Scene_P012CarriedCivilianExternalView.png")});
+        await page.evaluate(()=>{const g=window.Tengxian;g.viewmodel.root.visible=window.p012CarryViewmodelVisible;g.StepFrames(1);});
+      }
+      if(rescue.flow.beatIndex>=(process.argv.includes("--air-carry")||process.argv.includes("--air-dive")?19:18))break;
+    }
     await fs.writeFile(path.join(outputDir,"Data_P012AirRescue.json"),JSON.stringify(rescue,null,2));
     await page.screenshot({path:path.join(outputDir,"Scene_P012AirRescue.png")});
     Check(rescue.flow.beatIndex>=18&&rescue.flow.facts.includes("airRescued"),
       "实际按键背起百姓、绕入沟岸、放到硬掩体后并回接担架",JSON.stringify({beat:rescue.flow.beat,seconds:rescue.frames/30,travel:rescue.flow.airRescueTravelM}));
+    const carriedCivilian=rescue.trace.filter(sample=>sample.civilian?.carried),patient=rescue.scene.airCivilian;
+    Check(carriedCivilian.length>3&&patient?.id===setup.originalCivilianId&&patient?.delivered&&patient.alive&&carriedCivilian.every(sample=>sample.civilian.id===patient.id
+      &&Math.hypot(sample.civilian.position.x-sample.position[0],sample.civilian.position.z-sample.position[2])<.5),
+      "实际受伤、连续随身搬运和安置始终是同一个活着的百姓角色",JSON.stringify(patient));
+    if(process.argv.includes("--air-drop"))Check(rescue.dropped&&rescue.pickups>=2,"中途真实按F放下后可在实际落点再次背起同一人");
+    await page.evaluate(()=>{
+      const g=window.Tengxian,at=g.Debug.P012Scene().airCivilian.position,camera=g.camera.clone();
+      camera.position.set(at.x+2,at.y+2,at.z+3);camera.lookAt(at.x,at.y+.3,at.z);camera.updateMatrixWorld(true);
+      window.p012CarryViewmodelVisible=g.viewmodel.root.visible;g.viewmodel.root.visible=false;
+      g.renderer.setRenderTarget(null);g.renderer.render(g.scene,camera);
+    });
+    await page.screenshot({path:path.join(outputDir,"Scene_P012DeliveredCivilianExternalView.png")});
+    await page.evaluate(()=>{const g=window.Tengxian;g.viewmodel.root.visible=window.p012CarryViewmodelVisible;g.StepFrames(1);});
     if(process.argv.includes("--air-carry")||process.argv.includes("--air-dive"))Check(rescue.flow.beat==="B19"&&rescue.carry==="stretcher",
       "仍抬着同一担架到达沟边后才迎来俯冲",JSON.stringify({beat:rescue.flow.beat,distance:rescue.scene.carryDistance,seconds:rescue.trace.at(-1)?.carriedS}));
     if(process.argv.includes("--air-dive")){

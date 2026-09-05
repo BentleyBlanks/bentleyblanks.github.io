@@ -52,8 +52,35 @@ import { TelegraphKeyInteraction, TelegraphReconnectInteraction } from "./Script
 // 分工与为什么不是一条 host 回调，写在 Script_BlastTargets.mjs 的头注里。
 import { BLAST_TARGETS } from "./Script_BlastTargets.mjs";
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
-import { P012NextVisiblePoint, P012RouteProjection, P012RoutePoint } from "./Script_FirstLevelP012March.mjs";
+import { P012SegmentClear, P012NextVisiblePoint, P012RouteProjection, P012RoutePoint } from "./Script_FirstLevelP012March.mjs";
 import { CARRY_KINDS } from "./Script_Carry.mjs";
+
+// The actual civilian hit by the aircraft remains the same living actor.
+// Carry owns attachment only while that named load is in the player's hands;
+// an early drop leaves the casualty at the actual drop point for another pickup.
+export function StepP012AirCivilian(s) {
+  const casualty=s.mem.p012AirCivilian,actor=casualty?.member?.handle;
+  if(!casualty?.injured||!actor)return false;
+  const carrying=actor.alive!==false&&s.carry?.KindId==="wounded"
+    &&s.carry?.load?.payload?.who==="p012AirCivilian";
+  actor.p012CarriedCasualty=carrying;
+  actor.p012Guided=true;actor.scriptMoveSpeedMps=0;actor.scriptArrivalRadius=.15;
+  actor.scriptDefensive=false;actor.scriptedNoncombatant=true;
+  actor.stance=2;actor.proneBlend=1;actor.crouchBlend=0;
+  const at=s.d.host.PositionOf?.(actor);
+  if(at&&casualty.carried&&!carrying){
+    const ground=s.d.host.Ground?.(at.x,at.z)||0,blocks=s.phase?.whitebox?.layout?.blocks||[];
+    // Lay the original body along a clear axis at the actual drop position.
+    // Keeping its cross-shoulder yaw can leave its feet through the bank wall.
+    const yaw=[actor.yaw||0,0,Math.PI/2,Math.PI,-Math.PI/2].find(yaw=>P012SegmentClear(blocks,
+      {x:at.x-Math.sin(yaw)*1.1,y:ground,z:at.z-Math.cos(yaw)*1.1},
+      {x:at.x+Math.sin(yaw)*1.1,y:ground,z:at.z+Math.cos(yaw)*1.1},.25));
+    if(yaw!==undefined){actor.yaw=yaw;actor.lookYaw=0;}
+  }
+  if(at){casualty.position={...at};s.d.host.SetGoal?.(actor,at.x,at.z);}
+  casualty.carried=carrying;
+  return true;
+}
 
 // The surviving front holder walks the same physical route as the player.
 // Camera turns never drag an actor around, and rendering reads both real ends.
@@ -485,7 +512,7 @@ export class EscortColumn {
     const right = { x: -dir.z, z: dir.x };
     const scatterSide = this.scattered ? this.tuning.columnScatterM : 0;
     for (const m of this.members) {
-      if (!m.handle || !this._Alive(m.handle)) continue;
+      if (!m.handle || !this._Alive(m.handle) || m.p012Injured) continue;
       const lateral = m.slot.lateral + (this.scattered ? -scatterSide : 0);
       if (this.followRouteBodies && !this.scattered) {
         let distance = this.legT + (this.tailAdvanceM || 0);
@@ -1582,6 +1609,7 @@ export const SETPIECES = {
     Update(s, dt) {
       s.mem.column?.Update(dt);
       const p012 = s.phase?.whitebox?.p012;
+      if(p012)StepP012AirCivilian(s);
       if (p012 && s.mem.p012RetryDive) {
         s.mem.p012RetryDive = false; s.strafe?.Abort("p012Retry");
         s.mem.diveAt = null; s.mem.diveDone = null;
@@ -1758,7 +1786,14 @@ export const SETPIECES = {
         const bearer = column?.Bearers?.[1] || column?.Bearers?.[0];
         const civilian = column?.Civilians?.[column.Civilians.length - 1];
         if (bearer) victims.push({ ref: bearer.handle, at: 0.30 });
-        if (civilian) victims.push({ ref: civilian.handle, at: 0.72 });
+        if (civilian) victims.push({ ref: civilian.handle, at: 0.72,
+          ...(p012?{damage:35,lethal:false,part:"legs",OnHit:(actor)=>{
+            if(actor.alive===false)return;
+            civilian.p012Injured=true;
+            s.mem.p012AirCivilian={member:civilian,injured:true,carried:false,delivered:false,
+              position:s.d.host.PositionOf?.(actor)};
+            StepP012AirCivilian(s);
+          }}:{}) });
         s.strafe?.StrafeRun({
           preset: "crowdTurn",
           from: { x: -440, z: 55 }, to: { x: -450, z: 165 },
@@ -1773,15 +1808,13 @@ export const SETPIECES = {
               if (!p012) column?.Scatter(14);
               if (p012 && column) column.scriptPaused = true;
               if (p012) {
-                const activity=s.phase.whitebox.activities,cart=activity.airCartPosition,civilianAt=activity.airCivilianPosition;
-                s.mem.p012AirObstacle={cart:{...cart},civilian:{...civilianAt},resolved:false};
+                const activity=s.phase.whitebox.activities,cart=activity.airCartPosition;
+                s.mem.p012AirObstacle={cart:{...cart},resolved:false};
                 // Programmatic whitebox props identify the two different
                 // choices. Collision is the matching layout gate and opens on
                 // the shared resolution signal.
                 s.mem.p012AirCartProp=s.Prop?.({id:"P012AirOverturnedCart",kind:"crate",position:cart,
                   size:[2.1,.9,1.1],color:0xe58b2f,rotationY:.18});
-                s.mem.p012AirCivilianProp=s.Prop?.({id:"P012AirFallenCivilian",kind:"sandbag",position:civilianAt,
-                  size:[.65,.35,1.7],color:0x9b5b45,rotationY:1.2});
                 s.Signal("P012CrowdFire"); s.Signal("P012AircraftCrowdFire"); s.Signal("P012AirObstacleCreated"); s.Signal("StretcherHandoff");
               }
             }
@@ -1792,7 +1825,7 @@ export const SETPIECES = {
 
       if (p012 && HasSignal("P012SeekAirCover") && !HasSignal("P012Dived")) {
         const activity=s.phase.whitebox.activities,slots=activity.airCrowdCoverSlots || [];
-        for(const [index,member] of (s.mem.column?.Alive || []).filter((m)=>m.role!=="bearer").entries()) {
+        for(const [index,member] of (s.mem.column?.Alive || []).filter((m)=>m.role!=="bearer"&&!m.p012Injured).entries()) {
           if(member.role==="civilian" && !HasSignal("P012CrowdFire")) continue;
           const point=slots[index],at=s.d.host.PositionOf?.(member.handle);
           if(point){

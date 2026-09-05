@@ -58,7 +58,7 @@ import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 
 const points = new Map();
 {
- const registered=new Map(),carry={KindId:"wounded"},director=new FirstLevelP012Director({Carry:()=>carry,Register:point=>registered.set(point.id,point)},phase.whitebox);
+ const registered=new Map(),carry={KindId:"wounded",load:{payload:{who:"p012AirCivilian"}}},director=new FirstLevelP012Director({Carry:()=>carry,Register:point=>registered.set(point.id,point)},phase.whitebox);
  director.InstallInteractions();director.beat=17;director.signals.add("P012AirObstacleCreated");
  const start={x:106.76010411933754,z:60.99952806131418};
  director.lastSample={position:start,carryKind:"wounded",bodyRadius:.34};
@@ -571,7 +571,10 @@ signals.add("P012RailComplete"); Tick();
 assert.equal(flow.State().beat,"B17","actual rail exit plus the player's physical route choice releases B17");
 signals.add("P012CrowdFire");signals.add("P012AirObstacleCreated"); Tick();
 assert.equal(flow.State().beat,"B17","crowd fire creates a real unresolved obstruction");
+assert.equal(points.get("p012_airRescue").Enabled(),false,"opening fire alone cannot invent an injured civilian");
+Tick({airCivilianReady:true,airCivilianPosition:phase.whitebox.activities.airCivilianPosition});
 assert.equal(points.get("p012_airRescue").Enabled(),true);assert.equal(points.get("p012_airCartClear").Enabled(),true);
+assert.equal(points.get("p012_airRescue").Anchor(),flow.lastSample.airCivilianPosition,"pickup follows the real casualty position, including a later drop");
 Use("p012_airCartClear");
 assert.ok(signals.has("P012CrowdReady")&&signals.has("P012SeekAirCover"));
 Walk(phase.whitebox.activities.airRejoinRoute,{stance:"stand"});

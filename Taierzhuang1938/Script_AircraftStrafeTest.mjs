@@ -39,6 +39,16 @@ const { Vector3 } = await import(`data:text/javascript;base64,${Buffer.from(read
 }
 
 let checks = 0;
+{
+ const director=new AircraftStrafeDirector({});let hits=0;
+ const civilian={alive:true,health:100,position:new Vector3(0,0,10),TakeHit(damage){this.health-=damage;return false;},Kill(){throw new Error('nonlethal casualty must not be killed');}};
+ director.StrafeRun({preset:'crowdTurn',from:{x:0,z:0},to:{x:0,z:20},victims:[{ref:civilian,at:.72,damage:35,lethal:false,
+  OnHit:(actor,died)=>{assert.equal(actor,civilian);assert.equal(died,false);assert.equal(actor.health,65);hits++;}}]});
+ assert.equal(hits,0,'injury callback follows the actual strike, not setup or turn');
+ for(let frame=0;frame<1600&&director.Active;frame++)director.Update(.05);
+ assert.equal(hits,1,'one actual nonlethal hit produces one injury transition');
+ assert.equal(civilian.alive,true);assert.equal(civilian.health,65);
+}
 function Check(condition, message) {
   assert.ok(condition, message);
   checks += 1;

@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { FirstLevelP012Runtime, P012GuideApproach } from "./Script_FirstLevelP012Runtime.mjs";
 import {P012SegmentClear} from "./Script_FirstLevelP012March.mjs";
-import { SETPIECES, EscortColumn, LastLitterArrived, StepP012PlayerLitter } from "./Script_MissionSetpieces.mjs";
+import { SETPIECES, EscortColumn, LastLitterArrived, StepP012PlayerLitter, StepP012AirCivilian } from "./Script_MissionSetpieces.mjs";
 import P012Phase from "./Data_FirstLevelP012Whitebox.mjs";
 import {FirstLevelP012Director} from "./Script_FirstLevelP012Flow.mjs";
 import {InteractSystem} from "./Script_Interact.mjs";
@@ -20,6 +20,36 @@ function FootY(layout,p) {
  return y;
 }
 assert.ok(openingStoryBeats.length>0);
+{
+ const source=readFileSync(new URL('./Script_Ai.mjs',import.meta.url),'utf8');
+ const method=source.match(/  StepCarriedCasualty\(s, dt, player\) \{[\s\S]*?\n  \}/)[0];
+ const Step=vm.runInNewContext(`({${method}}).StepCarriedCasualty`,{Math});
+ const Position=(x,y,z)=>({x,y,z,copy(p){this.x=p.x;this.y=p.y;this.z=p.z;return this;}});
+ const bodyPositions=[],poses=[],actor={id:7,alive:true,health:65,position:Position(108,0,70),
+  body:{SetSize(){},Teleport:(x,y,z)=>bodyPositions.push({x,y,z})},
+  actor:{root:{position:Position(108,0,70),rotation:{}},Update:(dt,pose)=>poses.push(pose)}};
+ const member={role:'civilian',handle:actor,p012Injured:true};
+ const s={mem:{p012AirCivilian:{member,injured:true}},carry:{KindId:'wounded',load:{payload:{who:'anotherCasualty'}}},
+  d:{host:{PositionOf:handle=>({...handle.position}),SetGoal(){}}}};
+ StepP012AirCivilian(s);assert.equal(actor.p012CarriedCasualty,false,'a different wounded load cannot move this person');
+ s.carry.load.payload.who='p012AirCivilian';StepP012AirCivilian(s);
+ const player={position:Position(108,0,70),yaw:0};
+ for(let frame=0;frame<80;frame++){
+  player.position.z-=.04;player.yaw=frame*.01;Step.call({time:frame/30},actor,1/30,player);StepP012AirCivilian(s);
+  assert.ok(Math.hypot(actor.position.x-player.position.x,actor.position.z-player.position.z)<.36);
+  assert.deepEqual(bodyPositions.at(-1),{x:actor.position.x,y:actor.position.y,z:actor.position.z});
+ }
+ assert.ok(poses.every(pose=>pose.prone===1&&pose.moveSpeed===0),'same model has the carried casualty pose');
+ const drop={...actor.position};s.carry.KindId=null;s.carry.load=null;StepP012AirCivilian(s);
+ assert.equal(actor.p012CarriedCasualty,false);assert.deepEqual(actor.position,drop,'dropping preserves the current location, not the old pickup anchor');
+ assert.equal(actor.health,65);assert.equal(s.mem.p012AirCivilian.member.handle,actor);
+ s.phase={whitebox:P012Phase.whitebox};s.mem.p012AirCivilian.carried=true;
+ actor.position=Position(104.4300129913684,1.05,62.92767034613633);actor.yaw=Math.PI/2;
+ StepP012AirCivilian(s);
+ assert.equal(actor.yaw,0,'recorded narrow rescue bay lays the body along the bank instead of across its wall');
+ assert.equal(actor.position.x,104.4300129913684);assert.equal(actor.position.z,62.92767034613633);
+ console.log('PASS same living civilian attachment, physical body/model agreement, and drop identity');
+}
 {
  const config=P012Phase.whitebox,activity=config.activities,blocks=config.layout.blocks;
  // Actual positions from the screen-wall regression. The second defender
@@ -731,8 +761,8 @@ assert.match(main,/story\.P012Restore\?\.\(sample\.p012Story\.immediate\)/,"P012
  assert.equal(runs.length,2);assert.equal(runs[1].preset,'crowdTurn');
  runs[1].OnPhase('fire');SETPIECES.CH1_NanLu.Update(context,.1);
  assert.equal(column.scriptPaused,true,'earlier choice release cannot clear the later strafe pause');
- assert.ok(props.length===2&&props.every(prop=>Array.isArray(prop.size)&&prop.size.length===3&&prop.size.every(Number.isFinite)),
-  'air obstruction props satisfy the production BoxGeometry size-array contract');
+ assert.ok(props.length===1&&props.every(prop=>Array.isArray(prop.size)&&prop.size.length===3&&prop.size.every(Number.isFinite)),
+  'only the cart is a box prop; the wounded civilian is an existing actor');
  console.log('PASS real rail pass, physical route choice and road arrival own finite aircraft/column handoffs');
 }
 {

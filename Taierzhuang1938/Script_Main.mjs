@@ -2086,6 +2086,12 @@ async function Boot() {
         roots:scene.children.filter(root=>root.userData?.externalProps || /^(ExternalProps_|TrimProps_)/.test(root.name)).map(root=>root.name)}),
       P012Scene: () => p012Runtime ? { ...p012Runtime.Sample(), stageZero:p012StageZero?.Snapshot(), cast:ai.soldiers.filter(actor=>actor.castId).map(actor=>({castId:actor.castId,age:actor.identity?.age,modelVariant:actor.actor?.modelVariant,position:{...actor.position}})), resting:{count:p012Resting?.entries.length||0,people:p012Resting?.Snapshot()||[]}, airColumnEnteredRoad:AirColumnEnteredRoad(setpieces?.mem?.column,player.position,PHASE_TABLE[state.phaseIndex]?.whitebox?.activities), columnPosition: setpieces?.mem?.column?.HeadPosition(), columnRouteIndex: setpieces?.mem?.column?.legIndex,
         woundedDragDelivered: !!setpieces?.mem?.p012WoundedDrag?.delivered, woundedDragDistance: setpieces?.mem?.p012WoundedDrag?.distance || 0,
+        airCivilian: setpieces?.mem?.p012AirCivilian ? {
+          id:setpieces.mem.p012AirCivilian.member.handle.id,alive:setpieces.mem.p012AirCivilian.member.handle.alive,
+          health:setpieces.mem.p012AirCivilian.member.handle.health,carried:setpieces.mem.p012AirCivilian.carried,
+          delivered:setpieces.mem.p012AirCivilian.delivered,position:{...setpieces.mem.p012AirCivilian.member.handle.position},
+          modelKind:setpieces.mem.p012AirCivilian.member.handle.actor?.kind,
+        }:null,
         carryDistance: setpieces?.mem?.p012CarryDistance || 0, litterOverturned: !!setpieces?.mem?.p012LitterOverturned,
         litterRecovered: !!setpieces?.mem?.p012LitterRecovered, lastLitterArrived: LastLitterArrived(setpieces?.mem?.column),
         fallenAt: setpieces?.mem?.p012FallenAt ? { ...setpieces.mem.p012FallenAt } : null, recoveryReason: setpieces?.mem?.p012RecoveryReason || null,
@@ -3244,15 +3250,13 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     DeployRetreatSmoke: (point) => p012Runtime.DeployRetreatSmoke(point),
     ResolveAirObstacle:(mode)=>{
       const mem=setpieces?.mem;if(!mem?.p012AirObstacle)return false;
-      mem.p012AirObstacle.resolved=true;mem.p012AirObstacle.mode=mode;
       if(mode==="rescue"){
-        const at=phase.whitebox.activities.airRescueCover;
-        if(mem.p012AirCivilianProp)MoveSetpieceProp(mem.p012AirCivilianProp,{...at,y:.18,rotationY:1.2});
-        if(mem.p012AirCartProp)SetSetpiecePropState(mem.p012AirCartProp,"removed");
-      }else{
-        if(mem.p012AirCartProp)SetSetpiecePropState(mem.p012AirCartProp,"removed");
-        if(mem.p012AirCivilianProp)MoveSetpieceProp(mem.p012AirCivilianProp,{x:phase.whitebox.activities.airCivilianPosition.x-1.5,y:.18,z:phase.whitebox.activities.airCivilianPosition.z,rotationY:1.2});
+        const casualty=mem.p012AirCivilian;
+        if(!casualty?.injured||!casualty.member.handle.alive||carry?.load?.payload?.who!=="p012AirCivilian")return false;
+        casualty.delivered=true;
       }
+      mem.p012AirObstacle.resolved=true;mem.p012AirObstacle.mode=mode;
+      if(mem.p012AirCartProp)SetSetpiecePropState(mem.p012AirCartProp,"removed");
       return true;
     },
     HoldRetreatForCover: (hold) => {
@@ -6393,6 +6397,9 @@ function Frame(dt, render = true) {
       clips: state.clips, ammo: state.ammo, grenades: state.grenades,
       woundedDragDelivered: !!setpieces?.mem?.p012WoundedDrag?.delivered,
       woundedDragDistance: setpieces?.mem?.p012WoundedDrag?.distance || 0,
+      airCivilianPosition:setpieces?.mem?.p012AirCivilian?.member?.handle?.position||null,
+      airCivilianReady:!!setpieces?.mem?.p012AirCivilian?.injured&&!!setpieces.mem.p012AirCivilian.member.handle.alive
+        &&!setpieces.mem.p012AirCivilian.delivered,
       stretcherCarryDistance: setpieces?.mem?.p012CarryDistance || 0,
       carryDistance: setpieces?.mem?.p012CarryDistance || 0,
       lastLitterArrived,

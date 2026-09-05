@@ -405,6 +405,7 @@ export class AircraftStrafeDirector {
         damage: Num(raw.damage, 140),
         lethal: raw.lethal !== false,
         part: raw.part || "torso",
+        OnHit: typeof raw.OnHit === "function" ? raw.OnHit : null,
         struck: false,
       });
     }
@@ -680,7 +681,8 @@ export class AircraftStrafeDirector {
     for (const v of run.victims) {
       if (v.struck || u < v.at) continue;
       v.struck = true;
-      this.StrikeNpc(v.ref, { damage: v.damage, lethal: v.lethal, part: v.part, scripted: true });
+      const died=this.StrikeNpc(v.ref, { damage: v.damage, lethal: v.lethal, part: v.part, scripted: true });
+      v.OnHit?.(v.ref,died);
     }
   }
 

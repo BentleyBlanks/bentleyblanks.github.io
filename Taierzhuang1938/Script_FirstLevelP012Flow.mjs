@@ -278,16 +278,18 @@ export class FirstLevelP012Director {
         this.Mark("roadWounded"); this.Mark("regroup"); this.Emit("P012RoadWoundedChecked"); return true;
       } });
     Register({id:"p012_airRescue",kind:"carry",label:"背起扫射中受伤的百姓",gesture:"hold",seconds:1.2,
-      position:this.config.activities?.airCivilianPosition,once:false,
-      Enabled:()=>this.beat===17&&this.Signalled("P012AirObstacleCreated")&&!this.facts.has("airObstacleResolved")&&!carry?.Active,
+      Anchor:()=>this.lastSample.airCivilianPosition,once:false,
+      Enabled:()=>this.beat===17&&this.lastSample.airCivilianReady===true&&this.Signalled("P012AirObstacleCreated")&&!this.facts.has("airObstacleResolved")&&!carry?.Active,
       OnComplete:()=>carry?.Begin("wounded",{label:"受伤百姓",payload:{who:"p012AirCivilian"}})!==false});
     Register({id:"p012_airRescueCover",kind:"carry",label:"把伤员放到蓝色硬掩体后",gesture:"hold",seconds:1,
       position:this.config.activities?.airRescueCover,once:false,
       Enabled:()=>this.beat===17&&carry?.KindId==="wounded"
+        &&carry?.load?.payload?.who==="p012AirCivilian"
         &&Distance(this.lastSample.position,this.config.activities?.airRescueCover)<1.7
         &&P012SegmentClear(this.config.layout?.blocks||[],this.lastSample.position,this.config.activities?.airRescueCover,this.lastSample.bodyRadius||.42),
-      OnComplete:()=>{carry?.ForceRelease("airRescue");this.Mark("airObstacleResolved");this.Mark("airRescued");
-        this.Emit("P012AirObstacleResolved");this.host.ResolveAirObstacle?.("rescue");return true;}});
+      OnComplete:()=>{if(this.host.ResolveAirObstacle?.("rescue")===false)return false;
+        carry?.ForceRelease("airRescue");this.Mark("airObstacleResolved");this.Mark("airRescued");
+        this.Emit("P012AirObstacleResolved");return true;}});
     Register({id:"p012_airCartClear",kind:"plank",label:"推开翻倒小车，转入沟边",gesture:"hold",seconds:2.2,
       position:this.config.activities?.airCartPosition,once:false,
       Enabled:()=>this.beat===17&&this.Signalled("P012AirObstacleCreated")&&!this.facts.has("airObstacleResolved")&&!carry?.Active,
@@ -1221,8 +1223,8 @@ export class FirstLevelP012Director {
         interactionId=target===activity.airRescueCover||Distance(target,activity.airRescueCover)<.01?"p012_airRescueCover":null;
         requiredAction="carry";text="从蓝色沟岸南端开口绕入，把受伤百姓送到墙后";
       }else if(!this.facts.has("airObstacleResolved")){
-        const rescue=activity.airCivilianPosition,cart=activity.airCartPosition;
-        const chooseRescue=Distance(this.lastSample.position,rescue)<=Distance(this.lastSample.position,cart);
+        const rescue=this.lastSample.airCivilianPosition,cart=activity.airCartPosition;
+        const chooseRescue=!!rescue&&Distance(this.lastSample.position,rescue)<=Distance(this.lastSample.position,cart);
         target=chooseRescue?rescue:cart;requiredAction="interact";
         interactionId=chooseRescue?"p012_airRescue":"p012_airCartClear";text="选择：靠左背起伤员送到蓝墙后，或靠右推开小车转沟边";
       }else{target=route[this.routeIndex]||route.at(-1);requiredAction="move";

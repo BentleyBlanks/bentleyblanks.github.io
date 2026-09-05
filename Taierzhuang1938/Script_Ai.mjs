@@ -1405,6 +1405,7 @@ export class AiDirector {
     // animation and crowd LOD inside the normal AI scheduling contract, but do
     // not let gravity, navigation or idle collision steps move the measured rig.
     if (s.weaponRangeTargetId) { this.StepWeaponRange(s, dt); return; }
+    if (s.p012CarriedCasualty) { this.StepCarriedCasualty(s, dt, player); return; }
     if (s.actor?.pendingGrenadeThrow || s.actor?.characterRig?.infantry.IsThrowing()) {
       if (s.meleeCombat) { s.actor.pendingGrenadeThrow = null; this.StepMeleeCombat(s, dt); return; }
       s.stance = 0; s.crouchBlend = 0; s.proneBlend = 0; s.moveSpeed = 0;
@@ -1678,6 +1679,22 @@ export class AiDirector {
         carryRole: s.carryRole || null,
         woundedWalk: s.woundedWalk || 0,
       });
+    }
+  }
+
+  /** A named living casualty is attached to the carrier, with the same model and body. */
+  StepCarriedCasualty(s, dt, player) {
+    if(!player?.position)return;
+    const yaw=player.yaw||0;
+    s.position.copy(player.position);
+    s.position.x+=Math.sin(yaw)*.35;s.position.z+=Math.cos(yaw)*.35;
+    s.position.y+=1.05;s.yaw=yaw+Math.PI/2;
+    s.moveSpeed=0;s.aimBlend=0;s.velocityY=0;s.grounded=false;s.idleStepDt=0;
+    s.body?.SetSize(.42,.58);s.body?.Teleport(s.position.x,s.position.y,s.position.z);
+    if(s.actor){
+      s.actor.root.position.copy(s.position);s.actor.root.rotation.y=s.yaw;
+      s.actor.Update(dt,{moveSpeed:0,aim:0,crouch:0,prone:1,grounded:true,
+        elapsed:this.time,lookYaw:0,lookPitch:0});
     }
   }
 
