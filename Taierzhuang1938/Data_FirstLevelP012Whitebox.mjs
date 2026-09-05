@@ -129,7 +129,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
   id: FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID, contentId: FIRST_CHAPTER.id,
   sandbox: true, sandboxKey: "firstLevelP012Whitebox", sandboxGlyph: "012",
   date: "P0/P1/P2 场景白盒", label: "第一关 · P0/P1/P2 场景白盒",
-  place: "铁路兵站", sky: "p012WhiteboxDay", ambience: "smokyDay", music: null, minutes: 26,
+  place: "铁路兵站", sky: "testSceneDay", ambience: "smokyDay", music: null, minutes: 26,
   brief: Object.freeze(["跟随罗班长下车，领取枪弹后随队出发。",
     "灰：地面；黄：跨过；橙：翻越；紫：攀爬；蓝：掩体；黑：边界；红：危险；绿：任务路；青：担架路。"]),
   metaText: Object.freeze(["颜色语义白盒", "正式第一章人物与玩法", "节奏校准中"]),

@@ -69,7 +69,7 @@ export const RANGE_PHASE = {
   date: "测试靶场",
   label: "玩法测试靶场",
   place: "开发专用 · 不属于正片",
-  sky: "overcast",                // SKY_PRESETS 与 AMBIENCE_PRESETS 都有这一档
+  sky: "testSceneDay", ambience: "overcast",                // 与其余测试场共享角色光照基准
   music: null,
   minutes: 600,
   brief: [

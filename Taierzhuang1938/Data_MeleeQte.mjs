@@ -2,7 +2,7 @@
 export const MELEE_QTE_LEVEL_ID = "MeleeQte";
 export const MELEE_QTE_PHASE = Object.freeze({
   id: MELEE_QTE_LEVEL_ID, sandbox: true, sandboxKey: "melee", sandboxGlyph: "刃",
-  date: "机制实验场", label: "白刃战 · 大刀与刺刀", place: "独立战斗测试", sky: "overcast", music: null, minutes: 600,
+  date: "机制实验场", label: "白刃战 · 大刀与刺刀", place: "独立战斗测试", sky: "testSceneDay", ambience: "overcast", music: null, minutes: 600,
   brief: ["左键轻点攻击，长按松开重击；右键瞬时拨挡；贴身 F 推架。", "僵持与倒地压制时连续按 F。成功后自行移动和攻击。"],
   story: MELEE_QTE_LEVEL_ID, cutsceneIn: null, cutsceneOut: null,
   objectives: ["在右侧选择独立战斗项目", "看动作、拨挡、争夺距离，再自由攻击"],

@@ -135,37 +135,27 @@ void main() {
  * 时段预设。每一关按剧情选一个，关内可以插值过渡。
  * 数值单位是"线性 HDR"，配合 PostPipeline 的 exposure 一起看。
  */
+// Shared test daylight: fixed world-space key + neutral shadow fill, clear air.
+// Linear HDR renderer units, not measured physical lux. Compare identical poses,
+// orientation and graphics settings; preserve each character's authored albedo.
+export const TEST_SCENE_DAY = {
+  sunElevation: 52, sunAzimuth: 35,
+  zenith: [0.38, 0.52, 0.72], horizon: [0.68, 0.76, 0.86], ground: [0.30, 0.32, 0.34],
+  sunColor: [1.0, 0.98, 0.95], sunIntensity: 40, sunSize: 0.000012, glow: 0.18, glowSpread: 10,
+  smoke: 0, smokeColor: [0.67, 0.70, 0.75], smokeHeight: 0.10, stars: 0,
+  lightColor: 0xfffaf0, lightIntensity: 3.2,
+  envIntensity: 0.70, shProbeIntensity: 0.85, ambientColor: 0xffffff, ambientIntensity: 1.0,
+  fog: { density: 0, falloff: 30, max: 0,
+    sky: [0.50, 0.56, 0.65], ground: [0.42, 0.44, 0.47], sunGain: 0,
+    desat: 0, flatten: 0 },
+  exposure: 0.62, godStrength: 0, bloom: 0, saturation: 1, contrast: 1,
+};
+
 export const SKY_PRESETS = {
-  // Firearm/sight inspection uses clear air across the whole measured range.
-  // The overcast combat preset would erase a 200 m target beneath 95% fog.
-  // Neutral daylight keeps steel, wood, uniforms and painted lanes distinct.
-  weaponRangeDay: {
-    sunElevation: 52, sunAzimuth: 222,
-    zenith: [0.38, 0.52, 0.72], horizon: [0.68, 0.76, 0.86], ground: [0.30, 0.32, 0.34],
-    sunColor: [1.0, 0.98, 0.95], sunIntensity: 40, sunSize: 0.000012, glow: 0.18, glowSpread: 10,
-    smoke: 0, smokeColor: [0.67, 0.70, 0.75], smokeHeight: 0.10, stars: 0,
-    lightColor: 0xfffaf0, lightIntensity: 3.8,
-    hemiSky: 0x9bb6d1, hemiGround: 0x747b80, hemiIntensity: 0.55,
-    envIntensity: 0.70, shProbeIntensity: 0.25, ambientIntensity: 0.10,
-    fog: { density: 0, falloff: 30, max: 0,
-      sky: [0.50, 0.56, 0.65], ground: [0.42, 0.44, 0.47], sunGain: 0,
-      desat: 0, flatten: 0 },
-    exposure: 0.52, godStrength: 0, bloom: 0, saturation: 1, contrast: 1.06,
-  },
-  // P012 是颜色语义审读场：照亮背光人物与可通行体块，不借正片的烟尘掩盖空间。
-  // 独立预设，不改变旧白盒与正式章节。低对比保留蓝/紫/黑等类别的可辨性。
-  p012WhiteboxDay: {
-    sunElevation: 52, sunAzimuth: 222,
-    zenith: [0.42, 0.58, 0.78], horizon: [0.78, 0.85, 0.96], ground: [0.34, 0.35, 0.36],
-    sunColor: [1.0, 0.98, 0.95], sunIntensity: 42, sunSize: 0.000012, glow: 0.3, glowSpread: 10,
-    smoke: 0.05, smokeColor: [0.67, 0.70, 0.75], smokeHeight: 0.10, stars: 0,
-    lightColor: 0xfffaf0, lightIntensity: 4.2,
-    envIntensity: 0.85, shProbeIntensity: 0.35, ambientIntensity: 0.14,
-    fog: { density: 0.0015, falloff: 30, max: 0.35,
-      sky: [0.50, 0.56, 0.65], ground: [0.42, 0.44, 0.47], sunGain: 0.05,
-      desat: 0.03, flatten: 0.02 },
-    exposure: 0.65, godStrength: 0, bloom: 0.03, saturation: 1, contrast: 1,
-  },
+  testSceneDay: TEST_SCENE_DAY,
+  // Keep saved editor/debug preset names on the same calibration.
+  weaponRangeDay: TEST_SCENE_DAY,
+  p012WhiteboxDay: TEST_SCENE_DAY,
   // 关卡策划白盒专用：环境体块全是 0xffffff，不能沿用正片 smokyDay 的 8.6 直射、
   // 1.05 IBL 与 0.34 bloom —— 三项叠加会把地面和迎光面一起剪成纯白，形体反而消失。
   // 这里不靠给盒子染灰做层次；材质仍是纯白，只把光照压进可审读的动态范围，

@@ -94,7 +94,7 @@ export const WEAPON_RANGE_PHASE = {
   id: WEAPON_RANGE_LEVEL_ID, sandbox: true, sandboxKey: "weapons", sandboxGlyph: "枪",
   whitebox: { triggerAimBeforeRecoil: true, cleanSight: true, allowUndeployedAds: true },
   date: "枪械白盒", label: "枪械白盒靶场", place: "独立测试场 · 全枪械 / 无限弹药",
-  sky: "weaponRangeDay", music: null, minutes: 600,
+  sky: "testSceneDay", music: null, minutes: 600,
   brief: ["出生前方长桌按 F 领取枪械。所有枪械无限弹药；静靶在左、动靶在右。",
     "蓝色圆点是测距原点：各靶与圆点的水平直线距离为 10–200 米。移动靶沿等距圆弧往返。"],
   story: WEAPON_RANGE_LEVEL_ID, cutsceneIn: null, cutsceneOut: null,

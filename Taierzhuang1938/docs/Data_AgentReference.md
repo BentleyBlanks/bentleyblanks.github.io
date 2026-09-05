@@ -143,6 +143,9 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - `Script_Ai.mjs`（士兵 AI 与战斗结算）、`Script_Navigation.mjs`（「哪儿站得住」位图 + 下坡场）。
 - 先读：`docs/Data_TechPhysics.md`（角色 IK 部分）。
 
+### 测试场共享光照
+- 五个测试场共用 `Script_Sky.TEST_SCENE_DAY`；参数、角色比较条件与灰卡/全角色回归见 [测试场光照基准](Data_TestSceneLighting.md)。
+
 ### 枪械射击白盒（?weapons=1，全枪械专项）
 - `Data_WeaponRange.mjs` 动态收集枪表并定义精确距离/圆弧移动靶；`Script_WeaponRangeField.mjs` 管合批白盒、长桌和距离牌。
 - `Script_WeaponRangeRuntime.mjs` 管桌面拾取、移靶、无限弹/换弹测试和 `Debug.WeaponRange`；射击、装填、伤害仍走正式链路。

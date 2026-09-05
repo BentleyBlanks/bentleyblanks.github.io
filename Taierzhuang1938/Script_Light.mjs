@@ -105,6 +105,7 @@ export class LightRig {
     this.sun.intensity = preset.lightIntensity;
     // 全局 Probe 本身固定来源于通用 HDR；只按时段缩放，避免夜战仍吃正午亮度。
     this.probeBase = preset.shProbeIntensity ?? (preset.lightIntensity <= 0.5 ? 0.11 : 0.34);
+    this.ambient.color.setHex(preset.ambientColor ?? 0x607085);
     this.ambientBase = preset.ambientIntensity ?? (preset.lightIntensity <= 0.5 ? 0.045 : 0.16);
     this.globalProbe.intensity = this.probeBase * this.giFill;
     this.ambient.intensity = this.ambientBase * (this.giFill < 1 ? 0.72 : 1);

@@ -137,6 +137,7 @@ export const testDefs = {
   AdsSightTest: { file: "Script_AdsSightTest.mjs", desc: "全部枪械的实体准星与照门对齐、前景无遮挡" },
   BayonetTest: { file: "Script_BayonetTest.mjs", desc: "刺刀：装卸、空枪白刃、蓄力分挥砍/劈刺" },
   RangeTest: { file: "Script_RangeTest.mjs", desc: "玩法测试靶场（?range=1）：木桩兵 + 枪/镜/刀/刺刀/手榴弹全链路" },
+  TestSceneLightingTest: { file: "Script_TestSceneLightingTest.mjs", timeoutMs: 10 * 60 * 1000, desc: "测试场共享光照、四向灰卡、十四角色与正片还原" },
   WeaponRangeTest: { file: "Script_WeaponRangeTest.mjs", timeoutMs: 20 * 60 * 1000,
     desc: "全枪械白盒：桌面 F 拾取、无限弹药/换弹、10–200米静动靶与真实命中" },
   MeleeAnimationTest: { file: "Script_MeleeAnimationTest.mjs", timeoutMs: 15 * 60 * 1000, desc: "Blender 全骨骼与第一人称 42 动作、握持可见性及源工程样本" },
@@ -206,7 +207,7 @@ export const browserTests = new Set([
   "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MenuTest",
   "PerformanceTest", "PhysicsTest", "PostTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
-  "RangeTest", "WeaponRangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
+  "TestSceneLightingTest", "RangeTest", "WeaponRangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
   "FirstPersonEmbodimentTest", "SprintViewmodelTest", "TargetInfoTest", "VisibilityTest", "VoiceTest",
   "FirstLevelWhiteboxBrowserTest",
   "FirstLevelP012BrowserTest",
@@ -309,7 +310,7 @@ export const domains = {
     label: "渲染与合批自动契约",
     // 照明弹的灯走 LightRig 的火光池、烟走 VfxSystem 的烟源池，两处都加了新口子
     //（UpdateFire / MoveSmokeSource），所以碰灯光或粒子的改动也要连着 FlareTest 跑。
-    tests: ["PostTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest"],
+    tests: ["TestSceneLightingTest", "PostTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
