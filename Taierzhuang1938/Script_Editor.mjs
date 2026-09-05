@@ -40,6 +40,7 @@ import { FullSceneEditor } from "./Script_EditorFullScene.mjs";
 import { SamplePointEditor } from "./Script_EditorSamplePoints.mjs";
 import { DestructionEditor } from "./Script_EditorDestruction.mjs";
 import { DebugRenderingEditor } from "./Script_EditorDebugRendering.mjs";
+import { WorldInfoEditor } from "./Script_EditorWorldInfo.mjs";
 import { ProfilerEditor } from "./Script_EditorProfiler.mjs";
 import {
   GraphicsSettings, AudioSettings, ControlsSettings, ApplySavedSettings,
@@ -61,7 +62,7 @@ const EDITORS = [
 const ALL = [...SETTINGS, ...EDITORS];
 // 渲染调试只读地观察后处理靶，不接管相机，因此允许叠在任意一个互斥编辑器上。
 // 性能剖析同理：它甚至要求玩法照跑（量的就是战斗中的帧），读数在独立窗口里。
-const OVERLAYS = [DebugRenderingEditor, ProfilerEditor];
+const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, WorldInfoEditor];
 
 export class EditorSuite {
   /**
@@ -141,6 +142,7 @@ export class EditorSuite {
       Close: () => suite.Close(),
       CloseDebugRendering: () => suite.CloseOverlay(DebugRenderingEditor.id),
       CloseProfiler: () => suite.CloseOverlay(ProfilerEditor.id),
+      CloseWorldInfo: () => suite.CloseOverlay(WorldInfoEditor.id),
       // 性能剖析在面板关着（玩法进行中）时要把自己的页面内小面板收起来
       get launcherOpen() { return suite.panelOpen; },
     };
@@ -225,7 +227,7 @@ export class EditorSuite {
       body.appendChild(section);
     }
     Group("设置", SETTINGS);
-    Group("渲染调试（可叠加）", OVERLAYS);
+    Group("调试", OVERLAYS);
     Group("编辑器", EDITORS);
 
     const off = El("button", "edBtn wide danger", "全部关掉");
@@ -278,7 +280,7 @@ export class EditorSuite {
       if (this.host.audio && this.host.audio.SetPaused) this.host.audio.SetPaused(silenceBackground);
     }
     if (this.status) {
-      const overlayNote = this.overlays.size ? " · 渲染调试叠加中" : "";
+      const overlayNote = this.overlays.size ? " · 调试叠加中" : "";
       this.status.textContent = this.active
         ? `${this.activeId} 接管中 · 玩法已暂停${this.activeId === AudioEditor.id ? " · 背景试听已启用" : ""}${overlayNote}`
         : `玩法已暂停（面板开着）${overlayNote}`;
@@ -489,7 +491,7 @@ export class EditorSuite {
   }
 
   Dispose() {
-    this.Close();
+    this.Close({ all: true });
     document.removeEventListener("keydown", this._onKeyDown);
     document.removeEventListener("keydown", this._onTab, true);
     document.removeEventListener("keyup", this._onKeyUp);

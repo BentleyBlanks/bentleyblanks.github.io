@@ -173,6 +173,7 @@ export const testDefs = {
   // 实机约 12—14 分钟，继续吃 10 分钟默认值会在末段稳定误报 timeout。
   EditorTest: { file: "Script_EditorTest.mjs", timeoutMs: 16 * 60 * 1000,
     desc: "编辑器套件（phase=5 十字街）160 项" },
+  WorldInfoEditorTest: { file: "Script_WorldInfoEditorTest.mjs", desc: "WorldInfo：角色 Transform 实时浮窗与开关生命周期" },
   DestructionEditorTest: { file: "Script_DestructionEditorTest.mjs", desc: "可破坏预览编辑器：真实七关 + 承重白名单" },
   ActorBatchTest: { file: "Script_ActorBatchTest.mjs", desc: "人物合批：逐像素无损 + 真省 draw call" },
   PropInstancingTest: { file: "Script_PropInstancingTest.mjs", desc: "外部布设实例化：逐像素无损 + 真省 draw call + 流送自洽" },
@@ -205,7 +206,7 @@ export const browserTests = new Set([
   "ActorBatchTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
   "AudioTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
-  "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsGripEditorTest",
+  "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GunFeelTest",
   "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MenuTest",
   "PerformanceTest", "PhysicsTest", "PostTest", "ProfilerTest", "PropInstancingTest",
@@ -302,7 +303,7 @@ export const domains = {
   audio: { label: "音效/音乐/环境声", tests: ["AudioTest"] },
   voice: { label: "语音", tests: ["VoiceTest"] },
   menu: { label: "主菜单/开机陈设", tests: ["MenuTest", "BootPropTest"] },
-  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
+  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
@@ -333,6 +334,7 @@ export const domains = {
 
 const changedDomainRules = [
   { domain: "physics", pattern: /MovementRange/i },
+  { domain: "editor", pattern: /Script_EditorWorldInfo|Script_WorldInfoEditorTest/i },
   { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },
   { domain: 'animation', pattern: /BackRifleRun|Melee.*Animation|MeleeAnimation|Infantry/i },
   { domain: "ai", pattern: /FirstLevelP012(TrainColumn|March|Family|Resting|Arrival|VillageLife|StageZero|Cast)/i },

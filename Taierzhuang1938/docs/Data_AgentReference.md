@@ -21,7 +21,7 @@ node Taierzhuang1938/Script_TzmShot.mjs --id Type89Tank         # TZM 三视图�
 node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐项消融 GI/SSAO/阴影/MSAA
 ```
 
-**实机常驻剖析器**：编辑器面板「渲染调试（可叠加）→ Profiler」弹独立窗口，玩法照跑
+**实机常驻剖析器**：编辑器面板「调试 → Profiler」弹独立窗口，玩法照跑
 （CPU 逐系统 / GPU 逐 pass / 掉帧取证 / GC）。**没有页面内面板**（用户点名去掉的）。
 内核 `Script_Profiler.mjs` + 面板 `Script_EditorProfiler.mjs`，回归口 `Script_ProfilerTest`；
 调试页 `Probe.html` 把材质 / 光照 / 后处理单独摆出来看。
@@ -364,15 +364,16 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Debug.SetpieceFacts` / `Debug.SetpieceProps` / `Debug.Firewalls`。
   口径与施工单见 `docs/Data_MissionRemake.md` §10.7。
 
-### 编辑器（20 个模块，不对玩家开放）
+### 编辑器与调试工具
 - `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（要接管相机的同开必抖）。
-- `Script_Editor{Scene,FullScene,Actor,Weapon,FirstPerson,Audio,Timeline,Vfx,Destruction,PropLibrary,PropPcg,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler}.mjs`
+- `Script_Editor{Scene,FullScene,Actor,Weapon,FirstPerson,Audio,Timeline,Vfx,Destruction,PropLibrary,PropPcg,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler,WorldInfo}.mjs`
   （另含 AssetStandards = 资产规范只读总表；Splines = 场景样条PCG：道路 + 围墙的中心线编辑 + 拼接资产台与 WALL_PRESETS 滑杆）。
   PropPcg = 生活用具 / 工事支援的规则 volume、真实模型预览与正片 GPU 实例桶取证；
   FullScene = 完整县城与四门外 / 出川军列车厢静态布景的只读巡场、种子、Spline 与环境取证；
   FirstPerson = 正片 Viewmodel 的装备切换、玩家/外部检查视角、武器挂点/IK 目标/真实掌心与骨骼残差可视化，只读不写姿态表；
   车厢不播放 CS_Chuchuan 时间轴、不加载演员/对白/字幕，不读写 Scene 的关卡文档。
-  DebugRendering 与 Profiler 是「可叠加」组：不接管相机、不暂停玩法。
+  DebugRendering、Profiler 与 WorldInfo 位于「调试」组，可叠加且不接管相机、不暂停玩法。
+  WorldInfo 独立浮窗显示当前角色 Transform 与高度；回归口 `Script_WorldInfoEditorTest.mjs`。
   出图模式（`?shot=1`）下整棵编辑器 DOM 是 display:none，进不了截图。
 - 先读：`docs/Data_EditorSuite.md`。
 
