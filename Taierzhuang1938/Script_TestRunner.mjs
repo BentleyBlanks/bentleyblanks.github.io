@@ -100,6 +100,7 @@ export const testDefs = {
     desc: "P012独立入口、真实行走交互与画面取证" },
   WallPlanTest: { file: "Script_WallPlanTest.mjs", desc: "样条围墙规划契约：贴地/缺口/闭环角搭/塌段/确定性（纯 Node，毫秒级）" },
   TestRunnerTest: { file: "Script_TestRunnerTest.mjs", desc: "分级选择、基线和登记完整性（纯 Node）" },
+  BrowserBundleTest: { file: "Script_BrowserBundleTest.mjs", desc: "Pages 合并产物：白盒普通入口与正式菜单真实启动、脚本请求数门禁" },
   ModuleGraphTest: { file: "Script_ModuleGraphTest.mjs", desc: "index.html import map 盖满浏览器模块图、禁源码自写 ?v=（纯 Node，秒级）" },
   HudPromptTest: { file: "Script_HudPromptTest.mjs", desc: "HUD 提示规则（纯 Node，秒级）" },
   CarryTest: { file: "Script_CarryTest.mjs", desc: "担架/搬运负重状态机 + 可注册交互框架三手势 + 八个救护预制（纯 Node，毫秒级）" },
@@ -192,6 +193,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "BrowserBundleTest",
   'FirstLevelP012AnimationTest',
   'FirstLevelP012TerrainBrowserTest',
   "TrainLibraryTest",
@@ -317,7 +319,7 @@ export const domains = {
   },
   infra: {
     label: "测试入口/本地服务基础设施",
-    tests: ["TestRunnerTest", "ModuleGraphTest"],
+    tests: ["TestRunnerTest", "ModuleGraphTest", "BrowserBundleTest"],
   },
   trainAssets: {
     label: "参考火车资产与构件库接入",
@@ -347,7 +349,7 @@ const changedDomainRules = [
   { domain: "render", pattern: /(Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|FirstLevelP012CarryView|Vfx|Post|Light|Gi|GlobalShProbe|FirstPersonSelfShadow|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Pcg|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|Mocap|EscortLitter|TexBake|Pbr|PropBatch|PropStreaming|Profiler|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },
   { domain: "perf", pattern: /(Performance|FrameProfile|GodRays|Lod|Visibility|ActorBatch|Smoke)/i },
   { domain: "physics", pattern: /vendor\/rapier/i },
-  { domain: "infra", pattern: /(Script_TestRunner|Script_DevServer)/i },
+  { domain: "infra", pattern: /(Script_TestRunner|Script_DevServer|Script_BuildBrowserBundle|Script_BrowserBundle)/i },
 ];
 
 const ignoredChangeRules = [

@@ -48,3 +48,9 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=pre
 [系统参考](docs/Data_AgentReference.md) 保留原路由表、截图/性能命令和分册导读：引导、渲染、材质、地形、模型、AI、白盒、战斗、物理、音频、过场、交互、编辑器及资产。旧文档引用 AGENTS.md 中这些章节时，对应内容已迁到该参考。
 
 新增系统更新参考中的路由；改变跨系统契约更新本入口与测试。历史提案、事故记录和操作细节留在分册，不升级为所有任务的固定步骤。
+
+## Pages 启动产物
+
+- Pages 在独立 staging 目录运行 `Script_BuildBrowserBundle.mjs --deploy --output-dir <staging>/Taierzhuang1938`，将第一方模块合为带内容戳的入口；Three/Rapier 仍用本仓 vendor。每次部署重建，生成文件不提交。
+- 源码与本地默认入口继续使用 import map，模块修改仍更新对应版本戳。发布 HTML 仅预载合并入口与 vendor，不再预载全部源码。
+- 本地验收：`node Taierzhuang1938/Script_BuildBrowserBundle.mjs --preview` 后用 LocalPreview 打开 `/Taierzhuang1938/_check_Bundle.html?whitebox=p012`；回归入口 `Script_BrowserBundleTest.mjs` 验证普通白盒开始按钮、正式菜单与脚本请求数。

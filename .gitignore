@@ -64,3 +64,6 @@ Taierzhuang1938/_check_*.html
 Taierzhuang1938/_import/_mocap/*
 !Taierzhuang1938/_import/_mocap/*.mocap.json
 Taierzhuang1938/_import/__pycache__/
+
+# Generated Pages module bundle; rebuilt from source on every deployment.
+Taierzhuang1938/Script_BrowserBundle.mjs
