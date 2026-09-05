@@ -9,8 +9,10 @@ import {
   ExtractFailureNames,
   GetTier1Tests,
   InferDomains,
+  IsProcessAlive,
   ParseArgs,
   ResolveSelection,
+  ShouldReclaimBrowserLock,
   ValidateRegistry,
   browserTests,
   domains,
@@ -47,6 +49,23 @@ Check(tier0Fast.every((name) => voiceSelection.includes(name)), "--domain 默认
 Check(!voiceSelection.includes("VoiceTest"), "quick 不启动 voice 浏览器探针");
 Check(ParseArgs(["--dry-run"]).dryRun, "--dry-run 参数可用");
 Check(ParseArgs(["--profile=prepush"]).profile === "prepush", "--profile 参数可用");
+
+Check(IsProcessAlive(42, () => {}), "成功的存活探针保留 owner");
+Check(!IsProcessAlive(42, () => { throw Object.assign(new Error(), {code:"ESRCH"}); }), "只有进程不存在才确认 owner 退出");
+for (const code of ["EPERM", "EACCES", "EIO"]) {
+  Check(IsProcessAlive(42, () => { throw Object.assign(new Error(), {code}); }), "权限或临时探针错误不能回收 owner");
+}
+
+Check(!ShouldReclaimBrowserLock({ owner: { pid: 42 }, ownerAlive: true,
+  lockAgeMs: 45 * 60 * 1000 }), "存活 owner 超过四十分钟仍持有浏览器槽");
+Check(ShouldReclaimBrowserLock({ owner: { pid: 42 }, ownerAlive: false,
+  lockAgeMs: 1000 }), "死亡 owner 可立即回收");
+for (const owner of [null, undefined, { broken: true }]) {
+  Check(!ShouldReclaimBrowserLock({ owner, lockAgeMs: 5000, writeGraceMs: 10000 }),
+    "刚创建的空白或损坏锁享有写入宽限");
+  Check(ShouldReclaimBrowserLock({ owner, lockAgeMs: 11000, writeGraceMs: 10000 }),
+    "超过写入宽限的空白或损坏锁可回收");
+}
 
 const voicePrepush = ResolveSelection(ParseArgs(["--profile=prepush", "--domain=voice"]));
 Check(voicePrepush.includes("VoiceTest"), "prepush 运行完整领域探针");

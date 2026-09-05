@@ -40,7 +40,8 @@ const heartbeatMs = 60 * 1000;
 const maxCaptureChars = 4 * 1024 * 1024;
 const browserLockPath = path.join(os.tmpdir(), "Taierzhuang1938_BrowserTests.lock");
 const browserLockPollMs = 5 * 1000;
-const browserLockTimeoutMs = 30 * 60 * 1000;
+const browserLockWaitTimeoutMs = 60 * 60 * 1000;
+const browserLockWriteGraceMs = 10 * 1000;
 
 const playTestExpectedFailures = [
   // 「击杀回执 killConfirm」2026-08-26 已修并摘除：红的根源是测试自己的零余量竞态 ——
@@ -698,20 +699,31 @@ function Sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function IsProcessAlive(pid) {
+export function IsProcessAlive(pid, probe = process.kill) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
-    process.kill(pid, 0);
+    probe(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    // Permission or transient probe errors do not prove the owner exited.
+    return error?.code !== "ESRCH";
   }
+}
+
+/** Pure stale-lock decision. A live owner remains authoritative regardless of age. */
+export function ShouldReclaimBrowserLock({ owner, ownerAlive = false, lockAgeMs = Infinity,
+  writeGraceMs = browserLockWriteGraceMs } = {}) {
+  const validOwner = !!owner && Number.isInteger(owner.pid) && owner.pid > 0;
+  if (validOwner) return !ownerAlive;
+  // open("wx") creates the file before its JSON body is written. Give that
+  // small window time to finish instead of deleting another runner's new lock.
+  return !(Number.isFinite(lockAgeMs) && lockAgeMs >= 0 && lockAgeMs < writeGraceMs);
 }
 
 async function AcquireBrowserLock(testName) {
   const startedAt = Date.now();
   let lastNoticeAt = 0;
-  while (Date.now() - startedAt < browserLockTimeoutMs) {
+  while (Date.now() - startedAt < browserLockWaitTimeoutMs) {
     if (interruptedSignal) return null;
     try {
       const fd = fs.openSync(browserLockPath, "wx");
@@ -729,19 +741,25 @@ async function AcquireBrowserLock(testName) {
       if (error.code !== "EEXIST") throw error;
       let owner = null;
       try { owner = JSON.parse(fs.readFileSync(browserLockPath, "utf8")); } catch {}
-      const stale = !owner || !IsProcessAlive(owner.pid) || Date.now() - Number(owner.createdAt || 0) > browserLockTimeoutMs;
+      let lockAgeMs = Infinity;
+      try { lockAgeMs = Math.max(0, Date.now() - fs.statSync(browserLockPath).mtimeMs); } catch {}
+      const stale = ShouldReclaimBrowserLock({
+        owner,
+        ownerAlive: !!owner && IsProcessAlive(owner.pid),
+        lockAgeMs,
+      });
       if (stale) {
         try { fs.unlinkSync(browserLockPath); } catch {}
         continue;
       }
       if (Date.now() - lastNoticeAt >= 30 * 1000) {
-        console.log(`[runner] … ${testName} 等待浏览器测试槽（占用者 ${owner.testName ?? "unknown"}, pid ${owner.pid}）`);
+        console.log(`[runner] … ${testName} 等待浏览器测试槽（占用者 ${owner?.testName ?? "unknown"}, pid ${owner?.pid ?? "pending"}）`);
         lastNoticeAt = Date.now();
       }
       await Sleep(browserLockPollMs);
     }
   }
-  throw new Error(`${testName} 等待浏览器测试槽超过 ${Math.round(browserLockTimeoutMs / 60000)} 分钟`);
+  throw new Error(`${testName} 等待浏览器测试槽超过 ${Math.round(browserLockWaitTimeoutMs / 60000)} 分钟`);
 }
 
 function PreflightSelection(selection) {

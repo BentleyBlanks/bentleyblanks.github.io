@@ -65,10 +65,10 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
 
 - 默认透出子测试的 `--- 阶段` 行，并每 60 秒打印心跳；其余输出只在失败时显示尾部。
 - 选择阶段显示 profile、测试清单和基于历史量级的预计耗时；`--dry-run` 不做依赖预检。
-- BootTest 上限 4 分钟，PlayTest 上限 20 分钟，一般测试上限 10 分钟；
+- BootTest 上限 4 分钟，PlayTest 上限 40 分钟，一般测试上限 10 分钟；
   性能/出图测试按项目登记放宽到 20—30 分钟。
 - `Ctrl+C`、终止信号和超时会清理当前测试及其浏览器子进程。
-- runner 启动的浏览器测试跨 worktree 共用一个全局槽；多 agent 会排队，不再同时争抢 GPU/内存。
+- runner 启动的浏览器测试跨 worktree 共用一个全局槽；多 agent 最多排队 60 分钟，不再同时争抢 GPU/内存。存活 owner 不因锁龄被清理；刚创建而尚未写完或内容损坏的锁有 10 秒写入宽限，超过宽限且没有有效 owner 才回收。
 - `PASS`：测试全绿；`BASELINE`：只有已登记历史红；`FAIL`：新增红、崩溃或超时。
 - 默认只要没有 `FAIL` 就返回 0；`--strict-baseline` 下历史红也返回 1。
 - **测试内部的等待另算**：`page.waitForFunction(fn, arg?, options?)` 的第二格是
