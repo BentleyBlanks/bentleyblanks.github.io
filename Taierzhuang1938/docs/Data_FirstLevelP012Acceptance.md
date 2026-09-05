@@ -662,3 +662,5 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=pre
 - 首次远炮爆炸后六秒特写展示真实落点及北方接防方向，使用既有过场输入封锁/释放接口，暂停玩法而保留爆炸烟尘。按键、鼠标、射击无法改变玩家；结束恢复原位置、朝向、视场和控制。新口令目前为白盒字幕；本环境未配置 VOLCENGINE_API_KEY，没有生成配音。
 - 避炮不再限制到一个小圆圈：近失弹实际落地后，蹲下/卧倒并被真实掩体遮住即可，全段沟沿适用。班长先到蓝色矮墙后等玩家，现场标有“避炮处 C / Z”，目标选择就近沟段；成功提示“已躲过炮击”，随后跟班长继续。站在掩体上或暴露处不伪造成功。
 - 验证入口：ArrivalTest（行程/恢复）、RuntimeTest（分段齐射、百姓加速与首发事实隔离）、FlowTest（整段掩体判定）、AnimationTest（真列车位移/玩家支撑、驴车扫掠、两块玩家交互标牌、三角色蒙皮接地与战斗切回）、BrowserTest --prelude --geometry（实际行走、交互、B04 避炮至 B05 送弹）。截图与日志留本地。
+
+本批专项结果：`P012IterationFinal` 从 B00 顺序实跑至 B06，通过新增八发前奏/四发余波、特写输入封锁/恢复、原避炮与送弹接缝及实体通行，无浏览器错误。AnimationTest 三模型背枪跑步接地、驴车阻挡/绕行与列车支撑通过；FlowTest、RuntimeTest 和 Pages BrowserBundleTest 通过。分领域 prepush 未完成全量：浏览器槽被其他任务连续占用，已执行部分另有 AssetStandardsTest 的既存失败；`b34e78ff` 主线 import map 已是 EditorAssetStandards v=3，而该测试仍匹配 v=2，本批未改该断言。随后合入主线 ed06a063 的修复并复跑 AssetStandardsTest，现已通过；整套 prepush 仍未跑完，不能将本批称作全仓全绿或 P2 整关通关。
