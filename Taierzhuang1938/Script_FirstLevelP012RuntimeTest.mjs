@@ -844,7 +844,7 @@ console.log("PASS P012 runtime finite actors, guide speed, shell warning, delive
  const rear={role:'bearer',slot:{back:P012Phase.whitebox.activities.stretcherCarryPose.bearerSpanM},handle:{alive:false}};
  const replacement={role:'guard',handle:{alive:true,body:{radius:.34},position:{...P012Phase.whitebox.activities.airCrowdCoverSlots[0]}}};
  const litter={front,rear,dropped:true},goals=new Map();
- const context={phase:{whitebox:P012Phase.whitebox},mem:{p012CarriedLitter:litter,p012LitterOverturned:true,p012FallenAt:{x:105.2,z:61.6},column:{Update(){},Alive:[front,replacement]}},
+ const context={phase:{whitebox:P012Phase.whitebox},mem:{p012CarriedLitter:litter,p012LitterOverturned:true,p012FallenAt:{x:105.2,z:61.6},column:{Update(){},Alive:[front,replacement],keepArrivalSlots:true}},
   Spoken:()=>false,Signal(){},PlayerPos:()=>({x:104,z:60}),d:{host:{Story:()=>({Signalled:()=>false}),PositionOf:actor=>actor.position,
   SetGoal:(actor,x,z)=>{const point={x,z};assert.ok(P012SegmentClear(P012Phase.whitebox.layout.blocks,actor.position,point,.34),'replacement never receives a goal through a ditch bank');goals.set(actor,point);}}}};
  let seconds=0;
@@ -855,7 +855,8 @@ console.log("PASS P012 runtime finite actors, guide speed, shell warning, delive
   seconds+=1/30;
  }
  assert.ok(context.mem.p012LitterRecovered,'the same living guard physically returns from the separate crowd shelter');
- assert.equal(litter.rear,replacement);assert.equal(rear.handle.alive,false);
+  assert.equal(litter.rear,replacement);assert.equal(rear.handle.alive,false);
+  assert.equal(replacement.handle.scriptArrivalRadius,.3,'a living replacement inherits the precise P012 terminal slot arrival radius');
  console.log(`PASS physical replacement reaches the original overturned litter through bank openings in ${seconds.toFixed(1)}s`);
 }
 {
@@ -924,6 +925,40 @@ console.log("PASS P012 runtime finite actors, guide speed, shell warning, delive
   assert.equal(runtime.BlocksSight({ x: -10, y: 1, z: 0 }, { x: 10, y: 1, z: 0 }), true);
   assert.equal(runtime.BlocksSight({ x: -10, y: 1, z: 15 }, { x: 10, y: 1, z: 15 }), false);
   runtime.time = 126; assert.equal(runtime.BlocksSight({ x: -10, y: 1, z: 0 }, { x: 10, y: 1, z: 0 }), false);
+}
+{
+ const config=P012Phase.whitebox,pose=config.activities.stretcherCarryPose,goals=new Map(),props=[];
+ let time=0,column=null,nextId=1;
+ const host={Time:()=>time,PlayerPos:()=>column?.HeadPosition(),Alive:actor=>actor.alive,
+  PositionOf:actor=>actor.position,SpawnActor:spec=>({id:nextId++,alive:true,position:{x:spec.x,y:0,z:spec.z},body:{radius:.34}}),
+  Prop:spec=>{props.push(spec.id);return spec.id;},MoveProp(){},
+  SetGoal:(actor,x,z)=>{const point={x,z};assert.ok(P012SegmentClear(config.layout.blocks,actor.position,point,.34),
+    `P012 arrival slot command keeps real body clearance: ${JSON.stringify({id:actor.id,from:actor.position,to:point})}`);goals.set(actor,point);}};
+ column=new EscortColumn(host,{waypoints:config.escortWaypoints.slice(-2),followRouteBodies:true,keepArrivalSlots:true,...pose,
+  members:Array.from({length:4},()=>({role:'bearer',label:'担架员'}))});
+ column.Start();const ids=column.members.map(member=>member.handle.id),dt=1/30;
+ const MoveActors=()=>{for(const [actor,target] of goals){const dx=target.x-actor.position.x,dz=target.z-actor.position.z,distance=Math.hypot(dx,dz),step=Math.min(distance,1.35*dt);
+  if(distance){actor.position.x+=dx/distance*step;actor.position.z+=dz/distance*step;}}};
+ for(let frame=0;frame<30000&&!LastLitterArrived(column);frame++){time+=dt;column.Update(dt);MoveActors();}
+ assert.ok(column.arrived&&LastLitterArrived(column),'actual P012 escort reaches distinct terminal slots');
+ const bearers=column.litters.flatMap(litter=>[litter.front.handle,litter.rear.handle]);
+ const PairGap=litter=>Math.hypot(litter.front.handle.position.x-litter.rear.handle.position.x,litter.front.handle.position.z-litter.rear.handle.position.z);
+ assert.ok(column.litters.every(litter=>Math.abs(PairGap(litter)-pose.bearerSpanM)<.12),'each P012 litter retains its 2.4m bearer span');
+ const Mid=litter=>({x:(litter.front.handle.position.x+litter.rear.handle.position.x)/2,z:(litter.front.handle.position.z+litter.rear.handle.position.z)/2});
+ assert.ok(Math.hypot(Mid(column.litters[0]).x-Mid(column.litters[1]).x,Mid(column.litters[0]).z-Mid(column.litters[1]).z)>3.5,
+  'the two original litters remain separate at the route end');
+ const end=column.waypoints.at(-1);
+ assert.ok(bearers.filter(actor=>Math.hypot(actor.position.x-end.x,actor.position.z-end.z)<.7).length<4,
+  'arrival does not require all four bearers to overlap the endpoint');
+ const separated=bearers.map(actor=>({...actor.position}));for(const actor of bearers)actor.position={...end,y:0};
+ assert.equal(LastLitterArrived(column),false,'four bearers collapsed onto one endpoint cannot impersonate slotted P012 arrival');
+ bearers.forEach((actor,index)=>{actor.position=separated[index];});
+ for(let frame=0;frame<10*30;frame++){time+=dt;column.Update(dt);MoveActors();}
+ const settled=bearers.map(actor=>({...actor.position}));
+ for(let frame=0;frame<180*30;frame++){time+=dt;column.Update(dt);MoveActors();}
+ assert.ok(bearers.every((actor,index)=>Math.hypot(actor.position.x-settled[index].x,actor.position.z-settled[index].z)<.001),
+  'P012 terminal slots remain stable for 180 seconds');
+ assert.deepEqual(column.members.map(member=>member.handle.id),ids);assert.deepEqual(props,['escortLitter0','escortCasualty0','escortLitter1','escortCasualty1']);
 }
 {
   let dodges = 0, released = 0;

@@ -64,6 +64,33 @@ import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
  assert.equal(guideSpec.WaitAt(guideSpec.route.length-1),true,"Luo waits at the visible blockade decision position");
 }
 
+{
+ const activity=phase.whitebox.activities,anchor=activity.blockadeDecisionPosition;
+ const recorded={position:{x:103.10402145802439,z:87.65847555217354},
+  guidePosition:{x:104.68574502077546,z:79.50929779326573},columnAtSouthAssembly:true,guideAlive:true,
+  farSpawned:4,farDeaths:4,blockadeVisible:false,blockadePressure:false,zone:"Z09",stance:"stand"};
+ const Make=()=>{const director=new FirstLevelP012Director({},phase.whitebox);director.beat=22;
+  director.routeIndex=director.ActivityRoute().length;director.lastSample={...recorded};return director;};
+ const exact=Make();
+ assert.ok(Math.hypot(recorded.position.x-anchor.x,recorded.position.z-anchor.z)<activity.blockadeDecisionRangeM
+  &&Math.hypot(recorded.guidePosition.x-anchor.x,recorded.guidePosition.z-anchor.z)<1
+  &&Math.hypot(recorded.position.x-recorded.guidePosition.x,recorded.position.z-recorded.guidePosition.z)>activity.blockadeDecisionRangeM,
+  "recorded B22 geometry puts both people at the shared anchor despite their relative distance exceeding eight metres");
+ assert.equal(exact.CurrentObjective().requiredAction,"observe");exact.Update(.1,recorded);
+ assert.equal(exact.State().beat,"B23");assert.equal(exact.State().completionReasons[22],"blockadeCleared");
+ for(const [label,change] of [
+  ["player outside anchor",{position:{x:anchor.x,z:anchor.z+activity.blockadeDecisionRangeM+.01}}],
+  ["guide outside anchor",{guidePosition:{x:anchor.x,z:anchor.z+1.01}}],
+  ["column absent",{columnAtSouthAssembly:false}],
+  ["guide dead",{guideAlive:false}],
+  ["blockade neither cleared nor observed firing",{farDeaths:3}],
+ ]){
+  const director=Make(),sample={...recorded,...change};director.lastSample=sample;
+  if(label!=="blockade neither cleared nor observed firing")assert.notEqual(director.CurrentObjective().requiredAction,"observe",label);
+  director.Update(.1,sample);assert.equal(director.State().beat,"B22",label);
+ }
+}
+
 const points = new Map();
 {
  const registered=new Map(),carry={KindId:"wounded",load:{payload:{who:"p012AirCivilian"}}},director=new FirstLevelP012Director({Carry:()=>carry,Register:point=>registered.set(point.id,point)},phase.whitebox);
@@ -674,9 +701,9 @@ Tick({position:phase.whitebox.activities.blockadeDecisionPosition,zone:"Z09",sta
   farSpawned:4,farDeaths:4,blockadeDestroyed:true,columnAtSouthAssembly:true,guideAlive:false,
   guidePosition:phase.whitebox.activities.blockadeDecisionPosition},30);
 assert.equal(flow.State().beat,"B22","a hidden coordinate and elapsed time cannot replace the living squad leader");
-Tick({position:{x:104.46296071827587,z:79.89479223152942},zone:"Z08",stance:"stand",
+Tick({position:{x:103.10402145802439,z:87.65847555217354},zone:"Z08",stance:"stand",
   farSpawned:4,farDeaths:4,blockadeDestroyed:true,columnAtSouthAssembly:true,guideAlive:true,
-  guidePosition:{x:104.68652168788716,z:79.5110454646285}});
+  guidePosition:{x:104.68574502077546,z:79.50929779326573}});
 assert.equal(flow.State().beat,"B23");
 assert.ok(signals.has("P012BlockadeDecision"));
 assert.equal(flow.State().completionReasons[22],"blockadeCleared");

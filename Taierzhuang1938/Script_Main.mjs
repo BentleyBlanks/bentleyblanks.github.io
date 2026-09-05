@@ -6432,7 +6432,10 @@ function Frame(dt, render = true) {
         const a=litter.front?.handle,b=litter.rear?.handle;
         return a?.alive && b?.alive && (a.position.z+b.position.z)/2>=airReady.z && Math.abs((a.position.x+b.position.x)/2-airReady.x)<8;
       }),
-      columnAtSouthAssembly: !!column?.litters?.length && column.litters.every((litter) => !litter.dropped && [litter.front,litter.rear].every((member) => member?.handle?.alive && Math.hypot(member.handle.position.x-southAssembly.x,member.handle.position.z-southAssembly.z)<6)),
+      // A pair of litters arrives as a queue in its actual route slots. Sending
+      // every bearer into one six-metre circle would collapse both litters.
+      columnAtSouthAssembly: !!columnEnd && Math.hypot(columnEnd.x-southAssembly.x,columnEnd.z-southAssembly.z)<.1
+        && lastLitterArrived,
     });
     if (story.Signalled("P012Complete")) {
       p012Runtime.completed = true; ShowPauseMenu(); menu.OpenSandboxComplete();

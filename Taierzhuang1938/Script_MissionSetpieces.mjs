@@ -210,9 +210,10 @@ export function LastLitterArrived(column, radius = 2.5) {
   const litters = column?.litters || [];
   return !!column?.arrived && !!end && litters.length > 0 && litters.every((litter) => !litter.dropped &&
     [litter.front, litter.rear].every((member) => {
-      const target=column.scriptTerminalQueue ? TerminalSlot(column.waypoints,member.slot.back) : end;
+      const slotted=column.keepArrivalSlots||column.scriptTerminalQueue;
+      const target=slotted ? TerminalSlot(column.waypoints,member.slot.back) : end;
       return member.handle?.alive && member.handle.position
-        && Math.hypot(member.handle.position.x - target.x, member.handle.position.z - target.z) < (column.scriptTerminalQueue ? .7 : radius);
+        && Math.hypot(member.handle.position.x - target.x, member.handle.position.z - target.z) < (slotted ? .7 : radius);
     }));
 }
 export function TerminalSlot(points, back) {
@@ -281,6 +282,7 @@ export class EscortColumn {
    *   members    [{role,label,weapon}]  角色：bearer / guard / walking / civilian
    *   propPrefix 担架/伤员道具 ID 前缀（默认 escort，保留正式后送队契约）
    *   bearerSpanM / litterLiftM / bodyLiftM  可选的本关担架姿态；旧关卡保留默认值
+   *   keepArrivalSlots 到达后保留队列槽位；默认 false 保留旧关卡收拢行为
    *   tuning     覆盖 SETPIECE_TUNING 的部分字段
    */
   constructor(host = {}, spec = {}) {
@@ -292,6 +294,7 @@ export class EscortColumn {
     this.bearerSpanM = Number.isFinite(spec.bearerSpanM) ? spec.bearerSpanM : 1.9;
     this.litterLiftM = Number.isFinite(spec.litterLiftM) ? spec.litterLiftM : .62;
     this.bodyLiftM = Number.isFinite(spec.bodyLiftM) ? spec.bodyLiftM : .84;
+    this.keepArrivalSlots = spec.keepArrivalSlots === true;
     this.followRouteBodies = !!spec.followRouteBodies;
     this.members = [];
     /** 抬着走的担架实体（两名担架员一副，见 Start / _UpdateLitters）。 */
@@ -408,6 +411,7 @@ export class EscortColumn {
       if (!handle) { this.log.push({ label: entry.label, ok: false, why: "宿主没造出来（人口预算满了）" }); return; }
       // 「能走的轻伤员」走视频转骨骼的跛行 clip（Script_Ai 把旗透传给 Actor）。
       if (entry.role === "walking") handle.woundedWalk = 1;
+      if (entry.role === "bearer" && this.keepArrivalSlots) handle.scriptArrivalRadius = .3;
       this.members.push({ ...entry, handle, slot, index });
       this.log.push({ label: entry.label, ok: true, x: +x.toFixed(1), z: +z.toFixed(1) });
     });
@@ -501,7 +505,7 @@ export class EscortColumn {
       else if (!this.moving && gap < this.tuning.columnResumeM) this.moving = true;
     }
     if (this.scriptPaused) this.moving = false;
-    if (this.followRouteBodies && this.arrived && !this.scriptPaused && !this.scriptHoldTailSlots) this.tailAdvanceM = Math.min(this.roster.length * 2.2, (this.tailAdvanceM || 0) + this.tuning.columnSpeedMS * dt);
+    if (this.followRouteBodies && this.arrived && !this.keepArrivalSlots && !this.scriptPaused && !this.scriptHoldTailSlots) this.tailAdvanceM = Math.min(this.roster.length * 2.2, (this.tailAdvanceM || 0) + this.tuning.columnSpeedMS * dt);
     if (this.moving && this.legIndex < this.waypoints.length - 1) {
       const a = this.waypoints[this.legIndex];
       const b = this.waypoints[this.legIndex + 1];
@@ -1530,6 +1534,7 @@ export const SETPIECES = {
       s.mem.column = s.Column({
         waypoints: escortWaypoints,
         followRouteBodies: !!s.phase?.whitebox?.p012,
+        keepArrivalSlots: !!s.phase?.whitebox?.p012,
         ...(carryPose || {}),
         members: [
           { role: "bearer", label: "担架员", weapon: null },
@@ -1737,6 +1742,7 @@ export const SETPIECES = {
               const replacement = column.Alive.find((member) => member.role !== "bearer" && member.role !== "civilian");
               if (replacement) {
                 replacement.role = "bearer"; replacement.slot = { ...litter[role].slot }; litter[role] = replacement;
+                if(column.keepArrivalSlots)replacement.handle.scriptArrivalRadius=.3;
                 replacement.handle.scriptedNoncombatant = true; replacement.handle.unarmed = true;
                 replacement.handle.scriptEssential = true;
                 replacement.handle.scriptDefensive = false; replacement.handle.target = null;

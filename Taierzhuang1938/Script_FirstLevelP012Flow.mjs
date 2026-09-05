@@ -443,6 +443,15 @@ export class FirstLevelP012Director {
     return (forward ? candidates[0] : candidates.at(-1))?.point || null;
   }
 
+  AtBlockadeDecision(sample = this.lastSample) {
+    const activity = this.config.activities || {}, anchor = activity.blockadeDecisionPosition;
+    const range = activity.blockadeDecisionRangeM || 8;
+    return !!anchor && this.routeIndex >= this.ActivityRoute().length
+      && sample.columnAtSouthAssembly === true && sample.guideAlive === true
+      && Distance(sample.guidePosition, anchor) <= 1
+      && Distance(sample.position, anchor) <= range;
+  }
+
   RetreatLeadTarget(target) {
     if (this.lastSample.lastLitterArrived) return null;
     const column = this.lastSample.columnPosition;
@@ -952,10 +961,7 @@ export class FirstLevelP012Director {
         && this.SouthEnemiesCleared(); break;
       case 22: {
         const cleared = sample.farSpawned === 4 && sample.farDeaths === 4;
-        ready = Distance(p,activity.blockadeDecisionPosition)<=(activity.blockadeDecisionRangeM||8)
-          &&Distance(sample.guidePosition,activity.blockadeDecisionPosition)<1
-          && sample.columnAtSouthAssembly === true && this.routeIndex >= route.length
-          && sample.guideAlive === true && Distance(p, sample.guidePosition) <= (activity.blockadeDecisionRangeM || 8)
+        ready = this.AtBlockadeDecision(sample)
           && ((sample.blockadeVisible && sample.blockadePressure) || cleared);
         if (ready) { this.completionReasons[22] = cleared ? "blockadeCleared" : "blockadeObservedFiring";
           this.Emit("P012BlockadeDecision"); }
@@ -1334,9 +1340,7 @@ export class FirstLevelP012Director {
       text = this.routeIndex < route.length ? "沿原来的安全入口回到路沟，接应两副担架"
         : !this.lastSample.columnAtSouthAssembly ? "掩护两副担架到南路沟内集合，确认无人掉队"
         : "跟班长到南路实体掩体后，确认阻滞线是否仍在交火";
-      if(this.routeIndex>=route.length&&this.lastSample.columnAtSouthAssembly
-        &&this.lastSample.guideAlive!==false&&Distance(this.lastSample.guidePosition,activity.blockadeDecisionPosition)<=1
-        &&Distance(this.lastSample.position,activity.blockadeDecisionPosition)<=activity.blockadeDecisionRangeM){
+      if(this.AtBlockadeDecision(this.lastSample)){
         requiredAction="observe";
         text="班长正看向东南面的路障；留在沟岸后，查看那边的火力";
       }

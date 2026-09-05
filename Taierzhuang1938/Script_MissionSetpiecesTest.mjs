@@ -379,8 +379,17 @@ for (const level of LEVELS) {
   // 走到头
   for (let i = 0; i < 400; i += 1) { host.time += 0.5; host.player.z = column.HeadPosition().z; column.Update(0.5); }
   Check("走完全部路点会报到达", column.arrived);
+  Check("普通章节默认仍使用旧终点收拢", column.keepArrivalSlots === false);
   column.Reset();
   Check("收摊走 Despawn，不是 Kill（撤走 ≠ 阵亡）", host.despawned === 2, String(host.despawned));
+}
+
+{
+ const actor={alive:true,position:{x:0,z:0}},host={Time:()=>1,Alive:()=>true,PositionOf:value=>value.position,
+  SetGoal(){},PlayerPos:()=>({x:0,z:1}),SpawnActor:()=>actor};
+ const column=new EscortColumn(host,{followRouteBodies:true,waypoints:[{x:0,z:0},{x:0,z:1}],members:[{role:"bearer"}]});
+ column.Start();column.arrived=true;column.legIndex=1;column.Update(1);
+ Check("未启用 keepArrivalSlots 的旧队列到达后仍推进尾部",column.tailAdvanceM>0,String(column.tailAdvanceM));
 }
 
 // P012 的前沿伤员预置先于正式后送队创建。宿主与 Main 一样按 id 去重；
@@ -408,7 +417,7 @@ for (const level of LEVELS) {
   formal.Start();
   const carryPose = FIRST_LEVEL_P012_WHITEBOX_PHASE.whitebox.activities.stretcherCarryPose;
   Check("P012 正式后送队读取统一担架姿态",
-    formal.bearerSpanM === carryPose.bearerSpanM
+    formal.keepArrivalSlots === true && formal.bearerSpanM === carryPose.bearerSpanM
       && formal.litterLiftM === carryPose.litterLiftM
       && formal.bodyLiftM === carryPose.bodyLiftM
       && formal.Bearers[1].slot.back - formal.Bearers[0].slot.back === carryPose.bearerSpanM,

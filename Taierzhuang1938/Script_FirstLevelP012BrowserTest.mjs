@@ -553,7 +553,7 @@ async function PlayFrontline() {
             woundedDragDistance: scene.woundedDragDistance, carryDistance: scene.carryDistance,
             originalLitter: scene.litters.find(litter => litter.originalCarried)?.id,
             litterProps: game.Debug.SetpieceProps().filter(prop=>scene.litters.some(litter=>litter.id===prop.id||litter.bodyId===prop.id)),
-            ...(flow.beatIndex === 24 ? { litterParking: scene.litters.map(litter => ({
+            ...([22,23,24].includes(flow.beatIndex) ? { litterParking: scene.litters.map(litter => ({
               id: litter.id, front: litter.front, rear: litter.rear,
             })) } : {}),
             aliveColumnCount: scene.columnActors.length });
@@ -1134,13 +1134,15 @@ async function PlayFrontline() {
     Check(escortViews.some(entry=>entry.beat==="B13")&&escortViews.some(entry=>entry.beat==="B24")
       &&escortViews.every(entry=>entry.litterProps.length===4&&entry.litterProps.every(prop=>prop.visible)),
       "道路接敌、空袭、搬运与回撤各阶段的两副原担架及伤员实体均保持可见");
-    const parked = result.trace.find(entry => entry.beat === "B24")?.litterParking || [];
-    const spans = parked.map(litter => Math.hypot(litter.front.x - litter.rear.x, litter.front.z - litter.rear.z));
-    const centers = parked.map(litter => ({ x: (litter.front.x + litter.rear.x) / 2,
-      z: (litter.front.z + litter.rear.z) / 2 }));
-    Check(parked.length === 2 && spans.every(span => span > 1.2 && span < 2.8)
-      && Math.hypot(centers[0].x - centers[1].x, centers[0].z - centers[1].z) >= 3,
-    "回撤停车仍保留两副担架及前后抬手间距", JSON.stringify(parked));
+    for (const [beat,label] of [["B23","南路集合后"],["B24","回撤停车后"]]) {
+      const parked = result.trace.find(entry => entry.beat === beat)?.litterParking || [];
+      const spans = parked.map(litter => Math.hypot(litter.front.x - litter.rear.x, litter.front.z - litter.rear.z));
+      const centers = parked.map(litter => ({ x: (litter.front.x + litter.rear.x) / 2,
+        z: (litter.front.z + litter.rear.z) / 2 }));
+      Check(parked.length === 2 && spans.every(span => span > 1.85 && span < 2.8)
+        && Math.hypot(centers[0].x - centers[1].x, centers[0].z - centers[1].z) >= 3,
+      `${label}两副原担架分开停靠，前后身体不挤进床面`, JSON.stringify(parked));
+    }
     Check(ending.scene.farSpawned === 4 && ending.scene.retreatPursuit.length === 2
       && ending.scene.retreatPursuit.every(entry => !entry.alive || entry.index > 1),
     "有限追兵已沿路线追击或被真实击毙，不复活补兵",
