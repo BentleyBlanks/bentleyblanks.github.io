@@ -1682,6 +1682,51 @@ async function VerifyAirRouteHandoff(choice) {
   }
 }
 
+async function VerifyMachineGunCrew() {
+  const setup=await page.evaluate(async()=>{
+    const g=window.Tengxian,{FirstLevelP012Director,P012_WAVES}=await import("./Script_FirstLevelP012Flow.mjs");
+    const {FirstLevelP012Runtime}=await import("./Script_FirstLevelP012Runtime.mjs");
+    const update=FirstLevelP012Director.prototype.Update,runtimeUpdate=FirstLevelP012Runtime.prototype.Update;
+    let flow,runtime;
+    FirstLevelP012Director.prototype.Update=function(...args){flow=this;return update.apply(this,args);};
+    FirstLevelP012Runtime.prototype.Update=function(...args){runtime=this;return runtimeUpdate.apply(this,args);};
+    g.StepFrames(1);FirstLevelP012Director.prototype.Update=update;FirstLevelP012Runtime.prototype.Update=runtimeUpdate;
+    // Explicit local B08 setup isolates the two authored MG actors. Their spawn,
+    // route consumption, AI state, damage and collision remain production code.
+    flow.beat=8;flow.guideStarted=true;flow.unlockedWaves=P012_WAVES.map((_,index)=>index);
+    runtime.Update=function(dt){this.time+=dt;};
+    flow.SpawnWave(P012_WAVES[2],2);
+    const at=flow.config.anchors.gunports[2];g.player.Spawn(at.x,at.z,0);g.Debug.Key("KeyZ");
+    window.p012MgCrewFixture={flow,runtime,actors:runtime.near.slice(),trace:[],frames:0};
+    return {scope:"explicit local B08 crew movement and separation fixture, not campaign or shooting performance",terminals:flow.config.enemyLanes.machineGun.terminalGoals};
+  });
+  let result;
+  for(let chunk=0;chunk<12;chunk++){
+    result=await page.evaluate(()=>{
+      const g=window.Tengxian,f=window.p012MgCrewFixture;
+      for(let frame=0;frame<150;frame++){
+        g.StepFrames(1,1/30,false);f.frames++;
+        if(f.frames%30===0)f.trace.push({at:f.frames/30,actors:f.actors.map(actor=>({id:actor.id,weapon:actor.weaponId,alive:actor.alive,
+          position:actor.position.toArray(),holdZone:actor.holdZone,state:actor.state,radius:actor.body.radius}))});
+      }
+      g.StepFrames(1);
+      return {actors:f.trace.at(-1).actors,trace:f.trace,health:g.player.health,
+        routes:f.flow.enemyRoutes.map(route=>({index:route.index,points:route.points}))};
+    });
+  }
+  await fs.writeFile(path.join(outputDir,"Data_P012MachineGunCrew.json"),JSON.stringify({...setup,...result},null,2));
+  await page.evaluate(()=>{
+    const g=window.Tengxian,camera=g.camera.clone();camera.position.set(23,2.5,-172);camera.lookAt(23,.9,-180);camera.updateMatrixWorld(true);
+    window.p012MgViewmodelVisible=g.viewmodel.root.visible;g.viewmodel.root.visible=false;g.renderer.setRenderTarget(null);g.renderer.render(g.scene,camera);
+  });
+  await page.screenshot({path:path.join(outputDir,"Scene_P012MachineGunCrewExternalView.png")});
+  await page.evaluate(()=>{const g=window.Tengxian;g.viewmodel.root.visible=window.p012MgViewmodelVisible;g.StepFrames(1);});
+  const [gunner,assistant]=result.actors,distance=Math.hypot(gunner.position[0]-assistant.position[0],gunner.position[2]-assistant.position[2]);
+  Check(result.actors.length===2&&gunner.weapon==="Type11"&&assistant.weapon==="Type38"&&result.actors.every(actor=>actor.alive),"真实机枪主副手保持原人数与枪械");
+  Check(distance>=1.2&&result.actors.every((actor,index)=>Math.hypot(actor.position[0]-setup.terminals[index].x,actor.position[2]-setup.terminals[index].z)<=2.1),
+    "实际AI沿原路分别进入掩体后两槽，身体不重叠",JSON.stringify({distance,actors:result.actors}));
+}
+
 async function VerifyFrontlineRejoin() {
   const result=await page.evaluate(async()=>{
     const g=window.Tengxian;
@@ -2536,6 +2581,7 @@ try {
   }
   const airRouteFixture=process.argv.find(arg=>arg.startsWith("--air-route="))?.split("=")[1];
   if(process.argv.includes("--hub-view"))await VerifyHubGuideView();
+  if(process.argv.includes("--machine-gun-crew"))await VerifyMachineGunCrew();
   if(process.argv.includes("--frontline-rejoin"))await VerifyFrontlineRejoin();
   if(process.argv.includes("--wounded-guide"))await VerifyWoundedGuide();
   else if(process.argv.includes("--road-cover"))await VerifyRoadCover();
