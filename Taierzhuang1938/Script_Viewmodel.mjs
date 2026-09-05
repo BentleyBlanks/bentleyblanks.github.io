@@ -914,7 +914,14 @@ function AddGrenadeBody(steel, key, x = 0, y = 0, z = -0.055) {
 /** 木柄手榴弹：铸铁弹体 φ58×90 + 木柄 φ29×128，全长 220 mm（考据值）。 */
 function BuildGrenadeProp(materials, key, grenadeAsset = null) {
   const imported = CloneGrenadeAsset(grenadeAsset, { firstPerson: true });
-  if (imported) return imported;
+  if (imported) {
+    // GLB vertex bounds: long axis Y (-0.110..0.110 m), wide head at -Y.
+    // Keep the hand prop contract shared with the procedural fallback: head -Z.
+    const group = new THREE.Group();
+    imported.rotation.x = Math.PI / 2;
+    group.add(imported);
+    return group;
+  }
   const steel = [];
   const wood = [];
   AddGrenadeBody(steel, key);
@@ -932,7 +939,7 @@ function BuildGrenade(materials, weapon, key, grenadeAsset = null) {
   const prop = BuildGrenadeProp(materials, key, grenadeAsset);
   // 握在木柄中段，弹体朝前上方
   prop.position.set(0, 0.02, -0.02);
-  prop.rotation.set(-0.35, 0, 0);
+  prop.rotation.set(Math.PI / 2 - 0.35, 0, 0);
   group.add(prop);
 
   return {
@@ -1576,7 +1583,7 @@ export class Viewmodel {
     this.offhandGrenade.visible = false;
     this.handLeft.group.add(this.offhandGrenade);
     this.offhandGrenade.position.set(0, 0.01, 0.0);
-    this.offhandGrenade.rotation.set(-0.4, 0, 0);
+    this.offhandGrenade.rotation.set(Math.PI / 2 - 0.4, 0, 0);
 
     // --- 桥夹道具（装填用）---------------------------------------------------
     this.clipProp = this._BuildClipProp();
