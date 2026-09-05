@@ -29,9 +29,10 @@ for(const a of actors){assert.equal(Ground(a),1.25);Clear(a);}
 for(let i=0;i<actors.length;i++)for(let j=i+1;j<actors.length;j++)assert.ok(Math.hypot(actors[i].x-actors[j].x,actors[i].z-actors[j].z)>=.9);
 for(const a of actors)for(const p of [phase.spawn,phase.whitebox.activities.arrivalGuideStart,phase.whitebox.activities.trainRoute[1]])assert.ok(Math.hypot(a.x-p.x,a.z-p.z)>.84,'player and Luo reserve real body space');
 const start=actors.map(a=>({x:a.x,z:a.z}));for(let i=0;i<40;i++)run.Update(dt,0);assert.deepEqual(actors.map(a=>({x:a.x,z:a.z})),start);
-open=true;let frames=0,unchanged=0,lastSignature='';const checked=new Map();
+open=true;let frames=0,unchanged=0,lastSignature='';const checked=new Map(),overlappingExitCars=new Set();
 for(;frames<24000;frames++){
  run.Update(dt,frames*dt>20?3:0);
+ for(const carIndex of [0,1,2])if(run.entries.filter(entry=>entry.carIndex===carIndex&&!entry.exitDone&&entry.requestedSpeed>0).length>1)overlappingExitCars.add(carIndex);
  for(const e of run.Entries()){
   assert.ok(Number.isFinite(e.requestedSpeed));assert.ok(Array.isArray(e.mergeOwners));
   if(e.requestedSpeed>0)assert.ok(e.requestedTarget&&Number.isFinite(e.requestedTarget.x));
@@ -46,6 +47,7 @@ for(;frames<24000;frames++){
 }
 assert.ok(frames<24000,JSON.stringify(run.Entries().filter(e=>e.stage!=='arrived').map(e=>({id:e.actorId,stage:e.stage,index:e.index,at:e.position,target:e.steps[e.index]}))));
 assert.equal(released.length,6);assert.equal(run.Entries().filter(e=>e.retired).length,0,'visible arrivals do not disappear');
+assert.deepEqual([...overlappingExitCars].sort(),[0,1,2],'all three doorways let followers start before predecessors finish the whole exit route');
 assert.ok(released.every(a=>a.id.startsWith('original')),'background recruits never enter the fighting squad');
 for(const e of run.Entries()){
  assert.ok(e.exitDone&&e.weaponIssued&&e.ammoIssued);assert.equal(e.weaponIssueCount,1);assert.equal(e.ammoIssueCount,1);

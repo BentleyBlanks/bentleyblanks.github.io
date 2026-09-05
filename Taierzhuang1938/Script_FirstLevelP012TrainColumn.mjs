@@ -59,8 +59,15 @@ export class FirstLevelP012TrainColumn {
         continue;
       }
       if(!entry.exitDone){
-        const first=this.entries.find(e=>e.carIndex===entry.carIndex&&!e.exitDone&&e.actor.alive!==false);
-        if(first!==entry||this.host.DoorOpen?.(entry.carIndex)===false){this.Command(entry,p,0);continue;}
+        const previous=this.entries.findLast(e=>e.carIndex===entry.carIndex&&e.slot<entry.slot&&e.actor.alive!==false);
+        const car=this.config.cars.find(car=>car.carIndex===entry.carIndex),door=car.exitRoute[1],tread=car.exitRoute[2];
+        const ahead=previous&&this.host.Position(previous.actor),dx=tread.x-door.x,dz=tread.z-door.z;
+        const cleared=previous?.exitDone||previous?.index>=2&&ahead
+          &&((ahead.x-door.x)*dx+(ahead.z-door.z)*dz)/Math.hypot(dx,dz)>this.config.bodySpacingM+.2;
+        // The next person can enter once the previous body has cleared the
+        // doorway; no need to wait for the whole stair/apron route to finish.
+        // Move still sweeps every body and enforces the existing spacing.
+        if(previous&&!cleared||this.host.DoorOpen?.(entry.carIndex)===false){this.Command(entry,p,0);continue;}
       }
       const step=entry.steps[entry.index];entry.stage=step.stage;
       const arrival=step.stage==='weapon'||step.stage==='ammo'?this.config.arrivalRadiusM:(this.config.routeArrivalRadiusM??this.config.arrivalRadiusM);
