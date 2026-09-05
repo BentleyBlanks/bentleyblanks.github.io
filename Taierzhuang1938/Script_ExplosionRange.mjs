@@ -177,6 +177,20 @@ export class ExplosionRange {
   Reset() {
     this.aircraft?.SetManualPose(EXPLOSION_AIRSTRIKE.aircraftId, null); this.airstrike = null;
     this.barrage = null; this.combat.ClearProjectiles(); this.battlefield.deformation.Reset();
+    // Restoring ground while someone stands in a pit must lift their real body.
+    const ground = this.battlefield.GroundHeight(this.player.position.x, this.player.position.z);
+    if (this.player.position.y < ground) {
+      this.player.position.y = ground; this.player.velocity.y = 0;
+      this.player.body?.Teleport(this.player.position.x, ground, this.player.position.z);
+    }
+    for (const entry of this.patrols) {
+      const s = entry.soldier, y = this.battlefield.GroundHeight(s.position.x, s.position.z);
+      if (s.position.y < y) { s.position.y = y; s.velocityY = 0; s.body?.Teleport(s.position.x, y, s.position.z); }
+      entry.minY = s.position.y; entry.laps = 0;
+    }
+    for (const pool of Object.values(this.combat.host.vfx?.pools || {})) pool.Clear?.();
+    for (const [id] of this.recoils) this.battlefield.models.get(id).root.position.z = EXPLOSION_VEHICLES.find((s) => s.id === id).z;
+    this.recoils.clear(); this.launches.length = 0; this.airDrops.length = 0;
     this.hud.Hint("地形已恢复，可以继续测试", 3); return true;
   }
   GoTo(id) {

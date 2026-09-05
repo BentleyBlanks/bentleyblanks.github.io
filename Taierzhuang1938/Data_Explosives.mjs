@@ -27,6 +27,7 @@ export const VEHICLE_EXPLOSIVES = {
 
 export const TERRAIN_DEFORMATION = Object.freeze({
   cellM: 0.25, tileCells: 32, maxDepthM: 2.4,
+  maxRimM: 0.22, rimWidthM: 1.25,
   // Per-axis bound guarantees the triangle's total grade is below the slide angle.
   maxAxisGrade: 0.38, foundationMarginM: 0.55,
 });

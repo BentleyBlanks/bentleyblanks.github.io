@@ -21,6 +21,7 @@ import { Mulberry32, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { FindReturnableGrenade } from "./Script_GrenadeReturn.mjs";
 import { GRENADE_RETURN, ExplosiveIdFor } from "./Data_Explosives.mjs";
+import { ShellVisuals } from "./Script_ShellVisual.mjs";
 
 const GRAVITY = 19.6;
 
@@ -55,12 +56,7 @@ export class CombatSystem {
     this.shells = [];
     this.shellSerial = 0;
     this.returnCount = 0;
-    this.shellGeometry = new THREE.SphereGeometry(0.14, 8, 6);
-    this.shellMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(10, 5.8, 1.6), toneMapped: false });
-    this.trailGeometry = new THREE.CylinderGeometry(0.06, 0.32, 1, 6);
-    this.trailGeometry.rotateX(Math.PI / 2);
-    this.trailMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 2.1, 0.3), transparent: true,
-      opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+    this.shellVisuals = new ShellVisuals(host.scene);
     this.rnd = Mulberry32(19380324);
     this.time = 0;
     this.launcherTimer = 8;
@@ -187,17 +183,14 @@ export class CombatSystem {
     OnImpact = null, byPlayer = false } = {}) {
     const velocity = target.clone().sub(from).divideScalar(flight);
     velocity.y += GRAVITY * flight * 0.5;
-    const root = new THREE.Group(), core = new THREE.Mesh(this.shellGeometry, this.shellMaterial);
-    core.scale.set(1, 1, 2.5);
-    const trail = new THREE.Mesh(this.trailGeometry, this.trailMaterial);
-    trail.scale.z = 8; trail.position.z = 4;
-    root.add(core, trail); root.position.copy(from); this.host.scene.add(root);
     const shell = { id: ++this.shellSerial, from: from.clone(), target: target.clone(), position: from.clone(),
-      velocity, initialVelocity: velocity.clone(), age: 0, flight, kind: ExplosiveIdFor(kind), radius, damage, root, OnImpact, byPlayer };
+      velocity, initialVelocity: velocity.clone(), age: 0, flight, kind: ExplosiveIdFor(kind), radius, damage, OnImpact, byPlayer };
+    this.shellVisuals.Create(shell);
     this.shells.push(shell); return shell;
   }
 
   StepShells(dt) {
+    this.shellVisuals.Step(dt);
     for (let i = this.shells.length - 1; i >= 0; i--) {
       const shell = this.shells[i]; let impact = null;
       const steps = Math.max(1, Math.ceil(dt * 120)), step = dt / steps;
@@ -209,17 +202,24 @@ export class CombatSystem {
         next.y -= GRAVITY * shell.age * shell.age * 0.5;
         const delta = next.sub(previous), distance = delta.length();
         const hit = this.host.battlefield.Raycast(previous, delta.clone().normalize(), distance, { terrain: true });
-        if (hit) impact = previous.addScaledVector(delta.normalize(), hit.t);
+        if (hit) {
+          impact = previous.addScaledVector(delta.normalize(), hit.t);
+          shell.age -= step * (1 - hit.t / Math.max(distance, 1e-9));
+          shell.velocity.y = shell.initialVelocity.y - GRAVITY * shell.age;
+        }
         else shell.position.add(delta);
         const ground = this.host.battlefield.GroundHeight(shell.position.x, shell.position.z);
         if (!impact && shell.position.y <= ground) impact = shell.position.clone().setY(ground);
-        if (!impact && shell.age > shell.flight + 3) impact = shell.position.clone().setY(ground);
+        // A miss must expire in the air, never teleport an explosion onto soil.
       }
-      shell.root.position.copy(shell.position);
-      shell.root.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), shell.velocity.clone().normalize());
+      if (impact) shell.position.copy(impact);
+      this.shellVisuals.Update(shell);
+      if (!impact && shell.age > shell.flight + 3) {
+        this.shellVisuals.Retire(shell); this.shells.splice(i, 1); continue;
+      }
       if (!impact) continue;
       this.Blast(impact, shell.radius, shell.damage, "shell", null, shell.byPlayer, null, shell.kind);
-      shell.OnImpact?.(impact); this.host.scene.remove(shell.root); this.shells.splice(i, 1);
+      shell.OnImpact?.(impact); this.shellVisuals.Retire(shell); this.shells.splice(i, 1);
     }
   }
 
@@ -604,7 +604,7 @@ export class CombatSystem {
       if (p.mesh) p.mesh.visible = false;
     }
     this.projectiles.length = 0;
-    for (const shell of this.shells) this.host.scene.remove(shell.root);
+    this.shellVisuals.Clear(this.shells);
     this.shells.length = 0;
     this.incoming.length = 0;
     this.mortarInFlight.length = 0;
@@ -618,7 +618,6 @@ export class CombatSystem {
     }
     this.pool.length = 0;
     this.incoming.length = 0;
-    this.shellGeometry.dispose(); this.shellMaterial.dispose();
-    this.trailGeometry.dispose(); this.trailMaterial.dispose();
+    this.shellVisuals.Dispose();
   }
 }

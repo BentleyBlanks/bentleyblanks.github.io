@@ -135,6 +135,45 @@ function MakeOverlayGeometry(polygons, cellM) {
 
 const GROUND_OVERLAYS = /^(DirtRoad|RoadWear|RoadLitter|CartRoad|YardEarth|FieldEarth(?:Dark)?|FreshEarth|FieldSoil(?:Dark)?|PloughSoil(?:Dark)?|RiverSand|WheatRow(?:Dry)?|WinterWheat)$/;
 
+function ConfigureCraterSurface(material, source, soil) {
+  const CompileSource = source.onBeforeCompile, SourceKey = source.customProgramCacheKey.bind(source);
+  material.vertexColors = true;
+  material.onBeforeCompile = (shader, renderer) => {
+    CompileSource.call(material, shader, renderer);
+    shader.uniforms.uCraterSoil = { value: soil.map };
+    shader.uniforms.uCraterNormal = { value: soil.normalMap };
+    shader.vertexShader = shader.vertexShader.replace("#include <common>", `#include <common>
+      attribute vec2 terrainDelta;
+      varying float vTerrainDelta;
+      varying float vTerrainWear;
+      varying vec2 vSoilUv;`)
+      .replace("#include <begin_vertex>", `#include <begin_vertex>
+        vTerrainDelta = terrainDelta.x;
+        vTerrainWear = terrainDelta.y;
+        vSoilUv = (modelMatrix * vec4(position, 1.0)).xz / 2.4;`);
+    shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>
+      uniform sampler2D uCraterSoil;
+      uniform sampler2D uCraterNormal;
+      varying float vTerrainDelta;
+      varying float vTerrainWear;
+      varying vec2 vSoilUv;`)
+      .replace("#include <color_fragment>", `#include <color_fragment>
+        vec3 soil = texture2D(uCraterSoil, vSoilUv).rgb;
+        vec3 fineSoil = texture2D(uCraterSoil, mat2(0.8, 0.6, -0.6, 0.8) * vSoilUv * 3.7).rgb;
+        float grain = clamp(dot(fineSoil, vec3(0.333)) * 3.0, 0.0, 1.0);
+        float exposed = smoothstep(0.001, 0.06, vTerrainWear * mix(0.65, 1.45, grain));
+        float cavity = smoothstep(0.02, 0.7, vTerrainDelta);
+        vec3 earth = mix(soil, fineSoil, 0.25) * mix(1.12, 0.72, cavity);
+        diffuseColor.rgb = mix(diffuseColor.rgb, earth, exposed);`)
+      .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
+        roughnessFactor = mix(roughnessFactor, 0.96, exposed);`)
+      .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
+        vec2 soilSlope = texture2D(uCraterNormal, vSoilUv).xy * 2.0 - 1.0;
+        normal = normalize(normal + mat3(viewMatrix) * vec3(soilSlope.x, 0.0, -soilSlope.y) * exposed * 0.42);`);
+  };
+  material.customProgramCacheKey = () => `${SourceKey()}|CraterSoilV1`;
+}
+
 export class TerrainDeformationView {
   constructor(field, scene, library) {
     this.field = field; this.scene = scene; this.physics = null;
@@ -142,6 +181,7 @@ export class TerrainDeformationView {
     this.originalGeometry = new Map(); this.tileMeshes = new Map();
     this.overlayTiles = new Map(); this.overlayMaterials = new Map();
     const groundMaterial = library.Get("Ground");
+    this.soilMaterial = groundMaterial;
     this.sources = field.meshes.filter((m) => m.geometry && (m.userData.deformableTerrain
       || m.material === groundMaterial || /(?:^Static_|\|)Ground$/.test(m.name)
       || /^(JieheGround_|CityPlatform$|OuterGround$|RangeGround$)/.test(m.name)));
@@ -149,9 +189,7 @@ export class TerrainDeformationView {
       && GROUND_OVERLAYS.test(m.name.split("|").pop().replace(/^Static_/, "")));
     this.material = (this.sources[0]?.material || groundMaterial).clone();
     const sourceMaterial = this.sources[0]?.material || groundMaterial;
-    this.material.onBeforeCompile = sourceMaterial.onBeforeCompile;
-    this.material.customProgramCacheKey = sourceMaterial.customProgramCacheKey.bind(sourceMaterial);
-    this.material.vertexColors = true;
+    ConfigureCraterSurface(this.material, sourceMaterial, this.soilMaterial);
     this.model = new TerrainDeformation({ GroundHeight: this.originalHeight, bounds: field.bounds,
       CanDeform: (x, z) => this.CanDeform(x, z) });
     field.BaseGroundHeight = this.originalHeight;
@@ -172,6 +210,17 @@ export class TerrainDeformationView {
     return true;
   }
   AttachPhysics(physics) { this.physics = physics; }
+  SoilWear(x, z) {
+    const ix = Math.round(x / this.model.config.cellM), iz = Math.round(z / this.model.config.cellM);
+    let wear = Math.abs(this.model.Node(ix, iz));
+    // Keep freshly exposed earth continuous across the zero-height crossing
+    // between the depression and raised lip; signed displacement alone leaves
+    // a bright ring of untouched whitebox material through every crater.
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      wear = Math.max(wear, Math.abs(this.model.Node(ix + dx, iz + dz)) * 0.85);
+    }
+    return wear;
+  }
   CutSource(source, rect, options) {
     const before = source.geometry;
     if (!CutTerrainRectangle(source, rect, options)) return false;
@@ -193,11 +242,11 @@ export class TerrainDeformationView {
       const original = geometry.userData.basePositions, baseHeights = new Float64Array(original.length / 3);
       for (let i = 0; i < baseHeights.length; i++) baseHeights[i] = this.model.BaseHeight(original[i * 3], original[i * 3 + 2]);
       geometry.userData.baseHeights = baseHeights;
+      geometry.setAttribute("terrainDelta", new THREE.BufferAttribute(new Float32Array(baseHeights.length * 2), 2).setUsage(THREE.DynamicDrawUsage));
       let material = this.overlayMaterials.get(source.material);
       if (!material) {
         material = source.material.clone(); material.vertexColors = true;
-        material.onBeforeCompile = source.material.onBeforeCompile;
-        material.customProgramCacheKey = source.material.customProgramCacheKey.bind(source.material);
+        ConfigureCraterSurface(material, source.material, this.soilMaterial);
         this.overlayMaterials.set(source.material, material);
       }
       const mesh = new THREE.Mesh(geometry, material); mesh.name = `TerrainSurface_${key}_${source.name}`;
@@ -214,15 +263,16 @@ export class TerrainDeformationView {
       const original = geo.userData.basePositions, baseColor = geo.userData.baseColors;
       for (let i = 0; i < pos.count; i++) {
         const x = original[i * 3], z = original[i * 3 + 2], baseline = geo.userData.baseHeights[i];
-        const ground = this.model.GroundHeight(x, z), depth = Math.max(0, baseline - ground);
+        const ground = this.model.GroundHeight(x, z), delta = baseline - ground, depth = Math.abs(delta);
         // Intact surface retains its old crown. Exposed deep soil converges on
         // the shared collision surface with only a subpixel rendering offset.
-        const crown = original[i * 3 + 1] - baseline, burn = Math.min(1, depth / 0.09);
+        const crown = original[i * 3 + 1] - baseline;
         pos.setY(i, ground + crown * Math.max(0, 1 - depth / 0.18) + (depth > 0 ? 0.003 : 0));
-        color.setXYZ(i, baseColor[i * 3] * (1 - burn * 0.60),
-          baseColor[i * 3 + 1] * (1 - burn * 0.70), baseColor[i * 3 + 2] * (1 - burn * 0.78));
+        color.setXYZ(i, baseColor[i * 3], baseColor[i * 3 + 1], baseColor[i * 3 + 2]);
+        geo.attributes.terrainDelta.setXY(i, delta, this.SoilWear(x, z));
       }
       pos.needsUpdate = true; color.needsUpdate = true;
+      geo.attributes.terrainDelta.needsUpdate = true;
       geo.computeVertexNormals(); geo.computeBoundingBox(); geo.computeBoundingSphere();
     }
   }
@@ -248,6 +298,7 @@ export class TerrainDeformationView {
         geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(width * width * 3), 3).setUsage(THREE.DynamicDrawUsage));
         geometry.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(width * width * 3), 3).setUsage(THREE.DynamicDrawUsage));
         geometry.setAttribute("color", new THREE.BufferAttribute(new Float32Array(width * width * 3), 3).setUsage(THREE.DynamicDrawUsage));
+        geometry.setAttribute("terrainDelta", new THREE.BufferAttribute(new Float32Array(width * width * 2), 2).setUsage(THREE.DynamicDrawUsage));
         const uv = new Float32Array(width * width * 2), indices = [];
         for (let z = 0; z <= n; z++) for (let x = 0; x <= n; x++) {
           const at = z * width + x; uv[at * 2] = (x0 + x * s) / 3.4; uv[at * 2 + 1] = -(z0 + z * s) / 3.4;
@@ -266,10 +317,11 @@ export class TerrainDeformationView {
         const nx = this.model.NodeHeight(ix - 1, iz) - this.model.NodeHeight(ix + 1, iz);
         const nz = this.model.NodeHeight(ix, iz - 1) - this.model.NodeHeight(ix, iz + 1);
         const norm = Math.hypot(nx, 2 * s, nz); normals.setXYZ(at, nx / norm, 2 * s / norm, nz / norm);
-        const burn = Math.min(1, depth / 0.09), rough = 0.96 + 0.04 * Math.sin(ix * 0.47) * Math.sin(iz * 0.39);
-        color.setXYZ(at, 1 - burn * (1 - 0.40 * rough), 1 - burn * (1 - 0.30 * rough), 1 - burn * (1 - 0.22 * rough));
+        color.setXYZ(at, 1, 1, 1);
+        geo.attributes.terrainDelta.setXY(at, depth, this.SoilWear(ix * s, iz * s));
       }
       position.needsUpdate = true; normals.needsUpdate = true; color.needsUpdate = true;
+      geo.attributes.terrainDelta.needsUpdate = true;
       geo.computeBoundingBox(); geo.computeBoundingSphere();
       this.physics?.SetTerrainTile(key, position.array, geo.index.array);
       this.UpdateOverlays(key);

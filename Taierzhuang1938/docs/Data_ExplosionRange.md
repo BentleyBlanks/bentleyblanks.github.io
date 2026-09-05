@@ -14,7 +14,7 @@
 | 绿色台 | 投来一枚活手榴弹，练习靠近后 F 拾起返掷 |
 | 橙色台 | 呼叫远程炮击；每发发射时按玩家当前位置采样圆盘落点，范围读 `EXPLOSION_BARRAGE.radiusM` |
 | 紫色台 | 召唤飞机进场，从机腹释放测试弹，然后爬升飞离；散布读 `EXPLOSION_AIRSTRIKE.radiusM` |
-| 蓝色台 | 清除在途弹、炮坑与召唤中的飞机，恢复原地形 |
+| 蓝色台 | 取消炮击与空袭，清除在途弹、尾迹、预警粒子、炮坑与土沿；将坑内人物抬回恢复的地面 |
 
 飞机默认不盘旋。只有紫色台呼叫后才出现一架已有轰炸机模型；飞离后重新允许呼叫。
 测试弹从飞机的实际位置释放，继续走 `CombatSystem.FireShell`，不是定时在地面播放爆炸。
@@ -31,10 +31,14 @@
   支援迫击炮和远程炮击均有独立目录映射；不要直接改坑深来冒充一次武器爆炸。
 - `FireShell` 用连续弹道和分段扫掠命中实际地形 / 障碍物；亮芯与尾迹是表现层。
   撞墙会提前引爆；在高处爆炸对土地的作用随离地间距减弱，超出 `groundReachM` 不挖地。
+  `Script_ShellVisual.mjs` 用短的渐隐带采样真实弹道历史，出生时没有预先拉长的尾巴，
+  命中时亮芯停在实际扫掠点，残迹短暂淡出。两者不写入法线深度预通道。
+  未命中的超时弹只回收，不能将爆炸瞬移到它正下方的地面。
 - `Script_GrenadeReturn.mjs` 给各关注册高优先级交互。距离、垂直差、遮挡、离手宽限、
   剩余引信与拾取动作时长由 `GRENADE_RETURN` 管。F 拾起后按当前瞄准方向自动返掷，
   **沿用同一枚 Projectile 与原引信**，不补库存、不重置倒计时；已经来不及的弹不给交互。
-- `TerrainDeformation` 只存稀疏高度差。基础高度仍由关卡提供；界河仍来自
+- `TerrainDeformation` 存稀疏的有符号高度差：正值挖土，负值是坑外的堆积土沿。
+  基础高度仍由关卡提供；界河仍来自
   `SampleJieheHeight`，没有第二套地形公式。基础节点缓存随 Reset / 换关清除。
 - 各场景的 `GroundHeight` 在已分配块内使用同一格点和三角对角线插值；渲染、
   Rapier、玩家、NPC、子弹与 IK 共用。`BaseGroundHeight` 只用于原始地形 / 建筑分类。
@@ -44,6 +48,11 @@
   识别名单在 `GROUND_OVERLAYS`；新增地表材质须登记并补可见表面 / 碰撞对账。
 - 连续爆炸只加深或扩大已有坑，不会把旧坑填平。深度上限、格距和坡度约束都读
   `TERRAIN_DEFORMATION`。坡度松弛通过扩大坡面维持通行，不把坑作为导航障碍盒。
+  堆积沿跟随实际坑口边界，不在旧坑内回填；高度与宽度读 `maxRimM` / `rimWidthM`，
+  内外两面也受相同坡度限制，地基和水面同样不允许堆土。
+- 坑壁与土沿复用已有 Ground 土壤 albedo / normal，以世界坐标采样并逐像素混合。
+  土色覆盖使用独立的扰动强度，跨越正负高度差的零点时不能露出一圈白地。
+  白盒悬浮说明牌不投射阴影，避免说明牌的阴影条带盖在被测坡面上。
 - 建筑地基、实体路基、桥、工位与水面受保护；土层方案不负责掏空建筑基础或开挖洞穴。
   静态导航分类读基础地面，避免地面下降把矮物重新认成堵路高墙。
 - 换关或重新载入会清除炮坑。当前没有跨会话炮坑存档；蓝色台提供本关即时复原。
@@ -68,6 +77,12 @@
 技术路线参考 [DICE / Frostbite 的 SIGGRAPH 地形渲染资料](https://media.contentapi.ea.com/content/dam/eacom/frostbite/files/chapter5-andersson-terrain-rendering-in-frostbite.pdf)
 中的局部高度场破坏和脏区域更新。本实现是适合浏览器与现有关卡的稀疏 CPU 高度场，
 没有宣称复刻商用引擎的完整 GPU 管线、体素破坏或真实土壤力学。
+凹陷加边缘隆起的形态参考 Eidos-Montréal 的
+[《Rise of the Tomb Raider》SIGGRAPH 2015 分享](https://www.slideshare.net/slideshow/labs-siggraph15trxno-videos/130489149)
+中 Procedural Snow Deformation 部分，以及 Michels / Sikachev 的
+[GPU Pro 7「Deferred Snow Deformation」](https://www.routledge.com/GPU-Pro-7-Advanced-Rendering-Techniques/Engel/p/book/9781498742535)。
+本项目将这个形态思路用于土坑，继续使用浏览器的稀疏 CPU 网格和共用碰撞采样，
+不依赖原方案的 compute shader / 硬件细分，也不模拟雪地回填或守恒的土方运输。
 返掷的交互参考 [Call of Duty 官方手册](https://cdn2.callofduty.com/assets/codbo/pdf/COD_NDS_OMAN_US_v4.pdf)
 中的附近手雷提示与返掷动作；具体时间窗与持续引信规则以本项目配置为准。
 
@@ -79,9 +94,12 @@ node Taierzhuang1938/Script_ExplosionRangeTest.mjs
 node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=prepush --fail-fast
 ```
 
-纯规则测试覆盖目录完整性、威力层次、叠加、上限、坡度、分块接缝、地基与返掷窗口。
+纯规则测试覆盖目录完整性、威力层次、叠加、上限、坡度、分块接缝、地基与返掷窗口，
+以及真实土沿高度、重叠爆炸不回填旧坑、堆积沿两面的坡度与地基保护。
 浏览器测试通过正式 F / G / H 输入验证库存、单发战车、持续引信、两种召唤、飞机退场、
 真实网格 / Rapier 射线、玩家和 NPC 穿坑，并在正片道路与界河高程上再做表面对账。
+另检查尾迹与真实弹道一致、撞墙截断、空中超时、同时取消炮击与空袭后无延迟爆炸、
+尾迹和预警粒子清理、真实土沿表面对账、坑内人物即时复位。
 截图和 JSON 报告落在 `_shots/ExplosionRange/`；JSON 同时保留形变耗时供性能复查。
 
 调试入口：`Debug.Explosions.State()` / `GoTo(id)` / `Reset()`，通用查询为

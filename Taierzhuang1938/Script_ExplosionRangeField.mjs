@@ -18,6 +18,7 @@ export class ExplosionRangeField extends RangeField {
       Orange: 0xffb12e, Green: 0x48d9b1, Blue: 0x70bfff, Purple: 0xc6a0ff, Armor: 0x555c4a, Track: 0x3b3d3c })) {
       const material = library.Get("Ground").clone();
       material.map = null; material.normalMap = null; material.roughnessMap = null; material.metalnessMap = null;
+      material.aoMap = null;
       material.color.setHex(color); material.roughness = 0.96; material.metalness = 0;
       this.materials.set(name, material);
     }
@@ -73,7 +74,11 @@ export class ExplosionRangeField extends RangeField {
     const b = this.bounds;
     for (const x of [b.minX + 0.5, b.maxX - 0.5]) Box("SideBoundary", "Boundary", x, 1.4, (b.minZ + b.maxZ) / 2, 1, 2.8, b.maxZ - b.minZ);
     for (const z of [b.minZ + 0.5, b.maxZ - 0.5]) Box("EndBoundary", "Boundary", (b.minX + b.maxX) / 2, 1.4, z, b.maxX - b.minX, 2.8, 1);
-    for (const mesh of sink.Flush(this.scene, { Get: (key) => this.materials.get(key) })) this.meshes.push(mesh);
+    for (const mesh of sink.Flush(this.scene, { Get: (key) => this.materials.get(key) })) {
+      // Floating instructional signs must not stripe the test surfaces below.
+      if (mesh.material.isMeshBasicMaterial) mesh.castShadow = false;
+      this.meshes.push(mesh);
+    }
     this.colliders = sink.colliders; this.covers = []; this.stats.structures = sink.colliders.length;
   }
   async LoadVehicles() {

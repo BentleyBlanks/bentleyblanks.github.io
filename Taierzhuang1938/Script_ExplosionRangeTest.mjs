@@ -26,6 +26,9 @@ try {
   });
   assert.equal(result.boot.level, "ExplosionRange"); assert.equal(result.boot.models.length, EXPLOSION_VEHICLES.length);
   assert.ok(result.boot.pinned && result.boot.ground > 0);
+  assert.equal(await page.evaluate(() => window.Taierzhuang.scene.children.filter((m) =>
+    m.material?.isMeshBasicMaterial && /^Static_ExplosionStations/.test(m.name) && m.castShadow).length), 0,
+  "instruction boards do not cast bands over crater inspection surfaces");
   assert.deepEqual(result.boot.snapshot.visibleAircraft, [], "no uncalled aircraft in the test scene");
   await page.screenshot({ path: path.join(out, "Scene_Overview.png") });
   result.pickups = [];
@@ -74,6 +77,58 @@ try {
     result.vehicles.push(sample);
   }
   console.log("PASS vehicle shells / impact");
+  result.shellVisual = await page.evaluate(() => {
+    const t = window.Taierzhuang; t.Debug.Explosions.Reset();
+    const from = t.player.position.clone().set(2600, 2, 2608), target = from.clone().set(2600, 0, 2578);
+    const shell = t.combat.FireShell(from, target, { flight: 0.85, radius: 0.1, damage: 0 });
+    const initial = shell.visual.core.quaternion.clone();
+    t.combat.StepShells(0.35);
+    const positions = shell.visual.trail.geometry.attributes.position;
+    const head = Array.from(positions.array.slice(0, 3)), tail = Array.from(positions.array.slice(-3));
+    const trace = [];
+    const span = Math.min(shell.age, 0.12, 5.5 / shell.velocity.length());
+    for (let i = 0; i < positions.count; i += 2) {
+      const time = shell.age - span * i / (positions.count - 2);
+      const expected = from.clone().addScaledVector(shell.initialVelocity, time);
+      expected.y -= 19.6 * time * time * 0.5;
+      trace.push(Math.hypot(positions.getX(i) - expected.x, positions.getY(i) - expected.y, positions.getZ(i) - expected.z));
+    }
+    t.player.Spawn(2604, 2600, 0);
+    const delta = shell.position.clone().sub(t.player.position).add({x:0, y:-1.6, z:0});
+    t.player.yaw = Math.atan2(-delta.x, -delta.z); t.player.pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z));
+    t.StepFrames(24, 0);
+    return { head, tail, position: shell.position.toArray(), trace,
+      length: Math.hypot(...head.map((v,i) => v - tail[i])),
+      skipDepth: shell.visual.core.userData.skipNormalDepth && shell.visual.trail.userData.skipNormalDepth,
+      initialAligned: Math.abs(initial.w) < 1 && shell.visual.core.scale.x < 0.1 };
+  });
+  assert.ok(result.shellVisual.trace.every((error) => error < 0.0005), "ribbon follows actual past ballistic positions");
+  assert.ok(result.shellVisual.length > 1 && result.shellVisual.length < 5.6 && result.shellVisual.skipDepth);
+  await page.screenshot({ path: path.join(out, "Scene_ShellTrail.png") });
+  result.wallImpact = await page.evaluate(() => {
+    const t = window.Taierzhuang; t.Debug.Explosions.Reset();
+    const from = t.player.position.clone().set(2648, 1.2, 2600), target = from.clone().set(2660, 1.2, 2600);
+    let impact = null, count = 0;
+    const shell = t.combat.FireShell(from, target, { flight: 0.3, radius: 0.1, damage: 0,
+      OnImpact: (p) => { impact = p.toArray(); count++; } });
+    t.combat.StepShells(0.3);
+    const fading = t.combat.shellVisuals.fading.length;
+    t.combat.StepShells(0.2);
+    return { impact, count, position: shell.position.toArray(), age: shell.age, fading,
+      remaining: t.scene.children.filter((m) => /^ShellVisual_/.test(m.name)).length };
+  });
+  assert.ok(result.wallImpact.impact && Math.abs(result.wallImpact.impact[0] - 2654) < 0.05, "actual boundary wall intercepts shell");
+  assert.deepEqual(result.wallImpact.position, result.wallImpact.impact, "visual head stops at swept impact instead of jumping through wall");
+  assert.ok(result.wallImpact.age < 0.3 && result.wallImpact.count === 1 && result.wallImpact.fading === 1 && result.wallImpact.remaining === 0);
+  result.airMiss = await page.evaluate(() => {
+    const t = window.Taierzhuang; t.Debug.Explosions.Reset(); let impacts = 0;
+    const from = t.player.position.clone().set(2600, 100, 2600);
+    t.combat.FireShell(from, from.clone().setY(150), { flight: 0.1, radius: 0.1, damage: 0, OnImpact: () => impacts++ });
+    t.combat.StepShells(3.2); t.combat.StepShells(0.2);
+    return { impacts, active: t.combat.shells.length, terrain: t.Debug.Explosions.State().terrain.impacts };
+  });
+  assert.deepEqual(result.airMiss, { impacts: 0, active: 0, terrain: 0 }, "timeout never creates a disconnected ground explosion");
+  console.log("PASS curved shell trail / swept wall impact / fading cleanup / airborne timeout");
   result.return = await page.evaluate(() => {
     const t = window.Taierzhuang; t.Debug.Explosions.GoTo("return"); t.StepFrames(10);
     t.Debug.Key("KeyF"); t.StepFrames(83);
@@ -118,6 +173,23 @@ try {
   assert.ok(result.departure.airDrops.every((d) => d.impact), "dropped projectiles actually impact before the bomber leaves");
   console.log("PASS aircraft call-in / random nearby drops / departure / no idle flight");
 
+  result.cancel = await page.evaluate(() => {
+    const t = window.Taierzhuang;
+    t.Debug.Explosions.GoTo("barrage"); t.StepFrames(10); t.Debug.Key("KeyF"); t.StepFrames(25);
+    t.Debug.Explosions.GoTo("airstrike"); t.StepFrames(10); t.Debug.Key("KeyF"); t.StepFrames(25);
+    const before = t.Debug.Explosions.State();
+    t.Debug.Explosions.GoTo("reset"); t.StepFrames(10); t.Debug.Key("KeyF");
+    const immediate = { ...t.Debug.Explosions.State(), visuals: t.scene.children.filter((m) => /^ShellVisual_/.test(m.name)).length,
+      particles: Object.values(t.vfx.pools).reduce((sum, pool) => sum + pool.geometry.instanceCount, 0) };
+    t.StepFrames(950);
+    return { before, immediate, later: t.Debug.Explosions.State() };
+  });
+  assert.ok(result.cancel.before.barrage && result.cancel.before.airstrike && result.cancel.before.shells.length > 0);
+  assert.ok(!result.cancel.immediate.barrage && !result.cancel.immediate.airstrike && !result.cancel.immediate.shells.length);
+  assert.equal(result.cancel.immediate.visuals, 0); assert.equal(result.cancel.immediate.particles, 0);
+  assert.equal(result.cancel.later.terrain.impacts, 0); assert.deepEqual(result.cancel.later.visibleAircraft, []);
+  console.log("PASS F reset cancels active barrage/raid, trails and warning particles with no delayed impacts");
+
   result.traversal = await page.evaluate(() => {
     const t = window.Taierzhuang, field = t.combat.host.battlefield, physics = t.player.physics;
     t.Debug.Explosions.Reset(); t.player.health = 100; t.player.alive = true;
@@ -143,16 +215,21 @@ try {
     const s = t.ai.soldiers.find((soldier) => soldier.id === id);
     s.position.set(2590, 0, 2614); s.body.Teleport(2590, 0, 2614);
     s.goal.set(2610, 0, 2614); s.state = "advance"; s.stance = 0; s.velocityY = 0;
-    let minY = 0, maxStuck = 0, pathRequests = 0;
+    let minY = 0, maxStuck = 0, pathRequests = 0, maxX = s.position.x, exited = false;
     const nav = t.ai.ctx.nav, steer = nav.Steer;
     nav.Steer = function (...args) { pathRequests++; return steer.apply(this, args); };
     try {
-      for (let i = 0; i < 620; i++) { t.StepFrames(1); minY = Math.min(minY, s.position.y); maxStuck = Math.max(maxStuck, s.stuckTime); }
+      for (let i = 0; i < 620; i++) {
+        t.StepFrames(1); minY = Math.min(minY, s.position.y); maxStuck = Math.max(maxStuck, s.stuckTime); maxX = Math.max(maxX, s.position.x);
+        // Stop on the actual far-lip crossing: the patrol can then turn around
+        // and re-enter before an arbitrary final frame, depending on prior laps.
+        if (minY < -1.8 && s.position.x > 2607 && s.position.y > -0.2) { exited = true; break; }
+      }
     } finally { nav.Steer = steer; }
-    return { minY, maxStuck, pathRequests, final: s.position.toArray(), alive: s.alive, navigation: nav.revisions };
+    return { minY, maxStuck, pathRequests, maxX, exited, goal: s.goal.toArray(), final: s.position.toArray(), alive: s.alive, navigation: nav.revisions };
   });
   assert.ok(result.npc.pathRequests > 0 && result.npc.alive, "real NPC navigation and locomotion active");
-  assert.ok(result.npc.minY < -1.8 && result.npc.final[0] > 2607 && result.npc.final[1] > -0.2,
+  assert.ok(result.npc.exited && result.npc.minY < -1.8 && result.npc.final[0] > 2607 && result.npc.final[1] > -0.2,
     `NPC crosses and climbs out of maximum-depth crater: ${JSON.stringify(result.npc)}`);
   result.walk = await page.evaluate(() => {
     const t = window.Taierzhuang, field = t.combat.host.battlefield;
@@ -168,6 +245,34 @@ try {
   console.log("PASS depth cap / player and NPC enter and exit crater / navigation stable");
   await page.evaluate(() => { const t = window.Taierzhuang; t.player.Spawn(2600, 2618, 0); t.player.pitch = -0.5; t.StepFrames(4); });
   await page.screenshot({ path: path.join(out, "Scene_StackedCrater.png") });
+  result.rim = await page.evaluate(async () => {
+    const t = window.Taierzhuang, field = t.combat.host.battlefield, view = field.deformation;
+    const { Raycaster, Vector3 } = await import("three");
+    let best = null;
+    for (const mesh of view.tileMeshes.values()) {
+      const p = mesh.geometry.attributes.position;
+      for (let i = 0; i < p.count; i++) if (!best || p.getY(i) > best.y) best = new Vector3(p.getX(i), p.getY(i), p.getZ(i));
+    }
+    const origin = best.clone().setY(8), down = new Vector3(0, -1, 0);
+    t.scene.updateMatrixWorld(true);
+    const visual = new Raycaster(origin, down, 0, 20).intersectObjects([...view.tileMeshes.values()], false)[0];
+    const hit = t.player.physics.Raycast(origin, down, 20, { terrain: true });
+    const height = field.GroundHeight(best.x, best.z);
+    return { height, visual: visual?.point.y, physical: 8 - hit.t };
+  });
+  assert.ok(result.rim.height > 0.08 && Math.abs(result.rim.height - result.rim.visual) < 0.005
+    && Math.abs(result.rim.height - result.rim.physical) < 0.005, "raised soil is real in rendering and collision");
+  result.restoreBodies = await page.evaluate(() => {
+    const t = window.Taierzhuang, field = t.combat.host.battlefield;
+    const s = t.ai.soldiers.find((soldier) => soldier.id === t.Debug.Explosions.State().patrols[0].id);
+    const y = field.GroundHeight(2600, 2614);
+    t.player.position.set(2600, y, 2614); t.player.body.Teleport(2600, y, 2614);
+    s.position.set(2600, y, 2614); s.body.Teleport(2600, y, 2614);
+    t.Debug.Explosions.Reset();
+    return { before: y, player: t.player.position.y, npc: s.position.y };
+  });
+  assert.ok(result.restoreBodies.before < -2 && result.restoreBodies.player === 0 && result.restoreBodies.npc === 0,
+    "reset immediately brings people inside a pit back above restored ground");
   result.reset = await page.evaluate(() => {
     const t = window.Taierzhuang; t.Debug.Explosions.GoTo("reset"); t.StepFrames(10); t.Debug.Key("KeyF"); t.StepFrames(10);
     return t.Debug.Explosions.State();

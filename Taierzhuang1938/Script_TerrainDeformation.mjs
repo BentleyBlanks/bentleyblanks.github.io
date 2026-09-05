@@ -1,9 +1,11 @@
 // Authoritative sparse height delta field. Rendering, Rapier and gameplay consume
 // the same lattice and the same triangle diagonal. No texture-only collision holes.
-// Updates lower the soil; slope relaxation widens repeated craters instead of
-// raising their floor. Navigation topology is deliberately not invalidated.
+// Positive deltas excavate; negative deltas are bounded displaced soil outside
+// the cavity. New rims never fill an existing cavity. All share one heightfield.
 import { EXPLOSIVES, ExplosiveIdFor, TERRAIN_DEFORMATION } from "./Data_Explosives.mjs";
 import { ValueNoise2 } from "./Script_Noise.mjs";
+
+const NEIGHBORS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
 export class TerrainDeformation {
   constructor({ GroundHeight = () => 0, CanDeform = () => true, bounds, config = {} } = {}) {
@@ -114,10 +116,11 @@ export class TerrainDeformation {
       if (next <= old + 0.00001) return;
       this.SetNode(ix, iz, next); queue.push([ix, iz]); changed.add(`${ix},${iz}`);
     };
-    for (let iz = Math.floor((position.z - radius) / s); iz <= Math.ceil((position.z + radius) / s); iz++) {
-      for (let ix = Math.floor((position.x - radius) / s); ix <= Math.ceil((position.x + radius) / s); ix++) {
+    for (let iz = Math.floor((position.z - radius * 1.1) / s); iz <= Math.ceil((position.z + radius * 1.1) / s); iz++) {
+      for (let ix = Math.floor((position.x - radius * 1.1) / s); ix <= Math.ceil((position.x + radius * 1.1) / s); ix++) {
         const dx = ix * s - position.x, dz = iz * s - position.z;
-        const r = Math.hypot(dx, dz) / radius;
+        const contour = 0.9 + 0.2 * ValueNoise2(ix * s * 1.3, iz * s * 1.3, 8317);
+        const r = Math.hypot(dx, dz) / (radius * contour);
         if (r >= 1) continue;
         const rough = 0.94 + 0.06 * ValueNoise2(ix * 0.26, iz * 0.26, 1938);
         Lower(ix, iz, this.Node(ix, iz) + depth * (1 - r * r) ** 2 * rough);
@@ -126,15 +129,64 @@ export class TerrainDeformation {
     // Monotone relaxation: overlapping blasts can deepen and widen, never heal.
     for (let head = 0; head < queue.length; head++) {
       const [ix, iz] = queue[head], depthHere = this.Node(ix, iz);
-      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      for (const [dx, dz] of NEIGHBORS) {
         Lower(ix + dx, iz + dz, depthHere - maxAxisGrade * s * Math.hypot(dx, dz));
       }
     }
     if (!changed.size) return null;
+    const rimNodes = this.RaiseRim(changed, depth);
     this.revision++; this.impacts++;
-    this.lastImpact = { id, x: position.x, z: position.z, radius, changedNodes: changed.size,
+    this.lastImpact = { id, x: position.x, z: position.z, radius, changedNodes: changed.size, rimNodes,
       depth: this.base(position.x, position.z) - this.GroundHeight(position.x, position.z), revision: this.revision };
     return this.lastImpact;
+  }
+  RaiseRim(changed, blastDepth) {
+    const { cellM: s, maxAxisGrade, maxRimM, rimWidthM } = this.config;
+    const distances = new Map(), queue = [];
+    const Visit = (x, z, distance) => {
+      const key = this.Key(x, z);
+      if (distance >= rimWidthM || distance >= (distances.get(key)?.distance ?? Infinity)
+        || this.Node(x, z) > 0 || !this.Allowed(x, z)) return;
+      const entry = { x, z, distance }; distances.set(key, entry); queue.push(entry);
+    };
+    // Follow the actual excavation boundary, including merged/deepened pits.
+    for (const key of changed) {
+      const [x, z] = key.split(",").map(Number);
+      if (this.Node(x, z) <= 0) continue;
+      for (const [dx, dz] of NEIGHBORS) Visit(x + dx, z + dz, s * Math.hypot(dx, dz));
+    }
+    for (let head = 0; head < queue.length; head++) {
+      const { x, z, distance } = queue[head];
+      for (const [dx, dz] of NEIGHBORS) Visit(x + dx, z + dz, distance + s * Math.hypot(dx, dz));
+    }
+    const heights = new Map();
+    for (const [key, entry] of distances) {
+      const rough = 0.65 + 0.35 * ValueNoise2(entry.x * s * 2.3, entry.z * s * 2.3, 6319);
+      entry.height = Math.max(-this.Node(entry.x, entry.z), Math.min(maxRimM, blastDepth * 0.36)
+        * Math.sin(Math.PI * entry.distance / rimWidthM) ** 2 * rough);
+      heights.set(key, entry);
+    }
+    // Constrain both sides of the raised lip to the same walkable slope bound.
+    // Relaxation only reduces proposed NEW deposition, never raises a pit floor.
+    let unsettled = true;
+    while (unsettled) {
+      unsettled = false;
+      for (const entry of heights.values()) {
+        const old = -this.Node(entry.x, entry.z); let next = entry.height;
+        for (const [dx, dz] of NEIGHBORS) {
+          const x = entry.x + dx, z = entry.z + dz;
+          const neighbor = heights.get(this.Key(x, z))?.height ?? -this.Node(x, z);
+          next = Math.min(next, neighbor + maxAxisGrade * s * Math.hypot(dx, dz));
+        }
+        next = Math.max(old, next);
+        if (next < entry.height - 0.00001) { entry.height = next; unsettled = true; }
+      }
+    }
+    let count = 0;
+    for (const entry of heights.values()) if (entry.height > -this.Node(entry.x, entry.z) + 0.00001) {
+      this.SetNode(entry.x, entry.z, -entry.height); count++;
+    }
+    return count;
   }
   TakeDirty() { const keys = [...this.dirty]; this.dirty.clear(); return keys; }
   State() { return { revision: this.revision, impacts: this.impacts, tiles: this.tiles.size, pages: this.pages.size,

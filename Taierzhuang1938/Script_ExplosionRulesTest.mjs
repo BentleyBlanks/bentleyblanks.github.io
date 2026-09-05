@@ -43,6 +43,27 @@ for (let i = 0; i < 20; i++) protectedTerrain.ApplyBlast({ x: 0, y: protectedTer
 assert.equal(protectedTerrain.GroundHeight(1.5, 0), 0, "foundation retained");
 assert.ok(-protectedTerrain.GroundHeight(1.25, 0) <= TERRAIN_DEFORMATION.cellM * TERRAIN_DEFORMATION.maxAxisGrade + 1e-5);
 
+// Excavation and displaced earth are one signed, traversable heightfield.
+const raised = new TerrainDeformation({ bounds });
+raised.ApplyBlast({ x: 0, y: 0, z: 0 }, "Shell75");
+let rimHeight = 0; const cavityBefore = [];
+for (let z = -32; z <= 32; z++) for (let x = -32; x <= 32; x++) {
+  const delta = raised.Node(x, z); rimHeight = Math.max(rimHeight, -delta);
+  if (delta > 0) cavityBefore.push([x, z, delta]);
+}
+assert.ok(rimHeight > 0.08 && rimHeight <= TERRAIN_DEFORMATION.maxRimM, "blast deposits a real bounded raised rim");
+raised.ApplyBlast({ x: 2, y: raised.GroundHeight(2, 0), z: 0 }, "Shell75");
+for (const [x, z, depth] of cavityBefore) assert.ok(raised.Node(x, z) >= depth - 1e-5, "new rim never fills an old cavity");
+for (let z = -40; z <= 40; z++) for (let x = -40; x <= 40; x++) {
+  for (const [dx, dz] of [[1, 0], [0, 1], [1, 1], [1, -1]]) {
+    assert.ok(Math.abs(raised.Node(x, z) - raised.Node(x + dx, z + dz))
+      <= TERRAIN_DEFORMATION.maxAxisGrade * TERRAIN_DEFORMATION.cellM * Math.hypot(dx, dz) + 2e-5,
+    `both sides of the rim remain traversable at ${x},${z}`);
+  }
+}
+for (let z = -15; z <= 15; z++) for (let x = 6; x <= 15; x++) assert.equal(protectedTerrain.Node(x, z), 0, "no deposit on foundations");
+raised.Clear(); assert.equal(raised.State().bytes, 0); assert.equal(raised.GroundHeight(2, 0), 0);
+
 const player = { Alive: true, position: { x: 0, y: 0, z: 0 }, yaw: 0 };
 const MakeGrenade = (overrides = {}) => ({ alive: true, kind: "Grenade", owner: "ija", fuse: 2, age: 1,
   position: { x: 0, y: 0.05, z: -1 }, ...overrides });
