@@ -226,8 +226,10 @@ for(const beat of [6,7,8,9,10]) {
  director.lastSample={position:goal,clips:1};director.CurrentObjective();
  assert.equal(director.frontlineApproaching,false,"normal battle guidance resumes at the gunport");
  assert.equal(JSON.stringify(director.Snapshot()),before,"frontline guidance does not change progress, resources or enemy receipts");
- director.lastSample={position:frontlineRetry,clips:0};
- assert.equal(director.CurrentObjective().interactionId,"p012_frontlineAmmo","actual supply interaction retains priority");
+ director.lastSample={position:frontlineRetry,clips:0,ammo:5};
+ assert.notEqual(director.CurrentObjective().interactionId,"p012_frontlineAmmo","a loaded rifle does not redirect the player away from combat");
+ director.lastSample={position:frontlineRetry,clips:0,ammo:0};
+ assert.equal(director.CurrentObjective().interactionId,"p012_frontlineAmmo","actual empty weapon and reserve make the available supply the priority");
 }
 const retryFlow=new FirstLevelP012Director({},phase.whitebox);retryFlow.beat=21;retryFlow.routeIndex=5;
 const retrySnapshot=JSON.stringify(retryFlow.Snapshot());

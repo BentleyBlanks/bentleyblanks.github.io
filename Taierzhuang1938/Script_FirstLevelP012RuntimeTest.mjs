@@ -261,12 +261,12 @@ assert.ok(openingStoryBeats.length>0);
  assert.ok(signals.has('P012NorthSquadRegrouped'),'all six physically finish reaction and close on Luo before the count begins');
  assert.ok(runtime.openingCast.every(entry=>entry.shellReacted&&runtime.time>=entry.shellReactionUntil));
  runtime.openingCast[0].shellStanceRestored=false;actors[0].stance=2;
- runtime.time+=.1;runtime.beat=5;
+ runtime.time+=.1;runtime.beat=6;guide.x=30;guide.z=0;
  runtime.StepMarch(.05);assert.equal(actors[0].stance,2,'frontline entry does not force a delayed opening recovery');
  for(let i=0;i<600;i++){runtime.time+=.05;runtime.StepMarch(.05);}
  assert.equal(releases.length,6);assert.equal(defenses.length,6);assert.ok(runtime.openingCast.every(e=>e.marchComplete&&e.stage==='frontline'));
  for(const [i,a] of actors.entries())assert.ok(Math.hypot(a.x-positions[i].x,a.z-positions[i].z)<.45,'defense handover follows actual individual arrival');
- console.log('PASS six companions retain B03-B05 march and react only after actual shell impact');
+ console.log('PASS six companions reach real defense slots even when B06 replaces the previous guide destination');
 }
 {
  const route=P012Phase.whitebox.activities.ammoRoute,actor={...route.at(-2)},orders=[];
@@ -830,14 +830,17 @@ assert.match(main,/story\.P012Restore\?\.\(sample\.p012Story\.immediate\)/,"P012
   };
   SETPIECES.CH1_NanLu.Update(context, 0.1); assert.equal(runs.length, 0, "standing twenty seconds does not arm dive");
   ready = true; SETPIECES.CH1_NanLu.Update(context, 0.1); assert.equal(runs.length, 1);
-  runs[0].OnPlayerHit(); assert.equal(rewinds, 1); assert.ok(!emitted.includes("P012Dived"));
-  SETPIECES.CH1_NanLu.Update(context, 0.1); assert.equal(aborted, 1); assert.equal(runs.length, 2);
+  // Let this first pass finish while the player stands; no mandatory rewind or fake dodge.
+  runs[0].OnPhase("exit");assert.equal(rewinds,0);assert.ok(emitted.includes("P012AirPassComplete"));assert.ok(!emitted.includes("P012Dived"));
+  SETPIECES.CH1_NanLu.Update(context,.1);assert.equal(aborted,0);assert.equal(runs.length,1);
+  // Independent voluntary-dodge receipt, with the original litter already released by input.
+  context.mem.p012AirPassComplete=false;
   context.mem.p012CarriedLitter = { propLitter: "litter", propBody: "body" };
   // The input releases the load before TryDitchDodge reaches OnDodge.
   context.carry.KindId=null;context.mem.p012ReleaseAt={x:0,z:0};context.PlayerPos=()=>({x:0,z:-.8});
   for(let frame=0;frame<24;frame++)SETPIECES.CH1_NanLu.Update(context,1/30);
   assert.ok(context.mem.p012ReleaseAt?.placed,'physical crawl frames retain the already rendered input-release receipt');
-  runs[1].OnDodge(); assert.ok(emitted.includes("P012Dived"));
+  runs[0].OnDodge(); assert.ok(emitted.includes("P012Dived"));
   assert.ok(moved.some((entry) => entry.id === "litter" && entry.rotationZ > 1));
   assert.equal(moved.find(entry=>entry.id==='litter'&&entry.rotationZ>1).z,0,'litter falls at release position, not at the end of the dive');
   assert.equal(context.mem.p012ReleaseAt,null,'the release receipt is consumed by this physical overturn');

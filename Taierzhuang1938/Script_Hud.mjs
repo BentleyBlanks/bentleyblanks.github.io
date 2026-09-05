@@ -930,9 +930,9 @@ export class Hud {
       .filter((prompt) => prompt?.keys && prompt?.label)
       .slice(0, 3)
       .map((prompt) => ({
-        keys: String(prompt.keys), label: String(prompt.label), kind: String(prompt.kind || "action"),
+        keys: String(prompt.keys), label: String(prompt.label), kind: String(prompt.kind || "action"), text:!!prompt.text,
       }));
-    const signature = next.map((prompt) => `${prompt.kind}:${prompt.keys}:${prompt.label}`).join("|");
+    const signature = next.map((prompt) => `${prompt.kind}:${prompt.keys}:${prompt.label}:${prompt.text}`).join("|");
     if (signature === this.actionPromptSignature) return;
     this.actionPromptSignature = signature;
     this.actionPrompts = next;
@@ -949,6 +949,7 @@ export class Hud {
       row.title = prompt.label;
       row.setAttribute("aria-label", `${prompt.keys}：${prompt.label}`);
       row.append(key, icon);
+      if(prompt.text){const label=document.createElement("span");label.className="actionText";label.textContent=prompt.label;label.style.cssText="font:14px/1.4 sans-serif;color:#fff;white-space:normal;max-width:250px";row.append(label);}
       this.el.actions.appendChild(row);
     }
     this.el.actions.classList.toggle("on", next.length > 0);

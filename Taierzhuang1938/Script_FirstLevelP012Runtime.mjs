@@ -339,7 +339,7 @@ export class FirstLevelP012Runtime {
     if(!this.march)return;
     const guide=this.host.Position(this.host.GuideActor());if(!guide)return;
     const marchEnd=this.march.route.at(-1);
-    if(this.beat>=5&&Math.hypot(guide.x-marchEnd.x,guide.z-marchEnd.z)<3)this.marchFrontlineReached=true;
+    if(this.beat>=6||(this.beat>=5&&Math.hypot(guide.x-marchEnd.x,guide.z-marchEnd.z)<3))this.marchFrontlineReached=true;
     for(const entry of this.openingCast||[]){
       if(!entry.ammoIssued||entry.marchComplete||(!entry.issueComplete&&!entry.released))continue;
       const at=this.host.Position(entry.actor);if(!at)continue;
@@ -378,7 +378,7 @@ export class FirstLevelP012Runtime {
       entry.marchPlan=plan;entry.stage="march";
       this.host.Move(entry.actor,plan.point,plan.speed);
     }
-    if(this.beat===4&&this.host.Signalled?.("P012NorthDitchEntered")&&!this.host.Signalled?.("P012NorthSquadRegrouped")){
+    if(this.beat===4&&this.host.Signalled?.("P012NorthNearMissImpact")&&!this.host.Signalled?.("P012NorthSquadRegrouped")){
       const squad=(this.openingCast||[]).filter(entry=>entry.ammoIssued&&entry.actor?.alive!==false);
       const regroup=this.config.activities?.shellCoverRoute?.at(-1),range=this.config.activities?.northRegroupRangeM??10;
       const player=this.host.PlayerPosition?.();
@@ -622,7 +622,7 @@ export class FirstLevelP012Runtime {
       // actual destination, not the previous waypoint captured above.
       const gunport = guide.route.at(-1);
       if (guide.beat === 5 && guide.index === guide.route.length - 1 && position && Math.hypot(position.x - gunport.x, position.z - gunport.z) < 2) guide.clearGunport = true;
-      const sheltering=guide.beat===4&&this.host.Signalled?.("P012NorthNearMissImpact")&&!this.host.Signalled?.("P012NorthDitchEntered");
+      const sheltering=guide.beat===4&&this.host.Signalled?.("P012NorthNearMissImpact")&&this.time<(this.guideReactionUntil??0);
       const target = sheltering&&this.config.activities?.northShelterPosition?this.config.activities.northShelterPosition:guide.clearGunport ? { x: guide.route.at(-1).x - 5, z: guide.route.at(-1).z + 2 } : guide.route[guide.index];
       const opening=[0,2].includes(guide.beat),player=this.host.PlayerPosition?.();
       const distance=player&&position?Math.hypot(player.x-position.x,player.z-position.z):0;

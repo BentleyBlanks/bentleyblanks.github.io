@@ -36,8 +36,8 @@ export const openingActivities=Object.freeze({
   openingUrgentGuideMps:3.8,civilianAlarmSpeedScale:1.85,
   // Finite salvos advance with the player along the northbound road, never a camera-relative blast.
   approachShells:Object.freeze([
-    {stage:"distant",gateZ:110,delayS:0,point:Point(-36,-24)},
-    {stage:"distant",gateZ:110,delayS:3.8,point:Point(25,-27)},
+    {stage:"distant",gateZ:110,delayS:0,point:Point(-76,-144)},
+    {stage:"distant",gateZ:110,delayS:3.8,point:Point(-65,-161)},
     {stage:"village",gateZ:70,delayS:0,point:Point(-27,25)},
     {stage:"village",gateZ:70,delayS:2.8,point:Point(24,15)},
     {stage:"approaching",gateZ:40,delayS:0,point:Point(-21,0)},

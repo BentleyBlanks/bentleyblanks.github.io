@@ -440,7 +440,7 @@ export class AircraftStrafeDirector {
       victims, immune,
       lineHit: new Set(),
       player: {
-        on: playerOn,
+        on: playerOn, mode: playerCfg.mode || "window",
         atS: playerAtS,
         windowS: Math.max(0.1, Num(playerCfg.windowS, STRAFE_PLAYER_DEFAULTS.windowS)),
         damage: Num(playerCfg.damage, STRAFE_PLAYER_DEFAULTS.damage),
@@ -668,6 +668,7 @@ export class AircraftStrafeDirector {
       if (run.tracerAcc > 1) run.tracerAcc = 0;
     }
 
+    if(run.player.on&&run.player.mode==="line"&&run.burstOn)this.StepPlayerLine();
     this.StepVictims();
     if (run.damage.npc === "line") this.StepLineDamage();
   }
@@ -733,12 +734,26 @@ export class AircraftStrafeDirector {
     return died;
   }
 
+  // Optional spatial risk: only the actual swept gun line and an unblocked aircraft ray can hit.
+  StepPlayerLine(){
+    const run=this.run,p=run.player;if(p.hit)return;
+    const target=this.PlayerPoint(),a=run.lastImpact,b=run.impact;
+    const dx=b.x-a.x,dz=b.z-a.z,len=dx*dx+dz*dz;
+    const u=len>1e-6?Clamp01(((target.x-a.x)*dx+(target.z-a.z)*dz)/len):0;
+    if(Math.hypot(target.x-a.x-dx*u,target.z-a.z-dz*u)>run.lethalRadiusM)return;
+    const from=this.AirPoint();
+    if(this.host.CanHitPlayer?.(from)===false)return;
+    p.hit=true;p.resolved=true;this.stats.playerHits++;
+    this.host.HitPlayer?.(p.damage,this.Direction(from,target),{from,part:p.part,lethal:false,runId:run.id,strafe:true});
+    run.OnPlayerHit?.(this.View());this.Beat("playerHit");
+  }
+
   /** 玩家那一段：提示 → 窗口 → 结算。三拍都可能落在进入段与扫射段的交界上。 */
   StepPlayerWindow() {
     const run = this.run;
     if (!run) return;
     const p = run.player;
-    if (!p.on || p.resolved) return;
+    if (!p.on || p.resolved || p.mode === "line") return;
     // 窗口 = [atS − windowS, atS]：提示在飞机压下来的时候出，结算落在弹线到达那一帧。
     if (!p.cued && run.t >= p.atS - p.windowS) {
       p.cued = true;

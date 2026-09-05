@@ -87,14 +87,14 @@ function MovedFirstChapterVoice(key, event) {
 const guidanceCues = Object.freeze([
   ["Wounded", "P012GuideAtWounded", "先停一下，伤员在这里。你帮他挪进掩蔽部，我在前头看着路。"],
   ["FlankEntry", "P012GuideAtFlankEntry", "靠我这边的胸墙过来。别走正面，从这个拐角绕到破屋侧面，我在这里接应。"],
-  ["Smoke", "P012GuideAtSmoke", "烟幕在这儿。点上，等烟起来，咱们带着担架走西边的沟。"],
+  ["Smoke", "P012GuideAtSmoke", "我来放烟！你照应担架，咱们沿西边的沟撤回去。"],
   ["SmokeHandoff", "P012GuideSmokeHandoff", "沿西沟往回走。前后照应着担架，别落下伤员。"],
-  ["DelayMiddle", "P012DelayPosition1", "这边压住了。顺着蓝色沟岸换到中段，别离伤员太远。"],
-  ["DelaySouth", "P012DelayPosition2", "最后一组从南端缺口来。到折角后再开火，别站在路面上。"],
+  ["DelayMiddle", "P012DelayPosition1", "这边压住了，中段又有敌人接近！护住伤员，也可以沿蓝色沟岸换射位。"],
+  ["DelaySouth", "P012DelayPosition2", "还有敌人从南端缺口来！守住伤员，折角后有掩护。"],
   ["BlockadeDecision", "P012BlockadeDecision", "路障封死，南路走不通。点烟，改走西沟。"],
-  ["RoadContact", "P012RoadContactSeen", "墙外有四个。先把担架队叫停在墙后，你从右边矮墙过去；我们占住两边。"],
-  ["RoadContactClear", "P012RoadContactClear", "四个都压住了。回队尾亲自放行，别让担架散开。"],
-  ["AirObserve", "P012AirObserveOpen", "都到墙后面来。先看清铁路那架飞机怎么走，再挑路带担架过去。"],
+  ["RoadContact", "P012RoadContactSeen", "墙外有敌人！担架队在墙后停下！顺子，掩护伤员；右侧矮墙能绕过去，我们守两边。"],
+  ["RoadContactClear", "P012RoadContactClear", "道路敌人清了！两边掩护，担架队继续走！顺子，照应伤员，别掉队。"],
+  ["AirObserve", "P012AirObserveOpen", "铁路上有飞机！担架跟紧，开放路快，左边路沟有掩护，你选一条带大家过去。"],
   ["AirRoute", "P012AirRouteChosen", "路看清了就走。开放路快，沟边稳，别让两副担架挤成一串。"],
   ["AirObstruction", "P012AirObstacleCreated", "扫射把人和小车掀在路上了！救人拖到蓝墙后，或者推开车转进沟边。"],
 ].map(([id,event,text])=>Object.freeze({at:`event:${event}`,type:"line",who:"luo",text,tier:"虚构",
@@ -186,7 +186,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       // He must not occupy the litter's rear handle at its final ditch point.
       stretcherGuideRoute: Object.freeze([{x:44,z:64},{x:39,z:72},{x:40.5,z:73}]),
       stretcherCarryPose: Object.freeze({ bearerSpanM: 2.4, litterLiftM: .88, bodyLiftM: 1.1 }),
-      stretcherCarryTo:{x:44,z:61},stretcherCarryMinM:20,
+      stretcherCarryTo:{x:44,z:61},
       ambushProneSegments: Object.freeze([
         { minX: 56.5, maxX: 58.7, minZ: 23.8, maxZ: 24.5, afterGroup: -1 },
         { minX: 67.3, maxX: 68.7, minZ: 23.8, maxZ: 24.2, afterGroup: 0 },
@@ -233,9 +233,9 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
         [{ x: 58, z: 65 }, { x: 61, z: 69 }],
       ].map((positions, group) => ({ routeIndex: [0, 2, 3][group],
         cover: [{ x: 44, z: 62 }, { x: 38.5, z: 68 }, { x: 47, z: 80 }][group],
-        label: ["伏在第一段沟岸后，截住从残屋逼近的两人",
-          "前一组已退；沿蓝色沟岸转到中段，盯住东侧缺口",
-          "再转到南端折角，挡住最后两人接近担架"][group],
+        label: ["残屋方向有两人逼近，保护沟边的伤员",
+          "东侧缺口又有敌人逼近；可借蓝色沟岸接近射击",
+          "南端折角出现最后两人，阻止他们接近担架"][group],
         positions, spawns: positions.map((_, index) => {
           const slot = group * 2 + index;
           return { x: 72, z: slot < 3 ? 28 + slot * 2 : 61.5 + (slot - 3) * 2.5 };
@@ -278,7 +278,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
         { x: 38.5, z: 68 }, { x: 41, z: 74 }, { x: 45, z: 80 }]),
       blockadeDecisionPosition: { x: 45, z: 80 }, blockadeDecisionRangeM: 8,
       retreatSmokeUse: { x: 28, z: 96 }, retreatSmokeAt: { x: 40, z: 99 },
-      finalCarryMinM: 10, retreatCoverIndices: Object.freeze([2, 5, 8]), farEnemyBudget: 4,
+      retreatCoverIndices: Object.freeze([2, 5, 8]), farEnemyBudget: 4,
       retreatColumnSpeedMps: 2.05,
       retreatRejoinEnterM: 20, retreatRejoinExitM: 10,
       retreatPursuitRoutes: Object.freeze([
@@ -359,7 +359,8 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       divePress: Object.freeze({ from: P012_ANCHORS.diveFrom, to: P012_ANCHORS.diveTo,
         aircraftId: "MitsubishiKi30",
         speed: 32, approachM: 160, entryAltM: 38, altitudeM: 24,
-        player: { windowS: 2.2, atS: 6.52 } }),
+        cueText:"飞机压下来！可借路沟躲避，也可冲出弹线",
+        player: { mode:"line", damage:28, lethal:false } }),
     }),
     barkPolicy: Object.freeze({ suppressAutonomousUntilSignal: "P012Complete",
       preserveScriptedVoices: true, preserveTacticalPrompts: true }),

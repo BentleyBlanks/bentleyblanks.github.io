@@ -165,8 +165,10 @@ async function PlayPrelude() {
           if(game.player.position.toArray().some((v,i)=>Math.abs(v-before.position[i])>.0001)
             ||game.player.yaw!==before.yaw||game.player.pitch!==before.pitch||game.state.playerShots!==before.shots)
             throw new Error("Distant explosion shot leaked movement, aim or fire input");
-          if(shot.time>.4&&!bot.shellShotCaptured){
-            bot.shellShotCaptured=true;bot.pendingCausality={id:"DistantShellShot",shot,
+          if(game.Debug.P012Scene().stageZero.shellShot.active&&(game.camera.position.distanceTo(game.player.EyePosition)>.25||game.camera.fov>39))throw new Error("Shell shot left player eye or lost telephoto lens");
+          const capture=[2.8,5.3,8.2].find(at=>shot.time>=at&&!(bot.shellShotCaptures||[]).includes(at));
+          if(capture){
+            (bot.shellShotCaptures||=[]).push(capture);bot.pendingCausality={id:`DistantShellShot${capture}`,shot,actualShells:game.combat.shells.length,explosionCues:game.audio.RequestedCount("explosionFar"),
               position:before.position,camera:game.camera.position.toArray(),subtitle:document.querySelector('[data-p012-shell-shot]')?.textContent};break;
           }
           continue;
@@ -211,7 +213,7 @@ async function PlayPrelude() {
         if([4,5].includes(flow.beatIndex)&&pendingSpeech?.key==="p012_text_RegroupCheck"&&!bot.regroupCaptured){
           bot.regroupCaptured=true;bot.pendingCausality={id:"NorthRegroupCount",subtitle:pendingSpeech.text,...NorthSceneEvidence()};break;
         }
-        if(flow.beatIndex===5&&flow.routeIndex>=4&&!bot.ammoDoglegCaptured){
+        if(flow.beatIndex===5&&game.carry.KindId==="ammoCrate"&&flow.signals.includes("P012AmmoDoglegEntered")&&!bot.ammoDoglegCaptured){
           bot.ammoDoglegCaptured=true;bot.pendingCausality={id:"AmmoDogleg",...NorthSceneEvidence(),objective:flow.objective};break;
         }
         if(flow.beatIndex===2){
@@ -508,11 +510,47 @@ async function PlayPrelude() {
   Check(!arrival.actors.some(actor=>actor.distance<1.5&&actor.forward>.5),
     "首次交付后的正前方近距离没有友军身体堵住观察镜头",
     JSON.stringify(arrival.actors.filter(actor=>actor.distance<3)));
-  const salvo=await page.evaluate(()=>({shells:window.Tengxian.Debug.P012Scene().ambientShells,approach:window.Tengxian.Debug.P012Scene().approachShells,count:window.Tengxian.Debug.P012Scene().mortarImpactCount,shotRestored:window.p012ReviewBot.shellShotRestored}));
+  const salvo=await page.evaluate(()=>({shells:window.Tengxian.Debug.P012Scene().ambientShells,approach:window.Tengxian.Debug.P012Scene().approachShells,count:window.Tengxian.Debug.P012Scene().mortarImpactCount,shotRestored:window.p012ReviewBot.shellShotRestored,barrage:window.Tengxian.Debug.P012Scene().stageZero.shellShot}));
+  Check(salvo.barrage.launched>20&&salvo.barrage.impacts>15,"远阵地在恢复操作后持续受炮击",JSON.stringify(salvo.barrage));
   Check(salvo.approach.length===8&&salvo.approach.every(shell=>shell.launched&&shell.impacted)&&salvo.shotRestored,"远近八发炮击实际落地、特写封锁输入后交还控制权",JSON.stringify(salvo.approach));
   Check(salvo.shells.length===4&&salvo.shells.every(shell=>shell.launched&&shell.impacted)&&salvo.count===1,
     "首发与四处错开弹着均真实完成，环境弹着未替代避炮事实",JSON.stringify(salvo));
+  if(!openingCausalityReview)Check(!result.flow.facts.includes("northCovered"),"站姿跟队、送弹能完成开场，无须蹲下或卧倒触发剧情");
   console.log("P012 opening activity trace", JSON.stringify(result.trace));
+  if(process.argv.includes("--presentation"))await VerifyP012Presentation();
+}
+
+async function VerifyP012Presentation(){
+  const trace=[];
+  for(let i=0;i<6;i++)trace.push(await page.evaluate(()=>{
+    const g=window.Tengxian;g.StepFrames(150,1/30,false);
+    return {at:g.state.elapsed,cast:g.Debug.P012Scene().openingCast,actors:g.ai.soldiers.filter(a=>a.side==='nra').map(a=>({id:a.id,at:a.position.toArray(),goal:a.goal.toArray(),move:a.moveSpeed,alive:a.alive,guided:a.p012Guided,defensive:a.scriptDefensive}))};
+  }));
+  await fs.writeFile(path.join(outputDir,'Data_P012FrontlineHandoff.json'),JSON.stringify(trace,null,2));
+  Check(trace.at(-1).cast.every(a=>a.marchComplete),'已进入战斗后六人实际走到阵位，不再等被替换的班长旧终点');
+  await VerifyHumanCasualty();
+}
+
+async function VerifyHumanCasualty(){
+  const casualty=await page.evaluate(async()=>{
+    const g=window.Tengxian,THREE=await import('three');
+    const prop=g.scene.getObjectByName('Setpiece_p012PrepWoundedCasualty0');let skinned=0;prop?.traverse(node=>{if(node.isSkinnedMesh)skinned++;});
+    if(!prop||!skinned)throw new Error('Wounded prop must contain the real soldier skin');
+    const before=prop.uuid,at=prop.position.clone();
+    // Explicit visual fixture, separate from the uninterrupted opening run.
+    g.player.position.set(at.x+1.7,at.y,at.z+2.3);g.player.body?.Teleport(g.player.position.x,g.player.position.y,g.player.position.z);
+    g.player.yaw=Math.atan2(-(at.x-g.player.position.x),-(at.z-g.player.position.z));g.player.pitch=-.55;
+    g.StepFrames(2,1/30,true);
+    prop.updateMatrixWorld(true);prop.traverse(node=>{if(node.isSkinnedMesh)node.skeleton.update();});
+    const bounds=new THREE.Box3();prop.traverse(node=>{if(!node.isSkinnedMesh)return;for(let parent=node;parent;parent=parent.parent)if(!parent.visible)return;bounds.expandByObject(node,true);});
+    const size=bounds.getSize(new THREE.Vector3()).toArray();
+    const actor=g.Debug.P012Casualties().find(entry=>entry.root===prop)?.actor,rig=actor?.characterRig;
+    const pose={current:rig?.currentId,playback:rig?.currentPlaybackId,ready:actor?.woundedPoseReady,forced:rig?.forcedClip,time:rig?.currentAction?.time,weight:rig?.currentAction?.getEffectiveWeight(),body:actor?.body.position.toArray(),rig:rig?.root.position.toArray(),root:actor?.root.rotation.toArray(),bones:Object.fromEntries(Object.entries(rig?.bones||{}).map(([key,bone])=>[key,bone.getWorldPosition(new THREE.Vector3()).toArray()]))};
+    return {id:before,skinned,size,pose,position:at.toArray(),scope:'explicit casualty visual fixture after the sequential opening, no task facts changed'};
+  });
+  await fs.writeFile(path.join(outputDir,'Data_P012HumanCasualty.json'),JSON.stringify(casualty,null,2));
+  await page.screenshot({path:path.join(outputDir,'Scene_P012HumanCasualty.png')});
+  Check(casualty.size[1]<1&&Math.max(casualty.size[0],casualty.size[2])>1.3,'真实伤员蒙皮处于水平姿态',JSON.stringify(casualty));
 }
 
 async function PlayFrontline() {
@@ -661,7 +699,7 @@ async function PlayFrontline() {
         // Empty magazines are not a reason to repeat R forever. Discover only
         // nearby visible bodies, then walk and press the same contextual F as a
         // player. No item/weapon state or corpse coordinates are changed here.
-        const canSalvage = [20, 21].includes(flow.beatIndex)
+        const canSalvage = [14, 20, 21].includes(flow.beatIndex)
           && game.state.ammo === 0 && game.state.clips === 0 && !game.carry.Active;
         if (canSalvage) {
           const scav=bot.scavenge ||= {log:[],blocked:{},target:null,lastScan:-99};
@@ -676,7 +714,8 @@ async function PlayFrontline() {
           };
           let corpse=bodies.find(s=>s.id===scav.target);
           if(!corpse){
-            corpse=bodies.filter(s=>(scav.blocked[s.id]||-99)<flow.elapsed&&Visible(s))
+            corpse=bodies.filter(s=>(scav.blocked[s.id]||-99)<flow.elapsed&&Visible(s)
+              &&window.p012BodyRouteClear(game.player.position,s.position))
               .sort((a,b)=>a.position.distanceTo(eye)-b.position.distanceTo(eye))[0];
             if(corpse){scav.target=corpse.id;scav.started=flow.elapsed;scav.lastSeen=flow.elapsed;scav.confirmFrames=0;
               scav.log.push({event:"discovered",at:flow.elapsed,id:corpse.id,weapon:corpse.drop.weaponId,
@@ -688,7 +727,7 @@ async function PlayFrontline() {
             if(visible){scav.lastSeen=flow.elapsed;scav.confirmFrames++;}else scav.confirmFrames=0;
             game.Debug.Mouse(2,false);Key("ShiftLeft",false);Key("KeyF",false);
             const linedUp=TurnSalvage(Math.atan2(-delta.x,-delta.z),-.45);
-            if(game.player.stance!=="crouch")game.Debug.Key(game.player.stance==="prone"?"KeyZ":"KeyC");
+            if(game.player.stance!=="stand")game.Debug.Key(game.player.stance==="prone"?"KeyZ":"KeyC");
             const query=game.interact.Query(game.player);
             if(query?.kind==="pickup"&&query.soldier===corpse&&visible&&linedUp
               &&scav.confirmFrames>=(perception?.confirmationFrames??23)&&!game.viewmodel.IsBusy?.()){
@@ -1136,7 +1175,7 @@ async function PlayFrontline() {
     Check(result.flow.beatIndex>=14,"从下车顺序完成护送路口段",`${result.flow.beat} at ${result.flow.elapsed.toFixed(2)}s`);
     Check(firstSeen?.enemies.some(actor=>actor.alive),"实际到路口时仍有活敌接战，未在村西被友军提前清空",JSON.stringify(firstSeen));
     Check(["roadContactSeen","roadContactHeld","roadContactClear","roadContactReleased"].every(fact=>result.flow.facts.includes(fact)),
-      "真实叫停、接敌、清除与队尾放行完成");
+      "实际敌情触发班长停队，清除敌人后组织继续护送");
     return;
   }
   Check(result.flow.beatIndex >= (fullCampaign ? 25 : 11), fullCampaign ? "整关真实输入顺序通关" : "有限前线五波可由真实操作完成",
@@ -1160,7 +1199,7 @@ async function PlayFrontline() {
     const firstRoadSeen=result.roadContactTrace.find(sample=>sample.seen);
     ReviewCampaign(firstRoadSeen?.enemies.some(actor=>actor.alive),"顺序跟队到路口时仍有活敌接战",JSON.stringify(firstRoadSeen));
     Check(["roadContactSeen", "roadContactHeld", "roadContactClear", "roadContactReleased"].every(fact => result.flow.facts.includes(fact)),
-      "浏览器实跑完成识别道路敌情、叫停、清场与队尾放行闭环", JSON.stringify(result.flow.facts));
+      "浏览器实跑完成真实敌情、班长停队、清场与继续护送闭环", JSON.stringify(result.flow.facts));
     const requested = result.escortApproval.find(entry => entry.event === "P012EscortRequested");
     const spoken = result.escortApproval.find(entry => entry.event === "LuoApprovalStarted");
     const approved = result.escortApproval.find(entry => entry.event === "P012EscortApproved");
@@ -1265,15 +1304,17 @@ async function PlayFrontline() {
     await fs.writeFile(path.join(outputDir, "Data_P012EndingTrace.json"), JSON.stringify(ending, null, 2));
     await page.screenshot({ path: path.join(outputDir, "Scene_P012Ending.png") });
   }
-  // Keep the same strict P0 bounds. Defer their failures until the outer HUD,
-  // population, issue callbacks and browser-error checks have also run.
-  pacingChecks.push({ passed: result.firstShotAt >= 270 && result.firstShotAt <= 330,
-    label: "实际第一枪落在 P0 四分半至五分半窗口", detail: `${result.firstShotAt.toFixed(1)}s` });
+  // Opening combat now follows physical arrival and issued equipment. There is
+  // no minimum clock to pad with reloads, posture exercises or empty walking.
+  const contact=result.trace.find(row=>row.beat==="B06");
+  pacingChecks.push({passed:!!contact&&contact.facts.includes("weapon")&&contact.facts.includes("issuedAmmo")
+    &&contact.facts.includes("ammo")&&result.firstShotAt>=contact.at,
+    label:"实际领械、送弹和抵达阵地后交火，不以等待到指定分钟为条件",
+    detail:`contact ${contact?.at.toFixed(1)}s; first shot ${result.firstShotAt.toFixed(1)}s`});
   Check(result.shots[0]?.distance >= 44 && result.shots[0]?.distance <= 61,
     "中央枪眼首次交火距离约 45–60 米（含角色与枪眼边缘容差）", `${result.shots[0]?.distance?.toFixed(2)}m`);
   if (fullCampaign && process.argv.includes("--pacing")) {
-    pacingChecks.push({ passed: result.flow.elapsed >= 23 * 60 && result.flow.elapsed <= 26 * 60,
-      label: "整关实际时长落在 P0 目标", detail: `${(result.flow.elapsed / 60).toFixed(2)}min` });
+    console.log("P012 campaign duration (observational; no minimum-time gate)",`${(result.flow.elapsed/60).toFixed(2)}min`);
   }
   await page.screenshot({ path: path.join(outputDir, "Scene_P012FrontlineAftermath.png") });
 }
@@ -1657,10 +1698,10 @@ async function VerifyHubGuideView() {
 }
 
 async function VerifyAircraftModel() {
-  await page.waitForFunction(()=>window.Tengxian.scene.getObjectByName("Aircraft_MitsubishiKi30")?.children.length>0,null,{timeout:120000});
+  await page.waitForFunction(()=>window.Tengxian.Debug.AircraftModel("MitsubishiKi30")?.children.length>0,null,{timeout:120000});
   const result=await page.evaluate(async()=>{
     const THREE=await import("three"),g=window.Tengxian;
-    const model=g.scene.getObjectByName("Aircraft_MitsubishiKi30").clone(true);
+    const model=g.Debug.AircraftModel("MitsubishiKi30").clone(true);
     model.position.set(0,0,0);model.rotation.set(0,0,0);model.visible=true;model.updateMatrixWorld(true);
     const bounds=new THREE.Box3().setFromObject(model),center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
     const meshes=[];model.traverse(node=>{if(node.isMesh){const box=new THREE.Box3().setFromObject(node);meshes.push({name:node.name,size:box.getSize(new THREE.Vector3()).toArray(),center:box.getCenter(new THREE.Vector3()).toArray()});}});
@@ -1693,7 +1734,7 @@ async function VerifyAircraftModel() {
 
 async function VerifyAirRouteHandoff(choice) {
   Check(["open","ditch"].includes(choice),"空袭局部夹具使用有效路线",choice);
-  await page.waitForFunction(()=>window.Tengxian.scene.getObjectByName("Aircraft_MitsubishiKi30")?.children.length>0,null,{timeout:120000});
+  await page.waitForFunction(()=>window.Tengxian.Debug.AircraftModel("MitsubishiKi30")?.children.length>0,null,{timeout:120000});
   const setup=await page.evaluate(async choice=>{
     const game=window.Tengxian;
     const {FirstLevelP012Director}=await import("./Script_FirstLevelP012Flow.mjs");
@@ -1890,7 +1931,7 @@ async function VerifyAirRouteHandoff(choice) {
             const {Raycaster}=await import("three");
             for(const [side,at] of Object.entries(hands.worldGrip)){
               const target=g.player.position.clone().fromArray(at),direction=target.sub(g.camera.position),distance=direction.length();
-              const ray=new Raycaster(g.camera.position,direction.normalize(),0,distance+.03);
+              const ray=new Raycaster(g.camera.position,direction.normalize(),0,distance+.03);ray.camera=g.camera;
               gripOcclusion[side]=ray.intersectObjects(g.scene.children,true).filter(hit=>{
                 for(let node=hit.object;node;node=node.parent)if(!node.visible)return false;
                 return true;
@@ -1943,21 +1984,23 @@ async function VerifyAirRouteHandoff(choice) {
           const slot=f.flow.config.anchors.strafeSlots[0],target={x:slot.x,z:slot.z+(open?0:1.8)};
           const dx=target.x-game.player.position.x,dz=target.z-game.player.position.z;
           game.player.yaw=Math.atan2(-dx,-dz);game.player.pitch=0;
-          if(open&&game.player.stance!=="prone")game.Debug.Key("KeyZ");
+          if(game.player.stance!=="stand")game.Debug.Key(game.player.stance==="prone"?"KeyZ":"KeyC");
           game.Debug.Key("KeyW",Math.hypot(dx,dz)>.2);
           game.StepFrames(1,1/30,false);
           if(frame%3===0)trace.push({at:f.flow.elapsed,carry:view?.kindId,carriedS:view?.carriedS,open,stance:game.player.stance,position:game.player.position.toArray(),run:air?.presetId,phase:air?.phase,carryHands:game.Debug.P012CarryView()});
           if(f.flow.State().beatIndex>=20)break;
         }
-        game.Debug.Key("KeyW",false);game.StepFrames(1);
+        game.Debug.Key("KeyW",false);
+        for(let frame=0;frame<30;frame++){game.StepFrames(1,1/30,false);trace.push({at:f.flow.elapsed,stance:game.player.stance,carryHands:game.Debug.P012CarryView()});}
+        game.StepFrames(1);
         return {original,carriedS,trace,flow:f.flow.State(),scene:game.Debug.P012Scene(),carry:game.carry.KindId};
       });
       await fs.writeFile(path.join(outputDir,"Data_P012AirDive.json"),JSON.stringify(dive,null,2));
       await page.screenshot({path:path.join(outputDir,"Scene_P012AirDive.png")});
       Check(dive.flow.beat==="B20"&&dive.scene.litterOverturned&&dive.carry===null
         &&dive.scene.litters.find(litter=>litter.originalCarried)?.id===dive.original,
-        "真实危险窗按键扑沟，原担架松手侧翻，进入沟内交火",JSON.stringify({beat:dive.flow.beat,original:dive.original,carriedS:dive.carriedS}));
-      Check(dive.carriedS>=20&&dive.carriedS<=30,"正常搬运到俯冲之间实际握住担架20至30秒",String(dive.carriedS));
+        "站姿移动度过真实扫射，原担架松手侧翻后进入沟内交火",JSON.stringify({beat:dive.flow.beat,original:dive.original,carriedS:dive.carriedS}));
+      Check(dive.carriedS>0&&dive.trace.every(sample=>sample.stance==="stand"),"实际搬运后保持站姿，无须卧倒或累计指定秒数",String(dive.carriedS));
       Check(dive.trace.some(sample=>sample.carryHands?.releasing)
         &&dive.trace.some(sample=>sample.carryHands&&!sample.carryHands.visible),
         "实际强制松手后双臂撤回并隐藏，侧翻后不继续抓住空中握点");
@@ -2255,30 +2298,15 @@ async function VerifyGuideHandoffs() {
       const smoke=await page.evaluate(()=>{
         const g=window.Tengxian,f=window.p012GuideFixture;
         const before={fact:f.flow.facts.has("retreatSmokeDeployed"),guide:g.story.Signalled("P012GuideAtSmoke"),released:!f.runtime.guide};
-        g.StepFrames(90,1/30,false);
-        const stillWaiting=!!f.runtime.guide&&!f.flow.facts.has("retreatSmokeDeployed");
-        g.player.pitch=-.2;
-        // Arrival at the leader is not automatically within arm's reach of
-        // the prop. Continue toward the visible leader until the real prompt
-        // appears; do not read the hidden objective coordinate or widen reach.
-        let query=g.interact.Query(g.player)?.point?.id,approachFrames=0;
-        while(query!=="p012_retreatSmoke"&&approachFrames<90){
-          const at=f.guide.position,player=g.player.position;
-          g.player.yaw=Math.atan2(-(at.x-player.x),-(at.z-player.z));
-          g.Debug.Key("KeyW",Math.hypot(at.x-player.x,at.z-player.z)>1);
-          g.StepFrames(1,1/30,false);approachFrames++;
-          query=g.interact.Query(g.player)?.point?.id;
-        }
-        g.Debug.Key("KeyW",false);
-        g.Debug.Key("KeyF",true);g.StepFrames(120,1/30,false);g.Debug.Key("KeyF",false);g.StepFrames(1);
-        return {before,stillWaiting,query,approachFrames,fact:f.flow.facts.has("retreatSmokeDeployed"),smoke:f.runtime.Sample().retreatSmokeActive,
+        // No input: Luo reaches the actual release point and lays the finite smoke himself.
+        g.StepFrames(120,1/30,false);g.StepFrames(1);
+        return {before,fact:f.flow.facts.has("retreatSmokeDeployed"),smoke:f.runtime.Sample().retreatSmokeActive,
           released:!f.runtime.guide,handoff:g.story.Signalled("P012GuideSmokeHandoff"),views:window.p012GuideArrivalViews};
       });
       await fs.writeFile(path.join(outputDir,"Data_P012GuideFixtureSmoke.json"),JSON.stringify(smoke,null,2));
       await page.screenshot({path:path.join(outputDir,"Scene_P012GuideFixtureSmoke.png")});
-      Check(!smoke.before.fact&&smoke.before.guide&&!smoke.before.released&&smoke.stillWaiting
-        &&smoke.query==="p012_retreatSmoke"&&smoke.fact&&smoke.smoke&&smoke.released&&smoke.handoff,
-        "烟幕点真实F完成后才释放班长引导并交接",JSON.stringify(smoke));
+      Check(smoke.fact&&smoke.smoke&&smoke.released&&smoke.handoff,
+        "班长实际到达后自行施放烟幕并交接，不要求玩家按 F",JSON.stringify(smoke));
     }
   }
 }
@@ -2345,7 +2373,7 @@ async function VerifyAudioPlayback() {
   const samples = await page.evaluate(() => {
     const game = window.Tengxian, audio = game.audio;
     const keys = [...new Set([...game.story.queue, ...(game.story.p012Immediate || [])]
-      .map(cue => cue.voice).filter(Boolean))];
+      .filter(cue=>!cue.p012SubtitleOnly).map(cue => cue.voice).filter(Boolean))];
     const missing = keys.filter(key => !audio.voiceBank.has(key));
     const barkBefore = audio.barkCounter;
     const attempts = ["nra", "ija"].flatMap(side => ["hurt", "spot", "ammo", "rally"]
@@ -2390,7 +2418,26 @@ async function VerifyAudioPlayback() {
   });
   Check(output.peakRms > 0.00001, "剧情对白在混音输出端产生非零信号", JSON.stringify(output));
   Check(output.duration >= samples.duration - 0.1, "实际对白自然播完，没有被自主喊话截断");
-  await fs.writeFile(path.join(outputDir, "Data_P012AudioPlayback.json"), JSON.stringify({ samples, output,
+  const barrage=await page.evaluate(async()=>{
+    const game=window.Tengxian,audio=game.audio,{Vector3}=await import('three');
+    const analyser=audio.ctx.createAnalyser();analyser.fftSize=2048;audio.sfxUser.connect(analyser);
+    const data=new Float32Array(2048),started=audio.ctx.currentTime,before=audio.RequestedCount('explosionFar');
+    let impacts=0,peakRms=0,launched=0;
+    const launch=()=>{const p=game.player.position,at=new Vector3(p.x-18+launched*7,0,p.z-100);
+      at.y=game.battlefield.GroundHeight(at.x,at.z);
+      game.combat.FireShell(at.clone().add(new Vector3(-18,22,-30)),at,{flight:1.3,kind:'Shell75',damage:0,radius:7,OnImpact:()=>impacts++});launched++;};
+    while(audio.ctx.currentTime-started<5){
+      if(launched<6&&audio.ctx.currentTime-started>=launched*.32)launch();
+      game.combat.StepShells(1/60);analyser.getFloatTimeDomainData(data);
+      peakRms=Math.max(peakRms,Math.sqrt(data.reduce((sum,v)=>sum+v*v,0)/data.length));
+      await new Promise(resolve=>setTimeout(resolve,1000/60));
+    }
+    audio.sfxUser.disconnect(analyser);
+    return {launched,impacts,cues:audio.RequestedCount('explosionFar')-before,peakRms};
+  });
+  Check(barrage.launched===6&&barrage.impacts===6&&barrage.cues>=6&&barrage.peakRms>0.00001,
+    "六发实际炮弹错时落地，多重远爆声在真实混音端产生输出",JSON.stringify(barrage));
+  await fs.writeFile(path.join(outputDir, "Data_P012AudioPlayback.json"), JSON.stringify({ samples, output, barrage,
     scope: "real playback/suppression smoke only; not subjective listening approval" }, null, 2));
 }
 
@@ -2403,6 +2450,9 @@ try {
   await page.evaluate(enabled=>{window.p012TrainReview=enabled;},trainReview);
   await page.evaluate(async ({openingPhotoPoints,platformBounds}) => {
     const game = window.Tengxian, originalHit = game.player.TakeHit;
+    const {P012SegmentClear}=await import("./Script_FirstLevelP012March.mjs");
+    const {FIRST_LEVEL_P012_LAYOUT}=await import("./Data_FirstLevelP012Layout.mjs");
+    window.p012BodyRouteClear=(from,to)=>P012SegmentClear(FIRST_LEVEL_P012_LAYOUT.blocks,from,to,game.player.body?.radius||.42);
     const {FirstLevelP012Runtime}=await import("./Script_FirstLevelP012Runtime.mjs");
     const originalIssue=FirstLevelP012Runtime.prototype.StepOpeningCast;
     window.p012EquipmentCallbacks=[];window.p012OpeningIssueTrace=[];window.p012TrainTrace=[];window.p012TrainCaptures=[];
@@ -2862,6 +2912,7 @@ try {
     }
     await fs.writeFile(path.join(outputDir,"Data_P012CastReview.json"),JSON.stringify({scope:"explicit close-up portrait fixture; actual existing named actors, no model replacement",cast},null,2));
   }
+  if(process.argv.includes("--casualty-view"))await VerifyHumanCasualty();
   if(process.argv.includes("--hub-view"))await VerifyHubGuideView();
   if(process.argv.includes("--air-model"))await VerifyAircraftModel();
   if(process.argv.includes("--machine-gun-crew"))await VerifyMachineGunCrew();

@@ -48,6 +48,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 
 export const testDefs = {
   MovementRangeTest: { file: "Script_MovementRangeTest.mjs", timeoutMs: 240000, desc: "操作白盒：实体标尺、真实跳跃跑跳、翻越边界、姿态通行与复位" },
+  FirstLevelP012ShellShotTest: {file:"Script_FirstLevelP012ShellShotTest.mjs",desc:"P012玩家眼位、持续炮击和烟柱资源生命周期"},
   FirstLevelP012AnimationTest: {file:'Script_FirstLevelP012AnimationTest.mjs',desc:'P012实际GLB车厢待机、位移步频、担架停走与路边动作出图'},
   TrainLibraryTest: { file: "Script_TrainLibraryTest.mjs", desc: "火车构件库：点击懒载、原 PBR、完整轮组绑定、缓存隔离与实际显示" },
   BackRifleRunTest: { file: 'Script_BackRifleRunTest.mjs', desc: '独立背枪跑步 GLB：原骨架、循环接缝、真实蒙皮接地、速度与挂点浏览器验收' },
@@ -97,7 +98,7 @@ export const testDefs = {
     desc: "P012望远镜简模、遮罩、相机不夺控与资源释放（纯 Node）" },
   FirstLevelP012VisibilityTest: { file: "Script_FirstLevelP012VisibilityTest.mjs",
     desc: "P012剧情门恢复与飞机有意入场、旧模式兼容（纯 Node）" },
-  FirstLevelP012BrowserTest: { file: "Script_FirstLevelP012BrowserTest.mjs", args: ["--prelude", "--geometry"], timeoutMs: 8 * 60 * 1000,
+  FirstLevelP012BrowserTest: { file: "Script_FirstLevelP012BrowserTest.mjs", args: ["--prelude", "--geometry", "--presentation"], timeoutMs: 8 * 60 * 1000,
     desc: "P012独立入口、真实行走交互与画面取证" },
   WallPlanTest: { file: "Script_WallPlanTest.mjs", desc: "样条围墙规划契约：贴地/缺口/闭环角搭/塌段/确定性（纯 Node，毫秒级）" },
   TestRunnerTest: { file: "Script_TestRunnerTest.mjs", desc: "分级选择、基线和登记完整性（纯 Node）" },
@@ -311,7 +312,7 @@ export const domains = {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
     // 碰过场或剧本的改动要连着 MissionHooksTest 一起跑（毫秒级，白搭一条不亏）。
-    tests: ["CutsceneControlTest", "ActorPoseTest", "CutscenePoseTest", "MissionHooksTest", "MissionSetpiecesTest"],
+    tests: ["FirstLevelP012ShellShotTest", "CutsceneControlTest", "ActorPoseTest", "CutscenePoseTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
   render: {
     label: "渲染与合批自动契约",
@@ -342,6 +343,8 @@ const changedDomainRules = [
   { domain: "editor", pattern: /Script_EditorWorldInfo|Script_WorldInfoEditorTest/i },
   { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },
   { domain: 'animation', pattern: /BackRifleRun|Melee.*Animation|MeleeAnimation|Infantry/i },
+  { domain: "hud", pattern: /FirstLevelP012Guidance/i },
+  { domain: "cutscene", pattern: /FirstLevelP012ShellShot/i },
   { domain: "ai", pattern: /FirstLevelP012(ShellShot|BackRifle|TrainColumn|March|Family|Resting|Arrival|VillageLife|StageZero|Cast)/i },
   { domain: "explosives", pattern: /(Explosion|Explosives|CraterSurface|CraterDebris|CraterScorched|BakeCraterSoil|GrenadeReturn|TerrainDeformation|ShellVisual|Script_Combat|Script_Physics|Script_Vfx)/i },
   { domain: "terrain", pattern: /(Heightmap|JieheHeight|JieheField|TengxianField|FarLand|Terrain|Battlefield|Outfield|Ground|Water|WestSuburbBlocks|Whitebox|P012|Data_Levels)/i },

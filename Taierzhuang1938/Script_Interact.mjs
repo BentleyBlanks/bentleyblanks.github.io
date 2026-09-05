@@ -213,6 +213,7 @@ export class InteractSystem {
 
     for (const s of this.ctx?.ai?.soldiers || []) {
       const d = Math.hypot(s.position.x - player.position.x, s.position.z - player.position.z);
+      if(d > Math.max(INTERACT.corpseReachM,INTERACT.mateReachM) || this.hooks.CanReachActor?.(s,player)===false)continue;
       if (!s.alive) {
         // 尸体：身上有没有还没被拿走的东西
         if (!s.drop || s.drop.taken || d > INTERACT.corpseReachM) continue;

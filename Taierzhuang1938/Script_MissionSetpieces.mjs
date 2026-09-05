@@ -1156,7 +1156,7 @@ export const SETPIECES = {
         });
       }
 
-      if (p012 && HasSignal("P012SeekAirCover") && !HasSignal("P012Dived")) {
+      if (p012 && HasSignal("P012SeekAirCover") && !HasSignal("P012Dived") && !HasSignal("P012AirPassComplete")) {
         const activity=s.phase.whitebox.activities,slots=activity.airCrowdCoverSlots || [];
         for(const [index,member] of (s.mem.column?.Alive || []).filter((m)=>m.role!=="bearer"&&!m.p012Injured).entries()) {
           if(member.role==="civilian" && !HasSignal("P012CrowdFire")) continue;
@@ -1171,7 +1171,7 @@ export const SETPIECES = {
           }
         }
       }
-      if(p012 && HasSignal("P012Dived"))s.Once("p012_restoreCoverGuards",ss=>{
+      if(p012 && (HasSignal("P012Dived")||HasSignal("P012AirPassComplete")))s.Once("p012_restoreCoverGuards",ss=>{
         for(const member of ss.mem.column?.Alive || [])if(member.role==="guard"&&!member.handle.unarmed)member.handle.scriptedNoncombatant=false;
       });
 
@@ -1183,13 +1183,8 @@ export const SETPIECES = {
         const timedOut = !p012 && s.Time() - s.mem.crowdTurnDone > 30;
         if (carried || timedOut) {
           s.mem.diveAt = s.Time();
-          s.strafe?.StrafeRun({
-            preset: "divePress",
-            from: { x: -444, z: 100 }, to: { x: -452, z: 195 },
-            ...(s.phase?.whitebox?.aircraftRoutes?.divePress || {}),
-            TrackTo: () => s.PlayerPos(),
-            // 「你的手是先松开的」—— 剧情要求，不是玩家操作失误。
-            OnDodge: () => {
+          const CompleteAirPass = () => {
+            if(p012&&s.mem.p012AirPassComplete)return;
               const wasCarrying=s.carry?.KindId==="stretcher" || !!s.mem.p012ReleaseAt;
               s.carry?.ForceRelease("dive");
               if (p012) {
@@ -1203,21 +1198,27 @@ export const SETPIECES = {
                   s.mem.p012ReleaseAt = null;
                   s.mem.p012FallenAt = { x: point.x + 1.2, z: point.z };
                 }
-                s.Signal("P012Dived");
+                s.mem.p012AirPassComplete=true;s.Signal("P012AirPassComplete");
               }
-            },
+          };
+          s.strafe?.StrafeRun({
+            preset: "divePress",
+            from: { x: -444, z: 100 }, to: { x: -452, z: 195 },
+            ...(s.phase?.whitebox?.aircraftRoutes?.divePress || {}),
+            TrackTo: () => s.PlayerPos(),
+            // 「你的手是先松开的」—— 剧情要求，不是玩家操作失误。
+            OnDodge: () => { CompleteAirPass();if(p012)s.Signal("P012Dived"); },
             // 「不躲则被击倒并从数秒前重来」。**倒带必须发生在把伤害交给
             // 死亡链路之前** —— Script_AircraftStrafe 的 OnPlayerHit 就在那之前调。
             OnPlayerHit: () => {
+              if(p012){CompleteAirPass();return;}
               s.carry?.ForceRelease("dive");
-              if (p012) s.mem.p012ReleaseAt = null;
               s.checkpoint?.Rewind(4);
-              if (p012) s.mem.p012RetryDive = true;
               s.Hint("再来一次 —— 它压下来的时候扑进沟里。", 3.2);
             },
             OnPhase: (beat) => {
               if (p012 && beat === "enter") s.Signal("P012DiveApproach");
-              if (beat === "exit") s.mem.diveDone = s.Time();
+              if (beat === "exit") {s.mem.diveDone = s.Time();if(p012)CompleteAirPass();}
             },
           });
         }

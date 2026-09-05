@@ -1606,7 +1606,7 @@ export class AiDirector {
           s.stuckTime = 0;
         }
         wantedYaw = Math.atan2(-nx, -nz);
-        s.moveSpeed = Clamp01(speed * stanceMul / 3.6);
+        s.moveSpeed = Clamp01((s.p012Guided || s.scriptDefensive) ? moved / Math.max(dt,.0001) / 3.6 : speed * stanceMul / 3.6);
       } else {
         s.moveSpeed = 0;
         s.stuckTime = 0;

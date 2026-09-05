@@ -233,6 +233,12 @@ export function MakeAircraftStrafeHost(deps = {}) {
       deps.vfx.Impact(at, normal, surface);
     },
     GroundHeight: (x, z) => deps.battlefield?.()?.GroundHeight(x, z) ?? 0,
+    CanHitPlayer: origin => {
+      const player=deps.player?.(),field=deps.battlefield?.();if(!player?.Alive||!field)return false;
+      from.set(origin.x,origin.y,origin.z);to.copy(player.EyePosition);
+      dir.copy(to).sub(from);const distance=dir.length();
+      const hit=field.Raycast(from,dir.normalize(),distance);return !hit||hit.t>=distance-.2;
+    },
     HitPlayer: (damage, d, info) => {
       const player = deps.player?.();
       if (!player || !player.Alive) return;

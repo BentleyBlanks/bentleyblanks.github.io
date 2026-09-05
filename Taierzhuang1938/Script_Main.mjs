@@ -56,6 +56,7 @@ import { FirstLevelP012Binoculars, P012BinocularLensContains } from "./Script_Fi
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
 import { ApplyP012CastAppearance, InstallP012OpeningPose, InstallP012ActorMotion } from "./Script_FirstLevelP012CastAppearance.mjs";
 import { SelectP012CompanionCast, SelectP012RecruitCast } from "./Data_FirstLevelP012Cast.mjs";
+import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 import { FirstLevelP012StageZero } from "./Script_FirstLevelP012StageZero.mjs";
 import { CAST } from "./Data_TengxianScript.mjs";
 import {
@@ -1335,6 +1336,12 @@ async function Boot() {
       return !!state.slots[slot];
     },
     SpareClips: () => state.clips,
+    CanReachActor:(actor,p)=>{
+      if(!p012Flow)return true;
+      const target=actor.position.clone();target.y=battlefield.GroundHeight(target.x,target.z)+(actor.alive?1:.35);
+      const eye=p.EyePosition,delta=target.sub(eye),distance=delta.length();
+      const hit=battlefield.Raycast(eye,delta.normalize(),distance);return !hit||hit.t>=distance-.05;
+    },
     TakeWeapon: (weaponId, clips, soldier, weaponVariant) => PickUpWeapon(weaponId, clips, weaponVariant),
     GiveClip: () => {
       if (state.clips <= 1) return false;
@@ -2104,9 +2111,12 @@ async function Boot() {
       Setpieces: () => (setpieces ? setpieces.State() : null),
       P012: () => p012Flow?.State() || null,
       P012CarryView: () => p012CarryView?.Debug() || null,
+      P012Casualties:()=>[...setpieceProps.entries()].filter(([,entry])=>entry.woundedActor).map(([id,entry])=>({id,actor:entry.woundedActor,root:entry.root})),
+      AircraftModel: id => aircraft?.forms.find(form=>form.spec.id===id)?.root || null,
       P012Environment: () => ({externalCount:battlefield?.externalProps?.count || 0,pcgCount:battlefield?.externalProps?.pcgCount || 0,trimCount:battlefield?.trimProps?.count || 0,
         roots:scene.children.filter(root=>root.userData?.externalProps || /^(ExternalProps_|TrimProps_)/.test(root.name)).map(root=>root.name)}),
       P012Scene: () => p012Runtime ? { ...p012Runtime.Sample(), stageZero:p012StageZero?.Snapshot(), cast:ai.soldiers.filter(actor=>actor.castId).map(actor=>({castId:actor.castId,age:actor.identity?.age,modelVariant:actor.actor?.modelVariant,position:{...actor.position}})), resting:{count:p012Resting?.entries.length||0,people:p012Resting?.Snapshot()||[]}, airColumnEnteredRoad:AirColumnEnteredRoad(setpieces?.mem?.column,player.position,PHASE_TABLE[state.phaseIndex]?.whitebox?.activities), columnPosition: setpieces?.mem?.column?.HeadPosition(), columnRouteIndex: setpieces?.mem?.column?.legIndex,
+        woundedDragPosition: setpieces?.mem?.p012WoundedDrag?.position || null,
         woundedDragDelivered: !!setpieces?.mem?.p012WoundedDrag?.delivered, woundedDragDistance: setpieces?.mem?.p012WoundedDrag?.distance || 0,
         airCivilian: setpieces?.mem?.p012AirCivilian ? {
           id:setpieces.mem.p012AirCivilian.member.handle.id,alive:setpieces.mem.p012AirCivilian.member.handle.alive,
@@ -2786,6 +2796,31 @@ function SetpiecePropTexture(path) {
  *   shroudedBody 盖白布的门板担架（五关 A 区那一副）
  *   crate/stretcher/debris  box 的几个别名，只是默认尺寸与颜色不同
  */
+function UpdateWoundedActor(actor,dt){
+  const rig=actor.characterRig;
+  if(rig&&!actor.woundedPoseReady){
+    rig.Play("AdvanceFire",0);rig.currentAction.time=.3;actor.woundedPoseReady=true;
+  }
+  actor.Update(0,{moveSpeed:0,aim:0,idleLife:false,elapsed:0});
+  if(!rig)return;
+  actor.root.updateMatrixWorld(true);
+  // Rest the limbs on the litter using this model's actual bone directions.
+  // A rotated aiming clip alone leaves a marching knee and both hands in the air.
+  const aim=(name,childName,x,y,z)=>{
+    const bone=rig.bones[name],child=rig.bones[childName];if(!bone||!child)return;
+    const origin=bone.getWorldPosition(new THREE.Vector3());
+    const from=child.getWorldPosition(new THREE.Vector3()).sub(origin).normalize();
+    const to=new THREE.Vector3(x,y,z).transformDirection(actor.root.matrixWorld);
+    const world=bone.getWorldQuaternion(new THREE.Quaternion()).premultiply(new THREE.Quaternion().setFromUnitVectors(from,to));
+    bone.quaternion.copy(bone.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(world));
+    bone.updateWorldMatrix(false,true);
+  };
+  aim("thighR","calfR",.08,-1,0);aim("calfR","footR",0,-1,.02);
+  aim("thighL","calfL",-.08,-1,0);aim("calfL","footL",0,-1,.02);
+  aim("upperArmR","forearmR",.18,-1,.12);aim("forearmR","handR",-.8,-.2,-.12);
+  aim("upperArmL","forearmL",-.18,-1,.08);aim("forearmL","handL",0,-1,0);
+}
+
 function MakeSetpieceProp(spec = {}) {
   if (!scene || !spec || !spec.position) return null;
   const id = String(spec.id || `sp${setpieceProps.size}`);
@@ -2796,7 +2831,15 @@ function MakeSetpieceProp(spec = {}) {
   const at = spec.position;
   const y = Number.isFinite(at.y) ? at.y : (battlefield ? battlefield.GroundHeight(at.x, at.z) : 0);
   let mesh = null;
-  if (kind === "panel" || kind === "plane") {
+  let woundedActor=null;
+  if(whiteboxColors&&kind==="shroudedBody"){
+    woundedActor=actorFactory.Create("nra",{weapon:null,modelVariant:0,seed:1938});
+    mesh=new THREE.Group();mesh.add(woundedActor.root);
+    // The parent remains the same movable casualty/litter centre.
+    woundedActor.root.rotation.x=Math.PI/2;woundedActor.root.position.set(0,.02,-.85);
+    UpdateWoundedActor(woundedActor,0);
+    mesh.position.set(at.x,y+.34,at.z);
+  } else if (kind === "panel" || kind === "plane") {
     const size = spec.size || [0.28, 0.20];
     const geometry = whiteboxColors ? new THREE.BoxGeometry(size[0], size[1], 0.015) : new THREE.PlaneGeometry(size[0], size[1]);
     const material = new THREE.MeshStandardMaterial({
@@ -2829,7 +2872,7 @@ function MakeSetpieceProp(spec = {}) {
   mesh.receiveShadow = false;
   mesh.name = `Setpiece_${id}`;
   scene.add(mesh);
-  setpieceProps.set(id, { root: mesh, spec });
+  setpieceProps.set(id, { root: mesh, spec, woundedActor });
   return id;
 }
 
@@ -2860,6 +2903,7 @@ function ClearSetpieceProps() {
   for (const entry of setpieceProps.values()) {
     if (entry.root) {
       scene.remove(entry.root);
+      entry.woundedActor?.Dispose();
       entry.root.geometry?.dispose();
       entry.root.material?.dispose();
     }
@@ -3274,9 +3318,26 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   p012Runtime?.SaveSafePoint("Start",phase.spawn,"stand",phase.spawn.ry || 0);
   if (p012Runtime) p012StageZero = new FirstLevelP012StageZero({scene,actorFactory,physics,battlefield,audio,hud,camera,vfx,
     runtime:p012Runtime, config:phase.whitebox, ambience:phase.ambience||phase.sky,
+    Flow:()=>p012Flow, Carry:()=>carry,
+    FireShell:(from,at,options)=>{
+      audio.Play("shellIncoming",{position:from,volume:.8});
+      return combat.FireShell(from,at,{...options,kind:"Shell75",radius:7,damage:0});
+    },
     Capture: cut => cutscene.onCapture(cut), Release: () => {input.lookX=0;input.lookY=0;cutscene.onRelease();},
     Player:()=>player, Guide:()=>companion.Handle("luo"), Signal:name=>story.Signal(name), Signalled:name=>story.Signalled(name)});
   p012Flow = phase.whitebox?.p012 ? new FirstLevelP012Director({
+    PlayerPosition:()=>player.position, Hint:(text,seconds)=>hud.Hint(text,seconds),
+    NearbyDroppedWeapon:()=>{
+      const eye=player.EyePosition;
+      for(const actor of ai.soldiers.filter(s=>!s.alive&&!s.unarmed&&s.drop&&!s.drop.taken&&s.weapon?.kind!=="melee")
+        .sort((a,b)=>a.position.distanceToSquared(player.position)-b.position.distanceToSquared(player.position))){
+        const point=actor.position.clone();point.y=battlefield.GroundHeight(point.x,point.z)+.35;
+        const delta=point.clone().sub(eye),distance=delta.length();if(distance>18)continue;
+        const hit=battlefield.Raycast(eye,delta.normalize(),distance);
+        if((!hit||hit.t>=distance-.05)&&P012SegmentClear(p012Flow.config.layout.blocks,player.position,point,player.body?.radius||.42))return {x:point.x,z:point.z};
+      }
+      return null;
+    },
     Register: (spec) => interact.Register({ ...spec, tag: "P012",
       // Both Query and the held interaction recheck Enabled: starting a charge
       // during the handover cannot leave a live grenade/melee state in binocular use.
@@ -5539,6 +5600,17 @@ function UpdateContextualActionPrompts() {
     hud.SetActionPrompts(prompts);
     return;
   }
+  if(p012Flow?.beat===5){
+    const load=carry?.View();
+    const prompts=[];
+    if(load?.active){
+      if(load.phase==="carry"){
+        if(interaction?.point?.id==="p012_ammoDrop")prompts.push({keys:"按住 F",label:"交付弹药给机枪组",kind:"supply",text:true});
+        else if(load.canThrow)prompts.push({keys:"左键",label:"放下弹药箱（之后可再搬起）",kind:"carry",text:true});
+      }
+    }else if(interaction?.point?.id==="p012_ammoPickup")prompts.push({keys:"按住 F",label:"搬起弹药箱",kind:"carry",text:true});
+    hud.SetActionPrompts(prompts);return;
+  }
   const gunInHand = state.activeSlot === "primary" || state.activeSlot === "secondary";
   const prompts = ContextualActionPrompts({
     // 抬着东西时这一条会把提示条整段接管（只剩「放下 / 扔下」），见 ContextualActionPrompts。
@@ -5554,7 +5626,7 @@ function UpdateContextualActionPrompts() {
   if (meleeCombat?.CanUse() && meleeCombat.PushCandidate()) {
     prompts.unshift({ keys: "F", label: "近身推架", kind: "push" });
   }
-  hud.SetActionPrompts(prompts);
+  hud.SetActionPrompts(p012Flow?prompts.map(prompt=>({...prompt,text:true})):prompts);
 }
 
 /**
@@ -6861,6 +6933,7 @@ function Frame(dt, render = true) {
   // 按住型交互的进度环 + 负重条。两者都只读脱敏快照，HUD 不认识规则层的结构。
   hud.SetInteractProgress(interact?.View() || null);
   hud.SetCarry(carry?.View() || null);
+  for(const entry of setpieceProps.values())if(entry.woundedActor&&entry.root.visible)UpdateWoundedActor(entry.woundedActor,dt);
   // 架设机枪面板（热条 / 弹药 / 卡壳 / 退出提示）。同样只读脱敏快照。
   hud.SetEmplacement(empView);
   // 报码纸（终章亲手发报）。同样只读脱敏快照。

@@ -470,6 +470,10 @@ console.log(`ok  交互框架：注册/清理、三种手势、距离朝向、�
   Check(/^拾起 /.test(system.Query(player).label), "空手时是「拾起」");
   system.hooks.HasWeapon = () => true;
   Check(/^换上 /.test(system.Query(player).label), "有同类槽位时是「换上」");
+  system.hooks.CanReachActor=()=>false;
+  Check(system.Query(player)===null&&system.Press(player)===null,"实体遮挡时不显示或执行隔墙拾枪");
+  Check(taken.length===0&&!corpse.drop.taken,"遮挡不会消耗原枪械");
+  system.hooks.CanReachActor=()=>true;
   Check(system.Press(player).kind === "pickup", "按 F 捡起来");
   Check(taken.length === 1 && taken[0][1] === 2, "桥夹数如实传给装配层");
   Check(corpse.drop.taken === true && system.pickups === 1, "同一具尸体不许捡两次");

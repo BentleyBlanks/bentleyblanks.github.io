@@ -1,6 +1,7 @@
 // P012 render/physics adapters only. Story and finite lifecycles remain in the
 // pure Arrival/VillageLife controllers. ShellShot alone briefly captures the live camera.
 import * as THREE from "three";
+import { FirstLevelP012Guidance } from "./Script_FirstLevelP012Guidance.mjs";
 import { FirstLevelP012ShellShot } from "./Script_FirstLevelP012ShellShot.mjs";
 import { HashString } from "./Script_Noise.mjs";
 import { FirstLevelP012Arrival } from "./Script_FirstLevelP012Arrival.mjs";
@@ -14,6 +15,7 @@ export class FirstLevelP012StageZero {
   constructor(host) {
     this.host = host; this.elapsed = 0; this.people = new Set();
     this.shellShot=new FirstLevelP012ShellShot(host);
+    this.guidance=new FirstLevelP012Guidance(host);
     this.arrivalView = new FirstLevelP012ArrivalView();
     this.villageView = new FirstLevelP012VillageLifeView(host.scene, (x,z)=>host.battlefield.GroundHeight(x,z));
     this.arrival = new FirstLevelP012Arrival({
@@ -114,10 +116,12 @@ export class FirstLevelP012StageZero {
   }
   Update(dt) {
     this.elapsed+=dt;
+    if(!this.shellShot.active)this.shellShot.UpdateBarrage(dt);
     if(!this.trainInitialized){this.host.runtime.StepOpeningCast(0);this.trainInitialized=true;}
     this.arrival.Start();this.arrival.Update(dt);
     this.village.Start();this.village.Update(dt);this.villageView.Update(this.village.Snapshot());
     this.villageView.SyncColliders(this.host.physics);
+    this.guidance.Update();
   }
   Snapshot() {
     const village=this.village.Snapshot();
@@ -131,7 +135,7 @@ export class FirstLevelP012StageZero {
     if(view.canDisembark)this.host.Signal("P012TrainDoor");
   }
   Dispose() {
-    this.disposed=true;this.shellShot.Dispose();
+    this.disposed=true;this.shellShot.Dispose();this.guidance.Dispose();
     this.arrival.Dispose();this.arrivalView.Dispose();this.village.Dispose();this.villageView.Dispose();
     if(this.steam)this.host.vfx.RemoveSmokeSource(this.steam);this.steam=null;
   }

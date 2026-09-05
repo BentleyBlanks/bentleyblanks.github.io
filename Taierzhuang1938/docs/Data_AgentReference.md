@@ -199,7 +199,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - `Data_FirstLevelP012Opening.mjs` 管开场两向人流和纯字幕；班长直接带队接防，不再使用借镜／辨路／还镜流程。
   `Data_FirstLevelP012Arrival` / `Script_FirstLevelP012Arrival` 管到站事实与短黑场，`ArrivalView` 只画字幕底层；
   `Data_FirstLevelP012VillageLife` / `Script_FirstLevelP012VillageLife` 管有限村路作业和物流，`VillageLifeView` 只画无贴图体块；
-  `Script_FirstLevelP012StageZero` 接现有角色、Rapier、声音和视线，不占玩家镜头；`Data_FirstLevelP012Cast` 只对本白盒固定年轻队友与成熟班长的身份/模型，不改正式人物源资产。
+  `Script_FirstLevelP012StageZero` 接现有角色、Rapier、声音和视线；仅首次远炮由 ShellShot 短暂捕获镜头，其余行进由玩家控制；`Data_FirstLevelP012Cast` 只对本白盒固定年轻队友与成熟班长的身份/模型，不改正式人物源资产。
   不恢复四向计时看路、村口重复领弹或炮击发生前的避炮目标；镜子模块仅保留独立测试，不在本关装配。
 - `Data_FirstLevelP012TrainColumn.mjs` / `Script_FirstLevelP012TrainColumn.mjs` 管三车有限下车、发枪发弹与实际集结；额外士兵不进入战斗。
   `Script_FirstLevelP012March.mjs` 管可见目标直达、宽处松散并行与窄口收队；家庭/儿童只沿可走道路连续移动。
@@ -207,11 +207,12 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Data_FirstLevelP012Resting.mjs` / `Script_FirstLevelP012Resting.mjs` 管有限路边坐姿百姓与座凳；脚底留地面，独立演员仍纳入原始人口取证。
   原同班六人沿 `openingMarchRoute` 连续到前沿各侧位后才交防守；炮击反应须晚于真实弹着。
   本关 `hud.objectiveMarkers` 关闭全程悬浮地点和米数；跟随段由真实班长带路、停等与字幕引导，不能把内部测试目标重新画成玩家导航。
-  B11/B14/B23 的局部指南经 `P012GuideApproach` 检查实体净空，到位才发字幕；实际拖拽／点烟幕后交接，不占伤员身体、不代替玩家战斗。
+  B11/B14/B23 的局部指南经 `P012GuideApproach` 检查实体净空，到位才发字幕；拖拽由玩家完成，撤退烟幕由到位的班长施放，不占伤员身体、不代替玩家战斗。
 - 与正式第一关并存。旧 `?whitebox=1` 已移除。这个版本按用户要求使用
   灰地面、黄跨步、橙翻越、紫攀爬、蓝掩体、黑边界、红危险、绿任务路、青担架路。
   环境仍是程序化无贴图体块，人物及已烘焙声音复用现有配置。
-- `Script_FirstLevelP012ShellShot.mjs` 在首次远炮实际落地后展示六秒现场特写；沿用过场输入封锁与释放，恢复原第一人称相机。
+- `Script_FirstLevelP012ShellShot.mjs` 在首次远炮实际落地后，从玩家原地眼位展示九秒长焦观察；多发炮弹沿真实弹道落地，返还操控后接防目标持续遭受炮击。沿用过场输入封锁与释放，恢复原第一人称相机。
+- `Script_FirstLevelP012Guidance.mjs` 显示当前目标的方向与名称，以及随真实负重移动的弹药箱；只读取任务状态，不推进剧情或发放库存。
   村路炮击按玩家进度分段逼近，家庭在实际爆炸后加速；B04 接受整段真实掩体后的低姿，无隐藏小圆圈。
 - `Script_FirstLevelP012Flow.mjs` 是纯任务事实编排；`Script_FirstLevelP012Runtime.mjs`
   适配真实演员、人流、防守、炮击与扑沟输入。不能以目标时刻或虚拟队头替代真实完成。

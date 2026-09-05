@@ -689,24 +689,19 @@ console.log("ok  参数校验与换关兜底：起不来的四种、必不死优
 }
 {
   const cfg=P012Phase.whitebox.aircraftRoutes.divePress;
-  for(const z of [60,62])for(const dodge of [false,true]){
-    const target={...P012SouthPoint(44,z),y:0}, {sys,log}=MakeRig({PlayerPos:()=>target});
-    sys.StrafeRun({preset:"divePress",...cfg,TrackTo:()=>target});
-    Check(Math.abs(sys.run.fireToS-sys.run.fireFromS-2.5)<1e-9,"P012 dive has 2.5 seconds of actual strafe, excluding exit");
-    Check(sys.run.player.windowS===2.2,"expanded corridor preserves the 2.2 second reaction window");
-    let closest={distance:Infinity,time:0},activeShots=0;
-    while(sys.Active){
-      sys.Update(1/120);
-      if(dodge&&sys.run?.player.open)sys.Dodge("testActualDitchInput");
-      if(sys.run?.phase==="strafe"){
-        const p=sys.run.impact,distance=Math.hypot(p.x-target.x,p.z-target.z);
-        if(distance<closest.distance)closest={distance,time:sys.run.t};
-        if(sys.View().firing)activeShots++;
-      }
-    }
-    Check(closest.distance<.2&&Math.abs(closest.time-cfg.player.atS)<.08,"explicit player impact time agrees with the real steered line at both ditch positions");
-    Check(log.impacts.length>=30&&log.tracers.length>=10&&activeShots>120,"extended run produces real impacts and tracers during strafe, not just a long exit");
-    Check(log.playerHits.length===(dodge?0:1),"successful dodge prevents all later player damage; missed window hits exactly once");
+  for(const z of [60,62])for(const cover of [false,true])for(const offset of [0,16]){
+    const lineTarget={...P012SouthPoint(44,z),y:0},target={...lineTarget,x:lineTarget.x+offset};
+    const {sys,log}=MakeRig({PlayerPos:()=>target,CanHitPlayer:()=>!cover});
+    sys.StrafeRun({preset:"divePress",...cfg,TrackTo:()=>lineTarget});
+    Check(sys.run.player.mode==="line"&&!sys.run.player.lethal,"P012 uses spatial, non-forced-lethal gun-line damage");
+    let closest=Infinity,activeShots=0;
+    while(sys.Active){sys.Update(1/120);if(sys.run?.phase==="strafe"){
+      closest=Math.min(closest,Math.hypot(sys.run.impact.x-lineTarget.x,sys.run.impact.z-lineTarget.z));
+      if(sys.View().firing)activeShots++;
+    }}
+    Check(closest<.2,"the real steered gun line crosses its authored target");
+    Check(log.impacts.length>=30&&log.tracers.length>=10&&activeShots>120,"actual multi-burst impacts remain active");
+    Check(log.playerHits.length===(!cover&&offset===0?1:0),"cover or moving out of the line prevents damage; exposed standing can take one normal hit");
   }
   Check(STRAFE_PRESETS.divePress.speed===88,"formal chapter dive speed is unchanged");
 }
