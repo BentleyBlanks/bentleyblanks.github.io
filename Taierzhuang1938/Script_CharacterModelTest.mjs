@@ -139,6 +139,18 @@ for (const model of manifest.models) {
   assert.equal((gltf.nodes || []).some((node) => node.name === "Socket_HeadGear"), true,
     `${model.id} GLB has the head-centre collision anchor`);
 
+  if (model.id === "LugouIja03") {
+    const helmetIndex = gltf.nodes.findIndex(node => node.name === "Object005");
+    const chest = gltf.nodes.find(node => node.name === model.boneRoles.chest);
+    assert.ok(helmetIndex >= 0 && chest?.children?.includes(helmetIndex),
+      "Ija03 carries its spare steel helmet on the backpack/chest, not the head or scene root");
+    const face = gltf.materials.find(material => material.name === "Material #26");
+    assert.equal(face?.alphaMode || "OPAQUE", "OPAQUE", "Ija03 skin must be opaque despite source image alpha");
+    assert.ok(face?.pbrMetallicRoughness?.baseColorTexture && face.normalTexture,
+      "Ija03 keeps its original facial colour and normal texture");
+    assert.equal(model.bytes, fs.statSync(glbPath).size, "Ija03 manifest byte count matches repaired GLB");
+  }
+
   // ── 朝向闸：资产正面与引擎契约差多少，量出来钉死 ────────────────────────────
   const forwardYaw = MeasureForwardYaw(LoadGlb(glbPath), {
     clip: STANDING_REFERENCE_CLIP,

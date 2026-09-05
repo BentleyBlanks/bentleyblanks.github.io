@@ -128,6 +128,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Script_CharacterModelTest` 直接解析 GLB 现量（`_import/Script_LugouGlbPose.mjs`），
   不看烘焙自报的清单数。那次的离线修复留在 `_import/Script_RestoreLugouPelvisTracks.mjs`。
 - 先读：`_blender/Verify.mjs` 头注；改模型只重建那一件，别跑全量 BuildAll。
+- 日军 03 的脸部与备用钢盔修复见 [模型修复记录](Data_Ija03HeadRepair.md)；重新烘焙后运行 `_import/Script_RepairLugouIja03.mjs`。钢盔挂在背包对应的 Spine2，不能重新挂到 Head。
 - **视频转骨骼**（AI 视频 → RTMW3D → Biped clip）：`_import/Script_MocapVideoExtract.py`
   → `_import/Script_MocapRetargetClips.mjs` → 十套 GLB；联系图 `Script_MocapClipShot.mjs`。
   素材要求、坐标口径、偏航硬夹与遮挡回退的账全在 `docs/Data_MocapPipeline.md`，

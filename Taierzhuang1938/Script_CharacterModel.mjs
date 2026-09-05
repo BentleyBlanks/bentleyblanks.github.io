@@ -248,8 +248,9 @@ const MODEL_FORWARD_YAW = Math.PI;
 // v4 = 2026-08-29 补回骨盆位移轨道的那批 GLB；v5 = 2026-09-02 视频转骨骼三条
 // 新 clip（CarryStretcherFront/Rear、WoundedLimp）。十套模型的二进制都变了，
 // 戳不跟着走就会「新壳配旧芯」：清单是新的，浏览器缓存里的 GLB 还是旧的那批。
-const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=5";
-const ASSET_VERSION = "5";
+// v6 = Ija03 opaque skin and the spare helmet bound to the backpack/chest.
+const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=6";
+const ASSET_VERSION = "6";
 // 完整蒙皮轮廓必须进入 NormalDepth；但远处占屏很小的头、手和零碎附件不值得
 // 再为预通道提交一遍。每套模型三角最多的主分件始终保留，近景/编辑器则全部保留。
 const NORMAL_DEPTH_DETAIL_MAX_DISTANCE = 4;
@@ -470,15 +471,7 @@ export class LugouCharacterRig {
       const bone = FindNode(this.root, boneName);
       if (bone) this.bones[role] = bone;
     }
-    // Ija03's loose helmet was exported beside the armature, so it floated at bind height.
-    // Bind it to the actual head before the first pose is evaluated, retaining its rest transform.
-    if (this.modelId === "LugouIja03" && this.bones.head) {
-      const helmet = FindNode(this.root, "Object005");
-      if (helmet?.isMesh && !helmet.isSkinnedMesh) {
-        this.root.updateWorldMatrix(true, true);
-        this.bones.head.attach(helmet);
-      }
-    }
+    // Rigid carried equipment is parented to its authored bone in the GLB.
     this.sockets = {
       weaponR: FindNode(this.root, "Socket_WeaponR") || this.bones.handR || null,
       weaponL: FindNode(this.root, "Socket_WeaponL") || this.bones.handL || null,

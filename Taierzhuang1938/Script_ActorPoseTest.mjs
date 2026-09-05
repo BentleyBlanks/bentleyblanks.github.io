@@ -219,6 +219,41 @@ try {
       rig.bones.head.getWorldPosition(head);
       check(head.y < 0.8, `${candidate.modelId} 卧姿开火被拉站起来: ${head.y}`);
     };
+    const CheckIjaBackpackHelmet = (candidate) => {
+      if (candidate.modelId !== "LugouIja03") return;
+      const rig = candidate.characterRig;
+      const helmet = rig.root.getObjectByName("Object005");
+      let backpack, face;
+      rig.root.traverse(object => {
+        if (object.material?.name === "Material #164") backpack = object;
+        if (object.material?.name === "Material #26") face = object;
+      });
+      check(helmet?.parent === rig.bones.chest && backpack?.isSkinnedMesh,
+        "Ija03 spare helmet must remain on its backpack after runtime assembly");
+      check(face?.material.map && !face.material.transparent && face.material.depthWrite,
+        "Ija03 face must load opaque and write depth so eyes and clothing cannot overwrite skin");
+      helmet.geometry.computeBoundingBox();
+      const localCenter = helmet.geometry.boundingBox.getCenter(new THREE.Vector3());
+      const vertex = new THREE.Vector3();
+      // Measure against the actual animated backpack, not only the parent name.
+      // 19 source/mocap clips + five infantry clips: rest-centre surface distance
+      // is 4.7 cm, current animation maximum 5.9 cm; 7.5 cm leaves small bake tolerance.
+      for (const clip of [...rig.asset.gltf.animations, ...rig.asset.infantry.animations]) {
+        rig.mixer.stopAllAction();
+        rig.mixer.clipAction(clip).reset().play();
+        for (let sample = 0; sample <= 8; sample += 1) {
+          rig.mixer.setTime(clip.duration * sample / 8);
+          candidate.root.updateMatrixWorld(true);
+          const center = localCenter.clone().applyMatrix4(helmet.matrixWorld);
+          let distance = Infinity;
+          for (let index = 0; index < backpack.geometry.attributes.position.count; index += 1) {
+            backpack.getVertexPosition(index, vertex).applyMatrix4(backpack.matrixWorld);
+            distance = Math.min(distance, center.distanceTo(vertex) / rig.modelScale);
+          }
+          check(distance < 0.075, clip.name + ": Ija03 spare helmet left backpack (" + distance + " m)");
+        }
+      }
+    };
     const protagonist = factory.Create("nra", { seed: "player", protagonist: true, weapon: null });
     check(protagonist.modelId === "LugouNra01",
       `protagonist should use LugouNra01, got ${protagonist.modelId}`);
@@ -232,6 +267,7 @@ try {
         checkFacing(candidate, candidate.modelId);
         candidate.SetWeapon("ZhongZheng");
         CheckLowStance(candidate);
+        CheckIjaBackpackHelmet(candidate);
         candidate.Dispose();
       }
       check(variants.join(",") === [1, 2, 3, 4].map((n) => `${prefix}0${n}`).join(","),
