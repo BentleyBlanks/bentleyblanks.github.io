@@ -11,7 +11,7 @@
 
 import assert from "node:assert/strict";
 import path from "node:path";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
@@ -77,6 +77,36 @@ try {
   assert.ok(card.note.length > 0, "卡片上应当有注记");
   assert.equal(card.hint, false, "「拖动可转动」那行提示已经删掉了，不许回来");
   console.log(`ok   卡片：${card.name}`);
+
+  const type89 = await worker.evaluate(async () => {
+    const { PropStage } = await import(new URL(`./Script_BootPropStage.mjs${location.search}`, location.href).href);
+    const canvas = new OffscreenCanvas(1280, 900);
+    const stage = new PropStage(canvas);
+    try {
+      stage.Resize(1280, 900);
+      await stage.Load({ id: "Type89Tank", name: "八九式" });
+      stage.yaw = 2.5; stage.Tick(0);
+      const materials = [stage.materials.type89Armor, stage.materials.type89Track];
+      const blob = await canvas.convertToBlob({ type: "image/png" });
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      let binary = ""; for (const byte of bytes) binary += String.fromCharCode(byte);
+      return { ready: stage.type89PbrReady, draws: stage.renderer.info.render.calls,
+        triangles: stage.renderer.info.render.triangles,
+        maps: materials.map((m) => ({ width: m.map?.image?.width, normalWidth: m.normalMap?.image?.width,
+          colorSpace: m.map?.colorSpace, normalSpace: m.normalMap?.colorSpace,
+          wrapS: m.map?.wrapS, normalWrapS: m.normalMap?.wrapS })), image: btoa(binary) };
+    } finally { stage.Dispose(); }
+  });
+  assert.equal(type89.ready, true, "八九式专用贴图在 worker 中真实加载");
+  assert.equal(type89.triangles, 4089);
+  assert.equal(type89.draws, 4);
+  assert.deepEqual(type89.maps, [2048, 1024].map((width) => ({
+    width, normalWidth: width, colorSpace: "srgb", normalSpace: "", wrapS: 1000, normalWrapS: 1000,
+  })), "原装甲/履带底色和法线保持颜色空间、分辨率与重复采样");
+  const type89Dir = path.join(projectDir, "_shots", "Type89Restore");
+  mkdirSync(type89Dir, { recursive: true });
+  writeFileSync(path.join(type89Dir, "Scene_Worker.png"), Buffer.from(type89.image, "base64"));
+  console.log("ok  八九式 worker 原贴图 / 4 draws / 4,089 tris");
 
   const showcaseIds = await worker.evaluate(async () => {
     const stage = await import(new URL(`./Script_BootPropStage.mjs${location.search}`, location.href).href);

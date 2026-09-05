@@ -82,7 +82,7 @@ export const SOURCE_ASSET_STANDARDS = Object.freeze({
     note: "指定特例：以原成品 4,534 三角为基准翻倍，目标 9,068。" },
 
   Type89Tank: { name: "八九式中战车", group: "vehicle", sourceTriangles: 4089,
-    sourceTexture: "有（扫描图）", runtimeTexture: "项目共享 armor / track / steel PBR" },
+    sourceTexture: "有（原作者装甲/履带底色与法线）", runtimeTexture: "原 UV、逐角法线与专用 Type89 PBR" },
   Type95HaGo: { name: "九五式轻战车", group: "vehicle", sourceTriangles: 82142,
     sourceTexture: "有源包引用", runtimeTexture: "项目共享 armor PBR",
     note: "目标 80k 只会减 2.6%，按 5% 规则保留原始拓扑。" },

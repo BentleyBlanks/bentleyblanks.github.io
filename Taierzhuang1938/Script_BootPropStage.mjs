@@ -62,6 +62,9 @@ const PALETTE = {
   // 摄影测量源偶有单层薄片；展示台必须双面绘制，避免绕到反面时履带/挡泥板消失。
   armor: { color: 0x555c4a, roughness: 0.66, metalness: 0.35, side: THREE.DoubleSide },
   track: { color: 0x3b3d3c, roughness: 0.85, metalness: 0.5, side: THREE.DoubleSide },
+  type89Armor: { color: 0x695748, roughness: 0.92, metalness: 0, side: THREE.DoubleSide },
+  type89Barrel: { color: 0x695748, roughness: 0.92, metalness: 0, side: THREE.DoubleSide },
+  type89Track: { color: 0x514b42, roughness: 0.92, metalness: 0, side: THREE.DoubleSide },
   leather: { color: 0x4a3524, roughness: 0.68, metalness: 0.0 },
   WoodBeam: { color: 0x6b4f36, roughness: 0.78, metalness: 0.0 },
   WoodDoor: { color: 0x5c4230, roughness: 0.76, metalness: 0.0 },
@@ -91,7 +94,12 @@ function MaterialBank() {
       made.set(key, material);
     },
     dispose() {
-      for (const material of made.values()) material.dispose?.();
+      const textures = new Set();
+      for (const material of new Set(made.values())) {
+        for (const value of Object.values(material)) if (value?.isTexture) textures.add(value);
+        material.dispose?.();
+      }
+      for (const texture of textures) { texture.dispose(); texture.image?.close?.(); }
       made.clear();
     },
   };
@@ -202,6 +210,7 @@ export class PropStage {
     this.materialBank = MaterialBank();
     this.materials = this.materialBank.materials;
     this.dadaoPbrReady = false;
+    this.type89PbrReady = false;
   }
 
   /** 宿主量好的 CSS 像素尺寸。 */
@@ -240,6 +249,28 @@ export class PropStage {
       } catch (error) {
         // 加载画面不能被一张未热好的贴图拖死；PALETTE.dadao 仍能给出正确材质读感。
         console.warn(`[BootProp] 大刀 PBR 加载失败：${String(error).slice(0, 160)}`);
+      }
+    }
+    if (entry.id === "Type89Tank" && !this.type89PbrReady) {
+      try {
+        const loaded = await Promise.all(["Armor", "Track"].map(async (part) => {
+          const [map, normalMap] = await Promise.all([
+            LoadBitmapTexture(`./Texture/Texture_Type89${part}Base.webp?v=type89-20260906`, { srgb: true }),
+            LoadBitmapTexture(`./Texture/Texture_Type89${part}Normal.webp?v=type89-20260906`),
+          ]);
+          // Source track UVs repeat beyond [0, 1]; clamping smears one tread over the belt.
+          for (const texture of [map, normalMap]) {
+            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+          }
+          return new THREE.MeshStandardMaterial({ map, normalMap,
+            roughness: 235 / 255, metalness: 0, side: THREE.DoubleSide });
+        }));
+        this.materialBank.set("type89Armor", loaded[0]);
+        this.materialBank.set("type89Barrel", loaded[0]);
+        this.materialBank.set("type89Track", loaded[1]);
+        this.type89PbrReady = true;
+      } catch (error) {
+        console.warn(`[BootProp] Type89 textures: ${String(error).slice(0, 160)}`);
       }
     }
     const root = await LoadModel(url, {

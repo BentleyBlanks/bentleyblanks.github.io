@@ -1083,11 +1083,11 @@
    "meshBlocks": 4,
    "nodes": 8,
    "joints": 1,
-   "bytes": 143127,
+   "bytes": 140071,
    "materials": [
-    "armor",
-    "steel",
-    "track"
+    "type89Armor",
+    "type89Barrel",
+    "type89Track"
    ],
    "mounts": [
     "root",

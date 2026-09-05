@@ -588,6 +588,8 @@ export const RECIPES = {
   ClothIja: (s) => BakeCloth(s ?? 256, { seed: 521, hue: [124, 116, 82] }),
   Steel: (s) => BakeSteel(s ?? 256, { seed: 601 }),
   // Only baked after a failed external download. ActorFactory needs this name in every scene.
+  Type89Armor: (s) => BakeFlat(s ?? 64, { color: [130, 120, 90], rough: 0.92, metal: 0 }),
+  Type89Track: (s) => BakeFlat(s ?? 64, { color: [88, 82, 70], rough: 0.92, metal: 0 }),
   DadaoPbr: (s) => BakeFlat(s ?? 256, { color: [146, 154, 162], rough: 0.34, metal: 0.95 }),
   CarriageBenchWood: (s) => BakeWood(s ?? 256, { seed: 647, hue: [98, 72, 48], planks: 4, weathered: 0.45 }),
   CarriageFloorSteel: (s) => BakeSteel(s ?? 256, { seed: 653, base: [56, 59, 62], polish: 0.15, rust: 0.12 }),

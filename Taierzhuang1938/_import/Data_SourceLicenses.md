@@ -57,7 +57,7 @@ CC-BY-4.0 署名原文，文件头都有完整 credit 文本，发布时按 CC-B
 
 | 游戏内资产 | 源文件 | 作者 | 许可 | 史实对应 |
 |---|---|---|---|---|
-| 八九式中战车 `Type89Tank` | `Source/Model_Type89ChiRo/scene.gltf` | [snrnsrk5](https://sketchfab.com/snrnsrk5) | CC-BY-4.0 | 博物馆实体扫描的 Type 89 I-Go (Chi-Ro)：炮塔偏前、塔后机枪、车体右前机枪球座、前起动轮抬高都是模型自带的。导入管线（`_blender/ImportVehicles.py`）按部件组名收桶（Hull/Turret → armor、Track → track、Barrel → steel），炮塔单独成 joint 节点，尺寸按史实 2.15 × 2.56 × 4.30 m 逐轴归一；保留源件约 4,100 三角。源图为 2K 烘焙扫描图，运行时按共享 PBR 三桶重漆。 |
+| 八九式中战车 `Type89Tank` | `Source/Model_Type89ChiRo/scene.gltf` | [snrnsrk5](https://sketchfab.com/snrnsrk5) | CC-BY-4.0 | 原作者 Type 89 I-Go (Chi-Ro)，保留 4,089 三角、原 UV 与逐角法线。Hull/Turret/Barrel 使用专用装甲图，Track 使用原履带图；炮塔独立为 joint，既有 2.15 × 2.56 × 4.30 m 外廓不变。2026-09-06 从 Sketchfab 正式 glTF 下载包恢复贴图，装甲 4K 压为 2K WebP，履带保留 1024 × 256；不再三桶重漆。重建与排障见 [八九式外观恢复](../docs/Data_Type89Appearance.md)。 |
 | 九五式轻战车 `Type95HaGo` | `Source/Model_Type95HaGo/scene.gltf` | [Jesper Landin](https://sketchfab.com/JesperLandin) | CC-BY-4.0 | Type 95 Ha-Go 高模扫描源 82,142 三角；减至 80k 只降 2.6%，按“降幅 5% 及以下不减面”规则保留原始拓扑。源文件没有可拆的炮塔/车体/履带语义节点，仍作为单一静态装甲件；资产提供标准挂点，但炮塔不可独立旋转。尺寸归一为 2.07 × 2.27 × 4.38 m。 |
 | 九七式中战车 `Type97ChiHa` | `Source/Model_Type97ChiHa/scene.gltf` | [snrnsrk5](https://sketchfab.com/snrnsrk5) | CC-BY-4.0 | Type 97 Chi-Ha 博物馆扫描源约 4,000 面；Hull/Turret/Track/Barrel 部件可分别收桶，炮塔保留为 joint 节点。外廓归一为 2.475 × 2.380 × 5.50 m，保留原始 3969 三角、不焊点、不减面。 |
 

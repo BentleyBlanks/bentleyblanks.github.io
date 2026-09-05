@@ -71,7 +71,7 @@ MATERIAL_NAMES = {
     # 两个桶 ActorMaterials 早就返回了，只是以前没有模型用到它们。
     "trouser", "hair",
     # 车辆装甲板（喷漆钢，不是裸钢）与履带 —— 见 Script_Actor.ActorMaterials
-    "armor", "track",
+    "armor", "track", "type89Armor", "type89Track", "type89Barrel",
     # 建筑构件用的是 MaterialLibrary 的配方名，加载器同样直接透传
     "Stone", "WoodBeam", "WoodDoor", "RoofTile", "BrickWall", "Adobe",
 }

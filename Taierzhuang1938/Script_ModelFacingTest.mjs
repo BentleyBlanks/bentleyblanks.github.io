@@ -147,7 +147,7 @@ for (const [id, entry] of Object.entries(MESHES)) {
   // 八九式炮塔偏前，塔后机枪的世界 z 可以是负的；它只须在炮口后面。
   if (rear && gun) Check(rear.z > gun.z, `${id} rearMgMuzzle 在 gunMuzzle 之后`, `${rear.z.toFixed(2)} > ${gun.z.toFixed(2)}`);
   // 几何本身：挂点是人写的约定，车壳才是玩家看见的东西。
-  const steel = doc.meshes.map((m, i) => [m, i]).filter(([m]) => m.material === "steel");
+  const steel = doc.meshes.map((m, i) => [m, i]).filter(([m]) => ["steel", "type89Barrel"].includes(m.material));
   if (steel.length) {
     for (const [, i] of steel) {
       const points = TzmMeshPoints(doc, i);

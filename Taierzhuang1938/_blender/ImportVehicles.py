@@ -9,8 +9,8 @@
   Track         -> track（履带与负重轮，tile=track）
   Barrel        -> steel（炮管等发蓝钢件，tile=steel）
 
-源图依然不进 Pages（与枪械同一个理由：共享三套 authored PBR，见
-Data_SourceLicenses.md）。选定源几何在战车阈值以内原样保留；只有超过阈值的模型
+八九式保留源 UV、逐角法线与专用贴图；其他战车仍用共享 PBR，见
+Data_SourceLicenses.md。选定源几何在战车阈值以内原样保留；只有超过阈值的模型
 才减到尽可能贴近阈值，只做必要的坐标、尺度与节点层级运行时转换。
 
 挂点（gunMuzzle / rearMgMuzzle / hatch / mgMuzzle / hullFront）按部件几何推算：
@@ -25,7 +25,7 @@ import bmesh
 import bpy
 from mathutils import Matrix, Vector
 
-from TzmCore import Join, Node
+from TzmCore import AUTHORED_NORMAL_LAYER, Join, Node, TransformMatrix
 from ImportWeapons import _DecimateToBudget
 from AssetBudgets import VEHICLE_TRIANGLE_LIMIT, TriangleTarget
 
@@ -62,6 +62,7 @@ SOURCES = {
                 "运行时按 armor/track/steel 三桶重漆。",
     },
     "Type89Tank": {
+        "sourceAppearance": True,
         "file": os.path.join("Model_Type89ChiRo", "scene.gltf"),
         "span": (2.15, 2.56, 4.30),
         # (部件组名, 材质桶, 属于炮塔节点?)
@@ -69,8 +70,8 @@ SOURCES = {
                   ("Turret", "armor", True), ("Barrel", "steel", True)],
         "note": "CC-BY Type 89 I-Go (Chi-Ro)（Sketchfab / snrnsrk5）→ 八九式中战车（甲）。"
                 "前起动轮抬高、炮塔偏前、塔后机枪与车体右前机枪球座齐备；"
-                "尺寸按史实 4.30 × 2.15 × 2.56 m 归一。源图为摄影测量烘焙图，"
-                "运行时按 armor/track/steel 三桶重漆。",
+                "尺寸按既有 4.30 × 2.15 × 2.56 m 外廓归一；保留源 UV、逐角法线与作者贴图，"
+                "车体/炮塔/炮管共享原装甲图，履带独立用原履带图。",
     },
 }
 
@@ -105,7 +106,7 @@ def _Aabb(bms):
 
 def _Xform(bms, matrix):
     for bm in bms:
-        bmesh.ops.transform(bm, matrix=matrix, verts=bm.verts[:])
+        TransformMatrix(bm, matrix)
         bm.normal_update()
 
 
@@ -131,7 +132,14 @@ def BuildImported(name):
         mesh = evaluated.to_mesh()
         bm = bmesh.new()
         bm.from_mesh(mesh)
-        bmesh.ops.transform(bm, matrix=evaluated.matrix_world, verts=bm.verts[:])
+        if spec.get("sourceAppearance"):
+            # Keep glTF split normals: UV seams must not turn into hard edges.
+            authored = bm.loops.layers.float_vector.new(AUTHORED_NORMAL_LAYER)
+            bm.faces.ensure_lookup_table()
+            for polygon in mesh.polygons:
+                for loop, loop_index in zip(bm.faces[polygon.index].loops, polygon.loop_indices):
+                    loop[authored] = mesh.corner_normals[loop_index].vector
+        TransformMatrix(bm, evaluated.matrix_world)
         evaluated.to_mesh_clear()
         gathered.setdefault(key, []).append(bm)
 
@@ -215,8 +223,7 @@ def BuildImported(name):
     tlo, thi = _Aabb([partbm["Turret"]])
     pivot = Vector((0.0, tlo.y, 0.5 * (tlo.z + thi.z)))
     for key in turret_keys:
-        bmesh.ops.transform(partbm[key], matrix=Matrix.Translation(-pivot),
-                            verts=partbm[key].verts[:])
+        TransformMatrix(partbm[key], Matrix.Translation(-pivot))
         partbm[key].normal_update()
 
     # --- 挂点（部件几何推算）-----------------------------------------------
@@ -251,11 +258,16 @@ def BuildImported(name):
     # --- 节点树 ------------------------------------------------------------
     root = Node("root")
     body = root.Child("body")
-    body.Add("armor", partbm["Hull"], tile="armor")
-    body.Add("track", partbm["Track"], tile="track")
+    source_appearance = spec.get("sourceAppearance", False)
+    body.Add("type89Armor" if source_appearance else "armor", partbm["Hull"],
+             tile="sourceUv" if source_appearance else "armor")
+    body.Add("type89Track" if source_appearance else "track", partbm["Track"],
+             tile="sourceUv" if source_appearance else "track")
     turret = body.Child("turret", t=tuple(pivot), joint=True)
-    turret.Add("armor", partbm["Turret"], tile="armor")
-    turret.Add("steel", partbm["Barrel"], tile="steel")
+    turret.Add("type89Armor" if source_appearance else "armor", partbm["Turret"],
+               tile="sourceUv" if source_appearance else "armor")
+    turret.Add("type89Barrel" if source_appearance else "steel", partbm["Barrel"],
+               tile="sourceUv" if source_appearance else "steel")
 
     turret.Child("gunMuzzle", t=tuple(muzzle))
     turret.Child("rearMgMuzzle", t=(rearX, rearY, rearZ))

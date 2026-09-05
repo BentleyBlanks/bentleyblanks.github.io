@@ -61,6 +61,13 @@ const result = await page.evaluate(async ({ id, outDir }) => {
   const library = new MaterialLibrary(renderer, { textureSize: 128 });
   for (const _ of library.PrepareSteps(["ClothNra", "ClothIja", "Steel", "SteelHelmet",
     "WoodStock", "Stone", "WoodBeam", "WoodDoor", "RoofTile"])) { /* 逐配方烘 */ }
+  for (const part of ["Armor", "Track"]) {
+    await library.LoadExternalSet(`Type89${part}`, {
+      albedo: `./Texture/Texture_Type89${part}Base.webp`,
+      normal: `./Texture/Texture_Type89${part}Normal.webp`,
+      orm: "./Texture/Texture_Type89Orm.png",
+    });
+  }
   const Plain = (name, color, roughness, doubleSide) => library.Plain(name, {
     color, roughness, metalness: 0, side: doubleSide ? THREE.DoubleSide : THREE.FrontSide,
   });
@@ -79,6 +86,9 @@ const result = await page.evaluate(async ({ id, outDir }) => {
     blade: Plain("DadaoBlade", { color: 0x929aa2, roughness: 0.34, metalness: 0.95 }),
     grip: Plain("DadaoGrip", { color: 0x8f7c61, roughness: 0.78, metalness: 0 }),
     dadao: Plain("DadaoPbrFallback", { color: 0x77736f, roughness: 0.58, metalness: 0.72 }),
+    type89Armor: library.Get("Type89Armor", { side: THREE.DoubleSide }),
+    type89Barrel: library.Get("Type89Armor", { side: THREE.DoubleSide }),
+    type89Track: library.Get("Type89Track", { side: THREE.DoubleSide }),
     wood: library.Get("WoodStock", { roughness: 0.86, metalness: 0 }),
     armor: Plain("armor", 0x555c4a, 1, true),
     track: Plain("track", 0x3b3d3c, 1, true),

@@ -113,8 +113,45 @@ Check(/ExternalRows/.test(editorSource) && /EXTERNAL_GLB_STANDARDS/.test(editorS
   "外部 GLB 分类使用逐资产审计表而非仅显示通用卡片");
 Check(/AssetStandardsEditor/.test(suiteSource)
   && /Script_EditorAssetStandards\.mjs\?v=\d+/.test(html)
-  && /Data_AssetStandards\.mjs\?v=7/.test(html),
+  && /Data_AssetStandards\.mjs\?v=\d+/.test(html),
 "资产规范编辑器已注册到套件与 import map");
+
+// Compare triangle-corner UV distributions against the downloaded glTF, so a
+// future rebuild cannot silently replace the authored atlas with box projection.
+const type89 = JSON.parse(fs.readFileSync(path.join(projectDir, "Model/Type89Tank.tzm.json"), "utf8"));
+const source89 = JSON.parse(fs.readFileSync(path.join(projectDir, "_import/Source/Model_Type89ChiRo/scene.gltf"), "utf8"));
+const source89Bin = fs.readFileSync(path.join(projectDir, "_import/Source/Model_Type89ChiRo/scene.bin"));
+function Source89Value(accessorId, index, axis = 0) {
+  const accessor = source89.accessors[accessorId], view = source89.bufferViews[accessor.bufferView];
+  const components = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 }[accessor.type];
+  const bytes = accessor.componentType === 5126 || accessor.componentType === 5125 ? 4 : 2;
+  const offset = (view.byteOffset || 0) + (accessor.byteOffset || 0)
+    + index * (view.byteStride || components * bytes) + axis * bytes;
+  return accessor.componentType === 5126 ? source89Bin.readFloatLE(offset)
+    : bytes === 4 ? source89Bin.readUInt32LE(offset) : source89Bin.readUInt16LE(offset);
+}
+for (let i = 0; i < type89.meshes.length; i++) {
+  const block = type89.meshes[i], primitive = source89.meshes[i].primitives[0];
+  const indexBytes = Buffer.from(block.idx, "base64"), uvBytes = Buffer.from(block.uv, "base64");
+  for (let axis = 0; axis < 2; axis++) {
+    const source = [], runtime = [];
+    for (let corner = 0; corner < source89.accessors[primitive.indices].count; corner++) {
+      const vertex = Source89Value(primitive.indices, corner);
+      const uv = Source89Value(primitive.attributes.TEXCOORD_0, vertex, axis);
+      source.push(axis === 1 ? 1 - uv : uv); // Blender/TZM use bottom-left UVs.
+    }
+    for (let corner = 0; corner < block.idxCount; corner++) {
+      const vertex = block.idxBits === 32 ? indexBytes.readUInt32LE(corner * 4) : indexBytes.readUInt16LE(corner * 2);
+      runtime.push(block.uvMin[axis] + uvBytes.readUInt16LE((vertex * 2 + axis) * 2) * block.uvScale[axis]);
+    }
+    source.sort((a, b) => a - b); runtime.sort((a, b) => a - b);
+    const error = Math.max(...source.map((value, j) => Math.abs(value - runtime[j])));
+    Check(source.length === runtime.length && error < 0.0001,
+      `Type89 mesh ${i} authored UV axis ${axis} survives export`, String(error));
+  }
+}
+Check(type89.triangles === 4089 && type89.meshes.map((m) => m.material).join(",")
+  === "type89Armor,type89Track,type89Armor,type89Barrel", "八九式保留原拓扑和专用装甲/履带材质");
 
 if (failed) {
   console.error(`\n资产规范失败：${failed} 项。`);

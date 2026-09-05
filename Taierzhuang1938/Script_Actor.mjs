@@ -3639,6 +3639,10 @@ export class ActorFactory {
       // **不是** Steel（发蓝裸钢）—— 一辆镜面反光的战车比没有模型还糟。
       // 色是 1938 年在华日军战车的土黄褐单色；albedo 要比"看上去的颜色"再压两档，
       // 理由与九〇式钢盔那一行一模一样：史料记的是日光下的观感，不是反照率。
+      // Type 89 uses its authored atlas and split normals, without shared paint tint.
+      type89Armor: this.Material("type89Armor", () => lib.Get("Type89Armor", { side: THREE.DoubleSide })),
+      type89Barrel: this.Material("type89Barrel", () => lib.Get("Type89Armor", { side: THREE.DoubleSide })),
+      type89Track: this.Material("type89Track", () => lib.Get("Type89Track", { side: THREE.DoubleSide })),
       armor: this.Material("armor", () => lib.Get("SteelHelmet",
         { color: TintTo("SteelHelmet", 0x55503A), tintId: "armor", roughness: 1, metalness: 0.05 })),
       // 履带与负重轮：没喷漆的锻钢，接地面被磨得半亮、其余锈着。
