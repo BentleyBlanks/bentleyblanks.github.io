@@ -1077,6 +1077,8 @@ export class FirstLevelP012Director {
     let requiredAction = "move";
     let requiredStance = null;
     let progress = null;
+    const mortarDangerActive = this.beat >= 7 && this.beat <= 9 && !!this.mortarEscapeFrom
+      && this.lastSample.mortarWarningActive === true;
     if ([0, 2, 13].includes(this.beat)) requiredAction = "follow";
     if ([0, 2, 4, 14].includes(this.beat)) target = route[this.routeIndex] || route.at(-1);
     if ([0, 2].includes(this.beat) && this.lastSample.guidePosition) target = this.lastSample.guidePosition;
@@ -1123,8 +1125,7 @@ export class FirstLevelP012Director {
     }
     // A live mortar warning outranks the labelled rifle/MG action. It is a real
     // world hazard and can arrive on the independent frontline pressure clock.
-    if (this.beat >= 7 && this.beat <= 9 && this.mortarEscapeFrom
-      && (this.beat === 9 || this.lastSample.mortarWarningActive)) {
+    if (mortarDangerActive) {
       const origin = this.mortarEscapeFrom;
       const mgStatus = this.beat < 9 ? "" : this.completionReasons[8] === "threatCleared" ? "机枪威胁已清除；" : "友军机枪已恢复射击；";
       const safePort = [anchors.gunports?.[1], anchors.gunports?.[0], anchors.gunports?.[2]]
@@ -1344,7 +1345,7 @@ export class FirstLevelP012Director {
       (this.beat === 23 && (activity.retreatCoverIndices || []).includes(this.retreatPoint))) {
       if (!(this.beat === 23 && requiredAction === "follow")) requiredAction = "crouch";
     }
-    if (this.beat >= 6 && this.beat <= 10 && this.frontlineAmmoRemaining > 0
+    if (!mortarDangerActive && this.beat >= 6 && this.beat <= 10 && this.frontlineAmmoRemaining > 0
       && Number(this.host.CurrentClips?.() ?? this.lastSample.clips) <= 0) {
       target = anchors.ammoDrop; interactionId = "p012_frontlineAmmo"; requiredAction = "move";
       text = `退到弹药箱补充桥夹 · 箱内剩 ${this.frontlineAmmoRemaining}`;
@@ -1360,7 +1361,7 @@ export class FirstLevelP012Director {
         : "；步枪打空：留意倒下士兵的枪械，靠近按 F 缴获（替换当前枪弹）";
     }
     let frontlineApproach = null;
-    if (this.beat >= 6 && this.beat <= 10 && interactionId !== "p012_frontlineAmmo") {
+    if (!mortarDangerActive && this.beat >= 6 && this.beat <= 10 && interactionId !== "p012_frontlineAmmo") {
       const port = anchors.gunports?.[this.beat === 8 ? 2 : this.beat === 10 ? 0 : 1];
       frontlineApproach = this.FrontlineApproachTarget(port);
       if (frontlineApproach) {

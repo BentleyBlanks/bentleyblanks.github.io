@@ -698,6 +698,10 @@ assert.match(ai,/s\.scriptArrivalRadius\) : 1\.2/ ,"ordinary traffic retains pro
 assert.match(ai, /if \(Number\.isFinite\(s\.scriptMoveSpeedMps\)\) speed = s\.p012Guided && desired/);
 assert.match(ai, /\? Math\.max\(0, s\.scriptMoveSpeedMps\) : Math\.min\(speed, Math\.max\(0, s\.scriptMoveSpeedMps\)\)/,"only explicitly guided P012 actors bypass the ordinary speed cap");
 const main = readFileSync(new URL("./Script_Main.mjs", import.meta.url), "utf8");
+assert.match(main,/actor\.p012MachineGun = true; actor\.scriptDefensive = true/,
+  "the spawned finite MG keeps an explicit identity marker");
+assert.match(main,/actor\.alive\s*&&\s*actor\.p012MachineGun === true[\s\S]*?actor\.state === AI_STATE\.SUPPRESSED/,
+  "friendly MG recovery starts only from the living P012 MG's production SUPPRESSED state");
 {
  const body=main.match(/EnemyStaging: \(soldier, staging\) => \{([\s\S]*?)\n    \},/)[1];
  const Stage=vm.runInNewContext(`(soldier,staging)=>{${body}}`),soldier={alive:true,health:38,ammo:2,target:{},targetVisible:true,cover:{},state:"fire"};

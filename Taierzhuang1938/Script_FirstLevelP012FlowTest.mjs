@@ -1121,6 +1121,26 @@ for(const index of [2,3,4]) {
   assert.equal(director.State().pressureHistory.at(-1).reason,"normal40");
 }
 {
+  let clips=0;
+  const director=new FirstLevelP012Director({CurrentClips:()=>clips},phase.whitebox);
+  director.Restore({...director.Snapshot(),beat:8,unlockedWaves:[0,1,2,3],mortarEscapeFrom:P012Point(5,-65),
+    facts:["ammo"],frontlineAmmoRemaining:3});
+  director.lastSample={position:P012Point(5,-65),mortarWarningActive:true,clips:0};
+  let objective=director.CurrentObjective();
+  assert.equal(objective.requiredAction,"sprint");assert.equal(objective.interactionId,null,
+    "a live mortar warning outranks an empty-rifle trip to the ammunition box");
+  clips=2;director.lastSample={position:P012Point(5,-40),mortarWarningActive:true,clips:2};
+  objective=director.CurrentObjective();assert.match(objective.text,/落点/);
+  assert.notEqual(objective.text,"沿反斜面中间交通壕回到枪眼，绕开两侧实体壕墙",
+    "retry navigation cannot cover a live mortar warning");
+  director.lastSample.mortarWarningActive=false;
+  objective=director.CurrentObjective();assert.equal(objective.text,"沿反斜面中间交通壕回到枪眼，绕开两侧实体壕墙",
+    "ordinary frontline rejoin guidance returns after the real warning ends");
+  clips=0;director.lastSample.clips=0;
+  objective=director.CurrentObjective();assert.equal(objective.interactionId,"p012_frontlineAmmo",
+    "finite supply guidance returns after the real warning ends");
+}
+{
   const actors=[],pressures=[];
   const director=new FirstLevelP012Director({
     Pressure:wave=>pressures.push({kind:wave.kind,at:director.elapsed}),

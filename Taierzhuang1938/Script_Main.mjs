@@ -3039,7 +3039,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   p012Runtime = phase.whitebox?.p012 ? new FirstLevelP012Runtime({
     SpawnEnemy: (spec) => {
       const actor = ai.Spawn("ija", spec.x, spec.z, spec);
-      if (actor && spec.p012MachineGun) actor.scriptDefensive = true;
+      if (actor && spec.p012MachineGun) { actor.p012MachineGun = true; actor.scriptDefensive = true; }
       if (actor && spec.p012Far) {
         actor.scriptDefensive = true;
         actor.order = "hold"; actor.holdZone = { id: "P012SouthBlockade", x: spec.x, z: spec.z, radius: 2 };
@@ -3097,7 +3097,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       actor.order = "hold"; actor.holdZone = { id: "P012RetreatPursuit", ...point, radius: 0.3 };
       actor.goal.set(point.x, 0, point.z);
     },
-    EnemyMgSuppressed: () => ai.soldiers.some((actor) => actor.side === "ija" && actor.weaponId === "Type11" && (actor.suppression > 0.3 || !actor.alive)),
+    EnemyMgSuppressed: () => ai.soldiers.some((actor) => actor.side === "ija" && actor.alive
+      && actor.p012MachineGun === true && actor.weaponId === "Type11" && actor.state === AI_STATE.SUPPRESSED),
     FriendlyMgFired: (since) => ai.soldiers.some((actor) => actor.side === "nra" && actor.weaponId === "Zb26" && actor.lastFire > since),
     DeploySmoke: (point) => vfx.SmokeSource(new THREE.Vector3(point.x, 0.2, point.z), { kind: "screen", rate: 12, radius: 7.5, rise: 0.4, sizeStart: 3, sizeEnd: 6, life: 10 }),
     ClearSmoke: (handle) => vfx.RemoveSmokeSource(handle),
