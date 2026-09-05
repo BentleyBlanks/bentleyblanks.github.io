@@ -75,7 +75,14 @@ const VIEW_TARGETS = {
 export class DebugRenderingEditor {
   static id = "debugRendering";
   static label = "Debug Rendering";
-  static hint = "叠加查看 GBuffer、AO、GI 与后处理靶；切换其它编辑器时保持打开";
+  static hint = "叠加查看 GBuffer、AO、GI 与后处理靶；切换其它编辑器、关掉面板回去打仗都保持打开";
+  /**
+   * 关设置面板（回去打仗）**不收它**，与 Profiler 同一条规矩：运行时渲染 bug
+   * （第一人称手上的黑块、雾/AO 在移动中的闪烁）只在玩法照跑时才复现，
+   * 关面板就归还最终画面的话，调试视图只能看静止的一帧。停它：面板里再点一次
+   * 「Debug Rendering」，或点浮窗右上角的 ×，或「全部关掉」。
+   */
+  static keepOnClose = true;
 
   constructor(host) {
     this.host = host;

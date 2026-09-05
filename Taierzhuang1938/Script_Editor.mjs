@@ -229,7 +229,9 @@ export class EditorSuite {
     const off = El("button", "edBtn wide danger", "全部关掉");
     off.type = "button";
     off.dataset.editor = "";
-    off.addEventListener("click", () => this.Close());
+    // 「全部关掉」按字面办：连 keepOnClose 的叠加层（Debug Rendering / 性能剖析）
+    // 也一起收。只有「关面板回去打仗」那条路才保留它们。
+    off.addEventListener("click", () => this.Close({ all: true }));
     body.appendChild(off);
 
     this.status = El("div", "edNote warn", "");
@@ -362,7 +364,7 @@ export class EditorSuite {
     return this.active;
   }
 
-  Close({ switching = false } = {}) {
+  Close({ switching = false, all = false } = {}) {
     if (this.active) {
       try { this.active.Exit(); } catch (error) { console.error("[Editor] 关闭出错：", error); }
     }
@@ -372,12 +374,14 @@ export class EditorSuite {
     this.SetHint("");
     this.SetCrosshair(false);
     // 只有「完全关闭」才收叠加窗。编辑器之间的切换要保留 Debug Rendering。
-    // keepOnClose 的叠加层（性能剖析）连完全关闭也不收：它量的就是战斗中的帧，
-    // 「关面板回去打」正是它的主用例；要停就在面板里再点一次，或直接关它的窗口。
+    // keepOnClose 的叠加层（Debug Rendering / 性能剖析）连完全关闭也不收：
+    // 它们看的、量的就是战斗中的帧，「关面板回去打」正是主用例 —— 运行时才复现的
+    // 渲染 bug（第一人称手上的黑块）只能开着调试视图边打边看。要停：面板里再点
+    // 一次、叉掉浮窗，或按「全部关掉」（all）。
     if (!switching) {
       for (const id of [...this.overlays.keys()]) {
         const Editor = OVERLAYS.find((entry) => entry.id === id);
-        if (!Editor || !Editor.keepOnClose) this.CloseOverlay(id);
+        if (all || !Editor || !Editor.keepOnClose) this.CloseOverlay(id);
       }
     }
     this.RefreshStatus();

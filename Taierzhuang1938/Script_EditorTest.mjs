@@ -343,6 +343,32 @@ Check("Debug Rendering：每个视图都真的画到了屏幕上（不是黑屏�
 Check("Debug Rendering：四组 chips 只亮当前视图那一格",
   Object.values(debugRendering.chipsOn).every((n) => n === 1), JSON.stringify(debugRendering.chipsOn));
 
+// 关面板回去打仗（TogglePanel(false)）**不收** Debug Rendering：运行时才复现的渲染
+// bug 只能开着调试视图边打边看（static keepOnClose）。回来时它还开着、送屏的仍是
+// 同一张靶、材质假彩色 uniform 也没被归零 —— 而且玩法真的在跑（capturing=false）。
+await page.evaluate(() => window.Taierzhuang.editor.SetOverlayView?.("debugRendering", "baseColor")
+  ?? window.Taierzhuang.editor.overlays.get("debugRendering").SetView("baseColor"));
+await Step(2);
+const debugKeepOnClose = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  T.editor.TogglePanel(false);
+  T.StepFrames(6);
+  const inGame = {
+    ...T.Debug.Editor(),
+    matMode: T.library.gi ? T.library.gi.debugView.value : -1,
+    panel: !!document.querySelector(".edPanel.debugRendering"),
+  };
+  T.editor.TogglePanel(true);
+  return inGame;
+});
+Check("关面板回去打仗时 Debug Rendering 保持开着", !debugKeepOnClose.capturing
+  && !debugKeepOnClose.panelOpen && debugKeepOnClose.debugRendering
+  && debugKeepOnClose.debugView === "baseColor" && debugKeepOnClose.matMode === 6
+  && debugKeepOnClose.panel,
+JSON.stringify(debugKeepOnClose));
+await page.evaluate(() => window.Taierzhuang.editor.overlays.get("debugRendering").SetView("normal"));
+await Step(2);
+
 // 点击 range 后浏览器会把键盘焦点留在滑杆上。编辑器不能因为这个焦点
 // 就不再收到 WASD：场景编辑器的飞行镜头仍应继续移动。
 await page.click('[data-editor="scene"]');
@@ -426,6 +452,9 @@ Check("退出场景编辑器恢复战斗远平面", restoredTopDownFar === topDo
 const pauseAudio = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const audio = T.audio;
+  // 老流程里下面这句 TogglePanel(false) 顺手把 Debug Rendering 收了；它现在
+  // keepOnClose，得显式收掉 —— 后面的 `.edPanel.work` 选择器才指向互斥编辑器的面板
+  T.editor.CloseOverlay("debugRendering");
   // 先离开暂停、铺一层环境床与音乐 —— 这就是「背景里的枪声」那一层
   T.editor.TogglePanel(false);
   audio.Ambience("smokyDay");
@@ -2172,6 +2201,10 @@ const restored = await page.evaluate(() => {
   return {
     capturing: T.Debug.Editor().capturing,
     active: T.Debug.Editor().active,
+    // 「全部关掉」按字面办：keepOnClose 的 Debug Rendering 也要收，送屏回到最终画面
+    debugRendering: T.Debug.Editor().debugRendering,
+    debugView: T.Debug.Editor().debugView,
+    matMode: T.library.gi ? T.library.gi.debugView.value : 0,
     camera: [T.camera.position.x, T.camera.position.y, T.camera.position.z, T.camera.fov],
     weapon: T.viewmodel.weaponId,
     handWeapon: T.Debug.Slots().weapon,
@@ -2184,6 +2217,9 @@ const restored = await page.evaluate(() => {
   };
 });
 Check("关掉后不再接管", !restored.capturing && restored.active === null);
+Check("「全部关掉」连 keepOnClose 的 Debug Rendering 也收、送屏回到最终画面",
+  !restored.debugRendering && restored.debugView === "final" && restored.matMode === 0,
+  JSON.stringify({ debugRendering: restored.debugRendering, debugView: restored.debugView, matMode: restored.matMode }));
 Check("世界与 HUD 都放回来了", restored.worldVisible && !restored.hudHidden && restored.viewmodel);
 // 拿当前关的 currentWeapon 比，不拿一开始那次的 —— 中途换过关，
 // 那一关的携行本来就不一样；要验的是「视图模型举的是游戏认为你拿着的那一把」。

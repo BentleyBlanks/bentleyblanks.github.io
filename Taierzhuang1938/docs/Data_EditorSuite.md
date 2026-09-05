@@ -385,7 +385,12 @@ GPU 实例桶」：PCG 输出就是普通 ExternalProps placement，但默认 `s
 
 ### Debug Rendering `Script_EditorDebugRendering.mjs`（叠加层）
 
-不接管相机、不暂停玩法，负责把当前帧的渲染靶直接送到主画布。除 GBuffer、材质、
+不接管相机、不暂停玩法，负责把当前帧的渲染靶直接送到主画布。与 Profiler 一样
+`static keepOnClose = true`：**关设置面板回去打仗不收它** —— 运行时才复现的渲染 bug
+（第一人称手上的暗块、移动中的雾/AO 闪烁）只能开着调试视图边打边看；材质假彩色
+uniform 与送屏视图都原样保留，浮窗留在画面一侧照常刷「当前靶」。要停：面板里再点一次
+「Debug Rendering」、叉掉浮窗，或按「全部关掉」（它按字面办，keepOnClose 的叠加层
+也一起收，送屏回到最终画面）。`Script_EditorTest` 两条断言各守一头。除 GBuffer、材质、
 光照与 GI 外，「后处理」分组还把三段容易串线的结果拆开：`Bloom 提取` 是阈值/软膝后的
 半分辨率亮部，`Bloom 合成` 是正式 Composite 真正采样的多级叠加靶；`雾量` 从
 NormalDepth 和本帧 Composite uniforms 重算距离雾×高度衰减，`景深 CoC` 以同样方式
