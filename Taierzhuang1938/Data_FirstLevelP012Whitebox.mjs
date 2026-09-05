@@ -185,6 +185,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       // Luo takes the clear eastern opening to an existing squad defence slot.
       // He must not occupy the litter's rear handle at its final ditch point.
       stretcherGuideRoute: Object.freeze([{x:44,z:64},{x:39,z:72},{x:40.5,z:73}]),
+      stretcherCarryPose: Object.freeze({ bearerSpanM: 2.4, litterLiftM: .88, bodyLiftM: 1.1 }),
       stretcherCarryTo:{x:44,z:61},stretcherCarryMinM:20,
       ambushProneSegments: Object.freeze([
         { minX: 56.5, maxX: 58.7, minZ: 23.8, maxZ: 24.5, afterGroup: -1 },

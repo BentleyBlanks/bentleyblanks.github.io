@@ -406,6 +406,14 @@ for (const level of LEVELS) {
   const prepHiddenBySetup = props.get(prepLitter.propLitter)?.state === "removed";
   prep.Reset();
   formal.Start();
+  const carryPose = FIRST_LEVEL_P012_WHITEBOX_PHASE.whitebox.activities.stretcherCarryPose;
+  Check("P012 正式后送队读取统一担架姿态",
+    formal.bearerSpanM === carryPose.bearerSpanM
+      && formal.litterLiftM === carryPose.litterLiftM
+      && formal.bodyLiftM === carryPose.bodyLiftM
+      && formal.Bearers[1].slot.back - formal.Bearers[0].slot.back === carryPose.bearerSpanM,
+    JSON.stringify({ span: formal.bearerSpanM, litter: formal.litterLiftM, body: formal.bodyLiftM,
+      slots: formal.Bearers.map(member => member.slot) }));
   Check("P012 预置伤员与正式担架 ID 不同",
     prepLitter.propLitter === "p012PrepWoundedLitter0"
       && prepLitter.propBody === "p012PrepWoundedCasualty0"

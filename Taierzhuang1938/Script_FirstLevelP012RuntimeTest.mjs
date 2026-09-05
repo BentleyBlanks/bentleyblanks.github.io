@@ -841,7 +841,7 @@ assert.match(main,/story\.P012Restore\?\.\(sample\.p012Story\.immediate\)/,"P012
 console.log("PASS P012 runtime finite actors, guide speed, shell warning, delivery input routing");
 {
  const front={role:'bearer',handle:{alive:true,body:{radius:.34},position:{x:104,z:59.8}}};
- const rear={role:'bearer',slot:{back:1.9},handle:{alive:false}};
+ const rear={role:'bearer',slot:{back:P012Phase.whitebox.activities.stretcherCarryPose.bearerSpanM},handle:{alive:false}};
  const replacement={role:'guard',handle:{alive:true,body:{radius:.34},position:{...P012Phase.whitebox.activities.airCrowdCoverSlots[0]}}};
  const litter={front,rear,dropped:true},goals=new Map();
  const context={phase:{whitebox:P012Phase.whitebox},mem:{p012CarriedLitter:litter,p012LitterOverturned:true,p012FallenAt:{x:105.2,z:61.6},column:{Update(){},Alive:[front,replacement]}},
@@ -860,7 +860,8 @@ console.log("PASS P012 runtime finite actors, guide speed, shell warning, delive
 }
 {
  const path=P012Phase.whitebox.activities.stretcherCarryRoute,front={alive:true,body:{radius:.34},position:{x:path[0].x,z:path[0].z}},moves=[];
- let player={x:path[0].x,z:path[0].z+1.85},goal=null;
+ const pose=P012Phase.whitebox.activities.stretcherCarryPose;
+ let player={x:path[0].x,z:path[0].z+pose.bearerSpanM},goal=null;
  const litter={front:{handle:front},propLitter:'OriginalLitter',propBody:'OriginalPatient'};
  const context={phase:{whitebox:P012Phase.whitebox},mem:{p012CarriedLitter:litter},carry:{KindId:'stretcher',load:{serial:1}},PlayerPos:()=>player,
    d:{host:{PositionOf:actor=>actor.position,Story:()=>({Signalled:()=>false}),SetGoal:(actor,x,z)=>{assert.equal(actor,front);goal={x,z};},MoveProp:(id,at)=>moves.push({id,...at})}}};
@@ -880,7 +881,9 @@ console.log("PASS P012 runtime finite actors, guide speed, shell warning, delive
  assert.equal(context.carry.load.partner,front);
  const prop=moves.at(-2);assert.equal(prop.id,'OriginalLitter');
  assert.ok(Math.abs(prop.x-(front.position.x+player.x)/2)<1e-8&&Math.abs(prop.z-(front.position.z+player.z)/2)<1e-8,'existing litter is drawn between actual player and front holder');
- assert.ok(context.mem.p012CarryPartner.spanM>1.2&&context.mem.p012CarryPartner.spanM<2.8,'front holder keeps a real two-person carry span at the bay');
+ assert.ok(Math.abs(context.mem.p012CarryPartner.spanM-pose.bearerSpanM)<.08,'front holder keeps the authored P012 two-person carry span at the bay');
+ assert.equal(prop.y,pose.litterLiftM,'the carried original litter uses the verified P012 lift height');
+ assert.equal(moves.at(-1).y,pose.bodyLiftM,'the original patient stays at the matching lift height');
  context.carry.KindId=null;context.Spoken=()=>false;
  SETPIECES.CH1_NanLu.Update(context,1/30);
  for(const key of ['p012Guided','scriptArrivalRadius','carryRole','scriptMoveSpeedMps'])assert.equal(front[key],undefined,'release restores the surviving actor before ordinary column movement resumes');

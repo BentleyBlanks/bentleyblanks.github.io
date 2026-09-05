@@ -1843,8 +1843,11 @@ async function VerifyAirRouteHandoff(choice) {
       Check(hands.every(sample=>sample.guide?.distance>=2),
         "沟边搬运时班长已走到侧方，不再与玩家挤在同一停靠点",JSON.stringify(hands.map(sample=>({name:sample.name,guide:sample.guide}))));
       const fullDown=hands.find(sample=>sample.name==="LookFullyDown");
-      Check(["r","l"].every(side=>fullDown.projectedGrips[side].every(value=>Number.isFinite(value)&&Math.abs(value)<1)),
+      Check(["right","left"].every(side=>fullDown.projectedGrips[side].every(value=>Number.isFinite(value)&&Math.abs(value)<1)),
         "实际最大低头角度下两个原担架握点均在相机画幅内",JSON.stringify(fullDown.projectedGrips));
+      const lookDown=hands.find(sample=>sample.name==="LookDown");
+      Check(["right","left"].every(side=>lookDown.projectedGrips[side].slice(0,2).every(value=>Number.isFinite(value)&&Math.abs(value)<.9)),
+        "正常低头下两侧握点投影都留有画面边距",JSON.stringify(lookDown.projectedGrips));
     }
     if(process.argv.includes("--air-dive")){
       const dive=await page.evaluate(()=>{

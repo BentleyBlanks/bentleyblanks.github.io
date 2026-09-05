@@ -89,7 +89,8 @@ export function StepP012PlayerLitter(s) {
   if(!litter||s.carry?.KindId!=="stretcher")return false;
   const front=litter.front?.handle,at=front&&s.d.host.PositionOf?.(front),rear=s.PlayerPos();
   if(!front?.alive||!at||!rear)return false;
-  const span=CARRY_KINDS.stretcher.spanM,activity=s.phase.whitebox.activities;
+  const activity=s.phase.whitebox.activities,pose=activity.stretcherCarryPose||{};
+  const span=pose.bearerSpanM||CARRY_KINDS.stretcher.spanM;
   if(s.mem.p012CarrySerial!==load?.serial||!s.mem.p012PlayerCarryPath){
     const final=s.d.host.Story?.()?.Signalled("P012Regripped");
     const path=[{...rear},...(final?[s.phase.whitebox.anchors.shelter]:activity.stretcherCarryRoute)];
@@ -110,8 +111,8 @@ export function StepP012PlayerLitter(s) {
   const mid={x:(at.x+rear.x)/2,z:(at.z+rear.z)/2},gy=Math.min(at.y||0,rear.y||0);
   const yaw=Math.atan2(at.x-rear.x,at.z-rear.z);
   litter.lastMid={...mid,gy,yaw};
-  s.d.host.MoveProp?.(litter.propLitter,{...mid,y:gy+.62,rotationY:yaw,rotationZ:0});
-  s.d.host.MoveProp?.(litter.propBody,{...mid,y:gy+.84,rotationY:yaw,rotationZ:0});
+  s.d.host.MoveProp?.(litter.propLitter,{...mid,y:gy+(pose.litterLiftM??.62),rotationY:yaw,rotationZ:0});
+  s.d.host.MoveProp?.(litter.propBody,{...mid,y:gy+(pose.bodyLiftM??.84),rotationY:yaw,rotationZ:0});
   s.mem.p012CarryPartner={actor:front,previous,spanM:Math.hypot(at.x-rear.x,at.z-rear.z),blocked:!!next.blocked};
   return true;
 }
@@ -254,8 +255,9 @@ export function StepP012RoadCover(s, HasSignal) {
   }
   const end = route.at(-1), previous = route.at(-2) || state.from;
   const length = Math.hypot(end.x - previous.x, end.z - previous.z) || 1;
-  const rearGoal = { x: end.x - (end.x - previous.x) / length * 1.9,
-    z: end.z - (end.z - previous.z) / length * 1.9 };
+  const span=s.phase.whitebox.activities?.stretcherCarryPose?.bearerSpanM||1.9;
+  const rearGoal = { x: end.x - (end.x - previous.x) / length * span,
+    z: end.z - (end.z - previous.z) / length * span };
   const first = column.litters?.[0];
   const frontAt = first?.front && s.d.host.PositionOf?.(first.front.handle);
   const rearAt = first?.rear && s.d.host.PositionOf?.(first.rear.handle);
@@ -278,6 +280,7 @@ export class EscortColumn {
    *   waypoints  [{x,z}, ...]      队列走线（一般就是本章路标的一串）
    *   members    [{role,label,weapon}]  角色：bearer / guard / walking / civilian
    *   propPrefix 担架/伤员道具 ID 前缀（默认 escort，保留正式后送队契约）
+   *   bearerSpanM / litterLiftM / bodyLiftM  可选的本关担架姿态；旧关卡保留默认值
    *   tuning     覆盖 SETPIECE_TUNING 的部分字段
    */
   constructor(host = {}, spec = {}) {
@@ -286,6 +289,9 @@ export class EscortColumn {
     this.waypoints = (spec.waypoints || []).map((p) => ({ x: Num(p.x), z: Num(p.z) }));
     this.roster = spec.members || [];
     this.propPrefix = String(spec.propPrefix || "escort");
+    this.bearerSpanM = Number.isFinite(spec.bearerSpanM) ? spec.bearerSpanM : 1.9;
+    this.litterLiftM = Number.isFinite(spec.litterLiftM) ? spec.litterLiftM : .62;
+    this.bodyLiftM = Number.isFinite(spec.bodyLiftM) ? spec.bodyLiftM : .84;
     this.followRouteBodies = !!spec.followRouteBodies;
     this.members = [];
     /** 抬着走的担架实体（两名担架员一副，见 Start / _UpdateLitters）。 */
@@ -380,10 +386,10 @@ export class EscortColumn {
     const right = { x: -dir.z, z: dir.x };
     let bearerOrdinal = 0;
     this.roster.forEach((entry, index) => {
-      // 担架员成**对**走纵列：同一副担架前后两人隔一副担架的长度（CARRY_KINDS
-      // 里 stretcher 的 spanM ≈ 1.85），一对一对沿走线排开；其余角色照旧分两列。
+      // 担架员成对走纵列，前后身体按本关搬运姿态留出握把空间；
+      // 一对一对沿走线排开，其余角色照旧分两列。
       const slot = entry.role === "bearer"
-        ? { back: Math.floor(bearerOrdinal / 2) * 4.2 + (bearerOrdinal % 2) * 1.9, lateral: 0 }
+        ? { back: Math.floor(bearerOrdinal / 2) * 4.2 + (bearerOrdinal % 2) * this.bearerSpanM, lateral: 0 }
         : this._Slot(index, entry);
       if (entry.role === "bearer") bearerOrdinal += 1;
       const x = head.x - dir.x * slot.back + right.x * slot.lateral;
@@ -581,8 +587,8 @@ export class EscortColumn {
       const gy = Math.min(fp.y || 0, rp.y || 0);
       const yaw = Math.atan2(fp.x - rp.x, fp.z - rp.z);
       litter.lastMid = { ...mid, gy, yaw };
-      this.host.MoveProp?.(litter.propLitter, { x: mid.x, y: gy + 0.62, z: mid.z, rotationY: yaw });
-      this.host.MoveProp?.(litter.propBody, { x: mid.x, y: gy + 0.84, z: mid.z, rotationY: yaw });
+      this.host.MoveProp?.(litter.propLitter, { x: mid.x, y: gy + this.litterLiftM, z: mid.z, rotationY: yaw });
+      this.host.MoveProp?.(litter.propBody, { x: mid.x, y: gy + this.bodyLiftM, z: mid.z, rotationY: yaw });
     }
   }
 
@@ -1512,6 +1518,7 @@ export const SETPIECES = {
       // 可行走伤兵 + 撤离百姓。**妇孺老人必须在队里看得见** —— 阶段六
       // 「担架、女人、娃儿都照打」是靠玩家自己看见成立的，不是靠台词。
       const configuredWaypoints = s.phase?.whitebox?.escortWaypoints;
+      const carryPose = s.phase?.whitebox?.p012 ? s.phase.whitebox.activities?.stretcherCarryPose : null;
       const escortWaypoints = Array.isArray(configuredWaypoints)
         ? configuredWaypoints.map((point) => (
           point.zone ? s.Zone(point.zone) : point
@@ -1523,6 +1530,7 @@ export const SETPIECES = {
       s.mem.column = s.Column({
         waypoints: escortWaypoints,
         followRouteBodies: !!s.phase?.whitebox?.p012,
+        ...(carryPose || {}),
         members: [
           { role: "bearer", label: "担架员", weapon: null },
           { role: "bearer", label: "担架员", weapon: null },
@@ -1688,7 +1696,8 @@ export const SETPIECES = {
         ss.mem.column.scriptTerminalQueue = true;
         ss.mem.column.scriptHoldTailSlots = true;
         ss.mem.column.litters.forEach((litter,index)=>[litter.front,litter.rear].forEach((member,end)=>{
-          member.slot.back=index*4.2+end*1.9;member.slot.lateral=0;member.handle.scriptArrivalRadius=.3;
+          const span=ss.phase.whitebox.activities?.stretcherCarryPose?.bearerSpanM||1.9;
+          member.slot.back=index*4.2+end*span;member.slot.lateral=0;member.handle.scriptArrivalRadius=.3;
         }));
       });
       if (p012 && s.mem.p012ReleaseAt && !s.mem.p012ReleaseAt.placed && s.mem.p012CarriedLitter) {
@@ -1736,7 +1745,8 @@ export const SETPIECES = {
             }
           }
           let arrived = true;
-          for (const [role, offset] of [["front", -0.9], ["rear", 0.9]]) {
+          const halfSpan=(s.phase.whitebox.activities?.stretcherCarryPose?.bearerSpanM||1.8)/2;
+          for (const [role, offset] of [["front", -halfSpan], ["rear", halfSpan]]) {
             const actor = litter[role]?.handle, target = { x: point.x, z: point.z + offset };
             if (!actor?.alive) { arrived = false; continue; }
             const at = s.d.host.PositionOf?.(actor);
@@ -1750,8 +1760,9 @@ export const SETPIECES = {
             litter.dropped = false; s.mem.p012LitterRecovered = true;
             s.mem.p012RecoveryReason = "livingReplacementReachedFallenLitter";
             litter.front.handle.carryRole = "front"; litter.rear.handle.carryRole = "rear";
-            s.d.host.MoveProp?.(litter.propLitter, { ...point, y: 0.62, rotationZ: 0 });
-            s.d.host.MoveProp?.(litter.propBody, { ...point, y: 0.84, rotationZ: 0 });
+            const pose=s.phase.whitebox.activities?.stretcherCarryPose||{};
+            s.d.host.MoveProp?.(litter.propLitter, { ...point, y: pose.litterLiftM??0.62, rotationZ: 0 });
+            s.d.host.MoveProp?.(litter.propBody, { ...point, y: pose.bodyLiftM??0.84, rotationZ: 0 });
             s.Signal("P012LitterRecovered");
           }
         }
@@ -1760,7 +1771,8 @@ export const SETPIECES = {
       // Keep this same recovered patient at the actual ditch, not the stale column head.
       if (p012 && s.mem.p012LitterRecovered && !HasSignal("P012DitchClear")) {
         const point = s.mem.p012FallenAt, litter = s.mem.p012CarriedLitter;
-        if (point && litter) for (const [role, offset] of [["front", -0.9], ["rear", 0.9]]) {
+        const halfSpan=(s.phase.whitebox.activities?.stretcherCarryPose?.bearerSpanM||1.8)/2;
+        if (point && litter) for (const [role, offset] of [["front", -halfSpan], ["rear", halfSpan]]) {
           const actor = litter[role]?.handle;
           if (actor?.alive) s.d.host.SetGoal?.(actor, point.x, point.z + offset);
         }
