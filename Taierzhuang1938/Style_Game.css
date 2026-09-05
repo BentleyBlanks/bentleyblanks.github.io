@@ -654,7 +654,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    进度条挪到底部并加粗，是因为它是这张画面上唯一"还要等多久"的信息，
    原来那条 300×2 px 的细线摆在正中间既不好读，又把视线从道具上抢走。 */
 #boot {
-  position: fixed; inset: 0; background: #08080a; color: var(--paper);
+  position: fixed; inset: 0; background: var(--ui-black); font-family: var(--ui-font); color: var(--paper);
   z-index: 10; overflow: hidden;
 }
 #boot.gone { display: none; }
@@ -672,17 +672,17 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
     rgba(8,8,10,0) 55%, rgba(8,8,10,0.55) 78%, rgba(8,8,10,0.95) 100%);
 }
 #bootHead {
-  position: absolute; left: 0; right: 0; top: 8vh; text-align: center; pointer-events: none;
+  position: absolute; left: 8%; right: 8%; top: 4vh; text-align: left; pointer-events: none;
 }
-#bootTitle { font-size: 30px; letter-spacing: 0.34em; }
-#bootSub { font-size: 12.5px; color: var(--dim); letter-spacing: 0.16em; margin-top: 10px; }
+#bootTitle { font-size: clamp(28px, 2.65vw, 42px); font-weight: 700; color: var(--ui-bright); letter-spacing: 0.07em; }
+#bootSub { font-size: 12.5px; color: var(--dim); letter-spacing: 0.07em; margin-top: 10px; }
 
 /* 道具说明卡：贴左下，按 HUD 那套字距走，不做成商店里的装备卡。 */
 #bootCard {
   position: absolute; left: 34px; bottom: 132px; max-width: min(38vw, 400px);
   pointer-events: none; border-left: 2px solid var(--warn); padding: 2px 0 2px 12px;
 }
-#bootPropName { font-size: 17px; letter-spacing: 0.12em; }
+#bootPropName { font-size: 17px; font-weight: 700; color: var(--ui-gold); letter-spacing: 0.04em; }
 #bootPropNote {
   font-size: 12px; line-height: 1.7; color: var(--dim); margin-top: 6px;
 }
@@ -700,15 +700,15 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 #bootBar i {
   display: block; height: 100%; width: 0; background: var(--warn);
-  box-shadow: 0 0 10px rgba(224,176,98,0.35); transition: width 0.2s ease;
+  transition: width 0.2s ease;
 }
 #bootStart {
   pointer-events: auto; cursor: pointer;
-  border: 1px solid rgba(230,223,205,0.3); background: rgba(10,10,9,0.5); color: var(--paper);
-  font: inherit; font-size: 15px; letter-spacing: 0.2em; padding: 9px 34px;
+  border: 1px solid rgba(230,223,205,0.3); background: var(--ui-selection); color: var(--paper);
+  font: inherit; font-size: 17px; font-weight: 700; letter-spacing: 0.08em; padding: 9px 34px;
 }
 #bootStart[disabled] { opacity: 0.3; cursor: default; }
-#bootStart:not([disabled]):hover { background: rgba(230,223,205,0.08); }
+#bootStart:not([disabled]):hover { background: var(--ui-selection); color: var(--ui-gold); border-color: var(--ui-gold); }
 #bootPreview {
   color: var(--dim); font-size: 11px; letter-spacing: 0.12em;
   text-decoration: none; border-bottom: 1px solid rgba(230,223,205,0.24);

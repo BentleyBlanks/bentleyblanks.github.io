@@ -508,7 +508,7 @@ Check("画质面板：设置落盘",
 // 而玩家点了没反应 —— 这一栏加进来的起因正是「设置里根本没有 TAA」。
 const taaToggle = await page.evaluate(() => {
   const T = window.Taierzhuang;
-  // Toggle 建的是 div.edBtn 不是 <button>（Script_EditorUi.Toggle），
+  // Toggle 使用带状态的原生 button.edBtn（Script_EditorUi.Toggle），
   // 按标签选而不是按位置选：面板加一栏就不该让这条测试挪窝。
   const Btn = () => Array.from(document.querySelectorAll(".edPanel.work .edBtn"))
     .find((b) => (b.textContent || "").includes("TAA"));

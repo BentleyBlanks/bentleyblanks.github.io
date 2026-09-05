@@ -212,12 +212,12 @@
         "./Data_History.mjs": "./Data_History.mjs?v=1",
         "./Data_Script.mjs": "./Data_Script.mjs?v=1",
         "./Data_Menu.mjs": "./Data_Menu.mjs?v=7",
-        "./Script_Menu.mjs": "./Script_Menu.mjs?v=21",
+        "./Script_Menu.mjs": "./Script_Menu.mjs?v=22",
         "./Script_DebugOptions.mjs": "./Script_DebugOptions.mjs?v=1",
         "./Script_BootProp.mjs": "./Script_BootProp.mjs?v=8",
         "./Script_BootPropStage.mjs": "./Script_BootPropStage.mjs?v=8",
 
-        "./Script_EditorUi.mjs": "./Script_EditorUi.mjs?v=2",
+        "./Script_EditorUi.mjs": "./Script_EditorUi.mjs?v=3",
         "./Script_EditorStage.mjs": "./Script_EditorStage.mjs?v=4",
         "./Script_EditorActor.mjs": "./Script_EditorActor.mjs?v=13",
         "./Script_EditorWeapon.mjs": "./Script_EditorWeapon.mjs?v=9",
@@ -239,8 +239,8 @@
         "./Script_EditorDestruction.mjs": "./Script_EditorDestruction.mjs?v=3",
         "./Script_EditorSettings.mjs": "./Script_EditorSettings.mjs?v=8",
         "./Script_EditorDebugRendering.mjs": "./Script_EditorDebugRendering.mjs?v=10",
-        "./Script_EditorProfiler.mjs": "./Script_EditorProfiler.mjs?v=3",
-        "./Script_Editor.mjs": "./Script_Editor.mjs?v=24"
+        "./Script_EditorProfiler.mjs": "./Script_EditorProfiler.mjs?v=4",
+        "./Script_Editor.mjs": "./Script_Editor.mjs?v=25"
       }
     }
   </script>
@@ -286,11 +286,12 @@
       document.head.appendChild(fontStylesheet);
     }
   </script>
-  <link rel="stylesheet" href="./Style_Game.css?v=202609052115">
-  <!-- 主菜单与选章。颜色与字距沿用 Style_Game.css 的 :root，所以必须排在它后面。 -->
-  <link rel="stylesheet" href="./Style_Menu.css?v=8">
+  <link rel="stylesheet" data-interface-theme href="./Style_Interface.css?v=1">
+  <link rel="stylesheet" href="./Style_Game.css?v=202609052120">
+  <!-- 菜单、加载与工具窗共用 Style_Interface.css；各表只定义对应布局。 -->
+  <link rel="stylesheet" href="./Style_Menu.css?v=9">
   <!-- 编辑器套件的样式。出图模式下整棵 DOM 是 display:none，进不了任何一张截图。 -->
-  <link rel="stylesheet" href="./Style_Editor.css?v=9">
+  <link rel="stylesheet" href="./Style_Editor.css?v=10">
 </head>
 <body>
   <canvas id="view"></canvas>

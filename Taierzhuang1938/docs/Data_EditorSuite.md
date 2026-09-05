@@ -1,5 +1,16 @@
 # 编辑器套件
 
+## 窗口样式
+
+设置与编辑器使用 `Style_Interface.css` 的 World at War 主题，`Style_Editor.css` 定义工具布局。
+黑色标题栏、冷灰底色、旧金选中条与菜单一致；读数保留等宽字体，阵营和错误状态保留语义色。
+通用按钮、开关、选项及关闭按钮使用原生 button，支持 Tab / Enter / Space；开关和选项同步
+`aria-pressed`。窄屏将目录放在上方、当前工作窗放在下方，各自滚动。
+Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接。
+
+外观与操作验收见 [主菜单文档](Data_MainMenu.md) 的 `--interface-only`；相机、设置持久化与
+编辑工具功能继续由 `Script_EditorTest.mjs` 验证。
+
 开发用的十五个互斥编辑器、两个可叠加渲染工具 + 一个入口面板。**不对玩家开放**：出图模式（`?shot=1`）下整棵
 DOM 是 `display:none`，任何截图里都不会有它。
 

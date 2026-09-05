@@ -12,7 +12,7 @@
 // 菜单不该跟着改一行。
 //
 // 对标 Easy Red 2 的三条（见 Data_Menu.mjs 头注）：活场景、运镜、定时切机位。
-// 主菜单保留原有字体与色彩；选章独立使用 World at War 的无衬线文字列表与金色高亮。
+// 主菜单、暂停、选章与工具统一使用 World at War 的无衬线文字、冷灰与旧金选择条。
 
 import * as THREE from "three";
 import { FovFromFocalMm } from "./Script_Cutscene.mjs";
@@ -205,10 +205,13 @@ export class MainMenu {
     this.el.panel = mk("mnPanel");
     const head = mk("mnPanelHead", this.el.panel);
     this.el.panelTitle = mk("mnPanelTitle", head);
-    this.el.panelBack = mk("mnBack", head, "button");
+    const foot = mk("mnPanelFoot mnCampaignFoot", this.el.panel);
+    this.el.panelBack = mk("mnBack", foot, "button");
     this.el.panelBack.textContent = "返回";
+    mk("mnCampaignKeys", foot).textContent = "Esc 返回";
     this.el.panelBack.addEventListener("click", () => this.Show(this.panelReturnMode));
     this.el.panelBody = mk("mnPanelBody", this.el.panel);
+    this.el.panel.appendChild(foot);
 
     this.BuildLevels();
     this.el.text = document.createElement("div");
@@ -274,6 +277,7 @@ export class MainMenu {
       b.appendChild(bar);
       b.appendChild(label);
       b.addEventListener("mouseenter", () => this.Highlight(i));
+      b.addEventListener("focus", () => this.Highlight(i));
       b.addEventListener("click", () => { this.Highlight(i); this.Activate(item.id); });
       this.el.list.appendChild(b);
       return b;
@@ -435,6 +439,10 @@ export class MainMenu {
   Show(mode) {
     const wasMode = this.mode;
     this.mode = mode;
+    if (mode === "title" || mode === "pause") {
+      this.el.titleMain.textContent = mode === "pause" ? "游戏暂停" : MENU.title;
+      this.el.titleSub.textContent = mode === "pause" ? MENU.title : MENU.subtitle;
+    }
     const panel = mode === "levels" || mode === "codex" || mode === "credits" || mode === "debug";
     if (panel) this.panelReturnMode = wasMode === "pause" ? "pause" : "title";
     this.root.classList.toggle("panelOn", panel);
@@ -653,7 +661,8 @@ export class MainMenu {
   // -------------------------------------------------------------------------
   BindInput() {
     this.onKey = (event) => {
-      if (!this.open) return;
+      // 设置窗口接管键盘时，不让 Enter / 方向键穿透到背后的菜单。
+      if (!this.open || document.querySelector("body.edToolsOpen #edRoot:not(.off)")) return;
       const panel = this.root.classList.contains("panelOn");
       switch (event.key) {
         case "Escape":
@@ -667,14 +676,18 @@ export class MainMenu {
             this.levelEls[this.selected]?.focus({ preventScroll: true });
             this.levelEls[this.selected]?.scrollIntoView({ block: "nearest" });
           }
-          else if (!panel) this.Highlight(this.itemIndex + delta);
+          else if (!panel) {
+            this.Highlight(this.itemIndex + delta);
+            this.itemEls[this.itemIndex]?.focus({ preventScroll: true });
+            this.itemEls[this.itemIndex]?.scrollIntoView({ block: "nearest" });
+          }
           event.preventDefault();
           return;
         }
         case "Enter": case " ":
           // Native controls (especially Back) keep their own Enter/Space action.
-          if (panel && event.target.closest?.("button, input, select, textarea, a, summary")
-            && !event.target.closest(".mnLevel")) return;
+          if (event.target.closest?.("button, input, select, textarea, a, summary")
+            && !event.target.closest(".mnItem, .mnLevel")) return;
           if (panel && this.mode === "levels") this.Play(this.selected);
           else if (!panel) this.Activate(this.items[this.itemIndex]?.id);
           event.preventDefault();
@@ -684,6 +697,19 @@ export class MainMenu {
     };
     // 第一次点击解锁音频：没有用户手势时 AudioContext 是 suspended 的
     this.onClick = () => { if (this.open) this.host.Unlock?.(); };
+    this.onNativeKey = event => {
+      if ((event.key === " " || event.key === "Enter") && event.target.closest?.("button, input, select, textarea")
+        && !event.target.closest(".mnItem, .mnLevel")) event.stopPropagation();
+    };
+    this.onResize = () => {
+      if (this.open && this.root.contains(document.activeElement)) document.activeElement.scrollIntoView({ block: "nearest" });
+    };
+    this.root.addEventListener("keydown", this.onNativeKey);
+    this.onTab = event => {
+      if (event.key === "Tab" && this.open && !document.querySelector("body.edToolsOpen #edRoot:not(.off)")) event.stopPropagation();
+    };
+    document.addEventListener("keydown", this.onTab, true);
+    window.addEventListener("resize", this.onResize);
     document.addEventListener("keydown", this.onKey);
     this.root.addEventListener("pointerdown", this.onClick);
   }
@@ -802,6 +828,9 @@ export class MainMenu {
 
   Dispose() {
     document.removeEventListener("keydown", this.onKey);
+    this.root.removeEventListener("keydown", this.onNativeKey);
+    window.removeEventListener("resize", this.onResize);
+    document.removeEventListener("keydown", this.onTab, true);
     this.root.removeEventListener("pointerdown", this.onClick);
     this.root.textContent = "";
   }

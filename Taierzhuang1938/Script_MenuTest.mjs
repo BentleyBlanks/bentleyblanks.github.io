@@ -406,6 +406,106 @@ async function Boot(query = "") {
   Check("退出白盒完成恢复原菜单样式",await page.locator("#menu").evaluate(el=>getComputedStyle(el).backgroundColor==="rgba(0, 0, 0, 0)"&&!el.classList.contains("p012Complete")));
 }
 if(process.argv.includes("--completion-only")){await browser.close();server.close();process.exit(failed?1:0);}
+
+// 共用真实场景检查菜单与工具的视觉契约，避免每张截图重建一关。
+async function CheckInterface() {
+  const Shot = name => page.screenshot({path:path.join(outDir, "Scene_Interface"+name+".png")});
+  await page.mouse.move(2,2);
+  await Shot("Main");
+  const ReadStyle = selector => page.locator(selector).first().evaluate(el=>{
+    const css=getComputedStyle(el);return {font:css.fontFamily,color:css.color,background:css.backgroundImage};
+  });
+  const main=await ReadStyle('.mnItem.on');
+  await page.locator(".mnItem").first().focus();await page.keyboard.press("Tab");
+  Check("主菜单 Tab 焦点可前进",await page.locator(".mnItem").nth(1).evaluate(el=>el===document.activeElement));
+  await page.evaluate(()=>{const menu=window.Taierzhuang.menu;window.interfaceActivate=menu.Activate;window.interfaceActions=[];menu.Activate=id=>window.interfaceActions.push(id);});
+  try {
+    await page.locator('.mnItem').nth(2).hover();await page.keyboard.press('Enter');
+    Check('主菜单 Enter 激活鼠标当前高亮项',await page.evaluate(()=>window.interfaceActions.join(',')==='codex'));
+  } finally {await page.evaluate(()=>{window.Taierzhuang.menu.Activate=window.interfaceActivate;delete window.interfaceActivate;});}
+  await page.evaluate(()=>window.Taierzhuang.menu.Show('levels'));
+  const level=await ReadStyle('.mnLevel.on');
+  Check('主菜单与选章共用字体、旧金选中条',JSON.stringify(main)===JSON.stringify(level),JSON.stringify({main,level}));
+  await Shot("Levels");
+  await page.evaluate(()=>window.Taierzhuang.menu.Show('title'));
+  await page.evaluate(()=>window.Taierzhuang.menu.OpenPause());
+  Check('暂停标题明确标识当前状态',await page.locator('.mnTitleMain').textContent()==='游戏暂停');
+  await Shot("Pause");
+  await page.evaluate(()=>{window.Taierzhuang.menu.ToTitle();window.Taierzhuang.StepFrames(90);});
+  await page.evaluate(()=>window.Taierzhuang.Debug.MenuAct('settings'));
+  await page.locator('[data-editor="sound"]').click();
+  const editor=await ReadStyle('[data-editor="sound"]');
+  Check('设置入口沿用同一条金色选择反馈',JSON.stringify(main)===JSON.stringify(editor),JSON.stringify(editor));
+  const toggle=page.locator('.edPanel.work button[aria-pressed]').filter({hasText:'暂停时静音背景'});
+  const original=await toggle.getAttribute('aria-pressed');
+  await toggle.focus();await page.keyboard.press('Enter');
+  Check('设置可用键盘切换，状态可读',await toggle.getAttribute('aria-pressed')!==original);
+  await page.keyboard.press('Space');
+  Check('第二次切换还原原始设置',await toggle.getAttribute('aria-pressed')===original);
+  await page.keyboard.press("Tab");
+  Check("工具 Tab 焦点可前进",await toggle.evaluate(el=>el!==document.activeElement));
+  await page.keyboard.press("Shift+Tab");
+  Check("工具 Shift+Tab 焦点可返回",await toggle.evaluate(el=>el===document.activeElement));
+  await Shot("Sound");
+  await page.locator('[data-editor="graphics"]').click();
+  await Shot("Graphics");
+  await page.locator('[data-editor="controls"]').click();
+  await Shot("Controls");
+  await page.locator('.edPanel.work .edX').focus();await page.keyboard.press('Space');
+  Check('关闭设置工作窗后主菜单文字与键盘恢复',await page.locator('.mnList').evaluate(el=>getComputedStyle(el).visibility==='visible'));
+  await page.locator('.mnItem').nth(1).focus();await page.keyboard.press('Enter');
+  Check('Tab 焦点对应实际激活项',await page.evaluate(()=>window.Taierzhuang.menu.mode==='levels'));
+  await page.locator('.mnCampaignBack').focus();await page.keyboard.press('Space');
+  Check('选章返回也支持 Space',await page.evaluate(()=>window.Taierzhuang.menu.mode==='title'));
+  await page.evaluate(()=>{window.Taierzhuang.Debug.MenuAct('settings');window.Taierzhuang.editor.Open('controls');});
+  await page.locator('[data-editor="weapon"]').click();
+  await page.evaluate(()=>window.Taierzhuang.StepFrames(10));
+  await Shot("Weapon");
+  Check('编辑器工作窗关闭按钮可聚焦',await page.locator('.edPanel.work .edX').evaluate(el=>el.tagName==='BUTTON'&&!!el.getAttribute('aria-label')));
+  const popupPromise=page.waitForEvent('popup');
+  await page.locator('[data-editor="profiler"]').click();
+  const popup=await popupPromise;
+  await popup.waitForFunction(()=>getComputedStyle(document.body).fontFamily.includes('Arial'));
+  Check('独立性能窗口加载相同主题',await popup.locator('body').evaluate(el=>getComputedStyle(el).getPropertyValue('--ui-gold').trim()==='#dfbd68'));
+  await popup.screenshot({path:path.join(outDir,'Scene_InterfaceProfiler.png')});
+  await page.evaluate(()=>window.Taierzhuang.editor.CloseOverlay('profiler'));
+  for(const [name,width,height] of [['Laptop',1280,720],['Mobile',390,844],['Landscape',844,390]]) {
+    await page.setViewportSize({width,height});
+    const fits=await page.locator('.edPanel.work').evaluate(el=>{
+      const r=el.getBoundingClientRect();const body=el.querySelector('.edBody');
+      return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:innerWidth,height:innerHeight,bodyOverflow:body.scrollWidth>body.clientWidth+1};
+    });
+    Check(name+'工具窗边界与内容可达',fits.left>=0&&fits.right<=width&&fits.top>=0&&fits.bottom<=height&&!fits.bodyOverflow,JSON.stringify(fits));
+    await Shot('Weapon'+name);
+  }
+  await page.evaluate(()=>window.Taierzhuang.Debug.CloseEditor());
+  await page.setViewportSize({width:1600,height:900});
+  await page.evaluate(()=>window.Taierzhuang.menu.ToTitle());
+  for(const mode of ['codex','credits','debug']) {
+    await page.evaluate(mode=>window.Taierzhuang.menu.Show(mode),mode);
+    await Shot(mode);
+    await page.locator('.mnBack').focus();await page.keyboard.press('Enter');
+    Check(mode+'页脚返回可用',await page.evaluate(()=>window.Taierzhuang.menu.mode==='title'));
+  }
+  for(const [name,width,height] of [['Mobile',390,844],['Landscape',844,390]]) {
+    await page.setViewportSize({width,height});
+    await page.locator('.mnItem').last().focus();
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    Check(name+'主菜单末项可滚动到',await page.locator('.mnItem').last().evaluate(el=>{
+      const r=el.getBoundingClientRect(),list=el.parentElement.getBoundingClientRect();return r.top>=list.top&&r.bottom<=list.bottom+1;
+    }));
+    await Shot('Main'+name);
+  }
+  await page.setViewportSize({width:1600,height:900});
+  await page.mouse.move(2,2);
+  await page.evaluate(()=>{const menu=window.Taierzhuang.menu;menu.ToTitle();menu.el.list.scrollTop=0;});
+}
+if(process.argv.includes('--interface-only')) {
+  try {await Boot();await CheckInterface();Check('界面切换无浏览器错误',problems.length===0,problems.join(';'));}
+  finally {await browser.close();server.close();}
+  process.exit(failed?1:0);
+}
+
 if (process.argv.includes("--levels-only")) {
   try {
     await Boot();
@@ -415,6 +515,7 @@ if (process.argv.includes("--levels-only")) {
   process.exit(failed?1:0);
 }
 await Boot();
+await CheckInterface();
 {
   const m = await page.evaluate(() => {
     const T = window.Taierzhuang;
@@ -630,8 +731,10 @@ async function CheckMissionList() {
     await page.locator('.mnMissionTrack .mnLevel').nth(3).click();
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
+    await page.locator('.mnMissionTrack .mnLevel').nth(5).hover();
+    await page.keyboard.press('Enter');
     await page.locator('.mnSandboxLevel').nth(1).click();
-    Check("鼠标、Enter、测试入口各只触发一次正确任务",await page.evaluate(()=>window.missionPlayed.join(',')==='3,4,8'));
+    Check("鼠标、Enter、测试入口各只触发一次正确任务",await page.evaluate(()=>window.missionPlayed.join(',')==='3,4,5,8'));
     for (const [name,width,height] of [["Laptop",1280,720],["Mobile",390,844],["Landscape",844,390]]) {
       await page.setViewportSize({width,height});
       await page.mouse.move(1,1);

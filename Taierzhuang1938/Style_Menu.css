@@ -1,154 +1,86 @@
-/* 《滕县 一九三八》主菜单样式。
-   与 Style_Game.css 分开的理由：HUD 是「战斗中的克制」，菜单是「战斗之前的一页纸」——
-   两套东西唯一必须共用的是颜色与字距（:root 在 Style_Game.css 里定义，这里只引用）。
-
-   版式抄 Easy Red 2 的骨架：活场景打底、左侧一列字、右下角一行说明、
-   上下各压一道渐变让字浮得起来。**不抄**它的横排大按钮与蓝色高亮色。 */
-
-#menu {
-  position: fixed; inset: 0; z-index: 30;
-  pointer-events: none;                        /* 只有能点的东西自己开 auto */
-  color: var(--paper, #e6dfcd);
-  font-family: "Noto Serif SC", "Songti SC", serif;
-  -webkit-font-smoothing: antialiased;
-}
+/* 主菜单、暂停、任务选择与资料页共用 Style_Interface.css 的 WaW 视觉语言。 */
+#menu { position: fixed; inset: 0; z-index: 30; pointer-events: none; font-family: var(--ui-font); }
 #menu.off { display: none; }
-
-/* 上下两道渐变：ER2 那一屏的字之所以在亮天空上还读得清，靠的就是这个 */
 .mnVignette {
   position: absolute; inset: 0;
-  background:
-    linear-gradient(to right, rgba(6,6,8,0.78) 0%, rgba(6,6,8,0.34) 34%, rgba(6,6,8,0) 62%),
-    linear-gradient(to bottom, rgba(6,6,8,0.55) 0%, rgba(6,6,8,0) 26%, rgba(6,6,8,0) 62%, rgba(6,6,8,0.72) 100%);
+  backdrop-filter: saturate(0.42);
+  background: linear-gradient(90deg, #050707ed, #090d1099 38%, #06090b26 76%),
+    linear-gradient(0deg, #000a, transparent 40%, #0004);
 }
-/* 切机位的黑场。opacity 由 Script_Menu 每帧写 */
-.mnFade {
-  position: absolute; inset: 0; background: #05050a; opacity: 0;
+.mnVignette::before, .mnVignette::after {
+  content: ""; position: absolute; left: 0; right: 0; background: var(--ui-black);
 }
-/* 暂停态：整屏压暗一档，且不放黑场 */
-#menu.pause .mnVignette { background: rgba(6, 6, 8, 0.62); }
-#menu.pause .mnTitle .mnTitleLines { display: none; }
-/* 机位说明是运镜的字幕。暂停里相机是玩家自己的，留着就是一行对不上的字 */
-#menu.pause .mnShotNote { display: none; }
-
-/* --- 标题 ---------------------------------------------------------------- */
-.mnTitle {
-  position: absolute; left: 7%; top: 15%;
-  max-width: 44%;
+.mnVignette::before { top: 0; height: 14vh; }
+.mnVignette::after { bottom: 0; height: 8vh; }
+.mnFade { position: absolute; inset: 0; background: var(--ui-black); opacity: 0; }
+#menu.pause .mnVignette {
+  backdrop-filter: saturate(0.3);
+  background: linear-gradient(90deg, #050707ed, #090d10ad 45%, #06090b73);
 }
+#menu.pause .mnTitleLines, #menu.pause .mnShotNote { display: none; }
+.mnTitle { position: absolute; left: 8%; top: 3.8vh; max-width: 70%; }
 .mnTitleMain {
-  font-size: 46px; letter-spacing: 0.34em; text-indent: 0.34em; font-weight: 500;
-  text-shadow: 0 2px 18px rgba(0,0,0,0.8);
+  color: var(--ui-bright); font-size: clamp(28px, 2.65vw, 42px); font-weight: 700;
+  letter-spacing: 0.07em; line-height: 1.2; text-shadow: 0 2px 3px #000;
 }
-.mnTitleSub {
-  margin-top: 12px; font-size: 12.5px; letter-spacing: 0.18em;
-  color: var(--dim, rgba(230,223,205,0.62));
-}
-.mnTitleLines { margin-top: 26px; }
-.mnTitleLine {
-  font-size: 14px; line-height: 2.0; color: rgba(230, 223, 205, 0.72);
-  letter-spacing: 0.04em;
-}
-
-/* --- 主列表 -------------------------------------------------------------- */
+.mnTitleSub { margin-top: 10px; font-size: 12px; letter-spacing: 0.07em; color: var(--ui-muted); }
+.mnTitleLines { margin-top: 8vh; }
+.mnTitleLine { font-size: 14px; line-height: 2; color: var(--ui-muted); }
 .mnList {
-  position: absolute; left: 7%; bottom: 16%;
-  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  position: absolute; left: 8%; top: 40%; bottom: 14%; width: min(450px, 44vw);
+  display: flex; flex-direction: column; align-items: stretch; gap: 2px; overflow-y: auto;
 }
+#menu.pause .mnList { top: 30%; }
 .mnItem {
-  pointer-events: auto; cursor: pointer;
-  display: flex; align-items: center; gap: 12px;
-  border: 0; background: transparent; color: rgba(230, 223, 205, 0.78);
-  font: inherit; font-size: 21px; letter-spacing: 0.22em;
-  padding: 7px 4px; text-align: left;
-  transition: color 0.16s linear, transform 0.16s ease;
+  pointer-events: auto; cursor: pointer; flex: 0 0 auto; min-height: 44px;
+  display: flex; align-items: center; border: 1px solid transparent;
+  background: transparent; color: #b7bbb7; font: inherit; font-size: clamp(19px, 1.65vw, 25px);
+  font-weight: 700; letter-spacing: 0.04em; padding: 7px 12px; text-align: left;
+  text-shadow: 0 2px 3px #000; transition: color 0.12s linear, background 0.12s linear;
 }
-.mnItemBar {
-  display: block; width: 0; height: 1px; background: var(--warn, #e0b062);
-  transition: width 0.18s ease;
+.mnItemBar { display: none; }
+.mnItem.on {
+  color: var(--ui-gold); background: var(--ui-selection); border-image: var(--ui-selection-edge);
 }
-.mnItem.on { color: var(--paper, #e6dfcd); transform: translateX(4px); }
-.mnItem.on .mnItemBar { width: 26px; }
-.mnItemHint {
-  margin-top: 10px; min-height: 1.5em; font-size: 12.5px; letter-spacing: 0.08em;
-  color: var(--dim, rgba(230,223,205,0.62));
-}
-
-/* --- 角上两行小字 -------------------------------------------------------- */
+.mnItemHint { margin: 16px 12px 0; min-height: 3em; font-size: 12px; line-height: 1.7; color: var(--ui-muted); }
 .mnShotNote {
-  position: absolute; right: 22px; bottom: 40px; max-width: 40%;
-  text-align: right; font-size: 11.5px; letter-spacing: 0.08em;
-  color: rgba(230, 223, 205, 0.42);
+  position: absolute; right: 8%; bottom: 11%; max-width: 40%;
+  text-align: right; font-size: 11px; letter-spacing: 0.06em; color: var(--ui-muted);
 }
 .mnFoot {
-  position: absolute; right: 22px; bottom: 20px;
-  font-size: 11.5px; letter-spacing: 0.10em; color: rgba(230, 223, 205, 0.34);
+  position: absolute; left: 8%; bottom: 3vh; font-size: 11px; letter-spacing: 0.07em; color: var(--ui-muted);
 }
-
-/* --- 面板（选章 / 史实注记 / 关于）--------------------------------------- */
+/* 换页沿用任务选择的整屏黑栏与战地背景。 */
+#menu.panelOn .mnTitle, #menu.panelOn .mnList,
+#menu.panelOn .mnShotNote, #menu.panelOn .mnFoot { display: none; }
 .mnPanel {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(0.985);
-  width: min(1180px, 92vw); height: min(760px, 86vh);
-  display: none; flex-direction: column;
-  pointer-events: auto;
-  background: rgba(9, 9, 8, 0.90);
-  border: 1px solid rgba(230, 223, 205, 0.18);
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(3px);
+  position: absolute; inset: 0; width: 100%; height: 100%; display: none; flex-direction: column;
+  pointer-events: auto; background: #0b0d0e; isolation: isolate;
 }
 .mnPanel.on { display: flex; }
-/* 面板开着时，标题与列表让位（ER2 也是整屏换页，不做叠加） */
-#menu.panelOn .mnTitle, #menu.panelOn .mnList, #menu.panelOn .mnShotNote { opacity: 0.12; }
-
-.mnPanelHead {
-  flex: 0 0 auto; display: flex; align-items: center; gap: 14px;
-  padding: 14px 20px; border-bottom: 1px solid rgba(230, 223, 205, 0.16);
-}
-.mnPanelTitle { flex: 1 1 auto; font-size: 16px; letter-spacing: 0.24em; }
-.mnBack {
-  pointer-events: auto; cursor: pointer;
-  border: 1px solid rgba(230, 223, 205, 0.28); background: transparent;
-  color: var(--paper, #e6dfcd); font: inherit; font-size: 12.5px;
-  letter-spacing: 0.16em; padding: 5px 16px;
-}
-.mnBack:hover { background: rgba(230, 223, 205, 0.08); }
-.mnPanelBody { flex: 1 1 auto; min-height: 0; display: flex; }
-
-/* --- 选章：2008 World at War 的全屏任务列表 ------------------------------ */
-#menu.levelsOn {
-  --mn-gold: #dfbd68;
-  font-family: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
-}
-#menu.levelsOn .mnTitle, #menu.levelsOn .mnList,
-#menu.levelsOn .mnShotNote, #menu.levelsOn .mnFoot { display: none; }
-#menu.levelsOn .mnPanel {
-  inset: 0; transform: none; width: 100%; height: 100%;
-  border: 0; box-shadow: none; backdrop-filter: none; background: #0b0d0e;
-  isolation: isolate;
-}
-#menu.levelsOn .mnPanel::before {
+.mnPanel::before {
   content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background: url("./Texture/Menu/Texture_MissionCh1NanLu.png") center 58% / cover;
   filter: grayscale(1) blur(5px) brightness(0.36); opacity: 0.76;
 }
-#menu.levelsOn .mnPanel::after {
+.mnPanel::after {
   content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background: linear-gradient(0deg, #020303 4%, transparent 52%, #0008),
     linear-gradient(90deg, #0c101766, transparent 60%, #0004);
 }
-#menu.levelsOn .mnPanelHead {
-  min-height: 12vh; box-sizing: border-box; padding: 26px 8% 18px;
-  align-items: flex-end; border: 0; background: #030404;
+.mnPanelHead {
+  flex: 0 0 auto; display: flex; align-items: flex-end; gap: 14px;
+  min-height: 14vh; box-sizing: border-box; padding: 26px 8% 18px; background: var(--ui-black);
 }
-#menu.levelsOn .mnPanelHead::after {
-  content: "战役 · 滕县一九三八"; color: #868a87; font-size: 13px;
-  padding-bottom: 5px; letter-spacing: 0.08em;
+.mnPanelHead::after { content: "滕县 · 一九三八"; color: var(--ui-muted); font-size: 12px; padding-bottom: 5px; letter-spacing: 0.08em; }
+.mnPanelTitle {
+  flex: 1; font-size: clamp(25px, 2.5vw, 38px); font-weight: 700;
+  letter-spacing: 0.07em; color: var(--ui-bright); line-height: 1.2;
 }
-#menu.levelsOn .mnPanelTitle {
-  font-size: clamp(25px, 2.5vw, 38px); font-weight: 700; letter-spacing: 0.07em;
-  color: #eeefec; line-height: 1.2;
-}
-#menu.levelsOn .mnPanelBack, #menu.levelsOn .mnPanelHead > .mnBack { display: none; }
+.mnPanelBody { flex: 1 1 auto; min-height: 0; display: flex; }
+#menu.levelsOn .mnPanelFoot { display: none; }
+
+/* 选章：线性任务列表与对应的横幅预览。 */
 .mnLevels { display: flex; flex-direction: column; width: 100%; min-height: 0; }
 .mnCampaignMain {
   flex: 1; min-height: 0; display: grid; grid-template-columns: 46% minmax(0, 1fr);
@@ -180,11 +112,11 @@
 .mnLvMark { font-size: 10px; font-weight: 400; color: #8b9384; white-space: nowrap; }
 .mnLvMark.done { color: #b5bba2; }
 .mnLevel.on {
-  color: var(--mn-gold); border-image: linear-gradient(90deg, #d7d7c73d, transparent 95%) 1;
-  background: linear-gradient(90deg, #b6b8a92b, #9ea0920d 72%, transparent);
+  color: var(--ui-gold); border-image: var(--ui-selection-edge);
+  background: var(--ui-selection);
 }
 .mnLevel.on .mnLvNo, .mnLevel.on .mnLvMark { color: #cebd87; }
-.mnLevel:focus-visible { outline: 1px solid var(--mn-gold); outline-offset: -2px; }
+.mnLevel:focus-visible { outline: 1px solid var(--ui-gold); outline-offset: -2px; }
 .mnSandboxLevel { min-height: 35px; grid-template-columns: 28px minmax(0, 1fr) auto; }
 .mnSandboxLevel .mnLvName { font-size: clamp(12px, 1.06vw, 16px); font-weight: 500; }
 .mnSandboxLevel .mnLvMark { color: #8b9384; }
@@ -199,15 +131,15 @@
   box-shadow: inset 0 0 28px 9px #0009;
 }
 .mnMissionCopy { padding-top: 15px; text-shadow: 0 2px 3px #000; }
-.mnBriefTitle { color: var(--mn-gold); font-size: clamp(20px, 1.8vw, 28px); font-weight: 700; line-height: 1.4; }
+.mnBriefTitle { color: var(--ui-gold); font-size: clamp(20px, 1.8vw, 28px); font-weight: 700; line-height: 1.4; }
 .mnMissionWhen { margin-top: 8px; color: #a3aaa4; font-size: 12px; line-height: 1.8; }
 .mnMissionObjective { margin-top: 12px; color: #cbcec7; font-size: clamp(15px, 1.22vw, 19px); line-height: 1.8; }
 .mnMissionRecord {
   margin-top: auto; padding: 28px 0 14px; display: flex; align-items: center; justify-content: space-between;
-  gap: 20px; color: var(--mn-gold); font-size: 14px;
+  gap: 20px; color: var(--ui-gold); font-size: 14px;
 }
 .mnMissionRecord b { color: #a4aaa0; font-weight: 400; font-size: 13px; }
-.mnMissionRecord.done b { color: var(--mn-gold); }
+.mnMissionRecord.done b { color: var(--ui-gold); }
 .mnMissionRecord.done b::before { content: "✓ "; }
 .mnTrainingPreview {
   flex: 0 0 auto; width: 100%; aspect-ratio: 1.78; display: grid; place-items: center;
@@ -219,93 +151,98 @@
 }
 .mnCampaignFoot {
   flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  min-height: 8vh; box-sizing: border-box; padding: 12px 8%; background: #020303;
+  min-height: 8vh; box-sizing: border-box; padding: 12px 8%; background: var(--ui-black);
 }
-.mnCampaignBack {
+.mnCampaignBack, .mnBack {
   background: none; border: 0; padding: 10px 12px; min-height: 44px; cursor: pointer;
   color: #d6d9d1; font: inherit; font-size: 16px; font-weight: 700;
 }
-.mnCampaignBack:hover, .mnCampaignBack:focus-visible { color: var(--mn-gold); }
-.mnCampaignBack:focus-visible { outline: 1px solid var(--mn-gold); }
+.mnCampaignBack:hover, .mnCampaignBack:focus-visible, .mnBack:hover, .mnBack:focus-visible { color: var(--ui-gold); }
+.mnCampaignBack:focus-visible, .mnBack:focus-visible { outline: 1px solid var(--ui-gold); }
 .mnCampaignKeys { color: #828b83; font-size: 11px; word-spacing: 4px; }
 
 /* --- 史实注记 / 关于 ----------------------------------------------------- */
 .mnText {
-  flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 20px 30px 30px;
-  font-size: 13.5px; line-height: 2.0; color: rgba(230, 223, 205, 0.78);
+  flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 28px 8% 36px;
+  font-size: 14px; line-height: 2.0; color: rgba(214, 217, 209, 0.78);
 }
 .mnText p { margin: 0 0 4px; }
 .mnText .mnGap { height: 12px; }
 .mnText h4 {
-  margin: 22px 0 10px; font-size: 12px; letter-spacing: 0.20em; font-weight: 500;
-  color: var(--warn, #e0b062);
+  margin: 26px 0 12px; font-size: 15px; letter-spacing: 0.05em; font-weight: 700;
+  color: var(--ui-gold);
 }
 .mnCodexRow {
   display: grid; grid-template-columns: 190px 190px 1fr; gap: 12px;
-  padding: 7px 0; border-bottom: 1px solid rgba(230, 223, 205, 0.08);
+  padding: 7px 0; border-bottom: 1px solid rgba(214, 217, 209, 0.08);
   font-size: 12px; line-height: 1.7;
 }
 .mnCodexId {
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-  color: rgba(230, 223, 205, 0.55); font-size: 11.5px;
+  color: var(--ui-muted); font-size: 11.5px;
 }
 .mnCodexVal {
-  font-variant-numeric: tabular-nums; color: var(--paper, #e6dfcd);
+  font-variant-numeric: tabular-nums; color: var(--ui-text);
 }
-.mnCodexNote { color: rgba(230, 223, 205, 0.55); }
+.mnCodexNote { color: var(--ui-muted); }
 
 /* --- 调试选项 ------------------------------------------------------------ */
 .mnDebug {
-  flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 20px 30px 30px;
-  color: rgba(230, 223, 205, 0.78);
+  flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 28px 8% 36px;
+  color: rgba(214, 217, 209, 0.78);
 }
-.mnDebugIntro { margin: 0 0 14px; font-size: 13px; line-height: 1.8; color: rgba(230, 223, 205, 0.56); }
+.mnDebugIntro { margin: 0 0 14px; font-size: 13px; line-height: 1.8; color: var(--ui-muted); }
 .mnDebugRow {
   display: flex; align-items: center; justify-content: space-between; gap: 22px;
   min-height: 68px; padding: 11px 14px 11px 16px;
-  border-top: 1px solid rgba(230, 223, 205, 0.10); cursor: pointer;
+  border-top: 1px solid rgba(214, 217, 209, 0.10); cursor: pointer;
   transition: background 0.14s linear, border-color 0.14s linear;
 }
-.mnDebugRow:last-child { border-bottom: 1px solid rgba(230, 223, 205, 0.10); }
-.mnDebugRow:hover { background: rgba(230, 223, 205, 0.05); }
-.mnDebugRow.on { background: rgba(224, 176, 98, 0.08); border-color: rgba(224, 176, 98, 0.34); }
+.mnDebugRow:last-child { border-bottom: 1px solid rgba(214, 217, 209, 0.10); }
+.mnDebugRow:hover { background: rgba(214, 217, 209, 0.05); }
+.mnDebugRow.on { background: var(--ui-selection); border-color: var(--ui-line); }
 .mnDebugCopy { display: flex; flex-direction: column; gap: 5px; }
-.mnDebugCopy b { font-size: 15.5px; font-weight: 500; letter-spacing: 0.12em; color: var(--paper, #e6dfcd); }
-.mnDebugCopy small { max-width: 610px; font-size: 12px; line-height: 1.65; color: rgba(230, 223, 205, 0.52); }
+.mnDebugCopy b { font-size: 15.5px; font-weight: 700; letter-spacing: 0.04em; color: var(--ui-text); }
+.mnDebugCopy small { max-width: 610px; font-size: 12px; line-height: 1.65; color: var(--ui-muted); }
 .mnDebugControl { display: flex; align-items: center; gap: 9px; flex: 0 0 auto; }
 .mnDebugControl input {
-  appearance: none; width: 38px; height: 20px; margin: 0; border: 1px solid rgba(230,223,205,0.36);
-  border-radius: 12px; background: rgba(6,6,8,0.8); cursor: pointer; position: relative;
+  appearance: none; width: 20px; height: 20px; margin: 0; border: 1px solid rgba(214, 217, 209, 0.36);
+  border-radius: 0; background: rgba(6,6,8,0.8); cursor: pointer; position: relative;
   transition: background 0.14s linear, border-color 0.14s linear;
 }
 .mnDebugControl input::after {
-  content: ""; position: absolute; left: 3px; top: 3px; width: 12px; height: 12px; border-radius: 50%;
-  background: rgba(230,223,205,0.64); transition: transform 0.14s ease, background 0.14s linear;
+  content: ""; position: absolute; left: 5px; top: 2px; width: 6px; height: 10px;
+  border: solid var(--ui-gold); border-width: 0 2px 2px 0; transform: rotate(45deg); opacity: 0;
 }
-.mnDebugControl input:checked { background: rgba(224,176,98,0.66); border-color: var(--warn, #e0b062); }
-.mnDebugControl input:checked::after { transform: translateX(17px); background: #fff4d9; }
-.mnDebugControl input:focus-visible { outline: 2px solid var(--warn, #e0b062); outline-offset: 3px; }
-.mnDebugControl i { min-width: 1.4em; font-size: 12px; font-style: normal; letter-spacing: 0.1em; color: rgba(230,223,205,0.52); }
-.mnDebugRow.on .mnDebugControl i { color: var(--warn, #e0b062); }
+.mnDebugControl input:checked { background: #151918; border-color: var(--ui-gold); }
+.mnDebugControl input:checked::after { opacity: 1; }
+.mnDebugControl input:focus-visible { outline: 2px solid var(--ui-gold); outline-offset: 3px; }
+.mnDebugControl i { min-width: 1.4em; font-size: 12px; font-style: normal; letter-spacing: 0.1em; color: var(--ui-muted); }
+.mnDebugRow.on .mnDebugControl i { color: var(--ui-gold); }
 
-/* --- 窄屏（手机横屏 / 小窗）--------------------------------------------- */
+/* 小窗仍保留同一条标题、列表与页脚对齐线。 */
 @media (max-width: 900px) {
-  .mnTitle { left: 6%; top: 10%; max-width: 62%; }
-  .mnTitleMain { font-size: 32px; letter-spacing: 0.24em; }
+  .mnTitle, .mnList, .mnFoot { left: 5%; }
+  .mnTitle { max-width: 88%; }
+  .mnTitleMain { font-size: 30px; }
   .mnTitleLines { display: none; }
-  .mnList { left: 6%; bottom: 12%; }
-  .mnItem { font-size: 18px; }
-  .mnPanel { width: 96vw; height: 92vh; }
-
+  .mnList { top: 29%; width: min(420px, 85vw); bottom: 13%; }
+  .mnShotNote { right: 5%; bottom: 10%; }
   .mnCodexRow { grid-template-columns: 1fr; gap: 2px; }
-  .mnDebug { padding: 16px 18px 22px; }
+  .mnText, .mnDebug { padding: 20px 5% 24px; }
   .mnDebugRow { align-items: flex-start; gap: 12px; padding-inline: 10px; }
   .mnDebugCopy b { font-size: 14px; }
-  .mnDebugCopy small { font-size: 11px; }
+  .mnDebugCopy small { font-size: 12px; }
 }
-
+@media (max-height: 760px) {
+  .mnTitleLines { display: none; }
+  .mnList { top: 25%; bottom: 12%; }
+  .mnTitleSub { margin-top: 6px; }
+  .mnTitleMain { font-size: 28px; }
+  .mnVignette::before { height: 90px; }
+}
 @media (max-height: 760px) and (min-width: 641px) {
-  #menu.levelsOn .mnPanelHead { min-height: 80px; padding-top: 16px; }
+  .mnPanelHead { min-height: 80px; padding-top: 16px; }
   .mnCampaignMain { padding-top: 15px; }
   .mnLevel { min-height: 34px; padding-block: 3px; }
   .mnLvName { font-size: 18px; }
@@ -315,15 +252,15 @@
   .mnMissionRecord { padding-top: 16px; }
 }
 @media (max-width: 900px) {
-  #menu.levelsOn .mnPanelHead, .mnCampaignFoot { padding-inline: 5%; }
+  .mnPanelHead, .mnCampaignFoot { padding-inline: 5%; }
   .mnCampaignMain { padding-inline: 5%; gap: 3%; grid-template-columns: 48% minmax(0, 1fr); }
   .mnLevel { grid-template-columns: 46px minmax(0, 1fr) auto; gap: 6px; padding-inline: 7px; }
   .mnSandboxLevel { grid-template-columns: 25px minmax(0, 1fr) auto; }
   .mnLvNo { font-size: 10px; }
 }
 @media (max-width: 640px) {
-  #menu.levelsOn .mnPanelHead { min-height: 74px; padding: 20px 5% 15px; }
-  #menu.levelsOn .mnPanelHead::after { font-size: 10px; }
+  .mnPanelHead { min-height: 74px; padding: 20px 5% 15px; }
+  .mnPanelHead::after { font-size: 10px; }
   .mnCampaignMain { display: flex; flex-direction: column; gap: 24px; overflow-y: auto; padding: 16px 5% 24px; }
   .mnLevelList { overflow-y: auto; flex: 0 0 auto; max-height: 38vh; padding: 0; }
   .mnLevel { min-height: 44px; grid-template-columns: 48px minmax(0, 1fr) auto; }

@@ -154,8 +154,14 @@ export class EditorSuite {
     if (this.shot) root.classList.add("off");
     document.body.appendChild(root);
     this.root = root;
+    // 原生按钮的 Space / Enter 留给浏览器，不能被世界键位表吞掉。
+    const NativeActivation = event => {
+      if ((event.key === " " || event.key === "Enter") && event.target.closest?.("button, input, select, textarea")) event.stopPropagation();
+    };
+    root.addEventListener("keydown", NativeActivation);
 
-    const gear = El("div", "edGear", "⚙");
+    const gear = El("button", "edGear", "设置 · 工具");
+    gear.type = "button";
     gear.title = "设置与工具（`）";
     gear.addEventListener("click", () => this.TogglePanel());
     root.appendChild(gear);
@@ -171,8 +177,10 @@ export class EditorSuite {
     const panel = El("div", "edPanel launcher");
     panel.style.display = "none";
     const head = El("div", "edHead");
-    head.appendChild(El("div", "edTitle", "设置与工具"));
-    const x = El("div", "edX", "×");
+    head.appendChild(El("div", "edTitle", "工具目录"));
+    const x = El("button", "edX", "×");
+    x.type = "button";
+    x.setAttribute("aria-label", "关闭设置与工具");
     x.addEventListener("click", () => this.TogglePanel(false));
     head.appendChild(x);
     panel.appendChild(head);
@@ -186,7 +194,8 @@ export class EditorSuite {
       section.appendChild(El("div", "h", title));
       const box = El("div", "b");
       for (const Editor of list) {
-        const button = El("div", "edBtn wide", Editor.label);
+        const button = El("button", "edBtn wide", Editor.label);
+        button.type = "button";
         button.title = Editor.hint;
         // 冒烟测试按这个属性找按钮：按 nth-child 找的话，面板一分组就全错位了
         button.dataset.editor = Editor.id;
@@ -217,7 +226,8 @@ export class EditorSuite {
     Group("渲染调试（可叠加）", OVERLAYS);
     Group("编辑器", EDITORS);
 
-    const off = El("div", "edBtn wide danger", "全部关掉");
+    const off = El("button", "edBtn wide danger", "全部关掉");
+    off.type = "button";
     off.dataset.editor = "";
     off.addEventListener("click", () => this.Close());
     body.appendChild(off);
@@ -249,6 +259,7 @@ export class EditorSuite {
   }
 
   RefreshStatus() {
+    document.body.classList.toggle("edToolsOpen", this.panelOpen);
     for (const [id, button] of this.entries) {
       button.classList.toggle("on", id === this.activeId || this.overlays.has(id));
     }
@@ -434,6 +445,11 @@ export class EditorSuite {
       if (this.active && this.active.cameraMode === "fly") this.flycam.keys.delete(event.code);
       else this.flycam.keys.delete(event.code);
     };
+    // Tab 在玩法里打开指挥轮盘，在可见工具窗里则保留原生焦点导航。
+    this._onTab = event => {
+      if (event.key === "Tab" && this.panelOpen && !this.root.classList.contains("off")) event.stopPropagation();
+    };
+    document.addEventListener("keydown", this._onTab, true);
     document.addEventListener("keydown", this._onKeyDown);
     document.addEventListener("keyup", this._onKeyUp);
   }
@@ -471,10 +487,12 @@ export class EditorSuite {
   Dispose() {
     this.Close();
     document.removeEventListener("keydown", this._onKeyDown);
+    document.removeEventListener("keydown", this._onTab, true);
     document.removeEventListener("keyup", this._onKeyUp);
     this.viewport.Dispose();
     this.studio.Dispose();
     if (this.root) this.root.remove();
+    document.body.classList.remove("edToolsOpen");
   }
 }
 

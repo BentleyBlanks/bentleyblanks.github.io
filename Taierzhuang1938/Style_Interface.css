@@ -1,0 +1,37 @@
+/* World at War (2008) 界面语言：冷灰、旧金、黑色栏、横向选择条。
+   菜单 / 加载 / 编辑器 / Profiler 共用；战斗 HUD 的阵营与告警颜色独立。 */
+:root {
+  --ui-font: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+  --ui-mono: "Cascadia Mono", Consolas, monospace;
+  --ui-black: #030404;
+  --ui-surface: #101314;
+  --ui-panel: rgba(13, 16, 17, 0.96);
+  --ui-text: #d6d9d1;
+  --ui-bright: #eeefec;
+  --ui-muted: #a3aaa4;
+  --ui-gold: #dfbd68;
+  --ui-line: #c4c6bb33;
+  --ui-selection: linear-gradient(90deg, #b6b8a92b, #9ea0920d 72%, transparent);
+  --ui-selection-edge: linear-gradient(90deg, #d7d7c75c, transparent 95%) 1;
+}
+:is(#menu, #boot, #edRoot, .uiProfiler) {
+  --paper: var(--ui-text);
+  --dim: var(--ui-muted);
+  --warn: var(--ui-gold);
+  font-family: var(--ui-font);
+  color: var(--ui-text);
+  -webkit-font-smoothing: antialiased;
+  color-scheme: dark;
+}
+:is(#menu, #boot, #edRoot, .uiProfiler) :is(button, input, select, textarea, summary):focus-visible {
+  outline: 1px solid var(--ui-gold);
+  outline-offset: 2px;
+}
+:is(#menu, #edRoot, .uiProfiler) * {
+  scrollbar-width: thin;
+  scrollbar-color: #8a8e8070 transparent;
+}
+:is(#menu, #boot, #edRoot, .uiProfiler) button { font-family: inherit; }
+@media (prefers-reduced-motion: reduce) {
+  :is(#menu, #boot, #edRoot, .uiProfiler) * { transition-duration: 0s !important; }
+}

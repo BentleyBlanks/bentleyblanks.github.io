@@ -33,7 +33,9 @@ export function Panel({ title = "", sub = "", variant = "work", onClose = null }
   const subEl = El("div", "edSub", sub);
   head.appendChild(subEl);
   if (onClose) {
-    const x = El("div", "edX", "×");
+    const x = El("button", "edX", "×");
+    x.type = "button";
+    x.setAttribute("aria-label", `关闭${title}`);
     x.addEventListener("click", onClose);
     head.appendChild(x);
   }
@@ -69,7 +71,8 @@ export function Row(parent, label, control) {
 }
 
 export function Button(parent, label, onClick, { cls = "", wide = false } = {}) {
-  const btn = El("div", `edBtn ${wide ? "wide " : ""}${cls}`, label);
+  const btn = El("button", `edBtn ${wide ? "wide " : ""}${cls}`, label);
+  btn.type = "button";
   btn.addEventListener("click", (e) => { e.preventDefault(); onClick(btn); });
   parent.appendChild(btn);
   return btn;
@@ -89,8 +92,10 @@ export function ButtonRow(parent, specs) {
  */
 export function Toggle(parent, label, value, onChange) {
   let on = !!value;
-  const btn = El("div", `edBtn${on ? " on" : ""}`, label);
-  const Apply = () => btn.classList.toggle("on", on);
+  const btn = El("button", `edBtn${on ? " on" : ""}`, label);
+  btn.type = "button";
+  const Apply = () => { btn.classList.toggle("on", on); btn.setAttribute("aria-pressed", String(on)); };
+  Apply();
   btn.addEventListener("click", () => { on = !on; Apply(); onChange(on); });
   parent.appendChild(btn);
   return {
@@ -194,10 +199,11 @@ export function Select(parent, label, options, value, onChange) {
 export function Chips(parent, options, value, onChange) {
   const box = El("div", "edChips");
   const made = [];
-  const Apply = (v) => { for (const m of made) m.el.classList.toggle("on", m.value === v); };
+  const Apply = (v) => { for (const m of made) { m.el.classList.toggle("on", m.value === v); m.el.setAttribute("aria-pressed", String(m.value === v)); } };
   for (const raw of options) {
     const opt = typeof raw === "string" ? { value: raw, label: raw } : raw;
-    const chip = El("div", "edChip", opt.label);
+    const chip = El("button", "edChip", opt.label);
+    chip.type = "button";
     if (opt.title) chip.title = opt.title;
     chip.addEventListener("click", () => { Apply(opt.value); onChange(opt.value); });
     box.appendChild(chip);

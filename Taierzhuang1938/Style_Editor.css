@@ -1,15 +1,11 @@
-/* 《滕县 一九三八》编辑器套件样式。
-   与 Style_Game.css 分开的理由：这一套**不对玩家开放**，
-   出图模式（?shot=1）下整棵树 display:none，不许进任何一张截图。
-
-   视觉上刻意和 HUD 拉开距离：HUD 是宋体、无框、克制；
-   编辑器是等宽数字 + 明确的框线 + 可点的控件，一眼就知道自己在工具里。 */
+/* 设置与编辑器：与主菜单共用冷灰 / 旧金配色、矩形控件及选择条。
+   工作区保留紧凑布局与等宽读数；shot=1 仍隐藏全部工具。 */
 
 #edRoot {
   position: fixed; inset: 0; z-index: 40;
   pointer-events: none;                       /* 只有面板本身吃鼠标，其余全透 */
-  font-family: "Noto Serif SC", "Songti SC", serif;
-  color: var(--paper, #e6dfcd);
+  font-family: var(--ui-font);
+  color: var(--ui-text);
   font-size: 13px; line-height: 1.5;
 }
 #edRoot.off { display: none; }
@@ -23,30 +19,30 @@
 /* --- 齿轮按钮 ------------------------------------------------------------ */
 .edGear {
   position: absolute; top: 14px; right: 14px;
-  width: 34px; height: 34px; border-radius: 3px;
+  min-width: 104px; height: 34px; padding: 0 12px; border-radius: 0;
   pointer-events: auto; cursor: pointer;
-  background: rgba(12, 12, 10, 0.55);
-  border: 1px solid rgba(230, 223, 205, 0.28);
-  color: var(--paper, #e6dfcd);
-  font-size: 17px; line-height: 32px; text-align: center;
+  background: var(--ui-black);
+  border: 1px solid rgba(214, 217, 209, 0.28);
+  color: var(--ui-text);
+  font: 700 12px/32px var(--ui-font); letter-spacing: 0.04em; text-align: center;
   transition: background 0.15s linear, border-color 0.15s linear;
 }
-.edGear:hover { background: rgba(30, 28, 22, 0.85); border-color: rgba(224, 176, 98, 0.7); }
-.edGear.on { border-color: var(--warn, #e0b062); color: var(--warn, #e0b062); }
+.edGear:hover { background: var(--ui-selection); border-color: rgba(223, 189, 104, 0.7); }
+.edGear.on { border-color: var(--ui-gold); color: var(--ui-gold); }
 
 /* --- 面板 ---------------------------------------------------------------- */
 .edPanel {
-  position: absolute; top: 58px; bottom: 18px;
+  position: absolute; top: 84px; bottom: 18px;
   width: 268px;
   pointer-events: auto;
   display: flex; flex-direction: column;
-  background: rgba(10, 10, 9, 0.86);
-  border: 1px solid rgba(230, 223, 205, 0.20);
-  border-radius: 3px;
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-line);
+  border-radius: 0;
   backdrop-filter: blur(2px);
   box-shadow: 0 6px 26px rgba(0, 0, 0, 0.55);
 }
-.edPanel.launcher { left: 14px; width: 210px; bottom: auto; max-height: calc(100% - 76px); }
+.edPanel.launcher { left: 14px; width: 210px; bottom: auto; max-height: calc(100% - 102px); }
 .edPanel.work { right: 14px; width: 320px; }
 .edPanel.wide { width: 396px; }
 .edPanel.assetStandards {
@@ -56,123 +52,123 @@
 .edPanel.debugRendering { left: 238px; right: auto; width: 368px; bottom: 18px; }
 
 .edHead {
-  flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
-  padding: 7px 10px;
-  border-bottom: 1px solid rgba(230, 223, 205, 0.16);
-  letter-spacing: 0.10em; font-size: 13px;
+  flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 3px 8px;
+  padding: 12px 14px; background: var(--ui-black); border-bottom: 1px solid var(--ui-line);
 }
-.edHead .edTitle { flex: 1 1 auto; }
-.edHead .edSub { color: rgba(230, 223, 205, 0.5); font-size: 11px; letter-spacing: 0; }
+.edHead .edTitle { grid-column: 1; color: var(--ui-bright); font-size: 16px; font-weight: 700; letter-spacing: 0.04em; }
+.edHead .edSub { grid-column: 1; grid-row: 2; color: var(--ui-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.edHead .edSub:empty { display: none; }
 .edHead .edX {
-  cursor: pointer; width: 18px; height: 18px; text-align: center; line-height: 16px;
-  border: 1px solid rgba(230, 223, 205, 0.25); border-radius: 2px; font-size: 12px;
+  grid-column: 2; grid-row: 1 / span 2; align-self: start; flex-shrink: 0;
+  cursor: pointer; width: 28px; height: 28px; padding: 0; text-align: center; line-height: 26px;
+  border: 1px solid var(--ui-line); background: transparent; color: var(--ui-muted); font-size: 18px;
 }
-.edHead .edX:hover { border-color: var(--theirs, #d6604a); color: var(--theirs, #d6604a); }
+.edHead .edX:hover { border-color: var(--ui-gold); color: var(--ui-gold); }
 
-.edBody { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding: 8px 10px 12px; }
+.edBody { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; min-height: 0; padding: 12px 14px 16px; }
 .edBody::-webkit-scrollbar { width: 8px; }
-.edBody::-webkit-scrollbar-thumb { background: rgba(230, 223, 205, 0.18); border-radius: 4px; }
+.edBody::-webkit-scrollbar-thumb { background: rgba(214, 217, 209, 0.18); border-radius: 0; }
 
 /* --- 分节 ---------------------------------------------------------------- */
 .edSection { margin: 10px 0 4px; }
 .edSection:first-child { margin-top: 2px; }
 .edSection > .h {
-  color: var(--warn, #e0b062); font-size: 11px; letter-spacing: 0.18em;
-  border-bottom: 1px dotted rgba(224, 176, 98, 0.35);
-  padding-bottom: 2px; margin-bottom: 6px;
+  color: var(--ui-gold); font-size: 11px; letter-spacing: 0.08em; font-weight: 700;
+  border-bottom: 1px solid var(--ui-line);
+  padding-bottom: 6px; margin-bottom: 8px;
 }
 
 /* --- 行与控件 ------------------------------------------------------------ */
 .edRow { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
-.edRow > .l { flex: 0 0 82px; color: rgba(230, 223, 205, 0.62); font-size: 12px; }
+.edRow > .l { flex: 0 0 82px; color: var(--ui-muted); font-size: 12px; }
 .edRow > .c { flex: 1 1 auto; min-width: 0; }
 
 .edBtn {
   cursor: pointer; user-select: none;
-  padding: 3px 8px; border-radius: 2px; font-size: 12px;
-  background: rgba(230, 223, 205, 0.06);
-  border: 1px solid rgba(230, 223, 205, 0.22);
-  color: var(--paper, #e6dfcd);
+  padding: 5px 9px; min-height: 28px; box-sizing: border-box; border-radius: 0; font: 12px/1.5 var(--ui-font);
+  background: #151919;
+  border: 1px solid rgba(214, 217, 209, 0.22);
+  color: var(--ui-text);
 }
-.edBtn:hover { background: rgba(230, 223, 205, 0.16); }
-.edBtn.on { border-color: var(--warn, #e0b062); color: var(--warn, #e0b062); background: rgba(224, 176, 98, 0.10); }
+.edBtn:hover { background: var(--ui-selection); color: var(--ui-gold); }
+.edBtn.on { border-color: var(--ui-gold); color: var(--ui-gold); background: var(--ui-selection); }
 .edBtn.danger:hover { border-color: var(--theirs, #d6604a); color: var(--theirs, #d6604a); }
 .edBtn.wide { display: block; width: 100%; box-sizing: border-box; text-align: center; }
 .edBtns { display: flex; flex-wrap: wrap; gap: 4px; margin: 5px 0; }
 
 .edChips { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
 .edChip {
-  cursor: pointer; user-select: none; font-size: 12px;
-  padding: 2px 7px; border-radius: 10px;
-  border: 1px solid rgba(230, 223, 205, 0.20);
-  color: rgba(230, 223, 205, 0.82);
+  cursor: pointer; user-select: none; font: 12px/1.5 var(--ui-font); background: transparent;
+  padding: 4px 8px; border-radius: 0;
+  border: 1px solid rgba(214, 217, 209, 0.20);
+  color: rgba(214, 217, 209, 0.82);
 }
-.edChip:hover { border-color: rgba(230, 223, 205, 0.55); color: var(--paper, #e6dfcd); }
-.edChip.on { border-color: var(--warn, #e0b062); color: var(--warn, #e0b062); background: rgba(224, 176, 98, 0.12); }
+.edChip:hover { border-color: var(--ui-muted); color: var(--ui-text); }
+.edChip.on { border-color: var(--ui-gold); color: var(--ui-gold); background: var(--ui-selection); }
 
 .edPanel select, .edPanel input[type="text"], .edPanel textarea {
   width: 100%; box-sizing: border-box;
   background: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(230, 223, 205, 0.22);
-  color: var(--paper, #e6dfcd);
-  border-radius: 2px; padding: 3px 5px; font-size: 12px;
+  border: 1px solid rgba(214, 217, 209, 0.22);
+  color: var(--ui-text);
+  border-radius: 0; padding: 3px 5px; font-size: 12px;
   font-family: inherit;
 }
 .edPanel textarea { resize: vertical; min-height: 56px; font-family: ui-monospace, Consolas, monospace; }
 .edPanel select:focus, .edPanel input:focus, .edPanel textarea:focus {
-  outline: none; border-color: var(--warn, #e0b062);
+  outline: none; border-color: var(--ui-gold);
 }
-.edPanel select option { background: #0d0c0a; }
+.edPanel select option { background: var(--ui-surface); }
 
 /* JSON 取证默认收起：完整场景面板有三块长 JSON，不主动展开就不该挤走场景控件。 */
 .edJsonFold { margin: 5px 0; }
 .edJsonFold > summary {
   cursor: pointer; user-select: none; list-style-position: inside;
-  padding: 3px 7px; border-radius: 2px; font-size: 11.5px;
-  color: rgba(230, 223, 205, 0.62);
-  border: 1px solid rgba(230, 223, 205, 0.16);
-  background: rgba(230, 223, 205, 0.04);
+  padding: 3px 7px; border-radius: 0; font-size: 11.5px;
+  color: var(--ui-muted);
+  border: 1px solid rgba(214, 217, 209, 0.16);
+  background: rgba(214, 217, 209, 0.04);
 }
-.edJsonFold > summary:hover { color: var(--paper, #e6dfcd); border-color: rgba(230, 223, 205, 0.34); }
-.edJsonFold[open] > summary { color: var(--warn, #e0b062); border-color: rgba(224, 176, 98, 0.38); }
+.edJsonFold > summary:hover { color: var(--ui-text); border-color: rgba(214, 217, 209, 0.34); }
+.edJsonFold[open] > summary { color: var(--ui-gold); border-color: rgba(223, 189, 104, 0.38); }
 .edJsonFold > textarea { margin-top: 5px; }
 
-/* 滑杆：轨道压扁、滑块方形，和游戏里的圆润 UI 拉开 */
+/* 方形滑块沿用界面的旧金焦点色。 */
 .edPanel input[type="range"] {
   width: 100%; height: 14px; margin: 0; background: transparent;
   -webkit-appearance: none; appearance: none;
 }
 .edPanel input[type="range"]::-webkit-slider-runnable-track {
-  height: 3px; background: rgba(230, 223, 205, 0.22); border-radius: 2px;
+  height: 3px; background: rgba(214, 217, 209, 0.22); border-radius: 0;
 }
 .edPanel input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
-  width: 9px; height: 13px; margin-top: -5px; border-radius: 1px;
-  background: var(--paper, #e6dfcd); border: none; cursor: pointer;
+  width: 9px; height: 13px; margin-top: -5px; border-radius: 0;
+  background: var(--ui-text); border: none; cursor: pointer;
 }
-.edPanel input[type="range"]::-moz-range-track { height: 3px; background: rgba(230, 223, 205, 0.22); }
+.edPanel input[type="range"]::-moz-range-track { height: 3px; background: rgba(214, 217, 209, 0.22); }
 .edPanel input[type="range"]::-moz-range-thumb {
-  width: 9px; height: 13px; border-radius: 1px; background: var(--paper, #e6dfcd); border: none; cursor: pointer;
+  width: 9px; height: 13px; border-radius: 0; background: var(--ui-text); border: none; cursor: pointer;
 }
 
 /* --- 列表 ---------------------------------------------------------------- */
-.edList { border: 1px solid rgba(230, 223, 205, 0.14); border-radius: 2px; overflow-y: auto; }
+.edList { border: 1px solid rgba(214, 217, 209, 0.14); border-radius: 0; overflow-y: auto; }
 .edList .it {
   display: flex; align-items: baseline; gap: 6px;
-  padding: 3px 6px; cursor: pointer; border-bottom: 1px solid rgba(230, 223, 205, 0.07);
+  padding: 3px 6px; cursor: pointer; border-bottom: 1px solid rgba(214, 217, 209, 0.07);
 }
 .edList .it:last-child { border-bottom: none; }
-.edList .it:hover { background: rgba(230, 223, 205, 0.08); }
-.edList .it.on { background: rgba(224, 176, 98, 0.14); color: var(--warn, #e0b062); }
+.edList .it:hover { background: rgba(214, 217, 209, 0.08); }
+.edList .it.on { background: var(--ui-selection); color: var(--ui-gold); }
 .edList .it .n { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.edList .it .t { flex: 0 0 auto; color: rgba(230, 223, 205, 0.45); font-size: 11px; }
+.edList .it .t { flex: 0 0 auto; color: var(--ui-muted); font-size: 11px; }
 
 /* --- 读数 ---------------------------------------------------------------- */
 .edFacts { margin: 4px 0; }
 .edFacts .f { display: flex; gap: 8px; font-size: 12px; padding: 1px 0; }
-.edFacts .f .k { flex: 0 0 92px; color: rgba(230, 223, 205, 0.5); }
+.edFacts .f .k { flex: 0 0 92px; color: var(--ui-muted); }
 .edFacts .f .v { flex: 1 1 auto; word-break: break-all; }
-.edFacts .f .v.warn { color: var(--warn, #e0b062); }
+.edFacts .f .v.warn { color: var(--ui-gold); }
 .edFacts .f .v.bad { color: var(--theirs, #d6604a); }
 .edFacts .f .v.good { color: var(--ours, #9dc0e4); }
 
@@ -180,69 +176,69 @@
 .edAssetTable { width: 100%; min-width: 1030px; border-collapse: collapse; font-size: 11px; }
 .edAssetTable th {
   position: sticky; top: 0; z-index: 1; padding: 7px 6px; text-align: left;
-  background: rgba(18, 16, 13, 0.98); color: rgba(230, 223, 205, 0.58);
-  border-bottom: 1px solid rgba(230, 223, 205, 0.24); white-space: nowrap;
+  background: var(--ui-black); color: var(--ui-muted);
+  border-bottom: 1px solid rgba(214, 217, 209, 0.24); white-space: nowrap;
 }
-.edAssetTable td { padding: 6px; border-bottom: 1px solid rgba(230, 223, 205, 0.09); vertical-align: top; }
-.edAssetTable tbody tr:hover { background: rgba(224, 176, 98, 0.08); }
+.edAssetTable td { padding: 6px; border-bottom: 1px solid rgba(214, 217, 209, 0.09); vertical-align: top; }
+.edAssetTable tbody tr:hover { background: rgba(223, 189, 104, 0.08); }
 .edAssetTable td.asset { min-width: 142px; }
-.edAssetTable td.asset .name { color: #e6dfcd; font-size: 12px; }
-.edAssetTable td.asset .id { color: rgba(230, 223, 205, 0.42); font: 10px ui-monospace, Consolas, monospace; }
+.edAssetTable td.asset .name { color: var(--ui-text); font-size: 12px; }
+.edAssetTable td.asset .id { color: var(--ui-muted); font: 10px ui-monospace, Consolas, monospace; }
 .edAssetTable td.num { white-space: nowrap; font-family: ui-monospace, Consolas, monospace; }
 .edAssetTable td.status { white-space: nowrap; }
 .edAssetTable td.status.good { color: var(--ours, #9dc0e4); }
-.edAssetTable td.status.warn { color: var(--warn, #e0b062); }
+.edAssetTable td.status.warn { color: var(--ui-gold); }
 .edAssetTable td.status.bad { color: var(--theirs, #d6604a); }
 .edAssetRuleCards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
-.edAssetRuleCard { padding: 10px; border: 1px solid rgba(230, 223, 205, 0.16); background: rgba(0, 0, 0, 0.18); }
-.edAssetRuleCard .title { color: #e6dfcd; font-size: 13px; margin-bottom: 4px; }
-.edAssetRuleCard .limit { color: var(--warn, #e0b062); font-family: ui-monospace, Consolas, monospace; }
-.edAssetRuleCard .texture { color: rgba(230, 223, 205, 0.72); margin-top: 4px; }
-.edAssetRuleCard .note { color: rgba(230, 223, 205, 0.5); margin-top: 5px; line-height: 1.5; }
+.edAssetRuleCard { padding: 10px; border: 1px solid rgba(214, 217, 209, 0.16); background: rgba(0, 0, 0, 0.18); }
+.edAssetRuleCard .title { color: var(--ui-text); font-size: 13px; margin-bottom: 4px; }
+.edAssetRuleCard .limit { color: var(--ui-gold); font-family: ui-monospace, Consolas, monospace; }
+.edAssetRuleCard .texture { color: var(--ui-muted); margin-top: 4px; }
+.edAssetRuleCard .note { color: var(--ui-muted); margin-top: 5px; line-height: 1.5; }
 
 .edNote {
-  font-size: 11.5px; color: rgba(230, 223, 205, 0.55); line-height: 1.55;
-  border-left: 2px solid rgba(230, 223, 205, 0.18); padding: 2px 0 2px 7px; margin: 5px 0;
+  font-size: 11.5px; color: var(--ui-muted); line-height: 1.55;
+  border-left: 2px solid rgba(214, 217, 209, 0.18); padding: 2px 0 2px 7px; margin: 5px 0;
 }
-.edNote.warn { border-left-color: var(--warn, #e0b062); color: rgba(224, 176, 98, 0.85); }
+.edNote.warn { border-left-color: var(--ui-gold); color: rgba(223, 189, 104, 0.85); }
 
 /* --- 操作说明 ------------------------------------------------------------ */
 .edControlGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; }
 .edControlRow {
   display: grid; grid-template-columns: minmax(96px, auto) 1fr; align-items: center; gap: 9px;
   min-height: 28px; padding: 3px 6px;
-  border-bottom: 1px solid rgba(230, 223, 205, 0.08);
+  border-bottom: 1px solid rgba(214, 217, 209, 0.08);
 }
 .edControlRow kbd {
   justify-self: start; min-width: 72px; box-sizing: border-box;
-  padding: 2px 6px; border: 1px solid rgba(230, 223, 205, 0.26); border-radius: 2px;
-  background: rgba(0, 0, 0, 0.34); color: var(--paper, #e6dfcd);
+  padding: 2px 6px; border: 1px solid rgba(214, 217, 209, 0.26); border-radius: 0;
+  background: rgba(0, 0, 0, 0.34); color: var(--ui-text);
   font: 11px/1.35 ui-monospace, "Cascadia Mono", Consolas, monospace;
   text-align: center; white-space: nowrap;
 }
-.edControlRow span { color: rgba(230, 223, 205, 0.72); font-size: 11.5px; }
+.edControlRow span { color: var(--ui-muted); font-size: 11.5px; }
 
 /* --- 时间轴 -------------------------------------------------------------- */
 .edTrack {
   position: relative; height: 22px; margin: 6px 0 2px;
-  border: 1px solid rgba(230, 223, 205, 0.18); border-radius: 2px;
+  border: 1px solid rgba(214, 217, 209, 0.18); border-radius: 0;
   background: rgba(0, 0, 0, 0.35); cursor: pointer; overflow: hidden;
 }
 .edTrack .shot {
   position: absolute; top: 0; bottom: 0;
-  border-right: 1px solid rgba(230, 223, 205, 0.22);
-  font-size: 10px; color: rgba(230, 223, 205, 0.45);
+  border-right: 1px solid rgba(214, 217, 209, 0.22);
+  font-size: 10px; color: var(--ui-muted);
   text-align: center; line-height: 20px; overflow: hidden;
 }
-.edTrack .shot.on { background: rgba(224, 176, 98, 0.16); color: var(--warn, #e0b062); }
+.edTrack .shot.on { background: rgba(223, 189, 104, 0.16); color: var(--ui-gold); }
 .edTrack .play { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--theirs, #d6604a); }
 
 /* --- 屏幕中央的提示（拾取/放置模式） ------------------------------------- */
 .edHint {
   position: absolute; left: 50%; top: 16px; transform: translateX(-50%);
-  padding: 3px 12px; border-radius: 2px; font-size: 12px;
-  background: rgba(10, 10, 9, 0.75); border: 1px solid rgba(224, 176, 98, 0.45);
-  color: var(--warn, #e0b062); pointer-events: none; opacity: 0;
+  padding: 3px 12px; border-radius: 0; font-size: 12px;
+  background: rgba(10, 10, 9, 0.75); border: 1px solid rgba(223, 189, 104, 0.45);
+  color: var(--ui-gold); pointer-events: none; opacity: 0;
   transition: opacity 0.18s linear;
 }
 .edHint.on { opacity: 1; }
@@ -251,7 +247,7 @@
 .edCross { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; display: none; }
 .edCross.on { display: block; }
 .edCross::before, .edCross::after {
-  content: ""; position: absolute; background: rgba(224, 176, 98, 0.8);
+  content: ""; position: absolute; background: rgba(223, 189, 104, 0.8);
 }
 .edCross::before { left: -9px; top: -1px; width: 18px; height: 1px; }
 .edCross::after { left: -1px; top: -9px; width: 1px; height: 18px; }
@@ -274,20 +270,20 @@
 .edMapLabel {
   position: absolute; transform: translate(-50%, -100%);
   font: 600 12px/1.35 "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
-  color: #f0cc8b; padding: 1px 6px; border-radius: 2px; white-space: nowrap;
-  background: rgba(10, 10, 9, 0.62); border: 1px solid rgba(224, 176, 98, 0.4);
+  color: #f0cc8b; padding: 1px 6px; border-radius: 0; white-space: nowrap;
+  background: rgba(10, 10, 9, 0.62); border: 1px solid rgba(223, 189, 104, 0.4);
   text-shadow: 0 1px 2px #000;
 }
 .edMapLabel.road { color: #a7cee1; border-color: rgba(117, 169, 198, 0.45); }
 /* 布防图参考名（没进文档的）：虚线框区分「图纸上的」与「你放下的」 */
 .edMapLabel.ref { opacity: 0.82; border-style: dashed; }
-.edMapLabel.sel { color: #fff; border-color: var(--warn, #e0b062); background: rgba(58, 42, 18, 0.88); }
+.edMapLabel.sel { color: #fff; border-color: var(--ui-gold); background: rgba(58, 42, 18, 0.88); }
 
 /* 第一人称持枪检查：标签跟着真实挂点投到屏幕，外部检查时仍与同一棵 Viewmodel 对位。 */
 .edFpsMountHud { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: -1; }
 .edFpsMountLabel {
   position: absolute; transform: translate(-50%, -118%); white-space: nowrap;
-  padding: 1px 5px; border-radius: 2px;
+  padding: 1px 5px; border-radius: 0;
   color: var(--mount-color, #fff); background: rgba(7, 7, 6, 0.76);
   border: 1px solid var(--mount-color, #fff);
   font: 600 10px/1.35 ui-monospace, "Cascadia Mono", Consolas, monospace;
@@ -296,14 +292,14 @@
 .edFpsMountLabel.actual { transform: translate(-50%, 62%); border-style: dashed; }
 .edFpsLegend {
   position: absolute; left: 240px; bottom: 22px; display: flex; flex-wrap: wrap; gap: 5px 10px;
-  max-width: calc(100vw - 600px); padding: 5px 8px; border-radius: 2px;
+  max-width: calc(100vw - 600px); padding: 5px 8px; border-radius: 0;
   pointer-events: none; background: rgba(7, 7, 6, 0.72);
-  border: 1px solid rgba(230, 223, 205, 0.18);
+  border: 1px solid rgba(214, 217, 209, 0.18);
   font: 10px/1.35 ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
 .edFpsLegend span { color: var(--c); }
 .edFpsLegend span::before { content: "● "; }
-.edFpsLegend::after { content: attr(data-view); color: rgba(230, 223, 205, 0.68); }
+.edFpsLegend::after { content: attr(data-view); color: var(--ui-muted); }
 body.edFpsClean #edRoot .edPanel,
 body.edFpsClean #edRoot .edGear,
 body.edFpsClean #edRoot .edHint { display: none !important; }
@@ -321,4 +317,33 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
   .edPanel.debugRendering { left: 174px; width: min(280px, calc(100% - 188px)); }
   .edFpsLegend { left: 14px; max-width: calc(100vw - 28px); }
   .edControlGrid { grid-template-columns: 1fr; }
+}
+
+/* 工具目录沿用任务列表的文字选项；数值区维持明确的输入边框。 */
+.edPanel.launcher .edBtn {
+  border: 1px solid transparent; background: transparent; min-height: 32px;
+  padding: 6px 8px; text-align: left; color: var(--ui-text); font-weight: 700;
+}
+.edPanel.launcher .edBtn:hover, .edPanel.launcher .edBtn.on {
+  color: var(--ui-gold); background: var(--ui-selection); border-image: var(--ui-selection-edge);
+}
+.edPanel input[type="range"]:hover::-webkit-slider-thumb,
+.edPanel input[type="range"]:focus-visible::-webkit-slider-thumb { background: var(--ui-gold); }
+body.edToolsOpen #edRoot::before {
+  content: "设置与工具"; position: absolute; inset: 0 0 auto; height: 64px;
+  box-sizing: border-box; padding: 15px 24px; background: var(--ui-black);
+  color: var(--ui-bright); border-bottom: 1px solid var(--ui-line);
+  font-size: 24px; font-weight: 700; letter-spacing: 0.06em;
+}
+body.edToolsOpen:has(#edRoot:not(.off)) #menu:not(.off) .mnFoot,
+body.edToolsOpen:has(#edRoot:not(.off)) #menu:not(.off) .mnShotNote,
+body.edToolsOpen:has(#edRoot:not(.off)) #menu:not(.off) .mnList,
+body.edToolsOpen:has(#edRoot:not(.off)) #menu:not(.off) .mnTitle { visibility: hidden; }
+@media (max-width: 600px) {
+  .edPanel.launcher { left: 10px; right: 10px; width: auto; max-height: 26vh; }
+  .edPanel.work, .edPanel.wide, .edPanel.assetStandards {
+    left: 10px; right: 10px; width: auto; top: calc(26vh + 96px); bottom: 10px;
+  }
+  .edPanel.debugRendering { left: 10px; right: 10px; width: auto; top: 84px; bottom: 10px; z-index: 1; }
+  .edHint { top: 10px; max-width: calc(100% - 150px); left: 10px; transform: none; }
 }

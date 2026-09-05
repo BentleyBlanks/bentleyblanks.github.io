@@ -259,6 +259,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   编剧红线在 `Data_Script.mjs` 头注与 `docs/Data_HistoryQuotes.md`。先读 `docs/Data_CutsceneRedo.md`。
 
 ### HUD / 菜单 / 输入
+- `Style_Interface.css` —— 主菜单、加载、选章、暂停、设置与工具窗口的共用主题；
+  各窗口布局在 `Style_Menu.css` / `Style_Editor.css`，验收 `Script_MenuTest.mjs --interface-only`。
 - `Script_Hud.mjs` —— 纯 DOM/CSS，不进 three 渲染；层级参考战地，含阵亡卡片。
 - `Script_Menu.mjs` + `Data_Menu.mjs` —— 主菜单（活战场打底 + 相机导演）；`Data_Menu` 还放着
   **两片不进 PHASES 的切片**：全城俯瞰 `OVERVIEW_PHASE` 与界河白盒 `JIEHE_SANDBOX_PHASE`。

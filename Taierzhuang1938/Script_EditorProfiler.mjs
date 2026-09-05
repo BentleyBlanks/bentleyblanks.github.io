@@ -50,36 +50,36 @@ const GPU_LABELS = [
 
 const POPUP_CSS = `
   * { box-sizing: border-box; }
-  body { margin: 0; padding: 14px 18px; background: #0b0c10; color: #cfd3da;
-         font: 12px/1.55 "Segoe UI", "Microsoft YaHei", sans-serif; }
-  h1 { font-size: 14px; margin: 0 0 8px; color: #e8e2d2; letter-spacing: 1px; }
-  h2 { font-size: 12px; margin: 16px 0 4px; color: #b8a86a; letter-spacing: 1px; }
+  body { margin: 0; padding: 14px 18px; background: var(--ui-surface); color: var(--ui-text);
+         font: 12px/1.55 var(--ui-font); }
+  h1 { font-size: 21px; padding: 14px 18px; background: var(--ui-black); margin: -14px -18px 18px; color: var(--ui-bright); letter-spacing: 1px; }
+  h2 { font-size: 12px; margin: 16px 0 4px; color: var(--ui-gold); letter-spacing: 1px; }
   .num, td, .big span { font-family: Consolas, "Cascadia Mono", monospace; }
   .head { display: flex; align-items: baseline; gap: 18px; margin: 4px 0 8px; }
-  .big { font-size: 30px; color: #e8e2d2; }
-  .big em { font-size: 12px; font-style: normal; color: #7c828d; margin-left: 4px; }
-  .stats { color: #9aa0ab; }
-  .stats b { color: #cfd3da; font-weight: normal; font-family: Consolas, monospace; }
-  #badge { font-size: 11px; color: #6f7681; margin-left: 8px; }
-  canvas { display: block; background: #07080b; border: 1px solid #1d2026; width: 100%; }
-  .legend { color: #6f7681; font-size: 11px; margin: 3px 0 0; }
+  .big { font-size: 30px; color: var(--ui-bright); }
+  .big em { font-size: 12px; font-style: normal; color: var(--ui-muted); margin-left: 4px; }
+  .stats { color: var(--ui-muted); }
+  .stats b { color: var(--ui-text); font-weight: normal; font-family: Consolas, monospace; }
+  #badge { font-size: 11px; color: var(--ui-muted); margin-left: 8px; }
+  canvas { display: block; background: var(--ui-black); border: 1px solid var(--ui-line); width: 100%; }
+  .legend { color: var(--ui-muted); font-size: 11px; margin: 3px 0 0; }
   .legend i { display: inline-block; width: 9px; height: 9px; margin: 0 4px 0 10px; vertical-align: -1px; }
   table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: right; padding: 1px 8px; border-bottom: 1px solid #16181d; white-space: nowrap; }
-  th { color: #7c828d; font-weight: normal; }
+  th, td { text-align: right; padding: 1px 8px; border-bottom: 1px solid var(--ui-line); white-space: nowrap; }
+  th { color: var(--ui-muted); font-weight: normal; }
   th:first-child, td:first-child { text-align: left; }
   td.bar { width: 34%; padding: 0 0 0 8px; }
   td.bar i { display: block; height: 7px; background: #38607e; min-width: 1px; }
-  tr.total td { border-top: 1px solid #2a2d34; color: #e8e2d2; }
-  .note { color: #6f7681; font-size: 11px; margin: 4px 0; }
+  tr.total td { border-top: 1px solid var(--ui-line); color: var(--ui-bright); }
+  .note { color: var(--ui-muted); font-size: 11px; margin: 4px 0; }
   .warn { color: #c9a227; }
-  .worst { border: 1px solid #1d2026; background: #0d0f13; padding: 8px 10px; }
+  .worst { border: 1px solid var(--ui-line); background: var(--ui-black); padding: 8px 10px; }
   .worst b { color: #d88b85; font-family: Consolas, monospace; font-weight: normal; }
-  button { background: #1a1d23; color: #cfd3da; border: 1px solid #2a2d34;
+  button { background: var(--ui-surface); color: var(--ui-text); border: 1px solid var(--ui-line);
            padding: 4px 12px; cursor: pointer; font: inherit; margin: 10px 0 4px; }
-  button:hover { border-color: #b8a86a; }
-  textarea { width: 100%; height: 140px; background: #07080b; color: #9aa0ab;
-             border: 1px solid #1d2026; display: none; font: 11px Consolas, monospace; }
+  button:hover { border-color: var(--ui-gold); color: var(--ui-gold); background: var(--ui-selection); }
+  textarea { width: 100%; height: 140px; background: var(--ui-black); color: var(--ui-muted);
+             border: 1px solid var(--ui-line); display: none; font: 11px Consolas, monospace; }
 `;
 
 export class ProfilerEditor {
@@ -137,6 +137,14 @@ export class ProfilerEditor {
     doc.write("<!doctype html><html><head><meta charset='utf-8'>"
       + "<title>滕县 一九三八 · 性能剖析</title></head><body></body></html>");
     doc.close();
+    doc.body.className = "uiProfiler";
+    // 从当前入口复制实际版本 URL，独立窗口与游戏共用同一套主题。
+    const theme = document.querySelector("link[data-interface-theme]");
+    if (theme) {
+      const link = doc.createElement("link");
+      link.rel = "stylesheet"; link.href = theme.href;
+      doc.head.appendChild(link);
+    }
     const style = doc.createElement("style");
     style.textContent = POPUP_CSS;
     doc.head.appendChild(style);
