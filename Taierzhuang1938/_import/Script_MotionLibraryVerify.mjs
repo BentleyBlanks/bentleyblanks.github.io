@@ -25,37 +25,42 @@ async function Snapshot(phase){
     rawError=Math.max(rawError,...expected.map((x,k)=>Math.abs(x-track.joints[j].position.getComponent(k))));
    }
   }
-  return {id:m.variant.id,phase:m.phase,duration:m.model.duration,bones:m.model.bones.length,matrices:m.model.bones.flatMap(b=>b.matrixWorld.elements),time,videoTime:m.video.currentTime,videoWidth:m.video.videoWidth,videoSource:m.video.currentSrc,range:m.range,trackFrames:m.recovery.tracks.map(t=>t.frame),rawPositions:m.recovery.tracks.flatMap(t=>t.joints.flatMap(j=>j.position.toArray())),rawError,rawTracks:m.recovery.tracks.length,modelTime:m.model.mixer.time,sourceHidden:document.getElementById('sourceEmpty').hidden};
+  const nearStockParts=[];m.model.model.traverse(o=>{if(o.isMesh&&o.name.includes('RifleNear'))nearStockParts.push(o.name)});
+  return {id:m.variant.id,nearStockParts,phase:m.phase,duration:m.model.duration,bones:m.model.bones.length,matrices:m.model.bones.flatMap(b=>b.matrixWorld.elements),time,videoTime:m.video.currentTime,videoWidth:m.video.videoWidth,videoSource:m.video.currentSrc,range:m.range,trackFrames:m.recovery.tracks.map(t=>t.frame),rawPositions:m.recovery.tracks.flatMap(t=>t.joints.flatMap(j=>j.position.toArray())),rawError,rawTracks:m.recovery.tracks.length,modelTime:m.model.mixer.time,sourceHidden:document.getElementById('sourceEmpty').hidden};
  });
 }
 function Delta(a,b){assert.equal(a.length,b.length);return Math.max(0,...a.map((v,i)=>Math.abs(v-b[i])))}
 function CheckSync(s,v){
  assert.ok(s.matrices.every(Number.isFinite),v.id+' finite matrices');assert.ok(Math.abs(s.modelTime-s.phase*s.duration)<.00001,'Model time');
+ if(v.id.startsWith('Ija-v3-'))assert.equal(s.nearStockParts.length,2,'Complete Type 38 stock and receiver exported');
  if(!v.review?.sourceVideo)return;
  assert.ok(s.videoWidth>0&&s.sourceHidden,'Original video decoded and visible');assert.ok(Math.abs(s.time-s.videoTime)<.002,'Video time');
  assert.equal(s.videoSource,new URL('../'+v.review.sourceVideo,url).href);assert.equal(s.rawTracks,v.review.recoveryTracks.length);assert.ok(s.rawError<1e-10,'Raw viewing transform');
  for(const frame of s.trackFrames)assert.ok(Math.abs(frame-s.time*v.review.recoveryFps)<1e-7,'Recovery frame');
 }
-async function Select(action,id='Nra-v2-'+action){await page.locator(`#list button[data-id="${action}"]`).click();await page.locator('#faction').selectOption('Nra');await Ready(id)}
+async function LatestReady(action,faction='Nra'){const id=await page.evaluate(({action,faction})=>MotionReview.catalog.actions.find(e=>e.id===action).latestByFaction[faction],{action,faction});await Ready(id)}
+async function Select(action,id){await page.locator('#list details').evaluateAll(nodes=>nodes.forEach(n=>n.open=true));await page.locator(`#list button[data-id="${action}"]`).click();await page.locator('#faction').selectOption('Nra');if(id)await Ready(id);else await LatestReady(action)}
 try{
- await page.goto(url+'?action=RifleCrouchAdvance');await Ready('Nra-v2-RifleCrouchAdvance');const actions=await page.evaluate(()=>MotionReview.catalog.actions);
+ await page.goto(url+'?action=RifleCrouchAdvance');await LatestReady('RifleCrouchAdvance');const actions=await page.evaluate(()=>MotionReview.catalog.actions);
  assert.equal(await page.locator('#paneB').count(),0);assert.equal(await page.locator('#panes > article').count(),3);assert.equal(await page.locator('#history').evaluate(e=>e.open),false);
+ assert.equal(await page.locator('#legacyActions').evaluate(e=>e.open),false);assert.equal(await page.locator('#splitActions').evaluate(e=>e.open),false);
  for(const entry of actions){
+  await page.locator('#list details').evaluateAll(nodes=>nodes.forEach(n=>n.open=true));
   await page.locator(`#list button[data-id="${entry.id}"]`).click();
   for(const [faction,id] of Object.entries(entry.latestByFaction)){
    await page.locator('#faction').selectOption(faction);await Ready(id);
    const variant=entry.variants.find(v=>v.id===id),a=await Snapshot(.15),b=await Snapshot(.7);CheckSync(b,variant);
    const movement=Delta(a.matrices,b.matrices),rawMovement=Delta(a.rawPositions,b.rawPositions);let seam=null;
-   if(id.includes('-v2-'))assert.ok(movement>.0001,'Animated latest model '+id);
+   if(Number(id.match(/-v(\d+)-/)?.[1]||0)>=2)assert.ok(movement>.0001,'Animated latest model '+id);
    if(b.rawTracks)assert.ok(rawMovement>.0001,'Moving raw recovery '+id);
-   if(entry.loop&&id.includes('-v2-')){seam=Delta((await Snapshot(0)).matrices,(await Snapshot(1)).matrices);assert.ok(seam<.001,'Loop endpoints '+id+' '+seam)}
+   if(entry.loop&&Number(id.match(/-v(\d+)-/)?.[1]||0)>=2){seam=Delta((await Snapshot(0)).matrices,(await Snapshot(1)).matrices);assert.ok(seam<.001,'Loop endpoints '+id+' '+seam)}
    results.push({id,duration:b.duration,bones:b.bones,movement,seam,range:b.range,rawTracks:b.rawTracks,rawError:b.rawError,rawMovement});
    if(faction==='Nra'&&['RifleCrouchAdvance','KneelHold','KneelSequence','StretcherPair'].includes(entry.id)){await Snapshot(.45);await page.screenshot({path:path.join(root,'Preview',`Texture_SourceRecoveryLatest_${entry.id}.png`)})}
   }
  }
  await Select('RifleCrouchAdvance');await page.locator('#history > summary').click();await page.locator('[data-variant="Nra-v1-RifleCrouchAdvance"]').click();await Ready('Nra-v1-RifleCrouchAdvance');
  const history=await Snapshot(.4);assert.deepEqual(history.range,[.3,3.8]);controls.history={id:history.id,range:history.range,time:history.videoTime};
- await page.locator('#latest').click();await Ready('Nra-v2-RifleCrouchAdvance');const latest=await Snapshot(.4);assert.deepEqual(latest.range,[1,4.3]);
+ await page.locator('#latest').click();await LatestReady('RifleCrouchAdvance');const latest=await Snapshot(.4);assert.deepEqual(latest.range,[1,4.3]);
  await page.locator('#next').click();const step=await Snapshot(await page.evaluate(()=>MotionReview.phase));assert.ok(Math.abs(step.videoTime-latest.videoTime-1/30)<.002);
  await page.locator('#prev').click();assert.ok(Math.abs((await Snapshot(await page.evaluate(()=>MotionReview.phase))).videoTime-latest.videoTime)<.002);controls.frameStep=true;
  await page.locator('#timeline').fill('0.25');assert.ok(Math.abs((await Snapshot(await page.evaluate(()=>MotionReview.phase))).videoTime-1.825)<.002);controls.scrub=true;
@@ -72,8 +77,10 @@ try{
  assert.equal(controls.missing.range,null);assert.equal(controls.missing.tracks,0);assert.match(controls.missing.source,/未记录/);assert.match(controls.missing.recovery,/没有关联/);
  await page.route('**/*Animation_Nra_RifleCrouchAdvance*',async route=>{await new Promise(r=>setTimeout(r,350));await route.continue()});
  await page.evaluate(()=>{MotionReview.select(MotionReview.catalog.actions.find(e=>e.id==='RifleCrouchAdvance'));MotionReview.select(MotionReview.catalog.actions.find(e=>e.id==='KneelHold'))});
- await Ready('Nra-v2-KneelHold');await page.evaluate(()=>new Promise(r=>setTimeout(r,500)));assert.equal(await page.evaluate(()=>MotionReview.model.variant.id),'Nra-v2-KneelHold');controls.rapidSwitch=true;
- await page.locator('#faction').selectOption('Ija');await Ready('Ija-v2-KneelHold');assert.ok((await Snapshot(.4)).sourceHidden);controls.sameSourceFactionSwitch=true;
+ await LatestReady('KneelHold');await page.evaluate(()=>new Promise(r=>setTimeout(r,500)));assert.equal(await page.evaluate(()=>MotionReview.model.variant.id),await page.evaluate(()=>MotionReview.selected.latestByFaction.Nra));controls.rapidSwitch=true;
+ await page.locator('#faction').selectOption('Ija');await LatestReady('KneelHold','Ija');assert.ok((await Snapshot(.4)).sourceHidden);controls.sameSourceFactionSwitch=true;
+ await Select('CrouchIdle','Nra-original-CrouchIdle');controls.legacy=await page.evaluate(()=>({source:document.getElementById('sourceEmpty').textContent,recovery:document.getElementById('recoveryEmpty').textContent}));assert.match(controls.legacy.source,/BIP/);assert.match(controls.legacy.recovery,/未经过 GVHMR/);
+ await Select('StretcherPair');assert.match(await page.locator('#status').textContent(),/不符合严格单人/);controls.splitInputLinks=await page.locator('#references a').filter({hasText:'实际裁剪推理输入'}).count();assert.equal(controls.splitInputLinks,2);
  const source=actions.find(e=>e.id==='WoundedLimp').variants.find(v=>v.id==='Nra-v2-WoundedLimp').review.sourceVideo;
  const response=await fetch(new URL('../'+source,url),{headers:{Range:'bytes=0-63'}});assert.equal(response.status,206);assert.equal((await response.arrayBuffer()).byteLength,64);controls.referenceRangeStatus=206;
  assert.deepEqual(errors,[]);const report={status:'passed',rendering:'Original video + untouched GVHMR joints + latest GLTFLoader/AnimationMixer model',variants:results,controls,errors};

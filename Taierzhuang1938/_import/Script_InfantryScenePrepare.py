@@ -52,7 +52,7 @@ for faction in ['Nra','Ija']:
         image=bpy.data.images.load(str(project/('Texture/Texture_Weapon'+key.title()+'V2Base.webp')),check_existing=True)
         tex=mat.node_tree.nodes.new('ShaderNodeTexImage');tex.image=image
         mat.node_tree.links.new(tex.outputs['Color'],mat.node_tree.nodes.get('Principled BSDF').inputs['Base Color'])
-    meshIndices=next(n['meshes'] for n in data['nodes'] if n['name']=='body')
+    meshIndices=[i for n in data['nodes'] if n['name'] in ['body','adsNear'] for i in n.get('meshes',[])]
     for index in meshIndices:
         block=data['meshes'][index];q=Decode(block['pos'],'H');uv=Decode(block['uv'],'H');ids=Decode(block['idx'],'I' if block['idxBits']==32 else 'H')
         vertices=[tuple(block['posMin'][j]+q[i*3+j]*block['posScale'][j] for j in range(3)) for i in range(block['count'])]

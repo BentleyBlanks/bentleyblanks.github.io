@@ -39,6 +39,10 @@ for name,(source,video,span) in configs.items():
     sideYaw=np.pi/2 if name in ['CarryStretcherFront','CarryStretcherRear','StretcherPair','WoundedLimp'] else -np.pi/2
     latest={'sourceVideo':video,'sourceRangeSeconds':[f/30 for f in span],'recoveryTracks':tracks,'recoveryLabel':'GVHMR 原始恢复 · 未重定向、未修脚','recoveryFps':30,'sideCameraYawRadians':float(sideYaw)}
     if name=='StretcherPair':latest['recoveryLabel']='两人分别恢复 · 间距仅用于展示'
+    if name in ['CarryStretcherFront','CarryStretcherRear','StretcherPair']:
+        latest['sourceAssessment']='多人原片拆分实验：两名担架员分别裁剪推理；裁剪内仍可见伤员局部，不符合严格单人素材规范。两人间距与共用担架由后期组装。'
+        latest['inferenceInputs']=[f'Models/_Cache/ReviewV2/{s}_Crop.mp4' for s in (['CarryStretcherFront','CarryStretcherRear'] if name=='StretcherPair' else [name])]
+        latest['sourceQuality']='not_strict_single_person'
     history={}
     if name in v1Ranges:
         history['v1']={**latest,'sourceRangeSeconds':[f/30 for f in v1Ranges[name]],'recoveryTracks':[{'path':raw[('V1',source)],'offset':[0,0,0]}]}
