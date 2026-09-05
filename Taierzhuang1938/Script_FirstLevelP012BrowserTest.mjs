@@ -360,6 +360,8 @@ async function PlayPrelude() {
   Check(result.flow.beatIndex >= 6, "真实移动、领取枪弹、跟队与搬弹完成开场",
     result.flow.beatIndex >= 6 ? `${result.flow.elapsed.toFixed(1)}s` : JSON.stringify(result));
   Check(result.carry === null, "弹药实际交付后释放双手，能够拔枪");
+  Check(result.scene.openingCast.length===6&&result.scene.openingCast.every(entry=>entry.shellStanceRestored&&entry.shellStanceRestoredAt!==null),
+    "原六人炮后实际恢复行进姿态，不以永久卧姿慢爬拖住报数",JSON.stringify(result.scene.openingCast.map(entry=>({id:entry.actorId,previous:entry.shellPreviousStance,restoredAt:entry.shellStanceRestoredAt}))));
   Check(await page.evaluate(()=>!!window.p012ReviewBot.regroupCaptured&&!!window.p012ReviewBot.ammoDoglegCaptured),
     "实际玩家位置经历炮后全班报数与唯一一次狗腿沟搬弹");
   const briefingEvidence=await page.evaluate(()=>({captured:window.p012ReviewBot.briefingCaptured||[],inspection:window.p012ReviewBot.inspectionTrace||[]}));
@@ -2744,7 +2746,7 @@ try {
         immediate: game?.story.p012Immediate, cueLog: game?.story.p012CueLog } };
   }).catch(() => null);
   await fs.writeFile(path.join(outputDir, "Data_P012FailureTrace.json"),
-    JSON.stringify({ error: String(error), state: failureState }, null, 2));
+    JSON.stringify({ error: String(error), browserErrors:errors, state: failureState }, null, 2));
   console.error("P012 failure", {beat:failureState?.flow?.beat,elapsed:failureState?.flow?.elapsed,
     guide:failureState?.scene?.guidePosition,column:failureState?.scene?.columnPosition,
     trace:path.join(outputDir,"Data_P012FailureTrace.json")});

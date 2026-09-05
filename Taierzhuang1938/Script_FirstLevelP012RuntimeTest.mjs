@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
-import { FirstLevelP012Runtime, P012GuideApproach } from "./Script_FirstLevelP012Runtime.mjs";
+import { FirstLevelP012Runtime, P012GuideApproach, P012CanResumeMarch } from "./Script_FirstLevelP012Runtime.mjs";
 import {P012SegmentClear} from "./Script_FirstLevelP012March.mjs";
 import { SETPIECES, EscortColumn, LastLitterArrived, StepP012PlayerLitter, StepP012AirCivilian } from "./Script_MissionSetpieces.mjs";
 import P012Phase from "./Data_FirstLevelP012Whitebox.mjs";
@@ -193,14 +193,15 @@ assert.ok(openingStoryBeats.length>0);
  console.log('PASS physical casualty/flank/smoke/road guides: swept clearance, actual arrival cues, waits and handoff');
 }
 {
- const guide={x:0,z:0},player={x:0,z:0},actors=Array.from({length:6},(_,i)=>({id:`march${i}`,x:0,z:6+i,alive:true}));
+ const guide={x:0,z:0},player={x:0,z:0},actors=Array.from({length:6},(_,i)=>({id:`march${i}`,x:0,z:6+i,alive:true,stance:i===5?1:0}));
  const signals=new Set(),stances=[],releases=[],defenses=[],orders=[];
  const route=[{x:0,z:20},{x:0,z:0},{x:0,z:-20},{x:0,z:-40}];
  const positions=actors.map((_,i)=>({x:4+i*2,z:-39}));
  const runtime=new FirstLevelP012Runtime({GuideActor:()=>guide,Position:a=>a,PlayerPosition:()=>player,Signalled:s=>signals.has(s),
   Signal:s=>signals.add(s),
-  SetOpeningShelter:(a,duration)=>stances.push({a,duration}),ReleaseGuide:a=>releases.push(a),Defend:(a,p)=>defenses.push({a,p}),
-  Move:(a,p,speed)=>{orders.push({a,speed});const d=Math.hypot(p.x-a.x,p.z-a.z);if(d>.3){const f=Math.min(d-.3,speed*.05)/d;a.x+=(p.x-a.x)*f;a.z+=(p.z-a.z)*f;}},
+  SetOpeningShelter:(a,duration)=>{stances.push({a,duration});a.stance=2;a.stanceUntil=runtime.time+duration;},
+  SetGuideStance:(a,stance)=>{a.stance=stance;},ReleaseGuide:a=>releases.push(a),Defend:(a,p)=>defenses.push({a,p}),
+  Move:(a,p,speed)=>{orders.push({a,speed});const d=Math.hypot(p.x-a.x,p.z-a.z);if(d>.3){const f=Math.min(d-.3,speed*.05*(a.stance===2?.3:a.stance===1?.6:1))/d;a.x+=(p.x-a.x)*f;a.z+=(p.z-a.z)*f;}},
  },{layout:{blocks:[]},activities:{openingMarch:true,villageRoute:route.slice(0,2),shellCoverRoute:route,openingMarchRoute:route,openingMarchDefensePositions:positions}});
  runtime.openingCast=actors.map((actor,slot)=>({actor,slot,ammoIssued:true,issueComplete:true,parking:{...actor}}));
  for(const beat of [2,3,4]){runtime.beat=beat;guide.z=beat===4?-20:0;for(let i=0;i<180;i++){runtime.time+=.05;runtime.StepMarch(.05);}}
@@ -209,6 +210,19 @@ assert.ok(openingStoryBeats.length>0);
  signals.add('P012NorthNearMissImpact');runtime.guideReactionUntil=runtime.time+2.4;const before=actors.map(a=>({x:a.x,z:a.z}));
  for(let i=0;i<47;i++){runtime.StepMarch(.05);runtime.time+=.05;}
  assert.equal(stances.length,6);assert.deepEqual(actors.map(a=>({x:a.x,z:a.z})),before,'actual impact stops all six without changing positions');
+ assert.ok(actors.every(a=>a.stance===2),'actual shell reaction leaves all six prone during the commitment');
+ actors[0].suppression=.8;actors[1].state='suppressed';actors[2].stanceUntil=runtime.time+1;
+ actors[3].meleeCombat={};actors[4].stance=1;
+ runtime.time+=.1;runtime.StepMarch(.05);
+ assert.deepEqual(actors.map(a=>a.stance),[2,2,2,2,1,1],
+   'new pressure, suppression state, extended posture and another pose owner prevent forced standing; original crouch is restored');
+ assert.equal(runtime.openingCast[4].shellStanceRestoredAt,undefined,'external crouch is not overwritten or recorded as our pose restoration');
+ actors[0].suppression=0;actors[1].state='advance';actors[2].stanceUntil=-99;actors[3].meleeCombat=null;
+ runtime.time+=.1;runtime.StepMarch(.05);
+ assert.deepEqual(actors.map(a=>a.stance),[0,0,0,0,1,1],'safe march restores each earlier stance rather than retaining prone speed');
+ assert.ok(runtime.openingCast.every(entry=>entry.shellStanceRestored));
+ assert.equal(P012CanResumeMarch({...actors[0],alive:false},runtime.time),false);
+ assert.equal(P012CanResumeMarch({...actors[0],suppression:.321},runtime.time),false);
  signals.add('P012NorthDitchEntered');guide.z=-40;
  player.z=0;for(let i=0;i<400;i++){runtime.time+=.05;runtime.StepMarch(.05);}
  assert.equal(signals.has('P012NorthSquadRegrouped'),false,'the squad cannot report to an absent player through a wall');
@@ -216,7 +230,9 @@ assert.ok(openingStoryBeats.length>0);
  for(let i=0;i<400&&!signals.has('P012NorthSquadRegrouped');i++){runtime.time+=.05;runtime.StepMarch(.05);}
  assert.ok(signals.has('P012NorthSquadRegrouped'),'all six physically finish reaction and close on Luo before the count begins');
  assert.ok(runtime.openingCast.every(entry=>entry.shellReacted&&runtime.time>=entry.shellReactionUntil));
+ runtime.openingCast[0].shellStanceRestored=false;actors[0].stance=2;
  runtime.time+=.1;runtime.beat=5;
+ runtime.StepMarch(.05);assert.equal(actors[0].stance,2,'frontline entry does not force a delayed opening recovery');
  for(let i=0;i<600;i++){runtime.time+=.05;runtime.StepMarch(.05);}
  assert.equal(releases.length,6);assert.equal(defenses.length,6);assert.ok(runtime.openingCast.every(e=>e.marchComplete&&e.stage==='frontline'));
  for(const [i,a] of actors.entries())assert.ok(Math.hypot(a.x-positions[i].x,a.z-positions[i].z)<.45,'defense handover follows actual individual arrival');

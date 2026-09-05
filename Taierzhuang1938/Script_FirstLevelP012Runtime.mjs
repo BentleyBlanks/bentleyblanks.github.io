@@ -2,6 +2,11 @@
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
 import { FirstLevelP012March, P012SegmentClear, P012NextVisiblePoint, P012RouteProjection, P012RoutePoint } from "./Script_FirstLevelP012March.mjs";
 import { FirstLevelP012TrainColumn } from "./Script_FirstLevelP012TrainColumn.mjs";
+/** A scripted march bypasses normal AI stance decisions, including recovery. */
+export function P012CanResumeMarch(actor, time) {
+  return !!actor && actor.alive !== false && time >= (actor.stanceUntil ?? -Infinity)
+    && actor.state !== "suppressed" && (actor.suppression || 0) <= .32 && !actor.meleeCombat;
+}
 function TrafficPoint(path, distance) {
   for(let i=1;i<path.length;i++){
     const a=path[i-1],b=path[i],length=Math.hypot(b.x-a.x,b.z-a.z);
@@ -329,10 +334,20 @@ export class FirstLevelP012Runtime {
       const at=this.host.Position(entry.actor);if(!at)continue;
       if((this.beat??0)<2){this.host.Move(entry.actor,entry.parking,Math.hypot(at.x-entry.parking.x,at.z-entry.parking.z)>.5?3.05:0);continue;}
       if(this.host.Signalled?.("P012NorthNearMissImpact")&&!entry.shellReacted){
+        entry.shellPreviousStance=entry.actor.stance??0;
         entry.shellReacted=true;entry.shellReactionUntil=Math.max(this.guideReactionUntil||0,this.time+2.4);
         this.host.SetOpeningShelter?.(entry.actor,entry.shellReactionUntil-this.time);
       }
       if(this.time<(entry.shellReactionUntil||0)){this.host.Move(entry.actor,at,0);continue;}
+      if(this.beat===4&&entry.shellReacted&&!entry.shellStanceRestored){
+        // Recover only our own temporary prone reaction. New pressure or another
+        // pose owner can keep the actor low; never force a rise in frontline B05+.
+        if(entry.actor.stance!==2)entry.shellStanceRestored=true;
+        else if(P012CanResumeMarch(entry.actor,this.host.CombatTime?.()??this.time)){
+          this.ApplyGuideStance(entry.actor,entry.shellPreviousStance);
+          entry.shellStanceRestored=true;entry.shellStanceRestoredAt=this.time;
+        }
+      }
       entry.actor.scriptedNoncombatant=true;entry.actor.scriptArrivalRadius=.3;
       const activity=this.config.activities,end=this.march.route.at(-1),slot=entry.marchSlot??entry.slot;
       const defense=activity.openingMarchDefensePositions?.[slot];
@@ -704,6 +719,8 @@ export class FirstLevelP012Runtime {
         &&Math.hypot(this.host.Position(entry.actor).x-this.host.Position(this.host.GuideActor()).x,this.host.Position(entry.actor).z-this.host.Position(this.host.GuideActor()).z)<10).length,
       openingCast: (this.openingCast || []).map(entry=>({actorId:entry.actor.id,age:entry.actor.identity?.age,modelVariant:entry.actor.actor?.modelVariant,position:this.host.Position(entry.actor),parking:entry.parking,index:entry.index,released:!!entry.released,
         stage:entry.stage||"muster",weaponIssued:!!entry.weaponIssued,ammoIssued:!!entry.ammoIssued,marchPlan:entry.marchPlan||null,
+        stance:entry.actor.stance,shellPreviousStance:entry.shellPreviousStance,
+        shellStanceRestored:!!entry.shellStanceRestored,shellStanceRestoredAt:entry.shellStanceRestoredAt??null,
         marchComplete:!!entry.marchComplete,marchDefensePoint:entry.marchDefensePoint||null})),
       guideAlive: !!this.host.GuideActor() && !!this.host.Alive(this.host.GuideActor()),
       guideHealth: this.host.GuideActor()?.health ?? null, guideOrder: this.host.GuideActor()?.order ?? null,
