@@ -66,7 +66,9 @@ assert.ok(openingStoryBeats.length>0);
   const runtime=new FirstLevelP012Runtime({GuideActor:()=>actor,Position:a=>a,PlayerPosition:()=>player,
    Signalled:event=>signals.has(event),Signal:event=>{events.push(event);signals.add(event);},ReleaseGuide:()=>{releases++;},BodyRadius:()=>radius,
    Move:(a,target,speed)=>{assert.ok(P012SegmentClear(blocks,a,target,radius),'every guide command has body clearance');
-    const distance=Math.hypot(target.x-a.x,target.z-a.z),step=Math.min(distance,speed*.05);
+    const distance=Math.hypot(target.x-a.x,target.z-a.z);
+    if(distance<=(a.scriptArrivalRadius||.3))return;
+    const step=Math.min(distance,speed*.05);
     a.x+=(target.x-a.x)*step/(distance||1);a.z+=(target.z-a.z)*step/(distance||1);},
   },config);
   const flow=new FirstLevelP012Director({Guide:spec=>runtime.Guide(spec)},config);flow.beat=beat;
@@ -90,6 +92,15 @@ assert.ok(openingStoryBeats.length>0);
  assert.deepEqual(wounded.actor,dropped,'guide waits for lagging casualty carrier');
  wounded.Step(500);
  assert.ok(Math.hypot(wounded.actor.x-activity.woundedDragTo.x,wounded.actor.z-activity.woundedDragTo.z)<.6);
+ const westWounded=Make(11,{x:-16.645382287623885,z:-100.03317381459081},.34);
+ Object.assign(westWounded.player,activity.woundedDragFrom);
+ westWounded.Step(600,false);
+ assert.ok(westWounded.events.includes('P012GuideAtWounded'),'guide rounds the west wall to the player already ahead beside the casualty');
+ westWounded.flow.lastSample.woundedDragDelivered=true;
+ Object.assign(westWounded.player,{x:-6.3258401273,z:-91.889215854});
+ westWounded.flow.beat=12;westWounded.flow.StartGuide();westWounded.Step(600,false);
+ assert.ok(Math.hypot(westWounded.actor.x-activity.woundedDragTo.x,westWounded.actor.z-activity.woundedDragTo.z)<.6,
+  'recorded west-side start reaches the delivered casualty and volunteer rendezvous without asking the player to walk back');
  const flank=Make(14,config.routes.flank[0]);flank.Step(200);const cover={...flank.actor};flank.Step(200);
  assert.deepEqual(flank.actor,cover,'guide remains at safe entry, never follows the combat flank');
  assert.ok(Math.hypot(cover.x-activity.ambushEntryRoute[0].x,cover.z-activity.ambushEntryRoute[0].z)<.6);

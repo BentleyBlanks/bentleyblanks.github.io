@@ -194,7 +194,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       woundedDragFrom: { x: 5, z: -65 }, woundedDragTo: { x: -7, z: -52 },
       woundedDragRoute: Object.freeze([{ x: 5, z: -65 }, { x: 5, z: -59 }, { x: 5, z: -46 }, { x: 0, z: -52 }, { x: -7, z: -52 }]),
       woundedDragMinM: 10,
-      woundedGuideRoute: Object.freeze([P012_BLUEPRINT_ANCHORS.gunports[0], P012_BLUEPRINT_ANCHORS.gunports[1],
+      woundedGuideRoute: Object.freeze([{ x: -17, z: -63 }, P012_BLUEPRINT_ANCHORS.gunports[0], P012_BLUEPRINT_ANCHORS.gunports[1],
         { x: 5, z: -59 }, { x: 5, z: -46 }, { x: 0, z: -52 }, { x: -7, z: -52 }]),
       // All six exist before the flank begins: different wall/door sightlines,
       // never late pop-in beside a player who has already crossed the room.
@@ -328,10 +328,12 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
     }),
     storyBeats, actualEventsOnly: true,
     firstContact: Object.freeze({ atS: 285, fullWaveAtS: 330,
-      scoutSearch: Object.freeze(P012MapPoints({ speedMps: 0.65, approachSpeedMps: 0.9,
+      // Use the ordinary AI advance pace. The two scouts emerge from the
+      // existing spawn screen at that pace instead of being slowed for timing.
+      scoutSearch: Object.freeze(P012MapPoints({ speedMps: 2.6, approachSpeedMps: 2.6,
         entries: [
-          { spawn: {x:14,z:-118}, points: [{x:5,z:-118},{x:-2,z:-118}] },
-          { spawn: {x:14,z:-120}, points: [{x:5,z:-120},{x:-4,z:-120}] },
+          { spawn: {x:20,z:-118}, points: [{x:5,z:-118},{x:-2,z:-118}] },
+          { spawn: {x:20,z:-120}, points: [{x:5,z:-120},{x:-4,z:-120}] },
         ] })),
       scout: Object.freeze({ ...P012_ANCHORS.scout, weapon: "Type38" }),
       wave: Object.freeze({ minDistanceM: 45, maxDistanceM: 60, lateralSpanM: 18, deepShare: 0 }) }),

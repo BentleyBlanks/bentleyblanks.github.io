@@ -67,6 +67,7 @@ export class FirstLevelP012Runtime {
       this.guide.bodyRadius=this.GuideBodyRadius(actor);
       this.guide.approach=P012GuideApproach(this.config.layout?.blocks||[],position,route[0],spec.approachPoints,this.guide.bodyRadius);
       this.guide.approachIndex=0;
+      this.guide.travelStart=position&&{x:position.x,z:position.z};
     }
     if (!this.config.activities?.traffic && spec.beat === 2 && !this.traffic.length) {
       const routes = [route.map((point) => ({ x: point.x - 2, z: point.z })),
@@ -398,13 +399,20 @@ export class FirstLevelP012Runtime {
       const target=guide.approachIndex<guide.approach?.length ? guide.approach[guide.approachIndex] : guide.route[guide.index];
       guide.approach=P012GuideApproach(blocks,position,target,[...(guide.approachPoints||[]),...guide.route],radius);
       guide.approachIndex=0;
+      guide.travelStart={x:position.x,z:position.z};
     }
     if(!guide.approach){Stop();return;}
+    // A player across a corner can be farther from the next vertex while
+    // already ahead along the route. Do not wait for that player to come back.
+    const travelRoute=[guide.travelStart,...guide.approach,...guide.route].filter(Boolean);
+    const playerProgress=player&&P012RouteProjection(travelRoute,player);
+    const playerAhead=playerProgress?.distance<3&&playerProgress.along
+      >P012RouteProjection(travelRoute,position).along+.5;
     const near=point=>Math.hypot(position.x-point.x,position.z-point.z)<.6;
     while(guide.approachIndex<guide.approach.length && near(guide.approach[guide.approachIndex]))guide.approachIndex++;
     if(guide.approachIndex<guide.approach.length){
       const target=guide.approach[guide.approachIndex];
-      const lagging=player&&guide.waitDistance&&Math.hypot(player.x-position.x,player.z-position.z)>guide.waitDistance
+      const lagging=player&&!playerAhead&&guide.waitDistance&&Math.hypot(player.x-position.x,player.z-position.z)>guide.waitDistance
         &&Math.hypot(player.x-target.x,player.z-target.z)>Math.hypot(position.x-target.x,position.z-target.z);
       if(!lagging&&P012SegmentClear(blocks,position,target,radius))this.host.Move(actor,target,guide.speed);else {Stop();this.FaceToward(actor,position,player,dt);}
       return;
@@ -420,7 +428,7 @@ export class FirstLevelP012Runtime {
       }
       target=guide.route[++guide.index];
     }
-    const lagging=player&&guide.waitDistance&&Math.hypot(player.x-position.x,player.z-position.z)>guide.waitDistance
+    const lagging=player&&!playerAhead&&guide.waitDistance&&Math.hypot(player.x-position.x,player.z-position.z)>guide.waitDistance
       &&Math.hypot(player.x-target.x,player.z-target.z)>Math.hypot(position.x-target.x,position.z-target.z);
     if(guide.Hold?.() || lagging || !P012SegmentClear(blocks,position,target,radius)){Stop();this.FaceToward(actor,position,player,dt);return;}
     this.host.Move(actor,target,guide.speed);

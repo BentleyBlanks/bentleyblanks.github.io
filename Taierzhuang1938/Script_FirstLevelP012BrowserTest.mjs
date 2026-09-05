@@ -1640,6 +1640,62 @@ async function VerifyAirRouteHandoff(choice) {
   }
 }
 
+async function VerifyWoundedGuide() {
+  const setup=await page.evaluate(async()=>{
+    const game=window.Tengxian;
+    const {FirstLevelP012Director}=await import("./Script_FirstLevelP012Flow.mjs");
+    const {FirstLevelP012Runtime}=await import("./Script_FirstLevelP012Runtime.mjs");
+    let runtime,flow;
+    const update=FirstLevelP012Runtime.prototype.Update;
+    FirstLevelP012Runtime.prototype.Update=function(...args){runtime=this;return update.apply(this,args);};
+    FirstLevelP012Director.prototype.Update=function(dt,sample){flow=this;this.elapsed+=dt;this.lastSample={...sample,woundedDragDelivered:true};};
+    game.StepFrames(1);FirstLevelP012Runtime.prototype.Update=update;
+    const guide=runtime.host.GuideActor(),x=-16.645382287623885,z=-100.03317381459081;
+    const y=game.battlefield.GroundHeight(x,z);
+    guide.position.set(x,y,z);guide.body.Teleport(x,y,z);guide.goal.copy(guide.position);
+    runtime.host.ReleaseGuide(guide);runtime.host.Defend(guide,{x,z},runtime.config.activities.frontlineDoctrine);
+    game.player.Spawn(-6.3258401273,-91.889215854,0);
+    flow.lastSample={position:game.player.position,guidePosition:guide.position,woundedDragDelivered:true};
+    flow.beat=11;flow.StartGuide();flow.beat=12;flow.StartGuide();
+    runtime.Update=function(dt){this.time+=dt;this.StepSafeGuide(this.guide,guide,dt);};
+    window.p012WoundedGuideFixture={flow,runtime,guide,frames:0,trace:[]};
+    return {start:guide.position.toArray(),radius:guide.body.radius,
+      scope:"local B11 to B12 handoff with recorded initial guide/player positions and a delivered casualty; real AI, collision and volunteer interaction"};
+  });
+  let result;
+  for(let chunk=0;chunk<10;chunk++){
+    result=await page.evaluate(()=>{
+      const g=window.Tengxian,f=window.p012WoundedGuideFixture;
+      for(let frame=0;frame<120;frame++){
+        g.StepFrames(1,1/30,false);f.frames++;
+        if(f.frames%15===0)f.trace.push({at:f.frames/30,position:f.guide.position.toArray(),
+          goal:f.guide.goal.toArray(),approachIndex:f.runtime.guide.approachIndex,index:f.runtime.guide.index});
+        const end=f.runtime.guide.route.at(-1);
+        if(f.runtime.guide.index===f.runtime.guide.route.length-1&&Math.hypot(f.guide.position.x-end.x,f.guide.position.z-end.z)<.6)break;
+      }
+      g.StepFrames(1);
+      const end=f.runtime.guide.route.at(-1);
+      return {arrived:f.runtime.guide.index===f.runtime.guide.route.length-1&&Math.hypot(f.guide.position.x-end.x,f.guide.position.z-end.z)<.6,
+        elapsed:f.frames/30,gap:f.guide.position.distanceTo(g.player.position),alive:f.guide.alive,
+        guide:f.guide.position.toArray(),trace:f.trace};
+    });
+    if(result.arrived)break;
+  }
+  const interaction=await page.evaluate(()=>{
+    const g=window.Tengxian,f=window.p012WoundedGuideFixture;
+    const target=f.guide.position;
+    g.player.yaw=Math.atan2(-(target.x-g.player.position.x),-(target.z-g.player.position.z));g.player.pitch=-.2;
+    g.StepFrames(1);const query=g.interact.Query(g.player)?.point?.id;
+    g.Debug.Key("KeyF",true);g.StepFrames(60,1/30,false);g.Debug.Key("KeyF",false);g.StepFrames(1);
+    return {volunteer:f.flow.facts.has("volunteer"),requested:g.story.Signalled("P012EscortRequested"),query,
+      guideAlive:f.flow.lastSample.guideAlive};
+  });
+  await fs.writeFile(path.join(outputDir,"Data_P012WoundedGuideFixture.json"),JSON.stringify({setup,result,interaction},null,2));
+  await page.screenshot({path:path.join(outputDir,"Scene_P012WoundedGuideFixture.png")});
+  Check(result.alive&&result.gap<2&&interaction.volunteer&&interaction.requested,
+    "班长从西侧实走绕墙赶上已送抵的伤员，原地按F可主动申请护送",JSON.stringify({elapsed:result.elapsed,gap:result.gap,interaction}));
+}
+
 async function VerifyRoadCover() {
   const setup=await page.evaluate(async()=>{
     const game=window.Tengxian;
@@ -2399,7 +2455,8 @@ try {
   }
   const airRouteFixture=process.argv.find(arg=>arg.startsWith("--air-route="))?.split("=")[1];
   if(process.argv.includes("--hub-view"))await VerifyHubGuideView();
-  if(process.argv.includes("--road-cover"))await VerifyRoadCover();
+  if(process.argv.includes("--wounded-guide"))await VerifyWoundedGuide();
+  else if(process.argv.includes("--road-cover"))await VerifyRoadCover();
   if(airRouteFixture)await VerifyAirRouteHandoff(airRouteFixture);
   if (process.argv.includes("--guide-handoffs")) await VerifyGuideHandoffs();
   if (process.argv.includes("--geometry")) await VerifyTraversalFixtures();

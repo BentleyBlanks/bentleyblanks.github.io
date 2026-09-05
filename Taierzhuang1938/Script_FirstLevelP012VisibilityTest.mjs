@@ -67,6 +67,12 @@ function Occluded(from,to){
   }return true;
  });
 }
+for(const scout of phase.whitebox.firstContact.scoutSearch.entries){
+ assert.equal(Occluded({...anchors.gunports[1],y:1.62},{...scout.spawn,y:1.3}),true,
+  "normal-pace scouts begin behind the existing physical spawn screen");
+ assert.equal(Occluded({...anchors.gunports[1],y:1.62},{...scout.points[0],y:1.3}),false,
+  "normal-pace scouts emerge into the actual frontline firing lane");
+}
 const airCfg=phase.whitebox.aircraftRoutes.crowdTurn;
 assert.ok(airCfg.turnControl2,"P012 uses a two-tangent continuous turn");
 assert.ok(airCfg.to.z<airCfg.from.z,"attack enters from the south, not same-direction pursuit");

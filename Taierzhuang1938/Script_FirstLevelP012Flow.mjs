@@ -246,7 +246,7 @@ export class FirstLevelP012Director {
       OnComplete: () => { const issued = this.SupplyOnce("wounded"); if (issued) this.host.GiveBandages?.(1);
         this.Emit("P012WoundedChecked"); return issued; } });
     Register({ id: "p012_volunteer", kind: "supply", label: "向罗班长主动申请护送伤员",
-      gesture: "hold", seconds: 1.5, position: this.config.activities.woundedDragTo,
+      gesture: "hold", seconds: 1.5, Anchor: () => this.lastSample.guidePosition,
       Enabled: () => this.beat === 12 && !this.facts.has("volunteer") && this.lastSample.guideAlive === true
         && Distance(this.lastSample.guidePosition, this.config.activities.woundedDragTo) < 3, once: false,
       OnComplete: () => { this.Mark("volunteer"); this.Emit("P012EscortRequested"); } });
@@ -1128,7 +1128,11 @@ export class FirstLevelP012Director {
         interactionId = dragging ? null : "p012_woundedDrag"; text = "把伤员沿交通壕拖回掩蔽部";
       } else { target = activity.woundedDragTo; interactionId = null; requiredAction = "reload"; text = "安置伤员后重新装填步枪"; }
     }
-    if (this.beat === 12) { target = activity.woundedDragTo || anchors.shelter; interactionId = "p012_volunteer"; }
+    if (this.beat === 12) {
+      const rendezvous=activity.woundedDragTo||anchors.shelter;
+      target=Distance(this.lastSample.guidePosition,rendezvous)<3?this.lastSample.guidePosition:rendezvous;
+      interactionId="p012_volunteer";
+    }
     if (this.beat === 12 && this.facts.has("volunteer")) {
       interactionId = null; text = "已报名护送；听清罗班长的接应地点，准备随担架出发";
     }
