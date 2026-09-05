@@ -71,6 +71,26 @@ import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 }
 
 {
+ const config=phase.whitebox,director=new FirstLevelP012Director({Signalled:id=>id==='P012AircraftRailFire'},config);
+ director.beat=16;director.airRouteChoice='ditch';director.routeIndex=config.activities.airRouteChoices.ditch.length;
+ director.lastSample={position:{x:107.91536185454086,z:65.7728844681943},
+  columnPosition:{x:109.77400840727668,z:70.40751680151527},airColumnEnteredRoad:false,
+  airColumnTailPosition:{x:108.37855286653328,z:74.48579051979546}};
+ const objective=director.CurrentObjective();
+ assert.equal(objective.requiredAction,'follow');
+ assert.deepEqual(objective.target,director.lastSample.airColumnTailPosition,
+  'completed route directs the recorded injured player onward to the real tail, not the stale endpoint');
+ assert.ok(Math.hypot(objective.target.x-director.lastSample.position.x,
+  objective.target.z-director.lastSample.position.z)>objective.arrivalRadiusM);
+ assert.ok(P012SegmentClear(config.layout.blocks,director.lastSample.position,objective.target,.34),
+  'actual tail can be approached without crossing the ditch bank');
+ director.lastSample.airColumnEnteredRoad=true;
+ assert.deepEqual(director.CurrentObjective().target,config.activities.airRouteChoices.ditch.at(-1),
+  'tail correction ends after the actual road-entry condition is satisfied');
+ console.log('PASS B16 recorded route-end and convoy-distance mismatch retains physical entry requirements');
+}
+
+{
  let guideSpec=null;
  const director=new FirstLevelP012Director({Guide:spec=>{guideSpec=spec;}},phase.whitebox);
  director.lastSample={position:phase.whitebox.activities.stretcherCarryTo};

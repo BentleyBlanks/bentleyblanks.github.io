@@ -1257,9 +1257,10 @@ export class FirstLevelP012Director {
         target=route[this.routeIndex]||route.at(-1);requiredAction="follow";
         text=this.airRouteChoice==="open"?"沿选定的开放路接应担架，保持队伍展开":"沿选定的沟边路接应担架，利用蓝色沟岸遮蔽";
       }
-      if (Distance(this.lastSample.position,this.lastSample.columnPosition)>14) {
+      if (Distance(this.lastSample.position,this.lastSample.columnPosition)>14
+        || (this.airRouteChoice && this.routeIndex>=route.length && !this.lastSample.airColumnEnteredRoad)) {
         target = this.lastSample.airColumnTailPosition || this.lastSample.columnPosition;
-        requiredAction = "follow"; text = "后面的担架落开了，回身接住队尾再走";
+        requiredAction = "follow"; text = "接到担架队尾附近，照应伤员一起通过";
       }
     }
     if (this.beat === 17) {
