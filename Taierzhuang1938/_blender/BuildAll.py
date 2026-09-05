@@ -45,7 +45,7 @@ BUDGET = {
 WEAPON_LENGTH = {
     "ZhongZheng": 1.110, "HanYang": 1.250, "Zb26": 1.165, "Type38": 1.276,
     "Mauser96": 0.288, "ServicePistol": 0.222,
-    "Grenade": 0.220, "Dadao": 0.900, "DadaoAlt": 0.900, "Type89Launcher": 0.413,
+    "Grenade": 0.220, "Dadao": 0.900, "Type89Launcher": 0.413,
     "Type11": 1.100, "Type92Hmg": 1.156,
     "WaltherP38": 0.216, "BrowningTripodAssembly": 2.273,
     "UnidentifiedMunition": 0.253, "UnidentifiedBoltActionRifle": 1.120,

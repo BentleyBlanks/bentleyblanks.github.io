@@ -254,19 +254,6 @@ SOURCES = {
                 "→ 大刀。宽刃前展、上翘削尖、圆盘卡扣、缠柄、柄尾大铁环，"
                 "正是二十九军/西北军那一路的制式；全长按史实 0.900 m。",
     },
-    "DadaoAlt": {
-        # 大刀的第二种式样，**只是外观变体**：大刀是各地铁匠按各自习惯打的，
-        # 一个班里人手一把一模一样的刀反倒不像 1938。数值仍走 Data_Weapons.Dadao。
-        "file": os.path.join("Model_SketchfabDadao", "scene.gltf"),
-        "lengthM": 0.900,
-        "kind": "melee",
-        # 拆件名是俄文转写：Lezvie=刀身 / Stik=吞口 / Garda=护手 / Rukoiat=柄。
-        "nameBucket": {"Rukoiat": "wood"},
-        "noDetails": True,
-        "autoSmooth": 32.0,
-        "note": "CC-BY-4.0 Dadao（Sketchfab / Trector）→ 大刀第二式样。"
-                "圆盘吞口、束节木柄、刃线较直的一路；全长同样按 0.900 m。",
-    },
     "ServicePistol": {
         "file": os.path.join("Model_PolyHavenServicePistol", "service_pistol_1k.gltf"),
         "lengthM": 0.222,
@@ -446,7 +433,7 @@ def _SplitByColor(part, image, metallic=False):
 def _WeldDistance(diagonal):
     """收料时的焊接距离。**按模型自己的尺度取，不许写死一个绝对值。**
 
-    源模的单位五花八门 —— 三八式进来是 4747 单位长、大刀第二式样 2100、大刀 5.07、
+    源模的单位五花八门 —— 三八式进来是 4747 单位长、大刀 5.07、
     驳壳枪 6.75、汉阳造 3.02；真按米作者化的只有 Poly Haven 那两支（中正式 1.25、
     手枪 0.22）与三十年式刺刀（0.54）。统一缩放到史实全长是 `_Place` 的事，
     发生在这一步之后。所以同一个 1.5 mm 对四千单位长的模型等于「一点都不焊」，

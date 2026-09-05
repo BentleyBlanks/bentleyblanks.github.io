@@ -202,16 +202,6 @@ export const MESHES = {
       + "刀身 55→88 mm、刃线外鼓上翘、刀背 5.7 mm 厚，圆盘卡扣 + 缠柄 + 柄尾大铁环。"
       + "保留原 UV、逐角法线与压缩后的专用 PBR，不再套用枪械共享钢/木材质。",
   },
-  DadaoAlt: {
-    file: "DadaoAlt.tzm.json", category: "weapon",
-    triangles: 910, meshBlocks: 2, nodes: 5, joints: 0,
-    materials: ["steel", "wood"], mounts: ["muzzle", "gripR", "gripL"],
-    span: [0.0574, 0.1575, 0.8982], lengthM: 0.900, bladeM: 0.624,
-    draws: { high: 2, medium: 2, low: 2 },
-    note: "大刀的第二种式样（CC-BY Sketchfab / Trector）。**只是外观变体**，"
-      + "数值仍读 Data_Weapons.Dadao：大刀是各地铁匠各打各的，一个班人手一把"
-      + "一模一样的刀反倒不像 1938。圆盘吞口、束节木柄、刃线较直的一路。",
-  },
 
   // --- 刺刀（独立模型，socket 挂点扣到枪口；见 _blender/ImportBayonets.py）----
   BayonetZhongZheng: {
@@ -476,26 +466,10 @@ export const WEAPON_MESH_BY_ID = {
   Type89Tank: "Type89Tank", Type95HaGo: "Type95HaGo", Type97ChiHa: "Type97ChiHa",
 };
 
-/**
- * 武器 id → 可换用的外观变体模型（**只换模型，不换任何数值**）。
- *
- * 只有大刀有：它不是兵工厂的制式货，是各县铁匠照各自习惯打的，一个班里
- * 人手一把一模一样的刀反倒露馅。AI 士兵按自己的 seed 稳定抽一把；
- * 玩家手里的第一人称永远走 `WEAPON_MESH_BY_ID`（也就是数组第 0 项），
- * 免得同一场战斗里自己的刀会变。
- *
- * 第 0 项必须与 `WEAPON_MESH_BY_ID` 一致。
- */
-export const WEAPON_MESH_VARIANTS = {
-  Dadao: ["Dadao", "DadaoAlt"],
-};
+/** 保留通用变体接口；大刀统一使用带铁环、缠柄的二十九军战刀。 */
+export const WEAPON_MESH_VARIANTS = {};
 
-/**
- * 武器 id + 变体序号 → 模型 id。没登记变体、或者序号越界，都退回主模型。
- *
- * 变体的模型文件缺席（比如构建机上没有大刀第二式样的源）也不会白屏：
- * `Script_Actor._ModelWeaponGeometry` 里 `meshDocs.has(id)` 落空就退回程序化几何。
- */
+/** 越界或已退役的变体编号回到该武器的默认模型，兼容旧掉落和编辑器数据。 */
 export function WeaponMeshId(weaponId, variant = 0) {
   const list = WEAPON_MESH_VARIANTS[weaponId];
   if (list && variant > 0 && variant < list.length) return list[variant];

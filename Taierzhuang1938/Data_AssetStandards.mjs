@@ -68,8 +68,6 @@ export const SOURCE_ASSET_STANDARDS = Object.freeze({
 
   Dadao: { name: "二十九军战刀", group: "melee", sourceTriangles: 4199,
     sourceTexture: "有（付费源）", runtimeTexture: "专用 1K PBR，保留源 UV" },
-  DadaoAlt: { name: "大刀第二式样", group: "melee", sourceTriangles: 910,
-    sourceTexture: "有", runtimeTexture: SharedWeaponPbr },
   BayonetZhongZheng: { name: "HY1935 刺刀", group: "melee", sourceTriangles: 14431,
     sourceTexture: "有（源 4K）", runtimeTexture: SharedWeaponPbr, repair: true,
     note: "源底模无枪口环；最终数包含项目补环、环箍与木柄片。" },

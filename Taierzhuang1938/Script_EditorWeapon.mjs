@@ -292,8 +292,8 @@ export class WeaponEditor {
 
   /**
    * 选一把枪。`variant` 是**外观变体**序号（见 Data_Meshes.WEAPON_MESH_VARIANTS），
-   * 目前只有大刀有第二式样；出图脚本靠它把两把刀都拍一遍，
-   * 不然变体模型没有自己的 Data_Weapons 条目，台架上永远看不到。
+   * 大刀固定使用二十九军战刀；旧变体编号由 WeaponMeshId 回到默认模型，
+   * 变体接口保留供其他武器扩展，玩法数值始终读取武器本身的条目。
    */
   SetWeapon(id, variant = 0) {
     this.weaponId = id;

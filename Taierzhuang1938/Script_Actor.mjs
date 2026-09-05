@@ -1301,8 +1301,8 @@ export class Actor {
     // 背后的大刀 / 腰间的手榴弹：挂在 chest 上，跟着上身一起晃
     if (build.bones.officerGear) AttachBone(this.chest, build.bones.officerGear, this.materials, null);
     if (build.bones.hairBack) AttachBone(this.neck, build.bones.hairBack, this.materials, null);
-    // 敢死队背刀也走同一份大刀模型变体表。原来的程序化背刀只留作模型缺席时的
-    // 兜底，这样 NPC、玩家第一人称和尸体掉落看到的是同一把 A/B 式样。
+    // 敢死队背刀、手持刀、第一人称和尸体掉落统一解析到二十九军战刀。
+    // 程序化背刀只留作模型文件加载失败时的兜底。
     this.dadaoVariant = spec.dadao ? this._WeaponVariant("Dadao") : 0;
     if (build.bones.dadao) this._MountBackDadao(build.bones.dadao, d);
     if (build.bones.grenades) AttachBone(this.chest, build.bones.grenades, this.materials, null);

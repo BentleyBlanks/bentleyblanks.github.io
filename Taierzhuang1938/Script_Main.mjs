@@ -4175,8 +4175,8 @@ function RespawnPlayer(initial = false) {
   state.slots.melee = disarmed ? null : (loadout?.melee || null);
   state.weaponVariants.primary = 0;
   state.weaponVariants.secondary = 0;
-  // 每位接替者按自己的固定种子抽一把大刀；同一人换槽、死亡掉落和拾取后都不变。
-  state.weaponVariants.melee = RandomWeaponVariant(state.slots.melee, `player:${seed}`);
+  // 正片与白盒统一装备二十九军战刀；旧变体掉落由 WeaponVariantFor 归一化。
+  state.weaponVariants.melee = 0;
   state.weaponVariants.throwable = 0;
   const throwables = loadout?.throwables || {};
   // disarmed 是「脱离战斗」那一关：武器栏**整个**是空的，手榴弹也没有。
@@ -4242,13 +4242,6 @@ function WeaponVariantFor(weaponId, value = 0) {
   if (!variants || variants.length < 2) return 0;
   const n = Number.isInteger(value) ? value : 0;
   return n >= 0 && n < variants.length ? n : 0;
-}
-
-/** 新角色的式样也必须稳定：重生、换槽或截图复跑都不能悄悄换刀。 */
-function RandomWeaponVariant(weaponId, seedText) {
-  const variants = WEAPON_MESH_VARIANTS[weaponId];
-  if (!variants || variants.length < 2) return 0;
-  return HashString(`${seedText}|${weaponId}`) % variants.length;
 }
 
 /** 换槽。长枪/短枪各记各的弹仓 —— 切回来不该是满的。 */

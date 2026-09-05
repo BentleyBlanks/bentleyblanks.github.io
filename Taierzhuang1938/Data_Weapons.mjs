@@ -183,7 +183,7 @@ export const WEAPONS = {
     silent: true,
     note: "二十九军战刀式样：宽刃前展、上翘削尖、圆盘卡扣、缠柄、柄尾大铁环。"
       + "斜挎背在身后，右手过左肩抽出。AI 士兵按 seed 抽两种式样之一"
-      + "（大刀是各县铁匠各打各的，见 Data_Meshes.WEAPON_MESH_VARIANTS）；"
+      + "（统一使用二十九军环首缠柄战刀模型）；"
       + "玩家同样按接替者 seed 随机抽取，拾取时保留尸体上那一式。",
   },
 

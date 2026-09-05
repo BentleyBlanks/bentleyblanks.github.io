@@ -758,41 +758,6 @@
    "triangleLimit": 30000
   },
   {
-   "name": "DadaoAlt",
-   "category": "weapon",
-   "file": "DadaoAlt.tzm.json",
-   "triangles": 910,
-   "meshBlocks": 2,
-   "nodes": 5,
-   "joints": 0,
-   "bytes": 38055,
-   "materials": [
-    "steel",
-    "wood"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL"
-   ],
-   "bounds": {
-    "min": [
-     -0.02868,
-     -0.10602,
-     -0.63
-    ],
-    "max": [
-     0.02868,
-     0.05219,
-     0.27
-    ]
-   },
-   "sourceTriangles": 910,
-   "targetTriangles": 910,
-   "triangleLimit": 30000
-  },
-  {
    "name": "BrowningTripodAssembly",
    "category": "weapon",
    "file": "BrowningTripodAssembly.tzm.json",

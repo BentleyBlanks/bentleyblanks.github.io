@@ -38,6 +38,8 @@
 
 ## 代码与动画源
 
+大刀统一使用游戏原有的二十九军环首缠柄战刀（`Model/Dadao.tzm.json`，4,199 三角，原 UV 与专用 PBR）。正片出生、白盒、敌友军手持／背负、拾取和编辑器均解析到该模型；旧变体编号兼容回到默认刀型。木柄变体及其源文件、下载脚本、构建登记已移除。Blender 第一人称与全身武器同样使用该战刀，贴图打包在工程内；`Script_MeleeWeaponMaterials.py` 保留原 UV、逐角法线和 PBR。
+
 - `Data_MeleeCombat.mjs`：集中时序、距离、伤害、体力、平衡、QTE 和场景配置。Notion 未指定的具体数值是本次可调白盒参数。
 - `Script_MeleeCombat.mjs`：玩家／敌军／友军共同的纯规则状态机，依赖宿主提供物理、视线、伤害。
 - `Script_MeleeQte.mjs`：两类 F 抵抗、速率封顶、辅助输入、结果；不调用 Kill。

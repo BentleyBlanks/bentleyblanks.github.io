@@ -5,6 +5,7 @@ from mathutils import Matrix,Vector,Euler
 root=Path(globals()['MELEE_PROJECT_ROOT']) if globals().get('MELEE_PROJECT_ROOT') else Path(__file__).resolve().parents[1] if globals().get('__file__') else Path()
 if not (root/'Data_MeleeCombat.mjs').is_file():raise RuntimeError('Set MELEE_PROJECT_ROOT to the repository Taierzhuang1938 directory')
 scene=bpy.data.scenes['Scene_MeleeCombat'];bpy.context.window.scene=scene
+exec(compile((root/'_blender'/'Script_MeleeWeaponMaterials.py').read_text(encoding='utf-8'),'Script_MeleeWeaponMaterials.py','exec'))
 
 def Material(name,color):
  material=bpy.data.materials.get(name) or bpy.data.materials.new(name);material.diffuse_color=(*color,1)
@@ -12,7 +13,9 @@ def Material(name,color):
  return material
 
 def ImportWeapon(weaponId,name):
- parent=bpy.data.objects.new(name,None);scene.collection.objects.link(parent)
+ parent=bpy.data.objects.get(name)
+ if parent:ClearMeleeWeaponMeshes(parent)
+ else:parent=bpy.data.objects.new(name,None);scene.collection.objects.link(parent)
  doc=json.loads((root/'Model'/(weaponId+'.tzm.json')).read_text(encoding='utf-8'));nodes=[]
  for n in doc['nodes']:
   matrix=Matrix.Translation(Vector(n['t']))@Euler(n['r'],'YXZ').to_matrix().to_4x4()
@@ -23,8 +26,14 @@ def ImportWeapon(weaponId,name):
    vertices=[matrix@Vector([block['posMin'][j]+positions[i+j]*block['posScale'][j] for j in range(3)]) for i in range(0,len(positions),3)]
    raw=base64.b64decode(block['idx']);step=block['idxBits']//8;indices=struct.unpack('<'+('I' if step==4 else 'H')*(len(raw)//step),raw)
    mesh=bpy.data.meshes.new(name+'Part'+str(index));mesh.from_pydata(vertices,[],[indices[i:i+3] for i in range(0,len(indices),3)]);mesh.update()
+   uvraw=base64.b64decode(block['uv']);uvvalues=struct.unpack('<'+'H'*(len(uvraw)//2),uvraw)
+   uvs=[[block['uvMin'][j]+uvvalues[i+j]*block['uvScale'][j] for j in range(2)] for i in range(0,len(uvvalues),2)]
+   raw=base64.b64decode(block['nrm']);normalvalues=struct.unpack('<'+'b'*len(raw),raw);normalmatrix=matrix.to_3x3().inverted().transposed()
+   normals=[(normalmatrix@Vector(normalvalues[i:i+3])).normalized() for i in range(0,len(normalvalues),3)]
+   SetMeleeMeshSurface(mesh,uvs,normals)
    obj=bpy.data.objects.new(mesh.name,mesh);scene.collection.objects.link(obj);obj.parent=parent
-   key=block['material'];mesh.materials.append(Material('Material_Melee'+key,(.26,.12,.055) if key=='wood' else (.28,.3,.31)))
+   key=block['material'];mesh.materials.append(MeleeDadaoMaterial(root) if key=='dadao' else Material('Material_Melee'+key,(.26,.12,.055) if key=='wood' else (.28,.3,.31)))
+ parent['modelSource']=weaponId
  return parent,doc
 
 def Grip(arm,prefix,side):return sum(((arm.matrix_world@arm.pose.bones[prefix+side+' Finger'+str(i)].matrix).translation for i in range(1,5)),Vector())/4
@@ -35,7 +44,7 @@ for role,offset in [('Nra',-1),('Ija',1)]:
  prefix='Bip002 ' if role=='Nra' else 'Bip001 '
  for weapon in ['Dadao','Bayonet']:
   obj=bpy.data.objects.get('Model_'+role+weapon)
-  if not obj:
+  if not obj or weapon=='Dadao':
    obj,doc=ImportWeapon('Dadao' if weapon=='Dadao' else 'HanYang' if role=='Nra' else 'Type38','Model_'+role+weapon)
    if weapon=='Bayonet':
     bay,bayDoc=ImportWeapon('BayonetHanYang' if role=='Nra' else 'BayonetType38','Model_'+role+'BayonetBlade')
@@ -69,7 +78,9 @@ camera.location=(3,-6,2.8);camera.rotation_euler=(Vector((0,0,.82))-camera.locat
 Light(scene,'Scene_MeleeKey',(-3,-4,6),1300,5);Light(scene,'Scene_MeleeFill',(4,0,4),900,4)
 fps=bpy.data.scenes['Scene_FirstPersonMelee'];Light(fps,'Scene_MeleeFpKey',(-2,-2,3),450,3);Light(fps,'Scene_MeleeFpFill',(2,0,1),250,2)
 for obj in fps.objects:
- if obj.type=='MESH' and obj.name.startswith(('Model_DadaoPart','Model_BayonetPart')):
+ if obj.type=='MESH' and obj.name.startswith('Model_DadaoPart'):
+  obj.data.materials.clear();obj.data.materials.append(MeleeDadaoMaterial(root))
+ elif obj.type=='MESH' and obj.name.startswith('Model_BayonetPart'):
   wood=obj.name in ['Model_DadaoPart0','Model_BayonetPart0']
   obj.data.materials.clear();obj.data.materials.append(Material('Material_MeleeFpWood' if wood else 'Material_MeleeFpSteel',(.18,.08,.035) if wood else (.28,.30,.32)))
 for current in [scene,fps]:
@@ -78,7 +89,7 @@ for current in [scene,fps]:
  current.frame_start=1;current.frame_end=31
  if not current.world:current.world=bpy.data.worlds.new('World_MeleeStudio')
  current.world.use_nodes=True;current.world.node_tree.nodes['Background'].inputs['Color'].default_value=(.12,.15,.18,1);current.world.node_tree.nodes['Background'].inputs['Strength'].default_value=.5
-for name in ['Script_CreateMeleeProject.py','Script_MeleeLibrary.py','Script_MeleeStudio.py','Script_MeleeAnimationBake.py','Script_MeleeFirstPersonBake.py']:
+for name in ['Script_CreateMeleeProject.py','Script_MeleeLibrary.py','Script_MeleeStudio.py','Script_MeleeAnimationBake.py','Script_MeleeFirstPersonBake.py','Script_MeleeWeaponMaterials.py']:
  text=bpy.data.texts.get(name) or bpy.data.texts.new(name);text.clear();text.write((root/'_blender'/name).read_text(encoding='utf-8'));text.use_fake_user=True
 exec(compile((root/'_blender'/'Script_MeleeLibrary.py').read_text(encoding='utf-8'),'Script_MeleeLibrary.py','exec'))
 SelectMeleeAction('FirstPerson','Dadao','Guard');SelectMeleeAction('Nra','Dadao','Guard');SelectMeleeAction('Ija','Bayonet','Guard')

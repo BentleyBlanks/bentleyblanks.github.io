@@ -37,7 +37,6 @@ UModeler 拆件按**节点名**（三八式的 `All_Wood` 整组），纯色材�
 | 捷克式 `Zb26` | `Source/Model_SketchfabZb26Larkien/scene.gltf` | [Larkien — ZB26](https://sketchfab.com/3d-models/zb26-6920684ec16d40ffb857245be0661d34) | CC-BY-4.0 | 上置直弹匣、提把、两脚架、木托和木握把均来自源模；按史实全长 1.165 m 缩放，剔除包在完整主枪管外的 24k 三角重复细分壳。选定几何 7,811 三角，低于 30k，不做通用减面；成品拓扑清理后 7,781 三角。 |
 | 驳壳枪 `Mauser96` | `Source/Model_SketchfabMauserC96Maxence/scene.gltf` | [Maxence Rouillet — Mauser C96](https://sketchfab.com/3d-models/mauser-c96-4c49913126894908906c8512a52facd3) | CC-BY-4.0 | 毛瑟 C96：扫帚柄握把、扳机前固定弹仓、长枪管和系绳环均来自源模；按史实全长 0.288 m 缩放，金属度贴图只用于离线木/钢分桶。 |
 | 第二把手枪 `ServicePistol` | `Source/Model_PolyHavenServicePistol/service_pistol_1k.gltf` | [Poly Haven — Service Pistol](https://polyhaven.com/a/service_pistol) | CC0 | 页面两把是同一支枪的闭锁/空仓挂机状态；游戏只取可正常射击的 A 状态，移除展示用弹匣、子弹和 B 状态，修正源坐标方向，并按金属度图拆出木握把；选定源几何 7,265 三角，拓扑清理后成品 7,263 三角。**这一支是整批外部枪模里唯一一份按真米作者化的源**（进 Blender 就是 0.222 m 长），焊接阈值按模型对角线取值，见 `ImportWeapons._WeldDistance`。 |
-| 大刀第二式样 `DadaoAlt` | `Source/Model_SketchfabDadao/scene.gltf` | [Trector](https://sketchfab.com/trector) | CC-BY-4.0 | 大刀的**外观变体**，没有独立武器数值。圆盘吞口、束节木柄、刃线较直的一路，与主式样的环首宽刃刀刻意不同型。许可原文在 `Source/Model_SketchfabDadao/license.txt`。 |
 
 许可证副本随源放在 `Source/Model_*/license.txt` / `License_*.txt`（Sketchfab 生成的
 CC-BY-4.0 署名原文，文件头都有完整 credit 文本，发布时按 CC-BY 要求保留）。

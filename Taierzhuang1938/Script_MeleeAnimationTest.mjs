@@ -7,9 +7,14 @@ import {MELEE_NRA_ANIMATIONS as nra} from './Data_MeleeNraAnimations.mjs';
 import {MELEE_IJA_ANIMATIONS as ija} from './Data_MeleeIjaAnimations.mjs';
 import {MELEE_ANIMATION_ACTIONS as actions} from './Data_MeleeCombat.mjs';
 import {FPS_ARM_LIMITS} from './Data_FpsArmPoses.mjs';
+import {MESHES,WeaponMeshId,WEAPON_MESH_VARIANTS} from './Data_Meshes.mjs';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import {ServeRoot} from './Script_DevServer.mjs';
 const project=path.dirname(fileURLToPath(import.meta.url));
+assert.equal(WeaponMeshId('Dadao'),'Dadao');
+assert.equal(MESHES.Dadao.triangles,4199);
+assert.equal(WeaponMeshId('Dadao',1),'Dadao','retired variant must resolve to the historical sword');
+assert(!WEAPON_MESH_VARIANTS.Dadao?.some(id=>id!=='Dadao'));
 for(const data of [nra,ija]) {
   assert.equal(data.schema,2);assert.equal(data.parts.length,50);
   for(const weapon of ['Dadao','Bayonet']) for(const action of actions) {
@@ -37,13 +42,25 @@ try {
       root.traverse(o=>{if(!o.isMesh||!o.visible)return;for(let p=o.parent;p&&p!==root;p=p.parent)if(!p.visible)return;
         const m=new THREE.Matrix4().multiplyMatrices(inv,o.matrixWorld),position=o.geometry.attributes.position;
         const vertices=[];for(let i=0;i<position.count;i++){vector.fromBufferAttribute(position,i).applyMatrix4(m);vertices.push(...vector.toArray());}
+        const normalMatrix=new THREE.Matrix3().getNormalMatrix(m),normal=o.geometry.attributes.normal,uv=o.geometry.attributes.uv;
+        const normals=normal?Array.from({length:normal.count},(_,i)=>vector.fromBufferAttribute(normal,i).applyMatrix3(normalMatrix).normalize().toArray()):null;
+        const uvs=uv?Array.from({length:uv.count},(_,i)=>[uv.getX(i),uv.getY(i)]):null;
         const material=Array.isArray(o.material)?o.material[0]:o.material;
-        meshes.push({vertices,indices:o.geometry.index?Array.from(o.geometry.index.array):Array.from({length:position.count},(_,i)=>i),color:material?.color?.getHex?.()??0x777777});
+        meshes.push({vertices,uvs,normals,indices:o.geometry.index?Array.from(o.geometry.index.array):Array.from({length:position.count},(_,i)=>i),color:material?.color?.getHex?.()??0x777777});
       });return meshes;
     };
     const result={clips:{},weapons:{},boneNames:[],checks:[]};
     for(const weapon of ['Dadao','Bayonet']) {
       L.Select(weapon+'One');L.Pause(true);T.StepFrames(90,1/60,false);
+      if(weapon==='Dadao'){
+        if(T.viewmodel.weaponVariant!==0)throw new Error('Whitebox selected a retired sword variant');
+        const meshes=Geometry(T.viewmodel.rig.group);
+        if(meshes.reduce((n,m)=>n+m.indices.length/3,0)!==4199)throw new Error('First person is not the authored ring-pommel Dadao');
+        let pbr=false;T.viewmodel.rig.group.traverse(o=>{if(o.isMesh&&o.material?.map&&o.material?.normalMap)pbr=true;});
+        if(!pbr)throw new Error('Historical Dadao lost its source PBR');
+        const factory=T.ai.soldiers[0].actor.factory;
+        for(const variant of [0,1])if(factory.WeaponGeometry('Dadao',variant).meshId!=='Dadao')throw new Error('Actor still resolves to the retired sword');
+      }
       const rig=T.viewmodel.riggedArms, bones=[];rig.root.traverse(o=>{if(o.isBone)bones.push(o);});
       result.boneNames=bones.map(b=>b.name);
       if(bake)result.weapons[weapon]=Geometry(T.viewmodel.rig.group);
