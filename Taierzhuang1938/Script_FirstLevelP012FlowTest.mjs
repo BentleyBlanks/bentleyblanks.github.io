@@ -227,6 +227,7 @@ const flow = new FirstLevelP012Director({
     spawned.push(actor); return actor;
   },
   EnemyPosition: (actor) => actor.alive ? actor.position : null,
+  EnemyCombatState: (actor) => ({ lastFire: actor.lastFire, suppression: actor.suppression || 0 }),
   EnemyGoal: (actor, goal) => { actor.goal = goal; }, Shelling: () => { shelling += 1; },
 }, phase.whitebox);
 let shelteredFromImpact=false;
@@ -246,6 +247,10 @@ function At(zone, point = null) {
   return Tick({ zone, position: p });
 }
 function KillWave() { for (const actor of spawned) actor.alive = false; return Tick({ enemyDeaths: spawned.length }, 40); }
+function KillBeat(beat) {
+  for (const entry of flow.enemyRoutes) if (entry.encounterBeat === beat) entry.handle.alive = false;
+  return Tick({ enemyDeaths: spawned.filter(actor => !actor.alive).length });
+}
 function Walk(route, extra = {}) {
   for (const point of route) Tick({ position: point, guidePosition: point, ...extra });
 }
@@ -419,26 +424,30 @@ assert.equal(spawned.length,7,"cleared scouts immediately release the finite fro
 assert.ok(flow.State().pressureHistory[1].interval<1,"all-clear interval records actual short pacing instead of a fake 40s wait");
 assert.equal(flow.State().pressureHistory[1].mechanism,"sameAxisReinforcement");
 assert.equal(flow.State().pressureHistory[1].reason,"clearReinforcement");
-KillWave(); Tick({},40);
+KillWave();
 At("Z05",phase.whitebox.anchors.gunports[0]); At("Z05",phase.whitebox.anchors.gunports[1]);
 assert.equal(flow.CurrentObjective().requiredStance,"prone","moving between gunports follows the protected prone route");
-KillWave(); Tick({},40);
-assert.equal(flow.State().beat,"B08","dead MG enemies do not pretend the friendly gun resumed firing");
+Tick({mortarWarningActive:true,mortarWarningPosition:phase.whitebox.anchors.gunports[1]},40);
+assert.equal(flow.State().beat,"B08","the independent mortar clock does not manufacture MG completion");
+assert.notEqual(flow.CurrentObjective().requiredAction,"sprint","wave release alone cannot invent a shell warning before the runtime reports one");
+Tick({mortarWarningActive:true,mortarWarningPosition:phase.whitebox.anchors.gunports[1]},.1);
+assert.equal(flow.CurrentObjective().requiredAction,"sprint","an early real mortar warning outranks the current MG instruction");
+const earlyMortarStart=flow.mortarImpactStart,earlyMortarEscape={...flow.mortarEscapeFrom};
 const mgSnapshot=flow.Snapshot();
 const fallbackMg=new FirstLevelP012Director({EnemyPosition:(actor)=>actor.alive?actor.position:null},phase.whitebox);
 fallbackMg.Restore(mgSnapshot);
 // World actors intentionally live outside checkpoint snapshots, just as in Main.
 fallbackMg.enemyRoutes=flow.enemyRoutes;
-const remainingRifle=spawned.at(-1);remainingRifle.alive=true;
+const remainingRifle=fallbackMg.enemyRoutes.find(entry=>entry.encounterBeat===7).handle;remainingRifle.alive=true;
+for(const entry of fallbackMg.enemyRoutes)if(entry.encounterBeat===8)entry.handle.alive=false;
 fallbackMg.Update(0.1,{...sample,enemyMgDestroyed:true,friendlyMgFiredAfterSuppression:false});
-assert.equal(fallbackMg.State().beat,"B08","destroying the enemy MG while another threat lives cannot use all-clear fallback");
-remainingRifle.alive=false;
-fallbackMg.Update(0.1,{...sample,enemyMgDestroyed:true,friendlyMgFiredAfterSuppression:false});
-assert.equal(fallbackMg.State().beat,"B09");
+assert.equal(fallbackMg.State().beat,"B09","the actual MG group can clear while a suppressed earlier rifle survives");
 assert.equal(fallbackMg.State().completionReasons[8],"threatCleared");
 assert.ok(fallbackMg.CurrentObjective().text.startsWith("机枪威胁已清除"),"all-clear is not falsely described as friendly fire");
 Tick({friendlyMgFiredAfterSuppression:true});
 assert.equal(flow.State().completionReasons[8],"friendlyMgResumed");
+assert.equal(flow.mortarImpactStart,earlyMortarStart,"entering B09 preserves the earlier real mortar impact baseline");
+assert.deepEqual(flow.mortarEscapeFrom,earlyMortarEscape,"entering B09 preserves the earlier real warning position");
 Tick({position:P012Point(5,-65),mortarWarningActive:true,mortarWarningPosition:P012Point(5,-65)});
 assert.equal(flow.CurrentObjective().requiredAction,"sprint","mortar escape starts with sprint, never slow prone crawling");
 assert.equal(flow.CurrentObjective().requiredStance,"stand");
@@ -448,10 +457,14 @@ Tick({position:phase.whitebox.anchors.gunports[0]});
 assert.equal(flow.CurrentObjective().requiredStance,null,"arrival at a safe gunport permits standing to fire");
 const mortarFightingSample=flow.lastSample;
 flow.lastSample={...mortarFightingSample,nearEnemyDeaths:11,stance:"stand"};
-assert.equal(flow.CurrentObjective().requiredStance,"prone","cleared mortar fight explicitly requests the low stance needed to finish relocation");
+assert.equal(flow.CurrentObjective().requiredStance,null,"a cumulative death number cannot invent mortar suppression");
+for(const entry of flow.enemyRoutes)if(entry.encounterBeat===9)entry.handle.suppression=.5;
+assert.equal(flow.CurrentObjective().requiredStance,"prone","actual mortar-group suppression requests the low stance needed to finish relocation");
 flow.lastSample=mortarFightingSample;
 Tick({stance:"prone",mortarImpactCount:(sample.mortarImpactCount||0)+1,mortarImpactPosition:P012Point(100,100)});
-KillWave(); Tick({},40); KillWave();
+assert.equal(flow.State().beat,"B10","actual mortar suppression plus the real displaced impact completes B09");
+Tick({},40);
+KillBeat(10);
 assert.equal(flow.State().beat,"B11");
 Use("p012_woundedCheck"); Tick();
 assert.equal(flow.State().beat,"B11","wounded check cannot replace reloading");
@@ -478,7 +491,7 @@ for(const id of ["Z04","Z03","Z02","Z06"]) At(id);
   Tick({},40);
   assert.equal(spawned.filter(actor=>actor.p012RoadContact).length,4,"finite contact exists before arrival instead of popping into the observation breach");
   Tick({position:phase.whitebox.activities.roadContactBreach,guidePosition:phase.whitebox.activities.roadContactBreach,roadContactVisibleCount:0});
-  const contactActors=spawned.slice(-4);
+  const contactActors=spawned.filter(actor=>actor.p012RoadContact);
   assert.equal(contactActors.length,4);assert.ok(contactActors.every(actor=>actor.p012RoadContact),"the first road contact is one finite four-person set");
   Tick({roadContactVisibleCount:0});
 assert.equal(flow.facts.has("roadContactSeen"),false,"hidden living contact cannot open the stop command");
@@ -611,13 +624,16 @@ assert.equal(carry.KindId,"stretcher");
 assert.equal(points.has("p012_stretcherShelter"),false,"no safe parking bypasses the involuntary drop");
 signals.add("P012DiveApproach");signals.add("P012Dived"); Tick({carryKind:null,stance:"crouch"});
 const closeActors=spawned.slice(-6);
-assert.equal(closeActors.length,6);
-assert.deepEqual(flow.enemyRoutes.slice(-6).map(entry=>entry.encounterGroup),[0,0,1,1,2,2]);
+assert.ok(closeActors.length<=6);
+assert.deepEqual([...flow.enemyRoutes.filter(entry=>entry.encounterBeat===20),
+  ...flow.pendingEnemies.filter(entry=>entry.encounterBeat===20)].map(entry=>entry.encounterGroup),[0,0,1,1,2,2],
+  "the 14-person live cap keeps every excess finite close fighter pending");
 assert.equal(flow.CurrentObjective().requiredAction,"fight");
 assert.deepEqual(flow.CurrentObjective().target,P012Point(44,62));
 KillWave();
 assert.equal(flow.State().beat,"B20","even remote early deaths cannot replace both physical cover moves");
 Walk(phase.whitebox.activities.closeFightRoute,{zone:"Z08"});
+KillBeat(20);
 Tick({position:phase.whitebox.activities.closeFightRoute.at(-1),zone:"Z08"});
 assert.ok(signals.has("P012DitchClear"),"only cleared ditch combat plus all three cover positions release actual litters");
 Tick({},40);
@@ -1075,10 +1091,12 @@ assert.equal(returnVoices.filter(key=>key==="ch1_shunzi_07").length,1);
 for(const index of [2,3,4]) {
   const pressures=[],actors=[];
   const director=new FirstLevelP012Director({Pressure:wave=>pressures.push(wave.kind),
-    SpawnEnemy:spec=>{const actor={position:{x:spec.x,z:spec.z}};actors.push(actor);return actor;},
-    EnemyPosition:actor=>actor.position},phase.whitebox);
+    SpawnEnemy:spec=>{const actor={position:{x:spec.x,z:spec.z},alive:true};actors.push(actor);return actor;},
+    EnemyPosition:actor=>actor.alive===false?null:actor.position},phase.whitebox);
   director.Restore({...director.Snapshot(),beat:P012_WAVES[index].beat,elapsed:129,lastWaveAt:100,
     unlockedWaves:Array.from({length:index},(_,i)=>i)});
+  const prior=P012_WAVES[index-1];
+  director.enemyRoutes=Array.from({length:prior.count},()=>({handle:{alive:false},encounterBeat:prior.beat}));
   const sample={position:P012Point(23,-68),zone:"Z05",stance:"prone",enemyDeaths:0,mortarImpactCount:7,
     mortarWarningActive:true,mortarWarningPosition:P012Point(23,-68)};
   director.Update(.9,sample);
@@ -1101,6 +1119,45 @@ for(const index of [2,3,4]) {
   director.Update(.2,{position:P012Point(5,-65),zone:"Z05"});
   assert.deepEqual(pressures,["machineGun"]);
   assert.equal(director.State().pressureHistory.at(-1).reason,"normal40");
+}
+{
+  const actors=[],pressures=[];
+  const director=new FirstLevelP012Director({
+    Pressure:wave=>pressures.push({kind:wave.kind,at:director.elapsed}),
+    SpawnEnemy:spec=>{const actor={...spec,position:{x:spec.x,z:spec.z},alive:true,suppression:0};actors.push(actor);return actor;},
+    EnemyPosition:actor=>actor.alive?actor.position:null,
+    EnemyCombatState:actor=>({suppression:actor.suppression}),
+  },phase.whitebox);
+  director.Restore({...director.Snapshot(),beat:7,elapsed:100,lastWaveAt:100,unlockedWaves:[0,1]});
+  director.enemyRoutes=[
+    ...Array.from({length:2},()=>({handle:{alive:true,position:P012Point(5,-110)},encounterBeat:6,points:[],index:0})),
+    ...Array.from({length:5},()=>({handle:{alive:true,position:P012Point(5,-95),suppression:0},encounterBeat:7,points:[],index:0})),
+  ];
+  director.Update(40,{position:P012Point(5,-65),zone:"Z05",stance:"prone",mortarImpactCount:0});
+  director.Update(40,{position:P012Point(5,-65),zone:"Z05",stance:"prone",mortarImpactCount:0});
+  director.Update(40,{position:P012Point(5,-65),zone:"Z05",stance:"prone",mortarImpactCount:0});
+  assert.deepEqual(pressures.map(entry=>entry.kind),["machineGun","mortar","culvert"],
+    "MG, mortar and culvert pressure continue at one real kind per 40 seconds while B07 remains unresolved");
+  assert.deepEqual(pressures.map(entry=>entry.at),[140,180,220]);
+  assert.equal(director.beat,7,"the pressure clock does not manufacture rifle suppression");
+  assert.equal(director.enemyRoutes.filter(entry=>director.host.EnemyPosition(entry.handle)).length,14);
+  assert.equal(director.pendingEnemies.length,1,"the fifteenth finite enemy remains pending at the live peak");
+  const saved=director.Snapshot(),spawnedBefore=director.spawnedTotal;
+  director.Restore(saved);director.Update(.1,{position:P012Point(5,-65),zone:"Z05"});
+  assert.equal(director.spawnedTotal,spawnedBefore,"checkpoint restore cannot duplicate an already released pressure wave");
+  director.enemyRoutes.find(entry=>entry.encounterBeat===6).handle.alive=false;
+  director.Update(.1,{position:P012Point(5,-65),zone:"Z05"});
+  assert.equal(director.pendingEnemies.length,0);assert.equal(director.spawnedTotal,spawnedBefore+1,
+    "one freed live slot admits exactly the one finite pending culvert soldier");
+}
+{
+  const old={alive:true,position:P012Point(5,-90)},ambush=Array.from({length:6},()=>({alive:false}));
+  const director=new FirstLevelP012Director({EnemyPosition:actor=>actor.alive?actor.position:null},phase.whitebox);
+  director.Restore({...director.Snapshot(),beat:14,facts:["flanked"],ambushEntryIndex:phase.whitebox.activities.ambushEntryRoute.length,
+    routeIndex:phase.whitebox.routes.flank.length});
+  director.enemyRoutes=[{handle:old,encounterBeat:7,points:[],index:0},...ambush.map(handle=>({handle,encounterBeat:14,ambushGroup:0,points:[],index:0}))];
+  director.Update(.1,{position:P012Point(45,26),columnPosition:P012Point(45,26),nearEnemyDeaths:0});
+  assert.equal(director.beat,15,"a surviving earlier frontline enemy cannot hold B14 after its finite ambush group is truly clear");
 }
 {
   for(const groups of [phase.whitebox.activities.closeFightGroups,phase.whitebox.activities.southFightGroups]) {

@@ -42,7 +42,6 @@ export class FirstLevelP012Runtime {
       const actor=this.host.GuideActor();if(actor)actor.scriptArrivalRadius=Math.max(.05,spec.arrivalRadius*.5);
     }
     if(this.guide?.heldStance!==undefined){const actor=this.host.GuideActor();if(actor)this.ApplyGuideStance(actor,this.guide.heldStance);}
-    if (spec.beat === 8 && this.beat !== 8) { this.mgSuppressedAt = null; this.friendlyMgResponse = false; }
     this.beat = spec.beat;
     // Finish the casualty route physically before holding the volunteer rendezvous.
     if (spec.beat === 12 && this.guide?.beat === 11 && this.guide.route.length) {
@@ -496,7 +495,9 @@ export class FirstLevelP012Runtime {
     this.StepMarch(dt);
     this.time += dt;
     if (this.smoke && this.time >= this.smoke.until && !this.smoke.cleared) { this.host.ClearSmoke?.(this.smoke.handle); this.smoke.cleared = true; }
-    if (this.beat === 8) {
+    // The MG may be released on the frontline pressure clock before B08 is the
+    // labelled objective. Preserve the real suppression/return-fire receipt.
+    if (this.beat >= 7 && this.beat <= 10) {
       if (this.mgSuppressedAt == null && this.host.EnemyMgSuppressed?.()) this.mgSuppressedAt = this.host.CombatTime?.() ?? this.time;
       if (this.mgSuppressedAt != null && this.host.FriendlyMgFired?.(this.mgSuppressedAt)) this.friendlyMgResponse = true;
     }

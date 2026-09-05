@@ -75,6 +75,9 @@ export const P012_WAVES = Object.freeze([
   { beat: 21, atS: 1250, count: 6, kind: "southFight", lane: "southFight" },
 ].map(Object.freeze));
 
+const P012_FRONTLINE_WAVE_LAST = 4;
+const P012_NEAR_ENEMY_LIMIT = 14;
+
 export class FirstLevelP012Director {
   constructor(host = {}, config = {}) {
     this.host = host;
@@ -145,6 +148,18 @@ export class FirstLevelP012Director {
     this.Mark(fact);
     if (this.supplyReceipts.has(fact)) return false;
     this.supplyReceipts.add(fact); this.host.CheckWeapon?.(); return true;
+  }
+  WaveState(index, allowSuppressed = false) {
+    const wave = P012_WAVES[index];
+    if (!wave) return { authored: 0, pending: 0, living: 0, resolved: false };
+    const entries = this.enemyRoutes.filter((entry) => entry.encounterBeat === wave.beat);
+    const pending = this.pendingEnemies.filter((entry) => entry.encounterBeat === wave.beat).length;
+    const living = entries.filter((entry) => this.host.EnemyPosition?.(entry.handle));
+    const resolved = entries.length + pending === wave.count && pending === 0 && living.every((entry) => {
+      if (!allowSuppressed) return false;
+      return (this.host.EnemyCombatState?.(entry.handle)?.suppression || 0) > 0.3;
+    });
+    return { authored: entries.length + pending, pending, living: living.length, resolved };
   }
   FrontlineAmmoLabel() {
     return this.frontlineAmmoRemaining > 0
@@ -569,8 +584,13 @@ export class FirstLevelP012Director {
     this.guideStarted = false;
     if (next === 24) this.carryTravelM = 0;
     if (next === 16) this.airSprintM = 0;
-    if (next === 9) { this.mortarImpactStart = this.lastSample.mortarImpactCount || 0;
-      this.mortarEscapeFrom = null; }
+    // Mortar pressure may now arrive while the player is still completing the
+    // rifle or MG action. Entering its labelled beat must not erase that real
+    // warning position or an impact which already happened in the world.
+    if (next === 9 && !this.unlockedWaves.includes(3)) {
+      this.mortarImpactStart = this.lastSample.mortarImpactCount || 0;
+      this.mortarEscapeFrom = null;
+    }
     if (next === 11) this.cleanupWeaponStart = this.lastSample.weaponActionCount || 0;
     if (next === 12) this.Emit("P012EscortRequestOpen");
     if (next === 21) { this.grenadeStart = this.lastSample.grenadeThrows || 0; this.Emit("P012DitchClear"); }
@@ -598,7 +618,8 @@ export class FirstLevelP012Director {
     this.lastSample = sample;
     const p = sample.position;
     const activity = this.config.activities || {};
-    if (this.beat === 9 && this.unlockedWaves.includes(3) && sample.mortarWarningActive && sample.mortarWarningPosition)
+    if (this.beat >= 7 && this.beat <= 9 && this.unlockedWaves.includes(3)
+      && sample.mortarWarningActive && sample.mortarWarningPosition)
       this.mortarEscapeFrom = { ...sample.mortarWarningPosition };
     if (this.beat === 0) this.Emit("P012Arrival");
     if(this.beat===1&&this.facts.has("issuedAmmo")&&activity.briefing){
@@ -794,12 +815,14 @@ export class FirstLevelP012Director {
       // Scouts may call same-axis rifle reinforcements immediately. New MG,
       // mortar and culvert pressure keeps a 30s floor; existing gunport movement
       // remains active during this transition, not a stationary wait objective.
-      const previousGroupClear = this.pendingEnemies.length === 0
-        && this.enemyRoutes.every((entry) => !this.host.EnemyPosition?.(entry.handle));
+      const previous = index > 0 ? this.WaveState(index - 1, true) : null;
+      const previousGroupClear = !!previous?.resolved;
       const interval = this.elapsed - this.lastWaveAt;
       const newTacticalPressure = index >= 2 && index <= 4;
       const clearReady = previousGroupClear && (!newTacticalPressure || interval >= 30);
-      if (this.beat >= wave.beat && (interval >= 40 || clearReady)
+      const actionReached = index <= 1 || index > P012_FRONTLINE_WAVE_LAST ? this.beat >= wave.beat
+        : this.unlockedWaves.includes(index - 1) && this.unlockedWaves.includes(0);
+      if (actionReached && (interval >= 40 || clearReady)
         && !this.unlockedWaves.includes(index)) {
         this.unlockedWaves.push(index);
         this.pressureHistory.push({ kind: wave.kind, at: this.elapsed,
@@ -812,11 +835,12 @@ export class FirstLevelP012Director {
         this.lastWaveAt = this.elapsed;
         if (wave.kind === "mortar") {
           this.mortarImpactStart = sample.mortarImpactCount || 0;
-          this.mortarEscapeFrom = p ? { x: p.x, z: p.z } : null;
           this.Emit("P012MortarUnlocked");
         }
         this.host.Pressure?.(wave);
         this.SpawnWave(wave, index);
+        // lastWaveAt changed above, so no second kind can release in this update.
+        break;
       }
     }
     for (const route of this.enemyRoutes) {
@@ -870,17 +894,16 @@ export class FirstLevelP012Director {
         && this.Signalled("P012NorthContinue"); break;
       case 5: ready = Has("ammo") && this.gunports.size > 0; break;
       case 6: ready = dead >= 2 || (this.unlockedWaves.includes(0) && sample.scoutAlarm); break;
-      case 7: ready = dead >= 7; break;
+      case 7: ready = this.WaveState(1, true).resolved; break;
       case 8: {
-        const cleared = sample.enemyMgDestroyed && this.pendingEnemies.length === 0
-          && this.enemyRoutes.every((entry) => !this.host.EnemyPosition?.(entry.handle));
-        ready = dead >= 9 && this.gunports.size >= 2 && (sample.friendlyMgFiredAfterSuppression || cleared);
+        const cleared = this.WaveState(2).resolved;
+        ready = this.gunports.size >= 2 && (sample.friendlyMgFiredAfterSuppression || cleared);
         if (ready) this.completionReasons[8] = sample.friendlyMgFiredAfterSuppression ? "friendlyMgResumed" : "threatCleared";
         break;
       }
-      case 9: ready = this.unlockedWaves.includes(3) && dead >= 11 && sample.stance !== "stand"
+      case 9: ready = this.unlockedWaves.includes(3) && this.WaveState(3, true).resolved && sample.stance !== "stand"
         && sample.mortarImpactCount > this.mortarImpactStart && Distance(p, sample.mortarImpactPosition) >= 6; break;
-      case 10: ready = dead >= 15; break;
+      case 10: ready = this.WaveState(4).resolved; break;
       case 11: ready = Has("wounded") && sample.woundedDragDelivered
         && sample.woundedDragDistance >= (activity.woundedDragMinM || 10)
         && this.routeIndex >= route.length && sample.weaponActionCount > this.cleanupWeaponStart; break;
@@ -897,7 +920,7 @@ export class FirstLevelP012Director {
             && !this.pendingEnemies.some((entry) => entry.ambushGroup === 0)) this.Emit("P012RoadGunSilenced");
         }
         if (!this.ambushRejoin && Distance(p, this.config.activities?.ambushGroups?.[2]?.cover || P012Point(72, 43)) < 7) this.Mark("flanked");
-        ready = dead >= 25 && Has("flanked") && this.ambushEntryIndex >= (activity.ambushEntryRoute?.length || 0) && this.routeIndex >= route.length
+        ready = this.WaveState(6).resolved && Has("flanked") && this.ambushEntryIndex >= (activity.ambushEntryRoute?.length || 0) && this.routeIndex >= route.length
           && Distance(p, sample.columnPosition) < 18; break;
       case 15: ready = Has("regroup") && Has("roadWounded") && Distance(p, sample.columnPosition) < 12
         && Distance(sample.guidePosition,activity.airObservationPosition)<=3
@@ -916,9 +939,9 @@ export class FirstLevelP012Director {
         && this.routeIndex >= route.length && Distance(p, activity.stretcherCarryTo) < 3;
         if (ready) this.Emit("P012CarryReady"); break;
       case 19: ready = this.Signalled("P012Dived") && sample.stance !== "stand"; break;
-      case 20: ready = dead >= 31 && this.closeReleasedGroup >= (activity.closeFightGroups?.length||1)-1
+      case 20: ready = this.WaveState(7).resolved && this.closeReleasedGroup >= (activity.closeFightGroups?.length||1)-1
         && this.routeIndex >= (activity.closeFightRoute?.length || 0); break;
-      case 21: ready = dead >= 37 && At("Z09") && Has("southRoomEntered")
+      case 21: ready = At("Z09") && Has("southRoomEntered")
         && this.routeIndex >= route.length
         && this.SouthEnemiesCleared(); break;
       case 22: {
@@ -1022,6 +1045,9 @@ export class FirstLevelP012Director {
   SpawnPending() {
     const waiting = [];
     for (const pending of this.pendingEnemies) {
+      const livingNear = this.enemyRoutes.reduce((count, entry) => count
+        + (this.host.EnemyPosition?.(entry.handle) ? 1 : 0), 0);
+      if (livingNear >= P012_NEAR_ENEMY_LIMIT) { waiting.push(pending); continue; }
       const handle = this.host.SpawnEnemy?.(pending.spec);
       if (!handle) { waiting.push(pending); continue; }
       this.spawnedTotal += 1;
@@ -1095,9 +1121,11 @@ export class FirstLevelP012Director {
       requiredStance = "prone";
       text = `卧倒沿连续胸墙横移，前往${this.beat === 8 ? "东侧" : "西侧"}枪眼`;
     }
-    if (this.beat === 9 && this.mortarEscapeFrom) {
+    // A live mortar warning outranks the labelled rifle/MG action. It is a real
+    // world hazard and can arrive on the independent frontline pressure clock.
+    if (this.beat >= 7 && this.beat <= 9 && this.mortarEscapeFrom) {
       const origin = this.mortarEscapeFrom;
-      const mgStatus = this.completionReasons[8] === "threatCleared" ? "机枪威胁已清除；" : "友军机枪已恢复射击；";
+      const mgStatus = this.beat < 9 ? "" : this.completionReasons[8] === "threatCleared" ? "机枪威胁已清除；" : "友军机枪已恢复射击；";
       const safePort = [anchors.gunports?.[1], anchors.gunports?.[0], anchors.gunports?.[2]]
         .find((point) => point && Distance(point, origin) >= 8) || anchors.gunports?.[1];
       if (Distance(this.lastSample.position, origin) < 6 && safePort) {
@@ -1108,8 +1136,7 @@ export class FirstLevelP012Director {
         text = `${mgStatus}掷弹筒预警！先冲刺离开落点六米，再卧倒换位`;
       } else {
         target = safePort;
-        if (Distance(this.lastSample.position, target) > 3
-          || Number(this.lastSample.nearEnemyDeaths ?? this.lastSample.enemyDeaths) >= 11) requiredStance = "prone";
+        if (Distance(this.lastSample.position, target) > 3 || this.WaveState(3, true).resolved) requiredStance = "prone";
         text = `${mgStatus}已离开落点，卧倒沿连续胸墙转移到安全枪眼`;
       }
     }

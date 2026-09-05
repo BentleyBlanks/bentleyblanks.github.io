@@ -870,6 +870,16 @@ console.log("PASS P012 runtime finite actors, guide speed, shell warning, delive
   assert.match(combat, /this\.Blast\(shell\.at,[\s\S]*?shell\.OnImpact\?\.\(shell\.at\)/);
 }
 {
+  const runtime=new FirstLevelP012Runtime({GuideActor:()=>null,Position:()=>null,Signalled:()=>false,
+    EnemyMgSuppressed:()=>true,CombatTime:()=>12,FriendlyMgFired:since=>since===12,FriendlyActors:()=>[]},{});
+  runtime.Guide({beat:7,route:[]});runtime.Update(.1);
+  assert.equal(runtime.Sample().friendlyMgFiredAfterSuppression,true,
+    "real MG suppression and friendly return fire are recorded while B07 is still active");
+  runtime.Guide({beat:8,route:[]});runtime.Update(.1);
+  assert.equal(runtime.Sample().friendlyMgFiredAfterSuppression,true,
+    "entering B08 preserves the earlier production combat receipt");
+}
+{
   const front = { handle: { alive: true, position: { x: 0, z: 0 } } };
   const rear = { handle: { alive: true, position: { x: 0, z: 10 } } };
   const column = { arrived: true, waypoints: [{ x: 0, z: 0 }], litters: [{ front, rear }] };
