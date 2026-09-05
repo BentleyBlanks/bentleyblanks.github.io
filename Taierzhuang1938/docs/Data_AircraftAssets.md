@@ -23,6 +23,8 @@ XZ 面上斜着（机首指向约 (-0.851, 0.525)）。`Data_AircraftAssets.mjs`
 按它把模型套在一层 `NoseAlign` 节点里转到 -Z 机首，此后绕圈、扫射与召唤投弹的
 yaw/climb/bank 换算只认 -Z 一个约定。这些方向是用顶点云量出来的（螺旋桨盘一端、
 尾翼一端），换模型时重量，不要凭肉眼猜。2026-09-05 前三架都在倒着飞。
+闸门：`node Taierzhuang1938/Script_ModelFacingTest.mjs`（快速 Tier 0，纯 Node）用顶点云
+复量每架的机首方向，与 `noseDir` 对不上或对齐后不在 -Z 就红；新增机型必须先过它。
 
 ## 转换
 

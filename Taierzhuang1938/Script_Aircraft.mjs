@@ -13,7 +13,7 @@
 
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
-import { AIRCRAFT_ASSETS } from "./Data_AircraftAssets.mjs";
+import { AIRCRAFT_ASSETS, NoseYaw } from "./Data_AircraftAssets.mjs";
 
 const LOADER = new GLTFLoader();
 const _box = new THREE.Box3();
@@ -51,14 +51,6 @@ function PrepareAircraft(gltf, spec) {
   return root;
 }
 
-/**
- * 把源模型的机首方向 (x, z) 转到局部 -Z 所需的绕 Y 角。
- * three 的 rotation.y = φ 把 XZ 面上的航向角 atan2(x, z) 加 φ；目标航向 atan2(0, -1) = π。
- */
-export function NoseYaw(noseDir) {
-  if (!noseDir) return 0;
-  return Math.PI - Math.atan2(noseDir.x, noseDir.z);
-}
 
 function DisposeObject(root) {
   root.traverse((node) => {

@@ -68,6 +68,7 @@ export const testDefs = {
   TrainLibraryTest: { file: "Script_TrainLibraryTest.mjs", desc: "火车构件库：点击懒载、原 PBR、完整轮组绑定、缓存隔离与实际显示" },
   BackRifleRunTest: { file: 'Script_BackRifleRunTest.mjs', desc: '独立背枪跑步 GLB：原骨架、循环接缝、真实蒙皮接地、速度与挂点浏览器验收' },
   ExplosionRulesTest: { file: "Script_ExplosionRulesTest.mjs", desc: "爆炸配置、稀疏地形叠加/坡度/上限、返掷窗口与完整资产目录（纯 Node）" },
+  ModelFacingTest: { file: "Script_ModelFacingTest.mjs", desc: "外部模型朝向闸：飞机 GLB 机首按 noseDir 落到 -Z、战车 tzm 炮口/车头在 -Z，全部用顶点云复量（纯 Node，秒级）" },
   CraterSurfaceTest: { file: "Script_CraterSurfaceTest.mjs", desc: "真实连续爆炸后无水平焦痕环带，HDR 像素对照及普通弹孔保留" },
   ExplosionRangeTest: { file: "Script_ExplosionRangeTest.mjs", timeoutMs: 8 * 60 * 1000, desc: "爆炸白盒：真实F拾取/返掷/战车/炮击、地形网格/Rapier/人物穿坑与复位" },
   BootTest: {
@@ -242,6 +243,7 @@ export const browserTests = new Set([
 export const tier0Fast = [
   "BootPayloadTest",
   "AssetStandardsTest",
+  "ModelFacingTest",
   "TestRunnerTest",
   "ModuleGraphTest",
   "HudPromptTest",
@@ -284,7 +286,7 @@ export const domains = {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
       "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsGripEditorTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "MeleeQteTest", "MeleeCombatTest", "MeleeAnimationTest",
-      "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest",
+      "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest", "ModelFacingTest",
       // 负重会封掉开火/开镜/冲刺三条（Player 的 carrySpeedScale + TryFire 的闸），
       // 碰这三样的改动要连着枪感串一起跑，所以它同时挂在 combat 与 interact 两个域。
       "CarryTest",
@@ -361,7 +363,7 @@ const changedDomainRules = [
   { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
   // Aircraft 挂 combat：绕圈那一层是纯视觉，但同一个文件里的扫射航线打得倒玩家。
   // Hitbox 也挂 combat：人物子弹代理改了就是改了打中哪儿。
-  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Grenade|Blast|Aim|Reticle|Viewmodel|FpsArm|FpsAnatomy|FirstPersonBody|FirstPersonEmbodiment|FirstPersonSelfShadow|Projectile|Ballistic|Hitbox|Script_Input|Data_Meshes|_blender|Range|Melee|Carry|Emplacement|Aircraft|Strafe)/i },
+  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Grenade|Blast|Aim|Reticle|Viewmodel|FpsArm|FpsAnatomy|FirstPersonBody|FirstPersonEmbodiment|FirstPersonSelfShadow|Projectile|Ballistic|Hitbox|Script_Input|Data_Meshes|_blender|Range|Melee|Carry|Emplacement|Aircraft|Strafe|ModelFacing|Model_\w+\.glb)/i },
   { domain: "interact", pattern: /(Carry|Interact|Emplacement|Telegraph|Checkpoint|Script_Input|Hud|Prompt)/i },
   // Flare 挂 ai：它不打人，但它改「谁看得见谁」——那是 AI 的判据。
   { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle|Traversal|Flare|Companion|MissionSetpieces)/i },

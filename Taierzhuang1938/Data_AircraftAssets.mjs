@@ -5,6 +5,7 @@
 // 三件源模型没有一件把机首放在 -Z：两架轰炸机机首朝 +Z，Ki-43 还斜着 58°。
 // Script_Aircraft 的 PrepareAircraft 按这个向量把模型转到局部 -Z 机首，
 // 航线换算（绕圈 / 扫射 / 召唤投弹）只认 -Z 一个约定。漏写＝倒着飞。
+// 闸门：Script_ModelFacingTest 用顶点云复量每一架的机首方向，对不上这里就红。
 
 export const AIRCRAFT_ASSETS = Object.freeze([
   {
@@ -46,3 +47,13 @@ export const AIRCRAFT_ASSETS = Object.freeze([
     phaseOffset: 4.3,
   },
 ]);
+
+/**
+ * 把源模型的机首方向 (x, z) 转到局部 -Z 所需的绕 Y 角。
+ * three 的 rotation.y = φ 把 XZ 面上的航向角 atan2(x, z) 加 φ；目标航向 atan2(0, -1) = π。
+ * 放在数据层是为了让纯 Node 的朝向测试与运行时用同一个换算。
+ */
+export function NoseYaw(noseDir) {
+  if (!noseDir) return 0;
+  return Math.PI - Math.atan2(noseDir.x, noseDir.z);
+}

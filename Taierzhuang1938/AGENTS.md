@@ -9,7 +9,7 @@
 1. 浏览器模块变更更新 `index.html` import map 对应的 `?v=`，新增模块登记 import map；源码 import 不自带 `?v=`，避免同一模块形成两个实例。验收：`Script_ModuleGraphTest.mjs`。
 2. `Data_*.mjs`、规则层及要求纯 Node 运行的 TexBake / FarLand / Identify / CutsceneCheck 保持无 three 依赖。
 3. 新静态几何走 `BuildSink` 分区合批，不零散 add Mesh；开机预算统一取 `SCENE_RENDER_LIMITS`。涉及场景预算时按七关检查，验收：`Script_BootTest.mjs`。
-4. 世界坐标 X 向东、Z 向南、Y 向上，单位米，原点为城中心十字街口。人物正面与枪口为局部 -Z；外部 FBX/GLB 先查源朝向再经桥接层对齐。验收：CharacterModelTest 与 ActorPoseTest。
+4. 世界坐标 X 向东、Z 向南、Y 向上，单位米，原点为城中心十字街口。人物正面、枪口、车头与机首一律为局部 -Z。外部 FBX/GLB/glTF 的源朝向**用顶点云量出来并写进数据**（飞机 `Data_AircraftAssets.noseDir`、导入战车 `ImportVehicles.SOURCES.sourceNose` / `Data_Meshes.facing`），由桥接层对齐；不许凭「导入时看着像」或某一源站的默认约定假定朝向——三架飞机和九五式都曾因此倒着摆了几个月而没人发现。验收：CharacterModelTest、ActorPoseTest，飞机与战车走 `Script_ModelFacingTest.mjs`（新增外部模型必须登记进它）。
 5. 地面由共享采样器决定；界河 `L0_Jiehe` 统一使用 `SampleJieheHeight(x,z)` / 注入的 `groundAt`，渲染、角色、AI、弹道和布设不得另写高度公式或硬编码绝对 y。改高度图或界河地形时运行 HeightmapCli verify、JieheTerrainTest、BootTest；下载、贴地与原始数据规则见 [高度图说明](docs/Data_TaierzhuangHeightmap.md) 及系统参考末节。
 6. 材质 albedo 为 `SRGBColorSpace`，normal/orm 为 `NoColorSpace`；SSAO 只乘间接光。验收与依据：`Script_Materials.mjs`、`docs/Data_TechRenderPipeline.md`。
 7. 枪械、战车减面按 `WEAPON_TRIANGLE_LIMIT` / `VEHICLE_TRIANGLE_LIMIT`；先排除展示件、备用状态及重复壳，超阈值才减面，降幅不超过 5% 时保留原始拓扑。特例与登记取 `SPECIAL_TRIANGLE_TARGETS` / `EXTERNAL_GLB_STANDARDS`，全场预算同步进 `SCENE_RENDER_LIMITS`。验收：AssetStandardsTest。
