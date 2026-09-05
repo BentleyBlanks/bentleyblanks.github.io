@@ -6,7 +6,9 @@
 // by the field (including SampleJieheHeight).
 import * as THREE from "three";
 import { TerrainDeformation } from "./Script_TerrainDeformation.mjs";
+import { CraterDebris } from "./Script_CraterDebris.mjs";
 import { TERRAIN_DEFORMATION } from "./Data_Explosives.mjs";
+import { ValueNoise2 } from "./Script_Noise.mjs";
 
 function ClipByDistance(polygon, Distance) {
   const inside = [], outside = [];
@@ -178,16 +180,20 @@ function ConfigureCraterSurface(material, source, soil) {
     shader.uniforms.uCraterNormal = { value: soil.normalMap };
     shader.vertexShader = shader.vertexShader.replace("#include <common>", `#include <common>
       attribute vec2 terrainDelta;
+      attribute vec2 terrainBlast;
+      varying vec2 vTerrainBlast;
       varying float vTerrainDelta;
       varying float vTerrainWear;
       varying vec2 vSoilUv;`)
       .replace("#include <begin_vertex>", `#include <begin_vertex>
         vTerrainDelta = terrainDelta.x;
         vTerrainWear = terrainDelta.y;
-        vSoilUv = (modelMatrix * vec4(position, 1.0)).xz / 2.4;`);
+        vTerrainBlast = terrainBlast;
+        vSoilUv = (modelMatrix * vec4(position, 1.0)).xz / 1.6;`);
     shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>
       uniform sampler2D uCraterSoil;
       uniform sampler2D uCraterNormal;
+      varying vec2 vTerrainBlast;
       varying float vTerrainDelta;
       varying float vTerrainWear;
       varying vec2 vSoilUv;
@@ -201,47 +207,38 @@ function ConfigureCraterSurface(material, source, soil) {
         return mix(mix(CraterHash(cell).x, CraterHash(cell + vec2(1.0, 0.0)).x, f.x),
           mix(CraterHash(cell + vec2(0.0, 1.0)).x, CraterHash(cell + 1.0).x, f.x), f.y);
       }
-      // Sparse buried clods, separated by loose fines rather than a tiled crack
-      // network. World anchoring also keeps road and tile boundaries continuous.
-      float CraterClods(vec2 p) {
-        vec2 cell = floor(p), f = fract(p);
-        float height = 0.0;
-        for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
-          vec2 offset = vec2(float(x), float(y));
-          vec2 seed = CraterHash(cell + offset);
-          vec2 at = offset + seed - f;
-          float d = length(at * mix(vec2(0.8, 1.5), vec2(1.4, 0.85), seed.y));
-          float radius = mix(0.22, 0.55, seed.x);
-          float clod = (1.0 - smoothstep(radius * 0.25, radius, d))
-            * smoothstep(0.28, 0.68, seed.y);
-          height = max(height, clod);
-        }
-        return height;
-      }`)
+`)
       .replace("#include <color_fragment>", `#include <color_fragment>
-        vec3 soil = texture2D(uCraterSoil, vSoilUv).rgb;
-        vec3 fineSoil = texture2D(uCraterSoil, mat2(0.8, 0.6, -0.6, 0.8) * vSoilUv * 3.7).rgb;
-        vec2 soilMeters = vSoilUv * 2.4;
+        vec2 soilMeters = vSoilUv * 1.6;
         float macro = CraterNoise(soilMeters * 0.73);
-        float breakup = CraterNoise(soilMeters * 7.0 + 13.2);
-        float clods = CraterClods(soilMeters * 3.4 + vec2(macro, breakup) * 0.8);
-        float grain = clamp(dot(fineSoil, vec3(0.333)) * 3.0, 0.0, 1.0);
-        float exposed = smoothstep(0.004, 0.045,
-          vTerrainWear * mix(0.22, 1.8, breakup) * mix(0.65, 1.3, macro));
-        float cavity = smoothstep(0.035, 0.85, vTerrainDelta);
-        float lip = smoothstep(0.015, 0.12, -vTerrainDelta);
-        float fissure = (1.0 - smoothstep(0.15, 0.45, breakup)) * (1.0 - clods);
-        vec3 earth = mix(soil, fineSoil, 0.18);
-        // Fresh compact earth below, lighter broken dry soil on the ejected lip.
-        // Color is soil composition; cavity occlusion is applied to INDIRECT light below.
-        earth *= mix(vec3(0.82, 0.67, 0.51), vec3(1.06, 0.93, 0.77), macro);
-        earth *= mix(1.05, 0.57, cavity) * mix(0.72, 1.12, breakup) * mix(0.9, 1.22, clods);
-        earth *= 1.0 + lip * 0.12;
+        float breakup = CraterNoise(soilMeters * 8.0 + 13.2);
+        vec2 secondUv = mat2(0.8, 0.6, -0.6, 0.8) * vSoilUv * 1.91 + 0.37;
+        vec3 soil = texture2D(uCraterSoil, vSoilUv).rgb;
+        vec3 fineSoil = texture2D(uCraterSoil, secondUv).rgb;
+        // Non-aligned scales retain sharp fractures without an obvious square repeat.
+        float layer = smoothstep(0.2, 0.8, macro) * 0.42;
+        vec3 earth = mix(soil, fineSoil, layer);
+        float grain = dot(earth, vec3(0.333));
+        float exposed = smoothstep(0.003, 0.037,
+          vTerrainWear * mix(0.12, 2.1, breakup) * mix(0.5, 1.5, macro));
+        exposed = max(exposed, smoothstep(0.018, 0.18, vTerrainBlast.y * mix(0.3, 1.4, breakup)));
+        float cavity = smoothstep(0.025, 0.72, vTerrainDelta);
+        float lip = smoothstep(0.008, 0.1, -vTerrainDelta);
+        float charred = smoothstep(0.06, 0.6, vTerrainDelta) * mix(0.58, 1.0, macro);
+        charred = max(charred, vTerrainBlast.x * mix(0.75, 1.0, macro));
+        float fissure = 1.0 - smoothstep(0.012, 0.105, grain);
+        // Scorched umber at the blast seat, ochre fracture edges and dry dust on
+        // the lip. Scorch changes reflectance; cavity AO only affects indirect light.
+        earth *= mix(vec3(2.65, 2.12, 1.55), vec3(0.70, 0.53, 0.40), charred);
+        earth *= mix(0.8, 1.18, macro) * (1.0 + lip * 0.15);
+        float ash = smoothstep(0.54, 0.82, CraterNoise(soilMeters * 1.6 + 51.7)) * charred;
+        earth = mix(earth, vec3(0.018, 0.012, 0.008) * mix(0.7, 1.3, breakup), ash * 0.42);
+        float dust = smoothstep(0.005, 0.08, vTerrainBlast.y) * (1.0 - exposed) * 0.38;
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.57, 0.49, 0.4), dust);
         diffuseColor.rgb = mix(diffuseColor.rgb, earth, exposed);
-        float soilRelief = (clods * 0.032 + breakup * 0.009 + grain * 0.003)
-          * exposed * mix(1.0, 0.6, cavity);`)
+        float soilRelief = (grain * 0.003 + breakup * 0.001) * exposed;`)
       .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
-        roughnessFactor = mix(roughnessFactor, mix(0.98, 0.84, cavity) - clods * 0.035, exposed);`)
+        roughnessFactor = mix(roughnessFactor, mix(0.99, 0.94, cavity), exposed);`)
       .replace("#include <metalnessmap_fragment>", `#include <metalnessmap_fragment>
         metalnessFactor = mix(metalnessFactor, 0.0, exposed);`)
       .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
@@ -254,13 +251,13 @@ function ConfigureCraterSurface(material, source, soil) {
         vec3 soilGradient = sign(soilDet) * (dFdx(soilRelief) * soilR1 + dFdy(soilRelief) * soilR2);
         normal = normalize(max(abs(soilDet), 1e-8) * normal - soilGradient);
         vec2 soilSlope = texture2D(uCraterNormal, vSoilUv).xy * 2.0 - 1.0;
-        normal = normalize(normal + mat3(viewMatrix) * vec3(soilSlope.x, 0.0, -soilSlope.y) * exposed * 0.28);`)
+        normal = normalize(normal + mat3(viewMatrix) * vec3(soilSlope.x, 0.0, soilSlope.y) * exposed * 0.52);`)
       .replace("#include <aomap_fragment>", `#include <aomap_fragment>
         float earthOcclusion = mix(1.0, (1.0 - fissure * 0.36) * mix(1.0, 0.76, cavity), exposed);
         reflectedLight.indirectDiffuse *= earthOcclusion;
         reflectedLight.indirectSpecular *= earthOcclusion;`);
   };
-  material.customProgramCacheKey = () => `${SourceKey()}|CraterSoilV2`;
+  material.customProgramCacheKey = () => `${SourceKey()}|CraterSoilV3`;
 }
 
 export class TerrainDeformationView {
@@ -269,8 +266,9 @@ export class TerrainDeformationView {
     this.originalHeight = field.GroundHeight.bind(field);
     this.originalGeometry = new Map(); this.tileMeshes = new Map();
     this.overlayTiles = new Map(); this.overlayMaterials = new Map();
+    this.blastPages = new Map();
     const groundMaterial = library.Get("Ground");
-    this.soilMaterial = groundMaterial;
+    this.soilMaterial = library.Get(library.baked.has("CraterScorched") ? "CraterScorched" : "Ground");
     this.sources = field.meshes.filter((m) => m.geometry && (m.userData.deformableTerrain
       || m.material === groundMaterial || /(?:^Static_|\|)Ground$/.test(m.name)
       || /^(JieheGround_|CityPlatform$|OuterGround$|RangeGround$)/.test(m.name)));
@@ -292,6 +290,7 @@ export class TerrainDeformationView {
     const w = this.model.config.tileCells + 3;
     this._heights = new Float64Array(w * w); this._deltas = new Float32Array(w * w); this._wear = new Float32Array(w * w);
     this.lastUpdateMs = null; this.lastStepSerial = -1;
+    this.debris = new CraterDebris(this, library);
   }
   CanDeform(x, z) {
     if (!this.sources.length) return false;
@@ -332,7 +331,7 @@ export class TerrainDeformationView {
   Warm(renderer, camera) {
     this.RemoveWarmProxies();
     if (!renderer || !camera || !this.sources.length) return this.warmProxies;
-    const b = this.field.bounds, materials = [this.material, ...new Set(this.overlayMaterials.values())];
+    const b = this.field.bounds, materials = [this.material, ...this.debris.materials, ...new Set(this.overlayMaterials.values())];
     const group = new THREE.Group();
     for (const [i, material] of materials.entries()) {
       const geometry = new THREE.BufferGeometry();
@@ -341,9 +340,11 @@ export class TerrainDeformationView {
       geometry.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, 0, 1, 1, 0, 1, 1], 2));
       geometry.setAttribute("color", new THREE.Float32BufferAttribute([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 3));
       geometry.setAttribute("terrainDelta", new THREE.BufferAttribute(new Float32Array(8), 2));
+      geometry.setAttribute("terrainBlast", new THREE.BufferAttribute(new Float32Array(8), 2));
       geometry.setIndex([0, 1, 2, 2, 1, 3]);
       const mesh = new THREE.Mesh(geometry, material); mesh.name = `TerrainWarm_${i}`;
       mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
+      if (this.debris.materials.includes(material)) mesh.customDepthMaterial = this.debris.library.StaticDepth();
       mesh.position.set((b.minX + b.maxX) * 0.5, -500, (b.minZ + b.maxZ) * 0.5);
       mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.userData.terrainWarm = true;
       mesh.onAfterRender = () => {
@@ -374,6 +375,46 @@ export class TerrainDeformationView {
     }
     return wear;
   }
+  // Persistent heat and ejected fines live on the same lattice as the terrain.
+  // This adds broken radial tails without a floating scorch decal or a uniform
+  // feathered disk. Repeated hits accumulate marks rather than erase them.
+  StampBlast(hit) {
+    const { cellM: s, tileCells: n } = this.model.config;
+    const reach = hit.radius * 1.7, phase = ValueNoise2(hit.x, hit.z, 731) * Math.PI * 2;
+    const minX = Math.floor((hit.x - reach) / s), maxX = Math.ceil((hit.x + reach) / s);
+    const minZ = Math.floor((hit.z - reach) / s), maxZ = Math.ceil((hit.z + reach) / s);
+    for (let tz = Math.floor(minZ / n); tz <= Math.floor(maxZ / n); tz++) {
+      for (let tx = Math.floor(minX / n); tx <= Math.floor(maxX / n); tx++) {
+        const key = tx * 4096 + tz;
+        let page = this.blastPages.get(key);
+        for (let iz = Math.max(minZ, tz * n); iz <= Math.min(maxZ, (tz + 1) * n - 1); iz++) {
+          for (let ix = Math.max(minX, tx * n); ix <= Math.min(maxX, (tx + 1) * n - 1); ix++) {
+            const dx = ix * s - hit.x, dz = iz * s - hit.z, r = Math.hypot(dx, dz) / hit.radius;
+            if (r >= 1.7 || !this.model.Allowed(ix, iz)) continue;
+            const angle = Math.atan2(dz, dx);
+            const rays = (Math.sin(angle * 17 + phase) + Math.sin(angle * 29 - phase) * 0.5 + 1.5) / 3;
+            const noise = ValueNoise2(ix * 0.51, iz * 0.51, 417);
+            const heat = Math.max(0, 1 - r) ** 1.5 * (0.65 + noise * 0.35);
+            const powder = (1 - r / 1.7) ** 2 * (0.18 + rays * 0.82) * (0.55 + noise * 0.45);
+            if (powder < 0.004 && heat < 0.004) continue;
+            if (!page) { page = new Float32Array(n * n * 2); this.blastPages.set(key, page); }
+            const lx = ix - tx * n, lz = iz - tz * n, at = (lz * n + lx) * 2;
+            page[at] = Math.max(page[at], heat); page[at + 1] = Math.max(page[at + 1], powder);
+            // Border vertices belong to both neighbours, exactly as SetNode().
+            for (let z = lz === 0 ? tz - 1 : tz; z <= tz; z++) {
+              for (let x = lx === 0 ? tx - 1 : tx; x <= tx; x++) this.model.MarkTile(x, z);
+            }
+          }
+        }
+      }
+    }
+  }
+  ReadBlast(x, z, target, offset) {
+    const { cellM: s, tileCells: n } = this.model.config;
+    const ix = Math.round(x / s), iz = Math.round(z / s), tx = Math.floor(ix / n), tz = Math.floor(iz / n);
+    const page = this.blastPages.get(tx * 4096 + tz), at = ((iz - tz * n) * n + ix - tx * n) * 2;
+    target[offset] = page?.[at] || 0; target[offset + 1] = page?.[at + 1] || 0;
+  }
   /** Cut every rect of this Flush out of one source in a single triangle pass. */
   CutSource(source, rects, options) {
     const before = source.geometry;
@@ -400,6 +441,7 @@ export class TerrainDeformationView {
         for (let i = 0; i < baseHeights.length; i++) baseHeights[i] = this.model.BaseHeight(original[i * 3], original[i * 3 + 2]);
         geometry.userData.baseHeights = baseHeights;
         geometry.setAttribute("terrainDelta", new THREE.BufferAttribute(new Float32Array(baseHeights.length * 2), 2).setUsage(THREE.DynamicDrawUsage));
+        geometry.setAttribute("terrainBlast", new THREE.BufferAttribute(new Float32Array(baseHeights.length * 2), 2).setUsage(THREE.DynamicDrawUsage));
         const mesh = new THREE.Mesh(geometry, this.OverlayMaterial(source)); mesh.name = `TerrainSurface_${keys[tile]}_${source.name}`;
         mesh.receiveShadow = source.receiveShadow; mesh.castShadow = source.castShadow;
         mesh.onBeforeRender = source.onBeforeRender; mesh.onAfterRender = source.onAfterRender;
@@ -435,9 +477,11 @@ export class TerrainDeformationView {
           soil = lx >= 1 && lx <= n + 1 && lz >= 1 && lz <= n + 1 ? wear[lz * w + lx] : this.SoilWear(x, z);
         } else soil = this.SoilWear(x, z);
         delta[i * 2] = d; delta[i * 2 + 1] = soil;
+        this.ReadBlast(x, z, geo.attributes.terrainBlast.array, i * 2);
       }
       geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true;
       geo.attributes.terrainDelta.needsUpdate = true;
+      geo.attributes.terrainBlast.needsUpdate = true;
       geo.computeVertexNormals(); geo.computeBoundingBox(); geo.computeBoundingSphere();
     }
   }
@@ -447,7 +491,7 @@ export class TerrainDeformationView {
     const start = performance.now();
     const hit = this.model.ApplyBlast(position, kind);
     const rulesEnd = performance.now();
-    if (hit) this.Flush();
+    if (hit) { this.StampBlast(hit); this.Flush(); }
     this.lastUpdateMs = { rules: rulesEnd - start, surface: performance.now() - rulesEnd };
     return hit;
   }
@@ -467,6 +511,7 @@ export class TerrainDeformationView {
         geometry.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(width * width * 3), 3).setUsage(THREE.DynamicDrawUsage));
         geometry.setAttribute("color", new THREE.BufferAttribute(new Float32Array(width * width * 3), 3).setUsage(THREE.DynamicDrawUsage));
         geometry.setAttribute("terrainDelta", new THREE.BufferAttribute(new Float32Array(width * width * 2), 2).setUsage(THREE.DynamicDrawUsage));
+        geometry.setAttribute("terrainBlast", new THREE.BufferAttribute(new Float32Array(width * width * 2), 2).setUsage(THREE.DynamicDrawUsage));
         const uv = new Float32Array(width * width * 2), indices = [];
         for (let z = 0; z <= n; z++) for (let x = 0; x <= n; x++) {
           const at = z * width + x; uv[at * 2] = (x0 + x * s) / 3.4; uv[at * 2 + 1] = -(z0 + z * s) / 3.4;
@@ -505,12 +550,14 @@ export class TerrainDeformationView {
             if (v > soil) soil = v;
           }
           del[at * 2] = deltas[local]; del[at * 2 + 1] = soil; wear[local] = soil;
+          this.ReadBlast((tx * n + x) * s, (tz * n + z) * s, attributes.terrainBlast.array, at * 2);
           // Rapier heightfield layout: column-major, rows along z.
           field[z + x * width] = y;
         }
       }
       attributes.position.needsUpdate = true; attributes.normal.needsUpdate = true;
       attributes.color.needsUpdate = true; attributes.terrainDelta.needsUpdate = true;
+      attributes.terrainBlast.needsUpdate = true;
       geo.computeBoundingBox(); geo.computeBoundingSphere();
       // A halo tile only re-lights its seam; its surface did not move, so the
       // collider it already has is still exact.
@@ -518,6 +565,7 @@ export class TerrainDeformationView {
         this.physics.SetTerrainTile(key, { x0, z0, sizeM, cells: n, heights: field }); rebuilt++;
       }
       this.UpdateOverlays(key, tx, tz, wear, w);
+      this.debris.Update(key, tx, tz, wear, w);
     }
     if (rebuilt && this.physics) {
       // Gameplay steps the world every frame and the next Step publishes the new
@@ -529,6 +577,8 @@ export class TerrainDeformationView {
     }
   }
   Reset() {
+    this.debris.Reset();
+    this.blastPages.clear();
     for (const [source, original] of this.originalGeometry) { source.geometry.dispose(); source.geometry = original; }
     this.originalGeometry.clear();
     for (const [key, mesh] of this.tileMeshes) { this.scene.remove(mesh); mesh.geometry.dispose(); this.physics?.RemoveTerrainTile(key); }
@@ -539,11 +589,11 @@ export class TerrainDeformationView {
     this.physics?.RefreshStaticQueries();
   }
   State() { return { ...this.model.State(), meshes: this.tileMeshes.size,
-    lastUpdateMs: this.lastUpdateMs || null, warmProxies: this.warmProxies.length,
+    debris: this.debris.State(), lastUpdateMs: this.lastUpdateMs || null, warmProxies: this.warmProxies.length,
     overlays: [...this.overlayTiles.values()].reduce((sum, meshes) => sum + meshes.length, 0),
     colliderTiles: this.physics?.terrainTiles.size || 0 }; }
   Dispose() {
-    this.RemoveWarmProxies(); this.Reset(); this.material.dispose();
+    this.RemoveWarmProxies(); this.Reset(); this.debris.Dispose(); this.material.dispose();
     for (const material of this.overlayMaterials.values()) material.dispose();
     this.overlayMaterials.clear(); this.field.GroundHeight = this.originalHeight; this.field.deformation = null;
   }

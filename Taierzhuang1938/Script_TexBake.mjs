@@ -603,6 +603,7 @@ export const RECIPES = {
   LugouqiaoType11BodyAlt: (s) => BakeSteel(s ?? 256, { seed: 641 }),
   LugouqiaoType11Fore: (s) => BakeWood(s ?? 256, { seed: 642, planks: 1 }),
   SteelHelmet: (s) => BakeSteel(s ?? 256, { seed: 617, base: [64, 66, 60], polish: 0.2, rust: 0.35 }),
+  CraterScorched: (s) => BakeRubbleGround(s ?? 512, { seed: 715, brickiness: 0.06 }),
   Ground: (s) => BakeRubbleGround(s ?? 512, { seed: 701 }),
   // 东门外翻耕土的 ImageGen BaseColor + Normal 会在启动时覆盖；404 时仍保留
   // 同尺度的干燥碎土 PBR，避免新材质名让整关建场失败。

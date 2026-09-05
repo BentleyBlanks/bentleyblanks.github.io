@@ -28,6 +28,7 @@ import { RangeField } from "./Script_RangeField.mjs";
 import { ExplosionRangeField } from "./Script_ExplosionRangeField.mjs";
 import { ExplosionRange } from "./Script_ExplosionRange.mjs";
 import { EXPLOSION_RANGE_PHASE, EXPLOSION_RANGE_ID } from "./Data_ExplosionRange.mjs";
+import { PrepareCraterDebris } from "./Script_CraterDebris.mjs";
 import { TerrainDeformationView } from "./Script_TerrainDeformationView.mjs";
 import { RegisterGrenadeReturn } from "./Script_GrenadeReturn.mjs";
 import { WeaponRangeField } from "./Script_WeaponRangeField.mjs";
@@ -770,6 +771,10 @@ async function Boot() {
       albedo: "./Texture/Texture_CityWallStoneBase.webp?v=1",
       normal: "./Texture/Texture_CityWallStoneNormal.webp?v=1",
       orm: "./Texture/Texture_CityWallStoneOrm.webp?v=1" },
+    { name: "CraterScorched",
+      albedo: "./Texture/Texture_CraterScorchedBase.webp?v=1",
+      normal: "./Texture/Texture_CraterScorchedNormal.webp?v=1",
+      orm: "./Texture/Texture_CraterScorchedOrm.webp?v=1" },
     { name: "Ground",
       albedo: "./Texture/Texture_GroundBase.webp?v=1",
       normal: "./Texture/Texture_GroundNormal.webp?v=1",
@@ -960,7 +965,7 @@ async function Boot() {
   // 物理引擎的 wasm（2.8 MB，本地 vendor 里）。**必须排在建关之前** ——
   // BuildField 末尾就要拿它建碰撞体了。
   setStep("装物理引擎……", 0.245);
-  await InitPhysics();
+  await Promise.all([InitPhysics(), PrepareCraterDebris(library)]);
 
   const phase = PHASE_TABLE[state.phaseIndex];
   const preset = sky.Apply(phase.sky);

@@ -30,9 +30,23 @@ try {
     // Let all fire/dust/shockwaves expire. Only permanent surface detail remains.
     t.StepFrames(600);
     t.graphics.ssao = 0; t.StepFrames(1, 0);
-    return { left: field.GroundHeight(2595, 2576), right: field.GroundHeight(2605, 2576), state: field.deformation.State() };
+    const view = field.deformation, debris = [...view.debris.tiles.values()].flatMap((tile) => tile.meshes);
+    let tallestFragment = 0;
+    for (const mesh of debris) {
+      const positions = mesh.geometry.attributes.position;
+      for (let i = 0; i < positions.count; i += 17) tallestFragment = Math.max(tallestFragment,
+        positions.getY(i) - field.GroundHeight(positions.getX(i), positions.getZ(i)));
+    }
+    return { left: field.GroundHeight(2595, 2576), right: field.GroundHeight(2605, 2576), state: view.State(),
+      tallestFragment, receivesShadows: debris.every((mesh) => mesh.castShadow && mesh.receiveShadow),
+      textureSize: view.soilMaterial.map.image.width };
   });
   assert.ok(terrain.left < -2.3 && terrain.right < -2, "real repeated shells create deep physical pits");
+  assert.ok(terrain.state.debris.stones > 0 && terrain.state.debris.fragments > 20, "existing rock models and small clods dress real impacts");
+  assert.ok(terrain.state.debris.tiles <= terrain.state.debris.maxTiles, "fragment tile cache stays bounded");
+  assert.ok(terrain.state.debris.fragments <= terrain.state.debris.tiles * terrain.state.debris.maxFragmentsPerTile, "per-tile debris stays bounded");
+  assert.ok(terrain.tallestFragment > 0.02 && terrain.tallestFragment < 0.24, "repeated impacts re-ground boot-sized surface fragments");
+  assert.ok(terrain.receivesShadows && terrain.textureSize === 1024, "authored crater material and shadowed geometry are in the actual scene");
 
   async function CompareDecals(eye, target, label) {
     const difference = await page.evaluate(({ eye, target }) => {
@@ -67,7 +81,14 @@ try {
     t.vfx.Impact(at, up, "dirt"); t.StepFrames(180);
   });
   const bullet = await CompareDecals([2600, 1.4, 2587.5], [2600, 0, 2586], "BulletImpact");
-  const report = { terrain, crater, bullet, errors };
+  const reset = await page.evaluate(() => {
+    const t = window.Taierzhuang, view = t.combat.host.battlefield.deformation;
+    t.Debug.Explosions.Reset();
+    return { fragments: view.debris.State().fragments, marks: view.blastPages.size,
+      meshes: t.scene.children.filter((mesh) => mesh.userData.craterDebris).length };
+  });
+  assert.deepEqual(reset, { fragments: 0, marks: 0, meshes: 0 }, "reset releases all persistent soil marks and debris meshes");
+  const report = { terrain, crater, bullet, reset, errors };
   fs.writeFileSync(path.join(out, "Data_Acceptance.json"), JSON.stringify(report, null, 2));
   assert.deepEqual(errors, [], "no browser/GLSL errors");
   assert.ok(crater.changedPixels <= 4, `persistent flat decals must not cut rings through crater walls: ${JSON.stringify(crater)}`);
