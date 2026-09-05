@@ -3,13 +3,14 @@ from pathlib import Path
 import sys,argparse,json,math
 import bpy,numpy as np
 from mathutils import Matrix,Vector
-parser=argparse.ArgumentParser();parser.add_argument('--root',type=Path,required=True);parser.add_argument('--faction',default='Nra');parser.add_argument('--clip',required=True);parser.add_argument('--revision',type=int,choices=[2,3],default=2)
-args=parser.parse_args(sys.argv[sys.argv.index('--')+1:]);root=args.root;faction=args.faction;clip=args.clip;revision=args.revision
-runtime=root/'Models/_Cache/ReviewV2';out=root/f'Models/ReviewV{revision}';blendOut=root/f'Blender/ReviewV{revision}';out.mkdir(parents=True,exist_ok=True);blendOut.mkdir(parents=True,exist_ok=True)
+parser=argparse.ArgumentParser();parser.add_argument('--root',type=Path,required=True);parser.add_argument('--faction',default='Nra');parser.add_argument('--clip',required=True);parser.add_argument('--revision',type=int,choices=[1,2,3],default=2)
+parser.add_argument('--capture-group',default='ReviewV2');parser.add_argument('--output-group');parser.add_argument('--grip-revision',type=int)
+args=parser.parse_args(sys.argv[sys.argv.index('--')+1:]);root=args.root;faction=args.faction;clip=args.clip;revision=args.revision;gripRevision=args.grip_revision or revision
+runtime=root/'Models/_Cache'/args.capture_group;outputGroup=args.output_group or f'ReviewV{revision}';out=root/'Models'/outputGroup;blendOut=root/'Blender'/outputGroup;out.mkdir(parents=True,exist_ok=True);blendOut.mkdir(parents=True,exist_ok=True)
 archive=json.loads((root/'Data_ArchiveManifest.json').read_text(encoding='utf-8'))['records']
 preparation=root/next(r['path'] for r in archive if r['source'].replace('\\','/').endswith('InfantryActions_20260905/Scene_InfantryPreparation.blend'))
 fingerReference={}
-if revision>=3:
+if gripRevision>=3:
  bpy.ops.wm.read_factory_settings(use_empty=True)
  bpy.ops.import_scene.gltf(filepath=str(root/f'Models/SourceCharacters/Model_Lugou{faction}01.glb'))
  referenceArm=next(o for o in bpy.context.scene.objects if o.type=='ARMATURE')
@@ -20,8 +21,9 @@ bpy.ops.wm.open_mainfile(filepath=str(preparation))
 scene=bpy.data.scenes['Scene_'+faction+'InfantryActions'];bpy.context.window.scene=scene
 for other in list(bpy.data.scenes):
  if other!=scene:bpy.data.scenes.remove(other)
+if args.capture_group!='ReviewV2':bpy.context.view_layer.update()
 arm=bpy.data.objects['Rig_'+faction+'Infantry'];body=bpy.data.objects['Model_'+faction+'InfantryBody'];rifle=bpy.data.objects['Socket_'+faction+'InfantryRifle']
-if revision>=3:
+if gripRevision>=3:
  exec(compile(Path(__file__).with_name('Script_InfantryCompleteRifle.py').read_text(encoding='utf-8'),'CompleteRifle','exec'))
  CompleteRifle(root,faction,rifle)
 for mat in body.data.materials:
@@ -32,7 +34,7 @@ for mat in body.data.materials:
      for link in list(node.inputs[name].links):mat.node_tree.links.remove(link)
      node.inputs[name].default_value=value
 prefix='Bip002 ' if faction=='Nra' else 'Bip001 ';N=lambda p:prefix+p
-motion=json.loads((runtime/f'Data_{clip}Motion.json').read_text());count=motion['cycleFrames'];kind=motion['kind'];loop=motion['loop']
+motion=json.loads((runtime/f'Data_{clip}Motion.json').read_text(encoding='utf-8'));count=motion['cycleFrames'];kind=motion['kind'];loop=motion['loop']
 mapping={'Pelvis':0,'Spine':3,'Spine1':6,'Spine2':9,'Neck':12,'Head':15,'L Thigh':1,'R Thigh':2,'L Calf':4,'R Calf':5,'L Foot':7,'R Foot':8,'L Toe0':10,'R Toe0':11,'L Clavicle':13,'R Clavicle':14,'L UpperArm':16,'R UpperArm':17,'L Forearm':18,'R Forearm':19,'L Hand':20,'R Hand':21}
 rest={b.name:(arm.matrix_world@b.matrix_local).copy() for b in arm.data.bones};heads={n:m.translation.copy() for n,m in rest.items()};inverse=arm.matrix_world.inverted()
 leg=(heads[N('L Calf')]-heads[N('L Thigh')]).length+(heads[N('L Foot')]-heads[N('L Calf')]).length;ratio=leg/motion['sourceLegLength'];scale=heads[N('Pelvis')].z/.942464
@@ -79,7 +81,7 @@ def Base(index,drop=0):
     b.rotation_quaternion=fingerReference[b.name];continue
    side='L' if ' L ' in b.name else 'R';direction=rest[b.name].to_3x3().col[0].normalized();normal=rest[N(side+' Hand')].to_3x3().col[1].normalized();axis=rest[b.name].to_3x3().inverted()@direction.cross(normal)
    digit=b.name.rsplit('Finger',1)[1];joint=0 if len(digit)==1 else int(digit[-1]);angle=([.55,.6,.45][joint] if digit.startswith('0') else [1.05,.95,.6][joint]) if kind!='limp' else .25
-   if revision>=3 and kind in ['rifle','kneel'] and side=='R' and not digit.startswith('0'):angle=([.35,.45,.25] if digit.startswith('1') else [1.05,1.05,.65])[joint]
+   if gripRevision>=3 and kind in ['rifle','kneel'] and side=='R' and not digit.startswith('0'):angle=([.35,.45,.25] if digit.startswith('1') else [1.05,1.05,.65])[joint]
    b.rotation_quaternion=Matrix.Rotation(angle,4,axis).to_quaternion()
  return positions,rotations
 def Solve(upper,lower,tip,start,target,pole,rotations):
@@ -146,13 +148,18 @@ def Props(index,positions,rotations):
   for side,handle in zip(['L','R'],handles):
    point=Vector(((.27 if side=='L' else -.27)*scale,.065*scale,height));handle.location=point
    errors.append(Hand(side,point,Vector((0,-.1,-1)),Vector((1 if side=='L' else -1,0,0)),positions,rotations))
- elif kind in ['rifle','kneel'] and revision>=3:
+ elif kind in ['rifle','kneel'] and gripRevision>=3:
   # A shoulder stock contact determines the prop; fingers are separately posed.
   # Source shoulder and elbow planes drive heading and bounded arm IK.
   up=Vector((0,0,1));shoulderSpan=positions['L UpperArm']-positions['R UpperArm'];forward=Vector((shoulderSpan.y,-shoulderSpan.x,0)).normalized()
-  left=Vector((-forward.y,forward.x,0)).normalized();z=-forward;x=up.cross(z).normalized();y=z.cross(x).normalized()
+  left=Vector((-forward.y,forward.x,0)).normalized()
+  if motion.get('gripStyle')=='chest':forward=(forward*.55+left*.7+up*.45).normalized()
+  elif motion.get('gripStyle')=='crossbody':forward=(forward*.28+left*.96).normalized()
+  elif motion.get('gripStyle')=='lowready':forward=(forward-up*.35).normalized()
+  z=-forward;x=up.cross(z).normalized();y=z.cross(x).normalized()
   orientation=Matrix((x,y,z)).transposed();matrix=orientation.to_4x4()
   origin=positions['R UpperArm']+forward*(.23*scale)+left*(.045*scale)+up*(.035*scale)
+  if motion.get('gripStyle') in ['chest','lowready','crossbody']:origin=positions['R Hand']+forward*(.075*scale)+up*(.015*scale)
   localGrips={'R':Vector((.020*scale,-.045*scale,.055*scale)),'L':Vector((0,-.022*scale,-.16*scale))}
   localDirections={'R':Vector((0,.35,-.9367)).normalized(),'L':Vector((1,0,0))}
   localNormals={'R':Vector((-1,0,0)),'L':Vector((0,1,0))}
@@ -228,5 +235,5 @@ scene.frame_start=1;scene.frame_end=count+1;scene.frame_set(1)
 for img in bpy.data.images:
  if img.source=='FILE' and img.has_data and not img.packed_file:img.pack()
 bpy.ops.wm.save_as_mainfile(filepath=str(blendPath),compress=True)
-(out/f'Data_{faction}_{clip}_Validation.json').write_text(json.dumps({'status':'requires_visual_review','variants':variants,'samples':samples,'maxGripError':max(s['gripError'] for s in samples),'minSoleHeight':min(h for s in samples for h in s['soles'].values())},indent=2),encoding='utf-8')
+(out/f'Data_{faction}_{clip}_Validation.json').write_text(json.dumps({'status':'requires_visual_review','retargetScale':ratio,'variants':variants,'samples':samples,'maxGripError':max(s['gripError'] for s in samples),'minSoleHeight':min(h for s in samples for h in s['soles'].values())},indent=2),encoding='utf-8')
 print('DONE',faction,clip,flush=True)

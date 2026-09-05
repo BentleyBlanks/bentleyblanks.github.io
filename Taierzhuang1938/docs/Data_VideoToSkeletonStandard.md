@@ -27,6 +27,8 @@
 5. 用户要求重新转换时，新输出目录必须实际重新执行推理；记录缓存复用范围、原片哈希、推理结果哈希、时间和环境。不可把旧预测改名冒充新版。
 6. 保留完整恢复结果，再从原时间线选片段。循环取完整步态周期，只在局部接缝做平滑，不能从整段旋转线性扣除差值改变整个动作。连续跪起等片段共享坐标和边界姿态。
 7. 相机内参和摄影机移动无法可靠恢复时，写明假设；区分原地动画与根运动，保留速度和位移信息。
+8. 左右横移按人物自身的解剖方向验收，用左右髋轴与移动位移的点积辅助确认；生成任务名和屏幕左右不能作为方向证据。发现任务标签写反时更正动作登记，保留原任务 ID、视频与缓存路径，通过配方的 `source` 映射关联，不镜像原片或骨骼凑名称。
+9. 失败重做的素材放各来源的 `History`，最终原片从最新 `Data_GenerationResult.json` 的 `result_json.videos[0].path` 取用；不要用目录中第一个 MP4。生成费用按唯一成功 `submit_id` 去重记录，复制收据不能重复计费。约 45° 是生成镜头要求，未标定的实际视频不能登记为精确测量角度。
 
 ## 重定向与修正
 
@@ -53,6 +55,23 @@ GVHMR 的 22 个身体关节不提供可靠的手指握法和枪械姿态。持�
 - 从 GLB 真正加载、检查随时间变化的骨骼矩阵并人工看姿态；HTTP 200、轨道数量或数值阈值通过都不能单独证明动作自然。
 
 原始关节与来源映射由 `_import/Script_MotionReviewSources.py --root <资产库>` 从现有缓存导出；导出后运行资产库内 `Preview/Script_IndexLibrary.py` 更新目录。三栏播放、原片时间同步、模型运动、效果历史和缺失来源的验收入口为 `_import/Script_MotionLibraryVerify.mjs --root <资产库>`（Node，先启动本地预览）。原始关节 JSON 必须逐值核对其 `sourceCache` 内的数组及 `sourceCacheSha256`，不能只检验网页自洽。
+
+## 批量制作与复现入口
+
+以下是当前实现的操作入口，脚本均在 `_import`，随本地交付复制到 `Models/_Pipeline`。Python 使用具备 GVHMR / NumPy / SciPy 的环境；烘焙脚本通过 Blender `--background --python <脚本> -- <参数>` 执行。预览与检查用本机 HTTP 服务；仓库中的浏览器验证脚本仍从 worktree 运行。
+
+| 阶段 | 入口及数据 |
+| --- | --- |
+| 本机推理 | `Script_MotionRecover.py`；保存 `hmr4d_results.pt`、`Data_GvhmrMotion.npz` 和 `Data_Recovery.json`。恢复报告的 `resultSha256` 对应 PT 文件，原始关节 JSON 的 `sourceCacheSha256` 对应 NPZ，二者不能混用 |
+| 配方与选段 | `Models/NextTenV1/Data_Recipes.json`；`Script_MotionBatchPrepare.py --root <资产库> --ids <动作>` 处理持枪步态，`Script_MotionContactPrepare.py --root <资产库> --clip <动作>` 处理卧倒、起身、匍匐及受击 |
+| 持枪烘焙 | `Script_MotionBakeV2.py --root <资产库> --faction Nra或Ija --clip <动作> --revision 1 --grip-revision 3 --capture-group NextTenV1 --output-group NextTenV1`；效果版本与握枪修正算法版本分别登记 |
+| 全身接触烘焙 | `Script_MotionDeathBake.py --root <资产库> --faction Nra或Ija --clip <动作> --group NextTenV1`；死亡单独用 `Script_MotionDeathPrepare.py --root <资产库> --settle-frame 135` 后运行 baker 默认死亡配置 |
+| 原始骨骼工程 | `Script_MotionRawSkeleton.py --root <资产库> --raw Models/RecoveryPreview/Data_V1_<动作>RawJoints.json --name <动作>`；逐帧验证可编辑 rig 的关节位置，禁止混入后处理 |
+| 登记 | `Script_MotionBatchRegister.py --root <资产库>` 与 `Script_MotionDeathRegister.py --root <资产库>`；随后运行资产库内 `Preview/Script_IndexLibrary.py` |
+| 验证 | `Script_MotionLibraryDataVerify.py` 检查原数组、文件链接及 raw rig 对应关系；`Script_MotionLibraryVerify.mjs` 检查全库播放；`Script_MotionBatchVerify.mjs` 检查新增两军 GLB 方向、完整入镜并出图；`Script_MotionDeathVerify.mjs` 检查非循环末态；均传 `--root <资产库>` |
+| 生产与交付清单 | `Script_MotionBatchProvenance.py --root <资产库>` 核验最终原片、推理文件与去重生成收据；`Script_MotionDeliveryManifest.py --root <资产库>` 更新当前文件 SHA-256 清单，不修改历史 `Data_ArchiveManifest.json` |
+
+全身接触采用按源片检查的接触权重、支撑平面、躯干接地和末态保持；这些都属于重定向侧修正。配方应记录每个动作的支撑区间、冻结末态帧、持枪/背枪形式。原地跑步原片不能测出可靠行进速度，任何游戏移动速度设定必须另行注明。Python 读取含中文配方或目录 JSON 时明确使用 UTF-8，避免 Windows 默认编码污染标签。
 
 ## 交付与接受状态
 

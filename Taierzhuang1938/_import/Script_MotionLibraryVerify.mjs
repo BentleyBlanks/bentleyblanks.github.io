@@ -32,7 +32,7 @@ async function Snapshot(phase){
 function Delta(a,b){assert.equal(a.length,b.length);return Math.max(0,...a.map((v,i)=>Math.abs(v-b[i])))}
 function CheckSync(s,v){
  assert.ok(s.matrices.every(Number.isFinite),v.id+' finite matrices');assert.ok(Math.abs(s.modelTime-s.phase*s.duration)<.00001,'Model time');
- if(v.id.startsWith('Ija-v3-'))assert.equal(s.nearStockParts.length,2,'Complete Type 38 stock and receiver exported');
+ if(v.id.startsWith('Ija-v3-')||(v.faction==='Ija'&&v.path.includes('/NextTenV1/')))assert.equal(s.nearStockParts.length,2,'Complete Type 38 stock and receiver exported');
  if(!v.review?.sourceVideo)return;
  assert.ok(s.videoWidth>0&&s.sourceHidden,'Original video decoded and visible');assert.ok(Math.abs(s.time-s.videoTime)<.002,'Video time');
  assert.equal(s.videoSource,new URL('../'+v.review.sourceVideo,url).href);assert.equal(s.rawTracks,v.review.recoveryTracks.length);assert.ok(s.rawError<1e-10,'Raw viewing transform');
@@ -51,9 +51,9 @@ try{
    await page.locator('#faction').selectOption(faction);await Ready(id);
    const variant=entry.variants.find(v=>v.id===id),a=await Snapshot(.15),b=await Snapshot(.7);CheckSync(b,variant);
    const movement=Delta(a.matrices,b.matrices),rawMovement=Delta(a.rawPositions,b.rawPositions);let seam=null;
-   if(Number(id.match(/-v(\d+)-/)?.[1]||0)>=2)assert.ok(movement>.0001,'Animated latest model '+id);
+   if(Number(id.match(/-v(\d+)-/)?.[1]||0)>=2||variant.path.includes('/NextTenV1/'))assert.ok(movement>.0001,'Animated latest model '+id);
    if(b.rawTracks)assert.ok(rawMovement>.0001,'Moving raw recovery '+id);
-   if(entry.loop&&Number(id.match(/-v(\d+)-/)?.[1]||0)>=2){seam=Delta((await Snapshot(0)).matrices,(await Snapshot(1)).matrices);assert.ok(seam<.001,'Loop endpoints '+id+' '+seam)}
+   if(entry.loop&&(Number(id.match(/-v(\d+)-/)?.[1]||0)>=2||variant.path.includes('/NextTenV1/'))){seam=Delta((await Snapshot(0)).matrices,(await Snapshot(1)).matrices);assert.ok(seam<.001,'Loop endpoints '+id+' '+seam)}
    results.push({id,duration:b.duration,bones:b.bones,movement,seam,range:b.range,rawTracks:b.rawTracks,rawError:b.rawError,rawMovement});
    if(faction==='Nra'&&['RifleCrouchAdvance','KneelHold','KneelSequence','StretcherPair'].includes(entry.id)){await Snapshot(.45);await page.screenshot({path:path.join(root,'Preview',`Texture_SourceRecoveryLatest_${entry.id}.png`)})}
   }
