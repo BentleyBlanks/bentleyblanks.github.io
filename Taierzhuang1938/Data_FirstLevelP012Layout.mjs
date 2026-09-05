@@ -103,9 +103,11 @@ Add(Box("FrontlineRearWest",-13,-69,8,0.8,0.9,"cover"),Box("FrontlineRearEast",1
 Add(Box("ReturnRailSpurDeck",-40,50,64,5,0.5,"boundary",{y:3.25}),Box("ReturnRailSpurWestPier",-30,50,2,5,3),Box("ReturnRailSpurEastPier",-8,50,2,5,3));
 Add(Box("EvacWestCourtyard",22,18,5,15,2.5),Box("EvacEastCourtyard",40,9,5,16,2.5),Box("EvacWaitingCover",41,29,3,4,1,"cover"));
 Add(Box("EvacWaitingSideCover",50,29.5,.4,4,1.05,"cover"));
-Add(Box("RoadContactWallWest",24,14,6,.6,2.4,"structure"),Box("RoadContactWallEast",39,14,6,.6,2.4,"structure"),
- Box("RoadContactSideFire",41,10,.6,6,1.05,"cover",{cover:{faceX:1,faceZ:0}}),
- Box("RoadContactAllyCoverNorth",38,6,3,.6,1.05,"cover"),Box("RoadContactAllyCoverSouth",42,5,3,.6,1.05,"cover"));
+// The existing eastern courtyard is the tall wall. Low blue pieces mark the
+// player's side-fire corner and two separate squad positions without sealing
+// the established convoy window or the 1.3 m stretcher lane.
+Add(Box("RoadContactSideFire",36.5,14,.6,4,1.05,"cover",{cover:{faceX:1,faceZ:0}}),
+ Box("RoadContactAllyCoverNorth",26,18,3,.6,1.05,"cover"),Box("RoadContactAllyCoverSouth",30,20,3,.6,1.05,"cover"));
 // Single-storey ruin: open north entrance and east breach, real window towards waiting stretcher.
 Add(Box("RuinWestNorth",61,28,1,4,2.8),Box("RuinWestSouth",61,42,1,7,2.8),Box("RuinWindowSill",61,34,1,8,0.85,"cover"),Box("RuinWindowLintel",61,34,1,8,0.6,"boundary",{y:2.5}),Box("RuinEast",76,35,1,26,2.8),Box("RuinNorth",69,20,15,1,2.8),Box("RuinSouth",67,52,12,1,2.8),Box("RuinBrokenRoof",68,28,8,8,0.35,"boundary",{y:3.1}),Box("AmbushGunShield",55,40,1,3,1,"cover"));
 // B14 firing corners: standing fire clears the top; prone heads and crouched

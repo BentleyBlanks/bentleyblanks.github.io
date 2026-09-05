@@ -579,5 +579,5 @@ assert.equal(sync.call(host,{signalled:()=>false,restore:true}),0,"stable restor
 host.layout={};assert.equal(sync.call(host,{signalled:()=>true}),2,"legacy count remains opened gates only");
 console.log("PASS P012 scenario reconciliation change counts");
 
-const contactBlocks=layout.blocks.filter(block=>block.id.startsWith("RoadContact"));assert.equal(contactBlocks.length,5);assert.ok(contactBlocks.every(block=>block.solid!==false));
+const contactBlocks=layout.blocks.filter(block=>block.id.startsWith("RoadContact"));assert.equal(contactBlocks.length,3);assert.ok(contactBlocks.every(block=>block.solid!==false));
 Audit("RoadContactSideRoute",phase.whitebox.activities.roadContactSideRoute,layout.blocks,0.42);

@@ -955,7 +955,6 @@ async function PlayFrontline() {
   // Save the evidence before assertions: a failed distance/camera gate must not
   // discard pacing and idle-time diagnostics from a completed playthrough.
   if (fullCampaign) {
-    Check(["roadContactSeen","roadContactHeld","roadContactClear","roadContactReleased"].every(fact=>result.flow.facts.includes(fact)),"娴忚鍣ㄥ疄璺戝畬鎴愮湅瑙佸洓鏁屻€佸彨鍋溿€佷晶澧欐竻鍦轰笌闃熷熬鏀捐闂幆",JSON.stringify(result.flow.facts));
     const totals = {};
     for (const span of result.activity) totals[span.kind] = (totals[span.kind] || 0) + span.to - span.from;
     const stationaryOverEightSeconds = result.activity.filter(span => span.kind === "stationary" && span.to - span.from > 8);
@@ -989,7 +988,8 @@ async function PlayFrontline() {
   if (fullCampaign && process.argv.includes("--retry")) Check(result.rewindCount >= 1,
     "故意错过首次扑救后真实回退并继续通关", `${result.rewindCount}次`);
   if (fullCampaign) {
-    Check(["roadContactSeen","roadContactHeld","roadContactClear","roadContactReleased"].every(fact=>result.flow.facts.includes(fact)),"娴忚鍣ㄥ疄璺戝畬鎴愮湅瑙佸洓鏁屻€佸彨鍋溿€佷晶澧欐竻鍦轰笌闃熷熬鏀捐闂幆",JSON.stringify(result.flow.facts));
+    Check(["roadContactSeen", "roadContactHeld", "roadContactClear", "roadContactReleased"].every(fact => result.flow.facts.includes(fact)),
+      "浏览器实跑完成看见四敌、叫停、侧路清场与队尾放行闭环", JSON.stringify(result.flow.facts));
     const requested = result.escortApproval.find(entry => entry.event === "P012EscortRequested");
     const spoken = result.escortApproval.find(entry => entry.event === "LuoApprovalStarted");
     const approved = result.escortApproval.find(entry => entry.event === "P012EscortApproved");

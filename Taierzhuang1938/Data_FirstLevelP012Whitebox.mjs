@@ -191,14 +191,17 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       ]),
       ambushEntryRoute: Object.freeze([{ x: 42.5, z: 24 }, { x: 39, z: 25.5 }]),
       ambushColumnCoverRoute: Object.freeze([{ x: 32, z: 14.4 }, { x: 34, z: 18.8 }]),
-      roadContactGuideRoute: Object.freeze([...P012_ROUTES.south.slice(0, P012_ROUTES.south.findIndex(point=>point.x===90&&point.z===10)+1), {x:94,z:14}]),
-      roadContactBreach: {x:94,z:14}, roadContactColumnHold: {x:90,z:10},
-      roadContactSideRoute: Object.freeze([{x:97,z:14},{x:100,z:12},{x:101,z:10}]),
-      roadContactFirePosition: {x:101,z:10}, roadContactTailRelease: {x:86,z:8},
-      roadContactFriendlyCovers: Object.freeze([{x:98,z:6},{x:102,z:5}]),
+      // This block is still inside the one-time blueprint mapper. Reuse the
+      // blueprint route here; embedding P012_ROUTES would translate it twice.
+      roadContactGuideRoute: Object.freeze([...P012_BLUEPRINT_ROUTES.south.slice(0,
+        P012_BLUEPRINT_ROUTES.south.findIndex(point=>point.x===30&&point.z===10)+1), {x:32,z:12}]),
+      roadContactBreach: {x:32,z:12}, roadContactColumnHold: {x:30,z:10},
+      roadContactSideRoute: Object.freeze([{x:32,z:12},{x:34,z:14},{x:35.5,z:16}]),
+      roadContactFirePosition: {x:35.5,z:16}, roadContactTailRelease: {x:28,z:10},
+      roadContactFriendlyCovers: Object.freeze([{x:26,z:17},{x:30,z:19}]),
       roadContactEnemies: Object.freeze([
-        {role:"observer",position:{x:108,z:10}}, {role:"observer",position:{x:111,z:12}},
-        {role:"rifleman",position:{x:108,z:16}}, {role:"rifleman",position:{x:113,z:18}},
+        {role:"observer",position:{x:29,z:25}}, {role:"observer",position:{x:33,z:25}},
+        {role:"rifleman",position:{x:31,z:29}}, {role:"rifleman",position:{x:36,z:28}},
       ]),
       // Three bounded delaying positions use the existing ditch/bank geometry.
       // Clearing a pair earns the next move; no timer, respawn or health padding.
