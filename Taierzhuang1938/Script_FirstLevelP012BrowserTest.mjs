@@ -1433,7 +1433,7 @@ async function VerifyOpeningDiscovery() {
 // Thereafter the real Runtime, AI and Rapier move the existing leader, and the
 // player follows his sampled footsteps with normal input. Not campaign evidence.
 async function VerifyGuideHandoffs() {
-  for (const beat of [14, 22, 23]) {
+  for (const beat of [14, 15, 22, 23]) {
     const setup=await page.evaluate(async beat=>{
       const game=window.Tengxian;
       const {FirstLevelP012Director}=await import("./Script_FirstLevelP012Flow.mjs");
@@ -1448,8 +1448,8 @@ async function VerifyGuideHandoffs() {
       game.StepFrames(1);
       FirstLevelP012Runtime.prototype.Update=original;
       const guide=runtime.host.GuideActor();
-      const start=beat===14?{x:79.42825739632826,z:4.633856495656801}:beat===22?{x:105.575,z:68.092}:{x:94,z:105};
-      const playerStart=beat===14?{x:76.3,z:2.1}:beat===22?{x:104,z:66}:{x:91,z:105};
+      const start=beat===14?{x:79.42825739632826,z:4.633856495656801}:beat===15?{x:95.78584399952966,z:15.377326136763912}:beat===22?{x:105.575,z:68.092}:{x:94,z:105};
+      const playerStart=beat===14?{x:76.3,z:2.1}:beat===15?{x:94,z:16}:beat===22?{x:104,z:66}:{x:91,z:105};
       const y=game.battlefield.GroundHeight(start.x,start.z);
       guide.position.set(start.x,y,start.z);guide.body.Teleport(start.x,y,start.z);guide.goal.copy(guide.position);
       game.player.Spawn(playerStart.x,playerStart.z,0);
@@ -1466,9 +1466,10 @@ async function VerifyGuideHandoffs() {
             crosshairAngle:Math.acos(Math.max(-1,Math.min(1,(dx*tx+dz*tz)/(Math.hypot(dx,dz)*Math.hypot(tx,tz)||1))))};
         });
       }
-      flow.beat=beat;flow.lastSample={position:game.player.position,guidePosition:guide.position};flow.StartGuide();
+      flow.beat=beat;if(beat===15)flow.facts.add("roadWounded");
+      flow.lastSample={position:game.player.position,guidePosition:guide.position};flow.StartGuide();
       window.p012GuideFixture={flow,runtime,guide,trail:[{...start}],P012NextVisiblePoint,trace:[],frames:0,
-        event:beat===14?"P012GuideAtFlankEntry":beat===22?"P012GuideAtBlockade":"P012GuideAtSmoke",start:{...start}};
+        event:beat===14?"P012GuideAtFlankEntry":beat===15?"P012GuideAtAirObservation":beat===22?"P012GuideAtBlockade":"P012GuideAtSmoke",start:{...start}};
       return {beat,start,playerStart,hadDefense,b20,scope:"explicit local stage fixture; only initial placement, no campaign or balance claim"};
     },beat);
     let result;
@@ -2241,7 +2242,9 @@ try {
   }).catch(() => null);
   await fs.writeFile(path.join(outputDir, "Data_P012FailureTrace.json"),
     JSON.stringify({ error: String(error), state: failureState }, null, 2));
-  console.error("P012 failure state", failureState);
+  console.error("P012 failure", {beat:failureState?.flow?.beat,elapsed:failureState?.flow?.elapsed,
+    guide:failureState?.scene?.guidePosition,column:failureState?.scene?.columnPosition,
+    trace:path.join(outputDir,"Data_P012FailureTrace.json")});
   throw error;
 } finally {
   await browser.close();

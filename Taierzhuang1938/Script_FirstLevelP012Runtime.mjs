@@ -12,8 +12,8 @@ function TrafficPoint(path, distance) {
 }
 function TrafficLength(path){return path.slice(1).reduce((sum,p,i)=>sum+Math.hypot(p.x-path[i].x,p.z-path[i].z),0);}
 /** Local guide reconnect: only known corridor vertices and body-clear edges; never teleport. */
-export function P012GuideApproach(blocks, start, target, points = []) {
-  if (!start || !target) return null;
+export function P012GuideApproach(blocks, start, target, points = [], radius = .42) {
+  if (!start || !target || !Number.isFinite(radius) || radius<=0) return null;
   const nodes=[start,target,...points.filter(Boolean)], costs=nodes.map(()=>Infinity), previous=[], visited=new Set();
   costs[0]=0;
   while(visited.size<nodes.length){
@@ -22,7 +22,7 @@ export function P012GuideApproach(blocks, start, target, points = []) {
     if(at<0||!Number.isFinite(costs[at]))return null;
     if(at===1){const route=[];for(let index=1;index!==0;index=previous[index])route.unshift({...nodes[index]});return route;}
     visited.add(at);
-    for(let i=1;i<nodes.length;i++)if(!visited.has(i)&&P012SegmentClear(blocks,nodes[at],nodes[i],.42)){
+    for(let i=1;i<nodes.length;i++)if(!visited.has(i)&&P012SegmentClear(blocks,nodes[at],nodes[i],radius)){
       const cost=costs[at]+Math.hypot(nodes[i].x-nodes[at].x,nodes[i].z-nodes[at].z);
       if(cost<costs[i]){costs[i]=cost;previous[i]=at;}
     }
@@ -64,7 +64,8 @@ export class FirstLevelP012Runtime {
       const actor=this.host.GuideActor();
       if(actor?.scriptDefensive)this.host.ReleaseDefense?.(actor);
       if(this.defenders)this.defenders=this.defenders.filter(defender=>defender!==actor);
-      this.guide.approach=P012GuideApproach(this.config.layout?.blocks||[],position,route[0],spec.approachPoints);
+      this.guide.bodyRadius=this.GuideBodyRadius(actor);
+      this.guide.approach=P012GuideApproach(this.config.layout?.blocks||[],position,route[0],spec.approachPoints,this.guide.bodyRadius);
       this.guide.approachIndex=0;
     }
     if (!this.config.activities?.traffic && spec.beat === 2 && !this.traffic.length) {
@@ -346,11 +347,22 @@ export class FirstLevelP012Runtime {
     if(this.host.SetGuideStance)this.host.SetGuideStance(actor,stance);
     else actor.stance=stance;
   }
+  GuideBodyRadius(actor) {
+    const radius=this.host.BodyRadius?.(actor);
+    return Number.isFinite(radius)&&radius>0 ? radius : .42;
+  }
   StepSafeGuide(guide,actor,dt) {
     const position=this.host.Position(actor), player=this.host.PlayerPosition?.(), blocks=this.config.layout?.blocks||[];
     if(!position)return;
     actor.scriptArrivalRadius=.3;
     const Stop=()=>this.host.Move(actor,position,0);
+    const radius=this.GuideBodyRadius(actor);
+    if(radius!==guide.bodyRadius){
+      guide.bodyRadius=radius;
+      const target=guide.approachIndex<guide.approach?.length ? guide.approach[guide.approachIndex] : guide.route[guide.index];
+      guide.approach=P012GuideApproach(blocks,position,target,[...(guide.approachPoints||[]),...guide.route],radius);
+      guide.approachIndex=0;
+    }
     if(!guide.approach){Stop();return;}
     const near=point=>Math.hypot(position.x-point.x,position.z-point.z)<.6;
     while(guide.approachIndex<guide.approach.length && near(guide.approach[guide.approachIndex]))guide.approachIndex++;
@@ -358,12 +370,12 @@ export class FirstLevelP012Runtime {
       const target=guide.approach[guide.approachIndex];
       const lagging=player&&guide.waitDistance&&Math.hypot(player.x-position.x,player.z-position.z)>guide.waitDistance
         &&Math.hypot(player.x-target.x,player.z-target.z)>Math.hypot(position.x-target.x,position.z-target.z);
-      if(!lagging&&P012SegmentClear(blocks,position,target,.42))this.host.Move(actor,target,guide.speed);else {Stop();this.FaceToward(actor,position,player,dt);}
+      if(!lagging&&P012SegmentClear(blocks,position,target,radius))this.host.Move(actor,target,guide.speed);else {Stop();this.FaceToward(actor,position,player,dt);}
       return;
     }
     let target=guide.route[guide.index];
     if(near(target)){
-      const event=guide.beat===11&&guide.index===0?"P012GuideAtWounded":guide.beat===14?"P012GuideAtFlankEntry":guide.beat===22&&guide.index===guide.route.length-1?"P012GuideAtBlockade":guide.beat===23?"P012GuideAtSmoke":null;
+      const event=guide.beat===11&&guide.index===0?"P012GuideAtWounded":guide.beat===14?"P012GuideAtFlankEntry":guide.beat===15&&guide.index===guide.route.length-1?"P012GuideAtAirObservation":guide.beat===22&&guide.index===guide.route.length-1?"P012GuideAtBlockade":guide.beat===23?"P012GuideAtSmoke":null;
       if(event && !this.host.Signalled(event))this.host.Signal?.(event);
       const wait=guide.WaitAt?.(guide.index);
       if(wait || guide.index===guide.route.length-1){
@@ -374,7 +386,7 @@ export class FirstLevelP012Runtime {
     }
     const lagging=player&&guide.waitDistance&&Math.hypot(player.x-position.x,player.z-position.z)>guide.waitDistance
       &&Math.hypot(player.x-target.x,player.z-target.z)>Math.hypot(position.x-target.x,position.z-target.z);
-    if(guide.Hold?.() || lagging || !P012SegmentClear(blocks,position,target,.42)){Stop();this.FaceToward(actor,position,player,dt);return;}
+    if(guide.Hold?.() || lagging || !P012SegmentClear(blocks,position,target,radius)){Stop();this.FaceToward(actor,position,player,dt);return;}
     this.host.Move(actor,target,guide.speed);
   }
   StepGuideInspection(guide,actor,position,player,dt) {

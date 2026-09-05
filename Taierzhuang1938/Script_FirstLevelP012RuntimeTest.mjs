@@ -33,11 +33,11 @@ assert.ok(openingStoryBeats.length>0);
 }
 {
  const config=P012Phase.whitebox,activity=config.activities,blocks=config.layout.blocks;
- const Make=(beat,start)=>{
+ const Make=(beat,start,radius=.42)=>{
   const actor={...start},player={...start},events=[],signals=new Set();let releases=0;
   const runtime=new FirstLevelP012Runtime({GuideActor:()=>actor,Position:a=>a,PlayerPosition:()=>player,
-   Signalled:event=>signals.has(event),Signal:event=>{events.push(event);signals.add(event);},ReleaseGuide:()=>{releases++;},
-   Move:(a,target,speed)=>{assert.ok(P012SegmentClear(blocks,a,target,.42),'every guide command has body clearance');
+   Signalled:event=>signals.has(event),Signal:event=>{events.push(event);signals.add(event);},ReleaseGuide:()=>{releases++;},BodyRadius:()=>radius,
+   Move:(a,target,speed)=>{assert.ok(P012SegmentClear(blocks,a,target,radius),'every guide command has body clearance');
     const distance=Math.hypot(target.x-a.x,target.z-a.z),step=Math.min(distance,speed*.05);
     a.x+=(target.x-a.x)*step/(distance||1);a.z+=(target.z-a.z)*step/(distance||1);},
   },config);
@@ -110,6 +110,17 @@ assert.ok(openingStoryBeats.length>0);
  escort.flow.lastSample.guidePosition=config.escortWaypoints[7];
  escort.flow.lastSample.columnPosition=config.escortWaypoints[9];
  assert.equal(escort.flow.RoadColumnBehind(),false,'a column already ahead cannot stop the guide from catching up');
+ const air=Make(15,{x:95.78584399952966,z:15.377326136763912},.34);
+ assert.ok(air.runtime.guide.approach?.length,'recorded standing capsule beside the side wall has a real route to the observation wall');
+ air.Step(1000);
+ assert.ok(Math.hypot(air.actor.x-activity.airRegroupRoute[0].x,air.actor.z-activity.airRegroupRoute[0].z)<.6,
+  'Luo reaches the actual litter inspection rendezvous before waiting');
+ assert.equal(air.events.includes('P012GuideAtAirObservation'),false,'the rendezvous is not the observation wall');
+ const inspection={...air.actor};air.Step(60);assert.deepEqual(air.actor,inspection,'waits for the actual inspection');
+ air.flow.facts.add('roadWounded');air.Step(500);
+ assert.ok(Math.hypot(air.actor.x-activity.airObservationPosition.x,air.actor.z-activity.airObservationPosition.z)<.6,
+  'inspection releases all bends to the observation wall, not just its first waypoint');
+ assert.ok(air.events.includes('P012GuideAtAirObservation'));
  console.log('PASS physical casualty/flank/smoke/road guides: swept clearance, actual arrival cues, waits and handoff');
 }
 {
