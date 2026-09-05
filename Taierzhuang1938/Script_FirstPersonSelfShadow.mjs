@@ -68,6 +68,10 @@ function CloneOwnedMaterial(material) {
   return clone;
 }
 
+function EnableShadowLayerOnLight(object) {
+  if (object.isLight) object.layers.enable(FIRST_PERSON_SHADOW_LAYER);
+}
+
 export class FirstPersonSelfShadow {
   constructor(renderer, scene, camera, root, { size = 1024, extent = 1.35 } = {}) {
     this.renderer = renderer;
@@ -271,14 +275,27 @@ ${SHADOW_FRAGMENT_GLSL}`)
       }
     }
 
+    // 灯也要挂进本层。three 按「相机看得见的灯」算光照哈希，而这台相机只看
+    // FIRST_PERSON_SHADOW_LAYER：灯留在第 0 层的话，这一趟看到 0 盏灯、主通道又
+    // 看到全部灯，同一个 scene 的 lights.state.version 每帧被顶两次，全场每份带光照
+    // 材质在每个 pass 都重走一遍 getProgram（含 onBeforeCompile.toString() 的
+    // 缓存键）—— 爆炸测试场空场实测 0.44 ms/帧，占主线程 13%。深度覆盖材质不读灯，
+    // 多收进来的灯只让哈希稳定，画面不变。每帧遍历是为了接住运行时新挂的灯
+    // （过场道具自带点光），代价约 0.03 ms。
+    this.scene.traverse(EnableShadowLayerOnLight);
+    // 灯进了本层，three 会想在这一趟顺手烘战场阴影图：那是主通道的事，别搬过来。
+    const shadowMap = renderer.shadowMap;
+    const previousShadowNeedsUpdate = shadowMap.needsUpdate;
     try {
       this.scene.overrideMaterial = this.depthMaterial;
+      shadowMap.needsUpdate = false;
       renderer.setRenderTarget(this.target);
       renderer.setClearColor(0xffffff, 1);
       renderer.clear(true, true, true);
       renderer.render(this.scene, this.shadowCamera);
       this.renderedFrames += 1;
     } finally {
+      shadowMap.needsUpdate = previousShadowNeedsUpdate;
       this.scene.overrideMaterial = previousOverride;
       for (const [material, allowOverride] of this._overrideStates) material.allowOverride = allowOverride;
       for (const mesh of this._hidden) mesh.visible = true;
