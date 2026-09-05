@@ -13,7 +13,7 @@ from PIL import Image, ImageFilter
 def Bake(source, destination):
     destination = Path(destination)
     image = Image.open(source).convert("RGB").resize((1024, 1024), Image.Resampling.LANCZOS)
-    image.save(destination / "Texture_CraterScorchedBase.webp", quality=92, method=6)
+    image.save(destination / "Texture_CraterScorchedBase.webp", quality=84, method=6)
     height = image.convert("L").filter(ImageFilter.GaussianBlur(1.1))
     broad = height.filter(ImageFilter.GaussianBlur(9))
     pixels, macro = height.load(), broad.load()
@@ -30,8 +30,8 @@ def Bake(source, destination):
             crevice = max(0, macro[x, y] - pixels[x, y])
             packed[x, y] = (round(max(145, 255 - crevice * 2)),
                             round(min(252, 222 + crevice * 0.55)), 0)
-    normal.save(destination / "Texture_CraterScorchedNormal.webp", quality=92, method=6)
-    orm.save(destination / "Texture_CraterScorchedOrm.webp", quality=92, method=6)
+    normal.save(destination / "Texture_CraterScorchedNormal.webp", quality=85, method=6)
+    orm.save(destination / "Texture_CraterScorchedOrm.webp", quality=82, method=6)
 
 
 if __name__ == "__main__":
