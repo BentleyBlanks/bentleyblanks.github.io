@@ -253,6 +253,18 @@ async function PlayPrelude() {
           bot.lastDitch=ditch;
           const impacts=game.Debug.P012Scene().mortarImpactCount;
           if(bot.preShellImpacts===undefined)bot.preShellImpacts=impacts;
+          const incoming=game.combat.shells.find(shell=>shell.damage===0);
+          if(incoming){
+            const ndc=incoming.position.clone().project(game.camera),delta=incoming.position.clone().sub(game.camera.position),distance=delta.length();
+            const hit=game.battlefield.Raycast(game.camera.position,delta.normalize(),distance,{terrain:true});
+            const visible=Math.abs(ndc.x)<1&&Math.abs(ndc.y)<1&&ndc.z>-1&&ndc.z<1&&(!hit||hit.t>=distance-.2);
+            (bot.shellFlight||=[]).push({age:incoming.age,position:incoming.position.toArray(),ndc:ndc.toArray(),visible,impacts});
+            const capture=[.3,.7,1.1].find(age=>incoming.age>=age&&!(bot.shellOffsets||[]).includes(age));
+            if(capture!==undefined){
+              (bot.shellOffsets||=[]).push(capture);
+              bot.pendingCausality={id:`NorthShellFlight${Math.round(capture*1000)}ms`,...bot.shellFlight.at(-1)};break;
+            }
+          }
           if(!flow.facts.includes("northNearMissImpact")&&objective.requiredAction==="sprint")throw new Error("Shell sprint objective preceded actual impact");
           if(flow.facts.includes("northNearMissImpact")&&!(impacts>bot.preShellImpacts))throw new Error("Near-miss fact without actual mortar impact growth");
           if(flow.facts.includes("northApproachChat")&&!flow.facts.includes("northNearMissRequested")&&!bot.chatCaptured){
@@ -403,8 +415,12 @@ async function PlayPrelude() {
     "村路四处分段机位均来自正常行走，无摆拍替代");
   if(openingCausalityReview){
     const northEvidence=await page.evaluate(()=>({trace:window.p012ReviewBot.northEscortTrace||[],
-      offsets:window.p012ReviewBot.impactOffsets||[],resting:!!window.p012ReviewBot.restingCaptured}));
+      offsets:window.p012ReviewBot.impactOffsets||[],shellFlight:window.p012ReviewBot.shellFlight||[],resting:!!window.p012ReviewBot.restingCaptured}));
     await fs.writeFile(path.join(outputDir,"Data_P012NorthEscort.json"),JSON.stringify(northEvidence,null,2));
+    const flight=northEvidence.shellFlight,visible=flight.filter(row=>row.visible);
+    Check(flight.length>20&&visible.length>12&&visible.at(-1).age-visible[0].age>=.4,
+      "开场实体炮弹从实际玩家相机可见至少0.4秒，落地前不产生爆炸事实",JSON.stringify({frames:flight.length,visible:visible.length}));
+    Check(flight.every(row=>row.impacts===flight[0].impacts),"飞行过程不能提前报告命中");
     for(const beat of ["B03","B04","B05"]){
       const rows=northEvidence.trace.filter(row=>row.beat===beat);
       Check(rows.length>0&&rows.every(row=>row.people.length===6&&row.people.every(person=>person.alive)),

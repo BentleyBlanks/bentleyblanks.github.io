@@ -476,6 +476,7 @@ const guide = { x: 0, z: 0 }, actors = [], moves = [], impacts = [], signals = n
  assert.equal(r.Sample().guideAlive,true);assert.equal(r.Sample().guideHealth,1);
  actor.alive=false;assert.equal(r.Sample().guideAlive,false);
 }
+let openingImpact;
 const runtime = new FirstLevelP012Runtime({
   GuideActor: () => guide, Position: (actor) => actor, Alive: (actor) => actor.alive,
   Firing: (actor) => actor.firing, Signalled: (name) => signals.has(name),
@@ -483,7 +484,7 @@ const runtime = new FirstLevelP012Runtime({
   Move: (actor, point, speed) => moves.push({ point, speed }),
   TrafficActor: (side, slot, point) => ({ ...point, alive: true, side, slot }),
   SpawnEnemy: (spec) => { const actor = { ...spec, alive: true }; actors.push(actor); return actor; },
-  WarnShell: (point) => ({ ...point }), ImpactShell: (point) => impacts.push(point),
+  WarnShell: (point, damaging, callback) => { openingImpact = callback; return { ...point }; },
 }, {});
 runtime.Guide({ route: [{ x: 0, z: 0 }, { x: 0, z: 8 }], speed: 0.9 });
 runtime.Update(0.1); assert.equal(moves[0].speed, 0.9); assert.equal(actors.length, 0);
@@ -495,9 +496,11 @@ assert.equal(runtime.Sample().blockadeVisible, false, "alive outside LOS is not 
 runtime.far[1].visible = true; assert.equal(runtime.Sample().blockadeVisible, true);
 for (let i = 0; i < 20; i++) runtime.Update(0.1);
 assert.equal(runtime.far.length, 4); assert.equal(runtime.Sample().nearEnemyDeaths, 1);
-runtime.Shelling({ x: 3, z: 4 }); runtime.Update(1.5); assert.equal(impacts.length, 0);
-runtime.Update(0.11); assert.equal(impacts.length, 1); assert.equal(runtime.Sample().mortarImpactCount, 1);
-runtime.Update(10); assert.equal(impacts.length, 1);
+runtime.Shelling({ x: 3, z: 4 }); runtime.Update(1.5);
+runtime.Update(10); assert.equal(runtime.Sample().mortarImpactCount, 0, "elapsed time cannot fake the opening shell impact");
+openingImpact({x:3.25,z:4.5}); openingImpact({x:3.25,z:4.5});
+assert.equal(runtime.Sample().mortarImpactCount, 1, "actual collision is recorded exactly once");
+assert.deepEqual(runtime.Sample().mortarImpactPosition,{x:3.25,z:4.5});
 runtime.Guide({ beat: 2, route: [{ x: 0, z: 0 }, { x: 0, z: 8 }, { x: 0, z: 16 }], speed: 1 });
 assert.equal(runtime.traffic.length, 6); runtime.Update(0.1);
 assert.equal(runtime.Sample().trafficReady, true);

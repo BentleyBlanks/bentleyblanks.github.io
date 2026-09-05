@@ -110,6 +110,8 @@ export const testDefs = {
     desc: "首关纯白受光场地、具名同伴、实体剧情门与简洁 HUD 真浏览器接线" },
   FirstLevelP012LayoutTest: { file: "Script_FirstLevelP012LayoutTest.mjs",
     desc: "P012节点、担架扫掠、三态枢纽与敌军遮挡来向（纯 Node）" },
+  FirstLevelP012TerrainTest: { file: "Script_FirstLevelP012TerrainTest.mjs", desc: "P012连续地形、道路基底和渲染三角形共享高度（纯 Node）" },
+  FirstLevelP012TerrainBrowserTest: { file: "Script_FirstLevelP012TerrainBrowserTest.mjs", timeoutMs:240000, desc: "P012实际地形渲染、人物胶囊坡地、弹坑碰撞与预算" },
   FirstLevelP012FlowTest: { file: "Script_FirstLevelP012FlowTest.mjs",
     desc: "P012真实动作退出、反向护送、有限波次与检查点（纯 Node）" },
   FirstLevelP012RuntimeTest: { file: "Script_FirstLevelP012RuntimeTest.mjs",
@@ -225,6 +227,7 @@ export const testDefs = {
 
 export const browserTests = new Set([
   'FirstLevelP012AnimationTest',
+  'FirstLevelP012TerrainBrowserTest',
   "TrainLibraryTest",
   'BackRifleRunTest', 'MeleeAnimationTest', 'InfantryAnimationTest',
   "ActorBatchTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
@@ -279,7 +282,7 @@ export const domains = {
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
-    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxSurfaceTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "PhysicsTest", "JumpTest", "DestructionTest"],
+    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxSurfaceTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012TerrainTest", "FirstLevelP012TerrainBrowserTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "PhysicsTest", "JumpTest", "DestructionTest"],
   },
   physics: {
     label: "物理/移动/破坏（共享底座，下游成串跑）",

@@ -1,5 +1,6 @@
 // P2 spatial blueprint, pure data. Runtime +Z is south (Notion +Z north inverted).
-// Planar ground is deliberate: trench banks provide relative shelter without a second height source.
+// Continuous P012 soil uses shared heightfield triangles; authored foundations
+// and road aprons stay level, with explicit trench banks providing shelter.
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { P012Point, P012MapPoints, P012SouthPoint, P012RailPoint, P012StationPoint, P012_SPACE_BOUNDS } from "./Data_FirstLevelP012Space.mjs";
 import { P012_STATION_BLOCKS, P012_STATION_SURFACES, P012_STATION_GATES, P012_STATION_REMOVE_IDS, P012_STATION_HEIGHTS } from "./Data_FirstLevelP012Station.mjs";
@@ -310,7 +311,7 @@ const recruitIssueBlocks=[101.8,121,139].flatMap((z,index)=>[
   ...(index===0?[]:[Box(`StationRecruitAmmoTable${index}`,-51,z+1.4,2,.7,.8,"missionRoute",{y:P012_STATION_HEIGHTS.platformTop+.4})]),
 ]);
 export const FIRST_LEVEL_P012_LAYOUT=Object.freeze({scenario:Object.freeze({replaceBlockIds:Object.freeze(["HubBrokenWallTall","HubBrokenWallLow"]),states:hubStates}),
-  bounds:P012_SPACE_BOUNDS,ground:P012_HORIZON_GROUND,walkableSurfaces:P012_STATION_SURFACES,
+  bounds:P012_SPACE_BOUNDS,ground:P012_HORIZON_GROUND,terrain:"P012Heightfield",walkableSurfaces:P012_STATION_SURFACES,
   blocks:Object.freeze([...worldBlocks.filter(KeepBlock),...stationBlocks,...recruitIssueBlocks,...P012_RESTING_BLOCKS,...P012_HORIZON_BLOCKS]),
   gates:Object.freeze([...worldGates.filter(KeepBlock),...P012_STATION_GATES]),
   sections:Object.freeze(P012_ZONES.map(zone=>Object.freeze({id:zone.id,pressure:zone.name}))),semanticColors:P012_SEMANTIC_COLORS});

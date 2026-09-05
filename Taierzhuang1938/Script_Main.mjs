@@ -3222,15 +3222,16 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     WarnShell: (point, damaging, OnImpact) => {
       const at = new THREE.Vector3(point.x, battlefield.GroundHeight(point.x, point.z), point.z);
       if (damaging) { const impact = combat.CallIncoming("launcher", at, { OnImpact }); return { x: impact.x, z: impact.z }; }
-      // No glowing predictive marker during the surprise: only the incoming sound.
-      audio.Play("shellIncoming", { position: at }); return point;
-    },
-    ImpactShell: (point) => {
-      const at = new THREE.Vector3(point.x, battlefield.GroundHeight(point.x, point.z), point.z);
-      battlefield.deformation?.ApplyBlast(at, "Shell75");
-      vfx.Explosion(at, { radius: 4, kind: "shell" }); audio.Play("explosionNear", { position: at });
-      player.Suppress(Math.max(0,1-at.distanceTo(player.position)/28)*.65);
-      p012Resting?.OnImpact({event:"P012NorthNearMissImpact",position:point});
+      // Visible incoming shell and past-flight ribbon, without a predicted ground
+      // marker. Shared ballistic collision owns the explosion and crater exactly once.
+      const from = at.clone().add(new THREE.Vector3(-18, 14, -36));
+      combat.FireShell(from, at, {flight:1.6, kind:"Shell75", radius:4, damage:0,
+        OnImpact: impact => {
+          player.Suppress(Math.max(0,1-impact.distanceTo(player.position)/28)*.65);
+          p012Resting?.OnImpact({event:"P012NorthNearMissImpact",position:impact});
+          OnImpact(impact);
+        }});
+      audio.Play("shellIncoming", { position: from }); return point;
     },
   }, phase.whitebox) : null;
   p012Runtime?.SaveSafePoint("Start",phase.spawn,"stand",phase.spawn.ry || 0);

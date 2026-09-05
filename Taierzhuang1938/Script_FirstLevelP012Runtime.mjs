@@ -201,7 +201,7 @@ export class FirstLevelP012Runtime {
   }
   Shelling(point, damaging = false) {
     if (!point) return;
-    const shell = { point: { ...point }, due: damaging ? Infinity : this.time + 1.6, damaging, done: false };
+    const shell = { point: { ...point }, damaging, done: false };
     shell.point = this.host.WarnShell(point, damaging, (at) => this.RecordShellImpact(shell, at));
     this.pendingShells.push(shell);
     if (damaging) this.mortarWarningPosition = { ...shell.point };
@@ -578,9 +578,6 @@ export class FirstLevelP012Runtime {
     } else if (this.beat !== 23 && this.retreatGuards) {
       for(const actor of this.retreatGuards)this.host.FireDiscipline?.(actor,null);
       this.retreatGuards=null;
-    }
-    for (const shell of this.pendingShells.filter((item) => !item.done && item.due <= this.time)) {
-      this.host.ImpactShell(shell.point); this.RecordShellImpact(shell, shell.point);
     }
     const guide = this.guide, actor = this.host.GuideActor();
     if(guide?.ReleaseWhen?.()){

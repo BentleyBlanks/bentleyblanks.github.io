@@ -1,16 +1,17 @@
-// 第一关策划白盒场景：**唯一可见环境就是接受光照的白色长方体**。
+// 第一关策划白盒场景：受光语义体块；P012 使用连续可变形土壤地形。
 //
 // 它与 TengxianField / JieheField / RangeField 实现同一套战场查询接口，但不调用
 // 城、城外、道路、植被、贴图或外部资产生成器。所有静态体块先进入 BuildSink 合批；
 // 两扇剧情门保留为独立 Mesh，收到正式第一章信号后升起并同步移除 Rapier 碰撞体。
 //
-// GroundHeight 默认0；显式 walkableSurfaces 仅允许引用同一布局实体的顶面。
+// GroundHeight 取布局地形（旧布局默认0）；显式 walkableSurfaces 仅引用同一布局实体的顶面。
 // 车厢地板/逐级台阶可走解析支撑，屋顶不会因为是Box就自动成为地面。
 
 import * as THREE from "three";
 import { Clamp } from "./Script_Noise.mjs";
 import { RayAabb, MakeBox, PlaceGeometry } from "./Script_Geo.mjs";
 import { BuildSink } from "./Script_World.mjs";
+import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
 import {
   FIRST_LEVEL_WHITEBOX_LAYOUT,
 } from "./Data_FirstLevelWhitebox.mjs";
@@ -28,8 +29,8 @@ export function CompileWhiteboxWalkableSurfaces(layout) {
   });
 }
 
-export function SampleWhiteboxSurface(surfaces,x,z) {
-  let height=0;
+export function SampleWhiteboxSurface(surfaces,x,z,baseHeight=0) {
+  let height=baseHeight;
   for(const surface of surfaces){
     const dx=x-surface.x,dz=z-surface.z,c=Math.cos(surface.ry||0),s=Math.sin(surface.ry||0);
     if(Math.abs(dx*c-dz*s)<=surface.w/2 && Math.abs(dx*s+dz*c)<=surface.d/2)
@@ -80,6 +81,7 @@ export class FirstLevelWhiteboxField {
     this.levelId = levelId;
     this.layout = whiteboxLayout || FIRST_LEVEL_WHITEBOX_LAYOUT;
     this.walkableSurfaces = CompileWhiteboxWalkableSurfaces(this.layout);
+    this.terrain = this.layout.terrain === "P012Heightfield" ? CreateP012Terrain(this.layout) : null;
     this.bounds = bounds
       ? { minX: bounds.minX, maxX: bounds.maxX, minZ: bounds.minZ, maxZ: bounds.maxZ }
       : { ...this.layout.bounds };
@@ -119,22 +121,36 @@ export class FirstLevelWhiteboxField {
     };
   }
 
-  GroundHeight(x, z) { return SampleWhiteboxSurface(this.walkableSurfaces,x,z); }
+  GroundHeight(x, z) { return SampleWhiteboxSurface(this.walkableSurfaces,x,z,this.terrain?.SampleHeight(x,z) ?? 0); }
 
   BuildWhiteBoxes() {
     const sink = new BuildSink();
     sink.SetSector("FirstLevelWhitebox");
     const ground = this.layout.ground;
-    sink.Add(ground.semantic || "Whitebox", PlaceGeometry(MakeBox(ground.w, ground.h, ground.d, 1,
-      "FirstLevelWhiteboxGround"), { x: ground.x, y: ground.y, z: ground.z }));
+    if (this.terrain) {
+      for (const chunk of this.terrain.Chunks()) {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.BufferAttribute(chunk.positions, 3));
+        geometry.setAttribute("normal", new THREE.BufferAttribute(chunk.normals, 3));
+        geometry.setAttribute("uv", new THREE.BufferAttribute(chunk.uvs, 2));
+        geometry.setIndex(chunk.indices);
+        sink.SetSector(`P012Terrain_${chunk.id}`);
+        sink.Add(ground.semantic || "Whitebox", geometry);
+        this.stats.groundTris += chunk.indices.length / 3;
+      }
+    } else {
+      sink.Add(ground.semantic || "Whitebox", PlaceGeometry(MakeBox(ground.w, ground.h, ground.d, 1,
+        "FirstLevelWhiteboxGround"), { x: ground.x, y: ground.y, z: ground.z }));
+      this.stats.groundTris = 12;
+    }
     // Keep the physical soil separate from structural boxes so the shared crater
     // adapter can replace its surface without touching walls or elevated floors.
     for (const mesh of sink.Flush(this.scene, { Get: (key) => this.materials.get(key) || this.whiteMaterial })) {
       mesh.name = "FirstLevelWhitebox_Ground"; mesh.userData.deformableTerrain = true;
       this.meshes.push(mesh);
+      this.stats.groundChunks++;
     }
-    this.stats.groundChunks = 1;
-    this.stats.groundTris = 12;
+    sink.SetSector("FirstLevelWhitebox");
 
     for (const block of this.layout.blocks) {
       if (this.layout.scenario?.replaceBlockIds.includes(block.id)) continue;
