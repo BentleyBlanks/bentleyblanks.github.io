@@ -1625,6 +1625,10 @@ async function VerifyAirRouteHandoff(choice) {
     setpiece.mem.prepWounded.Reset();column.Reset();
     column.waypoints=[{x:110,z:53},{x:112.8,z:54},{x:114,z:57},{x:110,z:68},{x:107,z:80}];
     column.Start();column.scriptPaused=true;
+    const props=game.Debug.SetpieceProps();
+    const hidden=column.litters.flatMap(litter=>[litter.propLitter,litter.propBody])
+      .filter(id=>!props.find(prop=>prop.id===id)?.visible);
+    if(hidden.length)throw new Error(`Local escort reused hidden props: ${hidden.join(", ")}`);
     const guide=runtime.host.GuideActor();runtime.host.ReleaseDefense(guide);runtime.host.ReleaseGuide(guide);
     guide.position.set(at.x,0,at.z);guide.body.Teleport(at.x,0,at.z);guide.goal.copy(guide.position);
     game.player.Spawn(at.x+2,at.z,0);
@@ -1691,7 +1695,7 @@ async function VerifyAirRouteHandoff(choice) {
     for(let chunk=0;chunk<80;chunk++){
       rescue=await page.evaluate(({carryReview,dropReview})=>{
       const game=window.Tengxian,f=window.p012AirFixture;
-      f.rescueTrace||=[];f.rescueFrames||=0;let held=false,capture=null;
+      f.rescueTrace||=[];f.rescueFrames||=0;f.civilianAttachments||=[];let held=false,capture=null;
       for(let frame=0;frame<90;frame++,f.rescueFrames++){
         const state=f.flow.State();if(state.beatIndex>=(carryReview?19:18))break;
         let objective=state.objective;
@@ -1713,8 +1717,19 @@ async function VerifyAirRouteHandoff(choice) {
         game.Debug.Key("KeyW",!!target&&!usable&&distance>.5);game.Debug.Key("KeyF",usable);held=usable;
         game.StepFrames(1,1/30,false);
         const civilian=game.Debug.P012Scene().airCivilian;
+        const carryView=game.carry.View();
+        if(civilian?.carried){
+          const offset=Math.hypot(civilian.position.x-game.player.position.x,civilian.position.z-game.player.position.z);
+          if(!f.civilianWasCarried)f.civilianAttachments.push({id:civilian.id,firstFrame:f.rescueFrames,
+            phase:carryView?.phase,t:carryView?.t,initialOffset:offset});
+          const attachment=f.civilianAttachments.at(-1);
+          if(offset<.5&&attachment.attachedFrame===undefined)attachment.attachedFrame=f.rescueFrames;
+          if(attachment.attachedFrame!==undefined)attachment.maxAttachedOffset=Math.max(attachment.maxAttachedOffset||0,offset);
+        }
+        f.civilianWasCarried=!!civilian?.carried;
         if(f.rescueFrames%15===0)f.rescueTrace.push({at:f.rescueFrames/30,beat:f.flow.State().beat,position:game.player.position.toArray(),
           target,interaction:point?.id,query:query?.id,carry:game.carry.KindId,carriedS:game.carry.View()?.carriedS,
+          carryPhase:carryView?.phase,carryProgress:carryView?.t,
           civilian,litters:game.Debug.P012Scene().litters,carryHands:game.Debug.P012CarryView(),facts:[...f.flow.facts]});
         if(civilian?.carried&&game.carry.View()?.carriedS>2&&!f.civilianCarryCaptured){
           f.civilianCarryCaptured=true;capture="CarriedCivilian";break;
@@ -1725,7 +1740,7 @@ async function VerifyAirRouteHandoff(choice) {
         }
       }
       game.Debug.Key("KeyW",false);game.Debug.Key("KeyF",false);game.StepFrames(1);
-      return {frames:f.rescueFrames,trace:f.rescueTrace,held,flow:f.flow.State(),scene:game.Debug.P012Scene(),carry:game.carry.KindId,capture,
+      return {frames:f.rescueFrames,trace:f.rescueTrace,attachments:f.civilianAttachments,held,flow:f.flow.State(),scene:game.Debug.P012Scene(),carry:game.carry.KindId,capture,
         pickups:game.interact.Point("p012_airRescue")?.count,dropped:!!f.civilianDropped};
       },{carryReview:process.argv.includes("--air-carry")||process.argv.includes("--air-dive"),dropReview:process.argv.includes("--air-drop")});
       if(rescue.capture){
@@ -1745,7 +1760,15 @@ async function VerifyAirRouteHandoff(choice) {
     Check(rescue.flow.beatIndex>=18&&rescue.flow.facts.includes("airRescued"),
       "实际按键背起百姓、绕入沟岸、放到硬掩体后并回接担架",JSON.stringify({beat:rescue.flow.beat,seconds:rescue.frames/30,travel:rescue.flow.airRescueTravelM}));
     const carriedCivilian=rescue.trace.filter(sample=>sample.civilian?.carried),patient=rescue.scene.airCivilian;
-    Check(carriedCivilian.length>3&&patient?.id===setup.originalCivilianId&&patient?.delivered&&patient.alive&&carriedCivilian.every(sample=>sample.civilian.id===patient.id
+    // Setpieces observes a completed pickup after this frame's AI step. The
+    // next AI step attaches the original actor; measure that exact one-frame
+    // boundary separately from all subsequent lifted/carrying frames.
+    const attachedCivilian=carriedCivilian.filter(sample=>sample.carryPhase!=="lift"||sample.carryProgress>0);
+    Check(rescue.attachments.length>0&&rescue.attachments.every(attachment=>attachment.id===patient?.id
+      &&Number.isFinite(attachment.attachedFrame)&&attachment.attachedFrame-attachment.firstFrame<=1
+      &&attachment.maxAttachedOffset<.5),"真实拾起后下一帧内附着，之后每帧随同一人搬运",JSON.stringify(rescue.attachments));
+    Check(attachedCivilian.length>3&&patient?.id===setup.originalCivilianId&&patient?.delivered&&patient.alive
+      &&carriedCivilian.every(sample=>sample.civilian.id===patient.id)&&attachedCivilian.every(sample=>sample.civilian.id===patient.id
       &&Math.hypot(sample.civilian.position.x-sample.position[0],sample.civilian.position.z-sample.position[2])<.5),
       "实际受伤、连续随身搬运和安置始终是同一个活着的百姓角色",JSON.stringify(patient));
     if(process.argv.includes("--air-drop"))Check(rescue.dropped&&rescue.pickups>=2,"中途真实按F放下后可在实际落点再次背起同一人");

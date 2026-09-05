@@ -23,6 +23,7 @@ import {
   SETPIECES, MissionSetpieceDirector, EscortColumn, SETPIECE_TUNING,
 } from "./Script_MissionSetpieces.mjs";
 import { BLAST_TARGETS } from "./Script_BlastTargets.mjs";
+import { FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./Data_FirstLevelP012Whitebox.mjs";
 import { LEVELS, CHAPTERS, CHAPTER_EVENTS, CUTSCENES, FindLevel } from "./Data_TengxianScript.mjs";
 import { LEVEL_CUES } from "./Script_Story.mjs";
 
@@ -380,6 +381,43 @@ for (const level of LEVELS) {
   Check("走完全部路点会报到达", column.arrived);
   column.Reset();
   Check("收摊走 Despawn，不是 Kill（撤走 ≠ 阵亡）", host.despawned === 2, String(host.despawned));
+}
+
+// P012 的前沿伤员预置先于正式后送队创建。宿主与 Main 一样按 id 去重；
+// 预置 Reset 若复用 escortLitter0，会把稍后正式担架永久留在 removed 状态。
+{
+  const props = new Map();
+  const host = FakeHost({
+    SpawnActor: (spec) => ({ alive: true, position: { x: spec.x, y: 0, z: spec.z } }),
+    Despawn: () => {}, Alive: (handle) => !!handle?.alive,
+    PositionOf: (handle) => handle?.position,
+    Prop(spec) {
+      if (!props.has(spec.id)) props.set(spec.id, { id: spec.id, state: "shown" });
+      return props.get(spec.id).id;
+    },
+    SetPropState(id, state) { const prop = props.get(id); if (prop) prop.state = state; return !!prop; },
+  });
+  const director = new MissionSetpieceDirector(host);
+  director.BeginLevel("CH1_NanLu", FIRST_LEVEL_P012_WHITEBOX_PHASE);
+  const prep = director.mem.prepWounded;
+  const formal = director.mem.column;
+  const prepLitter = prep.litters[0];
+  // P012 Setup itself has already hidden the preparatory litter.
+  const prepHiddenBySetup = props.get(prepLitter.propLitter)?.state === "removed";
+  prep.Reset();
+  formal.Start();
+  Check("P012 预置伤员与正式担架 ID 不同",
+    prepLitter.propLitter === "p012PrepWoundedLitter0"
+      && prepLitter.propBody === "p012PrepWoundedCasualty0"
+      && formal.litters[0].propLitter === "escortLitter0"
+      && formal.litters[0].propBody === "escortCasualty0",
+    JSON.stringify({ prep: prepLitter, formal: formal.litters }));
+  Check("预置隐藏并 Reset 不会隐藏正式两副担架与伤员",
+    prepHiddenBySetup && props.get(prepLitter.propBody)?.state === "removed"
+      && formal.litters.length === 2
+      && formal.litters.flatMap(litter => [litter.propLitter, litter.propBody])
+        .every(id => props.get(id)?.state === "shown"),
+    JSON.stringify([...props.values()]));
 }
 
 // 台词游标从换关那一刻起算：`story.fired` 是一本不清的全局流水账，

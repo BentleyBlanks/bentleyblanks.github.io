@@ -277,6 +277,7 @@ export class EscortColumn {
    * @param {object} spec
    *   waypoints  [{x,z}, ...]      队列走线（一般就是本章路标的一串）
    *   members    [{role,label,weapon}]  角色：bearer / guard / walking / civilian
+   *   propPrefix 担架/伤员道具 ID 前缀（默认 escort，保留正式后送队契约）
    *   tuning     覆盖 SETPIECE_TUNING 的部分字段
    */
   constructor(host = {}, spec = {}) {
@@ -284,6 +285,7 @@ export class EscortColumn {
     this.tuning = { ...SETPIECE_TUNING, ...(spec.tuning || {}) };
     this.waypoints = (spec.waypoints || []).map((p) => ({ x: Num(p.x), z: Num(p.z) }));
     this.roster = spec.members || [];
+    this.propPrefix = String(spec.propPrefix || "escort");
     this.followRouteBodies = !!spec.followRouteBodies;
     this.members = [];
     /** 抬着走的担架实体（两名担架员一副，见 Start / _UpdateLitters）。 */
@@ -417,10 +419,10 @@ export class EscortColumn {
       const litter = {
         front, rear, dropped: false, lastMid: null,
         propLitter: this.host.Prop ? this.host.Prop({
-          id: `escortLitter${i / 2}`, kind: "stretcher", position: { x: at.x, z: at.z },
+          id: `${this.propPrefix}Litter${i / 2}`, kind: "stretcher", position: { x: at.x, z: at.z },
         }) : null,
         propBody: this.host.Prop ? this.host.Prop({
-          id: `escortCasualty${i / 2}`, kind: "shroudedBody", position: { x: at.x, z: at.z },
+          id: `${this.propPrefix}Casualty${i / 2}`, kind: "shroudedBody", position: { x: at.x, z: at.z },
         }) : null,
       };
       this.litters.push(litter);
@@ -1541,7 +1543,8 @@ export const SETPIECES = {
       if (s.phase?.whitebox?.p012) {
         const shelter = s.phase.whitebox.anchors.shelter;
         const woundedAt = s.phase.whitebox.activities.woundedDragFrom || shelter;
-        s.mem.prepWounded = s.Column({ waypoints: [shelter, { x: shelter.x + 0.1, z: shelter.z }],
+        s.mem.prepWounded = s.Column({ propPrefix: "p012PrepWounded",
+          waypoints: [shelter, { x: shelter.x + 0.1, z: shelter.z }],
           members: [{ role: "bearer", label: "阵地救护兵", weapon: null },
             { role: "bearer", label: "阵地救护兵", weapon: null }] });
         s.mem.prepWounded.Start();
