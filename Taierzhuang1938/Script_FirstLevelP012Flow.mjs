@@ -1028,7 +1028,7 @@ export class FirstLevelP012Director {
       const roadContact = wave.kind === "roadContact" ? this.config.activities?.roadContactEnemies?.[index] : null;
       const weapon = index === 0 && ["machineGun", "ambush", "southFight"].includes(wave.kind)
         ? "Type11" : "Type38";
-      const terminal = wave.kind === "culvert" ? lane?.terminalGoals?.[index] : null;
+      const terminal = ["culvert", "machineGun"].includes(wave.kind) ? lane?.terminalGoals?.[index] : null;
       const points = roadContact ? [roadContact.position]
         : encounterPosition ? [...(encounter.approaches?.[index % 2] || encounter.approach || []), encounterPosition]
         : ambushPosition ? [ambushPosition] : late ? [fallback] : terminal ? [...(lane?.waypoints || []).slice(0, -1), terminal]

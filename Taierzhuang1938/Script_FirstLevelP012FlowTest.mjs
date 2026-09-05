@@ -1296,6 +1296,19 @@ for(const beat of [14,20,21]) {
 points.get("p012_woundedCheck").OnComplete();
 assert.equal(bandagesIssued,1,"repeated wounded callbacks cannot duplicate bandages");
 {
+ const actors=[];
+ const director=new FirstLevelP012Director({
+  SpawnEnemy:spec=>{const actor={...spec,alive:true,position:{x:spec.x,z:spec.z}};actors.push(actor);return actor;},
+  EnemyPosition:actor=>actor.alive?actor.position:null,
+  EnemyGoal:(actor,goal)=>{actor.goal={...goal};},
+ },phase.whitebox);
+ director.SpawnWave(P012_WAVES[2],2);
+ assert.equal(actors.length,2,"the existing MG crew count remains unchanged");
+ assert.equal(actors[0].weapon,"Type11");assert.equal(actors[1].weapon,"Type38");
+ assert.deepEqual(director.enemyRoutes.map(route=>route.points.at(-1)),phase.whitebox.enemyLanes.machineGun.terminalGoals);
+ assert.notDeepEqual(director.enemyRoutes[0].points.at(-1),director.enemyRoutes[1].points.at(-1),"MG gunner and assistant receive distinct final hold goals");
+}
+{
  const actors=[],modes=[],goals=[];
  const director=new FirstLevelP012Director({
   SpawnEnemy:spec=>{const actor={...spec,alive:true,position:{x:spec.x,z:spec.z},perception:{}};actors.push(actor);return actor;},

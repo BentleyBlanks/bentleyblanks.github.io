@@ -186,7 +186,8 @@ export const P012_ROUTES = Object.freeze({...mappedRoutes,north:worldNorth,villa
   villageEvacuationWaiting:Route([[-19,108],[-14,153]]),
   approach:Object.freeze([...northLink,Point(3,-70),Point(5,-78),Point(5,-82)]),ammoCarry,machineGunEnemy});
 export const P012_ENEMY_LANES = Object.freeze({...P012MapPoints(blueprintEnemyLanes),
-  machineGun:Object.freeze({spawn:machineGunEnemy[0],reveal:machineGunEnemy[2],goal:machineGunEnemy.at(-1),waypoints:machineGunEnemy})});
+  machineGun:Object.freeze({spawn:machineGunEnemy[0],reveal:machineGunEnemy[2],goal:machineGunEnemy.at(-1),waypoints:machineGunEnemy,
+    terminalGoals:Object.freeze([Point(22,-178),Point(24,-178)])})});
 export const P012_ANCHORS = Object.freeze({...P012MapPoints(P012_BLUEPRINT_ANCHORS),hub:Point(0,0),
   ...Object.fromEntries(["trainSpawn","trainDoor","weaponCheck","ammoIssue","weaponInspect","traversal"].map(key=>[key,P012MapPoints(P012_BLUEPRINT_ANCHORS[key],P012StationPoint)])),
   railPassFrom:P012RailPoint(-72,0),railPassTo:P012RailPoint(-72,110)});

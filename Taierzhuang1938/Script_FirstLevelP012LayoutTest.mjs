@@ -275,7 +275,7 @@ for(const route of [routes.gunports,closeGunports])for(let segment=1;segment<rou
  const a=route[segment-1],b=route[segment];
  for(let step=0;step<=100;step++){
   const t=step/100,p={x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t};
-  for(const enemy of [...lanes.west.terminalGoals,P012MapPoints({x:-25,z:-83}),lanes.center.goal,lanes.east.goal,lanes.machineGun.goal]){
+  for(const enemy of [...lanes.west.terminalGoals,...lanes.machineGun.terminalGoals,P012MapPoints({x:-25,z:-83}),lanes.center.goal,lanes.east.goal]){
    let screened=false;
    for(let sample=0;sample<=500;sample++){
     const k=sample/500,q={x:p.x+(enemy.x-p.x)*k,z:p.z+(enemy.z-p.z)*k},eye=.45+(1.5-.45)*k;
@@ -473,7 +473,7 @@ for(let sample=0;sample<=100;sample++){
 for(const x of [58,68])for(const y of [.7,1.5])assert.ok(!SegmentBlocked({...P012SouthPoint(x,24),y:1.62},P012MapPoints({x:34,y,z:18.8})),"window must reveal actual convoy, including low stretcher");
 for(const x of [58,68])assert.ok(!SegmentBlocked({...P012SouthPoint(x,24),y:1.62},{...P012SouthPoint(34-1.1*.413803,18.8-1.1*.910366),y:.7}),"first physical litter trails lead bearer 1.1m and must still be visible");
 SightClear(anchors.gunports[1],anchors.scout,1.62);
-SightClear(anchors.gunports[2],lanes.machineGun.goal,1.62);
+for(const terminal of lanes.machineGun.terminalGoals)SightClear(anchors.gunports[2],terminal,1.62);
 SightClear(P012MapPoints({x:68,z:34}),anchors.stretcher,1.62);
 const partition=layout.blocks.find(b=>b.id==="RuinCrossfirePartition");
 assert.deepEqual([partition.x,partition.z,partition.w,partition.d,partition.h],[P012SouthPoint(67,40).x,P012SouthPoint(67,40).z,7,.5,2.2]);
@@ -529,6 +529,15 @@ for(const [index,goal] of lanes.west.terminalGoals.entries()){
  Audit(`CulvertTerminal${index}`,[...lanes.west.waypoints.slice(0,-1),goal],layout.blocks,0.4);
  for(const other of lanes.west.terminalGoals.slice(index+1))assert.ok(Math.hypot(goal.x-other.x,goal.z-other.z)>=1.2,"culvert terminal capsules cannot share a single goal");
 }
+const machineGunCover=layout.blocks.find(block=>block.id==="MachineGunPositionCover");
+assert.ok(machineGunCover&&machineGunCover.w===4,"the two MG slots use the existing four-metre emplacement");
+for(const [index,goal] of lanes.machineGun.terminalGoals.entries()){
+ Audit(`MachineGunTerminal${index}`,[...lanes.machineGun.waypoints.slice(0,-1),goal],layout.blocks,0.4);
+ assert.ok(Math.abs(goal.x-machineGunCover.x)<=machineGunCover.w/2-.7,"MG slot keeps capsule clearance from the cover side edge");
+ assert.ok(goal.z<=machineGunCover.z-machineGunCover.d/2-.7,"MG slot remains behind the emplacement with capsule clearance");
+}
+assert.ok(Math.hypot(lanes.machineGun.terminalGoals[0].x-lanes.machineGun.terminalGoals[1].x,
+ lanes.machineGun.terminalGoals[0].z-lanes.machineGun.terminalGoals[1].z)>=1.2,"MG crew cannot share a terminal capsule");
 const bridge=layout.blocks.find(b=>b.id==="ReturnRailSpurDeck");
 assert.ok(routes.retreat.some(p=>Math.abs(p.x-bridge.x)+1.3<bridge.w/2&&Math.abs(p.z-bridge.z)+1.3<bridge.d/2),"whole stretcher corridor actually passes under the drainage bridge, not along its outer edge");
 assert.ok(bridge.y-bridge.h/2>=2.6);
