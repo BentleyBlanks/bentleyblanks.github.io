@@ -39,9 +39,6 @@ import {
   MELEE_QTE_PHASE, MELEE_QTE_LEVEL_ID, MELEE_QTE_TARGETS, MELEE_QTE_STATIONS,
 } from "./Data_MeleeQte.mjs";
 import {
-  FIRST_LEVEL_WHITEBOX_PHASE, FIRST_LEVEL_WHITEBOX_LEVEL_ID,
-} from "./Data_FirstLevelWhitebox.mjs";
-import {
   FIRST_LEVEL_P012_WHITEBOX_PHASE, FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,
 } from "./Data_FirstLevelP012Whitebox.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
@@ -181,8 +178,6 @@ const RANGE = params.get("range") === "1";
 const EXPLOSION_TEST = params.get("explosions") === "1";
 const WEAPON_RANGE = params.get("weapons") === "1";
 const MELEE_TEST = params.get("melee") === "1";
-/** 第一关策划白盒（?whitebox=1）：独立纯白方盒场地，复用正式 CH1_NanLu 内容。 */
-const FIRST_LEVEL_WHITEBOX = params.get("whitebox") === "1";
 const FIRST_LEVEL_P012_WHITEBOX = params.get("whitebox") === "p012";
 /**
  * 序 · 界河白盒（?jiehe=1）：与靶场同一条整表替换的路子。
@@ -212,11 +207,10 @@ const FULL_SCENE = PHASE_PARAM === "fullscene" || LEGACY_FULL_SCENE_CARRIAGE;
 const FULL_SCENE_VIEW = FULL_SCENE
   && (LEGACY_FULL_SCENE_CARRIAGE || params.get("fullSceneView") === "carriage")
   ? "carriage" : "county";
-const SANDBOX = EXPLOSION_TEST || WEAPON_RANGE || RANGE || MELEE_TEST || FIRST_LEVEL_WHITEBOX || FIRST_LEVEL_P012_WHITEBOX || JIEHE;
+const SANDBOX = EXPLOSION_TEST || WEAPON_RANGE || RANGE || MELEE_TEST || FIRST_LEVEL_P012_WHITEBOX || JIEHE;
 const PHASE_TABLE = EXPLOSION_TEST ? [EXPLOSION_RANGE_PHASE] : WEAPON_RANGE ? [WEAPON_RANGE_PHASE] : RANGE ? [RANGE_PHASE]
   : MELEE_TEST ? [MELEE_QTE_PHASE]
-    : FIRST_LEVEL_WHITEBOX ? [FIRST_LEVEL_WHITEBOX_PHASE]
-      : FIRST_LEVEL_P012_WHITEBOX ? [FIRST_LEVEL_P012_WHITEBOX_PHASE]
+    : FIRST_LEVEL_P012_WHITEBOX ? [FIRST_LEVEL_P012_WHITEBOX_PHASE]
       : JIEHE ? [JIEHE_SANDBOX_PHASE]
         : OVERVIEW ? [OVERVIEW_PHASE]
           : FULL_SCENE ? [FULL_SCENE_PHASE]
@@ -2519,11 +2513,10 @@ async function Boot() {
       // 携行与七关口径一起翻一遍，重载一次比那条路诚实得多。
       // 玩家可见的测试场景集中保留核心玩法入口。界河与过场仍可通过
       // ?jiehe=1 / ?preview=... 直达，供自动化与内部验收使用，不再混入选章。
-      sandboxes: [WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE, FIRST_LEVEL_WHITEBOX_PHASE,
+      sandboxes: [WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE,
         FIRST_LEVEL_P012_WHITEBOX_PHASE],
       sandboxMode: WEAPON_RANGE ? "weapons" : EXPLOSION_TEST ? "explosions" : RANGE ? "range" : MELEE_TEST ? "melee"
-        : FIRST_LEVEL_WHITEBOX ? "firstLevelWhitebox"
-          : FIRST_LEVEL_P012_WHITEBOX ? "firstLevelP012Whitebox" : JIEHE ? "jiehe" : false,
+        : FIRST_LEVEL_P012_WHITEBOX ? "firstLevelP012Whitebox" : JIEHE ? "jiehe" : false,
       PlaySandbox: (key) => GoToSandbox(key),
       // 机位表按**建好的那一片**取，不按「第几章」取：`?phase=overview` 与
       // 这些独立切片都不在 PHASES 里，照 SliceIndex 去查 PHASES 会取到别人的机位
@@ -2608,7 +2601,6 @@ const WORLD_CLASSES = {
   [EXPLOSION_RANGE_ID]: ExplosionRangeField,
   [WEAPON_RANGE_LEVEL_ID]: WeaponRangeField,
   [MELEE_QTE_LEVEL_ID]: RangeField,
-  [FIRST_LEVEL_WHITEBOX_LEVEL_ID]: FirstLevelWhiteboxField,
   [FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID]: FirstLevelWhiteboxField,
 };
 function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField; }
@@ -2633,7 +2625,6 @@ function GoToSandbox(key) {
   else if (key === "range") url.searchParams.set("range", "1");
   else if (key === "explosions") url.searchParams.set("explosions", "1");
   else if (key === "melee") url.searchParams.set("melee", "1");
-  else if (key === "firstLevelWhitebox") url.searchParams.set("whitebox", "1");
   else if (key === "firstLevelP012Whitebox") url.searchParams.set("whitebox", "p012");
   else if (key === "jiehe") url.searchParams.set("jiehe", "1");
   url.searchParams.delete("phase");
@@ -3426,7 +3417,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   }
   else if (RANGE) { state.pinned = true; SeedRangeTargets(); }
   else if (MELEE_TEST) { state.pinned = true; SeedMeleeTargets(); }
-  else if (FIRST_LEVEL_WHITEBOX || FIRST_LEVEL_P012_WHITEBOX) { state.pinned = true; SeedSoldiers(phase); }
+  else if (FIRST_LEVEL_P012_WHITEBOX) { state.pinned = true; SeedSoldiers(phase); }
   else if (!PREVIEW && !cutsceneOnly) SeedSoldiers(phase);
   SeedSmokeColumns(phase);
   // 进关先打一个检查点：第一拍就被击倒时也有地方可退。

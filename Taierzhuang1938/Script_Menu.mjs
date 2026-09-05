@@ -30,7 +30,6 @@ const SANDBOX_NAMES = {
   weapons: { where: "枪械射击白盒", exit: "退出枪械靶场" },
   range: { where: "靶场", exit: "退出靶场" },
   melee: { where: "白刃测试场", exit: "退出白刃测试场" },
-  firstLevelWhitebox: { where: "第一关策划白盒", exit: "退出第一关白盒" },
   firstLevelP012Whitebox: { where: "第一关 P0/P1/P2 场景白盒", exit: "退出 P0/P1/P2 白盒" },
   jiehe: { where: "界河白盒", exit: "退出界河白盒" },
 };
@@ -113,7 +112,7 @@ export class MainMenu {
    *   camera       THREE.PerspectiveCamera —— 只在 title 态被接管，暂停态不碰
    *   phases       Data_Battle.PHASES
    *   sandboxes    可选：选章末尾的沙盒条目数组（靶场 / 白刃 QTE / 关卡白盒）
-   *   sandboxMode  false | "range" | "melee" | "firstLevelWhitebox"
+   *   sandboxMode  false | "range" | "melee" | "firstLevelP012Whitebox"
    *   Play(i, o)   进某一关（装配层负责建切片、播过场、进游戏）
    *   PlaySandbox() / ExitSandbox()  进／出靶场（都要重载页面，见 Play()）
    *   Resume()     暂停态的「继续」
@@ -129,7 +128,7 @@ export class MainMenu {
     this.camera = host.camera;
     this.phases = host.phases || [];
     /**
-     * 选章末尾的**沙盒条目**（玩法靶场、白刃 QTE 与第一关策划白盒）。
+     * 选章末尾的**沙盒条目**（核心玩法靶场与 P0/P1/P2 白盒）。
      * 它与七关并排摆在同一张列表上，但**不进 `this.phases`** —— 进度、「继续」、
      * 「下一关」标记与 `DefaultLevel()` 一概只按正片七关数，与 Script_Main
      * 那边「靶场不进 PHASES」的口径是同一条（见 docs/Data_TestRange.md）。
@@ -137,7 +136,7 @@ export class MainMenu {
     this.sandboxes = Array.isArray(host.sandboxes)
       ? host.sandboxes.filter(Boolean) : (host.sandbox ? [host.sandbox] : []);
     /**
-     * 列表上真正排出来的条目 = 七章 + 三条测试沙盒。键盘上下也按它走。
+     * 列表上真正排出来的条目 = 七章 + 测试沙盒。键盘上下也按它走。
      * **顺序就是分组顺序**：正式章节在前，测试场景在后（docs/Data_MissionRemake.md §9）。
      */
     this.entries = [...this.phases, ...this.sandboxes];

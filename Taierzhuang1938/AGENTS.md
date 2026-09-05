@@ -261,16 +261,10 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - 专用章与正片共用正式 Soldier/Actor/伤害/死亡链；`Debug.MeleeQte` 只做摆位和取证。
 - 回归口 `Script_MeleeQteTest.mjs`（combat 域）。先读：`docs/Data_MeleeQte.md`。
 
-### 第一关策划白盒（?whitebox=1，独立测试章节）
-- `Data_FirstLevelWhitebox.mjs` 是唯一 phase / 体块布局数据，`Script_FirstLevelWhiteboxField.mjs`
-  是独立场景实现；它们不进 `PHASES`，也不借 `TengxianOutfield`、PCG、贴图或外部模型。
-- 可见环境只能是程序化 `BoxGeometry` + 纯白无贴图 `MeshStandardMaterial`，接受正片太阳与阴影。
-  边界必须用可见实体白墙表达，不得恢复空气墙、世界说明卡或未来剧情标注。
-- 场景 id 是 `FirstLevelWhitebox`，内容 id 通过 `Script_FirstLevelWhiteboxFlow.mjs` 复用正式
-  `CH1_NanLu`；具名同伴、对白、后送队、担架、空袭与事件摆点必须跑正式第一章链路。
-- 护送门与折返门由正式剧情信号改变网格和 Rapier 碰撞，目标由事实门推进，不能退回
-  “走进目标圈就算完成”。回归口：`Script_FirstLevelWhiteboxTest.mjs` 与
-  `Script_FirstLevelWhiteboxBrowserTest.mjs`。
+### 已移除的旧策划白盒
+
+- 旧 `?whitebox=1` 关卡与选关入口已移除。`FirstLevelWhitebox` 数据、场景和规则模块仍供 P0/P1/P2 版本及纯逻辑回归复用。
+- `Script_FirstLevelWhiteboxBrowserTest.mjs` 验证旧链接回到正式菜单、旧卡片不再出现。
 
 ### 第一关 P0/P1/P2 场景白盒（?whitebox=p012，额外独立版本）
 
@@ -293,7 +287,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   原同班六人沿 `openingMarchRoute` 连续到前沿各侧位后才交防守；炮击反应须晚于真实弹着。
   本关 `hud.objectiveMarkers` 关闭全程悬浮地点和米数；跟随段由真实班长带路、停等与字幕引导，不能把内部测试目标重新画成玩家导航。
   B11/B14/B23 的局部指南经 `P012GuideApproach` 检查实体净空，到位才发字幕；实际拖拽／点烟幕后交接，不占伤员身体、不代替玩家战斗。
-- 与旧 `?whitebox=1`、正式第一关并存，不覆盖它们。这个版本按用户要求使用
+- 与正式第一关并存。旧 `?whitebox=1` 已移除。这个版本按用户要求使用
   灰地面、黄跨步、橙翻越、紫攀爬、蓝掩体、黑边界、红危险、绿任务路、青担架路。
   环境仍是程序化无贴图体块，人物及已烘焙声音复用现有配置。
 - `Script_FirstLevelP012Flow.mjs` 是纯任务事实编排；`Script_FirstLevelP012Runtime.mjs`

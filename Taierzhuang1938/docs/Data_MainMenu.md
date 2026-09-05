@@ -79,8 +79,9 @@ ER2 的出生菜单同理不抄，理由见 `Data_EasyRed2Parity.md` 那条「�
 | 玩法测试靶场 | 靶 | `Data_Range.RANGE_PHASE` | `?range=1` |
 | 爆炸测试场 | 爆 | `Data_ExplosionRange.EXPLOSION_RANGE_PHASE` | `?explosions=1` |
 | 白刃战 QTE 测试场 | 刃 | `Data_MeleeQte.MELEE_QTE_PHASE` | `?melee=1` |
-| 第一关 · 全新策划白盒 | 白 | `Data_FirstLevelWhitebox.FIRST_LEVEL_WHITEBOX_PHASE` | `?whitebox=1` |
 | 第一关 · P0/P1/P2 场景白盒 | 012 | `Data_FirstLevelP012Whitebox.FIRST_LEVEL_P012_WHITEBOX_PHASE` | `?whitebox=p012` |
+
+旧「第一关 · 全新策划白盒」已移除，旧 `?whitebox=1` 链接回到正式菜单。
 
 界河白盒与过场预览不再列入选章，避免测试入口越积越多。它们的内部直达 query 仍保留：
 `?jiehe=1` 服务地形回归与人工验收，`?preview=CS_Chuchuan` 服务序章预览。
