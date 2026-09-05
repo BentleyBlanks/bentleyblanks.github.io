@@ -58,6 +58,24 @@ import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 
 const points = new Map();
 {
+ const config=phase.whitebox,at=config.activities.roadContactBreach;
+ const actors=Array.from({length:4},(_,index)=>({alive:index===0,position:{...at}}));
+ const director=new FirstLevelP012Director({EnemyPosition:actor=>actor.alive?actor.position:null},config);
+ director.beat=13;director.guideStarted=true;
+ director.unlockedWaves=P012_WAVES.flatMap((wave,index)=>wave.beat<=13?[index]:[]);
+ director.enemyRoutes=actors.map(handle=>({handle,encounterBeat:13,points:[at],index:0}));
+ const sample={position:at,guidePosition:at,guideAlive:true,roadContactVisibleCount:0};
+ director.Update(.1,sample);
+ assert.equal(director.facts.has('roadContactSeen'),false,'one hidden survivor is still a real unresolved threat');
+ actors[0].alive=false;director.Update(.1,sample);
+ assert.equal(director.facts.has('roadContactSeen'),true,'a fully cleared finite contact cannot demand living enemies again');
+ assert.equal(director.facts.has('roadContactHeld'),false,'early clearance does not issue the player halt command');
+ director.Mark('roadContactHeld');director.Update(.1,sample);
+ assert.equal(director.facts.has('roadContactClear'),true);
+ assert.equal(director.facts.has('roadContactReleased'),false,'player still needs to return and release the column');
+ assert.ok(actors.every(actor=>!actor.alive),'no casualty is resurrected to repair progression');
+}
+{
  const cues=phase.whitebox.storyBeats.filter(beat=>beat.voice?.startsWith("p012_text_Guide"));
  assert.equal(cues.length,13);
  for(const cue of cues){
@@ -407,14 +425,22 @@ assert.equal(flow.State().beat,"B12","a request is not the commander's approval"
 assert.equal(signals.has("EscortCall"),false);
 assert.equal(signals.has("P012EscortRequested"),true);
 signals.add("P012EscortApproved"); Tick();
-assert.equal(flow.State().beat,"B13");
-At("Z06"); assert.equal(flow.State().beat,"B13","outbound history does not satisfy reverse escort");
+  assert.equal(flow.State().beat,"B13");
+  Tick({guideRouteIndex:3,guidePosition:phase.whitebox.activities.roadContactGuideRoute[3]});
+  assert.deepEqual(flow.CurrentObjective().target,phase.whitebox.activities.roadContactGuideRoute[3],
+    "southbound player follows the furthest body-clear guide bend rather than cutting through trench walls");
+  At("Z06"); assert.equal(flow.State().beat,"B13","outbound history does not satisfy reverse escort");
 for(const id of ["Z04","Z03","Z02","Z06"]) At(id);
-Tick({},40);const contactActors=spawned.slice(-4);
-assert.equal(contactActors.length,4);assert.ok(contactActors.every(actor=>actor.p012RoadContact),"the first road contact is one finite four-person set");
-Tick({position:phase.whitebox.activities.roadContactBreach,guidePosition:phase.whitebox.activities.roadContactBreach,roadContactVisibleCount:3});
-assert.equal(flow.facts.has("roadContactSeen"),false,"partial or hidden contact cannot open the stop command");
-Tick({roadContactVisibleCount:4});assert.equal(points.get("p012_roadContactHold").Enabled(),true);
+  Tick({},40);
+  assert.equal(spawned.filter(actor=>actor.p012RoadContact).length,0,"road contact cannot be killed by the escort before the observation breach");
+  Tick({position:phase.whitebox.activities.roadContactBreach,guidePosition:phase.whitebox.activities.roadContactBreach,roadContactVisibleCount:0});
+  const contactActors=spawned.slice(-4);
+  assert.equal(contactActors.length,4);assert.ok(contactActors.every(actor=>actor.p012RoadContact),"the first road contact is one finite four-person set");
+  Tick({roadContactVisibleCount:0});
+assert.equal(flow.facts.has("roadContactSeen"),false,"hidden living contact cannot open the stop command");
+contactActors[0].alive=false;
+Tick({roadContactVisibleCount:1});assert.equal(points.get("p012_roadContactHold").Enabled(),true,
+  "one visible threat still permits calling a halt after an early kill");
 Use("p012_roadContactHold");assert.ok(signals.has("P012RoadContactHold"));
 Walk(phase.whitebox.activities.roadContactSideRoute);
 assert.equal(flow.State().beat,"B13","reaching the physical side wall cannot replace clearing the contact");

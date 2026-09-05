@@ -66,7 +66,15 @@ assert.ok(openingStoryBeats.length>0);
  assert.equal(smoke.Released(),0);smoke.flow.facts.add('retreatSmokeDeployed');smoke.runtime.Update(.05);smoke.runtime.Update(.05);
  assert.equal(smoke.Released(),1);assert.deepEqual(smoke.events,['P012GuideAtSmoke','P012GuideSmokeHandoff']);
  assert.equal(P012GuideApproach([{x:0,z:0,w:2,d:20,h:3,y:1.5,ry:0}],{x:-3,z:0},{x:3,z:0}),null,'no safe known path returns failure, not a through-wall command');
- console.log('PASS physical casualty/flank/smoke guides: swept clearance, actual arrival cues, waits and handoff');
+ const road=Make(13,{x:-6.430167242887489,z:-91.96949797252844});
+ assert.equal(road.runtime.guide.safeRoute,true,'B13 owns a collision-checked guide route');
+ road.Step(20);const roadWaiting={...road.actor};road.player.z+=25;road.Step(20,false);
+ assert.deepEqual(road.actor,roadWaiting,'southbound guide waits for a player who fell behind');
+ road.Step(4000);
+ assert.ok(Math.hypot(road.actor.x-activity.roadContactBreach.x,road.actor.z-activity.roadContactBreach.z)<.6,
+  'recorded B13 stall reaches the actual breach via the complete world-space road');
+ assert.equal(road.flow.facts.size,0,'walking the guide cannot invent contact or kills');
+ console.log('PASS physical casualty/flank/smoke/road guides: swept clearance, actual arrival cues, waits and handoff');
 }
 {
  const guide={x:0,z:0},player={x:0,z:0},actors=Array.from({length:6},(_,i)=>({id:`march${i}`,x:0,z:6+i,alive:true}));

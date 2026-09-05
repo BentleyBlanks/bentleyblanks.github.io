@@ -204,7 +204,10 @@ export class FirstLevelP012Director {
           ? !this.Signalled("P012NorthContinue") : Distance(this.lastSample.position,this.lastSample.guidePosition)>8,
         FaceAt: index => index===this.ActivityRoute().length-1?this.lastSample.position:null } : {}),
       ...(this.beat === 12 ? { startIndex: 0, WaitAt: () => this.beat === 12 } : {}),
-      ...(this.beat === 13 ? { route: this.config.activities.roadContactGuideRoute, startIndex: 0, WaitAt: index => index === this.config.activities.roadContactGuideRoute.length-1, FaceAt: () => this.facts.has("roadContactClear") ? this.lastSample.position : this.config.activities.roadContactEnemies?.[0]?.position } : {}),
+      ...(this.beat === 13 ? { route: activity.roadContactGuideRoute, startIndex: 0, safeRoute: true,
+        approachPoints: activity.woundedDragRoute, waitDistance: 8,
+        WaitAt: index => index === activity.roadContactGuideRoute.length-1,
+        FaceAt: () => this.facts.has("roadContactClear") ? this.lastSample.position : activity.roadContactEnemies?.[0]?.position } : {}),
       speed: this.config.activities?.guideSpeedByBeat?.[this.beat] || this.config.activities?.guideSpeedMps || 1.3 });
   }
 
@@ -665,9 +668,15 @@ export class FirstLevelP012Director {
     if(this.beat===5&&this.routeIndex>=7)this.Emit("P012AmmoGunlineNear");
     if(this.beat===13){
       const atBreach=Distance(p,activity.roadContactBreach)<=4&&Distance(sample.guidePosition,activity.roadContactBreach)<=3;
-      if(!this.facts.has("roadContactSeen")&&atBreach&&sample.roadContactVisibleCount===4){this.Mark("roadContactSeen");this.Emit("P012RoadContactSeen");}
       const contact=this.enemyRoutes.filter(entry=>entry.encounterBeat===13);
-      if(this.facts.has("roadContactHeld")&&contact.length===4&&!this.pendingEnemies.some(entry=>entry.encounterBeat===13)&&contact.every(entry=>!this.host.EnemyPosition?.(entry.handle))){this.Mark("roadContactClear");this.Emit("P012RoadContactClear");}
+      const deployed=contact.length===4&&!this.pendingEnemies.some(entry=>entry.encounterBeat===13);
+      const cleared=deployed&&contact.every(entry=>!this.host.EnemyPosition?.(entry.handle));
+      // Identifying one real threat is enough to call a halt. A successful
+      // early shot must never require the victim to become alive/visible again.
+      if(!this.facts.has("roadContactSeen")&&atBreach&&deployed&&(sample.roadContactVisibleCount>0||cleared)){
+        this.Mark("roadContactSeen");this.Emit("P012RoadContactSeen");
+      }
+      if(this.facts.has("roadContactHeld")&&cleared){this.Mark("roadContactClear");this.Emit("P012RoadContactClear");}
     }
     if (this.beat === 0 && !this.config.arrival && this.routeIndex >= 2 && guideNear) this.Emit("P012TrainDoor");
     if(this.beat===4){
@@ -784,6 +793,12 @@ export class FirstLevelP012Director {
     }
     for (const [index, wave] of P012_WAVES.entries()) {
       if(["airAdvance","closeFight"].includes(wave.kind))continue;
+      // Keep the finite road contact out of the world until Luo and the player
+      // actually reach the observation breach. Otherwise the escort's armed
+      // guards can kill part of the group during the long southbound walk and
+      // make the four-person visual confirmation impossible.
+      if (wave.kind === "roadContact" && (Distance(p, activity.roadContactBreach) > 4
+        || Distance(sample.guidePosition, activity.roadContactBreach) > 3)) continue;
       // Scouts may call same-axis rifle reinforcements immediately. New MG,
       // mortar and culvert pressure keeps a 30s floor; existing gunport movement
       // remains active during this transition, not a stationary wait objective.
@@ -1118,7 +1133,12 @@ export class FirstLevelP012Director {
       interactionId = null; text = "已报名护送；听清罗班长的接应地点，准备随担架出发";
     }
     if(this.beat===13){
-      target=this.lastSample.guidePosition||activity.roadContactBreach;requiredAction="follow";
+      const guideRoute=activity.roadContactGuideRoute||[];
+      const guideCursor=Math.max(0,Math.min(guideRoute.length-1,Number(this.lastSample.guideRouteIndex)||0));
+      const followPlan=P012NextVisiblePoint(this.config.layout?.blocks||[],this.lastSample.position,
+        guideRoute.slice(0,guideCursor+1),0,.42);
+      target=followPlan.blocked?(this.lastSample.guidePosition||activity.roadContactBreach):followPlan.point;
+      requiredAction="follow";
       if(this.facts.has("roadContactSeen")&&!this.facts.has("roadContactHeld")){target=activity.roadContactColumnHold;interactionId="p012_roadContactHold";requiredAction="move";text="敌人已暴露；到院墙后命令担架队停下";}
       else if(this.facts.has("roadContactHeld")&&!this.facts.has("roadContactClear")){target=route[this.routeIndex]||activity.roadContactFirePosition;lookAt=activity.roadContactEnemies?.[0]?.position;requiredAction="fight";text="沿实体侧墙到射位，清除道路上的四名日军";}
       else if(this.facts.has("roadContactClear")&&!this.facts.has("roadContactReleased")){target=activity.roadContactTailRelease;interactionId="p012_roadContactRelease";requiredAction="move";text="回到担架队尾，确认两处掩体有人后放行";}
@@ -1133,7 +1153,7 @@ export class FirstLevelP012Director {
       target = this.lastSample.guidePosition||activity.airObservationPosition; interactionId = null; requiredAction = "follow";
       text = "跟班长收到矮墙后；他会面向铁路交代下一步";
     }
-    if (this.beat === 13 || (this.beat === 14 && this.routeIndex >= route.length)) target = this.lastSample.columnPosition;
+    if (this.beat === 14 && this.routeIndex >= route.length) target = this.lastSample.columnPosition;
     if (this.beat === 14) {
       const threat = this.AmbushThreat();
       if (threat) { target = threat.cover; lookAt = threat.lookAt; requiredAction = "fight"; text = threat.label; }

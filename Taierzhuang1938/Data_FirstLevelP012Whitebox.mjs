@@ -209,10 +209,6 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       ]),
       ambushEntryRoute: Object.freeze([{ x: 42.5, z: 24 }, { x: 39, z: 25.5 }]),
       ambushColumnCoverRoute: Object.freeze([{ x: 32, z: 14.4 }, { x: 34, z: 18.8 }]),
-      // This block is still inside the one-time blueprint mapper. Reuse the
-      // blueprint route here; embedding P012_ROUTES would translate it twice.
-      roadContactGuideRoute: Object.freeze([...P012_BLUEPRINT_ROUTES.south.slice(0,
-        P012_BLUEPRINT_ROUTES.south.findIndex(point=>point.x===30&&point.z===10)+1), {x:32,z:12}]),
       roadContactBreach: {x:32,z:12}, roadContactColumnHold: {x:30,z:10},
       roadContactSideRoute: Object.freeze([{x:32,z:12},{x:34,z:14},{x:35.5,z:16}]),
       roadContactFirePosition: {x:35.5,z:16}, roadContactTailRelease: {x:28,z:10},
@@ -279,6 +275,10 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
     }),
       ...stationActivities,
       ...openingActivities,
+      // Start at the casualty rendezvous and retain the built south road's
+      // village/ruin detours. These are world points, outside the mapper above.
+      roadContactGuideRoute: Object.freeze([{x:-7,z:-92}, ...P012_ROUTES.south.slice(2,
+        P012_ROUTES.south.findIndex(point=>point.x===90&&point.z===10)+1), {x:92,z:12}]),
       openingMarch:true,
       openingMarchRoute:Object.freeze([{x:-51,z:90},{x:-43,z:94},...P012_ROUTES.village.slice(1),
         ...P012_ROUTES.approach,{x:5,z:-92},{x:5,z:-99},{x:5,z:-104}]),
