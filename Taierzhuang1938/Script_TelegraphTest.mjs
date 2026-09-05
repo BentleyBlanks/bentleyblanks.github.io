@@ -27,7 +27,6 @@ import {
   TELEGRAPH_DEFAULTS, TELEGRAPH_SFX, TELEGRAPH_SIGNALS, TELEGRAPH_PHASES, TELEGRAPH_BEATS,
 } from "./Script_Telegraph.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
-import { EVENTS } from "./Data_MissionCh6.mjs";
 
 const dirHere = path.dirname(fileURLToPath(import.meta.url));
 let checks = 0;
@@ -83,20 +82,17 @@ const Spec = (over = {}) => ({
 // ---------------------------------------------------------------------------
 {
   Check(TELEGRAPH_PHASES.length === 5 && TELEGRAPH_BEATS.length === 6, "相位表五项、节拍表六项");
-  const ids = new Set(EVENTS.map((e) => e.id));
-  Check(ids.has(TELEGRAPH_SIGNALS.first), `第一组勾掉推的是 CH6 EVENTS 的 ${TELEGRAPH_SIGNALS.first}`);
-  Check(ids.has(TELEGRAPH_SIGNALS.break), `接头松脱推的是 CH6 EVENTS 的 ${TELEGRAPH_SIGNALS.break}`);
-  Check(ids.has(TELEGRAPH_SIGNALS.complete), `最后一组发完推的是 CH6 EVENTS 的 ${TELEGRAPH_SIGNALS.complete}`);
-  const wireBreak = EVENTS.find((e) => e.id === TELEGRAPH_SIGNALS.break);
-  Check(/第二组与最后一组之间|不能落在/.test(wireBreak.note),
-    "WireBreak 的登记里写死了「断线要发生在第二组与最后一组之间」—— ⑤ 就是照它测的");
+  // 2026-09-06：终章章节数据随章节废弃清空，三条默认信号名现在是引擎侧的契约常量，不再对账章节 EVENTS。
+  const names = ["first", "break", "complete"].map((k) => TELEGRAPH_SIGNALS[k]);
+  Check(names.every((n) => typeof n === "string" && n.length > 0), `三条默认信号名都是非空字符串：${names.join(",")}`);
+  Check(new Set(names).size === 3, "三条默认信号名互不相同（同名会把三拍并成一拍）");
   Check(TELEGRAPH_DEFAULTS.digitsPerGroup === 4, "一组四位（§7 与关内那条 system 提示的口径）");
   Check(TELEGRAPH_DEFAULTS.ditsMin === 2 && TELEGRAPH_DEFAULTS.ditsMax === 3,
     "按一下响两到三声「嗒」（任务书原话「2–3 声「嗒」变体」）");
   Check(TELEGRAPH_DEFAULTS.reconnectS === 1.2,
     "重连长按 1.2 s（Data_MissionCh6 ENGINE_REQUEST 1 写死的）");
 }
-console.log("ok  ① 契约表：默认信号名与 CH6 EVENTS 的 id 逐条对得上，从简口径按任务书");
+console.log("ok  ① 契约表：三条默认信号名是引擎侧契约常量，从简口径按任务书");
 
 // ---------------------------------------------------------------------------
 // ② 码组推进

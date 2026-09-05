@@ -131,9 +131,10 @@ checks += 1;
 const missionChange = InferDomains(["Taierzhuang1938/Script_MissionSetpieces.mjs"]);
 Check(missionChange.domains.includes("cutscene") && missionChange.domains.includes("ai"), "任务摆点映射 cutscene/ai");
 const missionQuick = ResolveSelection(ParseArgs(["--changed=origin/master"]), missionChange.domains, missionChange);
-Check(missionQuick.includes("MissionSetpiecesTest") && !missionQuick.includes("PlayTest"), "任务摆点编辑循环跑纯 Node 专项而不跑整局");
+Check(missionQuick.includes("MissionSetpiecesTest"), "任务摆点编辑循环跑纯 Node 专项");
 const missionPrepush = ResolveSelection(ParseArgs(["--changed=origin/master", "--profile=prepush"]), missionChange.domains, missionChange);
-Check(missionPrepush.includes("PlayTest"), "任务摆点推送前追加整局门禁");
+// 2026-09-06：整局通关测试随第一关到终章的废弃删除，推送前不再有 PlayTest 门禁。
+Check(missionPrepush.includes("MissionSetpiecesTest") && !missionPrepush.includes("PlayTest"), "任务摆点推送前跑领域专项，不再追加已删除的整局门禁");
 
 const textureChange = InferDomains(["Taierzhuang1938/Texture/Texture_BrickWallBase.webp"]);
 Check(textureChange.domains.includes("render"), "贴图改动映射 render");
@@ -164,23 +165,25 @@ for (const file of testFiles) {
   }
 }
 
-const expectedName = testDefs.PlayTest.expectedFailures[0];
+// 历史红基线机制用合成登记验（现在没有测试登记 expectedFailures）。
+const baselineDef = { file: "Script_Synthetic.mjs", expectedFailures: ["历史红样例"] };
+const expectedName = baselineDef.expectedFailures[0];
 const baselineOutput = `通关冒烟：129/130 过\n没过的：\n  · ${expectedName}  — detail\n`;
 assert.deepEqual(ExtractFailureNames(baselineOutput), [expectedName]);
 checks += 1;
 assert.deepEqual(ExtractFailureEntries(baselineOutput), [{ name: expectedName, detail: "detail" }]);
 checks += 1;
 
-const baseline = AssessResult({ code: 1, timedOut: false, text: baselineOutput }, testDefs.PlayTest);
+const baseline = AssessResult({ code: 1, timedOut: false, text: baselineOutput }, baselineDef);
 Check(baseline.ok && baseline.baselineOnly, "已知红不阻断默认门禁");
-const strictBaseline = AssessResult({ code: 1, timedOut: false, text: baselineOutput }, testDefs.PlayTest, true);
+const strictBaseline = AssessResult({ code: 1, timedOut: false, text: baselineOutput }, baselineDef, true);
 Check(!strictBaseline.ok && strictBaseline.baselineOnly, "strict 模式仍阻断历史红");
 
 const unexpectedOutput = "通关冒烟：129/130 过\n没过的：\n  · 新增回归  — detail\n";
-const unexpected = AssessResult({ code: 1, timedOut: false, text: unexpectedOutput }, testDefs.PlayTest);
+const unexpected = AssessResult({ code: 1, timedOut: false, text: unexpectedOutput }, baselineDef);
 Check(!unexpected.ok && !unexpected.baselineOnly, "新增红必须阻断门禁");
 
-const crash = AssessResult({ code: 1, timedOut: false, text: "PAGEERROR boom" }, testDefs.PlayTest);
+const crash = AssessResult({ code: 1, timedOut: false, text: "PAGEERROR boom" }, baselineDef);
 Check(!crash.ok, "没有正常完成摘要的崩溃不得误判为历史红");
 
 // playwright 的签名是 waitForFunction(pageFunction, arg?, options?)：第二个参数是

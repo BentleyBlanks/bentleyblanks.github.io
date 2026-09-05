@@ -119,11 +119,8 @@
 //     text: "这些人都没枪了……" }
 import { VOICE_LINES as CH0_LINES } from "./Data_MissionCh0.mjs";
 import { VOICE_LINES as CH1_LINES } from "./Data_MissionCh1.mjs";
-import { VOICE_LINES as CH2_LINES } from "./Data_MissionCh2.mjs";
-import { VOICE_LINES as CH3_LINES } from "./Data_MissionCh3.mjs";
-import { VOICE_LINES as CH4_LINES } from "./Data_MissionCh4.mjs";
-import { VOICE_LINES as CH5_LINES } from "./Data_MissionCh5.mjs";
-import { VOICE_LINES as CH6_LINES } from "./Data_MissionCh6.mjs";
+// 第二到终章（2026-09-06 暂时废弃）：VOICE_LINES 已清空、vo_ch2_*–vo_ch6_*.mp3 已删，
+// 这里不再拼接它们。第一章的行仍在 —— P0/P1/P2 白盒按 contentId = CH1_NanLu 播它们。
 
 export const VOICE_BASE = "Audio/";
 
@@ -370,12 +367,12 @@ function MergeChapter(lines, chapter, seen, out) {
 const CHAPTER_LINES = [];
 {
   const seen = new Set(BATTLE_LINES.map((l) => l.key));
-  const chapters = [CH0_LINES, CH1_LINES, CH2_LINES, CH3_LINES, CH4_LINES, CH5_LINES, CH6_LINES];
+  const chapters = [CH0_LINES, CH1_LINES];
   for (let i = 0; i < chapters.length; i += 1) MergeChapter(chapters[i], i, seen, CHAPTER_LINES);
 }
 
 /**
- * 总表 = 战场口令 + 七章剧情台词。
+ * 总表 = 战场口令 + 序章与第一章的剧情台词（第二到终章已废弃）。
  * 顺序有意义：战场口令在前（中方 31 条 + 日方 28 条），章节台词按章号接在后面。
  * 现有断言（「战斗 Bark 时长在 0.3—2.6 s」之类）按 kind 过滤，不靠下标 ——
  * 2026-08-29 删掉表头那 11 条 prologue_* 行时，正因为如此一条断言都没受影响。

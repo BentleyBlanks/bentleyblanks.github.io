@@ -99,7 +99,7 @@
 .mnLevelGroup b { font-weight: 400; }
 .mnLevelGroup small { font-size: 10px; color: #757c78; }
 .mnLevelGroup:not(:first-child) { margin-top: 18px; padding-top: 12px; border-top: 1px solid #c4c6bb20; }
-.mnMissionTrack, .mnSandboxTrack { display: flex; flex-direction: column; }
+.mnMissionTrack, .mnDeprecatedTrack, .mnSandboxTrack { display: flex; flex-direction: column; }
 .mnLevel {
   position: relative; width: 100%; min-height: 42px; padding: 6px 12px;
   display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 9px;
@@ -111,6 +111,12 @@
 .mnLvNo { color: #919790; font-size: 12px; font-weight: 400; white-space: nowrap; }
 .mnLvMark { font-size: 10px; font-weight: 400; color: #8b9384; white-space: nowrap; }
 .mnLvMark.done { color: #b5bba2; }
+.mnLvMark.todo { color: #7d7466; }
+/* 暂时废弃场景：压灰一档，字号比正式章节小 —— 点得进去，但一眼看出不是正片。 */
+.mnDeprecatedLevel { min-height: 36px; color: #8f948f; }
+.mnDeprecatedLevel .mnLvName { font-size: clamp(13px, 1.2vw, 18px); font-weight: 500; }
+.mnDeprecatedLevel.on { color: var(--ui-gold); }
+.mnMissionRecord.todo b { color: #8f948f; }
 .mnLevel.on {
   color: var(--ui-gold); border-image: var(--ui-selection-edge);
   background: var(--ui-selection);

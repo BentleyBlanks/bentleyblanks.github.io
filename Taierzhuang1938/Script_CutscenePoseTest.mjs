@@ -83,54 +83,24 @@ const CLIP_BANDS = {
   woundedWalk: { head: [0.95, 1.45], pelvis: [0.55, 0.95], why: "伤员跛行（驼背在躯干不在头：实测 1.36–1.42）" },
 };
 
-/** 过场实机门槛。head 是「离本人 root 平面」的高度。 */
+/**
+ * 过场实机门槛。head 是「离本人 root 平面」的高度。
+ *
+ * 2026-09-06：第一关到终章的过场（CS_Ch4_AidStation / CS_Ch5_TurnBack / CS_Ch6_LastWire）随章节
+ * 废弃删除；这里改用仍在注册表里的旧战役过场 CS_LastWire（Data_CutsceneLastWire.mjs）：
+ * 镜 2（t 3.4–8.6）王铭章站在桌东侧（crouch 0 / reach 0），赵渭滨站桌西侧（crouch 0.05）。
+ */
 const CUTSCENE_CASES = [
   {
-    cut: "CS_Ch4_AidStation",
-    samples: [
-      {
-        t: 12.0,
-        actors: {
-          luo: { clip: "proneFire", head: [0.25, 0.60], why: "罗班长躺在门板担架上" },
-          wounded1: { clip: "proneFire", head: [0.25, 0.60], why: "地上躺着的伤员" },
-          wounded2: { clip: "proneFire", head: [0.25, 0.60], why: "地上躺着的伤员" },
-          wounded3: { clip: "proneFire", head: [0.25, 0.60], why: "地上躺着的伤员" },
-          junyi: { clip: "crouchIdle", head: [0.45, 1.00], why: "军医跪在担架东侧动手（kneel 0.9 + reach 0.45）" },
-        },
-      },
-      {
-        t: 24.0,
-        actors: {
-          newWounded: { clip: "proneFire", head: [0.25, 0.60], why: "新抬进来的伤员" },
-          junyi: { clip: "crouchIdle", head: [0.45, 1.00], why: "军医转过去跪下（kneel 0.8 + reach 0.45）" },
-        },
-      },
-    ],
-  },
-  {
-    cut: "CS_Ch5_TurnBack",
+    cut: "CS_LastWire",
     samples: [
       {
         t: 6.0,
         actors: {
-          shangbing: { clip: "proneFire", head: [0.25, 0.60], why: "担架上的伤员" },
-          danjia_a: { clip: "crouchIdle", head: [0.45, 1.00], why: "跪着的担架员（kneel 1 + reach 0.4）" },
-          danjia_b: { clip: "crouchIdle", head: [0.45, 1.00], why: "蹲着的担架员（crouch 0.7 + reach 0.5）" },
-        },
-      },
-    ],
-  },
-  {
-    cut: "CS_Ch6_LastWire",
-    samples: [
-      {
-        t: 2.0,
-        actors: {
-          wangmingzhang: { clip: "standIdle", head: [1.00, 1.45], why: "王铭章站在桌东侧（crouch 0 / reach 0）" },
-          canmou: { clip: "standReach", head: [1.00, 1.45], why: "参谋站着念电文（reach 0.32）" },
+          wang: { clip: "standIdle", head: [1.00, 1.45], why: "王铭章站在桌东侧（crouch 0 / reach 0）" },
         },
         // 同一个 kind 的两个人站在同一间屋里，头不许差出一个姿态来
-        pairs: [["wangmingzhang", "canmou", 0.25]],
+        pairs: [["wang", "zhao", 0.25]],
       },
     ],
   },
@@ -226,8 +196,8 @@ try {
   Report(unit.table);
   failures.push(...unit.problems);
 
-  // ── 3：三场过场的实机高度 ────────────────────────────────────────────────
-  // 用同一个已建好的场跑三场：这条测试只看骨骼坐标，脚下是哪一关的地形不影响
+  // ── 3：过场的实机高度 ──────────────────────────────────────────────────
+  // 用同一个已建好的场跑：这条测试只看骨骼坐标，脚下是哪一关的地形不影响
   // 演员的姿态（出图要对机位才必须按 trigger 选关，那是 Script_CutsceneShot 的事）。
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&manual=1&phase=4&quality=medium&scale=medium`, {
     waitUntil: "load", timeout: 180000,
@@ -304,4 +274,4 @@ if (failures.length) {
   for (const line of failures) console.error(`  ✗ ${line}`);
   process.exit(1);
 }
-console.log("CutscenePoseTest: PASS — 8 个姿态 clip 的高度带、14 条优先级、三场过场逐人头高");
+console.log("CutscenePoseTest: PASS — 8 个姿态 clip 的高度带、14 条优先级、一场过场逐人头高");

@@ -79,7 +79,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   （把「城」翻译成规则层认得的「战场」）；`Script_JieheField.mjs` 是界河**独立场景**，
   不是城的切片（入口 `?jiehe=1`）。
 - **章节数据一章一个文件**：`Data_MissionCh0…6.mjs` 各导出 `CHAPTER`（史料字段 + zones +
-  beats + `tuning`）与 `VOICE_LINES`，过场在 `Data_CutsceneCh*.mjs`。
+  beats + `tuning`）与 `VOICE_LINES`，序章过场在 `Data_CutsceneChuchuan.mjs`（第一关到终章的 `Data_CutsceneCh1–6.mjs` 已随章节废弃删除）。
   `Data_TengxianScript.mjs` 与 `Data_Battle.mjs` 只是**组装层**，自己不再写关表；
   分层校验（打法字段不许摊在 CHAPTER 顶层、zones 数 == objectives 数、zone id 全局唯一、
   路标必须落在本章切片内）在 Data_TengxianScript 的组装处执行。
@@ -259,7 +259,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 ### 过场 / 剧情
 - `Script_Cutscene.mjs` —— 实机演出；只有用户点名的几场夺控制权，战斗内演出不夺。
   分镜数据在 `Data_Cutscene*.mjs`，纯 Node 自检 `Script_CutsceneCheck.mjs`。
-- `Script_Story.mjs` —— 把七章目标链 + 台词 + 分镜按章派发；史实注记卡 `Data_History.mjs`，
+- `Script_Story.mjs` —— 把章节目标链 + 台词 + 分镜按章派发（2026-09-06 起正片只剩序章，第一关内容由 P0/P1/P2 白盒消费，第二到终章为暂时废弃场景）；史实注记卡 `Data_History.mjs`，
   编剧红线在 `Data_Script.mjs` 头注与 `docs/Data_HistoryQuotes.md`。先读 `docs/Data_CutsceneRedo.md`。
 
 ### HUD / 菜单 / 输入
@@ -319,7 +319,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - 回归口 `Script_TelegraphTest.mjs`（纯 Node）；取证口 `Debug.Telegraph`，
   HUD 是报码纸 `.hudTelegraph`（**不压暗武器 UI** —— 发报不占手）。
 
-### 任务流程引擎钩子（集成批 INT1：七章内容与新系统之间的引擎侧原语）
+### 任务流程引擎钩子（集成批 INT1：章节内容与新系统之间的引擎侧原语；2026-09-06 起只有第一关内容还在用）
 - **关中过场**：beats 的 `{ type:"cutscene", id }`、`story.Signal(名字)`
   （`Script_Story.SIGNAL_CUTSCENES`）、`Taierzhuang.PlayMidCutscene(id)` 三条路
   **共用同一个 RunCutscene**，所以 Esc 跳过与补卡语义与关首过场一致。
@@ -344,7 +344,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - 回归口：`Script_MenuTest.mjs`「开始」那三条（预热期间有加载画面与进度条、放行后时间轴真的走、
   开演时 `t < 1.5 s`）。
 
-### 章节摆点（集成批 INT2：七章内容 × 九个玩法系统的唯一接缝）
+### 章节摆点（集成批 INT2：章节内容 × 九个玩法系统的唯一接缝；`SETPIECES` 现只剩 CH0 与 CH1）
 - `Script_MissionSetpieces.mjs` —— **纯规则，不 import three**。`SETPIECES` 一张按 levelId
   索引的表，**一章一条**，四种钩子 `Setup` / `onZone` / `onVoice` / `Update`；装配层里因此
   **一行 `if (章 id)` 都没有**。`s` 是判空过的门面，章节数据不写 `if (s.carry)`。
@@ -372,8 +372,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   先读：`docs/Data_TechRenderPipeline.md`。
 
 ### 测试 / 出图
-- `Script_TestRunner.mjs` 分级入口；`Script_BootTest.mjs` 七章开机 + 性能红线；
-  `Script_PlayTest.mjs` 真浏览器端到端通关（130 条断言**从运行时状态取证**）；
+- `Script_TestRunner.mjs` 分级入口；`Script_BootTest.mjs` 七片切片开机 + 性能红线；
+  整局通关测试 `Script_PlayTest.mjs` 已随第一关到终章的废弃删除（2026-09-06）；
   40+ 专项 `Script_*Test.mjs` 按领域挂在 Tier 1/2。
 - 出图七支 + `Script_SamplePoints.mjs`（一片一建的出图计划）+ `Data_SamplePoints.mjs`
   （机位表，用采样点编辑器逐点调，出图脚本不自己算机位）。

@@ -12,7 +12,8 @@
 3. **full**：完整 Tier 0 + 命中领域，供共享底座、集成批和终验；
 4. **Tier 2**：性能实测与出图仍是低频人工审查，不由 `--changed` 自动执行。
 
-`Script_PlayTest.mjs` 是跨模块整机安全网，但领域专项仍负责它够不到的深度，
+整局通关测试 `Script_PlayTest.mjs` 已随第一关到终章的废弃删除（2026-09-06，正片只剩序章）；
+跨模块安全网由 BootTest、领域专项与 P0/P1/P2 白盒的浏览器测试承担，领域专项仍负责深度，
 例如伤害口径重放、整墙碰撞扫掠、碰撞盒与几何对账、AI 决策和编辑器数据契约。
 
 ## 二、推荐命令
@@ -24,7 +25,7 @@ node Taierzhuang1938/Script_TestRunner.mjs
 # 编辑循环：比较提交、暂存/未暂存和未跟踪文件，只跑命中领域的纯 Node 探针
 node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=quick --fail-fast
 
-# 推送前：完整领域专项；只有高风险文件才追加 BootTest / PlayTest / GeoTest
+# 推送前：完整领域专项；只有高风险文件才追加 BootTest / GeoTest
 node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=prepush --fail-fast
 
 # 集成/终验：完整 Tier 0 + 命中领域
@@ -47,7 +48,7 @@ node Taierzhuang1938/Script_TestRunner.mjs --only=DamageTest
 ```
 
 `--list` 显示完整分级；`--fail-fast` 第一条新增红即停；`--verbose` 透传全部输出；
-`--strict-baseline` 把 PlayTest 的历史红也计为失败。
+`--strict-baseline` 把登记过的历史红（`expectedFailures`）也计为失败；现在没有测试登记基线。
 
 纯文档、说明和源工程（`.blend/.py/.ps1`）改动在 `--changed` 下会明确跳过游戏测试；
 未知运行时文件在 quick 显示警告，prepush 会保守补完整整机门禁。启动任何测试前会先检查
@@ -65,7 +66,7 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
 
 - 默认透出子测试的 `--- 阶段` 行，并每 60 秒打印心跳；其余输出只在失败时显示尾部。
 - 选择阶段显示 profile、测试清单和基于历史量级的预计耗时；`--dry-run` 不做依赖预检。
-- BootTest 上限 4 分钟，PlayTest 上限 40 分钟，一般测试上限 10 分钟；
+- BootTest 上限 4 分钟，一般测试上限 10 分钟；
   性能/出图测试按项目登记放宽到 20—30 分钟。
 - `Ctrl+C`、终止信号和超时会清理当前测试及其浏览器子进程。
 - runner 启动的浏览器测试跨 worktree 共用一个全局槽；多 agent 最多排队 60 分钟，不再同时争抢 GPU/内存。存活 owner 不因锁龄被清理；刚创建而尚未写完或内容损坏的锁有 10 秒写入宽限，超过宽限且没有有效 owner 才回收。
@@ -78,7 +79,7 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
   必须补 `null` 占位：`waitForFunction(fn, null, { timeout: 180000 })`。
   `TestRunnerTest` 会扫全部 `Script_*.mjs` 把漏写的挑出来（2026-08-26 一次修了 55 处）。
 
-2026-08-24 在 master `5c0781b9` 上完整实测：BootTest 92.7 秒、PlayTest
+2026-08-24 在 master `5c0781b9` 上完整实测：BootTest 92.7 秒、（已删除的）PlayTest
 610.5 秒、Tier 0 合计 703.7 秒；同日其他两轮曾达到 887.9 与 996.7 秒。
 耗时受机器和渲染改动影响，不再使用“约 12 分钟”作为保证值。
 
@@ -95,9 +96,8 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
 | FractureBakeTest | 预破碎离线数据 |
 | CutsceneControlTest | 过场导演机位与生命周期 |
 | GeoTest / RoadPathTest / WallPlanTest | 几何快路、道路与围墙规划契约；其中 GeoTest 需浏览器，只在门禁档运行 |
-| BootTest | 七关开机冒烟、WebGL 健康、draw call/triangles 红线；prepush 按渲染/关卡风险触发 |
+| BootTest | 七片切片开机冒烟（序章 + 六片暂时废弃场景）、WebGL 健康、draw call/triangles 红线；prepush 按渲染/关卡风险触发 |
 | BootStallTest | 外部贴图挂死降级；prepush 仅由材质/贴图/外部资产链触发 |
-| PlayTest | 真浏览器端到端通关；prepush 仅由共享玩法/任务流程触发，full 固定运行 |
 
 ## 五、Tier 1 —— 自动领域探针
 
@@ -127,22 +127,16 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
 `ShotTest`、`GiTest`、`DeathViewTest`、`PerformanceTest`、`FrameProfileTest`、
 `GodRaysPerformanceTest`。其中出图测试进程成功只代表产物生成成功，仍需人工看图。
 
-## 七、PlayTest 历史红基线
+## 七、历史红基线
 
-截至 2026-08-29，PlayTest 有 3 条历史红。runner 按**完整断言名和重复次数**核对：
+整局通关测试 PlayTest 与它的三条历史红已于 2026-09-06 随第一关到终章的废弃一起删除。
+runner 的基线机制（`testDefs[*].expectedFailures`，按**完整断言名和重复次数**核对）保留：
 
 - 实际红是基线子集：显示 `BASELINE`，缺失项会提示“已转绿、应更新基线”；
 - 出现未登记断言名：显示 `FAIL` 并返回 1；
-- 没有正常的通关汇总（崩溃、卡死、超时）：始终 `FAIL`；
-- 同名历史红的实际细节仍会列出，不等于问题已被认可或修复。
+- 没有正常的通关汇总（崩溃、卡死、超时）：始终 `FAIL`。
 
-当前基线包括两条火力节奏和 Esc 指针锁。
-清理一条后应立即删除 runner 中对应基线。
-
-（击杀回执 killConfirm 那条 08-26 已修并摘除：红的根源不是回执链坏了，而是测试
-自己的零余量竞态 —— 等拉栓的 120 帧里友军把摆好的靶子磨死，第二枪打的是尸体，
-ConfirmHit 不会被调用；场景/布设类提交改了友军射界就翻红。修法是等待期把靶子
-血垫到打不死、开枪前再压回 1，见 Script_PlayTest.mjs §11.6。）
+现在没有任何测试登记基线；新增基线前先修，修不了再登记并写明原因。
 
 ## 八、维护规则
 

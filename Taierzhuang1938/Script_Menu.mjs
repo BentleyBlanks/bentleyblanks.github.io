@@ -140,6 +140,13 @@ export class MainMenu {
      * **顺序就是分组顺序**：正式章节在前，测试场景在后（docs/Data_MissionRemake.md §9）。
      */
     this.entries = [...this.phases, ...this.sandboxes];
+    /**
+     * 正式章节数。进度、「继续」、「下一关」标记与 DefaultLevel() 只按这几章算；
+     * 后面带 `deprecated` 的那几章是「暂时废弃场景」（2026-09-06 起第一关到终章），
+     * 列在选章里、标「未完成」、点得进去，但不算正片。
+     */
+    const firstDeprecated = this.phases.findIndex((p) => p.deprecated);
+    this.officialCount = Math.max(1, firstDeprecated < 0 ? this.phases.length : firstDeprecated);
     /** 现在这一局本身就跑在沙盒里（?range=1）：暂停菜单换成「退出靶场」那一套。 */
     this.sandboxMode = host.sandboxMode || false;
 
@@ -221,12 +228,12 @@ export class MainMenu {
   /** 主列表。战役文案在 Data_TengxianScript.MENU 里，调试项只在这一层额外出现。 */
   TitleItems() {
     const progress = Progress.Read();
-    const resume = progress.furthest > 0 && progress.furthest < this.phases.length;
+    const resume = progress.furthest > 0 && progress.furthest < this.officialCount;
     const label = resume ? `继续 · ${this.phases[progress.furthest].label}` : MENU.start;
     return [
       { id: "start", label,
         hint: resume ? "从上次通过的下一章接着打" : "从序章 · 出川开始，先播车厢那一场过场" },
-      { id: "levels", label: MENU.chapters, hint: "七章任选一章直接进（不播过场），另有测试场景组" },
+      { id: "levels", label: MENU.chapters, hint: "正式章节、暂时废弃场景与测试场景三组，任选一条直接进（不播过场）" },
       { id: "codex", label: MENU.codex, hint: "哪些数是史料、哪些是推定" },
       { id: "credits", label: MENU.credits, hint: "史料口径与虚构人物的交代" },
       { id: "settings", label: "设置", hint: "操作、画面与声音" },
@@ -334,6 +341,7 @@ export class MainMenu {
       b.dataset.i = String(i);
       b.setAttribute("aria-label", entry.label);
       if (entry.sandbox) b.classList.add("mnSandboxLevel");
+      if (entry.deprecated) b.classList.add("mnDeprecatedLevel");
       const number = entry.sandbox ? (entry.glyph || entry.sandboxGlyph || "靶")
         : entry.label.split("·")[0].trim();
       Make("mnLvNo", b, "span", number);
@@ -347,7 +355,13 @@ export class MainMenu {
       this.levelEls[i] = b;
     };
     const official = Group("正式章节", "滕县保卫战", "mnMissionTrack");
-    this.phases.forEach((phase, i) => Row(phase, i, official));
+    this.phases.forEach((phase, i) => { if (!phase.deprecated) Row(phase, i, official); });
+    // 暂时废弃场景：第一关到终章的切片还建得出来、点得进去，但没有任务内容，
+    // 也不算正片进度。单独一组，别混进正式章节谎报流程。
+    if (this.phases.some((phase) => phase.deprecated)) {
+      const shelved = Group("暂时废弃场景", "只建场景 · 未完成", "mnDeprecatedTrack");
+      this.phases.forEach((phase, i) => { if (phase.deprecated) Row(phase, i, shelved); });
+    }
     if (this.sandboxes.length) {
       const sandbox = Group("测试场景", "独立测试", "mnSandboxTrack");
       this.sandboxes.forEach((entry, i) => Row(entry, this.phases.length + i, sandbox));
@@ -367,6 +381,15 @@ export class MainMenu {
     this.PickShots(true);
     this.Show("title");
     this.root.classList.remove("off", "pause");
+  }
+
+  /**
+   * 标题下那一行临时提示（序章过场播完回到主菜单时写「后续章节暂时废弃」）。
+   * 只改 titleSub，下一次 Show("title") 会换回 MENU.subtitle —— 它不是状态，是一句话。
+   */
+  SetNotice(text) {
+    if (!text) return;
+    this.el.titleSub.textContent = text;
   }
 
   /** 游戏中按 Esc：只挂一层暂停，**不碰相机**（世界冻在原地就是暂停该有的样子）。 */
@@ -474,10 +497,10 @@ export class MainMenu {
     }
   }
 
-  /** 选章默认落在「继续」那一关上。 */
+  /** 选章默认落在「继续」那一关上（只在正式章节里挑）。 */
   DefaultLevel() {
     const progress = Progress.Read();
-    return Clamp(progress.furthest, 0, this.phases.length - 1);
+    return Clamp(progress.furthest, 0, this.officialCount - 1);
   }
 
   /**
@@ -551,8 +574,9 @@ export class MainMenu {
       else el.removeAttribute("aria-current");
       const mark = el.querySelector(".mnLvMark");
       if (this.entries[k].sandbox) { mark.textContent = "沙盒"; mark.className = "mnLvMark"; return; }
+      if (this.entries[k].deprecated) { mark.textContent = "未完成"; mark.className = "mnLvMark todo"; return; }
       const done = progress.cleared.includes(this.entries[k].id);
-      mark.textContent = done ? "已通过" : (k === progress.furthest ? "下一关" : "");
+      mark.textContent = done ? "已通过" : (k === progress.furthest && k < this.officialCount ? "下一关" : "");
       mark.className = `mnLvMark${done ? " done" : ""}`;
     });
 
@@ -595,11 +619,13 @@ export class MainMenu {
     }
     const record = mk("mnMissionRecord");
     const cleared = progress.cleared.includes(phase.id);
-    record.classList.toggle("done", !phase.sandbox && cleared);
+    record.classList.toggle("done", !phase.sandbox && !phase.deprecated && cleared);
+    record.classList.toggle("todo", !!phase.deprecated);
     const label = document.createElement("span");
-    label.textContent = phase.sandbox ? "独立测试" : "章节记录";
+    label.textContent = phase.sandbox ? "独立测试" : phase.deprecated ? "暂时废弃场景" : "章节记录";
     const value = document.createElement("b");
-    value.textContent = phase.sandbox ? "不计入战役进度" : cleared ? "已通过" : "尚未通过";
+    value.textContent = phase.sandbox ? "不计入战役进度"
+      : phase.deprecated ? "未完成 · 只建场景，没有任务内容" : cleared ? "已通过" : "尚未通过";
     record.append(label, value);
   }
 
@@ -610,7 +636,7 @@ export class MainMenu {
     switch (id) {
       case "start": {
         const progress = Progress.Read();
-        const index = Clamp(progress.furthest, 0, this.phases.length - 1);
+        const index = Clamp(progress.furthest, 0, this.officialCount - 1);
         // 战役入口播关前过场（Esc 可跳）；选章那条直接进，见 Play()
         this.Play(index, { cutscenes: true });
         return;

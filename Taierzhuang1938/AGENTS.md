@@ -1,6 +1,6 @@
 # Taierzhuang1938 项目入口
 
-《滕县 一九三八》是浏览器 FPS 白盒，正片为滕县七章线性关卡；目录名是历史遗留。每章只建当前切片，换章拆掉重建。Three.js 与 Rapier3D 均使用仓库内 vendor，零 CDN；渲染管线不引入 addon。
+《滕县 一九三八》是浏览器 FPS 白盒；目录名是历史遗留。正片目前只有序章：第一关到终章自 2026-09-06 起为**暂时废弃场景**（`Data_TengxianScript.DEPRECATED_CHAPTER_IDS`），选章里单独一组、标「未完成」，进章只建切片、不装剧本、不摆点、不换关；新第一关在「测试场景」组的 P0/P1/P2 白盒里按 Notion 新稿重做（它复用 `Data_MissionCh1` 的人物与台词，改那份内容先看白盒）。每章只建当前切片，换章拆掉重建。Three.js 与 Rapier3D 均使用仓库内 vendor，零 CDN；渲染管线不引入 addon。
 
 仓库协作、命名、资产生成与发布遵循 [根 AGENTS.md](../AGENTS.md)。这里保留跨系统契约；涉及的模块、接口与分册在 [系统参考](docs/Data_AgentReference.md) 中按需查阅。源码头注是定位线索，仍需结合实现与测试确认现状。
 

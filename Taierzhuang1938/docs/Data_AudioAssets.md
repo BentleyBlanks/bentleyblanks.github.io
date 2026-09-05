@@ -80,7 +80,9 @@ node Taierzhuang1938/Script_VoiceTest.mjs
 
 # 章节剧情语音（2026-08-28 任务流程重制）
 
-七章正片的台词语音通道。规格出处：`docs/Data_MissionRemake.md` §10.2（CAST id）与 §10.3（台词→语音）。
+章节台词语音通道。规格出处：`docs/Data_MissionRemake.md` §10.2（CAST id）与 §10.3（台词→语音）。
+
+> **2026-09-06：** 第一关到终章暂时废弃。`vo_ch2_*`–`vo_ch6_*`（281 条）已从 `Audio/` 删除、对应章的 `VOICE_LINES` 清空，`Data_Voice.mjs` 现在只拼接序章与第一关（第一关的 67 条留给 P0/P1/P2 白盒）。下文「七章 379 条」是当时的烘焙记录，不是现状。
 与战场口令（下面那三十几条 Bark）**是两类活**，除了共用同一条 SeedAudio 管线与同一个
 `Audio/` 目录，后期参数、挑选方式、失败行为全都不一样：
 

@@ -30,7 +30,6 @@ import { fileURLToPath } from "node:url";
 import {
   FlareDirector, FLARE_PRESETS, FLARE_DEFAULTS, FLARE_SFX, FLARE_PHASES, FLARE_BEATS,
 } from "./Script_Flare.mjs";
-import { EVENTS } from "./Data_MissionCh4.mjs";
 
 const dirHere = path.dirname(fileURLToPath(import.meta.url));
 let checks = 0;
@@ -113,13 +112,9 @@ const Basic = (over = {}) => ({ from: { x: 100, z: 0 }, at: { x: 60, z: 10 }, ..
   for (const [id, preset] of Object.entries(FLARE_PRESETS)) {
     Check(preset.id === id, `${id} 的 id 字段与键名一致（取证口按 id 找它）`);
     Check(typeof preset.note === "string" && preset.note.length > 0, `${id} 写明了它挂在哪个 zone`);
-    Check(preset.signals.launch === "C4_FlareUp", `${id} 升空推的是 CH4 EVENTS 里那条 C4_FlareUp`);
+    // 2026-09-06：第四关章节数据随章节废弃清空，信号名现在是引擎侧的契约常量，不再对账章节 EVENTS。
+    Check(preset.signals.launch === "C4_FlareUp", `${id} 升空推的是契约常量 C4_FlareUp`);
   }
-  // 与章节数据对账：EVENTS 里真有这条闸，而且写明「同名可推两次」。
-  const flareUp = EVENTS.find((e) => e.name === "C4_FlareUp");
-  Check(flareUp, "Data_MissionCh4.EVENTS 里有 C4_FlareUp（照明弹的事件闸）");
-  Check(/两枚|每一枚|升空/.test(flareUp.signal + flareUp.stage),
-    "C4_FlareUp 登记的就是「每一枚升空时 Signal」");
   // 窄巷那一枚压得更低、烧得更短、暴露更狠、暗适应更深 —— 这是 §5 阶段 7 的口径。
   Check(P.narrowLane.apexM < P.crossLane.apexM, "窄巷那枚压得更低（十几米外要照得清人脸）");
   Check(P.narrowLane.burnS < P.crossLane.burnS, "窄巷那枚烧得更短");
@@ -128,7 +123,7 @@ const Basic = (over = {}) => ({ from: { x: 100, z: 0 }, at: { x: 60, z: 10 }, ..
     "窄巷那枚熄灭后更黑 ——「谁是谁，只能靠喊」");
   Check(FLARE_PHASES.length === 7 && FLARE_BEATS.length === 4, "相位表七项、节拍表四项");
 }
-console.log("ok  ① 档案表：两条预设 = §5 那两枚，signals 与 CH4 EVENTS 对得上");
+console.log("ok  ① 档案表：两条预设 = §5 那两枚，signals 是引擎侧契约常量");
 
 // ---------------------------------------------------------------------------
 // ② 相位机与四个节拍

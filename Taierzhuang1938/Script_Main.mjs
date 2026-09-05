@@ -2911,6 +2911,10 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   state.phaseIndex = Clamp(index, 0, PHASE_TABLE.length - 1);
   const phase = PHASE_TABLE[state.phaseIndex];
   const cutsceneOnly = !!phase.cutsceneOnly;
+  // 暂时废弃场景（Data_TengxianScript.DEPRECATED_CHAPTER_IDS）：只建场 ——
+  // 不装剧本、不摆点、不出具名同伴、不换关。切片、撒兵与 HUD 照常，
+  // 所以从选章仍然进得去，站在那片城里看得见东西；只是没有任务内容。
+  const deprecated = !!phase.deprecated;
 
   // --- 关前过场 ---
   // 盖加载画面：关前过场的布景是当场建的，预热要几秒（序章那一场最重）。
@@ -2975,6 +2979,10 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   if (gi) gi.ApplyPreset(preset, graphics.giStrength);
   hud.SetPhase(phase);
   hud.ShowBrief(phase);
+  // 废弃场景钉住：目标链走完或时长到了都不换关（与靶场同一条 state.pinned）。
+  // 正片章节走到这里把它放开 —— 别让上一片废弃场景的钉子带进序章。
+  if (!SANDBOX) state.pinned = deprecated;
+  if (deprecated) hud.Hint("暂时废弃场景 · 未完成：只建场景，没有任务内容", 6);
   // 环境档通常与天空档同名，直接把 phase.sky 递进去。
   // 旧写法是 night/dawn 之外一律「battle」，于是「烟尘白天」和「烧着的街」
   // 共用一档 —— 第三关满街在烧却听不见火，就是这么丢的。
@@ -2985,10 +2993,11 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
 
   // 测试白盒拥有独立的场地 id，但剧情、同伴与事件必须跑正式第一章内容。
   const contentId = PhaseContentId(phase);
-  const loaded = story.BeginLevel(contentId, { beats: phase.whitebox?.storyBeats,
+  // 废弃场景传空 beats：第一关的章节内容还在（P0/P1/P2 白盒用），正片入口不许播它。
+  const loaded = story.BeginLevel(contentId, { beats: deprecated ? [] : phase.whitebox?.storyBeats,
     actualEventsOnly: phase.whitebox?.actualEventsOnly });
   state.storyObjective = phase.objectives[0] || null;
-  if (loaded === 0) console.warn("这一章没有剧本：", phase.id);
+  if (loaded === 0 && !deprecated) console.warn("这一章没有剧本：", phase.id);
 
   // 过场承载章：不 Respawn、不撒兵、不挂烟柱 —— 车厢是过场自带的布景，
   // 底下那片地皮上不该有一条战线在后台开火消耗票池。
@@ -2997,7 +3006,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // CountSide("nra") 都会把他们数进去，于是撒兵自动少撒同样多 ——
   // 场上活人总数一个没多，开机红线（drawCalls / triangles）不受影响。
   // 名册默认从本章 beats 的 who 推导（该章说过话的战斗员自动在场），INT2 按章精修。
-  if (!EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && companion) {
+  if (!EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && !deprecated && companion) {
     companion.BeginLevel(contentId, {
       // 名册**优先走章节数据点名**（INT2 起七章都写了 roster）；没写才由 beats 推。
       // 推导只收「该章说过话的战斗员」—— 军医、参谋、师长这些 combatant:false 的人
@@ -3022,7 +3031,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // 章节摆点：**排在具名同伴之后**（罗班长要先站出来，摆点层才拿得到他的句柄），
   // 也排在 SeedSoldiers 之前（后送队要从 nra 名额里出人，撒兵才会自动少撒同样多）。
   // 靶场／白刃训练场／预览／过场承载章都不摆；第一关白盒有正式第一章内容。
-  if (!EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && setpieces) {
+  if (!EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && !deprecated && setpieces) {
     setpieces.BeginLevel(contentId, phase);
   }
   interact.Clear("P012");
@@ -3416,6 +3425,24 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
 }
 
 /**
+ * 正片到此为止：下一章是暂时废弃场景（Data_TengxianScript.DEPRECATED_CHAPTER_IDS），
+ * 不接着进。序章过场播完走这里 —— 回主菜单，标题下写一行「后续章节制作中」；
+ * 没有菜单的入口（?menu=0 / 出图）就盖一张收场卡，别让 Frame 继续推进目标链。
+ * **不是** EndBattle("breakout")：那张卡讲的是十七日夜的突围，放在序章后面是谎报流程。
+ */
+function EndOfficialCampaign(phase) {
+  state.advancing = false;
+  const note = `${phase?.label || "序章"}已完 · 后续章节暂时废弃，正按新稿重做`;
+  if (menu) {
+    OpenMenu();
+    menu.SetNotice?.(note);
+    return;
+  }
+  state.outcome = "campaignEnd";
+  hud.ShowEpilogue([note, "", "第一关到终章归入选章「暂时废弃场景」组：只建场景，没有任务内容。"]);
+}
+
+/**
  * 预编译一棵子树的着色器 —— **进序章那十几秒的黑屏就是这一步**。
  *
  * 车厢序章的布景一口气往场景里加三千多个网格、几十种新材质。three 是惰性编译的：
@@ -3714,6 +3741,8 @@ async function AdvanceLevel(opts = {}) {
   if (cutscenes && phase.cutsceneOut) await RunCutscene(phase.cutsceneOut, { loading: true });
   state.advancing = false;
   if (state.phaseIndex >= PHASE_TABLE.length - 1) { EndBattle("breakout"); return state.phaseIndex; }
+  // 下一章是暂时废弃场景：正片在这儿收口，不把玩家送进一片没有任务的城。
+  if (PHASE_TABLE[state.phaseIndex + 1]?.deprecated) { EndOfficialCampaign(phase); return state.phaseIndex; }
   return EnterLevel(state.phaseIndex + 1, { cutscenes });
 }
 
@@ -4765,6 +4794,9 @@ async function StartLevel(index, { cutscenes = false } = {}) {
   hud.HideDeathCard();
   const sameSlice = state.builtPhase === target;
   await EnterLevel(target, { initial: sameSlice, cutscenes });
+  // 序章播完发现后面全是暂时废弃场景时，EnterLevel 已经把主菜单重新打开
+  //（EndOfficialCampaign）——这时不许再 StartRun，否则菜单开着、玩法却在底下跑。
+  if (state.menu) return target;
   StartRun();
   return target;
 }

@@ -16,11 +16,11 @@
 //   node Taierzhuang1938/Script_TestRunner.mjs --domain=terrain
 //   node Taierzhuang1938/Script_TestRunner.mjs --tier=1
 //   node Taierzhuang1938/Script_TestRunner.mjs --tier=2
-//   node Taierzhuang1938/Script_TestRunner.mjs --only=PlayTest
+//   node Taierzhuang1938/Script_TestRunner.mjs --only=MenuTest
 //   node Taierzhuang1938/Script_TestRunner.mjs --list
 //
 // 默认只透出子测试的阶段行和每分钟心跳；失败时打印尾部，--verbose 透传全程。
-// PlayTest 的历史红按断言名显式基线化：历史红仍显示，但只有新增红使默认命令失败；
+// 浏览器测试的历史红可按断言名显式基线化（testDefs[*].expectedFailures）：历史红仍显示，但只有新增红使默认命令失败；
 // --strict-baseline 可让历史红也返回失败。
 // ===========================================================================
 
@@ -43,27 +43,8 @@ const browserLockPollMs = 5 * 1000;
 const browserLockWaitTimeoutMs = 60 * 60 * 1000;
 const browserLockWriteGraceMs = 10 * 1000;
 
-const playTestExpectedFailures = [
-  // 「击杀回执 killConfirm」2026-08-26 已修并摘除：红的根源是测试自己的零余量竞态 ——
-  // 等拉栓的 120 帧里友军把摆好的靶子磨死，第二枪打的是尸体，ConfirmHit 不会被调用。
-  // 场景/布设类提交改了友军射界就翻红。现在等待期把靶子血垫到打不死（见 Script_PlayTest 11.6）。
-  // 「玩家亲手击杀」「打中回执」「打死回执」三条已转绿（击杀测试的陈旧枪口 bug
-  // 已修：转向后推两帧再取瞄准线），按 runner 提示从基线摘除。
-  // 「六十秒内全场开火 > 200」两条是**临界抖动**：2026-08-27 同一天先转绿
-  // （221+）又转红（146/153）——量的是真实墙钟六十秒内的开火数，对机器负载、
-  // 帧率、战斗随机走向都敏感，200 的阈值正好切在分布中间。别再按单次结果
-  // 摘除或惊慌，连续多轮稳定 >200 再摘。
-  "六十秒内全场开火计数 > 200",
-  "头六十秒全场开火 > 200",
-  // 「P4 夜袭的携行是 L3_WhiteTowel」2026-08-28 转绿并摘除：任务流程重制之后
-  // 夜袭那一章（CH4 东关之夜）在 Data_MissionCh4 里**显式**声明 loadout:"L3_WhiteTowel"，
-  // 不再靠 loadoutOverride 蒙对；判据是确定的，红了就是真回归。
-  // 「姿态决定被发现的距离」2026-08-29 转绿并摘除：它测的是 Script_Ai.SIGHT_BY_STANCE
-  // 那三档（站 120 / 蹲 80 / 卧 45）与视线判据，判据本身是确定的 ——
-  // 当初留在基线里是因为"纯 master 红、合并树绿"的判定抖动，现在两边一致。
-  // 红了就是真回归（照明弹那条全局倍率是最可能的嫌疑：它乘的是倍率不是这张表）。
-  "Esc / 切走 / 关页 / 切后台 四条通道都会把鼠标还给用户",
-];
+// 2026-09-06：整局通关测试 Script_PlayTest.mjs 随第一关到终章的废弃一起删除（正片只剩序章，
+// 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
   FirstLevelP012AnimationTest: {file:'Script_FirstLevelP012AnimationTest.mjs',desc:'P012实际GLB车厢待机、位移步频、担架停走与路边动作出图'},
@@ -76,22 +57,7 @@ export const testDefs = {
   BootTest: {
     file: "Script_BootTest.mjs",
     timeoutMs: 4 * 60 * 1000,
-    desc: "七关开机冒烟 + draw call/triangles 红线",
-  },
-  PlayLateStagesTest: {
-    file: "Script_PlayTest.mjs",
-    args: ["--from=12.14"],
-    timeoutMs: 20 * 60 * 1000,
-    expectedFailures: playTestExpectedFailures,
-    desc: "通关冒烟后半段：300秒停摆、通行、AI翻越、换模、指针锁与枪感",
-  },
-  PlayTest: {
-    file: "Script_PlayTest.mjs",
-    // 七章过场与剧情全量长跑在 Windows Edge 软件渲染上实测会超过 20 分钟；
-    // 40 分钟是完整验收上限，不改变任何断言，也不把超时当绿。
-    timeoutMs: 40 * 60 * 1000,
-    expectedFailures: playTestExpectedFailures,
-    desc: "真浏览器端到端通关，130 条断言，跨模块安全网",
+    desc: "七片切片开机冒烟（序章 + 六片暂时废弃场景）+ draw call/triangles 红线",
   },
   BootStallTest: {
     file: "Script_BootStallTest.mjs",
@@ -149,8 +115,8 @@ export const testDefs = {
   ExternalPropAssetTest: { file: "Script_ExternalPropAssetTest.mjs", desc: "外部构件 GLB 节点、尺度与面数预算（纯 Node）" },
   FractureBakeTest: { file: "Script_FractureBakeTest.mjs", desc: "预破碎离线数据（纯 Node，秒级）" },
   CutsceneControlTest: { file: "Script_CutsceneControlTest.mjs", desc: "过场导演机位/生命周期（桩 three，Node 可跑）" },
-  MissionHooksTest: { file: "Script_MissionHooksTest.mjs", desc: "任务流程引擎钩子：关中过场 beat / Signal→过场、LEVEL_CUES 七章自动构建、具名同伴 Locate 与剧本指令、脚本检查点倒带、钉关原语（纯 Node，毫秒级）" },
-  MissionSetpiecesTest: { file: "Script_MissionSetpiecesTest.mjs", desc: "章节摆点：七章 Setup 不抛、台词节拍与信号名对得上、INT1 六条对接项、后送队队列控制器、装配层接线（纯 Node，毫秒级）" },
+  MissionHooksTest: { file: "Script_MissionHooksTest.mjs", desc: "任务流程引擎钩子：关中过场 beat / Signal→过场、LEVEL_CUES 自动构建、具名同伴 Locate 与剧本指令、脚本检查点倒带、钉关原语（纯 Node，毫秒级）" },
+  MissionSetpiecesTest: { file: "Script_MissionSetpiecesTest.mjs", desc: "章节摆点：序章与第一关 Setup 不抛、台词节拍与信号名对得上、第一关对接项、后送队队列控制器、装配层接线（纯 Node，毫秒级）" },
   PhysicsTest: { file: "Script_PhysicsTest.mjs", desc: "真浏览器撞墙：碰撞扫掠" },
   ColliderTest: {
     file: "Script_ColliderTest.mjs",
@@ -212,7 +178,7 @@ export const testDefs = {
   CutscenePoseTest: {
     file: "Script_CutscenePoseTest.mjs",
     timeoutMs: 15 * 60 * 1000,
-    desc: "蒙皮姿态契约：clip 高度带 + 躺＞跪＞手势的优先级 + 三场过场逐人头骨高度（真浏览器）",
+    desc: "蒙皮姿态契约：clip 高度带 + 躺＞跪＞手势的优先级 + 一场过场逐人头骨高度（真浏览器）",
   },
   GiTest: { file: "Script_GiTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "全局光照开关对照" },
   PostTest: { file: "Script_PostTest.mjs", desc: "后处理感知域对比：暗部信息不被裁成纯黑" },
@@ -236,7 +202,7 @@ export const browserTests = new Set([
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GunFeelTest",
   "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MenuTest",
-  "PerformanceTest", "PhysicsTest", "PlayLateStagesTest", "PlayTest", "PostTest", "ProfilerTest", "PropInstancingTest",
+  "PerformanceTest", "PhysicsTest", "PostTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
   "RangeTest", "WeaponRangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
   "FirstPersonEmbodimentTest", "SprintViewmodelTest", "TargetInfoTest", "VisibilityTest", "VoiceTest",
@@ -262,13 +228,12 @@ export const tier0Fast = [
   "WallPlanTest",
 ];
 
-export const tier0Browser = ["BootTest", "BootStallTest", "PlayTest", "GeoTest"];
+export const tier0Browser = ["BootTest", "BootStallTest", "GeoTest"];
 
 // 兼容旧入口：--tier=0 仍代表原来的完整 Tier 0。日常默认/--changed 使用 profile=quick。
 export const tier0 = [...tier0Browser, ...tier0Fast];
 
 export const tier2 = [
-  "PlayLateStagesTest",
   "ShotTest",
   "GiTest",
   "PerformanceTest",
@@ -397,10 +362,6 @@ const ignoredChangeRules = [
 
 const prepushGateRules = [
   {
-    tests: ["PlayTest"],
-    pattern: /(Script_Main|Script_Player|Script_Input|Script_Combat|Script_Ai|Script_Story|Script_Interact|Script_Mission|Data_Battle|Data_Levels|Data_MissionCh|Data_Script|TengxianScript|Companion|Checkpoint)/i,
-  },
-  {
     tests: ["BootTest"],
     pattern: /(Script_Main|index\.html|Data_Battle|Data_Levels|Render|Shader|Material|Texture|Model|Scene|Outfield|Battlefield|Tengxian|Jiehe|Dressing|ExternalAssets|ExternalProps|FarLand|Sky|Water)/i,
   },
@@ -416,14 +377,15 @@ const prepushGateRules = [
 
 const domainPrepushGates = {
   terrain: ["BootTest", "GeoTest"],
-  physics: ["PlayTest", "GeoTest"],
-  combat: ["PlayTest"],
-  ai: ["PlayTest"],
-  hud: ["PlayTest"],
-  interact: ["PlayTest"],
+  // 2026-09-06：PlayTest 已删，这些领域推送前不再追加整局门禁；领域专项本身仍完整运行。
+  physics: ["GeoTest"],
+  combat: [],
+  ai: [],
+  hud: [],
+  interact: [],
   menu: ["BootTest"],
   editor: ["BootTest"],
-  cutscene: ["PlayTest"],
+  cutscene: [],
   render: ["BootTest", "BootStallTest", "GeoTest"],
 };
 
@@ -779,8 +741,6 @@ function PreflightSelection(selection) {
 const estimatedSeconds = {
   BootTest: 100,
   BootStallTest: 15,
-  PlayLateStagesTest: 720,
-  PlayTest: 700,
   GeoTest: 20,
   ShotTest: 390,
   GiTest: 300,

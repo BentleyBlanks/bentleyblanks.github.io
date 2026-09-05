@@ -682,12 +682,15 @@ await CheckMissionList();
 async function CheckMissionList() {
   await page.evaluate(() => window.Taierzhuang.Debug.MenuShow("levels"));
   const panel = await page.evaluate(() => {
-    const rows = [...document.querySelectorAll(".mnMissionTrack .mnLevel")];
+    // 正式章节（序章）+ 暂时废弃场景（第一关到终章）：DOM 顺序就是 PHASES 顺序。
+    const rows = [...document.querySelectorAll(".mnMissionTrack .mnLevel, .mnDeprecatedTrack .mnLevel")];
     const rects = rows.map(el => { const r = el.getBoundingClientRect(); return { x:r.x, y:r.y, w:r.width, h:r.height }; });
     return {
       levels: document.querySelectorAll("#menu .mnLevel").length,
       retired: [...document.querySelectorAll(".mnSandboxLevel")].some(el => el.textContent.includes("第一关 · 全新策划白盒")),
       groups: [...document.querySelectorAll(".mnLevelGroup b")].map(el=>el.textContent),
+      official: document.querySelectorAll(".mnMissionTrack .mnLevel").length,
+      shelvedMarks: [...document.querySelectorAll(".mnDeprecatedTrack .mnLvMark")].map(el=>el.textContent),
       names: rows.map(el=>el.querySelector(".mnLvName").textContent), rects,
       oldMap: !!document.querySelector(".mnMap, .mnTimelineTrack, .mnLvThumb"),
       fullScreen: document.querySelector(".mnPanel").getBoundingClientRect().width === innerWidth,
@@ -696,11 +699,12 @@ async function CheckMissionList() {
   });
   Check("全屏任务选择采用七行纵向清单", panel.fullScreen && panel.title === "任务选择"
     && panel.rects.length === 7 && panel.rects.every((r,i)=>r.x===panel.rects[0].x && (!i||r.y>=panel.rects[i-1].y+panel.rects[i-1].h)),JSON.stringify(panel.rects));
-  Check("正式章节与五项测试入口分组保留，旧白盒已移除",panel.levels===12 && !panel.retired&&panel.groups.join(",")==="正式章节,测试场景",panel.groups.join(","));
+  Check("正式章节、暂时废弃场景与五项测试入口三组，旧白盒已移除",panel.levels===12 && !panel.retired&&panel.groups.join(",")==="正式章节,暂时废弃场景,测试场景",panel.groups.join(","));
+  Check("正式章节只剩序章，第一关到终章六条全标「未完成」",panel.official===1&&panel.shelvedMarks.length===6&&panel.shelvedMarks.every(t=>t==="未完成"),JSON.stringify({official:panel.official,marks:panel.shelvedMarks}));
   Check("任务选择不再出现地图、横向时间轴或缩略图卡",!panel.oldMap);
   const images=[];
   for(let index=0;index<7;index++){
-    await page.locator('.mnMissionTrack .mnLevel').nth(index).hover();
+    await page.locator('.mnMissionTrack .mnLevel, .mnDeprecatedTrack .mnLevel').nth(index).hover();
     await page.waitForFunction(()=>{const img=document.querySelector('.mnMissionArt img');return img?.complete&&img.naturalWidth>0;});
     const result=await page.evaluate(()=>({selected:window.Taierzhuang.menu.selected,
       title:document.querySelector('.mnBriefTitle').textContent,
@@ -728,10 +732,10 @@ async function CheckMissionList() {
   await page.evaluate(()=>{const menu=window.Taierzhuang.menu;menu.ToTitle();menu.Show('levels');
     window.missionOriginalPlay=menu.Play;window.missionPlayed=[];menu.Play=(index)=>window.missionPlayed.push(index);});
   try {
-    await page.locator('.mnMissionTrack .mnLevel').nth(3).click();
+    await page.locator('.mnMissionTrack .mnLevel, .mnDeprecatedTrack .mnLevel').nth(3).click();
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
-    await page.locator('.mnMissionTrack .mnLevel').nth(5).hover();
+    await page.locator('.mnMissionTrack .mnLevel, .mnDeprecatedTrack .mnLevel').nth(5).hover();
     await page.keyboard.press('Enter');
     await page.locator('.mnSandboxLevel').nth(1).click();
     Check("鼠标、Enter、测试入口各只触发一次正确任务",await page.evaluate(()=>window.missionPlayed.join(',')==='3,4,5,8'));
@@ -813,9 +817,19 @@ async function CheckMissionList() {
     level: window.Taierzhuang.Debug.Level().id,
     open: window.Taierzhuang.Debug.Menu().open,
   }));
-  // 序章是过场承载章：车厢播完（或 Esc 跳过）自动接第一章，中间不建自己的切片。
-  Check("跳过序章过场之后自动接进第一关", done.running && done.level === "CH1_NanLu" && !done.open,
-    `running=${done.running} level=${done.level}`);
+  // 2026-09-06：第一关到终章暂时废弃，序章是正片唯一一章 —— 车厢播完（或 Esc 跳过）
+  // 不再自动接第一关，而是回主菜单并在标题下写一行「后续章节暂时废弃」。
+  const ended = await page.evaluate(() => ({
+    open: window.Taierzhuang.Debug.Menu().open, mode: window.Taierzhuang.Debug.Menu().mode,
+    running: window.Taierzhuang.state.running, level: window.Taierzhuang.Debug.Level().id,
+    sub: document.querySelector("#menu .mnTitleSub")?.textContent || "",
+    cleared: JSON.parse(localStorage.getItem("tengxian1938_progress_v2") || "{}").cleared || [],
+  }));
+  Check("跳过序章过场之后回主菜单（不再接进废弃的第一关）", ended.open && ended.mode === "title" && !ended.running
+    && ended.level === "CH0_Chuchuan", `open=${ended.open} mode=${ended.mode} running=${ended.running} level=${ended.level}`);
+  Check("标题下写明后续章节暂时废弃", /暂时废弃/.test(ended.sub), ended.sub);
+  Check("序章记为已通过", ended.cleared.includes("CH0_Chuchuan"), ended.cleared.join(","));
+  await page.evaluate(() => window.Taierzhuang.Debug.ResetProgress());
 
   // 回主菜单，下一节从选章再进一次
   await page.evaluate(() => {
@@ -843,8 +857,15 @@ async function CheckMissionList() {
       viewmodel: T.viewmodel.root.visible,
     };
   });
-  Check("从选章能进关（第二关 · 手榴弹雨）", inGame.running && inGame.level === "CH2_Shouliudan",
+  Check("从选章能进废弃场景（第二关 · 手榴弹雨：只建场，没有任务内容）", inGame.running && inGame.level === "CH2_Shouliudan",
     `running=${inGame.running} level=${inGame.level} built=${inGame.built}`);
+  const shelved = await page.evaluate(() => ({
+    pinned: window.Taierzhuang.state.pinned,
+    setpieces: window.Taierzhuang.Debug.Setpieces?.()?.has ?? null,
+    remaining: window.Taierzhuang.story?.Remaining ?? 0,
+  }));
+  Check("废弃场景钉住不换关、不装剧本、不摆点", shelved.pinned === true && shelved.setpieces !== true && shelved.remaining === 0,
+    JSON.stringify(shelved));
   Check("进关后菜单收起、HUD 与枪回来", inGame.menuOff && !inGame.hudHidden && inGame.viewmodel,
     `menuOff=${inGame.menuOff} hud=${!inGame.hudHidden} vm=${inGame.viewmodel}`);
   Check("进关后战场上有人", inGame.soldiers > 4, `soldiers=${inGame.soldiers}`);
@@ -1142,9 +1163,11 @@ async function CheckMissionList() {
 // 6) 进度：通过一关之后，菜单的第一项变成「继续」，选章里标「已通过」
 // ===========================================================================
 {
+  // 正式章节只剩序章：打过序章之后没有「下一关」可继续，第一项仍是「开始」；
+  // 废弃场景一律标「未完成」，不受进度影响。
   await page.evaluate(() => {
     localStorage.setItem("tengxian1938_progress_v2",
-      JSON.stringify({ cleared: ["CH0_Chuchuan", "CH1_NanLu"], furthest: 2 }));
+      JSON.stringify({ cleared: ["CH0_Chuchuan"], furthest: 1 }));
   });
   await Boot();
   const m = await page.evaluate(() => {
@@ -1156,11 +1179,11 @@ async function CheckMissionList() {
       progress: window.Taierzhuang.Debug.Menu().progress,
     };
   });
-  Check("有进度时第一项是「继续」", m.first.startsWith("继续"), m.first);
-  Check("打过的两章标「已通过」，下一章标「下一关」",
-    m.marks[0] === "已通过" && m.marks[1] === "已通过" && m.marks[2] === "下一关",
+  Check("正片只有序章：打完之后第一项仍是「开始」（没有可继续的下一章）", m.first.startsWith("开始"), m.first);
+  Check("序章标「已通过」，废弃的六章全标「未完成」",
+    m.marks[0] === "已通过" && m.marks.slice(1, 7).every((t) => t === "未完成"),
     m.marks.join("|"));
-  Check("选章默认落在下一关上", m.selected === 2, `selected=${m.selected}`);
+  Check("选章默认落在序章上（不落到废弃场景）", m.selected === 0, `selected=${m.selected}`);
   await page.evaluate(() => window.Taierzhuang.Debug.ResetProgress());
 }
 
@@ -1215,7 +1238,7 @@ async function CheckMissionList() {
       go: !!document.querySelector("#menu .mnGo"),
     };
   });
-  Check("靶场条目排在七章之后，标「沙盒」",
+  Check("靶场条目排在七条章节之后，标「沙盒」",
     brief.selected === 8 && brief.mark === "沙盒" && brief.no === "靶",   // 枪械专项后保留原玩法靶场
     `selected=${brief.selected} mark=${brief.mark} no=${brief.no}`);
   Check("选章列出枪械、玩法、爆炸、白刃独立战斗与第一关策划白盒",

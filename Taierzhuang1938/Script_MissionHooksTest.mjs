@@ -62,9 +62,11 @@ const FakeHud = () => ({
 //     一条 zone 不再吃 MAX_WAIT.zone = 95 s —— 六条就是 570 s，
 //     终章十分钟的预算被它吃光，表现成「剧本被吞了 11 条」。
 //     C6 另加一条 WireConfirm（关中过场 CS_Ch6_LastWire 的挂点）。
+// 2026-09-06：第二到终章暂时废弃，EVENTS 随章节内容清空 —— 0 条是对的，不是漏。
+// 第一关那 11 条留着给 P0/P1/P2 白盒（contentId = CH1_NanLu）。
 const EXPECT_EVENTS = {
-  CH0_Chuchuan: 0, CH1_NanLu: 11, CH2_Shouliudan: 1, CH3_Jiuhusuo: 12,
-  CH4_DongguanYe: 9, CH5_Chengqiang: 14, CH6_Zuihou: 13,
+  CH0_Chuchuan: 0, CH1_NanLu: 11, CH2_Shouliudan: 0, CH3_Jiuhusuo: 0,
+  CH4_DongguanYe: 0, CH5_Chengqiang: 0, CH6_Zuihou: 0,
 };
 for (const level of LEVELS) {
   Check(`LEVEL_CUES 有 ${level.id} 这一条`, !!LEVEL_CUES[level.id]);
@@ -76,31 +78,37 @@ for (const [levelId, want] of Object.entries(EXPECT_EVENTS)) {
 }
 // 三种名字字段（name / event / id）都认得出来
 Check("C1 的 name 字段认得出来（EscortCall）", !!LEVEL_CUES.CH1_NanLu.EscortCall);
-Check("C3 的 event 字段认得出来（ExecutionConfirmed）", !!LEVEL_CUES.CH3_Jiuhusuo.ExecutionConfirmed);
-Check("C5 的 id 字段认得出来（TurnedBack）", !!LEVEL_CUES.CH5_Chengqiang.TurnedBack);
-Check("C6 的 id 字段认得出来（WireSent）", !!LEVEL_CUES.CH6_Zuihou.WireSent);
-// INT2：C2 自己导出了 EVENTS，判据回到它描述的那一章去（补丁表因此空了）。
-Check("C2 的 BayonetDone 由章节自己的 EVENTS 给", !!LEVEL_CUES.CH2_Shouliudan.BayonetDone);
-Check("C2 的 BayonetDone 是**章节写下的判据**，不是补丁也不是均匀兜底",
-  CUE_BUILD_REPORT.some((r) => r.levelId === "CH2_Shouliudan" && r.name === "BayonetDone"
-    && r.kind === "declared"),
-  CUE_BUILD_REPORT.filter((r) => r.levelId === "CH2_Shouliudan").map((r) => `${r.name}:${r.kind}`).join(","));
+// 三种名字字段（name / event / id）与三种判据字段（fallback / predicate / cue）：
+// 真表里现在只剩第一关，其余写法用合成数据验 —— 机制没删。
+{
+  const built = BuildLevelCues([{ levelId: "Z", events: [
+    { name: "ByName", fallback: "(c) => c.objectiveIndex >= 1" },
+    { event: "ByEvent", predicate: "(c) => c.levelTime > c.levelSeconds * 0.5" },
+    { id: "ById", cue: "(c) => c.zone === \"Q\"" },
+  ] }]);
+  Check("三种名字字段（name / event / id）都认得出来",
+    !!built.cues.Z?.ByName && !!built.cues.Z?.ByEvent && !!built.cues.Z?.ById,
+    Object.keys(built.cues.Z || {}).join(","));
+  Check("三种判据字段（fallback / predicate / cue）都算章节写下的判据",
+    built.report.filter((r) => r.levelId === "Z").every((r) => r.kind === "declared"),
+    built.report.filter((r) => r.levelId === "Z").map((r) => `${r.name}:${r.kind}`).join(","));
+  Check("章节写下的判据按原文执行",
+    built.cues.Z.ByName({ objectiveIndex: 1, levelTime: 0, levelSeconds: 100, zone: null }) === true
+    && built.cues.Z.ByEvent({ objectiveIndex: 0, levelTime: 60, levelSeconds: 100, zone: null }) === true
+    && built.cues.Z.ById({ objectiveIndex: 0, levelTime: 0, levelSeconds: 100, zone: "Q" }) === true
+    && built.cues.Z.ById({ objectiveIndex: 0, levelTime: 0, levelSeconds: 100, zone: "X" }) === false);
+}
 Check("Script_Story 的补丁表已经空了（一个事件的判据只许有一处）",
   CUE_BUILD_REPORT.every((r) => r.kind !== "supplement"),
   CUE_BUILD_REPORT.filter((r) => r.kind === "supplement").map((r) => `${r.levelId}.${r.name}`).join(","));
-Check("C2 的判据仍是章节头注那条",
-  LEVEL_CUES.CH2_Shouliudan.BayonetDone({ objectiveIndex: 4, levelTime: 0, levelSeconds: 1080 }) === true
-  && LEVEL_CUES.CH2_Shouliudan.BayonetDone({ objectiveIndex: 0, levelTime: 800, levelSeconds: 1080 }) === true
-  && LEVEL_CUES.CH2_Shouliudan.BayonetDone({ objectiveIndex: 0, levelTime: 100, levelSeconds: 1080 }) === false);
 
 // 章节写了判据的，一条都不许解析失败 —— 解析不动就悄悄退回均匀兜底，节奏全错而不报错。
 const unparsed = CUE_BUILD_REPORT.filter((r) => r.kind === "unparsed");
 Check("章节写下的判据全部解析得动", unparsed.length === 0,
   unparsed.map((r) => `${r.levelId}.${r.name}：${r.source}`).join(" / "));
 const declared = CUE_BUILD_REPORT.filter((r) => r.kind === "declared").length;
-// INT2：C2 补了 1 条、C5 的 14 条全部补了 fallback、C6 从 8 加到 13。
-Check("有判据的事件共 60 条（C1 11 + C2 1 + C3 12 + C4 9 + C5 14 + C6 13）",
-  declared === 60, `实际 ${declared}`);
+// 2026-09-06：只剩第一关的 11 条（第二到终章随章节废弃清空）。
+Check("有判据的事件共 11 条（只剩第一关）", declared === 11, `实际 ${declared}`);
 const spread = CUE_BUILD_REPORT.filter((r) => r.kind === "spread");
 // **一条都不许剩**：均匀铺开不是"准"，只是"不会把链挂死"；七章现在逐条都写了判据。
 Check("没有哪一条事件还吃着均匀兜底", spread.length === 0,
@@ -158,50 +166,22 @@ for (const [levelId, table] of Object.entries(SIGNAL_CUTSCENES)) {
     Check(`${levelId}.${name} 指的过场 ${id} 已注册`, !!CUTSCENES[id]);
   }
 }
-Check("C3 的两条 event 各自带一场关中过场",
-  SIGNAL_CUTSCENES.CH3_Jiuhusuo.ExecutionConfirmed === "CS_Ch3_BreakWall"
-  && SIGNAL_CUTSCENES.CH3_Jiuhusuo.LeafletBurned === "CS_Ch3_LeafletFire");
-// INT2：转身那一场从**默认信号**改挂到 **TurnedBack** 上 —— 章节数据写的是
-// `cutsceneMid: { id, signal }` 那种对象写法。挂默认信号的问题是没有人推它。
-Check("C5 的转身过场挂在 TurnedBack 上",
-  SIGNAL_CUTSCENES.CH5_Chengqiang.TurnedBack === "CS_Ch5_TurnBack",
-  JSON.stringify(SIGNAL_CUTSCENES.CH5_Chengqiang));
-Check("默认信号上没有东西了（不许两条信号都能播同一场）",
-  !SIGNAL_CUTSCENES.CH5_Chengqiang[MID_CUTSCENE_SIGNAL]);
-Check("LEVELS 把 cutsceneMid 的对象写法传下来了",
-  FindLevel("CH5_Chengqiang").cutsceneMid?.id === "CS_Ch5_TurnBack"
-  && FindLevel("CH5_Chengqiang").cutsceneMid?.signal === "TurnedBack");
-// TurnedBack 的兜底**不许是时刻**：时刻表推出来的转身会在玩家还站在城门口时抢镜头。
-Check("转身的兜底不是时钟（只认事实：人已经回到机枪位了）",
-  LEVEL_CUES.CH5_Chengqiang.TurnedBack({ levelTime: 1e9, levelSeconds: 1, objectiveIndex: 99, zone: null }) === false
-  && LEVEL_CUES.CH5_Chengqiang.TurnedBack({ levelTime: 0, levelSeconds: 1200, objectiveIndex: 0, zone: "C5_ReturnGun" }) === true);
-// 挂默认信号的写法（字符串形式）仍然认 —— 机制没删，只是 C5 不用它了。
+// 真表里现在没有关中过场（第二到终章废弃）；三种挂法用合成数据验，机制没删。
+Check("SIGNAL_CUTSCENES 现在是空表（没有章节挂关中过场）",
+  Object.values(SIGNAL_CUTSCENES).every((table) => Object.keys(table).length === 0),
+  JSON.stringify(SIGNAL_CUTSCENES));
+Check("EVENTS 条目的 cutscene 字段与 cutsceneMid 的对象写法都挂得上", (() => {
+  const built = BuildLevelCues([{ levelId: "W", events: [{ id: "E1", cutscene: "CS_A" }],
+    cutsceneMid: { id: "CS_B", signal: "S2" } }]);
+  return built.cutscenes.W?.E1 === "CS_A" && built.cutscenes.W?.S2 === "CS_B"
+    && !built.cutscenes.W?.[MID_CUTSCENE_SIGNAL];
+})());
+// 挂默认信号的写法（字符串形式）仍然认。
 Check("cutsceneMid 的字符串写法挂默认信号", (() => {
-  const built = BuildLevelCues([{ levelId: "X", events: [], cutsceneMid: "CS_Ch5_TurnBack" }]);
-  return built.cutscenes.X[MID_CUTSCENE_SIGNAL] === "CS_Ch5_TurnBack"
+  const built = BuildLevelCues([{ levelId: "X", events: [], cutsceneMid: "CS_TestMid" }]);
+  return built.cutscenes.X[MID_CUTSCENE_SIGNAL] === "CS_TestMid"
     && built.cues.X[MID_CUTSCENE_SIGNAL]({ levelTime: 1e9, levelSeconds: 1 }) === false;
 })());
-// 终章那两场关中过场：一场挂 beat（CS_Ch6_LastWire），一场挂信号（CS_Ch6_Xiguan）。
-Check("C6 的西关殉国挂在 FlankMg 上",
-  SIGNAL_CUTSCENES.CH6_Zuihou.FlankMg === "CS_Ch6_Xiguan");
-Check("C6 的最后电报确认走 beat 级 cutscene",
-  FindLevel("CH6_Zuihou").beats.some((b) => b.type === "cutscene" && b.id === "CS_Ch6_LastWire"));
-Check("C6 的西关殉国也留了一条 beat 入口（cutsceneFired 保证只播一次）",
-  FindLevel("CH6_Zuihou").beats.some((b) => b.type === "cutscene" && b.id === "CS_Ch6_Xiguan"));
-{
-  const ch6 = FindLevel("CH6_Zuihou");
-  const objectives = ch6.beats.filter((b) => b.type === "objective").map((b) => b.text);
-  const required = ["进入临时师部", "向师部报告东关战况", "发出最后一封电报"];
-  Check("C6 开场按 COD 单句动词目标拆成三次更新",
-    required.every((text, i) => objectives.indexOf(text) >= 0
-      && (i === 0 || objectives.indexOf(text) > objectives.indexOf(required[i - 1]))),
-    objectives.join(" → "));
-  Check("C6 不再把进入、报告、发报塞进同一条",
-    objectives.every((text) => !(/进入|进临时师部/.test(text) && /报告/.test(text) && /发出/.test(text))),
-    objectives.join(" / "));
-  Check("C6 发报后的处理与转移也分两次目标更新",
-    objectives.includes("处理密码材料") && objectives.includes("随通信组沿西门大街向西转移"));
-}
 
 // 组装层的三道校验必须在源码里（数据错了要在开机就炸，不是玩到一半才发现）
 Check("组装层校验 beats 里的 cutscene 类型", /beat\.type !== "cutscene"/.test(AssemblySource));
@@ -222,8 +202,8 @@ const CTX = { zone: null, objectiveIndex: 0, objectiveCount: 7, levelSeconds: 12
 
 // ① 没接线：记一笔，剧本照走（少一场过场不许把一关卡死）
 {
-  const { story } = MakeStory("CH5_Chengqiang", [
-    { at: "delay:0.1", type: "cutscene", id: "CS_Ch5_TurnBack" },
+  const { story } = MakeStory("CH1_NanLu", [
+    { at: "delay:0.1", type: "cutscene", id: "CS_TestMid" },
     { at: "delay:0.1", type: "objective", text: "返回最后火力点" },
   ]);
   story.Update(0.5, CTX);
@@ -234,46 +214,43 @@ const CTX = { zone: null, objectiveIndex: 0, objectiveCount: 7, levelSeconds: 12
 }
 // ② 接了线：宿主播的期间剧本停摆，播完接着走
 {
-  const { story } = MakeStory("CH5_Chengqiang", [
-    { at: "delay:0.1", type: "cutscene", id: "CS_Ch5_TurnBack" },
+  const { story } = MakeStory("CH1_NanLu", [
+    { at: "delay:0.1", type: "cutscene", id: "CS_TestMid" },
     { at: "delay:0.1", type: "objective", text: "返回最后火力点" },
   ]);
   const asked = [];
   let release = null;
   story.AttachCutscene((id) => { asked.push(id); return new Promise((r) => { release = r; }); });
   story.Update(0.5, CTX);
-  Check("beat 派发到宿主", asked.length === 1 && asked[0] === "CS_Ch5_TurnBack");
+  Check("beat 派发到宿主", asked.length === 1 && asked[0] === "CS_TestMid");
   Check("宿主在播时剧本停摆", story.CutsceneHold === true);
   const timeBefore = story.levelTime;
   story.Update(30, CTX);
   Check("停摆期间关内时钟也不走（否则八秒过场里会攒下一堆到点的台词）",
     story.levelTime === timeBefore && story.ObjectiveText !== "返回最后火力点");
-  release({ id: "CS_Ch5_TurnBack", skipped: false });
+  release({ id: "CS_TestMid", skipped: false });
   await Promise.resolve();
   await Promise.resolve();
   Check("播完解除停摆", story.CutsceneHold === false);
   story.Update(2.5, CTX);
   Check("播完之后剧本接着走", story.ObjectiveText === "返回最后火力点");
 }
-// ③ Signal 等价入口 + 同一场只播一次
+// ③ Signal 等价入口：现在没有章节挂关中过场，只验 Signalled 与「不请求过场」
 {
-  const { story } = MakeStory("CH3_Jiuhusuo", [{ at: "delay:99", type: "objective", text: "x" }]);
+  const { story } = MakeStory("CH1_NanLu", [{ at: "delay:99", type: "objective", text: "x" }]);
   const asked = [];
   story.AttachCutscene((id) => { asked.push(id); return true; });
-  story.Signal("ExecutionConfirmed");
-  story.Signal("ExecutionConfirmed");
-  story.Signal("LeafletBurned");
-  Check("Signal 到登记过的事件就请求那一场", asked.join(",") === "CS_Ch3_BreakWall,CS_Ch3_LeafletFire",
-    asked.join(","));
-  Check("同一场只播一次", story.MidCutscenes.length === 2);
-  Check("Signalled 报得出推过的事件", story.Signalled("ExecutionConfirmed") === true
+  story.Signal("EscortCall");
+  story.Signal("EscortCall");
+  Check("Signal 到没挂过场的事件不请求过场", asked.length === 0 && story.MidCutscenes.length === 0, asked.join(","));
+  Check("Signalled 报得出推过的事件", story.Signalled("EscortCall") === true
     && story.Signalled("没推过的") === false);
   Check("宿主同步返回时不留停摆（测试桩不会把剧本挂死）", story.CutsceneHold === false);
 }
 // ④ 宿主说「没这场」时不挂死
 {
-  const { story } = MakeStory("CH5_Chengqiang", [
-    { at: "delay:0.1", type: "cutscene", id: "CS_Ch5_TurnBack" },
+  const { story } = MakeStory("CH1_NanLu", [
+    { at: "delay:0.1", type: "cutscene", id: "CS_TestMid" },
     { at: "delay:0.1", type: "objective", text: "下一条" },
   ]);
   story.AttachCutscene(() => null);
@@ -284,8 +261,8 @@ const CTX = { zone: null, objectiveIndex: 0, objectiveCount: 7, levelSeconds: 12
 }
 // ⑤ 宿主抛异常也不许把剧本带走
 {
-  const { story } = MakeStory("CH5_Chengqiang", [
-    { at: "delay:0.1", type: "cutscene", id: "CS_Ch5_TurnBack" },
+  const { story } = MakeStory("CH1_NanLu", [
+    { at: "delay:0.1", type: "cutscene", id: "CS_TestMid" },
     { at: "delay:0.1", type: "objective", text: "下一条" },
   ]);
   story.AttachCutscene(() => { throw new Error("宿主炸了"); });
@@ -325,8 +302,8 @@ Check("关中过场不许与换关/另一场叠着播",
 }
 {
   const asked = [];
-  const { story } = MakeStory("CH5_Chengqiang", [
-    { at: "delay:99", type: "cutscene", id: "CS_Ch5_TurnBack" },
+  const { story } = MakeStory("CH1_NanLu", [
+    { at: "delay:99", type: "cutscene", id: "CS_TestMid" },
     { at: "end", type: "narration", text: "收场" },
   ]);
   story.AttachCutscene((id) => { asked.push(id); return true; });
@@ -373,6 +350,11 @@ for (const level of LEVELS) {
     Check("序章不点名（过场承载章）", !level.roster);
     continue;
   }
+  // 2026-09-06：第二到终章暂时废弃，名册随章节内容清空；第一关的名册留给 P0/P1/P2 白盒。
+  if (level.deprecated && level.id !== "CH1_NanLu") {
+    Check(`${level.id} 是废弃场景，不点名`, !level.roster);
+    continue;
+  }
   Check(`${level.id} 显式点了名册`, Array.isArray(level.roster) && level.roster.length > 0);
   Check(`${level.id} 的名册不超过上限`, (level.roster || []).length <= MAX_COMPANIONS,
     String((level.roster || []).length));
@@ -382,38 +364,21 @@ for (const level of LEVELS) {
   Check(`${level.id} 的名册里没有玩家自己`,
     !(level.roster || []).includes(level.playerCast || DEFAULT_PLAYER_CAST));
 }
-// 三关起军医必须在场（不点名的话「能走的靠右边！」全从玩家脑门上发出来）
-Check("三关与四关点了军医", FindLevel("CH3_Jiuhusuo").roster.includes("junyi")
-  && FindLevel("CH4_DongguanYe").roster.includes("junyi"));
-// 四关抬罗班长的是幺娃 —— 摆点层按 castId 找他的句柄，不在场就抬不起来
-Check("四关点了幺娃（阶段⑨抬罗班长的是他）", FindLevel("CH4_DongguanYe").roster.includes("yaowa"));
-// 五关罗班长已经牺牲；就算写上他，缺席宣告也会拒绝生成 —— 但这张表本身要读得出他不在
-Check("五关的名册里没有罗班长", !FindLevel("CH5_Chengqiang").roster.includes("luo"),
-  FindLevel("CH5_Chengqiang").roster.join(","));
-// 终章那两个人都是 combatant:false —— 这正是必须显式点名的典型情形
-Check("终章点了参谋与师长（两个都推不出来）",
-  FindLevel("CH6_Zuihou").roster.includes("canmou")
-  && FindLevel("CH6_Zuihou").roster.includes("wangmingzhang"));
 Check("装配层名册优先走章节数据",
   /roster: phase\.roster \|\| phase\.level\?\.roster \|\| undefined,/.test(MainSource));
 
 Check("默认玩家角色是顺子", DEFAULT_PLAYER_CAST === "shunzi");
-// INT2：「这一章玩家演谁」从 Script_Companion 的过渡表搬进**章节数据**。
-Check("终章玩家是小秦，而且写在章节数据里", FindLevel("CH6_Zuihou").playerCast === "xiaoqin");
-Check("六章不写 playerCast（退到默认的顺子）",
-  LEVELS.filter((l) => l.id !== "CH6_Zuihou").every((l) => !l.playerCast),
+// 「这一章玩家演谁」写在章节数据里（playerCast）；终章「玩家＝小秦」随章节废弃，现在没有章节改角色。
+Check("现在没有章节改玩家角色", LEVELS.every((l) => !l.playerCast),
   LEVELS.filter((l) => l.playerCast).map((l) => `${l.id}:${l.playerCast}`).join(","));
 Check("装配层把 playerCast 传给了 CompanionDirector",
   /playerCast: phase\.playerCast \|\| phase\.level\?\.playerCast \|\| undefined,/.test(MainSource));
 {
   const { host } = MakeCompanionHost();
-  const c6 = new CompanionDirector(host);
-  c6.BeginLevel("CH6_Zuihou", { beats: FindLevel("CH6_Zuihou").beats, zones: ZonesOf("CH6_Zuihou"),
-    playerCast: FindLevel("CH6_Zuihou").playerCast });
-  Check("终章不会把玩家自己（小秦）也摆出来", !c6.Roster.includes("xiaoqin"), c6.Roster.join(","));
-  const c4 = new CompanionDirector(host);
-  c4.BeginLevel("CH4_DongguanYe", { beats: FindLevel("CH4_DongguanYe").beats, zones: ZonesOf("CH4_DongguanYe") });
-  Check("四关的小秦照常在场（那一章玩家是顺子）", c4.Roster.includes("xiaoqin"), c4.Roster.join(","));
+  const swapped = new CompanionDirector(host);
+  swapped.BeginLevel("CH1_NanLu", { roster: ["xiaoqin", "luo"], zones: [], playerCast: "xiaoqin" });
+  Check("playerCast 指定的人不进名册（玩家就是他）",
+    !swapped.Roster.includes("xiaoqin") && swapped.Roster.includes("luo"), swapped.Roster.join(","));
   const explicit = new CompanionDirector(host);
   explicit.BeginLevel("CH1_NanLu", { roster: ["luo", "shunzi", "yaowa"], zones: [] });
   Check("显式名册里混进玩家自己也会被挡掉", !explicit.Roster.includes("shunzi"), explicit.Roster.join(","));
@@ -636,7 +601,7 @@ Check("换关时检查点环清空（上一关的坐标倒到这一关就是穿�
 
 Check("放行信号名是 ChapterRelease", CHAPTER_RELEASE_SIGNAL === "ChapterRelease");
 {
-  const { story } = MakeStory("CH5_Chengqiang", [{ at: "delay:99", type: "objective", text: "x" }]);
+  const { story } = MakeStory("CH1_NanLu", [{ at: "delay:99", type: "objective", text: "x" }]);
   Check("没推过就是没发生", story.Signalled(CHAPTER_RELEASE_SIGNAL) === false);
   story.Signal(CHAPTER_RELEASE_SIGNAL);
   Check("推过之后 Signalled 认得出来", story.Signalled(CHAPTER_RELEASE_SIGNAL) === true);
@@ -652,11 +617,9 @@ Check("放行靠 story.Signalled(CHAPTER_RELEASE_SIGNAL)",
 Check("有保险丝：信号一直不来也不许把一关永远打不完",
   /PIN_RELEASE_GRACE_S/.test(MainSource) && /钉关保险丝/.test(MainSource));
 Check("钉关状态有取证口", /ChapterPin: \(\) => \(\{/.test(MainSource));
-// INT2：第五关声明了这条旗标（阶段⑩⑪⑫全在最后一个路标之后）。
+// 第五关的钉关随章节废弃（2026-09-06）；原语留着，现在没有章节声明它。
 const pinned = LEVELS.filter((l) => l.mechanics && l.mechanics.pinFinalZone).map((l) => l.id);
-Check("第五关声明了 mechanics.pinFinalZone", pinned.includes("CH5_Chengqiang"),
-  `已声明：${pinned.join(",") || "（无）"}`);
-Check("只有第五关钉关（别的章钉住就是打不完）", pinned.length === 1, pinned.join(","));
+Check("现在没有章节声明 mechanics.pinFinalZone（钉住就是打不完）", pinned.length === 0, pinned.join(","));
 
 // ===========================================================================
 
@@ -666,6 +629,6 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(`任务流程钩子回归全过（${checks} 条）：`
-  + "关中过场 beat / Signal→过场、LEVEL_CUES 七章自动构建、具名同伴 Locate 与三条剧本指令、"
+  + "关中过场 beat / Signal→过场、LEVEL_CUES 自动构建、具名同伴 Locate 与三条剧本指令、"
   + "脚本检查点倒带、钉关原语。");
 assert.ok(true);

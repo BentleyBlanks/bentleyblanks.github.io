@@ -190,6 +190,31 @@ const CHAPTER_IDS = [
 ];
 
 /**
+ * **暂时废弃场景**（2026-09-06）：第一关到终章整体退出正片流程。
+ *
+ * 它们仍留在 CHAPTERS / LEVELS / PHASES 里（`?phase=N`、BootTest 七片开机冒烟、
+ * ShotTest 逐关出图、编辑器的 phase=5 十字街都按这张表的序号取切片），但带
+ * `deprecated: true`：
+ *   · 选章里归入「暂时废弃场景」组、标「未完成」，正式章节只剩序章；
+ *   · 进章只建场、不装剧本、不摆点、不换关（Script_Main.EnterLevel 按这条旗标短路）；
+ *   · 序章过场播完不再自动接第一关，回主菜单；
+ *   · 「继续」「下一关」与进度只按 OFFICIAL_LEVEL_COUNT 那几章算。
+ * 第一关的章节内容（Data_MissionCh1 的 beats / EVENTS / VOICE_LINES）**没有删**：
+ * 「第一关 · P0/P1/P2 场景白盒」（Data_FirstLevelP012Whitebox，contentId = CH1_NanLu）
+ * 仍从那里取人物与台词。第二到终章的内容已清空成骨架（各文件头注）。
+ */
+export const DEPRECATED_CHAPTER_IDS = Object.freeze([
+  "CH1_NanLu", "CH2_Shouliudan", "CH3_Jiuhusuo", "CH4_DongguanYe", "CH5_Chengqiang", "CH6_Zuihou",
+]);
+export function IsDeprecatedChapter(id) { return DEPRECATED_CHAPTER_IDS.includes(id); }
+/** 正式章节数：LEVELS 前面连续的、没打 deprecated 标的那几章（现在只有序章）。 */
+export const OFFICIAL_LEVEL_COUNT = (() => {
+  let n = 0;
+  while (n < CHAPTER_IDS.length && !IsDeprecatedChapter(CHAPTER_IDS[n])) n += 1;
+  return n;
+})();
+
+/**
  * 组装前的硬校验。**史料层与打法层的分层规则在这里执行**：
  *   · 史料字段（title/date/sky/minutes/pool/objectives/beats…）必须齐；
  *   · 打法字段（bounds/spawn/ijaPressure…）**只许出现在 chapter.tuning 里**，
@@ -251,6 +276,8 @@ for (let i = 0; i < CHAPTERS.length; i += 1) {
  */
 export const LEVELS = CHAPTERS.map((c) => ({
   id: c.id,
+  // 暂时废弃场景（见 DEPRECATED_CHAPTER_IDS）：只建场，不进正片流程。
+  deprecated: IsDeprecatedChapter(c.id),
   title: c.title,
   place: c.place,
   date: c.date,
@@ -322,12 +349,12 @@ export const CHAPTER_EVENTS = CHAPTERS.map((chapter, index) => ({
 // ===========================================================================
 //
 // 两组：
-//   · **正片七章**用的 CS_Chuchuan（序章车厢）与 CS_Ch1_* … CS_Ch6_*
-//     （各章一个文件，基建批留占位、内容批填实）；
+//   · **正片**用的 CS_Chuchuan（序章车厢）。第一关到终章的 CS_Ch1_* … CS_Ch6_*
+//     随章节废弃一起删除（2026-09-06，Data_CutsceneCh1–6.mjs 在 git 历史里）；
 //   · **旧战役五场**（CS_ChuchuanLegacy / CS_LiZongrenTang / CS_LastWire /
 //     CS_WangMingzhang / CS_BeimenBreakout）——从正片流程脱钩，但文件与注册保留：
 //     它们里面的分镜手法、史实注记与「不演王铭章举枪自尽」那段长注释是资产，
-//     删掉等于把账一起删掉。选章的「测试场景」组留了预览入口。
+//     删掉等于把账一起删掉。过场预览页与编辑器时间轴仍列它们。
 //
 // 分镜数据结构（Script_Cutscene.mjs 是唯一消费者）：
 //
@@ -354,19 +381,9 @@ import { CS_LiZongrenTang } from "./Data_CutsceneLiZongrenTang.mjs";
 import { CS_LastWire } from "./Data_CutsceneLastWire.mjs";
 import { CS_WangMingzhang } from "./Data_CutsceneWangMingzhang.mjs";
 import { CS_BeimenBreakout } from "./Data_CutsceneBeimenBreakout.mjs";
-import { CH1_CUTSCENES } from "./Data_CutsceneCh1.mjs";
-import { CH2_CUTSCENES } from "./Data_CutsceneCh2.mjs";
-import { CH3_CUTSCENES } from "./Data_CutsceneCh3.mjs";
-import { CH4_CUTSCENES } from "./Data_CutsceneCh4.mjs";
-import { CH5_CUTSCENES } from "./Data_CutsceneCh5.mjs";
-import { CH6_CUTSCENES } from "./Data_CutsceneCh6.mjs";
 
-/** 正片七章的过场，按章序摊平。序章复用 CS_Chuchuan（Data_CutsceneChuchuan.mjs）。 */
-export const CHAPTER_CUTSCENES = [
-  CS_Chuchuan,
-  ...CH1_CUTSCENES, ...CH2_CUTSCENES, ...CH3_CUTSCENES,
-  ...CH4_CUTSCENES, ...CH5_CUTSCENES, ...CH6_CUTSCENES,
-];
+/** 正片的过场：只剩序章的 CS_Chuchuan（Data_CutsceneChuchuan.mjs）。 */
+export const CHAPTER_CUTSCENES = [CS_Chuchuan];
 
 /** 旧战役五场：从正片流程脱钩，仅留预览入口与留档。 */
 export const LEGACY_CUTSCENES = [
@@ -416,7 +433,7 @@ export function FindLevel(id) {
   return LEVELS.find((l) => l.id === id) || null;
 }
 
-/** 过场的播放顺序（给预览页与选章的「测试场景」组用）：先正片七章，后旧五场。 */
+/** 过场的播放顺序（给预览页与编辑器时间轴用）：先正片（序章），后旧五场。 */
 export const CUTSCENE_ORDER = [
   ...CHAPTER_CUTSCENES.map((cut) => cut.id),
   ...LEGACY_CUTSCENES.map((cut) => cut.id),

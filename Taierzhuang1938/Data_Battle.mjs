@@ -24,7 +24,7 @@
 //
 // 世界坐标：X 向东，Z 向南，城心为原点。城墙中心线 ±305；四门位置按城防示意图略作错位。
 
-import { LEVELS, CHAPTERS } from "./Data_TengxianScript.mjs";
+import { LEVELS, CHAPTERS, OFFICIAL_LEVEL_COUNT } from "./Data_TengxianScript.mjs";
 import { CITY, GATES, EAST_FIELD } from "./Data_Tengxian.mjs";
 
 /**
@@ -128,6 +128,8 @@ export const PHASES = LEVELS.map((level, index) => {
   return {
     id: level.id,
     level,
+    // 暂时废弃场景（Data_TengxianScript.DEPRECATED_CHAPTER_IDS）：只建场，不进正片流程。
+    deprecated: !!level.deprecated,
     date: level.date,
     label: level.title,
     place: level.place,
@@ -186,6 +188,9 @@ export const EPILOGUE = {
     "第 22 集团军是川军。出川时没有钢盔，三分之一以上没有步枪。",
   ],
 };
+
+/** 正式章节数（选章「正式章节」组、进度与「继续」只按这几章算）。 */
+export const OFFICIAL_PHASE_COUNT = OFFICIAL_LEVEL_COUNT;
 
 /** 按 id 取一关（调试口与测试用）。 */
 export function FindPhase(id) {
