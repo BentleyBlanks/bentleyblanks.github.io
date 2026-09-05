@@ -178,6 +178,20 @@ export class ActorCrowd {
     return this.kinds.get(dead ? deadKey : standingKey);
   }
 
+  /**
+   * 进关时把这些 kind 的远景层先烘出来（站姿 + 倒地各一份）。
+   *
+   * 远景层原本是「第一个走远的人」那一帧才烘：造 Actor、合并几何、建 InstancedMesh，
+   * 然后那只 InstancedMesh 的 program 还要在同一帧现编（缓存键带 instancing，
+   * 与蒙皮人物不是同一个 program）。装配层的着色器预热（Script_Main.WarmActorShaders）
+   * 要把这一笔连同人物材质一起在加载画面后面付掉，所以先烘、再出画。
+   * 已经烘过的 kind 直接跳过。
+   */
+  Prepare(kinds = []) {
+    for (const kind of kinds) if (kind) this._Kind(kind, false);
+    return this;
+  }
+
   /** 每帧开始：把计数清零。 */
   Begin() {
     for (const entry of this.kinds.values()) entry.count = 0;

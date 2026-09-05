@@ -63,6 +63,7 @@ import { NavGrid } from "./Script_Navigation.mjs";
 import { PlayerController } from "./Script_Player.mjs";
 import { AiDirector, MakeSoldierIdentity, STATE as AI_STATE } from "./Script_Ai.mjs";
 import { ActorFactory } from "./Script_Actor.mjs";
+import { GetLugouCharacterVariantEntries } from "./Script_CharacterModel.mjs";
 import { ActorBatcher } from "./Script_ActorBatch.mjs";
 import { Viewmodel } from "./Script_Viewmodel.mjs";
 import { FirstPersonSelfShadow } from "./Script_FirstPersonSelfShadow.mjs";
@@ -103,7 +104,7 @@ import {
 } from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE } from "./Data_Weapons.mjs";
 import { WEAPON_MESH_VARIANTS, WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
-import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
+import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE, NAME_POOL } from "./Data_Battle.mjs";
 import { CUTSCENES } from "./Data_TengxianScript.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { Clamp, Clamp01, HashString, Mulberry32 } from "./Script_Noise.mjs";
@@ -3415,6 +3416,17 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   checkpoint?.Reset("enterLevel");
   checkpoint?.Save();
 
+  // 人物材质预热（见 WarmActorShaders 的抬头）：加载画面还盖着，在这里把全阵营
+  // 每个模型号的 program 先编出来，换人 / 某个模型号第一次进画面就不再冻那一两秒。
+  // 过场承载章不撒兵、预览不进玩法，两条都跳过。
+  if (!cutsceneOnly && !PREVIEW) {
+    try {
+      await WarmActorShaders(phase, (label, progress) => SetBootStep(label, 0.94 + 0.06 * progress));
+    } catch (error) {
+      console.warn("[Main] 人物材质预热失败（退回用到时现编）", error);
+    }
+  }
+
   if (!initial) {
     ShowBoot(false);
     bootStart.textContent = SHOT ? "（出图模式）" : (MOVEMENT_RANGE ? "进入操作测试场" : WEAPON_RANGE ? "进入枪械靶场" : EXPLOSION_TEST ? "进入爆炸测试场" : PREVIEW ? "播放序章" : "进 城");
@@ -3620,6 +3632,115 @@ async function WarmupShaders(root, onStep = null, shouldStop = null) {
   }
   onStep?.("就绪", 1);
   return picks.length;
+}
+
+/**
+ * 进关时把**人物材质**先编出来 —— 换人那一帧冻一到三秒的病根。
+ *
+ * 2026-09-05 的取证（`?explosions=1&shot=1&manual=1` 逐帧剖析）：玩家阵亡、卡片读完、
+ * RespawnPlayer 那一帧 post 桶 2929 ms，program 43 → 52。当时归因到「换上来的人
+ * 领了不同的枪，视图模型第一次画它」。探针（Script_RespawnShaderWarmTest）量出来
+ * **不是**：正片七章与各靶场的携行都由 loadoutOverride 钉死，换人后手里仍是同一支枪，
+ * 视图模型一个 program 都没新建；涨出来的全是卢沟桥人物 GLB 的材质 ——
+ * `John_All Body`、`战士5_头部`、`Material #1721585337`（军装）、`John_ Hair and Bread Mat`……
+ *
+ * 机制：每名士兵开局按种子在本阵营四个模型里抽一个，而 three 是惰性编译的：
+ * 某个模型号**第一次进视锥**（CullActors 把它挂回场景）的那一帧才编它的 program，
+ * 一个三四百毫秒；同一份材质在蒙皮网格、非蒙皮挂件（头盔）、远景 InstancedMesh 上
+ * 各是一个 program（缓存键带 skinning / instancing / vertexColors）。换人换了个机位，
+ * 也把倒地时看不见的那些人重新看见，这笔账就常落在 RespawnPlayer 那一帧；
+ * 平时某个模型号第一次走进画面同样会冻一下，只是没人盯着帧。
+ *
+ * 做法与 WarmupShaders 同款：按「kind × 模型号 × 本阵营会发的枪」造一批临时 Actor
+ * 挂进场景，远景层按 kind 先烘出来，走一遍 WarmupShaders（提交编译 → 真画一帧逼出
+ * 变体），再整批拆掉。已经热着的材质由 WarmupShaders 自己跳过，第二次进关几乎不花时间。
+ * 加载画面这时还盖着，这几帧出画玩家看不见。
+ *
+ * @param {object} phase 这一关的配置（夜袭关要把白毛巾那一身也编上）
+ * @param {(label: string, progress: number) => void|null} onStep 进度回调
+ * @returns {Promise<number>} 编过的代表网格数（0 = 没有新材质，或这一场没有人物库）
+ */
+async function WarmActorShaders(phase, onStep = null) {
+  if (!renderer || !scene || !ai || !actorFactory?.characterAssets) return 0;
+  const started = performance.now();
+  // 会出现在这一关的 kind：撒好的兵一律算上，nra / ija 保底（补兵、换人的班组都是它们），
+  // 夜袭关再加系白毛巾的那一身。军官只在过场/出图里摆，不在这里编。
+  const kinds = new Set(["nra", "ija"]);
+  for (const soldier of ai.soldiers) if (soldier.actor?.kind) kinds.add(soldier.actor.kind);
+  if (phase?.nightRaid) kinds.add("nraDare");
+  ai.PrepareCrowd([...kinds]);
+
+  // 本阵营会发到人手里的枪：世界模型按枪各一套几何，材质桶也可能不同（机枪的弹匣/脚架）。
+  const weaponsBySide = {
+    nra: NAME_POOL.weapons.map((entry) => entry.id),
+    ija: [...new Set(IJA_SQUAD.composition.map((entry) => entry.weapon))],
+  };
+  const group = new THREE.Group();
+  group.name = "ShaderWarm_Actors";
+  const proxies = [];
+  let serial = 0;
+  for (const kind of kinds) {
+    // 只有卢沟桥 GLB 的 kind 才有模型号；百姓是程序化分件，走合批层，不在这里编。
+    const variants = GetLugouCharacterVariantEntries(kind).map((entry) => entry.modelVariant);
+    if (!variants.length) continue;
+    const weapons = weaponsBySide[kind.startsWith("ija") ? "ija" : "nra"];
+    const count = Math.max(variants.length, weapons.length);
+    for (let i = 0; i < count; i += 1) {
+      serial += 1;
+      let actor = null;
+      try {
+        actor = actorFactory.Create(kind, {
+          seed: 90001 + serial * 37,
+          modelVariant: variants[i % variants.length],
+          weapon: weapons[i % weapons.length],
+        });
+      } catch (error) {
+        console.warn(`[Main] 人物预热：造 ${kind} 代理失败`, error);
+        continue;
+      }
+      // 位置无所谓：WarmupShaders 出画时把代表件的视锥剔除关掉，只要在场景树里就画。
+      actor.root.position.set((i - count * 0.5) * 1.2, 0, -4);
+      group.add(actor.root);
+      proxies.push(actor);
+    }
+  }
+  group.position.set(player.position.x, player.position.y, player.position.z);
+  scene.add(group);
+  group.updateMatrixWorld(true);
+
+  // 逐段计时（取证用：「重编场景光照」那一段是本来就要付的城的账，只是从第一帧挪到
+  // 这里；「提交着色器 / 预热材质」才是人物材质新增的那部分）。
+  const programsBefore = renderer.info.programs.length;
+  const stages = {};
+  let stageLabel = null;
+  let stageStart = performance.now();
+  const Step = (label, progress) => {
+    const name = label.split("……")[0];
+    if (name !== stageLabel) {
+      const now = performance.now();
+      if (stageLabel) stages[stageLabel] = Math.round((stages[stageLabel] || 0) + now - stageStart);
+      stageLabel = name;
+      stageStart = now;
+    }
+    onStep?.(label, progress);
+  };
+  const wasWarming = state.warming;
+  state.warming = true;
+  let picks = 0;
+  try {
+    picks = await WarmupShaders(group, Step, null);
+  } finally {
+    state.warming = wasWarming;
+    scene.remove(group);
+    for (const actor of proxies) actor.Dispose();
+  }
+  if (stageLabel) stages[stageLabel] = Math.round((stages[stageLabel] || 0) + performance.now() - stageStart);
+  state.actorShaderWarm = {
+    kinds: [...kinds], proxies: proxies.length, picks, stages,
+    ms: Math.round(performance.now() - started),
+    programsBefore, programs: renderer.info.programs.length,
+  };
+  return picks;
 }
 
 /** WarmCutscene 的场次号（见那里的注释）。 */

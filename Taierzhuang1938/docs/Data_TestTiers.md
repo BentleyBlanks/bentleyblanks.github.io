@@ -116,7 +116,7 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
 | menu | MenuTest、BootPropTest |
 | editor | EditorTest、DestructionEditorTest |
 | cutscene | CutsceneControl、ActorPose |
-| render | ActorBatch → PropInstancing → ExternalPropAsset → TownDressing → EastSuburbBlocks → EastSuburbNav → WestDistrictCoverage → WestSuburbBlocks → WestStation → DressingProbe；另提示相关 Tier 2 |
+| render | ActorBatch → PropInstancing → ExternalPropAsset → TownDressing → EastSuburbBlocks → EastSuburbNav → WestDistrictCoverage → WestSuburbBlocks → WestStation → DressingProbe → RespawnShaderWarm（换人 / 人物模型号首次进画面不现编着色器）；另提示相关 Tier 2 |
 | perf | 不自动跑机器敏感测试，只提示 Tier 2 |
 | infra | TestRunnerTest、ModuleGraphTest（测试入口与本地服务） |
 

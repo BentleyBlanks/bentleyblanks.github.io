@@ -1430,3 +1430,36 @@ CPU 采样（Profiler，300 帧）里排前面的是 `updateMatrixWorld` 17%、`
 
 编译总量本身没动过：序章要新建约 67 个 program。真想把它变短，得从内容侧减少材质
 变体，不在这条链上。
+
+### 16.1 换人那一帧的一到三秒：人物材质
+
+**症状**（2026-09-05，RTX 4070 SUPER / Edge，`?explosions=1&shot=1&manual=1` 逐帧剖析）：
+玩家阵亡、卡片读完、`RespawnPlayer()` 那一帧 post 桶 2929 ms，`renderer.info.programs`
+43 → 52。当时的归因是「换上来的人领了不同的枪，视图模型第一次画那支枪的材质」。
+
+**探针量出来不是这么回事。** `Script_RespawnShaderWarmTest` 在 phase=2 与爆炸场各连死
+三次：换人后手里都还是 loadoutOverride 钉死的那支汉阳造（正片七章与各靶场的携行全都
+钉死，`MakeSoldierIdentity` 抽出来的 `weapon` 实际上从没当过主武器），视图模型一个
+program 都没新建。涨出来的全是**卢沟桥人物 GLB 的材质**：`John_All Body`、`战士5_头部`、
+`Material #1721585337`（军装）、`John_ Hair and Bread Mat`……同名材质还各有两份 ——
+缓存键最后那两个位掩码解出来是 `vertexColors + vertexAlphas`（GLTFLoader 给带 COLOR_0
+的 primitive 克隆的那份）与 `skinning`（蒙皮身体 vs 挂在头骨上的头盔）。远景层
+`Crowd_*_Standing/Dead` 的 InstancedMesh 再各算一份（`instancing`）。
+
+**机制**：每名士兵开局按种子在本阵营四个模型里抽一个，`CullActors` 只把视锥内、
+细节距离以内的人挂回场景。某个模型号**第一次被画**的那一帧才编它的 program
+（一个三四百毫秒）。换人换了个机位，也把倒地时看不见的那些人重新看见，这笔账就常落在
+`RespawnPlayer` 那一帧；平时某个模型号第一次走进画面同样冻一下，只是没人盯着帧 ——
+同一份取证里卡片倒计时中途也冻过一次 800 ms，那一帧是倒地机位第一次看见某个模型号。
+
+**做法**（`Script_Main.WarmActorShaders`，`EnterLevel` 末尾、`state.ready` 之前）：按
+「kind × 模型号 × 本阵营会发的枪」造一批临时 Actor 挂进场景（`nra` / `ija` 保底，撒好的
+兵有什么 kind 就加什么，夜袭关补 `nraDare`），远景层按 kind 先烘出来
+（`AiDirector.PrepareCrowd`），然后整批走一遍上面那个 `WarmupShaders`，收工整批拆掉。
+加载画面这时还盖着，出画玩家看不见；已经热着的材质由 `WarmupShaders` 自己跳过，
+第二次进关几乎不花时间。
+
+**验收**：`node Taierzhuang1938/Script_RespawnShaderWarmTest.mjs [--query=phase=2|explosions=1]`
+—— 连死三次，落地那一帧 program 不涨、整帧 CPU < 50 ms；再把两个阵营四个模型号各配
+本阵营的枪摆到镜头前、镜头转一圈，仍一个 program 不新建。头一条只能证明「这次没撞上」，
+第二条才证明预热覆盖了全部模型号。

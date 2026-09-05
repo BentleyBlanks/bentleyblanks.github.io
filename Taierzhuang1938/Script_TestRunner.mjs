@@ -190,6 +190,8 @@ export const testDefs = {
   FrameProfileTest: { file: "Script_FrameProfileTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "整帧 CPU/GPU 剖析消融（对机器敏感）" },
   GodRaysPerformanceTest: { file: "Script_GodRaysPerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "体积光方向性性能回归（对机器敏感）" },
   DeathViewTest: { file: "Script_DeathViewTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "阵亡镜头出图（人工审）" },
+  RespawnShaderWarmTest: { file: "Script_RespawnShaderWarmTest.mjs", timeoutMs: 10 * 60 * 1000,
+    desc: "换人那一帧不编着色器：进关预热覆盖全部人物模型号" },
   // 出图已按 URL 参数组分批（并入西郊机位后 45 张只建 19 次城），实测 ~6.5 分钟；
   // 上限从 30 分钟降到 15 分钟，保持与旧口径相同的 ~2.5 倍裕量。
   ShotTest: { file: "Script_ShotTest.mjs", args: ["_shots"], timeoutMs: 15 * 60 * 1000, desc: "逐关逐机位实拍出图（人工审）" },
@@ -213,6 +215,7 @@ export const browserTests = new Set([
   "PropPcgEditorTest",
   "TestSceneLightingTest", "RangeTest", "WeaponRangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
   "FirstPersonEmbodimentTest", "SprintViewmodelTest", "TargetInfoTest", "VisibilityTest", "VoiceTest",
+  "RespawnShaderWarmTest",
   "FirstLevelWhiteboxBrowserTest",
   "FirstLevelP012BrowserTest",
   "ExplosionRangeTest",
@@ -314,7 +317,9 @@ export const domains = {
     label: "渲染与合批自动契约",
     // 照明弹的灯走 LightRig 的火光池、烟走 VfxSystem 的烟源池，两处都加了新口子
     //（UpdateFire / MoveSmokeSource），所以碰灯光或粒子的改动也要连着 FlareTest 跑。
-    tests: ["TestSceneLightingTest", "PostTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest"],
+    // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
+    // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
+    tests: ["TestSceneLightingTest", "PostTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -755,6 +760,7 @@ const estimatedSeconds = {
   GiTest: 300,
   PerformanceTest: 600,
   DeathViewTest: 240,
+  RespawnShaderWarmTest: 150,
   FrameProfileTest: 600,
   GodRaysPerformanceTest: 600,
 };
