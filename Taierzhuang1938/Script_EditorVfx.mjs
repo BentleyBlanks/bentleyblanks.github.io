@@ -76,7 +76,7 @@ export class VfxEditor {
     this.studio.SetGridVisible(true);
     this.studio.Frame(3.4, 8.5);
     this.panel = Panel({
-      title: "特效预览编辑器", sub: "Script_Vfx · 正片同源",
+      title: "特效预览编辑器", sub: "",
       variant: "work", onClose: () => this.host.Close(),
     });
     root.appendChild(this.panel.root);
@@ -153,7 +153,6 @@ export class VfxEditor {
     const buttons = ButtonRow(playback, [
       { label: "播放", onClick: () => this.Play() },
       { label: "停止", onClick: () => this.Stop() },
-      { label: "重播", onClick: () => this.Play() },
     ]);
     if (buttons.children[0]) buttons.children[0].dataset.vfxAction = "play";
     if (buttons.children[1]) buttons.children[1].dataset.vfxAction = "stop";
@@ -177,8 +176,8 @@ export class VfxEditor {
     Toggle(playback, "米格与地台", true, (on) => this.studio.SetGridVisible(on));
 
     const evidence = Section(body, "取证");
-    this.facts = Facts(evidence);
-    Note(evidence, "持续火焰/烟雾用 Vefects 轮廓纹理，未加载时退回程序化粒子；爆炸、枪口焰、命中不变。", true);
+    this.facts = Facts(evidence, ["当前效果", "Vefects 纹理"]);
+
   }
 
   IsContinuous() { return !!SCENE_EFFECTS[this.effectId]; }

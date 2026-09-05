@@ -239,14 +239,10 @@ export class FullSceneEditor {
       { label: this.sceneMode === "county" ? "● 完整县城" : "完整县城", onClick: () => this.SwitchScene("county") },
       { label: this.sceneMode === "carriage" ? "● 奇观 · 出川车厢" : "奇观 · 出川车厢", onClick: () => this.SwitchScene("carriage") },
     ]);
-    Note(scene, this.sceneMode === "county"
-      ? "当前一次生成城内与东西南北门外；这是独立完整切片，不改变章节关卡编辑器。"
-      : "当前只挂载车厢、月台与窗外环境的静态布景；没有演员、对白、字幕、音频或镜头时间轴。", true);
 
     if (this.sceneMode !== "carriage") this.BuildCountyUi(body);
     else this.BuildCarriageUi(body);
     this.BuildEnvironmentUi(body);
-    this.BuildSeedUi(body);
   }
 
   BuildCountyUi(body) {
@@ -255,7 +251,7 @@ export class FullSceneEditor {
       value, label: spec.label,
     })), "county", (id) => this.ApplyCamera(id));
     CameraProjectionControls(cameras, this.host.camera, { farMax: 5000 });
-    Note(cameras, "飞行：WASD；Q/E 降升；Shift 加速；Ctrl 慢速；滚轮调飞行速度。", false);
+    Note(cameras, "WASD 移动 · Q/E 升降 · 滚轮调速");
 
     const spline = Section(body, "Spline 完整预览（只读）");
     Chips(spline, ["全部", "street", "road", "railway", "wall"], "全部", (kind) => {
@@ -268,14 +264,7 @@ export class FullSceneEditor {
       this.BuildSplineOverlay();
     });
     this.splineList = ListBox(spline, { height: 190, onPick: (key) => this.SelectRoute(key, true) });
-    this.splineFacts = Facts(spline);
-    ButtonRow(spline, [
-      { label: "当前路线 JSON", onClick: () => RevealJson(this.splineJson, this.RouteEvidence(this.selectedRoute)) },
-      { label: "全部路线 JSON", onClick: () => RevealJson(this.splineJson, this.routes.map((r) => this.RouteEvidence(r))) },
-    ]);
-    this.splineJson = CollapsedJson(spline, "JSON（默认折叠）", {
-      rows: 7, placeholder: "路线控制点、长度、宽高、种子与来源",
-    });
+    this.splineFacts = Facts(spline, ["长度 / 控制点"]);
   }
 
   BuildCarriageUi(body) {
@@ -284,8 +273,8 @@ export class FullSceneEditor {
       value, label: spec.label,
     })), "overview", (id) => this.ApplyCamera(id));
     CameraProjectionControls(cameras, this.host.camera, { farMax: 5000 });
-    Note(cameras, "自由巡看：WASD；Q/E 降升；Shift 加速；Ctrl 慢速；滚轮调速度。", false);
-    this.carriageFacts = Facts(cameras);
+
+    this.carriageFacts = Facts(cameras, ["布景构件"]);
     this.carriageFacts.Set("预览模式", "纯静态场景");
     this.carriageFacts.Set("布景构件", this.carriageSet?.props ?? 0);
     this.carriageFacts.Set("演员 / 时间轴", "未加载 / 未启动");
@@ -298,10 +287,7 @@ export class FullSceneEditor {
     this.environmentChips = Chips(environment, Object.keys(SKY_PRESETS).map((name) => ({
       value: name, label: ENV_LABELS[name] || name,
     })), "smokyDay", (name) => this.SelectEnvironment(name, true));
-    this.environmentFacts = Facts(environment);
-    this.environmentJson = CollapsedJson(environment, "环境 JSON（默认折叠）", {
-      rows: 9, placeholder: "完整天空、灯光、雾与后期参数",
-    });
+    this.environmentFacts = Facts(environment, ["预设"]);
     ButtonRow(environment, [
       { label: "恢复进入时环境", onClick: () => {
         this.host.game.RestoreEnvironmentState?.(this.environmentState);
@@ -309,18 +295,6 @@ export class FullSceneEditor {
         if (name) this.SelectEnvironment(name, false);
       } },
     ]);
-  }
-
-  BuildSeedUi(body) {
-    const seeds = Section(body, "确定性随机种子");
-    this.seedList = ListBox(seeds, { height: 180, onPick: (id) => this.SelectSeed(id) });
-    this.seedFacts = Facts(seeds);
-    ButtonRow(seeds, [
-      { label: "完整种子清单 JSON", onClick: () => RevealJson(this.seedJson, this.seedRows) },
-    ]);
-    this.seedJson = CollapsedJson(seeds, "种子 JSON（默认折叠）", {
-      rows: 7, placeholder: "种子值、来源与用途",
-    });
   }
 
   SwitchScene(target) {

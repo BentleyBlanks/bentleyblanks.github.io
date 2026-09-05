@@ -814,7 +814,7 @@ export class SceneEditor {
     this.levelList.Fill([PROLOGUE_SCENE, ...PHASES.map((p) => ({
       id: p.id, name: p.label, tail: p.date || "", title: p.brief || "",
     }))]);
-    this.levelFacts = Facts(level);
+    this.levelFacts = Facts(level, ["当前关"]);
   }
 
   BuildCameraUi(body, modes = ["look"]) {
@@ -941,9 +941,7 @@ export class SceneEditor {
       this.hudNamesVisible = value;
       this.UpdateHudLabels();
     });
-    Note(mark, "区域标记画占地框，道路标记画带宽走向，随场景 JSON 存取。“载入滕县图纸标记”直接读 Data_Tengxian。", true);
-    Note(mark, "「名牌 HUD」把布防图（Data_Tengxian）与已放标记的名字直接投在屏幕上，"
-      + "任何机位高度都读得清；「视口显示」管的是近处才看得见的世界牌与占地框。");
+
     this.RefreshMarkerUi();
   }
 
@@ -969,11 +967,7 @@ export class SceneEditor {
       { label: "撤销一笔", onClick: () => this.UndoTerrain() },
       { label: "全部还原", onClick: () => this.ResetTerrain(), cls: "danger" },
     ]);
-    Note(terrain, "笔刷同时改**网格顶点**与**解析高程**：看得见的地和踩得到的地一起变。", true);
-    Note(terrain, "刷得动的只有**城内台地**（|x|、|z| < 318 m，约 5.5 m 一个顶点）。"
-      + "城外那张地面是绕城的方环，七百米以外每两百米才一个顶点 —— "
-      + "在那儿落笔会被拒绝并提示，不会偷偷只改解析高程。");
-    Note(terrain, "已放置的构件会跟着重采样地高，抬升/下挖都不会悬空或埋进地里。", true);
+
   }
 
   BuildStorageUi(body) {
@@ -987,12 +981,12 @@ export class SceneEditor {
     this.io = TextArea(io, {
       rows: 3, placeholder: "{ \"v\":2, \"items\":[…], \"markers\":[…], \"terrain\":[…] }",
     });
-    this.ioNote = Note(io, `本地存档键：${SAVE_KEY}`);
+    this.ioNote = Note(io, "");
   }
 
   BuildStatsUi(body) {
     const stats = Section(body, "取证");
-    this.facts = Facts(stats);
+    this.facts = Facts(stats, ["构件 / 标记 / 地形", "选中", "笔刷动到顶点"]);
   }
 
   Entry(id) { return PLACEABLE.find((p) => p.id === id) || null; }

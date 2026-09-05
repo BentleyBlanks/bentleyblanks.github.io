@@ -98,8 +98,7 @@ export class SamplePointEditor {
       this.followPhase = on;
       if (on) this.EnsurePhase();
     });
-    Note(list, "点位不在当前切片里就什么也拍不到（那一片根本不生成）。"
-      + "关掉这个开关只看不切时，面板会用红字提示切片不对。");
+    Note(list, "仅显示当前切片内的点位。");
 
     // --- 位姿 ---
     const pose = Section(body, "位姿");
@@ -138,8 +137,6 @@ export class SamplePointEditor {
       { label: "取当前相机", onClick: () => this.CaptureFromCamera() },
       { label: "对准目标", onClick: () => this.AimAtTarget() },
     ]);
-    Note(pose, "「取当前相机」把飞行到的位置与朝向写回所选点位 —— 这是调机位的主路："
-      + "先飞过去看，满意了再摁它。");
 
     // --- 增删 ---
     const edit = Section(body, "增删");
@@ -176,7 +173,7 @@ export class SamplePointEditor {
 
     // --- 取证 ---
     const evidence = Section(body, "取证");
-    this.facts = Facts(evidence);
+    this.facts = Facts(evidence, ["当前切片", "点位总数"]);
     this.status = Note(evidence, "", true);
 
     // --- 导出 ---
@@ -187,7 +184,7 @@ export class SamplePointEditor {
       { label: "导出 mjs 片段", onClick: () => this.Export("mjs") },
       { label: "导入", onClick: () => this.Import() },
     ]);
-    Note(io, "改动只在浏览器里，**基线在源码**：把「mjs 片段」誊回 Data_SamplePoints.mjs，否则出图仍是旧机位。", true);
+    Note(io, "导出后保存到源码才会永久生效。");
   }
 
   // -------------------------------------------------------------------------
@@ -534,13 +531,12 @@ export class SamplePointEditor {
     if (!resolved) { this.status.textContent = "没有选中点位"; return; }
     const messages = [];
     if (built !== resolved.phase) {
-      messages.push(`切片不对：本点属于 ${PhaseFor(resolved.phase)?.label || resolved.phase}，`
-        + (resolved.phase === OVERVIEW_KEY
-          ? "那一片当场切不过去 —— 用 ?phase=overview 重载页面再看这一批"
-          : "现在建的是另一关，看到的不是它该有的样子"));
+      messages.push(resolved.phase === OVERVIEW_KEY
+        ? "请用 ?phase=overview 打开总览。"
+        : `请切换到${PhaseFor(resolved.phase)?.label || resolved.phase}。`);
     }
-    if (!InPhaseBounds(resolved)) messages.push("落在本片 bounds 之外：那一片根本不生成");
-    if (this.dirty) messages.push("有未导出的改动 —— 基线在源码里，记得誊回去");
+    if (!InPhaseBounds(resolved)) messages.push("点位超出当前切片");
+    if (this.dirty) messages.push("改动待导出");
     this.status.textContent = messages.join(" · ");
     this.status.classList.toggle("warn", messages.length > 0);
   }

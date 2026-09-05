@@ -186,7 +186,7 @@ export class GraphicsSettings {
     ]);
 
     const stat = Section(body, "读数");
-    this.facts = Facts(stat);
+    this.facts = Facts(stat, ["帧率（渲染）"]);
     ButtonRow(stat, [
       { label: "全部恢复出厂", onClick: () => this.Reset(), cls: "danger" },
     ]);
@@ -267,7 +267,7 @@ export class AudioSettings {
   Enter(root) {
     if (this.audio) this.audio.Unlock();
     this.panel = Panel({
-      title: "音效设置", sub: "Script_Audio",
+      title: "音效设置", sub: "",
       variant: "work", onClose: () => this.host.Close(),
     });
     root.appendChild(this.panel.root);
@@ -295,8 +295,8 @@ export class AudioSettings {
   BuildUi(body) {
     const audio = this.audio;
     if (!audio || !audio.enabled) {
-      Note(Section(body, "引擎"), "音频在这个模式下是关掉的（出图模式 enabled=false）。", true);
-      this.facts = Facts(body);
+      Note(body, "当前模式未启用音频。", true);
+      this.facts = Facts(body, ["状态"]);
       return;
     }
 
@@ -306,18 +306,16 @@ export class AudioSettings {
       format: (v) => `${Math.round(v * 100)}%`,
       onInput: (v) => { audio.SetMasterVolume(v); this.Save(); },
     });
-    const Bus = (kind, label, note) => {
+    const Bus = (kind, label) => {
       Slider(mix, {
         label, min: 0, max: 1, step: 0.02, value: audio.mix[kind],
         format: (v) => `${Math.round(v * 100)}%`,
         onInput: (v) => { audio.SetBusVolume(kind, v); this.Save(); },
       });
-      if (note) Note(mix, note);
     };
-    Bus("sfx", "音效", "枪炮、命中、脚步、人声都走这条。压制与耳鸣不受它影响。");
+    Bus("sfx", "音效");
     Bus("music", "音乐");
-    Bus("ambience", "环境床", "2—4 条实录的空气叠在一起（风 / 火 / 远处的仗 / 夜）"
-      + "＋ 按概率撒的一次性音。觉得战场太吵先压这一条，它是「一直在响」的那一层。");
+    Bus("ambience", "环境音");
 
     const opts = Section(body, "开关");
     const box = document.createElement("div");
@@ -330,8 +328,6 @@ export class AudioSettings {
       if (on) audio.SetPaused(true); else audio.SetPaused(false);
       this.Save();
     });
-    Note(opts, "暂停只让 Frame() 提前返回，**拦不住声音**（环境床是自跑的循环 + 400 ms 调度器）；"
-      + "「暂停时静音背景」修的就是这条。", true);
 
     ButtonRow(opts, [
       { label: "静音", onClick: () => { audio.SetMasterVolume(0); this.Rebuild(); } },
@@ -340,7 +336,7 @@ export class AudioSettings {
     ]);
 
     const stat = Section(body, "读数");
-    this.facts = Facts(stat);
+    this.facts = Facts(stat, ["状态"]);
   }
 
   Rebuild() {
@@ -418,8 +414,7 @@ export class ControlsSettings {
       }
       section.appendChild(grid);
     }
-    Note(body, "情境提示只在动作真的可执行时出现：靠近可用枪械显示 F，"
-      + "拥有两支枪时显示 1 / 2，正在流血且还有绷带时显示 B。");
+
   }
 
   Exit() {

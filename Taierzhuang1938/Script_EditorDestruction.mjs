@@ -191,7 +191,7 @@ export class DestructionEditor {
       this.showVolumes = on;
       this.RefreshGizmos();
     });
-    Note(tool, "玩法里的场景破坏暂时关闭，只在本编辑器临时启用；复原或退出会还原。", true);
+    Note(tool, "仅测试期间启用破坏，退出自动复原。");
 
     const profiles = Section(body, "本关材质分布");
     this.profileList = ListBox(profiles, {
@@ -199,9 +199,9 @@ export class DestructionEditor {
     });
 
     const target = Section(body, "准心目标");
-    this.targetFacts = Facts(target);
+    this.targetFacts = Facts(target, ["目标", "材质", "耐久", "规则"]);
     const scene = Section(body, "破坏取证");
-    this.sceneFacts = Facts(scene);
+    this.sceneFacts = Facts(scene, ["受损 / 破口", "最近结果"]);
   }
 
   SetAction(action) {

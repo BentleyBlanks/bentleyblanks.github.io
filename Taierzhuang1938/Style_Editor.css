@@ -350,3 +350,6 @@ body.edToolsOpen:has(#edRoot:not(.off)) #menu:not(.off) .mnTitle { visibility: h
   .edPanel.debugRendering { left: 10px; right: 10px; width: auto; top: 84px; bottom: 10px; z-index: 1; }
   .edHint { top: 10px; max-width: calc(100% - 150px); left: 10px; transform: none; }
 }
+
+/* Empty status messages do not take up space in compact testing panels. */
+.edNote:empty { display: none; }

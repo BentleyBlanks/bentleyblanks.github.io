@@ -418,7 +418,7 @@ export class ActorEditor {
     this.studio.Open(this.host.hideInStudio);
     this.studio.Frame(1.7, 3.4);
     this.panel = Panel({
-      title: "人物动作编辑器", sub: "Script_Actor",
+      title: "人物动作编辑器", sub: "",
       variant: "work", onClose: () => this.host.Close(),
     });
     root.appendChild(this.panel.root);
@@ -455,14 +455,12 @@ export class ActorEditor {
     });
     this.kindList.Fill(KINDS.map((k) => ({ id: k.id, name: k.name, tail: k.id, title: k.note })));
     this.kindList.Select(this.kind);
-    this.kindNote = Note(who, KINDS[0].note);
 
     this.weaponSelect = Select(who, "武器",
       [{ value: DEFAULT_WEAPON_CHOICE, label: "（按人物源配置）" },
         { value: "", label: "（空手）" },
         ...Object.keys(WEAPONS).map((id) => ({ value: id, label: `${WEAPONS[id].name}  ${id}` }))],
       DEFAULT_WEAPON_CHOICE, (v) => this.SetWeaponChoice(v));
-    Note(who, "默认按 Script_Actor 的人物配置配枪；选择具体武器后会立即替换当前人物，本阵营对比时会替换五人。", true);
 
     this.modelSelect = Select(who, "源模型", [], "", (value) => {
       this.modelVariant = Number(value);
@@ -499,9 +497,7 @@ export class ActorEditor {
       this.xray = on;
       for (const gizmo of this.gizmos) gizmo.SetXray(on);
     });
-    Note(box, "红色 = 头、躯干、双臂、双腿的随骨骼命中体；"
-      + "蓝胶囊 = Rapier 移动碰撞。两套职责互不相干。");
-    Note(box, "GLB 加载失败时红色命中体才回退为 COMBAT.hitbox 固定球。", true);
+    Note(box, "红：命中体 · 蓝：移动胶囊");
 
     // --- 动作 ---
     const act = Section(body, "动作（资产与程序化）");
@@ -519,7 +515,7 @@ export class ActorEditor {
       height: 168,
       onPick: (id) => this.SetClip(id),
     });
-    this.importedClipNote = Note(act, "导入动作仅列出当前角色可用的阵营与身份；不会跨阵营或把士兵动作套给军官。", true);
+    this.importedClipNote = Note(act, "");
     this.FillActionList();
 
     ButtonRow(act, [
@@ -532,36 +528,10 @@ export class ActorEditor {
       onInput: (v) => { this.speed = v; },
     });
 
-    // --- 手动调参 ---
-    const man = Section(body, "手动调参");
-    Chips(man, [{ value: "clip", label: "按配方" }, { value: "manual", label: "手动" }],
-      "clip", (v) => {
-        this.manual = v === "manual";
-        if (this.manual) this.animationMode = "programmatic";
-      });
-    const S = (key, label, min, max) => {
-      this.sliders[key] = Slider(man, {
-        label, min, max, step: 0.01, value: this.manualState[key],
-        onInput: (v) => { this.manualState[key] = v; },
-      });
-    };
-    S("moveSpeed", "移动", 0, 1);
-    S("strafe", "横移", -1, 1);
-    S("crouch", "下蹲", 0, 1);
-    S("prone", "卧倒", 0, 1);
-    S("aim", "据枪", 0, 1);
-    S("throwing", "投弹", 0, 1);
-    S("melee", "白刃", 0, 1);
-    S("hurt", "中弹", 0, 1);
-    S("dying", "濒死", 0, 1);
-    S("lookYaw", "看 · 偏航", -1.4, 1.4);
-    S("lookPitch", "看 · 俯仰", -1.0, 0.9);
-    Toggle(man, "扣扳机", false, (on) => { this.manualState.firing = on; });
-
-    // --- 读数 ---
+    // --- 测试结果 ---
     const info = Section(body, "取证");
-    this.facts = Facts(info);
-    Note(info, "meshSource 应为 glb:Lugou…；出现 box/model 表示角色 GLB 没有接入。", true);
+    this.facts = Facts(info, ["角色模型", "动作", "姿态校正", "时间"]);
+
   }
 
   FillActionList() {
@@ -581,8 +551,8 @@ export class ActorEditor {
       const profile = GetLugouAnimationEntries(this.kind)[0];
       if (this.importedClipNote) {
         this.importedClipNote.textContent = profile
-          ? `当前：${profile.targetLabel}。只显示该角色的 ${GetLugouAnimationEntries(this.kind).length} 条动作；曲线只从本阵营模型播放。`
-          : "百姓没有导入军人动作；请切换到程序化配方预览。";
+          ? ""
+          : "无导入动作，请选择程序化配方。";
       }
     }
     this.clipList.Fill(entries);
@@ -716,8 +686,6 @@ export class ActorEditor {
       this.gizmos.push(gizmo);
     });
     if (this.towel != null) this.ApplyTowel();
-    const entry = KINDS.find((k) => k.id === this.kind);
-    if (this.kindNote && entry) this.kindNote.textContent = entry.note;
     this.studio.Frame(1.75, this.lineup ? 6.4 : 3.4);
     this.Step(0);
   }

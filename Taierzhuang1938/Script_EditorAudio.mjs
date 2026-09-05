@@ -143,7 +143,7 @@ export class AudioEditor {
       this.savedMusic = audio.musicCue || null;
     }
     this.panel = Panel({
-      title: "音效音乐编辑器", sub: "Script_Audio",
+      title: "音效音乐编辑器", sub: "",
       variant: "work wide", onClose: () => this.host.Close(),
     });
     root.appendChild(this.panel.root);
@@ -173,7 +173,7 @@ export class AudioEditor {
 
   BuildUi(body) {
     const state = Section(body, "引擎");
-    this.engineFacts = Facts(state);
+    this.engineFacts = Facts(state, ["状态", "采样缺失", "人声缺失"]);
     // 采样载不到时最要紧的两件事：**它去要的是哪个地址**（多 agent 并行时
     // 十有八九是浏览器指在了别人那棵树上），和**能不能就地再试一次**。
     Button(state, "↻ 重拉采样包", () => {
@@ -225,10 +225,8 @@ export class AudioEditor {
     }
     const stopAmbience = Button(ambBox, "■ 停止环境", () => this.StopAmbiencePreview(), { cls: "danger" });
     stopAmbience.dataset.stopAmbience = "";
-    Note(amb, "环境床 = 2—4 条实录的空气叠在一起（风 / 火 / 远处的仗 / 夜）"
-      + "＋ 按概率撒的一次性音。每条床挂两条播放头，各自从素材的随机位置起播、"
-      + "互相交叉淡 —— **没有循环点**，同一条素材永远不会以同样的方式接第二次。");
-    this.ambFacts = Facts(amb);
+
+    this.ambFacts = Facts(amb, ["当前环境", "环境缺失"]);
 
     const music = Section(body, "音乐");
     const musicBox = El("div", "edBtns");
@@ -240,7 +238,7 @@ export class AudioEditor {
     }
     const stopMusic = Button(musicBox, "■ 停止音乐", () => this.StopMusicPreview(), { cls: "danger" });
     stopMusic.dataset.stopMusic = "";
-    this.musicFacts = Facts(music);
+    this.musicFacts = Facts(music, ["当前音乐", "音乐缺失"]);
 
     const voice = Section(body, "人声（四川话 · 采样）");
     this.voiceList = ListBox(voice, {
@@ -260,7 +258,7 @@ export class AudioEditor {
         if (this.audio) this.audio.Bark(kind, { priority: true, seed: Math.floor(Math.random() * 1000) });
       });
     }
-    this.voiceNote = Note(voice, "「事件句」三条有前提（战车/飞机/无枪），只能点名喊，随机抽中即穿帮。", true);
+    this.voiceNote = Note(voice, "", true);
 
     const quiz = Section(body, "盲听指认");
     ButtonRow(quiz, [
@@ -271,8 +269,7 @@ export class AudioEditor {
     this.blindBox = El("div", "edBtns");
     quiz.appendChild(this.blindBox);
     this.blindFacts = Facts(quiz);
-    Note(quiz, "认错的那几对通常就是需要重新配平的：拉栓与压弹分不开、砖与土分不开，"
-      + "玩家在战场上也就分不开。");
+
   }
 
   // -------------------------------------------------------------------------
@@ -304,16 +301,7 @@ export class AudioEditor {
 
   /** 这一条现在到底在响哪一层：实录素材的出处，还是合成配方。 */
   Describe() {
-    const info = SOUND_INFO[this.soundName];
-    const base = info ? `${this.soundName} —— ${info[2]}` : this.soundName;
-    const audio = this.audio;
-    let source = "合成（Script_Audio 的 RECIPES）";
-    if (audio && audio.sampleCues.has(this.soundName)) {
-      const cue = this.soundName === "bugleCharge" ? "bugleTone" : this.soundName;
-      const entry = audio.sfxManifest && audio.sfxManifest.cues[cue];
-      source = entry ? `实录：${entry.credit}（${entry.files.length} 个变体）` : "实录";
-    }
-    this.soundNote.textContent = `${base}\n${source}`;
+    this.soundNote.textContent = this.audio?.sampleCues.has(this.soundName) ? "实录采样" : "合成音效";
   }
 
   PlayCurrent(times = 1) {
@@ -456,10 +444,10 @@ export class AudioEditor {
     const f = this.engineFacts;
     if (!f) return;
     if (!audio || !audio.enabled) {
-      f.Set("状态", "已关闭（出图模式下 AudioEngine enabled=false）", "bad");
+      f.Set("状态", "已关闭", "bad");
       return;
     }
-    f.Set("状态", audio.Ready ? "运行中" : "未解锁（点任意一个播放键）", audio.Ready ? "good" : "warn");
+    f.Set("状态", audio.Ready ? "运行中" : "点击播放启用", audio.Ready ? "good" : "warn");
     f.Set("在响的节点", audio.liveNodes);
     f.Set("配方数", SOUND_NAMES.length);
     // 采样一载进来就把同名合成配方盖掉了，列表的尾标要跟着翻

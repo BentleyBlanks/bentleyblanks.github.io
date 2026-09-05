@@ -238,9 +238,7 @@ export class EditorSuite {
 
     this.status = El("div", "edNote warn", "");
     body.appendChild(this.status);
-    body.appendChild(El("div", "edNote",
-      "一次只开一个：预览与编辑工具会接管相机，同时开会打架。"
-      + "开着任意一个时玩法暂停（与过场同一条通道）。"));
+
 
     this.workHost = El("div");
     root.appendChild(this.workHost);

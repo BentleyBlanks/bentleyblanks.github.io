@@ -193,13 +193,6 @@ export class ProfilerEditor {
     body.appendChild(El("h2", "", "CPU · 主线程（逐系统，ms/帧）"));
     const cpuTable = MakeTable(["系统", "avg", "p95", "max", ""]);
     body.appendChild(cpuTable);
-    body.appendChild(El("div", "note",
-      "「渲染提交」是主线程把整条链交给驱动的时间（预通道+阴影+主场景+全屏 pass 的"
-      + " draw call 提交），不是后处理本身贵 —— 逐 pass 的提交与 GPU 实耗看下表。"));
-    body.appendChild(El("div", "note",
-      "线程说明：玩法期间本作没有 worker（加载台的旋转 worker 只活在加载画面），"
-      + "游戏逻辑与渲染提交全在主线程；GPU 进程的实耗见下表；WebAudio 在浏览器的"
-      + "音频线程，页面测不到。"));
 
     body.appendChild(El("h2", "", "GPU · 逐 pass（ms/帧）"));
     const gpuTable = MakeTable(["pass", "GPU avg", "GPU p95", "GPU max", "提交 CPU", ""]);
@@ -215,7 +208,7 @@ export class ProfilerEditor {
     const events = El("div", "stats", "—");
     body.appendChild(events);
 
-    const copyBtn = El("button", "", "导出快照 JSON（发给排查的人）");
+    const copyBtn = El("button", "", "导出快照 JSON");
     body.appendChild(copyBtn);
     const copyBox = El("textarea");
     copyBox.readOnly = true;
@@ -365,10 +358,9 @@ export class ProfilerEditor {
 
     // --- GPU 表 ---
     if (!summary.timerAvailable) {
-      ui.gpuNote.textContent = "这个浏览器没有 EXT_disjoint_timer_query_webgl2，"
-        + "量不到 GPU 实耗（Chrome/Edge 有；表里只有提交 CPU 一列有数）。";
+      ui.gpuNote.textContent = "当前浏览器不支持 GPU 计时。";
     } else if (summary.gpuFrames === 0) {
-      ui.gpuNote.textContent = "等待查询结果……（结果比提交晚几帧回来）";
+      ui.gpuNote.textContent = "等待 GPU 计时…";
     } else {
       ui.gpuNote.textContent = `GPU 合计 avg ${F(summary.gpuTotal.avg)} ms · `
         + `采样帧 ${summary.gpuFrames}。misc 是有名字的 pass 之间的零碎 GL 工作`

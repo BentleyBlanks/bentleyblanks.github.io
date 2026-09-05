@@ -352,8 +352,6 @@ export class SplineEditor {
     Toggle(list, "显示真几何预览", this.showPreview, (on) => {
       this.showPreview = on; this.BuildOverlay();
     });
-    Note(list, "城外大车路/铁路/石墙村按当前关卡切片列出；切片外的路线看不到也编不了。"
-      + "围墙预览走 Script_WallSpline 同一份 PCG（变体/塌段/破口逐位一致）。");
 
     const edit = Section(body, "编辑");
     this.modeChips = Chips(edit, [
@@ -377,16 +375,14 @@ export class SplineEditor {
       { label: "还原所选", onClick: () => this.RevertSelected() },
       { label: "全部还原出厂", onClick: () => this.RevertAll(), cls: "danger" },
     ]);
-    Note(edit, "「选点」点控制点标记选中；「移动」把选中点挪到点击的地面；"
-      + "「插入」在选中点之后加一个点；「删除」点掉一个控制点。"
-      + "轴对齐/矩形来源拖弯后导出会带警告 —— 那些数据格式只有直线/矩形。");
+    Note(edit, "选点、移动或插入后，左键点击路线。");
 
     // --- 拼接资产 / 布设参数 ---
     const pcg = Section(body, "拼接资产 / 布设参数");
     this.presetList = ListBox(pcg, {
       height: 132, onPick: (key) => this.SelectPreset(key),
     });
-    this.assetFacts = Facts(pcg);
+    this.assetFacts = Facts(pcg, ["有效步距 / 露缝", "改动"]);
     Toggle(pcg, "在场里摆出拼接资产台", this.showAssets, (on) => {
       this.showAssets = on;
       this.BuildAssets();
@@ -396,17 +392,13 @@ export class SplineEditor {
       { label: "资产台搬到眼前", onClick: () => { this.assetAnchor = null; this.BuildAssets(); this.FlyToAssets(); } },
       { label: "还原该预设", onClick: () => this.RevertPreset() },
     ]);
-    Note(pcg, "资产台从左到右：**变体模块**（建城时实例化的就是这几只）、"
-      + "碱脚条、压顶条，最后一组是按当前「模块间隔 / 拼接重叠」拼起来的三块 —— "
-      + "缝和压茬看这一组。地上每格 1 m。");
+
     this.paramSliders = {};
     let lastGroup = "";
     for (const row of WALL_PARAMS) {
       if (row.group !== lastGroup) {
         lastGroup = row.group;
-        Note(pcg, row.group === "拼接"
-          ? "拼接：模块怎么排（间隔是标称值，实际步距按整除弦长；重叠让相邻两块互相压进去）"
-          : "随机：怎么不重复（六路全部确定性，按沿线弧长哈希取种）");
+
       }
       this.paramSliders[row.key] = Slider(pcg, {
         label: row.label, min: row.min, max: row.max, step: row.step,
@@ -415,11 +407,9 @@ export class SplineEditor {
         onInput: (v) => this.PatchPreset(row.key, +v.toFixed(4)),
       });
     }
-    Note(pcg, "**改的是 Script_WallSpline.WALL_PRESETS 那张表** —— 预览与建城读同一份，"
-      + "调完退出面板重建关卡就能看到。导出 JSON 里的 `presets` 一节要誊回源码。", true);
 
     const evidence = Section(body, "取证");
-    this.facts = Facts(evidence);
+    this.facts = Facts(evidence, ["长度 / 控制点", "选中点"]);
     this.status = Note(evidence, "", true);
 
     const io = Section(body, "导出 / 导入");
@@ -431,8 +421,7 @@ export class SplineEditor {
       { label: "导出改动 JSON", onClick: () => this.Export() },
       { label: "导入", onClick: () => this.Import() },
     ]);
-    Note(io, "面板里的改动只存在浏览器里。**基线在源码里** —— 改完把 JSON 里的"
-      + "点位誊回各自的数据文件（source 字段写明了去处），否则下次建城还是旧样。", true);
+    Note(io, "导出后保存到源码才会永久生效。");
   }
 
   // -------------------------------------------------------------------------

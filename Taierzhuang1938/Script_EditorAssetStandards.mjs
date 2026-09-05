@@ -146,7 +146,7 @@ export class AssetStandardsEditor {
   Enter(root) {
     this.panel = Panel({
       title: "资产规范与限制",
-      sub: "只读 · Data_AssetStandards + Data_Meshes",
+      sub: "只读",
       variant: "work wide assetStandards",
       onClose: () => this.host.Close(),
     });
@@ -168,20 +168,20 @@ export class AssetStandardsEditor {
     if (this.group === "external") {
       RenderRuleCards(this.dynamic, this.group);
       const rows = ExternalRows();
-      Note(this.dynamic, `四套外部 GLB 共 ${rows.length} 个可审计资产；原始/实际/目标/降幅与贴图策略均按最近一次真实烘焙登记。`, false);
+
       RenderAssetTable(this.dynamic, rows);
       return;
     }
     if (this.group === "procedural") {
-      Note(this.dynamic, "程序化资产没有外部原模，原始面数与降幅不适用；实际面数仍逐项展示。", false);
+
       RenderAssetTable(this.dynamic, ProceduralRows());
       return;
     }
     const rows = SourceRows(this.group);
     const bad = rows.filter((row) => row.compliance.tone === "bad").length;
     const rule = this.group === "vehicle" ? TRIANGLE_RULES.vehicle : TRIANGLE_RULES.weapon;
-    Note(this.dynamic, `${rule.rule} 当前 ${rows.length} 件，${bad ? `${bad} 件需处理` : "全部合规"}。`, bad > 0);
-    Note(this.dynamic, "原始面数只统计游戏选定几何；排除的展示件/重复壳不会因“恢复原模”重新加入。鼠标停在资产行可看处理说明。", false);
+    Note(this.dynamic, `${rows.length} 件 · ${bad ? `${bad} 件需处理` : "全部合规"}`, bad > 0);
+
     RenderAssetTable(this.dynamic, rows);
   }
 

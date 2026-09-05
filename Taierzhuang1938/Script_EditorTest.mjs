@@ -2061,7 +2061,8 @@ const externalProp = await page.evaluate(() => {
     category: active.cat,
     loaded: active.preview && active.preview.loaded,
     meshes: active.preview ? active.preview.meshes : 0,
-    source: active.facts.root.textContent,
+    // 精简面板不再展示源码路径，仍核对实际选中资产的来源。
+    source: active.Entry(active.paletteId)?.url || "",
   };
 });
 Check("构件库覆盖正式战场新增的带署名外部 GLB",
@@ -2398,9 +2399,9 @@ Check("完整场景编辑器使用独立全县城切片并覆盖四门外最远�
     && fullScene.bounds.minX <= -480 && fullScene.bounds.maxX >= 756
     && fullScene.bounds.minZ <= -560 && fullScene.bounds.maxZ >= 900,
   JSON.stringify({ id: fullScene.id, bounds: fullScene.bounds }));
-Check("完整场景编辑器入口与四类只读取证面板齐全",
+Check("完整场景编辑器保留场景、机位、路线和环境测试",
   fullScene.launcherPresent
-    && ["场景", "完整巡场机位", "Spline 完整预览（只读）", "环境系统 / 氛围预设", "确定性随机种子"]
+    && ["场景", "完整巡场机位", "Spline 完整预览（只读）", "环境系统 / 氛围预设"]
       .every((name) => fullScene.sections.includes(name)), fullScene.sections.join(" / "));
 Check("完整 Spline 清单复用真数据并覆盖城街、东关、铁路、北关与寨墙",
   ["city:WestGateStreet", "eastLane:EastGuangStreet", "west:railway", "north:street",
@@ -2410,8 +2411,8 @@ Check("完整 Spline 清单复用真数据并覆盖城街、东关、铁路、�
 Check("完整县城随机种子清单含主种子、地形与 Spline 派生种子",
   ["county.master", "county.outfield", "county.terrain", "spline.west:railway"]
     .every((id) => fullScene.seedIds.includes(id)), `${fullScene.seedIds.length} 项`);
-Check("完整场景编辑器的三块 JSON 默认折叠",
-  fullScene.jsonFolds.length === 3 && fullScene.jsonFolds.every((fold) => !fold.open),
+Check("完整场景不再展示只读 JSON 与种子清单",
+  fullScene.jsonFolds.length === 0 && !fullScene.sections.includes("确定性随机种子"),
   JSON.stringify(fullScene.jsonFolds));
 Check("环境预设实时切换并在退出完整场景编辑器后恢复",
   fullScene.beforeEnvironment.name === "editorClear" && fullScene.night.name === "night"
@@ -2469,12 +2470,12 @@ Check("车厢奇观是可自由巡看的纯静态场景，不启动正式序章"
     && !carriageEditor.buttons.some((label) => /播放|暂停|回到头/.test(label)),
   JSON.stringify({ props: carriageEditor.props, actors: carriageEditor.actors,
     before: carriageEditor.before, after: carriageEditor.after, preview: carriageEditor.preview }));
-Check("车厢静态场景只列布景种子并保留环境面板",
+Check("车厢静态场景保留布景种子数据与环境测试",
   carriageEditor.seedValues.includes(19380314)
     && !carriageEditor.seedValues.includes("chuchuanShunzi")
     && carriageEditor.sections.includes("车厢场景巡看机位")
     && carriageEditor.sections.includes("环境系统 / 氛围预设")
-    && carriageEditor.jsonFolds.length === 2 && carriageEditor.jsonFolds.every((open) => !open),
+    && carriageEditor.jsonFolds.length === 0 && !carriageEditor.sections.includes("确定性随机种子"),
   `${carriageEditor.seedValues.length} 项`);
 
 // ---------------------------------------------------------------------------

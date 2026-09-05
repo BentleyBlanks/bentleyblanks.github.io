@@ -54,7 +54,7 @@ export class PropLibraryEditor {
     this.host.studio.SetGridVisible(true);
     this.host.SetViewmodelVisible(false);
     this.panel = Panel({
-      title: "构件库预览器", sub: `${this.entries.length} 项 · 正片生成器`,
+      title: "构件库预览器", sub: `${this.entries.length} 项`,
       variant: "work wide", onClose: () => this.host.Close(),
     });
     root.appendChild(this.panel.root);
@@ -79,14 +79,10 @@ export class PropLibraryEditor {
       (value) => { this.cat = value; this.FillPalette(); });
     this.palette = ListBox(library, { height: 250, onPick: (id) => this.SetPalette(id) });
     this.FillPalette();
-    Note(library, "这里展示的清单与场景关卡编辑器完全共用：程序化构件来自 Script_World，"
-      + "模型来自 Data_Meshes；预览与实际布设不会分叉。");
 
     this.damageSection = Section(body, "建模状态");
     this.damageChips = Chips(this.damageSection, BUILDING_DAMAGE_STATE_OPTIONS, this.damageState,
       (value) => this.SetDamageState(value));
-    Note(this.damageSection, "建筑与地标若提供战损变体，可在原始、炮击初损和严重破坏之间即时切换；"
-      + "没有该状态的道具会隐藏本栏。");
 
     const camera = Section(body, "预览相机");
     this.gridToggle = Toggle(camera, "米格与地台", true,
@@ -101,7 +97,7 @@ export class PropLibraryEditor {
     ]);
 
     const evidence = Section(body, "构件取证");
-    this.facts = Facts(evidence);
+    this.facts = Facts(evidence, ["建模状态", "包围尺寸", "碰撞盒定义"]);
     this.status = Note(evidence, "");
   }
 
@@ -162,8 +158,7 @@ export class PropLibraryEditor {
     ]);
     this.externalModels = externalModels;
     if (this.disposed) return;
-    this.status.textContent = `已覆盖 ${this.entries.length} 项，其中 tzm 模型 `
-      + `${this.modelDocs.size}/${MODEL_PLACEABLE.length}，外部 GLB ${this.externalCatalog.length}`;
+    this.status.textContent = "模型已就绪";
     const entry = this.Entry(this.paletteId);
     if (entry && (entry.model || entry.id === "Tree"
       || entry.id === "Barricade" || entry.id === "SandbagPlug")) {
@@ -205,7 +200,7 @@ export class PropLibraryEditor {
       let meshes = 0;
       externalRoot.traverse((node) => { if (node.isMesh) meshes += 1; });
       built = { loaded: true, colliders: [], meshes };
-      this.status.textContent = `${entry.name} · ${entry.sourceLabel || "带署名外部 GLB"} · 仅视觉`;
+      this.status.textContent = "仅视觉，无碰撞";
     } else {
       built = BuildPlaceableVisual(root, entry, item, {
         library: this.host.library,

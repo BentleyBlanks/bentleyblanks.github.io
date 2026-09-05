@@ -158,7 +158,7 @@ export class FirstPersonEditor {
 
     this.studio.Open(this.host.hideInStudio);
     this.panel = Panel({
-      title: "第一人称持枪检查", sub: "只读 · 正片 Viewmodel",
+      title: "第一人称持枪检查", sub: "",
       variant: "work", onClose: () => this.host.Close(),
     });
     root.appendChild(this.panel.root);
@@ -214,7 +214,7 @@ export class FirstPersonEditor {
       { label: "枪口侧", onClick: () => this.SetInspectPreset("front") },
       { label: "俯视", onClick: () => this.SetInspectPreset("top") },
     ]);
-    Note(view, "外部检查显示的仍是同一棵正片 Viewmodel（含 FOV/深度压缩），不是另做一套展示手。左键拖动环绕，滚轮缩放。");
+    Note(view, "左键环绕 · 滚轮缩放");
 
     const pose = Section(body, "静态姿态与动作");
     this.poseChips = Chips(pose, [
@@ -262,7 +262,6 @@ export class FirstPersonEditor {
       this.showGrid = on;
       this.studio.SetGridVisible(on && this.view === "inspect");
     });
-    Note(overlay, "彩色球＝枪模/运行时挂点；其坐标轴＝正片 IK 目标方向；白球＝真实指骨算出的掌心。白线只回答“掌心是否追到目标”，不替人判断握姿是否自然。");
 
     const capture = Section(body, "截图与取证");
     ButtonRow(capture, [
@@ -271,10 +270,9 @@ export class FirstPersonEditor {
     ]);
     this.output = TextArea(capture, { rows: 5 });
     this.output.readOnly = true;
-    Note(capture, "自动化入口：Debug.OpenEditor(\"firstPerson\") 后调用 SetWeapon / SetView / SetInspectPreset / Snapshot。编辑器不写回任何姿态表。");
 
     const facts = Section(body, "当前真值");
-    this.facts = Facts(facts);
+    this.facts = Facts(facts, ["右掌→IK目标", "左掌→IK目标", "双臂拉伸"]);
     this.RefreshActions();
   }
 

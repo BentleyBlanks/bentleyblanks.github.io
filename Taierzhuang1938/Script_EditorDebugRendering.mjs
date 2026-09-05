@@ -510,7 +510,7 @@ export class DebugRenderingEditor {
     this.panel = null;
     this.view = "final";
     this.shading = "shaded";
-    this.facts = null;
+    this.status = null;
     // 四组 chips 是四个各自独立的高亮控件，但它们表示的是**同一个**选择。
     // 不集中同步的话，点了「辐照度图集」之后「最终画面」那一格还亮着 ——
     // 面板上会同时亮四格，读者根本判断不出当前送屏的是哪一张靶。
@@ -554,7 +554,7 @@ export class DebugRenderingEditor {
     this.SetColliders(false);
     this.panel?.root.remove();
     this.panel = null;
-    this.facts = null;
+    this.status = null;
     this.chipGroups = [];
     this.shadingChips = null;
     this.colliderToggle = null;
@@ -569,8 +569,6 @@ export class DebugRenderingEditor {
       this.shading, (id) => this.SetShading(id));
     // 冒烟按 .edViewChips 数「亮着的视图格」；着色模式的格子另起一类，别混进去
     this.shadingChips.root.classList.add("edShadingChips");
-    Note(shading, "线框 = 只画三角形边，绕过后处理直接送屏；着色线框 = 正片上叠压暗的边线。"
-      + "烟、火、粒子、天空穹与贴片不进线框（它们的材质换不掉）。第一人称照常出线。");
 
     const physics = Section(body, "物理");
     const switches = El("div", "edBtns");
@@ -596,8 +594,6 @@ export class DebugRenderingEditor {
       legend.appendChild(item);
     }
     physics.appendChild(legend);
-    Note(physics, "画的是 Rapier 世界里实际存在的碰撞体（破坏摘掉的不画、编辑器新加的会出现），"
-      + "静态层只在成员变化时重建。棱贴着墙的棱，靠深度拉近一点赢过面；相机所在的那只角色胶囊不画。");
 
     for (const group of ["输出", "后处理", "GBuffer", "材质", "光照", "AO", "GI"]) {
       const section = Section(body, group);
@@ -607,13 +603,8 @@ export class DebugRenderingEditor {
       chips.root.classList.add("edViewChips");
       this.chipGroups.push(chips);
     }
-    Note(body,
-      "前景叠加，开着别的编辑器也不关。前向管线没有 GBuffer：「材质」「光照」是"
-      + "假彩色重画一帧（low 档不可用）。第一人称的手与枪进全部视图；只有 GBuffer 的"
-      + "「视深」是个例外 —— 视图模型带非等比深度压缩，那里写的是常数近景标签 1 m，"
-      + "不是它自己的视深。", true);
-    const stat = Section(body, "当前靶");
-    this.facts = Facts(stat);
+
+    this.status = Note(body, "");
   }
 
   SetView(id) {
@@ -699,68 +690,14 @@ export class DebugRenderingEditor {
   }
 
   Update() {
-    // 碰撞体层每帧对一次物理世界的账（换关期间 physics 可能是 null，层会清空）
     if (this.colliders) this.colliders.Update(this.host.physics, this.CameraWorldPosition());
-    if (!this.facts) return;
-    const post = this.host.post;
-    const gi = this.host.gi;
-    const item = VIEWS.find((entry) => entry.id === this.view) || VIEWS[0];
-    // 以前这一行按视图 id 直接去 post.targets 里查同名键，于是 final 与 bloom
-    // 恒为"—"（两者都没有同名靶），看着像靶根本没建出来。
-    const target = VIEW_TARGETS[this.view]?.(post, gi) ?? null;
-    this.facts.Set("显示", item.label);
-    this.facts.Set("说明", item.note);
-    this.facts.Set("尺寸", target ? `${target.width} × ${target.height}` : "—", target ? "" : "warn");
-    const shading = SHADINGS.find((entry) => entry.id === this.shading) || SHADINGS[0];
-    this.facts.Set("着色模式", shading.label + (this.shading === "wireframe" && this.view === "final" ? "（hdr 靶直通，跳过合成）" : ""),
-      this.shading === "shaded" ? "" : "warn");
-    if (this.colliders) {
-      const s = this.colliders.stats;
-      const physics = this.host.physics;
-      this.facts.Set("碰撞体",
-        physics && !physics.disposed
-          ? `静态 ${s.solid} · 地形 ${s.terrain} · 角色 ${s.character} · 动态 ${s.dynamic}${s.sensor ? ` · 传感器 ${s.sensor}` : ""}${s.unsupported ? ` · 画不了 ${s.unsupported}` : ""}`
-          : "物理世界未就绪（换关中）",
-        physics && !physics.disposed ? (s.unsupported ? "warn" : "good") : "warn");
-      this.facts.Set("碰撞线段", `${s.staticSegments + s.dynamicSegments}（静态层重建 ${s.rebuilds} 次 · 上次 ${s.buildMs.toFixed(1)} ms）`);
-    } else {
-      this.facts.Set("碰撞体", "未显示");
-      this.facts.Set("碰撞线段", "—");
-    }
-    this.facts.Set("SSAO", post?.preset?.ssao ? "启用" : "当前画质档关闭", post?.preset?.ssao ? "good" : "warn");
-    this.facts.Set("GI 探针体", gi ? (gi.enabled ? `启用 · ${gi.warmed}/${gi.probeCount}` : "已构造，当前关闭") : "未构造（出厂默认关，画质 → 全局光照里打开）", gi?.enabled ? "good" : "warn");
-    // 材质/光照组的两个前置条件：材质注入过（low 档没有）、阴影真的开着
-    const injected = !!this.host.library?.gi;
-    this.facts.Set("材质假彩色", injected ? "已注入" : "low 档未注入，材质/光照组不可用", injected ? "good" : "warn");
-    const shadowOn = !!this.host.renderer?.shadowMap?.enabled;
-    this.facts.Set("太阳阴影", shadowOn ? "启用" : "关闭（阴影视图会是全黑/全白）", shadowOn ? "good" : "warn");
-    // 第一人称是两条独立的链，坏哪条都只坏一半视图，所以分两项报：
-    //   · 前景预通道 —— GBuffer / AO / 雾 / CoC 组看不看得见手和枪；
-    //   · 材质注入   —— 材质 / 光照 / GI 组画不画得到它们（外来 GLB 最容易漏）。
-    const fp = this.FirstPersonStatus();
-    if (!fp) {
-      this.facts.Set("第一人称", "本页面没有视图模型", "warn");
-    } else {
-      const inPrepass = fp.meshes > 0 && fp.prepass === fp.meshes;
-      this.facts.Set("第一人称预通道",
-        fp.meshes ? `${fp.prepass}/${fp.meshes} 件（半透明件按约定不进）` : "无网格",
-        inPrepass || fp.prepass > 0 ? "good" : "warn");
-      this.facts.Set("第一人称材质",
-        fp.materials ? `${fp.injected}/${fp.materials} 份已注入` : "无材质",
-        fp.materials > 0 && fp.injected === fp.materials ? "good" : "warn");
-    }
-    const composite = post?.uniformsComposite;
-    if (this.view === "fog") {
-      const density = composite?.uFogDensity?.value ?? 0;
-      this.facts.Set("雾效", density > 0 ? `启用 · 密度 ${density.toFixed(3)}` : "关闭（雾量图为深蓝）", density > 0 ? "good" : "warn");
-    }
-    if (this.view === "dof") {
-      const farStrength = composite?.uDofStrength?.value ?? 0;
-      const nearStrength = composite?.uNearDofStrength?.value ?? 0;
-      const strength = Math.max(farStrength, nearStrength);
-      const mode = farStrength > nearStrength ? "阵亡远景" : "开镜近景";
-      this.facts.Set("景深", strength > 0 ? `启用 · ${mode} ${strength.toFixed(2)}` : "当前未触发", strength > 0 ? "good" : "warn");
-    }
+    if (!this.status) return;
+    const target = VIEW_TARGETS[this.view]?.(this.host.post, this.host.gi) ?? null;
+    let message = "";
+    if (MATERIAL_VIEW_MODES[this.view] && !this.host.library?.gi) message = "当前画质不支持此视图。";
+    else if (!target && this.view !== "final") message = "此视图暂不可用，请启用对应效果。";
+    this.status.textContent = message;
+    this.status.hidden = !message;
   }
 }
 

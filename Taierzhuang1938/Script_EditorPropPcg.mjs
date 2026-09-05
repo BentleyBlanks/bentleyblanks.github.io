@@ -167,11 +167,9 @@ export class PropPcgEditor {
       { label: "看所选区", onClick: () => this.FrameSelected() },
     ]);
     CameraProjectionControls(preview, this.host.camera, { farMax: 5000 });
-    Note(preview, "青色=生活组，橙色=补给组，红色=沙袋线，黄色=铁丝网。真实构件来自 ExternalProps 同一资产缓存；"
-      + "退出编辑器会恢复正片 InstancedMesh，不留下克隆或碰撞。", true);
 
     const evidence = Section(body, "规则与 GPU 取证");
-    this.facts = Facts(evidence);
+    this.facts = Facts(evidence, ["PCG 结果", "拒绝原因"]);
     this.status = Note(evidence, "");
 
     const io = Section(body, "存取 / 交付");
@@ -183,7 +181,7 @@ export class PropPcgEditor {
       { label: "恢复源码默认", onClick: () => this.Reset(), cls: "danger" },
     ]);
     this.io = TextArea(io, { rows: 5, placeholder: "{ \"version\":2, \"seed\":…, \"volumes\":[…] }" });
-    this.ioNote = Note(io, `本地试调键：${STORE_KEY}；正式结果需誊回 Data_PropPcg.mjs。`);
+    this.ioNote = Note(io, "");
   }
 
   FillVolumeList() {
@@ -210,7 +208,7 @@ export class PropPcgEditor {
     if (!box) return;
     box.innerHTML = "";
     const volume = this.selected;
-    if (!volume) { Note(box, "还没有撒点区。用“准心处新建”建立矩形区或工事线。"); return; }
+    if (!volume) { Note(box, "点击准心处新建撒点区。"); return; }
     Row(box, "名称", MakeInput(volume.label, (value) => {
       volume.label = value.slice(0, 48) || volume.id;
       this.FillVolumeList();
@@ -271,8 +269,7 @@ export class PropPcgEditor {
         format: (v) => `${v.toFixed(2)} m`, onInput: (v) => { volume.sideJitter = v; this.RequestRefresh(); } });
       Slider(box, { label: "沿线抖动", min: 0, max: 3, step: 0.02, value: volume.alongJitter ?? 0,
         format: (v) => `${v.toFixed(2)} m`, onInput: (v) => { volume.alongJitter = v; this.RequestRefresh(); } });
-      Note(box, "控制点走向决定构件朝向；间隔按弧长均匀分槽，抖动只去复制感。"
-        + "会改通行的工事线务必把门洞、马道与任务轴切成独立安全段。", true);
+
     } else {
       const center = VolumeCenter(volume);
       const width = volume.bounds.maxX - volume.bounds.minX;
@@ -313,7 +310,7 @@ export class PropPcgEditor {
     Slider(box, { label: "种子偏移", min: 0, max: 4096, step: 1, value: volume.seedOffset,
       format: (v) => v.toFixed(0), onInput: (v) => { volume.seedOffset = Math.round(v); this.RequestRefresh(); } });
     const profile = PROP_PCG_PROFILES[volume.profile];
-    Note(box, profile ? `模板：${profile.templates.map((entry) => entry.label).join(" / ")}` : "规则组不存在", !profile);
+
   }
 
   Context() {

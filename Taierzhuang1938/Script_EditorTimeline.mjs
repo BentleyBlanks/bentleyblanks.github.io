@@ -45,7 +45,7 @@ export class TimelineEditor {
 
   Enter(root) {
     this.panel = Panel({
-      title: "Timeline 编辑器", sub: "Script_Cutscene",
+      title: "Timeline 编辑器", sub: "",
       variant: "work wide", onClose: () => this.host.Close(),
     });
     root.appendChild(this.panel.root);
@@ -75,7 +75,6 @@ export class TimelineEditor {
       };
     }));
     this.list.Select(this.cutId);
-    this.whyNote = Note(pick, "");
 
     const band = Section(body, "走带");
     this.track = El("div", "edTrack");
@@ -103,8 +102,7 @@ export class TimelineEditor {
     });
 
     const shot = Section(body, "当前镜");
-    this.shotFacts = Facts(shot);
-    this.shotNote = Note(shot, "");
+    this.shotFacts = Facts(shot, ["镜", "时长"]);
 
     const outline = Section(body, "分镜表");
     this.shotList = ListBox(outline, {
@@ -121,13 +119,13 @@ export class TimelineEditor {
     });
 
     const check = Section(body, "自检 / 日志");
-    this.checkFacts = Facts(check);
+    this.checkFacts = Facts(check, ["自检", "Play 失败"]);
     this.logBox = El("div", "edNote");
     this.logBox.style.maxHeight = "132px";
     this.logBox.style.overflowY = "auto";
     check.appendChild(this.logBox);
-    Note(check, "分镜秒数之和必须等于声明时长，对不上 Play() 直接抛错。", true);
-    Note(check, "按住 Alt 可临时释放鼠标：序章自由视线暂停响应，松开后继续审片。", true);
+    Note(check, "Alt 临时释放鼠标。");
+
   }
 
   // -------------------------------------------------------------------------
@@ -138,7 +136,6 @@ export class TimelineEditor {
     this.Stop();
     this.cutId = id;
     const cut = CUTSCENES[id];
-    this.whyNote.textContent = cut.why || "";
     this.shotList.Fill(cut.shots.map((s) => ({
       id: String(s.n),
       name: `镜 ${s.n} · ${s.focalMm}mm`,
@@ -300,7 +297,6 @@ export class TimelineEditor {
     f.Set("缓动", camera.ease || "easeInOut");
     f.Set("字幕 / 音效", `${(shot.subs || []).length} / ${(shot.sfx || []).length}`);
     f.Set("台词", `${(shot.lines || []).length}`);
-    this.shotNote.textContent = shot.note || "（分镜没写说明）";
   }
 
   RefreshCheck(cut) {

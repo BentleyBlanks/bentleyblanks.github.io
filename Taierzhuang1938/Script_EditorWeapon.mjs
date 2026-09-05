@@ -165,7 +165,7 @@ export class WeaponEditor {
   Enter(root) {
     this.studio.Open(this.host.hideInStudio);
     this.panel = Panel({
-      title: "枪械编辑器", sub: "Data_Weapons",
+      title: "枪械编辑器", sub: "",
       variant: "work", onClose: () => this.host.Close(),
     });
     root.appendChild(this.panel.root);
@@ -242,7 +242,6 @@ export class WeaponEditor {
       label: "开镜", min: 0, max: 1, step: 0.01, value: 0,
       onInput: (v) => { this.ads = v; this.UpdateCalibrationView(); },
     });
-    Note(act, "只显示当前武器真实支持的动作；台架是静态几何。");
 
     const calibration = Section(body, "放大准心校准");
     this.calibrationSection = calibration.parentElement;
@@ -271,13 +270,11 @@ export class WeaponEditor {
     ]);
     this.calibrationOutput = TextArea(calibration, { rows: 3 });
     this.calibrationOutput.readOnly = true;
-    Note(calibration, "红十字是实际弹道中心。进入校准后拖动画面可粗调，滑杆做 0.5 px 微调；让准星尖与红十字重合。Y 正值向上。");
+    Note(calibration, "准星对齐红十字；Y 正值向上。");
 
     const data = Section(body, "数据卡");
-    this.facts = Facts(data);
-    this.noteEl = Note(data, "");
-    this.sourceNote = Note(data, "", true);
-    Note(data, "“待考”表示原始素材没有提供足够信息来确认具体型号或阵营，不是游戏里的未知/未解锁状态。");
+    this.facts = Facts(data, ["模型", "动作中", "栓在后"]);
+
     this.RefreshControls();
   }
 
@@ -693,9 +690,6 @@ export class WeaponEditor {
       .map(([id]) => id);
     F("玩家携行", carriers.length ? carriers.join(" ") : "（不进玩家背包）");
 
-    this.noteEl.textContent = w.note || "";
-    this.sourceNote.textContent = "标琥珀色的几项（后坐 / 开镜 / 散布）是**手感调校值**，"
-      + "不是史料；尺寸与初速有来源，见 docs/Data_HistoryMaterial.md。";
   }
 }
 

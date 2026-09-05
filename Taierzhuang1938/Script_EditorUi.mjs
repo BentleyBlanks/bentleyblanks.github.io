@@ -256,7 +256,9 @@ export function ListBox(parent, { height = 150, onPick = null } = {}) {
  * 键值读数板。每帧刷新的数字都走它 —— 只改 textContent，不重建 DOM
  * （重建 DOM 会让正在滚动的面板每帧跳回顶部）。
  */
-export function Facts(parent) {
+// keys limits visible results; omitted keys preserve the full table for existing callers.
+export function Facts(parent, keys = null) {
+  const allowedKeys = keys ? new Set(keys) : null;
   const root = El("div", "edFacts");
   const rows = new Map();
   parent.appendChild(root);
@@ -264,6 +266,7 @@ export function Facts(parent) {
     root,
     /** @param {string} tone "" | "warn" | "bad" | "good" */
     Set(key, value, tone = "") {
+      if (allowedKeys && !allowedKeys.has(key)) return;
       let row = rows.get(key);
       if (!row) {
         const el = El("div", "f");
