@@ -21,6 +21,32 @@ function FootY(layout,p) {
 }
 assert.ok(openingStoryBeats.length>0);
 {
+ const config=P012Phase.whitebox,activity=config.activities,blocks=config.layout.blocks;
+ // Actual positions from the screen-wall regression. The second defender
+ // started on the wrong side; a direct defend goal left him there indefinitely.
+ const actors=[{id:1,x:85.65912309457913,z:15.04185442164237,alive:true},
+  {id:2,x:86.23992165377418,z:21.216750909685757,alive:true}];
+ const defended=[],released=[];let held=true,commands=0;
+ const runtime=new FirstLevelP012Runtime({Position:actor=>actor,BodyRadius:()=>.34,
+  Signalled:()=>held,ReleaseDefense:actor=>{actor.scriptDefensive=false;},
+  ReleaseGuide:actor=>released.push(actor.id),Defend:(actor,point)=>{defended.push(actor.id);actor.scriptDefensive=true;},
+  Move:(actor,target,speed)=>{
+    assert.ok(P012SegmentClear(blocks,actor,target,.34),'road defenders use the standing AI capsule through the real courtyard opening on every command');
+    const distance=Math.hypot(target.x-actor.x,target.z-actor.z),step=Math.min(distance,speed*.05);
+    actor.x+=(target.x-actor.x)*step/(distance||1);actor.z+=(target.z-actor.z)*step/(distance||1);commands++;
+  },
+ },config);
+ runtime.beat=13;runtime.defenders=actors;
+ for(let i=0;i<800&&!actors.every(actor=>actor.scriptDefensive);i++)runtime.StepRoadCover();
+ assert.ok(commands>0);
+ assert.deepEqual(defended.toSorted(),[1,2]);
+ assert.ok(actors.every((actor,index)=>Math.hypot(actor.x-activity.roadContactFriendlyCovers[index].x,
+  actor.z-activity.roadContactFriendlyCovers[index].z)<.6),'both original living defenders really reach separate covers');
+ const settled=actors.map(actor=>({...actor}));for(let i=0;i<20;i++)runtime.StepRoadCover();
+ assert.deepEqual(actors,settled,'arrived defenders hold without restarting movement');
+ runtime.beat=14;runtime.StepRoadCover();assert.equal(runtime.roadCoverMoves,null);
+}
+{
  const guard={id:'escortGuard',x:0,z:0},fighter={id:'companion',x:0,z:0},orders=[];let held=false;
  const runtime=new FirstLevelP012Runtime({GuideActor:()=>null,Position:actor=>actor,
   FriendlyActors:()=>[guard,fighter],IsEscortMember:actor=>actor===guard,

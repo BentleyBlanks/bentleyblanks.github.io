@@ -600,5 +600,8 @@ assert.equal(sync.call(cartHost,{signalled:()=>false,restore:true}),0,'rewind to
 host.layout={};assert.equal(sync.call(host,{signalled:()=>true}),2,"legacy count remains opened gates only");
 console.log("PASS P012 scenario reconciliation change counts");
 
-const contactBlocks=layout.blocks.filter(block=>block.id.startsWith("RoadContact"));assert.equal(contactBlocks.length,3);assert.ok(contactBlocks.every(block=>block.solid!==false));
+const contactBlocks=layout.blocks.filter(block=>block.id.startsWith("RoadContact"));assert.equal(contactBlocks.length,4);assert.ok(contactBlocks.every(block=>block.solid!==false));
 Audit("RoadContactSideRoute",phase.whitebox.activities.roadContactSideRoute,layout.blocks,0.42);
+Audit("RoadContactFriendlyApproach",phase.whitebox.activities.roadContactFriendlyApproach,layout.blocks,.42);
+for(const [index,cover] of phase.whitebox.activities.roadContactFriendlyCovers.entries())
+ Audit(`RoadContactFriendlyCover${index}`,[phase.whitebox.activities.roadContactFriendlyApproach[index+2],cover],layout.blocks,.42);

@@ -216,3 +216,15 @@ console.log("PASS normal 55FOV village traffic: actual Main callback, sky/feet/w
 const contactEye={...phase.whitebox.activities.roadContactBreach,y:1.55};assert.equal(phase.whitebox.activities.roadContactEnemies.length,4);
 assert.deepEqual(phase.whitebox.activities.roadContactEnemies.map(enemy=>enemy.role),["observer","observer","rifleman","rifleman"]);
 for(const enemy of phase.whitebox.activities.roadContactEnemies)assert.equal(Occluded(contactEye,{...enemy.position,y:1.3}),false,"road contact has real breach LOS");
+for(const cover of phase.whitebox.activities.roadContactFriendlyCovers)
+ assert.ok(phase.whitebox.activities.roadContactEnemies.some(enemy=>!Occluded({...cover,y:1.5},{...enemy.position,y:1.3})),
+  "each occupied friendly cover has a real road firing lane");
+// Earlier full runs lost these sentries to cross-village fire while the player
+// was still north. The same physical wall must screen both directions without
+// hiding the close encounter or making actors invulnerable.
+for(const point of [{x:5,z:-105},{x:-9,z:-29},{x:40,z:23},{x:65,z:24}]){
+ for(const enemy of phase.whitebox.activities.roadContactEnemies){
+  assert.equal(Occluded({...point,y:1.5},{...enemy.position,y:1.3}),true,
+   "courtyard wall blocks premature long-range contact from the north/west");
+ }
+}

@@ -613,6 +613,12 @@ assert.equal(flow.State().beat,"B22","far shooting cannot abandon litters back a
 Walk(phase.whitebox.activities.southAssemblyRoute,{zone:"Z09"});
 Tick({farSpawned:3,farDeaths:3,blockadeVisible:false,blockadePressure:false,columnAtSouthAssembly:true});
 assert.equal(flow.State().beat,"B22","partial far spawn cannot impersonate the finite four being cleared");
+Tick({position:phase.whitebox.activities.blockadeDecisionPosition,guideAlive:true,
+  guidePosition:phase.whitebox.activities.blockadeDecisionPosition,farSpawned:4,farDeaths:0,
+  blockadeVisible:false,blockadePressure:true});
+assert.equal(flow.State().beat,"B22","distant shots alone do not replace seeing the actual blockade");
+assert.equal(flow.CurrentObjective().requiredAction,"observe","arrival follows Luo's actual southeast-facing cue instead of staring at his back until all enemies die");
+assert.deepEqual(flow.CurrentObjective().lookAt,phase.whitebox.anchors.blockadePositions[1]);
 Tick({position:phase.whitebox.activities.blockadeDecisionPosition,zone:"Z09",stance:"stand",
   farSpawned:4,farDeaths:4,blockadeDestroyed:true,columnAtSouthAssembly:true,guideAlive:false,
   guidePosition:phase.whitebox.activities.blockadeDecisionPosition},30);

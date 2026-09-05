@@ -107,7 +107,11 @@ Add(Box("EvacWaitingSideCover",50,29.5,.4,4,1.05,"cover"));
 // player's side-fire corner and two separate squad positions without sealing
 // the established convoy window or the 1.3 m stretcher lane.
 Add(Box("RoadContactSideFire",36.5,14,.6,4,1.05,"cover",{cover:{faceX:1,faceZ:0}}),
- Box("RoadContactAllyCoverNorth",26,18,3,.6,1.05,"cover"),Box("RoadContactAllyCoverSouth",30,20,3,.6,1.05,"cover"));
+ Box("RoadContactAllyCoverNorth",29,18,3,.6,1.05,"cover"),Box("RoadContactAllyCoverSouth",30,20,3,.6,1.05,"cover"));
+// Continue the courtyard's western screen beside the southern sentries. The
+// north opening remains visible from the approach breach; distant frontline
+// allies cannot shoot across the whole village before the escort arrives.
+Add(Box("RoadContactCourtyardScreen",27,24,.8,22,2.8,"boundary"));
 // B15-B19 readable tactical furniture. The wall is Luo's physical regroup/
 // aircraft-observation position; the cart actually closes the exposed road
 // until either rescue branch is completed. The litter bay is hard cover, not

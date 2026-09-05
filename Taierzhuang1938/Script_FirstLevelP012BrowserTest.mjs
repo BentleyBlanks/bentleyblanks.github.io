@@ -447,6 +447,8 @@ async function PlayPrelude() {
 
 async function PlayFrontline() {
   const fullCampaign = process.argv.includes("--campaign");
+  const throughRoad = process.argv.includes("--through-road");
+  const stopBeat = throughRoad ? 14 : fullCampaign ? 25 : 11;
   const recoverDeaths = process.argv.includes("--recover-deaths");
   const deaths = [];
   let result;
@@ -454,7 +456,7 @@ async function PlayFrontline() {
   let capturedWindow = false;
   let capturedJointAirView = false;
   for (let chunk = 0; chunk < (fullCampaign ? 250 : 45); chunk += 1) {
-    result = await page.evaluate(({ ports, fullCampaign, anchors, routes, retryDive, perception, spatial }) => {
+    result = await page.evaluate(({ ports, fullCampaign, stopBeat, anchors, routes, retryDive, perception, spatial }) => {
       const game = window.Tengxian;
       const bot = window.p012CombatReview ||= { frame: 0, firstShotAt: null, trace: [], oldBeat: -1, shots: [], targetId: null, aimFrames: 0, held: {}, cleanupPoint: 0, lastProgress: 0, progressKey: "" };
       const TurnSalvage=(yaw,pitch)=>{
@@ -500,7 +502,16 @@ async function PlayFrontline() {
             player: airState.run?.player, held: { ...bot.held },
             intentionalMiss: retryDive && !bot.forceMissDone });
         }
-        if (flow.beatIndex >= (fullCampaign ? 25 : 11) || !game.player.Alive) break;
+        if(flow.beatIndex===13&&bot.frame%15===0){
+          (bot.roadContactTrace ||= []).push({at:flow.elapsed,player:game.player.position.toArray(),
+            seen:flow.facts.includes("roadContactSeen"),held:flow.facts.includes("roadContactHeld"),
+            visible:game.Debug.P012Scene().roadContactVisibleCount,
+            enemies:game.ai.soldiers.filter(actor=>actor.p012RoadContact).map(actor=>({id:actor.id,
+              alive:actor.alive,position:actor.position.toArray(),goal:actor.goal.toArray(),health:actor.health,
+              state:actor.state,shots:actor.fireSequence,visible:actor.targetVisible,
+              target:actor.target?.position?.toArray?.()||null}))});
+        }
+        if (flow.beatIndex >= stopBeat || !game.player.Alive) break;
         if (flow.beatIndex !== bot.oldBeat) {
           const scene = game.Debug.P012Scene();
           bot.trace.push({ at: flow.elapsed, beat: flow.beat,
@@ -907,12 +918,12 @@ async function PlayFrontline() {
           state: s.state, order: s.order, scripted: s.p012Guided, defense: s.scriptDefensive })),
         position: game.player.position.toArray(), ammo: game.state.ammo, clips: game.state.clips,
         firstShotAt: bot.firstShotAt, perceptionProfile: perception, rewindCount: bot.rewindCount || 0, diveTrace: bot.diveTrace || [],
-        trace: bot.trace, hits: game.Debug.Hits(), shots: bot.shots,
+        trace: bot.trace, roadContactTrace:bot.roadContactTrace||[], hits: game.Debug.Hits(), shots: bot.shots,
         carry: game.carry.KindId, strafe: game.Debug.Strafe.State(), interact: game.Debug.Interact(),
         stalled: game.Debug.P012().elapsed - bot.lastProgress > 180 || (bot.rewindCount || 0) >= 3,
         enemies: game.ai.soldiers.filter(s => s.alive && s.side === "ija").map(s => ({
           position: s.position.toArray(), health: s.health, state: s.state, goal: s.goal.toArray() })) };
-    }, { ports: P012_ANCHORS.gunports, fullCampaign, anchors: P012_ANCHORS, routes: P012_ROUTES,
+    }, { ports: P012_ANCHORS.gunports, fullCampaign, stopBeat, anchors: P012_ANCHORS, routes: P012_ROUTES,
       retryDive: process.argv.includes("--retry"), perception: perceptionProfile,
       spatial:{window:P012SouthPoint(68,24),airRoad:P012SouthPoint(50,68),southBlockade:P012SouthPoint(42,98)} });
     if(result.scavengeCapture){
@@ -967,7 +978,7 @@ async function PlayFrontline() {
       "普通死亡通过可见菜单继续，保留战场时间与弹药", JSON.stringify(recovery));
       continue;
     }
-    if (result.flow.beatIndex >= (fullCampaign ? 25 : 11) || result.health <= 0 || result.stalled) break;
+    if (result.flow.beatIndex >= stopBeat || result.health <= 0 || result.stalled) break;
   }
   result.ordinaryDeaths = deaths;
   result.airTurnEvidence = AirTurnEvidence(result.airViews);
@@ -990,6 +1001,17 @@ async function PlayFrontline() {
       totals, stationaryOverEightSeconds, spans: result.activity,
     }, null, 2));
   }
+  if(throughRoad){
+    const firstSeen=result.roadContactTrace.find(sample=>sample.seen);
+    await fs.writeFile(path.join(outputDir,"Data_P012RoadContact.json"),JSON.stringify({
+      scope:"sequential B00 through B13 only; ordinary deaths retained; not a full campaign or first-play pacing verdict",
+      trace:result.roadContactTrace,firstSeen,ordinaryDeaths:deaths},null,2));
+    Check(result.flow.beatIndex>=14,"从下车顺序完成护送路口段",`${result.flow.beat} at ${result.flow.elapsed.toFixed(2)}s`);
+    Check(firstSeen?.enemies.some(actor=>actor.alive),"实际到路口时仍有活敌接战，未在村西被友军提前清空",JSON.stringify(firstSeen));
+    Check(["roadContactSeen","roadContactHeld","roadContactClear","roadContactReleased"].every(fact=>result.flow.facts.includes(fact)),
+      "真实叫停、接敌、清除与队尾放行完成");
+    return;
+  }
   Check(result.flow.beatIndex >= (fullCampaign ? 25 : 11), fullCampaign ? "整关真实输入顺序通关" : "有限前线五波可由真实操作完成",
     `${result.flow.beat} at ${result.flow.elapsed.toFixed(1)}s; health ${result.health}; ${path.join(outputDir, "Data_P012GameplayTrace.json")}`);
   Check(result.firstShotAt !== null, "玩家实际参与射击而非全靠友军清场", String(result.firstShotAt));
@@ -1008,8 +1030,10 @@ async function PlayFrontline() {
   if (fullCampaign && process.argv.includes("--retry")) Check(result.rewindCount >= 1,
     "故意错过首次扑救后真实回退并继续通关", `${result.rewindCount}次`);
   if (fullCampaign) {
+    const firstRoadSeen=result.roadContactTrace.find(sample=>sample.seen);
+    Check(firstRoadSeen?.enemies.some(actor=>actor.alive),"顺序跟队到路口时仍有活敌接战",JSON.stringify(firstRoadSeen));
     Check(["roadContactSeen", "roadContactHeld", "roadContactClear", "roadContactReleased"].every(fact => result.flow.facts.includes(fact)),
-      "浏览器实跑完成看见四敌、叫停、侧路清场与队尾放行闭环", JSON.stringify(result.flow.facts));
+      "浏览器实跑完成识别道路敌情、叫停、清场与队尾放行闭环", JSON.stringify(result.flow.facts));
     const requested = result.escortApproval.find(entry => entry.event === "P012EscortRequested");
     const spoken = result.escortApproval.find(entry => entry.event === "LuoApprovalStarted");
     const approved = result.escortApproval.find(entry => entry.event === "P012EscortApproved");
@@ -2404,7 +2428,7 @@ try {
     "原有战斗/群众预算独立统计；另列训练队、儿童、坐姿百姓及新增5名村路作业人员，全部计入原始人数", JSON.stringify(traffic.population));
   Check(errors.length === 0, "浏览器没有脚本或控制台错误", errors.join(" | "));
   console.log(`P012 screenshots: ${outputDir}`);
-  console.log(process.argv.includes("--campaign") ? "FirstLevelP012BrowserTest campaign PASS" : "FirstLevelP012BrowserTest partial PASS (not a full campaign playthrough)");
+  console.log(process.argv.includes("--campaign")&&!process.argv.includes("--through-road") ? "FirstLevelP012BrowserTest campaign PASS" : "FirstLevelP012BrowserTest partial PASS (not a full campaign playthrough)");
 } catch (error) {
   const guidanceHud=await page.evaluate(()=>window.p012GuidanceHudTrace||[]).catch(()=>[]);
   await fs.writeFile(path.join(outputDir,"Data_P012GuidanceHud.json"),JSON.stringify(guidanceHud,null,2));

@@ -96,6 +96,37 @@ export class FirstLevelP012Runtime {
     this.failed=false;return true;
   }
   SpawnEnemy(spec) { const actor = this.host.SpawnEnemy(spec); if (actor) { actor.p012RoadContact=spec.p012RoadContact===true; this.near.push(actor); } return actor; }
+  StepRoadCover() {
+    const activity=this.config.activities;
+    if(!activity?.roadContactFriendlyApproach)return;
+    if(this.beat!==13||!this.host.Signalled?.("P012RoadContactHold")){
+      for(const entry of this.roadCoverMoves||[])if(!entry.arrived)this.host.ReleaseGuide?.(entry.actor);
+      this.roadCoverMoves=null;return;
+    }
+    this.roadCoverMoves ||= [];
+    for(const [index,cover] of activity.roadContactFriendlyCovers.entries()){
+      const actor=this.defenders?.[index],at=actor&&this.host.Position(actor);
+      if(!actor||actor.alive===false||!at)continue;
+      let entry=this.roadCoverMoves[index];
+      if(!entry||entry.actor!==actor)entry=this.roadCoverMoves[index]={actor,arrived:false};
+      if(entry.arrived)continue;
+      if(Math.hypot(at.x-cover.x,at.z-cover.z)<.6){
+        this.host.ReleaseGuide?.(actor);entry.arrived=true;
+        this.host.Defend?.(actor,cover,{...activity.frontlineDoctrine,holdRadiusM:2});continue;
+      }
+      const radius=this.GuideBodyRadius(actor);
+      if(!entry.path||entry.radius!==radius){
+        entry.radius=radius;
+        entry.path=P012GuideApproach(this.config.layout?.blocks||[],at,cover,
+          [...(activity.roadContactGuideRoute||[]),...activity.roadContactFriendlyApproach],radius);
+      }
+      const next=entry.path&&P012NextVisiblePoint(this.config.layout?.blocks||[],at,entry.path,0,radius);
+      if(!next||next.blocked)continue;
+      this.host.ReleaseDefense?.(actor);
+      actor.scriptArrivalRadius=.15;
+      this.host.Move?.(actor,next.point,activity.guideSpeedMps||3.05);
+    }
+  }
   RecordDodgeIntent(position, view = null, carryKind = null) {
     this.dodgeIntent = { position: { x: position.x, z: position.z }, at: this.time };
     if (view?.player?.open && carryKind === "stretcher") this.host.ReleaseForDodge?.();
@@ -494,6 +525,7 @@ export class FirstLevelP012Runtime {
       for (const actor of this.defenders) this.host.ReleaseDefense?.(actor);
       this.defenders = null;
     }
+    this.StepRoadCover();
     if (this.beat === 23 && !this.retreatDisciplineDone) {
       this.retreatGuards ||= this.host.FriendlyActors?.() || [];
       const route=this.config.returnWaypoints || [], at=this.host.RetreatPosition?.();
