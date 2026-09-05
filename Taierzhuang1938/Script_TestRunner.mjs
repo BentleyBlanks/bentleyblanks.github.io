@@ -65,6 +65,7 @@ const playTestExpectedFailures = [
 ];
 
 export const testDefs = {
+  TrainLibraryTest: { file: "Script_TrainLibraryTest.mjs", desc: "火车构件库：点击懒载、原 PBR、完整轮组绑定、缓存隔离与实际显示" },
   BackRifleRunTest: { file: 'Script_BackRifleRunTest.mjs', desc: '独立背枪跑步 GLB：原骨架、循环接缝、真实蒙皮接地、速度与挂点浏览器验收' },
   ExplosionRulesTest: { file: "Script_ExplosionRulesTest.mjs", desc: "爆炸配置、稀疏地形叠加/坡度/上限、返掷窗口与完整资产目录（纯 Node）" },
   ExplosionRangeTest: { file: "Script_ExplosionRangeTest.mjs", timeoutMs: 8 * 60 * 1000, desc: "爆炸白盒：真实F拾取/返掷/战车/炮击、地形网格/Rapier/人物穿坑与复位" },
@@ -215,6 +216,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "TrainLibraryTest",
   'BackRifleRunTest',
   "ActorBatchTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
   "AudioTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
@@ -338,9 +340,14 @@ export const domains = {
     label: "测试入口/本地服务基础设施",
     tests: ["TestRunnerTest", "ModuleGraphTest"],
   },
+  trainAssets: {
+    label: "参考火车资产与构件库接入",
+    tests: ["TrainLibraryTest", "ExternalPropAssetTest", "AssetStandardsTest"],
+  },
 };
 
 const changedDomainRules = [
+  { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },
   { domain: 'animation', pattern: /BackRifleRun/i },
   { domain: "ai", pattern: /FirstLevelP012(TrainColumn|March|Family|Resting|Arrival|VillageLife|StageZero|Cast)/i },
   { domain: "explosives", pattern: /(Explosion|Explosives|GrenadeReturn|TerrainDeformation|Script_Combat|Script_Physics)/i },

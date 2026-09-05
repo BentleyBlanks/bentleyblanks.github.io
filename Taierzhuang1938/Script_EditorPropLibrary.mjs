@@ -32,7 +32,7 @@ export class PropLibraryEditor {
       ...PLACEABLE.filter((entry) => !entry.effect),
       ...this.externalCatalog.map((entry) => ({
         id: `External_${entry.id}`, name: entry.label, cat: entry.category,
-        external: entry.id, url: entry.url, uses: [], defaults: {},
+        external: entry.id, url: entry.url, sourceLabel: entry.sourceLabel, uses: [], defaults: {},
       })),
     ];
     this.categories = PLACEABLE_CATEGORIES.filter((category) => category !== "特效");
@@ -205,7 +205,7 @@ export class PropLibraryEditor {
       let meshes = 0;
       externalRoot.traverse((node) => { if (node.isMesh) meshes += 1; });
       built = { loaded: true, colliders: [], meshes };
-      this.status.textContent = `${entry.name} · 带署名外部 GLB · 仅视觉`;
+      this.status.textContent = `${entry.name} · ${entry.sourceLabel || "带署名外部 GLB"} · 仅视觉`;
     } else {
       built = BuildPlaceableVisual(root, entry, item, {
         library: this.host.library,
@@ -250,6 +250,35 @@ export class PropLibraryEditor {
     const height = Math.max(0.5, size.y);
     const span = Math.max(size.x, size.y, size.z, 1);
     this.host.studio.Frame(height, Math.max(2.4, span * 1.55));
+    // Fit long exhibits inside the space between the actual editor panels.
+    // Their rendered bounds must remain visible when the library first opens.
+    const canvas = this.host.canvas.getBoundingClientRect();
+    const centerX = canvas.left + canvas.width / 2;
+    let left = canvas.left + 16, right = canvas.right - 16;
+    for (const panel of document.querySelectorAll(".edPanel")) {
+      const rect = panel.getBoundingClientRect();
+      if (!rect.width || !rect.height) continue;
+      if (rect.right <= centerX) left = Math.max(left, rect.right + 16);
+      if (rect.left >= centerX) right = Math.min(right, rect.left - 16);
+    }
+    if (left >= centerX || right <= centerX) return;
+    const camera = this.host.camera, studio = this.host.studio;
+    const corners = [];
+    for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) {
+      for (const z of [box.min.z, box.max.z]) corners.push(new THREE.Vector3(x, y, z));
+    }
+    for (let step = 0; step < 20; step += 1) {
+      camera.updateMatrixWorld(true);
+      const fits = corners.every((corner) => {
+        const projected = corner.clone().project(camera);
+        const x = canvas.left + (projected.x + 1) * canvas.width / 2;
+        const y = canvas.top + (1 - projected.y) * canvas.height / 2;
+        return x >= left && x <= right && y >= canvas.top + 16 && y <= canvas.bottom - 16;
+      });
+      if (fits || studio.orbit.dist >= 40) break;
+      studio.orbit.dist *= 1.08;
+      studio.ApplyCamera();
+    }
   }
 
   RefreshFacts(entry, box) {

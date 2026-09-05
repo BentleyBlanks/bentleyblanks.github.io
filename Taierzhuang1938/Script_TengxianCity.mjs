@@ -89,6 +89,10 @@ function DustBlend(hex, amount, dust = 0x8A8076) {
 }
 
 const MATERIAL_MAP = {
+  // TZM weapon buckets use lowercase keys; the baked recipes use PascalCase.
+  // The component library shares this resolver with scene placement.
+  steel: { recipe: "Steel", roughness: 0.82, metalness: 0.68, normalScale: 0.28, envMapIntensity: 1.35 },
+  wood: { recipe: "WoodStock", roughness: 0.78, metalness: 0, normalScale: 0.32 },
   // 城墙一套
   CityBrick: { recipe: "CityWallBrickPbr", color: 0xf4f7fb, roughness: 1.0 },
   CityBrickWorn: { recipe: "CityWallBrickPbr", color: 0xe7eaee, roughness: 1.0 },

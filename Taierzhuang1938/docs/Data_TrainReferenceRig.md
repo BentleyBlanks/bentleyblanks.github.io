@@ -3,7 +3,7 @@
 现状：独立模型资产包（细化第二版），位于 `Model/TrainReference/`。源于「提取火车样式并做三视图」任务的两张已生成参考图，保留灰褐横向木板双轴敞车与黑色蒸汽货运机车外观。机车按图中实际可见的一组导轮、五组动轮建模；参考图本身是推定设计，不代表考证确认的机车型号。原参考没有煤水车，本包对应车头本体与敞车。
 
 - 验收网页、截图、渲染图和视频只保存在本地 `_review/` / `_shots/`，不提交、不部署到 github.io。此前的验收页与视频已从当前版本移除；这不改写历史提交。
-- [Blender 源工程](../Model/TrainReference/Scene_TrainReferenceRig.blend)：两模型、独立轮轴与连杆、已打包的参考图和材质、摄影灯光、动作时间轴。
+- Blender 源工程已归档到本机 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\TrainReference\Scene_TrainReferenceRig.blend`，含两模型、独立轮轴与连杆、已打包的参考图和材质、摄影灯光、动作时间轴。源工程不再随网站发布；旧提交不改写。
 - [车头 GLB](../Model/TrainReference/Model_LocomotiveRig.glb) / [车厢 GLB](../Model/TrainReference/Model_GondolaRig.glb)。
 - 这一版补充铸造轮辐、工字截面连杆与油杯、板簧夹具、给水/空气管路、空气泵、汽缸压盖与排水阀、驾驶室窗框和通风盖；车厢补充槽钢立柱、铰链、轴箱导架与制动拉杆。
 
@@ -20,6 +20,8 @@
 这是直线轮轨运动和主要外露传动机构的视觉绑定。没有实现完整蒸汽配气过程、转向架或真实轮轨/悬挂物理。原参考图中的不一致连杆走向已按可运动结构纠正。汽缸与导轮留有横向间隙，活塞杆的前端在整个行程内保留在汽缸内部。
 
 ## 游戏使用
+
+在游戏右上角齿轮打开 **构件库预览 → 模型**，可选择「蒸汽机车 · 五组动轮（最终版）」与「木制敞车 · 双轴（最终版）」。目录 ID 分别为 `trainReferenceLocomotive`、`trainReferenceGondola`；点击时才加载，保留原 PBR 与完整机械节点，不增加关卡默认布设或开机下载。
 
 GLB 保留机械轴心，导出的是静止初始姿态。Blender 驱动器不会自动成为 glTF 动画，因此不能只加载 GLB 就期待车轮自行转动。
 
@@ -51,12 +53,13 @@ Blender 中选择 `Model_LocomotiveRoot` / `Model_GondolaRoot`，自定义属性
 
 ## 重建与验证
 
-使用独立 BlenderMCP 工程，先确认当前文件确实是本包的 `Scene_TrainReferenceRig.blend`。按顺序执行本目录的 `Script_BuildTrainReference.py`（内部执行 `Script_DetailTrainReference.py`）、`Script_FinishTrainMaterials.py`、`Script_VerifyTrainRig.py`、`Script_ExportTrainReference.py`。建模脚本会重建这个专用工程，不应在其他工作文件中执行。
+使用独立 BlenderMCP 工程，先确认当前文件确实是上述 OneDrive 目录中的 `Scene_TrainReferenceRig.blend`。该目录同时保存 Python 重建脚本、输入贴图和 `Reference/`；脚本更新后从本任务 worktree 同步到这里。按顺序执行 `Script_BuildTrainReference.py`（内部执行 `Script_DetailTrainReference.py`）、`Script_FinishTrainMaterials.py`、`Script_VerifyTrainRig.py`、`Script_ExportTrainReference.py`。建模脚本会重建这个专用工程，不应在其他工作文件中执行。导出后只将 GLB、更新的贴图及机械清单/验证数据同步回独占 worktree；`.blend`、备份与验收媒体留在本地。
 
 游戏导出验证：
 
 ```text
 node Taierzhuang1938/Model/TrainReference/Script_VerifyTrainExport.mjs
+node Taierzhuang1938/Script_TestRunner.mjs --only=TrainLibraryTest
 ```
 
 默认验证不依赖任何已提交的验收网页，会在被忽略的 `_shots/TrainReference/` 创建最小测试场景。已有本地交互页时可加 `--local-review --video`，帧图仍只写本地；MP4 输出也必须位于 `_review/`。

@@ -370,7 +370,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - 先读：`docs/Data_TestTiers.md`、`Data_SamplePoints.md`、`Data_VisualReview.md`（评分表）。
 
 ### 资产目录
-- `Model/TrainReference/` —— 参考三视图制作的独立车头/双轴敞车、Blender 工程、ImageGen PBR 与距离驱动车轮连杆；现状与接线见 `docs/Data_TrainReferenceRig.md`，导出验收 `Script_VerifyTrainExport.mjs`。
+- `Model/TrainReference/` —— 参考三视图制作的独立车头/双轴敞车 GLB、ImageGen PBR 与距离驱动车轮连杆；已登记构件库「模型」分类。Blender 工程放在根约定的 OneDrive 目录；现状与接线见 `docs/Data_TrainReferenceRig.md`，导出验收 `Script_VerifyTrainExport.mjs`，构件库验收 `Script_TrainLibraryTest.mjs`。
 - `Model/`（tzm.json 与 glb）、`Texture/`、`Audio/`（烘出的 mp3 + 清单）、`Scene/`、
   `Heightmap/`、`BgmReview/`、`_import/`（外部资产取源/烘焙）、`_blender/`（Blender 管线）、
   `_shots/`（出图产物，gitignore）、`vendor/`（three + rapier，别 grep 进去）。

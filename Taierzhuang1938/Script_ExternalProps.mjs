@@ -226,6 +226,20 @@ function PackAssets(pack, table) {
 }
 
 const ASSETS = Object.freeze({
+  // Library-only until explicitly placed. Keep native PBR and the complete
+  // hierarchy: wheel pivots and rods are consumed by Script_TrainRig.mjs.
+  trainReferenceLocomotive: {
+    label: "蒸汽机车 · 五组动轮（最终版）",
+    url: "./Model/TrainReference/Model_LocomotiveRig.glb?v=2",
+    tag: "prop", solid: false, category: "模型", projectUvs: false,
+    sourceLabel: "本项目 GLB · ImageGen PBR",
+  },
+  trainReferenceGondola: {
+    label: "木制敞车 · 双轴（最终版）",
+    url: "./Model/TrainReference/Model_GondolaRig.glb?v=2",
+    tag: "prop", solid: false, category: "模型", projectUvs: false,
+    sourceLabel: "本项目 GLB · ImageGen PBR",
+  },
   house: { label: "乡村房屋", url: "./Model/Model_ChineseRuralHouse.glb?v=4", material: null, tag: "wall", category: "建筑" },
   houseRow: { label: "民居排屋", url: "./Model/Model_AsianHouseRow.glb?v=2", material: null, tag: "wall", category: "建筑" },
   housePair: { label: "民居双栋", url: "./Model/Model_AsianHousePair.glb?v=2", material: null, tag: "wall", category: "建筑" },
@@ -755,7 +769,7 @@ export function ExternalPropCatalog() {
   return Object.entries(ASSETS).map(([id, spec]) => ({
     id, label: spec.label, url: spec.url, node: spec.node ?? null,
     material: spec.material, materialMap: !!spec.materialMap, tag: spec.tag,
-    solid: spec.solid !== false, category: spec.category,
+    solid: spec.solid !== false, category: spec.category, sourceLabel: spec.sourceLabel,
   }));
 }
 

@@ -44,6 +44,11 @@
 - 引擎回调、公共接口、第三方文件、工具约定名称（如 index.html、AGENTS.md、package.json）保留要求的拼写；Git 分支按上文命名。不做无关批量重命名。
 - 提交标题：`<AgentName> <Project>: short change summary`，例如 `Codex GravityTank: correct roulette weights`。不用 Conventional Commit 前缀或句末句号；跨项目基础设施用 `Repository`，游戏变化优先写主要项目。
 
+## Blender 源工程
+
+- 后续所有 Blender 原始工程统一存放在 `C:\Users\Bentl\OneDrive\AI\Models\Blender`，按项目与资产建立子目录；`.blend` 及自动备份均留在该目录，不放进 github.io 仓库。仓库保留游戏所需的 GLB、贴图、重建脚本与资产说明。
+- 使用 BlenderMCP 前确认当前文件属于本任务；新资产使用独立工程，避免覆盖其他任务的场景。模型验收网页和视频仍只留本地。
+
 ## 音频资产
 
 - 项目离线生成的音乐、BGM、环境音、音效、对白与人声统一使用 Volcengine，禁止使用 Lovart。模型为 `seed-audio-1.0`；音乐参考 `Taierzhuang1938/Script_SeedAudioMusicBake.mjs`，对白和音效使用对应 SeedAudio baker。
