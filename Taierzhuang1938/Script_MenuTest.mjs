@@ -406,6 +406,14 @@ async function Boot(query = "") {
   Check("退出白盒完成恢复原菜单样式",await page.locator("#menu").evaluate(el=>getComputedStyle(el).backgroundColor==="rgba(0, 0, 0, 0)"&&!el.classList.contains("p012Complete")));
 }
 if(process.argv.includes("--completion-only")){await browser.close();server.close();process.exit(failed?1:0);}
+if (process.argv.includes("--levels-only")) {
+  try {
+    await Boot();
+    await CheckMissionList();
+    Check("选章无浏览器错误",problems.length===0,problems.join(";"));
+  } finally { await browser.close(); server.close(); }
+  process.exit(failed?1:0);
+}
 await Boot();
 {
   const m = await page.evaluate(() => {
@@ -566,108 +574,94 @@ for (let i = 0; i < 3; i += 1) {
 }
 
 // ===========================================================================
-// 3) 选章：可拖拽缩放的动态战区地图 + 带图日期轴，单击直达任务
+// 3) 选章：真实 DOM / 输入 / 图片与窄屏排版，复用 --levels-only 入口。
 // ===========================================================================
-{
+await CheckMissionList();
+
+async function CheckMissionList() {
   await page.evaluate(() => window.Taierzhuang.Debug.MenuShow("levels"));
-  await page.waitForTimeout(150);
-  const panel = await page.evaluate(() => ({
-    levels: [...document.querySelectorAll("#menu .mnLevel")].length,
-    groups: [...document.querySelectorAll("#menu .mnLevelGroup b")].map((e) => e.textContent),
-    previews: [...document.querySelectorAll("#menu .mnCutscenePreview")].length,
-    prologue: document.querySelector("#menu .mnProloguePreview")?.textContent || "",
-    sandboxes: [...document.querySelectorAll("#menu .mnSandboxLevel")].map((entry) => entry.textContent || ""),
-    map: !!document.querySelector("#menu .mnMap"),
-    zones: document.querySelectorAll("#menu .mnMapZone").length,
-    route: !!document.querySelector("#menu .mnCampaignRoute"),
-    mapNodes: document.querySelectorAll("#menu .mnCampaignNode").length,
-    selectedMapNodes: document.querySelectorAll("#menu .mnCampaignNode.on").length,
-    thumbnails: [...document.querySelectorAll("#menu .mnTimelineTrack .mnLvThumb")]
-      .map((entry) => entry.getAttribute("src") || ""),
-    art: document.querySelector("#menu .mnMissionArt img")?.getAttribute("src") || "",
-    mapTools: document.querySelectorAll("#menu .mnMapTools button").length,
-    mapHint: document.querySelector("#menu .mnMapHint")?.textContent || "",
-    timelineDates: [...document.querySelectorAll("#menu .mnTimelineTrack .mnLvDate")]
-      .map((entry) => entry.textContent || ""),
-    panelTitle: document.querySelector("#menu .mnPanelTitle")?.textContent || "",
-    title: document.querySelector("#menu .mnBriefTitle")?.textContent || "",
-    objective: document.querySelector("#menu .mnMissionObjective")?.textContent || "",
-    go: !!document.querySelector("#menu .mnGo"),
-  }));
-  // 规格：正式章节（七章）与测试场景（玩法靶场 / 白刃 QTE / 策划白盒）分两组。
-  // 界河白盒与过场预览保留直达 query，但不出现在玩家可见的选章列表里。
-  Check("选章分成「正式章节」与「测试场景」两组",
-    panel.groups.length === 2 && panel.groups[0] === "正式章节" && panel.groups[1] === "测试场景",
-    panel.groups.join(" / "));
-  Check("测试场景包含枪械、玩法、爆炸、白刃 QTE 与策划白盒",
-    panel.levels === 13 && panel.previews === 0 && !panel.prologue
-      && panel.sandboxes.length === 6
-      && panel.sandboxes.some((entry) => entry.includes("枪械白盒靶场"))
-      && panel.sandboxes.some((entry) => entry.includes("玩法测试靶场"))
-      && panel.sandboxes.some((entry) => entry.includes("爆炸测试场"))
-      && panel.sandboxes.some((entry) => entry.includes("白刃战 QTE 测试场"))
-      && panel.sandboxes.some((entry) => entry.includes("第一关 · 全新策划白盒"))
-      && panel.sandboxes.some((entry) => entry.includes("第一关 · P0/P1/P2 场景白盒"))
-      && panel.sandboxes.every((entry) => !entry.includes("界河")),
-    `levels=${panel.levels} previews=${panel.previews} prologue=${panel.prologue} sandboxes=${panel.sandboxes.join("|")}`);
-  Check("简报里有全图，且标出了这一关的路标链", panel.map && panel.zones >= 3,
-    `map=${panel.map} zones=${panel.zones}`);
-  Check("选章以七节点战区地图呈现空间推进",
-    panel.route && panel.mapNodes === 7 && panel.selectedMapNodes === 1
-      && panel.panelTitle === "滕县战区 · 任务选择",
-    `route=${panel.route} nodes=${panel.mapNodes} selected=${panel.selectedMapNodes} title=${panel.panelTitle}`);
-  Check("地图提供缩放、复位与直接进入提示",
-    panel.mapTools === 3 && panel.mapHint.includes("拖动地图") && panel.mapHint.includes("单击节点进入"),
-    `tools=${panel.mapTools} hint=${panel.mapHint}`);
-  Check("正式章节以三月十四至十七日的横向时间轴呈现",
-    panel.timelineDates.length === 7
-      && panel.timelineDates[1] === "03.14"
-      && panel.timelineDates.includes("03.16")
-      && panel.timelineDates.at(-1) === "03.17",
-    panel.timelineDates.join(" / "));
-  Check("七章各有独立缩略图，右侧只留一图一句目标且没有二次确认按钮",
-    panel.thumbnails.length === 7 && new Set(panel.thumbnails).size === 7
-      && panel.art.includes("Texture_MissionCh0Chuchuan")
-      && panel.title.length > 0 && panel.objective.length > 0 && !panel.go,
-    `thumbs=${panel.thumbnails.length}/${new Set(panel.thumbnails).size} art=${panel.art} objective=${panel.objective} go=${panel.go}`);
-
-  const direct = await page.evaluate(() => {
-    const menu = window.Taierzhuang.menu;
-    const original = menu.Play;
-    const played = [];
-    menu.Play = (index) => played.push(index);
-    document.querySelectorAll("#menu .mnCampaignNode")[3].dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    document.querySelectorAll("#menu .mnTimelineTrack .mnLevel")[5].click();
-    menu.Play = original;
-    return played;
+  const panel = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll(".mnMissionTrack .mnLevel")];
+    const rects = rows.map(el => { const r = el.getBoundingClientRect(); return { x:r.x, y:r.y, w:r.width, h:r.height }; });
+    return {
+      levels: document.querySelectorAll("#menu .mnLevel").length,
+      groups: [...document.querySelectorAll(".mnLevelGroup b")].map(el=>el.textContent),
+      names: rows.map(el=>el.querySelector(".mnLvName").textContent), rects,
+      oldMap: !!document.querySelector(".mnMap, .mnTimelineTrack, .mnLvThumb"),
+      fullScreen: document.querySelector(".mnPanel").getBoundingClientRect().width === innerWidth,
+      title: document.querySelector(".mnPanelTitle").textContent,
+    };
   });
-  Check("地图节点与章节卡都是单击直接进入，不再要求再按一次",
-    direct.join(",") === "3,5", direct.join(","));
-
-  const mapBox = await page.locator("#menu .mnMap").boundingBox();
-  const beforeView = await page.locator("#menu .mnMap").getAttribute("viewBox");
-  await page.mouse.move(mapBox.x + mapBox.width * 0.72, mapBox.y + mapBox.height * 0.38);
-  await page.mouse.wheel(0, -420);
-  const zoomed = await page.locator("#menu .mnMap").getAttribute("viewBox");
-  await page.mouse.down();
-  await page.mouse.move(mapBox.x + mapBox.width * 0.60, mapBox.y + mapBox.height * 0.50, { steps: 5 });
-  await page.mouse.up();
-  const dragged = await page.locator("#menu .mnMap").getAttribute("viewBox");
-  Check("战区地图可缩放并可按住拖动", beforeView !== zoomed && zoomed !== dragged,
-    `before=${beforeView} zoomed=${zoomed} dragged=${dragged}`);
-  await page.screenshot({ path: path.join(outDir, "Menu_Levels.png") });
-
-  // 换一关看简报是不是跟着换
-  await page.evaluate(() => window.Taierzhuang.menu.SelectLevel(2));
-  await page.waitForTimeout(120);
-  const second = await page.evaluate(() => ({
-    title: document.querySelector("#menu .mnBriefTitle").textContent,
-    slice: document.querySelector("#menu .mnMapSlice").getAttribute("x"),
-    art: document.querySelector("#menu .mnMissionArt img")?.getAttribute("src") || "",
-  }));
-  Check("换一章，任务图与地图切片都跟着换",
-    second.title.includes("手榴弹雨") && second.art.includes("Texture_MissionCh2Shouliudan"),
-    `${second.title} / ${second.art}`);
+  Check("全屏任务选择采用七行纵向清单", panel.fullScreen && panel.title === "任务选择"
+    && panel.rects.length === 7 && panel.rects.every((r,i)=>r.x===panel.rects[0].x && (!i||r.y>=panel.rects[i-1].y+panel.rects[i-1].h)),JSON.stringify(panel.rects));
+  Check("正式章节与六项测试入口分组保留",panel.levels===13&&panel.groups.join(",")==="正式章节,测试场景",panel.groups.join(","));
+  Check("任务选择不再出现地图、横向时间轴或缩略图卡",!panel.oldMap);
+  const images=[];
+  for(let index=0;index<7;index++){
+    await page.locator('.mnMissionTrack .mnLevel').nth(index).hover();
+    await page.waitForFunction(()=>{const img=document.querySelector('.mnMissionArt img');return img?.complete&&img.naturalWidth>0;});
+    const result=await page.evaluate(()=>({selected:window.Taierzhuang.menu.selected,
+      title:document.querySelector('.mnBriefTitle').textContent,
+      objective:document.querySelector('.mnMissionObjective').textContent,
+      image:document.querySelector('.mnMissionArt img').getAttribute('src'),
+      current:document.querySelectorAll('.mnLevel[aria-current="true"]').length,
+      inMenu:window.Taierzhuang.state.menu}));
+    Check("悬停预览章节 "+index,result.selected===index&&result.title===panel.names[index]
+      &&result.objective.length>0&&result.current===1&&result.inMenu,JSON.stringify(result));
+    images.push(result.image);
+  }
+  Check("七章原创预览图全部加载且各不相同",new Set(images).size===7);
+  await page.mouse.move(2,2);
+  await page.evaluate(()=>window.Taierzhuang.menu.SelectLevel(1));
+  await page.screenshot({path:path.join(outDir,"Scene_MissionListDesktop.png")});
+  await page.keyboard.press('ArrowDown');
+  Check("上下键同步选中项、焦点和简报",await page.evaluate(()=>window.Taierzhuang.menu.selected===2
+    &&document.activeElement===document.querySelector('.mnLevel.on')&&document.querySelector('.mnBriefTitle').textContent.includes('手榴弹雨')));
+  await page.locator('.mnCampaignBack').focus();
+  await page.keyboard.press('Enter');
+  Check("返回按钮 Enter 确实返回主菜单",await page.evaluate(()=>window.Taierzhuang.menu.mode==='title'&&window.Taierzhuang.state.menu));
+  await page.evaluate(()=>{const menu=window.Taierzhuang.menu;menu.OpenPause();menu.Show('levels');});
+  await page.keyboard.press('Escape');
+  Check("暂停选章的 Esc 返回暂停菜单",await page.evaluate(()=>window.Taierzhuang.menu.mode==='pause'));
+  await page.evaluate(()=>{const menu=window.Taierzhuang.menu;menu.ToTitle();menu.Show('levels');
+    window.missionOriginalPlay=menu.Play;window.missionPlayed=[];menu.Play=(index)=>window.missionPlayed.push(index);});
+  try {
+    await page.locator('.mnMissionTrack .mnLevel').nth(3).click();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await page.locator('.mnSandboxLevel').nth(1).click();
+    Check("鼠标、Enter、测试入口各只触发一次正确任务",await page.evaluate(()=>window.missionPlayed.join(',')==='3,4,8'));
+    for (const [name,width,height] of [["Laptop",1280,720],["Mobile",390,844],["Landscape",844,390]]) {
+      await page.setViewportSize({width,height});
+      await page.mouse.move(1,1);
+      await page.evaluate(()=>window.Taierzhuang.menu.SelectLevel(1));
+      const layout=await page.evaluate(()=>{
+        const panel=document.querySelector('.mnPanel').getBoundingClientRect();
+        const back=document.querySelector('.mnCampaignBack').getBoundingClientRect();
+        return {panelWidth:panel.width,viewport:innerWidth,backBottom:back.bottom,
+          viewportHeight:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth,
+          touchRows:[...document.querySelectorAll('.mnLevel')].every(el=>el.getBoundingClientRect().height>=44)};
+      });
+      Check(name+"没有横向溢出，返回按钮可达",!layout.overflow&&layout.panelWidth===layout.viewport&&layout.backBottom<=layout.viewportHeight,JSON.stringify(layout));
+      if(width<=640)Check("手机任务点击区域至少44px",layout.touchRows);
+      await page.screenshot({path:path.join(outDir,"Scene_MissionList"+name+".png")});
+      await page.locator('.mnCampaignBack').focus();
+      await page.locator('.mnSandboxLevel').last().focus();
+      Check(name+"最后一个测试入口能滚动到并选中",await page.evaluate(()=>window.Taierzhuang.menu.selected===12));
+      const reopened=await page.evaluate(()=>{
+        const menu=window.Taierzhuang.menu;menu.Show('title');menu.Show('levels');
+        const row=document.querySelector('.mnLevel.on').getBoundingClientRect();
+        const list=document.querySelector('.mnLevelList').getBoundingClientRect();
+        return {selected:menu.selected,expected:menu.DefaultLevel(),visible:row.top>=list.top-1&&row.bottom<=list.bottom+1};
+      });
+      Check(name+"重开选章自动滚回继续章节",reopened.selected===reopened.expected&&reopened.visible,JSON.stringify(reopened));
+    }
+  } finally {
+    await page.evaluate(()=>{window.Taierzhuang.menu.Play=window.missionOriginalPlay;delete window.missionOriginalPlay;});
+    await page.setViewportSize({width:1600,height:900});
+  }
+  await page.evaluate(()=>window.Taierzhuang.menu.SelectLevel(2));
+  await page.screenshot({path:path.join(outDir,"Menu_Levels.png")});
 }
 
 // ===========================================================================

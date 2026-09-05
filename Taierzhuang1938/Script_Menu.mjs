@@ -1,6 +1,6 @@
 // 《滕县 一九三八》主菜单与选章 —— DOM/CSS + 一台相机导演。
 //
-// 分工：这一份**只管菜单自己**（画面上的字、机位的运镜、选章的那张地图），
+// 分工：这一份**只管菜单自己**（画面上的字、机位的运镜、选章的线性任务列表），
 // 一切「真的去做点什么」都通过 host 回调交回装配层（Script_Main）：
 //   host.Play(index, opts)   进某一章
 //   host.PlaySandbox()       进「测试场景」组里的沙盒（玩法测试靶场，重载页面）
@@ -12,20 +12,14 @@
 // 菜单不该跟着改一行。
 //
 // 对标 Easy Red 2 的三条（见 Data_Menu.mjs 头注）：活场景、运镜、定时切机位。
-// 排版上刻意**不抄** ER2 的横排大按钮：这一作用的是与 HUD、阵亡卡片、尾声
-// 同一套字距与颜色（Style_Game.css 的 :root），换成横排方按钮就成了另一个游戏。
+// 主菜单保留原有字体与色彩；选章独立使用 World at War 的无衬线文字列表与金色高亮。
 
 import * as THREE from "three";
 import { FovFromFocalMm } from "./Script_Cutscene.mjs";
 import { ValueNoise2, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { MENU, CREDITS, PRESUMED_STAGING } from "./Data_TengxianScript.mjs";
 import { MENU_SCENE, ShotsFor } from "./Data_Menu.mjs";
-import {
-  CITY, GATES, MOAT, EAST_SUBURB, WEST_SUBURB, OUTSKIRTS,
-  CITY_FEATURES, LANDMARKS, OUTER_LANDMARKS, PRESUMED,
-} from "./Data_Tengxian.mjs";
-
-const NS = "http://www.w3.org/2000/svg";
+import { PRESUMED } from "./Data_Tengxian.mjs";
 
 /**
  * 沙盒模式（`host.sandboxMode`）→ 暂停菜单里的两句话。
@@ -83,47 +77,15 @@ export const Progress = {
 };
 
 // ---------------------------------------------------------------------------
-// 选章里的那张图
+// 选章：World at War（2008）的纵向文字列表 + 右侧任务预览
 // ---------------------------------------------------------------------------
-/**
- * 滕县战区图投影。**范围写死**到七章真正经过的城与关厢：西含津浦路、东含荆河，
- * 北含东关寺院地、南含南向大车路。界河北侧没有正片任务，交给全城俯瞰入口展示。
- */
-// COD WWII 的选关地图不是一张百科全图，而是只保留当前战役会经过的战区。
-// 七章实际都发生在滕县城与四关厢，缩掉界河北侧的大块空白后，任务节点和推进线
-// 才能在第一眼读出来。地理坐标仍然全部来自 Data_Tengxian / phase.zones。
-const MAP = { minX: -760, maxX: 760, minZ: -620, maxZ: 480, w: 840, h: 420, pad: 24 };
-const Px = (x) => MAP.pad + ((x - MAP.minX) / (MAP.maxX - MAP.minX)) * (MAP.w - MAP.pad * 2);
-const Pz = (z) => MAP.pad + ((z - MAP.minZ) / (MAP.maxZ - MAP.minZ)) * (MAP.h - MAP.pad * 2);
-
-// 只决定 UI 上把每章的战区节点钉在哪一个**真实路标**上，不造第二份坐标。
-// 选择相互错开的路标是排版裁决：否则序章/第一关与二/三/四关会叠在同一点。
-const CAMPAIGN_ANCHOR_ZONE = [1, 4, 4, 0, 3, 1, 5];
-
-function CampaignAnchor(phase, index) {
-  const zones = phase?.zones || [];
-  const zone = zones[Clamp(CAMPAIGN_ANCHOR_ZONE[index] ?? 0, 0, Math.max(0, zones.length - 1))];
-  if (zone) return { x: zone.x, z: zone.z };
-  const bounds = phase?.bounds || { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
-  return { x: (bounds.minX + bounds.maxX) * 0.5, z: (bounds.minZ + bounds.maxZ) * 0.5 };
-}
-
 function MissionName(label = "") {
   const parts = label.split("·");
   return (parts.length > 1 ? parts.slice(1).join("·") : label).trim();
 }
 
-function TimelineDate(phase) {
-  if (phase?.sandbox) return "TEST";
-  const days = {
-    十四: "14", 十五: "15", 十六: "16", 十七: "17", 十八: "18",
-  };
-  const match = String(phase?.date || "").match(/三月(十四|十五|十六|十七|十八)日/);
-  return match ? `03.${days[match[1]]}` : "03月";
-}
-
 // 七章任务图由菜单独占，不进入战斗数据。文件顺序与 PHASES 的线性章节顺序一致；
-// 一章一图，选章大图与下沿缩略图共用同一份 URL，浏览器只下载一次。
+// 一章一图，右侧横向预览使用已有原创图片，不嵌入外部游戏截图。
 const MISSION_ART = [
   "./Texture/Menu/Texture_MissionCh0Chuchuan.png",
   "./Texture/Menu/Texture_MissionCh1NanLu.png",
@@ -144,174 +106,6 @@ const DEBUG_ITEMS = [
   { id: "infiniteGrenades", label: "无限手榴弹", note: "普通手榴弹不会消耗；开启时会补给一枚" },
 ];
 
-function SvgEl(tag, attrs, parent) {
-  const e = document.createElementNS(NS, tag);
-  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
-  if (parent) parent.appendChild(e);
-  return e;
-}
-
-/**
- * 画一张战场全图，并把选中那一关的切片框出来。
- * 底图全部从 Data_Tengxian 现算 —— 没有第二份坐标，城改了图跟着改。
- */
-function BuildMap(phase, phases = [], selected = 0, progress = { cleared: [], furthest: 0 }, onPlay = null) {
-  const svg = document.createElementNS(NS, "svg");
-  svg.setAttribute("class", "mnMap");
-  svg.setAttribute("viewBox", `0 0 ${MAP.w} ${MAP.h}`);
-  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-  svg.setAttribute("role", "group");
-  svg.setAttribute("aria-label", "滕县战区任务地图；拖动平移，滚轮缩放，单击任务节点直接进入");
-
-  const g = SvgEl("g", { class: "mnMapWorld" }, svg);
-  const wall = CITY.wallCenter;
-
-  // 作战图方格只是一层纸面坐标，不代表新的世界坐标。
-  for (let x = 80; x < MAP.w; x += 80) {
-    SvgEl("line", { class: "mnMapGrid", x1: x, y1: 0, x2: x, y2: MAP.h }, g);
-  }
-  for (let y = 60; y < MAP.h; y += 60) {
-    SvgEl("line", { class: "mnMapGrid", x1: 0, y1: y, x2: MAP.w, y2: y }, g);
-  }
-
-  // --- 城外：荆河、津浦路、界河与北沙河 -----------------------------------
-  const river = OUTSKIRTS.river;
-  SvgEl("path", {
-    class: "mnMapWater",
-    d: `M ${Px(river.x)} ${Pz(MAP.minZ)} L ${Px(river.x)} ${Pz(river.turnZ)} `
-     + `L ${Px(river.x - 620)} ${Pz(river.turnZ + 620)}`,
-  }, g);
-  SvgEl("line", {
-    class: "mnMapRail",
-    x1: Px(WEST_SUBURB.railway.x), y1: Pz(MAP.minZ),
-    x2: Px(WEST_SUBURB.railway.x), y2: Pz(MAP.maxZ),
-  }, g);
-
-  // --- 城 -----------------------------------------------------------------
-  SvgEl("rect", {
-    class: "mnMapMoat",
-    x: Px(-MOAT.outerEdge), y: Pz(-MOAT.outerEdge),
-    width: Px(MOAT.outerEdge) - Px(-MOAT.outerEdge),
-    height: Pz(MOAT.outerEdge) - Pz(-MOAT.outerEdge),
-  }, g);
-  SvgEl("rect", {
-    class: "mnMapWall",
-    x: Px(-wall), y: Pz(-wall), width: Px(wall) - Px(-wall), height: Pz(wall) - Pz(-wall),
-  }, g);
-  // 十字街：城内那两条主街，也是「城心」这个概念在图上的表达
-  SvgEl("line", { class: "mnMapStreet", x1: Px(-wall), y1: Pz(0), x2: Px(wall), y2: Pz(0) }, g);
-  SvgEl("line", { class: "mnMapStreet", x1: Px(0), y1: Pz(-wall), x2: Px(0), y2: Pz(wall) }, g);
-  for (const gate of GATES) {
-    SvgEl("circle", { class: "mnMapGate", cx: Px(gate.x), cy: Pz(gate.z), r: 2.2 }, g);
-  }
-
-  // --- 关厢与城外地标 -----------------------------------------------------
-  const eb = EAST_SUBURB.bounds;
-  SvgEl("rect", {
-    class: "mnMapSuburb",
-    x: Px(eb.minX), y: Pz(eb.minZ),
-    width: Px(eb.maxX) - Px(eb.minX), height: Pz(eb.maxZ) - Pz(eb.minZ),
-  }, g);
-  // 挂牌地标。坐标一律从 Data_Tengxian 现算，图上不留第二份坐标。
-  // 每条多带 [dx, dy, anchor] —— 那是**排版**参数不是地理数据：城在图上只有八十像素，
-  // 城内四个点里监狱与警备队相距 58 m（图上 7.8 px），西关的通讯队与 122 师部相距
-  // 40 m（5.5 px），一律用默认的「右下 5,3」就叠成一团糊字。
-  const Feature = (id) => CITY_FEATURES.find((f) => f.id === id);
-  const dots = [
-    // 西关：铁路一侧从北到南 —— 车站、通讯队、122 师部、电灯厂
-    [WEST_SUBURB.station.x, WEST_SUBURB.station.z, "车站", -5, -5, "end"],
-    [WEST_SUBURB.communications.x, WEST_SUBURB.communications.z, "通讯队", -5, 2, "end"],
-    [WEST_SUBURB.division122.x, WEST_SUBURB.division122.z, "122师部", -11, 9, "end"],
-    [WEST_SUBURB.powerPlant.x, WEST_SUBURB.powerPlant.z, "电灯厂", -5, 8, "end"],
-  ];
-  // 城内：北城的文庙／警备队／监狱，南城的天主堂（后者在 LANDMARKS 不在 CITY_FEATURES）
-  for (const [id, name, dx, dy, anchor] of [
-    ["ConfucianTemple", "文庙", -5, 2, "end"],
-    ["GarrisonHQ", "警备队", -5, -1, "end"],
-    ["CountyJail", "监狱", 5, 6, "start"],
-  ]) {
-    const f = Feature(id);
-    if (f) dots.push([f.x, f.z, name, dx, dy, anchor]);
-  }
-  const church = LANDMARKS.find((l) => l.id === "CatholicChurchInner");
-  if (church) dots.push([church.x, church.z, "天主堂", 5, 3, "start"]);
-  const pagoda = OUTER_LANDMARKS.find((l) => l.id === "LongquanPagoda");
-  if (pagoda) dots.push([pagoda.x, pagoda.z, "龙泉塔", 5, 3, "start"]);
-  for (const [x, z, name, dx = 5, dy = 3, anchor = "start"] of dots) {
-    SvgEl("circle", { class: "mnMapDot", cx: Px(x), cy: Pz(z), r: 1.8 }, g);
-    SvgEl("text", {
-      class: "mnMapLabel", x: Px(x) + dx, y: Pz(z) + dy, "text-anchor": anchor,
-    }, g).textContent = name;
-  }
-
-  // --- 选中的这一关：切片框 + 路标链 --------------------------------------
-  if (phase) {
-    const b = phase.bounds;
-    SvgEl("rect", {
-      class: "mnMapSlice",
-      x: Px(b.minX), y: Pz(b.minZ),
-      width: Px(b.maxX) - Px(b.minX), height: Pz(b.maxZ) - Pz(b.minZ),
-    }, g);
-    let prev = null;
-    for (const zone of phase.zones) {
-      const cx = Px(zone.x);
-      const cy = Pz(zone.z);
-      if (prev) SvgEl("line", { class: "mnMapPath", x1: prev[0], y1: prev[1], x2: cx, y2: cy }, g);
-      SvgEl("circle", { class: "mnMapZone", cx, cy, r: 2.6 }, g);
-      prev = [cx, cy];
-    }
-    // 路标链的终点标上名字：那就是这一关要走到的地方
-    const last = phase.zones[phase.zones.length - 1];
-    if (last) {
-      const anchor = Px(last.x) > MAP.w * 0.72 ? "end" : "start";
-      const dx = anchor === "end" ? -6 : 6;
-      SvgEl("text", {
-        class: "mnMapZoneLabel", x: Px(last.x) + dx, y: Pz(last.z) - 5, "text-anchor": anchor,
-      }, g).textContent = last.name;
-    }
-  }
-
-  // --- 七章战役推进线 + 空间节点 -----------------------------------------
-  // 节点的坐标来自各章真实 zone；横向日期顺序由下面那条时间轴负责，这里只讲空间。
-  const anchors = phases.map(CampaignAnchor);
-  if (anchors.length) {
-    const path = anchors.map((point, i) => `${i ? "L" : "M"} ${Px(point.x)} ${Pz(point.z)}`).join(" ");
-    SvgEl("path", { class: "mnCampaignRouteShadow", d: path }, g);
-    SvgEl("path", { class: "mnCampaignRoute", d: path }, g);
-  }
-  phases.forEach((entry, i) => {
-    const anchor = anchors[i];
-    if (!anchor) return;
-    const done = progress.cleared.includes(entry.id);
-    const next = i === progress.furthest;
-    const node = SvgEl("g", {
-      class: `mnCampaignNode${i === selected ? " on" : ""}${done ? " done" : ""}${next ? " next" : ""}`,
-      transform: `translate(${Px(anchor.x)} ${Pz(anchor.z)})`,
-      role: "button", tabindex: "0", "aria-label": `${entry.label}，${entry.date}`,
-    }, g);
-    SvgEl("line", { class: "mnCampaignBeam", x1: 0, y1: -58, x2: 0, y2: -7 }, node);
-    SvgEl("circle", { class: "mnCampaignNodeRing", cx: 0, cy: 0, r: 9 }, node);
-    if (i === selected) SvgEl("circle", { class: "mnCampaignPulse", cx: 0, cy: 0, r: 12 }, node);
-    SvgEl("circle", { class: "mnCampaignNodeCore", cx: 0, cy: 0, r: 3.4 }, node);
-    SvgEl("text", { class: "mnCampaignNodeNo", x: 0, y: -16, "text-anchor": "middle" }, node)
-      .textContent = String(i).padStart(2, "0");
-    SvgEl("text", { class: "mnCampaignNodeLabel", x: 0, y: 23, "text-anchor": "middle" }, node)
-      .textContent = MissionName(entry.label);
-    node.addEventListener("click", () => onPlay?.(i));
-    node.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      onPlay?.(i);
-      event.preventDefault();
-    });
-  });
-
-  SvgEl("text", { class: "mnMapNorth", x: MAP.w - 16, y: 16 }, g).textContent = "北 ↑";
-  return svg;
-}
-
-// ---------------------------------------------------------------------------
-// 主菜单
-// ---------------------------------------------------------------------------
 export class MainMenu {
   /**
    * @param {object} host
@@ -361,7 +155,6 @@ export class MainMenu {
     this.shots = [];
     this.shotSliceId = null;
     this.selected = 0;             // 选章里选中的关号
-    this.mapView = { cx: MAP.w * 0.5, cy: MAP.h * 0.5, zoom: 1 };
     this.itemIndex = 0;            // 主列表里高亮第几项
     this.panelReturnMode = "title";
     this.target = new THREE.Vector3();
@@ -497,7 +290,7 @@ export class MainMenu {
   }
 
   /**
-   * 选章面板：战区图 + 日期时间轴 + 任务简报。
+   * 选章面板：World at War 纵向任务列表 + 横向任务图与简报。
    *
    * **两组是规格要求**（docs/Data_MissionRemake.md §9）：
    *   正式章节 —— 七章按序，带「已通过 / 下一关」标记，进度只按这七条算；
@@ -506,185 +299,56 @@ export class MainMenu {
    * 而旧过场已经从正片流程脱钩了，摆在章节中间等于谎报流程。
    */
   BuildLevels() {
-    const wrap = document.createElement("div");
-    wrap.className = "mnLevels";
-    this.el.campaignMain = document.createElement("div");
-    this.el.campaignMain.className = "mnCampaignMain";
-    this.el.mapShell = document.createElement("section");
-    this.el.mapShell.className = "mnMapShell";
-    const mapHead = document.createElement("div");
-    mapHead.className = "mnMapHead";
-    mapHead.innerHTML = "<span>第五战区 · 滕县战场</span><b>1938.03.14—03.17</b>";
-    this.el.mapCanvas = document.createElement("div");
-    this.el.mapCanvas.className = "mnMapCanvas";
-    const mapTools = document.createElement("div");
-    mapTools.className = "mnMapTools";
-    mapTools.setAttribute("aria-label", "地图缩放");
-    for (const [label, title, factor] of [["−", "缩小地图", 0.82], ["+", "放大地图", 1.22]]) {
-      const tool = document.createElement("button");
-      tool.type = "button";
-      tool.textContent = label;
-      tool.title = title;
-      tool.setAttribute("aria-label", title);
-      tool.addEventListener("click", () => this.ChangeMapZoom(factor));
-      mapTools.appendChild(tool);
-    }
-    const reset = document.createElement("button");
-    reset.type = "button";
-    reset.className = "mnMapReset";
-    reset.textContent = "复位";
-    reset.addEventListener("click", () => this.ResetMapView());
-    mapTools.appendChild(reset);
-    const mapHint = document.createElement("div");
-    mapHint.className = "mnMapHint";
-    mapHint.textContent = "拖动地图 · 滚轮缩放 · 单击节点进入";
-    const legend = document.createElement("div");
-    legend.className = "mnMapLegend";
-    legend.innerHTML = "<span><i class=\"selected\"></i>当前任务</span>"
-      + "<span><i class=\"done\"></i>已通过</span><span><i></i>可选择</span>";
-    this.el.mapShell.append(mapHead, this.el.mapCanvas, mapTools, mapHint, legend);
-    this.el.levelList = document.createElement("div");
-    this.el.levelList.className = "mnLevelList";
-    this.el.brief = document.createElement("div");
-    this.el.brief.className = "mnBrief";
-    this.el.campaignMain.append(this.el.mapShell, this.el.brief);
-    wrap.append(this.el.campaignMain, this.el.levelList);
-    this.el.levelsWrap = wrap;
-
-    const Group = (text, note) => {
-      const head = document.createElement("div");
-      head.className = "mnLevelGroup";
-      const title = document.createElement("b");
-      title.textContent = text;
-      const sub = document.createElement("small");
-      sub.textContent = note;
-      head.append(title, sub);
-      this.el.levelList.appendChild(head);
-      const track = document.createElement("div");
-      track.className = text === "正式章节" ? "mnTimelineTrack" : "mnSandboxTrack";
-      this.el.levelList.appendChild(track);
-      return track;
+    const Make = (cls, parent, tag = "div", text = "") => {
+      const el = document.createElement(tag);
+      el.className = cls;
+      el.textContent = text;
+      parent?.appendChild(el);
+      return el;
     };
-
+    const wrap = Make("mnLevels");
+    this.el.campaignMain = Make("mnCampaignMain", wrap);
+    this.el.levelList = Make("mnLevelList", this.el.campaignMain, "nav");
+    this.el.levelList.setAttribute("aria-label", "章节与测试场景");
+    this.el.brief = Make("mnBrief", this.el.campaignMain, "section");
+    this.el.brief.setAttribute("aria-label", "所选任务简报");
+    const footer = Make("mnCampaignFoot", wrap);
+    const back = Make("mnCampaignBack", footer, "button", "返回");
+    back.type = "button";
+    back.addEventListener("click", () => this.Show(this.panelReturnMode));
+    Make("mnCampaignKeys", footer, "span", "↑↓ 选择  /  Enter 进入  /  Esc 返回");
+    this.el.levelsWrap = wrap;
+    const Group = (title, note, cls) => {
+      const head = Make("mnLevelGroup", this.el.levelList);
+      Make("", head, "b", title);
+      Make("", head, "small", note);
+      return Make(cls, this.el.levelList);
+    };
     this.levelEls = [];
     const Row = (entry, i, track) => {
-      const b = document.createElement("button");
-      b.className = "mnLevel";
-      if (entry.sandbox) b.classList.add("mnSandboxLevel");
+      const b = Make("mnLevel", track, "button");
+      b.type = "button";
       b.dataset.i = String(i);
-      // 章号取标题里的那个序数字（「第二关 · 手榴弹雨」→「第二关」），名字取后半。
-      // 沙盒条目的 label 里没有「·」，硬拆会把整个标题塞进 34 px 的章号列。
-      const [no, ...rest] = entry.sandbox
-        ? [entry.glyph || entry.sandboxGlyph || "靶", entry.label] : entry.label.split("·");
-      const mkSpan = (cls, text) => {
-        const s = document.createElement("span");
-        s.className = cls;
-        s.textContent = text;
-        b.appendChild(s);
-        return s;
-      };
-      if (!entry.sandbox) {
-        const image = document.createElement("img");
-        image.className = "mnLvThumb";
-        image.src = MISSION_ART[i] || "";
-        image.alt = "";
-        image.loading = i < 2 ? "eager" : "lazy";
-        image.decoding = "async";
-        image.draggable = false;
-        b.appendChild(image);
-      }
-      mkSpan("mnLvNo", entry.sandbox ? no.trim() : String(i).padStart(2, "0"));
-      mkSpan("mnLvName", (rest.join("·") || entry.label).trim());
-      // COD WWII 的日期轴要先读日期，再读任务名；完整时刻仍在右侧简报。
-      mkSpan("mnLvDate", entry.sandbox ? entry.place : TimelineDate(entry));
-      mkSpan("mnLvMark", "");
-      b.addEventListener("mouseenter", () => this.SelectLevel(i));
+      b.setAttribute("aria-label", entry.label);
+      if (entry.sandbox) b.classList.add("mnSandboxLevel");
+      const number = entry.sandbox ? (entry.glyph || entry.sandboxGlyph || "靶")
+        : entry.label.split("·")[0].trim();
+      Make("mnLvNo", b, "span", number);
+      Make("mnLvName", b, "span", entry.sandbox ? entry.label : MissionName(entry.label));
+      Make("mnLvMark", b, "span");
+      b.addEventListener("pointerenter", (event) => {
+        if (event.pointerType === "mouse") this.SelectLevel(i);
+      });
       b.addEventListener("focus", () => this.SelectLevel(i));
-      b.addEventListener("click", () => this.Play(i));
-      track.appendChild(b);
+      b.addEventListener("click", () => { this.SelectLevel(i); this.Play(i); });
       this.levelEls[i] = b;
     };
-
-    const officialTrack = Group("正式章节", "悬停预览 · 单击进入");
-    this.phases.forEach((phase, i) => Row(phase, i, officialTrack));
+    const official = Group("正式章节", "滕县保卫战", "mnMissionTrack");
+    this.phases.forEach((phase, i) => Row(phase, i, official));
     if (this.sandboxes.length) {
-      const sandboxTrack = Group("测试场景", "独立入口 · 不计进度，不影响正片");
-      const offset = this.phases.length;
-      this.sandboxes.forEach((entry, i) => Row(entry, offset + i, sandboxTrack));
+      const sandbox = Group("测试场景", "独立测试", "mnSandboxTrack");
+      this.sandboxes.forEach((entry, i) => Row(entry, this.phases.length + i, sandbox));
     }
-  }
-
-  MapViewBox() {
-    const width = MAP.w / this.mapView.zoom;
-    const height = MAP.h / this.mapView.zoom;
-    return { width, height, x: this.mapView.cx - width * 0.5, y: this.mapView.cy - height * 0.5 };
-  }
-
-  ClampMapView() {
-    const { width, height } = this.MapViewBox();
-    this.mapView.cx = Clamp(this.mapView.cx, width * 0.5, MAP.w - width * 0.5);
-    this.mapView.cy = Clamp(this.mapView.cy, height * 0.5, MAP.h - height * 0.5);
-  }
-
-  UpdateMapView(svg = this.el.mapCanvas?.querySelector(".mnMap")) {
-    if (!svg) return;
-    this.ClampMapView();
-    const { x, y, width, height } = this.MapViewBox();
-    svg.setAttribute("viewBox", `${x} ${y} ${width} ${height}`);
-    svg.dataset.zoom = this.mapView.zoom.toFixed(2);
-  }
-
-  ChangeMapZoom(factor, focusX = 0.5, focusY = 0.5) {
-    const old = this.MapViewBox();
-    const worldX = old.x + old.width * focusX;
-    const worldY = old.y + old.height * focusY;
-    this.mapView.zoom = Clamp(this.mapView.zoom * factor, 1, 2.5);
-    const next = this.MapViewBox();
-    this.mapView.cx = worldX - (focusX - 0.5) * next.width;
-    this.mapView.cy = worldY - (focusY - 0.5) * next.height;
-    this.UpdateMapView();
-  }
-
-  ResetMapView() {
-    this.mapView = { cx: MAP.w * 0.5, cy: MAP.h * 0.5, zoom: 1 };
-    this.UpdateMapView();
-  }
-
-  BindMapInteractions(svg) {
-    this.UpdateMapView(svg);
-    svg.addEventListener("wheel", (event) => {
-      const rect = svg.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
-      this.ChangeMapZoom(event.deltaY < 0 ? 1.18 : 0.85,
-        Clamp01((event.clientX - rect.left) / rect.width),
-        Clamp01((event.clientY - rect.top) / rect.height));
-      event.preventDefault();
-    }, { passive: false });
-
-    let drag = null;
-    const EndDrag = (event) => {
-      if (!drag) return;
-      svg.releasePointerCapture?.(event.pointerId);
-      svg.classList.remove("dragging");
-      drag = null;
-    };
-    svg.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0 || event.target.closest?.(".mnCampaignNode")) return;
-      drag = { x: event.clientX, y: event.clientY, cx: this.mapView.cx, cy: this.mapView.cy };
-      svg.setPointerCapture?.(event.pointerId);
-      svg.classList.add("dragging");
-      event.preventDefault();
-    });
-    svg.addEventListener("pointermove", (event) => {
-      if (!drag) return;
-      const rect = svg.getBoundingClientRect();
-      const view = this.MapViewBox();
-      this.mapView.cx = drag.cx - (event.clientX - drag.x) * view.width / Math.max(1, rect.width);
-      this.mapView.cy = drag.cy - (event.clientY - drag.y) * view.height / Math.max(1, rect.height);
-      this.UpdateMapView(svg);
-    });
-    svg.addEventListener("pointerup", EndDrag);
-    svg.addEventListener("pointercancel", EndDrag);
   }
 
   // -------------------------------------------------------------------------
@@ -754,7 +418,7 @@ export class MainMenu {
     this.open = false;
     this.live = false;
     this.root.classList.add("off");
-    this.root.classList.remove("pause", "panelOn");
+    this.root.classList.remove("pause", "panelOn", "levelsOn");
     this.el.panel.classList.remove("on");
     this.el.fade.style.opacity = "0";
   }
@@ -776,11 +440,13 @@ export class MainMenu {
     if (panel) this.panelReturnMode = wasMode === "pause" ? "pause" : "title";
     this.root.classList.toggle("panelOn", panel);
     this.el.panel.classList.toggle("on", panel);
+    this.root.classList.toggle("levelsOn", mode === "levels");
     if (mode === "levels") {
-      this.el.panelTitle.textContent = "滕县战区 · 任务选择";
+      this.el.panelTitle.textContent = "任务选择";
       this.el.panelBody.textContent = "";
       this.el.panelBody.appendChild(this.el.levelsWrap);
       this.SelectLevel(this.DefaultLevel());
+      this.levelEls[this.selected]?.scrollIntoView({ block: "nearest" });
     } else if (mode === "codex") {
       this.el.panelTitle.textContent = MENU.codex;
       this.el.panelBody.textContent = "";
@@ -795,6 +461,9 @@ export class MainMenu {
     } else if (mode === "debug") {
       this.el.panelTitle.textContent = "调试选项";
       this.BuildDebugOptions();
+    }
+    if (!panel && wasMode === "levels") {
+      this.itemEls[this.itemIndex]?.focus({ preventScroll: true });
     }
   }
 
@@ -871,6 +540,8 @@ export class MainMenu {
     const progress = Progress.Read();
     this.levelEls.forEach((el, k) => {
       el.classList.toggle("on", k === this.selected);
+      if (k === this.selected) el.setAttribute("aria-current", "true");
+      else el.removeAttribute("aria-current");
       const mark = el.querySelector(".mnLvMark");
       if (this.entries[k].sandbox) { mark.textContent = "沙盒"; mark.className = "mnLvMark"; return; }
       const done = progress.cleared.includes(this.entries[k].id);
@@ -879,19 +550,6 @@ export class MainMenu {
     });
 
     const phase = this.entries[this.selected];
-    this.el.mapCanvas.textContent = "";
-    if (!phase.sandbox) {
-      const map = BuildMap(phase, this.phases, this.selected, progress, (index) => this.Play(index));
-      this.el.mapCanvas.appendChild(map);
-      this.BindMapInteractions(map);
-      this.el.mapShell.classList.remove("sandbox");
-    } else {
-      const unavailable = document.createElement("div");
-      unavailable.className = "mnMapUnavailable";
-      unavailable.innerHTML = "<b>训练区不属于滕县战役时间线</b><span>请选择下方测试场景，进入后不会改写战役进度。</span>";
-      this.el.mapCanvas.appendChild(unavailable);
-      this.el.mapShell.classList.add("sandbox");
-    }
     const brief = this.el.brief;
     brief.textContent = "";
     const mk = (cls, tag = "div") => {
@@ -917,15 +575,25 @@ export class MainMenu {
       copy.appendChild(e);
       return e;
     };
-    AppendCopy("mnBriefEyebrow").textContent = phase.sandbox
-      ? "TRAINING GROUND" : `MISSION ${String(this.selected).padStart(2, "0")} · TENGXIAN THEATER`;
     AppendCopy("mnBriefTitle").textContent = MissionName(phase.label);
     AppendCopy("mnMissionWhen").textContent = phase.sandbox
-      ? phase.place : `${TimelineDate(phase)} · ${phase.place}`;
+      ? phase.place : `${phase.date} · ${phase.place}`;
     AppendCopy("mnMissionObjective").textContent = phase.objectives?.[0]
       || phase.brief?.[0] || "进入任务";
-    AppendCopy("mnMissionEnter").textContent = phase.sandbox
-      ? "单击下方测试场景进入" : "单击任务节点或章节卡进入";
+    if (phase.sandbox) {
+      const training = mk("mnTrainingPreview");
+      training.setAttribute("aria-hidden", "true");
+      training.textContent = phase.glyph || phase.sandboxGlyph || "靶";
+      brief.prepend(training);
+    }
+    const record = mk("mnMissionRecord");
+    const cleared = progress.cleared.includes(phase.id);
+    record.classList.toggle("done", !phase.sandbox && cleared);
+    const label = document.createElement("span");
+    label.textContent = phase.sandbox ? "独立测试" : "章节记录";
+    const value = document.createElement("b");
+    value.textContent = phase.sandbox ? "不计入战役进度" : cleared ? "已通过" : "尚未通过";
+    record.append(label, value);
   }
 
   // -------------------------------------------------------------------------
@@ -995,12 +663,19 @@ export class MainMenu {
           return;
         case "ArrowDown": case "ArrowUp": {
           const delta = event.key === "ArrowDown" ? 1 : -1;
-          if (panel && this.mode === "levels") this.SelectLevel(this.selected + delta);
+          if (panel && this.mode === "levels") {
+            this.SelectLevel(this.selected + delta);
+            this.levelEls[this.selected]?.focus({ preventScroll: true });
+            this.levelEls[this.selected]?.scrollIntoView({ block: "nearest" });
+          }
           else if (!panel) this.Highlight(this.itemIndex + delta);
           event.preventDefault();
           return;
         }
         case "Enter": case " ":
+          // Native controls (especially Back) keep their own Enter/Space action.
+          if (panel && event.target.closest?.("button, input, select, textarea, a, summary")
+            && !event.target.closest(".mnLevel")) return;
           if (panel && this.mode === "levels") this.Play(this.selected);
           else if (!panel) this.Activate(this.items[this.itemIndex]?.id);
           event.preventDefault();

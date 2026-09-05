@@ -1,4 +1,4 @@
-# 主菜单与选章 —— 活战场主菜单 + COD WWII 战区时间轴
+# 主菜单与选章 —— 活战场主菜单 + World at War 线性任务列表
 
 对应实现：`Data_Menu.mjs`（机位表）、`Script_Menu.mjs`（菜单本体）、`Style_Menu.css`、
 `Script_Main.mjs` 的菜单接线、`Script_MenuTest.mjs`（冒烟）。
@@ -46,28 +46,38 @@ ER2 的出生菜单同理不抄，理由见 `Data_EasyRed2Parity.md` 那条「�
 
 ## 选章
 
-选章改用 2017《Call of Duty: WWII》的「战区地图 + 日期时间轴」骨架，并保留本作自己的
-任务简报与史实纪律：
+选章按 2008《Call of Duty: World at War》的任务选择画面制作。
+指定参考来自 [Notion「COD/战地 选关UI 参考」](https://www.notion.so/3cc60335331c8149be4cf97d4d9a1822)
+中的 2008 条目：[原始参考图](https://news.softpedia.com/images/extra/GAMES/large/COWAWtextscr_002-large.jpg)。
+该页末尾的旧推荐仍提及 WWII 地图；本次用户明确指定 World at War，现状以这里为准。
 
-- 主区是一张**可操作的程序化 SVG 战区图**。底图取自 `Data_Tengxian`（城墙、四门、护城河、
-  东西关、铁路与荆河），支持按住拖动、滚轮/按钮缩放与复位；七个任务节点钉在各章真实
-  `zones` 上，推进虚线、选中节点与信标持续运动。没有外部截图或第二份地理坐标。
-- 底部是三月十四日至十七日的横向日期轴：七章各有一张独立任务图，按史实时间单线推进，
-  标 `已通过 / 下一关`；悬停只预览，**单击缩略图或地图节点直接进入**，不再二次确认。
-- 右侧不再塞完整简报，只保留任务图、任务名、日期地点和 `objectives[0]` 一句行动目标。
-  史料摘要、兵员池与机制解释不占选关首屏；七关全部可选，不锁关。
-- 训练靶场与白刃 QTE 仍是第二组独立入口，不接入战役路线与历史时间轴。
+- 全屏深色背景，上下黑色栏；左侧是紧凑的纵向文字任务列表。当前章节用金黄色文字与
+  淡灰横条标识，不再使用战区地图、地图节点、横向时间轴或缩略图卡。
+- 右侧是横向任务图，下方依次是金色任务名、日期地点、一句行动目标；底部显示真实的
+  章节通过记录。游戏没有难度完成档案，因此不照搬参考图中的最高难度或勋章。
+- 任务图片沿用菜单已有的原创资产；背景复用已有图片做灰度、模糊和压暗。
+  参考截图仅用于内部比对，不放进发布资产。
+- 鼠标悬停或键盘焦点更新简报，单击条目或按 Enter 直接进入；七章全部可选。
+  原生返回按钮保留 Enter / Space 行为，Esc 回到打开选章前的主菜单或暂停菜单。
+- 窄屏将列表与简报上下排布，可垂直滚动；触控行保留足够点击高度，返回按钮固定在下栏。
 
-进度存 `localStorage` 的 `tengxian_progress_v1`（`{ furthest, cleared }`），
-过一关写一次。有进度时第一项变成「继续 · 某关」。
+进度仍读写 `tengxian1938_progress_v2`（`{ furthest, cleared }`）。
+测试入口不参与进度，默认选中项和主菜单“继续”只由正式战役决定。
+
+局部验收：`node Taierzhuang1938/Script_MenuTest.mjs --levels-only`。
+它复用正式页面与浏览器 TestKit，检查七章图片、真实鼠标/键盘行为、返回导航、
+桌面/笔记本/手机/窄横屏布局，并保存 `_shots/Scene_MissionList*.png`。
+完整菜单冒烟仍涵盖实际进入战役、过场、暂停、进度与沙盒往返。
 
 ### 「测试场景」组：核心玩法沙盒与在验关卡白盒
 
-正式章节七章之后隔一条分隔线，是「测试场景」组。玩家可见列表目前是四条：
+正式章节之后隔一条分隔线，是「测试场景」组：
 
 | 条目 | 标号 | 切片 | query |
 | --- | --- | --- | --- |
+| 枪械白盒靶场 | 枪 | `Data_WeaponRange.WEAPON_RANGE_PHASE` | `?weapons=1` |
 | 玩法测试靶场 | 靶 | `Data_Range.RANGE_PHASE` | `?range=1` |
+| 爆炸测试场 | 爆 | `Data_ExplosionRange.EXPLOSION_RANGE_PHASE` | `?explosions=1` |
 | 白刃战 QTE 测试场 | 刃 | `Data_MeleeQte.MELEE_QTE_PHASE` | `?melee=1` |
 | 第一关 · 全新策划白盒 | 白 | `Data_FirstLevelWhitebox.FIRST_LEVEL_WHITEBOX_PHASE` | `?whitebox=1` |
 | 第一关 · P0/P1/P2 场景白盒 | 012 | `Data_FirstLevelP012Whitebox.FIRST_LEVEL_P012_WHITEBOX_PHASE` | `?whitebox=p012` |
@@ -75,10 +85,9 @@ ER2 的出生菜单同理不抄，理由见 `Data_EasyRed2Parity.md` 那条「�
 界河白盒与过场预览不再列入选章，避免测试入口越积越多。它们的内部直达 query 仍保留：
 `?jiehe=1` 服务地形回归与人工验收，`?preview=CS_Chuchuan` 服务序章预览。
 
-四条都**不进 `phases`**：菜单另有一份 `entries = [...phases, ...sandboxes]`
+这些入口都**不进 `phases`**：菜单另有一份 `entries = [...phases, ...sandboxes]`
 专给列表与键盘上下用，而进度、「继续」、「下一关」标记与 `DefaultLevel()` 一律只按七章数。
-沙盒简报直接读各自的 phase（工位/路标、机制、携行），但**不画那张全图** ——
-`MAP` 那个框写死在滕县城上，靶场在 (1400, 1400)，画出来是空图。
+沙盒简报直接读各自的 phase；预览使用程序化靶标与入口标识，显示“不计入战役进度”。
 
 进出沙盒都是**整页重载**（`Script_Main.GoToSandbox`），因为 `PHASE_TABLE` 在这些 query
 下都是整表替换的，当场换不过去。所以沙盒里的暂停菜单换成那一套：继续 / 设置 /
