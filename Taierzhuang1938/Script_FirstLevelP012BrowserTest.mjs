@@ -552,6 +552,7 @@ async function PlayFrontline() {
             lastLitterArrivedEvent: flow.signals.includes("P012LastLitterArrived"),
             woundedDragDistance: scene.woundedDragDistance, carryDistance: scene.carryDistance,
             originalLitter: scene.litters.find(litter => litter.originalCarried)?.id,
+            litterProps: game.Debug.SetpieceProps().filter(prop=>scene.litters.some(litter=>litter.id===prop.id||litter.bodyId===prop.id)),
             ...(flow.beatIndex === 24 ? { litterParking: scene.litters.map(litter => ({
               id: litter.id, front: litter.front, rear: litter.rear,
             })) } : {}),
@@ -1129,6 +1130,10 @@ async function PlayFrontline() {
     const returnedLitter = result.trace.find(entry => entry.beat === "B24")?.originalLitter;
     Check(!!firstLitter && firstLitter === returnedLitter && ending.scene.litterRecovered,
       "扑救放下、扶起恢复、结尾重新握住的是同一副担架", firstLitter);
+    const escortViews=result.trace.filter(entry=>Number(entry.beat.slice(1))>=13);
+    Check(escortViews.some(entry=>entry.beat==="B13")&&escortViews.some(entry=>entry.beat==="B24")
+      &&escortViews.every(entry=>entry.litterProps.length===4&&entry.litterProps.every(prop=>prop.visible)),
+      "道路接敌、空袭、搬运与回撤各阶段的两副原担架及伤员实体均保持可见");
     const parked = result.trace.find(entry => entry.beat === "B24")?.litterParking || [];
     const spans = parked.map(litter => Math.hypot(litter.front.x - litter.rear.x, litter.front.z - litter.rear.z));
     const centers = parked.map(litter => ({ x: (litter.front.x + litter.rear.x) / 2,
