@@ -42,14 +42,20 @@ for kind in ['Wood','Iron']:
     ormMap=DataImage('Texture_Train'+kind+'Orm',np.stack((np.ones_like(height),rough,metal),axis=2))
     DataImage('Texture_Train'+kind+'Height',height)
     maps[kind]=(albedo,normalMap,ormMap)
-    provenance.append({'material':kind,'generator':'Codex CLI gpt-5.6-sol / built-in image_gen__imagegen (tier 1)','albedo':albedo.name+'.png','albedoSha256':hashlib.sha256((assetDir/(albedo.name+'.png')).read_bytes()).hexdigest(),'size':list(albedo.size),'derivedMaps':['Normal (+Y / OpenGL)','ORM (R=1, G=roughness, B=metallic)','Height (inferred micro relief)'],'albedoModified':False})
+    provenance.append({'material':kind,'generator':'Codex CLI gpt-5.6-sol / built-in image_gen__imagegen (tier 1)','albedo':albedo.name+'.png','albedoSha256':hashlib.sha256((assetDir/(albedo.name+'.png')).read_bytes()).hexdigest(),'size':list(albedo.size),'derivedMaps':['Normal (+Y / OpenGL)','ORM (R=1, G=roughness, B=metallic)','Height (inferred micro relief)'],'albedoModified':False,'shaderTreatment':'Six per-plank baseColorFactor tints, texture pixels unchanged' if kind=='Wood' else 'Original base color; revised physical UV scale'})
 
 for mat in bpy.data.materials:
     if mat.name=='Material_AgedIron' or mat.name.startswith('Material_WeatheredPlank'):
         nodes=mat.node_tree.nodes;links=mat.node_tree.links
         nodes.clear();out=nodes.new('ShaderNodeOutputMaterial');bsdf=nodes.new('ShaderNodeBsdfPrincipled');links.new(bsdf.outputs[0],out.inputs['Surface'])
         albedo,normalImg,ormImg=maps['Wood' if 'Plank' in mat.name else 'Iron']
-        tex=nodes.new('ShaderNodeTexImage');tex.image=albedo;tex.extension='REPEAT';links.new(tex.outputs['Color'],bsdf.inputs['Base Color'])
+        tex=nodes.new('ShaderNodeTexImage');tex.image=albedo;tex.extension='REPEAT'
+        if 'Plank' in mat.name:
+            shade=int(mat.name[-1])*.023
+            multiply=nodes.new('ShaderNodeMix');multiply.data_type='RGBA';multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=1
+            multiply.inputs[7].default_value=(.34+shade,.32+shade,.27+shade,1)
+            links.new(tex.outputs['Color'],multiply.inputs[6]);links.new(multiply.outputs[2],bsdf.inputs['Base Color'])
+        else: links.new(tex.outputs['Color'],bsdf.inputs['Base Color'])
         normalTex=nodes.new('ShaderNodeTexImage');normalTex.image=normalImg
         normal=nodes.new('ShaderNodeNormalMap');normal.inputs['Strength'].default_value=.55
         links.new(normalTex.outputs['Color'],normal.inputs['Color']);links.new(normal.outputs[0],bsdf.inputs['Normal'])
@@ -65,8 +71,10 @@ for collectionName in ['Model_Locomotive','Model_Gondola']:
             axis=max(range(3),key=lambda i:abs(polygon.normal[i]))
             for loopIndex in polygon.loop_indices:
                 co=mesh.vertices[mesh.loops[loopIndex].vertex_index].co
-                u,v=(co.y*.42,co.z*.6) if axis==0 else (co.x*.15,(co.z if axis==1 else co.y)*.6)
+                isWood=any('Plank' in material.name for material in mesh.materials)
+                u,v=(co.y*.42,co.z*.6) if axis==0 else (co.x*(.15 if isWood else .43),(co.z if axis==1 else co.y)*.6)
                 uv.data[loopIndex].uv=(u,v)
 (assetDir/'Data_TrainPbr.json').write_text(json.dumps(provenance,indent=2),encoding='utf-8')
+bpy.data.orphans_purge(do_recursive=True)
 bpy.ops.wm.save_as_mainfile(filepath=str(assetDir/'Scene_TrainReferenceRig.blend'),compress=True)
 result={'imagegenAlbedos':[value[0].name for value in maps.values()],'normalAndOrmMaps':True,'packed':True,'provenance':provenance}

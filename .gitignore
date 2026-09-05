@@ -44,6 +44,16 @@ Taierzhuang1938/Audio/Music/_raw/
 Taierzhuang1938/Heightmap/_raw/
 # Taierzhuang1938 视觉审查用的截图（每轮重出，不进仓库）
 Taierzhuang1938/_shots/
+# Train acceptance pages and media are local only, never Pages assets.
+Taierzhuang1938/Model/TrainReference/_review/
+Taierzhuang1938/Model/TrainReference/index.html
+Taierzhuang1938/Model/TrainReference/Script_TrainReview.mjs
+Taierzhuang1938/Model/TrainReference/Animation_*.mp4
+Taierzhuang1938/Model/TrainReference/Texture_*Runtime.png
+Taierzhuang1938/Model/TrainReference/Texture_TrainHero.png
+Taierzhuang1938/Model/TrainReference/Data_BuildProgress.txt
+Taierzhuang1938/Model/TrainReference/*.blend1
+Taierzhuang1938/Model/TrainReference/__pycache__/
 Taierzhuang1938/_check_*.html
 # 视频转骨骼的中间产物：只留关键点 JSON（重烘 clip 的输入），叠帧 QC 图不进仓库
 Taierzhuang1938/_import/_mocap/*

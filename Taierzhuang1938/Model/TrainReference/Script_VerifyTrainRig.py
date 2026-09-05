@@ -9,7 +9,7 @@ scene=bpy.context.scene
 roots=[bpy.data.objects[name] for name in ['Model_LocomotiveRoot','Model_GondolaRoot']]
 actions=[root.animation_data.action for root in roots]
 for root in roots: root.animation_data.action=None
-maxJointError=0.0; maxSlipError=0.0; maxQuarterError=0.0
+maxJointError=0.0; maxSlipError=0.0; maxQuarterError=0.0;maxValveJointError=0.0
 sampleCount=0
 for distance in [i*math.tau*.73/120 for i in range(-120,121)]+[0,1,1,0,-1,17.345,-6.789]:
     for root in roots:
@@ -34,6 +34,17 @@ for distance in [i*math.tau*.73/120 for i in range(-120,121)]+[0,1,1,0,-1,17.345
             expectedEnd=evaluated['Model_LocomotiveRoot'].matrix_world.inverted() @ head.matrix_world.translation
         else: expectedEnd=expectedStart+Vector((rod['length'],0,0))
         maxJointError=max(maxJointError,(start-expectedStart).length,(end-expectedEnd).length,abs((end-start).length-rod['length']))
+    for record in manifest.get('valveGear',[]):
+        def Point(name,co):
+            return bpy.data.objects[name].evaluated_get(depsgraph).matrix_world @ Vector(co)
+        sideName='Left' if record['side']==1 else 'Right'
+        e=Point(record['eccentricRod'],(0,0,0));b=Point(record['eccentricRod'],(record['eccentricLength'],0,0))
+        crankPin=Point('Model_Driver2'+sideName,(0,record['side']*.56,.18))
+        rockerEnd=Point(record['rocker'],(0,0,-record['rockerLength']))
+        radiusStart=Point(record['radiusRod'],(0,0,0));radiusEnd=Point(record['radiusRod'],(record['radiusLength'],0,0))
+        radiusPin=Point(record['rocker'],(0,0,-record['rockerLength']*record['fixedSetting']))
+        valve=Point(record['stem'],(0,0,0))
+        maxValveJointError=max(maxValveJointError,(e-crankPin).length,(b-rockerEnd).length,(radiusStart-radiusPin).length,(radiusEnd-valve).length)
     for i in range(1,6):
         left=bpy.data.objects[f'Model_Driver{i}Left'].evaluated_get(depsgraph)
         right=bpy.data.objects[f'Model_Driver{i}Right'].evaluated_get(depsgraph)
@@ -47,8 +58,11 @@ assert invalidDrivers==0, f'{invalidDrivers} invalid drivers'
 assert maxJointError<.00002, f'Joint separation {maxJointError}'
 assert maxSlipError<.00002, f'Rolling mismatch {maxSlipError}'
 assert maxQuarterError<.00002, f'Quartering mismatch {maxQuarterError}'
+assert maxValveJointError<.00002, f'Valve linkage separation {maxValveJointError}'
 assert manifest['triangles']['Model_Locomotive']<80000
 assert manifest['triangles']['Model_Gondola']<80000
 report={'status':'PASS','signedDistanceSamples':sampleCount,'maxJointErrorMeters':maxJointError,'maxRollingErrorMeters':maxSlipError,'maxQuarteringErrorRadians':maxQuarterError,'driverCount':len(drivers),'invalidDrivers':invalidDrivers,'triangles':manifest['triangles'],'checks':['Both rolling directions, repeated stop, full revolution','Wheel tread at rail level','Five driver axles in phase on each side','Left and right cranks quartered','Main rods and coupling rods fixed length','Crosshead remains on straight slide guides']}
+report['maxValveJointErrorMeters']=maxValveJointError
+report['checks'].append('Return crank, eccentric rod, fixed-setting rocker and horizontal valve slide joints')
 (assetDir/'Data_TrainRigValidation.json').write_text(json.dumps(report,indent=2))
 result=report

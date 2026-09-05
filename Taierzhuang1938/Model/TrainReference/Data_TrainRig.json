@@ -223,11 +223,59 @@
   ],
   "quarteringSource": "https://en.wikisource.org/wiki/Steam_Locomotive_Construction_and_Maintenance/Chapter_VI",
   "triangles": {
-    "Model_Locomotive": 52528,
-    "Model_Gondola": 29151
+    "Model_Locomotive": 78348,
+    "Model_Gondola": 32269
   },
   "meshObjects": {
-    "Model_Locomotive": 65,
+    "Model_Locomotive": 100,
     "Model_Gondola": 25
-  }
+  },
+  "detailRevision": 2,
+  "detailFeatures": [
+    "Tapered cast wheel spokes",
+    "Forged I-section rods and oil cups",
+    "Flat stacked leaf springs and suspension hangers",
+    "Feedwater injector, duplex compressor and air lines",
+    "Cylinder glands, chest bolts and drain cocks",
+    "Cab window channels, roof vent and controls",
+    "Gondola channel posts, working-shape hinge fittings and axle guards",
+    "Underframe brake beams and coupler release bars",
+    "Fixed-setting return crank, eccentric rod, rocker and valve slide"
+  ],
+  "valveGear": [
+    {
+      "side": -1,
+      "phase": 0,
+      "eccentricRod": "Model_EccentricRodRight",
+      "rocker": "Model_ValveRockerRight",
+      "radiusRod": "Model_RadiusRodRight",
+      "stem": "Model_ValveStemRight",
+      "eccentricLength": 1.91,
+      "rockerLength": 0.32,
+      "radiusLength": 1.25,
+      "plane": 1.34,
+      "pivot": [
+        2.77,
+        1.36
+      ],
+      "fixedSetting": 0.55
+    },
+    {
+      "side": 1,
+      "phase": 1.5707963267948966,
+      "eccentricRod": "Model_EccentricRodLeft",
+      "rocker": "Model_ValveRockerLeft",
+      "radiusRod": "Model_RadiusRodLeft",
+      "stem": "Model_ValveStemLeft",
+      "eccentricLength": 1.91,
+      "rockerLength": 0.32,
+      "radiusLength": 1.25,
+      "plane": 1.34,
+      "pivot": [
+        2.77,
+        1.36
+      ],
+      "fixedSetting": 0.55
+    }
+  ]
 }

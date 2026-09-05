@@ -13,7 +13,8 @@
       "ORM (R=1, G=roughness, B=metallic)",
       "Height (inferred micro relief)"
     ],
-    "albedoModified": false
+    "albedoModified": false,
+    "shaderTreatment": "Six per-plank baseColorFactor tints, texture pixels unchanged"
   },
   {
     "material": "Iron",
@@ -29,6 +30,7 @@
       "ORM (R=1, G=roughness, B=metallic)",
       "Height (inferred micro relief)"
     ],
-    "albedoModified": false
+    "albedoModified": false,
+    "shaderTreatment": "Original base color; revised physical UV scale"
   }
 ]

@@ -1,4 +1,4 @@
-"""Run through BlenderMCP execute_blender_code_for_cli in the dedicated blend.
+"""Run through BlenderMCP in the dedicated train blend.
 Reference interpretation, not a documented locomotive class. Metres; +X forward,
 +Y left; Z up. glTF export is +X forward, Y up; its wheel axis is local -Z.
 """
@@ -71,8 +71,8 @@ def Material(name, color, metal=0, rough=.65):
     return material
 
 iron=Material('Material_AgedIron',(.063,.072,.073),.75,.59)
-steel=Material('Material_WornSteel',(.27,.29,.28),.82,.36)
-rim=Material('Material_PolishedWheelTread',(.38,.39,.37),.9,.29)
+steel=Material('Material_WornSteel',(.105,.115,.112),.78,.48)
+rim=Material('Material_PolishedWheelTread',(.245,.25,.23),.88,.32)
 black=Material('Material_Soot',(.018,.021,.023),.3,.83)
 rust=Material('Material_OxidizedEdges',(.18,.125,.075),.55,.75)
 brass=Material('Material_AgedBrass',(.37,.25,.09),.76,.4)
@@ -94,7 +94,7 @@ def Box(name, center, size, material=iron, parent=None, bevel=0):
     vertices=[(x+u*a,y+v*b,z+w*c) for u,v,w in [(-1,-1,-1),(1,-1,-1),(1,1,-1),(-1,1,-1),(-1,-1,1),(1,-1,1),(1,1,1),(-1,1,1)]]
     obj=Mesh(name,vertices,[(0,3,2,1),(4,5,6,7),(0,1,5,4),(1,2,6,5),(2,3,7,6),(3,0,4,7)],material,parent)
     if bevel:
-        mod=obj.modifiers.new('SoftEdges','BEVEL'); mod.width=bevel; mod.segments=2
+        mod=obj.modifiers.new('SoftEdges','BEVEL'); mod.width=bevel; mod.segments=1
     return obj
 
 def Cylinder(name, center, radius, length, axis='Z', material=iron, parent=None, segments=32, radiusTop=None):
@@ -141,6 +141,31 @@ def Pipe(name,points,radius=.024,material=iron,parent=None):
 def Bolt(name,center,axis='Y',parent=None,radius=.024):
     return Cylinder(name,center,radius,.025,axis,steel,parent,6)
 
+def Leaf(name,points,width,thickness,parent,material=steel):
+    vertices=[]
+    for x,y,z in points:
+        vertices.extend([(x,y-width/2,z-thickness/2),(x,y+width/2,z-thickness/2),(x,y+width/2,z+thickness/2),(x,y-width/2,z+thickness/2)])
+    faces=[(3,2,1,0),(len(vertices)-4,len(vertices)-3,len(vertices)-2,len(vertices)-1)]
+    for k in range(len(points)-1):
+        for j in range(4): faces.append((4*k+j,4*k+(j+1)%4,4*k+4+(j+1)%4,4*k+4+j))
+    return Mesh(name,vertices,faces,material,parent)
+
+def CastSpoke(angle,radius,parent):
+    # Elliptical cast section, with wider fillets where the spoke meets hub/rim.
+    vertices=[]
+    for radial,halfWidth,depth in [(.09,.064,.066),(.18,.038,.046),(radius-.18,.030,.038),(radius-.105,.052,.055)]:
+        for j in range(6):
+            t=j*math.tau/6; tangent=halfWidth*math.cos(t)
+            vertices.append((radial*math.cos(angle)-tangent*math.sin(angle),depth*math.sin(t),radial*math.sin(angle)+tangent*math.cos(angle)))
+    faces=[tuple(reversed(range(6))),tuple(range(18,24))]+[(k*6+j,k*6+(j+1)%6,(k+1)*6+(j+1)%6,(k+1)*6+j) for k in range(3) for j in range(6)]
+    obj=Mesh('Model_CastWheelSpoke',vertices,faces,iron,parent)
+    for p in obj.data.polygons: p.use_smooth=True
+
+def RodSection(length,height,depth,parent):
+    # Separate flanges and recessed web produce a forged I section.
+    Box('Model_RodWeb',(length/2,0,0),(length,.036,height*.62),steel,parent)
+    for z in [-height*.40,height*.40]: Box('Model_RodFlange',(length/2,0,z),(length,depth,height*.2),steel,parent,.008)
+
 def Driver(obj,path,index,expr,root):
     driver=obj.driver_add(path,index).driver
     driver.type='SCRIPTED'; driver.expression=expr
@@ -176,16 +201,16 @@ Box('Model_LocomotiveFrame',(0,0,1.18),(11.7,1.16,.25),black,loco,.025)
 for side in [-1,1]:
     Box('Model_MainFrameRail',(0,side*.53,.99),(10.9,.14,.48),iron,loco,.014)
     Box('Model_RunningBoard',(.3,side*1.04,1.76),(10.9,.50,.12),iron,loco,.025)
-    Box('Model_RunningBoardEdge',(.3,side*1.28,1.71),(10.9,.045,.16),steel,loco)
+    Box('Model_RunningBoardEdge',(.3,side*1.28,1.71),(10.9,.045,.16),iron,loco)
 Cylinder('Model_Boiler',(.45,0,2.62),.88,8.4,'X',iron,loco,64)
-Cylinder('Model_Smokebox',(4.85,0,2.62),.9,1.35,'X',black,loco,64)
+Cylinder('Model_Smokebox',(4.85,0,2.62),.9,1.35,'X',iron,loco,64)
 for x in [-3.55,-2.15,-.25,1.7,3.6,4.15,5.47]:
-    Ring('Model_BoilerBand',(x,0,2.62),.902,.876,.06,'X',steel,loco,64)
+    Ring('Model_BoilerBand',(x,0,2.62),.902,.876,.045,'X',iron,loco,64)
     for j in range(18):
         a=j*math.tau/18
         Bolt('Model_BoilerRivet',(x+.038,.902*math.cos(a),2.62+.902*math.sin(a)),'X',loco,.018)
 Cylinder('Model_SmokeboxDoor',(5.57,0,2.62),.77,.12,'X',iron,loco,64)
-Ring('Model_SmokeboxDoorRim',(5.65,0,2.62),.73,.68,.065,'X',steel,loco,48)
+Ring('Model_SmokeboxDoorRim',(5.65,0,2.62),.73,.68,.065,'X',iron,loco,48)
 for j in range(16):
     a=j*math.tau/16; Bolt('Model_DoorBolt',(5.7,.69*math.cos(a),2.62+.69*math.sin(a)),'X',loco,.034)
 for z in [2.31,2.93]: Box('Model_DoorHinge',(5.76,-.41,z),(.075,.58,.075),steel,loco,.012)
@@ -197,7 +222,7 @@ Cylinder('Model_Chimney',(4.8,0,3.96),.26,.85,'Z',black,loco,40,.32)
 Ring('Model_ChimneyLip',(4.8,0,4.405),.355,.25,.065,'Z',steel,loco,40)
 Cylinder('Model_ChimneyDarkMouth',(4.8,0,4.37),.25,.012,'Z',black,loco,40)
 for x,r,h in [(2.65,.37,.48),(.2,.44,.55),(-2.0,.28,.35)]:
-    Cylinder('Model_DomeFlange',(x,0,3.43),r+.10,.09,'Z',steel,loco,40)
+    Cylinder('Model_DomeFlange',(x,0,3.43),r+.10,.09,'Z',iron,loco,40)
     Cylinder('Model_Dome',(x,0,3.48+h*.32),r,h*.64,'Z',iron,loco,40)
     vertices=[]
     for ringIndex in range(9):
@@ -256,14 +281,16 @@ def WheelPair(prefix,x,r,root,driving=False):
         pivot=Empty(prefix+sideName,activeCollection); pivot.parent=root; pivot.location=(x,side*.78,r)
         pivot['WheelRadiusMeters']=r; pivot['PhaseRadians']=phase; pivot['WheelAxleX']=x
         Driver(pivot,'rotation_euler',1,f's/{r}+{phase}',root)
-        Ring('Model_WheelTyre',(0,0,0),r,r-.083,.135,'Y',rim,pivot,48)
+        tyre=Ring('Model_WheelTyre',(0,0,0),r,r-.083,.135,'Y',rim,pivot,48)
+        tyre.data.materials.append(steel)
+        for polygon in tyre.data.polygons: polygon.material_index=0 if polygon.index<48 else 1
         Ring('Model_WheelRim',(0,0,0),r-.082,r-.125,.14,'Y',iron,pivot,48)
         # Inside flange touches gauge face; steel tread lies on the rail head.
-        Ring('Model_WheelFlange',(0,-side*.081,0),r+.028,r-.073,.024,'Y',steel,pivot,48)
+        Ring('Model_WheelFlange',(0,-side*.081,0),r+.028,r-.073,.024,'Y',steel,pivot,40)
         Cylinder('Model_WheelHub',(0,0,0),r*.18,.20,'Y',iron,pivot,24)
         for j in range(12 if driving else 10):
             a=j*math.tau/(12 if driving else 10)
-            Bar('Model_WheelSpoke',(.11*math.cos(a),0,.11*math.sin(a)),((r-.12)*math.cos(a),0,(r-.12)*math.sin(a)),.067,.074,iron,pivot)
+            CastSpoke(a,r,pivot)
         Cylinder('Model_AxleCap',(0,side*.12,0),r*.105,.045,'Y',steel,pivot,20)
         if driving:
             # Crescent counterweight opposite the crank pin, genuinely part of the wheel.
@@ -293,13 +320,13 @@ for side,sideName in [(-1,'Right'),(1,'Left')]:
         # Each fixed length coupling rod translates with equal-phase crank pins.
         rod=Empty('Model_CouplingRod'+sideName+str(i+1),activeCollection); rod.parent=loco
         rod.location=(driverXs[i+1],y,.73)
-        Box('Model_CouplingBar',(.8,0,0),(1.6,.08,.09),steel,rod,.025)
+        RodSection(1.6,.11,.08,rod)
         for x in [0,1.6]: Ring('Model_CouplingBearing',(x,0,0),.115,.055,.09,'Y',steel,rod,24)
         Driver(rod,'location',0,f'{driverXs[i+1]}+.32*cos{a}',loco)
         Driver(rod,'location',2,f'.73-.32*sin{a}',loco)
         rodRecords.append({'name':rod.name,'kind':'coupling','length':1.6,'phase':phase,'axleX':driverXs[i+1],'side':side})
     main=Empty('Model_MainRod'+sideName,activeCollection); main.parent=loco; main.location.y=side*1.17
-    Box('Model_MainRodBeam',(1.45,0,0),(2.9,.09,.125),steel,main,.035)
+    RodSection(2.9,.15,.10,main)
     for x,r in [(0,.15),(2.9,.105)]: Ring('Model_MainRodBearing',(x,0,0),r,.057,.10,'Y',steel,main,24)
     Driver(main,'location',0,f'.9+.32*cos{a}',loco); Driver(main,'location',2,f'.73-.32*sin{a}',loco)
     Driver(main,'rotation_euler',1,f'-asin(.32*sin{a}/2.9)',loco)
@@ -319,7 +346,7 @@ for side,sideName in [(-1,'Right'),(1,'Left')]:
     for x in driverXs:
         Box('Model_AxleBox',(x,side*.60,.78),(.25,.2,.36),iron,loco,.03)
         for k in range(4):
-            Pipe('Model_DriverLeafSpring',[(x+u*(.53-k*.055),side*.55,1.3+k*.025+.13*u*u) for u in [-1,-.75,-.5,-.25,0,.25,.5,.75,1]],.016,steel,loco)
+            Leaf('Model_DriverLeafSpring',[(x+u*(.53-k*.055),side*.55,1.3+k*.025+.13*u*u) for u in [-1,-.75,-.5,-.25,0,.25,.5,.75,1]],.105,.015,loco)
     for x in [1.75,.15,-1.45,-3.05,-4.62]: Box('Model_BrakeShoe',(x,side*.79,.7),(.105,.17,.36),rust,loco,.025)
 
 def Coupler(x,z,root):
@@ -348,7 +375,7 @@ for side in [-1,1]:
     y=side*1.42
     for row in range(6):
         for start,end in [(-3.98,-.94),(-.9,.9),(.94,3.98)]:
-            Box('Model_GondolaSidePlank',((start+end)/2,y,1.29+row*.246),(end-start,.105,.233),woodMats[(row+int(side))%6],wagon,.008)
+            Box('Model_GondolaSidePlank',((start+end)/2,y,1.29+row*.262),(end-start,.105,.253),woodMats[(row+int(side))%6],wagon,.008)
     for x in [-4,-2.48,-.94,.94,2.48,4]:
         Box('Model_GondolaStanchion',(x,y+side*.073,1.88),(.145,.10,1.82),iron,wagon,.012)
         Box('Model_StanchionCap',(x,y,2.76),(.19,.21,.055),steel,wagon)
@@ -364,7 +391,7 @@ for side in [-1,1]:
         Pipe('Model_GondolaGrab',[(x,y+side*.14,2.31),(x,y+side*.30,2.31),(x,y+side*.30,1.83),(x,y+side*.14,1.83)],.025,steel,wagon)
         Pipe('Model_GondolaStep',[(x-.16,y,.98),(x-.16,y+side*.2,.45),(x+.16,y+side*.2,.45),(x+.16,y,.98)],.024,steel,wagon)
 for x in [-4.0,4.0]:
-    for row in range(6): Box('Model_GondolaEndPlank',(x,0,1.29+row*.246),(.11,2.77,.233),woodMats[row%6],wagon,.007)
+    for row in range(6): Box('Model_GondolaEndPlank',(x,0,1.29+row*.262),(.11,2.77,.253),woodMats[row%6],wagon,.007)
     for y in [-1.34,0,1.34]:
         Box('Model_GondolaEndStanchion',(x+( .075 if x>0 else -.075),y,1.87),(.11,.14,1.77),iron,wagon,.012)
         for z in [1.2,1.47,1.74,2.01,2.28,2.55]: Bolt('Model_EndRivet',(x+(.14 if x>0 else -.14),y,z),'X',wagon)
@@ -376,7 +403,7 @@ for i,x in enumerate([-2.45,2.45]):
         Box('Model_GondolaAxleBox',(x,side*.99,.46),(.25,.24,.29),iron,wagon,.05)
         Cylinder('Model_AxleBoxCover',(x,side*1.125,.46),.102,.024,'Y',steel,wagon,20)
         for k in range(6):
-            Pipe('Model_GondolaLeafSpring',[(x+u*(.82-k*.076),side*.99,.60+k*.025+.20*u*u) for u in [-1,-.75,-.5,-.25,0,.25,.5,.75,1]],.013,steel,wagon)
+            Leaf('Model_GondolaLeafSpring',[(x+u*(.82-k*.076),side*.99,.60+k*.025+.20*u*u) for u in [-1,-.75,-.5,-.25,0,.25,.5,.75,1]],.16,.017,wagon)
         for dx in [-.78,.78]:
             Bar('Model_SpringHanger',(x+dx,side*.99,.79),(x+dx,side*.99,.94),.066,.07,iron,wagon)
             Cylinder('Model_SpringShackle',(x+dx,side*1.015,.81),.066,.11,'Y',iron,wagon,16)
@@ -405,34 +432,37 @@ Label('Model_WagonStencilRight','15 t\nV 25217',(-3.55,-1.481,2.31),(math.pi/2,0
 Label('Model_WagonCapacityRight','LOAD 15 t\nTARE 7.2 t',(2.80,-1.481,1.87),(math.pi/2,0,0),.112,wagon)
 Label('Model_WagonStencilLeft','15 t\nV 25217',(3.55,1.481,2.31),(math.pi/2,0,math.pi),.18,wagon)
 
+# Add the reference-specific construction detail before rigid mesh merging.
+exec(compile((assetDir/'Script_DetailTrainReference.py').read_text(encoding='utf-8'),str(assetDir/'Script_DetailTrainReference.py'),'exec'))
+
 # Consolidate rigid meshes per parent and material: retain every mechanical pivot.
 def Consolidate(collection):
+    # Preserve per-face materials while merging only rigid parts at the same pivot.
     groups={}
     bpy.context.view_layer.update()
     depsgraph=bpy.context.evaluated_depsgraph_get()
-    for obj in list(collection.objects):
-        if obj.type not in {'MESH','CURVE','FONT'}: continue
-        key=(obj.parent.name if obj.parent else '',obj.data.materials[0].name if obj.data.materials else '')
-        groups.setdefault(key,[]).append(obj)
-    mergedData=[]
-    for (parentName,materialName),objects in groups.items():
-        vertices=[]; faces=[]; smooth=[]
-        for obj in objects:
-            evaluated=obj.evaluated_get(depsgraph); mesh=evaluated.to_mesh()
+    objects=[obj for obj in collection.objects if obj.type in {'MESH','CURVE','FONT'}]
+    for obj in objects:
+        evaluated=obj.evaluated_get(depsgraph);mesh=evaluated.to_mesh()
+        for materialIndex in set(p.material_index for p in mesh.polygons):
+            material=mesh.materials[materialIndex]
+            key=(obj.parent.name if obj.parent else '',material.name)
+            vertices,faces,smooth=groups.setdefault(key,([],[],[]))
             offset=len(vertices)
-            vertices.extend([tuple(obj.matrix_local @ v.co) for v in mesh.vertices])
-            faces.extend([tuple(offset+i for i in p.vertices) for p in mesh.polygons])
-            smooth.extend([p.use_smooth for p in mesh.polygons])
-            evaluated.to_mesh_clear()
-        mergedData.append((parentName,materialName,objects,vertices,faces,smooth))
-    for parentName,materialName,objects,vertices,faces,smooth in mergedData:
+            vertices.extend(tuple(obj.matrix_local @ v.co) for v in mesh.vertices)
+            polygons=[p for p in mesh.polygons if p.material_index==materialIndex]
+            faces.extend(tuple(offset+i for i in p.vertices) for p in polygons)
+            smooth.extend(p.use_smooth for p in polygons)
+        evaluated.to_mesh_clear()
+    for (parentName,materialName),(vertices,faces,smooth) in groups.items():
+        used=sorted(set(i for f in faces for i in f));remap={old:new for new,old in enumerate(used)}
         mesh=bpy.data.meshes.new(parentName+'_'+materialName)
-        mesh.from_pydata(vertices,[],faces); mesh.materials.append(bpy.data.materials[materialName]); mesh.update()
-        for p,flag in zip(mesh.polygons,smooth): p.use_smooth=flag
+        mesh.from_pydata([vertices[i] for i in used],[],[tuple(remap[i] for i in f) for f in faces]);mesh.materials.append(bpy.data.materials[materialName]);mesh.update()
+        for p,flag in zip(mesh.polygons,smooth):p.use_smooth=flag
         merged=bpy.data.objects.new(parentName+'_'+materialName.removeprefix('Material_'),mesh)
         collection.objects.link(merged)
-        if parentName: merged.parent=bpy.data.objects[parentName]
-        for obj in objects: bpy.data.objects.remove(obj,do_unlink=True)
+        if parentName:merged.parent=bpy.data.objects[parentName]
+    for obj in objects:bpy.data.objects.remove(obj,do_unlink=True)
 
 Progress('Geometry complete, consolidating rigid meshes')
 scene.frame_set(1)
@@ -441,6 +471,9 @@ Progress('Consolidation complete')
 manifest={'units':'meters','forward':'+X','blenderUp':'+Z','gltfUp':'+Y','gltfWheelAxis':'-Z','wheelbaseReferenceInferred':True,'wheels':wheelRecords,'rods':rodRecords,'sourceViews':['Reference/Texture_LocomotiveThreeView.png','Reference/Texture_GondolaThreeView.png'],'quarteringSource':'https://en.wikisource.org/wiki/Steam_Locomotive_Construction_and_Maintenance/Chapter_VI'}
 manifest['triangles']={c.name:sum(len(p.vertices)-2 for o in c.objects if o.type=='MESH' for p in o.data.polygons) for c in [locoCollection,wagonCollection]}
 manifest['meshObjects']={c.name:sum(o.type=='MESH' for o in c.objects) for c in [locoCollection,wagonCollection]}
+manifest['detailRevision']=2
+manifest['detailFeatures']=detailFeatures
+manifest['valveGear']=valveRecords
 (assetDir/'Data_TrainRig.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
 
 for name,file in [('Locomotive','Texture_LocomotiveThreeView.png'),('Gondola','Texture_GondolaThreeView.png')]:

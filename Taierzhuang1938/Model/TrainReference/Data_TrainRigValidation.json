@@ -4,11 +4,11 @@
   "maxJointErrorMeters": 1.1980385328675377e-06,
   "maxRollingErrorMeters": 1.0681152318170462e-06,
   "maxQuarteringErrorRadians": 6.39757837817001e-07,
-  "driverCount": 50,
+  "driverCount": 84,
   "invalidDrivers": 0,
   "triangles": {
-    "Model_Locomotive": 52528,
-    "Model_Gondola": 29151
+    "Model_Locomotive": 78348,
+    "Model_Gondola": 32269
   },
   "checks": [
     "Both rolling directions, repeated stop, full revolution",
@@ -16,6 +16,8 @@
     "Five driver axles in phase on each side",
     "Left and right cranks quartered",
     "Main rods and coupling rods fixed length",
-    "Crosshead remains on straight slide guides"
-  ]
+    "Crosshead remains on straight slide guides",
+    "Return crank, eccentric rod, fixed-setting rocker and horizontal valve slide joints"
+  ],
+  "maxValveJointErrorMeters": 1.4689370918988574e-05
 }
