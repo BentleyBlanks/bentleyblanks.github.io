@@ -749,10 +749,20 @@ async function PlayFrontline() {
                 Key("KeyD", right > 0.25); Key("KeyA", right < -0.25);
               }
             }
-            if (flow.beatIndex === 22 && objective.requiredAction === "observe" && objective.lookAt && distance < arrive + 0.2) {
+            if (flow.beatIndex === 22 && objective.requiredAction === "observe" && objective.lookAt) {
               const target = objective.lookAt;
-              game.player.yaw = target ? Math.atan2(-(target.x - game.player.position.x), -(target.z - game.player.position.z)) : Math.PI;
-              game.player.pitch = 0;
+              const eye = game.player.EyePosition;
+              const point = eye.clone().set(target.x, game.battlefield.GroundHeight(target.x,target.z)+1.2, target.z);
+              const sight = point.sub(eye), range = sight.length();
+              const hit = game.battlefield.Raycast(eye, sight.normalize(), range);
+              // The public observation goal already means we reached the
+              // decision area. Look from clear cover instead of walking into
+              // Luo merely because his position is also the follow target.
+              if (!hit || hit.t >= range - .5) {
+                Key("KeyW", false);
+                game.player.yaw = Math.atan2(-(target.x - game.player.position.x), -(target.z - game.player.position.z));
+                game.player.pitch = 0;
+              }
             }
             const crouching = (flow.beatIndex === 23 && objective.requiredAction === "crouch" && distance < 3)
               || diveOpen;
