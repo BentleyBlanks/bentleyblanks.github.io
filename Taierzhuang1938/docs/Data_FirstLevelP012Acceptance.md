@@ -36,6 +36,19 @@ CarrySystem、双臂及身体 GLB 骨骼检查 193 帧，低头、首次抬起�
 记录真实握点投影、视线及一个明确标注的外部诊断机位。最大低头角度下两个握点在画幅内，
 遮住画面中央的金色衣袖和步枪来自贴住玩家的罗班长：B18 共用担架路线，B19 距玩家仅约 0.67 米。
 应先修正班长实际路线，再重新看图；不以握点误差为零替代可见双手的验收。
+`af64247a` 将班长 B18 的路线分开，实际绕到已有沟侧防御位，B19 保持、B20 释放导引。
+`GoalResumeClearCarryGuide` 实际 B19 距离为 11.71 米，金色衣袖与步枪遮挡消失；
+该命令随后因新增投影检查误用 r/l 而非 right/left 键抛错，未执行扑沟，不能计整条通过。
+看图仍见床面挤到玩家身下，因此增加 P012 专用 `stretcherCarryPose`，前后身体间距 2.4 米，
+担架／伤员中心高为 0.88／1.10 米；统一首次列队、搬运、侧翻恢复与终点重握。
+普通章节默认、地面放下、翻覆姿态、原床面、杆长与实际握点均保持，手在身体前方抓原把手。
+真实骨骼记录的数值候选排除了双臂超伸的方案；所选方案的 1575 帧插值检查抬稳零失败，
+此候选试算不是新实机轨迹。MissionSetpieces 194 条、Runtime、Flow、ModuleGraph 通过。
+`GoalResumeCarryStance` 在干净 `4dc1a9af` 上实际运行并局部通过：原担架移动 21.634 米，
+实际握持 20.567 秒后按 Z 并移动扑沟，原担架松手侧翻至 B20；124 个 HUD 采样及浏览器错误检查通过。
+已查看低头、最大低头、侧看、回看及扑沟实际截图，低头双臂、把手和身体可辨认，
+班长距玩家 11.67 米；明确另存的外部诊断机位不作为自然玩家视角证据。
+完整 B00–B25 与终点重握仍需在此修正后重跑，不能用本局部通过代替。
 合并后的 ModuleGraph、TestRunner、Carry、P012 Flow 与 Runtime 五项通过。后续原 prepush 中不占浏览器的
 10 项已通过（望远镜所有权、电报、程序布设、外部资产、城镇布景、东郊街块、西城覆盖、西郊街块、
 西站与爆炸规则），日志为本地 `P012RemainingWithoutBrowser_20260905.log`。
@@ -48,8 +61,10 @@ Jump、Destruction、HudPromptBrowser、TargetInfo、Post、ActorDepth、ActorBa
 EastSuburbNav、DressingProbe、ActorPose、CutscenePose、BackRifleRun、ExplosionRange、Collider。
 日志为本地 `P012CarryApproachAndRemaining_20260905.log`；BackRifleRun 仅覆盖已集成资产，
 不能代表另一个任务尚未交付的动画。Audio 测试被主动中断以优先检查担架画面，未计为通过。
-原 97 项选测现保留 87 项通过；仍待 Audio、Voice、Menu、BootProp、Editor、PropPcgEditor、
-DestructionEditor、TrainLibrary、Play、Boot 十项。新 P012 修改另需对应专项及新的完整输入验收。
+随后 Audio（87.9 秒）、Voice（95.9 秒）与 Menu（228.1 秒）均通过，日志为本地
+`P012RemainingAudioVoiceMenu_20260905.log`；438 条配音解码零硬错误，菜单全绿。
+原 97 项选测现保留 90 项通过；仍待 BootProp、Editor、PropPcgEditor、DestructionEditor、
+TrainLibrary、Play、Boot 七项。新 P012 修改另需对应专项及新的完整输入验收。
 
 实机入口现在把实际启动版本、源目录、参数、未提交改动及断言结果写入本地 `Data_P012RunContext.json`。
 仅有 `notFinished` 的记录不能作为通过证据，也不能仅凭该文件判断进程仍然存活。
@@ -72,6 +87,11 @@ DestructionEditor、TrainLibrary、Play、Boot 十项。新 P012 修改另需对
 | 实际交火观察口径 | 251.117 秒，约 24.8% | 不足以证明约 55% 战斗体验 |
 | 飞机开火前连续可见 | 4.583 秒；3 个担架／百姓同屏采样 | 最新正常相机画面已查看 |
 | 超过八秒的静止段 | 到站演出 32.8 秒、B16 观察 8.52 秒、B20 18.88 秒 | 需区分观察、演出与输入脚本不行动，不能一律算被迫等待 |
+
+上述交火口径只按三秒内玩家开枪、或敌军向玩家及附近 12 米友军开枪分类；
+目标识别、压制承受、换枪眼、掩体机动、投雷及扫射间歇不会自动计入。
+它是可复现的枪响窗口统计，既不能直接判定 55% 体验不达标，也不能据此判通过；
+战斗体验仍需结合实际战术行为与画面单独验收。
 
 B20 画面已经提示现有六枚手榴弹，但旧测试脚本只在 B21 尝试真实 G 投雷和 F 拾枪，
 且 B20 空弹时永久保持卧姿。当前补齐 B20 的同一套真实靠近／按键操作；
