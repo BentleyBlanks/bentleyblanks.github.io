@@ -524,10 +524,15 @@ async function PlayFrontline() {
         if(flow.beatIndex===24&&!bot.finalCarryView&&game.carry?.View()?.phase==="carry"
           &&game.Debug.P012CarryView()?.gripWeight>=.999){
           Key("KeyW",false);Key("KeyF",false);Key("ShiftLeft",false);game.Debug.Mouse(2,false);
+          const approachYaw=game.player.yaw;
+          // Face the original litter before looking down. The preceding F
+          // approach can leave the free camera looking behind the rear bearer.
+          game.player.yaw=game.Debug.P012CarryView().bodyYaw;
           game.player.pitch=-1.15;
           game.StepFrames(1,1/30,false);bot.frame++;
           bot.finalCarryView={at:game.Debug.P012().elapsed,position:game.player.position.toArray(),
-            pitch:game.player.pitch,hands:game.Debug.P012CarryView()};
+            yaw:game.player.yaw,approachYaw,pitch:game.player.pitch,hands:game.Debug.P012CarryView(),
+            scope:"ordinary free-camera turn toward the original litter, then look down; no actor placement"};
           break;
         }
         if (flow.beatIndex >= 18) {
