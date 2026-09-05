@@ -39,6 +39,8 @@ import { InstantiateModel } from "./Script_MeshLoad.mjs";
 import { WEAPON_MESH_BY_ID, WeaponMeshId, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
 import { FpsArmRig } from "./Script_RiggedModel.mjs";
 import { FpsArmPose } from "./Data_FpsArmPoses.mjs";
+import { FirstPersonBody } from "./Script_FirstPersonBody.mjs";
+import { FrameQuaternion } from "./Script_FpsAnatomy.mjs";
 
 const DEG = Math.PI / 180;
 
@@ -1531,6 +1533,7 @@ export class Viewmodel {
     this.handRight = MakeHand(this.materials, 1, "hr");
     this.handLeft = MakeHand(this.materials, -1, "hl");
     this.riggedArms = null;
+    this.body = riggedAssets?.fpsBody ? new FirstPersonBody(riggedAssets.fpsBody, library) : null;
     if (riggedAssets && riggedAssets.fpsArms) {
       try {
         // 第二参是**材质库**，不是本地材质表：GLB 自带的 MeshStandardMaterial 要走
@@ -1690,6 +1693,16 @@ export class Viewmodel {
       this.rig = null;
       this.equipSpring.Set(1);
       this.compensation.set(1, 1, 1);
+      this.fovRig.scale.set(1, 1, 1);
+      for (const pivot of [this.weaponMount, this.reloadPivot, this.swingPivot, this.actionPivot]) {
+        pivot.position.set(0, 0, 0); pivot.quaternion.identity();
+      }
+      this.armAnchor.add(this.handRight.group, this.handLeft.group, this.gripContactRight, this.gripContactLeft);
+      this._UpdateUnarmedHands(0, 0, 0);
+      this.riggedArms?.Attach(this.armAnchor, this.handRight.group, this.handLeft.group,
+        this.gripContactRight, this.gripContactLeft,
+        [this.handRight, this.handLeft, this.sleeveRight, this.sleeveLeft], null);
+      this.markForegroundPrepass();
       return this;
     }
 
@@ -1989,6 +2002,8 @@ export class Viewmodel {
       });
       this.rig = null;
     }
+    this.handRight.group.removeFromParent(); this.handLeft.group.removeFromParent();
+    this.gripContactRight.removeFromParent(); this.gripContactLeft.removeFromParent();
   }
 
   // -------------------------------------------------------------------------
@@ -2392,11 +2407,28 @@ export class Viewmodel {
     this._StepDebris(step);
     if (this.riggedArms) {
       this.armAnchor.quaternion.identity();
-      this.riggedArms.SetPoseState({ ads: Clamp01(ads), sprint: Clamp01(sprintValue),
+      if (!this.weapon) this._UpdateUnarmedHands(gait, sprint, grounded ? 1 : 0);
+      else this.riggedArms.SetPoseState({ ads: Clamp01(ads), sprint: Clamp01(sprintValue),
         reload: this.action?.kind === "reload", reloadBlend: this.reloadBlend });
       this.riggedArms.Update(step);
     }
+    if (!this.weapon && !this.riggedArms) this._UpdateUnarmedHands(gait, sprint, grounded ? 1 : 0);
+    this.body?.Update(step, input, parent, this.root.visible);
     this._UpdateSleeves();
+  }
+
+  _UpdateUnarmedHands(gait, sprint, grounded) {
+    const amplitude = gait * grounded;
+    if (this.riggedArms) {
+      this.riggedArms.poseState.sprint = sprint;
+      this.riggedArms.poseState.ads = 0;
+    }
+    for (const [side, sign, hand, contact] of [["r", 1, this.handRight.group, this.gripContactRight], ["l", -1, this.handLeft.group, this.gripContactLeft]]) {
+      const swing = Math.sin(this.bobPhase + (side === "l" ? Math.PI : 0)) * amplitude;
+      hand.position.set(sign * (0.19 - 0.025 * swing), -0.27 + amplitude * 0.19 + swing * (0.025 + sprint * 0.04), -0.45 - swing * (0.030 + sprint * 0.045));
+      hand.quaternion.copy(FrameQuaternion(new THREE.Vector3(-sign*0.10, 0.60, -0.80), new THREE.Vector3(sign, 0, 0)));
+      contact.position.copy(hand.position); contact.quaternion.copy(hand.quaternion);
+    }
   }
 
   /**
@@ -2409,7 +2441,7 @@ export class Viewmodel {
    * 所以即便相机本身的世界矩阵还没更新，两者之间的**相对**变换也是对的。
    */
   _UpdateSleeves() {
-    const on = !!this.rig;
+    const on = !!this.rig || !this.weapon;
     this.sleeveRight.group.visible = on;
     this.sleeveLeft.group.visible = on;
     if (!on) return;
@@ -3106,6 +3138,7 @@ export class Viewmodel {
   Dispose() {
     this._ClearRig();
     if (this.riggedArms) this.riggedArms.Dispose();
+    this.body?.Dispose();
     const seen = new Set();
     this.root.traverse((node) => {
       if (node.isMesh && node.geometry && !seen.has(node.geometry)) {

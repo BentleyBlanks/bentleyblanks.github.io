@@ -118,6 +118,9 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   完整十指与源动作，肩—肘—腕解析 IK 跟随各枪左右握持坐标系；失败自动降级回
   程序化几何，不堵开机、不改战斗时序。资产契约与画面握把残差分别由
   `Script_RiggedModelTest.mjs` / `Script_FpsArmTest.mjs` 守。
+- `Script_FpsAnatomy.mjs` 建立掌面与指节屈曲轴；`Script_RiggedModel.mjs` 以腕部约束和连续肘部方向解双骨 IK。
+- `Script_FirstPersonBody.mjs` 管理世界空间上衣、腿与姿态混合；`Script_Viewmodel.Equip(null)` 保留空手摆臂。
+- 第一人称 Blender 工程与验收入口见 `docs/Data_FirstPersonEmbodiment.md`；`Script_FirstPersonEmbodimentTest.mjs` 检查全枪连续动作、空手跑步与低头身体。
 - 十名蒙皮士兵（`Model/Character/`）由 `_import/Script_BakeLugouCharacters.{ps1,py}`
   从 3ds Max 桥烘出。**动它之前先读那份 py 的模块头注**：2026-08-29 有一次重烘把根骨
   位移轨道烘丢了，十六条 clip 的人全钉在站立高度，而当时唯一的贴地审计对此完全看不见

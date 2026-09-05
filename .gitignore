@@ -57,6 +57,8 @@ Taierzhuang1938/Model/TrainReference/Texture_TrainHero.png
 Taierzhuang1938/Model/TrainReference/Data_BuildProgress.txt
 Taierzhuang1938/Model/TrainReference/*.blend1
 Taierzhuang1938/Model/TrainReference/__pycache__/
+# First-person Blender sources and backups live in OneDrive/AI/Models/Blender.
+Taierzhuang1938/Animation/FirstPerson/*.blend*
 Taierzhuang1938/_check_*.html
 # 视频转骨骼的中间产物：只留关键点 JSON（重烘 clip 的输入），叠帧 QC 图不进仓库
 Taierzhuang1938/_import/_mocap/*

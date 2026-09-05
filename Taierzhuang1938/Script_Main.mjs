@@ -6213,6 +6213,8 @@ function Frame(dt, render = true) {
 
   profiler.B("viewmodel");
   viewmodel.Update(dt, {
+    playerPosition: player.position, playerYaw: player.yaw,
+    prone: player.stanceBlend.prone, alive: player.Alive,
     dt, moveSpeed: Clamp01(Math.hypot(player.velocity.x, player.velocity.z) / 3.2),
     strafe: input.strafe, grounded: player.grounded, sprint: player.sprint,
     verticalVelocity: player.velocity.y,
@@ -6587,6 +6589,7 @@ function Frame(dt, render = true) {
  * 必然抄漏（夜战预设 exposure 是 3.6，抄成 0.5 整帧就是纯黑）。
  */
 function RenderScene(dt) {
+  if (viewmodel?.body) viewmodel.body.root.visible = !!player?.Alive && !state.cutscene && !state.menu && !editor?.Capturing;
   const phase = PHASE_TABLE[state.phaseIndex];
   // 剖析：GPU 帧从这里开到 post.Render 之后 —— GI 的几趟探针 pass、阴影烘焙、
   // 整条合成链都在这个窗口里按段计时（剖析器关着时这些调用是空转）。
