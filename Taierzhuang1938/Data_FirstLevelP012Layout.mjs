@@ -27,13 +27,13 @@ const flank = Route([[45,26],[58,24],[68,24],[72,24],[72,30],[72,43],[74,43],[74
 export const P012_BLUEPRINT_ROUTES = Object.freeze({ north, south, retreat, flank,
   trainExit:Route([[-66,65],[-66,61],[-60,61],[-55,55],[-55,44]]),
   gunports:Route([[-15,-64],[5,-65],[23,-68]]),
-  westEnemy:Route([[-26,-108],[-17,-108],[-17,-100],[-26,-99],[-26,-74],[-20,-74],[-15,-78.5]]),
+  westEnemy:Route([[-26,-108],[-33,-108],[-33,-100],[-26,-100],[-26,-94],[-26,-79]]),
   centerEnemy:Route([[14,-113],[5,-113],[5,-96],[5,-81]]),
   eastEnemy:Route([[35,-115],[29,-115],[29,-108],[35,-108],[32,-92],[23,-80]]) });
 const blueprintEnemyLanes = Object.freeze({
   center:Object.freeze({spawn:Point(14,-113),reveal:Point(5,-113),goal:Point(5,-81),waypoints:P012_BLUEPRINT_ROUTES.centerEnemy}),
-  west:Object.freeze({spawn:Point(-26,-108),reveal:Point(-17,-100),goal:Point(-15,-78.5),waypoints:P012_BLUEPRINT_ROUTES.westEnemy,
-    terminalGoals:Object.freeze([-17.1,-15.7,-14.3,-12.9].map(x=>Point(x,-78.5)))}),
+  west:Object.freeze({spawn:Point(-26,-108),reveal:Point(-26,-94),goal:Point(-26,-78.5),waypoints:P012_BLUEPRINT_ROUTES.westEnemy,
+    terminalGoals:Object.freeze([-28,-26.7,-25.3,-24].map(x=>Point(x,-78.5)))}),
   east:Object.freeze({spawn:Point(35,-115),reveal:Point(29,-108),goal:Point(23,-80),waypoints:P012_BLUEPRINT_ROUTES.eastEnemy}),
 });
 export const P012_BLUEPRINT_ANCHORS = Object.freeze({
@@ -98,6 +98,10 @@ for(let i=1;i<P012_BLUEPRINT_ANCHORS.gunports.length;i++) {
   Add({...Strip(`GunportTransitCover${i}`,Point(a.x,a.z-2.5),Point(b.x,b.z-2.5),1,"cover",1.05,true),cover:{faceX:0,faceZ:-1}});
 }
 Add(Box("FrontlineRearWest",-13,-69,8,0.8,0.9,"cover"),Box("FrontlineRearEast",17,-72,8,0.8,0.9,"cover"),Box("CulvertWestPier",-30,-85,2,16,3),Box("CulvertEastPier",-22,-85,2,16,3),Box("CulvertRoof",-26,-85,10,16,0.7,"boundary",{y:3.35}),Box("EastEnemyWall",38,-96,2,30,2.8),Box("EnemySpawnScreenWest",-26,-104,12,2,3),Box("EnemySpawnScreenCenter",14,-110,12,1,3),Box("EnemySpawnScreenEast",35,-113,9,1,3));
+// Join the west spawn screen to the east culvert pier. The finite flankers use
+// the open tunnel between the piers; the screen removes the long diagonal shot
+// from the east gunport without closing the western firing lane.
+Add(Box("CulvertEastApproachScreen",-20.5,-98,1,12,3));
 // A visible rail spur joins the western embankment and crosses the actual Z10 drainage route.
 // Deck bottom is above standing clearance; its piers are outside the swept stretcher corridor.
 Add(Box("ReturnRailSpurDeck",-40,50,64,5,0.5,"boundary",{y:3.25}),Box("ReturnRailSpurWestPier",-30,50,2,5,3),Box("ReturnRailSpurEastPier",-8,50,2,5,3));

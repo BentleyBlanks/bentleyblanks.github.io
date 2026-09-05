@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { FirstLevelP012Runtime, P012GuideApproach, P012CanResumeMarch } from "./Script_FirstLevelP012Runtime.mjs";
 import {P012SegmentClear} from "./Script_FirstLevelP012March.mjs";
-import { SETPIECES, EscortColumn, LastLitterArrived, StepP012PlayerLitter, StepP012AirCivilian } from "./Script_MissionSetpieces.mjs";
+import { SETPIECES, EscortColumn, LastLitterArrived, StepP012PlayerLitter, StepP012AirCivilian, StepP012RoadEscort } from "./Script_MissionSetpieces.mjs";
 import P012Phase from "./Data_FirstLevelP012Whitebox.mjs";
 import {FirstLevelP012Director} from "./Script_FirstLevelP012Flow.mjs";
 import {InteractSystem} from "./Script_Interact.mjs";
@@ -20,6 +20,25 @@ function FootY(layout,p) {
  return y;
 }
 assert.ok(openingStoryBeats.length>0);
+{
+ const player={x:67.9455568614408,z:16.5441564191144};
+ const column=new EscortColumn({PlayerPos:()=>player},{waypoints:[{x:76,z:6},{x:84,z:6},{x:90,z:10}],members:[]});
+ column.Start();
+ const context={phase:P012Phase,mem:{column}};
+ StepP012RoadEscort(context,()=>false);
+ const start=column.HeadPosition();column.Update(1/30);
+ assert.deepEqual(column.HeadPosition(),start,'the escort waits before rounding the blind corner without a hurt player');
+ assert.equal(column.tuning.columnSpeedMS,1.35,'waiting never changes actual column walking speed');
+ Object.assign(player,{x:73,z:6});column.Update(1/30);
+ assert.ok(column.HeadPosition().x>start.x,'the escort resumes as the player catches up');
+ Object.assign(player,{x:72,z:6});column.moving=false;column.Update(1/30);
+ assert.equal(column.moving,true,'a player inside the five-metre resume distance releases the hold');
+ StepP012RoadEscort(context,name=>name==='P012RoadContactSeen');
+ assert.equal(column.scriptEscortWaitM,null,'actual contact restores normal escort travel rules');
+ const distant=new EscortColumn({}, {waypoints:[{x:5,z:-105},{x:5,z:-90}],members:[]});distant.Start();
+ StepP012RoadEscort({phase:P012Phase,mem:{column:distant}},()=>false);
+ assert.equal(distant.scriptEscortWaitM,null,'the close escort rule is local to the road approach');
+}
 {
  const source=readFileSync(new URL('./Script_Ai.mjs',import.meta.url),'utf8');
  const method=source.match(/  StepCarriedCasualty\(s, dt, player\) \{[\s\S]*?\n  \}/)[0];

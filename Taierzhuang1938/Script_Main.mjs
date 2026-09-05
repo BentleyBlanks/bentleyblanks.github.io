@@ -3025,7 +3025,14 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   interact.Clear("P012");
   p012CarryView?.Dispose();
   p012CarryView = phase.whitebox?.p012 && viewmodel?.riggedArms
-    ? new FirstLevelP012CarryView({ scene, sourceRig: viewmodel.riggedArms, bodyRoot: viewmodel.body?.root, camera }) : null;
+    ? new FirstLevelP012CarryView({ scene, sourceRig: viewmodel.riggedArms, bodyRoot: viewmodel.body?.root, camera,
+      syncBodyPose: ({bodyYaw,bodyCrouch,visible}) => viewmodel.body?.Update(0, {
+        playerPosition:player.position,playerYaw:bodyYaw,prone:player.stanceBlend.prone,
+        crouch:Math.max(player.stanceBlend.crouch||0,bodyCrouch||0),alive:player.Alive,
+        moveSpeed:Clamp01(Math.hypot(player.velocity.x,player.velocity.z)/3.2),
+        grounded:player.grounded,sprint:player.sprint,
+      },camera,visible&&player.Alive&&!state.cutscene&&!state.menu&&player.meleeCameraDrop<=.05),
+    }) : null;
   p012StageZero?.Dispose(); p012StageZero = null;
   p012Binoculars?.Dispose();
   p012Binoculars = null; // Removed from this scenario: the leader supplies the route.

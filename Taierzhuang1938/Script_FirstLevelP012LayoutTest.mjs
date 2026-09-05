@@ -9,6 +9,7 @@ import {P012_STATION_EXITS,P012_STATION_GATES,P012_STATION_HEIGHTS} from "./Data
 import {trainColumn} from "./Data_FirstLevelP012TrainColumn.mjs";
 import {CARRY_KINDS} from "./Script_Carry.mjs";
 import {FirstLevelP012Director} from "./Script_FirstLevelP012Flow.mjs";
+import {P012SegmentClear} from "./Script_FirstLevelP012March.mjs";
 import {FIRST_LEVEL_P012_WHITEBOX_PHASE as phase} from "./Data_FirstLevelP012Whitebox.mjs";
 assert.equal(phase.hud.objectiveMarkers,false,"P012 follows actual people, never floating destinations or metre labels");
 function FootY(layout,p) {
@@ -166,6 +167,19 @@ const approachLength=Audit("B04ExposedApproach",phase.whitebox.activities.shellC
 const ammoCarryLength=Audit("B05AmmoDogleg",phase.whitebox.activities.ammoRoute,layout.blocks,.42);
 assert.ok(approachLength>=70&&approachLength<=80,"B04 restores the direct exposed approach instead of a winding distance loop");
 assert.ok(ammoCarryLength>=58,"B05 carries the one ammunition box through a physical dogleg trench");
+
+// The culvert squad stays physically concealed from the east gunport until the
+// player moves to the western firing lane. This route remains ordinary AI
+// movement: no delayed spawn, invulnerability or survival fact is involved.
+for(let index=1;index<lanes.west.waypoints.length;index++)assert.ok(
+ P012SegmentClear(layout.blocks,lanes.west.waypoints[index-1],lanes.west.waypoints[index],.34),
+ `west culvert approach leg ${index} clears the real standing actor capsule`);
+for(const terminal of lanes.west.terminalGoals)assert.ok(
+ P012SegmentClear(layout.blocks,lanes.west.waypoints.at(-1),terminal,.34),
+ "each dispersed culvert terminal is reachable from the common tunnel approach");
+const culvertXs=lanes.west.terminalGoals.map(point=>point.x).sort((a,b)=>a-b);
+for(let index=1;index<culvertXs.length;index++)assert.ok(culvertXs[index]-culvertXs[index-1]>=1.2,
+ "four culvert actors retain separate terminal slots");
 assert.equal(phase.whitebox.activities.guideSpeedByBeat[4],3.05,"B04 retains the established guide movement speed");
 assert.equal(phase.whitebox.activities.guideSpeedByBeat[5],phase.whitebox.activities.guideSpeedMps*CARRY_KINDS.ammoCrate.speedScale,
   "loaded Luo matches the standing player's configured ammunition-crate speed");
@@ -525,7 +539,7 @@ for(const [name,lane] of Object.entries(lanes)){
 }
 for(const [index,goal] of lanes.west.terminalGoals.entries()){
  const distance=Math.hypot(goal.x-anchors.gunports[0].x,goal.z-anchors.gunports[0].z);
- assert.ok(distance>=12&&distance<=15,`culvert terminal ${index} must remain a readable 12–15m threat`);
+ assert.ok(distance>=17&&distance<=20,`culvert terminal ${index} must remain a readable 17–20m western threat`);
  Audit(`CulvertTerminal${index}`,[...lanes.west.waypoints.slice(0,-1),goal],layout.blocks,0.4);
  for(const other of lanes.west.terminalGoals.slice(index+1))assert.ok(Math.hypot(goal.x-other.x,goal.z-other.z)>=1.2,"culvert terminal capsules cannot share a single goal");
 }

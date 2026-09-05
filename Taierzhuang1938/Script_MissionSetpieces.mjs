@@ -222,6 +222,19 @@ export function TerminalSlot(points, back) {
   return {...points[0]};
 }
 
+// Near the blind road corner the armed escort must stay with a hurt player.
+// A 26m travel gap lets its rear guards round the corner and finish the entire
+// firefight before the player can see it. Keep their walking speed unchanged.
+export function StepP012RoadEscort(s, HasSignal) {
+  const column=s.mem.column,activity=s.phase?.whitebox?.activities;
+  if(!s.phase?.whitebox?.p012||!column)return;
+  const range=activity?.roadContactEscortRange,head=column.HeadPosition?.(),breach=activity?.roadContactBreach;
+  const close=range&&head&&breach&&!HasSignal("P012RoadContactSeen")
+    &&Math.hypot(head.x-breach.x,head.z-breach.z)<range.approachM;
+  column.scriptEscortWaitM=close?range.waitM:null;
+  column.scriptEscortResumeM=close?range.resumeM:null;
+}
+
 /** P012 road fire cleared: a bounded relocation inside the evacuation cover.
  * Bodies keep their existing identities and traverse real goals. The distant
  * player may watch from the ruin; this exception ends at the short route end. */
@@ -501,8 +514,8 @@ export class EscortColumn {
     // 玩家落后就等 —— 「不许传送」的另一半是「不许把人甩掉」。
     if (player && !this.scattered && !this.scriptMoveWithoutEscort) {
       const gap = Math.hypot(player.x - head.x, player.z - head.z);
-      if (this.moving && gap > this.tuning.columnWaitM) this.moving = false;
-      else if (!this.moving && gap < this.tuning.columnResumeM) this.moving = true;
+      if (this.moving && gap > (this.scriptEscortWaitM ?? this.tuning.columnWaitM)) this.moving = false;
+      else if (!this.moving && gap < (this.scriptEscortResumeM ?? this.tuning.columnResumeM)) this.moving = true;
     }
     if (this.scriptPaused) this.moving = false;
     if (this.followRouteBodies && this.arrived && !this.keepArrivalSlots && !this.scriptPaused && !this.scriptHoldTailSlots) this.tailAdvanceM = Math.min(this.roster.length * 2.2, (this.tailAdvanceM || 0) + this.tuning.columnSpeedMS * dt);
@@ -1623,14 +1636,15 @@ export const SETPIECES = {
     },
 
     Update(s, dt) {
-      s.mem.column?.Update(dt);
       const p012 = s.phase?.whitebox?.p012;
+      const HasSignal = (name) => s.d.host.Story?.()?.Signalled(name);
+      StepP012RoadEscort(s, HasSignal);
+      s.mem.column?.Update(dt);
       if(p012)StepP012AirCivilian(s);
       if (p012 && s.mem.p012RetryDive) {
         s.mem.p012RetryDive = false; s.strafe?.Abort("p012Retry");
         s.mem.diveAt = null; s.mem.diveDone = null;
       }
-      const HasSignal = (name) => s.d.host.Story?.()?.Signalled(name);
       StepP012RoadCover(s, HasSignal);
       if (p012 && HasSignal("P012AmbushClear") && !HasSignal("P012AirReady")) {
         const column=s.mem.column, litter=s.mem.p012InspectionLitter ||= column?.litters?.[0];

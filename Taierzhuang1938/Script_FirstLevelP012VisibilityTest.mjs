@@ -4,7 +4,7 @@ import fs from "node:fs";
 import vm from "node:vm";
 import {P012MapPoints} from "./Data_FirstLevelP012Space.mjs";
 import {AircraftStrafeDirector} from "./Script_AircraftStrafe.mjs";
-import {FIRST_LEVEL_P012_LAYOUT as layout,P012_ANCHORS as anchors} from "./Data_FirstLevelP012Layout.mjs";
+import {FIRST_LEVEL_P012_LAYOUT as layout,P012_ANCHORS as anchors,P012_ENEMY_LANES as lanes} from "./Data_FirstLevelP012Layout.mjs";
 import phase from "./Data_FirstLevelP012Whitebox.mjs";
 import {MissionSetpieceDirector} from "./Script_MissionSetpieces.mjs";
 import {FirstLevelP012Runtime} from "./Script_FirstLevelP012Runtime.mjs";
@@ -72,6 +72,24 @@ for(const scout of phase.whitebox.firstContact.scoutSearch.entries){
   "normal-pace scouts begin behind the existing physical spawn screen");
  assert.equal(Occluded({...anchors.gunports[1],y:1.62},{...scout.points[0],y:1.3}),false,
   "normal-pace scouts emerge into the actual frontline firing lane");
+}
+const eastGunportEye={...anchors.gunports[2],y:1.55};
+const westGunportEye={...anchors.gunports[0],y:1.55};
+for(let index=1;index<lanes.west.waypoints.length;index++){
+ const from=lanes.west.waypoints[index-1],to=lanes.west.waypoints[index];
+ const distance=Math.hypot(to.x-from.x,to.z-from.z),steps=Math.ceil(distance/.25);
+ for(let step=0;step<=steps;step++)for(const y of [1.2,1.55]){
+  const t=step/steps,target={x:from.x+(to.x-from.x)*t,y,z:from.z+(to.z-from.z)*t};
+  assert.equal(Occluded(eastGunportEye,target),true,"east gunport cannot pre-clear the concealed culvert approach");
+ }
+}
+for(const terminal of lanes.west.terminalGoals){
+ const westDistance=Math.hypot(terminal.x-anchors.gunports[0].x,terminal.z-anchors.gunports[0].z);
+ assert.ok(westDistance>=17&&westDistance<=20,"culvert terminal forms a western close-side shot");
+ for(const y of [1.2,1.55]){
+  assert.equal(Occluded(eastGunportEye,{...terminal,y}),true,"east gunport is screened from every culvert terminal");
+  assert.equal(Occluded(westGunportEye,{...terminal,y}),false,"west gunport sees every culvert terminal at chest and head height");
+ }
 }
 const airCfg=phase.whitebox.aircraftRoutes.crowdTurn;
 assert.ok(airCfg.turnControl2,"P012 uses a two-tangent continuous turn");

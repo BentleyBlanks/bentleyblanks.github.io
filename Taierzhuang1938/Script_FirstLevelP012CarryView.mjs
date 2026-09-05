@@ -67,15 +67,17 @@ class P012CarryArmRig extends FpsArmRig {
 }
 
 /**
-   * @param {{scene:THREE.Object3D, sourceRig:FpsArmRig, bodyRoot?:THREE.Object3D, camera?:THREE.Camera}} options
+   * @param {{scene:THREE.Object3D, sourceRig:FpsArmRig, bodyRoot?:THREE.Object3D, camera?:THREE.Camera,
+   *   syncBodyPose?:(pose:{bodyYaw:number,bodyCrouch:number,visible:boolean})=>void}} options
  * sourceRig supplies the already-loaded GLTF and its material library. A new
  * skeleton is cloned; the weapon rig remains owned by Viewmodel.
  */
 export class FirstLevelP012CarryView {
-  constructor({ scene, sourceRig, bodyRoot = null, camera = null } = {}) {
+  constructor({ scene, sourceRig, bodyRoot = null, camera = null, syncBodyPose = null } = {}) {
     if (!scene?.add || !sourceRig?.gltf) throw new Error("P012 CarryView requires scene and loaded FpsArmRig");
     this.scene = scene;
     this.camera = camera;
+    this.syncBodyPose = syncBodyPose;
     this.anchor = new THREE.Group();
     this.anchor.name = "P012CarryArmWorldAnchor";
     this.handRight = new THREE.Object3D();
@@ -161,6 +163,11 @@ export class FirstLevelP012CarryView {
     this.anchor.rotation.set(0, this.bodyYaw, 0);
     this.anchor.updateWorldMatrix(true, false);
     this.litter.updateWorldMatrix?.(true, false);
+    // Setpieces update the original litter after the normal viewmodel pass.
+    // Re-evaluate the existing owner body at zero dt before sampling its
+    // shoulders, so a rapid turn or retry uses this frame's litter yaw without
+    // advancing the body's animation mixer twice.
+    this.syncBodyPose?.({ bodyYaw: this.bodyYaw, bodyCrouch: this.BodyCrouch, visible: true });
     if (this.bodyShoulders.right && this.bodyShoulders.left) {
       this.rig.bodyShoulders ||= { right: [0, 0, 0], left: [0, 0, 0] };
       for (const side of ["right", "left"]) {

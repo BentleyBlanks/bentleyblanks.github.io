@@ -62,6 +62,7 @@ const browser = await LaunchBrowser();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const errors = [];
 const pacingChecks = [];
+const campaignChecks = [];
 const audioSmoke = process.argv.includes("--audio-smoke");
 if (audioSmoke && ["--campaign", "--frontline", "--prelude", "--pacing", "--voice-timing"].some(flag => process.argv.includes(flag))) {
   throw new Error("--audio-smoke is a separate real-time playback fixture, not accelerated campaign timing");
@@ -76,6 +77,11 @@ page.on("console", (message) => {
 function Check(condition, label, detail = "") {
   if (!condition) throw new Error(`${label}${detail ? `: ${detail}` : ""}`);
   console.log(`ok  ${label}${detail ? ` — ${detail}` : ""}`);
+}
+
+function ReviewCampaign(condition, label, detail = "") {
+  campaignChecks.push({ passed: !!condition, label, detail });
+  console.log(`${condition ? "ok" : "FAIL"}  ${label}${detail ? ` — ${detail}` : ""}`);
 }
 
 function AirTurnEvidence(views) {
@@ -477,6 +483,7 @@ async function PlayFrontline() {
   let capturedBeat = -1;
   let capturedWindow = false;
   let capturedJointAirView = false;
+  let capturedFinalCarryView = false;
   for (let chunk = 0; chunk < (fullCampaign ? 250 : 45); chunk += 1) {
     result = await page.evaluate(({ ports, fullCampaign, stopBeat, anchors, routes, retryDive, perception, spatial }) => {
       const game = window.Tengxian;
@@ -514,6 +521,15 @@ async function PlayFrontline() {
           bot.forceMissDone = true;
         }
         bot.previousElapsed = flow.elapsed;
+        if(flow.beatIndex===24&&!bot.finalCarryView&&game.carry?.View()?.phase==="carry"
+          &&game.Debug.P012CarryView()?.gripWeight>=.999){
+          Key("KeyW",false);Key("KeyF",false);Key("ShiftLeft",false);game.Debug.Mouse(2,false);
+          game.player.pitch=-1.15;
+          game.StepFrames(1,1/30,false);bot.frame++;
+          bot.finalCarryView={at:game.Debug.P012().elapsed,position:game.player.position.toArray(),
+            pitch:game.player.pitch,hands:game.Debug.P012CarryView()};
+          break;
+        }
         if (flow.beatIndex >= 18) {
           const carry = game.carry.View(), hands = game.Debug.P012CarryView();
           const signature = [carry?.serial, carry?.phase, hands?.visible, hands?.releasing].join("|");
@@ -946,6 +962,7 @@ async function PlayFrontline() {
       return { flow: game.Debug.P012(), scene: game.Debug.P012Scene(), health: game.player.health,
         activity: window.p012ActivityTrace || [],
         carryHands: bot.carryHands || [],
+        finalCarryView:bot.finalCarryView||null,
         airViews: window.p012AirViews || [], crowdFireCues: window.p012CrowdFireCues || [], airGroundShots: window.p012AirGroundShots || [],
         airImpacts: window.p012AirImpacts || [],
         escortApproval: window.p012EscortApproval || [],
@@ -972,6 +989,11 @@ async function PlayFrontline() {
     }, { ports: P012_ANCHORS.gunports, fullCampaign, stopBeat, anchors: P012_ANCHORS, routes: P012_ROUTES,
       retryDive: process.argv.includes("--retry"), perception: perceptionProfile,
       spatial:{window:P012SouthPoint(68,24),airRoad:P012SouthPoint(50,68),southBlockade:P012SouthPoint(42,98)} });
+    if(result.finalCarryView&&!capturedFinalCarryView){
+      capturedFinalCarryView=true;
+      await fs.writeFile(path.join(outputDir,"Data_P012FinalCarryView.json"),JSON.stringify(result.finalCarryView,null,2));
+      await page.screenshot({path:path.join(outputDir,"Scene_P012FinalCarryHandsLookDown.png")});
+    }
     if(result.scavengeCapture){
       await fs.writeFile(path.join(outputDir,"Data_P012Scavenging.json"),JSON.stringify(result.scavenging,null,2));
       await page.screenshot({path:path.join(outputDir,`Scene_P012Scavenge${result.scavengeCapture.id}_${Math.round(result.flow.elapsed*10)}.png`)});
@@ -1077,7 +1099,7 @@ async function PlayFrontline() {
     "故意错过首次扑救后真实回退并继续通关", `${result.rewindCount}次`);
   if (fullCampaign) {
     const firstRoadSeen=result.roadContactTrace.find(sample=>sample.seen);
-    Check(firstRoadSeen?.enemies.some(actor=>actor.alive),"顺序跟队到路口时仍有活敌接战",JSON.stringify(firstRoadSeen));
+    ReviewCampaign(firstRoadSeen?.enemies.some(actor=>actor.alive),"顺序跟队到路口时仍有活敌接战",JSON.stringify(firstRoadSeen));
     Check(["roadContactSeen", "roadContactHeld", "roadContactClear", "roadContactReleased"].every(fact => result.flow.facts.includes(fact)),
       "浏览器实跑完成识别道路敌情、叫停、清场与队尾放行闭环", JSON.stringify(result.flow.facts));
     const requested = result.escortApproval.find(entry => entry.event === "P012EscortRequested");
@@ -1163,7 +1185,7 @@ async function PlayFrontline() {
     const heldHands=result.carryHands.filter(sample=>sample.alive&&sample.carry?.kindId==="stretcher"
       &&sample.carry.phase==="carry"&&sample.hands?.gripWeight>=.999);
     const originalId=ending.scene.litters.find(litter=>litter.originalCarried)?.id;
-    Check(heldHands.some(sample=>sample.beat==="B18")&&heldHands.some(sample=>sample.beat==="B24")
+    ReviewCampaign(heldHands.some(sample=>sample.beat==="B18")&&heldHands.some(sample=>sample.beat==="B24")
       &&new Set(heldHands.map(sample=>sample.carry.serial)).size>=2
       &&heldHands.every(sample=>sample.hands.visible&&sample.hands.litterId===originalId
         &&["r","l"].every(side=>sample.hands.reachable[side]&&sample.hands.gripError[side]<=.006
@@ -2871,10 +2893,13 @@ try {
     "原有战斗/群众预算独立统计；另列训练队、儿童、坐姿百姓及新增5名村路作业人员，全部计入原始人数", JSON.stringify(traffic.population));
   Check(errors.length === 0, "浏览器没有脚本或控制台错误", errors.join(" | "));
   console.log(`P012 screenshots: ${outputDir}`);
+  if(campaignChecks.length)await fs.writeFile(path.join(outputDir,"Data_P012CampaignChecks.json"),JSON.stringify(campaignChecks,null,2));
   if (pacingChecks.length) {
     await fs.writeFile(path.join(outputDir, "Data_P012PacingChecks.json"), JSON.stringify(pacingChecks, null, 2));
-    for (const check of pacingChecks) Check(check.passed, check.label, check.detail);
+    for (const check of pacingChecks) console.log(`${check.passed?"ok":"FAIL"}  ${check.label} — ${check.detail}`);
   }
+  const failedChecks=[...campaignChecks,...pacingChecks].filter(check=>!check.passed);
+  if(failedChecks.length)throw new Error(failedChecks.map(check=>`${check.label}: ${check.detail}`).join("\n"));
   runContext.assertionOutcome = "passed";
   console.log(process.argv.includes("--campaign")&&!process.argv.includes("--through-road") ? "FirstLevelP012BrowserTest campaign PASS" : "FirstLevelP012BrowserTest partial PASS (not a full campaign playthrough)");
 } catch (error) {

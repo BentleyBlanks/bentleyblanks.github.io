@@ -214,6 +214,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       ambushEntryRoute: Object.freeze([{ x: 42.5, z: 24 }, { x: 39, z: 25.5 }]),
       ambushColumnCoverRoute: Object.freeze([{ x: 32, z: 14.4 }, { x: 34, z: 18.8 }]),
       roadContactBreach: {x:32,z:12}, roadContactColumnHold: {x:30,z:10},
+      roadContactEscortRange: Object.freeze({ approachM: 40, waitM: 8, resumeM: 5 }),
       roadContactSideRoute: Object.freeze([{x:32,z:12},{x:34,z:14},{x:35.5,z:16}]),
       roadContactFirePosition: {x:35.5,z:16}, roadContactTailRelease: {x:28,z:10},
       roadContactFriendlyCovers: Object.freeze([{x:29,z:17},{x:30,z:19}]),
