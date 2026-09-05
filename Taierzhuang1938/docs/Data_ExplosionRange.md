@@ -40,6 +40,14 @@
   尾迹加色相加混合，带宽与亮芯都有按视距的像素下限，远处不许缩成一个点。
   两者不写入法线深度预通道。
   未命中的超时弹只回收，不能将爆炸瞬移到它正下方的地面。
+- `Vfx.IncomingMarker(position, secondsToImpact, { radius })` 是落点预警的唯一表现入口，
+  掷弹筒、炮兵支援、测试场炮击与空投都走它。`marker` 池一张贴地 quad 演完整个倒计时：
+  `Texture_IncomingMarker_01.webp` 的线稿（外圈 / 16 段虚线 / 四刻度 / 中心点）慢转并向
+  落点收拢、闪频从 2 Hz 升到 8 Hz，程序化收缩环与追赶脉冲一路收到中心亮核，最后 15% 亮核
+  炸亮；线稿间的焦土颗粒与被下压气流掀起的尘团贴面受光，另有几团低尘被吸向落点。
+  外圈半径取杀伤半径的一半并夹在 2.4—4.2 m；落在坑沿 / 坡面上悬空的部分按预通道深度差淡掉。
+  贴图加载失败只退回程序化环与亮核。贴图由 `_import/BuildIncomingMarkerTexture.py` 从两张
+  imagegen 源图打包，来源与许可见 `_import/Data_SourceLicenses.md`。
 - `Script_GrenadeReturn.mjs` 给各关注册高优先级交互。距离、垂直差、遮挡、离手宽限、
   剩余引信与拾取动作时长由 `GRENADE_RETURN` 管。F 拾起后按当前瞄准方向自动返掷，
   **沿用同一枚 Projectile 与原引信**，不补库存、不重置倒计时；已经来不及的弹不给交互。

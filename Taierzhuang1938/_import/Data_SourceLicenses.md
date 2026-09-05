@@ -210,11 +210,12 @@ CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保�
 | `Model_HouseholdWareSet.glb`：14 件家什容器（木桶/木盆/陶罐/花盆/笸箩/提篮/凳/粗木桌/斧锤锹/柴枝/风灯） | Poly Haven（slug 清单在 `Data_ExternalAssets_HouseholdWare.mjs`；`Source/Model_PolyHaven*/`） | CC0 1.0 | 10,594 三角，537 KB，无贴图 |
 | `Model_RuralYardSet.glb`：15 件村居农具（井圈/柴堆/草垛/劈柴墩/石槽/陶盆/水桶/锄/锹/木料/车轮/条凳/方凳/晾杆） | Kenney（Nature / Survival / Graveyard / Fantasy Town Kit）与 Quaternius（Medieval Village），URL+sha256 在 `_import/Source/*/Source_RuralYard.json` | CC0 1.0 | 3,606 三角，254 KB，无贴图 |
 
-## 特效轮廓纹理（常驻烟雾与燃烧）
+## 特效轮廓纹理（常驻烟雾、燃烧与落点预警）
 
 | 游戏内资产 | 来源 | 作者 / 页面声明 | 处理方式 |
 |---|---|---|---|
 | `Texture/Texture_VefectsFireMask_01.webp`、`Texture_VefectsGroundFireMask_01.webp`、`Texture_VefectsSmokeMask_01.webp`、`Texture_VefectsNoise_03.webp`、`Texture_VefectsNoise_08.webp` | [Free Fire VFX - Unity](https://vefects.itch.io/free-fire-vfx-unity) 的 `Vefects_VFX_Free_Fire_SRP_Final_01.unitypackage` | Vefects - Realtime VFX for Games；发布页标为免费游戏资产，但没有另附 CC0 / CC-BY 文本，因此不得写成 CC0 | 从 Unity 包中保留原灰度轮廓与噪声，无损转 WebP。`Script_Vfx.mjs` 将轮廓 + 滚动噪声用于常驻烟源、柱状火和贴地火；异步加载失败则回退原程序化烟火。完整源包、15 个 prefab、未使用的灰烬/尘土/渐变纹理及联系表保存在本机 `C:\Users\Bentl\Documents\Program\Taierzhuang1938SourceAssets\Vfx\VefectsFreeFire\`，不把未用素材塞进站点。 |
+| `Texture/Texture_IncomingMarker_01.webp`（炮弹落点预警准星，768×768 RGB 无损 WebP） | 两张 OpenAI 内置 imagegen 生成图：`Marker_Reticle.png`（黑底白线稿：外圈、16 段虚线、四刻度、中心点、线稿间焦土颗粒）与 `Marker_DustGrain.png`（黑底灰度尘团）；原图保存在本机 `C:\Users\Bentl\Documents\Program\Taierzhuang1938SourceAssets\Vfx\IncomingMarker\` | 本项目通过 Codex CLI 调 imagegen 生成（2026-09-05），无第三方作者与许可约束 | `_import/BuildIncomingMarkerTexture.py`：只取 RGB 亮度（imagegen 的 alpha 是抠图估值，会把线稿削半，故忽略），按亮度质心与外圈半径重新居中缩放，线稿经开运算去掉散点后进 R，虚线环与外圈之间的颗粒进 G，尘团重居中、径向淡出后进 B；G/B 量化到 32 级以压体积。`Script_Vfx.mjs` 的 `marker` 池采样三通道，加载失败退回程序化收缩环。 |
 
 用户同时选中的 Compositing Academy **Free VFX Fire Elements** 免费档未并入本公开仓库：
 该档仅允许个人非商业成品，并明确禁止在 Git repositories / project files 中分发原素材或

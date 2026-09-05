@@ -327,7 +327,7 @@ export class CombatSystem {
     const from = at.clone().add(new THREE.Vector3(Math.cos(angle) * 120, 24, Math.sin(angle) * 120));
     this.FireShell(from, at, { flight, kind, radius: spec.radius, damage: spec.damage,
       OnImpact: (point) => { options.OnImpact?.(point); this.host.story?.Signal("shelling"); } });
-    if (this.host.vfx) this.host.vfx.IncomingMarker(at, flight);
+    if (this.host.vfx) this.host.vfx.IncomingMarker(at, flight, { radius: spec.radius });
     if (this.host.audio) {
       this.host.audio.Play("shellIncoming", { position: at.clone(), volume: kind === "artillery" ? 1 : 0.7 });
     }

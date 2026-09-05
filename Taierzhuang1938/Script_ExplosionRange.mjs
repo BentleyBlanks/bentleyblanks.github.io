@@ -124,7 +124,7 @@ export class ExplosionRange {
       const drop = { from: from.toArray(), center: { x: center.x, z: center.z }, target: { x: target.x, z: target.z }, radius, impact: null };
       this.combat.FireShell(from, target, { flight: Math.sqrt(2 * Math.max(1, from.y - target.y) / 19.6),
         kind: "Shell75", radius: 7, damage: 150, OnImpact: (at) => { drop.impact = at.toArray(); } });
-      this.combat.host.vfx?.IncomingMarker(target, 2);
+      this.combat.host.vfx?.IncomingMarker(target, 2, { radius: 7 });
       this.combat.host.audio?.Play("shellIncoming", { position: target, volume: 0.85 });
       this.airDrops.push(drop); if (this.airDrops.length > 40) this.airDrops.shift();
       raid.dropped++; raid.nextDrop += spec.intervalS;
@@ -155,7 +155,7 @@ export class ExplosionRange {
         const { center, target, radius: r } = this.RandomTarget(EXPLOSION_BARRAGE.radiusM);
         const from = target.clone().add(new THREE.Vector3(45, 28, -EXPLOSION_BARRAGE.distanceM));
         this.combat.FireShell(from, target, { flight: EXPLOSION_BARRAGE.flightS, kind: "Shell75", radius: 7, damage: 150 });
-        this.combat.host.vfx?.IncomingMarker(target, EXPLOSION_BARRAGE.flightS);
+        this.combat.host.vfx?.IncomingMarker(target, EXPLOSION_BARRAGE.flightS, { radius: 7 });
         this.combat.host.audio?.Play("shellIncoming", { position: target, volume: 0.9 });
         this.launches.push({ center: { x: center.x, z: center.z }, target: { x: target.x, z: target.z }, radius: r });
         if (this.launches.length > 60) this.launches.shift();

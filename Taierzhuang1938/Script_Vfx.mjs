@@ -87,7 +87,9 @@ export const VFX_PALETTE = {
   tracerIja: LinearOf(0xCFE6FF, 5.0),    // 日方：偏冷白/淡青
   sparkHot: LinearOf(0xFFE2B0, 6.5),
   sparkCool: LinearOf(0xD05A16, 2.0),
-  markerWarn: LinearOf(0xFF6A3A, 3.0),   // 掷弹筒落点预警
+  markerWarn: LinearOf(0xFF6A3A, 3.0),   // 炮弹落点预警：准星线稿与收缩环
+  markerHot: LinearOf(0xFFC48A, 9.0),    // 预警最后半秒的中心亮核
+  markerScorch: LinearOf(0x66605A),      // 准星线稿间的焦土颗粒：比任何地面都暗一档，读作阴影而不是橙漆
 };
 
 // ---------------------------------------------------------------------------
@@ -120,6 +122,10 @@ const VEFECTS_MASKS = {
   noise: "./Texture/Texture_VefectsNoise_03.webp",
   detailNoise: "./Texture/Texture_VefectsNoise_08.webp",
 };
+
+// 炮弹落点预警准星：R 线稿 / G 焦土颗粒 / B 尘团，由 _import/BuildIncomingMarkerTexture.py
+// 从两张 imagegen 源图打包而成（来源见 _import/Data_SourceLicenses.md）。
+const MARKER_TEXTURE = "./Texture/Texture_IncomingMarker_01.webp";
 
 /** 可供关卡编辑器与独立预览器布设的持续场景特效。 */
 export const SCENE_EFFECTS = Object.freeze({
@@ -213,6 +219,7 @@ varying vec3 vColorAlt;      // 生命末端色，弹孔那种"同一片上要�
 varying float vAlpha;
 varying float vSeed;
 varying float vAge01;
+varying float vAgeS;           // 已活秒数：预警准星的闪频与脉冲相位按真实秒走，不按寿命比例
 varying float vFrame;          // 序列帧池的起始帧；其余池恒为 0
 varying float vViewDepth;
 #if defined(LIT) || defined(LIT_SURFACE)
@@ -236,6 +243,7 @@ void main() {
   }
   float t01 = clamp(age / life, 0.0, 1.0);
   vAge01 = t01;
+  vAgeS = age;
   vSeed = iParams.w;
   vFrame = iExtra.w;
 
@@ -389,6 +397,7 @@ varying vec3 vColorAlt;
 varying float vAlpha;
 varying float vSeed;
 varying float vAge01;
+varying float vAgeS;
 varying float vFrame;          // 序列帧池的起始帧；其余池恒为 0
 varying float vViewDepth;
 #if defined(LIT) || defined(LIT_SURFACE)
@@ -397,6 +406,11 @@ varying vec3 vLitNormal;
 #ifdef SHAPE_DECAL
 varying float vRays;       // 放射断口线的强度：弹孔 1、爆炸焦痕 0
 varying float vDecalSize;
+#endif
+#ifdef SHAPE_MARKER
+uniform vec3 uMarkerSoil;  // 焦土颗粒色（受光）
+uniform vec3 uMarkerDust;  // 掀起的尘团色（受光）
+uniform vec3 uMarkerHot;   // 中心亮核的 HDR 色（自发光）
 #endif
 #ifdef LIT
 varying vec3 vViewDir;     // 世界空间视线（相机 -> 粒子），前向散射要用
@@ -439,6 +453,50 @@ void main() {
   float band = 0.30 - 0.16 * vAge01;             // 环随时间变薄
   // 外圈只做很轻的收边：卡在 1.0 会把环的外半边直接切掉，看着像半个碗
   mask = smoothstep(band, 0.0, abs(d - radius)) * smoothstep(1.38, 1.10, d);
+#elif defined(SHAPE_MARKER)
+  // 炮弹落点预警：一枚会收拢的准星，不再复用爆炸尘环那个软胖的圈。
+  // 贴图三通道：R 线稿（外圈 / 16 段虚线 / 四刻度 / 中心点），G 线稿间的焦土颗粒，
+  // B 被下压气流掀起的尘团。贴图没到位时 tex 全 0，只剩程序化收缩环与亮核。
+  // 寿命 = 落地倒计时，所以 vAge01 越接近 1 越急。
+  float t = vAge01;
+  float urgency = t * t;
+  // 准星整体从 0.86 收拢到 0.55：虚线环向落点靠，玩家看得出它在合围这一点。
+  // 起点留在 1.0 以内，这样程序化收缩环出生时不会和线稿外圈叠成一道双线。
+  float reticleScale = mix(0.86, 0.55, smoothstep(0.0, 1.0, t));
+  vec2 ruv = p / reticleScale * 0.5 + 0.5;
+  float inside = step(abs(ruv.x - 0.5), 0.5) * step(abs(ruv.y - 0.5), 0.5);
+  vec4 tex = texture2D(uSpriteMap, clamp(ruv, 0.0, 1.0)) * inside;
+  // 尘团不跟准星收缩：它是地面上的事，贴地铺开，随倒计时慢慢变浓。
+  float dustTex = texture2D(uSpriteMap, p * 0.5 + 0.5).b;
+  float aa = fwidth(d) * 1.2;
+  float lineW = 0.014;
+  // 1) 主收缩环：从外圈一路收到中心亮核，先慢后快。
+  float rc = mix(1.0, 0.13, pow(t, 1.7));
+  float ring = 1.0 - smoothstep(lineW, lineW + aa, abs(d - rc));
+  // 2) 追赶脉冲：相位错开的细环反复从外向内收，越接近落地越密。
+  float f = fract(4.0 * pow(t, 1.8) + vSeed);
+  float rp = mix(1.0, 0.13, f);
+  float pulse = (1.0 - smoothstep(lineW * 0.7, lineW * 0.7 + aa, abs(d - rp))) * pow(1.0 - f, 1.5) * 0.45;
+  // 3) 线稿：随倒计时整体变亮，按越来越快的频率闪（2 Hz → 8 Hz）。
+  float blink = 0.72 + 0.28 * sin(vAgeS * (2.0 + 6.0 * t) * 6.2831853);
+  float lines = tex.r * (0.70 + 0.30 * urgency) * blink;
+  // 4) 中心亮核：平时只是一个点，最后 15% 猛然亮成一小片。
+  float core = smoothstep(0.075, 0.0, d) * (0.35 + 0.65 * urgency)
+    + smoothstep(0.30, 0.0, d) * smoothstep(0.85, 1.0, t) * 0.9;
+  float hot = clamp(ring + pulse + lines + core, 0.0, 1.0);
+  // 5) 焦土颗粒与尘团贴面受光，和真地面一起明暗；亮线是自发光，不吃光照
+  //   （下面 LIT_SURFACE 那段对准星池不生效）。
+  vec3 lit = uSkyColor + uSunColor * max(dot(normalize(vLitNormal), uSunDirection), 0.0);
+  float aGrit = tex.g * 0.38 * (0.30 + 0.70 * urgency);
+  float aDust = dustTex * 0.30 * smoothstep(0.0, 0.60, t);
+  // 三层按"尘 → 焦土 → 亮线"叠，只有一次混合输出，所以先在这里做 over 合成。
+  float alphaAll = 1.0 - (1.0 - aDust) * (1.0 - aGrit) * (1.0 - hot);
+  vec3 hotColor = mix(vColor, uMarkerHot, clamp(core, 0.0, 1.0));
+  vec3 stack = uMarkerDust * lit * aDust * (1.0 - aGrit) * (1.0 - hot)
+    + uMarkerSoil * lit * aGrit * (1.0 - hot)
+    + hotColor * hot;
+  color = stack / max(alphaAll, 1e-4);
+  mask = alphaAll;
 #elif defined(SHAPE_DECAL)
   // 弹孔：暗芯 + 比墙面亮 1—2 档的砖芯环 + 放射白线（考据里的"新弹痕断口"）
   float a = atan(p.y, p.x);
@@ -500,9 +558,10 @@ void main() {
   lit += uSunColor * forward * 0.55 * (1.0 - mask * 0.75);
   color *= lit;
 #endif
-#ifdef LIT_SURFACE
+#if defined(LIT_SURFACE) && !defined(SHAPE_MARKER)
   // 贴面的东西（弹孔、贴地尘环）必须跟它趴着的那个面一起明暗。一张恒定色的贴片
   // 在太阳底下永远比墙暗 —— 考据要的"新弹痕断口比墙面亮 1—2 档"就永远做不出来。
+  // 预警准星自己分层打光（尘/焦土受光、亮线自发光），不走这一乘。
   color *= uSkyColor + uSunColor * max(dot(normalize(vLitNormal), uSunDirection), 0.0);
 #endif
 
@@ -520,6 +579,14 @@ void main() {
   if (uDepthValid > 0.5) {
     float surfaceTolerance = max(0.006 + vDecalSize * 0.08, vViewDepth * 0.00008);
     if (sceneDepth <= 0.001 || abs(sceneDepth - vViewDepth) > surfaceTolerance) discard;
+  }
+#endif
+#ifdef SHAPE_MARKER
+  // 准星是落点切平面上的一张几米宽的 quad。坑沿、土沿或坡面会让它局部埋没 / 悬空：
+  // 埋没的由深度测试处理，悬空的按预通道深度差淡掉，别让一段亮线飘在坑口上方。
+  if (uDepthValid > 0.5 && sceneDepth > 0.001) {
+    float tolerance = 0.30 + vViewDepth * 0.02;
+    alpha *= 1.0 - smoothstep(tolerance, tolerance * 2.5, abs(sceneDepth - vViewDepth));
   }
 #endif
 
@@ -785,6 +852,10 @@ class ParticlePool {
         uMaskNoiseMap: { value: config.mask?.noise ?? shared.uMaskNoiseMap.value },
         uMaskNoiseDetailMap: { value: config.mask?.detailNoise ?? shared.uMaskNoiseDetailMap.value },
         uMaskEmission: { value: config.mask?.emission ?? 1 },
+        // 预警准星池的三个分层色；其余池的着色器里没有这几个 uniform，three 不会上传。
+        uMarkerSoil: { value: new THREE.Vector3(...(config.marker?.soil ?? [0, 0, 0])) },
+        uMarkerDust: { value: new THREE.Vector3(...(config.marker?.dust ?? [0, 0, 0])) },
+        uMarkerHot: { value: new THREE.Vector3(...(config.marker?.hot ?? [0, 0, 0])) },
       }),
       vertexShader: `${GLSL_VERT_HELPERS}\n${VERT_PARTICLE}`,
       fragmentShader: `${GLSL_NOISE}\n${FRAG_PARTICLE}`,
@@ -1319,10 +1390,19 @@ export class VfxSystem {
         shape: "star", orient: "billboard", blending: THREE.AdditiveBlending,
         softRange: 0.2, renderOrder: 10,
       }, this.shared),
-      // 贴面的环：爆炸尘环、落点预警、水花圈
+      // 贴面的环：爆炸尘环、水花圈
       ring: new ParticlePool(cap(POOL_SHARE.ring, 16), {
         shape: "ring", orient: "normal", blending: THREE.NormalBlending,
         litSurface: true, softRange: 0, renderOrder: 5,
+      }, this.shared),
+      // 炮弹落点预警：准星贴图 + 程序化收缩环，一张 quad 演完整个倒计时。容量固定 ——
+      // 同屏预警不过十几发，而且这是玩法信号，不能被画质档的预算削没。
+      marker: new ParticlePool(12, {
+        shape: "marker", orient: "normal", blending: THREE.NormalBlending,
+        litSurface: true, softRange: 0, renderOrder: 5, polygonOffset: true,
+        fadeOutStart: 0.985,
+        sprite: { texture: this.spriteTransparentPlaceholder, grid: [1, 1], frames: 1 },
+        marker: { soil: VFX_PALETTE.markerScorch, dust: VFX_PALETTE.soilAir, hot: VFX_PALETTE.markerHot },
       }, this.shared),
       // 弹孔贴花：几何留在命中面，polygonOffset 只动深度；预通道逐像素裁掉悬空部分。
       decal: new ParticlePool(Math.min(this.preset.decals, cap(POOL_SHARE.decal, 32)), {
@@ -1386,6 +1466,21 @@ export class VfxSystem {
         if (key === "groundFire") this.pools.sourceGroundFire.material.uniforms.uMaskMap.value = texture;
       }, undefined, () => {});
     }
+
+    // 落点预警准星：imagegen 线稿 + 尘团经 _import/BuildIncomingMarkerTexture.py 打包成
+    // 三通道 mask。加载前 / 失败时池挂全透明占位，只剩程序化收缩环与亮核，不会黑屏。
+    this.markerTexture = null;
+    textureLoader.load(new URL(MARKER_TEXTURE, import.meta.url).href, (texture) => {
+      texture.colorSpace = THREE.NoColorSpace;
+      texture.flipY = false;
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      // 贴地准星几乎总是被斜着看：没有各向异性，虚线在十米外就糊成一圈色块。
+      texture.anisotropy = 8;
+      texture.needsUpdate = true;
+      this.markerTexture = texture;
+      this.pools.marker.material.uniforms.uSpriteMap.value = texture;
+    }, undefined, () => {});
 
     // 深度法线预通道里必须隐身（见文件头第 2 条）。挂钩子而不是改 Script_Post。
     this.previousSceneHook = scene.onBeforeRender;
@@ -2216,34 +2311,45 @@ export class VfxSystem {
   }
 
   /**
-   * 掷弹筒落点预警。八九式有 3.2 s 飞行时间、1.5 s 提前量，
-   * 玩家要能"听到啸声看见地上一圈"然后跑掉 —— 这一圈是收缩的，越收越急。
+   * 炮弹 / 掷弹筒落点预警。掷弹筒 1.6 s、炮兵 2.6 s 提前量：玩家要能"听到啸声、
+   * 看见地上一枚收拢的准星"然后跑开。准星（贴图线稿 + 程序化收缩环 + 中心亮核）由
+   * marker 池的一张 quad 全程演完；外圈半径按杀伤半径给，看得出这一发大概波及多大。
+   * @param {{x:number,y:number,z:number}} position 落点（已贴地）
+   * @param {number} secondsToImpact 距落地秒数 = 粒子寿命
+   * @param {{radius?:number}} [options] radius 为该弹种的杀伤半径（米）
    */
-  IncomingMarker(position, secondsToImpact = 1.5) {
+  IncomingMarker(position, secondsToImpact = 1.5, { radius = 5 } = {}) {
     const life = Math.max(0.35, secondsToImpact);
-    for (let i = 0; i < 2; i += 1) {
-      const s = ResetSpawn();
-      s.x = position.x; s.y = position.y + 0.05 + i * 0.02; s.z = position.z;
-      s.nx = 0; s.ny = 1; s.nz = 0;
-      s.life = life * (i === 0 ? 1 : 0.62);
-      s.sizeStart = 3.2 - i * 1.1;            // 收缩：从外往内套住落点
-      s.sizeEnd = 0.7;
-      s.opacity = 0.55; s.fadeIn = 0.05;
-      s.flicker = 3.5 + i;                     // 越接近落地闪得越显眼
-      s.angle = this._Range(0, 3.14);
-      s.colorA = VFX_PALETTE.markerWarn; s.colorB = VFX_PALETTE.dustDense;
-      s.seed = this.random();
-      this.pools.ring.Spawn(s, this.time);
-    }
-    // 落点上方一点微弱的尘扬，提示"有东西正在下来"
+    const outer = Math.min(4.2, Math.max(2.4, radius * 0.5));
     const s = ResetSpawn();
-    s.x = position.x; s.y = position.y + 0.15; s.z = position.z;
-    s.life = life; s.sizeStart = 0.25; s.sizeEnd = 0.6;
-    s.opacity = 0.18; s.fadeIn = 0.25; s.drag = 6;
-    s.vy = 0.25;
-    s.colorA = VFX_PALETTE.dust; s.colorB = VFX_PALETTE.dustDense;
+    s.x = position.x; s.y = position.y + 0.04; s.z = position.z;
+    s.nx = 0; s.ny = 1; s.nz = 0;
+    s.life = life; s.sizeStart = outer; s.sizeEnd = outer;   // 收拢在着色器里做，quad 不动
+    s.opacity = 1; s.fadeIn = 0.06; s.flicker = 0;
+    s.angle = this._Range(0, 6.283); s.spin = 0.22;          // 准星慢转，虚线才"活"
+    s.colorA = VFX_PALETTE.markerWarn; s.colorB = VFX_PALETTE.markerWarn;
     s.seed = this.random();
-    this.pools.smoke.Spawn(s, this.time);
+    this.pools.marker.Spawn(s, this.time);
+    // 外圈附近几团低矮的土尘被往落点方向"吸"：弹体下压的气流先于爆炸到地面，
+    // 这是整套预警里唯一贴近物理的一笔。很淡，只负责让准星像长在地上而不是贴在地上。
+    const puffs = Math.max(2, Math.round(3 * this.spawnScale));
+    for (let i = 0; i < puffs; i += 1) {
+      const a = this._Range(0, 6.283), r = outer * this._Range(0.55, 0.85);
+      const d = ResetSpawn();
+      d.x = position.x + Math.cos(a) * r; d.y = position.y + 0.12; d.z = position.z + Math.sin(a) * r;
+      d.vx = -Math.cos(a) * 0.45; d.vy = 0.22; d.vz = -Math.sin(a) * 0.45;
+      d.life = life; d.sizeStart = 0.45; d.sizeEnd = 1.5; d.drag = 1.6;
+      d.opacity = 0.12; d.fadeIn = 0.3; d.spin = this._Signed(0.6); d.angle = this._Range(0, 6.283);
+      d.colorA = VFX_PALETTE.dust; d.colorB = VFX_PALETTE.dustDense; d.seed = this.random();
+      this.pools.smoke.Spawn(d, this.time);
+    }
+    // 落点正上方一缕更细的尘往上走，提示"有东西正在下来"
+    const c = ResetSpawn();
+    c.x = position.x; c.y = position.y + 0.15; c.z = position.z;
+    c.life = life; c.sizeStart = 0.22; c.sizeEnd = 0.7;
+    c.opacity = 0.16; c.fadeIn = 0.25; c.drag = 6; c.vy = 0.3;
+    c.colorA = VFX_PALETTE.dust; c.colorB = VFX_PALETTE.dustDense; c.seed = this.random();
+    this.pools.smoke.Spawn(c, this.time);
   }
 
   Dispose() {
@@ -2259,6 +2365,8 @@ export class VfxSystem {
     this.loadedExplosionSprites.clear();
     for (const texture of this.vefectsTextures.values()) texture.dispose();
     this.vefectsTextures.clear();
+    if (this.markerTexture) this.markerTexture.dispose();
+    this.markerTexture = null;
     this.loadedVefectsMasks.clear();
     if (this.spritePlaceholder) this.spritePlaceholder.dispose();
     if (this.spriteTransparentPlaceholder) this.spriteTransparentPlaceholder.dispose();
