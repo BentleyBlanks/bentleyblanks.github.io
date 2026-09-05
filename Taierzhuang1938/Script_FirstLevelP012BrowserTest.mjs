@@ -160,7 +160,7 @@ async function PlayPrelude() {
             yaw:game.player.yaw,pitch:game.player.pitch,rawSay:subtitle?.textContent||"",subtitleClass:subtitle?.className,
             scope:"actual in-progress subtitle and ordinary player camera; no actor/camera placement"};break;
         }
-        if(flow.beatIndex===4&&pendingSpeech?.key==="p012_text_RegroupCheck"&&!bot.regroupCaptured){
+        if([4,5].includes(flow.beatIndex)&&pendingSpeech?.key==="p012_text_RegroupCheck"&&!bot.regroupCaptured){
           bot.regroupCaptured=true;bot.pendingCausality={id:"NorthRegroupCount",subtitle:pendingSpeech.text,...NorthSceneEvidence()};break;
         }
         if(flow.beatIndex===5&&flow.routeIndex>=4&&!bot.ammoDoglegCaptured){
@@ -364,7 +364,7 @@ async function PlayPrelude() {
     "实际玩家位置经历炮后全班报数与唯一一次狗腿沟搬弹");
   const briefingEvidence=await page.evaluate(()=>({captured:window.p012ReviewBot.briefingCaptured||[],inspection:window.p012ReviewBot.inspectionTrace||[]}));
   await fs.writeFile(path.join(outputDir,"Data_P012BriefingInspection.json"),JSON.stringify(briefingEvidence,null,2));
-  Check(["p012_text_BriefingMission","p012_text_BriefingRoute","p012_text_BriefingReply"].every(key=>briefingEvidence.captured.includes(key)),"三段训话各有实际在播截图");
+  Check(["p012_text_BriefingMission","p012_text_BriefingRoute","p012_text_BriefingReply"].every(key=>briefingEvidence.captured.includes(key)),"简短训话与两句行进交代各有实际在播截图");
   const stopped=briefingEvidence.inspection.filter(row=>row.inspection.endedAt==null),resumed=briefingEvidence.inspection.filter(row=>row.inspection.endedAt!=null);
   Check(stopped.length>2&&resumed.length>2,"路口检查有实际停步阶段与继续阶段");
   const distance=(a,b)=>Math.hypot(a[0]-b[0],a[2]-b[2]);
@@ -2469,7 +2469,7 @@ try {
   if (openingGuidanceReview) await VerifyOpeningDiscovery();
   if (stationReview || openingCausalityReview || orientationReview || process.argv.includes("--prelude") || process.argv.includes("--pacing") || process.argv.includes("--frontline") || process.argv.includes("--campaign")) await PlayPrelude();
   if(process.argv.includes("--stage-zero-review")){
-    const captures=await page.evaluate(()=>window.p012StageZeroCaptures||[]),required=["ArrivalApproach","ArrivalDoor","ArrivalTitle","WaitingWounded","DoorLowering","Telephone","MuleAmmo","FamilyCart","p012_text_HubRail","p012_text_HubFront","p012_text_HubVillage","p012_text_HubSouth"];
+    const captures=await page.evaluate(()=>window.p012StageZeroCaptures||[]),required=["ArrivalApproach","ArrivalDoor","ArrivalTitle","WaitingWounded","DoorLowering","Telephone","MuleAmmo","FamilyCart"];
     Check(required.every(id=>captures.includes(id)),"普通跟队实跑依次看见到站、村路生活与四向口头交代",JSON.stringify(captures));
   }
   if (process.argv.includes("--frontline") || process.argv.includes("--campaign") || process.argv.includes("--pacing")) await PlayFrontline();

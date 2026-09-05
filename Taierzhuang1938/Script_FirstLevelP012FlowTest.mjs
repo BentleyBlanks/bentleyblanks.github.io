@@ -118,10 +118,13 @@ const points = new Map();
  story.BeginLevel(phase.contentId,{beats:openingStoryBeats,actualEventsOnly:true});
  story.Signal("P012NorthSquadRegrouped");
  let elapsed=0;
- for(;elapsed<18&&!story.Signalled("P012NorthContinue");elapsed+=.1)story.Update(.1,{p012Beat:4});
- assert.deepEqual(shown,["靠沟边收拢，报数。","顺子、幺娃都在，后头也跟上来了。","一个不少，都在！","后头齐了。沿沟继续，去接机枪位。"]);
- assert.ok(elapsed>=14.9&&elapsed<=15.4,`displayed regroup/count/continue chain is fifteen causal seconds, got ${elapsed.toFixed(1)}`);
- assert.ok(elapsed+2.4>=17&&elapsed+2.4<=18,"actual squad reaction plus displayed count fits the 17-18s post-impact window");
+ for(;elapsed<8&&!story.Signalled("P012NorthContinue");elapsed+=.1)story.Update(.1,{p012Beat:4});
+ assert.ok(elapsed>=3.9&&elapsed<=4.3,`one short instruction releases the regroup, got ${elapsed.toFixed(1)}`);
+ assert.equal(shown[0],"靠沟收拢，沿沟继续。何有田，照应后头！");
+ assert.equal(story.Signalled("P012NorthCounted"),false,"leaving the regroup does not manufacture the walking response");
+ for(let i=0;i<90;i++)story.Update(.1,{p012Beat:5});
+ assert.deepEqual(shown,["靠沟收拢，沿沟继续。何有田，照应后头！","顺子、幺娃都在，后头也跟上来了。","一个不少，都在！"]);
+ assert.ok(story.Signalled("P012NorthCounted"),"the original companions finish the exchange during onward movement");
 }
 // Recorded VillageFrontlineCampaign failure: CP03 retry preserved B14 cursor5
 // but the old public goal aimed straight through the ruin to the third nest.
@@ -283,6 +286,18 @@ signals.add("P012BriefingRouteExplained");Tick();assert.equal(flow.State().beat,
 signals.add("P012BriefingComplete");Tick();
 assert.equal(flow.State().beat,"B02","actual briefing completion permits departure with no obligatory R");
 assert.equal(sample.weaponActionCount,0);
+{
+ const spoken=[],story=new StoryDirector({hud:{Say:(who,text)=>spoken.push(text),Title(){}}});
+ story.BeginLevel(phase.contentId,{beats:openingStoryBeats,actualEventsOnly:true});
+ story.Signal("P012BriefingStarted");
+ for(let i=0;i<70;i++)story.Update(.1,{p012Beat:1});
+ assert.ok(story.Signalled("P012BriefingComplete"),"the single mission instruction releases the equipped squad within eight seconds");
+ assert.equal(story.Signalled("P012BriefingWalkingReply"),false,"the walking reply is not a second departure gate");
+ for(let i=0;i<110;i++)story.Update(.1,{p012Beat:2});
+ assert.ok(story.Signalled("P012BriefingWalkingReply"));
+ assert.equal(spoken.length,3,"brief practical guidance continues while the squad walks");
+ assert.ok(!openingStoryBeats.some(beat=>/P012Hub(Rail|Front|Village|South|Brief)/.test(beat.at)),"no four-direction lecture remains installed");
+}
 assert.equal(flow.State().checkpointId, "CP00");
 const villageRoute = phase.whitebox.activities.villageRoute;
 Tick({zone:"Z01",position:P012Point(70,100),guidePosition:villageRoute[2],guideRouteIndex:3,trafficReady:false});
@@ -317,14 +332,23 @@ assert.equal(P012SegmentClear(phase.whitebox.layout.blocks,hub,exit,.42),true,"p
  assert.equal(remote.State().beat,"B03");assert.equal(remote.orientationIndex,0);
 }
 Tick({position:hub,guidePosition:hub,guideAlive:true,zone:"Z02"});
-assert.equal(flow.State().beat,"B03","the actual hub briefing must finish before departure");
-assert.ok(signals.has("P012HubBriefingStarted"));
-assert.equal(flow.CurrentObjective().text,"听班长交代前沿位置与后送路","briefing text must not simultaneously order the player to leave");
-signals.add("P012HubBriefed");Tick();
+assert.equal(flow.State().beat,"B04","joining the real guide at the open north exit immediately continues the march");
+assert.equal(signals.has("P012HubBriefingStarted"),false,"departure never starts a four-direction standing lecture");
 assert.ok(signals.has("P012VillageNorthDeparture"));
 assert.equal(signals.has("P012NorthApproachChat"),false,"departure and roadside chat do not fire in the same update");
 assert.equal(flow.State().beat,"B04");assert.equal(shelling,0);
 assert.equal(flow.CurrentObjective().text,"跟随班长北上");
+{
+ const director=new FirstLevelP012Director({},phase.whitebox);director.beat=4;
+ const route=phase.whitebox.activities.shellCoverRoute;
+ director.lastSample={position:route[0],guidePosition:{x:route[0].x,z:route[0].z-2},guideRouteIndex:1};
+ assert.deepEqual(director.CurrentObjective().target,director.lastSample.guidePosition,"northbound following targets the actual leader rather than the next unvisited corner");
+ director.lastSample.guidePosition=route.at(-1);director.lastSample.position={x:route.at(-1).x,z:route.at(-1).z+2};
+ director.lastSample.guideRouteIndex=route.length-1;director.Mark("northCovered");director.Mark("northNearMissImpact");
+ director.Update(.1,director.lastSample);
+ assert.equal(director.routeIndex,route.length,"ordinary close following can finish the physically reached final regroup");
+ assert.equal(director.beat,4,"real arrival cannot invent the squad's completed regroup instruction");
+}
 const northRoute=phase.whitebox.activities.shellCoverRoute;
 Tick({position:northRoute[0],zone:"Z03",stance:"stand",guidePosition:northRoute[0]});
 assert.ok(signals.has("P012NorthApproachChat"));assert.equal(shelling,0);
@@ -736,11 +760,11 @@ const openingStory=new StoryDirector({hud:{Say(){},Title(){}}});
   const completed=[];
   for(let i=0;i<240;i++){
     story.Update(.1,{p012Beat:1});
-    for(const signal of ["P012MissionExplained","P012BriefingRouteExplained","P012BriefingComplete"])
+    for(const signal of ["P012BriefingComplete","P012BriefingRouteExplained","P012BriefingWalkingReply"])
       if(story.Signalled(signal)&&!completed.includes(signal))completed.push(signal);
   }
   assert.equal(shown.length,4,"muster, mission, route and reply actually reach the subtitle sink");
-  assert.deepEqual(completed,["P012MissionExplained","P012BriefingRouteExplained","P012BriefingComplete"]);
+  assert.deepEqual(completed,["P012BriefingComplete","P012BriefingRouteExplained","P012BriefingWalkingReply"]);
   assert.deepEqual(shown.map(cue=>cue.seconds),[5,6.5,6,4],"each real completion follows its own displayed subtitle duration");
 }
 openingStory.AttachVoice(({key})=>{spoken.push(key);return 0.1;});

@@ -198,7 +198,7 @@ export class FirstLevelP012Director {
         WaitAt: () => true, FaceAt: () => this.lastSample.position,
         ReleaseWhen: () => this.facts.has("retreatSmokeDeployed"),
       } : {}),
-      ...(this.beat === 3 ? {startIndex:0,WaitAt:()=>true,FaceAt:()=>this.HubFacing()} : {}),
+      ...(this.beat === 3 ? {startIndex:0,WaitAt:()=>true,FaceAt:()=>this.lastSample.position} : {}),
       ...(this.beat === 4 ? { startIndex: 0,
         WaitAt: index => index===this.ActivityRoute().length-1
           ? !this.Signalled("P012NorthContinue") : Distance(this.lastSample.position,this.lastSample.guidePosition)>8,
@@ -210,15 +210,6 @@ export class FirstLevelP012Director {
         WaitAt: index => index === activity.roadContactGuideRoute.length-1,
         FaceAt: () => this.facts.has("roadContactClear") ? this.lastSample.position : activity.roadContactEnemies?.[0]?.position } : {}),
       speed: this.config.activities?.guideSpeedByBeat?.[this.beat] || this.config.activities?.guideSpeedMps || 1.3 });
-  }
-
-  HubFacing() {
-    const directions=this.config.activities?.hubBriefing;
-    if(!directions||!this.Signalled("P012HubBriefingStarted"))return this.lastSample.position;
-    if(!this.Signalled("P012HubRailExplained"))return directions.rail;
-    if(!this.Signalled("P012HubFrontExplained"))return directions.front;
-    if(!this.Signalled("P012HubVillageExplained"))return directions.village;
-    return directions.south;
   }
 
   InstallInteractions() {
@@ -654,7 +645,7 @@ export class FirstLevelP012Director {
     // The actor advances its target within 2m; a player following 1–2m behind can
     // legitimately never enter a 3m circle. Consume only guide-traversed segments
     // while physically accompanying him, and separately acknowledge his last stop.
-    if ([0, 2].includes(this.beat) && Distance(p, sample.guidePosition) <= 4
+    if ([0, 2, 4].includes(this.beat) && Distance(p, sample.guidePosition) <= 4
       && Number.isInteger(sample.guideRouteIndex)) {
       const passed = Math.min(route.length - 1, Math.max(0, sample.guideRouteIndex));
       this.routeIndex = Math.max(this.routeIndex, passed);
@@ -869,7 +860,6 @@ export class FirstLevelP012Director {
         ready=sample.guideAlive!==false && Distance(p,sample.guidePosition)<=4
           &&Distance(sample.guidePosition,hub)<=4 && !!exit
           &&P012SegmentClear(this.config.layout?.blocks||[],sample.guidePosition,exit,.42);
-        if(ready&&activity.hubBriefing){this.Emit("P012HubBriefingStarted");ready=this.Signalled("P012HubBriefed");}
         if(ready)this.Emit("P012VillageNorthDeparture");
         break;
       }
@@ -1074,10 +1064,15 @@ export class FirstLevelP012Director {
     }
     if (this.beat === 3) {
       target=this.lastSample.guidePosition||activity.villageRoute?.at(-1);
-      interactionId=null;requiredAction="follow";text=this.Signalled("P012HubBriefingStarted")?"听班长交代前沿位置与后送路":"跟班长到村口集合";
+      interactionId=null;requiredAction="follow";text="跟班长穿过村口，继续北上";
     }
     if(this.beat===4){
-      if(this.routeIndex>=route.length&&!this.Signalled("P012NorthContinue"))target=this.lastSample.guidePosition||route.at(-1);
+      if(this.lastSample.guidePosition){
+        const cursor=Math.max(0,Math.min(route.length,this.lastSample.guideRouteIndex||0));
+        const followed=[...route.slice(0,cursor),this.lastSample.guidePosition];
+        const next=P012NextVisiblePoint(this.config.layout?.blocks||[],this.lastSample.position,followed,0,.42);
+        target=next.blocked?this.lastSample.guidePosition:next.point;
+      }
       if(!this.facts.has("northNearMissImpact")){text="跟随班长北上";requiredAction="follow";}
       else{
         text=this.facts.has("northCovered")?"沿交通壕继续跟上班长":"炮弹落在路旁！冲进前面的路沟，压低身子";
