@@ -378,6 +378,10 @@ for(const [name,route] of Object.entries(phase.whitebox.activities.airRouteChoic
 Audit("AirObstacleRejoin",phase.whitebox.activities.airRejoinRoute,layout.blocks,1.02);
 Audit("AirCivilianRescue",[phase.whitebox.activities.airCivilianPosition,...phase.whitebox.activities.airRescueRoute],layout.blocks,1.02);
 Audit("AirStretcherCarry",phase.whitebox.activities.stretcherCarryRoute,layout.blocks,1.02);
+for(const [index,point] of phase.whitebox.activities.airCrowdCoverSlots.entries()){
+ Audit(`AirCrowdCover${index}`,[...phase.whitebox.activities.airCrowdCoverRoute,point],layout.blocks,.7);
+ assert.ok(Math.hypot(point.x-anchors.strafeSlots[0].x,point.z-anchors.strafeSlots[0].z)>12,'crowd shelter never occupies the player carry/dive bay');
+}
 assert.ok(phase.whitebox.activities.stretcherCarryRoute.slice(1).reduce((sum,point,index)=>sum+Math.hypot(
  point.x-phase.whitebox.activities.stretcherCarryRoute[index].x,point.z-phase.whitebox.activities.stretcherCarryRoute[index].z),0)>=20,
  "B18 uses a physical route rather than a repeated interaction point");

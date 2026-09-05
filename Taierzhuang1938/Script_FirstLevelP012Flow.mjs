@@ -327,7 +327,7 @@ export class FirstLevelP012Director {
 
   RouteArrivalRadius() {
     const activity = this.config.activities || {};
-    return [13, 21, 22].includes(this.beat) ? 0.6
+    return [13, 18, 21, 22].includes(this.beat) ? 0.6
       : this.beat === 14 ? (activity.ambushRouteRadiusM || 0.6) : (activity.routeRadiusM || 3);
   }
 
@@ -1206,7 +1206,8 @@ export class FirstLevelP012Director {
       }
     }
     if (this.beat === 17) {
-      if(!this.Signalled("P012AirObstacleCreated")){target=activity.airObstaclePosition;requiredAction="observe";text="扫射刚落下，确认路上伤员和翻倒小车的位置";}
+      if(!this.Signalled("P012AirObstacleCreated")){target=activity.airObstaclePosition;requiredAction="observe";
+        text=this.Signalled("P012CrowdFire")?"扫射刚落下，确认路上伤员和翻倒小车的位置":"飞机正在转向这条路，留意担架队，寻找路沟";}
       else if(this.lastSample.carryKind==="wounded"){
         target=P012NextVisiblePoint(this.config.layout?.blocks||[],this.lastSample.position,
           activity.airRescueRoute||[activity.airRescueCover],0,this.lastSample.bodyRadius||.42).point;

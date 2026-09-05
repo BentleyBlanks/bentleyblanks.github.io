@@ -52,6 +52,42 @@ import { TelegraphKeyInteraction, TelegraphReconnectInteraction } from "./Script
 // 分工与为什么不是一条 host 回调，写在 Script_BlastTargets.mjs 的头注里。
 import { BLAST_TARGETS } from "./Script_BlastTargets.mjs";
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
+import { P012NextVisiblePoint, P012RouteProjection, P012RoutePoint } from "./Script_FirstLevelP012March.mjs";
+import { CARRY_KINDS } from "./Script_Carry.mjs";
+
+// The surviving front holder walks the same physical route as the player.
+// Camera turns never drag an actor around, and rendering reads both real ends.
+export function StepP012PlayerLitter(s) {
+  const litter=s.mem.p012CarriedLitter,load=s.carry?.load;
+  if(!litter||s.carry?.KindId!=="stretcher")return false;
+  const front=litter.front?.handle,at=front&&s.d.host.PositionOf?.(front),rear=s.PlayerPos();
+  if(!front?.alive||!at||!rear)return false;
+  const span=CARRY_KINDS.stretcher.spanM,activity=s.phase.whitebox.activities;
+  if(s.mem.p012CarrySerial!==load?.serial||!s.mem.p012PlayerCarryPath){
+    const final=s.d.host.Story?.()?.Signalled("P012Regripped");
+    const path=[{...rear},...(final?[s.phase.whitebox.anchors.shelter]:activity.stretcherCarryRoute)];
+    const end=path.at(-1),previous=path.at(-2),dx=end.x-previous.x,dz=end.z-previous.z,length=Math.hypot(dx,dz)||1;
+    path.push({x:end.x+dx/length*span,z:end.z+dz/length*span});
+    s.mem.p012PlayerCarryPath=path;s.mem.p012CarrySerial=load?.serial;
+  }
+  const path=s.mem.p012PlayerCarryPath,projection=P012RouteProjection(path,rear);
+  const goal=P012RoutePoint(path,projection.along+span),self=P012RouteProjection(path,at);
+  const corners=path.slice(self.index).filter(point=>P012RouteProjection(path,point).along<projection.along+span);
+  const next=P012NextVisiblePoint(s.phase.whitebox.layout.blocks,at,[...corners,goal],0,front.body?.radius||.42);
+  const previous=s.mem.p012CarryPartner?.previous || Object.fromEntries(
+    ["p012Guided","scriptMoveSpeedMps","scriptArrivalRadius","scriptDefensive","order","carryRole"].map(key=>[key,front[key]]));
+  front.p012Guided=true;front.scriptMoveSpeedMps=3.05;front.scriptArrivalRadius=.15;
+  front.scriptDefensive=false;front.order="advance";front.carryRole="front";
+  if(load)load.partner=front;
+  s.d.host.SetGoal?.(front,next.point.x,next.point.z);
+  const mid={x:(at.x+rear.x)/2,z:(at.z+rear.z)/2},gy=Math.min(at.y||0,rear.y||0);
+  const yaw=Math.atan2(at.x-rear.x,at.z-rear.z);
+  litter.lastMid={...mid,gy,yaw};
+  s.d.host.MoveProp?.(litter.propLitter,{...mid,y:gy+.62,rotationY:yaw,rotationZ:0});
+  s.d.host.MoveProp?.(litter.propBody,{...mid,y:gy+.84,rotationY:yaw,rotationZ:0});
+  s.mem.p012CarryPartner={actor:front,previous,spanM:Math.hypot(at.x-rear.x,at.z-rear.z),blocked:!!next.blocked};
+  return true;
+}
 
 function P012WaypointIndex(route, target) {
   return route.reduce((best,point,index)=>best<0 || Math.hypot(point.x-target.x,point.z-target.z)
@@ -1624,11 +1660,20 @@ export const SETPIECES = {
           member.slot.back=index*4.2+end*1.9;member.slot.lateral=0;member.handle.scriptArrivalRadius=.3;
         }));
       });
-      if (p012 && s.mem.p012ReleaseAt && s.mem.p012CarriedLitter) {
+      if (p012 && s.mem.p012ReleaseAt && !s.mem.p012ReleaseAt.placed && s.mem.p012CarriedLitter) {
         const point = s.mem.p012ReleaseAt, litter = s.mem.p012CarriedLitter;
-        s.d.host.MoveProp?.(litter.propLitter, { x: point.x, y: 0.1, z: point.z - 1.5 });
-        s.d.host.MoveProp?.(litter.propBody, { x: point.x, y: 0.3, z: point.z - 1.5 });
-        s.mem.p012ReleaseAt = null;
+        const mid=litter.lastMid || point;
+        s.d.host.MoveProp?.(litter.propLitter, { x: mid.x, y: .1, z: mid.z, rotationY: mid.yaw || 0 });
+        s.d.host.MoveProp?.(litter.propBody, { x: mid.x, y: .3, z: mid.z, rotationY: mid.yaw || 0 });
+        // Input release precedes physical arrival in the ditch. Keep that
+        // receipt until this dodge succeeds or fails, across every frame.
+        point.placed = true;
+      }
+      if(p012 && s.mem.p012ReleaseAt && s.mem.p012CarryPartner){
+        const actor=s.mem.p012CarryPartner.actor,at=s.d.host.PositionOf?.(actor),point=s.mem.p012ReleaseAt;
+        const target={x:point.x+1.2,z:point.z-2.4};
+        const next=at&&P012NextVisiblePoint(s.phase.whitebox.layout.blocks,at,[target],0,actor.body?.radius||.42);
+        if(next&&!next.blocked)s.d.host.SetGoal?.(actor,next.point.x,next.point.z);
       }
       if (p012 && s.mem.p012CarriedLitter && s.carry?.KindId === "stretcher") {
         const point = s.PlayerPos(), litter = s.mem.p012CarriedLitter;
@@ -1636,8 +1681,13 @@ export const SETPIECES = {
         const step = last ? Math.hypot(point.x - last.x, point.z - last.z) : 0;
         if (step < 3) s.mem.p012CarryDistance = (s.mem.p012CarryDistance || 0) + step;
         s.mem.p012CarryLast = { ...point };
-        s.d.host.MoveProp?.(litter.propLitter, { x: point.x, y: (point.y || 0) + 0.62, z: point.z - 1.5, rotationZ: 0 });
-        s.d.host.MoveProp?.(litter.propBody, { x: point.x, y: (point.y || 0) + 0.84, z: point.z - 1.5, rotationZ: 0 });
+        StepP012PlayerLitter(s);
+      } else if(p012&&s.mem.p012CarryPartner&&!s.mem.p012ReleaseAt){
+        const actor=s.mem.p012CarryPartner.actor;
+        for(const [key,value] of Object.entries(s.mem.p012CarryPartner.previous)){
+          if(value===undefined)delete actor[key];else actor[key]=value;
+        }
+        delete s.mem.p012CarryPartner;s.mem.p012PlayerCarryPath=null;
       }
       if (p012 && s.mem.p012LitterOverturned && !s.mem.p012LitterRecovered) {
         const litter = s.mem.p012CarriedLitter, column = s.mem.column, point = s.mem.p012FallenAt;
@@ -1658,8 +1708,11 @@ export const SETPIECES = {
           for (const [role, offset] of [["front", -0.9], ["rear", 0.9]]) {
             const actor = litter[role]?.handle, target = { x: point.x, z: point.z + offset };
             if (!actor?.alive) { arrived = false; continue; }
-            s.d.host.SetGoal?.(actor, target.x, target.z);
             const at = s.d.host.PositionOf?.(actor);
+            const activity=s.phase.whitebox.activities;
+            const route=[...(activity?.airCrowdCoverRoute || []).toReversed(),...(activity?.airRescueRoute || []),target];
+            const next=at&&s.phase.whitebox.layout?P012NextVisiblePoint(s.phase.whitebox.layout.blocks,at,route,0,actor.body?.radius||.42):null;
+            if(!next?.blocked)s.d.host.SetGoal?.(actor,next?.point.x??target.x,next?.point.z??target.z);
             if (!at || Math.hypot(at.x - target.x, at.z - target.z) > 1.8) arrived = false;
           }
           if (arrived) {
@@ -1738,15 +1791,17 @@ export const SETPIECES = {
       }
 
       if (p012 && HasSignal("P012SeekAirCover") && !HasSignal("P012Dived")) {
-        const slots=s.phase.whitebox.anchors.strafeSlots || [];
+        const activity=s.phase.whitebox.activities,slots=activity.airCrowdCoverSlots || [];
         for(const [index,member] of (s.mem.column?.Alive || []).filter((m)=>m.role!=="bearer").entries()) {
           if(member.role==="civilian" && !HasSignal("P012CrowdFire")) continue;
-          const point=slots[index%slots.length];
+          const point=slots[index],at=s.d.host.PositionOf?.(member.handle);
           if(point){
             member.handle.scriptedNoncombatant=true;
-            const entry=s.phase.whitebox.activities.airCoverEntryPosition || P012SouthPoint(44,66);
-            const at=s.d.host.PositionOf?.(member.handle), target=at&&at.z>entry.z+.8?entry:point;
-            s.d.host.SetGoal?.(member.handle,target.x,target.z+(target===point?(index%2?1:-1):0));
+            // The original people reach separate southern pockets through
+            // physical openings; the player's rescue/carry bay stays free.
+            const next=at&&P012NextVisiblePoint(s.phase.whitebox.layout.blocks,at,
+              [...activity.airCrowdCoverRoute,point],0,member.handle.body?.radius||.42);
+            if(next&&!next.blocked)s.d.host.SetGoal?.(member.handle,next.point.x,next.point.z);
           }
         }
       }

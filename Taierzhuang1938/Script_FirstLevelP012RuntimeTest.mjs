@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { FirstLevelP012Runtime, P012GuideApproach } from "./Script_FirstLevelP012Runtime.mjs";
 import {P012SegmentClear} from "./Script_FirstLevelP012March.mjs";
-import { SETPIECES, EscortColumn, LastLitterArrived } from "./Script_MissionSetpieces.mjs";
+import { SETPIECES, EscortColumn, LastLitterArrived, StepP012PlayerLitter } from "./Script_MissionSetpieces.mjs";
 import P012Phase from "./Data_FirstLevelP012Whitebox.mjs";
 import {FirstLevelP012Director} from "./Script_FirstLevelP012Flow.mjs";
 import {InteractSystem} from "./Script_Interact.mjs";
@@ -713,6 +713,8 @@ assert.match(main,/story\.P012Restore\?\.\(sample\.p012Story\.immediate\)/,"P012
   context.mem.p012CarriedLitter = { propLitter: "litter", propBody: "body" };
   // The input releases the load before TryDitchDodge reaches OnDodge.
   context.carry.KindId=null;context.mem.p012ReleaseAt={x:0,z:0};context.PlayerPos=()=>({x:0,z:-.8});
+  for(let frame=0;frame<24;frame++)SETPIECES.CH1_NanLu.Update(context,1/30);
+  assert.ok(context.mem.p012ReleaseAt?.placed,'physical crawl frames retain the already rendered input-release receipt');
   runs[1].OnDodge(); assert.ok(emitted.includes("P012Dived"));
   assert.ok(moved.some((entry) => entry.id === "litter" && entry.rotationZ > 1));
   assert.equal(moved.find(entry=>entry.id==='litter'&&entry.rotationZ>1).z,0,'litter falls at release position, not at the end of the dive');
@@ -737,6 +739,53 @@ assert.match(main,/story\.P012Restore\?\.\(sample\.p012Story\.immediate\)/,"P012
   assert.equal(context.mem.column.scriptPaused,true,'historic road release cannot override a later aircraft or ambush halt');
 }
 console.log("PASS P012 runtime finite actors, guide speed, shell warning, delivery input routing");
+{
+ const front={role:'bearer',handle:{alive:true,body:{radius:.34},position:{x:104,z:59.8}}};
+ const rear={role:'bearer',slot:{back:1.9},handle:{alive:false}};
+ const replacement={role:'guard',handle:{alive:true,body:{radius:.34},position:{...P012Phase.whitebox.activities.airCrowdCoverSlots[0]}}};
+ const litter={front,rear,dropped:true},goals=new Map();
+ const context={phase:{whitebox:P012Phase.whitebox},mem:{p012CarriedLitter:litter,p012LitterOverturned:true,p012FallenAt:{x:105.2,z:61.6},column:{Update(){},Alive:[front,replacement]}},
+  Spoken:()=>false,Signal(){},PlayerPos:()=>({x:104,z:60}),d:{host:{Story:()=>({Signalled:()=>false}),PositionOf:actor=>actor.position,
+  SetGoal:(actor,x,z)=>{const point={x,z};assert.ok(P012SegmentClear(P012Phase.whitebox.layout.blocks,actor.position,point,.34),'replacement never receives a goal through a ditch bank');goals.set(actor,point);}}}};
+ let seconds=0;
+ while(!context.mem.p012LitterRecovered&&seconds<40){
+  SETPIECES.CH1_NanLu.Update(context,1/30);
+  for(const [actor,point] of goals){const dx=point.x-actor.position.x,dz=point.z-actor.position.z,distance=Math.hypot(dx,dz),step=Math.min(distance,1.35/30);
+   if(distance){actor.position.x+=dx/distance*step;actor.position.z+=dz/distance*step;}}
+  seconds+=1/30;
+ }
+ assert.ok(context.mem.p012LitterRecovered,'the same living guard physically returns from the separate crowd shelter');
+ assert.equal(litter.rear,replacement);assert.equal(rear.handle.alive,false);
+ console.log(`PASS physical replacement reaches the original overturned litter through bank openings in ${seconds.toFixed(1)}s`);
+}
+{
+ const path=P012Phase.whitebox.activities.stretcherCarryRoute,front={alive:true,body:{radius:.34},position:{x:path[0].x,z:path[0].z}},moves=[];
+ let player={x:path[0].x,z:path[0].z+1.85},goal=null;
+ const litter={front:{handle:front},propLitter:'OriginalLitter',propBody:'OriginalPatient'};
+ const context={phase:{whitebox:P012Phase.whitebox},mem:{p012CarriedLitter:litter},carry:{KindId:'stretcher',load:{serial:1}},PlayerPos:()=>player,
+   d:{host:{PositionOf:actor=>actor.position,Story:()=>({Signalled:()=>false}),SetGoal:(actor,x,z)=>{assert.equal(actor,front);goal={x,z};},MoveProp:(id,at)=>moves.push({id,...at})}}};
+ const initial={...front.position};
+ for(const target of path){
+   for(let frame=0;frame<1800;frame++){
+     StepP012PlayerLitter(context);
+     assert.ok(P012SegmentClear(P012Phase.whitebox.layout.blocks,front.position,goal,.34),'real front holder receives only body-clear commands');
+     const d=Math.hypot(goal.x-front.position.x,goal.z-front.position.z),step=Math.min(d,3.05/30);
+     if(d){front.position.x+=(goal.x-front.position.x)*step/d;front.position.z+=(goal.z-front.position.z)*step/d;}
+     const distance=Math.hypot(target.x-player.x,target.z-player.z);if(distance<.05)break;
+     const move=Math.min(distance,1.281/30);player={x:player.x+(target.x-player.x)*move/distance,z:player.z+(target.z-player.z)*move/distance};
+   }
+ }
+ StepP012PlayerLitter(context);
+ assert.ok(Math.hypot(front.position.x-initial.x,front.position.z-initial.z)>10,'the same surviving actor physically follows the whole carried route');
+ assert.equal(context.carry.load.partner,front);
+ const prop=moves.at(-2);assert.equal(prop.id,'OriginalLitter');
+ assert.ok(Math.abs(prop.x-(front.position.x+player.x)/2)<1e-8&&Math.abs(prop.z-(front.position.z+player.z)/2)<1e-8,'existing litter is drawn between actual player and front holder');
+ assert.ok(context.mem.p012CarryPartner.spanM>1.2&&context.mem.p012CarryPartner.spanM<2.8,'front holder keeps a real two-person carry span at the bay');
+ context.carry.KindId=null;context.Spoken=()=>false;
+ SETPIECES.CH1_NanLu.Update(context,1/30);
+ for(const key of ['p012Guided','scriptArrivalRadius','carryRole','scriptMoveSpeedMps'])assert.equal(front[key],undefined,'release restores the surviving actor before ordinary column movement resumes');
+ console.log('PASS original carried litter follows the living front holder and player through physical corners');
+}
 {
   let impact;
   const runtime = new FirstLevelP012Runtime({ GuideActor: () => null, Position: () => null, Signalled: () => false,

@@ -731,7 +731,7 @@ async function PlayFrontline() {
         }
         Key("KeyF", false);
         if (destination && Math.hypot(destination.x - game.player.position.x, destination.z - game.player.position.z)
-          > (flow.beatIndex <= 10 ? 0.35 : [14, 21].includes(flow.beatIndex)
+          > (flow.beatIndex <= 10 ? 0.35 : [14, 18, 21].includes(flow.beatIndex)
             ? Math.max(0.1, (flow.objective.arrivalRadiusM ?? 0.6) - 0.05) : 1)) {
           game.Debug.Mouse(2, false);
           Key("ShiftLeft", flow.objective.requiredAction === "sprint");
@@ -1559,12 +1559,12 @@ async function VerifyAirRouteHandoff(choice) {
   Check(setup.members===10&&result.members===10,"局部初始十人队列在空袭交接中不重复生成");
   Check(result.airTurnEvidence.longestVisibleS>=4,"转向开火前真实自由视角连续可见至少四秒",JSON.stringify(result.airTurnEvidence));
   Check(result.airTurnEvidence.jointViews>0,"转向时真实同屏可辨认飞机、担架员和平民");
-  if(process.argv.includes("--air-rescue")){
-    const rescue=await page.evaluate(()=>{
+  if(process.argv.includes("--air-rescue")||process.argv.includes("--air-carry")||process.argv.includes("--air-dive")){
+    const rescue=await page.evaluate(carryReview=>{
       const game=window.Tengxian,f=window.p012AirFixture,trace=[];
       let frames=0,held=false;
       for(;frames<3600;frames++){
-        const state=f.flow.State();if(state.beatIndex>=18)break;
+        const state=f.flow.State();if(state.beatIndex>=(carryReview?19:18))break;
         const objective=state.objective,point=objective.interactionId&&game.interact.Point(objective.interactionId);
         const target=objective.target,dx=target?target.x-game.player.position.x:0,dz=target?target.z-game.player.position.z:0,distance=Math.hypot(dx,dz);
         game.player.yaw=Math.atan2(-dx,-dz);game.player.pitch=0;
@@ -1572,15 +1572,45 @@ async function VerifyAirRouteHandoff(choice) {
         game.Debug.Key("KeyW",!!target&&!usable&&distance>.5);game.Debug.Key("KeyF",usable);held=usable;
         game.StepFrames(1,1/30,false);
         if(frames%15===0)trace.push({at:frames/30,beat:f.flow.State().beat,position:game.player.position.toArray(),
-          target,interaction:point?.id,query:query?.id,carry:game.carry.KindId,facts:[...f.flow.facts]});
+          target,interaction:point?.id,query:query?.id,carry:game.carry.KindId,carriedS:game.carry.View()?.carriedS,
+          litters:game.Debug.P012Scene().litters,facts:[...f.flow.facts]});
       }
       game.Debug.Key("KeyW",false);game.Debug.Key("KeyF",false);game.StepFrames(1);
       return {frames,trace,held,flow:f.flow.State(),scene:game.Debug.P012Scene(),carry:game.carry.KindId};
-    });
+    },process.argv.includes("--air-carry")||process.argv.includes("--air-dive"));
     await fs.writeFile(path.join(outputDir,"Data_P012AirRescue.json"),JSON.stringify(rescue,null,2));
     await page.screenshot({path:path.join(outputDir,"Scene_P012AirRescue.png")});
-    Check(rescue.flow.beat==="B18"&&rescue.flow.facts.includes("airRescued")&&rescue.carry===null,
+    Check(rescue.flow.beatIndex>=18&&rescue.flow.facts.includes("airRescued"),
       "实际按键背起百姓、绕入沟岸、放到硬掩体后并回接担架",JSON.stringify({beat:rescue.flow.beat,seconds:rescue.frames/30,travel:rescue.flow.airRescueTravelM}));
+    if(process.argv.includes("--air-carry")||process.argv.includes("--air-dive"))Check(rescue.flow.beat==="B19"&&rescue.carry==="stretcher",
+      "仍抬着同一担架到达沟边后才迎来俯冲",JSON.stringify({beat:rescue.flow.beat,distance:rescue.scene.carryDistance,seconds:rescue.trace.at(-1)?.carriedS}));
+    if(process.argv.includes("--air-dive")){
+      const dive=await page.evaluate(()=>{
+        const game=window.Tengxian,f=window.p012AirFixture,trace=[];
+        const original=game.Debug.P012Scene().litters.find(litter=>litter.originalCarried)?.id;
+        let carriedS=0;
+        for(let frame=0;frame<600;frame++){
+          const view=game.carry.View(),air=game.Debug.Strafe.State().run,open=air?.presetId==="divePress"&&air.player?.open;
+          carriedS=Math.max(carriedS,view?.carriedS||0);
+          const slot=f.flow.config.anchors.strafeSlots[0],target={x:slot.x,z:slot.z+(open?0:1.8)};
+          const dx=target.x-game.player.position.x,dz=target.z-game.player.position.z;
+          game.player.yaw=Math.atan2(-dx,-dz);game.player.pitch=0;
+          if(open&&game.player.stance!=="prone")game.Debug.Key("KeyZ");
+          game.Debug.Key("KeyW",Math.hypot(dx,dz)>.2);
+          game.StepFrames(1,1/30,false);
+          if(frame%3===0)trace.push({at:f.flow.elapsed,carry:view?.kindId,carriedS:view?.carriedS,open,stance:game.player.stance,position:game.player.position.toArray(),run:air?.presetId,phase:air?.phase});
+          if(f.flow.State().beatIndex>=20)break;
+        }
+        game.Debug.Key("KeyW",false);game.StepFrames(1);
+        return {original,carriedS,trace,flow:f.flow.State(),scene:game.Debug.P012Scene(),carry:game.carry.KindId};
+      });
+      await fs.writeFile(path.join(outputDir,"Data_P012AirDive.json"),JSON.stringify(dive,null,2));
+      await page.screenshot({path:path.join(outputDir,"Scene_P012AirDive.png")});
+      Check(dive.flow.beat==="B20"&&dive.scene.litterOverturned&&dive.carry===null
+        &&dive.scene.litters.find(litter=>litter.originalCarried)?.id===dive.original,
+        "真实危险窗按键扑沟，原担架松手侧翻，进入沟内交火",JSON.stringify({beat:dive.flow.beat,original:dive.original,carriedS:dive.carriedS}));
+      Check(dive.carriedS>=20&&dive.carriedS<=30,"正常搬运到俯冲之间实际握住担架20至30秒",String(dive.carriedS));
+    }
   }
 }
 
@@ -2076,6 +2106,7 @@ try {
               flightTime: air.t, airVisible: airState.modelVisible===true&&!!airState.modelAt&&Visible(airState.modelAt),
               modelVisible:airState.modelVisible,modelAt:airState.modelAt,airPosition: air.aircraft,
               player: game.player.position.toArray(), yaw: game.player.yaw, pitch: game.player.pitch,
+              members:members.map(member=>({...member,visible:visible.includes(member)})),
               bearersVisible: visible.filter(member => member.role === "bearer").length,
               civiliansVisible: visible.filter(member => member.role === "civilian").length };
             window.p012AirViews.push(view);
