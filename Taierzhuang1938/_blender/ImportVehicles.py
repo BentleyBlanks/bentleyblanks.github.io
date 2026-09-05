@@ -43,6 +43,10 @@ SOURCES = {
         # 语义层级；完整保留原始网格，运行时用 shared armor 材质重漆。
         "parts": [("Object_", "armor", False)],
         "singleBody": True,
+        # 这件源 glTF 的车头在 Blender 导入后的 -Y（Sketchfab 场景 glTF 的 +Z）：
+        # 前部驾驶员/机枪隆起高、尾部发动机舱盖低。单体网格没有炮管可探，
+        # 车头方向只能在这里声明；漏了就是炮口朝后。
+        "sourceNose": "-Y",
         "note": "CC-BY Type 95 Ha-Go（Sketchfab / Jesper Landin）→ 九五式轻战车。"
                 "源件 82.8k 面，按 4.38 × 2.07 × 2.27 m 归一后原样保留；"
                 "源 glTF 没有可分离的炮塔/履带节点，保留完整外形为单一装甲网格。",
@@ -150,11 +154,15 @@ def BuildImported(name):
     # 绕 X 转 -90°：(x, y, z) -> (x, z, -y)，old +Y(车头) -> new -Z ✓，old +Z(上) -> new +Y ✓
     _Xform(all_bms, Matrix.Rotation(-math.pi * 0.5, 4, "X"))
 
-    # 车头验正：能分出炮管的源件用它；九五式高模没有语义节点，按源模型
-    # 的 +Y 车头约定直接落入同一规范系。
+    # 车头验正：能分出炮管的源件用它（炮管质心落在 +Z 就是装反了）；
+    # 单体网格按 spec 的 sourceNose 声明翻正（"+Y" 车头已落在 -Z，"-Y" 要转半圈）。
     probe = partbm.get("Barrel", next(iter(partbm.values())))
     blo, bhi = _Aabb([probe])
-    if not spec.get("singleBody") and (blo.z + bhi.z) * 0.5 > 0.0:
+    if spec.get("singleBody"):
+        flip = spec.get("sourceNose", "+Y") == "-Y"
+    else:
+        flip = (blo.z + bhi.z) * 0.5 > 0.0
+    if flip:
         _Xform(all_bms, Matrix.Rotation(math.pi, 4, "Y"))
 
     # 逐轴归一缩放到史实三围（扫描件比例与实车有几厘米级偏差，逐轴拉正）

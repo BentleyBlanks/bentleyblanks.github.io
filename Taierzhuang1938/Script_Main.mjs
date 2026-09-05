@@ -1682,6 +1682,8 @@ async function Boot() {
     get meleeCombat() { return meleeCombat; },
     story, combat, destruction, interact, carry, emplacement, wheel, strafe, flare, telegraph,
     companion, checkpoint, setpieces,
+    // 机队实例：出图脚本要能给任意一架摆手动姿态，核对模型机头朝向。
+    get aircraft() { return aircraft; },
     StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
     // 关中过场的宿主 API（story.Signal→过场 的等价入口）。玩法系统批直接调它，
     // 或者走 story.Signal("<名字>") 让登记表去派发 —— 两条路同一个实现。

@@ -18,7 +18,7 @@ export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
 // 士兵预览必须把模型文件与角色/加载器模块当作同一份发布物。单独换模型而
 // 浏览器仍命中旧模块缓存，会造成面板写着 model、骨架却按旧布局拆散的假成功。
-const MESH_REV = "26";
+const MESH_REV = "27";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -330,7 +330,8 @@ export const MESHES = {
     span: [2.07, 2.27, 4.38],
     draws: { high: 1, medium: 1, low: 1 },
     note: "九五式轻战车 Ha-Go。CC-BY 高模（Sketchfab / Jesper Landin）原始 82,142 三角；"
-      + "80,000 阈值只会减少 2.6%，按 5% 免减面规则保留原始拓扑。车体仍为单一 armor 网格，标准挂点与炮塔关节齐备。",
+      + "80,000 阈值只会减少 2.6%，按 5% 免减面规则保留原始拓扑。车体仍为单一 armor 网格，标准挂点与炮塔关节齐备。"
+      + "源件车头在 Blender 导入后的 -Y，ImportVehicles 按 sourceNose 翻正（2026-09-05 前炮口朝后）。",
   },
   Type97ChiHa: {
     file: "Type97ChiHa.tzm.json", category: "vehicle",

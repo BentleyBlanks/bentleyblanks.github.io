@@ -34,12 +34,30 @@ function PrepareAircraft(gltf, spec) {
   // 源模型的原点各不相同；把模型重心收回编队根节点，航迹的高度才稳定。
   _box.setFromObject(model);
   _box.getCenter(_center);
-  _box.getSize(_size);
-  model.position.sub(_center);
+  model.position.copy(_center).multiplyScalar(-spec.scale);
   model.scale.setScalar(spec.scale);
-  root.add(model);
-  root.userData.wingspan = _size.x * spec.scale;
+  // 源模型机首朝向各不相同（AGENTS 硬规矩 4：外部 GLB 先查源朝向再经桥接层对齐）。
+  // 按 Data_AircraftAssets 量出的 noseDir 把机首转到局部 -Z；根节点上的 yaw/climb/bank
+  // 换算从此只认这一个约定。三件源模型没有一件天生朝 -Z。
+  const align = new THREE.Group();
+  align.name = "NoseAlign";
+  align.rotation.y = NoseYaw(spec.noseDir);
+  align.add(model);
+  root.add(align);
+  root.updateMatrixWorld(true);
+  _box.setFromObject(align);
+  _box.getSize(_size);
+  root.userData.wingspan = _size.x;
   return root;
+}
+
+/**
+ * 把源模型的机首方向 (x, z) 转到局部 -Z 所需的绕 Y 角。
+ * three 的 rotation.y = φ 把 XZ 面上的航向角 atan2(x, z) 加 φ；目标航向 atan2(0, -1) = π。
+ */
+export function NoseYaw(noseDir) {
+  if (!noseDir) return 0;
+  return Math.PI - Math.atan2(noseDir.x, noseDir.z);
 }
 
 function DisposeObject(root) {
@@ -132,7 +150,7 @@ export class AircraftFlight {
       const dx = -Math.sin(angle) * radiusX;
       const dz = Math.cos(angle) * radiusZ;
       root.position.set(x, spec.altitude + Math.sin(angle * 2.0) * 7, z);
-      // glTF 飞机的机首朝 -Z；依路径切线转向，再给一点克制的滚转。
+      // 机首已由 PrepareAircraft 对齐到局部 -Z；依路径切线转向，再给一点克制的滚转。
       root.rotation.set(0, Math.atan2(-dx, -dz), Math.cos(angle) * spec.bank, "YXZ");
     }
   }
@@ -168,7 +186,7 @@ export class AircraftFlight {
 
 /**
  * 把规则层给的那一帧姿态摆到模型上。
- * 机首朝局部 -Z（AGENTS 硬规矩 5），所以 yaw 与绕圈那条用同一个换算；
+ * 机首朝局部 -Z（PrepareAircraft 已按 noseDir 对齐），所以 yaw 与绕圈那条用同一个换算；
  * 爬升为正 = 抬头 = rotation.x 为正（对 (0,0,-1) 绕 X 转 +φ，y 分量变正）。
  */
 function ApplyStrafePose(root, air) {

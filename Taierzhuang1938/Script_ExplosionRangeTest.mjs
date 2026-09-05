@@ -86,7 +86,7 @@ try {
     const positions = shell.visual.trail.geometry.attributes.position;
     const head = Array.from(positions.array.slice(0, 3)), tail = Array.from(positions.array.slice(-3));
     const trace = [];
-    const span = Math.min(shell.age, 0.12, 5.5 / shell.velocity.length());
+    const span = shell.visual.span;
     for (let i = 0; i < positions.count; i += 2) {
       const time = shell.age - span * i / (positions.count - 2);
       const expected = from.clone().addScaledVector(shell.initialVelocity, time);
@@ -103,7 +103,8 @@ try {
       initialAligned: Math.abs(initial.w) < 1 && shell.visual.core.scale.x < 0.1 };
   });
   assert.ok(result.shellVisual.trace.every((error) => error < 0.0005), "ribbon follows actual past ballistic positions");
-  assert.ok(result.shellVisual.length > 1 && result.shellVisual.length < 5.6 && result.shellVisual.skipDepth);
+  // 0.35 s at ~36 m/s: the ribbon must show the whole flight so far, not a 5 m stub.
+  assert.ok(result.shellVisual.length > 10 && result.shellVisual.length < 14 && result.shellVisual.skipDepth, "trail length " + result.shellVisual.length);
   await page.screenshot({ path: path.join(out, "Scene_ShellTrail.png") });
   result.wallImpact = await page.evaluate(() => {
     const t = window.Taierzhuang; t.Debug.Explosions.Reset();
