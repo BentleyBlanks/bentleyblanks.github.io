@@ -1472,3 +1472,25 @@ for(const z of [-39,-43,-47]){
  assert.ok(director.facts.has("northCovered"),"any protected part of the ditch passes: "+z);
  assert.ok(director.CurrentObjective().text.includes("已避开炮击"));
 }
+
+{
+ const config=phase.whitebox,blocks=config.layout.blocks;
+ const director=new FirstLevelP012Director({},config);director.beat=21;
+ const target=config.activities.southRoomRoute[0],start={x:106.760116,z:66.000009};
+ director.lastSample={position:{...start},bodyRadius:.34};
+ assert.equal(P012SegmentClear(blocks,start,target,.34),false,'recorded scavenging return starts across the actual bank');
+ const before=JSON.stringify({facts:[...director.facts],route:director.routeIndex,unlocked:director.unlockedWaves});
+ let walked=0;
+ for(let frame=0;frame<400&&Math.hypot(director.lastSample.position.x-target.x,director.lastSample.position.z-target.z)>.1;frame++){
+  const at=director.lastSample.position,next=director.SouthRouteApproachTarget(target)||target;
+  assert.ok(P012SegmentClear(blocks,at,next,.34),'every guidance leg clears the real standing capsule');
+  const distance=Math.hypot(next.x-at.x,next.z-at.z),step=Math.min(.08,distance);
+  assert.ok(distance>.001,'guidance never stalls on the wrong side of the bank');
+  at.x+=(next.x-at.x)*step/distance;at.z+=(next.z-at.z)*step/distance;walked+=step;
+ }
+ assert.ok(Math.hypot(director.lastSample.position.x-target.x,director.lastSample.position.z-target.z)<.1,'returns around bank to the south route');
+ assert.ok(walked>3&&walked<8,'uses the nearby bank opening instead of a long route rewind');
+ assert.equal(JSON.stringify({facts:[...director.facts],route:director.routeIndex,unlocked:director.unlockedWaves}),before,'navigation cannot grant story progress');
+ assert.equal(director.SouthRouteApproachTarget(target),null,'clear destinations require no corner visit');
+ console.log('PASS B21 actual scavenging return guides around solid bank without story receipts');
+}

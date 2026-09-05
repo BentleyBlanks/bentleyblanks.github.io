@@ -419,33 +419,27 @@ export class FirstLevelP012Director {
   }
 
   SouthRouteApproachTarget(target) {
-    // A player-only retry keeps the room-clear progress but returns to the
-    // northern ditch. Reuse the complete cleared approach in both directions;
-    // the short B22 exit route alone would still point through the return bank.
-    // This is guidance along that known route, not arbitrary off-road pathfinding.
-    const activity = this.config.activities || {};
-    const points = [activity.closeFightRoute?.[0], ...(activity.southRoomRoute || [])].filter(Boolean);
-    const player = this.lastSample.position;
-    if (!player || !target || points.length < 2) return null;
-    let along = 0, nearest = null;
-    const vertices = points.map((point, index) => {
-      if (index) {
-        const a = points[index - 1], dx = point.x - a.x, dz = point.z - a.z;
-        const length = Math.hypot(dx, dz);
-        const t = Math.max(0, Math.min(1, ((player.x - a.x) * dx + (player.z - a.z) * dz) / (length * length || 1)));
-        const distance = Math.hypot(player.x - a.x - dx * t, player.z - a.z - dz * t);
-        if (!nearest || distance < nearest.distance) nearest = { distance, along: along + length * t };
-        along += length;
-      }
-      return { point, along };
-    });
-    const destination = vertices.find(vertex => Distance(vertex.point, target) < 0.01);
-    if (!destination || !nearest) return null;
-    const forward = destination.along >= nearest.along;
-    const candidates = vertices.filter(vertex => Distance(player, vertex.point) > this.RouteArrivalRadius()
-      && (forward ? vertex.along > nearest.along + 0.001 && vertex.along < destination.along
-        : vertex.along < nearest.along - 0.001 && vertex.along > destination.along));
-    return (forward ? candidates[0] : candidates.at(-1))?.point || null;
+    const player=this.lastSample.position,radius=this.lastSample.bodyRadius||.42;
+    const blocks=this.config.layout?.blocks||[],activity=this.config.activities||{};
+    if(!player||!target)return null;
+    if(P012SegmentClear(blocks,player,target,radius)){this.southApproach=null;return null;}
+    const cached=this.southApproach;
+    if(cached&&Distance(cached.target,target)<.01&&Math.abs(cached.radius-radius)<.001){
+      const visible=P012NextVisiblePoint(blocks,player,cached.path,0,radius);
+      if(!visible.blocked)return visible.point;
+    }
+    // Scavenging and ordinary combat may leave the player on either side of
+    // the bank. Reconnect through actual obstacle corners, not route receipts.
+    const points=[...(activity.closeFightRoute||[]),...(activity.southRoomRoute||[]),...(activity.southAssemblyRoute||[])];
+    for(const block of blocks){
+      if(block.solid===false||Distance(player,block)>Math.max(block.w,block.d)/2+20)continue;
+      const c=Math.cos(block.ry||0),s=Math.sin(block.ry||0),margin=radius+.8;
+      for(const x of [-block.w/2-margin,block.w/2+margin])for(const z of [-block.d/2-margin,block.d/2+margin])
+        points.push({x:block.x+x*c+z*s,z:block.z-x*s+z*c,y:player.y||0});
+    }
+    const path=P012EnemyRejoinPath(this.config,player,target,radius,points);
+    this.southApproach=path?{target:{...target},radius,path}:null;
+    return path?.[0]||null;
   }
 
   AtBlockadeDecision(sample = this.lastSample) {
