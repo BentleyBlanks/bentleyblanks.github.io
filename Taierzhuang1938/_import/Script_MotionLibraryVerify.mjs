@@ -32,7 +32,8 @@ async function Snapshot(phase){
 function Delta(a,b){assert.equal(a.length,b.length);return Math.max(0,...a.map((v,i)=>Math.abs(v-b[i])))}
 function CheckSync(s,v){
  assert.ok(s.matrices.every(Number.isFinite),v.id+' finite matrices');assert.ok(Math.abs(s.modelTime-s.phase*s.duration)<.00001,'Model time');
- if(v.faction==='Ija'&&(Number(v.id.match(/-v(\d+)-/)?.[1]||0)>=3||v.path.includes('/NextTenV1/')))assert.equal(s.nearStockParts.length,2,'Complete Type 38 stock and receiver exported');
+ const requiresType38=v.propKind?['rifle','back'].includes(v.propKind):(Number(v.id.match(/-v(\d+)-/)?.[1]||0)>=3||v.path.includes('/NextTenV1/'));
+ if(v.faction==='Ija'&&requiresType38)assert.equal(s.nearStockParts.length,2,'Complete Type 38 stock and receiver exported');
  if(!v.review?.sourceVideo)return;
  assert.ok(s.videoWidth>0&&s.sourceHidden,'Original video decoded and visible');assert.ok(Math.abs(s.time-s.videoTime)<.002,'Video time');
  assert.equal(s.videoSource,new URL('../'+v.review.sourceVideo,url).href);assert.equal(s.rawTracks,v.review.recoveryTracks.length);assert.ok(s.rawError<1e-10,'Raw viewing transform');
