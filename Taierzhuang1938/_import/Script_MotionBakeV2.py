@@ -163,7 +163,7 @@ def Props(index,positions,rotations):
   left=Vector((-forward.y,forward.x,0)).normalized()
   if motion.get('gripStyle')=='chest':forward=(forward*.55+left*.7+up*.45).normalized()
   elif motion.get('gripStyle')=='crossbody':forward=(forward*.28+left*.96).normalized()
-  elif motion.get('gripStyle')=='lowready':forward=(forward-up*.35).normalized()
+  elif motion.get('gripStyle')=='lowready':forward=(forward-up*motion.get('rifleDownwardSlope',.35)).normalized()
   z=-forward;x=up.cross(z).normalized();y=z.cross(x).normalized()
   orientation=Matrix((x,y,z)).transposed();matrix=orientation.to_4x4()
   origin=positions['R UpperArm']+forward*(.23*scale)+left*(.045*scale)+up*(.035*scale)
@@ -172,6 +172,21 @@ def Props(index,positions,rotations):
   localDirections={'R':Vector((0,.35,-.9367)).normalized(),'L':Vector((1,0,0))}
   localNormals={'R':Vector((-1,0,0)),'L':Vector((0,1,0))}
   directions={side:orientation@localDirections[side] for side in ['L','R']};normals={side:orientation@localNormals[side] for side in ['L','R']}
+  if motion.get('fitRifleToArmReach'):
+   # Fit the shared prop into both wrist reach spheres before solving either arm.
+   # Independent wrist clamping would detach one palm from its rifle grip.
+   reachSpheres=[]
+   for side in ['L','R']:
+    source=Basis(rest[N(side+' Hand')].to_3x3().col[0],rest[N(side+' Hand')].to_3x3().col[1])
+    handDelta=Basis(directions[side],normals[side])@source.transposed()
+    palm=rest[N(side+' Hand')].to_3x3().col[0].normalized()*(.065*scale)+rest[N(side+' Hand')].to_3x3().col[1].normalized()*(.015*scale)
+    wristOffset=orientation@localGrips[side]-handDelta@palm
+    reach=((heads[N(side+' Forearm')]-heads[N(side+' UpperArm')]).length+(heads[N(side+' Hand')]-heads[N(side+' Forearm')]).length)*.94
+    reachSpheres.append((positions[side+' UpperArm']-wristOffset,reach))
+   for iteration in range(12):
+    for center,reach in reachSpheres:
+     delta=origin-center
+     if delta.length>reach:origin=center+delta.normalized()*reach
   matrix.translation=origin;SetRifle(matrix)
   for side in ['L','R']:errors.append(Hand(side,matrix@localGrips[side],directions[side],normals[side],positions,rotations))
  elif kind in ['rifle','kneel']:
@@ -237,6 +252,19 @@ for i in range(count+1):
  for si,side in enumerate(['L','R']):
   sole=min(v.z for v in points[side]);correction=max(0,.004-sole)+min(0,.004-sole)*weights[index,si]
   target=targets[side]+Vector((0,0,correction));ankle,_=Solve(side+' Thigh',side+' Calf',side+' Foot',positions[side+' Thigh'],target,positions[side+' Calf']-positions[side+' Thigh'],rotations);Foot(side,ankle,rotations)
+ if motion.get('refineFootAnchors'):
+  # Skin deformation changes the sole marker after IK. Close that residual on
+  # actual support, without constraining the free swing foot or changing raw data.
+  for iteration in range(3):
+   points=MeshPoints()
+   for si,side in enumerate(['L','R']):
+    weight=weights[index,si]
+    if weight<.05:continue
+    marker=Marker(points[side],side);anchor=anchors[side].get(index,marker)
+    residual=anchor-marker;residual.z=0
+    ankle=arm.matrix_world@arm.pose.bones[N(side+' Foot')].head
+    ankle,_=Solve(side+' Thigh',side+' Calf',side+' Foot',positions[side+' Thigh'],ankle+residual*weight,positions[side+' Calf']-positions[side+' Thigh'],rotations)
+    Foot(side,ankle,rotations)
  gripError=Props(index,positions,rotations);points=MeshPoints()
  samples.append({'frame':i+1,'sourceFrame':motion['sourceFrameIndices'][index],'soles':{s:min(v.z for v in ps) for s,ps in points.items()},'markers':{s:list(Marker(ps,s)) for s,ps in points.items()},'contactWeights':weights[index].tolist(),'gripError':gripError,'wristDeviation':{s:(arm.matrix_world@arm.pose.bones[N(s+' Hand')].head-positions[s+' Hand']).length for s in ['L','R']},'pelvisDrop':drop,'kneeHeight':KneeMin() if kind=='kneel' else None})
  for b in arm.pose.bones:
