@@ -1,19 +1,57 @@
 /* World at War (2008) 界面语言：冷灰、旧金、黑色栏、横向选择条。
    菜单 / 加载 / 编辑器 / Profiler 共用；战斗 HUD 的阵营与告警颜色独立。 */
 
-/* 标题字体：思源宋体 Black（SIL OFL 1.1），只裁了标题那 26 个字，4.7 KB。
-   改标题必须重跑 Font/Script_TitleFontSubset.py，否则新字会逐字回退到系统字体。
-   swap：字体没到之前先用系统字体把标题写出来，不留空档。 */
+/* 打包字体（全部 SIL OFL 1.1，源与授权见 Font/README.md）。三套各司其职：
+     TzTitle    思源宋体 Black —— 只排大标题那 26 个字，4.6 KB
+     TzUiSans   思源黑体 —— 界面汉字，裁到实际用得到的 1546 字，两个字重共 426 KB
+     TzUiLatin  Barlow Semi Condensed —— 界面的拉丁字母与数字（只装 ASCII），两个字重共 10 KB
+
+   拉丁为什么单拎一款：思源黑自带的拉丁偏圆偏宽，和这套冷灰界面不搭；战地那一族
+   （BF Body）就是拿开源的 Barlow 改的，窄一档、工业味立刻起来，代价只有 10 KB。
+   它**只装 ASCII**：破折号、间隔号、省略号、箭头的码位虽然也在拉丁区，但在中文行里
+   必须是全角的，得留给思源黑排（见 Font/Script_FontChars.mjs 的 LatinOf）。
+   叠字族的顺序就是回退顺序：ASCII 先命中 TzUiLatin，其余落到 TzUiSans，
+   两边都没有的字（子集漏了、或字体还没到）继续掉到系统字体，不会变成豆腐块。
+
+   **改了界面上任何一句中文，就要重跑 Font/Script_FontSubset.py。** 新字不在子集里
+   不会报错，只会让那几个字悄悄回退到系统字体。Script_TextTest 的「打包字体子集」
+   一节替你盯着这件事；戳与 index.html 那几条 preload 必须逐字一致，也由它对账。
+   swap：字体没到之前先用系统字体把字写出来，不留空档。 */
 @font-face {
   font-family: "TzTitle";
-  /* 戳必须与 index.html 那条 <link rel=preload> 逐字一致 ——
-     两边写得不一样就是两个 URL：预加载白下一份，字体下两遍。 */
-  src: url("./Font/Font_Title.woff2?v=202609061945") format("woff2");
+  src: url("./Font/Font_Title.woff2?v=202609070040") format("woff2");
   font-weight: 400 900;
   font-display: swap;
 }
+@font-face {
+  font-family: "TzUiSans";
+  src: url("./Font/Font_UiSans_Regular.woff2?v=202609070040") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "TzUiSans";
+  src: url("./Font/Font_UiSans_Bold.woff2?v=202609070040") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "TzUiLatin";
+  src: url("./Font/Font_UiLatin_Regular.woff2?v=202609070040") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  /* 装的是 SemiBold（600）而不是 Bold —— 700 的 Barlow 比思源黑 Bold 的汉字更黑，
+     一行里「Enter」会比旁边的汉字重一档。600 配上去粗细才齐。 */
+  font-family: "TzUiLatin";
+  src: url("./Font/Font_UiLatin_SemiBold.woff2?v=202609070040") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
 :root {
-  --ui-font: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+  /* 界面通用。系统字体留在链尾兜底：子集漏字、或字体还没到的那一瞬间都靠它。 */
+  --ui-font: "TzUiLatin", "TzUiSans", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
   /* 大标题专用。换字体只改这一行 + Font/ 里的那个 woff2。 */
   --ui-title-font: "TzTitle", "Noto Serif SC", "Songti SC", serif;
   --ui-mono: "Cascadia Mono", Consolas, monospace;

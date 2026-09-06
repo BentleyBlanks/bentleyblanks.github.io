@@ -578,20 +578,33 @@ await CheckInterface();
       && m.menuLines.length === 3
       && m.menuLines.every((line) => line.length > 0 && !line.includes("\uFFFD")),
     `${m.menuTitle} / ${m.menuSubtitle} / ${m.menuLines.join(" | ")}`);
-  // 标题字体（Font/Font_Title.woff2）。文件 404 或 @font-face 写错时页面不会报错，
+  // 打包字体（Font/*.woff2）。文件 404 或 @font-face 写错时页面不会报错，
   // 只是安静地回退到系统字体 —— 截图里也未必看得出来，所以在这里量。
-  // 这一条只保证「字体接上了」；「标题里每个字都在子集里」由 Script_TextTest 对账。
+  // 这一条只保证「字体接上了」；「每个字都在子集里」由 Script_TextTest 对账。
   {
     const font = await page.evaluate(async () => {
       await document.fonts.ready;
-      const el = document.querySelector("#menu .mnTitleMain");
+      const Loaded = (family) => [...document.fonts]
+        .filter((f) => f.family === family).map((f) => f.status);
+      const Family = (selector) => getComputedStyle(document.querySelector(selector)).fontFamily;
       return {
-        loaded: [...document.fonts].some((f) => f.family === "TzTitle" && f.status === "loaded"),
-        applied: getComputedStyle(el).fontFamily.includes("TzTitle"),
+        title: Loaded("TzTitle"),
+        sans: Loaded("TzUiSans"),
+        latin: Loaded("TzUiLatin"),
+        titleApplied: Family("#menu .mnTitleMain").includes("TzTitle"),
+        // 菜单项是 font: inherit，量它等于量整层界面的字族
+        itemApplied: Family("#menu .mnItem"),
       };
     });
-    Check("标题字体已加载并用在大标题上", font.loaded && font.applied,
-      `loaded=${font.loaded} applied=${font.applied}`);
+    // 常规字重必到（index.html 预加载了它们）；Bold 靠 swap 晚到，只要不是 error 就行。
+    const Ready = (list) => list.length > 0 && list.every((status) => status !== "error");
+    Check("标题字体已加载并用在大标题上",
+      font.title.includes("loaded") && font.titleApplied,
+      `${font.title.join("/")} applied=${font.titleApplied}`);
+    Check("界面字体（思源黑 + Barlow）已加载并用在菜单项上",
+      Ready(font.sans) && Ready(font.latin)
+        && font.itemApplied.includes("TzUiLatin") && font.itemApplied.includes("TzUiSans"),
+      `sans=${font.sans.join("/")} latin=${font.latin.join("/")} item=${font.itemApplied}`);
   }
   Check("开机落在主菜单上", m.menu.open && m.inMenu && !m.running && !m.rootOff,
     `open=${m.menu.open} menu=${m.inMenu} running=${m.running}`);

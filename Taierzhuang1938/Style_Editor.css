@@ -272,7 +272,7 @@
 .edMapHud { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: -1; }
 .edMapLabel {
   position: absolute; transform: translate(-50%, -100%);
-  font: 600 12px/1.35 "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  font: 600 12px/1.35 var(--ui-font);
   color: #f0cc8b; padding: 1px 6px; border-radius: 0; white-space: nowrap;
   background: rgba(10, 10, 9, 0.62); border: 1px solid rgba(223, 189, 104, 0.4);
   text-shadow: 0 1px 2px #000;

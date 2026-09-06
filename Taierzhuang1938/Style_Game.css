@@ -81,7 +81,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   position: absolute; top: 14px; left: 8px;
   width: min(460px, calc(100vw - 16px));
   display: flex; flex-direction: column; align-items: flex-start;
-  font-family: Arial, "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  font-family: var(--ui-font);
 }
 .hudPhase {
   display: none;
@@ -106,7 +106,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudForceStatus {
   position: absolute; top: 32px; right: 28px; max-width: min(300px, 44vw);
   padding: 0; opacity: 0;
-  font: 400 10px/1.35 "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  font: 400 10px/1.35 var(--ui-font);
   letter-spacing: 0; text-align: right; color: rgba(205,202,194,0.5);
   background: none; border: 0; text-shadow: 0 1px 2px rgba(0,0,0,0.82);
 }
@@ -129,7 +129,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudState {
   position: absolute; right: 18px; bottom: 158px;
   display: flex; justify-content: flex-end; gap: 9px; max-width: 360px;
-  padding: 3px 7px; font: 600 11px/1.4 "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  padding: 3px 7px; font: 600 11px/1.4 var(--ui-font);
   color: var(--dim); background: rgba(8,10,12,0.48); opacity: 0;
 }
 .hudState.on { opacity: 1; }
@@ -141,7 +141,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 /* 右下战斗信息。大号当前弹、细分隔、小号备弹，姿态用人形而不是“站/蹲/趴”文字。 */
 .hudCombat {
   position: absolute; right: 18px; bottom: 18px; width: 190px;
-  color: var(--paper); font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  color: var(--paper); font-family: var(--ui-font);
   filter: drop-shadow(0 2px 5px rgba(0,0,0,0.68));
 }
 .combatWeapon {
@@ -401,7 +401,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   width: min(520px, calc(100vw - 34px)); box-sizing: border-box;
   transform: translate(-50%, -50%) scale(0.96); opacity: 0;
   padding: 18px 24px 15px; text-align: center;
-  font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  font-family: var(--ui-font);
   background: linear-gradient(115deg, rgba(8,9,10,0.90), rgba(23,18,13,0.82));
   border: 1px solid rgba(230,223,205,0.28);
   border-top: 2px solid rgba(224,176,98,0.88);
@@ -492,7 +492,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudGrenadeWarning {
   position: absolute; transform: translate(-50%, -50%);
   display: flex; align-items: center; gap: 7px;
-  color: #ead39c; font: 600 12px/1.2 "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  color: #ead39c; font: 600 12px/1.2 var(--ui-font);
   letter-spacing: 0.05em; white-space: nowrap;
   filter: drop-shadow(0 2px 3px rgba(0,0,0,0.95));
 }
@@ -806,7 +806,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   transform: translate(-50%, 0); margin-top: var(--y, 46px);
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   min-width: 96px; padding: 3px 10px 4px; opacity: 0;
-  font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  font-family: var(--ui-font);
   text-align: center; white-space: nowrap; pointer-events: none;
   transition: opacity 0.1s linear;
   text-shadow: 0 1px 2px rgba(0,0,0,0.95), 0 0 6px rgba(0,0,0,0.78);

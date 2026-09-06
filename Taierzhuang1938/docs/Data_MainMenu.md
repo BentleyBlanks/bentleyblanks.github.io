@@ -9,10 +9,20 @@
 `Style_Interface.css` 的无衬线字体、冷灰文字、旧金强调色、黑色标题栏与淡灰横向选择条。
 数值编辑保留等宽字体，控件为直角，选中和键盘焦点都有金色反馈。
 
-**唯一的例外是大标题**：主菜单 `.mnTitleMain`、暂停标题与加载画面 `#bootTitle` 走
-`--ui-title-font`（思源宋体 Black，SIL OFL 1.1，随仓库打包的 26 字子集，4.7 KB），
-取的是碑刻/正史那一口气；其余全部界面文字仍是 `--ui-font` 的系统无衬线。
-字体本体、授权、子集脚本与「改标题必须重跑」的纪律见 `Taierzhuang1938/Font/README.md`。
+**字体一律自带，不吃系统字体。**`--ui-font` 是 `TzUiLatin`（Barlow Semi Condensed，
+排拉丁与数字）叠 `TzUiSans`（思源黑体，排汉字），系统字体只留在链尾兜底。
+拉丁单拎一款是照战地那一族的做法（`BF Body` 就是拿开源的 Barlow 改的）——
+思源黑自带的拉丁偏圆偏宽，配这套冷灰界面差一口气，换成窄体只花 11 KB。
+HUD 与编辑器里原先写死的 `"Noto Sans SC" / "Microsoft YaHei"` 也一并接到 `--ui-font`。
+
+**大标题另走一路**：主菜单 `.mnTitleMain`、暂停标题与加载画面 `#bootTitle` 用
+`--ui-title-font`（思源宋体 Black，26 字子集，4.6 KB），取碑刻／正史那一口气 ——
+游戏 logo 本来就该单独处理，不跟正文同族。
+
+三套全部 SIL OFL 1.1、随仓库打包（合计约 442 KB，`font-display: swap` 不挡开机）。
+字体本体、授权、子集脚本与「改了界面文案必须重跑」的纪律见
+`Taierzhuang1938/Font/README.md`；覆盖与缓存戳由 `Script_TextTest` 对账，
+「字体真的接上了」由 `Script_MenuTest` 在真浏览器里量。
 Profiler 独立窗口复制入口的主题样式 URL，与主页面使用同一缓存版本。
 战斗 HUD 的阵营与危险色不受这些局部主题变量影响。
 

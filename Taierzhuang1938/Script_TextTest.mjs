@@ -1,6 +1,6 @@
 // Script_TextTest.mjs — 文本数据驱动的闸门（纯 Node，毫秒级）。
 //
-// 守四件事（口径见 docs/Data_TextAndTuning.md）：
+// 守六件事（口径见 docs/Data_TextAndTuning.md）：
 //   1. 语言表本身：键名合法、值是非空字符串、占位符 `{name}` 成对且合法；
 //      非基准语言只能覆盖基准语言里有的键（多出来的键是拼错了）。
 //   2. 代码里 `T("key")` 静态引用的键在基准语言表里都存在（动态拼键的前缀由
@@ -11,6 +11,8 @@
 //        · console.* / throw / new Error( 所在行（开发者诊断不是玩家文本）；
 //        · 行尾带 `// @text-ok` 的行（必须在注释里写为什么，例如资产 id 恰好是汉字）。
 //   4. 表里没有任何引用的键 → 只警告（动态拼键与 Localize 的 content.* 不静态可见）。
+//   5. 打包字体的子集覆盖界面上写得出来的每一个字（字表见 Font/Script_FontChars.mjs）。
+//   6. 字体的 @font-face 与 preload 是同一个 URL（戳写歪＝白下一份，页面却完全正常）。
 //
 // 用法：node Script_TextTest.mjs [--report]   --report 额外列出未闸门化模块里的中文字面量数，
 // 用来看迁移进度。
@@ -241,29 +243,59 @@ for (const [module, table] of [...gated.entries()].sort()) {
 Ok(`闸门模块 ${gatedClean}/${gated.size} 个干净`);
 
 // ---------------------------------------------------------------------------
-// 4. 标题字体子集：标题里的每一个字都得在 Font/Font_Title.woff2 里
+// 4. 打包字体子集：界面上写得出来的每一个字，都得在 Font/ 的子集里
 // ---------------------------------------------------------------------------
-// 标题字体只裁了标题那几十个字（整套 11 MB，为八个字全量打包不合算）。
-// 改了标题却没重跑 Font/Script_TitleFontSubset.py，浏览器会**逐字**回退到系统字体 ——
-// 表现成「标题里有两三个字长得不一样」，肉眼极容易看漏，所以在这里对账。
+// 整套思源黑 8 MB、思源宋 11 MB，全量下发不合算，所以只裁真正用得到的那些字
+// （字表的唯一真相是 Font/Script_FontChars.mjs，烘焙与这里共用同一份）。
+// 改了界面文案却没重跑 Font/Script_FontSubset.py，浏览器会**逐字**回退到系统字体 ——
+// 一句话里有一两个字长得不一样，肉眼极容易看漏，所以在这里对账。
 {
   const fontDir = path.join(here, "Font");
-  const manifestPath = path.join(fontDir, "Font_Title.json");
-  const woff2Path = path.join(fontDir, "Font_Title.woff2");
-  if (!fs.existsSync(manifestPath) || !fs.existsSync(woff2Path)) {
-    Fail("缺少 Font/Font_Title.woff2 或 Font_Title.json（跑一次 Font/Script_TitleFontSubset.py）");
-  } else {
-    const { chars } = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  const { TitleChars, UiChars } = await import(pathToFileURL(path.join(fontDir, "Script_FontChars.mjs")).href);
+  const jobs = [
+    { manifest: "Font_Title.json", label: "标题字体", Chars: TitleChars },
+    { manifest: "Font_Ui.json", label: "界面字体", Chars: UiChars },
+  ];
+  for (const { manifest, label, Chars } of jobs) {
+    const manifestPath = path.join(fontDir, manifest);
+    if (!fs.existsSync(manifestPath)) { Fail(`缺少 Font/${manifest}（跑一次 Font/Script_FontSubset.py）`); continue; }
+    const { chars, faces } = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const gone = (faces ?? []).filter((face) => !fs.existsSync(path.join(fontDir, face)));
+    if (gone.length) { Fail(`${label}少了字体文件：${gone.join(", ")}（跑一次 Font/Script_FontSubset.py）`); continue; }
     const covered = new Set([...chars]);
-    const { MENU } = await import(pathToFileURL(path.join(here, "Data_TengxianScript.mjs")).href);
-    // 会用标题字体排版的全部文本：主菜单大标题 / 暂停标题 / 加载画面标题与副标题。
-    const rendered = [MENU.title, MENU.subtitle, base?.strings["menu.title.paused"] ?? ""].join("");
-    const missing = [...new Set([...rendered])].filter((ch) => !covered.has(ch));
+    const wanted = [...new Set([...await Chars()])];
+    const missing = wanted.filter((ch) => !covered.has(ch));
     if (missing.length) {
-      Fail(`标题里有 ${missing.length} 个字不在字体子集里：${missing.join(" ")}`
-        + "（改完标题要重跑 Font/Script_TitleFontSubset.py，并抬一次 index.html 的 ?v= 戳）");
+      Fail(`${label}少 ${missing.length} 个字：${missing.slice(0, 24).join(" ")}${missing.length > 24 ? " …" : ""}`
+        + "（改完文案要重跑 Font/Script_FontSubset.py，并抬一次 index.html 的 ?v= 戳）");
     } else {
-      Ok(`标题字体子集覆盖标题全部 ${new Set([...rendered]).size} 个字`);
+      Ok(`${label}子集覆盖全部 ${wanted.length} 个字`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 5. 字体的缓存戳：@font-face 与 preload 必须是同一个 URL
+// ---------------------------------------------------------------------------
+// 两边的 ?v= 写歪一位，就是两个 URL：预加载的那份没人用，字体照旧再下一遍。
+// 页面照常显示，只是白烧一次带宽 —— 没有任何症状，只能靠对账。
+{
+  const css = fs.readFileSync(path.join(here, "Style_Interface.css"), "utf8");
+  const html = fs.readFileSync(path.join(here, "index.html"), "utf8");
+  const Urls = (text, re) => [...text.matchAll(re)].map((m) => m[1]);
+  const faces = Urls(css, /url\("(\.\/Font\/[^"]+\.woff2[^"]*)"\)/g);
+  const preloads = Urls(html, /<link rel="preload"[^>]*href="(\.\/Font\/[^"]+\.woff2[^"]*)"/g);
+  const stamps = new Set(faces.map((url) => url.split("?v=")[1] ?? ""));
+  if (!faces.length) Fail("Style_Interface.css 里一条 @font-face 都没有");
+  else if (stamps.size !== 1 || [...stamps][0] === "") {
+    Fail(`@font-face 的 ?v= 戳不统一：${[...stamps].join(" / ")}`);
+  } else {
+    const orphan = preloads.filter((url) => !faces.includes(url));
+    if (orphan.length) {
+      Fail(`preload 的字体 URL 在 @font-face 里没有一模一样的一条：${orphan.join(", ")}`
+        + "（戳没跟着抬 = 白下一份）");
+    } else {
+      Ok(`${faces.length} 条 @font-face 与 ${preloads.length} 条 preload 同戳（v=${[...stamps][0]}）`);
     }
   }
 }
