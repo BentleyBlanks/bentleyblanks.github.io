@@ -572,6 +572,13 @@ Check("装配层把「玩家下过命令 / 占着战位」报成 Busy（跟随�
   world.x = 500;
   Check("Save 明确打一个点", recorder.Save() === true && recorder.Latest.mark === true
     && recorder.Latest.x === 500);
+  world.now += CHECKPOINT_TUNING.windowS + 1;
+  world.x = 900;
+  recorder.Update();
+  Check("调试继续使用明确检查点，不被滚动采样淘汰",
+    recorder.ContinueCheckpoint() && world.x === 500);
+  recorder.Reset("levelChange");
+  Check("换关清除调试检查点", !recorder.saved && !recorder.ContinueCheckpoint());
   // 环是空的时候不许炸
   const empty = new CheckpointRecorder({ Time: () => 0, Sample: () => null, Apply: () => true });
   Check("采不到样、环是空的时候 Rewind 返回 null 而不是抛",

@@ -344,6 +344,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   所以开机红线不受影响；`SetAbsent` 跨关保留（罗班长四关牺牲、五关起缺席）。
 - `Script_Checkpoint.mjs` —— 脚本检查点。**不扣兵员池、不弹死亡卡**，
   必须在把伤害提交给死亡链路**之前**调 —— 打完再调，卡已经弹了。
+  Esc → 调试选项 →「从当前检查点继续」使用最近一次显式保存的点，换关清除；P012 使用安全点，只恢复玩家，保留任务、NPC 与剩余补给，载物留在原地。
 - **钉关** `CHAPTER.mechanics.pinFinalZone`：等 `story.Signal("ChapterRelease")` 放行，
   保险丝是配置时长 + 240 s。
 - 回归口 `Script_MissionHooksTest.mjs`（纯 Node）＋ `Script_CutsceneControlTest.mjs`

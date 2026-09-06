@@ -119,6 +119,7 @@ export class MainMenu {
    *   Resume()     暂停态的「继续」
    *   Settings()   暂停态的「设置」
    *   DebugOptions() / SetDebugOption(id, on) 调试选项的读取与写入
+   *   CheckpointStatus() / ContinueCheckpoint() 暂停调试中的检查点状态与恢复动作
    *   SliceIndex() 当前建好的是哪一关的切片
    *   Unlock()     第一次用户手势时解锁音频（可选）
    *   GroundHeight(x, z) 可选：把机位抬到地面之上，免得穿地
@@ -530,7 +531,7 @@ export class MainMenu {
     wrap.className = "mnDebug";
     const intro = document.createElement("p");
     intro.className = "mnDebugIntro";
-    intro.textContent = "这些开关只用于测试，可在主菜单或暂停菜单中随时调整。";
+    intro.textContent = "这些选项只用于测试，可在主菜单或暂停菜单中调整。";
     wrap.appendChild(intro);
     for (const item of DEBUG_ITEMS) {
       const row = document.createElement("label");
@@ -561,6 +562,28 @@ export class MainMenu {
       row.append(copy, control);
       row.classList.toggle("on", input.checked);
       wrap.appendChild(row);
+    }
+    if (this.panelReturnMode === "pause") {
+      const status = this.host.CheckpointStatus?.() || { available: false, note: "当前没有可用的检查点" };
+      const action = document.createElement("button");
+      action.type = "button";
+      action.className = "mnDebugRow mnDebugAction";
+      action.dataset.action = "continueCheckpoint";
+      action.disabled = !status.available;
+      const copy = document.createElement("span");
+      copy.className = "mnDebugCopy";
+      const name = document.createElement("b");
+      name.textContent = "从当前检查点继续";
+      const note = document.createElement("small");
+      note.textContent = status.note;
+      copy.append(name, note);
+      action.appendChild(copy);
+      const cue = document.createElement("span");
+      cue.className = "mnDebugControl";
+      cue.textContent = "继续 →";
+      action.appendChild(cue);
+      action.addEventListener("click", () => this.host.ContinueCheckpoint?.());
+      wrap.appendChild(action);
     }
     this.el.panelBody.textContent = "";
     this.el.panelBody.appendChild(wrap);

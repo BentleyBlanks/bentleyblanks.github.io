@@ -2515,6 +2515,8 @@ async function Boot() {
       },
       DebugOptions: () => debugOptions.Get(),
       SetDebugOption: (id, enabled) => SetDebugOption(id, enabled),
+      CheckpointStatus,
+      ContinueCheckpoint,
       Crowd: (anchor) => PlaceMenuGarrison(anchor),
     });
     window.Taierzhuang.menu = menu;
@@ -5161,6 +5163,32 @@ function ShowPauseMenu() {
 function PauseGame() {
   if (!menu || !state.running || state.cutscene || state.advancing) return false;
   ShowPauseMenu();
+  return true;
+}
+
+/** 调试动作只使用当前关卡已经建立的检查点。 */
+function CheckpointStatus() {
+  const available = !!player && !state.menu && !state.cutscene && !state.advancing
+    && !p012Runtime?.completed && !!(p012Runtime ? p012Runtime.safePoint : checkpoint?.saved);
+  return { available, note: available
+    ? (p012Runtime ? "保留现场进度与剩余补给；手中载物会留在原地" : "恢复到本关最近的检查点")
+    : "当前没有可用的检查点" };
+}
+
+function ContinueCheckpoint() {
+  if (!CheckpointStatus().available) return false;
+  // Release at the old position so recovery never teleports a payload across the scene.
+  if (p012Runtime) carry?.ForceRelease("debugCheckpoint");
+  if (!(p012Runtime || checkpoint).ContinueCheckpoint()) return false;
+  meleeCombat?.EscapeQte();
+  meleeCombat?.ReleasePlayer();
+  state.playerAliveLast = true;
+  state.pendingRespawn = false;
+  state.deathTimer = 0;
+  viewmodel.root.visible = true;
+  hud.HideDeathCard();
+  ResumeFromPause();
+  hud.Hint("已从当前检查点继续", 3);
   return true;
 }
 

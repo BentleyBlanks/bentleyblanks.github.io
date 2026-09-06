@@ -355,6 +355,28 @@ if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-v
   Check("失败菜单600帧不推进时间/伤害/NPC/任务",result.frozen);
   Check("恢复同一顺子而非随机新兵",result.identity.name==="顺子"&&!("origin" in result.identity)&&result.alive&&result.running&&result.hp===100);
   Check("任务资源与NPC世界保留",["flow","ammo","clips","pool"].every(k=>result[k]===result.before[k])&&JSON.stringify(result.actors)===JSON.stringify(result.before.actors));
+  const debugCheckpoint = await page.evaluate(() => {
+    const g = window.Tengxian;
+    // The preceding retry reached the current safe point; it can differ from the chapter spawn.
+    const safePoint = g.player.position.clone();
+    g.player.Spawn(safePoint.x + 5, safePoint.z + 5, 0);
+    g.player.health = 25;
+    g.Debug.Pause(); g.Debug.MenuAct("debug");
+    const action = document.querySelector('[data-action="continueCheckpoint"]');
+    const before = JSON.stringify({ flow: g.Debug.P012(), ammo: g.state.ammo, clips: g.state.clips,
+      pool: g.state.nraPool, actors: g.ai.soldiers.map(a => a.position.toArray()) });
+    const enabled = !!action && !action.disabled;
+    action?.click();
+    return { enabled, label: action?.querySelector("b")?.textContent, running: g.state.running,
+      menuClosed: !g.menu.open, health: g.player.health,
+      distance: Math.hypot(g.player.position.x - safePoint.x, g.player.position.z - safePoint.z),
+      preserved: before === JSON.stringify({ flow: g.Debug.P012(), ammo: g.state.ammo, clips: g.state.clips,
+        pool: g.state.nraPool, actors: g.ai.soldiers.map(a => a.position.toArray()) }) };
+  });
+  Check("暂停调试按钮从当前检查点恢复并关闭菜单", debugCheckpoint.enabled
+    && debugCheckpoint.label === "从当前检查点继续" && debugCheckpoint.running && debugCheckpoint.menuClosed
+    && debugCheckpoint.health === 100 && debugCheckpoint.distance < .01 && debugCheckpoint.preserved,
+    JSON.stringify(debugCheckpoint));
   const loaded=await page.evaluate(()=>{
    const g=window.Tengxian,payload={fixture:"existingLoad"};g.carry.Begin("stretcher",{payload});
    const serial=g.carry.serial,position=g.player.position.clone(),update=g.combat.Update;

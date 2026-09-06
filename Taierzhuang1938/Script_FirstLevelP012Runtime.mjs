@@ -108,6 +108,14 @@ export class FirstLevelP012Runtime {
     if(this.host.RestorePlayer?.({...this.retryAtLoad || this.safePoint})===false)return false;
     this.failed=false;return true;
   }
+  /** Debug recovery keeps the live mission, actors and supplies at their current state. */
+  ContinueCheckpoint() {
+    if (this.completed || !this.safePoint || !this.host.RestorePlayer) return false;
+    if (this.host.RestorePlayer({ ...this.safePoint }) === false) return false;
+    this.failed = false;
+    this.retryAtLoad = null;
+    return true;
+  }
   SpawnEnemy(spec) { const actor = this.host.SpawnEnemy(spec); if (actor) { actor.p012RoadContact=spec.p012RoadContact===true; this.near.push(actor); } return actor; }
   StepRoadCover() {
     const activity=this.config.activities;

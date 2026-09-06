@@ -431,6 +431,13 @@ const guide = { x: 0, z: 0 }, actors = [], moves = [], impacts = [], signals = n
  r.failed=true;r.retryAtLoad={x:load.x,z:load.z,stance:"prone"};const before=JSON.stringify(load);
  r.RetryPlayer();assert.deepEqual([restored.x,restored.z],[44,60]);assert.equal(JSON.stringify(load),before,"retry does not move or duplicate the active payload");
  assert.equal(r.completed,undefined,"failure retry is not completion");
+ assert.equal(r.ContinueCheckpoint(),true,"debug recovery also works while alive");
+ assert.equal(restored.id,"CP05","debug recovery ignores the old death-at-load position");
+ assert.equal(r.retryAtLoad,null);
+ r.completed=true;assert.equal(r.ContinueCheckpoint(),false,"completed scenes cannot resume");
+ const missing=new FirstLevelP012Runtime({},{});assert.equal(missing.ContinueCheckpoint(),false);
+ r.completed=false;r.failed=true;r.host.RestorePlayer=()=>false;
+ assert.equal(r.ContinueCheckpoint(),false);assert.equal(r.failed,true,"failed restore stays paused");
 }
 {
  let visible=true;const events=new Set();

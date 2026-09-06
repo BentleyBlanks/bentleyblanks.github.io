@@ -62,6 +62,7 @@ export class CheckpointRecorder {
     this.host = host;
     this.tuning = { ...CHECKPOINT_TUNING, ...(options.tuning || {}) };
     this.samples = [];
+    this.saved = null;
     this.lastAt = -99;
     this.enabled = true;
     /** 取证：倒带过几次、每次倒回多久。PlayTest 与排障读它。 */
@@ -75,6 +76,7 @@ export class CheckpointRecorder {
   /** 换关/收摊：环里的东西一律作废（上一关的坐标倒到这一关就是穿墙）。 */
   Reset(reason = "reset") {
     this.samples.length = 0;
+    this.saved = null;
     this.lastAt = -99;
     this.rewinds.length = 0;
     return reason;
@@ -97,7 +99,21 @@ export class CheckpointRecorder {
    */
   Save() {
     const now = this.host.Time ? this.host.Time() : 0;
-    return this._Push(now, true);
+    if (!this._Push(now, true)) return false;
+    this.saved = this.Latest;
+    return true;
+  }
+
+  /** The explicit checkpoint survives the short rewind window until the next Save/Reset. */
+  ContinueCheckpoint() {
+    if (!this.saved || !this.host.Apply) return false;
+    try {
+      if (this.host.Apply(this.saved) === false) return false;
+    } catch { return false; }
+    this.samples.length = 0;
+    this.lastAt = -99;
+    this.Update();
+    return true;
   }
 
   /**

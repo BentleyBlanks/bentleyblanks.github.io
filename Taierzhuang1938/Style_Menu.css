@@ -225,6 +225,9 @@
 .mnDebugControl input:focus-visible { outline: 2px solid var(--ui-gold); outline-offset: 3px; }
 .mnDebugControl i { min-width: 1.4em; font-size: 12px; font-style: normal; letter-spacing: 0.1em; color: var(--ui-muted); }
 .mnDebugRow.on .mnDebugControl i { color: var(--ui-gold); }
+.mnDebugAction { width: 100%; background: transparent; border-inline: 0; border-bottom: 0; text-align: left; font: inherit; }
+.mnDebugAction:focus-visible { outline: 2px solid var(--ui-gold); outline-offset: -2px; }
+.mnDebugAction:disabled { opacity: 0.5; cursor: default; }
 
 /* 小窗仍保留同一条标题、列表与页脚对齐线。 */
 @media (max-width: 900px) {
