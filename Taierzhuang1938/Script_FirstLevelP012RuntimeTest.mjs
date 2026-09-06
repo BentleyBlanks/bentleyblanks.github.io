@@ -1048,7 +1048,7 @@ assert.equal(P012Phase.whitebox.activities.guideSpeedByBeat[13],undefined,"B13 h
  const walker={...openingActivities.traffic.find(w=>w.role==='civilian'),actor:{position:{x:1.4,z:5}}};
  walker.parking=walker.route.at(-1);walker.path=walker.route;walker.index=0;walker.travelM=0;
  runtime.traffic=[walker];runtime.StepFamilyWalker(walker,.1);const calmSpeed=walker.actualSpeedMps;
- launched[0].impact(launched[0].point);runtime.StepFamilyWalker(walker,.1);
+ launched[0].impact(launched[0].point);runtime.StepFamilyWalker(walker,.1);runtime.time+=2;runtime.StepFamilyWalker(walker,.1);
  assert.ok(walker.actualSpeedMps>calmSpeed*1.5,'families accelerate only after a real audible impact');
  assert.ok(signals.has('P012DistantShellImpact'));runtime.Update(30);assert.equal(launched.length,2,'waiting cannot consume later road salvos');
  for(const z of [70,40,12]){player.z=z;runtime.Update(.1);runtime.Update(4);}

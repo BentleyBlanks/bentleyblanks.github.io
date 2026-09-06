@@ -305,7 +305,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       trainColumn,
       briefing:Object.freeze({position:{x:-51,z:90},route:[{x:-55,z:93},{x:-51,z:93},{x:-51,z:90}],playerRadiusM:8,readyCount:2}),
       villageInspections:Object.freeze([{index:3,event:"P012VillageCheck0"},{index:5,event:"P012VillageCheck1"},{index:7,event:"P012VillageCheck2"}]),
-      initialEquipment:Object.freeze({weapon:"HanYang",clips:3,grenades:6}),
+      initialEquipment:Object.freeze({weapon:"HanYang",clips:3,grenades:0}),
       openingIssue:Object.freeze({
         spawns:Object.freeze(Array.from({length:6},(_,slot)=>P012StationPoint(-67.2,62+slot*1.7))),
         exitRoute:Object.freeze([P012StationPoint(-66,61),P012StationPoint(-60,61),

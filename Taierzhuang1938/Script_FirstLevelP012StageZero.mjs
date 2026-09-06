@@ -45,8 +45,8 @@ export class FirstLevelP012StageZero {
         actor.root.position.set(spec.x,host.battlefield.GroundHeight(spec.x,spec.z),spec.z); actor.root.rotation.y=spec.yaw;
         host.scene.add(actor.root);
         const entry={id:spec.id,actor,position:actor.root.position,role:spec.role};
-        if(spec.role==="telephone"||spec.role==="worker") entry.body=host.physics.MakeCharacter({radius:spec.role==="worker"?spec.bodyRadius:.34,height:1.78,position:entry.position});
-        if(spec.role==="worker")entry.workPose=InstallP012VillagePose(actor);
+        if(spec.role==="telephone"||spec.role==="worker"||spec.role==="muleHandler") entry.body=host.physics.MakeCharacter({radius:spec.role==="worker"?spec.bodyRadius:.34,height:1.78,position:entry.position});
+        if(spec.role==="worker"||spec.role==="muleHandler")entry.workPose=InstallP012VillagePose(actor);
         this.people.add(entry); return entry;
       },
       Position: entry => entry?.position,
@@ -58,12 +58,17 @@ export class FirstLevelP012StageZero {
       },
       Pose: (entry,pose,dt) => {
         entry.actor.root.rotation.y=pose.yaw;
-        entry.workPose?.SetTargets(pose.workTargets);
+        let targets=pose.workTargets;
+        if(entry.role==="muleHandler"){
+          const p=entry.position,c=Math.cos(pose.yaw),s=Math.sin(pose.yaw),point=(x,y,z)=>({x:p.x+x*c+z*s,y:p.y+y,z:p.z-x*s+z*c});
+          targets={left:point(-.3,.9,.03),right:point(.36,1.15,-.25)};
+        }
+        entry.workPose?.SetTargets(targets);
         entry.actor.Update(dt,{...pose,moveSpeed:pose.moveSpeed/3.05,elapsed:this.elapsed,prone:0,dead:0,carrying:0});
       },
       MoveProp: (from,to,radius,{fromYaw,toYaw}) => {
         // Translation AND rotation arcs: a cart tail can hit a wall while its nose is stationary.
-        const bodies=[host.Player()?.position,host.Guide()?.position,...host.runtime.traffic.filter(entry=>!entry.retired).map(entry=>entry.actor?.position),...[...this.people].map(entry=>entry.position)].filter(Boolean);
+        const bodies=[host.Player()?.position,host.Guide()?.position,...host.runtime.traffic.filter(entry=>!entry.retired).map(entry=>entry.actor?.position),...[...this.people].filter(entry=>entry.role!=="muleHandler").map(entry=>entry.position)].filter(Boolean);
         for(const offset of [0,1.1,2.2])for(const body of bodies){
           const before=Math.hypot(body.x-from.x-Math.sin(fromYaw)*offset,body.z-from.z-Math.cos(fromYaw)*offset);
           const after=Math.hypot(body.x-to.x-Math.sin(toYaw)*offset,body.z-to.z-Math.cos(toYaw)*offset);
@@ -119,7 +124,11 @@ export class FirstLevelP012StageZero {
     if(!this.shellShot.active)this.shellShot.UpdateBarrage(dt);
     if(!this.trainInitialized){this.host.runtime.StepOpeningCast(0);this.trainInitialized=true;}
     this.arrival.Start();this.arrival.Update(dt);
-    this.village.Start();this.village.Update(dt);this.villageView.Update(this.village.Snapshot());
+    this.village.Start();this.village.Update(dt);
+    const village=this.village.Snapshot(),handler=[...this.people].find(entry=>entry.role==="muleHandler");
+    const hand=handler?.actor.characterRig?.bones?.handR;
+    if(hand){const p=hand.getWorldPosition(new THREE.Vector3());village.mule.reinHand={x:p.x,y:p.y,z:p.z};}
+    this.villageView.Update(village);
     this.villageView.SyncColliders(this.host.physics);
     this.guidance.Update();
   }

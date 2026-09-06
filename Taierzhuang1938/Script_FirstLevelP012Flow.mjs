@@ -419,9 +419,12 @@ export class FirstLevelP012Director {
   }
 
   SouthRouteApproachTarget(target) {
-    const player=this.lastSample.position,radius=this.lastSample.bodyRadius||.42;
+    const player=this.lastSample.position,bodyRadius=this.lastSample.bodyRadius||.42;
     const blocks=this.config.layout?.blocks||[],activity=this.config.activities||{};
     if(!player||!target)return null;
+    const envelope=bodyRadius+this.RouteArrivalRadius();
+    const tight=!P012SegmentClear(blocks,player,player,envelope),radius=tight?bodyRadius:envelope;
+    this.southArrivalRadius=tight?.15:this.RouteArrivalRadius();
     if(P012SegmentClear(blocks,player,target,radius)){this.southApproach=null;return null;}
     const cached=this.southApproach;
     if(cached&&Distance(cached.target,target)<.01&&Math.abs(cached.radius-radius)<.001){
@@ -1407,7 +1410,7 @@ export class FirstLevelP012Director {
     if(requiredAction==="crouch")requiredAction="move";
     text=text.replaceAll("卧倒沿","沿").replaceAll("卧倒转移","转移").replaceAll("卧倒换位","换位").replaceAll("卧倒移","移").replaceAll("卧倒进入","进入").replaceAll("先卧倒，再","可以贴掩体，随后").replaceAll("扑入路沟","避开扫射，准备还击");
     return { text, targetLabel, suggestedStance, zone: beat.zone, target, lookAt, interactionId, requiredAction, requiredStance, progress,
-      routeTarget: route[this.routeIndex] || null, arrivalRadiusM: this.beat === 13 && requiredAction === "follow"
+      routeTarget: route[this.routeIndex] || null, arrivalRadiusM: [21,22].includes(this.beat)&&this.southArrivalRadius ? this.southArrivalRadius : this.beat === 13 && requiredAction === "follow"
         && target === this.lastSample.guidePosition ? 2.4
         : frontlineApproach || (this.beat === 23 && requiredAction === "follow")
           || (this.beat===17&&requiredAction==="carry") ? 0.6 : this.RouteArrivalRadius() };

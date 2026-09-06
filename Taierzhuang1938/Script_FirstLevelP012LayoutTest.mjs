@@ -258,7 +258,9 @@ for(const beat of [21,22]) {
  }
 }
 retryFlow.beat=21;retryFlow.routeIndex=5;retryFlow.lastSample={position:southApproach[2]};
-assert.deepEqual(retryFlow.CurrentObjective().target,southApproach[3],"walking back along the road retains forward corner guidance");
+const clearSouthTarget=retryFlow.CurrentObjective().target;
+assert.deepEqual(clearSouthTarget,retryFlow.ActivityRoute()[5],"a directly clear destination does not require a redundant corner visit");
+Audit("SouthDirectArrivalEnvelope",[southApproach[2],clearSouthTarget],layout.blocks,.42+retryFlow.RouteArrivalRadius());
 assert.equal(JSON.stringify(retryFlow.Snapshot()),retrySnapshot,"guidance does not mutate facts, enemies, checkpoint or resources");
 for(const [i,goal] of lateFights[0].enemies.entries())Audit(`RearguardArrival${i}`,[P012SouthPoint(72,54+i*2.5),P012MapPoints({x:69,z:73}),P012MapPoints({x:64,z:73}),P012MapPoints({x:64,z:67}),goal],layout.blocks,.42);
 const ruinCovers=layout.blocks.filter(b=>/^Ruin.*FightCover$/.test(b.id));

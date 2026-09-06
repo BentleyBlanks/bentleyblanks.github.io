@@ -37,6 +37,9 @@ try{
    return {x:p.x,animal:Sweep(p.z),cart:Sweep(p.z+2),clear:Sweep(p.z-3)};
  });
  assert.ok(collision.animal<collision.x-.5);assert.ok(collision.cart<collision.x-.9);assert.ok(collision.clear>collision.x+2);
+ const handler=await page.evaluate(()=>{const t=window.Tengxian,v=t.Debug.P012Scene().stageZero.village;const root=t.scene.getObjectByName('VillageMuleHandler');return{id:v.mule.handlerId,position:v.mule.handlerPosition,mule:v.mule.position,visible:!!root,rein:t.scene.getObjectByName('P012MuleRein')?.visible};});
+ assert.equal(handler.id,'VillageMuleHandler');assert.ok(handler.visible&&handler.rein,'actual handler and rein exist in the rendered world');
+ assert.ok(Math.hypot(handler.position.x-handler.mule.x,handler.position.z-handler.mule.z)<2.5);
  console.log('PASS real train movement/rider support, two player-interactable supply labels and mule/cart blocking with clear bypass',transport,collision);
  const backRifle=await page.evaluate(async()=>{
    const t=window.Tengxian,THREE=await import('three'),{InstallP012ActorMotion}=await import('./Script_FirstLevelP012CastAppearance.mjs');

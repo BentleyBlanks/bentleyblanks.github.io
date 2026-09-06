@@ -12,6 +12,8 @@ export class FirstLevelP012VillageLifeView {
   this.legs=[];for(const x of [-.22,.22])for(const z of [-.4,.4]){const leg=this.Part(this.mule,[[0,-.3,0,.13,.6,.15]]);leg.position.set(x,.74,z);this.legs.push(leg);}
   this.Part(this.mule,[[-.51,.73,1.05,.09,.09,2.9],[.51,.73,1.05,.09,.09,2.9],[0,.76,1.95,1.2,.15,1.5],[0,1.02,2.65,1.2,.45,.08],[-.57,1.02,1.95,.08,.45,1.5],[.57,1.02,1.95,.08,.45,1.5],[-.27,1.08,1.55,.45,.45,.5],[.27,1.08,1.55,.45,.45,.5],[-.27,1.08,2.15,.45,.45,.5],[.27,1.08,2.15,.45,.45,.5]]);
   this.muleWheels=[-.73,.73].map(x=>{const wheel=this.Part(this.mule,[[0,0,0,.13,.75,.75]],true);wheel.position.set(x,.42,2);return wheel;});
+  this.reinGeometry=new THREE.BufferGeometry();this.reinPositions=new THREE.BufferAttribute(new Float32Array(9),3);this.reinGeometry.setAttribute('position',this.reinPositions);
+  this.reinMaterial=new THREE.LineBasicMaterial({color:0x60492e});this.rein=new THREE.Line(this.reinGeometry,this.reinMaterial);this.rein.name="P012MuleRein";this.root.add(this.rein);
   this.cart=this.Part(this.root,[[0,.62,0,.95,.12,1],[-.45,.82,0,.08,.38,1],[.45,.82,0,.08,.38,1],[0,.82,.48,.95,.38,.08],[-.32,.64,.9,.08,.08,1.2],[.32,.64,.9,.08,.08,1.2],[0,.94,0,.7,.5,.65],[-.59,.36,0,.14,.65,.65],[.59,.36,0,.14,.65,.65]]);
   this.reel=this.Part(this.root,[[-.23,0,0,.09,.55,.55],[.23,0,0,.09,.55,.55],[0,0,0,.46,.28,.28]],true);
   this.wireGeometry=new THREE.BufferGeometry();this.wirePositions=new THREE.BufferAttribute(new Float32Array(2048*3),3);this.wireGeometry.setAttribute("position",this.wirePositions);this.wireGeometry.setDrawRange(0,0);
@@ -24,6 +26,11 @@ export class FirstLevelP012VillageLifeView {
   this.Place(this.mule,snapshot.mule.position);this.mule.rotation.y=snapshot.mule.yaw;
   this.legs.forEach((leg,index)=>leg.rotation.x=Math.sin(snapshot.mule.travel*5+(index===0||index===3?0:Math.PI))*.28);
   this.muleWheels.forEach(wheel=>wheel.rotation.x=-snapshot.mule.travel/.375);
+  const hand=snapshot.mule.reinHand;this.rein.visible=!!hand;
+  if(hand){const mouth=new THREE.Vector3(0,1.43,-1.1);this.mule.localToWorld(mouth);
+    this.reinPositions.setXYZ(0,hand.x,hand.y,hand.z);this.reinPositions.setXYZ(1,(hand.x+mouth.x)/2,(hand.y+mouth.y)/2-.12,(hand.z+mouth.z)/2);this.reinPositions.setXYZ(2,mouth.x,mouth.y,mouth.z);
+    this.reinPositions.needsUpdate=true;this.reinGeometry.computeBoundingSphere();}
+
   const p=snapshot.cart.position,yaw=snapshot.cart.yaw;this.Place(this.cart,p?{x:p.x-Math.sin(yaw)*1.3,z:p.z-Math.cos(yaw)*1.3}:null);this.cart.rotation.y=yaw;
   this.Place(this.reel,snapshot.telephone.position?{x:snapshot.telephone.position.x+.38,z:snapshot.telephone.position.z}:null,1.05);
   const points=snapshot.telephone.wire;
@@ -47,5 +54,5 @@ export class FirstLevelP012VillageLifeView {
   while(this.colliders.length>specs.length){physics.RemoveSolid(this.colliders.pop()._physicsHandle);changed=true;}
   if(changed)physics.RefreshStaticQueries();
  }
- Dispose(){for(const record of this.colliders||[])this.physics?.RemoveSolid(record._physicsHandle);this.root.traverse(object=>object.geometry?.dispose());this.material.dispose();this.dark.dispose();this.wireMaterial.dispose();this.root.removeFromParent();}
+ Dispose(){for(const record of this.colliders||[])this.physics?.RemoveSolid(record._physicsHandle);this.root.traverse(object=>object.geometry?.dispose());this.material.dispose();this.dark.dispose();this.wireMaterial.dispose();this.reinMaterial.dispose();this.root.removeFromParent();}
 }

@@ -9,7 +9,7 @@ function Step(a,b,amount){const distance=Distance(a,b),t=distance?Math.min(1,amo
 function Turn(from,to,amount){const delta=Math.atan2(Math.sin(to-from),Math.cos(to-from));return from+Math.max(-amount,Math.min(amount,delta));}
 export class FirstLevelP012VillageLife {
  constructor(host){this.host=host;this.entries=[];this.started=false;this.disposed=false;this.time=0;this.doorTime=0;this.phoneIndex=1;this.muleIndex=1;this.phoneActive=false;this.muleActive=false;this.wire=[];this.mule=Copy(config.muleRoute[0]);this.muleYaw=0;this.muleTravel=0;this.familyPrevious=null;this.familyYaw=Math.PI;this.seen=new Set();}
- Start(){if(this.started||this.disposed)return false;this.started=true;this.entries=people.map(spec=>({spec,actor:this.host.Spawn({...spec})}));this.wire=[Copy(this.host.Position(this.entries[4].actor))];return true;}
+ Start(){if(this.started||this.disposed)return false;this.started=true;this.entries=people.map(spec=>({spec,actor:this.host.Spawn({...spec})}));this.wire=[Copy(this.host.Position(this.entries.find(entry=>entry.spec.role==="telephone").actor))];return true;}
  Visible(position){return !!position&&this.host.IsVisible?.(position)===true;}
  Update(dt){
   if(!this.started||this.disposed)return;
@@ -22,6 +22,10 @@ export class FirstLevelP012VillageLife {
     const target=config.telephoneRoute[this.phoneIndex];
     if(this.phoneActive&&target){const before=Copy(this.host.Position(actor));this.host.Move(actor,target,config.telephoneSpeed,step);const after=this.host.Position(actor);speed=step?Distance(before,after)/step:0;yaw=speed>.001?Math.atan2(before.x-after.x,before.z-after.z):yaw;if(Distance(after,target)<.08)this.phoneIndex++;if(Distance(this.wire.at(-1),after)>.4)this.wire.push(Copy(after));}
    }
+   if(spec.role==="muleHandler"){
+    const c=Math.cos(this.muleYaw),s=Math.sin(this.muleYaw),target={x:this.mule.x-1.6*c-.9*s,z:this.mule.z+1.6*s-.9*c};
+    const before=Copy(this.host.Position(actor));this.host.Move(actor,target,2.2,step);const after=this.host.Position(actor);speed=step?Distance(before,after)/step:0;yaw=this.muleYaw;
+   }
    const working=spec.role==="worker"&&doorVisible&&this.doorTime<config.doorSeconds;
    const work=working?this.host.WorkerWork?.(spec,this.Door()):null;if(working&&!work)workersReady=false;
    if(work){const before=Copy(this.host.Position(actor));this.host.Move(actor,work.position,work.speedMps,step);const after=this.host.Position(actor);speed=step?Distance(before,after)/step:0;yaw=work.yaw;workersReady&&=Distance(after,work.position)<=work.arrivalRadius;}
@@ -30,11 +34,14 @@ export class FirstLevelP012VillageLife {
   if(doorVisible&&workersReady)this.doorTime=Math.min(config.doorSeconds,this.doorTime+step);
   this.muleActive ||= this.Visible(this.mule);
   const target=config.muleRoute[this.muleIndex];
-  if(this.muleActive&&target){
+  const handler=this.entries.find(entry=>entry.spec.role==="muleHandler"),handlerAt=handler&&this.host.Position(handler.actor);
+  this.muleWaiting=false;
+  if(this.muleActive&&target&&handlerAt&&Distance(handlerAt,this.mule)<2.5){
    const before=Copy(this.mule),wanted=Math.atan2(before.x-target.x,before.z-target.z),yaw=Turn(this.muleYaw,wanted,.9*step);
    const aligned=Math.abs(Math.atan2(Math.sin(wanted-yaw),Math.cos(wanted-yaw)))<.12;
    const candidate=aligned?Step(before,target,config.muleSpeed*step):before;
    const approved=this.host.MoveProp(before,candidate,1.05,{fromYaw:this.muleYaw,toYaw:yaw});
+   this.muleWaiting=aligned&&Distance(before,approved)<.00001;
    this.mule=Copy(approved);this.muleYaw=approved.yaw??yaw;this.muleTravel+=Distance(before,this.mule);
    if(Distance(this.mule,target)<.08)this.muleIndex++;
   }
@@ -53,7 +60,7 @@ export class FirstLevelP012VillageLife {
   const family=this.host.ExistingFamilyActor?.(config.familyId,config.familySlot),familyPosition=family?Copy(this.host.Position(family)):null;
   const door=this.Door();
   const wire=this.wire.map(Copy);if(phone?.position&&wire.length&&Distance(wire.at(-1),phone.position)>.00001)wire.push(Copy(phone.position));
-  const mule={position:Copy(this.mule),yaw:this.muleYaw,travel:this.muleTravel,state:this.muleIndex>=config.muleRoute.length?"arrived":this.muleActive?"northbound":"waiting"};
+  const mule={position:Copy(this.mule),yaw:this.muleYaw,travel:this.muleTravel,handlerId:actors.find(entry=>entry.role==="muleHandler")?.id,handlerPosition:actors.find(entry=>entry.role==="muleHandler")?.position,state:this.muleIndex>=config.muleRoute.length?"arrived":this.muleWaiting?"yielding":this.muleActive?"northbound":"waiting"};
   return{started:this.started,disposed:this.disposed,actors,door,telephone:{position:phone?.position,wire,state:this.phoneIndex>=config.telephoneRoute.length?"arrived":this.phoneActive?"laying":"waiting"},mule,cart:{position:familyPosition,yaw:this.familyYaw,actorId:family?.id??null,familyId:config.familyId,slot:config.familySlot,state:familyPosition?"attached":"awaitingExistingFamily"},vignettes:[{id:"WaitingWounded",position:actors[0]?.position,state:"waitingForEvacuation"},{id:"DoorStretcher",position:door.position,state:door.state},{id:"Telephone",position:phone?.position,state:this.phoneActive?"laying":"waiting"},{id:"MuleAmmo",position:mule.position,state:mule.state},{id:"FamilyCart",position:familyPosition,state:familyPosition?"southbound":"absent"}].map(entry=>({...entry,visible:this.Visible(entry.position)}))};
  }
  Dispose(){if(this.disposed)return;this.disposed=true;for(const entry of this.entries)this.host.Remove?.(entry.actor);this.entries=[];}

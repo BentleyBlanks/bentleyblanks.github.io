@@ -483,11 +483,15 @@ export class FirstLevelP012Runtime {
       if(shell.at===null||shell.launched||this.time<shell.at)continue;
       shell.launched=true;shell.launchedAt=this.time;
       this.host.WarnShell(shell.point,false,impact=>{
-        shell.impactPoint={x:impact.x,z:impact.z};shell.impacted=true;shell.impactedAt=this.time;
+        shell.impactPoint={x:impact.x,z:impact.z};shell.impacted=true;shell.impactedAt=this.time;this.CivilianImpact(impact);
         if(!this.civilianAlarm){this.civilianAlarm=true;this.host.Signal?.("P012DistantShellImpact");this.host.DistantShellShot?.(shell.impactPoint);}
         if(shell.stage==="approaching"&&!this.approachAlarm){this.approachAlarm=true;this.host.Signal?.("P012ApproachShellImpact");}
       });
     }
+  }
+  CivilianImpact(point) {
+    this.civilianAlarmAt??=this.time;
+    this.civilianImpact={...point,at:this.time,sequence:(this.civilianImpact?.sequence||0)+1};
   }
   StepFamilyWalker(walker,dt) {
     if(!walker.familyId||!this.config.activities?.civilianRoute||walker.arrived)return false;
@@ -496,11 +500,25 @@ export class FirstLevelP012Runtime {
     if(!at||!guardian)return false;
     const lead=this.host.Position(guardian.actor),self=P012RouteProjection(route,at),leadAt=P012RouteProjection(route,lead);
     const isLeader=guardian===walker,member=walker.memberIndex||0;
-    const lag=[0,.1,1.6,2.1][member]||0;
+    const alarm=this.civilianAlarm,seed=(walker.slot||0)*2.399963;
+    const impact=this.civilianImpact;
+    if(alarm&&(!walker.panic||walker.panic.sequence!==impact?.sequence)){
+      const distance=impact?Math.hypot(at.x-impact.x,at.z-impact.z):Infinity;
+      if(!walker.panic||distance<65){const reactionAt=this.time+.08+((walker.slot*7)%11)*.075;
+        walker.panic={sequence:impact?.sequence,at:reactionAt,until:reactionAt+.35+((walker.slot*3)%7)*.1,near:distance<45};}
+      else walker.panic.sequence=impact?.sequence;
+    }
+    const panic=walker.panic,flinch=panic&&this.time>=panic.at&&this.time<panic.until;
+    const noise=Math.sin(this.time*.91+seed)*Math.sin(this.time*.37+seed*1.7);
+    const lag=alarm?(walker.child?2.2:0):([0,.1,1.6,2.1][member]||0);
     const endDistance=P012RouteProjection(route,walker.parking).along;
-    const progress=Math.min(endDistance,isLeader?self.along+2.3:Math.max(0,leadAt.along-lag));
+    const separated=alarm&&walker.child&&Math.hypot(lead.x-at.x,lead.z-at.z)>3;
+    const progress=Math.min(endDistance,alarm&&!separated?self.along+4.5:isLeader?self.along+2.3:Math.max(0,leadAt.along-lag));
     const center=P012RoutePoint(route,progress),radius=walker.child?.26:.46;
-    const desired=P012RoutePoint(route,progress,walker.lateralM||0);
+    const ahead=P012RoutePoint(route,progress+.5),normal={x:-(ahead.z-center.z),z:ahead.x-center.x};
+    const away=impact&&panic?.near?Math.sign((at.x-impact.x)*normal.x+(at.z-impact.z)*normal.z)*Math.max(0,1-(this.time-panic.until)/3)*.7:0;
+    const lateral=alarm?(walker.lateralM||0)*1.4+noise*(walker.child?.55:1.25)+away:(walker.lateralM||0);
+    const desired=P012RoutePoint(route,progress,lateral);
     const target=P012SegmentClear(blocks,center,desired,radius)?desired:center;
     const waypoints=[];let along=0;
     for(let index=1;index<route.length;index++){
@@ -512,10 +530,27 @@ export class FirstLevelP012Runtime {
     if(next.blocked&&P012SegmentClear(blocks,at,center,radius))next={point:center};
     const child=this.traffic.find(other=>other.familyId===walker.familyId&&other.child&&!other.retired);
     const childAt=child&&this.host.Position(child.actor);
-    const childBehind=isLeader&&childAt&&Math.hypot(childAt.x-at.x,childAt.z-at.z)>5;
+    const childBehind=isLeader&&childAt&&Math.hypot(childAt.x-at.x,childAt.z-at.z)>(alarm?6:5);
     const gap=Math.hypot(next.point.x-at.x,next.point.z-at.z);
-    const speed=(walker.speedMps||1.2)*(this.civilianAlarm?(this.config.activities.civilianAlarmSpeedScale||1.85):1)*(1+.045*Math.sin(this.time*.3+walker.guardianSlot));
-    walker.actualSpeedMps=childBehind?0:Math.min(speed+(isLeader?0:.35),gap*1.6);
+    const speed=alarm&&this.time>=(panic?.until||0)?(3.25+((walker.slot*5)%9)*.16)*(1+noise*.2):(walker.speedMps||1.2)*(1+.045*Math.sin(this.time*.3+walker.guardianSlot));
+    walker.actualSpeedMps=childBehind||flinch?0:Math.min(speed+(isLeader?0:.35),gap*(alarm?2:1.6));
+    walker.panicState=alarm?(flinch?'startled':childBehind?'callingChild':'fleeing'):'walking';
+    walker.panicLateral=lateral;
+    const render=walker.actor.actor;
+    if(render&&!render.p012PanicUpdate){
+      const original=render.Update;
+      render.p012PanicUpdate=true;
+      render.Update=function(dt,state={}){
+        const reaction=this.p012Panic,active=!!reaction&&!state.dead;
+        const result=original.call(this,dt,active?{...state,lookYaw:reaction.lookYaw,crouch:Math.max(state.crouch||0,reaction.flinch?.45:.12)}:state);
+        if(active&&!this.characterRig&&this.arms&&this.chest){
+          this.chest.rotation.x-=reaction.flinch?.28:.17;
+          for(const side of ['L','R'])if(reaction.flinch||side===reaction.hand){const arm=this.arms[side];arm.shoulder.rotation.set(1.8,side==='L'?.15:-.15,side==='L'?-.3:.3);arm.elbow.rotation.set(1.8,0,0);}
+        }
+        return result;
+      };
+    }
+    if(render)render.p012Panic=alarm?{flinch:!!flinch,hand:walker.slot%2?'L':'R',lookYaw:childBehind?.9:noise*.42}:null;
     walker.familyTarget=next.point;walker.actor.scriptArrivalRadius=.15;
     this.host.Move(walker.actor,next.point,walker.actualSpeedMps);
     if(endDistance-self.along<.5){walker.arrived=true;this.host.Move(walker.actor,at,0);}
@@ -758,7 +793,7 @@ export class FirstLevelP012Runtime {
       binocularOwned:!!this.binocularOwned,
       trafficReady: this.config.activities?.traffic ? !!this.trafficPassedNearPlayer : this.traffic.length === 6 && this.traffic.every((walker) => walker.index > 0),
       traffic: this.traffic.map((walker) => ({ side: walker.side, slot:walker.slot, role:walker.role, travelM:walker.travelM||0,
-        actorId:walker.actor.id,child:!!walker.child,familyId:walker.familyId,guardianSlot:walker.guardianSlot,lateralM:walker.lateralM,speedMps:walker.actualSpeedMps??walker.speedMps,familyTarget:walker.familyTarget,
+        actorId:walker.actor.id,child:!!walker.child,familyId:walker.familyId,guardianSlot:walker.guardianSlot,lateralM:walker.lateralM,speedMps:walker.actualSpeedMps??walker.speedMps,familyTarget:walker.familyTarget,panicState:walker.panicState,panicLateral:walker.panicLateral,reactionAt:walker.panic?.at,
         index: walker.index, arrived:walker.arrived,retired:!!walker.retired,retiredAt:walker.retiredAt,parking:walker.parking,position: this.host.Position(walker.actor) })),
       nearEnemyDeaths: this.near.filter((actor) => !this.host.Alive(actor)).length,
       roadContactVisibleCount:this.near.filter(actor=>actor.alive!==false&&actor.p012RoadContact&&this.host.Visible?.(actor)).length,

@@ -662,6 +662,10 @@ function EffectiveInfiniteAmmo() {
   return AllowP012InfiniteAmmo({ enabled: debugOptions.Enabled("infiniteAmmo"),
     isP012: !!p012Runtime, manualReloadCompleted: p012Runtime?.manualReloadCompleted === true });
 }
+function EffectiveInfiniteGrenades() {
+  const isP012 = !!p012Runtime || PHASE_TABLE[state.phaseIndex]?.whitebox?.p012 === true;
+  return debugOptions.Enabled("infiniteGrenades") && (!isP012 || state.grenades > 0);
+}
 function EnsureDebugInventory() {
   if (typeof weaponRange !== "undefined" && weaponRange) {
     state.clips = 999;
@@ -678,7 +682,7 @@ function EnsureDebugInventory() {
       if (state.mags[state.activeSlot]) state.mags[state.activeSlot].ammo = state.ammo;
     }
   }
-  if (debugOptions.Enabled("infiniteGrenades")) {
+  if (EffectiveInfiniteGrenades()) {
     state.grenades = Math.max(1, state.grenades);
     if (!state.slots.throwable) state.slots.throwable = "Grenade";
   }
@@ -5422,7 +5426,7 @@ function Reload() {
 /** 按住蓄力：手榴弹可以攥着数几秒再扔，落地即炸。 */
 function BeginCook(kind) {
   if (!player.Alive || state.cooking || combat.Returning) return;
-  const infiniteGrenades = debugOptions.Enabled("infiniteGrenades");
+  const infiniteGrenades = EffectiveInfiniteGrenades();
   if (kind === "Grenade" && !infiniteGrenades && state.grenades <= 0) { hud.Hint("没有手榴弹了", 2); return; }
   if (kind === "GrenadeBundle" && state.bundles <= 0) { hud.Hint("没有集束了", 2); return; }
   state.cooking = kind;
@@ -5446,7 +5450,7 @@ function ReleaseCook() {
   // 塞 state.cooking 的，绕开了那道闸。库存变负之后 HUD 会显示 −1 枚手榴弹，
   // 而且下一次 BeginCook 的 <= 0 判断照样过 —— 一个负数会一直负下去。
   if (kind === "Grenade") {
-    if (!debugOptions.Enabled("infiniteGrenades")) state.grenades = Math.max(0, state.grenades - 1);
+    if (!EffectiveInfiniteGrenades()) state.grenades = Math.max(0, state.grenades - 1);
   } else {
     state.bundles = Math.max(0, state.bundles - 1);
   }

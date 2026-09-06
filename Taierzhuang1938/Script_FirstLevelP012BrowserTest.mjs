@@ -111,6 +111,7 @@ async function PlayPrelude() {
     result = await page.evaluate(({ orientationReview, openingCausalityReview, savedInfiniteAmmo, northShelter, northShelterRadius }) => {
       const game = window.Tengxian;
       const bot = window.p012ReviewBot ||= { held: {}, trace: [], frame: 0, lastProgress: 0, progressKey: "" };
+      if(game.state.grenades!==0||game.state.bundles!==0)throw new Error("Opening and rifle ammunition issue must not grant throwables");
       const DitchEvidence=()=>{
         const flow=game.Debug.P012(),scene=game.Debug.P012Scene(),p=game.player.position;
         const impact=scene.mortarImpactPosition,eye=game.player.EyePosition;
@@ -3000,7 +3001,7 @@ try {
   }
   await fs.writeFile(path.join(outputDir, "Data_P012TrafficViews.json"), JSON.stringify(traffic, null, 2));
   if(!airRouteFixture)Check(traffic.population.armed <= 12 && traffic.population.unarmed <= 15,
-    "原有战斗/群众预算独立统计；另列训练队、儿童、坐姿百姓及新增5名村路作业人员，全部计入原始人数", JSON.stringify(traffic.population));
+    "原有战斗/群众预算独立统计；另列训练队、儿童、坐姿百姓及新增6名村路作业人员，全部计入原始人数", JSON.stringify(traffic.population));
   Check(errors.length === 0, "浏览器没有脚本或控制台错误", errors.join(" | "));
   console.log(`P012 screenshots: ${outputDir}`);
   if(campaignChecks.length)await fs.writeFile(path.join(outputDir,"Data_P012CampaignChecks.json"),JSON.stringify(campaignChecks,null,2));

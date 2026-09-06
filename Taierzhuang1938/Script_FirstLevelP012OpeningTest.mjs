@@ -7,6 +7,8 @@ import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { AmmoReadout } from "./Script_Hud.mjs";
 import { AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload, RestoreP012ManualReload } from "./Script_FirstLevelP012Opening.mjs";
 
+import { FIRST_LEVEL_P012_WHITEBOX_PHASE as openingPhase } from "./Data_FirstLevelP012Whitebox.mjs";
+
 const main = readFileSync(new URL("./Script_Main.mjs", import.meta.url), "utf8");
 function MainFunction(name) {
   const match = main.match(new RegExp(`function ${name}\\([^]*?\\n}`));
@@ -18,13 +20,13 @@ const debugOptions = new DebugOptions({ getItem: key => store.get(key), setItem:
 assert.equal(debugOptions.Enabled("infiniteAmmo"), true, "reproduce an existing user's persisted debug setting");
 let busy = false;
 const state = { activeSlot: "primary", slots: { primary: "HanYang" }, mags: { primary: { ammo: 0, clips: 0 } }, ammo: 0, clips: 0, playerShots: 0, grenades: 0 };
-const context = vm.createContext({ state, debugOptions, currentWeapon: "HanYang", p012Runtime: null,
+const context = vm.createContext({ PHASE_TABLE: [openingPhase], combat: { Returning: false }, state, debugOptions, currentWeapon: "HanYang", p012Runtime: null,
   WEAPONS: { HanYang: { magazine: 5 } }, AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload,
   player: { Alive: true, Busy: false, InWater: false }, viewmodel: { IsBusy: () => busy, TriggerReload: () => { busy = true; } },
   audio: { Play() {} }, hud: { Hint() {} }, fireCooldown: 0, fireEdge: true,
   emplacement: null, carry: null, meleeCombat: null, input: { fire: true }, BeginMeleeCharge: () => { state.meleeCharge = true; },
 });
-vm.runInContext(["EffectiveInfiniteAmmo", "EnsureDebugInventory", "Reload", "TryFire"].map(MainFunction).join("\n"), context);
+vm.runInContext(["EffectiveInfiniteAmmo", "EffectiveInfiniteGrenades", "EnsureDebugInventory", "BeginCook", "Reload", "TryFire"].map(MainFunction).join("\n"), context);
 context.EnsureDebugInventory();
 assert.equal(state.ammo, 5, "ordinary chapters retain the existing debug refill");
 
@@ -72,3 +74,25 @@ assert.equal(context.EffectiveInfiniteAmmo(), false, "bolt inspection without co
 state.activeSlot = "melee";
 assert.equal(SyncP012ActiveMagazine(state), false, "non-firearm slots do not acquire a magazine ledger");
 console.log("FirstLevelP012OpeningTest PASS: persisted debug, real Main input seams, HUD and checkpoint magazine ledgers");
+
+// Actual issue callback and G entry: no free grenades, even with a saved debug preference.
+assert.equal(openingPhase.loadoutOverride.throwables.Grenade,0);
+assert.equal(openingPhase.loadoutOverride.throwables.GrenadeBundle,0);
+assert.equal(openingPhase.whitebox.activities.initialEquipment.grenades,0);
+context.phase=openingPhase;state.activeSlot="primary";state.phaseIndex=0;
+state.grenades=0;state.slots.throwable=null;state.cooking=null;
+debugOptions.Set("infiniteGrenades",true);
+const issue=main.match(/CheckWeapon: \(\) => \{([^]*?)\n    },/)?.[1];
+assert.ok(issue,"production ammunition issue callback exists");
+vm.runInContext(issue,context);
+for(let frame=0;frame<120;frame++)context.EnsureDebugInventory();
+context.BeginCook("Grenade");
+assert.equal(state.grenades,0);assert.equal(state.slots.throwable,null);assert.equal(state.cooking,null);
+context.p012Runtime=null;context.EnsureDebugInventory();
+assert.equal(state.grenades,0,"P012 phase selection also protects spawn before runtime construction");
+state.grenades=2;context.EnsureDebugInventory();context.BeginCook("Grenade");
+assert.equal(state.grenades,2);assert.equal(state.cooking,"Grenade","actual later supply remains usable");
+state.cooking=null;state.grenades=0;context.EnsureDebugInventory();context.BeginCook("Grenade");
+assert.equal(state.grenades,0);assert.equal(state.cooking,null,"zero-stock restoration cannot mint a grenade");
+state.phaseIndex=undefined;context.EnsureDebugInventory();assert.equal(state.grenades,1,"ordinary scenes retain debug policy");
+console.log("PASS P012 starts and receives rifle ammunition without grenades; debug, G and zero-stock restore stay empty");

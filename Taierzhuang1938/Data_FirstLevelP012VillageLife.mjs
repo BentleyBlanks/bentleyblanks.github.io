@@ -5,6 +5,7 @@ export const P012_VILLAGE_LIFE_PEOPLE=Object.freeze([
  {id:"VillageWaitingWoundedB",kind:"nra",x:-39.6,z:61,yaw:-Math.PI/2,role:"wounded"},
  {id:"VillageDoorWorkerA",kind:"nra",x:-37.73,z:53.82,yaw:-Math.PI/2,role:"worker"},
  {id:"VillageDoorWorkerB",kind:"nra",x:-36.07,z:53.82,yaw:Math.PI/2,role:"worker"},
+ {id:"VillageMuleHandler",kind:"nra",x:-20.6,z:98.9,yaw:0,role:"muleHandler"},
  {id:"VillageTelephoneSoldier",kind:"nra",x:-31.5,z:79,yaw:0,role:"telephone"},
 ].map(spec=>Object.freeze({...spec,weapon:null,bodyRadius:spec.role==="worker"?.3:.42})));
 export const P012_VILLAGE_LIFE_BLOCKS=Object.freeze([
@@ -15,6 +16,6 @@ export const P012_VILLAGE_LIFE_BLOCKS=Object.freeze([
 export const P012_VILLAGE_LIFE=Object.freeze({
  door:Point(-36.9,53.7),doorSeconds:12,
  telephoneRoute:Object.freeze([Point(-31.5,79),Point(-31.5,62),Point(-35.5,46),Point(-31.5,30),Point(-31.5,18),Point(-18,10),Point(-2,-2)]),
- muleRoute:Object.freeze([Point(-30,88),Point(-30,80),Point(-30,62),Point(-34,46),Point(-30,30),Point(-30,19),Point(-17,12),Point(-6,10),Point(6,8),Point(6,-14)]),
+ muleRoute:Object.freeze([Point(-19,100),Point(-19,91),Point(-19,82)]),
  telephoneSpeed:1.15,muleSpeed:1.05,familyId:"VillageFamily2",familySlot:6,
 });
