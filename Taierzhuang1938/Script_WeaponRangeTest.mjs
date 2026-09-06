@@ -20,8 +20,8 @@ const only = process.argv.find((argument) => argument.startsWith("--only="))?.sl
 if (only?.some((id) => !allFirearms.some((weapon) => weapon.id === id))) throw new Error(`Unknown firearm in --only=${only}`);
 const firearms = only ? allFirearms.filter((weapon) => only.includes(weapon.id))
   : smoke ? allFirearms.filter((weapon) => weapon.id === "HanYang") : allFirearms;
-const progressKey = "tengxian1938_progress_v2";
-const progressSeed = JSON.stringify({ cleared: ["CH0_Chuchuan"], furthest: 1 });
+const progressKey = "tengxian1938_progress_v3";
+const progressSeed = JSON.stringify({ cleared: ["FirstLevelP012Whitebox"], furthest: 1 });
 const checks = [];
 const errors = [];
 const evidence = {};

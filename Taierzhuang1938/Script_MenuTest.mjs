@@ -723,29 +723,38 @@ await CheckMissionList();
 async function CheckMissionList() {
   await page.evaluate(() => window.Taierzhuang.Debug.MenuShow("levels"));
   const panel = await page.evaluate(() => {
-    // 正式章节（序章）+ 暂时废弃场景（第一关到终章）：DOM 顺序就是 PHASES 顺序。
-    const rows = [...document.querySelectorAll(".mnMissionTrack .mnLevel, .mnDeprecatedTrack .mnLevel")];
+    // 正式章节组（Data_Menu.CAMPAIGN_ENTRIES）：第一关（P0/P1/P2 白盒）+ 第二关到终章的占位条目。
+    // 旧序章与旧第一关到终章（PHASES）一条都不列，「暂时废弃场景」那一组也没有了。
+    const rows = [...document.querySelectorAll(".mnMissionTrack .mnLevel")];
     const rects = rows.map(el => { const r = el.getBoundingClientRect(); return { x:r.x, y:r.y, w:r.width, h:r.height }; });
     return {
       levels: document.querySelectorAll("#menu .mnLevel").length,
-      retired: [...document.querySelectorAll(".mnSandboxLevel")].some(el => el.textContent.includes("第一关 · 全新策划白盒")),
+      retired: [...document.querySelectorAll("#menu .mnLevel")].some(el => /全新策划白盒|P0\/P1\/P2|出川|序章|往南的路|手榴弹雨/.test(el.textContent)),
       groups: [...document.querySelectorAll(".mnLevelGroup b")].map(el=>el.textContent),
-      official: document.querySelectorAll(".mnMissionTrack .mnLevel").length,
-      shelvedMarks: [...document.querySelectorAll(".mnDeprecatedTrack .mnLvMark")].map(el=>el.textContent),
+      shelved: !!document.querySelector(".mnDeprecatedTrack, .mnDeprecatedLevel"),
       names: rows.map(el=>el.querySelector(".mnLvName").textContent), rects,
+      marks: rows.map(el=>el.querySelector(".mnLvMark").textContent),
+      placeholders: rows.map(el=>el.classList.contains("mnPlaceholderLevel")),
+      numbers: rows.map(el=>el.querySelector(".mnLvNo")?.textContent ?? null),
       oldMap: !!document.querySelector(".mnMap, .mnTimelineTrack, .mnLvThumb"),
       fullScreen: document.querySelector(".mnPanel").getBoundingClientRect().width === innerWidth,
       title: document.querySelector(".mnPanelTitle").textContent,
     };
   });
-  Check("全屏任务选择采用七行纵向清单", panel.fullScreen && panel.title === "任务选择"
-    && panel.rects.length === 7 && panel.rects.every((r,i)=>r.x===panel.rects[0].x && (!i||r.y>=panel.rects[i-1].y+panel.rects[i-1].h)),JSON.stringify(panel.rects));
-  Check("正式章节、暂时废弃场景与六项测试入口三组，旧白盒已移除",panel.levels===13 && !panel.retired&&panel.groups.join(",")==="正式章节,暂时废弃场景,测试场景",panel.groups.join(","));
-  Check("正式章节只剩序章，第一关到终章六条全标「未完成」",panel.official===1&&panel.shelvedMarks.length===6&&panel.shelvedMarks.every(t=>t==="未完成"),JSON.stringify({official:panel.official,marks:panel.shelvedMarks}));
+  Check("全屏任务选择采用六行纵向章节清单", panel.fullScreen && panel.title === "任务选择"
+    && panel.rects.length === 6 && panel.rects.every((r,i)=>r.x===panel.rects[0].x && (!i||r.y>=panel.rects[i-1].y+panel.rects[i-1].h)),JSON.stringify(panel.rects));
+  Check("只剩正式章节与五项测试入口两组，没有「暂时废弃场景」组", panel.levels===11 && !panel.shelved
+    && panel.groups.join(",")==="正式章节,测试场景", panel.groups.join(","));
+  Check("旧序章、旧第一关到终章与旧白盒的入口一条都不列", !panel.retired, JSON.stringify(panel.names));
+  Check("第一条是「第一关」（P0/P1/P2 白盒改名），后面五条只列关号、标「未完成」",
+    panel.names.join(",")==="第一关,第二关,第三关,第四关,第五关,终章"
+      && panel.placeholders.join(",")==="false,true,true,true,true,true"
+      && panel.marks.slice(1).every(t=>t==="未完成") && panel.numbers.every(n=>n===null),
+    JSON.stringify({names:panel.names,marks:panel.marks,placeholders:panel.placeholders,numbers:panel.numbers}));
   Check("任务选择不再出现地图、横向时间轴或缩略图卡",!panel.oldMap);
   const images=[];
-  for(let index=0;index<7;index++){
-    await page.locator('.mnMissionTrack .mnLevel, .mnDeprecatedTrack .mnLevel').nth(index).hover();
+  for(let index=0;index<6;index++){
+    await page.locator('.mnMissionTrack .mnLevel').nth(index).hover();
     await page.waitForFunction(()=>{const img=document.querySelector('.mnMissionArt img');return img?.complete&&img.naturalWidth>0;});
     const result=await page.evaluate(()=>({selected:window.Taierzhuang.menu.selected,
       title:document.querySelector('.mnBriefTitle').textContent,
@@ -757,13 +766,41 @@ async function CheckMissionList() {
       &&result.objective.length>0&&result.current===1&&result.inMenu,JSON.stringify(result));
     images.push(result.image);
   }
-  Check("七章原创预览图全部加载且各不相同",new Set(images).size===7);
+  Check("六章原创预览图全部加载且各不相同",new Set(images).size===6);
+  const firstBrief=await page.evaluate(()=>{
+    window.Taierzhuang.menu.SelectLevel(0);
+    return {when:document.querySelector('.mnMissionWhen')?.textContent||'',record:document.querySelector('.mnMissionRecord b')?.textContent||'',
+      label:document.querySelector('.mnMissionRecord span')?.textContent||''};
+  });
+  Check("第一关的简报按章节写（日期 · 地点，章节记录 · 尚未通过）",
+    /三月十四日/.test(firstBrief.when)&&/铁路兵站/.test(firstBrief.when)&&firstBrief.label==="章节记录"&&firstBrief.record==="尚未通过",JSON.stringify(firstBrief));
+  const placeholderBrief=await page.evaluate(()=>{
+    window.Taierzhuang.menu.SelectLevel(1);
+    return {objective:document.querySelector('.mnMissionObjective').textContent,record:document.querySelector('.mnMissionRecord b').textContent,
+      when:!!document.querySelector('.mnMissionWhen')};
+  });
+  Check("占位章节的简报写「未完成 · 敬请期待」，不写旧稿的日期地点",
+    placeholderBrief.objective.includes('敬请期待')&&placeholderBrief.record.includes('敬请期待')&&!placeholderBrief.when,JSON.stringify(placeholderBrief));
   await page.mouse.move(2,2);
   await page.evaluate(()=>window.Taierzhuang.menu.SelectLevel(1));
   await page.screenshot({path:path.join(outDir,"Scene_MissionListDesktop.png")});
   await page.keyboard.press('ArrowDown');
   Check("上下键同步选中项、焦点和简报",await page.evaluate(()=>window.Taierzhuang.menu.selected===2
-    &&document.activeElement===document.querySelector('.mnLevel.on')&&document.querySelector('.mnBriefTitle').textContent.includes('手榴弹雨')));
+    &&document.activeElement===document.querySelector('.mnLevel.on')&&document.querySelector('.mnBriefTitle').textContent==='第三关'));
+  // 占位章节点了不进任何场景：菜单还开着、玩法没起来，简报上亮一句「敬请期待」。
+  await page.locator('.mnMissionTrack .mnLevel').nth(2).click();
+  await page.evaluate(()=>window.Taierzhuang.StepFrames(10));
+  const placeholder=await page.evaluate(()=>({inMenu:window.Taierzhuang.state.menu,running:window.Taierzhuang.state.running,
+    mode:window.Taierzhuang.Debug.Menu().mode,level:window.Taierzhuang.Debug.Level().id,
+    notice:document.querySelector('.mnBriefNotice')?.textContent||''}));
+  Check("点占位章节只提示「敬请期待」，不进场景",placeholder.inMenu&&!placeholder.running&&placeholder.mode==='levels'
+    &&placeholder.level!=='CH3_Jiuhusuo'&&placeholder.notice.includes('敬请期待'),JSON.stringify(placeholder));
+  await page.evaluate(()=>document.querySelector('.mnBriefNotice')?.remove());
+  await page.keyboard.press('Enter');
+  await page.evaluate(()=>window.Taierzhuang.StepFrames(10));
+  Check("Enter 键同样只提示，不进场景",await page.evaluate(()=>window.Taierzhuang.state.menu&&!window.Taierzhuang.state.running
+    &&!!document.querySelector('.mnBriefNotice')));
+  await page.screenshot({path:path.join(outDir,"Scene_MissionListPlaceholder.png")});
   await page.locator('.mnCampaignBack').focus();
   await page.keyboard.press('Enter');
   Check("返回按钮 Enter 确实返回主菜单",await page.evaluate(()=>window.Taierzhuang.menu.mode==='title'&&window.Taierzhuang.state.menu));
@@ -773,13 +810,14 @@ async function CheckMissionList() {
   await page.evaluate(()=>{const menu=window.Taierzhuang.menu;menu.ToTitle();menu.Show('levels');
     window.missionOriginalPlay=menu.Play;window.missionPlayed=[];menu.Play=(index)=>window.missionPlayed.push(index);});
   try {
-    await page.locator('.mnMissionTrack .mnLevel, .mnDeprecatedTrack .mnLevel').nth(3).click();
+    await page.locator('.mnMissionTrack .mnLevel').nth(3).click();
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
-    await page.locator('.mnMissionTrack .mnLevel, .mnDeprecatedTrack .mnLevel').nth(5).hover();
+    await page.locator('.mnMissionTrack .mnLevel').nth(5).hover();
     await page.keyboard.press('Enter');
     await page.locator('.mnSandboxLevel').nth(1).click();
-    Check("鼠标、Enter、测试入口各只触发一次正确任务",await page.evaluate(()=>window.missionPlayed.join(',')==='3,4,5,8'));
+    Check("鼠标、Enter、测试入口各只触发一次正确任务",await page.evaluate(()=>window.missionPlayed.join(',')==='3,4,5,7'),
+      await page.evaluate(()=>window.missionPlayed.join(',')));
     for (const [name,width,height] of [["Laptop",1280,720],["Mobile",390,844],["Landscape",844,390]]) {
       await page.setViewportSize({width,height});
       await page.mouse.move(1,1);
@@ -814,77 +852,61 @@ async function CheckMissionList() {
 }
 
 // ===========================================================================
-// 3.5) 战役入口：「开始」要播关前过场，而且**过场必须真的在走**
+// 3.5) 战役入口：「开始」直接落进第一关。
 //
-// 这一条是补票。过场没有自己的帧驱动，全靠 Frame() 推；而从菜单进关时
-// state.running 还是 false（要等过场播完才 StartRun）——主循环里那道
-// 「没在跑就直接 return」曾经把「开始」卡死在出川的黑场里：过场在等一个
-// 永远不来的帧，而 StartRun 在等过场结束。选章那条路不播过场，测不到它。
+// 序章已并入第一关、旧第一关到终章的入口已撤（2026-09-06），所以「开始」不再播
+// 出川过场，而是走沙盒那条整表替换的路：重载进 ?whitebox=p012（现在的第一关就是那片
+// 白盒）。这一节验三段：真的重载到了白盒、白盒里的暂停菜单叫「退出第一关」、退得回主菜单。
 // ===========================================================================
 {
-  await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("start"));
-  await page.waitForTimeout(900);
-  // 开演前有一段着色器预热（Script_Main.WarmupShaders）：布景已经建好、时间轴被
-  // 按住，屏幕上盖着加载画面。这一段几秒到十几秒不等（看机器和驱动的着色器缓存），
-  // 所以**不能按固定等待去采时间轴**，要等 Held 放开再采。
-  const warming = await page.evaluate(() => ({
-    held: !!window.Taierzhuang.cutscene?.Held,
-    boot: !document.getElementById("boot").classList.contains("gone"),
-    bar: document.querySelector("#bootBar i").style.width,
-    step: document.getElementById("bootStep").textContent,
-  }));
-  Check("预热期间盖着加载画面、进度条在走（不是黑屏干等）",
-    !warming.held || (warming.boot && parseFloat(warming.bar) > 0),
-    `held=${warming.held} boot=${warming.boot} bar=${warming.bar} step=${warming.step}`);
-  await page.waitForFunction(() => window.Taierzhuang.cutscene && !window.Taierzhuang.cutscene.Held,
-    null, { timeout: 120000 }).catch(() => {});
-  const a = await page.evaluate(() => ({
-    playing: !!window.Taierzhuang.cutscene?.Playing,
-    id: window.Taierzhuang.state.cutscene,
-    t: window.Taierzhuang.cutscene?.time || 0,
-  }));
-  await page.waitForTimeout(1200);
-  const b = await page.evaluate(() => window.Taierzhuang.cutscene?.time || 0);
-  Check("「开始」播序章那一场过场", a.playing && a.id === "CS_Chuchuan", `id=${a.id} playing=${a.playing}`);
-  Check("过场真的在往前走（不是卡在第一帧）", b > a.t + 0.5, `t ${a.t.toFixed(2)} -> ${b.toFixed(2)} s`);
-  Check("预热完才开演：头几秒的台词没有在加载画面背后白白流走", a.t < 1.5, `t=${a.t.toFixed(2)} s`);
-
-  // Esc 跳过，别在冒烟里干等三十八秒
-  await page.keyboard.press("Escape");
-  await page.waitForFunction(() => window.Taierzhuang.Debug.Menu().open
-    && window.Taierzhuang.Debug.Menu().mode === "title", null, { timeout: 180000 });
-  const done = await page.evaluate(() => ({
-    running: window.Taierzhuang.state.running,
-    level: window.Taierzhuang.Debug.Level().id,
+  // 上一节结束时选章面板还开着，主列表被盖住；先回标题层再真点「开始」。
+  await page.evaluate(() => window.Taierzhuang.Debug.MenuShow("title"));
+  await page.click('#menu .mnItem[data-act="start"]');
+  await page.waitForFunction(() => new URL(location.href).searchParams.get("whitebox") === "p012"
+    && !!window.Taierzhuang?.state?.ready && !!window.Taierzhuang.Debug?.Whitebox?.(), null, { timeout: 240000 });
+  const started = await page.evaluate(() => ({
+    query: new URL(location.href).searchParams.get("whitebox"),
+    phase: window.Taierzhuang.Debug.Whitebox().phase,
     open: window.Taierzhuang.Debug.Menu().open,
+    rootOff: document.getElementById("menu").classList.contains("off"),
+    bootStart: !document.getElementById("bootStart").disabled,
   }));
-  // 2026-09-06：第一关到终章暂时废弃，序章是正片唯一一章 —— 车厢播完（或 Esc 跳过）
-  // 不再自动接第一关，而是回主菜单并在标题下写一行「后续章节暂时废弃」。
-  const ended = await page.evaluate(() => ({
-    open: window.Taierzhuang.Debug.Menu().open, mode: window.Taierzhuang.Debug.Menu().mode,
-    running: window.Taierzhuang.state.running, level: window.Taierzhuang.Debug.Level().id,
-    sub: document.querySelector("#menu .mnTitleSub")?.textContent || "",
-    cleared: JSON.parse(localStorage.getItem("tengxian1938_progress_v2") || "{}").cleared || [],
-  }));
-  Check("跳过序章过场之后回主菜单（不再接进废弃的第一关）", ended.open && ended.mode === "title" && !ended.running
-    && ended.level === "CH0_Chuchuan", `open=${ended.open} mode=${ended.mode} running=${ended.running} level=${ended.level}`);
-  Check("标题下写明后续章节暂时废弃", /暂时废弃/.test(ended.sub), ended.sub);
-  Check("序章记为已通过", ended.cleared.includes("CH0_Chuchuan"), ended.cleared.join(","));
-  await page.evaluate(() => window.Taierzhuang.Debug.ResetProgress());
-
-  // 回主菜单，下一节从选章再进一次
-  await page.evaluate(() => {
+  Check("「开始」落进第一关（?whitebox=p012，菜单只建不开、等「进城」）",
+    started.query === "p012" && started.phase === "FirstLevelP012Whitebox" && !started.open && started.rootOff && started.bootStart,
+    JSON.stringify(started));
+  await page.click("#bootStart");
+  await page.waitForFunction(() => window.Taierzhuang.state.running, null, { timeout: 120000 });
+  await page.evaluate(() => window.Taierzhuang.StepFrames(10));
+  const pauseItems = await page.evaluate(() => {
     window.Taierzhuang.Debug.Pause();
-    window.Taierzhuang.Debug.MenuAct("title");
+    return {
+      items: window.Taierzhuang.Debug.Menu().items,
+      labels: [...document.querySelectorAll("#menu .mnItemLabel")].map((e) => e.textContent),
+      hints: [...document.querySelectorAll("#menu .mnItemHint")].map((e) => e.textContent),
+    };
   });
+  Check("第一关里的暂停菜单写「退出第一关」，不再叫 P0/P1/P2 白盒",
+    pauseItems.items.join(",") === "resume,settings,debug,exitSandbox" && pauseItems.labels.includes("退出第一关")
+      && !pauseItems.labels.some((text) => /P0\/P1\/P2/.test(text)),
+    pauseItems.labels.join(" / "));
+  await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("exitSandbox"));
+  await page.waitForFunction(() => window.Taierzhuang?.Debug?.Menu?.()?.mode === "title"
+    && !new URL(location.href).searchParams.has("whitebox"), null, { timeout: 240000 });
   await page.evaluate(() => window.Taierzhuang.StepFrames(20));
+  const back = await page.evaluate(() => ({
+    open: window.Taierzhuang.Debug.Menu().open, inMenu: window.Taierzhuang.state.menu,
+    running: window.Taierzhuang.state.running, level: window.Taierzhuang.Debug.Level().id,
+  }));
+  Check("「退出第一关」摘掉 whitebox，回到主菜单", back.open && back.inMenu && !back.running && back.level !== "FirstLevelP012Whitebox",
+    JSON.stringify(back));
 }
 
 // ===========================================================================
-// 4) 从选章进关：切片重建、玩法真的跑起来
+// 4) 开发入口进旧切片（Debug.StartLevel，按 PHASES 序号）：切片重建、玩法真的跑起来。
+//    选章已不列这几章，但下面暂停 / 设置 / 调试那几节要一个在正片模式下跑着的关。
 // ===========================================================================
 {
-  await page.evaluate(() => window.Taierzhuang.Debug.MenuPlay(2));
+  await page.evaluate(() => window.Taierzhuang.Debug.StartLevel(2));
   await page.waitForFunction(() => window.Taierzhuang.state.running === true, null, { timeout: 180000 });
   await page.evaluate(() => window.Taierzhuang.StepFrames(60));
   const inGame = await page.evaluate(() => {
@@ -898,7 +920,7 @@ async function CheckMissionList() {
       viewmodel: T.viewmodel.root.visible,
     };
   });
-  Check("从选章能进废弃场景（第二关 · 手榴弹雨：只建场，没有任务内容）", inGame.running && inGame.level === "CH2_Shouliudan",
+  Check("Debug.StartLevel(2) 进得去旧第二关切片（只建场，没有任务内容；选章不列它）", inGame.running && inGame.level === "CH2_Shouliudan",
     `running=${inGame.running} level=${inGame.level} built=${inGame.built}`);
   const shelved = await page.evaluate(() => ({
     pinned: window.Taierzhuang.state.pinned,
@@ -1175,7 +1197,7 @@ async function CheckMissionList() {
 // 5b) 齿轮设置 -> 返回主菜单
 // ===========================================================================
 {
-  await page.evaluate(() => window.Taierzhuang.Debug.MenuPlay(2));
+  await page.evaluate(() => window.Taierzhuang.Debug.StartLevel(2));
   await page.waitForFunction(() => window.Taierzhuang.state.running === true, null, { timeout: 180000 });
   await page.keyboard.press("Backquote");
   const option = await page.evaluate(() => ({
@@ -1201,30 +1223,31 @@ async function CheckMissionList() {
 }
 
 // ===========================================================================
-// 6) 进度：通过一关之后，菜单的第一项变成「继续」，选章里标「已通过」
+// 6) 进度：第一关是正片唯一能进的一章 —— 打过之后选章里标「已通过」，
+//    主菜单第一项仍是「开始」（没有可继续的下一章），占位章节不受进度影响。
 // ===========================================================================
 {
-  // 正式章节只剩序章：打过序章之后没有「下一关」可继续，第一项仍是「开始」；
-  // 废弃场景一律标「未完成」，不受进度影响。
   await page.evaluate(() => {
-    localStorage.setItem("tengxian1938_progress_v2",
-      JSON.stringify({ cleared: ["CH0_Chuchuan"], furthest: 1 }));
+    localStorage.setItem("tengxian1938_progress_v3",
+      JSON.stringify({ cleared: ["FirstLevelP012Whitebox"], furthest: 1 }));
   });
   await Boot();
   const m = await page.evaluate(() => {
     window.Taierzhuang.Debug.MenuShow("levels");
     return {
       first: document.querySelector("#menu .mnItem .mnItemLabel").textContent,
-      marks: [...document.querySelectorAll("#menu .mnLevel .mnLvMark")].map((e) => e.textContent),
+      marks: [...document.querySelectorAll("#menu .mnMissionTrack .mnLvMark")].map((e) => e.textContent),
+      record: document.querySelector("#menu .mnMissionRecord b")?.textContent || "",
       selected: window.Taierzhuang.Debug.Menu().selected,
       progress: window.Taierzhuang.Debug.Menu().progress,
     };
   });
-  Check("正片只有序章：打完之后第一项仍是「开始」（没有可继续的下一章）", m.first.startsWith("开始"), m.first);
-  Check("序章标「已通过」，废弃的六章全标「未完成」",
-    m.marks[0] === "已通过" && m.marks.slice(1, 7).every((t) => t === "未完成"),
+  Check("正片只有第一关能进：打完之后第一项仍是「开始」（没有可继续的下一章）", m.first.startsWith("开始"), m.first);
+  Check("第一关标「已通过」，第二关到终章全标「未完成」",
+    m.marks[0] === "已通过" && m.marks.length === 6 && m.marks.slice(1).every((t) => t === "未完成"),
     m.marks.join("|"));
-  Check("选章默认落在序章上（不落到废弃场景）", m.selected === 0, `selected=${m.selected}`);
+  Check("选章默认落在第一关上、简报记「已通过」", m.selected === 0 && m.record === "已通过",
+    `selected=${m.selected} record=${m.record}`);
   await page.evaluate(() => window.Taierzhuang.Debug.ResetProgress());
 }
 
@@ -1279,19 +1302,19 @@ async function CheckMissionList() {
       go: !!document.querySelector("#menu .mnGo"),
     };
   });
-  Check("靶场条目排在七条章节之后，标「沙盒」",
-    brief.selected === 9 && brief.mark === "沙盒" && brief.no === "靶",   // 枪械专项后保留原玩法靶场
+  Check("靶场条目排在六条章节之后，标「沙盒」",
+    brief.selected === 8 && brief.mark === "沙盒" && brief.no === "靶",   // 枪械专项后保留原玩法靶场
     `selected=${brief.selected} mark=${brief.mark} no=${brief.no}`);
-  Check("选章列出操作、枪械、玩法、爆炸、白刃独立战斗与第一关策划白盒",
-    brief.sandboxes.length === 6
-      && brief.sandboxes.map((entry) => entry.no).join(",") === "跃,枪,靶,爆,刃,012"
+  Check("选章列出操作、枪械、玩法、爆炸、白刃五项测试入口（第一关已归入正式章节）",
+    brief.sandboxes.length === 5
+      && brief.sandboxes.map((entry) => entry.no).join(",") === "跃,枪,靶,爆,刃"
       && brief.sandboxes.every((entry) => entry.mark === "沙盒")
       && brief.sandboxes[0].name.includes("操作交互测试场")
       && brief.sandboxes[1].name.includes("枪械白盒靶场")
       && brief.sandboxes[2].name.includes("玩法测试靶场")
       && brief.sandboxes[3].name.includes("爆炸测试场")
       && brief.sandboxes[4].name.includes("白刃战 · 大刀与刺刀")
-      && brief.sandboxes[5].name.includes("第一关 · P0/P1/P2 场景白盒")
+      && !brief.sandboxes.some((entry) => /第一关|P0\/P1\/P2/.test(entry.name))
       && brief.sandboxes.every((entry) => !entry.name.includes("界河")),
     JSON.stringify(brief.sandboxes));
   Check("靶场预览只留一句目标、没有二次确认按钮，且**不画**滕县全图",
@@ -1375,7 +1398,7 @@ async function CheckMissionList() {
     const menu = window.Taierzhuang.menu;
     menu.SelectLevel(menu.entries.findIndex(entry => entry.sandboxKey === "firstLevelP012Whitebox"));
   });
-  await page.click("#menu .mnSandboxLevel.on");
+  await page.click("#menu .mnMissionTrack .mnChapterLevel.on");
   await page.waitForFunction(() => window.Taierzhuang?.Debug?.P012?.()?.beat === "B00",
     null, { timeout: 240000 });
   const p012Entered = await page.evaluate(() => ({
@@ -1383,13 +1406,13 @@ async function CheckMissionList() {
     phase: window.Taierzhuang.Debug.Whitebox().phase,
     open: window.Taierzhuang.Debug.Menu().open,
   }));
-  Check("P012 菜单卡实际进入保留的独立白盒",
+  Check("选章「第一关」实际进入 P0/P1/P2 白盒",
     p012Entered.query === "p012" && p012Entered.phase === "FirstLevelP012Whitebox" && !p012Entered.open,
     JSON.stringify(p012Entered));
   await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("exitSandbox"));
   await page.waitForFunction(() => window.Taierzhuang?.Debug?.Menu?.()?.mode === "title"
     && !new URL(location.href).searchParams.has("whitebox"), null, { timeout: 240000 });
-  Check("P012 退出独立测试后回主菜单", await page.evaluate(() => window.Taierzhuang.Debug.Menu().open));
+  Check("第一关退出后回主菜单", await page.evaluate(() => window.Taierzhuang.Debug.Menu().open));
 }
 
 // ===========================================================================

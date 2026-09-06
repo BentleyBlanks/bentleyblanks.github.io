@@ -1,8 +1,8 @@
 // Data_MissionCh1.mjs — 第一关｜往南的路。规格：docs/Data_MissionRemake.md §2（正文）与 §10（契约）。
 //
 // ---------------------------------------------------------------------------
-// 2026-09-06：第一关的**正片入口已暂时废弃**（选章里归入「暂时废弃场景」组、标「未完成」，
-// 进章只建场、不装剧本、不摆点）。本文件的 CHAPTER（beats / roster / mechanics）、
+// 2026-09-06：本章作为 PHASES 章节的**正片入口已废弃**（选章不再列它，只剩 ?phase=1
+// 开发入口，进章只建场、不装剧本、不摆点）。本文件的 CHAPTER（beats / roster / mechanics）、
 // EVENTS 与 VOICE_LINES **仍然保留**，因为「第一关 · P0/P1/P2 场景白盒」
 // （Data_FirstLevelP012Whitebox.mjs，contentId = CH1_NanLu）整套人物、台词与摆点
 // 都从这里取 —— 那是正在按 Notion 新稿人工验收的新第一关。改这份内容先看白盒。

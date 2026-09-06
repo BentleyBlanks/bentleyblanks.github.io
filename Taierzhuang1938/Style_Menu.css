@@ -100,7 +100,7 @@
 .mnLevelGroup b { font-weight: 400; }
 .mnLevelGroup small { font-size: 10px; color: #757c78; }
 .mnLevelGroup:not(:first-child) { margin-top: 18px; padding-top: 12px; border-top: 1px solid #c4c6bb20; }
-.mnMissionTrack, .mnDeprecatedTrack, .mnSandboxTrack { display: flex; flex-direction: column; }
+.mnMissionTrack, .mnSandboxTrack { display: flex; flex-direction: column; }
 .mnLevel {
   position: relative; width: 100%; min-height: 42px; padding: 6px 12px;
   display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 9px;
@@ -113,11 +113,19 @@
 .mnLvMark { font-size: 10px; font-weight: 400; color: #8b9384; white-space: nowrap; }
 .mnLvMark.done { color: #b5bba2; }
 .mnLvMark.todo { color: #7d7466; }
-/* 暂时废弃场景：压灰一档，字号比正式章节小 —— 点得进去，但一眼看出不是正片。 */
-.mnDeprecatedLevel { min-height: 36px; color: #8f948f; }
-.mnDeprecatedLevel .mnLvName { font-size: clamp(13px, 1.2vw, 18px); font-weight: 500; }
-.mnDeprecatedLevel.on { color: var(--ui-gold); }
+/* 章节行：名字栏就是关号（「第一关」「终章」），没有左边那格小字。 */
+.mnChapterLevel { grid-template-columns: minmax(0, 1fr) auto; }
+/* 占位章节（第二关到终章）：压灰一档、字号小一档 —— 点了只提示「敬请期待」，不进场景。 */
+.mnPlaceholderLevel { min-height: 36px; color: #8f948f; }
+.mnPlaceholderLevel .mnLvName { font-size: clamp(13px, 1.2vw, 18px); font-weight: 500; }
+.mnPlaceholderLevel.on { color: var(--ui-gold); }
 .mnMissionRecord.todo b { color: #8f948f; }
+/* 点了占位章节：简报目标行下面亮一句「敬请期待」（换选中项时简报重建，自然消失）。 */
+.mnBriefNotice {
+  margin-top: 14px; color: var(--ui-gold); font-size: clamp(13px, 1.1vw, 16px); font-weight: 700;
+  letter-spacing: 0.08em; text-shadow: 0 2px 3px #000; animation: mnBriefNoticeIn 0.35s ease-out both;
+}
+@keyframes mnBriefNoticeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 .mnLevel.on {
   color: var(--ui-gold); border-image: var(--ui-selection-edge);
   background: var(--ui-selection);

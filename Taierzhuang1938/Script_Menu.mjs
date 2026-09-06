@@ -2,9 +2,10 @@
 //
 // 分工：这一份**只管菜单自己**（画面上的字、机位的运镜、选章的线性任务列表），
 // 一切「真的去做点什么」都通过 host 回调交回装配层（Script_Main）：
-//   host.Play(index, opts)   进某一章
-//   host.PlaySandbox()       进「测试场景」组里的沙盒（玩法测试靶场，重载页面）
-//   host.ExitSandbox()       从靶场退回正片
+//   host.Play(index, opts)   进某一章（正式章节组里真正挂在 PHASES 上的章；现在没有 ——
+//                            第一关走 PlaySandbox，后面几章只是占位，见 Data_Menu.CAMPAIGN_ENTRIES）
+//   host.PlaySandbox(key)    进沙盒（第一关＝P0/P1/P2 白盒，与「测试场景」组的靶场同一条路，重载页面）
+//   host.ExitSandbox()       从沙盒退回主菜单
 //   host.Resume()            从暂停回到游戏
 //   host.SliceIndex()        现在建好的是哪一章的切片（决定用哪一组机位）
 //   host.Unlock()            第一次点击时解锁音频（浏览器要用户手势）
@@ -81,7 +82,9 @@ function Lerp(a, b, k) { return a + (b - a) * k; }
 // v2：2026-08-28 任务流程重制换了全部章节 id（L0_Jiehe… → CH0_Chuchuan…）。
 // 沿用 v1 的话，老存档里那串 cleared 一个都对不上、furthest 却还是旧的关号 ——
 // 表现成「选章里一关没通过，第一项却写着继续 · 第五关」。换键即弃旧档。
-const STORE_KEY = "tengxian1938_progress_v2";
+// v3：2026-09-06 序章退出选章、第一关换成 P0/P1/P2 白盒（id FirstLevelP012Whitebox）。
+// v2 里「序章已通过、furthest=1」这条记录在新表上对应不到任何一行，同样弃旧档。
+const STORE_KEY = "tengxian1938_progress_v3";
 
 export const Progress = {
   Read() {
@@ -114,18 +117,26 @@ function MissionName(label = "") {
   const parts = label.split("·");
   return (parts.length > 1 ? parts.slice(1).join("·") : label).trim();
 }
+/** 关号：章节 label 里「·」前面那一截（「第二关 · 手榴弹雨」→「第二关」；没有「·」就是整个 label）。 */
+function ChapterNumber(label = "") { return label.split("·")[0].trim(); }
+/**
+ * 章节行 = 正式章节组里的条目：不是沙盒，或者是被标成 `chapter` 的沙盒
+ *（现在的第一关就是 P0/P1/P2 白盒，进出走沙盒那条重载的路，但在列表上是一章）。
+ */
+function IsChapter(entry) { return !!entry && (!entry.sandbox || !!entry.chapter); }
 
-// 七章任务图由菜单独占，不进入战斗数据。文件顺序与 PHASES 的线性章节顺序一致；
-// 一章一图，右侧横向预览使用已有原创图片，不嵌入外部游戏截图。
-const MISSION_ART = [
-  "./Texture/Menu/Texture_MissionCh0Chuchuan.png",
-  "./Texture/Menu/Texture_MissionCh1NanLu.png",
-  "./Texture/Menu/Texture_MissionCh2Shouliudan.png",
-  "./Texture/Menu/Texture_MissionCh3Jiuhusuo.png",
-  "./Texture/Menu/Texture_MissionCh4DongguanYe.png",
-  "./Texture/Menu/Texture_MissionCh5Chengqiang.png",
-  "./Texture/Menu/Texture_MissionCh6Zuihou.png",
-];
+// 章节任务图由菜单独占，不进入战斗数据。按章节 id 取（条目可用 artId 指定借哪一章的图：
+// 第一关的白盒借第一章那张）；一章一图，右侧横向预览使用已有原创图片，不嵌入外部游戏截图。
+const MISSION_ART = {
+  CH0_Chuchuan: "./Texture/Menu/Texture_MissionCh0Chuchuan.png",
+  CH1_NanLu: "./Texture/Menu/Texture_MissionCh1NanLu.png",
+  CH2_Shouliudan: "./Texture/Menu/Texture_MissionCh2Shouliudan.png",
+  CH3_Jiuhusuo: "./Texture/Menu/Texture_MissionCh3Jiuhusuo.png",
+  CH4_DongguanYe: "./Texture/Menu/Texture_MissionCh4DongguanYe.png",
+  CH5_Chengqiang: "./Texture/Menu/Texture_MissionCh5Chengqiang.png",
+  CH6_Zuihou: "./Texture/Menu/Texture_MissionCh6Zuihou.png",
+};
+function MissionArt(entry) { return MISSION_ART[entry?.artId || entry?.id] || ""; }
 
 // 菜单只声明布局；开关值及实际效果由装配层交回的 host 管，避免菜单
 // 偷偷持有玩家、物理世界或弹药账本。
@@ -138,8 +149,8 @@ export class MainMenu {
    * @param {object} host
    *   root         DOM 容器（#menu）
    *   camera       THREE.PerspectiveCamera —— 只在 title 态被接管，暂停态不碰
-   *   phases       Data_Battle.PHASES
-   *   sandboxes    可选：选章末尾的沙盒条目数组（靶场 / 白刃 QTE / 关卡白盒）
+   *   campaign     Data_Menu.CAMPAIGN_ENTRIES（正式章节组：第一关 + 占位章节）
+   *   sandboxes    可选：「测试场景」组的沙盒条目数组（靶场 / 白刃 QTE …）
    *   sandboxMode  false | "range" | "melee" | "firstLevelP012Whitebox"
    *   Play(i, o)   进某一关（装配层负责建切片、播过场、进游戏）
    *   PlaySandbox() / ExitSandbox()  进／出靶场（都要重载页面，见 Play()）
@@ -156,27 +167,31 @@ export class MainMenu {
     this.host = host;
     this.root = host.root;
     this.camera = host.camera;
-    this.phases = host.phases || [];
     /**
-     * 选章末尾的**沙盒条目**（核心玩法靶场与 P0/P1/P2 白盒）。
-     * 它与七关并排摆在同一张列表上，但**不进 `this.phases`** —— 进度、「继续」、
-     * 「下一关」标记与 `DefaultLevel()` 一概只按正片七关数，与 Script_Main
-     * 那边「靶场不进 PHASES」的口径是同一条（见 docs/Data_TestRange.md）。
+     * 选章「正式章节」组（Data_Menu.CAMPAIGN_ENTRIES）：第一条是能进的第一关
+     *（现在是 P0/P1/P2 白盒，走 sandbox 那条重载页面的路），后面是只占位的章节
+     *（placeholder：标「未完成」，点了只提示「敬请期待」）。旧七章的 PHASES 不再
+     * 交给菜单 —— `?phase=N` 那条开发入口与 BootTest 仍按它取切片，玩家点不到。
+     */
+    this.campaign = Array.isArray(host.campaign) ? host.campaign.filter(Boolean) : [];
+    /**
+     * 「测试场景」组的**沙盒条目**（核心玩法靶场、白刃 QTE …）。进度、「继续」、
+     * 「下一关」标记与 `DefaultLevel()` 一概不算它们，与 Script_Main 那边
+     * 「靶场不进 PHASES」的口径是同一条（见 docs/Data_TestRange.md）。
      */
     this.sandboxes = Array.isArray(host.sandboxes)
       ? host.sandboxes.filter(Boolean) : (host.sandbox ? [host.sandbox] : []);
     /**
-     * 列表上真正排出来的条目 = 七章 + 测试沙盒。键盘上下也按它走。
-     * **顺序就是分组顺序**：正式章节在前，测试场景在后（docs/Data_MissionRemake.md §9）。
+     * 列表上真正排出来的条目 = 正式章节 + 测试沙盒。键盘上下也按它走。
+     * **顺序就是分组顺序**：正式章节在前，测试场景在后。
      */
-    this.entries = [...this.phases, ...this.sandboxes];
+    this.entries = [...this.campaign, ...this.sandboxes];
     /**
-     * 正式章节数。进度、「继续」、「下一关」标记与 DefaultLevel() 只按这几章算；
-     * 后面带 `deprecated` 的那几章是「暂时废弃场景」（2026-09-06 起第一关到终章），
-     * 列在选章里、标「未完成」、点得进去，但不算正片。
+     * 能进的正式章节数（正式章节组里第一条占位之前的那几条，现在只有第一关）。
+     * 进度、「继续」、「下一关」标记与 DefaultLevel() 只按这几条算。
      */
-    const firstDeprecated = this.phases.findIndex((p) => p.deprecated);
-    this.officialCount = Math.max(1, firstDeprecated < 0 ? this.phases.length : firstDeprecated);
+    const firstPlaceholder = this.campaign.findIndex((entry) => entry.placeholder);
+    this.officialCount = Math.max(1, firstPlaceholder < 0 ? this.campaign.length : firstPlaceholder);
     /** 现在这一局本身就跑在沙盒里（?range=1）：暂停菜单换成「退出靶场」那一套。 */
     this.sandboxMode = host.sandboxMode || false;
 
@@ -262,7 +277,7 @@ export class MainMenu {
     const progress = Progress.Read();
     const resume = progress.furthest > 0 && progress.furthest < this.officialCount;
     const label = resume
-      ? T("menu.item.resume", { label: this.phases[progress.furthest].label })
+      ? T("menu.item.resume", { label: ChapterNumber(PhaseText(this.campaign[progress.furthest], "label")) })
       : Localize(MenuTextId("start"), MENU.start);
     return [
       { id: "start", label,
@@ -337,10 +352,11 @@ export class MainMenu {
    * 选章面板：World at War 纵向任务列表 + 横向任务图与简报。
    *
    * **两组是规格要求**（docs/Data_MissionRemake.md §9）：
-   *   正式章节 —— 七章按序，带「已通过 / 下一关」标记，进度只按这七条算；
-   *   测试场景 —— 列玩法测试靶场、白刃 QTE 与第一关策划白盒。
-   * 混在一张平铺列表里的后果不是难看：玩家分不清「哪些是正片」，
-   * 而旧过场已经从正片流程脱钩了，摆在章节中间等于谎报流程。
+   *   正式章节 —— Data_Menu.CAMPAIGN_ENTRIES：第一关（P0/P1/P2 白盒）带「已通过 / 下一关」
+   *              标记；第二关到终章只占位、标「未完成」，点了只提示「敬请期待」；
+   *   测试场景 —— 列玩法测试靶场、白刃 QTE 等沙盒。
+   * 混在一张平铺列表里的后果不是难看：玩家分不清「哪些是正片」。
+   * 旧序章与旧第一关到终章（PHASES）一条都不列（2026-09-06）—— 它们只剩 ?phase=N 开发入口。
    */
   BuildLevels() {
     const Make = (cls, parent, tag = "div", text = "") => {
@@ -373,15 +389,22 @@ export class MainMenu {
       const b = Make("mnLevel", track, "button");
       b.type = "button";
       b.dataset.i = String(i);
-      b.setAttribute("aria-label", PhaseText(entry, "label"));
-      if (entry.sandbox) b.classList.add("mnSandboxLevel");
-      if (entry.deprecated) b.classList.add("mnDeprecatedLevel");
-      const number = entry.sandbox
-        ? (PhaseText(entry, "glyph") || PhaseText(entry, "sandboxGlyph") || T("menu.level.sandboxGlyph"))
-        : entry.label.split("·")[0].trim();
-      Make("mnLvNo", b, "span", number);
-      Make("mnLvName", b, "span", entry.sandbox
-        ? PhaseText(entry, "label") : MissionName(PhaseText(entry, "label")));
+      const label = PhaseText(entry, "label");
+      const chapter = IsChapter(entry);
+      b.setAttribute("aria-label", chapter ? ChapterNumber(label) : label);
+      if (chapter) {
+        // 章节行只写关号（「第一关」「终章」），关号占满名字栏；旧副题不上屏。
+        // 占位行**不标 aria-disabled**：它点了有反应（简报上亮「敬请期待」），不是禁用控件；
+        // playwright 也把 aria-disabled 当「不可点」，MenuTest 会在这儿卡死。
+        b.classList.add("mnChapterLevel");
+        if (entry.placeholder) b.classList.add("mnPlaceholderLevel");
+        Make("mnLvName", b, "span", ChapterNumber(label));
+      } else {
+        b.classList.add("mnSandboxLevel");
+        Make("mnLvNo", b, "span",
+          PhaseText(entry, "glyph") || PhaseText(entry, "sandboxGlyph") || T("menu.level.sandboxGlyph"));
+        Make("mnLvName", b, "span", label);
+      }
       Make("mnLvMark", b, "span");
       b.addEventListener("pointerenter", (event) => {
         if (event.pointerType === "mouse") this.SelectLevel(i);
@@ -391,16 +414,10 @@ export class MainMenu {
       this.levelEls[i] = b;
     };
     const official = Group(T("menu.group.official.title"), T("menu.group.official.note"), "mnMissionTrack");
-    this.phases.forEach((phase, i) => { if (!phase.deprecated) Row(phase, i, official); });
-    // 暂时废弃场景：第一关到终章的切片还建得出来、点得进去，但没有任务内容，
-    // 也不算正片进度。单独一组，别混进正式章节谎报流程。
-    if (this.phases.some((phase) => phase.deprecated)) {
-      const shelved = Group(T("menu.group.shelved.title"), T("menu.group.shelved.note"), "mnDeprecatedTrack");
-      this.phases.forEach((phase, i) => { if (phase.deprecated) Row(phase, i, shelved); });
-    }
+    this.campaign.forEach((entry, i) => Row(entry, i, official));
     if (this.sandboxes.length) {
       const sandbox = Group(T("menu.group.sandbox.title"), T("menu.group.sandbox.note"), "mnSandboxTrack");
-      this.sandboxes.forEach((entry, i) => Row(entry, this.phases.length + i, sandbox));
+      this.sandboxes.forEach((entry, i) => Row(entry, this.campaign.length + i, sandbox));
     }
   }
 
@@ -420,8 +437,9 @@ export class MainMenu {
   }
 
   /**
-   * 标题下那一行临时提示（序章过场播完回到主菜单时写「后续章节暂时废弃」）。
-   * 只改 titleSub，下一次 Show("title") 会换回 MENU.subtitle —— 它不是状态，是一句话。
+   * 标题下那一行临时提示（?phase=0 开发入口把旧序章过场播完回到主菜单时写
+   * 「后续章节尚未完成」）。只改 titleSub，下一次 Show("title") 会换回 MENU.subtitle ——
+   * 它不是状态，是一句话。
    */
   SetNotice(text) {
     if (!text) return;
@@ -667,15 +685,18 @@ export class MainMenu {
       if (k === this.selected) el.setAttribute("aria-current", "true");
       else el.removeAttribute("aria-current");
       const mark = el.querySelector(".mnLvMark");
-      if (this.entries[k].sandbox) { mark.textContent = T("menu.mark.sandbox"); mark.className = "mnLvMark"; return; }
-      if (this.entries[k].deprecated) { mark.textContent = T("menu.mark.todo"); mark.className = "mnLvMark todo"; return; }
-      const done = progress.cleared.includes(this.entries[k].id);
+      const entry = this.entries[k];
+      if (!IsChapter(entry)) { mark.textContent = T("menu.mark.sandbox"); mark.className = "mnLvMark"; return; }
+      if (entry.placeholder) { mark.textContent = T("menu.mark.todo"); mark.className = "mnLvMark todo"; return; }
+      const done = progress.cleared.includes(entry.id);
       mark.textContent = done ? T("menu.mark.done")
         : (k === progress.furthest && k < this.officialCount ? T("menu.mark.next") : "");
       mark.className = `mnLvMark${done ? " done" : ""}`;
     });
 
     const phase = this.entries[this.selected];
+    const chapter = IsChapter(phase);
+    const title = chapter ? ChapterNumber(PhaseText(phase, "label")) : MissionName(PhaseText(phase, "label"));
     const brief = this.el.brief;
     brief.textContent = "";
     const mk = (cls, tag = "div") => {
@@ -684,12 +705,12 @@ export class MainMenu {
       brief.appendChild(e);
       return e;
     };
-    brief.classList.toggle("sandbox", !!phase.sandbox);
-    if (!phase.sandbox) {
+    brief.classList.toggle("sandbox", !chapter);
+    if (chapter) {
       const art = mk("mnMissionArt", "figure");
       const image = document.createElement("img");
-      image.src = MISSION_ART[this.selected] || "";
-      image.alt = T("menu.aria.missionArt", { name: MissionName(PhaseText(phase, "label")) });
+      image.src = MissionArt(phase);
+      image.alt = T("menu.aria.missionArt", { name: title });
       image.decoding = "async";
       image.draggable = false;
       art.appendChild(image);
@@ -701,13 +722,16 @@ export class MainMenu {
       copy.appendChild(e);
       return e;
     };
-    AppendCopy("mnBriefTitle").textContent = MissionName(PhaseText(phase, "label"));
-    AppendCopy("mnMissionWhen").textContent = phase.sandbox
-      ? PhaseText(phase, "place")
-      : T("menu.brief.when", { date: PhaseText(phase, "date"), place: PhaseText(phase, "place") });
-    AppendCopy("mnMissionObjective").textContent = phase.objectives?.[0]
-      || phase.brief?.[0] || T("menu.brief.defaultObjective");
-    if (phase.sandbox) {
+    AppendCopy("mnBriefTitle").textContent = title;
+    // 占位章节没有日期与地点（旧稿的不上屏），那一行整个不出。
+    const date = PhaseText(phase, "date");
+    const place = PhaseText(phase, "place");
+    if (!chapter) AppendCopy("mnMissionWhen").textContent = place;
+    else if (date && place) AppendCopy("mnMissionWhen").textContent = T("menu.brief.when", { date, place });
+    else if (date || place) AppendCopy("mnMissionWhen").textContent = date || place;
+    AppendCopy("mnMissionObjective").textContent = phase.placeholder ? T("menu.brief.placeholder")
+      : (phase.objectives?.[0] || phase.brief?.[0] || T("menu.brief.defaultObjective"));
+    if (!chapter) {
       const training = mk("mnTrainingPreview");
       training.setAttribute("aria-hidden", "true");
       training.textContent = PhaseText(phase, "glyph") || PhaseText(phase, "sandboxGlyph")
@@ -716,16 +740,29 @@ export class MainMenu {
     }
     const record = mk("mnMissionRecord");
     const cleared = progress.cleared.includes(phase.id);
-    record.classList.toggle("done", !phase.sandbox && !phase.deprecated && cleared);
-    record.classList.toggle("todo", !!phase.deprecated);
+    record.classList.toggle("done", chapter && !phase.placeholder && cleared);
+    record.classList.toggle("todo", !!phase.placeholder);
     const label = document.createElement("span");
-    label.textContent = phase.sandbox ? T("menu.record.sandbox")
-      : phase.deprecated ? T("menu.record.shelved") : T("menu.record.chapter");
+    label.textContent = chapter ? T("menu.record.chapter") : T("menu.record.sandbox");
     const value = document.createElement("b");
-    value.textContent = phase.sandbox ? T("menu.record.sandboxValue")
-      : phase.deprecated ? T("menu.record.shelvedValue")
+    value.textContent = !chapter ? T("menu.record.sandboxValue")
+      : phase.placeholder ? T("menu.brief.placeholder")
         : cleared ? T("menu.mark.done") : T("menu.record.notCleared");
     record.append(label, value);
+  }
+
+  /**
+   * 点了占位章节（第二关到终章）：没有场景可进，在简报目标行下面亮一句「敬请期待」。
+   * 重复点就重新亮一次；换选中项时 SelectLevel 重建简报，这句自然消失。
+   */
+  ShowPlaceholderNotice() {
+    this.el.brief.querySelector(".mnBriefNotice")?.remove();
+    const copy = this.el.brief.querySelector(".mnMissionCopy") || this.el.brief;
+    const notice = document.createElement("div");
+    notice.className = "mnBriefNotice";
+    notice.setAttribute("role", "status");
+    notice.textContent = T("menu.notice.placeholder");
+    copy.appendChild(notice);
   }
 
   // -------------------------------------------------------------------------
@@ -736,7 +773,9 @@ export class MainMenu {
       case "start": {
         const progress = Progress.Read();
         const index = Clamp(progress.furthest, 0, this.officialCount - 1);
-        // 战役入口播关前过场（Esc 可跳）；选章那条直接进，见 Play()
+        // 战役入口：落在「继续」那一章上（现在只有第一关＝P0/P1/P2 白盒，Play 会走
+        // 沙盒那条重载的路）。真挂在 PHASES 上的章从这儿进要播关前过场（Esc 可跳），
+        // 选章那条直接进，见 Play()。
         this.Play(index, { cutscenes: true });
         return;
       }
@@ -764,8 +803,12 @@ export class MainMenu {
    */
   Play(index, opts = {}) {
     if (this.busy) return;
-    if (this.entries[index]?.sandbox) {
-      this.host.PlaySandbox?.(this.entries[index].sandboxKey || "range");
+    const entry = this.entries[index];
+    if (!entry) return;
+    // 占位章节（第二关到终章）：没有场景可进，只在简报上亮一句「敬请期待」。
+    if (entry.placeholder) { this.ShowPlaceholderNotice(); return; }
+    if (entry.sandbox) {
+      this.host.PlaySandbox?.(entry.sandboxKey || "range");
       return;
     }
     // 已经在靶场里了：正片那七章同样换不过去，先退回正片再说。
@@ -844,10 +887,9 @@ export class MainMenu {
   // -------------------------------------------------------------------------
   /** 按当前建好的切片取机位表。切片换了就重取（回主菜单时会用到）。 */
   PickShots(reset = false) {
-    const index = this.host.SliceIndex?.() ?? 0;
-    // 优先问装配层「现在建好的是哪一片」：沙盒与 ?phase=overview 都不在 PHASES 里，
-    // 只按序号去查 this.phases 会取到别人的机位（见 Script_Main 的 SlicePhase 注释）。
-    const phase = this.host.SlicePhase?.() || this.phases[index];
+    // 问装配层「现在建好的是哪一片」：菜单手上没有 PHASES（沙盒与 ?phase=overview
+    // 也都不在 PHASES 里），机位只能按建好的那片取（见 Script_Main 的 SlicePhase 注释）。
+    const phase = this.host.SlicePhase?.();
     if (!phase) return;
     if (!reset && this.shotSliceId === phase.id) return;
     this.shotSliceId = phase.id;
@@ -945,7 +987,7 @@ export class MainMenu {
 
     // 角上那行小字只报地名（ER2 报的是地图名）。note 是写给改坐标的人看的，不上屏。
     if (this.el.shotNote) {
-      const phase = this.host.SlicePhase?.() || this.phases[this.host.SliceIndex?.() ?? 0];
+      const phase = this.host.SlicePhase?.();
       const where = shot.titleKey ? T(shot.titleKey) : (shot.title || shot.id);
       this.el.shotNote.textContent = phase
         ? T("menu.shotNote", { label: PhaseText(phase, "label"), where })

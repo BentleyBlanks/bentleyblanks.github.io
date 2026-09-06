@@ -195,13 +195,14 @@ const CHAPTER_IDS = [
  * 它们仍留在 CHAPTERS / LEVELS / PHASES 里（`?phase=N`、BootTest 七片开机冒烟、
  * ShotTest 逐关出图、编辑器的 phase=5 十字街都按这张表的序号取切片），但带
  * `deprecated: true`：
- *   · 选章里归入「暂时废弃场景」组、标「未完成」，正式章节只剩序章；
- *   · 进章只建场、不装剧本、不摆点、不换关（Script_Main.EnterLevel 按这条旗标短路）；
- *   · 序章过场播完不再自动接第一关，回主菜单；
- *   · 「继续」「下一关」与进度只按 OFFICIAL_LEVEL_COUNT 那几章算。
+ *   · 选章**不再列出**它们（连同序章：序章要并进第一关）。玩家看到的正式章节组是
+ *     Data_Menu.CAMPAIGN_ENTRIES —— 第一关 = P0/P1/P2 白盒，第二关到终章只占位「敬请期待」；
+ *   · 从 ?phase=N 开发入口进章只建场、不装剧本、不摆点、不换关（Script_Main.EnterLevel 按这条旗标短路）；
+ *   · ?phase=0 的序章过场播完不接第一关，回主菜单；
+ *   · OFFICIAL_LEVEL_COUNT 只数 PHASES 前面没打标的章（现在是序章那 1 章），菜单进度不再按它算。
  * 第一关的章节内容（Data_MissionCh1 的 beats / EVENTS / VOICE_LINES）**没有删**：
- * 「第一关 · P0/P1/P2 场景白盒」（Data_FirstLevelP012Whitebox，contentId = CH1_NanLu）
- * 仍从那里取人物与台词。第二到终章的内容已清空成骨架（各文件头注）。
+ * 第一关（Data_FirstLevelP012Whitebox，contentId = CH1_NanLu）仍从那里取人物与台词。
+ * 第二到终章的内容已清空成骨架（各文件头注）。
  */
 export const DEPRECATED_CHAPTER_IDS = Object.freeze([
   "CH1_NanLu", "CH2_Shouliudan", "CH3_Jiuhusuo", "CH4_DongguanYe", "CH5_Chengqiang", "CH6_Zuihou",

@@ -104,7 +104,7 @@ import { CheckpointRecorder } from "./Script_Checkpoint.mjs";
 import { MissionSetpieceDirector, LastLitterArrived } from "./Script_MissionSetpieces.mjs";
 import { RECIPES } from "./Script_TexBake.mjs";
 import {
-  MENU_SCENE, OVERVIEW_PHASE, FULL_SCENE_PHASE, JIEHE_SANDBOX_PHASE,
+  MENU_SCENE, OVERVIEW_PHASE, FULL_SCENE_PHASE, JIEHE_SANDBOX_PHASE, CAMPAIGN_ENTRIES,
 } from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE } from "./Data_Weapons.mjs";
 import { WEAPON_MESH_VARIANTS, WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
@@ -2500,7 +2500,10 @@ async function Boot() {
   // 还要能把编辑器的齿轮藏起来 —— 三样东西到这一步才齐。
   if ((MENU_ON || FIRST_LEVEL_P012_WHITEBOX) && menuRoot) {
     menu = new MainMenu({
-      root: menuRoot, camera, phases: PHASES,
+      // 正式章节组不再交 PHASES（旧序章与旧第一关到终章 2026-09-06 起退出选章，
+      // 只剩 ?phase=N 开发入口与 Debug.StartLevel）：第一关 = P0/P1/P2 白盒，
+      // 后面几章只占位（Data_Menu.CAMPAIGN_ENTRIES）。
+      root: menuRoot, camera, campaign: CAMPAIGN_ENTRIES,
       SliceIndex: () => state.builtPhase,
       GroundHeight: (x, z) => (battlefield ? battlefield.GroundHeight(x, z) : null),
       Unlock: () => audio.Unlock(),
@@ -2511,8 +2514,8 @@ async function Boot() {
       // 携行与七关口径一起翻一遍，重载一次比那条路诚实得多。
       // 玩家可见的测试场景集中保留核心玩法入口。界河与过场仍可通过
       // ?jiehe=1 / ?preview=... 直达，供自动化与内部验收使用，不再混入选章。
-      sandboxes: [MOVEMENT_RANGE_PHASE, WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE,
-        FIRST_LEVEL_P012_WHITEBOX_PHASE],
+      // P0/P1/P2 白盒不在这一组：它已是正式章节组里的「第一关」（CAMPAIGN_ENTRIES[0]）。
+      sandboxes: [MOVEMENT_RANGE_PHASE, WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE],
       sandboxMode: MOVEMENT_RANGE ? "movement" : WEAPON_RANGE ? "weapons" : EXPLOSION_TEST ? "explosions" : RANGE ? "range" : MELEE_TEST ? "melee"
         : FIRST_LEVEL_P012_WHITEBOX ? "firstLevelP012Whitebox" : JIEHE ? "jiehe" : false,
       PlaySandbox: (key) => GoToSandbox(key),
@@ -2559,6 +2562,9 @@ async function Boot() {
     window.Taierzhuang.Debug.MenuAct = (id) => menu.Activate(id);
     window.Taierzhuang.Debug.MenuShow = (mode) => menu.Show(mode);
     window.Taierzhuang.Debug.MenuPlay = (index, opts) => menu.Play(index, opts);
+    // 开发入口：按 PHASES 序号直接进旧七章的切片（选章已不列它们；MenuTest 的暂停/设置
+    // 那几节要一个在跑的关）。不播过场。
+    window.Taierzhuang.Debug.StartLevel = (index, opts = {}) => StartLevel(index, { cutscenes: false, ...opts });
     window.Taierzhuang.Debug.Pause = () => PauseGame();
     window.Taierzhuang.Debug.ResetProgress = () => { Progress.Reset(); };
     window.Taierzhuang.Debug.DebugOptions = () => debugOptions.Get();
@@ -3563,7 +3569,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
 
 /**
  * 正片到此为止：下一章是暂时废弃场景（Data_TengxianScript.DEPRECATED_CHAPTER_IDS），
- * 不接着进。序章过场播完走这里 —— 回主菜单，标题下写一行「后续章节制作中」；
+ * 不接着进。旧序章（2026-09-06 起只剩 ?phase=0 开发入口，选章不列）过场播完走这里 ——
+ * 回主菜单，标题下写一行「后续章节尚未完成」；
  * 没有菜单的入口（?menu=0 / 出图）就盖一张收场卡，别让 Frame 继续推进目标链。
  * **不是** EndBattle("breakout")：那张卡讲的是十七日夜的突围，放在序章后面是谎报流程。
  */
@@ -6902,6 +6909,8 @@ function Frame(dt, render = true) {
     }
     p012Flow.Update(dt, ReadP012ProgressSample());
     if (story.Signalled("P012Complete")) {
+      // 这片白盒就是玩家的第一关：打完记进度，选章里标「已通过」（id 与 CAMPAIGN_ENTRIES[0] 同）。
+      Progress.MarkCleared(FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID, 0);
       p012Runtime.completed = true; ShowPauseMenu(); menu.OpenSandboxComplete();
       profiler.E("story"); return;
     }

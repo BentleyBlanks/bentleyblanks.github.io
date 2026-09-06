@@ -1236,7 +1236,7 @@ async function PlayFrontline() {
         scene: game.Debug.P012Scene(), complete: game.Debug.P012().complete,
         endingText: document.body.innerText };
     });
-    Check(ending.complete && ending.endingText.includes("测试关卡完成")
+    Check(ending.complete && ending.endingText.includes("第一关完成")
       && ending.endingText.includes("重新测试") && ending.endingText.includes("返回主菜单"),
     "独立测试完成后提供重玩和返回主菜单");
     Check(JSON.stringify(ending.before) === JSON.stringify(ending.after),

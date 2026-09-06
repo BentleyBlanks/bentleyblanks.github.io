@@ -276,7 +276,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 ### 过场 / 剧情
 - `Script_Cutscene.mjs` —— 实机演出；只有用户点名的几场夺控制权，战斗内演出不夺。
   分镜数据在 `Data_Cutscene*.mjs`，纯 Node 自检 `Script_CutsceneCheck.mjs`。
-- `Script_Story.mjs` —— 把章节目标链 + 台词 + 分镜按章派发（2026-09-06 起正片只剩序章，第一关内容由 P0/P1/P2 白盒消费，第二到终章为暂时废弃场景）；史实注记卡 `Data_History.mjs`，
+- `Script_Story.mjs` —— 把章节目标链 + 台词 + 分镜按章派发（2026-09-06 起玩家能进的正片只有第一关＝P0/P1/P2 白盒，它消费第一章内容；旧序章与第二到终章退出选章，只剩 ?phase=N 开发入口）；史实注记卡 `Data_History.mjs`，
   编剧红线在 `Data_Script.mjs` 头注与 `docs/Data_HistoryQuotes.md`。先读 `docs/Data_CutsceneRedo.md`。
 
 ### 玩家文本 / 调参表（数据驱动）

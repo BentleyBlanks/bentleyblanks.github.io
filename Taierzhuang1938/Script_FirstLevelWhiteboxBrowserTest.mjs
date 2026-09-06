@@ -29,12 +29,14 @@ try {
   await page.waitForFunction(() => window.Taierzhuang?.menu, null, { timeout: 240000 });
   const result = await page.evaluate(() => {
     const menu = window.Taierzhuang.menu;
-    return { sandboxMode: menu.sandboxMode, phases: menu.phases.length,
-      keys: menu.sandboxes.map(entry => entry.sandboxKey) };
+    return { sandboxMode: menu.sandboxMode, campaign: menu.campaign.length,
+      first: menu.campaign[0]?.sandboxKey, placeholders: menu.campaign.filter(entry => entry.placeholder).length,
+      keys: menu.entries.map(entry => entry.sandboxKey).filter(Boolean) };
   });
-  Check(!result.sandboxMode && result.phases === 7, "旧链接回到正式战役菜单", JSON.stringify(result));
+  Check(!result.sandboxMode && result.campaign === 6 && result.placeholders === 5,
+    "旧链接回到正式战役菜单（第一关 + 五条占位章节）", JSON.stringify(result));
   Check(!result.keys.includes("firstLevelWhitebox"), "已移除旧策划白盒入口");
-  Check(result.keys.includes("firstLevelP012Whitebox"), "保留 P012 白盒入口");
+  Check(result.first === "firstLevelP012Whitebox", "第一关就是 P012 白盒入口");
   Check(errors.length === 0, "浏览器无脚本或控制台错误", errors.join(" | "));
   console.log("FirstLevelWhiteboxBrowserTest PASS");
 } finally {

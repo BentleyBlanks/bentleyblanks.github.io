@@ -17,7 +17,8 @@
 // 切片以外只有地皮没有建筑（Script_TengxianCity 按 bounds 生成），
 // 镜头架到切片外朝外看 = 一片空地，这是最容易犯的错。
 
-import { OVERVIEW_BOUNDS } from "./Data_Battle.mjs";
+import { OVERVIEW_BOUNDS, PHASES } from "./Data_Battle.mjs";
+import { FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./Data_FirstLevelP012Whitebox.mjs";
 
 // ---------------------------------------------------------------------------
 // 两片**不进 PHASES** 的切片（2026-08-29 抛光批 P2）
@@ -224,6 +225,31 @@ export const JIEHE_SANDBOX_PHASE = Object.freeze({
     note: "白盒携行：汉阳造、大刀、木柄手榴弹六枚 —— 够验弹道与投掷落点，不复刻原关的「无枪」开局。",
   }),
 });
+
+// ---------------------------------------------------------------------------
+// 选章「正式章节」组（2026-09-06）
+//
+// 旧七章（序章 + 第一关到终章）整体退出了选章：序章要并进第一关，第一关到终章是
+// 已废弃的旧稿（Data_TengxianScript.DEPRECATED_CHAPTER_IDS）。它们的切片与资产一件
+// 没删 —— `?phase=N`、BootTest 七片冒烟、ShotTest 与编辑器仍按 PHASES 的序号取 ——
+// 只是玩家再也点不到。玩家在选章里看到的是这张表：
+//   · 第一关 = P0/P1/P2 场景白盒（重载进 ?whitebox=p012，与靶场同一条整表替换的路子），
+//     也是主菜单「开始」的落点；
+//   · 第二关到终章只是**占位**（placeholder）：只列关号、标「未完成」，
+//     点了只在简报上提示「敬请期待」，不进任何场景。
+// 占位条目按 PHASES 里带 deprecated 标的那几章生成（去掉第一关：它被白盒顶替了），
+// 章数与关号跟着章节表走，不在这里再抄一份。旧副题、日期、地点随旧稿一起不上屏。
+// ---------------------------------------------------------------------------
+export const CAMPAIGN_ENTRIES = Object.freeze([
+  FIRST_LEVEL_P012_WHITEBOX_PHASE,
+  ...PHASES
+    .filter((phase) => phase.deprecated && phase.id !== FIRST_LEVEL_P012_WHITEBOX_PHASE.contentId)
+    .map((phase) => Object.freeze({
+      id: phase.id, chapter: true, placeholder: true,
+      // 内容原稿（Script_Menu 显示时按 id 过 Localize，再只取「·」前面的关号）。
+      label: phase.label,
+    })),
+]);
 
 /** 焦距语汇沿用分镜表（Script_Cutscene.FovFromFocalMm，35 mm 全画幅等效）。 */
 export const MENU_SCENE = {

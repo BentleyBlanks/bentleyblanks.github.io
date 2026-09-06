@@ -1,6 +1,6 @@
 # 滕县保卫战 · 任务流程重制规格（2026-08-28，源自 Notion《藤县保卫战》修订版）
 
-> **2026-09-06 状态：第一关到终章暂时废弃。** 本文件 §2–§7 描述的六章内容已从代码中清空：`Data_MissionCh2–6.mjs` 只剩切片/出生点/路标骨架，`Data_CutsceneCh1–6.mjs`、`Script_MissionSetpieces` 的 CH2–CH6 摆点、`Audio/vo_ch2_*–vo_ch6_*.mp3` 与整局通关测试 `Script_PlayTest.mjs` 已删除（都在 git 历史 `13594c5ae` 里）。选章里这六章归入「暂时废弃场景」组、标「未完成」，进章只建场景。正片只剩 §1 序章；`Data_MissionCh1.mjs` 的内容仍保留给「第一关 · P0/P1/P2 场景白盒」（`docs/Data_FirstLevelP012Acceptance.md`），新第一关按 Notion 新稿在那里重做。§9 的选章要求以 `Script_Menu.mjs` 现状为准（三组：正式章节 / 暂时废弃场景 / 测试场景）。
+> **2026-09-06 状态：第一关到终章暂时废弃。** 本文件 §2–§7 描述的六章内容已从代码中清空：`Data_MissionCh2–6.mjs` 只剩切片/出生点/路标骨架，`Data_CutsceneCh1–6.mjs`、`Script_MissionSetpieces` 的 CH2–CH6 摆点、`Audio/vo_ch2_*–vo_ch6_*.mp3` 与整局通关测试 `Script_PlayTest.mjs` 已删除（都在 git 历史 `13594c5ae` 里）。选章里**不再列出**这六章，也不再列旧序章（序章要并入第一关；旧切片只剩 `?phase=N` 开发入口）。玩家能进的第一关就是 P0/P1/P2 场景白盒（`docs/Data_FirstLevelP012Acceptance.md`，`Data_MissionCh1.mjs` 的内容保留给它），按 Notion 新稿在那里重做。§9 的选章要求以 `Data_Menu.CAMPAIGN_ENTRIES` 与 `Script_Menu.mjs` 现状为准（两组：正式章节＝第一关 + 第二关到终章的占位「敬请期待」 / 测试场景）。
 
 > 本文件是本轮任务流程重制的**唯一口径**，由 Notion《〈滕县保卫战〉完整修订版任务与关卡规划》及其七个章节子页、过场动画子页、人物介绍页整理而来。实现与本文件冲突时以本文件为准；本文件与 Notion 冲突时以 Notion 为准并回改本文件。
 

@@ -21,8 +21,8 @@ export const TEXT = Object.freeze({
   "menu.item.settings": "设置",
   "menu.item.debug": "调试选项",
   "menu.hint.resume": "从上次通过的下一章接着打",
-  "menu.hint.start": "从序章 · 出川开始，先播车厢那一场过场",
-  "menu.hint.levels": "正式章节、暂时废弃场景与测试场景三组，任选一条直接进（不播过场）",
+  "menu.hint.start": "从第一关开始",
+  "menu.hint.levels": "正式章节与测试场景两组，任选一条直接进",
   "menu.hint.codex": "哪些数是史料、哪些是推定",
   "menu.hint.credits": "史料口径与虚构人物的交代",
   "menu.hint.settings": "操作、画面与声音",
@@ -48,20 +48,21 @@ export const TEXT = Object.freeze({
   "menu.sandbox.range.exit": "退出靶场",
   "menu.sandbox.melee.where": "白刃测试场",
   "menu.sandbox.melee.exit": "退出白刃测试场",
-  "menu.sandbox.firstLevelP012Whitebox.where": "第一关 P0/P1/P2 场景白盒",
-  "menu.sandbox.firstLevelP012Whitebox.exit": "退出 P0/P1/P2 白盒",
+  // 第一关现在就是 P0/P1/P2 白盒（Data_Menu.CAMPAIGN_ENTRIES），玩家面前只叫「第一关」。
+  "menu.sandbox.firstLevelP012Whitebox.where": "第一关",
+  "menu.sandbox.firstLevelP012Whitebox.exit": "退出第一关",
   "menu.sandbox.jiehe.where": "界河白盒",
   "menu.sandbox.jiehe.exit": "退出界河白盒",
 
-  // --- 第一关 P0/P1/P2 白盒的收场与失败面板 ---------------------------------
-  "menu.p012.completeTitle": "第一关 P0/P1/P2 测试关卡完成",
+  // --- 第一关（P0/P1/P2 白盒）的收场与失败面板 -------------------------------
+  "menu.p012.completeTitle": "第一关完成",
   "menu.p012.failTitle": "{name} · 测试失败",
   "menu.item.restartSandbox": "重新测试",
   "menu.item.exitToTitle": "返回主菜单",
   "menu.item.retryAtLoad": "在载物处继续",
   "menu.item.retryCheckpoint": "从检查点继续",
-  "menu.hint.restartSandbox": "从车厢重新开始这一版白盒",
-  "menu.hint.exitSandboxComplete": "退出独立测试，不进入第二章",
+  "menu.hint.restartSandbox": "从车厢重新开始第一关",
+  "menu.hint.exitSandboxComplete": "回到主菜单（第二关尚未完成）",
   "menu.hint.exitSandboxFail": "退出独立测试",
   "menu.hint.retrySandbox": "保留现场进度与剩余补给；仅恢复{name}本人，不移动载物",
 
@@ -71,8 +72,6 @@ export const TEXT = Object.freeze({
   "menu.aria.missionArt": "{name}任务场景图",
   "menu.group.official.title": "正式章节",
   "menu.group.official.note": "滕县保卫战",
-  "menu.group.shelved.title": "暂时废弃场景",
-  "menu.group.shelved.note": "只建场景 · 未完成",
   "menu.group.sandbox.title": "测试场景",
   "menu.group.sandbox.note": "独立测试",
   "menu.level.sandboxGlyph": "靶",
@@ -82,11 +81,13 @@ export const TEXT = Object.freeze({
   "menu.mark.next": "下一关",
   "menu.brief.when": "{date} · {place}",
   "menu.brief.defaultObjective": "进入任务",
+  // 占位章节（第二关到终章，Data_Menu.CAMPAIGN_ENTRIES 的 placeholder）：
+  // 简报目标行与章节记录都写这一句；点了在简报上再亮一句 notice。
+  "menu.brief.placeholder": "未完成 · 敬请期待",
+  "menu.notice.placeholder": "这一关还没做完，敬请期待",
   "menu.record.chapter": "章节记录",
   "menu.record.sandbox": "独立测试",
-  "menu.record.shelved": "暂时废弃场景",
   "menu.record.sandboxValue": "不计入战役进度",
-  "menu.record.shelvedValue": "未完成 · 只建场景，没有任务内容",
   "menu.record.notCleared": "尚未通过",
 
   // --- 史实注记页 -----------------------------------------------------------
@@ -149,10 +150,10 @@ export const TEXT = Object.freeze({
   "menu.slice.jiehe.label": "界河 · 白盒",
   "menu.slice.jiehe.place": "开发专用 · 不属于正片",
 
-  // --- 正片打到序章为止时的告示（Script_Main.EndOfficialCampaign） -----------
+  // --- 旧序章（只剩 ?phase=0 开发入口）播完时的告示（Script_Main.EndOfficialCampaign） ---
   "menu.notice.prologue": "序章",
-  "menu.notice.campaignEnd": "{label}已完 · 后续章节暂时废弃，正按新稿重做",
-  "menu.notice.campaignEndDetail": "第一关到终章归入选章「暂时废弃场景」组：只建场景，没有任务内容。",
+  "menu.notice.campaignEnd": "{label}已完 · 后续章节尚未完成，敬请期待",
+  "menu.notice.campaignEndDetail": "第一关在选章里就是 P0/P1/P2 白盒；第二关到终章尚未完成。",
 });
 
 export const GATED_MODULES = Object.freeze([
