@@ -104,6 +104,16 @@ GVHMR 的 22 个身体关节不提供可靠的手指握法和枪械姿态。持�
 
 登记执行 `Script_MotionFidelityRegister.py` 后运行资产库 `Preview/Script_IndexLibrary.py`。历史保持不变，默认切到 V7。`Script_MotionFidelityVerify.mjs --root <资产库>` 读取实际 GLB 每一帧，核对 21 条解剖骨段方向、原长度、Blender 记录的关节位置、原始恢复在非接缝区的方向及循环首尾。`Script_MotionBatchVerify.mjs --group ReviewV7` 检查两军全部网格完整入镜；继续运行 LibraryDataVerify 与 LibraryVerify 核对原数据、对应时间和播放控件。配方、每模型报告、执行日志与导出保真报告均保存在 `Models/ReviewV7`。
 
+### 大刀刀向与握柄返修（ReviewV8）
+
+大刀不能由双腕连线直接决定刀尖朝向。`Data_DadaoBladeObservations.json` 保存人工查看原片后记录的刀柄到刀尖或可见刀刃线段，使用缓存的 30 fps 输入帧号；出画、遮挡和纵深缩短必须单独记录。原视频若不是 30 fps，应按秒映射，不能拿原生帧号直接套恢复缓存。观测坐标与估计深度分开，单目线段不能证明真实三维刀向或刀刃滚转。
+
+`Script_DadaoBladePrepare.py --root <资产库>` 生成观测平面、深度先验和刀向轨迹；`Script_DadaoBladeBatch.py --root <资产库> --blender <blender.exe>` 从 V7 工程重导出五组大刀动作的两军版本。`--register-only` 仅重新登记已存在的报告与文件。深度分支整段求解，限制相邻帧变化，避免逐帧选择近/远解造成突然翻刀。滚转采用平行传输，仍需在实际模型中查看刀刃方向。
+
+保持 V7 的身体、大臂、手肘和原骨长；先适配刀的可估计深度和柄上握距，再修掌面、拇指和手指。若原恢复双腕与短刀柄不能同时接触，仅将前臂末端投影到固定手肘、固定骨长的最近可握位置，逐帧记录腕点位移和前臂角度。此接触修正不能再标注为双腕完全保真，也不能用零握点残差代替自然度验收。原始恢复及 V7 保持不变。
+
+`Script_DadaoBladeCheck.py` 把烘焙刀向投回原片观测平面；`Script_DadaoBladeVerify.mjs` 检查实际 GLB 每帧的刀向、道具位置、身体矩阵、固定手肘和前臂骨长，另报告腕点修正与相邻帧转角。继续用 `Script_MotionBatchVerify.mjs --group ReviewV8` 检查完整入镜和三栏同步出图。报告、工程和 GLB 只留资产库；仅这五组动作更新为最新 V8，其余保持原版本。刀尖出画和单目深度不确定性应留在审阅说明中。
+
 每轮交付可编辑 `.blend`、包含原人物和动画的 `.glb`、实时预览入口、来源/修正说明与验收记录。历史版本可比较，新版区分“待审阅”“需修正”“已接受”。用户要求先本地看时，不直接替换线上正式动作。得到接入范围后再按项目规则导出游戏动作库、测试和发布。
 
 当前 SMPL-X/GVHMR 研究产物按用户授权仅用于非商业研究和效果验证；正式商业使用前重新核对模型及来源许可。

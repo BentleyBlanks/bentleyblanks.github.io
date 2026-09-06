@@ -17,6 +17,7 @@ for pattern in ['Models/ReviewV*','Blender/ReviewV*','Models/DeathCollapseV*','B
     for folder in root.glob(pattern):
         paths.update(p for p in folder.rglob('*') if p.is_file() and '__pycache__' not in p.parts and p.suffix not in ['.log'])
 paths.update(p for name in ['Data_ReadMe.md','Data_Standard.md'] if (p:=root/name).is_file())
+paths.update(p for p in root.glob('Data_ReviewV*.md') if p.is_file())
 records=[]
 for file in sorted(paths):
     assert file.resolve().is_relative_to(root) and file.is_file(),file
