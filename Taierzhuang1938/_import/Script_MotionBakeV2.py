@@ -75,6 +75,13 @@ def Base(index,drop=0):
   if part=='Pelvis':point=pelvis
   elif 'Thigh' in part:point=pelvis+rotations['Pelvis'].to_3x3()@(heads[N(part)]-heads[N('Pelvis')])
   else:point=positions[parent]+rotations[parent].to_3x3()@(heads[N(part)]-heads[N(parent)])
+  if kind=='melee' and parent in mapping:
+   # SMPL collar/spine bind axes differ from the original BIP character.
+   # Transfer observed segment directions with original segment lengths;
+   # rotating BIP's collar offset with the SMPL matrix lifts shoulders above neck.
+   source=motion['sourceRelativeJoints'][index]
+   direction=Vector(source[mapping[part]])-Vector(source[mapping[parent]])
+   point=positions[parent]+direction.normalized()*(heads[N(part)]-heads[N(parent)]).length
   positions[part]=point;Put(part,point,rotations[part])
  for b in arm.pose.bones:
   if 'Finger' in b.name:
@@ -177,6 +184,8 @@ def Props(index,positions,rotations):
    grip=point if side=='R' else matrix@Vector((0,-.012,-.245*scale))
    errors.append(Hand(side,grip,(forward*.4+up*.9165).normalized() if side=='R' else forward,right if side=='R' else up,positions,rotations))
  return max(errors or [0])
+if kind=='melee':
+ exec(compile(Path(__file__).with_name('Script_MeleeVideoContact.py').read_text(encoding='utf-8'),'MeleeVideoContact','exec'))
 action=bpy.data.actions.new('Animation_'+faction+'_'+clip+f'_V{revision}');action.use_fake_user=True;arm.animation_data_create();arm.animation_data.action=action
 rifle.animation_data_create();rifle.animation_data.action=bpy.data.actions.new(action.name+'_Rifle');rifle.animation_data.action.use_fake_user=True
 scene.render.fps=60;scene.frame_start=1;scene.frame_end=count+1;previous={};samples=[]
@@ -261,3 +270,5 @@ for img in bpy.data.images:
 bpy.ops.wm.save_as_mainfile(filepath=str(blendPath),compress=True)
 (out/f'Data_{faction}_{clip}_Validation.json').write_text(json.dumps({'status':'requires_visual_review','retargetScale':ratio,'variants':variants,'samples':samples,'maxGripError':max(s['gripError'] for s in samples),'minSoleHeight':min(h for s in samples for h in s['soles'].values())},indent=2),encoding='utf-8')
 print('DONE',faction,clip,flush=True)
+if kind=='melee':
+ exec(compile(Path(__file__).with_name('Script_MeleeVideoBodyExport.py').read_text(encoding='utf-8'),'MeleeVideoBodyExport','exec'))

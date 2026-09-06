@@ -30,7 +30,7 @@
 // 不用 Math.random。视觉审查靠逐轮截图比对，画面自己在抖就没法判断版本好坏。
 
 import * as THREE from "three";
-import { SampleMeleeFirstPerson } from "./Script_MeleeAnimation.mjs";
+import { SampleMeleeFirstPerson, SampleMeleeVideo } from "./Script_MeleeAnimation.mjs";
 import { CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { WEAPONS, GUN_MELEE } from "./Data_Weapons.mjs";
 import { Mulberry32, HashString, Clamp, Clamp01, Mix } from "./Script_Noise.mjs";
@@ -2437,6 +2437,7 @@ export class Viewmodel {
       else this.riggedArms.SetPoseState({ ads: Clamp01(ads), sprint: Clamp01(sprintValue),
         reload: this.action?.kind === "reload", reloadBlend: this.reloadBlend, melee: !!input.meleeCombat,
         fire: 1-Ease.InOut(Ease.Seg(this.flashTime,0.055,0.18)) });
+      if (this.meleeVideoFrame) this._ApplyMeleeVideo();
       this.riggedArms.Update(step);
     }
     if (!this.weapon && !this.riggedArms) this._UpdateUnarmedHands(gait, sprint, grounded ? 1 : 0);
@@ -2582,6 +2583,8 @@ export class Viewmodel {
 
   /** 把所有会被动画改动的东西恢复到静止姿态。 */
   _ResetAnimatedParts() {
+    this.meleeVideoFrame = null;
+    if (this.riggedArms) this.riggedArms.videoBody = null;
     this.actionPivot.position.set(0, 0, 0);
     this.actionPivot.rotation.set(0, 0, 0);
     this.reloadPivot.position.set(0, 0, 0);
@@ -3057,11 +3060,17 @@ export class Viewmodel {
 
   /** Source channels are baked in Blender; existing grip/arm IK follows the animated weapon. */
   _AnimMeleeBaked(pose) {
+    this.meleeVideoFrame = SampleMeleeVideo(pose);
     const frame = SampleMeleeFirstPerson(pose);
     if (!frame || !this.rig) return;
     this.actionPivot.position.set(frame[0], frame[1], frame[2]);
     this.actionPivot.rotation.set(frame[3], frame[4], frame[5], "YXZ");
     this.swingPivot.rotation.set(frame[6] || 0, frame[7] || 0, frame[8] || 0, "YXZ");
+    if (this.meleeVideoFrame) {
+      this.actionPivot.position.set(0,pose.weapon === "Bayonet" ? .055 : 0,pose.weapon === "Bayonet" ? -.12 : 0);
+      this.actionPivot.quaternion.identity();
+      this.swingPivot.quaternion.identity();
+    }
     this.actionPivot.rotation.y += THREE.MathUtils.clamp(pose.weaponYawOffset || 0,-1.1,1.1);
     if (pose.state === "qte") {
       const struggle = 1 - pose.progress;
@@ -3069,6 +3078,35 @@ export class Viewmodel {
       this.actionPivot.position.y += Math.sin(this.elapsed * 43) * (0.003 + struggle * 0.008);
     }
     this.lastMeleeClip = pose.clip;
+  }
+
+  _ApplyMeleeVideo() {
+    const frame = this.meleeVideoFrame, rig = this.riggedArms, values = frame.values;
+    const weight = frame.weight;
+    const length = rig.armLength.r.upper + rig.armLength.r.lower;
+    const scale = length / frame.sourceArmLength;
+    const rotation = new THREE.Quaternion().slerp(new THREE.Quaternion().fromArray(values,3),weight*.65);
+    const displacement = new THREE.Vector3().fromArray(values).multiplyScalar(scale*weight*.45);
+    if (frame.source === "StaffThrustsV1") {
+      // The source starts at the waist; the FPS rifle is already at chest
+      // height. Preserve its thrust timing/path without repeating that lift.
+      displacement.y *= .12/.45;
+      displacement.z *= .30/.45;
+    }
+    // Rotate the prop about the calibrated dominant grip. The camera carrier
+    // stays fixed, so it cannot drag shoulders along with the weapon.
+    this.root.updateWorldMatrix(true,true);
+    const grip = this.recoilPivot.worldToLocal(this.gripContactRight.getWorldPosition(new THREE.Vector3()));
+    this.weaponMount.position.sub(grip).applyQuaternion(rotation).add(grip).add(displacement);
+    this.weaponMount.quaternion.premultiply(rotation);
+    const body = rig._CurrentBody();
+    rig.videoBody = {shoulders:{},elbowPoles:{}};
+    for (const [key,offset,pole] of [["right",7,13],["left",10,16]]) {
+      rig.videoBody.shoulders[key] = new THREE.Vector3().fromArray(body.shoulders[key])
+        .add(new THREE.Vector3().fromArray(values,offset).multiplyScalar(scale*weight*.5)).toArray();
+      rig.videoBody.elbowPoles[key] = new THREE.Vector3().fromArray(body.elbowPoles[key]).normalize()
+        .lerp(new THREE.Vector3().fromArray(values,pole).normalize(),weight*.65).normalize().toArray();
+    }
   }
 
   /**

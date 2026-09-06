@@ -9,7 +9,7 @@ from mathutils import Matrix
 def ExportInfantry(filepath,animationName):
  scene=bpy.context.scene
  arm=next(o for o in scene.objects if o.type=='ARMATURE')
- props=[o for o in scene.objects if o.name.startswith('Socket_') and o.name.endswith(('InfantryRifle','InfantryGrenade'))]
+ props=[o for o in scene.objects if o.name.startswith('Socket_') and o.name.endswith(('InfantryRifle','InfantryGrenade')) and o.animation_data and o.animation_data.action]
  factor=2 if 'GrenadeThrow' in animationName else 1
  originalStart,originalEnd,originalFps=scene.frame_start,scene.frame_end,scene.render.fps
  originalArmAction=arm.animation_data.action

@@ -24,14 +24,16 @@ for name,cfg in recipes.items():
         report=json.loads(reportPath.read_text(encoding='utf-8'))
         v=report['variants'][0]
         sourceName=cfg.get('source',name)
-        review={'sourceVideo':f'Video/Sources/{sourceName}/Video_{sourceName}.mp4',
+        review={'sourceVideo':cfg.get('sourceVideo',f'Video/Sources/{sourceName}/Video_{sourceName}.mp4'),
             'sourceRangeSeconds':[x/30 for x in v['sourceFrames']],'recoveryFps':30,
             'recoveryLabel':'GVHMR 原始恢复 · 未重定向、未修脚',
             'recoveryTracks':[{'path':f'Models/RecoveryPreview/Data_V{revision}_{name}RawJoints.json','offset':[0,0,0]}],
             'defaultCameraYawRadians':cfg.get('defaultCameraYawRadians',.7853981633974483),'cameraElevationRadians':cfg.get('cameraElevationRadians',.65),
             'sideCameraYawRadians':-1.5707963267948966}
-        for key,path in [('recoveryBlend',f'Blender/RawRecovery/Scene_{name}RawRecovery_V{revision}.blend'),('recoveryGlb',f'Models/RecoveryPreview/Animation_{name}RawRecovery_V{revision}.glb')]:
+        rawName=sourceName if cfg.get('kind')=='melee' else name
+        for key,path in [('recoveryBlend',f'Blender/RawRecovery/Scene_{rawName}RawRecovery_V{revision}.blend'),('recoveryGlb',f'Models/RecoveryPreview/Animation_{rawName}RawRecovery_V{revision}.glb')]:
             if (root/path).exists():review[key]=path
+        if cfg.get('kind')=='melee':review['firstPersonBlend']='Blender/MeleeVideoV1/Scene_MeleeVideoFirstPerson.blend'
         if cfg.get('sourceAssessment'):review['sourceAssessment']=cfg['sourceAssessment']
         ratio=report['retargetScale']
         travel=motion['sourceTravelMeters']

@@ -16,7 +16,7 @@ import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/Skelet
 import { FpsArmPose, FpsArmStateRotation, FPS_ARM_LIMITS, FPS_BAYONET_SUPPORT } from "./Data_FpsArmPoses.mjs";
 import { CaptureAnatomy, ApplyAnatomicalFingers, AimAnatomicalBone } from "./Script_FpsAnatomy.mjs";
 
-const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=5", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
+const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
 const PROFILE_CLIPS = Object.freeze({
   rifle: "RifleIdle",
   lmg: "MachineGunFire",
@@ -450,6 +450,7 @@ export class FpsArmRig {
   }
 
   _CurrentBody() {
+    if (this.videoBody) return this.videoBody;
     if (this.unarmed) return { shoulders: { right:[0.19,-0.36,-0.07], left:[-0.19,-0.36,-0.07] },
       elbowPoles: {right:[0.3,-0.8,0.15], left:[-0.3,-0.8,0.15]} };
     if (!this.poseSpec) return null;
@@ -616,7 +617,8 @@ export class FpsArmRig {
     chosen.normalize();
     const previousPlane = chosen.clone();
     const SignedAngle = (from,to) => Math.atan2(direction.dot(new THREE.Vector3().crossVectors(from,to)),from.dot(to));
-    if (computeGoal) chosen.applyAxisAngle(direction,THREE.MathUtils.clamp(SignedAngle(chosen,pole),
+    if (this.videoBody) chosen.copy(pole);
+    else if (computeGoal) chosen.applyAxisAngle(direction,THREE.MathUtils.clamp(SignedAngle(chosen,pole),
       -FPS_ARM_LIMITS.elbowReturnRadPerS*this.solveDt,FPS_ARM_LIMITS.elbowReturnRadPerS*this.solveDt));
     const axial = handDirection.dot(direction);
     const radius = upper*Math.sin(angle);

@@ -11,7 +11,7 @@ target=root/'Data_DeliveryManifest.json'
 previous=json.loads(target.read_text(encoding='utf-8')) if target.exists() else {'files':[]}
 paths={root/item['path'] for item in previous['files']}
 for pattern in ['Models/ReviewV*','Blender/ReviewV*','Models/DeathCollapseV*','Blender/DeathCollapseV*',
-    'Models/NextTenV*','Blender/NextTenV*',
+    'Models/NextTenV*','Blender/NextTenV*','Models/MeleeVideoV*','Blender/MeleeVideoV*',
     'Models/RecoveryPreview','Blender/RawRecovery','Models/SourceWeapons','Models/_Pipeline',
     'Models/_Cache/*','Video/Sources/*','Preview']:
     for folder in root.glob(pattern):

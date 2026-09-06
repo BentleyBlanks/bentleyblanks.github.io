@@ -216,6 +216,14 @@ Test('even exhausted resistances remain winnable with the supported input cap',(
     assert.equal(q.active?.success,true,kind);
   }
 });
+Test('successful parry keeps monotonic video time and an interruptible visual recovery',()=>{
+  const {p,c}=Make('Dadao',1.1);assert(c.Parry());Step(c,.08);
+  const before=c.Pose(c.Fighter(p));assert(c.events.some(e=>e.kind==='weaponBeat'));
+  assert(Math.abs(before.animationNormalized-before.t/(R.parryWindowS+R.parryRecoveryS))<1e-8);
+  Step(c,.14);assert.equal(c.Fighter(p).state,'idle');
+  const recovery=c.Pose(c.Fighter(p));assert(recovery.visualRecovery);assert(recovery.animationNormalized>before.animationNormalized);
+  assert(c.AttackDown());assert.equal(c.Fighter(p).state,'charge');assert(!c.Pose(c.Fighter(p)).visualRecovery);
+});
 console.log(`${count} melee rule tests passed`);
 
 assert.deepEqual(failures,[]);

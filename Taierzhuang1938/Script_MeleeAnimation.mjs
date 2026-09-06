@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { MELEE_NRA_ANIMATIONS } from './Data_MeleeNraAnimations.mjs';
 import { MELEE_IJA_ANIMATIONS } from './Data_MeleeIjaAnimations.mjs';
+import { MELEE_VIDEO_ANIMATIONS } from './Data_MeleeVideoAnimations.mjs';
 const q0=new THREE.Quaternion(),q1=new THREE.Quaternion(),qr=new THREE.Quaternion(),qp=new THREE.Quaternion(),qd=new THREE.Quaternion();
 const v=new THREE.Vector3(),vp=new THREE.Vector3(),vs=new THREE.Vector3(),inv=new THREE.Matrix4();
 function Samples(data,pose) {
@@ -26,6 +27,31 @@ export function SampleMeleeFirstPerson(pose) {
   const pair=Samples(MELEE_NRA_ANIMATIONS,pose);if(!pair)return null;
   const start=MELEE_NRA_ANIMATIONS.parts.length*7;
   return Array.from({length:9},(_,i)=>THREE.MathUtils.lerp(pair.a[start+i],pair.b[start+i],pair.mix));
+}
+/** Actual recovered wrist/shoulder/elbow tracks, sampled at gameplay phase time. */
+export function SampleMeleeVideo(pose, transition = true) {
+  if (!pose) return null;
+  const clip = MELEE_VIDEO_ANIMATIONS.clips[pose.clip];
+  let result = null;
+  if (clip) {
+    const frame = THREE.MathUtils.clamp(pose.animationNormalized ?? pose.normalized ?? 0,0,1)*30;
+    const i = Math.floor(frame), mix = frame-i, a = clip.frames[i], b = clip.frames[Math.min(30,i+1)];
+    const values = a.map((value,index)=>THREE.MathUtils.lerp(value,b[index],mix));
+    const rotation = new THREE.Quaternion().fromArray(a,3).slerp(new THREE.Quaternion().fromArray(b,3),mix).normalize();
+    rotation.toArray(values,3);
+    result = {values, sourceArmLength:clip.sourceArmLength, weight:1, source:clip.source};
+  }
+  if (transition && pose.transition?.mix < 1) {
+    const previous = SampleMeleeVideo(pose.transition.from,false), mix = pose.transition.mix;
+    if (previous && result) {
+      const rotation = new THREE.Quaternion().fromArray(previous.values,3)
+        .slerp(new THREE.Quaternion().fromArray(result.values,3),mix);
+      result.values = result.values.map((value,i)=>THREE.MathUtils.lerp(previous.values[i],value,mix));
+      rotation.toArray(result.values,3);
+    } else if (result) result.weight = mix;
+    else if (previous) result = {...previous,weight:1-mix};
+  }
+  return result;
 }
 export class MeleeAnimationPlayer {
   constructor(root,kind) {

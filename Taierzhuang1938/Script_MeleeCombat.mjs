@@ -53,6 +53,10 @@ export class MeleeCombatDirector {
   }
   SetState(f, state, duration = 0, clip = null) {
     const previous=this.Pose(f);
+    // Successful contact releases input early. Let the captured deflection
+    // finish visually, while any new attack can interrupt it immediately.
+    f.parryVisualTail = state === "idle" && f.state === "parry"
+      ? {pose:previous,startedAt:this.time-f.t,duration:R.parryWindowS+R.parryRecoveryS} : null;
     if(previous) {delete previous.transition;f.previousPose=previous;f.transitionAt=this.time;}
     f.state = state; f.t = 0; f.duration = duration; f.clip = clip; f.actionSerial++; f.feint = false;
     if (state !== "attack") f.attack = null;
@@ -580,9 +584,9 @@ export class MeleeCombatDirector {
     }
     const phase = f.attack ? f.t < f.attack.windup ? "windup" : f.t < f.attack.windup + f.attack.active ? "active" : "recovery" : f.state;
     const attackTime=f.attack ? (f.t<f.attack.windup ? f.t/f.attack.windup*f.attack.baseWindup : f.attack.baseWindup+f.t-f.attack.windup) / f.attack.baseDuration : null;
-    return { managed: true, weapon: f.weapon, state: f.state, phase, clip: `${f.weapon}${clip}`, action: clip,
+    const result = { managed: true, weapon: f.weapon, state: f.state, phase, clip: `${f.weapon}${clip}`, action: clip,
       t: f.t, duration: f.duration, normalized: f.duration ? Clamp(f.t / f.duration, 0, 1) : (f.t % 1),
-      animationNormalized:attackTime,
+      animationNormalized:attackTime ?? (f.state === "parry" ? f.t/(R.parryWindowS+R.parryRecoveryS) : null),
       transition:f.previousPose && this.time-f.transitionAt<.07 ? {from:f.previousPose,mix:Clamp((this.time-f.transitionAt)/.07,0,1)} : null,
       weaponYawOffset:f.attack?.locked?Wrap(f.attack.yaw-(f.entity.yaw||0)):0,
       stamina: f.stamina, poise: f.poise, actionSerial: f.actionSerial,
@@ -593,6 +597,14 @@ export class MeleeCombatDirector {
       focusPitch: a?.kind === "ground" ? .70 : -.28,
       move: f.move, targetId: f.target?.id ?? null, role: f.role?.kind || null,
     };
+    const tail=f.parryVisualTail;
+    if(f.state === "idle" && tail) {
+      const elapsed=this.time-tail.startedAt;
+      const from={...tail.pose,t:elapsed,animationNormalized:Clamp(elapsed/tail.duration,0,1),transition:null};
+      if(elapsed<tail.duration) return {...result,clip:from.clip,action:from.action,animationNormalized:from.animationNormalized,transition:null,visualRecovery:true};
+      if(elapsed<tail.duration+.07)result.transition={from,mix:(elapsed-tail.duration)/.07};
+    }
+    return result;
   }
   ViewPose() { return this.CanUse() ? this.Pose(this.Fighter(this.Player())) : null; }
   View() { return this.qte.View(); }

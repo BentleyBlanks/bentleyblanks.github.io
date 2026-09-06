@@ -155,7 +155,7 @@ export const FPS_ARM_POSES = Freeze({
   }),
   Dadao: WeaponPose({
     family: "melee", hip: FixedPose(V(0.235, -0.195, -0.520), V(0.720, -0.620, 1.540)), ads: FixedPose(V(0.175, -0.170, -0.470), V(0.900, -0.540, -1.500)), sprint: FixedPose(V(0.255, -0.225, -0.500), V(-0.130, -0.520, 1.890)),
-    right: Contact(V(0, 0, 0.030), V(0.05208, -1.93229, -1.75862), CLOSED), left: Contact(V(0, 0, 0.155), V(0.20553, -2.61358, -0.42501), CLOSED),
+    right: Contact(V(0, 0, 0.030), V(0.05208, -1.93229, -1.75862), CLOSED, TRIGGER, {thumbDirection:[0,-.7,1],thumbRoll:0}), left: Contact(V(0, 0, 0.155), V(0.20553, -2.61358, -0.42501), CLOSED, TRIGGER, {thumbDirection:[0,-.7,1],thumbRoll:0}),
     bodyHip: BladeBody(-0.500, -0.175), bodyAds: BladeBody(-0.470, -0.175), bodySprint: BladeBody(-0.440, -0.165), actions: { melee: { family: "dadao", release: 0.18 } },
   }),
   OfficerSwordSet: WeaponPose({

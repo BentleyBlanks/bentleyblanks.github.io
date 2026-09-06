@@ -5,6 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {MELEE_NRA_ANIMATIONS as nra} from './Data_MeleeNraAnimations.mjs';
 import {MELEE_IJA_ANIMATIONS as ija} from './Data_MeleeIjaAnimations.mjs';
+import {MELEE_VIDEO_ANIMATIONS as video} from './Data_MeleeVideoAnimations.mjs';
 import {MELEE_ANIMATION_ACTIONS as actions} from './Data_MeleeCombat.mjs';
 import {FPS_ARM_LIMITS} from './Data_FpsArmPoses.mjs';
 import {MESHES,WeaponMeshId,WEAPON_MESH_VARIANTS} from './Data_Meshes.mjs';
@@ -24,6 +25,14 @@ for(const data of [nra,ija]) {
   }
 }
 const bake=process.argv.includes('--bakefp');
+for(const weapon of ['Dadao','Bayonet']) for(const action of ['Light','LightAlt','Heavy','ParryLeft','ParryRight','Compact','CompactAlt']) {
+  const clip=video.clips[weapon+action];assert(clip,`missing recovered source ${weapon}${action}`);
+  assert.match(clip.sourceSha256,/^[a-f0-9]{64}$/);assert.match(clip.recoverySha256,/^[a-f0-9]{64}$/);
+  assert.equal(clip.frames.length,31);assert.equal(clip.sourceFrames.length,31);
+  assert(clip.sourceFrames.every((v,i,a)=>Number.isFinite(v)&&(!i||v>a[i-1])));
+  for(const row of clip.frames){assert.equal(row.length,19);assert(row.every(Number.isFinite));}
+  for(const library of [nra,ija])assert.match(library.clips[weapon+action].source,/GVHMR video/);
+}
 const server=await ServeRoot(path.resolve(project,'..'),0);
 const browser=await LaunchBrowser();
 const page=await browser.newPage({viewport:{width:1440,height:900}});
@@ -71,6 +80,12 @@ try {
           T.camera.updateWorldMatrix(true,true);rig.root.updateWorldMatrix(true,true);
           const actor=T.ai.soldiers[0].actor;
           if(actor.characterRig.meleeAnimation.bones.length!==50)throw new Error('Unmatched third person bones');
+          if(weapon==='Bayonet'&&['Light','Heavy'].includes(action)&&i===12){
+            const origin=actor.weaponGroup.getWorldPosition(new THREE.Vector3());
+            const barrel=actor.weaponGroup.localToWorld(actor.weaponMuzzle.clone()).sub(origin).normalize();
+            const toward=T.player.position.clone().sub(actor.root.getWorldPosition(new THREE.Vector3()));toward.y=0;toward.normalize();
+            if(barrel.dot(toward)<.85)throw new Error(`${action}: recovered thrust points away from opponent`);
+          }
           if(T.viewmodel.lastMeleeClip!==weapon+action)throw new Error('Missing first person animation');
           if(!T.viewmodel.root.visible)throw new Error('Invisible first person weapon after reset');
           const hand=rig.bones.r.hand.getWorldPosition(new THREE.Vector3()).project(T.camera);

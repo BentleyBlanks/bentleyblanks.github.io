@@ -90,14 +90,14 @@ export function ApplyAnatomicalFingers(rig) {
       const match = bone.name.match(/finger(\d)(\d)?$/i);
       if (!match) continue;
       const finger = Number(match[1]); const segment = Number(match[2] || 0);
-      const baseCurl = contact?.fingers?.[finger] || (rig.unarmed ? [55, 76, 40].map((value,index)=>THREE.MathUtils.lerp([18,28,18][index],value,rig.poseState.sprint)) : side === "r" && finger === 1
+      const baseCurl = contact?.fingers?.[finger] || (rig.unarmed ? [55, 76, 40].map((value,index)=>THREE.MathUtils.lerp([18,28,18][index],value,rig.poseState.sprint)) : firearm && side === "r" && finger === 1
         ? [14, 28, 20] : (contact?.curl || [56, 74, 46]));
       const curl = baseCurl.map((value,index) => THREE.MathUtils.lerp(
         THREE.MathUtils.lerp(value, finger === 1 ? (contact?.triggerFingers?.[index] ?? value) : value, fire),
         working?.fingers?.[finger]?.[index] ?? value, workingBlend));
       // Thumb opposition comes from its CMC joint, independently of the four
       // finger hinges. Keep it along the grip instead of crossing the slide.
-      if ((firearm || rig.unarmed) && finger === 0 && segment === 0) {
+      if ((firearm || rig.unarmed || contact?.thumbDirection) && finger === 0 && segment === 0) {
         const target = (contact?.thumbDirection ? new THREE.Vector3().fromArray(contact.thumbDirection)
           : new THREE.Vector3(0,rig.unarmed ? -0.50 : -0.28,1));
         if (working?.thumbDirection) {

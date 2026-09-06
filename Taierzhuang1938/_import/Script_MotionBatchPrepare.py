@@ -29,7 +29,7 @@ for name in args.ids:
     query=np.linspace(a,b,(b-a)*2+1)
     forward=data['worldGlobalRotations'][:20,0,:,2].mean(0)
     direction=conversion@forward
-    heading=Rotation.from_euler('z',-np.pi/2-np.arctan2(direction[1],direction[0])).as_matrix()
+    heading=Rotation.from_euler('z',cfg.get('headingRadians',-np.pi/2-np.arctan2(direction[1],direction[0]))).as_matrix()
     transform=heading@conversion
     allJoints=gaussian_filter1d(data['worldJoints']@transform.T,.6,axis=0)
     floor=gaussian_filter1d(percentile_filter(np.min(allJoints[:,[10,11],2],axis=1),25,size=25),8)
@@ -80,6 +80,9 @@ for name in args.ids:
         'contactWeights':np.stack(contacts,axis=1).tolist(),
         'sourceRelativeJoints':CubicSpline(ids,allJoints[ids]-allJoints[ids,0,None])(query).tolist(),
         'seamBlendSourceFrames':seam if cfg['loop'] else 0}
+    if cfg.get('kind')=='melee' and cfg.get('weapon')=='Bayonet':
+        prop=np.load(path.with_name('Data_PropTrack.npz'))['worldPropRotations']
+        result['propRotations']=(transform@Slerp(np.arange(len(prop)),Rotation.from_matrix(prop))(query).as_matrix()).tolist()
     (runtime/f'Data_{name}Motion.json').write_text(json.dumps(result),encoding='utf-8')
     positions=data['worldJoints']
     raw={'schemaVersion':1,'stage':'GVHMR worldJoints before retarget, filtering, IK or loop correction',

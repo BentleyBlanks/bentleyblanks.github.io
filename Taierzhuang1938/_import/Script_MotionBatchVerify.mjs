@@ -8,12 +8,14 @@ if(!root||root==='--root')throw Error('--root required');
 const group=args.includes('--group')?args[args.indexOf('--group')+1]:'NextTenV1';
 const reportName=group==='NextTenV1'?'Data_BatchPlaybackValidation.json':`Data_${group}PlaybackValidation.json`;
 const recipes=JSON.parse(await fs.readFile(path.join(root,'Models',group,'Data_Recipes.json'),'utf8'));
+const reviewOutput=group==='MeleeVideoV1'?path.join(root,'Preview',group):path.join(root,'Preview');
+await fs.mkdir(reviewOutput,{recursive:true});
 const browser=await LaunchBrowser(),results=[],errors=[];
 function MatrixDelta(a,b){return Math.max(0,...a.map((value,i)=>Math.abs(value-b[i])))}
 try{
  const page=await browser.newPage({viewport:{width:1700,height:1000}});
  page.on('pageerror',error=>errors.push(error.message));
- for(const name of Object.keys(recipes)){
+ for(const name of Object.keys(recipes).filter(name=>!args.includes('--ids')||args[args.indexOf('--ids')+1].split(',').includes(name))){
   await page.goto('http://127.0.0.1:8136/Preview/index.html?action='+name);
   await page.waitForFunction(()=>window.MotionReview&&!MotionReview.loading&&MotionReview.video.readyState>=2);
   for(const faction of ['Nra','Ija']){
@@ -37,8 +39,8 @@ try{
     if(name==='RifleStrafeLeft')assert.ok(state.anatomicalLeftDisplacement>0,'Actual GLB left strafe');
     if(name==='RifleStrafeRight')assert.ok(state.anatomicalLeftDisplacement<0,'Actual GLB right strafe');
     samples.push(state);
-    if([0,.5,1].includes(phase))await page.screenshot({path:path.join(root,'Preview',`Texture_Batch_${name}_${faction}_${phase===0?'Start':phase===1?'End':'Middle'}.png`)});
-    if(faction==='Nra'&&phase===.5)await page.screenshot({path:path.join(root,'Preview',`Texture_Latest_${name}.png`)});
+    if([0,.5,1].includes(phase))await page.screenshot({path:path.join(reviewOutput,`Texture_Batch_${name}_${faction}_${phase===0?'Start':phase===1?'End':'Middle'}.png`)});
+    if(faction==='Nra'&&phase===.5)await page.screenshot({path:path.join(reviewOutput,`Texture_Latest_${name}.png`)});
    }
    const movement=MatrixDelta(samples[0].matrices,samples[2].matrices);
    assert.ok(movement>.0001,'Actual model bones move');
@@ -49,6 +51,6 @@ try{
   }
  }
  assert.deepEqual(errors,[]);
- await fs.writeFile(path.join(root,'Preview',reportName),JSON.stringify({status:'passed',results,errors},null,2));
+ await fs.writeFile(path.join(reviewOutput,group==='MeleeVideoV1'?'Data_BatchPlaybackValidation.json':reportName),JSON.stringify({status:'passed',results,errors},null,2));
  console.log(JSON.stringify({status:'passed',models:results.length,sampledPoses:results.reduce((n,r)=>n+r.samples.length,0),maxProjection:Math.max(...results.flatMap(r=>r.samples.map(s=>s.maxProjection))),errors}));
 }finally{await browser.close()}
