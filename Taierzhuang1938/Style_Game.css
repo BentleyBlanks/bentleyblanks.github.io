@@ -1,4 +1,4 @@
-/* 《血战台儿庄》HUD 样式。
+/* 《台儿庄：血战滕县》HUD 样式。
    战术层级参考《战地》：目标在上、地图在左、武器与弹药在右，中央只留即时反馈。 */
 
 :root {
@@ -679,7 +679,10 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 #bootHead {
   position: absolute; left: 8%; right: 8%; top: 4vh; text-align: left; pointer-events: none;
 }
-#bootTitle { font-size: clamp(28px, 2.65vw, 42px); font-weight: 700; color: var(--ui-bright); letter-spacing: 0.07em; }
+#bootTitle {
+  font-family: var(--ui-title-font);
+  font-size: clamp(28px, 2.65vw, 42px); font-weight: 700; color: var(--ui-bright); letter-spacing: 0.07em;
+}
 #bootSub { font-size: 12.5px; color: var(--dim); letter-spacing: 0.07em; margin-top: 10px; }
 
 /* 道具说明卡：贴左下，按 HUD 那套字距走，不做成商店里的装备卡。 */

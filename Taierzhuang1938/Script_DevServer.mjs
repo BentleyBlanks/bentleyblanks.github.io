@@ -1,4 +1,4 @@
-// 《血战台儿庄》本地静态服：显式 MIME 表（Windows 注册表把 .js 映射成 text/plain，
+// 《台儿庄：血战滕县》本地静态服：显式 MIME 表（Windows 注册表把 .js 映射成 text/plain，
 // 模块加载会直接炸）。用法：node Taierzhuang1938/Script_DevServer.mjs [port]
 // 服务的是 worktree 根，路径与线上一致。
 import http from "node:http";
@@ -24,6 +24,9 @@ const MIME = {
   ".mp3": "audio/mpeg",
   ".wav": "audio/wav",
   ".ogg": "audio/ogg",
+  // 标题字体子集。字体其实不看 Content-Type，但 <link rel=preload as=font type=font/woff2>
+  // 对不上就会在控制台丢一条 "preload but not used" 警告，白白污染门禁日志。
+  ".woff2": "font/woff2",
 };
 
 /**

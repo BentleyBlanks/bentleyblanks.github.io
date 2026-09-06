@@ -1,4 +1,4 @@
-// 《滕县 一九三八》人物可见性回归：近景 Actor + 远景 LOD 必须覆盖所有人，
+// 《台儿庄：血战滕县》人物可见性回归：近景 Actor + 远景 LOD 必须覆盖所有人，
 // 人数预算不得再藏活人，尸体不得在本关内消失。
 //
 // 用法：node Taierzhuang1938/Script_VisibilityTest.mjs

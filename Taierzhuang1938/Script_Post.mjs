@@ -1,4 +1,4 @@
-// 《血战台儿庄》自研后处理管线。
+// 《台儿庄：血战滕县》自研后处理管线。
 //
 // 为什么自己写：仓库里 vendor 的 three 只有 build/，**没有 examples/jsm**，
 // 没有 EffectComposer / UnrealBloomPass / SSAOPass 可用。所以整条链子从

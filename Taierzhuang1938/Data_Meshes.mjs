@@ -1,4 +1,4 @@
-// 《血战台儿庄》模型清单：Blender 程序化管线（Taierzhuang1938/_blender/）出的
+// 《台儿庄：血战滕县》模型清单：Blender 程序化管线（Taierzhuang1938/_blender/）出的
 // 那批 .tzm.json 的元数据。
 //
 // 这张表是**手写但可校验**的：数字全部抄自 Model/Index.json（BuildAll.py 每次

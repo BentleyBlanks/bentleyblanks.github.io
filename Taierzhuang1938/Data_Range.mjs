@@ -1,4 +1,4 @@
-// 《滕县 一九三八》玩法测试靶场 —— 纯数据，**不许 import three**。
+// 《台儿庄：血战滕县》玩法测试靶场 —— 纯数据，**不许 import three**。
 //
 // 这不是正片的一关：它是 ?range=1 进入的**人机共同测试沙盒**（docs/Data_TestRange.md）。
 // 人手动进来试枪感，agent 从 window.Taierzhuang.Debug.Range 取证 —— 两边用的是

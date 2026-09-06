@@ -1,4 +1,4 @@
-// 《滕县 一九三八》离线预破碎模板生成器。
+// 《台儿庄：血战滕县》离线预破碎模板生成器。
 //
 // 运行：node Taierzhuang1938/Script_FractureBake.mjs
 // 校验：node Taierzhuang1938/Script_FractureBake.mjs --check

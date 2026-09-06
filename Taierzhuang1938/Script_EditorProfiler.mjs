@@ -135,7 +135,7 @@ export class ProfilerEditor {
     this.doc = doc;
     doc.open();
     doc.write("<!doctype html><html><head><meta charset='utf-8'>"
-      + "<title>滕县 一九三八 · 性能剖析</title></head><body></body></html>");
+      + "<title>台儿庄：血战滕县 · 性能剖析</title></head><body></body></html>");
     doc.close();
     doc.body.className = "uiProfiler";
     // 从当前入口复制实际版本 URL，独立窗口与游戏共用同一套主题。
@@ -156,7 +156,7 @@ export class ProfilerEditor {
       return el;
     };
     const body = doc.body;
-    const title = El("h1", "", "滕县 一九三八 · 性能剖析");
+    const title = El("h1", "", "台儿庄：血战滕县 · 性能剖析");
     const badge = El("span");
     badge.id = "badge";
     title.appendChild(badge);

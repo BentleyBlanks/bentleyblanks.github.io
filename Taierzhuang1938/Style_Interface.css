@@ -1,7 +1,21 @@
 /* World at War (2008) 界面语言：冷灰、旧金、黑色栏、横向选择条。
    菜单 / 加载 / 编辑器 / Profiler 共用；战斗 HUD 的阵营与告警颜色独立。 */
+
+/* 标题字体：思源宋体 Black（SIL OFL 1.1），只裁了标题那 26 个字，4.7 KB。
+   改标题必须重跑 Font/Script_TitleFontSubset.py，否则新字会逐字回退到系统字体。
+   swap：字体没到之前先用系统字体把标题写出来，不留空档。 */
+@font-face {
+  font-family: "TzTitle";
+  /* 戳必须与 index.html 那条 <link rel=preload> 逐字一致 ——
+     两边写得不一样就是两个 URL：预加载白下一份，字体下两遍。 */
+  src: url("./Font/Font_Title.woff2?v=202609061945") format("woff2");
+  font-weight: 400 900;
+  font-display: swap;
+}
 :root {
   --ui-font: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+  /* 大标题专用。换字体只改这一行 + Font/ 里的那个 woff2。 */
+  --ui-title-font: "TzTitle", "Noto Serif SC", "Songti SC", serif;
   --ui-mono: "Cascadia Mono", Consolas, monospace;
   --ui-black: #030404;
   --ui-surface: #101314;

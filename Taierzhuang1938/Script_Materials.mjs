@@ -1,4 +1,4 @@
-// 《血战台儿庄》材质库：把 Script_TexBake 烘出的裸字节包成 three 纹理与
+// 《台儿庄：血战滕县》材质库：把 Script_TexBake 烘出的裸字节包成 three 纹理与
 // MeshStandardMaterial，并把屏幕空间 AO 注入到**间接光**里。
 //
 // 两条铁律（错一条画面立刻塑料）：

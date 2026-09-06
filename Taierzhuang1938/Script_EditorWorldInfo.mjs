@@ -43,7 +43,7 @@ export class WorldInfoEditor {
     try {
       const doc = this.win.document;
       doc.open();
-      doc.write("<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>WorldInfo · 滕县 一九三八</title></head><body></body></html>");
+      doc.write("<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>WorldInfo · 台儿庄：血战滕县</title></head><body></body></html>");
       doc.close();
       const theme = document.querySelector("link[data-interface-theme]");
       if (theme) {

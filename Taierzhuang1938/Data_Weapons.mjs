@@ -1,4 +1,4 @@
-// 《血战台儿庄》武器数据 —— 纯数据，**不许 import three**。
+// 《台儿庄：血战滕县》武器数据 —— 纯数据，**不许 import three**。
 // 尺寸与性能取自 docs/Data_HistoryMaterial.md 的考据（带来源），
 // 手感参数（recoil / sway / adsTime）是玩法调校值，不是史料。
 //

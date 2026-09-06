@@ -1,4 +1,4 @@
-// 《血战台儿庄》程序化 PBR 贴图烘焙 —— 纯 JS，**不许 import three**。
+// 《台儿庄：血战滕县》程序化 PBR 贴图烘焙 —— 纯 JS，**不许 import three**。
 // 输出裸字节（Uint8Array），由 Script_Materials.mjs 包成 DataTexture。
 // 这样 Node 里能直接跑烘焙做断言（不需要 canvas，也不需要 GL）。
 //

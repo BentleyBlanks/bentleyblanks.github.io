@@ -20,7 +20,8 @@
 #menu.pause .mnTitleLines, #menu.pause .mnShotNote { display: none; }
 .mnTitle { position: absolute; left: 8%; top: 3.8vh; max-width: 70%; }
 .mnTitleMain {
-  color: var(--ui-bright); font-size: clamp(28px, 2.65vw, 42px); font-weight: 700;
+  color: var(--ui-bright); font-family: var(--ui-title-font);
+  font-size: clamp(28px, 2.65vw, 42px); font-weight: 700;
   letter-spacing: 0.07em; line-height: 1.2; text-shadow: 0 2px 3px #000;
 }
 .mnTitleSub { margin-top: 10px; font-size: 12px; letter-spacing: 0.07em; color: var(--ui-muted); }
@@ -72,7 +73,7 @@
   flex: 0 0 auto; display: flex; align-items: flex-end; gap: 14px;
   min-height: 14vh; box-sizing: border-box; padding: 26px 8% 18px; background: var(--ui-black);
 }
-.mnPanelHead::after { content: "滕县 · 一九三八"; color: var(--ui-muted); font-size: 12px; padding-bottom: 5px; letter-spacing: 0.08em; }
+.mnPanelHead::after { content: "台儿庄 · 血战滕县"; color: var(--ui-muted); font-size: 12px; padding-bottom: 5px; letter-spacing: 0.08em; }
 .mnPanelTitle {
   flex: 1; font-size: clamp(25px, 2.5vw, 38px); font-weight: 700;
   letter-spacing: 0.07em; color: var(--ui-bright); line-height: 1.2;

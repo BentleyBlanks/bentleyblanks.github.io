@@ -245,7 +245,7 @@ const hooked = rows.filter((r) => r.hooked).length;
 
 function Markdown() {
   const lines = [];
-  lines.push("# 《滕县 一九三八》内容文本清单");
+  lines.push("# 《台儿庄：血战滕县》内容文本清单");
   lines.push("");
   lines.push(`由 \`node Taierzhuang1938/Script_TextGather.mjs\` 导出，共 **${rows.length}** 条。`);
   lines.push("");

@@ -1,4 +1,4 @@
-// 《滕县 一九三八》主菜单冒烟：真浏览器把菜单跑起来，验运镜与选章这两条链路。
+// 《台儿庄：血战滕县》主菜单冒烟：真浏览器把菜单跑起来，验运镜与选章这两条链路。
 //
 // 为什么单起一份而不是并进开机冒烟：开机冒烟一律走 ?shot=1（不建菜单），
 // 通关冒烟走 ?menu=0（要点 #bootStart）—— 两份都刻意绕开了菜单，
@@ -566,18 +566,33 @@ await CheckInterface();
     };
   });
   Check("启动界面标题、日期与按钮文字正确",
-    m.documentTitle === "滕县 一九三八"
-      && m.bootTitle === "滕县 一九三八"
+    m.documentTitle === "台儿庄：血战滕县"
+      && m.bootTitle === "台儿庄：血战滕县"
       && m.bootSubtitle === "一九三八年三月十四日 — 十八日 · 山东滕县"
       && m.bootStart === "进 城"
       && m.bootHierarchy === "bootHead",
     `${m.documentTitle} / ${m.bootTitle} / ${m.bootSubtitle} / ${m.bootStart}`);
   Check("主菜单标题与战役说明文字正确",
-    m.menuTitle === "滕县 一九三八"
+    m.menuTitle === "台儿庄：血战滕县"
       && m.menuSubtitle === "一九三八年三月十四日 — 十八日 · 山东滕县"
       && m.menuLines.length === 3
       && m.menuLines.every((line) => line.length > 0 && !line.includes("\uFFFD")),
     `${m.menuTitle} / ${m.menuSubtitle} / ${m.menuLines.join(" | ")}`);
+  // 标题字体（Font/Font_Title.woff2）。文件 404 或 @font-face 写错时页面不会报错，
+  // 只是安静地回退到系统字体 —— 截图里也未必看得出来，所以在这里量。
+  // 这一条只保证「字体接上了」；「标题里每个字都在子集里」由 Script_TextTest 对账。
+  {
+    const font = await page.evaluate(async () => {
+      await document.fonts.ready;
+      const el = document.querySelector("#menu .mnTitleMain");
+      return {
+        loaded: [...document.fonts].some((f) => f.family === "TzTitle" && f.status === "loaded"),
+        applied: getComputedStyle(el).fontFamily.includes("TzTitle"),
+      };
+    });
+    Check("标题字体已加载并用在大标题上", font.loaded && font.applied,
+      `loaded=${font.loaded} applied=${font.applied}`);
+  }
   Check("开机落在主菜单上", m.menu.open && m.inMenu && !m.running && !m.rootOff,
     `open=${m.menu.open} menu=${m.inMenu} running=${m.running}`);
   Check("菜单六项都在（含设置与调试选项）",

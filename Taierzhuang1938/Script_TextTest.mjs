@@ -241,6 +241,34 @@ for (const [module, table] of [...gated.entries()].sort()) {
 Ok(`闸门模块 ${gatedClean}/${gated.size} 个干净`);
 
 // ---------------------------------------------------------------------------
+// 4. 标题字体子集：标题里的每一个字都得在 Font/Font_Title.woff2 里
+// ---------------------------------------------------------------------------
+// 标题字体只裁了标题那几十个字（整套 11 MB，为八个字全量打包不合算）。
+// 改了标题却没重跑 Font/Script_TitleFontSubset.py，浏览器会**逐字**回退到系统字体 ——
+// 表现成「标题里有两三个字长得不一样」，肉眼极容易看漏，所以在这里对账。
+{
+  const fontDir = path.join(here, "Font");
+  const manifestPath = path.join(fontDir, "Font_Title.json");
+  const woff2Path = path.join(fontDir, "Font_Title.woff2");
+  if (!fs.existsSync(manifestPath) || !fs.existsSync(woff2Path)) {
+    Fail("缺少 Font/Font_Title.woff2 或 Font_Title.json（跑一次 Font/Script_TitleFontSubset.py）");
+  } else {
+    const { chars } = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const covered = new Set([...chars]);
+    const { MENU } = await import(pathToFileURL(path.join(here, "Data_TengxianScript.mjs")).href);
+    // 会用标题字体排版的全部文本：主菜单大标题 / 暂停标题 / 加载画面标题与副标题。
+    const rendered = [MENU.title, MENU.subtitle, base?.strings["menu.title.paused"] ?? ""].join("");
+    const missing = [...new Set([...rendered])].filter((ch) => !covered.has(ch));
+    if (missing.length) {
+      Fail(`标题里有 ${missing.length} 个字不在字体子集里：${missing.join(" ")}`
+        + "（改完标题要重跑 Font/Script_TitleFontSubset.py，并抬一次 index.html 的 ?v= 戳）");
+    } else {
+      Ok(`标题字体子集覆盖标题全部 ${new Set([...rendered]).size} 个字`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // --report：未闸门化模块的迁移进度
 // ---------------------------------------------------------------------------
 if (REPORT) {
