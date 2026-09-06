@@ -11,6 +11,11 @@ import { VOICE_LINES as CH1_VOICES, CHAPTER as CH1_CHAPTER } from "./Data_Missio
 import { existsSync, readFileSync } from "node:fs";
 import { openingStoryBeats } from "./Data_FirstLevelP012Opening.mjs";
 import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
+import { BLAST } from "./Data_Tuning_Combat.mjs";
+import { HasText } from "./Script_Text.mjs";
+import {
+  P012_BEATS, P012_INTERACTION_SPECS, P012_OBJECTIVE_LINES, P012_GUIDANCE_NAMES,
+} from "./Data_FirstLevelP012Beats.mjs";
 {
  const config=phase.whitebox,blocks=config.layout.blocks;
  const start={x:39.36023830793246,z:-136.07995752133593},target={x:32,z:-132};
@@ -250,7 +255,8 @@ const points = new Map();
   }
   const source=readFileSync(new URL("./Script_Combat.mjs",import.meta.url),"utf8");
   const method=source.slice(source.indexOf("  Blast(position"),source.indexOf("  get MortarLeft"));
-  const blast=Function("Clamp01",`return ({${method}}).Blast;`)(v=>Math.max(0,Math.min(1,v)));
+  // Blast 的手感常量已经搬进 Data_Tuning_Combat.BLAST：把表注进去，不在这里抄数。
+  const blast=Function("Clamp01","BLAST",`return ({${method}}).Blast;`)(v=>Math.max(0,Math.min(1,v)),BLAST);
   const director=new FirstLevelP012Director({EnemyPosition:actor=>actor.alive?actor.position:null},phase.whitebox);
   director.beat=21;
   const enemies=Array.from({length:6},(_,id)=>({id,alive:true,side:"ija",suppression:0,position:new Vec(2+id,0,0),TakeHit(damage){this.health=(this.health??100)-damage;return false;}}));
@@ -1493,4 +1499,56 @@ for(const z of [-39,-43,-47]){
  assert.equal(JSON.stringify({facts:[...director.facts],route:director.routeIndex,unlocked:director.unlockedWaves}),before,'navigation cannot grant story progress');
  assert.equal(director.SouthRouteApproachTarget(target),null,'clear destinations require no corner visit');
  console.log('PASS B21 actual scavenging return guides around solid bank without story receipts');
+}
+
+// ---------------------------------------------------------------------------
+// 编排表的完整性：表里点名的键与 id 必须真的有东西对得上。
+// 动态拼键（p012.beat. / p012.objective. / p012.guide. / p012.point.）绕过了
+// Script_TextTest 的静态引用检查，这一段就是它们的闸门。
+// ---------------------------------------------------------------------------
+{
+ const seen=new Set();
+ for(const beat of P012_BEATS){
+  assert.ok(HasText(beat.objectiveKey),`拍 ${beat.id} 的目标行缺文案：${beat.objectiveKey}`);
+  assert.ok(!seen.has(beat.id),`拍 id 重复：${beat.id}`);seen.add(beat.id);
+ }
+ assert.equal(P012_BEATS.length,26,'拍表长度是运行时与检查点的硬契约');
+
+ const FIELDS=new Set(['facts','notFacts','signals','notSignals','carry','notCarry','flags','notFlags']);
+ const FLAGS=new Set(['briefingConfigured','ammoCarrying','atAmmoDrop','portFar','mortarDanger','mortarNearOrigin',
+  'mortarWaveLocked','mortarResolved','mgStatusShown','woundedDelivered','roadWoundedInspect','ambushThreat',
+  'ambushThreatFirst','ambushMoveAdvice','ambushProneApproach','ambushProneSegment','ambushEntry','ambushResolved',
+  'ambushRejoin','airTail','airRouteChosen','airRouteOpen','retreatArrived','retreatGuideAtSmoke','retreatBlockade',
+  'retreatCoverHold','retreatRejoining','retreatLead','southSupplyPhase','lateThreat','lateThreatFight','movingShooter',
+  'southRouteBefore','columnAtSouthAssembly','atBlockadeDecision','southApproach','hasGrenades','scavengeGrenades',
+  'bleedingWithBandage','resupply','scavenge','weaponNearby','frontlineApproach','guideAtAmmoDrop','frontlineAmmoPoint']);
+ for(const [name,table] of [['P012_OBJECTIVE_LINES',P012_OBJECTIVE_LINES],['P012_GUIDANCE_NAMES',P012_GUIDANCE_NAMES]]){
+  for(const rule of table){
+   assert.ok(HasText(rule.textKey),`${name} 点名了没有的文案：${rule.textKey}`);
+   for(const key of Object.keys(rule.when||{})) assert.ok(FIELDS.has(key),`${name} 用了谓词表没定义的字段：${key}`);
+   for(const flag of [...(rule.when?.flags||[]),...(rule.when?.notFlags||[])])
+    assert.ok(FLAGS.has(flag),`${name} 点名了代码不置位的钩子：${flag}`);
+  }
+ }
+
+ const director=new FirstLevelP012Director({},phase.whitebox);
+ const behaviours=director.InteractionBehaviours(null);
+ for(const spec of P012_INTERACTION_SPECS){
+  assert.ok(HasText(spec.labelKey),`交互点 ${spec.id} 的标签缺文案：${spec.labelKey}`);
+  if(spec.loadLabelKey) assert.ok(HasText(spec.loadLabelKey),`${spec.id} 的负重名缺文案`);
+  if(spec.itemKey) assert.ok(HasText(spec.itemKey),`${spec.id} 的交付物名缺文案`);
+  assert.ok(behaviours[spec.id],`交互点 ${spec.id} 在规格表里，却没有回调接线`);
+  assert.ok(spec.anchor||spec.position,`交互点 ${spec.id} 既没有锚点也没有位置`);
+  if(spec.dynamicLabel) assert.equal(typeof behaviours[spec.id].Label,'function',`${spec.id} 声明了动态标签却没给 Label()`);
+ }
+ for(const id of Object.keys(behaviours))
+  assert.ok(P012_INTERACTION_SPECS.some(spec=>spec.id===id),`回调表里多出一个规格表没有的点：${id}`);
+
+ // 火力点自己的战术提示也存键不存句（Data_FirstLevelP012Whitebox 的三组）。
+ const activity=phase.whitebox.activities;
+ for(const group of [...activity.ambushGroups,...activity.closeFightGroups,...activity.southFightGroups]){
+  assert.equal(group.label,undefined,'火力点标签不许再写句子');
+  assert.ok(HasText(group.labelKey),`火力点提示缺文案：${group.labelKey}`);
+ }
+ console.log('PASS 编排表与文案表、回调表互相对得上');
 }

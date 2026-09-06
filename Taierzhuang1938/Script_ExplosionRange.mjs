@@ -2,6 +2,7 @@
 // deformation and actor locomotion all run the ordinary game systems.
 import * as THREE from "three";
 import { WEAPONS } from "./Data_Weapons.mjs";
+import { T } from "./Script_Text.mjs";
 import { Mulberry32 } from "./Script_Noise.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { EXPLOSION_GRENADES, EXPLOSION_VEHICLES, EXPLOSION_CONTROLS, EXPLOSION_BARRAGE, EXPLOSION_AIRSTRIKE, EXPLOSION_PATROL } from "./Data_ExplosionRange.mjs";
@@ -36,30 +37,37 @@ export class ExplosionRange {
   }
   Register() {
     const base = { tag: "ExplosionRange", once: false, facingDot: null, cooldownS: 0.35, reachM: 2.5, heightM: 2 };
-    for (const grenade of EXPLOSION_GRENADES) this.interact.Register({ ...base,
-      id: `ExplosionPickup${grenade.id}`, position: grenade,
-      label: `领取${grenade.name} · ${grenade.id === "GrenadeBundle" ? "H" : "G"} 投掷`,
-      OnComplete: () => { this.GiveGrenade(grenade.id); this.pickups[grenade.id] = (this.pickups[grenade.id] || 0) + 1;
-        this.hud.Hint(`已领取${grenade.name}，按住 ${grenade.id === "GrenadeBundle" ? "H" : "G"}，松开投出`, 3); },
-    });
+    for (const grenade of EXPLOSION_GRENADES) {
+      // 投掷键按弹种分（集束弹在 H，普通木柄弹在 G）；键位与名字都只当参数交给模板。
+      const key = grenade.id === "GrenadeBundle" ? "H" : "G";
+      this.interact.Register({ ...base,
+        id: `ExplosionPickup${grenade.id}`, position: grenade,
+        label: T("range.explosion.pickupLabel", { name: grenade.name, key }),
+        OnComplete: () => { this.GiveGrenade(grenade.id); this.pickups[grenade.id] = (this.pickups[grenade.id] || 0) + 1;
+          this.hud.Hint(T("range.explosion.pickupHint", { name: grenade.name, key }), 3); },
+      });
+    }
     for (const vehicle of EXPLOSION_VEHICLES) this.interact.Register({ ...base,
       id: `ExplosionFire${vehicle.id}`, position: { x: vehicle.x, y: 1.2, z: vehicle.z + 4.6 },
-      cooldownS: 0.6, reachM: 3.2, label: `${vehicle.name} · 向前开一炮`, OnComplete: () => this.FireVehicle(vehicle.id),
+      cooldownS: 0.6, reachM: 3.2, label: T("range.explosion.vehicleLabel", { name: vehicle.name }),
+      OnComplete: () => this.FireVehicle(vehicle.id),
     });
     this.interact.Register({ ...base, id: EXPLOSION_CONTROLS.barrage.id, position: EXPLOSION_CONTROLS.barrage,
-      label: () => this.barrage ? "炮击进行中" : "呼叫炮击 · 落点在玩家周围16m", Enabled: () => !this.barrage,
-      OnComplete: () => { this.barrage = { left: EXPLOSION_BARRAGE.count, timer: 0 }; this.hud.Hint("炮弹来袭！抬头观察亮光轨迹，移动避开落点", 5); },
+      label: () => (this.barrage ? T("range.explosion.barrageBusy") : T("range.explosion.barrageCall")),
+      Enabled: () => !this.barrage,
+      OnComplete: () => { this.barrage = { left: EXPLOSION_BARRAGE.count, timer: 0 };
+        this.hud.Hint(T("range.explosion.barrageHint"), 5); },
     });
     this.interact.Register({ ...base, id: EXPLOSION_CONTROLS.return.id, position: EXPLOSION_CONTROLS.return,
-      cooldownS: 4.5, label: "投来一枚活手雷 · 靠近按F掷回", OnComplete: () => this.ThrowPracticeGrenade(),
+      cooldownS: 4.5, label: T("range.explosion.returnLabel"), OnComplete: () => this.ThrowPracticeGrenade(),
     });
     this.interact.Register({ ...base, id: EXPLOSION_CONTROLS.airstrike.id, position: EXPLOSION_CONTROLS.airstrike,
-      label: () => this.airstrike ? "飞机投弹中，等待飞离" : "召唤飞机 · 玩家周围16m随机投弹",
+      label: () => (this.airstrike ? T("range.explosion.airstrikeBusy") : T("range.explosion.airstrikeCall")),
       Enabled: () => !this.airstrike && !!this.aircraft?.FormFor(EXPLOSION_AIRSTRIKE.aircraftId),
       OnComplete: () => this.StartAirstrike(),
     });
     this.interact.Register({ ...base, id: EXPLOSION_CONTROLS.reset.id, position: EXPLOSION_CONTROLS.reset,
-      label: "恢复平地 · 清除在途弹", OnComplete: () => this.Reset(),
+      label: T("range.explosion.resetLabel"), OnComplete: () => this.Reset(),
     });
   }
   FireVehicle(id) {
@@ -86,7 +94,7 @@ export class ExplosionRange {
     p.owner = "ija";
     const flight = 1.15, velocity = target.sub(p.position).divideScalar(flight); velocity.y += 19.6 * flight * 0.5;
     p.velocity.copy(velocity); p.body?.setLinvel(velocity, true);
-    this.hud.Hint("活手雷落到附近后，按 F 拾起并掷回。原引信继续计时", 5);
+    this.hud.Hint(T("range.explosion.returnHint"), 5);
     return true;
   }
   RandomTarget(radiusM) {
@@ -107,7 +115,7 @@ export class ExplosionRange {
     const fallS = Math.sqrt(2 * spec.altitudeM / 19.6);
     this.airstrike = { time: 0, dropped: 0, nextDrop: spec.approachS, x: center.x,
       z: center.z - spec.speedMps * (spec.approachS + fallS), y: center.y + spec.altitudeM };
-    this.hud.Hint("飞机正在进场，向你附近随机投弹。抬头观察，移动避开弹着！", 6);
+    this.hud.Hint(T("range.explosion.airstrikeHint"), 6);
     return true;
   }
   UpdateAirstrike(dt) {
@@ -191,7 +199,7 @@ export class ExplosionRange {
     for (const pool of Object.values(this.combat.host.vfx?.pools || {})) pool.Clear?.();
     for (const [id] of this.recoils) this.battlefield.models.get(id).root.position.z = EXPLOSION_VEHICLES.find((s) => s.id === id).z;
     this.recoils.clear(); this.launches.length = 0; this.airDrops.length = 0;
-    this.hud.Hint("地形已恢复，可以继续测试", 3); return true;
+    this.hud.Hint(T("range.explosion.resetHint"), 3); return true;
   }
   GoTo(id) {
     const grenade = EXPLOSION_GRENADES.find((s) => s.id === id);

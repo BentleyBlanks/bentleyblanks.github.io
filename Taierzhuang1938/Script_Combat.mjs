@@ -22,7 +22,13 @@ import { CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { FindReturnableGrenade } from "./Script_GrenadeReturn.mjs";
 import { GRENADE_RETURN, ExplosiveIdFor } from "./Data_Explosives.mjs";
 import { ShellVisuals } from "./Script_ShellVisual.mjs";
+import { T } from "./Script_Text.mjs";
+import {
+  THROW, GRENADE_BODY, MELEE, BLAST, SHELL, INDIRECT, THREAT,
+} from "./Data_Tuning_Combat.mjs";
 
+// 世界重力。Script_Player 的 JUMP.gravityMps2 与 Script_ShellVisual 各自还存着
+// 同一个 19.6；三处合成一张世界表是待办（见本轮报告的集成请求）。
 const GRAVITY = 19.6;
 
 /** 一枚在飞的投掷物。 */
@@ -33,7 +39,7 @@ class Projectile {
     this.velocity = velocity.clone();
     this.weapon = weapon;
     this.owner = owner;               // "player" | "ija"
-    this.fuse = weapon.fuseS ?? 4.2;
+    this.fuse = weapon.fuseS ?? THROW.fuseFallbackS;
     // 刚脱手的己方弹会在镜头前掠过；给它一点离手宽限，避免每次正常投掷都闪一下警告。
     // 如果弹落回脚边，宽限结束后仍会按真实杀伤范围报警。
     this.age = 0;
@@ -59,8 +65,8 @@ export class CombatSystem {
     this.shellVisuals = new ShellVisuals(host.scene);
     this.rnd = Mulberry32(19380324);
     this.time = 0;
-    this.launcherTimer = 8;
-    this.artilleryTimer = 26;
+    this.launcherTimer = INDIRECT.launcherFirstS;
+    this.artilleryTimer = INDIRECT.artilleryFirstS;
     this.support = { mortar: SUPPORT.nra[0].uses, runner: SUPPORT.nra[1].uses };
     this.mortarCooldown = 0;
     this.runnerCooldown = 0;
@@ -138,13 +144,13 @@ export class CombatSystem {
     const speed = weapon.throwSpeedMin
       + (weapon.throwSpeedMax - weapon.throwSpeedMin) * Clamp01(power);
     const velocity = direction.clone().normalize().multiplyScalar(speed);
-    velocity.y += speed * 0.26;                     // 抛物线：手榴弹是抛出去的，不是打出去的
-    const start = fromPosition.clone().addScaledVector(direction, 0.4);
-    start.y += 0.1;
+    velocity.y += speed * THROW.arcLift;            // 抛物线：手榴弹是抛出去的，不是打出去的
+    const start = fromPosition.clone().addScaledVector(direction, THROW.muzzleAheadM);
+    start.y += THROW.muzzleRiseM;
     const p = new Projectile(kind, start, velocity, weapon, "player");
     this.Attach(p);
     // 攥着数几秒再扔（cook）：老兵的做法，落地即炸不给对面时间踢回来
-    p.fuse = Math.max(0.35, p.fuse - cookedFor);
+    p.fuse = Math.max(THROW.cookedFuseMinS, p.fuse - cookedFor);
     p.mesh = this.TakeMesh(kind);
     p.mesh.position.copy(start);
     this.projectiles.push(p);
@@ -174,21 +180,23 @@ export class CombatSystem {
   StepReturn(p, dt) {
     const player = this.host.player;
     const direction = player.AimDirection(new THREE.Vector3()).clone();
-    p.position.copy(player.EyePosition).addScaledVector(direction, 0.42); p.position.y -= 0.23;
+    p.position.copy(player.EyePosition).addScaledVector(direction, THROW.returnAheadM);
+    p.position.y -= THROW.returnDropM;
     if (p.mesh) p.mesh.position.copy(p.position);
     p.pickupLeft -= dt;
     if (p.pickupLeft > 0 && player.Alive) return;
     p.returning = false;
     if (!player.Alive) { p.velocity.set(0, 0, 0); this.Attach(p); return; }
     const speed = p.weapon.throwSpeedMin + (p.weapon.throwSpeedMax - p.weapon.throwSpeedMin) * GRENADE_RETURN.power;
-    p.velocity.copy(direction).multiplyScalar(speed); p.velocity.y += speed * 0.26;
+    p.velocity.copy(direction).multiplyScalar(speed); p.velocity.y += speed * THROW.arcLift;
     p.owner = "player"; p.age = 0; p.returned = true;
     this.Attach(p); this.returnCount++;
     this.host.audio?.Play("grenadeThrow", { position: p.position.clone(), volume: 0.8 });
   }
 
   /** Shared visible ballistic shell: no delayed explosion disconnected from a projectile. */
-  FireShell(from, target, { flight = 1.2, kind = "Shell75", radius = 6, damage = 120,
+  FireShell(from, target, { flight = SHELL.flightFallbackS, kind = "Shell75",
+    radius = SHELL.radiusFallbackM, damage = SHELL.damageFallback,
     OnImpact = null, byPlayer = false } = {}) {
     const velocity = target.clone().sub(from).divideScalar(flight);
     velocity.y += GRAVITY * flight * 0.5;
@@ -202,7 +210,7 @@ export class CombatSystem {
     this.shellVisuals.Step(dt);
     for (let i = this.shells.length - 1; i >= 0; i--) {
       const shell = this.shells[i]; let impact = null;
-      const steps = Math.max(1, Math.ceil(dt * 120)), step = dt / steps;
+      const steps = Math.max(1, Math.ceil(dt * SHELL.substepsPerS)), step = dt / steps;
       for (let j = 0; j < steps && !impact; j++) {
         const previous = shell.position.clone();
         shell.age += step;
@@ -223,7 +231,7 @@ export class CombatSystem {
       }
       if (impact) shell.position.copy(impact);
       this.shellVisuals.Update(shell);
-      if (!impact && shell.age > shell.flight + 3) {
+      if (!impact && shell.age > shell.flight + SHELL.expireAfterFlightS) {
         this.shellVisuals.Retire(shell); this.shells.splice(i, 1); continue;
       }
       if (!impact) continue;
@@ -247,10 +255,10 @@ export class CombatSystem {
     p.body = physics.MakeSphere({
       position: p.position,
       velocity: p.velocity,
-      radius: 0.055,
-      mass: p.kind === "GrenadeBundle" ? 3.2 : 0.6,
-      restitution: 0.24,
-      friction: 0.68,
+      radius: GRENADE_BODY.radiusM,
+      mass: p.kind === "GrenadeBundle" ? GRENADE_BODY.bundleMassKg : GRENADE_BODY.massKg,
+      restitution: GRENADE_BODY.restitution,
+      friction: GRENADE_BODY.friction,
     });
     return p;
   }
@@ -279,14 +287,14 @@ export class CombatSystem {
     const power = Clamp01(opts.power ?? 1);
     let reach, damage, arcDot;
     if (isBlade || mode === "slash") {
-      reach = weapon.reachM ?? 2.0;
+      reach = weapon.reachM ?? MELEE.bladeReachFallbackM;
       damage = weapon.damage;
-      arcDot = 0.5;
+      arcDot = MELEE.bladeArcDot;
     } else {
       const spec = GUN_MELEE[mode === "cut" ? "slash" : mode] || GUN_MELEE.bash;
       reach = spec.reachM + (mode === "thrust" ? (weapon.bayonetLengthM || 0) : 0);
       damage = spec.damage + (mode === "thrust" ? (spec.chargedBonus || 0) * power : 0);
-      arcDot = spec.arcDot ?? 0.5;
+      arcDot = spec.arcDot ?? MELEE.bladeArcDot;
     }
     const ai = this.host.ai;
     let hit = null, best = 1e9;
@@ -307,8 +315,11 @@ export class CombatSystem {
     }
     if (hit) {
       const died = hit.TakeHit(damage, "torso", direction);
-      const at = hit.position.clone(); at.y += 1.0;
-      if (this.host.vfx) this.host.vfx.Blood(at, direction, died ? 1 : 0.6);
+      const at = hit.position.clone(); at.y += MELEE.hitHeightM;
+      if (this.host.vfx) {
+        this.host.vfx.Blood(at, direction,
+          died ? MELEE.bloodStrengthKill : MELEE.bloodStrengthHit);
+      }
       if (this.host.audio) {
         this.host.audio.Play(bladed ? (isBlade ? "dadaoHit" : "bayonetHit") : "bodyFall",
           { position: at, volume: 0.9 });
@@ -326,19 +337,22 @@ export class CombatSystem {
     const spec = kind === "artillery"
       ? SUPPORT.ija.find((s) => s.id === "artillery")
       : SUPPORT.ija.find((s) => s.id === "launcher");
-    const jitter = kind === "artillery" ? 7 : 3.2;
+    const jitter = kind === "artillery" ? INDIRECT.artillerySpreadM : INDIRECT.launcherSpreadM;
     const at = targetPosition.clone();
     at.x += (this.rnd() - 0.5) * jitter;
     at.z += (this.rnd() - 0.5) * jitter;
     at.y = this.host.battlefield.GroundHeight(at.x, at.z);
-    const flight = kind === "artillery" ? 2.6 : 1.6;
+    const flight = kind === "artillery" ? INDIRECT.artilleryFlightS : INDIRECT.launcherFlightS;
     const angle = this.rnd() * Math.PI * 2;
-    const from = at.clone().add(new THREE.Vector3(Math.cos(angle) * 120, 24, Math.sin(angle) * 120));
+    const from = at.clone().add(new THREE.Vector3(
+      Math.cos(angle) * INDIRECT.incomingOriginM, INDIRECT.incomingOriginHeightM,
+      Math.sin(angle) * INDIRECT.incomingOriginM));
     this.FireShell(from, at, { flight, kind, radius: spec.radius, damage: spec.damage,
       OnImpact: (point) => { options.OnImpact?.(point); this.host.story?.Signal("shelling"); } });
     if (this.host.vfx) this.host.vfx.IncomingMarker(at, flight, { radius: spec.radius });
     if (this.host.audio) {
-      this.host.audio.Play("shellIncoming", { position: at.clone(), volume: kind === "artillery" ? 1 : 0.7 });
+      this.host.audio.Play("shellIncoming", { position: at.clone(),
+        volume: kind === "artillery" ? INDIRECT.artilleryAudioVolume : INDIRECT.launcherAudioVolume });
     }
     return at;
   }
@@ -347,15 +361,17 @@ export class CombatSystem {
   CallMortar(targetPosition) {
     const spec = SUPPORT.nra.find((s) => s.id === "mortar");
     if (this.support.mortar <= 0 || this.mortarCooldown > 0) {
-      return { ok: false, reason: this.support.mortar <= 0 ? "没有炮弹了" : "炮位还在装填" };
+      return { ok: false, reason: this.support.mortar <= 0
+        ? T("gameplay.mortar.noShells") : T("gameplay.mortar.reloading") };
     }
     this.support.mortar -= 1;
     this.mortarCooldown = spec.cooldownS;
     const at = targetPosition.clone();
-    at.x += (this.rnd() - 0.5) * 5;
-    at.z += (this.rnd() - 0.5) * 5;
+    at.x += (this.rnd() - 0.5) * INDIRECT.mortarSpreadM;
+    at.z += (this.rnd() - 0.5) * INDIRECT.mortarSpreadM;
     at.y = this.host.battlefield.GroundHeight(at.x, at.z);
-    this.FireShell(at.clone().add(new THREE.Vector3(-90, 10, 100)), at,
+    const origin = INDIRECT.mortarOrigin;
+    this.FireShell(at.clone().add(new THREE.Vector3(origin.x, origin.y, origin.z)), at,
       { flight: spec.delayS, kind: "Shell82", radius: spec.radius, damage: spec.damage, byPlayer: true });
     return { ok: true, at, left: this.support.mortar };
   }
@@ -401,23 +417,23 @@ export class CombatSystem {
           const dir = this.tmpB.copy(step).divideScalar(dist);
           const hit = bf.Raycast(p.position, dir, dist, { terrain: true });
           if (hit) {
-            p.position.addScaledVector(dir, Math.max(0, hit.t - 0.03));
+            p.position.addScaledVector(dir, Math.max(0, hit.t - GRENADE_BODY.fallbackSkinM));
             const n = new THREE.Vector3(hit.normal[0], hit.normal[1], hit.normal[2]);
-            p.velocity.reflect(n).multiplyScalar(0.34);
+            p.velocity.reflect(n).multiplyScalar(GRENADE_BODY.fallbackBounce);
           } else {
             p.position.add(step);
           }
         }
         const ground = bf.GroundHeight(p.position.x, p.position.z);
-        if (p.position.y < ground + 0.03) {
-          p.position.y = ground + 0.03;
-          p.velocity.y = Math.abs(p.velocity.y) * 0.26;
-          p.velocity.x *= 0.62;
-          p.velocity.z *= 0.62;
+        if (p.position.y < ground + GRENADE_BODY.fallbackSkinM) {
+          p.position.y = ground + GRENADE_BODY.fallbackSkinM;
+          p.velocity.y = Math.abs(p.velocity.y) * GRENADE_BODY.fallbackGroundBounce;
+          p.velocity.x *= GRENADE_BODY.fallbackGroundDrag;
+          p.velocity.z *= GRENADE_BODY.fallbackGroundDrag;
         }
         if (p.mesh) {
           p.mesh.position.copy(p.position);
-          p.spin += dt * 9;
+          p.spin += dt * GRENADE_BODY.fallbackSpinRadPerS;
           p.mesh.rotation.set(p.spin, p.spin * 0.7, 0);
         }
       }
@@ -468,18 +484,20 @@ export class CombatSystem {
       this.launcherTimer -= dt * (phase.ijaPressure ?? 1);
       if (this.launcherTimer <= 0) {
         const spec = SUPPORT.ija.find((s) => s.id === "launcher");
-        this.launcherTimer = spec.intervalS * (0.7 + this.rnd() * 0.8);
+        this.launcherTimer = spec.intervalS
+          * (INDIRECT.launcherJitterMin + this.rnd() * INDIRECT.launcherJitterSpan);
         // 只在玩家不在开阔奔跑时才打过来：贴着掩体待久了才吃曲射，
         // 这样它是"逼你动起来"的压力，而不是随机惩罚
-        const still = Math.hypot(player.velocity.x, player.velocity.z) < 1.4;
+        const still = Math.hypot(player.velocity.x, player.velocity.z) < INDIRECT.stillSpeedMps;
         if (still) this.CallIncoming("launcher", player.position);
       }
     }
-    if (phase.ijaSupport.includes("artillery") || (phase.ijaPressure ?? 1) > 1.5) {
+    if (phase.ijaSupport.includes("artillery") || (phase.ijaPressure ?? 1) > INDIRECT.artilleryPressure) {
       this.artilleryTimer -= dt;
       if (this.artilleryTimer <= 0) {
         const spec = SUPPORT.ija.find((s) => s.id === "artillery");
-        this.artilleryTimer = spec.intervalS * (0.8 + this.rnd() * 0.6);
+        this.artilleryTimer = spec.intervalS
+          * (INDIRECT.artilleryJitterMin + this.rnd() * INDIRECT.artilleryJitterSpan);
         this.CallIncoming("artillery", player.position);
       }
     }
@@ -505,8 +523,9 @@ export class CombatSystem {
       const audio = this.host.audio;
       const L = audio.listenerPos || { x: 0, y: 0, z: 0 };
       const d = Math.hypot(position.x - L.x, position.y - L.y, position.z - L.z);
-      audio.Play(d > 60 ? "explosionFar" : "explosionNear",
-        { position: position.clone(), volume: Clamp(radius / 8, 0.5, 1.2) });
+      audio.Play(d > BLAST.nearAudioM ? "explosionFar" : "explosionNear",
+        { position: position.clone(),
+          volume: Clamp(radius / BLAST.audioVolumeRadiusDiv, BLAST.audioVolumeMin, BLAST.audioVolumeMax) });
     }
     // 先改场景拓扑、再算人物遮挡：爆压把墙打穿的同一瞬间，洞口后面的人应该吃到
     // 剩余冲击，而不是等下一颗弹。Destruction.Blast 内部会把同一次爆炸批量提交，
@@ -518,16 +537,16 @@ export class CombatSystem {
     const bf = this.host.battlefield;
     const ai = this.host.ai;
     const from = position.clone();
-    from.y += 0.35;
+    from.y += BLAST.originRiseM;
 
     const affect = (targetPos, apply) => {
       const rel = this.tmp.subVectors(targetPos, from);
       const dist = rel.length();
-      if (dist > radius * 1.9) return;
+      if (dist > radius * BLAST.radiusScale) return;
       const dir = this.tmpB.copy(rel).divideScalar(dist || 1);
       const hit = bf.Raycast(from, dir, dist);
-      if (hit && hit.t < dist - 0.5) return;            // 有墙挡着
-      const falloff = Clamp01(1 - dist / (radius * 1.9));
+      if (hit && hit.t < dist - BLAST.wallMarginM) return;   // 有墙挡着
+      const falloff = Clamp01(1 - dist / (radius * BLAST.radiusScale));
       apply(damage * falloff * falloff, dir, falloff);
     };
 
@@ -539,16 +558,16 @@ export class CombatSystem {
       if (hurtSide && s.side !== hurtSide) {
         // 自己的弹也能伤自己人，但只在很近的时候（避免变成"友军免疫"的假物理）
         const d = s.position.distanceTo(from);
-        if (d > radius * 0.75) continue;
+        if (d > radius * BLAST.friendlyRadiusScale) continue;
       }
-      const at = s.position.clone(); at.y += 0.9;
+      const at = s.position.clone(); at.y += BLAST.soldierHitRiseM;
       affect(at, (dmg, dir) => {
         // 不在这里扣票。这条回调以前是 onKill(s) —— 不带 side，装配层写死扣日方池，
         // 于是**日军炮弹炸死中国兵扣的是日军的票**（实跑 ijaPool 700→696 / nraPool 600→600）。
         // 扣票统一由 Soldier.Kill() 发的阵亡事件负责，这里只管伤害与压制。
         const died = s.TakeHit(dmg, "torso", dir);
         onHit?.(s, dmg, position);
-        s.suppression = Clamp01(s.suppression + 0.8);
+        s.suppression = Clamp01(s.suppression + BLAST.soldierSuppression);
         // 只数日军。玩家的手榴弹也炸得到自己人，而给误伤发一记"击杀确认"
         // 是这套反馈能犯的最难看的错。
         if (byPlayer && s.side === "ija") { blastHits += 1; if (died) blastKills += 1; }
@@ -557,14 +576,14 @@ export class CombatSystem {
     if (blastHits > 0 && this.host.onPlayerHit) this.host.onPlayerHit(blastKills > 0);
     const player = this.host.player;
     if (player && player.Alive) {
-      const at = player.position.clone(); at.y += 1.0;
+      const at = player.position.clone(); at.y += BLAST.playerHitRiseM;
       affect(at, (dmg, dir, falloff) => {
-        player.Suppress(0.9 * falloff);
+        player.Suppress(BLAST.playerSuppression * falloff);
         // 爆炸对玩家的口径也回数据层（COMBAT.player.blastScale）——
         // 这里原来写死 0.7，和 Script_Ai 的 0.55、Script_Player 的部位倍率
         // 各改各的，谁也算不出"一发掷弹筒到底打掉多少血"。
         // 传 from：屏幕边缘那个指向楔形要知道弹是从哪炸的。
-        if (dmg > 4) {
+        if (dmg > BLAST.playerMinDamage) {
           player.TakeHit(dmg * (COMBAT.player?.blastScale ?? 0.55), "torso", dir,
             { from: position.clone(), blast: true });
         }
@@ -586,11 +605,11 @@ export class CombatSystem {
     const threats = [];
     for (const p of this.projectiles) {
       if (!p.alive || p.fuse <= 0) continue;
-      if (p.owner === "player" && p.age < 0.35) continue;
+      if (p.owner === "player" && p.age < THREAT.ownGraceS) continue;
       const dx = p.position.x - playerPosition.x;
       const dz = p.position.z - playerPosition.z;
       const distance = Math.hypot(dx, dz);
-      const dangerRadius = p.weapon.radiusM * 1.9;
+      const dangerRadius = p.weapon.radiusM * BLAST.radiusScale;
       if (distance > dangerRadius) continue;
       threats.push({
         kind: p.kind,

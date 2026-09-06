@@ -5,6 +5,8 @@
 import * as THREE from "three";
 import { BuildSink } from "./Script_World.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
+import { T, Localize } from "./Script_Text.mjs";
+import { WeaponNameId } from "./Script_TextIds.mjs";
 import {
   WEAPON_RANGE_WEAPONS, WEAPON_RANGE_TARGETS, WEAPON_RANGE_STATIONS,
   WEAPON_RANGE_TABLE, WEAPON_RANGE_RESPAWN_S, SampleWeaponRangeTargetPosition,
@@ -73,7 +75,8 @@ export class WeaponRangeRuntime {
       interact.Register({ id: `WeaponRangePickup_${slot.id}`, kind: "weaponRangePickup", tag: "WeaponRange",
         position: { x: slot.x, y: WEAPON_RANGE_TABLE.topY, z: slot.z },
         reachM: 2.3, heightM: 2, facingDot: 0.65, priority: 50, once: false, cooldownS: 0.25,
-        label: `换上 ${slot.name}`, sound: "magIn", hint: `已领取 ${slot.name}`,
+        label: T("range.weapon.pickupLabel", { name: Localize(WeaponNameId(slot.weaponId), slot.name) }), sound: "magIn",
+        hint: T("range.weapon.pickupHint", { name: Localize(WeaponNameId(slot.weaponId), slot.name) }),
         Enabled: () => !this.host.viewmodel.IsBusy?.(),
         OnComplete: () => this.Pickup(slot.id),
       });
@@ -243,9 +246,14 @@ export class WeaponRangeRuntime {
     const target = this.AimedTarget();
     this.targetInfo.hidden = !!this.host.state.menu || !this.host.player.Alive || !target;
     if (!target) return;
-    this.targetInfo.textContent = `${target.id} · ${target.moving ? "移动靶" : "静止靶"}`
-      + `  标尺 ${target.distanceM} m · 当前 ${target.currentDistanceM.toFixed(1)} m`
-      + (target.alive ? "" : " · 复位中");
+    const info = {
+      id: target.id,
+      kind: target.moving ? T("range.weapon.kindMoving") : T("range.weapon.kindStatic"),
+      ruler: target.distanceM, current: target.currentDistanceM.toFixed(1),
+    };
+    // 倒下到复位之间那几秒：读数照给，但要说清楚它正在回去。
+    this.targetInfo.textContent = target.alive
+      ? T("range.weapon.aimInfo", info) : T("range.weapon.aimInfoRespawning", info);
   }
 
   SetAmmoMode(mode) {
@@ -272,20 +280,23 @@ export class WeaponRangeRuntime {
   BuildPanel() {
     this.panel = document.createElement("aside");
     this.panel.id = "weaponRangePanel";
-    this.panel.innerHTML = `<strong>枪械射击白盒</strong><p>桌前 F 换枪 · 右键机瞄 · 左键射击 · R 换弹</p>
-      <p>蓝点为测距原点；左侧静止靶、右侧移动靶。离开蓝点后，以当前距离为准。</p>
+    // `<br>` 是排版不是文案：三行分别登记，代码负责把它们串起来。
+    const footer = [T("range.weapon.panelHotkeys"), T("range.weapon.panelAltHint"),
+      T("range.weapon.panelAutoHint")].join("<br>");
+    this.panel.innerHTML = `<strong>${T("range.weapon.panelTitle")}</strong><p>${T("range.weapon.panelKeys")}</p>
+      <p>${T("range.weapon.panelDesc")}</p>
       <output id="weaponRangeStatus"></output><div>
-      <button id="weaponRangeMotion" type="button">暂停移动靶</button>
-      <button id="weaponRangeAmmo" type="button">切换换弹测试</button>
-      <button id="weaponRangeReset" type="button">重置靶场</button></div>
-      <small>F6 移动靶 · F7 弹药模式 · F8 重置<br>按住 Alt 可用鼠标点击面板<br>目标倒地后自动复位；开镜时自动收起面板</small>`;
+      <button id="weaponRangeMotion" type="button">${T("range.weapon.btnMotionPause")}</button>
+      <button id="weaponRangeAmmo" type="button">${T("range.weapon.btnAmmoReload")}</button>
+      <button id="weaponRangeReset" type="button">${T("range.weapon.btnReset")}</button></div>
+      <small>${footer}</small>`;
     const style = document.createElement("style");
     style.textContent = `#weaponRangePanel{position:fixed;left:18px;top:94px;z-index:12;width:310px;padding:14px 16px;background:rgba(20,30,39,.88);border:1px solid #8198a6;border-left:3px solid #77c8e3;border-radius:4px;color:#edf3f5;font:13px/1.55 system-ui,sans-serif;pointer-events:auto}#weaponRangePanel strong{font-size:17px;letter-spacing:2px}#weaponRangePanel p{margin:7px 0;color:#c9d5da}#weaponRangePanel output{display:block;white-space:pre-line;margin:8px 0;color:#ffe3a4}#weaponRangePanel button{color:#edf3f5;background:#334b5c;border:1px solid #738795;border-radius:3px;padding:5px 7px;margin:2px;cursor:pointer}#weaponRangePanel small{display:block;color:#aabbc5;margin-top:6px}@media(max-width:700px){#weaponRangePanel{top:65px;left:8px;width:225px;padding:8px;font-size:11px}#weaponRangePanel p:nth-of-type(2){display:none}}`;
     this.panel.append(style);
     document.body.append(this.panel);
     this.targetInfo = document.createElement("output");
     this.targetInfo.id = "weaponRangeTargetInfo";
-    this.targetInfo.setAttribute("aria-label", "当前瞄准目标与距离");
+    this.targetInfo.setAttribute("aria-label", T("range.weapon.aimAria"));
     this.targetInfo.style.cssText = "position:fixed;left:50%;top:calc(50% + 74px);transform:translateX(-50%);z-index:13;padding:4px 9px;border-radius:3px;background:rgba(20,30,39,.78);color:#f4f6ed;font:14px/1.4 system-ui,sans-serif;white-space:nowrap;pointer-events:none;text-shadow:0 1px 2px #000";
     this.targetInfo.hidden = true;
     document.body.append(this.targetInfo);
@@ -310,12 +321,28 @@ export class WeaponRangeRuntime {
     this.panel.hidden = !!state.menu || player.ads > 0.5;
     const last = this.history.at(-1);
     const target = last?.targetId ? this.targets.find((entry) => entry.spec.id === last.targetId) : null;
-    this.panel.querySelector("#weaponRangeStatus").textContent =
-      `${WEAPONS[this.host.Weapon()]?.name || "未持枪"} · ${this.ammoMode === "infinite" ? "弹药 ∞" : `弹匣 ${state.ammo} / 备弹 ∞`}\n` +
-      `射击 ${this.stats.shots} · 命中 ${this.stats.hits}` +
-      (last ? `\n上一发：${target ? `${target.spec.distanceM}m ${target.spec.moving ? "移动" : "静止"}靶` : "未命中人体"} · ${Math.round(last.dist)}m` : "");
-    this.panel.querySelector("#weaponRangeMotion").textContent = this.moving ? "暂停移动靶" : "恢复移动靶";
-    this.panel.querySelector("#weaponRangeAmmo").textContent = this.ammoMode === "infinite" ? "切换换弹测试" : "恢复无限弹匣";
+    // 三行分开拼：每一行是完整的一句，翻译时不必猜前后文，也不必在这里接中文。
+    const lines = [
+      T("range.weapon.statusWeapon", {
+        weapon: WEAPONS[this.host.Weapon()]?.name ? Localize(WeaponNameId(this.host.Weapon()), WEAPONS[this.host.Weapon()].name) : T("range.weapon.noWeapon"),
+        ammo: this.ammoMode === "infinite" ? T("range.weapon.ammoInfinite")
+          : T("range.weapon.ammoCounted", { mag: state.ammo }),
+      }),
+      T("range.weapon.statusShots", { shots: this.stats.shots, hits: this.stats.hits }),
+    ];
+    if (last) {
+      lines.push(T("range.weapon.statusLast", {
+        target: !target ? T("range.weapon.lastTargetMiss")
+          : target.spec.moving ? T("range.weapon.lastTargetMoving", { n: target.spec.distanceM })
+            : T("range.weapon.lastTargetStatic", { n: target.spec.distanceM }),
+        dist: Math.round(last.dist),
+      }));
+    }
+    this.panel.querySelector("#weaponRangeStatus").textContent = lines.join("\n");
+    this.panel.querySelector("#weaponRangeMotion").textContent =
+      this.moving ? T("range.weapon.btnMotionPause") : T("range.weapon.btnMotionResume");
+    this.panel.querySelector("#weaponRangeAmmo").textContent =
+      this.ammoMode === "infinite" ? T("range.weapon.btnAmmoReload") : T("range.weapon.btnAmmoInfinite");
   }
 
   Dispose() {

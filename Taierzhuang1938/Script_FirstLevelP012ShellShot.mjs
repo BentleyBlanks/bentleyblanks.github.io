@@ -1,6 +1,9 @@
 // Player-eye observation and the same world-space battery throughout the approach.
 // Combat owns ballistic hits/audio; bounded smoke sources outlive the brief camera capture.
+// 字幕两行走文本表（p012.shellShot.*），说话人取 P012_COMPANION_CAST 的名字。
 import * as THREE from "three";
+import { T } from "./Script_Text.mjs";
+import { P012_COMPANION_CAST } from "./Data_FirstLevelP012Cast.mjs";
 export class FirstLevelP012ShellShot {
   constructor(host){this.host=host;this.played=false;this.active=false;this.time=0;this.elapsed=0;this.serial=0;this.impacts=0;this.plumes=[];this.nextShell=0;this.disposed=false;}
   Start(point){
@@ -15,9 +18,9 @@ export class FirstLevelP012ShellShot {
     if(doc){
       this.overlay=doc.createElement('div');this.overlay.dataset.p012ShellShot='true';
       this.overlay.style.cssText='position:fixed;inset:0;z-index:60;pointer-events:none;border-top:7vh solid #000;border-bottom:12vh solid #000;box-sizing:border-box';
-      const title=doc.createElement('div');title.textContent='北方阵地 · 铁路侧翼持续遭到炮击';
+      const title=doc.createElement('div');title.textContent=T("p012.shellShot.title");
       title.style.cssText='position:absolute;left:5%;top:20px;color:#fff;font:20px serif;text-shadow:0 2px 5px #000';
-      const line=doc.createElement('div');line.textContent='罗班长：看北边，阵地沿线还在挨炮！乡亲们往后撤！跟紧我，沿沟赶去接防！';
+      const line=doc.createElement('div');line.textContent=T("p012.shellShot.line",{speaker:P012_COMPANION_CAST.luo.name});
       line.style.cssText='position:absolute;bottom:-9vh;left:8%;right:8%;color:#fff;text-align:center;font:20px/1.6 sans-serif';
       const style=doc.createElement('style');style.textContent='body:has([data-p012-shell-shot]) [data-p012-navigation],body:has([data-p012-shell-shot]) #hud,body:has([data-p012-shell-shot]) #firstLevelP012Legend {visibility:hidden !important}';
       this.overlay.append(style,title,line);doc.body.append(this.overlay);

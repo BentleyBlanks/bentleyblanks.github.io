@@ -25,6 +25,7 @@ import { BuildSink } from "./Script_World.mjs";
 import {
   RANGE_WORLD, RANGE_CAMERA_FAR, RANGE_STATIONS, RANGE_TARGETS,
 } from "./Data_Range.mjs";
+import { T } from "./Script_Text.mjs";
 import { MELEE_QTE_LEVEL_ID } from "./Data_MeleeQte.mjs";
 import { MELEE_ENCOUNTERS } from "./Data_MeleeCombat.mjs";
 
@@ -115,8 +116,10 @@ export class RangeField {
         const canvas=document.createElement('canvas');canvas.width=512;canvas.height=160;
         const ctx=canvas.getContext('2d');ctx.fillStyle='#232c30';ctx.fillRect(0,0,512,160);
         ctx.strokeStyle=station.trigger==='auto'?'#cfb36c':'#b1c9ca';ctx.lineWidth=8;ctx.strokeRect(4,4,504,152);
-        ctx.textAlign='center';ctx.fillStyle='#f5f1df';ctx.font='bold 50px sans-serif';ctx.fillText(`1 对 ${station.enemies}`,256,64);
-        ctx.font='32px sans-serif';ctx.fillText(station.trigger==='auto'?'靠近白线开始':'白线前按 F 开始',256,124);
+        ctx.textAlign='center';ctx.fillStyle='#f5f1df';ctx.font='bold 50px sans-serif';
+        ctx.fillText(T("range.melee.signVersus",{enemies:station.enemies}),256,64);
+        ctx.font='32px sans-serif';
+        ctx.fillText(station.trigger==='auto'?T("range.melee.signAuto"):T("range.melee.signManual"),256,124);
         const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
         const material=new THREE.SpriteMaterial({map:texture,depthTest:true,toneMapped:false});
         const sign=new THREE.Sprite(material);sign.position.set(station.x,2.5,station.z-.8);sign.scale.set(2.8,.875,1);sign.name=`MeleeLabel${station.id}`;
@@ -178,14 +181,14 @@ export class RangeField {
 
   /** 分帧生成。用法与 TengxianField / JieheField.BuildSteps 一致。 */
   *BuildSteps() {
-    const label = this.levelId === MELEE_QTE_LEVEL_ID ? "白刃测试场" : "靶场";
-    yield { label: `${label}：地皮`, progress: 0.3 };
+    const name = this.levelId === MELEE_QTE_LEVEL_ID ? T("range.field.melee") : T("range.field.rifle");
+    yield { label: T("range.build.ground", { name }), progress: 0.3 };
     this.BuildGround();
-    yield { label: `${label}：工事与标识`, progress: 0.7 };
+    yield { label: T("range.build.structures", { name }), progress: 0.7 };
     this.BuildStructures();
-    yield { label: `${label}：碰撞格`, progress: 0.92 };
+    yield { label: T("range.build.collision", { name }), progress: 0.92 };
     this.BuildCollisionGrid();
-    yield { label: "就绪", progress: 1.0 };
+    yield { label: T("range.build.ready"), progress: 1.0 };
   }
 
   /** 把 colliders 刷进空间散列（判据与 TengxianCity.BuildCollisionGrid 一致）。 */

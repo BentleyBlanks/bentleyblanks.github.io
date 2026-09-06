@@ -204,11 +204,11 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       // All six exist before the flank begins: different wall/door sightlines,
       // never late pop-in beside a player who has already crossed the room.
       ambushGroups: Object.freeze([
-        { routeIndex: 0, cover: { x: 39, z: 25.5 }, label: "从蓝色胸墙后起身观察道路，压制拦路火力",
+        { routeIndex: 0, cover: { x: 39, z: 25.5 }, labelKey: "p012.objective.ambush.g0",
           positions: [{ x: 58, z: 39 }, { x: 57, z: 41 }] },
-        { routeIndex: 2, cover: { x: 68, z: 24 }, label: "注意屋内侧窗，清除室内射手再继续侧绕",
+        { routeIndex: 2, cover: { x: 68, z: 24 }, labelKey: "p012.objective.ambush.g1",
           positions: [{ x: 68, z: 34 }, { x: 70, z: 36 }] },
-        { routeIndex: 5, cover: { x: 72, z: 43 }, label: "观察屋南出口，清除阻断回队道路的日军",
+        { routeIndex: 5, cover: { x: 72, z: 43 }, labelKey: "p012.objective.ambush.g2",
           positions: [{ x: 67, z: 49 }, { x: 70, z: 49 }] },
       ]),
       ambushEntryRoute: Object.freeze([{ x: 42.5, z: 24 }, { x: 39, z: 25.5 }]),
@@ -233,9 +233,8 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
         [{ x: 58, z: 65 }, { x: 61, z: 69 }],
       ].map((positions, group) => ({ routeIndex: [0, 2, 3][group],
         cover: [{ x: 44, z: 62 }, { x: 38.5, z: 68 }, { x: 47, z: 80 }][group],
-        label: ["残屋方向有两人逼近，保护沟边的伤员",
-          "东侧缺口又有敌人逼近；可借蓝色沟岸接近射击",
-          "南端折角出现最后两人，阻止他们接近担架"][group],
+        labelKey: ["p012.objective.closeFight.g0", "p012.objective.closeFight.g1",
+          "p012.objective.closeFight.g2"][group],
         positions, spawns: positions.map((_, index) => {
           const slot = group * 2 + index;
           return { x: 72, z: slot < 3 ? 28 + slot * 2 : 61.5 + (slot - 3) * 2.5 };
@@ -252,13 +251,13 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
         }),
       }))),
       southFightGroups: Object.freeze([
-        { routeIndex: 2, cover: { x: 42, z: 94 }, label: "从路沟掩体清除南路道路火力",
+        { routeIndex: 2, cover: { x: 42, z: 94 }, labelKey: "p012.objective.southFight.g0",
           relocations: [{ x: 51, z: 103 }, { x: 55, z: 108 }],
           positions: [{ x: 49, z: 104 }, { x: 53, z: 108 }] },
-        { routeIndex: 4, cover: { x: 41, z: 100 }, label: "绕过院墙，在胸墙后清除屋外射手",
+        { routeIndex: 4, cover: { x: 41, z: 100 }, labelKey: "p012.objective.southFight.g1",
           relocations: [{ x: 26, z: 97.5 }, { x: 32.5, z: 98 }],
           positions: [{ x: 28, z: 97 }, { x: 34.5, z: 99 }] },
-        { routeIndex: 7, cover: { x: 34, z: 105 }, label: "从门口掩护位置观察室内，清除残敌再进屋",
+        { routeIndex: 7, cover: { x: 34, z: 105 }, labelKey: "p012.objective.southFight.g2",
           relocations: [{ x: 29, z: 109 }, { x: 31, z: 109.5 }],
           positions: [{ x: 27, z: 109 }, { x: 33, z: 109.5 }] },
       ]),

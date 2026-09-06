@@ -6,6 +6,7 @@ import { RangeField } from "./Script_RangeField.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { MakeBox, MakePlane, PlaceGeometry } from "./Script_Geo.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
+import { T } from "./Script_Text.mjs";
 import { EXPLOSION_GRENADES, EXPLOSION_VEHICLES, EXPLOSION_CONTROLS, EXPLOSION_PATROL } from "./Data_ExplosionRange.mjs";
 
 export class ExplosionRangeField extends RangeField {
@@ -51,26 +52,26 @@ export class ExplosionRangeField extends RangeField {
     for (const row of EXPLOSION_GRENADES) {
       Box(`${row.id}TableTop`, "White", row.x, 1.04, row.z, 4.3, 0.16, 1.4);
       for (const dx of [-1.85, 1.85]) for (const dz of [-0.5, 0.5]) Box("TableLeg", "Boundary", row.x + dx, 0.49, row.z + dz, 0.15, 0.98, 0.15);
-      this.Label(sink, `${row.id}Sign`, row.name + " · F 领取", row.x, 0.72, row.z + 0.72, 3.8);
+      this.Label(sink, `${row.id}Sign`, T("range.explosion.signPickup", { name: row.name }), row.x, 0.72, row.z + 0.72, 3.8);
     }
     for (const [key, point] of Object.entries(EXPLOSION_CONTROLS)) {
       const color = key === "barrage" ? "Orange" : key === "return" ? "Green" : key === "airstrike" ? "Purple" : "Blue";
       Box(point.id, color, point.x, 0.65, point.z, 1.5, 1.3, 1.2);
       Box(`${point.id}Beacon`, color, point.x, 3.2, point.z - 0.35, 0.15, 4, 0.15, false);
       this.Label(sink, `${point.id}Sign`, point.label, point.x, 3.45, point.z, 5.3, `#${point.color.toString(16)}`);
-      if (key === "barrage") this.Label(sink, "BarrageRadius", "F · 玩家周围 16m", point.x, 0.8, point.z + 0.62, 3, "#ffb12e");
-      if (key === "airstrike") this.Label(sink, "AirstrikeRadius", "F · 召唤后才有飞机", point.x, 0.8, point.z + 0.62, 3, "#c6a0ff");
+      if (key === "barrage") this.Label(sink, "BarrageRadius", T("range.explosion.signBarrageRadius"), point.x, 0.8, point.z + 0.62, 3, "#ffb12e");
+      if (key === "airstrike") this.Label(sink, "AirstrikeRadius", T("range.explosion.signAirstrikeRadius"), point.x, 0.8, point.z + 0.62, 3, "#c6a0ff");
     }
     for (const vehicle of EXPLOSION_VEHICLES) {
       const weaponWidth = vehicle.id === "Type97ChiHa" ? 2.475 : 2.15;
       // Models recoil visually, hull collision remains fixed on its concrete pad.
       Box(`${vehicle.id}Pad`, "White", vehicle.x, 0.04, vehicle.z, 6.4, 0.08, 8);
       sink.Solid(vehicle.x, 1, vehicle.z, weaponWidth / 2, 1, 2.3, "testVehicle");
-      this.Label(sink, `${vehicle.id}Sign`, `${vehicle.name} · F 单发`, vehicle.x, 0.48, vehicle.z + 4.6, 5.2);
+      this.Label(sink, `${vehicle.id}Sign`, T("range.explosion.signVehicle", { name: vehicle.name }), vehicle.x, 0.48, vehicle.z + 4.6, 5.2);
       for (const distance of [10, 20, 30]) this.Label(sink, `${vehicle.id}Distance${distance}`, `${distance} m`, vehicle.x - 5, 0.5, vehicle.z - distance, 2);
     }
-    this.Label(sink, "ExplosionTitle", "爆 炸 测 试 场", 2600, 5.4, 2650, 20);
-    this.Label(sink, "ExplosionRoute", "通行验证 · 士兵往返穿越炮坑", 2600, 3.3, EXPLOSION_PATROL.z - 5, 17, "#70bfff");
+    this.Label(sink, "ExplosionTitle", T("range.explosion.signTitle"), 2600, 5.4, 2650, 20);
+    this.Label(sink, "ExplosionRoute", T("range.explosion.signRoute"), 2600, 3.3, EXPLOSION_PATROL.z - 5, 17, "#70bfff");
     const b = this.bounds;
     for (const x of [b.minX + 0.5, b.maxX - 0.5]) Box("SideBoundary", "Boundary", x, 1.4, (b.minZ + b.maxZ) / 2, 1, 2.8, b.maxZ - b.minZ);
     for (const z of [b.minZ + 0.5, b.maxZ - 0.5]) Box("EndBoundary", "Boundary", (b.minX + b.maxX) / 2, 1.4, z, b.maxX - b.minX, 2.8, 1);

@@ -27,6 +27,7 @@ import {
   TELEGRAPH_DEFAULTS, TELEGRAPH_SFX, TELEGRAPH_SIGNALS, TELEGRAPH_PHASES, TELEGRAPH_BEATS,
 } from "./Script_Telegraph.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
+import { T } from "./Script_Text.mjs";
 
 const dirHere = path.dirname(fileURLToPath(import.meta.url));
 let checks = 0;
@@ -161,7 +162,8 @@ console.log("ok  ② 码组推进：按一下发一组、两到三声「嗒」�
     "报码纸如实反映：第二组既没勾也不在发");
   Check(log.breaks.length === 1 && log.signals.includes(TELEGRAPH_SIGNALS.break),
     "OnDisconnect 回调 + WireBreak 信号");
-  Check(sys.View().prompt === TELEGRAPH_DEFAULTS.reconnectLabel,
+  // 期望值从文本表取（TELEGRAPH_DEFAULTS 只存键，句子在 Data_Text_Gameplay）。
+  Check(sys.View().prompt === T(TELEGRAPH_DEFAULTS.reconnectLabelKey),
     "提示语换成「按住接回接头」——玩家要知道现在该干什么");
 
   Check(sys.Key() === false, "接头断着按电键不算数");

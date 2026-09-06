@@ -7,6 +7,13 @@
 // 生平打出刚才那个人的名字、籍贯、生卒年。ER2 有这个设计，而在台儿庄它有额外的分量：
 // 孙连仲的命令原话就是「士兵打完了，你自己填上去。你填过了，我来填」。
 
+import { T, Localize } from "./Script_Text.mjs";
+import { LevelBriefId, LevelFieldId } from "./Script_TextIds.mjs";
+import {
+  TITLE_CARD, TIMING, GRENADE_WARNING, HITMARK, HITDIR, VIGNETTE, SUPPRESSION,
+  PROMPTS, MINIMAP, FPS,
+} from "./Data_Tuning_Hud.mjs";
+
 const NS = "http://www.w3.org/2000/svg";
 
 /**
@@ -33,24 +40,23 @@ function SetClass(el, name, on) {
   if (el.classList.contains(name) !== !!on) el.classList.toggle(name, !!on);
 }
 
-/** 章节卡排在简报之后要等多久。0.55 s 让简报那 0.6 s 的淡出先走完。 */
-const TITLE_AFTER_BRIEF_S = 0.55;
-
 /**
  * 两个目标标签在纵向上至少要隔开多少像素（同时横向要近到 MARKER_SEP_X 才算撞）。
  * 一个 marker 是「▲ + 名字 + 进度条」三行，实测占 38 px 高。
  * 线性关卡里所有路标几乎在同一个方位角上 —— 实测第五关「十字街口 62m /
  * 西门里街 222m / 西门里 340m」三个标签打在同一像素上（x 762–838、y 449.5–465.8），
  * 两两重叠 1019–1103 px²，而且整关不散。投影点不做避让就必然叠成一坨。
+ *
+ * **这是绘制布局，不是调参**：它跟着 .hudMarker 的字号与行高走，不跟着策划走。
  */
 const MARKER_SEP_Y = 40;
 const MARKER_SEP_X = 130;
-const GRENADE_WARNING_LIMIT = 4;
 
-const STANCE_LABELS = {
-  stand: "站立",
-  crouch: "下蹲",
-  prone: "趴下",
+/** 姿态 id → 文本键。id 与 Script_Player 的 STANCE 同一套。 */
+const STANCE_TEXT = {
+  stand: "hud.stance.stand",
+  crouch: "hud.stance.crouch",
+  prone: "hud.stance.prone",
 };
 
 /**
@@ -195,8 +201,10 @@ export function ContextualActionPrompts({
    */
   if (carry?.active) {
     if (carry.phase === "carry" && carry.canDrop) {
-      prompts.push({ keys: "F", label: carry.prompt || "放下", kind: "carry" });
-      if (carry.canThrow) prompts.push({ keys: "左键", label: "扔下，立刻还手", kind: "carry" });
+      prompts.push({ keys: "F", label: carry.prompt || T("hud.prompt.carryDrop"), kind: "carry" });
+      if (carry.canThrow) {
+        prompts.push({ keys: T("hud.key.mouseLeft"), label: T("hud.prompt.carryThrow"), kind: "carry" });
+      }
     }
     return prompts;
   }
@@ -204,20 +212,20 @@ export function ContextualActionPrompts({
     prompts.push({ keys: "F", label: interaction.label, kind: interaction.kind || "interact" });
   }
   if (Number(bleeding) > 0 && Number(bandages) > 0) {
-    prompts.push({ keys: "B", label: "包扎止血", kind: "bandage" });
+    prompts.push({ keys: "B", label: T("hud.prompt.bandage"), kind: "bandage" });
   }
   // 空枪时先教"这一下还能捅出去"，再教装填 —— 白刃是贴脸时唯一来得及的选项
   if (ammoEmpty) {
-    prompts.push({ keys: "左键", label: "白刃（按住蓄力劈刺）", kind: "melee" });
+    prompts.push({ keys: T("hud.key.mouseLeft"), label: T("hud.prompt.meleeCharge"), kind: "melee" });
   }
   const firearms = [
-    ["primary", "1", "长枪"],
-    ["secondary", "2", "短枪"],
+    ["primary", "1", T("hud.weaponSlot.primary")],
+    ["secondary", "2", T("hud.weaponSlot.secondary")],
   ].filter(([slot]) => !!slots?.[slot]);
   if (firearms.length > 1) {
     prompts.push({
       keys: firearms.map(([, key]) => key).join(" / "),
-      label: `切换${firearms.map(([, , name]) => name).join(" / ")}`,
+      label: T("hud.prompt.switchWeapon", { slots: firearms.map(([, , name]) => name).join(" / ") }),
       kind: "switchWeapon",
     });
   }
@@ -291,7 +299,7 @@ export class Hud {
     this.el.phase = mk("hudPhase", this.el.top);
     this.el.objective = mk("hudObjective", this.el.top);
     this.el.objective.innerHTML = `<span class="o"></span>`
-      + `<span class="objectiveUpdate">目标已更新</span>`;
+      + `<span class="objectiveUpdate">${T("hud.objective.updated")}</span>`;
     this.el.objectiveText = this.el.objective.querySelector(".o");
     this.el.objective.setAttribute("role", "status");
     this.el.objective.setAttribute("aria-live", "polite");
@@ -304,24 +312,24 @@ export class Hud {
     this.el.combat.innerHTML = `
       <div class="combatWeapon"></div>
       <div class="combatMain">
-        <div class="combatStance" data-stance="stand" role="img" aria-label="站立">
+        <div class="combatStance" data-stance="stand" role="img" aria-label="${T("hud.stance.stand")}">
           <svg class="stanceStand" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="5.5" r="3"/><path d="M16 9v10m0-7-6 6m6-6 6 5m-6 2-5 10m5-10 6 10"/></svg>
           <svg class="stanceCrouch" viewBox="0 0 32 32" aria-hidden="true"><circle cx="20.5" cy="7" r="3"/><path d="m19 10-6 7m2-4 8 4m-10 0 6 5m0 0 7 1m-7-1-6 7m13-6 3 6"/></svg>
           <svg class="stanceProne" viewBox="0 0 32 32" aria-hidden="true"><circle cx="25.5" cy="17" r="3"/><path d="M22 18h-9l-7 5m8-5-5-5m5 5 7 5m-12 0H3"/></svg>
         </div>
-        <div class="combatAmmo" aria-label="弹药">
+        <div class="combatAmmo" aria-label="${T("hud.aria.ammo")}">
           <span class="ammoCurrent">00</span><span class="ammoDivider"></span><span class="ammoReserve">00</span>
         </div>
       </div>
-      <div class="combatStanceChoices" role="group" aria-label="切换姿态" title="按住 Alt 后点击，或使用对应键位">
-        <button type="button" data-player-stance="stand" aria-pressed="true">站立<kbd>空格</kbd></button>
-        <button type="button" data-player-stance="crouch" aria-pressed="false">下蹲<kbd>C</kbd></button>
-        <button type="button" data-player-stance="prone" aria-pressed="false">趴下<kbd>Z</kbd></button>
+      <div class="combatStanceChoices" role="group" aria-label="${T("hud.aria.stanceGroup")}" title="${T("hud.aria.stanceHint")}">
+        <button type="button" data-player-stance="stand" aria-pressed="true">${T("hud.stance.stand")}<kbd>${T("hud.key.space")}</kbd></button>
+        <button type="button" data-player-stance="crouch" aria-pressed="false">${T("hud.stance.crouch")}<kbd>C</kbd></button>
+        <button type="button" data-player-stance="prone" aria-pressed="false">${T("hud.stance.prone")}<kbd>Z</kbd></button>
       </div>
       <div class="combatEquipment">
-        <span class="equipment grenade" aria-label="手榴弹">${EQUIPMENT_ICONS.grenade}<b>0</b></span>
-        <span class="equipment bundle" aria-label="集束手榴弹">${EQUIPMENT_ICONS.bundle}<b>0</b></span>
-        <span class="equipment mortar" aria-label="迫击炮支援">${EQUIPMENT_ICONS.mortar}<b>0</b></span>
+        <span class="equipment grenade" aria-label="${T("hud.equipment.grenade")}">${EQUIPMENT_ICONS.grenade}<b>0</b></span>
+        <span class="equipment bundle" aria-label="${T("hud.equipment.bundle")}">${EQUIPMENT_ICONS.bundle}<b>0</b></span>
+        <span class="equipment mortar" aria-label="${T("hud.equipment.mortar")}">${EQUIPMENT_ICONS.mortar}<b>0</b></span>
       </div>`;
     this.el.combatWeapon = this.el.combat.querySelector(".combatWeapon");
     this.el.combatStance = this.el.combat.querySelector(".combatStance");
@@ -418,11 +426,11 @@ export class Hud {
     this.telegraphPaperKey = "";
     this.el.meleeQte = mk("hudMeleeQte");
     this.el.meleeQte.innerHTML = `
-      <div class="mqSlow">武器控制 · 我方 ← ● → 敌方</div>
+      <div class="mqSlow">${T("hud.melee.scale")}</div>
       <div class="mqTitle"></div>
       <div class="mqPrompt"></div>
       <div class="mqKeys"></div>
-      <div class="mqProgress" role="progressbar" aria-label="我方武器控制" aria-valuemin="0" aria-valuemax="100"><i></i></div>
+      <div class="mqProgress" role="progressbar" aria-label="${T("hud.melee.progressAria")}" aria-valuemin="0" aria-valuemax="100"><i></i></div>
       <div class="mqTimeline"><b></b><i></i></div>
       <div class="mqResult"></div>
       <div class="mqAssist"></div>`;
@@ -437,7 +445,7 @@ export class Hud {
     this.el.note = mk("hudNote");
     this.el.markers = mk("hudMarkers");
     this.el.grenadeWarnings = mk("hudGrenadeWarnings");
-    for (let i = 0; i < GRENADE_WARNING_LIMIT; i += 1) {
+    for (let i = 0; i < GRENADE_WARNING.maxIcons; i += 1) {
       const warning = mk("hudGrenadeWarning", this.el.grenadeWarnings);
       warning.innerHTML = `<span class="ico"><i>!</i></span><span class="txt"></span>`;
       warning.style.display = "none";
@@ -452,7 +460,7 @@ export class Hud {
     // 开镜交给机械瞄具。四条线和中心点常驻，只改 class/CSS 变量，避免每帧重建 DOM。
     this.el.crosshair = mk("hudCrosshair");
     this.el.crosshair.setAttribute("role", "img");
-    this.el.crosshair.setAttribute("aria-label", "腰射准心");
+    this.el.crosshair.setAttribute("aria-label", T("hud.crosshair.hip"));
     for (const side of ["left", "right", "up", "down"]) mk(`arm ${side}`, this.el.crosshair, "i");
     mk("dot", this.el.crosshair, "i");
     // 目标识别卡：准心正下方一行。COD 的名牌读法，但不打数字血量（除体验档的血条）。
@@ -512,8 +520,8 @@ export class Hud {
     const poolChanged = this.poolLast !== undefined && ours !== this.poolLast;
     this.poolLast = ours;
     if (poolChanged) {
-      const enemyIntel = theirs === null ? "" : ` · 对面 ${theirs}`;
-      this.el.forceStatus.textContent = `城中仍在坚守者：${ours} 人${enemyIntel}`;
+      const enemyIntel = theirs === null ? "" : T("hud.force.enemyIntel", { theirs });
+      this.el.forceStatus.textContent = T("hud.force.holding", { ours, enemyIntel });
       this.el.forceStatus.classList.remove("flash");
       // 同一节点连续变化时强制重启动画；否则第二次变化会停在第一次的末帧。
       void this.el.forceStatus.offsetWidth;
@@ -521,7 +529,7 @@ export class Hud {
       clearTimeout(this.forceStatusTimer);
       this.forceStatusTimer = setTimeout(() => {
         this.el.forceStatus.classList.remove("flash");
-      }, 3500);
+      }, TIMING.forceStatusS * 1000);
     }
   }
 
@@ -539,10 +547,10 @@ export class Hud {
       + (view.success === true ? " success" : view.success === false ? " fail" : "")
       + (view.wrongPulse > 0.05 ? " wrong" : "");
     root.setAttribute("aria-hidden", "false");
-    root.setAttribute("aria-label", `${view.label}，${view.prompt}`);
+    root.setAttribute("aria-label", T("hud.melee.aria", { label: view.label, prompt: view.prompt }));
     this.el.mqTitle.textContent = view.label;
     this.el.mqPrompt.textContent = view.phase === "resolve"
-      ? (view.success ? "推开了！准备恢复自由战斗" : "失势 · 抵抗失败")
+      ? (view.success ? T("hud.melee.resolveWon") : T("hud.melee.resolveLost"))
       : view.prompt;
     const signature = `${view.serial}|${view.index}|${view.expected}|${view.phase}`;
     if (this.el.mqKeys.dataset.signature !== signature) {
@@ -567,9 +575,10 @@ export class Hud {
       this.el.mqSweet.style.width = `${sweet.width}%`;
     }
     this.el.mqResult.textContent = view.phase === "resolve"
-      ? (view.success ? "成功" : "失败") : `${Math.max(0, view.timeLeft).toFixed(1)} 秒`;
-    this.el.mqAssist.textContent = view.assist === "auto" ? "辅助：自动完成"
-      : view.assist === "hold" ? "辅助：长按代替连按" : "有效连按最多每秒 7 次";
+      ? (view.success ? T("hud.melee.resultWin") : T("hud.melee.resultLose"))
+      : T("hud.melee.timeLeft", { seconds: Math.max(0, view.timeLeft).toFixed(1) });
+    this.el.mqAssist.textContent = view.assist === "auto" ? T("hud.melee.assistAuto")
+      : view.assist === "hold" ? T("hud.melee.assistHold") : T("hud.melee.assistMash");
   }
 
   MeleeQteState() { return this.meleeQteState ? { ...this.meleeQteState } : null; }
@@ -616,8 +625,8 @@ export class Hud {
     SetVar(e, "--gap", `${this.crosshairGap.toFixed(1)}px`);
     SetVar(e, "--arm", `${geo.arm.toFixed(1)}px`);
     SetAttr(e, "aria-hidden", String(!shown));
-    SetAttr(e, "aria-label", sprinting ? "冲刺扩散准心"
-      : `腰射准心 散布 ${geo.spreadDeg.toFixed(1)} 度`);
+    SetAttr(e, "aria-label", sprinting ? T("hud.crosshair.sprint")
+      : T("hud.crosshair.hipSpread", { deg: geo.spreadDeg.toFixed(1) }));
     // 识别卡贴着准心下沿走：散布撑大时它跟着让开，不会被四条线压住。
     SetVar(this.el.target, "--y", `${(this.crosshairGap + geo.arm + 16).toFixed(1)}px`);
   }
@@ -678,7 +687,7 @@ export class Hud {
     this.el.targetBar.style.display = hasBar ? "" : "none";
     if (hasBar) this.el.targetBar.firstChild.style.width = `${Math.round(card.health * 100)}%`;
     e.setAttribute("aria-hidden", "false");
-    e.setAttribute("aria-label", `${card.title}，${card.meta}`);
+    e.setAttribute("aria-label", T("hud.target.aria", { title: card.title, meta: card.meta }));
   }
 
   /** 识别卡的运行时真值，给冒烟取证。 */
@@ -693,10 +702,10 @@ export class Hud {
     ammo = 0, clips = 0, magazine = 0, armed = true,
     infiniteAmmo = false, infiniteReserve = false,
     grenades = 0, bundles = 0, mortar = 0, cooking = 0 }) {
-    const stanceKey = STANCE_LABELS[stance] ? stance : "stand";
+    const stanceKey = STANCE_TEXT[stance] ? stance : "stand";
     if (this.el.combatStance.dataset.stance !== stanceKey) {
       this.el.combatStance.dataset.stance = stanceKey;
-      this.el.combatStance.setAttribute("aria-label", STANCE_LABELS[stanceKey]);
+      this.el.combatStance.setAttribute("aria-label", T(STANCE_TEXT[stanceKey]));
       for (const button of this.el.stanceChoices) {
         button.setAttribute("aria-pressed", String(button.dataset.playerStance === stanceKey));
       }
@@ -717,10 +726,10 @@ export class Hud {
     }
 
     const bits = [];
-    if (bleeding > 0) bits.push(`<span class="b">流血</span>`);
-    else if (wounded) bits.push(`<span class="w">带伤</span>`);
-    if (bandages > 0) bits.push(`<span class="g">绷带 ${bandages}</span>`);
-    if (breath) bits.push(`<span class="h">屏息</span>`);
+    if (bleeding > 0) bits.push(`<span class="b">${T("hud.state.bleeding")}</span>`);
+    else if (wounded) bits.push(`<span class="w">${T("hud.state.wounded")}</span>`);
+    if (bandages > 0) bits.push(`<span class="g">${T("hud.state.bandages", { n: bandages })}</span>`);
+    if (breath) bits.push(`<span class="h">${T("hud.state.breath")}</span>`);
     if (order) bits.push(`<span class="c">${order}</span>`);
     const stateHtml = bits.join("");
     if (stateHtml !== this.stateHtml) {
@@ -776,10 +785,7 @@ export class Hud {
    */
   Hitmark(kind = "hit") {
     this.el.hitmark.className = `hudHitmark on ${kind}`;
-    // 旧值（命中 0.26 s / 击杀 0.42 s）在 60 Hz 下只亮 16 帧，第一帧又常被
-    // 枪口焰和后坐遮掉；高分屏上的 1.5 px 细线更容易被抗锯齿吃掉。稍微延长，
-    // 仍然短到不能被当成常驻准星，但玩家确实能读到这一枪有没有打中。
-    this.hitmarkSpan = kind === "kill" ? 0.50 : 0.34;
+    this.hitmarkSpan = kind === "kill" ? HITMARK.killS : HITMARK.hitS;
     this.hitmarkTimer = this.hitmarkSpan;
     // 立刻亮，不等下一帧的 Update —— 命中回执迟一帧就等于枪响与记号对不上，
     // 而这一记号存在的全部理由就是"这一枪"和"打中了"要绑在同一个瞬间。
@@ -813,22 +819,22 @@ export class Hud {
 
   SetSuppression(v) {
     // 千分位截断：压制值指数衰减永远到不了 0，不截断的话尾巴上每帧都是一个新字符串。
-    SetStyle(this.el.suppress, "opacity", Math.min(1, v * 1.15).toFixed(3));
+    SetStyle(this.el.suppress, "opacity", Math.min(1, v * SUPPRESSION.gain).toFixed(3));
   }
 
   /**
    * 受伤的全部画面反馈，一次调用。三层叠在同一张暗角上：
-   *   · 底噪 —— 剩余血量（现在从 90 就开始渗，而不是 70：让"我该包扎了"提前到
-   *     还有得救的时候；曲线取 1.6 次幂，越低涨得越快）；
+   *   · 底噪 —— 剩余血量；
    *   · 事件 —— 这一发的红闪（player.hitFlash，独立衰减，与剩余血量无关）；
-   *   · 濒死 —— 40 以下整块暗角开始搏动（CSS 动画，零 JS 成本）。
-   * 前两层取 max 而不是相加：相加会让"低血 + 连中"直接糊成纯红看不见路。
+   *   · 濒死 —— 血量到某一档以下整块暗角开始搏动（CSS 动画，零 JS 成本）。
+   * 三个档位的数与「为什么是这个数」都在 Data_Tuning_Hud.VIGNETTE。
    */
   SetHurt({ health = 100, flash = 0, marks = null, yaw = 0 } = {}) {
-    const base = Math.pow(Math.max(0, 1 - health / 90), 1.6) * 0.78;
-    const v = Math.min(0.92, Math.max(base, flash * 0.85));
+    const base = Math.pow(Math.max(0, 1 - health / VIGNETTE.bleedFromHealth),
+      VIGNETTE.curvePower) * VIGNETTE.baseMax;
+    const v = Math.min(VIGNETTE.totalMax, Math.max(base, flash * VIGNETTE.flashGain));
     SetStyle(this.el.damage, "opacity", v.toFixed(3));
-    SetClass(this.el.damage, "low", health < 40 && health > 0);
+    SetClass(this.el.damage, "low", health < VIGNETTE.pulseBelowHealth && health > 0);
 
     const paths = this.hitDirPaths;
     if (!paths) return;
@@ -844,12 +850,13 @@ export class Hud {
       const deg = Math.atan2(right, fwd) * 180 / Math.PI;
       const life = m.max ? m.life / m.max : 0;
       SetAttr(paths[i], "transform", `rotate(${deg.toFixed(1)})`);
-      // 前 0.25 s 满亮，之后淡出：一眼看得见，但不会在屏幕上挂两秒。
-      SetStyle(paths[i], "opacity", (Math.min(1, life * 1.35) * 0.92).toFixed(3));
+      // 前四分之一寿命满亮，之后淡出：一眼看得见，但不会在屏幕上挂两秒。
+      SetStyle(paths[i], "opacity",
+        (Math.min(1, life * HITDIR.fullBrightGain) * HITDIR.maxOpacity).toFixed(3));
     }
   }
 
-  Say(speaker, text, seconds = 3.6, variant = "") {
+  Say(speaker, text, seconds = TIMING.subtitleS, variant = "") {
     this.el.subtitle.innerHTML = speaker
       ? `<span class="who">${speaker}</span><span class="txt">${text}</span>`
       : `<span class="txt narr">${text}</span>`;
@@ -885,7 +892,7 @@ export class Hud {
   Title(text, sub = "") {
     this.spoken.push(String(text));
     if (this.briefTimer > 0) {
-      this.pendingTitle = { text, sub, wait: this.briefTimer + TITLE_AFTER_BRIEF_S };
+      this.pendingTitle = { text, sub, wait: this.briefTimer + TITLE_CARD.afterBriefS };
       return;
     }
     this._ShowTitle(text, sub);
@@ -895,7 +902,7 @@ export class Hud {
     this.el.title.innerHTML = `<div class="tMain">${text}</div>`
       + (sub ? `<div class="tSub">${sub}</div>` : "");
     this.el.title.classList.add("on");
-    this.titleTimer = 4.2;
+    this.titleTimer = TITLE_CARD.holdS;
   }
 
   /** 尾声：一行一行浮出来，不打歼敌数。 */
@@ -915,7 +922,7 @@ export class Hud {
     this.el.epilogue.classList.remove("on");
   }
 
-  Hint(text, seconds = 4.5) {
+  Hint(text, seconds = TIMING.hintS) {
     this.el.hint.textContent = text;
     this.el.hint.classList.add("on");
     this.hintTimer = seconds;
@@ -928,7 +935,7 @@ export class Hud {
   SetActionPrompts(prompts = []) {
     const next = prompts
       .filter((prompt) => prompt?.keys && prompt?.label)
-      .slice(0, 3)
+      .slice(0, PROMPTS.maxRows)
       .map((prompt) => ({
         keys: String(prompt.keys), label: String(prompt.label), kind: String(prompt.kind || "action"), text:!!prompt.text,
       }));
@@ -947,7 +954,7 @@ export class Hud {
       icon.innerHTML = ACTION_ICONS[prompt.kind] || ACTION_ICONS.action;
       // 文字不上屏，只留在无障碍属性里
       row.title = prompt.label;
-      row.setAttribute("aria-label", `${prompt.keys}：${prompt.label}`);
+      row.setAttribute("aria-label", T("hud.action.aria", { keys: prompt.keys, label: prompt.label }));
       row.append(key, icon);
       if(prompt.text){const label=document.createElement("span");label.className="actionText";label.textContent=prompt.label;label.style.cssText="font:14px/1.4 sans-serif;color:#fff;white-space:normal;max-width:250px";row.append(label);}
       this.el.actions.appendChild(row);
@@ -977,7 +984,9 @@ export class Hud {
     root.className = `hudInteractRing on ${view.gesture || "hold"}`
       + (view.holding ? "" : " fading");
     root.setAttribute("aria-hidden", "false");
-    root.setAttribute("aria-label", `${view.label || "交互"} ${Math.round(t * 100)}%`);
+    root.setAttribute("aria-label", T("hud.interact.aria", {
+      label: view.label || T("hud.interact.generic"), percent: Math.round(t * 100),
+    }));
     this.el.interactRingFill.style.strokeDashoffset =
       `${this.interactRingCircumference * (1 - t)}`;
     if (this.el.interactRingLabel.textContent !== (view.label || "")) {
@@ -1005,7 +1014,10 @@ export class Hud {
       }
       root.className = view ? `hudCarry on ${view.phase}` : "hudCarry";
       root.setAttribute("aria-hidden", view ? "false" : "true");
-      if (view) root.setAttribute("aria-label", `负重：${view.label}，${view.prompt || ""}`);
+      if (view) {
+        root.setAttribute("aria-label",
+          T("hud.carry.aria", { label: view.label, prompt: view.prompt || "" }));
+      }
       this.root.classList.toggle("carrying", !!view);
     }
     if (view) this.el.carryBar.style.width = `${Math.round(Math.max(0, Math.min(1, view.t)) * 100)}%`;
@@ -1048,8 +1060,11 @@ export class Hud {
         : "hudEmplacement";
       root.setAttribute("aria-hidden", view ? "false" : "true");
       if (view) {
-        root.setAttribute("aria-label",
-          `${view.label}：热量 ${Math.round(view.heat * 100)}%，${view.prompt || "可射击"}`);
+        root.setAttribute("aria-label", T("hud.emplacement.aria", {
+          label: view.label,
+          heat: Math.round(view.heat * 100),
+          prompt: view.prompt || T("hud.emplacement.ready"),
+        }));
       }
       this.root.classList.toggle("emplaced", !!view);
     }
@@ -1057,8 +1072,10 @@ export class Hud {
     this.el.empHeatBar.style.width = `${Math.round(Math.max(0, Math.min(1, view.heat)) * 100)}%`;
     // 警戒线是画在条上的一根竖线：玩家要看得见"还有多少余量"，不是等它变红才知道。
     this.el.empHeatWarn.style.left = `${Math.round(view.warnHeat * 100)}%`;
-    const ammo = view.dead ? "——"
-      : `${String(view.rounds).padStart(2, "0")} / ${view.belts} 板`;
+    const ammo = view.dead ? "——"                                   // @text-ok 破折号占位，不是句子
+      : T("hud.emplacement.ammo", {
+        rounds: String(view.rounds).padStart(2, "0"), belts: view.belts,
+      });
     if (this.el.empAmmo.textContent !== ammo) this.el.empAmmo.textContent = ammo;
     // 小卡的排障进度直接画在热条底下（不占准星那个环 —— 那个环归 F 交互）。
     const clearT = view.jam && view.jam.kind !== "fatal" ? view.jam.t : 0;
@@ -1101,8 +1118,9 @@ export class Hud {
       if (view) {
         this.el.tgCount.textContent = `${view.sent} / ${view.total}`;
         this.el.tgPrompt.textContent = view.prompt || "";
-        root.setAttribute("aria-label",
-          `${view.label}：已发 ${view.sent} 组，共 ${view.total} 组。${view.prompt || ""}`);
+        root.setAttribute("aria-label", T("hud.telegraph.aria", {
+          label: view.label, sent: view.sent, total: view.total, prompt: view.prompt || "",
+        }));
         const items = this.el.tgPaper.children;
         for (let i = 0; i < items.length; i += 1) {
           const g = view.groups[i];
@@ -1160,7 +1178,7 @@ export class Hud {
     const born = 1938 - identity.age;
     this.el.deathCard.innerHTML =
       `<div class="dcBiography">`
-      + `<div class="dcKicker">阵亡</div>`
+      + `<div class="dcKicker">${T("hud.death.kicker")}</div>`
       + `<div class="dcName">${identity.name}</div>`
       + `<div class="dcRule"></div>`
       + `<div class="dcYears">${born} — 1938</div>`
@@ -1181,11 +1199,14 @@ export class Hud {
   ShowBrief(phase) {
     // 旧版把每关三四句史实全铺在左侧，正好又与顶部目标、人物喊话同时出现。
     // 战术 HUD 只需要一条“刚发生了什么”；其余内容继续由关内对白和史实注记承接。
-    const headline = phase.brief.find((line) => String(line || "").trim()) || phase.label;
-    this.el.brief.innerHTML = `<div class="bTitle">${phase.date}</div>`
+    // 简报与关卡字段是章节数据里的原稿：显示时按 Script_TextIds 的 id 找译文，没有就用原稿。
+    const index = phase.brief.findIndex((line) => String(line || "").trim());
+    const headline = index >= 0 ? Localize(LevelBriefId(phase.id, index), phase.brief[index])
+      : Localize(LevelFieldId(phase.id, "label"), phase.label);
+    this.el.brief.innerHTML = `<div class="bTitle">${Localize(LevelFieldId(phase.id, "date"), phase.date)}</div>`
       + `<div class="bLine">${headline}</div>`;
     this.el.brief.classList.add("on");
-    this.briefTimer = 4.0;
+    this.briefTimer = TIMING.briefS;
     // 换关了：上一关没来得及浮出来的章节卡就地作废，别飘到下一关去
     this.pendingTitle = null;
   }
@@ -1262,9 +1283,9 @@ export class Hud {
     const centerY = height * 0.5;
     const edgeX = Math.max(40, centerX - 58);
     const edgeY = Math.max(40, centerY - 76);
-    const count = Math.min(GRENADE_WARNING_LIMIT, threats.length);
+    const count = Math.min(GRENADE_WARNING.maxIcons, threats.length);
 
-    for (let i = 0; i < GRENADE_WARNING_LIMIT; i += 1) {
+    for (let i = 0; i < GRENADE_WARNING.maxIcons; i += 1) {
       const el = box.children[i];
       if (i >= count) { el.style.display = "none"; continue; }
       const threat = threats[i];
@@ -1286,16 +1307,19 @@ export class Hud {
       x = Math.max(42, Math.min(width - 42, x));
       y = Math.max(48, Math.min(height - 48, y));
 
-      const urgent = threat.fuse <= 1.35;
-      const lethal = threat.distance <= threat.dangerRadius * 0.58;
+      const urgent = threat.fuse <= GRENADE_WARNING.urgentFuseS;
+      const lethal = threat.distance <= threat.dangerRadius * GRENADE_WARNING.lethalRadiusFrac;
       el.style.display = "";
       el.style.left = `${x.toFixed(1)}px`;
       el.style.top = `${y.toFixed(1)}px`;
       el.className = `hudGrenadeWarning${offscreen ? " edge" : ""}`
         + `${urgent ? " urgent" : ""}${lethal ? " lethal" : ""}`;
-      el.children[1].textContent = `${threat.kind === "GrenadeBundle" ? "集束" : "手榴弹"}`
-        + ` ${Math.max(1, Math.ceil(threat.distance))}m`;
-      el.setAttribute("aria-label", `${el.children[1].textContent}，附近爆炸物`);
+      const kind = threat.kind === "GrenadeBundle"
+        ? T("hud.grenade.bundle") : T("hud.grenade.single");
+      el.children[1].textContent = T("hud.grenade.warning", {
+        kind, metres: Math.max(1, Math.ceil(threat.distance)),
+      });
+      el.setAttribute("aria-label", T("hud.grenade.aria", { warning: el.children[1].textContent }));
     }
   }
 
@@ -1304,14 +1328,14 @@ export class Hud {
     // 地图收起时连 Canvas 都不重绘；按 M 打开后的第一帧会立刻补一张。
     if (!this.minimapVisible) return;
     this.minimapDirty += dt;
-    if (this.minimapDirty < 0.2) return;
+    if (this.minimapDirty < MINIMAP.refreshS) return;
     this.minimapDirty = 0;
     const ctx = this.minimapCtx;
     const W = this.el.minimap.width, H = this.el.minimap.height;
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = "rgba(14,13,11,0.72)";
     ctx.fillRect(0, 0, W, H);
-    const span = 260;
+    const span = MINIMAP.spanM;
     const toMap = (x, z) => [
       W / 2 + (x - player.position.x) / span * W,
       H / 2 + (z - player.position.z) / span * H,
@@ -1333,7 +1357,7 @@ export class Hud {
         const [mx, my] = toMap(s.position.x, s.position.z);
         ctx.fillStyle = "rgba(160,200,240,0.85)";
         ctx.fillRect(mx - 1.2, my - 1.2, 2.4, 2.4);
-      } else if (s.position.distanceTo(player.position) < 90) {
+      } else if (s.position.distanceTo(player.position) < MINIMAP.enemyClusterM) {
         ex += s.position.x; ez += s.position.z; en += 1;
       }
     }
@@ -1363,7 +1387,7 @@ export class Hud {
     this.minimapVisible = !!on;
     this.el.minimap.classList.toggle("on", this.minimapVisible);
     this.el.minimap.setAttribute("aria-hidden", String(!this.minimapVisible));
-    if (this.minimapVisible) this.minimapDirty = 0.2;
+    if (this.minimapVisible) this.minimapDirty = MINIMAP.refreshS;
     return this.minimapVisible;
   }
 
@@ -1383,12 +1407,12 @@ export class Hud {
     this.fpsAccum += (now - this.fpsLast) / 1000;
     this.fpsLast = now;
     this.fpsFrames += 1;
-    if (this.fpsAccum < 0.25) return;
+    if (this.fpsAccum < FPS.sampleS) return;
     const fps = Math.round(this.fpsFrames / this.fpsAccum);
     this.fpsAccum = 0;
     this.fpsFrames = 0;
     this.el.fps.textContent = `${fps} FPS`;
-    this.el.fps.classList.toggle("low", fps < 30);
+    this.el.fps.classList.toggle("low", fps < FPS.lowFps);
   }
 
   Update(dt) {
@@ -1448,7 +1472,7 @@ export class Hud {
         + `<div class="nTitle">${n.title}</div>`
         + `<div class="nBody">${n.body}</div>`;
       this.el.note.classList.add("on");
-      this.noteTimer = 9.5;
+      this.noteTimer = TIMING.noteS;
     }
   }
 

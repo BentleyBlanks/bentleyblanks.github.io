@@ -26,7 +26,9 @@ export class FirstLevelP012StageZero {
         for(const [id,gate] of host.battlefield.gates) if(gate.spec.signal==="P012TrainDoor") host.battlefield.SetGateProgress(id,progress);
       },
       ReleaseColumn: () => host.Signal("P012TrainDoor"),
-      Subtitle: text => {const [speaker,...words]=text.split("：");host.hud.Say(speaker,words.join("："),4);},
+      // 原稿是「说话人：台词」，这里只按全角冒号拆开，不产生新文案。
+      Subtitle: text => {const [speaker,...words]=text.split("："); // @text-ok 分隔符，不是玩家文案
+        host.hud.Say(speaker,words.join("："),4);}, // @text-ok 同上，拆开后再拼回去
       StartAudio: cue => { const previous=host.audio.ambiencePreset; host.audio.Ambience(cue); return {cue,previous}; },
       StopAudio: handle => { if(host.audio.ambiencePreset===handle.cue)host.audio.Ambience(handle.previous||host.ambience); },
       PlaySfx: cue => host.audio.Play(cue,{volume:.55,position:host.Guide()?.position}),

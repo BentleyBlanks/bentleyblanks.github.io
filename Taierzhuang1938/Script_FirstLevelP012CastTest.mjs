@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { COMPANION_CAST } from "./Script_Companion.mjs";
+import { T } from "./Script_Text.mjs";
 import { P012_COMPANION_CAST, SelectP012CompanionCast, SelectP012RecruitCast } from "./Data_FirstLevelP012Cast.mjs";
 
 const ids = ["luo", "yaowa", "heyoutian", "liuwencai", "zhaodegui", "xiaoqin"];
@@ -11,7 +12,8 @@ assert.ok(Object.isFrozen(P012_COMPANION_CAST));
 for (const castId of ids) {
   const spec = P012_COMPANION_CAST[castId];
   assert.ok(Object.isFrozen(spec));
-  assert.equal(spec.name, COMPANION_CAST[castId].label);
+  // 名册的名字 2026-09-06 起存文本键（Data_Companions.labelKey），期望值现取不抄。
+  assert.equal(spec.name, T(COMPANION_CAST[castId].labelKey));
   assert.ok(spec.fullName.trim().length >= 2, `${castId} has a complete established name or alias`);
   if (castId !== "luo") {
     assert.ok(spec.age >= 18 && spec.age <= 23 && spec.age < P012_COMPANION_CAST.luo.age);

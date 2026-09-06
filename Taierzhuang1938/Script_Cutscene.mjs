@@ -46,6 +46,14 @@ import { MarkNoPrepass } from "./Script_Post.mjs";
 // 两份实现迟早会有一份被改。
 import { HashString, ValueNoise2, Clamp01, Clamp, Mix as Lerp } from "./Script_Noise.mjs";
 import { CUTSCENES, CAST } from "./Data_TengxianScript.mjs";
+// 界面文案（ESC 提示、说话人格式、tier 标签）走文本表；分镜台词/字幕/卡片的**原稿**
+// 仍在各 Data_Cutscene* 里，显示那一刻经 Localize(id, 原稿) 换译文。id 口径只写在
+// Script_TextIds 一处 —— 运行时与 Script_TextGather 的翻译清单必须同源。
+import { T, Localize } from "./Script_Text.mjs";
+import {
+  ShotTextId, CutsceneTitleId, CardTitleId, CardTextId, TallyRowId, TallyClosingId, NoteTextId, CastNameId,
+} from "./Script_TextIds.mjs";
+import { TEXT_HOLD, CARD, LOOK } from "./Data_Tuning_Cutscene.mjs";
 import { TILE_METERS, ScaleBoxUv } from "./Script_Geo.mjs";
 import { FarLandY, ReliefHeight, FarmlandTint } from "./Script_FarLand.mjs";
 
@@ -232,6 +240,18 @@ function SampleTrack(track, t) {
 const STYLE_ID = "cutsceneStyle";
 const BAR_RATIO = 0.12;          // 上下黑边各占视高 12%（设计书给死的）
 
+// 下面这张样式表里原来夹着四段中文注释。它们搬到这里，不是"整理"：模板字符串里的
+// `/* … */` 对 CSS 是注释、对文本闸门却是**字符串里的汉字**，一个都豁免不掉。
+// 账本身一个字没改：
+//   · `.csSubs` 比 `.csLine` 高一档 —— 两层都锚在 bottom:16% 时，同屏出现会直接
+//     压在一起（李宗仁那一场因此只能把带时刻的字幕全挪进跳过卡）。字幕在上、台词在下。
+//   · `.csMap`（shot.mapCard，尾声那一镜）：底图**一个字都没有**，地名、箭头、部队
+//     标识全是这一层按归一化坐标叠上去的 DOM（贴图那一批就是照这个口径出的，
+//     见 Texture/PaperProps_README.md「交付边界」）。为什么不画进三维布景：一张 3:2
+//     的纸正面平拍，DOM 层对得准、改得动、在任何分辨率上字都是清的；画进贴图就得
+//     为每次改标注重出一次图。
+//   · `.csMapMark.unit` 用**方框**不是圆点 —— 军标里方框是步兵。
+//   · `.csMapArrow` 是一条带箭镞的细线，日军南进只有这一条 ——「极简」是硬要求。
 const CSS = `
 .csRoot{position:fixed;inset:0;pointer-events:none;z-index:60;
   font-family:"Noto Serif SC",serif;opacity:0;transition:opacity .35s ease}
@@ -240,8 +260,6 @@ const CSS = `
 .csBar.top{top:0}
 .csBar.bot{bottom:0}
 .csBlack{position:absolute;inset:0;background:#000;opacity:0}
-/* 字幕层比台词层高一档：两层都锚在 bottom:16% 时，同屏出现会直接压在一起
-   （李宗仁那一场因此只能把带时刻的字幕全挪进跳过卡）。字幕在上、台词在下。 */
 .csSubs{position:absolute;left:8%;right:8%;bottom:${BAR_RATIO * 100 + 11}%;text-align:center}
 .csSubs.center{bottom:auto;top:50%;transform:translateY(-50%)}
 .csSub.title{font-size:clamp(26px,3.2vw,52px);letter-spacing:.32em;color:#f2ead6;margin:0 0 .6em}
@@ -270,11 +288,6 @@ const CSS = `
   font-size:clamp(14px,1.35vw,22px);line-height:2.1}
 .csTallyLabel{color:#8f8776;letter-spacing:.32em;min-width:6em;text-align:right}
 .csTallyNote{color:#7e7767;font-size:.72em;margin-left:.8em}
-/* 地图卡（shot.mapCard，尾声那一镜）。底图**一个字都没有**，
-   地名、箭头、部队标识全是这一层按归一化坐标叠上去的 DOM ——
-   贴图那一批就是照这个口径出的（Texture/PaperProps_README.md「交付边界」）。
-   为什么不画进三维布景：一张 3:2 的纸正面平拍，DOM 层对得准、改得动、
-   在任何分辨率上字都是清的；画进贴图就得为每次改标注重出一次图。 */
 .csMap{position:absolute;left:0;right:0;top:${BAR_RATIO * 100}%;bottom:${BAR_RATIO * 100 + 13}%;
   display:none;align-items:center;justify-content:center;pointer-events:none}
 .csMap.on{display:flex}
@@ -287,9 +300,7 @@ const CSS = `
   margin-left:-2.5px;border-radius:50%;background:#2e2a22}
 .csMapMark.emphasis{font-weight:700;font-size:clamp(12px,1.3vw,21px)}
 .csMapMark.emphasis::before{width:8px;height:8px;margin-left:-4px}
-/* 部队标识：方框，不是圆点（军标里方框是步兵） */
 .csMapMark.unit::before{border-radius:0;width:9px;height:6px;margin-left:-4.5px}
-/* 箭头：一条带箭镞的细线。日军南进只有这一条 —— 「极简」是硬要求 */
 .csMapArrow{position:absolute;height:0;border-top:2px solid #6d2b22;transform-origin:0 50%}
 .csMapArrow::after{content:"";position:absolute;right:-1px;top:-5px;
   border-left:9px solid #6d2b22;border-top:5px solid transparent;border-bottom:5px solid transparent}
@@ -305,9 +316,19 @@ function EnsureStyle(doc) {
   doc.head.appendChild(style);
 }
 
+/**
+ * tier 是**内容数据里的枚举值**（信史 / 主流 / 推演 / 游戏 / 虚构），不是代码写的文案。
+ * 它恰好是汉字，所以：比较那一行按「资产 id 恰好是汉字」登记豁免；显示那一层只把
+ * 方括号交给文本表（`【{tier}】`），tier 本身照原样带出去。
+ *
+ * **tier 值本身现在还翻不了**：`content.<id>` 的键名正则不收汉字（见 Script_TextIds
+ * 头注），要翻得先给这五档定 ASCII slug —— 那是内容数据的口径，不该由渲染层擅自定。
+ */
+const TIER_GAMEPLAY = "游戏";   // @text-ok 内容数据里的 tier 枚举值，用于比较不用于显示
+
 function TierTag(tier) {
-  if (!tier || tier === "游戏") return "";
-  return `<span class="csTier">【${tier}】</span>`;
+  if (!tier || tier === TIER_GAMEPLAY) return "";
+  return `<span class="csTier">${T("story.cutscene.tierTag", { tier })}</span>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -608,7 +629,7 @@ export class CutsceneDirector {
   /** 输入层传入鼠标增量；过场机位本身仍由时间轴唯一驱动。 */
   AddLook(deltaX = 0, deltaY = 0) {
     if (!this.AllowsLook) return this.Look;
-    const scale = this.lookConfig.sensitivityScale * 0.002;
+    const scale = this.lookConfig.sensitivityScale * LOOK.radPerPixel;
     // Three 的相机在 lookAt 后仍沿局部轴旋转：正 yaw 是画面向左，正 pitch 是
     // 画面向上。因此标准第一人称输入必须两轴都减 movement，不能只凭 Euler 数值
     // 的正负猜玩家实际看到的方向。
@@ -645,7 +666,7 @@ export class CutsceneDirector {
       <div class="csBlack"></div>
       <div class="csSubs"></div>
       <div class="csLine"></div>
-      <div class="csSkip">ESC 跳过</div>
+      <div class="csSkip">${T("story.cutscene.skipHint")}</div>
       <div class="csCard"></div>`;
     this.rootHost.appendChild(el);
     this.dom = {
@@ -684,7 +705,13 @@ export class CutsceneDirector {
     const frame = this.dom.mapFrame;
     frame.style.backgroundImage = card.texture ? `url("${card.texture}")` : "";
     const parts = [];
+    // 地名 / 部队标识 / 箭头注记是内容原稿（考据过的地名），走 Localize 按 id 覆盖。
+    const cutId = this.cut ? this.cut.id : (this.staticSet ? this.staticSet.id : "?");
+    const MarkerLabel = (marker, index) =>
+      Localize(ShotTextId(cutId, shot.n, "map", index), marker.label || "");
+    let index = -1;
     for (const marker of card.markers || []) {
+      index += 1;
       if (!marker) continue;
       if (marker.kind === "arrow" && marker.from && marker.to) {
         // 一条带箭镞的细线：长度与角度按两端归一化坐标现算（容器是 3:2，
@@ -701,14 +728,14 @@ export class CutsceneDirector {
           + `width:${len}%;transform:rotate(${deg.toFixed(2)}deg)"></div>`);
         if (marker.label) {
           parts.push(`<div class="csMapArrowLabel" style="left:${(ax + bx) / 2}%;`
-            + `top:${(ay + by) / 2}%">${marker.label}</div>`);
+            + `top:${(ay + by) / 2}%">${MarkerLabel(marker, index)}</div>`);
         }
         continue;
       }
       const at = marker.at || [0.5, 0.5];
       const cls = `csMapMark${marker.emphasis ? " emphasis" : ""}${marker.kind === "unit" ? " unit" : ""}`;
       parts.push(`<div class="${cls}" style="left:${Number(at[0]) * 100}%;`
-        + `top:${Number(at[1]) * 100}%">${marker.label || ""}</div>`);
+        + `top:${Number(at[1]) * 100}%">${MarkerLabel(marker, index)}</div>`);
     }
     frame.innerHTML = parts.join("");
     this.dom.map.classList.add("on");
@@ -888,7 +915,7 @@ export class CutsceneDirector {
       // 正常播完：还有 epilogueCard 的（王铭章那场并列史源装不下三秒）先补卡片。
       this._TeardownSet();
       this._ClearText();
-      if (cut.epilogueCard) { this.blackAlpha = 1; this._ShowCard(cut.epilogueCard); return; }
+      if (cut.epilogueCard) { this.blackAlpha = 1; this._ShowCard(this._LocalizeCard(cut.id, "epilogueCard", cut.epilogueCard)); return; }
       if (cut.tally) { this.blackAlpha = 1; this._ShowCard(this._TallyCard(cut)); return; }
       this._Finish(false);
     }
@@ -1852,13 +1879,19 @@ export class CutsceneDirector {
     const key = (kind, i) => `${shot.n}:${kind}:${i}`;
     const crossed = (at) => this.prevTime <= shotStart + at && this.time > shotStart + at;
 
+    // 上屏那一刻换译文；`this.log` 仍记**原稿**（它是取证与自检的账，不是画面）。
     (shot.subs || []).forEach((sub, i) => {
       const id = key("sub", i);
       if (this.fired.has(id) || !crossed(sub.at)) return;
       this.fired.add(id);
       const voiceCue = sub.voiceCue ?? sub.voice ?? null;
       const voiceDuration = this._PlayVoice(voiceCue);
-      this.subSlots.push({ ...sub, left: Math.max(sub.seconds || 3.0, voiceDuration) });
+      const textId = ShotTextId(cut.id, shot.n, "sub", i);
+      this.subSlots.push({ ...sub,
+        text: Localize(textId, sub.text),
+        // small 既可能是 true（只表示"用小字号"）也可能是一行小字注记；只有后者要翻。
+        small: typeof sub.small === "string" ? Localize(NoteTextId(textId), sub.small) : sub.small,
+        left: Math.max(sub.seconds || TEXT_HOLD.subtitleS, voiceDuration) });
       this.log.push({ cut: cut.id, shot: shot.n, kind: "sub", tier: sub.tier, text: sub.text });
       this._RenderSubs();
     });
@@ -1871,9 +1904,10 @@ export class CutsceneDirector {
       const voiceCue = line.voiceCue ?? line.voice ?? null;
       const voiceDuration = this._PlayVoice(voiceCue);
       this.lineSlot = {
-        who: who ? (who.short || who.name) : "",
-        text: line.text, off: !!line.off, tier: line.tier,
-        left: Math.max(line.seconds || 3.0, voiceDuration),
+        who: who ? Localize(CastNameId(line.who), who.short || who.name) : "",
+        text: Localize(ShotTextId(cut.id, shot.n, "line", i), line.text),
+        off: !!line.off, tier: line.tier,
+        left: Math.max(line.seconds || TEXT_HOLD.lineS, voiceDuration),
       };
       this.log.push({ cut: cut.id, shot: shot.n, kind: "line", who: line.who, tier: line.tier, text: line.text });
       this._RenderLine();
@@ -2005,7 +2039,10 @@ export class CutsceneDirector {
     if (!this.dom) return;
     if (!this.lineSlot) { this.dom.line.innerHTML = ""; return; }
     const l = this.lineSlot;
-    const who = l.who ? `<span class="csWho">${l.who}${l.off ? "（画外）" : ""}：</span>` : "";
+    // 「谁：」与「谁（画外）：」整句进表 —— 冒号、括号、语序在别的语言里都不一样，
+    // 不许在这里拼（docs/Data_TextAndTuning.md §2）。
+    const label = l.off ? T("story.cutscene.speakerOff", { who: l.who }) : T("story.cutscene.speaker", { who: l.who });
+    const who = l.who ? `<span class="csWho">${label}</span>` : "";
     this.dom.line.innerHTML = `<div class="csLineText${l.off ? " csOff" : ""}">${who}${l.text}</div>`;
   }
 
@@ -2026,22 +2063,53 @@ export class CutsceneDirector {
   // -------------------------------------------------------------------------
 
   _SkipCardOf(cut) {
-    if (cut.skipCardFrom && cut[cut.skipCardFrom]) return cut[cut.skipCardFrom];
-    if (cut.skipCard) return cut.skipCard;
+    if (cut.skipCardFrom && cut[cut.skipCardFrom]) return this._LocalizeCard(cut.id, cut.skipCardFrom, cut[cut.skipCardFrom]);
+    if (cut.skipCard) return this._LocalizeCard(cut.id, "skipCard", cut.skipCard);
     if (cut.tally) return this._TallyCard(cut);
     return null;
+  }
+
+  /**
+   * 把一张数据里的卡片（skipCard / epilogueCard）换成显示用的那一份。
+   *
+   * **id 里带字段名**：王铭章那场的 epilogueCard 同时也是它的跳过卡
+   *（`skipCardFrom: "epilogueCard"`），两条路要落在同一批 id 上，译文才不会
+   * 「跳过时是译文、播完是原文」。所以 id 认的是**卡片在数据上的字段名**，
+   * 不是"这次是怎么被显示出来的"。
+   */
+  _LocalizeCard(cutId, field, card) {
+    if (!card) return card;
+    const out = { ...card };
+    if (card.title) out.title = Localize(CardTitleId(cutId, field), card.title);
+    if (Array.isArray(card.lines)) {
+      out.lines = card.lines.map((line, i) => {
+        const id = CardTextId(cutId, field, i);
+        return { ...line,
+          text: Localize(id, line.text),
+          small: typeof line.small === "string" ? Localize(NoteTextId(id), line.small) : line.small };
+      });
+    }
+    return out;
   }
 
   /** 结算面板：只打守住时长、阵地易手次数、出城人数。**不打歼敌数。** */
   _TallyCard(cut) {
     const tally = cut.tally;
     if (!tally) return null;
-    const rows = tally.rows.map((row) => ({
-      label: row.label,
-      value: String(row.value).replace("{poolOut}", String(this.ctx.poolOut ?? "—")),
-      note: row.note || "",
+    const rows = tally.rows.map((row, i) => ({
+      label: Localize(TallyRowId(cut.id, i, "label"), row.label),
+      // `{poolOut}` 是**数据自己写的**占位符（"{poolOut} 人"），译文里照抄它就行。
+      value: String(Localize(TallyRowId(cut.id, i, "value"), row.value))
+        .replace("{poolOut}", String(this.ctx.poolOut ?? "—")),
+      note: row.note ? Localize(TallyRowId(cut.id, i, "note"), row.note) : "",
     }));
-    return { title: cut.title, tallyRows: rows, lines: tally.closing || [] };
+    const lines = (tally.closing || []).map((line, i) => {
+      const id = TallyClosingId(cut.id, i);
+      return { ...line,
+        text: Localize(id, line.text),
+        small: typeof line.small === "string" ? Localize(NoteTextId(id), line.small) : line.small };
+    });
+    return { title: Localize(CutsceneTitleId(cut.id), cut.title), tallyRows: rows, lines };
   }
 
   _ShowCard(card) {
@@ -2058,9 +2126,9 @@ export class CutsceneDirector {
       `<div class="csCardTitle">${card.title || ""}</div>${rows}${rows && lines ? "<div style='height:2em'></div>" : ""}${lines}`;
     this.dom.card.classList.add("on");
     this.dom.skip.style.display = "none";
-    // 读秒：一行大约 1.6 秒，加 2 秒余量。任意键可以提前翻过。
+    // 读秒：一行大约 CARD.perLineS，加 CARD.baseS 余量。任意键可以提前翻过。
     const count = (card.lines || []).length + (card.tallyRows || []).length;
-    this.cardHold = 2.0 + 1.6 * count;
+    this.cardHold = CARD.baseS + CARD.perLineS * count;
     this.cardTime = 0;
   }
 

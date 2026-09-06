@@ -17,23 +17,54 @@
 import * as THREE from "three";
 import { FovFromFocalMm } from "./Script_Cutscene.mjs";
 import { ValueNoise2, Clamp, Clamp01 } from "./Script_Noise.mjs";
-import { MENU, CREDITS, PRESUMED_STAGING } from "./Data_TengxianScript.mjs";
+import { MENU, CREDITS, PRESUMED_STAGING, CAST } from "./Data_TengxianScript.mjs";
 import { MENU_SCENE, ShotsFor } from "./Data_Menu.mjs";
 import { PRESUMED } from "./Data_Tengxian.mjs";
+// 界面文案走字符串表（Data_Text_Menu.mjs），内容原稿（MENU / CREDITS / CAST）留在
+// Data_TengxianScript 里，显示时按 id 过 Localize —— 口径见 docs/Data_TextAndTuning.md §3。
+import { T, Localize } from "./Script_Text.mjs";
+import { CastNameId, LevelFieldId } from "./Script_TextIds.mjs";
+import { DRIFT, CAMERA } from "./Data_Tuning_Menu.mjs";
+
+/** 主菜单四项与两行标题的内容 id（`menu.<字段>`，译文放 `content.menu.<字段>`）。 */
+function MenuTextId(field) { return `menu.${field}`; }
+/** 标题下那几行史实小字。 */
+function MenuLineId(index) { return `menu.lines.${index}`; }
+/** 鸣谢一行。 */
+function CreditsLineId(index) { return `credits.${index}`; }
+/** 说话人 / 人物显示名：与 Script_Story、Script_Cutscene 同一条口径。 */
+function CastName(id) { return Localize(CastNameId(id), CAST[id]?.short || CAST[id]?.name || id); }
 
 /**
- * 沙盒模式（`host.sandboxMode`）→ 暂停菜单里的两句话。
- * key 与 Script_Main 的 `?range=1 / ?melee=1 / ?jiehe=1` 一一对应。
+ * 切片上某个字段的**显示文本**。
+ *
+ * 切片的 `label` / `date` / `place` 既是给玩家看的字，又被当 id 用
+ *（`label.split("·")[0]` 取关号、aria-label、MissionName），所以迁移的办法是
+ * **原字段留着不动，另加一个 `<字段>Key`**：有键就走字符串表，没有就用原字段。
+ * 现在只有 Data_Menu.JIEHE_SANDBOX_PHASE 带键；正片七章的 Data_Battle.PHASES
+ * 由战斗数据那一包迁，迁完这里一行都不用改。
  */
-const SANDBOX_NAMES = {
-  movement: { where: "操作交互测试场", exit: "退出操作测试场" },
-  explosions: { where: "爆炸测试场", exit: "退出爆炸测试场" },
-  weapons: { where: "枪械射击白盒", exit: "退出枪械靶场" },
-  range: { where: "靶场", exit: "退出靶场" },
-  melee: { where: "白刃测试场", exit: "退出白刃测试场" },
-  firstLevelP012Whitebox: { where: "第一关 P0/P1/P2 场景白盒", exit: "退出 P0/P1/P2 白盒" },
-  jiehe: { where: "界河白盒", exit: "退出界河白盒" },
-};
+function PhaseText(entry, field) {
+  const key = entry?.[`${field}Key`];
+  if (key) return T(key);
+  const raw = entry?.[field] ?? "";
+  // 正片章节的 label / date / place 是内容原稿：按 Script_TextIds 的 id 找译文，没有就用原稿。
+  return raw && entry?.id ? Localize(LevelFieldId(entry.id, field), raw) : raw;
+}
+
+/**
+ * 沙盒模式（`host.sandboxMode`）→ 暂停菜单里的两句话（「回到哪儿」与「怎么退出去」）。
+ * 这几个 id 与 Script_Main 的 `?range=1 / ?melee=1 / ?jiehe=1` 一一对应，
+ * 文案在 Data_Text_Menu 的 `menu.sandbox.<id>.where / .exit`。
+ */
+const SANDBOX_MODES = ["movement", "explosions", "weapons", "range", "melee",
+  "firstLevelP012Whitebox", "jiehe"];
+const DEFAULT_SANDBOX_MODE = "range";
+
+function SandboxText(mode) {
+  const id = SANDBOX_MODES.includes(mode) ? mode : DEFAULT_SANDBOX_MODE;
+  return { where: T(`menu.sandbox.${id}.where`), exit: T(`menu.sandbox.${id}.exit`) };
+}
 
 /** 缓动：进出都软的推轨。ER2 的菜单运镜没有一处是匀速的。 */
 function EaseInOutSine(k) { return 0.5 - 0.5 * Math.cos(Math.PI * Clamp01(k)); }
@@ -96,15 +127,11 @@ const MISSION_ART = [
   "./Texture/Menu/Texture_MissionCh6Zuihou.png",
 ];
 
-// 菜单只声明文案与布局；开关值及实际效果由装配层交回的 host 管，避免菜单
+// 菜单只声明布局；开关值及实际效果由装配层交回的 host 管，避免菜单
 // 偷偷持有玩家、物理世界或弹药账本。
-const DEBUG_ITEMS = [
-  { id: "noCollision", label: "无碰撞", note: "穿过人物、墙体与掩体；地形与关卡边界仍然生效" },
-  { id: "fastMove", label: "快速移动", note: "步行、冲刺与匍匐移动速度提高至三倍" },
-  { id: "invincible", label: "无敌模式", note: "免疫子弹、爆炸与流血伤害" },
-  { id: "infiniteAmmo", label: "无限子弹", note: "已持有枪械无需装填，空弹仓会自动补满" },
-  { id: "infiniteGrenades", label: "无限手榴弹", note: "普通手榴弹不会消耗；开启时会补给一枚" },
-];
+// id 与 Script_DebugOptions.DEBUG_OPTIONS_DEFAULTS 同一套，名字与那行小字
+//（**玩家看得见**，不是注释）在 Data_Text_Menu 的 `menu.debug.<id>.label / .note`。
+const DEBUG_ITEMS = ["noCollision", "fastMove", "invincible", "infiniteAmmo", "infiniteGrenades"];
 
 export class MainMenu {
   /**
@@ -193,11 +220,13 @@ export class MainMenu {
 
     const title = mk("mnTitle");
     this.el.titleMain = mk("mnTitleMain", title);
-    this.el.titleMain.textContent = MENU.title;
+    this.el.titleMain.textContent = Localize(MenuTextId("title"), MENU.title);
     this.el.titleSub = mk("mnTitleSub", title);
-    this.el.titleSub.textContent = MENU.subtitle;
+    this.el.titleSub.textContent = Localize(MenuTextId("subtitle"), MENU.subtitle);
     this.el.titleLines = mk("mnTitleLines", title);
-    for (const line of MENU.lines) mk("mnTitleLine", this.el.titleLines).textContent = line;
+    MENU.lines.forEach((line, index) => {
+      mk("mnTitleLine", this.el.titleLines).textContent = Localize(MenuLineId(index), line);
+    });
 
     // --- 主列表 -----------------------------------------------------------
     this.el.list = mk("mnList", this.root, "nav");
@@ -209,7 +238,7 @@ export class MainMenu {
 
     this.el.shotNote = mk("mnShotNote");
     this.el.foot = mk("mnFoot");
-    this.el.foot.textContent = "↑↓ 选择 · Enter 确定 · Esc 返回";
+    this.el.foot.textContent = T("menu.foot.main");
 
     // --- 面板（选章 / 史实注记 / 关于）-------------------------------------
     this.el.panel = mk("mnPanel");
@@ -217,8 +246,8 @@ export class MainMenu {
     this.el.panelTitle = mk("mnPanelTitle", head);
     const foot = mk("mnPanelFoot mnCampaignFoot", this.el.panel);
     this.el.panelBack = mk("mnBack", foot, "button");
-    this.el.panelBack.textContent = "返回";
-    mk("mnCampaignKeys", foot).textContent = "Esc 返回";
+    this.el.panelBack.textContent = T("menu.back");
+    mk("mnCampaignKeys", foot).textContent = T("menu.foot.escBack");
     this.el.panelBack.addEventListener("click", () => this.Show(this.panelReturnMode));
     this.el.panelBody = mk("mnPanelBody", this.el.panel);
     this.el.panel.appendChild(foot);
@@ -232,15 +261,17 @@ export class MainMenu {
   TitleItems() {
     const progress = Progress.Read();
     const resume = progress.furthest > 0 && progress.furthest < this.officialCount;
-    const label = resume ? `继续 · ${this.phases[progress.furthest].label}` : MENU.start;
+    const label = resume
+      ? T("menu.item.resume", { label: this.phases[progress.furthest].label })
+      : Localize(MenuTextId("start"), MENU.start);
     return [
       { id: "start", label,
-        hint: resume ? "从上次通过的下一章接着打" : "从序章 · 出川开始，先播车厢那一场过场" },
-      { id: "levels", label: MENU.chapters, hint: "正式章节、暂时废弃场景与测试场景三组，任选一条直接进（不播过场）" },
-      { id: "codex", label: MENU.codex, hint: "哪些数是史料、哪些是推定" },
-      { id: "credits", label: MENU.credits, hint: "史料口径与虚构人物的交代" },
-      { id: "settings", label: "设置", hint: "操作、画面与声音" },
-      { id: "debug", label: "调试选项", hint: "碰撞、移动、伤害与补给的测试开关" },
+        hint: resume ? T("menu.hint.resume") : T("menu.hint.start") },
+      { id: "levels", label: Localize(MenuTextId("chapters"), MENU.chapters), hint: T("menu.hint.levels") },
+      { id: "codex", label: Localize(MenuTextId("codex"), MENU.codex), hint: T("menu.hint.codex") },
+      { id: "credits", label: Localize(MenuTextId("credits"), MENU.credits), hint: T("menu.hint.credits") },
+      { id: "settings", label: T("menu.item.settings"), hint: T("menu.hint.settings") },
+      { id: "debug", label: T("menu.item.debug"), hint: T("menu.hint.debug") },
     ];
   }
 
@@ -255,20 +286,20 @@ export class MainMenu {
     if (this.sandboxMode) {
       // 各片沙盒报自己的名字：通过直达 query 进入界河白盒时按 Esc 不能显示「退出靶场」，
       // 会让人以为自己进错了地方。
-      const here = SANDBOX_NAMES[this.sandboxMode] || SANDBOX_NAMES.range;
+      const here = SandboxText(this.sandboxMode);
       return [
-        { id: "resume", label: "继续", hint: `回到${here.where}` },
-        { id: "settings", label: "设置", hint: "操作、画面与声音" },
-        { id: "debug", label: "调试选项", hint: "碰撞、移动、伤害与补给的测试开关" },
-        { id: "exitSandbox", label: here.exit, hint: "重载回正片，回到主菜单" },
+        { id: "resume", label: T("menu.item.resumeGame"), hint: T("menu.hint.resumeSandbox", { where: here.where }) },
+        { id: "settings", label: T("menu.item.settings"), hint: T("menu.hint.settings") },
+        { id: "debug", label: T("menu.item.debug"), hint: T("menu.hint.debug") },
+        { id: "exitSandbox", label: here.exit, hint: T("menu.hint.exitSandbox") },
       ];
     }
     return [
-      { id: "resume", label: "继续", hint: "回到这一关" },
-      { id: "settings", label: "设置", hint: "操作、画面与声音" },
-      { id: "debug", label: "调试选项", hint: "碰撞、移动、伤害与补给的测试开关" },
-      { id: "levels", label: MENU.chapters, hint: "换一关打（这一局的进度会丢）" },
-      { id: "title", label: "主菜单", hint: "放弃这一局，回到主菜单" },
+      { id: "resume", label: T("menu.item.resumeGame"), hint: T("menu.hint.resumeLevel") },
+      { id: "settings", label: T("menu.item.settings"), hint: T("menu.hint.settings") },
+      { id: "debug", label: T("menu.item.debug"), hint: T("menu.hint.debug") },
+      { id: "levels", label: Localize(MenuTextId("chapters"), MENU.chapters), hint: T("menu.hint.levelsFromPause") },
+      { id: "title", label: T("menu.item.title"), hint: T("menu.hint.title") },
     ];
   }
 
@@ -322,14 +353,14 @@ export class MainMenu {
     const wrap = Make("mnLevels");
     this.el.campaignMain = Make("mnCampaignMain", wrap);
     this.el.levelList = Make("mnLevelList", this.el.campaignMain, "nav");
-    this.el.levelList.setAttribute("aria-label", "章节与测试场景");
+    this.el.levelList.setAttribute("aria-label", T("menu.aria.levelList"));
     this.el.brief = Make("mnBrief", this.el.campaignMain, "section");
-    this.el.brief.setAttribute("aria-label", "所选任务简报");
+    this.el.brief.setAttribute("aria-label", T("menu.aria.brief"));
     const footer = Make("mnCampaignFoot", wrap);
-    const back = Make("mnCampaignBack", footer, "button", "返回");
+    const back = Make("mnCampaignBack", footer, "button", T("menu.back"));
     back.type = "button";
     back.addEventListener("click", () => this.Show(this.panelReturnMode));
-    Make("mnCampaignKeys", footer, "span", "↑↓ 选择  /  Enter 进入  /  Esc 返回");
+    Make("mnCampaignKeys", footer, "span", T("menu.foot.campaign"));
     this.el.levelsWrap = wrap;
     const Group = (title, note, cls) => {
       const head = Make("mnLevelGroup", this.el.levelList);
@@ -342,13 +373,15 @@ export class MainMenu {
       const b = Make("mnLevel", track, "button");
       b.type = "button";
       b.dataset.i = String(i);
-      b.setAttribute("aria-label", entry.label);
+      b.setAttribute("aria-label", PhaseText(entry, "label"));
       if (entry.sandbox) b.classList.add("mnSandboxLevel");
       if (entry.deprecated) b.classList.add("mnDeprecatedLevel");
-      const number = entry.sandbox ? (entry.glyph || entry.sandboxGlyph || "靶")
+      const number = entry.sandbox
+        ? (PhaseText(entry, "glyph") || PhaseText(entry, "sandboxGlyph") || T("menu.level.sandboxGlyph"))
         : entry.label.split("·")[0].trim();
       Make("mnLvNo", b, "span", number);
-      Make("mnLvName", b, "span", entry.sandbox ? entry.label : MissionName(entry.label));
+      Make("mnLvName", b, "span", entry.sandbox
+        ? PhaseText(entry, "label") : MissionName(PhaseText(entry, "label")));
       Make("mnLvMark", b, "span");
       b.addEventListener("pointerenter", (event) => {
         if (event.pointerType === "mouse") this.SelectLevel(i);
@@ -357,16 +390,16 @@ export class MainMenu {
       b.addEventListener("click", () => { this.SelectLevel(i); this.Play(i); });
       this.levelEls[i] = b;
     };
-    const official = Group("正式章节", "滕县保卫战", "mnMissionTrack");
+    const official = Group(T("menu.group.official.title"), T("menu.group.official.note"), "mnMissionTrack");
     this.phases.forEach((phase, i) => { if (!phase.deprecated) Row(phase, i, official); });
     // 暂时废弃场景：第一关到终章的切片还建得出来、点得进去，但没有任务内容，
     // 也不算正片进度。单独一组，别混进正式章节谎报流程。
     if (this.phases.some((phase) => phase.deprecated)) {
-      const shelved = Group("暂时废弃场景", "只建场景 · 未完成", "mnDeprecatedTrack");
+      const shelved = Group(T("menu.group.shelved.title"), T("menu.group.shelved.note"), "mnDeprecatedTrack");
       this.phases.forEach((phase, i) => { if (phase.deprecated) Row(phase, i, shelved); });
     }
     if (this.sandboxes.length) {
-      const sandbox = Group("测试场景", "独立测试", "mnSandboxTrack");
+      const sandbox = Group(T("menu.group.sandbox.title"), T("menu.group.sandbox.note"), "mnSandboxTrack");
       this.sandboxes.forEach((entry, i) => Row(entry, this.phases.length + i, sandbox));
     }
   }
@@ -409,10 +442,10 @@ export class MainMenu {
 
   OpenSandboxComplete() {
     this.OpenPause();
-    this.el.titleSub.textContent = "第一关 P0/P1/P2 测试关卡完成";
+    this.el.titleSub.textContent = T("menu.p012.completeTitle");
     this.SetItems([
-      { id: "restartSandbox", label: "重新测试", hint: "从车厢重新开始这一版白盒" },
-      { id: "exitSandbox", label: "返回主菜单", hint: "退出独立测试，不进入第二章" },
+      { id: "restartSandbox", label: T("menu.item.restartSandbox"), hint: T("menu.hint.restartSandbox") },
+      { id: "exitSandbox", label: T("menu.item.exitToTitle"), hint: T("menu.hint.exitSandboxComplete") },
     ]);
     const style = document.createElement("style");
     style.textContent = `
@@ -428,11 +461,13 @@ export class MainMenu {
   }
   OpenSandboxFailure(atLoad = false) {
     this.OpenPause();
-    this.el.titleSub.textContent="顺子 · 测试失败";
+    const who = CastName("shunzi");
+    this.el.titleSub.textContent = T("menu.p012.failTitle", { name: who });
     this.SetItems([
-      {id:"retrySandbox",label:atLoad?"在载物处继续":"从检查点继续",hint:"保留现场进度与剩余补给；仅恢复顺子本人，不移动载物"},
-      {id:"restartSandbox",label:"重新测试",hint:"从车厢重新开始这一版白盒"},
-      {id:"exitSandbox",label:"返回主菜单",hint:"退出独立测试"},
+      { id: "retrySandbox", label: atLoad ? T("menu.item.retryAtLoad") : T("menu.item.retryCheckpoint"),
+        hint: T("menu.hint.retrySandbox", { name: who }) },
+      { id: "restartSandbox", label: T("menu.item.restartSandbox"), hint: T("menu.hint.restartSandbox") },
+      { id: "exitSandbox", label: T("menu.item.exitToTitle"), hint: T("menu.hint.exitSandboxFail") },
     ]);
   }
 
@@ -466,8 +501,10 @@ export class MainMenu {
     const wasMode = this.mode;
     this.mode = mode;
     if (mode === "title" || mode === "pause") {
-      this.el.titleMain.textContent = mode === "pause" ? "游戏暂停" : MENU.title;
-      this.el.titleSub.textContent = mode === "pause" ? MENU.title : MENU.subtitle;
+      const title = Localize(MenuTextId("title"), MENU.title);
+      this.el.titleMain.textContent = mode === "pause" ? T("menu.title.paused") : title;
+      this.el.titleSub.textContent = mode === "pause"
+        ? title : Localize(MenuTextId("subtitle"), MENU.subtitle);
     }
     const panel = mode === "levels" || mode === "codex" || mode === "credits" || mode === "debug";
     if (panel) this.panelReturnMode = wasMode === "pause" ? "pause" : "title";
@@ -475,24 +512,25 @@ export class MainMenu {
     this.el.panel.classList.toggle("on", panel);
     this.root.classList.toggle("levelsOn", mode === "levels");
     if (mode === "levels") {
-      this.el.panelTitle.textContent = "任务选择";
+      this.el.panelTitle.textContent = T("menu.panel.levels");
       this.el.panelBody.textContent = "";
       this.el.panelBody.appendChild(this.el.levelsWrap);
       this.SelectLevel(this.DefaultLevel());
       this.levelEls[this.selected]?.scrollIntoView({ block: "nearest" });
     } else if (mode === "codex") {
-      this.el.panelTitle.textContent = MENU.codex;
+      this.el.panelTitle.textContent = Localize(MenuTextId("codex"), MENU.codex);
       this.el.panelBody.textContent = "";
       this.el.text.innerHTML = this.CodexHtml();
       this.el.panelBody.appendChild(this.el.text);
     } else if (mode === "credits") {
-      this.el.panelTitle.textContent = MENU.credits;
+      this.el.panelTitle.textContent = Localize(MenuTextId("credits"), MENU.credits);
       this.el.panelBody.textContent = "";
       this.el.text.innerHTML = CREDITS
-        .map((line) => (line ? `<p>${line}</p>` : `<p class="mnGap"></p>`)).join("");
+        .map((line, index) => (line
+          ? `<p>${Localize(CreditsLineId(index), line)}</p>` : `<p class="mnGap"></p>`)).join("");
       this.el.panelBody.appendChild(this.el.text);
     } else if (mode === "debug") {
-      this.el.panelTitle.textContent = "调试选项";
+      this.el.panelTitle.textContent = T("menu.item.debug");
       this.BuildDebugOptions();
     }
     if (!panel && wasMode === "levels") {
@@ -519,10 +557,9 @@ export class MainMenu {
         + `<div class="mnCodexVal">${value}${unit}</div>`
         + `<div class="mnCodexNote">${p.note}</div></div>`;
     }).join("");
-    return "<p>这一作把史料与推定分开记账。下面两张表里的数<b>全部是推定</b>，"
-      + "游戏内任何文本都不许把它们说成史实；找到实测数据就改表，并把该条删掉。</p>"
-      + `<h4>城的几何 · Data_Tengxian.PRESUMED</h4>${rows(PRESUMED)}`
-      + `<h4>演出与关卡 · Data_TengxianScript.PRESUMED_STAGING</h4>${rows(PRESUMED_STAGING)}`;
+    return `<p>${T("menu.codex.intro")}</p>`
+      + `<h4>${T("menu.codex.geometryHeading")}</h4>${rows(PRESUMED)}`
+      + `<h4>${T("menu.codex.stagingHeading")}</h4>${rows(PRESUMED_STAGING)}`;
   }
 
   /** 每次打开时从 host 重建，切换之后的 on/off 绝不留在过期 DOM 快照里。 */
@@ -532,7 +569,7 @@ export class MainMenu {
     wrap.className = "mnDebug";
     const intro = document.createElement("p");
     intro.className = "mnDebugIntro";
-    intro.textContent = "这些选项只用于测试，可在主菜单或暂停菜单中调整。";
+    intro.textContent = T("menu.debug.intro");
     wrap.appendChild(intro);
     const progress = this.host.P012Progress?.();
     if (progress) {
@@ -542,51 +579,53 @@ export class MainMenu {
       const copy = document.createElement("span");
       copy.className = "mnDebugCopy";
       const name = document.createElement("b");
-      name.textContent = "跳到下一任务进度";
+      name.textContent = T("menu.debug.p012Progress.label");
       const note = document.createElement("small");
-      note.textContent = `${progress.current.id} · ${progress.current.objective}`
-        + (progress.next ? ` → ${progress.next.id} · ${progress.next.objective}。同步玩家、NPC 与剧情状态。` : " · 已完成");
+      note.textContent = T("menu.debug.p012Progress.current", { id: progress.current.id, objective: progress.current.objective })
+        + (progress.next ? T("menu.debug.p012Progress.next", { id: progress.next.id, objective: progress.next.objective })
+          : T("menu.debug.p012Progress.done"));
       const button = document.createElement("button");
       button.type = "button";
       button.className = "mnDebugAdvance";
-      button.textContent = progress.next ? "下一进度" : "已完成";
+      button.textContent = progress.next ? T("menu.debug.p012Progress.advance") : T("menu.debug.p012Progress.finished");
       button.disabled = !progress.enabled;
-      if (!progress.enabled && progress.next) note.textContent += " 开始白盒后，在暂停菜单中使用。";
+      if (!progress.enabled && progress.next) note.textContent += T("menu.debug.p012Progress.pauseHint");
       button.addEventListener("click", () => {
         button.disabled = true;
         try {
           this.host.P012NextProgress?.();
           if (!this.sandboxCompleteStyle) this.BuildDebugOptions();
         } catch (error) {
-          note.textContent = `跳转未完成：${error.message}`;
+          note.textContent = T("menu.debug.p012Progress.failed", { message: error.message });
           button.disabled = false;
         }
       });
       copy.append(name, note);row.append(copy, button);wrap.appendChild(row);
     }
-    for (const item of DEBUG_ITEMS) {
+    for (const id of DEBUG_ITEMS) {
+      const label = T(`menu.debug.${id}.label`);
       const row = document.createElement("label");
       row.className = "mnDebugRow";
-      row.dataset.option = item.id;
+      row.dataset.option = id;
       const copy = document.createElement("span");
       copy.className = "mnDebugCopy";
       const name = document.createElement("b");
-      name.textContent = item.label;
+      name.textContent = label;
       const note = document.createElement("small");
-      note.textContent = item.note;
+      note.textContent = T(`menu.debug.${id}.note`);
       copy.append(name, note);
       const control = document.createElement("span");
       control.className = "mnDebugControl";
       const input = document.createElement("input");
       input.type = "checkbox";
-      input.checked = values[item.id] === true;
-      input.setAttribute("aria-label", item.label);
+      input.checked = values[id] === true;
+      input.setAttribute("aria-label", label);
       const state = document.createElement("i");
-      state.textContent = input.checked ? "开" : "关";
+      state.textContent = input.checked ? T("menu.toggle.on") : T("menu.toggle.off");
       input.addEventListener("change", () => {
-        const next = this.host.SetDebugOption?.(item.id, input.checked) || {};
-        input.checked = next[item.id] === true;
-        state.textContent = input.checked ? "开" : "关";
+        const next = this.host.SetDebugOption?.(id, input.checked) || {};
+        input.checked = next[id] === true;
+        state.textContent = input.checked ? T("menu.toggle.on") : T("menu.toggle.off");
         row.classList.toggle("on", input.checked);
       });
       control.append(input, state);
@@ -595,7 +634,7 @@ export class MainMenu {
       wrap.appendChild(row);
     }
     if (this.panelReturnMode === "pause") {
-      const status = this.host.CheckpointStatus?.() || { available: false, note: "当前没有可用的检查点" };
+      const status = this.host.CheckpointStatus?.() || { available: false, note: T("menu.checkpoint.none") };
       const action = document.createElement("button");
       action.type = "button";
       action.className = "mnDebugRow mnDebugAction";
@@ -604,14 +643,14 @@ export class MainMenu {
       const copy = document.createElement("span");
       copy.className = "mnDebugCopy";
       const name = document.createElement("b");
-      name.textContent = "从当前检查点继续";
+      name.textContent = T("menu.checkpoint.continue");
       const note = document.createElement("small");
       note.textContent = status.note;
       copy.append(name, note);
       action.appendChild(copy);
       const cue = document.createElement("span");
       cue.className = "mnDebugControl";
-      cue.textContent = "继续 →";
+      cue.textContent = T("menu.checkpoint.cue");
       action.appendChild(cue);
       action.addEventListener("click", () => this.host.ContinueCheckpoint?.());
       wrap.appendChild(action);
@@ -628,10 +667,11 @@ export class MainMenu {
       if (k === this.selected) el.setAttribute("aria-current", "true");
       else el.removeAttribute("aria-current");
       const mark = el.querySelector(".mnLvMark");
-      if (this.entries[k].sandbox) { mark.textContent = "沙盒"; mark.className = "mnLvMark"; return; }
-      if (this.entries[k].deprecated) { mark.textContent = "未完成"; mark.className = "mnLvMark todo"; return; }
+      if (this.entries[k].sandbox) { mark.textContent = T("menu.mark.sandbox"); mark.className = "mnLvMark"; return; }
+      if (this.entries[k].deprecated) { mark.textContent = T("menu.mark.todo"); mark.className = "mnLvMark todo"; return; }
       const done = progress.cleared.includes(this.entries[k].id);
-      mark.textContent = done ? "已通过" : (k === progress.furthest && k < this.officialCount ? "下一关" : "");
+      mark.textContent = done ? T("menu.mark.done")
+        : (k === progress.furthest && k < this.officialCount ? T("menu.mark.next") : "");
       mark.className = `mnLvMark${done ? " done" : ""}`;
     });
 
@@ -649,7 +689,7 @@ export class MainMenu {
       const art = mk("mnMissionArt", "figure");
       const image = document.createElement("img");
       image.src = MISSION_ART[this.selected] || "";
-      image.alt = `${MissionName(phase.label)}任务场景图`;
+      image.alt = T("menu.aria.missionArt", { name: MissionName(PhaseText(phase, "label")) });
       image.decoding = "async";
       image.draggable = false;
       art.appendChild(image);
@@ -661,15 +701,17 @@ export class MainMenu {
       copy.appendChild(e);
       return e;
     };
-    AppendCopy("mnBriefTitle").textContent = MissionName(phase.label);
+    AppendCopy("mnBriefTitle").textContent = MissionName(PhaseText(phase, "label"));
     AppendCopy("mnMissionWhen").textContent = phase.sandbox
-      ? phase.place : `${phase.date} · ${phase.place}`;
+      ? PhaseText(phase, "place")
+      : T("menu.brief.when", { date: PhaseText(phase, "date"), place: PhaseText(phase, "place") });
     AppendCopy("mnMissionObjective").textContent = phase.objectives?.[0]
-      || phase.brief?.[0] || "进入任务";
+      || phase.brief?.[0] || T("menu.brief.defaultObjective");
     if (phase.sandbox) {
       const training = mk("mnTrainingPreview");
       training.setAttribute("aria-hidden", "true");
-      training.textContent = phase.glyph || phase.sandboxGlyph || "靶";
+      training.textContent = PhaseText(phase, "glyph") || PhaseText(phase, "sandboxGlyph")
+        || T("menu.level.sandboxGlyph");
       brief.prepend(training);
     }
     const record = mk("mnMissionRecord");
@@ -677,10 +719,12 @@ export class MainMenu {
     record.classList.toggle("done", !phase.sandbox && !phase.deprecated && cleared);
     record.classList.toggle("todo", !!phase.deprecated);
     const label = document.createElement("span");
-    label.textContent = phase.sandbox ? "独立测试" : phase.deprecated ? "暂时废弃场景" : "章节记录";
+    label.textContent = phase.sandbox ? T("menu.record.sandbox")
+      : phase.deprecated ? T("menu.record.shelved") : T("menu.record.chapter");
     const value = document.createElement("b");
-    value.textContent = phase.sandbox ? "不计入战役进度"
-      : phase.deprecated ? "未完成 · 只建场景，没有任务内容" : cleared ? "已通过" : "尚未通过";
+    value.textContent = phase.sandbox ? T("menu.record.sandboxValue")
+      : phase.deprecated ? T("menu.record.shelvedValue")
+        : cleared ? T("menu.mark.done") : T("menu.record.notCleared");
     record.append(label, value);
   }
 
@@ -878,7 +922,7 @@ export class MainMenu {
     let y = Lerp(from[1], to[1], e);
     // 机位不许穿地：地形是程序化的，坐标表里写死的高度有可能被土坎顶掉
     const ground = this.host.GroundHeight?.(x, z);
-    if (Number.isFinite(ground)) y = Math.max(y, ground + 1.6);
+    if (Number.isFinite(ground)) y = Math.max(y, ground + CAMERA.groundClearanceM);
     this.camera.position.set(x, y, z);
     this.target.set(
       Lerp(look[0], lookTo[0], e),
@@ -892,18 +936,20 @@ export class MainMenu {
     // 手持漂移。**不许 Math.random**：同一时刻永远同一个值，出图才可复现
     const amount = MENU_SCENE.drift;
     if (amount > 0) {
-      const t = this.time * 0.34;
-      const n = (u, v) => ValueNoise2(t * u, v, 1938) - 0.5;
-      this.camera.rotateX(n(1.0, 3.1) * 0.012 * amount);
-      this.camera.rotateY(n(0.83, 11.7) * 0.014 * amount);
-      this.camera.rotateZ(n(0.61, 23.5) * 0.010 * amount);
+      const t = this.time * DRIFT.rateHz;
+      const n = (u, v) => ValueNoise2(t * u, v, DRIFT.seed) - 0.5;
+      this.camera.rotateX(n(DRIFT.pitch.u, DRIFT.pitch.v) * DRIFT.pitch.gain * amount);
+      this.camera.rotateY(n(DRIFT.yaw.u, DRIFT.yaw.v) * DRIFT.yaw.gain * amount);
+      this.camera.rotateZ(n(DRIFT.roll.u, DRIFT.roll.v) * DRIFT.roll.gain * amount);
     }
 
     // 角上那行小字只报地名（ER2 报的是地图名）。note 是写给改坐标的人看的，不上屏。
     if (this.el.shotNote) {
       const phase = this.host.SlicePhase?.() || this.phases[this.host.SliceIndex?.() ?? 0];
+      const where = shot.titleKey ? T(shot.titleKey) : (shot.title || shot.id);
       this.el.shotNote.textContent = phase
-        ? `${phase.label}　${shot.title || shot.id}` : (shot.title || "");
+        ? T("menu.shotNote", { label: PhaseText(phase, "label"), where })
+        : (shot.titleKey ? T(shot.titleKey) : (shot.title || ""));
     }
   }
 

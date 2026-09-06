@@ -321,8 +321,13 @@ console.log("ok  ⑤ 暴露：燃烧期抬到 exposeSight、三档比例不变�
 // ---------------------------------------------------------------------------
 {
   const src = fs.readFileSync(path.join(dirHere, "Script_Ai.mjs"), "utf8");
-  const table = src.match(/export const SIGHT_BY_STANCE = \[([^\]]+)\]/);
-  Check(table, "Script_Ai 仍然导出 SIGHT_BY_STANCE（姿态那张表还在）");
+  // 姿态那张表 2026-09-06 搬进了 Data_Tuning_Ai.mjs（数据驱动改造），Script_Ai 按原名
+  // re-export。所以数字对账去看那张表，判定对账（下面 rawReads）仍然只看 Script_Ai。
+  const tuning = fs.readFileSync(path.join(dirHere, "Data_Tuning_Ai.mjs"), "utf8");
+  const table = tuning.match(/export const SIGHT_BY_STANCE = \[([^\]]+)\]/);
+  Check(table, "Data_Tuning_Ai 仍然导出 SIGHT_BY_STANCE（姿态那张表还在）");
+  Check(/export \{[^}]*SIGHT_BY_STANCE[^}]*\}/.test(src),
+    "Script_Ai 仍按原名把它 re-export 出去（照明弹与编辑器按这个名字找它）");
   const values = table[1].split(",").map((v) => Number(v.trim()));
   Check(values.length === 3 && values[0] > values[1] && values[1] > values[2],
     "站 > 蹲 > 卧 —— 这就是「姿态决定被发现的距离」那条机制本身");

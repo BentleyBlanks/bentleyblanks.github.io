@@ -11,6 +11,8 @@
 //
 // 纯 Canvas 2D，零 3D 开销，零外部资源，不进渲染管线。
 
+import { T } from "./Script_Text.mjs";
+
 export class RadialWheel {
   /**
    * @param {HTMLElement} root HUD 的根节点
@@ -152,7 +154,7 @@ export class RadialWheel {
     ctx.font = "400 12px system-ui,sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    const hint = this.Item ? (this.Item.hint || this.Item.label) : "推鼠标选，松开下令";
+    const hint = this.Item ? (this.Item.hint || this.Item.label) : T("hud.wheel.idle");
     const clipped = hint.length > 18 ? `${hint.slice(0, 17)}…` : hint;
     ctx.fillText(clipped, 0, 0);
 

@@ -414,8 +414,12 @@ async function Boot(query = "") {
   const source=fs.readFileSync(path.join(projectDir,"Script_Menu.mjs"),"utf8").replace(/\r/g,"");
   const methods=["OpenSandboxComplete","ClearSandboxComplete"].map(name=>source.match(new RegExp(`  ${name}\\([^\\n]*[\\s\\S]*?\\n  }\\n`))[0]).join(",");
   await page.setContent(`<style>${fs.readFileSync(path.join(projectDir,"Style_Menu.css"),"utf8")}</style><body style="background:#829aaa"><div id="menu"><div class="mnTitle"><div class="mnTitleSub"></div></div><nav class="mnList">重新测试 / 返回主菜单</nav></div></body>`);
+  // 抠出来的两个方法在这张空白页里跑，模块作用域一概不在场：文本表的 T 由这里
+  // 喂一个回显键名的替身。这一组守的是**淡黑动画与操作可见性**（CSS + class），
+  // 不是文案，所以替身不削弱任何断言 —— 文案由 Script_TextTest 的闸门另外守。
   await page.evaluate(methods=>{
-    const menu={...new Function(`return ({${methods}})`)(),root:document.querySelector("#menu"),el:{titleSub:document.querySelector(".mnTitleSub")},OpenPause(){this.ClearSandboxComplete();this.root.classList.add("pause");},SetItems(items){this.items=items;}};
+    const T=(key)=>key;
+    const menu={...new Function("T",`return ({${methods}})`)(T),root:document.querySelector("#menu"),el:{titleSub:document.querySelector(".mnTitleSub")},OpenPause(){this.ClearSandboxComplete();this.root.classList.add("pause");},SetItems(items){this.items=items;}};
     window.completionTest=menu;menu.OpenSandboxComplete();
   },methods);
   Check("白盒完成淡黑期间不显示操作",await page.locator(".mnList").evaluate(el=>getComputedStyle(el).visibility==="hidden"));

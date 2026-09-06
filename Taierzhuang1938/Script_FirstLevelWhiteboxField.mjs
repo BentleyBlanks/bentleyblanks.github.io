@@ -11,6 +11,7 @@ import * as THREE from "three";
 import { Clamp } from "./Script_Noise.mjs";
 import { RayAabb, MakeBox, PlaceGeometry } from "./Script_Geo.mjs";
 import { BuildSink } from "./Script_World.mjs";
+import { T } from "./Script_Text.mjs";
 import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
 import {
   FIRST_LEVEL_WHITEBOX_LAYOUT,
@@ -232,16 +233,16 @@ export class FirstLevelWhiteboxField {
   }
 
   *BuildSteps() {
-    yield { label: "策划白盒：纯白地皮", progress: 0.24 };
+    yield { label: T("p012.whitebox.build.ground"), progress: 0.24 };
     this.BuildWhiteBoxes();
-    yield { label: "策划白盒：空间体块", progress: 0.62 };
+    yield { label: T("p012.whitebox.build.blocks"), progress: 0.62 };
     this.BuildGates();
     this.SetScenarioState(this.layout.scenario?.states[0]);
     this.BuildLegend();
     this.BuildSupplyLabels();
-    yield { label: "策划白盒：碰撞与掩体", progress: 0.88 };
+    yield { label: T("p012.whitebox.build.collision"), progress: 0.88 };
     this.BuildCollisionGrid();
-    yield { label: "策划白盒就绪", progress: 1 };
+    yield { label: T("p012.whitebox.build.ready"), progress: 1 };
   }
 
   /**
@@ -298,10 +299,10 @@ export class FirstLevelWhiteboxField {
     const labels=this.layout.blocks.flatMap(block=>{
       const gun=block.id==="WeaponCheckTable";
       const ammo=block.id==="WeaponIssueCrate";
-      return gun||ammo?[{...block,label:gun?"领取步枪":"领取弹药",color:gun?"#f0cf79":"#a4dfd0"}]:[];
+      return gun||ammo?[{...block,label:gun?T("p012.whitebox.label.weapon"):T("p012.whitebox.label.ammo"),color:gun?"#f0cf79":"#a4dfd0"}]:[];
     });
     const bank=this.layout.blocks.find(block=>block.id==="NorthNearMissDitchBank");
-    if(bank)labels.push({...bank,id:"NorthShelter",x:bank.x+2.8,z:bank.z,label:"避炮处 C / Z",color:"#a5dfff",shelter:true});
+    if(bank)labels.push({...bank,id:"NorthShelter",x:bank.x+2.8,z:bank.z,label:T("p012.whitebox.label.shelter"),color:"#a5dfff",shelter:true});
     for(const spec of labels){
       const canvas=document.createElement("canvas");canvas.width=512;canvas.height=160;
       const ctx=canvas.getContext("2d");ctx.fillStyle="#182326";ctx.fillRect(0,0,512,160);
@@ -337,18 +338,22 @@ export class FirstLevelWhiteboxField {
     }`;
     legend.appendChild(objectiveStyle);
     legend.style.cssText = "position:fixed;right:12px;top:76px;z-index:25;max-width:220px;padding:8px 10px;background:#151a20df;color:#fff;border:1px solid #76808b;border-radius:5px;font:12px/1.55 sans-serif;pointer-events:auto;";
-    const title = document.createElement("summary"); title.textContent = "白盒色标"; title.style.cursor = "pointer"; legend.appendChild(title);
-    const direction = document.createElement("div"); direction.textContent = "北：阵地｜南：兵站｜西：铁路"; direction.style.cssText = "font-size:11px;color:#c6d2df;margin:5px 0"; legend.appendChild(direction);
+    const title = document.createElement("summary"); title.textContent = T("p012.whitebox.legend.title"); title.style.cursor = "pointer"; legend.appendChild(title);
+    const direction = document.createElement("div"); direction.textContent = T("p012.whitebox.legend.direction"); direction.style.cssText = "font-size:11px;color:#c6d2df;margin:5px 0"; legend.appendChild(direction);
     const coordinates = document.createElement("details");
-    const coordinateTitle = document.createElement("summary"); coordinateTitle.textContent = "坐标约定"; coordinates.appendChild(coordinateTitle);
-    coordinates.appendChild(document.createTextNode("世界坐标：北 −Z，南 +Z，东 +X；不随镜头转动。"));
+    const coordinateTitle = document.createElement("summary"); coordinateTitle.textContent = T("p012.whitebox.legend.coordinates"); coordinates.appendChild(coordinateTitle);
+    coordinates.appendChild(document.createTextNode(T("p012.whitebox.legend.coordinatesBody")));
     coordinates.style.cssText = "font-size:10px;color:#b7c3d0;margin:3px 0"; legend.appendChild(coordinates);
-    const labels = {ground:"通行/奔跑",structure:"车体/建筑结构",step:"跨步/台阶",vault:"翻越",mantle:"攀爬",cover:"掩体",boundary:"不可通行",danger:"危险区域",missionRoute:"任务路线",stretcherRoute:"担架通道"};
-    for (const [semantic, label] of Object.entries(labels)) {
+    // 色标一行一个语义：语义名是稳定 id，写在屏幕上的那半句在文本表里。
+    const labels = {ground:"p012.whitebox.legend.ground",structure:"p012.whitebox.legend.structure",
+      step:"p012.whitebox.legend.step",vault:"p012.whitebox.legend.vault",mantle:"p012.whitebox.legend.mantle",
+      cover:"p012.whitebox.legend.cover",boundary:"p012.whitebox.legend.boundary",danger:"p012.whitebox.legend.danger",
+      missionRoute:"p012.whitebox.legend.missionRoute",stretcherRoute:"p012.whitebox.legend.stretcherRoute"};
+    for (const [semantic, key] of Object.entries(labels)) {
       if(this.layout.semanticColors[semantic]===undefined)continue;
       const row = document.createElement("div"); row.style.cssText = "display:inline-flex;align-items:center;gap:5px;width:50%;white-space:nowrap";
       const chip = document.createElement("span"); chip.style.cssText = `display:inline-block;width:10px;height:10px;border:1px solid #aaa;background:#${this.layout.semanticColors[semantic].toString(16).padStart(6,"0")}`;
-      row.appendChild(chip); row.appendChild(document.createTextNode(label)); legend.appendChild(row);
+      row.appendChild(chip); row.appendChild(document.createTextNode(T(key))); legend.appendChild(row);
     }
     document.body.appendChild(legend); this.legend = legend;
   }

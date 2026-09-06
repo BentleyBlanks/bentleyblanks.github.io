@@ -8,12 +8,14 @@ import {FIRST_LEVEL_P012_LAYOUT as layout,P012_ANCHORS as anchors,P012_ENEMY_LAN
 import phase from "./Data_FirstLevelP012Whitebox.mjs";
 import {MissionSetpieceDirector} from "./Script_MissionSetpieces.mjs";
 import {FirstLevelP012Runtime} from "./Script_FirstLevelP012Runtime.mjs";
+import {T} from "./Script_Text.mjs";
 function Source(file){return fs.readFileSync(new URL(file,import.meta.url),"utf8").replace(/\r/g,"");}
 function Method(source,name){return source.match(new RegExp(`  (?:async )?${name}\\([^\\n]*[\\s\\S]*?\\n  }\\n`))[0];}
 const field=Source("./Script_FirstLevelWhiteboxField.mjs");
 const nodes=[];
 const document={createElement:tag=>({tag,style:{},children:[],appendChild(node){this.children.push(node);}}),createTextNode:text=>({text}),body:{appendChild:node=>nodes.push(node)}};
-const legendMethod=vm.runInNewContext(`({${Method(field,"BuildLegend")}})`,{document,window:{innerWidth:390}});
+// 色标文案已进文本表：把真的 T 注进去，断言仍看真正上屏的那几行。
+const legendMethod=vm.runInNewContext(`({${Method(field,"BuildLegend")}})`,{document,window:{innerWidth:390},T});
 const legendHost={layout:{scenario:{},semanticColors:{ground:0xb8b8b0,step:1,vault:2,mantle:3,cover:4,boundary:5,danger:6,missionRoute:7,stretcherRoute:8}}};
 legendMethod.BuildLegend.call(legendHost);
 assert.equal(legendHost.legend.open,false,"mobile legend starts compact");

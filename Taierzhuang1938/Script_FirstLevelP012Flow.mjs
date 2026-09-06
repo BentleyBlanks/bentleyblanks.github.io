@@ -1,8 +1,23 @@
 // P012 白盒行为编排。纯规则，不 import three；复用正式交互、搬运、剧情信号与检查点。
-// 动作驱动阶段；新战术压力常态40秒、快清最短30秒。侦察→同轴步枪增援是明确例外，不代表全部波次达标。
+//
+// 这一层是**解释器**，不是内容：拍表、波次、交互点规格、目标行与导航牌的谓词表全在
+// `Data_FirstLevelP012Beats.mjs`，节奏与补给数在 `Data_Tuning_P012.mjs`，
+// 句子在 `Data_Text_P012.mjs`。这里只做三件事 ——
+//   ① 按规格表登记交互点，回调按 id 从 `InteractionBehaviours()` 接线；
+//   ② 算出目标点 / 动作 / 姿态，并把"当前是什么情形"置成一组具名 flag；
+//   ③ 把 flag 交给 `P012ResolveLine` 去表里选那一句。
+// 口径见 docs/Data_TextAndTuning.md §6。
 import { PickUpLoadInteraction, GiveSupplyInteraction } from "./Script_Interact.mjs";
 import { P012Point } from "./Data_FirstLevelP012Space.mjs";
 import { P012NextVisiblePoint, P012SegmentClear, P012RouteProjection, P012RoutePoint } from "./Script_FirstLevelP012March.mjs";
+import { T } from "./Script_Text.mjs";
+import { PACING, SUPPLY, GUIDE } from "./Data_Tuning_P012.mjs";
+import {
+  P012_BEATS, P012_WAVES, P012_INTERACTION_SPECS, P012_OBJECTIVE_LINES, P012_GUIDANCE_NAMES,
+} from "./Data_FirstLevelP012Beats.mjs";
+
+// 编排数据从这里转出去：消费方（运行时、测试、菜单跳关）继续 import 这个模块。
+export { P012_BEATS, P012_WAVES, P012_INTERACTION_SPECS, P012_OBJECTIVE_LINES, P012_GUIDANCE_NAMES };
 
 const Distance = (a, b) => a && b ? Math.hypot(a.x - b.x, a.z - b.z) : Infinity;
 const Clone = (value) => JSON.parse(JSON.stringify(value));
@@ -34,50 +49,45 @@ export function P012EnemyRejoinPath(config, position, target, radius, points = [
   return null;
 }
 
-export const P012_BEATS = Object.freeze([
-  ["B00", "跟随罗班长下车", "Z00", 0, "door"],
-  ["B01", "领取步枪和子弹", "Z00", 40, "weapon"],
-  ["B02", "跟随小队穿过集结村路", "Z01", 85, "village"],
-  ["B03", "在村口跟上班长，继续北上接防", "Z02", 140, "depart"],
-  ["B04", "跟随班长北上", "Z03", 185, "shelling"],
-  ["B05", "把弹药送到机枪阵位", "Z04", 230, "ammo"],
-  ["B06", "观察前方田地", "Z05", 285, "scouts"],
-  ["B07", "阻止正面步兵接近阵地", "Z05", 330, "front"],
-  ["B08", "压制敌方机枪，恢复阵地火力", "Z05", 380, "machineGun"],
-  ["B09", "听掷弹筒发射声，离开旧枪眼", "Z05", 425, "mortar"],
-  ["B10", "封锁西侧铁路涵洞", "Z05", 465, "culvert"],
-  ["B11", "救助伤员，送回掩蔽部", "Z04", 510, "wounded"],
-  ["B12", "到交通壕后送队集合点", "Z04", 565, "volunteer"],
-  ["B13", "沿交通壕、村口原路向南护送", "Z06", 600, "escort"],
-  ["B14", "侧绕残屋，压制道路机枪再回担架队", "Z07", 740, "ambush"],
-  ["B15", "检查担架伤员，随班长到墙后收队", "Z08", 910, "regroup"],
-  ["B16", "从墙后观察航迹，选择护送路线", "Z08", 980, "railPass"],
-  ["B17", "处理扫射造成的道路阻碍", "Z08", 1030, "crowdTurn"],
-  ["B18", "接住同一副担架后端，沿沟边搬运", "Z08", 1100, "stretcher"],
-  ["B19", "避开扫射，准备还击", "Z08", 1140, "dive"],
-  ["B20", "守住沟边，阻止日军接近伤员", "Z08", 1185, "closeFight"],
-  ["B21", "清除近处敌人，尝试打开南路", "Z09", 1250, "southFight"],
-  ["B22", "观察南侧截断线", "Z09", 1370, "southCut"],
-  ["B23", "掩护后送队沿回撤沟道退回阵地", "Z10", 1395, "retreat"],
-  ["B24", "把伤员抬入掩蔽部", "Z04", 1500, "regrip"],
-  ["B25", "第一关结束", "Z04", 1550, "complete"],
-].map(([id, objective, zone, targetStartS, action]) => Object.freeze({ id, objective, zone, targetStartS, action })));
+/**
+ * 目标行 / 导航牌谓词表的解释器（Data_FirstLevelP012Beats 头注写了字段全集）。
+ * 按数组顺序走一遍：`set` 命中就整行替换，`append` 命中就追加 —— 与它替换掉的
+ * 那段顺序赋值代码是同一种语义。Flow 与 Guidance 共用这一处实现。
+ *
+ * @param {Array} table   谓词表（P012_OBJECTIVE_LINES / P012_GUIDANCE_NAMES）
+ * @param {object} ctx    { beat, facts:Set, Signalled(name), carry, flags:Set }
+ * @param {object} params 占位符值，整包交给 T
+ * @param {string} seed   起始行（目标行用本拍的标称目标；导航牌用空串靠表兜底）
+ * @returns {string} 拼好的一行
+ */
+export function P012ResolveLine(table, ctx, params = null, seed = "") {
+  let text = seed;
+  for (const rule of table) {
+    if (!P012LineMatches(rule, ctx)) continue;
+    const piece = T(rule.textKey, params);
+    text = rule.append ? text + piece : piece;
+  }
+  return text;
+}
 
-/** 每波只引入一种主压力，数量有限；死亡不返还预算。 */
-export const P012_WAVES = Object.freeze([
-  { beat: 6, atS: 285, count: 2, kind: "scouts", lane: "scoutSearch" },
-  { beat: 7, atS: 330, count: 5, kind: "rifles", lane: "centerEnemy" },
-  { beat: 8, atS: 380, count: 2, kind: "machineGun", lane: "machineGunEnemy" },
-  { beat: 9, atS: 425, count: 2, kind: "mortar", lane: "eastEnemy" },
-  { beat: 10, atS: 465, count: 4, kind: "culvert", lane: "westEnemy" },
-  { beat: 13, atS: 600, count: 4, kind: "roadContact", lane: "roadContact" },
-  { beat: 14, atS: 740, count: 6, kind: "ambush", lane: "ambush" },
-  { beat: 20, atS: 1185, count: 6, kind: "closeFight", lane: "closeFight" },
-  { beat: 21, atS: 1250, count: 6, kind: "southFight", lane: "southFight" },
-].map(Object.freeze));
-
-const P012_FRONTLINE_WAVE_LAST = 4;
-const P012_NEAR_ENEMY_LIMIT = 14;
+/** 一条谓词是否成立。字段少而固定，写不下的条件由 ctx.flags 里的具名钩子承担。 */
+export function P012LineMatches(rule, ctx) {
+  if (rule.beat !== undefined) {
+    const beats = Array.isArray(rule.beat) ? rule.beat : [rule.beat];
+    if (!beats.includes(ctx.beat)) return false;
+  }
+  const when = rule.when;
+  if (!when) return true;
+  for (const fact of when.facts || []) if (!ctx.facts.has(fact)) return false;
+  for (const fact of when.notFacts || []) if (ctx.facts.has(fact)) return false;
+  for (const signal of when.signals || []) if (!ctx.Signalled(signal)) return false;
+  for (const signal of when.notSignals || []) if (ctx.Signalled(signal)) return false;
+  if (when.carry !== undefined && ctx.carry !== when.carry) return false;
+  if (when.notCarry !== undefined && ctx.carry === when.notCarry) return false;
+  for (const flag of when.flags || []) if (!ctx.flags.has(flag)) return false;
+  for (const flag of when.notFlags || []) if (ctx.flags.has(flag)) return false;
+  return true;
+}
 
 export class FirstLevelP012Director {
   constructor(host = {}, config = {}) {
@@ -113,7 +123,7 @@ export class FirstLevelP012Director {
     this.checkpoints = [];
     this.checkpointId = null;
     this.history = [];
-    this.action = P012_BEATS[0].objective;
+    this.action = T(P012_BEATS[0].objectiveKey);
     this.lastSample = {};
     this.routeIndex = 0;
     this.orientationIndex = 0;
@@ -122,10 +132,10 @@ export class FirstLevelP012Director {
     this.shellObservationTime = 0;
     this.shellImpactStart = 0;
     this.shellTarget = null;
-    this.frontlineAmmoRemaining = config.activities?.frontlineAmmo?.stockClips ?? 12;
+    this.frontlineAmmoRemaining = config.activities?.frontlineAmmo?.stockClips ?? SUPPLY.frontlineStockClips;
     this.frontlineAmmoDispensed = 0;
     this.supplyReceipts = new Set();
-    this.southGrenadesRemaining = config.activities?.southGrenadeStock ?? 2;
+    this.southGrenadesRemaining = config.activities?.southGrenadeStock ?? SUPPLY.southGrenadeStock;
     this.grenadeStart = 0;
     this.completionReasons = {};
     this.mortarEscapeFrom = null;
@@ -163,8 +173,9 @@ export class FirstLevelP012Director {
   }
   FrontlineAmmoLabel() {
     return this.frontlineAmmoRemaining > 0
-      ? `领取桥夹 · 箱内剩 ${this.frontlineAmmoRemaining}/${this.config.activities?.frontlineAmmo?.stockClips ?? 12}`
-      : "弹药箱已空";
+      ? T("p012.point.frontlineAmmo", { clips: this.frontlineAmmoRemaining,
+        stock: this.config.activities?.frontlineAmmo?.stockClips ?? SUPPLY.frontlineStockClips })
+      : T("p012.point.frontlineAmmoEmpty");
   }
   ActivityRoute() {
     const a = this.config.activities || {};
@@ -230,124 +241,184 @@ export class FirstLevelP012Director {
         Hold: () => this.RoadColumnBehind(),
         WaitAt: index => index === activity.roadContactGuideRoute.length-1,
         FaceAt: () => this.facts.has("roadContactClear") ? this.lastSample.position : activity.roadContactEnemies?.[0]?.position } : {}),
-      speed: this.config.activities?.guideSpeedByBeat?.[this.beat] || this.config.activities?.guideSpeedMps || 1.3 });
+      speed: this.config.activities?.guideSpeedByBeat?.[this.beat] || this.config.activities?.guideSpeedMps || GUIDE.guideSpeedMps });
   }
 
+  /** config 里的一个点位 / 数值，按 "activities.foo.bar" 这样的路径取；取不到返回 undefined。 */
+  ConfigAt(path) {
+    return path.split(".").reduce((value, key) => (value == null ? undefined : value[key]), this.config);
+  }
+
+  /**
+   * 「摆了什么点」是数据（Data_FirstLevelP012Beats.P012_INTERACTION_SPECS），
+   * 「点完发生什么」是代码（下面的 InteractionBehaviours）—— 按 id 对上号。
+   * 登记顺序 = 规格表顺序。
+   */
   InstallInteractions() {
-    const Register = (spec) => this.host.Register?.(spec);
-    Register({ id: "p012_weaponCheck", kind: "supply", label: "领取步枪，前往弹药分发点",
-      gesture: "hold", seconds: 2.4, position: this.config.activities.weaponReceiveAnchor,
-      Enabled: () => this.beat <= 1 && !this.facts.has("weapon"), once: false,
-      OnComplete: () => {
-        if(this.beat>1||this.facts.has("weapon")||this.host.ReceiveWeapon?.()===false)return false;
-        this.Mark("weapon"); this.Emit("P012WeaponReceived"); return true;
-      } });
-    Register({ id: "p012_ammoIssue", kind: "supply", label: "领取子弹，随后跟队出发",
-      gesture: "hold", seconds: 1.8, position: this.config.activities?.weaponIssueAnchor,
-      Enabled: () => this.beat === 1 && this.facts.has("weapon") && !this.facts.has("issuedAmmo"), once: false,
-      OnComplete: () => {
-        if(this.beat!==1||!this.facts.has("weapon")||this.facts.has("issuedAmmo"))return false;
-        this.Mark("issuedAmmo"); this.Emit("P012AmmoIssued"); this.host.CheckWeapon?.();
-        if(this.config.activities?.briefing)this.host.Guide?.({beat:1,route:this.config.activities.briefing.route,startIndex:0,
-          WaitAt:index=>index===this.config.activities.briefing.route.length-1,FaceAt:()=>this.lastSample.position,speed:3.05});
-        return true;
-      } });
-    Register({ id: "p012_woundedCheck", kind: "bandage", label: "查看伤员，整理弹药并补充1包绷带",
-      gesture: "hold", seconds: 2.2, position: this.config.activities?.woundedDragFrom || this.Point("shelter", P012Point(-7, -52)),
-      Enabled: () => this.beat === 11 && !this.supplyReceipts.has("wounded"), once: false,
-      OnComplete: () => { const issued = this.SupplyOnce("wounded"); if (issued) this.host.GiveBandages?.(1);
-        this.Emit("P012WoundedChecked"); return issued; } });
-    Register({ id: "p012_volunteer", kind: "supply", label: "向罗班长主动申请护送伤员",
-      gesture: "hold", seconds: 1.5, Anchor: () => this.lastSample.guidePosition,
-      Enabled: () => this.beat === 12 && !this.facts.has("volunteer") && this.lastSample.guideAlive === true
-        && Distance(this.lastSample.guidePosition, this.config.activities.woundedDragTo) < 3, once: false,
-      OnComplete: () => { this.Mark("volunteer"); this.Emit("P012EscortRequested"); } });
-    Register({ id: "p012_roadContactHold", kind: "supply", label: "命令担架队停在院墙后", gesture: "hold", seconds: 1.4, position: this.config.activities?.roadContactColumnHold, once: false,
-      Enabled: () => this.beat === 13 && this.facts.has("roadContactSeen") && !this.facts.has("roadContactHeld"), OnComplete: () => { this.Mark("roadContactHeld"); this.Emit("P012RoadContactHold"); } });
-    Register({ id: "p012_roadContactRelease", kind: "supply", label: "从队尾放行担架队", gesture: "hold", seconds: 1.4, position: this.config.activities?.roadContactTailRelease, once: false,
-      Enabled: () => this.beat === 13 && this.facts.has("roadContactClear") && this.lastSample.roadContactFriendlyCoverCount >= 2 && !this.facts.has("roadContactReleased"), OnComplete: () => { this.Mark("roadContactReleased"); this.Emit("P012RoadContactRelease"); } });
-    Register({ id: "p012_frontlineAmmo", kind: "supply", label: this.FrontlineAmmoLabel(),
-      gesture: "hold", seconds: this.config.activities?.frontlineAmmo?.takeSeconds ?? 2.4,
-      position: this.Point("ammoDrop"), once: false,
-      Enabled: () => this.beat >= 6 && this.beat <= 10 && this.facts.has("ammo"),
-      OnBegin: (ctx) => { if (ctx?.point) ctx.point.label = this.FrontlineAmmoLabel(); },
-      OnComplete: (ctx) => {
-        const current = Math.max(0, Number(this.host.CurrentClips?.() ?? this.lastSample.clips) || 0);
-        const request = Math.min(this.frontlineAmmoRemaining,
-          Math.max(0, (this.config.activities?.frontlineAmmo?.carryCapClips ?? 4) - current));
-        if (request <= 0) return false;
-        const actual = Math.max(0, Math.min(request, Math.floor(Number(this.host.GiveClips?.(request)) || 0)));
-        this.frontlineAmmoRemaining -= actual; this.frontlineAmmoDispensed += actual;
-        if (ctx?.point) ctx.point.label = this.FrontlineAmmoLabel();
-        return actual > 0;
-      } });
-    Register({ id: "p012_roadWounded", kind: "bandage", label: "检查前方担架伤员",
-      gesture: "hold", seconds: 2.2, Anchor: () => this.lastSample.roadWoundedPosition,
-      Enabled: () => this.beat === 15 && this.lastSample.roadWoundedAtInspection === true
-        && !!this.lastSample.roadWoundedPosition && !this.facts.has("roadWounded"), once: false,
-      OnComplete: () => {
-        if (this.beat !== 15 || this.lastSample.roadWoundedAtInspection !== true || !this.lastSample.roadWoundedPosition) return false;
-        this.Mark("roadWounded"); this.Mark("regroup"); this.Emit("P012RoadWoundedChecked"); return true;
-      } });
-    Register({id:"p012_airRescue",kind:"carry",label:"背起扫射中受伤的百姓",gesture:"hold",seconds:1.2,
-      Anchor:()=>this.lastSample.airCivilianPosition,once:false,
-      Enabled:()=>this.beat===17&&this.lastSample.airCivilianReady===true&&this.Signalled("P012AirObstacleCreated")&&!this.facts.has("airObstacleResolved")&&!carry?.Active,
-      OnComplete:()=>carry?.Begin("wounded",{label:"受伤百姓",payload:{who:"p012AirCivilian"}})!==false});
-    Register({id:"p012_airRescueCover",kind:"carry",label:"把伤员放到蓝色硬掩体后",gesture:"hold",seconds:1,
-      position:this.config.activities?.airRescueCover,once:false,
-      Enabled:()=>this.beat===17&&carry?.KindId==="wounded"
-        &&carry?.load?.payload?.who==="p012AirCivilian"
-        &&Distance(this.lastSample.position,this.config.activities?.airRescueCover)<1.7
-        &&P012SegmentClear(this.config.layout?.blocks||[],this.lastSample.position,this.config.activities?.airRescueCover,this.lastSample.bodyRadius||.42),
-      OnComplete:()=>{if(this.host.ResolveAirObstacle?.("rescue")===false)return false;
-        carry?.ForceRelease("airRescue");this.Mark("airObstacleResolved");this.Mark("airRescued");
-        this.Emit("P012AirObstacleResolved");return true;}});
-    Register({id:"p012_airCartClear",kind:"plank",label:"推开翻倒小车，转入沟边",gesture:"hold",seconds:2.2,
-      position:this.config.activities?.airCartPosition,once:false,
-      Enabled:()=>this.beat===17&&this.Signalled("P012AirObstacleCreated")&&!this.facts.has("airObstacleResolved")&&!carry?.Active,
-      OnComplete:()=>{this.Mark("airObstacleResolved");this.Mark("airCartCleared");this.Emit("P012AirObstacleResolved");
-        this.host.ResolveAirObstacle?.("cart");return true;}});
-    Register({ id: "p012_southGrenades", kind: "supply", label: "领取手榴弹 · 备用2枚",
-      gesture: "hold", seconds: 1.8, position: this.config.activities?.southGrenadeSupply,
-      Enabled: () => this.beat === 21 && this.southGrenadesRemaining > 0 && !(this.lastSample.grenades > 0), once: false,
-      OnComplete: (ctx) => {
-        const actual = Math.max(0, Math.min(this.southGrenadesRemaining,
-          Math.floor(Number(this.host.GiveGrenades?.(this.southGrenadesRemaining)) || 0)));
-        this.southGrenadesRemaining -= actual;
-        if (ctx?.point) ctx.point.label = `领取手榴弹 · 备用${this.southGrenadesRemaining}枚`;
-        return actual > 0;
-      } });
-    Register({ id: "p012_retreatSmoke", kind: "supply", label: "点燃烟幕，遮断南路火线",
-      gesture: "hold", seconds: 1.8, position: this.config.activities?.retreatSmokeUse,
-      Enabled: () => this.beat === 23 && !this.facts.has("retreatSmokeDeployed"), once: false,
-      OnComplete: () => {
-        if (!this.host.DeployRetreatSmoke?.(this.config.activities?.retreatSmokeAt)) return false;
-        this.Mark("retreatSmokeDeployed"); return true;
-      } });
     const carry = this.host.Carry?.();
-    Register({ ...PickUpLoadInteraction({ id: "p012_ammoPickup", kindId: "ammoCrate", carry,
-      Anchor: () => this.ammoBoxPosition, label: "搬起弹药箱", gesture:"hold", seconds:.55,
-      once: false,
-      options: { label: "机枪弹药箱", payload: { to: "p012Mg" }, OnRelease:info=>{
-        if(info.reason!=="delivered"&&info.how!=="reset"){
-          const p=this.host.PlayerPosition?.()||this.lastSample.position;
-          if(p)this.ammoBoxPosition={x:p.x,z:p.z};
-        }
-      } } }),
-      Enabled: () => this.beat === 5 && !this.facts.has("ammo") && !carry?.Active });
-    Register({...GiveSupplyInteraction({ id: "p012_ammoDrop", item: "弹药箱",
-      position: this.Point("ammoDrop", P012Point(5, -65)), label: "交付弹药给机枪组",
-      Has: () => this.beat === 5 && carry?.KindId === "ammoCrate" && !this.facts.has("ammo"), once: false,
-      OnComplete: () => {
-        carry?.ForceRelease("delivered");
-        if (!carry?.Active) { this.Mark("ammo");this.host.Hint?.("弹药已送达，去机枪旁观察前方田地",4); }
-      } }),gesture:"hold",seconds:.65});
+    const behaviours = this.InteractionBehaviours(carry);
+    for (const spec of P012_INTERACTION_SPECS) {
+      this.host.Register?.(this.ComposeInteraction(spec, behaviours[spec.id] || {}, carry));
+    }
+  }
+
+  /** 规格里的锚点：先按路径取，取不到退到具名 anchor，再退到写死的坐标。 */
+  InteractionPosition(spec) {
+    const direct = this.ConfigAt(spec.position);
+    if (direct) return direct;
+    const fallback = spec.pointFallback ? P012Point(...spec.pointFallback) : undefined;
+    return spec.anchorFallback ? this.Point(spec.anchorFallback, fallback) : (fallback ?? direct);
+  }
+
+  /** 规格 + 回调 → 一条交互点。三种拼法：自己摆 / 搬起一件 / 交付一件。 */
+  ComposeInteraction(spec, behaviour, carry) {
+    const { Label, Anchor, options, ...callbacks } = behaviour;
+    const label = Label ? Label() : T(spec.labelKey);
+    const seconds = spec.secondsPath ? (this.ConfigAt(spec.secondsPath) ?? spec.seconds) : spec.seconds;
+    const place = spec.anchor ? { Anchor } : { position: this.InteractionPosition(spec) };
+    const common = { id: spec.id, gesture: spec.gesture, seconds, once: spec.once, label, ...place };
+    if (spec.preset === "pickUpLoad") {
+      return { ...PickUpLoadInteraction({ ...common, kindId: spec.kindId, carry,
+        options: { label: T(spec.loadLabelKey), ...options } }), ...callbacks };
+    }
+    if (spec.preset === "giveSupply") {
+      return { ...GiveSupplyInteraction({ ...common, item: T(spec.itemKey), ...callbacks }),
+        gesture: spec.gesture, seconds };
+    }
+    return { ...common, kind: spec.kind, ...callbacks };
+  }
+
+  /**
+   * 每个交互点点完发生什么。键必须与规格表的 id 一一对应（FlowTest 守这条）。
+   * `Label` 只给动态标签用（箱内剩几个桥夹这种）；`Anchor` 给跟着人走的点；
+   * `options` 只给 pickUpLoad 预制用；其余的键原样并进交互点。
+   */
+  InteractionBehaviours(carry) {
+    return {
+      p012_weaponCheck: {
+        Enabled: () => this.beat <= 1 && !this.facts.has("weapon"),
+        OnComplete: () => {
+          if(this.beat>1||this.facts.has("weapon")||this.host.ReceiveWeapon?.()===false)return false;
+          this.Mark("weapon"); this.Emit("P012WeaponReceived"); return true;
+        },
+      },
+      p012_ammoIssue: {
+        Enabled: () => this.beat === 1 && this.facts.has("weapon") && !this.facts.has("issuedAmmo"),
+        OnComplete: () => {
+          if(this.beat!==1||!this.facts.has("weapon")||this.facts.has("issuedAmmo"))return false;
+          this.Mark("issuedAmmo"); this.Emit("P012AmmoIssued"); this.host.CheckWeapon?.();
+          if(this.config.activities?.briefing)this.host.Guide?.({beat:1,route:this.config.activities.briefing.route,startIndex:0,
+            WaitAt:index=>index===this.config.activities.briefing.route.length-1,FaceAt:()=>this.lastSample.position,speed:3.05});
+          return true;
+        },
+      },
+      p012_woundedCheck: {
+        Enabled: () => this.beat === 11 && !this.supplyReceipts.has("wounded"),
+        OnComplete: () => { const issued = this.SupplyOnce("wounded");
+          if (issued) this.host.GiveBandages?.(SUPPLY.woundedCheckBandages);
+          this.Emit("P012WoundedChecked"); return issued; },
+      },
+      p012_volunteer: {
+        Anchor: () => this.lastSample.guidePosition,
+        Enabled: () => this.beat === 12 && !this.facts.has("volunteer") && this.lastSample.guideAlive === true
+          && Distance(this.lastSample.guidePosition, this.config.activities.woundedDragTo) < 3,
+        OnComplete: () => { this.Mark("volunteer"); this.Emit("P012EscortRequested"); },
+      },
+      p012_roadContactHold: {
+        Enabled: () => this.beat === 13 && this.facts.has("roadContactSeen") && !this.facts.has("roadContactHeld"),
+        OnComplete: () => { this.Mark("roadContactHeld"); this.Emit("P012RoadContactHold"); },
+      },
+      p012_roadContactRelease: {
+        Enabled: () => this.beat === 13 && this.facts.has("roadContactClear")
+          && this.lastSample.roadContactFriendlyCoverCount >= 2 && !this.facts.has("roadContactReleased"),
+        OnComplete: () => { this.Mark("roadContactReleased"); this.Emit("P012RoadContactRelease"); },
+      },
+      p012_frontlineAmmo: {
+        Label: () => this.FrontlineAmmoLabel(),
+        Enabled: () => this.beat >= 6 && this.beat <= 10 && this.facts.has("ammo"),
+        OnBegin: (ctx) => { if (ctx?.point) ctx.point.label = this.FrontlineAmmoLabel(); },
+        OnComplete: (ctx) => {
+          const current = Math.max(0, Number(this.host.CurrentClips?.() ?? this.lastSample.clips) || 0);
+          const request = Math.min(this.frontlineAmmoRemaining,
+            Math.max(0, (this.config.activities?.frontlineAmmo?.carryCapClips ?? SUPPLY.frontlineCapClips) - current));
+          if (request <= 0) return false;
+          const actual = Math.max(0, Math.min(request, Math.floor(Number(this.host.GiveClips?.(request)) || 0)));
+          this.frontlineAmmoRemaining -= actual; this.frontlineAmmoDispensed += actual;
+          if (ctx?.point) ctx.point.label = this.FrontlineAmmoLabel();
+          return actual > 0;
+        },
+      },
+      p012_roadWounded: {
+        Anchor: () => this.lastSample.roadWoundedPosition,
+        Enabled: () => this.beat === 15 && this.lastSample.roadWoundedAtInspection === true
+          && !!this.lastSample.roadWoundedPosition && !this.facts.has("roadWounded"),
+        OnComplete: () => {
+          if (this.beat !== 15 || this.lastSample.roadWoundedAtInspection !== true || !this.lastSample.roadWoundedPosition) return false;
+          this.Mark("roadWounded"); this.Mark("regroup"); this.Emit("P012RoadWoundedChecked"); return true;
+        },
+      },
+      p012_airRescue: {
+        Anchor: () => this.lastSample.airCivilianPosition,
+        Enabled: () => this.beat===17&&this.lastSample.airCivilianReady===true&&this.Signalled("P012AirObstacleCreated")&&!this.facts.has("airObstacleResolved")&&!carry?.Active,
+        OnComplete: () => carry?.Begin("wounded",{label:T("p012.point.airRescueLoad"),payload:{who:"p012AirCivilian"}})!==false,
+      },
+      p012_airRescueCover: {
+        Enabled: () => this.beat===17&&carry?.KindId==="wounded"
+          &&carry?.load?.payload?.who==="p012AirCivilian"
+          &&Distance(this.lastSample.position,this.config.activities?.airRescueCover)<1.7
+          &&P012SegmentClear(this.config.layout?.blocks||[],this.lastSample.position,this.config.activities?.airRescueCover,this.lastSample.bodyRadius||.42),
+        OnComplete: () => {if(this.host.ResolveAirObstacle?.("rescue")===false)return false;
+          carry?.ForceRelease("airRescue");this.Mark("airObstacleResolved");this.Mark("airRescued");
+          this.Emit("P012AirObstacleResolved");return true;},
+      },
+      p012_airCartClear: {
+        Enabled: () => this.beat===17&&this.Signalled("P012AirObstacleCreated")&&!this.facts.has("airObstacleResolved")&&!carry?.Active,
+        OnComplete: () => {this.Mark("airObstacleResolved");this.Mark("airCartCleared");this.Emit("P012AirObstacleResolved");
+          this.host.ResolveAirObstacle?.("cart");return true;},
+      },
+      p012_southGrenades: {
+        Label: () => T("p012.point.southGrenades", { grenades: this.southGrenadesRemaining }),
+        Enabled: () => this.beat === 21 && this.southGrenadesRemaining > 0 && !(this.lastSample.grenades > 0),
+        OnComplete: (ctx) => {
+          const actual = Math.max(0, Math.min(this.southGrenadesRemaining,
+            Math.floor(Number(this.host.GiveGrenades?.(this.southGrenadesRemaining)) || 0)));
+          this.southGrenadesRemaining -= actual;
+          if (ctx?.point) ctx.point.label = T("p012.point.southGrenades", { grenades: this.southGrenadesRemaining });
+          return actual > 0;
+        },
+      },
+      p012_retreatSmoke: {
+        Enabled: () => this.beat === 23 && !this.facts.has("retreatSmokeDeployed"),
+        OnComplete: () => {
+          if (!this.host.DeployRetreatSmoke?.(this.config.activities?.retreatSmokeAt)) return false;
+          this.Mark("retreatSmokeDeployed"); return true;
+        },
+      },
+      p012_ammoPickup: {
+        Anchor: () => this.ammoBoxPosition,
+        options: { payload: { to: "p012Mg" }, OnRelease: info => {
+          if(info.reason!=="delivered"&&info.how!=="reset"){
+            const p=this.host.PlayerPosition?.()||this.lastSample.position;
+            if(p)this.ammoBoxPosition={x:p.x,z:p.z};
+          }
+        } },
+        Enabled: () => this.beat === 5 && !this.facts.has("ammo") && !carry?.Active,
+      },
+      p012_ammoDrop: {
+        Has: () => this.beat === 5 && carry?.KindId === "ammoCrate" && !this.facts.has("ammo"),
+        OnComplete: () => {
+          carry?.ForceRelease("delivered");
+          if (!carry?.Active) { this.Mark("ammo");this.host.Hint?.(T("p012.hint.ammoDelivered"),4); }
+        },
+      },
+    };
   }
 
   RouteArrivalRadius() {
     const activity = this.config.activities || {};
-    return [13, 18, 21, 22].includes(this.beat) ? 0.6
-      : this.beat === 14 ? (activity.ambushRouteRadiusM || 0.6) : (activity.routeRadiusM || 3);
+    return [13, 18, 21, 22].includes(this.beat) ? GUIDE.tightRadiusM
+      : this.beat === 14 ? (activity.ambushRouteRadiusM || GUIDE.tightRadiusM)
+        : (activity.routeRadiusM || GUIDE.routeRadiusM);
   }
 
   RoadColumnBehind() {
@@ -610,7 +681,7 @@ export class FirstLevelP012Director {
     }
     if (next === 12) this.Emit("P012EscortRequestOpen");
     if (next === 21) { this.grenadeStart = this.lastSample.grenadeThrows || 0; this.Emit("P012DitchClear"); }
-    this.action = P012_BEATS[next].objective;
+    this.action = T(P012_BEATS[next].objectiveKey);
     this.host.Objective?.(this.action);
     if (next === 2) this.SaveCheckpoint("CP00");
     if (next === 5) this.SaveCheckpoint("CP01");
@@ -854,10 +925,10 @@ export class FirstLevelP012Director {
       const previousGroupSuppressed = index > 0 && !previousGroupClear && this.WaveState(index - 1, true).resolved;
       const interval = this.elapsed - this.lastWaveAt;
       const newTacticalPressure = index >= 2 && index <= 4;
-      const clearReady = (previousGroupClear || previousGroupSuppressed) && (!newTacticalPressure || interval >= 30);
-      const actionReached = index <= 1 || index > P012_FRONTLINE_WAVE_LAST ? this.beat >= wave.beat
+      const clearReady = (previousGroupClear || previousGroupSuppressed) && (!newTacticalPressure || interval >= PACING.fastClearS);
+      const actionReached = index <= 1 || index > PACING.frontlineWaveLast ? this.beat >= wave.beat
         : this.unlockedWaves.includes(index - 1) && this.unlockedWaves.includes(0);
-      if (actionReached && (interval >= 40 || clearReady)
+      if (actionReached && (interval >= PACING.normalIntervalS || clearReady)
         && !this.unlockedWaves.includes(index)) {
         this.unlockedWaves.push(index);
         this.pressureHistory.push({ kind: wave.kind, at: this.elapsed,
@@ -865,7 +936,7 @@ export class FirstLevelP012Director {
           previousGroupClear, previousGroupSuppressed,
           mechanism: index === 0 ? "initialContact" : index === 1 ? "sameAxisReinforcement"
             : newTacticalPressure ? "newTacticalPressure" : "lateEncounter",
-          reason: interval >= 40 ? "normal40" : newTacticalPressure ? (previousGroupSuppressed ? "suppressedMinimum30" : "clearMinimum30")
+          reason: interval >= PACING.normalIntervalS ? "normal40" : newTacticalPressure ? (previousGroupSuppressed ? "suppressedMinimum30" : "clearMinimum30")
             : index === 1 ? "clearReinforcement" : "clearReady" });
         this.lastWaveAt = this.elapsed;
         if (wave.kind === "mortar") {
@@ -1066,7 +1137,7 @@ export class FirstLevelP012Director {
     for (const pending of this.pendingEnemies) {
       const livingNear = this.enemyRoutes.reduce((count, entry) => count
         + (this.host.EnemyPosition?.(entry.handle) ? 1 : 0), 0);
-      if (livingNear >= P012_NEAR_ENEMY_LIMIT) { waiting.push(pending); continue; }
+      if (livingNear >= PACING.nearEnemyLimit) { waiting.push(pending); continue; }
       const handle = this.host.SpawnEnemy?.(pending.spec);
       if (!handle) { waiting.push(pending); continue; }
       this.spawnedTotal += 1;
@@ -1084,39 +1155,60 @@ export class FirstLevelP012Director {
     }
     this.pendingEnemies = waiting;
   }
+  /**
+   * 谓词表的求值上下文。拍号、任务事实、剧情信号与手上搬的东西直接来自导演本身；
+   * `flags` 是调用方刚算出来的那组具名钩子。Guidance 自己拼一份同样形状的。
+   */
+  LineContext(flags = new Set(), carryKind = this.lastSample.carryKind ?? null) {
+    return { beat: this.beat, facts: this.facts, carry: carryKind,
+      Signalled: (name) => this.Signalled(name), flags };
+  }
+
+  /**
+   * 当前目标。目标点 / 动作 / 姿态在这里算（几何、波次账、导航求解都在这一层），
+   * **那一句话**交给 `Data_FirstLevelP012Beats.P012_OBJECTIVE_LINES` 去选 ——
+   * 这里只把「现在是什么情形」置成一组具名 flag（表的头注列了全集），再连同
+   * 占位符值一起交给 `P012ResolveLine`。原来那串 `if (beat === 8) { text = "…" }`
+   * 因此整段消失：加一句话 / 改一句话 / 翻译一句话都不再动这个函数。
+   */
   CurrentObjective() {
     const beat = P012_BEATS[this.beat];
     const anchors = this.config.anchors || {};
     const activity = this.config.activities || {};
     const route = this.ActivityRoute();
     let target = null;
-    let text = beat.objective;
     let lookAt = null;
     let interactionId = null;
     let requiredAction = "move";
     let requiredStance = null;
     let progress = null;
     let targetLabel = null;
+    const flags = new Set();
+    const params = {};
+    /** 置一个具名钩子并把它当条件用：`if (Flag("x", cond))`。 */
+    const Flag = (name, on) => { if (on) flags.add(name); return !!on; };
+    const MgStatusText = () => T(this.completionReasons[8] === "threatCleared"
+      ? "p012.objective.mg.cleared" : "p012.objective.mg.restored");
     const mortarDangerActive = this.beat >= 7 && this.beat <= 9 && !!this.mortarEscapeFrom
       && this.lastSample.mortarWarningActive === true;
     const mortarSafePort = this.mortarEscapeFrom
       ? [anchors.gunports?.[1], anchors.gunports?.[0], anchors.gunports?.[2]]
         .find((point) => point && Distance(point, this.mortarEscapeFrom) >= 8) || anchors.gunports?.[1]
       : anchors.gunports?.[1];
+    Flag("briefingConfigured", !!activity.briefing);
     if ([0, 2, 13].includes(this.beat)) requiredAction = "follow";
     if ([0, 2, 4, 14].includes(this.beat)) target = route[this.routeIndex] || route.at(-1);
     if ([0, 2].includes(this.beat) && this.lastSample.guidePosition) target = this.lastSample.guidePosition;
     if (this.beat === 1) { target = activity.weaponReceivePosition; interactionId = "p012_weaponCheck"; }
     if (this.beat === 1 && this.facts.has("weapon")) {
       target = this.facts.has("issuedAmmo") ? activity.villageRoute[0] : activity.weaponIssuePosition;
-      text = this.facts.has("issuedAmmo") ? "跟随小队穿过村路" : "到弹药桌领取子弹";
       interactionId = this.facts.has("issuedAmmo") ? null : "p012_ammoIssue";
       if(this.facts.has("issuedAmmo")&&activity.briefing){target=this.lastSample.guidePosition||activity.briefing.position;
-        text=this.Signalled("P012BriefingStarted")?"听罗班长交代接防任务":"随班长集结，准备前往北面阵地";requiredAction="follow";}
+        requiredAction="follow";}
     }
     if (this.beat === 3) {
       target=this.lastSample.guidePosition||activity.villageRoute?.at(-1);
-      interactionId=null;requiredAction="follow";text="跟班长穿过村口，继续北上";
+      interactionId=null;requiredAction="follow";
     }
     if(this.beat===4){
       if(this.lastSample.guidePosition){
@@ -1125,75 +1217,64 @@ export class FirstLevelP012Director {
         const next=P012NextVisiblePoint(this.config.layout?.blocks||[],this.lastSample.position,followed,0,.42);
         target=next.blocked?this.lastSample.guidePosition:next.point;
       }
-      if(!this.facts.has("northNearMissImpact")){text="跟随班长北上";requiredAction="follow";}
-      else {
-        text=this.facts.has("northCovered")?"已避开炮击，跟班长继续北上":"炮击逼近！跟班长继续北上；可借蓝色矮墙避炮，也可加速通过";
-        requiredAction="follow";
-      }
+      requiredAction="follow";
     }
     if (this.beat === 5) {
-      const carrying=this.lastSample.carryKind === "ammoCrate",delivered=this.facts.has("ammo");
+      const carrying=Flag("ammoCarrying",this.lastSample.carryKind === "ammoCrate"),delivered=this.facts.has("ammo");
       const next=P012NextVisiblePoint(this.config.layout?.blocks||[],this.lastSample.position,route,this.routeIndex,.42);
       target=delivered?anchors.gunports?.[1]:carrying?(next.point||anchors.ammoDrop):this.ammoBoxPosition;
       interactionId=delivered?null:carrying?"p012_ammoDrop":"p012_ammoPickup";
-      text=delivered?"弹药已送达！到机枪旁的观察位，看向前方田地"
-        :!carrying?"① 找到标记的弹药箱，靠近后按住 F 搬起"
-        :Distance(this.lastSample.position,anchors.ammoDrop)<=2.2?"③ 已到机枪收弹处：面向收弹处，按住 F 交付弹药"
-        :"② 已搬起弹药箱：沿标记拐进交通壕，送往机枪收弹处";
+      Flag("atAmmoDrop", Distance(this.lastSample.position,anchors.ammoDrop)<=2.2);
     }
     if ([6,7].includes(this.beat)) { target=anchors.gunports?.[1]; requiredAction=this.beat===6?"observe":"fight"; }
-    if (this.beat === 8) { target = anchors.gunports?.[2]; text = "压制村墙边的机枪；东侧枪眼可提供射击角度"; }
+    if (this.beat === 8) target = anchors.gunports?.[2];
     if (this.beat === 9) {
       target = mortarSafePort;
       const mortarCleared = this.WaveState(3).resolved;
-      const mortarResolved = mortarCleared || this.WaveState(3, true).resolved;
-      requiredStance = mortarResolved ? "prone" : null;
-      text = mortarResolved ? `掷弹筒组已${mortarCleared ? "清除" : "受压制"}；卧倒转移到远离旧弹着点的安全枪眼`
-        : "转到远离旧弹着点的安全枪眼，继续压制掷弹筒组";
+      requiredStance = Flag("mortarResolved", mortarCleared || this.WaveState(3, true).resolved) ? "prone" : null;
+      params.mortar = T(mortarCleared ? "p012.objective.mortar.stateCleared" : "p012.objective.mortar.stateSuppressed");
     }
-    if (this.beat === 10) { target = anchors.gunports?.[0]; text = "转向西侧枪眼，封锁铁路涵洞"; }
+    if (this.beat === 10) target = anchors.gunports?.[0];
     if ([8, 10].includes(this.beat) && Distance(this.lastSample.position, target) > 3) {
       requiredStance = "prone";
-      text = `卧倒沿连续胸墙横移，前往${this.beat === 8 ? "东侧" : "西侧"}枪眼`;
+      Flag("portFar", true);
+      params.side = T(this.beat === 8 ? "p012.objective.port.sideEast" : "p012.objective.port.sideWest");
     }
     // A live mortar warning outranks the labelled rifle/MG action. It is a real
     // world hazard and can arrive on the independent frontline pressure clock.
     if (mortarDangerActive) {
+      Flag("mortarDanger", true);
       const origin = this.mortarEscapeFrom;
-      const mgStatus = this.beat < 9 ? "" : this.completionReasons[8] === "threatCleared" ? "机枪威胁已清除；" : "友军机枪已恢复射击；";
+      if (Flag("mgStatusShown", this.beat >= 9)) params.mg = MgStatusText();
       const safePort = mortarSafePort;
-      if (Distance(this.lastSample.position, origin) < 6 && safePort) {
+      if (Flag("mortarNearOrigin", Distance(this.lastSample.position, origin) < 6 && !!safePort)) {
         const length = Distance(origin, safePort) || 1;
         target = { x: origin.x + (safePort.x - origin.x) * Math.min(1, 8 / length),
           z: origin.z + (safePort.z - origin.z) * Math.min(1, 8 / length) };
         requiredAction = "sprint"; requiredStance = "stand";
-        text = `${mgStatus}掷弹筒来袭！可离开落点或利用实体掩体避炮`;
       } else {
         target = safePort;
         if (Distance(this.lastSample.position, target) > 3 || this.WaveState(3, true).resolved) requiredStance = "prone";
-        text = `${mgStatus}已离开落点；可沿胸墙转移，继续压制敌人`;
       }
     }
     if (this.beat === 9 && !this.unlockedWaves.includes(3)) {
       target = anchors.gunports?.[1]; requiredStance = "prone"; requiredAction = "move";
-      text = `${this.completionReasons[8] === "threatCleared" ? "机枪威胁已清除" : "友军机枪已恢复射击"}；沿胸墙低姿调整到中央枪眼，必要时装填并留意东侧动静`;
+      Flag("mortarWaveLocked", true); params.mg = MgStatusText();
     }
-    if (this.beat === 11) { target = activity.woundedDragFrom; interactionId = "p012_woundedCheck"; text="找到地上的伤员，靠近后按住 F 查看伤势"; }
+    if (this.beat === 11) { target = activity.woundedDragFrom; interactionId = "p012_woundedCheck"; }
     if (this.beat === 11 && this.facts.has("wounded")) {
-      if (!this.lastSample.woundedDragDelivered) {
+      if (!Flag("woundedDelivered", !!this.lastSample.woundedDragDelivered)) {
         const dragging = this.lastSample.carryKind === "wounded";
         target = dragging ? P012NextVisiblePoint(this.config.layout?.blocks||[],this.lastSample.position,route,0,.42).point || activity.woundedDragTo : this.lastSample.woundedDragPosition || activity.woundedDragFrom;
-        interactionId = dragging ? null : "p012_woundedDrag"; text = dragging?"沿交通壕把伤员拖到标记的掩蔽部接收处":"靠近伤员按 F 拖起，再沿交通壕送回掩蔽部";
-      } else { target = this.lastSample.guidePosition||activity.woundedDragTo; interactionId = null; requiredAction = "follow"; text = "伤员已安置，跟班长集合"; }
+        interactionId = dragging ? null : "p012_woundedDrag";
+      } else { target = this.lastSample.guidePosition||activity.woundedDragTo; interactionId = null; requiredAction = "follow"; }
     }
     if (this.beat === 12) {
       const rendezvous=activity.woundedDragTo||anchors.shelter;
       target=Distance(this.lastSample.guidePosition,rendezvous)<3?this.lastSample.guidePosition:rendezvous;
       interactionId="p012_volunteer";
     }
-    if (this.beat === 12 && this.facts.has("volunteer")) {
-      interactionId = null; text = "已报名护送；听清罗班长的接应地点，准备随担架出发";
-    }
+    if (this.beat === 12 && this.facts.has("volunteer")) interactionId = null;
     if(this.beat===13){
       const guideRoute=activity.roadContactGuideRoute||[];
       const guideCursor=Math.max(0,Math.min(guideRoute.length-1,Number(this.lastSample.guideRouteIndex)||0));
@@ -1202,178 +1283,153 @@ export class FirstLevelP012Director {
         followRoute,0,.42);
       target=followPlan.blocked?(this.lastSample.guidePosition||activity.roadContactBreach):followPlan.point;
       requiredAction="follow";
-      if(this.facts.has("roadContactSeen")&&!this.facts.has("roadContactHeld")){target=activity.roadContactColumnHold;interactionId="p012_roadContactHold";requiredAction="move";text="敌人已暴露；到院墙后命令担架队停下";}
-      else if(this.facts.has("roadContactHeld")&&!this.facts.has("roadContactClear")){target=route[this.routeIndex]||activity.roadContactFirePosition;lookAt=activity.roadContactEnemies?.[0]?.position;requiredAction="fight";text="沿实体侧墙到射位，清除道路上的四名日军";}
-      else if(this.facts.has("roadContactClear")&&!this.facts.has("roadContactReleased")){target=activity.roadContactTailRelease;interactionId="p012_roadContactRelease";requiredAction="move";text="道路敌人已清除；照应担架队，班长正在组织继续前进";}
+      if(this.facts.has("roadContactSeen")&&!this.facts.has("roadContactHeld")){target=activity.roadContactColumnHold;interactionId="p012_roadContactHold";requiredAction="move";}
+      else if(this.facts.has("roadContactHeld")&&!this.facts.has("roadContactClear")){target=route[this.routeIndex]||activity.roadContactFirePosition;lookAt=activity.roadContactEnemies?.[0]?.position;requiredAction="fight";}
+      else if(this.facts.has("roadContactClear")&&!this.facts.has("roadContactReleased")){target=activity.roadContactTailRelease;interactionId="p012_roadContactRelease";requiredAction="move";}
     }
     if (this.beat === 15 && !this.facts.has("roadWounded")) {
       target = this.lastSample.roadWoundedPosition || this.lastSample.columnPosition;
-      interactionId = this.lastSample.roadWoundedAtInspection ? "p012_roadWounded" : null;
-      requiredAction = this.lastSample.roadWoundedAtInspection ? "move" : "follow";
-      text = this.lastSample.roadWoundedAtInspection ? "检查这副真实担架上的伤员" : "随担架到墙边停靠处，留意伤员状况";
+      const inspecting = Flag("roadWoundedInspect", !!this.lastSample.roadWoundedAtInspection);
+      interactionId = inspecting ? "p012_roadWounded" : null;
+      requiredAction = inspecting ? "move" : "follow";
     }
     if (this.beat === 15 && this.facts.has("roadWounded")) {
       target = this.lastSample.guidePosition||activity.airObservationPosition; interactionId = null; requiredAction = "follow";
-      text = "跟班长收到矮墙后；他会面向铁路交代下一步";
     }
     if (this.beat === 14 && this.routeIndex >= route.length) target = this.lastSample.columnPosition;
     if (this.beat === 14) {
       const threat = this.AmbushThreat();
-      if (threat) { target = threat.cover; lookAt = threat.lookAt; requiredAction = "fight"; text = threat.label; }
+      if (Flag("ambushThreat", !!threat)) { target = threat.cover; lookAt = threat.lookAt; requiredAction = "fight";
+        params.label = T(threat.labelKey); }
       else { requiredAction = this.routeIndex >= route.length ? "follow" : "move"; }
       const alive = this.enemyRoutes.some((entry) => entry.ambushGroup !== null && entry.ambushGroup !== undefined && this.host.EnemyPosition?.(entry.handle));
       const p = this.lastSample.position;
-      const protectedSegment = p && (activity.ambushProneSegments || []).some((segment) =>
+      const protectedSegment = Flag("ambushProneSegment", !!p && (activity.ambushProneSegments || []).some((segment) =>
         p.x >= segment.minX && p.x <= segment.maxX && p.z >= segment.minZ && p.z <= segment.maxZ
         && !this.enemyRoutes.some((entry) => entry.ambushGroup !== null && entry.ambushGroup !== undefined
-          && entry.ambushGroup <= segment.afterGroup && this.host.EnemyPosition?.(entry.handle)));
-      const prepareProne = p && (activity.ambushProneApproaches || []).some((segment) =>
-        p.x >= segment.minX && p.x <= segment.maxX && p.z >= segment.minZ && p.z <= segment.maxZ);
-      if (alive && (Distance(p, target) > 0.65 || !threat)) {
+          && entry.ambushGroup <= segment.afterGroup && this.host.EnemyPosition?.(entry.handle))));
+      const prepareProne = Flag("ambushProneApproach", !!p && (activity.ambushProneApproaches || []).some((segment) =>
+        p.x >= segment.minX && p.x <= segment.maxX && p.z >= segment.minZ && p.z <= segment.maxZ));
+      if (Flag("ambushMoveAdvice", alive && (Distance(p, target) > 0.65 || !threat))) {
         requiredAction = protectedSegment || prepareProne ? "move" : "sprint";
         requiredStance = protectedSegment || prepareProne ? "prone" : "stand";
-        text = prepareProne ? "前方是低胸墙，卧倒可减少暴露；也可直接推进" : protectedSegment ? "可借胸墙隐蔽接近射击位" : "掩体之间有空档，短冲刺到下一个射击角";
-      } else if (threat) text = `${text}；可借掩体装填，再择机还击`;
-      if (this.Signalled("P012RoadGunSilenced")) text += this.Signalled("P012RoadCoverReached")
-        ? "；前副担架已移入掩蔽" : "；道路火力已清，前副担架正从院墙后移出";
-      const entryTarget = activity.ambushEntryRoute?.[this.ambushEntryIndex];
-      if (entryTarget) {
-        target = entryTarget; requiredAction = "move"; requiredStance = "prone";
-        text = "清除残屋伏兵；蓝色胸墙提供侧绕掩护";
-      } else if (threat?.index === 0) {
-        target = threat.cover; requiredAction = "fight"; requiredStance = Distance(p,target) > 0.65 ? "prone" : null;
-        text = this.lastSample.bleeding > 0 && this.lastSample.bandages > 0
-          ? "压制道路火力；流血时可借胸墙掩护，按 B 包扎"
-          : "清除道路和残屋的敌人；可借胸墙掩护或侧绕";
       }
-      if(this.WaveState(6).resolved){target=this.lastSample.columnPosition;lookAt=null;requiredAction="follow";requiredStance=null;text="伏兵已清除，回到担架队继续护送";}
-      else if(this.ambushRejoin){
+      const entryTarget = activity.ambushEntryRoute?.[this.ambushEntryIndex];
+      if (Flag("ambushEntry", !!entryTarget)) {
+        target = entryTarget; requiredAction = "move"; requiredStance = "prone";
+      } else if (Flag("ambushThreatFirst", threat?.index === 0)) {
+        target = threat.cover; requiredAction = "fight"; requiredStance = Distance(p,target) > 0.65 ? "prone" : null;
+        Flag("bleedingWithBandage", this.lastSample.bleeding > 0 && this.lastSample.bandages > 0);
+      }
+      if(Flag("ambushResolved", this.WaveState(6).resolved)){target=this.lastSample.columnPosition;lookAt=null;requiredAction="follow";requiredStance=null;}
+      else if(Flag("ambushRejoin", !!this.ambushRejoin)){
         target=this.ambushRejoin.target;lookAt=null;requiredAction="move";requiredStance=null;
-        text="沿原入口重新接回残屋侧翼，不要穿越院墙；现场敌情和剩余补给保持不变";
       }
     }
     if (this.beat === 16) {
       if(!this.Signalled("P012AircraftRailFire")){
         target=activity.airObservationPosition;lookAt=anchors.railPassFrom;requiredAction="observe";
-        text="铁路方向有飞机！照应担架，可选择道路或沟边通过";
-      }else if(!this.airRouteChoice){
+      }else if(!Flag("airRouteChosen", !!this.airRouteChoice)){
         const choices=activity.airRouteChoices||{};
         const open=choices.open?.[0],ditch=choices.ditch?.[0];
         target=Distance(this.lastSample.position,open)<Distance(this.lastSample.position,ditch)?open:ditch;
-        requiredAction="move";text="自己判断：向右走开放路更快，向左贴沟边更稳";
+        requiredAction="move";
       }else{
         target=route[this.routeIndex]||route.at(-1);requiredAction="follow";
-        text=this.airRouteChoice==="open"?"沿选定的开放路接应担架，保持队伍展开":"沿选定的沟边路接应担架，利用蓝色沟岸遮蔽";
+        Flag("airRouteOpen", this.airRouteChoice==="open");
       }
-      if (Distance(this.lastSample.position,this.lastSample.columnPosition)>14
-        || (this.airRouteChoice && this.routeIndex>=route.length && !this.lastSample.airColumnEnteredRoad)) {
+      if (Flag("airTail", Distance(this.lastSample.position,this.lastSample.columnPosition)>14
+        || (this.airRouteChoice && this.routeIndex>=route.length && !this.lastSample.airColumnEnteredRoad))) {
         target = this.lastSample.airColumnTailPosition || this.lastSample.columnPosition;
-        requiredAction = "follow"; text = "接到担架队尾附近，照应伤员一起通过";
+        requiredAction = "follow";
       }
     }
     if (this.beat === 17) {
       if(!this.Signalled("P012AirObstacleCreated")){
         target=activity.airTurnWatchPositions?.[this.airRouteChoice]||activity.airObservationPosition;requiredAction="observe";
-        text=this.Signalled("P012CrowdFire")?"扫射刚落下，确认路上伤员和翻倒小车的位置":"飞机正在转向这条路，留意担架队，寻找路沟";}
+      }
       else if(this.lastSample.carryKind==="wounded"){
         target=P012NextVisiblePoint(this.config.layout?.blocks||[],this.lastSample.position,
           activity.airRescueRoute||[activity.airRescueCover],0,this.lastSample.bodyRadius||.42).point;
         interactionId=target===activity.airRescueCover||Distance(target,activity.airRescueCover)<.01?"p012_airRescueCover":null;
-        requiredAction="carry";text="从蓝色沟岸南端开口绕入，把受伤百姓送到墙后";
+        requiredAction="carry";
       }else if(!this.facts.has("airObstacleResolved")){
         const rescue=this.lastSample.airCivilianPosition,cart=activity.airCartPosition;
         const chooseRescue=!!rescue&&Distance(this.lastSample.position,rescue)<=Distance(this.lastSample.position,cart);
         target=chooseRescue?rescue:cart;requiredAction="interact";
-        interactionId=chooseRescue?"p012_airRescue":"p012_airCartClear";text="选择：靠左背起伤员送到蓝墙后，或靠右推开小车转沟边";
-      }else{target=route[this.routeIndex]||route.at(-1);requiredAction="move";
-        text=this.facts.has("airRescued")?"伤员已入掩体；沿沟边回接同一副担架":"小车已推开；从沟边绕过扫射路面";}
+        interactionId=chooseRescue?"p012_airRescue":"p012_airCartClear";
+      }else{target=route[this.routeIndex]||route.at(-1);requiredAction="move";}
     }
     if (this.beat === 18) target = this.lastSample.columnPosition || anchors.stretcher;
     if (this.beat === 18 && !this.Signalled("P012StretcherLifted")) interactionId = "ch1_stretcher";
     if (this.beat === 18 && this.lastSample.carryKind === "stretcher") {
       target = route[this.routeIndex] || activity.stretcherCarryTo; interactionId = null;
-      text = "接牢同一副担架后端，和前面的担架员沿沟边走";
     }
     if (this.beat === 19) {
       const slots = anchors.strafeSlots || [];
       target = slots.reduce((nearest, point) => Distance(this.lastSample.position, point) < Distance(this.lastSample.position, nearest) ? point : nearest, null);
-      text = "飞机正在扫射！可利用路沟，也可冲出弹线；准备还击";
     }
     if (this.beat === 23) {
       requiredAction="follow";
       const points = this.config.routes?.retreat || [];
       target = points[this.retreatPoint];
-      if (this.lastSample.columnArrived && this.lastSample.lastLitterArrived) {
+      if (Flag("retreatArrived", this.lastSample.columnArrived && this.lastSample.lastLitterArrived)) {
         target = this.RetreatRejoinTarget();
         interactionId = null;
-        text = "担架已到阵地入口，沿沟道过去接稳后端，送伤员进入掩蔽部";
       } else if (!this.facts.has("retreatSmokeDeployed")) {
-        const guideAtSmoke = Distance(this.lastSample.guidePosition, activity.retreatSmokeUse) < 2.5;
-        if (guideAtSmoke) {
+        if (Flag("retreatGuideAtSmoke", Distance(this.lastSample.guidePosition, activity.retreatSmokeUse) < 2.5)) {
           target = this.lastSample.columnPosition||activity.retreatSmokeUse; interactionId = null;
-          text = "掩护担架改走西沟；班长将在撤退线施放烟幕";
-          if (this.completionReasons[22] === "blockadeCleared") text = "南路断障无法通行；护送伤员改走西沟，班长负责烟幕";
+          Flag("retreatBlockade", this.completionReasons[22] === "blockadeCleared");
         } else {
           target = this.lastSample.guidePosition || activity.retreatSmokeUse;
           requiredAction = "follow";
-          text = "跟班长和担架沿已清路沟改走西沟";
         }
       } else if (this.facts.has("retreatRecoveryRequired")) {
         target = Distance(this.lastSample.position, this.lastSample.columnPosition) < 8
           ? this.lastSample.columnPosition : this.RetreatRejoinTarget();
         requiredAction = Distance(this.lastSample.position, this.lastSample.columnPosition) < 8 ? "crouch" : "follow";
-        text = "沿回撤沟接应实际担架队，到站后照应伤员";
-      } else if (this.RetreatCoverState().hold) {
+      } else if (Flag("retreatCoverHold", this.RetreatCoverState().hold)) {
         target = this.RetreatRejoinTarget(this.RetreatCoverState().point);
         requiredAction = Distance(this.lastSample.position, this.RetreatCoverState().point) < 6 ? "crouch" : "follow";
-        text = "在路沟接应担架，跟上队伍，留意追兵";
-      } else if (this.retreatRejoining) {
+      } else if (Flag("retreatRejoining", !!this.retreatRejoining)) {
         target = this.RetreatRejoinTarget(); requiredAction = "follow";
-        text = "担架队落在后面，沿原路拐点回接，再一起撤退";
       } else {
         const lead = this.RetreatLeadTarget(target);
-        if (lead) { target = this.RetreatRejoinTarget(lead); requiredAction = "follow";
-          text = "在担架前方近距离引路，保持队伍一起移动"; }
+        if (Flag("retreatLead", !!lead)) { target = this.RetreatRejoinTarget(lead); requiredAction = "follow"; }
       }
     }
     if (this.beat === 21) {
-      if (this.routeIndex < (activity.southSupplyRouteIndex || 0)) {
-        target = route[this.routeIndex]; text = "掩护担架沿已清路沟向南推进"; requiredAction = "move";
-      } else { target = route[this.routeIndex] || activity.southRoom; text = "沿沟口绕进南路民房，清除近处日军";
+      if (Flag("southSupplyPhase", this.routeIndex < (activity.southSupplyRouteIndex || 0))) {
+        target = route[this.routeIndex]; requiredAction = "move";
+      } else { target = route[this.routeIndex] || activity.southRoom;
         const threat = this.LateThreat();
-        if (threat) { target = threat.cover; lookAt = threat.lookAt; requiredAction = "fight"; text = threat.label; }
-        if (threat && this.lastSample.grenades > 0) text += "；可向当前火力点投掷手榴弹";
+        if (Flag("lateThreat", !!threat)) { target = threat.cover; lookAt = threat.lookAt; requiredAction = "fight";
+          params.label = T(threat.labelKey); }
+        Flag("hasGrenades", this.lastSample.grenades > 0);
       }
     }
     if (this.beat === 20) {
       const threat = this.LateThreat(); target = threat?.cover || route[this.routeIndex] || route.at(-1);
       lookAt = threat?.lookAt || null; requiredAction = threat ? "fight" : "move";
-      text = threat?.label || "守住沟边伤员，确认接近的敌人已被清除";
+      if (Flag("lateThreat", !!threat)) params.label = T(threat.labelKey);
     }
     if (this.beat === 22) {
       target = route[this.routeIndex] || this.lastSample.guidePosition || activity.blockadeDecisionPosition;
       requiredAction = this.routeIndex < route.length || !this.lastSample.columnAtSouthAssembly ? "move" : "follow";
       lookAt = anchors.blockadePositions?.[1] || this.Point("southGunpoint");
-      text = this.routeIndex < route.length ? "沿原来的安全入口回到路沟，接应两副担架"
-        : !this.lastSample.columnAtSouthAssembly ? "掩护两副担架到南路沟内集合，确认无人掉队"
-        : "跟班长到南路实体掩体后，确认阻滞线是否仍在交火";
-      if(this.AtBlockadeDecision(this.lastSample)){
-        requiredAction="observe";
-        text="南路正遭到封锁；跟班长和担架会合，准备改道";
-      }
+      Flag("southRouteBefore", this.routeIndex < route.length);
+      Flag("columnAtSouthAssembly", !!this.lastSample.columnAtSouthAssembly);
+      if(Flag("atBlockadeDecision", this.AtBlockadeDecision(this.lastSample))) requiredAction="observe";
     }
     if ([20, 21].includes(this.beat) && requiredAction === "fight") {
+      Flag("lateThreatFight", true);
       const moving = this.enemyRoutes.find((entry) => entry.encounterBeat === this.beat
         && entry.bound?.phase === "moving" && this.host.EnemyPosition?.(entry.handle));
-      if (moving) { text += "；敌人正转移到另一射击位，注意移动射手";
-        lookAt = this.host.EnemyPosition(moving.handle); }
+      if (Flag("movingShooter", !!moving)) lookAt = this.host.EnemyPosition(moving.handle);
     }
     if ([21, 22].includes(this.beat)) {
       const approach = this.SouthRouteApproachTarget(target);
-      if (approach) {
-        target = approach; lookAt = null; requiredAction = "move";
-        text = "沿已清路沟的转角接近民房入口，绕开沟岸";
-      }
+      if (Flag("southApproach", !!approach)) { target = approach; lookAt = null; requiredAction = "move"; }
     }
     if (this.beat >= 24) target = this.lastSample.carryKind === "stretcher" ? anchors.shelter
       : this.lastSample.regripPosition || activity.regripPosition;
@@ -1381,39 +1437,37 @@ export class FirstLevelP012Director {
     if (!mortarDangerActive && this.beat >= 6 && this.beat <= 10 && this.frontlineAmmoRemaining > 0
       && Number(this.host.CurrentClips?.() ?? this.lastSample.clips) <= 0 && Number(this.lastSample.ammo) <= 0) {
       target = anchors.ammoDrop; interactionId = "p012_frontlineAmmo"; requiredAction = "move";
-      text = `退到弹药箱补充桥夹 · 箱内剩 ${this.frontlineAmmoRemaining}`;
+      Flag("resupply", true); params.clips = this.frontlineAmmoRemaining;
     }
     if ([14, 20, 21].includes(this.beat) && !this.lastSample.carryKind
       && Number(this.lastSample.ammo) === 0 && Number(this.lastSample.clips) === 0) {
       // Point only to an actual reachable dropped weapon. Scavenging remains
       // optional and neither creates ammunition nor completes the encounter.
+      Flag("scavenge", true);
       const weapon=this.host.NearbyDroppedWeapon?.();
-      if(weapon){target=weapon;interactionId=null;requiredAction="move";targetLabel="地上枪械 · 靠近按 F 缴获";
-        text="步枪打空，附近有可用枪械：靠近按 F 缴获（替换当前枪弹）；也可继续用手榴弹或白刃战";}
-      const grenades = Math.max(0, Math.floor(Number(this.lastSample.grenades) || 0));
-      if (!weapon) text += grenades > 0
-        ? `；步枪打空，尚有${grenades}枚手榴弹：按住 G 准备，松开投出`
-        : "；步枪打空：留意倒下士兵的枪械，靠近按 F 缴获（替换当前枪弹）";
+      if(Flag("weaponNearby", !!weapon)){target=weapon;interactionId=null;requiredAction="move";
+        targetLabel=T("p012.objective.scavenge.weaponLabel");}
+      params.grenades = Math.max(0, Math.floor(Number(this.lastSample.grenades) || 0));
+      Flag("scavengeGrenades", params.grenades > 0);
     }
     let frontlineApproach = null;
     if (!mortarDangerActive && this.beat >= 6 && this.beat <= 10 && interactionId !== "p012_frontlineAmmo") {
       const port = this.beat === 9 ? mortarSafePort
         : anchors.gunports?.[this.beat === 8 ? 2 : this.beat === 10 ? 0 : 1];
       frontlineApproach = this.FrontlineApproachTarget(port);
-      if (frontlineApproach) {
+      if (Flag("frontlineApproach", !!frontlineApproach)) {
         target = frontlineApproach; lookAt = null; requiredAction = "move"; requiredStance = "prone";
-        text = "沿反斜面中间交通壕回到枪眼，绕开两侧实体壕墙";
       }
     }
     // Posture is tactical advice, never a story key. Keep the recommendation distinct.
     const suggestedStance=requiredStance;requiredStance=null;
     if(requiredAction==="crouch")requiredAction="move";
-    text=text.replaceAll("卧倒沿","沿").replaceAll("卧倒转移","转移").replaceAll("卧倒换位","换位").replaceAll("卧倒移","移").replaceAll("卧倒进入","进入").replaceAll("先卧倒，再","可以贴掩体，随后").replaceAll("扑入路沟","避开扫射，准备还击");
+    const text = P012ResolveLine(P012_OBJECTIVE_LINES, this.LineContext(flags), params, T(beat.objectiveKey));
     return { text, targetLabel, suggestedStance, zone: beat.zone, target, lookAt, interactionId, requiredAction, requiredStance, progress,
       routeTarget: route[this.routeIndex] || null, arrivalRadiusM: [21,22].includes(this.beat)&&this.southArrivalRadius ? this.southArrivalRadius : this.beat === 13 && requiredAction === "follow"
-        && target === this.lastSample.guidePosition ? 2.4
+        && target === this.lastSample.guidePosition ? GUIDE.followGuideRadiusM
         : frontlineApproach || (this.beat === 23 && requiredAction === "follow")
-          || (this.beat===17&&requiredAction==="carry") ? 0.6 : this.RouteArrivalRadius() };
+          || (this.beat===17&&requiredAction==="carry") ? GUIDE.tightRadiusM : this.RouteArrivalRadius() };
   }
   Snapshot() { return Clone({ ammoBoxPosition:this.ammoBoxPosition, beat: this.beat, elapsed: this.elapsed, enteredAt: this.enteredAt,
     facts: [...this.facts], signals: [...this.signals], visits: this.visits, travelM: this.travelM,
@@ -1457,7 +1511,7 @@ export class FirstLevelP012Director {
     this.last = null;
     this.ambushRejoin = null;
     this.guideStarted = false;
-    this.action = P012_BEATS[this.beat].objective;
+    this.action = T(P012_BEATS[this.beat].objectiveKey);
     this.host.RestoreSignals?.([...this.signals]);
     this.host.Objective?.(this.action);
     return true;

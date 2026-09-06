@@ -112,12 +112,29 @@ import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EP
 import { CUTSCENES } from "./Data_TengxianScript.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { Clamp, Clamp01, HashString, Mulberry32 } from "./Script_Noise.mjs";
+// 玩家可见文本一律走这里（表在 Data_Text_Hud / Data_Text_Boot / Data_Text_Menu）。
+// 内容层（考据过的原稿：CAST 的名字、REINFORCE 的台词）走 Localize + Script_TextIds 的 id 口径。
+import { T, Localize } from "./Script_Text.mjs";
+/** 武器名是 Data_Weapons 里的内容原稿：显示前按 id 找译文。没有这把枪返回空串（调用点自己兜底）。 */
+const WeaponName = (weaponId) => (WEAPONS[weaponId]?.name ? Localize(WeaponNameId(weaponId), WEAPONS[weaponId].name) : "");
+import { CastNameId, LevelObjectiveStepId, WeaponNameId } from "./Script_TextIds.mjs";
+import { BOOT, CAMERA, PACING, SQUAD } from "./Data_Tuning_Main.mjs";
 
-// 近身班组的人数：不是加出来的兵，是把原本撒在两百米外、被雾墙吃掉的人挪到镜头前。
-// 实测一个 Actor 是 **37 个 draw call**（身体部件没合批），14 个近身兵约 1400 calls，
-// 低于当前 5000 红线。5 + 4 是班组构成，不再是靠藏人的性能上限；全场开销由
-// Script_BootTest 按 5000 dc / 600 万三角面统一验。
-const NEAR_SQUAD = { nra: 5, ija: 4 };
+/** 加载条一段之内的进度：`from + span * t`。别在调用点手拼这两个数。 */
+function BootProgress(step, t) { return step.from + step.span * t; }
+
+/**
+ * 开始按钮上写什么。**同一句话在开机与换关之后各要写一次**，
+ * 分成两处拼就会出现「换了关按钮写着上一次那句」。
+ */
+function BootStartLabel() {
+  if (SHOT) return T("boot.start.shot");
+  if (MOVEMENT_RANGE) return T("boot.start.movementRange");
+  if (WEAPON_RANGE) return T("boot.start.weaponRange");
+  if (EXPLOSION_TEST) return T("boot.start.explosionRange");
+  if (PREVIEW) return T("boot.start.preview");
+  return T("boot.start.play");
+}
 
 /** 弹道与抛掷物的射线要连解析地表一起打（见 Script_Physics.RaycastTerrain）。 */
 const TERRAIN_RAY = { terrain: true };
@@ -367,12 +384,10 @@ const scene = new THREE.Scene();
 // 注意：以后任何在 RenderScene 之外要读 matrixWorld / getWorldPosition 的新代码，
 // 拿到的仍是「上一次出画时」的位姿 —— 这一点和改之前完全一样（原来也是渲染时才更新）。
 scene.matrixWorldAutoUpdate = false;
-// FOV 55：Easy Red 2 那种“周围很远、人很小但看得清”的观感靠窄视场。
-// 70 度会把巷战拉成鱼眼，远处的人缩成一个点，尺度感全没了。
-const BASE_FOV = 55;
 // SSAO 的出厂强度。设置面板按倍率乘它，所以要有个名字。
 const SSAO_BASE = 0.80;
-const camera = new THREE.PerspectiveCamera(BASE_FOV, window.innerWidth / window.innerHeight, 0.06, 620);
+const camera = new THREE.PerspectiveCamera(CAMERA.baseFovDeg,
+  window.innerWidth / window.innerHeight, 0.06, 620);
 camera.rotation.order = "YXZ";
 
 // 破口 uniform 同时喂主材质、阴影与深度法线预通道，三条链必须是一只洞。
@@ -432,7 +447,7 @@ const graphics = {
   // 实时探针体默认关。默认间接光由 Global SH Probe + AmbientColor 提供；打开时
   // 才跑五个 GI pass/帧，并在图集收敛后渐进接管室内与墙角的反弹光。
   gi: params.get("gi") === "1", giStrength: 1,
-  fov: BASE_FOV,
+  fov: CAMERA.baseFovDeg,
 };
 NormalizeGraphicsDetails(graphics, post);
 // 探针体（GI）。默认关到底：ProbeVolume 不构造（省掉图集/靶与每帧 Update），
@@ -931,17 +946,18 @@ async function Boot() {
   for (const set of PBR_SETS) if (set.fallback) pbrOverridden.delete(set.fallback);
   const bakeNames = Object.keys(RECIPES).filter((name) => !pbrOverridden.has(name));
 
-  setStep("烘贴图……", 0.02);
+  setStep(T("boot.step.bakeTextures"), BOOT.progress.bakeTextures.from);
   let baked = 0;
   const total = bakeNames.length;
   for (const name of library.PrepareSteps(bakeNames)) {
     baked += 1;
-    setStep(`烘贴图 ${baked}/${total} · ${name}`, 0.02 + 0.22 * (baked / total));
+    setStep(T("boot.step.bakeTexturesProgress", { done: baked, total, name }),
+      BootProgress(BOOT.progress.bakeTextures, baked / total));
     await NextFrame();
   }
 
 
-  setStep("加载 PBR 材质……", 0.242);
+  setStep(T("boot.step.loadPbr"), BOOT.progress.loadPbr.from);
   const pbrQueue = PBR_SETS.slice();
   const pbrFailed = [];
   let pbrDone = 0;
@@ -961,19 +977,19 @@ async function Boot() {
           + String(error).slice(0, 160));
       }
       pbrDone += 1;
-      setStep(`加载 PBR 材质 ${pbrDone}/${PBR_SETS.length}`,
-        0.242 + 0.003 * (pbrDone / PBR_SETS.length));
+      setStep(T("boot.step.loadPbrProgress", { done: pbrDone, total: PBR_SETS.length }),
+        BootProgress(BOOT.progress.loadPbr, pbrDone / PBR_SETS.length));
     }
   };
   await Promise.all(Array.from({ length: PBR_LANES }, RunPbrLane));
   if (pbrFailed.length) {
     console.warn(`[Main] 共 ${pbrFailed.length}/${PBR_SETS.length} 套外部 PBR 走了程序化退路：`
-      + pbrFailed.join("、"));
+      + pbrFailed.join("、"));            // @text-ok console.warn 的续行，是诊断输出
   }
 
   // 物理引擎的 wasm（2.8 MB，本地 vendor 里）。**必须排在建关之前** ——
   // BuildField 末尾就要拿它建碰撞体了。
-  setStep("装物理引擎……", 0.245);
+  setStep(T("boot.step.physics"), BOOT.progress.physics);
   await Promise.all([InitPhysics(), PrepareCraterDebris(library)]);
 
   const phase = PHASE_TABLE[state.phaseIndex];
@@ -988,9 +1004,10 @@ async function Boot() {
   aircraft = new AircraftFlight(scene);
   aircraft.Load().catch((error) => console.warn("AircraftFlight: model load failed", error));
 
-  await BuildField(PHASE_TABLE[state.phaseIndex], setStep, 0.24, 0.62, NextFrame);
+  await BuildField(PHASE_TABLE[state.phaseIndex], setStep,
+    BOOT.progress.field.from, BOOT.progress.field.to, NextFrame);
 
-  setStep("上刺刀……", 0.9);
+  setStep(T("boot.step.actors"), BOOT.progress.actors);
   actorFactory = new ActorFactory(library, { quality: QUALITY });
   // 人物合批：全场人物的分件按「几何 × 材质」收成 InstancedMesh，
   // 一帧 1408 个人物 draw call 收到几十个。逐像素等价，账见 Script_ActorBatch.mjs。
@@ -1016,7 +1033,8 @@ async function Boot() {
     // warn 不是 error：BootTest 把 console.error 当事故，而少一个模型只是降级不是崩
     console.warn(`[Main] 这些模型没读到，对应的人/枪退回方块几何：${meshes.missing.join(", ")}`);
   }
-  setStep(`上刺刀…… 模型 ${meshes.loaded}/${meshes.requested}`, 0.92);
+  setStep(T("boot.step.actorsProgress", { loaded: meshes.loaded, requested: meshes.requested }),
+    BOOT.progress.actorMeshes);
   const grenadeAsset = await LoadGrenadeAsset();
   vfx = new VfxSystem(scene, library, {
     quality: QUALITY, maxParticles: SCALE.vfxBudget, lights,
@@ -1241,7 +1259,7 @@ async function Boot() {
       // 重来的那一下手上不该还抬着担架（担架已经翻了），也不该还架着机枪。
       carry?.Reset("checkpoint");
       if (sample.p012) p012Flow?.Restore(sample.p012);
-      if (sample.p012Carry) carry?.Begin(sample.p012Carry, { label: "担架（伤员）" });
+      if (sample.p012Carry) carry?.Begin(sample.p012Carry, { label: T("hud.carry.stretcherWounded") });
       if (sample.p012Story) {
         story.index = sample.p012Story.index; story.pushed = new Set(sample.p012Story.pushed);
         story.cued = new Set(sample.p012Story.cued);
@@ -1453,7 +1471,7 @@ async function Boot() {
     SpawnActor: ({ label, x, z, weapon, squadId, role, civilian, variant }) => {
       if (!ai) return null;
       const seed = HashString(`setpiece:${label}:${Math.round(x)}:${Math.round(z)}`);
-      const identity = { ...MakeSoldierIdentity(seed), name: label || "后送队" };
+      const identity = { ...MakeSoldierIdentity(seed), name: label || T("hud.actor.escort") };
       const noncombatant = !!PHASE_TABLE[state.phaseIndex]?.whitebox?.p012 && weapon === null;
       const actor = ai.Spawn("nra", x, z, {
         identity, weapon: weapon || identity.weapon, squadId: squadId || "Setpiece",
@@ -1623,7 +1641,7 @@ async function Boot() {
       player.Spawn(at.x, at.z, typeof yaw === "number" ? yaw : player.yaw);
       state.ammo = Math.max(state.ammo, 5);
       state.setpieceFacts.pov = id || label || "?";
-      hud.Say(null, `视角接替：${label || id}`, 3.2, "system");
+      hud.Say(null, T("hud.say.povSwitch", { label: label || id }), 3.2, "system");
       if (task) { state.storyObjective = task; hud.SetObjective(task, state.nraPool, null); }
       return true;
     },
@@ -1697,11 +1715,11 @@ async function Boot() {
   });
 
   await NextFrame();
-  setStep("就绪", 1.0);
+  setStep(T("boot.step.ready"), BOOT.progress.ready);
   await EnterLevel(state.phaseIndex, { initial: true, cutscenes: false });
   state.ready = true;
   bootStart.disabled = false;
-  bootStart.textContent = SHOT ? "（出图模式）" : (MOVEMENT_RANGE ? "进入操作测试场" : WEAPON_RANGE ? "进入枪械靶场" : EXPLOSION_TEST ? "进入爆炸测试场" : PREVIEW ? "播放序章" : "进 城");
+  bootStart.textContent = BootStartLabel();
 
 
   // 各阶段的配置时长，给通关冒烟按出厂配置跑用
@@ -2176,7 +2194,7 @@ async function Boot() {
         id: PREVIEW_ID,
         playing: state.previewPlaying,
         done: state.previewDone,
-        handoff: state.previewHandoffShown ? "跟随通信排。" : null,
+        handoff: state.previewHandoffShown ? T("boot.preview.handoff") : null,
         handoffCount: state.previewHandoffCount,
         aiAlive: ai ? ai.soldiers.filter((s) => s.alive).length : 0,
         error: state.previewError,
@@ -2505,7 +2523,7 @@ async function Boot() {
       SlicePhase: () => PHASE_TABLE[state.builtPhase] || PHASES[state.builtPhase] || null,
       ExitSandbox: () => GoToSandbox(null),
       RestartSandbox: () => location.reload(),
-      RetrySandbox: () => { if(p012Runtime?.RetryPlayer()){state.playerAliveLast=true;state.pendingRespawn=false;state.deathTimer=0;viewmodel.root.visible=true;ResumeFromPause();hud.Hint("保留现场进度与剩余补给",4);} },
+      RetrySandbox: () => { if(p012Runtime?.RetryPlayer()){state.playerAliveLast=true;state.pendingRespawn=false;state.deathTimer=0;viewmodel.root.visible=true;ResumeFromPause();hud.Hint(T("hud.hint.p012Retry"),4);} },
       Resume: () => ResumeFromPause(),
       // OpenMenu / PauseGame 会把整棵编辑器 DOM 藏掉（主菜单不该常驻开发齿轮）。
       // 「设置」既然复用了这棵 DOM，就必须先把它显式还回来；否则内部的
@@ -2710,7 +2728,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   // 探针体的代理几何体就是物理那张 AABB 表。**换关必须重接** ——
   // 上一关的盒子留着，新一关的射线会打在一座已经不存在的城上。
   if (gi) gi.SetWorld(battlefield);
-  setStep("砌墙（物理）……", base + span);
+  setStep(T("boot.step.physicsWalls"), base + span);
   await yieldFrame();
   // 炮坑材质在这里就编译：第一颗手榴弹落地那一帧才建 program 会冻 400 ms。
   new TerrainDeformationView(battlefield, scene, library).Warm(renderer, camera);
@@ -3064,7 +3082,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // 废弃场景钉住：目标链走完或时长到了都不换关（与靶场同一条 state.pinned）。
   // 正片章节走到这里把它放开 —— 别让上一片废弃场景的钉子带进序章。
   if (!SANDBOX) state.pinned = deprecated;
-  if (deprecated) hud.Hint("暂时废弃场景 · 未完成：只建场景，没有任务内容", 6);
+  if (deprecated) hud.Hint(T("hud.hint.deprecatedScene"), 6);
   // 环境档通常与天空档同名，直接把 phase.sky 递进去。
   // 旧写法是 night/dawn 之外一律「battle」，于是「烟尘白天」和「烧着的街」
   // 共用一档 —— 第三关满街在烧却听不见火，就是这么丢的。
@@ -3078,7 +3096,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // 废弃场景传空 beats：第一关的章节内容还在（P0/P1/P2 白盒用），正片入口不许播它。
   const loaded = story.BeginLevel(contentId, { beats: deprecated ? [] : phase.whitebox?.storyBeats,
     actualEventsOnly: phase.whitebox?.actualEventsOnly });
-  state.storyObjective = phase.objectives[0] || null;
+  state.storyObjective = phase.objectives[0] ? Localize(LevelObjectiveStepId(phase.id, 0), phase.objectives[0]) : null;
   if (loaded === 0 && !deprecated) console.warn("这一章没有剧本：", phase.id);
 
   // 过场承载章：不 Respawn、不撒兵、不挂烟柱 —— 车厢是过场自带的布景，
@@ -3215,7 +3233,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     IsEscortMember: (actor) => (setpieces?.mem?.column?.members || []).some((member) => member.handle === actor),
     BodyRadius: (actor) => actor?.body?.radius,
     SpawnRecruit: (spec) => {
-      const actor=ai.Spawn("nra",spec.x,spec.z,{identity:{...MakeSoldierIdentity(HashString(`P012Train:${spec.carIndex}:${spec.slot}`)),name:"下车集结的士兵"},
+      const actor=ai.Spawn("nra",spec.x,spec.z,{identity:{...MakeSoldierIdentity(HashString(`P012Train:${spec.carIndex}:${spec.slot}`)),name:T("hud.actor.trainRecruit")},
         weapon:"HanYang",unarmed:true,scriptedNoncombatant:true,escortRole:"trainRecruit",squadId:`P012Train${spec.carIndex}`});
       if(actor)actor.p012TrainExtra=true;
       return actor;
@@ -3293,7 +3311,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
           if (actor.actor) actor.actor.root.position.copy(actor.position);
         }
       } else {
-        actor = setpieces.host.SpawnActor({ label: entry.role === "walking" ? "向后方转移的伤兵" : "向后方转移的乡亲",
+        actor = setpieces.host.SpawnActor({ label: entry.role === "walking"
+          ? T("hud.actor.walkingWounded") : T("hud.actor.civilianRefugee"),
           x: point.x, z: point.z, weapon: null, civilian: entry.role !== "walking",
           variant: entry.variant, role: entry.role || "civilian", squadId: "P012Traffic" });
         if (actor && entry.role === "walking") actor.woundedWalk = 1;
@@ -3369,13 +3388,13 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       const equipment = phase.whitebox.activities.initialEquipment;
       state.clips = equipment.clips; state.mags.primary = {ammo:state.ammo,clips:state.clips};
       state.grenades = equipment.grenades; state.slots.throwable = state.grenades ? "Grenade" : null;
-      hud.Hint("已领子弹，按 R 装弹；可以边走边装", 4);
+      hud.Hint(T("hud.hint.ammoIssued"), 4);
     },
     CurrentClips: () => state.clips,
     GiveBandages: (request) => {
       const granted = Number.isFinite(request) ? Math.max(0, Math.floor(request)) : 0;
       player.bandages += granted;
-      if (granted) hud.Hint(`补充${granted}包绷带；受伤流血时按 B 包扎`, 4);
+      if (granted) hud.Hint(T("hud.hint.bandagesGiven", { n: granted }), 4);
       return granted;
     },
     GiveGrenades: (request) => { const granted = Number.isFinite(request) ? Math.max(0, Math.floor(request)) : 0; state.grenades += granted; return granted; },
@@ -3517,7 +3536,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // 过场承载章不撒兵、预览不进玩法，两条都跳过。
   if (!cutsceneOnly && !PREVIEW) {
     try {
-      await WarmActorShaders(phase, (label, progress) => SetBootStep(label, 0.94 + 0.06 * progress));
+      await WarmActorShaders(phase,
+        (label, progress) => SetBootStep(label, BootProgress(BOOT.progress.warmActors, progress)));
     } catch (error) {
       console.warn("[Main] 人物材质预热失败（退回用到时现编）", error);
     }
@@ -3525,7 +3545,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
 
   if (!initial) {
     ShowBoot(false);
-    bootStart.textContent = SHOT ? "（出图模式）" : (MOVEMENT_RANGE ? "进入操作测试场" : WEAPON_RANGE ? "进入枪械靶场" : EXPLOSION_TEST ? "进入爆炸测试场" : PREVIEW ? "播放序章" : "进 城");
+    bootStart.textContent = BootStartLabel();
   }
   // 这一片切片是哪一章的。菜单靠它决定用哪一组机位，StartLevel 靠它决定要不要重建。
   // **借片的章不改它**：地皮还是上一次建的那一片，改了菜单会去取一组不存在的机位。
@@ -3549,14 +3569,14 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
  */
 function EndOfficialCampaign(phase) {
   state.advancing = false;
-  const note = `${phase?.label || "序章"}已完 · 后续章节暂时废弃，正按新稿重做`;
+  const note = T("menu.notice.campaignEnd", { label: phase?.label || T("menu.notice.prologue") });
   if (menu) {
     OpenMenu();
     menu.SetNotice?.(note);
     return;
   }
   state.outcome = "campaignEnd";
-  hud.ShowEpilogue([note, "", "第一关到终章归入选章「暂时废弃场景」组：只建场景，没有任务内容。"]);
+  hud.ShowEpilogue([note, "", T("menu.notice.campaignEndDetail")]);
 }
 
 /**
@@ -3646,7 +3666,8 @@ async function WarmupShaders(root, onStep = null, shouldStop = null) {
         break;
       }
       const submitted = Math.min(picks.length, i + SUBMIT);
-      onStep?.(`提交着色器…… ${submitted}/${picks.length}`, 0.05 + 0.3 * (submitted / picks.length));
+      onStep?.(T("boot.step.submitShaders", { done: submitted, total: picks.length }),
+        BootProgress(BOOT.warm.submitShaders, submitted / picks.length));
       if (!await Yield()) return picks.length;
     }
 
@@ -3669,7 +3690,8 @@ async function WarmupShaders(root, onStep = null, shouldStop = null) {
         for (const object of outside.slice(i, i + size)) object.layers.mask = outsideMasks.get(object);
         RenderScene(0);
         const shown = Math.min(outside.length, i + size);
-        onStep?.(`重编场景光照…… ${Math.ceil(shown / size)}/${SLICES}`, 0.35 + 0.2 * (shown / outside.length));
+        onStep?.(T("boot.step.relightScene", { done: Math.ceil(shown / size), total: SLICES }),
+          BootProgress(BOOT.warm.relightScene, shown / outside.length));
         if (!await Yield()) return picks.length;
       }
     } finally {
@@ -3707,7 +3729,8 @@ async function WarmupShaders(root, onStep = null, shouldStop = null) {
       done += batch.length;
       if (born) chunk = 1;
       else if (cost < 30) chunk = Math.min(32, chunk * 2);
-      onStep?.(`预热材质…… ${done}/${picks.length}`, 0.55 + 0.35 * (done / picks.length));
+      onStep?.(T("boot.step.warmMaterials", { done, total: picks.length }),
+        BootProgress(BOOT.warm.warmMaterials, done / picks.length));
       if (!await Yield()) return picks.length;
     }
 
@@ -3720,13 +3743,14 @@ async function WarmupShaders(root, onStep = null, shouldStop = null) {
       for (const object of meshes.slice(i, i + REVEAL)) object.layers.mask = masks.get(object);
       RenderScene(0);
       const shown = Math.min(meshes.length, i + REVEAL);
-      onStep?.(`载入网格…… ${shown}/${meshes.length}`, 0.9 + 0.1 * (shown / meshes.length));
+      onStep?.(T("boot.step.loadMeshes", { done: shown, total: meshes.length }),
+        BootProgress(BOOT.warm.loadMeshes, shown / meshes.length));
       if (!await Yield()) return picks.length;
     }
   } finally {
     for (const object of meshes) object.layers.mask = masks.get(object);
   }
-  onStep?.("就绪", 1);
+  onStep?.(T("boot.step.ready"), BOOT.progress.ready);
   return picks.length;
 }
 
@@ -3861,7 +3885,7 @@ async function WarmCutscene({ loading }) {
     ShowBoot(true);
     bootStart.disabled = true;
     bootStart.textContent = "……";
-    SetBootStep("搭布景……", 0.1);
+    SetBootStep(T("boot.step.dressSet"), BOOT.warm.dressSet);
   }
   state.warming = true;
   try {
@@ -3913,7 +3937,7 @@ async function RunCutscene(id, { loading = false } = {}) {
   // 新版序章的终点是一个可复现的交接提示，不是旧 L0 的开战入口。
   // 正常播完、Esc 跳过、失焦收口都只会经过这里一次。
   if (PREVIEW && id === PREVIEW_ID && !state.previewHandoffShown) {
-    const task = "跟随通信排。";
+    const task = T("boot.preview.handoff");
     state.previewHandoffShown = true;
     state.previewHandoffCount += 1;
     state.storyObjective = task;
@@ -3949,8 +3973,12 @@ function PlayMidCutscene(id) {
   return RunCutscene(id);
 }
 
-/** 章节钉住时，等这条信号才放行换关（名字见 Script_Story.CHAPTER_RELEASE_SIGNAL）。 */
-const PIN_RELEASE_GRACE_S = 240;
+/**
+ * 章节钉住时，等这条信号才放行换关（名字见 Script_Story.CHAPTER_RELEASE_SIGNAL）。
+ * 数与理由在 Data_Tuning_Main.PACING；这里留一个名字是因为
+ * Script_MissionHooksTest 按标识符查这条保险丝在不在。
+ */
+const PIN_RELEASE_GRACE_S = PACING.pinReleaseGraceS;
 
 /** 换下一关。关末过场 -> 下一关关前过场 -> 建切片。 */
 async function AdvanceLevel(opts = {}) {
@@ -4048,7 +4076,7 @@ function StartMeleeScenario(id) {
   state.clips = state.mags[state.activeSlot]?.clips || 0;
   viewmodel.Equip(currentWeapon, SlotWeaponVariant(state.activeSlot));
   state.bayonetFixed = true; meleeStance=true; SyncBayonet();
-  hud.SetWeaponName(WEAPONS[currentWeapon]?.name || "");
+  hud.SetWeaponName(WeaponName(currentWeapon));
   const centerZ = spec.kind === "observe" ? 1463 : 1467;
   const close = ["push", "ground", "bind"].includes(spec.kind);
   const separation = close ? (spec.kind === "bind" ? 1.04 : 0.82) : 3.3;
@@ -4100,13 +4128,13 @@ function TriggerMeleeEncounter(spec) {
     const f=meleeCombat.Fighter(e.soldier);f.nextThink=meleeCombat.time+.65+e.soldier.meleeTraining.slot*.22;
   }
   meleeCombat.Log('encounterStart',player,null,{encounter:spec.id});
-  hud.Hint(`${spec.name} · 自由移动、转向与攻击`,2.5);return true;
+  hud.Hint(T("hud.hint.meleeEncounter", { name: spec.name }),2.5);return true;
 }
 function MaintainMeleeTargets() {
   if(meleeScenario!=='EncounterField')return;
   if(meleeEncounter && !meleeTargets.some(e=>e.encounterId===meleeEncounter && e.soldier.alive)) {
     meleeCompleted.add(meleeEncounter);meleeCombat.Log('encounterComplete',player,null,{encounter:meleeEncounter});meleeEncounter=null;
-    hud.Hint('交锋结束 · 可继续前往另一组',3);
+    hud.Hint(T("hud.hint.meleeEncounterDone"),3);
   }
   const near=NearbyMeleeEncounter();if(near?.trigger==='auto')TriggerMeleeEncounter(near);
 }
@@ -4261,7 +4289,7 @@ function SeedSoldiers(phase) {
   }
 
   // --- 近身班组：跟着你的班 -------------------------------------------------
-  for (let i = CountNear("nra", 40); i < NEAR_SQUAD.nra
+  for (let i = CountNear("nra", 40); i < SQUAD.nra
     && (!phase.whitebox?.p012 || ai.CountSide("nra") < nraTarget); i += 1) {
     // 前向弧而不是整圈：整圈撒 5 个人，85° 的水平视场只兜得住 1 个。
     // 直接转前向量，不要去凑"yaw 对应的极角"—— player.yaw 的零向是 -Z，
@@ -4287,7 +4315,7 @@ function SeedSoldiers(phase) {
     if (s) { s.holdZone = null; s.goal.set(px + ax * 15, 0, pz + az * 15); }
   }
   // --- 中景的敌人：压在你与下一个路标之间 -----------------------------------
-  for (let i = CountNear("ija", 110); enemyStage === "wave" && i < NEAR_SQUAD.ija; i += 1) {
+  for (let i = CountNear("ija", 110); enemyStage === "wave" && i < SQUAD.ija; i += 1) {
     let open = null;
     for (let attempt = 0; attempt < 12; attempt += 1) {
       const d = 45 + rnd() * 55;
@@ -4557,7 +4585,8 @@ function RespawnPlayer(initial = false) {
   viewmodel.Equip(currentWeapon, SlotWeaponVariant(state.activeSlot));
   SyncBayonet();
   viewmodel.root.visible = true;
-  hud.SetWeaponName(currentWeapon ? (WEAPONS[currentWeapon]?.name || "步枪") : "赤手");
+  hud.SetWeaponName(currentWeapon
+    ? (WeaponName(currentWeapon) || T("hud.weapon.rifle")) : T("hud.weapon.barehand"));
   ApplyDebugOptions();
   state.pendingRespawn = false;
   state.playerAliveLast = true;
@@ -4609,7 +4638,7 @@ function SwitchSlot(slot) {
   state.meleeCharge = null;                        // 换手就把蓄着的那一下松掉
   viewmodel.Equip(currentWeapon, SlotWeaponVariant(slot));
   SyncBayonet();                                   // 切回长枪时刺刀还在枪上
-  hud.SetWeaponName(WEAPONS[currentWeapon]?.name || "");
+  hud.SetWeaponName(WeaponName(currentWeapon));
   return true;
 }
 
@@ -4626,7 +4655,7 @@ function CycleSlot(delta) {
 function ToggleBipod() {
   if (!player?.Alive) return false;
   const weapon = WEAPONS[currentWeapon];
-  if (!weapon?.bipod) { hud.Hint("这支枪没有两脚架", 1.8); return false; }
+  if (!weapon?.bipod) { hud.Hint(T("hud.hint.noBipod"), 1.8); return false; }
   let rest = player.stance === "prone";
   if (!rest) {
     for (const b of battlefield.NearbyColliders(player.position.x, player.position.z, 1.4)) {
@@ -4635,20 +4664,20 @@ function ToggleBipod() {
     }
   }
   if (!player.ToggleBipod(weapon, rest)) {
-    hud.Hint("得先趴下，或者靠着能搭枪的东西", 2.2);
+    hud.Hint(T("hud.hint.bipodNeedsRest"), 2.2);
     return false;
   }
   audio.Play(player.bipod ? "magIn" : "bolt", { volume: 0.55 });
-  hud.Hint(player.bipod ? "两脚架架好了" : "收了两脚架", 1.6);
+  hud.Hint(player.bipod ? T("hud.hint.bipodOn") : T("hud.hint.bipodOff"), 1.6);
   return true;
 }
 
 /** 单发／连发。只有捷克式有得切（十一年式是日军的，玩家摸不到）。 */
 function ToggleFireMode() {
   const weapon = WEAPONS[currentWeapon];
-  if (!weapon?.rpm) { hud.Hint("这支枪只有一种发射方式", 1.6); return false; }
+  if (!weapon?.rpm) { hud.Hint(T("hud.hint.singleFireMode"), 1.6); return false; }
   state.fireMode = state.fireMode === "auto" ? "semi" : "auto";
-  hud.Hint(state.fireMode === "auto" ? "连发" : "单发", 1.6);
+  hud.Hint(state.fireMode === "auto" ? T("hud.hint.fireModeAuto") : T("hud.hint.fireModeSemi"), 1.6);
   return true;
 }
 
@@ -4684,7 +4713,7 @@ function OnPlayerDown() {
   if (MELEE_TEST) {
     state.pendingRespawn = false; state.deathTimer = 0;
     viewmodel.root.visible = false; audio.Play("bodyFall", {volume:.8});
-    hud.Hint("本轮阵亡 · 在白刃实验面板开始／重开", 30); return;
+    hud.Hint(T("hud.hint.meleeTestDown"), 30); return;
   }
   if(p012Runtime){
     p012Runtime.failed=true;state.pendingRespawn=false;state.deathTimer=0;
@@ -4698,7 +4727,7 @@ function OnPlayerDown() {
   const identity = state.identity;
   state.fallen.push(identity);
   state.nraPool = Math.max(0, state.nraPool - 1);
-  hud.ShowDeathCard(identity, "第三十一师 一八六团", REINFORCE.deathCardSeconds);
+  hud.ShowDeathCard(identity, T("hud.death.unit"), REINFORCE.deathCardSeconds);
   state.deathTimer = REINFORCE.deathCardSeconds;
   state.pendingRespawn = true;
   // 倒地镜头保留战场，但手里的枪不能冻结在半空；接管下一名士兵时再恢复。
@@ -4707,7 +4736,7 @@ function OnPlayerDown() {
   if (story) story.Signal("playerDown");
   // 池子见底：四月四日真下过的命令 —— 担架兵、炊事兵、伙夫都编进来
   if (state.nraPool > 0 && state.nraPool / (state.phasePoolNra || 1) < REINFORCE.lastDitchAt) {
-    hud.Say("团长", REINFORCE.lastDitchLine, 6);
+    hud.Say(Localize(CastNameId("zhang"), CAST.zhang.short), REINFORCE.lastDitchLine, 6);
   }
 }
 
@@ -4774,7 +4803,7 @@ function RequestPointerLock() {
     if (!fakeLocked) { fakeLocked = true; OnPointerLockChange(); }
     return;
   }
-  const nudge = () => hud?.Hint("点一下画面，接管镜头", 3.0);
+  const nudge = () => hud?.Hint(T("hud.hint.pointerLock"), 3.0);
   // **先要 raw input**（unadjustedMovement）。事故：镜头在鼠标往一个方向推到一定
   // 距离之后会突然跳切到另一个角度。页内链路（mousemove -> lookX -> yaw -> 相机）
   // 逐帧量过是连续的，跳的是浏览器送来的 movementX/Y 本身：Chromium on Windows
@@ -4900,9 +4929,9 @@ function ShowPreviewTerminal(task) {
     terminal.className = "previewTerminal";
     hudRoot.appendChild(terminal);
   }
-  terminal.innerHTML = `<div class="title">序章预览结束</div>`
+  terminal.innerHTML = `<div class="title">${T("boot.preview.title")}</div>`
     + `<div class="task">${task}</div>`
-    + `<div class="note">等待《断线》接手 · 预览不会启动界河战斗</div>`;
+    + `<div class="note">${T("boot.preview.note")}</div>`;
   terminal.classList.add("on");
   // _Finish() 按正片契约解除 cinematic；预览终点重新锁回 cinematic，
   // 只留下这个明确的终点卡，不露血量、武器、命令栏等战斗 HUD。
@@ -5287,8 +5316,8 @@ function CheckpointStatus() {
   const available = !!player && !state.menu && !state.cutscene && !state.advancing
     && !p012Runtime?.completed && !!(p012Runtime ? p012Runtime.safePoint : checkpoint?.saved);
   return { available, note: available
-    ? (p012Runtime ? "保留现场进度与剩余补给；手中载物会留在原地" : "恢复到本关最近的检查点")
-    : "当前没有可用的检查点" };
+    ? (p012Runtime ? T("menu.checkpoint.noteP012") : T("menu.checkpoint.noteLevel"))
+    : T("menu.checkpoint.none") };
 }
 
 function ContinueCheckpoint() {
@@ -5304,7 +5333,7 @@ function ContinueCheckpoint() {
   viewmodel.root.visible = true;
   hud.HideDeathCard();
   ResumeFromPause();
-  hud.Hint("已从当前检查点继续", 3);
+  hud.Hint(T("hud.hint.checkpointResumed"), 3);
   return true;
 }
 
@@ -5405,7 +5434,7 @@ const router = new InputRouter({
         if (WEAPONS[currentWeapon]?.bayonet && state.bayonetFixed) {
           if(detail.down && meleeCombat.CanChangeWeapon() && !viewmodel.IsBusy() && !player.Busy) {
             meleeCombat.ReleasePlayer();meleeStance=!meleeStance;
-            input.fire=false;input.ads=false;hud.Hint(meleeStance?'白刃架势 · 左键攻击 / 右键拨枪 / F 顶架':'射击架势 · 左键射击 / 右键瞄准',2);
+            input.fire=false;input.ads=false;hud.Hint(meleeStance?T("hud.hint.meleeStanceMelee"):T("hud.hint.meleeStanceFire"),2);
           }
         } else if (WEAPONS[currentWeapon]?.kind!=='melee') {
           if(detail.down)BeginMeleeCharge('key');else ReleaseMeleeCharge();
@@ -5510,7 +5539,7 @@ function IssueOrderByKey(key) {
   const aimPoint = AimPoint(60);
   const n = ai.IssueOrder(order.id, player.position, aimPoint);
   state.order = order.label;
-  if (n > 0) hud.Say("你", `${order.label}！`, 2.2);
+  if (n > 0) hud.Say(T("hud.say.self"), T("hud.say.order", { label: order.label }), 2.2);
 }
 
 function ReadKeys() {
@@ -5571,8 +5600,8 @@ function Reload() {
 function BeginCook(kind) {
   if (!player.Alive || state.cooking || combat.Returning) return;
   const infiniteGrenades = EffectiveInfiniteGrenades();
-  if (kind === "Grenade" && !infiniteGrenades && state.grenades <= 0) { hud.Hint("没有手榴弹了", 2); return; }
-  if (kind === "GrenadeBundle" && state.bundles <= 0) { hud.Hint("没有集束了", 2); return; }
+  if (kind === "Grenade" && !infiniteGrenades && state.grenades <= 0) { hud.Hint(T("hud.hint.noGrenades"), 2); return; }
+  if (kind === "GrenadeBundle" && state.bundles <= 0) { hud.Hint(T("hud.hint.noBundles"), 2); return; }
   state.cooking = kind;
   state.cook = 0;
   audio.Play("grenadePin", { volume: 0.7 });
@@ -5651,7 +5680,7 @@ function ToggleBayonet() {
   if (!player?.Alive || !viewmodel) return false;
   const weapon = WEAPONS[currentWeapon];
   if (!weapon?.bayonet) {
-    hud.Hint(weapon?.kind === "melee" ? "大刀本身就是白刃" : "这支枪装不了刺刀", 2.0);
+    hud.Hint(weapon?.kind === "melee" ? T("hud.hint.dadaoIsMelee") : T("hud.hint.noBayonet"), 2.0);
     return false;
   }
   if (viewmodel.IsBusy?.() || state.meleeCharge) return false;
@@ -5661,7 +5690,7 @@ function ToggleBayonet() {
   // "咔哒"落在刀滑进枪口环那一帧（装 0.95 s × 0.58 ≈ 0.55，卸在 0.52 起拔）
   audio.Play("stripperLoad", { volume: 0.7, pitch: next ? 1.25 : 1.1,
     delay: next ? 0.55 : 0.50 });
-  hud.Hint(next ? "上刺刀" : "收刺刀", 1.6);
+  hud.Hint(next ? T("hud.hint.bayonetOn") : T("hud.hint.bayonetOff"), 1.6);
   return true;
 }
 
@@ -5711,8 +5740,8 @@ function UpdateContextualActionPrompts() {
   }
   if (MELEE_TEST) {
     const near=NearbyMeleeEncounter();
-    const prompts=near?.trigger==='interact'?[{keys:'F',label:near.name,kind:'interact'}]:meleeCombat?.CanUse() && meleeCombat.PushCandidate() ? [{keys:"F",label:"近身推架",kind:"push"}] : [];
-    if(WEAPONS[currentWeapon]?.bayonet && state.bayonetFixed)prompts.push({keys:'V',label:meleeStance?'白刃架势 → 射击':'射击架势 → 白刃',kind:'melee'});
+    const prompts=near?.trigger==='interact'?[{keys:'F',label:near.name,kind:'interact'}]:meleeCombat?.CanUse() && meleeCombat.PushCandidate() ? [{keys:"F",label:T("hud.prompt.push"),kind:"push"}] : [];
+    if(WEAPONS[currentWeapon]?.bayonet && state.bayonetFixed)prompts.push({keys:"V",label:meleeStance?T("hud.prompt.meleeToFire"):T("hud.prompt.fireToMelee"),kind:"melee"});
     hud.SetActionPrompts(prompts);
     return;
   }
@@ -5724,11 +5753,11 @@ function UpdateContextualActionPrompts() {
     if (mounted.jam) {
       prompts.push({
         keys: "R",
-        label: mounted.jam.kind === "fatal" ? "拉枪机" : "按住排障",
+        label: mounted.jam.kind === "fatal" ? T("hud.prompt.pullBolt") : T("hud.prompt.clearJam"),
         kind: "reload",
       });
     } else if (!mounted.dead && mounted.rounds < mounted.beltRounds && mounted.belts > 0) {
-      prompts.push({ keys: "R", label: "换弹板", kind: "reload" });
+      prompts.push({ keys: "R", label: T("hud.prompt.changeBelt"), kind: "reload" });
     }
     prompts.push({ keys: "F", label: mounted.exit, kind: "interact" });
     hud.SetActionPrompts(prompts);
@@ -5741,7 +5770,7 @@ function UpdateContextualActionPrompts() {
     return;
   }
   if (p012Runtime?.binocularOwned) {
-    const prompts = [{keys:"右键",label:"按住举起望远镜",kind:"interact"}];
+    const prompts = [{keys:T("hud.key.mouseRight"),label:T("hud.prompt.binocular"),kind:"interact"}];
     if (interaction?.point?.id === "p012_binocularReturn") {
       prompts.unshift({keys:"F",label:interaction.label,kind:"interact"});
     }
@@ -5753,10 +5782,10 @@ function UpdateContextualActionPrompts() {
     const prompts=[];
     if(load?.active){
       if(load.phase==="carry"){
-        if(interaction?.point?.id==="p012_ammoDrop")prompts.push({keys:"按住 F",label:"交付弹药给机枪组",kind:"supply",text:true});
-        else if(load.canThrow)prompts.push({keys:"左键",label:"放下弹药箱（之后可再搬起）",kind:"carry",text:true});
+        if(interaction?.point?.id==="p012_ammoDrop")prompts.push({keys:T("hud.key.holdF"),label:T("hud.prompt.ammoDeliver"),kind:"supply",text:true});
+        else if(load.canThrow)prompts.push({keys:T("hud.key.mouseLeft"),label:T("hud.prompt.ammoDrop"),kind:"carry",text:true});
       }
-    }else if(interaction?.point?.id==="p012_ammoPickup")prompts.push({keys:"按住 F",label:"搬起弹药箱",kind:"carry",text:true});
+    }else if(interaction?.point?.id==="p012_ammoPickup")prompts.push({keys:T("hud.key.holdF"),label:T("hud.prompt.ammoPickup"),kind:"carry",text:true});
     hud.SetActionPrompts(prompts);return;
   }
   const gunInHand = state.activeSlot === "primary" || state.activeSlot === "secondary";
@@ -5772,7 +5801,7 @@ function UpdateContextualActionPrompts() {
   // 抬着东西的时候提示条已经被负重接管（只剩放下/扔下），不插入推架提示。
   // 那一下 F 的实际结果是「放下担架」，提示与因果就分叉了。
   if (meleeCombat?.CanUse() && meleeCombat.PushCandidate()) {
-    prompts.unshift({ keys: "F", label: "近身推架", kind: "push" });
+    prompts.unshift({ keys: "F", label: T("hud.prompt.push"), kind: "push" });
   }
   hud.SetActionPrompts(p012Flow?prompts.map(prompt=>({...prompt,text:true})):prompts);
 }
@@ -5806,7 +5835,7 @@ function PickUpWeapon(weaponId, clips, variant = 0) {
     state.fireMode = "auto";
     viewmodel.Equip(currentWeapon, SlotWeaponVariant(slot));
     SyncBayonet();
-    hud.SetWeaponName(WEAPONS[currentWeapon]?.name || "");
+    hud.SetWeaponName(WeaponName(currentWeapon));
   }
   return true;
 }
@@ -5817,8 +5846,8 @@ function CallMortar() {
   const target = AimPoint(160);
   const r = combat.CallMortar(target);
   if (r.ok) {
-    hud.Say("你", `迫击炮，坐标——`, 2.6);
-    hud.Hint(`炮弹在路上（还剩 ${r.left} 发）`, 4);
+    hud.Say(T("hud.say.self"), T("hud.say.mortarCall"), 2.6);
+    hud.Hint(T("hud.hint.mortarOnTheWay", { left: r.left }), 4);
   } else {
     hud.Hint(r.reason, 2.4);
   }
@@ -6080,7 +6109,7 @@ function TryFire(dt, returningGrenade = false) {
       // 白刃起手的一部分响 —— 击针落空、随即人把枪抡起来。
       audio.Play("bolt", { volume: 0.34, pitch: 1.55 });
       BeginMeleeCharge("mouse");
-      if (state.clips > 0) hud.Hint("按 R 压弹", 2.2);
+      if (state.clips > 0) hud.Hint(T("hud.hint.reloadClip"), 2.2);
     }
     return;
   }
@@ -6442,7 +6471,7 @@ function ReachObjective(index) {
   const phase = PHASE_TABLE[state.phaseIndex];
   const text = phase.objectives[state.objectiveIndex];
   if (text) {
-    state.storyObjective = text;
+    state.storyObjective = Localize(LevelObjectiveStepId(phase.id, state.objectiveIndex), text);
   }
   SeedSmokeColumns(phase);
 }
@@ -6551,7 +6580,7 @@ function Frame(dt, render = true) {
     if (state.deathTimer <= 0 && state.pendingRespawn) {
       if (MELEE_TEST) { /* Keep the test result until the player restarts. */ }
       else if (state.nraPool > 0) RespawnPlayer();
-      else hud.Say(null, "没有人可以填上去了。", 8);
+      else hud.Say(null, T("hud.say.noOneLeft"), 8);
     }
   }
 
@@ -6853,7 +6882,7 @@ function Frame(dt, render = true) {
       if (near > 1.6) continue;
       wall.lastHurt = state.elapsed;
       player.TakeHit(9, "legs", null, { fire: true });
-      hud.Hint("火里过不去。", 1.6);
+      hud.Hint(T("hud.hint.fireBlocks"), 1.6);
     }
   }
 
@@ -6948,7 +6977,7 @@ function Frame(dt, render = true) {
       state.chapterReleased = true;
       state.chapterReleaseAt = state.phaseTime;
       console.warn(`钉关保险丝：${phase.id} 等不到 ${CHAPTER_RELEASE_SIGNAL}，`
-        + `已超时 ${Math.round(state.phaseTime - state.levelSeconds)} s，自动放行`);
+        + `已超时 ${Math.round(state.phaseTime - state.levelSeconds)} s，自动放行`);   // @text-ok console.warn 的续行
     }
   }
   const chapterPinned = state.pinFinalZone && !state.chapterReleased;
@@ -7434,7 +7463,7 @@ function ApplyGraphics() {
 window.addEventListener("resize", ApplyGraphics);
 
 Boot().catch((error) => {
-  bootStep.textContent = "启动失败：" + error.message;
+  bootStep.textContent = T("boot.error.startFailed", { message: error.message });
   // 交给开机守望补一颗「重试」按钮（老缓存里的 index.html 可能还没有守望，所以带 ?.）
   window.__bootGuardFail?.(error.message, false);
   console.error(error);

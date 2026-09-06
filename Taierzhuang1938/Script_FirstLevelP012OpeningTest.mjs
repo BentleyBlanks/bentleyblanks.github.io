@@ -5,6 +5,9 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { AmmoReadout } from "./Script_Hud.mjs";
+// 抠出来的 Main 函数在 vm 里跑，模块作用域不在场：提示语走 T，所以把**真的那一份**
+// 喂进上下文（不是替身），缺键会当场读成键名，与线上行为一致。
+import { T } from "./Script_Text.mjs";
 import { AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload, RestoreP012ManualReload } from "./Script_FirstLevelP012Opening.mjs";
 
 import { FIRST_LEVEL_P012_WHITEBOX_PHASE as openingPhase } from "./Data_FirstLevelP012Whitebox.mjs";
@@ -20,7 +23,7 @@ const debugOptions = new DebugOptions({ getItem: key => store.get(key), setItem:
 assert.equal(debugOptions.Enabled("infiniteAmmo"), true, "reproduce an existing user's persisted debug setting");
 let busy = false;
 const state = { activeSlot: "primary", slots: { primary: "HanYang" }, mags: { primary: { ammo: 0, clips: 0 } }, ammo: 0, clips: 0, playerShots: 0, grenades: 0 };
-const context = vm.createContext({ PHASE_TABLE: [openingPhase], combat: { Returning: false }, state, debugOptions, currentWeapon: "HanYang", p012Runtime: null,
+const context = vm.createContext({ T, PHASE_TABLE: [openingPhase], combat: { Returning: false }, state, debugOptions, currentWeapon: "HanYang", p012Runtime: null,
   WEAPONS: { HanYang: { magazine: 5 } }, AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload,
   player: { Alive: true, Busy: false, InWater: false }, viewmodel: { IsBusy: () => busy, TriggerReload: () => { busy = true; } },
   audio: { Play() {} }, hud: { Hint() {} }, fireCooldown: 0, fireEdge: true,

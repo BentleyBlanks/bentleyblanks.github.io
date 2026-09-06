@@ -30,6 +30,12 @@
 import { VoiceDurOf } from "./Data_Voice.mjs";
 
 import { LEVELS, CAST, MENU, CREDITS, FindLevel, CHAPTER_EVENTS } from "./Data_TengxianScript.mjs";
+// 内容层本地化：台词原稿仍写在各 Data_Mission* 里，这里只在**显示那一刻**按 id 换译文。
+// 基准语言（zh-CN）不登记 content.*，所以 Localize 原样返回原稿 —— 行为零变化。
+import { Localize } from "./Script_Text.mjs";
+import { BeatTextId, BeatSubId, LevelObjectiveId, CastNameId } from "./Script_TextIds.mjs";
+// 节奏数值全在表里（注释也跟着搬过去了），这里只读不抄。
+import { MAX_WAIT, PACING, VOICE_HOLD, SUBTITLE, BEAT_SECONDS, PARSE_AT, WHISTLE } from "./Data_Tuning_Story.mjs";
 
 // ===========================================================================
 // 关内事件线：`event:名字` 什么时候算发生了
@@ -247,34 +253,19 @@ export const SIGNAL_CUTSCENES = BUILT.cutscenes;
 /** 构建报告：哪些事件有章节自己的判据、哪些吃了均匀兜底。测试与排障读它。 */
 export const CUE_BUILD_REPORT = BUILT.report;
 
-/**
- * 各类触发式等不到时的兜底上限（秒）。
- * zone 给得最宽 —— 走到某个路标是玩家自己的事；event 次之；
- * delay/start 本来就是时间条件，兜底等于它自己。
- */
-const MAX_WAIT = { after: 0, zone: 95, event: 80, fight: 70, fightEnd: 85, end: 1e9 };
-const MIN_GAP = 2.0;              // 两条台词之间的最小间隔，不然会叠成一团
-// 带语音的那一条要**占住话筒直到自己说完**：字幕的默认停留（3.4—5.4 s）跟音频
-// 长度没有关系，按默认间隔放行下一条，长句子会被下一句从中间打断。
-// 上限 8 s 是保险丝：真有一条 20 s 的连续场景（序章动员那种）也不至于把整条
-// 剧本链卡在那儿 —— 超时兜底虽然照常在走，但那要等到 MAX_WAIT。
-const VOICE_HOLD_MAX = 8.0;
-const VOICE_HOLD_TAIL = 0.35;     // 说完之后再留一点，别话音未落就下一句
-// 字幕跟着语音走：有音频时字幕至少陪到人说完（取长者）。
-// 反过来不成立 —— 音频短不代表字幕可以更短，字幕有自己的可读下限。
-const SUBTITLE_TAIL = 0.6;
-const SUBTITLE_MAX = 9.0;
+// 节奏常量（MAX_WAIT / 最小间隔 / 话筒占用 / 字幕停留 / 各类 beat 的默认秒数）全部
+// 搬进 Data_Tuning_Story.mjs，连同「为什么是这个数」的账。这里只 import 读表。
 
 /** 把一条 beat 的 at 解析成运行时条件。**没有翻译，只有解析。** */
 function ParseAt(at) {
-  if (!at || at === "start") return { kind: "after", seconds: 0.8 };
+  if (!at || at === "start") return { kind: "after", seconds: PARSE_AT.startS };
   if (at === "end") return { kind: "end" };
-  if (at.startsWith("delay:")) return { kind: "after", seconds: parseFloat(at.slice(6)) || 2 };
+  if (at.startsWith("delay:")) return { kind: "after", seconds: parseFloat(at.slice(6)) || PARSE_AT.delayFallbackS };
   if (at.startsWith("zone:")) return { kind: "zone", zone: at.slice(5) };
   if (at.startsWith("event:")) return { kind: "event", event: at.slice(6) };
   if (at.startsWith("waveClear:")) return { kind: "fightEnd", n: parseInt(at.slice(10), 10) || 1 };
   if (at.startsWith("wave:")) return { kind: "fight", n: parseInt(at.slice(5), 10) || 1 };
-  return { kind: "after", seconds: 3 };
+  return { kind: "after", seconds: PARSE_AT.unknownS };
 }
 
 export class StoryDirector {
@@ -288,7 +279,7 @@ export class StoryDirector {
     this.index = 0;
     this.levelId = null;
     this.levelTime = 0;
-    this.sinceLast = MIN_GAP;
+    this.sinceLast = PACING.minGapS;
     this.beatWait = 0;
     this.fightCount = 0;
     this.fightEndCount = 0;
@@ -423,8 +414,14 @@ export class StoryDirector {
     const beats = Array.isArray(options.beats) ? options.beats : level?.beats || [];
     this.actualEventsOnly = options.actualEventsOnly === true;
     this.p012SubtitleActiveUntil = 0;
+    // 内容 id 要用 **beats 数组里的原始下标**（口径见 Script_TextIds）：队列会被
+    // p012Immediate 过滤掉几条，拿过滤后的下标当 id，加一条即时台词就会让后面
+    // 整本剧本的译文错位一格。所以先把下标钉在这里，再过滤。
+    const indexed = beats.map((beat, index) => ({ beat, index }));
     this.p012Immediate = this.actualEventsOnly
-      ? beats.filter((beat) => beat.p012Immediate).map((beat) => ({ ...beat, level: levelId, done: false })) : [];
+      ? indexed.filter(({ beat }) => beat.p012Immediate)
+        .map(({ beat, index }) => ({ ...beat, level: levelId, done: false, textId: BeatTextId(levelId, beat, index) }))
+      : [];
     this.p012SignalTimes = new Map();
     this.p012CueLog = [];
     this.p012PendingCompletion = null;
@@ -433,16 +430,18 @@ export class StoryDirector {
     // sameAsPrev：连着几条写同一个 at 的，作者的意思是「这几句一起来」。
     // 不标出来的话每一条都要各等一遍自己的兜底 —— 实测 L0 那 12 条里有 6 条
     // 是成对的同 at，各等 95 s 的结果是一关跑到头也播不完（冒烟里表现为
-    // 「剧本被吞了」，而其实只是排在后面）。标出来之后同组的第二条只等 0.25 s。
+    // 「剧本被吞了」，而其实只是排在后面）。标出来之后同组的第二条只等 PACING.sameAsPrevS。
     this.queue = level
-      ? beats.filter((beat) => !this.p012Immediate.length || !beat.p012Immediate).map((b, i, sequence) => ({
-        ...b, level: levelId,
-        sameAsPrev: i > 0 && b.at === sequence[i - 1].at,
-      }))
+      ? indexed.filter(({ beat }) => !this.p012Immediate.length || !beat.p012Immediate)
+        .map(({ beat, index }, i, sequence) => ({
+          ...beat, level: levelId,
+          textId: BeatTextId(levelId, beat, index),
+          sameAsPrev: i > 0 && beat.at === sequence[i - 1].beat.at,
+        }))
       : [];
     this.index = 0;
     this.levelTime = 0;
-    this.sinceLast = MIN_GAP;      // 开场不要立刻甩台词，让 brief 先说完
+    this.sinceLast = PACING.minGapS;   // 开场不要立刻甩台词，让 brief 先说完
     this.beatWait = 0;
     this.fightCount = 0;
     this.fightEndCount = 0;
@@ -455,7 +454,7 @@ export class StoryDirector {
     this.cutsceneHold = false;
     this.flushLog = null;
     this.signalCutscenes = SIGNAL_CUTSCENES[levelId] || null;
-    this.objectiveText = level ? level.objective : null;
+    this.objectiveText = level ? Localize(LevelObjectiveId(levelId), level.objective) : null;
     return this.queue.length;
   }
 
@@ -513,14 +512,14 @@ export class StoryDirector {
     // This absolute deadline belongs to the cancelled channel/old clock. A
     // restored approval is protected semantic occupancy, not interruptible chat.
     this.p012SubtitleActiveUntil = 0;
-    this.sinceLast = MIN_GAP;
+    this.sinceLast = PACING.minGapS;
     this.p012PendingCompletion = pending && !this.p012CompletedSignals.has(pending.signal) ? { ...pending } : null;
     if (this.p012PendingCompletion) {
       // The recording was stopped on rewind. Resume its remaining semantic
       // occupancy as a subtitle, never restart or silently skip an approval.
       const cue = this.p012PendingCompletion;
       this.hud.Say(cue.speaker, cue.text, cue.remaining);
-      this.sinceLast = MIN_GAP - cue.remaining;
+      this.sinceLast = PACING.minGapS - cue.remaining;
     }
     for (const signal of this.p012CompletedSignals) this.Signal(signal);
     return true;
@@ -541,7 +540,7 @@ export class StoryDirector {
     if (fighting && !this.inFight && this.fightCooldown <= 0) {
       this.inFight = true;
       this.fightCount += 1;
-      this.fightCooldown = 6;
+      this.fightCooldown = PACING.fightCooldownS;
     } else if (!fighting && this.inFight) {
       this.inFight = false;
       this.fightEndCount += 1;
@@ -607,13 +606,13 @@ export class StoryDirector {
       &&this.p012SignalTimes.has(beat.p012Immediate.event)
       &&(!Number.isFinite(beat.p012Immediate.maxAgeS)||this.levelTime-this.p012SignalTimes.get(beat.p012Immediate.event)<=beat.p012Immediate.maxAgeS));
     if(interruption && !this.p012PendingCompletion
-      && (this.sinceLast>=MIN_GAP || this.p012SubtitleActiveUntil>this.levelTime)){
+      && (this.sinceLast>=PACING.minGapS || this.p012SubtitleActiveUntil>this.levelTime)){
       interruption.done=true;this.Play(interruption,false);
       this.p012CueLog.push({key:interruption.voice,time:this.levelTime,expired:false});
       return;
     }
     // 一帧最多播一条：台词叠在一起谁都读不清
-    if (this.sinceLast < MIN_GAP) return;
+    if (this.sinceLast < PACING.minGapS) return;
     // P012 alone: scene cues share the normal voice occupancy, never interrupt
     // a recording. A missed semantic window is logged rather than queued late.
     for (const beat of this.p012Immediate || []) {
@@ -651,7 +650,7 @@ export class StoryDirector {
     if (Number.isFinite(beat.p012Beat) && (ctx.p012Beat ?? -1) < beat.p012Beat) return;
     if (Number.isFinite(beat.notBeforeS) && this.levelTime < beat.notBeforeS) return;
     const cond = beat._cond
-      || (beat._cond = beat.sameAsPrev ? { kind: "after", seconds: 0.25 } : ParseAt(beat.at));
+      || (beat._cond = beat.sameAsPrev ? { kind: "after", seconds: PACING.sameAsPrevS } : ParseAt(beat.at));
     let ready = false;
 
     switch (cond.kind) {
@@ -663,13 +662,13 @@ export class StoryDirector {
       // 收场那一条只在关卡真的要结束时播：目标链走完，或者时间到了九成
       case "end":
         ready = full.objectiveIndex >= full.objectiveCount
-          || this.levelTime >= full.levelSeconds * 0.9;
+          || this.levelTime >= full.levelSeconds * PACING.endTimeRatio;
         break;
       default: ready = true;
     }
 
     // 超时兜底：等不到就直接播。没有这一条，链子会卡死并静默吞掉后面全部剧本。
-    const limit = MAX_WAIT[cond.kind] ?? 60;
+    const limit = MAX_WAIT[cond.kind] ?? MAX_WAIT.fallbackS;
     const timedOut = !(this.actualEventsOnly && ["event", "zone"].includes(cond.kind))
       && limit > 0 && this.beatWait >= limit;
     if (!ready && !timedOut) return;
@@ -688,7 +687,7 @@ export class StoryDirector {
    * 改的是两件与「吞对白」有关的事（Data_MissionCh1 头注记着这笔账）：
    *   1. **扫描范围有上限**。原来的 while 只数「倒出来几条」，跳过的对话不计数 ——
    *      于是关末还剩三十句没播时，它会一路把三十句全部静默跳过去只为凑够四条旁白。
-   *      现在跳过的也计进预算（scanLimit = limit × 8），扫完就停：**没走到的
+   *      现在跳过的也计进预算（scanLimit = limit × PACING.flushScanFactor），扫完就停：**没走到的
    *      beat 留在队列里**，而不是被悄悄标成「播过了」。
    *   2. **留痕**。倒了哪几条、跳了哪几条记在 this.flushLog 里；
    *      「验收项目本身播不出来」这类事故只能从这儿看出来，画面上是静默的。
@@ -696,10 +695,10 @@ export class StoryDirector {
    * 关中钉住（mechanics.pinFinalZone）的那一段与这条无关 —— 钉着的时候
    * AdvanceLevel 根本不会被调到，尾巴上那几十条会在关内按 delay 链正常播完。
    */
-  FlushTail(limit = 4) {
+  FlushTail(limit = PACING.flushLimit) {
     let n = 0;
     let scanned = 0;
-    const scanLimit = Math.max(limit, limit * 8);
+    const scanLimit = Math.max(limit, limit * PACING.flushScanFactor);
     const played = [];
     const dropped = [];
     while (this.index < this.queue.length && n < limit && scanned < scanLimit) {
@@ -727,58 +726,62 @@ export class StoryDirector {
    * 两个时间是两件事，不能混：
    *   · 字幕停留 —— 读得完就行，有自己的下限；
    *   · 话筒占用（sinceLast）—— 说完之前不放行下一条，否则长句会被下一句打断。
-   * 没有语音时这个函数与改造前逐字等价（默认时长、MIN_GAP 照旧）。
+   * 没有语音时这个函数与改造前逐字等价（默认时长、PACING.minGapS 照旧）。
    */
   _Speech(speaker, beat, seconds, variant = "") {
     const subtitleOnly = this.actualEventsOnly && beat.p012SubtitleOnly === true;
     const dur = subtitleOnly ? 0 : this._Speak(beat);
     const silentSeconds = this.actualEventsOnly && beat.p012SubtitleSeconds || seconds;
-    const shown = dur > 0 ? Math.min(SUBTITLE_MAX, Math.max(seconds, dur + SUBTITLE_TAIL)) : silentSeconds;
-    this.hud.Say(speaker, beat.text, shown, variant);
+    const shown = dur > 0 ? Math.min(SUBTITLE.maxS, Math.max(seconds, dur + SUBTITLE.tailS)) : silentSeconds;
+    // 显示那一刻才换译文（原稿仍在章节数据里）。字幕是事件驱动的，不在每帧热路径上。
+    const text = Localize(beat.textId, beat.text);
+    this.hud.Say(speaker, text, shown, variant);
     this.p012SubtitleActiveUntil = subtitleOnly ? this.levelTime + shown : 0;
     // sinceLast 是**倒扣**的：置成负数就等于让下一条多等这么久
-    //（Update 里的闸是 sinceLast < MIN_GAP 就不放行）。
-    const hold = dur > 0 ? Math.min(VOICE_HOLD_MAX, dur + VOICE_HOLD_TAIL) : 0;
-    this.sinceLast = hold > MIN_GAP ? MIN_GAP - hold : 0;
-    if (subtitleOnly) this.sinceLast = MIN_GAP - shown;
+    //（Update 里的闸是 sinceLast < PACING.minGapS 就不放行）。
+    const hold = dur > 0 ? Math.min(VOICE_HOLD.maxS, dur + VOICE_HOLD.tailS) : 0;
+    this.sinceLast = hold > PACING.minGapS ? PACING.minGapS - hold : 0;
+    if (subtitleOnly) this.sinceLast = PACING.minGapS - shown;
     if (this.actualEventsOnly && beat.p012CompleteSignal) {
       const remaining = dur > 0 ? dur : shown;
+      // 存已经本地化过的那一句：倒带恢复时补字幕，两次显示必须是同一行字。
       this.p012PendingCompletion = { signal: beat.p012CompleteSignal, key: beat.voice,
-        remaining, speaker, text: beat.text };
-      this.sinceLast = Math.min(this.sinceLast, MIN_GAP - remaining);
+        remaining, speaker, text };
+      this.sinceLast = Math.min(this.sinceLast, PACING.minGapS - remaining);
     }
     return dur;
   }
 
   Play(beat, byTimeout) {
     const who = beat.who ? CAST[beat.who] : null;
-    const speaker = who ? (who.short || who.name) : null;
+    // 说话人名字也是文本：CAST 里的 short/name 是原稿，显示时按 cast.<who>.short 换译文。
+    const speaker = who ? Localize(CastNameId(beat.who), who.short || who.name) : null;
     switch (beat.type) {
       case "title":
-        this.hud.Title(beat.text, beat.sub || "");
+        this.hud.Title(Localize(beat.textId, beat.text), Localize(BeatSubId(beat.textId), beat.sub || ""));
         this.sinceLast = 0;
         break;
       case "line":
-        this._Speech(speaker, beat, 4.2);
+        this._Speech(speaker, beat, BEAT_SECONDS.line);
         break;
       case "shout": {
-        const spoken = this._Speech(speaker, beat, 3.4, "shout");
+        const spoken = this._Speech(speaker, beat, BEAT_SECONDS.shout, "shout");
         // 哨子是「没有配音时的喊话替身」。真有人声了还叠一声哨，
         // 等于在台词上盖一层噪音 —— 有语音就不吹。
-        if (this.audio && !spoken) this.audio.Play("whistle", { volume: 0.35 });
+        if (this.audio && !spoken) this.audio.Play("whistle", { volume: WHISTLE.volume });
         break;
       }
       case "narration":
-        this._Speech(null, beat, 4.8);
+        this._Speech(null, beat, BEAT_SECONDS.narration);
         break;
       // env：环境描写。没有说话的人，语气也不是旁白点评，走同一条字幕但更长一点
       case "env":
-        this._Speech(null, beat, 5.4);
+        this._Speech(null, beat, BEAT_SECONDS.env);
         break;
       // system：机制播报（「城里还站着的人 ＋132」「弹药：无。」）。
       // 走字幕而不是 Hint —— 这几条是**剧本里的一句**，通关冒烟要在 spoken 里找到它。
       case "system":
-        this.hud.Say(null, beat.text, 3.6, "system");
+        this.hud.Say(null, Localize(beat.textId, beat.text), BEAT_SECONDS.system, "system");
         this.sinceLast = 0;
         break;
       // 临时关掉：剧情层级的底部一次性提示（"主武器是手榴弹。子弹要省，命更要省"等
@@ -786,10 +789,10 @@ export class StoryDirector {
       // （按 R 压弹 / 没有手榴弹了 等）走 hud.Hint 另一条调用，保留显示；这里只
       // 抑制剧本教学提示，画面太满。fired 仍照常记录，PlayTest 不会受影响。
       case "hint":
-        // this.hud.Hint(beat.text, 5.5);
+        // this.hud.Hint(Localize(beat.textId, beat.text), BEAT_SECONDS.hint);
         break;
       case "objective":
-        this.objectiveText = beat.text;
+        this.objectiveText = Localize(beat.textId, beat.text);
         break;
       // cutscene：**关中**过场。`{ at, type:"cutscene", id:"CS_x" }`。
       // 派发到它时请求宿主播那一场 —— 宿主负责夺控制权、掐战斗输入、播完还回来；

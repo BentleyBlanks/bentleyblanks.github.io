@@ -6,6 +6,8 @@ import * as THREE from "three";
 import { RangeField } from "./Script_RangeField.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { MakeBox, PlaceGeometry } from "./Script_Geo.mjs";
+import { T, Localize } from "./Script_Text.mjs";
+import { WeaponNameId } from "./Script_TextIds.mjs";
 import {
   WEAPON_RANGE_LEVEL_ID, WEAPON_RANGE_WORLD, WEAPON_RANGE_CAMERA_FAR,
   WEAPON_RANGE_STATIONS, WEAPON_RANGE_FIRING_ORIGIN, WEAPON_RANGE_TABLE,
@@ -18,12 +20,14 @@ const PALETTE = Object.freeze({ Floor: 0xaeb6bd, White: 0xd1d7db, Table: 0x77838
 /** Stable sign manifest doubles as a pure inspectable accessibility contract. */
 export function WeaponRangeSigns() {
   return [
-    { id: "WeaponRangeWelcome", text: "枪械白盒靶场", subtext: "长桌 F 领取 · 无限弹药" },
-    { id: "WeaponRangeMeasure", text: "蓝点测距 / METRES", subtext: "静靶左 · 动靶右 · 10—200 米" },
+    { id: "WeaponRangeWelcome", text: T("range.weapon.signWelcome"), subtext: T("range.weapon.signWelcomeSub") },
+    { id: "WeaponRangeMeasure", text: T("range.weapon.signMeasure"), subtext: T("range.weapon.signMeasureSub") },
     ...WEAPON_RANGE_WEAPONS.map(slot => ({ id: `WeaponRangeGun${slot.slot}`,
-      text: `${String(slot.slot + 1).padStart(2, "0")}  ${slot.name}`, subtext: "F 领取  /  无限弹药" })),
+      text: `${String(slot.slot + 1).padStart(2, "0")}  ${Localize(WeaponNameId(slot.weaponId), slot.name)}`, subtext: T("range.weapon.signSlotSub") })),
     ...WEAPON_RANGE_TARGETS.map(target => ({ id: target.id,
-      text: `${target.distanceM} m`, subtext: target.moving ? `${target.id}  移动靶` : `${target.id}  静止靶` })),
+      text: `${target.distanceM} m`,
+      subtext: target.moving ? T("range.weapon.signTargetMoving", { id: target.id })
+        : T("range.weapon.signTargetStatic", { id: target.id }) })),
   ];
 }
 
@@ -163,11 +167,11 @@ export class WeaponRangeField extends RangeField {
   }
 
   *BuildSteps() {
-    yield { label: "枪械白盒：长桌与测距靶道", progress: 0.3 };
+    yield { label: T("range.build.weaponWhitebox"), progress: 0.3 };
     this.BuildWhitebox();
-    yield { label: "枪械白盒：碰撞与标识", progress: 0.85 };
+    yield { label: T("range.build.weaponCollision"), progress: 0.85 };
     this.BuildCollisionGrid();
-    yield { label: "就绪", progress: 1 };
+    yield { label: T("range.build.ready"), progress: 1 };
   }
 
   CheckSightCorridor() { return { ok: true, blockers: [], scene: "weaponRange", applies: false }; }

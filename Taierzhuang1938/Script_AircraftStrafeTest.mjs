@@ -24,6 +24,7 @@ import assert from "node:assert/strict";
 import {
   AircraftStrafeDirector, STRAFE_PRESETS, STRAFE_DEFAULTS, STRAFE_SFX, STRAFE_PHASES, STRAFE_BEATS,
 } from "./Script_AircraftStrafe.mjs";
+import { T, HasText } from "./Script_Text.mjs";
 import { EVENTS } from "./Data_MissionCh1.mjs";
 import P012Phase from "./Data_FirstLevelP012Whitebox.mjs";
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
@@ -133,7 +134,9 @@ function BasicSpec(over = {}) {
   Check(ids.length === 4, "四条预设：CH1 阶段五 / 六 / 八，外加 CH2 那条只有飞越声的");
   for (const [key, preset] of Object.entries(P)) {
     Check(preset.id === key, `${key} 的 id 字段与键一致`);
-    Check(typeof preset.label === "string" && preset.label.length > 0, `${key} 有中文标签`);
+    // 标签存文本键，句子在 Data_Text_Gameplay（期望值从表里取，不抄句子）。
+    Check(typeof preset.labelKey === "string" && HasText(preset.labelKey)
+      && T(preset.labelKey).length > 0, `${key} 有中文标签`);
     Check(preset.speed > 0 && preset.altitudeM > 0, `${key} 的速度与高度是正数`);
     // 不开枪的那条没有「弹着超前」这回事，其余三条必须是正的（弹着在机身前方）。
     if (preset.guns === false) Check(preset.leadM === 0, `${key} 不开枪，超前量归零`);
@@ -162,7 +165,7 @@ function BasicSpec(over = {}) {
   Check(STRAFE_PRESETS.crowdTurn.damage.npc === "whitelist", "crowdTurn 只打点名的人");
   Check(STRAFE_PRESETS.crowdTurn.chase === true, "crowdTurn 的弹线追人群");
   Check(STRAFE_PRESETS.divePress.damage.player === true, "divePress 打得到玩家");
-  Check(STRAFE_PRESETS.divePress.cueText === "扑入路沟", "divePress 的提示逐字照策划案");
+  Check(T(STRAFE_PRESETS.divePress.cueTextKey) === "扑入路沟", "divePress 的提示逐字照策划案");
   Check(STRAFE_PRESETS.flybyOnly.guns === false, "flybyOnly 一发不打（二关只要飞越音）");
   Check(P.railPass.guns !== false && P.crowdTurn.guns !== false && P.divePress.guns !== false,
     "另外三条是真开枪的");

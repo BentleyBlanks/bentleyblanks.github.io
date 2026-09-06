@@ -5,6 +5,7 @@ import { BuildSink } from "./Script_World.mjs";
 import { MakeBox, PlaceGeometry } from "./Script_Geo.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { PlayerMovementReference } from "./Script_Player.mjs";
+import { T } from "./Script_Text.mjs";
 import { MOVEMENT_RANGE_ID, MOVEMENT_RANGE_WORLD, MOVEMENT_RANGE_STATIONS,
   MOVEMENT_FIXTURES, MOVEMENT_RUNWAY } from "./Data_MovementRange.mjs";
 
@@ -14,27 +15,32 @@ const Metres = value => value.toFixed(2) + ' m';
 export function MovementRangeSigns() {
   const ref = PlayerMovementReference();
   return [
-    { id: 'Welcome', text: '操作交互测试场', sub: '单位 m · Home 复位 · PgUp / PgDn 切区' },
+    { id: 'Welcome', text: T('range.movement.signWelcome'), sub: T('range.movement.signWelcomeSub') },
+    // 工位牌的抬头用工位表里的 name（Data_MovementRange），副标题按工位 id 挑一句。
     ...MOVEMENT_RANGE_STATIONS.map(s => ({ id: s.id, text: s.name,
-      sub: s.id === 'RunJump' ? 'Shift + W 助跑 → Space 起跳' : s.id === 'Vault' ? '贴近后 Space · 橙翻越 / 紫攀爬 / 红超限'
-        : s.id === 'Jump' ? '提前起跳测障碍 · 贴近 Space 会优先翻越'
-          : s.id === 'Crouch' ? 'C 蹲起 · W / A / S / D · 低顶下切姿态'
-            : 'Z 趴下 · W / A / S / D · Shift 快速匍匐' })),
+      sub: s.id === 'RunJump' ? T('range.movement.signRunJump') : s.id === 'Vault' ? T('range.movement.signVault')
+        : s.id === 'Jump' ? T('range.movement.signJump')
+          : s.id === 'Crouch' ? T('range.movement.signCrouch')
+            : T('range.movement.signProne') })),
     ...MOVEMENT_FIXTURES.map(f => ({ id: f.id,
-      text: (f.kind === 'tunnel' ? '净空 ' + Metres(f.clearance) : '高度 ' + Metres(f.h)),
-      sub: f.kind === 'tunnel' ? '长 7 m · 入内 / 起身 / 退回' :
-        f.h > TRAVERSAL.mantleMax ? '超过攀爬上限 · 阻挡对照' :
-        f.h === TRAVERSAL.mantleMax ? '攀爬最高档' :
-        f.h === TRAVERSAL.vaultMax ? '翻越最高档' :
-        f.h <= TRAVERSAL.stepMax ? '可自动跨步 · 不能当跳跃成绩' : '以实测动作类型判定' })),
-    { id: 'JumpReference', text: '空地跃起理论参考', sub: '原地 ' + Metres(ref.standingRiseM) + ' / 满助跑 ' + Metres(ref.runningRiseM) },
-    { id: 'JumpLimit', text: '跳跃设计上限 ' + Metres(TRAVERSAL.jumpRiseMax), sub: '红线为参数限值 · 实际峰值看记录' },
-    { id: 'VaultReference', text: '翻越 ' + Metres(TRAVERSAL.vaultMax) + ' / 攀爬 ' + Metres(TRAVERSAL.mantleMax),
-      sub: '水平位移：翻越 ' + Metres(TRAVERSAL.vaultReachM) + ' / 攀爬 ' + Metres(TRAVERSAL.mantleReachM) },
-    { id: 'RunZero', text: '0 m · 起跳参考线', sub: '成绩按真实起跳 → 落地点计算' },
-    { id: 'RunBest', text: '会话最远跑跳', sub: '黄线 = 从 0 m 投影的实测最佳距离' },
+      text: f.kind === 'tunnel' ? T('range.movement.signClearance', { value: Metres(f.clearance) })
+        : T('range.movement.signHeight', { value: Metres(f.h) }),
+      sub: f.kind === 'tunnel' ? T('range.movement.signTunnel') :
+        f.h > TRAVERSAL.mantleMax ? T('range.movement.signOverLimit') :
+        f.h === TRAVERSAL.mantleMax ? T('range.movement.signMantleTop') :
+        f.h === TRAVERSAL.vaultMax ? T('range.movement.signVaultTop') :
+        f.h <= TRAVERSAL.stepMax ? T('range.movement.signStep') : T('range.movement.signMeasured') })),
+    { id: 'JumpReference', text: T('range.movement.signJumpRef'),
+      sub: T('range.movement.signJumpRefSub', { standing: Metres(ref.standingRiseM), running: Metres(ref.runningRiseM) }) },
+    { id: 'JumpLimit', text: T('range.movement.signJumpLimit', { value: Metres(TRAVERSAL.jumpRiseMax) }),
+      sub: T('range.movement.signJumpLimitSub') },
+    { id: 'VaultReference',
+      text: T('range.movement.signVaultRef', { vault: Metres(TRAVERSAL.vaultMax), mantle: Metres(TRAVERSAL.mantleMax) }),
+      sub: T('range.movement.signVaultRefSub', { vault: Metres(TRAVERSAL.vaultReachM), mantle: Metres(TRAVERSAL.mantleReachM) }) },
+    { id: 'RunZero', text: T('range.movement.signRunZero'), sub: T('range.movement.signRunZeroSub') },
+    { id: 'RunBest', text: T('range.movement.signRunBest'), sub: T('range.movement.signRunBestSub') },
     ...Array.from({ length: 17 }, (_, i) => ({ id: 'Distance' + i, text: Metres(i / 2), sub: '' })),
-    ...Array.from({ length: 7 }, (_, i) => ({ id: 'Height' + i, text: Metres(i / 2), sub: '脚底基准 0 m' })),
+    ...Array.from({ length: 7 }, (_, i) => ({ id: 'Height' + i, text: Metres(i / 2), sub: T('range.movement.signHeightSub') })),
   ];
 }
 function MakeAtlas(signs) {
@@ -79,7 +85,7 @@ export class MovementRangeField extends RangeField {
     }
   }
   *BuildSteps() {
-    yield { label: '操作白盒：五区工位与标尺', progress: 0.3 };
+    yield { label: T('range.build.movementFixtures'), progress: 0.3 };
     const sink = new BuildSink(), b = this.bounds, r = MOVEMENT_RUNWAY;
     this.atlas = MakeAtlas(this.signManifest);
     this.materials.set('Signs', new THREE.MeshBasicMaterial({ name: 'MovementRangeSigns', map: this.atlas.texture, side: THREE.DoubleSide, toneMapped: false }));
@@ -138,7 +144,7 @@ export class MovementRangeField extends RangeField {
       this.meshes.push(mesh);
     }
     this.colliders = sink.colliders; this.BuildCollisionGrid();
-    yield { label: '操作白盒：物理与测量就绪', progress: 1 };
+    yield { label: T('range.build.movementReady'), progress: 1 };
   }
   Dispose() {
     super.Dispose(); for (const m of this.materials.values()) m.dispose(); this.materials.clear(); this.atlas?.texture.dispose();

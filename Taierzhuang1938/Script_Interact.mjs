@@ -27,25 +27,15 @@
 // 因为槽位与弹仓的账在 Script_Main 手里（state.slots / state.mags）。
 
 import { WEAPONS } from "./Data_Weapons.mjs";
+import { T, Localize } from "./Script_Text.mjs";
+import { WeaponNameId } from "./Script_TextIds.mjs";
+/** 武器名是 Data_Weapons 的内容原稿：显示前按 id 找译文；没有这把枪返回空串。 */
+const WeaponName = (weaponId) => (WEAPONS[weaponId]?.name ? Localize(WeaponNameId(weaponId), WEAPONS[weaponId].name) : "");
+import { INTERACT } from "./Data_Tuning_Interact.mjs";
 
-/**
- * 判据常数。数值只在这里；文档写常量名不抄数（AGENTS 硬规矩 12）。
- *
- * corpseReachM / mateReachM 比 ER2 短一点 —— 巷战里两米开外的东西本来就不该「顺手」拿到。
- * facingDot 是「大致朝着它」：0.20 约等于 ±78°，比准心宽得多；
- * 交互不是射击，不该要求玩家对准。
- */
-export const INTERACT = {
-  corpseReachM: 2.0,
-  mateReachM: 2.5,
-  pointReachM: 2.2,
-  pointHeightM: 3.0,
-  facingDot: 0.20,
-  /** hold 型松手之后进度每秒退多少（按占总时长的比例算）。 */
-  holdDecayPerS: 1.4,
-  /** 注册点默认优先级：比内建的拾枪（0）高，同样距离下先提示「止血」而不是「捡枪」。 */
-  pointPriority: 10,
-};
+// 判据与节奏数在 `Data_Tuning_Interact.INTERACT`；这里 re-export，
+// 老调用点与测试（断言从表里取期望值，不抄数）一行不改。
+export { INTERACT };
 
 const Clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
 const GESTURES = new Set(["tap", "hold", "confirm"]);
@@ -114,7 +104,7 @@ export class InteractSystem {
       id,
       gesture,
       kind: spec.kind || "interact",
-      seconds: Math.max(0.05, Number(spec.seconds ?? 1.2)),
+      seconds: Math.max(INTERACT.minSeconds, Number(spec.seconds ?? INTERACT.defaultSeconds)),
       reachM: Number(spec.reachM ?? INTERACT.pointReachM),
       heightM: Number(spec.heightM ?? INTERACT.pointHeightM),
       facingDot: spec.facingDot === null ? null : Number(spec.facingDot ?? INTERACT.facingDot),
@@ -217,25 +207,30 @@ export class InteractSystem {
       if (!s.alive) {
         // 尸体：身上有没有还没被拿走的东西
         if (!s.drop || s.drop.taken || d > INTERACT.corpseReachM) continue;
-        const name = WEAPONS[s.drop.weaponId]?.name || "枪";
+        const name = WeaponName(s.drop.weaponId) || T("interact.pickup.unknownWeapon");
         // HasPrimary 是早期测试/嵌入方的兼容口；主程序提供 HasWeapon，
         // 才能让大刀按 3 号槽而不是拿长枪槽判断“拾起/换上”。
         const hasWeapon = this.hooks.HasWeapon
           ? this.hooks.HasWeapon(s.drop.weaponId) : this.hooks.HasPrimary?.();
-        const verb = hasWeapon ? "换上" : "拾起";
+        // 「拾起 / 换上」是两句不同的话，各有各的键 —— 不在这里拼动词。
+        const label = hasWeapon
+          ? T("interact.pickup.swap", { name })
+          : T("interact.pickup.take", { name });
         Consider({
-          kind: "pickup", soldier: s, label: `${verb} ${name}`, dist: d,
-          priority: 0, gesture: "tap", seconds: 0,
+          kind: "pickup", soldier: s, label, dist: d,
+          priority: INTERACT.builtinPriority, gesture: "tap", seconds: 0,
         });
         continue;
       }
       // 活着的自己人：弹打光了就分一个桥夹过去
       if (s.side !== "nra" || d > INTERACT.mateReachM) continue;
       if (s.ammo > 0) continue;
-      if ((this.hooks.SpareClips?.() ?? 0) < 2) continue;    // 自己只剩一个就不给了
+      // 自己只剩一个就不给了
+      if ((this.hooks.SpareClips?.() ?? 0) < INTERACT.spareClipsMin) continue;
       Consider({
-        kind: "ammo", soldier: s, label: `分一个桥夹给 ${s.identity.name}`, dist: d,
-        priority: 0, gesture: "tap", seconds: 0,
+        kind: "ammo", soldier: s, dist: d,
+        label: T("interact.ammo.give", { name: s.identity.name }),
+        priority: INTERACT.builtinPriority, gesture: "tap", seconds: 0,
       });
     }
     return best;
@@ -292,7 +287,7 @@ export class InteractSystem {
    * 玩家走开一步进度就该断（不是走开之后还在后台读条）。
    */
   Update(dt, player) {
-    const step = Math.max(0, Math.min(0.1, Number(dt) || 0));
+    const step = Math.max(0, Math.min(INTERACT.maxStepS, Number(dt) || 0));
     for (const point of this.points.values()) {
       if (point.cooldownLeft > 0) point.cooldownLeft = Math.max(0, point.cooldownLeft - step);
     }
@@ -336,13 +331,15 @@ export class InteractSystem {
       const w = WEAPONS[drop.weaponId];
       this.ctx?.audio?.Play("magIn", { volume: 0.6 });
       if (w?.kind === "melee") {
-        this.ctx?.hud?.Hint(`拾起${w.name}，放进 3 号近战槽`, 2.8);
+        this.ctx?.hud?.Hint(T("interact.pickup.melee", { name: WeaponName(drop.weaponId) }),
+          INTERACT.pickupMeleeHintS);
         return true;
       }
       // 缴获日械只有枪里那五发 —— 这句提示是这条规则唯一的说明书，别删
+      const name = WeaponName(drop.weaponId) || T("interact.pickup.unknownWeapon");
       this.ctx?.hud?.Hint(drop.clips > 0
-        ? `捡了一支${w?.name || "枪"}，还有 ${drop.clips} 个桥夹`
-        : `捡了一支${w?.name || "枪"} —— 只有枪里这几发，我们没有这个口径`, 3.2);
+        ? T("interact.pickup.withClips", { name, clips: drop.clips })
+        : T("interact.pickup.noClips", { name }), INTERACT.pickupClipsHintS);
       return true;
     }
     if (candidate.kind === "ammo") {
@@ -350,7 +347,7 @@ export class InteractSystem {
       candidate.soldier.ammo = candidate.soldier.weapon.magazine || 5;
       this.handouts += 1;
       this.ctx?.audio?.Play("stripperLoad", { volume: 0.55 });
-      this.ctx?.hud?.Say(candidate.soldier.identity.name, "接着！", 2.0);
+      this.ctx?.hud?.Say(candidate.soldier.identity.name, T("interact.ammo.thanks"), INTERACT.ammoSayS);
       return true;
     }
     const point = candidate.point;
@@ -361,7 +358,7 @@ export class InteractSystem {
     point.count += 1;
     this.completions += 1;
     if (point.sound) this.ctx?.audio?.Play(point.sound, { volume: point.soundVolume ?? 0.6 });
-    if (point.hint) this.ctx?.hud?.Hint(point.hint, point.hintSeconds ?? 2.6);
+    if (point.hint) this.ctx?.hud?.Hint(point.hint, point.hintSeconds ?? INTERACT.hintSeconds);
     if (point.once) this.points.delete(point.id);
     else point.cooldownLeft = point.cooldownS;
     return true;
@@ -407,7 +404,7 @@ export class InteractSystem {
     const label = candidate ? candidate.label : null;
     if (label === this.lastLabel) return candidate;
     this.lastLabel = label;
-    if (label) this.ctx?.hud?.Hint(`F — ${label}`, 1.6);
+    if (label) this.ctx?.hud?.Hint(T("interact.prompt.press", { label }), INTERACT.promptSeconds);
     return candidate;
   }
 }
@@ -468,26 +465,26 @@ export class InteractSystem {
 
 /** 按住伤口止血（三关大出血、四关罗班长腹部中弹）。手抖一下不清零，所以是 hold。 */
 export function BleedControlInteraction({
-  id, position, Anchor, seconds = 3.0, label = "按住出血口", tag = null,
+  id, position, Anchor, seconds = 3.0, label = T("interact.bleed.label"), tag = null,
   OnComplete, OnProgress, once = true, payload = null,
 } = {}) {
   return {
     id, position, Anchor, tag, payload, once,
     kind: "bandage", gesture: "hold", seconds, label,
-    hint: "先压住出血。", sound: "stripperLoad",
+    hint: T("interact.bleed.hint"), sound: "stripperLoad",
     OnProgress, OnComplete,
   };
 }
 
 /** 递纱布 / 交药品：手上有就递过去，没有就整条不出现（不给灰提示）。 */
 export function GiveSupplyInteraction({
-  id, position, Anchor, item = "纱布", label, tag = null,
+  id, position, Anchor, item = T("interact.supply.gauze"), label, tag = null,
   Has, OnComplete, once = true, payload = null,
 } = {}) {
   return {
     id, position, Anchor, tag, payload, once,
     kind: "supply", gesture: "tap", seconds: 0,
-    label: label ?? `递${item}`,
+    label: label ?? T("interact.supply.give", { item }),
     Enabled: Has ? (ctx) => !!Has(ctx) : undefined,
     sound: "magIn", OnComplete,
   };
@@ -498,7 +495,7 @@ export function GiveSupplyInteraction({
  * 「没得脉了」是固定演出）。这里只负责把「玩家真的蹲下来看了一眼」这件事报上去。
  */
 export function CheckWoundedInteraction({
-  id, position, Anchor, seconds = 1.1, label = "查看伤员", tag = null,
+  id, position, Anchor, seconds = 1.1, label = T("interact.check.label"), tag = null,
   OnComplete, once = true, payload = null,
 } = {}) {
   return {
@@ -514,13 +511,13 @@ export function CheckWoundedInteraction({
  * 引擎只保证「拆」这个动作真的发生过一次。
  */
 export function DoorPlankInteraction({
-  id, position, Anchor, seconds = 1.8, label = "拆下门板做担架", tag = null,
+  id, position, Anchor, seconds = 1.8, label = T("interact.plank.label"), tag = null,
   RemovePlank, SpawnStretcher, OnComplete, once = true, payload = null,
 } = {}) {
   return {
     id, position, Anchor, tag, payload, once,
     kind: "plank", gesture: "hold", seconds, label,
-    hint: "门板拆下来了 —— 当担架使。", sound: "impactWood",
+    hint: T("interact.plank.hint"), sound: "impactWood",
     OnComplete: (ctx) => {
       // 顺序是固定的：先摘门板再放担架，反过来会有一帧两件东西叠在同一个位置。
       const removed = RemovePlank ? RemovePlank(ctx) : true;
@@ -539,7 +536,7 @@ export function DoorPlankInteraction({
  */
 export function WireInteractions({
   id = "wire", a, b, seconds = 1.6, tag = null,
-  labelA = "接上这一头", labelB = "接上另一头", OnJoin, once = true,
+  labelA = T("interact.wire.joinA"), labelB = T("interact.wire.joinB"), OnJoin, once = true,
 } = {}) {
   const link = { a: false, b: false };
   const Make = (side, spot, label) => ({
@@ -559,19 +556,19 @@ export function WireInteractions({
 
 /** 剪断收不回来的线路（三关撤退时小秦那一剪）。不可逆 → confirm。 */
 export function CutWireInteraction({
-  id, position, Anchor, seconds = 1.4, label = "剪断线路", tag = null,
+  id, position, Anchor, seconds = 1.4, label = T("interact.wire.cut"), tag = null,
   OnComplete, once = true, payload = null,
 } = {}) {
   return {
     id, position, Anchor, tag, payload, once,
     kind: "wire", gesture: "confirm", seconds, label,
-    hint: "这一段收不回来了。", OnComplete,
+    hint: T("interact.wire.cutHint"), OnComplete,
   };
 }
 
 /** 拾一张「放下武器，可保生命」的传单。 */
 export function LeafletPickupInteraction({
-  id, position, Anchor, label = "拾起传单", tag = null,
+  id, position, Anchor, label = T("interact.leaflet.pick"), tag = null,
   OnComplete, once = true, payload = null,
 } = {}) {
   return {
@@ -586,7 +583,7 @@ export function LeafletPickupInteraction({
  * 手上没有传单时整条不出现；点燃哪一处火由 IgniteSource 回调决定。
  */
 export function LeafletBurnInteraction({
-  id, position, Anchor, label = "把传单投进火里", tag = null,
+  id, position, Anchor, label = T("interact.leaflet.burn"), tag = null,
   HasLeaflet, IgniteSource, OnComplete, once = true, payload = null,
 } = {}) {
   return {
@@ -609,7 +606,7 @@ export function LeafletBurnInteraction({
  */
 export function TearShirtInteraction({
   id = "tearShirt", position, Anchor, seconds = 2.2, tag = null,
-  label = "撕开背包里那件短褂", ConsumeShirt, OnComplete, once = true,
+  label = T("interact.tear.shirt"), ConsumeShirt, OnComplete, once = true,
 } = {}) {
   return {
     id, position, Anchor, tag, once,
@@ -634,7 +631,8 @@ export function PickUpLoadInteraction({
   return {
     id, position, Anchor, tag, once,
     kind: "carry", gesture, seconds,
-    label: label ?? `抬起${kindId === "stretcher" ? "担架" : "东西"}`,
+    label: label ?? (kindId === "stretcher"
+      ? T("interact.carry.liftStretcher") : T("interact.carry.liftThing")),
     // 手上已经占着的时候整条不出现 —— 不给一个按了没反应的提示。
     Enabled: () => !carry || !carry.Active,
     OnComplete: (ctx) => {

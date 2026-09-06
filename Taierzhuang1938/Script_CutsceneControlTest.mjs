@@ -6,6 +6,15 @@ import { CS_Chuchuan } from "./Data_CutsceneChuchuan.mjs";
 // 序章的每一句台词都要在总表里认得出来 —— 写错一个 voiceCue 的后果是静默降级成
 // 纯字幕（画面照跑、控制台干净、通关冒烟全绿），只有对着表逐条查才看得见。
 import { VOICE_LINES } from "./Data_Voice.mjs";
+// 类体是被 new Function 单独切出来跑的（见下面那段），模块作用域里的东西一个都看不见。
+// 文本层与 id 口径因此必须像 THREE / ValidateCutscene 一样**显式注入**，
+// 用的是与浏览器里同一份实现 —— 注入桩会让「译文没生效」这类事故测不出来。
+import { T, Localize } from "./Script_Text.mjs";
+import {
+  ShotTextId, CutsceneTitleId, CardTitleId, CardTextId, TallyRowId, TallyClosingId,
+  NoteTextId, CastNameId,
+} from "./Script_TextIds.mjs";
+import { TEXT_HOLD, CARD, LOOK } from "./Data_Tuning_Cutscene.mjs";
 
 const cut = {
   id: "TEST_HeadLook", title: "test", seconds: 1,
@@ -59,9 +68,13 @@ const FakeThree = {
 const directorSource = fs.readFileSync(new URL("./Script_Cutscene.mjs", import.meta.url), "utf8");
 const classSource = directorSource.slice(directorSource.indexOf("export class CutsceneDirector"), directorSource.indexOf("export default CutsceneDirector"))
   .replace("export class CutsceneDirector", "class CutsceneDirector");
-const Director = new Function("THREE", "MarkNoPrepass", "HashString", "ValueNoise2", "Clamp", "Clamp01", "Lerp", "FovFromFocalMm", "Ease", "ResolveHeadLookConfig", "ClampHeadLook", "ValidateCutscene", `${classSource}; return CutsceneDirector;`)(
+const Director = new Function("THREE", "MarkNoPrepass", "HashString", "ValueNoise2", "Clamp", "Clamp01", "Lerp", "FovFromFocalMm", "Ease", "ResolveHeadLookConfig", "ClampHeadLook", "ValidateCutscene",
+  "T", "Localize", "ShotTextId", "CutsceneTitleId", "CardTitleId", "CardTextId", "TallyRowId", "TallyClosingId", "NoteTextId", "CastNameId",
+  "TEXT_HOLD", "CARD", "LOOK", `${classSource}; return CutsceneDirector;`)(
   FakeThree, () => {}, () => 1, () => 0.5, (x, low, high) => Math.max(low, Math.min(high, x)), (x) => Math.max(0, Math.min(1, x)), (a, b, t) => a + (b - a) * t,
   (f) => 27, () => 0.5, ResolveHeadLookConfig, ClampHeadLook, () => [],
+  T, Localize, ShotTextId, CutsceneTitleId, CardTitleId, CardTextId, TallyRowId, TallyClosingId, NoteTextId, CastNameId,
+  TEXT_HOLD, CARD, LOOK,
 );
 class FakeCamera {
   constructor() { this.position = new Vec3(0, 1, 4); this.quaternion = new Quat(); this.rotation = new Euler(); this.fov = 60; this.near = 0.03; this.far = 100; this._yaw = 0; this._pitch = 0; }

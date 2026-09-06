@@ -12,8 +12,9 @@
 //   · Script_BootPropWorker.mjs  worker 里跑（默认，主线程建关卡它照转不误）
 //   · Script_BootProp.mjs        主线程里跑（worker 或 OffscreenCanvas 不可用时的退路）
 //
-// 独立性：**只依赖 three + Script_MeshLoad + Data_Meshes**，与主渲染器、材质库、
-// 后处理完全无关 —— 它要在主场景还没建起来的时候就转，那时候 MaterialLibrary 还不存在。
+// 独立性：**只依赖 three + Script_MeshLoad + Data_Meshes + Script_Text**（最后一个是
+// 纯数据的字符串表，没有任何运行时依赖），与主渲染器、材质库、后处理完全无关 ——
+// 它要在主场景还没建起来的时候就转，那时候 MaterialLibrary 还不存在。
 // 材质因此在这里现造（Script_MeshLoad 头注第 2 条禁的是往游戏场景里造默认材质，
 // 那是为了别让 SSAO 注入落空；这台离屏展示台没有预通道，不受那条约束）。
 //
@@ -30,19 +31,26 @@ import { MESHES, MeshUrl } from "./Data_Meshes.mjs";
  * 展示池。**故意不放士兵**：TZM 里的人是静止的绑定姿势（两臂平举），
  * 单独摆出来像具人体模型，与这个游戏对人的态度不合。枪、道具、车都是静物，
  * 摆出来就是它本来的样子。只展示战斗装备，不混入屋脊、门窗等建筑饰件。
+ *
+ * 只存 id：卡片上写的那个名字在 Data_Text_Boot 的 `boot.showcase.<id>` 里，
+ * 由**主线程**的 Script_BootProp.ShowcaseName 现取（换语言即时生效）。
+ * 这个文件会被 Script_BootPropWorker 在 Worker 里直接按源模块加载（不走打包产物），
+ * 所以它**不许 import Script_Text**——那会把整棵语言表拖成十几个额外请求
+ * （Script_BrowserBundleTest 的「启动脚本请求 ≤ 20」就是为这个设的）。
+ * id 与 Data_Meshes 的模型键一一对应。
  */
 const SHOWCASE = [
-  { id: "HanYang", name: "汉阳造 八八式步枪" },
-  { id: "ZhongZheng", name: "中正式 步骑枪" },
-  { id: "Zb26", name: "ZB-26 轻机枪" },
-  { id: "Type38", name: "三八式 步枪" },
-  { id: "ServicePistol", name: "外购九毫米 军用手枪" },
-  { id: "Grenade", name: "木柄手榴弹" },
-  { id: "Dadao", name: "大刀" },
-  { id: "Type89Launcher", name: "八九式 重掷弹筒" },
-  { id: "Type95HaGo", name: "九五式 轻战车 Ha-Go" },
-  { id: "Type97ChiHa", name: "九七式 中战车 Chi-Ha" },
-  { id: "Type89Tank", name: "八九式 中战车" },
+  { id: "HanYang" },
+  { id: "ZhongZheng" },
+  { id: "Zb26" },
+  { id: "Type38" },
+  { id: "ServicePistol" },
+  { id: "Grenade" },
+  { id: "Dadao" },
+  { id: "Type89Launcher" },
+  { id: "Type95HaGo" },
+  { id: "Type97ChiHa" },
+  { id: "Type89Tank" },
 ];
 
 /**
@@ -252,7 +260,7 @@ export class PropStage {
 
   /**
    * 换一件展示品。异步（要下模型），失败就静静保持上一件。
-   * 返回 { id, name, note } 给宿主写卡片；没换成返回 null。
+   * 返回 { id } 给宿主写卡片（名字与注记由主线程按 id 解，见 Script_BootProp.CardFor）；没换成返回 null。
    */
   async Load(entry) {
     const url = MeshUrl(entry.id);
@@ -324,7 +332,7 @@ export class PropStage {
     this.camera.updateProjectionMatrix();
 
     this.currentId = entry.id;
-    return { id: entry.id, name: entry.name, note: ShortNote(entry.id, entry.name) };
+    return { id: entry.id };
   }
 
   /** 走一帧。dt 秒。 */

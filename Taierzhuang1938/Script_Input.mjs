@@ -14,54 +14,45 @@
 // 这里**不含任何游戏规则** —— 路由器只把物理按键翻译成动作名，
 // 动作干什么全在 Script_Main 的 OnAction 里。
 
+import { T } from "./Script_Text.mjs";
+
 /**
  * 设置页里的操作说明。它与 KEYMAP 放在同一个文件里，避免改了实际键位却忘了改说明。
  * 这里只写玩家能直接执行的动作；调试键与编辑器键不混进战斗操作。
+ *
+ * **表里只有文本键**：一行的按键框与说明各是一条 `input.guide.<组>.<行>.keys/.label`，
+ * 文案在 Data_Text_Input.mjs。按键框那一栏同样是文本 ——「鼠标」「滚轮」「按住 Tab」
+ * 这些不是 `event.code`（真键位在下面的 KEYMAP），换一种语言要跟着翻。
  */
-export const CONTROL_GUIDE = [
+const GUIDE = [
   {
-    title: "移动与观察",
-    rows: [
-      { keys: "W A S D", label: "移动" },
-      { keys: "鼠标", label: "观察" },
-      { keys: "Shift", label: "冲刺；开镜时屏息" },
-      { keys: "Q / E", label: "向左 / 右探身" },
-      { keys: "C", label: "下蹲；再按一次站立" },
-      { keys: "Z", label: "趴下；再按一次站立" },
-      { keys: "Space", label: "低姿态时站起；站立时翻越 / 跳跃" },
-      { keys: "按住 Alt + 点击姿态", label: "直接选择站立 / 下蹲 / 趴下" },
-    ],
+    id: "move",
+    rows: ["wasd", "look", "sprint", "lean", "crouch", "prone", "traverse", "stancePick"],
   },
   {
-    title: "武器与救治",
-    rows: [
-      { keys: "左键 / 右键", label: "开火 / 瞄准" },
-      { keys: "1 / 2 / 3 / 4", label: "长枪 / 短枪 / 大刀 / 投掷物" },
-      { keys: "滚轮", label: "循环切换已有武器" },
-      { keys: "R / 0", label: "装填 / 切换射击模式" },
-      { keys: "T", label: "架两脚架" },
-      { keys: "大刀／已装刺刀", label: "左键轻击／蓄力重击，右键瞬时拨挡，贴身 F 推架" },
-      { keys: "僵持／倒地压制", label: "连续按 F 抵抗；成功后恢复自由战斗" },
-      { keys: "V", label: "刺刀步枪：射击／白刃架势" },
-      { keys: "X", label: "装 / 卸刺刀（可装刺刀的枪）" },
-      { keys: "空枪左键", label: "白刃架势下左键轻击／按住重击" },
-      { keys: "G / H", label: "投手榴弹 / 集束手榴弹" },
-      { keys: "F", label: "拾枪、换枪或给战友分弹" },
-      { keys: "按住 F", label: "止血、拆门板、接线：按住到进度环走满" },
-      { keys: "B", label: "有绷带且流血时包扎止血" },
-    ],
+    id: "combat",
+    rows: ["fire", "slots", "wheelSlot", "reload", "bipod", "meleeAttack", "meleeStruggle",
+      "meleeStance", "bayonet", "emptyMelee", "throw", "interact", "holdInteract", "bandage"],
   },
   {
-    title: "班组与菜单",
-    rows: [
-      { keys: "M", label: "显示 / 隐藏战场地图" },
-      { keys: "按住 Tab", label: "打开命令轮盘，鼠标选择" },
-      { keys: "Tab + 1—8", label: "直接下达对应命令" },
-      { keys: "Esc", label: "暂停 / 返回" },
-      { keys: "`", label: "打开设置与工具" },
-    ],
+    id: "squad",
+    rows: ["map", "orders", "ordersDirect", "pause", "tools"],
   },
 ];
+
+/**
+ * 操作说明的对外形状与从前逐字相同（`[{ title, rows: [{ keys, label }] }]`），
+ * 只是三个字段改成**读取时**经 T 解析 —— 换语言不用重建这张表，消费方
+ * （Script_EditorSettings 的设置页、Script_HudPromptTest / Script_CarryTest 的键位契约）
+ * 一行都不用改。
+ */
+export const CONTROL_GUIDE = Object.freeze(GUIDE.map((group) => Object.freeze({
+  get title() { return T(`input.guide.${group.id}.title`); },
+  rows: Object.freeze(group.rows.map((row) => Object.freeze({
+    get keys() { return T(`input.guide.${group.id}.${row}.keys`); },
+    get label() { return T(`input.guide.${group.id}.${row}.label`); },
+  }))),
+})));
 
 /** 连续量（每帧读）与边沿量（按下那一刻派发一次）的分界写在 mode 上。 */
 export const KEYMAP = [

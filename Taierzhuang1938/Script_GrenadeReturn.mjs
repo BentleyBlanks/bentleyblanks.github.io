@@ -1,6 +1,7 @@
 // Shared live-grenade reach/fuse contract. F claims the actual projectile; its
 // original fuse keeps burning during the short pickup and the return flight.
 import { GRENADE_RETURN } from "./Data_Explosives.mjs";
+import { T } from "./Script_Text.mjs";
 
 export function FindReturnableGrenade(projectiles, player, Visible = () => true) {
   if (!player?.Alive) return null;
@@ -16,7 +17,9 @@ export function RegisterGrenadeReturn(interact, combat, player, { CanUse = () =>
     priority: 1000, facingDot: null, reachM: GRENADE_RETURN.reachM, heightM: GRENADE_RETURN.heightM,
     Anchor: () => combat.ReturnCandidate()?.position || null,
     Enabled: () => CanUse() && !combat.Returning && !!combat.ReturnCandidate(),
-    label: () => `拾起并掷回 · ${Math.max(0, combat.ReturnCandidate()?.fuse || 0).toFixed(1)}秒`,
+    label: () => T("interact.grenade.return", {
+      seconds: Math.max(0, combat.ReturnCandidate()?.fuse || 0).toFixed(1),
+    }),
     OnComplete: () => { const result = combat.BeginReturn(); if (result) OnPickup(); return result; },
   });
 }

@@ -31,70 +31,15 @@
 // 于是撒兵自动少撒同样多。开机红线（drawCalls ≤ 5000 / triangles ≤ 600 万）因此
 // 不受影响 —— 场上活人总数一个没多。MAX_COMPANIONS 是这条账的保险丝。
 
-/**
- * 同伴名册档案。**key 就是契约 §10.2 的 CAST id**，beats 的 who 一律用这些 id。
- *
- * combatant  true = 「该章说过话就自动在场」的战斗员（默认名册从 beats 推导时只收这些）；
- *            false = 得由章节显式点名才在场（军医、担架员、参谋、师长）。
- * absent     永不由这一层生成，附理由。改成 true/false 之前先读那条理由。
- * mode       "follow"（跟着玩家）或 "hold"（在指定 zone 待命）。
- * weapon     Data_Weapons 的 id。川军这一班发的是兵站那批汉阳造（§1 阶段二）。
- * slot       跟随时的固定站位序号；决定横向偏移，避免一个班排成一条线（Conga Line）。
- */
-export const COMPANION_CAST = {
-  luo: { label: "罗班长", combatant: true, mode: "follow", weapon: "HanYang", slot: 0,
-    note: "班长。四关夜战救顺子腹部中弹牺牲 —— 他倒下那一拍要调 SetAbsent('luo')。"
-      + "现在五关他不在名册里只是因为五关没有他的台词，那是巧合不是保证" },
-  yaowa: { label: "幺娃", combatant: true, mode: "follow", weapon: "HanYang", slot: 1 },
-  heyoutian: { label: "何有田", combatant: true, mode: "follow", weapon: "HanYang", slot: 2 },
-  liuwencai: { label: "刘文财", combatant: true, mode: "follow", weapon: "HanYang", slot: 3 },
-  zhaodegui: { label: "赵德贵", combatant: true, mode: "follow", weapon: "HanYang", slot: 4 },
-  xiaoqin: { label: "小秦", combatant: true, mode: "follow", weapon: "HanYang", slot: 5,
-    note: "通信兵。护线时要 Detach（他蹲下查断点，不跟着走）" },
-  paizhang: { label: "排长", combatant: true, mode: "hold", weapon: "HanYang", slot: 6,
-    note: "负伤排长。五关下军令，钉在街口不跟人跑" },
-  s124: { label: "伤兵", combatant: true, mode: "follow", weapon: "HanYang", slot: 7,
-    note: "第 124 师伤兵。五关视角①的机枪副射手" },
-  junyi: { label: "军医", combatant: false, mode: "hold", weapon: "HanYang", slot: 8,
-    note: "只处理战伤，钉在救护所院里。章节要点名才在场" },
-  danjiayuan: { label: "担架员", combatant: false, mode: "follow", weapon: "HanYang", slot: 9,
-    note: "escortColumn 自己会摆担架队；点名之前不要重复生成" },
-  canmou: { label: "参谋", combatant: false, mode: "hold", weapon: "HanYang", slot: 10,
-    note: "终章通信参谋，钉在师部" },
-  wangmingzhang: { label: "师长", combatant: false, mode: "hold", weapon: null, slot: 11,
-    note: "真实历史人物。终章由章节点名，不许自动在场" },
-  // --- 这一层永不生成的 ---
-  shunzi: { absent: true, reason: "玩家自己" },
-  shangbing: { absent: true, reason: "担架上的伤员，由 escortColumn / carryWounded 摆" },
-  junguan: { absent: true, reason: "后方喊话的人不露脸（§2 阶段二原文）" },
-  ija_gunso: { absent: true, reason: "日方" },
-  narrator: { absent: true, reason: "旁白，没有身体" },
-  crowd: { absent: true, reason: "无名无脸的人群，走布设与百姓 tzm" },
-  runner: { absent: true, reason: "只出声" },
-  adjutant: { absent: true, reason: "只出声" },
-};
+import { T } from "./Script_Text.mjs";
+import {
+  COMPANION_CAST, MAX_COMPANIONS, DEFAULT_PLAYER_CAST, COMPANION_TUNING,
+} from "./Data_Companions.mjs";
 
-/**
- * 同时在场的具名同伴上限。
- *
- * 六个是一个班的量级（罗班长 + 五个），也正好是七章里说话最多的那一批。
- * 再多就不是「认得出的人」而是「一群兵」，而且会把撒兵的近身班组名额挤光。
- */
-export const MAX_COMPANIONS = 6;
-
-/** 跟随的几何与节奏。数只在这里，文档里只写常量名。 */
-export const COMPANION_TUNING = {
-  followBackM: 6.0,       // 站在玩家身后多少米（顺着玩家朝向的反方向）
-  laneSpanM: 3.4,         // 相邻站位的横向间距 —— 排成一线是 AI 最难看的毛病
-  laneSpreadM: 2.2,       // 纵深错开：偶数号往后再让一点，不站成一排
-  regoalS: 0.45,          // 多久重设一次跟随目标（每帧写目标等于每帧打断寻路）
-  leashM: 70,             // 离玩家超过这个距离就直接归队（隔着两条街追不回来）
-  spawnRingM: 7.5,        // 生成时离玩家多远
-  holdRadiusM: 9.0,       // hold 模式的待命半径
-  // 嘴的高度。宿主给的是**脚下**坐标；声音从脚脖子发出来在 HRTF 里是听得出来的
-  // （近处尤其明显：五米外的人听着像趴在地上说话）。站姿眼位约 1.62，嘴略低一点。
-  mouthY: 1.52,
-};
+// 名册、上限、跟随节奏与默认玩家角色全在 `Data_Companions.mjs`
+//（labelKey 指向 Data_Text_Gameplay 的 `gameplay.cast.*`）。
+// 这里 re-export，老调用点与章节数据里写的常量名一行不改。
+export { COMPANION_CAST, MAX_COMPANIONS, DEFAULT_PLAYER_CAST, COMPANION_TUNING };
 
 /** 稳定的小哈希：同一个名字永远得到同一个站位偏移。**不许 Math.random。** */
 function HashId(text) {
@@ -112,21 +57,6 @@ export function IsCompanionCast(castId) {
   const spec = COMPANION_CAST[castId];
   return !!spec && !spec.absent;
 }
-
-/**
- * 默认的玩家角色。
- *
- * **玩家自己不能同时站在自己旁边。** 六章里玩家是顺子；终章 §7 明写
- * 「玩家＝小秦」，而小秦在终章话最多，按 beats 推名册会把他推出来，
- * 于是场上会有两个小秦（一个是你，一个站你旁边）。
- *
- * INT1 时这里另有一张过渡表 `CHAPTER_PLAYER_CAST`（只有终章一条）。
- * **INT2 删了它**：那一条现在写在 `Data_MissionCh6.CHAPTER.playerCast` 上，
- * 由 Data_TengxianScript.LEVELS 传到装配层，再由 `BeginLevel({ playerCast })`
- * 传进来 —— 「这一章玩家演谁」是章节内容，不是引擎常量。
- * 章节没写就退到这个默认值。
- */
-export const DEFAULT_PLAYER_CAST = "shunzi";
 
 /**
  * 从一章的 beats 推导默认名册：**该章说过话的战斗员自动在场**，按首次开口的顺序。
@@ -223,26 +153,27 @@ export class CompanionDirector {
       if (placed >= this.max) break;
       const spec = COMPANION_CAST[castId];
       if (!spec || spec.absent) {
-        this.log.push({ castId, ok: false, why: spec ? `档案标了 absent：${spec.reason}` : "不在同伴档案表里" });
+        // 取证日志是开发者诊断，不是玩家文本（Debug 面板与接线自检读它）。
+        this.log.push({ castId, ok: false, why: spec ? `档案标了 absent：${spec.reason}` : "不在同伴档案表里" });  // @text-ok 取证日志：只进 director.log 与接线自检
         continue;
       }
       if (this.absent.has(castId)) {
-        this.log.push({ castId, ok: false, why: "剧本已宣告缺席" });
+        this.log.push({ castId, ok: false, why: "剧本已宣告缺席" });  // @text-ok 取证日志
         continue;
       }
       const at = this._SpawnSpot(spec, placed);
-      if (!at) { this.log.push({ castId, ok: false, why: "拿不到玩家位置" }); break; }
+      if (!at) { this.log.push({ castId, ok: false, why: "拿不到玩家位置" }); break; }  // @text-ok 取证日志
       let handle = null;
       try {
         handle = this.host.Spawn ? this.host.Spawn({
-          castId, label: spec.label, x: at.x, z: at.z,
+          castId, label: T(spec.labelKey), x: at.x, z: at.z,
           weapon: spec.weapon || null, squadId: `Companion_${levelId || "?"}`,
         }) : null;
       } catch (err) {
-        this.log.push({ castId, ok: false, why: `宿主造人抛异常：${String((err && err.message) || err)}` });
+        this.log.push({ castId, ok: false, why: `宿主造人抛异常：${String((err && err.message) || err)}` });  // @text-ok 取证日志
         continue;
       }
-      if (!handle) { this.log.push({ castId, ok: false, why: "宿主没造出来（多半是人口预算满了）" }); continue; }
+      if (!handle) { this.log.push({ castId, ok: false, why: "宿主没造出来（多半是人口预算满了）" }); continue; }  // @text-ok 取证日志
       const mode = spec.mode === "hold" ? "hold" : "follow";
       const member = {
         castId, spec, handle, mode, zone: null, detachUntil: -99, fell: false,
@@ -336,7 +267,7 @@ export class CompanionDirector {
     const at = this.host.PositionOf(member.handle);
     if (!at || !Number.isFinite(at.x)) return null;
     const foot = Number.isFinite(at.y) ? at.y : 0;
-    return { x: at.x, y: foot + (member.fell ? 0.35 : this.tuning.mouthY), z: at.z };
+    return { x: at.x, y: foot + (member.fell ? this.tuning.fellMouthY : this.tuning.mouthY), z: at.z };
   }
 
   /** 这个人此刻在不在场（还站着）。 */

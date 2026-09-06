@@ -2119,25 +2119,28 @@ export const AMBIENCE_PRESETS = {
  * 这场仗的声音本体是枪炮，音乐只负责在缝隙里给一个情绪的落点。
  * 所以 level 全部压得很低，而且大部分时间根本不放。
  */
+// `label` 只有一个消费者：编辑器音频面板的试听按钮（Script_EditorAudio）。
+// 编辑器不本地化（docs/Data_TextAndTuning.md §2「什么不走文本表」），所以这九条
+// 逐行登记 @text-ok，而不是搬进 Data_Text_*。**玩家在任何界面上都看不到它们。**
 export const MUSIC_CUES = {
   // 进城之前：一间空屋子。
-  menu: { level: 0.55, label: "菜单" },
+  menu: { level: 0.55, label: "菜单" },              // @text-ok 编辑器音频面板的试听标签
   // 白天守城时垫在枪炮底下的一层，几乎察觉不到 —— 察觉到了就说明太响。
-  siege: { level: 0.3, label: "守城" },
+  siege: { level: 0.3, label: "守城" },              // @text-ok 编辑器音频面板的试听标签
   // 夜里潜行与等待。
-  tension: { level: 0.38, label: "夜" },
+  tension: { level: 0.38, label: "夜" },             // @text-ok 编辑器音频面板的试听标签
   // 反攻与白刃，五段里唯一有律动的。
-  charge: { level: 0.6, label: "反攻" },
+  charge: { level: 0.6, label: "反攻" },             // @text-ok 编辑器音频面板的试听标签
   // 结局。全场唯一允许「像配乐」的地方 —— 仗已经打完了。
-  aftermath: { level: 0.62, label: "战后" },
+  aftermath: { level: 0.62, label: "战后" },         // @text-ok 编辑器音频面板的试听标签
   // 界河开阔地：宽而沉，不给第一次接敌加英雄色彩。
-  fieldLament: { level: 0.34, label: "界河" },
+  fieldLament: { level: 0.34, label: "界河" },       // @text-ok 编辑器音频面板的试听标签
   // 城墙炮击：只留下持续推进的压力，必须沉在炮声下面。
-  wallPressure: { level: 0.24, label: "城墙" },
+  wallPressure: { level: 0.24, label: "城墙" },      // @text-ok 编辑器音频面板的试听标签
   // 十字街封锁：近距离、持续收紧。
-  streetDistress: { level: 0.32, label: "十字街" },
+  streetDistress: { level: 0.32, label: "十字街" },  // @text-ok 编辑器音频面板的试听标签
   // 北门突围：无武器、无反攻，只剩离城。
-  exodus: { level: 0.48, label: "突围" },
+  exodus: { level: 0.48, label: "突围" },            // @text-ok 编辑器音频面板的试听标签
 };
 
 /**

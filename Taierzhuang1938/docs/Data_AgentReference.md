@@ -215,6 +215,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - `Script_FirstLevelP012Guidance.mjs` 显示当前目标的方向与名称，以及随真实负重移动的弹药箱；只读取任务状态，不推进剧情或发放库存。
   村路炮击按玩家进度分段逼近，家庭在实际爆炸后加速；B04 接受整段真实掩体后的低姿，无隐藏小圆圈。
 - 暂停菜单「调试选项 → 跳到下一任务进度」由 `Script_FirstLevelP012Debug.mjs` 完成当前 B 段并同步玩家、同班 NPC、有限敌军、领械/搬运、剧情回执和原担架。每次只前进一段，保留暂停；最后一段进入白盒完成页。调试跳转单独记录 `debugNextProgress`，不作为正常通关证据；浏览器验收入口 `Script_FirstLevelP012DebugTest.mjs`。
+- **编排是数据**：拍表 / 波次 / 交互点规格 / 目标行与导航牌谓词表在 `Data_FirstLevelP012Beats.mjs`，节奏与补给数在 `Data_Tuning_P012.mjs`，句子在 `Data_Text_P012.mjs`；`Script_FirstLevelP012Flow.mjs` 是解释器（`P012ResolveLine`）。口径见 `docs/Data_TextAndTuning.md` §6。
 - `Script_FirstLevelP012Flow.mjs` 是纯任务事实编排；`Script_FirstLevelP012Runtime.mjs`
   适配真实演员、人流、防守、炮击与扑沟输入。不能以目标时刻或虚拟队头替代真实完成。
 - `Script_FirstLevelP012CarryView.mjs` 复用已加载的双臂骨骼，读取原担架与真实负重状态。
@@ -277,6 +278,10 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   分镜数据在 `Data_Cutscene*.mjs`，纯 Node 自检 `Script_CutsceneCheck.mjs`。
 - `Script_Story.mjs` —— 把章节目标链 + 台词 + 分镜按章派发（2026-09-06 起正片只剩序章，第一关内容由 P0/P1/P2 白盒消费，第二到终章为暂时废弃场景）；史实注记卡 `Data_History.mjs`，
   编剧红线在 `Data_Script.mjs` 头注与 `docs/Data_HistoryQuotes.md`。先读 `docs/Data_CutsceneRedo.md`。
+
+### 玩家文本 / 调参表（数据驱动）
+- 玩家可见文本一律 `Script_Text.T("domain.key")`，表在 `Data_Text_<Domain>.mjs`，`Data_Locale_zhCN.mjs` 拼成基准语言；内容原稿（台词 / 分镜 / 史料 / 武器名 / 关卡字段）留在数据文件，显示时经 `Localize(id, text)`，id 口径只在 `Script_TextIds.mjs`；翻译清单 `node Script_TextGather.mjs`。手感 / 平衡 / 节奏数在 `Data_Tuning_<System>.mjs`（Player / Ai / Combat / Interact / Hud / Main / Menu / Story / Cutscene / P012）。
+- 闸门 `Script_TextTest.mjs`（各表 `GATED_MODULES` 零中文字面量）+ `Script_TextGather.mjs --check`。先读：`docs/Data_TextAndTuning.md`。
 
 ### HUD / 菜单 / 输入
 - `Style_Interface.css` —— 主菜单、加载、选章、暂停、设置与工具窗口的共用主题；

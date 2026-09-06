@@ -11,6 +11,7 @@ import {InteractSystem} from "./Script_Interact.mjs";
 import {FIRST_LEVEL_P012_LAYOUT as openingLayout} from "./Data_FirstLevelP012Layout.mjs";
 import {P012SouthPoint,P012StationPoint} from "./Data_FirstLevelP012Space.mjs";
 import {openingActivities,openingStoryBeats} from "./Data_FirstLevelP012Opening.mjs";
+import { T } from "./Script_Text.mjs";
 function FootY(layout,p) {
  let y=0;
  for(const b of layout.walkableSurfaces||[]){
@@ -385,7 +386,10 @@ assert.ok(openingStoryBeats.every(cue=>!/hubSupply/i.test(JSON.stringify(cue))),
  const {Vector3}=await import(`data:text/javascript;base64,${Buffer.from(readFileSync(new URL("./vendor/three/build/three.core.js",import.meta.url),"utf8")).toString("base64")}`);
  const source=readFileSync(new URL("./Script_Player.mjs",import.meta.url),"utf8");
  const movement=source.slice(source.indexOf("    let speed = target.speed;"),source.indexOf("    this.MoveWithCollision(dt);")+"    this.MoveWithCollision(dt);".length);
- const Step=vm.runInNewContext(`(function(dt,input,target){${movement}})`,{UP:new Vector3(0,1,0),GRAVITY_MPS2:19.6,Clamp:(n,a,b)=>Math.max(a,Math.min(b,n)),Clamp01:n=>Math.max(0,Math.min(1,n))});
+  // 移动那一段 2026-09-06 起从 Data_Tuning_Player 读手感数（MOVE / JUMP），
+ // 所以 vm 上下文直接把真表灌进去 —— 断言仍然不抄数。
+ const {MOVE,JUMP}=await import("./Data_Tuning_Player.mjs");
+ const Step=vm.runInNewContext(`(function(dt,input,target){${movement}})`,{UP:new Vector3(0,1,0),MOVE,JUMP,Clamp:(n,a,b)=>Math.max(a,Math.min(b,n)),Clamp01:n=>Math.max(0,Math.min(1,n))});
  function Travel(diveSpeedMps,forward,wall=false){
   const p={stance:"prone",health:20.267,suppression:1,ads:1,sprint:0,carrySpeedScale:1,debug:{},yaw:0,grounded:true,velocity:new Vector3(),position:new Vector3(),_forward:new Vector3(),_right:new Vector3(),_tmp:new Vector3(),LegPenalty:()=>.72*.72,MoveWithCollision(dt){if(!wall)this.position.addScaledVector(this.velocity,dt);this.position.y=0;this.velocity.y=0;}};
   for(let i=0;i<132;i++)Step.call(p,1/60,{forward,diveSpeedMps},{speed:.72});
@@ -783,7 +787,8 @@ assert.match(main,/actor\.alive\s*&&\s*actor\.p012MachineGun === true[\s\S]*?act
 {
   const body = main.match(/GiveBandages: \(request\) => \{([\s\S]*?)\n    \},/)[1];
   const patient = { bandages: 0, health: 27, bleeding: 2.8 }, hints = [];
-  const Give = vm.runInNewContext(`(request)=>{${body}}`, {player:patient,hud:{Hint:(text)=>hints.push(text)}});
+  // 提示文案已进文本表：把真的 T 注进去，断言仍看真正上屏的那一句。
+  const Give = vm.runInNewContext(`(request)=>{${body}}`, {player:patient,hud:{Hint:(text)=>hints.push(text)},T});
   assert.equal(Give(1),1); assert.equal(patient.bandages,1);
   assert.equal(patient.health,27); assert.equal(patient.bleeding,2.8);
   assert.equal(Give(-1),0); assert.equal(Give(NaN),0); assert.equal(patient.bandages,1);

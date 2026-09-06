@@ -41,90 +41,17 @@
 
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { Mulberry32, Clamp, Clamp01 } from "./Script_Noise.mjs";
+import { T } from "./Script_Text.mjs";
+import { EMPLACEMENT_KINDS } from "./Data_Emplacements.mjs";
+import { EMPLACEMENT as TUNING } from "./Data_Tuning_Interact.mjs";
 
 const TAU = Math.PI * 2;
 const D2R = Math.PI / 180;
 
-/**
- * 架设武器档案表。**数值只在这里**，文档写常量名不抄数（AGENTS 硬规矩 12）。
- *
- * 射速 / 伤害 / 有效射程 / 换弹时间一律**不在这张表里重复**：
- * 它们在 `Data_Weapons.WEAPONS[weaponId]` 上，这里只放「架起来之后才有的那些数」。
- * 抄一遍的代价见 Data_Weapons 头注 —— 两处数字第二天就会分叉。
- *
- * arcYawDeg / arcUpDeg / arcDownDeg
- *   三脚架的回旋与俯仰限位（度，相对 baseYaw / 水平）。九二式的三脚架是可以
- *   松开回旋卡箍的，但架在射孔或街垒后头时真正限住射界的是工事本身 —— 30° 是
- *   「封住一条街 + 两侧院门」够用、又明显是一挺**固定**武器的宽度。
- * heatPerShot / coolPerS / overheatCoolPerS / resumeHeat / warnHeat
- *   热量 0—1，**升温与散热一直同时在跑**，所以「能压多少发」不是 1/heatPerShot，
- *   而是 1 / (heatPerShot/fireIntervalS − coolPerS)。两个数是照这两条目标解出来的：
- *     ① 一直压着不放 → 差不多一条保弹板打完就顶到红线（教「莫一直压」）；
- *     ② 可持续占空比 = coolPerS / (heatPerShot/fireIntervalS) ≈ 五成
- *        —— 打一梭歇一梭就永远不会过热（教「短点射」）。
- *   resumeHeat 是强制冷却之后放行的门槛（不是 0 —— 停火两秒就能接着压的话，
- *   过热就不是代价了）。
- * jamHeatFloor / jamChanceAtMax
- *   概率性小卡只在**热枪**上发生：低于 floor 一次都不卡，到 1.0 时每发 jamChanceAtMax。
- *   冷枪不卡是有意的 —— 「短点射」的玩家不该被随机数惩罚。
- * clearS / clearHeatVent
- *   小卡排障要按住多久；排完顺手放掉多少热（开盖排壳本来就在散热）。
- * deadPulls
- *   **必然失效**（ForceJam）之后要拉几次枪机才判定这挺枪彻底废了。
- *   §6 阶段⑩②「顺子拉枪机『妈卖批！』『早不卡晚不卡！』」就是这几下。
- * beltRounds / belts
- *   一板多少发、身边有几板。九二式是 30 发金属保弹板横向供弹（reloadKind:"stripFeed"）。
- * spreadDeg
- *   架起来的枪比端着的稳得多：比中正式腰射的 spreadHipDeg 小一个量级。
- */
-export const EMPLACEMENT_KINDS = {
-  Type92Hmg: {
-    id: "Type92Hmg",
-    weaponId: "Type92Hmg",
-    label: "九二式重机枪",
-    note: "架在街垒上的重机枪。短点射，莫一直压。",
-    arcYawDeg: 30, arcUpDeg: 12, arcDownDeg: 10,
-    // 200 rpm（0.3 s 一发）：净升温 0.119/s → 一直压着约 8.4 s / 28 发顶红线，
-    // 一条 30 发保弹板压到底正好过热；可持续占空比 0.125/0.2433 ≈ 51%。
-    heatPerShot: 0.073, coolPerS: 0.125, overheatCoolPerS: 0.20,
-    resumeHeat: 0.35, warnHeat: 0.70,
-    jamHeatFloor: 0.65, jamChanceAtMax: 0.035,
-    clearS: 1.2, clearHeatVent: 0.30,
-    deadPulls: 3,
-    beltRounds: 30, belts: 5, maxBelts: 8,
-    spreadDeg: 0.30,
-    // 枪身相对 position 的几何：枪口往前多少、瞄准线离基座多高、射手站在后头多远。
-    muzzleAheadM: 0.55, sightRiseM: 0.10, seatBackM: 0.85,
-    stance: "crouch",
-    sfxFire: "type92", sfxDry: "bolt", sfxBolt: "bolt",
-    sfxReload: "stripperLoad", sfxMount: "magIn",
-  },
-  Zb26Nest: {
-    id: "Zb26Nest",
-    weaponId: "Zb26",
-    label: "捷克式（架起来的）",
-    note: "两脚架撑在墙垛上。二十发一匣，换得勤。",
-    // 两脚架只能在垛口那一段扫，比三脚架窄；但抬得起来打屋顶。
-    arcYawDeg: 22, arcUpDeg: 18, arcDownDeg: 12,
-    // 500 rpm（0.12 s 一发）：净升温 0.139/s → 一直压着约 7.2 s / 60 发顶红线；
-    // 一匣 20 发压到底只到七成热，换匣那 3 秒就把它散掉 —— 弹匣本身就是节奏器。
-    heatPerShot: 0.0347, coolPerS: 0.15, overheatCoolPerS: 0.24,
-    resumeHeat: 0.30, warnHeat: 0.68,
-    // 捷克式可以快速换枪管，热到卡壳之前枪管就该换了 —— 卡壳概率比九二式低。
-    jamHeatFloor: 0.72, jamChanceAtMax: 0.025,
-    clearS: 1.0, clearHeatVent: 0.35,
-    deadPulls: 3,
-    beltRounds: 20, belts: 6, maxBelts: 10,
-    spreadDeg: 0.42,
-    muzzleAheadM: 0.45, sightRiseM: 0.08, seatBackM: 0.70,
-    stance: "prone",
-    sfxFire: "zb26", sfxDry: "bolt", sfxBolt: "bolt",
-    sfxReload: "magIn", sfxMount: "magIn",
-  },
-};
-
-/** 卸下之后再上枪位之前的空窗。没有它，一次 F 会在同一帧下枪又上枪。 */
-const REMOUNT_LOCK_S = 0.40;
+// 档案表本体在 `Data_Emplacements.mjs`（射界 / 热量 / 卡壳 / 弹药 / 几何 / 文本键），
+// 状态机自己的节奏数在 `Data_Tuning_Interact.EMPLACEMENT`。
+// 这里 re-export 档案表，老调用点与测试一行不改。
+export { EMPLACEMENT_KINDS };
 
 /**
  * 取一个数，取不到就用兜底值。
@@ -230,8 +157,8 @@ export class EmplacementSystem {
     const belts = Math.max(0, Math.floor(Number(spec.belts ?? kind.belts)));
     const gun = {
       id, kind, weapon,
-      label: String(spec.label ?? kind.label),
-      note: String(spec.note ?? kind.note ?? ""),
+      label: String(spec.label ?? T(kind.labelKey)),
+      note: String(spec.note ?? (kind.noteKey ? T(kind.noteKey) : "")),
       side: spec.side === "ija" ? "ija" : "nra",
       position, seat, baseYaw,
       arc: {
@@ -318,15 +245,15 @@ export class EmplacementSystem {
     if (this.mounted) {
       return this.mounted === gun
         ? { ok: false, reason: "already", text: "" }
-        : { ok: false, reason: "busy", text: "手上已经有一挺了" };
+        : { ok: false, reason: "busy", text: T("gameplay.emplacement.busy") };
     }
     if (this.remountLockS > 0) return { ok: false, reason: "cooldown", text: "" };
     if (gun.side !== "nra") return { ok: false, reason: "enemy", text: "" };
-    if (gun.dead) return { ok: false, reason: "dead", text: "这挺枪废了" };
+    if (gun.dead) return { ok: false, reason: "dead", text: T("gameplay.emplacement.wrecked") };
     // NPC 占着的战位玩家不能抢 —— 与 Script_Ai 的「一个战位只填一个人」同一道闸。
-    if (gun.npc && gun.npc.alive !== false) return { ok: false, reason: "manned", text: "有人在打" };
+    if (gun.npc && gun.npc.alive !== false) return { ok: false, reason: "manned", text: T("gameplay.emplacement.manned") };
     if (player && player.Alive === false) return { ok: false, reason: "down", text: "" };
-    return { ok: true, reason: "ok", text: "接管机枪" };
+    return { ok: true, reason: "ok", text: T("gameplay.emplacement.take") };
   }
 
   /**
@@ -336,7 +263,7 @@ export class EmplacementSystem {
   Occupy(id, player = this.player) {
     const check = this.CanOccupy(id, player);
     if (!check.ok) {
-      if (check.text) this.host.Hint?.(check.text, 1.8);
+      if (check.text) this.host.Hint?.(check.text, TUNING.hintRefuseS);
       if (check.reason === "manned" || check.reason === "dead") this.stats.refused += 1;
       return false;
     }
@@ -373,7 +300,7 @@ export class EmplacementSystem {
     this.mounted = null;
     this.firing = false;
     this.clearing = false;
-    this.remountLockS = REMOUNT_LOCK_S;
+    this.remountLockS = TUNING.remountLockS;
     gun.occupant = gun.npc ? { npc: gun.npc } : null;
     const info = { ...this.Info(gun, "player"), reason, abandoned: !!gun.dead };
     this.lastVacate = info;
@@ -462,7 +389,7 @@ export class EmplacementSystem {
     this.stats.fatalJams += 1;
     if (!opts.silent) {
       this.host.Play?.(gun.kind.sfxDry, { volume: 0.5, pitch: 1.35 });
-      if (this.mounted === gun) this.host.Hint?.("卡壳了 —— 按 R 拉枪机", 2.6);
+      if (this.mounted === gun) this.host.Hint?.(T("gameplay.emplacement.jamFatal"), TUNING.hintJamS);
     }
     gun.OnJam?.({ ...this.Info(gun, "script"), kind: "fatal", forced: true });
     return true;
@@ -491,11 +418,11 @@ export class EmplacementSystem {
     if (jam.pulls >= jam.need) {
       gun.dead = true;
       this.stats.dead += 1;
-      this.host.Hint?.("这挺枪废了。按 F 弃枪。", 3.4);
+      this.host.Hint?.(T("gameplay.emplacement.dead"), TUNING.hintDeadS);
       gun.OnDead?.(this.Info(gun, "player"));
       return true;
     }
-    this.host.Hint?.("拉不动 —— 再来", 1.4);
+    this.host.Hint?.(T("gameplay.emplacement.pullAgain"), TUNING.hintPullAgainS);
     return true;
   }
 
@@ -521,13 +448,13 @@ export class EmplacementSystem {
     if (gun.reloadT > 0) return false;
     if (gun.rounds >= gun.kind.beltRounds) return false;
     if (gun.belts <= 0) {
-      this.host.Hint?.("没得弹板了", 1.8);
+      this.host.Hint?.(T("gameplay.emplacement.noBelts"), TUNING.hintRefuseS);
       return false;
     }
     // 板在按下 R 那一刻就从身边拿走了，不是装完才扣：中途被打断（人倒了、换关）
     // 那一板也回不来 —— 弹药经济必须在**取用**的那一刻结账。
     gun.belts -= 1;
-    gun.reloadT = Math.max(0.2, Number(gun.weapon.reloadTimeS) || 4.0);
+    gun.reloadT = Math.max(TUNING.minReloadS, Number(gun.weapon.reloadTimeS) || TUNING.reloadFallbackS);
     this.host.Play?.(gun.kind.sfxReload, { volume: 0.6 });
     this.stats.reloads += 1;
     return true;
@@ -588,7 +515,7 @@ export class EmplacementSystem {
    * 夹晚一帧就会看见画面先越界再被拉回来。
    */
   Update(dt, player = this.player) {
-    const step = Math.max(0, Math.min(0.1, Number(dt) || 0));
+    const step = Math.max(0, Math.min(TUNING.maxStepS, Number(dt) || 0));
     if (player) this.player = player;
     if (this.remountLockS > 0) this.remountLockS = Math.max(0, this.remountLockS - step);
 
@@ -598,7 +525,7 @@ export class EmplacementSystem {
       gun.heat = Math.max(0, gun.heat - cool);
       if (gun.overheated && gun.heat <= gun.kind.resumeHeat) {
         gun.overheated = false;
-        if (this.mounted === gun) this.host.Hint?.("凉下来了 —— 短点射", 2.0);
+        if (this.mounted === gun) this.host.Hint?.(T("gameplay.emplacement.cooled"), TUNING.hintCooledS);
       }
       if (gun.reloadT > 0) {
         gun.reloadT = Math.max(0, gun.reloadT - step);
@@ -638,7 +565,7 @@ export class EmplacementSystem {
           gun.heat = Math.max(0, gun.heat - gun.kind.clearHeatVent);
           if (gun.heat <= gun.kind.resumeHeat) gun.overheated = false;
           this.host.Play?.(gun.kind.sfxBolt, { volume: 0.6 });
-          this.host.Hint?.("排出来了", 1.6);
+          this.host.Hint?.(T("gameplay.emplacement.cleared"), TUNING.hintClearedS);
         }
       }
     } else if (this.clearing) {
@@ -653,19 +580,19 @@ export class EmplacementSystem {
         // 空膛的"咔"只在**刚扣下**那一下响（fireCooldown 拿来当去重窗口），
         // 不然按住左键会得到一串每 0.3 秒一次的干咔。
         if (gun.fireCooldown <= 0) {
-          gun.fireCooldown = 0.55;
+          gun.fireCooldown = TUNING.dryFireWindowS;
           this.host.Play?.(gun.kind.sfxDry, { volume: 0.34, pitch: 1.5 });
-          if (block === "empty") this.host.Hint?.("按 R 换弹板", 2.0);
+          if (block === "empty") this.host.Hint?.(T("gameplay.emplacement.reloadPrompt"), TUNING.hintReloadS);
           else {
-            this.host.Hint?.("弹尽", 2.0);
+            this.host.Hint?.(T("gameplay.emplacement.ammoOut"), TUNING.hintReloadS);
             gun.OnEmpty?.(this.Info(gun, "player"));
           }
         }
       } else if (!block) {
-        const interval = Math.max(0.02, Number(gun.weapon.fireIntervalS) || 0.3);
+        const interval = Math.max(TUNING.minFireIntervalS, Number(gun.weapon.fireIntervalS) || 0.3);
         // 一帧可能跨过不止一个射击间隔（低帧率），但**每帧最多两发**：
         // 不封顶的话卡一下就会在同一帧喷十几发，热量与弹药一起瞬间见底。
-        for (let n = 0; n < 2 && gun.fireCooldown <= 0 && !this.FireBlock(gun); n += 1) {
+        for (let n = 0; n < TUNING.maxShotsPerFrame && gun.fireCooldown <= 0 && !this.FireBlock(gun); n += 1) {
           gun.fireCooldown += interval;
           shots.push(this.EmitShot(gun));
         }
@@ -689,8 +616,8 @@ export class EmplacementSystem {
       origin: muzzle.origin,
       dir: muzzle.dir,
       spreadDeg: gun.kind.spreadDeg,
-      damage: Number(gun.weapon.damage) || 80,
-      rangeM: Number(gun.weapon.effectiveRangeM) || 800,
+      damage: Number(gun.weapon.damage) || TUNING.damageFallback,
+      rangeM: Number(gun.weapon.effectiveRangeM) || TUNING.rangeFallbackM,
       index: gun.shots,
       // 机枪每发都出曳光：满场只有靠它才读得出火力从哪个方向压过来
       //（与玩家步枪的 1/5 比例是两条不同的账，见 Script_Main 的 TRACER_EVERY）。
@@ -704,8 +631,8 @@ export class EmplacementSystem {
     if (!gun.overheated && gun.heat >= 1) {
       gun.overheated = true;
       this.stats.overheats += 1;
-      this.host.Hint?.("枪管红了 —— 停火", 2.6);
-      this.host.Say?.("你", "莫一直压！", 1.8);
+      this.host.Hint?.(T("gameplay.emplacement.overheatHint"), TUNING.hintOverheatS);
+      this.host.Say?.(T("gameplay.speaker.you"), T("gameplay.emplacement.overheatShout"), TUNING.sayOverheatS);
     }
     // 概率性小卡：只有热枪才卡。冷枪不卡是有意的 —— 打短点射的玩家不该被随机数罚。
     const floor = gun.kind.jamHeatFloor;
@@ -715,7 +642,7 @@ export class EmplacementSystem {
         gun.jam = { kind: "minor", pulls: 0, t: 0, need: 1 };
         this.stats.minorJams += 1;
         this.host.Play?.(gun.kind.sfxDry, { volume: 0.5, pitch: 1.3 });
-        this.host.Hint?.("卡壳 —— 按住 R 排障", 2.4);
+        this.host.Hint?.(T("gameplay.emplacement.jamMinor"), TUNING.hintMinorJamS);
         gun.OnJam?.({ ...this.Info(gun, "player"), kind: "minor", forced: false });
       }
     }
@@ -747,17 +674,19 @@ export class EmplacementSystem {
     const block = this.FireBlock(gun);
     const heatState = gun.overheated ? "overheat"
       : gun.heat >= gun.kind.warnHeat ? "hot"
-        : gun.heat >= gun.kind.warnHeat * 0.5 ? "warm" : "cool";
+        : gun.heat >= gun.kind.warnHeat * TUNING.warmHeatFrac ? "warm" : "cool";
     const jam = gun.jam
       ? { kind: gun.jam.kind, t: Clamp01(gun.jam.t), pulls: gun.jam.pulls, need: gun.jam.need }
       : null;
-    const prompt = gun.dead ? "这挺枪废了"
-      : jam ? (jam.kind === "fatal" ? `拉枪机（${jam.pulls}/${jam.need}）` : "按住 R 排障")
-        : gun.reloadT > 0 ? "换弹板……"
-          : gun.overheated ? "过热 —— 停火"
-            : block === "empty" ? "按 R 换弹板"
-              : block === "out" ? "弹尽"
-                : heatState === "hot" ? "短点射。莫一直压。" : "";
+    const prompt = gun.dead ? T("gameplay.emplacement.wrecked")
+      : jam ? (jam.kind === "fatal"
+        ? T("gameplay.emplacement.pullProgress", { pulls: jam.pulls, need: jam.need })
+        : T("gameplay.emplacement.clearPrompt"))
+        : gun.reloadT > 0 ? T("gameplay.emplacement.reloading")
+          : gun.overheated ? T("gameplay.emplacement.overheatPrompt")
+            : block === "empty" ? T("gameplay.emplacement.reloadPrompt")
+              : block === "out" ? T("gameplay.emplacement.ammoOut")
+                : heatState === "hot" ? T("gameplay.emplacement.burstPrompt") : "";
     return {
       active: true,
       id: gun.id,
@@ -784,7 +713,7 @@ export class EmplacementSystem {
       // 顶到射界边了没有：HUD 要拿它给限位一点视觉反馈（不然玩家只觉得鼠标坏了）。
       atYawLimit: Math.abs(Math.abs(WrapPi(gun.yaw - gun.baseYaw)) - gun.arc.yaw) < 1e-3,
       prompt,
-      exit: gun.dead ? "弃枪" : "离位",
+      exit: gun.dead ? T("gameplay.emplacement.exitAbandon") : T("gameplay.emplacement.exitLeave"),
       blockFire: false,
     };
   }
@@ -859,8 +788,8 @@ export class EmplacementSystem {
  */
 export function EmplacementInteraction({
   id, emplacement, gunId, tag = null, label,
-  position, Anchor, reachM = 1.9, facingDot = 0.10,
-  priority = 20, carry = null, Available = null, OnComplete, payload = null,
+  position, Anchor, reachM = TUNING.takeReachM, facingDot = TUNING.takeFacingDot,
+  priority = TUNING.takePriority, carry = null, Available = null, OnComplete, payload = null,
 } = {}) {
   const Gun = () => emplacement?.Emplacement(gunId) || null;
   return {
@@ -874,7 +803,8 @@ export function EmplacementInteraction({
     Anchor: Anchor || (() => (position || Gun()?.seat || null)),
     label: label ?? (() => {
       const gun = Gun();
-      return gun ? `接管${gun.label}` : "接管机枪";
+      return gun ? T("gameplay.emplacement.takeNamed", { name: gun.label })
+        : T("gameplay.emplacement.take");
     }),
     // 打不了的时候整条不出现（不给灰提示）：有人在打、枪废了、玩家已经在枪上，
     // 外加**手上占着东西**（抬着担架的人腾不出手来打机枪 —— 传 carry 就自动带上这条）。
@@ -899,13 +829,14 @@ export function EmplacementInteraction({
  */
 export function AmmoResupplyInteraction({
   id, emplacement, gunId, tag = null, position, Anchor,
-  belts = 1, seconds = 1.8, label = "给机枪补弹", reachM = 2.2,
+  belts = 1, seconds = TUNING.resupplySeconds, label = T("gameplay.emplacement.resupply"),
+  reachM = TUNING.resupplyReachM,
   Consume, OnComplete, payload = null,
 } = {}) {
   const Gun = () => emplacement?.Emplacement(gunId) || null;
   return {
     id: id ?? `${gunId}_ammo`,
-    tag, payload, once: false, cooldownS: 1.2,
+    tag, payload, once: false, cooldownS: TUNING.resupplyCooldownS,
     // 不给坐标就锚在枪身上（供弹口就在那儿）；给了就用给的那口弹药箱。
     position,
     Anchor: Anchor || (position ? null : () => Gun()?.position || null),
@@ -913,7 +844,7 @@ export function AmmoResupplyInteraction({
     // 语义名，`Complete()` 按 kind 分流，撞名之后这一下会被当成分桥夹处理
     // （hooks.GiveClip 不存在 → 静默返回 false，读起来像「按了没反应」）。
     kind: "gunAmmo", gesture: "hold", seconds, label, reachM,
-    hint: "弹板压进去了。", sound: "stripperLoad",
+    hint: T("gameplay.emplacement.resupplyHint"), sound: "stripperLoad",
     Enabled: () => {
       const gun = Gun();
       return !!gun && !gun.dead && gun.belts < gun.kind.maxBelts;

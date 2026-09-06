@@ -16,8 +16,18 @@
 // 退回时**换一张新画布**：transferControlToOffscreen 过继掉的画布回不来了。
 
 import { PropStage, PickShowcase, ShortNote } from "./Script_BootPropStage.mjs";
+import { T } from "./Script_Text.mjs";
 
 export { PickShowcase, ShortNote };
+
+/** 展示品卡片上的名字（Data_Text_Boot 的 `boot.showcase.<id>`）。只在主线程解：Worker 侧不许碰语言表。 */
+export function ShowcaseName(id) { return T(`boot.showcase.${id}`); }
+
+/** 按 id 组出卡片 { id, name, note }；Worker 与主线程退路两条路都走这里。 */
+export function CardFor(id) {
+  const name = ShowcaseName(id);
+  return { id, name, note: ShortNote(id, name) };
+}
 
 /** worker 起来多久还没吱声就当它废了，走退路。 */
 const WORKER_READY_TIMEOUT_MS = 4000;
@@ -72,11 +82,7 @@ export class BootProp {
     worker.onmessage = (event) => {
       const msg = event.data || {};
       if (msg.type === "ready") { this.workerReady = true; return; }
-      if (msg.type === "prop") {
-        this.currentId = msg.id;
-        if (this.labelEl) this.labelEl.textContent = msg.name;
-        if (this.noteEl) this.noteEl.textContent = msg.note;
-      }
+      if (msg.type === "prop") this.WriteCard(CardFor(msg.id));
     };
     // worker 挂了（模块 404、worker 里拿不到 WebGL）就换张画布退回主线程。
     worker.onerror = () => this.FallBackToInline();
@@ -190,7 +196,10 @@ export class BootProp {
 
   async LoadInline() {
     const card = await this.stage.Load(PickShowcase(this.currentId));
-    if (!card) return;
+    if (card) this.WriteCard(CardFor(card.id));
+  }
+
+  WriteCard(card) {
     this.currentId = card.id;
     if (this.labelEl) this.labelEl.textContent = card.name;
     if (this.noteEl) this.noteEl.textContent = card.note;

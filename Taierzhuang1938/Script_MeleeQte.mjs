@@ -1,5 +1,6 @@
 // 两种僵持共用 F 连按进度。纯规则，不负责伤害或自动处决。
 import { MELEE_QTE_RULES as Q } from "./Data_MeleeCombat.mjs";
+import { T } from "./Script_Text.mjs";
 const Clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 export class MeleeQteDirector {
   constructor(host = {}, { assist = "tap" } = {}) {
@@ -64,7 +65,8 @@ export class MeleeQteDirector {
     const a = this.active;
     if (!a) return null;
     return { kind: a.kind, serial: a.serial, phase: a.phase, success: a.success,
-      label: a.kind === "ground" ? "倒地抵抗" : "武器僵持", prompt: "快速连按 F · 抵抗",
+      label: a.kind === "ground" ? T("gameplay.melee.qte.ground") : T("gameplay.melee.qte.standing"),
+      prompt: T("gameplay.melee.qte.prompt"),
       keys: ["F"], expected: "F", input: "mash", index: a.accepted,
       progress: a.progress, timeT: a.t / Q.windowS, timeLeft: Math.max(0, Q.windowS - a.t),
       resolveT: a.resolveT / Q.resolveS, pulse: a.pulse, assist: this.assist,

@@ -72,7 +72,7 @@ const report = await page.evaluate(() => {
   T.Debug.Key("ShiftLeft", false);
   T.Debug.Key("KeyW", false);
   settle();
-  // 蹲下：散布按 STANCE 收到 0.66，准心必须跟着收。
+  // 蹲下：散布按 Data_Tuning_Player.STANCE 收到 0.66，准心必须跟着收。
   T.Debug.Key("KeyC");
   settle();
   const crouch = { ...read(), stance: T.player.stance };
@@ -124,7 +124,7 @@ const centered = (row) => Math.abs(row.centerX - 640) < 0.1 && Math.abs(row.cent
 // 人顶在墙上它照样充到 1，光看它永远发现不了走没走动。
 //
 // 冲刺倍率 2.5 保持不变，它没有过期：满速时缝是站姿的
-// SpreadDeg 走动项（×1.85，见 Script_Player 的【2026-08-25 调走动那一项】）
+// SpreadDeg 走动项（×1.85，见 Data_Tuning_Player.SPREAD 的【2026-08-25 调走动那一项】）
 // 乘以 CROSSHAIR.sprintBloom（×1.5）≈ 2.78 倍。注意这条断言**同时压着两个常数**，
 // 余量只有一成上下：再收一次走动散布就得连它一起重算。
 const checks = [

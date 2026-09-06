@@ -11,6 +11,11 @@
 // 近处按人体半径够得着，远处按角度收敛，于是"看起来压在准心上"就等于"识别得到"。
 // 锥角至少与当前散布同宽：散布撑大到 7° 时准心画的就是 7°，
 // 那么落在那个圈里的人本来就都是这一枪可能打到的人，识别范围与准心必须是同一件事。
+//
+// 卡片上的字一律走 Script_Text（表在 Data_Text_Hud.mjs 的 `hud.faction.` /
+// `hud.rank.ija.` / `hud.unit.ija.` 三段）—— 它是纯数据依赖，这一层仍然纯 Node 跑得起来。
+
+import { T } from "./Script_Text.mjs";
 
 export const IDENTIFY = {
   /**
@@ -64,8 +69,11 @@ const CAPSULE = [
 ];
 const BODY_HALF_W = 0.45;
 
-/** 阵营显示名。中方一律"川军"—— 第 2 集团军的川军番号在阵亡卡里另有交代。 */
-const FACTION_LABEL = { nra: "川军", ija: "日军" };
+/**
+ * 阵营显示名。中方一律"川军"—— 第 2 集团军的川军番号在阵亡卡里另有交代。
+ * side id 与 Script_Ai 同一套（nra / ija），键按它拼。
+ */
+function FactionLabel(faction) { return T(`hud.faction.${faction}`); }
 
 /**
  * 日军军衔。**1938 年没有"兵长"** —— 那一级是 1940 年才加的，别往表里填。
@@ -75,11 +83,12 @@ const FACTION_LABEL = { nra: "川军", ija: "日军" };
  * 轻机枪手（歪把子）通常是上等兵，其余按出生序号在二等兵/一等兵之间分。
  */
 function IjaRank(soldier) {
-  if (soldier.weaponId === "Type92Hmg") return "伍长";
-  if (soldier.weaponId === "Type89Launcher") return "上等兵";
-  if (soldier.weapon?.kind === "lmg") return "上等兵";
-  if (soldier.tacticalRole === "leader") return "军曹";
-  return (Number(soldier.id) % 3 === 0) ? "一等兵" : "二等兵";
+  if (soldier.weaponId === "Type92Hmg") return T("hud.rank.ija.corporal");
+  if (soldier.weaponId === "Type89Launcher") return T("hud.rank.ija.superiorPrivate");
+  if (soldier.weapon?.kind === "lmg") return T("hud.rank.ija.superiorPrivate");
+  if (soldier.tacticalRole === "leader") return T("hud.rank.ija.sergeant");
+  return (Number(soldier.id) % 3 === 0)
+    ? T("hud.rank.ija.privateFirst") : T("hud.rank.ija.privateSecond");
 }
 
 /**
@@ -90,13 +99,13 @@ function IjaRank(soldier) {
  * 为什么报番号而不报枪：玩家真正要读的是"对面是哪一支、成建制到什么程度"，
  * 而"他拿的是三八式"这件事在这个战场上是废话 —— 日军步兵人手一支三八式。
  */
-const IJA_REGIMENTS = ["步兵第63联队", "步兵第10联队"];
+const IJA_REGIMENTS = ["hud.unit.ija.regiment63", "hud.unit.ija.regiment10"];
 
 function IjaUnit(soldier) {
-  if (soldier.weaponId === "Type92Hmg") return "机关枪中队";
-  if (soldier.weaponId === "Type89Launcher") return "掷弹筒分队";
+  if (soldier.weaponId === "Type92Hmg") return T("hud.unit.ija.mgCompany");
+  if (soldier.weaponId === "Type89Launcher") return T("hud.unit.ija.grenadierSquad");
   // 按 id 定死，不随帧变：同一个人每次指到他都该是同一支部队。
-  return IJA_REGIMENTS[Math.abs(Number(soldier.id) || 0) % IJA_REGIMENTS.length];
+  return T(IJA_REGIMENTS[Math.abs(Number(soldier.id) || 0) % IJA_REGIMENTS.length]);
 }
 
 function Meters(dist) {
@@ -114,7 +123,7 @@ function Meters(dist) {
  */
 function Years(identity) {
   const age = Math.round(Number(identity?.age));
-  return Number.isFinite(age) && age > 0 ? `${age} 岁` : "";
+  return Number.isFinite(age) && age > 0 ? T("hud.target.age", { age }) : "";
 }
 
 /**
@@ -139,7 +148,7 @@ export function TargetCard(entity, dist, detail = "basic") {
       key: `x${entity.id}`,
       faction: entity.side || "ija",
       kind: entity.kind,
-      title: entity.title || "载具",
+      title: entity.title || T("hud.target.vehicle"),
       meta: bits.join(" · "),
       health: detail === "full" && Number.isFinite(entity.health01) ? entity.health01 : null,
       dead: false,
@@ -164,7 +173,7 @@ export function TargetCard(entity, dist, detail = "basic") {
       key: `s${entity.id}`,
       faction,
       kind: "corpse",
-      title: `阵亡 ${identity.name || ""}`.trim(),
+      title: T("hud.target.corpse", { name: identity.name || "" }).trim(),
       meta: bits.filter(Boolean).join(" · "),
       health: null,
       dead: true,
@@ -178,7 +187,7 @@ export function TargetCard(entity, dist, detail = "basic") {
       key: `s${entity.id}`,
       faction,
       kind: faction === "nra" ? "friend" : "enemy",
-      title: FACTION_LABEL[faction],
+      title: FactionLabel(faction),
       meta: Meters(dist),
       health: null,
       dead: false,
@@ -187,13 +196,13 @@ export function TargetCard(entity, dist, detail = "basic") {
   }
   if (faction === "nra") {
     // 自己人这一行**不报枪**，报岁数（见 Years 的账）。
-    const bits = [entity.towel ? "敢死队" : "", Years(identity), Meters(dist)];
-    if (detail !== "full" && wounded) bits.push("负伤");
+    const bits = [entity.towel ? T("hud.target.stormTeam") : "", Years(identity), Meters(dist)];
+    if (detail !== "full" && wounded) bits.push(T("hud.target.wounded"));
     return {
       key: `s${entity.id}`,
       faction,
       kind: "friend",
-      title: identity.name || FACTION_LABEL.nra,
+      title: identity.name || T("hud.faction.nra"),
       meta: bits.filter(Boolean).join(" · "),
       health: detail === "full" ? Math.max(0, Math.min(1, Number(entity.health) / 100)) : null,
       dead: false,
@@ -203,12 +212,12 @@ export function TargetCard(entity, dist, detail = "basic") {
   // 活着的日军：**军衔 + 部队番号**，不报他手里那支枪 ——
   // 日军步兵人手一支三八式，报枪等于没报；番号才是"对面是哪一支"。
   const bits = [IjaUnit(entity), Meters(dist)].filter(Boolean);
-  if (detail !== "full" && wounded) bits.push("负伤");
+  if (detail !== "full" && wounded) bits.push(T("hud.target.wounded"));
   return {
     key: `s${entity.id}`,
     faction,
     kind: "enemy",
-    title: `${FACTION_LABEL.ija} ${IjaRank(entity)}`,
+    title: T("hud.rank.ija.title", { faction: T("hud.faction.ija"), rank: IjaRank(entity) }),
     meta: bits.filter(Boolean).join(" · "),
     health: detail === "full" ? Math.max(0, Math.min(1, Number(entity.health) / 100)) : null,
     dead: false,

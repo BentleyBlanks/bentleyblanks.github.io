@@ -48,6 +48,8 @@ import { BLAST_TARGETS } from "./Script_BlastTargets.mjs";
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
 import { P012SegmentClear, P012NextVisiblePoint, P012RouteProjection, P012RoutePoint } from "./Script_FirstLevelP012March.mjs";
 import { CARRY_KINDS } from "./Script_Carry.mjs";
+import { T } from "./Script_Text.mjs";
+import { CH1_ESCORT_MEMBERS, CH1_PREP_WOUNDED_MEMBERS } from "./Data_Setpieces_Ch1.mjs";
 
 // The actual civilian hit by the aircraft remains the same living actor.
 // Carry owns attachment only while that named load is in the player's hands;
@@ -407,7 +409,7 @@ export class EscortColumn {
       let handle = null;
       try {
         handle = this.host.SpawnActor ? this.host.SpawnActor({
-          label: entry.label || "后送队", x, z,
+          label: entry.label || T("setpieces.escort.default"), x, z,
           weapon: entry.weapon || null, squadId: "EscortColumn",
           role: entry.role, civilian: entry.civilian === true, variant: entry.variant,
         }) : null;
@@ -415,7 +417,7 @@ export class EscortColumn {
         this.log.push({ label: entry.label, ok: false, why: String((err && err.message) || err) });
         return;
       }
-      if (!handle) { this.log.push({ label: entry.label, ok: false, why: "宿主没造出来（人口预算满了）" }); return; }
+      if (!handle) { this.log.push({ label: entry.label, ok: false, why: "宿主没造出来（人口预算满了）" }); return; } // @text-ok 取证日志（Debug.Setpieces），不上屏
       // 「能走的轻伤员」走视频转骨骼的跛行 clip（Script_Ai 把旗透传给 Actor）。
       if (entry.role === "walking") handle.woundedWalk = 1;
       if (entry.role === "bearer" && this.keepArrivalSlots) handle.scriptArrivalRadius = .3;
@@ -786,7 +788,7 @@ export const SETPIECES = {
   // =========================================================================
   CH0_Chuchuan: {
     id: "CH0_Chuchuan",
-    note: "过场承载章：车厢、兵站、逃跑计划三段全在 CS_Chuchuan 里。",
+    note: "过场承载章：车厢、兵站、逃跑计划三段全在 CS_Chuchuan 里。", // @text-ok note 是给读表的人看的注记，不上屏
     Setup() {},
   },
 
@@ -811,17 +813,17 @@ export const SETPIECES = {
       if (crate && !s.phase?.whitebox?.p012) {
         s.Register(PickUpLoadInteraction({
           id: "ch1_ammoCrate", position: crate, kindId: "ammoCrate",
-          label: "抬起弹药箱", carry: s.carry, once: false,
-          options: { label: "弹药箱", payload: { to: "mg" } },
+          label: T("setpieces.ch1.ammoCrate"), carry: s.carry, once: false,
+          options: { label: T("setpieces.ch1.ammoCrateLoad"), payload: { to: "mg" } },
         }));
       }
       if (nest && !s.phase?.whitebox?.p012) {
         s.Register(GiveSupplyInteraction({
-          id: "ch1_ammoDrop", position: nest, item: "弹药箱", label: "把箱子送过去",
+          id: "ch1_ammoDrop", position: nest, item: T("setpieces.ch1.ammoCrateLoad"), label: T("setpieces.ch1.ammoDrop"),
           Has: () => !!s.carry && s.carry.KindId === "ammoCrate",
           OnComplete: () => {
             s.carry?.Drop("delivered");
-            s.Hint("弹药送到机枪位了。", 2.4);
+            s.Hint(T("setpieces.ch1.ammoDelivered"), 2.4);
             s.mem.ammoDelivered = (s.mem.ammoDelivered || 0) + 1;
           },
           once: false,
@@ -847,30 +849,22 @@ export const SETPIECES = {
         followRouteBodies: !!s.phase?.whitebox?.p012,
         keepArrivalSlots: !!s.phase?.whitebox?.p012,
         ...(carryPose || {}),
-        members: [
-          { role: "bearer", label: "担架员", weapon: null },
-          { role: "bearer", label: "担架员", weapon: null },
-          { role: "bearer", label: "担架员", weapon: null },
-          { role: "bearer", label: "担架员", weapon: null },
-          { role: "guard", label: "护卫", weapon: "HanYang" },
-          { role: "guard", label: "护卫", weapon: "HanYang" },
-          { role: "walking", label: "可行走伤兵", weapon: null },
-          { role: "walking", label: "可行走伤兵", weapon: null },
-          // 队列只传角色身份；P012宿主通过正式ActorFactory复用男女平民模型，
-          // 无枪标记同时约束可见武器和AI攻击，不在这里复制人物渲染或战斗规则。
-          { role: "civilian", label: "百姓", weapon: null, civilian: true, variant: s.phase?.whitebox?.p012 ? "male" : undefined,
-            routeSlot: s.phase?.whitebox?.p012 ? {back:.95,lateral:.8} : undefined },
-          { role: "civilian", label: "百姓（抱娃的婆娘）", weapon: null, civilian: true, variant: s.phase?.whitebox?.p012 ? "female" : undefined,
-            routeSlot: s.phase?.whitebox?.p012 ? {back:5.15,lateral:.8} : undefined },
-        ],
+        // 编成在 Data_Setpieces_Ch1.CH1_ESCORT_MEMBERS；这里只把它翻成队列要的形状：
+        // 名牌取文本键，P012 专用的模型分身与固定槽位只在白盒里给。
+        members: CH1_ESCORT_MEMBERS.map((entry) => ({
+          role: entry.role, label: T(entry.labelKey), weapon: entry.weapon,
+          ...(entry.civilian ? { civilian: true } : {}),
+          variant: s.phase?.whitebox?.p012 ? entry.p012Variant : undefined,
+          routeSlot: s.phase?.whitebox?.p012 ? entry.p012RouteSlot : undefined,
+        })),
       });
       if (s.phase?.whitebox?.p012) {
         const shelter = s.phase.whitebox.anchors.shelter;
         const woundedAt = s.phase.whitebox.activities.woundedDragFrom || shelter;
         s.mem.prepWounded = s.Column({ propPrefix: "p012PrepWounded",
           waypoints: [shelter, { x: shelter.x + 0.1, z: shelter.z }],
-          members: [{ role: "bearer", label: "阵地救护兵", weapon: null },
-            { role: "bearer", label: "阵地救护兵", weapon: null }] });
+          members: CH1_PREP_WOUNDED_MEMBERS.map((entry) => ({
+            role: entry.role, label: T(entry.labelKey), weapon: entry.weapon })) });
         s.mem.prepWounded.Start();
         const litter = s.mem.prepWounded.litters[0];
         if (litter) {
@@ -878,8 +872,8 @@ export const SETPIECES = {
           s.mem.p012WoundedDrag = { prop: litter.propBody, position: { ...woundedAt }, distance: 0, delivered: false };
           s.d.host.MoveProp?.(litter.propBody, { ...woundedAt, y: 0.15 });
           s.Register({ ...PickUpLoadInteraction({ id: "p012_woundedDrag", kindId: "wounded", carry: s.carry,
-            Anchor: () => s.mem.p012WoundedDrag.position, label: "拖住伤员，带回交通壕",
-            options: { label: "拖回伤员", canDrop: true, payload: { who: "p012DraggedWounded" } } }),
+            Anchor: () => s.mem.p012WoundedDrag.position, label: T("setpieces.ch1.woundedDrag"),
+            options: { label: T("setpieces.ch1.woundedDragLoad"), canDrop: true, payload: { who: "p012DraggedWounded" } } }),
             once: false, Enabled: () => !s.mem.p012WoundedDrag.delivered && !s.carry?.Active && s.d.host.Story?.()?.Signalled("P012WoundedChecked") });
         }
       }
@@ -911,9 +905,9 @@ export const SETPIECES = {
           id: "ch1_stretcher", kindId: "stretcher",
           // 挂在队头上：担架跟着队伍走，交互点也跟着走。
           Anchor: () => s.mem.column?.HeadPosition() || spot,
-          label: "接住担架后端", carry: s.carry,
+          label: T("setpieces.ch1.stretcher"), carry: s.carry,
           options: {
-            label: "担架（伤员）", canDrop: true,
+            label: T("setpieces.ch1.stretcherLoad"), canDrop: true,
             partner: s.mem.column?.Bearers?.[0]?.handle || null,
             payload: { who: "shangbing" },
           },
@@ -1214,7 +1208,7 @@ export const SETPIECES = {
               if(p012){CompleteAirPass();return;}
               s.carry?.ForceRelease("dive");
               s.checkpoint?.Rewind(4);
-              s.Hint("再来一次 —— 它压下来的时候扑进沟里。", 3.2);
+              s.Hint(T("setpieces.ch1.diveRetry"), 3.2);
             },
             OnPhase: (beat) => {
               if (p012 && beat === "enter") s.Signal("P012DiveApproach");
@@ -1245,10 +1239,10 @@ export const SETPIECES = {
           }
           ss.Register(PickUpLoadInteraction({
             id: "ch1_regrip", position: spot, kindId: "stretcher",
-            label: "重新握住担架后端", carry: ss.carry,
-            options: { label: "担架（伤员）", canDrop: true, payload: { who: "shangbing" } },
+            label: T("setpieces.ch1.regrip"), carry: ss.carry,
+            options: { label: T("setpieces.ch1.stretcherLoad"), canDrop: true, payload: { who: "shangbing" } },
             OnComplete: () => {
-              ss.Hint("腿抬高了。", 2.2);
+              ss.Hint(T("setpieces.ch1.legRaised"), 2.2);
               if (ss.phase?.whitebox?.p012) ss.Signal("P012Regripped");
             },
           }));
@@ -1371,7 +1365,7 @@ export class MissionSetpieceDirector {
     // 当成刚播的重演一遍 —— 表现是「一进关罗班长就已经牺牲了」。
     this.firedCursor = this.host.Story?.()?.fired?.length ?? 0;
     if (!this.spec) {
-      this.log.push({ levelId, ok: false, why: "没有这一章的摆点表" });
+      this.log.push({ levelId, ok: false, why: "没有这一章的摆点表" }); // @text-ok 取证日志（Debug.Setpieces），不上屏
       return false;
     }
     // 上下文**一关一个**，不是一帧一个：Update 是每帧路径，而这个门面
@@ -1382,7 +1376,7 @@ export class MissionSetpieceDirector {
       this.spec.Setup?.(s);
     } catch (err) {
       // 摆点炸了不该把一关带走：吞掉、留痕、继续玩（台词与目标链不依赖这一层）。
-      this.log.push({ levelId, ok: false, why: `Setup 抛异常：${String((err && err.message) || err)}` });
+      this.log.push({ levelId, ok: false, why: `Setup 抛异常：${String((err && err.message) || err)}` }); // @text-ok 取证日志，不上屏
       return false;
     }
     this.log.push({ levelId, ok: true, points: this.host.Interact?.()?.PointCount ?? null });
@@ -1467,7 +1461,7 @@ export class MissionSetpieceDirector {
 
   _Safe(fn, where) {
     try { fn(); } catch (err) {
-      this.log.push({ levelId: this.levelId, ok: false, why: `${where}：${String((err && err.message) || err)}` });
+      this.log.push({ levelId: this.levelId, ok: false, why: `${where}：${String((err && err.message) || err)}` }); // @text-ok 取证日志，不上屏
     }
   }
 

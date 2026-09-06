@@ -31,6 +31,7 @@
 // ---------------------------------------------------------------------------
 
 import * as THREE from "three";
+import { T } from "./Script_Text.mjs";
 import { Mulberry32, HashString, Clamp, Clamp01, Fbm2, SmoothStep } from "./Script_Noise.mjs";
 import {
   CITY, MOAT, GATES, BARBICAN, WALL_SIDES, BASTION, BASTIONS,
@@ -514,25 +515,25 @@ export class TengxianCity {
   *BuildSteps() {
     const rnd = Mulberry32(this.seed);
 
-    yield { label: "夯地：城内台地与濠外原野", progress: 0.03 };
+    yield { label: T("boot.build.city.ground"), progress: 0.03 };
     this.BuildTerrain(rnd);
 
-    yield { label: "挖濠：宽 10.5 深 4.8", progress: 0.10 };
+    yield { label: T("boot.build.city.moat"), progress: 0.10 };
     this.BuildMoat(rnd);
 
-    yield { label: "筑城：墙身 11.5 米", progress: 0.16 };
+    yield { label: T("boot.build.city.wall"), progress: 0.16 };
     this.BuildWalls(rnd);
 
-    yield { label: "马面与角楼", progress: 0.26 };
+    yield { label: T("boot.build.city.bastions"), progress: 0.26 };
     this.BuildBastions(rnd);
 
-    yield { label: "开四门：半圆瓮城与城楼", progress: 0.34 };
+    yield { label: T("boot.build.city.gates"), progress: 0.34 };
     this.BuildGates(rnd);
 
-    yield { label: "上城道（全城只有四条）", progress: 0.42 };
+    yield { label: T("boot.build.city.ramps"), progress: 0.42 };
     this.BuildRamps(rnd);
 
-    yield { label: "铺街：十字街口与四条门里街", progress: 0.47 };
+    yield { label: T("boot.build.city.streets"), progress: 0.47 };
     this.BuildStreets(rnd);
 
     // --- 城内院落 ---
@@ -545,27 +546,27 @@ export class TengxianCity {
       this.BuildBlock(cell, rnd);
       done += 1;
       if (done % 24 === 0) {
-        yield { label: `盖房子 ${done}/${cells.length}`, progress: 0.47 + 0.28 * (done / cells.length) };
+        yield { label: T("boot.build.city.houses", { done, total: cells.length }), progress: 0.47 + 0.28 * (done / cells.length) };
       }
     }
 
-    yield { label: "县衙、警报楼、牌坊、天主堂", progress: 0.77 };
+    yield { label: T("boot.build.city.landmarks"), progress: 0.77 };
     this.BuildLandmarks(rnd);
     this.BuildMapFeatures(rnd);
 
-    yield { label: "东关：家家有枪眼的院落迷宫", progress: 0.84 };
+    yield { label: T("boot.build.city.eastSuburb"), progress: 0.84 };
     this.BuildEastSuburb(rnd);
 
-    yield { label: "东关外：农田、坟地与独户农院", progress: 0.86 };
+    yield { label: T("boot.build.city.eastFields"), progress: 0.86 };
     this.BuildEastApproach(rnd);
 
-    yield { label: "生活层：门前家什、店铺摊具与路面痕迹", progress: 0.88 };
+    yield { label: T("boot.build.city.livedIn"), progress: 0.88 };
     this.BuildStreetLife();
 
-    yield { label: "城外：龙泉塔、荆河、西关", progress: 0.90 };
+    yield { label: T("boot.build.city.outskirts"), progress: 0.90 };
     this.BuildOutskirts(rnd);
 
-    yield { label: "合批", progress: 0.95 };
+    yield { label: T("boot.build.city.batch"), progress: 0.95 };
     // 注意是 push 不是赋值：地面／河面那几张网格是在前面几步直接挂进场景的，
     // 写成 this.meshes = Flush(...) 会把它们从表里抹掉（包围盒与销毁都要用这张表）。
     for (const m of this.sink.Flush(this.scene, this.library,
@@ -580,7 +581,7 @@ export class TengxianCity {
     this.covers = this.sink.covers;
     this.BuildCollisionGrid();
 
-    yield { label: "就绪", progress: 1.0 };
+    yield { label: T("boot.build.city.ready"), progress: 1.0 };
   }
 
   // =========================================================================

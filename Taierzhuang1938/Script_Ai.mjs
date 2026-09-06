@@ -16,6 +16,14 @@ import { WEAPONS } from "./Data_Weapons.mjs";
 import { COMBAT, NAME_POOL, DIFFICULTY } from "./Data_Battle.mjs";
 import { TRAVERSAL, TraversalPlan, TraversalCurve } from "./Data_Traversal.mjs";
 import { ActorCrowd } from "./Script_ActorCrowd.mjs";
+import {
+  SIGHT_BY_STANCE, SIGHT_SCALE_RANGE, SQUAD, ENGAGE, ACTOR_DETAIL,
+} from "./Data_Tuning_Ai.mjs";
+
+// 发现距离、班组队形、交火距离与人物 LOD 预算全在 `Data_Tuning_Ai.mjs`
+//（每一组的账跟着数搬过去了）。这里按原名 re-export —— 那两个名字是跨系统契约：
+// 照明弹按 SIGHT_SCALE_RANGE 夹倍率，人物动作编辑器与 FlareTest 都按名字找它们。
+export { SIGHT_BY_STANCE, SIGHT_SCALE_RANGE };
 
 const STATE = {
   IDLE: "idle", ADVANCE: "advance", COVER: "cover", FIRE: "fire",
@@ -23,43 +31,7 @@ const STATE = {
   VAULT: "vault",
 };
 
-/**
- * 被发现的距离，按**目标自己的姿态**缩放：站 120 / 蹲 80 / 卧 45 m。
- *
- * 这是 ER2 的 Covert Movements 那条机制里最便宜也最值钱的一半：姿态第一次真的
- * 影响"会不会被打"。原来两边一律 120 m 一刀切，趴下除了走得慢没有任何收益，
- * 于是玩家（和 AI）永远没有理由卧倒。
- */
-export const SIGHT_BY_STANCE = [120, 80, 45];
 
-/**
- * 发现距离的**全局倍率**上下限（`AiDirector.SetSightScale`）。
- *
- * 谁在写它：第四关的照明弹（Script_Flare）—— 燃烧期把三档一起抬上去（敌我同时
- * 暴露），熄灭之后压到 1 以下几秒（暗适应），过完再还原成 1。
- *
- * 为什么是**乘一个数**而不是改这张表：三档的比例就是「姿态决定被发现的距离」
- * 那条机制本身。整表乘同一个数，站/蹲/卧的次序与比例一个都不变 ——
- * 照明弹底下趴着仍然比站着难被看见。谁要是改成「照明弹期间一律 200 m」，
- * 这条机制当场作废。
- */
-export const SIGHT_SCALE_RANGE = Object.freeze({ min: 0.25, max: 4 });
-
-// 六人战斗组。不是给 HUD 看的职业系统，而是让一群人不再对着同一个点做同一个动作：
-// 组长定方向，突击手靠前，机枪/掩护手压后，侧翼手走最外侧，步枪手填中间。
-// Spawn 顺序固定，所以这张表也固定；同一种子重跑不会换队形。
-const SQUAD_SIZE = 6;
-const SQUAD_ENEMY_FOCUS_M = 92;
-const SQUAD_LOOKAHEAD_M = 22;
-const SQUAD_TURN_PER_UPDATE = 0.72;
-const SQUAD_SLOTS = [
-  { role: "leader", lateral: 0, depth: 1 },
-  { role: "assault", lateral: -2.5, depth: -4 },
-  { role: "rifleman", lateral: 4, depth: 1 },
-  { role: "support", lateral: -3, depth: 9 },
-  { role: "rifleman", lateral: -6, depth: 3 },
-  { role: "flank", lateral: 9, depth: -1 },
-];
 
 function AngleDelta(from, to) {
   return Math.atan2(Math.sin(to - from), Math.cos(to - from));
@@ -71,38 +43,11 @@ function ApproachAngle(from, to, maxStep) {
 
 let nextId = 1;
 
-/**
- * 【2026-08-20 可见性优先】不再给人物发“可见名额”。
- *
- * 旧实现只让 13 个（十字街甚至 10 个）Actor 走完整模型。其余活人只有超过 55 m
- * 才进入静态远景人群，导致镜头里第 14 个人若在 55 m 内就被直接设成 invisible；
- * 尸体既不进远景层、排序又垫底，通常倒下当帧就从画面消失。
- *
- * 2026-08-21 性能取证：相机朝向 23 名日军时一帧 27.5 ms / 948 calls，
- * 转身只看 8 名守军时 11.0 ms / 500 calls。视锥内全用完整 Actor 会让“朝向敌人”
- * 本身变成 CPU 尖峰；而 root.visible 又打开了每人每帧两次足底物理探测。
- *
- * 所以保留“视锥内每个人都必须看得见”，但改为距离 LOD：近处是完整 Actor，
- * 远处是 ActorCrowd 烘焙出的同款模型实例。这不按人数发名额，不会隐藏第 N 个人；
- * 活人、卧倒者与尸体都进 LOD，只是二十几像素高时不再白算关节、脚 IK 与逐件提交。
- */
-const ACTOR_DETAIL_ENTER_M = 46;
-const ACTOR_DETAIL_EXIT_M = 56;
-// 尸体没有步态、瞄准或足部 IK 可读，投影缩到这个距离后继续保留完整分件只会
-// 重复提交同一套定格网格。近处仍用真实倒地姿势，稍远处交给同款人物的尸体 LOD；
-// 两档之间留 6 m 迟滞，玩家在边界前后走动时不会反复切换。
-const CORPSE_DETAIL_ENTER_M = 24;
-const CORPSE_DETAIL_EXIT_M = 30;
-const ACTOR_ANIMATION_60HZ_M = 20;
-const ACTOR_ANIMATION_30HZ_M = 32;
-const ACTOR_FOOT_IK_M = 18;
-const ACTOR_SHADOW_M = 24;
-// 视锥判定用的包围球：半径给到 1.6 m（人高 1.7 上下）再加一点余量，
-// 免得屏幕边缘上的人在转身时一格一格地闪出来。
-const ACTOR_BOUND_R = 1.6;
+// 人物 LOD 的距离预算在 `Data_Tuning_Ai.ACTOR_DETAIL`（为什么改成距离 LOD、
+// 迟滞留多少，那段账跟着数搬过去了）。这三个是复用的临时对象，不是调参。
 const _cullFrustum = new THREE.Frustum();
 const _cullMatrix = new THREE.Matrix4();
-const _cullSphere = new THREE.Sphere(new THREE.Vector3(), ACTOR_BOUND_R);
+const _cullSphere = new THREE.Sphere(new THREE.Vector3(), ACTOR_DETAIL.boundRadiusM);
 
 /**
  * 屏幕上只有二十来像素高的人不需要 60 Hz 解十三个关节。位移与转向仍每帧同步，
@@ -110,8 +55,8 @@ const _cullSphere = new THREE.Sphere(new THREE.Vector3(), ACTOR_BOUND_R);
  */
 function ActorAnimationCadence(soldier) {
   const distanceSq = soldier.actor?.renderDistanceSq ?? 0;
-  if (distanceSq > ACTOR_ANIMATION_30HZ_M * ACTOR_ANIMATION_30HZ_M) return 3;
-  if (distanceSq > ACTOR_ANIMATION_60HZ_M * ACTOR_ANIMATION_60HZ_M) return 2;
+  if (distanceSq > ACTOR_DETAIL.animation30HzM ** 2) return 3;
+  if (distanceSq > ACTOR_DETAIL.animation60HzM ** 2) return 2;
   return 1;
 }
 
@@ -534,21 +479,21 @@ export class AiDirector {
     if (assignedSquadId) {
       let overflow = 1;
       while (this.soldiers.filter((candidate) => candidate.alive
-        && candidate.squadId === assignedSquadId).length >= SQUAD_SIZE) {
+        && candidate.squadId === assignedSquadId).length >= SQUAD.size) {
         assignedSquadId = `${explicitSquadId}_${overflow}`;
         overflow += 1;
       }
     }
-    let slot = serial % SQUAD_SIZE;
+    let slot = serial % SQUAD.size;
     if (assignedSquadId) {
       const used = new Set(this.soldiers
         .filter((candidate) => candidate.alive && candidate.squadId === assignedSquadId)
         .map((candidate) => candidate.squadSlot));
-      slot = SQUAD_SLOTS.findIndex((_, index) => !used.has(index));
-      if (slot < 0) slot = serial % SQUAD_SIZE;
+      slot = SQUAD.slots.findIndex((_, index) => !used.has(index));
+      if (slot < 0) slot = serial % SQUAD.size;
     }
-    const slotSpec = SQUAD_SLOTS[slot];
-    soldier.squadId = assignedSquadId || `${side}_${Math.floor(serial / SQUAD_SIZE)}`;
+    const slotSpec = SQUAD.slots[slot];
+    soldier.squadId = assignedSquadId || `${side}_${Math.floor(serial / SQUAD.size)}`;
     soldier.squadSlot = slot;
     // 战位登记必须用**改名前**的那个 id（assignedSquadId 可能已被改成 `..._1`）
     soldier.emplacementId = emplacementId;
@@ -673,7 +618,7 @@ export class AiDirector {
 
       // 最近敌情由小队统一看：一个人接敌，旁边五个人不应继续各走各的。
       let nearest = null;
-      let nearestD = SQUAD_ENEMY_FOCUS_M;
+      let nearestD = SQUAD.enemyFocusM;
       const enemySide = group.side === "nra" ? "ija" : "nra";
       for (const other of this.soldiers) {
         if (!other.alive || other.side !== enemySide) continue;
@@ -703,7 +648,7 @@ export class AiDirector {
         }
         if (oldEnemy) {
           oldEnemy.dist = Math.hypot(oldEnemy.x - group.x, oldEnemy.z - group.z);
-          if (oldEnemy.dist > SQUAD_ENEMY_FOCUS_M * 1.25) oldEnemy = null;
+          if (oldEnemy.dist > SQUAD.enemyFocusM * 1.25) oldEnemy = null;
         }
       }
       if (oldEnemy && (this.time < group.focusUntil || !nearest || oldEnemy.dist <= nearestD * 1.3)) {
@@ -737,7 +682,7 @@ export class AiDirector {
           const wanted = Math.atan2(dx, dz);
           const hasHeading = Math.hypot(group.forwardX, group.forwardZ) > 0.5;
           const current = hasHeading ? Math.atan2(group.forwardX, group.forwardZ) : wanted;
-          const heading = ApproachAngle(current, wanted, SQUAD_TURN_PER_UPDATE);
+          const heading = ApproachAngle(current, wanted, SQUAD.turnPerUpdate);
           group.forwardX = Math.sin(heading);
           group.forwardZ = Math.cos(heading);
         }
@@ -761,11 +706,11 @@ export class AiDirector {
    * 锚只放到队伍前方一小段，不再把每个人直接拽到几百米外的终点。
    */
   SetSquadGoal(s, group) {
-    const slot = SQUAD_SLOTS[s.squadSlot] || SQUAD_SLOTS[2];
+    const slot = SQUAD.slots[s.squadSlot] || SQUAD.slots[2];
     const fx = group.forwardX, fz = group.forwardZ;
     const rx = -fz, rz = fx;
     const focusDist = Math.hypot(group.focusX - group.x, group.focusZ - group.z);
-    const lookahead = Math.min(focusDist, group.focusKind === "enemy" ? 14 : SQUAD_LOOKAHEAD_M);
+    const lookahead = Math.min(focusDist, group.focusKind === "enemy" ? 14 : SQUAD.lookaheadM);
     const anchorX = group.x + fx * lookahead;
     const anchorZ = group.z + fz * lookahead;
     // 支援位即使序号不是 3，也按掩护纵深站；机枪手不顶到突击手前面。
@@ -951,12 +896,12 @@ export class AiDirector {
       }
       const distanceSq = s.position.distanceToSquared(camera.position);
       s.actor.renderDistanceSq = distanceSq;
-      s.actor.allowFootIk = distanceSq <= ACTOR_FOOT_IK_M * ACTOR_FOOT_IK_M;
-      s.actor.SetShadowEnabled(distanceSq <= ACTOR_SHADOW_M * ACTOR_SHADOW_M);
+      s.actor.allowFootIk = distanceSq <= ACTOR_DETAIL.footIkM ** 2;
+      s.actor.SetShadowEnabled(distanceSq <= ACTOR_DETAIL.shadowM ** 2);
       const settledCorpse = !s.alive && s.deadTime >= 0.9;
       const detailLimit = settledCorpse
-        ? (s.renderLod === "detail" ? CORPSE_DETAIL_EXIT_M : CORPSE_DETAIL_ENTER_M)
-        : (s.renderLod === "detail" ? ACTOR_DETAIL_EXIT_M : ACTOR_DETAIL_ENTER_M);
+        ? (s.renderLod === "detail" ? ACTOR_DETAIL.corpseExitM : ACTOR_DETAIL.corpseEnterM)
+        : (s.renderLod === "detail" ? ACTOR_DETAIL.exitM : ACTOR_DETAIL.enterM);
       // 纯逻辑测试没有 scene/factory，没有远景层可以接手时必须回退完整 Actor。
       const detailed = !crowd || distanceSq <= detailLimit * detailLimit;
       this._SetDetailedAttached(s.actor, detailed);
@@ -1218,7 +1163,7 @@ export class AiDirector {
 
     // 状态机。压制门槛从 0.72 降到 0.50：ER2 的 allowFindCoverWhenSuppressed
     // 是一条**独立行为**，被打得抬不起头的表现是往掩体里缩，不是站着不动。
-    const engageRange = s.tacticalRole === "support" ? 95 : 74;
+    const engageRange = s.tacticalRole === "support" ? ENGAGE.supportM : ENGAGE.defaultM;
     const wasEngaged = s.state === STATE.FIRE || s.state === STATE.CHARGE;
     if (s.suppression > 0.50 || (s.state === STATE.SUPPRESSED && s.suppression > 0.32)) {
       // 被压制打断的冲锋是失败的冲锋：这一轮不再自动重起。冷却带抖动，
@@ -1254,7 +1199,7 @@ export class AiDirector {
           this.ctx.audio.Bark("ammo", { position: s.position.clone(), seed: s.id | 0, side: s.side });
         }
       }
-    } else if (s.target && bestDist < engageRange + (wasEngaged ? 12 : 0)) {
+    } else if (s.target && bestDist < engageRange + (wasEngaged ? ENGAGE.hysteresisM : 0)) {
       // 六人组内不再人人同一种打法：突击位先压、侧翼位次之，步枪位只在贴脸时冲，
       // 支援位永不自行冲锋，留在后方持续射击。
       const chargeRange = s.tacticalRole === "assault" ? 24

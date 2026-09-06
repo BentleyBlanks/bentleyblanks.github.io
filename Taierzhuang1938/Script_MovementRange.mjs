@@ -1,9 +1,11 @@
 // Observes the production controller; never supplies movement velocities or physics.
 import * as THREE from 'three';
-import { PlayerMovementReference } from './Script_Player.mjs';
+import { PlayerMovementReference, StanceLabel } from './Script_Player.mjs';
 import { TRAVERSAL } from './Data_Traversal.mjs';
 import { MOVEMENT_RANGE_STATIONS, MOVEMENT_FIXTURES, MOVEMENT_RUNWAY } from './Data_MovementRange.mjs';
-const Names = { jump: '原地 / 慢步跳', runJump: '助跑跳', vault: '翻越', mantle: '攀爬' };
+import { T } from './Script_Text.mjs';
+// 动作种类的显示名。键的可变部分是 Player 那边的动作 id（jump / runJump / vault / mantle）。
+const KindKey = kind => 'range.movement.kind.' + kind;
 const M = n => Number.isFinite(n) ? n.toFixed(2) + ' m' : '—';
 export class MovementRange {
   constructor(host) {
@@ -115,7 +117,10 @@ export class MovementRange {
     this.style.textContent = '#movementRangePanel{position:fixed;z-index:35;right:18px;top:86px;width:292px;max-height:calc(100vh - 300px);overflow:auto;padding:14px;color:#e7eef0;background:rgba(24,36,45,.91);border:1px solid #91a2ad;border-radius:5px;font:13px/1.6 sans-serif;pointer-events:auto}#movementRangePanel[hidden],body:has(#menu.mnRoot:not(.off)) #movementRangePanel{display:none}#movementRangePanel summary{font-size:16px;font-weight:700;cursor:pointer}#movementRangePanel p{margin:7px 0}#movementRangePanel button{background:#394e5c;color:white;border:1px solid #718895;border-radius:3px;padding:4px 7px;margin:3px;font:inherit;cursor:pointer}#movementRangePanel .movementValues{font-variant-numeric:tabular-nums;color:#f6db93;white-space:pre-line}#movementRangePanel .movementHelp{color:#b6c5cc;font-size:12px}@media(max-width:700px){#movementRangePanel{right:8px;top:75px;width:235px;font-size:11px;padding:8px;max-height:36vh}}';
     document.head.append(this.style);
     this.panel = document.createElement('details'); this.panel.id = 'movementRangePanel'; this.panel.open = window.innerWidth > 700; this.panel.hidden = !this.host.CanUse();
-    this.panel.innerHTML = '<summary>操作测试 · 实测记录</summary><p class="movementStation"></p><div class="movementValues"></div><p class="movementHelp">Space 跳跃 / 翻越 · Shift 冲刺<br>C 蹲起 · Z 趴下 · 低姿态 Space 先站起<br>Home 复位补满体力 · PgUp / PgDn 切区<br>按住 Alt 可点击面板</p><div class="movementStations"></div><button data-reset>复位本区</button><button data-clear>清空成绩</button><p class="movementHelp">高度从起跳脚底量到脚底峰值；距离为起落点水平直线。跑跳最佳只计平地跑道。蓝线起跳，黄线落地；记录仅保留本次会话。</p>';
+    // `<br>` 是排版不是文案：四行分别登记，代码把它们串起来。
+    const help = [T('range.movement.helpMove'), T('range.movement.helpStance'),
+      T('range.movement.helpReset'), T('range.movement.helpAlt')].join('<br>');
+    this.panel.innerHTML = `<summary>${T('range.movement.panelTitle')}</summary><p class="movementStation"></p><div class="movementValues"></div><p class="movementHelp">${help}</p><div class="movementStations"></div><button data-reset>${T('range.movement.btnReset')}</button><button data-clear>${T('range.movement.btnClear')}</button><p class="movementHelp">${T('range.movement.panelNote')}</p>`;
     const buttons = this.panel.querySelector('.movementStations');
     for (const s of MOVEMENT_RANGE_STATIONS) { const button = document.createElement('button'); button.textContent = s.name; button.dataset.station = s.id; button.onclick = () => { if (this.host.CanUse()) this.GoTo(s.id); button.blur(); }; buttons.append(button); }
     this.panel.querySelector('[data-reset]').onclick = () => { if (this.host.CanUse()) this.GoTo(this.station); };
@@ -125,17 +130,22 @@ export class MovementRange {
   PaintPanel() {
     const p = this.host.player, last = this.history.at(-1), ref = this.references;
     this.panel.querySelector('.movementStation').textContent = MOVEMENT_RANGE_STATIONS.find(s => s.id === this.station)?.name;
-    const current = ref.stances[p.stance];
-    const lines = [(p.debug.fastMove || p.debug.noCollision) ? '调试加速 / 穿墙开启：不计最佳成绩' : '', current.label + ' · 速度 ' + Math.hypot(p.velocity.x, p.velocity.z).toFixed(2) + ' m/s · 体力 ' + Math.round(p.stamina * 100) + '%',
-      '眼高 ' + M(p.eyeHeight) + ' · 脚底 ' + M(p.position.y),
-      last ? '上次 ' + Names[last.kind] + '：↑ ' + M(last.riseM) + ' / → ' + M(last.distanceM) : '按 Space 完成一次动作以记录',
-      last?.obstacleHeightM ? '本次障碍净高 ' + M(last.obstacleHeightM) : '',
-      '最佳跃起：原地 ' + M(this.best.jump?.riseM) + ' / 助跑 ' + M(this.best.runJump?.riseM),
-      '跑道最远跑跳：' + M(this.best.runJump?.distanceM || undefined),
-      '最高翻越 ' + M(this.best.vault?.obstacleHeightM || undefined) + ' / 攀爬 ' + M(this.best.mantle?.obstacleHeightM || undefined),
-      '跳过障碍：' + M(Math.max(this.best.jump?.crossedHeightM || 0, this.best.runJump?.crossedHeightM || 0) || undefined),
-      '参数上限：翻越 ' + M(TRAVERSAL.vaultMax) + ' / 攀爬 ' + M(TRAVERSAL.mantleMax),
-      '跳高理论：' + M(ref.standingRiseM) + ' / ' + M(ref.runningRiseM)];
+    // 每一行都是完整的一句进表：这里只把量好的数交进去，不在调用点接中文。
+    const lines = [(p.debug.fastMove || p.debug.noCollision) ? T('range.movement.debugOn') : '',
+      T('range.movement.live', { stance: StanceLabel(p.stance),
+        speed: Math.hypot(p.velocity.x, p.velocity.z).toFixed(2), stamina: Math.round(p.stamina * 100) }),
+      T('range.movement.eye', { eye: M(p.eyeHeight), foot: M(p.position.y) }),
+      last ? T('range.movement.last', { kind: T(KindKey(last.kind)), rise: M(last.riseM), distance: M(last.distanceM) })
+        : T('range.movement.prompt'),
+      last?.obstacleHeightM ? T('range.movement.obstacle', { height: M(last.obstacleHeightM) }) : '',
+      T('range.movement.bestRise', { standing: M(this.best.jump?.riseM), running: M(this.best.runJump?.riseM) }),
+      T('range.movement.bestRun', { distance: M(this.best.runJump?.distanceM || undefined) }),
+      T('range.movement.bestVault', { vault: M(this.best.vault?.obstacleHeightM || undefined),
+        mantle: M(this.best.mantle?.obstacleHeightM || undefined) }),
+      T('range.movement.crossed', { height: M(Math.max(this.best.jump?.crossedHeightM || 0,
+        this.best.runJump?.crossedHeightM || 0) || undefined) }),
+      T('range.movement.limits', { vault: M(TRAVERSAL.vaultMax), mantle: M(TRAVERSAL.mantleMax) }),
+      T('range.movement.theory', { standing: M(ref.standingRiseM), running: M(ref.runningRiseM) })];
     this.panel.querySelector('.movementValues').textContent = lines.filter(Boolean).join('\n');
   }
   Dispose() {

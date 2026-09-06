@@ -173,6 +173,13 @@ export const JIEHE_SANDBOX_PHASE = Object.freeze({
   id: JIEHE_LEVEL_ID,
   sandbox: true,
   sandboxKey: "jiehe",
+  // 玩家在选章「测试场景」组里点得到这一条，所以这三样是**界面文本**：
+  // 字段保留（`label` 同时被 MissionName / aria-label 当 id 用），
+  // 显示走 `<字段>Key`（Script_Menu 优先读它，没有才回落到原字段）。
+  sandboxGlyphKey: "menu.slice.jiehe.glyph",
+  dateKey: "menu.slice.jiehe.date",
+  labelKey: "menu.slice.jiehe.label",
+  placeKey: "menu.slice.jiehe.place",
   sandboxGlyph: "河",
   date: "白盒场地",
   label: "界河 · 白盒",
@@ -258,8 +265,11 @@ export const MENU_SCENE = {
  *   from/to     推轨的起讫（世界坐标）。to 省略 = 定机位。
  *   look/lookTo 注视点的起讫。lookTo 省略 = 一直看着 look。
  *   focalMm     焦距。24≈53°、35≈37.8°、50≈27°、85≈16°。
- *   title       角上那行小字（给玩家看的地名）。
- *   note        这一机位在拍什么 —— 给后来改坐标的人看的，别删。
+ *   titleKey    角上那行小字（**给玩家看的地名**）的文本键，文案在 Data_Text_Menu
+ *               的 `menu.shot.<地名>`；Script_Menu 显示时 T() 解析。
+ *               键按**地方**取而不按关号取 —— 电灯厂在一关与终章各架了一次机位，
+ *               但它是同一处地方、同一行字，两处共用一条键（同一句话只登记一次）。
+ *   note        这一机位在拍什么 —— 给后来改坐标的人看的，不上屏，所以留原文。
  *   crowd       false = 这一机位不摆人。**镜头在墙顶时必须给 false**：
  *               撒兵按地皮高度落点（Script_Ai.Spawn 用 GroundHeight），
  *               人会摆到十一米五的墙底下去，画面上就是「一个人都没有」。
@@ -270,12 +280,12 @@ export const MENU_SHOTS = {
   // 所以机位与第一关同一组 —— 玩家在选章里点序章时看见的就是那片原野。
   CH0_Chuchuan: [
     {
-      id: "Railbed", title: "津浦路 · 路基", note: "路基侧后方：军列停下来的地方，也是第一关接敌的那道土坎",
+      id: "Railbed", titleKey: "menu.shot.railbed", note: "路基侧后方：军列停下来的地方，也是第一关接敌的那道土坎",
       from: [-540, 12, -232], to: [-522, 11, -206],
       look: [-478, 4.0, -172], focalMm: 40,
     },
     {
-      id: "Depot", title: "兵站月台", note: "车站货场方向：第五战区补的那批枪弹是从这儿发下去的",
+      id: "Depot", titleKey: "menu.shot.depot", note: "车站货场方向：第五战区补的那批枪弹是从这儿发下去的",
       from: [-504, 15, -136], to: [-488, 14, -114],
       look: [-458, 6.5, -82], focalMm: 35,
     },
@@ -285,12 +295,12 @@ export const MENU_SHOTS = {
   // 一 · 往南的路：城外原野。电灯厂那根二十二米的烟囱是西关天际线的关键剪影。
   CH1_NanLu: [
     {
-      id: "PowerPlant", title: "西关 · 电灯厂", note: "电灯厂：师部原设于此，十五日迁入城内。烟囱在西城门楼直瞄射程内",
+      id: "PowerPlant", titleKey: "menu.shot.powerPlant", note: "电灯厂：师部原设于此，十五日迁入城内。烟囱在西城门楼直瞄射程内",
       from: [-504, 15, 142], to: [-486, 14, 108],
       look: [-408, 11, 62], focalMm: 40,
     },
     {
-      id: "WestGate", title: "西门 · 怀古门", note: "西门外的护城河边看怀古门 —— 第一关末尾把人带回城走的就是这个门",
+      id: "WestGate", titleKey: "menu.shot.westGate", note: "西门外的护城河边看怀古门 —— 第一关末尾把人带回城走的就是这个门",
       from: [-426, 19, -66], to: [-408, 17.5, -24],
       look: [-318, 8.5, 0], focalMm: 35,
     },
@@ -300,12 +310,12 @@ export const MENU_SHOTS = {
   // 二 · 手榴弹雨：本战真正的主战场，打了整整二十四小时。菜单默认切片。
   CH2_Shouliudan: [
     {
-      id: "ZhaiWall", title: "东关 · 东寨墙", note: "东寨墙外：高两米、顶宽四十公分，一炮一个口",
+      id: "ZhaiWall", titleKey: "menu.shot.zhaiWall", note: "东寨墙外：高两米、顶宽四十公分，一炮一个口",
       from: [594, 13, -56], to: [576, 12, 2],
       look: [452, 5.5, -6], focalMm: 40,
     },
     {
-      id: "Courtyard", title: "东关 · 关厢院落", note: "关厢院落上方：日方检讨说要命的不是城墙，是这片密集民房",
+      id: "Courtyard", titleKey: "menu.shot.courtyard", note: "关厢院落上方：日方检讨说要命的不是城墙，是这片密集民房",
       from: [470, 24, 122], to: [452, 21, 84],
       look: [378, 6, 34], lookTo: [356, 6.5, 18], focalMm: 35,
     },
@@ -315,12 +325,12 @@ export const MENU_SHOTS = {
   // 三 · 救护所：城内 A 区 → 东门 → 东关失守街区。
   CH3_Jiuhusuo: [
     {
-      id: "EastGate", title: "东门 · 宗鲁门", note: "东门外一百米，关厢屋顶之上望宗鲁门与瓮城 —— 救护队来回走的那道门",
+      id: "EastGate", titleKey: "menu.shot.eastGate", note: "东门外一百米，关厢屋顶之上望宗鲁门与瓮城 —— 救护队来回走的那道门",
       from: [432, 17.5, -52], to: [424, 16.5, -22],
       look: [316, 8.5, -65], lookTo: [316, 8.5, -57], focalMm: 35,
     },
     {
-      id: "LostBlock", title: "东关 · 失守街区", note: "东关大街上方：前沿救护点就在这一片院落里",
+      id: "LostBlock", titleKey: "menu.shot.lostBlock", note: "东关大街上方：前沿救护点就在这一片院落里",
       from: [470, 24, 122], to: [452, 21, 84],
       look: [452, 6, -20], lookTo: [449, 6.5, -60], focalMm: 35,
     },
@@ -330,12 +340,12 @@ export const MENU_SHOTS = {
   // 四 · 东关之夜：白毛巾、刺刀、火光。
   CH4_DongguanYe: [
     {
-      id: "Lane", title: "东关 · 黑巷", note: "巷道低机位：夜里那一队人要走的那条巷子",
+      id: "Lane", titleKey: "menu.shot.lane", note: "巷道低机位：夜里那一队人要走的那条巷子",
       from: [556, 6.5, -72], to: [538, 6.0, -44],
       look: [470, 2.6, -6], focalMm: 40,
     },
     {
-      id: "AssemblyYard", title: "东关 · 集结院", note: "B 区集结院方向：分弹药、喝稀粥、写回信的那个院子",
+      id: "AssemblyYard", titleKey: "menu.shot.assemblyYard", note: "B 区集结院方向：分弹药、喝稀粥、写回信的那个院子",
       from: [492, 18, -230], to: [476, 16.5, -206],
       look: [449, 5.5, -175], focalMm: 35,
     },
@@ -347,12 +357,12 @@ export const MENU_SHOTS = {
     {
       // 机位必须**站在街上**（眼高 1.8 m）。第一版架在 6.2 m，实拍出来是一片屋顶 ——
       // 那条走廊是贴地的一条直街，抬到屋檐以上就什么都不是了。
-      id: "Corridor", title: "西街长街 · 通视走廊", note: "十字街口沿西门大街往西推：西城门楼一眼望穿",
+      id: "Corridor", titleKey: "menu.shot.corridor", note: "十字街口沿西门大街往西推：西城门楼一眼望穿",
       from: [64, 1.85, 0], to: [22, 1.80, 0],
       look: [-180, 2.2, 0], lookTo: [-288, 5.0, 0], focalMm: 50,
     },
     {
-      id: "Yamen", title: "县衙", note: "县衙：城内唯一有实物可参照的建筑，明代大堂",
+      id: "Yamen", titleKey: "menu.shot.yamen", note: "县衙：城内唯一有实物可参照的建筑，明代大堂",
       from: [88, 23, -72], to: [106, 21, -62],
       look: [128, 6, -118], focalMm: 40,
     },
@@ -362,12 +372,12 @@ export const MENU_SHOTS = {
   // 终 · 最后一封：城内临时师部 → 西关电灯厂。
   CH6_Zuihou: [
     {
-      id: "WestGateInner", title: "西门 · 怀古门（城里）", note: "西门里往城门看：通信组带着密码材料从这儿出城",
+      id: "WestGateInner", titleKey: "menu.shot.westGateInner", note: "西门里往城门看：通信组带着密码材料从这儿出城",
       from: [-176, 14, -58], to: [-198, 13, -34],
       look: [-300, 7.5, 0], focalMm: 40,
     },
     {
-      id: "PowerPlant", title: "西关 · 电灯厂", note: "电灯厂：王铭章在这附近殉国。二十二米的烟囱是西关天际线",
+      id: "PowerPlant", titleKey: "menu.shot.powerPlant", note: "电灯厂：王铭章在这附近殉国。二十二米的烟囱是西关天际线",
       from: [-462, 15, 128], to: [-450, 14, 106],
       look: [-410, 9, 69], focalMm: 40,
     },
@@ -383,22 +393,22 @@ export const MENU_SHOTS = {
   // 先去 Script_ShotTest 里搜一遍。
   Overview: [
     {
-      id: "EastGate", title: "东门 · 宗鲁门", note: "东门外一百米，关厢屋顶之上望宗鲁门与瓮城 —— 城的正脸",
+      id: "EastGate", titleKey: "menu.shot.eastGate", note: "东门外一百米，关厢屋顶之上望宗鲁门与瓮城 —— 城的正脸",
       from: [432, 17.5, -52], to: [424, 16.5, -22],
       look: [316, 8.5, -65], lookTo: [316, 8.5, -57], focalMm: 35,
     },
     {
-      id: "SouthEastTower", title: "东南角望楼", note: "东南角望楼：日方战详报点名的那一座，突破口在它西侧二十米",
+      id: "SouthEastTower", titleKey: "menu.shot.southEastTower", note: "东南角望楼：日方战详报点名的那一座，突破口在它西侧二十米",
       from: [408, 16, 372], to: [382, 14, 344],
       look: [306, 8, 300], focalMm: 40,
     },
     {
-      id: "Rampart", title: "东城墙 · 墙顶回廊", note: "墙顶回廊：站在女墙后沿东墙往北推，尽头是东门城楼",
+      id: "Rampart", titleKey: "menu.shot.rampart", note: "墙顶回廊：站在女墙后沿东墙往北推，尽头是东门城楼",
       from: [305, 13.3, 244], to: [305, 13.2, 150],
       look: [305, 12.2, 60], lookTo: [307, 12.0, 10], focalMm: 50, crowd: false,
     },
     {
-      id: "Yamen", title: "县衙", note: "县衙：城内唯一有实物可参照的建筑，明代大堂",
+      id: "Yamen", titleKey: "menu.shot.yamen", note: "县衙：城内唯一有实物可参照的建筑，明代大堂",
       from: [88, 23, -72], to: [106, 21, -62],
       look: [128, 6, -118], focalMm: 40,
     },
@@ -410,7 +420,7 @@ export function FallbackShot(zone) {
   const x = zone?.x ?? 0;
   const z = zone?.z ?? 0;
   return {
-    id: "Fallback", note: "兜底机位：按本关第一个路标现算",
+    id: "Fallback", note: "兜底机位：按本关第一个路标现算",   // note 不上屏
     from: [x + 88, 26, z + 88], to: [x + 70, 22, z + 70],
     look: [x, 3, z], focalMm: 35,
   };

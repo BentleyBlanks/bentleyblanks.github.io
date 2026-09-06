@@ -26,64 +26,13 @@
 // 玩家随时按 F 就能放下、按左键就能摔下。**这一层不夺控制权、不锁视角、不锁移动**，
 // 这是 docs/Data_MissionDesign.md 的实机演出规矩。
 
-/**
- * 负重档案表。数值只在这里，文档里只写常量名（AGENTS 硬规矩 12）。
- *
- * speedScale  乘进 `player.carrySpeedScale`；<1 时冲刺与开镜一并封掉。
- * liftS       举起的收尾时间：这一段已经走不快也开不了枪，但还没「抬稳」。
- * releaseS    主动放下的收尾时间。担架比箱子长，因为要跟前端那个人对上节奏。
- * canThrow    慌了能不能直接摔在地上（左键）。**担架不许摔** —— 那是个人，不是麻袋。
- * holders     几个人抬。2 表示需要一个前端同伴（由 AI/演员占位，不在这一层驱动）。
- * spanM       前后端的间距，`PartnerAnchor` 按它算前端该站哪儿。
- * sfxLift/Drop/Throw  三个动作各用哪条现成的音效配方（Script_Audio 的 RECIPES 名）。
- */
-export const CARRY_KINDS = {
-  stretcher: {
-    id: "stretcher", label: "担架", holderLabel: "担架后端",
-    speedScale: 0.42, liftS: 0.75, releaseS: 0.60,
-    canThrow: false, holders: 2, spanM: 1.85,
-    note: "两只手都占着 —— 枪背在背上",
-    sfxLift: "footstepRubble", sfxDrop: "impactDirt", sfxThrow: "bodyFall",
-  },
-  wounded: {
-    id: "wounded", label: "伤员", holderLabel: "背着伤员",
-    speedScale: 0.38, liftS: 1.00, releaseS: 0.55,
-    canThrow: false, holders: 1, spanM: 0,
-    note: "背上一个人 —— 走不快，也打不了",
-    sfxLift: "footstepRubble", sfxDrop: "bodyFall", sfxThrow: "bodyFall",
-  },
-  medBox: {
-    id: "medBox", label: "药箱",
-    speedScale: 0.58, liftS: 0.55, releaseS: 0.35,
-    canThrow: true, holders: 1, spanM: 0,
-    note: "抱着药箱",
-    sfxLift: "footstepRubble", sfxDrop: "impactWood", sfxThrow: "impactWood",
-  },
-  ammoCrate: {
-    id: "ammoCrate", label: "弹药箱",
-    speedScale: 0.50, liftS: 0.65, releaseS: 0.40,
-    canThrow: true, holders: 1, spanM: 0,
-    note: "拖着弹药箱",
-    sfxLift: "footstepRubble", sfxDrop: "impactWood", sfxThrow: "impactWood",
-  },
-  doorPlank: {
-    id: "doorPlank", label: "门板",
-    speedScale: 0.54, liftS: 0.70, releaseS: 0.40,
-    canThrow: true, holders: 1, spanM: 0,
-    note: "扛着一扇门板",
-    sfxLift: "footstepRubble", sfxDrop: "impactWood", sfxThrow: "impactWood",
-  },
-  ironPot: {
-    id: "ironPot", label: "铁锅",
-    speedScale: 0.72, liftS: 0.40, releaseS: 0.25,
-    canThrow: true, holders: 1, spanM: 0,
-    note: "抱着一口铁锅",
-    sfxLift: "footstepRubble", sfxDrop: "impactMetal", sfxThrow: "impactMetal",
-  },
-};
+import { T } from "./Script_Text.mjs";
+import { CARRY_KINDS } from "./Data_Carry.mjs";
+import { CARRY } from "./Data_Tuning_Interact.mjs";
 
-/** 摔下去之后再拿起来之前的空窗；没有它，一次左键会在同一帧摔完又捡起来。 */
-const REPICK_LOCK_S = 0.45;
+// 档案表本体在 `Data_Carry.mjs`（种类、速度倍率、举放时长、音效配方、文本键），
+// 节奏数在 `Data_Tuning_Interact.CARRY`。这里 re-export，老调用点与测试一行不改。
+export { CARRY_KINDS };
 
 const Clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
 
@@ -142,12 +91,12 @@ export class CarrySystem {
     this.load = {
       serial: ++this.serial,
       kind,
-      label: String(opts.label ?? kind.label),
-      note: String(opts.note ?? kind.note ?? ""),
+      label: String(opts.label ?? T(kind.labelKey)),
+      note: String(opts.note ?? (kind.noteKey ? T(kind.noteKey) : "")),
       partner: opts.partner ?? null,
       payload: opts.payload ?? null,
       canDrop: opts.canDrop !== false,
-      refuseLine: opts.refuseLine ?? "哪个都不准松！",
+      refuseLine: opts.refuseLine ?? T("gameplay.carry.refuseDefault"),
       OnDrop: opts.OnDrop ?? null,
       OnRelease: opts.OnRelease ?? null,
       phase: "lift",
@@ -171,7 +120,7 @@ export class CarrySystem {
     if (load.phase === "release") return false;
     if (!load.canDrop) {
       this.stats.refused += 1;
-      this.host.Say?.("你", load.refuseLine, 1.8);
+      this.host.Say?.(T("gameplay.speaker.you"), load.refuseLine, CARRY.refuseSayS);
       return false;
     }
     load.phase = "release";
@@ -194,7 +143,7 @@ export class CarrySystem {
     // 「拒绝松手」连摔也拦住，而且同样回一句 —— 静默无反应会被读成 bug。
     if (!load.canDrop) {
       this.stats.refused += 1;
-      this.host.Say?.("你", load.refuseLine, 1.8);
+      this.host.Say?.(T("gameplay.speaker.you"), load.refuseLine, CARRY.refuseSayS);
       return false;
     }
     this.host.Play?.(load.kind.sfxThrow, { volume: 0.7 });
@@ -234,7 +183,7 @@ export class CarrySystem {
     };
     this.load = null;
     this.lastRelease = info;
-    this.lockS = how === "reset" ? 0 : REPICK_LOCK_S;
+    this.lockS = how === "reset" ? 0 : CARRY.repickLockS;
     if (this.player) this.player.carrySpeedScale = 1;
     load.OnRelease?.(info);
     return info;
@@ -304,9 +253,10 @@ export class CarrySystem {
     const t = load.phase === "lift" ? Clamp01(load.phaseT / Math.max(1e-3, kind.liftS))
       : load.phase === "release" ? 1 - Clamp01(load.phaseT / Math.max(1e-3, kind.releaseS))
         : 1;
-    const prompt = load.phase === "lift" ? `抬起${load.label}……`
-      : load.phase === "release" ? `放下${load.label}……`
-        : load.canDrop ? `放下${load.label}` : `不许松手`;
+    const prompt = load.phase === "lift" ? T("gameplay.carry.lifting", { name: load.label })
+      : load.phase === "release" ? T("gameplay.carry.releasing", { name: load.label })
+        : load.canDrop ? T("gameplay.carry.drop", { name: load.label })
+          : T("gameplay.carry.locked");
     return {
       active: true,
       serial: load.serial,

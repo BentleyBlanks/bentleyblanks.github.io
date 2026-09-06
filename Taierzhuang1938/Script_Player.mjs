@@ -19,6 +19,11 @@ import * as THREE from "three";
 import { Clamp, Clamp01, Mulberry32, SmoothStep } from "./Script_Noise.mjs";
 import { DIFFICULTY, COMBAT } from "./Data_Battle.mjs";
 import { TRAVERSAL, TraversalPlan, TraversalCurve } from "./Data_Traversal.mjs";
+import { T } from "./Script_Text.mjs";
+import {
+  STANCE as STANCE_TUNING, JUMP, MOVE, STAMINA, FREE_AIM, RECOIL,
+  SUPPRESSION, WOUNDS, SPAWN, HIT_FEEDBACK, SWAY, SPREAD, CAMERA,
+} from "./Data_Tuning_Player.mjs";
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -31,44 +36,26 @@ const UP = new THREE.Vector3(0, 1, 0);
  */
 
 /**
- * 跳跃不是跑酷动词，是越沟、上瓦砾、脱离低矮卡点的最后半步。
- * 4.65 m/s 配 19.6 m/s² 重力：净抬高约 0.55 m、完整滞空约 0.47 s。
- * 这个量级与 Easy Red 2 那种背着装备的步兵感一致，也低于 `TRAVERSAL.vaultMin`，
- * 所以按 Space 时仍然是「能翻就翻、能爬就爬，都不行才跳」——
- * 跳跃跳不上任何一件该走翻越/攀爬的东西，这是通行阶梯的地基。
- *
- * **助跑加成**：上面那组数是**站着起跳**的数。原先起跳只写死竖直速度，水平速度原样
- * 带走 —— 意味着跳跃对位移的净贡献是 0（跳 0.47 s 走过的距离，和不跳继续跑一模一样），
- * 而且弧线跟速度完全无关，跑得越快这个小驼峰在画面上越不起眼，实测「跑起来跳和站着跳
- * 看不出区别」就是这么来的。现在按助跑速度给一点竖直与水平加成：站着跳分毫不变，
- * 冲刺跳抬高约 0.68 m、滞空约 0.53 s、空中位移从 2.45 m 到约 3.1 m。
- * 加成的天花板是 `TRAVERSAL.jumpRiseMax`（0.72 m），仍压在 vaultMin 之下；
- * 兔子跳照旧由冷却、落地硬直与随助跑变贵的体力挡住。
+ * 跳跃、姿态、体力、自由瞄准、后坐、压制、伤口、受击反馈的数**全在
+ * `Data_Tuning_Player.mjs`**（每一组的出处与账都跟着数搬过去了）。
+ * 这里只 import 读，不复制成本地常量 —— 复制一份的后果是热改表不生效、
+ * 而且测试与代码会读到两个真相。
  */
-const GRAVITY_MPS2 = 19.6;
-const JUMP_SPEED_MPS = 4.65;
-const JUMP_RUN_MIN_MPS = 1.80;     // 助跑加成的起算速度：慢步以下当站着跳
-const JUMP_RUN_FULL_MPS = 5.25;    // 满加成速度：站姿冲刺（3.05 × 1.72）
-const JUMP_RUN_RISE = 0.11;        // 满助跑的竖直加成 → 抬高 0.55 → 0.68 m
-const JUMP_RUN_PUSH = 0.16;        // 满助跑的蹬地水平加成
-const JUMP_STAMINA = 0.08;
-const JUMP_RUN_STAMINA = 0.5;      // 满助跑再贵一半：0.08 → 0.12
-const JUMP_COYOTE_S = 0.10;
-const JUMP_BUFFER_S = 0.12;
-const JUMP_COOLDOWN_S = 0.24;
 
-/** 姿态参数。眼高按真人来：站 1.62，蹲 1.05，卧 0.42（趴下之后视线只比枪高一点）。 */
-export const STANCE = {
-  stand: { eye: 1.62, speed: 3.05, radius: 0.34, sway: 1.0, spread: 1.0, label: "立" },
-  crouch: { eye: 1.05, speed: 1.62, radius: 0.34, sway: 0.62, spread: 0.66, label: "蹲" },
-  prone: { eye: 0.42, speed: 0.72, radius: 0.42, sway: 0.30, spread: 0.34, label: "卧" },
-};
+/** 姿态表。数在 `Data_Tuning_Player.STANCE`；姿态名用 `StanceLabel(id)` 取（表里只有 labelKey）。 */
+export const STANCE = STANCE_TUNING;
 
-/** Read-only measuring references; movement continues to use the constants above. */
+/** 姿态名（「立 / 蹲 / 卧」）。HUD 与白盒面板都该走这一条。 */
+export function StanceLabel(stance) {
+  const spec = STANCE_TUNING[stance];
+  return spec ? T(spec.labelKey) : "";
+}
+
+/** Read-only measuring references; movement continues to use the tuning table above. */
 export function PlayerMovementReference() {
-  return { standingRiseM: JUMP_SPEED_MPS ** 2 / (2 * GRAVITY_MPS2),
-    runningRiseM: (JUMP_SPEED_MPS * (1 + JUMP_RUN_RISE)) ** 2 / (2 * GRAVITY_MPS2),
-    runFullMps: JUMP_RUN_FULL_MPS, stances: structuredClone(STANCE) };
+  return { standingRiseM: JUMP.speedMps ** 2 / (2 * JUMP.gravityMps2),
+    runningRiseM: (JUMP.speedMps * (1 + JUMP.runRise)) ** 2 / (2 * JUMP.gravityMps2),
+    runFullMps: JUMP.runFullMps, stances: structuredClone(STANCE) };
 }
 
 export class PlayerController {
@@ -103,7 +90,7 @@ export class PlayerController {
     // 开完枪视角纹丝不动，只有散布在变。现在开火时把枪口顶上去，然后**只回落 70%**，
     // 剩下 30% 要玩家自己压回来 —— 这是"栓动枪打完一发要重新找目标"的手感来源。
     this.recoilPending = { pitch: 0, yaw: 0 };   // 还没回落完的那部分（弧度）
-    this.recoilRecoverS = 0.4;
+    this.recoilRecoverS = RECOIL.defaultRecoverS;
     this.recoilTotal = 0;                       // 尚未收回的净后坐（弧度，取证用；收干净即 0）
     this.recoilSince = 999;                     // 距上一发多久（回落曲线的 TimeSinceLastShot）
     this.recoilPeak = 0;                        // 上一发顶到的峰值，回落曲线按它归一化
@@ -139,7 +126,7 @@ export class PlayerController {
     // coyote / buffer 都很短，只用来消掉 60 Hz 输入与落地帧之间的偶然误差；
     // cooldown + 体力成本负责挡住兔子跳。landSerial 是装配层的落地音效边沿。
     this.jump = {
-      count: 0, coyote: JUMP_COYOTE_S, buffer: 0, cooldown: 0,
+      count: 0, coyote: JUMP.coyoteS, buffer: 0, cooldown: 0,
       airTime: 0, landSerial: 0, landImpact: 0,
       runK: 0,                                  // 上一次起跳吃到的助跑加成（取证用）
     };
@@ -162,7 +149,7 @@ export class PlayerController {
     this.health = 100;
     this.bleeding = 0;                      // 每秒失血
     this.wounds = [];                       // { part, bleed, since }
-    this.bandages = 2;
+    this.bandages = WOUNDS.bandages;
     this.suppression = 0;                   // 0..1，被打压的程度
     this.suppressedUpright = false;         // 压得很狠但还站着（只用于提示，不改姿态）
     this.stamina = 1;
@@ -256,7 +243,7 @@ export class PlayerController {
     this.deadTime = 0;
     // 出生保护。ER2 有这条（重生后几秒无敌），我写进了对齐文档却一直没实现 ——
     // 而接替者必然出生在还在打的地方，没有这几秒，他睁眼那一刻就在九支枪的射界里。
-    this.spawnGrace = 3.2;
+    this.spawnGrace = SPAWN.graceS;
     this.recoilPending.pitch = 0;
     this.recoilPending.yaw = 0;
     this.recoilTotal = 0;
@@ -266,7 +253,7 @@ export class PlayerController {
     this.fastCrawl = false;
     this.freeAimLimitDeg = DIFFICULTY.freeAimDeg;
     this.vault.active = false;
-    this.jump.coyote = JUMP_COYOTE_S;
+    this.jump.coyote = JUMP.coyoteS;
     this.jump.buffer = 0;
     this.jump.cooldown = 0;
     this.jump.airTime = 0;
@@ -411,19 +398,19 @@ export class PlayerController {
    */
   TryJump() {
     if (!this.alive || this.vault.active || this.InWater || this.stance === "prone") return false;
-    if (this.jump.cooldown > 0 || this.stamina < JUMP_STAMINA) return false;
+    if (this.jump.cooldown > 0 || this.stamina < JUMP.stamina) return false;
     if (!this.grounded && this.jump.coyote <= 0) {
-      this.jump.buffer = JUMP_BUFFER_S;
+      this.jump.buffer = JUMP.bufferS;
       return false;
     }
     this.stance = "stand";
     // 助跑加成：0（站着/慢步）→ 1（站姿冲刺）。fastMove 之类的超速一律按满档，
     // 不再往上叠 —— 调试速度不该顺手变成一个能上房的跳。
     const planar = Math.hypot(this.velocity.x, this.velocity.z);
-    const runK = Clamp01((planar - JUMP_RUN_MIN_MPS) / (JUMP_RUN_FULL_MPS - JUMP_RUN_MIN_MPS));
-    this.velocity.y = JUMP_SPEED_MPS * (1 + JUMP_RUN_RISE * runK);
+    const runK = Clamp01((planar - JUMP.runMinMps) / (JUMP.runFullMps - JUMP.runMinMps));
+    this.velocity.y = JUMP.speedMps * (1 + JUMP.runRise * runK);
     if (runK > 0 && planar > 1e-3) {
-      const push = 1 + JUMP_RUN_PUSH * runK;
+      const push = 1 + JUMP.runPush * runK;
       this.velocity.x *= push;
       this.velocity.z *= push;
     }
@@ -431,11 +418,11 @@ export class PlayerController {
     this.grounded = false;
     this.jump.coyote = 0;
     this.jump.buffer = 0;
-    this.jump.cooldown = JUMP_COOLDOWN_S;
+    this.jump.cooldown = JUMP.cooldownS;
     this.jump.airTime = 0;
     this.jump.count += 1;
-    this.stamina = Clamp01(this.stamina - JUMP_STAMINA * (1 + JUMP_RUN_STAMINA * runK));
-    this.ads = Math.min(this.ads, 0.2);             // 起跳先把枪从照门上摘下来
+    this.stamina = Clamp01(this.stamina - JUMP.stamina * (1 + JUMP.runStamina * runK));
+    this.ads = Math.min(this.ads, JUMP.adsOnJump);   // 起跳先把枪从照门上摘下来
     this.wantAds = false;
     return true;
   }
@@ -451,9 +438,10 @@ export class PlayerController {
     // 只有相机直跟这一条：自由瞄准/后坐回落都跟着 Update 一起跳过了，
     // 翻墙那半秒本来也不该有据枪微调。
     if (input) {
-      const sens = (input.sensitivity ?? 1) * 0.0022;
+      const sens = (input.sensitivity ?? 1) * FREE_AIM.sensitivityScale;
       this.yaw += -(input.lookX || 0) * sens;
-      this.pitch = Clamp(this.pitch + -(input.lookY || 0) * sens, -1.35, 1.35);
+      this.pitch = Clamp(this.pitch + -(input.lookY || 0) * sens,
+        -FREE_AIM.pitchLimitRad, FREE_AIM.pitchLimitRad);
     }
     const k = Clamp01(v.t / v.duration);
     const c = TraversalCurve(v.kind, k);
@@ -467,7 +455,7 @@ export class PlayerController {
     this.grounded = false;
     // 眼高照常收敛，不然翻越途中视线会僵在起跳那一刻
     const target = STANCE[this.stance];
-    const rate = 1 - Math.exp(-dt * 8.5);
+    const rate = 1 - Math.exp(-dt * MOVE.stanceLerpRate);
     this.eyeHeight += (target.eye - this.eyeHeight) * rate;
     if (k >= 1) {
       v.active = false;
@@ -497,35 +485,23 @@ export class PlayerController {
     }
 
     // --- 视角与自由瞄准 -----------------------------------------------------
-    const sens = (input.sensitivity ?? 1) * 0.0022;
+    const sens = (input.sensitivity ?? 1) * FREE_AIM.sensitivityScale;
     // 架起两脚架之后转向只剩三成：机枪压在垛口上，横过来要连人带枪挪。
     // 这是"机枪手必须先选好位置"这条战术决策的成本，不是手感黏滞。
-    const adsScale = (1 - this.ads * 0.55) * (this.bipod ? 0.30 : 1);
+    const adsScale = (1 - this.ads * FREE_AIM.adsLookScale)
+      * (this.bipod ? FREE_AIM.bipodLookScale : 1);
     const dx = -input.lookX * sens * adsScale;
     const dy = -input.lookY * sens * adsScale;
 
-    // 后坐回落 —— 照战地的曲线，不是指数衰减。出处见 docs/Data_BattlefieldNumbers.md。
-    //
-    //   Decrease ∝ (|R| / R0)^0.6 · (R0 / T) · K · **TimeSinceLastShot^0.5** · dt
-    //
-    // 两个要点，缺一个手感就不对：
-    //   · **回到零，不留残留。** 我按"留 28% 让玩家自己压"做过一版 —— 那是 CS /
-    //     Valorant 的喷射弹道逻辑。战地的栓动步枪 0.25—0.5 s 收干净，而两发间隔
-    //     1.0—2.4 s，**每一发都从同一个瞄准点开始**。
-    //   · **重量感在 TimeSinceLastShot^0.5 上。** t=0 时该因子为 0，回落**从零速率
-    //     起步再加速** —— 踢上去、悬住、加速归位。那一"悬"就是枪的重量。
-    //     指数回落是反过来的（起步最快、尾巴最长），所以它永远像"画面在往下淌"。
-    //
-    // 指数 0.6 < 1 还有一个好处：dR/dt ∝ R^0.6 是**有限时间收敛到精确的零**的，
-    // 不像指数回落拖一条永远抹不掉的微小尾巴。
-    // K = 1.432 / sqrt(T) 是解出来的：让回稳时间恒等于 1.9×T，与后坐大小无关。
+    // 后坐回落 —— 照战地的曲线，不是指数衰减。曲线的形状与出处见
+    // `Data_Tuning_Player.RECOIL` 的头注与 docs/Data_BattlefieldNumbers.md。
     this.recoilSince += dt;
     const pend = Math.hypot(this.recoilPending.pitch, this.recoilPending.yaw);
-    if (pend > 1e-7) {
-      const T = Math.max(0.05, this.recoilRecoverS);
+    if (pend > RECOIL.epsilon) {
+      const T = Math.max(RECOIL.minRecoverS, this.recoilRecoverS);
       const peak = Math.max(pend, this.recoilPeak || pend);
-      const K = 1.432 / Math.sqrt(T);
-      const dec = Math.pow(pend / peak, 0.6) * (peak / T) * K * Math.sqrt(this.recoilSince) * dt;
+      const K = RECOIL.gain / Math.sqrt(T);
+      const dec = Math.pow(pend / peak, RECOIL.exponent) * (peak / T) * K * Math.sqrt(this.recoilSince) * dt;
       const scale = Math.max(0, 1 - dec / pend);
       const bp = this.recoilPending.pitch * (1 - scale);
       const by = this.recoilPending.yaw * (1 - scale);
@@ -541,8 +517,8 @@ export class PlayerController {
     // 交给 yaw/pitch；原有的枪口偏移快速收回，同时等量补给相机以保持世界瞄准点不跳。
     // 每帧从难度表取，滑条一拨就生效（缓存在字段里的话要重生一次才认）。
     this.freeAimLimitDeg = DIFFICULTY.freeAimDeg;
-    const limit = THREE.MathUtils.degToRad(this.freeAimLimitDeg * (1 - this.ads * 0.72));
-    const walking = Math.hypot(input.forward || 0, input.strafe || 0) > 0.05;
+    const limit = THREE.MathUtils.degToRad(this.freeAimLimitDeg * (1 - this.ads * FREE_AIM.adsNarrow));
+    const walking = Math.hypot(input.forward || 0, input.strafe || 0) > FREE_AIM.walkThreshold;
     // 腾空时同样按「相机直跟」走。原来只看 forward/strafe：原地按空格跳起来时两者
     // 都是 0，鼠标位移就全落进那 2° 的自由瞄准锥里 —— 屏幕上就是「一跳起来镜头
     // 转不动了」，落地才突然接上。人在半空本来也谈不上据枪微调，这一段没有存在意义。
@@ -550,7 +526,7 @@ export class PlayerController {
     if (directLook) {
       this.yaw += dx;
       this.pitch += dy;
-      const recentre = 1 - Math.exp(-dt * 18);
+      const recentre = 1 - Math.exp(-dt * FREE_AIM.directRecentreRate);
       const backYaw = this.aimYaw * recentre;
       const backPitch = this.aimPitch * recentre;
       this.aimYaw -= backYaw; this.yaw += backYaw;
@@ -577,9 +553,9 @@ export class PlayerController {
     // 边界以内动的是枪、边界以外动的是视线，但**总瞄准角与鼠标永远是 1:1**。
     const looking = directLook || Math.abs(dx) + Math.abs(dy) > 1e-6;
     this.lookIdle = looking ? 0 : this.lookIdle + dt;
-    const settle = Clamp01((this.lookIdle - 0.10) / 0.12);
+    const settle = Clamp01((this.lookIdle - FREE_AIM.settleDelayS) / FREE_AIM.settleSpanS);
     if (settle > 0) {
-      const recentre = Math.exp(-dt * (2.2 + this.ads * 5) * settle);
+      const recentre = Math.exp(-dt * (FREE_AIM.recentreRate + this.ads * FREE_AIM.adsRecentreBoost) * settle);
       // 归位收回来的这一段**交给视线**，不是凭空丢掉：
       // 枪回到画面中间的同时相机自己转过同样的角度，枪口在世界里指着的那个点不动。
       // 不补的话，玩家把枪停在目标上、手一松，瞄准点会在 1.5 s 里自己漂掉 2°
@@ -589,7 +565,7 @@ export class PlayerController {
       this.aimYaw -= backYaw; this.yaw += backYaw;
       this.aimPitch -= backPitch; this.pitch += backPitch;
     }
-    this.pitch = Clamp(this.pitch, -1.35, 1.35);
+    this.pitch = Clamp(this.pitch, -FREE_AIM.pitchLimitRad, FREE_AIM.pitchLimitRad);
 
     // --- 姿态 ---------------------------------------------------------------
     if (input.stanceRequested) this.SetStance(input.stanceRequested);
@@ -602,13 +578,13 @@ export class PlayerController {
     // 体感就是「WASD 时灵时不灵」，而且找不到原因（唯一的反馈是一圈很淡的暗角）。
     // 改成只在**玩家自己按下过蹲/卧**之后才由压制维持；纯站着挨打就只是走得慢一点，
     // 是不是趴下由玩家自己决定。这也更接近 ER2：压制影响的是精度与视野，不是替你操作。
-    if (this.suppression > 0.85 && this.stance === "stand") {
+    if (this.suppression > SUPPRESSION.uprightEnter && this.stance === "stand") {
       this.suppressedUpright = true;          // 只做提示，不改姿态
-    } else if (this.suppression < 0.5) {
+    } else if (this.suppression < SUPPRESSION.uprightExit) {
       this.suppressedUpright = false;
     }
     const target = STANCE[this.stance];
-    const rate = 1 - Math.exp(-dt * 8.5);
+    const rate = 1 - Math.exp(-dt * MOVE.stanceLerpRate);
     this.eyeHeight += (target.eye - this.eyeHeight) * rate;
     this.radius += (target.radius - this.radius) * rate;
     this.stanceBlend.crouch += ((this.stance === "crouch" ? 1 : 0) - this.stanceBlend.crouch) * rate;
@@ -629,20 +605,21 @@ export class PlayerController {
     this.ads = Clamp01(this.ads);
     // 卧姿按住 Shift = 快速匍匐（ER2 有匍匐速度档）。它不是冲刺：不进 sprint 弹簧，
     // 只把速度从 0.72 提到 1.25，并把脚步声放大 —— 快就得响，这是一对取舍。
-    this.fastCrawl = !!input.sprint && this.stance === "prone" && this.stamina > 0.05;
-    const canSprint = input.sprint && this.stamina > 0.05 && this.ads < 0.25
+    this.fastCrawl = !!input.sprint && this.stance === "prone" && this.stamina > STAMINA.sprintMin;
+    const canSprint = input.sprint && this.stamina > STAMINA.sprintMin && this.ads < 0.25
       && this.stance === "stand" && input.forward > 0.3 && !loaded;
-    this.sprint += ((canSprint ? 1 : 0) - this.sprint) * (1 - Math.exp(-dt * 6));
+    this.sprint += ((canSprint ? 1 : 0) - this.sprint) * (1 - Math.exp(-dt * MOVE.sprintRate));
     // 冲刺时长挂难度：staminaSeconds 就是"从满到空能跑几秒"。
     const burn = 1 / Math.max(1, DIFFICULTY.staminaSeconds);
     // 恢复的上限受 staminaCeiling 夹（五关终局的章节作用域旋钮，常态 1；消耗不受它管）。
     this.stamina = Math.max(0, Math.min(this.staminaCeiling ?? 1,
-      this.stamina + ((canSprint || this.fastCrawl) ? -dt * burn : dt * 0.13)));
-    this.lean += ((input.lean || 0) - this.lean) * (1 - Math.exp(-dt * 9));
+      this.stamina + ((canSprint || this.fastCrawl) ? -dt * burn : dt * STAMINA.regenPerS)));
+    this.lean += ((input.lean || 0) - this.lean) * (1 - Math.exp(-dt * MOVE.leanRate));
 
     // 屏息：只在开镜时有意义，能压住摇摆，但会很快耗尽
-    this.breathHold = !!input.breathHold && this.ads > 0.6 && this.stamina > 0.1;
-    if (this.breathHold) this.stamina = Clamp01(this.stamina - dt * 0.28);
+    this.breathHold = !!input.breathHold && this.ads > STAMINA.breathHoldAds
+      && this.stamina > STAMINA.breathHoldMin;
+    if (this.breathHold) this.stamina = Clamp01(this.stamina - dt * STAMINA.breathHoldDrainPerS);
 
     // --- 下水（软墙，不是游泳系统）-------------------------------------------
     // 运河是全城唯一的退路与补给线，而那条退路是 5.5 m 宽的浮桥。
@@ -653,25 +630,25 @@ export class PlayerController {
       ? this.world.WaterDepth(this.position.x, this.position.z, this.position.y)
       : 0;
     if (this.InWater) {
-      this.stamina = Clamp01(this.stamina - dt * 0.5);
+      this.stamina = Clamp01(this.stamina - dt * STAMINA.waterDrainPerS);
       this.ads = 0;
       this.breathHold = false;
     }
 
     // --- 移动 ---------------------------------------------------------------
+    // 这条乘法链就是「移动的账只有一本」那条纪律；每个系数的账在 MOVE 里。
     let speed = target.speed;
-    if (this.fastCrawl) speed = 1.25;              // 卧姿 0.72 -> 1.25
-    speed *= 1 + this.sprint * 0.72;
-    speed *= 1 - this.ads * 0.42;
-    // 被压制时腿会软，但这是个温和的惩罚（最多 -25%），不是把人按到蹲姿的 -47%
-    speed *= 1 - this.suppression * 0.25;
-    if (this.InWater) speed *= 0.25;               // 齐腰的水里迈不开腿
+    if (this.fastCrawl) speed = MOVE.fastCrawlMps;  // 卧姿 0.72 -> 1.25
+    speed *= 1 + this.sprint * MOVE.sprintBoost;
+    speed *= 1 - this.ads * MOVE.adsSlow;
+    speed *= 1 - this.suppression * MOVE.suppressionSlow;
+    if (this.InWater) speed *= MOVE.waterSlow;
     // 腿部中弹会拖着走
     speed *= this.LegPenalty();
-    speed *= Clamp(this.health / 60, 0.45, 1);
-    // 负重（担架 / 弹药箱 / 门板…各自一档，数在 Script_Carry.CARRY_KINDS）
-    speed *= Clamp(this.carrySpeedScale, 0.05, 1);
-    if (this.debug.fastMove) speed *= 3;
+    speed *= Clamp(this.health / MOVE.healthSlowDiv, MOVE.healthSlowMin, 1);
+    // 负重（担架 / 弹药箱 / 门板…各自一档，数在 Data_Carry.CARRY_KINDS）
+    speed *= Clamp(this.carrySpeedScale, MOVE.carryScaleMin, 1);
+    if (this.debug.fastMove) speed *= MOVE.debugFastMoveScale;
 
     const forward = this._forward.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     // 右向量**不能再取反**。朝向 -Z、上方 +Y 时 cross(forward, up) 出来的已经是 +X，
@@ -683,23 +660,25 @@ export class PlayerController {
       .addScaledVector(right, input.strafe || 0);
     if (wish.lengthSq() > 1) wish.normalize();
     // 后退与横移比前进慢
-    if ((input.forward || 0) < 0) speed *= 0.72;
+    if ((input.forward || 0) < 0) speed *= MOVE.backwardScale;
     // Explicit scenario dive impulse: still requires directional input and uses normal collision.
     // Absent in normal play; the host only enables it during a live, intentional ditch dive.
-    if (this.stance !== "stand" && !this.InWater && Number.isFinite(input.diveSpeedMps)) speed = Math.max(speed, Math.min(1.2, input.diveSpeedMps));
+    if (this.stance !== "stand" && !this.InWater && Number.isFinite(input.diveSpeedMps)) speed = Math.max(speed, Math.min(MOVE.diveSpeedCapMps, input.diveSpeedMps));
 
     const desired = wish.multiplyScalar(speed);
     // 空中不许**加速**到助跑之上（accel 3 只够小幅修正方向），但也不能把蹬地那一下
     // 的动量当阻力擦掉 —— 半空里比目标速度快的时候收敛慢一档，否则 0.5 s 的滞空
     // 会把 16% 的助跑加成磨掉近八成，加了等于没加。
     const overRun = !this.grounded
-      && Math.hypot(this.velocity.x, this.velocity.z) > Math.hypot(desired.x, desired.z) + 0.05;
-    const accel = this.grounded ? 14 : (overRun ? 1 : 3);
+      && Math.hypot(this.velocity.x, this.velocity.z)
+        > Math.hypot(desired.x, desired.z) + MOVE.overrunMarginMps;
+    const accel = this.grounded ? MOVE.accelGround
+      : (overRun ? MOVE.accelAirOverrun : MOVE.accelAir);
     this.velocity.x += (desired.x - this.velocity.x) * Clamp01(dt * accel);
     this.velocity.z += (desired.z - this.velocity.z) * Clamp01(dt * accel);
     const wasGrounded = this.grounded;
     const fallSpeed = Math.max(0, -this.velocity.y);
-    this.velocity.y -= GRAVITY_MPS2 * dt;
+    this.velocity.y -= JUMP.gravityMps2 * dt;
 
     this.MoveWithCollision(dt);
 
@@ -707,20 +686,21 @@ export class PlayerController {
       this.jump.airTime += dt;
       this.jump.coyote = Math.max(0, this.jump.coyote - dt);
     } else {
-      this.jump.coyote = JUMP_COYOTE_S;
+      this.jump.coyote = JUMP.coyoteS;
       if (!wasGrounded) {
-        this.jump.landImpact = Clamp01((fallSpeed - 2.2) / 6.8);
+        this.jump.landImpact = Clamp01((fallSpeed - JUMP.landImpactBaseMps) / JUMP.landImpactSpanMps);
         this.jump.landSerial += 1;
         this.jump.airTime = 0;
         // 落地以后要把重心重新接住，不能在同一帧把缓冲输入变成下一跳。
-        this.jump.cooldown = Math.max(this.jump.cooldown, 0.16);
+        this.jump.cooldown = Math.max(this.jump.cooldown, JUMP.landCooldownS);
       }
     }
 
     // --- 脚步 / 晃动 --------------------------------------------------------
     const planar = Math.hypot(this.velocity.x, this.velocity.z);
     this.stepDistance += planar * dt;
-    this.headBob = Math.sin(this.stepDistance * (this.stance === "prone" ? 5.5 : 3.4)) * 0.5 + 0.5;
+    this.headBob = Math.sin(this.stepDistance
+      * (this.stance === "prone" ? CAMERA.strideProne : CAMERA.strideStand)) * 0.5 + 0.5;
 
     // --- 流血 ---------------------------------------------------------------
     if (this.debug.invincible) {
@@ -731,17 +711,18 @@ export class PlayerController {
       // 封顶。伤口是叠加的，四个躯干伤口 = 10.4 HP/s，而衰减是 5%/s ——
       // 那不是"慢性死亡"，那是一块十秒的秒表，包扎只有两卷也追不上。
       // 上限之下它仍然逼你去包扎，上限之上它只是替敌人把你打完。
-      const cap = COMBAT.player?.maxBleedPerS ?? 5.5;
+      const cap = COMBAT.player?.maxBleedPerS ?? WOUNDS.maxBleedPerSFallback;
       if (this.bleeding > cap) this.bleeding = cap;
       this.health -= this.bleeding * dt;
       // 伤口自己会慢慢收一点，但收不干净 —— 不包扎就是慢性死亡
-      this.bleeding = Math.max(this.bleeding * Math.exp(-dt * 0.05), this.bleeding - dt * 0.02);
+      this.bleeding = Math.max(this.bleeding * Math.exp(-dt * WOUNDS.bleedDecayPerS),
+        this.bleeding - dt * WOUNDS.bleedDecayFlatPerS);
       if (this.health <= 0) this.Kill();
     }
 
     // --- 受击反馈的寿命 ------------------------------------------------------
     // 红闪衰减比暗角快：它要读起来像"挨了一下"，不是"我现在很虚"。
-    if (this.hitFlash > 0) this.hitFlash = Math.max(0, this.hitFlash - dt * 1.7);
+    if (this.hitFlash > 0) this.hitFlash = Math.max(0, this.hitFlash - dt * HIT_FEEDBACK.flashDecayPerS);
     for (let i = this.hitMarks.length - 1; i >= 0; i -= 1) {
       const m = this.hitMarks[i];
       m.life -= dt;
@@ -749,11 +730,16 @@ export class PlayerController {
     }
     // 濒死心跳：血越少跳得越快（Audio/Sfx 的 Heartbeat 素材烘好了一直没人播）。
     // 只在 45 以下开始 —— 再高就成了背景噪音，那条线也就不再是信号了。
-    if (this.alive && this.health < 45) {
+    if (this.alive && this.health < HIT_FEEDBACK.heartbeatBelowHp) {
       this.heartbeatTimer -= dt;
       if (this.heartbeatTimer <= 0) {
-        this.heartbeatTimer = Clamp(0.42 + this.health * 0.012, 0.42, 1.0);
-        this.PushHitEvent({ kind: "heartbeat", severity: 1 - this.health / 45 });
+        this.heartbeatTimer = Clamp(
+          HIT_FEEDBACK.heartbeatMinS + this.health * HIT_FEEDBACK.heartbeatPerHp,
+          HIT_FEEDBACK.heartbeatMinS, HIT_FEEDBACK.heartbeatMaxS);
+        this.PushHitEvent({
+          kind: "heartbeat",
+          severity: 1 - this.health / HIT_FEEDBACK.heartbeatBelowHp,
+        });
       }
     } else {
       this.heartbeatTimer = 0;
@@ -762,7 +748,7 @@ export class PlayerController {
     if (this.spawnGrace > 0) this.spawnGrace -= dt;
 
     // --- 压制自然衰减 -------------------------------------------------------
-    this.suppression = Math.max(0, this.suppression - dt * 0.55);
+    this.suppression = Math.max(0, this.suppression - dt * SUPPRESSION.decayPerS);
 
     this.SyncCamera(dt);
     return { planarSpeed: planar };
@@ -770,15 +756,15 @@ export class PlayerController {
 
   LegPenalty() {
     let p = 1;
-    for (const w of this.wounds) if (w.part === "leg") p *= 0.72;
-    return Math.max(0.42, p);
+    for (const w of this.wounds) if (w.part === "leg") p *= WOUNDS.legPenalty;
+    return Math.max(WOUNDS.legFloor, p);
   }
 
   /** 手臂中弹：瞄准摇摆变大、拉栓变慢。 */
   ArmPenalty() {
     let p = 1;
-    for (const w of this.wounds) if (w.part === "arm") p *= 1.7;
-    return Math.min(3.2, p);
+    for (const w of this.wounds) if (w.part === "arm") p *= WOUNDS.armPenalty;
+    return Math.min(WOUNDS.armCap, p);
   }
 
   /**
@@ -893,13 +879,14 @@ export class PlayerController {
   SyncCamera(dt) {
     const cam = this.camera;
     // 步伐晃动：走路上下 + 左右 8 字。开镜压到 20%，卧倒几乎没有。
-    const damp = (1 - this.ads * 0.8) * (1 - this.stanceBlend.prone * 0.7);
-    const bobAmp = 0.028 * damp * Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / 3)
+    const damp = (1 - this.ads * CAMERA.bobAdsDamp) * (1 - this.stanceBlend.prone * CAMERA.bobProneDamp);
+    const bobAmp = CAMERA.bobAmp * damp
+      * Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / CAMERA.bobRefMps)
       * (this.grounded ? 1 : 0);
-    const bobY = Math.sin(this.stepDistance * 6.8) * bobAmp;
-    const bobX = Math.sin(this.stepDistance * 3.4) * bobAmp * 1.3;
+    const bobY = Math.sin(this.stepDistance * CAMERA.bobYFreq) * bobAmp;
+    const bobX = Math.sin(this.stepDistance * CAMERA.bobXFreq) * bobAmp * CAMERA.bobXScale;
     // 侧身：身体横移 + 相机滚转，探头出去看的那一下必须有位移，不然只是画面歪了
-    const leanOffset = this.lean * 0.42 * (1 - this.stanceBlend.prone);
+    const leanOffset = this.lean * CAMERA.leanOffsetM * (1 - this.stanceBlend.prone);
     const rightVec = this._right.set(-Math.cos(this.yaw), 0, Math.sin(this.yaw));
 
     cam.position.set(
@@ -930,8 +917,8 @@ export class PlayerController {
     cam.rotation.x += ((this.meleeFocusPitch || 0) - cam.rotation.x) * this.meleeCameraFocus;
 
     // 受压制时画面轻微抖动 —— 不是特效，是"被按在地上抬不起头"的触感
-    const shake = this.suppression * 0.012;
-    cam.rotation.z = -this.lean * 0.16
+    const shake = this.suppression * SUPPRESSION.shakeScale;
+    cam.rotation.z = -this.lean * CAMERA.leanRollRad
       + (shake > 0 ? Math.sin(this.stepDistance * 41 + this.suppression * 90) * shake : 0)
       + (focusing ? Math.sin(melee.t * 39) * (1 - melee.progress) * .013 : 0);
   }
@@ -989,7 +976,7 @@ export class PlayerController {
     // 出生保护期内只吃压制不吃伤 —— 让接替者有几秒找到掩体，
     // 而不是睁眼就躺回去。子弹照样从耳边过，压制照样上。
     if (this.spawnGrace > 0) {
-      this.suppression = Clamp01(this.suppression + 0.35);
+      this.suppression = Clamp01(this.suppression + SUPPRESSION.onGraceHit);
       return;
     }
     const P = COMBAT.player || {};
@@ -1004,31 +991,39 @@ export class PlayerController {
     // 而且它们有啸声、有落点标记、有一秒半的预警，玩家是"没躲开"，不是"没看见"。
     if (info && info.bullet) applied = Math.min(applied, P.maxBulletDamage ?? 62);
     this.health -= applied;
-    const bleed = (part === "head" ? 6 : part === "torso" ? 2.6 : 1.4) * (P.bleedScale ?? 0.6);
+    const bleed = (part === "head" ? WOUNDS.bleedHead
+      : part === "torso" ? WOUNDS.bleedTorso : WOUNDS.bleedLimb) * (P.bleedScale ?? 0.6);
     this.wounds.push({ part, bleed, since: 0 });
     this.bleeding += bleed;
-    this.suppression = Clamp01(this.suppression + 0.5);
+    this.suppression = Clamp01(this.suppression + SUPPRESSION.onHit);
 
     // --- 让"我中弹了"这件事看得见、听得见 -----------------------------------
     // 红闪按这一发的实际伤害定强度，与剩余血量无关：擦一下腿是一闪，
     // 挨一发胸口是满屏。这是玩家判断"要不要现在退"的唯一即时信号。
-    this.hitFlash = Clamp01(Math.max(this.hitFlash, 0.30 + applied / 68));
+    this.hitFlash = Clamp01(Math.max(this.hitFlash,
+      HIT_FEEDBACK.flashBase + applied / HIT_FEEDBACK.flashDamageDiv));
     const from = info && info.from ? info.from : null;
     if (from) {
       // 来弹方位存世界方向（从玩家指向枪口），HUD 每帧按当前 yaw 转成屏幕角。
       // 存屏幕角的话转身之后指示器就指错了。
       const dx = from.x - this.position.x, dz = from.z - this.position.z;
       const len = Math.hypot(dx, dz) || 1;
-      this.hitMarks.push({ x: dx / len, z: dz / len, life: 2.2, max: 2.2 });
-      if (this.hitMarks.length > 5) this.hitMarks.shift();
+      this.hitMarks.push({
+        x: dx / len, z: dz / len,
+        life: HIT_FEEDBACK.markLifeS, max: HIT_FEEDBACK.markLifeS,
+      });
+      if (this.hitMarks.length > HIT_FEEDBACK.markMax) this.hitMarks.shift();
     }
-    this.PushHitEvent({ kind: "hurt", part, damage: applied, severity: Clamp01(applied / 55), blast: !!info?.blast });
+    this.PushHitEvent({
+      kind: "hurt", part, damage: applied,
+      severity: Clamp01(applied / HIT_FEEDBACK.severityDiv), blast: !!info?.blast,
+    });
 
     if (direction) {
-      this.velocity.addScaledVector(direction, 1.2);
+      this.velocity.addScaledVector(direction, HIT_FEEDBACK.knockbackMps);
       // 中弹把视线打偏 —— 被打中还能稳稳瞄准是最假的一件事
-      this.aimYaw += (this.rnd() - 0.5) * 0.09;
-      this.aimPitch += (this.rnd() - 0.5) * 0.07 + 0.03;
+      this.aimYaw += (this.rnd() - 0.5) * HIT_FEEDBACK.aimKickYaw;
+      this.aimPitch += (this.rnd() - 0.5) * HIT_FEEDBACK.aimKickPitch + HIT_FEEDBACK.aimKickPitchBias;
     }
     if (this.health <= 0) this.Kill();
   }
@@ -1039,7 +1034,7 @@ export class PlayerController {
    */
   PushHitEvent(event) {
     this.hitEvents.push(event);
-    if (this.hitEvents.length > 8) this.hitEvents.shift();
+    if (this.hitEvents.length > HIT_FEEDBACK.eventQueueMax) this.hitEvents.shift();
   }
 
   /** 取走这一帧攒下的受击事件（装配层拿去播音效）。取完即清。 */
@@ -1058,9 +1053,9 @@ export class PlayerController {
    * **战地的后坐是回到零的，没有残留**，见 docs/Data_BattlefieldNumbers.md。
    * 参数留着是为了将来真有哪支枪要破例，默认值不许再动。
    */
-  ApplyRecoil(pitchRad, yawRad, recoverS = 0.4, recoverFrac = 1.0) {
-    const keep = Number.isFinite(recoverFrac) ? recoverFrac : 1.0;
-    this.pitch = Clamp(this.pitch + pitchRad, -1.35, 1.35);
+  ApplyRecoil(pitchRad, yawRad, recoverS = RECOIL.defaultRecoverS, recoverFrac = RECOIL.keepFrac) {
+    const keep = Number.isFinite(recoverFrac) ? recoverFrac : RECOIL.keepFrac;
+    this.pitch = Clamp(this.pitch + pitchRad, -FREE_AIM.pitchLimitRad, FREE_AIM.pitchLimitRad);
     this.yaw += yawRad;
     this.recoilPending.pitch += pitchRad * keep;
     this.recoilPending.yaw += yawRad * keep;
@@ -1090,7 +1085,7 @@ export class PlayerController {
     if (this.bandages <= 0 || this.bleeding <= 0) return false;
     this.bandages -= 1;
     this.bleeding = 0;
-    this.health = Math.min(100, this.health + 14);
+    this.health = Math.min(100, this.health + WOUNDS.bandageHeal);
     for (const w of this.wounds) w.bleed = 0;
     return true;
   }
@@ -1111,13 +1106,13 @@ export class PlayerController {
   /** 当前的瞄准摇摆幅度（度）。给视图模型与散布计算共用。 */
   SwayAmount(weapon) {
     const stanceScale = STANCE[this.stance].sway;
-    let sway = 1.0 * stanceScale * (weapon?.swayScale ?? 1);
-    sway *= 1 - this.ads * 0.55;
+    let sway = SWAY.base * stanceScale * (weapon?.swayScale ?? 1);
+    sway *= 1 - this.ads * SWAY.adsDamp;
     sway *= this.ArmPenalty();
-    sway *= 1 + this.suppression * 0.9;
-    sway *= 1 + (1 - this.stamina) * 0.6;
-    if (this.breathHold) sway *= 0.28;
-    if (this.bipod) sway *= 0.25;                  // 架上去之后枪自己稳住了
+    sway *= 1 + this.suppression * SWAY.suppressionGain;
+    sway *= 1 + (1 - this.stamina) * SWAY.staminaGain;
+    if (this.breathHold) sway *= SWAY.breathHold;
+    if (this.bipod) sway *= SWAY.bipod;            // 架上去之后枪自己稳住了
     return sway;
   }
 
@@ -1134,15 +1129,17 @@ export class PlayerController {
    * **这一改同时改的是真实落点**，不是只把 HUD 画小 —— 准心不许再骗人。
    */
   SpreadDeg(weapon) {
-    if (!weapon) return 4;
-    const base = this.ads > 0.5 ? (weapon.spreadAdsDeg ?? 0.2) : (weapon.spreadHipDeg ?? 3);
+    if (!weapon) return SPREAD.noWeaponDeg;
+    const base = this.ads > SPREAD.adsThreshold
+      ? (weapon.spreadAdsDeg ?? SPREAD.adsFallbackDeg)
+      : (weapon.spreadHipDeg ?? SPREAD.hipFallbackDeg);
     let s = base * STANCE[this.stance].spread;
-    s *= 1 + this.suppression * 1.3;
-    s *= this.ArmPenalty() * 0.6 + 0.4;
-    s *= 1 + Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / 3) * 0.85;
-    if (!this.grounded) s *= 2.4;                    // 半空开火可以，但绝不是稳定射击姿态
-    if (this.breathHold) s *= 0.55;
-    if (this.bipod) s *= 0.35;
+    s *= 1 + this.suppression * SPREAD.suppressionGain;
+    s *= this.ArmPenalty() * SPREAD.armMix + SPREAD.armBias;
+    s *= 1 + Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / SPREAD.moveRefMps) * SPREAD.moveGain;
+    if (!this.grounded) s *= SPREAD.airborne;        // 半空开火可以，但绝不是稳定射击姿态
+    if (this.breathHold) s *= SPREAD.breathHold;
+    if (this.bipod) s *= SPREAD.bipod;
     return s;
   }
 }
