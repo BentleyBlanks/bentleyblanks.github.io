@@ -41,7 +41,7 @@ for faction in ['Nra','Ija']:
  if not prop:
   prop=bpy.data.objects.new('Socket_'+faction+'InfantryGrenade',None);scene.collection.objects.link(prop)
   prop.parent=arm;prop.parent_type='BONE';prop.parent_bone=prefix+'R Hand';prop.rotation_mode='QUATERNION'
-  data=json.loads((project/'Model/Grenade.tzm.json').read_text())
+  data=json.loads((project/'Model/Model_Grenade.tzm.json').read_text())
   for i,block in enumerate(data['meshes']):
    q=Decode(block['pos'],'H');ids=Decode(block['idx'],'I' if block['idxBits']==32 else 'H')
    vertices=[tuple(block['posMin'][j]+q[v*3+j]*block['posScale'][j] for j in range(3)) for v in range(block['count'])]

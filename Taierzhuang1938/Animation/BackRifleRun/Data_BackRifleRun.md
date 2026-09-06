@@ -15,7 +15,7 @@
 
 使用 `Model/Character/Model_LugouNra01.glb` 的完整原始关节名与绑定层级；保留 `GroundRoot` 与 `Bip002` 骨名。动作没有复制、改名或剪取旧 `RifleRun` 曲线：支撑足轨迹、腿部解析 IK、骨盆重心、躯干反扭、交替摆臂和手指姿态在 `Script_BackRifleRunBake.py` 中独立生成。
 
-`Socket_BackRifle` 固定在 `Bip002 Spine2`，步枪和绑带是该挂点子节点。步枪几何解码自项目现有 `Model/ZhongZheng.tzm.json`，尺寸与枪托/枪口方向保留；没有替换生产枪模。新挂点独立于 `Socket_BackBlade` 和双手武器挂点。绑带用可编辑带状网格表示，从上枪带环跨右肩，沿胸腹绕左肋连接枪托带环，与胸椎保持相同约束。枪体不在运行中换父节点，也不使用逐帧世界坐标纠偏。
+`Socket_BackRifle` 固定在 `Bip002 Spine2`，步枪和绑带是该挂点子节点。步枪几何解码自项目现有 `Model/Model_ZhongZheng.tzm.json`，尺寸与枪托/枪口方向保留；没有替换生产枪模。新挂点独立于 `Socket_BackBlade` 和双手武器挂点。绑带用可编辑带状网格表示，从上枪带环跨右肩，沿胸腹绕左肋连接枪托带环，与胸椎保持相同约束。枪体不在运行中换父节点，也不使用逐帧世界坐标纠偏。
 
 独立 GLB 的制服/皮肤非金属设置对齐 `Script_CharacterModel` 的 `ConfigureExternalPbr` 规则；原始生产材质文件保持不变。
 

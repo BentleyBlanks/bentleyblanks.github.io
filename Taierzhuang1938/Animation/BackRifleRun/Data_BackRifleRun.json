@@ -18,7 +18,7 @@
   "strideMeters": 1.9066666666666665,
   "sourceModel": "Taierzhuang1938/Model/Character/Model_LugouNra01.glb",
   "sourceModelSha256": "2f5ef965581971da9a9ba90e8f17cd96180a390b1f922c73828522ed25703913",
-  "sourceWeapon": "Taierzhuang1938/Model/ZhongZheng.tzm.json",
+  "sourceWeapon": "Taierzhuang1938/Model/Model_ZhongZheng.tzm.json",
   "sourceWeaponSha256": "0d18aaf93c0451cc2ebb0e8266648874798bd100d3a372aad920edcd027c199e",
   "armature": "Rig_LugouCharacter",
   "socket": "Socket_BackRifle",

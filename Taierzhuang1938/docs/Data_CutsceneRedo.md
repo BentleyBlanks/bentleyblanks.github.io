@@ -402,7 +402,7 @@ node Taierzhuang1938/Script_CutsceneShot.mjs --cut=CS_Chuchuan --times=60 --yaw=
 没有肩、脚是两团光脚趾（见 `Model/Texture_NraSoldierRefined*QA.png`）。
 
 现在 `ActorFactory.CreateRiggedSkin` 只给**百姓**返回 GLB 皮；`nra*` / `ija*` 一律走
-程序化 tzm 模型（`Model/SoldierNra.tzm.json`、`SoldierIja.tzm.json`），那套是照这副
+程序化 tzm 模型（`Model/Model_SoldierNra.tzm.json`、`Model_SoldierIja.tzm.json`），那套是照这副
 13 关节骨架建的，关节自带交叠、有绑腿有布鞋有立领。
 
 顺带修掉一个长期潜伏的 bug：`Script_RiggedModel.mjs` 用了 `HashString` 却没 import，
@@ -423,8 +423,8 @@ tzm 模型直接通过，而 GLB 那版全员悬空约 8 cm。
 平板叠着，头是个方盒加一片浮在上面的帽板，胳膊是两根裸露的肉色管子（1938 年 3—4 月
 鲁南春寒，光膀子本身就不对）。
 
-现在百姓也走程序化 tzm：`Model/CivilianMale.tzm.json`（1726 三角）与
-`CivilianFemale.tzm.json`（1536 三角），建模脚本 `_blender/BuildCivilians.py`。
+现在百姓也走程序化 tzm：`Model/Model_CivilianMale.tzm.json`（1726 三角）与
+`Model_CivilianFemale.tzm.json`（1536 三角），建模脚本 `_blender/BuildCivilians.py`。
 骨架、关节偏移、四肢装配**全部复用 `BuildSoldiers.Limbs`** —— 运行时只有一套 13 关节
 骨架，抄第二份关节表迟早会漂；那个函数因此多了三个 spec 钩子
 （`legMaterial` / `shinParts` / `footParts`），军民差异全走它们。

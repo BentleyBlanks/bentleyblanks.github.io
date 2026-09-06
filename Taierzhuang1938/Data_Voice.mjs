@@ -119,10 +119,23 @@
 //     text: "这些人都没枪了……" }
 import { VOICE_LINES as CH0_LINES } from "./Data_MissionCh0.mjs";
 import { VOICE_LINES as CH1_LINES } from "./Data_MissionCh1.mjs";
-// 第二到终章（2026-09-06 暂时废弃）：VOICE_LINES 已清空、vo_ch2_*–vo_ch6_*.mp3 已删，
+// 第二到终章（2026-09-06 暂时废弃）：VOICE_LINES 已清空、vo_ch2_*–AudioVoice_Ch6*.mp3 已删，
 // 这里不再拼接它们。第一章的行仍在 —— P0/P1/P2 白盒按 contentId = CH1_NanLu 播它们。
 
 export const VOICE_BASE = "Audio/";
+
+/**
+ * 语音文件名的唯一口径：key → `AudioVoice_<PascalKey>[_NN].mp3`（根 AGENTS 的
+ * `<Category>_<DescriptivePascalCase>` 规范）。`ch1_luo_02` → `AudioVoice_Ch1Luo_02.mp3`，
+ * `rally_bayonet` → `AudioVoice_RallyBayonet.mp3`。烘焙（Script_VoiceBake）、加载
+ * （Script_Audio）与测试都只认这一个函数，不许手拼。
+ */
+export function VoiceFileName(key) {
+  const parts = String(key).split("_");
+  let suffix = "";
+  if (parts.length > 1 && /^\d+$/.test(parts[parts.length - 1])) suffix = "_" + parts.pop();
+  return "AudioVoice_" + parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join("") + suffix + ".mp3";
+}
 
 /**
  * 章节台词的 CAST id（docs/Data_MissionRemake.md §10.2）。
@@ -179,33 +192,33 @@ export const STORY_DELIVERIES = Object.keys(VOICE_DELIVERY_MIX);
 // 里留档。哪天要回看旧序章，把这几行贴回来就行。
 
 const BATTLE_LINES = [
-  { key: "rally_bayonet",   kind: "rally",  file: "vo_rally_bayonet.mp3",  dur: 2.36,  role: "老兵",    pitch: -4,                  text: "刺刀上起！跟到我杀！" },
-  { key: "rally_charge",    kind: "rally",  file: "vo_rally_charge.mp3",   dur: 2.50,  role: "班长",    pitch: -2,                  text: "冲！给老子冲！" },
-  { key: "rally_dadao",     kind: "rally",  file: "vo_rally_dadao.mp3",    dur: 2.37,  role: "老兵",    pitch: -4,                  text: "杀！大刀砍拢去！" },
-  { key: "rally_follow",    kind: "rally",  file: "vo_rally_follow.mp3",   dur: 2.14,  role: "班长",    pitch: -2,                  text: "弟兄伙，跟到我上！" },
-  { key: "rally_grenade",   kind: "rally",  file: "vo_rally_grenade.mp3",  dur: 2.51,  role: "老兵",    pitch: -4,  event: true,  text: "莫慌！等他走拢再甩！" },
-  { key: "rally_hold",      kind: "rally",  file: "vo_rally_hold.mp3",     dur: 2.51,  role: "班长",    pitch: -2,                  text: "顶到起！给老子顶到起！" },
-  { key: "rally_hold2",     kind: "rally",  file: "vo_rally_hold2.mp3",    dur: 2.50,  role: "班长",    pitch: -2,                  text: "人不倒，阵地就不得丢！" },
-  { key: "rally_noretreat", kind: "rally",  file: "vo_rally_noretreat.mp3", dur: 2.35,  role: "班长",    pitch: -2,                  text: "莫退！一步都莫退！" },
-  { key: "rally_oath",      kind: "rally",  file: "vo_rally_oath.mp3",     dur: 2.49,  role: "班长",    pitch: -2,                  text: "鬼子不打完，莫回四川！" },
-  { key: "rally_shoot",     kind: "rally",  file: "vo_rally_shoot.mp3",    dur: 2.37,  role: "班长",    pitch: -2,                  text: "打！打！莫歇气！" },
-  { key: "spot_east",       kind: "spot",   file: "vo_spot_east.mp3",      dur: 2.36,  role: "普通兵",   pitch: 0,                   text: "东边！东边有鬼子！" },
-  { key: "spot_enemy",      kind: "spot",   file: "vo_spot_enemy.mp3",     dur: 2.37,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "鬼子！鬼子摸拢来了！" },
-  { key: "spot_gap",        kind: "spot",   file: "vo_spot_gap.mp3",       dur: 2.35,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "缺口！鬼子钻进来了！" },
-  { key: "spot_plane",      kind: "spot",   file: "vo_spot_plane.mp3",     dur: 2.30,  role: "普通兵",   pitch: 0,   event: true,  text: "飞机！快躲起！" },
-  { key: "spot_tank",       kind: "spot",   file: "vo_spot_tank.mp3",      dur: 2.36,  role: "新兵",    pitch: 0,   event: true,  speed: 1.15, text: "战车！战车碾拢来了！" },
-  { key: "spot_wall",       kind: "spot",   file: "vo_spot_wall.mp3",      dur: 2.34,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "墙上！鬼子爬上墙了！" },
-  { key: "warn_down",       kind: "warn",   file: "vo_warn_down.mp3",      dur: 1.84,  role: "老兵",    pitch: -4,                  text: "趴倒！趴倒！" },
-  { key: "warn_grenade",    kind: "warn",   file: "vo_warn_grenade.mp3",   dur: 1.91,  role: "普通兵",   pitch: 0,                   text: "手榴弹！闪！" },
-  { key: "warn_shell",      kind: "warn",   file: "vo_warn_shell.mp3",     dur: 2.36,  role: "老兵",    pitch: -4,                  speed: 1.1, text: "炮来了！趴倒！莫动！" },
-  { key: "ammo_ask",        kind: "ammo",   file: "vo_ammo_ask.mp3",       dur: 2.37,  role: "普通兵",   pitch: 0,                   text: "桥夹！哪个匀我一个！" },
-  { key: "ammo_grenade",    kind: "ammo",   file: "vo_ammo_grenade.mp3",   dur: 2.36,  role: "普通兵",   pitch: 0,   event: true,  text: "手榴弹！莫得了！" },
-  { key: "ammo_out",        kind: "ammo",   file: "vo_ammo_out.mp3",       dur: 2.35,  role: "普通兵",   pitch: 0,                   text: "子弹！我莫得子弹了！" },
-  { key: "ammo_reload",     kind: "ammo",   file: "vo_ammo_reload.mp3",    dur: 2.14,  role: "普通兵",   pitch: 0,                   text: "我压子弹！掩护我一哈！" },
-  { key: "hurt_down",       kind: "hurt",   file: "vo_hurt_down.mp3",      dur: 2.37,  role: "普通兵",   pitch: -4, speed: 0.85,                   text: "班长哦！班长！" },
-  { key: "hurt_hit",        kind: "hurt",   file: "vo_hurt_hit.mp3",       dur: 2.37,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "遭了！我遭枪子了！" },
-  { key: "hurt_medic",      kind: "hurt",   file: "vo_hurt_medic.mp3",     dur: 2.36,  role: "普通兵",   pitch: 0,                   text: "担架兵！这头有人挂彩！" },
-    { key: "hurt_scream", kind: "hurt", file: "vo_hurt_scream.mp3", dur: 0.82, role: "普通兵",
+  { key: "rally_bayonet",   kind: "rally",  file: "AudioVoice_RallyBayonet.mp3", dur: 2.36,  role: "老兵",    pitch: -4,                  text: "刺刀上起！跟到我杀！" },
+  { key: "rally_charge",    kind: "rally",  file: "AudioVoice_RallyCharge.mp3", dur: 2.50,  role: "班长",    pitch: -2,                  text: "冲！给老子冲！" },
+  { key: "rally_dadao",     kind: "rally",  file: "AudioVoice_RallyDadao.mp3", dur: 2.37,  role: "老兵",    pitch: -4,                  text: "杀！大刀砍拢去！" },
+  { key: "rally_follow",    kind: "rally",  file: "AudioVoice_RallyFollow.mp3", dur: 2.14,  role: "班长",    pitch: -2,                  text: "弟兄伙，跟到我上！" },
+  { key: "rally_grenade",   kind: "rally",  file: "AudioVoice_RallyGrenade.mp3", dur: 2.51,  role: "老兵",    pitch: -4,  event: true,  text: "莫慌！等他走拢再甩！" },
+  { key: "rally_hold",      kind: "rally",  file: "AudioVoice_RallyHold.mp3", dur: 2.51,  role: "班长",    pitch: -2,                  text: "顶到起！给老子顶到起！" },
+  { key: "rally_hold2",     kind: "rally",  file: "AudioVoice_RallyHold2.mp3", dur: 2.50,  role: "班长",    pitch: -2,                  text: "人不倒，阵地就不得丢！" },
+  { key: "rally_noretreat", kind: "rally",  file: "AudioVoice_RallyNoretreat.mp3", dur: 2.35,  role: "班长",    pitch: -2,                  text: "莫退！一步都莫退！" },
+  { key: "rally_oath",      kind: "rally",  file: "AudioVoice_RallyOath.mp3", dur: 2.49,  role: "班长",    pitch: -2,                  text: "鬼子不打完，莫回四川！" },
+  { key: "rally_shoot",     kind: "rally",  file: "AudioVoice_RallyShoot.mp3", dur: 2.37,  role: "班长",    pitch: -2,                  text: "打！打！莫歇气！" },
+  { key: "spot_east",       kind: "spot",   file: "AudioVoice_SpotEast.mp3", dur: 2.36,  role: "普通兵",   pitch: 0,                   text: "东边！东边有鬼子！" },
+  { key: "spot_enemy",      kind: "spot",   file: "AudioVoice_SpotEnemy.mp3", dur: 2.37,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "鬼子！鬼子摸拢来了！" },
+  { key: "spot_gap",        kind: "spot",   file: "AudioVoice_SpotGap.mp3", dur: 2.35,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "缺口！鬼子钻进来了！" },
+  { key: "spot_plane",      kind: "spot",   file: "AudioVoice_SpotPlane.mp3", dur: 2.30,  role: "普通兵",   pitch: 0,   event: true,  text: "飞机！快躲起！" },
+  { key: "spot_tank",       kind: "spot",   file: "AudioVoice_SpotTank.mp3", dur: 2.36,  role: "新兵",    pitch: 0,   event: true,  speed: 1.15, text: "战车！战车碾拢来了！" },
+  { key: "spot_wall",       kind: "spot",   file: "AudioVoice_SpotWall.mp3", dur: 2.34,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "墙上！鬼子爬上墙了！" },
+  { key: "warn_down",       kind: "warn",   file: "AudioVoice_WarnDown.mp3", dur: 1.84,  role: "老兵",    pitch: -4,                  text: "趴倒！趴倒！" },
+  { key: "warn_grenade",    kind: "warn",   file: "AudioVoice_WarnGrenade.mp3", dur: 1.91,  role: "普通兵",   pitch: 0,                   text: "手榴弹！闪！" },
+  { key: "warn_shell",      kind: "warn",   file: "AudioVoice_WarnShell.mp3", dur: 2.36,  role: "老兵",    pitch: -4,                  speed: 1.1, text: "炮来了！趴倒！莫动！" },
+  { key: "ammo_ask",        kind: "ammo",   file: "AudioVoice_AmmoAsk.mp3", dur: 2.37,  role: "普通兵",   pitch: 0,                   text: "桥夹！哪个匀我一个！" },
+  { key: "ammo_grenade",    kind: "ammo",   file: "AudioVoice_AmmoGrenade.mp3", dur: 2.36,  role: "普通兵",   pitch: 0,   event: true,  text: "手榴弹！莫得了！" },
+  { key: "ammo_out",        kind: "ammo",   file: "AudioVoice_AmmoOut.mp3", dur: 2.35,  role: "普通兵",   pitch: 0,                   text: "子弹！我莫得子弹了！" },
+  { key: "ammo_reload",     kind: "ammo",   file: "AudioVoice_AmmoReload.mp3", dur: 2.14,  role: "普通兵",   pitch: 0,                   text: "我压子弹！掩护我一哈！" },
+  { key: "hurt_down",       kind: "hurt",   file: "AudioVoice_HurtDown.mp3", dur: 2.37,  role: "普通兵",   pitch: -4, speed: 0.85,                   text: "班长哦！班长！" },
+  { key: "hurt_hit",        kind: "hurt",   file: "AudioVoice_HurtHit.mp3", dur: 2.37,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "遭了！我遭枪子了！" },
+  { key: "hurt_medic",      kind: "hurt",   file: "AudioVoice_HurtMedic.mp3", dur: 2.36,  role: "普通兵",   pitch: 0,                   text: "担架兵！这头有人挂彩！" },
+    { key: "hurt_scream", kind: "hurt", file: "AudioVoice_HurtScream.mp3", dur: 0.82, role: "普通兵",
     // **这一条不走 TTS**：非语言的惨叫模型做不像，而且 seedaudio 的默认音色偏女声，
     // pitch 压到 -6 出来还是个女的（用户第一反应就是「啊——怎么是女声」）。
     // 改用免版税素材库里的真人男声痛呼 —— 一声「啊」没有台词，换成实录零成本。
@@ -215,10 +228,10 @@ const BATTLE_LINES = [
       credit: "SoundBits · 男性痛呼 · Sonniss GDC 2016（免版税）", maxDur: 1.6,
     },
     text: "啊——！" },
-  { key: "move_cover",      kind: "move",   file: "vo_move_cover.mp3",     dur: 2.35,  role: "班长",    pitch: -2,                  text: "找掩护！躲到起！" },
-  { key: "move_flank",      kind: "move",   file: "vo_move_flank.mp3",     dur: 1.73,  role: "班长",    pitch: -2,                  text: "左手边！绕过去！" },
-  { key: "move_go",         kind: "move",   file: "vo_move_go.mp3",        dur: 1.84,  role: "班长",    pitch: -2,                  text: "走！莫站到起！" },
-  { key: "move_nogun",      kind: "move",   file: "vo_move_nogun.mp3",     dur: 2.22,  role: "班长",    pitch: -2,  event: true,  text: "莫得枪的，跟到走！" },
+  { key: "move_cover",      kind: "move",   file: "AudioVoice_MoveCover.mp3", dur: 2.35,  role: "班长",    pitch: -2,                  text: "找掩护！躲到起！" },
+  { key: "move_flank",      kind: "move",   file: "AudioVoice_MoveFlank.mp3", dur: 1.73,  role: "班长",    pitch: -2,                  text: "左手边！绕过去！" },
+  { key: "move_go",         kind: "move",   file: "AudioVoice_MoveGo.mp3", dur: 1.84,  role: "班长",    pitch: -2,                  text: "走！莫站到起！" },
+  { key: "move_nogun",      kind: "move",   file: "AudioVoice_MoveNogun.mp3", dur: 2.22,  role: "班长",    pitch: -2,  event: true,  text: "莫得枪的，跟到走！" },
 
   // ===== 日方（濑谷支队）=====================================================
   //
@@ -250,37 +263,37 @@ const BATTLE_LINES = [
   // 拍数与时长的相关性验过（r=0.57，喊话本来忽长忽短）；四条相对拟合明显偏短的重生成过，
   // 其中两条确实是截断（いったんさがれ 0.63→2.11 s、もくひょう 1.00→1.66 s），
   // 另两条三次独立生成都稳定 —— **截断会忽长忽短，稳定就说明是真的喊得快**。
-  { key: "ija_rally_bayonet",   kind: "rally",  file: "vo_ija_rally_bayonet.mp3", dur: 2.24,  role: "古兵",    pitch: -4,  side: "ija", event: true,  text: "ちゃっけん！いそげ！", kanji: "着剣！急げ！", cn: "上刺刀！快！" },
-  { key: "ija_rally_charge",    kind: "rally",  file: "vo_ija_rally_charge.mp3", dur: 1.14,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "とつげき！", kanji: "突撃！", cn: "冲锋！" },
-  { key: "ija_rally_fire",      kind: "rally",  file: "vo_ija_rally_fire.mp3",   dur: 1.91,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "うちかたはじめ！", kanji: "撃ち方始め！", cn: "开始射击！" },
-  { key: "ija_rally_follow",    kind: "rally",  file: "vo_ija_rally_follow.mp3", dur: 1.42,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "われにつづけ！", kanji: "我に続け！", cn: "跟我上！" },
+  { key: "ija_rally_bayonet",   kind: "rally",  file: "AudioVoice_IjaRallyBayonet.mp3", dur: 2.24,  role: "古兵",    pitch: -4,  side: "ija", event: true,  text: "ちゃっけん！いそげ！", kanji: "着剣！急げ！", cn: "上刺刀！快！" },
+  { key: "ija_rally_charge",    kind: "rally",  file: "AudioVoice_IjaRallyCharge.mp3", dur: 1.14,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "とつげき！", kanji: "突撃！", cn: "冲锋！" },
+  { key: "ija_rally_fire",      kind: "rally",  file: "AudioVoice_IjaRallyFire.mp3", dur: 1.91,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "うちかたはじめ！", kanji: "撃ち方始め！", cn: "开始射击！" },
+  { key: "ija_rally_follow",    kind: "rally",  file: "AudioVoice_IjaRallyFollow.mp3", dur: 1.42,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "われにつづけ！", kanji: "我に続け！", cn: "跟我上！" },
   // 突击声库批：全数采用 assault 交付指令，要求 SeedAudio 给出近距离交火时胸腔爆发、
   // 已经冲上去的急迫感；不是普通操典朗读，也不使用影视反派式的拖长吼叫。
-  { key: "ija_rally_push",      kind: "rally",  file: "vo_ija_rally_push.mp3",   dur: 1.65,  role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "おせ！おくれるな！", kanji: "押せ！遅れるな！", cn: "压上去！别掉队！" },
-  { key: "ija_rally_storm",     kind: "rally",  file: "vo_ija_rally_storm.mp3",  dur: 2.19,  role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "とつげき！いっきにいけ！", kanji: "突撃！一気に行け！", cn: "冲锋！一口气冲过去！" },
-  { key: "ija_rally_suppress",  kind: "rally",  file: "vo_ija_rally_suppress.mp3", dur: 1.56, role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "うて！うちつづけろ！", kanji: "撃て！撃ち続けろ！", cn: "开火！持续射击！" },
+  { key: "ija_rally_push",      kind: "rally",  file: "AudioVoice_IjaRallyPush.mp3", dur: 1.65,  role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "おせ！おくれるな！", kanji: "押せ！遅れるな！", cn: "压上去！别掉队！" },
+  { key: "ija_rally_storm",     kind: "rally",  file: "AudioVoice_IjaRallyStorm.mp3", dur: 2.19,  role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "とつげき！いっきにいけ！", kanji: "突撃！一気に行け！", cn: "冲锋！一口气冲过去！" },
+  { key: "ija_rally_suppress",  kind: "rally",  file: "AudioVoice_IjaRallySuppress.mp3", dur: 1.56, role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "うて！うちつづけろ！", kanji: "撃て！撃ち続けろ！", cn: "开火！持续射击！" },
   // ija_spot_enemy 曾因底噪撤下；本批已通过 SeedAudio 1.0 重摇并过 −48 dB 闸。
-  { key: "ija_spot_enemy",      kind: "spot",   file: "vo_ija_spot_enemy.mp3",  dur: 2.06,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "てきだ！ひだり！ひだりだ！", kanji: "敵だ！左！左だ！", cn: "敌人！左边！左边！" },
-  { key: "ija_spot_roof",       kind: "spot",   file: "vo_ija_spot_roof.mp3",   dur: 1.39,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "おくじょうにてき！", kanji: "屋上に敵！", cn: "屋顶有敌人！" },
-  { key: "ija_spot_mg",         kind: "spot",   file: "vo_ija_spot_mg.mp3",      dur: 2.29,  role: "兵",     pitch: 0,   side: "ija",                 text: "きかんじゅう！まえだ！", kanji: "機関銃！前だ！", cn: "机枪！在前面！" },
-  { key: "ija_spot_shina",      kind: "spot",   file: "vo_ija_spot_shina.mp3",   dur: 2.30,  role: "古兵",    pitch: -4,  side: "ija", event: true,  text: "しなへいだ！まだいるぞ！", kanji: "支那兵だ！まだ居るぞ！", cn: "支那兵！他们还在！" },
-  { key: "ija_spot_target",     kind: "spot",   file: "vo_ija_spot_target.mp3",  dur: 2.30,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "もくひょう！みぎぜんぽう！", kanji: "目標！右前方！", cn: "目标！右前方！" },
-  { key: "ija_spot_wall",       kind: "spot",   file: "vo_ija_spot_wall.mp3",    dur: 1.17,  role: "兵",     pitch: 0,   side: "ija", event: true,  text: "じょうへきにてきへい！", kanji: "城壁に敵兵！", cn: "城墙上有敌兵！" },
-  { key: "ija_warn_down",       kind: "warn",   file: "vo_ija_warn_down.mp3",    dur: 1.60,  role: "古兵",    pitch: -4,  side: "ija",                 text: "ふせろ！うごくな！", kanji: "伏せろ！動くな！", cn: "卧倒！别动！" },
-  { key: "ija_warn_cover",      kind: "warn",   file: "vo_ija_warn_cover.mp3",   dur: 2.30,  role: "古兵",    pitch: -4,  side: "ija", delivery: "assault", text: "かくれろ！あたまをさげろ！", kanji: "隠れろ！頭を下げろ！", cn: "隐蔽！低下头！" },
-  { key: "ija_warn_grenade",    kind: "warn",   file: "vo_ija_warn_grenade.mp3", dur: 1.91,  role: "兵",     pitch: 0,   side: "ija",                 text: "てりゅうだん！ふせろ！", kanji: "手榴弾！伏せろ！", cn: "手榴弹！卧倒！" },
-  { key: "ija_warn_shell",      kind: "warn",   file: "vo_ija_warn_shell.mp3",   dur: 1.91,  role: "分隊長",   pitch: -2,  side: "ija", event: true,  text: "ほうげき！たいひ！", kanji: "砲撃！退避！", cn: "炮击！退避！" },
-  { key: "ija_ammo_out",        kind: "ammo",   file: "vo_ija_ammo_out.mp3",     dur: 1.21,  role: "兵",     pitch: 0,   side: "ija",                 text: "だんやくをよこせ！", kanji: "弾薬を寄こせ！", cn: "把弹药递过来！" },
-  { key: "ija_ammo_reload",     kind: "ammo",   file: "vo_ija_ammo_reload.mp3",  dur: 2.51,  role: "兵",     pitch: 0,   side: "ija",                 text: "そうてんちゅう！えんごたのむ！", kanji: "装填中！援護頼む！", cn: "装填中！掩护我！" },
-  { key: "ija_ammo_pass",       kind: "ammo",   file: "vo_ija_ammo_pass.mp3",    dur: 2.07,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "だんやく！はやくまわせ！", kanji: "弾薬！早く回せ！", cn: "弹药！快传过来！" },
-  { key: "ija_hurt_hit",        kind: "hurt",   file: "vo_ija_hurt_hit.mp3",     dur: 1.07,  role: "兵",     pitch: 0,   side: "ija",                 text: "うでをやられた！", kanji: "腕をやられた！", cn: "胳膊中弹了！" },
-  { key: "ija_hurt_leg",        kind: "hurt",   file: "vo_ija_hurt_leg.mp3",     dur: 1.41,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "あしをやられた！", kanji: "脚をやられた！", cn: "腿受伤了！" },
-  { key: "ija_hurt_leader",     kind: "hurt",   file: "vo_ija_hurt_leader.mp3",  dur: 2.51,  role: "兵",     pitch: 0,   side: "ija", event: true,  text: "ぶんたいちょうどのがやられた！", kanji: "分隊長殿がやられた！", cn: "分队长中弹了！（分隊長＝相当于中方的班长）" },
-  { key: "ija_hurt_medic",      kind: "hurt",   file: "vo_ija_hurt_medic.mp3",   dur: 2.42,  role: "兵",     pitch: 0,   side: "ija",                 text: "えいせいへい！こっちだ！", kanji: "衛生兵！こっちだ！", cn: "卫生兵！在这边！" },
-  { key: "ija_move_advance",    kind: "move",   file: "vo_ija_move_advance.mp3", dur: 2.14,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "さんかい！まえへ！", kanji: "散開！前へ！", cn: "散开！向前！" },
-  { key: "ija_move_back",       kind: "move",   file: "vo_ija_move_back.mp3",    dur: 2.27,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "いったんさがれ！", kanji: "一旦下がれ！", cn: "暂时后撤！" },
-  { key: "ija_move_flank",      kind: "move",   file: "vo_ija_move_flank.mp3",   dur: 1.31,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "そくめんにまわれ！", kanji: "側面に回れ！", cn: "从侧翼绕过去！" },
-  { key: "ija_move_forward",    kind: "move",   file: "vo_ija_move_forward.mp3", dur: 2.01,  role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "まえへでろ！おせ！", kanji: "前へ出ろ！押せ！", cn: "冲到前面！压上去！" },
+  { key: "ija_spot_enemy",      kind: "spot",   file: "AudioVoice_IjaSpotEnemy.mp3", dur: 2.06,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "てきだ！ひだり！ひだりだ！", kanji: "敵だ！左！左だ！", cn: "敌人！左边！左边！" },
+  { key: "ija_spot_roof",       kind: "spot",   file: "AudioVoice_IjaSpotRoof.mp3", dur: 1.39,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "おくじょうにてき！", kanji: "屋上に敵！", cn: "屋顶有敌人！" },
+  { key: "ija_spot_mg",         kind: "spot",   file: "AudioVoice_IjaSpotMg.mp3", dur: 2.29,  role: "兵",     pitch: 0,   side: "ija",                 text: "きかんじゅう！まえだ！", kanji: "機関銃！前だ！", cn: "机枪！在前面！" },
+  { key: "ija_spot_shina",      kind: "spot",   file: "AudioVoice_IjaSpotShina.mp3", dur: 2.30,  role: "古兵",    pitch: -4,  side: "ija", event: true,  text: "しなへいだ！まだいるぞ！", kanji: "支那兵だ！まだ居るぞ！", cn: "支那兵！他们还在！" },
+  { key: "ija_spot_target",     kind: "spot",   file: "AudioVoice_IjaSpotTarget.mp3", dur: 2.30,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "もくひょう！みぎぜんぽう！", kanji: "目標！右前方！", cn: "目标！右前方！" },
+  { key: "ija_spot_wall",       kind: "spot",   file: "AudioVoice_IjaSpotWall.mp3", dur: 1.17,  role: "兵",     pitch: 0,   side: "ija", event: true,  text: "じょうへきにてきへい！", kanji: "城壁に敵兵！", cn: "城墙上有敌兵！" },
+  { key: "ija_warn_down",       kind: "warn",   file: "AudioVoice_IjaWarnDown.mp3", dur: 1.60,  role: "古兵",    pitch: -4,  side: "ija",                 text: "ふせろ！うごくな！", kanji: "伏せろ！動くな！", cn: "卧倒！别动！" },
+  { key: "ija_warn_cover",      kind: "warn",   file: "AudioVoice_IjaWarnCover.mp3", dur: 2.30,  role: "古兵",    pitch: -4,  side: "ija", delivery: "assault", text: "かくれろ！あたまをさげろ！", kanji: "隠れろ！頭を下げろ！", cn: "隐蔽！低下头！" },
+  { key: "ija_warn_grenade",    kind: "warn",   file: "AudioVoice_IjaWarnGrenade.mp3", dur: 1.91,  role: "兵",     pitch: 0,   side: "ija",                 text: "てりゅうだん！ふせろ！", kanji: "手榴弾！伏せろ！", cn: "手榴弹！卧倒！" },
+  { key: "ija_warn_shell",      kind: "warn",   file: "AudioVoice_IjaWarnShell.mp3", dur: 1.91,  role: "分隊長",   pitch: -2,  side: "ija", event: true,  text: "ほうげき！たいひ！", kanji: "砲撃！退避！", cn: "炮击！退避！" },
+  { key: "ija_ammo_out",        kind: "ammo",   file: "AudioVoice_IjaAmmoOut.mp3", dur: 1.21,  role: "兵",     pitch: 0,   side: "ija",                 text: "だんやくをよこせ！", kanji: "弾薬を寄こせ！", cn: "把弹药递过来！" },
+  { key: "ija_ammo_reload",     kind: "ammo",   file: "AudioVoice_IjaAmmoReload.mp3", dur: 2.51,  role: "兵",     pitch: 0,   side: "ija",                 text: "そうてんちゅう！えんごたのむ！", kanji: "装填中！援護頼む！", cn: "装填中！掩护我！" },
+  { key: "ija_ammo_pass",       kind: "ammo",   file: "AudioVoice_IjaAmmoPass.mp3", dur: 2.07,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "だんやく！はやくまわせ！", kanji: "弾薬！早く回せ！", cn: "弹药！快传过来！" },
+  { key: "ija_hurt_hit",        kind: "hurt",   file: "AudioVoice_IjaHurtHit.mp3", dur: 1.07,  role: "兵",     pitch: 0,   side: "ija",                 text: "うでをやられた！", kanji: "腕をやられた！", cn: "胳膊中弹了！" },
+  { key: "ija_hurt_leg",        kind: "hurt",   file: "AudioVoice_IjaHurtLeg.mp3", dur: 1.41,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "あしをやられた！", kanji: "脚をやられた！", cn: "腿受伤了！" },
+  { key: "ija_hurt_leader",     kind: "hurt",   file: "AudioVoice_IjaHurtLeader.mp3", dur: 2.51,  role: "兵",     pitch: 0,   side: "ija", event: true,  text: "ぶんたいちょうどのがやられた！", kanji: "分隊長殿がやられた！", cn: "分队长中弹了！（分隊長＝相当于中方的班长）" },
+  { key: "ija_hurt_medic",      kind: "hurt",   file: "AudioVoice_IjaHurtMedic.mp3", dur: 2.42,  role: "兵",     pitch: 0,   side: "ija",                 text: "えいせいへい！こっちだ！", kanji: "衛生兵！こっちだ！", cn: "卫生兵！在这边！" },
+  { key: "ija_move_advance",    kind: "move",   file: "AudioVoice_IjaMoveAdvance.mp3", dur: 2.14,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "さんかい！まえへ！", kanji: "散開！前へ！", cn: "散开！向前！" },
+  { key: "ija_move_back",       kind: "move",   file: "AudioVoice_IjaMoveBack.mp3", dur: 2.27,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "いったんさがれ！", kanji: "一旦下がれ！", cn: "暂时后撤！" },
+  { key: "ija_move_flank",      kind: "move",   file: "AudioVoice_IjaMoveFlank.mp3", dur: 1.31,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "そくめんにまわれ！", kanji: "側面に回れ！", cn: "从侧翼绕过去！" },
+  { key: "ija_move_forward",    kind: "move",   file: "AudioVoice_IjaMoveForward.mp3", dur: 2.01,  role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "まえへでろ！おせ！", kanji: "前へ出ろ！押せ！", cn: "冲到前面！压上去！" },
 ];
 
 // ===========================================================================
@@ -306,9 +319,9 @@ function Normalize(line, chapter) {
     delivery: "normal",
     ...line,
     chapter,
-    // 文件名是机械推导的：key `ch3_yaowa_07` → `vo_ch3_yaowa_07.mp3`。
+    // 文件名是机械推导的：key `ch3_yaowa_07` → `AudioVoice_Ch3Yaowa_07.mp3`（VoiceFileName）。
     // 写错文件名的后果是静默 404 + 只剩字幕，所以默认不让人手写。
-    file: line.file || (m ? `vo_${line.key}.mp3` : ""),
+    file: line.file || (m ? VoiceFileName(line.key) : ""),
     // dur 由 Script_VoiceBake 烘完写回**章节文件**（不是这里）。
     // 未烘焙时是 0：运行时用解码出来的真实时长，这个值只给纯 Node 侧的估算用。
     dur: typeof line.dur === "number" ? line.dur : 0,

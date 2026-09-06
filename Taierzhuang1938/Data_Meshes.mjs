@@ -1,12 +1,12 @@
 // 《台儿庄：血战滕县》模型清单：Blender 程序化管线（Taierzhuang1938/_blender/）出的
 // 那批 .tzm.json 的元数据。
 //
-// 这张表是**手写但可校验**的：数字全部抄自 Model/Index.json（BuildAll.py 每次
+// 这张表是**手写但可校验**的：数字全部抄自 Model/Data_ModelIndex.json（BuildAll.py 每次
 // 重建都会重写它），_blender/Verify.mjs 会把两边逐字段对一遍。不直接在运行时
-// fetch Index.json 的理由：开机路径上每多一次往返就多一次可能失败的网络请求，
+// fetch Data_ModelIndex.json 的理由：开机路径上每多一次往返就多一次可能失败的网络请求，
 // 而这些数字是构建期常量，没有必要在玩家的手机上再确认一遍。
 //
-// 改了 _blender 里的建模脚本 → 重跑 BuildAll → 照 Index.json 更新这张表 →
+// 改了 _blender 里的建模脚本 → 重跑 BuildAll → 照 Data_ModelIndex.json 更新这张表 →
 // 跑 Verify。跳过任何一步，Verify 都会报出来。
 //
 // 史实红线（docs/Data_HistoryMaterial.md 第三节）：
@@ -78,7 +78,7 @@ export const MERGE_PROFILES = {
  */
 export const MESHES = {
   SoldierNra: {
-    file: "SoldierNra.tzm.json", category: "soldier",
+    file: "Model_SoldierNra.tzm.json", category: "soldier",
     triangles: 1800, meshBlocks: 23, nodes: 29, joints: 13,
     materials: ["accentA", "accentB", "accessory", "shoe", "skin", "uniform"],
     mounts: SOLDIER_MOUNTS, joinNames: SOLDIER_JOINTS,
@@ -88,7 +88,7 @@ export const MESHES = {
       + "斜挎布子弹带（只有靠身三格鼓着）、层叠绑腿、露趾草鞋。**无钢盔。**",
   },
   SoldierIja: {
-    file: "SoldierIja.tzm.json", category: "soldier",
+    file: "Model_SoldierIja.tzm.json", category: "soldier",
     triangles: 1776, meshBlocks: 23, nodes: 32, joints: 13,
     materials: ["accentA", "accentB", "helmet", "leather", "shoe", "skin", "uniform"],
     mounts: SOLDIER_MOUNTS, joinNames: SOLDIER_JOINTS,
@@ -103,7 +103,7 @@ export const MESHES = {
   // 运行时的整体缩放 —— 加载器的 scale = KIND_SPEC.height / MESHES.height 会把
   // 烘死在模型里的身高差直接除回去，所以身高差不能烘进模型。
   CivilianMale: {
-    file: "CivilianMale.tzm.json", category: "soldier",
+    file: "Model_CivilianMale.tzm.json", category: "soldier",
     triangles: 1726, meshBlocks: 26, nodes: 33, joints: 13,
     materials: ["accessory", "hair", "shoe", "skin", "trouser", "uniform"],
     mounts: SOLDIER_MOUNTS, joinNames: SOLDIER_JOINTS,
@@ -115,7 +115,7 @@ export const MESHES = {
       + "（白毛巾是敢死队的标志，见 Script_Actor 的 towelHead）。",
   },
   CivilianFemale: {
-    file: "CivilianFemale.tzm.json", category: "soldier",
+    file: "Model_CivilianFemale.tzm.json", category: "soldier",
     triangles: 1536, meshBlocks: 24, nodes: 31, joints: 13,
     materials: ["accessory", "hair", "shoe", "skin", "trouser", "uniform"],
     mounts: SOLDIER_MOUNTS, joinNames: SOLDIER_JOINTS,
@@ -127,7 +127,7 @@ export const MESHES = {
   },
 
   ZhongZheng: {
-    file: "ZhongZheng.tzm.json", category: "weapon",
+    file: "Model_ZhongZheng.tzm.json", category: "weapon",
     triangles: 6703, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
     span: [0.05556, 0.16470, 1.11000], lengthM: 1.110,
@@ -137,7 +137,7 @@ export const MESHES = {
       + "全程不减面，并按中正式史实全长 1.110 m 导入。",
   },
   HanYang: {
-    file: "HanYang.tzm.json", category: "weapon",
+    file: "Model_HanYang.tzm.json", category: "weapon",
     triangles: 2672, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
     span: [0.08117, 0.19311, 1.24977], lengthM: 1.250,
@@ -147,7 +147,7 @@ export const MESHES = {
     draws: { high: 2, medium: 2, low: 2 },
   },
   Zb26: {
-    file: "Zb26.tzm.json", category: "weapon",
+    file: "Model_Zb26.tzm.json", category: "weapon",
     triangles: 7781, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
     span: [0.07999, 0.32660, 1.16500], lengthM: 1.165,
@@ -156,10 +156,10 @@ export const MESHES = {
       + "保留上插直弹匣、提把、两脚架、木托与木握把，按史实全长 1.165 m 重建。",
   },
   Type38: {
-    file: "Type38.tzm.json", category: "weapon",
+    file: "Model_Type38.tzm.json", category: "weapon",
     // meshBlocks 4 / nodes 8：三八式在某一轮换模后多了一个 adsNear 挂点，
     // 木/钢两桶也各裂成两块，而这张表当时没跟着改 —— Verify 第一关一直报红。
-    // WP-E1 照 Model/Index.json 补正（数字来自构建期实测，不是猜的）。
+    // WP-E1 照 Model/Data_ModelIndex.json 补正（数字来自构建期实测，不是猜的）。
     triangles: 12467, meshBlocks: 4, nodes: 8, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
     span: [0.09814, 0.19673, 1.27529], lengthM: 1.276,
@@ -168,7 +168,7 @@ export const MESHES = {
       + "机匣上方的防尘滑盖、近乎水平的直拉机柄、护翼准星、两道箍与通条齐备。",
   },
   ServicePistol: {
-    file: "ServicePistol.tzm.json", category: "weapon",
+    file: "Model_ServicePistol.tzm.json", category: "weapon",
     triangles: 7263, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
     span: [0.03180, 0.12953, 0.22200], lengthM: 0.222,
@@ -178,7 +178,7 @@ export const MESHES = {
       + "按原 PBR 金属度分出木握把并修正源模型的上下/枪口方向。",
   },
   Grenade: {
-    file: "Grenade.tzm.json", category: "weapon",
+    file: "Model_Grenade.tzm.json", category: "weapon",
     triangles: 4480, meshBlocks: 1, nodes: 4, joints: 0,
     materials: ["grenade"], mounts: ["muzzle", "gripR"],
     span: [0.0501,0.0501,0.22], lengthM: 0.220,
@@ -186,7 +186,7 @@ export const MESHES = {
     note: "战前国产巩式木柄手榴弹的外观复原。滕县守军使用手榴弹的记载明确，具体生产批次尚未确证。",
   },
   Dadao: {
-    file: "Dadao.tzm.json", category: "weapon",
+    file: "Model_Dadao.tzm.json", category: "weapon",
     triangles: 4199, meshBlocks: 1, nodes: 5, joints: 0,
     materials: ["dadao"], mounts: ["muzzle", "gripR", "gripL"],
     span: [0.0232, 0.1106, 0.8988], lengthM: 0.900, bladeM: 0.625,
@@ -198,7 +198,7 @@ export const MESHES = {
 
   // --- 刺刀（独立模型，socket 挂点扣到枪口；见 _blender/ImportBayonets.py）----
   BayonetZhongZheng: {
-    file: "BayonetZhongZheng.tzm.json", category: "weapon",
+    file: "Model_BayonetZhongZheng.tzm.json", category: "weapon",
     triangles: 14730, meshBlocks: 2, nodes: 4, joints: 0,
     materials: ["steel", "wood"], mounts: ["socket", "tip"],
     span: [0.02899, 0.05034, 0.572], lengthM: 0.572, bladeM: 0.428,
@@ -207,7 +207,7 @@ export const MESHES = {
       + "PL_historyfan_K），程序化补枪口环与木柄片，刃拉长到史实 428 mm。",
   },
   BayonetHanYang: {
-    file: "BayonetHanYang.tzm.json", category: "weapon",
+    file: "Model_BayonetHanYang.tzm.json", category: "weapon",
     triangles: 14666, meshBlocks: 2, nodes: 4, joints: 0,
     materials: ["steel", "wood"], mounts: ["socket", "tip"],
     span: [0.02647, 0.04787, 0.517], lengthM: 0.517, bladeM: 0.395,
@@ -215,7 +215,7 @@ export const MESHES = {
     note: "汉阳造配刀（八八式系）。与 HY1935 同一 CC-BY 底模，刃 395 mm。",
   },
   BayonetType38: {
-    file: "BayonetType38.tzm.json", category: "weapon",
+    file: "Model_BayonetType38.tzm.json", category: "weapon",
     triangles: 265, meshBlocks: 1, nodes: 4, joints: 0,
     materials: ["steel"], mounts: ["socket", "tip"],
     span: [0.01029, 0.05253, 0.514], lengthM: 0.514, bladeM: 0.400,
@@ -226,7 +226,7 @@ export const MESHES = {
   },
 
   Type89Launcher: {
-    file: "Type89Launcher.tzm.json", category: "weapon",
+    file: "Model_Type89Launcher.tzm.json", category: "weapon",
     triangles: 318, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
     span: [0.098, 0.0932, 0.413], lengthM: 0.413,
@@ -235,7 +235,7 @@ export const MESHES = {
       + "**没有两脚架** —— 加了脚架就成了迫击炮。约 45° 手持抵地发射。",
   },
   Type11: {
-    file: "Type11.tzm.json", category: "weapon",
+    file: "Model_Type11.tzm.json", category: "weapon",
     triangles: 8252, meshBlocks: 5, nodes: 7, joints: 0,
     materials: ["lqType11AmmoBox", "lqType11Body", "lqType11BodyAlt", "lqType11Fore", "lqWeaponPlain"],
     mounts: WEAPON_MOUNTS,
@@ -245,17 +245,17 @@ export const MESHES = {
       + "四张 DDS 的原 UV 与独立材质槽；项目原 CC-BY 模型仍保留作对比参考。",
   },
   OfficerSwordSet: {
-    file: "OfficerSwordSet.tzm.json", category: "weapon", triangles: 7801, meshBlocks: 2, nodes: 5, joints: 0,
+    file: "Model_OfficerSwordSet.tzm.json", category: "weapon", triangles: 7801, meshBlocks: 2, nodes: 5, joints: 0,
     materials: ["lqOfficerSword", "lqWeaponPlain"], mounts: ["muzzle", "gripR", "gripL"], span: [0.05975, 0.07192, 1.00151], lengthM: 1.000,
     draws: { high: 2, medium: 2, low: 2 }, note: "源节点 Group146；仅刀柄饰带使用 stripe01L，刀身与刀鞘改回枪钢材质，具体制式未明。",
   },
   MediumMortar: {
-    file: "MediumMortar.tzm.json", category: "weapon", triangles: 9064, meshBlocks: 1, nodes: 7, joints: 0,
+    file: "Model_MediumMortar.tzm.json", category: "weapon", triangles: 9064, meshBlocks: 1, nodes: 7, joints: 0,
     materials: ["lqMediumMortar"], mounts: WEAPON_MOUNTS, span: [0.79565, 1.20429, 1.44394], lengthM: 1.444,
     draws: { high: 1, medium: 1, low: 1 }, note: "源节点 sphere3；民二十年式八二迫击炮（按 Stokes-Brandt 外形认领）。",
   },
   Type92Hmg: {
-    file: "Type92Hmg.tzm.json", category: "weapon",
+    file: "Model_Type92Hmg.tzm.json", category: "weapon",
     triangles: 20065, meshBlocks: 1, nodes: 7, joints: 0,
     materials: ["steel"], mounts: WEAPON_MOUNTS,
     span: [0.53558, 0.55684, 1.156], lengthM: 1.156,
@@ -264,7 +264,7 @@ export const MESHES = {
       + "只排除两块空白展示方块，未减面。",
   },
   Type89Tank: {
-    file: "Type89Tank.tzm.json", category: "vehicle",
+    file: "Model_Type89Tank.tzm.json", category: "vehicle",
     triangles: 4089, meshBlocks: 4, nodes: 8, joints: 1,
     materials: ["type89Armor", "type89Barrel", "type89Track"], mounts: VEHICLE_MOUNTS_TANK,
     span: [2.15, 2.56, 4.3],
@@ -275,7 +275,7 @@ export const MESHES = {
       + "装甲 6—17 mm，巷宽 < 2.5 m 进不来。炮塔是关节（turret），将来接载具系统直接转它。",
   },
   Type95HaGo: {
-    file: "Type95HaGo.tzm.json", category: "vehicle",
+    file: "Model_Type95HaGo.tzm.json", category: "vehicle",
     triangles: 82142, meshBlocks: 1, nodes: 8, joints: 1,
     materials: ["armor"], mounts: VEHICLE_MOUNTS_TANK,
     span: [2.07, 2.27, 4.38],
@@ -288,7 +288,7 @@ export const MESHES = {
     facing: { probeZ: 1.6, frontHigherByM: 0.3 },
   },
   Type97ChiHa: {
-    file: "Type97ChiHa.tzm.json", category: "vehicle",
+    file: "Model_Type97ChiHa.tzm.json", category: "vehicle",
     triangles: 3968, meshBlocks: 4, nodes: 8, joints: 1,
     materials: ["armor", "steel", "track"], mounts: VEHICLE_MOUNTS_TANK,
     span: [2.475, 2.38, 5.5],
@@ -298,7 +298,7 @@ export const MESHES = {
   },
 
   Dougong: {
-    file: "Dougong.tzm.json", category: "prop",
+    file: "Model_Dougong.tzm.json", category: "prop",
     triangles: 176, meshBlocks: 1, nodes: 3, joints: 0,
     materials: ["WoodBeam"], mounts: ["top"],
     span: [0.642, 0.196, 0.2853],
@@ -306,7 +306,7 @@ export const MESHES = {
     note: "门楼斗拱（一斗三升简化）。坐斗上的十字卯口是真挖出来的（布尔）。原点在坐斗底面。",
   },
   RidgeBeast: {
-    file: "RidgeBeast.tzm.json", category: "prop",
+    file: "Model_RidgeBeast.tzm.json", category: "prop",
     triangles: 172, meshBlocks: 1, nodes: 3, joints: 0,
     materials: ["RoofTile"], mounts: ["ridge"],
     span: [0.144, 0.275, 0.250],
@@ -314,7 +314,7 @@ export const MESHES = {
     note: "屋脊兽头。民居的糙陶兽首，不是宫殿正吻。原点在脊背安装面。",
   },
   WindowLattice: {
-    file: "WindowLattice.tzm.json", category: "prop",
+    file: "Model_WindowLattice.tzm.json", category: "prop",
     triangles: 284, meshBlocks: 1, nodes: 3, joints: 0,
     materials: ["WoodDoor"], mounts: ["sillCenter"],
     span: [1.100, 1.350, 0.055],
@@ -322,7 +322,7 @@ export const MESHES = {
     note: "格子窗棂 1.10 × 1.35 m，竖 4 横 5 的疏格。原点在窗台中点。",
   },
   DoorPier: {
-    file: "DoorPier.tzm.json", category: "prop",
+    file: "Model_DoorPier.tzm.json", category: "prop",
     triangles: 248, meshBlocks: 1, nodes: 3, joints: 0,
     materials: ["Stone"], mounts: ["doorSide"],
     span: [0.360, 0.630, 0.480],
@@ -338,7 +338,7 @@ export const MESHES = {
   // ResolveTengxianMaterial 认得。交集只有 Stone / WoodBeam / WoodDoor / RoofTile /
   // armor / track，所以铁活一律借 track（哑光暗灰熟铁）、漆钢借 armor。
   SemaphoreSignal: {
-    file: "SemaphoreSignal.tzm.json", category: "prop",
+    file: "Model_SemaphoreSignal.tzm.json", category: "prop",
     triangles: 244, meshBlocks: 3, nodes: 3, joints: 0,
     materials: ["Stone", "WoodDoor", "armor"], mounts: ["foot"],
     span: [1.36, 5.16, 0.46],
@@ -348,7 +348,7 @@ export const MESHES = {
       + "不做转动 —— 饰件层没有逐帧驱动。",
   },
   StationLamp: {
-    file: "StationLamp.tzm.json", category: "prop",
+    file: "Model_StationLamp.tzm.json", category: "prop",
     triangles: 142, meshBlocks: 3, nodes: 3, joints: 0,
     materials: ["RoofTile", "Stone", "armor"], mounts: ["foot"],
     span: [0.6, 3.2, 0.57324],
@@ -357,7 +357,7 @@ export const MESHES = {
       + "**不带光源** —— 一盏灯一个 light 就是一遍 shadow pass，六盏就没了。",
   },
   ChurchTracery: {
-    file: "ChurchTracery.tzm.json", category: "prop",
+    file: "Model_ChurchTracery.tzm.json", category: "prop",
     triangles: 192, meshBlocks: 1, nodes: 3, joints: 0,
     materials: ["Stone"], mounts: ["sillCenter"],
     span: [1.21, 3.07429, 0.07],
@@ -368,7 +368,7 @@ export const MESHES = {
       + "原点在窗台中点，厚度对称于墙心。",
   },
   CellDoorIron: {
-    file: "CellDoorIron.tzm.json", category: "prop",
+    file: "Model_CellDoorIron.tzm.json", category: "prop",
     triangles: 204, meshBlocks: 1, nodes: 3, joints: 0,
     materials: ["track"], mounts: ["doorFace"],
     span: [0.9225, 1.52, 0.0825],
@@ -379,7 +379,7 @@ export const MESHES = {
       + "原点在门板外表面、门扇底边中点，几何全部 z ≥ 0（朝门外）。",
   },
   CrossingSign: {
-    file: "CrossingSign.tzm.json", category: "prop",
+    file: "Model_CrossingSign.tzm.json", category: "prop",
     triangles: 68, meshBlocks: 2, nodes: 3, joints: 0,
     materials: ["Stone", "WoodDoor"], mounts: ["foot"],
     span: [1.0748, 2.5574, 0.34],

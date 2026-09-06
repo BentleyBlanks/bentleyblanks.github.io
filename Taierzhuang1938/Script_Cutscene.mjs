@@ -247,7 +247,7 @@ const BAR_RATIO = 0.12;          // 上下黑边各占视高 12%（设计书给�
 //     压在一起（李宗仁那一场因此只能把带时刻的字幕全挪进跳过卡）。字幕在上、台词在下。
 //   · `.csMap`（shot.mapCard，尾声那一镜）：底图**一个字都没有**，地名、箭头、部队
 //     标识全是这一层按归一化坐标叠上去的 DOM（贴图那一批就是照这个口径出的，
-//     见 Texture/PaperProps_README.md「交付边界」）。为什么不画进三维布景：一张 3:2
+//     见 Texture/Data_PaperProps.md「交付边界」）。为什么不画进三维布景：一张 3:2
 //     的纸正面平拍，DOM 层对得准、改得动、在任何分辨率上字都是清的；画进贴图就得
 //     为每次改标注重出一次图。
 //   · `.csMapMark.unit` 用**方框**不是圆点 —— 军标里方框是步兵。
@@ -684,10 +684,10 @@ export class CutsceneDirector {
   /**
    * 地图卡（`shot.mapCard`，2026-08-29 集成批 INT2）。
    *
-   * 底图 `Texture/Tex_PaperEndingMap.png` 上**一个字都没有**：滕县／临城／台儿庄
+   * 底图 `Texture/Texture_PaperEndingMap.png` 上**一个字都没有**：滕县／临城／台儿庄
    * 三处节点、日军南进箭头、台儿庄附近的中国军队标识全由这一层按归一化坐标
    * （左上角为 0,0）叠上去。贴图那一批就是照这个口径出的，节点与箭头故意没画
-   * （见 Texture/PaperProps_README.md「交付边界」）。
+   * （见 Texture/Data_PaperProps.md「交付边界」）。
    *
    * 只在**镜头切换时**重建一次 DOM：每帧重建的话浏览器会在这一镜里反复重排，
    * 而这一镜有七秒多。没有 mapCard 的镜头把这一层藏起来（不是删掉）。

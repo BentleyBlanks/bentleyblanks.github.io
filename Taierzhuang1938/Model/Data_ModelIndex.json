@@ -12,7 +12,7 @@
   {
    "name": "SoldierNra",
    "category": "soldier",
-   "file": "SoldierNra.tzm.json",
+   "file": "Model_SoldierNra.tzm.json",
    "triangles": 1800,
    "meshBlocks": 23,
    "nodes": 29,
@@ -53,7 +53,7 @@
   {
    "name": "SoldierIja",
    "category": "soldier",
-   "file": "SoldierIja.tzm.json",
+   "file": "Model_SoldierIja.tzm.json",
    "triangles": 1776,
    "meshBlocks": 23,
    "nodes": 32,
@@ -95,7 +95,7 @@
   {
    "name": "CivilianMale",
    "category": "soldier",
-   "file": "CivilianMale.tzm.json",
+   "file": "Model_CivilianMale.tzm.json",
    "triangles": 1726,
    "meshBlocks": 26,
    "nodes": 33,
@@ -136,7 +136,7 @@
   {
    "name": "CivilianFemale",
    "category": "soldier",
-   "file": "CivilianFemale.tzm.json",
+   "file": "Model_CivilianFemale.tzm.json",
    "triangles": 1536,
    "meshBlocks": 24,
    "nodes": 31,
@@ -177,7 +177,7 @@
   {
    "name": "Grenade",
    "category": "weapon",
-   "file": "Grenade.tzm.json",
+   "file": "Model_Grenade.tzm.json",
    "triangles": 4480,
    "meshBlocks": 1,
    "nodes": 4,
@@ -207,7 +207,7 @@
   {
    "name": "Dougong",
    "category": "prop",
-   "file": "Dougong.tzm.json",
+   "file": "Model_Dougong.tzm.json",
    "triangles": 176,
    "meshBlocks": 1,
    "nodes": 3,
@@ -236,7 +236,7 @@
   {
    "name": "RidgeBeast",
    "category": "prop",
-   "file": "RidgeBeast.tzm.json",
+   "file": "Model_RidgeBeast.tzm.json",
    "triangles": 172,
    "meshBlocks": 1,
    "nodes": 3,
@@ -265,7 +265,7 @@
   {
    "name": "WindowLattice",
    "category": "prop",
-   "file": "WindowLattice.tzm.json",
+   "file": "Model_WindowLattice.tzm.json",
    "triangles": 284,
    "meshBlocks": 1,
    "nodes": 3,
@@ -294,7 +294,7 @@
   {
    "name": "DoorPier",
    "category": "prop",
-   "file": "DoorPier.tzm.json",
+   "file": "Model_DoorPier.tzm.json",
    "triangles": 248,
    "meshBlocks": 1,
    "nodes": 3,
@@ -323,7 +323,7 @@
   {
    "name": "SemaphoreSignal",
    "category": "prop",
-   "file": "SemaphoreSignal.tzm.json",
+   "file": "Model_SemaphoreSignal.tzm.json",
    "triangles": 244,
    "meshBlocks": 3,
    "nodes": 3,
@@ -354,7 +354,7 @@
   {
    "name": "StationLamp",
    "category": "prop",
-   "file": "StationLamp.tzm.json",
+   "file": "Model_StationLamp.tzm.json",
    "triangles": 142,
    "meshBlocks": 3,
    "nodes": 3,
@@ -385,7 +385,7 @@
   {
    "name": "ChurchTracery",
    "category": "prop",
-   "file": "ChurchTracery.tzm.json",
+   "file": "Model_ChurchTracery.tzm.json",
    "triangles": 192,
    "meshBlocks": 1,
    "nodes": 3,
@@ -414,7 +414,7 @@
   {
    "name": "CellDoorIron",
    "category": "prop",
-   "file": "CellDoorIron.tzm.json",
+   "file": "Model_CellDoorIron.tzm.json",
    "triangles": 204,
    "meshBlocks": 1,
    "nodes": 3,
@@ -443,7 +443,7 @@
   {
    "name": "CrossingSign",
    "category": "prop",
-   "file": "CrossingSign.tzm.json",
+   "file": "Model_CrossingSign.tzm.json",
    "triangles": 68,
    "meshBlocks": 2,
    "nodes": 3,
@@ -473,7 +473,7 @@
   {
    "name": "Type89Launcher",
    "category": "weapon",
-   "file": "Type89Launcher.tzm.json",
+   "file": "Model_Type89Launcher.tzm.json",
    "triangles": 318,
    "meshBlocks": 2,
    "nodes": 7,
@@ -507,7 +507,7 @@
   {
    "name": "Type92Hmg",
    "category": "weapon",
-   "file": "Type92Hmg.tzm.json",
+   "file": "Model_Type92Hmg.tzm.json",
    "triangles": 20065,
    "meshBlocks": 1,
    "nodes": 7,
@@ -540,7 +540,7 @@
   {
    "name": "ZhongZheng",
    "category": "weapon",
-   "file": "ZhongZheng.tzm.json",
+   "file": "Model_ZhongZheng.tzm.json",
    "triangles": 6703,
    "meshBlocks": 2,
    "nodes": 7,
@@ -577,7 +577,7 @@
   {
    "name": "HanYang",
    "category": "weapon",
-   "file": "HanYang.tzm.json",
+   "file": "Model_HanYang.tzm.json",
    "triangles": 2672,
    "meshBlocks": 2,
    "nodes": 7,
@@ -614,7 +614,7 @@
   {
    "name": "Zb26",
    "category": "weapon",
-   "file": "Zb26.tzm.json",
+   "file": "Model_Zb26.tzm.json",
    "triangles": 7781,
    "meshBlocks": 2,
    "nodes": 7,
@@ -651,7 +651,7 @@
   {
    "name": "Type38",
    "category": "weapon",
-   "file": "Type38.tzm.json",
+   "file": "Model_Type38.tzm.json",
    "triangles": 12467,
    "meshBlocks": 4,
    "nodes": 8,
@@ -688,7 +688,7 @@
   {
    "name": "ServicePistol",
    "category": "weapon",
-   "file": "ServicePistol.tzm.json",
+   "file": "Model_ServicePistol.tzm.json",
    "triangles": 7263,
    "meshBlocks": 2,
    "nodes": 7,
@@ -725,7 +725,7 @@
   {
    "name": "Dadao",
    "category": "weapon",
-   "file": "Dadao.tzm.json",
+   "file": "Model_Dadao.tzm.json",
    "triangles": 4199,
    "meshBlocks": 1,
    "nodes": 5,
@@ -759,7 +759,7 @@
   {
    "name": "OfficerSwordSet",
    "category": "weapon",
-   "file": "OfficerSwordSet.tzm.json",
+   "file": "Model_OfficerSwordSet.tzm.json",
    "triangles": 7801,
    "meshBlocks": 2,
    "nodes": 5,
@@ -794,7 +794,7 @@
   {
    "name": "Type11",
    "category": "weapon",
-   "file": "Type11.tzm.json",
+   "file": "Model_Type11.tzm.json",
    "triangles": 8252,
    "meshBlocks": 5,
    "nodes": 7,
@@ -834,7 +834,7 @@
   {
    "name": "MediumMortar",
    "category": "weapon",
-   "file": "MediumMortar.tzm.json",
+   "file": "Model_MediumMortar.tzm.json",
    "triangles": 9064,
    "meshBlocks": 1,
    "nodes": 7,
@@ -870,7 +870,7 @@
   {
    "name": "BayonetZhongZheng",
    "category": "weapon",
-   "file": "BayonetZhongZheng.tzm.json",
+   "file": "Model_BayonetZhongZheng.tzm.json",
    "triangles": 14730,
    "meshBlocks": 2,
    "nodes": 4,
@@ -904,7 +904,7 @@
   {
    "name": "BayonetHanYang",
    "category": "weapon",
-   "file": "BayonetHanYang.tzm.json",
+   "file": "Model_BayonetHanYang.tzm.json",
    "triangles": 14666,
    "meshBlocks": 2,
    "nodes": 4,
@@ -938,7 +938,7 @@
   {
    "name": "BayonetType38",
    "category": "weapon",
-   "file": "BayonetType38.tzm.json",
+   "file": "Model_BayonetType38.tzm.json",
    "triangles": 265,
    "meshBlocks": 1,
    "nodes": 4,
@@ -971,7 +971,7 @@
   {
    "name": "Type89Tank",
    "category": "vehicle",
-   "file": "Type89Tank.tzm.json",
+   "file": "Model_Type89Tank.tzm.json",
    "triangles": 4089,
    "meshBlocks": 4,
    "nodes": 8,
@@ -1009,7 +1009,7 @@
   {
    "name": "Type97ChiHa",
    "category": "vehicle",
-   "file": "Type97ChiHa.tzm.json",
+   "file": "Model_Type97ChiHa.tzm.json",
    "triangles": 3968,
    "meshBlocks": 4,
    "nodes": 8,
@@ -1047,7 +1047,7 @@
   {
    "name": "Type95HaGo",
    "category": "vehicle",
-   "file": "Type95HaGo.tzm.json",
+   "file": "Model_Type95HaGo.tzm.json",
    "triangles": 82142,
    "meshBlocks": 1,
    "nodes": 8,

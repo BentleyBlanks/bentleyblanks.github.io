@@ -5,7 +5,7 @@
 // 史料字段（章名、日期、简报）、切片范围与出生点、路标（LOD 焦点与 HUD 去向）。
 // 台词、事件线（EVENTS）、语音行（VOICE_LINES）、两场关中过场、playerCast（玩家＝小秦）
 // 与摆点全部删除 —— 旧内容在 git 历史里（13594c5ae 之前的本文件、Data_CutsceneCh6.mjs、
-// Script_MissionSetpieces.SETPIECES.CH6_Zuihou、Audio/vo_ch6_*.mp3）。
+// Script_MissionSetpieces.SETPIECES.CH6_Zuihou、Audio/AudioVoice_Ch6*.mp3）。
 //
 // 发报系统（Script_Telegraph）的默认信号名（WireFirst / WireBreak / WireSent）是引擎侧
 // 契约常量，不再依赖本文件的 EVENTS。

@@ -215,7 +215,7 @@ const storyLoad = await page.evaluate(async () => {
     deliveries: mod.VOICE_DELIVERY_MIX,
   };
 });
-const hardErrors = r.errors.filter((e) => !e.startsWith("vo_ch"));
+const hardErrors = r.errors.filter((e) => !e.startsWith("AudioVoice_Ch"));
 Check("配音全部解码成功（战斗口令一条都不许静默丢）",
   r.size >= 30 && hardErrors.length === 0,
   `载入 ${r.size} 条，硬错误 ${hardErrors.length} 条${hardErrors.length ? "：" + hardErrors.join(" / ") : ""}`

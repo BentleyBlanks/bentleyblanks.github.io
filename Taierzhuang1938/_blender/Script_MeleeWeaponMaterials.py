@@ -32,5 +32,5 @@ def MeleeDadaoMaterial(root):
  tangent=nodes.new('ShaderNodeNormalMap');links.new(normal.outputs['Color'],tangent.inputs['Color']);links.new(tangent.outputs['Normal'],shader.inputs['Normal'])
  channels=nodes.new('ShaderNodeSeparateColor');channels.mode='RGB';links.new(orm.outputs['Color'],channels.inputs['Color'])
  links.new(channels.outputs['Green'],shader.inputs['Roughness']);links.new(channels.outputs['Blue'],shader.inputs['Metallic'])
- material['source']='Model/Dadao.tzm.json; original CGMOL PBR'
+ material['source']='Model/Model_Dadao.tzm.json; original CGMOL PBR'
  return material

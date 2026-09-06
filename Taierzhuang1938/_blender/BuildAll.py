@@ -103,7 +103,7 @@ def main():
     os.makedirs(out, exist_ok=True)
     requested = NamedArg("--only")
     removed = NamedArg("--remove")
-    index_path = os.path.join(out, "Index.json")
+    index_path = os.path.join(out, "Data_ModelIndex.json")
     # 单件重建不能把其余模型从清单抹掉。只替换本次落盘的条目，同时可把已经
     # 废弃的型号从清单摘掉；完整构建仍从空清单开始，保证没有历史幽灵条目。
     manifest = []
@@ -176,7 +176,7 @@ def main():
         FLIPPED.clear()
         built = builder()
         root = built[0] if isinstance(built, tuple) else built
-        path = os.path.join(out, name + ".tzm.json")
+        path = os.path.join(out, "Model_" + name + ".tzm.json")
         static_mesh = getattr(builder, "staticMesh", False)
         tris, blocks, size, audit = WriteTzm(root, path, name, notes, audit=not static_mesh)
         # 摄影测量车的近景预算由导入器逐资产声明；其余类别仍强制全局红线。
@@ -242,7 +242,7 @@ def main():
                 mounts.append(node["name"])
         materials = sorted({m["material"] for m in doc["meshes"]})
         entry = {
-            "name": name, "category": category, "file": name + ".tzm.json",
+            "name": name, "category": category, "file": "Model_" + name + ".tzm.json",
             "triangles": tris, "meshBlocks": blocks, "nodes": len(doc["nodes"]),
             "joints": joints, "bytes": size, "materials": materials,
             "mounts": mounts, "bounds": doc["bounds"],

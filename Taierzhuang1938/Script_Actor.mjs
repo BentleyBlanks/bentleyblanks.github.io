@@ -308,7 +308,7 @@ const KIND_SPEC = {
   civilian: {
     height: 1.60, clothRecipe: "ClothNra", clothHex: HEX.civilCloth,
     headgear: "wrap", shoe: "clothShoe", gear: "none", defaultWeapon: null,
-    // 男女两个模型（Model/CivilianMale|Female.tzm.json），按 seed 抽。
+    // 男女两个模型（Model/CivilianMale|Model_Female.tzm.json），按 seed 抽。
     // 值是整体缩放：**身高差只能走缩放**，不能给两套 Dimensions ——
     // 关节偏移必须与 _blender 里烘死的那一套逐字一致，改比值就开缝。
     // 1.03 / 0.958 落在 1.65 m / 1.53 m，是 1930 年代华北成年男女的平均身高；

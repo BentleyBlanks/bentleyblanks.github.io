@@ -22,6 +22,6 @@
 python Taierzhuang1938/_import/Script_Type89TextureBake.py <OriginalDownload目录>
 ```
 
-网格用现有 _blender/ImportVehicles.BuildImported("Type89Tank") 和 TzmCore.WriteTzm 导出；BuildAll 的该资产入口同样会保留原外观。更新 Model/Index.json、Data_Meshes 登记和 import map 缓存戳。
+网格用现有 _blender/ImportVehicles.BuildImported("Type89Tank") 和 TzmCore.WriteTzm 导出；BuildAll 的该资产入口同样会保留原外观。更新 Model/Data_ModelIndex.json、Data_Meshes 登记和 import map 缓存戳。
 
 验收入口：AssetStandardsTest 逐网格比较原 glTF 与 TZM 的三角角点 UV；ModelFacingTest 检查真实炮管质心；BootPropTest 在 worker 中实际加载原贴图；Script_TzmShot.mjs --id=Type89Tank 输出三视图。截图与模型验收网页只保留本地 _shots / _check 文件。

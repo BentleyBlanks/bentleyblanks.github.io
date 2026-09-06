@@ -14,7 +14,7 @@
 
 ## 资产与坐标
 
-- `Model/Grenade.tzm.json`：加载展示、角色持握用；4,480三角、1材质，右手握点为原点。
+- `Model/Model_Grenade.tzm.json`：加载展示、角色持握用；4,480三角、1材质，右手握点为原点。
 - `Model/Model_Type24Grenade.glb`：第一人称与投掷用；同一份网格，包围盒中心为原点。Type24仅为兼容保留的旧文件名。
 - `Texture/Texture_Grenade{Base,Normal,Orm}.webp`：共用UV图集，左半木柄、右半金属。底色使用内置 imagegen，法线与粗糙度/金属度由 Blender 侧程序场生成。网页编码保留在1536×768以内。
 - Blender编辑坐标中弹头朝+Z；GLB导出前转到Blender+Y，经glTF坐标转换后为游戏-Z。TZM直接旋转到游戏-Z，并沿Z平移-0.035米保持握点。`Script_ModelFacingTest.mjs`实际解码两份顶点云，验证宽弹体在-Z、木柄在+Z和全长包络。

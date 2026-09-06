@@ -129,7 +129,7 @@ export const CHAPTER = {
 // 与过场 CS_Chuchuan 的 shots[].lines 是**一一对应**的：那边每一句写 voiceCue，
 // 这边写行本体。key 形如 ch0_<who>_<两位序号>，序号按**每个人自己的出场顺序**排，
 // 不是全章流水号 —— 序号乱了不会报错，只会让后面补录的人对不上是哪一句。
-// 文件名不写：Data_Voice.Normalize 会按 key 推成 vo_ch0_xxx_NN.mp3（手写必错）。
+// 文件名不写：Data_Voice.Normalize 会按 key 推成 AudioVoice_Ch0Xxx_NN.mp3（手写必错）。
 // dur: 0 是必须留的占位，烘焙完由 Script_VoiceBake 把实测时长写回这一行。
 //
 // delivery 四档的分配口径（§10.3 + Data_Voice.VOICE_DELIVERY_MIX）：

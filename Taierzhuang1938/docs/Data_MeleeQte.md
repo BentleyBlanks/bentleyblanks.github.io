@@ -40,7 +40,7 @@ AI 从动作状态与反应延迟判断，不直接读取按键。命中显著�
 
 下文是上一轮 Blender 创作动作的源工程说明，仍用于未替换的动作。
 
-大刀继续使用现有二十九军环首缠柄战刀 `Model/Dadao.tzm.json`、原 UV/PBR 与 4199 三角；第一人称为生产版解剖手臂与握持 IK。
+大刀继续使用现有二十九军环首缠柄战刀 `Model/Model_Dadao.tzm.json`、原 UV/PBR 与 4199 三角；第一人称为生产版解剖手臂与握持 IK。
 
 本轮 BlenderMCP 源工程：`C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\MeleeFusion_20260906\Scene_MeleeFusion.blend`。国军、日军各 54 段全身，第一人称 54 段；每种武器 27 动作，31 个采样帧。全身 50 根骨骼，第一人称 53 根骨骼。新增左右拨枪、紧凑正反斩、环境受阻和武器碰撞；短长刺有预备、前送、重心与步法、收枪，短转场插值避免姿态跳变。
 

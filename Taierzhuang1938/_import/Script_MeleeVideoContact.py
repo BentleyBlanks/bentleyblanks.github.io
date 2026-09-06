@@ -11,7 +11,7 @@ for obj in rifleParts:
  obj.hide_render=True;obj.hide_set(True)
 
 def ImportMeleeProp(asset,name,parent=None):
- document=json.loads((project/'Model'/(asset+'.tzm.json')).read_text(encoding='utf-8'))
+ document=json.loads((project/'Model'/('Model_'+asset+'.tzm.json')).read_text(encoding='utf-8'))
  carrier=bpy.data.objects.new(name,None);scene.collection.objects.link(carrier)
  if parent:carrier.parent=parent
  matrices=[]

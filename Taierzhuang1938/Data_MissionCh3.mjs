@@ -5,7 +5,7 @@
 // 史料字段（章名、日期、简报）、切片范围与出生点、路标（LOD 焦点与 HUD 去向）。
 // 台词、事件线（EVENTS）、语音行（VOICE_LINES）、过场与摆点全部删除 ——
 // 旧内容在 git 历史里（13594c5ae 之前的本文件、Data_CutsceneCh3.mjs、
-// Script_MissionSetpieces.SETPIECES.CH3_Jiuhusuo、Audio/vo_ch3_*.mp3）。
+// Script_MissionSetpieces.SETPIECES.CH3_Jiuhusuo、Audio/AudioVoice_Ch3*.mp3）。
 //
 // 三个功能院落的锚点（A 区 (214,-18) / B 区 (449,-175) / C 区 (462,-19)）仍照旧
 // 写在 zones 里 —— 它们是场景坐标，不是任务内容。

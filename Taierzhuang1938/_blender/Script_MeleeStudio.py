@@ -16,7 +16,7 @@ def ImportWeapon(weaponId,name):
  parent=bpy.data.objects.get(name)
  if parent:ClearMeleeWeaponMeshes(parent)
  else:parent=bpy.data.objects.new(name,None);scene.collection.objects.link(parent)
- doc=json.loads((root/'Model'/(weaponId+'.tzm.json')).read_text(encoding='utf-8'));nodes=[]
+ doc=json.loads((root/'Model'/('Model_'+weaponId+'.tzm.json')).read_text(encoding='utf-8'));nodes=[]
  for n in doc['nodes']:
   matrix=Matrix.Translation(Vector(n['t']))@Euler(n['r'],'YXZ').to_matrix().to_4x4()
   if n['parent']>=0:matrix=nodes[n['parent']]@matrix

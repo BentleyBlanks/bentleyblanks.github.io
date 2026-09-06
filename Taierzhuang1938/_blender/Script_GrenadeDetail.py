@@ -170,7 +170,7 @@ def Build():
     bpy.context.view_layer.update()
     # Export TZM from the SAME mesh and atlas as the GLB.
     root=TzmRoot([obj])
-    stats=WriteTzm(root,str(PROJECT/'Model/Grenade.tzm.json'),'Grenade',
+    stats=WriteTzm(root,str(PROJECT/'Model/Model_Grenade.tzm.json'),'Grenade',
         'Authored Gongxian-pattern exterior; imagegen reference; historical batch unverified',audit=True)
     # Blender +Y maps to glTF -Z. Apply the rotation to vertices before export.
     obj.data.transform(Matrix.Rotation(-math.pi/2,4,'X'))

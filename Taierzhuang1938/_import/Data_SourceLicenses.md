@@ -93,7 +93,7 @@ CC-BY-4.0 署名原文，文件头都有完整 credit 文本，发布时按 CC-B
 
 **这份源模不进公开仓库。** bentleyblanks.github.io 是公开站点；买来的原始文件
 只授权用在成品里，不等于可以把 FBX 本身当素材再分发。仓库里只有它派生出的
-`Model/Dadao.tzm.json`（选定源几何低于 30k，保留 4,199 三角）和从源包压制的 1K 成品 PBR
+`Model/Model_Dadao.tzm.json`（选定源几何低于 30k，保留 4,199 三角）和从源包压制的 1K 成品 PBR
 `Texture/Texture_Dadao{Base,Normal,Orm}.webp`。原始 4K PNG、FBX 与 .blend 都不分发；
 成品贴图保留原 UV，ORM 遵循 R=AO、G=roughness、B=metalness。做法与本文件末尾
 Vefects 素材那条一致。
@@ -110,7 +110,7 @@ Vefects 素材那条一致。
 
 **找不到源就自动退回程序化几何**：`ImportWeapons.BuilderFor("Dadao")` 返回 None，
 `BuildAll` 改用 `BuildWeapons.BuildDadao`。没有这份素材的人 clone 下来照样能跑通
-构建，只是重建出的刀会退回旧式样 —— 仓库里已提交的 `Dadao.tzm.json` 是用付费源
+构建，只是重建出的刀会退回旧式样 —— 仓库里已提交的 `Model_Dadao.tzm.json` 是用付费源
 建的那一版，别拿没有源的机器去覆盖它。
 
 本机原始下载包另存于

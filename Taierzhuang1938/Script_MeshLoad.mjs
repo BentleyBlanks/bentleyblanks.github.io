@@ -313,7 +313,7 @@ export function InstantiateModel(doc, options = {}) {
  * 上层拿到 null 就退回 Script_Actor 的程序化几何 —— 一个模型 404 不能整页黑屏。
  *
  * @example
- *   const built = await LoadModel("./Model/SoldierNra.tzm.json",
+ *   const built = await LoadModel("./Model/Model_SoldierNra.tzm.json",
  *     { materials: factory.ActorMaterials("nra", rnd) });
  *   if (built) {
  *     scene.add(built.root);

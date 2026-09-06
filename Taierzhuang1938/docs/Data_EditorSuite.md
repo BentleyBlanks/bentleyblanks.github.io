@@ -313,7 +313,7 @@ Spline、环境与种子三块 JSON 都用 `<details>` 默认折叠；列表与�
 三件特例及“目标降幅 ≤5% 不减面”在 `_blender/AssetBudgets.py`。外部 GLB 页当前登记乡村房屋、
 Battlefield Pack 24 件、Chinese Life 16 件与无叶乔木三变体，共 44 行。
 `Script_AssetStandardsTest.mjs` 同时核对两边、
-`Model/Index.json` 构建元数据、import map 与编辑器分类，防止面数表悄悄过期。
+`Model/Data_ModelIndex.json` 构建元数据、import map 与编辑器分类，防止面数表悄悄过期。
 
 建筑与地标如果登记了预建模战损，会额外出现「建模状态」三选一：原始状态保留构件自己的
 历史缺省；「炮击初损」统一使用中等 `damage` 与 `BuildingDamageEarly` PBR；「严重破坏」

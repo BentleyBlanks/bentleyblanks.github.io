@@ -84,7 +84,7 @@ export class ExplosionRangeField extends RangeField {
   }
   async LoadVehicles() {
     for (const spec of EXPLOSION_VEHICLES) {
-      const doc = await LoadDocument(`./Model/${spec.id}.tzm.json`);
+      const doc = await LoadDocument(`./Model/Model_${spec.id}.tzm.json`);
       if (!doc) throw new Error(`Missing vehicle ${spec.id}`);
       const model = InstantiateModel(doc, { materials: { armor: this.materials.get("Armor"), steel: this.library.Get("Steel"), track: this.materials.get("Track") } });
       model.root.name = `ExplosionVehicle_${spec.id}`;

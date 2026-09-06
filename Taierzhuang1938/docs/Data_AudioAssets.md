@@ -82,7 +82,7 @@ node Taierzhuang1938/Script_VoiceTest.mjs
 
 章节台词语音通道。规格出处：`docs/Data_MissionRemake.md` §10.2（CAST id）与 §10.3（台词→语音）。
 
-> **2026-09-06：** 第一关到终章暂时废弃。`vo_ch2_*`–`vo_ch6_*`（281 条）已从 `Audio/` 删除、对应章的 `VOICE_LINES` 清空，`Data_Voice.mjs` 现在只拼接序章与第一关（第一关的 67 条留给 P0/P1/P2 白盒）。下文「七章 379 条」是当时的烘焙记录，不是现状。
+> **2026-09-06：** 第一关到终章暂时废弃。`vo_ch2_*`–`vo_ch6_*`（旧命名）（281 条）已从 `Audio/` 删除、对应章的 `VOICE_LINES` 清空，`Data_Voice.mjs` 现在只拼接序章与第一关（第一关的 67 条留给 P0/P1/P2 白盒）。下文「七章 379 条」是当时的烘焙记录，不是现状。
 与战场口令（下面那三十几条 Bark）**是两类活**，除了共用同一条 SeedAudio 管线与同一个
 `Audio/` 目录，后期参数、挑选方式、失败行为全都不一样：
 
@@ -98,7 +98,7 @@ node Taierzhuang1938/Script_VoiceTest.mjs
 ## 命名规则
 
 - 语音 key：`ch<N>_<who>_<两位序号>`，例如 `ch3_yaowa_07`。
-- 文件名：`vo_<key>.mp3`，落 `Audio/`。行里不写 `file` 时由 `Data_Voice.Normalize` 按 key 推出来 —— 别手写，写错的后果是静默 404。
+- 文件名：`AudioVoice_<PascalKey>[_NN].mp3`（`Data_Voice.VoiceFileName`），落 `Audio/`。行里不写 `file` 时由 `Data_Voice.Normalize` 按 key 推出来 —— 别手写，写错的后果是静默 404。
 - 行本体写在 `Data_MissionChX.mjs` 的 `VOICE_LINES`（章节内容批的文件），`Data_Voice.mjs` 只做拼接与体检；
   拼表时 key 命名、`who` 是否在 `STORY_CAST_IDS` 里、`delivery` 是否合法、日方是否纯假名、有无重复 key 逐条查，
   坏行会被**剔出总表**并记进 `VOICE_MERGE_WARNINGS`（`Script_VoiceTest` 断言它是空的 —— 坏行被剔掉的样子就是「台词静默消失」）。

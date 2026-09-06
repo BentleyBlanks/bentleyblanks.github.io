@@ -282,7 +282,7 @@ export class PropLibraryEditor {
     this.facts.Set("构件", `${entry.id} · ${entry.name}`);
     this.facts.Set("类别", entry.cat);
     this.facts.Set("来源", entry.external ? entry.url
-      : (entry.model ? `Model/${entry.model}.tzm.json` : "Script_World 程序化"));
+      : (entry.model ? `Model/Model_${entry.model}.tzm.json` : "Script_World 程序化"));
     this.facts.Set("参数", (entry.uses || []).join(" / ") || "固定尺寸");
     const damageState = SupportsBuildingDamageStates(entry)
       ? BUILDING_DAMAGE_STATES[this.damageState] : null;

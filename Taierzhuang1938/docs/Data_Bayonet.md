@@ -6,7 +6,7 @@
 
 中正式、汉阳造、三八式配备独立刺刀模型。其他武器不凭空增加刺刀座。数据来自 Data_Weapons.WEAPONS 的 bayonet、bayonetLengthM 与 bayonetTotalM。X 装／卸保留 0.95 秒动作与中段声音，装后刀常显，收招不藏刀；换槽保留装配状态，换关／捡枪按原装备规则重置。
 
-Model/BayonetZhongZheng.tzm.json、BayonetHanYang.tzm.json、BayonetType38.tzm.json 独立建模，通过 socket 对齐枪口挂点。历史尺寸、模型许可仍见 _import/Data_SourceLicenses.md 及 _blender/ImportBayonets.py。不得为了动画任意缩放兵器。
+Model/Model_BayonetZhongZheng.tzm.json、Model_BayonetHanYang.tzm.json、Model_BayonetType38.tzm.json 独立建模，通过 socket 对齐枪口挂点。历史尺寸、模型许可仍见 _import/Data_SourceLicenses.md 及 _blender/ImportBayonets.py。不得为了动画任意缩放兵器。
 
 第一人称通过 Script_Viewmodel._BuildBayonetProp 挂载真实刀件。第三人称共读 Soldier.bayonetFixed，weaponR／weaponL 握持挂点驱动枪线；高档用真实模型，低档保留刀片回退。没有显式装刀时不能因枪有 bayonet 属性就显示刀。
 

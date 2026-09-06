@@ -5,7 +5,7 @@
 // 史料字段（章名、日期、简报）、切片范围与出生点、路标（LOD 焦点与 HUD 去向）。
 // 台词、事件线（EVENTS）、语音行（VOICE_LINES）、过场（含关中过场 cutsceneMid）、
 // 钉关旗标与摆点全部删除 —— 旧内容在 git 历史里（13594c5ae 之前的本文件、
-// Data_CutsceneCh5.mjs、Script_MissionSetpieces.SETPIECES.CH5_Chengqiang、Audio/vo_ch5_*.mp3）。
+// Data_CutsceneCh5.mjs、Script_MissionSetpieces.SETPIECES.CH5_Chengqiang、Audio/AudioVoice_Ch5*.mp3）。
 //
 // corridorGun（西城门楼上那挺沿街扫射的重机枪）是场景/切片层的东西，保留：
 // Script_BootTest 的 sightCorridor 那条闸还量它。

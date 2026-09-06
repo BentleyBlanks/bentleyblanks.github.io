@@ -245,7 +245,7 @@ scene.frame_set(1)
 bpy.context.view_layer.update()
 
 # Read the already shipped weapon mesh; no alternate gun or guessed dimensions.
-weaponPath=root/'Taierzhuang1938/Model/ZhongZheng.tzm.json'
+weaponPath=root/'Taierzhuang1938/Model/Model_ZhongZheng.tzm.json'
 weapon=json.loads(weaponPath.read_text(encoding='utf-8'))
 def Decode(data,kind):
     raw=base64.b64decode(data)
@@ -367,7 +367,7 @@ libraryPath=root/'.codex-tmp/Animation_BackRifleRunLibrary.blend'
 libraryPath.parent.mkdir(parents=True,exist_ok=True)
 bpy.data.libraries.write(str(libraryPath),{scene,sourceText},fake_user=True,compress=True)
 
-manifest={**BACK_RIFLE_CONFIG,'durationSeconds':cycle,'strideMeters':speed*cycle,'sourceModel':str(sourcePath.relative_to(root)).replace('\\','/'),'sourceModelSha256':hashlib.sha256(sourcePath.read_bytes()).hexdigest(),'sourceWeapon':'Taierzhuang1938/Model/ZhongZheng.tzm.json','sourceWeaponSha256':hashlib.sha256(weaponPath.read_bytes()).hexdigest(),'armature':arm.name,'socket':'Socket_BackRifle','socketBone':'Bip002 Spine2','socketMatrixBlenderLocal':[list(row) for row in socket.matrix_basis],'rootMotion':'inPlace; GroundRoot fixed; pelvis vertical and lateral only','sourceForward':'Blender -Y / glTF +Z','gameForward':'apply existing MODEL_FORWARD_YAW once, game -Z','playbackRate':'actualSpeedMps / (referenceSpeedMps * uniformCharacterScale)', 'nativeBindHeightMeters':1.8143911361694336, 'runtimeDefaultHeightMeters':1.68,'authoring':'BlenderMCP execute_blender_code, analytical support-path IK and newly authored upper-body keys','acceptance':'Independent asset review only; production replacement is not authorized','samples':samples}
+manifest={**BACK_RIFLE_CONFIG,'durationSeconds':cycle,'strideMeters':speed*cycle,'sourceModel':str(sourcePath.relative_to(root)).replace('\\','/'),'sourceModelSha256':hashlib.sha256(sourcePath.read_bytes()).hexdigest(),'sourceWeapon':'Taierzhuang1938/Model/Model_ZhongZheng.tzm.json','sourceWeaponSha256':hashlib.sha256(weaponPath.read_bytes()).hexdigest(),'armature':arm.name,'socket':'Socket_BackRifle','socketBone':'Bip002 Spine2','socketMatrixBlenderLocal':[list(row) for row in socket.matrix_basis],'rootMotion':'inPlace; GroundRoot fixed; pelvis vertical and lateral only','sourceForward':'Blender -Y / glTF +Z','gameForward':'apply existing MODEL_FORWARD_YAW once, game -Z','playbackRate':'actualSpeedMps / (referenceSpeedMps * uniformCharacterScale)', 'nativeBindHeightMeters':1.8143911361694336, 'runtimeDefaultHeightMeters':1.68,'authoring':'BlenderMCP execute_blender_code, analytical support-path IK and newly authored upper-body keys','acceptance':'Independent asset review only; production replacement is not authorized','samples':samples}
 (output/'Data_BackRifleRun.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
 packaged=subprocess.run([bpy.app.binary_path,'--background','--factory-startup','--python-exit-code','1','--python',str(root/'Taierzhuang1938/_import/Script_BackRifleRunSource.py'),'--',str(libraryPath),str(output/'Animation_LugouNraBackRifleRun.blend'),str(output/'Data_BackRifleRun.json')],capture_output=True,text=True,check=True)
 

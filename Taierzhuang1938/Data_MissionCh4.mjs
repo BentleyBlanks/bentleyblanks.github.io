@@ -5,7 +5,7 @@
 // 史料字段（章名、日期、简报）、切片范围与出生点、路标（LOD 焦点与 HUD 去向）。
 // 台词、事件线（EVENTS）、语音行（VOICE_LINES）、过场与摆点全部删除 ——
 // 旧内容在 git 历史里（13594c5ae 之前的本文件、Data_CutsceneCh4.mjs、
-// Script_MissionSetpieces.SETPIECES.CH4_DongguanYe、Audio/vo_ch4_*.mp3）。
+// Script_MissionSetpieces.SETPIECES.CH4_DongguanYe、Audio/AudioVoice_Ch4*.mp3）。
 //
 // 照明弹系统（Script_Flare）的两条预设仍以 `C4_FlareUp` 为默认信号名 ——
 // 那是引擎侧的契约常量，不再依赖本文件的 EVENTS。

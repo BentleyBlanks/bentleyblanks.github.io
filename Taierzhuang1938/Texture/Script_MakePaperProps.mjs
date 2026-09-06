@@ -1,4 +1,4 @@
-// 纸品道具贴图生成器（Tex_Paper*.png）。
+// 纸品道具贴图生成器（Texture_Paper*.png）。
 //
 // 为什么是「分层合成」而不是直接生图：AI 生图写不对汉字，一定出乱码。
 // 所以 AI（或纯程序化）只负责**做旧纸底**，所有文字由本脚本用系统字体
@@ -39,10 +39,10 @@ const basesDir = args.get("bases") ? path.resolve(String(args.get("bases"))) : n
 // 策划案原句写成简体只是文档录入方便，不是美术口径 —— 贴图要照 1938 年写。
 // ---------------------------------------------------------------------------
 const PROPS = [
-  { key: "leaflet", out: "Tex_PaperLeaflet.png", w: 1024, h: 1536, base: "base_leaflet.png" },
-  { key: "news", out: "Tex_PaperNewspaper.png", w: 1024, h: 1448, base: "base_news.png" },
-  { key: "letter", out: "Tex_PaperLetter.png", w: 1024, h: 1536, base: "base_letter.png" },
-  { key: "map", out: "Tex_PaperEndingMap.png", w: 1536, h: 1024, base: "base_map.png" },
+  { key: "leaflet", out: "Texture_PaperLeaflet.png", w: 1024, h: 1536, base: "base_leaflet.png" },
+  { key: "news", out: "Texture_PaperNewspaper.png", w: 1024, h: 1448, base: "base_news.png" },
+  { key: "letter", out: "Texture_PaperLetter.png", w: 1024, h: 1536, base: "base_letter.png" },
+  { key: "map", out: "Texture_PaperEndingMap.png", w: 1536, h: 1024, base: "base_map.png" },
 ];
 
 const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "paperprops-"));

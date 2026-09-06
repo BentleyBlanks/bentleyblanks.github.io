@@ -31,12 +31,12 @@ const Report = (ok, line) => {
 };
 
 // ---------------------------------------------------------------------------
-// 第一关：Data_Meshes.mjs 与 Blender 刚写的 Model/Index.json 必须对得上。
+// 第一关：Data_Meshes.mjs 与 Blender 刚写的 Model/Data_ModelIndex.json 必须对得上。
 // 手写清单最经典的翻车是「改了建模脚本没更新表」，那会一路无声地滑到运行时。
 // ---------------------------------------------------------------------------
-const indexPath = path.join(projectDir, "Model", "Index.json");
+const indexPath = path.join(projectDir, "Model", "Data_ModelIndex.json");
 if (!fs.existsSync(indexPath)) {
-  console.log("FAIL Model/Index.json 不存在 —— 先跑 BuildAll.py");
+  console.log("FAIL Model/Data_ModelIndex.json 不存在 —— 先跑 BuildAll.py");
   process.exit(1);
 }
 const buildIndex = JSON.parse(fs.readFileSync(indexPath, "utf8"));
@@ -45,7 +45,7 @@ const { MESHES } = await import(path.join(projectDir, "Data_Meshes.mjs").replace
 const built = new Map(buildIndex.models.map((m) => [m.name, m]));
 for (const [id, entry] of Object.entries(MESHES)) {
   const b = built.get(id);
-  if (!b) { Report(false, `${id}：Data_Meshes 里有，Index.json 里没有`); continue; }
+  if (!b) { Report(false, `${id}：Data_Meshes 里有，Data_ModelIndex.json 里没有`); continue; }
   const problems = [];
   if (b.triangles !== entry.triangles) problems.push(`三角 ${b.triangles}≠${entry.triangles}`);
   if (b.meshBlocks !== entry.meshBlocks) problems.push(`网格块 ${b.meshBlocks}≠${entry.meshBlocks}`);
@@ -63,7 +63,7 @@ for (const [id, entry] of Object.entries(MESHES)) {
   Report(problems.length === 0, `清单一致 ${id}${problems.length ? "  << " + problems.join("; ") : ""}`);
 }
 for (const name of built.keys()) {
-  if (!MESHES[name]) Report(false, `${name}：Index.json 里有，Data_Meshes 里漏登记`);
+  if (!MESHES[name]) Report(false, `${name}：Data_ModelIndex.json 里有，Data_Meshes 里漏登记`);
 }
 
 // 用户提供的卢沟桥合集不是“只有网格”的模型包：16 张 DDS/TGA/JPEG 原图是
@@ -507,7 +507,7 @@ const result = await page.evaluate(async () => {
 
   // 兜底用例：404 必须返回 null 而不是抛出去。一个模型缺文件不能整页黑屏。
   try {
-    const missing = await LoadModel(MODEL_BASE + "NoSuchModel.tzm.json", { materials: {} });
+    const missing = await LoadModel(MODEL_BASE + "Model_NoSuchModel.tzm.json", { materials: {} });
     out.fallbackOk = missing === null;
   } catch (error) {
     out.fallbackOk = false;

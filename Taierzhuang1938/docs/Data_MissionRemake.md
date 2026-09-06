@@ -1,6 +1,6 @@
 # 滕县保卫战 · 任务流程重制规格（2026-08-28，源自 Notion《藤县保卫战》修订版）
 
-> **2026-09-06 状态：第一关到终章暂时废弃。** 本文件 §2–§7 描述的六章内容已从代码中清空：`Data_MissionCh2–6.mjs` 只剩切片/出生点/路标骨架，`Data_CutsceneCh1–6.mjs`、`Script_MissionSetpieces` 的 CH2–CH6 摆点、`Audio/vo_ch2_*–vo_ch6_*.mp3` 与整局通关测试 `Script_PlayTest.mjs` 已删除（都在 git 历史 `13594c5ae` 里）。选章里**不再列出**这六章，也不再列旧序章（序章要并入第一关；旧切片只剩 `?phase=N` 开发入口）。玩家能进的第一关就是 P0/P1/P2 场景白盒（`docs/Data_FirstLevelP012Acceptance.md`，`Data_MissionCh1.mjs` 的内容保留给它），按 Notion 新稿在那里重做。§9 的选章要求以 `Data_Menu.CAMPAIGN_ENTRIES` 与 `Script_Menu.mjs` 现状为准（两组：正式章节＝第一关 + 第二关到终章的占位「敬请期待」 / 测试场景）。
+> **2026-09-06 状态：第一关到终章暂时废弃。** 本文件 §2–§7 描述的六章内容已从代码中清空：`Data_MissionCh2–6.mjs` 只剩切片/出生点/路标骨架，`Data_CutsceneCh1–6.mjs`、`Script_MissionSetpieces` 的 CH2–CH6 摆点、`Audio/vo_ch2_*–AudioVoice_Ch6*.mp3` 与整局通关测试 `Script_PlayTest.mjs` 已删除（都在 git 历史 `13594c5ae` 里）。选章里**不再列出**这六章，也不再列旧序章（序章要并入第一关；旧切片只剩 `?phase=N` 开发入口）。玩家能进的第一关就是 P0/P1/P2 场景白盒（`docs/Data_FirstLevelP012Acceptance.md`，`Data_MissionCh1.mjs` 的内容保留给它），按 Notion 新稿在那里重做。§9 的选章要求以 `Data_Menu.CAMPAIGN_ENTRIES` 与 `Script_Menu.mjs` 现状为准（两组：正式章节＝第一关 + 第二关到终章的占位「敬请期待」 / 测试场景）。
 
 > 本文件是本轮任务流程重制的**唯一口径**，由 Notion《〈滕县保卫战〉完整修订版任务与关卡规划》及其七个章节子页、过场动画子页、人物介绍页整理而来。实现与本文件冲突时以本文件为准；本文件与 Notion 冲突时以 Notion 为准并回改本文件。
 
@@ -261,7 +261,7 @@
 ### 10.3 台词→语音通道
 
 - beat 增加可选字段 `voice: "<key>"`；Script_Story 派发 line/shout 时若带 voice，则按 key 点名经 Script_Audio 播放（若能定位说话人演员则空间化，否则以玩家附近定位）。无音频文件时静默降级为纯字幕，不许报错阻塞。
-- 语音 key 命名：`ch<N>_<who>_<两位序号>`，文件名 `vo_ch<N>_<who>_<NN>.mp3`，落 `Audio/`。
+- 语音 key 命名：`ch<N>_<who>_<两位序号>`，文件名 `AudioVoice_Ch<N><Who>_<NN>.mp3`（`Data_Voice.VoiceFileName`），落 `Audio/`。
 - 烘焙走火山引擎 SeedAudio 1.0（`Script_VoiceBake.mjs` 现有管线），每个新 CAST 人物在 VoiceBake 里配一条音色 prompt（川音口径、年龄性格见 §8；`ija_gunso` 走日语假名分支）。密钥只读 `VOLCENGINE_API_KEY` 环境变量。
 
 ### 10.4 分工与文件所有权（并行纪律）

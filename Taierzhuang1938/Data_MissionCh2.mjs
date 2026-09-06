@@ -5,7 +5,7 @@
 // 史料字段（章名、日期、简报）、切片范围与出生点、路标（LOD 焦点与 HUD 去向）。
 // 台词、事件线（EVENTS）、语音行（VOICE_LINES）、过场与摆点全部删除 ——
 // 旧内容在 git 历史里（13594c5ae 之前的本文件、Data_CutsceneCh2.mjs、
-// Script_MissionSetpieces.SETPIECES.CH2_Shouliudan、Audio/vo_ch2_*.mp3）。
+// Script_MissionSetpieces.SETPIECES.CH2_Shouliudan、Audio/AudioVoice_Ch2*.mp3）。
 //
 // 组装层（Data_TengxianScript）按 DEPRECATED_CHAPTER_IDS 给它打 `deprecated` 标：
 // 进章只建场、不装剧本、不摆点、不换关；从序章过场结束不会自动接进来。

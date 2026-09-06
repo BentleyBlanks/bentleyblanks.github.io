@@ -12,7 +12,7 @@ import {
 } from "./Data_AssetStandards.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
-const index = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", "Index.json"), "utf8"));
+const index = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", "Data_ModelIndex.json"), "utf8"));
 const built = new Map(index.models.map((entry) => [entry.name, entry]));
 const pythonRules = fs.readFileSync(path.join(projectDir, "_blender", "AssetBudgets.py"), "utf8");
 const editorSource = fs.readFileSync(path.join(projectDir, "Script_EditorAssetStandards.mjs"), "utf8");
@@ -72,15 +72,15 @@ Check(Object.keys(SOURCE_ASSET_STANDARDS).length === 16 && missing.length === 0,
 Check(!WEAPONS.Mauser96 && Object.values(LOADOUTS).every((loadout) =>
   [loadout.primary, loadout.secondary, loadout.melee].every((id) => !id || WEAPONS[id]))
   && !MESHES.Mauser96 && !SOURCE_ASSET_STANDARDS.Mauser96
-  && !FPS_ARM_POSES.Mauser96 && !fs.existsSync(path.join(projectDir, "Model", "Mauser96.tzm.json")),
+  && !FPS_ARM_POSES.Mauser96 && !fs.existsSync(path.join(projectDir, "Model", "Model_Mauser96.tzm.json")),
   "已移除的 C96 不再登记或随游戏发布");
-Check(drift.length === 0, "实际面数与 Model/Index.json 一致", drift.join("、"));
+Check(drift.length === 0, "实际面数与 Model/Data_ModelIndex.json 一致", drift.join("、"));
 Check(sourceDrift.length === 0, "原始选定面数与 Blender 构建元数据一致", sourceDrift.join("、"));
 Check(complianceBad.length === 0, "全部有源资产符合特例或分类阈值", complianceBad.join("、"));
 
 // Measure the shipped geometry, not just its claimed -Z axis or muzzle marker.
 // The old export kept correct mount labels while its wood grip was at the front.
-const servicePistol = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", "ServicePistol.tzm.json"), "utf8"));
+const servicePistol = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", "Model_ServicePistol.tzm.json"), "utf8"));
 const gripTriangles = [];
 const gripVertices = servicePistol.meshes.filter((mesh) => mesh.material === "wood").flatMap((mesh) => {
   const bytes = Buffer.from(mesh.pos, "base64");
@@ -141,7 +141,7 @@ Check(/AssetStandardsEditor/.test(suiteSource)
 
 // Compare triangle-corner UV distributions against the downloaded glTF, so a
 // future rebuild cannot silently replace the authored atlas with box projection.
-const type89 = JSON.parse(fs.readFileSync(path.join(projectDir, "Model/Type89Tank.tzm.json"), "utf8"));
+const type89 = JSON.parse(fs.readFileSync(path.join(projectDir, "Model/Model_Type89Tank.tzm.json"), "utf8"));
 const source89 = JSON.parse(fs.readFileSync(path.join(projectDir, "_import/Source/Model_Type89ChiRo/scene.gltf"), "utf8"));
 const source89Bin = fs.readFileSync(path.join(projectDir, "_import/Source/Model_Type89ChiRo/scene.bin"));
 function Source89Value(accessorId, index, axis = 0) {

@@ -773,11 +773,11 @@ HUD 右上角常驻一个**只增不减的计数器**：`守住 ── 时 ─�
 - 程序化 PBR 贴图烘焙 Script_TexBake.mjs：砖、石、土坯、瓦、木的生成器全部可用。新增两套材质变体即可——石灰岩条石（#B0ADA3 灰白偏冷）与夯土断面（#A38F6C）
 - Script_World.mjs 的鲁南民居构件全套：AddWall / AddHardMountainRoof / AddCompound / AddRoomBlock / AddDoorReveal / AddWell / AddMillstone / AddWaterVat / AddBarricade / AddTree / AddPole。滕县与台儿庄同属鲁南，硬山小青瓦、四合院、对外不开窗、过墙石都成立，直接搬
 - Script_World.mjs 的 AddRampWay 与 RAMP_STEPS / RAMP_RUN_M / RAMP_WIDTH_M：滕县「全城只有四条上城道」正好用它，只需把爬升高度从 4 m 拉到 13 m、加中间转折平台
-- 日军一侧完整保留：Model/SoldierIja.tzm.json、Model/Type38.tzm.json，以及 Data_Weapons 的 Type38 / Type11 / Type92Hmg / Type89Launcher —— 打滕县的正是濑谷支队，与台儿庄同一支敌人，装备编成一致，一枚像素都不用改
+- 日军一侧完整保留：Model/Model_SoldierIja.tzm.json、Model/Model_Type38.tzm.json，以及 Data_Weapons 的 Type38 / Type11 / Type92Hmg / Type89Launcher —— 打滕县的正是濑谷支队，与台儿庄同一支敌人，装备编成一致，一枚像素都不用改
 - 枪械手感层与操作层原样保留：Script_Player.mjs / Script_Input.mjs / Script_Combat.mjs / Script_Viewmodel.mjs / Script_Wheel.mjs / Script_Interact.mjs，以及 Data_Battle 的 COMBAT / FREE_AIM_STEPS / DIFFICULTY_PRESETS / ORDERS / SUPPORT
 - AI 行为原样保留：Script_Ai.mjs 的压制、掩体、守点，以及 Script_Navigation.mjs。滕县的守点比台儿庄更多（缺口、寺院地、望楼、街口），是同一套逻辑的更密使用
 - 伤势与包扎、死亡换人：Script_Actor.mjs ＋ Data_Battle.REINFORCE 的黑底卡片 2.6 秒 → 镜头平滑飞到接替者。呈现方式一字不改
-- Blender 建模流水线原样保留：_blender/BuildAll.py / BuildProps.py / BuildSoldiers.py / BuildWeapons.py / TzmCore.py / Verify.mjs，以及 Script_MeshLoad.mjs 与 Model/Index.json 的 .tzm.json 装配
+- Blender 建模流水线原样保留：_blender/BuildAll.py / BuildProps.py / BuildSoldiers.py / BuildWeapons.py / TzmCore.py / Verify.mjs，以及 Script_MeshLoad.mjs 与 Model/Data_ModelIndex.json 的 .tzm.json 装配
 - 中方轻武器数据可留：Data_Weapons 的 HanYang（汉阳造）/ Grenade / GrenadeBundle / Dadao / Mauser96 —— 川军也用这几样，只是比例极端不同
 - Script_Story.mjs 的 beats 引擎与 at 触发式语义（start / end / zone: / event: / wave:N / waveClear:N / delay:）与 type 分派（title / line / shout / phone / narration / objective / note / hint）：滕县剧本直接照这套语法写，引擎不动
 - Script_Vfx.mjs 全套：烟、尘、火、弹着、爆炸尘。其中的全局淡出接口正好给新的过场系统收尾用
@@ -792,7 +792,7 @@ HUD 右上角常驻一个**只增不减的计数器**：`守住 ── 时 ─�
 - Script_World.mjs 的 AddGatehouse（寨门约 7 m）废弃 → 新写 AddGateComplex：内外二门 ＋ 半圆形瓮城（半径 18 m）＋ 重檐筒瓦叠脊彩画城楼 ＋ 方砖月台加石栏 ＋ 内外两块石刻门额 ＋ 东门旁凸出的侧防机关高台
 - Script_World.mjs 的 AddMosque（清真寺）删除 → 新写 AddYamen（县衙，照现存的滕州旧县衙大堂明代原物做，注意避开 2007 年后复建的仪门谯楼门细部）、AddChurch（德式小型天主堂，形制全推定）、AddPagoda（龙泉塔，八角九级，1938 年状态：塔刹已毁、顶层塔室倾塌、檐角斗拱脱落）
 - 护城河参数重做：宽 10.5 m、深 4.8 m、濠内边距墙脚 8 m、濠底到墙顶落差约 16 m。濠岸栽柳（三月无叶，深褐红枝条）
-- 守军换川军 —— Model/SoldierNra.tzm.json 需新皮：无钢盔（竹斗笠／布军帽）、草鞋、绑腿、单衣、腰上一圈手榴弹布袋（约六枚）。这是本轮美术工作量最大的单项，且「不许给守军加钢盔」是红线
+- 守军换川军 —— Model/Model_SoldierNra.tzm.json 需新皮：无钢盔（竹斗笠／布军帽）、草鞋、绑腿、单衣、腰上一圈手榴弹布袋（约六枚）。这是本轮美术工作量最大的单项，且「不许给守军加钢盔」是红线
 - Data_Weapons.mjs 的 LOADOUT 全表重写：主武器是手榴弹，步枪以四川造／汉阳造为主，中正式极少，Zb26 稀缺到近乎不出现（全团只有 4 挺重机枪），并把「无枪」做成合法初始状态
 - Data_Battle.mjs 的 NAME_POOL.origins 整表换四川籍贯（广汉、射洪、新都、三台、资中、内江、遂宁、蓬溪、简阳、南部…），weapons 比例改成 四川造＞汉阳造＞无枪只有手榴弹＞中正式
 - Data_Battle.mjs 的 REINFORCE.phaseRefill 关掉：滕县兵员池只出不进，下降曲线本身就是叙事。poolLabel 改为「城里还站着的人」

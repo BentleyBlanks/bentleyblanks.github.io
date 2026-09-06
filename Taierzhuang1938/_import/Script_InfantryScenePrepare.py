@@ -45,7 +45,7 @@ for faction in ['Nra','Ija']:
     rifle.parent=arm;rifle.parent_type='BONE';rifle.parent_bone=prefix+'Spine2'
     rifle.matrix_basis=Matrix.Identity(4);bpy.context.view_layer.update()
     rifle['parentRestWorld']=[v for row in rifle.matrix_world for v in row]
-    data=json.loads((project/('Model/ZhongZheng.tzm.json' if faction=='Nra' else 'Model/Type38.tzm.json')).read_text())
+    data=json.loads((project/('Model/Model_ZhongZheng.tzm.json' if faction=='Nra' else 'Model/Model_Type38.tzm.json')).read_text())
     rifle['weapon']=data['name'];rifle['gripL']=next(n['t'] for n in data['nodes'] if n['name']=='gripL')
     materials={k:Material('Material_'+faction+k,c,.75 if k=='steel' else 0) for k,c in [('wood',(.16,.07,.03)),('steel',(.08,.09,.1))]}
     for key,mat in materials.items():

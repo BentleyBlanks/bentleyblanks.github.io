@@ -1,4 +1,5 @@
 // P012实际状态机的纯Node宿主测试：用注册交互回调/玩家动作/正式信号驱动，不写beat跳关。
+import { VoiceFileName } from "./Data_Voice.mjs";
 import assert from "node:assert/strict";
 import { P012Point } from "./Data_FirstLevelP012Space.mjs";
 import { FirstLevelP012Director, P012_WAVES, P012EnemyRejoinPath } from "./Script_FirstLevelP012Flow.mjs";
@@ -895,7 +896,7 @@ for(const voice of ["ch1_heyoutian_01","ch1_shunzi_01","ch1_luo_05"]){
   assert.equal(phase.whitebox.storyBeats.filter(beat=>beat.voice===voice).length,1,`${voice} was moved, never duplicated`);
   assert.equal(spoken.filter(key=>key===voice).length,1,`${voice} plays once at the actual task`);
 }
-for(const voice of spoken)assert.ok(existsSync(new URL(`./Audio/vo_${voice}.mp3`,import.meta.url)),`${voice} reuses a checked-in recording`);
+for(const voice of spoken)assert.ok(existsSync(new URL(`./Audio/${VoiceFileName(voice)}`,import.meta.url)),`${voice} reuses a checked-in recording`);
 // Real recording durations, frame-stepped actual aircraft windows. A deliberately
 // blocked ordinary queue must not delay the scene-critical event lane.
 const airStory=new StoryDirector({hud:{Say(){},Title(){}}});
