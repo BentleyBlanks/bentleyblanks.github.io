@@ -5,7 +5,10 @@ import argparse,json
 parser=argparse.ArgumentParser()
 parser.add_argument('--root',type=Path,required=True)
 parser.add_argument('--group',default='NextTenV1')
+parser.add_argument('--revision',type=int,default=1)
 args=parser.parse_args()
+if args.revision<1:parser.error('--revision must be positive')
+revision=args.revision
 root=args.root
 out=root/'Models'/args.group
 recipes=json.loads((out/'Data_Recipes.json').read_text(encoding='utf-8'))
@@ -24,17 +27,17 @@ for name,cfg in recipes.items():
         review={'sourceVideo':f'Video/Sources/{sourceName}/Video_{sourceName}.mp4',
             'sourceRangeSeconds':[x/30 for x in v['sourceFrames']],'recoveryFps':30,
             'recoveryLabel':'GVHMR 原始恢复 · 未重定向、未修脚',
-            'recoveryTracks':[{'path':f'Models/RecoveryPreview/Data_V1_{name}RawJoints.json','offset':[0,0,0]}],
+            'recoveryTracks':[{'path':f'Models/RecoveryPreview/Data_V{revision}_{name}RawJoints.json','offset':[0,0,0]}],
             'defaultCameraYawRadians':cfg.get('defaultCameraYawRadians',.7853981633974483),'cameraElevationRadians':cfg.get('cameraElevationRadians',.65),
             'sideCameraYawRadians':-1.5707963267948966}
-        for key,path in [('recoveryBlend',f'Blender/RawRecovery/Scene_{name}RawRecovery_V1.blend'),('recoveryGlb',f'Models/RecoveryPreview/Animation_{name}RawRecovery_V1.glb')]:
+        for key,path in [('recoveryBlend',f'Blender/RawRecovery/Scene_{name}RawRecovery_V{revision}.blend'),('recoveryGlb',f'Models/RecoveryPreview/Animation_{name}RawRecovery_V{revision}.glb')]:
             if (root/path).exists():review[key]=path
         if cfg.get('sourceAssessment'):review['sourceAssessment']=cfg['sourceAssessment']
         ratio=report['retargetScale']
         travel=motion['sourceTravelMeters']
-        entry['variants'].append({'id':f'{faction}-v1-{name}','faction':faction,'label':'V1 · 本机恢复与重定向','revisionOrder':1,
+        entry['variants'].append({'id':f'{faction}-v{revision}-{name}','faction':faction,'label':f'V{revision} · 本机恢复与重定向','revisionOrder':revision,
             'status':'待审阅','path':v['path'],'clip':v['clip'],'blend':v['blend'],'review':review,
-            'travelMeters':[travel[0]*ratio,0,-travel[1]*ratio] if cfg['loop'] else None})
+            'travelMeters':cfg.get('travelMeters',[travel[0]*ratio,0,-travel[1]*ratio]) if cfg['loop'] else None})
     actions.append(entry)
 (out/'Data_Versions.json').write_text(json.dumps({'actions':actions},ensure_ascii=False,indent=2),encoding='utf-8')
 print('Registered',len(actions),'completed batch actions')

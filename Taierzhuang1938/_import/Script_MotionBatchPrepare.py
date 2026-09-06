@@ -9,8 +9,10 @@ from scipy.spatial.transform import Rotation,Slerp
 parser=argparse.ArgumentParser()
 parser.add_argument('--root',type=Path,required=True)
 parser.add_argument('--group',default='NextTenV1')
+parser.add_argument('--revision',type=int,default=1)
 parser.add_argument('--ids',nargs='+',required=True)
 args=parser.parse_args()
+if args.revision<1:parser.error('--revision must be positive')
 root=args.root
 runtime=root/'Models/_Cache'/args.group
 recipes=json.loads((root/'Models'/args.group/'Data_Recipes.json').read_text(encoding='utf-8'))
@@ -85,5 +87,5 @@ for name in args.ids:
         'fps':float(data['fps']),'parents':data['parents'].tolist(),'jointNames':names,'positions':positions.tolist(),
         'viewerYawRadians':float(-np.arctan2(forward[0],forward[2])),
         'viewerOrigin':[float(positions[0,0,0]),0,float(positions[0,0,2])]}
-    (root/f'Models/RecoveryPreview/Data_V1_{name}RawJoints.json').write_text(json.dumps(raw,separators=(',',':')),encoding='utf-8')
+    (root/f'Models/RecoveryPreview/Data_V{args.revision}_{name}RawJoints.json').write_text(json.dumps(raw,separators=(',',':')),encoding='utf-8')
     print(name,'range',cfg['range'],'duration',result['durationSeconds'],'travel',np.round(travel,3),flush=True)

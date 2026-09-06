@@ -73,6 +73,10 @@ GVHMR 的 22 个身体关节不提供可靠的手指握法和枪械姿态。持�
 
 全身接触采用按源片检查的接触权重、支撑平面、躯干接地和末态保持；这些都属于重定向侧修正。配方应记录每个动作的支撑区间、冻结末态帧、持枪/背枪形式。原地跑步原片不能测出可靠行进速度，任何游戏移动速度设定必须另行注明。Python 读取含中文配方或目录 JSON 时明确使用 UTF-8，避免 Windows 默认编码污染标签。
 
+同一动作重新生成原片时，创建独立来源和版本目录，例如 `Video/Sources/RifleCrouchAdvanceV4`、`Models/ReviewV4`、`Models/_Cache/ReviewV4`、`Blender/ReviewV4`。持枪批次的 prepare、register、raw skeleton 脚本通过 `--revision 4` 使用对应原始骨骼和模型版本，prepare / register 另传 `--group ReviewV4`；baker 的效果版本与 `--grip-revision 3` 分开。原始骨骼的工程、GLB 和校验报告也按版本保存，不能覆盖之前的 raw rig 报告。用 `Script_MotionBatchVerify.mjs --root <资产库> --group ReviewV4` 单独验收，用 `Script_MotionBatchProvenance.py --root <资产库> --group ReviewV4 --revision 4 --without-death` 记录该轮来源；不必重新运行其他批次。原地演示同样需要完整、自然的左右步态，任何地面移动的参考速度应标明为估计或后期设定。
+
+低姿步态若在鞋底贴地后支撑膝被拉直，可在该动作配方启用 `preserveSupportKneeBend`：用原恢复的膝弯角和目标人物腿长计算支撑距离，调整髋部高度，保持支撑脚锚点；摆动脚随髋部高度调整。双脚接触按权重协调，髋部修正经过短时间窗平滑，循环采用周期边界，避免接触切换造成高度突变。按左右支撑阶段对照原关节角度并检查实际姿态，不能把此修正默认套到全部动作。原地演示用配方 `travelMeters: [0, 0, 0]` 明确停止预览地面位移。完整入镜验收覆盖人物和枪械等所有导出网格，不能只检验皮肤网格而漏掉枪口。
+
 ## 交付与接受状态
 
 每轮交付可编辑 `.blend`、包含原人物和动画的 `.glb`、实时预览入口、来源/修正说明与验收记录。历史版本可比较，新版区分“待审阅”“需修正”“已接受”。用户要求先本地看时，不直接替换线上正式动作。得到接入范围后再按项目规则导出游戏动作库、测试和发布。

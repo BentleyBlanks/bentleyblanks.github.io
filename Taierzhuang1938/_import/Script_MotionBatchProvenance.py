@@ -5,18 +5,24 @@ import argparse, hashlib, json
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--root',type=Path,required=True)
+parser.add_argument('--group',default='NextTenV1')
+parser.add_argument('--revision',type=int,default=1)
+parser.add_argument('--without-death',action='store_true')
 args=parser.parse_args()
+if args.revision<1:parser.error('--revision must be positive')
 root=args.root.resolve()
 
 def Read(path): return json.loads(path.read_text(encoding='utf-8'))
 def Hash(path):
     with path.open('rb') as stream: return hashlib.file_digest(stream,'sha256').hexdigest()
 
-recipes=Read(root/'Models/NextTenV1/Data_Recipes.json')
+recipes=Read(root/'Models'/args.group/'Data_Recipes.json')
 receipts={}
 records=[]
-for name,cfg in [('DeathCollapse',{'group':'DeathCollapseV1'}),*recipes.items()]:
-    group=cfg.get('group','NextTenV1');source=cfg.get('source',name)
+items=list(recipes.items())
+if not args.without_death:items.insert(0,('DeathCollapse',{'group':'DeathCollapseV1','revision':1}))
+for name,cfg in items:
+    group=cfg.get('group',args.group);source=cfg.get('source',name);revision=cfg.get('revision',args.revision)
     sourceDir=root/'Video/Sources'/source
     sourcePath=sourceDir/f'Video_{source}.mp4'
     generation=Read(sourceDir/'Data_GenerationResult.json')
@@ -30,9 +36,10 @@ for name,cfg in [('DeathCollapse',{'group':'DeathCollapseV1'}),*recipes.items()]
     assert recovery['status']=='fresh_local_recovery' and recovery['predictionReused'] is False,name
     assert recovery['sourceSha256']==sourceHash,name
     assert recovery['resultSha256']==Hash(cache/'hmr4d_results.pt'),name
-    raw=Read(root/f'Models/RecoveryPreview/Data_V1_{name}RawJoints.json')
+    raw=Read(root/f'Models/RecoveryPreview/Data_V{revision}_{name}RawJoints.json')
     assert raw['sourceCacheSha256']==Hash(cache/'Data_GvhmrMotion.npz'),name
-    rig=Read(root/f'Models/RecoveryPreview/Data_{name}RawRigValidation.json')
+    rigReport=f'Models/RecoveryPreview/Data_{name}RawRigValidation.json' if revision==1 else f'Models/RecoveryPreview/Data_V{revision}_{name}RawRigValidation.json'
+    rig=Read(root/rigReport)
     assert rig['sourceCacheSha256']==raw['sourceCacheSha256'],name
     variants=Read(root/'Models'/group/'Data_Versions.json')['actions']
     entry=next(action for action in variants if action['id']==name)
@@ -48,7 +55,7 @@ for name,cfg in [('DeathCollapse',{'group':'DeathCollapseV1'}),*recipes.items()]
         'sourceRangeSeconds':entry['variants'][0]['review']['sourceRangeSeconds'],
         'sourceAssessment':cfg.get('sourceAssessment'),
         'corrections':motion.get('corrections',['Retarget-only temporal filtering, local loop seam, contact IK and calibrated rifle grips']),
-        'rawRigValidation':f'Models/RecoveryPreview/Data_{name}RawRigValidation.json',
+        'rawRigValidation':rigReport,
         'variants':[{'faction':v['faction'],'glb':v['path'],'blend':v['blend'],'status':v['status']} for v in entry['variants']]})
     for receiptPath in sourceDir.rglob('Data_GenerationResult*.json'):
         receipt=Read(receiptPath)
@@ -61,7 +68,7 @@ report={'updatedAt':datetime.now(timezone.utc).isoformat(),'status':'local_revie
     'camera':'Requested fixed diagonal semi-overhead view near 45 degrees; generated angles are not calibrated camera measurements',
     'actions':records,'uniqueSuccessfulGenerationReceipts':list(receipts.values()),
     'receiptCreditsTotal':sum(r['credits'] for r in receipts.values()),
-    'scope':'DeathCollapse plus ten new actions, including rejected source attempts retained in History; existing approved video reuse excluded'}
-target=root/'Models/NextTenV1/Data_Production.json'
+    'scope':f'{args.group} revision {args.revision}'+(' plus DeathCollapse' if not args.without_death else '')+'; includes rejected source attempts retained in History, excludes existing approved video reuse'}
+target=root/'Models'/args.group/'Data_Production.json'
 target.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
 print(json.dumps({'actions':len(records),'retargets':sum(len(r['variants']) for r in records),'rawRigs':len(records),'uniqueGenerationReceipts':len(receipts),'receiptCreditsTotal':report['receiptCreditsTotal']}))

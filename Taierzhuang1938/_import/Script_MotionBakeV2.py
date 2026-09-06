@@ -3,9 +3,10 @@ from pathlib import Path
 import sys,argparse,json,math
 import bpy,numpy as np
 from mathutils import Matrix,Vector
-parser=argparse.ArgumentParser();parser.add_argument('--root',type=Path,required=True);parser.add_argument('--faction',default='Nra');parser.add_argument('--clip',required=True);parser.add_argument('--revision',type=int,choices=[1,2,3],default=2)
+parser=argparse.ArgumentParser();parser.add_argument('--root',type=Path,required=True);parser.add_argument('--faction',default='Nra');parser.add_argument('--clip',required=True);parser.add_argument('--revision',type=int,default=2)
 parser.add_argument('--capture-group',default='ReviewV2');parser.add_argument('--output-group');parser.add_argument('--grip-revision',type=int)
 args=parser.parse_args(sys.argv[sys.argv.index('--')+1:]);root=args.root;faction=args.faction;clip=args.clip;revision=args.revision;gripRevision=args.grip_revision or revision
+if revision<1:parser.error('--revision must be positive')
 runtime=root/'Models/_Cache'/args.capture_group;outputGroup=args.output_group or f'ReviewV{revision}';out=root/'Models'/outputGroup;blendOut=root/'Blender'/outputGroup;out.mkdir(parents=True,exist_ok=True);blendOut.mkdir(parents=True,exist_ok=True)
 archive=json.loads((root/'Data_ArchiveManifest.json').read_text(encoding='utf-8'))['records']
 preparation=root/next(r['path'] for r in archive if r['source'].replace('\\','/').endswith('InfantryActions_20260905/Scene_InfantryPreparation.blend'))
@@ -179,11 +180,34 @@ def Props(index,positions,rotations):
 action=bpy.data.actions.new('Animation_'+faction+'_'+clip+f'_V{revision}');action.use_fake_user=True;arm.animation_data_create();arm.animation_data.action=action
 rifle.animation_data_create();rifle.animation_data.action=bpy.data.actions.new(action.name+'_Rifle');rifle.animation_data.action.use_fake_user=True
 scene.render.fps=60;scene.frame_start=1;scene.frame_end=count+1;previous={};samples=[]
-for i in range(count+1):
- index=0 if loop and i==count else i;targets=Targets(index);drop=0
+def RequiredDrop(index):
+ targets=Targets(index);drop=0;kneeDropSum=0;kneeWeightSum=0
  for s in ['L','R']:
   hip=base[index]['positions'][s+' Thigh'];target=targets[s];a=(heads[N(s+' Calf')]-heads[N(s+' Thigh')]).length;b=(heads[N(s+' Foot')]-heads[N(s+' Calf')]).length;horizontal=(hip.x-target.x)**2+(hip.y-target.y)**2
   drop=max(drop,hip.z-target.z-math.sqrt(max(.01,(a+b-.004)**2-horizontal)))
+  if motion.get('preserveSupportKneeBend'):
+   source=motion['sourceRelativeJoints'][index]
+   thigh=Vector(source[mapping[s+' Calf']])-Vector(source[mapping[s+' Thigh']])
+   calf=Vector(source[mapping[s+' Foot']])-Vector(source[mapping[s+' Calf']])
+   cosine=max(-1,min(1,thigh.normalized().dot(calf.normalized())))
+   reachSquared=a*a+b*b+2*a*b*cosine
+   sourceDrop=hip.z-target.z-math.sqrt(max(.005,reachSquared-horizontal))
+   weight=weights[index,0 if s=='L' else 1]
+   kneeDropSum+=max(0,sourceDrop)*weight;kneeWeightSum+=weight
+ if motion.get('preserveSupportKneeBend'):drop=max(drop,kneeDropSum/max(1,kneeWeightSum))
+ return drop
+drops=np.array([RequiredDrop(i) for i in range(count+1)])
+if motion.get('preserveSupportKneeBend'):
+ # Blend competing contacts and smooth their transfer over a short time window.
+ offsets=np.arange(-10,11);kernel=np.exp(-.5*(offsets/4)**2);kernel/=kernel.sum()
+ if loop:
+  cycle=drops[:-1];smoothed=sum(weight*np.roll(cycle,int(offset)) for offset,weight in zip(offsets,kernel));drops=np.r_[smoothed,smoothed[0]]
+ else:drops=np.convolve(np.pad(drops,10,mode='edge'),kernel,mode='valid')
+for i in range(count+1):
+ index=0 if loop and i==count else i;targets=Targets(index);drop=float(drops[index])
+ if motion.get('preserveSupportKneeBend'):
+  # Stance feet keep their anchors; free feet follow the adjusted hip height.
+  for si,s in enumerate(['L','R']):targets[s].z-=drop*(1-weights[index,si])
  positions,rotations=Base(index,drop)
  if kind=='kneel':
   def Ease(t):t=max(0,min(1,t));return t*t*(3-2*t)

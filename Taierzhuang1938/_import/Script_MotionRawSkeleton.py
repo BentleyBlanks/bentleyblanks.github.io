@@ -8,7 +8,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--root',type=Path,required=True)
 parser.add_argument('--raw',type=Path,required=True,help='Raw joint JSON, relative to root')
 parser.add_argument('--name',required=True)
+parser.add_argument('--revision',type=int,default=1)
 args = parser.parse_args(sys.argv[sys.argv.index('--')+1:])
+if args.revision<1:parser.error('--revision must be positive')
 raw = json.loads((args.root/args.raw).read_text(encoding='utf-8'))
 data = np.load(args.root/raw['sourceCache'])
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -118,11 +120,12 @@ bpy.ops.object.select_all(action='SELECT')
 out=args.root/'Models/RecoveryPreview'
 blendOut=args.root/'Blender/RawRecovery'
 blendOut.mkdir(parents=True,exist_ok=True)
-glb=out/('Animation_'+args.name+'RawRecovery_V1.glb')
+glb=out/(f'Animation_{args.name}RawRecovery_V{args.revision}.glb')
 bpy.ops.export_scene.gltf(filepath=str(glb),export_format='GLB',use_selection=True,
     export_animations=True,export_animation_mode='ACTIVE_ACTIONS',export_nla_strips_merged_animation_name=action.name,
     export_frame_range=True,export_force_sampling=True,export_anim_slide_to_zero=True,export_skins=True,export_yup=True,export_extras=True)
-blend=blendOut/('Scene_'+args.name+'RawRecovery_V1.blend')
+blend=blendOut/(f'Scene_{args.name}RawRecovery_V{args.revision}.blend')
 bpy.ops.wm.save_as_mainfile(filepath=str(blend),compress=True)
-(out/('Data_'+args.name+'RawRigValidation.json')).write_text(json.dumps({'frames':scene.frame_end,'maxJointPositionErrorMeters':maxError,'sourceCacheSha256':raw['sourceCacheSha256'],'glb':glb.relative_to(args.root).as_posix(),'blend':blend.relative_to(args.root).as_posix()},indent=2),encoding='utf-8')
+reportName=f'Data_{args.name}RawRigValidation.json' if args.revision==1 else f'Data_V{args.revision}_{args.name}RawRigValidation.json'
+(out/reportName).write_text(json.dumps({'frames':scene.frame_end,'maxJointPositionErrorMeters':maxError,'sourceCacheSha256':raw['sourceCacheSha256'],'glb':glb.relative_to(args.root).as_posix(),'blend':blend.relative_to(args.root).as_posix()},indent=2),encoding='utf-8')
 print('Raw rig verified',maxError,flush=True)

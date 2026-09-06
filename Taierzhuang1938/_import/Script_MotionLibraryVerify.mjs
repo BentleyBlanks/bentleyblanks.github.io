@@ -32,7 +32,7 @@ async function Snapshot(phase){
 function Delta(a,b){assert.equal(a.length,b.length);return Math.max(0,...a.map((v,i)=>Math.abs(v-b[i])))}
 function CheckSync(s,v){
  assert.ok(s.matrices.every(Number.isFinite),v.id+' finite matrices');assert.ok(Math.abs(s.modelTime-s.phase*s.duration)<.00001,'Model time');
- if(v.id.startsWith('Ija-v3-')||(v.faction==='Ija'&&v.path.includes('/NextTenV1/')))assert.equal(s.nearStockParts.length,2,'Complete Type 38 stock and receiver exported');
+ if(v.faction==='Ija'&&(Number(v.id.match(/-v(\d+)-/)?.[1]||0)>=3||v.path.includes('/NextTenV1/')))assert.equal(s.nearStockParts.length,2,'Complete Type 38 stock and receiver exported');
  if(!v.review?.sourceVideo)return;
  assert.ok(s.videoWidth>0&&s.sourceHidden,'Original video decoded and visible');assert.ok(Math.abs(s.time-s.videoTime)<.002,'Video time');
  assert.equal(s.videoSource,new URL('../'+v.review.sourceVideo,url).href);assert.equal(s.rawTracks,v.review.recoveryTracks.length);assert.ok(s.rawError<1e-10,'Raw viewing transform');
@@ -60,10 +60,12 @@ try{
  }
  await Select('RifleCrouchAdvance');await page.locator('#history > summary').click();await page.locator('[data-variant="Nra-v1-RifleCrouchAdvance"]').click();await Ready('Nra-v1-RifleCrouchAdvance');
  const history=await Snapshot(.4);assert.deepEqual(history.range,[.3,3.8]);controls.history={id:history.id,range:history.range,time:history.videoTime};
- await page.locator('#latest').click();await LatestReady('RifleCrouchAdvance');const latest=await Snapshot(.4);assert.deepEqual(latest.range,[1,4.3]);
+ await page.locator('#latest').click();await LatestReady('RifleCrouchAdvance');const latest=await Snapshot(.4);
+ const crouchEntry=actions.find(e=>e.id==='RifleCrouchAdvance'),crouchLatest=crouchEntry.variants.find(v=>v.id===crouchEntry.latestByFaction.Nra);
+ assert.deepEqual(latest.range,crouchLatest.review.sourceRangeSeconds);
  await page.locator('#next').click();const step=await Snapshot(await page.evaluate(()=>MotionReview.phase));assert.ok(Math.abs(step.videoTime-latest.videoTime-1/30)<.002);
  await page.locator('#prev').click();assert.ok(Math.abs((await Snapshot(await page.evaluate(()=>MotionReview.phase))).videoTime-latest.videoTime)<.002);controls.frameStep=true;
- await page.locator('#timeline').fill('0.25');assert.ok(Math.abs((await Snapshot(await page.evaluate(()=>MotionReview.phase))).videoTime-1.825)<.002);controls.scrub=true;
+ await page.locator('#timeline').fill('0.25');assert.ok(Math.abs((await Snapshot(await page.evaluate(()=>MotionReview.phase))).videoTime-(latest.range[0]+.25*(latest.range[1]-latest.range[0])))<.002);controls.scrub=true;
  await page.locator('#skeleton').check();await page.locator('[data-view="side"]').click();await page.evaluate(()=>new Promise(requestAnimationFrame));
  controls.view=await page.evaluate(()=>({skeleton:MotionReview.model.skeleton.visible,camera:MotionReview.model.camera.position.toArray()}));assert.ok(controls.view.skeleton&&controls.view.camera[0]<-1);
  await Snapshot(.2);await page.locator('#speed').selectOption('0.5');await page.locator('#play').click();await page.waitForFunction(()=>!MotionReview.video.paused&&MotionReview.video.playbackRate===.5);
