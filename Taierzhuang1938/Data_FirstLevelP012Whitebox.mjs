@@ -130,9 +130,10 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
   // 进出仍走沙盒那条整表替换的路（重载进 ?whitebox=p012），但 2026-09-06 起它就是
   // 玩家看到的「第一关」：选章「正式章节」组第一条、主菜单「开始」的落点
   //（序章并入其中，旧第一关到终章的入口已撤，见 Data_Menu.CAMPAIGN_ENTRIES）。
-  // chapter 让菜单把它当章节排（任务图按 artId 取第一章那张）；label 只写关号。
+  // chapter 让菜单把它当章节排（任务图按 artId 取第一章那张）；label 沿用第一章原名
+  //（「第一关 · 往南的路」：关卡名字保持原来的，不只写第几关）。
   sandbox: true, sandboxKey: "firstLevelP012Whitebox", chapter: true, artId: FIRST_CHAPTER.id,
-  date: "一九三八年三月十四日", label: "第一关",
+  date: "一九三八年三月十四日", label: FIRST_CHAPTER.title,
   place: "铁路兵站", sky: "testSceneDay", ambience: "smokyDay", music: null, minutes: 26,
   brief: Object.freeze(["跟随罗班长下车，领取枪弹后随队出发。",
     "灰：地面；黄：跨过；橙：翻越；紫：攀爬；蓝：掩体；黑：边界；红：危险；绿：任务路；青：担架路。"]),

@@ -729,7 +729,7 @@ async function CheckMissionList() {
     const rects = rows.map(el => { const r = el.getBoundingClientRect(); return { x:r.x, y:r.y, w:r.width, h:r.height }; });
     return {
       levels: document.querySelectorAll("#menu .mnLevel").length,
-      retired: [...document.querySelectorAll("#menu .mnLevel")].some(el => /全新策划白盒|P0\/P1\/P2|出川|序章|往南的路|手榴弹雨/.test(el.textContent)),
+      retired: [...document.querySelectorAll("#menu .mnLevel")].some(el => /全新策划白盒|P0\/P1\/P2|出川|序章/.test(el.textContent)),
       groups: [...document.querySelectorAll(".mnLevelGroup b")].map(el=>el.textContent),
       shelved: !!document.querySelector(".mnDeprecatedTrack, .mnDeprecatedLevel"),
       names: rows.map(el=>el.querySelector(".mnLvName").textContent), rects,
@@ -746,10 +746,12 @@ async function CheckMissionList() {
   Check("只剩正式章节与五项测试入口两组，没有「暂时废弃场景」组", panel.levels===11 && !panel.shelved
     && panel.groups.join(",")==="正式章节,测试场景", panel.groups.join(","));
   Check("旧序章、旧第一关到终章与旧白盒的入口一条都不列", !panel.retired, JSON.stringify(panel.names));
-  Check("第一条是「第一关」（P0/P1/P2 白盒改名），后面五条只列关号、标「未完成」",
-    panel.names.join(",")==="第一关,第二关,第三关,第四关,第五关,终章"
+  // 关卡名字保持原来的（用户口径）：左栏关号 + 章节原名，第一关沿用第一章的「往南的路」。
+  Check("第一条是「第一关 · 往南的路」（P0/P1/P2 白盒改名），后面五条照原名列、标「未完成」",
+    panel.numbers.join(",")==="第一关,第二关,第三关,第四关,第五关,终章"
+      && panel.names.join(",")==="往南的路,手榴弹雨,救护所,东关之夜,城墙没有了,最后一封"
       && panel.placeholders.join(",")==="false,true,true,true,true,true"
-      && panel.marks.slice(1).every(t=>t==="未完成") && panel.numbers.every(n=>n===null),
+      && panel.marks.slice(1).every(t=>t==="未完成"),
     JSON.stringify({names:panel.names,marks:panel.marks,placeholders:panel.placeholders,numbers:panel.numbers}));
   Check("任务选择不再出现地图、横向时间轴或缩略图卡",!panel.oldMap);
   const images=[];
@@ -777,16 +779,17 @@ async function CheckMissionList() {
   const placeholderBrief=await page.evaluate(()=>{
     window.Taierzhuang.menu.SelectLevel(1);
     return {objective:document.querySelector('.mnMissionObjective').textContent,record:document.querySelector('.mnMissionRecord b').textContent,
-      when:!!document.querySelector('.mnMissionWhen')};
+      title:document.querySelector('.mnBriefTitle').textContent,when:document.querySelector('.mnMissionWhen')?.textContent||''};
   });
-  Check("占位章节的简报写「未完成 · 敬请期待」，不写旧稿的日期地点",
-    placeholderBrief.objective.includes('敬请期待')&&placeholderBrief.record.includes('敬请期待')&&!placeholderBrief.when,JSON.stringify(placeholderBrief));
+  Check("占位章节的简报按原名写（手榴弹雨 + 日期地点），目标行与记录写「未完成 · 敬请期待」",
+    placeholderBrief.title==='手榴弹雨'&&/三月十六日/.test(placeholderBrief.when)
+      &&placeholderBrief.objective.includes('敬请期待')&&placeholderBrief.record.includes('敬请期待'),JSON.stringify(placeholderBrief));
   await page.mouse.move(2,2);
   await page.evaluate(()=>window.Taierzhuang.menu.SelectLevel(1));
   await page.screenshot({path:path.join(outDir,"Scene_MissionListDesktop.png")});
   await page.keyboard.press('ArrowDown');
   Check("上下键同步选中项、焦点和简报",await page.evaluate(()=>window.Taierzhuang.menu.selected===2
-    &&document.activeElement===document.querySelector('.mnLevel.on')&&document.querySelector('.mnBriefTitle').textContent==='第三关'));
+    &&document.activeElement===document.querySelector('.mnLevel.on')&&document.querySelector('.mnBriefTitle').textContent==='救护所'));
   // 占位章节点了不进任何场景：菜单还开着、玩法没起来，简报上亮一句「敬请期待」。
   await page.locator('.mnMissionTrack .mnLevel').nth(2).click();
   await page.evaluate(()=>window.Taierzhuang.StepFrames(10));

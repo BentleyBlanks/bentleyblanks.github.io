@@ -238,7 +238,8 @@ export const JIEHE_SANDBOX_PHASE = Object.freeze({
 //   · 第二关到终章只是**占位**（placeholder）：只列关号、标「未完成」，
 //     点了只在简报上提示「敬请期待」，不进任何场景。
 // 占位条目按 PHASES 里带 deprecated 标的那几章生成（去掉第一关：它被白盒顶替了），
-// 章数与关号跟着章节表走，不在这里再抄一份。旧副题、日期、地点随旧稿一起不上屏。
+// 章数、关号、关名与日期地点都跟着章节表走，不在这里再抄一份（关卡名字保持原来的：
+// 「第二关 · 手榴弹雨」照样列，只是点不进去）。
 // ---------------------------------------------------------------------------
 export const CAMPAIGN_ENTRIES = Object.freeze([
   FIRST_LEVEL_P012_WHITEBOX_PHASE,
@@ -246,8 +247,8 @@ export const CAMPAIGN_ENTRIES = Object.freeze([
     .filter((phase) => phase.deprecated && phase.id !== FIRST_LEVEL_P012_WHITEBOX_PHASE.contentId)
     .map((phase) => Object.freeze({
       id: phase.id, chapter: true, placeholder: true,
-      // 内容原稿（Script_Menu 显示时按 id 过 Localize，再只取「·」前面的关号）。
-      label: phase.label,
+      // 内容原稿（Script_Menu 显示时按 id 过 Localize；关号与关名从 label 的「·」两侧取）。
+      label: phase.label, date: phase.date, place: phase.place,
     })),
 ]);
 

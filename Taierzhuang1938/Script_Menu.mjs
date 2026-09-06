@@ -277,7 +277,7 @@ export class MainMenu {
     const progress = Progress.Read();
     const resume = progress.furthest > 0 && progress.furthest < this.officialCount;
     const label = resume
-      ? T("menu.item.resume", { label: ChapterNumber(PhaseText(this.campaign[progress.furthest], "label")) })
+      ? T("menu.item.resume", { label: PhaseText(this.campaign[progress.furthest], "label") })
       : Localize(MenuTextId("start"), MENU.start);
     return [
       { id: "start", label,
@@ -391,14 +391,16 @@ export class MainMenu {
       b.dataset.i = String(i);
       const label = PhaseText(entry, "label");
       const chapter = IsChapter(entry);
-      b.setAttribute("aria-label", chapter ? ChapterNumber(label) : label);
+      b.setAttribute("aria-label", label);
       if (chapter) {
-        // 章节行只写关号（「第一关」「终章」），关号占满名字栏；旧副题不上屏。
+        // 章节行 = 左栏关号（「第一关」「终章」）+ 关名（「往南的路」「手榴弹雨」…）：
+        // 关名照章节原名，占位章节也一样（用户口径：关卡名字保持原来的，不只写第几关）。
         // 占位行**不标 aria-disabled**：它点了有反应（简报上亮「敬请期待」），不是禁用控件；
         // playwright 也把 aria-disabled 当「不可点」，MenuTest 会在这儿卡死。
         b.classList.add("mnChapterLevel");
         if (entry.placeholder) b.classList.add("mnPlaceholderLevel");
-        Make("mnLvName", b, "span", ChapterNumber(label));
+        Make("mnLvNo", b, "span", ChapterNumber(label));
+        Make("mnLvName", b, "span", MissionName(label));
       } else {
         b.classList.add("mnSandboxLevel");
         Make("mnLvNo", b, "span",
@@ -696,7 +698,7 @@ export class MainMenu {
 
     const phase = this.entries[this.selected];
     const chapter = IsChapter(phase);
-    const title = chapter ? ChapterNumber(PhaseText(phase, "label")) : MissionName(PhaseText(phase, "label"));
+    const title = MissionName(PhaseText(phase, "label"));
     const brief = this.el.brief;
     brief.textContent = "";
     const mk = (cls, tag = "div") => {
