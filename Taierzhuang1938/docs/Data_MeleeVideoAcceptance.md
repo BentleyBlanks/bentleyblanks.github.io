@@ -27,7 +27,7 @@
 - 双手共同约束刚性刀柄／枪身，使用原握持 IK 与手腕限制。大刀食指不再使用枪械扳机预备姿势，并补拇指对握。袖口裁边、延伸和细分消除抬臂时的破面，7,050 个手部顶点逐值保持不变。
 - 成功拨挡提前交还输入时，视频时间不再突然跳到收招后段；剩余拨开动作继续播放，任何新攻击可立即中断。
 
-## 本地资产与复现
+## V1 本地资产与复现（历史）
 
 统一资产库：`C:/Users/Bentl/OneDrive/Sync/饮河/FPS/视频转骨骼`。
 
@@ -39,7 +39,7 @@
 
 复现顺序：`Script_MeleeVideoPropTrack.py` → `Script_MeleeVideoPrepare.py` → `Script_MotionBatchPrepare.py --group MeleeVideoV1 --ids <动作>` → Blender 后台 `Script_MeleeVideoBatchBake.py` → `Script_MotionBatchRegister.py --group MeleeVideoV1`。Python 工具传 `--root <资产库>`。第一人称先 `Script_MeleeAnimationTest.mjs --bakefp`，再通过 BlenderMCP 后台运行 `Script_MeleeVideoSourcePackage.py`。修袖口入口 `Script_MeleeSleeveRepair.py --input <资产库>/Models/SourceCharacters/Model_FpsArmsBeforeMeleeSleeve.glb`。
 
-## 验收证据
+## V1 验收证据（历史）
 
 - 白刃规则增加“成功拨挡视频时间单调且可立即接攻击”的回归；共 41 项。
 - 全部 108 段全身与 54 段第一人称动作逐帧验收，握点限值 6 mm、腕关节限值 65° 保持不变；新突刺还检查接触时枪口确实朝向对手。
@@ -87,3 +87,5 @@ V2 按原始恢复的解剖关系转移全身段方向，保留原角色的骨�
 - 同原片时间的两军全身三栏对照，以及斜侧、侧面、背侧手部近景已查看。交叉斩需从背侧查看被双袖遮住的握持，不能把单侧遮挡当成缺失手部。
 
 详细逐帧报告和截图仅留资产库 `Preview/MeleeFidelityV2`；报告为 `Data_FidelityValidation.json`、`Data_RuntimeFidelity.json`。本轮只证明对原恢复表演的保真及运行时一致性，不把单目恢复本身、手指补姿或玩家主观动作评价宣称为绝对准确。
+
+发布前选中 68 项 prepush，68 通过、0 历史基线、0 失败；最终数据冻结后的模块、全动作、人物姿态、白刃规则、QTE 与部署打包六项专项全部通过。测试未放宽既有握持、腕关节、场景或开机预算。
