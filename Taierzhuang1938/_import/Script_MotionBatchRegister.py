@@ -19,6 +19,7 @@ for name,cfg in recipes.items():
     motion=json.loads((root/'Models/_Cache'/args.group/f'Data_{name}Motion.json').read_text(encoding='utf-8'))
     entry={'id':name,'label':cfg['label'],'loop':cfg['loop'],'description':'单人斜俯视原片 · 本机恢复 · 两军原骨架重定向',
         'cameraDistance':cfg.get('cameraDistance',4.5),'variants':[]}
+    if cfg.get('preserveRecoveredPose'):entry['description']='保留原恢复的肢体运动 · 原角色骨长 · 武器适配手腕'
     if cfg.get('cameraCenter'):entry['cameraCenter']=cfg['cameraCenter']
     for faction,reportPath in zip(['Nra','Ija'],reports):
         report=json.loads(reportPath.read_text(encoding='utf-8'))
@@ -31,13 +32,17 @@ for name,cfg in recipes.items():
             'defaultCameraYawRadians':cfg.get('defaultCameraYawRadians',.7853981633974483),'cameraElevationRadians':cfg.get('cameraElevationRadians',.65),
             'sideCameraYawRadians':-1.5707963267948966}
         rawName=sourceName if cfg.get('kind')=='melee' else name
-        for key,path in [('recoveryBlend',f'Blender/RawRecovery/Scene_{rawName}RawRecovery_V{revision}.blend'),('recoveryGlb',f'Models/RecoveryPreview/Animation_{rawName}RawRecovery_V{revision}.glb')]:
+        rawRevision=1 if cfg.get('preserveRecoveredPose') else revision
+        for key,path in [('recoveryBlend',f'Blender/RawRecovery/Scene_{rawName}RawRecovery_V{rawRevision}.blend'),('recoveryGlb',f'Models/RecoveryPreview/Animation_{rawName}RawRecovery_V{rawRevision}.glb')]:
             if (root/path).exists():review[key]=path
-        if cfg.get('kind')=='melee':review['firstPersonBlend']='Blender/MeleeVideoV1/Scene_MeleeVideoFirstPerson.blend'
+        firstPerson=f'Blender/{args.group}/Scene_MeleeVideoFirstPerson.blend'
+        if cfg.get('kind')=='melee' and (root/firstPerson).exists():review['firstPersonBlend']=firstPerson
         if cfg.get('sourceAssessment'):review['sourceAssessment']=cfg['sourceAssessment']
+        if cfg.get('preserveRecoveredPose'):review['sourceAssessment']='复用原始视频恢复；保留身体与手腕运动，适配原角色比例。手指握法为重定向补充。'
         ratio=report['retargetScale']
         travel=motion['sourceTravelMeters']
-        entry['variants'].append({'id':f'{faction}-v{revision}-{name}','faction':faction,'label':f'V{revision} · 本机恢复与重定向','revisionOrder':revision,
+        label=f'V{revision} · 保真重定向' if cfg.get('preserveRecoveredPose') else f'V{revision} · 本机恢复与重定向'
+        entry['variants'].append({'id':f'{faction}-v{revision}-{name}','faction':faction,'label':label,'revisionOrder':revision,
             'status':'待审阅','path':v['path'],'clip':v['clip'],'blend':v['blend'],'review':review,
             'travelMeters':cfg.get('travelMeters',[travel[0]*ratio,0,-travel[1]*ratio]) if cfg['loop'] else None})
     actions.append(entry)

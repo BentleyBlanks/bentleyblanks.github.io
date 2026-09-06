@@ -33,6 +33,17 @@ for(const weapon of ['Dadao','Bayonet']) for(const action of ['Light','LightAlt'
   for(const row of clip.frames){assert.equal(row.length,19);assert(row.every(Number.isFinite));}
   for(const library of [nra,ija])assert.match(library.clips[weapon+action].source,/GVHMR video/);
 }
+for(const library of [nra,ija])for(const [name,clip] of Object.entries(library.clips)){
+  if(!clip.preserveRecoveredPose)continue;
+  const meta=(clip.aliasOf?library.clips[clip.aliasOf]:clip).recoveredPose;
+  assert(meta,`${name}: recovered pose missing`);
+  assert.equal(meta.space,'parent-relative');assert.equal(meta.encoding,'float32le/base64');
+  assert.equal(meta.parts.length,52);assert.equal(meta.parents.length,52);
+  assert.equal(meta.stride,371);assert.equal(meta.sampleFps,60);
+  assert(meta.parents.every((parent,i)=>parent>=-1&&parent<i),'Tracks must compose in parent order');
+  const packed=Buffer.from(meta.frames,'base64');assert.equal(packed.length,meta.frameCount*meta.stride*4);
+  for(let offset=0;offset<packed.length;offset+=4)assert(Number.isFinite(packed.readFloatLE(offset)),`${name}: invalid packed value`);
+}
 const server=await ServeRoot(path.resolve(project,'..'),0);
 const browser=await LaunchBrowser();
 const page=await browser.newPage({viewport:{width:1440,height:900}});
@@ -80,6 +91,13 @@ try {
           T.camera.updateWorldMatrix(true,true);rig.root.updateWorldMatrix(true,true);
           const actor=T.ai.soldiers[0].actor;
           if(actor.characterRig.meleeAnimation.bones.length!==50)throw new Error('Unmatched third person bones');
+          const body=actor.characterRig.meleeAnimation;
+          if(body.propWeight===1){
+            actor.weaponGroup.updateWorldMatrix(true,false);body.prop.updateWorldMatrix(true,false);
+            const distance=actor.weaponGroup.getWorldPosition(new THREE.Vector3()).distanceTo(body.prop.getWorldPosition(new THREE.Vector3()));
+            const angle=actor.weaponGroup.getWorldQuaternion(new THREE.Quaternion()).normalize().angleTo(body.prop.getWorldQuaternion(new THREE.Quaternion()).normalize());
+            if(distance>.00001||angle>.00001)throw new Error(`${weapon}${action}: Actor overwrites recovered prop transform (${distance}m, ${angle}rad)`);
+          }
           if(weapon==='Bayonet'&&['Light','Heavy'].includes(action)&&i===12){
             const origin=actor.weaponGroup.getWorldPosition(new THREE.Vector3());
             const barrel=actor.weaponGroup.localToWorld(actor.weaponMuzzle.clone()).sub(origin).normalize();

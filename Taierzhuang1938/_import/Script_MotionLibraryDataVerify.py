@@ -24,6 +24,12 @@ for path in sorted((root/'Models/RecoveryPreview').glob('Data_*RawJoints.json'))
         assert float(raw['fps'])==float(data['fps']),path
     rawReports.append({'path':path.relative_to(root).as_posix(),'frames':len(raw['positions']),'exactRawArrayMatch':True})
 catalog=json.loads((root/'Preview/Data_Catalog.json').read_text(encoding='utf-8'))
+for path in sorted((root/'Models/RecoveryPreview').glob('Data_*RawWristRotations.json')):
+    raw=json.loads(path.read_text(encoding='utf-8'));cache=root/raw['sourceCache']
+    assert hashlib.sha256(cache.read_bytes()).hexdigest()==raw['sourceCacheSha256'],path
+    with np.load(cache) as data:
+        assert np.array_equal(np.array(raw['worldRotations']),data['worldGlobalRotations'][:,raw['joints']]),path
+        assert float(raw['fps'])==float(data['fps']),path
 references=set()
 for entry in catalog['actions']:
     for variant in entry['variants']:

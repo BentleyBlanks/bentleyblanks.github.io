@@ -1599,6 +1599,9 @@ export class Actor {
     if (rig.infantryPropWeight > 0 && this.weaponGroup) {
       this._ApplyInfantryProp(this.weaponGroup, rig.infantryProps.rifle, rig.infantryPropWeight);
     }
+    if (rig.meleeAnimation?.propWeight > 0 && this.weaponGroup) {
+      this._ApplyInfantryProp(this.weaponGroup, rig.meleeAnimation.prop, rig.meleeAnimation.propWeight);
+    }
     const throwing = rig.currentId === "GrenadeThrow";
     if (throwing) {
       this.EnsureGrenade();

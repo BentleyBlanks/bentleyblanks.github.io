@@ -78,3 +78,40 @@ def Props(index,positions,rotations):
  errors=[Hand('R',matrix@rightGrip,direction,normal,positions,rotations)]
  errors.append(Hand('L',matrix@leftGrip,leftDirection,leftNormal,positions,rotations))
  return max(errors)
+
+if motion.get('preserveRecoveredPose'):
+ wristCalibrations={}
+ def Props(index,positions,rotations):
+  if not wristCalibrations:
+   for side in ['L','R']:
+    # Calibrate the anatomical wrist-to-knuckle axis from the entire take.
+    # This fixed basis preserves all recovered wrist rotations while avoiding
+    # a prop-derived contact pose that folds the hand back inside the cuff.
+    sourceDirections=[]
+    for sample in base:
+     source=(sample['rotations'][side+' Hand']@rest[N(side+' Hand')]).to_quaternion()
+     extension=(sample['positions'][side+' Hand']-sample['positions'][side+' Forearm']).normalized()
+     sourceDirections.append(source.inverted()@extension)
+    targetDirection=sum(sourceDirections,Vector()).normalized()
+    nativeDirection=rest[N(side+' Hand')].to_3x3().inverted()@(heads[N(side+' Finger2')]-heads[N(side+' Hand')]).normalized()
+    wristCalibrations[side]=nativeDirection.rotation_difference(targetDirection)
+  palms={}
+  for side in ['L','R']:
+   # One constant bind-axis calibration; source wrist rotation is never
+   # replaced by the prop's orientation on subsequent frames.
+   source=(rotations[side+' Hand']@rest[N(side+' Hand')]).to_quaternion()
+   target=source@wristCalibrations[side];delta=(target@rest[N(side+' Hand')].to_quaternion().inverted()).to_matrix().to_4x4()
+   Put(side+' Hand',positions[side+' Hand'],delta)
+   palm=rest[N(side+' Hand')].to_3x3().col[0].normalized()*(.065*scale)+rest[N(side+' Hand')].to_3x3().col[1].normalized()*(.015*scale)
+   palms[side]=positions[side+' Hand']+delta.to_3x3()@palm
+  span=palms['L']-palms['R'];grip=leftGrip.copy();localSpan=grip-rightGrip
+  remaining=span.length_squared-localSpan.x*localSpan.x-localSpan.y*localSpan.y
+  if remaining<0:raise RuntimeError(f'{clip} palm contact separation is incompatible with prop width')
+  grip.z=rightGrip.z+(-1 if weapon=='Bayonet' else 1)*math.sqrt(remaining);localSpan=grip-rightGrip
+  if weapon=='Bayonet':reference=Matrix(motion['propRotations'][index])
+  else:
+   forward=(positions['R Hand']-positions['L Hand']).normalized();up=(positions['Neck']-positions['Pelvis']).normalized()
+   z=-forward;x=up.cross(z).normalized();y=z.cross(x).normalized();reference=Matrix((x,y,z)).transposed()
+  rotation=(reference@localSpan).rotation_difference(span).to_matrix()@reference
+  matrix=rotation.to_4x4();matrix.translation=palms['R']-rotation@rightGrip;SetRifle(matrix)
+  return max((matrix@rightGrip-palms['R']).length,(matrix@grip-palms['L']).length)

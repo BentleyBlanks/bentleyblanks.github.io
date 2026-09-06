@@ -2,7 +2,7 @@
 from pathlib import Path
 import sys,argparse,json,math
 import bpy,numpy as np
-from mathutils import Matrix,Vector
+from mathutils import Matrix,Vector,Quaternion
 parser=argparse.ArgumentParser();parser.add_argument('--root',type=Path,required=True);parser.add_argument('--faction',default='Nra');parser.add_argument('--clip',required=True);parser.add_argument('--revision',type=int,default=2)
 parser.add_argument('--capture-group',default='ReviewV2');parser.add_argument('--output-group');parser.add_argument('--grip-revision',type=int)
 args=parser.parse_args(sys.argv[sys.argv.index('--')+1:]);root=args.root;faction=args.faction;clip=args.clip;revision=args.revision;gripRevision=args.grip_revision or revision
@@ -38,6 +38,19 @@ prefix='Bip002 ' if faction=='Nra' else 'Bip001 ';N=lambda p:prefix+p
 motion=json.loads((runtime/f'Data_{clip}Motion.json').read_text(encoding='utf-8'));count=motion['cycleFrames'];kind=motion['kind'];loop=motion['loop']
 mapping={'Pelvis':0,'Spine':3,'Spine1':6,'Spine2':9,'Neck':12,'Head':15,'L Thigh':1,'R Thigh':2,'L Calf':4,'R Calf':5,'L Foot':7,'R Foot':8,'L Toe0':10,'R Toe0':11,'L Clavicle':13,'R Clavicle':14,'L UpperArm':16,'R UpperArm':17,'L Forearm':18,'R Forearm':19,'L Hand':20,'R Hand':21}
 rest={b.name:(arm.matrix_world@b.matrix_local).copy() for b in arm.data.bones};heads={n:m.translation.copy() for n,m in rest.items()};inverse=arm.matrix_world.inverted()
+fingerAnatomy={}
+for side in ['L','R']:
+ forward=(heads[N(side+' Finger2')]-heads[N(side+' Hand')]).normalized()
+ across=heads[N(side+' Finger1')]-heads[N(side+' Finger4')]
+ if side=='L':across.negate()
+ dorsal=forward.cross(across).normalized()
+ for b in arm.data.bones:
+  if not b.name.startswith(N(side+' Finger')):continue
+  child=next(iter(b.children),None)
+  direction=(heads[child.name]-heads[b.name] if child else heads[b.name]-heads[b.parent.name]).normalized()
+  axis=rest[b.name].to_3x3().inverted()@direction.cross(-dorsal).normalized()
+  thumbTarget=rest[b.name].to_3x3().inverted()@(forward-dorsal*.7).normalized()
+  fingerAnatomy[b.name]={'axis':axis,'thumbDirection':rest[b.name].to_3x3().inverted()@direction,'thumbTarget':thumbTarget}
 leg=(heads[N('L Calf')]-heads[N('L Thigh')]).length+(heads[N('L Foot')]-heads[N('L Calf')]).length;ratio=leg/motion['sourceLegLength'];scale=heads[N('Pelvis')].z/.942464
 alignment={}
 for side in ['L','R']:
@@ -68,6 +81,14 @@ def Put(part,point,delta):
  bone.matrix_basis=bone.bone.convert_local_to_pose(desired[bone.name],bone.bone.matrix_local,parent_matrix=parentMatrix,parent_matrix_local=parent.bone.matrix_local if parent else Matrix.Identity(4),invert=True)
 def Base(index,drop=0):
  desired.clear();rotations={p:Matrix(motion['rotations'][index][j]).to_4x4()@alignment.get(p,Matrix.Identity(4)) for p,j in mapping.items()}
+ if motion.get('preserveRecoveredPose'):
+  children={'Pelvis':'Spine','Spine':'Spine1','Spine1':'Spine2','Spine2':'Neck','Neck':'Head'}
+  for side in ['L','R']:
+   children.update({side+' '+p:side+' '+c for p,c in [('Clavicle','UpperArm'),('UpperArm','Forearm'),('Forearm','Hand'),('Thigh','Calf'),('Calf','Foot'),('Foot','Toe0')]})
+  for part,child in children.items():
+   expected=Vector(motion['sourceRelativeJoints'][index][mapping[child]])-Vector(motion['sourceRelativeJoints'][index][mapping[part]])
+   current=rotations[part].to_3x3()@(heads[N(child)]-heads[N(part)])
+   rotations[part]=current.rotation_difference(expected).to_matrix().to_4x4()@rotations[part]
  positions={};pelvis=Vector(motion['rootOffsets'][index])*ratio;pelvis.z+=.032*scale-drop
  for bone in arm.pose.bones:
   if bone.name not in [N(p) for p in mapping]:continue
@@ -75,7 +96,14 @@ def Base(index,drop=0):
   if part=='Pelvis':point=pelvis
   elif 'Thigh' in part:point=pelvis+rotations['Pelvis'].to_3x3()@(heads[N(part)]-heads[N('Pelvis')])
   else:point=positions[parent]+rotations[parent].to_3x3()@(heads[N(part)]-heads[N(parent)])
-  if kind=='melee' and parent in mapping:
+  if motion.get('preserveRecoveredPose') and part!='Pelvis':
+   # BIP thighs may parent to the root, and its clavicles to the neck. Use
+   # the recovered anatomical graph for correspondence, not BIP's controls.
+   sourceParent=next(p for p,j in mapping.items() if j==motion['sourceParents'][mapping[part]])
+   source=motion['sourceRelativeJoints'][index]
+   direction=Vector(source[mapping[part]])-Vector(source[mapping[sourceParent]])
+   point=positions[sourceParent]+direction.normalized()*(heads[N(part)]-heads[N(sourceParent)]).length
+  elif kind=='melee' and parent in mapping:
    # SMPL collar/spine bind axes differ from the original BIP character.
    # Transfer observed segment directions with original segment lengths;
    # rotating BIP's collar offset with the SMPL matrix lifts shoulders above neck.
@@ -85,7 +113,12 @@ def Base(index,drop=0):
   positions[part]=point;Put(part,point,rotations[part])
  for b in arm.pose.bones:
   if 'Finger' in b.name:
-   if b.name in fingerReference and kind in ['rifle','kneel'] and (' L ' in b.name or 'Finger0' in b.name):
+   if motion.get('preserveRecoveredPose') and motion['weapon']=='Dadao':
+    digit=b.name.rsplit('Finger',1)[1];joint=0 if len(digit)==1 else int(digit[-1]);anatomy=fingerAnatomy[b.name]
+    if digit=='0':b.rotation_quaternion=anatomy['thumbDirection'].rotation_difference(anatomy['thumbTarget'])
+    else:b.rotation_quaternion=Quaternion(anatomy['axis'],math.radians(28 if digit.startswith('0') else [56,74,46][joint]))
+    continue
+   if b.name in fingerReference and (kind in ['rifle','kneel'] or motion.get('preserveRecoveredPose')) and (' L ' in b.name or 'Finger0' in b.name):
     b.rotation_quaternion=fingerReference[b.name];continue
    side='L' if ' L ' in b.name else 'R';direction=rest[b.name].to_3x3().col[0].normalized();normal=rest[N(side+' Hand')].to_3x3().col[1].normalized();axis=rest[b.name].to_3x3().inverted()@direction.cross(normal)
    digit=b.name.rsplit('Finger',1)[1];joint=0 if len(digit)==1 else int(digit[-1]);angle=([.55,.6,.45][joint] if digit.startswith('0') else [1.05,.95,.6][joint]) if kind!='limp' else .25
@@ -220,7 +253,7 @@ def RequiredDrop(index):
    kneeDropSum+=max(0,sourceDrop)*weight;kneeWeightSum+=weight
  if motion.get('preserveSupportKneeBend'):drop=max(drop,kneeDropSum/max(1,kneeWeightSum))
  return drop
-drops=np.array([RequiredDrop(i) for i in range(count+1)])
+drops=np.zeros(count+1) if motion.get('preserveRecoveredPose') else np.array([RequiredDrop(i) for i in range(count+1)])
 if motion.get('preserveSupportKneeBend'):
  # Blend competing contacts and smooth their transfer over a short time window.
  offsets=np.arange(-10,11);kernel=np.exp(-.5*(offsets/4)**2);kernel/=kernel.sum()
@@ -245,26 +278,27 @@ for i in range(count+1):
     if iteration==0:desiredKnee=height*(1-kneeWeight)+.006*kneeWeight
     drop+=max(-.03,min(.045,(height-desiredKnee)*.9))
    positions,rotations=Base(index,drop)
- for side in ['L','R']:
-  ankle,_=Solve(side+' Thigh',side+' Calf',side+' Foot',positions[side+' Thigh'],targets[side],positions[side+' Calf']-positions[side+' Thigh'],rotations);Foot(side,ankle,rotations)
- points=MeshPoints()
- # One geometric sole pass compensates original skin thickness after the IK solve.
- for si,side in enumerate(['L','R']):
-  sole=min(v.z for v in points[side]);correction=max(0,.004-sole)+min(0,.004-sole)*weights[index,si]
-  target=targets[side]+Vector((0,0,correction));ankle,_=Solve(side+' Thigh',side+' Calf',side+' Foot',positions[side+' Thigh'],target,positions[side+' Calf']-positions[side+' Thigh'],rotations);Foot(side,ankle,rotations)
- if motion.get('refineFootAnchors'):
-  # Skin deformation changes the sole marker after IK. Close that residual on
-  # actual support, without constraining the free swing foot or changing raw data.
-  for iteration in range(3):
-   points=MeshPoints()
-   for si,side in enumerate(['L','R']):
-    weight=weights[index,si]
-    if weight<.05:continue
-    marker=Marker(points[side],side);anchor=anchors[side].get(index,marker)
-    residual=anchor-marker;residual.z=0
-    ankle=arm.matrix_world@arm.pose.bones[N(side+' Foot')].head
-    ankle,_=Solve(side+' Thigh',side+' Calf',side+' Foot',positions[side+' Thigh'],ankle+residual*weight,positions[side+' Calf']-positions[side+' Thigh'],rotations)
-    Foot(side,ankle,rotations)
+ if not motion.get('preserveRecoveredPose'):
+  for side in ['L','R']:
+   ankle,_=Solve(side+' Thigh',side+' Calf',side+' Foot',positions[side+' Thigh'],targets[side],positions[side+' Calf']-positions[side+' Thigh'],rotations);Foot(side,ankle,rotations)
+  points=MeshPoints()
+  # One geometric sole pass compensates original skin thickness after the IK solve.
+  for si,side in enumerate(['L','R']):
+   sole=min(v.z for v in points[side]);correction=max(0,.004-sole)+min(0,.004-sole)*weights[index,si]
+   target=targets[side]+Vector((0,0,correction));ankle,_=Solve(side+' Thigh',side+' Calf',side+' Foot',positions[side+' Thigh'],target,positions[side+' Calf']-positions[side+' Thigh'],rotations);Foot(side,ankle,rotations)
+  if motion.get('refineFootAnchors'):
+   # Skin deformation changes the sole marker after IK. Close that residual on
+   # actual support, without constraining the free swing foot or changing raw data.
+   for iteration in range(3):
+    points=MeshPoints()
+    for si,side in enumerate(['L','R']):
+     weight=weights[index,si]
+     if weight<.05:continue
+     marker=Marker(points[side],side);anchor=anchors[side].get(index,marker)
+     residual=anchor-marker;residual.z=0
+     ankle=arm.matrix_world@arm.pose.bones[N(side+' Foot')].head
+     ankle,_=Solve(side+' Thigh',side+' Calf',side+' Foot',positions[side+' Thigh'],ankle+residual*weight,positions[side+' Calf']-positions[side+' Thigh'],rotations)
+     Foot(side,ankle,rotations)
  gripError=Props(index,positions,rotations);points=MeshPoints()
  samples.append({'frame':i+1,'sourceFrame':motion['sourceFrameIndices'][index],'soles':{s:min(v.z for v in ps) for s,ps in points.items()},'markers':{s:list(Marker(ps,s)) for s,ps in points.items()},'contactWeights':weights[index].tolist(),'gripError':gripError,'wristDeviation':{s:(arm.matrix_world@arm.pose.bones[N(s+' Hand')].head-positions[s+' Hand']).length for s in ['L','R']},'pelvisDrop':drop,'kneeHeight':KneeMin() if kind=='kneel' else None})
  for b in arm.pose.bones:

@@ -53,6 +53,41 @@ export function SampleMeleeVideo(pose, transition = true) {
   }
   return result;
 }
+const recoveredCache=new WeakMap();
+function RecoveredSample(data,pose) {
+  let clip=data.clips[pose?.clip];if(clip?.aliasOf)clip=data.clips[clip.aliasOf];
+  const meta=clip?.recoveredPose;if(!meta)return null;
+  let cache=recoveredCache.get(meta);
+  if(!cache){
+    const text=atob(meta.frames),bytes=Uint8Array.from(text,c=>c.charCodeAt(0)),view=new DataView(bytes.buffer);
+    const values=Float32Array.from({length:bytes.length/4},(_,i)=>view.getFloat32(i*4,true));
+    cache={values,indices:new Map(meta.parts.map((part,i)=>[part,i]))};recoveredCache.set(meta,cache);
+  }
+  const phase=THREE.MathUtils.clamp(pose.animationNormalized??pose.normalized??0,0,1),knots=meta.runtimeTimeKnots;
+  let i=1;while(i<knots.length-1&&phase>knots[i])i++;
+  const source=THREE.MathUtils.lerp(meta.sourceFrameKnots[i-1],meta.sourceFrameKnots[i],(phase-knots[i-1])/(knots[i]-knots[i-1]));
+  const frame=THREE.MathUtils.clamp((source-meta.sourceStartFrame)*meta.sampleFps/meta.sourceFrameRate,0,meta.frameCount-1);
+  const a=Math.floor(frame)*meta.stride,b=Math.min(Math.floor(frame)+1,meta.frameCount-1)*meta.stride,mix=frame%1;
+  if(meta.space!=='parent-relative')return{...cache,meta,a,b,mix};
+  // glTF interpolates each local bone track before composing its hierarchy.
+  // Interpolating world positions instead cuts across fast wrist arcs.
+  const values=new Float32Array(meta.stride),position=new THREE.Vector3(),parentPosition=new THREE.Vector3();
+  const rotation=new THREE.Quaternion(),other=new THREE.Quaternion(),parentRotation=new THREE.Quaternion();
+  for(let i=0;i<=meta.parts.length;i++){
+    const offset=i*7;
+    position.set(THREE.MathUtils.lerp(cache.values[a+offset],cache.values[b+offset],mix),THREE.MathUtils.lerp(cache.values[a+offset+1],cache.values[b+offset+1],mix),THREE.MathUtils.lerp(cache.values[a+offset+2],cache.values[b+offset+2],mix));
+    rotation.fromArray(cache.values,a+offset+3);other.fromArray(cache.values,b+offset+3);rotation.slerp(other,mix).normalize();
+    const parent=meta.parents[i]??-1;
+    if(parent>=0){parentPosition.fromArray(values,parent*7);parentRotation.fromArray(values,parent*7+3);position.applyQuaternion(parentRotation).add(parentPosition);rotation.premultiply(parentRotation);}
+    position.toArray(values,offset);rotation.toArray(values,offset+3);
+  }
+  return{indices:cache.indices,values,meta,a:0,b:0,mix:0};
+}
+function ReadRecovered(sample,part,position,rotation) {
+  const index=part===null?sample.meta.parts.length:sample.indices.get(part),a=sample.a+index*7,b=sample.b+index*7;
+  position.fromArray(sample.values,a);v.fromArray(sample.values,b);position.lerp(v,sample.mix);
+  rotation.fromArray(sample.values,a+3);q1.fromArray(sample.values,b+3);rotation.slerp(q1,sample.mix).normalize();
+}
 export class MeleeAnimationPlayer {
   constructor(root,kind) {
     this.root=root;this.data=String(kind).startsWith('ija')?MELEE_IJA_ANIMATIONS:MELEE_NRA_ANIMATIONS;
@@ -68,25 +103,36 @@ export class MeleeAnimationPlayer {
       this.bones.push({bone,index,part,depth,position,rotation,localPosition:bone.position.clone(),localRotation:bone.quaternion.clone(),localScale:bone.scale.clone(),links:[]});
     }
     this.bones.sort((a,b)=>a.depth-b.depth);
+    this.allBones=[...this.bones];
+    for(const part of ['L Toe0','R Toe0']){
+      let bone;root.traverse(b=>{if(b.isBone&&b.name.replaceAll('_',' ').endsWith(' '+part))bone=b});
+      if(!bone)continue;let depth=0;for(let p=bone.parent;p;p=p.parent)depth++;
+      this.allBones.push({bone,part,index:-1,depth,position:bone.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv),rotation:bone.getWorldQuaternion(new THREE.Quaternion()).premultiply(qr),localPosition:bone.position.clone(),localRotation:bone.quaternion.clone(),localScale:bone.scale.clone(),links:[]});
+    }
+    this.allBones.sort((a,b)=>a.depth-b.depth);
     // Apply 按深度顺序摆骨，父骨的 matrixWorld 在轮到子骨时已经是现成的；只有夹在
     // 两根采样骨之间、没被采样的中间节点会因上面的骨改了姿势而过期，提前记下来
     // （自上而下），摆骨前只刷新这几个。以前每根骨都 updateWorldMatrix(true) 爬到场景根，
     // 三名日军就要 0.8 ms/帧，占白刃战主线程两成。
-    const posed=new Set(this.bones.map(r=>r.bone));
-    for(const r of this.bones) {
+    const posed=new Set(this.allBones.map(r=>r.bone));
+    for(const r of this.allBones) {
       for(let p=r.bone.parent;p&&p!==root&&!posed.has(p);p=p.parent)r.links.unshift(p);
       if(r.links.length&&!posed.has(r.links[0].parent))r.links.length=0;   // 上面没有采样骨，初始那次整树刷新已经算准了
     }
     this.heightScale=(this.bones.find(b=>b.part==='Pelvis')?.position.y||1)/(this.data.faction==='Nra'?.942464:.876513);
     this.applied=false;this.lastClip=null;
+    this.prop=new THREE.Group();this.prop.name='MeleeRecoveredProp';root.add(this.prop);this.propWeight=0;
   }
   Restore() {
+    this.propWeight=0;
     if(!this.applied)return;
-    for(const r of this.bones){r.bone.position.copy(r.localPosition);r.bone.quaternion.copy(r.localRotation);r.bone.scale.copy(r.localScale);}
+    for(const r of this.allBones){r.bone.position.copy(r.localPosition);r.bone.quaternion.copy(r.localRotation);r.bone.scale.copy(r.localScale);}
     this.applied=false;
   }
   Apply(pose) {
     if(!pose)return;
+    const recovered=RecoveredSample(this.data,pose),from=pose.transition?.mix<1?RecoveredSample(this.data,pose.transition.from):null;
+    if(recovered||from){this._ApplyRecovered(pose,recovered,from);return;}
     const pair=Samples(this.data,pose);if(!pair)return;
     const {a,b,mix}=pair;
     this.root.updateWorldMatrix(true,true);this.root.getWorldQuaternion(qr);
@@ -105,6 +151,36 @@ export class MeleeAnimationPlayer {
       parent.matrixWorld.decompose(vp,qp,vs);qp.invert();bone.quaternion.copy(qp.multiply(qd));
       bone.updateMatrix();bone.updateWorldMatrix(false,false);
     }
+    this.propWeight=0;
+    this.root.updateWorldMatrix(true,true);this.applied=true;this.lastClip=pose.clip;
+  }
+  _ApplyRecovered(pose,recovered,from) {
+    const mix=pose.transition?.mix??1,previous=pose.transition?.from;
+    const pelvis=this.bones.find(r=>r.part==='Pelvis').position.y;
+    const currentLegacy=recovered?null:Samples(this.data,{...pose,transition:null});
+    const previousLegacy=previous&&!from?Samples(this.data,{...previous,transition:null}):null;
+    const Read=(r,sample,legacy,position,rotation)=>{
+      if(sample){ReadRecovered(sample,r.part,position,rotation);position.multiplyScalar(pelvis/sample.meta.bindPelvisHeight);return;}
+      if(r.index<0||!legacy){position.copy(r.position);rotation.copy(r.rotation);return;}
+      const offset=r.index*7,{a,b,mix}=legacy;
+      position.set(THREE.MathUtils.lerp(a[offset],b[offset],mix),THREE.MathUtils.lerp(a[offset+1],b[offset+1],mix),THREE.MathUtils.lerp(a[offset+2],b[offset+2],mix)).multiplyScalar(this.heightScale).add(r.position);
+      rotation.fromArray(a,offset+3);q1.fromArray(b,offset+3);rotation.slerp(q1,mix).normalize().multiply(r.rotation);
+    };
+    this.root.updateWorldMatrix(true,true);this.root.getWorldQuaternion(qr);
+    for(const r of this.allBones){
+      const {bone}=r,parent=bone.parent;bone.scale.copy(r.localScale);
+      for(const link of r.links)link.updateWorldMatrix(false,false);
+      Read(r,recovered,currentLegacy,vp,qd);
+      if(previous&&mix<1){Read(r,from,previousLegacy,vs,qp);vp.lerpVectors(vs,vp,mix);q0.copy(qd);qd.copy(qp).slerp(q0,mix);}
+      this.root.localToWorld(vp);parent.worldToLocal(vp);bone.position.copy(vp);
+      qd.premultiply(qr);parent.getWorldQuaternion(qp).invert();bone.quaternion.copy(qp.multiply(qd));
+      bone.updateMatrix();bone.updateWorldMatrix(false,false);
+    }
+    const source=recovered||from;ReadRecovered(source,null,this.prop.position,this.prop.quaternion);
+    this.prop.position.multiplyScalar(pelvis/source.meta.bindPelvisHeight);
+    if(recovered&&from&&mix<1){ReadRecovered(from,null,vs,qp);vs.multiplyScalar(pelvis/from.meta.bindPelvisHeight);this.prop.position.lerpVectors(vs,this.prop.position,mix);q0.copy(this.prop.quaternion);this.prop.quaternion.copy(qp).slerp(q0,mix);}
+    this.propWeight=recovered?(previous&&!from?mix:1):1-mix;
+    if(pose.weapon==='Dadao')this.prop.rotateX(-Math.PI/2);
     this.root.updateWorldMatrix(true,true);this.applied=true;this.lastClip=pose.clip;
   }
 }
