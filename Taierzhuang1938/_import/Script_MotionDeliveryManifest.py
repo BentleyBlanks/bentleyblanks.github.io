@@ -1,7 +1,7 @@
 """Refresh the local delivery manifest; historical archive inventory stays immutable."""
 from pathlib import Path
 from datetime import datetime,timezone
-import argparse,hashlib,json
+import argparse,hashlib,json,re
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--root',type=Path,required=True)
@@ -32,9 +32,10 @@ for record in records:
         counts=groups.setdefault(group,{'glb':0,'blend':0})
         counts[suffix[1:]]+=1
 archive=root/'Data_ArchiveManifest.json'
+previewVersion=re.search(r'Script_SourceReview\.mjs\?v=([^"\s]+)',(root/'Preview/index.html').read_text(encoding='utf-8'))
 report={'schemaVersion':2,'updatedAt':datetime.now(timezone.utc).isoformat(),
     'status':'local_review_not_accepted_for_production','defaultView':'source-recovery-latest',
-    'previewRevision':'SourceRecoveryLatest_20260906d','groups':groups,
+    'previewRevision':'SourceRecoveryLatest_'+previewVersion.group(1) if previewVersion else None,'groups':groups,
     'glbCount':sum(Path(f['path']).suffix=='.glb' for f in records),
     'blendCount':sum(Path(f['path']).suffix=='.blend' for f in records),
     'rawJointFileCount':len(list((root/'Models/RecoveryPreview').glob('Data_*RawJoints.json'))),

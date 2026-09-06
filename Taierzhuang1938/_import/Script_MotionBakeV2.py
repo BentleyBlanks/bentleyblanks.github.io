@@ -234,6 +234,8 @@ def Props(index,positions,rotations):
  return max(errors or [0])
 if kind=='melee':
  exec(compile(Path(__file__).with_name('Script_MeleeVideoContact.py').read_text(encoding='utf-8'),'MeleeVideoContact','exec'))
+if kind=='rifle' and motion.get('gripStyle')=='recovered':
+ exec(compile(Path(__file__).with_name('Script_MotionRecoveredRifle.py').read_text(encoding='utf-8'),'RecoveredRifle','exec'))
 action=bpy.data.actions.new('Animation_'+faction+'_'+clip+f'_V{revision}');action.use_fake_user=True;arm.animation_data_create();arm.animation_data.action=action
 rifle.animation_data_create();rifle.animation_data.action=bpy.data.actions.new(action.name+'_Rifle');rifle.animation_data.action.use_fake_user=True
 scene.render.fps=60;scene.frame_start=1;scene.frame_end=count+1;previous={};samples=[]
@@ -332,5 +334,7 @@ for img in bpy.data.images:
 bpy.ops.wm.save_as_mainfile(filepath=str(blendPath),compress=True)
 (out/f'Data_{faction}_{clip}_Validation.json').write_text(json.dumps({'status':'requires_visual_review','retargetScale':ratio,'variants':variants,'samples':samples,'maxGripError':max(s['gripError'] for s in samples),'minSoleHeight':min(h for s in samples for h in s['soles'].values())},indent=2),encoding='utf-8')
 print('DONE',faction,clip,flush=True)
+if kind=='rifle' and motion.get('gripStyle')=='recovered':
+ (out/f'Data_{faction}_{clip}_RecoveredGrip.json').write_text(json.dumps({'sourceArmScale':recoveredArmScale,'localGrips':{s:list(p) for s,p in recoveredLocalGrips.items()},'samples':recoveredGripSamples},indent=2),encoding='utf-8')
 if kind=='melee':
  exec(compile(Path(__file__).with_name('Script_MeleeVideoBodyExport.py').read_text(encoding='utf-8'),'MeleeVideoBodyExport','exec'))

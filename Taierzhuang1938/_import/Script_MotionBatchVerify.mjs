@@ -16,6 +16,8 @@ try{
  const page=await browser.newPage({viewport:{width:1700,height:1000}});
  page.on('pageerror',error=>errors.push(error.message));
  for(const name of Object.keys(recipes).filter(name=>!args.includes('--ids')||args[args.indexOf('--ids')+1].split(',').includes(name))){
+  const recoveredRifle=recipes[name].gripStyle==='recovered';
+  const sourceMotion=recoveredRifle?JSON.parse(await fs.readFile(path.join(root,'Models','_Cache',group,`Data_${name}Motion.json`),'utf8')):null;
   await page.goto('http://127.0.0.1:8136/Preview/index.html?action='+name);
   await page.waitForFunction(()=>window.MotionReview&&!MotionReview.loading&&MotionReview.video.readyState>=2);
   for(const faction of ['Nra','Ija']){
@@ -32,10 +34,23 @@ try{
      const left=m.bones.find(b=>/L[_ ]Thigh$/.test(b.name)),right=m.bones.find(b=>/R[_ ]Thigh$/.test(b.name));
      const axis=left.getWorldPosition(left.position.clone()).sub(right.getWorldPosition(right.position.clone()));axis.y=0;axis.normalize();
      const travel=MotionReview.variant.travelMeters;
-     return{phase:MotionReview.phase,path:MotionReview.variant.path,matrices:m.bones.flatMap(b=>b.matrixWorld.elements),maxProjection,minHeight,anatomicalLeftDisplacement:travel?axis.x*travel[0]+axis.z*travel[2]:null};
+     const point=part=>{const b=m.bones.find(b=>b.name.replaceAll('_',' ').endsWith(part));return b?.getWorldPosition(b.position.clone())};
+     const lh=point('L Hand'),rh=point('R Hand'),ls=point('L UpperArm'),rs=point('R UpperArm');let wristDirection=null;
+     if(lh&&rh&&ls&&rs){const left=ls.sub(rs);left.y=0;left.normalize();const span=lh.sub(rh).normalize();wristDirection=[span.dot(left),span.x*left.z-span.z*left.x,span.y]}
+     return{phase:MotionReview.phase,path:MotionReview.variant.path,matrices:m.bones.flatMap(b=>b.matrixWorld.elements),maxProjection,minHeight,wristDirection,anatomicalLeftDisplacement:travel?axis.x*travel[0]+axis.z*travel[2]:null};
     });
     assert.ok(state.path.startsWith(`Models/${group}/`),'Requested delivery group loaded');
     assert.ok(state.maxProjection<1,`${name} ${faction} body leaves viewport at ${phase}: ${state.maxProjection}`);
+    if(recoveredRifle){
+     const j=sourceMotion.sourceRelativeJoints[phase===1?0:Math.round(phase*sourceMotion.cycleFrames)];
+     const span=j[20].map((v,i)=>v-j[21][i]),left=j[16].map((v,i)=>v-j[17][i]);left[2]=0;
+     const length=Math.hypot(...left),size=Math.hypot(...span);left.forEach((v,i)=>left[i]=v/length);
+     const expected=[(span[0]*left[0]+span[1]*left[1])/size,(-span[0]*left[1]+span[1]*left[0])/size,span[2]/size];
+     assert.ok(state.wristDirection,'Exported GLB has both wrists and shoulders');
+     const cosine=expected.reduce((sum,v,i)=>sum+v*state.wristDirection[i],0);
+     state.recoveredWristDirectionErrorDegrees=Math.acos(Math.max(-1,Math.min(1,cosine)))*180/Math.PI;
+     assert.ok(state.recoveredWristDirectionErrorDegrees<5,`${faction} exported GLB changes recovered wrist direction`);
+    }
     if(name==='RifleStrafeLeft')assert.ok(state.anatomicalLeftDisplacement>0,'Actual GLB left strafe');
     if(name==='RifleStrafeRight')assert.ok(state.anatomicalLeftDisplacement<0,'Actual GLB right strafe');
     samples.push(state);
