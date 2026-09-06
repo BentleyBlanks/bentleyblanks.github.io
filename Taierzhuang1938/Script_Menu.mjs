@@ -118,6 +118,7 @@ export class MainMenu {
    *   PlaySandbox() / ExitSandbox()  进／出靶场（都要重载页面，见 Play()）
    *   Resume()     暂停态的「继续」
    *   Settings()   暂停态的「设置」
+   *   P012Progress() / P012NextProgress() 白盒逐段调试推进
    *   DebugOptions() / SetDebugOption(id, on) 调试选项的读取与写入
    *   CheckpointStatus() / ContinueCheckpoint() 暂停调试中的检查点状态与恢复动作
    *   SliceIndex() 当前建好的是哪一关的切片
@@ -533,6 +534,36 @@ export class MainMenu {
     intro.className = "mnDebugIntro";
     intro.textContent = "这些选项只用于测试，可在主菜单或暂停菜单中调整。";
     wrap.appendChild(intro);
+    const progress = this.host.P012Progress?.();
+    if (progress) {
+      const row = document.createElement("div");
+      row.className = "mnDebugRow";
+      row.dataset.action = "p012NextProgress";
+      const copy = document.createElement("span");
+      copy.className = "mnDebugCopy";
+      const name = document.createElement("b");
+      name.textContent = "跳到下一任务进度";
+      const note = document.createElement("small");
+      note.textContent = `${progress.current.id} · ${progress.current.objective}`
+        + (progress.next ? ` → ${progress.next.id} · ${progress.next.objective}。同步玩家、NPC 与剧情状态。` : " · 已完成");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "mnDebugAdvance";
+      button.textContent = progress.next ? "下一进度" : "已完成";
+      button.disabled = !progress.enabled;
+      if (!progress.enabled && progress.next) note.textContent += " 开始白盒后，在暂停菜单中使用。";
+      button.addEventListener("click", () => {
+        button.disabled = true;
+        try {
+          this.host.P012NextProgress?.();
+          if (!this.sandboxCompleteStyle) this.BuildDebugOptions();
+        } catch (error) {
+          note.textContent = `跳转未完成：${error.message}`;
+          button.disabled = false;
+        }
+      });
+      copy.append(name, note);row.append(copy, button);wrap.appendChild(row);
+    }
     for (const item of DEBUG_ITEMS) {
       const row = document.createElement("label");
       row.className = "mnDebugRow";

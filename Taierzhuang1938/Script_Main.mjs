@@ -47,6 +47,7 @@ import {
   FIRST_LEVEL_P012_WHITEBOX_PHASE, FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,
 } from "./Data_FirstLevelP012Whitebox.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
+import { FirstLevelP012Debug } from "./Script_FirstLevelP012Debug.mjs";
 import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
 import { FirstLevelP012Runtime } from "./Script_FirstLevelP012Runtime.mjs";
 import { FirstLevelP012Resting } from "./Script_FirstLevelP012Resting.mjs";
@@ -2114,6 +2115,8 @@ async function Boot() {
        */
       Setpieces: () => (setpieces ? setpieces.State() : null),
       P012: () => p012Flow?.State() || null,
+      P012Progress: () => p012Debug.State(),
+      P012NextProgress: () => p012Debug.Next(),
       P012CarryView: () => p012CarryView?.Debug() || null,
       P012Casualties:()=>[...setpieceProps.entries()].filter(([,entry])=>entry.woundedActor).map(([id,entry])=>({id,actor:entry.woundedActor,root:entry.root})),
       AircraftModel: id => aircraft?.forms.find(form=>form.spec.id===id)?.root || null,
@@ -2513,6 +2516,8 @@ async function Boot() {
         if (!SHOT) document.getElementById("edRoot")?.classList.remove("off");
         editor.TogglePanel(true);
       },
+      P012Progress: () => p012Debug.State(),
+      P012NextProgress: () => p012Debug.Next(),
       DebugOptions: () => debugOptions.Get(),
       SetDebugOption: (id, enabled) => SetDebugOption(id, enabled),
       CheckpointStatus,
@@ -5133,6 +5138,117 @@ function PlaceMenuGarrison(anchor) {
   }
 }
 
+function ReadP012ProgressSample() {
+    const column = setpieces?.mem?.column;
+    const columnActor = column?.Bearers?.[0]?.handle || column?.Alive?.[0]?.handle;
+    const columnPosition = columnActor?.position || column?.HeadPosition() || null;
+    const columnEnd = column?.waypoints?.at(-1);
+    const columnAtEnd = !!column?.arrived && !!columnPosition && !!columnEnd
+      && Math.hypot(columnPosition.x - columnEnd.x, columnPosition.z - columnEnd.z) < 8;
+    const lastLitterArrived = LastLitterArrived(column);
+    const p012Activities=PHASE_TABLE[state.phaseIndex].whitebox.activities;
+    const airEntrance=p012Activities.airAttackStartPosition || P012SouthPoint(50,60);
+    const airReady=p012Activities.airColumnReadyPosition || P012SouthPoint(50,68);
+    const southAssembly=p012Activities.southAssemblyPosition || P012SouthPoint(42,94);
+    const zone = battlefield.objectives.find((item) =>
+      Math.hypot(player.position.x - item.x, player.position.z - item.z) < item.radius);
+    return {
+      ...p012Runtime.Sample(),
+      binocularRaised:p012BinocularRaised,
+      position: player.position, bodyRadius:player.radius, yaw: player.yaw, stance: player.stance, sprint: player.sprint,
+      zone: zone?.id || null, enemyDeaths: ai.deaths.ija || 0,
+      scoutAlarm: ai.soldiers.some((soldier) => soldier.side === "ija" && state.elapsed - soldier.lastFire < 1),
+      ammoDelivered: setpieces?.mem?.ammoDelivered || 0,
+      clips: state.clips, ammo: state.ammo, grenades: state.grenades,
+      woundedDragDelivered: !!setpieces?.mem?.p012WoundedDrag?.delivered,
+      woundedDragDistance: setpieces?.mem?.p012WoundedDrag?.distance || 0,
+      airCivilianPosition:setpieces?.mem?.p012AirCivilian?.member?.handle?.position||null,
+      airCivilianReady:!!setpieces?.mem?.p012AirCivilian?.injured&&!!setpieces.mem.p012AirCivilian.member.handle.alive
+        &&!setpieces.mem.p012AirCivilian.delivered,
+      stretcherCarryDistance: setpieces?.mem?.p012CarryDistance || 0,
+      carryDistance: setpieces?.mem?.p012CarryDistance || 0,
+      lastLitterArrived,
+      carryKind: carry?.KindId, columnArrived: columnAtEnd,
+      bleeding: player.bleeding, bandages: player.bandages,
+      columnPosition, columnAtEscortEnd: columnAtEnd,
+      columnAtAirRoad: !!columnPosition && columnPosition.z >= airEntrance.z && Math.abs(columnPosition.x - airEntrance.x) < 8,
+      airColumnEnteredRoad: AirColumnEnteredRoad(column, player.position, p012Activities),
+      aircraftVisible:p012Runtime.AircraftVisible(player.EyePosition,strafe?.View()),
+      roadWoundedPosition: setpieces?.mem?.p012RoadWoundedPosition || null,
+      roadWoundedAtInspection: !!setpieces?.mem?.p012RoadWoundedAtInspection,
+      airColumnTailPosition: (column?.litters || []).filter(litter=>litter.front?.handle?.alive&&litter.rear?.handle?.alive).map(litter=>({x:(litter.front.handle.position.x+litter.rear.handle.position.x)/2,z:(litter.front.handle.position.z+litter.rear.handle.position.z)/2})).sort((a,b)=>a.z-b.z)[0] || null,
+      airColumnReady: !!column?.litters?.length && column.litters.every((litter)=>{
+        const a=litter.front?.handle,b=litter.rear?.handle;
+        return a?.alive && b?.alive && (a.position.z+b.position.z)/2>=airReady.z && Math.abs((a.position.x+b.position.x)/2-airReady.x)<8;
+      }),
+      // A pair of litters arrives as a queue in its actual route slots. Sending
+      // every bearer into one six-metre circle would collapse both litters.
+      columnAtSouthAssembly: !!columnEnd && Math.hypot(columnEnd.x-southAssembly.x,columnEnd.z-southAssembly.z)<.1
+        && lastLitterArrived,
+    };
+}
+
+function ClearP012DebugPosition(point, ignoredActor = null) {
+  const radius=ignoredActor?.body?.radius || player.body?.radius || .42;
+  const candidates=[point];
+  for(let ring=1;ring<=6;ring++)for(let slot=0;slot<16;slot++)
+    candidates.push({x:point.x+Math.cos(slot*Math.PI/8)*ring,z:point.z+Math.sin(slot*Math.PI/8)*ring});
+  const found=candidates.find(candidate=>{
+    const at={...candidate,y:battlefield.GroundHeight(candidate.x,candidate.z)};
+    return P012SegmentClear(p012Flow.config.layout.blocks,at,at,radius)
+      && ai.soldiers.every(actor=>!actor.alive||actor===ignoredActor
+        ||Math.hypot(actor.position.x-at.x,actor.position.z-at.z)>radius+(actor.body?.radius||.42)+.25)
+      &&(!ignoredActor||Math.hypot(player.position.x-at.x,player.position.z-at.z)>radius+.7);
+  });
+  if(!found)throw new Error("任务落点附近没有可站立的空位");
+  return found;
+}
+
+const p012Debug = new FirstLevelP012Debug({
+  Get: () => ({ flow:p012Flow, runtime:p012Runtime, stageZero:p012StageZero, setpieces, story, carry, interact, player, strafe }),
+  CanAdvance: () => !!p012Runtime && state.ready && !state.advancing && !p012Runtime.failed
+    && !p012Runtime.completed && player.Alive && !!menu && !menu.live,
+  Sample: () => ReadP012ProgressSample(),
+  ClearPosition: ClearP012DebugPosition,
+  Prepare: () => {
+    interact.CancelHold("debugNextProgress");keys.clear();router.held.clear();router.mouse.clear();
+    Object.assign(input,{forward:0,strafe:0,sprint:false,fire:false,ads:false,lookX:0,lookY:0});
+    state.cooking=null;state.cook=0;state.meleeCharge=null;
+    viewmodel.CancelMeleeCharge?.();meleeCombat?.EscapeQte();meleeCombat?.ReleasePlayer();
+    p012StageZero?.shellShot.Finish();
+    audio.StopStoryVoice();hud.subtitleTimer=0;hud.el.subtitle.classList.remove("on");
+  },
+  MovePlayer: point => {
+    if(!point)throw new Error("Missing P012 debug player destination");
+    point=ClearP012DebugPosition(point);
+    const y=battlefield.GroundHeight(point.x,point.z);
+    player.vault.active=false;player.jump.buffer=0;player.jump.airTime=0;player.grounded=true;
+    player.stanceBlend.crouch=0;player.stanceBlend.prone=0;
+    player.position.set(point.x,y,point.z);player.body?.Teleport(point.x,y,point.z);
+    player.velocity.set(0,0,0);player.stance="stand";player.sprint=0;
+  },
+  MoveActor: (actor,point) => {
+    if(!actor?.alive)return;
+    if(!point)throw new Error("Missing P012 debug actor destination");
+    const y=battlefield.GroundHeight(point.x,point.z);
+    actor.position.set(point.x,y,point.z);actor.body?.Teleport(point.x,y,point.z);
+    actor.goal.set(point.x,0,point.z);actor.velocity?.set(0,0,0);
+    actor.actor?.root.position.copy(actor.position);
+  },
+  KillEnemy: actor => actor.Kill(new THREE.Vector3(0,0,1)),
+  Finish: complete => {
+    const objective=p012Flow.CurrentObjective(),target=objective.lookAt || objective.target;
+    if(target&&Math.hypot(target.x-player.position.x,target.z-player.position.z)>.25){
+      player.yaw=Math.atan2(player.position.x-target.x,player.position.z-target.z);player.pitch=0;
+    }
+    player.SyncCamera(0);
+    p012Runtime.SaveSafePoint("DebugNextProgress",player.position,player.stance,player.yaw);
+    checkpoint?.Save();
+    if(complete){carry.ForceRelease("delivered");p012Runtime.completed=true;menu.OpenSandboxComplete();}
+    p012StageZero.guidance.Update();
+  },
+});
+
 /**
  * 挂上暂停层。**进暂停的每一条路都必须走这里**，两条路进的暂停要长得一模一样。
  *
@@ -6755,53 +6871,7 @@ function Frame(dt, render = true) {
       p012Runtime.weaponActionPending = false; p012Runtime.weaponActionCount++;
       CompleteP012ManualReload(p012Runtime);
     }
-    const column = setpieces?.mem?.column;
-    const columnActor = column?.Bearers?.[0]?.handle || column?.Alive?.[0]?.handle;
-    const columnPosition = columnActor?.position || column?.HeadPosition() || null;
-    const columnEnd = column?.waypoints?.at(-1);
-    const columnAtEnd = !!column?.arrived && !!columnPosition && !!columnEnd
-      && Math.hypot(columnPosition.x - columnEnd.x, columnPosition.z - columnEnd.z) < 8;
-    const lastLitterArrived = LastLitterArrived(column);
-    const p012Activities=PHASE_TABLE[state.phaseIndex].whitebox.activities;
-    const airEntrance=p012Activities.airAttackStartPosition || P012SouthPoint(50,60);
-    const airReady=p012Activities.airColumnReadyPosition || P012SouthPoint(50,68);
-    const southAssembly=p012Activities.southAssemblyPosition || P012SouthPoint(42,94);
-    const zone = battlefield.objectives.find((item) =>
-      Math.hypot(player.position.x - item.x, player.position.z - item.z) < item.radius);
-    p012Flow.Update(dt, {
-      ...p012Runtime.Sample(),
-      binocularRaised:p012BinocularRaised,
-      position: player.position, bodyRadius:player.radius, yaw: player.yaw, stance: player.stance, sprint: player.sprint,
-      zone: zone?.id || null, enemyDeaths: ai.deaths.ija || 0,
-      scoutAlarm: ai.soldiers.some((soldier) => soldier.side === "ija" && state.elapsed - soldier.lastFire < 1),
-      ammoDelivered: setpieces?.mem?.ammoDelivered || 0,
-      clips: state.clips, ammo: state.ammo, grenades: state.grenades,
-      woundedDragDelivered: !!setpieces?.mem?.p012WoundedDrag?.delivered,
-      woundedDragDistance: setpieces?.mem?.p012WoundedDrag?.distance || 0,
-      airCivilianPosition:setpieces?.mem?.p012AirCivilian?.member?.handle?.position||null,
-      airCivilianReady:!!setpieces?.mem?.p012AirCivilian?.injured&&!!setpieces.mem.p012AirCivilian.member.handle.alive
-        &&!setpieces.mem.p012AirCivilian.delivered,
-      stretcherCarryDistance: setpieces?.mem?.p012CarryDistance || 0,
-      carryDistance: setpieces?.mem?.p012CarryDistance || 0,
-      lastLitterArrived,
-      carryKind: carry?.KindId, columnArrived: columnAtEnd,
-      bleeding: player.bleeding, bandages: player.bandages,
-      columnPosition, columnAtEscortEnd: columnAtEnd,
-      columnAtAirRoad: !!columnPosition && columnPosition.z >= airEntrance.z && Math.abs(columnPosition.x - airEntrance.x) < 8,
-      airColumnEnteredRoad: AirColumnEnteredRoad(column, player.position, p012Activities),
-      aircraftVisible:p012Runtime.AircraftVisible(player.EyePosition,strafe?.View()),
-      roadWoundedPosition: setpieces?.mem?.p012RoadWoundedPosition || null,
-      roadWoundedAtInspection: !!setpieces?.mem?.p012RoadWoundedAtInspection,
-      airColumnTailPosition: (column?.litters || []).filter(litter=>litter.front?.handle?.alive&&litter.rear?.handle?.alive).map(litter=>({x:(litter.front.handle.position.x+litter.rear.handle.position.x)/2,z:(litter.front.handle.position.z+litter.rear.handle.position.z)/2})).sort((a,b)=>a.z-b.z)[0] || null,
-      airColumnReady: !!column?.litters?.length && column.litters.every((litter)=>{
-        const a=litter.front?.handle,b=litter.rear?.handle;
-        return a?.alive && b?.alive && (a.position.z+b.position.z)/2>=airReady.z && Math.abs((a.position.x+b.position.x)/2-airReady.x)<8;
-      }),
-      // A pair of litters arrives as a queue in its actual route slots. Sending
-      // every bearer into one six-metre circle would collapse both litters.
-      columnAtSouthAssembly: !!columnEnd && Math.hypot(columnEnd.x-southAssembly.x,columnEnd.z-southAssembly.z)<.1
-        && lastLitterArrived,
-    });
+    p012Flow.Update(dt, ReadP012ProgressSample());
     if (story.Signalled("P012Complete")) {
       p012Runtime.completed = true; ShowPauseMenu(); menu.OpenSandboxComplete();
       profiler.E("story"); return;

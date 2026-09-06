@@ -80,6 +80,7 @@ export const testDefs = {
     desc: "P012节点、担架扫掠、三态枢纽与敌军遮挡来向（纯 Node）" },
   FirstLevelP012TerrainTest: { file: "Script_FirstLevelP012TerrainTest.mjs", desc: "P012连续地形、道路基底和渲染三角形共享高度（纯 Node）" },
   FirstLevelP012TerrainBrowserTest: { file: "Script_FirstLevelP012TerrainBrowserTest.mjs", timeoutMs:240000, desc: "P012实际地形渲染、人物胶囊坡地、弹坑碰撞与预算" },
+  FirstLevelP012DebugTest: { file: "Script_FirstLevelP012DebugTest.mjs", timeoutMs: 300000, desc: "P012真实调试菜单逐段跳转与NPC剧情衔接" },
   FirstLevelP012FlowTest: { file: "Script_FirstLevelP012FlowTest.mjs",
     desc: "P012真实动作退出、反向护送、有限波次与检查点（纯 Node）" },
   FirstLevelP012RuntimeTest: { file: "Script_FirstLevelP012RuntimeTest.mjs",
@@ -219,6 +220,7 @@ export const browserTests = new Set([
   "FirstPersonEmbodimentTest", "SprintViewmodelTest", "TargetInfoTest", "VisibilityTest", "VoiceTest",
   "RespawnShaderWarmTest",
   "FirstLevelWhiteboxBrowserTest",
+  "FirstLevelP012DebugTest",
   "FirstLevelP012BrowserTest",
   "ExplosionRangeTest",
   "CraterSurfaceTest",
@@ -307,7 +309,7 @@ export const domains = {
   },
   audio: { label: "音效/音乐/环境声", tests: ["AudioTest"] },
   voice: { label: "语音", tests: ["VoiceTest"] },
-  menu: { label: "主菜单/开机陈设", tests: ["MenuTest", "BootPropTest"] },
+  menu: { label: "主菜单/开机陈设", tests: ["FirstLevelP012DebugTest", "MenuTest", "BootPropTest"] },
   editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
@@ -340,6 +342,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  { domain: "menu", pattern: /FirstLevelP012Debug/i },
   { domain: "physics", pattern: /MovementRange/i },
   { domain: "editor", pattern: /Script_EditorWorldInfo|Script_WorldInfoEditorTest/i },
   { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },

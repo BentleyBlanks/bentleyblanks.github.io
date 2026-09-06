@@ -214,6 +214,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - `Script_FirstLevelP012ShellShot.mjs` 在首次远炮实际落地后，从玩家原地眼位展示九秒长焦观察；多发炮弹沿真实弹道落地，返还操控后接防目标持续遭受炮击。沿用过场输入封锁与释放，恢复原第一人称相机。
 - `Script_FirstLevelP012Guidance.mjs` 显示当前目标的方向与名称，以及随真实负重移动的弹药箱；只读取任务状态，不推进剧情或发放库存。
   村路炮击按玩家进度分段逼近，家庭在实际爆炸后加速；B04 接受整段真实掩体后的低姿，无隐藏小圆圈。
+- 暂停菜单「调试选项 → 跳到下一任务进度」由 `Script_FirstLevelP012Debug.mjs` 完成当前 B 段并同步玩家、同班 NPC、有限敌军、领械/搬运、剧情回执和原担架。每次只前进一段，保留暂停；最后一段进入白盒完成页。调试跳转单独记录 `debugNextProgress`，不作为正常通关证据；浏览器验收入口 `Script_FirstLevelP012DebugTest.mjs`。
 - `Script_FirstLevelP012Flow.mjs` 是纯任务事实编排；`Script_FirstLevelP012Runtime.mjs`
   适配真实演员、人流、防守、炮击与扑沟输入。不能以目标时刻或虚拟队头替代真实完成。
 - `Script_FirstLevelP012CarryView.mjs` 复用已加载的双臂骨骼，读取原担架与真实负重状态。

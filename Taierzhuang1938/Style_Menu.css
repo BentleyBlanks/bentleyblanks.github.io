@@ -208,6 +208,9 @@
 .mnDebugRow:hover { background: rgba(214, 217, 209, 0.05); }
 .mnDebugRow.on { background: var(--ui-selection); border-color: var(--ui-line); }
 .mnDebugCopy { display: flex; flex-direction: column; gap: 5px; }
+.mnDebugAdvance { flex: 0 0 auto; padding: 10px 15px; border: 1px solid var(--ui-line); background: var(--ui-selection); color: var(--ui-text); font: inherit; cursor: pointer; }
+.mnDebugAdvance:disabled { opacity: .45; cursor: default; }
+.mnDebugAdvance:focus-visible { outline: 2px solid var(--ui-gold); outline-offset: 3px; }
 .mnDebugCopy b { font-size: 15.5px; font-weight: 700; letter-spacing: 0.04em; color: var(--ui-text); }
 .mnDebugCopy small { max-width: 610px; font-size: 12px; line-height: 1.65; color: var(--ui-muted); }
 .mnDebugControl { display: flex; align-items: center; gap: 9px; flex: 0 0 auto; }
