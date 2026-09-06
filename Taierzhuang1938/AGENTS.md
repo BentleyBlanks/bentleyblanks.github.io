@@ -1,6 +1,6 @@
 # Taierzhuang1938 项目入口
 
-《台儿庄：血战滕县》是浏览器 FPS 白盒；目录名是历史遗留。玩家能进的正片只有**第一关**＝P0/P1/P2 场景白盒（`?whitebox=p012`，按 Notion 新稿重做，复用 `Data_MissionCh1` 的人物与台词，改那份内容先看白盒）；选章「正式章节」组由 `Data_Menu.CAMPAIGN_ENTRIES` 决定：第一关之后的第二关到终章只占位、标「未完成」，点了提示「敬请期待」。旧序章与旧第一关到终章（`Data_TengxianScript.DEPRECATED_CHAPTER_IDS`）自 2026-09-06 起**退出选章**（序章要并入第一关），切片与资产全部保留，只剩 `?phase=N` 开发入口与 `Debug.StartLevel`，进章只建切片、不装剧本、不摆点、不换关。每章只建当前切片，换章拆掉重建。Three.js 与 Rapier3D 均使用仓库内 vendor，零 CDN；渲染管线不引入 addon。
+《台儿庄：血战滕县》是浏览器 FPS 白盒；目录名是历史遗留。玩家能进的正片只有**第一关**＝《往南的路》完整任务白盒（`?whitebox=p012`，序章已并入；当前任务、对白与数值分别在 `Data_FirstLevelMission`、`Data_FirstLevelMissionDialogue`、`Data_Tuning_FirstLevel`，Notion 来源及差异见 [重构验收](docs/Data_FirstLevelRebuildAcceptance.md)）；选章「正式章节」组由 `Data_Menu.CAMPAIGN_ENTRIES` 决定：第一关之后的第二关到终章只占位、标「未完成」，点了提示「敬请期待」。旧序章与旧第一关到终章（`Data_TengxianScript.DEPRECATED_CHAPTER_IDS`）自 2026-09-06 起**退出选章**（序章要并入第一关），切片与资产全部保留，只剩 `?phase=N` 开发入口与 `Debug.StartLevel`，进章只建切片、不装剧本、不摆点、不换关。旧 P0–P2 仅在 `?whitebox=p012-archive` 保留为开发回归夹具，不进入菜单；旧资产与组件测试继续验证原契约，新版通关必须运行 `Script_FirstLevelMissionBrowserTest.mjs --campaign`。每章只建当前切片，换章拆掉重建。Three.js 与 Rapier3D 均使用仓库内 vendor，零 CDN；渲染管线不引入 addon。
 
 仓库协作、命名、资产生成与发布遵循 [根 AGENTS.md](../AGENTS.md)。这里保留跨系统契约；涉及的模块、接口与分册在 [系统参考](docs/Data_AgentReference.md) 中按需查阅。源码头注是定位线索，仍需结合实现与测试确认现状。
 

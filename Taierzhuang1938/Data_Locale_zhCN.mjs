@@ -15,6 +15,7 @@ import { TEXT as P012 } from "./Data_Text_P012.mjs";
 import { TEXT as SETPIECES } from "./Data_Text_Setpieces.mjs";
 import { TEXT as STORY } from "./Data_Text_Story.mjs";
 import { TEXT as RANGE } from "./Data_Text_Range.mjs";
+import { TEXT as FIRSTLEVEL } from "./Data_Text_FirstLevel.mjs";
 
 const TABLES = [
   ["Data_Text_Hud", HUD],
@@ -27,6 +28,7 @@ const TABLES = [
   ["Data_Text_Setpieces", SETPIECES],
   ["Data_Text_Story", STORY],
   ["Data_Text_Range", RANGE],
+  ["Data_Text_FirstLevel", FIRSTLEVEL],
 ];
 
 /** 拼表；重复键抛错并点名两份来源。导出给测试与其他语言的拼表复用。 */

@@ -47,6 +47,8 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  FirstLevelMissionTest: {file:'Script_FirstLevelMissionTest.mjs',desc:'新版第一关完整事实门、共享地形、实际担架队列和往返撤离'},
+  FirstLevelMissionBrowserTest: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign'],timeoutMs:600000,desc:'新版第一关真实输入、移动军列、壕沟路线、作战与通关'},
   TextGatherCheck: { file: "Script_TextGather.mjs", args: ["--check"], desc: "内容文本清单：id 全局唯一、无空文本、与运行时 Localize 同一口径（纯 Node，毫秒级）" },
   TextTest: { file: "Script_TextTest.mjs", desc: "文本数据驱动闸门：语言表键/占位符、T() 静态引用、闸门模块零中文字面量（纯 Node，毫秒级）" },
   MovementRangeTest: { file: "Script_MovementRangeTest.mjs", timeoutMs: 240000, desc: "操作白盒：实体标尺、真实跳跃跑跳、翻越边界、姿态通行与复位" },
@@ -203,6 +205,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "FirstLevelMissionBrowserTest",
   "BrowserBundleTest",
 
   "MovementRangeTest",
@@ -261,6 +264,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelMissionTest','FirstLevelMissionBrowserTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['BackRifleRunTest','MeleeAnimationTest','InfantryAnimationTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -347,6 +351,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:'firstLevel',pattern:/FirstLevelMission|SeedAudioFirstLevel|Audio\/FirstLevel/},
   { domain: "menu", pattern: /FirstLevelP012Debug/i },
   { domain: "text", pattern: /(Script_Text|Data_Text_|Data_Locale_|Data_Tuning_|Data_Mission|Data_Cutscene|Data_History|Data_Voice|Data_Weapons|TengxianScript)/i },
   { domain: "ai", pattern: /Data_Setpieces_|Data_Companions|Data_Flares|Data_AircraftStrafe|Data_Telegraph|Data_Emplacements|Data_Carry/i },

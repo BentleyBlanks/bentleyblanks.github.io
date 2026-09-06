@@ -18,7 +18,7 @@
 // 镜头架到切片外朝外看 = 一片空地，这是最容易犯的错。
 
 import { OVERVIEW_BOUNDS, PHASES } from "./Data_Battle.mjs";
-import { FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./Data_FirstLevelP012Whitebox.mjs";
+import { FIRST_LEVEL_MISSION_PHASE as FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./Data_FirstLevelMission.mjs";
 
 // ---------------------------------------------------------------------------
 // 两片**不进 PHASES** 的切片（2026-08-29 抛光批 P2）

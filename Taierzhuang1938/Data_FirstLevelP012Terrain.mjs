@@ -1,10 +1,11 @@
 // P012 soil heightfield. The same Float32 vertices define visible triangles and
 // all ground queries; flattened foundations preserve the authored metre scale.
+import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 const Clamp01 = value => Math.max(0, Math.min(1, value));
 const Smooth = value => { const t = Clamp01(value); return t * t * (3 - 2 * t); };
 
 export function CreateP012Terrain(layout) {
-  const {x, z, w, d} = layout.ground, cellM = 2, chunkCells = 32;
+  const {x, z, w, d} = layout.ground, cellM = layout.terrainSpec?.cellM || 2, chunkCells = 32;
   const minX = x - w / 2, minZ = z - d / 2;
   const cols = Math.ceil(w / cellM), rows = Math.ceil(d / cellM);
   const stepX = w / cols, stepZ = d / rows, width = cols + 1;
@@ -37,7 +38,7 @@ export function CreateP012Terrain(layout) {
         Math.max(0,Math.abs(dx*pad.s+dz*pad.c)-pad.hz));
       flat=Math.min(flat,Smooth((distance-apron)/blend)); if(flat===0)break;
     }
-    heights[iz*width+ix]=h*flat;
+    heights[iz*width+ix]=layout.terrainSpec ? SampleMissionTerrain(px,pz,layout.terrainSpec) : h*flat;
   }
   const NodeHeight = (ix, iz) => heights[Math.max(0,Math.min(rows,iz))*width+Math.max(0,Math.min(cols,ix))];
   const SampleHeight = (px,pz) => {

@@ -801,7 +801,7 @@ assert.match(main,/story\.P012Restore\?\.\(sample\.p012Story\.immediate\)/,"P012
 {
  const source=main.match(/case "interact":([\s\S]*?)case "bipod":/)[1],calls=[];
  let point=null;
- const context={detail:{down:true},player:{},p012Flow:{},interact:{Query:()=>({point}),Release:()=>calls.push('release')},
+ const context={detail:{down:true},player:{},missionRuntime:null,p012Flow:{},interact:{Query:()=>({point}),Release:()=>calls.push('release')},
    meleeQte:{TryBeginExecution:()=>false},emplacement:null,carry:{Active:true,Drop:()=>calls.push('drop')},DoInteract:()=>calls.push('deliver')};
  const Input=vm.runInNewContext(`()=>{${source}}`,context);
  for(const id of ['p012_ammoDrop','p012_airRescueCover']){point={id};calls.length=0;Input();assert.deepEqual(calls,['deliver'],'production F routing preserves a registered carried delivery hold');}

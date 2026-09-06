@@ -391,7 +391,7 @@ const chan = await page.evaluate(async () => {
   A.lastBarkAt = A.ctx.currentTime;              // 假装刚有人喊过（Bark 此刻会闸掉一切）
   const first = A.PlayStoryVoice("rally_hold");
   const firstHandle = A.storyVoice;
-  const second = A.PlayStoryVoice("rally_charge");
+  const second = A.PlayStoryVoice("rally_charge", {offset:0.25});
   const missing = A.PlayStoryVoice("ch9_nobody_01");
   const nullKey = A.PlayStoryVoice(null);
   const slotKey = A.storyVoiceKey;
@@ -402,6 +402,9 @@ const chan = await page.evaluate(async () => {
     preempted: !!second && A.storyVoice !== firstHandle && slotKey === "rally_charge",
     missingNull: missing === null && nullKey === null,
     stopped: A.storyVoice === null,
+    resumedOffset: second?.voice?.offset,
+    remainingDuration: second?.voice?.duration,
+    wholeDuration: second?.duration,
   };
 });
 Check("剧情台词进不了 Bark 的随机池（只能由 beat.voice 点名）",
@@ -411,6 +414,9 @@ Check("PlayStoryVoice 点名能播，且不吃 Bark 的 0.55 s / 4.5 s 节流闸
   chan.firstOk, "rally_hold");
 Check("剧情语音单槽：新的顶掉旧的（不叠成两个人同时说话）", chan.preempted,
   `槽里现在是 ${chan.preempted ? "rally_charge" : "没换过来"}`);
+Check("暂停后从同一完整文件的偏移续播", chan.resumedOffset===.25
+  &&Math.abs(chan.remainingDuration-(chan.wholeDuration-.25))<.001,
+  `offset=${chan.resumedOffset}, remaining=${chan.remainingDuration}`);
 Check("没有音频时静默降级返回 null（台词先写、音频后烘是常态，不许报错阻塞）",
   chan.missingNull && chan.stopped, "ch9_nobody_01 / null 都返回 null，StopStoryVoice 清空了槽");
 

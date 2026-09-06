@@ -1,3 +1,4 @@
+// Archived P0–P2 regression fixture; current campaign acceptance is Script_FirstLevelMissionBrowserTest.mjs.
 // Isolated terrain/capsule/crater fixture inside the real P012 scene.
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -12,7 +13,7 @@ const server=await ServeRoot(root,0),browser=await LaunchBrowser();
 const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];
 page.on('pageerror',e=>errors.push(String(e)));
 try{
- await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=high`,{timeout:120000});
+ await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012-archive&shot=1&manual=1&quality=high`,{timeout:120000});
  await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:180000});
  const soil=await page.evaluate(async()=>{
   const t=window.Tengxian,field=t.battlefield,THREE=await import('/Taierzhuang1938/vendor/three/build/three.module.js');

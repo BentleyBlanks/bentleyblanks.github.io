@@ -157,6 +157,7 @@ export class FirstLevelWhiteboxField {
 
     const trainSink = new BuildSink();
     for (const block of this.layout.blocks) {
+      if(block.dynamic)continue;
       const targetSink = this.layout.terrain === "P012Heightfield" && IsP012TrainBlock(block.id) ? trainSink : sink;
       if (this.layout.scenario?.replaceBlockIds.includes(block.id)) continue;
       targetSink.Add(block.semantic || "Whitebox", PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), {
@@ -201,7 +202,7 @@ export class FirstLevelWhiteboxField {
     for(const mesh of this.trainMeshes)mesh.position.z=offset;
     for(const surface of this.walkableSurfaces)if(IsP012TrainBlock(surface.id))surface.z+=delta;
     const records=[...this.trainColliders];
-    for(const gate of this.gates.values())if(gate.spec.signal==="P012TrainDoor"){
+    for(const gate of this.gates.values())if(gate.spec.signal==="P012TrainDoor"||gate.spec.signal==="MissionTrainStopped"){
       gate.mesh.position.z+=delta;if(!gate.open)records.push(gate.collider);
     }
     for(const record of records){record.c[2]+=delta;record.min[2]+=delta;record.max[2]+=delta;this.physics?.MoveSolid(record);}
@@ -378,12 +379,13 @@ export class FirstLevelWhiteboxField {
     const gate = this.gates.get(id);
     if (!gate || gate.open) return false;
     gate.open = true;
-    if (this.layout.scenario) gate.mesh.visible = false;
+    if (this.layout.scenario || this.layout.terrainSpec) gate.mesh.visible = false;
     else gate.mesh.position.y = gate.spec.y + gate.spec.h + 1.2;
     const handle = gate.collider._physicsHandle;
     if (this.physics && handle !== null && handle !== undefined) this.physics.RemoveSolid(handle);
     const index = this.colliders.indexOf(gate.collider);
     if (index >= 0) this.colliders.splice(index, 1);
+    if(gate.spec.walkableId)this.walkableSurfaces=this.walkableSurfaces.filter(surface=>surface.id!==gate.spec.walkableId);
     this.BuildCollisionGrid();
     return true;
   }
@@ -397,6 +399,9 @@ export class FirstLevelWhiteboxField {
     gate.mesh.position.z = gate.spec.z; gate.progress = undefined;
     gate.collider = ColliderRecord(gate.spec);
     this.colliders.push(gate.collider);
+    if(gate.spec.walkableId&&!this.walkableSurfaces.some(surface=>surface.id===gate.spec.walkableId)){
+      const surface=this.layout.blocks.find(block=>block.id===gate.spec.walkableId);if(surface)this.walkableSurfaces.push({...surface});
+    }
     if (this.physics) this.physics.AddSolid(gate.collider);
     this.BuildCollisionGrid();
     return true;
@@ -522,7 +527,7 @@ export class FirstLevelWhiteboxField {
       scenarioColliders: this.scenarioColliders.length,
       whiteBoxes: this.stats.whiteBoxes,
       blocks: this.layout.blocks.length,
-      sections: this.layout.sections.map((section) => ({ ...section })),
+      sections: (this.layout.sections||[]).map((section) => ({ ...section })),
       gates: [...this.gates.entries()].map(([id, gate]) => ({
         id,
         signal: gate.spec.signal,

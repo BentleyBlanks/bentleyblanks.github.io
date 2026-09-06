@@ -23,7 +23,7 @@ const debugOptions = new DebugOptions({ getItem: key => store.get(key), setItem:
 assert.equal(debugOptions.Enabled("infiniteAmmo"), true, "reproduce an existing user's persisted debug setting");
 let busy = false;
 const state = { activeSlot: "primary", slots: { primary: "HanYang" }, mags: { primary: { ammo: 0, clips: 0 } }, ammo: 0, clips: 0, playerShots: 0, grenades: 0 };
-const context = vm.createContext({ T, PHASE_TABLE: [openingPhase], combat: { Returning: false }, state, debugOptions, currentWeapon: "HanYang", p012Runtime: null,
+const context = vm.createContext({ T, PHASE_TABLE: [openingPhase], combat: { Returning: false }, state, debugOptions, currentWeapon: "HanYang", p012Runtime: null, missionRuntime: null,
   WEAPONS: { HanYang: { magazine: 5 } }, AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload,
   player: { Alive: true, Busy: false, InWater: false }, viewmodel: { IsBusy: () => busy, TriggerReload: () => { busy = true; } },
   audio: { Play() {} }, hud: { Hint() {} }, fireCooldown: 0, fireEdge: true,

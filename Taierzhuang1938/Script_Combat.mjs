@@ -515,6 +515,7 @@ export class CombatSystem {
    * 台儿庄巷战的标准打法，如果墙不挡弹片，那堵墙就白存在了。
    */
   Blast(position, radius, damage, kind, hurtSide = null, byPlayer = false, onHit = null, explosiveId = kind) {
+    this.host.onBlast?.({position:position.clone(),radius,damage,kind,hurtSide,byPlayer,explosiveId});
     if (this.host.vfx) this.host.vfx.Explosion(position, { radius, kind });
     if (this.host.audio) {
       // 近/远两条**不同的录音**（城区爆炸 vs 远处爆炸），按**听者的距离**挑，

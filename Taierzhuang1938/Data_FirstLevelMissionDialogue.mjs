@@ -1,0 +1,288 @@
+// One continuous exchange = one Seed Audio generation and one retained cue.
+// Latest Notion amendments override archived P0/P1/P2 and older chapter recordings.
+export const MISSION_VOICE_CAST = Object.freeze({
+  shunzi: ["顺子", "二十多岁四川男兵，嘴硬、精明，害怕时说话急，但不是喜剧腔"],
+  yaowa: ["幺娃", "十八岁四川男兵，清亮年轻，嘴快，受到惊吓会结巴、重复，不能沉稳播音"],
+  heyoutian: ["何有田", "二十多岁四川男兵，粗嗓门，生活化挖苦，战斗时短促直接"],
+  liuwencai: ["刘文财", "二十多岁四川男兵，较细干嗓，认真计较弹药，报数清楚"],
+  luo: ["罗班长", "三十多岁四川班长，低沉沙哑有力量，吼命令不用播音腔"],
+  zhou: ["老周", "三十多岁四川伤兵，腿伤疼痛，初期还嘴硬，重伤后气弱短句"],
+  medic: ["卫生兵", "四川男性卫生兵，忙碌疲惫，救人时急促，确认死亡时压低声音"],
+  bearer: ["担架员", "四川成年男性，劳累喘气，抬担架时短促报路"],
+  runner: ["传令兵", "年轻四川男兵，奔跑后气喘，命令说清楚"],
+  soldier: ["士兵", "四川成年男性军人，现场自然喊话"],
+  ija: ["日军", "成年日本男性军人，日语原声，命令短促粗哑，不讲中文"],
+});
+const Cue = (id, lines, extra = {}) =>
+  Object.freeze({
+    id,
+    file: `AudioVoice_FirstLevel${id}.mp3`,
+    lines: lines.map(([who, text]) => Object.freeze({ who, text })),
+    ...extra,
+  });
+export const MISSION_DIALOGUE = Object.freeze([
+  Cue("TrainMeal", [
+    ["yaowa", "顺哥，接到。"],
+    ["shunzi", "你切这么薄，透亮了都。"],
+    ["yaowa", "一车人，就这点。你还想啃一坨嗦？"],
+    ["heyoutian", "给老子也来一片。"],
+    ["yaowa", "吃个锤子，昨晚上你就偷了两坨！"],
+    ["heyoutian", "放你妈的屁，老子那叫尝咸淡。"],
+    ["liuwencai", "十九……妈卖批，明明二十颗。"],
+    ["heyoutian", "你数一晚上了，那颗子弹都要遭你数出娃儿来。"],
+    ["liuwencai", "滚。少一颗你赔老子？"],
+    ["heyoutian", "赔个锤子，你那几颗烂子弹金子打的嗦？"],
+    ["luo", "莫闹了。幺娃，给后头留点，莫全进你几个龟儿肚皮。"],
+  ]),
+  Cue("TrainShelling", [
+    ["luo", "把东西拢起，要到了。"],
+    ["soldier", "炮——！"],
+    ["soldier", "啊——！老子遭了！手！手遭打中了！"],
+    ["luo", "站到！车还没停！都给老子趴下！莫堵门口！"],
+    ["liuwencai", "手拿开！我看！"],
+    ["soldier", "莫碰！痛！妈的痛！"],
+    ["liuwencai", "你不拿开我看个锤子！"],
+    ["heyoutian", "让开点！龟儿些莫挤！"],
+    ["soldier", "卫生兵！担架！"],
+  ]),
+  Cue(
+    "EscapeWhisper",
+    [
+      ["yaowa", "你准备跑路换的那身老百姓衣裳，还藏在包里？"],
+      ["shunzi", "带了。等喊送伤兵，老子就去。"],
+      ["yaowa", "你莫说这么响。"],
+      ["shunzi", "那你就莫问。"],
+    ],
+    { delivery: "低声私语，靠得很近，不让远处班长听见" },
+  ),
+  Cue("SupportOrder", [
+    ["soldier", "罗班长！前头顶不住了！排长叫你们过去支援，帮他们撤下来！"],
+    ["luo", "哪边？"],
+    ["soldier", "沿沟进去！最前头那个机枪位！"],
+  ]),
+  Cue("TankTerror", [
+    ["heyoutian", "妈卖批……这龟儿子一炮一个窝！"],
+    ["yaowa", "妈卖批！啥子鬼东西！"],
+    ["soldier", "战车！脑壳莫伸出去！"],
+    ["luo", "都下去！它看过来了！"],
+    ["luo", "幺娃！你龟儿聋了嗦！"],
+    ["yaowa", "晓得！晓得！"],
+    ["luo", "莫盯到看！前头还有自己人！"],
+  ]),
+  Cue("TakeMachineGun", [
+    ["zhou", "弹匣！妈的……"],
+    ["luo", "周哥，莫逞！"],
+    ["zhou", "外头还有人！"],
+    ["luo", "顺子！你上！"],
+    ["shunzi", "我？"],
+    ["luo", "不然老子喊哪个？压住前头，让他们回来！"],
+    ["zhou", "破墙后头！那个冒火的口子！"],
+    ["liuwencai", "弹匣在手边！"],
+  ]),
+  Cue("ThreeMagazines", [["liuwencai", "还有三匣！"]]),
+  Cue("TwoMagazines", [["liuwencai", "两匣！"]]),
+  Cue("GuardsSafe", [
+    ["soldier", "下来了！"],
+    ["yaowa", "最后两个也进来了！"],
+    ["luo", "顺子，下来！何有田接枪！那车再过来，后头沟口都要给它封死！"],
+    ["liuwencai", "这边！集束手榴弹！"],
+    ["luo", "拿上！先把那龟儿车弄停！"],
+  ]),
+  Cue("TankStopped", [
+    ["heyoutian", "停了！狗日的停了！"],
+    ["luo", "脑壳收回来！炮还在！"],
+  ]),
+  Cue("JapaneseFlank", [["ija", "戦車が止まった！機関銃、援護しろ！右から回れ！村へ入れ！"]], {
+    subtitles: false,
+  }),
+  Cue("FlankWarning", [
+    ["yaowa", "右边那股进村了！"],
+    ["luo", "莫追！看住沟口！"],
+  ]),
+  Cue("Volunteer", [
+    ["runner", "排长命令！这里三班接，你们班抽两个人跟后送队，把伤员送到南边转运点！"],
+    ["luo", "交完呢？"],
+    ["runner", "回来找排部！"],
+    ["shunzi", "我去。"],
+    ["luo", "老子点你了？"],
+    ["shunzi", "我认得到刚才下车那条路。再说周哥我也认得到。"],
+    ["luo", "你跟幺娃。何有田、文财也跟到，路上护着。"],
+    ["shunzi", "晓得。"],
+  ]),
+  Cue("ZhouLift", [
+    ["zhou", "慢点！脚这头托住……啊！"],
+    ["bearer", "托到的！莫乱挣！"],
+    ["luo", "周哥，忍一下，先送你去南头。"],
+    ["zhou", "那边有车没得？"],
+    ["bearer", "有接应。先过去再说。"],
+  ]),
+  Cue(
+    "SouthSecret",
+    [
+      ["yaowa", "你娃跑得倒快。"],
+      ["shunzi", "这种时候不快，等他喊我留下来嗦？"],
+      ["yaowa", "你真准备送到地方就跑？"],
+      ["shunzi", "先到了再说。"],
+    ],
+    { delivery: "并肩走路低声交谈" },
+  ),
+  Cue("SouthVehicles", [
+    ["soldier", "能走的继续往南！重伤的前头上车！"],
+    ["shunzi", "车往哪儿开？"],
+    ["soldier", "往后头送啊！还能往哪儿开？"],
+    ["yaowa", "你问得还多。"],
+    ["shunzi", "老子随便问下。"],
+    ["yaowa", "你随便个锤子。"],
+  ]),
+  Cue(
+    "SouthHope",
+    [
+      ["shunzi", "还真有车。"],
+      ["shunzi", "等把周哥送过去……"],
+      ["yaowa", "嗯。"],
+      ["shunzi", "你跟不跟我？"],
+      ["yaowa", "……先把人送过去再说。"],
+    ],
+    { delivery: "放松一点、有希望，但仍低声，最后一句犹豫" },
+  ),
+  Cue("VillageAmbush", [
+    ["medic", "后头莫挤！前头打起来了！"],
+    ["bearer", "担架往墙根靠！莫堵路！"],
+    ["heyoutian", "东巷有鬼子！机枪进屋了！"],
+    ["luo", "顺子！穿右手那间屋！把窗口的机枪干掉，再把院门打开！担架从里头过！幺娃跟他！"],
+  ]),
+  Cue("CourtyardOpen", [
+    ["luo", "通了！担架先过！"],
+    ["bearer", "前头往里走！莫停门口！"],
+  ]),
+  Cue("ZhouThreshold", [
+    ["zhou", "慢……慢点！"],
+    ["yaowa", "门槛！脚这头抬高！"],
+    ["bearer", "看到的！抬到！"],
+  ]),
+  Cue("TwoLitters", [["liuwencai", "后头还有两副！"]]),
+  Cue("LastLitter", [
+    ["luo", "最后一副！"],
+    ["liuwencai", "过了！"],
+    ["luo", "走！跟后送队！"],
+  ]),
+  Cue("TransferHope", [
+    ["zhou", "前头……就是车？"],
+    ["bearer", "就是。你龟儿命大，赶上了。"],
+    ["zhou", "那就走快点嘛……"],
+  ]),
+  Cue("TransferDefense", [
+    ["heyoutian", "后头追出来了！"],
+    ["luo", "顺子！棚子东头那个墙口！担架先装！拿枪的跟老子顶住！"],
+  ]),
+  Cue("TransferQueue", [
+    ["liuwencai", "这批再装四个！"],
+    ["medic", "腿伤那个先放这边！"],
+    ["zhou", "老子排第几个？"],
+    ["bearer", "急个锤子，前头三个。"],
+  ]),
+  Cue("TransferTwo", [
+    ["zhou", "现在呢？"],
+    ["bearer", "两个！"],
+    ["heyoutian", "右边两个！"],
+    ["luo", "莫追出去！守住路就行！"],
+  ]),
+  Cue("FollowVehicle", [
+    ["medic", "下一副！"],
+    ["bearer", "周哥，到你了！"],
+    ["shunzi", "班长，我跟车送过去？"],
+    ["luo", "先把人抬上去再说！"],
+  ]),
+  Cue("AircraftFirst", [
+    ["medic", "飞机——！"],
+    ["luo", "散开！莫挤在路上！"],
+    ["medic", "能走的自己下沟！担架往西边！"],
+    ["zhou", "啊——！莫动！莫动我！"],
+    ["soldier", "这边中了一个！卫生兵！"],
+    ["medic", "老子就是！莫喊了！先把他拖下来！"],
+    ["yaowa", "狗日的！这边全是伤兵！"],
+    ["heyoutian", "妈卖批！趴下！趴下！"],
+    ["luo", "顺子！回来！东边鬼子上来了！"],
+  ]),
+  Cue("CarryZhou", [
+    ["zhou", "啊——！后头！来个人！"],
+    ["luo", "顺子！接后头！何有田，顶他的位置！"],
+    ["bearer", "往这边！前头有坡！"],
+    ["zhou", "慢点……莫把我丢了。"],
+  ]),
+  Cue("AircraftReturn", [
+    ["yaowa", "又来了！"],
+    ["heyoutian", "狗日的！伤兵也打！"],
+    ["luo", "下沟！快！"],
+  ]),
+  Cue("RescueZhou", [
+    ["yaowa", "周哥！看我！"],
+    ["bearer", "还有气！卫生兵！这边！"],
+    ["luo", "顺子！拿枪！后头要进来了！"],
+  ]),
+  Cue("WestRetreat", [
+    ["soldier", "南边那条后送路断了！车过不去！"],
+    ["luo", "走西边沟！去城边接收院！文财带前头！顺子跟老子断后！"],
+  ]),
+  Cue("RetreatFirst", [
+    ["yaowa", "周哥，听到没得？"],
+    ["zhou", "听到……了。"],
+    ["yaowa", "那你应我一声嘛，莫闭眼。"],
+    ["luo", "撤！下一处墙口！"],
+  ]),
+  Cue("RetreatBleeding", [
+    ["bearer", "转弯！后头慢点！"],
+    ["yaowa", "他这边又在流！何有田！布！快点！"],
+    ["heyoutian", "拿这个！"],
+    ["medic", "莫围到！让出路！"],
+    ["luo", "幺娃！把布压住！"],
+  ]),
+  Cue("RetreatCold", [
+    ["yaowa", "周哥？"],
+    ["zhou", "……冷。"],
+    ["yaowa", "班长！周哥喊冷！"],
+    ["luo", "还有好远？"],
+    ["liuwencai", "院门就在前头！"],
+  ]),
+  Cue("ReceptionDefense", [
+    ["soldier", "担架进来！枪口莫堵门！"],
+    ["luo", "顺子！右手窗口！先把外头那几个压回去！"],
+  ]),
+  Cue("FinalCarry", [
+    ["heyoutian", "这边我看着！接一下周哥！"],
+    ["medic", "放这里！慢点！"],
+  ]),
+  Cue(
+    "ZhouDeath",
+    [
+      ["yaowa", "周哥？到了，听到没得？"],
+      ["medic", "让开点。……没得了。"],
+      ["yaowa", "啥子？"],
+      ["medic", "人没了。"],
+      ["yaowa", "你再看哈！他刚才还答我了！周哥——！"],
+      ["soldier", "鬼子上来了！"],
+      ["luo", "幺娃！起来！顺子，把枪拿起！"],
+    ],
+    { delivery: "紧凑的十至十二秒战场对白；短句相接，幺娃最后的惊叫可与远处士兵喊话自然重叠，不加长沉默" },
+  ),
+  Cue("ReceptionWithdrawal", [
+    ["soldier", "右边墙口守不住了！"],
+    ["runner", "罗班长！接收点往城里撤！东关缺人！排长叫能拿枪的过去！"],
+    ["medic", "能走的跟后头！药箱拿上！"],
+    ["luo", "何有田守门！顺子，把右边墙口那几个打下去！文财带伤员走！幺娃！后头还有活人！过来搭手！"],
+  ]),
+  Cue("JapanesePursuit", [["ija", "門だ！撃て！家の裏へ回れ！"]], { subtitles: false }),
+  Cue("FinalExit", [
+    ["liuwencai", "最后两个出来了！"],
+    ["heyoutian", "顺子！走！老子换弹！"],
+    ["luo", "退到后门！莫恋战！"],
+    ["soldier", "伤员往里！拿枪的去东关！"],
+    ["luo", "跟上！"],
+  ]),
+]);
+export function MissionVoicePrompt(cue) {
+  const cast = [...new Set(cue.lines.map((line) => line.who))]
+    .map((who) => MISSION_VOICE_CAST[who].join("："))
+    .join("；");
+  return `生成游戏中文战场剧情的整段连续多人对白，一个完整音频。1938年四川军人，真实四川口音，不能普通话播音。${cast}。${cue.delivery || "自然接话、短停顿、呼吸，角色声音明确不同且稳定。"}只录人声，不要配乐、枪炮或环境音，不念角色名和说明，不删词改词。日语角色只说日语。完整对白如下：\n${cue.lines.map((line) => `${MISSION_VOICE_CAST[line.who][0]}：“${line.text}”`).join("\n")}`;
+}

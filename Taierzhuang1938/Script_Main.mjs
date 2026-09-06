@@ -44,8 +44,11 @@ import {
   MELEE_QTE_PHASE, MELEE_QTE_LEVEL_ID,
 } from "./Data_MeleeQte.mjs";
 import {
-  FIRST_LEVEL_P012_WHITEBOX_PHASE, FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,
+  FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,
+  FIRST_LEVEL_P012_WHITEBOX_PHASE as ARCHIVED_P012_PHASE,
 } from "./Data_FirstLevelP012Whitebox.mjs";
+import { FIRST_LEVEL_MISSION_PHASE as FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./Data_FirstLevelMission.mjs";
+import { FirstLevelMissionRuntime } from "./Script_FirstLevelMissionRuntime.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { FirstLevelP012Debug } from "./Script_FirstLevelP012Debug.mjs";
 import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
@@ -207,7 +210,9 @@ const EXPLOSION_TEST = params.get("explosions") === "1";
 const WEAPON_RANGE = params.get("weapons") === "1";
 const MOVEMENT_RANGE = params.get("movement") === "1";
 const MELEE_TEST = params.get("melee") === "1";
-const FIRST_LEVEL_P012_WHITEBOX = params.get("whitebox") === "p012";
+// Archived content is a developer regression fixture, absent from chapter selection.
+const ARCHIVED_P012_FIXTURE = params.get("whitebox") === "p012-archive";
+const FIRST_LEVEL_P012_WHITEBOX = params.get("whitebox") === "p012" || ARCHIVED_P012_FIXTURE;
 /**
  * 序 · 界河白盒（?jiehe=1）：与靶场同一条整表替换的路子。
  * 界河退出了正片流程，但 Script_JieheField / Script_JieheHeight /
@@ -239,7 +244,7 @@ const FULL_SCENE_VIEW = FULL_SCENE
 const SANDBOX = MOVEMENT_RANGE || EXPLOSION_TEST || WEAPON_RANGE || RANGE || MELEE_TEST || FIRST_LEVEL_P012_WHITEBOX || JIEHE;
 const PHASE_TABLE = MOVEMENT_RANGE ? [MOVEMENT_RANGE_PHASE] : EXPLOSION_TEST ? [EXPLOSION_RANGE_PHASE] : WEAPON_RANGE ? [WEAPON_RANGE_PHASE] : RANGE ? [RANGE_PHASE]
   : MELEE_TEST ? [MELEE_QTE_PHASE]
-    : FIRST_LEVEL_P012_WHITEBOX ? [FIRST_LEVEL_P012_WHITEBOX_PHASE]
+    : FIRST_LEVEL_P012_WHITEBOX ? [ARCHIVED_P012_FIXTURE ? ARCHIVED_P012_PHASE : FIRST_LEVEL_P012_WHITEBOX_PHASE]
       : JIEHE ? [JIEHE_SANDBOX_PHASE]
         : OVERVIEW ? [OVERVIEW_PHASE]
           : FULL_SCENE ? [FULL_SCENE_PHASE]
@@ -641,6 +646,7 @@ let companion = null;
 // 这里只给它「采一帧」与「写回去」两个回调。**不扣兵员池、不走死亡换人卡。**
 let checkpoint = null;
 let p012Flow = null;
+let missionRuntime = null;
 let p012Runtime = null;
 let p012Resting = null;
 let p012CarryView = null;
@@ -2132,7 +2138,8 @@ async function Boot() {
        *   SetCombatBed  —— 交火声床的整层淡入淡出归音频批（INT3）。
        */
       Setpieces: () => (setpieces ? setpieces.State() : null),
-      P012: () => p012Flow?.State() || null,
+      P012: () => missionRuntime?.State() || p012Flow?.State() || null,
+      FirstLevelMission: () => missionRuntime?.State() || null,
       P012Progress: () => p012Debug.State(),
       P012NextProgress: () => p012Debug.Next(),
       P012CarryView: () => p012CarryView?.Debug() || null,
@@ -2526,7 +2533,7 @@ async function Boot() {
       SlicePhase: () => PHASE_TABLE[state.builtPhase] || PHASES[state.builtPhase] || null,
       ExitSandbox: () => GoToSandbox(null),
       RestartSandbox: () => location.reload(),
-      RetrySandbox: () => { if(p012Runtime?.RetryPlayer()){state.playerAliveLast=true;state.pendingRespawn=false;state.deathTimer=0;viewmodel.root.visible=true;ResumeFromPause();hud.Hint(T("hud.hint.p012Retry"),4);} },
+      RetrySandbox: () => { if(missionRuntime?.Retry() || p012Runtime?.RetryPlayer()){state.playerAliveLast=true;state.pendingRespawn=false;state.deathTimer=0;viewmodel.root.visible=true;ResumeFromPause();hud.Hint(T("hud.hint.p012Retry"),4);} },
       Resume: () => ResumeFromPause(),
       // OpenMenu / PauseGame 会把整棵编辑器 DOM 藏掉（主菜单不该常驻开发齿轮）。
       // 「设置」既然复用了这棵 DOM，就必须先把它显式还回来；否则内部的
@@ -2947,6 +2954,7 @@ function ClearSetpieceProps() {
 }
 
 function ClearRuntime() {
+  missionRuntime?.Dispose(); missionRuntime = null;
   p012StageZero?.Dispose(); p012StageZero = null;
   explosionRange?.Dispose(); explosionRange = null;
   movementRange?.Dispose(); movementRange = null;
@@ -3137,7 +3145,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // 章节摆点：**排在具名同伴之后**（罗班长要先站出来，摆点层才拿得到他的句柄），
   // 也排在 SeedSoldiers 之前（后送队要从 nra 名额里出人，撒兵才会自动少撒同样多）。
   // 靶场／白刃训练场／预览／过场承载章都不摆；第一关白盒有正式第一章内容。
-  if (!MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && !deprecated && setpieces) {
+  if (!phase.whitebox?.fullMission && !MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && !deprecated && setpieces) {
     setpieces.BeginLevel(contentId, phase);
   }
   interact.Clear("P012");
@@ -3156,7 +3164,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   p012Binoculars = null; // Removed from this scenario: the leader supplies the route.
   p012BinocularRaised = false;
   p012Resting?.Dispose();
-  p012Resting = phase.whitebox?.p012 ? new FirstLevelP012Resting({
+  p012Resting = phase.whitebox?.p012 && !phase.whitebox?.fullMission ? new FirstLevelP012Resting({
     Spawn: (spec) => {
       const actor = actorFactory.Create("civilian", {seed:HashString(spec.id),variant:spec.variant,weapon:null});
       actor.root.position.set(spec.x,battlefield.GroundHeight(spec.x,spec.z),spec.z);
@@ -3168,7 +3176,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     Remove: (actor) => {scene.remove(actor.root);actor.Dispose?.();},
   }) : null;
   p012Resting?.Start();
-  p012Runtime = phase.whitebox?.p012 ? new FirstLevelP012Runtime({
+  p012Runtime = phase.whitebox?.p012 && !phase.whitebox?.fullMission ? new FirstLevelP012Runtime({
     SpawnEnemy: (spec) => {
       const actor = ai.Spawn("ija", spec.x, spec.z, spec);
       if (actor && spec.p012MachineGun) { actor.p012MachineGun = true; actor.scriptDefensive = true; }
@@ -3361,7 +3369,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     },
     Capture: cut => cutscene.onCapture(cut), Release: () => {input.lookX=0;input.lookY=0;cutscene.onRelease();},
     Player:()=>player, Guide:()=>companion.Handle("luo"), Signal:name=>story.Signal(name), Signalled:name=>story.Signalled(name)});
-  p012Flow = phase.whitebox?.p012 ? new FirstLevelP012Director({
+  p012Flow = phase.whitebox?.p012 && !phase.whitebox?.fullMission ? new FirstLevelP012Director({
     PlayerPosition:()=>player.position, Hint:(text,seconds)=>hud.Hint(text,seconds),
     NearbyDroppedWeapon:()=>{
       const eye=player.EyePosition;
@@ -3489,6 +3497,17 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     },
   }, phase.whitebox) : null;
   if (p012Flow) state.storyObjective = p012Flow.CurrentObjective().text;
+  missionRuntime?.Dispose();
+  missionRuntime = phase.whitebox?.fullMission ? new FirstLevelMissionRuntime({
+    scene,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,
+    Objective:text=>{state.storyObjective=text;},
+    Inventory:()=>({ammo:state.ammo,clips:state.clips,grenades:state.grenades,bundles:state.bundles,shots:state.playerShots}),
+    GiveSupply:({clips=0,grenades=0,bundles=0,bandages=0})=>{state.clips+=clips;state.grenades+=grenades;state.bundles+=bundles;player.bandages+=bandages;state.mags.primary.clips=state.clips;},
+    RestoreRifle:()=>{if(state.activeSlot!=='primary')SwitchSlot('primary');viewmodel.root.visible=true;},
+    Control:active=>{state.missionControl=active;state.cooking=null;state.cook=0;input.fire=false;input.ads=false;},
+    Complete:()=>{Progress.MarkCleared(FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,0);ShowPauseMenu();menu.OpenSandboxComplete();},
+  }) : null;
+  await missionRuntime?.voiceReady;
   // 靶场撒的是木桩兵，不是战线；同时钉住本关 —— 站遍三个工位不许触发换关结算。
   RegisterGrenadeReturn(interact, combat, player, {
     CanUse: () => !state.cooking && !carry?.Active && !emplacement?.Mounted && !meleeCombat?.Active
@@ -4248,6 +4267,7 @@ function HasLineOfSight(toX, toZ) {
  *     随便撒一个点有一多半落在别人家院子里，玩家永远看不见。
  */
 function SeedSoldiers(phase) {
+  if(phase.whitebox?.fullMission)return;
   const rnd = Mulberry32(1000 + state.phaseIndex * 97);
   const nraTarget = phase.whitebox?.p012
     ? Math.max(0, phase.whitebox.friendlyLimit - (ai.deaths.nra || 0)) : Math.round(SCALE.maxAlive * 0.42);
@@ -4717,6 +4737,10 @@ function PlayHurtCues() {
 }
 
 function OnPlayerDown() {
+  if(missionRuntime){
+      missionRuntime.OnPlayerDown();state.pendingRespawn=false;state.deathTimer=0;
+    p012CarryView?.Update(0,{alive:false});audio.Play('bodyFall',{volume:.9});ShowPauseMenu();menu.OpenSandboxFailure(false);return;
+  }
   if (MELEE_TEST) {
     state.pendingRespawn = false; state.deathTimer = 0;
     viewmodel.root.visible = false; audio.Play("bodyFall", {volume:.8});
@@ -5297,6 +5321,7 @@ const p012Debug = new FirstLevelP012Debug({
  */
 function ShowPauseMenu() {
   meleeCombat?.HandleInput("Blur", false);
+  missionRuntime?.voice.Pause();
   state.running = false;
   interact?.CancelHold("pause");
   p012BinocularRaised = false;
@@ -5321,9 +5346,9 @@ function PauseGame() {
 /** 调试动作只使用当前关卡已经建立的检查点。 */
 function CheckpointStatus() {
   const available = !!player && !state.menu && !state.cutscene && !state.advancing
-    && !p012Runtime?.completed && !!(p012Runtime ? p012Runtime.safePoint : checkpoint?.saved);
+    && !missionRuntime?.completed && !p012Runtime?.completed && !!(missionRuntime?.safePoint || (p012Runtime ? p012Runtime.safePoint : checkpoint?.saved));
   return { available, note: available
-    ? (p012Runtime ? T("menu.checkpoint.noteP012") : T("menu.checkpoint.noteLevel"))
+    ? (missionRuntime || p012Runtime ? T("menu.checkpoint.noteP012") : T("menu.checkpoint.noteLevel"))
     : T("menu.checkpoint.none") };
 }
 
@@ -5331,7 +5356,7 @@ function ContinueCheckpoint() {
   if (!CheckpointStatus().available) return false;
   // Release at the old position so recovery never teleports a payload across the scene.
   if (p012Runtime) carry?.ForceRelease("debugCheckpoint");
-  if (!(p012Runtime || checkpoint).ContinueCheckpoint()) return false;
+  if (!(missionRuntime || p012Runtime || checkpoint).ContinueCheckpoint()) return false;
   meleeCombat?.EscapeQte();
   meleeCombat?.ReleasePlayer();
   state.playerAliveLast = true;
@@ -5347,6 +5372,7 @@ function ContinueCheckpoint() {
 /** 暂停里的「继续」。 */
 function ResumeFromPause() {
   if (!menu) return;
+  if (missionRuntime?.completed || missionRuntime?.failed) return;
   if (p012Runtime?.completed) return;
   if (p012Runtime?.failed) return;
   // 设置面板很可能还开着：关掉「画质」那一页只关那一页，**入口面板留着**
@@ -5362,6 +5388,7 @@ function ResumeFromPause() {
   state.running = true;
   hudRoot.style.display = "";
   audio.SetPaused(false);
+  missionRuntime?.voice.Resume();
   RequestPointerLock();
 }
 
@@ -5414,6 +5441,7 @@ const router = new InputRouter({
     return !!meleeCombat?.HandleInput(detail.code,detail.down,detail.repeat);
   },
   OnAction: (action, detail) => {
+    if(missionRuntime?.controls)return;
     if (state.cutscene) return; // 过场只由 CutsceneDirector 接收 Look/Esc
     if (!state.ready) return;
     // 编辑器开着就把整张键位表闸掉。不闸的话在编辑器里按 R 会真的去装填、
@@ -5438,6 +5466,7 @@ const router = new InputRouter({
         if (emplacement?.Mounted) { emplacement.PullBolt(); return; }
         Reload(); return;
       case "melee":
+        if(missionRuntime){if(detail.down)SwitchSlot(state.activeSlot==='melee'?'primary':'melee');return;}
         if (WEAPONS[currentWeapon]?.bayonet && state.bayonetFixed) {
           if(detail.down && meleeCombat.CanChangeWeapon() && !viewmodel.IsBusy() && !player.Busy) {
             meleeCombat.ReleasePlayer();meleeStance=!meleeStance;
@@ -5463,7 +5492,7 @@ const router = new InputRouter({
         // Registered delivery holds take precedence over dropping a carried load.
         if (carry?.Active) {
           const delivery = interact?.Query(player)?.point;
-          if (p012Flow && ["p012_ammoDrop", "p012_airRescueCover"].includes(delivery?.id)) { DoInteract(); return; }
+          if ((missionRuntime && delivery?.id==='MissionZhouPlace') || p012Flow && ["p012_ammoDrop", "p012_airRescueCover"].includes(delivery?.id)) { DoInteract(); return; }
           carry.Drop("player"); return;
         }
         DoInteract(); return;
@@ -6076,6 +6105,7 @@ function ConfirmHit(died) {
 
 function TryFire(dt, returningGrenade = false) {
   fireCooldown -= dt;
+  if(missionRuntime?.controls)return;
   if (returningGrenade) return;
   if (p012Runtime?.binocularOwned) return;
   // 架着机枪：左键交给机枪那条射速与过热闸（Script_Emplacement.Update 里排），
@@ -6416,6 +6446,7 @@ function AimEmplacementView(view) {
  * 「争夺中：路西村庄外围」）—— 顶栏那一行归剧本，不归战场状态。
  */
 function UpdateObjectives(dt) {
+  if(missionRuntime){state.objectiveIndex=missionRuntime.flow.index;state.storyObjective=missionRuntime.flow.stage.objective;return;}
   if (p012Flow) {
     const goal = p012Flow.CurrentObjective();
     const index = battlefield.objectives.findIndex((item) => item.id === goal.zone);
@@ -6501,7 +6532,7 @@ const _proj = new THREE.Vector3();
  */
 function Frame(dt, render = true) {
   // StepFrames also enters here directly: terminal P012 screens freeze the entire world clock.
-  if (p012Runtime?.completed || p012Runtime?.failed) {
+  if (missionRuntime?.completed || missionRuntime?.failed || (missionRuntime && !state.running && !editor?.Capturing) || p012Runtime?.completed || p012Runtime?.failed) {
     if (render) RenderScene(0);
     return;
   }
@@ -6625,6 +6656,7 @@ function Frame(dt, render = true) {
   profiler.B("player");
   input.diveSpeedMps = p012Runtime?.DiveSpeed(strafe?.View());
   player.meleePose = meleeCombat?.ViewPose();
+  missionRuntime?.BeforePlayer(dt,input);
   player.Update(dt, input, WEAPONS[currentWeapon], WEAPON_RANGE ? WEAPON_RANGE_PHASE.whitebox : null);
   movementRange?.Update(dt);
   profiler.E("player");
@@ -6864,7 +6896,7 @@ function Frame(dt, render = true) {
   }
   if (state.playerAliveLast && !player.Alive) OnPlayerDown();
   state.playerAliveLast = player.Alive;
-  if(p012Runtime?.failed){if(render)RenderScene(dt);return;}
+  if(missionRuntime?.failed || p012Runtime?.failed){if(render)RenderScene(dt);return;}
 
   // 火墙（三关传单入火封住的那条追击路线）。**对玩家同样有伤害** ——
   // 它是封路，不是单向道具。烧完就把烟收掉。
@@ -6898,6 +6930,8 @@ function Frame(dt, render = true) {
   checkpoint?.Update();
 
   profiler.B("story");
+  missionRuntime?.Update(dt);
+  if(missionRuntime?.completed){profiler.E('story');return;}
   if (p012Flow) {
     p012StageZero?.Update(dt);
     p012Resting?.Update(dt);
@@ -6941,14 +6975,14 @@ function Frame(dt, render = true) {
     pool: state.nraPool,
     p012Beat: p012Flow?.beat,
   });
-  if (story.ObjectiveText && !p012Flow) state.storyObjective = story.ObjectiveText;
+  if (story.ObjectiveText && !p012Flow && !missionRuntime) state.storyObjective = story.ObjectiveText;
   // 章节摆点：**排在 story.Update 之后**。它的 onVoice 钩子读的是 story.fired，
   // 排在前面的话每一拍都要慢一帧 —— 「顺子喊完『老子回去压住！』就播转身那一场」
   // 这种同拍的事会看得出来差一帧。
   setpieces?.Update(dt);
   if (p012CarryView) {
     const litterId = setpieces?.mem?.p012CarriedLitter?.propLitter;
-    p012CarryView.Update(dt, { litter: setpieceProps.get(String(litterId))?.root,
+    p012CarryView.Update(dt, { litter: missionRuntime?.view.zhouRoot || setpieceProps.get(String(litterId))?.root,
       player, carry: carry?.View(), alive: player.Alive && !state.cutscene && !state.menu });
   }
   // 事件先改变白盒，再让玩家从改变后的世界里读到结果：护送队喊走后开院门，
@@ -7013,7 +7047,7 @@ function Frame(dt, render = true) {
 
   // --- HUD ---
   profiler.B("hud");
-  hud.SetObjective(state.storyObjective || phase.label, state.nraPool, null);
+  hud.SetObjective(state.storyObjective || phase.label, phase.whitebox?.fullMission?null:state.nraPool, null);
   hud.SetState({
     stance: player.stance,
     wounded: player.wounds.length > 0,

@@ -36,6 +36,15 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   （转动跑在 worker 里，建关卡不掉帧）。
 - 先读：`docs/Data_TengxianIntegration.md`（模块契约与推定值索引）。
 
+### 第一关《往南的路》
+- `Data_FirstLevelMission` / `Data_Tuning_FirstLevel`：24 个执行阶段对应 Notion 18 段剧情；事实门、有限敌人、节奏和装备。
+- `Data_FirstLevelMissionLayout` / `Terrain`：纯数据空间与共享高度场。室外地面不使用盒体；列车地板、台阶和桥面属于结构。
+- `Script_FirstLevelMissionRuntime` / `Flow` / `Column` / `View`：实际操作、阶段记录、20 副担架和装车/撤离、简化实例化角色。
+- `Data_FirstLevelMissionDialogue` / `Script_FirstLevelMissionVoice`：整段连续对白。`Script_SeedAudioFirstLevelBake.mjs` 仅从环境变量取密钥，每段一个请求、一个音频文件；`--dry` 审核请求，`Script_FirstLevelMissionTest.mjs --audio` 验实际资产。
+- 当前入口直接覆盖 `?whitebox=p012`。`p012-archive` 只供旧模型、调试与共享组件回归，不作为新版验收。
+- 本地通关：`node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign`。截图、过程 JSON 留在忽略目录 `_shots/FirstLevelMission`。
+- 来源与逐项验收见 [Data_FirstLevelRebuildAcceptance.md](Data_FirstLevelRebuildAcceptance.md)。
+
 ### 渲染管线 / GI / 灯光天空
 - `Script_Post.mjs` —— 自研后处理：深度法线预通道 → SSAO → Bloom → 体积光 → tonemap →
   抗锯齿，**顺序错一条画面就「塑料」**；帧结构在文件头。

@@ -52,9 +52,9 @@ try {
       assert.ok(await page.locator('#bootStart').isEnabled());
       await page.locator('#bootStart').click();
       await page.waitForFunction(() => window.Tengxian.state.running && document.getElementById('boot').classList.contains('gone'), null, {timeout:10000});
-      const before = await page.evaluate(() => window.Tengxian.Debug.P012().elapsed);
-      await page.waitForFunction(before => window.Tengxian.Debug.P012().elapsed > before, before, {timeout:10000});
-      assert.ok(await page.evaluate(() => !!window.Tengxian.Debug.P012Scene().stageZero));
+      const before = await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().time);
+      await page.waitForFunction(before => window.Tengxian.Debug.FirstLevelMission().time > before, before, {timeout:10000});
+      assert.ok(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage === "Train"));
     } else {
       assert.equal(await page.evaluate(() => window.Tengxian.Debug.Menu().open), true);
     }

@@ -59,7 +59,7 @@ const Url = (query = "") => `http://127.0.0.1:${port}/Taierzhuang1938/?quality=m
 // Explicit lethal-hit fixture, not campaign or balance evidence.
 if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-voice-only") || process.argv.includes("--p012-enemy-bound-only") || process.argv.includes("--p012-approval-only") || process.argv.includes("--p012-grenade-only") || process.argv.includes("--p012-salvage-only")){
  try{
-  await page.goto(Url("&whitebox=p012&shot=1&manual=1"),{timeout:120000});
+  await page.goto(Url("&whitebox=p012-archive&shot=1&manual=1"),{timeout:120000});
   await page.waitForFunction(()=>window.Tengxian?.Debug?.P012?.(),null,{timeout:240000});
   if(process.argv.includes("--p012-salvage-only")){
     // Explicit local range initialization on the real P012 outer ground. This
@@ -788,7 +788,7 @@ async function CheckMissionList() {
       label:document.querySelector('.mnMissionRecord span')?.textContent||''};
   });
   Check("第一关的简报按章节写（日期 · 地点，章节记录 · 尚未通过）",
-    /三月十四日/.test(firstBrief.when)&&/铁路兵站/.test(firstBrief.when)&&firstBrief.label==="章节记录"&&firstBrief.record==="尚未通过",JSON.stringify(firstBrief));
+    firstBrief.when==="一九三八年三月 · 滕县外围"&&firstBrief.label==="章节记录"&&firstBrief.record==="尚未通过",JSON.stringify(firstBrief));
   const placeholderBrief=await page.evaluate(()=>{
     window.Taierzhuang.menu.SelectLevel(1);
     return {objective:document.querySelector('.mnMissionObjective').textContent,record:document.querySelector('.mnMissionRecord b').textContent,
@@ -1415,14 +1415,14 @@ async function CheckMissionList() {
     menu.SelectLevel(menu.entries.findIndex(entry => entry.sandboxKey === "firstLevelP012Whitebox"));
   });
   await page.click("#menu .mnMissionTrack .mnChapterLevel.on");
-  await page.waitForFunction(() => window.Taierzhuang?.Debug?.P012?.()?.beat === "B00",
+  await page.waitForFunction(() => window.Taierzhuang?.Debug?.FirstLevelMission?.()?.stage === "Train",
     null, { timeout: 240000 });
   const p012Entered = await page.evaluate(() => ({
     query: new URL(location.href).searchParams.get("whitebox"),
     phase: window.Taierzhuang.Debug.Whitebox().phase,
     open: window.Taierzhuang.Debug.Menu().open,
   }));
-  Check("选章「第一关」实际进入 P0/P1/P2 白盒",
+  Check("选章「第一关」实际进入新版完整任务白盒",
     p012Entered.query === "p012" && p012Entered.phase === "FirstLevelP012Whitebox" && !p012Entered.open,
     JSON.stringify(p012Entered));
   await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("exitSandbox"));

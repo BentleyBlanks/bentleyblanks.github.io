@@ -1,3 +1,4 @@
+// Archived P0–P2 regression fixture; current campaign acceptance is Script_FirstLevelMissionBrowserTest.mjs.
 // Real pause-menu action, full sequential debug chain and playable handoffs.
 import assert from "node:assert/strict";
 import path from "node:path";
@@ -14,7 +15,7 @@ const base=process.env.P012_DEBUG_PREVIEW_URL||`http://127.0.0.1:${server.addres
 const browser=await LaunchBrowser(),page=await browser.newPage({viewport:{width:1440,height:900}});
 const errors=[];page.on("pageerror",error=>errors.push(String(error)));
 try {
-  await page.goto(`${base}/Taierzhuang1938/?whitebox=p012&manual=1&quality=medium&scale=small`,{timeout:120000});
+  await page.goto(`${base}/Taierzhuang1938/?whitebox=p012-archive&manual=1&quality=medium&scale=small`,{timeout:120000});
   await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:240000});
   await page.locator("#bootStart").click();
   await page.evaluate(()=>{const g=window.Tengxian;g.StepFrames(1);g.Debug.Pause();g.Debug.MenuAct("debug");});

@@ -517,7 +517,7 @@ export class Hud {
     } else if (playerJustTookControl) this.ReplayObjective();
 
     // 第一次进关只记基线，不把开局数字误报成「发生了变化」。
-    const poolChanged = this.poolLast !== undefined && ours !== this.poolLast;
+    const poolChanged = ours != null && this.poolLast !== undefined && ours !== this.poolLast;
     this.poolLast = ours;
     if (poolChanged) {
       const enemyIntel = theirs === null ? "" : T("hud.force.enemyIntel", { theirs });

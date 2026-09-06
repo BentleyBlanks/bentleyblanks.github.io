@@ -18,6 +18,7 @@ export class MeleeQteDirector {
       decay: Q.decayPerS * Clamp(context.strength ?? 1, 0.8, 1.25),
       lastPress: -1, credit: 1, held: false, accepted: 0, rejected: 0, pulse: 0, success: null,
       reason: context.reason || "contact", advantage: !!context.parried,
+      windowS: Number.isFinite(context.windowS) ? Clamp(context.windowS, 1, Q.windowS) : Q.windowS,
     };
     if (context.parried) this.active.progress += 0.06;
     return true;
@@ -58,7 +59,7 @@ export class MeleeQteDirector {
     }
     if (a.phase !== "input") return;
     a.progress = Math.max(0, a.progress - a.decay * dt);
-    if (a.progress <= 0 || a.t >= Q.windowS) this.Resolve(false);
+    if (a.progress <= 0 || a.t >= a.windowS) this.Resolve(false);
   }
   Cancel() { this.active = null; }
   View() {
@@ -68,7 +69,7 @@ export class MeleeQteDirector {
       label: a.kind === "ground" ? T("gameplay.melee.qte.ground") : T("gameplay.melee.qte.standing"),
       prompt: T("gameplay.melee.qte.prompt"),
       keys: ["F"], expected: "F", input: "mash", index: a.accepted,
-      progress: a.progress, timeT: a.t / Q.windowS, timeLeft: Math.max(0, Q.windowS - a.t),
+      progress: a.progress, timeT: a.t / a.windowS, timeLeft: Math.max(0, a.windowS - a.t),
       resolveT: a.resolveT / Q.resolveS, pulse: a.pulse, assist: this.assist,
       accepted: a.accepted, rejected: a.rejected, reason: a.reason,
     };

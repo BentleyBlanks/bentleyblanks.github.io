@@ -1983,6 +1983,7 @@ const AMB_TICKS_PER_MIN = 60000 / AMB_TICK_MS;
  */
 export const AMBIENCE_PRESETS = {
   silence: { space: "street", layers: [], events: [], fallbackWind: 0 },
+  firstLevelSouth: {space:'open',fallbackWind:.04,fallbackCut:480,layers:[{bed:'windPlain',gain:.3,seg:13}],events:[]},
 
   // 序章｜出川：车厢静止，窗外布景由过场时间轴移动。制动不是第二套环境系统，
   // 而是同一床上的明确事件 cue；新版 102 秒序章在 0:40—0:56 触发 trainBrake 一次。
@@ -2610,7 +2611,7 @@ export class AudioEngine {
         // **剧情台词不重试**：章节内容批会先把台词写进表、过几天才烘音频，
         // 中间这段时间每条未烘焙的行都会 404。默认 2 次重试 = 一条缺失台词发三个请求，
         // 几十条就是开机时几百个白等的请求（「加载卡在夯地」那一类症状的做法）。
-        const bytes = await FetchAudioAsset(`${base}${e.file}?v=20260828chapterstory`,
+        const bytes = await FetchAudioAsset(`${base}${e.file}?v=${e.version || '20260828chapterstory'}`,
           e.kind === "story" ? 0 : 2);
         const buf = await this.ctx.decodeAudioData(bytes);
         const name = "voice." + e.key;
@@ -2883,7 +2884,7 @@ export class AudioEngine {
    * @returns {{key:string,duration:number,voice:object}|null} null = 没有这条音频，
    *   由调用方降级成纯字幕（这是常态，不是错误：台词先写、音频后烘）。
    */
-  PlayStoryVoice(key, { position = null, volume = 1 } = {}) {
+  PlayStoryVoice(key, { position = null, volume = 1, offset = 0 } = {}) {
     if (!this.ctx || this.disposed || this.voiceMute) return null;
     const entry = key ? this.voiceBank.get(key) : null;
     if (!entry) return null;
@@ -2895,7 +2896,7 @@ export class AudioEngine {
       if (dx * dx + dy * dy + dz * dz > VOICE_CULL_M * VOICE_CULL_M) at = null;
     }
     this.StopStoryVoice();
-    const voice = this.Play("voice." + key, { position: at, volume, pitch: 1, priority: true });
+    const voice = this.Play("voice." + key, { position: at, volume, offset, pitch: 1, priority: true });
     if (!voice) return null;
     this.storyVoice = voice;
     this.storyVoiceKey = key;

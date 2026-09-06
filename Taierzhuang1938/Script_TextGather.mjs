@@ -45,6 +45,9 @@ import {
 import { HISTORY_NOTES, BATTLE_TIMELINE, EPILOGUE_LINES } from "./Data_History.mjs";
 import { VOICE_LINES } from "./Data_Voice.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
+import { MISSION_STAGES,FIRST_LEVEL_MISSION_PHASE } from "./Data_FirstLevelMission.mjs";
+import { MISSION_DIALOGUE,MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
+import { FirstLevelStageTextId,FirstLevelVoiceTextId,FirstLevelCastTextId } from "./Script_TextIds.mjs";
 import {
   BeatTextId, BeatSubId, LevelObjectiveId, LevelObjectiveStepId, LevelBriefId, LevelFieldId, CastNameId,
   ShotTextId, CutsceneTitleId, CardTitleId, CardTextId, TallyRowId, TallyClosingId, NoteTextId,
@@ -102,6 +105,11 @@ function Add(row) {
 }
 
 // --- 说话人名册 -------------------------------------------------------------
+for(const stage of MISSION_STAGES)Add({id:FirstLevelStageTextId(stage.id),text:stage.objective,source:'Data_FirstLevelMission'});
+for(const cue of MISSION_DIALOGUE)cue.lines.forEach((line,index)=>Add({id:FirstLevelVoiceTextId(cue.id,index),text:line.text,who:line.who,voice:cue.file,source:'Data_FirstLevelMissionDialogue'}));
+for(const [id,person] of Object.entries(MISSION_VOICE_CAST))Add({id:FirstLevelCastTextId(id),text:person[0],who:id,source:'Data_FirstLevelMissionDialogue'});
+for(const field of ['label','date','place'])Add({id:LevelFieldId(FIRST_LEVEL_MISSION_PHASE.id,field),text:FIRST_LEVEL_MISSION_PHASE[field],source:'Data_FirstLevelMission'});
+FIRST_LEVEL_MISSION_PHASE.brief.forEach((text,index)=>Add({id:LevelBriefId(FIRST_LEVEL_MISSION_PHASE.id,index),text,source:'Data_FirstLevelMission'}));
 // CAST 在 Data_TengxianScript 载入时已经把各过场自带的 people 并进来了，所以这一遍是全的。
 for (const [id, person] of Object.entries(CAST)) {
   Add({ id: CastNameId(id), text: person.short || person.name, source: "CAST", who: id });

@@ -1,3 +1,4 @@
+// Archived P0–P2 regression fixture; current campaign acceptance is Script_FirstLevelMissionBrowserTest.mjs.
 // Actual P012 spawn/GLB playback, with isolated diagnostic motion afterwards.
 // This verifies playback and produces local images, not a campaign completion.
 import assert from 'node:assert/strict';
@@ -12,7 +13,7 @@ const server=await ServeRoot(root,0),browser=await LaunchBrowser();
 const page=await browser.newPage({viewport:{width:1600,height:1000}}),errors=[];
 page.on('pageerror',e=>errors.push(String(e)));
 try{
- await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=high`,{timeout:120000});
+ await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012-archive&shot=1&manual=1&quality=high`,{timeout:120000});
  await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:180000});
  const train=await page.evaluate(()=>{
   const t=window.Tengxian;t.StepFrames(1,1/30,false);

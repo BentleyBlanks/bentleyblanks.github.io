@@ -1,3 +1,4 @@
+// Archived P0–P2 regression fixture; current campaign acceptance is Script_FirstLevelMissionBrowserTest.mjs.
 // P012 真浏览器验收。截图成功不等于玩法通过，运行时断言与人工看图分别记录。
 import path from "node:path";
 import os from "node:os";
@@ -2444,7 +2445,7 @@ async function VerifyAudioPlayback() {
 
 try {
   if(savedInfiniteAmmo)await page.addInitScript(()=>localStorage.setItem("tengxian1938_debug_options_v1",JSON.stringify({infiniteAmmo:true})));
-  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&${audioSmoke ? "audio=1" : "shot=1"}&manual=1&quality=low&scale=small`,
+  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012-archive&${audioSmoke ? "audio=1" : "shot=1"}&manual=1&quality=low&scale=small`,
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 180000 });
   if (audioSmoke) await page.click("#bootStart");

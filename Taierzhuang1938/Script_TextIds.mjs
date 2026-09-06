@@ -26,6 +26,9 @@
 // 枚举值（tier 那种）因此**不做 id**，见 Script_Cutscene.TierTag 上的账。
 
 /** 一条章节 beat 的内容 id。index 必须是该关 beats 数组里的原始下标。 */
+export const FirstLevelStageTextId = id => `mission.firstLevel.stage.${id}`;
+export const FirstLevelVoiceTextId = (id, index) => `mission.firstLevel.${id}.${index}`;
+export const FirstLevelCastTextId = id => `mission.firstLevel.cast.${id}`;
 export function BeatTextId(levelId, beat, index) {
   if (beat && beat.voice) return beat.voice;
   return `${levelId}.beat.${index}`;

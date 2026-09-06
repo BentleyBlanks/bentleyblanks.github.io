@@ -19,6 +19,8 @@ const projectDir = path.resolve(here, "..");
 /** 供界面取字的纯数据模块（都不许 import three，Node 里要能直接 import）。 */
 const UI_MODULES = [
   "Data_Locale_zhCN.mjs",   // 语言表：绝大多数界面文案的家
+  "Data_FirstLevelMission.mjs",
+  "Data_FirstLevelMissionDialogue.mjs",
   "Data_TengxianScript.mjs", // 标题 / 关于页 / 七章的名字、地点与简报
   "Data_Menu.mjs",           // 主菜单机位说明
   "Data_History.mjs",        // 史实注记页
