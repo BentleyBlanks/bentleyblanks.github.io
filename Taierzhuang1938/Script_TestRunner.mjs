@@ -155,6 +155,7 @@ export const testDefs = {
   SprintViewmodelTest: { file: "Script_SprintViewmodelTest.mjs", desc: "冲刺第一人称持械视觉回归" },
   FirstPersonEmbodimentTest: { file: "Script_FirstPersonEmbodimentTest.mjs", desc: "全枪人体关节、空手摆臂与低头身体回归" },
   FpsArmTest: { file: "Script_FpsArmTest.mjs", desc: "第一人称国军 01 双手：手扣在枪上、腕袖不糊屏" },
+  FpsHandContactTest: { file: "Script_FpsHandContactTest.mjs", desc: "实际指腹与扳机、枪栓、桥夹、弹匣及套筒的接触与动作可达性" },
   FpsGripEditorTest: { file: "Script_FpsGripEditorTest.mjs", desc: "第一人称持枪检查编辑器：装备/双视角/真实挂点/骨骼残差与退出还原" },
   SprintMeleeTest: { file: "Script_SprintMeleeTest.mjs", desc: "冲刺白刃：左键挥得出、刀在画面里" },
   HudPromptBrowserTest: { file: "Script_HudPromptBrowserTest.mjs", desc: "HUD 提示真浏览器交互" },
@@ -209,7 +210,7 @@ export const browserTests = new Set([
   "ActorBatchTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
   "AudioTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
-  "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsGripEditorTest",
+  "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GunFeelTest",
   "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MenuTest",
   "PerformanceTest", "PhysicsTest", "PostTest", "ProfilerTest", "PropInstancingTest",
@@ -267,7 +268,7 @@ export const domains = {
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsGripEditorTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "MeleeQteTest", "MeleeCombatTest", "MeleeAnimationTest",
+      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "MeleeQteTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest", "ModelFacingTest",
       // 负重会封掉开火/开镜/冲刺三条（Player 的 carrySpeedScale + TryFire 的闸），
       // 碰这三样的改动要连着枪感串一起跑，所以它同时挂在 combat 与 interact 两个域。
@@ -351,7 +352,7 @@ const changedDomainRules = [
   { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
   // Aircraft 挂 combat：绕圈那一层是纯视觉，但同一个文件里的扫射航线打得倒玩家。
   // Hitbox 也挂 combat：人物子弹代理改了就是改了打中哪儿。
-  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Grenade|Blast|Aim|Reticle|Viewmodel|FpsArm|FpsAnatomy|FirstPersonBody|FirstPersonEmbodiment|FirstPersonSelfShadow|Projectile|Ballistic|Hitbox|Script_Input|Data_Meshes|_blender|Range|Melee|Carry|Emplacement|Aircraft|Strafe|ModelFacing|Model_\w+\.glb)/i },
+  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Grenade|Blast|Aim|Reticle|Viewmodel|FpsArm|FpsHand|FpsAnatomy|FirstPersonBody|FirstPersonEmbodiment|FirstPersonSelfShadow|Projectile|Ballistic|Hitbox|Script_Input|Data_Meshes|_blender|Range|Melee|Carry|Emplacement|Aircraft|Strafe|ModelFacing|Model_\w+\.glb)/i },
   { domain: "interact", pattern: /(Carry|Interact|Emplacement|Telegraph|Checkpoint|Script_Input|Hud|Prompt)/i },
   // Flare 挂 ai：它不打人，但它改「谁看得见谁」——那是 AI 的判据。
   { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle|Traversal|Flare|Companion|MissionSetpieces)/i },

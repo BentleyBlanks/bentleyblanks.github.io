@@ -8,7 +8,14 @@
 IK 在 FOV 压缩之前的 `armAnchor` 空间求解。固定的第一人称骨段比例让肩截面保持
 在画面下方，肘部在腕关节允许的圆弧内求解，保留上一帧弯肘方向并限制变化速度；
 肩锚位于眼位后方，防止近距离收枪时可用弯肘空间消失。装刺刀等极限取物允许有限肩部前探，
-不允许随距离伸长骨段。脱离握把的工作手跟随小臂，再随接触权重重新握住物体。
+不允许随距离伸长骨段。换弹、拉栓的工作手使用实际部件的掌面目标与手型；
+目标位置、掌面旋转、手指形状在同一动作时钟内插值，骨骼桥接层不再二次插值或覆盖掌面旋转。
+
+六把随身枪分别标定左右掌位、五指的三节屈曲、张指及拇指对掌方向。
+射击时食指在扳机接触点附近弯曲；托枪、抓机柄、捏桥夹、压弹、拔匣、拉套筒各有手型。
+每帧只旋转指节，保留烘焙后的骨骼静止位移。枪械动作件从第一人称私有几何分离，
+弹匣、机柄与手掌接触使用同一变换，世界枪模不受影响。开镜保留完整枪托，
+通过照门眼距留出相机净空，避免隐藏近端木件后暴露枪身内部。
 
 空手是正式的 `Equip(null)` 状态：保留同一副双臂，跑动时左右反相摆动，指节向
 松握拳过渡，静止时自然放低。武器切换、装填及伤害时序仍走原来的游戏链路。
@@ -20,23 +27,23 @@ IK 在 FOV 压缩之前的 `armAnchor` 空间求解。固定的第一人称骨�
 搬运或使用架设武器收枪时仍保留身体；
 死亡、菜单、过场及独立编辑器镜头由主渲染入口统一隐藏。
 
-## Blender MCP 工程
+## Blender 工程
 
 - 身体源工程：`C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\FirstPersonBody\Animation_FirstPersonBody.blend`。
 - 烘焙脚本：`_import/Script_FirstPersonBake.py`，必须在本任务专用 Blender 实例中运行。
 - 源资产：`Model/Character/Model_LugouNra01.glb`；原始角色与第三人称动作保持独立。
 - 运行时身体：`Model/Model_FirstPersonBody.glb`，含 FirstPersonIdle/Walk/Run/Crouch/Prone。
 - 骨架测量：`Animation/FirstPerson/Data_FirstPersonSource.json`。
-- 手部工程：`C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\FirstPersonHands\Animation_FirstPersonHands.blend`，由
+- 手部工程：`C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\FirstPersonGrip_20260906\Animation_FirstPersonHands.blend`，由
   `_import/Script_FirstPersonHandsBake.py` 从正式角色重新派生并导出 FPS 双臂。
-  掌长为原来的 82%，指长为 78%，掌宽增加 8%；模型与指节绑定位置同步调整，
+  掌长和四指长度为源角色的 108%，掌宽为 135%，拇指在此基础上缩至 82%；模型与指节绑定位置同步调整，
   保留单位骨骼缩放、蒙皮与原动作。腕部和袖口重新分配权重，避免前臂适配拉长掌根。
   空手使用松握拳与独立拇指对掌姿势。
 
 `.blend` 与 Blender 自动备份只保存在上述源工程目录，不提交到 github.io 仓库。
 烘焙脚本使用当前用户主目录下的 `OneDrive/AI/Models/Blender` 作为源工程根目录。
 MCP 使用独立实例与端口，不能在其他任务正在制作的场景中清场、覆盖文件或改骨架。
-本次使用 Blender MCP 的后台 socket server 执行脚本，源工程可以直接重新打开。
+此次手部重建使用独立 Blender 后台 CLI 实例运行烘焙脚本，源工程可以直接重新打开。
 
 ## 验证
 
@@ -50,9 +57,15 @@ MCP 使用独立实例与端口，不能在其他任务正在制作的场景中�
 `Script_FpsArmTest` 覆盖全部装备与开火、拉栓、装填、刺刀、投掷、近战动作；
 `Script_WeaponShot --fp` 负责人工检查手与枪的实际轮廓。接触残差合格不等于画面合格。
 
+`Script_FpsHandContactTest` 进一步测量六把随身枪的蒙皮指腹到真实扳机、机柄、桥夹、
+弹匣和套筒表面的距离，以及五把长枪左手五个指腹到护木的距离，
+覆盖腰射、开镜、射击及完整换弹/拉栓逐帧动作。
+同时检查指腹朝向、手指骨长不变、腕部弯曲及双臂可达性。九二式属于架设武器，
+接管时隐藏随身枪视图模型；其规则与显示由 `Script_Emplacement` 和主循环负责。
+
 军用手枪 `ServicePistol` 的导入显式朝向优先于木件重心启发式；金属度分桶后的源坐标
 不能再次反转枪口。掌心和换匣路径按修正后的闭锁 A 状态测量，左手依次到握把底部、
-取匣位和套筒后部，右手保持握持。`AssetStandardsTest` 直接解码成品木握把顶点，
+取匣位和套筒后部，右手保持握持。`AssetStandardsTest` 直接解码成品木握把三角面，
 检查前后关系、右掌表面距离和弹匣入口，防止只有挂点正确、实际枪模拿反的回归。
 
 ## 参考方法

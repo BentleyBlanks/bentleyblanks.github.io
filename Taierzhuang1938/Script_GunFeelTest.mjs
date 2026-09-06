@@ -101,14 +101,23 @@ const report = await page.evaluate(() => {
       hasBoltAction: !["ZhongZheng", "HanYang", "Type38"].includes(id) || !!vm.rig?.parts?.bolt,
     };
     if (id === "Type38") {
-      // The imported Arisaka has a dedicated rear receiver/stock node.  It
-      // must remain at hip but be hidden at full ADS, otherwise the camera
-      // near plane cuts it into the screen-filling block reported by players.
+      // Keep the complete rear receiver/stock outside the camera near plane.
+      // Hiding these uncapped submeshes exposes the inside of the rifle.
       for (let frame = 0; frame < 48; frame += 1) {
         vm.Update(1 / 60, { ads: 1, moveSpeed: 0, grounded: true });
       }
-      const parts = vm.adsHideParts || [];
-      type38AdsNear = { count: parts.length, hidden: parts.filter((part) => !part.visible).length };
+      const parts = [];
+      vm.rig.group.traverse(part=>{if(part.isMesh&&/adsNear/.test(part.name))parts.push(part);});
+      vm.root.updateWorldMatrix(true,true);T.camera.updateMatrixWorld(true);
+      const inverse=T.camera.matrixWorld.clone().invert(),point=T.camera.position.clone();
+      let minDepth=Infinity,vertices=0;
+      for(const part of parts){
+        const transform=inverse.clone().multiply(part.matrixWorld),position=part.geometry.attributes.position;
+        for(let i=0;i<position.count;i++){
+          point.fromBufferAttribute(position,i).applyMatrix4(transform);minDepth=Math.min(minDepth,-point.z);vertices++;
+        }
+      }
+      type38AdsNear = { count:parts.length,hidden:parts.filter(part=>!part.visible).length,minDepth,vertices,near:T.camera.near };
     }
   }
 
@@ -190,11 +199,12 @@ Check("五支火器走模型、铁瞄零偏心并保留栓动动作链",
   Object.entries(report.sights)
     .map(([id, entry]) => `${id}: model=${entry.isModel} sight=${entry.hasSight} offset=${entry.offsetMm.toFixed(2)}mm bolt=${entry.hasBoltAction}`)
     .join(" · "));
-Check("三八式开镜会藏掉近眼机匣，不再被裁成方块",
+Check("三八式开镜保留完整机匣与枪托，近端顶点不穿相机裁切面",
   report.type38AdsNear && report.type38AdsNear.count >= 2
-    && report.type38AdsNear.hidden === report.type38AdsNear.count,
+    && report.type38AdsNear.hidden === 0 && report.type38AdsNear.vertices > 0
+    && report.type38AdsNear.minDepth > report.type38AdsNear.near + 0.003,
   report.type38AdsNear
-    ? `ADS 近眼网格 ${report.type38AdsNear.hidden}/${report.type38AdsNear.count} 已隐藏`
+    ? `ADS 近端 ${report.type38AdsNear.vertices} 顶点，最近 ${(report.type38AdsNear.minDepth*1000).toFixed(1)} mm，裁切面 ${(report.type38AdsNear.near*1000).toFixed(1)} mm`
     : "缺少三八式 ADS 近眼网格");
 Check("第一人称手臂只画外表面，冲刺时袖筒背面不会铺满屏幕",
   report.sprintAmount > 0.8 && report.armSides.length > 0 && report.armSides.every((side) => side === 0),

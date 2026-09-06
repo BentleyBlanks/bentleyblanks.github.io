@@ -16,7 +16,7 @@ import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/Skelet
 import { FpsArmPose, FpsArmStateRotation, FPS_ARM_LIMITS, FPS_BAYONET_SUPPORT } from "./Data_FpsArmPoses.mjs";
 import { CaptureAnatomy, ApplyAnatomicalFingers, AimAnatomicalBone } from "./Script_FpsAnatomy.mjs";
 
-const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=4", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
+const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=5", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
 const PROFILE_CLIPS = Object.freeze({
   rifle: "RifleIdle",
   lmg: "MachineGunFire",
@@ -134,6 +134,7 @@ export class FpsArmRig {
     this.poseSpec = null;
     this.poseState = { ads: 0, sprint: 0 };
     this.contactWeight = { r: 1, l: 1 };
+    this.operationPose = { r: null, l: null };
     this.bones = {};
     this.fingerBones = {};
     this.bindPose = [];
@@ -350,7 +351,8 @@ export class FpsArmRig {
     return this;
   }
 
-  SetPoseState({ ads = 0, sprint = 0, reload = false, reloadBlend = 0, melee = false } = {}) {
+  SetPoseState({ ads = 0, sprint = 0, reload = false, reloadBlend = 0, melee = false, fire = 0 } = {}) {
+    this.poseState.fire = THREE.MathUtils.clamp(fire,0,1);
     this.poseState.melee = melee;
     this.poseState.reload = reload;
     this.poseState.ads = THREE.MathUtils.clamp(ads, 0, 1);
@@ -405,6 +407,8 @@ export class FpsArmRig {
     this.SetWeaponPose(weaponId);
     this.contactWeight.r = 1;
     this.contactWeight.l = 1;
+    this.operationPose.r = null;
+    this.operationPose.l = null;
     anchor.add(this.root);
     this.root.position.set(0, 0, 0);
     this.root.rotation.set(0, 0, 0);
@@ -510,19 +514,19 @@ export class FpsArmRig {
     // by inverse(anchor.matrixWorld) cancels that render-only affine layer.
     this._InAnchorTransform(poseTarget, this._v2, this._q0, this._v4);
     this._InAnchorTransform(contactTarget, this._v3, this._q1, this._v5);
-    // Operation targets author the palm path, not a free-form wrist rotation.
-    // The legacy hidden hand Euler values were made for rigid hand meshes and
-    // are not anatomical constraints.  Start a detached hand from its natural
-    // post-pose palm frame, then blend back into the calibrated weapon contact.
-    if (weight < 0.999) this._InAnchorBasisQuaternion(this.gripNodes[side], this._q0);
-    const targetAnchorPosition = this._v2.lerp(this._v3, weight);
-    const targetAnchorQuaternion = this._q2.copy(this._q0).slerp(this._q1, weight);
+    // Authored working-hand targets already contain the blended palm position
+    // and rotation. Legacy free-hand actions still use the natural forearm
+    // frame and blend back into the calibrated weapon contact.
+    const authoredOperation = !!this.operationPose[side];
+    if (weight < 0.999 && !authoredOperation) this._InAnchorBasisQuaternion(this.gripNodes[side], this._q0);
+    const targetAnchorPosition = authoredOperation ? this._v2 : this._v2.lerp(this._v3, weight);
+    const targetAnchorQuaternion = this._q2.copy(this._q0).slerp(this._q1, authoredOperation ? 0 : weight);
     this.gripGoalAnchorQuaternion[side].copy(targetAnchorQuaternion);
     this.gripGoalAnchorPosition[side].copy(targetAnchorPosition);
     this.handGoalPosition[side].copy(targetAnchorPosition);
     poseTarget.getWorldPosition(this._v2);
     contactTarget.getWorldPosition(this._v3);
-    this.gripGoalPosition[side].copy(this._v2).lerp(this._v3, weight);
+    this.gripGoalPosition[side].copy(this._v2).lerp(this._v3, authoredOperation ? 0 : weight);
     this.gripGoalQuaternion[side].copy(this._WorldBasisQuaternion(contactTarget, this._q3));
     const desiredHandAnchorQuaternion = this.handGoalQuaternion[side]
       .copy(targetAnchorQuaternion).multiply(this._q1.copy(frame.quaternion).invert());
@@ -651,7 +655,7 @@ export class FpsArmRig {
   _OrientHand(side) {
     const hand = this.bones[side].hand;
     const frame = this.anatomy[side].frame;
-    if (this.contactWeight[side] < 0.999) {
+    if (this.contactWeight[side] < 0.999 && !this.operationPose[side]) {
       const natural = this._InAnchorBasisQuaternion(this.bones[side].forearm, new THREE.Quaternion())
         .multiply(this.anatomy[side].bones.forearm.clone().invert());
       this.gripGoalAnchorQuaternion[side].copy(natural.slerp(this.gripGoalAnchorQuaternion[side], this.contactWeight[side]));
@@ -663,7 +667,7 @@ export class FpsArmRig {
       hand.updateMatrixWorld(true);
     };
     Orient();
-    if (this.contactWeight[side] < 0.999) {
+    if (this.contactWeight[side] < 0.999 && !this.operationPose[side]) {
       const offset = this._InAnchor(this.gripNodes[side], new THREE.Vector3()).sub(this._InAnchor(hand,new THREE.Vector3()));
       this.handGoalPosition[side].copy(this.gripGoalAnchorPosition[side]).sub(offset);
       this._SolveArm(side, false);

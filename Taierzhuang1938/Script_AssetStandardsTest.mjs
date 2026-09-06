@@ -81,17 +81,40 @@ Check(complianceBad.length === 0, "全部有源资产符合特例或分类阈值
 // Measure the shipped geometry, not just its claimed -Z axis or muzzle marker.
 // The old export kept correct mount labels while its wood grip was at the front.
 const servicePistol = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", "ServicePistol.tzm.json"), "utf8"));
+const gripTriangles = [];
 const gripVertices = servicePistol.meshes.filter((mesh) => mesh.material === "wood").flatMap((mesh) => {
   const bytes = Buffer.from(mesh.pos, "base64");
-  return Array.from({ length: mesh.count }, (_, index) => [0, 1, 2].map((axis) =>
+  const points = Array.from({ length: mesh.count }, (_, index) => [0, 1, 2].map((axis) =>
     mesh.posMin[axis] + bytes.readUInt16LE((index * 3 + axis) * 2) * mesh.posScale[axis]));
+  const indices = Buffer.from(mesh.idx,"base64"), stride=mesh.idxBits===32?4:2;
+  const ReadIndex = offset => stride===4?indices.readUInt32LE(offset):indices.readUInt16LE(offset);
+  for(let offset=0;offset<indices.length;offset+=3*stride)gripTriangles.push(
+    [0,1,2].map(i=>points[ReadIndex(offset+i*stride)]));
+  return points;
 });
 const gripMean = [0, 1, 2].map((axis) => gripVertices.reduce((sum, point) => sum + point[axis], 0) / gripVertices.length);
 const muzzle = servicePistol.nodes.find((node) => node.name === "muzzle").t;
 Check(gripMean[2] > (servicePistol.bounds.min[2] + servicePistol.bounds.max[2]) / 2
   && gripMean[1] < muzzle[1] - 0.02, "军用手枪真实木握把在枪口后下方");
 const palm = FPS_ARM_POSES.ServicePistol.contacts.right.position;
-const palmGap = Math.min(...gripVertices.map((point) => Math.hypot(...point.map((value, axis) => value - palm[axis]))));
+// A palm can touch the middle of a broad triangle several centimetres from
+// every vertex. Measure the shipped surface while retaining the 12 mm gate.
+function PointTriangleDistance(point,[a,b,c]) {
+  const Sub=(p,q)=>p.map((v,i)=>v-q[i]),Dot=(p,q)=>p.reduce((sum,v,i)=>sum+v*q[i],0);
+  const ab=Sub(b,a),ac=Sub(c,a),ap=Sub(point,a),aa=Dot(ab,ab),cc=Dot(ac,ac),across=Dot(ab,ac);
+  const denominator=aa*cc-across*across;
+  if(denominator>1e-20){
+    const u=(cc*Dot(ap,ab)-across*Dot(ap,ac))/denominator;
+    const v=(aa*Dot(ap,ac)-across*Dot(ap,ab))/denominator;
+    if(u>=0&&v>=0&&u+v<=1)return Math.hypot(...ap.map((value,i)=>value-u*ab[i]-v*ac[i]));
+  }
+  return Math.min(...[[a,b],[b,c],[c,a]].map(([from,to])=>{
+    const direction=Sub(to,from),delta=Sub(point,from),length=Dot(direction,direction);
+    const t=length?Math.max(0,Math.min(1,Dot(delta,direction)/length)):0;
+    return Math.hypot(...delta.map((value,i)=>value-t*direction[i]));
+  }));
+}
+const palmGap = Math.min(...gripTriangles.map(triangle => PointTriangleDistance(palm,triangle)));
 Check(palmGap < 0.012, "军用手枪右掌接触真实握把表面", `${(palmGap * 1000).toFixed(1)} mm`);
 const magazine = servicePistol.nodes.find((node) => node.name === "magazine").t;
 Check(Math.abs(magazine[1] - servicePistol.bounds.min[1]) < 0.012

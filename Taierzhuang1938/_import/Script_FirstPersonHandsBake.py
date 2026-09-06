@@ -1,4 +1,4 @@
-"""Refine the dedicated FPS hand mesh and its rest joints together via Blender MCP.
+"""Refine the dedicated FPS hand mesh and its rest joints in an isolated Blender.
 
 The shared third-person character is read-only. Rebuild from it on every bake;
 never repeatedly shorten an already refined GLB.
@@ -42,9 +42,16 @@ def Remap(point, side):
     longitudinal = offset.dot(forward)
     if longitudinal <= 0:
         return point.copy()
-    shortened = min(longitudinal, palmLength)*0.82 + max(0, longitudinal-palmLength)*0.78
+    remappedLength = longitudinal*1.08
     widthBlend = min(1, longitudinal/(palmLength*0.7))
-    return point + forward*(shortened-longitudinal) + across*(offset.dot(across)*0.08*widthBlend)
+    return point + forward*(remappedLength-longitudinal) + across*(offset.dot(across)*0.35*widthBlend)
+
+# The thumb's metacarpal is already part of the source palm. Giving it the four
+# fingers' full extension produces an oversized hook; keep its opposition arc
+# shorter while remapping both the skinned surface and the rest pivots.
+thumbRoots = {side: Remap(rig.matrix_world @ FindBone(side, 'finger0').head_local, side) for side in ('r','l')}
+def RemapThumb(point, side):
+    return thumbRoots[side] + (point-thumbRoots[side])*0.82
 
 for mesh in meshes:
     inverse = mesh.matrix_world.inverted()
@@ -59,7 +66,9 @@ for mesh in meshes:
         if sideWeights[side] < 0.001:
             continue
         point = mesh.matrix_world @ vertex.co
-        vertex.co = inverse @ (point + (Remap(point, side)-point)*min(1, sideWeights[side]))
+        mapped = point + (Remap(point, side)-point)*min(1, sideWeights[side])
+        thumbWeight = sum(a.weight for a in vertex.groups if side+'finger0' in sourceBake.NormalizeName(mesh.vertex_groups[a.group].name))
+        vertex.co = inverse @ (mapped + (RemapThumb(mapped,side)-mapped)*min(1,thumbWeight))
     mesh.data.update()
 
     # Let the wrist skin and cuff travel with the hand. The FPS rig has longer
@@ -96,19 +105,22 @@ for bone in rig.data.edit_bones:
     name = sourceBake.NormalizeName(bone.name)
     side = next((s for s in ('r','l') if s+'finger' in name), None)
     if side:
-        delta = inverse @ Remap(rig.matrix_world @ bone.head, side)-bone.head
+        mapped = Remap(rig.matrix_world @ bone.head, side)
+        if side+'finger0' in name:
+            mapped = RemapThumb(mapped,side)
+        delta = inverse @ mapped-bone.head
         bone.head += delta
         bone.tail += delta
 bpy.ops.object.mode_set(mode='OBJECT')
 rig.data.pose_position = 'POSE'
-rig['fpsHandProportions'] = json.dumps({'palmLength':0.82,'fingerLength':0.78,'palmWidth':1.08})
+rig['fpsHandProportions'] = json.dumps({'palmLength':1.08,'fingerLength':1.08,'palmWidth':1.35,'thumbLength':0.82})
 output = projectRoot/'Model/Model_FpsArmsNraSkeletal01.glb'
 sourceBake.Export(output, rig, meshes)
 rig.data.pose_position = 'REST'
 for image in bpy.data.images:
     if image.source == 'FILE' and image.has_data:
         image.pack()
-sourceDirectory = Path.home()/'OneDrive/AI/Models/Blender/Taierzhuang1938/FirstPersonHands'
+sourceDirectory = Path.home()/'OneDrive/AI/Models/Blender/Taierzhuang1938/FirstPersonGrip_20260906'
 sourceDirectory.mkdir(parents=True, exist_ok=True)
 blendPath = sourceDirectory/'Animation_FirstPersonHands.blend'
 bpy.ops.wm.save_as_mainfile(filepath=str(blendPath))
