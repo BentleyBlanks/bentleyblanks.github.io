@@ -141,6 +141,8 @@
   [资源来源、完整提示词与加工命令](../_import/Data_CraterSoil.md) 随运行时贴图一起保留。
 - 爆心焦色和放射状细土抛撒强度积存在同一地形格点，随真实地表起伏；
   多次轰击取已有痕迹与新痕迹的并集，Reset 同时清除。不新增水平焦痕贴片。
+- 浅土沿按连续扰动强度覆盖，噪声只影响最外沿的渐隐区和土壤细节；
+  多个坑沿交叠时，已翻动的内部不再被高频噪声打穿、露出白盒底材。
 - Script_CraterDebris 复用七种 StackableStone 石块，并生成多种小型破土块。
   碎块按世界坐标稳定分布、按土壤扰动与噪声成簇；每次脏块更新都重新采样地形高度和坡向。
   几何走 BuildSink 按地形块、土/石材质合批，数量与缓存上限读该模块常量。
@@ -168,7 +170,9 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=pre
 截图和 JSON 报告落在 `_shots/ExplosionRange/`；JSON 同时保留形变耗时供性能复查。
 表面回归额外通过正式 Blast 连续挖坑，再切换贴花层做 HDR 像素对照：坑壁不能依赖
 悬空贴片，普通子弹弹孔仍须产生可见像素；另核对真实石块、贴图分辨率、碎块数量上限、
-重复轰击后的贴地高度，以及 Reset 后无残留网格和焦土格点。取证落在 `_shots/CraterSurface/`。
+重复轰击后的贴地高度，以及 Reset 后无残留网格和焦土格点。
+错位炮弹与手榴弹场景额外读取实际材质着色器的覆盖值，检查浅土沿内部无露底像素、
+未扰动地面不被染色，并保留叠加截图。取证落在 `_shots/CraterSurface/`。
 
 调试入口：`Debug.Explosions.State()` / `GoTo(id)` / `Reset()`，通用查询为
 `Debug.TerrainDeformation.State()` / `Height(x,z)` / `BaseHeight(x,z)` / `Reset()`。

@@ -219,9 +219,13 @@ function ConfigureCraterSurface(material, source, soil) {
         float layer = smoothstep(0.2, 0.8, macro) * 0.42;
         vec3 earth = mix(soil, fineSoil, layer);
         float grain = dot(earth, vec3(0.333));
-        float exposed = smoothstep(0.003, 0.037,
-          vTerrainWear * mix(0.12, 2.1, breakup) * mix(0.5, 1.5, macro));
-        exposed = max(exposed, smoothstep(0.018, 0.18, vTerrainBlast.y * mix(0.3, 1.4, breakup)));
+        // The merged lip is one continuous soil surface. Multiplying wear by
+        // high-frequency noise punched whitebox holes through shallow, already
+        // disturbed soil, especially where several raised lips intersected.
+        // Noise may roughen the feathered perimeter, never perforate its interior.
+        float exposed = smoothstep(0.0015, 0.014, vTerrainWear);
+        exposed = max(exposed, smoothstep(0.018, 0.18, vTerrainBlast.y));
+        exposed += (breakup - 0.5) * exposed * (1.0 - exposed) * 0.45;
         float cavity = smoothstep(0.025, 0.72, vTerrainDelta);
         float lip = smoothstep(0.008, 0.1, -vTerrainDelta);
         float charred = smoothstep(0.06, 0.6, vTerrainDelta) * mix(0.58, 1.0, macro);
@@ -258,7 +262,7 @@ function ConfigureCraterSurface(material, source, soil) {
         reflectedLight.indirectDiffuse *= earthOcclusion;
         reflectedLight.indirectSpecular *= earthOcclusion;`);
   };
-  material.customProgramCacheKey = () => `${SourceKey()}|CraterSoilV3`;
+  material.customProgramCacheKey = () => `${SourceKey()}|CraterSoilV4`;
 }
 
 export class TerrainDeformationView {
