@@ -47,6 +47,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  TextTest: { file: "Script_TextTest.mjs", desc: "文本数据驱动闸门：语言表键/占位符、T() 静态引用、闸门模块零中文字面量（纯 Node，毫秒级）" },
   MovementRangeTest: { file: "Script_MovementRangeTest.mjs", timeoutMs: 240000, desc: "操作白盒：实体标尺、真实跳跃跑跳、翻越边界、姿态通行与复位" },
   FirstLevelP012ShellShotTest: {file:"Script_FirstLevelP012ShellShotTest.mjs",desc:"P012玩家眼位、持续炮击和烟柱资源生命周期"},
   FirstLevelP012AnimationTest: {file:'Script_FirstLevelP012AnimationTest.mjs',desc:'P012实际GLB车厢待机、位移步频、担架停走与路边动作出图'},
@@ -227,6 +228,7 @@ export const browserTests = new Set([
 ]);
 
 export const tier0Fast = [
+  "TextTest",
   "BootPayloadTest",
   "AssetStandardsTest",
   "ModelFacingTest",
@@ -257,6 +259,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest"] },
   animation: { label: '独立动画资产验收', tests: ['BackRifleRunTest','MeleeAnimationTest','InfantryAnimationTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
   terrain: {
@@ -343,6 +346,7 @@ export const domains = {
 
 const changedDomainRules = [
   { domain: "menu", pattern: /FirstLevelP012Debug/i },
+  { domain: "text", pattern: /(Script_Text|Data_Text_|Data_Locale_|Data_Tuning_)/i },
   { domain: "physics", pattern: /MovementRange/i },
   { domain: "editor", pattern: /Script_EditorWorldInfo|Script_WorldInfoEditorTest/i },
   { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },
