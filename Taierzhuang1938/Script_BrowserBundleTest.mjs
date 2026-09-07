@@ -19,7 +19,7 @@ const browser = await LaunchBrowser();
 const outputDir = path.join(os.tmpdir(), 'WhiteboxBootFix');
 await fs.mkdir(outputDir, {recursive:true});
 try {
-  for (const fixture of [{name:'Whitebox',query:'whitebox=p012'}, {name:'MainMenu',query:''}]) {
+  for (const fixture of [{name:'Whitebox',query:'whitebox=p012'}, {name:'MainMenu',query:''}, {name:'MissingCharacters',query:'whitebox=p012'}]) {
     const page = await browser.newPage({viewport:{width:1280,height:800}});
     const errors = [], modules = new Set(), failedSets = [];
     page.on('console', message => { const match = message.text().match(/外部 PBR「(\w+)」/); if (match) failedSets.push(match[1]); });
@@ -28,6 +28,8 @@ try {
       await page.route('**/Texture_DadaoBase.webp*', () => {});
       await page.route(/Texture_Carriage(?:BenchWood|FloorSteel|CeilingSteel)Base\.webp/, route => route.fulfill({status:404,body:'missing test texture'}));
     }
+    if (fixture.name === 'MissingCharacters') await page.route(/Model_LugouNra0[124][.]glb/,
+      route => route.fulfill({status:503,body:'interrupted character download'}));
     page.on('pageerror', error => errors.push(String(error)));
     page.on('request', request => { if (/\.m?js(?:\?|$)/.test(request.url())) modules.add(new URL(request.url()).pathname); });
     await page.route('**/Taierzhuang1938/?*', route => route.fulfill({contentType:'text/html',body:result.html}));
@@ -55,6 +57,16 @@ try {
       const before = await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().time);
       await page.waitForFunction(before => window.Tengxian.Debug.FirstLevelMission().time > before, before, {timeout:10000});
       assert.ok(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage === "Train"));
+    } else if (fixture.name === 'MissingCharacters') {
+      const partial=await page.evaluate(()=>{const g=window.Tengxian;const actors=g.ai.soldiers.filter(a=>a.missionTrainPassenger);
+        return {count:actors.length,models:actors.map(a=>a.actor.characterRig?.modelId||null),train:g.Debug.FirstLevelMission().train};});
+      assert.equal(partial.count,41,'interrupted models preserve every physical passenger');
+      assert.deepEqual(partial.train.counts,[8,24,8]);
+      assert.ok(partial.models.includes(null),'missing selected models use the explicit whitebox fallback');
+      assert.ok(partial.models.includes('LugouNra03'),'the surviving soldier keeps its original model ID');
+      assert.ok(partial.models.every(id=>id===null||id==='LugouNra03'),'failed downloads never shift soldier slots into another model or officer');
+      await page.locator('#bootStart').click();
+      await page.waitForFunction(()=>window.Tengxian.state.running&&document.getElementById('boot').classList.contains('gone'),null,{timeout:10000});
     } else {
       assert.equal(await page.evaluate(() => window.Tengxian.Debug.Menu().open), true);
     }

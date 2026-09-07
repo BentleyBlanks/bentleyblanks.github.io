@@ -910,7 +910,11 @@ export function CreateLugouCharacterRig(
     : explicit !== null
       ? explicit
       : allowed[HashString(`${faction}:${options.seed ?? 0}:model`) % allowed.length];
-  return new LugouCharacterRig(variants[index], {
+  // Loaded arrays omit failed downloads; numeric slots must never change model identity.
+  const modelId = `Lugou${faction === "nra" ? "Nra" : "Ija"}${String(index + 1).padStart(2, "0")}`;
+  const asset = variants.find(candidate => candidate.record?.id === modelId);
+  if (!asset?.gltf) return null;
+  return new LugouCharacterRig(asset, {
     kind, targetHeight, seed: options.seed ?? 0, variantIndex: index, materialLibrary,
   });
 }

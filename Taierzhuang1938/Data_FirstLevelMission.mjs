@@ -1,7 +1,7 @@
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-export const MISSION_VERSION = "first-level-20260907-r3";
+export const MISSION_VERSION = "first-level-20260907-r4";
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 const Stage = (id, objective, target, requirements, cue, extra = {}) =>
