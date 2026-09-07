@@ -754,7 +754,14 @@ export class SkyDome {
     return true;
   }
 
-  /** 画质面板的「烟霾」倍率。改了要重套预设（LUT 要重算）。 */
+  /**
+   * 画质面板的「烟霾」倍率。改了要重套预设（LUT 要重算）。
+   *
+   * 注意它**不重装平行光** —— 调用方（`ApplyGraphics`）只补一次 `BakeEnvironment`。
+   * 今天没事：`physicalSun` 出厂全档关着，平行光是预设里手调的常数，与霾无关。
+   * 哪天把某一档的 `physicalSun` 翻开，这里要连着调一次 `lights.ApplyPreset(返回值)`
+   * —— 霾变浓，太阳方向的透过率就变了。
+   */
   SetHazeScale(scale) {
     const value = THREE.MathUtils.clamp(scale ?? 1, 0.1, 6);
     if (Math.abs(value - this.hazeScale) < 1e-4) return false;

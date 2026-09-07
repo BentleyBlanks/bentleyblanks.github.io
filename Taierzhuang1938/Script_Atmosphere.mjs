@@ -916,7 +916,11 @@ export class Atmosphere {
     renderer.setRenderTarget(prevTarget);
   }
 
-  /** 套用一档预设的大气参数。会把三张静态 LUT 重算（约 1—3 ms，只在换预设时）。 */
+  /**
+   * 套用一档预设的大气参数，并把三张 LUT **同步**算完
+   * （实测 high 档 0.05 ms + 0.03 ms；只在换关 / 换时段 / 调烟霾时走这里）。
+   * 同步是硬要求：调用方紧接着就要 `BakeEnvironment` 从天穹烘 PMREM。
+   */
   ApplyPreset(atmoFields, { sunDirection = null, fog = null } = {}) {
     const preset = MakeAtmospherePreset(atmoFields);
     this.preset = preset;
