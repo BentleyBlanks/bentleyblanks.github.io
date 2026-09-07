@@ -331,7 +331,9 @@ export class LensFlarePass {
     if (!this.active) return;
 
     const U = this.uniforms;
-    U.uAspect.value = ctx.width / Math.max(1, ctx.height);
+    // 鬼影/光环的几何按**输出**画面的宽高比摆（这一趟读的是泛光亮部图，
+    // 而泛光跟着 TAA 之后的 sceneColor 走）。TAAU 开着时两组分辨率不同。
+    U.uAspect.value = ctx.outputWidth / Math.max(1, ctx.outputHeight);
     U.uFrame.value = ctx.frame;
     if (ctx.options.sunDirection) {
       // 太阳只是方向；取相机前方一个仍在远裁面以内的点做屏幕投影

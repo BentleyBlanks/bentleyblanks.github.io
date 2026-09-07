@@ -353,7 +353,8 @@ export class DebugPass {
     // ------------------------------------------------------------------
     // 查找顺序（2026-09 三条登记路合流之后，**只有这一处仲裁**）：
     //   ① 帧图里的 pass 自带的视图 —— `pass.GetDebugSource(view)`（B3 体积雾四项，
-    //      B2 GTAO 的弯曲法线 / SSIL / 镜面遮蔽三项 —— 后者返回自带材质）；
+    //      B2 GTAO 的弯曲法线 / SSIL / 镜面遮蔽三项，B6b 的 velocityTile / dofCoc /
+    //      taaWeight 三项挂在 `Script_PostFxaa` 上 —— 后两组返回自带材质）；
     //   ② 下面那条 switch 的内置表 —— 预通道 / AO / Bloom / 材质假彩色 / SunShadow /
     //      SSR 三视图（SSR 走 `P.ssrPass.DebugSource(view)`，是内置表里的一行）；
     //   ③ 登记表 `PostPipeline.RegisterDebugView(id, resolve)` —— 给「持有者不是 pass」

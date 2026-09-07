@@ -23,16 +23,18 @@
 //   9) volumetricInject     Script_PostVolumetrics froxel 注入 + 光照 + 时域重投影
 //  10) volumetricIntegrate  Script_PostVolumetrics 沿 z 积分（散射 + 透过率）
 //  11) volumetricApply      Script_PostVolumetrics → Composite 的 uFogScatter
-//  12) taa                  Script_PostTaa         时域解算（线性 HDR 域，UE 的位置）
+//  12) taa                  Script_PostTaa         时域解算 + TAAU 上采样到输出分辨率
 //  13) exposure             Script_PostExposure    直方图自动曝光（→ 1×1 增益靶）
 //  14) ssilHistory          Script_PostGtao        解算后的场景色降采样 → 下一帧的反弹源
 //  15) ssrColor             Script_PostSsr         解算后的 HDR 降采样成带 mip 的「上一帧场景色」
-//  16) godPrepare           Script_PostBloom       只做决策：太阳在不在屏内、拖影强度
-//  17) bloom                Script_PostBloom       亮部 + 降/升采样（阈值跟随曝光增益）
-//  18) god                  Script_PostBloom       太阳拖影（太阳在屏内才跑）
-//  19) lensFlare            Script_PostLensFlare   鬼影/光环/受遮挡星芒 + 脏污（读亮部图）
-//  20) composite            Script_PostComposite   运动模糊→景深→雾→镜头进光→曝光→tonemap→LUT→镜头→sRGB
-//  21) fxaa                 Script_PostFxaa        FXAA + 锐化 → 屏幕（或调试视图送屏）
+//  16) motionBlur           Script_PostMotionBlur  tile max → neighbor max → 逐物体重建
+//  17) dof                  Script_PostDof         散景景深（CoC → gather → 填洞 → 合成）
+//  18) godPrepare           Script_PostBloom       只做决策：太阳在不在屏内、拖影强度
+//  19) bloom                Script_PostBloom       亮部 + 降/升采样（阈值跟随曝光增益）
+//  20) god                  Script_PostBloom       太阳拖影（太阳在屏内才跑）
+//  21) lensFlare            Script_PostLensFlare   鬼影/光环/受遮挡星芒 + 脏污（读亮部图）
+//  22) composite            Script_PostComposite   雾→镜头进光→曝光→tonemap→LUT→镜头→sRGB
+//  23) fxaa                 Script_PostFxaa        FXAA + CAS 锐化 → 屏幕（或调试视图送屏）
 //
 // 体积雾三趟排在 main 之后：它只读预通道的法线/视深靶，与主场景颜色无关，
 // 而 Composite 要它产出的 `uFogScatter`。排在 wireframe / debugOverlay 之后是因为
@@ -40,6 +42,12 @@
 //
 // `exposure` 必须排在 `bloom` 之前：泛光阈值要除以本帧的曝光增益。
 // `lensFlare` 必须排在 `bloom` 之后：它读的就是泛光那一趟提取好的亮部图。
+// `ssilHistory` / `ssrColor` 必须排在 `motionBlur` / `dof` **之前**：它们存的是
+// 下一帧的近场反弹源与反射源，存一张糊过的画面等于把运动模糊喂回间接光里。
+//
+// **两组分辨率**（2026-09 TAAU）：0–15 里除 `exposure` 外都在内部分辨率
+// （`graphics.renderScale` 缩的就是它），`taa` 起解算到输出分辨率，
+// 16 之后一律输出分辨率。分界与逐 pass 的域见 `SetSize` 与 `OUTPUT_DOMAIN_PASSES`。
 //
 // **加一个 pass = 新模块 + 这张列表里插一行 + `Data_Tuning_Graphics` 加一位开关。**
 // 不要往 `Render()` 里插代码，也不要去改别人的模块。
@@ -63,6 +71,8 @@ import { SsrPass, SsrColorPass } from "./Script_PostSsr.mjs";
 import { VolumetricsPass } from "./Script_PostVolumetrics.mjs";
 import { ContactShadowsPass, MakeShadowDebugViews } from "./Script_ContactShadows.mjs";
 import { TaaPass } from "./Script_PostTaa.mjs";
+import { MotionBlurPass } from "./Script_PostMotionBlur.mjs";
+import { DofPass } from "./Script_PostDof.mjs";
 import { BloomPass, GodRaysPass } from "./Script_PostBloom.mjs";
 import { ExposurePass } from "./Script_PostExposure.mjs";
 import { LensFlarePass } from "./Script_PostLensFlare.mjs";
@@ -78,6 +88,34 @@ export { MarkNoPrepass, MarkForegroundPrepass, MarkDynamicPrepass, FOREGROUND_VI
 export { InjectDepthPull, SHADING_MODES };
 export { POST_QUALITY_KEYS };
 
+/**
+ * 跑在**输出分辨率**上的 pass（TAAU 开着时 ≠ 内部分辨率）。`Resize` 收到的
+ * 就是这一组尺寸，帧内则读 `ctx.outputWidth/outputHeight`（= 解算分辨率）。
+ *
+ * 分界线在 TAA：它把内部分辨率的主场景解算到输出网格，从它开始，
+ * **凡是以 `ctx.sceneColor` 为源、按它的纹素取偏移的 pass 都在输出域**。
+ *
+ *   · `taa`                   解算靶 = 输出网格；
+ *   · `motionBlur` / `dof`    彩色靶按输出建（速度 tile 与 CoC 的**像素**口径
+ *                             仍按内部分辨率算 —— 速度靶是内部的，见各自模块）；
+ *   · `bloom` / `god` / `lensFlare`
+ *                             亮部图是 sceneColor 的 1/2、拖影与光晕是 1/4：
+ *                             跟着内部分辨率建的话，比例与画面对不上，
+ *                             超分之后泛光半径会随 renderScale 变；
+ *   · `composite` / `fxaa`    最终 ldr 靶与送屏。
+ *
+ * 留在**内部**域的（它们只读 `ctx.width/height`，一个字都不用改）：
+ * `atmosphere` / `prepass` / `hzb` / `ssr` / `gtao` / `contactShadows` / `main` /
+ * 体积雾三趟 / `ssilHistory` / `ssrColor`。后两条虽然**读**输出分辨率的
+ * sceneColor，产出的却是喂给下一帧内部分辨率追踪的图，靶按内部建正好；
+ * 它们按 uv 采样，只有 `ssrColor` 的 2×2 盒式要按源纹素取偏移（已改成问靶自己）。
+ * `exposure` 的靶是固定尺寸（160×90 / 64×16 / 64×1 / 1×1），Resize 不吃尺寸，
+ * 但它帧内读的是 `ctx.sceneColor` 的纹素 —— 也是输出域。
+ */
+const OUTPUT_DOMAIN_PASSES = new Set([
+  "taa", "motionBlur", "dof", "bloom", "god", "lensFlare", "composite", "fxaa",
+]);
+
 export class PostPipeline {
   constructor(renderer, { width, height, quality = "high", destruction = null } = {}) {
     this.renderer = renderer;
@@ -86,6 +124,16 @@ export class PostPipeline {
     this.frame = 0;
     this.width = Math.max(2, width | 0);
     this.height = Math.max(2, height | 0);
+    // 输出（显示）分辨率。调用方不给就等于内部分辨率 —— 与 TAAU 落地之前完全一致。
+    this.outputWidth = this.width;
+    this.outputHeight = this.height;
+    // 解算分辨率：TAAU 真的在跑时 = 输出分辨率，否则 = 内部分辨率。
+    this.resolveWidth = this.width;
+    this.resolveHeight = this.height;
+    this.taauActive = false;
+    // 预通道给第一人称手/枪写的常数近景标签。TAA 的 responsive 掩码、运动模糊的
+    // 硬闸、景深的「枪不糊」三处都按它认前景，所以挂在编排器上统一发。
+    this.foregroundViewDepth = FOREGROUND_VIEW_DEPTH;
 
     // 半浮点渲染目标是整条链的地基：没有 HDR 就没有真正的泛光与曝光。
     // WebGL2 下 EXT_color_buffer_float / half_float 缺一不可，缺了就降级到 8 位，
@@ -160,6 +208,8 @@ export class PostPipeline {
     this.contactShadowsPass = new ContactShadowsPass(this, { quality: this.quality });
     this.taaPass = new TaaPass(this);
     this.exposurePass = new ExposurePass(this);
+    this.motionBlurPass = new MotionBlurPass(this);
+    this.dofPass = new DofPass(this);
     this.bloomPass = new BloomPass(this);
     this.godRaysPass = new GodRaysPass(this, this.bloomPass);
     this.lensFlarePass = new LensFlarePass(this, this.bloomPass);
@@ -246,6 +296,14 @@ export class PostPipeline {
       // 排在 TAA 之后：取的是时域解算过、已卸抖动的那一张 HDR，
       // 比主靶原图干净，下一帧的 SSR 反射里也就少一层噪。
       this.ssrColorPass,
+      // 运动模糊与景深排在 TAA 之后、泛光之前（UE 与 COD:AW 同一位置）：
+      //   · 在 TAA 之后 —— 它们要吃解算干净的画面，且 TAAU 之后才是输出分辨率；
+      //   · 在泛光之前 —— 散景里的亮斑与拖影都该继续参与泛光，反过来会把
+      //     一坨已经晕开的光再糊一遍，成了"雾里开灯"。
+      // 又排在 ssilHistory / ssrColor **之后**：那两张是喂给下一帧 GTAO 与 SSR 的
+      // 场景色，存一张糊过 / 虚化过的画面等于把运动模糊反馈进间接光与反射。
+      this.motionBlurPass,
+      this.dofPass,
       {
         // 只做决策不出画：太阳拖影要在**亮部提取之前**定下来（亮部图的 alpha
         // 只在拖影开着时才顺手打包天空遮挡）。位置也不能提前 —— 太阳投影要用
@@ -325,11 +383,39 @@ export class PostPipeline {
     });
   }
 
-  SetSize(width, height) {
+  /** TAAU 这一帧到底该不该跑（历史靶尺寸与下游靶尺寸都按它定）。 */
+  _WantTaau() {
+    return !!(this.taaEnabled && this.preset.taaUpscale
+      && (this.outputWidth !== this.width || this.outputHeight !== this.height));
+  }
+
+  /**
+   * 改分辨率。
+   *
+   * **两组尺寸**（2026-09 TAAU）：
+   *   · `width` / `height`       —— **内部分辨率**：预通道、HZB、SSAO、主场景那一趟。
+   *     `graphics.renderScale` 缩的就是它，也是整帧最大的性能杠杆。
+   *   · `outputWidth` / `outputHeight` —— **输出（显示）分辨率**。不给就等于内部，
+   *     行为与 TAAU 落地之前完全一致。
+   *
+   * TAAU 真的在跑（TAA 开着 + 档位允许 + 两组尺寸不同）时，TAA 把画面解算到输出
+   * 网格，于是 `taa` / `motionBlur` / `dof` / `composite` / `fxaa` 五个 pass 的靶
+   * 按输出分辨率建，其余按内部。TAAU 不跑时两组相等，末趟送屏时由画布做那次
+   * 唯一的双线性放大 —— 与重构前一模一样。
+   */
+  SetSize(width, height, outputWidth = width, outputHeight = height) {
     this.width = Math.max(2, width | 0);
     this.height = Math.max(2, height | 0);
+    this.outputWidth = Math.max(2, outputWidth | 0);
+    this.outputHeight = Math.max(2, outputHeight | 0);
+    this.taauActive = this._WantTaau();
+    this.resolveWidth = this.taauActive ? this.outputWidth : this.width;
+    this.resolveHeight = this.taauActive ? this.outputHeight : this.height;
     this.pool.Resize();
-    for (const pass of this.passes) pass.Resize?.(this.width, this.height);
+    for (const pass of this.passes) {
+      if (OUTPUT_DOMAIN_PASSES.has(pass.name)) pass.Resize?.(this.resolveWidth, this.resolveHeight);
+      else pass.Resize?.(this.width, this.height);
+    }
     // 尺寸一变 TAA 历史与上一帧矩阵全部作废（uv 与视差都对不上位）
     this.taaFlip = false;
     this.hasTaaHistory = false;
@@ -352,6 +438,12 @@ export class PostPipeline {
     const want = !!on;
     if (want === this.taaEnabled) return;
     this.taaEnabled = want;
+    // TAAU 的开合会改变**解算分辨率**，下游五张靶都要跟着重建；只有不涉及
+    // TAAU 的普通开关才走惰性建靶那条便宜路。
+    if (this._WantTaau() !== this.taauActive) {
+      this.SetSize(this.width, this.height, this.outputWidth, this.outputHeight);
+      return;
+    }
     this.taaPass.SyncTargets();
     this.taaFlip = false;
     this.hasTaaHistory = false;
@@ -507,8 +599,17 @@ export class PostPipeline {
    * 把加性粒子叠亮一倍。第一人称的手与枪照常出线（深度压缩是节点缩放，不在材质里）。
    */
   SetShadingMode(mode = "shaded") {
-    this.shadingMode = SHADING_MODES.includes(mode) ? mode : "shaded";
+    const want = SHADING_MODES.includes(mode) ? mode : "shaded";
+    const changed = want !== this.shadingMode;
+    this.shadingMode = want;
     this.debugPass.ApplyShadingMode(this.shadingMode);
+    // 换着色模式对测光来说是**硬切**：线框那一档整幅画换成「深灰底 + 亮线」，
+    // 平均亮度跟正片完全不是一回事。不当硬切处理的话，切回 shaded 之后
+    // 自动曝光要按适应时间常数（暗→亮 3.0 s / 亮→暗 1.0 s）慢慢爬回来 ——
+    // 表现是「从线框切回来，画面先亮/暗一下再正过来」，而且逐帧对比工具
+    // （Script_EditorTest 的着色模式那一条）会把这层瞬态当成画面没还原。
+    // 与 NotifyCameraCut 同一个理由、同一个动作。
+    if (changed) this.exposurePass.RequestReset();
     return this.shadingMode;
   }
 

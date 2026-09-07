@@ -31,6 +31,10 @@ const VIEWS = [
   { id: "volumetricScatter", label: "体积散射", group: "体积雾", note: "沿视线积分出来的绝对散射亮度（Reinhard + sRGB 显示）。光柱、被建筑切断的暗带、火照亮的空气全在这一张上；被墙挡住的地方只剩环境项，不发亮。" },
   { id: "volumetricTransmittance", label: "体积透过率", group: "体积雾", note: "合成 pass 实际吃到的透过率（白 = 全透、黑 = 全挡）。出厂走 legacyTransmittance：这一张与今天的解析雾**逐像素相同**，局部烟幕才会额外压暗 —— 用它核对「七十米外能不能看见敌人」没有变差。" },
   { id: "volumetricReproject", label: "体积重投影", group: "体积雾", note: "时域重投影的历史权重：绿 = 历史被采纳，红 = 只能用本帧抽样（会更噪）。相机快速转身、froxel 网格边缘、镜头硬切之后应当短暂变红再收敛回绿。" },
+  // 2026-09 TAAU / 运动模糊 / 散景景深三个 pass 的中间量（由 Script_PostFxaa 认领）。
+  { id: "dofCoc", label: "景深 CoC（物理）", group: "后处理", note: "散景景深实际使用的薄透镜 CoC：深蓝 = 合焦、暖黄 = 远景散焦、洋红 = 近景散焦、绿 = 第一人称前景标签（恒锐）。与上一项的区别是这一张是新 DofPass 的真实口径。" },
+  { id: "taaWeight", label: "TAA 权重", group: "后处理", note: "R = 当前帧权重（×4 显示，静止约 0.04）、G = 历史被邻域盒裁掉多少、B = responsive 掩码（第一人称）。全红 = 这一帧没有可用历史。" },
+  { id: "velocityTile", label: "速度 tile max", group: "GBuffer", note: "运动模糊的 tile 邻域最大速度（已乘快门）：R/G = 方向、B = 模糊长度。运动模糊没跑时显示不可用斜纹。" },
   { id: "normal", label: "法线", group: "GBuffer", note: "NormalDepth 预通道的视空间法线。" },
   { id: "depth", label: "视深", group: "GBuffer", note: "NormalDepth 预通道 alpha；近处亮、80 m 以外渐黑。第一人称的手与枪写的是常数 1 m 近景标签（它的几何带非等比深度压缩，视深不是世界视深），所以那一块是一片平的。" },
   { id: "motionVector", label: "Motion Vector", group: "GBuffer", note: "由深度反投影得到的相机屏幕速度：R/G = 水平/垂直方向，B = 像素速度。没有逐物体速度缓冲。" },
@@ -124,6 +128,11 @@ const VIEW_TARGETS = {
   depth: (post) => post?.targets?.normalDepth,
   motionVector: (post) => post?.targets?.normalDepth,
   velocity: (post) => post?.targets?.normalDepth,
+  // 2026-09 追加：这三张由 Script_PostFxaa 的 GetDebugSource 认领（① 那条路，
+  // 见那里的 TEMPORAL_DEBUG_VIEWS）；这里报的是面板上那一行的尺寸标注。
+  dofCoc: (post) => post?.targets?.normalDepth,
+  taaWeight: (post) => post?.taaPass?.debugTarget ?? post?.targets?.taaA,
+  velocityTile: (post) => post?.targets?.velocityTile,
   sunShadow: (post) => post?.targets?.normalDepth,
   csmCascade: (post) => post?.targets?.normalDepth,
   csmPenumbra: (post) => post?.targets?.normalDepth,

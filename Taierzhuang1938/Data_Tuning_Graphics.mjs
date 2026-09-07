@@ -92,17 +92,26 @@
  *   autoExposure  直方图自动曝光（Script_PostExposure；四趟极小的 pass + 一张 1×1）
  *   lensFlare     镜头光晕 / 脏污 / 太阳眩光（Script_PostLensFlare；1/4 分辨率一趟）
  *   lut           3D LUT 分级（Script_PostGrade 把既有分级数学原样烘成 64³）
- *   ——— 以下为后续子系统的占位位，本阶段一律「等价于今天」———
- *   dof           景深（今天恒开：阵亡与开镜两条都走 Composite 的圆盘采样）
- *   taaUpscale    TAA 超分（TAAU）
+ *   ——— TAAU / 运动模糊 / 景深 B6b（2026-09 落地，Data_Tuning_TemporalDof 管算法口径）———
+ *   taaUpscale    TAA 超分（TAAU）。开着且内部分辨率 ≠ 输出分辨率时，TAA 解算到输出网格
+ *   renderScale   **该档的默认内部分辨率比例**（Script_Main 的 graphics.renderScale 出厂值）。
+ *                 2026-09-08 集成期实测（3394×1348 输出 / high / phase=2，14 轮 A/B 交替、
+ *                 逐轮配对差取中位数）：内部 0.8 相对 1.0 **省 3.76 ms GPU（−24.2%）**，
+ *                 IQR [2.48, 5.09]、14 轮只有 1 轮负号。TAAU 把画面解算回满分辨率，
+ *                 画质代价约 3 dB PSNR（见 docs §17 的 TAAU 表），所以 high 保持 0.8。
+ *                 重量的规矩：**输出分辨率必须钉死、只动内部**，并在每次 SetSize
+ *                 之后推 24 帧滚满 TAA 历史 —— 两组一起缩量到的是别的东西。
+ *   motionBlurTaps  运动模糊的重建抽样数（0 = 不建 pass 也没意义，配合 motionBlur 用）
+ *   motionBlurScale 重建靶相对输出分辨率的比例（0.5 = 半分辨率 + 按模糊长度回填全分辨率）
+ *   dof           散景景深（阵亡远景虚化 + 开镜近景虚化两条用法共用）
+ *   dofScale      景深靶相对「输出的一半」再乘一档（1.0 = 半分辨率，0.5 = 四分之一）
  * @typedef {Record<string, boolean|number>} QualityPreset
  */
 
 /** 后续子系统的占位位。四档共用同一份「等价于今天」的取值。 */
 const RESERVED_OFF = {
-  taaUpscale: false,
-  // 景深今天就在跑（阵亡远景虚化 + 开镜近景虚化），所以它不是 false。
-  dof: true,
+  // 八个子系统全部落地之后这张表空了 —— 每一位都在各档里给了实际值。
+  // 留着它是为了「加一个 pass 先在这里加一位占位」那条流程还有落脚点。
 };
 
 /**
@@ -144,6 +153,9 @@ export const QUALITY_PRESETS = {
     bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
     aoScale: 0.5, sharpen: 0.14, taa: false,
     velocity: true, hzb: true, atmosphere: true,
+    // TAA 关着就没有 TAAU；内部分辨率保持 1.0，抗锯齿由 FXAA + CAS 承担。
+    taaUpscale: false, renderScale: 1.0,
+    motionBlurTaps: 0, motionBlurScale: 1.0, dof: false, dofScale: 0.5,
     // low 不跑 SSR：连靶都不建，材质也不编入补丁（`ssr` 进 cache key）。
     ssr: false, ssrScale: 0.5, ssrSteps: 32, ssrResolveTaps: 0,
     // low 不跑簇：每帧几千次球-AABB 判定 + 一张表上传，换来的画面收益抵不过
@@ -178,6 +190,8 @@ export const QUALITY_PRESETS = {
     pom: 8, pomRefine: 4, pomSelfShadow: false, detailNormal: true,
     microShadow: true, horizonOcclusion: true, skinSss: true,
     materialTexture: 512,
+    taaUpscale: true, renderScale: 0.75,
+    motionBlurTaps: 8, motionBlurScale: 0.5, dof: true, dofScale: 0.5,
   },
   // high 的抗锯齿由 TAA 承担。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
   // 上百 MB 显存并重复抗锯齿；把 4× 留给主动选择 ultra 的玩家
@@ -198,6 +212,9 @@ export const QUALITY_PRESETS = {
     pom: 16, pomRefine: 5, pomSelfShadow: false, detailNormal: true,
     microShadow: true, horizonOcclusion: true, skinSss: true,
     materialTexture: 512,
+    // 0.8 是实测背书的（省 24.2% GPU，见上面 renderScale 那一条），不是拍的
+    taaUpscale: true, renderScale: 0.8,
+    motionBlurTaps: 12, motionBlurScale: 1.0, dof: true, dofScale: 0.5,
   },
   ultra: {
     ...RESERVED_OFF,
@@ -216,6 +233,10 @@ export const QUALITY_PRESETS = {
     pom: 32, pomRefine: 6, pomSelfShadow: true, detailNormal: true,
     microShadow: true, horizonOcclusion: true, skinSss: true,
     materialTexture: 1024,
+    // ultra 是「内部 = 输出」，TAA 退回纯抗锯齿（TAAU 的上采样部分不生效，
+    // 因为两组尺寸相等）。留 taaUpscale: true 是为了玩家手动下调分辨率时它照样接上。
+    taaUpscale: true, renderScale: 1.0,
+    motionBlurTaps: 16, motionBlurScale: 1.0, dof: true, dofScale: 1.0,
   },
 };
 

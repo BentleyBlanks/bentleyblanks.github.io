@@ -1148,7 +1148,11 @@ export class SsrColorPass {
   Render(ctx) {
     if (!this.target) return;
     this.uniforms.uSource.value = ctx.sceneColor.texture;
-    this.uniforms.uTexel.value.set(1 / this.pipeline.width, 1 / this.pipeline.height);
+    // 源是 **TAA 解算后的 sceneColor**（TAAU 开着时是输出分辨率，不是内部），
+    // 而 uBox 的 2×2 盒式要按源的纹素取偏移。拿内部分辨率算的话四个抽样会
+    // 落错格子 —— 直接问靶自己最稳，两组分辨率相等时与旧版逐比特相同。
+    this.uniforms.uTexel.value.set(
+      1 / ctx.sceneColor.width, 1 / ctx.sceneColor.height);
     this.uniforms.uBox.value = this.fullRes ? 0 : 1;
     ctx.blitter.Blit(this.material, this.target);
     this.ssrPass.trace.uSsrHasColor.value = 1;

@@ -439,11 +439,15 @@ const profiler = new FrameProfiler(renderer, { post });
  * 混在一张表里的下场是玩家把画质调低之后夜战关变成纯黑（预设 exposure 3.6 被当成
  * 画质项一起压了）。
  *
- * renderScale 是唯一真正省时间的那一项：整条合成链（法线深度、AO、泛光六级、
- * 体积光、运动模糊）都按 post 靶的尺寸走，它减半等于这一整条链省四分之三。
+ * renderScale 是唯一真正省时间的那一项：法线深度预通道、AO、主场景那一趟都按
+ * 它缩，减半等于这一整段省四分之三。
+ *
+ * **2026-09 起它是 TAAU 的输入分辨率**：出厂值跟画质档走（medium 0.75 / high 0.8 /
+ * ultra 1.0），TAA 把画面解算回满分辨率，所以低于 1 也不再是"整帧被拉伸"。
+ * 关掉 TAA（或 low 档）时退回老行为：末趟送屏做一次双线性放大。
  */
 const graphics = {
-  renderScale: 1.0,
+  renderScale: post.preset.renderScale ?? 1.0,
   shadows: true,
   shadowSize: 0,          // 0 = 用出厂档位（级联之后这是**每一级**的图边长）
   // 独立小阴影图，只在第一人称手臂/武器材质内部采样；仍服从上面的阴影总闸。
@@ -521,6 +525,15 @@ NormalizeGraphicsDetails(graphics, post);
 // 本档位到底编没编接触阴影那段材质 GLSL（编译期，见 Script_Csm.SetCsmContactCompiled）。
 // 面板那个开关只能在「编过」的档位上生效；low 档打开也没用，所以两者取与。
 const CONTACT_SHADOWS_SUPPORTED = !!post.preset.contactShadows;
+// 出厂内部分辨率来自画质档（TAAU：medium 0.75 / high 0.8 / ultra 1.0）。
+// PostPipeline 是按满分辨率建起来的，这里立刻按档切一次「内部 + 输出」两组尺寸 ——
+// ApplyGraphics 只在 resize / 设置面板 / 存档回灌时跑，不在这儿补一次的话出厂档位的
+// renderScale 要等玩家改窗口大小才生效（症状：high 档默认仍旧满分辨率跑）。
+{
+  const bootScale = Clamp(graphics.renderScale, 0.4, 1.6);
+  post.SetSize(Math.round(window.innerWidth * bootScale),
+    Math.round(window.innerHeight * bootScale), window.innerWidth, window.innerHeight);
+}
 // 探针体（GI）。默认关到底：ProbeVolume 不构造（省掉图集/靶与每帧 Update），
 // 材质也**不编入**探针采样代码 —— GI_SAMPLE_GLSL 占着采样器与寄存器，
 // 即使 uGiEnabled 恒为 0 也让整帧贵 ~2.7 ms（2026-08-26 FrameProfileTest 实测）。
@@ -7434,8 +7447,10 @@ function RenderScene(dt) {
     grain: (skyName === "night" ? 0.020 : 0.014) * graphics.grain,
     vignette: (0.42 + suppression * 0.22) * graphics.vignette,
     damage: Clamp01(1 - health / 62) * 0.55,
-    // DOF 要把近景钉清楚；死亡时再叠相机运动模糊会把前景也抹掉，焦点层级就没了。
-    motionBlur: WEAPON_RANGE ? 0 : 0.15 * graphics.motionBlur * (1 - deathDof),
+    // DOF 要把近景钉清楚；死亡时再叠运动模糊会把前景也抹掉，焦点层级就没了。
+    // 2026-09 起这是 **0–1 的总闸**，不再是「模糊长度倍率」——
+    // 长度由物理快门（Data_Tuning_TemporalDof.MOTION_BLUR.shutterFraction，180°）定。
+    motionBlur: WEAPON_RANGE ? 0 : graphics.motionBlur * (1 - deathDof),
     dofStrength: deathDof,
     dofFocus: 1.5,
     dofRange: 2.8,
@@ -7588,7 +7603,13 @@ function ApplyGraphics() {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   const width = Math.round(window.innerWidth * scale), height = Math.round(window.innerHeight * scale);
-  if (post.width !== width || post.height !== height) post.SetSize(width, height);
+  // 两组尺寸：内部（renderScale 缩过的）与输出（画布满分辨率）。TAAU 开着时
+  // TAA 把画面解算到后者，composite 与末趟都在满分辨率上跑；关着时两者由
+  // SetSize 内部拉平，行为与 TAAU 落地之前一致。
+  if (post.width !== width || post.height !== height
+    || post.outputWidth !== window.innerWidth || post.outputHeight !== window.innerHeight) {
+    post.SetSize(width, height, window.innerWidth, window.innerHeight);
+  }
   // 排在 SetSize 之后：SetSize 按当前的 taaEnabled 建靶，这一行才是改它的人。
   // 反过来的话，刚打开 TAA 的那一次 SetSize 会漏建历史靶（要等下一次改分辨率才补）。
   post.SetTaaEnabled(graphics.taa !== false);

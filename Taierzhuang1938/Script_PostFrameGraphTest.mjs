@@ -289,10 +289,14 @@ server.close();
 //     并在 taa 之后多一趟 `ssilHistory`（把解算后的场景色降采样存下来，下一帧当近场反弹源）；
 //   · exposure / lensFlare —— B6a 相机轮：exposure 在 bloom **之前**（泛光阈值要读
 //     它写的那张 1×1 增益靶），lensFlare 在 bloom / god **之后**、composite 之前
-//     （它读的就是泛光那一趟提取好的亮部图）。
+//     （它读的就是泛光那一趟提取好的亮部图）；
+//   · motionBlur / dof —— B6b TAAU 轮：两者在 taa **之后**（要解算干净的画面，
+//     且 TAAU 之后才是输出分辨率）、bloom **之前**（散景亮斑与拖影仍要参与泛光），
+//     并且在 ssilHistory / ssrColor **之后**（那两张喂下一帧，不能存糊过的画面）。
 const EXPECTED_ORDER = ["atmosphere", "prepass", "hzb", "ssr", "gtao", "contactShadows", "main", "wireframe", "debugOverlay",
   "volumetricInject", "volumetricIntegrate", "volumetricApply",
-  "taa", "exposure", "ssilHistory", "ssrColor", "godPrepare", "bloom", "god", "lensFlare", "composite", "fxaa"];
+  "taa", "exposure", "ssilHistory", "ssrColor", "motionBlur", "dof",
+  "godPrepare", "bloom", "god", "lensFlare", "composite", "fxaa"];
 
 /** EXPECTED_ORDER 是不是 actual 的子序列（顺序不许乱，中间可以插新 pass）。 */
 function IsOrderedSubsequence(expected, actual) {

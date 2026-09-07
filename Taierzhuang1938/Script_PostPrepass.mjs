@@ -29,6 +29,10 @@
 //     显存与上传：一具 50 骨的骨骼 three 原本按 16×16 RGBA32F 算（4 KB），翻倍成
 //     16×32（8 KB）。本关 69 名士兵满编 ≈ 0.55 MB/帧上传（原来 0.28 MB）。
 //   · **静态几何 / InstancedMesh / BatchedMesh：只有相机速度**（把实例矩阵当不变）。
+//     2026-09 复量：本关 161 只 InstancedMesh / 2467 个实例，再挂一份上一帧
+//     instanceMatrix 只要 0.151 MB —— 显存不是拦路石，「覆盖材质全场只有一份」才是
+//     （自定义属性的 define 是材质级不是对象级，缺属性的那只会静默塌到原点）。
+//     详见 docs/Data_TechRenderPipeline.md §17.10。
 //     `Script_ActorBatch` 与布设流送每帧改写 `instanceMatrix`，所以**远景人群与
 //     会动的布设件在 RT1 里是「静止物体」**。要修得给每只 InstancedMesh 再挂一份
 //     上一帧 `instanceMatrix` 属性（显存翻倍 + 每帧多一次上传），本阶段不做。

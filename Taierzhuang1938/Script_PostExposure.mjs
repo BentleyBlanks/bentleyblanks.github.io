@@ -576,7 +576,11 @@ export class ExposurePass {
     void VERT_QUAD;
   }
 
-  /** Debug Rendering 面板的「曝光直方图」视图（见 Script_PostDebug 的 extraViews）。 */
+  /**
+   * Debug Rendering 面板的「曝光直方图」视图。
+   * `DebugPass.RegisterView` 是 `PostPipeline.RegisterDebugView` 的别名 ——
+   * 走 `GetSource()` 的第 ③ 条登记路，全管线只有那一张表（口径见 docs §1.11）。
+   */
   RegisterDebugViews(debugPass) {
     debugPass.RegisterView("exposure", (pipeline) => ({
       material: this.materialView,
@@ -584,7 +588,8 @@ export class ExposurePass {
       Prepare: (ctx) => {
         this.uniformsView.uLdr.value = pipeline.targets.ldr.texture;
         this.uniformsView.uState.value = this.stateTargets[this.flip].texture;
-        this.uniformsView.uAspect.value = ctx.width / Math.max(1, ctx.height);
+        // 直方图叠在**输出**画面上，宽高比要取输出那一组（TAAU 开着时两组不同）。
+        this.uniformsView.uAspect.value = ctx.outputWidth / Math.max(1, ctx.outputHeight);
       },
     }));
   }
@@ -674,7 +679,12 @@ export class ExposurePass {
 
     // --- 1) 亮度降采样 ---------------------------------------------------
     this.uniformsLum.uSource.value = ctx.sceneColor.texture;
-    this.uniformsLum.uSourceTexel.value.set(1 / ctx.width, 1 / ctx.height);
+    // **输出分辨率**，不是 `ctx.width/height`：这一趟排在 TAA 之后，
+    // TAAU 开着时 sceneColor 已经是解算靶（输出网格）。拿内部分辨率算纹素
+    // 会让 2×2 盒式抽样的两个偏移落错格子 —— 测光偏一点点，整帧亮度就偏。
+    // 直接问靶自己最稳（ctx.outputWidth 是同一个数，见 FrameContext 字段表）。
+    this.uniformsLum.uSourceTexel.value.set(
+      1 / ctx.sceneColor.width, 1 / ctx.sceneColor.height);
     ctx.blitter.Blit(this.matLum, this.lumTarget);
 
     // --- 2) 点图元直方图 -------------------------------------------------

@@ -51,9 +51,13 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - 帧图各段（2026-09 拆分，加 pass 只动自己那一个文件 + 编排器里插一行）：
   `Script_PostCommon.mjs`（blit / 靶工厂 / 靶池 / `FrameContext` / pass 契约）、
   `Script_PostPrepass.mjs`（MRT 预通道 + 速度缓冲 + HZB + 蒙皮上一帧骨矩阵）、
-  `Script_PostGtao.mjs`、`Script_PostSsr.mjs`（Hi-Z 随机 SSR）、`Script_PostTaa.mjs`、
+  `Script_PostGtao.mjs`、`Script_PostSsr.mjs`（Hi-Z 随机 SSR）、
+  `Script_PostTaa.mjs`（TAA + **TAAU 上采样**）、
+  `Script_PostMotionBlur.mjs`（**逐物体运动模糊**：tile max → neighbor max → 重建）、
+  `Script_PostDof.mjs`（**散景景深**：CoC → near/far gather → 填洞 → 合成）、
   `Script_PostBloom.mjs`（含太阳拖影）、
-  `Script_PostComposite.mjs`（分段 GLSL）、`Script_PostFxaa.mjs`、`Script_PostDebug.mjs`、
+  `Script_PostComposite.mjs`（分段 GLSL）、
+  `Script_PostFxaa.mjs`（FXAA + **CAS 锐化** + 时域三视图）、`Script_PostDebug.mjs`、
   `Script_ContactShadows.mjs`（屏幕空间接触阴影 + 阴影系统的三张调试图）。
 - `Script_PostSsr.mjs` —— **屏幕空间反射**：自建 min-reduce Hi-Z（共享 HZB 是 max-reduce，
   语义相反）+ GGX VNDF 随机追踪 + ratio estimator 解算 + 时域累积，另出一条「上一帧 TAA
@@ -81,8 +85,19 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   测光参数、**逐关曝光锚点** `EXPOSURE_ANCHORS`、EV 钳位、光晕与 LUT 尺寸）。
   铁律：自动曝光**全 GPU、一次 readback 都不允许**；增益锤在每关出生机位的实测亮度上，
   所以打开它不改变默认机位的亮度（改关卡布设/天光后要重跑 `--calibrate`）。
+- **TAAU / 运动模糊 / 散景景深（2026-09）**：`Script_PostTaa.mjs` 吃速度靶解算到输出网格，
+  `Script_PostMotionBlur.mjs` / `Script_PostDof.mjs` 两个新 pass，口径表
+  `Data_Tuning_TemporalDof.mjs`；`Script_PostFxaa.mjs` 的锐化换成 CAS。
+- **两组分辨率**（2026-09 TAAU）：`post.width/height` 是**内部分辨率**、
+  `post.outputWidth/outputHeight` 是**输出分辨率**，分界线在 `Script_Post.OUTPUT_DOMAIN_PASSES`
+  （TAA 起 + 泛光/拖影/光晕/合成/送屏在输出域；预通道 / HZB / SSR / GTAO / 接触阴影 /
+  体积雾 / ssilHistory / ssrColor 仍在内部域）。只读 `ctx.width/height` 的 pass 不用改；
+  逐 pass 的域表见 `docs/Data_TechRenderPipeline.md` §17 的「分辨率域」一节。
 - `Data_Tuning_Graphics.mjs` —— 画质档位表（纯数据，零 three）：每档每个 pass 的开关与旋钮，
   外加 `HZB` / `VELOCITY` 两组常量。`Script_Post` / `Script_Main` / `Script_EditorSettings` 只读它。
+- `Data_Tuning_TemporalDof.mjs` —— TAAU / 运动模糊 / 景深 / CAS 的**算法口径**（纯数据）：
+  快门比例、方差裁剪 γ、anti-flicker、responsive 权重、薄透镜光圈、CAS 峰值。
+  与画质档位表的分工：那张表管「这台机器画多重」，这张管「算法怎么算」。
 - `Script_MaterialPatches.mjs` —— **材质补丁注册表**：所有往 `MeshStandardMaterial` 插 GLSL 的
   事都走它（ORM 三合一 / AO / GI 三态 / CSM / SSR / **簇状局部光** / **材质着色升级** /
   破口裁切，顺序固定），一个 `onBeforeCompile` 做完，cache key 由补丁 key 拼。
@@ -136,11 +151,14 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Script_VolumetricsTest.mjs`（体积雾：能见度不变差 / 阴影切光柱 / 时域收敛）、
   `Script_ExposureTest.mjs`（自动曝光 / 光晕 / LUT；`--calibrate` 量锚点、
   `--shots` 出开关对照图、`--baseline=<根目录>` 与另一份检出逐比特比对）、
+  `Script_TaauTest.mjs`（TAAU 两组分辨率 / 斜边锯齿能量 / 速度靶消鬼影 / 运动模糊快门 /
+  散景 CoC 与「枪不糊」）、
   `Script_GiTest.mjs`、`Script_EditorTest.mjs`（Debug Rendering 全部视图）。
 - 先读：`docs/Data_TechRenderPipeline.md` **§1「帧图与模块契约」**（接入说明，
   采样器预算表在 §1.8）与 **§1S「阴影：CSM / PCSS / 接触阴影」**（阴影现状；§10 是它的历史稿）；
-  §1A 起是设计期草案与专题深挖，GI 在 §12，SSR / 簇状光 / 物理大气 / froxel 体积雾 / GTAO
-  各占一节 §17（并行落地，本轮不重编号），坑表在末尾）。
+  §1A 起是设计期草案与专题深挖，GI 在 §12，SSR / 簇状光 / 物理大气 / froxel 体积雾 / GTAO /
+  相机曝光 / **TAAU + 运动模糊 + 散景景深** 各占一节 §17（并行落地，本轮不重编号），
+  坑表在末尾）。
 
 ### 材质 / 贴图
 - `Script_TexBake.mjs`（纯 JS PBR 烘焙，每种材质出 albedo / normal / orm；另出全场共用的
