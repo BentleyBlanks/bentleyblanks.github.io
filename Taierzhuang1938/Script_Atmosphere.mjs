@@ -374,7 +374,9 @@ float AtmoSunDisk(float cosTheta) {
   // 在长焦下看着「有体积」而不是一块白饼的原因
   float centerToEdge = sqrt(max(1.0 - t * t, 0.0));
   float limb = 1.0 - uAtmoLimb * (1.0 - centerToEdge);
-  float edge = 1.0 - smoothstep(0.985, 1.0, t);
+  // 边缘的 7% 做软化。0.53° 的盘在 55° FOV / 1600 px 上只有 15 px 直径，
+  // 硬边会被 FXAA 啃出锯齿；7% 折算约半个像素，正好是一条抗锯齿边而不是渐变斑。
+  float edge = 1.0 - smoothstep(0.93, 1.0, t);
   return max(limb, 0.0) * edge;
 }
 #endif
@@ -792,6 +794,10 @@ export class Atmosphere {
     this.viewHeightKm = ATMOSPHERE_EARTH.bottomRadiusKm + ATMOSPHERE_EARTH.siteAltitudeKm;
     this.staticDirty = true;
     this.ready = false;
+    // 天空视图 LUT 的脏标记（见 RenderSkyView）
+    this._skyViewDone = false;
+    this._skyViewHeight = -1;
+    this._skyViewSunCos = -2;
 
     const T = this.tier;
     this.transTarget = MakeLutTarget(T.trans[0], T.trans[1]);
@@ -951,14 +957,18 @@ export class Atmosphere {
 
     if (sunDirection) this.sunDirection.copy(sunDirection).normalize();
     this.staticDirty = true;
+    this._skyViewDone = false;      // 介质参数变了，脏标记那两个自变量看不出来
     this.RenderStatic();
-    this.RenderSkyView();
+    this.RenderSkyView(true);
     return preset;
   }
 
   SetSunDirection(direction) {
     this.sunDirection.copy(direction).normalize();
   }
+
+  /** 强制下一帧重算天空视图 LUT（外部改了介质 uniform 时用）。 */
+  InvalidateSkyView() { this._skyViewDone = false; }
 
   /** 相机世界高度（米）→ LUT 的 r。 */
   SetViewAltitude(worldY) {
@@ -977,12 +987,28 @@ export class Atmosphere {
     this.ready = true;
   }
 
-  /** 天空视图：每帧（两万像素，便宜）。 */
-  RenderSkyView() {
-    if (!this.renderer) return;
+  /**
+   * 天空视图 LUT。
+   *
+   * **它只有两个自变量**：相机海拔与太阳天顶角。本作的太阳一关之内不动，
+   * 相机海拔在城里的变化是米级（大气标高是 8 km）—— 所以每帧无条件重算是
+   * 白烧钱：实测这一张占 atmosphere 段的六成。改成脏标记之后，正常游玩里
+   * 它每关只算个位数次（进关一次 + 上城墙那几次）。
+   * 阈值 2 m / 1e-5（太阳天顶余弦）都远小于 LUT 自身的量化误差。
+   */
+  RenderSkyView(force = false) {
+    if (!this.renderer) return false;
     if (this.staticDirty) this.RenderStatic();
-    this.skyViewUniforms.uAtmoSunCosZenith.value = THREE.MathUtils.clamp(this.sunDirection.y, -1, 1);
+    const sunCos = THREE.MathUtils.clamp(this.sunDirection.y, -1, 1);
+    if (!force && this._skyViewDone
+      && Math.abs(this.viewHeightKm - this._skyViewHeight) < 0.002
+      && Math.abs(sunCos - this._skyViewSunCos) < 1e-5) return false;
+    this.skyViewUniforms.uAtmoSunCosZenith.value = sunCos;
     this._Blit(this.skyViewMaterial, this.skyViewTarget);
+    this._skyViewDone = true;
+    this._skyViewHeight = this.viewHeightKm;
+    this._skyViewSunCos = sunCos;
+    return true;
   }
 
   /**
@@ -1105,15 +1131,24 @@ export class AtmospherePass {
     return this.screenMaterial;
   }
 
-  Prepare() {
+  Prepare(ctx) {
     const atmosphere = activeAtmosphere;
     const composite = this.pipeline.compositePass;
     if (!composite) return;
-    if (this.bound === atmosphere) return;
-    // 把大气透视那一批 uniform 挂进合成 pass（共享对象，不是拷值）。
-    // 名字不变，所以不触发重编译；换 SkyDome（编辑器重建场景）时重挂一次。
-    BindAtmosphereUniforms(composite.uniforms, atmosphere);
-    this.bound = atmosphere;
+    if (this.bound !== atmosphere) {
+      // 把大气透视那一批 uniform 挂进合成 pass（共享对象，不是拷值）。
+      // 名字不变，所以不触发重编译；换 SkyDome（编辑器重建场景）时重挂一次。
+      BindAtmosphereUniforms(composite.uniforms, atmosphere);
+      this.bound = atmosphere;
+    }
+    // **Prepare 跑在 Enabled 之前，关掉的那一帧也会进来** —— 这里正是关掉时
+    // 把合成 pass 的大气透视摘干净的地方。不摘的话：LUT 不再更新，而合成
+    // 仍按 blend 混一张冻在上一帧的散射图，表现是「关了开关雾色还跟着走」。
+    if (atmosphere) {
+      const on = this.Enabled(ctx);
+      atmosphere.aerialUniforms.uAtmoAerialBlend.value = on ? (atmosphere.preset.aerialBlend ?? 0) : 0;
+      atmosphere.aerialUniforms.uAtmoAerialMode.value = on && atmosphere.preset.aerialMode ? 1 : 0;
+    }
   }
 
   Enabled(ctx) {

@@ -197,6 +197,8 @@ export const testDefs = {
   PostTest: { file: "Script_PostTest.mjs", desc: "后处理感知域对比：暗部信息不被裁成纯黑" },
   PostFrameGraphTest: { file: "Script_PostFrameGraphTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "渲染帧图地基契约：pass 顺序 / MRT 速度靶 / HZB / 太阳阴影接口 / 材质补丁三态 / 不重编译" },
+  AtmosphereTest: { file: "Script_AtmosphereTest.mjs", timeoutMs: 15 * 60 * 1000,
+    desc: "物理大气：四张 LUT / 十档预设的辐照度与色相标定 / 70 m 能见度不许降 / 大气透视近远端" },
   PerformanceTest: { file: "Script_PerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "帧率/负载实测（对机器敏感）" },
   FrameProfileTest: { file: "Script_FrameProfileTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "整帧 CPU/GPU 剖析消融（对机器敏感）" },
   GodRaysPerformanceTest: { file: "Script_GodRaysPerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "体积光方向性性能回归（对机器敏感）" },
@@ -223,7 +225,7 @@ export const browserTests = new Set([
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GunFeelTest",
   "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MenuTest",
-  "PerformanceTest", "PhysicsTest", "PostTest", "PostFrameGraphTest", "ProfilerTest", "PropInstancingTest",
+  "PerformanceTest", "PhysicsTest", "PostTest", "PostFrameGraphTest", "AtmosphereTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
   "TestSceneLightingTest", "RangeTest", "WeaponRangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
   "FirstPersonEmbodimentTest", "SprintViewmodelTest", "TargetInfoTest", "VisibilityTest", "VoiceTest",
@@ -341,7 +343,7 @@ export const domains = {
     //（UpdateFire / MoveSmokeSource），所以碰灯光或粒子的改动也要连着 FlareTest 跑。
     // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
-    tests: ["TestSceneLightingTest", "PostTest", "PostFrameGraphTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
+    tests: ["TestSceneLightingTest", "PostTest", "PostFrameGraphTest", "AtmosphereTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -386,7 +388,7 @@ const changedDomainRules = [
   { domain: "menu", pattern: /(Menu|Style_Interface|BootProp|index\.html|Font_Title|\/Font\/)/i },
   { domain: "editor", pattern: /(Editor|Style_Interface|AssetStandards|Pcg|Data_Levels|SamplePoint|Data_Dressing|Data_ExternalAssets|WestSuburbBlocks|_import)/i },
   { domain: "cutscene", pattern: /(Cutscene|Story|Data_Script|TengxianScript|Mission|ActorPose|Train|Data_MissionCh|Companion|Checkpoint)/i },
-  { domain: "render", pattern: /(Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|FirstLevelP012CarryView|Vfx|Post|Light|Gi|GlobalShProbe|FirstPersonSelfShadow|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Pcg|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|Mocap|EscortLitter|TexBake|Pbr|PropBatch|PropStreaming|Profiler|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },
+  { domain: "render", pattern: /(Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|FirstLevelP012CarryView|Vfx|Post|Light|Gi|GlobalShProbe|FirstPersonSelfShadow|Atmosphere|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Pcg|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|Mocap|EscortLitter|TexBake|Pbr|PropBatch|PropStreaming|Profiler|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },
   // Data_Tuning_Graphics 是渲染帧图的档位表（不是玩法数值）：它同时命中 text 的
   // Data_Tuning_ 那条，这里再补一条把 render 域也拉进来。
   { domain: "render", pattern: /Data_Tuning_Graphics/i },
@@ -792,6 +794,7 @@ const estimatedSeconds = {
   PerformanceTest: 600,
   DeathViewTest: 240,
   RespawnShaderWarmTest: 150,
+  AtmosphereTest: 130,
   FrameProfileTest: 600,
   GodRaysPerformanceTest: 600,
 };

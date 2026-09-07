@@ -25,20 +25,29 @@
 //   2. 四张 LUT 非空、有限、范围合理；透过率∈[0,1]，天顶方向 > 地平线方向，
 //      且掠地平线偏红（瑞利 λ⁻⁴ 的直接证据）
 //   3. 每预设新旧天空的辐照度 / 分组亮度 / 均色对照（标定表打印进输出）
-//   4. night 比白天暗两个数量级，且有星
+//   4. night 在线性域比白天暗一个数量级以上，且有星
 //   5. 70 m 透过率 ≥ 旧解析雾同距离的值（用户定论「先别动雾」的硬闸）
 //   6. 大气透视：500 m 外透过率 < 1 且散射 > 0；10 m 处 ≈ 恒等
-//   7. BakeEnvironment 之后 scene.environment 非空
-//   8. 稳态不再编译新程序（LUT pass 不许每帧建材质）
+//   7. 六个大气调试视图都真的出画（**读回屏幕像素**，不看 uniform）
+//   8. BakeEnvironment 之后 scene.environment 非空
+//   9. 稳态不再编译新程序（LUT pass 不许每帧建材质）
 //
-// 用法：node Taierzhuang1938/Script_AtmosphereTest.mjs
+// 用法：node Taierzhuang1938/Script_AtmosphereTest.mjs [--shot]
 // 退出码即成败。
 // ===========================================================================
 
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+
+/**
+ * `--shot` 出 A/B 对照图（新物理天空 vs `?skyLegacy=1` 的旧解析天空）。
+ * 数值全绿不等于画面对：LUT 可以每一项都在范围内，而地平线上有一条缝。
+ * 出图落 `_shots/Atmosphere/`（已 gitignore），人工对照后才算验收。
+ */
+const wantShots = process.argv.includes("--shot");
 
 /** 上半球辐照度的容差（任务书口径：曝光后亮度均值 ±15%）。 */
 const IRRADIANCE_TOLERANCE = 0.15;
@@ -301,6 +310,42 @@ try {
     probe.Dispose();
     enabledUniform.value = enabledWas;
 
+    // --- 6.5) 六个调试视图必须**读回像素**验证 ------------------------------
+    // GLSL ES 3.00 保留字撞上的话 three 只在控制台留一行，那一趟什么都不画，
+    // 屏幕上留着上一次 clear 的颜色 —— 「面板亮着、画面没变」是最难往着色器上想的
+    // 一类 bug（Script_Post 的 FRAG_DEBUG_VIEW 用 sample 那次就是这么漏过去的）。
+    const ReadScreen = () => {
+      const w = gl.drawingBufferWidth;
+      const h = gl.drawingBufferHeight;
+      const pixels = new Uint8Array(w * h * 4);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      let sum = 0;
+      let min = 255;
+      let max = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        const luma = 0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2];
+        sum += luma; min = Math.min(min, luma); max = Math.max(max, luma);
+      }
+      const count = pixels.length / 4;
+      return { mean: sum / count, min, max };
+    };
+    const viewWas = P.post.GetDebugView();
+    out.debugViews = {};
+    for (const view of ["atmoTransmittance", "atmoMultiScatter", "atmoSkyView",
+      "atmoAerialLut", "aerialScatter", "aerialTransmittance"]) {
+      P.post.SetDebugView(view);
+      P.StepFrames(2, 1 / 60);
+      // 「不可用」的暗红斜纹不能靠数像素认（透过率 LUT 本身就有一大片纯红区）——
+      // 直接问 pass 自己这一帧判成了什么。
+      const source = P.post._GetDebugSource();
+      out.debugViews[view] = {
+        ...ReadScreen(),
+        unavailable: !!(source?.unavailable || (!source?.texture && !source?.material)),
+      };
+    }
+    P.post.SetDebugView(viewWas);
+    P.StepFrames(2, 1 / 60);
+
     // --- 7) IBL 还烘得出来 ---------------------------------------------------
     P.sky.Apply("smokyDay");
     P.lights.ApplyPreset(SKY_PRESETS.smokyDay, P.sky.sunDirection);
@@ -319,6 +364,65 @@ try {
   });
 } catch (error) {
   problems.push(`THROW ${String(error).slice(0, 500)}`);
+}
+
+// --- A/B 出图（`--shot`）--------------------------------------------------
+const shots = [];
+const shotProblems = [];
+if (wantShots && result) {
+  const outDir = path.join(projectDir, "_shots", "Atmosphere");
+  fs.mkdirSync(outDir, { recursive: true });
+  const shotPage = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const Snap = async (name) => {
+    const file = path.join(outDir, `${name}.png`);
+    await shotPage.screenshot({ path: file });
+    shots.push(file);
+    console.log(`shot ${name.padEnd(34)} ${file}`);
+  };
+  try {
+    // 五个时段的街景探针：新 vs 旧，同一机位同一帧序，可以逐像素比。
+    for (const preset of ["dusk", "smokyDay", "burningStreet", "night", "dawn"]) {
+      for (const [tag, legacy] of [["new", ""], ["legacy", "&skyLegacy=1"]]) {
+        await shotPage.goto(
+          `http://127.0.0.1:${port}/Taierzhuang1938/Probe.html?quality=high&preset=${preset}&scene=street&gi=0${legacy}`,
+          { waitUntil: "load", timeout: 180000 });
+        await shotPage.waitForFunction(() => window.Probe?.state?.ready, null, { timeout: 240000 });
+        await shotPage.evaluate(() => {
+          window.Probe.state.elapsed = 0;
+          window.Probe.post.frame = 0;
+          window.Probe.StepFrames(90, 1 / 60);
+        });
+        await shotPage.waitForTimeout(400);
+        await Snap(`Probe_Street_${preset}_${tag}`);
+      }
+    }
+    // 远景两张：正片第一关的户外切片（地形一路铺到 2.9 km），
+    // 大气透视只有在这种视距上才看得出来 —— 探针街景只有 120 m。
+    for (const [tag, legacy] of [["new", ""], ["legacy", "&skyLegacy=1"]]) {
+      await shotPage.goto(
+        `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=1&quality=high&scale=medium${legacy}`,
+        { waitUntil: "load", timeout: 300000 });
+      await shotPage.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 420000 });
+      for (const [id, yaw] of [["A", 0], ["B", Math.PI / 2]]) {
+        await shotPage.evaluate((turn) => {
+          const game = window.Taierzhuang;
+          game.player.pitch = 0.02;
+          game.player.yaw = turn;
+          game.player.aimYaw = 0;
+          game.player.aimPitch = 0;
+          game.player.health = 100;
+          game.player.bleeding = 0;
+          if (game.ai) for (const soldier of game.ai.soldiers) soldier.coolUntil = 1e9;
+          game.StepFrames(48);
+        }, yaw);
+        await shotPage.waitForTimeout(400);
+        await Snap(`Aerial_CH1_${id}_${tag}`);
+      }
+    }
+  } catch (error) {
+    shotProblems.push(`SHOT ${String(error).slice(0, 300)}`);
+  }
+  await shotPage.close();
 }
 
 await browser.close();
@@ -416,12 +520,30 @@ if (!result || !result.hasAtmosphere) {
   }
   console.log("");
 
+  const viewOffenders = [];
+  for (const [view, shot] of Object.entries(result.debugViews || {})) {
+    // 三条一起才算「这张图真的画出来了」：不是全黑、有对比（不是一块纯色）、
+    // 而且 pass 自己没把它判成「不可用」。
+    if (!(shot.mean > 3 && shot.max - shot.min > 12 && !shot.unavailable)) {
+      viewOffenders.push(`${view}=${JSON.stringify({
+        mean: Number(shot.mean.toFixed(1)), min: Number(shot.min.toFixed(1)),
+        max: Number(shot.max.toFixed(1)), unavailable: shot.unavailable })}`);
+    }
+  }
+  Check("六个大气调试视图都真的出画（读回像素）",
+    Object.keys(result.debugViews || {}).length === 6 && viewOffenders.length === 0,
+    viewOffenders.join(" | "));
+
   Check("BakeEnvironment 之后 scene.environment 非空",
     result.environment.baked && result.environment.onScene, JSON.stringify(result.environment));
   Check("60 帧内不再编译新程序",
     result.programs.after === result.programs.before, JSON.stringify(result.programs));
   Check("无 GL 错误", result.glError === 0, `glError=${result.glError}`);
   Check("页面无控制台报错", problems.length === 0, problems.slice(0, 4).join(" | "));
+  if (wantShots) {
+    Check(`A/B 出图完成（${shots.length} 张）`, shotProblems.length === 0 && shots.length >= 12,
+      shotProblems.join(" | ") || `shots=${shots.length}`);
+  }
 }
 
 for (const check of checks) {
