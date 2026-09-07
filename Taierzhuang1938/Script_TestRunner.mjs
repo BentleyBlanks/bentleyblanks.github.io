@@ -195,6 +195,8 @@ export const testDefs = {
   },
   GiTest: { file: "Script_GiTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "全局光照开关对照" },
   PostTest: { file: "Script_PostTest.mjs", desc: "后处理感知域对比：暗部信息不被裁成纯黑" },
+  AutoQualityTest: { file: "Script_AutoQualityTest.mjs",
+    desc: "自动降档（纯 Node）：阶梯映射 / 持续 2 s 才降 / 降后锁 30 s / 升档要 8 s / 死区不抖" },
   ClusteredLightsTest: { file: "Script_ClusteredLightsTest.mjs", timeoutMs: 20 * 60 * 1000,
     desc: "簇状前向光照：簇分配与暴力法逐簇相等（纯 Node）+ 24 盏彩色点光逐盏读回、聚光锥内外、不重编译（真浏览器）" },
   PostFrameGraphTest: { file: "Script_PostFrameGraphTest.mjs", timeoutMs: 15 * 60 * 1000,
@@ -259,6 +261,7 @@ export const browserTests = new Set([
 
 export const tier0Fast = [
   "TextTest",
+  "AutoQualityTest",
   "TextGatherCheck",
   "BootPayloadTest",
   "AssetStandardsTest",
@@ -363,7 +366,7 @@ export const domains = {
     //（UpdateFire / MoveSmokeSource），所以碰灯光或粒子的改动也要连着 FlareTest 跑。
     // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
-    tests: ["TestSceneLightingTest", "PostTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
+    tests: ["TestSceneLightingTest", "PostTest", "AutoQualityTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -412,6 +415,9 @@ const changedDomainRules = [
   // Data_Tuning_Graphics 是渲染帧图的档位表（不是玩法数值）：它同时命中 text 的
   // Data_Tuning_ 那条，这里再补一条把 render 域也拉进来。
   { domain: "render", pattern: /Data_Tuning_Graphics/i },
+  // 自动降档是渲染档位的规则层：它读 Data_Tuning_Graphics.AUTO_QUALITY，
+  // 由 Script_Main 的 rAF 循环驱动、由 ApplyGraphics 落地。
+  { domain: "render", pattern: /AutoQuality/i },
   // 同理：Data_Tuning_Volumetrics 是 froxel 体积雾的时段参数与网格分档；
   // Data_Tuning_Shadows 是级联阴影的分割 / 图尺寸 / PCSS 抽样数；
   // Data_Tuning_Gtao 是 GTAO / SSIL 的数值表。

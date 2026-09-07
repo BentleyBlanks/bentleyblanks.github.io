@@ -101,6 +101,8 @@ import { MainMenu, Progress } from "./Script_Menu.mjs";
 import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction.mjs";
 import { FrameProfiler } from "./Script_Profiler.mjs";
+import { AutoQuality } from "./Script_AutoQuality.mjs";
+import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
 import { BootProp } from "./Script_BootProp.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
 import { AddTrimProps, ClearTrimProps } from "./Script_TrimProps.mjs";
@@ -429,6 +431,9 @@ const ssrUniforms = post.SsrUniforms;
 // 运行时性能剖析器。构造免费、常态休眠（Enable 由编辑器「性能剖析」叠加层调）；
 // Frame/RenderScene 里的 B/E/Gpu* 标记在它关着时只是一次布尔检查。
 const profiler = new FrameProfiler(renderer, { post });
+// 自动降档（docs §13）。出厂开、画质面板可关；只在**真实 rAF 帧**上喂数据，
+// StepFrames（出图 / 测试 / 过场手动步进）一律不喂 —— 那些帧的间隔不是帧率。
+const autoQuality = new AutoQuality();
 
 /**
  * 画质旋钮。
@@ -1860,7 +1865,7 @@ async function Boot() {
     // 或者走 story.Signal("<名字>") 让登记表去派发 —— 两条路同一个实现。
     PlayMidCutscene,
     // FrameProfileTest 的 GI 消融走设置面板同一条路（graphics.gi + ApplyGraphics）
-    graphics, ApplyGraphics,
+    graphics, ApplyGraphics, autoQuality,
     // 通关冒烟用的口子：直接驱动动作，不必去合成键盘事件
     Debug: {
       Reload, DoMelee, CallMortar, EndBattle,
@@ -2540,7 +2545,7 @@ async function Boot() {
     ReturnToMainMenu: MENU_AT_BOOT ? () => OpenMenu() : null,
     game: {
       // gi 走取值器：惰性构造后 Debug Rendering 面板才能看见新建的探针体
-      state, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics,
+      state, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics, autoQuality,
       // 材质着色升级那一包：Debug Rendering 的「材质细节」组按它设假彩色编号。
       materialShading: shadingUniforms,
       get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },
@@ -7605,6 +7610,12 @@ function Loop(now) {
   // window.Taierzhuang.StepFrames() 推进，不能让 rAF 在两次截图之间偷偷加
   // 时间。普通 ?shot 页面不带 manual，仍按实时循环运行。
   if (MANUAL_STEP) return;
+  // 自动降档只吃**玩法帧**：菜单/加载/暂停帧要么便宜得离谱要么长得离谱，
+  // 混进窗口只会让阶梯在进出菜单时来回跳。跳过的那一帧留下的长间隔会被
+  // maxIntervalMs 自己滤掉，不用额外清状态。
+  if (state.running && !state.menu && !state.warming) {
+    if (autoQuality.Frame(now)) ApplyGraphics();
+  }
   // 剖析帧边界包在分支外面：LoopStep 的三条早退路径（菜单帧 / 停摆）也各是一帧。
   profiler.BeginFrame(now);
   LoopStep(dt);
@@ -7660,7 +7671,15 @@ function RecompileAllMaterials() {
 
 function ApplyGraphics() {
   NormalizeGraphicsDetails(graphics, post);
-  const scale = Clamp(graphics.renderScale, 0.4, 1.6);
+  // 自动降档给的是**倍率**不是绝对值：玩家在面板拉过的「渲染分辨率」仍然是
+  // 他拉的那个数，阶梯只在它上面再乘一个 ≤1 的系数。两者分开之后，
+  // 自动与手动不会互相覆盖，「恢复出厂」也不必知道阶梯当前在第几级。
+  const manualScale = Clamp(graphics.renderScale, 0.4, 1.6);
+  const autoScale = autoQuality.enabled ? autoQuality.scale : 1;
+  // 阶梯不许把内部分辨率压到 floor 以下（TAAU 补不回来了），但也不许反过来
+  // 把玩家自己调低的那个数抬上去 —— 所以下限取两者的小者。
+  const scale = autoScale >= 1 ? manualScale
+    : Math.max(manualScale * autoScale, Math.min(manualScale, AUTO_QUALITY.floor));
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight, false);
@@ -7675,7 +7694,11 @@ function ApplyGraphics() {
   // 排在 SetSize 之后：SetSize 按当前的 taaEnabled 建靶，这一行才是改它的人。
   // 反过来的话，刚打开 TAA 的那一次 SetSize 会漏建历史靶（要等下一次改分辨率才补）。
   post.SetTaaEnabled(graphics.taa !== false);
-  post.SetSsrEnabled(graphics.ssr !== false);
+  // 自动降档的第 3 级起摘 SSR、第 4 级起摘接触阴影（两者都是运行时开关，
+  // 不重编译 —— 在已经掉帧的时候送一次几百毫秒的编译只会更糟）。
+  const autoSsr = !autoQuality.enabled || autoQuality.ssr;
+  const autoContact = !autoQuality.enabled || autoQuality.contactShadows;
+  post.SetSsrEnabled(graphics.ssr !== false && autoSsr);
   post.SetSsrStrength(graphics.ssrStrength ?? 1);
   // SSIL：档位给不给是构造期的（`preset.ssil`），倍率滑到 0 时把整趟也停掉 ——
   // 材质端那一次取样会自动顶上一张 1×1 全黑，不用重编译任何材质。
@@ -7701,7 +7724,8 @@ function ApplyGraphics() {
   lights.SetShadowDistance(graphics.shadowDistance);
   // 接触阴影：只是「这一趟 pass 跑不跑」。关掉时 ContactShadowsPass.Idle 会把
   // 材质那边还原成 1×1 纯白，不重编译。
-  post.preset.contactShadows = CONTACT_SHADOWS_SUPPORTED && graphics.contactShadows !== false;
+  post.preset.contactShadows = CONTACT_SHADOWS_SUPPORTED
+    && graphics.contactShadows !== false && autoContact;
   // --- 相机曝光轮：三位开关 + 四根旋钮（口径见 graphics 表里的注释）---------
   // 两位走管线的运行时状态（同 SetTaaEnabled 的先例），不写 preset ——
   // preset 是「这一档的出厂值」，面板的「恢复出厂」要从它读回去。

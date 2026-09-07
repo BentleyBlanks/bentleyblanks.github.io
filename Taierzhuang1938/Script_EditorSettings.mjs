@@ -189,6 +189,22 @@ export class GraphicsSettings {
       ? "TAA 开着时低于 100% 走 TAAU 超分：主场景在这个分辨率跑，TAA 解算回满分辨率，末趟不再有拉伸。"
       : "本档没有 TAAU：低于 100% 时末趟做一次双线性放大。");
 
+    // 自动降档（docs §13）。它给的是**乘在上面那根滑杆上**的倍率，不覆盖玩家的值。
+    const autoQuality = this.host.game?.autoQuality;
+    if (autoQuality) {
+      const autoBox = document.createElement("div");
+      autoBox.className = "edBtns";
+      perf.appendChild(autoBox);
+      Toggle(autoBox, "自动降档", gfx.autoQuality !== false, (on) => {
+        gfx.autoQuality = on;
+        autoQuality.SetEnabled(on);
+        this.Apply();
+      });
+      Note(perf, "帧时间中位数持续 >20 ms 就按阶梯往回收内部分辨率（必要时再摘 SSR /"
+        + " 接触阴影），<13 ms 持续 8 s 才升回去，每次降级锁 30 s。只动运行时旋钮，"
+        + "不整档切换 —— 换档要重编译全场材质，在已经掉帧时更糟。");
+    }
+
     const shadowBox = document.createElement("div");
     shadowBox.className = "edBtns";
     perf.appendChild(shadowBox);
@@ -436,6 +452,11 @@ export class GraphicsSettings {
     // 渲染分辨率的出厂值跟画质档走（TAAU：medium 0.75 / high 0.8 / ultra 1.0），
     // 不是固定的 1 —— 「恢复出厂」要回到这一档真正的出厂设置。
     gfx.renderScale = this.host.post?.preset.renderScale ?? 1;
+    // 自动降档出厂开（Data_Tuning_Graphics.AUTO_QUALITY.enabled），
+    // 并把阶梯收回第 0 级 —— 否则「恢复出厂」之后画面还留在降过的分辨率上。
+    gfx.autoQuality = true;
+    this.host.game?.autoQuality?.SetEnabled(true);
+    this.host.game?.autoQuality?.Reset(0);
     gfx.shadows = true; gfx.shadowSize = 0;
     gfx.firstPersonSelfShadow = true;
     gfx.firstPersonSelfShadowSoft = false;

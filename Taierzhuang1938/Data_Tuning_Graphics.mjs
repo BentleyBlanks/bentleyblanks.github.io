@@ -153,8 +153,13 @@ export const QUALITY_PRESETS = {
     bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
     aoScale: 0.5, sharpen: 0.14, taa: false,
     velocity: true, hzb: true, atmosphere: true,
-    // TAA 关着就没有 TAAU；内部分辨率保持 1.0，抗锯齿由 FXAA + CAS 承担。
-    taaUpscale: false, renderScale: 1.0,
+    // TAA 关着就没有 TAAU，末趟做一次双线性放大。0.85 是 docs §13「自动降档」
+    // 那一段为低配档写死的那个数（「集显同时把 setPixelRatio(1) 并允许 0.85×
+    // 内部分辨率 + FXAA 拉回来」）。2026-09-08 分档定稿把它从 1.0 落到 0.85：
+    // low 出厂**没有** TAAU，1.0 意味着这一档反而在比 high（0.8）更多的像素上
+    // 跑主场景 —— 实测 3394×1348 下 low 与 high 的整帧 GPU 几乎持平，
+    // 这不是「能跑」该有的样子。抗锯齿仍由 FXAA + CAS 承担。
+    taaUpscale: false, renderScale: 0.85,
     motionBlurTaps: 0, motionBlurScale: 1.0, dof: false, dofScale: 0.5,
     // low 不跑 SSR：连靶都不建，材质也不编入补丁（`ssr` 进 cache key）。
     ssr: false, ssrScale: 0.5, ssrSteps: 32, ssrResolveTaps: 0,
@@ -190,7 +195,9 @@ export const QUALITY_PRESETS = {
     pom: 8, pomRefine: 4, pomSelfShadow: false, detailNormal: true,
     microShadow: true, horizonOcclusion: true, skinSss: true,
     materialTexture: 512,
-    taaUpscale: true, renderScale: 0.75,
+    // 2026-09-08 分档定稿：0.75 → 0.70。medium 的定位是「笔记本独显 1080p 稳 60」，
+    // 而它与 high 的差价主要就在这一项（其余几位是构造期开关，省的是编译不是像素）。
+    taaUpscale: true, renderScale: 0.70,
     motionBlurTaps: 8, motionBlurScale: 0.5, dof: true, dofScale: 0.5,
   },
   // high 的抗锯齿由 TAA 承担。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
@@ -264,6 +271,59 @@ export const HZB = { maxLevels: 8, minSize: 8 };
  *   skinnedPrev    蒙皮上一帧骨骼矩阵（doubled boneTexture，见 Script_PostPrepass）
  */
 export const VELOCITY = { clampUv: 0.25, skinnedPrev: true };
+
+/**
+ * 自动降档（`Script_AutoQuality.mjs`）。docs §13 的那一条落地：
+ * 滑动窗口的帧间隔中位数 >20 ms 持续 2 s 降一级、<13 ms 持续 8 s 升一级、
+ * **降级后锁 30 s**（避免在临界点来回抖）。
+ *
+ * ## 为什么是「阶梯」不是「整档切换」
+ * 换画质档要重建全部靶、重编译全场材质（POM / SSIL / 簇状光都是编译期开关），
+ * 那是几百毫秒的卡顿 —— 在**已经掉帧**的时候再送一次几百毫秒的卡顿，
+ * 玩家感受到的是「越卡越卡」。所以阶梯只动运行时旋钮：
+ *   · `scale`          内部分辨率**倍率**（乘在玩家/档位的 renderScale 上，
+ *                      不覆盖它 —— 玩家拉过的滑杆仍然是他拉的那个数）
+ *   · `ssr`            屏幕空间反射（`SetSsrEnabled`，运行时开关不重编译）
+ *   · `contactShadows` 屏幕空间接触阴影（`preset.contactShadows`，同上）
+ * 三者都是 `ApplyGraphics` 里一句话的事，没有一处会触发 `RecompileAllMaterials`。
+ *
+ * ## 出厂开、面板可关
+ * 它是**保底**不是画质策略：出厂配置本身已经按 docs §13 的表定过，
+ * 自动降档只在实际机器跑不动时才动手，并且一路只往回收 `scale`（画面变软），
+ * 不动曝光、不动雾、不动阴影总闸 —— 那几样一动，画面明暗就漂了。
+ */
+export const AUTO_QUALITY = {
+  /** 出厂开。画质面板「分辨率与阴影」组第一行可关。 */
+  enabled: true,
+  /** 滑动窗口的帧数（60 fps 下 1.5 秒）。docs §13 写的是 90。 */
+  window: 90,
+  /** 超过它的帧间隔当作「页面被切走 / 加载卡顿」，不进窗口（与剖析器同口径）。 */
+  maxIntervalMs: 250,
+  /** 中位数高于它才算「跑不动」（docs §13：20 ms）。 */
+  downMedianMs: 20,
+  /** 要连续满足多久才降一级（毫秒）。 */
+  downSustainMs: 2000,
+  /** 中位数低于它才算「有余量」（docs §13：13 ms）。升档比降档保守。 */
+  upMedianMs: 13,
+  /** 要连续满足多久才升一级（毫秒）。 */
+  upSustainMs: 8000,
+  /** 降一级之后锁多久，期间既不降也不升（docs §13：30 s）。 */
+  lockMs: 30000,
+  /**
+   * 阶梯。第 0 级 = 出厂配置（倍率 1、什么都不摘）。
+   * `scale` 是**乘在**当前 renderScale 上的倍率；`floor` 是绝对下限，
+   * 低于它 TAAU 已经补不回来了（1440p 输出 × 0.5 = 720p 内部）。
+   */
+  ladder: [
+    { scale: 1.00, ssr: true, contactShadows: true },
+    { scale: 0.92, ssr: true, contactShadows: true },
+    { scale: 0.85, ssr: true, contactShadows: true },
+    { scale: 0.78, ssr: false, contactShadows: true },
+    { scale: 0.70, ssr: false, contactShadows: false },
+  ],
+  /** 内部分辨率倍率乘完之后的绝对下限（相对输出分辨率）。 */
+  floor: 0.50,
+};
 
 /**
  * 屏幕空间反射（`Script_PostSsr.mjs`）。与档位无关的那一套常数都在这里，

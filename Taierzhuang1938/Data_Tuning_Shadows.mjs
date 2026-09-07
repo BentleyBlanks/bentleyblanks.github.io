@@ -86,7 +86,9 @@ export const SHADOW_PRESETS = {
     bakeOrder: [0, 1, 0, 2],
     pcssLevels: 0,
     blockerTaps: 0,
-    filterTaps: 10,
+    // 2026-09-08 分档定稿：10 → 8（固定盘 PCF，没有 blocker search，
+    // 盘半径不变、只是盘内少两个点；1024 图上肉眼分辨不出，TAA 之后更看不出）。
+    filterTaps: 8,
     fade: 0.10,
     contact: true,
     contactScale: 0.5,
@@ -102,8 +104,12 @@ export const SHADOW_PRESETS = {
     // 7 帧一轮：最近一级占 4 格（~34 Hz）、中间级 2 格（~17 Hz）、最远级 1 格（~9 Hz）。
     bakeOrder: [0, 1, 0, 2, 0, 1, 0],
     pcssLevels: 2,          // 最近两级做 blocker search → 接触硬化
-    blockerTaps: 8,
-    filterTaps: 12,
+    // 2026-09-08 分档定稿：8/12 → 6/9。high 的每像素阴影取样从 20 降到 15
+    // （−25%），实测整帧 GPU 见 docs §13 的旋钮账。半影形状由 blocker search
+    // 的**搜索半径**决定，取样数只决定盘内的噪声；6 抽样 blocker 在 2048 图上
+    // 仍能分辨「贴着遮挡体」与「一米外」，9 抽样 Poisson 盘的噪声被 TAA 吃掉。
+    blockerTaps: 6,
+    filterTaps: 9,
     fade: 0.10,
     contact: true,
     contactScale: 1.0,
