@@ -17,6 +17,98 @@ const MAX_EXPLOSION_ENVELOPES = 12;
 
 function Clamp01(value) { return Math.max(0, Math.min(1, value)); }
 
+// ---------------------------------------------------------------------------
+// 太阳阴影的**公共采样接口**（2026-09 帧图重构新增）
+//
+// 谁要用：体积雾（光柱被墙切断）、屏幕空间接触阴影、簇状多光源、任何要在自己的
+// pass 里问「这一点晒不晒得到太阳」的着色器。做法：
+//
+//   import { SUN_SHADOW_GLSL, BindSunShadowUniforms } from "./Script_Light.mjs";
+//   const uniforms = { ...自己的 };
+//   BindSunShadowUniforms(uniforms, lightRig);      // 建条目 + 接上当前阴影图
+//   const frag = `...${SUN_SHADOW_GLSL}... void main(){ float v = SunShadowVisibility(wp, wn); }`;
+//   // 每帧（或每次换靶）调一次 lightRig.SyncShadowUniforms()
+//
+// **现在它指向唯一那张 66 m 跟随框阴影图。CSM 代理会在这个接口后面换成级联，
+// 调用方一个字都不用改。** 所以：别在自己的 pass 里直接采 `sun.shadow.map`，
+// 也别自己写一遍矩阵与 bias —— 那样级联落地时要改的地方就散在八个文件里。
+//
+// 两条硬要求（漏一条整趟全黑）：
+//   · `PCFShadowMap` 下 `depthTexture.compareFunction = LessEqualCompare`，
+//     它是**shadow 采样器纹理**，用 `sampler2D` 绑定是未定义行为（多数驱动返回 0）。
+//     必须 `highp sampler2DShadow` + `texture(s, vec3(uv, z))`。
+//   · normal offset 在世界空间做（把着色点沿法线推出去），不是把 bias 调大 ——
+//     后者是 peter-panning。
+// ---------------------------------------------------------------------------
+export const SUN_SHADOW_GLSL = /* glsl */`
+uniform highp sampler2DShadow uSunShadowMap;
+uniform mat4 uSunShadowMatrix;      // 世界 -> [0,1] 阴影图坐标（three 的 shadow.matrix）
+uniform vec2 uSunShadowMapSize;
+uniform float uSunShadowBias;       // three 的 shadow.bias（加在 z 上）
+uniform float uSunShadowNormalBias; // 世界米，沿法线推出去
+uniform float uSunShadowRadius;     // Vogel 盘半径（纹素）
+uniform float uSunShadowIntensity;  // 1 = 全黑影；<1 = 影子不死黑
+uniform float uSunShadowEnabled;    // 0 = 这一档没有阴影图，恒返回 1
+
+float SunShadowIgn(vec2 position) {
+  return fract(52.9829189 * fract(dot(position, vec2(0.06711056, 0.00583715))));
+}
+
+vec2 SunShadowVogel(int sampleIndex, int samplesCount, float phi) {
+  const float goldenAngle = 2.399963229728653;
+  float r = sqrt((float(sampleIndex) + 0.5) / float(samplesCount));
+  float theta = float(sampleIndex) * goldenAngle + phi;
+  return vec2(cos(theta), sin(theta)) * r;
+}
+
+/**
+ * 1.0 = 完全照到太阳，0.0 = 完全被挡。阴影框外一律返回 1.0（不是 0）——
+ * 66 m 之外本来就没有阴影信息，返回 0 会让整个远景一片死黑。
+ */
+float SunShadowVisibility(vec3 worldPos, vec3 worldNormal) {
+  if (uSunShadowEnabled < 0.5) return 1.0;
+  vec4 coord = uSunShadowMatrix * vec4(worldPos + worldNormal * uSunShadowNormalBias, 1.0);
+  coord.xyz /= coord.w;
+  coord.z += uSunShadowBias;
+  bool inFrustum = coord.x >= 0.0 && coord.x <= 1.0 && coord.y >= 0.0 && coord.y <= 1.0;
+  if (!inFrustum || coord.z > 1.0) return 1.0;
+  // 与 three 的 SHADOWMAP_TYPE_PCF 同一套：Vogel 5 抽样盘 + 交错梯度噪声旋转。
+  vec2 texelSize = vec2(1.0) / uSunShadowMapSize;
+  float radius = uSunShadowRadius * texelSize.x;
+  float phi = SunShadowIgn(gl_FragCoord.xy) * 6.283185307179586;
+  float shadow = (
+    texture(uSunShadowMap, vec3(coord.xy + SunShadowVogel(0, 5, phi) * radius, coord.z)) +
+    texture(uSunShadowMap, vec3(coord.xy + SunShadowVogel(1, 5, phi) * radius, coord.z)) +
+    texture(uSunShadowMap, vec3(coord.xy + SunShadowVogel(2, 5, phi) * radius, coord.z)) +
+    texture(uSunShadowMap, vec3(coord.xy + SunShadowVogel(3, 5, phi) * radius, coord.z)) +
+    texture(uSunShadowMap, vec3(coord.xy + SunShadowVogel(4, 5, phi) * radius, coord.z))
+  ) * 0.2;
+  return mix(1.0, shadow, uSunShadowIntensity);
+}
+`;
+
+/**
+ * 在一份 uniforms 上建齐 `SUN_SHADOW_GLSL` 要的条目，并接上当前的阴影图。
+ * `lightRig` 传 null 也合法（建条目、置 `uSunShadowEnabled = 0`），
+ * 之后再调 `lightRig.SyncShadowUniforms()` 补上。
+ * @returns {object} 同一份 uniforms（方便链式）
+ */
+export function BindSunShadowUniforms(uniforms, lightRig = null) {
+  uniforms.uSunShadowMap = uniforms.uSunShadowMap || { value: null };
+  uniforms.uSunShadowMatrix = uniforms.uSunShadowMatrix || { value: new THREE.Matrix4() };
+  uniforms.uSunShadowMapSize = uniforms.uSunShadowMapSize || { value: new THREE.Vector2(1024, 1024) };
+  uniforms.uSunShadowBias = uniforms.uSunShadowBias || { value: -0.0004 };
+  uniforms.uSunShadowNormalBias = uniforms.uSunShadowNormalBias || { value: 0.035 };
+  uniforms.uSunShadowRadius = uniforms.uSunShadowRadius || { value: 2.2 };
+  uniforms.uSunShadowIntensity = uniforms.uSunShadowIntensity || { value: 1 };
+  uniforms.uSunShadowEnabled = uniforms.uSunShadowEnabled || { value: 0 };
+  if (lightRig) {
+    lightRig.RegisterShadowUniforms(uniforms);
+    lightRig.SyncShadowUniforms();
+  }
+  return uniforms;
+}
+
 export class LightRig {
   constructor(scene, { quality = "high", shadowExtent = 62 } = {}) {
     this.scene = scene;
@@ -85,6 +177,46 @@ export class LightRig {
     this.muzzleBase = 0;
 
     this.sunDirection = new THREE.Vector3(0, 1, 0);
+    // 登记过的「太阳阴影采样」uniform 包（见 SUN_SHADOW_GLSL）。用 Set 不用数组：
+    // 同一个 pass 重复登记是幂等的。
+    this.shadowUniformClients = new Set();
+  }
+
+  /** 让一份 uniforms 跟着本 rig 的阴影图走。一般由 `BindSunShadowUniforms` 代调。 */
+  RegisterShadowUniforms(uniforms) {
+    if (uniforms) this.shadowUniformClients.add(uniforms);
+    return uniforms;
+  }
+
+  UnregisterShadowUniforms(uniforms) {
+    this.shadowUniformClients.delete(uniforms);
+  }
+
+  /**
+   * 每帧（或换靶/换画质档后）调一次：把阴影图引用与矩阵推给所有登记过的 pass。
+   *
+   * **必须排在本帧阴影图烘完之后** —— `sun.shadow.map` 是 three 在第一次
+   * `shadowMap.render` 时才建的，boot 那几帧是 null。矩阵每帧都在动
+   * （阴影框跟着玩家滚并吸附纹素），所以不能只接一次。
+   */
+  SyncShadowUniforms() {
+    if (!this.shadowUniformClients.size) return;
+    const shadow = this.sun.shadow;
+    const map = shadow.map;
+    const depth = map ? map.depthTexture : null;
+    // compareFunction 为 null 表示当前不是 PCFShadowMap（BASIC/VSM）—— 那张图
+    // 不能用 sampler2DShadow 绑，宁可整体退回「没有阴影」也不要未定义行为。
+    const usable = !!(this.sun.castShadow && depth && depth.compareFunction);
+    for (const uniforms of this.shadowUniformClients) {
+      uniforms.uSunShadowMap.value = usable ? depth : null;
+      uniforms.uSunShadowMatrix.value.copy(shadow.matrix);
+      uniforms.uSunShadowMapSize.value.set(shadow.mapSize.x, shadow.mapSize.y);
+      uniforms.uSunShadowBias.value = shadow.bias;
+      uniforms.uSunShadowNormalBias.value = shadow.normalBias;
+      uniforms.uSunShadowRadius.value = shadow.radius;
+      uniforms.uSunShadowIntensity.value = shadow.intensity ?? 1;
+      uniforms.uSunShadowEnabled.value = usable ? 1 : 0;
+    }
   }
 
   /**
