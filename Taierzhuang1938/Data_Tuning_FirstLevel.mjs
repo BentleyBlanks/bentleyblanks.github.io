@@ -36,6 +36,24 @@ export const MISSION_TUNING = Object.freeze({
   defenderAccuracyScale:.3,
   defenderFireIntervalScale:1.05,
   tankRevealDistanceM:70,
+  // Bounding assault (2026-09-08): rush between FRONT_ASSAULT lines, kneel and fire at each, pinned men go prone
+  // and crawl back a bound after assaultPinnedS; at the last line a man holds assaultFinalHoldS then falls back to
+  // assaultRegroupLine and comes again (assaultRegroupCycles times) so the field is never static.
+  assaultRushMps:3.4,
+  assaultHoldS:3.5,
+  assaultFinalHoldS:11,
+  assaultRegroupLine:1,
+  assaultRegroupCycles:3,
+  assaultArrivalM:.9,
+  assaultPinnedS:7,
+  // Reinforcement waves drop at FRONT_ASSAULT.spawnZ while the front stages run and fewer than waveAliveCap assault men live.
+  waveFirstDelayS:18,
+  waveIntervalS:26,
+  waveSquadSize:6,
+  waveBudget:42,
+  waveAliveCap:30,
+  // Encounter spawns are drained a few per frame: 46 rigs in one frame was a 200 ms hitch at stage entry.
+  spawnPerFrame:2,
   tankSpeedMps: 1.55,
   tankAdvanceSeconds: 11,
   tankFiringHaltSeconds: 5,
@@ -151,4 +169,7 @@ export const MISSION_TUNING = Object.freeze({
   zhouStrafeAtS: 2.6,
 });
 
-export const MISSION_PEOPLE_TUNING=Object.freeze({aftermathCellM:.05,closeAnimationM:8,nearAnimationM:45,farAnimationM:90,nearAnimationS:1/20,idleAnimationS:1/10,midAnimationS:1/15,farAnimationS:1/8,walkThresholdMps:.08,gaitSpeedMps:3.6,carrySourceMps:1.4,loadSinkM:.08,loadLeanRad:.045,breathRate:1.7,watchYawRad:.18});
+// Aftermath tiers (2026-09-08 frame probe: 87 full bodies inside 30 m cost 0.9 M triangles per pass): full mesh only to
+// aftermathDetailExitM, 5 cm clusters to aftermathMidExitM, 14 cm clusters beyond. Live corpses keep ACTOR_DETAIL.
+// Tables are recompacted only after the focus moves aftermathRefreshM or the view turns (1-|q·q'| > aftermathRefreshDot).
+export const MISSION_PEOPLE_TUNING=Object.freeze({aftermathCellM:.05,aftermathFarCellM:.14,aftermathDetailEnterM:12,aftermathDetailExitM:15,aftermathMidEnterM:70,aftermathMidExitM:80,aftermathRefreshM:.35,aftermathRefreshDot:.00012,closeAnimationM:8,nearAnimationM:45,farAnimationM:90,nearAnimationS:1/20,idleAnimationS:1/10,midAnimationS:1/15,farAnimationS:1/8,walkThresholdMps:.08,gaitSpeedMps:3.6,carrySourceMps:1.4,loadSinkM:.08,loadLeanRad:.045,breathRate:1.7,watchYawRad:.18});

@@ -2,34 +2,62 @@ import * as THREE from "three";
 import { ACTOR_DETAIL } from "./Data_Tuning_Ai.mjs";
 import { MISSION_PEOPLE_TUNING as C } from "./Data_Tuning_FirstLevel.mjs";
 import { MissionTrainLifePose } from "./Script_FirstLevelMissionTrainLife.mjs";
+import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { MISSION_AFTERMATH } from "./Data_FirstLevelMissionFront.mjs";
 
-// Skin each pose once, then merge bodies by terrain sector and material.
-// No AI, tickets, collision walls or animation mixers are added for historical casualties.
+// Historical casualties: eight baked poses (side × pose) drawn as InstancedMesh with three
+// distance tiers. No AI, tickets, collision walls or animation mixers are added for them.
+//
+// 2026-09-08 rewrite. The previous version cloned every body's full geometry into
+// per-sector static meshes: 141 bodies = 1.2 M triangles and 373 draw calls per frame,
+// 5 ms of a 17 ms GPU frame, plus a per-frame name-parsing walk over every sector mesh.
+// Tripling the count that way was impossible. Now:
+//   · geometry lives once per pose (detail / mid / far), instances carry only a matrix;
+//   · every frame does its own frustum + distance test and compacts the instance tables
+//     (InstancedMesh cannot cull per instance; the whole-scene table has no sectors);
+//   · only the detail tier casts shadows, and only when the camera is near enough;
+//   · materials are cloned from the live actor materials so the static instances never
+//     share a material object with skinned meshes (see CloneShadedMaterial).
+const TIERS = 3;
+const _frustum = new THREE.Frustum();
+const _matrix = new THREE.Matrix4();
+const _sphere = new THREE.Sphere();
+const _position = new THREE.Vector3();
+const _rotation = new THREE.Quaternion();
+const _scale = new THREE.Vector3();
+const _euler = new THREE.Euler();
+const _quaternion = new THREE.Quaternion();
+
 export class MissionAftermath {
-  constructor({root,battlefield,actorFactory}) {
+  constructor({root,battlefield,actorFactory,bodies=MISSION_AFTERMATH}) {
     this.root=new THREE.Group();this.root.name="MissionBattlefieldAftermath";root.add(this.root);
-    this.materials=new Map();this.prototypes=new Map();
+    this.materials=new Map();this.clones=[];
     this.blood=new THREE.MeshStandardMaterial({color:0x4b1110,roughness:.72,metalness:0,side:THREE.DoubleSide});
     this.materials.set("Blood",this.blood);
-    const sink=new BuildSink(),distantSink=new BuildSink(),matrix=new THREE.Matrix4(),rotation=new THREE.Quaternion(),scale=new THREE.Vector3();
-    for(const spec of MISSION_AFTERMATH){
-      const sector="Aftermath_"+Math.floor(spec.x/28)+"_"+Math.floor(spec.z/28);sink.SetSector(sector);distantSink.SetSector(sector);
+    this.prototypes=new Map();
+    this.instances=[];
+    this.lastFocus=new THREE.Vector3(NaN,NaN,NaN);this.lastQuaternion=new THREE.Quaternion(0,0,0,0);this.frames=0;
+    const bloodSink=new BuildSink();
+    for(const spec of bodies){
       const key=spec.side+spec.pose;
-      if(!this.prototypes.has(key)){
-        const parts=this.Bake(actorFactory,spec);
-        for(const part of parts)part.distant=CreateDistantBodyGeometry(part.geometry);
-        this.prototypes.set(key,parts);
+      let prototype=this.prototypes.get(key);
+      if(!prototype){
+        const parts=BakeMissionBody(actorFactory,spec,this.materials).map(part=>{
+          const source=this.materials.get(part.key);
+          const material=CloneShadedMaterial(source);this.clones.push(material);
+          const tiers=[part.geometry,CreateDistantBodyGeometry(part.geometry,C.aftermathCellM),CreateDistantBodyGeometry(part.geometry,C.aftermathFarCellM)];
+          return {material,tiers,triangles:tiers.map(Triangles)};
+        });
+        prototype={key,parts,members:[],meshes:[]};
+        this.prototypes.set(key,prototype);
       }
       const ground=battlefield.GroundHeight(spec.x,spec.z);
-      rotation.setFromEuler(new THREE.Euler(0,spec.yaw,0));scale.setScalar(spec.scale);
-      matrix.compose(new THREE.Vector3(spec.x,ground+spec.pile+.025,spec.z),rotation,scale);
-      for(const part of this.prototypes.get(key)){
-        sink.Add(part.key,part.geometry.clone().applyMatrix4(matrix));
-        distantSink.Add(part.key,part.distant.clone().applyMatrix4(matrix));
-      }
-      // Irregular, terrain-conforming pools and smears; each corpse has its own outline.
+      _rotation.setFromEuler(_euler.set(0,spec.yaw,0));_scale.setScalar(spec.scale);
+      const matrix=new THREE.Matrix4().compose(_position.set(spec.x,ground+spec.pile+.025,spec.z),_rotation,_scale);
+      const instance={x:spec.x,y:ground+spec.pile+.5,z:spec.z,radius:1.25*spec.scale,matrix,tier:TIERS-1,prototype};
+      this.instances.push(instance);prototype.members.push(instance);
+      // Irregular, terrain-conforming pools and smears; each body has its own outline.
       const vertices=[],count=13,angle=spec.yaw;
       const Point=(i)=>{const a=i/count*Math.PI*2,r=spec.blood*(.78+.22*Math.sin(i*2.37+spec.x));
         const x=spec.x+Math.cos(a+angle)*r,z=spec.z+Math.sin(a+angle)*r*.68;
@@ -37,31 +65,90 @@ export class MissionAftermath {
       const center=[spec.x,ground+.013,spec.z];
       for(let i=0;i<count;i++)vertices.push(...center,...Point(i),...Point((i+1)%count));
       const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.Float32BufferAttribute(vertices,3));g.computeVertexNormals();
-      sink.Add("Blood",g);
+      bloodSink.Add("Blood",g);
     }
-    this.meshes=sink.Flush(this.root,{Get:key=>this.materials.get(key)});
-    const distant=distantSink.Flush(this.root,{Get:key=>this.materials.get(key)});
-    this.triangles={detail:this.meshes.reduce((n,m)=>n+(m.geometry.index?.count||m.geometry.attributes.position.count)/3,0),distant:distant.reduce((n,m)=>n+(m.geometry.index?.count||m.geometry.attributes.position.count)/3,0)};
-    for(const m of distant){m.userData.missionDistant=true;m.visible=false;}
-    this.meshes.push(...distant);
-    for(const m of this.meshes){m.castShadow=m.material!==this.blood;m.receiveShadow=true;m.geometry.computeBoundingBox();}
-    this.count=MISSION_AFTERMATH.length;
-    for(const parts of this.prototypes.values())for(const p of parts){p.geometry.dispose();p.distant.dispose();}
-    this.prototypes.clear();
+    // One instance table per part and tier, sized to the pose's member count.
+    for(const prototype of this.prototypes.values()){
+      for(const part of prototype.parts){
+        part.meshes=part.tiers.map((geometry,tier)=>{
+          const mesh=new THREE.InstancedMesh(geometry,part.material,Math.max(1,prototype.members.length));
+          mesh.name=`MissionAftermath_${prototype.key}_${tier}`;
+          mesh.frustumCulled=false;mesh.count=0;
+          mesh.castShadow=tier===0;mesh.receiveShadow=true;
+          mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+          this.root.add(mesh);return mesh;
+        });
+      }
+    }
+    this.bloodMeshes=bloodSink.Flush(this.root,{Get:key=>this.materials.get(key)});
+    for(const m of this.bloodMeshes){m.castShadow=false;m.receiveShadow=true;m.geometry.computeBoundingBox();}
+    this.count=bodies.length;
+    // Budget report: what the whole field would cost at full detail versus the mid tier.
+    this.triangles={detail:0,distant:0,far:0};
+    for(const prototype of this.prototypes.values())for(const part of prototype.parts){
+      this.triangles.detail+=part.triangles[0]*prototype.members.length;
+      this.triangles.distant+=part.triangles[1]*prototype.members.length;
+      this.triangles.far+=part.triangles[2]*prototype.members.length;
+    }
+    this.visible={detail:0,distant:0,far:0};
   }
-  Update(focus){
+  /**
+   * Compact the instance tables for this camera. Runs every frame but only rewrites the
+   * tables when the focus moved or the view turned; the tests measure this path.
+   * @param {THREE.Vector3} focus  player position (distance tiers)
+   * @param {THREE.Camera} [camera] frustum source; without it every body in range is kept
+   */
+  Update(focus,camera=null){
     if(!focus)return;
-    for(const mesh of this.meshes){
-      const [x,z]=mesh.name.split("|")[0].split("_").slice(-2).map(Number);
-      const dx=Math.max(x*28-2-focus.x,0,focus.x-((x+1)*28+2)),dz=Math.max(z*28-2-focus.z,0,focus.z-((z+1)*28+2));
-      const detail=dx*dx+dz*dz<=ACTOR_DETAIL.corpseExitM**2;
-      mesh.visible=mesh.material===this.blood||(mesh.userData.missionDistant?!detail:detail);
-      mesh.castShadow=mesh.visible&&mesh.material!==this.blood&&dx*dx+dz*dz<=ACTOR_DETAIL.shadowM**2;
+    this.frames++;
+    let dirty=this.frames<3||this.lastFocus.distanceToSquared(focus)>C.aftermathRefreshM**2;
+    if(camera){
+      camera.updateMatrixWorld();
+      _quaternion.setFromRotationMatrix(camera.matrixWorld);
+      if(Math.abs(_quaternion.dot(this.lastQuaternion))<1-C.aftermathRefreshDot)dirty=true;
+    }
+    if(!dirty)return;
+    this.lastFocus.copy(focus);if(camera)this.lastQuaternion.copy(_quaternion);
+    if(camera){
+      _matrix.copy(camera.matrixWorld).invert().premultiply(camera.projectionMatrix);
+      _frustum.setFromProjectionMatrix(_matrix);
+    }
+    const detailEnter=C.aftermathDetailEnterM**2,detailExit=C.aftermathDetailExitM**2;
+    const midEnter=C.aftermathMidEnterM**2,midExit=C.aftermathMidExitM**2,shadow=ACTOR_DETAIL.shadowM**2;
+    const visible=this.visible;visible.detail=0;visible.distant=0;visible.far=0;
+    for(const prototype of this.prototypes.values()){
+      for(const part of prototype.parts)for(const mesh of part.meshes)mesh.count=0;
+      for(const instance of prototype.members){
+        const dx=instance.x-focus.x,dz=instance.z-focus.z,d2=dx*dx+dz*dz;
+        // Hysteresis per body so a corpse on the boundary does not flicker between tiers.
+        let tier=instance.tier;
+        if(tier===0){if(d2>detailExit)tier=1;}
+        else if(d2<=detailEnter)tier=0;
+        if(tier===1){if(d2>midExit)tier=2;}
+        else if(tier===2&&d2<=midEnter)tier=1;
+        instance.tier=tier;
+        if(camera){
+          _sphere.center.set(instance.x,instance.y,instance.z);_sphere.radius=instance.radius;
+          // Bodies just outside the view still throw shadows into it; keep the near ones.
+          if(!_frustum.intersectsSphere(_sphere)&&!(tier===0&&d2<=shadow))continue;
+        }
+        for(const part of prototype.parts){const mesh=part.meshes[tier];mesh.setMatrixAt(mesh.count++,instance.matrix);}
+        if(tier===0)visible.detail++;else if(tier===1)visible.distant++;else visible.far++;
+      }
+      for(const part of prototype.parts)for(const mesh of part.meshes){mesh.instanceMatrix.needsUpdate=true;mesh.visible=mesh.count>0;}
     }
   }
   Bake(factory,spec){return BakeMissionBody(factory,spec,this.materials);}
-  Dispose(){this.root.removeFromParent();for(const mesh of this.meshes)mesh.geometry.dispose();this.blood.dispose();}
+  Dispose(){
+    this.root.removeFromParent();
+    for(const prototype of this.prototypes.values())for(const part of prototype.parts){for(const g of part.tiers)g.dispose();for(const m of part.meshes)m.dispose?.();}
+    for(const mesh of this.bloodMeshes)mesh.geometry.dispose();
+    for(const material of this.clones)material.dispose();
+    this.blood.dispose();
+  }
 }
+
+function Triangles(geometry){return (geometry.index?.count||geometry.attributes.position.count)/3;}
 
 export function BakeMissionBody(factory,spec,materials){
     const actor=factory.Create(spec.side,{weapon:null,modelVariant:spec.pose,seed:1938+spec.pose});
@@ -119,17 +206,19 @@ export function BakeMissionBody(factory,spec,materials){
     actor.Dispose();return parts;
   }
 
-// Five-centimetre vertex clustering is used only for distant, already settled bodies.
-function CreateDistantBodyGeometry(source){
-  const position=source.attributes.position,normal=source.attributes.normal,uv=source.attributes.uv;
+// Vertex clustering for already settled bodies: 5 cm keeps the silhouette past 15 m,
+// 14 cm is enough for the far tier where a body is a few pixels long.
+// Positions take the cluster centroid; uv and normal come from one representative vertex.
+// Averaging them was the "black bodies" bug: a cell straddling two atlas islands samples
+// an unused (black) texel, and a cell spanning both sides of a sleeve cancels the normal.
+export function CreateDistantBodyGeometry(source,cellM=C.aftermathCellM){
+  const position=source.attributes.position,normal=source.attributes.normal;
   const clusters=new Map(),vertices=[],remap=[];
   for(let i=0;i<position.count;i++){
-    const x=position.getX(i),y=position.getY(i),z=position.getZ(i),key=[x,y,z].map(v=>Math.round(v/C.aftermathCellM)).join(",");
+    const x=position.getX(i),y=position.getY(i),z=position.getZ(i),key=[x,y,z].map(v=>Math.round(v/cellM)).join(",");
     let index=clusters.get(key);
-    if(index===undefined){index=vertices.length;clusters.set(key,index);vertices.push({x:0,y:0,z:0,nx:0,ny:0,nz:0,u:0,v:0,count:0});}
-    const p=vertices[index];p.x+=x;p.y+=y;p.z+=z;p.count++;
-    if(normal){p.nx+=normal.getX(i);p.ny+=normal.getY(i);p.nz+=normal.getZ(i);}
-    if(uv){p.u+=uv.getX(i);p.v+=uv.getY(i);}remap.push(index);
+    if(index===undefined){index=vertices.length;clusters.set(key,index);vertices.push({x:0,y:0,z:0,rep:i,count:0});}
+    const p=vertices[index];p.x+=x;p.y+=y;p.z+=z;p.count++;remap.push(index);
   }
   const indices=[],faces=new Set(),count=source.index?.count||position.count;
   for(let i=0;i<count;i+=3){
@@ -139,7 +228,15 @@ function CreateDistantBodyGeometry(source){
   }
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute("position",new THREE.Float32BufferAttribute(vertices.flatMap(p=>[p.x/p.count,p.y/p.count,p.z/p.count]),3));
-  geometry.setAttribute("normal",new THREE.Float32BufferAttribute(vertices.flatMap(p=>{const n=Math.hypot(p.nx,p.ny,p.nz)||1;return[p.nx/n,p.ny/n,p.nz/n];}),3));
-  if(uv)geometry.setAttribute("uv",new THREE.Float32BufferAttribute(vertices.flatMap(p=>[p.u/p.count,p.v/p.count]),2));
-  geometry.setIndex(indices);return geometry;
+  // Every other attribute (normal, uv, vertex color, tangent, uv1...) is copied from the
+  // representative vertex: a material with vertexColors reads a missing color as black.
+  for(const [name,attribute] of Object.entries(source.attributes)){
+    if(name==="position")continue;
+    const size=attribute.itemSize,array=new Float32Array(vertices.length*size);
+    for(let v=0;v<vertices.length;v++)for(let k=0;k<size;k++)array[v*size+k]=attribute.getComponent(vertices[v].rep,k);
+    geometry.setAttribute(name,new THREE.BufferAttribute(array,size));
+  }
+  geometry.setIndex(indices);
+  if(!normal)geometry.computeVertexNormals();
+  return geometry;
 }

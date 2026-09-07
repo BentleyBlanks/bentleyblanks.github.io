@@ -274,6 +274,29 @@ ${DestructionShaderGlsl(destruction.maxVolumes)}`)
   return material;
 }
 
+/**
+ * 克隆一份**带着注入钩子**的材质。
+ *
+ * 为什么要有它（2026-09-08 第一关帧取证）：静态烘焙的尸体、远景实例化人群和蒙皮人物
+ * 曾共用同一个材质对象。three 在 setProgram 里按 object 的 skinning / instancing 标志
+ * 与 materialProperties 里上一次的标志比较，不一致就整个重新 getProgram ——
+ * 程序本身有缓存不会重编，但 getParameters + 缓存键拼串每次都跑：实测一帧
+ * 四百多次，约 930 KB 垃圾 / 帧、四到六毫秒 CPU，GC 每五帧一次。
+ * 每一类 object（蒙皮 / 静态 / 实例）拿自己的一份材质，标志就稳定了。
+ *
+ * `Material.clone()` 不带走实例上挂的 onBeforeCompile / customProgramCacheKey，
+ * 这里显式抄过去；闭包里只引用共享的 uniforms 包与注入参数，可以安全共用。
+ */
+export function CloneShadedMaterial(material) {
+  if (!material) return material;
+  if (Array.isArray(material)) return material.map(CloneShadedMaterial);
+  const clone = material.clone();
+  if (Object.prototype.hasOwnProperty.call(material, "onBeforeCompile")) clone.onBeforeCompile = material.onBeforeCompile;
+  if (Object.prototype.hasOwnProperty.call(material, "customProgramCacheKey")) clone.customProgramCacheKey = material.customProgramCacheKey;
+  clone.name = material.name;
+  return clone;
+}
+
 /** 阴影深度也裁同一批洞；否则墙已经穿了，太阳底下还留一块完整墙影。 */
 function MakeDestructionDepthMaterial(uniforms) {
   const material = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });

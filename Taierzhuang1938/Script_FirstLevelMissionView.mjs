@@ -220,9 +220,9 @@ export class FirstLevelMissionView {
       }
     }
   }
-  Update(time, { tank,player } = {}) {
+  Update(time, { tank,player,camera=null } = {}) {
     this.people.Begin(time,player?.position);
-    this.aftermath.Update(player?.position);
+    this.aftermath.Update(player?.position,camera);
     for (const mesh of Object.values(this.parts)) mesh.count = 0;
     this.TrainHandProps();
     this.UpdateSupplies(time);

@@ -28,6 +28,7 @@
 
 import * as THREE from "three";
 import { MergeGeometries } from "./Script_Geo.mjs";
+import { CloneShadedMaterial } from "./Script_Materials.mjs";
 
 /**
  * 单一 kind 的实例上限。尸体现在保留到本关结束，最大日军票池是 480；
@@ -150,7 +151,9 @@ export class ActorCrowd {
 
     const meshes = [];
     for (const [material, list] of byMaterial) {
-      const mesh = new THREE.InstancedMesh(MergeGeometries(list), material, this.capacity);
+      // 实例表拿自己的一份材质：与蒙皮人物共用同一个对象时，three 每次在 skinning 与
+      // instancing 之间切换都要重新 getProgram（参数对象 + 缓存键拼串），一帧几百次。
+      const mesh = new THREE.InstancedMesh(MergeGeometries(list), CloneShadedMaterial(material), this.capacity);
       mesh.name = `Crowd_${kind}_${dead ? "Dead" : "Standing"}`;
       // 自己做视锥剔除（Script_Ai 那边逐人判），而且实例散布在全场，
       // 用一个包围球去剔整批人只会在转身时整批闪掉
@@ -281,7 +284,8 @@ export class ActorCrowd {
     for (const entry of this.kinds.values()) {
       for (const mesh of entry.meshes) {
         if (mesh.parent) mesh.parent.remove(mesh);
-        mesh.geometry.dispose();      // 材质是工厂缓存的共用件，**不能** dispose
+        mesh.geometry.dispose();
+        mesh.material.dispose();      // 自己克隆的那一份；工厂缓存的原件不在这里
       }
     }
     this.kinds.clear();

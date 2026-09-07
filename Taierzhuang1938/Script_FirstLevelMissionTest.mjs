@@ -1,4 +1,4 @@
-import { FRONT_BREACHES } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_BREACHES, FRONT_ASSAULT, FrontAssaultLane } from "./Data_FirstLevelMissionFront.mjs";
 import { CollectBulletNearMisses,ApplyBulletNearMisses } from "./Script_BallisticSuppression.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
@@ -65,8 +65,16 @@ assert.ok(SampleMissionTerrain(135,90)>2.8 && SampleMissionTerrain(-204,90)>3.8,
 console.log("ok shared terrain, excavated trenches, structural floors only");
 const tacticalRoutes = Object.fromEntries(Object.entries(MISSION_TACTICS).map(([id, plan]) => [id,
   [Object.values(MISSION_ENCOUNTERS).flat().find(spec => spec.id === id), ...plan.points]]));
+// Bounding-assault lanes: every front rifleman and every wave drop point must rush between lines without cutting a cover block.
+const assaultLanes=Object.fromEntries([
+  ...MISSION_ENCOUNTERS.front.filter(spec=>!spec.hold&&FrontAssaultLane(spec.x,spec.z).length).map(spec=>["Assault"+spec.id,[spec,...FrontAssaultLane(spec.x,spec.z)]]),
+  ...FRONT_ASSAULT.waveCentersX.flatMap((cx,squad)=>[0,1,2,3,4,5].map(i=>{const x=cx+((i%3)-1)*3.2+(i>=3?1.6:0),z=FRONT_ASSAULT.spawnZ-(i>=3?2.5:0);
+    return ["AssaultWave"+squad+"_"+i,[{x,z},...FrontAssaultLane(x,z)]];})),
+]);
+assert.ok(Object.values(assaultLanes).every(route=>route.length>=2&&route.at(-1).z===FRONT_ASSAULT.lines.at(-1)),"every assault lane ends on the last bound line");
+assert.ok(Object.keys(assaultLanes).length>=24,"most front riflemen and every wave drop point get a bounding lane: "+Object.keys(assaultLanes).length);
 const reliefRoutes=Object.fromEntries(P.reliefPositions.map((point,i)=>["Relief"+i,[MISSION_TRAIN.cars[2].muster[i],...P.reliefApproach,{x:point.x,z:-123},point]]));
-for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...tacticalRoutes, ...reliefRoutes, ...Object.fromEntries(P.guardWithdrawalRoutes.map((route,i)=>["Guard"+i,route])) })) {
+for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...tacticalRoutes, ...assaultLanes, ...reliefRoutes, ...Object.fromEntries(P.guardWithdrawalRoutes.map((route,i)=>["Guard"+i,route])) })) {
   for (let i = 1; i < route.length; i++) {
     const a = route[i - 1],
       b = route[i],

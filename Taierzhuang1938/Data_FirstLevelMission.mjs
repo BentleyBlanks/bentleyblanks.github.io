@@ -208,14 +208,8 @@ export const MISSION_GUIDANCE = Object.freeze({
   RetreatFirst:{label:'retreat'},RetreatWall:{label:'retreat'},RetreatYard:{label:'retreat'},
   Reception:{label:'reception'},FinalCarry:{label:'carry'},FinalDefense:{label:'rearCover'},Exit:{label:'exit',route:'exit'},
 });
+// Front riflemen no longer use point tactics: they bound between FRONT_ASSAULT lines (runtime UpdateAssault).
 export const MISSION_TACTICS = Object.freeze({
-  ...Object.fromEntries(FRONT_REINFORCEMENTS.filter(s=>s.route).map(s=>[s.id,s.route])),
-  FrontRifleA: { delay: 2, points: [{x:-16,z:-154},{x:-16,z:-151}] },
-  FrontRifleB: { delay: 7, points: [{x:-8,z:-156},{x:-8,z:-153}] },
-  FrontRifleC: { delay: 5, points: [{x:12,z:-155},{x:12,z:-153}] },
-  FrontRifleD: { delay: 11, points: [{x:27,z:-155},{x:23,z:-153}] },
-  FrontRifleE: { delay: 16, points: [{x:-33,z:-169},{x:-33,z:-160},{x:-32,z:-155}] },
-  FrontRifleG: { delay: 20, points: [{x:-7,z:-175},{x:-7,z:-164},{x:-6,z:-160}] },
   CourtyardPursuerA: { delay: 1, points: [{x:86,z:37},{x:62,z:40},{x:53,z:38}] },
   CourtyardPursuerB: { delay: 12, points: [{x:89,z:39},{x:66,z:43},{x:59,z:40}] },
   CourtyardPursuerC: { delay: 25, points: [{x:91,z:41},{x:70,z:44},{x:64,z:40}] },

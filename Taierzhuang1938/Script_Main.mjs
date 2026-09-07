@@ -2152,6 +2152,8 @@ async function Boot() {
       Setpieces: () => (setpieces ? setpieces.State() : null),
       P012: () => missionRuntime?.State() || p012Flow?.State() || null,
       FirstLevelMission: () => missionRuntime?.State() || null,
+      // 性能取证与专项测试直接读运行时对象（敌人表、事实、列队）；不是玩法入口。
+      FirstLevelMissionRuntime: () => missionRuntime || null,
       P012Progress: () => p012Debug.State(),
       P012NextProgress: () => p012Debug.Next(),
       P012CarryView: () => p012CarryView?.Debug() || null,
@@ -3510,7 +3512,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   missionRuntime?.Dispose();
   if(phase.whitebox?.fullMission)await LoadFirstLevelTrainAnimation();
   missionRuntime = phase.whitebox?.fullMission ? new FirstLevelMissionRuntime({
-    scene,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,
+    scene,camera,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,
     FireVehicleBullet,
     Objective:text=>{state.storyObjective=text;},
     VoiceClock:()=>MANUAL_STEP?null:audio.ctx?.currentTime,

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { ACTOR_DETAIL } from "./Data_Tuning_Ai.mjs";
 import { BakeMissionBody } from "./Script_FirstLevelMissionAftermath.mjs";
+import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { MissionTrainLifePose } from "./Script_FirstLevelMissionTrainLife.mjs";
 import { MISSION_PEOPLE_TUNING as C } from "./Data_Tuning_FirstLevel.mjs";
 
@@ -103,7 +104,8 @@ export class MissionPeople {
     const variant=id.length%2;let parts=this.patients.get(variant);
     if(!parts){
       const materials=new Map(),baked=BakeMissionBody(this.actorFactory,{side:"nra",pose:variant,patient:true},materials);
-      parts=baked.map(part=>{const mesh=new THREE.InstancedMesh(part.geometry,materials.get(part.key),64);
+      // Own material per instanced table: sharing the skinned actors' material makes three re-derive the program every draw.
+      parts=baked.map(part=>{const mesh=new THREE.InstancedMesh(part.geometry,CloneShadedMaterial(materials.get(part.key)),64);
         mesh.name="MissionLitterPatient";mesh.castShadow=true;mesh.receiveShadow=true;mesh.frustumCulled=false;mesh.count=0;
         this.root.add(mesh);return mesh;});this.patients.set(variant,parts);
     }
@@ -115,7 +117,7 @@ export class MissionPeople {
   State(){return {count:this.people.size,visible:[...this.people.values()].filter(e=>e.used).length,
     maxGripError:Math.max(0,...[...this.people.values()].filter(e=>e.used).flatMap(e=>e.gripErrors||[]))};}
   Dispose(){for(const entry of this.people.values())entry.actor.Dispose();this.people.clear();
-    for(const parts of this.patients.values())for(const mesh of parts){mesh.removeFromParent();mesh.geometry.dispose();}this.patients.clear();}
+    for(const parts of this.patients.values())for(const mesh of parts){mesh.removeFromParent();mesh.geometry.dispose();mesh.material.dispose();}this.patients.clear();}
 }
 
 // Idle observation layers onto existing animation; it releases immediately on fire,
