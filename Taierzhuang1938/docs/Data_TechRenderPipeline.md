@@ -1828,7 +1828,7 @@ if (uSsrStrength > 0.0 && material.roughness <= uSsrMaxRoughness) {
 用它自己的波浪法线（含 Gerstner 与细节法线）当反射面，按置信度与解析天空反射
 混合。接线点是 `Script_Water.SetWaterSsr(post.ssrPass.trace)`，**必须在任何水面
 材质建出来之前调**（材质按 preset+flow 缓存，建完就定型）；传 null 时那份
-着色器与接 SSR 之前**逐字节相同**。水面按 32 步追踪 —— 一条护城河宽十米，
+着色器只多两条没人用的 uniform 声明，光照与合成**一个算式没改**。水面按 32 步追踪 —— 一条护城河宽十米，
 反射线斜着打到对岸城墙足够了，而水面是半透明大面，步数直接乘在填充率上。
 
 ### 17.7 分档与面板

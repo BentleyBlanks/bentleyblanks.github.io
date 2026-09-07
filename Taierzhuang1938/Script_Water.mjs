@@ -114,7 +114,7 @@ export function SetWaterSkyUniforms(skyUniforms) { skyUniformsRef = skyUniforms;
  * 所以水面自己按平面反射假设追同一条 Hi-Z（`SsrSurfaceBlockGlsl`），拿它自己
  * 的波浪法线当反射面，再按置信度与解析天空反射混合。
  *
- * 传 null（或压根不调）= 今天的行为，一个字节都不变。
+ * 传 null（或压根不调）= 接 SSR 之前的行为，光照与合成一个算式没改。
  * **必须在任何水面材质建出来之前调**：材质按 preset+flow 缓存，建完就定型。
  */
 let ssrTraceRef = null;
@@ -374,8 +374,9 @@ void main() {
 const WATER_SSR = { steps: 32, refine: 3, strength: 0.92, roughness: 0.035 };
 
 /**
- * 水面片元着色器。SSR 关着时两个锚点替换成空串 —— 那份着色器与接 SSR 之前
- * **逐字节相同**，所以「水面看起来变了」永远只可能是 SSR 那一档的锅。
+ * 水面片元着色器。SSR 关着（`SetWaterSsr(null)`，即 low 档或无浮点靶）时两个
+ * 锚点替换成空串 —— 剩下的只有两条没人用的 uniform 声明，光照与合成那一段
+ * 与接 SSR 之前**一个算式没改**。所以「水面看起来变了」只可能是 SSR 那一档的锅。
  */
 function WaterFragment(withSsr) {
   if (!withSsr) {
