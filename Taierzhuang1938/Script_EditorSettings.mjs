@@ -178,6 +178,12 @@ export class GraphicsSettings {
       gfx.firstPersonSelfShadowSoft = on;
       this.Apply();
     });
+    // 屏幕空间接触阴影：补物件贴地那一圈（normalBias 把着色点推出地面造成的漏光）。
+    // 只是「跑不跑那一趟 pass」，材质里那段 GLSL 是档位级的编译期开关，热切不重编译。
+    Toggle(shadowBox, "接触阴影", gfx.contactShadows !== false, (on) => {
+      gfx.contactShadows = on;
+      this.Apply();
+    });
     // 级联之后这一栏是**每一级**的图边长（high/ultra 四级、medium 三级、low 两级）。
     // 「默认」= 档位值（high/ultra 2k、medium/low 1k）；4k × 四级 = 半 GB 显存，
     // 留着是给取证用的，不是给玩家日常开的。
@@ -265,6 +271,7 @@ export class GraphicsSettings {
     gfx.renderScale = 1; gfx.shadows = true; gfx.shadowSize = 0;
     gfx.firstPersonSelfShadow = true;
     gfx.firstPersonSelfShadowSoft = false;
+    gfx.contactShadows = true;
     gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
     gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;
     gfx.gi = false; gfx.giStrength = 1;

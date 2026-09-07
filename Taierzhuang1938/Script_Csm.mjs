@@ -238,15 +238,30 @@ vec2 CsmWorldScale( mat4 shadowMatrix ) {
 float CsmFilterDisk( CSM_SAMPLER shadowMap, DirectionalLightShadow shadowData,
     vec3 coord, vec2 planeBias, float diskUv, float phi ) {
   float sum = 0.0;
+#if defined( SHADOWMAP_TYPE_PCF )
   for ( int tapIndex = 0; tapIndex < CSM_DISK_TAPS; tapIndex ++ ) {
     vec2 offset = CsmVogel( tapIndex, CSM_DISK_TAPS, phi ) * diskUv;
-    float z = coord.z + shadowData.shadowBias + dot( offset, planeBias );
-    #if defined( SHADOWMAP_TYPE_PCF )
-      sum += CsmCompare( shadowMap, coord.xy + offset, z );
-    #else
-      sum += CsmCompare( shadowMap, coord.xy + offset, z, shadowData.shadowMapSize );
-    #endif
+    sum += CsmCompare( shadowMap, coord.xy + offset, coord.z + shadowData.shadowBias + dot( offset, planeBias ) );
   }
+#else
+  // 盘半径超过四个纹素时抽样点本来就散在不同纹素上，「先比较再插值」的双线性
+  // 只是让每个抽样点多花三次取样，换不来任何可见差别。窄盘（贴着遮挡体的接触处、
+  // 以及固定盘那 2.2 个纹素）才需要它 —— 那里的边缘只有一两个纹素宽，
+  // 点采样会是台阶。分支写在循环**外面**：写在里面的话有些驱动会把两条路都算掉。
+  if ( diskUv * shadowData.shadowMapSize.x > 4.0 ) {
+    for ( int tapIndex = 0; tapIndex < CSM_DISK_TAPS; tapIndex ++ ) {
+      vec2 offset = CsmVogel( tapIndex, CSM_DISK_TAPS, phi ) * diskUv;
+      float z = coord.z + shadowData.shadowBias + dot( offset, planeBias );
+      sum += step( z, texture2D( shadowMap, coord.xy + offset ).r );
+    }
+  } else {
+    for ( int tapIndex = 0; tapIndex < CSM_DISK_TAPS; tapIndex ++ ) {
+      vec2 offset = CsmVogel( tapIndex, CSM_DISK_TAPS, phi ) * diskUv;
+      float z = coord.z + shadowData.shadowBias + dot( offset, planeBias );
+      sum += CsmCompare( shadowMap, coord.xy + offset, z, shadowData.shadowMapSize );
+    }
+  }
+#endif
   return sum / float( CSM_DISK_TAPS );
 }
 
@@ -306,9 +321,6 @@ float CsmDispatch( int csmLevel, vec3 csmCoord, vec2 csmPlane ) {${Dispatch("csm
   return 1.0;
 }
 
-/** 本片元选中的级号（-1 = 级联之外）。调试视图「级联假彩色」读它。 */
-float gCsmDebugLevel = -1.0;
-
 /**
  * 1.0 = 完全照到太阳，0.0 = 完全被挡。**所有级联之外返回 1.0**（不是 0）——
  * 最远一级之外没有阴影信息，返回 0 会让整个远景死黑。
@@ -320,7 +332,6 @@ float CsmSunVisibility() {
   bool csmHasFar = false;
   float csmMix = 0.0;
 ${select}
-  gCsmDebugLevel = float( csmLevel );
   if ( csmLevel < 0 ) return 1.0;
   if ( !csmHasFar ) csmMix = 0.0;
 
@@ -653,6 +664,10 @@ export class CsmRig {
     this.splits = [];
     this.frame = 0;
     this.lastScheduled = new Array(this.count).fill(true);
+    // 「这一级重拟合过了，还没重烘」。Update 置位、ScheduleShadowUpdate 消位 ——
+    // 两者必须严格配对：只要出现「矩阵是新的、图是旧的」，影子就整体平移半个身位，
+    // 而且只在移动时出现，是最难查的一类阴影 bug。
+    this.dirty = new Array(this.count).fill(true);
     this.pendingForce = true;
     this.lastFitCenter = [];
     for (let i = 0; i < this.count; i += 1) this.lastFitCenter.push(new THREE.Vector3());
@@ -665,7 +680,7 @@ export class CsmRig {
     this.enabled = true;
   }
 
-  /** 一帧只用一次的节流判据：本级这一帧要不要重烘。 */
+  /** 一帧只用一次的节流判据：本级这一帧要不要重拟合 + 重烘。 */
   _WantsUpdate(level) {
     if (this.pendingForce) return true;
     const every = Math.max(1, this.preset.updateEvery[level] | 0);
@@ -674,7 +689,10 @@ export class CsmRig {
   }
 
   /** 相机瞬移 / 太阳转向 / 换档：下一帧全级重烘并重拟合。 */
-  ForceUpdate() { this.pendingForce = true; }
+  ForceUpdate() {
+    this.pendingForce = true;
+    this.dirty.fill(true);
+  }
 
   SetIntensity(value) {
     this.intensity = Math.min(1, Math.max(0, Number(value) || 0));
@@ -796,6 +814,8 @@ export class CsmRig {
 
     for (let level = 0; level < this.count; level += 1) {
       if (!this._WantsUpdate(level)) continue;
+      // 拟合了就必须烘：置位交给 ScheduleShadowUpdate 去消。
+      this.dirty[level] = true;
       const zn = this.splits[level];
       const zf = this.splits[level + 1];
       const sphere = SliceBoundingSphere(zn, zf, tanHalfFovY, aspect);
@@ -836,7 +856,6 @@ export class CsmRig {
       this.lastFitCenter[level].copy(origin);
       this._ApplyBias(level, radius);
     }
-    this.pendingForce = false;
   }
 
   /**
@@ -846,7 +865,10 @@ export class CsmRig {
   ScheduleShadowUpdate(renderer) {
     let pending = 0;
     for (let level = 0; level < this.count; level += 1) {
-      const want = this._WantsUpdate(level);
+      // **不要在这里重算节流判据**：Update 里 pendingForce 可能已经被消掉，
+      // 两处各算一次就会出现「拟合了但没排烘」。以 dirty 为准。
+      const want = this.dirty[level];
+      this.dirty[level] = false;
       this.lights[level].shadow.needsUpdate = want;
       // 取证用：三方在烘完之后就把 needsUpdate 清成 false，事后读不出这一帧
       // 排了谁，所以在这里留一份。
@@ -854,6 +876,7 @@ export class CsmRig {
       if (want) pending += 1;
     }
     if (renderer?.shadowMap) renderer.shadowMap.needsUpdate = pending > 0;
+    this.pendingForce = false;
     return pending;
   }
 

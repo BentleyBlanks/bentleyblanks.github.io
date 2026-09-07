@@ -34,7 +34,7 @@ import {
 import { SHADOW_COMMON, MakeShadowPreset } from "./Data_Tuning_Shadows.mjs";
 import {
   SUN_SHADOW_SAMPLER_GLSL, MakeSunShadowUniforms, CSM_CONTACT_UNIFORMS, CsmWhiteTexture,
-  CSM_MAX_CASCADES, SetCsmContactCompiled,
+  SetCsmContactCompiled,
 } from "./Script_Csm.mjs";
 
 const C = SHADOW_COMMON.contact;
@@ -132,7 +132,11 @@ export class ContactShadowsPass {
     // **必须在任何材质编译之前**：这一位决定材质里编不编 `CSM_CONTACT` 那一段。
     // PostPipeline 在 MaterialLibrary 之前构造（Script_Main / Script_Probe 都是），
     // 所以这里点一下就够。运行时开关不翻这一位（见 Script_Csm 那边的账）。
-    SetCsmContactCompiled(!!pipeline.preset.contactShadows);
+    // **开机那一刻**这一档支不支持接触阴影。运行时开关（画质面板）只翻
+    // `preset.contactShadows`，不翻这一位 —— 靶按它建，不然「关了再开」那次
+    // 要等到下一回改分辨率才有靶可写。
+    this.compiled = !!pipeline.preset.contactShadows;
+    SetCsmContactCompiled(this.compiled);
     this.uniforms = {
       uNormalDepth: { value: null },
       uProjScale: { value: new THREE.Vector2(1, 1) },
@@ -162,10 +166,15 @@ export class ContactShadowsPass {
     CSM_CONTACT_UNIFORMS.map.value = CsmWhiteTexture();
   }
 
-  Enabled(ctx) { return !!ctx.preset.contactShadows; }
+  Enabled(ctx) { return this.compiled && !!ctx.preset.contactShadows && !!this.blur; }
 
   Resize(width, height) {
     for (const rt of [this.raw, this.tmp, this.blur]) if (rt) rt.dispose();
+    this.raw = null; this.tmp = null; this.blur = null;
+    // 材质按 gl_FragCoord / **主靶尺寸**取样（不是接触阴影靶的尺寸！）——
+    // 这一行不许跟着 compiled 走，调试面板与关掉的档位也要有正确的分辨率。
+    CSM_CONTACT_UNIFORMS.resolution.value.set(width, height);
+    if (!this.compiled) { delete this.pipeline.targets.contactShadow; return; }
     const scale = this.shadowPreset.contactScale || 1;
     const w = Math.max(2, Math.round(width * scale));
     const h = Math.max(2, Math.round(height * scale));
@@ -173,8 +182,6 @@ export class ContactShadowsPass {
     this.tmp = MakeRenderTarget(w, h, { type: THREE.UnsignedByteType });
     this.blur = MakeRenderTarget(w, h, { type: THREE.UnsignedByteType });
     this.pipeline.targets.contactShadow = this.blur;
-    // 材质按 gl_FragCoord / 主靶尺寸取样（不是接触阴影靶的尺寸！）
-    CSM_CONTACT_UNIFORMS.resolution.value.set(width, height);
   }
 
   Render(ctx) {
@@ -311,5 +318,3 @@ export function MakeShadowDebugViews(pipeline) {
     Dispose() { material.dispose(); },
   };
 }
-
-export { CSM_MAX_CASCADES };

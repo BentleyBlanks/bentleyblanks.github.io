@@ -459,6 +459,9 @@ const graphics = {
   fov: CAMERA.baseFovDeg,
 };
 NormalizeGraphicsDetails(graphics, post);
+// 本档位到底编没编接触阴影那段材质 GLSL（编译期，见 Script_Csm.SetCsmContactCompiled）。
+// 面板那个开关只能在「编过」的档位上生效；low 档打开也没用，所以两者取与。
+const CONTACT_SHADOWS_SUPPORTED = !!post.preset.contactShadows;
 // 探针体（GI）。默认关到底：ProbeVolume 不构造（省掉图集/靶与每帧 Update），
 // 材质也**不编入**探针采样代码 —— GI_SAMPLE_GLSL 占着采样器与寄存器，
 // 即使 uGiEnabled 恒为 0 也让整帧贵 ~2.7 ms（2026-08-26 FrameProfileTest 实测）。
@@ -7471,6 +7474,9 @@ function ApplyGraphics() {
     mapSize: graphics.shadowSize || lights.defaultShadowSize,
   });
   lights.SetShadowDistance(graphics.shadowDistance);
+  // 接触阴影：只是「这一趟 pass 跑不跑」。关掉时 ContactShadowsPass.Idle 会把
+  // 材质那边还原成 1×1 纯白，不重编译。
+  post.preset.contactShadows = CONTACT_SHADOWS_SUPPORTED && graphics.contactShadows !== false;
   giUniforms.normalBias.value = graphics.giNormalBias;
   giUniforms.specularOcclusion.value = graphics.giSpecularOcclusion;
 
