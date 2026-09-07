@@ -305,6 +305,7 @@ export class PhysicsWorld {
    *   terrain  是否也与解析地表求交（子弹、抛掷物给 true；AI 视线给 false，
    *            见 Script_Ai —— 视线判据一变，整套交战节奏都会跟着变，
    *            那是另一件事，不混在换引擎这一趟里做）
+   *   excludeCollider  发射载具自身的碰撞记录；其他实体和地形仍参与求交
    *   groups   自定义 InteractionGroups（默认只认静态世界）
    */
   Raycast(origin, direction, maxDist = 200, options = null) {
@@ -314,7 +315,10 @@ export class PhysicsWorld {
     this._ray.origin.x = origin.x; this._ray.origin.y = origin.y; this._ray.origin.z = origin.z;
     this._ray.dir.x = direction.x; this._ray.dir.y = direction.y; this._ray.dir.z = direction.z;
     const hit = this.world.castRayAndGetNormal(this._ray, maxDist, true, undefined, groups,
-      undefined, undefined, (collider) => terrain || !this.recordByHandle.get(collider.handle)?.terrain);
+      undefined, undefined, (collider) => {
+        const record=this.recordByHandle.get(collider.handle);
+        return (!options?.excludeCollider || record!==options.excludeCollider) && (terrain || !record?.terrain);
+      });
     let best = null;
     if (hit) {
       const n = hit.normal;

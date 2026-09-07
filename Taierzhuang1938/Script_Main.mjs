@@ -5453,6 +5453,7 @@ const router = new InputRouter({
   },
   OnAction: (action, detail) => {
     if(missionRuntime?.controls)return;
+    if (missionRuntime?.ReceivingFood && (["crouch","prone","traverse"].includes(action) || action.startsWith("stance:"))) return;
     if (state.cutscene) return; // 过场只由 CutsceneDirector 接收 Look/Esc
     if (!state.ready) return;
     // 编辑器开着就把整张键位表闸掉。不闸的话在编辑器里按 R 会真的去装填、

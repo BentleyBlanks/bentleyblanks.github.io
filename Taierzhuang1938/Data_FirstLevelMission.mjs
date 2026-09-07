@@ -1,18 +1,18 @@
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-export const MISSION_VERSION = "first-level-20260907-r4";
+export const MISSION_VERSION = "first-level-20260907-r5";
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 const Stage = (id, objective, target, requirements, cue, extra = {}) =>
   Object.freeze({ id, objective, target, requirements, cue, ...extra });
 export const MISSION_STAGES = Object.freeze([
-  Stage("Train", "整理装备，随军列抵达卸载点。", A.train, ["trainShelling"], "TrainMeal"),
+  Stage("Train", "随军列前行，和同伴待在车厢内。", A.train, ["trainShelling"], "TrainMeal"),
   Stage(
     "Unloading",
-    "炮击！留在车内躲避，停稳后跟罗班长下车。",
+    "军列遭袭！车内伏低，紧急停车后跟罗班长撤进交通壕。",
     A.unload,
-    ["trainStopped", "unloaded"],
+    ["trainStopped", "unloadOrdersHeard", "unloaded"],
     "TrainShelling",
   ),
   Stage(

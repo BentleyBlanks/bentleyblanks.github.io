@@ -431,3 +431,40 @@ export function MissionGuideSpeed(actor,player,target,yielding=false) {
   if(playerAhead<0&&distance>R.squadWaitDistanceM)return 0;
   return playerAhead>0&&distance>R.squadCatchupDistanceM?R.squadCatchupMps:R.squadSpeedMps;
 }
+
+export function MissionSquadRoute(route, slot=0) {
+  if(route.length<2)return route.map(point=>({...point}));
+  const centre=[{...route[0]}];
+  const AppendLine=point=>{
+    const from=centre.at(-1),distance=Math.hypot(point.x-from.x,point.z-from.z);
+    const steps=Math.max(1,Math.ceil(distance/R.squadRouteSampleM));
+    for(let i=1;i<=steps;i++)centre.push({x:from.x+(point.x-from.x)*i/steps,z:from.z+(point.z-from.z)*i/steps});
+  };
+  for(let i=1;i<route.length-1;i++){
+    const a=route[i-1],b=route[i],c=route[i+1];
+    const incoming=Math.hypot(b.x-a.x,b.z-a.z),outgoing=Math.hypot(c.x-b.x,c.z-b.z);
+    const trim=Math.min(R.squadRouteCornerM,incoming*R.squadRouteCornerFraction,outgoing*R.squadRouteCornerFraction);
+    const p={x:b.x+(a.x-b.x)*trim/(incoming||1),z:b.z+(a.z-b.z)*trim/(incoming||1)};
+    const q={x:b.x+(c.x-b.x)*trim/(outgoing||1),z:b.z+(c.z-b.z)*trim/(outgoing||1)};
+    AppendLine(p);
+    for(let j=1;j<=R.squadRouteCornerSamples;j++){const t=j/R.squadRouteCornerSamples,u=1-t;centre.push({x:u*u*p.x+2*u*t*b.x+t*t*q.x,z:u*u*p.z+2*u*t*b.z+t*t*q.z});}
+  }
+  AppendLine(route.at(-1));
+  centre[centre.length-1]={...route.at(-1)};
+  const lane=R.squadRouteLanesM[slot%R.squadRouteLanesM.length];
+  return centre.map((point,i)=>{
+    const a=centre[Math.max(0,i-1)],b=centre[Math.min(centre.length-1,i+1)];
+    const dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz)||1;
+    const taper=Math.min(1,Math.hypot(point.x-route.at(-1).x,point.z-route.at(-1).z)/R.squadRouteExitBlendM);
+    return {x:point.x-dz/length*lane*taper,z:point.z+dx/length*lane*taper};
+  });
+}
+export function MissionSquadPace({speed,slot=0,yaw,target,position,gap=Infinity,previous=0,dt=0}) {
+  if(speed<=0 || gap<=R.squadSpacingM)return 0;
+  const bearing=Math.atan2(position.x-target.x,position.z-target.z);
+  const turn=Math.abs(Math.atan2(Math.sin(bearing-yaw),Math.cos(bearing-yaw)));
+  const corner=Math.max(R.squadTurnSpeedFloor,Math.cos(Math.min(Math.PI/2,turn)));
+  const spacing=Math.min(1,(gap-R.squadSpacingM)/R.squadGapEaseM);
+  const desired=speed*R.squadStrideScales[slot%R.squadStrideScales.length]*corner*spacing;
+  return previous+(desired-previous)*(1-Math.exp(-dt/R.squadSpeedBlendS));
+}

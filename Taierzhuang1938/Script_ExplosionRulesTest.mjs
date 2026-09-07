@@ -43,6 +43,16 @@ for (let i = 0; i < 20; i++) protectedTerrain.ApplyBlast({ x: 0, y: protectedTer
 assert.equal(protectedTerrain.GroundHeight(1.5, 0), 0, "foundation retained");
 assert.ok(-protectedTerrain.GroundHeight(1.25, 0) <= TERRAIN_DEFORMATION.cellM * TERRAIN_DEFORMATION.maxAxisGrade + 1e-5);
 
+// A protected impact centre must not veto the exposed soil reached by the same blast.
+const edgeBlast = new TerrainDeformation({ bounds, CanDeform: x => x < 0 });
+assert.ok(edgeBlast.ApplyBlast({x:0.25,y:0.25,z:0}, "Shell57"));
+assert.ok(edgeBlast.GroundHeight(-0.5,0)<-0.01, "low-cover impact excavates adjacent soil");
+for(let iz=-8;iz<=8;iz++)for(let ix=0;ix<=8;ix++)
+  assert.equal(edgeBlast.Node(ix,iz),0,"protected foundation never excavates or receives debris soil");
+const sealedBlast = new TerrainDeformation({ bounds, CanDeform: () => false });
+assert.equal(sealedBlast.ApplyBlast({x:0,y:0,z:0}, "Shell57"),null);
+assert.equal(sealedBlast.State().tiles,0);
+
 // Excavation and displaced earth are one signed, traversable heightfield.
 const raised = new TerrainDeformation({ bounds });
 raised.ApplyBlast({ x: 0, y: 0, z: 0 }, "Shell75");

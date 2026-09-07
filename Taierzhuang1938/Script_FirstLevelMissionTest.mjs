@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
-import { FirstLevelMissionColumn, MissionGuideSpeed } from "./Script_FirstLevelMissionColumn.mjs";
+import { FirstLevelMissionColumn, MissionGuideSpeed, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE } from "./Data_FirstLevelMission.mjs";
 import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
@@ -184,13 +184,13 @@ console.log(process.argv.includes("--audio")
   });
   voice.Enqueue("TrainShelling");
   for(let i=0;i<900;i++)voice.Update(1/60);
-  assert.deepEqual(events,["TrainFirstShell"]);
+  assert.deepEqual(events,[]);
   assert.equal(voice.State().segment,"FirstShellWarning");
   assert.equal(voice.State().playbackPhase,"waiting","the shout cannot anticipate the first shell impact");
-  assert.equal(sources.length,1);
+  assert.equal(sources.length,0,"no arrival speech precedes the actual surprise impact");
   facts.add("trainFirstShellImpact");
-  for(let i=0;i<240;i++)voice.Update(1/60);
-  assert.deepEqual(events,["TrainFirstShell","TrainNearShell"]);
+  for(let i=0;i<360;i++)voice.Update(1/60);
+  assert.deepEqual(events,["TrainNearShell","TrainProneOrder"]);
   assert.equal(voice.State().segment,"WoundedSoldier");
   assert.ok(!subtitles.some(text=>text.includes("手遭打中了")),"injury speech waits for actual impact");
   facts.add("trainSoldierWounded");
@@ -200,6 +200,11 @@ console.log(process.argv.includes("--audio")
   voice.Update(40);assert.deepEqual(voice.State(),paused);
   voice.Resume();
   for(let i=0;i<1800;i++)voice.Update(1/60);
+  assert.equal(voice.State().segment,"EmergencyUnload");
+  assert.equal(voice.State().playbackPhase,"waiting");
+  assert.ok(!subtitles.some(text=>text.includes("停稳了")),"unload command waits for physical emergency braking");
+  facts.add("trainStopped");
+  for(let i=0;i<360;i++)voice.Update(1/60);
   assert.deepEqual(done,["TrainShelling"]);
   assert.ok(sources.every(source=>source.maxDuration>0&&source.offset>=0));
   assert.equal(events.filter(id=>id==="TrainNearShell").length,1,"resume never re-fires a shell");
@@ -285,3 +290,39 @@ console.log("ok paused audio ranges, subtitle source timing, queued cues and she
  assert.equal(MissionGuideSpeed(actor,{x:0,z:5},target),R.squadSpeedMps,"nearby guide keeps walking pace");
  assert.equal(MissionGuideSpeed(actor,{x:0,z:-40},target,true),0,"spacing still takes priority");
 }
+
+{
+  const routes=R.squadRouteLanesM.map((_,slot)=>MissionSquadRoute(MISSION_ROUTES.support,slot));
+  assert.ok(routes.every(route=>route.length>MISSION_ROUTES.support.length*3));
+  for(const route of routes){
+    assert.deepEqual(route.at(-1),MISSION_ROUTES.support.at(-1),"firing-post approach retains the final authored point");
+    for(const p of route) {
+      assert.ok(Number.isFinite(terrain.SampleHeight(p.x,p.z)));
+      for(const box of MISSION_LAYOUT.blocks){
+        if(MISSION_LAYOUT.walkableSurfaces.some(surface=>surface.id===box.id))continue;
+        const y=terrain.SampleHeight(p.x,p.z);
+        assert.ok(!(Math.abs(p.x-box.x)<box.w/2+.4&&Math.abs(p.z-box.z)<box.d/2+.4&&box.y+box.h/2>y+.3&&box.y-box.h/2<y+1.7),"personal squad route clears "+box.id);
+      }
+    }
+  }
+  assert.ok(Math.hypot(routes[0][10].x-routes[1][10].x,routes[0][10].z-routes[1][10].z)>.9,"soldiers occupy distinct lanes instead of one exact line");
+  const sample={speed:3,slot:0,yaw:0,target:{x:0,z:-10},position:{x:0,z:0},gap:Infinity,previous:2,dt:.1};
+  assert.ok(MissionSquadPace({...sample,yaw:Math.PI/2})<MissionSquadPace(sample),"turning slows actual travel");
+  assert.equal(MissionSquadPace({...sample,gap:1}),0,"personal space wins over catching up");
+  assert.equal(MissionSquadPace({...sample,speed:0}),0,"leader waiting cannot leak residual movement");
+  assert.notEqual(MissionSquadPace({...sample,slot:1}),MissionSquadPace({...sample,slot:2}),"individual stride cadence");
+}
+console.log("ok individual trench lanes, rounded corners, safe spacing and variable march pace");
+
+{
+ let clock=0;const events=[];
+ const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){},PlayStoryVoice(){return {voice:{t:clock}};}},hud:{Say(){}},Clock:()=>clock,Event:id=>events.push(id)});
+ voice.Enqueue("TrainMeal");voice.Update(5);voice.Update(90);
+ assert.equal(events.length,0,"simulation time cannot finish the receiving gesture ahead of audio");
+ clock=5.3;voice.Update(.1);voice.Pause();clock=90;voice.Update(60);
+ assert.equal(events.length,0,"pause cannot release the handoff");
+ voice.Resume();clock=90.11;voice.Update(.01);
+ assert.deepEqual(events,["TrainFoodReceived"],"Shunzi's completed reply releases the handoff at its source timestamp");
+ clock=91;voice.Update(1);assert.equal(events.length,1);
+}
+console.log("ok receiving-food release follows the source clock and survives pause/resume");

@@ -5,7 +5,8 @@ import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.
 export const MISSION_VOICE_TIMING = Object.freeze({
   TrainMeal: {
     segments: [
-      {id:"ShareFood",start:0,end:15.55,wait:5},
+      {id:"ShareFood",start:0,end:15.55,wait:5,
+        events:[{at:MISSION_VOICE_ALIGNMENT.TrainMeal.lines[1][1],id:"TrainFoodReceived"}]},
       {id:"CountAmmo",start:15.55,end:27.54,wait:4.5},
       {id:"LeaveSome",start:27.54,end:38.818,wait:3.5},
     ],
@@ -13,14 +14,14 @@ export const MISSION_VOICE_TIMING = Object.freeze({
   },
   TrainShelling: {
     segments: [
-      {id:"PrepareArrival",start:0,end:2.13,wait:2,endEvent:"TrainFirstShell"},
-      {id:"FirstShellWarning",start:2.13,end:3.65,wait:0,gate:"trainFirstShellImpact",endEvent:"TrainNearShell"},
-      {id:"WoundedSoldier",start:3.65,end:6.69,wait:0,gate:"trainSoldierWounded"},
-      {id:"TakeCover",start:6.69,end:10.65,wait:.2,
-        events:[{at:9.15,id:"TrainProneOrder"}]},
-      {id:"CheckWound",start:10.65,end:22.544,wait:4},
+      {id:"FirstShellWarning",start:0,end:2.12,wait:.3,gate:"trainFirstShellImpact",endEvent:"TrainNearShell"},
+      {id:"BrakeAndCover",start:2.12,end:4.76,wait:0,startEvent:"TrainProneOrder"},
+      {id:"WoundedSoldier",start:4.76,end:6.44,wait:0,gate:"trainSoldierWounded"},
+      {id:"TakeCover",start:6.44,end:9.32,wait:.2},
+      {id:"CheckWound",start:9.32,end:17,wait:2.5},
+      {id:"EmergencyUnload",start:17,end:20.036,wait:.5,gate:"trainStopped"},
     ],
-    tail: 2,
+    tail: 1,
   },
   AircraftReturn: {
     segments:[{id:"ReturnAndDive",start:0,end:5.721,wait:0,events:[{at:4.58,id:"AircraftDiveOrder"}]}],tail:0,

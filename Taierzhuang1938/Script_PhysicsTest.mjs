@@ -762,6 +762,32 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
     `${r.n} 件摆件 / ${r.own} 只盒子${r.bad.length ? "；出问题的：" + r.bad.join("、") : ""}`);
 }
 
+// A tank muzzle may start inside its conservative hull collider. Excluding its
+// owner must still collide with the next solid and the shared terrain surface.
+{
+  const r = await page.evaluate(async () => {
+    const { PhysicsWorld } = await import("./Script_Physics.mjs");
+    const pw = new PhysicsWorld({ groundAt: () => 0 });
+    const source = { min: [-2, 0, -3], max: [2, 3, 3], tag: "sourceHull" };
+    const wall = { min: [-3, 0, -9], max: [3, 4, -8], tag: "otherCover" };
+    try {
+      pw.BuildStatic([source, wall]);
+      const origin = { x: 0, y: 2, z: -1 };
+      const direction = { x: 0, y: 0, z: -1 };
+      const normal = pw.Raycast(origin, direction, 20);
+      const excluded = pw.Raycast(origin, direction, 20, { excludeCollider: source });
+      const ground = pw.Raycast(origin, { x: 0, y: -1, z: 0 }, 20,
+        { terrain: true, excludeCollider: source });
+      return { normalTag: normal?.box.tag, excludedTag: excluded?.box.tag,
+        wallDistance: excluded?.t, groundTag: ground?.box.tag, groundDistance: ground?.t };
+    } finally { pw.Dispose(); }
+  });
+  Check("炮口排除发射车体后仍命中其他掩体和地形",
+    r.normalTag === "sourceHull" && r.excludedTag === "otherCover"
+      && Math.abs(r.wallDistance - 7) < .001 && r.groundTag === "dirt"
+      && Math.abs(r.groundDistance - 2) < .02, JSON.stringify(r));
+}
+
 await browser.close();
 server.close();
 

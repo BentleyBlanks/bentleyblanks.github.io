@@ -19,25 +19,25 @@
    swap：字体没到之前先用系统字体把字写出来，不留空档。 */
 @font-face {
   font-family: "TzTitle";
-  src: url("./Font/Font_Title.woff2?v=202609070523") format("woff2");
+  src: url("./Font/Font_Title.woff2?v=202609071700") format("woff2");
   font-weight: 400 900;
   font-display: swap;
 }
 @font-face {
   font-family: "TzUiSans";
-  src: url("./Font/Font_UiSans_Regular.woff2?v=202609070523") format("woff2");
+  src: url("./Font/Font_UiSans_Regular.woff2?v=202609071700") format("woff2");
   font-weight: 400;
   font-display: swap;
 }
 @font-face {
   font-family: "TzUiSans";
-  src: url("./Font/Font_UiSans_Bold.woff2?v=202609070523") format("woff2");
+  src: url("./Font/Font_UiSans_Bold.woff2?v=202609071700") format("woff2");
   font-weight: 700;
   font-display: swap;
 }
 @font-face {
   font-family: "TzUiLatin";
-  src: url("./Font/Font_UiLatin_Regular.woff2?v=202609070523") format("woff2");
+  src: url("./Font/Font_UiLatin_Regular.woff2?v=202609071700") format("woff2");
   font-weight: 400;
   font-display: swap;
 }
@@ -45,7 +45,7 @@
   /* 装的是 SemiBold（600）而不是 Bold —— 700 的 Barlow 比思源黑 Bold 的汉字更黑，
      一行里「Enter」会比旁边的汉字重一档。600 配上去粗细才齐。 */
   font-family: "TzUiLatin";
-  src: url("./Font/Font_UiLatin_SemiBold.woff2?v=202609070523") format("woff2");
+  src: url("./Font/Font_UiLatin_SemiBold.woff2?v=202609071700") format("woff2");
   font-weight: 700;
   font-display: swap;
 }

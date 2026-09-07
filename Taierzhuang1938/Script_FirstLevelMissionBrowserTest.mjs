@@ -238,6 +238,7 @@ try {
     slots: { ...window.Tengxian.state.slots },
   }));
   assert.equal(initial.mission.stage, "Train");
+  assert.equal(initial.mission.receivingFood,true,"the opening starts in the receiving position");
   assert.equal(initial.slots.primary, "HanYang");
   assert.equal(initial.slots.melee, "Dadao");
   console.log(
@@ -248,18 +249,25 @@ try {
   assert.equal(initial.mission.train.entries.length, 41, "40 recruits plus Luo, player separate");
   const ride = await page.evaluate(() => {
     const g = window.Tengxian;
-    g.StepFrames(120, 1/60, true);
+    const playerStart={x:g.player.position.x,z:g.player.position.z-g.battlefield.trainOffsetM,y:g.player.position.y,yaw:g.player.yaw};
+    g.Debug.Key("KeyW",true);g.Debug.Key("KeyD",true);g.Debug.Key("ShiftLeft",true);
+    for(const key of ["Space","KeyC","KeyZ"])g.Debug.Key(key);
+    g.Debug.Look(70,-12);g.StepFrames(1,1/60,true);
+    const canLook=Math.abs(g.player.yaw-playerStart.yaw)>.02;
+    g.Debug.Look(-70,12);g.StepFrames(119,1/60,true);
     const actors = g.ai.soldiers.filter(a => a.missionTrainPassenger);
     const BoneLocal = (a, role) => a.actor.root.worldToLocal(a.actor.characterRig.bones[role].getWorldPosition(a.position.clone()));
     const start = actors.map(a => ({x:a.position.x, z:a.position.z-g.battlefield.trainOffsetM,
       hand:BoneLocal(a,'handR'),feet:['footL','footR'].map(role=>BoneLocal(a,role))}));
     const life = actors.map(a=>({kind:a.missionTrainLife.kind,seated:a.missionTrainLife.seated,active:a.actor.characterRig.missionTrainLifeActive,
       pelvis:BoneLocal(a,'pelvis').y, poseTime:a.actor.characterRig.missionTrainLifeState.time, animatedSeconds:0, handTravel:0, footDrift:0}));
-    let maxLocalDrift=0, maxAnimationSpeed=0, maxRootError=0;
+    let maxLocalDrift=0, maxAnimationSpeed=0, maxRootError=0, playerDrift=0, playerRise=0;
     const offsetBefore=g.battlefield.trainOffsetM;
     const poses=actors.map(a=>({clip:a.actor.characterRig?.currentPlaybackId,rate:a.actor.characterRig?.currentAction?.getEffectiveTimeScale()}));
     for(let frame=0;frame<480;frame++) {
       g.StepFrames(1,1/60,true);
+      playerDrift=Math.max(playerDrift,Math.hypot(g.player.position.x-playerStart.x,g.player.position.z-g.battlefield.trainOffsetM-playerStart.z));
+      playerRise=Math.max(playerRise,Math.abs(g.player.position.y-playerStart.y));
       actors.forEach((a,i)=>{
         maxLocalDrift=Math.max(maxLocalDrift,Math.hypot(a.position.x-start[i].x,a.position.z-g.battlefield.trainOffsetM-start[i].z));
         maxAnimationSpeed=Math.max(maxAnimationSpeed,a.actor.characterRig?.p012ActualSpeedMps||0);
@@ -269,9 +277,13 @@ try {
         for(const [j,role] of ['footL','footR'].entries())life[i].footDrift=Math.max(life[i].footDrift,BoneLocal(a,role).distanceTo(start[i].feet[j]));
       });
     }
-    return {count:actors.length,travel:offsetBefore-g.battlefield.trainOffsetM,maxLocalDrift,maxAnimationSpeed,maxRootError,poses,life};
+    for(const key of ["KeyW","KeyD","ShiftLeft"])g.Debug.Key(key,false);
+    return {count:actors.length,travel:offsetBefore-g.battlefield.trainOffsetM,maxLocalDrift,maxAnimationSpeed,maxRootError,poses,life,
+      handoff:{canLook,playerDrift,playerRise,stance:g.player.stance,locked:g.Debug.FirstLevelMission().receivingFood}};
   });
   console.log("TRAIN_RIDE",JSON.stringify(ride));
+  assert.ok(ride.handoff.canLook&&ride.handoff.playerDrift<.04&&ride.handoff.playerRise<.08&&ride.handoff.stance==="stand"&&ride.handoff.locked,
+    "receiving food holds walking, sprinting, jumping and stance, while retaining free look: "+JSON.stringify(ride.handoff));
   assert.ok(ride.poses.every(p=>p.clip==="AttackCommand"&&p.rate===0), "the sampled base pose never treats train travel as walking");
   assert.ok(ride.travel>1 && ride.maxLocalDrift<.08 && ride.maxAnimationSpeed<.05 && ride.maxRootError<.08, "train-local bodies and rendered roots stay still without a walking cycle: "+JSON.stringify(ride));
   assert.equal(ride.life.filter(p=>p.seated).length,32,'32 actual side-bench seats, eight standing recruits and Luo');
@@ -296,10 +308,11 @@ try {
     const before = Snapshot();
     g.StepFrames(300, 1 / 60, false);
     const frozen = before === Snapshot();
+    const locked=g.Debug.FirstLevelMission().receivingFood;
     g.Debug.MenuAct("resume");
-    return { frozen, running: g.state.running };
+    return { frozen, running: g.state.running, locked };
   });
-  assert.ok(pause.frozen && pause.running, "Pause freezes the world and resume restores input");
+  assert.ok(pause.frozen && pause.running && pause.locked, "Pause freezes the world and resume restores input");
   const opening = await page.evaluate(() => {
     const g=window.Tengxian;
     const ammo=g.state.ammo,shots=g.state.playerShots,bundles=g.state.bundles,grenades=g.state.grenades;
@@ -307,6 +320,10 @@ try {
     for(const key of ["KeyR","KeyV","KeyG","KeyH","Digit2"])g.Debug.Key(key);
     g.StepFrames(30,1/60,true);
     g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+    const released=!g.Debug.FirstLevelMission().receivingFood, xBefore=g.player.position.x;
+    g.Debug.Key("KeyA",true);g.StepFrames(18,1/60,true);g.Debug.Key("KeyA",false);
+    const walkAfter=Math.abs(g.player.position.x-xBefore);
+    g.Debug.Key("KeyD",true);g.StepFrames(18,1/60,true);g.Debug.Key("KeyD",false);
     const empty={hidden:!g.viewmodel.root.visible,ammo:g.state.ammo===ammo,shots:g.state.playerShots===shots,
       grenades:g.state.grenades===grenades,bundles:g.state.bundles===bundles,ads:g.player.ads};
     for(let i=0;i<120*60&&!g.Debug.FirstLevelMission().facts.includes("trainProneOrder");i++)g.StepFrames(1,1/60,false);
@@ -318,18 +335,22 @@ try {
     const after=g.Debug.FirstLevelMission();
     const prone={prompt,stanceBefore,stanceAfter:g.player.stance,ack:after.facts.includes("trainPlayerProne"),
       promptCleared:!after.openingPrompt};
-    for(let i=0;i<120*60&&!g.Debug.FirstLevelMission().facts.includes("trainStopped");i++)g.StepFrames(1,1/60,false);
-    return {empty,prone,after:g.Debug.FirstLevelMission()};
+    for(let i=0;i<120*60&&!g.Debug.FirstLevelMission().facts.includes("unloadOrdersHeard");i++)g.StepFrames(1,1/60,false);
+    return {empty,prone,released,walkAfter,after:g.Debug.FirstLevelMission()};
   });
   assert.ok(opening.empty.hidden&&opening.empty.ammo&&opening.empty.shots&&opening.empty.grenades&&opening.empty.bundles&&opening.empty.ads<.01,
     "empty hands also blocks all weapon actions: "+JSON.stringify(opening.empty));
+  assert.ok(opening.released&&opening.walkAfter>.1,"walking resumes after the completed receiving reply");
   assert.equal(opening.prone.prompt?.keys,"Z");
   assert.notEqual(opening.prone.stanceBefore,"prone","the mission never forces the player prone");
   assert.ok(opening.prone.stanceAfter==="prone"&&opening.prone.ack&&opening.prone.promptCleared);
   const firstHit=opening.after.log.find(x=>x.id==="trainFirstShellImpact")?.time;
   const injury=opening.after.log.find(x=>x.id==="trainSoldierWounded")?.time;
   const proneOrder=opening.after.log.find(x=>x.id==="trainProneOrder")?.time;
-  assert.ok(firstHit<injury&&injury<proneOrder,"explosion, wound, then the spoken prone instruction");
+  assert.ok(firstHit<proneOrder&&proneOrder<injury,"surprise impact, immediate cover order, then the second hit and injury");
+  const stoppedAt=opening.after.log.find(x=>x.id==="trainStopped").time;
+  const unloadOrderAt=opening.after.log.find(x=>x.id==="unloadOrdersHeard").time;
+  assert.ok(stoppedAt>firstHit&&unloadOrderAt>stoppedAt,"physical emergency stop precedes the completed unload order");
   await fs.writeFile(path.join(output,"Data_OpeningInteraction.json"),JSON.stringify(opening,null,2));
 
   await page.evaluate(() => window.Tengxian.StepFrames(1, 1 / 60, true));
@@ -500,7 +521,8 @@ try {
           if(g.player.bleeding && g.player.health<85)g.Debug.Key("KeyB");
           g.StepFrames(1, 1 / 60, false);
           b.frames++;
-          if(b.frames%300===0){const m=g.Debug.FirstLevelMission();if(m.stage==="Support")b.battleEvidence.push({position:{...p},sound:m.battleSound,front:m.enemies.filter(e=>e.id.startsWith("Front")).length});}
+          if(b.frames%300===0){const m=g.Debug.FirstLevelMission();if(m.stage==="Support")b.battleEvidence.push({position:{...p},sound:m.battleSound,front:m.enemies.filter(e=>e.id.startsWith("Front")).length,
+            squad:g.ai.soldiers.filter(a=>a.missionNaturalMarch&&a.castId).map(a=>({id:a.castId,x:a.position.x,z:a.position.z,speed:a.missionMarchSpeed||0,yaw:a.yaw,goal:{x:a.goal.x,z:a.goal.z}}))});}
           if (!g.player.alive) break;
         }
         g.Debug.Key("KeyW", false);
@@ -559,6 +581,11 @@ try {
     const battlefieldSound=await page.evaluate(()=>window.missionBot.battleEvidence);
     assert.ok(battlefieldSound.length>=3&&battlefieldSound.every(e=>e.front===12),"front encounter exists along the support approach");
     assert.ok(battlefieldSound.some(e=>e.sound.recent.some(s=>s.cue==="amb.cannonFar"))&&battlefieldSound.some(e=>e.sound.recent.some(s=>s.cue==="type92")),"distant cannon and machine gun persist in the trench");
+    assert.ok(battlefieldSound.some(e=>e.squad.filter(a=>a.speed>.1).length>=2 && Math.max(...e.squad.map(a=>a.speed))-Math.min(...e.squad.map(a=>a.speed))>.05),"actual squad march has independent pace");
+    for(const id of ["luo","yaowa","heyoutian","liuwencai"]){
+      const samples=battlefieldSound.flatMap(e=>e.squad.filter(a=>a.id===id));
+      assert.ok(samples.length>=2&&samples.some(a=>Math.hypot(a.x-samples[0].x,a.z-samples[0].z)>5),id+" makes physical progress along the personal route");
+    }
     await fs.writeFile(path.join(output,"Data_TrenchCombatSound.json"),JSON.stringify(battlefieldSound,null,2));
     await page.evaluate(() => {
       const g = window.Tengxian;
@@ -669,6 +696,9 @@ try {
     await fs.writeFile(path.join(output, "Data_Defense.json"), JSON.stringify(defense, null, 2));
     assert.ok(defense.alive, "Player survives covered emplacement");
     assert.equal(defense.stage, "Tank", "Actual guards pass under player machine gun support");
+    const tankCraters=await page.evaluate(()=>({tank:window.Tengxian.Debug.FirstLevelMission().tank,terrain:window.Tengxian.battlefield.deformation.State()}));
+    await fs.writeFile(path.join(output,"Data_TankShellCraters.json"),JSON.stringify(tankCraters,null,2));
+    assert.ok(tankCraters.tank.impacts?.some(hit=>hit.crater),"actual tank fire reaches the shared deformable ground: "+JSON.stringify(tankCraters.tank));
     const evacSpacing=await page.evaluate(()=>{const g=window.Tengxian,ids=new Set(g.Debug.FirstLevelMission().guards.filter(a=>a.safe&&a.alive).map(a=>a.id));const a=g.ai.soldiers.filter(a=>ids.has(a.id));return a.flatMap((p,i)=>a.slice(i+1).map(q=>Math.hypot(p.position.x-q.position.x,p.position.z-q.position.z)));});
     assert.ok(evacSpacing.every(d=>d>.8),"withdrawn soldiers do not occupy the same stopping point");
     await page.evaluate(() => {

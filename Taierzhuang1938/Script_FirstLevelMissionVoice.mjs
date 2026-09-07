@@ -129,7 +129,7 @@ export class FirstLevelMissionVoice {
       : current.sourceTime+dt);
     for(const event of segment.events||[])if(current.sourceTime>=event.at)this.Emit(event.id);
     const index=current.plan.lines.findIndex(([start,end])=>current.sourceTime>=start&&current.sourceTime<end);
-    if(index>=0 && index!==current.index && current.cue.subtitles!==false){
+    if(index>=0 && current.sourceTime<segment.end && index!==current.index && current.cue.subtitles!==false){
       current.index=index;
       const line=current.cue.lines[index];
       this.hud.Say(Localize(FirstLevelCastTextId(line.who),MISSION_VOICE_CAST[line.who][0]),

@@ -5,6 +5,7 @@ export const TEXT = Object.freeze({
   "firstLevel.interaction.carry": "接过老周担架后端",
   "firstLevel.interaction.place": "将老周放在卫生兵旁",
   "firstLevel.interaction.supply": "补充弹药、手榴弹和绷带",
+  "firstLevel.hint.receiveFood": "接过幺娃递来的腊肉 · 可转头查看",
   "firstLevel.hint.trainProne": "卧倒，躲到车帮下",
   "firstLevel.hint.standAndUnload": "起身，跟罗班长下车",
   "firstLevel.hint.leaveTrain": "从打开的车门跟队下车",

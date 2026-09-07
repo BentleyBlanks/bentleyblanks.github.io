@@ -462,10 +462,10 @@ export class FirstLevelWhiteboxField {
 
   Raycast(origin, direction, maxDist = 200, options = null) {
     if (this.physics) return this.physics.Raycast(origin, direction, maxDist, options);
-    return this.RaycastAabb(origin, direction, maxDist);
+    return this.RaycastAabb(origin, direction, maxDist, options);
   }
 
-  RaycastAabb(origin, direction, maxDist = 200) {
+  RaycastAabb(origin, direction, maxDist = 200, options = null) {
     let best = null;
     const steps = Math.ceil(maxDist / this.gridSize) + 1;
     const seen = new Set();
@@ -483,6 +483,7 @@ export class FirstLevelWhiteboxField {
           const list = this.grid.get(key);
           if (!list) continue;
           for (const box of list) {
+            if (options?.excludeCollider === box) continue;
             const hit = RayAabb(origin, direction, box, maxDist);
             if (hit !== null && (best === null || hit.t < best.t)) best = hit;
           }

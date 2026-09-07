@@ -170,7 +170,9 @@ export class TerrainDeformation {
     const id = ExplosiveIdFor(kind), spec = EXPLOSIVES[id];
     const surface = this.GroundHeight(position.x, position.z);
     const gap = Math.max(0, position.y - surface);
-    if (gap > spec.groundReachM || !this.canDeform(position.x, position.z)) return null;
+    // A strike on a low protected object can still excavate the exposed soil beside it.
+    // Allowed()/Cap() preserve every foundation node and its traversable margin.
+    if (gap > spec.groundReachM) return null;
     const coupling = Math.max(0, 1 - gap / spec.groundReachM);
     const radius = spec.craterRadiusM * (0.75 + 0.25 * coupling);
     const depth = spec.craterDepthM * coupling;

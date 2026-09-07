@@ -197,11 +197,11 @@ export class CombatSystem {
   /** Shared visible ballistic shell: no delayed explosion disconnected from a projectile. */
   FireShell(from, target, { flight = SHELL.flightFallbackS, kind = "Shell75",
     radius = SHELL.radiusFallbackM, damage = SHELL.damageFallback,
-    OnImpact = null, byPlayer = false } = {}) {
+    OnImpact = null, byPlayer = false, sourceCollider = null } = {}) {
     const velocity = target.clone().sub(from).divideScalar(flight);
     velocity.y += GRAVITY * flight * 0.5;
     const shell = { id: ++this.shellSerial, from: from.clone(), target: target.clone(), position: from.clone(),
-      velocity, initialVelocity: velocity.clone(), age: 0, flight, kind: ExplosiveIdFor(kind), radius, damage, OnImpact, byPlayer };
+      velocity, initialVelocity: velocity.clone(), age: 0, flight, kind: ExplosiveIdFor(kind), radius, damage, OnImpact, byPlayer, sourceCollider };
     this.shellVisuals.Create(shell);
     this.shells.push(shell); return shell;
   }
@@ -218,7 +218,7 @@ export class CombatSystem {
         const next = shell.from.clone().addScaledVector(shell.initialVelocity, shell.age);
         next.y -= GRAVITY * shell.age * shell.age * 0.5;
         const delta = next.sub(previous), distance = delta.length();
-        const hit = this.host.battlefield.Raycast(previous, delta.clone().normalize(), distance, { terrain: true });
+        const hit = this.host.battlefield.Raycast(previous, delta.clone().normalize(), distance, { terrain: true, excludeCollider: shell.sourceCollider });
         if (hit) {
           impact = previous.addScaledVector(delta.normalize(), hit.t);
           shell.age -= step * (1 - hit.t / Math.max(distance, 1e-9));
