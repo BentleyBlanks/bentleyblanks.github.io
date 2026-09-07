@@ -238,7 +238,15 @@ export class MotionBlurPass {
     for (const rt of [this.tileX, this.tile, this.neighbor, this.target, this.blurTarget]) {
       if (rt) rt.dispose();
     }
+    this.tileX = this.tile = this.neighbor = this.target = this.blurTarget = null;
     const P = this.pipeline;
+    // 档位关掉就**一张靶都不建**（low 的定位是「能跑」，不该为一个永不启用的
+    // pass 押着一张全分辨率 RGBA16F）。`Enabled` 会看 this.target 是不是在。
+    if (!P.preset.motionBlur) {
+      delete P.targets.motionBlur;
+      delete P.targets.velocityTile;
+      return;
+    }
     const K = this.tilePx;
     const tilesX = Math.max(1, Math.ceil(P.width / K));
     const tilesY = Math.max(1, Math.ceil(P.height / K));

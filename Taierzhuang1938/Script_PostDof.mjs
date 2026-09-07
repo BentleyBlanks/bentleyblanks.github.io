@@ -262,7 +262,14 @@ export class DofPass {
 
   Resize(width, height) {
     for (const rt of [this.half, this.gather, this.fill, this.target]) if (rt) rt.dispose();
+    this.half = this.gather = this.fill = this.target = null;
     const P = this.pipeline;
+    // 档位关掉就一张靶都不建（同运动模糊那条账）。`Enabled` 会看 this.target。
+    if (!P.preset.dof) {
+      delete P.targets.dof;
+      delete P.targets.dofCoc;
+      return;
+    }
     // 半分辨率是 COD:AW 的口径；`dofScale` 再乘一档（ultra = 1.0 → 半分辨率，
     // 其余 0.5 → 四分之一分辨率），够用而且散景本来就是低频。
     const w = Math.max(2, Math.round(width * 0.5 * this.scale));
