@@ -1,5 +1,7 @@
 // Instanced whitebox crowd. Critical characters still use the game's shared actor rigs.
 import * as THREE from "three";
+import { MissionAftermath } from "./Script_FirstLevelMissionAftermath.mjs";
+import { MissionPeople } from "./Script_FirstLevelMissionPeople.mjs";
 import { T } from "./Script_Text.mjs";
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { CreateP012StretcherGeometry } from "./Script_FirstLevelP012CarryView.mjs";
@@ -65,12 +67,14 @@ export class FirstLevelMissionView {
       this.parts.patient.material.clone(),
     );
     this.zhouPatient.position.y = 0.16;
-    this.zhouRoot.add(this.zhouPatient);
+    this.zhouRoot.add(this.zhouPatient);this.zhouPatient.visible=false;
     this.materials.push(this.zhouPatient.material);
     const zhouHead = new THREE.Mesh(new THREE.SphereGeometry(0.13, 7, 5), this.parts.head.material);
     zhouHead.position.set(0, 0.22, -0.84);
-    this.zhouRoot.add(zhouHead);
+    this.zhouRoot.add(zhouHead);zhouHead.visible=false;
     this.zhouRoot.visible = false;
+    this.people=new MissionPeople({root:this.root,actorFactory,battlefield});
+    this.aftermath=new MissionAftermath({root:this.root,actorFactory,battlefield});
     this.BuildTank();
     this.BuildSupplies();
     this.navigation=document.createElement("div");
@@ -148,8 +152,9 @@ export class FirstLevelMissionView {
     const front=h(tank.x,tank.z+1.8),rear=h(tank.x,tank.z-1.8);
     const left=h(tank.x+1,tank.z),right=h(tank.x-1,tank.z);
     this.tank.position.set(tank.x,(front+rear+left+right)/4,tank.z);
-    this.tank.rotation.set(Math.atan2(front-rear,3.6),Math.PI,Math.atan2(left-right,2),"YXZ");
-    this.turret.rotation.y=tank.turretYaw-Math.PI;
+    const hullYaw=tank.hullYaw??Math.PI;
+    this.tank.rotation.set(Math.atan2(front-rear,3.6),hullYaw,Math.atan2(left-right,2),"YXZ");
+    this.turret.rotation.y=tank.turretYaw-hullYaw;
     this.tank.updateMatrixWorld(true);
   }
   TankMuzzle(tank,node="gunMuzzle") {
@@ -196,44 +201,8 @@ export class FirstLevelMissionView {
     if(!box){box=values;this.cartColliders.set(cart.id,box);this.physics.AddSolid(box);this.colliders.push(box);this.battlefield.colliders.push(box);}
     else {Object.assign(box,values);this.physics.MoveSolid(box);}
   }
-  Person(
-    x,
-    z,
-    yaw,
-    time,
-    { kind = "bearer", alive = true, moving = false, crouch = false, carrying = false, carrySide = -1 } = {},
-  ) {
-    const y = this.battlefield.GroundHeight(x, z),
-      height = alive ? (crouch ? 0.95 : 1.35) : 0.18;
-    this.Instance("body", x, y + height - 0.24, z, yaw, 1, alive ? 1 : 0.45, alive ? 1 : 2.2);
-    this.parts.body.setColorAt(this.parts.body.count-1,this.personColor.setHex({medic:0xd8ddd2,wounded:0xa9a08a,civilian:0x947d64,bearer:0x93a39b}[kind]||0x93a39b));
-    this.Instance("head", x, y + height + 0.24, z, yaw);
-    const c = Math.cos(yaw),
-      s = Math.sin(yaw),
-      swing = moving ? Math.sin(time * 7) * 0.18 : 0;
-    for (const side of [-1, 1]) {
-      this.Instance(
-        "limb",
-        x + c * side * 0.13 - s * swing * side,
-        y + (alive ? 0.36 : 0.15),
-        z - s * side * 0.13 - c * swing * side,
-        yaw,
-        1,
-        alive ? 1 : 0.3,
-      );
-      this.Instance(
-        "limb",
-        x + c * side * 0.28,
-        y + height - 0.22,
-        z - s * side * 0.28,
-        yaw,
-        0.85,
-        carrying ? 0.65 : 0.85,
-        1,
-        carrying ? carrySide : kind === "wounded" && side === -1 ? -.8 : crouch ? -.7 : -swing * side,
-      );
-    }
-    if (kind === "medic") this.Instance("medical", x + c * 0.33, y + 0.8, z - s * 0.33, yaw);
+  Person(x,z,yaw,time,options={}) {
+    return this.people.Person(options.id||("Person"+x+"_"+z),x,z,yaw,options);
   }
   TrainHandProps() {
     for(const entry of this.train?.entries || []) {
@@ -251,13 +220,15 @@ export class FirstLevelMissionView {
       }
     }
   }
-  Update(time, { tank } = {}) {
+  Update(time, { tank,player } = {}) {
+    this.people.Begin(time,player?.position);
+    this.aftermath.Update(player?.position);
     for (const mesh of Object.values(this.parts)) mesh.count = 0;
     this.TrainHandProps();
     this.UpdateSupplies(time);
     if (this.column.stationBombed)
       for (const person of MISSION_PLACEMENT.stationCasualties)
-        this.Person(person.x, person.z, person.yaw, time, { alive: person.health > 0, crouch: true });
+        this.Person(person.x, person.z, person.yaw, time, { id:"Station"+person.x, alive: person.health > 0, crouch: true });
     for (const litter of this.column.litters) {
       if (!litter.visible) continue;
       const ground = this.battlefield.GroundHeight(litter.x, litter.z),
@@ -265,7 +236,7 @@ export class FirstLevelMissionView {
           ? 1.2
           : litter.state === "fallen" || litter.state === "critical" || litter.state === "placed"
             ? 0.22
-            : 0.82 + (litter.liftFraction || 0) * 0.38;
+            : .76 + (litter.liftFraction || 0) * .44;
       const yaw = litter.yaw || 0;
       if (litter.zhou) {
         this.zhouRoot.visible = true;
@@ -274,24 +245,22 @@ export class FirstLevelMissionView {
         this.zhouPatient.material.color.setHex(litter.health < 25 ? 0xbda5a0 : 0xd9d7cb);
       } else {
         this.Instance("bed", litter.x, ground + height, litter.z, yaw);
-        this.Instance("patient", litter.x, ground + height + 0.16, litter.z, yaw);
-        this.Instance(
-          "head",
-          litter.x - Math.sin(yaw) * 0.84,
-          ground + height + 0.22,
-          litter.z - Math.cos(yaw) * 0.84,
-          yaw,
-        );
       }
+      this.people.Patient(litter.id,litter.x,ground+height+.07,litter.z,yaw,time);
+      const SetGrip=(side,end)=>new THREE.Vector3(litter.x+Math.cos(yaw)*side*.29-Math.sin(yaw)*end,
+        ground+height+.12,litter.z-Math.sin(yaw)*side*.29-Math.cos(yaw)*end);
       if (!litter.loaded && litter.state !== "placed")
         for (const [index, side] of [-1, 1].entries()) {
-          if (litter.bearers[index] <= 0 || (litter.state === "carried" && side === 1)) continue;
+          if (litter.bearers[index] <= 0 || (litter.state === "carried" && side === -1)) continue;
           this.Person(
-            litter.x - Math.sin(yaw) * side * 1.6,
-            litter.z - Math.cos(yaw) * side * 1.6,
+            litter.x - Math.sin(yaw) * side * MISSION_TUNING.litterBearerOffsetM,
+            litter.z - Math.cos(yaw) * side * MISSION_TUNING.litterBearerOffsetM,
             yaw,
             time,
             {
+              id:litter.id+"Bearer"+index,
+              carryTarget:{left:SetGrip(-1,side),right:SetGrip(1,side)},
+              role:side===1?"front":"rear",
               alive: litter.bearers[index] > 0,
               moving: ["moving", "loading"].includes(litter.state),
               carrying: true,
@@ -301,13 +270,14 @@ export class FirstLevelMissionView {
         }
     }
     for(const body of this.column.bearerCasualties)
-      this.Person(body.x,body.z,body.yaw,time,{alive:false});
+      this.Person(body.x,body.z,body.yaw,time,{id:"BearerCasualty"+body.x+"_"+body.z,alive:false});
     for (const walker of this.column.walkers) {
       const last=this.walkerPositions.get(walker.id);
       const moving=!!last&&Math.hypot(walker.x-last.x,walker.z-last.z)>.0001;
       this.walkerPositions.set(walker.id,{x:walker.x,z:walker.z});
       if (walker.visible && !walker.assigned && !(walker.health<=0&&walker.casualtyRepresented))
         this.Person(walker.x, walker.z, walker.yaw, time, {
+          id:walker.id,
           kind: walker.kind,
           alive: walker.health > 0,
           moving: moving && !walker.crouch,
@@ -336,7 +306,7 @@ export class FirstLevelMissionView {
           const swing=moving||team?Math.sin(time*(team?10:6)+side*end*Math.PI/2)*.32:0;
           this.Instance("limb",mx+mc*side*.21-ms*end*.52,my+.37,mz-ms*side*.21-mc*end*.52,yaw,.8,1.1,.8,swing);
         }
-        this.Person(mx+mc*1.1,mz-ms*1.1,yaw,time,{kind:"medic",moving:moving||!!team});
+        this.Person(mx+mc*1.1,mz-ms*1.1,yaw,time,{id:cart.id+"Driver",kind:"medic",moving:moving||!!team});
       }
       for(const side of [-1,1])for(const end of [-1,1]){
         this.CartInstance("wheel",cart,y,side*1.55,-.51,-end*1.8,0,Math.PI/2);
@@ -344,17 +314,11 @@ export class FirstLevelMissionView {
       }
       if (cart.id.startsWith("SouthCart")) {
         for (const side of [-1, 1]) {
-          this.Instance("patient", cart.x + c * side * 0.65, y + 1.35, cart.z - s * side * 0.65, cart.yaw);
-          this.Instance(
-            "head",
-            cart.x + c * side * 0.65 - s * 0.84,
-            y + 1.42,
-            cart.z - s * side * 0.65 - c * 0.84,
-            cart.yaw,
-          );
+          this.people.Patient(cart.id+side,cart.x+c*side*.65,y+1.22,cart.z-s*side*.65,cart.yaw,time);
         }
       }
     }
+    this.people.End();
     const visibleCarts=new Set([...this.column.vehicles,...this.column.traffic.filter(c=>c.visible)].filter(c=>c.z<=178).map(c=>c.id));
     for(const [id,box] of this.cartColliders)if(!visibleCarts.has(id)){
       this.physics.RemoveSolid(box._physicsHandle);
@@ -370,7 +334,7 @@ export class FirstLevelMissionView {
       this.SyncTank(tank);
       this.trackDamage.visible = tank.immobilized;
       if (tank.present || tank.active) {
-        const c = this.tankCollider;
+        const c = this.tankCollider;c.ry=tank.hullYaw??Math.PI;
         c.c = [tank.x, this.tank.position.y + 1.28, tank.z];
         c.min = c.c.map((v, i) => v - c.h[i]);
         c.max = c.c.map((v, i) => v + c.h[i]);
@@ -395,6 +359,7 @@ export class FirstLevelMissionView {
   }
   Dispose() {
     this.navigation?.remove();
+    this.people.Dispose();this.aftermath.Dispose();
     for (const collider of this.colliders) {
       if (collider._physicsHandle != null) this.physics.RemoveSolid(collider._physicsHandle);
       const index=this.battlefield.colliders.indexOf(collider);

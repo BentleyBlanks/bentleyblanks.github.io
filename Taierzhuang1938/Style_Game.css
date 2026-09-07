@@ -304,12 +304,12 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    放到屏幕角落等于没有（第五关唯一的教学界面就是这条热条）。
    与白刃 QTE 同一块视野，但两者不会同时出现（架着枪拼不了刺刀）。 */
 .hudEmplacement {
-  position: absolute; left: 50%; top: 62%; z-index: 6;
-  width: min(340px, calc(100vw - 40px)); box-sizing: border-box;
-  transform: translateX(-50%); opacity: 0; transition: opacity 0.14s linear;
-  padding: 7px 11px 6px;
-  border: 1px solid rgba(230,223,205,0.22); border-top: 2px solid var(--warn);
-  background: rgba(10,10,9,0.60);
+  position: absolute; right: 32px; bottom: 176px; z-index: 6;
+  width: min(272px, calc(100vw - 40px)); box-sizing: border-box;
+  opacity: 0; transition: opacity 0.2s linear;
+  padding: 8px 0; border: 0;
+  background: linear-gradient(90deg, transparent, rgba(10,10,9,.16));
+  text-shadow: 0 1px 3px #000;
   font-size: 12px; letter-spacing: 0.04em;
 }
 .hudEmplacement.on { opacity: 1; }
@@ -319,10 +319,10 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 /* 热条：底槽 + 走条 + 一根警戒线。警戒线常驻——玩家要看得见"还剩多少余量"，
    不是等它红了才知道自己压太久。 */
 .empHeat {
-  position: relative; height: 5px; margin: 5px 0 0;
+  position: relative; height: 2px; margin: 9px 0 0;
   background: rgba(230,223,205,0.14); overflow: hidden;
 }
-.empHeat u { display: block; height: 100%; width: 0; background: var(--ours); transition: width 0.08s linear; }
+.empHeat u { display: block; height: 100%; width: 0; background: rgba(228,221,203,.75); transition: width 0.08s linear; }
 .empHeat .empHeatWarn {
   position: absolute; top: -1px; bottom: -1px; width: 1px;
   background: rgba(230,223,205,0.55); text-decoration: none;
@@ -330,7 +330,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudEmplacement.heat-warm .empHeat u { background: #c9b168; }
 .hudEmplacement.heat-hot .empHeat u { background: var(--warn); }
 .hudEmplacement.heat-overheat { border-top-color: var(--theirs); }
-.hudEmplacement.heat-overheat .empHeat u { background: var(--theirs); animation: empPulse 0.5s linear infinite; }
+.hudEmplacement.heat-overheat .empHeat u { background: var(--theirs); animation: empPulse 1.2s ease-in-out infinite; }
 @keyframes empPulse { 50% { opacity: 0.45; } }
 /* 小卡的排障进度：单独一条细线，不去占准星那个 F 交互环 */
 .empJam { height: 2px; margin-top: 2px; background: transparent; }
@@ -861,3 +861,11 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 
 /* Keep the left control panel above the resistance HUD during a bind. */
 .meleeLabActive:has(.hudMeleeQte.on) .meleeLab{max-height:min(var(--mlMaxHeight),calc(100dvh - 290px))}
+
+/* Mounted weapon information occupies the existing ammunition corner. */
+.hudEmplacement .empLabel {font-size:11px;letter-spacing:.12em;opacity:.65}
+.hudEmplacement .empAmmo {font-size:18px;color:#eee8d8}
+.hudEmplacement.heat-cool .empHeat {opacity:.28}
+.hudEmplacement .empPrompt:empty {display:none}
+.hudEmplacement .empExit {margin-left:auto;opacity:.75}
+#hud.emplaced .combatWeapon,#hud.emplaced .combatAmmo {visibility:hidden}

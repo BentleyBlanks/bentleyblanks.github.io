@@ -28,7 +28,11 @@ const Smooth = value => value * value * (3 - 2 * value);
 
 /** One brown-material geometry for the original P012 litter prop. */
 export function CreateP012StretcherGeometry() {
-  const bed = new THREE.BoxGeometry(0.58, 0.14, 1.85);
+  const bed = new THREE.PlaneGeometry(.58,1.85,6,12);
+  bed.rotateX(-Math.PI/2);
+  const cloth=bed.attributes.position;
+  for(let i=0;i<cloth.count;i++)cloth.setY(i,.085-.055*(1-(cloth.getX(i)/.29)**2));
+  bed.computeVertexNormals();
   const railRight = new THREE.BoxGeometry(0.065, 0.065, P012_STRETCHER_GRIPS.railLengthM);
   const railLeft = railRight.clone();
   railRight.translate(P012_STRETCHER_GRIPS.railSpacingM / 2, P012_STRETCHER_GRIPS.gripHeightAbovePropM, 0);

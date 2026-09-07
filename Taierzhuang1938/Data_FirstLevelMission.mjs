@@ -1,7 +1,8 @@
+import { FRONT_REINFORCEMENTS, FRONT_APPROACH_ENEMIES } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-export const MISSION_VERSION = "first-level-20260907-r11";
+export const MISSION_VERSION = "first-level-20260907-r12";
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 const Stage = (id, objective, target, requirements, cue, extra = {}) =>
@@ -19,7 +20,7 @@ export const MISSION_STAGES = Object.freeze([
     "Support",
     "沿交通壕支援前沿守军，掩护他们撤回。",
     A.front,
-    ["frontReached", "frontContact"],
+    ["frontReached", "frontContact", "frontRifleDefense", "forwardNestDestroyed"],
     "SupportOrder",
   ),
   Stage(
@@ -38,9 +39,9 @@ export const MISSION_STAGES = Object.freeze([
   ),
   Stage(
     "Orders",
-    "随罗班长接收后送命令，带老周离开阵地。",
-    A.front,
-    ["volunteerHeard", "zhouOnLitter"],
+    "撤回交通壕，与罗班长接令，带老周离开阵地。",
+    A.orders,
+    ["ordersReached", "volunteerHeard", "zhouOnLitter"],
     "Volunteer",
   ),
   Stage(
@@ -133,7 +134,9 @@ export const MISSION_STAGES = Object.freeze([
   Stage("Complete", "第一关完成 · 往南的路", A.end, [], null),
 ]);
 export const MISSION_ENCOUNTERS = Object.freeze({
+  approach: FRONT_APPROACH_ENEMIES,
   front: [
+    ...FRONT_REINFORCEMENTS,
     { id: "FrontGunner", x: 25, z: -161, weapon: "Type11", hold: true },
     { id: "FrontRifleA", x: -18, z: -159 },
     { id: "FrontRifleB", x: -9, z: -164 },
@@ -155,7 +158,7 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   ],
   village: [
     { id: "VillageGunner", x: 43, z: 8, weapon: "Type11", hold: true },
-    { id: "VillageCorner", x: 35, z: -12 },
+    { id: "VillageCorner", x: 54, z: -12 },
     { id: "KitchenGuard", x: 58, z: -7 },
     { id: "RearWindow", x: 66, z: 16 },
     { id: "SideYard", x: 40, z: 27 },
@@ -198,14 +201,15 @@ export const MISSION_ENCOUNTERS = Object.freeze({
 // Finite squads cross authored openings while the shared AI owns fire and damage.
 export const MISSION_GUIDANCE = Object.freeze({
   Unloading: {label:'unload'}, Support:{label:'support',route:'support'},
-  MachineGun:{label:'gun'},Tank:{label:'bundle'},Orders:{label:'support'},
-  South:{label:'south',route:'south'},Village:{label:'village',route:'village'},
+  MachineGun:{label:'gun'},Tank:{label:'bundle'},Orders:{label:'orders'},
+  South:{label:'south'},Village:{label:'village',route:'village'},
   Courtyard:{label:'gate'},TransferApproach:{label:'transfer',route:'village'},Transfer:{label:'transfer'},AirFirst:{label:'transfer'},
   Carry:{label:'carry'},Rescue:{label:'ditch'},
   RetreatFirst:{label:'retreat'},RetreatWall:{label:'retreat'},RetreatYard:{label:'retreat'},
   Reception:{label:'reception'},FinalCarry:{label:'carry'},FinalDefense:{label:'rearCover'},Exit:{label:'exit',route:'exit'},
 });
 export const MISSION_TACTICS = Object.freeze({
+  ...Object.fromEntries(FRONT_REINFORCEMENTS.filter(s=>s.route).map(s=>[s.id,s.route])),
   FrontRifleA: { delay: 2, points: [{x:-16,z:-154},{x:-16,z:-151}] },
   FrontRifleB: { delay: 7, points: [{x:-8,z:-156},{x:-8,z:-153}] },
   FrontRifleC: { delay: 5, points: [{x:12,z:-155},{x:12,z:-153}] },
@@ -285,6 +289,7 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
     anchors: A,
     routes: MISSION_ROUTES,
     friendlyLimit: 4,
+    actorCapacity:144,
     actualEventsOnly: true,
     storyBeats: [],
     activities: { arrivalGuideStart: { x: -76, z: 71 }, trainColumn: { extraCount: MISSION_TRAIN.extraCount } },

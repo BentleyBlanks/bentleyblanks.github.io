@@ -1,4 +1,5 @@
 // Population mirrors the accepted P012 train: 40 recruits (8 / 24 / 8), plus Luo and the player.
+import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { trainColumn } from "./Data_FirstLevelP012TrainColumn.mjs";
 const Point = (x, z) => ({ x, z });
 export const MISSION_TRAIN = Object.freeze({
@@ -7,6 +8,7 @@ export const MISSION_TRAIN = Object.freeze({
   mainCar: 1,
   life: { seatTopM: 0.48, pelvisAboveSeatM: 0.12, standSeconds: 1.25, sideSeatM: 1.65, gesturePeriodS: 7.5 },
   centerX: -77,
+  approachEndZ: R.trainTravelM + 140,
   doorClearX: -73.1,
   stairFootX: -71.7,
   apronLaneX: -69,
@@ -30,3 +32,12 @@ export const MISSION_TRAIN = Object.freeze({
     };
   }),
 });
+
+// Constant approach followed by constant deceleration, with continuous speed and an exact station stop.
+export function MissionTrainMotion(time, impactAt = null, impactOffset = null) {
+  if (impactAt == null) return { offsetM: Math.max(0, R.trainTravelM - time * R.trainCruiseSpeedMps), speedMps: R.trainCruiseSpeedMps, stopped: false };
+  const distance = Math.max(0, impactOffset ?? R.trainTravelM - impactAt * R.trainCruiseSpeedMps);
+  const brakeSeconds = 2 * distance / R.trainCruiseSpeedMps;
+  const ratio = brakeSeconds > 0 ? Math.max(0, Math.min(1, (time - impactAt) / brakeSeconds)) : 1;
+  return { offsetM: distance * (1 - ratio) ** 2, speedMps: R.trainCruiseSpeedMps * (1 - ratio), stopped: ratio === 1, brakeSeconds };
+}

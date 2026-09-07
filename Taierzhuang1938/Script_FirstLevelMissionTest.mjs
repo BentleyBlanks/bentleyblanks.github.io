@@ -1,19 +1,39 @@
+import { FRONT_BREACHES } from "./Data_FirstLevelMissionFront.mjs";
 import { CollectBulletNearMisses,ApplyBulletNearMisses } from "./Script_BallisticSuppression.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
-import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
+import { MISSION_TRAIN, MissionTrainMotion } from "./Data_FirstLevelMissionTrain.mjs";
 import { FirstLevelMissionTrain } from "./Script_FirstLevelMissionTrain.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
-import { FirstLevelMissionColumn, MissionGuideSpeed, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
+import { FirstLevelMissionColumn, MissionCarryRoutePoint, MissionGuideSpeed, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
 import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
 import { MISSION_DIALOGUE, MissionVoicePrompt } from "./Data_FirstLevelMissionDialogue.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
+{
+  for (const time of [0,10,30,55]) {
+    const a=MissionTrainMotion(time),b=MissionTrainMotion(time+.1);
+    assert.ok(Math.abs((a.offsetM-b.offsetM)/.1-6)<1e-6,"train keeps real cruise speed before shell impact");
+  }
+  for (const impactAt of [56,57.5,60]) {
+    const start=MissionTrainMotion(impactAt),stop=MissionTrainMotion(impactAt,impactAt,start.offsetM);
+    let previous=start;
+    for(let t=.01;t<=stop.brakeSeconds+.02;t+=.01) {
+      const current=MissionTrainMotion(impactAt+t,impactAt,start.offsetM);
+      assert.ok(current.offsetM<=previous.offsetM && current.offsetM>=0);
+      assert.ok(current.speedMps<=previous.speedMps && current.speedMps>=0);
+      previous=current;
+    }
+    assert.equal(previous.offsetM,0);assert.ok(previous.stopped);
+    assert.equal(stop.speedMps,start.speedMps,"impact does not accelerate or jerk the train");
+  }
+  assert.ok(MISSION_TRAIN.cars.at(-1).z+R.trainTravelM+8<MISSION_LAYOUT.bounds.maxZ,"whole train begins inside the extended approach");
+}
 const flow = new FirstLevelMissionFlow();
 flow.Start();
 for (const stage of MISSION_STAGES.slice(0, -1)) {
@@ -31,8 +51,8 @@ assert.equal(flow.completed, true);
 console.log("ok all mission gates require recorded gameplay facts and restore exactly");
 const terrain = CreateP012Terrain(MISSION_LAYOUT);
 for (const [x, z] of [
-  [-24, -40],
-  [-8, -95],
+  [-24, -53],
+  [-8, -106],
   [12, -124],
   [20, 109],
 ])
@@ -73,16 +93,39 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...tacticalRoute
     }
   }
 }
+for(const id of ["FrontTraverseBlastScreen","BundleParapet","FlankParapet","MachineGunSideCover-1","MachineGunSideCover1"]){
+  const wall=MISSION_LAYOUT.blocks.find(b=>b.id===id);assert.ok(wall,"hand-built cover survives generic route cleanup: "+id);
+  for(const x of [-1,0,1])for(const z of [-1,0,1])assert.ok(wall.y-wall.h/2<=SampleMissionTerrain(wall.x+x*wall.w/2,wall.z+z*wall.d/2),"cover foundations follow the trench slope");
+}
 console.log("ok authored capsule routes clear walls, crates and gun supports");
+// Each waiting team occupies an authored work area, with clear paths for both bearer ends.
+import {MISSION_CROWD_AREAS as areas} from './Data_FirstLevelMissionCrowd.mjs';import {MISSION_LAYOUT as crowdLayout} from './Data_FirstLevelMissionLayout.mjs';import {SampleMissionTerrain as crowdGround} from './Data_FirstLevelMissionTerrain.mjs';import {MissionCarryRoutePoint as crowdPoint,MissionRouteLength as crowdLength} from './Script_FirstLevelMissionColumn.mjs';
+const bad=[];for(const a of areas)for(const [kind,points] of [['litter',a.pockets],['walker',a.walkerPockets]])for(const [i,p] of points.entries()){const routes=[[a.trigger,{x:a.trigger.x,z:a.entryZ},{x:p.x,z:a.entryZ},p],[p,{x:p.x,z:a.exitZ},a.merge]];for(const route of routes)for(let d=0;d<crowdLength(route);d+=.3){const c=crowdPoint(route,d);for(const offset of kind==='litter'?[-1.28,0,1.28]:[0]){const x=c.x-Math.sin(c.yaw)*offset,z=c.z-Math.cos(c.yaw)*offset,y=crowdGround(x,z);for(const b of crowdLayout.blocks){if(b.solid===false||crowdLayout.walkableSurfaces.some(s=>s.id===b.id))continue;const dx=x-b.x,dz=z-b.z,co=Math.cos(b.ry||0),si=Math.sin(b.ry||0);if(Math.abs(dx*co-dz*si)<b.w/2+.32&&Math.abs(dx*si+dz*co)<b.d/2+.32&&b.y+b.h/2>y+.3&&b.y-b.h/2<y+1.7)bad.push({area:a.id,kind,i,box:b.id,x,z});}}}}
+assert.deepEqual(bad,[],"all staging routes clear real walls and furniture, including both bearers");
+assert.ok(areas.every(a=>a.walkerPockets.length===R.walkingWoundedCount+R.medicCount+R.civilianCount));
 const c = new FirstLevelMissionColumn();
+function CheckStagingClearance(column){
+  const teams=column.litters.filter(l=>l.staging);
+  for(let i=0;i<teams.length;i++)for(let j=i+1;j<teams.length;j++)
+    assert.ok(Math.hypot(teams[i].x-teams[j].x,teams[i].z-teams[j].z)>2,"arriving and departing litters do not pass through resting teams");
+}
 c.Activate();
-for (let i = 0; i < 6000; i++) c.Update(0.1);
+for (let i = 0; i < 6000; i++){c.Update(0.1);if(i%5===0)CheckStagingClearance(c);}
 assert.equal(c.State().gatePassed, 0);
+assert.ok(c.litters.every(l=>l.staging?.mode==="resting"&&l.staging.area==="courtyard"));
+assert.ok(Math.max(...c.litters.map(l=>l.x))-Math.min(...c.litters.map(l=>l.x))>25,"waiting litters occupy the width of the sheltered yard");
+assert.ok(c.walkers.every(w=>w.staging?.mode==="resting"),"walkers reach separate waiting places");
+const waitingStart=c.walkers.map(w=>({x:w.x,z:w.z})),waitingTravel=c.walkers.map(()=>0);
+for(let frame=0;frame<240;frame++){c.Update(.1);c.walkers.forEach((w,i)=>waitingTravel[i]=Math.max(waitingTravel[i],Math.hypot(w.x-waitingStart[i].x,w.z-waitingStart[i].z)));}
+assert.ok(waitingTravel.filter(d=>d>.15).length>=5,"waiting wounded and medics make staggered short steps");
+assert.ok(waitingTravel.every(d=>d<1.1),"waiting people remain near their assigned places");
 c.gateOpen = true;
-for (let i = 0; i < 6000; i++) c.Update(0.1);
+for (let i = 0; i < 6000; i++){c.Update(0.1);if(i%5===0)CheckStagingClearance(c);}
 assert.equal(c.State().gatePassed, R.litterCount);
 c.loading = true;
-for (let i = 0; i < 6000; i++) c.Update(0.1);
+let transferReadyAt=null;
+for (let i = 0; i < 6000; i++){c.Update(0.1);if(transferReadyAt===null&&c.TransferReady())transferReadyAt=(i+1)*.1;}
+assert.ok(transferReadyAt>=120&&transferReadyAt<=240,"physical staging and loading fit the planned two-to-four-minute transfer");
 assert.equal(c.State().loaded, R.zhouQueueIndex);
 assert.equal(c.departed, 2);
 assert.equal(c.QueueAhead(), 0);
@@ -369,6 +412,7 @@ console.log("ok paused audio ranges, subtitle source timing, queued cues and she
  assert.equal(MissionGuideSpeed(actor,{x:0,z:-40},target),R.squadCatchupMps,"only a trailing guide accelerates");
  assert.equal(MissionGuideSpeed(actor,{x:0,z:5},target),R.squadSpeedMps,"nearby guide keeps walking pace");
  assert.equal(MissionGuideSpeed(actor,{x:0,z:-40},target,true),0,"spacing still takes priority");
+ assert.equal(MissionGuideSpeed({x:0,z:-124},{x:48,z:-20},{x:-1,z:-123},false,[{x:-8,z:-112},{x:-24,z:-60},{x:-24,z:-18},{x:0,z:0},{x:48,z:-20}]),R.squadCatchupMps,"a squad behind a route bend catches up instead of waiting forever");
 }
 
 {
@@ -407,3 +451,24 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
  clock=91;voice.Update(1);assert.equal(events.length,1);
 }
 console.log("ok receiving-food release follows the source clock and survives pause/resume");
+
+{
+  assert.equal(MISSION_ENCOUNTERS.front.length,30,"first contact has three authored sections plus the original line");
+  assert.equal(MISSION_ENCOUNTERS.approach.length,6,"two approach positions provide actual enemy fire");
+  assert.ok(MISSION_STAGES.find(s=>s.id==="Support").requirements.includes("frontRifleDefense"));
+  assert.ok(FIRST_LEVEL_MISSION_PHASE.whitebox.actorCapacity>=130,"small graphics scale cannot cut the mission manifest");
+  for(const point of FRONT_BREACHES){
+    const h=SampleMissionTerrain(point.x,point.z);
+    assert.ok(h>-.8 && h<-.35,"broken trench lips remain shallow walkable soil: "+h);
+  }
+  const corner=[{x:0,z:0},{x:0,z:5},{x:5,z:5}],step=1.4/60;
+  let before=MissionCarryRoutePoint(corner,3);
+  for(let d=3+step;d<7;d+=step){
+    const at=MissionCarryRoutePoint(corner,d);
+    assert.ok(Math.hypot(at.x-before.x,at.z-before.z)<=step+.00001,"corner never teleports the litter");
+    const turn=Math.atan2(Math.sin(at.yaw-before.yaw),Math.cos(at.yaw-before.yaw));
+    assert.ok(Math.abs(turn)<.09,"litter heading turns gradually");
+    before=at;
+  }
+  assert.deepEqual(MissionCarryRoutePoint(corner,10),{x:5,z:5,yaw:-Math.PI/2},"arrival position and hidden passage distance stay stable");
+}

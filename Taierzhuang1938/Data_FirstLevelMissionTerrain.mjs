@@ -1,5 +1,6 @@
 // Authored soil, metres: natural ground, roads, rail berm and excavated trenches.
 // This function is baked once into the shared rendered/physical heightfield.
+import { FRONT_BREACHES } from "./Data_FirstLevelMissionFront.mjs";
 const Smooth = (value) => {
   const t = Math.max(0, Math.min(1, value));
   return t * t * (3 - 2 * t);
@@ -167,6 +168,10 @@ export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {
   for (const trench of spec.trenches) {
     const d = MissionPathDistance({ x, z }, trench.points);
     height = Math.min(height, natural - trench.depth * (1 - Smooth((d - trench.bottom / 2) / trench.bank)));
+  }
+  for (const breach of FRONT_BREACHES) {
+    const blend=1-Smooth(Math.hypot(x-breach.x,z-breach.z)/breach.radius);
+    if(blend>0)height=Math.max(height,height+(natural-breach.depth-height)*blend);
   }
   for (const step of spec.steps) {
     const d = Math.hypot(x - step.x, z - step.z),

@@ -1,6 +1,6 @@
 // Interaction strings for the September first-level replacement.
 export const TEXT = Object.freeze({
-  "firstLevel.interaction.bundle": "领取集束手榴弹 · 按住 H 瞄准，松开投掷",
+  "firstLevel.interaction.bundle": "领取集束手榴弹 · 按住 H 蓄力，松开投掷",
   "firstLevel.interaction.gate": "打开院门，让担架通过",
   "firstLevel.interaction.carry": "接过老周担架后端",
   "firstLevel.interaction.place": "将老周放在卫生兵旁",
@@ -13,6 +13,7 @@ export const TEXT = Object.freeze({
   "firstLevel.guide.distance": "{label} · {distance} 米",
   "firstLevel.guide.unload": "下车与集合",
   "firstLevel.guide.support": "沿交通壕进入阵地",
+  "firstLevel.guide.orders": "撤回交通壕接令",
   "firstLevel.guide.gun": "接管机枪",
   "firstLevel.guide.bundle": "集束手榴弹",
   "firstLevel.guide.throw": "侧沟投掷位置",
@@ -28,12 +29,12 @@ export const TEXT = Object.freeze({
   "firstLevel.guide.place": "卫生兵接收位置",
   "firstLevel.guide.exit": "城边联络巷",
   "firstLevel.guide.rearCover": "后门外侧：压住西侧追兵",
-  "firstLevel.hint.rearQueue": "还有 {remaining} 副担架等待撤出",
-  "firstLevel.hint.guards": "守军已撤回 {safe} 人 · 仍在前沿 {remaining} 人 · 压住敌军火力，让他们撤回",
+  "firstLevel.hint.rearQueue": "伤员还在后面，守住撤退通道",
+  "firstLevel.hint.guards": "压住敌军火力，掩护前沿守军撤回",
   "firstLevel.hint.gunSupply": "机枪弹药不足：F 离位，身后弹药箱可补充弹匣",
-  "firstLevel.hint.bundle": "按住 H 调整投掷，松开 H 出手；炸履带，炮塔仍能开火",
+  "firstLevel.hint.bundle": "按住 H 蓄力投向履带，松开后退回沟内；炮塔仍能开火",
   "firstLevel.hint.bundleEmpty": "集束弹已用完：回侧沟弹药箱补充后继续投掷",
-  "firstLevel.hint.queue": "担架已通过 {passed}/{total} · 已装车 {loaded} 副",
+  "firstLevel.hint.queue": "掩护伤员转移，留意两侧和来路",
 });
 export const DYNAMIC_PREFIXES = ["firstLevel.interaction.", "firstLevel.guide."];
 export const GATED_MODULES = ["Script_FirstLevelMissionRuntime.mjs", "Script_FirstLevelMissionVoice.mjs"];

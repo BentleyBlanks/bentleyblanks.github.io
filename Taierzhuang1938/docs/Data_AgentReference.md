@@ -39,10 +39,14 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 ### 第一关《往南的路》
 - `Data_FirstLevelMission` / `Data_Tuning_FirstLevel`：24 个执行阶段对应 Notion 18 段剧情；事实门、有限敌人、节奏和装备。
 - `Data_FirstLevelMissionLayout` / `Terrain`：纯数据空间与共享高度场。室外地面不使用盒体；列车地板、台阶和桥面属于结构。
-- `Script_FirstLevelMissionRuntime` / `Flow` / `Column` / `View`：实际操作、阶段记录、20 副担架和装车/撤离、简化实例化角色。
+- `Script_FirstLevelMissionRuntime` / `Flow` / `Column` / `View`：实际操作、阶段记录、20 副担架和装车/撤离。
+- `Data_FirstLevelMissionCrowd`：院落/转运区分散停靠点、错峰汇流和轻伤员等候区域。
+- `Data_FirstLevelMissionFront`：前沿增援、沿途火力、友军据点和战场遗体布局；`Script_FirstLevelMissionAftermath`：按真实角色骨骼烘焙遗体并分区合批。
+- `Script_FirstLevelMissionPeople`：真实担架员/轻伤员角色、抬运握持校正、停步接地、警戒观察与按距离降低远景动画频率。
 - `Data_FirstLevelMissionDialogue` / `Script_FirstLevelMissionVoice`：整段连续对白。`Script_SeedAudioFirstLevelBake.mjs` 仅从环境变量取密钥，每段一个请求、一个音频文件；`--dry` 审核请求，`Script_FirstLevelMissionTest.mjs --audio` 验实际资产。
 - 当前入口直接覆盖 `?whitebox=p012`。`p012-archive` 只供旧模型、调试与共享组件回归，不作为新版验收。
 - 本地通关：`node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign`。截图、过程 JSON 留在忽略目录 `_shots/FirstLevelMission`。
+- `Script_FirstLevelMissionPresentationTest.mjs`：独立夹具验证抬运与停步握持、双脚接地、持续警戒走动、右键射击、机枪后坐及土坡爆炸遮挡；不能替代真实通关。
 - 来源与逐项验收见 [Data_FirstLevelRebuildAcceptance.md](Data_FirstLevelRebuildAcceptance.md)。
 
 ### 渲染管线 / GI / 灯光天空

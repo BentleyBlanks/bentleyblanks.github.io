@@ -46,6 +46,7 @@ async function Capture(name) {
         mission: window.Tengxian.Debug.FirstLevelMission(),
         position: { ...window.Tengxian.player.position },
         health: window.Tengxian.player.health,
+        damage:window.missionDamage?.slice(-12),
         cast: window.Tengxian.ai.soldiers
           .filter((a) => a.castId)
           .map((a) => ({
@@ -272,6 +273,10 @@ try {
     );
     console.log("ok every first-level voice asset decoded and played in the real audio engine");
   }
+  await page.evaluate(()=>{const g=window.Tengxian,original=g.player.TakeHit.bind(g.player);window.missionDamage=[];
+    g.player.TakeHit=(damage,part,direction,info)=>{const before=g.player.health,result=original(damage,part,direction,info);
+      window.missionDamage.push({time:g.Debug.FirstLevelMission()?.time,before,after:g.player.health,damage,part,blast:!!info?.blast,bullet:!!info?.bullet,from:info?.from?.toArray(),position:g.player.position.toArray()});
+      if(window.missionDamage.length>120)window.missionDamage.shift();return result;};});
   const initial = await page.evaluate(() => ({
     mission: window.Tengxian.Debug.FirstLevelMission(),
     position: { ...window.Tengxian.player.position },
@@ -326,7 +331,7 @@ try {
   assert.ok(ride.handoff.canLook&&ride.handoff.playerDrift<.04&&ride.handoff.playerRise<.08&&ride.handoff.stance==="stand"&&ride.handoff.locked,
     "receiving food holds walking, sprinting, jumping and stance, while retaining free look: "+JSON.stringify(ride.handoff));
   assert.ok(ride.poses.every(p=>p.clip==="AttackCommand"&&p.rate===0), "the sampled base pose never treats train travel as walking");
-  assert.ok(ride.travel>1 && ride.maxLocalDrift<.08 && ride.maxAnimationSpeed<.05 && ride.maxRootError<.08, "train-local bodies and rendered roots stay still without a walking cycle: "+JSON.stringify(ride));
+  assert.ok(Math.abs(ride.travel-48)<.05 && ride.maxLocalDrift<.08 && ride.maxAnimationSpeed<.05 && ride.maxRootError<.08, "train-local bodies and rendered roots stay still without a walking cycle: "+JSON.stringify(ride));
   assert.equal(ride.life.filter(p=>p.seated).length,32,'32 actual side-bench seats, eight standing recruits and Luo');
   assert.ok(ride.life.every(p=>p.active && p.footDrift<.025),'procedural upper-body activity keeps boot contacts fixed');
   assert.ok(ride.life.filter(p=>p.seated).every(p=>Math.abs(p.pelvis-.6)<.025),'seated pelvis rests over the bench');
@@ -362,10 +367,12 @@ try {
     g.StepFrames(30,1/60,true);
     g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
     const released=!g.Debug.FirstLevelMission().receivingFood, xBefore=g.player.position.x;
+    const handBefore=g.viewmodel.handRight.group.position.clone();
     g.Debug.Key("KeyA",true);g.StepFrames(18,1/60,true);g.Debug.Key("KeyA",false);
     const walkAfter=Math.abs(g.player.position.x-xBefore);
+    const handTravel=handBefore.distanceTo(g.viewmodel.handRight.group.position);
     g.Debug.Key("KeyD",true);g.StepFrames(18,1/60,true);g.Debug.Key("KeyD",false);
-    const empty={hidden:!g.viewmodel.root.visible,ammo:g.state.ammo===ammo,shots:g.state.playerShots===shots,
+    const empty={visible:g.viewmodel.root.visible,unarmed:g.viewmodel.weaponId===null,handTravel,ammo:g.state.ammo===ammo,shots:g.state.playerShots===shots,
       grenades:g.state.grenades===grenades,bundles:g.state.bundles===bundles,ads:g.player.ads};
     for(let i=0;i<120*60&&!g.Debug.FirstLevelMission().facts.includes("trainProneOrder");i++)g.StepFrames(1,1/60,false);
     const before=g.Debug.FirstLevelMission();
@@ -379,7 +386,7 @@ try {
     for(let i=0;i<120*60&&!g.Debug.FirstLevelMission().facts.includes("unloadOrdersHeard");i++)g.StepFrames(1,1/60,false);
     return {empty,prone,released,walkAfter,after:g.Debug.FirstLevelMission()};
   });
-  assert.ok(opening.empty.hidden&&opening.empty.ammo&&opening.empty.shots&&opening.empty.grenades&&opening.empty.bundles&&opening.empty.ads<.01,
+  assert.ok(opening.empty.visible&&opening.empty.unarmed&&opening.empty.handTravel>.01&&opening.empty.ammo&&opening.empty.shots&&opening.empty.grenades&&opening.empty.bundles&&opening.empty.ads<.01,
     "empty hands also blocks all weapon actions: "+JSON.stringify(opening.empty));
   assert.ok(opening.released&&opening.walkAfter>.1,"walking resumes after the completed receiving reply");
   assert.equal(opening.prone.prompt?.keys,"Z");
@@ -641,9 +648,15 @@ try {
       ),
     );
     assert.ok(navigation.alive, "Player survives normal approach");
-    assert.equal(navigation.stage, "MachineGun");
+    assert.equal(navigation.stage, "Support", "arrival retains an actual rifle defense before the tank breaks the nest");
+    assert.equal(await page.evaluate(()=>window.Tengxian.interact.Point("MissionGunTake").Enabled()),false,"the MG cannot be taken before the handover");
+    await page.evaluate(()=>{window.villageBodies=window.Tengxian.ai.soldiers.filter(a=>["VillageGunner","VillageCorner","KitchenGuard","RearWindow","SideYard","MeleeTutor"].includes(a.missionId)).map(a=>({id:a.id,missionId:a.missionId}));});
+    assert.equal(await page.evaluate(()=>window.villageBodies.length),6,"all village bodies exist before leaving the front");
+    await WaitStage("MachineGun",100,{fight:true});
+    const rifle=await page.evaluate(()=>({shots:window.Tengxian.state.playerShots,facts:window.Tengxian.Debug.FirstLevelMission().facts}));
+    assert.ok(rifle.shots>0 && rifle.facts.includes("frontRifleDefense") && rifle.facts.includes("forwardNestDestroyed"),"rifle shooting and the real tank shell precede machine gun handover");
     const battlefieldSound=await page.evaluate(()=>window.missionBot.battleEvidence);
-    assert.ok(battlefieldSound.length>=3&&battlefieldSound.every(e=>e.front===12),"front encounter exists along the support approach");
+    assert.ok(battlefieldSound.length>=3&&battlefieldSound.every(e=>e.front===30),"front encounter exists along the support approach");
     assert.ok(battlefieldSound.some(e=>e.sound.recent.some(s=>s.cue==="amb.cannonFar"))&&battlefieldSound.some(e=>e.sound.recent.some(s=>s.cue==="type92")),"distant cannon and machine gun persist in the trench");
     assert.ok(battlefieldSound.some(e=>e.squad.filter(a=>a.speed>.1).length>=2 && Math.max(...e.squad.map(a=>a.speed))-Math.min(...e.squad.map(a=>a.speed))>.05),"actual squad march has independent pace");
     for(const id of ["luo","yaowa","heyoutian","liuwencai"]){
@@ -813,24 +826,47 @@ try {
         g.StepFrames(1, 1 / 60, false);
     });
     for (let attempt = 0; attempt < 2; attempt++) {
+      if(attempt>0)await Route([{x:15,z:-111},{x:25,z:-110},{x:30,z:-117}],"TankFlankRetry",{stance:"crouch"});
       const thrown = await page.evaluate(() => {
         const g = window.Tengxian,
           tank = g.Debug.FirstLevelMission().tank,
           p = g.player.position;
         g.player.yaw = Math.atan2(p.x - tank.x, p.z - tank.z);
         g.player.pitch = 0.35;
+        const distance=Math.hypot(p.x-tank.x,p.z-tank.z)-.4;
+        const rise=g.battlefield.GroundHeight(tank.x,tank.z)-(g.player.EyePosition.y+.1);
+        const cosine=Math.cos(g.player.pitch),sine=Math.sin(g.player.pitch)+.26;
+        const speed=Math.sqrt(4.905*distance*distance/(cosine*cosine*Math.max(.1,distance*sine/cosine-rise)));
+        const chargeFrames=Math.round(66*Math.max(.08,Math.min(1,(speed-8)/5)));
         const before = g.state.bundles;
         g.Debug.Key("KeyH", true);
-        g.StepFrames(24, 1 / 60, false);
+        g.StepFrames(chargeFrames, 1 / 60, false);
         g.Debug.Key("KeyH", false);
-        g.StepFrames(420, 1 / 60, false);
-        return { before, after: g.state.bundles, mission: g.Debug.FirstLevelMission() };
+        // Finish the release before turning, then physically run back along the side trench.
+        g.StepFrames(1,1/60,false);
+        if(g.player.stance==="crouch")g.Debug.Key("KeyC");
+        g.Debug.Key("ShiftLeft",true);
+        const escape=[{x:25,z:-110},{x:15,z:-111}];let escapeIndex=0;
+        for(let frame=0;frame<420&&g.player.alive;frame++){
+          const p=g.player.position;
+          if(escapeIndex<escape.length-1&&Math.hypot(p.x-escape[escapeIndex].x,p.z-escape[escapeIndex].z)<.8)escapeIndex++;
+          const dx=escape[escapeIndex].x-p.x,dz=escape[escapeIndex].z-p.z;
+          const yaw=Math.atan2(-dx,-dz),gap=Math.atan2(Math.sin(yaw-g.player.yaw),Math.cos(yaw-g.player.yaw));
+          g.player.yaw+=Math.max(-.09,Math.min(.09,gap));g.player.pitch=0;
+          g.Debug.Key("KeyW",Math.hypot(dx,dz)>.8&&Math.abs(gap)<.6);
+          g.StepFrames(1,1/60,false);
+        }
+        g.Debug.Key("KeyW",false);g.Debug.Key("ShiftLeft",false);
+        if(g.player.stance==="stand")g.Debug.Key("KeyC");
+        g.StepFrames(1,1/60,false);
+        return { before, after: g.state.bundles, health:g.player.health,position:{...g.player.position},damage:window.missionDamage?.slice(-8),mission: g.Debug.FirstLevelMission() };
       });
       console.log(
         "actual bundle throw",
         JSON.stringify({
           before: thrown.before,
           after: thrown.after,
+          health:thrown.health,position:thrown.position,damage:thrown.damage,
           tank: thrown.mission.tank,
           explosions: thrown.mission.playerExplosions,
         }),
@@ -840,18 +876,20 @@ try {
     await WaitStage("Orders", 20);
     await Route(
       [
-        { x: 25, z: -110 },
         { x: 15, z: -111 },
         { x: 6, z: -124 },
-        { x: 0, z: -124 },
+        { x: -8, z: -112 },
+        { x: -8, z: -102 },
       ],
       "EscortOrders",
-      { stance: "crouch" },
+      { stance: "stand", sprint:true },
     );
+    const ordersSupply=await Interact();
+    assert.ok(ordersSupply.kind==="supply","covered orders position offers an actual supply interaction");
+    await page.evaluate(()=>{const g=window.Tengxian;g.Debug.Key("KeyB");if(g.player.stance!=="crouch")g.Debug.Key("KeyC");g.StepFrames(1,1/60,false);});
     await WaitStage("South", 240);
     await Route(
       [
-        { x: -8, z: -112 },
         { x: -8, z: -78 },
         { x: -24, z: -60 },
         { x: -24, z: -18 },
@@ -863,6 +901,7 @@ try {
       { stance: "stand" },
     );
     await WaitStage("Village", 120);
+    assert.ok(await page.evaluate(()=>window.villageBodies.every(b=>window.Tengxian.ai.soldiers.some(a=>a.id===b.id&&a.missionId===b.missionId))),"the village reuses its pre-positioned soldiers");
     await Route(
       [
         { x: 58, z: -20 },
@@ -872,6 +911,9 @@ try {
       "VillageKitchen",
       { fight: true },
     );
+    const kitchenSquad=await page.evaluate(()=>{const g=window.Tengxian;return g.ai.soldiers.filter(a=>["luo","yaowa","heyoutian","liuwencai"].includes(a.castId)).map(a=>({id:a.castId,distance:a.position.distanceTo(g.player.position),alive:a.alive}));});
+    console.log("kitchen squad",JSON.stringify(kitchenSquad));
+    assert.ok(kitchenSquad.filter(a=>a.alive&&a.distance<25).length>=2,"at least two squadmates provide nearby kitchen support after the continuous march");
     const melee = await page.evaluate(() => {
       const g = window.Tengxian,
         enemy = g.ai.soldiers.find((a) => a.missionId === "MeleeTutor");
@@ -889,7 +931,9 @@ try {
         const gap = Math.atan2(Math.sin(yaw - g.player.yaw), Math.cos(yaw - g.player.yaw));
         g.player.yaw += Math.max(-0.06, Math.min(0.06, gap));
         g.player.pitch = 0;
-        g.Debug.Key("KeyW", distance > 1.22);
+        // The shared bind contact is 1.15 m; keep approaching until actually inside it.
+        // Stopping at 1.22 m made this check depend on the opponent closing the last gap.
+        g.Debug.Key("KeyW", !g.meleeCombat.Active && distance > 1.03);
         if (g.meleeCombat.Active) {
           sawQte = true;
           windowS = g.meleeCombat.qte.active.windowS;
@@ -907,7 +951,7 @@ try {
           ) {
             g.Debug.Mouse(2, true);
             g.Debug.Mouse(2, false);
-          } else if (distance < 1.5 && (sawQte || frame > 180)) {
+          } else if (distance < 1.5 && sawQte) {
             g.Debug.Mouse(0, true);
             g.Debug.Mouse(0, false);
           }
@@ -957,6 +1001,13 @@ try {
       "F opens the actual courtyard door",
     );
     await Route([{x:53,z:38},{x:57,z:38}], "CourtyardOuterCover", {fight:true});
+    const columnFocus=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().column.litters.filter(l=>l.visible&&!l.loaded).sort((a,b)=>Math.hypot(a.x-53,a.z-35)-Math.hypot(b.x-53,b.z-35))[0]);
+    if(columnFocus)await CaptureFocus("CourtyardColumn",columnFocus);
+    assert.ok(!await page.locator("#hud").innerText().then(text=>/担架已通过|通过[：:]?\s*\d+\s*[\/／]/.test(text)),"passage counts stay out of the player HUD");
+    await Route([{x:53,z:35},{x:53,z:32.2},{x:50,z:32.5}],"CourtyardDressings",{fight:true});
+    const dressings=await Interact();assert.equal(dressings.kind,"supply","the courtyard medical post provides real supplies");
+    await page.evaluate(()=>{const g=window.Tengxian;g.Debug.Key("KeyB");g.StepFrames(1,1/60,false);});
+    await Route([{x:53,z:32.2},{x:53,z:38},{x:57,z:38}],"CourtyardWatch",{fight:true});
     await WaitStage("TransferApproach", 360, { fight: true });
     await Route(
       [

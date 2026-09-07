@@ -90,6 +90,7 @@ import { LoadMeleeAnimations, MeleeAnimationsLoaded } from "./Script_MeleeAnimat
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
 import { CarrySystem } from "./Script_Carry.mjs";
+import { PlayerHitboxes, RaycastPlayerHitboxes } from "./Script_PlayerHitbox.mjs";
 import { EmplacementSystem } from "./Script_Emplacement.mjs";
 import { IdentifySystem, IDENTIFY } from "./Script_Identify.mjs";
 import { EditorSuite } from "./Script_Editor.mjs";
@@ -1346,7 +1347,7 @@ async function Boot() {
       state.cutscene = null;
       router?.SetSuppressed(false);
       // 过场里抬着东西的话（第一关接替担架那一段就是），枪该继续收着。
-      if (viewmodel && viewmodel.root) viewmodel.root.visible = !carry?.Blocking && !missionRuntime?.EmptyHands;
+      if (viewmodel && viewmodel.root) viewmodel.root.visible = !carry?.Blocking;
       if (state.running && !state.menu) RequestPointerLock();
     },
     // 过场自带的天空：出川是阴天、长官部是夜里 —— 不能沿用上一关的拂晓。
@@ -2993,7 +2994,10 @@ function ClearRuntime() {
   interact?.Clear();
   // 机枪位同理：它的世界模型也要拆，不然下一关的同一坐标上会多出一挺枪。
   emplacement?.Clear();
-  for (const view of emplacementViews.values()) if (view.root) scene.remove(view.root);
+  for (const view of emplacementViews.values()) {
+    if(view.root)scene.remove(view.root);
+    if(view.heatSmoke!=null)vfx.RemoveSmokeSource(view.heatSmoke);
+  }
   emplacementViews.clear();
   debugEmplacedFire = false;
   carryHidGun = false;
@@ -3067,7 +3071,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   }
 
   // Extra unloading recruits and two children belong only to this test scene.
-  ai.maxAlive=SCALE.maxAlive+(phase.whitebox?.p012?(phase.whitebox.activities.trainColumn?.extraCount||0)+2:0);
+  ai.maxAlive=Math.max(phase.whitebox?.actorCapacity||0,SCALE.maxAlive+(phase.whitebox?.p012?(phase.whitebox.activities.trainColumn?.extraCount||0)+2:0));
   state.phaseTime = 0;
   state.objectiveIndex = 0;
   state.objectiveBlockedReason = null;
@@ -3505,15 +3509,17 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   missionRuntime?.Dispose();
   missionRuntime = phase.whitebox?.fullMission ? new FirstLevelMissionRuntime({
     scene,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,
+    FireVehicleBullet,
     Objective:text=>{state.storyObjective=text;},
     VoiceClock:()=>MANUAL_STEP?null:audio.ctx?.currentTime,
     Inventory:()=>({ammo:state.ammo,clips:state.clips,grenades:state.grenades,bundles:state.bundles,shots:state.playerShots}),
     GiveSupply:({clips=0,grenades=0,bundles=0,bandages=0})=>{state.clips+=clips;state.grenades+=grenades;state.bundles+=bundles;player.bandages+=bandages;state.mags.primary.clips=state.clips;},
-    RestoreRifle:()=>{if(state.activeSlot!=='primary')SwitchSlot('primary');viewmodel.root.visible=!missionRuntime?.EmptyHands;},
+    RestoreRifle:()=>{if(state.activeSlot!=='primary')SwitchSlot('primary');SyncMissionHands();viewmodel.root.visible=!carry?.Blocking;},
     Control:active=>{state.missionControl=active;state.cooking=null;state.cook=0;input.fire=false;input.ads=false;},
     Complete:()=>{Progress.MarkCleared(FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,0);ShowPauseMenu();menu.OpenSandboxComplete();},
   }) : null;
   await missionRuntime?.voiceReady;
+  SyncMissionHands();
   // 靶场撒的是木桩兵，不是战线；同时钉住本关 —— 站遍三个工位不许触发换关结算。
   RegisterGrenadeReturn(interact, combat, player, {
     CanUse: () => !state.cooking && !carry?.Active && !emplacement?.Mounted && !meleeCombat?.Active
@@ -4650,6 +4656,15 @@ function WeaponVariantFor(weaponId, value = 0) {
   return n >= 0 && n < variants.length ? n : 0;
 }
 
+function SyncMissionHands() {
+  if (!missionRuntime || !viewmodel) return;
+  const weaponId = missionRuntime.EmptyHands ? null : currentWeapon;
+  if (viewmodel.weaponId !== weaponId) {
+    viewmodel.Equip(weaponId, weaponId ? SlotWeaponVariant(state.activeSlot) : 0);
+    SyncBayonet();
+  }
+}
+
 /** 换槽。长枪/短枪各记各的弹仓 —— 切回来不该是满的。 */
 function SwitchSlot(slot) {
   if(missionRuntime?.EmptyHands)return false;
@@ -5088,7 +5103,7 @@ function CloseMenu() {
   state.menu = false;
   hudRoot.style.display = "";
   // 回到战场时手上还占着东西的话，枪继续收着（负重的边沿不会重放一次）。
-  if (viewmodel) viewmodel.root.visible = !carry?.Blocking && !missionRuntime?.EmptyHands;
+  if (viewmodel) viewmodel.root.visible = !carry?.Blocking;
   if (!SHOT) document.getElementById("edRoot")?.classList.remove("off");
 }
 
@@ -6045,7 +6060,7 @@ function BulletNearMissBlocked(from,to){
   const hit=battlefield.Raycast(_suppressionFrom,_suppressionDir.multiplyScalar(1/distance),distance,TERRAIN_RAY);
   return !!hit&&hit.t<distance-.01;
 }
-function MarchBullet(from, dir, weapon, targets) {
+function MarchBullet(from, dir, weapon, targets, sourceCollider=null) {
   const nearMisses=new Map();
   const muzzle = AMMO[weapon.ammo]?.muzzle || 700;
   const gravity = 9.8 * (DIFFICULTY.bulletGravity ?? 1);
@@ -6079,6 +6094,7 @@ function MarchBullet(from, dir, weapon, targets) {
         }
         continue;
       }
+      if(s.preciseHitboxes)continue;
       _rel.set(s.position.x - _bulletPos.x,
         s.position.y + HITBOX.centerY - _bulletPos.y,
         s.position.z - _bulletPos.z);
@@ -6093,7 +6109,7 @@ function MarchBullet(from, dir, weapon, targets) {
     }
     // terrain:true —— 子弹要打得中山坡。以前只与碰撞盒求交，打向土坎、河堤、
     // 路基的子弹一律穿过去，弹着点凭空出现在坡的另一边。
-    const wallHit = battlefield.Raycast(_bulletPos, _segDir, segLen, TERRAIN_RAY);
+    const wallHit = battlefield.Raycast(_bulletPos, _segDir, segLen, sourceCollider?{terrain:true,excludeCollider:sourceCollider}:TERRAIN_RAY);
     const solidDistance=Math.min(segLen,bestSoldier?bestT:Infinity,wallHit?.t??Infinity);
     CollectBulletNearMisses(_bulletPos,_segDir,solidDistance,targets,nearMisses);
     if (bestSoldier && (!wallHit || bestT < wallHit.t)) {
@@ -6202,7 +6218,7 @@ function TryFire(dt, returningGrenade = false) {
   const infiniteAmmo = EffectiveInfiniteAmmo();
   // 开镜播完之前不给开枪：ER2 的枪举到位才打得出去，
   // 否则"右键 + 左键一起按"永远比先瞄再打划算，开镜就没有意义了。
-  if (input.ads && player.ads < 0.9) return;
+  if (player.wantAds && player.ads < 0.9) return;
   // 单发模式（仅捷克式）：一次按下只出一发
   if (weapon.rpm && state.fireMode === "semi" && !fireEdge) return;
   // 空仓的分支已经上移到冲刺闸前面（空枪左键 = 白刃那一支）。空膛"咔"的三维
@@ -6370,6 +6386,23 @@ const _empTargets = [];
  */
 const EMPLACED_CONVERGE_M = 160;
 
+function FireVehicleBullet(from,direction,{weaponId="Type11",damageScale=1,sourceCollider=null}={}) {
+  const boxes=PlayerHitboxes(player.position,player.yaw,player.stance);
+  const playerTarget={alive:player.Alive,position:player.position,preciseHitboxes:true,
+    stance:player.stance==="prone"?2:player.stance==="crouch"?1:0,
+    get suppression(){return player.suppression;},
+    set suppression(value){player.Suppress(Math.max(0,value-player.suppression));},
+    actor:{RaycastHitboxes:(from,dir,length)=>RaycastPlayerHitboxes(from,dir,boxes,length)}};
+  const targets=ai.soldiers.filter(s=>s.alive&&s.side==="nra");
+  if(player.Alive)targets.push(playerTarget);
+  const weapon=WEAPONS[weaponId],result=MarchBullet(from,direction,weapon,targets,sourceCollider),end=_hitPoint.clone();
+  vfx.MuzzleFlash(from,direction,{scale:1.1,kind:"hmg"});
+  vfx.Tracer(from,end,{kind:"ija"});audio.PlayGunshot("type92",{position:from,volume:.85});
+  if(result.soldier===playerTarget)player.TakeHit(weapon.damage*damageScale*(COMBAT.player?.bulletScale??.4),result.part,direction,{from,bullet:true});
+  else if(result.soldier){result.soldier.TakeHit(weapon.damage*damageScale,result.part,direction);vfx.Blood(end,direction,.5);}
+  else if(result.wall){const normal=new THREE.Vector3(...result.wall.normal);vfx.Impact(end,normal,SURFACE_BY_TAG[result.wall.box?.tag]||"dirt");}
+  return {hit:result.soldier===playerTarget?"player":result.soldier?.missionId||null,wall:result.wall?.box?.tag||null,end:end.toArray()};
+}
 function FireEmplacedShot(shot) {
   if (!player || !battlefield) return;
   const view=emplacementViews.get(shot.id);
@@ -6421,6 +6454,15 @@ function FireEmplacedShot(shot) {
   // 机枪**每发都出曳光**（与步枪 1/5 是两条账）：满场只有靠它才读得出
   // 压制火力从哪个方向来，这也是「封住两侧院门」看得见的那一半。
   if (shot.tracer) vfx.Tracer(_empFrom, _hitPoint.clone(), { kind: shot.side === "ija" ? "ija" : "nra" });
+  const recoil=gun?.kind.recoil;
+  if(recoil){
+    const heatGain=1+shot.heat*.25;
+    player.ApplyRecoil(THREE.MathUtils.degToRad(recoil.pitchDeg)*heatGain,
+      THREE.MathUtils.degToRad(recoil.yawDeg)*(rnd()-.5)*2,recoil.recoverS,1);
+    firePunch=.48;
+    if(view)view.lastShotAt=state.elapsed;
+    audio.Play("shellDrop",{volume:.32,pan:.4,delay:.16});
+  }
 }
 
 /**
@@ -6436,6 +6478,7 @@ function SyncEmplacementViews() {
   for (const [id, view] of [...emplacementViews]) {
     if (emplacement.Emplacement(id)) continue;
     scene.remove(view.root);
+    if(view.heatSmoke!=null)vfx.RemoveSmokeSource(view.heatSmoke);
     emplacementViews.delete(id);
   }
   for (const gun of emplacement.List()) {
@@ -6462,6 +6505,18 @@ function SyncEmplacementViews() {
     if (!view.root) continue;
     view.root.position.set(gun.position.x, gun.position.y + gun.kind.sightRiseM, gun.position.z);
     view.root.rotation.set(gun.pitch, gun.yaw, 0, "YXZ");
+    const recoil=gun.kind.recoil, age=state.elapsed-(view.lastShotAt??-100);
+    if(recoil && age<recoil.recoverS){
+      const kick=(1-age/recoil.recoverS)**2;
+      view.root.translateZ(kick*recoil.kickM);
+      view.root.rotateX(kick*recoil.kickPitch);
+    }
+    const muzzle=view.nodes?.get("muzzle");
+    if(gun.heat>gun.kind.warnHeat && muzzle){
+      muzzle.getWorldPosition(_empFrom);
+      if(view.heatSmoke==null)view.heatSmoke=vfx.SmokeSource(_empFrom,gun.kind.heatSmoke);
+      else vfx.MoveSmokeSource(view.heatSmoke,_empFrom);
+    }else if(view.heatSmoke!=null){vfx.RemoveSmokeSource(view.heatSmoke);view.heatSmoke=null;}
   }
 }
 
@@ -6748,8 +6803,9 @@ function Frame(dt, render = true) {
   // 负重与架设机枪都要收枪（两只手都占着 / 枪背在背上）。**只在边沿写 visible**：
   // 过场、菜单、倒地镜头三处也在切同一个字段，每帧写会互相盖掉。
   // 抬着东西的人被打死时负重会在同一帧卸掉，不挡住的话枪会在尸体镜头里冒出来。
+  SyncMissionHands();
   const handsBusy = !!carry?.Blocking || !!p012CarryView?.rig.root.visible
-    || !!emplacement?.Blocking || !!p012Runtime?.binocularOwned || !!missionRuntime?.EmptyHands;
+    || !!emplacement?.Blocking || !!p012Runtime?.binocularOwned;
   if (viewmodel?.root && carryHidGun !== handsBusy) {
     carryHidGun = handsBusy;
     if (!state.cutscene && !state.menu && player.Alive) viewmodel.root.visible = !carryHidGun;

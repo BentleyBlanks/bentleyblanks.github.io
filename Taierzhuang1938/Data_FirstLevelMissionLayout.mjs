@@ -23,6 +23,11 @@ function Block(id, x, z, w, h, d, semantic = "structure", extra = {}) {
 function Wall(id, x, z, w, h, d) {
   return Block(id, x, z, w, h, d, "cover", { cover: { faceX: 0, faceZ: -1 } });
 }
+function GroundedWall(id,x,z,w,h,d){
+  const wall=Wall(id,x,z,w,h,d),top=wall.y+wall.h/2;
+  const base=Math.min(...[-1,0,1].flatMap(a=>[-1,0,1].map(b=>SampleMissionTerrain(x+a*w/2,z+b*d/2))))-.1;
+  wall.y=(top+base)/2;wall.h=top-base;return wall;
+}
 function DoorWall(id, x, z, w, h, opening = 3.8) {
   const side = (w - opening) / 2;
   Wall(`${id}Left`, x - (w + opening) / 4, z, side, h, 0.6);
@@ -177,10 +182,10 @@ for (const part of P012_STATION_BLOCKS.filter((block) =>
     { y: part.y },
   );
 }
-for (let z = -196; z < 176; z += 3)
+for (let z = -196; z < MISSION_TRAIN.approachEndZ; z += 3)
   Block("RailSleeper" + z, -77, z, 4.5, 0.12, 0.3, "structure");
 for (const x of [-77.75, -76.25])
-  Block("Rail" + x, x, -10, 0.1, 0.14, 374, "structure", { y: 0.76 });
+  Block("Rail" + x, x, (MISSION_TRAIN.approachEndZ-197)/2, 0.1, 0.14, MISSION_TRAIN.approachEndZ+197, "structure", { y: 0.76 });
 Block("SupplyTable", -68.5, 66, 2, 0.85, 1, "missionRoute");
 Room("UnloadingShed", -58, 85, 9, 9);
 Wall("BrokenStationWall", -68, 55, 9, 1.1, 0.65);
@@ -190,9 +195,13 @@ for (const x of [-25, 0, 15]) {
   Wall(`FrontTraverseCover${x}`, x + 3.6, -119.4, 0.8, 0.65, 2);
 }
 Block("BundleCrate", 13, -118, 1.2, 0.5, 0.8, "missionRoute");
+// A traverse stops the tank from firing lengthwise down the full front trench.
+GroundedWall("FrontTraverseBlastScreen",25.1,-124.5,.7,3.75,5.5);
+GroundedWall("BundleParapet",13,-118.9,5.2,1.65,.7);
+GroundedWall("FlankParapet",23,-112.6,5.4,1.5,.75);
 // The forward weapon belongs to its real gunner; no suspended placeholder mesh.
 // Side protection sits behind the muzzle so the documented firing arc stays usable.
-for (const side of [-1, 1]) Wall(`MachineGunSideCover${side}`, side * 2.8, -126.0, 0.65, 1.8, 1.6);
+for (const side of [-1, 1]) GroundedWall(`MachineGunSideCover${side}`, side * 2.8, -126.7, 0.65, 1.8, 4);
 // The authored ZB-26 minimum is 0.12294 m below its model origin.
 const gunRestTop=SampleMissionTerrain(0,-128)+1.45+.08-.12294;
 const gunRestHeight=gunRestTop-SampleMissionTerrain(0,-128.55);
@@ -302,7 +311,7 @@ for (const wall of blocks.filter(b=>b.semantic==='cover' && b.h<1.21 && b.w>2 &&
     Detail(wall.id+'BagSeam'+i,x,wall.z-.01,.035,wall.h+.018,wall.d+.024,'earthDark');
 }
 // Station telegraph line, water tower and damaged outbuildings establish direction and depth.
-for (let z=-184;z<157;z+=28) {
+for (let z=-184;z<MISSION_TRAIN.approachEndZ;z+=28) {
   Block('TelegraphPole'+z,-86,z,.22,6,.22,'timber');
   Detail('TelegraphCrossarm'+z,-86,z,2.6,.14,.16,'timber',{y:SampleMissionTerrain(-86,z)+5.35});
   for(const side of [-1,1]) Detail('TelegraphWire'+z+side,-86+side*.9,z+14,.018,.018,28,'metal',
@@ -332,6 +341,7 @@ for(const [row,points] of [
   ['East',[-180,-151,-116,-81,-43,-5,36,71,104,142,167].map((z,i)=>({x:125+(i%3)*2,z}))],
   ['West',[-165,-131,-97,-63,-29,6,84,122,151].map((z,i)=>({x:-117-(i%2)*5,z}))],
   ['SouthRoad',[-83,-51,-20,12,43,71].map((z,i)=>({x:18+(i%2)*3,z}))],
+  ['RailApproach',Array.from({length:Math.ceil((MISSION_TRAIN.approachEndZ-175)/24)},(_,i)=>({x:i%2?-109:-47,z:175+i*24}))],
 ]) for(const [i,p] of points.entries()) {
   const id='FieldPoplar'+row+i, ground=SampleMissionTerrain(p.x,p.z),height=6+(i%3)*.7;
   Block(id+'Trunk',p.x,p.z,.28,height*.65,.3,'timber');
@@ -367,6 +377,7 @@ export const MISSION_ANCHORS = Object.freeze({
   train: MISSION_TRAIN.player,
   unload: { x: -66, z: 66 },
   front: { x: 0, z: -124 },
+  orders: { x: -8, z: -102 },
   gun: { x: 0, z: -128 },
   bundle: { x: 13, z: -118 },
   throw: { x: 30, z: -117 },
@@ -453,6 +464,7 @@ export const MISSION_ROUTES = Object.freeze({
     { x: -186, z: -8 },
   ],
 });
+import { FRONT_GUARD_POSTS } from "./Data_FirstLevelMissionFront.mjs";
 export const MISSION_PLACEMENT = Object.freeze({
   stationCasualties: [
     { x: -65, z: 73, yaw: 0.3, health: 0 },
@@ -462,10 +474,10 @@ export const MISSION_PLACEMENT = Object.freeze({
   ],
   squadFrontPositions:[{x:-1.7,z:-129},{x:1.7,z:-128.7},{x:14,z:-129},{x:16,z:-127.5}],
   reliefApproach: [{x:-69,z:106},{x:-71,z:74},{x:-66,z:66},...MISSION_ROUTES.support,{x:6,z:-123}],
-  reliefPositions: Array.from({length:8},(_,i)=>({x:-32+i*3,z:-124})),
+  reliefPositions: [{x:-30,z:-123.4},{x:-26,z:-124.9},{x:-21,z:-122.8},{x:-17,z:-125},{x:-10,z:-124.3},{x:4,z:-123.2},{x:11,z:-125},{x:20,z:-124.6}],
   // First arrivals move furthest down the communication trench; the mouth stays open.
   guardWithdrawalRoutes: Array.from({length:8},(_,i)=>[
-    {x:-28+i*5,z:-148+(i%2)*.7},
+    FRONT_GUARD_POSTS[i],
     {x:-20+i*.45,z:-137+i*.35},
     {x:-20+i*.35,z:-124+i*.2},
     {x:-8,z:-112},
@@ -488,6 +500,8 @@ export const MISSION_PLACEMENT = Object.freeze({
 export const MISSION_SUPPLIES = Object.freeze([
   {id:"Unloading",x:-68.5,z:66,supportHeight:.85},
   {id:"Front",x:-2.2,z:-124,supportHeight:null},
+  {id:"Orders",x:-9.5,z:-102,supportHeight:null},
+  {id:"Courtyard",x:50,z:33.05,supportHeight:null},
   {id:"Transfer",x:93,z:110,supportHeight:1.15},
   {id:"Retreat",x:-53.2,z:82,supportHeight:null},
   {id:"Reception",x:-132.8,z:31,supportHeight:null},
@@ -512,8 +526,8 @@ export const MISSION_LAYOUT = Object.freeze({
   terrain: "P012Heightfield",
   terrainSpec: MISSION_TERRAIN,
   SampleGroundColor: SampleMissionGroundColor,
-  bounds: { minX: -205, maxX: 137, minZ: -202, maxZ: 180 },
-  ground: { x: -34, z: -11, w: 342, d: 382, h: 1, y: -0.5, semantic: "ground" },
+  bounds: { minX: -205, maxX: 137, minZ: -202, maxZ: MISSION_TRAIN.approachEndZ },
+  ground: { x: -34, z: (MISSION_TRAIN.approachEndZ-202)/2, w: 342, d: MISSION_TRAIN.approachEndZ+202, h: 1, y: -0.5, semantic: "ground" },
   semanticColors: {
     foliage: 0x68715f,
     timber: 0x746956,

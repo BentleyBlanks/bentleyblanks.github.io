@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { FRONT_DEFENDERS, FRONT_GUARD_POSTS, FRONT_SHELLS } from "./Data_FirstLevelMissionFront.mjs";
 import {
   MISSION_STAGES,
   MISSION_TUNING as R,
@@ -13,7 +14,7 @@ import {
   MISSION_PLACEMENT as P,
   MISSION_SUPPLIES,
 } from "./Data_FirstLevelMissionLayout.mjs";
-import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
+import { MISSION_TRAIN, MissionTrainMotion } from "./Data_FirstLevelMissionTrain.mjs";
 import { FirstLevelMissionTrain } from "./Script_FirstLevelMissionTrain.mjs";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
 import {
@@ -22,6 +23,7 @@ import {
   MissionRouteLength,
   MissionGuideSpeed, MissionSquadRoute, MissionSquadPace, MissionRouteLookahead,
 } from "./Script_FirstLevelMissionColumn.mjs";
+import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
 import { FirstLevelMissionView } from "./Script_FirstLevelMissionView.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
@@ -85,10 +87,10 @@ export class FirstLevelMissionRuntime {
   Point(point, rise = 0) {
     return new THREE.Vector3(point.x, this.battlefield.GroundHeight(point.x, point.z) + rise, point.z);
   }
-  BlocksSight(from,to) {
+  BlocksSight(from,to,excludeCollider=null) {
     const delta=to.clone().sub(from),distance=delta.length();
     if(distance<.01)return false;
-    const hit=this.battlefield.Raycast(from,delta.multiplyScalar(1/distance),distance,{terrain:true});
+    const hit=this.battlefield.Raycast(from,delta.multiplyScalar(1/distance),distance,{terrain:true,excludeCollider});
     return !!hit && hit.t<distance-.1;
   }
   Record(id, detail) {
@@ -143,8 +145,9 @@ export class FirstLevelMissionRuntime {
     if (id==="TrainFirstShell") {
       if(this.Has("trainFirstShellLaunched"))return;
       this.Record("trainFirstShellLaunched");
-      this.combat.FireShell(new THREE.Vector3(-35,20,40),this.Point({x:-62,z:70}),{
-        flight:1.4,kind:"Shell75",radius:6,damage:0,
+      const target={x:-62,z:A.train.z+this.battlefield.trainOffsetM-R.trainShellLeadM-R.trainCruiseSpeedMps*R.trainFirstShellFlightS};
+      this.combat.FireShell(new THREE.Vector3(-35,20,target.z-30),this.Point(target),{
+        flight:R.trainFirstShellFlightS,kind:"Shell75",radius:6,damage:0,
         OnImpact:()=>{
           this.Record("trainFirstShellImpact");
           this.trainShellStartedAt=this.time;
@@ -242,8 +245,8 @@ export class FirstLevelMissionRuntime {
     actor.scriptSuppressible=true;
     delete actor.scriptMoveSpeedMps;
     actor.manualGoalUntil=Infinity;
-    actor.scriptAccuracyScale = 0.5;
-    actor.scriptFireIntervalScale = 1.5;
+    actor.scriptAccuracyScale = actor.missionAccuracyScale ?? 0.5;
+    actor.scriptFireIntervalScale = actor.missionFireIntervalScale ?? 1.5;
     actor.order = "hold";
     actor.holdZone = { id: "MissionDefense", ...point, radius: 2 };
     actor.goal.set(point.x, 0, point.z);
@@ -251,10 +254,12 @@ export class FirstLevelMissionRuntime {
   Guide(route) {
     this.guideRoute = route;
     for (const actor of this.squad) {
-      const personalRoute = route === MISSION_ROUTES.support ? MissionSquadRoute(route,this.squad.indexOf(actor)) : route;
-      actor.missionNaturalMarch = route === MISSION_ROUTES.support;
-      const queued = this.squadRoutes.get(actor.id) || [];
-      const from = queued.at(-1) || actor.position;
+      const naturalMarch=[MISSION_ROUTES.support,MISSION_ROUTES.south].includes(route);
+      const personalRoute = naturalMarch ? MissionSquadRoute(route,this.squad.indexOf(actor)) : route;
+      actor.missionNaturalMarch = naturalMarch;
+      actor.missionWatch=null;
+      const queued = [];
+      const from = actor.position;
       let index = 0,
         best = Infinity;
       for (let i = 0; i < personalRoute.length; i++) {
@@ -270,13 +275,40 @@ export class FirstLevelMissionRuntime {
         const post=P.squadFrontPositions[this.squad.indexOf(actor)];
         if(post)queued.push({x:post.x,z:-124},{...post});
       }
+      if(!naturalMarch && personalRoute.length>1){
+        const end=personalRoute.at(-1),before=personalRoute.at(-2),dx=end.x-before.x,dz=end.z-before.z,d=Math.hypot(dx,dz)||1,slot=this.squad.indexOf(actor);
+        const lateral=(slot%2?1:-1)*R.squadPostLateralM,back=slot<2?0:R.squadPostRearM;
+        const post={x:end.x+dz/d*lateral-dx/d*back,z:end.z-dx/d*lateral-dz/d*back};
+        if(!this.BlocksSight(this.Point(end,.7),this.Point(post,.7)))queued.push(post);
+      }
       this.squadRoutes.set(actor.id, queued);
     }
+  }
+  WaitWatch(actor, stage) {
+    const slot=this.squad.indexOf(actor);
+    if(!R.squadWatchStages.includes(stage) || actor.target || actor.suppression>.3)return false;
+    let watch=actor.missionWatch;
+    if(!watch || watch.stage!==stage)watch=actor.missionWatch={stage,anchor:{x:actor.position.x,z:actor.position.z},next:this.time+2+slot*1.7,cycle:0};
+    if(watch.goal && this.time-watch.startedAt<R.squadWatchTimeoutS && Distance(actor.position,watch.goal)>R.squadWatchArrivalM){
+      this.ai.SetStance(actor,0,.5,true);this.MoveActor(actor,watch.goal,R.squadWatchSpeedMps);actor.scriptArrivalRadius=R.squadWatchArrivalM;return true;
+    }
+    watch.goal=null;
+    if(this.time<watch.next)return false;
+    watch.next=this.time+R.squadWatchPauseS+slot*.7;watch.cycle++;
+    const angle=(slot*1.73+watch.cycle*2.4),reach=R.squadWatchRadiusM;
+    const point={x:watch.anchor.x+Math.cos(angle)*reach,z:watch.anchor.z+Math.sin(angle)*reach};
+    const from=this.Point(actor.position,.6),to=this.Point(point,.6);
+    if(Math.abs(from.y-to.y)<.25 && !this.BlocksSight(from,to) &&
+      ![this.player,...this.squad.filter(s=>s!==actor),...this.column.litters.filter(l=>l.visible)].some(s=>Distance(s.position||s,point)<1.1)){
+      watch.goal=point;watch.startedAt=this.time;this.MoveActor(actor,point,R.squadWatchSpeedMps);actor.scriptArrivalRadius=R.squadWatchArrivalM;return true;
+    }
+    return false;
   }
   UpdateSquad() {
     const stage = this.flow.stage.id;
     if (["Train", "Unloading"].includes(stage) && !this.Has("trainStopped")) return;
     for (const actor of [...this.squad, this.trainWounded].filter(Boolean)) {
+      InstallMissionSentry(actor);
       if (!actor.missionTrainReady) continue;
       if (actor === this.trainWounded) {
         this.ai.SetStance(actor, 1, Infinity, true);
@@ -304,7 +336,7 @@ export class FirstLevelMissionRuntime {
             (previous.position.z - actor.position.z) * (route[0].z - actor.position.z) >
             0;
         const yielding = ahead && Distance(previous.position, actor.position) < R.squadSpacingM;
-        let speed=MissionGuideSpeed(actor.position,this.player.position,route[0],actor.missionNaturalMarch?false:yielding);
+        let speed=MissionGuideSpeed(actor.position,this.player.position,route[0],actor.missionNaturalMarch?false:yielding,route);
         if(actor.missionNaturalMarch){
           const p=actor.position,dx=route[0].x-p.x,dz=route[0].z-p.z,d=Math.hypot(dx,dz)||1;
           let gap=Infinity;
@@ -319,7 +351,7 @@ export class FirstLevelMissionRuntime {
         }
         this.MoveActor(actor,route[0],speed);
       } else if (!["Rescue", "Death"].includes(stage)) {
-        this.Defend(actor, actor.position);
+        if(!this.WaitWatch(actor,stage))this.Defend(actor, actor.position);
         if(["Support","MachineGun","Tank"].includes(stage))this.ai.SetStance(actor,1,2);
       }
       if (actor.suppression > 0.65 && stage !== "Train") this.ai.SetStance(actor, 1, 1, true);
@@ -335,14 +367,15 @@ export class FirstLevelMissionRuntime {
         bayonetFixed: !!spec.bayonet,
       });
       if (!actor) continue;
-      actor.missionId = spec.id;
+      actor.missionId = spec.id;InstallMissionSentry(actor);
+      if(["village","melee"].includes(id)){actor.missionDormant=true;actor.scriptedNoncombatant=true;}
       if (MISSION_TACTICS[spec.id]) actor.missionTactic = { index: 0, elapsed: 0, hold: 0,
         movingSeconds: 0, distance: 0, last: { x: spec.x, z: spec.z }, shelter: {x:spec.x,z:spec.z}, mode: "cover" };
       if(spec.id.startsWith("Flank")||["front","tank"].includes(id))actor.scriptedNoncombatant=true;
       actor.missionFrontStandby=["front","tank"].includes(id)&&!spec.id.startsWith("Flank");
       if(actor.missionFrontStandby)this.ai.SetStance(actor,1,4+actor.id%3,true);
-      actor.scriptAccuracyScale = 0.5;
-      actor.scriptFireIntervalScale = 1.45;
+      actor.scriptAccuracyScale = actor.missionAccuracyScale = ["front","approach"].includes(id)?R.frontAccuracyScale:.5;
+      actor.scriptFireIntervalScale = actor.missionFireIntervalScale = ["front","approach"].includes(id)?R.frontFireIntervalScale:1.45;
       actor.scriptArrivalRadius = 0.7;
       actor.manualGoalUntil = Infinity;
       actor.order = "hold";
@@ -476,7 +509,7 @@ export class FirstLevelMissionRuntime {
         emplacement: this.emplacement,
         gunId: this.gunId,
         carry: this.carry,
-        Available: () => ["Support", "MachineGun", "Tank"].includes(this.flow.stage.id),
+        Available: () => ["MachineGun", "Tank"].includes(this.flow.stage.id),
         reachM: 3,
         facingDot: null,
       }),
@@ -512,7 +545,16 @@ export class FirstLevelMissionRuntime {
         });
         if (this.forwardGunner) this.Defend(this.forwardGunner, A.forwardNest);
         this.SpawnEncounter("front");
+        this.SpawnEncounter("approach");
         this.SpawnEncounter("tank");
+        this.SpawnEncounter("village");
+        this.SpawnEncounter("melee");
+        this.frontDefenders=FRONT_DEFENDERS.map(spec=>{
+          const actor=this.ai.Spawn("nra",spec.x,spec.z,{weapon:spec.weapon,squadId:"MissionFrontDefense"});
+          if(actor){InstallMissionSentry(actor);actor.missionId=spec.id;this.Defend(actor,spec);this.ai.SetStance(actor,spec.stance,Infinity,true);
+            actor.scriptAccuracyScale=R.defenderAccuracyScale;actor.scriptFireIntervalScale=R.defenderFireIntervalScale;}
+          return actor;
+        }).filter(Boolean);
         this.SpawnGuards();
         this.tank.present=true;
         break;
@@ -520,13 +562,13 @@ export class FirstLevelMissionRuntime {
         this.tank.active = true;
         this.SpawnEncounter("tank");
         this.SpawnGuards();
-        for (const [i, actor] of this.squad.entries()) this.Defend(actor, { x: -20 + i * 6, z: -124 });
+        for (const [i, actor] of this.squad.entries()) this.Defend(actor, P.squadFrontPositions[i]);
         break;
       case "Tank":
         this.Guide([...MISSION_ROUTES.bundle]);
         break;
       case "Orders":
-        this.Guide([...MISSION_ROUTES.bundle].reverse().concat([A.front]));
+        this.Guide([...MISSION_ROUTES.bundle].reverse().concat([{x:-8,z:-112},A.orders]));
         this.column.Activate();
         this.column.zhou.health = 65;
         this.column.zhou.state = "waiting";
@@ -646,12 +688,13 @@ export class FirstLevelMissionRuntime {
   SpawnGuards() {
     if(this.guards.length)return;
     for (let i = 0; i < R.guardCount; i++) {
-      const actor = this.ai.Spawn("nra", -28 + i * 5, -148 + (i % 2) * .7, {
+      const post=FRONT_GUARD_POSTS[i];
+      const actor = this.ai.Spawn("nra", post.x, post.z, {
         weapon: "HanYang",
         squadId: "MissionWithdrawingGuard",
       });
       if (actor) {
-        this.Defend(actor,actor.position);
+        InstallMissionSentry(actor);this.Defend(actor,actor.position);
         actor.scriptedNoncombatant=true;
         this.ai.SetStance(actor,1,4+i*.35,true);
         this.guards.push({
@@ -810,7 +853,18 @@ export class FirstLevelMissionRuntime {
     }
   }
   UpdateFront() {
+    for(const actor of this.enemies.values())if(["South","Village"].includes(this.flow.stage.id) && actor.missionId!=="MeleeTutor" && actor.missionDormant && Distance(actor.position,this.player.position)<55){
+      actor.missionDormant=false;actor.scriptedNoncombatant=false;
+    }
     if(!["Support","MachineGun","Tank","Orders"].includes(this.flow.stage.id))return;
+    if(this.flow.stage.id==="Support")for(const [i,shell] of FRONT_SHELLS.entries()){
+      const fact="approachShell"+i;
+      if(!this.Has(fact)&&this.Near(shell.trigger,10)){
+        this.Record(fact);
+        this.combat.FireShell(this.Point({x:shell.impact.x+45,z:shell.impact.z-45},32),this.Point(shell.impact),
+          {kind:"Shell75",flight:1.8,radius:6,damage:70});
+      }
+    }
     if(!this.Has("frontBattleStarted")&&this.Near(A.front,R.frontEngageDistanceM)){
       this.Record("frontBattleStarted");
       for(const actor of this.enemies.values())if(actor.missionFrontStandby){actor.scriptedNoncombatant=false;actor.missionFrontStandby=false;}
@@ -824,27 +878,54 @@ export class FirstLevelMissionRuntime {
       if(this.tankDust!=null){this.vfx.RemoveSmokeSource(this.tankDust);this.tankDust=null;}
       return;
     }
+    const muzzle=this.view.TankMuzzle(tank);
+    const candidates=[this.player,...this.squad,...(this.frontDefenders||[]),...this.guards.map(g=>g.actor)]
+      .filter(actor=>(actor.Alive??actor.alive)&&Distance(actor.position,tank)<100);
+    const visible=candidates.find(actor=>!this.BlocksSight(muzzle,actor===this.player?actor.EyePosition:actor.position.clone().add(new THREE.Vector3(0,1,0)),this.view.tankCollider));
+    if(visible){
+      const targetId=visible===this.player?"player":visible.missionId||visible.id;
+      if(tank.targetId!==targetId){tank.targetAcquiredAt=this.time;tank.mgAim=null;}
+      tank.lastSeen={x:visible.position.x,z:visible.position.z};tank.lastSeenAt=this.time;tank.targetId=targetId;
+      const desired=visible===this.player?this.player.EyePosition.clone().add(new THREE.Vector3(0,-.2,0)):
+        visible.position.clone().add(new THREE.Vector3(0,visible.stance===2?.3:.95,0));
+      tank.mgAim ||= {x:desired.x,y:desired.y,z:desired.z};
+      const blend=1-Math.exp(-this.delta/R.tankMgTrackingS);
+      for(const axis of ["x","y","z"])tank.mgAim[axis]+=(desired[axis]-tank.mgAim[axis])*blend;
+    }
+    const tracked=tank.lastSeen && this.time-(tank.lastSeenAt||0)<R.tankTargetMemoryS?tank.lastSeen:null;
     tank.advanceTime = (tank.advanceTime || 0) + this.delta;
     const cycle = R.tankAdvanceSeconds + R.tankFiringHaltSeconds;
-    tank.moving = !tank.immobilized && tank.z < R.tankStopZ && tank.advanceTime % cycle < R.tankAdvanceSeconds;
-    if (tank.moving) tank.z = Math.min(R.tankStopZ, tank.z + this.delta * R.tankSpeedMps);
+    const advanceZ=this.Has("forwardNestDestroyed")?R.tankStopZ:R.tankFirstFireZ;
+    tank.moving = !tank.immobilized && tank.z < advanceZ && tank.advanceTime % cycle < R.tankAdvanceSeconds;
+    if (tank.moving){
+      const destination={x:Clamp((tracked?.x??12)+24,R.tankPursuitBounds.minX,R.tankPursuitBounds.maxX),z:advanceZ};
+      tank.moveYaw=Math.atan2(tank.x-destination.x,tank.z-destination.z);
+      const distance=Distance(tank,destination),step=Math.min(1,this.delta*R.tankSpeedMps/(distance||1));
+      tank.x+=(destination.x-tank.x)*step;tank.z+=(destination.z-tank.z)*step;
+    }
     if(tank.moving){
       const point=this.Point({x:tank.x,z:tank.z-2},.2);
       if(this.tankDust==null)this.tankDust=this.vfx.SmokeSource(point,R.tankDust);
       else this.vfx.MoveSmokeSource(this.tankDust,point);
     }else if(this.tankDust!=null){this.vfx.RemoveSmokeSource(this.tankDust);this.tankDust=null;}
+    if(this.flow.stage.id==="Support" && !this.Has("frontRifleDefense"))return;
     const targets = P.tankTargets;
-    const target = targets[tank.shots % targets.length];
+    const target = !this.Has("forwardNestDestroyed")?A.forwardNest:tracked||targets[tank.shots % targets.length];
+    const hullTarget=tank.moving?tank.moveYaw:Math.atan2(tank.x-target.x,tank.z-target.z);
+    tank.hullYaw??=Math.PI;
+    if(!tank.immobilized)tank.hullYaw+=Clamp(Math.atan2(Math.sin(hullTarget-tank.hullYaw),Math.cos(hullTarget-tank.hullYaw)),-this.delta*R.tankHullTurnRad,this.delta*R.tankHullTurnRad);
     const desiredYaw=Math.atan2(tank.x-target.x,tank.z-target.z);
     const yawGap=Math.atan2(Math.sin(desiredYaw-tank.turretYaw),Math.cos(desiredYaw-tank.turretYaw));
-    tank.turretYaw+=Clamp(yawGap,-this.delta*.65,this.delta*.65);
-    if (this.time-tank.lastShell>R.tankShellIntervalS && Math.abs(yawGap)<.06) {
+    tank.turretYaw+=Clamp(yawGap,-this.delta*R.tankTurretSpeedRad,this.delta*R.tankTurretSpeedRad);
+    if (Distance(tank,target)>=R.tankCannonMinRangeM && this.time-tank.lastShell>R.tankShellIntervalS && Math.abs(yawGap)<.06) {
       tank.lastShell = this.time;
       tank.shots++;
       const from = this.view.TankMuzzle(tank);
       this.vfx.MuzzleFlash(from,this.Point(target).sub(from).normalize(),{scale:2,kind:"hmg"});
-      this.combat.FireShell(from, this.Point(target), {
-        flight: 1.1,
+      const aim=this.Has("forwardNestDestroyed")?{x:target.x+Math.sin(tank.shots*2.399)*R.tankShellScatterM,z:target.z+Math.cos(tank.shots*1.79)*R.tankShellScatterM}:{x:target.x,z:target.z+R.tankNestAimOffsetZ};
+      const impactTarget=this.Point(aim,this.Has("forwardNestDestroyed")?0:R.tankNestAimRiseM);
+      this.combat.FireShell(from, impactTarget, {
+        flight: Math.max(.06,from.distanceTo(impactTarget)/R.tankShellSpeedMps),
         kind: "Shell57",
         sourceCollider: this.view.tankCollider,
         radius: 5,
@@ -855,33 +936,35 @@ export class FirstLevelMissionRuntime {
             crater:!!crater&&crater.id==="Shell57"&&Math.hypot(crater.x-position.x,crater.z-position.z)<.01,
             revision:crater?.revision||0});
           if(tank.impacts.length>8)tank.impacts.shift();
-          this.player.Suppress(0.7);
-          for (const actor of this.squad) this.ai.SetStance(actor, 2, 2, true);
-          if (!this.Has("forwardNestDestroyed")) {
+          for (const actor of this.squad)if(Distance(actor.position,position)<12)this.ai.SetStance(actor,2,2,true);
+          if (!this.Has("forwardNestDestroyed") && Distance(position,A.forwardNest)<6) {
             this.Record("forwardNestDestroyed");
-            if (this.forwardGunner?.alive)
-              this.forwardGunner.TakeHit(160, "torso", new THREE.Vector3(-1, 0, 0));
             this.Say("TankTerror");
           }
         },
       });
     }
-    if (this.time - tank.lastMg > R.tankMachineGunIntervalS) {
-      tank.lastMg = this.time;
-      const from = this.view.TankMuzzle(tank,"mgMuzzle"),
-        target = this.Point({ x: -20 + (this.time % 40), z: -129 }, 0.45);
-      this.vfx.Tracer(from, target, { kind: "ija" });
-      this.audio.Play("type92", { position: from, volume: 0.6 });
-      const ray = this.player.EyePosition.clone().sub(from),
-        distance = ray.length(),
-        hit = this.battlefield.Raycast(from, ray.normalize(), distance);
-      if (!hit || hit.t >= distance - 0.4) {
-        this.player.Suppress(0.18);
-        if (this.player.stance === "stand" && Distance(this.player.position, target) < 4.5)
-          this.player.TakeHit(4, "torso", ray, { from });
+    if(!this.Has("forwardNestDestroyed"))return;
+    const mgYaw=visible?Math.atan2(tank.x-visible.position.x,tank.z-visible.position.z):tank.hullYaw;
+    const burst=tank.advanceTime%(R.tankMgBurstSeconds+R.tankMgRestSeconds)<R.tankMgBurstSeconds;
+    if(visible && this.time-tank.targetAcquiredAt>=R.tankMgAcquireS && burst && Math.abs(Math.atan2(Math.sin(mgYaw-tank.hullYaw),Math.cos(mgYaw-tank.hullYaw)))<R.tankHullMgArcRad && this.time-tank.lastMg>R.tankMachineGunIntervalS){
+      tank.lastMg=this.time;
+      const from=this.view.TankMuzzle(tank,"mgMuzzle");
+      const aim=new THREE.Vector3(tank.mgAim.x,tank.mgAim.y,tank.mgAim.z);
+      const phase=tank.advanceTime%(R.tankMgBurstSeconds+R.tankMgRestSeconds)/R.tankMgBurstSeconds;
+      const sweep=(1-Math.min(1,phase))*R.tankMgSweepM;
+      aim.x+=Math.cos(tank.hullYaw)*sweep;aim.z-=Math.sin(tank.hullYaw)*sweep;
+      const n=(tank.mgShots||0)+1,spread=R.tankMgSpreadM;
+      aim.x+=Math.sin(n*2.399)*spread;aim.y+=Math.cos(n*1.79)*spread*.45;
+      const direction=aim.sub(from).normalize();
+      const elevation=Math.asin(direction.y);
+      if(elevation>=-R.tankMgDownRad&&elevation<=R.tankMgUpRad){
+        tank.mgShots=n;
+        tank.lastMgShot=this.FireVehicleBullet(from,direction,{weaponId:"Type11",damageScale:R.tankMgDamageScale,sourceCollider:this.view.tankCollider});
       }
     }
   }
+
   BeginCarry() {
     const zhou = this.column.zhou;
     const ok = this.carry.Begin("stretcher", {
@@ -1132,12 +1215,8 @@ export class FirstLevelMissionRuntime {
       }
     }
     if (["Train", "Unloading"].includes(stage)) {
-      const end = this.trainShellStartedAt == null ? Infinity : this.trainShellStartedAt + R.trainBrakeSeconds;
-      const ratio = Clamp((this.time - (this.trainShellStartedAt || 0)) / R.trainBrakeSeconds, 0, 1);
-      const offset =
-        this.trainShellStartedAt == null
-          ? R.trainTravelM * Math.exp(-this.time / R.trainApproachDecayS)
-          : this.shellTrainOffset * (1 - ratio) ** 2;
+      const motion = MissionTrainMotion(this.time, this.trainShellStartedAt, this.shellTrainOffset);
+      const offset = motion.offsetM;
       const before = this.battlefield.trainOffsetM,
         delta = offset - before;
       const aboard = this.battlefield.TrainContains(this.player.position);
@@ -1150,7 +1229,7 @@ export class FirstLevelMissionRuntime {
         this.train.Translate(delta);
         if (aboard) this.player.SyncCamera(0);
       }
-      if (this.time >= end && !this.Has("trainStopped")) {
+      if (motion.stopped && !this.Has("trainStopped")) {
         this.Record("trainStopped");
         this.trainStoppedAt = this.time;
         for (let i = 0; i < 3; i++) this.battlefield.OpenGate(`TrainDoor${i}`);
@@ -1159,6 +1238,9 @@ export class FirstLevelMissionRuntime {
     }
     if (stage === "Support" && this.Near(A.front, 18)) {
       this.Record("frontReached");
+      this.frontArrivalAt ??= this.time;
+      if(this.time-this.frontArrivalAt>=R.frontRifleDefenseSeconds &&
+        (this.Inventory().shots>0 || this.squad.some(actor=>actor.fireSequence>0)))this.Record("frontRifleDefense");
       this.SpawnEncounter("front");
       this.tank.active = true;
       if ([...this.enemies.values()].some((actor) => actor.lastFire > 0) || this.Inventory().shots > 0)
@@ -1181,6 +1263,7 @@ export class FirstLevelMissionRuntime {
       this.lastTankHint=Math.floor(t / 10);
       this.hud.Hint(this.Inventory().bundles>0?T("firstLevel.hint.bundle"):T("firstLevel.hint.bundleEmpty"),5);
     }
+    if(stage==="Orders" && this.Near(A.orders,8))this.Record("ordersReached");
     if (stage === "South") {
       if (t > R.southVehiclesAtS) this.Say("SouthVehicles");
       if (t > R.southHopeAtS) this.Say("SouthHope");
@@ -1339,7 +1422,7 @@ export class FirstLevelMissionRuntime {
     }
     if (stage === "Exit" && this.Near(A.end, 5)) this.Record("playerAtHandoff");
     this.column.Update(dt, { moving, routeSafe: safe, maxProgress, player: this.player.position, ...(safeAt ? {SafeAt:safeAt} : {}) });
-    this.view.Update(this.time, { tank: this.tank });
+    this.view.Update(this.time, { tank: this.tank,player:this.player });
     this.view.UpdateNavigation(this.CurrentGuide(),this.player);
     this.flow.Update(dt);
   }
@@ -1415,6 +1498,7 @@ export class FirstLevelMissionRuntime {
       tank: { ...this.tank },
       playerExplosions: this.playerExplosions || [],
       column: this.column.State(),
+      people:this.view.people.State(),aftermathCount:this.view.aftermath.count,aftermathTriangles:this.view.aftermath.triangles,
       train: this.train?.State(),
       relief: this.relief?.map(entry=>({id:entry.actor.id,alive:entry.actor.alive,arrived:entry.arrived,distance:entry.distance,index:entry.index,x:entry.actor.position.x,z:entry.actor.position.z})) || [],
       voice: this.voice.State(),

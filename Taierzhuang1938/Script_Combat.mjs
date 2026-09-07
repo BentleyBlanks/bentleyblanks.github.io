@@ -548,7 +548,7 @@ export class CombatSystem {
       const toEye = this.tmpB.subVectors(eye, from);
       const eyeDist = toEye.length();
       toEye.divideScalar(eyeDist || 1);
-      const wall = eyeDist > BLAST.wallMarginM ? bf.Raycast(from, toEye, eyeDist) : null;
+      const wall = eyeDist > BLAST.wallMarginM ? bf.Raycast(from, toEye, eyeDist, {terrain:true}) : null;
       shaken.shake.Explosion(eyeDist, radius * BLAST.radiusScale, !!(wall && wall.t < eyeDist - BLAST.wallMarginM));
     }
 
@@ -557,7 +557,7 @@ export class CombatSystem {
       const dist = rel.length();
       if (dist > radius * BLAST.radiusScale) return;
       const dir = this.tmpB.copy(rel).divideScalar(dist || 1);
-      const hit = bf.Raycast(from, dir, dist);
+      const hit = bf.Raycast(from, dir, dist, {terrain:true});
       if (hit && hit.t < dist - BLAST.wallMarginM) return;   // 有墙挡着
       const falloff = Clamp01(1 - dist / (radius * BLAST.radiusScale));
       apply(damage * falloff * falloff, dir, falloff);
