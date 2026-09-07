@@ -349,7 +349,13 @@ async function ShootGroup(group) {
   if (group.shots.length > 1) console.log(`--- ${group.query}（${group.shots.length} 张同页连拍）---`);
   try {
     await page.goto(url, { waitUntil: "load", timeout: 90000 });
-    await page.waitForFunction((g) => window[g] !== undefined, group.globalName, { timeout: 90000 });
+    // 开机等 5 分钟而不是 90 秒：2026-09 八个渲染子系统合流之后，正片的着色器预热
+    // （提交 program → 重编场景光照 → 预热材质，见 §16）在 high/medium 上实测
+    // 约 145 s（`?shot=1&phase=2&quality=high&scale=medium&ads=1` 实测 160 s 到
+    // window.Taierzhuang）—— program 数没多少，是每一份变大了（POM 16 步 / 三级 PCSS /
+    // 簇光循环 / GTAO 升采样）。这里只是把闸抬到真实耗时之上，开机耗时本身是
+    // 遗留项（它的回归口在 Script_BootStallTest / Script_BootTest）。
+    await page.waitForFunction((g) => window[g] !== undefined, group.globalName, { timeout: 300000 });
     // 先让加载/烘焙走完，再推进固定帧数把时序相关效果（火焰闪烁、运动模糊历史）稳住
     // 先推逻辑帧把战场跑活（AI 铺开、粒子起来），再让 rAF 真渲染若干帧。
     // 推逻辑帧 != 推渲染帧：镜头缓动、材质淡出、光照换挡全在渲染侧。
