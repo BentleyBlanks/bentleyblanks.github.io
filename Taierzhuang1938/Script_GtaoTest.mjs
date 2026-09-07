@@ -139,7 +139,10 @@ try {
       halfFloat: aoTarget.textures[0].type === THREE.HalfFloatType,
       size: [aoTarget.width, aoTarget.height],
       mainSize: [post.width, post.height],
-      ssilIsSecond: post.SsilTexture === aoTarget.textures[1],
+      // GTAO pass 自己那张才是第二附件；材质端的 post.SsilTexture 自 2026-09 集成期
+      // 起可能是接触阴影合成的那一张（SSIL rgb + 接触阴影 alpha，采样器预算）。
+      ssilIsSecond: post.gtaoPass.SsilTexture === aoTarget.textures[1],
+      ssilCombined: post.SsilTexture !== post.gtaoPass.SsilTexture,
       tier: { ...post.gtaoPass.tier },
       ssilEnabled: post.gtaoPass.ssilEnabled,
     };
@@ -348,7 +351,10 @@ try {
       post.SetSsilEnabled(false);
       Settle(12);
       out.ssilOff = {
-        textureIs1x1: post.SsilTexture.image?.width === 1 && post.SsilTexture.image?.height === 1,
+        // 同上：问 GTAO pass 自己那张。材质端那张在接触阴影开着时是合成靶，
+        // 它的 rgb 就是这张 1×1 全黑采出来的 —— 效果一样。
+        textureIs1x1: post.gtaoPass.SsilTexture.image?.width === 1
+          && post.gtaoPass.SsilTexture.image?.height === 1,
         attachments: post.targets.aoBlur.textures.length,
         aoStillWorks: (() => {
           const target = post.targets.aoBlur;

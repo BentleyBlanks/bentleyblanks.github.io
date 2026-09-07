@@ -56,6 +56,7 @@
 import * as THREE from "three";
 import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_PostCommon.mjs";
 import { SUN_SHADOW_GLSL, BindSunShadowUniforms } from "./Script_Light.mjs";
+import { CSM_RAW_DEPTH } from "./Script_Csm.mjs";
 import { SKY_PRESETS } from "./Script_Sky.mjs";
 import {
   VOLUMETRIC_GRIDS, MakeVolumetricParams, MAX_FOG_VOLUMES, MAX_VOLUMETRIC_LIGHTS,
@@ -1203,7 +1204,10 @@ export class VolumetricsPass {
     const rt = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: true });
     rt.texture.colorSpace = THREE.NoColorSpace;
     rt.depthTexture = new THREE.DepthTexture(1, 1);
-    rt.depthTexture.compareFunction = THREE.LessEqualCompare;
+    // 采样器类型必须与 `Script_Csm.SHADOW_MAP_TYPE` 一致：级联走 BasicShadowMap
+    // （裸深度、plain sampler2D），这时**不能**留 compareFunction —— 带比较函数的
+    // 深度纹理绑到 sampler2D 上是未定义行为（多数驱动整片返回 0，见坑表）。
+    if (!CSM_RAW_DEPTH) rt.depthTexture.compareFunction = THREE.LessEqualCompare;
     const previous = renderer.getRenderTarget();
     renderer.setRenderTarget(rt);
     renderer.clear(true, true, false);
@@ -1220,8 +1224,15 @@ export class VolumetricsPass {
     // 阴影框每帧都在滚（跟玩家 + 吸附纹素），矩阵必须现取 —— 只接一次的话
     // 走两步之后光柱与建筑就错开了。
     this.sunShadowRig?.SyncShadowUniforms?.();
-    if (!this.uniformsInject.uSunShadowMap.value) {
-      this.uniformsInject.uSunShadowMap.value = this._EnsureShadowFallback(ctx.renderer);
+    // 2026-09 级联落地之后 `uSunShadowMap` 是一个**采样器数组**（逐级一张），
+    // 所以「绑没绑上」要逐项看 —— 直接 `!value` 判一个数组永远是 false，
+    // 兜底就再也不会生效了（那正是这段代码存在的理由）。
+    const shadowMaps = this.uniformsInject.uSunShadowMap.value;
+    const shadowMapsArray = Array.isArray(shadowMaps);
+    if (!(shadowMapsArray ? shadowMaps.some(Boolean) : shadowMaps)) {
+      const fallback = this._EnsureShadowFallback(ctx.renderer);
+      if (shadowMapsArray) shadowMaps.fill(fallback);
+      else this.uniformsInject.uSunShadowMap.value = fallback;
       this.uniformsInject.uSunShadowEnabled.value = 0;
     }
     ctx.blitter.Blit(this.materialInject, write);

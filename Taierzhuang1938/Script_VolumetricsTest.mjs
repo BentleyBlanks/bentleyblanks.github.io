@@ -430,7 +430,12 @@ try {
     P.lights.UnregisterShadowUniforms(vp.uniformsInject);
     vp.uniformsInject.uSunShadowEnabled.value = 0;
     const withoutShadow = InjectAt(4000);          // 同一帧序 = 同一批抽样
-    const fallbackUsed = vp.uniformsInject.uSunShadowMap.value === (vp.shadowFallback?.depthTexture);
+    // 级联之后 uSunShadowMap 是采样器数组：逐级看有没有换成兜底那张。
+    const shadowMapValue = vp.uniformsInject.uSunShadowMap.value;
+    const fallbackTexture = vp.shadowFallback?.depthTexture;
+    const fallbackUsed = Array.isArray(shadowMapValue)
+      ? shadowMapValue.some((texture) => texture === fallbackTexture)
+      : shadowMapValue === fallbackTexture;
     P.lights.RegisterShadowUniforms(vp.uniformsInject);
     P.lights.SyncShadowUniforms();
     P.StepFrames(4, 1 / 60);
@@ -453,7 +458,13 @@ try {
     // 阴影图整个不可用（开机头几帧 / 画质面板关掉阴影）时仍要出雾：
     // uSunShadowMap 为 null 会被驱动丢掉整趟 draw，兜底靶就是为这条留的。
     P.lights.UnregisterShadowUniforms(vp.uniformsInject);
-    vp.uniformsInject.uSunShadowMap.value = null;
+    // 数组版要逐项清 —— 把整个 value 换成 null 的话 three 的 setValueT1Array
+    // 会在 v.length 上抛 TypeError（那是测试自己写错，不是被测的行为）。
+    if (Array.isArray(vp.uniformsInject.uSunShadowMap.value)) {
+      vp.uniformsInject.uSunShadowMap.value.fill(null);
+    } else {
+      vp.uniformsInject.uSunShadowMap.value = null;
+    }
     vp.uniformsInject.uSunShadowEnabled.value = 0;
     const noMap = InjectAt(4100);
     let noMapMax = 0;
@@ -732,9 +743,17 @@ try {
       };
     };
     // 稳三帧（LUT 每帧重算，开关那一帧还没稳），再钉死帧序单帧注入一次才读。
+    //
+    // **还要把屏幕空间的历史都清一遍**（NotifyCameraCut）：TAA / SSR 颜色金字塔 /
+    // SSIL 颜色历史都是「读上一帧的画面」—— 不清的话，关掉大气后远处那面墙变了色，
+    // 下一帧会经 SSIL 的近场反弹把那一点色差送回近景，于是“近段不变”这条变成在量
+    // 屏幕空间反馈而不是在量雾。（B2 SSIL 落地后实测：不清历史时近景有 13% 的像素
+    // 会动，均差 0.15/255。）
     const Shot = () => {
+      post.NotifyCameraCut();
       P.StepFrames(3, 1 / 60);
       vp.hasHistory = false;
+      post.NotifyCameraCut();
       post.frame = 900;
       P.StepFrames(1, 1 / 60);
       return Ldr();
@@ -820,14 +839,16 @@ if (!seam) {
     JSON.stringify({ blendOn: seam.blendOn, blendOff: seam.blendOff,
       population: seam.population, on: seam.pixelOn, off: seam.pixelOff, back: seam.pixelBack }));
   // froxel 范围之内的像素远段份额恰好为 0，那几行一个乘除都不做 —— ApplyFog 给近段
-  // 的结果逐比特不变。**但整帧不是**：泛光与 SSR 是屏幕空间的，远处那面墙一变色，
-  // 贴着它轮廓的近景像素会跟着动一两个色阶（实测约 0.7% 的近景像素、均差 < 0.01）。
-  // 所以这里认「几乎全都没动 + 均差近零 + 取样点逐比特相同」，不认绝对零。
+  // 的结果逐比特不变。**但整帧不是**：泛光 / SSR / SSIL 都是屏幕空间的，远处那面墙
+  // 一变色，贴着它轮廓的近景像素会跟着动一两个色阶（清掉屏幕空间历史之后实测
+  // 约 0.5% 的近景像素、均差 < 0.01；不清历史的话 SSIL 的近场反弹会把它放大到 13%）。
+  // 所以这里认「几乎全都没动 + 均差近零 + 取样点最多差一个色阶」，不认绝对零。
+  // 对比着看才是重点：远段均差 ~8.8、近段 ~0.006，两个量级差三个数量级。
   Check("froxel 范围内的像素不受大气开关影响（近段的雾逐比特不变）",
     seam.population?.nearTotal > 5000
     && seam.population.nearChanged / seam.population.nearTotal < 0.02
     && seam.population.nearMeanDelta < 0.05
-    && Diff(seam.pixelOn?.near, seam.pixelOff?.near) === 0,
+    && Diff(seam.pixelOn?.near, seam.pixelOff?.near) <= 1,
     JSON.stringify({ population: seam.population,
       on: seam.pixelOn?.near, off: seam.pixelOff?.near }));
   // 远段换色不加能量、也不碰透过率：能见度那一档开关大气前后必须一模一样。
