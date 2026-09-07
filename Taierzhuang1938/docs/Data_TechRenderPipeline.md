@@ -2096,6 +2096,13 @@ Update/UpdateClusters/GetEffectLightState/GetClusterLightData`）归本节。
   不写越界。
 * 管状光是**代表点法**（Karis 2013）：高光形状会略短，漫反射几乎无差别。
   矩形面光没做（本关没有会亮的大平面）。
+* **探针体 GI 只看得见灯池里那几盏**（`Script_Gi.MAX_FIRES = 6`，与
+  `EFFECT_LIGHT_COUNT` 对齐）。簇里第 7 盏往后的火不参与间接光反弹，只有直接光。
+  要接就是把 `Script_Gi` 的 `uFirePos/uFireColor` 数组接到
+  `GetClusterLightData()` 上 —— 那是 GI 那一路的活。
+* **过场道具灯仍是三方 `PointLight`**（`Script_Cutscene._MakeProp` 的 `spec.light`）。
+  它们进出场景照旧会翻 `NUM_POINT_LIGHTS`、照旧重编译一次；这是 2026-09 之前就有的
+  行为，簇状光照没让它变好也没让它变坏。改法是让那条路也走 `lights.AddFire`。
 
 ### 17.10 成本（RTX 4070 SUPER / ANGLE-D3D11，探针街景）
 
