@@ -477,6 +477,9 @@ scene.add(sky.mesh);
 // 水面借天空 uniform：反射的天顶/地平线/太阳色随时段预设一起换（Script_Water）
 SetWaterSkyUniforms(sky.uniforms);
 const lights = new LightRig(scene, { quality: QUALITY, shadowExtent: 66 });
+// 太阳阴影的公共采样接口（Script_Light.SUN_SHADOW_GLSL）：Debug Rendering 的
+// 「SunShadow 采样」视图靠它出图，将来体积雾 / 接触阴影 / CSM 也从这条接口取。
+post.SetSunShadowSource(lights);
 // 天空 uniform 借给探针体：漏空的射线问的是同一片天，换预设两边同时变。
 // let 不是 const：默认关不构造，运行时打开由 ApplyGraphics 惰性补建。
 let gi = (GI_ON && graphics.gi)

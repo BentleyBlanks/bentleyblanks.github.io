@@ -46,7 +46,391 @@ function generateShadowMapTypeDefine( parameters ) {
 
 ---
 
-## 1. 帧结构总览
+## 1. 帧图与模块契约（2026-09 重构）
+
+> **这一节是渲染侧唯一的接入说明。** 后续所有子系统（CSM/接触阴影、GTAO+SSIL、SSR、
+> froxel 体积雾、物理大气、曝光/镜头/LUT、TAAU/运动模糊/DoF、材质升级、簇状多光源）
+> 按这里定的契约接入。下面的 §1A 起是设计期草案与专题深挖，**现状以本节为准**。
+>
+> 本轮重构对画面**逐比特无损**：`Script_Post.mjs` 从一坨 1891 行拆成编排器 + 九个
+> 模块，GLSL 一个算式没改。回归证据见本节末「怎么验」。
+
+### 1.1 模块清单
+
+| 模块 | 职责 | 对外的东西 |
+|---|---|---|
+| `Script_Post.mjs` | **编排器**。持有有序 pass 列表、具名靶、运行时状态（TAA 开关/历史、调试视图、着色模式）。所有旧的公共 API 都还在这里。 | `PostPipeline`、`MarkNoPrepass`、`MarkForegroundPrepass`、`MarkDynamicPrepass`、`InjectDepthPull`、`FOREGROUND_VIEW_DEPTH`、`SHADING_MODES`、`POST_QUALITY_KEYS` |
+| `Script_PostCommon.mjs` | 地基：全屏 blit、`GLSL_COMMON`、靶工厂、瞬时靶池、`FrameContext`、pass 契约文档 | `Blitter`、`RenderTargetPool`、`FrameContext`、`MakeRenderTarget`、`MakeFullscreenMaterial`、`QUAD_GEOMETRY/CAMERA`、`VERT_QUAD`、`GLSL_COMMON`、`GLSL_VIEW_POS` |
+| `Script_PostPrepass.mjs` | 深度法线预通道（MRT）+ 速度缓冲 + HZB + 蒙皮上一帧骨矩阵 | `PrepassPass`、`MarkNoPrepass`、`MarkForegroundPrepass`、`MarkDynamicPrepass`、`FOREGROUND_VIEW_DEPTH` |
+| `Script_PostSsao.mjs` | SSAO（半分辨率 + 双边模糊）。**GTAO 落地时整个替换这个模块** | `SsaoPass` |
+| `Script_PostTaa.mjs` | TAA（UE 缺省方案）+ 子像素抖动的上/卸 | `TaaPass`、`TAA_JITTER`、`TAA_SAMPLES`、`TAA_CURRENT_FRAME_WEIGHT` |
+| `Script_PostBloom.mjs` | 亮部提取 + 多级降/升采样；太阳拖影 | `BloomPass`、`GodRaysPass` |
+| `Script_PostComposite.mjs` | 合成（分段函数，见 §1.9） | `CompositePass` |
+| `Script_PostFxaa.mjs` | FXAA + 锐化 → 屏幕（调试视图时让位给 DebugPass） | `FxaaPass` |
+| `Script_PostDebug.mjs` | 中间靶展示 pass、线框着色模式、调试叠加层、SunShadow 验证图 | `DebugPass`、`InjectDepthPull`、`SHADING_MODES`、`WIRE_BACKGROUND_PURE` |
+| `Script_MaterialPatches.mjs` | 材质补丁注册表 + 现役三路补丁（AO / GI / 破口） | `MakePatch`、`ApplyPatches`、`PatchKeysOf`、`MakeSsaoPatch`、`MakeGiPatch`、`MakeDestructionPatch`、`IndirectLightingPatches` |
+| `Data_Tuning_Graphics.mjs` | 画质档位表（纯数据，零 three 依赖） | `QUALITY_PRESETS`、`POST_QUALITY_KEYS`、`MakeQualityPreset`、`HZB`、`VELOCITY` |
+| `Script_Light.mjs` | 太阳阴影的公共采样接口（新增） | `SUN_SHADOW_GLSL`、`BindSunShadowUniforms`、`LightRig.RegisterShadowUniforms/SyncShadowUniforms` |
+
+### 1.2 帧图（有序 pass 列表，`PostPipeline.passes`）
+
+```
+ 0  （不是 pass）TaaPass.ApplyJitter —— Halton(2,3) 子像素抖动写进 projectionMatrix
+ 1  prepass       MRT：RT0 法线+线性视深 / RT1 屏幕空间速度 / DepthTexture
+ 2  hzb           RT0.w 的 max-reduce 金字塔（SSR / 体积雾 / 接触阴影共用）
+ 3  ssao          半分辨率半球采样 + 双边模糊 → rtAoBlur
+ 4  main          HDR 主场景（AO 由材质补丁注入间接光；ultra 才 4×MSAA）
+ 5  wireframe     着色模式非 shaded 时叠一层三角形边线
+ 6  debugOverlay  Rapier 碰撞体线框等（同一张 hdr 靶与深度）
+ 7  taa           时域解算（先卸抖动）→ 线性 HDR 域，UE 的位置
+ 8  godPrepare    只做决策不出画：太阳在不在屏内、拖影强度
+ 9  bloom         亮部提取 → 13 抽样降采样 ×N → 9 抽样 tent 升采样
+10  god           屏幕空间太阳拖影（出厂关，`graphics.godEnabled`）
+11  composite     运动模糊→景深→+泛光/拖影→雾→曝光→ACES→调色→镜头→sRGB
+12  fxaa          FXAA + 锐化 → 屏幕（调试视图时改为把选中的中间靶送屏）
+```
+
+编排器对每个 pass 依次做：`Prepare?.(ctx)` → `Enabled(ctx)` → `GpuPush(name)` →
+`Render(ctx)` → `GpuPop()`。`Enabled` 为 false 的 pass **不产生 GPU 分段**
+（剖析器里就看不到它，这是有意的：没跑的东西不该占一行）。
+
+### 1.3 pass 接口
+
+```js
+{
+  name: "ssr",                 // GPU 分段名；Script_Profiler 按它归账
+  Prepare(ctx) {},             // 可选。在 GPU 段之外先算好本帧参数（决策、矩阵）
+  Enabled(ctx) { return ctx.preset.ssr; },
+  Resize(width, height) {},    // SetSize 时建/重建自己的靶；旧靶自己 dispose
+  Render(ctx) {},              // 出画
+  Dispose() {},                // 材质与靶一起还
+}
+```
+
+约定：
+
+* **靶归 pass 自己所有**。要让老代码/测试也能按名字拿到，在 `Resize` 里写
+  `pipeline.targets.<名字> = rt`（`pipeline.targets` 跨 `SetSize` 是同一个对象，
+  不会被整体重建，所以 `delete` 语义也稳）。
+* 需要**跨帧**留内容的靶（TAA 历史、GI 图集）自己持有；只在本帧中转的用
+  `ctx.pool.Rent(name, w, h, options)`，`SetSize` 会整池作废。
+* `Render` 里**不许**碰别的 pass 的 uniform；要什么就往 `FrameContext` 上加字段
+  并在 §1.4 登记。
+
+### 1.4 FrameContext 字段表（`ctx`）
+
+矩阵**一律是无抖动的那一份**：TAA 的子像素抖动只在预通道与主场景两趟生效，
+速度、运动模糊、太阳投影拿到的必须是干净矩阵。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `renderer` / `scene` / `camera` | three 对象 | 本帧三件套 |
+| `pipeline` | PostPipeline | 要 `targets` / `preset` / 别的 pass 时用 |
+| `preset` | object | `Data_Tuning_Graphics` 那一档的**运行时副本**（面板与测试会改它） |
+| `targets` | object | 具名靶：`normalDepth` / `hdr` / `ao` / `aoTmp` / `aoBlur` / `bright` / `god` / `ldr` / `taaA` / `taaB` |
+| `pool` | RenderTargetPool | 瞬时靶 |
+| `blitter` | Blitter | `ctx.blitter.Blit(material, target)`（target=null 即屏幕） |
+| `profiler` | FrameProfiler \| null | 一般不用碰，编排器已经按 pass 包好了 |
+| `options` | object | `Render()` 的第三参，原样透传 |
+| `frame` | number | 帧序号。**所有确定性噪声的种子**，不许用 `Math.random` |
+| `width` / `height` / `resolution` | number / Vector2 | 主靶尺寸 |
+| `jitterX` / `jitterY` | number | 本帧 TAA 抖动（像素） |
+| `taaActive` | boolean | 本帧 TAA 是否真的在跑 |
+| `projScale` | Vector2 | `(1/tan(fov/2)/aspect, 1/tan(fov/2))` |
+| `view` / `projection` / `viewProjection` | Matrix4 | 本帧**无抖动** |
+| `prevViewProjection` | Matrix4 | 上一帧无抖动（`hasPrev=false` 时无意义） |
+| `invView` / `invProjection` | Matrix4 | `camera.matrixWorld` / 投影逆 |
+| `hasPrev` | boolean | 上一帧矩阵可用 |
+| `sceneColor` | RenderTarget | 当前「场景颜色」靶。TAA 跑完会换成解算靶 —— **下游一律读它，别读 `targets.hdr`** |
+| `normalDepthTexture` | Texture | RT0 |
+| `velocityTexture` | Texture \| null | RT1 |
+| `sceneDepthTexture` | DepthTexture | 预通道的深度 |
+| `hzb` | object \| null | 见 §1.6 |
+| `sunDirection` / `sunColor` / `exposure` | Vector3 / number | 本帧太阳与曝光 |
+| `godActive` / `godStrength` / `sunUv` / `sunNdc` | — | `godPrepare` 写，bloom 与 god 读 |
+
+`FrameContext.Begin()` 里有一条容易踩的账：**它会先 `camera.updateMatrixWorld()`**。
+三方是在 `renderer.render()` 里做这件事的，而现在整帧只在 Begin 读一次矩阵；不先更新
+的话 `invView` / `viewProjection` 会整体落后一帧，症状是速度缓冲恒为 0、雾按上一帧的
+相机位置算。回归口：`Script_PostFrameGraphTest` 的「相机右移时街面像素速度 x 为负」。
+
+### 1.5 渲染靶命名与格式
+
+| 名字 | 尺寸 | 格式 | 谁建 | 备注 |
+|---|---|---|---|---|
+| `normalDepth` | 全分辨率 | **MRT**：RT0 RGBA16F、RT1 RG16F，+ `DepthTexture(UnsignedInt)` | PrepassPass | `minFilter=Nearest / magFilter=Linear`（这一对是历史口径，改了 SSAO 读数就变） |
+| `hdr` | 全分辨率 | RGBA16F（ultra 4×MSAA） | 编排器 | 主场景。**别往 MSAA 靶上挂 DepthTexture** |
+| `ao` / `aoTmp` / `aoBlur` | `aoScale ×` | RGBA8 | SsaoPass | R=遮蔽量、G=线性视深（双边模糊要） |
+| `bright` | 1/2 | RGBA16F | BloomPass | alpha 在拖影开着时打包天空遮挡 |
+| `bloomMips[]` | 逐级折半 ×2 | RGBA16F | BloomPass | 每级两张（降采样结果 + tent 回叠） |
+| `god` | 1/4，封顶 9.6 万像素 | RGBA16F | GodRaysPass | |
+| `ldr` | 全分辨率 | RGBA8 | CompositePass | 合成输出，FXAA 的输入 |
+| `taaA` / `taaB` | 全分辨率 | RGBA16F | TaaPass | 只在 `taaEnabled` 时存在（热切会建/还） |
+| HZB `levels[i]` | 1/2 起逐级折半 | RGBA16F（四通道同值） | PrepassPass | 见 §1.6 |
+
+**所有中间靶 `texture.colorSpace = NoColorSpace`**：three 渲进 RenderTarget 时不做
+sRGB 编码，最后一趟必须自己手写（Composite 的 `EncodeOutput`）。
+
+#### MRT 的硬约束（本轮实测得出，改预通道之前必读）
+
+**WebGL2 里「有一个 enabled 的 draw buffer 却没有对应的片元着色器输出」是
+`INVALID_OPERATION`，那一次 draw 被驱动整个丢掉。** 实测（RTX 4070 SUPER / ANGLE-D3D11，
+`Script_PostFrameGraphTest` 里留了回归口）：
+
+| 靶 | 材质 | `getError()` |
+|---|---|---|
+| 单靶 | 一输出（three 内置材质） | 0 |
+| MRT ×2（RG16F 或 RGBA16F 都一样） | 一输出 | **1282 INVALID_OPERATION** |
+| MRT ×2 | 两输出（`layout(location=0/1)`） | 0 |
+
+后果：**`allowOverride === false` 的对象必须整只藏出预通道**。它们用的是自己的
+一输出材质（天空穹、水面、粒子、烟、编辑器线框），换不成覆盖材质，留在这一趟里
+只会每帧刷 GL 错误，而且那些 draw 本来也被驱动丢掉了。`PrepassPass._CollectSkipped`
+现在按这条收人。
+
+**这是本轮重构唯一一处刻意的行为变化。** 重构前它们**是**被画进 `rtNormalDepth` 的，
+写进去的 xyz 是自己的光照颜色（当法线用是纯垃圾）、w 是不透明度 —— 水面那种
+`depthWrite=false` 的半透明大面会把 w 写成 0~1，下游一律误判成「一米内有实体」。
+所以这一改同时修掉了一条老账（旧 §1A 的抬头里本来就写着这是个坑，只是当时
+只对「铺满全屏的东西」要求补 `skipNormalDepth`）。谁要往预通道里加东西，规矩是：
+**要么能吃覆盖材质（`allowOverride` 保持 true），要么就不在这一趟里。**
+
+### 1.6 速度缓冲（RT1）与 HZB
+
+**速度口径**
+
+* 单位 **uv**（本帧 uv − 上一帧 uv），不是像素；消费方自己乘分辨率。
+* 用**无抖动**的两帧 `viewProjection` 算 —— 拿 `gl_Position` 算的话 TAA 的 ±0.5 像素
+  抖动会整个漏进速度里。
+* 单帧钳在 `Data_Tuning_Graphics.VELOCITY.clampUv`（0.25 uv）。
+* 第一帧、前景件（`uForegroundDepth > 0`，即第一人称手与枪）一律写 0；天空整只
+  `skipNormalDepth` 藏出预通道，那里留的是 clear 值 0。
+
+**逐物体速度做到哪一步（已知近似，别当 bug 修）**
+
+| 对象 | 速度 | 怎么做的 |
+|---|---|---|
+| 静态几何 | 相机速度（精确） | prevWorld = curWorld |
+| **蒙皮人物（SkinnedMesh）** | **逐骨骼（精确）** | `skeleton.boneTexture` 换成**高度翻倍**的图：上半是本帧骨矩阵（three 每帧自己写），下半是上一帧的副本（`PrepassPass._SnapshotSkeletons` 在 Render 末尾 `copyWithin`）。取样端 `GetPrevBoneMatrix(i)` = three 的 `getBoneMatrix(i)` 把纹素下标 +`size*size`。**零逐 draw 成本** —— `boneTexture` 本来就是 three 逐 draw 塞的 |
+| InstancedMesh / BatchedMesh | **只有相机速度（近似）** | 实例矩阵当不变。`Script_ActorBatch` 的远景人群、流送的布设件每帧改写 `instanceMatrix`，所以它们在 RT1 里是「静止物体」。要修得给每只实例网格再挂一份上一帧 `instanceMatrix`（显存翻倍 + 每帧多一次上传） |
+| 非蒙皮刚体运动件（大车、列车、载具、碎块） | **只有相机速度（近似）** | 接线点是 `uPrevModelMatrix` + `MarkDynamicPrepass(object)`；**当前没有消费方**。它逐 draw 置 `material.uniformsNeedUpdate = true`，会把整份 uniform（含 24 组破口数组）重传一遍，几十只以内不值一提，成百上千会撞「CPU 提交是瓶颈」那条红线 |
+
+主 pass 读到的骨骼纹理**逐纹素不变**（宽度没动，`getBoneMatrix(i)` 对
+`i < size²/4` 落点完全一样），所以换成翻倍纹理对画面零影响。显存与上传：一具 50 骨的
+骨骼从 16×16 RGBA32F（4 KB）变成 16×32（8 KB）；本关 69 名士兵满编约 0.55 MB/帧上传。
+
+**TAA 与运动模糊本阶段仍走深度反投影**（只有相机运动）。切换到速度靶的接线点已经
+留好：`TaaPass` 的 `uVelocity` + `uUseVelocityBuffer`（置 1 即切换），Composite 的
+`MotionBlur()` 段注释里写了改哪三行。切换要连着重新标定邻域裁剪与 `velocityPx/40`
+那条曲线，属于 TAAU 那一轮。
+
+**HZB**
+
+```js
+ctx.hzb = {
+  source,     // 全分辨率那一级 = RT0 的 w 通道（不另存）
+  texture,    // = levels[0]，半分辨率
+  levels: [Texture, ...],   // 每级一张独立 RT（不是一张纹理的多个 mip）
+  sizes: [[w, h], ...],
+  mipCount,
+  size: [w, h],             // levels[0] 的尺寸
+};
+```
+
+max-reduce：每级取 2×2 的**最大**线性视深；天空（RT0.w ≤ 0）按 `camera.far` 记。
+级数与最小边长在 `Data_Tuning_Graphics.HZB`。格式是 RGBA16F 而不是 R16F —— 
+`readRenderTargetPixels` 只保证 RGBA + UnsignedByte/HalfFloat/Float 可读，
+「测得动」优先；SSR 落地时若带宽吃紧再换并同步改回归口。
+
+#### 本轮新增的 GPU 成本（实测）
+
+RTX 4070 SUPER / ANGLE-D3D11，3394×1348 / high / phase=2，运行时剖析器逐段中位数
+（约 395 帧）。**重构前后同机同参各跑一遍**：
+
+| GPU 段 | 重构前 | 重构后 | Δ |
+|---|---:|---:|---:|
+| prepass | 2.634 ms | 2.882 ms | **+0.25**（MRT 第二附件 RG16F + DepthTexture） |
+| hzb | — | 0.042 ms | **+0.04**（8 级 max-reduce） |
+| ssao | 0.437 | 0.425 | −0.01 |
+| taa | 0.428 | 0.426 | 0.00 |
+| bloom | 0.082 | 0.081 | 0.00 |
+| composite | 0.281 | 0.197 | −0.08 |
+| fxaa | 0.055 | 0.054 | 0.00 |
+| main / shadow | 6.09 / 1.71 | 6.66 / 1.90 | 场景状态噪声（AI 与烟火不跨进程复现） |
+
+**可归因的新增成本 ≈ 0.29 ms/帧**；`ssao / taa / bloom / composite / fxaa` 逐段持平，
+说明「拆模块」本身不花钱。CPU 提交侧 `FrameProfileTest` 的 baseline 行两版各两轮：
+submit 15.30/14.70 → 15.60/14.40 ms（噪声以内，没变），draw call 839/833 → 846/841
+（+7，就是 HZB 那条链的 blit）。
+
+### 1.7 太阳阴影的公共采样接口
+
+```js
+import { SUN_SHADOW_GLSL, BindSunShadowUniforms } from "./Script_Light.mjs";
+
+const uniforms = { /* 自己的 */ };
+BindSunShadowUniforms(uniforms, lightRig);   // 建条目 + 登记 + 立刻同步一次
+const frag = `...${SUN_SHADOW_GLSL}...
+  void main() { float v = SunShadowVisibility(worldPos, worldNormal); }`;
+// 每帧（阴影框在滚）调一次：
+lightRig.SyncShadowUniforms();
+```
+
+GLSL 侧签名：`float SunShadowVisibility(vec3 worldPos, vec3 worldNormal)` ——
+1.0 = 完全照到，0.0 = 完全被挡，**阴影框外返回 1.0**（不是 0：66 m 外没有阴影信息，
+返回 0 会让整个远景死黑）。内部与 three 的 `SHADOWMAP_TYPE_PCF` 同一套：
+world-space normal offset + Vogel 5 抽样盘 + 交错梯度噪声旋转 + `shadow.intensity`。
+
+uniform 组：`uSunShadowMap`（**必须 `highp sampler2DShadow`**）、`uSunShadowMatrix`、
+`uSunShadowMapSize`、`uSunShadowBias`、`uSunShadowNormalBias`、`uSunShadowRadius`、
+`uSunShadowIntensity`、`uSunShadowEnabled`。
+
+**现在它指向唯一那张 66 m 跟随框阴影图。CSM 代理在这个接口后面换成级联，调用方一个字
+都不用改。** 所以：别在自己的 pass 里直接采 `sun.shadow.map`，也别自己写一遍矩阵与
+bias —— 那样级联落地时要改的地方就散在八个文件里。
+
+最小验证：Debug Rendering 面板「光照」组的 **SunShadow 采样**（`?` 面板里选，或
+`post.SetDebugView("sunShadow")`）。`Script_PostFrameGraphTest` 断言它「有黑有白」。
+
+### 1.8 材质补丁注册表
+
+three 一个材质只有一个 `onBeforeCompile`，谁后写谁把前面的整个覆盖掉且不报错。
+所以往 `MeshStandardMaterial` 插 GLSL 一律走注册表：
+
+```js
+import { MakePatch, ApplyPatches } from "./Script_MaterialPatches.mjs";
+
+const ssrPatch = MakePatch({
+  key: () => `ssr${mode}`,                       // 运行时会翻的位写成函数（**每次编译现读**）
+  uniforms: (shaderUniforms) => { shaderUniforms.uSsr = ssr.map; },
+  vertex:   [["#include <common>", `varying vec3 vFoo;`]],
+  fragment: [["#include <lights_fragment_end>", `...`]],
+  defines:  { USE_SSR: "" },
+});
+ApplyPatches(material, [...IndirectLightingPatches({ ssao, gi, destruction }), ssrPatch]);
+```
+
+* 锚点一律**追加在 chunk 之后**；多个补丁挂同一个锚点按注册顺序拼接。
+* `customProgramCacheKey` = 各补丁 key 拼接。**改了代码不改 key = 两种档位共用同一份
+  编译缓存**（现役三态：`ssao1` / `ssao1|gi1` / `ssao1|gi2`）。
+* 现役顺序固定 **AO → GI → 破口**：`<aomap_fragment>` 上同时挂着 AO 的乘法与 GI 的
+  光照分量取证，AO 先压、取证后抓，面板读到的才是正式画面的值。
+* `Script_Materials.InjectIndirectLighting` 只是这套的薄封装，外部签名没变；
+  `MaterialLibrary.Get/Plain/Static/ConfigureExternalPbr` 与 `ActorFactory` 那条路
+  全部经它，行为不变。
+
+**锚点表**（three r185 的 chunk 名；每个锚点处能拿到什么）
+
+| 锚点 | 着色器 | 那里有什么 |
+|---|---|---|
+| `#include <common>` | 顶点 / 片元 | 只能放 uniform / varying / 函数声明 |
+| `#include <project_vertex>` | 顶点 | `transformed`（局部，已过形变/蒙皮）、`mvPosition`、`gl_Position`、`modelMatrix`、`batchingMatrix`/`instanceMatrix`（按宏）。算世界坐标在这儿 |
+| `#include <color_fragment>` | 片元 | `diffuseColor`（rgb = BaseColor×顶点色，a = 不透明度） |
+| `#include <roughnessmap_fragment>` | 片元 | `roughnessFactor` |
+| `#include <metalnessmap_fragment>` | 片元 | `metalnessFactor` |
+| `#include <lights_fragment_begin>` | 片元 | `geometryNormal`（**视空间**）、`geometryViewDir`、`geometryPosition`、`material`、`vDirectionalShadowCoord[]`、`getShadow()` |
+| `#include <lights_fragment_maps>` | 片元 | `iblIrradiance`（= π×辐射亮度）、`radiance`、`irradiance`。**替换天空 IBL 在这儿** |
+| `#include <aomap_fragment>` | 片元 | `reflectedLight.*` 全部累加完、`aoMap` 已乘。**SSAO 实际压间接光的位置** |
+| `#include <lights_fragment_end>` | 片元 | 最后一次能改 `reflectedLight` |
+| `#include <clipping_planes_fragment>` | 片元 | 最早能 `discard`（破口裁切用它） |
+| `#include <dithering_fragment>` | 片元 | `gl_FragColor` 已成型。整帧覆盖输出（调试假彩色）用它 |
+
+「屏幕空间输入」的公共声明块在 `MakeSsaoPatch` 的 `<common>` 段：`uSsaoMap` /
+`uSsaoResolution` / `uSsaoStrength`，外加 `#define uScreenResolution uSsaoResolution`
+（`Script_Main` 喂的是**主渲染靶**尺寸而不是 AO 靶尺寸 —— 这条踩过两轮）。
+low 档没有 ssao，那些补丁要自带一份分辨率 uniform。
+
+### 1.9 Composite 的分段
+
+`FRAG_COMPOSITE` 拆成七段，每段一个函数 + 一组 uniform + 一个 `SEGMENT` 锚点注释。
+**只替换自己那一段，不要往 `main()` 里插代码。**
+
+```
+SEGMENT motion-blur      MotionBlur()            ← 逐物体速度 / 分块最大速度代理
+SEGMENT depth-of-field   DepthOfField()          ← 光圈形状 / 前后景分离代理
+SEGMENT fog              ApplyFog()              ← froxel 体积雾 / 物理大气代理
+SEGMENT exposure         ApplyExposureTonemap()  ← 自动曝光 / AgX / 别的 tonemap
+SEGMENT color-grade      ColorGrade()            ← 3D LUT 代理
+SEGMENT lens             LensEffects()           ← 镜头光晕 / 脏污 / 暗角
+SEGMENT encode           EncodeOutput()          ← 输出色彩空间 / 抖动
+```
+
+两个**已经在、但还没有生产者**的接口：
+
+* **曝光** `uExposure`（float）× `uExposureTex`（1×1 靶，出厂纯白 = 精确 1.0）。
+  自动曝光落地时往那张 1×1 写增益即可，手调偏移仍走 `uExposure`。
+* **雾** `uFogScatter`（全分辨率，rgb = 沿视线累积的散射色，a = 透过率）+
+  `uFogSource`（0 = 用内联的解析式高度雾自算，1 = 读那张图）。体积雾 / 大气代理
+  产出这张图并把 `uFogSource` 置 1 即可；下面那三次 mix（去饱和、降对比、上色）
+  是**大气透视的口径**，两条路共用。
+
+色差的通道偏移**融在 `MotionBlur()` 的同一趟圆盘采样里**（分开就要再来一趟全分辨率
+取样），语义上归 `LensEffects`。
+
+### 1.10 Data_Tuning_Graphics 结构
+
+纯数据、零 three 依赖（契约 2）。`QUALITY_PRESETS[low|medium|high|ultra]` 每档是一张
+平表，键分三类：
+
+* **现役开关/旋钮**：`ssao` `aoScale` `bloomLevels` `godrays` `msaa` `motionBlur`
+  `sharpen` `taa` `velocity` `hzb`；
+* **占位位**（本阶段值 = 「等价于今天」）：`csm` `contactShadows` `gtao` `ssil` `ssr`
+  `volumetrics` `atmosphere` `autoExposure` `lensFlare` `lut` `dof` `taaUpscale`
+  `clusteredLights`；
+* 另有两组独立常量：`HZB`（`maxLevels` / `minSize`）、`VELOCITY`（`clampUv` /
+  `skinnedPrev`）。
+
+`Script_Post` / `Script_Main` / `Script_EditorSettings` **只读**这张表。
+子系统落地时把自己那一位改成实际档位，并在表里补出处注释。
+
+### 1.11 怎么新增一个 pass / 一个材质补丁
+
+**加一个 pass**（三步，不动别人）：
+
+1. 新建 `Script_Post<Name>.mjs`，导出一个实现 §1.3 契约的类；靶在 `Resize` 里建，
+   要按名字对外就写 `pipeline.targets.<名字>`。
+2. `Data_Tuning_Graphics` 里给四档各加一位开关（占位位已经预留了常见的几个）。
+3. `Script_Post.mjs` 的 `this.passes` 里**插一行**，位置按帧图语义决定
+   （问自己：它要读谁的输出？谁要读它的输出？）。
+
+然后：`index.html` import map 登记新模块 `?v=1`、改过的模块戳 +1；
+`Script_PostFrameGraphTest` 里给自己的接口补一条读回像素的断言。
+**展示类 pass 必须读回像素验证** —— GLSL ES 3.00 保留字（`sample` / `filter` /
+`input` / `output` / `patch` / `resource` / `active` / `common` / `partition`）
+编译失败时 three 只在控制台留一行，那一趟什么都不画。
+
+**加一个材质补丁**：写 `MakePatch({...})`（§1.8），加进
+`Script_MaterialPatches.IndirectLightingPatches` 的返回数组（或调用方自己的列表），
+key 带上会在运行时翻的位。
+
+### 1.12 怎么验（本轮的回归口）
+
+```bash
+node Taierzhuang1938/Script_PostFrameGraphTest.mjs   # 帧图契约（新增）
+node Taierzhuang1938/Script_PostTest.mjs             # 合成暗部 + TAA 基本盘
+node Taierzhuang1938/Script_GiTest.mjs               # GI 三态与调试视图
+node Taierzhuang1938/Script_EditorTest.mjs           # Debug Rendering 全部视图
+node Taierzhuang1938/Script_ActorDepthTest.mjs       # 蒙皮人物写进预通道
+node Taierzhuang1938/Script_ProfilerTest.mjs         # GPU 分段名（prepass/main/composite/fxaa）
+node Taierzhuang1938/Script_FrameProfileTest.mjs     # 整帧 CPU/GPU 消融
+```
+
+逐比特无损的证据留法：把探针页的时间与帧序全部钉死
+（`Probe.state.elapsed = 0; Probe.post.frame = 0; hasTaaHistory = hasPrev = false;`
+再 `StepFrames(N, 1/60)`），然后 `readRenderTargetPixels` 读 `post.targets.ldr`。
+**这样跨进程逐比特可复现**；而走 `Script_ShotTest` 出图的路子有 `waitForTimeout`
+里的自由 rAF，跨进程本底噪声就有 1–2 的通道均差（实测同版本两轮：Probe_Materials
+最大差 37、均差 1.19；正片镜头因为有 AI 与烟火，均差到 2.3），只能判「结构有没有变」。
+
+---
+
+## 1A. 帧结构总览（历史稿：2026-09 之前的设计期草案）
+
+> **现状以 §1「帧图与模块契约」为准。** 这一节留着是因为下面几节（§2–§16）
+> 的深挖仍然有效，而它们引用的是这张老帧图。两者的差别：TAA 实际跑在 tonemap
+> 之前的线性 HDR 域（不是 sRGB 之后）、体积雾与 CSM 仍未实装、速度缓冲
+> 2026-09 才真的产出。
+
 
 ```
 [-] GiProbes      : 半实时辐照度探针体，5 个 draw call 更新十几个探针（见 §12）
@@ -1285,6 +1669,8 @@ baseline 11.1 ms vs 无 GI 8.4 ms，差 ~2.7 ms，且 CPU 分项里 `gi=0.00` �
 - Bloom 必须在 tonemap **之前**。放到 ACES 之后，超亮部早被压到 1.0，阈值提取不出任何东西，只能靠把阈值降到 0.6 来“伪造”泛光，结果整屏发奶白。同理 SSAO 必须在材质里注入间接光，不能在 Composite 里乘最终颜色。
 - `Scene.overrideMaterial` 在 r165+ 加了 `material.allowOverride === true` 闸门（module 18102），默认 true —— 意味着 **Sprite / Points / 粒子也会被 override**，几何属性对不上，预通道里蹦出糊在原点的方块，SSAO 直接乱掉。给所有贴片/粒子材质设 `allowOverride = false`，或用 `Layers` 隔离。
 - 预通道覆盖材质忘记 `#include <batching_pars_vertex>` / `<skinning_*>` / `<morph*>` → `InstancedMesh` 的瓦砾全部塌回原点、骨骼角色变成 T-pose 剪影，SSAO 和运动模糊跟着一起废。用 three 的 chunk 拼顶点着色器，别自己写 `projectionMatrix * modelViewMatrix * position`。
+- 【2026-09 实测】**MRT 打开之后，任何「一输出」的材质都不能再进那一趟**。WebGL2 里「有一个 enabled 的 draw buffer 却没有对应的片元着色器输出」是 `INVALID_OPERATION`，驱动把那次 draw 整个丢掉 —— 画面上表现为「某些东西突然不写深度了」，而 `renderer.info` 一切正常。对照实验（RTX 4070 SUPER / ANGLE-D3D11）：单靶+一输出 → 0；MRT(2)+一输出 → 1282（RG16F 与 RGBA16F 都一样）；MRT(2)+两输出 → 0。所以 `allowOverride === false` 的对象（天空穹 / 水面 / 粒子 / 烟 / 编辑器线框）现在由 `PrepassPass._CollectSkipped` 整只藏出预通道。回归口：`Script_PostFrameGraphTest` 的「外来一输出材质被藏出 MRT 预通道且不刷 GL 错误」。
+- 【2026-09 实测】整帧只在一处读相机矩阵（`FrameContext.Begin`）的话，**必须先自己调一次 `camera.updateMatrixWorld()`** —— 三方是在 `renderer.render()` 里做这件事的。不先更新，`invView` / `viewProjection` 会整体落后一帧：速度缓冲恒为 0、运动模糊少一帧、雾按上一帧的相机位置算，而画面看上去「差不多对」。回归口：`Script_PostFrameGraphTest` 的「相机右移时街面像素速度 x 为负」。
 - MRT 必须 `glslVersion: THREE.GLSL3` + 自己写 `layout(location = N) out vec4`。不设的话 three 会注入 `layout(location = 0) out highp vec4 pc_fragColor;` 并 `#define gl_FragColor pc_fragColor`（module 7050），你的第二个 out 要么和它冲突要么永远写不出去。注意 ShaderMaterial 本来就永远是 `#version 300 es`，`varying`/`texture2D` 有兼容 define，所以 chunk 照常可用。
 - ShaderMaterial 的 GLSL 里**不许用 GLSL ES 3.00 的保留字当标识符** —— `sample` 是最容易撞上的一个（`texel`/`texelSample` 都行）。非 Raw 材质永远被前置 `#version 300 es`（module 7039），ESSL 1.00 里能编过的`vec4 sample = texture2D(...)` 到这里直接报 `Illegal use of reserved word`。**编译失败不抛异常**：three 只在控制台打一行 `THREE.WebGLProgram: Shader Error`，那一趟 blit 什么都不画，屏幕留着上一次 clear 的颜色。表现是「某个 pass 恒为纯黑」而其余画面完全正常，极难往着色器上想。同类保留字还有 `filter` / `input` / `output` / `patch` / `resource` / `active` / `common` / `partition`。
   已发生：`Script_Post.mjs` 的 `FRAG_DEBUG_VIEW` 用了 `sample`，Debug Rendering 面板九个视图全黑，而当时的冒烟只比对 uniform 上的纹理引用，一路全绿。**验一个展示 pass 一定要读回像素**。
