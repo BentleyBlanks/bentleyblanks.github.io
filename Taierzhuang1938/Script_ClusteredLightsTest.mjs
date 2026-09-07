@@ -219,8 +219,10 @@ Check(CLUSTER_TIERS.low.enabled === false
 // 材质补丁必须挂在 GI 之后、AO 的 <aomap_fragment> 之前 —— 局部光是直接光，
 // 被 SSAO 压就成了「墙角的火照不亮墙角」。这是纯 shader 行为，只能在源码这一级锁。
 const patchSource = fs.readFileSync(path.join(projectDir, "Script_MaterialPatches.mjs"), "utf8");
-Check(/MakeSsaoPatch\(ssao\),\s*MakeGiPatch\(gi\),\s*MakeClusteredLightsPatch\(\)/.test(patchSource),
-  "补丁注册顺序：AO → GI → 簇光 → 破口");
+// 2026-09 合并后 SSR 补丁排在 GI 与簇光之间（它改的是 <lights_fragment_maps> 的 radiance，
+// 与簇光锚点不同）；这里锁的是「GI 之后、破口之前」，SSR 那一项可有可无。
+Check(/MakeSsaoPatch\(ssao\),\s*MakeGiPatch\(gi\),(?:\s*MakeSsrPatch\(ssr\),)?\s*MakeClusteredLightsPatch\(\),\s*MakeDestructionPatch/.test(patchSource),
+  "补丁注册顺序：AO → GI → (SSR) → 簇光 → 破口");
 const clusterSource = fs.readFileSync(path.join(projectDir, "Script_ClusteredLights.mjs"), "utf8");
 Check(clusterSource.includes("uniform highp usampler2D uClusterTable")
   && clusterSource.includes("uniform highp usampler2D uClusterIndex"),
