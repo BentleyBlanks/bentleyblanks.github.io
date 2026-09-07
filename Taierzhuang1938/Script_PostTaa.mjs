@@ -219,16 +219,19 @@ void main() {
   history = center + dir * clamp(t, 0.0, 1.0);
 
   // --- 4) 混合权重 -----------------------------------------------------
-  // ① 静止 0.04（UE 缺省），快动向 0.2 抬减少拖尾
-  float velocityPx = length(velocity * uHistoryResolution);
-  float w = mix(uCurrentWeight, uFastMotionWeight,
-                clamp(velocityPx / max(uFastMotionPx, 1.0), 0.0, 1.0));
-  // ② anti-flicker：局部亮度对比越高越信历史。高对比像素上「这一帧恰好采到哪」
-  //    本身就是噪声源（HDRP 的 feedback 调制同一件事）。
+  // ① anti-flicker 只压**静止**那一档：局部亮度对比越高越信历史，因为高对比
+  //    像素上「这一帧恰好采到哪」本身就是噪声源（HDRP 的 feedback 调制同一件事）。
+  //    **必须压在 mix 之前**：压在之后的话快动像素的 0.2 会被一起压到 0.07，
+  //    邻域裁剪来不及跟上，运动物体的边就开始拖影 —— 那正是要避免的那一头。
+  float stillWeight = uCurrentWeight;
   if (uAntiFlicker > 0.0) {
     float contrast = (boxMax.x - boxMin.x) / max(0.5 * (boxMax.x + boxMin.x), 0.05);
-    w *= mix(1.0, uAntiFlickerFloor, clamp(contrast * uAntiFlicker, 0.0, 1.0));
+    stillWeight *= mix(1.0, uAntiFlickerFloor, clamp(contrast * uAntiFlicker, 0.0, 1.0));
   }
+  // ② 静止吃上面那一档（UE 缺省 0.04），快动向 0.2 抬减少拖尾
+  float velocityPx = length(velocity * uHistoryResolution);
+  float w = mix(stillWeight, uFastMotionWeight,
+                clamp(velocityPx / max(uFastMotionPx, 1.0), 0.0, 1.0));
   // ③ responsive（UE ResponsiveAA）：第一人称手/枪几乎只用当前帧。
   //    预通道给它们写的是常数前景标签深度，速度恒 0 —— 世界在它们背后滑过时
   //    历史会把瞄具边缘拖出一条虚影，正是 FPS 手感的红线。

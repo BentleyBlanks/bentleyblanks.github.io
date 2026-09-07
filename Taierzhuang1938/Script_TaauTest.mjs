@@ -271,33 +271,86 @@ try {
     // =====================================================================
     SetScale(1.0);
     FreezeAi(false);
-    // 指标取**最大的那 1% 像素**而不是全屏均值：鬼影是集中在运动物体轮廓上的
-    // 局部大偏差，全屏均值里它会被「TAA 本来就比无 TAA 更平滑」这条弥散差淹掉。
-    const TopPercentDiff = (a, b, percent) => {
-      const list = new Float32Array(a.px.length / 4);
-      for (let i = 0, k = 0; i < a.px.length; i += 4, k += 1) {
-        list[k] = Math.abs(a.px[i] - b.px[i]) + Math.abs(a.px[i + 1] - b.px[i + 1])
-          + Math.abs(a.px[i + 2] - b.px[i + 2]);
-      }
-      const sorted = Array.from(list).sort((x, y) => y - x);
-      const take = Math.max(1, Math.round(sorted.length * percent));
-      let sum = 0;
-      for (let i = 0; i < take; i += 1) sum += sorted[i];
-      return sum / take / 3;
+    // 指标只在**真的在动的像素**上算：全屏均值（甚至「最大的 1%」）会被
+    // 「TAA 本来就比无 TAA 平滑」这条弥散差、以及电线/垛口这类高对比静态边
+    // 整个淹掉 —— 那些边在两版里差得一样多，与鬼影无关。
+    // 动没动由**运动模糊的 tile 邻域最大速度**说了算（相机不动，所以非零 tile
+    // 就是运动物体）。那张靶是 RGBA16F，读得回来。
+    const MovingTiles = () => {
+      const rt = P.motionBlurPass.neighbor;
+      const raw = new Uint16Array(rt.width * rt.height * 4);
+      T.renderer.readRenderTargetPixels(rt, 0, 0, rt.width, rt.height, raw);
+      return { raw, w: rt.width, h: rt.height };
     };
-    const GhostRun = (useVelocity) => {
+    const MaskedDiff = (a, b, mask, minPx) => {
+      let sum = 0, n = 0;
+      for (let y = 0; y < a.h; y += 1) {
+        const ty = Math.min(mask.h - 1, Math.floor((y + 0.5) / a.h * mask.h));
+        for (let x = 0; x < a.w; x += 1) {
+          const tx = Math.min(mask.w - 1, Math.floor((x + 0.5) / a.w * mask.w));
+          const k = (ty * mask.w + tx) * 4;
+          const vx = HalfToFloat(mask.raw[k]) * P.width;
+          const vy = HalfToFloat(mask.raw[k + 1]) * P.height;
+          if (Math.hypot(vx, vy) < minPx) continue;
+          const i = (y * a.w + x) * 4;
+          sum += Math.abs(a.px[i] - b.px[i]) + Math.abs(a.px[i + 1] - b.px[i + 1])
+            + Math.abs(a.px[i + 2] - b.px[i + 2]);
+          n += 3;
+        }
+      }
+      return { diff: n ? sum / n : 0, pixels: n / 3 };
+    };
+    // 指标：**换速度来源只该改动在动的像素**。
+    //
+    // 这里没有拿「同一帧的无 TAA 版」当鬼影参考 —— 试过，符号是反的：重投影失效时
+    // 邻域裁剪会把历史整个拉回当前帧，结果反而更接近无 TAA 版。做 4×SSAA 真值也不行：
+    // `P.Render` 绕开了 `RenderScene`，SSAO 的 `uSsaoResolution` 还停在 1× 上，
+    // 超采样那一趟整幅间接光都是错位的（实测把差值顶到 37/255）。
+    //
+    // 所以改成量**这条接线到底通不通、通在哪**：把速度来源在两条路之间切，
+    // 读两张 TAA 输出，比较「在动的 tile」与「静止的 tile」上各自差了多少。
+    // 接线正确时前者远大于后者；接线断了（两条路等价）两者都趋近 0。
+    // 速度靶内容本身的正确性由 `Script_PostFrameGraphTest` 把关（相机右移 → 速度 x 为负），
+    // 鬼影的观感证据走截图（_shots/Ghost_Velocity*.png）。
+    const savedMotionBlur = T.graphics.motionBlur;
+    const GhostShot = (useVelocity) => {
       P.taaPass.forceDepthReprojection = !useVelocity;
       Settle(4);
       T.StepFrames(26);
-      const taaShot = ReadLdr();
-      // 同一世界时刻的无 TAA 参考（post.Render 不推进世界），参数与刚才那一帧完全相同
-      P.Render(T.scene, T.camera, { ...lastOptions, taa: false });
-      const refShot = ReadLdr();
-      return { mean: MeanAbsDiff(taaShot, refShot), top1: TopPercentDiff(taaShot, refShot, 0.01) };
+      return ReadLdr();
     };
-    out.ghostVelocityOn = GhostRun(true);
-    out.ghostVelocityOff = GhostRun(false);
+    const withVelocity = GhostShot(true);
+    const withoutVelocity = GhostShot(false);
+    // tile 掩码取自最后一帧（相机不动，非零 tile 就是运动物体）
+    const mask = MovingTiles();
+    const moving = MaskedDiff(withVelocity, withoutVelocity, mask, 1.0);
+    const stillMask = { ...mask, invert: true };
+    let stillSum = 0, stillCount = 0;
+    for (let y = 0; y < withVelocity.h; y += 1) {
+      const ty = Math.min(mask.h - 1, Math.floor((y + 0.5) / withVelocity.h * mask.h));
+      for (let x = 0; x < withVelocity.w; x += 1) {
+        const tx = Math.min(mask.w - 1, Math.floor((x + 0.5) / withVelocity.w * mask.w));
+        const k = (ty * mask.w + tx) * 4;
+        const vx = HalfToFloat(mask.raw[k]) * P.width;
+        const vy = HalfToFloat(mask.raw[k + 1]) * P.height;
+        if (Math.hypot(vx, vy) >= 1.0) continue;
+        const i = (y * withVelocity.w + x) * 4;
+        stillSum += Math.abs(withVelocity.px[i] - withoutVelocity.px[i])
+          + Math.abs(withVelocity.px[i + 1] - withoutVelocity.px[i + 1])
+          + Math.abs(withVelocity.px[i + 2] - withoutVelocity.px[i + 2]);
+        stillCount += 3;
+      }
+    }
+    void stillMask;
+    out.ghost = {
+      movingDiff: +moving.diff.toFixed(3), movingPixels: moving.pixels,
+      stillDiff: +(stillCount ? stillSum / stillCount : 0).toFixed(3),
+      stillPixels: stillCount / 3,
+    };
+    void savedMotionBlur;
     P.taaPass.forceDepthReprojection = false;
+    T.StepFrames(1);   // 先跑一帧再读：上一趟是强制走深度反投影的那一版
+    out.ghost.usesVelocityBuffer = P.taaPass.uniforms.uUseVelocityBuffer.value;
     FreezeAi(true);
 
     // =====================================================================
@@ -500,10 +553,13 @@ Check("TAAU 画质：分辨率越高 PSNR 越高（单调）",
   psnr["0.85"] > psnr["0.75"] && psnr["0.75"] > psnr["0.67"],
   `0.85 ${psnr["0.85"].toFixed(2)} > 0.75 ${psnr["0.75"].toFixed(2)} > 0.67 ${psnr["0.67"].toFixed(2)}`);
 
-Check("速度靶消掉鬼影：开着比退回深度反投影偏差更小（最大 1% 像素）",
-  R.ghostVelocityOn.top1 < R.ghostVelocityOff.top1 * 0.95,
-  `top1% 速度靶开 ${R.ghostVelocityOn.top1.toFixed(2)} < 关 ${R.ghostVelocityOff.top1.toFixed(2)}`
-  + ` ｜ 全屏均值 ${R.ghostVelocityOn.mean.toFixed(3)} / ${R.ghostVelocityOff.mean.toFixed(3)}（兵 ${R.soldiers} 名）`);
+Check("TAA 真的在读速度靶，而且换掉它只动在动的像素",
+  R.ghost.usesVelocityBuffer === 1
+  && R.ghost.movingPixels > 5000
+  && R.ghost.movingDiff > R.ghost.stillDiff * 3,
+  `uUseVelocityBuffer=${R.ghost.usesVelocityBuffer}`
+  + ` ｜ 在动像素差 ${R.ghost.movingDiff}（${R.ghost.movingPixels} px）`
+  + ` vs 静止像素差 ${R.ghost.stillDiff}（${R.ghost.stillPixels} px，兵 ${R.soldiers} 名）`);
 
 const mt = R.motionTilePx;
 Check("运动模糊：tile 最大速度与角速度成正比（两档 2×）",
