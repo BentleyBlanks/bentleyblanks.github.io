@@ -12,7 +12,9 @@ def Main():
     args=parser.parse_args();root=args.root.resolve()
     labels={'TrainStairDisembark':'车梯逐阶下车与走停','TrainMealCutOffer':'幺娃展开食物切片递出',
         'ZhouSeatedAttempt':'老周腿伤撑起失败与指前沿',
-        'TrainBenchRest':'车厢长凳休息与前倾','TrainGearStow':'车厢整理背包'}
+        'TrainBenchRest':'车厢长凳休息与前倾','TrainGearStow':'车厢整理背包',
+        'MedicSupportLegs':'医护托腿与侧移放下','ZhouWeakeningDeath':'老周卧姿衰弱与松手',
+        'TrainShellStartleBlock':'车厢炮击惊缩与抬臂','TrainWoundedArm':'车厢保护左伤臂与坐下'}
     names=['Pelvis','LeftHip','RightHip','Spine1','LeftKnee','RightKnee','Spine2','LeftAnkle',
         'RightAnkle','Spine3','LeftFoot','RightFoot','Neck','LeftCollar','RightCollar','Head',
         'LeftShoulder','RightShoulder','LeftElbow','RightElbow','LeftWrist','RightWrist']

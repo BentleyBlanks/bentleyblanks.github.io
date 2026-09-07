@@ -1,8 +1,46 @@
-# 第一关动画接力状态（2026-09-07）
+# 第一关动画接力状态（2026-09-08）
 
-当前用户要求为**先覆盖全部 48 项的素材生成**，随后继续恢复、重定向、协作装配和游戏接入。尚未完成全部动作，也没有替换正式关卡动画。逐项字段、来源哈希和运行时文件快照见 [状态 JSON](Data_FirstLevelMissionAnimationStatus.json)。需求仍以 [完整需求](Data_FirstLevelMissionAnimationRequirements.md) 和 [视频转骨骼标准](Data_VideoToSkeletonStandard.md) 为准。
+当前用户要求为**先覆盖全部 48 项的素材生成**，随后继续恢复、重定向、协作装配和游戏接入。尚未完成全部动作；本轮接入侧凳支撑与扶腿起身子集。逐项字段、来源哈希和运行时文件快照见 [状态 JSON](Data_FirstLevelMissionAnimationStatus.json)。需求仍以 [完整需求](Data_FirstLevelMissionAnimationRequirements.md) 和 [视频转骨骼标准](Data_VideoToSkeletonStandard.md) 为准。
 
-## 最新：四型号起身 V4 支撑验证通过，新增两条车厢恢复
+## 最新：侧凳支撑与扶腿起身接入原角色和真实队列
+
+复用冻结的 TrainSupport V2／审阅 V4，四份原骨架动画库进入 `Animation/FirstLevelTrain`。32 个侧凳坐席按原角色型号与真实身高采样，保留 8 名站立新兵、罗班长和玩家。角色物理根在初次摆位时以站稳双脚中心为锚点，坐姿身体留在身后凳面；起身结束维持直立等待，只有原物理队列开始移动后才渐交回原行走动作。没有在起身结束传送角色，也没有重写任务事实或对白事件。
+
+实际车板仍来自共享地形／结构高度。渲染支撑抵消 Rapier 的接触余量；站姿到原行走的旋转混合检查实际鞋底，只向上补偿穿地，保留原行走片段自身的离地高度。交回原动作后，这批角色的站立接地仍消费共享 GroundHeight；死亡、卧姿、近战和真实离地不套用。检查使用实际原蒙皮，不以脚踝当鞋底；CPU 取样刷新 SkinnedMesh 的 bindMatrixInverse，避免把屏外旧矩阵误判为穿地。
+
+原骨名、层级、inverse bind 与命中骨架保留。四型号 × 九身高的生产采样与冻结动画库比较通过，position／quaternion／scale 逐帧还原。实际车厢中的谈话、休息、装备、进食、观察等活动和背枪挂接保留；这些上身手势仍是程序化过渡方案，不能声称专用视频表演、掌指和食物／数弹道具已经完成。
+
+验收读取真实板凳蒙皮接触、41 人实际下车、起身期间暂停、站立等队列、进入行走及结束后的连续帧。完全释放后，另用独立 mixer 对照原动作的骨盆轨道，分别记录过渡速度与原行走循环的接缝；原跑步／占位行走仍有自身跳变，专用走路和步态接缝继续列为未完成，不能把本次接入算作步行自然度验收。第一关完整流程和原 41 段语音由现有 `--campaign --audio` 门禁验收。逐次指标、运行时哈希及证据位置登记到状态 JSON 的 `gameIntegration`；该记录只对本次脚本与资产哈希有效。专用逐阶下车、担架和老周救护仍未接入。
+
+本批实测 144 个坐姿样本的凳面间隙为 0.933–2.228 mm；14 名实际角色连续起身，四型号全覆盖，静止脚漂最大 0.0892 mm，过渡骨盆垂直速度最大 1.141 m/s。完全交回原 mixer 后骨盆 local 变换误差为 0；原动作自身的速度跳变另记 3.708 m/s，仍待专用步态修正。完整第一关与原音频门禁通过。
+
+prepush 共选 117 项：首次 75 项通过，PhysicsTest 的普通 phase=5 出现 3/40 人与实体重叠后停止；后续 41 项及原 PhysicsTest 复测通过。当前版与精确 HEAD 基线的默认运行均通过；导航按真实耗时分帧会使两次轨迹不同，另用相同导航推进节奏对照，两版从初始到 AI 验收的物理状态逐项相同，均 0/40 重叠。没有放宽断言、修改 AI 或抹掉首次失败；原日志、续跑、默认与受控对照的字节哈希随 `Data_GameIntegration.json` 留私有库。该结果为复测后通过，不能描述成首次全绿或默认基线失败。
+
+- [本地游戏接入预览](http://127.0.0.1:8137/Taierzhuang1938/?whitebox=p012)
+- [原视频／原恢复／起身 V4 三栏](http://127.0.0.1:8136/Preview/index.html?action=TrainBenchRise)
+- [48 项素材与状态看板](http://127.0.0.1:8136/Preview/FirstLevelSourceBatchV1/index.html)
+
+原素材仍覆盖 **47/48** 项；数弹原 ID 实查仍为 `querying`，余额 **30 积分**。17 条已知补拍与医生重做缺约 **3,370 积分**，未估计成全部返修的封顶预算。本轮无新付费生成或 GVHMR 推理，未覆盖原片、raw、原工程与已冻结审阅。
+
+已按原片初筛缺陷准备 18 条补拍／重做方案，逐条绑定原任务 ID、回执与原视频哈希；[修正提示词](../_import/Data_FirstLevelSourceRetakeChanges.json)针对裁头、角色缺头、前后位错误、遮挡、踩台和错误内容修改构图与单人练习动作。用 `Script_FirstLevelRetakePlan.py --root <库> --observed-balance 30` 可重建私有 `Models/FirstLevelSourceRetakeV2/Data_RetakePlan.json`。该脚本只生成计划，**尚未提交、扣费为零**；18 条按原模型／时长一次成功预计 3,400，数弹原 ID 排除在本计划外，继续对账。
+
+新增查看“托伤腿”和“老周衰弱”的 0.25 秒密集原片抽帧（41／49 个时刻），并完成 0.5 秒二维覆盖审阅（20／24 个时刻）。托腿片的台面遮挡膝踝，老周卧姿片的远侧手臂有遮挡；两条只允许制作首次三维候选，卧姿深度、死亡保持、鞋底和协作接触均未接受。观察准备走 CPU，未与浏览器回归争用三维推理 GPU；原片与既有恢复不变。
+
+“炮击惊缩抬臂”和“护左伤臂坐下”各查看 33 个 0.25 秒源时刻和 16 个二维覆盖时刻。炮击片右手护头、左臂伸向门柱与屈膝追踪连续，进入首次三维候选准备；手与门柱的深度及掌面接触仍待复核。伤臂片坐到的是木凳，不能登记成坐地；右手护左上臂的伤侧须保持，二维覆盖中未见双腿或交叉手臂明显换位，三维深度与接触仍未接受。四条新观察记录均绑定原片、输入视频与关节点 SHA，尚未产生新三维恢复。看板区分只有源片审阅、已看二维覆盖、三维候选和游戏接入。
+
+逐阶下车另存实测 `Models/FirstLevelStairFitV1/Data_StairFitInspection.json`，由 [StairFitInspect](../_import/Script_FirstLevelStairFitInspect.mjs)直接读取最新布局与原候选 GLB：三车各有四级踏面，车板高 1.17 m，四级顶面分别为 1.02／0.77／0.52／0.27 m；没有独立车梯扶栏。当前审阅 GLB 的最低蒙皮点下降约 0.384 m（尚未施加游戏角色身高缩放），原片也只有台顶、两级低踏面再到地面。另保存 599 个时刻的双踝／脚趾及骨盆轨迹到 `Data_StairFootTrajectories.json`，左／右踝总下降约 0.400／0.379 m；这些关节测量不代表鞋底接触或已认定支撑区间。不能直接把整段根位移套入真实队列；后续须分别适配支撑脚、步幅、级数和扶手动作，原片／raw／V1 保留。
+
+```text
+node Taierzhuang1938/_import/Script_FirstLevelTrainGamePrepare.mjs --root <库>
+node Taierzhuang1938/Script_FirstLevelTrainAnimationTest.mjs
+node Taierzhuang1938/Script_FirstLevelMissionTest.mjs --audio
+node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --audio
+python Taierzhuang1938/_import/Script_FirstLevelTrainGameRegister.py --root <库>
+```
+
+GamePrepare 只在私有库导出候选和清单；实际游戏资产在独占 worktree 中复制并验证。GameRegister 核验通过报告、运行时哈希、原模型哈希和完整通关记录后登记子集。验收网页、截图、视频、报告及 Blender 工程均留私有库／忽略目录。
+
+## 历史：四型号起身 V4 支撑验证通过，新增两条车厢恢复
 
 本轮没有新生成视频或扣费；数弹原任务和余额实查仍为 `querying`／30 积分。首轮 60 成功、1 失败、1 待对账及 17 条明确补拍保持，已知补拍费用缺约 3,370 积分；这不是全部后续修正的封顶费用。
 

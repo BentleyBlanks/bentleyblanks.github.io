@@ -335,7 +335,7 @@ console.log(process.argv.includes("--audio")
 console.log("ok paused audio ranges, subtitle source timing, queued cues and shell-impact gates");
 
 // Regression: 40 real recruit bodies plus Luo, stable carriage-local positions, all three doors.
-{
+for(const preparedAnimation of [false,true]) {
   const dt = 1/60, actors = [];
   const Make = () => { const a = { id: actors.length, alive: true, position: {x:0,y:1.17,z:0}, goal:{x:0,z:0} }; actors.push(a); return a; };
   const originals = Array.from({length:6}, Make), guide = Make();
@@ -344,6 +344,12 @@ console.log("ok paused audio ranges, subtitle source timing, queued cues and she
     Offset:()=>offset, Place:(a,p)=>Object.assign(a.position,p), Hold:a=>Object.assign(a.goal,a.position),
     Move:(a,p,speed)=>{assert.equal(a.missionTrainLife.weight,0,"passengers stand before physical walking");const d=Math.hypot(p.x-a.position.x,p.z-a.position.z);if(d>MISSION_TRAIN.arrivalRadiusM){const step=Math.min(speed*dt,d)/d;a.position.x+=(p.x-a.position.x)*step;a.position.z+=(p.z-a.position.z)*step;}},
     Player:()=>player, Exited:()=>{},
+    // Deliberately simple animation fixture: the production sampler is checked
+    // independently in FirstLevelTrainAnimationTest. Here its measured anchor
+    // must fit the same 41-body queue without changing its movement authority.
+    PrepareAnimation:preparedAnimation?a=>({duration:5,config:{riseStaggerSeconds:.35},
+      SeatOffset:()=>({x:.002,z:-(a.id%4===2?.28:.24)-.35*(.96+(a.id%9)*.01)}),
+      State:t=>({weight:t<5?1:0,gestureWeight:0})}):undefined,
   });
   train.Initialize(); train.Initialize();
   assert.equal(actors.length,41);assert.deepEqual(train.State().counts,[8,24,8]);
@@ -361,7 +367,7 @@ console.log("ok paused audio ranges, subtitle source timing, queued cues and she
   assert.equal(train.State().exited,40,JSON.stringify(train.State()));
   assert.ok(train.entries.every(e=>e.arrived),'all passengers physically reach their own muster point: '+JSON.stringify(train.State().entries.filter(e=>!e.arrived)));
   assert.ok(actors.every(a=>!a.p012OnMovingTrain&&a.missionUnloaded));
-  console.log('ok train 8/24/8, Luo separate, unchanged local positions while moving, all physical exits in '+(ticks*dt).toFixed(1)+'s');
+  console.log('ok train 8/24/8, Luo separate, '+(preparedAnimation?'prepared standing anchors':'fallback seats')+', unchanged local positions while moving, all physical exits in '+(ticks*dt).toFixed(1)+'s');
 }
 
 {

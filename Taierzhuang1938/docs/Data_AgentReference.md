@@ -43,6 +43,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - `Data_FirstLevelMissionCrowd`：院落/转运区分散停靠点、错峰汇流和轻伤员等候区域。
 - `Data_FirstLevelMissionFront`：前沿增援、沿途火力、友军据点和战场遗体布局；`Script_FirstLevelMissionAftermath`：按真实角色骨骼烘焙遗体并分区合批。
 - `Script_FirstLevelMissionPeople`：真实担架员/轻伤员角色、抬运握持校正、停步接地、警戒观察与按距离降低远景动画频率。
+- `Script_FirstLevelTrainAnimation` / `MissionTrainLife` / `MissionTrain`：四型号原骨架侧凳支撑、扶腿起身、生活手势和物理队列衔接。库在 `Animation/FirstLevelTrain`，接入门禁为 `Script_FirstLevelTrainAnimationTest.mjs`；其余动作和缺口见 [动画进度](Data_FirstLevelMissionAnimationProgress.md)。
 - `Data_FirstLevelMissionDialogue` / `Script_FirstLevelMissionVoice`：整段连续对白。`Script_SeedAudioFirstLevelBake.mjs` 仅从环境变量取密钥，每段一个请求、一个音频文件；`--dry` 审核请求，`Script_FirstLevelMissionTest.mjs --audio` 验实际资产。
 - 当前入口直接覆盖 `?whitebox=p012`。`p012-archive` 只供旧模型、调试与共享组件回归，不作为新版验收。
 - 本地通关：`node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign`。截图、过程 JSON 留在忽略目录 `_shots/FirstLevelMission`。

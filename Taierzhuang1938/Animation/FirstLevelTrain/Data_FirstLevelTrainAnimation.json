@@ -1,0 +1,79 @@
+{
+  "version": "FirstLevelTrainGameV1",
+  "status": "runtime_seated_support_and_rise_subset",
+  "sourceGroup": "FirstLevelTrainSupportV2",
+  "sourceReview": 4,
+  "profiles": [
+    0.96,
+    0.98,
+    1,
+    1.02,
+    1.04
+  ],
+  "clipPrefix": "FirstLevelTrainBench",
+  "sourceEndSeconds": 7.966666666666667,
+  "riseSourceStartSeconds": 4,
+  "approachSeconds": 0.4,
+  "releaseSeconds": 0.8,
+  "riseStaggerSeconds": 0.35,
+  "floorClearanceM": 0.002,
+  "notes": "The final source ankle midpoint defines a fixed horizontal actor anchor. No vertical recentering; physical AI retains world movement. Upper-body carriage gestures are authored overlays.",
+  "models": [
+    {
+      "id": "LugouNra01",
+      "file": "Animation_LugouNra01FirstLevelTrainSupport.glb",
+      "nominalScale": 0.9149075364681593,
+      "seatForwardOffsetM": 0.24,
+      "sourceAnchor": [
+        -0.0020508731091154475,
+        0,
+        0.37282753315465667
+      ],
+      "maxProfileAnchorErrorM": 4.9096079147005626e-9,
+      "sourceAnimationSha256": "b53c894f0b7677e507b1b643b63225b41f6d2786f232324060a5e117b798ad90",
+      "originalModelSha256": "d9c6c14884444ab18b61aa41ce4df32df81f1a2207295a26bc2c3683bcf4e170"
+    },
+    {
+      "id": "LugouNra02",
+      "file": "Animation_LugouNra02FirstLevelTrainSupport.glb",
+      "nominalScale": 0.91353450904124,
+      "seatForwardOffsetM": 0.24,
+      "sourceAnchor": [
+        -0.002050879651177062,
+        0,
+        0.372827553425501
+      ],
+      "maxProfileAnchorErrorM": 7.077467069406622e-9,
+      "sourceAnimationSha256": "5ff7f7d573dd5900f8487361cbdd859ca8bcf44359602bad4d896015cc51cd51",
+      "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225"
+    },
+    {
+      "id": "LugouNra03",
+      "file": "Animation_LugouNra03FirstLevelTrainSupport.glb",
+      "nominalScale": 0.9387621685632301,
+      "seatForwardOffsetM": 0.28,
+      "sourceAnchor": [
+        -0.0020502857688870363,
+        0,
+        0.372827555999382
+      ],
+      "maxProfileAnchorErrorM": 5.448899190958952e-9,
+      "sourceAnimationSha256": "d3c1e1d02138eadb2b566eef4a016ee4b0e880c94d92c67f38f16da4a27d0120",
+      "originalModelSha256": "d4b7b487387cca2e7758d1c0bbcd51a299ee7a500a193ea14d9754e6563aa74d"
+    },
+    {
+      "id": "LugouNra04",
+      "file": "Animation_LugouNra04FirstLevelTrainSupport.glb",
+      "nominalScale": 0.9225963863122266,
+      "seatForwardOffsetM": 0.24,
+      "sourceAnchor": [
+        -0.0020508648400443807,
+        0,
+        0.3728273541194755
+      ],
+      "maxProfileAnchorErrorM": 4.7175041956278736e-9,
+      "sourceAnimationSha256": "39d919605a3200a76ab97af54e40335c2adeb2b0580cfd270f5a6e16da250dce",
+      "originalModelSha256": "06bfff4d100d766767f8516584de0c9ac62b2f50a6ac10ce3b4285f24889a073"
+    }
+  ]
+}

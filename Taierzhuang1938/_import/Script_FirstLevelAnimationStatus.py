@@ -1,6 +1,6 @@
 """Build an evidence-based mission handoff; missing source is never a fake clip."""
 from pathlib import Path
-import argparse, hashlib, json, re, subprocess
+import argparse, datetime, hashlib, json, re, subprocess
 from Script_FirstLevelRetargetEvidence import CollectRetargetEvidence
 
 
@@ -154,16 +154,37 @@ def Main():
         if row['newRecoveryCandidates']:
             row['status']='partially_retargeted_requires_contact_review' if all('retargetCandidate' in c for c in row['newRecoveryCandidates']) else 'partially_recovered_pending_retarget'
             row['blockers'].append('Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted.')
+    gameReport=root/'Models/FirstLevelTrainGameV1/Data_GameIntegration.json'
+    integration=Read(gameReport) if gameReport.exists() else None
+    if integration:
+        visual=Read(gameReport.with_name('Data_VisualAssessment.json'))
+        assert visual['frozen'] and visual['gameIntegrationSha256']==Hash(gameReport), 'Review the tested game subset before publishing its status'
+        for filename,expected in integration['runtimeHashes'].items():
+            assert Hash(project/filename)==expected, f'Runtime changed after game integration review: {filename}'
+        for evidence in integration['evidence']:
+            assert Hash(root/evidence['path'])==evidence['sha256']
+        for row in rows:
+            if row['requirementId'] not in integration['requirementScopes']:continue
+            row['status']='partially_integrated_other_actions_pending'
+            row['runtimeBinding'].update(enabled=True,scope=integration['requirementScopes'][row['requirementId']],
+                evidence=gameReport.relative_to(root).as_posix(),version=integration['version'])
+            row['blockers']=[b for b in row['blockers'] if not b.startswith('Not enabled in mission;') and not b.startswith('Support validation and past failures') and not b.startswith('Full bench sequence only;')]
+            row['blockers'].append('Only the recorded carriage subset is enabled; dedicated life gestures, prop/finger contact and stair-down are still pending.')
+            row['reviewEvidence'].append(gameReport.relative_to(root).as_posix())
+            if row.get('productionSupportTrial',{}).get('group')=='FirstLevelTrainSupportV2':
+                row['productionSupportTrial']['runtimeEnabled']=True
+                row['productionSupportTrial']['runtimeScope']='The recorded carriage support/rise subset only'
     files=['Data_FirstLevelMission.mjs','Data_FirstLevelMissionDialogue.mjs','Data_FirstLevelMissionTrain.mjs',
         'Data_Tuning_FirstLevel.mjs','Script_FirstLevelMissionRuntime.mjs','Script_FirstLevelMissionColumn.mjs',
         'Script_FirstLevelMissionVoice.mjs','Script_FirstLevelMissionTrain.mjs','Audio/FirstLevel/Data_FirstLevelVoiceManifest.json',
-        'Data_FirstLevelMissionVoiceAlignment.mjs','Data_FirstLevelMissionVoiceTiming.mjs']
+        'Data_FirstLevelMissionVoiceAlignment.mjs','Data_FirstLevelMissionVoiceTiming.mjs',
+        'Script_FirstLevelTrainAnimation.mjs','Script_FirstLevelMissionTrainLife.mjs']
     missionContract=json.loads(subprocess.check_output(['node','--input-type=module','-e',
         "import {MISSION_VERSION,MISSION_STAGES} from './Data_FirstLevelMission.mjs';"
         "import {MISSION_VOICE_TIMING} from './Data_FirstLevelMissionVoiceTiming.mjs';"
         "console.log(JSON.stringify({version:MISSION_VERSION,stages:MISSION_STAGES,voiceTiming:MISSION_VOICE_TIMING}));"],
         cwd=project,text=True,encoding='utf-8'))
-    report=dict(schemaVersion=1,updated='2026-09-07',baseCommit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=project,text=True).strip(),
+    report=dict(schemaVersion=1,updated=datetime.datetime.now().date().isoformat(),recordedUtc=datetime.datetime.now(datetime.timezone.utc).isoformat(),baseCommit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=project,text=True).strip(),
         missionContract=missionContract,
         libraryRoot=str(root),catalogSha256=Hash(root/'Preview/Data_Catalog.json'),requirementsSha256=Hash(required),
         missionBaselineFiles={p:Hash(project/p) for p in files},
@@ -172,7 +193,8 @@ def Main():
         timing=dict(status='recorded_alignment_and_playback_events_available',
             retainedContinuousRecordings=True,animationDialogueOffsetsInvented=False,
             sources=['Data_FirstLevelMissionVoiceAlignment.mjs','Data_FirstLevelMissionVoiceTiming.mjs'],
-            note='Read current cue/segment/source seconds and Runtime VoiceEvent. TrainFoodReceived releases opening movement after the actual response; free look remains available. Actual shell impacts, train stop, prone/dive orders, TransferHope and medic arrival remain authoritative. New animation clips are not bound yet.'),
+            note='Read current cue/segment/source seconds and Runtime VoiceEvent. TrainFoodReceived releases opening movement after the actual response; free look remains available. Actual shell impacts, train stop, prone/dive orders, TransferHope and medic arrival remain authoritative. '+('Only the recorded bench-support/rise subset is enabled.' if integration else 'New animation clips are not bound yet.')),
+        gameIntegration=integration,
         sourceSearch=dict(directories=[str(root/'Video/Sources'),'C:/Users/Bentl/Downloads/GVHMR'],
             catalogActions=len(catalog['actions']),newVideoGenerations=batch['summary'].get('success',0),
             newInferenceRuns=len(list((root/'Models/_Cache/FirstLevelV1').glob('*/Data_Recovery.json')))),

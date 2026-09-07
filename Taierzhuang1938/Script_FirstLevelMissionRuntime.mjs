@@ -16,6 +16,7 @@ import {
 } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_TRAIN, MissionTrainMotion } from "./Data_FirstLevelMissionTrain.mjs";
 import { FirstLevelMissionTrain } from "./Script_FirstLevelMissionTrain.mjs";
+import { PrepareFirstLevelTrainAnimation } from "./Script_FirstLevelTrainAnimation.mjs";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
 import {
   FirstLevelMissionColumn,
@@ -208,6 +209,7 @@ export class FirstLevelMissionRuntime {
         weapon: "HanYang", scriptedNoncombatant: true, squadId: "MissionTrain" + car.carIndex,
       }),
       Offset: () => this.battlefield.trainOffsetM,
+      PrepareAnimation: actor=>PrepareFirstLevelTrainAnimation(actor,(x,z)=>this.battlefield.GroundHeight(x,z)),
       Place: (actor, point) => { this.PlaceActor(actor, point); actor.yaw = Math.PI / 2; },
       Hold: (actor) => { actor.scriptedNoncombatant = true; this.MoveActor(actor, actor.position, 0); },
       Move: (actor, point, speed) => {

@@ -207,7 +207,7 @@ export class FirstLevelMissionView {
   TrainHandProps() {
     for(const entry of this.train?.entries || []) {
       const actor=entry.actor, rig=actor.actor?.characterRig, life=actor.missionTrainLife;
-      if(!rig?.missionTrainLifeActive || life.brace>.25 || life.weight<.7)continue;
+      if(!rig?.missionTrainLifeActive || life.brace>.25 || life.weight<.7 || life.gestureWeight<.7)continue;
       const kind=life.kind;
       if(!['Eat','ShareFood','CountAmmo','Gear'].includes(kind))continue;
       for(const side of ['L','R']) {

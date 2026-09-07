@@ -1,10 +1,10 @@
 # 第一关《往南的路》全部人物动作／动画接力需求
 
-更新：2026-09-07。适用：主菜单第一关与 `?whitebox=p012`，序章已并入，共 25 个运行时阶段（含完成）。任务契约已同步 `d9d373f35`／r11；接手时拉取最新 master。本文是完整制作需求，**不是已完成动作清单**。跨电脑视频转骨骼与原骨架重定向接力须保留最新任务流程、对白时机与交互。
+更新：2026-09-08。适用：主菜单第一关与 `?whitebox=p012`，序章已并入，共 25 个运行时阶段（含完成）。任务契约已同步 `d9d373f35`／r11；接手时拉取最新 master。本文是完整制作需求，**不是已完成动作清单**。跨电脑视频转骨骼与原骨架重定向接力须保留最新任务流程、对白时机与交互。
 
-本机接力实测见[逐项进度](Data_FirstLevelMissionAnimationProgress.md)和[状态清单](Data_FirstLevelMissionAnimationStatus.json)：最新用户要求先覆盖全部 48 项的素材生成；62 条首轮请求已有 60 条视频落盘、1 条服务失败、1 条待对账，复用旧库；60 条均已初筛，其中 17 条需补拍。当前本地候选为担架 V10、四套原游戏人物的长凳扶腿起身 V4、切片递食 V2，以及逐阶下车、老周撑起失败、长凳休息和整理背包 V1。起身 V4 已完成实际模型尺度、凳面／鞋底／掌面与完整速度三栏播放检查；真实车厢座位、生活分层、道具和转场仍待接入验证，未替换正式关卡动画。
+本机接力实测见[逐项进度](Data_FirstLevelMissionAnimationProgress.md)和[状态清单](Data_FirstLevelMissionAnimationStatus.json)：最新用户要求先覆盖全部 48 项的素材生成；62 条首轮请求已有 60 条视频落盘、1 条服务失败、1 条待对账，复用旧库；60 条均已初筛，其中 17 条需补拍。四套原游戏人物的长凳扶腿起身 V4 已导出独立游戏动画库，接入 32 个侧凳坐席的身体支撑、起身、站立等队列和行走衔接。生活手势仍是有区别的程序化叠加；专用递食／数弹／背包手指接触和逐阶下车尚未接入。担架 V10、切片递食 V2，以及逐阶下车、老周撑起失败、长凳休息和整理背包 V1 继续保留为本地候选。
 
-TrainSupport V1 的插值失败保留在历史；新组 TrainSupport V2 对应上述审阅 V4。四型号 × 九身高 × 957 时刻的原网格检查通过，完整装配 GLB 与原模型加动画库逐骨／逐顶点一致，四个工程已重新打开核验。新恢复的休息和整理背包仍需坐姿与接触修正。原 48 项素材批次仍覆盖 47 个需求；FL16 数弹原请求继续待对账，不重复提交。详细证据和补拍预算见逐项进度。
+TrainSupport V1 的插值失败保留在历史；新组 TrainSupport V2 对应上述审阅 V4，原片、raw、工程和冻结审阅不覆盖。游戏适配另记 FirstLevelTrainGameV1，接入验证与剩余范围逐项记录，不把坐姿支撑子集算作完整 FL13／FL17／FL21。原 48 项素材批次仍覆盖 47 个需求；FL16 数弹原请求继续待对账，不重复提交。详细证据和补拍预算见逐项进度。
 
 ## 先读与范围
 
@@ -61,7 +61,7 @@ TrainSupport V1 的插值失败保留在历史；新组 TrainSupport V2 对应�
 | FL10／B | 部位受击、受压缩回、倒下、死亡最终保持 | 非循环死亡，不能滑回待机、循环踢腿或用贴脚 IK 把尸体撑起。 |
 | FL11／B | 指路、招停、招呼跟上、短促换位指挥 | 班长／传令兵／医护；上身层或单次，仅空出的手可挥动，指向真实对象。 |
 | FL12／C | 侧耳、短回头、点头、低声交谈、疲惫喘气 | 头颈／上身小幅叠加，限制转角、错峰，不强转玩家镜头。 |
-| FL13／A | 长凳坐姿两版、站姿扶稳；车内人群 | 程序化已有；凳面 0.48 m，骨盆目标约 0.60 m，侧凳本地横向 ±1.65 m；双脚落板、手扶实体。 |
+| FL13／A | 长凳坐姿两版、站姿扶稳；车内人群 | 32 个侧凳坐席已接原骨架身体支撑；凳面 0.48 m，侧凳本地横向 ±1.65 m，以实际衣摆／腿部蒙皮接凳验收，不再用 0.60 m 占位骨盆高度。第二版生活表演、站姿扶物与手指仍待制。 |
 | FL14／A | 展开食物包、切一薄片、递出收手；幺娃 | TrainMeal 单次片段组，小刀／食物／包布接触；按播放段触发，不永久循环切同一片。ShareFood 占位。 |
 | FL15／A | 伸手接食／讨食、小口吃；顺子／何有田／背景 | 给予与接收成对；开场至顺子接食回应完毕（TrainFoodReceived）固定玩家走位、保留自由转头，期间禁止跳跃和换姿态；交接后恢复移动。后续递附近同伴按实际距离收手，不远距离吸附。Eat／Talk 占位。 |
 | FL16／A | 点弹、拨弹、停顿找少的一颗、抬头回嘴；刘文财 | TrainMeal；弹药袋与手指接触，人物数弹不改玩家库存。CountAmmo 占位。 |
@@ -69,7 +69,7 @@ TrainSupport V1 的插值失败保留在历史；新组 TrainSupport V2 对应�
 | FL18／A | 第一炮愣住侧看、近炮护头、欲挤门被拦住 | 幺娃／班长／新兵；实际炮击与口令触发，不能炮前齐刷刷抽动；不得拖动玩家。 |
 | FL19／A | 捂臂跌坐、躲痛；跪下查看手臂 | 匿名伤兵＋刘文财成对装配；伤侧一致、近炮实际命中后发生。当前受击＋蹲姿，检查待制。 |
 | FL20／B | 过道侧身通行、踢开背包、让出车门 | 班长／何有田；物件真实移到安全处，不踢穿箱子、不增通道障碍。待制。 |
-| FL21／A | 凳上起身、站稳转身、队列挪步、逐阶下车 | 同一 41 NPC；起身当前 1.25 s 占位，交回真实队列；测三处车梯脚点，不瞬移。 |
+| FL21／A | 凳上起身、站稳转身、队列挪步、逐阶下车 | 同一 41 NPC；侧凳已接原骨架扶腿起身、站立等队列和物理行走衔接。站立乘客仍用旧过渡；逐阶下车及三处车梯脚点待接，不能把正常走下车算成专用阶梯动作完成。 |
 | FL22／B | 靠近低语、回头确认再分开；幺娃与顺子 | EscapeWhisper；不展示逃跑衣物特写，不自动低头翻玩家包。 |
 | FL23／A | 腿伤靠坐、撑起失败、跌回仍指前沿；老周 | TakeMachineGun；固定伤腿、侧壁支撑，补从机枪旁到担架的连续转换。待制。 |
 | FL24／A | 托腿扶肩、患者抓杆、移上担架 | 老周＋两人＋同一担架同步；支撑重心，不瞬移患者。ZhouLift，待制。 |
@@ -132,7 +132,7 @@ TrainSupport V1 的插值失败保留在历史；新组 TrainSupport V2 对应�
 
 - [正式步兵库](../Model/Character/Data_InfantryAnimations.json)：两军 01–04 八份动画 GLB、五种正式动作；[InfantryAnimation](../Script_InfantryAnimation.mjs)负责衔接，复用游戏原网格。
 - 原 GLB 的 RifleIdle 实际单膝据枪，LeanWallSitPeek 实际地面坐姿；名字不等于适用。CarryStretcherFront／Rear、WoundedLimp 有旧素材，但接触和过渡仍须复核。[背枪跑资产](../Animation/BackRifleRun/Animation_LugouNraBackRifleRun.glb)已有消费方，不覆盖成未经审阅的本地版本。
-- [Train](../Script_FirstLevelMissionTrain.mjs)拥有车上坐站、起身和队列；[TrainLife](../Script_FirstLevelMissionTrainLife.mjs)是程序化占位；[CastAppearance](../Script_FirstLevelP012CastAppearance.mjs)包裹 mixer。新片段接管时停对应覆写，每帧还原再采样，防累积旋转。
+- [Train](../Script_FirstLevelMissionTrain.mjs)拥有车上坐站、起身和队列；[TrainAnimation](../Script_FirstLevelTrainAnimation.mjs)采样四型号五档身高曲线，消费[独立游戏库](../Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json)。[TrainLife](../Script_FirstLevelMissionTrainLife.mjs)叠加有区别的生活手势并处理支撑与行走衔接；[CastAppearance](../Script_FirstLevelP012CastAppearance.mjs)包裹 mixer。每帧先还原 position／quaternion／scale，再采样，不累积覆盖。
 - missionTrainLife 的 kind／seated／phase／weight／brace／yaw 驱动姿态；missionTrainLifeActive 同时影响[背枪挂接](../Script_FirstLevelP012BackRifle.mjs)和[View 手中道具](../Script_FirstLevelMissionView.mjs)。不能关闭占位后把枪和食物一并弄丢。乘车局部速度排除整车平移。
 - [Column](../Script_FirstLevelMissionColumn.mjs)是患者身份、抬手健康、队列装车、补位、撤离事实来源。View 里大量患者与医护是实例化白盒，需要骨架适配层；仅导出 GLB 不算已接上。
 - 当前白盒前后抬手距担架中心各 1.6 m，床面显示高度随状态取 0.82／0.22／1.2 m，**是占位数值，不是最终握点标准**。测量[真实担架几何](../Script_FirstLevelP012CarryView.mjs)、[Carry](../Script_Carry.mjs)和原骨架后统一适配，不照抄旧文档 2.4 m 身体间距。

@@ -7,10 +7,13 @@ parser.add_argument('--output',type=Path,required=True);parser.add_argument('--c
 parser.add_argument('--runtime',type=Path,default=Path.home()/'Downloads/GVHMR')
 parser.add_argument('--crop',type=float,nargs=2)
 parser.add_argument('--preprocess-only',action='store_true',help='Save observations for source tracking review before any 3D prediction')
+parser.add_argument('--preprocess-device',choices=['cuda','cpu'],default='cuda',help='Observation-only device; CPU can prepare a new source while browser/GPU acceptance is running')
 args=parser.parse_args()
+if args.preprocess_device!='cuda' and not args.preprocess_only:
+    parser.error('--preprocess-device=cpu requires --preprocess-only; explicit 3D recovery keeps the established CUDA pipeline')
 os.environ['GVHMR_CHECKPOINTS']=str(args.runtime/'Checkpoints')
 os.environ['GVHMR_BODY_MODELS']=str(args.runtime/'Checkpoints/body_models')
-os.environ['GVHMR_DEVICE']='cuda';os.environ['GVHMR_PREDICT_DEVICE']='cuda'
+os.environ['GVHMR_DEVICE']=args.preprocess_device;os.environ['GVHMR_PREDICT_DEVICE']='cuda'
 import torch, numpy as np, av, cv2
 import gvhmr.cli.demo as demo
 from gvhmr import GVHMR
@@ -47,6 +50,7 @@ if args.preprocess_only:
     report={'status':'observations_prepared_pending_visual_review','source':str(args.source),
         'sourceSha256':hashlib.sha256(args.source.read_bytes()).hexdigest(),
         'staticCameraAssumption':True,'cropFraction':args.crop,'predictionRun':False,
+        'requestedObservationDevice':args.preprocess_device,
         'seconds':time.perf_counter()-started,'cache':str(capture)}
     (capture/'Data_ObservationPreparation.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
     print(json.dumps(report),flush=True)

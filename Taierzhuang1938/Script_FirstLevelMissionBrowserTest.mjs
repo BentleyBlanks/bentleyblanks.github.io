@@ -293,7 +293,8 @@ try {
   );
   assert.deepEqual(initial.mission.train.counts, [8, 24, 8]);
   assert.equal(initial.mission.train.entries.length, 41, "40 recruits plus Luo, player separate");
-  const ride = await page.evaluate(() => {
+  const ride = await page.evaluate(async () => {
+    const {ProbeFirstLevelTrainContact}=await import('./_import/Script_FirstLevelTrainContactProbe.mjs');
     const g = window.Tengxian;
     const playerStart={x:g.player.position.x,z:g.player.position.z-g.battlefield.trainOffsetM,y:g.player.position.y,yaw:g.player.yaw};
     g.Debug.Key("KeyW",true);g.Debug.Key("KeyD",true);g.Debug.Key("ShiftLeft",true);
@@ -308,6 +309,7 @@ try {
     const life = actors.map(a=>({kind:a.missionTrainLife.kind,seated:a.missionTrainLife.seated,active:a.actor.characterRig.missionTrainLifeActive,
       pelvis:BoneLocal(a,'pelvis').y, poseTime:a.actor.characterRig.missionTrainLifeState.time, animatedSeconds:0, handTravel:0, footDrift:0}));
     let maxLocalDrift=0, maxAnimationSpeed=0, maxRootError=0, playerDrift=0, playerRise=0;
+    const contacts=[];
     const offsetBefore=g.battlefield.trainOffsetM;
     const poses=actors.map(a=>({clip:a.actor.characterRig?.currentPlaybackId,rate:a.actor.characterRig?.currentAction?.getEffectiveTimeScale()}));
     for(let frame=0;frame<480;frame++) {
@@ -322,19 +324,23 @@ try {
         life[i].handTravel=Math.max(life[i].handTravel,BoneLocal(a,'handR').distanceTo(start[i].hand));
         for(const [j,role] of ['footL','footR'].entries())life[i].footDrift=Math.max(life[i].footDrift,BoneLocal(a,role).distanceTo(start[i].feet[j]));
       });
+      if(frame%60===0)contacts.push(...actors.filter(a=>a.missionTrainLife.seated).map(a=>({...ProbeFirstLevelTrainContact(g,a),frame})));
     }
     for(const key of ["KeyW","KeyD","ShiftLeft"])g.Debug.Key(key,false);
-    return {count:actors.length,travel:offsetBefore-g.battlefield.trainOffsetM,maxLocalDrift,maxAnimationSpeed,maxRootError,poses,life,
+    return {count:actors.length,travel:offsetBefore-g.battlefield.trainOffsetM,maxLocalDrift,maxAnimationSpeed,maxRootError,poses,life,contacts,
       handoff:{canLook,playerDrift,playerRise,stance:g.player.stance,locked:g.Debug.FirstLevelMission().receivingFood}};
   });
-  console.log("TRAIN_RIDE",JSON.stringify(ride));
+  await fs.writeFile(path.join(output,'Data_TrainRide.json'),JSON.stringify(ride,null,2));
+  console.log("TRAIN_RIDE",JSON.stringify({...ride,contacts:ride.contacts.filter(p=>p.rendered&&(p.penetrating||p.deckPenetrating||p.seatGap===null||p.seatGap>.006))}));
   assert.ok(ride.handoff.canLook&&ride.handoff.playerDrift<.04&&ride.handoff.playerRise<.08&&ride.handoff.stance==="stand"&&ride.handoff.locked,
     "receiving food holds walking, sprinting, jumping and stance, while retaining free look: "+JSON.stringify(ride.handoff));
   assert.ok(ride.poses.every(p=>p.clip==="AttackCommand"&&p.rate===0), "the sampled base pose never treats train travel as walking");
   assert.ok(Math.abs(ride.travel-48)<.05 && ride.maxLocalDrift<.08 && ride.maxAnimationSpeed<.05 && ride.maxRootError<.08, "train-local bodies and rendered roots stay still without a walking cycle: "+JSON.stringify(ride));
   assert.equal(ride.life.filter(p=>p.seated).length,32,'32 actual side-bench seats, eight standing recruits and Luo');
   assert.ok(ride.life.every(p=>p.active && p.footDrift<.025),'procedural upper-body activity keeps boot contacts fixed');
-  assert.ok(ride.life.filter(p=>p.seated).every(p=>Math.abs(p.pelvis-.6)<.025),'seated pelvis rests over the bench');
+  const renderedContacts=ride.contacts.filter(p=>p.rendered);
+  assert.ok(ride.contacts.length===32*8&&renderedContacts.length>=8&&new Set(renderedContacts.map(p=>p.model)).size===4&&renderedContacts.every(p=>p.animation&&p.vertices>0&&p.penetrating===0&&p.deckPenetrating===0&&p.seatGap!==null&&p.seatGap>=0&&p.seatGap<.006),
+    'actual original skin rests on the actual bench with no board/deck penetration; see Data_TrainRide.json');
   assert.ok(new Set(ride.life.map(p=>p.kind)).size>=7,'distinct carriage activities');
   const gestureKinds=['ShareFood','Eat','Talk','CountAmmo','Gear'];
   // The existing visibility budget intentionally stops evaluating off-screen rigs.
