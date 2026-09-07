@@ -247,6 +247,8 @@ function Frame(dt) {
   const forward = new THREE.Vector3();
   camera.getWorldDirection(forward);
   lights.UpdateShadowFrustum(camera.position, forward);
+  // 簇状局部光的簇表：与正片 RenderScene 里那一行同一条路（见 Script_Light）。
+  lights.UpdateClusters(camera, post.width, post.height);
   if (gi) gi.Update(dt, camera.position, lights);
   ssao.map.value = post.AoTexture;
   ssao.resolution.value.set(post.targets.aoBlur.width, post.targets.aoBlur.height);

@@ -461,6 +461,13 @@ const graphics = {
   // 实时探针体默认关。默认间接光由 Global SH Probe + AmbientColor 提供；打开时
   // 才跑五个 GI pass/帧，并在图集收敛后渐进接管室内与墙角的反弹光。
   gi: params.get("gi") === "1", giStrength: 1,
+  // 簇状前向光照（局部光源）。medium 及以上出厂开：它不是"多一层效果"，
+  // 而是把动态光预算从 6 盏解到 32/64/128 盏（low 档的 CLUSTER_TIERS 是 enabled:false，
+  // 打开也仍走旧的固定灯池）。运行时开关，不重编译。
+  clusteredLights: true,
+  // 英雄光的立方体阴影：整城几何要多画六遍，出厂关。打开会重编译一次
+  // （NUM_POINT_LIGHTS 0↔1），与阴影总闸、GI 采样层同一个先例。
+  clusterHeroShadow: false,
   fov: CAMERA.baseFovDeg,
 };
 NormalizeGraphicsDetails(graphics, post);
@@ -7276,6 +7283,11 @@ function RenderScene(dt) {
   // 但三者都从 RenderScene 出画（见上面那段注释），接在这儿一次覆盖三种镜头。
   camera.updateWorldMatrix(true, false);   // 取的是这一帧的位姿，不是上一帧的
   audio.SetListener(camera);
+  // 簇状光照的簇表：每帧一次，**必须排在出画之前**。和上面音频听者同一类账 ——
+  // 出画的路有四条（玩法 / 过场 / 菜单 / 编辑器），只有 RenderScene 是四条都过的
+  // 那一处；挂在玩法分支上的话，一进过场街上的火就整体错位。
+  // 接在 camera.updateWorldMatrix 之后：它要的是这一帧的 matrixWorldInverse。
+  lights.UpdateClusters(camera, post.width, post.height);
   // 整帧唯一一次世界矩阵更新（见 scene.matrixWorldAutoUpdate = false 那里的账）。
   // 必须排在天空穹跟位、相机 updateWorldMatrix 之后 —— 它们改的是这一帧的位姿。
   profiler.B("matrix");
@@ -7521,6 +7533,20 @@ function ApplyGraphics() {
       const preset = SKY_PRESETS[PHASE_TABLE[state.phaseIndex].sky];
       if (preset) gi.ApplyPreset(preset, graphics.giStrength);
     }
+  }
+  // 簇状局部光：总闸是**运行时** uniform（不重编译），英雄光阴影才是编译期的。
+  lights.SetClusteredEnabled(graphics.clusteredLights !== false);
+  const wantHero = !!graphics.clusterHeroShadow;
+  if (lights.heroShadow !== wantHero) {
+    lights.SetHeroShadow(wantHero);
+    // NUM_POINT_LIGHTS / NUM_POINT_LIGHT_SHADOWS 翻了，整场材质要重编译一次
+    // （与上面阴影总闸同一个先例）。不重编译的话着色器还按老的灯数跑。
+    scene.traverse((object) => {
+      const material = object.material;
+      if (!material) return;
+      if (Array.isArray(material)) material.forEach((m) => { m.needsUpdate = true; });
+      else material.needsUpdate = true;
+    });
   }
   const shadowSize = graphics.shadowSize || lights.defaultShadowSize;
   if (lights.sun.shadow.mapSize.x !== shadowSize) {

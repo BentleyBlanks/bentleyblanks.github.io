@@ -19,8 +19,13 @@
 //   · ssr / ssrScale / ssrSteps / ssrResolveTaps —— 2026-09 屏幕空间反射落地。
 //        档位口径见 §「SSR 分档」注释与 docs/Data_TechRenderPipeline.md
 //        「屏幕空间反射」一节；不随天光预设变。
+//   · clusteredLights —— 2026-09 簇状前向光照落地：medium 及以上开。
+//        low 保持 2026-09 之前的固定灯池（`Data_Tuning_Lights.CLUSTER_TIERS.low`
+//        的 enabled 也是 false，两处都关才是真关）。网格与光源预算不在这张表里，
+//        它们在 `Data_Tuning_Lights.CLUSTER_TIERS`（那张表是纯数值 + 纯几何，
+//        纯 Node 单测直接 import 它）。
 //   · 其余键（csm / gtao / ssil / volumetrics / atmosphere / autoExposure /
-//     lensFlare / lut / dof / taaUpscale / clusteredLights / contactShadows）
+//     lensFlare / lut / dof / taaUpscale / contactShadows）
 //     —— **本阶段全部为占位**，值 = 与今天等价（即「不启用新东西」）。
 //        对应子系统落地时把自己那一位改成实际档位，并在这里补出处注释。
 //
@@ -59,7 +64,9 @@
  *   lut           3D LUT 调色（今天：lift/gain + 分离调色）
  *   dof           景深（今天恒开：阵亡与开镜两条都走 Composite 的圆盘采样）
  *   taaUpscale    TAA 超分（TAAU）
- *   clusteredLights 簇状多光源（今天：固定预算的 PointLight 池）
+ *   clusteredLights 簇状多光源：视锥切簇 + CPU 每帧建簇表 + 材质补丁里的局部光循环。
+ *                   medium 32 盏 / high 64 盏 / ultra 128 盏；low 仍是固定预算的
+ *                   PointLight 池。网格与预算见 Data_Tuning_Lights.CLUSTER_TIERS
  * @typedef {Record<string, boolean|number>} QualityPreset
  */
 
@@ -75,7 +82,6 @@ const RESERVED_OFF = {
   lensFlare: false,
   lut: false,
   taaUpscale: false,
-  clusteredLights: false,
   // 景深今天就在跑（阵亡远景虚化 + 开镜近景虚化），所以它不是 false。
   dof: true,
 };
@@ -93,9 +99,13 @@ export const QUALITY_PRESETS = {
     velocity: true, hzb: true,
     // low 不跑 SSR：连靶都不建，材质也不编入补丁（`ssr` 进 cache key）。
     ssr: false, ssrScale: 0.5, ssrSteps: 32, ssrResolveTaps: 0,
+    // low 不跑簇：每帧几千次球-AABB 判定 + 三张表上传，换来的画面收益抵不过
+    // 它在 CPU 上的占用（low 档本来就卡在 CPU 提交）。这一档仍是两盏三方点光。
+    clusteredLights: false,
   },
   medium: {
     ...RESERVED_OFF,
+    clusteredLights: true,   // 局部光预算 32 盏（Data_Tuning_Lights.CLUSTER_TIERS.medium）
     ssao: true, bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.6, sharpen: 0.18, taa: true,
     velocity: true, hzb: true,
@@ -108,6 +118,7 @@ export const QUALITY_PRESETS = {
   // （ultra 是 MSAA 喂更干净的几何边给 TAA，两层叠加不冲突，只是贵）。
   high: {
     ...RESERVED_OFF,
+    clusteredLights: true,   // 局部光预算 64 盏（Data_Tuning_Lights.CLUSTER_TIERS.high）
     ssao: true, bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.75, sharpen: 0.22, taa: true,
     velocity: true, hzb: true,
@@ -117,6 +128,7 @@ export const QUALITY_PRESETS = {
   },
   ultra: {
     ...RESERVED_OFF,
+    clusteredLights: true,   // 局部光预算 128 盏（Data_Tuning_Lights.CLUSTER_TIERS.ultra）
     ssao: true, bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,
     aoScale: 1.0, sharpen: 0.22, taa: true,
     velocity: true, hzb: true,

@@ -8,7 +8,7 @@
 //
 // 2026-09 帧图重构之前，这段逻辑是 `Script_Materials.InjectIndirectLighting` 里
 // 一坨三百行的 if/else。现在它是一张注册表：GTAO / SSR / 接触阴影 / 簇状多光源
-// 各写一个补丁，插进列表即可，互不覆盖。
+// 各写一个补丁，插进列表即可，互不覆盖（簇状多光源已经按这条路接上了）。
 //
 // ## 用法
 // ```js
@@ -50,6 +50,9 @@
 
 import { GI_SAMPLE_GLSL, BindGiUniforms } from "./Script_Gi.mjs";
 import { BindDestructionUniforms, DestructionShaderGlsl } from "./Script_Destruction.mjs";
+import {
+  CLUSTER_COMMON_GLSL, ClusterLoopGlsl, BindClusterUniforms, GetActiveClusteredLights,
+} from "./Script_ClusteredLights.mjs";
 
 /**
  * 造一个补丁。字段全是可选的（只加 uniform 不改代码也合法）。
@@ -140,9 +143,10 @@ export function PatchKeysOf(material) {
 }
 
 // ===========================================================================
-// 现役补丁三路：屏幕空间 AO / 探针体 GI（含三态与全部调试视图）/ 破口裁切。
-// 2026-09 帧图重构从 `Script_Materials.InjectIndirectLighting` 原样搬来，
-// GLSL 一个字没改（拼接顺序与空白有差异，编译结果相同）。
+// 现役补丁四路：屏幕空间 AO / 探针体 GI（含三态与全部调试视图）/
+// 簇状局部光（2026-09 新增，见 Script_ClusteredLights）/ 破口裁切。
+// 前三路里的 AO 与 GI 是 2026-09 帧图重构从 `Script_Materials.InjectIndirectLighting`
+// 原样搬来的，GLSL 一个字没改（拼接顺序与空白有差异，编译结果相同）。
 // ===========================================================================
 
 /**
@@ -446,17 +450,56 @@ ${DestructionShaderGlsl(destruction.maxVolumes)}`],
 }
 
 /**
- * 现役间接光补丁组：顺序固定 **AO → GI → SSR → 破口**。
+ * 簇状前向光照的**局部光补丁**：替换 three 的点光/聚光循环。
+ *
+ * 它没有参数 —— 现役簇光系统是**全局单例**（`Script_ClusteredLights` 的
+ * `SetActiveClusteredLights`），补丁在编译那一刻现问一次。这样接是有由头的：
+ * 材质是 `MaterialLibrary` / `ActorFactory` / 过场三条链各自建的，而簇系统由
+ * `LightRig` 构造，两边的构造顺序在正片与探针页里都是「材质在前」。把
+ * cluster 一路穿过那三条链的签名，只为了拿一个全场唯一的对象，不划算。
+ *
+ * **没有簇系统时返回 null**：补丁列表里就没有这一项，`customProgramCacheKey`
+ * 逐字节回到 2026-09 之前的 `ssao1|gi2`，low 档与旧回归口一个字不差。
+ *
+ * key 里带簇网格的形状（`clust64_16x9x24`）：改档位 = 换 GLSL 循环上界，
+ * 必须换一份编译缓存。**灯的开关不在 key 里** —— 那是 `uClusterParams.w`
+ * 这个运行时 uniform，点一处火不会重编译整座城。
+ */
+export function MakeClusteredLightsPatch() {
+  const cluster = GetActiveClusteredLights();
+  if (!cluster) return null;
+  const grid = cluster.grid;
+  return MakePatch({
+    key: () => `clust${cluster.maxLights}_${grid.tilesX}x${grid.tilesY}x${grid.slices}`,
+    uniforms: (uniforms) => { BindClusterUniforms(uniforms, cluster); },
+    fragment: [
+      ["#include <common>", CLUSTER_COMMON_GLSL],
+      // 锚点选 `<lights_fragment_begin>` 之后：那里 geometryPosition（视空间）、
+      // geometryNormal、material、reflectedLight、RE_Direct 全都在，而三方的
+      // 点光/聚光循环刚跑完（NUM_POINT_LIGHTS = 0 时那两段整个不存在）。
+      // 上界取 maxLights：一个簇最多也就登记这么多盏。
+      ["#include <lights_fragment_begin>", ClusterLoopGlsl(cluster.maxLights)],
+    ],
+  });
+}
+
+/**
+ * 现役间接光补丁组：顺序固定 **AO → GI → SSR → 簇光 → 破口**。
  * 新补丁插在哪儿要想清楚：
  *   · `<aomap_fragment>` 上挂着 AO 的乘法与 GI 的光照分量取证，两者按这个顺序拼
  *     （AO 先压、取证后抓，面板读到的才是正式画面的值）；
  *   · `<lights_fragment_maps>` 上挂着 GI 的 `radiance *= 遮蔽比` 与 SSR 的
  *     `radiance = mix(...)`，SSR 必须在后（它是真实屏幕空间的光，不该再吃一层
- *     「探针亮度／天空亮度」的近似遮蔽）。
+ *     「探针亮度／天空亮度」的近似遮蔽）；
+ *   · 簇光挂在 `<lights_fragment_begin>` 之后，往 `reflectedLight.direct*` 里加直接光，
+ *     与 GI/SSR 改的间接光锚点不同、互不覆盖；它在 AO 的 `<aomap_fragment>` **之前**
+ *     是必须的 —— 局部光是直接光，不该被 SSAO 压。
  */
 export function IndirectLightingPatches({
   ssao = null, gi = null, ssr = null, destruction = null,
 } = {}) {
-  return [MakeSsaoPatch(ssao), MakeGiPatch(gi), MakeSsrPatch(ssr), MakeDestructionPatch(destruction)]
-    .filter(Boolean);
+  return [
+    MakeSsaoPatch(ssao), MakeGiPatch(gi), MakeSsrPatch(ssr), MakeClusteredLightsPatch(),
+    MakeDestructionPatch(destruction),
+  ].filter(Boolean);
 }

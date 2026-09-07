@@ -194,6 +194,29 @@ export class GraphicsSettings {
     Details(giBox, "gi");
     if (this.host.post?.quality === "low") Note(giBox, "GI 需 medium 及以上档位。");
 
+    // 簇状局部光：把动态光预算从 6 盏解到 32/64/128 盏。总闸是运行时 uniform
+    // （关掉不重编译）；英雄光阴影是编译期的，翻它会重编译一次整场材质。
+    const clusterBox = Section(body, "局部光源（簇状前向）");
+    const clusterRow = document.createElement("div");
+    clusterRow.className = "edBtns";
+    clusterBox.appendChild(clusterRow);
+    const clusterToggle = Toggle(clusterRow, "簇状多光源", gfx.clusteredLights !== false, (on) => {
+      gfx.clusteredLights = on;
+      this.Apply();
+    });
+    clusterToggle.root.dataset.role = "clusteredLights";
+    clusterToggle.root.title = "关掉就退回 2026-09 之前的固定灯池（同时只有几盏火有光）";
+    const heroToggle = Toggle(clusterRow, "英雄光阴影", gfx.clusterHeroShadow === true, (on) => {
+      gfx.clusterHeroShadow = on;
+      this.Apply();
+    });
+    heroToggle.root.dataset.role = "clusterHeroShadow";
+    heroToggle.root.title = "给优先级最高的那一盏局部光加立方体阴影：整城几何多画六遍，很贵";
+    this.clusterFacts = Facts(clusterBox, ["局部光", "簇均值 / 峰值", "簇表构建"]);
+    if (!this.host.lights?.clustered) {
+      Note(clusterBox, "当前画质档不跑簇（low 档保持固定灯池），面板开关无效。");
+    }
+
     const aa = Section(body, "抗锯齿 TAA");
     const aaRow = document.createElement("div");
     aaRow.className = "edBtns";
@@ -280,6 +303,10 @@ export class GraphicsSettings {
     // 在 low 档按「恢复出厂」应该回到关，而不是给它开一个建不出靶的开关。
     gfx.ssr = this.host.post ? !!this.host.post.preset.ssr : true;
     gfx.ssrStrength = 1;
+    // 簇状局部光的出厂值跟画质档走（low 那一档的表里就是 false），
+    // 与 TAA 同一条规矩：别在 low 上「恢复出厂」反而把它打开。
+    gfx.clusteredLights = this.host.post ? this.host.post.preset.clusteredLights !== false : true;
+    gfx.clusterHeroShadow = false;
     NormalizeGraphicsDetails(gfx, this.host.post, true);
     // TAA 的出厂值跟画质档走（medium 及以上开），不是固定的 true/false ——
     // 在 low 档上按「恢复出厂」应该回到关，而不是给它按上一份历史靶。
@@ -328,6 +355,24 @@ export class GraphicsSettings {
       : "—");
     const fpShadow = this.host.game?.firstPersonSelfShadow?.Status?.();
     f.Set("第一人称自阴影", fpShadow?.enabled ? `开（${fpShadow.size}${fpShadow.soft ? " · 软化" : " · 硬 3×3"}）` : "关");
+    // 簇状局部光的实况。「簇均值」量的是**每片元实际要循环几盏灯** —— 这一栏
+    // 才是这套东西的性能开关，光看「亮了几盏」没有意义。
+    if (this.clusterFacts) {
+      const cluster = this.host.lights?.clustered;
+      const cf = this.clusterFacts;
+      if (!cluster) {
+        cf.Set("局部光", "固定灯池（本档不跑簇）");
+        cf.Set("簇均值 / 峰值", "—");
+        cf.Set("簇表构建", "—");
+      } else {
+        const s = cluster.stats;
+        cf.Set("局部光", `${s.active} / ${cluster.maxLights}${cluster.enabled ? "" : "（已关）"}`
+          + `${this.host.lights.heroShadow ? " · 英雄光投影" : ""}`);
+        cf.Set("簇均值 / 峰值",
+          `${s.meanPerOccupied.toFixed(2)} / ${s.maxPerCluster}（${s.occupied}/${s.clusters} 簇非空）`);
+        cf.Set("簇表构建", `${s.buildMs.toFixed(3)} ms${s.overflow ? ` · 溢出 ${s.overflow}` : ""}`);
+      }
+    }
   }
 }
 
