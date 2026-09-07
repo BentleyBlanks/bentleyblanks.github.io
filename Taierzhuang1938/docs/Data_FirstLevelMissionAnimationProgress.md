@@ -20,6 +20,10 @@
 
 最新 master 已有 `Data_FirstLevelMissionVoiceAlignment.mjs`、`Data_FirstLevelMissionVoiceTiming.mjs` 与 Runtime VoiceEvent。后续动作读实际 cue／segment／源秒数和真实事件；本轮没有改对白录音、人数、任务状态或原演员身份。
 
+任务快照已同步另一台电脑的 `d9d373f35`／r11：25 阶段含新增 `TransferApproach`，村后接近至少 45 秒且等待实际抵达与 `TransferHope` 完成。开场保留自由转头，`TrainFoodReceived` 在 TrainMeal 第二句实际录音结束时释放走位；受袭后紧急制动，停稳并听到下车命令后才下车。最新 TrainShelling 原录音为 **20.036 秒**：2.12 秒进入 BrakeAndCover 并发出 TrainProneOrder，17–20.036 秒 EmergencyUnload 受 trainStopped 事实门约束。动作不得沿用旧 22.544 秒时间表。
+
+本次在 r11 上实跑 `Script_FirstLevelMissionTest.mjs --audio` 通过，保留 41 NPC、20 担架、36 轻伤、14 医护、8 百姓、8 守军及 Litter11 老周身份；消费上游新增的实际行军、装车、补位、撤离与战术演员。此版尚未重跑全关浏览器流程；下方 V9 的浏览器结果属于历史基线。
+
 新增入口（仍从本任务 worktree 根执行）：
 
 ```text

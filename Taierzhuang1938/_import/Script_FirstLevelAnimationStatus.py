@@ -26,8 +26,8 @@ def Main():
     stageById={13:['Train'],14:['Train'],15:['Train'],16:['Train'],17:['Train'],
         18:['Unloading'],19:['Unloading'],20:['Unloading'],21:['Unloading'],
         23:['MachineGun'],24:['Orders','Rescue'],25:['Orders','Carry','FinalCarry'],
-        26:['South','Courtyard','Transfer','RetreatFirst','RetreatWall','RetreatYard'],
-        27:['South','Transfer','Carry'],33:['AirFirst','Dive'],35:['Carry','FinalCarry'],
+        26:['South','Courtyard','TransferApproach','Transfer','RetreatFirst','RetreatWall','RetreatYard'],
+        27:['South','TransferApproach','Transfer','Carry'],33:['AirFirst','Dive'],35:['Carry','FinalCarry'],
         36:['Dive'],37:['Rescue'],38:['RetreatWall'],39:['RetreatFirst','RetreatWall','RetreatYard','Death'],
         40:['AirFirst','RetreatWall','FinalDefense'],43:['FinalCarry','Death'],44:['Death'],45:['Death'],46:['FinalDefense','Exit']}
     rows=[]
@@ -98,7 +98,7 @@ def Main():
                 blendFile='Blender/FirstLevelTrainV1/Scene_Nra_TrainBenchRise_V1.blend',
                 revisionLabel='V1 full bench sequence; not cut into accepted idle/rise transitions',
                 blockers=['Full bench sequence only; seat/palm contact and knee depth require review.',
-                    'Other source targets for this requirement are still in production.',
+                    'Other generated source targets require dense source review and recovery; first-pass retakes remain explicit.',
                     'Not enabled in mission; preserve the same 41 passengers and real queue.'],
                 reviewEvidence=['Models/FirstLevelTrainV1/Data_SelectedExportFidelityValidation.json',
                     'Models/RecoveryPreview/Data_TrainBenchRiseRawRigValidation.json',
@@ -117,7 +117,13 @@ def Main():
         'Data_Tuning_FirstLevel.mjs','Script_FirstLevelMissionRuntime.mjs','Script_FirstLevelMissionColumn.mjs',
         'Script_FirstLevelMissionVoice.mjs','Script_FirstLevelMissionTrain.mjs','Audio/FirstLevel/Data_FirstLevelVoiceManifest.json',
         'Data_FirstLevelMissionVoiceAlignment.mjs','Data_FirstLevelMissionVoiceTiming.mjs']
+    missionContract=json.loads(subprocess.check_output(['node','--input-type=module','-e',
+        "import {MISSION_VERSION,MISSION_STAGES} from './Data_FirstLevelMission.mjs';"
+        "import {MISSION_VOICE_TIMING} from './Data_FirstLevelMissionVoiceTiming.mjs';"
+        "console.log(JSON.stringify({version:MISSION_VERSION,stages:MISSION_STAGES,voiceTiming:MISSION_VOICE_TIMING}));"],
+        cwd=project,text=True,encoding='utf-8'))
     report=dict(schemaVersion=1,updated='2026-09-07',baseCommit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=project,text=True).strip(),
+        missionContract=missionContract,
         libraryRoot=str(root),catalogSha256=Hash(root/'Preview/Data_Catalog.json'),requirementsSha256=Hash(required),
         missionBaselineFiles={p:Hash(project/p) for p in files},
         population=dict(trainRecruits=40,trainNpcsIncludingLuo=41,carRecruits=[8,24,8],litters=20,
@@ -125,7 +131,7 @@ def Main():
         timing=dict(status='recorded_alignment_and_playback_events_available',
             retainedContinuousRecordings=True,animationDialogueOffsetsInvented=False,
             sources=['Data_FirstLevelMissionVoiceAlignment.mjs','Data_FirstLevelMissionVoiceTiming.mjs'],
-            note='Read current cue/segment/source seconds and Runtime VoiceEvent. Actual shell impacts, prone/dive orders and medic arrival remain authoritative. New animation clips are not bound yet.'),
+            note='Read current cue/segment/source seconds and Runtime VoiceEvent. TrainFoodReceived releases opening movement after the actual response; free look remains available. Actual shell impacts, train stop, prone/dive orders, TransferHope and medic arrival remain authoritative. New animation clips are not bound yet.'),
         sourceSearch=dict(directories=[str(root/'Video/Sources'),'C:/Users/Bentl/Downloads/GVHMR'],
             catalogActions=len(catalog['actions']),newVideoGenerations=batch['summary'].get('success',0),newInferenceRuns=1),
         sourceProduction=dict(userScope='Generate source coverage for all 48 requirements before completing individual retargets.',
@@ -137,7 +143,8 @@ def Main():
     text=json.dumps(report,ensure_ascii=False,indent=2)+'\n'
     (project/'docs/Data_FirstLevelMissionAnimationStatus.json').write_text(text,encoding='utf-8')
     (root/f'Models/{group}/Data_MissionStatus.json').write_text(text,encoding='utf-8')
-    print(json.dumps(dict(requirements=len(rows),priority=len(rows),status='source_production_in_progress'),ensure_ascii=False))
+    print(json.dumps(dict(requirements=len(rows),priority=len(rows),sourceSummary=batch['summary'],
+        missionVersion=missionContract['version'],stages=len(missionContract['stages'])),ensure_ascii=False))
 
 
 if __name__=='__main__':Main()

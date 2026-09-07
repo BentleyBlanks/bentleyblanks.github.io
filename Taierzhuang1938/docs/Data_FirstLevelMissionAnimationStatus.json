@@ -1,22 +1,452 @@
 {
   "schemaVersion": 1,
   "updated": "2026-09-07",
-  "baseCommit": "633f1ea928c74b682482c3bf42d29afe231e1026",
+  "baseCommit": "6425c5eeb9d35f12244a72690b309bef03dfacc4",
+  "missionContract": {
+    "version": "first-level-20260907-r11",
+    "stages": [
+      {
+        "id": "Train",
+        "objective": "随军列前行，和同伴待在车厢内。",
+        "target": {
+          "x": -77,
+          "z": 88
+        },
+        "requirements": [
+          "trainShelling"
+        ],
+        "cue": "TrainMeal"
+      },
+      {
+        "id": "Unloading",
+        "objective": "军列遭袭！车内伏低，紧急停车后跟罗班长撤进交通壕。",
+        "target": {
+          "x": -66,
+          "z": 66
+        },
+        "requirements": [
+          "trainStopped",
+          "unloadOrdersHeard",
+          "unloaded"
+        ],
+        "cue": "TrainShelling"
+      },
+      {
+        "id": "Support",
+        "objective": "沿交通壕支援前沿守军，掩护他们撤回。",
+        "target": {
+          "x": 0,
+          "z": -124
+        },
+        "requirements": [
+          "frontReached",
+          "frontContact"
+        ],
+        "cue": "SupportOrder"
+      },
+      {
+        "id": "MachineGun",
+        "objective": "接手机枪，压住火力点，掩护前方守军撤回。",
+        "target": {
+          "x": 0,
+          "z": -128
+        },
+        "requirements": [
+          "gunUsed",
+          "guardsSafe"
+        ],
+        "cue": "TakeMachineGun"
+      },
+      {
+        "id": "Tank",
+        "objective": "领取集束手榴弹，沿侧沟炸停战车。",
+        "target": {
+          "x": 13,
+          "z": -118
+        },
+        "requirements": [
+          "bundleTaken",
+          "tankImmobilized"
+        ],
+        "cue": "GuardsSafe"
+      },
+      {
+        "id": "Orders",
+        "objective": "随罗班长接收后送命令，带老周离开阵地。",
+        "target": {
+          "x": 0,
+          "z": -124
+        },
+        "requirements": [
+          "volunteerHeard",
+          "zhouOnLitter"
+        ],
+        "cue": "Volunteer"
+      },
+      {
+        "id": "South",
+        "objective": "向南开路，跟随后送纵队前往转运点。",
+        "target": {
+          "x": 55,
+          "z": -20
+        },
+        "requirements": [
+          "southTraversed",
+          "southHopeHeard"
+        ],
+        "cue": "SouthSecret",
+        "minimumSeconds": 75
+      },
+      {
+        "id": "Village",
+        "objective": "从右侧灶屋绕进内院，夺取伤员通道。",
+        "target": {
+          "x": 58,
+          "z": 6
+        },
+        "requirements": [
+          "innerCourtReached"
+        ],
+        "cue": "VillageAmbush"
+      },
+      {
+        "id": "Melee",
+        "objective": "近距离接敌：V 切大刀，F 拨推枪身，左键挥刀。",
+        "target": {
+          "x": 58,
+          "z": 6
+        },
+        "requirements": [
+          "meleeResolved"
+        ],
+        "cue": null
+      },
+      {
+        "id": "Courtyard",
+        "objective": "清理窗口机枪，打开院门，掩护担架分批通过。",
+        "target": {
+          "x": 53,
+          "z": 34
+        },
+        "requirements": [
+          "villageGunSilent",
+          "courtyardGateOpen",
+          "courtyardPassed"
+        ],
+        "cue": "CourtyardOpen"
+      },
+      {
+        "id": "TransferApproach",
+        "objective": "沿院后道路前往转运棚，掩护伤员交接。",
+        "target": {
+          "x": 95,
+          "z": 103
+        },
+        "requirements": [
+          "transferApproachReached",
+          "transferHopeHeard"
+        ],
+        "cue": "TransferHope",
+        "minimumSeconds": 45
+      },
+      {
+        "id": "Transfer",
+        "objective": "守住村东来路，等待伤员完成转运。",
+        "target": {
+          "x": 95,
+          "z": 103
+        },
+        "requirements": [
+          "transferArrived",
+          "vehiclesDeparted",
+          "zhouNext",
+          "followVehicleHeard"
+        ],
+        "cue": "TransferDefense",
+        "minimumSeconds": 150
+      },
+      {
+        "id": "AirFirst",
+        "objective": "日机来袭！利用掩体，压住村东追兵。",
+        "target": {
+          "x": 95,
+          "z": 103
+        },
+        "requirements": [
+          "firstAirPassComplete",
+          "firstAirOrdersHeard"
+        ],
+        "cue": "AircraftFirst"
+      },
+      {
+        "id": "Carry",
+        "objective": "接替老周担架后端，抬往西侧下沟口。",
+        "target": {
+          "x": 74,
+          "z": 111
+        },
+        "requirements": [
+          "zhouCarried",
+          "atDitchMouth",
+          "carryOrdersHeard"
+        ],
+        "cue": "CarryZhou"
+      },
+      {
+        "id": "Dive",
+        "objective": "下沟！",
+        "target": {
+          "x": 39,
+          "z": 116
+        },
+        "requirements": [
+          "diveComplete"
+        ],
+        "cue": "AircraftReturn"
+      },
+      {
+        "id": "Rescue",
+        "objective": "拿枪断后，掩护幺娃把老周拖回担架。",
+        "target": {
+          "x": 39,
+          "z": 116
+        },
+        "requirements": [
+          "zhouRecovered",
+          "rescuePassageClear"
+        ],
+        "cue": "RescueZhou"
+      },
+      {
+        "id": "RetreatFirst",
+        "objective": "守住排水沟折角，让担架从身后通过。",
+        "target": {
+          "x": 18,
+          "z": 109
+        },
+        "requirements": [
+          "retreatFirstPassed"
+        ],
+        "cue": "WestRetreat"
+      },
+      {
+        "id": "RetreatWall",
+        "objective": "退到院墙缺口，补弹并继续掩护担架。",
+        "target": {
+          "x": -51,
+          "z": 82
+        },
+        "requirements": [
+          "retreatWallPassed"
+        ],
+        "cue": "RetreatBleeding"
+      },
+      {
+        "id": "RetreatYard",
+        "objective": "从后院门窗阻击，掩护最后一副担架撤离。",
+        "target": {
+          "x": -99,
+          "z": 42
+        },
+        "requirements": [
+          "retreatYardPassed"
+        ],
+        "cue": "RetreatCold"
+      },
+      {
+        "id": "Reception",
+        "objective": "守住接收院入口，让最后一批伤员进入。",
+        "target": {
+          "x": -131,
+          "z": 31
+        },
+        "requirements": [
+          "receptionPassed"
+        ],
+        "cue": "ReceptionDefense"
+      },
+      {
+        "id": "FinalCarry",
+        "objective": "接过老周担架，抬入接收院，放到卫生兵旁。",
+        "target": {
+          "x": -139,
+          "z": 47
+        },
+        "requirements": [
+          "zhouPlaced"
+        ],
+        "cue": "FinalCarry"
+      },
+      {
+        "id": "Death",
+        "objective": "老周……",
+        "target": {
+          "x": -150,
+          "z": 42
+        },
+        "requirements": [
+          "deathSceneComplete"
+        ],
+        "cue": "ZhouDeath"
+      },
+      {
+        "id": "FinalDefense",
+        "objective": "掩护医护和伤员撤离接收院。",
+        "target": {
+          "x": -172,
+          "z": 54
+        },
+        "requirements": [
+          "rearLaneClear",
+          "medicsEscaped"
+        ],
+        "cue": "ReceptionWithdrawal"
+      },
+      {
+        "id": "Exit",
+        "objective": "从后门撤入城边联络巷，跟上罗班长。",
+        "target": {
+          "x": -186,
+          "z": -8
+        },
+        "requirements": [
+          "playerAtHandoff",
+          "finalExitHeard"
+        ],
+        "cue": "FinalExit"
+      },
+      {
+        "id": "Complete",
+        "objective": "第一关完成 · 往南的路",
+        "target": {
+          "x": -186,
+          "z": -8
+        },
+        "requirements": [],
+        "cue": null
+      }
+    ],
+    "voiceTiming": {
+      "TrainMeal": {
+        "segments": [
+          {
+            "id": "ShareFood",
+            "start": 0,
+            "end": 15.55,
+            "wait": 5,
+            "events": [
+              {
+                "at": 5.4,
+                "id": "TrainFoodReceived"
+              }
+            ]
+          },
+          {
+            "id": "CountAmmo",
+            "start": 15.55,
+            "end": 27.54,
+            "wait": 4.5
+          },
+          {
+            "id": "LeaveSome",
+            "start": 27.54,
+            "end": 38.818,
+            "wait": 3.5
+          }
+        ],
+        "tail": 4
+      },
+      "TrainShelling": {
+        "segments": [
+          {
+            "id": "FirstShellWarning",
+            "start": 0,
+            "end": 2.12,
+            "wait": 0.3,
+            "gate": "trainFirstShellImpact",
+            "endEvent": "TrainNearShell"
+          },
+          {
+            "id": "BrakeAndCover",
+            "start": 2.12,
+            "end": 4.76,
+            "wait": 0,
+            "startEvent": "TrainProneOrder"
+          },
+          {
+            "id": "WoundedSoldier",
+            "start": 4.76,
+            "end": 6.44,
+            "wait": 0,
+            "gate": "trainSoldierWounded"
+          },
+          {
+            "id": "TakeCover",
+            "start": 6.44,
+            "end": 9.32,
+            "wait": 0.2
+          },
+          {
+            "id": "CheckWound",
+            "start": 9.32,
+            "end": 17,
+            "wait": 2.5
+          },
+          {
+            "id": "EmergencyUnload",
+            "start": 17,
+            "end": 20.036,
+            "wait": 0.5,
+            "gate": "trainStopped"
+          }
+        ],
+        "tail": 1
+      },
+      "AircraftReturn": {
+        "segments": [
+          {
+            "id": "ReturnAndDive",
+            "start": 0,
+            "end": 5.721,
+            "wait": 0,
+            "events": [
+              {
+                "at": 4.58,
+                "id": "AircraftDiveOrder"
+              }
+            ]
+          }
+        ],
+        "tail": 0
+      },
+      "EscapeWhisper": {
+        "segments": [
+          {
+            "id": "PrivateExchange",
+            "start": 0,
+            "end": 9.143,
+            "wait": 3
+          }
+        ],
+        "tail": 1
+      }
+    }
+  },
   "libraryRoot": "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼",
   "catalogSha256": "720d1074f4a816f810bc4d3d235c61a35adf5ed1bf9a015a555b3d20cd4336fe",
-  "requirementsSha256": "95f286bddd727d1f2ceb0a70fe8ae5a3c26d115518deef7a83fb219de2a65cca",
+  "requirementsSha256": "61986df45369309975fcd5efd6a56056919768e3e920f1cb80aca6f6f898a980",
   "missionBaselineFiles": {
-    "Data_FirstLevelMission.mjs": "700b1641fb2b561aa7428e66205edad1e90290e874e92ac1836e7be90e194d03",
-    "Data_FirstLevelMissionDialogue.mjs": "781f30e496377189894ab1d45fec9f123721ca14f11c8dd923ef143d29fef8a9",
+    "Data_FirstLevelMission.mjs": "112fd1c53150b14478eb6be5a9748a9523cbd9b28d905c357d883c4663f9a8ee",
+    "Data_FirstLevelMissionDialogue.mjs": "a62830fc97fedc1f5df3aacf0664c89edada411ae7689e1dbdaf3164550a5cda",
     "Data_FirstLevelMissionTrain.mjs": "79884ae4f4975b37c1359dddb98db021cecacd5e123c275ddc25c65fa1cd89d2",
-    "Data_Tuning_FirstLevel.mjs": "c25b2607a0312e202d507416ce29953354aa58df4ee06c7c0ba6bc71d47f3dac",
-    "Script_FirstLevelMissionRuntime.mjs": "4fc37cc8add02a918f21f04d31961d19202f8ec285675a64f2acbd0ff375b92a",
-    "Script_FirstLevelMissionColumn.mjs": "c0146b500e65b7c735c548370d4ec2c84e4c2c049e43a463cf4c0b4d335bc15c",
-    "Script_FirstLevelMissionVoice.mjs": "05e021d4947dd0a2d5a4daacbef8f4cd5cd641aaf1b347c330bab1306093da2c",
+    "Data_Tuning_FirstLevel.mjs": "57b05e49999a13146229c24847b342faa5880a18157e66019623e5064df9c7a4",
+    "Script_FirstLevelMissionRuntime.mjs": "3879862fec2ffe675f7c3a6ce0273ec5aec9087f06a2a378b4905a72ffb41638",
+    "Script_FirstLevelMissionColumn.mjs": "061aaed5fbfd87063b53ec5b178569023d9ed4cc1956c112ec4a244de75582dc",
+    "Script_FirstLevelMissionVoice.mjs": "f875246b5de9b224acb27ea58c17e84863898257a6f72417b26f14b657ec2dc5",
     "Script_FirstLevelMissionTrain.mjs": "aa8ed5b30be396851eaea802886508e9f2ea6b60683b9804d5e6684ecb14dbf4",
-    "Audio/FirstLevel/Data_FirstLevelVoiceManifest.json": "43e9898deaed2dd5f856a6bb621d27392f00b6fa380d5cd08a827a3837f362ad",
-    "Data_FirstLevelMissionVoiceAlignment.mjs": "387ab996fc5932493515fc19d3a47ed7dcfb5f2170ca7ee0247e4917b8bbb27c",
-    "Data_FirstLevelMissionVoiceTiming.mjs": "588c803e16634d29318a11540af281079fb3c0b1e65eae6fcd8837687bc64475"
+    "Audio/FirstLevel/Data_FirstLevelVoiceManifest.json": "3a0b13601f63726dcd2ff112fdb7c332e3ac3f5064d714bf632833c6df2dffc8",
+    "Data_FirstLevelMissionVoiceAlignment.mjs": "af8cdc555cdd92c227e999ce07198b2f17f7d5ee3ad044faa29bdf09f5bf4146",
+    "Data_FirstLevelMissionVoiceTiming.mjs": "414c2270c3b93d5116eb48ec59335a67d5a0e4a2ca0efc4ff780d2e439e57091"
   },
   "population": {
     "trainRecruits": 40,
@@ -41,7 +471,7 @@
       "Data_FirstLevelMissionVoiceAlignment.mjs",
       "Data_FirstLevelMissionVoiceTiming.mjs"
     ],
-    "note": "Read current cue/segment/source seconds and Runtime VoiceEvent. Actual shell impacts, prone/dive orders and medic arrival remain authoritative. New animation clips are not bound yet."
+    "note": "Read current cue/segment/source seconds and Runtime VoiceEvent. TrainFoodReceived releases opening movement after the actual response; free look remains available. Actual shell impacts, train stop, prone/dive orders, TransferHope and medic arrival remain authoritative. New animation clips are not bound yet."
   },
   "sourceSearch": {
     "directories": [
@@ -5819,7 +6249,7 @@
       ],
       "blockers": [
         "Full bench sequence only; seat/palm contact and knee depth require review.",
-        "Other source targets for this requirement are still in production.",
+        "Other generated source targets require dense source review and recovery; first-pass retakes remain explicit.",
         "Not enabled in mission; preserve the same 41 passengers and real queue."
       ],
       "newSourceProduction": [
@@ -6147,7 +6577,7 @@
       "requirementId": "FL15",
       "priority": "A",
       "label": "伸手接食／讨食、小口吃；顺子／何有田／背景",
-      "acceptanceRequirements": "给予与接收成对；玩家走开就收回或递附近同伴，不锁视角、不远距离吸附。Eat／Talk 占位。",
+      "acceptanceRequirements": "给予与接收成对；开场至顺子接食回应完毕（TrainFoodReceived）固定玩家走位、保留自由转头，期间禁止跳跃和换姿态；交接后恢复移动。后续递附近同伴按实际距离收手，不远距离吸附。Eat／Talk 占位。",
       "actorRoles": [],
       "sourceVideo": null,
       "sourceVideoSha256": null,
@@ -7149,7 +7579,7 @@
       ],
       "blockers": [
         "Full bench sequence only; seat/palm contact and knee depth require review.",
-        "Other source targets for this requirement are still in production.",
+        "Other generated source targets require dense source review and recovery; first-pass retakes remain explicit.",
         "Not enabled in mission; preserve the same 41 passengers and real queue."
       ],
       "newSourceProduction": [
@@ -7990,6 +8420,7 @@
         "stages": [
           "South",
           "Courtyard",
+          "TransferApproach",
           "Transfer",
           "RetreatFirst",
           "RetreatWall",
@@ -8364,6 +8795,7 @@
         "enabled": false,
         "stages": [
           "South",
+          "TransferApproach",
           "Transfer",
           "Carry"
         ]
