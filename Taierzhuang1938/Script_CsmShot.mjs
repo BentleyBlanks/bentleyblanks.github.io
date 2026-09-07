@@ -106,7 +106,14 @@ try {
   await Shoot("Csm_Street_PenumbraView");
   await page.evaluate(() => window.Probe.post.SetDebugView("final"));
 
-  // 接触阴影：补物件贴地那一圈（normalBias 把着色点推出地面造成的漏光）
+  // 接触阴影：补物件贴地那一圈（normalBias 把着色点推出地面造成的漏光）。
+  // 走到沙袋垛跟前低头拍 —— 远景那一圈只有一两个像素宽，看不出开没开。
+  await page.evaluate(() => {
+    const P = window.Probe;
+    P.camera.position.set(0.2, 1.55, -18);
+    P.camera.lookAt(0.2, 0.1, -25);
+    P.StepFrames(12, 1 / 60);
+  });
   await Shoot("Csm_Street_ContactOn");
   await page.evaluate(() => { window.Probe.post.preset.contactShadows = false; });
   await Shoot("Csm_Street_ContactOff");
