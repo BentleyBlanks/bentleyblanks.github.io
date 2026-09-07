@@ -2062,9 +2062,67 @@ node Taierzhuang1938/Script_ActorDepthTest.mjs
 | `dofStrength = 0` | pass 整个不跑，省 4 个 draw call | 同上 |
 | CoC 正确性 | 焦平面 |CoC| = 0.000 px；天空 = 上限 11 px；前景标签恒 0（2200+ 样本） | 直接读半分辨率 CoC 靶的 alpha（半浮点解码） |
 
-**GPU 单段耗时本轮没有可信数字**：取证期间有别的代理在同一台机器上跑浏览器测试，
-同一配置的 `EXT_disjoint_timer_query_webgl2` 读数在 4.8–30 ms 之间跳，A/B 交替 6 轮
-取最小值仍然给出「1.0 比 0.8 更快」这种不可能的排序。已量到的**结构性**结论：
-`renderScale` 缩的是 prepass / SSAO / 主场景那一段（面积比就是它的比例），
-TAAU 把 TAA 之后那几趟留在满分辨率，运动模糊与景深各是 4 个 draw call、关掉即零。
-真机分段基线要等机器空下来再补一轮 `Script_FrameProfileTest`。
+**GPU 单段耗时（配对差分，1600×900 输出 / 内部 0.8）**。取证期间有别的代理在同一台
+机器上跑浏览器测试（70–120 个浏览器进程），各自取最小值再相减会给出「开着比关着还快」
+这种不可能的排序；改成**每一轮紧挨着测 on / off 再取逐轮差的中位数**（噪声是共模的，
+配对能消掉）之后才稳：
+
+| 段 | 逐轮差中位数 | 噪声带（IQR） |
+|---|---:|---|
+| 整条 post 链（`P.Render` 一次） | 5.0 ms | — |
+| motionBlur（全分辨率 12 抽样） | **+0.25 ms** | ±0.5 ms |
+| dof（四分之一分辨率 48 抽样，远景档） | **+0.40 ms** | ±0.5 ms |
+| taa 解算（含 TAAU 上采样） | **+0.15 ms** | ±0.5 ms |
+
+**`renderScale` 的省时量这一轮没量出来**：1.0 与 0.8 / 0.75 / 0.67 的配对差都落在
+±0.1 ms 以内，3394×1348 与 1600×900 两个分辨率上都是。两种解释都还站得住 ——
+① 这个白盒场景是**逐 draw 绑定**的（726 个 draw call，1.4–4.6 MPix 对 4070 SUPER 都不算填充压力），
+缩分辨率本来就省不到；② ANGLE/D3D11 的 `TIME_ELAPSED_EXT` 在 GPU 被别的进程抢占时
+会把饥饿空档也算进来，把 1 ms 级的差别淹掉。
+分不清这两者之前**不要**据此调档位默认值；机器空下来后用 `Script_FrameProfileTest`
+的「70% scale」那一行重量（它跑的是完整帧、不是只有 post 链）。
+
+顺带记两条不受噪声影响的：运动模糊与景深各是 **4 个 draw call**，
+`motionBlur = 0` / `dofStrength = 0` 时整个 pass 不跑（`renderer.info.render.calls`
+从 569 掉到 565），GPU 分段也整个消失。
+
+### 17.10 实例化 / 非蒙皮刚体的逐物体速度：量过了，本轮不做
+
+`docs` §1.6 留的那两条已知近似（InstancedMesh / BatchedMesh 与非蒙皮刚体运动件
+**只有相机速度**）本轮**没有**补上。不是漏掉，是量完之后决定不做。实测（phase=1、
+scale=medium、玩家在西关大街）：
+
+| 数 | 值 |
+|---|---:|
+| InstancedMesh 只数 / 实例总数 | 161 / 2467 |
+| 再挂一份上一帧 `instanceMatrix` 的显存 | **0.151 MB** |
+| BatchedMesh | 1 |
+| 可见的非蒙皮普通 Mesh | 432 |
+| 其中**已经占着 `onBeforeRender`** 的 | **419**（BuildSink 的破口裁切） |
+| 其中前景标签（第一人称手/枪） | 13 |
+| **没有钩子、能直接挂 `MarkDynamicPrepass` 的** | **0** |
+
+两条各自的拦路石：
+
+* **非蒙皮刚体**：`MarkDynamicPrepass` 是**直接赋值** `object.onBeforeRender`，
+  而 432 只可见网格里 **一只空闲的都没有** —— 419 只被破口裁切占着、13 只被前景
+  标签占着。挂上去等于把破口裁切静默摘掉（墙上打了洞照样是完整的墙）。
+  改成链式调用是可行的，但成本那一条仍在：逐 draw 置 `uniformsNeedUpdate` 会把
+  整份 uniform（含 24 组破口数组、288 个 float）重传，419 只 × 进出各一次 =
+  每帧 838 次全量重传，正好撞在「CPU 提交是瓶颈」那条红线上（`FrameProfileTest`
+  的 baseline 是 submit ≈ 15 ms）。
+* **实例化**：显存不是问题（0.15 MB）。问题是预通道的覆盖材质**全场只有一份**，
+  自定义属性的 `#define` 是材质级不是对象级 —— 要么 161 只 InstancedMesh
+  （以及布设流送、`Script_ActorBatch` 之后新建的每一只）**都**带上第二份
+  `instanceMatrix` 属性，要么缺属性的那几只会拿到全零矩阵、几何整只塌到原点
+  （而且是静默的）。这是一条跨 `BuildSink` / 布设流送 / `ActorBatch` 三处的契约，
+  不该由后处理这一侧单方面加。
+
+**现状的实际影响**：远景人群（`Script_ActorBatch` 的实例化 LOD）与会动的布设件在
+速度靶里是「静止物体」，所以它们不吃逐物体运动模糊、TAA 对它们只能靠邻域裁剪。
+近处的兵是真 SkinnedMesh，逐骨骼速度是准的 —— 运动模糊那张转身截图里几个兵都糊对了。
+
+**要做的话该怎么做**（留给拥有 `Script_ActorBatch` / `BuildSink` 的人）：
+① 在 InstancedMesh 的建构处统一挂 `aPrevInstanceMatrix`（缺一只就塌，所以必须在
+建构处而不是在预通道里补）；② 把 `MarkDynamicPrepass` 改成链式钩子，并把破口裁切
+那一组 uniform 挪进 UBO 或独立材质，让逐 draw 只重传一个矩阵。
