@@ -107,6 +107,17 @@ def Main():
                 reviewEvidence=['Models/FirstLevelTrainV1/Data_SelectedExportFidelityValidation.json',
                     'Models/RecoveryPreview/Data_TrainBenchRiseRawRigValidation.json',
                     'Preview/Data_FirstLevelTrainV1PlaybackValidation.json',latest['review']['retargetReport']]+[h['path'] for h in history])
+            support=root/'Models/FirstLevelTrainSupportV1'
+            if (support/'Data_ProductionSkinValidation.json').exists():
+                measured=Read(support/'Data_ProductionSkinValidation.json')
+                projects=Read(support/'Data_EditableProjects.json')
+                for result in measured['results']:
+                    assert Hash(support/('Animation_'+result['id']+'FirstLevelTrainSupport.glb'))==result['animationSha256']
+                row['productionSupportTrial']=dict(group='FirstLevelTrainSupportV1',status=measured['status'],runtimeEnabled=False,
+                    models=projects['results'],failures=measured['failures'],
+                    validation='Models/FirstLevelTrainSupportV1/Data_ProductionSkinValidation.json',
+                    editableValidation='Models/FirstLevelTrainSupportV1/Data_EditableProjectValidation.json')
+                row['blockers'].append('Production Support V1 fails temporal/height interpolation: retain its evidence and author a new version before runtime use.')
         elif row['requirementId']!='FL26':
             statuses=[s['status'] for s in row['newSourceProduction']]
             row['status']=('video_generation_in_progress' if 'querying' in statuses else

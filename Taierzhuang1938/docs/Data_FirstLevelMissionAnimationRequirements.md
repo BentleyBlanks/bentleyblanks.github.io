@@ -4,6 +4,8 @@
 
 本机接力实测见[逐项进度](Data_FirstLevelMissionAnimationProgress.md)和[状态清单](Data_FirstLevelMissionAnimationStatus.json)：最新用户要求先覆盖全部 48 项的素材生成；62 条首轮请求已有 60 条视频落盘、1 条服务失败、1 条待对账，复用旧库；60 条均已初筛，其中 17 条需补拍。当前本地候选为担架 V10、长凳扶腿起身 V3、切片递食 V2，以及逐阶下车和老周撑起失败 V1。两条坐姿已修正座面与鞋底，起身新增双掌扶腿；道具、游戏模型尺度及转场仍待验收，未替换正式关卡动画。
 
+正式四套人物的 TrainSupport V1 试制已完成关键帧烘焙与可编辑工程，但帧间／身高插值检查失败，已冻结为需修正，未接入。原 48 项素材批次仍覆盖 47 个需求；FL16 数弹原请求继续待对账，不重复提交。详细失败指标和补拍预算见逐项进度。
+
 ## 先读与范围
 
 按[项目 AGENTS](../AGENTS.md)和[根 AGENTS](../../AGENTS.md)使用独占 worktree。必读[视频转骨骼标准](Data_VideoToSkeletonStandard.md)、[新版剧情快照](Data_FirstLevelRebuildSource.md)、[重构验收](Data_FirstLevelRebuildAcceptance.md)、[任务与演员](../Data_FirstLevelMission.mjs)、[对白](../Data_FirstLevelMissionDialogue.mjs)。

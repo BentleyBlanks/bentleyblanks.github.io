@@ -25,7 +25,8 @@ if catalogPath.exists():
 for pattern in ['Models/ReviewV*','Blender/ReviewV*','Models/DeathCollapseV*','Blender/DeathCollapseV*',
     'Models/NextTenV*','Blender/NextTenV*','Models/MeleeVideoV*','Blender/MeleeVideoV*',
     'Models/RecoveryPreview','Blender/RawRecovery','Models/SourceWeapons','Models/_Pipeline',
-    'Models/FirstLevelSourceBatchV*','Models/_Cache/*','Video/Sources/*','Preview']:
+    'Models/FirstLevelSourceBatchV*','Models/FirstLevelTrainSupportV*','Blender/FirstLevelTrainSupportV*',
+    'Models/_Cache/*','Video/Sources/*','Preview']:
     for folder in root.glob(pattern):
         paths.update(p for p in folder.rglob('*') if p.is_file() and '__pycache__' not in p.parts and p.suffix not in ['.log'])
 paths.update(p for name in ['Data_ReadMe.md','Data_Standard.md'] if (p:=root/name).is_file())

@@ -2,7 +2,28 @@
 
 当前用户要求为**先覆盖全部 48 项的素材生成**，随后继续恢复、重定向、协作装配和游戏接入。尚未完成全部动作，也没有替换正式关卡动画。逐项字段、来源哈希和运行时文件快照见 [状态 JSON](Data_FirstLevelMissionAnimationStatus.json)。需求仍以 [完整需求](Data_FirstLevelMissionAnimationRequirements.md) 和 [视频转骨骼标准](Data_VideoToSkeletonStandard.md) 为准。
 
-## 最新进展：座凳支撑 V2 与双掌扶腿 V3
+## 正式人物尺度试制：TrainSupport V1 未通过
+
+2026-09-07 再次 fetch 后，需求仍为 r11 的 25 阶段。本轮没有修改任务、人数、对白时机或正式动画。即梦原 ID 查询仍返回 `querying`，实查余额仍为 **30 积分**；首轮保持 60 成功、1 失败、1 待对账，覆盖 47 个需求，FL16 缺成功来源。17 条补拍与医生重做合计预计 3,400 积分，现余额缺约 **3,370**；不含再次失败余量，未假设数弹退款，也未重新提交。
+
+已把扶腿起身 V3 绑定空间转换到四套原游戏模型，并制作各自的 .96/.98/1/1.02/1.04 五档支撑曲线，每档 479 帧、60 fps。原骨名、层级、inverse bind 与 NRA03 额外骨保留。正式凳板为深 .68 m、厚 .14 m、顶 .48 m；本地候选把身体朝过道前移 .24 m，**这个试制座位尚未写入游戏**。
+
+关键帧全部零穿凳、鞋底 2 mm，但独立浏览器对原网格的 **4 型号 × 9 身高 × 957 时刻（120 fps）**检查失败：最多 16 个蒙皮顶点穿凳，最大脚漂移约 5.682 mm，最低鞋底 −1.947 mm，掌面最低 −3.213 mm。02 号模型的骨盆瞬时速度达约 6.318 m/s，说明高度求解在不同可行区间之间跳变。不能以关键帧成功、工程能打开或静态近景代替插值连续性验收，也不能将这些曲线接入队列。
+
+四个 `.blend` 已重新打开；20 条 NLA 轨道保留完整 0–478 帧，五档身高共 120 个关键帧样本的凳面与鞋底接触通过。Blender 转换的鞋底偏差最大约 0.0202 mm，单独记录；此项不抵消上述插值失败。全身、掌面和松手近景已查看，报告、完整原模型 GLB、工程与截图保存在私有 `Models/FirstLevelTrainSupportV1`、`Blender/FirstLevelTrainSupportV1`、`Preview/FirstLevelTrainSupportV1`。
+
+该试制已标记 `needs_correction` 并冻结；后续用新版本目录修正曲线连续性。主三栏仍保留已审阅的起身 V3／递食 V2。尚缺坐姿循环与起身边界、生活活动分层、起身前移到物理队列的衔接、暂停／中断及实际游戏验收。生成和重定向过程均未改写原恢复数组。
+
+```text
+node Taierzhuang1938/_import/Script_FirstLevelTrainRuntimeBake.mjs --root <库>
+node Taierzhuang1938/_import/Script_FirstLevelTrainSupportBake.mjs --root <库> --group <新的版本目录>
+node Taierzhuang1938/_import/Script_FirstLevelTrainSupportVerify.mjs --root <库> --group FirstLevelTrainSupportV1
+blender --background --python-exit-code 1 --python Taierzhuang1938/_import/Script_FirstLevelTrainSupportProject.py -- --root <库> --group FirstLevelTrainSupportV1 --verify
+```
+
+V1 的浏览器命令应仍报告上述失败。不能覆盖其审阅文件来让重建入口通过；新组名形如 `FirstLevelTrainSupportV2`。本轮只交付重建、验收脚本和真实状态，没有发布试制资产，也未因这些私有试制重跑无变化的整关流程。
+
+## 已交付审阅：座凳支撑 V2 与双掌扶腿 V3
 
 - 本轮复用上述原视频和原恢复缓存，无新增视频费用或三维推理。切片递食与长凳起身的 `FirstLevelSeatedV2` 从明确的 V1 工程制作；原始数组、V1 工程与旧审阅记录保留。
 - 两条 V2 共 **1,078 帧**的实际 GLB 已验：完整凳板体积中无蒙皮顶点，鞋底最小点稳定在地面上方约 **2 mm**，棕色凳材质导出正确，inverse bind 矩阵与 V1 完全相同，原骨名、顺序、层级和骨长保持。原片时钟未改变。最大 root 修正为递食约 0.123 m、起身约 0.101 m，最大膝点修正约 0.151／0.176 m；这是明确的后期支撑修正，不是全身恢复保真。
