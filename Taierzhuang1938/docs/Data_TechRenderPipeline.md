@@ -477,7 +477,13 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 为什么 `renderer.toneMapping` 必须设 `NoToneMapping`：三方源码里 `toneMapping` 只在 `currentRenderTarget === null` 时才注入（module 7549–7559），也就是说渲进 RT 时它本来就不生效；但如果你留着 `ACESFilmicToneMapping`，最后那一 pass 如果哪天直接渲到屏幕，就会**tonemap 两次**。索性关掉，全部收进 Composite。
 
-### 2.1 动态特效灯进入哪一段
+### 2.1 动态特效灯进入哪一段（历史稿：2026-09 簇状光照之前）
+
+> **现状以 §17「簇状前向光照」为准。** 下面这一节描述的是 2026-09 之前的做法：
+> 固定预算的物理 `PointLight` 池（high 6 盏），逻辑火源可以更多但每帧只有前 N 盏
+> 进 GPU。那条「别改 `NUM_POINT_LIGHTS`」的由头**今天仍然成立**，也正是簇状光照
+> 存在的理由 —— 它把灯从「three 的 uniform 数组」搬进了纹理，于是开灯关灯不再是
+> 编译期的事。low 档仍然走本节这条路。
 
 爆炸和持续燃烧的点光不在 Composite 里“染一层橙色”，而是在第 3 趟 HDR 主场景里作为
 three 前向 PBR 的直接光参与 `MeshStandardMaterial`：地面、墙、人物和碎块收到的是真正按
@@ -1849,3 +1855,310 @@ program 都没新建。涨出来的全是**卢沟桥人物 GLB 的材质**：`Jo
 —— 连死三次，落地那一帧 program 不涨、整帧 CPU < 50 ms；再把两个阵营四个模型号各配
 本阵营的枪摆到镜头前、镜头转一圈，仍一个 program 不新建。头一条只能证明「这次没撞上」，
 第二条才证明预热覆盖了全部模型号。
+
+---
+
+## 17. 簇状前向光照（Clustered Forward，2026-09）
+
+> 这一节替代 §2.1（那一节留作历史稿）。**现状以本节为准。**
+> 代码：`Script_ClusteredLights.mjs`（运行时 + GLSL + 调试叠加）、
+> `Data_Tuning_Lights.mjs`（档位 + `ClusterGrid` 纯几何）、
+> `Script_Light.mjs` 的特效点光池、`Script_MaterialPatches.MakeClusteredLightsPatch`。
+> 回归口：`Script_ClusteredLightsTest.mjs`。
+
+### 17.0 先说要解决的那条实测
+
+2026-09 之前，全城同时能亮的动态光**一共 6 盏**（`EFFECT_LIGHT_COUNT.high`）。
+不是美术选的，是 three 的账：
+
+```js
+// three.module.js / WebGLPrograms.getParameters
+numPointLights: lights.point.length,     // → #define NUM_POINT_LIGHTS n
+```
+
+`NUM_POINT_LIGHTS` 是**编译期**的。场景里多一盏 visible 的 `PointLight`，整座城的
+`MeshStandardMaterial` 就要重编译一次（几百毫秒的硬卡顿）。所以灯池必须定长，
+逻辑火源再多也只有前 6 名进 GPU（`LightRig.Update` 按镜头贡献排序）。
+后果在夜战与燃烧的街道上一眼可见：**第七处火只有粒子，地面上没有光**。
+
+现在：medium 32 盏 / high 64 盏 / ultra 128 盏，而且开灯关灯**不碰 defines**。
+
+### 17.1 一帧做什么
+
+```
+[CPU] LightRig.Update(dt, elapsed, focus)
+        逻辑火源 / 爆炸包络 / 聚光 / 枪口闪光 → 打分（_ScoreEffect）
+        前 EFFECT_LIGHT_COUNT 盏照旧写进 fireLights（喂探针体 GI；不进场景）
+        全部候选灌进 ClusteredLights（BeginFrame + AddPoint/AddSpot/AddTube）
+[CPU] LightRig.UpdateClusters(camera, post.width, post.height)   ← RenderScene 里一行
+        ① 超预算时按分数选前 maxLights（部分选择排序，零分配）
+        ② 世界 → 视空间（直接乘 camera.matrixWorldInverse 的元素，不 new Vector3）
+        ③ ClusterGrid.SetProjection(p0, p5, p8, p9)  ← 从投影矩阵现取，TAA 抖动逐帧对齐
+        ④ ClusterGrid.Build(spheres, n)              ← 球→簇分配 + 压实
+        ⑤ 三张 DataTexture 置 needsUpdate
+[GPU] 主场景那一趟：材质补丁在 <lights_fragment_begin> 之后接一段循环
+        gl_FragCoord + 线性视深 → 簇号 → offset/count → 逐灯 RE_Direct
+```
+
+**场景里一盏 three 的 `PointLight` 都没有**（`NUM_POINT_LIGHTS = 0`，省寄存器也省
+那两段展开的循环）。唯一的例外是「英雄光」，见 §17.6。
+
+### 17.2 簇网格
+
+视锥切成 `tilesX × tilesY × slices`，深度按**指数**分布（Olsson 2012）：
+
+```
+sliceScale = slices / ln(far/near)
+sliceBias  = -slices · ln(near) / ln(far/near)
+slice(d)   = floor(ln(d) · sliceScale + sliceBias)
+```
+
+指数分布让每个簇在屏幕空间里近似立方（近处密、远处疏）；线性分布的远处簇会退化成
+一根针，它的 AABB 会把大量不相干的灯算进来。
+
+| 档 | tiles | slices | 簇数 | far | 光预算 | 索引表 | 聚光 | 英雄光阴影 |
+|---|---|---|---:|---:|---:|---:|---|---|
+| low | — | — | — | — | — | — | — | — |
+| medium | 16×9 | 24 | 3456 | 140 m | 32 | 32768 | 有 | 无 |
+| high | 16×9 | 24 | 3456 | 150 m | 64 | 65536 | 有 | 可开 |
+| ultra | 24×16 | 32 | 12288 | 170 m | 128 | 196608 | 有 | 可开 |
+
+low **不跑簇**（`CLUSTER_TIERS.low.enabled = false`）：每帧几千次球-AABB 判定 + 三张表
+上传，换来的画面收益抵不过它在 CPU 上的占用；那一档保持 2026-09 之前的两盏物理点光。
+
+`near` 是 **0.5 m 不是相机的 0.08 m**：`ln(d/near)` 在 near 太小时会把一半切片花在
+「贴着鼻子的 10 cm」上，街道那一段反而只剩几片。
+
+**网格参数从 `camera.projectionMatrix` 现取，不从 fov/aspect 算**：
+
+```
+clip.x = p0·vx + p8·vz,  clip.w = -vz = d
+ndcX   = p0·vx/d - p8    =>   tile 边界 i 处的 x/d 比值  kx[i] = (ndcX_i + p8) / p0
+```
+
+TAA 的子像素抖动走 `camera.setViewOffset`，改的正是 p8/p9（离轴），fov 与 aspect 一个字
+没变。拿 fov 算出来的网格与着色端 `gl_FragCoord → tile` 就差半个像素。
+（顺带：抖动是 `post.Render` 里才上的，`UpdateClusters` 拿到的是**未抖动**那一份，
+所以还留了 2% 的半径余量 `RADIUS_MARGIN`，见那里的注释。）
+
+### 17.3 球→簇分配（CPU，每帧）
+
+Persson 2013 的两段式：**先按屏幕矩形收窄候选 tile，再逐候选做精确的球-AABB 判定。**
+
+```
+for slice in [sliceOfDepth(d-r), sliceOfDepth(d+r)]:
+    dz = 球心到这一片深度带的距离；dz ≥ r 就跳过
+    rr = sqrt(r² - dz²)                      # 这一片里的截面半径
+    tan 区间 → tile 矩形（取两个深度端点的并集）
+    for ty in 行:  dy = 球心到这一行 AABB 的 y 距离（整行常数）
+        for tx in 列: dx = …；dx² + dy² + dz² ≤ r² 就挂进这一簇的链表
+```
+
+**收窄是严格保守的**（证明写在 `Data_Tuning_Lights` 的注释里），所以它与暴力法
+（扫全部 3456 个簇）**逐簇相等** —— 单测里那条断言不是「差不多」。
+
+三层循环里能提的都提了：深度那一维的平方距离在整片里是常数、y 那一维在整行里是常数，
+内层只剩两次乘法与一次比较。**不走回调** —— 一帧几万次命中，闭包调用本身就是 0.1 ms
+量级（实测 64 盏灯 0.51 → 0.28 ms）。
+
+压实用链表法：一趟几何（挂 `head[cluster]` 链表）+ 一趟压实（链表 → 连续索引段）。
+不用「先数个数再填」的两趟，那要把球-AABB 判定跑两遍。全部 TypedArray 预分配，零 GC。
+
+### 17.4 三张表
+
+| 表 | 格式 | 尺寸 | 内容 |
+|---|---|---|---|
+| `uClusterLights` | RGBA32F（**必须 NearestFilter**） | 4 × maxLights | 逐灯 4 个纹素，见下 |
+| `uClusterTable` | **R32UI**（`RedIntegerFormat` + `UnsignedIntType`） | (tilesX·tilesY) × slices | `offset << 8 \| count` |
+| `uClusterIndex` | **R16UI**（`RedIntegerFormat` + `UnsignedShortType`） | 1024 × ⌈maxIndices/1024⌉ | 光下标，按 1024 折行 |
+
+逐灯 4 个纹素：
+
+```
+t0: xyz = 视空间位置,  w = ±截断距离（符号 = 是不是纯点光）
+t1: rgb = color × intensity（线性）, a = 类型 0 点 / 1 聚光 / 2 管状
+t2: xyz = 视空间方向（聚光是「靶点→灯」，与 three 的 spotLight.direction 同口径）, w = coneCos
+t3: x = penumbraCos, z = 管长半值
+```
+
+**位置存视空间**：与 `WebGLLights.setupView` 给 `pointLights[i].position` 的口径一致，
+着色端 `lVector = pos - geometryPosition` 与三方逐字节同构。
+**decay 不存**：全项目恒为 2（物理逆平方），常数比一个通道便宜。
+
+`texture.needsUpdate = true` 整表传即可 —— three 对已分配过的 `DataTexture` 走
+`texSubImage2D`，不重新分配显存。high 档三张表合计约 200 KB/帧。
+
+### 17.5 着色（材质补丁）
+
+补丁挂在 `<lights_fragment_begin>` **之后**（那里 `geometryPosition`（视空间）、
+`geometryNormal`、`material`、`reflectedLight`、`RE_Direct` 全都在），
+注册顺序 **AO → GI → 簇光 → 破口**：
+
+* 排在 GI 之后：GI 改 `iblIrradiance`（间接光），簇光加 `reflectedLight.direct*`，锚点不同、互不覆盖；
+* 排在 AO 的 `<aomap_fragment>` **之前**是必须的 —— 局部光是直接光，被 SSAO 压就成了
+  「墙角的火照不亮墙角」。
+
+```glsl
+float clusterViewDepth = max(-geometryPosition.z, near);
+ivec2 tile = (gl_FragCoord.xy * uClusterScreen);          // uClusterScreen = tiles / 主靶尺寸
+int slice = int(floor(log(clusterViewDepth) * sliceScale + sliceBias));
+uint cell = texelFetch(uClusterTable, ivec2(ty*tilesX+tx, slice), 0).r;
+for (k < cell & 255u) {
+  int id = int(texelFetch(uClusterIndex, ivec2(slot & 1023u, slot >> 10u), 0).r);
+  vec4 t0 = texelFetch(uClusterLights, ivec2(0, id), 0);
+  // 纯点光可以在取颜色那一次 texelFetch 之前就退（窗口函数在 d ≥ cutoff 处恒为 0）
+  ...
+  light.color = t1.rgb * getDistanceAttenuation(dist, range, 2.0);      // three 自己的函数
+  if (spot) light.color *= getSpotAttenuation(coneCos, penumbraCos, angleCos);
+  RE_Direct(light, geometryPosition, geometryNormal, geometryViewDir,
+            geometryClearcoatNormal, material, reflectedLight);          // 同一个宏
+}
+```
+
+衰减与聚光都直接调 three 在 `lights_pars_begin` 里的**无条件段**定义的
+`getDistanceAttenuation` / `getSpotAttenuation`（`NUM_POINT_LIGHTS = 0` 时它们照样存在），
+最后调的也是同一个 `RE_Direct` 宏 —— 能量、菲涅尔、各向异性全部走材质自己的 BRDF，
+不是另写一份 Lambert。
+
+**cache key**：`clust<maxLights>_<tilesX>x<tilesY>x<slices>`（三态之外多一段）。
+改档位 = 换 GLSL 循环上界，必须换编译缓存；**灯的开关不在 key 里** —— 那是
+`uClusterParams.w` 这个运行时 uniform，点一处火不会重编译整座城。
+簇系统不存在时补丁返回 `null`，cache key 逐字节回到 `ssao1|gi2`（low 档与旧回归口一致）。
+
+补丁怎么拿到簇系统：`Script_ClusteredLights` 里一个**全局现役实例**
+（`SetActiveClusteredLights` / `GetActiveClusteredLights`），补丁在编译那一刻现问。
+材质是 `MaterialLibrary` / `ActorFactory` / 过场三条链各自建的，而簇系统由 `LightRig`
+构造（顺序还在材质之后），把 cluster 穿过那三条链的签名只为了拿一个全场唯一的对象，
+不划算。
+
+### 17.6 局部光的阴影 / 英雄光
+
+**簇里的灯一律不投影。** 想给某一盏加影子（照明弹、眼前那处大火），走
+`LightRig.SetHeroShadow(true)`：把当前分数最高的那一盏搬回一盏真的三方 `PointLight`
+（立方体阴影），其余仍走簇；那一盏会从簇表里剔掉，不会双份。
+
+出厂**关**，账很直白：一盏投影点光 = 整城几何再画六遍（六个面），而本项目
+CPU 提交本来就是瓶颈（1440p / phase=2 实测 15 ms）。开关会翻
+`NUM_POINT_LIGHTS` 0↔1 与 `NUM_POINT_LIGHT_SHADOWS` 0↔1，是**编译期**改动，
+`ApplyGraphics` 里跟着重编译一次整场材质（与阴影总闸、GI 采样层同一个先例）。
+
+### 17.7 给别的子系统的接口
+
+```js
+lights.GetClusterLightData()
+// {
+//   enabled, quality, maxLights,
+//   grid:  { tilesX, tilesY, slices, near, far, clusters },
+//   stats: { sources, active, indexCount, occupied, maxPerCluster,
+//            meanPerOccupied, meanPerCluster, overflow, buildMs, clusters },
+//   lights: [{ index, type: "point"|"spot"|"tube",
+//              position: [x,y,z],        // **世界坐标**（体积雾在世界空间 raymarch）
+//              color:    [r,g,b],        // 线性，已乘强度
+//              radius, decay,
+//              direction: [x,y,z]|null,  // 聚光是**光束朝向**（已还原符号）
+//              coneCos, penumbraCos, halfLength, score }]
+// }
+```
+
+`GetEffectLightState()` 的前五个字段（`budget` / `persistent` / `explosions` /
+`active` / `muzzle`）**一个字没改**，BootTest 与现有消费方照旧；新增的
+`spots` / `cluster` / `heroShadow` 是追加。簇光没开时 `GetClusterLightData()` 返回
+`null`，消费方退回 `GetEffectLightState().active`（那条路一直都在）。
+
+与 CSM 代理在 `Script_Light.mjs` 的分界线：**太阳那一半**（`sun`、阴影框、
+`SUN_SHADOW_GLSL`、`BindSunShadowUniforms`、`SyncShadowUniforms`、
+`UpdateShadowFrustum`、`ApplyPreset`）归 CSM；**特效点光池那一半**
+（`AddFire/UpdateFire/RemoveFire/ClearFires/AddSpot/FlashMuzzle/FlashExplosion/
+Update/UpdateClusters/GetEffectLightState/GetClusterLightData`）归本节。
+
+### 17.8 Debug Rendering
+
+两层**叠加层**（不是视图格 —— 视图那条路要在 `Script_PostDebug.GetSource()` 里加 case，
+那是后处理帧图的地盘）：
+
+* **簇灯数热图** —— 全屏四边形，读预通道的线性视深算簇号，按 count 上色
+  （蓝 0-2 / 青 / 绿 / 黄 / 红 ≥8）。打开时面板自动把视图切到「HDR 场景」：那一档是
+  uMode 4（Reinhard + sRGB，**不过合成链**），热图色标才不会被雾、曝光与 ACES 改掉；
+  着色器里先做一次 `L/(1-L)` 反解，屏幕上拿到的正是这条色标本身。关掉时视图还原。
+* **光源球线框** —— 本帧真正送进 GPU 的每盏灯的影响半径（三个大圆），聚光另画锥口圆
+  与四根母线。线色按 1/曝光预补（与 ColliderWireframe 同一条账）。
+
+面板同一栏还有三行读数：`局部光 n/预算`、`簇网格`、`每片元均/峰 + 索引条数`。
+**「每片元灯数」才是这套东西的性能开关**，光看「亮了几盏」没有意义。
+
+### 17.9 已知近似（都是有意的，别当 bug 修）
+
+* 簇用 **AABB** 而不是精确棱台。多算进来的灯在着色端被逆平方 + 窗口函数压成 0，
+  画面无差别；精确的棱台-球判定要六个平面，贵十倍。
+* **局部光不投影**（英雄光除外）。近墙的火靠直接光 + SSAO + 几何阴影维持体积。
+* 簇网格用**未抖动**的投影矩阵，靠 2% 的半径余量吃掉半像素误差（§17.2）。
+* 超预算时按分数丢灯（`stats.overflow` 非零就是撞上了）；索引表满了是**停下来**，
+  不写越界。
+* 管状光是**代表点法**（Karis 2013）：高光形状会略短，漫反射几乎无差别。
+  矩形面光没做（本关没有会亮的大平面）。
+
+### 17.10 成本（RTX 4070 SUPER / ANGLE-D3D11，探针街景）
+
+CPU（`ClusterGrid.Build`，64 盏 9 m 半径的火从眼前 14 m 铺到 63 m）：
+
+| | 最好一次 | 中位 |
+|---|---:|---:|
+| Node（同一份摆法） | 0.118 ms | 0.161 ms |
+| 浏览器（300 次圈进同一个计时窗口） | — | 0.186 ms |
+
+> 浏览器的 `performance.now` 被降精到 0.1 ms（Spectre 缓解），逐帧那个 `stats.buildMs`
+> 只能读出 0.1/0.2/0.3；CPU 预算这么紧，必须把 N 次建表圈进同一个窗口再除。
+
+GPU（2560×1440 / high，`EXT_disjoint_timer_query_webgl2`，**一次查询包 12 帧**，
+A/B 交替 5 轮取中位数）：
+
+| 摆法 | 灯数 | 簇光开 | 簇光关 | Δ | 每片元均/峰 |
+|---|---:|---:|---:|---:|---|
+| spread 8（正片密度） | 8 | 3.282 | 3.149 | **+0.133** | 2.67 / 6 |
+| spread 64 | 64 | 3.535 | 3.640 | **−0.106** | 3.76 / 18 |
+| dense 64 | 64 | 3.713 | 3.527 | **+0.186** | 7.60 / 27 |
+
+三行的 Δ 都落在 ±0.2 ms 以内，也就是**本底噪声量级**（同一档位来回摆就有这么多）。
+结论只能下到「64 盏灯在 1440p 上的增量 ≤ 0.2 ms 量级，远在 0.8 ms 预算之内」，
+再细的数这套计时方法给不出来。
+
+**踩过的坑**：单帧一个 `TIME_ELAPSED` 查询在 ANGLE-D3D11 上噪声比信号还大 ——
+第一版就是这么量出「960×540 增量 0.907 ms」而「1440p 增量 −0.25 ms」的自相矛盾结果
+（每次 begin/end 都要把命令流切断一次）。包 12 帧再除，噪声降一个量级。
+
+### 17.11 怎么验
+
+```bash
+node Taierzhuang1938/Script_ClusteredLightsTest.mjs --node   # 纯 Node 段（秒级）
+node Taierzhuang1938/Script_ClusteredLightsTest.mjs          # + 真浏览器
+node Taierzhuang1938/Script_ClusteredLightsTest.mjs --perf   # + 1440p GPU/CPU 消融
+```
+
+纯 Node 段查的是几何：**正式分配路径（`Build` → `_AssignSphere`）与暴力法逐簇相等**
+（24 盏灯，含「贴镜头 / 裁剪外 / 半径罩住整个视锥 / 贴屏幕边」四个边界例）、
+簇表与光索引表的压实结果、溢出停得住、聚光包围球装得下整个球扇形、
+64 盏灯的构建耗时、四档档位自洽，外加三条源码契约（补丁顺序 / `highp usampler2D` /
+衰减调的是 three 自己的函数）。
+
+浏览器段摆 24 盏彩色点光（**三原色轮转**：地面反照率偏棕，任何非原色都会被它拉偏；
+纯原色下 delta 的最大通道与反照率无关，断言才是硬的），逐盏读回它脚下那块地面像素：
+簇光开/关的差值要亮、而且亮的是它自己那个通道。同一组灯在 low 档只亮 2 盏
+（`EFFECT_LIGHT_COUNT.low`）—— 这条对照就是那道预算线。再验聚光锥内/锥外亮度比、
+半影平滑、开关 120 次灯 + 总闸热切不新建 program。
+
+两层调试叠加也**真的挂上去读回像素**：热图要让 144 个采样点全部变色，光源球线框要
+写满顶点缓冲，摘掉之后画面**逐点完全还原**（不许把调试色带回正片）。叠加层的
+ShaderMaterial 编译失败同样是静默的，热图又用了 `usampler2D` + `texelFetch`，
+少写一个 `highp` 就整片不见。
+
+> 逐像素比对前先 `post.SetTaaEnabled(false)`：抖动是逐帧的 Halton 子像素偏移，
+> 两帧之间同一个像素本来就不相等。第一版没关，"摘掉叠加层后完全还原"那条被
+> 判成 22/144 个点没还原 —— 越亮的地方越明显（半浮点在 20 附近的 ULP 就是 0.016）。
+
+> **摆灯别摆在探针街景的房子里**：房子从 z = −6 排到 −63，x 半宽 3.75-4.5 m，
+> 内沿只到 ±1.45 m；沙包工事在 z = −14。第一版把 24 盏摆在「街上」，四列钉进墙体，
+> 俯视相机看到的是屋顶不是地面，24 盏一盏都读不到 —— 症状与「簇光没生效」一模一样。
+> 测试现在统一用 z > +10 那半边空地（同一张 120×120 地面网格，材质法线 AO 全一样）。
+
+截图：`_shots/ClusteredLights_{burningStreet,night}_{on,off}.png`（14 处火 + 一枚
+照明弹 + 一盏探照灯，簇光开/关对照）。

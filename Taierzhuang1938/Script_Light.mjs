@@ -10,9 +10,10 @@
 
 import * as THREE from "three";
 import { GLOBAL_SH_PROBE_COEFFICIENTS } from "./Data_GlobalShProbe.mjs";
+import { ClusteredLights, SetActiveClusteredLights } from "./Script_ClusteredLights.mjs";
+import { EFFECT_LIGHT_COUNT, MakeClusterTier } from "./Data_Tuning_Lights.mjs";
 
 const SHADOW_SIZE = { low: 1024, medium: 2048, high: 4096, ultra: 4096 };
-const EFFECT_LIGHT_COUNT = { low: 2, medium: 4, high: 6, ultra: 6 };
 const MAX_EXPLOSION_ENVELOPES = 12;
 
 function Clamp01(value) { return Math.max(0, Math.min(1, value)); }
@@ -143,12 +144,28 @@ export class LightRig {
     this.ambientBase = this.ambient.intensity;
     this.giFill = 1;
 
-    // 持续火焰与爆炸共用一组固定预算的物理 PointLight。逻辑源可以多于灯槽；每帧按
-    // 镜头处贡献排序，只把最有用的几盏送进 three 的前向 PBR pass。这样炮击齐射不会
-    // 无上限加 NUM_POINT_LIGHTS，也不会为了“有灯/没灯”反复重编译整座城的材质。
+    // ---------------------------------------------------------------------
+    // 特效点光池
     //
-    // 灯从出生到销毁都保持 visible=true，闲置只把 intensity 归零。three 会把 visible
-    // 点光数量编进 shader；切 visible 会让第一颗手榴弹那一帧刚好撞上 shader 重编译。
+    // 2026-09 之前：持续火焰与爆炸共用一组固定预算的物理 `PointLight`，逻辑源
+    // 可以多于灯槽，每帧按镜头处贡献排序只把前 N 盏送进 three 的前向 PBR。
+    // 灯从出生到销毁保持 `visible = true`，闲置只把 intensity 归零 —— three 把
+    // visible 点光数编进 shader，切 visible 会让第一颗手榴弹那一帧撞上整城重编译。
+    //
+    // 2026-09 起：medium 及以上改走**簇状前向光照**（`Script_ClusteredLights`）。
+    // 那条路上场景里一盏三方 `PointLight` 都不放（`NUM_POINT_LIGHTS = 0`），
+    // 灯槽退化成「喂给探针体 GI 的那几盏」的数据载体 —— 所以下面这些
+    // `PointLight` 对象照建、`visible` 照样恒 true（`Script_Gi` 与 BootTest 都
+    // 按它们取数），只是不 `scene.add`。low 档保持老路径。
+    // ---------------------------------------------------------------------
+    this.clusterTier = MakeClusterTier(quality);
+    this.clustered = this.clusterTier.enabled
+      ? new ClusteredLights({ quality, tier: this.clusterTier })
+      : null;
+    if (this.clustered) SetActiveClusteredLights(this.clustered);
+    // 簇光开着时灯槽只是数据；关着时它们就是画面上的光，必须进场景。
+    this.poolInScene = !this.clustered;
+
     this.fireLights = [];
     const effectLightCount = EFFECT_LIGHT_COUNT[quality] ?? EFFECT_LIGHT_COUNT.high;
     for (let i = 0; i < effectLightCount; i += 1) {
@@ -156,10 +173,11 @@ export class LightRig {
       light.name = `VfxPointLight${i + 1}`;
       light.castShadow = false;
       light.visible = true;
-      scene.add(light);
+      if (this.poolInScene) scene.add(light);
       this.fireLights.push(light);
     }
     this.fireSources = new Map();
+    this.spotSources = new Map();
     this.nextFireHandle = 1;
     this.explosionEnvelopes = [];
     this.nextExplosionId = 1;
@@ -171,10 +189,18 @@ export class LightRig {
     this.muzzle.name = "VfxMuzzleLight";
     this.muzzle.visible = true;
     this.muzzle.castShadow = false;
-    scene.add(this.muzzle);
+    if (this.poolInScene) scene.add(this.muzzle);
     this.muzzleAge = 1;
     this.muzzleDuration = 0.055;
     this.muzzleBase = 0;
+
+    // 英雄光：簇里的灯一律不投影，但「照明弹」「眼前那处大火」这一盏值得有影子。
+    // 做法是把**最高优先级的那一盏**退回三方 `PointLight` 走立方体阴影，其余仍走簇。
+    // 代价是六面阴影图（整城几何画六遍），所以出厂关，由画质面板/测试显式打开；
+    // 开关会翻 `NUM_POINT_LIGHTS` 0↔1，与 GI 采样层同一个先例：一次性重编译。
+    this.heroLight = null;
+    this.heroShadow = false;
+    this.heroSourceId = 0;
 
     this.sunDirection = new THREE.Vector3(0, 1, 0);
     // 登记过的「太阳阴影采样」uniform 包（见 SUN_SHADOW_GLSL）。用 Set 不用数组：
@@ -332,11 +358,82 @@ export class LightRig {
 
   RemoveFire(handle) {
     this.fireSources.delete(handle);
+    this.spotSources.delete(handle);
   }
 
   ClearFires() {
     this.fireSources.clear();
+    this.spotSources.clear();
   }
+
+  // -------------------------------------------------------------------------
+  // 聚光（探照灯 / 车灯 / 门里透出来的光）—— 只走簇，永远不进 three
+  //
+  // three 的 `NUM_SPOT_LIGHTS` 与 `NUM_POINT_LIGHTS` 是同一类账：场景里加一盏
+  // 聚光就是整城重编译。这些灯从一开始就只以数据形式存在，簇表里挂上就亮。
+  // low 档（不跑簇）会把它们**整组忽略** —— 那一档本来就只有两盏点光的预算。
+  // -------------------------------------------------------------------------
+
+  /**
+   * 点一盏聚光。
+   * @param {{x:number,y:number,z:number}} position 世界坐标
+   * @param {object} [options]
+   * @param {{x:number,y:number,z:number}} [options.direction] **光束朝向**（灯→照射方向）
+   * @param {number} [options.intensity] 与点光同一量纲（color × intensity 进 GPU）
+   * @param {number} [options.radius] 衰减截断距离（米）
+   * @param {number} [options.color] 十六进制
+   * @param {number} [options.angle] 半锥角（弧度）
+   * @param {number} [options.penumbra] 0 = 硬边，1 = 从轴心就开始软
+   * @param {boolean} [options.flicker] 与 AddFire 同义（false = 调用方自带包络）
+   * @param {number} [options.priority] 灯槽紧张时的抢占权重
+   * @returns {number} 句柄（与 AddFire 共用一个号段，RemoveFire 也认）
+   */
+  AddSpot(position, {
+    direction = { x: 0, y: -1, z: 0 }, intensity = 18, radius = 30, color = 0xfff0d0,
+    angle = 0.5, penumbra = 0.35, flicker = false, priority = 1,
+  } = {}) {
+    const handle = this.nextFireHandle;
+    this.nextFireHandle += 1;
+    const half = Math.max(0.02, Math.min(Math.PI / 2 - 0.01, Number(angle) || 0.5));
+    this.spotSources.set(handle, {
+      handle,
+      position: new THREE.Vector3(position.x, position.y, position.z),
+      direction: new THREE.Vector3(direction.x, direction.y, direction.z).normalize(),
+      color: new THREE.Color(color),
+      base: Math.max(0, Number(intensity) || 0),
+      radius: Math.max(1, Number(radius) || 30),
+      angle: half,
+      penumbra: Math.max(0, Math.min(1, Number(penumbra) || 0)),
+      seed: handle * 41.7,
+      flicker: flicker === true,
+      currentIntensity: 0,
+      currentRadius: Math.max(1, Number(radius) || 30),
+      score: 0,
+      priority: Math.max(0, Number(priority) || 1),
+    });
+    return handle;
+  }
+
+  /** 改一盏已有的聚光。会动的灯（车灯、扫射的探照灯）用它逐帧写，别拆了重建。 */
+  UpdateSpot(handle, {
+    position = null, direction = null, intensity = null,
+    radius = null, color = null, angle = null, penumbra = null,
+  } = {}) {
+    const state = this.spotSources.get(handle);
+    if (!state) return false;
+    if (position) state.position.set(position.x, position.y, position.z);
+    if (direction) state.direction.set(direction.x, direction.y, direction.z).normalize();
+    if (intensity != null) state.base = Math.max(0, Number(intensity) || 0);
+    if (radius != null) state.radius = Math.max(1, Number(radius) || state.radius);
+    if (color != null) state.color.setHex(color);
+    if (angle != null) state.angle = Math.max(0.02, Math.min(Math.PI / 2 - 0.01, Number(angle)));
+    if (penumbra != null) state.penumbra = Math.max(0, Math.min(1, Number(penumbra)));
+    return true;
+  }
+
+  RemoveSpot(handle) { this.spotSources.delete(handle); }
+
+  ClearSpots() { this.spotSources.clear(); }
 
   /**
    * 爆炸的白热核 → 橙红火球光包络。粒子负责看见火球，这里负责把同一拍亮度泼到
@@ -461,9 +558,160 @@ export class LightRig {
     } else {
       this.muzzle.intensity = 0;
     }
+
+    // 聚光的包络：与点光同一套（flicker 默认关，探照灯不该在抖）。
+    for (const state of this.spotSources.values()) {
+      if (state.flicker) {
+        const t = elapsed * 1.0 + state.seed;
+        const flicker = 0.78 + 0.14 * Math.sin(t * 6.1) + 0.08 * Math.sin(t * 15.3 + 2.2);
+        state.currentIntensity = state.base * Math.max(0.3, flicker);
+      } else {
+        state.currentIntensity = state.base;
+      }
+      state.currentRadius = state.radius;
+      state.score = this._ScoreEffect(state, state.currentRadius, scoringFocus);
+    }
+
+    // 英雄光要在灌簇之前定下来：那一盏走三方立方体阴影，簇里必须把它剔掉。
+    this._SyncHeroLight();
+    this._FeedClusters(candidates);
   }
 
-  /** 浏览器测试与渲染调试面板取证，不参与玩法。 */
+  /**
+   * 把本帧的候选源灌进簇光系统。
+   *
+   * **顺序即优先级**：candidates 已经按 `_ScoreEffect` 排好（灯圈内不降权、
+   * 灯圈外按距离平方降权 × priority），簇系统在超预算时按同一个分数取前 N。
+   * 枪口闪光给一个压倒性的分数：它在镜头正前方零点几米，任何时候都该在。
+   */
+  _FeedClusters(candidates) {
+    const cluster = this.clustered;
+    if (!cluster || !cluster.enabled) return;
+    cluster.BeginFrame();
+    // 英雄光那一盏走三方立方体阴影，不能再进簇（否则双份直接光）。
+    const heroId = this.heroShadow && this.heroLight ? this.heroSourceId : 0;
+    for (const state of candidates) {
+      if (state.currentIntensity <= 0) continue;
+      const id = state.handle ?? -state.id;
+      if (heroId && id === heroId) continue;
+      const color = state.currentColor || state.color;
+      const k = state.currentIntensity;
+      cluster.AddPoint(
+        state.position.x, state.position.y, state.position.z,
+        color.r * k, color.g * k, color.b * k,
+        state.currentRadius, state.score);
+    }
+    if (this.clusterTier.spots) {
+      for (const state of this.spotSources.values()) {
+        if (state.currentIntensity <= 0) continue;
+        const color = state.color;
+        const k = state.currentIntensity;
+        const coneCos = Math.cos(state.angle);
+        const penumbraCos = Math.cos(state.angle * (1 - state.penumbra));
+        cluster.AddSpot(
+          state.position.x, state.position.y, state.position.z,
+          color.r * k, color.g * k, color.b * k, state.currentRadius,
+          state.direction.x, state.direction.y, state.direction.z,
+          coneCos, penumbraCos, state.score);
+      }
+    }
+    if (this.muzzle.intensity > 0) {
+      const c = this.muzzle.color, k = this.muzzle.intensity;
+      cluster.AddPoint(
+        this.muzzle.position.x, this.muzzle.position.y, this.muzzle.position.z,
+        c.r * k, c.g * k, c.b * k, this.muzzle.distance || 22,
+        // 枪口在眼睛前面半米：它永远该在预算里，分数直接顶到最高一档
+        1e9);
+    }
+  }
+
+  /**
+   * 建本帧的簇表并上传。**必须每帧调一次，排在出画之前**（`RenderScene`
+   * 与探针页的 `Frame` 各接一行）——不调的话着色器读到的是上一帧的相机，
+   * 街上的火会整体错位。相机换了（过场用另一台）也照样只要调它。
+   *
+   * @param {THREE.Camera} camera 本帧真正出画的相机
+   * @param {number} [width] 主渲染靶宽（`post.width`）
+   * @param {number} [height] 主渲染靶高（`post.height`）
+   */
+  UpdateClusters(camera, width = 0, height = 0) {
+    if (!this.clustered) return null;
+    return this.clustered.EndFrame(camera, width, height);
+  }
+
+  /** 英雄光：把最高分那一盏搬到三方 PointLight 上（只有它有阴影）。 */
+  _SyncHeroLight() {
+    if (!this.heroShadow || !this.heroLight) return;
+    let best = null;
+    for (const state of this.fireSources.values()) {
+      if (state.currentIntensity <= 0) continue;
+      if (!best || state.score > best.score) best = state;
+    }
+    for (const state of this.explosionEnvelopes) {
+      if (state.currentIntensity <= 0) continue;
+      if (!best || state.score > best.score) best = state;
+    }
+    if (!best) {
+      this.heroLight.intensity = 0;
+      this.heroSourceId = 0;
+      return;
+    }
+    this.heroSourceId = best.handle ?? -best.id;
+    this.heroLight.position.copy(best.position);
+    this.heroLight.color.copy(best.currentColor || best.color);
+    this.heroLight.distance = best.currentRadius;
+    this.heroLight.intensity = best.currentIntensity;
+  }
+
+  /**
+   * 开关英雄光的立方体阴影。
+   *
+   * **这是一次编译期改动**：加/减一盏 visible 的三方 `PointLight` 会翻
+   * `NUM_POINT_LIGHTS` 与 `NUM_POINT_LIGHT_SHADOWS`，整城材质重编译一次
+   * （与「阴影总闸」「GI 采样层」同一个先例，代价一次性几百毫秒）。
+   * 所以它只在设置动作里调，不许每帧翻。
+   * @returns {boolean} 实际状态
+   */
+  SetHeroShadow(on) {
+    const want = !!on && !!this.clustered && this.clusterTier.heroShadow !== false;
+    if (want === this.heroShadow) return this.heroShadow;
+    this.heroShadow = want;
+    if (want) {
+      if (!this.heroLight) {
+        this.heroLight = new THREE.PointLight(0xff7a2a, 0, 26, 2);
+        this.heroLight.name = "VfxHeroLight";
+        this.heroLight.castShadow = true;
+        this.heroLight.shadow.mapSize.set(512, 512);
+        this.heroLight.shadow.bias = -0.004;
+        this.heroLight.shadow.normalBias = 0.05;
+        this.heroLight.shadow.camera.near = 0.4;
+      }
+      this.scene.add(this.heroLight);
+    } else if (this.heroLight) {
+      this.scene.remove(this.heroLight);
+      this.heroLight.intensity = 0;
+      this.heroSourceId = 0;
+    }
+    return this.heroShadow;
+  }
+
+  /**
+   * 簇光运行时总闸（画质面板）。关掉之后着色器那段循环整条跳过 ——
+   * **不改 defines、不重编译**，只是 `uClusterParams.w` 归零。
+   */
+  SetClusteredEnabled(on) {
+    if (!this.clustered) return false;
+    return this.clustered.SetEnabled(on);
+  }
+
+  /**
+   * 浏览器测试与渲染调试面板取证，不参与玩法。
+   *
+   * 前五个字段是 2026-09 之前就有的口径（BootTest / 体积雾代理都按它读），
+   * **一个字都不能改**：`budget` 是灯槽数、`active` 是灯槽里真正亮着的那几盏。
+   * 簇光落地之后灯槽不再决定画面能亮几盏灯，但它仍然是喂给探针体 GI 的那一批，
+   * 所以这几个数照旧有意义。簇那边的实况另开 `cluster` 一节（新增，不冲突）。
+   */
   GetEffectLightState() {
     return {
       budget: this.fireLights.length,
@@ -474,13 +722,32 @@ export class LightRig {
         position: light.position.toArray(),
       })),
       muzzle: this.muzzle.intensity,
+      spots: this.spotSources.size,
+      cluster: this.clustered ? { ...this.clustered.stats, enabled: this.clustered.enabled } : null,
+      heroShadow: this.heroShadow,
     };
+  }
+
+  /**
+   * 本帧真正送进 GPU 的那批局部光（**世界坐标**）。体积雾 / 大气代理用它 ——
+   * 它们在世界空间 raymarch，拿不到簇表里的视空间数据。
+   * 结构见 `Script_ClusteredLights.GetClusterLightData`。簇光没开时返回 null，
+   * 消费方退回 `GetEffectLightState().active`（那条路一直都在）。
+   */
+  GetClusterLightData() {
+    return this.clustered ? this.clustered.GetClusterLightData() : null;
   }
 
   Dispose() {
     this.scene.remove(this.sun, this.sun.target, this.globalProbe, this.ambient, this.muzzle);
     for (const l of this.fireLights) this.scene.remove(l);
+    if (this.heroLight) this.scene.remove(this.heroLight);
     this.fireSources.clear();
+    this.spotSources.clear();
     this.explosionEnvelopes.length = 0;
+    if (this.clustered) {
+      this.clustered.Dispose();
+      this.clustered = null;
+    }
   }
 }

@@ -12,6 +12,7 @@ import * as THREE from "three";
 import { Panel, Section, Chips, Facts, Note, Toggle, El } from "./Script_EditorUi.mjs";
 import { InjectDepthPull, SHADING_MODES } from "./Script_Post.mjs";
 import { R } from "./Script_Physics.mjs";
+import { MakeClusterHeatOverlay, MakeClusterSphereOverlay } from "./Script_ClusteredLights.mjs";
 
 const VIEWS = [
   { id: "final", label: "最终画面", group: "输出", note: "正式的合成 + FXAA 输出。" },
@@ -525,6 +526,13 @@ export class DebugRenderingEditor {
     this.colliderXray = false;
     this.colliderFilters = { solid: true, terrain: true, character: true, dynamic: true, sensor: true };
     this.colliderToggle = null;
+    /** 簇状局部光的两层叠加：灯数热图 / 光源球线框。关着时是 null。 */
+    this.clusterHeat = null;
+    this.clusterSpheres = null;
+    this.clusterHeatToggle = null;
+    this.clusterSphereToggle = null;
+    this.clusterViewBefore = null;
+    this.clusterFacts = null;
     this._cameraWorld = new THREE.Vector3();
   }
 
@@ -556,12 +564,17 @@ export class DebugRenderingEditor {
     const pack = this.host.library?.gi;
     if (pack) pack.debugView.value = 0;
     this.SetColliders(false);
+    this.SetClusterHeat(false);
+    this.SetClusterSpheres(false);
     this.panel?.root.remove();
     this.panel = null;
     this.status = null;
     this.chipGroups = [];
     this.shadingChips = null;
     this.colliderToggle = null;
+    this.clusterHeatToggle = null;
+    this.clusterSphereToggle = null;
+    this.clusterFacts = null;
   }
 
   BuildUi(body) {
@@ -598,6 +611,22 @@ export class DebugRenderingEditor {
       legend.appendChild(item);
     }
     physics.appendChild(legend);
+
+    // 簇状局部光的两层。它们是**叠加层**不是视图格：视图那条路要在
+    // Script_PostDebug.GetSource() 里加 case（那是后处理帧图的地盘），
+    // 而叠加层走 post.AddDebugOverlay，画进 hdr 靶、TAA 之前，与碰撞体线框同一条路。
+    const cluster = Section(body, "局部光源（簇状）");
+    const clusterBox = El("div", "edBtns");
+    this.clusterHeatToggle = Toggle(clusterBox, "簇灯数热图", false, (on) => this.SetClusterHeat(on));
+    this.clusterHeatToggle.root.dataset.role = "clusterHeat";
+    this.clusterHeatToggle.root.title = "每个片元实际要循环几盏局部光：蓝 0-2 / 绿 3-4 / 黄 5-6 / 红 ≥8。"
+      + "打开时自动切到「HDR 场景」视图 —— 那一档不过合成链，看到的才是色标本身";
+    this.clusterSphereToggle = Toggle(clusterBox, "光源球线框", false, (on) => this.SetClusterSpheres(on));
+    this.clusterSphereToggle.root.dataset.role = "clusterSpheres";
+    this.clusterSphereToggle.root.title = "本帧真正送进 GPU 的每盏灯的影响半径；聚光另画锥口圆与四根母线";
+    cluster.appendChild(clusterBox);
+    this.clusterFacts = Facts(cluster, ["局部光", "簇网格", "每片元灯数"]);
+    if (!this.host.lights?.clustered) Note(cluster, "当前画质档不跑簇（low 档保持固定灯池）。");
 
     for (const group of ["输出", "后处理", "GBuffer", "材质", "光照", "AO", "GI"]) {
       const section = Section(body, group);
@@ -655,6 +684,54 @@ export class DebugRenderingEditor {
     return this.colliders;
   }
 
+  /**
+   * 簇灯数热图。打开时顺手把视图切到「HDR 场景」—— 那一档是
+   * `Script_PostDebug` 的 uMode 4（Reinhard + sRGB，**不过合成链**），
+   * 热图色标才不会被雾、曝光与 ACES 改掉。关掉时把视图还回去。
+   */
+  SetClusterHeat(on) {
+    const want = !!on && !!this.host.lights?.clustered;
+    if (want === !!this.clusterHeat) {
+      this.clusterHeatToggle?.Set(want);
+      return this.clusterHeat;
+    }
+    if (want) {
+      this.clusterHeat = MakeClusterHeatOverlay(this.host.lights.clustered);
+      this.clusterHeat.userData.SetSource(this.host.post?.NormalDepthTexture || null);
+      this.host.post?.AddDebugOverlay?.(this.clusterHeat);
+      this.clusterViewBefore = this.host.post?.GetDebugView?.() || "final";
+      this.SetView("hdr");
+    } else {
+      this.host.post?.RemoveDebugOverlay?.(this.clusterHeat);
+      this.clusterHeat.userData.Dispose();
+      this.clusterHeat = null;
+      if (this.clusterViewBefore) this.SetView(this.clusterViewBefore);
+      this.clusterViewBefore = null;
+    }
+    this.clusterHeatToggle?.Set(want);
+    return this.clusterHeat;
+  }
+
+  /** 光源球线框：本帧真正送进 GPU 的每盏局部光的影响半径。 */
+  SetClusterSpheres(on) {
+    const want = !!on && !!this.host.lights?.clustered;
+    if (want === !!this.clusterSpheres) {
+      this.clusterSphereToggle?.Set(want);
+      return this.clusterSpheres;
+    }
+    if (want) {
+      this.clusterSpheres = MakeClusterSphereOverlay(this.host.lights.clustered);
+      this.clusterSpheres.userData.Update();
+      this.host.post?.AddDebugOverlay?.(this.clusterSpheres);
+    } else {
+      this.host.post?.RemoveDebugOverlay?.(this.clusterSpheres);
+      this.clusterSpheres.userData.Dispose();
+      this.clusterSpheres = null;
+    }
+    this.clusterSphereToggle?.Set(want);
+    return this.clusterSpheres;
+  }
+
   SetColliderXray(on) {
     this.colliderXray = !!on;
     this.colliders?.SetXray(this.colliderXray);
@@ -695,6 +772,26 @@ export class DebugRenderingEditor {
 
   Update() {
     if (this.colliders) this.colliders.Update(this.host.physics, this.CameraWorldPosition());
+    // 热图要现接预通道靶：SetSize 会重建它，纹理引用每帧都可能换（与 RenderScene
+    // 里 vfx.SetDepthSource 那三行同一类账，只在打开时接一次就会指向已废弃的靶）。
+    if (this.clusterHeat) this.clusterHeat.userData.SetSource(this.host.post?.NormalDepthTexture || null);
+    if (this.clusterSpheres) this.clusterSpheres.userData.Update();
+    if (this.clusterFacts) {
+      const cluster = this.host.lights?.clustered;
+      const cf = this.clusterFacts;
+      if (!cluster) {
+        cf.Set("局部光", "固定灯池（本档不跑簇）");
+        cf.Set("簇网格", "—");
+        cf.Set("每片元灯数", "—");
+      } else {
+        const s = cluster.stats;
+        const g = cluster.grid;
+        cf.Set("局部光", `${s.active} / ${cluster.maxLights}${cluster.enabled ? "" : "（已关）"}`);
+        cf.Set("簇网格", `${g.tilesX}×${g.tilesY}×${g.slices} · ${g.near.toFixed(1)}–${g.far.toFixed(0)} m`);
+        cf.Set("每片元灯数", `均 ${s.meanPerOccupied.toFixed(2)} / 峰 ${s.maxPerCluster}`
+          + ` · 索引 ${s.indexCount}${s.overflow ? `（溢出 ${s.overflow}）` : ""}`);
+      }
+    }
     if (!this.status) return;
     const target = VIEW_TARGETS[this.view]?.(this.host.post, this.host.gi) ?? null;
     let message = "";

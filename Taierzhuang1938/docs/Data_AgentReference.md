@@ -56,7 +56,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - `Data_Tuning_Graphics.mjs` —— 画质档位表（纯数据，零 three）：每档每个 pass 的开关与旋钮，
   外加 `HZB` / `VELOCITY` 两组常量。`Script_Post` / `Script_Main` / `Script_EditorSettings` 只读它。
 - `Script_MaterialPatches.mjs` —— **材质补丁注册表**：所有往 `MeshStandardMaterial` 插 GLSL 的
-  事都走它（AO / GI 三态 / 破口裁切），一个 `onBeforeCompile` 做完，cache key 由补丁 key 拼。
+  事都走它（AO / GI 三态 / **簇状局部光** / 破口裁切，顺序固定），一个 `onBeforeCompile` 做完，
+  cache key 由补丁 key 拼。
   `Script_Materials.InjectIndirectLighting` 只是它的薄封装。
 - `Script_FirstPersonSelfShadow.mjs` —— 第一人称手臂/武器专用 packed-depth + 3×3 PCF
   自阴影；与战场太阳阴影图隔离，禁止改成 Viewmodel 直接 `castShadow=true`。
@@ -64,8 +65,17 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Script_Light.mjs`（太阳 + 跟随式阴影框 + 火光池 + 枪口闪光 + **`SUN_SHADOW_GLSL` 公共阴影
   采样接口**：体积雾 / 接触阴影 / CSM 都从这条接口取，别自己采 `sun.shadow.map`）、
   `Script_Sky.mjs`（解析式天空 + PMREM）、`Script_Water.mjs`（Gerstner 护城河）。
+- **局部光源（簇状前向光照，2026-09）**：`Script_ClusteredLights.mjs`（视锥切簇 + 三张
+  DataTexture + 材质补丁里的局部光循环 + 两层调试叠加）＋ `Data_Tuning_Lights.mjs`
+  （档位 + `ClusterGrid` 纯几何，零 three，纯 Node 单测直接 import 它）。
+  接口在 `Script_Light.mjs`：`AddFire/UpdateFire/RemoveFire` 签名一个字没变，
+  新增 `AddSpot/UpdateSpot/RemoveSpot`、`UpdateClusters(camera, w, h)`（每帧一次，
+  正片挂在 `RenderScene`）、`GetClusterLightData()`（**世界坐标**的当前光源表，给体积雾/大气）。
+  medium 32 盏 / high 64 盏 / ultra 128 盏；low 仍走固定灯池。
+  回归口 `Script_ClusteredLightsTest.mjs`（`--node` 只跑纯 Node 段，`--perf` 加跑 1440p GPU 消融）。
+  先读：`docs/Data_TechRenderPipeline.md` §17（§2.1 是它的历史稿）。
 - 回归口：`Script_PostFrameGraphTest.mjs`（帧图契约）、`Script_PostTest.mjs`、
-  `Script_GiTest.mjs`、`Script_EditorTest.mjs`（Debug Rendering 全部视图）。
+  `Script_GiTest.mjs`、`Script_ClusteredLightsTest.mjs`、`Script_EditorTest.mjs`（Debug Rendering 全部视图）。
 - 先读：`docs/Data_TechRenderPipeline.md` **§1「帧图与模块契约」**（接入说明；
   §1A 起是设计期草案与专题深挖，GI 在 §12，坑表在末尾）。
 
