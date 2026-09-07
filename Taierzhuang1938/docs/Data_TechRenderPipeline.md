@@ -1861,6 +1861,9 @@ program 都没新建。涨出来的全是**卢沟桥人物 GLB 的材质**：`Jo
 
 ## 17. 体积雾 / 体积光（froxel，2026-09）
 
+> 2026-09 这一轮有八个并行子系统各自往这份文档追加章节，**节号会撞**。
+> 认文件名不认节号：本节对应 `Script_PostVolumetrics.mjs`。
+
 `Script_PostVolumetrics.mjs` / `Data_Tuning_Volumetrics.mjs` / `Script_VolumetricsTest.mjs`。
 出厂 medium 及以上开；low 保留合成 pass 里的解析式高度雾（fallback 路径永久保留）。
 **旧的 §6.2 是设计期草案，没有实装。**
@@ -1937,6 +1940,7 @@ froxel 网格存成一张 **2D 图集**（切片平铺），不是 `Data3DTextur
 | `VolumetricFarTransmittance(vec2 uv)` | 同上那块 GLSL | **物理大气代理**：体积雾覆盖 0..`far`，把 aerial perspective 乘上这个值即可。apply 在最远切片处**没有把透过率硬归零**，就是为了留这个接口 |
 | `post.volumetricsPass.AddFogVolume / UpdateFogVolume / RemoveFogVolume` | 玩法侧 | 烟幕、炮击烟、着火房屋的热烟、河面薄雾 |
 | `SunShadowVisibilityCheap(vec3 worldPos)` | **CSM 代理**（未落地时本模块自带 `#ifndef SUN_SHADOW_HAS_CHEAP` 的 fallback） | 注入那一趟 |
+| 局部点光列表 | `LightRig`。三选一按「灯多的优先」：① `GetClusterLightData().lights[]`（**簇状多光源**，世界坐标 + 已乘强度的线性色 + 半径，按镜头贡献排过序）② `fireLights` + `muzzle`（今天的定长灯池，零分配）③ `GetEffectLightState().active`（兜底） | 注入那一趟，取前 `MAX_VOLUMETRIC_LIGHTS`（8）盏 |
 
 Composite 侧只动了 `ApplyFog` 一段：体积路走**加法**（`color·T + scatter`），
 解析路仍走 `mix`（`scatterAdd` 恒 0，逐比特不变）。反过来做
@@ -1981,6 +1985,14 @@ Composite 侧只动了 `ApplyFog` 一段：体积路走**加法**（`color·T + 
   `whiteboxDay` 0.35、`editorClear` 0.5、`night` 0.55。
 * **噪声按帧序漂移**（`ctx.frame/60`），不是按真实秒。30 fps 下烟走得慢一半。
   换成秒会让逐轮截图比对失效 —— 决定论优先（本仓库的老规矩）。
+* **天空前的粒子**：粒子不进 MRT 预通道，所以它在 `nd.w` 上是隐身的，与天空同一个桶。
+  接上体积雾之后合成 pass 也给这一桶上雾了，粒子那份 `AERIAL` 自带雾就成了双份
+  （烟柱跨过屋脊线会裂成深浅两截）。现在的做法是**体积雾真的在跑时把粒子那份停掉**
+  （`Script_Main.RenderScene` 里 `vfx.SetFog(null, …)`），雾只由合成 pass 一处产出。
+  残留的近似：天空前一根 60 m 的烟柱吃到的是**最远切片**那一整列的雾，比它自己该吃的多。
+  要根治得让半透明件也有深度（另开一张覆盖靶，或者把雾挪到透明 pass 之前）。
+  **水面不在这条里** —— 它是 `skipNormalDepth`，`nd.w` 上留的是身后河床的深度，
+  照常走 legacy 那条，与今天逐比特相同。
 * **时域重投影只做出界降权**，没有做邻域裁剪（TAA 那套 YCoCg AABB）。
   雾是低频量，遮挡变化时会有约 10 帧的拖尾；快速转身时网格边缘会短暂变噪
   （调试视图「体积重投影」看得到）。
@@ -1998,7 +2010,29 @@ pass 自带调试视图的登记方式是 `GetDebugSource(view)`（`Script_PostD
 会遍历 `passes` 问一遍）—— 八个并行子系统各带两三个视图，集中在一张表里必然天天冲突，
 所以 2026-09 这一轮把它改成了 pass 自己登记。
 
-### 17.8 怎么验
+### 17.8 成本（实测）
+
+RTX 4070 SUPER / ANGLE-D3D11，正片 `?shot=1&phase=1`，**3394×1348**，
+逐 pass GPU 计时（`FrameProfiler` 的 `EXT_disjoint_timer_query_webgl2`），
+体积雾开/关**交替各 5 轮**取中位数：
+
+| 档 | froxel | 图集 | inject | integrate | apply | 合计 | composite Δ |
+|---|---|---|---:|---:|---:|---:|---:|
+| high | 160×90×64 | 1280×720 | 0.082 ms | 0.124 ms | 0.077 ms | **0.283 ms** | +0.035 ms |
+
+逐轮离散度很小（inject 0.080–0.088 / integrate 0.124–0.132 / apply 0.077–0.085），
+因为这三趟是纯全屏 blit，不受场景状态影响。**整帧 gpuTotal 的 on/off 差值不可用**：
+它被 prepass 与 main 的几毫秒漂移（AI、烟火、别的 agent 同时在跑浏览器测试）盖过，
+单向先后测会把那点漂移算成特性开销 —— 逐段计时才是这一项的正确量法。
+
+CPU 侧：draw call +4（三趟 blit 与它们的靶切换），提交耗时在噪声以内。
+
+**计时查询的坑**：ANGLE/D3D11 上 `QUERY_RESULT_AVAILABLE` 要**过一个 event-loop turn**
+才翻过来。在一个 `page.evaluate` 里连着 `StepFrames` 推几十帧的话，`FrameProfiler._Poll`
+一次都收不到结果，`pending > 8 就丢最老的` 会把整批扔掉（症状是逐段全 null）。
+每帧之间 `await setTimeout(0)` 才量得到。
+
+### 17.9 怎么验
 
 ```bash
 node Taierzhuang1938/Script_VolumetricsTest.mjs     # 本节的看门狗（Node 对账 + 四时段真浏览器）

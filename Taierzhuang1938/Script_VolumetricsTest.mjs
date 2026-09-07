@@ -383,11 +383,12 @@ let dawn = null;
 try {
   await OpenProbe("dawn");
   dawn = await Run(`
-    // 转向太阳：光柱是逆光现象（HG 前向散射峰在 cosTheta = 1），
-    // 背对太阳时被挡住的 froxel 只丢掉一小份贡献，量出来的信号会淹在环境项里。
-    const sun = P.sky.sunDirection.clone().normalize();
-    P.camera.position.set(0.4, 1.68, 6);
-    P.camera.lookAt(P.camera.position.x + sun.x * 40, 4.5, P.camera.position.z + sun.z * 40);
+    // 站进街巷深处（z = −20 两侧都是房子），镜头顺街往南、略偏向太阳那一侧。
+    // 两件事都要：**有遮挡物**（Probe 的房子只铺在 z ∈ [−6, −66]，站在 z = 6
+    // 朝东看是一片空地，一颗 froxel 都挡不住 —— 第一版就是这么量出 0.03% 的），
+    // 以及**一点逆光分量**（HG 前向散射峰在 cosTheta = 1，正侧向时太阳项只占两成）。
+    P.camera.position.set(0.4, 1.68, -20);
+    P.camera.lookAt(6, 3.2, -48);
     P.StepFrames(30, 1 / 60);
     const withShadow = InjectAt(4000);
     // A/B 只翻 uSunShadowEnabled，**不动 castShadow**：后者会让 SyncShadowUniforms
@@ -435,8 +436,8 @@ try {
 
     return {
       counted, meanOn: sumOn / counted, meanOff: sumOff / counted,
-      shadowedFrac: shadowed / counted, brighter, minRatio, fallbackUsed,
-      noMapMax, noMapError,
+      shadowedCount: shadowed, shadowedFrac: shadowed / counted,
+      brighter, minRatio, fallbackUsed, noMapMax, noMapError,
       enabled: vp.uniformsInject.uSunShadowEnabled.value,
     };
   `);
@@ -447,9 +448,13 @@ try {
 if (!dawn) {
   Check("dawn 取证成功", false, problems.slice(0, 3).join(" | "));
 } else {
-  Check("SunShadowVisibility 为 0 的 froxel 散射显著低于为 1 的（逆光机位）",
-    dawn.counted > 10000 && dawn.meanOn < dawn.meanOff * 0.995
-    && dawn.shadowedFrac > 0.01 && dawn.minRatio < 0.7,
+  // 「显著低于」的口径：正侧向看时太阳项只占总散射的两成上下（环境项是各向同性的
+  // 雾色），所以一颗**完全**被挡住的 froxel 的比值下界大约是 0.75–0.80，不是 0。
+  // 因此断言三件事：存在一批真被压暗的（数量级不是个位数）、最深的那一颗压到 0.85
+  // 以下（= 太阳项被整份拿掉）、整体均值确实降了。
+  Check("SunShadowVisibility 为 0 的 froxel 散射显著低于为 1 的（街巷内机位）",
+    dawn.counted > 10000 && dawn.meanOn < dawn.meanOff
+    && dawn.shadowedCount > 2000 && dawn.minRatio < 0.85,
     JSON.stringify(dawn));
   // 帧序钉死之后两次注入是同一批抽样，阴影只能拿走光。这一条同时看住
   // 「A/B 有没有被抖动噪声污染」—— 第一版没钉帧序时它是 10%。

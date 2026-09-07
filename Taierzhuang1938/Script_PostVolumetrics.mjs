@@ -1116,8 +1116,6 @@ export class VolumetricsPass {
     pos.fill(0); color.fill(0);
     const rig = this.sunShadowRig;
     if (!rig || params.pointScale <= 0) return;
-    // 灯池优先走对象本体（零分配）；簇光代理换成别的容器时退回公共的取证接口。
-    const lights = Array.isArray(rig.fireLights) ? rig.fireLights : null;
     let slot = 0;
     const Push = (position, hex, intensity, radius) => {
       if (slot >= MAX_VOLUMETRIC_LIGHTS || !(intensity > 0) || !(radius > 0)) return;
@@ -1131,6 +1129,30 @@ export class VolumetricsPass {
       color[slot * 4 + 2] = SCRATCH_COLOR.b * intensity;
       slot += 1;
     };
+    // 光源来源三选一，按「灯多的优先」：
+    //  ① 簇状多光源（`GetClusterLightData`）—— 它按镜头贡献排过序，位置是**世界坐标**、
+    //     颜色是已乘强度的线性值，正好是雾要的口径。簇里可能有几十上百盏，
+    //     这里只取前 MAX_VOLUMETRIC_LIGHTS 盏（雾是低频量，第九盏的贡献看不出来）。
+    //  ② 固定灯池 `fireLights` + 枪口闪光（2026-09 之前的形态，零分配）。
+    //  ③ 公共取证接口 `GetEffectLightState().active`（有分配，只当兜底）。
+    const cluster = typeof rig.GetClusterLightData === "function" ? rig.GetClusterLightData() : null;
+    if (cluster?.enabled && Array.isArray(cluster.lights) && cluster.lights.length) {
+      for (const light of cluster.lights) {
+        if (slot >= MAX_VOLUMETRIC_LIGHTS) break;
+        const p = light.position;
+        const c = light.color;
+        if (!p || !c || !(light.radius > 0)) continue;
+        pos[slot * 4] = p[0]; pos[slot * 4 + 1] = p[1]; pos[slot * 4 + 2] = p[2];
+        pos[slot * 4 + 3] = light.radius;
+        // 簇光的 color 已经是「线性 × 强度」，与 Push() 里那条乘法同口径，直接照抄。
+        color[slot * 4] = c[0];
+        color[slot * 4 + 1] = c[1];
+        color[slot * 4 + 2] = c[2];
+        slot += 1;
+      }
+      return;
+    }
+    const lights = Array.isArray(rig.fireLights) ? rig.fireLights : null;
     if (lights) {
       for (const light of lights) Push(light.position, light.color.getHex(), light.intensity, light.distance);
       if (rig.muzzle) Push(rig.muzzle.position, rig.muzzle.color.getHex(), rig.muzzle.intensity, rig.muzzle.distance);
@@ -1220,8 +1242,10 @@ export class VolumetricsPass {
     if (mode === undefined) return null;
     return {
       material: this.materialDebug,
+      // 不可用时走 DebugPass 的斜纹路径，那条要 texture + mode 才不会喂 undefined 进 uniform
       texture: this.integrated?.texture || null,
-      unavailable: !this.ready,
+      mode: 4,
+      unavailable: !this.ready || !this.materialDebug,
       Prepare: () => { this.uniformsDebug.uMode.value = mode; },
     };
   }
