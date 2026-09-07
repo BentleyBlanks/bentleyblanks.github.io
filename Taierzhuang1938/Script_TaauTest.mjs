@@ -494,6 +494,63 @@ try {
     T.scene.remove(nearBoard);
     nearGeometry.dispose();
     nearMaterial.dispose();
+    T.scene.updateMatrixWorld(true);
+    T.StepFrames(2);
+
+    // 7b) **近场里什么都没有时，景深必须是恒等式。**
+    // 上面那两条都是「近场里真有东西」的档：阵亡档铺远景、开镜档补了一块 0.9 m
+    // 的板。正片开镜的常态恰恰是**近场空的**（焦平面 1.6 m，枪自己带前景标签、
+    // CoC 恒 0，场景里最近的墙在三十多米外）—— CoC 靶全是 0，可这一趟照样跑。
+    // 2026-09-08 集成期抓到的 bug 正在这条缝里：近场 gather 的半径是常数
+    // uNearRadius，羽化项 `+1.0` 让 cocS = 0 的样本在 1 像素以内仍拿到权重，
+    // 覆盖度 0.31 × nearCoverageGain 1.35 = 0.41，四成画面被半分辨率的近场层
+    // 盖掉 —— 一开镜整幅画发糊，连枪都糊。所以这一条比的是**像素**不是 CoC。
+    {
+      // **TAA 保持开着**（正片就是这么跑的）。用 `taa: false` 那个 escape hatch
+      // 反而更糟：TAA 一停 sceneColor 就退回内部分辨率的 hdr，景深那条路比
+      // 直通那条路多一次重采样，两边的差全落在这个上面（实测均差反而从 0.22
+      // 涨到 1.04）。TAA 开着时两帧的抖动相位不同，高对比边缘会有几十级的差 ——
+      // 所以下面**先量一次「同样两帧、景深都开」的噪声底**，再要求
+      // 「开/关的差不明显高于这个底」。绝对阈值只当兜底，主判据是相对的。
+      const adsOptions = { motionBlur: 0, dofStrength: 0, grain: 0,
+        nearDofStrength: 0.72, nearDofFocus: 1.6, nearDofRange: 0.85, nearDofMaxPx: 4.5 };
+      const ldr = P.targets.ldr;
+      const ReadLdr = () => {
+        const px = new Uint8Array(ldr.width * ldr.height * 4);
+        T.renderer.readRenderTargetPixels(ldr, 0, 0, ldr.width, ldr.height, px);
+        return px;
+      };
+      const Diff = (a, b) => {
+        let max = 0; let sum = 0; let count = 0; let over8 = 0;
+        for (let i = 0; i < a.length; i += 4) {
+          for (let c = 0; c < 3; c += 1) {
+            const d = Math.abs(a[i + c] - b[i + c]);
+            if (d > max) max = d;
+            if (d > 8) over8 += 1;
+            sum += d; count += 1;
+          }
+        }
+        return { max, mean: sum / count, over8Pct: over8 / count * 100 };
+      };
+      const presetWas = P.preset.dof;
+      const Shot = (dofOn) => {
+        P.preset.dof = dofOn;
+        P.Render(T.scene, T.camera, { ...lastOptions, ...adsOptions });
+        return ReadLdr();
+      };
+      const on1 = Shot(true);
+      const off1 = Shot(false);
+      const on2 = Shot(true);
+      P.preset.dof = presetWas;
+      out.emptyNearDof = {
+        // 噪声底：两帧都开着景深，差别只来自 TAA 抖动相位与场景自身
+        floor: Diff(on1, on2),
+        // 真判据：开 vs 关
+        onOff: Diff(on1, off1),
+        cocActive: P.dofPass.coc.active,
+        nearMaxPx: P.dofPass.coc.nearMaxPx, ran: P.dofPass.active,
+      };
+    }
 
     // =====================================================================
     // 8) 调试视图
@@ -585,6 +642,20 @@ Check("景深：第一人称手/枪的 CoC 恒 0（枪不糊）",
   `阵亡档 ${R.coc.foregroundMaxAbs}（${R.coc.foregroundSamples} 样本） · 开镜档 ${R.ads.foregroundMaxAbs}（${R.ads.foregroundSamples} 样本）`);
 Check("开镜近景档：近处真的产生负 CoC",
   R.ads.nearMin < -0.5, `最小 CoC ${R.ads.nearMin.toFixed(2)} px（上限 −${R.ads.nearMaxPx}）`);
+// 三条一起看：均差 ≤ 0.5/255、超 8/255 的通道占比 ≤ 0.2%、峰值 ≤ 24/255。
+// 不写「逐比特相等」是因为这一趟仍然真的跑了（降采样 → gather → 填洞 → 合成），
+// 合成那一步的 mix 在 blend = 0 时是恰当的恒等式，但中间靠半浮点存过一道。
+// 修好之前这三个数是均差 20+、占比五成以上（四成画面被半分辨率层盖掉），
+// 差两个数量级，不会抱阀值。
+Check("近场里什么都没有时，景深是恒等式（开镜不允许整幅画发糊）",
+  R.emptyNearDof.ran === true
+  && R.emptyNearDof.onOff.mean <= Math.max(0.5, R.emptyNearDof.floor.mean * 2)
+  && R.emptyNearDof.onOff.over8Pct <= Math.max(0.5, R.emptyNearDof.floor.over8Pct * 2),
+  `开/关 均差 ${R.emptyNearDof.onOff.mean.toFixed(3)} 超 8 ${R.emptyNearDof.onOff.over8Pct.toFixed(3)}%`
+  + ` 峰值 ${R.emptyNearDof.onOff.max}`
+  + ` ｜ 噪声底（两帧都开）均差 ${R.emptyNearDof.floor.mean.toFixed(3)}`
+  + ` 超 8 ${R.emptyNearDof.floor.over8Pct.toFixed(3)}% 峰值 ${R.emptyNearDof.floor.max}`
+  + ` （pass 真的跑了=${R.emptyNearDof.ran}，nearMaxPx=${R.emptyNearDof.nearMaxPx?.toFixed(2)}）`);
 
 for (const [view, px] of Object.entries(R.debugViews)) {
   Check(`调试视图 ${view} 出画（非全黑）`, Math.max(px[0], px[1], px[2]) > 4, `RGBA ${px.join(",")}`);

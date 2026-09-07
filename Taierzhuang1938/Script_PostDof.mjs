@@ -135,7 +135,17 @@ void main() {
       vec2 offset = dir * uNearRadius;
       vec4 s = texture2D(uSource, vUv + offset * uTexel);
       float cocS = max(-s.a, 0.0) * uCocScale;
-      float w = clamp(cocS - length(offset) + 1.0, 0.0, 1.0);
+      // 那个 +1.0 是 scatter-as-gather 的一像素羽化，**必须再乘一道「这个样本
+      // 本来就是近景」的闸**：不乘的话 cocS = 0 的样本只要落在 1 像素以内
+      // 就仍然拿到 w = 1 − dist > 0。远场那一支踩不到这条（它由中心自己的
+      // farRadius > 0.5 门住，合焦处整段不跑），而近场这一支的半径是**常数**
+      // uNearRadius，每一帧每一个像素都进循环。
+      // 后果（2026-09-08 集成期实测）：开镜时场景里根本没有东西比焦平面更近
+      //（枪自己带前景标签，CoC 恒 0），CoC 靶**全是 0**，覆盖度却还有 0.31，
+      // ×nearCoverageGain 1.35 = 0.41 —— 四成的画面被半分辨率的近场层盖掉，
+      // 表现是「一开镜整幅画发糊，连枪和 34 m 外的墙都糊」。
+      float nearMask = clamp(cocS, 0.0, 1.0);
+      float w = clamp(cocS - length(offset) + 1.0, 0.0, 1.0) * nearMask;
       nearSum += s.rgb * w;
       nearWeight += w;
     }
