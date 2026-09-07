@@ -250,7 +250,7 @@ export function MakeAmbientOcclusionPatch(ssao) {
         // 联合双边升采样：2×2 双线性权重 × 深度接近度。断层处只剩同深度的那几个
         // 抽样，所以人物脚下的接触带不会在半分辨率下糊出一圈亮边。
         const vec2 AO_TAPS[4] = vec2[4](vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(0.0, 1.0), vec2(1.0, 1.0));
-        float AoUpsample(vec2 screenUv, float receiverZ, out vec3 bentNormal) {
+        float AoUpsample(vec2 screenUv, float receiverZ, vec3 fallbackNormal, out vec3 bentNormal) {
           vec2 texel = screenUv * uAoTexelResolution - 0.5;
           vec2 baseCoord = floor(texel);
           vec2 aoFrac = texel - baseCoord;
@@ -269,9 +269,12 @@ export function MakeAmbientOcclusionPatch(ssao) {
             bent += AoOctDecode(t.gb) * w;
             wsum += w;
           }
-          // 一个有效抽样都没有（整块是天空）：可见度 1，弯曲法线交给调用点
-          // 用几何法线兜底 —— 这个函数拿不到 geometryNormal（它是 main 里的局部量）。
-          if (wsum <= 1e-5) { bentNormal = vec3(0.0, 0.0, 1.0); return 1.0; }
+          // 一个有效抽样都没有：可见度 1、弯曲法线退回几何法线。
+          // 这条不是只为天空留的 —— **low 档（preset.ssao = false）AO 那一趟根本不跑**，
+          // 靶里躺的是建靶时的全零，A 通道 = 0 会整片走到这里。退回几何法线之后
+          // 镜面遮蔽也恒等于 1（可见性锥张满半球、轴与反射向量同侧），画面与"没有 AO"
+          // 完全一致；退回一个常数视向量的话掠射面会凭空多出一层假遮蔽。
+          if (wsum <= 1e-5) { bentNormal = fallbackNormal; return 1.0; }
           bentNormal = normalize(bent);
           return visibility / wsum;
         }`],
@@ -279,7 +282,7 @@ export function MakeAmbientOcclusionPatch(ssao) {
         {
           vec2 aoScreenUv = gl_FragCoord.xy / uSsaoResolution;
           vec3 aoBentNormal;
-          float aoVisibility = AoUpsample(aoScreenUv, vViewPosition.z, aoBentNormal);
+          float aoVisibility = AoUpsample(aoScreenUv, vViewPosition.z, geometryNormal, aoBentNormal);
           aoVisibility = clamp(mix(1.0, aoVisibility, uSsaoStrength), 0.0, 1.0);
           reflectedLight.indirectDiffuse *= AoMultiBounce(aoVisibility, material.diffuseContribution);
           reflectedLight.indirectSpecular *= AoSpecularOcclusion(

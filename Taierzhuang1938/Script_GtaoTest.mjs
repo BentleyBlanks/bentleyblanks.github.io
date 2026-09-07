@@ -401,6 +401,57 @@ try {
     out.glError = gl.getError();
     return out;
   });
+  // --- 11) low 档：AO 那一趟根本不跑，材质端必须当「完全没有遮蔽」 -----------
+  // 靶是建了的（Resize 不看 Enabled），但没人往里写 —— 里面躺的是全零，A 通道 = 0。
+  // 材质里那条 `t.a <= 0 就跳过` 的兜底一旦失手，整个 low 档的间接光会被乘上一个
+  // 假遮蔽（旧 SSAO 的补丁没有这条兜底，读到的 R=0 会把间接光压到两成）。
+  // 判据：把 AO 强度手动置 0（等价于 mix(1.0, ao, 0) = 恒 1）之后画面**逐像素不变**。
+  await page.goto(
+    `http://127.0.0.1:${port}/Taierzhuang1938/Probe.html?quality=low&preset=smokyDay&scene=street&gi=0`,
+    { waitUntil: "load", timeout: 180000 },
+  );
+  await page.waitForFunction(() => window.Probe?.state?.ready, null, { timeout: 240000 });
+  const low = await page.evaluate(() => {
+    const P = window.Probe;
+    const post = P.post;
+    const renderer = P.renderer;
+    const Settle = () => {
+      P.state.elapsed = 0; post.frame = 0;
+      post.hasTaaHistory = false; post.hasPrev = false;
+      post.gtaoPass.NotifyCameraCut();
+      P.StepFrames(24, 1 / 60);
+    };
+    const Grab = () => {
+      const target = post.targets.ldr;
+      const w = Math.min(256, target.width);
+      const h = Math.min(144, target.height);
+      const buffer = new Uint8Array(w * h * 4);
+      renderer.readRenderTargetPixels(target, (target.width - w) >> 1, (target.height - h) >> 1, w, h, buffer);
+      return buffer;
+    };
+    const was = P.ssao.strength.value;
+    Settle();
+    const withPatch = Grab();
+    P.ssao.strength.value = 0;
+    Settle();
+    const noAo = Grab();
+    P.ssao.strength.value = was;
+    let maxDelta = 0;
+    let sum = 0;
+    for (let i = 0; i < withPatch.length; i += 1) {
+      const d = Math.abs(withPatch[i] - noAo[i]);
+      maxDelta = Math.max(maxDelta, d);
+      sum += d;
+    }
+    return {
+      aoPassEnabled: !!post.preset.ssao,
+      gtaoTier: post.preset.gtao,
+      strength: was,
+      maxDelta,
+      meanDelta: sum / withPatch.length,
+    };
+  });
+  result.lowTier = low;
 } catch (error) {
   problems.push(`THROW ${String(error).slice(0, 400)}`);
 }
@@ -490,6 +541,10 @@ if (!result) {
   Check("AO 调试图仍然出画",
     result.views.aoBlur.max > 200 && result.views.aoBlur.min < 200,
     JSON.stringify(result.views.aoBlur));
+  Check("low 档（AO 那一趟不跑）材质端不产生假遮蔽",
+    !!result.lowTier && result.lowTier.aoPassEnabled === false
+    && result.lowTier.maxDelta === 0 && result.lowTier.meanDelta === 0,
+    JSON.stringify(result.lowTier));
   Check("60 帧内不再编译新程序",
     result.programs.after === result.programs.before, JSON.stringify(result.programs));
   Check("无 GL 错误", result.glError === 0, `glError=${result.glError}`);
