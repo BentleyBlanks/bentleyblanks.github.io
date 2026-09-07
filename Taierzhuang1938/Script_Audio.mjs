@@ -221,7 +221,7 @@ function Glide(param, t, from, to, seconds) {
 // 节点没人 disconnect，几分钟就泄漏满了（Chrome 不会替你收还在 connect 的节点）。
 // ===========================================================================
 class Voice {
-  constructor(engine, startTime, pitch, rng, offset = 0) {
+  constructor(engine, startTime, pitch, rng, offset = 0, maxDuration = Infinity) {
     this.engine = engine;
     this.ctx = engine.ctx;
     this.t = startTime;
@@ -230,6 +230,7 @@ class Voice {
     // Timeline seek 只对采样源有“从中间开始”的语义。合成配方照常从头构造，
     // 外部人声配方在 Start() 时显式消费这份偏移。
     this.offset = Math.max(0, Number(offset) || 0);
+    this.maxDuration = maxDuration > 0 ? maxDuration : Infinity;
     this.duration = 0;
     this.nodes = [];
     this.life = 0.6;          // 秒；配方可以往上抬
@@ -2024,6 +2025,7 @@ const AMB_TICKS_PER_MIN = 60000 / AMB_TICK_MS;
  */
 export const AMBIENCE_PRESETS = {
   silence: { space: "street", layers: [], events: [], fallbackWind: 0 },
+  firstLevelFront: {space:"open",fallbackWind:.045,fallbackCut:480,layers:[{bed:"windPlain",gain:.3,seg:13}],events:[]},
   firstLevelSouth: {space:'open',fallbackWind:.04,fallbackCut:480,layers:[{bed:'windPlain',gain:.3,seg:13}],events:[]},
 
   // 序章｜出川：车厢静止，窗外布景由过场时间轴移动。制动不是第二套环境系统，
@@ -2664,7 +2666,7 @@ export class AudioEngine {
           src.playbackRate.value = v.pitch;
           src.connect(v.out);
           const offset = Math.min(Math.max(0, v.offset || 0), Math.max(0, buf.duration - 0.01));
-          const duration = Math.max(0.01, (buf.duration - offset) / Math.max(0.1, v.pitch));
+          const duration = Math.max(0.01, Math.min(buf.duration - offset, v.maxDuration) / Math.max(0.1, v.pitch));
           v.duration = duration;
           v.Start(src, v.t, duration, offset);
         };
@@ -2925,7 +2927,7 @@ export class AudioEngine {
    * @returns {{key:string,duration:number,voice:object}|null} null = 没有这条音频，
    *   由调用方降级成纯字幕（这是常态，不是错误：台词先写、音频后烘）。
    */
-  PlayStoryVoice(key, { position = null, volume = 1, offset = 0 } = {}) {
+  PlayStoryVoice(key, { position = null, volume = 1, offset = 0, maxDuration = Infinity } = {}) {
     if (!this.ctx || this.disposed || this.voiceMute) return null;
     const entry = key ? this.voiceBank.get(key) : null;
     if (!entry) return null;
@@ -2937,7 +2939,7 @@ export class AudioEngine {
       if (dx * dx + dy * dy + dz * dz > VOICE_CULL_M * VOICE_CULL_M) at = null;
     }
     this.StopStoryVoice();
-    const voice = this.Play("voice." + key, { position: at, volume, offset, pitch: 1, priority: true });
+    const voice = this.Play("voice." + key, { position: at, volume, offset, maxDuration, pitch: 1, priority: true });
     if (!voice) return null;
     this.storyVoice = voice;
     this.storyVoiceKey = key;
@@ -3058,8 +3060,8 @@ export class AudioEngine {
   /** 某个 cue 被请求过多少次。取证专用（见 this.playRequests 的抬头）。 */
   RequestedCount(name) { return this.playRequests.get(name) || 0; }
 
-  Play(name, { position = null, volume = 1, pitch = 1, delay = 0, offset = 0, pan = 0, burst = null, priority = false,
-    bus = "sfx", airCut = 0 } = {}) {
+  Play(name, { position = null, volume = 1, pitch = 1, delay = 0, offset = 0, maxDuration = Infinity, pan = 0, burst = null, priority = false,
+    bus = "sfx", airCut = 0, soundField = false } = {}) {
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
     // "rifleNra" 这一个去重 key，22 ms 窗口内谁先谁得。
@@ -3098,7 +3100,7 @@ export class AudioEngine {
     // 距离闸：听不见的东西不该占混响（见 CullDistance）。
     // 枪声那一档在 PlayGunshot 里就闸掉了（它要在分成近/远两路之前决定），
     // 这里管的是喊话、弹着、脚步，以及任何绕开 PlayGunshot 直接进来的枪声。
-    if (position && distance > CullDistance(name)) { this.drops.distance += 1; return null; }
+    if (position && distance > (soundField ? 1000 : CullDistance(name))) { this.drops.distance += 1; return null; }
 
     // 预算闸门：按实测开销**发声前**判断。连发的开销随点射长度涨一点。
     // 连发的开销与点射长度无关（整条点射共用一套链，见 GunAuto），所以查表就够。
@@ -3119,7 +3121,7 @@ export class AudioEngine {
     const t = now + Math.max(0, delay) + 0.005;   // 留 5 ms 调度余量，免得首音被吃
     // 种子 = 名字哈希 ^ 播放序号：确定性，但同一个音效每次不一样。
     const rng = Mulberry32((HashString(name) ^ Math.imul(this.playCounter += 1, 2654435761)) >>> 0);
-    const v = new Voice(this, t, pitch, rng, offset);
+    const v = new Voice(this, t, pitch, rng, offset, maxDuration);
     v.burst = burst ?? BURST_DEFAULT[name] ?? null;
 
     // 源 gain（干声起点）。混音表在这儿乘进去，配方里不必关心整体平衡。
@@ -3136,7 +3138,7 @@ export class AudioEngine {
 
     if (position) {
       // 空气吸收：距离越远高频掉得越快。20 m 上还有 8 kHz，200 m 上只剩 1 kHz 出头。
-      const airHz = Clamp(18000 / (1 + distance * 0.09), 700, 20000);
+      const airHz = Math.min(airCut || 20000, Clamp(18000 / (1 + distance * 0.09), 700, 20000));
       const air = v.Filter("lowpass", airHz, 0.7);
       src.connect(air);
       // 混响 send 接在空气低通**之后**（坑 1 说的是不能接在 Panner 之后，
@@ -3147,8 +3149,9 @@ export class AudioEngine {
       // HRTF 很贵，25 m 以外听不出方位差别，改用 equalpower（文件头坑 3）。
       panner.panningModel = distance < 25 ? "HRTF" : "equalpower";
       panner.distanceModel = "inverse";
-      panner.refDistance = 3.5;
-      panner.maxDistance = 600;
+      // A distant battle sector is an extended field, not a one-metre muzzle.
+      panner.refDistance = soundField ? 64 : 3.5;
+      panner.maxDistance = soundField ? 1000 : 600;
       panner.rolloffFactor = 0.9;
       if (panner.positionX) {
         panner.positionX.value = position.x;
@@ -3157,7 +3160,7 @@ export class AudioEngine {
       } else if (panner.setPosition) {
         panner.setPosition(position.x, position.y, position.z);
       }
-      air.connect(panner).connect(this.sfxBus);
+      air.connect(panner).connect(this.Bus(bus));
       // MoveVoice 要搬的就是这三样：方位、空气低通、混响占比。
       v.panner = panner;
       v.air = air;

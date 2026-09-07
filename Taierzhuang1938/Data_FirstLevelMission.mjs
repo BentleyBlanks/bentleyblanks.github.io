@@ -1,7 +1,7 @@
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-export const MISSION_VERSION = "first-level-20260907-r1";
+export const MISSION_VERSION = "first-level-20260907-r2";
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 const Stage = (id, objective, target, requirements, cue, extra = {}) =>
@@ -72,10 +72,10 @@ export const MISSION_STAGES = Object.freeze([
     "AirFirst",
     "日机来袭！利用掩体，压住村东追兵。",
     A.transfer,
-    ["firstAirPassComplete"],
+    ["firstAirPassComplete", "firstAirOrdersHeard"],
     "AircraftFirst",
   ),
-  Stage("Carry", "接替老周担架后端，抬往西侧下沟口。", A.queue, ["zhouCarried", "atDitchMouth"], "CarryZhou"),
+  Stage("Carry", "接替老周担架后端，抬往西侧下沟口。", A.queue, ["zhouCarried", "atDitchMouth", "carryOrdersHeard"], "CarryZhou"),
   Stage("Dive", "下沟！", A.ditch, ["diveComplete"], "AircraftReturn"),
   Stage(
     "Rescue",
@@ -133,8 +133,8 @@ export const MISSION_ENCOUNTERS = Object.freeze({
     { id: "FrontRifleD", x: 30, z: -151 },
   ],
   tank: [
-    { id: "TankEscortA", x: 34, z: -136 },
-    { id: "TankEscortB", x: 40, z: -141 },
+    { id: "TankEscortA", x: 24, z: -145 },
+    { id: "TankEscortB", x: 28, z: -152 },
     { id: "FlankA", x: 58, z: -139 },
     { id: "FlankB", x: 63, z: -144 },
   ],

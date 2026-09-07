@@ -9,6 +9,7 @@ import {
   MISSION_ANCHORS as A,
   MISSION_ROUTES,
   MISSION_PLACEMENT as P,
+  MISSION_SUPPLIES,
 } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { FirstLevelMissionTrain } from "./Script_FirstLevelMissionTrain.mjs";
@@ -19,6 +20,7 @@ import {
   MissionRouteLength,
 } from "./Script_FirstLevelMissionColumn.mjs";
 import { FirstLevelMissionView } from "./Script_FirstLevelMissionView.mjs";
+import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
 import { EmplacementInteraction } from "./Script_Emplacement.mjs";
 import { Localize, T } from "./Script_Text.mjs";
@@ -53,6 +55,9 @@ export class FirstLevelMissionRuntime {
       hud: this.hud,
       Position: (cue) => this.VoicePosition(cue),
       Done: (id) => this.VoiceDone(id),
+      Event: (id) => this.VoiceEvent(id),
+      Ready: (id) => this.Has(id),
+      Clock: this.VoiceClock,
     });
     this.view = new FirstLevelMissionView({
       scene: this.scene,
@@ -65,6 +70,8 @@ export class FirstLevelMissionRuntime {
       this.oldBlast?.(event);
       this.OnBlast(event);
     };
+    this.battleSound = new FirstLevelMissionBattleSound(this.audio);
+    this.view.interact = this.interact;
     this.Register();
     this.flow.Start();
     this.voiceReady = this.voice.Load();
@@ -92,9 +99,66 @@ export class FirstLevelMissionRuntime {
       ? null
       : this.companion.Handle(who)?.position || this.Point(this.flow.stage.target, 1);
   }
+  get EmptyHands() {
+    return ["Train","Unloading"].includes(this.flow.stage.id) && !this.Has("unloaded");
+  }
+  OpeningPrompt() {
+    if (!this.EmptyHands) return null;
+    if (this.Has("trainStopped")) return this.player.stance==="prone"
+      ? {keys:"Z",label:T("firstLevel.hint.standAndUnload"),kind:"stance",text:true}
+      : {keys:"WASD",label:T("firstLevel.hint.leaveTrain"),kind:"move",text:true};
+    if (this.Has("trainProneOrder") && this.player.stance!=="prone")
+      return {keys:"Z",label:T("firstLevel.hint.trainProne"),kind:"stance",text:true};
+    return null;
+  }
+  VoiceEvent(id) {
+    if(id==="AircraftDiveOrder" && !this.Has("diveComplete")) {
+      this.Record("diveOrderHeard");
+      this.BeginControl("dive", R.diveSeconds);
+      this.carry.ForceRelease("instinct");
+      this.column.zhou.state="fallen";
+      return;
+    }
+    if (id==="TrainProneOrder") {
+      this.Record("trainProneOrder");
+      return;
+    }
+    if (id==="TrainFirstShell") {
+      if(this.Has("trainFirstShellLaunched"))return;
+      this.trainShellStartedAt=this.time;
+      this.shellTrainOffset=this.battlefield.trainOffsetM;
+      this.Record("trainFirstShellLaunched");
+      this.combat.FireShell(new THREE.Vector3(-35,20,40),this.Point({x:-62,z:70}),{
+        flight:1.4,kind:"Shell75",radius:6,damage:0,
+        OnImpact:()=>this.Record("trainFirstShellImpact"),
+      });
+    }
+    if (id==="TrainNearShell") {
+      if(this.Has("trainNearShell"))return;
+      this.Record("trainNearShell");
+      this.combat.FireShell(new THREE.Vector3(-35,20,40),
+        this.Point({x:-73,z:A.train.z+5+this.battlefield.trainOffsetM}),{
+        flight:2.8,kind:"Shell75",radius:5,damage:0,
+        OnImpact:()=>{
+          this.player.Suppress(.9);
+          for(const actor of this.squad)this.ai.SetStance(actor,2,3,true);
+          if(this.trainWounded){
+            this.trainWounded.TakeHit(70,"arm",new THREE.Vector3(-1,0,0));
+            this.ai.SetStance(this.trainWounded,1,15,true);
+          }
+          this.Record("trainSoldierWounded");
+          this.column.stationBombed=true;
+        },
+      });
+    }
+  }
   VoiceDone(id) {
+    if (id === "TrainMeal") this.Record("trainShelling");
+    if (id === "AircraftFirst") this.Record("firstAirOrdersHeard");
+    if (id === "CarryZhou") this.Record("carryOrdersHeard");
     if (id === "FinalExit") this.Record("finalExitHeard");
     if (id === "Volunteer") this.Record("volunteerHeard");
+    if (id === "ZhouLift") this.Record("zhouOnLitter");
     if (id === "SouthHope") this.Record("southHopeHeard");
     if (id === "FollowVehicle") this.Record("followVehicleHeard");
   }
@@ -234,6 +298,7 @@ export class FirstLevelMissionRuntime {
       });
       if (!actor) continue;
       actor.missionId = spec.id;
+      if(spec.id.startsWith("Flank"))actor.scriptedNoncombatant=true;
       actor.scriptAccuracyScale = 0.5;
       actor.scriptFireIntervalScale = 1.45;
       actor.scriptArrivalRadius = 0.7;
@@ -249,6 +314,7 @@ export class FirstLevelMissionRuntime {
       if (
         (ids && !ids.includes(id)) ||
         !actor.alive ||
+        actor.scriptedNoncombatant ||
         actor.suppression >= R.threatSuppression ||
         actor.state === "suppressed"
       )
@@ -332,24 +398,15 @@ export class FirstLevelMissionRuntime {
         return true;
       },
     );
-    for (const [id, point] of [
-      ["Unloading", A.unload],
-      ["Front", A.front],
-      ["Transfer", A.transferSupply],
-      ["Retreat", A.retreatB],
-      ["Reception", A.reception],
-    ])
+    for (const spec of MISSION_SUPPLIES) {
       Register(
-        `MissionSupply${id}`,
-        point,
-        () => this.Text("supply"),
-        () => !this.carry.Active,
-        () => {
-          this.GiveSupply({ clips: 4, grenades: 2, bandages: 1 });
-          return true;
-        },
-        { cooldownS: R.supplyCooldownS },
+        `MissionSupply${spec.id}`, spec, () => this.Text("supply"),
+        () => !this.carry.Active && !this.EmptyHands,
+        () => { this.GiveSupply({clips:4,grenades:2,bandages:1});return true; },
+        {cooldownS:R.supplyCooldownS,
+          Anchor:()=>new THREE.Vector3(spec.x,this.battlefield.GroundHeight(spec.x,spec.z)+(spec.supportHeight||0)+.3,spec.z)},
       );
+    }
     this.gunId = this.emplacement.CreateEmplacement({
       id: "MissionGun",
       tag: "FirstLevelMission",
@@ -381,7 +438,7 @@ export class FirstLevelMissionRuntime {
   }
   Enter(stage) {
     this.Objective(Localize(FirstLevelStageTextId(stage.id), stage.objective));
-    if (stage.cue && !["Courtyard", "Train", "Unloading"].includes(stage.id))
+    if (stage.cue && !["Courtyard", "Train", "Unloading", "Death"].includes(stage.id))
       this.Say(stage.cue, { urgent: ["AirFirst", "Dive", "Death"].includes(stage.id) });
     switch (stage.id) {
       case "Train":
@@ -397,13 +454,14 @@ export class FirstLevelMissionRuntime {
       case "Support":
         this.column.zhou.visible = true;
         this.column.zhou.health = 65;
-        this.audio.Ambience("smokyDay");
+        this.audio.Ambience("firstLevelFront");
         this.Guide(MISSION_ROUTES.support);
         this.forwardGunner = this.ai.Spawn("nra", A.forwardNest.x, A.forwardNest.z, {
           weapon: "Zb26",
           squadId: "MissionForwardNest",
         });
         if (this.forwardGunner) this.Defend(this.forwardGunner, A.forwardNest);
+        this.SpawnEncounter("front");
         break;
       case "MachineGun":
         this.tank.active = true;
@@ -419,7 +477,6 @@ export class FirstLevelMissionRuntime {
         this.column.Activate();
         this.column.zhou.health = 65;
         this.column.zhou.state = "waiting";
-        this.Record("zhouOnLitter");
         this.Say("ZhouLift");
         break;
       case "South":
@@ -430,7 +487,7 @@ export class FirstLevelMissionRuntime {
         break;
       case "Village":
         for (const actor of this.enemies.values()) if (actor.alive) actor.scriptedNoncombatant = false;
-        this.audio.Ambience("smokyDay");
+        this.audio.Ambience("firstLevelFront");
         this.Guide(MISSION_ROUTES.village.slice(0, 3));
         this.SpawnEncounter("village");
         this.SpawnEncounter("melee");
@@ -468,10 +525,7 @@ export class FirstLevelMissionRuntime {
         this.Defend(this.companion.Handle("heyoutian"), A.transfer);
         break;
       case "Dive":
-        this.StartAir(2);
-        this.BeginControl("dive", R.diveSeconds);
-        this.carry.ForceRelease("instinct");
-        this.column.zhou.state = "fallen";
+        this.StartAir(2, R.secondAirLeadS);
         break;
       case "Rescue":
         this.RestoreRifle();
@@ -505,11 +559,11 @@ export class FirstLevelMissionRuntime {
         if (this.bedGuide.actor) this.squadRoutes.set(this.bedGuide.actor.id, []);
         break;
       case "Death":
-        this.BeginControl("death", R.deathSeconds);
         this.SpawnEncounter("final");
         this.deathMedic = this.column.walkers
-          .filter((w) => w.kind === "medic" && w.health > 0)
+          .filter((w) => w.kind === "medic" && w.health > 0 && !w.assigned)
           .sort((a, b) => Distance(a, A.zhouDrop) - Distance(b, A.zhouDrop))[0];
+        if(this.deathMedic)this.deathMedic.treating=true;
         break;
       case "FinalDefense":
         this.guideRoute = null;
@@ -748,8 +802,8 @@ export class FirstLevelMissionRuntime {
       this.player.stance = "prone";
     }
   }
-  StartAir(pass) {
-    this.air = { pass, time: 0, shots: 0, lastShot: 0 };
+  StartAir(pass, lead = 0) {
+    this.air = { pass, time: -lead, shots: 0, lastShot: 0 };
   }
   UpdateAir(dt) {
     const air = this.air;
@@ -826,7 +880,9 @@ export class FirstLevelMissionRuntime {
     this.delta = dt;
     this.time += dt;
     this.voice.Update(dt);
-    this.train?.Update(dt, this.Has("trainStopped"), this.Has("trainShelling"));
+    this.battleSound.Update(dt,this.flow.stage.id,this.voice.current?.phase==="playing");
+    this.train?.Update(dt, this.Has("trainStopped"), this.Has("trainFirstShellImpact"));
+    if(this.Has("trainProneOrder") && this.player.stance==="prone")this.Record("trainPlayerProne");
     this.UpdateSquad();
     this.UpdateTank();
     this.UpdateFlank();
@@ -845,27 +901,33 @@ export class FirstLevelMissionRuntime {
         medic.z += (target.z - medic.z) * step;
         medic.yaw = Math.PI / 2;
         medic.crouch = distance < 1.5;
+        if(distance<1.2 && !this.Has("deathMedicArrived")){
+          this.Record("deathMedicArrived");
+          this.BeginControl("death",R.deathSeconds);
+          this.Say("ZhouDeath",{urgent:true});
+        }
       }
       const yaowa = this.companion.Handle("yaowa");
       if (yaowa && Distance(yaowa.position, zhou) < 2) this.ai.SetStance(yaowa, 1, 2, true);
     }
     if (this.controls) {
       this.controls.time += dt;
-      if (this.controls.time >= this.controls.seconds) {
+      if (this.controls.time >= this.controls.seconds &&
+        (this.controls.kind!=="death" || this.voice.finished.has("ZhouDeath"))) {
         const kind = this.controls.kind;
         this.controls = null;
         this.Control?.(false, kind);
         if (kind === "dive") this.Record("diveComplete");
         else {
           this.column.zhou.health = 0;
+          if(this.deathMedic){this.deathMedic.treating=false;this.deathMedic.crouch=false;}
           this.Record("deathSceneComplete");
           this.RestoreRifle();
         }
       }
     }
     if (["Train", "Unloading"].includes(stage)) {
-      const start = R.trainShellAtS,
-        end = this.trainShellStartedAt == null ? Infinity : this.trainShellStartedAt + R.trainBrakeSeconds;
+      const end = this.trainShellStartedAt == null ? Infinity : this.trainShellStartedAt + R.trainBrakeSeconds;
       const ratio = Clamp((this.time - (this.trainShellStartedAt || 0)) / R.trainBrakeSeconds, 0, 1);
       const offset =
         this.trainShellStartedAt == null
@@ -883,41 +945,7 @@ export class FirstLevelMissionRuntime {
         this.train.Translate(delta);
         if (aboard) this.player.SyncCamera(0);
       }
-      if (this.time > start && this.voice.finished.has("TrainMeal") && !this.Has("trainShelling")) {
-        this.trainShellStartedAt = this.time;
-        this.shellTrainOffset = offset;
-        this.Record("trainShelling");
-        this.combat.FireShell(new THREE.Vector3(-35, 20, 40), this.Point({ x: -62, z: 70 }), {
-          flight: 1.4,
-          kind: "Shell75",
-          radius: 6,
-          damage: 0,
-        });
-      }
-      if (
-        this.trainShellStartedAt != null &&
-        this.time > this.trainShellStartedAt + 4 &&
-        !this.Has("trainNearShell")
-      ) {
-        this.Record("trainNearShell");
-        this.combat.FireShell(new THREE.Vector3(-35, 20, 40), this.Point({ x: -73, z: A.train.z + 5 + offset }), {
-          flight: 1,
-          kind: "Shell75",
-          radius: 5,
-          damage: 0,
-          OnImpact: () => {
-            this.player.Suppress(0.9);
-            for (const actor of this.squad) this.ai.SetStance(actor, 2, 3, true);
-            if (this.trainWounded) {
-              this.trainWounded.TakeHit(70, "arm", new THREE.Vector3(-1, 0, 0));
-              this.ai.SetStance(this.trainWounded, 1, 15, true);
-              this.Record("trainSoldierWounded");
-            }
-            this.column.stationBombed = true;
-          },
-        });
-      }
-      if (this.time >= end && !this.Has("trainStopped")) {
+      if (this.time >= end && this.voice.finished.has("TrainShelling") && !this.Has("trainStopped")) {
         this.Record("trainStopped");
         this.trainStoppedAt = this.time;
         for (let i = 0; i < 3; i++) this.battlefield.OpenGate(`TrainDoor${i}`);
@@ -963,7 +991,6 @@ export class FirstLevelMissionRuntime {
       }
     }
     let moving = [
-        "Orders",
         "South",
         "Courtyard",
         "Transfer",
@@ -980,7 +1007,7 @@ export class FirstLevelMissionRuntime {
         this.hud.Hint(
           T("firstLevel.hint.queue", {
             passed: this.column.State().gatePassed,
-            total: R.litterCount,
+            total: this.column.litters.filter(litter=>litter.health>0||litter.passedGate).length,
             loaded: this.column.loadEvents.length,
           }),
           4,
@@ -990,11 +1017,12 @@ export class FirstLevelMissionRuntime {
       if (gun && !gun.alive) this.Record("villageGunSilent");
       safe = this.Has("villageGunSilent") && !this.Threatens(A.gate);
       if (this.Has("courtyardGateOpen") && this.Has("villageGunSilent")) this.Say("CourtyardOpen");
-      const count = this.column.litters.filter((litter) => litter.passedGate).length;
-      if (count >= 12) this.Say("ZhouThreshold");
-      if (count === 18) this.Say("TwoLitters");
-      if (count === R.litterCount) {
-        this.Record("courtyardPassed");
+      const pending=this.column.litters.filter(litter=>litter.health>0&&!litter.passedGate);
+      if(this.column.zhou.passedGate)this.Say("ZhouThreshold");
+      if(pending.length===2)this.Say("TwoLitters");
+      if(pending.length===0){
+        this.Record("courtyardPassed",{passed:this.column.litters.filter(litter=>litter.passedGate).length,
+          casualties:this.column.litters.filter(litter=>litter.health<=0&&!litter.passedGate).length});
         this.Say("LastLitter");
         this.Say("TransferHope");
       }
@@ -1152,12 +1180,15 @@ export class FirstLevelMissionRuntime {
       missionVersion: MISSION_VERSION,
       time: this.time,
       control: this.controls?.kind || null,
+      emptyHands: this.EmptyHands,
+      openingPrompt: this.OpeningPrompt(),
       failed: this.failed,
       tank: { ...this.tank },
       playerExplosions: this.playerExplosions || [],
       column: this.column.State(),
       train: this.train?.State(),
       voice: this.voice.State(),
+      battleSound: this.battleSound.State(),
       enemies: [...this.enemies].map(([id, actor]) => ({
         id,
         alive: actor.alive,
@@ -1176,6 +1207,7 @@ export class FirstLevelMissionRuntime {
   }
   Dispose() {
     this.voice.Dispose();
+    this.battleSound.Dispose();
     this.view.Dispose();
     this.interact.Clear("FirstLevelMission");
     this.emplacement.Clear("FirstLevelMission");

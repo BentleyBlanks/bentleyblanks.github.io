@@ -12,6 +12,8 @@
 
 最新用户要求：车内玩家空手；车厢对白播放端按实际录音拆段、留合理停顿，字幕、炮击、卧倒口令对齐；Z 由玩家自己按。**整段生成的原始录音仍保留**。动画接力读取最新播放时间线，不按字数比例推测台词时间。美术／地形贴图暂缓，本轮先完善任务目标与流程因果。
 
+接入最新实现时，直接消费 [源录音对齐表](../Data_FirstLevelMissionVoiceAlignment.mjs)、[片段与事件表](../Data_FirstLevelMissionVoiceTiming.mjs) 和 Runtime 的 VoiceEvent。TrainFirstShell／TrainNearShell 后的弹着事实、TrainProneOrder、AircraftDiveOrder 与 deathMedicArrived 已接入任务；动画不能另起固定总时长抢跑这些事实。
+
 ## 全部演员与人数
 
 语音的 soldier、bearer、medic、runner 是类别，不是全关唯一演员。为每场表演绑定具体实例；同一伤员跨阶段不换人、不复制、不复活。

@@ -5,6 +5,9 @@ export const TEXT = Object.freeze({
   "firstLevel.interaction.carry": "接过老周担架后端",
   "firstLevel.interaction.place": "将老周放在卫生兵旁",
   "firstLevel.interaction.supply": "补充弹药、手榴弹和绷带",
+  "firstLevel.hint.trainProne": "卧倒，躲到车帮下",
+  "firstLevel.hint.standAndUnload": "起身，跟罗班长下车",
+  "firstLevel.hint.leaveTrain": "从打开的车门跟队下车",
   "firstLevel.hint.melee": "V 拔刀 · F 拨推 · 左键挥刀",
   "firstLevel.hint.queue": "担架已通过 {passed}/{total} · 已转运 {loaded} 副",
 });

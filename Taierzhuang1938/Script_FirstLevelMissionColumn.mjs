@@ -198,7 +198,7 @@ export class FirstLevelMissionColumn {
       }
     if (this.mode === "reception") {
       for (const entry of [...this.litters, ...this.walkers].filter(
-        (entry) => entry.receiveRoute && !entry.received,
+        (entry) => entry.receiveRoute && !entry.received && !entry.treating,
       )) {
         if (routeSafe)
           entry.receiveProgress = Math.min(
@@ -277,7 +277,7 @@ export class FirstLevelMissionColumn {
       if (litter.joinRoute) litter.progress = this.length - (ownLength - litter.joinProgress);
     }
     for (const [i, walker] of this.walkers.entries()) {
-      if (!walker.visible || walker.health <= 0 || walker.assigned) continue;
+      if (!walker.visible || walker.health <= 0 || walker.assigned || walker.treating) continue;
       const route = walker.joinRoute || this.route,
         key = walker.joinRoute ? "joinProgress" : "progress";
       const ownLength = walker.joinLength || this.length,

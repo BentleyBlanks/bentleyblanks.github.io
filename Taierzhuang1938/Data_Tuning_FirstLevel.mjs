@@ -58,6 +58,7 @@ export const MISSION_TUNING = Object.freeze({
   rescuerApproachMps: 2.6,
   pursuerSpeedMps: 1.65,
   airPassSeconds: 8,
+  secondAirLeadS: 4.58,
   bridgeBombAtS: 3,
   cartBombAtS: 3.3,
   zhouStrafeAtS: 2.6,

@@ -1,7 +1,9 @@
 // Instanced whitebox crowd. Critical characters still use the game's shared actor rigs.
 import * as THREE from "three";
 import { CreateP012StretcherGeometry } from "./Script_FirstLevelP012CarryView.mjs";
-import { MISSION_PLACEMENT } from "./Data_FirstLevelMissionLayout.mjs";
+import { BuildSink } from "./Script_World.mjs";
+import { PlaceGeometry } from "./Script_Geo.mjs";
+import { MISSION_PLACEMENT, MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
 export class FirstLevelMissionView {
   constructor({ scene, battlefield, physics, column }) {
     Object.assign(this, { scene, battlefield, physics, column });
@@ -11,6 +13,7 @@ export class FirstLevelMissionView {
     this.materials = [];
     this.meshes = [];
     this.colliders = [];
+    this.walkerPositions = new Map();
     this.matrix = new THREE.Matrix4();
     this.position = new THREE.Vector3();
     this.rotation = new THREE.Quaternion();
@@ -58,6 +61,7 @@ export class FirstLevelMissionView {
     this.zhouRoot.add(zhouHead);
     this.zhouRoot.visible = false;
     this.BuildTank();
+    this.BuildSupplies();
   }
   Box(root, w, h, d, x, y, z, color) {
     const material = new THREE.MeshStandardMaterial({ color, roughness: 0.9 });
@@ -68,6 +72,36 @@ export class FirstLevelMissionView {
     mesh.receiveShadow = true;
     root.add(mesh);
     return mesh;
+  }
+  BuildSupplies() {
+    const sink=new BuildSink();
+    this.supplyMarkers=[];
+    for(const spec of [...MISSION_SUPPLIES,{id:"Bundle",x:13,z:-118,supportHeight:.5}]){
+      const y=this.battlefield.GroundHeight(spec.x,spec.z)+(spec.supportHeight||0)+.25;
+      const material=new THREE.MeshStandardMaterial({color:0x9b927b,roughness:.88,
+        metalness:0,emissive:0xffeac8,emissiveIntensity:0});
+      const geometry=PlaceGeometry(new THREE.BoxGeometry(.96,.5,.64),{x:spec.x,y,z:spec.z});
+      const center=[spec.x,y,spec.z],half=[.48,.25,.32];
+      const collider={c:center,h:half,min:center.map((v,i)=>v-half[i]),max:center.map((v,i)=>v+half[i]),tag:"missionSupply",ry:0};
+      this.physics.AddSolid(collider);
+      this.battlefield.colliders.push(collider);
+      this.colliders.push(collider);
+      sink.SetSector(`MissionSupply${spec.id}`);
+      sink.Add(spec.id,geometry);
+      this.materials.push(material);
+      this.supplyMarkers.push({id:spec.id==="Bundle"?"MissionBundle":`MissionSupply${spec.id}`,material});
+    }
+    const materials=new Map(this.supplyMarkers.map(m=>[m.id.replace("MissionSupply","").replace("MissionBundle","Bundle"),m.material]));
+    for(const mesh of sink.Flush(this.root,{Get:key=>materials.get(key)})){
+      mesh.name="MissionInteractiveSupply";mesh.castShadow=true;mesh.receiveShadow=true;
+    }
+  }
+  UpdateSupplies(time) {
+    for(const marker of this.supplyMarkers){
+      const point=this.interact?.Point(marker.id);
+      const usable=!!point && point.cooldownLeft<=0 && point.Enabled?.()!==false;
+      marker.material.emissiveIntensity=usable ? .12+.55*(.5+.5*Math.sin(time*2.4))**3:0;
+    }
   }
   BuildTank() {
     this.tank = new THREE.Group();
@@ -161,6 +195,7 @@ export class FirstLevelMissionView {
   Update(time, { tank } = {}) {
     for (const mesh of Object.values(this.parts)) mesh.count = 0;
     this.TrainHandProps();
+    this.UpdateSupplies(time);
     if (this.column.stationBombed)
       for (const person of MISSION_PLACEMENT.stationCasualties)
         this.Person(person.x, person.z, person.yaw, time, { alive: person.health > 0, crouch: true });
@@ -205,14 +240,18 @@ export class FirstLevelMissionView {
           );
         }
     }
-    for (const walker of this.column.walkers)
+    for (const walker of this.column.walkers) {
+      const last=this.walkerPositions.get(walker.id);
+      const moving=!!last&&Math.hypot(walker.x-last.x,walker.z-last.z)>.0001;
+      this.walkerPositions.set(walker.id,{x:walker.x,z:walker.z});
       if (walker.visible && !walker.assigned)
         this.Person(walker.x, walker.z, walker.yaw, time, {
           kind: walker.kind,
           alive: walker.health > 0,
-          moving: this.column.active,
+          moving: moving && !walker.crouch,
           crouch: walker.crouch,
         });
+    }
     for (const cart of [...this.column.vehicles, ...this.column.traffic.filter((cart) => cart.visible)]) {
       if (cart.z > 178) continue;
       const y = this.battlefield.GroundHeight(cart.x, cart.z);
@@ -278,8 +317,11 @@ export class FirstLevelMissionView {
     }
   }
   Dispose() {
-    for (const collider of this.colliders)
+    for (const collider of this.colliders) {
       if (collider._physicsHandle != null) this.physics.RemoveSolid(collider._physicsHandle);
+      const index=this.battlefield.colliders.indexOf(collider);
+      if(index>=0)this.battlefield.colliders.splice(index,1);
+    }
     this.root.traverse((object) => {
       if (object.isMesh) object.geometry.dispose();
     });

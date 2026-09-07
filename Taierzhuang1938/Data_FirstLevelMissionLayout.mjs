@@ -373,6 +373,13 @@ export const MISSION_PLACEMENT = Object.freeze({
     { x: 86, z: 127 },
   ],
 });
+export const MISSION_SUPPLIES = Object.freeze([
+  {id:"Unloading",x:-68.5,z:66,supportHeight:.85},
+  {id:"Front",x:-2.2,z:-124,supportHeight:null},
+  {id:"Transfer",x:93,z:110,supportHeight:1.15},
+  {id:"Retreat",x:-53.2,z:82,supportHeight:null},
+  {id:"Reception",x:-132.8,z:31,supportHeight:null},
+]);
 export const MISSION_LAYOUT = Object.freeze({
   id: "FirstLevelMissionSeptember07",
   terrain: "P012Heightfield",

@@ -1,3 +1,5 @@
+import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
+import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { FirstLevelMissionTrain } from "./Script_FirstLevelMissionTrain.mjs";
 import assert from "node:assert/strict";
@@ -137,6 +139,14 @@ if (process.argv.includes("--audio")) {
   );
   for (const cue of MISSION_DIALOGUE) {
     const entry = manifest.cues[cue.id];
+    const aligned=MISSION_VOICE_ALIGNMENT[cue.id];
+    assert.equal(aligned.sha256,entry.sha256,cue.id+' timing is bound to this recording');
+    assert.equal(aligned.lines.length,cue.lines.length);
+    aligned.lines.forEach(([start,end],i)=>{
+      assert.ok(start>=0 && end>=start && end<=entry.seconds+.02,cue.id+' source interval');
+      if(start===end)assert.ok(aligned.note,'ambiguous interval must be explained');
+      if(i)assert.ok(start>=aligned.lines[i-1][1],cue.id+' subtitles do not overlap');
+    });
     assert.ok(entry?.continuous && entry.requests === 1 && entry.seconds > 0.5, cue.id);
     const bytes=fs.readFileSync(new URL('./Audio/FirstLevel/'+cue.file,import.meta.url));
     assert.equal(bytes.length,entry.bytes,cue.id+' bytes');
@@ -148,39 +158,52 @@ if (process.argv.includes("--audio")) {
 console.log(process.argv.includes("--audio")
   ? "ok all 41 continuous audio assets, current script/file hashes and short death-scene duration"
   : "ok continuous dialogue prompts; audio assets require --audio acceptance");
-const completedCues = [];
-const voiceOffsets = [];
-const voice = new FirstLevelMissionVoice({
-  audio: {
-    PlayStoryVoice: (_key, options) => {
-      voiceOffsets.push(options.offset || 0);
-      return { duration: 1 };
-    },
-    StopStoryVoice() {},
-  },
-  hud: { Say() {} },
-  Done: (id) => completedCues.push(id),
-});
-voice.Enqueue("TrainMeal");
-voice.Enqueue("Volunteer");
-voice.Update(0.3);
-voice.Pause();
-voice.Update(10);
-assert.equal(voice.current.time, 0.3, "Paused story audio and subtitles retain the same playback position");
-voice.Resume();
-voice.Update(1.1);
-voice.Update(1.1);
-assert.deepEqual(
-  completedCues,
-  ["TrainMeal", "Volunteer"],
-  "Retrying one continuous cue must retain queued mission dialogue",
-);
-assert.equal(voice.queue.length, 0);
-assert.deepEqual(
-  voiceOffsets,
-  [0, 0.3, 0],
-  "Resume plays the same uncut cue from its paused offset before queued dialogue",
-);
+// Source-range playback preserves pauses, queued cues and physical event gates.
+{
+  const offsets=[], done=[];
+  const voice=new FirstLevelMissionVoice({
+    audio:{PlayStoryVoice:(_key,options)=>{offsets.push(options.offset||0);return {duration:1};},StopStoryVoice(){}},
+    hud:{Say(){}},Done:id=>done.push(id),
+  });
+  voice.manifest={cues:{ThreeMagazines:{seconds:3.109},TwoMagazines:{seconds:2.429}}};
+  voice.Enqueue("ThreeMagazines");voice.Enqueue("TwoMagazines");
+  voice.Update(0);voice.Update(.3);voice.Pause();voice.Update(10);
+  assert.equal(voice.current.time,.3);
+  voice.Resume();
+  for(let i=0;i<400;i++)voice.Update(1/60);
+  assert.deepEqual(done,["ThreeMagazines","TwoMagazines"]);
+  assert.deepEqual(offsets,[0,.3,0]);
+}
+{
+  const events=[], sources=[], subtitles=[], done=[], facts=new Set();
+  const voice=new FirstLevelMissionVoice({
+    audio:{PlayStoryVoice:(key,options)=>{sources.push({key,...options});return {duration:22.544};},StopStoryVoice(){}},
+    hud:{Say:(_who,text)=>subtitles.push(text)},Done:id=>done.push(id),
+    Event:id=>events.push(id),Ready:id=>facts.has(id),
+  });
+  voice.Enqueue("TrainShelling");
+  for(let i=0;i<900;i++)voice.Update(1/60);
+  assert.deepEqual(events,["TrainFirstShell"]);
+  assert.equal(voice.State().segment,"FirstShellWarning");
+  assert.equal(voice.State().playbackPhase,"waiting","the shout cannot anticipate the first shell impact");
+  assert.equal(sources.length,1);
+  facts.add("trainFirstShellImpact");
+  for(let i=0;i<240;i++)voice.Update(1/60);
+  assert.deepEqual(events,["TrainFirstShell","TrainNearShell"]);
+  assert.equal(voice.State().segment,"WoundedSoldier");
+  assert.ok(!subtitles.some(text=>text.includes("手遭打中了")),"injury speech waits for actual impact");
+  facts.add("trainSoldierWounded");
+  for(let i=0;i<360;i++)voice.Update(1/60);
+  assert.ok(events.includes("TrainProneOrder"));
+  voice.Pause();const paused=voice.State();
+  voice.Update(40);assert.deepEqual(voice.State(),paused);
+  voice.Resume();
+  for(let i=0;i<1800;i++)voice.Update(1/60);
+  assert.deepEqual(done,["TrainShelling"]);
+  assert.ok(sources.every(source=>source.maxDuration>0&&source.offset>=0));
+  assert.equal(events.filter(id=>id==="TrainNearShell").length,1,"resume never re-fires a shell");
+}
+console.log("ok paused audio ranges, subtitle source timing, queued cues and shell-impact gates");
 
 // Regression: 40 real recruit bodies plus Luo, stable carriage-local positions, all three doors.
 {
@@ -210,4 +233,34 @@ assert.deepEqual(
   assert.ok(train.entries.every(e=>e.arrived),'all passengers physically reach their own muster point: '+JSON.stringify(train.State().entries.filter(e=>!e.arrived)));
   assert.ok(actors.every(a=>!a.p012OnMovingTrain&&a.missionUnloaded));
   console.log('ok train 8/24/8, Luo separate, unchanged local positions while moving, all physical exits in '+(ticks*dt).toFixed(1)+'s');
+}
+
+{
+ const calls=[], sound=new FirstLevelMissionBattleSound({Play:(cue,options)=>{calls.push({cue,...options});return null;}});
+ for(let i=0;i<120;i++)sound.Update(.5,"Train");
+ assert.equal(calls.length,0,"the carriage stays clear of premature front sound");
+ for(let i=0;i<120;i++)sound.Update(.5,"Support");
+ assert.ok(calls.some(c=>c.cue==="amb.cannonFar")&&calls.some(c=>c.cue==="type92")&&calls.some(c=>c.cue==="rifleNraFar"));
+ assert.ok(calls.every(c=>c.position.z< -190&&c.soundField&&c.bus==="ambience"));
+ const north=sound.sources.find(s=>s.spec.id==="NorthArtillery");
+ assert.ok(north.count>=5,"sustained cannon pressure throughout the support trench");
+ const supportVolume=calls.find(c=>c.cue==="rifleNraFar").volume, count=calls.length;
+ for(let i=0;i<120;i++)sound.Update(.5,"South",true);
+ const south=calls.slice(count);
+ assert.ok(south.length>8&&south.find(c=>c.cue==="rifleNraFar").volume<supportVolume);
+ const frozen=sound.State();sound.Update(10,"Complete");
+ assert.deepEqual(sound.State(),frozen);
+ console.log("ok directional sustained front combat, quieter south and no train/end leakage");
+}
+{
+ let clock=10;const events=[],subtitles=[];
+ const voice=new FirstLevelMissionVoice({audio:{PlayStoryVoice:()=>({voice:{t:clock+.005}}),StopStoryVoice(){}},
+   hud:{Say:(_who,text)=>subtitles.push(text)},Clock:()=>clock,Event:id=>events.push(id)});
+ voice.Enqueue("AircraftReturn");voice.Update(0);
+ voice.Update(30);assert.equal(voice.State().sourceTime,0,"gameplay stepping cannot outrun a live audio clock");
+ clock+=4.4;voice.Update(.01);assert.deepEqual(events,[]);
+ clock+=.3;voice.Update(.01);assert.deepEqual(events,["AircraftDiveOrder"]);
+ voice.Pause();clock+=20;voice.Update(20);voice.Resume();clock+=.2;voice.Update(.01);
+ assert.equal(events.length,1,"resuming the source never repeats the physical dive");
+ console.log("ok real audio clock governs subtitles and second-aircraft dive order");
 }

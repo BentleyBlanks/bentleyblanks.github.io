@@ -636,6 +636,10 @@ export class Hud {
   MeleeQteState() { return this.meleeQteState ? { ...this.meleeQteState } : null; }
 
   /** 常驻 HUD 不再展示姓名与队伍；人物身份只在阵亡卡里出现。换枪本身算一次交互。 */
+  SetWeaponUiVisible(visible) {
+    this.el.combat.style.visibility=visible ? "" : "hidden";
+    this.el.combat.setAttribute("aria-hidden",visible ? "false" : "true");
+  }
   SetWeaponName(weaponName) {
     const text = String(weaponName ?? "");
     if (this.el.combatWeapon.textContent === text) return;

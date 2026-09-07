@@ -1123,7 +1123,7 @@ async function Boot() {
       return weapon?.kind === "melee" ? "Dadao" : weapon?.bayonet && (isPlayer ? state.bayonetFixed && meleeStance : entity.bayonetFixed) ? "Bayonet" : null;
     },
     MoveIntent: () => ({strafe:input.strafe,forward:input.forward}),
-    CanUse: () => !carry?.Active && !emplacement?.Mounted && !state.cooking && !p012Runtime?.binocularOwned && !player?.Busy && !viewmodel?.IsBusy?.(),
+    CanUse: () => !missionRuntime?.EmptyHands && !carry?.Active && !emplacement?.Mounted && !state.cooking && !p012Runtime?.binocularOwned && !player?.Busy && !viewmodel?.IsBusy?.(),
     LineClear: (a, b) => {
       const from = new THREE.Vector3(a.position.x, a.position.y + 1.1, a.position.z);
       const to = new THREE.Vector3(b.position.x, b.position.y + 1.1, b.position.z);
@@ -1345,7 +1345,7 @@ async function Boot() {
       state.cutscene = null;
       router?.SetSuppressed(false);
       // 过场里抬着东西的话（第一关接替担架那一段就是），枪该继续收着。
-      if (viewmodel && viewmodel.root) viewmodel.root.visible = !carry?.Blocking;
+      if (viewmodel && viewmodel.root) viewmodel.root.visible = !carry?.Blocking && !missionRuntime?.EmptyHands;
       if (state.running && !state.menu) RequestPointerLock();
     },
     // 过场自带的天空：出川是阴天、长官部是夜里 —— 不能沿用上一关的拂晓。
@@ -3505,9 +3505,10 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   missionRuntime = phase.whitebox?.fullMission ? new FirstLevelMissionRuntime({
     scene,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,
     Objective:text=>{state.storyObjective=text;},
+    VoiceClock:()=>MANUAL_STEP?null:audio.ctx?.currentTime,
     Inventory:()=>({ammo:state.ammo,clips:state.clips,grenades:state.grenades,bundles:state.bundles,shots:state.playerShots}),
     GiveSupply:({clips=0,grenades=0,bundles=0,bandages=0})=>{state.clips+=clips;state.grenades+=grenades;state.bundles+=bundles;player.bandages+=bandages;state.mags.primary.clips=state.clips;},
-    RestoreRifle:()=>{if(state.activeSlot!=='primary')SwitchSlot('primary');viewmodel.root.visible=true;},
+    RestoreRifle:()=>{if(state.activeSlot!=='primary')SwitchSlot('primary');viewmodel.root.visible=!missionRuntime?.EmptyHands;},
     Control:active=>{state.missionControl=active;state.cooking=null;state.cook=0;input.fire=false;input.ads=false;},
     Complete:()=>{Progress.MarkCleared(FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,0);ShowPauseMenu();menu.OpenSandboxComplete();},
   }) : null;
@@ -4650,6 +4651,7 @@ function WeaponVariantFor(weaponId, value = 0) {
 
 /** 换槽。长枪/短枪各记各的弹仓 —— 切回来不该是满的。 */
 function SwitchSlot(slot) {
+  if(missionRuntime?.EmptyHands)return false;
   if (meleeCombat && !meleeCombat.CanChangeWeapon()) return false;
   if (!player?.Alive || !SlotWeaponId(slot)) return false;
   if (slot === state.activeSlot) return false;
@@ -5083,7 +5085,7 @@ function CloseMenu() {
   state.menu = false;
   hudRoot.style.display = "";
   // 回到战场时手上还占着东西的话，枪继续收着（负重的边沿不会重放一次）。
-  if (viewmodel) viewmodel.root.visible = !carry?.Blocking;
+  if (viewmodel) viewmodel.root.visible = !carry?.Blocking && !missionRuntime?.EmptyHands;
   if (!SHOT) document.getElementById("edRoot")?.classList.remove("off");
 }
 
@@ -5461,6 +5463,8 @@ const router = new InputRouter({
       if (input.stanceRequested !== "stand") p012Runtime?.RecordDodgeIntent(player.position, strafe?.View(), carry?.KindId);
       return;
     }
+    if (missionRuntime?.EmptyHands && (action.startsWith("slot:") || action.startsWith("cook:")
+      || ["reload","melee","bayonet","bipod","cycleSlot"].includes(action))) return;
     if (p012Runtime?.binocularOwned && (action.startsWith("slot:") || action.startsWith("cook:")
       || ["reload","melee","bayonet","bipod","cycleSlot"].includes(action))) return;
     switch (action) {
@@ -5586,6 +5590,7 @@ function IssueOrderByKey(key) {
 
 function ReadKeys() {
   router.Read(input, { ads: player ? player.ads : 0 });
+  if(missionRuntime?.EmptyHands){input.fire=false;input.ads=false;}
   if (SHOT_ADS) input.ads = true;
   if (SHOT_FIRE) input.fire = true;
 }
@@ -5606,6 +5611,7 @@ function AimPoint(maxDist = 120) {
 
 /** 装填。桥夹压入固定弹仓，一次五发；没有备弹就只能去死人身上找。 */
 function Reload() {
+  if(missionRuntime?.EmptyHands)return false;
   if (meleeCombat && !meleeCombat.CanChangeWeapon()) return false;
   if (!player.Alive || viewmodel.IsBusy?.()) return false;
   const w = WEAPONS[currentWeapon];
@@ -5638,6 +5644,7 @@ function Reload() {
 
 /** 按住蓄力：手榴弹可以攥着数几秒再扔，落地即炸。 */
 function BeginCook(kind) {
+  if(missionRuntime?.EmptyHands)return false;
   if (!player.Alive || state.cooking || combat.Returning) return;
   const infiniteGrenades = EffectiveInfiniteGrenades();
   if (kind === "Grenade" && !infiniteGrenades && state.grenades <= 0) { hud.Hint(T("hud.hint.noGrenades"), 2); return; }
@@ -5673,6 +5680,7 @@ function ReleaseCook() {
 
 /** 白刃快捷出招也经过统一时序，不保留旧大刀即时伤害旁路。 */
 function DoMelee() {
+  if(missionRuntime?.EmptyHands)return false;
   return !!(meleeCombat?.CanUse() && meleeCombat.Attack(player, false));
 }
 
@@ -5804,6 +5812,7 @@ function UpdateContextualActionPrompts() {
     return;
   }
   const interaction = interact?.Query(player) || null;
+  if(missionRuntime?.EmptyHands){const prompt=missionRuntime.OpeningPrompt();hud.SetActionPrompts(prompt?[prompt]:[]);return;}
   if (typeof weaponRange !== "undefined" && weaponRange) {
     hud.SetActionPrompts(interaction?.point?.tag === "WeaponRange"
       ? [{ keys: "F", label: interaction.label, kind: "interact" }] : []);
@@ -6109,7 +6118,7 @@ function ConfirmHit(died) {
 
 function TryFire(dt, returningGrenade = false) {
   fireCooldown -= dt;
-  if(missionRuntime?.controls)return;
+  if(missionRuntime?.controls || missionRuntime?.EmptyHands)return;
   if (returningGrenade) return;
   if (p012Runtime?.binocularOwned) return;
   // 架着机枪：左键交给机枪那条射速与过热闸（Script_Emplacement.Update 里排），
@@ -6693,7 +6702,7 @@ function Frame(dt, render = true) {
   // 过场、菜单、倒地镜头三处也在切同一个字段，每帧写会互相盖掉。
   // 抬着东西的人被打死时负重会在同一帧卸掉，不挡住的话枪会在尸体镜头里冒出来。
   const handsBusy = !!carry?.Blocking || !!p012CarryView?.rig.root.visible
-    || !!emplacement?.Blocking || !!p012Runtime?.binocularOwned;
+    || !!emplacement?.Blocking || !!p012Runtime?.binocularOwned || !!missionRuntime?.EmptyHands;
   if (viewmodel?.root && carryHidGun !== handsBusy) {
     carryHidGun = handsBusy;
     if (!state.cutscene && !state.menu && player.Alive) viewmodel.root.visible = !carryHidGun;
@@ -7088,7 +7097,7 @@ function Frame(dt, render = true) {
     // 抬着东西时准心收掉：枪不在手上，画一个散布锥就是在骗人。
     // 架着机枪反过来**要**留着：弹道收敛到准心指着的那个点上（EMPLACED_CONVERGE_M）。
     visible: DIFFICULTY.showCrosshair !== false && player.Alive
-      && !state.ordersOpen && !state.cutscene && !meleeCombat?.Active && !carry?.Blocking && !p012Runtime?.binocularOwned,
+      && !state.ordersOpen && !state.cutscene && !meleeCombat?.Active && !carry?.Blocking && !p012Runtime?.binocularOwned && !missionRuntime?.EmptyHands,
     spreadDeg,
     fovDeg: camera.fov,
     viewportHeight: window.innerHeight,
@@ -7114,6 +7123,7 @@ function Frame(dt, render = true) {
   // 按住型交互的进度环 + 负重条。两者都只读脱敏快照，HUD 不认识规则层的结构。
   hud.SetInteractProgress(interact?.View() || null);
   hud.SetCarry(carry?.View() || null);
+  hud.SetWeaponUiVisible(!missionRuntime?.EmptyHands);
   for(const entry of setpieceProps.values())if(entry.woundedActor&&entry.root.visible)UpdateWoundedActor(entry.woundedActor,dt);
   // 架设机枪面板（热条 / 弹药 / 卡壳 / 退出提示）。同样只读脱敏快照。
   hud.SetEmplacement(empView);

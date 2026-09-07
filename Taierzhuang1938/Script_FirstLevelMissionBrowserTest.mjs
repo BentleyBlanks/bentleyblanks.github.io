@@ -294,7 +294,38 @@ try {
     return { frozen, running: g.state.running };
   });
   assert.ok(pause.frozen && pause.running, "Pause freezes the world and resume restores input");
-  await page.evaluate(() => window.Tengxian.StepFrames(4200, 1 / 60, false));
+  const opening = await page.evaluate(() => {
+    const g=window.Tengxian;
+    const ammo=g.state.ammo,shots=g.state.playerShots,bundles=g.state.bundles,grenades=g.state.grenades;
+    g.Debug.Mouse(0,true);g.Debug.Mouse(2,true);
+    for(const key of ["KeyR","KeyV","KeyG","KeyH","Digit2"])g.Debug.Key(key);
+    g.StepFrames(30,1/60,true);
+    g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+    const empty={hidden:!g.viewmodel.root.visible,ammo:g.state.ammo===ammo,shots:g.state.playerShots===shots,
+      grenades:g.state.grenades===grenades,bundles:g.state.bundles===bundles,ads:g.player.ads};
+    for(let i=0;i<120*60&&!g.Debug.FirstLevelMission().facts.includes("trainProneOrder");i++)g.StepFrames(1,1/60,false);
+    const before=g.Debug.FirstLevelMission();
+    const prompt=before.openingPrompt;
+    const stanceBefore=g.player.stance;
+    g.Debug.Key("KeyZ");
+    g.StepFrames(60,1/60,true);
+    const after=g.Debug.FirstLevelMission();
+    const prone={prompt,stanceBefore,stanceAfter:g.player.stance,ack:after.facts.includes("trainPlayerProne"),
+      promptCleared:!after.openingPrompt};
+    for(let i=0;i<120*60&&!g.Debug.FirstLevelMission().facts.includes("trainStopped");i++)g.StepFrames(1,1/60,false);
+    return {empty,prone,after:g.Debug.FirstLevelMission()};
+  });
+  assert.ok(opening.empty.hidden&&opening.empty.ammo&&opening.empty.shots&&opening.empty.grenades&&opening.empty.bundles&&opening.empty.ads<.01,
+    "empty hands also blocks all weapon actions: "+JSON.stringify(opening.empty));
+  assert.equal(opening.prone.prompt?.keys,"Z");
+  assert.notEqual(opening.prone.stanceBefore,"prone","the mission never forces the player prone");
+  assert.ok(opening.prone.stanceAfter==="prone"&&opening.prone.ack&&opening.prone.promptCleared);
+  const firstHit=opening.after.log.find(x=>x.id==="trainFirstShellImpact")?.time;
+  const injury=opening.after.log.find(x=>x.id==="trainSoldierWounded")?.time;
+  const proneOrder=opening.after.log.find(x=>x.id==="trainProneOrder")?.time;
+  assert.ok(firstHit<injury&&injury<proneOrder,"explosion, wound, then the spoken prone instruction");
+  await fs.writeFile(path.join(output,"Data_OpeningInteraction.json"),JSON.stringify(opening,null,2));
+
   await page.evaluate(() => window.Tengxian.StepFrames(1, 1 / 60, true));
   const unloaded = await page.evaluate(() => ({
     mission: window.Tengxian.Debug.FirstLevelMission(),
@@ -438,6 +469,7 @@ try {
         index: 0,
         frames: 0,
         trace: [],
+        battleEvidence: [],
       };
     });
     let navigation;
@@ -459,8 +491,10 @@ try {
             yaw = Math.atan2(p.x - at.x, p.z - at.z);
           g.player.yaw += Math.max(-0.04, Math.min(0.04, Wrap(yaw - g.player.yaw)));
           g.player.pitch = 0;
+          if(g.player.bleeding && g.player.health<85)g.Debug.Key("KeyB");
           g.StepFrames(1, 1 / 60, false);
           b.frames++;
+          if(b.frames%300===0){const m=g.Debug.FirstLevelMission();if(m.stage==="Support")b.battleEvidence.push({position:{...p},sound:m.battleSound,front:m.enemies.filter(e=>e.id.startsWith("Front")).length});}
           if (!g.player.alive) break;
         }
         g.Debug.Key("KeyW", false);
@@ -516,6 +550,10 @@ try {
     );
     assert.ok(navigation.alive, "Player survives normal approach");
     assert.equal(navigation.stage, "MachineGun");
+    const battlefieldSound=await page.evaluate(()=>window.missionBot.battleEvidence);
+    assert.ok(battlefieldSound.length>=3&&battlefieldSound.every(e=>e.front===5),"front encounter exists along the support approach");
+    assert.ok(battlefieldSound.some(e=>e.sound.recent.some(s=>s.cue==="amb.cannonFar"))&&battlefieldSound.some(e=>e.sound.recent.some(s=>s.cue==="type92")),"distant cannon and machine gun persist in the trench");
+    await fs.writeFile(path.join(output,"Data_TrenchCombatSound.json"),JSON.stringify(battlefieldSound,null,2));
     await page.evaluate(() => {
       const g = window.Tengxian;
       g.Debug.Key("KeyF", true);
@@ -572,6 +610,7 @@ try {
             );
             g.Debug.Mouse(0, true);
           } else g.Debug.Mouse(0, false);
+          if(g.player.bleeding && g.player.health<85)g.Debug.Key("KeyB");
           if (gun.rounds === 0) g.Debug.Key("KeyR");
           g.Debug.Key("KeyR", !!gun.jam);
           g.StepFrames(1, 1 / 60, false);
@@ -798,7 +837,7 @@ try {
     await Interact();
     await Route([{ x: 95, z: 103 }], "TransferPosition", { fight: true });
     await WaitStage("AirFirst", 300, { fight: true });
-    await WaitStage("Carry", 12, { fight: true });
+    await WaitStage("Carry", 30, { fight: true });
     const pickup = await page.evaluate(() => {
       const z = window.Tengxian.Debug.FirstLevelMission().column.litters.find((l) => l.zhou);
       return { x: z.x + Math.sin(z.yaw) * 1.6, z: z.z + Math.cos(z.yaw) * 1.6 };
@@ -885,7 +924,7 @@ try {
     );
     await Interact();
     assert.equal(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage), "Death");
-    await WaitStage("FinalDefense", 14);
+    await WaitStage("FinalDefense", 45);
     assert.equal(
       await page.evaluate(
         () => window.Tengxian.Debug.FirstLevelMission().column.litters.find((l) => l.zhou).health,
@@ -930,7 +969,9 @@ try {
       "Physical transfer fits the authored 2–4 minutes",
     );
     assert.ok(
-      pacing.Death >= 8 && pacing.Death <= 12.1,
+      await page.evaluate(()=>{const log=window.Tengxian.Debug.FirstLevelMission().log;
+        const duration=log.find(e=>e.id==="deathSceneComplete").time-log.find(e=>e.id==="deathMedicArrived").time;
+        return duration>=8&&duration<=12.1;}),
       "The limited-control death scene lasts 8–12 seconds",
     );
     assert.deepEqual(errors, []);
