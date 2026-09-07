@@ -1060,9 +1060,9 @@ export function GetActiveAtmosphere() { return activeAtmosphere; }
  * 帧图里的 `atmosphere` pass（排在 prepass 之前）。
  *
  * 干两件事，都不出画：
- *   · 天空视图 LUT —— 相机高度一变就该重算（这一关高差只有几十米，
- *     但过场镜头会飞到城墙上）。两万像素，便宜到不值得做脏标记。
- *   · 大气透视 froxel LUT —— 视锥对齐，每帧必须重算。
+ *   · 天空视图 LUT —— 只在相机海拔或太阳天顶角真的变了才重算
+ *     （见 `RenderSkyView` 的脏标记：每帧无条件重算占了这一段六成的钱）。
+ *   · 大气透视 froxel LUT —— 视锥对齐，每帧必须重算。剩下的 0.15 ms 基本是它。
  * 透过率与多次散射两张是**静态**的，在 `SkyDome.Apply()` 里同步算完，
  * 这里只在被外部改脏（画质面板调烟霾）时补一次。
  *
@@ -1139,6 +1139,8 @@ export class AtmospherePass {
       // 把大气透视那一批 uniform 挂进合成 pass（共享对象，不是拷值）。
       // 名字不变，所以不触发重编译；换 SkyDome（编辑器重建场景）时重挂一次。
       BindAtmosphereUniforms(composite.uniforms, atmosphere);
+      // 调试材质（如果已经建过）跟着重挂，否则它还指着上一台大气的靶。
+      if (this.screenUniforms) BindAtmosphereUniforms(this.screenUniforms, atmosphere);
       this.bound = atmosphere;
     }
     // **Prepare 跑在 Enabled 之前，关掉的那一帧也会进来** —— 这里正是关掉时

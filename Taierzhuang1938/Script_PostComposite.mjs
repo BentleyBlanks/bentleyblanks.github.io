@@ -228,6 +228,10 @@ vec3 ApplyFog(vec3 color, vec2 uv, vec4 nd) {
   vec3 fogCol;
   float fog;
   if (uFogSource > 0.5) {
+    // 体积雾代理接管：整条视线的散射与透过率由它那张图给。
+    // **它必须自己把大气透视乘进去**（`AerialPerspectiveUv(uv, dist)`）——
+    // 走到这一支时下面那段大气透视根本不会被调用，只写体积雾就等于
+    // 「近处有雾、远处的空气不见了」。接口与口径见 §17.4。
     vec4 scatter = texture2D(uFogScatter, uv);
     fogCol = scatter.rgb;
     fog = clamp(1.0 - scatter.a, 0.0, 1.0);

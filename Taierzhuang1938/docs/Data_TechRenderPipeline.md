@@ -1953,8 +1953,14 @@ fogCol = mix(今天的 mix(ground, sky, 仰角) + pow(sunDot,8)*sunGain,
 `color × T + S`，仍吃 `uFogMax` 上限（「远处兵的剪影不许更糊」那条硬约束靠它）。
 **出厂不开**：它会把能见度整条曲线换成物理的，那是要用户拍板的一次画面变化。
 
-与体积雾代理的分工：`uVolumetricFarTransmittance` 由体积雾那一侧写（它负责
-0—`uVolumetricFar`），这里把它乘进 `aerial.a`。没人接线时恒为 1。
+与体积雾代理的分工，两条都要接：
+
+1. `uVolumetricFarTransmittance` 由体积雾那一侧写（它负责 0—`uVolumetricFar`），
+   这里把它乘进 `aerial.a`。没人接线时恒为 1，本代理按 1 处理。
+2. **体积雾一旦把 `uFogSource` 置 1，ApplyFog 就走另一支，下面这段大气透视根本不会
+   被调用。** 所以体积雾那张 `uFogScatter` 必须自己把 `AerialPerspectiveUv(uv, dist)`
+   乘进去，否则表现是「近处有雾、远处的空气不见了」。这一条写在
+   `Script_PostComposite` 那一支的注释里，别只看这里。
 
 ### 17.5 每预设标定表
 

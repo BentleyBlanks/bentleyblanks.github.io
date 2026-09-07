@@ -192,8 +192,11 @@ void main() {
  * 是物理大气的每预设参数，缺省值见 `Script_Atmosphere.ATMOSPHERE_PRESET_DEFAULTS`。
  * 旧的 `zenith / horizon / glow / sunSize` 一个都没删：`?skyLegacy=1` 要用它们
  * 做 A/B，水面（Script_Water）也仍借 `uZenith/uHorizon/uGround` 当反射底色。
- * 数值由 `Script_AtmosphereCalibrate.mjs` 在真浏览器里拟合出来，
- * 目标是**曝光后**的天顶/地平线/太阳侧亮度与旧天空相差 15% 以内。
+ * 数值由 `Script_AtmosphereCalibrate.mjs` 在真浏览器里拟合出来。**拟合的主目标是
+ * 上半球余弦加权辐照度**（十档全部落在 ±5%）—— 它正比于 PMREM 烘出来那张 IBL 的
+ * 量级，也就是「整幅画有多亮」。天顶/地平线/太阳侧允许重新分配（实测最多 ±23%）：
+ * 物理天空本来就会把能量从天顶挪到地平线，逼它们逐项等于旧值等于把物理模型
+ * 重新拟合成旧模型。逐档的数与理由见 docs/Data_TechRenderPipeline.md §17.5。
  */
 // Shared test daylight: fixed world-space key + neutral shadow fill, clear air.
 // Linear HDR renderer units, not measured physical lux. Compare identical poses,
@@ -209,8 +212,9 @@ export const TEST_SCENE_DAY = {
     sky: [0.50, 0.56, 0.65], ground: [0.42, 0.44, 0.47], sunGain: 0,
     desat: 0, flatten: 0 },
   exposure: 0.62, godStrength: 0, bloom: 0, saturation: 1, contrast: 1,
-  // 测试场是"干净空气"的基准：Mie 不加倍，天顶该有的蓝留着；
-  // 灰卡基线（Script_TestSceneLightingTest）对这一档最敏感，标定优先保它。
+  // 测试场是六个白盒共用的基准，灰卡基线（Script_TestSceneLightingTest）对它最敏感。
+  // Mie 2.4 不是"干净空气"：手调的那张天本来就偏白偏平（天顶 B/R 只有 1.9，
+  // 真正的晴空是 5 上下），拟合出来的就是一层薄霾 —— 鲁南三四月浮尘大，说得通。
   atmosphere: { mie: 2.4, rayleigh: 2.0, groundAlbedo: 0.2, sunIrradiance: 14.04,
     skyTint: [1.069, 0.922, 1.014], skyFloor: [0.069, 0.128, 0.238],
     aerialBlend: 0.5, aerialGain: 0.532, artGlow: 0.35 },
