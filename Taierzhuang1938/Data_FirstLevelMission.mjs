@@ -1,7 +1,7 @@
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-export const MISSION_VERSION = "first-level-20260907-r2";
+export const MISSION_VERSION = "first-level-20260907-r3";
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 const Stage = (id, objective, target, requirements, cue, extra = {}) =>
@@ -131,6 +131,13 @@ export const MISSION_ENCOUNTERS = Object.freeze({
     { id: "FrontRifleB", x: -9, z: -164 },
     { id: "FrontRifleC", x: 14, z: -154 },
     { id: "FrontRifleD", x: 30, z: -151 },
+    { id: "FrontRifleE", x: -29, z: -171 },
+    { id: "FrontRifleF", x: -22, z: -178 },
+    { id: "FrontRifleG", x: -10, z: -180 },
+    { id: "FrontRifleH", x: 2, z: -177 },
+    { id: "FrontRifleI", x: 9, z: -170 },
+    { id: "FrontRifleJ", x: 20, z: -179 },
+    { id: "FrontSupportGunner", x: 33, z: -181, weapon:"Type11", hold:true },
   ],
   tank: [
     { id: "TankEscortA", x: 24, z: -145 },

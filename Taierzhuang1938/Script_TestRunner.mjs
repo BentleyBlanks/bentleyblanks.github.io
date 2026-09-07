@@ -293,7 +293,7 @@ export const domains = {
       "CarryTest",
       // 架设机枪把左键整条接管过去（TryFire 的第一道闸）、还借 MarchBullet 打弹道，
       // 所以它同样同时挂在 combat 与 interact 两个域。
-      "EmplacementTest",
+      "EmplacementTest", "FirstLevelMissionTest",
       // 日机扫射自己算一条伤害链（打倒 NPC、打倒玩家），不走 MarchBullet 也不走 Blast，
       // 所以碰伤害口径的改动要连着它一起跑（毫秒级，白搭一条不亏）。
       "AircraftStrafeTest"],
@@ -358,6 +358,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"combat",pattern:/BallisticSuppression/},
   {domain:'firstLevel',pattern:/FirstLevelMission|FirstLevelVoiceAlign|SeedAudioFirstLevel|Audio\/FirstLevel/},
   { domain: "menu", pattern: /FirstLevelP012Debug/i },
   { domain: "text", pattern: /(Script_Text|Data_Text_|Data_Locale_|Data_Tuning_|Data_Mission|Data_Cutscene|Data_History|Data_Voice|Data_Weapons|TengxianScript)/i },

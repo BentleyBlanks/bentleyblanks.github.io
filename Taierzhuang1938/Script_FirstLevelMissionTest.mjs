@@ -1,3 +1,4 @@
+import { CollectBulletNearMisses,ApplyBulletNearMisses } from "./Script_BallisticSuppression.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
@@ -6,7 +7,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
-import { FirstLevelMissionColumn } from "./Script_FirstLevelMissionColumn.mjs";
+import { FirstLevelMissionColumn, MissionGuideSpeed } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE } from "./Data_FirstLevelMission.mjs";
 import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
@@ -263,4 +264,24 @@ console.log("ok paused audio ranges, subtitle source timing, queued cues and she
  voice.Pause();clock+=20;voice.Update(20);voice.Resume();clock+=.2;voice.Update(.01);
  assert.equal(events.length,1,"resuming the source never repeats the physical dive");
  console.log("ok real audio clock governs subtitles and second-aircraft dive order");
+}
+
+{
+  const Actor=(x,z)=>({alive:true,position:{x,y:0,z},stance:0,suppression:0});
+  const nearby=Actor(1,-12),behindWall=Actor(.1,-24),occluded=Actor(-1,-12),far=Actor(5,-12);
+  const near=new Map();
+  CollectBulletNearMisses({x:0,y:1.05,z:0},{x:0,y:0,z:-1},18,[nearby,behindWall,occluded,far],near);
+  ApplyBulletNearMisses(near,(point,body)=>body.x<0);
+  assert.ok(nearby.suppression>0,"real near miss suppresses adjacent enemy");
+  assert.equal(behindWall.suppression,0,"stopped bullet cannot suppress beyond solid");
+  assert.equal(occluded.suppression,0,"cover between path and body blocks suppression");
+  assert.equal(far.suppression,0,"distant scenery fire cannot affect gameplay");
+}
+
+{
+ const actor={x:0,z:0},target={x:0,z:-60};
+ assert.equal(MissionGuideSpeed(actor,{x:0,z:40},target),0,"leader waits for a trailing player");
+ assert.equal(MissionGuideSpeed(actor,{x:0,z:-40},target),R.squadCatchupMps,"only a trailing guide accelerates");
+ assert.equal(MissionGuideSpeed(actor,{x:0,z:5},target),R.squadSpeedMps,"nearby guide keeps walking pace");
+ assert.equal(MissionGuideSpeed(actor,{x:0,z:-40},target,true),0,"spacing still takes priority");
 }

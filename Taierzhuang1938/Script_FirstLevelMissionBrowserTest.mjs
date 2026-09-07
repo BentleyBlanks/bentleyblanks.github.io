@@ -148,6 +148,12 @@ async function Interact() {
   return page.evaluate(() => {
     const g = window.Tengxian,
       query = g.Debug.Interact();
+    const interaction=g.interact.Query(g.player);
+    if(interaction?.point?.tag==="FirstLevelMission"){
+      g.StepFrames(1,1/60,true);
+      const prompt=g.hud.actionPrompts.find(p=>p.label===interaction.label);
+      if(!prompt?.text||!document.querySelector(".actionText")?.textContent)throw Error("mission interaction needs a visible action label");
+    }
     g.Debug.Key("KeyF", true);
     g.StepFrames(90, 1 / 60, false);
     g.Debug.Key("KeyF", false);
@@ -551,7 +557,7 @@ try {
     assert.ok(navigation.alive, "Player survives normal approach");
     assert.equal(navigation.stage, "MachineGun");
     const battlefieldSound=await page.evaluate(()=>window.missionBot.battleEvidence);
-    assert.ok(battlefieldSound.length>=3&&battlefieldSound.every(e=>e.front===5),"front encounter exists along the support approach");
+    assert.ok(battlefieldSound.length>=3&&battlefieldSound.every(e=>e.front===12),"front encounter exists along the support approach");
     assert.ok(battlefieldSound.some(e=>e.sound.recent.some(s=>s.cue==="amb.cannonFar"))&&battlefieldSound.some(e=>e.sound.recent.some(s=>s.cue==="type92")),"distant cannon and machine gun persist in the trench");
     await fs.writeFile(path.join(output,"Data_TrenchCombatSound.json"),JSON.stringify(battlefieldSound,null,2));
     await page.evaluate(() => {
@@ -567,6 +573,21 @@ try {
     }));
     assert.ok(occupied.mounted, "F actually occupies the mission machine gun");
     console.log("ok machine gun occupied");
+    const frontVisual=await page.evaluate(()=>{
+      const g=window.Tengxian,root=g.scene.getObjectByName("Emplacement_MissionGun"),tank=g.scene.getObjectByName("MissionTankTrackDamage");
+      const sights=[];
+      for(const yaw of [0,.5,-.5]){g.player.yaw=yaw;g.player.pitch=0;g.StepFrames(6,1/60,false);
+        const p=root.getObjectByName("sight").getWorldPosition(g.player.position.clone()).project(g.camera);sights.push({yaw,x:p.x,y:p.y});}
+      return {sights,tankModel:!!tank?.getObjectByName("Type89Tank_root_type89Armor"),
+        fired:g.ai.soldiers.filter(a=>a.lastFire>0).map(a=>({id:a.missionId||a.id,side:a.side})),
+        aliveEnemy:g.ai.soldiers.filter(a=>a.side==="ija"&&a.alive).length,
+        gunGroundClearance:root.position.y-g.battlefield.GroundHeight(0,-128)};
+    });
+    await fs.writeFile(path.join(output,"Data_FrontVisual.json"),JSON.stringify(frontVisual,null,2));
+    assert.ok(frontVisual.tankModel,"use the repository Type89Tank authored model");
+    assert.ok(frontVisual.sights.every(p=>Math.abs(p.x)<.08&&Math.abs(p.y)<.16),"sight stays in front of shooter while traversing: "+JSON.stringify(frontVisual.sights));
+    assert.ok(frontVisual.fired.filter(a=>a.side==="nra").length>=3&&frontVisual.fired.filter(a=>a.side==="ija").length>=3,"both forces visibly engage before the player takes over");
+    assert.ok(frontVisual.aliveEnemy>=4,"front contact retains visible living opposition");
     let defense;
     for (let chunk = 0; chunk < 30; chunk++) {
       defense = await page.evaluate(() => {
@@ -586,14 +607,12 @@ try {
             )
             .sort((a, b) => a.position.distanceToSquared(p) - b.position.distanceToSquared(p))
             .find((a) => {
-              const from = p
-                  .clone()
-                  .set(gun.position.x, gun.position.y + gun.kind.sightRiseM, gun.position.z),
+              const from = g.player.EyePosition.clone(),
                 to = a.position.clone();
               to.y += a.stance === 2 ? 0.3 : a.stance === 1 ? 0.85 : 1.2;
               const d = to.sub(from),
                 len = d.length();
-              const hit = g.battlefield.Raycast(from, d.normalize(), len);
+              const hit = g.battlefield.Raycast(from, d.normalize(), len, {terrain:true});
               return !hit || hit.t >= len - 0.3;
             });
           if (target) {
@@ -604,8 +623,7 @@ try {
             g.player.pitch = Math.atan2(
               target.position.y +
                 (target.stance === 2 ? 0.3 : target.stance === 1 ? 0.85 : 1.2) -
-                gun.position.y -
-                gun.kind.sightRiseM,
+                eye.y,
               Math.hypot(dx, dz),
             );
             g.Debug.Mouse(0, true);
@@ -615,6 +633,10 @@ try {
           g.Debug.Key("KeyR", !!gun.jam);
           g.StepFrames(1, 1 / 60, false);
           b.frames++;
+          if(g.state.lastEmplacedShot && b.lastGunShot!==g.state.lastEmplacedShot.index) {
+            b.lastGunShot=g.state.lastEmplacedShot.index;
+            (b.gunShots??=[]).push({...g.state.lastEmplacedShot,target:target?{id:target.missionId||target.id,position:target.position.toArray(),stance:target.stance}:null,eye:g.player.EyePosition.toArray()});
+          }
           if (g.Debug.FirstLevelMission().stage !== "MachineGun" || !g.player.alive) break;
         }
         g.Debug.Mouse(0, false);
@@ -625,6 +647,7 @@ try {
           alive: g.player.alive,
           gun: g.emplacement.View(),
           gunStats: { ...g.emplacement.stats },
+          shots:b.gunShots,
           mission: g.Debug.FirstLevelMission(),
         };
       });
@@ -646,11 +669,18 @@ try {
     await fs.writeFile(path.join(output, "Data_Defense.json"), JSON.stringify(defense, null, 2));
     assert.ok(defense.alive, "Player survives covered emplacement");
     assert.equal(defense.stage, "Tank", "Actual guards pass under player machine gun support");
+    const evacSpacing=await page.evaluate(()=>{const g=window.Tengxian,ids=new Set(g.Debug.FirstLevelMission().guards.filter(a=>a.safe&&a.alive).map(a=>a.id));const a=g.ai.soldiers.filter(a=>ids.has(a.id));return a.flatMap((p,i)=>a.slice(i+1).map(q=>Math.hypot(p.position.x-q.position.x,p.position.z-q.position.z)));});
+    assert.ok(evacSpacing.every(d=>d>.8),"withdrawn soldiers do not occupy the same stopping point");
     await page.evaluate(() => {
       const g = window.Tengxian;
       g.Debug.Key("KeyF");
       g.Debug.Key("KeyB");
     });
+    await Route([{x:0,z:-124},{x:-2.2,z:-122.5}],"FrontResupply",{stance:"crouch"});
+    const reserveBefore=await page.evaluate(()=>window.Tengxian.emplacement.Emplacement("MissionGun").belts);
+    await Interact();
+    const reserveAfter=await page.evaluate(()=>window.Tengxian.emplacement.Emplacement("MissionGun").belts);
+    assert.ok(reserveAfter>reserveBefore,"front box physically replenishes machine-gun reserve");
     await Route(
       [
         { x: 0, z: -124 },

@@ -42,7 +42,7 @@ V9 保留 V7 躯干与下肢，按游戏 `CreateP012StretcherGeometry` 的 0.58 
 - 原任务纯规则及音频校验通过：24 阶段事实门、41 NPC 的 8/24/8 下车、20 架队列与转运、原老周身份、41 段录音文件／提示词哈希均保持。
 - 本轮 `Script_FirstLevelMissionBrowserTest.mjs --audio --campaign` 以真实玩家输入完成全关，41 段语音实际解码播放；乘车相对漂移约 0.128 mm，TrainMeal 38.833 秒，南行 75.017 秒、转运 224.767 秒、死亡 12 秒，末句完成后到达 Complete。此项验证**原任务未回退**，不代表 V9 已在关卡启用。按改动运行的 33 项 quick 检查全部通过。
 
-当前 master 的 `Script_FirstLevelMissionVoice` 仍按整段时长与字数权重分配字幕，没有实际录音拆段表。本批没有据此猜手势时间，也未改变录音、台词、口令、任务时长、人数或镜头。取得最新 cue ID＋播放段 ID＋原 MP3 起止后再绑定动作事件；暂停／重试必须拒绝旧事件。
+本批验证基线的 Script_FirstLevelMissionVoice 当时仍按整段时长与字数权重分配字幕，没有实际录音拆段表。本批没有据此猜手势时间，也未改变录音、台词、口令、任务时长、人数或镜头。取得最新 cue ID＋播放段 ID＋原 MP3 起止后再绑定动作事件；暂停／重试必须拒绝旧事件。
 
 检查报告在资产库 `Models/FirstLevelCarryV9`、`Preview/FirstLevelCarryV9` 与 worktree 的 `Taierzhuang1938/_shots/FirstLevelCarry`。报告、源工程、候选动画、预览和截图均留本地。
 
@@ -65,3 +65,7 @@ node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --audio --campaign
 ```
 
 新首批缺源动作需要补齐可用原片或确认其另存目录；查找范围已包括标准库和 Downloads/GVHMR。预览从资产库 `Preview/Open_Preview.cmd` 启动。索引器按版本数字合并持久清单，避免 `FirstLevelCarryV9` 这样的目录被字母排序靠后的旧 ReviewV7 覆盖取景元数据。
+
+后续流程版本已提供 [源录音对齐表](../Data_FirstLevelMissionVoiceAlignment.mjs) 与 [播放段／事件表](../Data_FirstLevelMissionVoiceTiming.mjs)。下一批动作接入使用这两个最新接口；上面的 V9 未启用状态与原批验证结果保持不变。
+
+首战运行时接力注意：第一关已将 8 名撤退守军提前布置，等待时还击、受压伏低、通过后分散停留；具名同伴走向各自射击踏步。机枪射手随枪托调整位置。替换动画须保留这些实际运动、目标、开火与接触事件，不把它们烘成固定播放时间轴。

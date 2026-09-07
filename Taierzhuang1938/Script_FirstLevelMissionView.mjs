@@ -5,8 +5,8 @@ import { BuildSink } from "./Script_World.mjs";
 import { PlaceGeometry } from "./Script_Geo.mjs";
 import { MISSION_PLACEMENT, MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
 export class FirstLevelMissionView {
-  constructor({ scene, battlefield, physics, column }) {
-    Object.assign(this, { scene, battlefield, physics, column });
+  constructor({ scene, battlefield, physics, column, actorFactory, library }) {
+    Object.assign(this, { scene, battlefield, physics, column, actorFactory, library });
     this.root = new THREE.Group();
     this.root.name = "FirstLevelMissionWhitebox";
     scene.add(this.root);
@@ -108,22 +108,37 @@ export class FirstLevelMissionView {
     this.tank.name = "MissionTankTrackDamage";
     this.root.add(this.tank);
     this.tank.visible = false;
-    this.Box(this.tank, 2.6, 1.25, 4.8, 0, 1.2, 0, 0x777d6e);
-    this.trackLeft = this.Box(this.tank, 0.5, 1.1, 5.5, -1.45, 0.64, 0, 0x434944);
-    this.Box(this.tank, 0.5, 1.1, 5.5, 1.45, 0.64, 0, 0x434944);
-    this.turret = new THREE.Group();
-    this.turret.position.y = 2.15;
-    this.tank.add(this.turret);
-    this.Box(this.turret, 1.6, 0.8, 1.6, 0, 0, 0, 0x8c927f);
-    this.Box(this.turret, 0.17, 0.17, 2.7, 0, 0.03, -1.7, 0x515a50);
+    const materials = { type89Armor:this.library.Get("Type89Armor",{side:THREE.DoubleSide}),
+      type89Barrel:this.library.Get("Type89Armor",{side:THREE.DoubleSide}),
+      type89Track:this.library.Get("Type89Track",{side:THREE.DoubleSide}) };
+    const model=this.actorFactory.ModelInstance("Type89Tank",materials);
+    if(!model)throw new Error("First level requires the existing Type89Tank model");
+    this.tankModel=model;this.tank.add(model.root);
+    model.root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+    this.turret=model.nodes.get("turret");
+    this.trackDamage=this.Box(this.tank,.19,.12,1.1,-1.02,.07,.2,0x252c27);
+    this.trackDamage.visible=false;
     this.tankCollider = {
       min: [0, 0, 0],
       max: [0, 0, 0],
       c: [0, 0, 0],
-      h: [1.8, 1.65, 3],
+      h: [1.075, 1.28, 2.15],
       tag: "missionTank",
       ry: 0,
     };
+  }
+  SyncTank(tank) {
+    const h=(x,z)=>this.battlefield.GroundHeight(x,z);
+    const front=h(tank.x,tank.z+1.8),rear=h(tank.x,tank.z-1.8);
+    const left=h(tank.x+1,tank.z),right=h(tank.x-1,tank.z);
+    this.tank.position.set(tank.x,(front+rear+left+right)/4,tank.z);
+    this.tank.rotation.set(Math.atan2(front-rear,3.6),Math.PI,Math.atan2(left-right,2),"YXZ");
+    this.turret.rotation.y=tank.turretYaw-Math.PI;
+    this.tank.updateMatrixWorld(true);
+  }
+  TankMuzzle(tank,node="gunMuzzle") {
+    this.SyncTank(tank);
+    return this.tankModel.nodes.get(node).getWorldPosition(new THREE.Vector3());
   }
   Instance(key, x, y, z, yaw = 0, sx = 1, sy = 1, sz = 1, rx = 0) {
     const mesh = this.parts[key],
@@ -297,15 +312,12 @@ export class FirstLevelMissionView {
     }
     for (const mesh of Object.values(this.parts)) mesh.instanceMatrix.needsUpdate = true;
     if (tank) {
-      this.tank.visible = tank.active;
-      this.tank.position.set(tank.x, this.battlefield.GroundHeight(tank.x, tank.z), tank.z);
-      this.tank.rotation.y = Math.PI;
-      this.turret.rotation.y = tank.turretYaw - Math.PI;
-      this.trackLeft.rotation.z = tank.immobilized ? 0.18 : 0;
-      this.trackLeft.material.color.setHex(tank.immobilized ? 0x252c27 : 0x434944);
-      if (tank.active) {
+      this.tank.visible = tank.present || tank.active;
+      this.SyncTank(tank);
+      this.trackDamage.visible = tank.immobilized;
+      if (tank.present || tank.active) {
         const c = this.tankCollider;
-        c.c = [tank.x, this.tank.position.y + 1.65, tank.z];
+        c.c = [tank.x, this.tank.position.y + 1.28, tank.z];
         c.min = c.c.map((v, i) => v - c.h[i]);
         c.max = c.c.map((v, i) => v + c.h[i]);
         if (!this.tankRegistered) {

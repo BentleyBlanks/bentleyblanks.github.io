@@ -190,25 +190,22 @@ for (const x of [-25, 0, 15]) {
   Wall(`FrontTraverseCover${x}`, x + 3.6, -119.4, 0.8, 0.65, 2);
 }
 Block("BundleCrate", 13, -118, 1.2, 0.5, 0.8, "missionRoute");
-gates.push({
-  id: "ForwardGunNest",
-  x: -24,
-  y: 0.85,
-  z: -130,
-  w: 0.25,
-  h: 0.3,
-  d: 1.6,
-  semantic: "danger",
-  signal: "MissionForwardGunDestroyed",
-});
-for (const side of [-1, 1]) Wall(`MachineGunSideCover${side}`, side * 2.8, -128, 0.65, 1.8, 2.4);
+// The forward weapon belongs to its real gunner; no suspended placeholder mesh.
+// Side protection sits behind the muzzle so the documented firing arc stays usable.
+for (const side of [-1, 1]) Wall(`MachineGunSideCover${side}`, side * 2.8, -126.0, 0.65, 1.8, 1.6);
+// The authored ZB-26 minimum is 0.12294 m below its model origin.
+const gunRestTop=SampleMissionTerrain(0,-128)+1.45+.08-.12294;
+const gunRestHeight=gunRestTop-SampleMissionTerrain(0,-128.55);
+Block("MachineGunRest",0,-128.55,1.18,gunRestHeight,1.0,"cover");
 for (const [i, x, z, w] of [
   [0, -26, -164, 10],
   [1, 28, -158, 9],
   [2, 62, -144, 10],
   [3, 35, -82, 14],
 ])
-  Wall(`FieldRuin${i}`, x, z, w, 1.3, 0.7);
+  Wall(`FieldRuin${i}`, x, z, w, i<2?.75:1.3, 0.7);
+for(const x of [-28,-13,2])Wall(`WithdrawCover${x}`,x,-150,3.8,.72,.65);
+for(const x of [-20,0,20])Wall(`EnemyForwardCover${x}`,x,-173,4.2,.62,.7);
 // The village route passes through a kitchen, inner courtyard and connected rooms.
 Room("Kitchen", 58, -9, 12, 15, { northDoor: true, southDoor: true });
 Room("ConnectedHouse", 58, 8, 12, 15, { northDoor: true, southDoor: true, eastWindow: true });
@@ -360,6 +357,7 @@ export const MISSION_PLACEMENT = Object.freeze({
     { x: -69, z: 70, yaw: 1.2, health: 0 },
     { x: -64, z: 77, yaw: 2.1, health: 28 },
   ],
+  squadFrontPositions:[{x:-1.7,z:-129},{x:1.7,z:-128.7},{x:14,z:-129},{x:16,z:-127.5}],
   tankStart: { x: 36, z: -173 },
   tankTargets: [
     { x: -24, z: -130 },

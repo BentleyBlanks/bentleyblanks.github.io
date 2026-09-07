@@ -2016,6 +2016,11 @@ export class AiDirector {
 
   ApplyScriptDefense(s) {
     s.order = "hold"; s.cover = null; s.bayonetFixed = false;
+    if(s.scriptSuppressible && s.suppression>=.5){
+      s.state=STATE.SUPPRESSED;
+      this.SetStance(s,s.suppression>.8?2:1,1.5,s.suppression>.8);
+      return;
+    }
     if (s.ammo <= 0) {
       if (s.state !== STATE.RELOAD) s.reloadTimer = s.weapon.reloadTimeS || 3.2;
       s.state = STATE.RELOAD;

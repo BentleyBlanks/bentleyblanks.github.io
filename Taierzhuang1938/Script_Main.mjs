@@ -1,3 +1,4 @@
+import { CollectBulletNearMisses, ApplyBulletNearMisses } from "./Script_BallisticSuppression.mjs";
 // 《台儿庄：血战滕县》装配层：把渲染、城、玩家、AI、特效、音效、HUD、过场拼起来。
 //
 // 这一份只做四件事：**启动顺序**、**关卡流程**、**每帧调度**、**输入**。
@@ -1102,7 +1103,7 @@ async function Boot() {
     onActorSpawn: (soldier) => {
       if(PHASE_TABLE[state.phaseIndex]?.whitebox?.p012)InstallP012ActorMotion(soldier);
     },
-    BlocksSight: (from, to) => p012Runtime?.BlocksSight(from, to) || false,
+    BlocksSight: (from, to) => missionRuntime?.BlocksSight(from,to) || p012Runtime?.BlocksSight(from, to) || false,
     // 票池 = 兵力池：**谁死了扣谁的**。
     // 以前只有玩家的命和玩家的战绩会动票池，而 Combat.Blast 的 onKill 不带 side，
     // 装配层写死扣日方 —— 日军炮弹炸死中国兵扣的是日军的票。
@@ -3503,7 +3504,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   if (p012Flow) state.storyObjective = p012Flow.CurrentObjective().text;
   missionRuntime?.Dispose();
   missionRuntime = phase.whitebox?.fullMission ? new FirstLevelMissionRuntime({
-    scene,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,
+    scene,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,
     Objective:text=>{state.storyObjective=text;},
     VoiceClock:()=>MANUAL_STEP?null:audio.ctx?.currentTime,
     Inventory:()=>({ammo:state.ammo,clips:state.clips,grenades:state.grenades,bundles:state.bundles,shots:state.playerShots}),
@@ -5012,6 +5013,8 @@ function StartPreview({ unlockAudio = true } = {}) {
 }
 
 function StartRun() {
+  // Direct whitebox links also warm the deferred body clips after boot.
+  LoadMeleeAnimations();
   ShowBoot(false);
   state.menu = false;
   state.running = true;
@@ -5600,7 +5603,7 @@ const _aimPoint = new THREE.Vector3();
 function AimPoint(maxDist = 120) {
   player.AimDirection(_aimDir);
   const from = player.EyePosition.clone();
-  const hit = battlefield.Raycast(from, _aimDir, maxDist);
+  const hit = battlefield.Raycast(from, _aimDir, maxDist, TERRAIN_RAY);
   const t = hit ? hit.t : maxDist;
   return _aimPoint.copy(from).addScaledVector(_aimDir, t);
 }
@@ -5837,6 +5840,11 @@ function UpdateContextualActionPrompts() {
     }else if(interaction?.point?.id==="p012_ammoPickup")prompts.push({keys:T("hud.key.holdF"),label:T("hud.prompt.ammoPickup"),kind:"carry",text:true});
     hud.SetActionPrompts(prompts);return;
   }
+  if(missionRuntime && interaction?.point?.tag==="FirstLevelMission"){
+    const prompts=[{keys:interaction.point.gesture==="hold"?T("hud.key.holdF"):"F",label:interaction.label,kind:interaction.kind||"interact",text:true}];
+    if(player.bleeding>0&&player.bandages>0)prompts.push({keys:"B",label:T("hud.prompt.bandage"),kind:"bandage",text:true});
+    hud.SetActionPrompts(prompts);return;
+  }
   const gunInHand = state.activeSlot === "primary" || state.activeSlot === "secondary";
   const prompts = ContextualActionPrompts({
     // 抬着东西时这一条会把提示条整段接管（只剩「放下 / 扔下」），见 ContextualActionPrompts。
@@ -5852,7 +5860,7 @@ function UpdateContextualActionPrompts() {
   if (meleeCombat?.CanUse() && meleeCombat.PushCandidate()) {
     prompts.unshift({ keys: "F", label: T("hud.prompt.push"), kind: "push" });
   }
-  hud.SetActionPrompts(p012Flow?prompts.map(prompt=>({...prompt,text:true})):prompts);
+  hud.SetActionPrompts(p012Flow||missionRuntime?prompts.map(prompt=>({...prompt,text:true})):prompts);
 }
 
 /**
@@ -6027,7 +6035,17 @@ const IMPACT_CUE = {
 /** 玩家每几发出一颗曳光。史实上常见的装填比例就是 1/5。见 TryFire 末尾的注释。 */
 const TRACER_EVERY = 5;
 
+const _suppressionFrom=new THREE.Vector3(),_suppressionDir=new THREE.Vector3();
+function BulletNearMissBlocked(from,to){
+  _suppressionFrom.set(from.x,from.y,from.z);
+  _suppressionDir.set(to.x-from.x,to.y-from.y,to.z-from.z);
+  const distance=_suppressionDir.length();
+  if(distance<.01)return false;
+  const hit=battlefield.Raycast(_suppressionFrom,_suppressionDir.multiplyScalar(1/distance),distance,TERRAIN_RAY);
+  return !!hit&&hit.t<distance-.01;
+}
 function MarchBullet(from, dir, weapon, targets) {
+  const nearMisses=new Map();
   const muzzle = AMMO[weapon.ammo]?.muzzle || 700;
   const gravity = 9.8 * (DIFFICULTY.bulletGravity ?? 1);
   const range = weapon.effectiveRangeM || 400;
@@ -6075,17 +6093,22 @@ function MarchBullet(from, dir, weapon, targets) {
     // terrain:true —— 子弹要打得中山坡。以前只与碰撞盒求交，打向土坎、河堤、
     // 路基的子弹一律穿过去，弹着点凭空出现在坡的另一边。
     const wallHit = battlefield.Raycast(_bulletPos, _segDir, segLen, TERRAIN_RAY);
+    const solidDistance=Math.min(segLen,bestSoldier?bestT:Infinity,wallHit?.t??Infinity);
+    CollectBulletNearMisses(_bulletPos,_segDir,solidDistance,targets,nearMisses);
     if (bestSoldier && (!wallHit || bestT < wallHit.t)) {
+      ApplyBulletNearMisses(nearMisses,BulletNearMissBlocked,bestSoldier);
       _hitPoint.copy(_bulletPos).addScaledVector(_segDir, bestT);
       return { soldier: bestSoldier, part: bestPart, dist: travelled + bestT, dir: _segDir };
     }
     if (wallHit) {
+      ApplyBulletNearMisses(nearMisses,BulletNearMissBlocked);
       _hitPoint.copy(_bulletPos).addScaledVector(_segDir, wallHit.t);
       return { wall: wallHit, dist: travelled + wallHit.t, dir: _segDir };
     }
     _bulletPos.addScaledVector(_segDir, segLen);
     travelled += segLen;
   }
+  ApplyBulletNearMisses(nearMisses,BulletNearMissBlocked);
   _hitPoint.copy(_bulletPos);
   return { dist: travelled, dir: _segDir };
 }
@@ -6348,7 +6371,14 @@ const EMPLACED_CONVERGE_M = 160;
 
 function FireEmplacedShot(shot) {
   if (!player || !battlefield) return;
-  _empFrom.set(shot.origin.x, shot.origin.y, shot.origin.z);
+  const view=emplacementViews.get(shot.id);
+  const gun=emplacement.Emplacement(shot.id);
+  const modelMuzzle=view?.nodes?.get("muzzle");
+  if(modelMuzzle&&gun){
+    view.root.rotation.set(gun.pitch,gun.yaw,0,"YXZ");
+    view.root.updateMatrixWorld(true);
+    modelMuzzle.getWorldPosition(_empFrom);
+  }else _empFrom.set(shot.origin.x,shot.origin.y,shot.origin.z);
   const aim = AimPoint(EMPLACED_CONVERGE_M);
   _empDir.set(aim.x - _empFrom.x, aim.y - _empFrom.y, aim.z - _empFrom.z);
   if (_empDir.lengthSq() < 1e-6) _empDir.set(shot.dir.x, shot.dir.y, shot.dir.z);
@@ -6370,6 +6400,9 @@ function FireEmplacedShot(shot) {
   // 借玩家步枪那条 MarchBullet：重力、空气阻力、地形与骨骼命中体一条都不少。
   const weapon = { ...WEAPONS[shot.weaponId], effectiveRangeM: shot.rangeM };
   const result = MarchBullet(_empFrom, _empDir, weapon, _empTargets);
+  state.lastEmplacedShot = { index:shot.index, origin:_empFrom.toArray(), aim:aim.toArray(), end:_hitPoint.toArray(),
+    hit:result.soldier?.missionId || result.soldier?.id || null, part:result.part || null,
+    wall:result.wall?.box?.tag || null, wallId:result.wall?.box?.id || null, dist:result.dist };
   if (result.soldier) {
     const died = result.soldier.TakeHit(shot.damage, result.part || "torso", _empDir);
     vfx.Blood(_hitPoint, _empDir, died ? 1 : 0.5);
@@ -6437,6 +6470,19 @@ function AimEmplacementView(view) {
   const entry = emplacementViews.get(view.id);
   if (!entry || !entry.root) return;
   entry.root.rotation.set(view.pitch, view.yaw, 0, "YXZ");
+  const gun=emplacement.Emplacement(view.id);
+  if(gun?.payload?.followSight && player?.Alive){
+    // A braced shooter moves around the stock as the weapon traverses.
+    const back=.6,side=-.0234;
+    const x=gun.position.x+Math.sin(view.yaw)*back+Math.cos(view.yaw)*side,
+      z=gun.position.z+Math.cos(view.yaw)*back-Math.sin(view.yaw)*side;
+    const dx=x-player.position.x,dz=z-player.position.z;
+    if(player.body){
+      player.body.ReconcileTo(player.position.x,player.position.y,player.position.z);
+      const next=player.body.Move(dx,-.002,dz);player.position.set(next.x,next.y,next.z);
+    }
+    player.SyncCamera(0);
+  }
 }
 
 // ---------------------------------------------------------------------------

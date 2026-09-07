@@ -423,3 +423,11 @@ export class FirstLevelMissionColumn {
     };
   }
 }
+
+export function MissionGuideSpeed(actor,player,target,yielding=false) {
+  if(yielding)return 0;
+  const dx=player.x-actor.x,dz=player.z-actor.z,distance=Math.hypot(dx,dz);
+  const playerAhead=dx*(target.x-actor.x)+dz*(target.z-actor.z);
+  if(playerAhead<0&&distance>R.squadWaitDistanceM)return 0;
+  return playerAhead>0&&distance>R.squadCatchupDistanceM?R.squadCatchupMps:R.squadSpeedMps;
+}
