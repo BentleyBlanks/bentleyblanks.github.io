@@ -61,7 +61,10 @@ const library = new MaterialLibrary(renderer, {
 
 const sky = new SkyDome(renderer);
 scene.add(sky.mesh);
-const lights = new LightRig(scene, { quality });
+// renderer 交给 LightRig：它把阴影口径切成级联要的 BasicShadowMap
+// （采样器类型必须与 Script_Csm.SHADOW_MAP_TYPE 一致，不一致是未定义行为）。
+const lights = new LightRig(scene, { quality, renderer });
+lights.SetViewCamera(camera);
 // 太阳阴影公共采样接口：探针页也接上，SunShadow 调试图与正片同一条路。
 post.SetSunShadowSource(lights);
 // 天空 uniform 直接借给探针体：漏空的射线问的是同一片天
@@ -303,6 +306,9 @@ function Frame(dt) {
   lights.UpdateShadowFrustum(camera.position, forward);
   // 簇状局部光的簇表：与正片 RenderScene 里那一行同一条路（见 Script_Light）。
   lights.UpdateClusters(camera, post.width, post.height);
+  // 级联把 renderer.shadowMap.autoUpdate 关掉了（一帧里 renderer.render 要跑很多趟），
+  // 所以每帧必须自己点一次「这一帧要烘哪几级」，否则探针页一张阴影图都不会烘。
+  lights.ScheduleShadowUpdate(renderer);
   if (gi) gi.Update(dt, camera.position, lights);
   // 靶引用每帧重接（SetSize 会换靶）。分辨率的两个 uniform 在工厂里分好了。
   SyncAoUniforms(ssao, post);

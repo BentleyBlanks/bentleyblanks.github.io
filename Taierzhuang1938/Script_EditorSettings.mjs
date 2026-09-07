@@ -28,10 +28,19 @@ import { CONTROL_GUIDE } from "./Script_Input.mjs";
 // 可热调参数的范围、标签和默认值共用；旧存档缺项时沿用默认值。
 export function GraphicsDetailControls(post) {
   return {
+    // 级联阴影（Script_Csm）。这三根给的都是**第 0 级的基准**，往外逐级按纹素
+    // 尺度自动缩放 —— 远级纹素粗四倍，痤疮台阶也粗四倍，同一个绝对偏移必然是
+    // 「近处彼得潘 + 远处痤疮」二选一。
+    // shadowExtent（旧的单张框「覆盖半径」）已废：级联的每级半径由 practical split
+    // 与视锥切片包围球算，不再是一个数。换成 shadowDistance = 最远一级铺到哪。
     shadow: [
       { key: "shadowBias", label: "深度偏移", min: -0.003, max: 0.003, step: 0.0001, value: -0.0004, digits: 4 },
       { key: "shadowNormalBias", label: "法线偏移", min: 0, max: 0.15, step: 0.005, value: 0.035, digits: 3 },
-      { key: "shadowExtent", label: "覆盖半径", min: 30, max: 100, step: 1, value: 66, unit: " m", digits: 0 },
+      // 0 = 用档位默认（high 220 m / ultra 300 m / medium 130 / low 70）。
+      // 不能把默认写成 220：那样 ultra 会被这根滑杆悄悄压回 high 的覆盖。
+      { key: "shadowDistance", label: "阴影距离", min: 0, max: 400, step: 10, value: 0, unit: " m", digits: 0,
+        format: (v) => (v > 0 ? `${v.toFixed(0)} m` : "档位默认") },
+      { key: "shadowIntensity", label: "阴影强度", min: 0.4, max: 1, step: 0.02, value: 1, digits: 2 },
     ],
     gi: [
       { key: "giNormalBias", label: "采样偏移", min: 0, max: 1.5, step: 0.05, value: 0.4, unit: " m" },
@@ -153,7 +162,9 @@ export class GraphicsSettings {
       for (const control of controls[group]) {
         const slider = Slider(parent, {
           ...control, value: gfx[control.key],
-          format: (v) => (control.prefix ?? "") + v.toFixed(control.digits ?? 2) + (control.unit ?? ""),
+          // 逐项可以自带 format（阴影距离的 0 要显示成「档位默认」而不是「0 m」）
+          format: control.format
+            ?? ((v) => (control.prefix ?? "") + v.toFixed(control.digits ?? 2) + (control.unit ?? "")),
           onInput: (v) => { gfx[control.key] = v; this.Apply(); },
         });
         slider.root.lastElementChild.style.whiteSpace = "nowrap";
@@ -178,7 +189,16 @@ export class GraphicsSettings {
       gfx.firstPersonSelfShadowSoft = on;
       this.Apply();
     });
-    const shadowSize = Section(perf, "阴影分辨率");
+    // 屏幕空间接触阴影：补物件贴地那一圈（normalBias 把着色点推出地面造成的漏光）。
+    // 只是「跑不跑那一趟 pass」，材质里那段 GLSL 是档位级的编译期开关，热切不重编译。
+    Toggle(shadowBox, "接触阴影", gfx.contactShadows !== false, (on) => {
+      gfx.contactShadows = on;
+      this.Apply();
+    });
+    // 级联之后这一栏是**每一级**的图边长（high/ultra 四级、medium 三级、low 两级）。
+    // 「默认」= 档位值（high/ultra 2k、medium/low 1k）；4k × 四级 = 半 GB 显存，
+    // 留着是给取证用的，不是给玩家日常开的。
+    const shadowSize = Section(perf, "阴影分辨率（每级）");
     Chips(shadowSize, [
       { value: 0, label: "默认" }, { value: 512, label: "512" },
       { value: 1024, label: "1k" }, { value: 2048, label: "2k" }, { value: 4096, label: "4k" },
@@ -330,6 +350,7 @@ export class GraphicsSettings {
     gfx.firstPersonSelfShadow = true;
     gfx.firstPersonSelfShadowSoft = false;
     gfx.atmosphere = true;
+    gfx.contactShadows = true;
     gfx.ssao = 1; gfx.ssil = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
     // 体积雾的出厂值跟画质档走（medium 及以上开），不是固定的 true —— 同 TAA 那条先例。
     // 读的是 froxel 网格在不在（VOLUMETRIC_GRIDS 里 low 是 null），不是 preset 那一位：
@@ -396,9 +417,16 @@ export class GraphicsSettings {
     void post;
     const canvas = this.host.canvas;
     f.Set("画布", `${canvas.width} × ${canvas.height}`);
-    f.Set("阴影图", this.host.lights
-      ? `${this.host.lights.sun.shadow.mapSize.x}${this.host.renderer.shadowMap.enabled ? "" : "（已关）"}`
+    // 级联：报「N 级 × 每级边长」，再报最近一级的纹素世界尺寸 ——
+    // 后者才是「阴影糊不糊」的那个数（重构前是一张 4096 铺 132 m = 3.2 cm）。
+    const csm = this.host.lights?.GetShadowState?.();
+    f.Set("阴影图", csm
+      ? `${csm.cascades} 级 × ${csm.mapSize}${this.host.renderer.shadowMap.enabled ? "" : "（已关）"}`
       : "—");
+    if (csm) {
+      f.Set("最近级纹素", `${(csm.texelWorld[0] * 100).toFixed(2)} cm`);
+      f.Set("阴影覆盖", `${(csm.splits[csm.splits.length - 1] || 0).toFixed(0)} m`);
+    }
     const fpShadow = this.host.game?.firstPersonSelfShadow?.Status?.();
     f.Set("第一人称自阴影", fpShadow?.enabled ? `开（${fpShadow.size}${fpShadow.soft ? " · 软化" : " · 硬 3×3"}）` : "关");
     // 簇状局部光的实况。「簇均值」量的是**每片元实际要循环几盏灯** —— 这一栏

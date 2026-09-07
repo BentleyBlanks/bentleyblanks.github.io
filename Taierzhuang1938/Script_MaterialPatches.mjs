@@ -53,6 +53,7 @@ import { BindDestructionUniforms, DestructionShaderGlsl } from "./Script_Destruc
 import {
   CLUSTER_COMMON_GLSL, ClusterLoopGlsl, BindClusterUniforms, GetActiveClusteredLights,
 } from "./Script_ClusteredLights.mjs";
+import { MakeCsmPatch } from "./Script_Csm.mjs";
 
 /**
  * 造一个补丁。字段全是可选的（只加 uniform 不改代码也合法）。
@@ -711,7 +712,7 @@ export function MakeClusteredLightsPatch() {
 }
 
 /**
- * 现役间接光补丁组：顺序固定 **ORM → AO → GI → SSR → 簇光 → 破口**。
+ * 现役间接光补丁组：顺序固定 **ORM → AO → GI → CSM → SSR → 簇光 → 破口**。
  * 新补丁插在哪儿要想清楚：
  *   · ORM 三合一排**最前**：它把材质自带的遮蔽（烘进贴图的小尺度细节）乘进
  *     `indirectDiffuse`，等价于三方 `aomap_fragment` chunk 原来的位置；
@@ -722,13 +723,24 @@ export function MakeClusteredLightsPatch() {
  *     「探针亮度／天空亮度」的近似遮蔽）；
  *   · 簇光挂在 `<lights_fragment_begin>` 之后，往 `reflectedLight.direct*` 里加直接光，
  *     与 GI/SSR 改的间接光锚点不同、互不覆盖；它在 AO 的 `<aomap_fragment>` **之前**
- *     是必须的 —— 局部光是直接光，不该被 SSAO 压。
+ *     是必须的 —— 局部光是直接光，不该被 SSAO 压；
+ *   · CSM 那一路必须排在 **GI 之后** —— 它要覆盖 GI 补丁里视图 9「太阳阴影」那一行
+ *     （同锚点按注册顺序拼接，后写的赢）。**级联阴影本体不在补丁里**：它整段替换了
+ *     `ShaderChunk.lights_fragment_begin`，覆盖每一份内置光照材质（连没走 MaterialLibrary
+ *     的都算），见 `Script_Csm.mjs` 抬头。这里的 CSM 补丁只做两件补丁注册表才做得到的事：
+ *     接屏幕空间接触阴影那张全屏图，以及把调试视图 9 改读级联可见度。
  */
 export function IndirectLightingPatches({
   orm = null, ssao = null, gi = null, ssr = null, destruction = null,
 } = {}) {
   return [
-    MakeOrmPatch(orm), MakeSsaoPatch(ssao), MakeGiPatch(gi), MakeSsrPatch(ssr),
-    MakeClusteredLightsPatch(), MakeDestructionPatch(destruction),
+    MakeOrmPatch(orm), MakeSsaoPatch(ssao), MakeGiPatch(gi),
+    // contact 的开关是**档位级**的（`Script_ContactShadows` 构造时告诉 Script_Csm），
+    // 不从这里传：MaterialLibrary 的构造参数不该为了一个编译期布尔多一项。
+    // contact 那一位还要求**本材质挂了 AO 补丁**：接触阴影读的是 AO 补丁声明的
+    // `uSsilMap` 的 alpha（采样器预算，见 Script_Csm.CsmContactShadow）。没有 AO 补丁
+    // 的材质编上 CSM_CONTACT 就是未声明标识符 —— 那一趟直接编译失败、什么都不画。
+    MakeCsmPatch({ contact: ssao ? null : false, giDebug: !!gi }),
+    MakeSsrPatch(ssr), MakeClusteredLightsPatch(), MakeDestructionPatch(destruction),
   ].filter(Boolean);
 }

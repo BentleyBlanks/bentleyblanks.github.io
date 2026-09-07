@@ -371,6 +371,9 @@ renderer.debug.checkShaderErrors = !!SHOT;
 renderer.shadowMap.enabled = true;
 // r185 的 shadowMapTypeDefines 里只有 PCFShadowMap 与 VSMShadowMap；
 // 写 PCFSoftShadowMap 会掉进 SHADOWMAP_TYPE_BASIC（硬阴影 + 最近邻）。
+// 2026-09：真正的口径由 LightRig -> Script_Csm.ApplyRendererShadowSettings 定
+// （BasicShadowMap，裸深度，PCSS 要读深度值）。这一行只是 LightRig 建起来之前的
+// 兜底，别把它当成现役设置。
 renderer.shadowMap.type = THREE.PCFShadowMap;
 // 阴影图一帧只烘一次。three 默认 autoUpdate = true，意思是**每一次
 // renderer.render() 都把所有灯的阴影图重烘一遍** —— 而我们一帧里
@@ -439,7 +442,7 @@ const profiler = new FrameProfiler(renderer, { post });
 const graphics = {
   renderScale: 1.0,
   shadows: true,
-  shadowSize: 0,          // 0 = 用出厂档位
+  shadowSize: 0,          // 0 = 用出厂档位（级联之后这是**每一级**的图边长）
   // 独立小阴影图，只在第一人称手臂/武器材质内部采样；仍服从上面的阴影总闸。
   firstPersonSelfShadow: true,
   // 自阴影软化：2048 图 + 双线性 Poisson PCF + receiver-plane 偏置。出厂关（2026-09-05），
@@ -481,6 +484,9 @@ const graphics = {
   fov: CAMERA.baseFovDeg,
 };
 NormalizeGraphicsDetails(graphics, post);
+// 本档位到底编没编接触阴影那段材质 GLSL（编译期，见 Script_Csm.SetCsmContactCompiled）。
+// 面板那个开关只能在「编过」的档位上生效；low 档打开也没用，所以两者取与。
+const CONTACT_SHADOWS_SUPPORTED = !!post.preset.contactShadows;
 // 探针体（GI）。默认关到底：ProbeVolume 不构造（省掉图集/靶与每帧 Update），
 // 材质也**不编入**探针采样代码 —— GI_SAMPLE_GLSL 占着采样器与寄存器，
 // 即使 uGiEnabled 恒为 0 也让整帧贵 ~2.7 ms（2026-08-26 FrameProfileTest 实测）。
@@ -506,7 +512,13 @@ const sky = new SkyDome(renderer, { quality: QUALITY });
 scene.add(sky.mesh);
 // 水面借天空 uniform：反射的天顶/地平线/太阳色随时段预设一起换（Script_Water）
 SetWaterSkyUniforms(sky.uniforms);
-const lights = new LightRig(scene, { quality: QUALITY, shadowExtent: 66 });
+// 级联阴影（Script_Csm）：renderer 交给 LightRig 是为了让它把阴影口径切成
+// BasicShadowMap（PCSS 的 blocker search 必须读到裸深度；采样器类型必须与
+// Script_Csm.SHADOW_MAP_TYPE 一致，不一致是未定义行为）。
+const lights = new LightRig(scene, { quality: QUALITY, shadowExtent: 66, renderer });
+// 接主相机：级联按真实视锥切片的包围球拟合（半径只依赖 fov/aspect/分割距离，
+// 不依赖相机位姿 —— 转头不沸腾）。开镜压 fov 用基准 FOV，不然阴影边缘随开镜呼吸。
+lights.SetViewCamera(camera);
 // 太阳阴影的公共采样接口（Script_Light.SUN_SHADOW_GLSL）：Debug Rendering 的
 // 「SunShadow 采样」视图靠它出图，将来体积雾 / 接触阴影 / CSM 也从这条接口取。
 post.SetSunShadowSource(lights);
@@ -7252,9 +7264,10 @@ function RenderScene(dt) {
     profiler.GpuPop();
     profiler.E("gi");
   }
-  // 这一帧的阴影图在下面第一次 renderer.render 时烘，烘完 three 自己把
-  // needsUpdate 清掉（autoUpdate 已在渲染器那里关掉，见那一行的账）。
-  renderer.shadowMap.needsUpdate = true;
+  // 这一帧要烘哪几级级联阴影图（逐级节流：近级每帧、远级 2–3 帧一次，
+  // 相机瞬移 / 换关 / 太阳转向时 CsmRig 会强制全更）。真正的烘焙发生在下面
+  // 第一次 renderer.render 里，烘完 three 自己把逐灯的 needsUpdate 清掉。
+  lights.ScheduleShadowUpdate(renderer);
   // AO / SSIL 的靶引用每帧重接：SetSize 会重建靶，纹理引用随时可能换。
   // uSsaoResolution 是**主靶**尺寸、uAoTexelResolution 才是 AO 靶尺寸（升采样用），
   // 两者的分工写在 Script_PostGtao.SyncAoUniforms 里。
@@ -7518,9 +7531,18 @@ function ApplyGraphics() {
   // low 档没有 froxel 网格（VOLUMETRIC_GRIDS.low = null），pass 自己就恒不跑，
   // 所以这里不用再查一遍档位表 —— 玩家在 low 上打开这一位也只是空转一个布尔。
   post.preset.volumetrics = graphics.volumetrics !== false;
-  lights.sun.shadow.bias = graphics.shadowBias;
-  lights.sun.shadow.normalBias = graphics.shadowNormalBias;
-  lights.shadowExtent = graphics.shadowExtent;
+  // 级联阴影：面板给的是**第 0 级的基准**，往外逐级按纹素尺度缩放
+  // （见 Script_Csm.CsmRig._ApplyBias）。shadowSize 是**每一级**的图边长。
+  lights.SetShadowTuning({
+    bias: graphics.shadowBias,
+    normalBias: graphics.shadowNormalBias,
+    intensity: graphics.shadowIntensity,
+    mapSize: graphics.shadowSize || lights.defaultShadowSize,
+  });
+  lights.SetShadowDistance(graphics.shadowDistance);
+  // 接触阴影：只是「这一趟 pass 跑不跑」。关掉时 ContactShadowsPass.Idle 会把
+  // 材质那边还原成 1×1 纯白，不重编译。
+  post.preset.contactShadows = CONTACT_SHADOWS_SUPPORTED && graphics.contactShadows !== false;
   giUniforms.normalBias.value = graphics.giNormalBias;
   giUniforms.specularOcclusion.value = graphics.giSpecularOcclusion;
 

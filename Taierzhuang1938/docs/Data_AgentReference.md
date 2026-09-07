@@ -53,7 +53,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Script_PostPrepass.mjs`（MRT 预通道 + 速度缓冲 + HZB + 蒙皮上一帧骨矩阵）、
   `Script_PostGtao.mjs`、`Script_PostSsr.mjs`（Hi-Z 随机 SSR）、`Script_PostTaa.mjs`、
   `Script_PostBloom.mjs`（含太阳拖影）、
-  `Script_PostComposite.mjs`（分段 GLSL）、`Script_PostFxaa.mjs`、`Script_PostDebug.mjs`。
+  `Script_PostComposite.mjs`（分段 GLSL）、`Script_PostFxaa.mjs`、`Script_PostDebug.mjs`、
+  `Script_ContactShadows.mjs`（屏幕空间接触阴影 + 阴影系统的三张调试图）。
 - `Script_PostSsr.mjs` —— **屏幕空间反射**：自建 min-reduce Hi-Z（共享 HZB 是 max-reduce，
   语义相反）+ GGX VNDF 随机追踪 + ratio estimator 解算 + 时域累积，另出一条「上一帧 TAA
   解算后场景色」的 mip 链。粗糙度取自主 HDR 靶的 alpha（材质补丁写进去的免费 GBuffer）。
@@ -82,8 +83,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - `Script_FirstPersonSelfShadow.mjs` —— 第一人称手臂/武器专用 packed-depth + 3×3 PCF
   自阴影；与战场太阳阴影图隔离，禁止改成 Viewmodel 直接 `castShadow=true`。
 - `Script_Gi.mjs`（半实时辐照度探针体 + `Data_GlobalShProbe.mjs`，回归口 `Script_GiTest.mjs`）、
-  `Script_Light.mjs`（太阳 + 跟随式阴影框 + 火光池 + 枪口闪光 + **`SUN_SHADOW_GLSL` 公共阴影
-  采样接口**：体积雾 / 接触阴影 / CSM 都从这条接口取，别自己采 `sun.shadow.map`）、
+  `Script_Light.mjs`（太阳 + 级联阴影框 + 火光池 + 枪口闪光 + **`SUN_SHADOW_GLSL` 公共阴影
+  采样接口**：体积雾 / 接触阴影 / 簇光都从这条接口取，别自己采 `sun.shadow.map`）、
   `Script_Sky.mjs`（天穹 + `SKY_PRESETS` + `SKY_RADIANCE_GLSL` + PMREM 烘焙）、
   `Script_Water.mjs`（Gerstner 护城河）。
 - `Script_Atmosphere.mjs` —— **物理大气**（Hillaire 2020 / UE SkyAtmosphere 那一套）：
@@ -91,6 +92,17 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   天穹与探针体 GI 的漏空射线共用同一批采样 uniform；`AERIAL_PERSPECTIVE_GLSL` 供
   合成 pass 的 ApplyFog 段。每预设参数在 `SKY_PRESETS[...].atmosphere`，
   由 `Script_AtmosphereCalibrate.mjs` 在真浏览器里拟合。`?skyLegacy=1` 退回旧解析天空。
+- **阴影（级联 CSM + PCSS + 屏幕空间接触阴影，2026-09）**：`Script_Csm.mjs`
+  （N 盏同方向灯 + 拟合/吸附/节流 + **整段替换 `ShaderChunk.lights_fragment_begin`** 的
+  级联采样 chunk + 全屏采样接口 GLSL）、`Data_Tuning_Shadows.mjs`（级数/图尺寸/分割/
+  节流/PCSS 抽样数/接触阴影，全部数值）、`Script_ContactShadows.mjs`（pass）。
+  四条铁律：级联本体走 chunk 不走材质补丁（补丁漏材质 = 那份材质吃 N 份太阳）；
+  只有第 0 盏灯带强度（能量守恒的安全网）；阴影图是 `BasicShadowMap` 裸深度
+  （PCSS 的 blocker search 要读深度值，采样器类型两边必须一致）；
+  **一帧只烘一张**（城里每趟阴影烘焙有 ~1.45 M 三角的地板，`SCENE_RENDER_LIMITS`
+  的 8.10 M 单帧红线只剩 2.59 M 余量 —— 多烘一张 BootTest 就红）。
+  回归口 `Script_CsmTest.mjs` + `Script_BootTest.mjs`（三角红线）；
+  出图 `Script_CsmShot.mjs`；先读 `docs/Data_TechRenderPipeline.md` **§1S**。
 - **局部光源（簇状前向光照，2026-09）**：`Script_ClusteredLights.mjs`（视锥切簇 + 三张
   DataTexture + 材质补丁里的局部光循环 + 两层调试叠加）＋ `Data_Tuning_Lights.mjs`
   （档位 + `ClusterGrid` 纯几何，零 three，纯 Node 单测直接 import 它）。
@@ -102,12 +114,15 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   先读：`docs/Data_TechRenderPipeline.md` §17（§2.1 是它的历史稿）。
 - 回归口：`Script_PostFrameGraphTest.mjs`（帧图契约）、`Script_PostTest.mjs`、
   `Script_GtaoTest.mjs`（GTAO / 弯曲法线 / 镜面遮蔽 / SSIL）、
+  `Script_CsmTest.mjs`（级联阴影 / PCSS / 接触阴影）、
+  `Script_SamplerBudgetTest.mjs`（采样器预算：四档×gi 八轮正片都 ≤ 16 个纹素单元）、
   `Script_SsrTest.mjs`（屏幕空间反射）、`Script_ClusteredLightsTest.mjs`（簇状局部光）、
   `Script_AtmosphereTest.mjs`（物理大气：四张 LUT + 十档标定 + 能见度闸；`--shot` 出 A/B 图）、
   `Script_VolumetricsTest.mjs`（体积雾：能见度不变差 / 阴影切光柱 / 时域收敛）、
   `Script_GiTest.mjs`、`Script_EditorTest.mjs`（Debug Rendering 全部视图）。
-- 先读：`docs/Data_TechRenderPipeline.md` **§1「帧图与模块契约」**（接入说明；
-  §1A 起是设计期草案与专题深挖，GI 在 §12，SSR / 簇状光 / 物理大气 / froxel 体积雾
+- 先读：`docs/Data_TechRenderPipeline.md` **§1「帧图与模块契约」**（接入说明，
+  采样器预算表在 §1.8）与 **§1S「阴影：CSM / PCSS / 接触阴影」**（阴影现状；§10 是它的历史稿）；
+  §1A 起是设计期草案与专题深挖，GI 在 §12，SSR / 簇状光 / 物理大气 / froxel 体积雾 / GTAO
   各占一节 §17（并行落地，本轮不重编号），坑表在末尾）。
 
 ### 材质 / 贴图

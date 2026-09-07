@@ -16,6 +16,7 @@
 //   3) hzb                  Script_PostPrepass     线性视深 max-reduce 金字塔
 //   4) ssr                  Script_PostSsr         min-Hi-Z + 随机 GGX 追踪 + 解算 + 时域
 //   5) gtao                 Script_PostGtao        地平线基 AO + 弯曲法线 + SSIL（半分辨率）
+//   5b) contactShadows      Script_ContactShadows  屏幕空间接触阴影（只压直射太阳）
 //   6) main                 （本文件）HDR 主场景，AO / SSIL / SSR / 簇状局部光由材质补丁注入
 //   7) wireframe            Script_PostDebug       着色模式非 shaded 时叠一层线
 //   8) debugOverlay         Script_PostDebug       Rapier 碰撞体线框等
@@ -55,6 +56,7 @@ import {
 import { GtaoPass } from "./Script_PostGtao.mjs";
 import { SsrPass, SsrColorPass } from "./Script_PostSsr.mjs";
 import { VolumetricsPass } from "./Script_PostVolumetrics.mjs";
+import { ContactShadowsPass, MakeShadowDebugViews } from "./Script_ContactShadows.mjs";
 import { TaaPass } from "./Script_PostTaa.mjs";
 import { BloomPass, GodRaysPass } from "./Script_PostBloom.mjs";
 import { CompositePass } from "./Script_PostComposite.mjs";
@@ -138,6 +140,8 @@ export class PostPipeline {
     this.ssrColorPass = new SsrColorPass(this, this.ssrPass);
     // GTAO + 弯曲法线 + SSIL（子系统 B2）。替掉了旧的 Script_PostSsao。
     this.gtaoPass = new GtaoPass(this);
+    // 屏幕空间接触阴影（子系统 B1）。
+    this.contactShadowsPass = new ContactShadowsPass(this, { quality: this.quality });
     this.taaPass = new TaaPass(this);
     this.bloomPass = new BloomPass(this);
     this.godRaysPass = new GodRaysPass(this, this.bloomPass);
@@ -167,6 +171,9 @@ export class PostPipeline {
       // 上一帧 —— 口径与 UE 的 SSR 相同，详见 Script_PostSsr 抬头。
       this.ssrPass,
       this.gtaoPass,
+      // 屏幕空间接触阴影：要预通道的法线+视深，产出的图要在主场景那一趟被材质
+      // 采到，所以卡在 gtao 与 main 之间。关着时 Idle() 把材质那边还原成纯白。
+      this.contactShadowsPass,
       {
         name: "main",
         Enabled: () => true,
@@ -257,6 +264,26 @@ export class PostPipeline {
     this.quadScene = this.blitter.scene;
     this.quadMesh = this.blitter.mesh;
 
+    // 阴影系统的三张调试图（级联假彩色 / 半影尺寸 / 接触阴影）。
+    // 走的是 **第 ③ 条登记路**（`RegisterDebugView`）—— 与物理大气那四张 LUT 同一条，
+    // 不另开第四套登记表。视图定义留在 Script_ContactShadows，这里只把它们的
+    // `{ material | Texture(), Prepare, Unavailable }` 翻成 GetSource 统一的那一种结构。
+    this.shadowDebugViews = MakeShadowDebugViews(this);
+    for (const [id, view] of Object.entries(this.shadowDebugViews.views)) {
+      this.RegisterDebugView(id, () => {
+        const unavailable = view.Unavailable ? !!view.Unavailable() : false;
+        if (view.material) {
+          return {
+            material: view.material, Prepare: view.Prepare, unavailable,
+            texture: this.targets.normalDepth?.texture, mode: 0,
+          };
+        }
+        const texture = view.Texture ? view.Texture() : null;
+        return { texture, mode: view.mode ?? 4, unavailable: unavailable || !texture };
+      });
+    }
+    this.debugPass.RegisterSunShadowClient(this.shadowDebugViews);
+
     this.SetSize(this.width, this.height);
   }
 
@@ -323,8 +350,19 @@ export class PostPipeline {
    */
   get AoTexture() { return this.targets.aoBlur.texture; }
 
-  /** SSIL（屏幕空间近场间接光）的 RGB 辐照度。关着时是一张 1×1 全黑，永远不为 null。 */
-  get SsilTexture() { return this.gtaoPass.SsilTexture; }
+  /**
+   * 材质端 `uSsilMap` 采的那张：**rgb = SSIL 近场反弹，alpha = 屏幕空间接触阴影**。
+   *
+   * 两件东西合一张是采样器预算逼出来的（ANGLE-D3D11 上 16 个纹素单元，八个子系统
+   * 合流后人物与视模材质实测 17），而代价是零：SSIL 那张的 alpha 全链路本来就没人读。
+   * 口径与预算表见 docs §1.8。
+   *
+   * 接触阴影那一趟没跑时退回 GTAO 的原张 —— 它的 alpha 恒为 1（GTAO 写 1，
+   * SSIL 关着时的 1×1 傅底图也是 1）= 没挡住，正是中性值。永远不为 null。
+   */
+  get SsilTexture() {
+    return this.contactShadowsPass.CombinedTexture || this.gtaoPass.SsilTexture;
+  }
 
   /** 运行时开关 SSIL（重建 GTAO 的材质与靶；不是每帧的事）。 */
   SetSsilEnabled(on) { this.gtaoPass.SetSsilEnabled(on); }
@@ -480,7 +518,9 @@ export class PostPipeline {
       // 太阳拖影要在亮部提取**之前**定下来（亮部图的 alpha 只在拖影开着时
       // 才顺手打包天空遮挡）。Prepare 跑在 GPU 段之外，不占别人的账。
       pass.Prepare?.(ctx);
-      if (pass.Enabled && !pass.Enabled(ctx)) continue;
+      // 被跳过的 pass 可以实现 Idle(ctx) 把「消费方看到的东西」还原成中性值。
+      // 不还原的话，关掉开关之后画面还留着最后一帧的图（接触阴影踩过这一条）。
+      if (pass.Enabled && !pass.Enabled(ctx)) { pass.Idle?.(ctx); continue; }
       // TAA 解算前先把抖动从投影矩阵上摘掉：泛光/雾/运动模糊/太阳投影
       // 拿到的必须是干净矩阵。
       if (pass === this.taaPass) this.taaPass.RemoveJitter(ctx);
@@ -502,6 +542,7 @@ export class PostPipeline {
 
   Dispose() {
     for (const pass of this.passes) pass.Dispose?.();
+    this.shadowDebugViews?.Dispose?.();
     this.debugPass.Dispose();
     this.pool.Dispose();
     this.targets = {};

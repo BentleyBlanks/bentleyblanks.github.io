@@ -229,9 +229,23 @@ export class DebugPass {
     BindSunShadowUniforms(this.uniformsSunShadow, null);
     this.materialSunShadow = MakeFullscreenMaterial(FRAG_SUN_SHADOW_VIEW, this.uniformsSunShadow);
     this.sunShadowRig = null;
+    /**
+     * 也要跟着 LightRig 走的外部 uniform 客户（阴影调试图）。
+     * **这不是第四条调试视图登记路** —— 视图本身走 `PostPipeline.RegisterDebugView`
+     * （查找顺序的第 ③ 条）；这里只管「换了 LightRig 要通知谁重接阴影图」。
+     */
+    this.sunShadowClients = new Set();
   }
 
   Resize() { /* 没有自己的靶 */ }
+
+  /** 登记一个要跟着 LightRig 换阴影图的外部客户（实现 `SetSunShadowSource(rig)`）。 */
+  RegisterSunShadowClient(client) {
+    if (client?.SetSunShadowSource) {
+      this.sunShadowClients.add(client);
+      client.SetSunShadowSource(this.sunShadowRig);
+    }
+  }
 
   /** 接一台 LightRig，`sunShadow` 调试视图才有阴影图可采。 */
   SetSunShadowSource(lightRig) {
@@ -240,6 +254,7 @@ export class DebugPass {
     }
     this.sunShadowRig = lightRig || null;
     BindSunShadowUniforms(this.uniformsSunShadow, lightRig);
+    for (const client of this.sunShadowClients) client.SetSunShadowSource(lightRig);
   }
 
   /**

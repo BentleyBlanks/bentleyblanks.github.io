@@ -1,25 +1,28 @@
-// 《台儿庄：血战滕县》灯光装置：太阳（含跟随式阴影框）、Global SH Probe、环境底色、特效点光池。
+// 《台儿庄：血战滕县》灯光装置：太阳（**级联阴影**）、Global SH Probe、环境底色、特效点光池。
 //
 // 阴影是"3A 与网页 demo"的第一道分水岭。要点：
-//  - 平行光的正交阴影框必须**跟着玩家走**并且尽量小：框开到 500 米，2048 的图
-//    每个纹素 24cm，砖墙的影子就是一条锯齿。这里框只开 62 米。
+//  - 2026-09 起太阳阴影是**级联**（CSM）：N 盏同方向 DirectionalLight 各持一张图，
+//    近级小而密、远级大而疏。实现与着色器在 `Script_Csm.mjs`，数值在
+//    `Data_Tuning_Shadows.mjs`；这里只负责装配与外部接口。
+//    在此之前是**一张** 66 m 跟随框（4096 铺 132 m = 3.2 cm/texel，框外没有阴影）。
 //  - 框的移动必须**吸附到纹素网格**，否则玩家一走动，所有阴影边缘就在那儿爬行
-//    （shadow shimmering），比锯齿更廉价。
+//    （shadow shimmering），比锯齿更廉价。级联版逐级吸附。
 //  - normalBias 比 bias 好使：斜面上的自阴影痤疮靠它，而不是靠把 bias 调大到
-//    影子整个飘起来（peter-panning）。
+//    影子整个飘起来（peter-panning）。级联版把面板给的基准值按逐级纹素尺度缩放。
 
 import * as THREE from "three";
 import { GLOBAL_SH_PROBE_COEFFICIENTS } from "./Data_GlobalShProbe.mjs";
 import { ClusteredLights, SetActiveClusteredLights } from "./Script_ClusteredLights.mjs";
 import { EFFECT_LIGHT_COUNT, MakeClusterTier } from "./Data_Tuning_Lights.mjs";
-
-const SHADOW_SIZE = { low: 1024, medium: 2048, high: 4096, ultra: 4096 };
+import {
+  CsmRig, ApplyRendererShadowSettings, SUN_SHADOW_SAMPLER_GLSL, MakeSunShadowUniforms,
+} from "./Script_Csm.mjs";
 const MAX_EXPLOSION_ENVELOPES = 12;
 
 function Clamp01(value) { return Math.max(0, Math.min(1, value)); }
 
 // ---------------------------------------------------------------------------
-// 太阳阴影的**公共采样接口**（2026-09 帧图重构新增）
+// 太阳阴影的**公共采样接口**（2026-09 帧图重构新增，同月升级为级联版）
 //
 // 谁要用：体积雾（光柱被墙切断）、屏幕空间接触阴影、簇状多光源、任何要在自己的
 // pass 里问「这一点晒不晒得到太阳」的着色器。做法：
@@ -30,79 +33,33 @@ function Clamp01(value) { return Math.max(0, Math.min(1, value)); }
 //   const frag = `...${SUN_SHADOW_GLSL}... void main(){ float v = SunShadowVisibility(wp, wn); }`;
 //   // 每帧（或每次换靶）调一次 lightRig.SyncShadowUniforms()
 //
-// **现在它指向唯一那张 66 m 跟随框阴影图。CSM 代理会在这个接口后面换成级联，
-// 调用方一个字都不用改。** 所以：别在自己的 pass 里直接采 `sun.shadow.map`，
-// 也别自己写一遍矩阵与 bias —— 那样级联落地时要改的地方就散在八个文件里。
+// GLSL 侧三个签名：
+//   `float SunShadowVisibility(vec3 worldPos, vec3 worldNormal)`  8 抽样 Vogel 盘
+//   `float SunShadowVisibilityCheap(vec3 worldPos)`               单抽样（体积雾用）
+//   `float SunShadowPenumbraTexels(vec3 worldPos, vec3 worldNormal)` 半影宽度（调试）
+//
+// **接口在 2026-09 换成级联时签名一个字没改**，调用方（Debug Rendering 的
+// SunShadow 视图、接触阴影、体积雾）无需跟着改。所以：别在自己的 pass 里直接采
+// `sun.shadow.map`，也别自己写一遍矩阵与 bias —— 那样再换一次实现要改八个文件。
 //
 // 两条硬要求（漏一条整趟全黑）：
-//   · `PCFShadowMap` 下 `depthTexture.compareFunction = LessEqualCompare`，
-//     它是**shadow 采样器纹理**，用 `sampler2D` 绑定是未定义行为（多数驱动返回 0）。
-//     必须 `highp sampler2DShadow` + `texture(s, vec3(uv, z))`。
+//   · 采样器类型必须与 `Script_Csm.SHADOW_MAP_TYPE` 一致。`PCFShadowMap` 下
+//     `depthTexture.compareFunction = LessEqualCompare`，它是**shadow 采样器纹理**，
+//     用 `sampler2D` 绑定是未定义行为（多数驱动返回 0 = 全屏死黑）。本仓现在走
+//     `BasicShadowMap`（裸深度，PCSS 要读深度值），GLSL 由 Script_Csm 按它生成。
 //   · normal offset 在世界空间做（把着色点沿法线推出去），不是把 bias 调大 ——
 //     后者是 peter-panning。
 // ---------------------------------------------------------------------------
-export const SUN_SHADOW_GLSL = /* glsl */`
-uniform highp sampler2DShadow uSunShadowMap;
-uniform mat4 uSunShadowMatrix;      // 世界 -> [0,1] 阴影图坐标（three 的 shadow.matrix）
-uniform vec2 uSunShadowMapSize;
-uniform float uSunShadowBias;       // three 的 shadow.bias（加在 z 上）
-uniform float uSunShadowNormalBias; // 世界米，沿法线推出去
-uniform float uSunShadowRadius;     // Vogel 盘半径（纹素）
-uniform float uSunShadowIntensity;  // 1 = 全黑影；<1 = 影子不死黑
-uniform float uSunShadowEnabled;    // 0 = 这一档没有阴影图，恒返回 1
-
-float SunShadowIgn(vec2 position) {
-  return fract(52.9829189 * fract(dot(position, vec2(0.06711056, 0.00583715))));
-}
-
-vec2 SunShadowVogel(int sampleIndex, int samplesCount, float phi) {
-  const float goldenAngle = 2.399963229728653;
-  float r = sqrt((float(sampleIndex) + 0.5) / float(samplesCount));
-  float theta = float(sampleIndex) * goldenAngle + phi;
-  return vec2(cos(theta), sin(theta)) * r;
-}
+export const SUN_SHADOW_GLSL = SUN_SHADOW_SAMPLER_GLSL;
 
 /**
- * 1.0 = 完全照到太阳，0.0 = 完全被挡。阴影框外一律返回 1.0（不是 0）——
- * 66 m 之外本来就没有阴影信息，返回 0 会让整个远景一片死黑。
- */
-float SunShadowVisibility(vec3 worldPos, vec3 worldNormal) {
-  if (uSunShadowEnabled < 0.5) return 1.0;
-  vec4 coord = uSunShadowMatrix * vec4(worldPos + worldNormal * uSunShadowNormalBias, 1.0);
-  coord.xyz /= coord.w;
-  coord.z += uSunShadowBias;
-  bool inFrustum = coord.x >= 0.0 && coord.x <= 1.0 && coord.y >= 0.0 && coord.y <= 1.0;
-  if (!inFrustum || coord.z > 1.0) return 1.0;
-  // 与 three 的 SHADOWMAP_TYPE_PCF 同一套：Vogel 5 抽样盘 + 交错梯度噪声旋转。
-  vec2 texelSize = vec2(1.0) / uSunShadowMapSize;
-  float radius = uSunShadowRadius * texelSize.x;
-  float phi = SunShadowIgn(gl_FragCoord.xy) * 6.283185307179586;
-  float shadow = (
-    texture(uSunShadowMap, vec3(coord.xy + SunShadowVogel(0, 5, phi) * radius, coord.z)) +
-    texture(uSunShadowMap, vec3(coord.xy + SunShadowVogel(1, 5, phi) * radius, coord.z)) +
-    texture(uSunShadowMap, vec3(coord.xy + SunShadowVogel(2, 5, phi) * radius, coord.z)) +
-    texture(uSunShadowMap, vec3(coord.xy + SunShadowVogel(3, 5, phi) * radius, coord.z)) +
-    texture(uSunShadowMap, vec3(coord.xy + SunShadowVogel(4, 5, phi) * radius, coord.z))
-  ) * 0.2;
-  return mix(1.0, shadow, uSunShadowIntensity);
-}
-`;
-
-/**
- * 在一份 uniforms 上建齐 `SUN_SHADOW_GLSL` 要的条目，并接上当前的阴影图。
+ * 在一份 uniforms 上建齐 `SUN_SHADOW_GLSL` 要的条目，并接上当前的级联阴影图。
  * `lightRig` 传 null 也合法（建条目、置 `uSunShadowEnabled = 0`），
  * 之后再调 `lightRig.SyncShadowUniforms()` 补上。
  * @returns {object} 同一份 uniforms（方便链式）
  */
 export function BindSunShadowUniforms(uniforms, lightRig = null) {
-  uniforms.uSunShadowMap = uniforms.uSunShadowMap || { value: null };
-  uniforms.uSunShadowMatrix = uniforms.uSunShadowMatrix || { value: new THREE.Matrix4() };
-  uniforms.uSunShadowMapSize = uniforms.uSunShadowMapSize || { value: new THREE.Vector2(1024, 1024) };
-  uniforms.uSunShadowBias = uniforms.uSunShadowBias || { value: -0.0004 };
-  uniforms.uSunShadowNormalBias = uniforms.uSunShadowNormalBias || { value: 0.035 };
-  uniforms.uSunShadowRadius = uniforms.uSunShadowRadius || { value: 2.2 };
-  uniforms.uSunShadowIntensity = uniforms.uSunShadowIntensity || { value: 1 };
-  uniforms.uSunShadowEnabled = uniforms.uSunShadowEnabled || { value: 0 };
+  MakeSunShadowUniforms(uniforms);
   if (lightRig) {
     lightRig.RegisterShadowUniforms(uniforms);
     lightRig.SyncShadowUniforms();
@@ -111,25 +68,31 @@ export function BindSunShadowUniforms(uniforms, lightRig = null) {
 }
 
 export class LightRig {
-  constructor(scene, { quality = "high", shadowExtent = 62 } = {}) {
+  /**
+   * @param {THREE.Scene} scene
+   * @param {object} options
+   * @param {string} options.quality low | medium | high | ultra
+   * @param {number} options.shadowExtent 兼容参数：**级联版不再用它**（级数与半径
+   *   由 `Data_Tuning_Shadows` 按 practical split 算）。保留是为了旧调用点不报错。
+   * @param {THREE.WebGLRenderer} options.renderer 传了就由本装置把渲染器切到
+   *   级联要的阴影口径（`BasicShadowMap` + `autoUpdate = false`）。**强烈建议传** ——
+   *   采样器类型必须与 `Script_Csm.SHADOW_MAP_TYPE` 一致，不一致是未定义行为。
+   */
+  constructor(scene, { quality = "high", shadowExtent = 62, renderer = null } = {}) {
     this.scene = scene;
     this.shadowExtent = shadowExtent;
     this.quality = quality;
+    if (renderer) ApplyRendererShadowSettings(renderer);
 
-    this.sun = new THREE.DirectionalLight(0xffffff, 3.0);
-    this.sun.castShadow = quality !== "low";
-    const mapSize = SHADOW_SIZE[quality] ?? 2048;
-    this.defaultShadowSize = mapSize;
-    this.sun.shadow.mapSize.set(mapSize, mapSize);
-    this.sun.shadow.camera.near = 0.5;
-    this.sun.shadow.camera.far = 260;
-    this.sun.shadow.bias = -0.0004;
-    this.sun.shadow.normalBias = 0.035;
-    this.sun.shadow.radius = quality === "low" ? 1 : 2.2;
-    this.sun.shadow.blurSamples = 12;
-    this.sun.target = new THREE.Object3D();
-    scene.add(this.sun);
-    scene.add(this.sun.target);
+    // 级联阴影。`csm.lights[0]` 就是 `this.sun`：外部（Script_Gi 取太阳色、
+    // 画质面板读 mapSize、ApplyGraphics 写 bias）拿的都是它，那些引用不许断。
+    this.csm = new CsmRig(scene, { quality });
+    this.sun = this.csm.sun;
+    this.defaultShadowSize = this.csm.defaultMapSize;
+    // 重构前 low 档**完全没有**太阳阴影（castShadow = false，靠雾盖）。级联之后
+    // low 是 2 级 × 1024、只铺 70 m、第二级三帧一烘 —— 比原来的「一张 1024 铺
+    // 132 m」还便宜，所以这一档也给上阴影。总闸（画质面板「阴影」）照常管得着。
+    this.csm.SetCastShadow(true);
 
     // 默认间接光基线：下载的通用 HDR 积分出的全局 L2 SH + 一盏很弱的环境底色。
     // 与旧的实时探针体不同，它不跑 ray-trace pass，也不依赖 scene.environment；
@@ -203,9 +166,33 @@ export class LightRig {
     this.heroSourceId = 0;
 
     this.sunDirection = new THREE.Vector3(0, 1, 0);
+    this.viewCamera = null;
     // 登记过的「太阳阴影采样」uniform 包（见 SUN_SHADOW_GLSL）。用 Set 不用数组：
     // 同一个 pass 重复登记是幂等的。
     this.shadowUniformClients = new Set();
+  }
+
+  /**
+   * 画质面板那几根：深度偏移 / 法线偏移 / 阴影强度 / 阴影图尺寸。
+   * 面板给的是**第 0 级的基准**，往外逐级按纹素尺度缩放（见 CsmRig._ApplyBias）。
+   * @param {object} options
+   * @param {number} [options.bias] 归一化深度偏移（在参考深度范围上）
+   * @param {number} [options.normalBias] 世界米
+   * @param {number} [options.intensity] 1 = 影子全黑；< 1 = 影子不死黑
+   * @param {number} [options.mapSize] 每级图边长；0 / 缺省 = 用档位默认
+   */
+  SetShadowTuning({ bias, normalBias, intensity, mapSize } = {}) {
+    if (Number.isFinite(intensity)) this.csm.SetIntensity(intensity);
+    this.csm.SetBias(bias, normalBias);
+    if (Number.isFinite(mapSize)) this.csm.SetMapSize(mapSize || this.csm.defaultMapSize);
+  }
+
+  /**
+   * 阴影总距离（米）= 最远一级铺到哪。面板那根「阴影距离」。
+   * 分割按 practical split 在 [splitNear, min(camera.far, 这个数)] 上重算。
+   */
+  SetShadowDistance(meters) {
+    this.csm.SetMaxDistance(meters);
   }
 
   /** 让一份 uniforms 跟着本 rig 的阴影图走。一般由 `BindSunShadowUniforms` 代调。 */
@@ -219,31 +206,32 @@ export class LightRig {
   }
 
   /**
-   * 每帧（或换靶/换画质档后）调一次：把阴影图引用与矩阵推给所有登记过的 pass。
+   * 每帧（或换靶/换画质档后）调一次：把**全部级联**的图、矩阵与参数推给所有
+   * 登记过的 pass。
    *
-   * **必须排在本帧阴影图烘完之后** —— `sun.shadow.map` 是 three 在第一次
+   * **必须排在本帧阴影图烘完之后** —— `shadow.map` 是 three 在第一次
    * `shadowMap.render` 时才建的，boot 那几帧是 null。矩阵每帧都在动
-   * （阴影框跟着玩家滚并吸附纹素），所以不能只接一次。
+   * （逐级跟着相机滚并吸附纹素），所以不能只接一次。
    */
   SyncShadowUniforms() {
     if (!this.shadowUniformClients.size) return;
-    const shadow = this.sun.shadow;
-    const map = shadow.map;
-    const depth = map ? map.depthTexture : null;
-    // compareFunction 为 null 表示当前不是 PCFShadowMap（BASIC/VSM）—— 那张图
-    // 不能用 sampler2DShadow 绑，宁可整体退回「没有阴影」也不要未定义行为。
-    const usable = !!(this.sun.castShadow && depth && depth.compareFunction);
-    for (const uniforms of this.shadowUniformClients) {
-      uniforms.uSunShadowMap.value = usable ? depth : null;
-      uniforms.uSunShadowMatrix.value.copy(shadow.matrix);
-      uniforms.uSunShadowMapSize.value.set(shadow.mapSize.x, shadow.mapSize.y);
-      uniforms.uSunShadowBias.value = shadow.bias;
-      uniforms.uSunShadowNormalBias.value = shadow.normalBias;
-      uniforms.uSunShadowRadius.value = shadow.radius;
-      uniforms.uSunShadowIntensity.value = shadow.intensity ?? 1;
-      uniforms.uSunShadowEnabled.value = usable ? 1 : 0;
-    }
+    for (const uniforms of this.shadowUniformClients) this.csm.SyncUniforms(uniforms);
   }
+
+  /**
+   * 点这一帧要烘哪几级阴影图。**替代旧的那句全局
+   * `renderer.shadowMap.needsUpdate = true`**（见 Script_Main.RenderScene）。
+   * @returns {number} 这一帧真的要烘的级数
+   */
+  ScheduleShadowUpdate(renderer) {
+    return this.csm.ScheduleShadowUpdate(renderer);
+  }
+
+  /** 镜头硬切 / 换关 / 传送：下一帧全级重拟合重烘。 */
+  NotifyCameraCut() { this.csm.ForceUpdate(); }
+
+  /** 级联取证（逐级半径、纹素、分割、bias、这一帧烘了几张）。测试与面板读它。 */
+  GetShadowState() { return this.csm.GetState(); }
 
   /**
    * Global SH 基线与探针体的分工。
@@ -269,45 +257,39 @@ export class LightRig {
     this.globalProbe.intensity = this.probeBase * this.giFill;
     this.ambient.intensity = this.ambientBase * (this.giFill < 1 ? 0.72 : 1);
     this.sunDirection.copy(sunDirection).normalize();
-    this.sun.castShadow = this.quality !== "low" && preset.lightIntensity > 0.35;
+    // 夜战（lightIntensity ≤ 0.35）关掉阴影：那一档太阳本来就几乎不照，
+    // 烘四张图纯属白花。low 档不再一刀切关掉（见构造器里的账）。
+    this.csm.SetCastShadow(preset.lightIntensity > 0.35);
+    // 太阳换方向 = 所有级的图全废，下一帧整体重烘（CsmRig 自己也会按点积判，
+    // 这里显式点一下是为了换关那一帧不落后）。
+    this.csm.ForceUpdate();
   }
 
   /**
-   * 每帧把阴影框挪到玩家前方，并吸附到纹素网格。
-   * @param {THREE.Vector3} focus 玩家位置
-   * @param {THREE.Vector3} forward 视线朝向（水平分量）
+   * 每帧把级联框拟合到相机视锥并吸附纹素网格。
+   *
+   * **只重拟合这一帧要重烘的级**（逐级节流在 CsmRig 里）—— 否则会出现
+   * 「矩阵是新的、图是旧的」，影子整体平移半个身位而且只在移动时出现。
+   *
+   * @param {THREE.Vector3} focus 玩家/相机位置（没接相机时的退路）
+   * @param {THREE.Vector3} forward 视线朝向
+   * @param {THREE.PerspectiveCamera} camera 主视图相机（拿 fov / aspect / far / 位姿）
    */
-  UpdateShadowFrustum(focus, forward) {
-    const extent = this.shadowExtent;
-    // 阴影框中心往前推 1/4 框宽：玩家看得见的东西比背后多
-    const ahead = new THREE.Vector3(forward.x, 0, forward.z);
-    if (ahead.lengthSq() > 1e-6) ahead.normalize().multiplyScalar(extent * 0.22);
-    else ahead.set(0, 0, 0);
-    const center = focus.clone().add(ahead);
+  UpdateShadowFrustum(focus, forward, camera = null) {
+    this.csm.Update(camera || this.viewCamera || null, this.sunDirection, focus, forward);
+  }
 
-    const cam = this.sun.shadow.camera;
-    cam.left = -extent; cam.right = extent;
-    cam.top = extent; cam.bottom = -extent;
-
-    // 纹素吸附：把中心投到光空间，量化到纹素，再投回来
-    const mapSize = this.sun.shadow.mapSize.x;
-    const texelWorld = (extent * 2) / mapSize;
-    const lightDir = this.sunDirection;
-    const up = Math.abs(lightDir.y) > 0.98 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
-    const right = new THREE.Vector3().crossVectors(up, lightDir).normalize();
-    const trueUp = new THREE.Vector3().crossVectors(lightDir, right).normalize();
-    const px = Math.round(center.dot(right) / texelWorld) * texelWorld;
-    const py = Math.round(center.dot(trueUp) / texelWorld) * texelWorld;
-    const pz = center.dot(lightDir);
-    const snapped = new THREE.Vector3()
-      .addScaledVector(right, px)
-      .addScaledVector(trueUp, py)
-      .addScaledVector(lightDir, pz);
-
-    this.sun.target.position.copy(snapped);
-    this.sun.position.copy(snapped).addScaledVector(lightDir, 130);
-    this.sun.target.updateMatrixWorld();
-    cam.updateProjectionMatrix();
+  /**
+   * 接一台主视图相机。接上之后 `UpdateShadowFrustum` 就按真实视锥切片拟合级联
+   * （包围球半径只依赖 fov/aspect/分割距离，不依赖相机位姿 —— 转头不沸腾）。
+   * 不接也能跑，只是退回一套固定的 fov/aspect 估计。
+   */
+  SetViewCamera(camera) {
+    this.viewCamera = camera || null;
+    // 开镜会把 fov 从 55 压到 20，级联半径跟着缩三分之一 = 阴影边缘随开镜呼吸。
+    // 拟合一律用基准 FOV。
+    if (camera) camera.userData.csmBaseFov = camera.userData.csmBaseFov ?? camera.fov;
+    this.csm.ForceUpdate();
   }
 
   /**
@@ -739,7 +721,8 @@ export class LightRig {
   }
 
   Dispose() {
-    this.scene.remove(this.sun, this.sun.target, this.globalProbe, this.ambient, this.muzzle);
+    this.csm.Dispose();
+    this.scene.remove(this.globalProbe, this.ambient, this.muzzle);
     for (const l of this.fireLights) this.scene.remove(l);
     if (this.heroLight) this.scene.remove(this.heroLight);
     this.fireSources.clear();

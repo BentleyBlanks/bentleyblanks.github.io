@@ -38,7 +38,12 @@
 //        是旧 SSAO 的两倍多（地平线搜索 + 弯曲法线 + 位掩码），而它在半分辨率上
 //        配联合双边升采样的画质仍然明显好于旧 SSAO 的 0.75 —— 详见
 //        docs/Data_TechRenderPipeline.md「GTAO / SSIL / 镜面遮蔽」一节的实测表。
-//   · 其余键（csm / autoExposure / lensFlare / lut / dof / taaUpscale / contactShadows）
+//   · csm / contactShadows —— 2026-09 阴影子系统落地：
+//        csm 四档全开（级数、图尺寸、分割、节流、PCSS 抽样数在
+//        `Data_Tuning_Shadows.SHADOW_PRESETS`，这里只是「跑不跑」的总闸）；
+//        contactShadows 只 medium 及以上（low 档一张半分辨率 12 步 raymarch
+//        在集显上不值那个钱，而且 low 的阴影本来就只铺 70 m）。
+//   · 其余键（autoExposure / lensFlare / lut / dof / taaUpscale）
 //     —— **本阶段全部为占位**，值 = 与今天等价（即「不启用新东西」）。
 //        对应子系统落地时把自己那一位改成实际档位，并在这里补出处注释。
 //
@@ -70,9 +75,9 @@
  *   volumetrics   froxel 体积雾 / 体积光（medium 及以上开；low 保留解析式高度雾）。
  *                 froxel 网格尺寸不在这张表里，在 `Data_Tuning_Volumetrics.VOLUMETRIC_GRIDS`
  *                 （按同名档位查），时段参数在同文件的 VOLUMETRIC_PRESETS
+ *   csm           级联阴影总闸（级数/尺寸/分割/节流见 Data_Tuning_Shadows）
+ *   contactShadows 屏幕空间接触阴影（帧图里排在 gtao 之后、main 之前）
  *   ——— 以下为后续子系统的占位位，本阶段一律「等价于今天」———
- *   csm           级联阴影（今天：单张 66 m 跟随框，false）
- *   contactShadows 屏幕空间接触阴影
  *   autoExposure  自动曝光（今天：时段预设手调的常数曝光）
  *   lensFlare     镜头光晕
  *   lut           3D LUT 调色（今天：lift/gain + 分离调色）
@@ -86,8 +91,6 @@
 
 /** 后续子系统的占位位。四档共用同一份「等价于今天」的取值。 */
 const RESERVED_OFF = {
-  csm: false,
-  contactShadows: false,
   autoExposure: false,
   lensFlare: false,
   lut: false,
@@ -114,13 +117,15 @@ export const QUALITY_PRESETS = {
     velocity: true, hzb: true, atmosphere: true,
     // low 不跑 SSR：连靶都不建，材质也不编入补丁（`ssr` 进 cache key）。
     ssr: false, ssrScale: 0.5, ssrSteps: 32, ssrResolveTaps: 0,
-    // low 不跑簇：每帧几千次球-AABB 判定 + 三张表上传，换来的画面收益抵不过
+    // low 不跑簇：每帧几千次球-AABB 判定 + 一张表上传，换来的画面收益抵不过
     // 它在 CPU 上的占用（low 档本来就卡在 CPU 提交）。这一档仍是两盏三方点光。
     clusteredLights: false,
     // low 唯一保留解析式高度雾的一档（Composite 的 uFogSource = 0 那条路永久保留）。
     // 也是唯一还能开屏幕空间太阳拖影（godrays）的一档 —— 体积雾开着时两者会双份。
     // 这一档的雾色仍由大气透视供（atmosphere 开着），只是散射按解析式一条常数走。
     volumetrics: false,
+    // 级联阴影四档全开（low 是 2 级）；接触阴影 low 不跑。
+    csm: true, contactShadows: false,
   },
   medium: {
     ...RESERVED_OFF,
@@ -133,6 +138,7 @@ export const QUALITY_PRESETS = {
     // 噪声全交给时域累积压。静止画面收敛得和 high 一样干净，动起来会脏一点。
     ssr: true, ssrScale: 0.5, ssrSteps: 32, ssrResolveTaps: 0,
     volumetrics: true,
+    csm: true, contactShadows: true,
   },
   // high 的抗锯齿由 TAA 承担。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
   // 上百 MB 显存并重复抗锯齿；把 4× 留给主动选择 ultra 的玩家
@@ -148,6 +154,7 @@ export const QUALITY_PRESETS = {
     //（3394×1348 实测 hiz+trace+resolve+temporal 合计见 docs「屏幕空间反射」）。
     ssr: true, ssrScale: 0.5, ssrSteps: 48, ssrResolveTaps: 4,
     volumetrics: true,
+    csm: true, contactShadows: true,
   },
   ultra: {
     ...RESERVED_OFF,
@@ -159,6 +166,7 @@ export const QUALITY_PRESETS = {
     // ultra：全分辨率追踪（不再有半分辨率上采样的边缘渗色）+ 64 步 + 8 抽样解算。
     ssr: true, ssrScale: 1.0, ssrSteps: 64, ssrResolveTaps: 8,
     volumetrics: true,
+    csm: true, contactShadows: true,
   },
 };
 

@@ -47,6 +47,29 @@ function OrmRoughnessFloor(orm) {
 }
 
 /**
+ * 一张**外部图片**的 ORM 粗糙度下界。用一张离屏 canvas 解码后整张扫（每张一次，
+ * 512² 约 1 ms）。**不能降采样再扫** —— 降采样会把最小值平均高，把一块真的
+ * 光滑区域误判成“全都很糙”，于是 SSR 被错误地注销掉。
+ * 读不到（跨域 / 没有 canvas）时返回 0 = “不知道”，保守地保留 SSR。
+ */
+function ExternalOrmRoughnessFloor(texture) {
+  const image = texture?.image;
+  if (!image || !image.width || !image.height) return 0;
+  try {
+    const canvas = typeof OffscreenCanvas === "function"
+      ? new OffscreenCanvas(image.width, image.height)
+      : Object.assign(document.createElement("canvas"), { width: image.width, height: image.height });
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return 0;
+    context.drawImage(image, 0, 0);
+    const data = context.getImageData(0, 0, image.width, image.height).data;
+    return OrmRoughnessFloor(data);
+  } catch (error) {
+    return 0;
+  }
+}
+
+/**
  * 这份材质的粗糙度有没有**可能**落进 SSR 的区间。
  *
  * SSR 的材质侧只在 `material.roughness <= uSsrMaxRoughness`（出厂 0.60）时才动
@@ -274,7 +297,11 @@ export class MaterialLibrary {
       this._LoadExternalImage(normal, false, timeoutMs, flipY),
       this._LoadExternalImage(orm, false, timeoutMs, flipY),
     ]);
-    this.baked.set(name, { albedo: loaded[0], normal: loaded[1], orm: loaded[2] });
+    this.baked.set(name, {
+      albedo: loaded[0], normal: loaded[1], orm: loaded[2],
+      // 与程序化配方同一条：粗糙度下界超过 SSR 上限就不编那一路补丁（见 SsrEligible）。
+      roughMin: ExternalOrmRoughnessFloor(loaded[2]),
+    });
     // LoadExternalSet runs before actors are built. Clear anyway so editor hot reloads
     // cannot retain a material that still points at the procedural fallback.
     this.materials.clear();
@@ -295,7 +322,9 @@ export class MaterialLibrary {
       this._LoadExternalImage(albedo, true, timeoutMs, flipY),
       this._LoadExternalImage(normal, false, timeoutMs, flipY),
     ]);
-    this.baked.set(name, { albedo: loaded[0], normal: loaded[1], orm: fallback.orm });
+    this.baked.set(name, {
+      albedo: loaded[0], normal: loaded[1], orm: fallback.orm, roughMin: fallback.roughMin,
+    });
     this.materials.clear();
     return name;
   }
@@ -309,7 +338,9 @@ export class MaterialLibrary {
     const fallback = this.baked.get(fallbackName);
     if (!fallback) throw new Error(`材质未烘焙：${fallbackName}`);
     const texture = await this._LoadExternalImage(albedo, true, timeoutMs);
-    this.baked.set(name, { albedo: texture, normal: fallback.normal, orm: fallback.orm });
+    this.baked.set(name, {
+      albedo: texture, normal: fallback.normal, orm: fallback.orm, roughMin: fallback.roughMin,
+    });
     this.materials.clear();
     return name;
   }
