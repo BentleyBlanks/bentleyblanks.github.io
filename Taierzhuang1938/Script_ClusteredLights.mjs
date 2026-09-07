@@ -286,14 +286,12 @@ export class ClusteredLights {
     this.height = 1080;
     this.frames = 0;
     this.buildMs = 0;
-    this.uploadBytes = 0;
     // 上一帧的统计（画质面板 / 测试 / 报告读它）
     this.stats = {
       sources: 0, active: 0, indexCount: 0, occupied: 0,
       maxPerCluster: 0, meanPerOccupied: 0, meanPerCluster: 0, overflow: 0,
       buildMs: 0, clusters: this.grid.clusterCount,
     };
-    this._color = new THREE.Color();
   }
 
   /** 主渲染靶尺寸。`gl_FragCoord → tile` 的换算靠它，改分辨率必须跟着改。 */

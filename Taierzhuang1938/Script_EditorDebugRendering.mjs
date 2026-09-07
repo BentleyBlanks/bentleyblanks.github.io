@@ -564,6 +564,9 @@ export class DebugRenderingEditor {
     const pack = this.host.library?.gi;
     if (pack) pack.debugView.value = 0;
     this.SetColliders(false);
+    // 先把「热图关掉要还原成哪个视图」清掉：上面已经把视图归位成 final 了，
+    // 留着的话 SetClusterHeat(false) 会把退出前那个视图再装回去，正片带着调试图走。
+    this.clusterViewBefore = null;
     this.SetClusterHeat(false);
     this.SetClusterSpheres(false);
     this.panel?.root.remove();

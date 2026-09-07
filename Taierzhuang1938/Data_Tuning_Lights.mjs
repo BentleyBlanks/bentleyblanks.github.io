@@ -262,19 +262,6 @@ export class ClusterGrid {
     return hits;
   }
 
-  /** tan 值（x/d）落在哪一列。kx 单调递增，直接解析求解不用二分。 */
-  _TileOfTanX(tanX) {
-    // tanX = (ndcX + p8) / p0  =>  ndcX = tanX·p0 - p8
-    const ndcX = tanX * this.p0 - this.p8;
-    const tile = Math.floor((ndcX + 1) * 0.5 * this.tilesX);
-    return tile;
-  }
-
-  _TileOfTanY(tanY) {
-    const ndcY = tanY * this.p5 - this.p9;
-    return Math.floor((ndcY + 1) * 0.5 * this.tilesY);
-  }
-
   /**
    * 一盏球形光的快路分配：逐深度片把球截成一个薄片，按薄片的屏幕矩形收窄
    * 候选 tile，再逐候选做精确的球-AABB 判定，命中就挂进那一簇的链表。
