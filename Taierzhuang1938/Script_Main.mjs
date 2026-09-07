@@ -15,6 +15,9 @@
 
 import * as THREE from "three";
 import { MaterialLibrary } from "./Script_Materials.mjs";
+import {
+  MakeMaterialShadingUniforms, ApplyShadingQuality, SyncShadingKnobs,
+} from "./Script_MaterialShading.mjs";
 import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
 import { NormalizeGraphicsDetails } from "./Script_EditorSettings.mjs";
 import { LightRig } from "./Script_Light.mjs";
@@ -453,6 +456,19 @@ const graphics = {
   // 实时探针体默认关。默认间接光由 Global SH Probe + AmbientColor 提供；打开时
   // 才跑五个 GI pass/帧，并在图集收敛后渐进接管室内与墙角的反弹光。
   gi: params.get("gi") === "1", giStrength: 1,
+  // 材质着色升级（子系统 B7）。
+  // 布尔位是**编译期**的：翻一次要把全场材质重编译（几百毫秒，一次性），
+  // 与阴影总闸、GI 采样层同一个先例。出厂值跟画质档走（与 taa 同款写法）——
+  // 写成常量的话 low 档一进来就会给自己编上 32 步 POM。
+  pom: (post.preset.pom || 0) > 0,
+  pomSelfShadow: !!post.preset.pomSelfShadow,
+  detailNormal: !!post.preset.detailNormal,
+  microShadow: !!post.preset.microShadow,
+  horizonOcclusion: !!post.preset.horizonOcclusion,
+  skinSss: !!post.preset.skinSss,
+  // 带 Strength / Depth 的是运行时倍率，拖了立刻生效、不重编译。
+  pomDepth: 1, detailNormalStrength: 1, microShadowStrength: 1,
+  horizonStrength: 1, skinStrength: 1, pomSelfShadowStrength: 1,
   fov: CAMERA.baseFovDeg,
 };
 NormalizeGraphicsDetails(graphics, post);
@@ -468,9 +484,19 @@ const giUniforms = MakeGiUniforms();
 giUniforms.debugView.value = parseFloat(params.get("giView") || "0") || 0;
 // 编译期开关：false = 材质不含探针采样代码（进了 cache key，翻转要整场重编译）
 giUniforms.sampling = GI_ON && graphics.gi;
+// 材质着色升级（POM / 细节法线 / 微阴影 / 地平线镜面遮蔽 / 皮肤预积分）那一包。
+// 与 ssao / gi 同一个模式：全场共用一份 uniform，档位是**编译期**的（进 cache key），
+// 运行时翻转要连着把材质全部 needsUpdate（见 ApplyGraphics 里那一段）。
+const shadingUniforms = MakeMaterialShadingUniforms();
+ApplyShadingQuality(shadingUniforms, post.preset, graphics);
+SyncShadingKnobs(shadingUniforms, graphics);
+shadingUniforms.debugView.value = parseFloat(params.get("matView") || "0") || 0;
 const library = new MaterialLibrary(renderer, {
-  textureSize: QUALITY === "low" ? 256 : 512, ssao, gi: GI_ON ? giUniforms : null,
+  // 烘焙基准边长跟画质档走（ultra 1024，砖类翻倍后仍由 Script_TexBake 封在 1024）。
+  textureSize: post.preset.materialTexture || (QUALITY === "low" ? 256 : 512),
+  ssao, gi: GI_ON ? giUniforms : null,
   destruction: destructionUniforms,
+  shading: shadingUniforms,
 });
 const sky = new SkyDome(renderer);
 scene.add(sky.mesh);
@@ -958,7 +984,9 @@ async function Boot() {
 
   setStep(T("boot.step.bakeTextures"), BOOT.progress.bakeTextures.from);
   let baked = 0;
-  const total = bakeNames.length;
+  // 细节法线与皮肤 LUT 是全场共用的两张图，由 PrepareSteps 排在配方前面先烘；
+  // 进度条的分母要把它们算进去，否则第一格就跳到 13%。
+  const total = bakeNames.length + library.PendingShadingSteps();
   for (const name of library.PrepareSteps(bakeNames)) {
     baked += 1;
     setStep(T("boot.step.bakeTexturesProgress", { done: baked, total, name }),
@@ -1741,6 +1769,9 @@ async function Boot() {
     // gi 是取值器：探针体默认不构造，运行时打开（ApplyGraphics）才补建，
     // 拷值出去的话冒烟与剖析脚本拿到的永远是 boot 时那个 null
     renderer, scene, camera, post, sky, lights, library, profiler,
+    // 材质着色升级那一包（POM / 细节法线 / 微阴影 / 地平线 / 皮肤）：
+    // Debug Rendering 面板按它设假彩色编号，MaterialUpgradeTest 按它做 A/B。
+    materialShading: shadingUniforms, RecompileAllMaterials,
     get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, actorBatch, input,
     get meleeCombat() { return meleeCombat; },
@@ -2437,6 +2468,8 @@ async function Boot() {
     game: {
       // gi 走取值器：惰性构造后 Debug Rendering 面板才能看见新建的探针体
       state, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics,
+      // 材质着色升级那一包：Debug Rendering 的「材质细节」组按它设假彩色编号。
+      materialShading: shadingUniforms,
       get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },
       // 物理同理走取值器：换关重建 PhysicsWorld，Debug Rendering 的碰撞体线框要跟着换
       get physics() { return physics; },
@@ -7437,6 +7470,23 @@ requestAnimationFrame(Loop);
  * 去采一张已经不再更新的图 —— 画面会留着一层永不变化的假阴影。
  * 重编译是一次性的（几百毫秒），而这是个设置动作，不是每帧的事。
  */
+/**
+ * 把**全部**材质标脏。编译期开关（阴影总闸 / GI 采样层 / 材质着色升级那几位）
+ * 翻转之后必须走一遍：只改标志位不重编译的话，画面还跑着旧程序。
+ * 库缓存里暂不在场的材质也要标 —— 它们换关会被挂回来，而 three 不会为
+ * 没有 needsUpdate 的材质重查 cache key。
+ */
+function RecompileAllMaterials() {
+  const Mark = (material) => { if (material) material.needsUpdate = true; };
+  scene.traverse((object) => {
+    const material = object.material;
+    if (Array.isArray(material)) material.forEach(Mark); else Mark(material);
+  });
+  for (const material of library.materials.values()) Mark(material);
+  for (const material of library.staticMaterials.values()) Mark(material);
+  for (const material of library.upgradedExternal.values()) Mark(material);
+}
+
 function ApplyGraphics() {
   NormalizeGraphicsDetails(graphics, post);
   const scale = Clamp(graphics.renderScale, 0.4, 1.6);
@@ -7457,6 +7507,9 @@ function ApplyGraphics() {
   lights.shadowExtent = graphics.shadowExtent;
   giUniforms.normalBias.value = graphics.giNormalBias;
   giUniforms.specularOcclusion.value = graphics.giSpecularOcclusion;
+  // 材质着色升级：倍率直接写 uniform（免费），开关变了才整场重编译。
+  SyncShadingKnobs(shadingUniforms, graphics);
+  if (ApplyShadingQuality(shadingUniforms, post.preset, graphics)) RecompileAllMaterials();
 
   // 玩家可单关第一人称自阴影，但「阴影」总闸关闭时它也必须一起停：否则面板说
   // 阴影已关，枪上却还留着一层独立阴影，会成为两套互相矛盾的设置语义。

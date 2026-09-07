@@ -11,6 +11,7 @@
 import * as THREE from "three";
 import { Panel, Section, Chips, Facts, Note, Toggle, El } from "./Script_EditorUi.mjs";
 import { InjectDepthPull, SHADING_MODES } from "./Script_Post.mjs";
+import { MATERIAL_DEBUG_VIEWS } from "./Data_Tuning_Materials.mjs";
 import { R } from "./Script_Physics.mjs";
 
 const VIEWS = [
@@ -29,6 +30,11 @@ const VIEWS = [
   { id: "baseColor", label: "BaseColor", group: "材质", note: "反照率（贴图×顶点色×材质色），光照之前的底色。" },
   { id: "roughness", label: "粗糙度", group: "材质", note: "ORM 采样后的 roughnessFactor；白 = 糙、黑 = 光。" },
   { id: "metalness", label: "金属度", group: "材质", note: "ORM 采样后的 metalnessFactor；这一关的世界大多是 0（黑），枪机、刺刀才亮。" },
+  { id: "pomOffset", label: "视差位移", group: "材质细节", note: "视差遮蔽把 uv 推了多远，单位是**屏幕像素**（红 = 位移大）。关掉 POM 的同一块墙这张图恒为纯黑 —— 两张一比就是「视差到底有没有在动」。没编 POM 的材质（人物、枪、low 档）也是黑。" },
+  { id: "pomHeight", label: "视差高度", group: "材质细节", note: "视差命中点落在高度场的哪一层：白 = 砖面，黑 = 缝底。ultra 的 POM 自阴影会把被挡住的缝再压暗一档。" },
+  { id: "detailNormal", label: "细节法线", group: "材质细节", note: "第二张高频法线实际扰动了多少（切线空间 xy 映射到 RG，中灰 = 无扰动）。超过淡出距离（4.5 m）应当整片中灰。" },
+  { id: "microShadow", label: "微阴影", group: "材质细节", note: "Chan 2018 的直射光微遮蔽因子：白 = 一点不压，黑 = 全压。平整表面（材质 AO ≈ 1）恒白，只有砖缝/木纹在斜射光下才暗下来。" },
+  { id: "skinCurvature", label: "皮肤曲率", group: "材质细节", note: "皮肤预积分散射查表用的曲率（1/米，红 = 尖）。只有被识别成皮肤的材质有值，其余全黑 —— 顺带能核对脸和手有没有被认出来。" },
   { id: "shadow", label: "太阳阴影", group: "光照", note: "平行光阴影因子：白 = 照到、黑 = 挡住。阴影框只有 66 m，框外恒白 —— 顺带能看到覆盖边界。不收影的材质显示黑。" },
   { id: "sunShadow", label: "SunShadow 采样", group: "光照", note: "用预通道重建世界坐标，走 Script_Light.SUN_SHADOW_GLSL 的公共接口采一遍太阳阴影：白 = 照到、黑 = 挡住、天空是深蓝底。体积雾/接触阴影/CSM 共用这条接口，这张图就是它的看门狗。" },
   { id: "diffuseLighting", label: "Diffuse Lighting", group: "光照", note: "正式 reflectedLight.directDiffuse：太阳/局部直射的漫反射贡献（HDR 映射显示）。" },
@@ -60,6 +66,14 @@ const MATERIAL_VIEW_MODES = {
 };
 
 /**
+ * 材质着色升级（2026-09）那一路的假彩色编号，走**自己的** uniform
+ * （`Script_MaterialShading` 的 `uMatDebugView`），与上面 GI 那一包互不干扰：
+ * 两条注入链是分开的补丁，各自的 debugView 也就必须分开，否则关掉 GI
+ * 的档位连视差图都看不了。表里没有的视图必须归零，不然材质还在写上一个假彩色。
+ */
+const SHADING_VIEW_MODES = MATERIAL_DEBUG_VIEWS;
+
+/**
  * 视图 id -> 它正在显示的那张靶。与 Post._GetDebugSource 是同一张表，
  * 改一边必须改另一边，否则面板报的尺寸不是屏幕上那张图的尺寸。
  */
@@ -80,6 +94,11 @@ const VIEW_TARGETS = {
   giIrradiance: (post, gi) => gi?.irradiance?.[gi.pingPong],
   giDistance: (post, gi) => gi?.distanceMoments?.[gi.pingPong],
   // 材质通道假彩色都是场景按调试口径重画进 hdr 靶再送屏
+  pomOffset: (post) => post?.targets?.hdr,
+  pomHeight: (post) => post?.targets?.hdr,
+  detailNormal: (post) => post?.targets?.hdr,
+  microShadow: (post) => post?.targets?.hdr,
+  skinCurvature: (post) => post?.targets?.hdr,
   baseColor: (post) => post?.targets?.hdr,
   roughness: (post) => post?.targets?.hdr,
   metalness: (post) => post?.targets?.hdr,
@@ -555,6 +574,8 @@ export class DebugRenderingEditor {
     this.host.post?.SetShadingMode?.("shaded");
     const pack = this.host.library?.gi;
     if (pack) pack.debugView.value = 0;
+    const shadingPack = this.host.library?.shading;
+    if (shadingPack) shadingPack.debugView.value = 0;
     this.SetColliders(false);
     this.panel?.root.remove();
     this.panel = null;
@@ -599,7 +620,7 @@ export class DebugRenderingEditor {
     }
     physics.appendChild(legend);
 
-    for (const group of ["输出", "后处理", "GBuffer", "材质", "光照", "AO", "GI"]) {
+    for (const group of ["输出", "后处理", "GBuffer", "材质", "材质细节", "光照", "AO", "GI"]) {
       const section = Section(body, group);
       const options = VIEWS.filter((item) => item.group === group)
         .map((item) => ({ value: item.id, label: item.label, title: item.note }));
@@ -620,9 +641,12 @@ export class DebugRenderingEditor {
     // post 决定拿哪张靶、按哪种口径显示。只设一边就是「面板亮着、画面没变」。
     const pack = this.host.library?.gi;
     if (pack) pack.debugView.value = MATERIAL_VIEW_MODES[id] || 0;
+    const shadingPack = this.host.library?.shading;
+    if (shadingPack) shadingPack.debugView.value = SHADING_VIEW_MODES[id] || 0;
     // 第三参 = 材质注了调试层没有：GI 出厂默认关时探针体（host.gi）是 null，
     // 但材质/光照组的假彩色照样可用 —— 可用性要看 library.gi，不看探针体。
-    this.host.post?.SetDebugView?.(id, this.host.gi, !!pack);
+    // 材质细节那一组走另一包（library.shading），任一包在就算注入过。
+    this.host.post?.SetDebugView?.(id, this.host.gi, !!pack || !!shadingPack);
   }
 
   /** 着色模式：着色 / 线框 / 着色线框（Script_Post.SetShadingMode）。 */
@@ -699,6 +723,7 @@ export class DebugRenderingEditor {
     const target = VIEW_TARGETS[this.view]?.(this.host.post, this.host.gi) ?? null;
     let message = "";
     if (MATERIAL_VIEW_MODES[this.view] && !this.host.library?.gi) message = "当前画质不支持此视图。";
+    if (SHADING_VIEW_MODES[this.view] && !this.host.library?.shading) message = "当前画质不支持此视图。";
     else if (!target && this.view !== "final") message = "此视图暂不可用，请启用对应效果。";
     this.status.textContent = message;
     this.status.hidden = !message;

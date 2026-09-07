@@ -8,10 +8,15 @@
 //      乘了直接光 = 太阳照到的墙角也发黑，那是脏，不是遮蔽。
 
 import * as THREE from "three";
-import { RECIPES } from "./Script_TexBake.mjs";
+import { RECIPES, BakeDetailNormal, BakeSkinLut } from "./Script_TexBake.mjs";
 import {
   ApplyPatches, IndirectLightingPatches, MakeDestructionPatch,
 } from "./Script_MaterialPatches.mjs";
+import { MakeMaterialShadingPatch, MakeShadingFeatures } from "./Script_MaterialShading.mjs";
+import {
+  SurfaceOf, CLOTH_SHEEN, METAL_ANISOTROPY, DETAIL_NORMAL,
+  EXTERNAL_MATERIAL_CLASSES, EXTERNAL_MATERIAL_ORDER,
+} from "./Data_Tuning_Materials.mjs";
 
 /**
  * 1×1 透明 GIF。给一张挂死的 `<img>` 换上它 = 当场放弃原来那条连接，
@@ -52,15 +57,33 @@ function MakeTexture(bytes, size, { srgb = false, repeat = 1, anisotropy = 1 } =
  *          采样层是**编译期**开关（`gi.sampling` 进了 cache key），调试层常在。
  *   破口 —— 主材质 / 静态克隆 / 阴影深度三条链共用同一份 OBB。
  */
-export function InjectIndirectLighting(material, { ssao = null, gi = null, destruction = null } = {}) {
+export function InjectIndirectLighting(material,
+  { ssao = null, gi = null, destruction = null, shading = null } = {}) {
   material.userData.ssaoUniforms = ssao;
   material.userData.giUniforms = gi;
   material.userData.destructionUniforms = destruction;
-  ApplyPatches(material, IndirectLightingPatches({ ssao, gi, destruction }));
+  ApplyPatches(material, IndirectLightingPatches({ ssao, gi, destruction, shading }));
   // 布尔标记只给运行时取证与幂等接入用。不要把 uniforms 包塞进新标记：
   // 里面有 Texture，material.clone()/toJSON 会为每个人刷一屏“Unable to serialize”。
   material.userData.indirectLightingInjected = true;
   return material;
+}
+
+/**
+ * 外部 GLB 材质按**名字**分类（皮肤 / 金属 / 布）。
+ *
+ * 为什么按名字：卢沟桥那十套人物是混合 atlas，一个网格里同时有脸、军装和头发，
+ * 几何上分不开；能分开的只有材质名（`John_All Body` / `战士5_头部` /
+ * `Material #1721585337`）。命中不到时返回 null —— **什么都不做**是有意的：
+ * 宁可少一层绒光，也不要把眼球或刺刀误判成棉布。
+ */
+export function ClassifyExternalMaterial(name) {
+  const text = String(name || "");
+  if (!text) return null;
+  for (const kind of EXTERNAL_MATERIAL_ORDER) {
+    if (EXTERNAL_MATERIAL_CLASSES[kind]?.test(text)) return kind;
+  }
+  return null;
 }
 
 /** 阴影深度也裁同一批洞；否则墙已经穿了，太阳底下还留一块完整墙影。 */
@@ -82,13 +105,24 @@ export function InjectScreenSpaceAo(material, aoUniforms) {
  * 加载条能真的动起来（一次性烘 15 张 512 会把主线程卡死 3 秒，白屏就是这么来的）。
  */
 export class MaterialLibrary {
-  constructor(renderer, { textureSize = 512, ssao = null, gi = null, destruction = null } = {}) {
+  constructor(renderer,
+    { textureSize = 512, ssao = null, gi = null, destruction = null, shading = null } = {}) {
     this.renderer = renderer;
     this.textureSize = textureSize;
+    // 小件（布、钢、沙包、木梁）一直是 256；ultra 把基准抬到 1024 时它们跟着翻一档。
+    // 写成推导而不是再加一个构造参数：调用方只需要说"这一档基准多大"。
+    this.smallTextureSize = Math.min(512, Math.max(256, Math.round(textureSize / 2)));
     this.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 1;
     this.ssao = ssao;         // { map: {value}, resolution: {value}, strength: {value} }
     this.gi = gi;             // MakeGiUniforms() 那一包，与 ProbeVolume 共用同一批对象
     this.destruction = destruction;
+    // MakeMaterialShadingUniforms() 那一包（POM / 细节法线 / 微阴影 / 地平线 / 皮肤）。
+    // 与 ssao / gi 同一个模式：全场共用一份，调一根旋钮全场生效。
+    this.shading = shading;
+    this.shadingMapsReady = false;
+    // 外部 GLB 材质换 MeshPhysicalMaterial 之后的对照表（同一份源材质只换一次，
+    // 换出来的那份被所有引用它的网格共用 —— 否则每个网格一份材质 = 每个网格一份程序）。
+    this.upgradedExternal = new Map();
     this.baked = new Map();   // name -> { albedo, normal, orm }（three 纹理）
     this.materials = new Map();
     // 演员也会复用 BrickWall / WoodBeam 的底材，不能把破口 shader 直接挂到底材上，
@@ -109,10 +143,20 @@ export class MaterialLibrary {
    * 金属桶，因此运行时明确归零 metalness；roughness 仍保留作者标量与贴图，调试视图
    * 显示的是 three 真正参与 BRDF 的 roughnessFactor。
    */
-  ConfigureExternalPbr(material, { metalness = null, minRoughness = null } = {}) {
-    const materials = Array.isArray(material) ? material : [material];
-    for (const item of materials) {
-      if (!item || (!item.isMeshStandardMaterial && !item.isMeshPhysicalMaterial)) continue;
+  ConfigureExternalPbr(material, { metalness = null, minRoughness = null, mesh = null } = {}) {
+    const list = Array.isArray(material) ? material : [material];
+    const out = [];
+    let rebind = false;
+    for (const source of list) {
+      if (!source || (!source.isMeshStandardMaterial && !source.isMeshPhysicalMaterial)) {
+        out.push(source);
+        continue;
+      }
+      // 类型升级只在调用方交出网格时做（`mesh`）：换类等于换对象，拿不到网格
+      // 就没法把新材质挂回去，那只会造出一份没人用的 MeshPhysicalMaterial。
+      const item = mesh ? this._UpgradeExternal(source) : source;
+      if (item !== source) rebind = true;
+      out.push(item);
       let changed = false;
       if (Number.isFinite(metalness)) {
         const nextMetalness = Math.max(0, Math.min(1, metalness));
@@ -124,28 +168,170 @@ export class MaterialLibrary {
         changed ||= item.roughness !== nextRoughness;
         item.roughness = nextRoughness;
       }
+      // 金属件的各向异性要 roughness 有个下限才看得出方向（全镜面时高光是一个点）。
+      if (item.userData.externalMaterialClass === "metal" && item.isMeshPhysicalMaterial) {
+        const anisoRoughness = Math.max(METAL_ANISOTROPY.minRoughness, Number(item.roughness) || 0);
+        changed ||= item.roughness !== anisoRoughness;
+        item.roughness = anisoRoughness;
+      }
+      // 没被分类的外部材质也要吃微阴影与地平线遮蔽（那两项只要有 ORM / 法线图
+      // 就成立，与是什么东西无关）。细节法线在这里一律 0：人物与枪械是 atlas UV，
+      // 一份 uv 摊在整个身体上，再乘 10 倍平铺只有二十厘米一个循环 —— 那不是
+      // 微表面，那是花布。外部件要细节法线得先有一套按世界尺度走的 uv（已知缺口）。
+      if (!item.userData.materialShadingSurface) {
+        item.userData.materialShadingSurface = {
+          pom: 0, detailNormal: 0, detailTile: 9, microShadow: 0.8,
+          horizonOcclusion: true, skin: false,
+          hasNormalMap: !!item.normalMap, hasAoMap: !!item.aoMap,
+        };
+      }
       const firstConfiguration = !this.externalPbrMaterials.has(item);
       if (firstConfiguration) {
-        if (this.ssao || this.gi) {
-          InjectIndirectLighting(item, { ssao: this.ssao, gi: this.gi });
-        }
+        this._Inject(item);
         this.externalPbrMaterials.add(item);
       }
       item.userData.externalPbrConfigured = true;
       if (firstConfiguration || changed) item.needsUpdate = true;
     }
-    return material;
+    if (mesh && rebind) mesh.material = Array.isArray(material) ? out : out[0];
+    return Array.isArray(material) ? out : out[0];
+  }
+
+  /**
+   * 按材质名给外部 GLB 材质分类，需要时换成 `MeshPhysicalMaterial`。
+   *
+   * 为什么必须换类：three 的绒光（Charlie sheen）与各向异性是
+   * `MeshPhysicalMaterial` 的字段 —— `WebGLPrograms` 的 `HAS_SHEEN`
+   * 只看 `material.sheen > 0`（任何材质都读得到），但 uniform 的上传
+   * (`refreshUniformsPhysical`) 门在 `material.isMeshPhysicalMaterial` 上。
+   * 只设字段不换类 = 定义开着、uniform 恒 0：白付一份程序，画面一点不变。
+   *
+   * 同一份源材质只换一次并记进对照表：卢沟桥那十套人物的材质由加载器缓存共享，
+   * 逐网格各换一份等于逐网格一份程序（换人那一帧要现编几十个）。
+   */
+  _UpgradeExternal(source) {
+    if (source.isMeshPhysicalMaterial && source.userData.externalMaterialClass) return source;
+    const existing = this.upgradedExternal.get(source);
+    if (existing) return existing;
+    const kind = ClassifyExternalMaterial(source.name);
+    if (!kind || (kind === "skin" && !this.shading)) {
+      source.userData.externalMaterialClass = kind || "";
+      this.upgradedExternal.set(source, source);
+      return source;
+    }
+    if (kind === "skin") {
+      // 皮肤不换类：预积分散射是自己的补丁，不用 three 的任何 Physical 字段，
+      // 换类只会白吃一份 PHYSICAL 程序（IOR + USE_SPECULAR 两段）。
+      source.userData.externalMaterialClass = "skin";
+      source.userData.materialShadingSurface = {
+        pom: 0, detailNormal: 0, detailTile: 9, microShadow: 0.6,
+        horizonOcclusion: true, skin: true,
+        hasNormalMap: !!source.normalMap, hasAoMap: !!source.aoMap,
+      };
+      this.upgradedExternal.set(source, source);
+      return source;
+    }
+    const upgraded = new THREE.MeshPhysicalMaterial();
+    // 用**父类的** copy：MeshPhysicalMaterial.copy 会去读 source.sheenColor.copy(...)，
+    // 而源材质是 MeshStandardMaterial，那些字段根本不存在，当场抛异常。
+    THREE.MeshStandardMaterial.prototype.copy.call(upgraded, source);
+    // 父类的 copy 顺手把 defines 写成 { STANDARD: '' }，PHYSICAL 要补回来。
+    upgraded.defines = { STANDARD: "", PHYSICAL: "" };
+    upgraded.name = source.name;
+    upgraded.userData.externalMaterialClass = kind;
+    if (kind === "cloth") {
+      upgraded.sheen = CLOTH_SHEEN.sheen;
+      upgraded.sheenRoughness = CLOTH_SHEEN.roughness;
+      // 绒光色 = 布色去饱和后往白提。纯白绒光看着像蒙了一层塑料膜，
+      // 完全用布色又等于把布整体提亮一档、颜色不变（等于没有绒光）。
+      const sheenColor = upgraded.color.clone();
+      const luminance = sheenColor.r * 0.2126 + sheenColor.g * 0.7152 + sheenColor.b * 0.0722;
+      sheenColor.lerp(new THREE.Color(luminance, luminance, luminance), 1 - CLOTH_SHEEN.colorSaturation);
+      sheenColor.lerp(new THREE.Color(1, 1, 1), CLOTH_SHEEN.colorLift);
+      upgraded.sheenColor = sheenColor;
+      upgraded.userData.materialShadingSurface = {
+        pom: 0, detailNormal: 0, detailTile: 10, microShadow: 0.7,
+        horizonOcclusion: true, skin: false,
+        hasNormalMap: !!upgraded.normalMap, hasAoMap: !!upgraded.aoMap,
+      };
+    } else {
+      upgraded.anisotropy = METAL_ANISOTROPY.anisotropy;
+      // 枪管是沿模型局部 -Z 的，UV 上对应切线 U 方向 —— 0 弧度就是沿枪管拉长。
+      upgraded.anisotropyRotation = METAL_ANISOTROPY.rotation;
+      upgraded.userData.materialShadingSurface = {
+        pom: 0, detailNormal: 0, detailTile: 10, microShadow: 0.6,
+        horizonOcclusion: true, skin: false,
+        hasNormalMap: !!upgraded.normalMap, hasAoMap: !!upgraded.aoMap,
+      };
+    }
+    this.upgradedExternal.set(source, upgraded);
+    return upgraded;
+  }
+
+  /**
+   * 材质着色升级要用的两张全场共用图还差几步没烘（进度条要拿它算总数）。
+   * 已经烘过或没接 shading 包时返回 0。
+   */
+  PendingShadingSteps() {
+    return this.shading && !this.shadingMapsReady ? 2 : 0;
+  }
+
+  /**
+   * 细节法线 + 皮肤预积分 LUT。两张都是**全场一份**，与配方无关，所以不进
+   * `baked` 表，直接挂到 shading 包的 uniform 上。
+   *
+   * LUT 的两条硬要求（错一条就是一张彩色噪点或者一条硬边）：
+   * `flipY = false`（它是数据不是图片）、`ClampToEdgeWrapping`（NdotL=±1 与
+   * 曲率两端不许绕回去）、`NoColorSpace`、不生成 mipmap。
+   */
+  *PrepareShadingSteps() {
+    if (!this.shading || this.shadingMapsReady) return;
+    const detail = BakeDetailNormal(DETAIL_NORMAL.size);
+    const detailTexture = new THREE.DataTexture(detail.normal, detail.size, detail.size,
+      THREE.RGBAFormat, THREE.UnsignedByteType);
+    detailTexture.colorSpace = THREE.NoColorSpace;
+    detailTexture.wrapS = THREE.RepeatWrapping;
+    detailTexture.wrapT = THREE.RepeatWrapping;
+    detailTexture.generateMipmaps = true;
+    detailTexture.minFilter = THREE.LinearMipmapLinearFilter;
+    detailTexture.magFilter = THREE.LinearFilter;
+    detailTexture.anisotropy = this.anisotropy;
+    detailTexture.needsUpdate = true;
+    this.shading.detailNormalMap.value?.dispose?.();
+    this.shading.detailNormalMap.value = detailTexture;
+    this.shadingTextures = [detailTexture];
+    yield "DetailNormal";
+
+    const lut = BakeSkinLut();
+    const lutTexture = new THREE.DataTexture(lut.data, lut.width, lut.height,
+      THREE.RGBAFormat, THREE.UnsignedByteType);
+    lutTexture.colorSpace = THREE.NoColorSpace;
+    lutTexture.flipY = false;
+    lutTexture.wrapS = THREE.ClampToEdgeWrapping;
+    lutTexture.wrapT = THREE.ClampToEdgeWrapping;
+    lutTexture.generateMipmaps = false;
+    lutTexture.minFilter = THREE.LinearFilter;
+    lutTexture.magFilter = THREE.LinearFilter;
+    lutTexture.needsUpdate = true;
+    this.shading.skinLut.value?.dispose?.();
+    this.shading.skinLut.value = lutTexture;
+    this.shadingTextures.push(lutTexture);
+    this.shadingMapsReady = true;
+    yield "SkinLut";
   }
 
   /** 逐个配方烘焙，每 yield 一次交还主线程。 */
   *PrepareSteps(names = Object.keys(RECIPES)) {
+    // 两张全场共用图排在最前：它们是**每一份材质**都要接的 uniform，
+    // 谁先建关谁就得等着，不能懒到第一次用的时候现烘（那一帧直接冻住）。
+    yield* this.PrepareShadingSteps();
     for (const name of names) {
       const recipe = RECIPES[name];
       if (!recipe) continue;
       const size = name.startsWith("Cloth") || name === "Steel" || name === "SteelHelmet"
         || name === "Sandbag" || name === "WoodBeam" || name === "WoodStock"
         || name === "WattleFence"
-        ? Math.min(256, this.textureSize)
+        ? Math.min(this.smallTextureSize, this.textureSize)
         : this.textureSize;
       const maps = recipe(size);
       this.baked.set(name, {
@@ -304,9 +490,44 @@ export class MaterialLibrary {
       opacity: options.opacity ?? 1,
       flatShading: !!options.flatShading,
     });
-    if (this.ssao || this.gi) InjectIndirectLighting(material, { ssao: this.ssao, gi: this.gi });
+    // 表面着色升级：POM 深度 / 细节法线 / 微阴影倍率按配方查
+    // `Data_Tuning_Materials.SURFACE_RECIPES`。四个标量存进 userData（纯数字，
+    // clone 时 JSON 拷得过去），Static() 克隆一份时照原样重建同一路补丁。
+    material.userData.materialShadingSurface = this._SurfaceFeatures(name);
+    this._Inject(material);
     this.materials.set(key, material);
     return material;
+  }
+
+  /** 一份烘焙配方对应的着色特性（Get 与 Static 共用同一份口径）。 */
+  _SurfaceFeatures(name) {
+    const surface = SurfaceOf(name);
+    return {
+      pom: surface.pomDepth,
+      detailNormal: surface.detailWeight,
+      detailTile: surface.detailTile,
+      microShadow: surface.microShadow,
+      horizonOcclusion: true,
+      skin: false,
+      hasNormalMap: true,
+      hasAoMap: true,
+    };
+  }
+
+  /** 造这份材质的着色补丁（没接 shading 包或一路都不编时返回 null）。 */
+  _ShadingPatch(material) {
+    const spec = material.userData.materialShadingSurface;
+    if (!this.shading || !spec) return null;
+    return MakeMaterialShadingPatch(this.shading, MakeShadingFeatures(spec));
+  }
+
+  /** 统一的注入口：AO / GI / 着色升级 /（可选）破口，顺序由补丁注册表定。 */
+  _Inject(material, { destruction = null } = {}) {
+    const shading = this._ShadingPatch(material);
+    if (!this.ssao && !this.gi && !shading && !destruction) return material;
+    return InjectIndirectLighting(material, {
+      ssao: this.ssao, gi: this.gi, destruction, shading,
+    });
   }
 
   /** 无贴图的纯色 PBR（玻璃、水、旗面这类）。也吃 SSAO。 */
@@ -339,11 +560,10 @@ export class MaterialLibrary {
     if (this.staticMaterials.has(key)) return this.staticMaterials.get(key);
     const clone = material.clone();
     clone.name = `${material.name || material.type}_DestructibleStatic`;
-    InjectIndirectLighting(clone, {
-      ssao: this.ssao,
-      gi: this.gi,
-      destruction: this.destruction,
-    });
+    // userData 是 JSON 深拷的，materialShadingSurface（四个数字）原样跟过来了，
+    // 所以静态克隆与底材编的是同一路补丁、同一份 cache key —— 不然场景里
+    // 同一块砖会出现"能打穿的那面有视差、不能打穿的那面没有"。
+    this._Inject(clone, { destruction: this.destruction });
     this.staticMaterials.set(key, clone);
     return clone;
   }
@@ -357,6 +577,15 @@ export class MaterialLibrary {
     for (const m of this.materials.values()) m.dispose();
     for (const m of this.staticMaterials.values()) m.dispose();
     if (this.staticDepthMaterial) this.staticDepthMaterial.dispose();
+    // 换类出来的那些 MeshPhysicalMaterial 是本库造的，跟着还；源材质属于资产
+    // 加载器（外部 GLB 在多个关卡之间复用），一个都不许碰。
+    for (const [source, upgraded] of this.upgradedExternal) {
+      if (upgraded && upgraded !== source) upgraded.dispose();
+    }
+    this.upgradedExternal.clear();
+    for (const texture of this.shadingTextures || []) texture.dispose();
+    this.shadingTextures = null;
+    this.shadingMapsReady = false;
     this.baked.clear();
     this.materials.clear();
     this.staticMaterials.clear();

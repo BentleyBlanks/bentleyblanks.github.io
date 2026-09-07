@@ -70,10 +70,16 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   §1A 起是设计期草案与专题深挖，GI 在 §12，坑表在末尾）。
 
 ### 材质 / 贴图
-- `Script_TexBake.mjs`（纯 JS PBR 烘焙，每种材质出 albedo / normal / orm）→
-  `Script_Materials.mjs`（包成 three 纹理，SSAO 注入间接光）。
+- `Script_TexBake.mjs`（纯 JS PBR 烘焙，每种材质出 albedo / normal / orm；另出全场共用的
+  细节法线与皮肤预积分 LUT）→ `Script_Materials.mjs`（包成 three 纹理，注入间接光与表面着色）。
+- `Script_MaterialShading.mjs` —— **材质着色升级**（2026-09）：视差遮蔽 POM / 细节法线 /
+  微阴影（Chan 2018）/ 地平线镜面遮蔽（Lagarde）/ 皮肤预积分次表面散射（Penner 2011）。
+  它是补丁注册表里 **GI 之后、破口之前**那一路；逐材质数值在
+  `Data_Tuning_Materials.mjs`，档位开关在 `Data_Tuning_Graphics.mjs`。
+  回归口 `Script_MaterialUpgradeTest.mjs`；Debug Rendering 的「材质细节」组是它的取证图。
 - `Script_Noise.mjs` —— 确定性噪声全家桶，**一切散布参数的随机源**（不许 Math.random）。
-- 先读：`docs/Data_TechRenderPipeline.md` §11；城墙专用 PBR 见 `docs/Data_CityWallPbr.md`。
+- 先读：`docs/Data_TechRenderPipeline.md` 的「材质着色升级（2026-09）」一节（现状）与 §11
+  （烘焙旧稿）；城墙专用 PBR 见 `docs/Data_CityWallPbr.md`。
 
 ### 世界生成底座（台儿庄时期沉淀，滕县共用）
 - `Script_World.mjs` —— 鲁南民居 / 寨墙 / 清真寺建造器 + `BuildSink` 合批槽；尺寸全按

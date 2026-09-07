@@ -44,6 +44,15 @@ export function GraphicsDetailControls(post) {
       { key: "taaJitterScale", label: "抖动幅度", min: 0, max: 1.5, step: 0.05, value: 1, prefix: "×" },
       { key: "sharpen", label: "锐化强度", min: 0, max: 1, step: 0.02, value: post?.preset.sharpen ?? 0.22 },
     ],
+    // 材质着色升级（2026-09）：这一组全是**运行时倍率**，拖了立刻生效不重编译。
+    // 开关（编不编）是上面那几个 Toggle，翻一次要整场重编译几百毫秒。
+    material: [
+      { key: "pomDepth", label: "视差深度", min: 0, max: 2, step: 0.05, value: 1, prefix: "×" },
+      { key: "detailNormalStrength", label: "细节法线", min: 0, max: 2, step: 0.05, value: 1, prefix: "×" },
+      { key: "microShadowStrength", label: "微阴影", min: 0, max: 2, step: 0.05, value: 1, prefix: "×" },
+      { key: "horizonStrength", label: "地平线遮蔽", min: 0, max: 2, step: 0.05, value: 1, prefix: "×" },
+      { key: "skinStrength", label: "皮肤散射", min: 0, max: 2, step: 0.05, value: 1, prefix: "×" },
+    ],
   };
 }
 
@@ -194,6 +203,38 @@ export class GraphicsSettings {
     Details(giBox, "gi");
     if (this.host.post?.quality === "low") Note(giBox, "GI 需 medium 及以上档位。");
 
+    // 材质着色（POM / 细节法线 / 微阴影 / 地平线镜面遮蔽 / 皮肤预积分）。
+    // 开关是**编译期**的：翻一次要把全场材质重编译（几百毫秒，一次性）——
+    // 与阴影总闸、GI 采样层同一个先例，所以放 Toggle 不放滑杆。
+    // 出厂值跟画质档走（Data_Tuning_Graphics 的 pom / detailNormal / … 那几位）：
+    // 面板上显示的是「这一档实际编了没有」，不是一个独立的偏好。
+    const mat = Section(body, "材质细节");
+    const matRow = document.createElement("div");
+    matRow.className = "edBtns";
+    mat.appendChild(matRow);
+    const preset = this.host.post?.preset || {};
+    const Bit = (key, fallback) => (typeof gfx[key] === "boolean" ? gfx[key] : !!fallback);
+    // 出厂值由 Script_Main 从画质档拷进 graphics（与 taa 同款），所以这里读的是
+    // 玩家的实际选择；fallback 只在旧存档缺项时兜底。
+    Toggle(matRow, "视差遮蔽 POM", Bit("pom", (preset.pom || 0) > 0),
+      (on) => { gfx.pom = on; this.Apply(); });
+    Toggle(matRow, "POM 自阴影", Bit("pomSelfShadow", preset.pomSelfShadow),
+      (on) => { gfx.pomSelfShadow = on; this.Apply(); });
+    Toggle(matRow, "细节法线", Bit("detailNormal", preset.detailNormal),
+      (on) => { gfx.detailNormal = on; this.Apply(); });
+    const matRow2 = document.createElement("div");
+    matRow2.className = "edBtns";
+    mat.appendChild(matRow2);
+    Toggle(matRow2, "微阴影", Bit("microShadow", preset.microShadow),
+      (on) => { gfx.microShadow = on; this.Apply(); });
+    Toggle(matRow2, "地平线镜面遮蔽", Bit("horizonOcclusion", preset.horizonOcclusion),
+      (on) => { gfx.horizonOcclusion = on; this.Apply(); });
+    Toggle(matRow2, "皮肤预积分散射", Bit("skinSss", preset.skinSss),
+      (on) => { gfx.skinSss = on; this.Apply(); });
+    Details(mat, "material");
+    if ((preset.pom || 0) === 0) Note(mat, "POM 需 medium 及以上档位；步数由档位决定。");
+    else if (!preset.pomSelfShadow) Note(mat, "POM 自阴影只在 ultra 档编译进材质。");
+
     const aa = Section(body, "抗锯齿 TAA");
     const aaRow = document.createElement("div");
     aaRow.className = "edBtns";
@@ -259,6 +300,17 @@ export class GraphicsSettings {
     gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
     gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;
     gfx.gi = false; gfx.giStrength = 1;
+    // 材质着色的开关恢复出厂 = **按当前画质档重取**，不是钉成 true/false ——
+    // 在 low 档按恢复出厂不该给它编上 POM（与 taa 那一行同一个道理）。
+    const matPreset = this.host.post?.preset || {};
+    gfx.pom = (matPreset.pom || 0) > 0;
+    gfx.pomSelfShadow = !!matPreset.pomSelfShadow;
+    gfx.detailNormal = !!matPreset.detailNormal;
+    gfx.microShadow = !!matPreset.microShadow;
+    gfx.horizonOcclusion = !!matPreset.horizonOcclusion;
+    gfx.skinSss = !!matPreset.skinSss;
+    gfx.pomDepth = 1; gfx.detailNormalStrength = 1; gfx.microShadowStrength = 1;
+    gfx.horizonStrength = 1; gfx.skinStrength = 1; gfx.pomSelfShadowStrength = 1;
     NormalizeGraphicsDetails(gfx, this.host.post, true);
     // TAA 的出厂值跟画质档走（medium 及以上开），不是固定的 true/false ——
     // 在 low 档上按「恢复出厂」应该回到关，而不是给它按上一份历史靶。

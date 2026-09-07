@@ -16,6 +16,11 @@
 //   · velocity / hzb —— 2026-09 帧图重构新增：MRT 速度靶与 HZB 链。
 //        高低档都开：它们是后续 SSR / 体积雾 / 接触阴影的公共输入，
 //        关掉等于把八个并行子系统一起关掉；真要省，先关消费方。
+//   · pom / pomRefine / pomSelfShadow / detailNormal / microShadow /
+//     horizonOcclusion / skinSss / materialTexture —— 2026-09 材质着色升级
+//     （子系统 B7）。数值背书见 `docs/Data_TechRenderPipeline.md` 的
+//     「材质着色升级（2026-09）」一节与 `Data_Tuning_Materials.mjs`。
+//     POM 的步数是**编译期常量**（进 cache key），运行时只能整档开关。
 //   · 其余键（csm / gtao / ssil / ssr / volumetrics / atmosphere / autoExposure /
 //     lensFlare / lut / dof / taaUpscale / clusteredLights / contactShadows）
 //     —— **本阶段全部为占位**，值 = 与今天等价（即「不启用新东西」）。
@@ -86,12 +91,21 @@ export const QUALITY_PRESETS = {
     ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
     aoScale: 0.5, sharpen: 0.14, taa: false,
     velocity: true, hzb: true,
+    // low 的定位是"能跑"：POM 与细节法线整个不编（省的是采样数与寄存器，
+    // 不是一两个 uniform）。微阴影与地平线遮蔽留着 —— 它们各只有几条算术，
+    // 却是"表面不像塑料贴纸"里最便宜的两条。
+    pom: 0, pomRefine: 0, pomSelfShadow: false, detailNormal: false,
+    microShadow: true, horizonOcclusion: true, skinSss: false,
+    materialTexture: 256,
   },
   medium: {
     ...RESERVED_OFF,
     ssao: true, bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.6, sharpen: 0.18, taa: true,
     velocity: true, hzb: true,
+    pom: 8, pomRefine: 4, pomSelfShadow: false, detailNormal: true,
+    microShadow: true, horizonOcclusion: true, skinSss: true,
+    materialTexture: 512,
   },
   // high 的抗锯齿由 TAA 承担。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
   // 上百 MB 显存并重复抗锯齿；把 4× 留给主动选择 ultra 的玩家
@@ -101,12 +115,20 @@ export const QUALITY_PRESETS = {
     ssao: true, bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.75, sharpen: 0.22, taa: true,
     velocity: true, hzb: true,
+    pom: 16, pomRefine: 5, pomSelfShadow: false, detailNormal: true,
+    microShadow: true, horizonOcclusion: true, skinSss: true,
+    materialTexture: 512,
   },
   ultra: {
     ...RESERVED_OFF,
     ssao: true, bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,
     aoScale: 1.0, sharpen: 0.22, taa: true,
     velocity: true, hzb: true,
+    // ultra 才开 POM 自阴影：那是每像素再走 8 步高度图，砖缝里投出的细影
+    // 在 1440p 上是三四个像素的事，只有主动选 ultra 的人值得为它付这一笔。
+    pom: 32, pomRefine: 6, pomSelfShadow: true, detailNormal: true,
+    microShadow: true, horizonOcclusion: true, skinSss: true,
+    materialTexture: 1024,
   },
 };
 

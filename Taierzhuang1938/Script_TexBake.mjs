@@ -14,6 +14,21 @@ import {
   TileableFbm2, TileableValue2, Worley2, Ridged2,
   Clamp01, Clamp, Mix, SmoothStep, Mulberry32, HashString,
 } from "./Script_Noise.mjs";
+import { SurfaceOf, DETAIL_NORMAL, SKIN } from "./Data_Tuning_Materials.mjs";
+
+/**
+ * 单张烘焙图的边长上限。
+ *
+ * 砖墙那一档写的是「按传进来的档位翻倍」，ultra 把基准抬到 1024 之后翻倍就是
+ * 2048² —— 八个砖类配方 × 三张图 = 四百多 MB 显存，机器不会报错，只会在开机
+ * 那一步吃掉一半显存然后到处掉帧。翻倍照旧，封顶写在这里。
+ */
+export const MAX_BAKE_SIZE = 1024;
+
+/** 「面积最大的表面吃双倍分辨率」那一档的取尺寸口径（带上封顶）。 */
+export function Wide(size, fallback = 512) {
+  return Math.min((size ?? fallback) * 2, MAX_BAKE_SIZE);
+}
 
 /** #rrggbb -> [r,g,b] 0-255 */
 export function HexRgb(hex) {
@@ -543,31 +558,224 @@ export function BakeFlat(size = 4, { color = [128, 128, 128], rough = 0.9, metal
   }, { normalStrength: 0.01 });
 }
 
+// ---------------------------------------------------------------------------
+// 污渍 / 尘土第二层（2026-09 材质升级）
+// ---------------------------------------------------------------------------
+
+/**
+ * 把一层尘土/水渍**后期**叠到已经烘好的 albedo + ORM 上。
+ *
+ * 为什么不写进各配方的 shade()：那十几个 shade 是一轮一轮回调出来的（注释里
+ * 记着"砖的窑变幅度要跟着密度收""烟熏是唯一进 albedo 的低频项"这类账），
+ * 在里面再插一手很容易把已经调好的观感推翻。后期叠一层只动颜色与粗糙度、
+ * **不动 height**，所以法线贴图一个字节都不变，凹凸观感守恒。
+ *
+ * 频率同样服从那条铁律：**一张要无限平铺的图，不许含有低于约 1/4 格波长的能量**。
+ * 尘团取 17/格（一格里十几处），水渍取横向 23 / 纵向 6 的拉长条（顺着墙流下来），
+ * 两者都在"看得见脏但看不出重复"的带里。
+ *
+ * @param {object} maps BakeMaps 的返回值（原地修改 albedo / orm）
+ * @param {number} amount 0–1，见 Data_Tuning_Materials.SURFACE_RECIPES[*].grime
+ * @param {string} tag 种子标签，同一种材质每次烘出来一样（确定性截图对比要）
+ */
+export function ApplyGrimeLayer(maps, amount, tag = "grime") {
+  if (!(amount > 0)) return maps;
+  const { size, albedo, orm } = maps;
+  const seed = HashString(`grime:${tag}`) >>> 0;
+  // 尘的颜色：鲁南的黄土灰，比任何一种底材都浅、都黄；纯灰会把墙压成水泥色。
+  const dust = [128, 116, 96];
+  // 水渍/雨痕的颜色：比底材深一点点的冷色，别用黑（黑=烧焦，那是 sootiness 的活）。
+  const wash = [86, 84, 80];
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const u = x / size, v = y / size;
+      const blot = TileableFbm2(u * 17, v * 17, 17, { octaves: 4, seed: seed + 3 });
+      const streak = TileableFbm2(u * 23, v * 6, 23, { octaves: 3, seed: seed + 11, periodY: 6 });
+      const fine = TileableFbm2(u * 61, v * 61, 61, { octaves: 2, seed: seed + 29 });
+      // 尘往上积（v 小 = 贴图上沿）本来该按世界朝向决定，程序化贴图不知道自己
+      // 会贴到墙还是地，所以两种都给一点，靠 mask 的形状而不是位置读出"脏"。
+      const dustMask = Clamp01((blot * 0.85 + fine * 0.3 - 0.58) * 2.6) * amount;
+      const washMask = Clamp01((streak * 1.35 - 0.72) * 2.2) * amount * 0.8;
+      if (dustMask <= 0 && washMask <= 0) continue;
+      const i = (y * size + x) * 4;
+      for (let c = 0; c < 3; c += 1) {
+        let value = albedo[i + c];
+        value = Mix(value, dust[c], dustMask * 0.34);
+        value = Mix(value, wash[c], washMask * 0.26);
+        albedo[i + c] = Clamp(value, 0, 255) | 0;
+      }
+      // 尘让表面更糙（干粉散射），水渍反过来压糙度（湿痕更亮）。
+      const rough = orm[i + 1] / 255;
+      orm[i + 1] = (Clamp01(rough + dustMask * 0.10 - washMask * 0.14) * 255) | 0;
+      // 积尘的地方多半是背光的凹处，AO 稍微再压一点点；水渍不动 AO。
+      const ao = orm[i] / 255;
+      orm[i] = (Clamp01(ao - dustMask * 0.08) * 255) | 0;
+    }
+  }
+  return maps;
+}
+
+// ---------------------------------------------------------------------------
+// 细节法线（第二张高频微表面；全场共用一张）
+// ---------------------------------------------------------------------------
+
+/**
+ * 通用微表面法线：颗粒 + 砂粒 + 一点顺向纤维。
+ *
+ * 它要在**主法线的 6–10 倍频率**上叠加，作用是"一米内看还有东西"——
+ * 砖面上的砂粒、木头上的顺纹、土墙上的粉尘团。所以这张图里不许有任何可读的
+ * 图案：只有各向同性的细颗粒 + 一层很弱的方向性纤维，否则贴到全场每一种材质上
+ * 就是同一张花纹重复一万次。
+ *
+ * 返回值只有 normal（RGB = 切线空间法线，A = 高度，与主法线同格式），
+ * albedo / orm 用不上，不烘。
+ */
+export function BakeDetailNormal(size = DETAIL_NORMAL.size, { seed = DETAIL_NORMAL.seed } = {}) {
+  const n = size * size;
+  const height = new Float32Array(n);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const u = x / size, v = y / size;
+      // 三层颗粒：粗砂 / 细砂 / 粉尘，频率一路上推到接近纹素极限。
+      const grit = TileableFbm2(u * 24, v * 24, 24, { octaves: 3, seed: seed + 5 });
+      const sand = TileableFbm2(u * 61, v * 61, 61, { octaves: 3, seed: seed + 17 });
+      const dust = TileableFbm2(u * 127, v * 127, 127, { octaves: 2, seed: seed + 31 });
+      // 顺向纤维（木纹/布纹/夯土的层理）：一轴拉长 8 倍，权重压到 0.18 ——
+      // 再高就成了"所有材质都带同一道刷痕"。
+      const fibre = TileableFbm2(u * 96, v * 12, 96, { octaves: 2, seed: seed + 43, periodY: 12 });
+      // 零星凸起的砂粒：Worley 的最近点距离取反，出的是圆颗粒不是团块。
+      const w = Worley2(u * 46, v * 46, seed + 61, 46);
+      const pebble = SmoothStep(0.10, 0.0, w.f1) * 0.35;
+      height[y * size + x] = Clamp01(0.5
+        + (grit - 0.5) * 0.36 + (sand - 0.5) * 0.44 + (dust - 0.5) * 0.30
+        + (fibre - 0.5) * 0.18 + pebble);
+    }
+  }
+  return { size, normal: HeightToNormal(height, size, 2.6) };
+}
+
+// ---------------------------------------------------------------------------
+// 皮肤预积分 LUT（Penner 2011）
+// ---------------------------------------------------------------------------
+
+/**
+ * 预积分次表面散射查找表。
+ *
+ * x 轴 = NdotL（−1 → 1），y 轴 = 曲率 1/r（curvatureMin → curvatureMax，单位 1/米）。
+ * 每一格是"在半径 r 的球面上、光照方向与法线夹角 θ 处，把 d'Eon 六高斯扩散剖面
+ * 沿一条大圆环积分"的结果 —— 也就是 Penner 的 `integrateDiffuseScatteringOnRing`。
+ *
+ * 直觉：曲率越大（越尖），光从背面绕过来的距离越短，红光越容易穿过来，所以
+ * 明暗交界处会先出现红边再变暗；平面（曲率 0）退化成普通 Lambert。
+ *
+ * 剖面的方差单位是 **mm²**，所以环上的弦长也要换成 mm（r = 1000/曲率）。
+ * 纯 JS、无 canvas、无 GL —— Node 里能直接断言（契约 2）。
+ */
+export function BakeSkinLut({
+  width = SKIN.lutWidth, height = SKIN.lutHeight,
+  radiusMinMm = SKIN.radiusMinMm, radiusMaxMm = SKIN.radiusMaxMm,
+  steps = SKIN.integrationSteps, profile = SKIN.profile,
+} = {}) {
+  const data = new Uint8Array(width * height * 4);
+  // 剖面按距离预先查表：内层循环要跑 width*height*steps 次，
+  // 每次现算六个 exp 是四千万次超越函数，纯 JS 要好几秒（开机路径上不能这么烧）。
+  const maxDistance = 2 * radiusMaxMm + 1;
+  const tableSize = 4096;
+  const table = new Float64Array(tableSize * 3);
+  for (let i = 0; i < tableSize; i += 1) {
+    const distance = (i / (tableSize - 1)) * maxDistance;
+    for (const [variance, ...rgb] of profile) {
+      const g = Math.exp(-(distance * distance) / (2 * variance)) / (2 * Math.PI * variance);
+      table[i * 3] += rgb[0] * g;
+      table[i * 3 + 1] += rgb[1] * g;
+      table[i * 3 + 2] += rgb[2] * g;
+    }
+  }
+  const Weight = (distance, out) => {
+    const t = Math.min(tableSize - 1, Math.max(0, (distance / maxDistance) * (tableSize - 1)));
+    const i0 = Math.floor(t), i1 = Math.min(tableSize - 1, i0 + 1), f = t - i0;
+    for (let c = 0; c < 3; c += 1) out[c] = Mix(table[i0 * 3 + c], table[i1 * 3 + c], f);
+  };
+
+  const inc = Math.PI / steps;
+  const angles = new Float64Array(steps + 1);
+  for (let i = 0; i <= steps; i += 1) angles[i] = -Math.PI / 2 + i * inc;
+  const w = [0, 0, 0];
+  for (let y = 0; y < height; y += 1) {
+    // 半径轴取几何级数：小半径那一段（鼻尖、指节）才是散射最强的地方，
+    // 线性分格会把一半的格子浪费在"几乎是平面"上。
+    const t = height === 1 ? 0 : y / (height - 1);
+    // y=0 最平（半径大），y=1 最尖（半径小）—— 与运行时 saturate 出来的曲率同向。
+    const radiusMm = radiusMaxMm * Math.pow(radiusMinMm / radiusMaxMm, t);
+    // 环上的权重和与光照方向无关，逐半径算一次就够。
+    const totalWeight = [0, 0, 0];
+    const ringWeights = new Float64Array((steps + 1) * 3);
+    for (let i = 0; i <= steps; i += 1) {
+      const distance = Math.abs(2 * radiusMm * Math.sin(angles[i] * 0.5));
+      Weight(distance, w);
+      for (let c = 0; c < 3; c += 1) {
+        ringWeights[i * 3 + c] = w[c];
+        totalWeight[c] += w[c];
+      }
+    }
+    for (let x = 0; x < width; x += 1) {
+      const cosTheta = (x / (width - 1)) * 2 - 1;
+      const theta = Math.acos(Clamp(cosTheta, -1, 1));
+      const light = [0, 0, 0];
+      for (let i = 0; i <= steps; i += 1) {
+        const diffuse = Math.max(0, Math.cos(theta + angles[i]));
+        if (diffuse <= 0) continue;
+        for (let c = 0; c < 3; c += 1) light[c] += diffuse * ringWeights[i * 3 + c];
+      }
+      const i = (y * width + x) * 4;
+      for (let c = 0; c < 3; c += 1) {
+        data[i + c] = (Clamp01(totalWeight[c] > 0 ? light[c] / totalWeight[c] : Math.max(0, cosTheta)) * 255) | 0;
+      }
+      data[i + 3] = 255;
+    }
+  }
+  return { width, height, data };
+}
+
+/**
+ * 给一张配方表挂上污渍层。**单一来源**：脏到什么程度写在
+ * `Data_Tuning_Materials.SURFACE_RECIPES[*].grime`，不在这里再抄一份。
+ * grime 为 0 的配方原样透传（连一次遍历都不做）。
+ */
+function WithGrime(table) {
+  const out = {};
+  for (const [name, bake] of Object.entries(table)) {
+    const amount = SurfaceOf(name).grime;
+    out[name] = amount > 0 ? (size) => ApplyGrimeLayer(bake(size), amount, name) : bake;
+  }
+  return out;
+}
+
 /** 全部配方登记在此，Materials 层按名字取；测试也按这张表逐个烘一遍。 */
-export const RECIPES = {
+export const RECIPES = WithGrime({
   // 砖墙吃双倍分辨率：它是全场**面积最大**的表面（每一张正片的主体都是砖墙），
   // 512 那一档一格贴图只塞得下 12×6 块砖，1.2 m 一个循环在两米开外就能数出来。
   // 注意别写成 `s ?? 1024` —— Materials 层 **总是**显式传 size 进来，?? 永远不生效，
   // 上一轮就是这么"改了等于没改"。这里按传进来的档位翻倍，低配档跟着降。
-  BrickWall: (s) => BakeBrickWall((s ?? 512) * 2, { seed: 101, rowsPerTile: 20 }),
-  BrickWallSooty: (s) => BakeBrickWall((s ?? 512) * 2, { seed: 137, rowsPerTile: 20, damage: 0.6, sootiness: 0.95 }),
+  BrickWall: (s) => BakeBrickWall(Wide(s), { seed: 101, rowsPerTile: 20 }),
+  BrickWallSooty: (s) => BakeBrickWall(Wide(s), { seed: 137, rowsPerTile: 20, damage: 0.6, sootiness: 0.95 }),
   // 构件库离散战损态的 imagegen PBR 兜底。正式图缺失时仍保留相同的
   // “初阶崩裂 / 严重破坏”层级，不让编辑器因为一张贴图 404 回到同一张完好墙。
-  BuildingDamageEarly: (s) => BakeBrickWall((s ?? 512) * 2,
+  BuildingDamageEarly: (s) => BakeBrickWall(Wide(s),
     { seed: 101, rowsPerTile: 20, damage: 0.26, sootiness: 0.12 }),
-  BuildingDamageSevere: (s) => BakeBrickWall((s ?? 512) * 2,
+  BuildingDamageSevere: (s) => BakeBrickWall(Wide(s),
     { seed: 101, rowsPerTile: 20, damage: 0.56, sootiness: 0.28 }),
   Adobe: (s) => BakeAdobe(s ?? 512, { seed: 211 }),
   // 滕县城墙的三套 ImageGen PBR 在启动时覆盖这些同步兜底。独立命名避免把
   // 民居青砖、土坯房和普通院落条石一起换成军事城墙尺度的纹理。
-  CityWallBrickPbr: (s) => BakeBrickWall((s ?? 512) * 2,
+  CityWallBrickPbr: (s) => BakeBrickWall(Wide(s),
     { seed: 181, rowsPerTile: 22, damage: 0.42, sootiness: 0.32 }),
   CityWallCorePbr: (s) => BakeAdobe(s ?? 512, { seed: 229 }),
   CityWallStonePbr: (s) => BakeStone(s ?? 512, { seed: 929 }),
   RoofTile: (s) => BakeRoofTile(s ?? 512, { seed: 307 }),
   // 四座滕县城门的专属近景材质。外部 imagegen PBR 加载失败时仍用这些
   // 对齐尺度的程序化底材启动，不能让地标因为一张图 404 阻断整关。
-  GateBrick: (s) => BakeBrickWall((s ?? 512) * 2, {
+  GateBrick: (s) => BakeBrickWall(Wide(s), {
     seed: 331, rowsPerTile: 14, damage: 0.56, sootiness: 0.34,
   }),
   GatePaintedWood: (s) => BakeWood(s ?? 512, { seed: 347, planks: 5 }),
@@ -629,4 +837,4 @@ export const RECIPES = {
   // 故意不上 BrickWall 那档双倍分辨率（反正会被顶掉，白烤）。
   StationBrick: (s) => BakeBrickWall(s ?? 512, { seed: 163, rowsPerTile: 16 }),
   PrisonBrick: (s) => BakeBrickWall(s ?? 512, { seed: 149, rowsPerTile: 18 }),
-};
+});

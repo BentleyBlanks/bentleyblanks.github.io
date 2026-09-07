@@ -378,6 +378,12 @@ export class DebugPass {
       // （黑 = 没有探针 GI）—— 都是准确信息，不是"不可用"。
       case "giWorld": case "giConfidence":
         return { texture: T.hdr.texture, mode: 5, unavailable: !P.debugInjected };
+      // 2026-09 材质着色升级（子系统 B7）的四张取证图。与上面那一组同一条路：
+      // 真正的换色在材质补丁里（Script_MaterialShading 按 uMatDebugView 把该项
+      // 当颜色写进 hdr 靶），这里只负责 0-1 直通送屏。可用性同样看材质注没注入。
+      case "pomOffset": case "pomHeight": case "detailNormal":
+      case "microShadow": case "skinCurvature":
+        return { texture: T.hdr.texture, mode: 5, unavailable: !P.debugInjected };
       default: return null;
     }
   }
