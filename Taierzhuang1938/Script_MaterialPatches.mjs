@@ -113,6 +113,37 @@ function ApplyAnchors(source, byAnchor) {
  */
 export function ApplyPatches(material, patches) {
   const list = (patches || []).filter(Boolean);
+  /**
+   * 把补丁的 defines 同步进 `material.defines`。
+   *
+   * **必须在算 cache key 之前做完，不能只在 onBeforeCompile 里做。**
+   * three 的 `getProgramCacheKey` 是从 `material.defines` 现读的，而
+   * `onBeforeCompile` 要等到 program 已经开建之后才跑 —— 于是同一份材质：
+   * 第一次编译时键里没有 `CSM_CONTACT` / `USE_MATERIAL_POM` 这些位（钩子还没跑），
+   * 钩子跑完把它们写进了 material.defines，第二次 `getProgram` 算出来的键就多了这几位，
+   * three 认成另一个程序，**再链接一份逐字节相同的 GLSL**。
+   * 2026-09 实测（正片 phase=2 / high）：188 个 program 里 95 个是这么白建的，
+   * 而链接一份一秒上下 —— 开机预热一多半的账在这儿。
+   *
+   * `RefreshDefines`（Script_MaterialShading）会在改画质档时原地改 `patch.defines`，
+   * 所以这里每次编译现同步一遍，而不是只在装补丁时同步一次；补丁列表换了以后
+   * 不再要的位要 `delete`（three 只看键在不在，值是空串照样成立）。
+   */
+  const SyncDefines = () => {
+    const wanted = {};
+    for (const patch of list) if (patch.defines) Object.assign(wanted, patch.defines);
+    const owned = material.userData.materialPatchDefines;
+    if (owned && material.defines) {
+      for (const name of owned) if (!(name in wanted)) delete material.defines[name];
+    }
+    const names = Object.keys(wanted);
+    if (names.length) {
+      material.defines = material.defines || {};
+      Object.assign(material.defines, wanted);
+    }
+    material.userData.materialPatchDefines = names;
+  };
+  SyncDefines();
   material.onBeforeCompile = (shader) => {
     const vertexByAnchor = new Map();
     const fragmentByAnchor = new Map();
@@ -130,9 +161,14 @@ export function ApplyPatches(material, patches) {
   };
   // 缓存键必须跟着注入组合走，而且**每次编译现读** —— 运行时翻转某个补丁的
   // 三态位再 needsUpdate，就能拿到另一套程序而不撞缓存。
-  material.customProgramCacheKey = () => list
-    .map((patch) => (typeof patch.key === "function" ? patch.key() : patch.key))
-    .join("|");
+  // 顺带把 defines 同源刷一遍：three 在同一次 getParameters 里先取 defines 的
+  // **引用**、再调这只函数，所以这里改到的仍然是这一次编译要用的那份。
+  material.customProgramCacheKey = () => {
+    SyncDefines();
+    return list
+      .map((patch) => (typeof patch.key === "function" ? patch.key() : patch.key))
+      .join("|");
+  };
   material.userData.materialPatchKeys = list.map((patch) => patch.key);
   return material;
 }

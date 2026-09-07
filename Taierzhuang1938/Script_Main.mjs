@@ -3719,6 +3719,37 @@ function EndOfficialCampaign(phase) {
 }
 
 /**
+ * 从一批网格里挑「每个 program 一件」的代表。
+ *
+ * 去重键是材质加上几条会进 program cache key 的物体特征（蒙皮 / 实例化 / 顶点色）；
+ * 键漏了某一维只意味着那个 program 退回老路（用到它的第一帧现编），不会出错。
+ * 已经热着的整件跳过 —— 判据与 three 自己在 setProgram 里的一样（有 currentProgram
+ * 且版本没变），漏判同样只是退回老路。
+ *
+ * @param {THREE.Object3D[]} objects 候选
+ * @param {Set<string>} seen 跨批共用的去重集（同一个 program 只留一件）
+ */
+function SelectShaderRepresentatives(objects, seen) {
+  const picks = [];
+  for (const object of objects) {
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    let novel = false;
+    for (const material of materials) {
+      if (!material) continue;
+      const properties = renderer.properties.get(material);
+      if (properties && properties.currentProgram && properties.__version === material.version) continue;
+      const key = `${material.uuid}|${object.isSkinnedMesh ? 1 : 0}|${object.isInstancedMesh ? 1 : 0}`
+        + `|${object.geometry?.attributes?.color ? 1 : 0}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      novel = true;
+    }
+    if (novel) picks.push(object);
+  }
+  return picks;
+}
+
+/**
  * 预编译一棵子树的着色器 —— **进序章那十几秒的黑屏就是这一步**。
  *
  * 车厢序章的布景一口气往场景里加三千多个网格、几十种新材质。three 是惰性编译的：
@@ -3749,28 +3780,9 @@ async function WarmupShaders(root, onStep = null, shouldStop = null) {
   });
   if (!meshes.length) return 0;
 
-  // 代表网格：同一个 program 只画一次。去重键是材质加上几条会进 program cache key
-  // 的物体特征（蒙皮 / 实例化 / 顶点色）；键漏了某一维只意味着那个 program 退回
-  // 老路（用到它的第一帧现编），不会出错。三千六百件收敛到三百来个代表。
+  // 代表网格：同一个 program 只画一次。三千六百件收敛到三百来个代表。
   const seen = new Set();
-  const picks = [];
-  for (const object of meshes) {
-    const materials = Array.isArray(object.material) ? object.material : [object.material];
-    let novel = false;
-    for (const material of materials) {
-      if (!material) continue;
-      // 已经热着的跳过。判据与 three 自己在 setProgram 里的一样（有 currentProgram
-      // 且版本没变）—— 只是个省事的过滤，漏判同样只是退回老路。
-      const properties = renderer.properties.get(material);
-      if (properties && properties.currentProgram && properties.__version === material.version) continue;
-      const key = `${material.uuid}|${object.isSkinnedMesh ? 1 : 0}|${object.isInstancedMesh ? 1 : 0}`
-        + `|${object.geometry?.attributes?.color ? 1 : 0}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      novel = true;
-    }
-    if (novel) picks.push(object);
-  }
+  const picks = SelectShaderRepresentatives(meshes, seen);
   if (!picks.length) return 0;
 
   // 藏起来用的是**层**不是 visible：visible 是层级的（父物体一藏，整棵子树连同
@@ -3779,6 +3791,17 @@ async function WarmupShaders(root, onStep = null, shouldStop = null) {
   const HIDDEN_LAYER = 31;
   const masks = new Map(meshes.map((object) => [object, object.layers.mask]));
   for (const object of meshes) object.layers.set(HIDDEN_LAYER);
+
+  // 场上原有的那批（第二段要重编的城）**在第一段就一起提交**。理由见第一段的抬头：
+  // 「提交」不等链接，只有「用到」才等；把两边的 program 全在开画之前交出去，
+  // 驱动的编译线程池才有活可并行。以前这批是第二段渲染时才现建的 —— 建一个等一个，
+  // 整座城的链接被排成一条队（实测那一段占了整条预热链的一多半）。
+  const outside = [];
+  scene.traverse((object) => {
+    if (!(object.isMesh || object.isPoints || object.isLine || object.isSprite)) return;
+    if (!masks.has(object)) outside.push(object);
+  });
+  const outsidePicks = SelectShaderRepresentatives(outside, seen);
 
   // 每次让帧都问一句还要不要继续：玩家在预热里按了 Esc（Skip 会放开 held）、
   // 这一场已经收了、或者换了一场 —— 就地收工，剩下的照旧退回「用到时现编」。
@@ -3789,37 +3812,76 @@ async function WarmupShaders(root, onStep = null, shouldStop = null) {
 
   try {
     // --- 一、提交编译 -------------------------------------------------------
-    // renderer.compile 是同步的（ANGLE 在这一步做 HLSL 翻译），整包一次交上去就是
-    // 四五秒的长任务；分批交、批间让一帧，进度条才动得起来。交完不等它链完 ——
-    // 链接在驱动的编译线程上继续跑，第三段出画时正好陆续到货。
-    const SUBMIT = 16;
-    for (let i = 0; i < picks.length; i += SUBMIT) {
-      const proxy = new THREE.Group();
-      // 代理组只借 children 走一趟 traverse，**不进场景树**，也不动这些网格的
-      // parent —— compile 只读不写，这一层是安全的。
-      proxy.children = picks.slice(i, i + SUBMIT);
-      try {
-        renderer.compile(proxy, camera, scene);
-      } catch (error) {
-        console.warn("[Main] 着色器提交编译失败（退回逐帧编译）", error);
-        break;
+    // `renderer.compile` 只**建** program（compileShader + linkProgram），一次都不等：
+    // ANGLE 把 GLSL→HLSL 翻译和 D3D 编译都甩给驱动的工作线程池，两个调用加起来
+    // 实测全场不到 5 ms。真正的账全在「第一次用到它」那一下 ——
+    // `setProgram → getUniforms → onFirstUse` 会一直阻塞到那一个 program 链接完成
+    // （2026-09 取证：整条开机链 130 s 里 100% 落在这一条）。
+    //
+    // **所以顺序就是一切**：建一个立刻用一个 = 链接被排成一条队，每个 1 s 上下、
+    // 一百六十多个就是两分半；把全部 program 先交出去再统一等，驱动的线程池才有活
+    // 可并行（本机实测 8 份同样的着色器：逐个等 12.6 s / 先全交再等 3.5 s，3.6×）。
+    // 场上原有的那批（第二段要重编的城）因此**也在这一段一起交**。
+    //
+    // **提交时必须把主渲染靶绑上。** three 的 program cache key 里带
+    // `outputColorSpace`，而它是按「当前绑着的靶」算的：绑着画布 = `srgb`，
+    // 绑着任意离屏靶 = 工作色彩空间 `srgb-linear`。场景网格实际上只画进 HDR 靶，
+    // 所以不绑靶就 compile 出来的是**另一份用不上的 program** —— 白链一遍，
+    // 真正那份到第一帧还得现编现等。（改之前每个材质因此各多一份 `srgb` 变体。）
+    const submitList = picks.concat(outsidePicks);
+    const SUBMIT = 24;
+    const restoreTarget = renderer.getRenderTarget();
+    if (post?.targets?.hdr) renderer.setRenderTarget(post.targets.hdr);
+    try {
+      for (let i = 0; i < submitList.length; i += SUBMIT) {
+        const proxy = new THREE.Group();
+        // 代理组只借 children 走一趟 traverse，**不进场景树**，也不动这些网格的
+        // parent —— compile 只读不写，这一层是安全的。
+        proxy.children = submitList.slice(i, i + SUBMIT);
+        try {
+          renderer.compile(proxy, camera, scene);
+        } catch (error) {
+          console.warn("[Main] 着色器提交编译失败（退回逐帧编译）", error);
+          break;
+        }
+        const submitted = Math.min(submitList.length, i + SUBMIT);
+        onStep?.(T("boot.step.submitShaders", { done: submitted, total: submitList.length }),
+          BootProgress(BOOT.warm.submitShaders, (submitted / submitList.length) * 0.5));
+        if (!await Yield()) return picks.length;
       }
-      const submitted = Math.min(picks.length, i + SUBMIT);
-      onStep?.(T("boot.step.submitShaders", { done: submitted, total: picks.length }),
-        BootProgress(BOOT.warm.submitShaders, submitted / picks.length));
-      if (!await Yield()) return picks.length;
+    } finally {
+      renderer.setRenderTarget(restoreTarget);
+    }
+
+    // --- 一之二、等链接（并行） ---------------------------------------------
+    // `KHR_parallel_shader_compile` 的 `COMPLETION_STATUS_KHR` 是**不阻塞**的一问，
+    // three 把它包成了 `WebGLProgram.isReady()`。逐帧问一遍全表，进度条跟着走 ——
+    // 这几秒里主线程完全空着，驱动的四条编译线程在满负荷跑。
+    // 没有这一段的话，同样这笔账会在第二段渲染时一个一个被同步逼出来。
+    // 兜底：驱动不给这个扩展时 isReady() 恒真，这一段直接空过；卡住超过 90 s 也放行
+    // （剩下的照旧退回「用到时现编」，慢但不会挂）。
+    {
+      const linking = renderer.info.programs.slice();
+      const deadline = performance.now() + 90000;
+      let ready = 0;
+      while (ready < linking.length) {
+        ready = 0;
+        for (const program of linking) {
+          if (typeof program.isReady !== "function" || program.isReady()) ready += 1;
+        }
+        onStep?.(T("boot.step.linkShaders", { done: ready, total: linking.length }),
+          BootProgress(BOOT.warm.submitShaders, 0.5 + (ready / Math.max(1, linking.length)) * 0.5));
+        if (ready >= linking.length || performance.now() > deadline) break;
+        if (!await Yield()) return picks.length;
+      }
     }
 
     // --- 二、场上原有材质的重编 ---------------------------------------------
     // 过场一开场就换天光（Play 里 applySky 排在建布景之前），场上那座城的材质整批
-    // 作废要重编。这笔账与新布景无关，却同样落在「进过场」这一下，而且是最大的一
-    // 块（实测六七秒）。同样按批放出来摊平；八批就够 —— 城里上万件，逐件跑的开销
+    // 作废要重编。这笔账与新布景无关，却同样落在「进过场」这一下。它的 program 已经
+    // 在第一段交过、第一段之二等过了，这里只剩「真画一遍」把顶点缓冲与各 pass 的
+    // 状态过一遍。同样按批放出来摊平；八批就够 —— 城里上万件，逐件跑的开销
     // 比它省下的还大。累加式放出，最后一批放完城就是完整的一座。
-    const outside = [];
-    scene.traverse((object) => {
-      if (!(object.isMesh || object.isPoints || object.isLine || object.isSprite)) return;
-      if (!masks.has(object)) outside.push(object);
-    });
     const outsideMasks = new Map(outside.map((object) => [object, object.layers.mask]));
     for (const object of outside) object.layers.set(HIDDEN_LAYER);
     try {
