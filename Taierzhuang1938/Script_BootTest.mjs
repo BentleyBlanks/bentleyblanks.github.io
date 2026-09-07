@@ -195,6 +195,12 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         spread: max - min,
         tones: tones.size,
         programs: T.renderer.info.programs.length,
+        // 着色器预热耗时：**软指标，只打印不判红**。机器差异太大（同一份代码在
+        // 有没有 ANGLE program 磁盘缓存两种状态下能差五倍），拿它当门禁只会天天
+        // 假红。要量对比得用固定方法：关掉 program 缓存、每轮起全新浏览器、
+        // 三次取中位数，口径见 docs/Data_TechRenderPipeline.md §16。
+        warmMs: T.state?.actorShaderWarm?.ms ?? -1,
+        warmStages: T.state?.actorShaderWarm?.stages || null,
         // 环境贴图不是可有可无的装饰：军装背光和金属刀枪都依赖它的 IBL。
         // 少它时整个交战双方会压成黑色，普通的全帧色调统计抓不住这条回归。
         hasEnvironment: T.scene.environment?.isTexture === true,
@@ -474,7 +480,12 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
           + ` sight=${health.sightCorridor?.ok ? "ok" : "blocked"}` : "")
       : "(no health)")
     + (spawnRun ? ` spawnRun=${spawnRun.ran}m` : "")
+    // 软指标（不判红）：着色器预热墙钟。数字大幅上涨时先看 §16 的账，别当功能回归查。
+    + (health && health.warmMs >= 0 ? ` warm=${(health.warmMs / 1000).toFixed(1)}s` : "")
     + (bad.length ? `  << ${bad.join("; ")}` : ""));
+  if (health && health.warmStages) {
+    console.log(`       预热分段(ms) ${JSON.stringify(health.warmStages)}`);
+  }
   for (const p of problems.slice(0, 4)) console.log(`       ${p}`);
 }
 

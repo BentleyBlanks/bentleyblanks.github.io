@@ -52,23 +52,54 @@ export function MakeDestructionUniforms(maxVolumes = MAX_DAMAGE_VOLUMES) {
   };
 }
 
+/**
+ * 分形图案表的 GLSL。**这里是查表，不是分支级联** —— 那件事踩过一次账：
+ *
+ * 原来这两只函数是 JS 展开出来的 `if` 级联（6 个图案 × 13 个扇区 = 78 个分支，
+ * `FractureRadius` 里还调它两次）。HLSL 编译器会把整棵树内联展平，而这段代码又落在
+ * 每个可破坏材质的片元着色器里 —— 2026-09 实测（同一份着色器交替 A/B 九轮取中位数）：
+ * 链接一份带破口的材质 1.70 s，把这两张表换成常数数组之后 1.10 s，**省 35%**；
+ * 整段破口全删掉也只到 0.91 s，所以级联本身就是那 35%。
+ * 开机预热里最长的那几份 program 全是带破口的静态墙（frag 源码 115 KB）。
+ *
+ * 逐比特等价：调用点传进来的 `sector` 只可能是 `floor(...)` 与 `mod(...,12)` 出来的
+ * **整数**，`pattern` 是 uniform 里的图案号（同样是整数）。级联的 `sector < k+0.5`
+ * 与这里的 `floor(sector + 0.5)` 在整数上选出同一格；两端越界的兜底也照抄
+ * （扇区越界回 0 号、图案越界回 0.85 / 偏移回 0）。
+ */
 function ShaderPatternGlsl() {
-  const radiusCases = FRACTURE_PATTERNS.map((pattern, patternIndex) => {
-    const sectors = pattern.radii.map((radius, sectorIndex) =>
-      `if (sector < ${Number(sectorIndex + 0.5).toFixed(1)}) return ${radius.toFixed(5)};`).join("\n    ");
-    return `${patternIndex > 0 ? "else " : ""}if (pattern < ${Number(patternIndex + 0.5).toFixed(1)}) {\n    ${sectors}\n    return ${pattern.radii[0].toFixed(5)};\n  }`;
-  }).join(" ");
-  const offsets = FRACTURE_PATTERNS.map((pattern, patternIndex) =>
-    `${patternIndex > 0 ? "else " : ""}if (pattern < ${Number(patternIndex + 0.5).toFixed(1)}) return ${pattern.angleOffset.toFixed(5)};`).join("\n  ");
+  const segments = FRACTURE_SEGMENT_COUNT;
+  const patterns = FRACTURE_PATTERNS.length;
+  const radii = FRACTURE_PATTERNS
+    .flatMap((pattern) => pattern.radii.map((radius) => radius.toFixed(5)));
+  const offsets = FRACTURE_PATTERNS.map((pattern) => pattern.angleOffset.toFixed(5));
+  const Rows = (values, perRow) => {
+    const out = [];
+    for (let i = 0; i < values.length; i += perRow) out.push(`  ${values.slice(i, i + perRow).join(", ")}`);
+    return out.join(",\n");
+  };
   return `
+const float FRACTURE_RADII[${radii.length}] = float[${radii.length}](
+${Rows(radii, segments)}
+);
+const float FRACTURE_OFFSETS[${patterns}] = float[${patterns}](
+${Rows(offsets, patterns)}
+);
+
 float FractureSectorRadius(float pattern, float sector) {
-  ${radiusCases}
-  return 0.85;
+  float row = floor(pattern + 0.5);
+  if (row < 0.0) row = 0.0;
+  if (row > ${Number(patterns - 1).toFixed(1)}) return 0.85;
+  float column = floor(sector + 0.5);
+  if (column < 0.0 || column > ${Number(segments - 1).toFixed(1)}) column = 0.0;
+  return FRACTURE_RADII[int(row) * ${segments} + int(column)];
 }
 
 float FractureAngleOffset(float pattern) {
-  ${offsets}
-  return 0.0;
+  float row = floor(pattern + 0.5);
+  if (row < 0.0) row = 0.0;
+  if (row > ${Number(patterns - 1).toFixed(1)}) return 0.0;
+  return FRACTURE_OFFSETS[int(row)];
 }
 
 float FractureRadius(float pattern, float angle) {

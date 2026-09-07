@@ -336,6 +336,15 @@ ApplyPatches(material, [...IndirectLightingPatches({ ssao, gi, destruction }), s
 * 锚点一律**追加在 chunk 之后**；多个补丁挂同一个锚点按注册顺序拼接。
 * `customProgramCacheKey` = 各补丁 key 拼接。**改了代码不改 key = 两种档位共用同一份
   编译缓存**（现役三态：`gtao1` / `gtao1|gi1` / `gtao1|gi2`）。
+* **补丁的 `defines` 由 `ApplyPatches` 写进 `material.defines`，不是在
+  `onBeforeCompile` 里写。** three 的 `getProgramCacheKey` 从 `material.defines`
+  现读，而 `onBeforeCompile` 要等 program 已经开建之后才跑 —— 在钩子里写的话，
+  第一次编译的键里没有这些位、第二次才有，同一份 GLSL 会被认成两个程序各链接一遍
+  （2026-09 实测：正片 phase=2/high 的 188 个 program 里 95 个是这么白建的，
+  链接一份一秒上下）。`ApplyPatches` 装补丁时同步一次、`customProgramCacheKey`
+  里再同步一次（`Script_MaterialShading.RefreshDefines` 会在改画质档时原地改
+  `patch.defines`，两边必须同源），补丁列表换了以后不再要的位 `delete` 掉。
+  账见 §16.0。
 * 现役顺序固定 **ORM → AO → GI → CSM → SSR → 簇光 → 材质着色 → 破口**（AO 那一路 2026-09 起是 GTAO 补丁，见 §17.4）：
   ORM 三合一排最前（它把材质自带的遮蔽乘进 `indirectDiffuse`，等价于三方 `aomap_fragment`
   chunk 原来的位置）；`<aomap_fragment>` 上同时挂着 AO 的乘法与 GI 的
@@ -2549,6 +2558,116 @@ CPU 采样（Profiler，300 帧）里排前面的是 `updateMatrixWorld` 17%、`
 
 编译总量本身没动过：序章要新建约 67 个 program。真想把它变短，得从内容侧减少材质
 变体，不在这条链上。
+
+> 上面这四段的**顺序在 2026-09 改过一次**（多了「一之二 等链接」，第一段的范围也扩到
+> 场上原有材质），账见下面 16.0。这一节的实测数字是改之前的，留作对照。
+
+### 16.0 2026-09：八子系统合流之后的预热账
+
+八个渲染子系统合进来之后开机预热从几十秒涨到两分多。**涨的不是 program 数**
+（157 → 166），是每一份都变大了，而且**建一个就同步等一个**。这一轮把它压回基线以下。
+
+#### 怎么量（不这么量就是量了个寂寞）
+
+同一份代码在这台机器上能量出 145 s / 82 s / 20 s 三种结果，差别全在
+**ANGLE 的 program 磁盘缓存**（HLSL→DXBC 那一步，缓存在浏览器 profile 里）。
+可复现的口径只有一条：
+
+```bash
+# 每轮起全新浏览器，并关掉 program 缓存；三次取中位数
+--disable-gpu-shader-disk-cache --disable-gpu-program-cache --disk-cache-size=1
+```
+
+跑的是 `?shot=1&phase=2&quality=high`，从 `page.goto` 到 `window.Taierzhuang` 就绪。
+
+| 树 | 中位数（3 次） | 三次 | program 数 | 其中人物预热 |
+|---|---:|---|---:|---:|
+| 大修前基线 `27f6ace0f` | **34.1 s** | 33.1 / 34.1 / 34.5 | 128 | 24.0 s |
+| 八子系统合流后 `5252487d0` | **82.4 s** | 77.8 / 82.4 / 82.8 | 164 | 63.8 s |
+| 本轮 ①②③ 之后 | 32.5 s | 31.7 / 32.5 / 33.0 | 149 | 20.6 s |
+| 本轮 ①②③④ 之后 | **31.0 s** | 29.0 / 31.0 / 31.9 | 149 | 17.7 s |
+
+**时间到底花在哪**（包住 WebGL 入口逐调用计时，合流后那一版）：整条链
+130 s 里 **100% 落在 `getProgramInfoLog`**，131 次、每次八百多毫秒；
+`compileShader` 与 `linkProgram` 加起来不到 5 ms，`getShaderInfoLog`、
+`getUniformLocation`、`getActiveUniform` 全是零头。栈是同一条：
+`onFirstUse ← WebGLProgram.getUniforms ← setProgram ← renderBufferDirect`。
+
+也就是说：**ANGLE 把编译和链接全甩给驱动线程池了，一次都不阻塞；阻塞的是「第一次
+用到它」那一下。** `renderer.debug.checkShaderErrors` 只决定拿不拿错误日志
+（`?shot` 下开着），关掉它 `getUniforms` 里的 `getProgramParameter(ACTIVE_UNIFORMS)`
+照样要等链接完成 —— 躲不掉，只能**改顺序**。
+
+#### 三条改动（逐比特无损，按收益排序）
+
+**① 提交与等待分家 —— 建一个用一个 → 全部先交、再统一等。**
+本机对照（同一份 115 KB 的着色器 8 份）：逐个「link 完立刻问」12.6 s，
+「先全 link 再统一问」3.5 s，**3.6×** —— 驱动的编译线程池是四条。
+落地：`WarmupShaders` 第一段现在把**新布景与场上原有材质一起**交（以前场上那批是
+第二段渲染时才现建的，整座城的链接排成一条队）；交完新增一段
+「等待着色器就绪」，逐帧轮询 `WebGLProgram.isReady()`
+（`KHR_parallel_shader_compile` 的 `COMPLETION_STATUS_KHR`，不阻塞），
+进度条跟着走，主线程空着让驱动跑满。第二段「重编场景光照」因此从 18.5 s 掉到 2.1 s。
+
+**② 提交时必须绑主渲染靶。** three 的 program cache key 里带 `outputColorSpace`，
+它按「当前绑着的靶」算：绑画布 = `srgb`，绑任意离屏靶 = `srgb-linear`。
+场景网格只画进 HDR 靶，所以不绑靶就 `renderer.compile` 出来的是**另一份用不上的
+program** —— 白链一遍，真正那份到第一帧还得现编现等。
+
+**③ 补丁的 `defines` 必须在算 cache key 之前写进 `material.defines`
+（不能只在 `onBeforeCompile` 里写）。** 这条是本轮最大的一处白烧：
+`getProgramCacheKey` 从 `material.defines` 现读，而 `onBeforeCompile` 要等 program
+已经开建之后才跑。于是同一份材质第一次编译时键里没有 `CSM_CONTACT` /
+`USE_MATERIAL_POM` 这些位，钩子跑完把它们写进了材质，第二次 `getProgram` 算出来的键
+就多了几位 —— three 认成另一个程序，**再链接一份逐字节相同的 GLSL**。
+症状是程序表里成对出现 frag 长度只差两三个字节的孪生程序
+（`118176`/`118174`、`113981`/`113978`、`108217`/`108214`……）。
+`ApplyPatches` 现在装补丁时同步一次、`customProgramCacheKey` 里再同步一次
+（改画质档时 `RefreshDefines` 会原地改 `patch.defines`，两边必须同源），
+不再要的位 `delete` 掉。program 数 188 → 149。
+
+**④ 破口分形图案：78 个分支的级联 → 常数表。**
+`FractureSectorRadius` 原来是 JS 展开的 `if` 级联（6 图案 × 13 扇区），
+`FractureRadius` 里调它两次，而这段代码落在**每个可破坏材质**的片元着色器里。
+HLSL 编译器把整棵树内联展平，链接一份带破口的墙材质要 1.70 s —— 换成
+`const float[72]` 查表之后 1.10 s（**−35%**）；把整段破口全删掉也只到 0.91 s，
+所以级联本身就是那 35%。开机时最长的那几份 program 全是带破口的静态墙
+（frag 源码 115 KB）。逐比特等价：调用点传进来的扇区号只可能是 `floor`/`mod`
+出来的整数，`floor(sector + 0.5)` 与 `sector < k+0.5` 在整数上选同一格；
+131072 点扫描（含两侧越界值）`floatBitsToUint` 完全一致。
+
+#### 量过但**不是**瓶颈的（别再重做一遍）
+
+拿真实 dump 出来的那份 115 KB 片元着色器做消融，交替 A/B 九轮取中位数
+（基线 1.70 s）：
+
+| 消融 | 省 | 结论 |
+|---|---:|---|
+| 破口分形表→常数表 | **35.3%** | 做了（上面④） |
+| 去掉整段破口（对照） | 46.3% | 上限；表查完就只剩 11 个点 |
+| 去掉整块簇光 | 15.0% | 功能，不动 |
+| 簇光循环上界 64→16 / 64→4 | 3.0% / 2.4% | **噪声**。ANGLE 没有展开这个循环 |
+| POM 步数 16/5→8/3 | 1.8% | **噪声**。同上 |
+| 去掉 GI 的 13 个调试视图 | 2.8% | **噪声**。分支体只是几条赋值，编译器不怕 |
+| 去掉材质的 5 个调试视图 | 5.7% | **噪声**（同量级的轮内漂移就有 ±10%） |
+| PCSS→固定盘 / CSM 抽样数→4 | 0.6% / 0.8% | **噪声** |
+
+所以 `RENDER_DEBUG_VIEWS` 这类「把调试分支编译期剔掉」的方案**这一轮没有做**：
+量出来的收益在噪声里，而代价是面板打开要整场重编译 + `EditorTest` 那 172 项全部
+要走新路径。要动它得先有新的取证，不能凭直觉。同理，循环上界与 POM 步数是
+**画质旋钮**，不是编译成本旋钮。
+
+#### 剩下的瓶颈
+
+改完之后 31.0 s 里最大的一段是「等待着色器就绪」10.8 s —— 那是 149 份
+（其中一百来份是 100 KB 量级的 `MeshStandardMaterial`）在四条驱动线程上并行编译的
+真实耗时，主线程这期间是空的、进度条在走。要再往下压只有两条路：
+**减 program 数**（`physical` 那一族仍有近百个，差异多来自 three 自己的
+`USE_UV`/`vertexColors`/`side`/贴图组合），或者**减每份的活**
+（破口那一条已经吃掉了，下一个候选是簇光那 15%，但那是功能）。
+
+`Script_BootTest` 现在会打印 `warm=<秒>` 与预热分段 —— **软指标，只打印不判红**：
+带不带 program 缓存能差五倍，拿它当门禁只会天天假红。
 
 ### 16.1 换人那一帧的一到三秒：人物材质
 
