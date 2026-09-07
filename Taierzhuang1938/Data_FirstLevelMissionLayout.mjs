@@ -1,3 +1,4 @@
+import { P012_STATION_BLOCKS } from "./Data_FirstLevelP012Station.mjs";
 import { MISSION_TERRAIN, SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 const blocks = [],
   gates = [],
@@ -44,24 +45,84 @@ function Room(id, x, z, w, d, { southDoor = true, northDoor = true, eastWindow =
   // Cut-away whitebox roof leaves rooms legible while retaining actual cover.
   Block(`${id}Roof`, x - w * 0.28, z, w * 0.4, 0.22, d, "structure", { y: 3.05 });
 }
-// Three connected cars: wooden floors are structures, all outdoor soil is terrain.
+// Reuse the accepted P012 open freight-wagon boards, ribs and undercarriage.
+// Only the east door is recentered on this mission's existing unloading lane.
+const sourceCarFloor = P012_STATION_BLOCKS.find(
+  (block) => block.id === "StationCar0Floor",
+);
+const sourceCarParts = P012_STATION_BLOCKS.filter((block) =>
+  /^StationCar0(?:NorthEnd|SouthEnd|WestWaist|WestRib|Wheel|Underframe)/.test(
+    block.id,
+  ),
+);
 for (let i = 0; i < 3; i++) {
-  const z = 74 + i * 14;
-  const floor = Block(`StationCar${i}Floor`, -77, z, 3.7, 0.24, 12.8, "structure", { y: 1.05 });
+  const z = 74 + i * 14,
+    id = "StationCar" + i,
+    lengthScale = 12.8 / sourceCarFloor.d;
+  const floor = Block(
+    id + "Floor",
+    -77,
+    z,
+    sourceCarFloor.w,
+    0.24,
+    12.8,
+    "structure",
+    { y: 1.05 },
+  );
   surfaces.push(floor);
-  Block(`StationCar${i}West`, -78.85, z, 0.18, 2.5, 12.8, "structure", { y: 2.42 });
-  Block(`StationCar${i}EastFront`, -75.15, z - 4.3, 0.18, 2.5, 4.2, "structure", { y: 2.42 });
-  Block(`StationCar${i}EastBack`, -75.15, z + 4.3, 0.18, 2.5, 4.2, "structure", { y: 2.42 });
-  for (const sign of [-1, 1])
-    Block(`StationCar${i}End${sign}`, -77, z + sign * 6.4, 3.7, 2.5, 0.18, "structure", { y: 2.42 });
-  Block(`StationCar${i}Roof`, -77, z, 3.9, 0.22, 13, "structure", { y: 3.8 });
-  Block(`StationCar${i}BenchWest`, -78.15, z, 0.6, 0.2, 8, "structure", { y: 1.27 });
+  for (const part of sourceCarParts) {
+    Block(
+      part.id.replace("StationCar0", id),
+      -77 + part.x - sourceCarFloor.x,
+      z + (part.z - sourceCarFloor.z) * lengthScale,
+      part.w,
+      part.h,
+      part.d * lengthScale,
+      part.semantic,
+      { y: part.y - 0.08 },
+    );
+  }
+  for (const side of [-1, 1]) {
+    Block(
+      id + "EastWaist" + side,
+      -74.6,
+      z + side * 4.3,
+      0.22,
+      1.4,
+      4.2,
+      "structure",
+      { y: 1.87 },
+    );
+    for (let rib = 0; rib < 3; rib++)
+      Block(
+        id + "EastRib" + side + "_" + rib,
+        -74.44,
+        z + side * (2.4 + rib * 1.5),
+        0.12,
+        1.5,
+        0.14,
+        "boundary",
+        { y: 1.87 },
+      );
+  }
+  Block(id + "BenchWest", -78.7, z, 0.6, 0.2, 8, "structure", { y: 1.27 });
   for (const end of [-1, 1])
-    Block(`StationCar${i}BenchEast${end}`, -75.85, z + end * 3.5, 0.6, 0.2, 3, "structure", { y: 1.27 });
+    Block(
+      id + "BenchEast" + end,
+      -75.3,
+      z + end * 3.5,
+      0.6,
+      0.2,
+      3,
+      "structure",
+      { y: 1.27 },
+    );
+  if (i < 2)
+    Block(id + "Coupler", -77, z + 7, 0.4, 0.35, 1.4, "boundary", { y: 0.97 });
   for (let step = 0; step < 4; step++) {
     const stair = Block(
-      `StationExitStep${i}_${step}`,
-      -74.9 + step * 0.5,
+      "StationExitStep" + i + "_" + step,
+      -74.3 + step * 0.5,
       z,
       0.65,
       1.02 - step * 0.25,
@@ -72,23 +133,39 @@ for (let i = 0; i < 3; i++) {
     surfaces.push(stair);
   }
   gates.push({
-    id: `TrainDoor${i}`,
-    x: -75.1,
-    y: 2.42,
+    id: "TrainDoor" + i,
+    x: -74.6,
+    y: 1.87,
     z,
-    w: 0.18,
-    h: 2.5,
+    w: 0.22,
+    h: 1.4,
     d: 4.5,
     semantic: "structure",
     signal: "MissionTrainStopped",
   });
 }
-Block("StationEngineCab", -77, 57, 3.8, 3, 5, "structure", { y: 1.8 });
-Block("StationEngineBoiler", -77, 50, 2.8, 2.3, 8, "structure", { y: 2.1 });
-for (let z = -196; z < 176; z += 3) {
-  Block(`RailSleeper${z}`, -77, z, 4.5, 0.12, 0.3, "structure");
+// Keep the original box-built steam engine: open cab, chimney, wheels and side rods.
+const sourceEngineFrame = P012_STATION_BLOCKS.find(
+  (block) => block.id === "StationEngineFrame",
+);
+for (const part of P012_STATION_BLOCKS.filter((block) =>
+  block.id.startsWith("StationEngine"),
+)) {
+  Block(
+    part.id,
+    -77 + part.x - sourceEngineFrame.x,
+    58 + part.z - sourceEngineFrame.z,
+    part.w,
+    part.h,
+    part.d,
+    part.semantic,
+    { y: part.y },
+  );
 }
-for (const x of [-77.75, -76.25]) Block(`Rail${x}`, x, -10, 0.1, 0.14, 374, "structure", { y: 0.76 });
+for (let z = -196; z < 176; z += 3)
+  Block("RailSleeper" + z, -77, z, 4.5, 0.12, 0.3, "structure");
+for (const x of [-77.75, -76.25])
+  Block("Rail" + x, x, -10, 0.1, 0.14, 374, "structure", { y: 0.76 });
 Block("SupplyTable", -68.5, 66, 2, 0.85, 1, "missionRoute");
 Room("UnloadingShed", -58, 85, 9, 9);
 Wall("BrokenStationWall", -68, 55, 9, 1.1, 0.65);

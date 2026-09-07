@@ -73,7 +73,24 @@ async function Main() {
         }),
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error(`Seed Audio returned HTTP ${response.status}`);
+      if (!response.ok) {
+        const failure = await response.json().catch(() => ({}));
+        const code = String(failure.code ?? failure.status_code ?? failure.error?.code ?? "")
+          .replaceAll(apiKey, "[redacted]")
+          .slice(0, 60);
+        const message =
+          failure.message ??
+          failure.error?.message ??
+          failure.error_msg ??
+          failure.status_msg ??
+          "";
+        const detail = String(message)
+          .replaceAll(apiKey, "[redacted]")
+          .slice(0, 300);
+        throw new Error(
+          `Seed Audio returned HTTP ${response.status}${code ? " [" + code + "]" : ""}${detail ? ": " + detail : ""}`,
+        );
+      }
       payload = await response.json();
     } finally {
       clearTimeout(timer);
