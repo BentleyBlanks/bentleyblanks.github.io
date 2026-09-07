@@ -53,6 +53,8 @@ const library = new MaterialLibrary(renderer, { textureSize: 512, ssao, gi: giUn
 const sky = new SkyDome(renderer);
 scene.add(sky.mesh);
 const lights = new LightRig(scene, { quality });
+// 太阳阴影公共采样接口：探针页也接上，SunShadow 调试图与正片同一条路。
+post.SetSunShadowSource(lights);
 // 天空 uniform 直接借给探针体：漏空的射线问的是同一片天
 const gi = giEnabled
   ? new ProbeVolume(renderer, { quality, skyUniforms: sky.uniforms, uniforms: giUniforms })
