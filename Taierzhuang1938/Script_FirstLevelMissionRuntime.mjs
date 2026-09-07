@@ -93,6 +93,7 @@ export class FirstLevelMissionRuntime {
       : this.companion.Handle(who)?.position || this.Point(this.flow.stage.target, 1);
   }
   VoiceDone(id) {
+    if (id === "FinalExit") this.Record("finalExitHeard");
     if (id === "Volunteer") this.Record("volunteerHeard");
     if (id === "SouthHope") this.Record("southHopeHeard");
     if (id === "FollowVehicle") this.Record("followVehicleHeard");
@@ -129,6 +130,7 @@ export class FirstLevelMissionRuntime {
       Exited: () => {}, Player: () => this.player.position,
     });
     this.train.Initialize();
+    this.view.train = this.train;
   }
   MoveActor(actor, point, speed = R.squadSpeedMps) {
     if (!actor?.alive) return;
@@ -824,7 +826,7 @@ export class FirstLevelMissionRuntime {
     this.delta = dt;
     this.time += dt;
     this.voice.Update(dt);
-    this.train?.Update(dt, this.Has("trainStopped"));
+    this.train?.Update(dt, this.Has("trainStopped"), this.Has("trainShelling"));
     this.UpdateSquad();
     this.UpdateTank();
     this.UpdateFlank();
@@ -881,7 +883,7 @@ export class FirstLevelMissionRuntime {
         this.train.Translate(delta);
         if (aboard) this.player.SyncCamera(0);
       }
-      if (this.time > start && !this.Has("trainShelling")) {
+      if (this.time > start && this.voice.finished.has("TrainMeal") && !this.Has("trainShelling")) {
         this.trainShellStartedAt = this.time;
         this.shellTrainOffset = offset;
         this.Record("trainShelling");

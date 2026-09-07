@@ -121,7 +121,7 @@ export const MISSION_STAGES = Object.freeze([
     ["rearLaneClear", "medicsEscaped"],
     "ReceptionWithdrawal",
   ),
-  Stage("Exit", "从后门撤入城边联络巷，跟上罗班长。", A.end, ["playerAtHandoff"], "FinalExit"),
+  Stage("Exit", "从后门撤入城边联络巷，跟上罗班长。", A.end, ["playerAtHandoff", "finalExitHeard"], "FinalExit"),
   Stage("Complete", "第一关完成 · 往南的路", A.end, [], null),
 ]);
 export const MISSION_ENCOUNTERS = Object.freeze({

@@ -1,3 +1,4 @@
+import { MissionTrainLifePose } from "./Script_FirstLevelMissionTrainLife.mjs";
 // P012-only temporary cast identification; these are not historical uniform colours.
 // Clone only the GLB uniform material (hands, heads, badges and mounted weapons
 // use separate materials). No source asset, shared material or geometry is edited.
@@ -19,12 +20,14 @@ export function InstallP012OpeningPose(soldier) {
   if(!rig?.root||typeof rig.Update!=="function"||rig.p012OpeningPose)return false;
   const arms=["L","R"].map(side=>[rig.bones?.[`upperArm${side}`],rig.bones?.[`forearm${side}`],rig.bones?.[`hand${side}`]]);
   if(arms.some(chain=>chain.some(bone=>!bone)))return false;
-  const original=rig.Update,saved=new Map();let time=0;
+  const original=rig.Update,saved=new Map(),lifePose=new MissionTrainLifePose(soldier);let time=0;
   rig.p012OpeningPose=true;
   rig.Update=function UpdateP012OpeningPose(dt,state={}) {
+    lifePose.Restore();
     for(const [bone,rotation] of saved)bone.quaternion.copy(rotation);
     saved.clear();
     const result=original.call(this,dt,state);
+    if(lifePose.Apply(dt,state))return result;
     const trainRest = soldier.missionTrainPassenger && !soldier.missionTrainReady && (state.moveSpeed ?? 0) < .025
       && !state.firing && !state.carryRole && !state.meleeCombat && !(state.prone > .35 || state.crouch > .35);
     if(!soldier.p012AwaitingWeapon && !trainRest)return result;

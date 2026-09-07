@@ -114,7 +114,7 @@ async function Main() {
         "-map_metadata",
         "-1",
         "-af",
-        "loudnorm=I=-19:TP=-2:LRA=10",
+        "aformat=channel_layouts=mono,loudnorm=I=-19:TP=-3:LRA=10",
         "-ac",
         "1",
         "-ar",
@@ -137,6 +137,7 @@ async function Main() {
       lineCount: cue.lines.length,
       requests: 1,
       continuous: true,
+      mastering: "MonoBeforeLoudnessTruePeakMinus3",
     };
     manifest.updatedAt = new Date().toISOString();
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");

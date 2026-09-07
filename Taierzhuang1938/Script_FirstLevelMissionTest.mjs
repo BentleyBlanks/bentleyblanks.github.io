@@ -2,6 +2,7 @@ import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { FirstLevelMissionTrain } from "./Script_FirstLevelMissionTrain.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
 import { FirstLevelMissionColumn } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE } from "./Data_FirstLevelMission.mjs";
@@ -137,10 +138,16 @@ if (process.argv.includes("--audio")) {
   for (const cue of MISSION_DIALOGUE) {
     const entry = manifest.cues[cue.id];
     assert.ok(entry?.continuous && entry.requests === 1 && entry.seconds > 0.5, cue.id);
-    assert.ok(fs.statSync(new URL("./Audio/FirstLevel/" + cue.file, import.meta.url)).size === entry.bytes);
+    const bytes=fs.readFileSync(new URL('./Audio/FirstLevel/'+cue.file,import.meta.url));
+    assert.equal(bytes.length,entry.bytes,cue.id+' bytes');
+    assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),entry.sha256,cue.id+' content hash');
+    assert.equal(crypto.createHash('sha256').update(MissionVoicePrompt(cue)).digest('hex'),entry.promptHash,cue.id+' current complete script');
+    if(cue.id==='ZhouDeath')assert.ok(entry.seconds>=8 && entry.seconds<=12.1,'whole death exchange fits the authored short scene');
   }
 }
-console.log("ok continuous dialogue prompts; audio assets require --audio acceptance");
+console.log(process.argv.includes("--audio")
+  ? "ok all 41 continuous audio assets, current script/file hashes and short death-scene duration"
+  : "ok continuous dialogue prompts; audio assets require --audio acceptance");
 const completedCues = [];
 const voiceOffsets = [];
 const voice = new FirstLevelMissionVoice({
@@ -183,11 +190,12 @@ assert.deepEqual(
   let offset = R.trainTravelM, player = {...MISSION_TRAIN.player,z:MISSION_TRAIN.player.z+offset};
   const train = new FirstLevelMissionTrain({ Originals:()=>originals, Guide:()=>guide, Spawn:Make,
     Offset:()=>offset, Place:(a,p)=>Object.assign(a.position,p), Hold:a=>Object.assign(a.goal,a.position),
-    Move:(a,p,speed)=>{const d=Math.hypot(p.x-a.position.x,p.z-a.position.z);if(d>MISSION_TRAIN.arrivalRadiusM){const step=Math.min(speed*dt,d)/d;a.position.x+=(p.x-a.position.x)*step;a.position.z+=(p.z-a.position.z)*step;}},
+    Move:(a,p,speed)=>{assert.equal(a.missionTrainLife.weight,0,"passengers stand before physical walking");const d=Math.hypot(p.x-a.position.x,p.z-a.position.z);if(d>MISSION_TRAIN.arrivalRadiusM){const step=Math.min(speed*dt,d)/d;a.position.x+=(p.x-a.position.x)*step;a.position.z+=(p.z-a.position.z)*step;}},
     Player:()=>player, Exited:()=>{},
   });
   train.Initialize(); train.Initialize();
   assert.equal(actors.length,41);assert.deepEqual(train.State().counts,[8,24,8]);
+  assert.equal(actors.filter(a=>a.missionTrainLife.seated).length,32);
   const local=actors.map(a=>({x:a.position.x,z:a.position.z-offset}));
   for(let i=0;i<120;i++){offset-=R.trainTravelM/120;train.Translate(-R.trainTravelM/120);train.Update(dt,false);}
   for(const [i,a] of actors.entries()) {assert.ok(Math.abs(a.position.z-offset-local[i].z)<1e-8);assert.equal(a.position.x,local[i].x);assert.ok(a.p012OnMovingTrain);}

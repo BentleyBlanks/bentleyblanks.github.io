@@ -244,7 +244,11 @@ try {
     const g = window.Tengxian;
     g.StepFrames(120, 1/60, true);
     const actors = g.ai.soldiers.filter(a => a.missionTrainPassenger);
-    const start = actors.map(a => ({x:a.position.x, z:a.position.z-g.battlefield.trainOffsetM}));
+    const BoneLocal = (a, role) => a.actor.root.worldToLocal(a.actor.characterRig.bones[role].getWorldPosition(a.position.clone()));
+    const start = actors.map(a => ({x:a.position.x, z:a.position.z-g.battlefield.trainOffsetM,
+      hand:BoneLocal(a,'handR'),feet:['footL','footR'].map(role=>BoneLocal(a,role))}));
+    const life = actors.map(a=>({kind:a.missionTrainLife.kind,seated:a.missionTrainLife.seated,active:a.actor.characterRig.missionTrainLifeActive,
+      pelvis:BoneLocal(a,'pelvis').y, poseTime:a.actor.characterRig.missionTrainLifeState.time, animatedSeconds:0, handTravel:0, footDrift:0}));
     let maxLocalDrift=0, maxAnimationSpeed=0, maxRootError=0;
     const offsetBefore=g.battlefield.trainOffsetM;
     const poses=actors.map(a=>({clip:a.actor.characterRig?.currentPlaybackId,rate:a.actor.characterRig?.currentAction?.getEffectiveTimeScale()}));
@@ -254,13 +258,25 @@ try {
         maxLocalDrift=Math.max(maxLocalDrift,Math.hypot(a.position.x-start[i].x,a.position.z-g.battlefield.trainOffsetM-start[i].z));
         maxAnimationSpeed=Math.max(maxAnimationSpeed,a.actor.characterRig?.p012ActualSpeedMps||0);
         maxRootError=Math.max(maxRootError,a.actor.root.position.distanceTo(a.position));
+        life[i].animatedSeconds=a.actor.characterRig.missionTrainLifeState.time-life[i].poseTime;
+        life[i].handTravel=Math.max(life[i].handTravel,BoneLocal(a,'handR').distanceTo(start[i].hand));
+        for(const [j,role] of ['footL','footR'].entries())life[i].footDrift=Math.max(life[i].footDrift,BoneLocal(a,role).distanceTo(start[i].feet[j]));
       });
     }
-    return {count:actors.length,travel:offsetBefore-g.battlefield.trainOffsetM,maxLocalDrift,maxAnimationSpeed,maxRootError,poses};
+    return {count:actors.length,travel:offsetBefore-g.battlefield.trainOffsetM,maxLocalDrift,maxAnimationSpeed,maxRootError,poses,life};
   });
   console.log("TRAIN_RIDE",JSON.stringify(ride));
-  assert.ok(ride.poses.every(p=>p.clip==="AttackCommand"&&p.rate===0), "moving train passengers hold the existing planted-foot pose");
+  assert.ok(ride.poses.every(p=>p.clip==="AttackCommand"&&p.rate===0), "the sampled base pose never treats train travel as walking");
   assert.ok(ride.travel>1 && ride.maxLocalDrift<.08 && ride.maxAnimationSpeed<.05 && ride.maxRootError<.08, "train-local bodies and rendered roots stay still without a walking cycle: "+JSON.stringify(ride));
+  assert.equal(ride.life.filter(p=>p.seated).length,32,'32 actual side-bench seats, eight standing recruits and Luo');
+  assert.ok(ride.life.every(p=>p.active && p.footDrift<.025),'procedural upper-body activity keeps boot contacts fixed');
+  assert.ok(ride.life.filter(p=>p.seated).every(p=>Math.abs(p.pelvis-.6)<.025),'seated pelvis rests over the bench');
+  assert.ok(new Set(ride.life.map(p=>p.kind)).size>=7,'distinct carriage activities');
+  const gestureKinds=['ShareFood','Eat','Talk','CountAmmo','Gear'];
+  // The existing visibility budget intentionally stops evaluating off-screen rigs.
+  // Every fully observed gesture must move; each activity also needs a visible witness.
+  assert.ok(ride.life.filter(p=>gestureKinds.includes(p.kind)&&p.animatedSeconds>7).every(p=>p.handTravel>.012),'visible hands perform their activity rather than freezing');
+  for(const kind of gestureKinds)assert.ok(ride.life.some(p=>p.kind===kind&&p.handTravel>.025),'visible gesture witness: '+kind);
   await Capture("Train");
   const pause = await page.evaluate(() => {
     const g = window.Tengxian;
@@ -286,6 +302,7 @@ try {
   }));
   assert.equal(unloaded.mission.stage, "Unloading");
   assert.ok(unloaded.mission.facts.includes("trainStopped"));
+  assert.ok(unloaded.mission.voice.finished.includes("TrainMeal"),"the opening exchange finishes before shelling interrupts it");
   // Deliberate lethal-damage fixture tests the new runtime retry; it does not grant any mission facts.
   const retry = await page.evaluate(() => {
     const g = window.Tengxian,
@@ -362,6 +379,7 @@ try {
   await Capture("TrainAllDisembarked");
   await fs.writeFile(path.join(output,"Data_TrainDisembark.json"),JSON.stringify({ride,train:trainExit},null,2));
   assert.equal(trainExit.exited,40,"all 40 original recruit bodies leave via the three real stairways");
+  assert.ok(trainExit.entries.every(e=>e.life.weight===0),"every boarding pose releases before walking away");
   assert.ok(trainExit.entries.every(e=>e.arrived),"all train bodies arrive without respawning: "+JSON.stringify(trainExit.entries.filter(e=>!e.arrived)));
   console.log("ok all 40 recruits and Luo physically disembarked and reached individual muster points");
   if (process.argv.includes("--campaign")) {
@@ -895,6 +913,8 @@ try {
       "PersonalExit",
       { fight: true },
     );
+    await WaitStage("Complete", 60);
+    assert.ok(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().voice.finished.includes("FinalExit")),"final handoff dialogue finishes before completion");
     assert.equal(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage), "Complete");
     const pacing = await page.evaluate(() => {
       const stages = window.Tengxian.Debug.FirstLevelMission().log.filter((e) => e.kind === "stage");

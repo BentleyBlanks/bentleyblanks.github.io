@@ -17,6 +17,9 @@ export class FirstLevelMissionView {
     this.scale = new THREE.Vector3();
     this.parts = {};
     for (const [key, geometry, color, count] of [
+      ["ration", new THREE.BoxGeometry(.10,.045,.13), 0xa47752, 20],
+      ["pouch", new THREE.BoxGeometry(.14,.07,.12), 0x857a56, 20],
+      ["cartridge", new THREE.BoxGeometry(.018,.018,.07), 0xc2a45d, 32],
       ["body", new THREE.BoxGeometry(0.42, 0.65, 0.25), 0x87958d, 160],
       ["head", new THREE.SphereGeometry(0.13, 7, 5), 0xc9bda7, 160],
       ["limb", new THREE.BoxGeometry(0.13, 0.64, 0.14), 0x747c72, 480],
@@ -139,8 +142,25 @@ export class FirstLevelMissionView {
     }
     if (kind === "medic") this.Instance("medical", x + c * 0.33, y + 0.8, z - s * 0.33, yaw);
   }
+  TrainHandProps() {
+    for(const entry of this.train?.entries || []) {
+      const actor=entry.actor, rig=actor.actor?.characterRig, life=actor.missionTrainLife;
+      if(!rig?.missionTrainLifeActive || life.brace>.25 || life.weight<.7)continue;
+      const kind=life.kind;
+      if(!['Eat','ShareFood','CountAmmo','Gear'].includes(kind))continue;
+      for(const side of ['L','R']) {
+        const bone=rig.bones['hand'+side];
+        bone.getWorldPosition(this.position);
+        const {x,y,z}=this.position, yaw=actor.yaw;
+        if(kind==='CountAmmo'&&side==='R')this.Instance('cartridge',x,y,z,yaw);
+        else if(kind==='CountAmmo'||kind==='Gear')this.Instance('pouch',x,y,z,yaw);
+        else this.Instance('ration',x,y,z,yaw,side==='L'?1.4:1,1,side==='L'?1.4:1);
+      }
+    }
+  }
   Update(time, { tank } = {}) {
     for (const mesh of Object.values(this.parts)) mesh.count = 0;
+    this.TrainHandProps();
     if (this.column.stationBombed)
       for (const person of MISSION_PLACEMENT.stationCasualties)
         this.Person(person.x, person.z, person.yaw, time, { alive: person.health > 0, crouch: true });

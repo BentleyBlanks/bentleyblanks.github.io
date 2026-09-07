@@ -106,18 +106,32 @@ for (let i = 0; i < 3; i++) {
         { y: 1.87 },
       );
   }
-  Block(id + "BenchWest", -78.7, z, 0.6, 0.2, 8, "structure", { y: 1.27 });
-  for (const end of [-1, 1])
-    Block(
-      id + "BenchEast" + end,
-      -75.3,
-      z + end * 3.5,
-      0.6,
-      0.2,
-      3,
-      "structure",
-      { y: 1.27 },
-    );
+  const deck = floor.y + floor.h / 2, benchTop = deck + MISSION_TRAIN.life.seatTopM;
+  for (const [side, end, depth, offset] of [[-1,0,11.2,0],[1,-1,4.6,-3.35],[1,1,4.6,3.35]]) {
+    const benchId=id+'Bench'+side+'_'+end, x=-77+side*MISSION_TRAIN.life.sideSeatM;
+    // The seated actor keeps its existing ground capsule; furniture is visual support.
+    Block(benchId, x, z+offset, .68, .14, depth, 'trainWood', {y:benchTop-.07,solid:false});
+    for(const leg of [-1,1]) Block(benchId+'Leg'+leg,x,z+offset+leg*(depth/2-.25),.12,MISSION_TRAIN.life.seatTopM-.14,.16,'trainWood',
+      {y:deck+(MISSION_TRAIN.life.seatTopM-.14)/2,solid:false});
+  }
+  // Cargo stays in the end pockets. The middle door and central unloading lane stay clear.
+  for(const end of [-1,1]) {
+    const cargoZ=z+end*5.65, cargoId=id+'Cargo'+end;
+    Block(cargoId+'Crate',-77,cargoZ,.82,.58,.62,'trainWood',{y:deck+.29});
+    for(const band of [-1,1]) Block(cargoId+'Band'+band,-77+band*.28,cargoZ,.055,.60,.64,'trainMetal',{y:deck+.30,solid:false});
+    Block(cargoId+'Lid',-77,cargoZ,.86,.045,.65,'trainWood',{y:deck+.603,solid:false});
+    for(const side of [-1,1]) {
+      const x=-77+side*1.65;
+      Block(cargoId+'Bedroll'+side,x,cargoZ,.56,.28,.55,'trainCanvas',{y:benchTop+.14,solid:false});
+      for(const strap of [-1,1]) Block(cargoId+'Strap'+side+'_'+strap,x+strap*.17,cargoZ,.045,.30,.57,'trainWood',{y:benchTop+.15,solid:false});
+    }
+  }
+  for(const [slot,seat] of MISSION_TRAIN.cars[i].seats.entries()) if(Math.abs(seat.x+77)>1.2) {
+    const side=Math.sign(seat.x+77), packId=id+'Pack'+slot, x=-77+side*2.04;
+    Block(packId,x,seat.z,.27,.43,.35,'trainCanvas',{y:benchTop+.215,solid:false});
+    Block(packId+'Flap',x-side*.15,seat.z,.045,.14,.36,'trainWood',{y:benchTop+.34,solid:false});
+    Block(packId+'Canteen',x,seat.z+.30,.14,.21,.13,'trainMetal',{y:benchTop+.13,solid:false});
+  }
   if (i < 2)
     Block(id + "Coupler", -77, z + 7, 0.4, 0.35, 1.4, "boundary", { y: 0.97 });
   for (let step = 0; step < 4; step++) {
@@ -366,6 +380,9 @@ export const MISSION_LAYOUT = Object.freeze({
   bounds: { minX: -205, maxX: 137, minZ: -202, maxZ: 180 },
   ground: { x: -34, z: -11, w: 342, d: 382, h: 1, y: -0.5, semantic: "ground" },
   semanticColors: {
+    trainWood: 0x82715c,
+    trainCanvas: 0x747c67,
+    trainMetal: 0x59625e,
     ground: 0x86877d,
     structure: 0xc1bdb1,
     cover: 0x6d8b98,

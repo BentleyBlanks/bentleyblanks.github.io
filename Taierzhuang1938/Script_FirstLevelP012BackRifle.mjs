@@ -37,7 +37,7 @@ export async function InstallP012BackRifle(soldier) {
   };
   const update=actor.Update;let mounted=false;
   actor.Update=function UpdateP012BackRifle(dt,state={}){
-    const result=update.call(this,dt,state),active=rig.p012BackRifleActive&&!!this.weaponGroup;
+    const result=update.call(this,dt,state),active=(rig.p012BackRifleActive||rig.missionTrainLifeActive)&&!!this.weaponGroup;
     if(active){
       if(this.weaponGroup.parent!==mount)mount.add(this.weaponGroup);
       this.weaponGroup.position.set(0,0,0);this.weaponGroup.rotation.set(-Math.PI/2,0,0);

@@ -24,6 +24,14 @@ export class FirstLevelMissionTrain {
     actor.missionUnloaded = false;
     actor.missionTrainPassenger = true;
     actor.p012OnMovingTrain = true;
+    const side = Math.sign(seat.x - C.centerX), seated = Math.abs(seat.x - C.centerX) > 1.2;
+    const kinds = ['Talk', 'Rest', 'Gear', 'Eat', 'Lookout'];
+    const kind = {yaowa:'ShareFood', liuwencai:'CountAmmo', heyoutian:'Talk', luo:'Lookout'}[actor.castId]
+      || kinds[(slot + car.carIndex * 3 + kinds.length) % kinds.length];
+    actor.missionTrainLife = { kind, seated, phase: ((slot + 2 + car.carIndex * 13) * .61803398875) % 1,
+      weight: 1, brace: 0, yaw: seated ? side * Math.PI / 2 : (slot % 2 ? -.3 : Math.PI - .3) };
+    if (!recruit) actor.missionTrainLife.yaw = Math.PI / 2;
+    actor.yaw = actor.missionTrainLife.yaw;
     const steps = [ { x: C.centerX, z: seat.z }, ...car.exit ];
     if (!recruit) steps.splice(0, 2); // Luo already stands in the door pocket.
     const muster = recruit ? car.muster[slot] : C.guideMuster;
@@ -40,11 +48,12 @@ export class FirstLevelMissionTrain {
       a.actor?.root.position.copy(a.position);
     }
   }
-  Update(dt, open) {
+  Update(dt, open, shelling = false) {
     this.open = open;
     for (const e of this.entries) {
       const a = e.actor;
       a.p012OnMovingTrain = !open;
+      a.missionTrainLife.brace += ((shelling ? 1 : 0) - a.missionTrainLife.brace) * Math.min(1, dt * 3);
       if (!a.alive || e.arrived) continue;
       if (!open) { this.host.Hold(a); continue; }
       const p = a.position;
@@ -54,6 +63,11 @@ export class FirstLevelMissionTrain {
           this.host.Hold(a); continue;
         }
       }
+      // Finish the visible stand-up before the same physical body starts walking.
+      e.rise = Math.min(C.life.standSeconds, (e.rise || 0) + dt);
+      const rise = e.rise / C.life.standSeconds;
+      a.missionTrainLife.weight = 1 - rise * rise * (3 - 2 * rise);
+      if (e.rise < C.life.standSeconds) { this.host.Hold(a); continue; }
       while (e.index < e.steps.length && Distance(p, e.steps[e.index]) < C.routeArrivalRadiusM) e.index++;
       // Crossing the stair foot is a real body event, independent of the player's stage.
       if (!e.exited && p.x > C.stairFootX) { e.exited = true; a.missionUnloaded = true; this.host.Exited(a); }
@@ -76,7 +90,7 @@ export class FirstLevelMissionTrain {
       counts: C.cars.map(car => this.entries.filter(e => e.recruit && e.carIndex === car.carIndex).length),
       exited: this.entries.filter(e => e.recruit && e.exited).length,
       entries: this.entries.map(e => ({ id: e.actor.id, carIndex: e.carIndex, slot: e.slot, recruit: e.recruit,
-        alive: e.actor.alive, exited: e.exited, arrived: e.arrived, index: e.index, target: e.steps[e.index],
+        life: { ...e.actor.missionTrainLife }, alive: e.actor.alive, exited: e.exited, arrived: e.arrived, index: e.index, target: e.steps[e.index],
         position: { x: e.actor.position.x, y: e.actor.position.y, z: e.actor.position.z } })) };
   }
 }
