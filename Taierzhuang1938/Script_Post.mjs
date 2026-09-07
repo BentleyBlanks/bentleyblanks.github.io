@@ -41,6 +41,7 @@ import {
   PrepassPass, MarkNoPrepass, MarkForegroundPrepass, MarkDynamicPrepass, FOREGROUND_VIEW_DEPTH,
 } from "./Script_PostPrepass.mjs";
 import { SsaoPass } from "./Script_PostSsao.mjs";
+import { ContactShadowsPass, MakeShadowDebugViews } from "./Script_ContactShadows.mjs";
 import { TaaPass } from "./Script_PostTaa.mjs";
 import { BloomPass, GodRaysPass } from "./Script_PostBloom.mjs";
 import { CompositePass } from "./Script_PostComposite.mjs";
@@ -113,6 +114,7 @@ export class PostPipeline {
     // --- pass 实例 ---------------------------------------------------------
     this.prepassPass = new PrepassPass(this, { destruction });
     this.ssaoPass = new SsaoPass(this);
+    this.contactShadowsPass = new ContactShadowsPass(this, { quality: this.quality });
     this.taaPass = new TaaPass(this);
     this.bloomPass = new BloomPass(this);
     this.godRaysPass = new GodRaysPass(this, this.bloomPass);
@@ -131,6 +133,9 @@ export class PostPipeline {
         Dispose: () => {},
       },
       this.ssaoPass,
+      // 屏幕空间接触阴影：要预通道的法线+视深，产出的图要在主场景那一趟被材质
+      // 采到，所以卡在 ssao 与 main 之间。关着时 Idle() 把材质那边还原成纯白。
+      this.contactShadowsPass,
       {
         name: "main",
         Enabled: () => true,
@@ -196,6 +201,14 @@ export class PostPipeline {
     // 老代码用 post.quadScene / quadMesh 直接摆全屏四边形；指向同一份。
     this.quadScene = this.blitter.scene;
     this.quadMesh = this.blitter.mesh;
+
+    // 阴影系统的三张调试图（级联假彩色 / 半影尺寸 / 接触阴影）。
+    // 走 DebugPass 的展示 pass 扩展口，视图定义留在 Script_ContactShadows。
+    this.shadowDebugViews = MakeShadowDebugViews(this);
+    for (const [id, view] of Object.entries(this.shadowDebugViews.views)) {
+      this.debugPass.RegisterView(id, view);
+    }
+    this.debugPass.RegisterSunShadowClient(this.shadowDebugViews);
 
     this.SetSize(this.width, this.height);
   }
@@ -377,7 +390,9 @@ export class PostPipeline {
       // 太阳拖影要在亮部提取**之前**定下来（亮部图的 alpha 只在拖影开着时
       // 才顺手打包天空遮挡）。Prepare 跑在 GPU 段之外，不占别人的账。
       pass.Prepare?.(ctx);
-      if (pass.Enabled && !pass.Enabled(ctx)) continue;
+      // 被跳过的 pass 可以实现 Idle(ctx) 把「消费方看到的东西」还原成中性值。
+      // 不还原的话，关掉开关之后画面还留着最后一帧的图（接触阴影踩过这一条）。
+      if (pass.Enabled && !pass.Enabled(ctx)) { pass.Idle?.(ctx); continue; }
       // TAA 解算前先把抖动从投影矩阵上摘掉：泛光/雾/运动模糊/太阳投影
       // 拿到的必须是干净矩阵。
       if (pass === this.taaPass) this.taaPass.RemoveJitter(ctx);

@@ -52,7 +52,10 @@ const library = new MaterialLibrary(renderer, { textureSize: 512, ssao, gi: giUn
 
 const sky = new SkyDome(renderer);
 scene.add(sky.mesh);
-const lights = new LightRig(scene, { quality });
+// renderer 交给 LightRig：它把阴影口径切成级联要的 BasicShadowMap
+// （采样器类型必须与 Script_Csm.SHADOW_MAP_TYPE 一致，不一致是未定义行为）。
+const lights = new LightRig(scene, { quality, renderer });
+lights.SetViewCamera(camera);
 // 太阳阴影公共采样接口：探针页也接上，SunShadow 调试图与正片同一条路。
 post.SetSunShadowSource(lights);
 // 天空 uniform 直接借给探针体：漏空的射线问的是同一片天
@@ -241,6 +244,9 @@ function Frame(dt) {
   const forward = new THREE.Vector3();
   camera.getWorldDirection(forward);
   lights.UpdateShadowFrustum(camera.position, forward);
+  // 级联把 renderer.shadowMap.autoUpdate 关掉了（一帧里 renderer.render 要跑很多趟），
+  // 所以每帧必须自己点一次「这一帧要烘哪几级」，否则探针页一张阴影图都不会烘。
+  lights.ScheduleShadowUpdate(renderer);
   if (gi) gi.Update(dt, camera.position, lights);
   ssao.map.value = post.AoTexture;
   ssao.resolution.value.set(post.targets.aoBlur.width, post.targets.aoBlur.height);

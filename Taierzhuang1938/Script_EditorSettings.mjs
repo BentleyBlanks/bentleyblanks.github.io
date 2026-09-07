@@ -28,10 +28,16 @@ import { CONTROL_GUIDE } from "./Script_Input.mjs";
 // 可热调参数的范围、标签和默认值共用；旧存档缺项时沿用默认值。
 export function GraphicsDetailControls(post) {
   return {
+    // 级联阴影（Script_Csm）。这三根给的都是**第 0 级的基准**，往外逐级按纹素
+    // 尺度自动缩放 —— 远级纹素粗四倍，痤疮台阶也粗四倍，同一个绝对偏移必然是
+    // 「近处彼得潘 + 远处痤疮」二选一。
+    // shadowExtent（旧的单张框「覆盖半径」）已废：级联的每级半径由 practical split
+    // 与视锥切片包围球算，不再是一个数。换成 shadowDistance = 最远一级铺到哪。
     shadow: [
       { key: "shadowBias", label: "深度偏移", min: -0.003, max: 0.003, step: 0.0001, value: -0.0004, digits: 4 },
       { key: "shadowNormalBias", label: "法线偏移", min: 0, max: 0.15, step: 0.005, value: 0.035, digits: 3 },
-      { key: "shadowExtent", label: "覆盖半径", min: 30, max: 100, step: 1, value: 66, unit: " m", digits: 0 },
+      { key: "shadowDistance", label: "阴影距离", min: 40, max: 400, step: 10, value: 220, unit: " m", digits: 0 },
+      { key: "shadowIntensity", label: "阴影强度", min: 0.4, max: 1, step: 0.02, value: 1, digits: 2 },
     ],
     gi: [
       { key: "giNormalBias", label: "采样偏移", min: 0, max: 1.5, step: 0.05, value: 0.4, unit: " m" },
@@ -172,7 +178,10 @@ export class GraphicsSettings {
       gfx.firstPersonSelfShadowSoft = on;
       this.Apply();
     });
-    const shadowSize = Section(perf, "阴影分辨率");
+    // 级联之后这一栏是**每一级**的图边长（high/ultra 四级、medium 三级、low 两级）。
+    // 「默认」= 档位值（high/ultra 2k、medium/low 1k）；4k × 四级 = 半 GB 显存，
+    // 留着是给取证用的，不是给玩家日常开的。
+    const shadowSize = Section(perf, "阴影分辨率（每级）");
     Chips(shadowSize, [
       { value: 0, label: "默认" }, { value: 512, label: "512" },
       { value: 1024, label: "1k" }, { value: 2048, label: "2k" }, { value: 4096, label: "4k" },
@@ -295,9 +304,16 @@ export class GraphicsSettings {
     void post;
     const canvas = this.host.canvas;
     f.Set("画布", `${canvas.width} × ${canvas.height}`);
-    f.Set("阴影图", this.host.lights
-      ? `${this.host.lights.sun.shadow.mapSize.x}${this.host.renderer.shadowMap.enabled ? "" : "（已关）"}`
+    // 级联：报「N 级 × 每级边长」，再报最近一级的纹素世界尺寸 ——
+    // 后者才是「阴影糊不糊」的那个数（重构前是一张 4096 铺 132 m = 3.2 cm）。
+    const csm = this.host.lights?.GetShadowState?.();
+    f.Set("阴影图", csm
+      ? `${csm.cascades} 级 × ${csm.mapSize}${this.host.renderer.shadowMap.enabled ? "" : "（已关）"}`
       : "—");
+    if (csm) {
+      f.Set("最近级纹素", `${(csm.texelWorld[0] * 100).toFixed(2)} cm`);
+      f.Set("阴影覆盖", `${(csm.splits[csm.splits.length - 1] || 0).toFixed(0)} m`);
+    }
     const fpShadow = this.host.game?.firstPersonSelfShadow?.Status?.();
     f.Set("第一人称自阴影", fpShadow?.enabled ? `开（${fpShadow.size}${fpShadow.soft ? " · 软化" : " · 硬 3×3"}）` : "关");
   }

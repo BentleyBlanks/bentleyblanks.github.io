@@ -52,7 +52,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Script_PostCommon.mjs`（blit / 靶工厂 / 靶池 / `FrameContext` / pass 契约）、
   `Script_PostPrepass.mjs`（MRT 预通道 + 速度缓冲 + HZB + 蒙皮上一帧骨矩阵）、
   `Script_PostSsao.mjs`、`Script_PostTaa.mjs`、`Script_PostBloom.mjs`（含太阳拖影）、
-  `Script_PostComposite.mjs`（分段 GLSL）、`Script_PostFxaa.mjs`、`Script_PostDebug.mjs`。
+  `Script_PostComposite.mjs`（分段 GLSL）、`Script_PostFxaa.mjs`、`Script_PostDebug.mjs`、
+  `Script_ContactShadows.mjs`（屏幕空间接触阴影 + 阴影系统的三张调试图）。
 - `Data_Tuning_Graphics.mjs` —— 画质档位表（纯数据，零 three）：每档每个 pass 的开关与旋钮，
   外加 `HZB` / `VELOCITY` 两组常量。`Script_Post` / `Script_Main` / `Script_EditorSettings` 只读它。
 - `Script_MaterialPatches.mjs` —— **材质补丁注册表**：所有往 `MeshStandardMaterial` 插 GLSL 的
@@ -61,13 +62,23 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - `Script_FirstPersonSelfShadow.mjs` —— 第一人称手臂/武器专用 packed-depth + 3×3 PCF
   自阴影；与战场太阳阴影图隔离，禁止改成 Viewmodel 直接 `castShadow=true`。
 - `Script_Gi.mjs`（半实时辐照度探针体 + `Data_GlobalShProbe.mjs`，回归口 `Script_GiTest.mjs`）、
-  `Script_Light.mjs`（太阳 + 跟随式阴影框 + 火光池 + 枪口闪光 + **`SUN_SHADOW_GLSL` 公共阴影
-  采样接口**：体积雾 / 接触阴影 / CSM 都从这条接口取，别自己采 `sun.shadow.map`）、
+  `Script_Light.mjs`（太阳 + 火光池 + 枪口闪光 + **`SUN_SHADOW_GLSL` 公共阴影采样接口**：
+  体积雾 / 接触阴影 / 簇光都从这条接口取，别自己采 `sun.shadow.map`）、
   `Script_Sky.mjs`（解析式天空 + PMREM）、`Script_Water.mjs`（Gerstner 护城河）。
+- **阴影（级联 CSM + PCSS + 屏幕空间接触阴影，2026-09）**：`Script_Csm.mjs`
+  （N 盏同方向灯 + 拟合/吸附/节流 + **整段替换 `ShaderChunk.lights_fragment_begin`** 的
+  级联采样 chunk + 全屏采样接口 GLSL）、`Data_Tuning_Shadows.mjs`（级数/图尺寸/分割/
+  节流/PCSS 抽样数/接触阴影，全部数值）、`Script_ContactShadows.mjs`（pass）。
+  三条铁律：级联本体走 chunk 不走材质补丁（补丁漏材质 = 那份材质吃 N 份太阳）；
+  只有第 0 盏灯带强度（能量守恒的安全网）；阴影图是 `BasicShadowMap` 裸深度
+  （PCSS 的 blocker search 要读深度值，采样器类型两边必须一致）。
+  回归口 `Script_CsmTest.mjs`；先读 `docs/Data_TechRenderPipeline.md` **§1S**。
 - 回归口：`Script_PostFrameGraphTest.mjs`（帧图契约）、`Script_PostTest.mjs`、
+  `Script_CsmTest.mjs`（级联阴影 / PCSS / 接触阴影）、
   `Script_GiTest.mjs`、`Script_EditorTest.mjs`（Debug Rendering 全部视图）。
-- 先读：`docs/Data_TechRenderPipeline.md` **§1「帧图与模块契约」**（接入说明；
-  §1A 起是设计期草案与专题深挖，GI 在 §12，坑表在末尾）。
+- 先读：`docs/Data_TechRenderPipeline.md` **§1「帧图与模块契约」**（接入说明）与
+  **§1S「阴影：CSM / PCSS / 接触阴影」**（阴影现状；§10 是它的历史稿）；
+  §1A 起是设计期草案与专题深挖，GI 在 §12，坑表在末尾。
 
 ### 材质 / 贴图
 - `Script_TexBake.mjs`（纯 JS PBR 烘焙，每种材质出 albedo / normal / orm）→

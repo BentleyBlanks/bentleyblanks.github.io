@@ -16,8 +16,13 @@
 //   · velocity / hzb —— 2026-09 帧图重构新增：MRT 速度靶与 HZB 链。
 //        高低档都开：它们是后续 SSR / 体积雾 / 接触阴影的公共输入，
 //        关掉等于把八个并行子系统一起关掉；真要省，先关消费方。
-//   · 其余键（csm / gtao / ssil / ssr / volumetrics / atmosphere / autoExposure /
-//     lensFlare / lut / dof / taaUpscale / clusteredLights / contactShadows）
+//   · csm / contactShadows —— 2026-09 阴影子系统落地：
+//        csm 四档全开（级数、图尺寸、分割、节流、PCSS 抽样数在
+//        `Data_Tuning_Shadows.SHADOW_PRESETS`，这里只是「跑不跑」的总闸）；
+//        contactShadows 只 medium 及以上（low 档一张半分辨率 12 步 raymarch
+//        在集显上不值那个钱，而且 low 的阴影本来就只铺 70 m）。
+//   · 其余键（gtao / ssil / ssr / volumetrics / atmosphere / autoExposure /
+//     lensFlare / lut / dof / taaUpscale / clusteredLights）
 //     —— **本阶段全部为占位**，值 = 与今天等价（即「不启用新东西」）。
 //        对应子系统落地时把自己那一位改成实际档位，并在这里补出处注释。
 //
@@ -40,9 +45,9 @@
  *   taa           时域抗锯齿的**出厂默认**（运行时可经 SetTaaEnabled 热切）
  *   velocity      预通道 MRT 的 RT1 屏幕空间速度靶
  *   hzb           预通道之后建线性视深 max-reduce mip 链（HZB）
+ *   csm           级联阴影总闸（级数/尺寸/分割/节流见 Data_Tuning_Shadows）
+ *   contactShadows 屏幕空间接触阴影（帧图里排在 ssao 之后、main 之前）
  *   ——— 以下为后续子系统的占位位，本阶段一律「等价于今天」———
- *   csm           级联阴影（今天：单张 66 m 跟随框，false）
- *   contactShadows 屏幕空间接触阴影
  *   gtao          GTAO（将来替换 ssao 那一位）
  *   ssil          屏幕空间间接光
  *   ssr           屏幕空间反射
@@ -59,8 +64,6 @@
 
 /** 后续子系统的占位位。四档共用同一份「等价于今天」的取值。 */
 const RESERVED_OFF = {
-  csm: false,
-  contactShadows: false,
   gtao: false,
   ssil: false,
   ssr: false,
@@ -86,12 +89,14 @@ export const QUALITY_PRESETS = {
     ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
     aoScale: 0.5, sharpen: 0.14, taa: false,
     velocity: true, hzb: true,
+    csm: true, contactShadows: false,
   },
   medium: {
     ...RESERVED_OFF,
     ssao: true, bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.6, sharpen: 0.18, taa: true,
     velocity: true, hzb: true,
+    csm: true, contactShadows: true,
   },
   // high 的抗锯齿由 TAA 承担。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
   // 上百 MB 显存并重复抗锯齿；把 4× 留给主动选择 ultra 的玩家
@@ -101,12 +106,14 @@ export const QUALITY_PRESETS = {
     ssao: true, bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.75, sharpen: 0.22, taa: true,
     velocity: true, hzb: true,
+    csm: true, contactShadows: true,
   },
   ultra: {
     ...RESERVED_OFF,
     ssao: true, bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,
     aoScale: 1.0, sharpen: 0.22, taa: true,
     velocity: true, hzb: true,
+    csm: true, contactShadows: true,
   },
 };
 

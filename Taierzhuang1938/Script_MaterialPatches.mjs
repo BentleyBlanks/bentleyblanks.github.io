@@ -50,6 +50,7 @@
 
 import { GI_SAMPLE_GLSL, BindGiUniforms } from "./Script_Gi.mjs";
 import { BindDestructionUniforms, DestructionShaderGlsl } from "./Script_Destruction.mjs";
+import { MakeCsmPatch } from "./Script_Csm.mjs";
 
 /**
  * 造一个补丁。字段全是可选的（只加 uniform 不改代码也合法）。
@@ -383,10 +384,24 @@ ${DestructionShaderGlsl(destruction.maxVolumes)}`],
 }
 
 /**
- * 现役间接光补丁组：顺序固定 **AO → GI → 破口**。
+ * 现役补丁组：顺序固定 **AO → GI → CSM → 破口**。
  * 新补丁插在哪儿要想清楚：`<aomap_fragment>` 上挂着 AO 的乘法与 GI 的光照分量
- * 取证，两者按这个顺序拼（AO 先压，取证后抓，面板读到的才是正式画面的值）。
+ * 取证，两者按这个顺序拼（AO 先压，取证后抓，面板读到的才是正式画面的值）；
+ * CSM 那一路挂在 `<lights_fragment_begin>` 上，必须**排在 GI 之后** —— 它要覆盖
+ * GI 补丁里视图 9「太阳阴影」那一行（同锚点按注册顺序拼接，后写的赢）。
+ *
+ * **级联阴影本体不在补丁里**：它整段替换了 `ShaderChunk.lights_fragment_begin`，
+ * 覆盖每一份内置光照材质（连没走 MaterialLibrary 的都算），见 `Script_Csm.mjs` 抬头。
+ * 这里的 CSM 补丁只有两件补丁注册表才做得到的事：接屏幕空间接触阴影那张全屏图，
+ * 以及把调试视图 9 改读级联可见度。
  */
 export function IndirectLightingPatches({ ssao = null, gi = null, destruction = null } = {}) {
-  return [MakeSsaoPatch(ssao), MakeGiPatch(gi), MakeDestructionPatch(destruction)].filter(Boolean);
+  return [
+    MakeSsaoPatch(ssao),
+    MakeGiPatch(gi),
+    // contact 的开关是**档位级**的（`Script_ContactShadows` 构造时告诉 Script_Csm），
+    // 不从这里传：MaterialLibrary 的构造参数不该为了一个编译期布尔多一项。
+    MakeCsmPatch({ giDebug: !!gi }),
+    MakeDestructionPatch(destruction),
+  ].filter(Boolean);
 }

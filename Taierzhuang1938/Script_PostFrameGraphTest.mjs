@@ -272,8 +272,8 @@ try {
 await browser.close();
 server.close();
 
-const EXPECTED_ORDER = ["prepass", "hzb", "ssao", "main", "wireframe", "debugOverlay",
-  "taa", "godPrepare", "bloom", "god", "composite", "fxaa"];
+const EXPECTED_ORDER = ["prepass", "hzb", "ssao", "contactShadows", "main", "wireframe",
+  "debugOverlay", "taa", "godPrepare", "bloom", "god", "composite", "fxaa"];
 
 const checks = [];
 function Check(name, ok, detail = "") {

@@ -424,6 +424,214 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs     # 整帧 CPU/GPU 消融
 
 ---
 
+## 1S. 阴影：CSM / PCSS / 接触阴影（2026-09）
+
+> **这一节是阴影侧的现状说明。** 旧的 §10 是设计期草案，选型与实装不同（见那一节抬头）。
+> 模块：`Script_Csm.mjs`（级联 + 着色器 chunk）、`Script_ContactShadows.mjs`（屏幕空间
+> 接触阴影 pass + 三张调试图）、`Script_Light.mjs`（装配与对外接口）、
+> `Data_Tuning_Shadows.mjs`（全部数值）。
+
+### 1S.1 重构前是什么样
+
+一盏 `DirectionalLight`、**一张** 66 m 跟随正交框（前推 22%、纹素吸附），
+high 档 4096²（132 m 铺满 = **3.2 cm/texel**），`PCFShadowMap`（three 内置 Vogel 5
+抽样 + IGN 旋转、硬件比较），`bias −0.0004 / normalBias 0.035 / radius 2.2`。
+**66 m 之外一点阴影都没有**，远处靠雾盖；近处 3.2 cm 的纹素在 5 m 处铺开约
+8 个屏幕像素，砖缝级的影子糊成一团。
+
+### 1S.2 选型与 3A 参考实现的对应
+
+| 这一版做的 | 对应的参考实现 | 为什么 |
+|---|---|---|
+| N 盏同方向 `DirectionalLight` 各持一张阴影图，三方的 `WebGLShadowMap` 照常烘 | three CSM addon 的原理（本仓零 addon，自己写） | 复用三方的 `castShadow` / 蒙皮 / 实例化 / alphaTest / 自定义深度材质全套，不重写一遍阴影渲染 |
+| practical split（λ 混对数与均匀） | Zhang 2006，UE / Unity / DX 示例通用 | λ=0.92 偏对数：λ=0.7 在 far=220 上把最近一级推到 21 m（3.2 cm/texel），等于白改 |
+| 视锥切片**包围球** + 光空间纹素吸附 + 半径量化到 1/16 m | UE 的 CSM 拟合、"Stable Cascaded Shadow Maps" | 球半径只依赖 `zn/zf/fov/aspect`，与相机位姿无关 → 转头不沸腾 |
+| 相邻级 **过渡带混合**（本级图边缘 10% 内按边距淡入下一级） | UE 的 cascade fade | 不混合 = 级边界一条硬缝，而且随相机移动扫过画面 |
+| **纹理空间选级**（第一张覆盖到本片元的图），不是按视深选 | — | 包围球被 `maxRadius` 封顶后「本级铺到多远」不再是常数，只有图自己知道 |
+| **PCSS**：blocker search → 半影估计 → 按半影缩放的 Vogel 盘 | Fernando 2005；COD / Frostbite 的实践 | 平行光的半影只跟「遮挡体—接收面」间距成正比，一条直线 |
+| **receiver-plane 深度偏置**（梯度钳住） | Isidoro 2006（本仓第一人称自阴影已经在用同一套） | 盘上偏出去的抽样点比较的是「同一个平面在那儿该有多深」，掠射角不必把常数 bias 调到顶飞影子 |
+| 逐级 bias / normalBias 按**纹素世界尺寸**缩放 | 通用做法 | 远级纹素粗四倍、痤疮台阶也粗四倍，同一个绝对偏移必然「近处彼得潘 + 远处痤疮」二选一 |
+| **屏幕空间接触阴影**：沿太阳方向短距离 raymarch | UE Contact Shadows / Frostbite SSCS / COD screen-space shadows | 补 `normalBias` 把着色点推出地面造成的贴地漏光，以及远级纹素够不到的接触带 |
+| 逐级**更新节流**（`shadow.autoUpdate=false` + 自己点 `needsUpdate`） | UE 的 per-cascade update frequency / shadow caching | 远级覆盖整座城，每帧重烘是笔大账 |
+
+### 1S.3 为什么是「替换 chunk」不是「材质补丁」
+
+材质补丁（`Script_MaterialPatches`）只覆盖走 `MaterialLibrary` 那条路的材质。
+白盒关卡（`Script_FirstLevelWhiteboxField`）、破口碎块（`Script_Destruction`）、
+过场自建的 `MeshStandardMaterial` 都是自己 `new` 出来的，**一份都不走补丁**。
+而 N 盏灯是全局的：漏掉一份材质，那份材质就吃 N 份太阳，画面当场过曝。
+
+所以级联本体整段替换 `THREE.ShaderChunk.lights_fragment_begin` 里的平行光循环，
+外加把采样函数追加进 `shadowmap_pars_fragment`。`ShaderChunk` 是三方导出的**可变对象**，
+换掉它 = 每一份内置光照材质都跟着改。**必须在任何材质编译之前做一次**
+（`InstallCsmShaderChunks(quality)`，由 `LightRig` 构造时调；`PostPipeline` 与
+`MaterialLibrary` 都在它之后才编译第一份程序）。
+
+补丁注册表里只留两件 chunk 做不到的事：接屏幕空间接触阴影那张全屏图（要逐材质
+接 uniform），以及把 Debug Rendering 的「太阳阴影」假彩色（GI 视图 9）改读级联可见度。
+
+### 1S.4 零额外 uniform 的级联
+
+级联要的东西三方已经逐灯上传了：
+
+* `vDirectionalShadowCoord[i]` —— 顶点着色器里按**逐级** `shadowNormalBias` 推过法线的阴影坐标；
+* `directionalShadowMap[i]` —— 逐级阴影图；
+* `directionalLightShadows[i]` —— `shadowBias` / `shadowNormalBias` / `shadowRadius` / `shadowIntensity` / `shadowMapSize`。
+
+唯一缺的是「这一级铺了多少米、深度范围多少米」，而它能从 `directionalShadowMatrix[i]`
+反解：正交矩阵第 0 行的模 = 1/覆盖宽度，第 2 行的模 = 1/深度范围。那张矩阵三方本来
+就写进 `uniforms.directionalShadowMatrix`（`three.module.js:18251`），只是只在
+**顶点**着色器里声明过；追加的 chunk 在**片元**着色器里再声明一次即可。
+
+**结果：整套 CSM + PCSS 不需要任何自备 uniform**，接谁都不会漏，也不会因为
+「某个材质没接到 uniform」而半边画面不对。
+
+### 1S.5 能量守恒（安全网，别删）
+
+N 盏灯里**只有第 0 盏有强度**，1..N-1 的 `intensity = 0` —— 它们只是阴影图的容器。
+于是任何没走到级联代码的路径（玩家关掉阴影 → `USE_SHADOWMAP` 消失 → 落回三方原版
+循环；某个非内置着色器自己算光）加出来的太阳仍然只有一份。
+`Script_CsmTest` 的「只有第 0 盏灯带强度」守着这一条。
+
+`lights.sun` 仍然是第 0 盏（`csm.lights[0]`）：`Script_Gi` 取太阳色、画质面板读
+`mapSize`、`ApplyGraphics` 写 bias 都还指着它，那些引用一个都没断。
+
+### 1S.6 采样口径：BasicShadowMap（裸深度）
+
+PCSS 的 blocker search 必须**读到深度值**，而 `PCFShadowMap` 下三方给 `depthTexture`
+设了 `compareFunction = LessEqualCompare`，它是 shadow 采样器纹理，只能比较不能读
+（用 `sampler2D` 绑是未定义行为，多数驱动整片返回 0 = 全屏死黑）。所以整局走
+`BasicShadowMap`：`compareFunction = null`、`NearestFilter`、
+`uniform sampler2D directionalShadowMap[]`，**双线性 PCF / 半影估计 / receiver-plane
+偏置全部自己写**（这也正是 3A 引擎的做法）。
+
+「先比较再插值」不能反：先插值再比较等于比较一个被平滑过的深度，阴影边缘会整体
+外扩一个纹素。
+
+渲染器的这一位由 `Script_Csm.ApplyRendererShadowSettings(renderer)` 统一设置，
+`LightRig` 构造时替调用方做掉（`Script_Main` / `Script_Probe` 都把 `renderer` 传给它）。
+代码里同时保留 `SHADOWMAP_TYPE_PCF` 分支：别的页面（`Script_InfantryAnimationTest`）
+用三方默认的 PCF 档，那里走硬件比较 + 固定盘，级联照常工作，只是没有接触硬化。
+
+### 1S.7 帧内位置、RT 与 uniform
+
+```
+prepass → hzb → ssao → contactShadows → main → …
+                        ↑ 新增
+```
+
+* **阴影图**由三方的 `WebGLShadowMap` 在本帧**第一次** `renderer.render`（就是预通道那趟）
+  内部烘。`renderer.shadowMap.autoUpdate = false`；每帧由
+  `lights.ScheduleShadowUpdate(renderer)`（`Script_Main.RenderScene`）点逐级的
+  `shadow.needsUpdate`，再由它汇总成全局 `shadowMap.needsUpdate`。
+  剖析器里它仍然是 `shadow` 那一段（`Script_Profiler` 包着 `shadowMap.render`）。
+* **接触阴影靶** `targets.contactShadow`：RGBA8，`contactScale ×` 主靶尺寸
+  （high/ultra 1.0、medium/low 0.5）。R = 可见度（1 = 没挡住），G = 线性视深 / 64
+  （双边模糊要）。经一次分离双边模糊后交给材质。
+* 材质侧的 uniform 只有两条，且是**共享引用**（一处更新全场生效）：
+  `uCsmContactMap`（关着时是 1×1 纯白）、`uCsmContactResolution`（**主靶尺寸**，
+  不是接触阴影靶的尺寸 —— 材质按 `gl_FragCoord.xy / 它` 取样）。
+* 全屏 pass 的公共接口在 `Script_Light.SUN_SHADOW_GLSL`（本体在 `Script_Csm.SUN_SHADOW_SAMPLER_GLSL`）：
+  `uSunShadowMap[4]` / `uSunShadowMatrix[4]` / `uSunShadowParams[4]`（x=图边长, y=深度偏移,
+  z=法线偏移, w=盘半径）/ `uSunShadowCount` / `uSunShadowIntensity` / `uSunShadowEnabled`。
+  由 `BindSunShadowUniforms(uniforms, lightRig)` 建齐，每帧 `lightRig.SyncShadowUniforms()`。
+  GLSL 三个签名：
+
+  ```glsl
+  float SunShadowVisibility( vec3 worldPos, vec3 worldNormal );        // 8 抽样 Vogel 盘
+  float SunShadowVisibilityCheap( vec3 worldPos );                     // 单抽样（体积雾 raymarch）
+  float SunShadowPenumbraTexels( vec3 worldPos, vec3 worldNormal );    // 半影宽度（调试视图）
+  ```
+  **签名跨这次实现更换一个字没改**：调用方（Debug Rendering 的 SunShadow 视图、
+  接触阴影、将来的体积雾）不用跟着改。
+
+### 1S.8 分档（`Data_Tuning_Shadows.SHADOW_PRESETS`）
+
+| 档 | 级数 | 每级图 | 覆盖 | 更新节流 | PCSS 级 | blocker / 盘抽样 | 接触阴影 |
+|---|---|---|---|---|---|---|---|
+| low | 2 | 1024 | 70 m | 1 / 3 帧 | 0 | — / 5 | 关 |
+| medium | 3 | 1024 | 130 m | 1 / 1 / 3 | 0 | — / 10 | 半分辨率 |
+| high | 4 | 2048 | 220 m | 1 / 1 / 2 / 3 | 2 | 8 / 12 | 全分辨率 |
+| ultra | 4 | 2048 | 300 m | 1 / 1 / 2 / 2 | 2 | 12 / 16 | 全分辨率 |
+
+**显存与重构前持平**：4 × 2048² = 1 × 4096²。low 档重构前**完全没有**太阳阴影
+（`castShadow = false`），现在给上两级 —— 2 × 1024 铺 70 m 比原来那张「1024 铺 132 m」
+还便宜。夜战预设（`lightIntensity ≤ 0.35`）仍然整体关掉阴影。
+
+`Data_Tuning_Graphics` 里只留两位总闸：`csm`（四档全开）与 `contactShadows`
+（medium 及以上）。
+
+画质面板（`Script_EditorSettings`）：
+
+* **阴影** 总开关、**阴影分辨率（每级）**、
+* 细节组：**深度偏移** / **法线偏移**（都是**第 0 级的基准**，往外逐级按纹素缩放）、
+  **阴影距离**（最远一级铺到哪，40–400 m）、**阴影强度**（`shadow.intensity`，
+  「影子不死黑」那根）。
+* 旧的「覆盖半径 `shadowExtent`」已废（级联的每级半径由分割与包围球算，不再是一个数），
+  换成 `shadowDistance`；键名换了，老存档里的 66 不会被误读成 66 m 的总覆盖。
+
+### 1S.9 调试视图
+
+Debug Rendering「光照」组新增三项（`Script_ContactShadows.MakeShadowDebugViews`，
+经 `DebugPass.RegisterView` 登记）：
+
+* **级联假彩色**（`csmCascade`）：红=第 0 级、黄=1、绿=2、蓝=3、深灰=级联之外。
+  底色乘了阴影可见度，所以同时看得到影子落在哪。相邻级之间那条颜色渐变带就是 cascade fade。
+* **阴影半影**（`csmPenumbra`）：蓝 = 硬（贴着遮挡体）、橙 = 软。柱子/旗杆根部应该是蓝、
+  越往上越橙；整屏一个颜色 = blocker search 没生效或这一级不跑 PCSS。
+* **接触阴影**（`contactShadow`）：接触阴影靶本尊。只该出现在贴地那一圈与缝隙里。
+
+「SunShadow 采样」（`sunShadow`）与「太阳阴影」（材质假彩色视图 9）照旧可用，
+两者现在都显示级联结果。
+
+### 1S.10 已知近似（都是有意的，别当 bug 修）
+
+1. **r185 没法给远级做逐级层剔除。** `WebGLShadowMap.renderObject( scene, camera,
+   shadow.camera, light, type )` 里的判据是 `object.layers.test( camera.layers )` ——
+   `camera` 是**主视图相机**不是阴影相机。任务书里「给远级阴影相机关掉小投影体那一层」
+   的前提不成立（已核实源码）。远级成本改用逐级节流压。
+2. **包围球封顶。** 超宽屏下切片包围球半径是切片远端距离的 ~1.5 倍
+   （`k = tan(fovY/2)·√(1+aspect²)`）。`maxRadius` 给它封顶，封顶之后最远一级的四角
+   落到覆盖外，那里返回「照到」，由雾接管。
+3. **中段纹素比重构前粗。** 25–70 m 从 3.2 cm 变到 ~8.5 cm。这是有意的取舍：
+   40 m 处 1 屏幕像素 ≈ 3.1 cm，8.5 cm ≈ 3 px，而那个距离的 PCSS 半影本来就更宽。
+   换来的是最近一级 1.3–1.7 cm（重构前 3.2 cm）与 66 m → 220 m 的覆盖。
+4. **过渡带只混两级。** 本级与下一级；三级同时相交的角落按本级算。
+5. **PCSS 只在最近两级。** 远级半影早就比一个屏幕像素宽，blocker search 是白花钱。
+6. **接触阴影是屏幕空间的。** 射线走出屏幕、或遮挡体在屏幕外就没有；深度缓冲只有一层，
+   「射线钻到表面后面」与「表面后面是空的」靠 `thicknessMeters` 分。
+   第一人称的手与枪写的是常数 1 m 前景标签（不是真视深），由 `minViewDepth = 1.25`
+   整段排除。
+7. **抖动不掺帧序号。** 盘旋转用 `interleavedGradientNoise(gl_FragCoord.xy)`，没有帧项 ——
+   TAA 每帧抖动相机，同一个世界点落在不同的 `gl_FragCoord` 上，时间上的样本轮换由它提供
+   （三方内置的 `getShadow` 同样如此），而画面仍然逐帧确定，逐轮截图比对才有意义。
+8. **节流期间不重拟合。** 被跳过的级连矩阵一起不动 —— 否则会出现「矩阵是新的、图是旧的」，
+   影子整体平移半个身位而且只在移动时出现。相机瞬移 / 换关 / 太阳转向由
+   `CsmRig.ForceUpdate()` 强制全级重来。
+9. **拟合用基准 FOV 不用当下 FOV。** 开镜把 fov 从 55 压到 20 会让包围球缩到三分之一，
+   级联每帧变尺寸 = 阴影边缘随开镜呼吸。
+
+### 1S.11 怎么验
+
+```bash
+node Taierzhuang1938/Script_CsmTest.mjs            # 级联/PCSS/接触阴影（新增）
+node Taierzhuang1938/Script_PostFrameGraphTest.mjs # 帧图契约（pass 顺序里多了 contactShadows）
+node Taierzhuang1938/Script_PostTest.mjs
+node Taierzhuang1938/Script_GiTest.mjs
+node Taierzhuang1938/Script_EditorTest.mjs         # Debug Rendering 全部视图（含新增三张）
+node Taierzhuang1938/Script_BootTest.mjs
+node Taierzhuang1938/Script_ModuleGraphTest.mjs
+node Taierzhuang1938/Script_TestRunnerTest.mjs
+```
+
+`Script_CsmTest` 断的是数值不是观感：逐级图与尺寸、只有第 0 盏带强度、
+分割单调与纹素单调、相机平移 0.37 纹素后各级光空间中心**只整纹素地跳**、
+相邻级过渡带外沿投进下一级仍在图内、节流排班对得上 `updateEvery`、
+地面孤立暗点比例（痤疮）在有/无 normalBias 两种设置下都守得住、
+三张调试图都有内容、60 帧不重编译、GL 无错。
+
+---
+
 ## 1A. 帧结构总览（历史稿：2026-09 之前的设计期草案）
 
 > **现状以 §1「帧图与模块契约」为准。** 这一节留着是因为下面几节（§2–§16）
@@ -1128,7 +1336,17 @@ vec3 SampleLut(vec3 c) {
 
 ---
 
-## 10. 阴影：没有 addon 的最简 CSM
+## 10. 阴影：没有 addon 的最简 CSM（历史稿：2026-09 之前的设计期草案）
+
+> **现状以 §1S「阴影：CSM / PCSS / 接触阴影（2026-09）」为准。** 这一节留着是因为
+> 里面的事实核查（r185 的 `shadowMapTypeDefines` 只有 PCF/VSM 两个 key、
+> `PCFSoftShadowMap` 掉进 BASIC、PCF 内置 Vogel 5 抽样）仍然有效，而实装的选型
+> 与它并不相同：**没有走「路线 A 的 onBeforeCompile」，走的是整段替换
+> `ShaderChunk.lights_fragment_begin`**（补丁只覆盖走 MaterialLibrary 那条路的材质，
+> 漏一份就是那份吃 N 份太阳）；阴影图类型也从 `PCFShadowMap` 换成了
+> `BasicShadowMap`（PCSS 的 blocker search 必须读到裸深度）。
+> 「第一人称自阴影」与「前景标签」两小节仍是现状。
+
 
 ### 路线 A（推荐，~120 行，就是 three CSM addon 的原理）
 建 **N 盏同方向 DirectionalLight**，各自持有一张阴影图；用 `onBeforeCompile` 改写 `<lights_fragment_begin>`，按片元视深度只让**一盏**贡献。

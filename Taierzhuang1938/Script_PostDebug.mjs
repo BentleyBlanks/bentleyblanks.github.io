@@ -229,9 +229,31 @@ export class DebugPass {
     BindSunShadowUniforms(this.uniformsSunShadow, null);
     this.materialSunShadow = MakeFullscreenMaterial(FRAG_SUN_SHADOW_VIEW, this.uniformsSunShadow);
     this.sunShadowRig = null;
+    /**
+     * 别的子系统登记进来的展示视图（`Script_Post` 构造时接）。
+     * 一条 = `{ material?, Prepare?(ctx), Texture?(), mode?, Unavailable?() }`：
+     * 带 `material` 的自己出画（像 sunShadow 那样），只给 `Texture` 的走通用展示 pass。
+     * 这样新增一张调试图 = 自己的模块里写材质 + 这里登记一行，不动本文件的开关表。
+     */
+    this.extraViews = new Map();
+    /** 也要跟着 LightRig 走的外部 uniform 客户（阴影调试图）。 */
+    this.sunShadowClients = new Set();
   }
 
   Resize() { /* 没有自己的靶 */ }
+
+  /** 登记一张外部调试视图（见 extraViews 的账）。 */
+  RegisterView(id, view) {
+    if (id && view) this.extraViews.set(id, view);
+  }
+
+  /** 登记一个要跟着 LightRig 换阴影图的外部客户（实现 `SetSunShadowSource(rig)`）。 */
+  RegisterSunShadowClient(client) {
+    if (client?.SetSunShadowSource) {
+      this.sunShadowClients.add(client);
+      client.SetSunShadowSource(this.sunShadowRig);
+    }
+  }
 
   /** 接一台 LightRig，`sunShadow` 调试视图才有阴影图可采。 */
   SetSunShadowSource(lightRig) {
@@ -240,6 +262,7 @@ export class DebugPass {
     }
     this.sunShadowRig = lightRig || null;
     BindSunShadowUniforms(this.uniformsSunShadow, lightRig);
+    for (const client of this.sunShadowClients) client.SetSunShadowSource(lightRig);
   }
 
   /**
@@ -316,6 +339,16 @@ export class DebugPass {
   GetSource() {
     const P = this.pipeline;
     const T = P.targets;
+    // 外部登记的视图先查（阴影：级联假彩色 / 半影尺寸 / 接触阴影）。
+    const extra = this.extraViews.get(P.debugView);
+    if (extra) {
+      const unavailable = extra.Unavailable ? !!extra.Unavailable() : false;
+      if (extra.material) {
+        return { view: extra, material: extra.material, unavailable, texture: T.normalDepth.texture, mode: 0 };
+      }
+      const texture = extra.Texture ? extra.Texture() : null;
+      return { view: extra, texture, mode: extra.mode ?? 4, unavailable: unavailable || !texture };
+    }
     // 纯线框：主场景靶里就是「深灰底 + 亮线」，直接 0-1 直通送屏。别走合成 ——
     // 雾会把远处的线整片抹成雾色、暗角与颗粒叠在线框上只是噪声。
     // 其它视图（GBuffer / AO / 材质假彩色 …）不受着色模式影响，照常各看各的靶。
@@ -387,6 +420,12 @@ export class DebugPass {
     const P = this.pipeline;
     const U = this.uniforms;
     const C = P.compositePass.uniforms;
+    // 外部登记的自出画视图（阴影级联假彩色 / 半影尺寸）
+    if (source.view?.material && !source.unavailable) {
+      source.view.Prepare?.(ctx);
+      ctx.blitter.Blit(source.view.material, null);
+      return;
+    }
     if (source.material === this.materialSunShadow && !source.unavailable) {
       const S = this.uniformsSunShadow;
       S.uNormalDepth.value = ctx.normalDepthTexture;
