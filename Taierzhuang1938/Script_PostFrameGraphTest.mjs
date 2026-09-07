@@ -272,8 +272,20 @@ try {
 await browser.close();
 server.close();
 
+// Phase A 的地基 pass。**它们的相对顺序**才是契约（AO 在主场景之前、泛光在 tonemap
+// 之前、抗锯齿在 sRGB 之后 —— 错一条画面立刻塑料）；八个并行子系统按 §1.11 往这张
+// 列表里插自己那几行，所以这里断言的是「子序列」而不是「全等」。
+// 全等断言会让每一个新 pass 都把别人的回归口撞红，等于逼着大家改这一行 —— 而真正
+// 要守的东西（相对次序）子序列一样守得住。
 const EXPECTED_ORDER = ["prepass", "hzb", "ssao", "main", "wireframe", "debugOverlay",
   "taa", "godPrepare", "bloom", "god", "composite", "fxaa"];
+
+/** EXPECTED_ORDER 是不是 actual 的子序列（顺序不许乱，中间可以插新 pass）。 */
+function IsOrderedSubsequence(expected, actual) {
+  let cursor = 0;
+  for (const name of actual) if (name === expected[cursor]) cursor += 1;
+  return cursor === expected.length;
+}
 
 const checks = [];
 function Check(name, ok, detail = "") {
@@ -283,8 +295,11 @@ function Check(name, ok, detail = "") {
 if (!result) {
   Check("页面取证成功", false, problems.join(" | "));
 } else {
-  Check("帧图 pass 顺序未变",
-    JSON.stringify(result.passOrder) === JSON.stringify(EXPECTED_ORDER),
+  Check("帧图地基 pass 的相对顺序未变（新 pass 可以插进来，次序不许乱）",
+    IsOrderedSubsequence(EXPECTED_ORDER, result.passOrder),
+    JSON.stringify(result.passOrder));
+  Check("pass 名字不重复（profiler 按名字归账，重名会把两段账混在一起）",
+    new Set(result.passOrder).size === result.passOrder.length,
     JSON.stringify(result.passOrder));
   Check("预通道是 MRT（RT0 法线深度 + RT1 速度 + DepthTexture）",
     result.mrt.attachments === 2 && result.mrt.velocityTexture && result.mrt.velocityIsSecond

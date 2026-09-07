@@ -15,6 +15,9 @@
 //   2) hzb               Script_PostPrepass  线性视深 max-reduce 金字塔
 //   3) ssao              Script_PostSsao     半分辨率 + 双边模糊
 //   4) main              （本文件）HDR 主场景，AO 由材质补丁注入间接光
+//   4a) volumetricInject     Script_PostVolumetrics  froxel 注入 + 光照 + 时域重投影
+//   4b) volumetricIntegrate  Script_PostVolumetrics  沿 z 积分（散射 + 透过率）
+//   4c) volumetricApply      Script_PostVolumetrics  → Composite 的 uFogScatter
 //   5) wireframe         Script_PostDebug    着色模式非 shaded 时叠一层线
 //   6) debugOverlay      Script_PostDebug    Rapier 碰撞体线框等
 //   7) taa               Script_PostTaa      时域解算（线性 HDR 域，UE 的位置）
@@ -41,6 +44,7 @@ import {
   PrepassPass, MarkNoPrepass, MarkForegroundPrepass, MarkDynamicPrepass, FOREGROUND_VIEW_DEPTH,
 } from "./Script_PostPrepass.mjs";
 import { SsaoPass } from "./Script_PostSsao.mjs";
+import { VolumetricsPass } from "./Script_PostVolumetrics.mjs";
 import { TaaPass } from "./Script_PostTaa.mjs";
 import { BloomPass, GodRaysPass } from "./Script_PostBloom.mjs";
 import { CompositePass } from "./Script_PostComposite.mjs";
@@ -119,6 +123,9 @@ export class PostPipeline {
     this.compositePass = new CompositePass(this);
     this.fxaaPass = new FxaaPass(this);
     this.debugPass = new DebugPass(this);
+    // froxel 体积雾。三行帧图共用这一个实例（注入 / 积分 / apply），
+    // 局部雾体 API 也挂在它身上：`post.volumetricsPass.AddFogVolume({...})`。
+    this.volumetricsPass = new VolumetricsPass(this);
 
     // --- 有序帧图 ---------------------------------------------------------
     this.passes = [
@@ -138,6 +145,13 @@ export class PostPipeline {
         Render: (ctx) => this._RenderScene(ctx),
         Dispose: () => { if (this.targets.hdr) this.targets.hdr.dispose(); },
       },
+      // froxel 体积雾（B3）。排在 main 之后：注入那一趟要采本帧的太阳阴影图，
+      // 而阴影是 three 在第一次 renderer.render 里烘的。它不读场景颜色，只读
+      // 预通道的法线深度靶，所以放在 TAA 之前之后都行 —— 挑这里是为了让
+      // 「关掉体积雾」在剖析器里干净地少三行，不影响别人的顺序。
+      this.volumetricsPass,
+      this.volumetricsPass.integratePass,
+      this.volumetricsPass.applyPass,
       {
         name: "wireframe",
         Enabled: () => this.shadingMode !== "shaded",
@@ -289,8 +303,14 @@ export class PostPipeline {
 
   GetDebugView() { return this.debugView; }
 
-  /** 接一台 LightRig：`sunShadow` 调试视图要采它的阴影图（见 Script_Light）。 */
-  SetSunShadowSource(lightRig) { this.debugPass.SetSunShadowSource(lightRig); }
+  /**
+   * 接一台 LightRig：`sunShadow` 调试视图要采它的阴影图（见 Script_Light），
+   * froxel 体积雾要它的阴影图（光柱被建筑切断）与火源池（局部光进雾）。
+   */
+  SetSunShadowSource(lightRig) {
+    this.debugPass.SetSunShadowSource(lightRig);
+    this.volumetricsPass.SetSunShadowSource(lightRig);
+  }
 
   /**
    * 着色模式：

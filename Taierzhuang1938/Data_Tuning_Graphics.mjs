@@ -16,7 +16,10 @@
 //   · velocity / hzb —— 2026-09 帧图重构新增：MRT 速度靶与 HZB 链。
 //        高低档都开：它们是后续 SSR / 体积雾 / 接触阴影的公共输入，
 //        关掉等于把八个并行子系统一起关掉；真要省，先关消费方。
-//   · 其余键（csm / gtao / ssil / ssr / volumetrics / atmosphere / autoExposure /
+//   · volumetrics —— 2026-09 froxel 体积雾落地：medium/high/ultra 开，low 保留解析雾。
+//        网格与时段参数在 `Data_Tuning_Volumetrics.mjs`（这张表只留开关位，
+//        免得画质档与美术意图又混成一张表）。
+//   · 其余键（csm / gtao / ssil / ssr / atmosphere / autoExposure /
 //     lensFlare / lut / dof / taaUpscale / clusteredLights / contactShadows）
 //     —— **本阶段全部为占位**，值 = 与今天等价（即「不启用新东西」）。
 //        对应子系统落地时把自己那一位改成实际档位，并在这里补出处注释。
@@ -40,13 +43,15 @@
  *   taa           时域抗锯齿的**出厂默认**（运行时可经 SetTaaEnabled 热切）
  *   velocity      预通道 MRT 的 RT1 屏幕空间速度靶
  *   hzb           预通道之后建线性视深 max-reduce mip 链（HZB）
+ *   volumetrics   froxel 体积雾 / 体积光（medium 及以上开；low 保留解析式高度雾）。
+ *                 froxel 网格尺寸不在这张表里，在 `Data_Tuning_Volumetrics.VOLUMETRIC_GRIDS`
+ *                 （按同名档位查），时段参数在同文件的 VOLUMETRIC_PRESETS
  *   ——— 以下为后续子系统的占位位，本阶段一律「等价于今天」———
  *   csm           级联阴影（今天：单张 66 m 跟随框，false）
  *   contactShadows 屏幕空间接触阴影
  *   gtao          GTAO（将来替换 ssao 那一位）
  *   ssil          屏幕空间间接光
  *   ssr           屏幕空间反射
- *   volumetrics   froxel 体积雾（今天：合成 pass 里的解析式指数高度雾）
  *   atmosphere    物理大气（今天：SkyDome 的解析式天空）
  *   autoExposure  自动曝光（今天：时段预设手调的常数曝光）
  *   lensFlare     镜头光晕
@@ -64,7 +69,6 @@ const RESERVED_OFF = {
   gtao: false,
   ssil: false,
   ssr: false,
-  volumetrics: false,
   atmosphere: false,
   autoExposure: false,
   lensFlare: false,
@@ -86,12 +90,16 @@ export const QUALITY_PRESETS = {
     ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
     aoScale: 0.5, sharpen: 0.14, taa: false,
     velocity: true, hzb: true,
+    // low 唯一保留解析式高度雾的一档（Composite 的 uFogSource = 0 那条路永久保留）。
+    // 也是唯一还能开屏幕空间太阳拖影（godrays）的一档 —— 体积雾开着时两者会双份。
+    volumetrics: false,
   },
   medium: {
     ...RESERVED_OFF,
     ssao: true, bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.6, sharpen: 0.18, taa: true,
     velocity: true, hzb: true,
+    volumetrics: true,
   },
   // high 的抗锯齿由 TAA 承担。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
   // 上百 MB 显存并重复抗锯齿；把 4× 留给主动选择 ultra 的玩家
@@ -101,12 +109,14 @@ export const QUALITY_PRESETS = {
     ssao: true, bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.75, sharpen: 0.22, taa: true,
     velocity: true, hzb: true,
+    volumetrics: true,
   },
   ultra: {
     ...RESERVED_OFF,
     ssao: true, bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,
     aoScale: 1.0, sharpen: 0.22, taa: true,
     velocity: true, hzb: true,
+    volumetrics: true,
   },
 };
 

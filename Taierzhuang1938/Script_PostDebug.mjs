@@ -322,6 +322,14 @@ export class DebugPass {
     if (P.debugView === "final" && P.shadingMode === "wireframe") {
       return { texture: T.hdr.texture, mode: 5 };
     }
+    // 2026-09：pass 自带的调试视图。实现 `GetDebugSource(view)` 就能登记自己的视图，
+    // 不用回来改下面这张表 —— 八个并行子系统各带两三个视图，集中在一处必然天天冲突。
+    // 返回 `{ material, Prepare?, texture, mode, unavailable? }`：给了 material 就走
+    // 自定义材质那条（见 RenderView），没给就跟内置视图一样按 texture + mode 送屏。
+    for (const pass of P.passes) {
+      const custom = pass.GetDebugSource?.(P.debugView);
+      if (custom) return custom;
+    }
     switch (P.debugView) {
       case "normal": return { texture: T.normalDepth.texture, mode: 0 };
       case "depth": return { texture: T.normalDepth.texture, mode: 1 };
@@ -395,6 +403,13 @@ export class DebugPass {
       // 阴影框每帧都在滚（跟玩家 + 吸附纹素），矩阵必须现取。
       this.sunShadowRig?.SyncShadowUniforms?.();
       ctx.blitter.Blit(this.materialSunShadow, null);
+      return;
+    }
+    // pass 自带的调试材质（GetDebugSource 返回了 material）。不可用时不走这条，
+    // 落到下面的斜纹路径 —— 把一张没内容的靶送屏跟"渲染坏了"长得一模一样。
+    if (source.material && !source.unavailable) {
+      source.Prepare?.(ctx);
+      ctx.blitter.Blit(source.material, null);
       return;
     }
     // 雾量 / CoC 调试视图必须复用刚刚送进 Composite 的本帧参数。不要另存一份

@@ -20,6 +20,10 @@ const VIEWS = [
   { id: "bloom", label: "Bloom 合成", group: "后处理", note: "多级降采样再 tent 升采样叠回的最终 Bloom 靶；与正式合成实际采样的是同一张。" },
   { id: "fog", label: "雾量", group: "后处理", note: "指数距离雾 × 高度衰减得到的实际混合系数；深蓝 = 无雾、暖黄 = 雾量高。" },
   { id: "dof", label: "景深 CoC", group: "后处理", note: "正式景深使用的散焦系数；蓝 = 锐利、暖黄 = 最大散焦。景深只在阵亡镜头启用。" },
+  { id: "volumetricDensity", label: "体积密度", group: "体积雾", note: "这一像素背后那颗 froxel 的消光系数 σ_t（0–0.15 /m 满量程：深蓝无、暖黄浓、红爆表）。基础高度雾 + 烟尘噪声 + 局部雾体三项之和；看烟幕/热烟铺得对不对就看它。" },
+  { id: "volumetricScatter", label: "体积散射", group: "体积雾", note: "沿视线积分出来的绝对散射亮度（Reinhard + sRGB 显示）。光柱、被建筑切断的暗带、火照亮的空气全在这一张上；被墙挡住的地方只剩环境项，不发亮。" },
+  { id: "volumetricTransmittance", label: "体积透过率", group: "体积雾", note: "合成 pass 实际吃到的透过率（白 = 全透、黑 = 全挡）。出厂走 legacyTransmittance：这一张与今天的解析雾**逐像素相同**，局部烟幕才会额外压暗 —— 用它核对「七十米外能不能看见敌人」没有变差。" },
+  { id: "volumetricReproject", label: "体积重投影", group: "体积雾", note: "时域重投影的历史权重：绿 = 历史被采纳，红 = 只能用本帧抽样（会更噪）。相机快速转身、froxel 网格边缘、镜头硬切之后应当短暂变红再收敛回绿。" },
   { id: "normal", label: "法线", group: "GBuffer", note: "NormalDepth 预通道的视空间法线。" },
   { id: "depth", label: "视深", group: "GBuffer", note: "NormalDepth 预通道 alpha；近处亮、80 m 以外渐黑。第一人称的手与枪写的是常数 1 m 近景标签（它的几何带非等比深度压缩，视深不是世界视深），所以那一块是一片平的。" },
   { id: "motionVector", label: "Motion Vector", group: "GBuffer", note: "由深度反投影得到的相机屏幕速度：R/G = 水平/垂直方向，B = 像素速度。没有逐物体速度缓冲。" },
@@ -70,6 +74,12 @@ const VIEW_TARGETS = {
   bloom: (post) => post?.BloomTarget,
   fog: (post) => post?.targets?.normalDepth,
   dof: (post) => post?.targets?.normalDepth,
+  // 体积雾四视图都是全分辨率重算（Debug pass 现查图集），面板报的是积分图集的尺寸 ——
+  // 那才是「这一档到底有多少 froxel」的读数。
+  volumetricDensity: (post) => post?.targets?.volumetricScatter,
+  volumetricScatter: (post) => post?.targets?.volumetricIntegrated,
+  volumetricTransmittance: (post) => post?.targets?.volumetricIntegrated,
+  volumetricReproject: (post) => post?.targets?.volumetricScatter,
   normal: (post) => post?.targets?.normalDepth,
   depth: (post) => post?.targets?.normalDepth,
   motionVector: (post) => post?.targets?.normalDepth,
@@ -599,7 +609,7 @@ export class DebugRenderingEditor {
     }
     physics.appendChild(legend);
 
-    for (const group of ["输出", "后处理", "GBuffer", "材质", "光照", "AO", "GI"]) {
+    for (const group of ["输出", "后处理", "体积雾", "GBuffer", "材质", "光照", "AO", "GI"]) {
       const section = Section(body, group);
       const options = VIEWS.filter((item) => item.group === group)
         .map((item) => ({ value: item.id, label: item.label, title: item.note }));

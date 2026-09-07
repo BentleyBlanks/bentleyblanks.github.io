@@ -224,10 +224,15 @@ vec3 DepthOfField(vec3 color, vec2 uv, vec4 nd) {
 vec3 ApplyFog(vec3 color, vec2 uv, vec4 nd) {
   vec3 fogCol;
   float fog;
+  // B3 froxel 体积雾：图里的 rgb 是**已积分的绝对散射亮度**，不是一个可以 mix 的颜色。
+  // 所以体积那条走加法（color·T + scatter），解析那条仍走 mix（scatterAdd 恒 0，逐比特不变）。
+  // 反过来做（scatter / (1-T) 反推 fogCol 再 mix）在 T→1 的近处会除零炸成白斑。
+  vec3 scatterAdd = vec3(0.0);
   if (uFogSource > 0.5) {
-    vec4 scatter = texture2D(uFogScatter, uv);
-    fogCol = scatter.rgb;
-    fog = clamp(1.0 - scatter.a, 0.0, 1.0);
+    vec4 volume = texture2D(uFogScatter, uv);        // B3 体积采样
+    fog = clamp(1.0 - volume.a, 0.0, 1.0);           // B3 a = 透过率
+    scatterAdd = max(volume.rgb, vec3(0.0));         // B3 rgb = 散射亮度
+    fogCol = vec3(0.0);                              // B3 颜色已经含在 scatterAdd 里
   } else {
     if (uFogDensity <= 0.0 || nd.w <= 0.0) return color;
     vec3 fogViewPos = ViewPos(uv, nd.w);
@@ -246,7 +251,9 @@ vec3 ApplyFog(vec3 color, vec2 uv, vec4 nd) {
   float fogLum = Luma(color);
   color = mix(color, vec3(fogLum), fog * uDepthDesat);
   color = mix(color, vec3(0.42), fog * uDepthFlatten);
-  return mix(color, fogCol, fog);
+  // B3：解析路 scatterAdd = 0，mix(color, fogCol, fog) 原样保留；
+  // 体积路 fogCol = 0，mix 退化成 color·(1−fog) = color·T，再加上积分出来的散射。
+  return mix(color, fogCol, fog) + scatterAdd;
 }
 
 // ===========================================================================
