@@ -39,8 +39,11 @@
 //     的可见性判据是 `object.layers.test( camera.layers )` —— **camera 是主视图相机，
 //     不是阴影相机**。所以「给远级的阴影相机关掉某个层来剔除小投影体」在 r185
 //     行不通（任务书里那条要求先核实，核实结果是否定的）。远级的成本改用
-//     **逐级节流**（`shadow.autoUpdate = false` + 自己点 `needsUpdate`）来压，
-//     那条早退在源码里是 `if ( shadow.autoUpdate === false && shadow.needsUpdate === false ) continue;`。
+//     **一帧只烘一张**（`shadow.autoUpdate = false` + 自己按 `bakeOrder` 点
+//     `needsUpdate`）来压，那条早退在源码里是
+//     `if ( shadow.autoUpdate === false && shadow.needsUpdate === false ) continue;`。
+//     为什么必须一帧一张：城里每趟阴影烘焙有 ~1.45 M 三角的地板（BuildSink 合批块
+//     剔不掉），而单帧三角红线只剩 2.59 M 余量。账在 Data_Tuning_Shadows 抬头。
 //   · `PCFSoftShadowMap` 在 r185 会被 `WebGLShadowMap.render` 当场警告并改成
 //     `PCFShadowMap`；`shadowMapTypeDefines` 只有 PCF 与 VSM 两个 key。
 //
@@ -680,12 +683,23 @@ export class CsmRig {
     this.enabled = true;
   }
 
-  /** 一帧只用一次的节流判据：本级这一帧要不要重拟合 + 重烘。 */
-  _WantsUpdate(level) {
-    if (this.pendingForce) return true;
-    const every = Math.max(1, this.preset.updateEvery[level] | 0);
-    if (every <= 1) return true;
-    return (this.frame % every) === (level % every);
+  /**
+   * 这一帧烘哪一级。**每帧恰好一张**（`bakeOrder` 轮转表）——
+   * 城里每趟阴影烘焙有 ~1.45 M 三角的地板（合批块剔不掉），单帧三角红线只剩
+   * 2.59 M 余量，多烘一张就顶穿。账在 `Data_Tuning_Shadows` 抬头。
+   *
+   * 例外：**还没有图的级必须立刻烘**。`shadow.map === null` 时三方给材质绑的是
+   * 空纹理，裸深度读到 0 → 那一级覆盖的区域整片死黑。开机/换图尺寸那一帧
+   * 允许一次性烘满（那时加载画面盖着屏幕，也不在任何单帧预算的取样点上）。
+   */
+  _LevelsThisFrame() {
+    const missing = [];
+    for (let level = 0; level < this.count; level += 1) {
+      if (this.lights[level].castShadow && !this.lights[level].shadow.map) missing.push(level);
+    }
+    if (missing.length) return missing;
+    const order = this.preset.bakeOrder;
+    return [order[this.frame % order.length] % this.count];
   }
 
   /** 相机瞬移 / 太阳转向 / 换档：下一帧全级重烘并重拟合。 */
@@ -812,8 +826,8 @@ export class CsmRig {
     _right.crossVectors(up, lightDir).normalize();
     _up.crossVectors(lightDir, _right).normalize();
 
-    for (let level = 0; level < this.count; level += 1) {
-      if (!this._WantsUpdate(level)) continue;
+    const levels = this._LevelsThisFrame();
+    for (const level of levels) {
       // 拟合了就必须烘：置位交给 ScheduleShadowUpdate 去消。
       this.dirty[level] = true;
       const zn = this.splits[level];
@@ -929,7 +943,7 @@ export class CsmRig {
       castShadow: this.lights.map((light) => !!light.castShadow),
       pending: this.lights.map((light) => !!light.shadow.needsUpdate),
       scheduled: this.lastScheduled.slice(),
-      updateEvery: this.preset.updateEvery.slice(0, this.count),
+      bakeOrder: this.preset.bakeOrder.slice(),
       intensity: this.intensity,
       bias: this.lights.map((light) => light.shadow.bias),
       normalBias: this.lights.map((light) => light.shadow.normalBias),

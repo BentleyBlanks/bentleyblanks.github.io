@@ -36,7 +36,10 @@ export function GraphicsDetailControls(post) {
     shadow: [
       { key: "shadowBias", label: "深度偏移", min: -0.003, max: 0.003, step: 0.0001, value: -0.0004, digits: 4 },
       { key: "shadowNormalBias", label: "法线偏移", min: 0, max: 0.15, step: 0.005, value: 0.035, digits: 3 },
-      { key: "shadowDistance", label: "阴影距离", min: 40, max: 400, step: 10, value: 220, unit: " m", digits: 0 },
+      // 0 = 用档位默认（high 220 m / ultra 300 m / medium 130 / low 70）。
+      // 不能把默认写成 220：那样 ultra 会被这根滑杆悄悄压回 high 的覆盖。
+      { key: "shadowDistance", label: "阴影距离", min: 0, max: 400, step: 10, value: 0, unit: " m", digits: 0,
+        format: (v) => (v > 0 ? `${v.toFixed(0)} m` : "档位默认") },
       { key: "shadowIntensity", label: "阴影强度", min: 0.4, max: 1, step: 0.02, value: 1, digits: 2 },
     ],
     gi: [
@@ -153,7 +156,9 @@ export class GraphicsSettings {
       for (const control of controls[group]) {
         const slider = Slider(parent, {
           ...control, value: gfx[control.key],
-          format: (v) => (control.prefix ?? "") + v.toFixed(control.digits ?? 2) + (control.unit ?? ""),
+          // 逐项可以自带 format（阴影距离的 0 要显示成「档位默认」而不是「0 m」）
+          format: control.format
+            ?? ((v) => (control.prefix ?? "") + v.toFixed(control.digits ?? 2) + (control.unit ?? "")),
           onInput: (v) => { gfx[control.key] = v; this.Apply(); },
         });
         slider.root.lastElementChild.style.whiteSpace = "nowrap";

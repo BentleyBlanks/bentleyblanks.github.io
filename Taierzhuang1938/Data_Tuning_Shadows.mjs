@@ -8,12 +8,12 @@
 // 今天（2026-09 之前）是**一张** 66 m 跟随框：high 档 4096²，132 m 铺满 → 3.2 cm/texel，
 // 66 m 之外一点阴影都没有（靠雾盖）。显存 = 4096² 的深度附件 + 颜色附件 ≈ 134 MB。
 //
-// 换成 4 级 2048² 之后显存完全一样（4 × 2048² = 1 × 4096²），但：
-//   · 最近一级 ~20 m 半径 → **2.0 cm/texel**，比今天锐 1.6 倍（砖缝级）；
-//   · 最远一级铺到 220 m，今天那里是**没有阴影**；
-//   · 中段（25–70 m）纹素从 3.2 cm 变粗到 ~10 cm —— 这是有意的取舍：
-//     40 m 处 1 屏幕像素 ≈ 3.1 cm，10 cm 纹素 ≈ 3 px，而那个距离上 PCSS 的
-//     半影本来就比 3 px 宽，锐过半影没有意义。近处欠采样才是眼睛真的看得见的。
+// 换成 high 档 3 级 2048² 之后显存反而降到四分之三（3 × 2048² < 1 × 4096²），而：
+//   · 最近一级 ~19 m 半径 → **~1.8 cm/texel**，比今天锐 1.8 倍（砖缝级）；
+//   · 最远一级封在 90 m 半径，比今天那张 66 m 框远；
+//   · 中段（20–60 m）纹素从 3.2 cm 变粗到 ~5.5 cm —— 这是有意的取舍：
+//     40 m 处 1 屏幕像素 ≈ 3.1 cm，5.5 cm 纹素 ≈ 2 px，而那个距离上 PCSS 的
+//     半影本来就比 2 px 宽，锐过半影没有意义。近处欠采样才是眼睛真的看得见的。
 //
 // ## 视锥切片包围球为什么这么大
 // 切片 [zn, zf] 的包围球半径是 `zf · k`，`k = tan(fovY/2)·√(1+aspect²)`。
@@ -25,9 +25,9 @@
 //   · 级数 / 图尺寸 / maxDistance / maxRadius —— 2026-09 本轮实装，按上面那笔
 //     显存与纹素账定；四档都在 `Script_CsmTest.mjs` 里断言单调与覆盖比例。
 //   · lambda / splitNear —— practical split（Zhang 2006）。λ=0.92 偏对数：
-//     λ=0.7 在 far=220 上给出 21/47/97/220，最近一级 21 m → 3.2 cm/texel，
-//     等于白改；偏对数才把最近一级压到 ~13 m。splitNear 不用 camera.near(0.06)：
-//     对数项会被 0.06 拉到 0.5 m 以内，等于白扔一级。
+//     λ=0.7 在 far=120 上给出 12/27/56/120 这种「均匀分割」的形状，最近一级太大，
+//     纹素回到 3 cm，等于白改；偏对数才把最近一级压到 ~10 m。
+//     splitNear 不用 camera.near(0.06)：对数项会被 0.06 拉到 0.5 m 以内，等于白扔一级。
 //   · sunAngularDiameterDeg —— 真太阳是 0.53°（半影 = 间距 × 0.0093，3 m 间距只有
 //     2.8 cm，屏幕上看不出软硬变化）。游戏一律夸大；UE 的 Source Angle 缺省 0.5357°，
 //     COD/Frostbite 的 PCSS 实践值在 1°–2°。这里取 1.6°：3 m 间距 → 8 cm 半影，
@@ -39,16 +39,34 @@
 //     在地面上，于是箱底那一圈永远晒得到太阳）。厚度判据 0.35 m 防止把
 //     「远处的墙」当成「眼前的遮挡」。
 
+// ## 一帧只烘一张（2026-09 实测逼出来的口径）
+// 滕县城里**每一趟阴影烘焙都有约 1.45 M 三角形的地板**，而且它几乎不随级联半径变化：
+// 半径 13.5 m 的最近一级要 1.455 M / 98 draw，半径 233 m 的最远一级也只要 2.91 M / 377 draw
+// （phase=2 / quality=high / scale=small 实测）。原因是静态世界走 `BuildSink` 分区合批，
+// 那些巨大的合批块与地形块的包围体覆盖整片区，逐级视锥剔除根本剔不掉它们。
+//
+// 而 `Data_AssetStandards.SCENE_RENDER_LIMITS.triangles` 的单帧红线是 8.10 M，
+// 这一关不带阴影是 5.51 M —— **留给阴影的余量只有 2.59 M，也就是一帧一张**。
+// 四张一起烘是 8.4 M，直接把红线顶穿（BootTest 会红）。
+//
+// 所以调度不是「每级隔几帧」而是 **`bakeOrder`：一条逐帧轮转表，每帧恰好烘一张**。
+// 最近一级在表里占的格子最多（它扛着会动的人和车）。副作用是近级阴影按 ~30 Hz 刷新，
+// 60 fps 下最多落后一帧 —— 看不出来；而远级按 ~9 Hz 刷新，那里一个人只有几个像素宽。
+//
+// 想要真正的四级铺满 200 m，前提是先解决那 1.45 M 的地板（静态几何的阴影缓存 ——
+// 城不动，只有人在动，UE 的 cached whole-scene shadow 就是干这个的），或者提高三角红线。
+// 两件事都超出本子系统的边界，留给集成方。
+
 /** 一档阴影 = 级联布局 + 滤波预算 + 接触阴影预算。 */
 export const SHADOW_PRESETS = {
   low: {
     cascades: 2,
     mapSize: 1024,
-    maxDistance: 70,
+    maxDistance: 60,
     maxRadius: [20, 60],
     lambda: 0.92,
-    // 每级隔几帧重烘一次（1 = 每帧）。低档把第二级摊到 3 帧。
-    updateEvery: [1, 3],
+    // 逐帧轮转表：每帧烘表里那一张。近级占的格子多。
+    bakeOrder: [0, 1],
     pcssLevels: 0,          // 0 = 全部固定盘 PCF
     blockerTaps: 0,
     filterTaps: 5,
@@ -59,10 +77,10 @@ export const SHADOW_PRESETS = {
   medium: {
     cascades: 3,
     mapSize: 1024,
-    maxDistance: 130,
-    maxRadius: [22, 58, 140],
+    maxDistance: 90,
+    maxRadius: [22, 55, 80],
     lambda: 0.92,
-    updateEvery: [1, 1, 3],
+    bakeOrder: [0, 1, 0, 2],
     pcssLevels: 0,
     blockerTaps: 0,
     filterTaps: 10,
@@ -71,14 +89,15 @@ export const SHADOW_PRESETS = {
     contactScale: 0.5,
   },
   high: {
-    cascades: 4,
+    cascades: 3,
     mapSize: 2048,
-    maxDistance: 220,
-    maxRadius: [26, 64, 150, 260],
+    maxDistance: 120,
+    // 最远一级封到 90 m：它是这一档里最贵的一张（实测 2.24 M 三角 / 236 draw），
+    // 再放大就顶穿单帧红线。覆盖仍然比重构前那张 66 m 单框远。
+    maxRadius: [26, 64, 90],
     lambda: 0.92,
-    // 近两级每帧、第三级隔帧、第四级三帧一次。相机大幅移动 / 换关 / 太阳转向
-    // 时由 CsmRig.ForceUpdate() 强制全更。
-    updateEvery: [1, 1, 2, 3],
+    // 7 帧一轮：最近一级占 4 格（~34 Hz）、中间级 2 格（~17 Hz）、最远级 1 格（~9 Hz）。
+    bakeOrder: [0, 1, 0, 2, 0, 1, 0],
     pcssLevels: 2,          // 最近两级做 blocker search → 接触硬化
     blockerTaps: 8,
     filterTaps: 12,
@@ -89,10 +108,11 @@ export const SHADOW_PRESETS = {
   ultra: {
     cascades: 4,
     mapSize: 2048,
-    maxDistance: 300,
-    maxRadius: [26, 64, 150, 300],
+    maxDistance: 170,
+    maxRadius: [26, 64, 110, 130],
     lambda: 0.92,
-    updateEvery: [1, 1, 2, 2],
+    // 8 帧一轮：最近一级 4 格，其余各 1–2 格。峰值仍是一帧一张。
+    bakeOrder: [0, 1, 0, 2, 0, 1, 0, 3],
     pcssLevels: 2,
     blockerTaps: 12,
     filterTaps: 16,
@@ -163,7 +183,7 @@ export function MakeShadowPreset(quality) {
   return {
     ...preset,
     maxRadius: preset.maxRadius.slice(),
-    updateEvery: preset.updateEvery.slice(),
+    bakeOrder: preset.bakeOrder.slice(),
   };
 }
 

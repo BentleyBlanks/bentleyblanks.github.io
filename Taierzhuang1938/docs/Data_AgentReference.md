@@ -69,10 +69,13 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   （N 盏同方向灯 + 拟合/吸附/节流 + **整段替换 `ShaderChunk.lights_fragment_begin`** 的
   级联采样 chunk + 全屏采样接口 GLSL）、`Data_Tuning_Shadows.mjs`（级数/图尺寸/分割/
   节流/PCSS 抽样数/接触阴影，全部数值）、`Script_ContactShadows.mjs`（pass）。
-  三条铁律：级联本体走 chunk 不走材质补丁（补丁漏材质 = 那份材质吃 N 份太阳）；
+  四条铁律：级联本体走 chunk 不走材质补丁（补丁漏材质 = 那份材质吃 N 份太阳）；
   只有第 0 盏灯带强度（能量守恒的安全网）；阴影图是 `BasicShadowMap` 裸深度
-  （PCSS 的 blocker search 要读深度值，采样器类型两边必须一致）。
-  回归口 `Script_CsmTest.mjs`；先读 `docs/Data_TechRenderPipeline.md` **§1S**。
+  （PCSS 的 blocker search 要读深度值，采样器类型两边必须一致）；
+  **一帧只烘一张**（城里每趟阴影烘焙有 ~1.45 M 三角的地板，`SCENE_RENDER_LIMITS`
+  的 8.10 M 单帧红线只剩 2.59 M 余量 —— 多烘一张 BootTest 就红）。
+  回归口 `Script_CsmTest.mjs` + `Script_BootTest.mjs`（三角红线）；
+  出图 `Script_CsmShot.mjs`；先读 `docs/Data_TechRenderPipeline.md` **§1S**。
 - 回归口：`Script_PostFrameGraphTest.mjs`（帧图契约）、`Script_PostTest.mjs`、
   `Script_CsmTest.mjs`（级联阴影 / PCSS / 接触阴影）、
   `Script_GiTest.mjs`、`Script_EditorTest.mjs`（Debug Rendering 全部视图）。
