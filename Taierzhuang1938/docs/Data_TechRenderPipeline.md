@@ -2240,6 +2240,24 @@ GTAO ×3 + SSR 的 min-Hi-Z 与颜色金字塔 + 体积雾图集（high 7.4 MB�
 问题见上面「镜头光晕」那一节（`West_Communications` / `Gate_SouthOuter` 这类
 朝天机位上的整片彩虹晕）。
 
+#### ShotTest 全套（45 张）对 `BaselineFull` 的两条离群
+
+* **`Game_CH5_Chengqiang`（拂晓，出生机位正对低太阳）**：整幅均值 77.4 → 113.9，
+  基线那张天上的云层结构在新版里被霾洗平。**不是体积雾的 `sunScale`**：
+  同机位把三档的 `sunScale` 退回 1.0 复拍，均值 106.1 → 104.1（新值反而**低** 1.9%、
+  分块峰值 15.6），所以那 +36 来自「大修整体」（基线树根本没有 froxel 体积雾与
+  物理大气）而不是本轮的美术定稿。要压回去动的是 `dawn` 那一档的
+  `fog.density` / `atmosphere.aerialGain`，属于要用户拍板的画面变化，**没有自行改**。
+  证据：`_shots/PhaseC/Compare_Game_CH5_Chengqiang.png`、
+  `_shots/PhaseC/Vol_CH5_sun10_vs_18.png`。
+* **`Game_CH0_Chuchuan`（出川车厢内景）**：157.1 → 140.9，是**变暗**的那一侧。
+  车厢内壁的亮度几乎全部来自 `envIntensity` / `shProbeIntensity` / `ambientIntensity`
+  三项（见 `chuchuanDay` 的注释），而 GTAO 比旧 SSAO 压得更准、SSIL 只补近场 ——
+  合理的方向，但幅度要用户看过才算数。同样没有自行改。
+
+（这两张的读数还受玩法状态影响：ShotTest 的正片图带 HUD 与受伤暗角，
+同一机位两次拍到的血量/暗角不一定一样。逐点对位仍以采样点那一批为准。）
+
 
 ### [中] 接触阴影（AO）真的贴着物体根部
 - **为什么**：SSAO 是把物体“钉”在地面上的唯一手段。没有它，所有几何体都像浮在贴图上，是“网页 demo 感”的第一来源。
@@ -4572,6 +4590,23 @@ John Chapman《Pseudo Lens Flare》(2013) 那一套，读亮部图、四分之�
 
 `Script_ExposureTest` 的「有亮源时鬼影层非零」那一条不受影响：它自己把
 `uThreshold` 压到 0.20 再喂一张纯白，读数与 `threshold` 无关。
+
+**开/关 A/B 的局部峰值实测**（五个朝天采样点，同机位同帧数，只翻
+`LENS_FLARE.byQuality.high`；读数是 16×16 分块均值亮度的最大差）：
+
+| 采样点 | 分块峰值差 | 逐像素最大差 | 整幅均值差 |
+|---|---:|---:|---:|
+| Wall_SouthBreach | 12.93 | 50 | +5.1 |
+| West_Communications | 10.75 | 37 | +1.9 |
+| Lm_AlarmTower | 9.80 | 86 | +0.9 |
+| Street_Crossroad | 8.84 | 128 | +0.7 |
+| Gate_SouthOuter | 7.41 | 87 | +0.4 |
+
+五个点里四个在 12/255 以内。唯一越线的 `Wall_SouthBreach` 是 12.93，
+而看图（`_shots/PhaseC/Flare_Wall_SouthBreach.png`）那 12.93 **不是鬼影**：
+是城墙缺口那片过曝天在旁边墙面上铺的一层均匀 veiling glare —— 没有色散、
+没有可辨的斑，正是逆光镜头该有的样子。真要把这一条也压进 12，
+`ghostScale` 从 0.12 降到 0.10 就够（线性），一行的事。
 
 玩家侧仍有出路：画质面板「相机」栏的镜头光晕倍率可以直接调到 0。
 
