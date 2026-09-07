@@ -7,7 +7,9 @@ if(!root)throw Error('--root required');
 const revision=args.includes('--revision')?Number(args[args.indexOf('--revision')+1]):9;
 const frozen=await fs.readFile(path.join(root,`Models/FirstLevelCarryV${revision}/Data_VisualAssessment.json`),'utf8').then(s=>JSON.parse(s).frozen,()=>false);
 if(frozen)throw Error('Use another version; frozen contact captures must be preserved.');
-const output=path.join(root,`Preview/FirstLevelCarryV${revision}/Contacts`);
+const captureGroup=args.includes('--capture-group')?args[args.indexOf('--capture-group')+1]:'Contacts';
+if(!/^Contacts[A-Za-z0-9]*$/.test(captureGroup))throw Error('Invalid contact capture group');
+const output=path.join(root,`Preview/FirstLevelCarryV${revision}`,captureGroup);
 await fs.mkdir(output,{recursive:true});
 const browser=await LaunchBrowser(),page=await browser.newPage({viewport:{width:1700,height:1000}});
 try {
@@ -28,7 +30,8 @@ try {
    const Belongs=b=>{for(let p=b;p;p=p.parent)if(p.name.startsWith(role+'_'))return true;return false;};
    const hand=m.bones.find(b=>b.name.replace(/[_.]\d+$/,'').replaceAll('_',' ').endsWith(' '+side+' Hand')&&Belongs(b));
    const V=hand.position.constructor,center=hand.getWorldPosition(new V());
-   const sign=Math.sign(center.x),offset=view==='above'?new V(sign*.13,.55,.15):new V(sign*(view==='outside'?.6:-.4),.07,.3);
+   const sign=Math.sign(center.x),towardBed=role==='Front'?-1:1;
+   const offset=view==='above'?new V(sign*.13,.55,towardBed*.15):new V(sign*(view==='outside'?.6:-.4),.07,towardBed*.4);
    m.camera.aspect=1;m.camera.updateProjectionMatrix();m.renderer.setSize(800,800,false);
    m.camera.position.copy(center).add(offset);m.camera.lookAt(center.clone().add(new V(0,-.055,0)));
    m.renderer.render(m.scene,m.camera);

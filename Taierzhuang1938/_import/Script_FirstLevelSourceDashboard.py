@@ -16,6 +16,9 @@ def Main():
     labels={match[1]:match[2] for line in requirements.splitlines() if (match:=re.match(r'^\| (FL\d+)／[ABC] \| (.*?) \|',line))}
     out=root/'Preview/FirstLevelSourceBatchV1'
     out.mkdir(parents=True,exist_ok=True)
+    status=json.loads((folder.parent/'docs/Data_FirstLevelMissionAnimationStatus.json').read_text(encoding='utf-8'))
+    assert len(status['requirements'])==48
+    (out/'Data_MissionStatus.json').write_text(json.dumps(status,ensure_ascii=False),encoding='utf-8')
     (out/'Data_Labels.json').write_text(json.dumps(dict(labels=labels,requests=requests),ensure_ascii=False),encoding='utf-8')
     html='''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>第一关 · 48 项素材制作</title>
 <style>
@@ -26,6 +29,7 @@ def Main():
 <div class="layout"><div class="left"><table><thead><tr><th>需求</th><th>动作／角色</th><th>新片成功</th><th>生成中</th><th>复用条目</th><th>本批接入</th></tr></thead><tbody id="rows"></tbody></table></div><div class="detail"><h2 id="title">选择需求</h2><p id="runtime"></p><div id="sources" class="sources"></div><video id="video" controls playsinline preload="metadata" hidden></video><p id="note"></p><div id="links"></div></div></div>
 <script type="module">
 const $=id=>document.getElementById(id),labels=await(await fetch('./Data_Labels.json')).json(),requests=new Map(labels.requests.map(r=>[r.id,r]));
+const missionStatus=await(await fetch('./Data_MissionStatus.json',{cache:'no-store'})).json();
 const statusLabels={unsubmitted:'待提交',querying:'生成中',success:'已生成 · 待验片',waiting_for_credit:'等待积分',fail:'服务生成失败',uncertain_submission:'原任务待对账',success_download_missing:'生成成功 · 下载待核实'};
 let plan,batch,states,inspection={sources:[]},integration=null,integrationFile='Data_GameIntegration.json',reviews=new Map(),selected='FL01',selectedSource=null;
 function Element(tag,text,parent){const e=document.createElement(tag);e.textContent=text;if(parent)parent.append(e);return e}
@@ -55,6 +59,9 @@ $('search').oninput=RenderRows;$('reload').onclick=Refresh;await Refresh();setIn
     version=json.loads((folder.parent/'Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json').read_text(encoding='utf-8'))['version']
     assert re.fullmatch(r'FirstLevelTrainGameV[1-9]\d*',version)
     html=html.replace('FirstLevelTrainGameV1',version)
+    html=html.replace("integration=response.ok?await response.json():null;", "integration=response.ok?await response.json():null;if(integration&&missionStatus.gameIntegrationCompatibility?.fullCampaignCurrent===false)integration.validationPending=true;")
+    html=html.replace('已启用 · 关卡复验中：','已启用 · 当前完整关卡待复验：').replace('已启用 · 复验中','已启用 · 全流程待验')
+    html=html.replace("if(scope){Link('接入证据'", "if(scope){Link('当前逐项状态','./Data_MissionStatus.json',$('runtime'));Element('span',' · ',$('runtime'));Link('历史接入证据'")
     (out/'index.html').write_text(html,encoding='utf-8')
     print(str(out/'index.html'))
 

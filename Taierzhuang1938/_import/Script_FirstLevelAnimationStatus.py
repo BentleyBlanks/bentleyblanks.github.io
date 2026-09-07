@@ -7,7 +7,8 @@ from Script_FirstLevelRetargetEvidence import CollectRetargetEvidence
 def Main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--root',type=Path,required=True)
-    parser.add_argument('--carry-revision',type=int,default=13)
+    parser.add_argument('--carry-revision',type=int,default=15)
+    parser.add_argument('--compatibility-group')
     args=parser.parse_args()
     root=args.root.resolve()
     revision=args.carry_revision
@@ -194,18 +195,36 @@ def Main():
     assert re.fullmatch(r'FirstLevelTrainGameV[1-9]\d*',gameVersion)
     gameReport=root/'Models'/gameVersion/'Data_GameIntegration.json'
     integration=Read(gameReport) if gameReport.exists() else None
+    compatibility=None
     if integration:
         visual=Read(gameReport.with_name('Data_VisualAssessment.json'))
         assert visual['frozen'] and visual['gameIntegrationSha256']==Hash(gameReport), 'Review the tested game subset before publishing its status'
-        for filename,expected in integration['runtimeHashes'].items():
-            assert Hash(project/filename)==expected, f'Runtime changed after game integration review: {filename}'
+        changed=[filename for filename,expected in integration['runtimeHashes'].items() if Hash(project/filename)!=expected]
+        compatibility=dict(status='matches_frozen_integration' if not changed else 'upstream_changed_revalidation_pending',
+            changedFiles=changed,fullCampaignCurrent=not changed,historicalIntegration=gameReport.relative_to(root).as_posix())
+        if args.compatibility_group:
+            assert re.fullmatch(r'FirstLevelTrain[A-Za-z0-9]+',args.compatibility_group)
+            file=root/'Models'/args.compatibility_group/'Data_CompatibilityValidation.json'
+            checked=Read(file)
+            assert checked['historicalIntegrationSha256']==Hash(gameReport)
+            assert checked['changedFiles']==changed
+            for filename,digest in checked['runtimeHashes'].items():
+                assert Hash(project/filename)==digest, f'Runtime changed after compatibility validation: {filename}'
+            assert set(checked['runtimeHashes'])==set(integration['runtimeHashes'])
+            for item in checked['evidence']:
+                assert Hash(root/item['path'])==item['sha256']
+            compatibility.update(checked,evidencePath=file.relative_to(root).as_posix())
         for evidence in integration['evidence']:
             assert Hash(root/evidence['path'])==evidence['sha256']
         for row in rows:
             if row['requirementId'] not in integration['requirementScopes']:continue
             row['status']='partially_integrated_other_actions_pending'
             row['runtimeBinding'].update(enabled=True,scope=integration['requirementScopes'][row['requirementId']],
-                evidence=gameReport.relative_to(root).as_posix(),version=integration['version'])
+                evidence=gameReport.relative_to(root).as_posix(),version=integration['version'],
+                fullCampaignCurrent=compatibility['fullCampaignCurrent'],compatibilityStatus=compatibility['status'])
+            if changed:
+                row['status']='runtime_subset_enabled_upstream_campaign_validation_pending'
+                row['blockers'].append('The frozen full campaign validates the previous runtime. Current upstream compatibility evidence has its own scope; it does not replace a current full campaign.')
             row['blockers']=[b for b in row['blockers'] if not b.startswith('Not enabled in mission;') and not b.startswith('Support validation and past failures') and not b.startswith('Full bench sequence only;')]
             row['blockers'].append('Only the recorded carriage subset is enabled; dedicated life gestures, prop/finger contact and stair-down are still pending.')
             row['reviewEvidence'].append(gameReport.relative_to(root).as_posix())
@@ -249,7 +268,7 @@ def Main():
             retainedContinuousRecordings=True,animationDialogueOffsetsInvented=False,
             sources=['Data_FirstLevelMissionVoiceAlignment.mjs','Data_FirstLevelMissionVoiceTiming.mjs'],
             note='Read current cue/segment/source seconds and Runtime VoiceEvent. TrainFoodReceived releases opening movement after the actual response; free look remains available. Actual shell impacts, train stop, prone/dive orders, TransferHope and medic arrival remain authoritative. '+('Only the recorded bench-support/rise subset is enabled.' if integration else 'Carriage subset is enabled, with r12 campaign validation still pending.' if pending else 'New animation clips are not bound yet.')),
-        gameIntegration=integration,gameIntegrationPending=pending,
+        gameIntegration=integration,gameIntegrationPending=pending,gameIntegrationCompatibility=compatibility,
         sourceSearch=dict(directories=[str(root/'Video/Sources'),'C:/Users/Bentl/Downloads/GVHMR'],
             catalogActions=len(catalog['actions']),newVideoGenerations=batch['summary'].get('success',0),
             newInferenceRuns=len(list((root/'Models/_Cache/FirstLevelV1').glob('*/Data_Recovery.json')))),

@@ -13,7 +13,7 @@ import {MISSION_TUNING} from '../Data_Tuning_FirstLevel.mjs';
 const project=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const args=process.argv.slice(2),Arg=(key,fallback)=>args.includes(key)?args[args.indexOf(key)+1]:fallback;
 const root=Arg('--root'),group=Arg('--group','FirstLevelCarryFitV1'),revision=Number(Arg('--revision','10'));
-const fit=args.includes('--fit'),hold=args.includes('--hold');
+const fit=args.includes('--fit'),hold=args.includes('--hold'),wristFit=args.includes('--wrist-fit'),torsoFit=args.includes('--torso-fit');
 const gripHeightM=Number(Arg('--grip-height','.88')),bodyTowardGripM=Number(Arg('--body-offset','.12'));
 assert.ok(gripHeightM>=.7&&gripHeightM<=1.4&&bodyTowardGripM>=0&&bodyTowardGripM<=.2);
 const referenceSpeedMps=Number(Arg('--speed','.55'));assert.ok(referenceSpeedMps>=.2&&referenceSpeedMps<=.7);
@@ -50,7 +50,18 @@ for(const n of modelNumbers){
     for(const side of ['L','R']){
       const name='Bip002 '+side+' Hand',i=scene.NodeIndex(name),j=src.NodeIndex(name);
       const correction=srcRest[j].clone().invert().multiply(rest[i].clone().setPosition(Pos(rest[i]).sub(offset)));
-      palms[role][side]={point:new Vector3(...contact.calibration[role][side].palmLocal).applyMatrix4(correction.invert()).toArray(),sign:-contact.calibration[role][side].sign};
+      const handInverse=rest[i].clone().invert(),fingerCenter=new Vector3();
+      for(let finger=1;finger<=4;finger++)fingerCenter.add(Pos(rest[scene.NodeIndex('Bip002 '+side+' Finger'+finger)]).applyMatrix4(handInverse));
+      const fingers=[];
+      for(let finger=0;finger<5;finger++){
+        const chain=[];
+        for(const suffix of ['', '1', '2']){
+          const node=scene.NodeIndex('Bip002 '+side+' Finger'+finger+suffix),local=rest[scene.parent[node]].clone().invert().multiply(rest[node]),q=new Quaternion();local.decompose(new Vector3(),q,new Vector3());
+          const previous=scene.parent[node],tip=Pos(rest[node]).add(Pos(rest[node]).sub(Pos(rest[previous])).multiplyScalar(.72)).applyMatrix4(rest[node].clone().invert());
+          chain.push({name:scene.nodes[node].name,rotation:q.toArray(),tip:tip.toArray()});
+        }fingers.push(chain);
+      }
+      palms[role][side]={point:new Vector3(...contact.calibration[role][side].palmLocal).applyMatrix4(correction.invert()).toArray(),forward:fingerCenter.multiplyScalar(.25).normalize().toArray(),fingers,sign:-contact.calibration[role][side].sign};
     }
   }
   const footCalibration={};
@@ -108,7 +119,7 @@ try{
   const page=await browser.newPage({viewport:{width:1400,height:1000}});page.on('pageerror',e=>errors.push(e.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/_shots/${group}/_check_Fit.html`);await page.waitForFunction(()=>window.CarryFit);
   for(const record of records){
-    const result=await page.evaluate(async({record,bearerOffsetM,fit,hold,exportGroup,gripHeightM,bodyTowardGripM,referenceSpeedMps})=>{
+    const result=await page.evaluate(async({record,bearerOffsetM,fit,hold,exportGroup,gripHeightM,bodyTowardGripM,referenceSpeedMps,wristFit,torsoFit})=>{
       const {T,loader,LugouCharacterRig,FirstLevelCarryContactFit}=CarryFit;
       const [gltf,library]=await Promise.all([loader.loadAsync('../../Model/Character/Model_'+record.id+'.glb'),loader.loadAsync('./'+record.file)]);
       const profiles=[];const V=()=>new T.Vector3();
@@ -142,10 +153,10 @@ try{
           const pelvis=actor.root.worldToLocal(rig.bones.pelvis.getWorldPosition(V()));
           // A single initial anchor retains the recovered sway. It does not
           // cancel each frame's pelvis translation or invent root motion.
-          anchor??=new T.Vector3(pelvis.x,0,pelvis.z-end*.06);rig.root.position.x-=anchor.x;rig.root.position.z-=anchor.z;actor.root.updateMatrixWorld(true);
+          anchor??=new T.Vector3(pelvis.x,0,pelvis.z-end*.06);rig.root.position.x-=anchor.x;rig.root.position.z-=anchor.z;actor.root.updateMatrixWorld(true);fitter?.PrepareBody();
         };
         if(fit){
-          fitter=new FirstLevelCarryContactFit({T,actor,rig,role,palms:record.palms[role],probes,neutralFeet,neutralToes,gripHeightM,bodyTowardGripM,footCalibration:record.footCalibration,referenceSpeedMps});
+          fitter=new FirstLevelCarryContactFit({T,actor,rig,role,palms:record.palms[role],probes,neutralFeet,neutralToes,gripHeightM,bodyTowardGripM,footCalibration:record.footCalibration,referenceSpeedMps,wristFit,torsoFit});
           const needed=[];for(let frame=0;frame<120;frame++){Sample(frame/60);needed.push(fitter.RequiredDrop(frame/60,hold));}
           // A periodic smooth upper envelope preserves reach at every frame
           // without holding the whole cycle at its single deepest correction.
@@ -171,7 +182,8 @@ try{
             lengths.push(...lengthsArm,rig.bones['thigh'+side].getWorldPosition(V()).distanceTo(rig.bones['calf'+side].getWorldPosition(V())),rig.bones['calf'+side].getWorldPosition(V()).distanceTo(rig.bones['foot'+side].getWorldPosition(V())));
           }
           firstLengths??=lengths;maxLengthDelta=Math.max(maxLengthDelta,...lengths.map((v,i)=>Math.abs(v-firstLengths[i])));
-          frames.push({frame,time:frame/60,pelvis:rig.bones.pelvis.getWorldPosition(V()).toArray(),feet,hands,correction});
+          const pelvisPoint=rig.bones.pelvis.getWorldPosition(V()),shoulderCenter=new T.Vector3(...hands.L.shoulder).add(new T.Vector3(...hands.R.shoulder)).multiplyScalar(.5),torso=shoulderCenter.sub(pelvisPoint);
+          frames.push({frame,time:frame/60,pelvis:pelvisPoint.toArray(),upperBodyForwardLeanDeg:-Math.atan2(torso.z,torso.y)*180/Math.PI,feet,hands,correction});
           if(exportGroup)for(let i=0;i<nodes.length;i++){
             const node=nodes[i],p=V(),q=new T.Quaternion(),s=V();
             if(record.topNodes.includes(i))baseRigInverse.clone().multiply(node.matrixWorld).decompose(p,q,s);else {p.copy(node.position);q.copy(node.quaternion);s.copy(node.scale);}
@@ -201,7 +213,7 @@ try{
         }
       }
       return {id:record.id,profiles};
-    },{record,bearerOffsetM:MISSION_TUNING.litterBearerOffsetM,fit,hold,exportGroup,gripHeightM,bodyTowardGripM,referenceSpeedMps});
+    },{record,bearerOffsetM:MISSION_TUNING.litterBearerOffsetM,fit,hold,exportGroup,gripHeightM,bodyTowardGripM,referenceSpeedMps,wristFit,torsoFit});
     for(const p of result.profiles){assert.ok(p.bindingUnchanged,'original binding/hierarchy');assert.ok(p.summary.maxLengthDelta<.0001,'fixed original limb lengths');assert.ok(Number.isFinite(p.summary.minSole)&&Number.isFinite(p.summary.maxLowestSole),'finite actual shoe samples');}
     if(fit)for(const p of result.profiles){assert.ok(p.summary.minSole>=.0018,'no boot penetration');assert.ok(p.summary.targets[0].maxPalmError<.0001,'actual rail contact');}
     if(exportGroup){
@@ -218,7 +230,7 @@ try{
   }
   assert.deepEqual(errors,[]);
   const runtimeHashes={};for(const name of ['Script_CharacterModel.mjs','Script_FirstLevelMissionPeople.mjs','Script_FirstLevelMissionView.mjs','Data_Tuning_FirstLevel.mjs'])runtimeHashes[name]=Hash(await fs.readFile(path.join(project,name)));
-  await fs.writeFile(reportPath,JSON.stringify({status:fit?'authored_contact_trial_requires_review':'measured_requires_contact_correction',fit,hold,gripHeightM,bodyTowardGripM,referenceSpeedMps,geometryStatus:gripHeightM===.88?'current_r12':'local_proposed_height_not_in_runtime',createdUtc:new Date().toISOString(),sourceGroup,libraryGroup,modelNumbers,sourceContactReportSha256:Hash(await fs.readFile(path.join(root,'Models',sourceGroup,'Data_ContactValidation.json'))),
+  await fs.writeFile(reportPath,JSON.stringify({status:fit?'authored_contact_trial_requires_review':'measured_requires_contact_correction',fit,hold,wristFit,torsoFit,gripHeightM,bodyTowardGripM,referenceSpeedMps,geometryStatus:gripHeightM===.88?'current_r12':'local_proposed_height_not_in_runtime',createdUtc:new Date().toISOString(),sourceGroup,libraryGroup,modelNumbers,sourceContactReportSha256:Hash(await fs.readFile(path.join(root,'Models',sourceGroup,'Data_ContactValidation.json'))),
     scope:fit?`Authored flat-ground ${gripHeightM} m contact trial on ${results.reduce((n,r)=>n+r.profiles.length,0)} production profiles; original V10 and raw untouched. Periodic body-height reach envelope, constant longitudinal placement correction, reconstructed ${referenceSpeedMps} m/s support gait and authored IK. Foot orientation comes from original inverse bind matrices. Not game acceptance.`:'24 real production rig profiles; flat terrain, constant first-frame pelvis anchor. No per-frame ground or hand correction. Moving .88, loading 1.32, fallen .34 metre grips use r12 geometry. Reach uses the V10 hand orientation and is a geometric bound, not a naturalness verdict.',
     newVideoGenerations:0,newInferenceRuns:0,bearerOffsetM:MISSION_TUNING.litterBearerOffsetM,records:records.map(({assetRecord,...r})=>r),runtimeHashes,results,errors},null,2));
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

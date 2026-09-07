@@ -11,7 +11,9 @@ const project=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),ar
 const root=args.includes('--root')?args[args.indexOf('--root')+1]:null;
 const version=JSON.parse(await fs.readFile(path.join(project,'Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json'),'utf8')).version;
 assert.match(version,/^FirstLevelTrainGameV[1-9]\d*$/);
-const out=path.join(project,'_shots',version),folder=root?path.join(root,'Models',version):path.join(project,'Animation/FirstLevelTrain');
+const outputGroup=args.includes('--output-group')?args[args.indexOf('--output-group')+1]:version;
+assert.match(outputGroup,/^FirstLevelTrain[A-Za-z0-9]+$/);
+const out=path.join(project,'_shots',outputGroup),folder=root?path.join(root,'Models',version):path.join(project,'Animation/FirstLevelTrain');
 await fs.mkdir(out,{recursive:true});
 const config=JSON.parse(await fs.readFile(path.join(folder,'Data_FirstLevelTrainAnimation.json'),'utf8'));
 for(const record of config.models){
@@ -26,7 +28,7 @@ window.GameCheck={T,loader:new GLTFLoader(),LugouCharacterRig,FirstLevelTrainAni
 const server=await ServeRoot(path.dirname(project),0),browser=await LaunchBrowser(),results=[],failures=[],errors=[];
 try{
  const page=await browser.newPage({viewport:{width:1400,height:1000}});page.on('pageerror',e=>errors.push(e.message));
- await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/_shots/${version}/_check_Game.html`);
+ await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/_shots/${outputGroup}/_check_Game.html`);
  await page.waitForFunction(()=>window.GameCheck);
  const manifest=JSON.parse(await fs.readFile(path.join(project,'Model/Character/Data_LugouCharacterManifest.json'),'utf8'));
  for(const record of config.models){

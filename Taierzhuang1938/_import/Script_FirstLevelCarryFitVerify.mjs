@@ -32,10 +32,22 @@ try{
         const action=rig.mixer.clipAction(clip).reset().setLoop(T.LoopOnce,1);action.clampWhenFinished=true;action.play();
         const meshes=[],bones=[];rig.root.traverse(n=>{if(n.isSkinnedMesh)meshes.push(n);if(n.isBone)bones.push(n)});
         const bind=JSON.stringify(meshes.map(m=>m.skeleton.boneInverses.map(b=>b.elements))),parents=bones.map(b=>b.parent),probes={L:[],R:[]};
+        const fingerOffsets=bones.filter(b=>/Finger/.test(b.name)).map(b=>({bone:b,position:b.position.clone()}));
         for(const mesh of meshes){const indices=mesh.geometry.attributes.skinIndex,weights=mesh.geometry.attributes.skinWeight;
           for(let vertex=0;vertex<indices.count;vertex++)for(const side of ['L','R']){let weight=0;for(let k=0;k<4;k++){const name=mesh.skeleton.bones[indices.getComponent(vertex,k)].name.replaceAll('_',' ');if(name.includes(' '+side+' ')&&/Foot|Toe/.test(name))weight+=weights.getComponent(vertex,k);}if(weight>.5)probes[side].push({mesh,vertex});}
         }
         const soleMarkers={};
+        const handForward={};
+        for(const side of ['L','R']){
+          const skeleton=meshes.find(m=>m.skeleton.bones.includes(rig.bones['hand'+side])).skeleton;
+          const handIndex=skeleton.bones.indexOf(rig.bones['hand'+side]),forward=V();
+          for(let i=1;i<=4;i++){
+            const fingerIndex=skeleton.bones.findIndex(b=>b.name.replaceAll('_',' ')==='Bip002 '+side+' Finger'+i);
+            if(fingerIndex<0)throw Error('Original bind metacarpal missing');
+            forward.add(V().setFromMatrixPosition(skeleton.boneInverses[fingerIndex].clone().invert()).applyMatrix4(skeleton.boneInverses[handIndex]));
+          }
+          handForward[side]=forward.normalize();
+        }
         if(record.footCalibration)for(const side of ['L','R']){
           soleMarkers[side]={};
           for(const key of ['heel','toe']){
@@ -46,17 +58,33 @@ try{
         }
         let maxPositionError=0,maxSoleError=0,minSole=Infinity,maxPalmError=0,seam=0,first=null,maxStanceDrift=0,firstLengths=null,maxLengthDelta=0,maxPelvisSpeed=0,lastPelvis=null;
         const contacts={},contactWindows=[],markerMode=record.footCalibration?'original_skin_heel_flat_toe':'legacy_fixed_ankle';
+        const wristBends=[],upperArmTilts=[],forwardLeans=[],lastHandQ={};let maxHandRotationStepDeg=0,maxBedPenetrationM=0,bedPenetrationSamples=0,maxFingerTranslationDeltaM=0;
         // Include half-frame interpolation; baking knots alone cannot expose
         // quaternion-interpolation contact failures.
         for(let sample=0;sample<=240;sample++){
           const time=sample/120;action.enabled=true;action.paused=false;rig.mixer.setTime(time);actor.root.updateMatrixWorld(true);for(const mesh of meshes)mesh.skeleton.update();
           const matrices=bones.flatMap(b=>b.matrixWorld.elements);if(sample===0)first=matrices;if(sample===240)seam=Math.max(...matrices.map((v,i)=>Math.abs(v-first[i])));
           const pelvis=rig.bones.pelvis.getWorldPosition(V());if(lastPelvis)maxPelvisSpeed=Math.max(maxPelvisSpeed,pelvis.distanceTo(lastPelvis)*120);lastPelvis=pelvis;
+          const torso=rig.bones.upperArmL.getWorldPosition(V()).add(rig.bones.upperArmR.getWorldPosition(V())).multiplyScalar(.5).sub(pelvis);
+          forwardLeans.push(-Math.atan2(torso.z,torso.y)*180/Math.PI);
           if(sample%2===0)maxPositionError=Math.max(maxPositionError,pelvis.distanceTo(new T.Vector3(...expected.frames[sample/2].pelvis)));
           const lengths=[];
+          for(const {bone,position} of fingerOffsets){
+            const reference=bone.parent.localToWorld(position.clone()),actual=bone.getWorldPosition(V());
+            maxFingerTranslationDeltaM=Math.max(maxFingerTranslationDeltaM,actual.distanceTo(reference));
+          }
+          for(const mesh of meshes)for(let vertex=0;vertex<mesh.geometry.attributes.position.count;vertex++){
+            const p=mesh.getVertexPosition(vertex,V()).applyMatrix4(mesh.matrixWorld);
+            const depth=Math.min(.29-Math.abs(p.x),.925-Math.abs(p.z),.07-Math.abs(p.y-(gripHeightM-.12)));
+            if(depth>.001){bedPenetrationSamples++;maxBedPenetrationM=Math.max(maxBedPenetrationM,depth);}
+          }
           for(const side of ['L','R']){
             let floor=Infinity;for(const p of probes[side])floor=Math.min(floor,p.mesh.getVertexPosition(p.vertex,V()).applyMatrix4(p.mesh.matrixWorld).y);minSole=Math.min(minSole,floor);
             const wrist=rig.bones['hand'+side].getWorldPosition(V()),ankle=rig.bones['foot'+side].getWorldPosition(V()),cfg=record.palms[expected.role][side];
+            const q=rig.bones['hand'+side].getWorldQuaternion(new T.Quaternion()),elbow=rig.bones['forearm'+side].getWorldPosition(V()),shoulder=rig.bones['upperArm'+side].getWorldPosition(V());
+            wristBends.push(wrist.clone().sub(elbow).angleTo(handForward[side].clone().applyQuaternion(q))*180/Math.PI);
+            upperArmTilts.push(elbow.clone().sub(shoulder).angleTo(new T.Vector3(0,-1,0))*180/Math.PI);
+            if(lastHandQ[side])maxHandRotationStepDeg=Math.max(maxHandRotationStepDeg,lastHandQ[side].angleTo(q)*180/Math.PI);lastHandQ[side]=q;
             const palm=rig.bones['hand'+side].localToWorld(new T.Vector3(...cfg.point));maxPalmError=Math.max(maxPalmError,palm.distanceTo(new T.Vector3(cfg.sign*.29,gripHeightM,-end)));
             if(sample%2===0){const f=expected.frames[sample/2];maxPositionError=Math.max(maxPositionError,wrist.distanceTo(new T.Vector3(...f.hands[side].wrist)),ankle.distanceTo(new T.Vector3(...f.feet[side].ankle)));maxSoleError=Math.max(maxSoleError,Math.abs(floor-f.feet[side].minY));}
             const phase=((time-(side==='L'?.3:1.3))%2+2)%2;
@@ -83,12 +111,21 @@ try{
           }
           firstLengths??=lengths;maxLengthDelta=Math.max(maxLengthDelta,...lengths.map((v,i)=>Math.abs(v-firstLengths[i])));
         }
-        profiles.push({size:expected.size,role:expected.role,samples:241,minSole,maxPalmError,maxPositionError,maxSoleError,seam,maxStanceDrift,markerMode,contactWindows,maxLengthDelta,maxPelvisSpeed,bindingUnchanged:bind===JSON.stringify(meshes.map(m=>m.skeleton.boneInverses.map(b=>b.elements)))&&bones.every((b,i)=>b.parent===parents[i])});
+        profiles.push({size:expected.size,role:expected.role,samples:241,minSole,maxPalmError,maxPositionError,maxSoleError,seam,maxStanceDrift,markerMode,contactWindows,maxLengthDelta,maxPelvisSpeed,
+          handPosture:{maxWristBendDeg:Math.max(...wristBends),medianWristBendDeg:wristBends.sort((a,b)=>a-b)[Math.floor(wristBends.length/2)],maxUpperArmTiltDeg:Math.max(...upperArmTilts),maxHandRotationStepDeg,minForwardLeanDeg:Math.min(...forwardLeans),maxForwardLeanDeg:Math.max(...forwardLeans),acceptedForGame:false},
+          bedContact:{maxBedPenetrationM,bedPenetrationSamples,method:'all actual skin vertices inside the candidate bed box, excluding the outer 1 mm boundary; no patient is included'},
+          fingerStructure:{bones: fingerOffsets.length,maxFingerTranslationDeltaM,method:'all finger joint offsets compared with the independently loaded original model before animation'},
+          bindingUnchanged:bind===JSON.stringify(meshes.map(m=>m.skeleton.boneInverses.map(b=>b.elements)))&&bones.every((b,i)=>b.parent===parents[i])});
       }
       return {id:model.id,profiles};
     },{model,record,assetRecord,bearerOffsetM:report.bearerOffsetM,gripHeightM:report.gripHeightM??.88,referenceSpeedMps:report.referenceSpeedMps??.55});
     results.push(actual);
     for(const p of actual.profiles)if(!(p.bindingUnchanged&&p.maxPositionError<.00005&&p.maxSoleError<.00005&&p.minSole>=.001&&p.maxPalmError<.001&&p.seam<.001&&p.maxStanceDrift<.001&&p.maxLengthDelta<.0001&&p.maxPelvisSpeed<1.6))failures.push({id:actual.id,...p});
+    if(report.wristFit)for(const p of actual.profiles)if(p.handPosture.maxHandRotationStepDeg>=5)failures.push({id:actual.id,role:p.role,size:p.size,reason:'hand orientation discontinuity',handPosture:p.handPosture});
+    for(const p of actual.profiles){
+      if(p.bedContact.bedPenetrationSamples>0)failures.push({id:actual.id,role:p.role,size:p.size,reason:'body penetrates the candidate bed beyond 1 mm',bedContact:p.bedContact});
+      if(p.fingerStructure.bones!==30||p.fingerStructure.maxFingerTranslationDeltaM>=.0001)failures.push({id:actual.id,role:p.role,size:p.size,reason:'original finger structure changed',fingerStructure:p.fingerStructure});
+    }
     console.log(JSON.stringify(actual));
   }
   const file=path.join(folder,reportName);assert.equal(await fs.stat(file).then(()=>true,()=>false),false,'Preserve the previous validation');

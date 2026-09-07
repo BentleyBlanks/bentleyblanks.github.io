@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "updated": "2026-09-08",
-  "recordedUtc": "2026-09-07T20:38:01.953091+00:00",
-  "baseCommit": "5f7c51ed994cbd486d5ae8fa531897a707b62205",
+  "recordedUtc": "2026-09-07T21:25:26.051693+00:00",
+  "baseCommit": "d3fe8deea8b0a0701e956ca3a8e8ecb2d516c1f4",
   "missionContract": {
     "version": "first-level-20260907-r12",
     "stages": [
@@ -437,14 +437,14 @@
     }
   },
   "libraryRoot": "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼",
-  "catalogSha256": "ed4f4ab87fb9f11193a6cf21ca70c67e643ac07125f96d42d0a46f599a1e47d5",
-  "requirementsSha256": "1d77602e3713829d591429682832a02f067d078e01ee0aad6df25837c68f69d2",
+  "catalogSha256": "ec70f86276dd5ab2038c9e8db92269d1a70c46213062ea448bc76d5e3e22e23a",
+  "requirementsSha256": "53b130f8d9313e08136a04e1d01cfd6be06b3ba7f45fef46c25fa39c843b39ad",
   "missionBaselineFiles": {
-    "Data_FirstLevelMission.mjs": "05d2b588248ceb494ee39d04a0734cb9702125b1a8156cc75d9575da41aa1eaf",
+    "Data_FirstLevelMission.mjs": "933174877ea1595b60221e57fd3d0a46e0431ce60ab08460c3ee8267e09ab44b",
     "Data_FirstLevelMissionDialogue.mjs": "a62830fc97fedc1f5df3aacf0664c89edada411ae7689e1dbdaf3164550a5cda",
     "Data_FirstLevelMissionTrain.mjs": "adfd567c006889c6d1e48470ba002622d4c119d6741dfa6d9d4fe9ac118698d9",
-    "Data_Tuning_FirstLevel.mjs": "fbc29f88f02489f58e25663ebc41a17448c250d0777288c915a9082fbaa16d75",
-    "Script_FirstLevelMissionRuntime.mjs": "a185d7624695a91ad21e3ca97100ab7c9aab57e4e38d930b358671c64185f3f0",
+    "Data_Tuning_FirstLevel.mjs": "792c3019f190dbfd800a03f47bbde0daf9ab6a9fc92f0fbcd02a7e94ca934c44",
+    "Script_FirstLevelMissionRuntime.mjs": "8bd7ec7a94ef9d7650aeeda8af2bccf73c1a2a9cd157d37dd780262b5f5d4707",
     "Script_FirstLevelMissionColumn.mjs": "bbcee070b8d4faf20417973dfadcf87328877f926014b8186dc7a57bbd89ef24",
     "Script_FirstLevelMissionVoice.mjs": "f875246b5de9b224acb27ea58c17e84863898257a6f72417b26f14b657ec2dc5",
     "Script_FirstLevelMissionTrain.mjs": "a1b81b6240c1ff41d07a7f0d36e52ea1e93d43896025a8799a1f227dd9775cbb",
@@ -970,6 +970,81 @@
     }
   },
   "gameIntegrationPending": null,
+  "gameIntegrationCompatibility": {
+    "status": "carriage_and_rules_passed_full_campaign_not_repeated",
+    "changedFiles": [
+      "Script_FirstLevelMissionView.mjs",
+      "Script_FirstLevelMissionRuntime.mjs",
+      "Script_Main.mjs",
+      "Data_FirstLevelMission.mjs",
+      "Data_FirstLevelMissionFront.mjs",
+      "Data_Tuning_FirstLevel.mjs",
+      "Script_FirstLevelMissionPeople.mjs",
+      "index.html"
+    ],
+    "fullCampaignCurrent": false,
+    "historicalIntegration": "Models/FirstLevelTrainGameV2/Data_GameIntegration.json",
+    "recordedUtc": "2026-09-07T21:19:55.008856+00:00",
+    "baseCommit": "d3fe8deea8b0a0701e956ca3a8e8ecb2d516c1f4",
+    "historicalIntegrationSha256": "6eec122e72d7213c7afce8b91566bbeb780f206458581d3a86e44b6e2ce17be8",
+    "runtimeHashes": {
+      "Script_FirstLevelTrainAnimation.mjs": "2a15df1c03f49c47186ddaf2efddabd074d0f407a1b8f781adeb67f697c8a34f",
+      "Script_FirstLevelMissionTrainLife.mjs": "db3a9de87116a057b6ee8fdd546af674e6954172ae994b6d0f4e561a571abf3d",
+      "Script_FirstLevelMissionTrain.mjs": "a1b81b6240c1ff41d07a7f0d36e52ea1e93d43896025a8799a1f227dd9775cbb",
+      "Script_FirstLevelMissionView.mjs": "8a8a19465f3fbd4139c437910b763ea7a910e938deb9d9008d90f4c609fca83a",
+      "Script_FirstLevelMissionRuntime.mjs": "8bd7ec7a94ef9d7650aeeda8af2bccf73c1a2a9cd157d37dd780262b5f5d4707",
+      "Script_FirstLevelP012CastAppearance.mjs": "de0433e6c5f4e0a8752c121055ebc4bfd7692c968201bea381fb0b248b91724c",
+      "Script_Main.mjs": "49c4f9977c40cabf949a9643a42248ad3baa0829d63362ec5ccd6bde1fac959e",
+      "Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json": "e6a8b7088774f86f97ce2c03462a377f90ae91e98fc39530f13f0d1e5a204595",
+      "Data_FirstLevelMission.mjs": "933174877ea1595b60221e57fd3d0a46e0431ce60ab08460c3ee8267e09ab44b",
+      "Data_FirstLevelMissionTrain.mjs": "adfd567c006889c6d1e48470ba002622d4c119d6741dfa6d9d4fe9ac118698d9",
+      "Data_FirstLevelMissionLayout.mjs": "861183d55d818e28128aebb9d5583a60bf3d6d11f9478328fb5ad76256dd5898",
+      "Data_FirstLevelMissionCrowd.mjs": "f6607e5ee2422c188572cd10551882c7dae5058ea5717c88821862c0d4fe0796",
+      "Data_FirstLevelMissionFront.mjs": "1c5d0f23600a6f860a5977e745f4fd6d2ac6d14d9c60338d01a5aad09d447f99",
+      "Data_Tuning_FirstLevel.mjs": "792c3019f190dbfd800a03f47bbde0daf9ab6a9fc92f0fbcd02a7e94ca934c44",
+      "Data_FirstLevelMissionVoiceTiming.mjs": "414c2270c3b93d5116eb48ec59335a67d5a0e4a2ca0efc4ff780d2e439e57091",
+      "Data_FirstLevelMissionVoiceAlignment.mjs": "af8cdc555cdd92c227e999ce07198b2f17f7d5ee3ad044faa29bdf09f5bf4146",
+      "Data_FirstLevelMissionDialogue.mjs": "a62830fc97fedc1f5df3aacf0664c89edada411ae7689e1dbdaf3164550a5cda",
+      "Script_FirstLevelMissionColumn.mjs": "bbcee070b8d4faf20417973dfadcf87328877f926014b8186dc7a57bbd89ef24",
+      "Script_FirstLevelMissionPeople.mjs": "0d1b3f7a34676f21252ad33e779a3c7e3271b6fb27f513f8ebcc04f4de5d674b",
+      "Script_FirstLevelMissionVoice.mjs": "f875246b5de9b224acb27ea58c17e84863898257a6f72417b26f14b657ec2dc5",
+      "index.html": "b786c94e301ccd5ce0df04da95cc098f1246619498834fb7ad067d57e81cb2f9"
+    },
+    "evidence": [
+      {
+        "path": "Models/FirstLevelTrainR13/Data_RealTrainTransition.json",
+        "sha256": "49310cc7f763cb407a156350963930fcef7c419545c8066f37466320fd16be39"
+      },
+      {
+        "path": "Models/FirstLevelTrainR13/Data_SamplerValidation.json",
+        "sha256": "4a59004475b19118be10f658690106f5588c35dc693f58d9a6566ca315fc0c65"
+      },
+      {
+        "path": "Models/FirstLevelTrainR13/Data_TrainR13.log",
+        "sha256": "080109ba43c3572d510b5be2049ce8d26fcde0c7c536e697e4cba21468449021"
+      },
+      {
+        "path": "Models/FirstLevelTrainR13/Data_MissionR13.log",
+        "sha256": "43342adb7590e1e165831b027277af17115bd56f3ddf005a50667e979410a48c"
+      },
+      {
+        "path": "Models/FirstLevelTrainR13/Data_ModuleGraphR13.log",
+        "sha256": "fbca1ae040fbec40d6d6209a24762066ebdc661b491343dcb45b4cc4315269a7"
+      },
+      {
+        "path": "Models/FirstLevelTrainR13/Data_TestRunnerR13.log",
+        "sha256": "76e47455608a2a52e29e2726243ce5353858a75511530b5ccabdd3ad67927bb8"
+      }
+    ],
+    "testScope": [
+      "Original-rig sampler and real train rise/queue handoff",
+      "Mission pure rules and original audio manifest",
+      "Module graph",
+      "Registered test runner"
+    ],
+    "note": "Upstream calls this change r13, but MISSION_VERSION still reads first-level-20260907-r12. Runtime hashes distinguish these builds. The old full-campaign result is historical; no current campaign completion is claimed.",
+    "evidencePath": "Models/FirstLevelTrainR13/Data_CompatibilityValidation.json"
+  },
   "sourceSearch": {
     "directories": [
       "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources",
@@ -985,14 +1060,14 @@
     "expectedFirstPassCredits": 11360,
     "lastCreditObservation": {
       "balance": 60,
-      "recordedUtc": "2026-09-07T20:24:14.092357+00:00"
+      "recordedUtc": "2026-09-07T21:25:24.969137+00:00"
     },
     "pendingAmmoQuery": {
       "resubmitted": false,
       "genStatus": "querying",
       "submitId": "370184c6-ecdf-467d-8c4c-fa67243dce8a",
       "downloadAvailable": false,
-      "recordedUtc": "2026-09-07T20:24:14.092357+00:00"
+      "recordedUtc": "2026-09-07T21:25:24.969137+00:00"
     },
     "retakeBudget": {
       "status": "prepared_not_submitted",
@@ -8438,7 +8513,7 @@
       "blendFile": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra01TrainSupport.blend",
       "previewId": "TrainBenchRise",
       "revisionLabel": "原模型 bind/层级/骨长保持；实际身高五档曲线，经九身高 120 fps 验证。根、腿、腕、掌指为后期支撑修正，未接入任务。",
-      "status": "partially_integrated_other_actions_pending",
+      "status": "runtime_subset_enabled_upstream_campaign_validation_pending",
       "runtimeBinding": {
         "enabled": true,
         "stages": [
@@ -8446,7 +8521,9 @@
         ],
         "scope": "原骨架侧凳身体支撑；站姿扶稳和第二版表演待制",
         "evidence": "Models/FirstLevelTrainGameV2/Data_GameIntegration.json",
-        "version": "FirstLevelTrainGameV2"
+        "version": "FirstLevelTrainGameV2",
+        "fullCampaignCurrent": false,
+        "compatibilityStatus": "carriage_and_rules_passed_full_campaign_not_repeated"
       },
       "reviewEvidence": [
         "Models/FirstLevelTrainV1/Data_SelectedExportFidelityValidation.json",
@@ -8464,6 +8541,7 @@
       "blockers": [
         "Other generated source targets require dense source review and recovery; first-pass retakes remain explicit.",
         "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted.",
+        "The frozen full campaign validates the previous runtime. Current upstream compatibility evidence has its own scope; it does not replace a current full campaign.",
         "Only the recorded carriage subset is enabled; dedicated life gestures, prop/finger contact and stair-down are still pending."
       ],
       "newSourceProduction": [
@@ -10080,7 +10158,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "partially_integrated_other_actions_pending",
+      "status": "runtime_subset_enabled_upstream_campaign_validation_pending",
       "runtimeBinding": {
         "enabled": true,
         "stages": [
@@ -10088,7 +10166,9 @@
         ],
         "scope": "复用原骨架坐姿支撑；专用生活表演与手中道具待接",
         "evidence": "Models/FirstLevelTrainGameV2/Data_GameIntegration.json",
-        "version": "FirstLevelTrainGameV2"
+        "version": "FirstLevelTrainGameV2",
+        "fullCampaignCurrent": false,
+        "compatibilityStatus": "carriage_and_rules_passed_full_campaign_not_repeated"
       },
       "reviewEvidence": [
         "Models/FirstLevelTrainGameV2/Data_GameIntegration.json"
@@ -10096,6 +10176,7 @@
       "blockers": [
         "Source targets/reused candidates do not prove this complete requirement is accepted or integrated.",
         "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted.",
+        "The frozen full campaign validates the previous runtime. Current upstream compatibility evidence has its own scope; it does not replace a current full campaign.",
         "Only the recorded carriage subset is enabled; dedicated life gestures, prop/finger contact and stair-down are still pending."
       ],
       "newSourceProduction": [
@@ -11756,7 +11837,7 @@
       "blendFile": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra01TrainSupport.blend",
       "previewId": "TrainBenchRise",
       "revisionLabel": "原模型 bind/层级/骨长保持；实际身高五档曲线，经九身高 120 fps 验证。根、腿、腕、掌指为后期支撑修正，未接入任务。",
-      "status": "partially_integrated_other_actions_pending",
+      "status": "runtime_subset_enabled_upstream_campaign_validation_pending",
       "runtimeBinding": {
         "enabled": true,
         "stages": [
@@ -11764,7 +11845,9 @@
         ],
         "scope": "扶腿起身、直立等队列与行走衔接；逐阶下车待接",
         "evidence": "Models/FirstLevelTrainGameV2/Data_GameIntegration.json",
-        "version": "FirstLevelTrainGameV2"
+        "version": "FirstLevelTrainGameV2",
+        "fullCampaignCurrent": false,
+        "compatibilityStatus": "carriage_and_rules_passed_full_campaign_not_repeated"
       },
       "reviewEvidence": [
         "Models/FirstLevelTrainV1/Data_SelectedExportFidelityValidation.json",
@@ -11782,6 +11865,7 @@
       "blockers": [
         "Other generated source targets require dense source review and recovery; first-pass retakes remain explicit.",
         "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted.",
+        "The frozen full campaign validates the previous runtime. Current upstream compatibility evidence has its own scope; it does not replace a current full campaign.",
         "Only the recorded carriage subset is enabled; dedicated life gestures, prop/finger contact and stair-down are still pending."
       ],
       "newSourceProduction": [
@@ -13899,7 +13983,7 @@
       "requirementId": "FL26",
       "priority": "A",
       "label": "前后负重走停、缓转、坡道、门槛",
-      "acceptanceRequirements": "20 副担架，共享相位和刚性道具，手不滑杆；r12 已用原骨架前后抬运片段与握点修正，本批 V11 尚未替换，停步、坡道和门槛接触待验。",
+      "acceptanceRequirements": "20 副担架，共享相位和刚性道具，手不滑杆；r12 已用原骨架前后抬运片段与握点修正，本批 V15 尚未替换，停步、坡道和门槛接触待验。",
       "actorRoles": [
         "litter.frontBearer",
         "litter.rearBearer"
@@ -13939,8 +14023,8 @@
             -1,
             1
           ],
-          "bedHeightM": 0.92,
-          "gripHeightM": 1.04,
+          "bedHeightM": 0.86,
+          "gripHeightM": 0.98,
           "runtimeBedHeightM": 0.76,
           "runtimeGripHeightM": 0.88,
           "correction": "Authored pelvis placement, support gait, arms and fingers; original raw unchanged."
@@ -13950,9 +14034,9 @@
       "entryPose": "walking",
       "exitPose": "walking",
       "interruptPolicy": "Animation must not write mission facts, population, inventory, camera or patient identity.",
-      "blendFile": "Blender/FirstLevelCarryV13/Scene_LugouNra01_CarryPair_V13.blend",
+      "blendFile": "Blender/FirstLevelCarryV15/Scene_LugouNra01_CarryPair_V15.blend",
       "previewId": "StretcherPair",
-      "revisionLabel": "V13 production-scale contact trial; pelvis, support gait and hand contacts authored after recovery",
+      "revisionLabel": "V15 production-scale contact trial; pelvis, support gait and hand contacts authored after recovery",
       "status": "needs_correction",
       "runtimeBinding": {
         "enabled": false,
@@ -13967,29 +14051,28 @@
         ]
       },
       "reviewEvidence": [
-        "Models/FirstLevelCarryV13/Data_IndependentValidation.json",
-        "Models/FirstLevelCarryV13/Data_EditableProjects.json",
-        "Models/FirstLevelCarryV13/Data_EditableProjectValidation.json",
-        "Models/FirstLevelCarryV13/Data_ProjectAndPlaybackValidation.json",
-        "Models/FirstLevelCarryV13/Data_VisualAssessment.json",
-        "Preview/FirstLevelCarryV13/Contacts/Data_ContactViews.json",
-        "Models/FirstLevelCarryV13/Data_ContinuousContactValidation.json"
+        "Models/FirstLevelCarryV15/Data_IndependentValidation.json",
+        "Models/FirstLevelCarryV15/Data_EditableProjects.json",
+        "Models/FirstLevelCarryV15/Data_EditableProjectValidation.json",
+        "Models/FirstLevelCarryV15/Data_ProjectAndPlaybackValidation.json",
+        "Models/FirstLevelCarryV15/Data_VisualAssessment.json",
+        "Preview/FirstLevelCarryV15/Contacts/Data_ContactViews.json"
       ],
       "blockers": [
-        "Two-person cropped input remains experimental; original source and raw are unchanged.",
-        "Load-bearing elbows are lower, but the front bearer still leans backward and flexes the support knee; source upright gait is not visually matched.",
-        "Close views retain palm/finger contact but show excessive wrist bend and cuff occlusion. Hand orientation must be refit with the lowered elbow plane; contact distance is not naturalness acceptance.",
-        "Trial grip/bed heights are 1.04/0.92 m versus runtime 0.88/0.76 m. The 0.40 m/s reference is authored. Geometry, patient, first-person handles and loading consumers have not been changed or validated for this proposal.",
-        "No patient, double-support idle, start/stop, turn, slope, threshold or loading transition is accepted.",
-        "r12 still uses its existing original-rig carry clips; V13 is not runtime-enabled."
+        "Two-person cropped input remains experimental; source video and raw recovery are unchanged.",
+        "Support knees remain more flexed than the source upright walk; authored gait naturalness is not accepted.",
+        "Wrist bend is substantially reduced. Viewed palms/thumbs oppose across the rail, but fingertip pressure and skin clearance are not independently surface-validated on all five models. Some original inside views were occluded; clear views are preserved separately.",
+        "Trial grip/bed heights are 0.98/0.86 m versus runtime 0.88/0.76 m. The 0.40 m/s speed is authored; patient, first-person hands and loading consumers are not adapted to the proposed geometry.",
+        "No patient, double-support idle, pickup/release, start/stop, turn, slope, threshold or loading transition is accepted.",
+        "Latest master still consumes its existing original-rig carry clips; V15 is not enabled."
       ],
       "variants": [
         {
           "previewId": "CarryStretcherFront",
-          "variantId": "Nra-v13-CarryStretcherFront",
+          "variantId": "Nra-v15-CarryStretcherFront",
           "clipName": "FirstLevelCarryFrontWalk100",
-          "path": "Models/FirstLevelCarryV13/Model_LugouNra01_CarryFront.glb",
-          "blendFile": "Blender/FirstLevelCarryV13/Scene_LugouNra01_CarryPair_V13.blend",
+          "path": "Models/FirstLevelCarryV15/Model_LugouNra01_CarryFront.glb",
+          "blendFile": "Blender/FirstLevelCarryV15/Scene_LugouNra01_CarryPair_V15.blend",
           "sourceVideo": "Video/Sources/EarlyMocap/Video_StretcherWalk.mp4",
           "sourceVideoSha256": "7ea06eb51ffea12b012cac7a6e5987b9bf9ecd10860d8b28112e663ae4b0b69b",
           "sourceRangeSeconds": [
@@ -14012,10 +14095,10 @@
         },
         {
           "previewId": "CarryStretcherRear",
-          "variantId": "Nra-v13-CarryStretcherRear",
+          "variantId": "Nra-v15-CarryStretcherRear",
           "clipName": "FirstLevelCarryRearWalk100",
-          "path": "Models/FirstLevelCarryV13/Model_LugouNra01_CarryRear.glb",
-          "blendFile": "Blender/FirstLevelCarryV13/Scene_LugouNra01_CarryPair_V13.blend",
+          "path": "Models/FirstLevelCarryV15/Model_LugouNra01_CarryRear.glb",
+          "blendFile": "Blender/FirstLevelCarryV15/Scene_LugouNra01_CarryPair_V15.blend",
           "sourceVideo": "Video/Sources/EarlyMocap/Video_StretcherWalk.mp4",
           "sourceVideoSha256": "7ea06eb51ffea12b012cac7a6e5987b9bf9ecd10860d8b28112e663ae4b0b69b",
           "sourceRangeSeconds": [
@@ -14038,10 +14121,10 @@
         },
         {
           "previewId": "StretcherPair",
-          "variantId": "Nra-v13-StretcherPair",
+          "variantId": "Nra-v15-StretcherPair",
           "clipName": "FirstLevelCarryPair1",
-          "path": "Models/FirstLevelCarryV13/Model_LugouNra01_CarryPair.glb",
-          "blendFile": "Blender/FirstLevelCarryV13/Scene_LugouNra01_CarryPair_V13.blend",
+          "path": "Models/FirstLevelCarryV15/Model_LugouNra01_CarryPair.glb",
+          "blendFile": "Blender/FirstLevelCarryV15/Scene_LugouNra01_CarryPair_V15.blend",
           "sourceVideo": "Video/Sources/EarlyMocap/Video_StretcherWalk.mp4",
           "sourceVideoSha256": "7ea06eb51ffea12b012cac7a6e5987b9bf9ecd10860d8b28112e663ae4b0b69b",
           "sourceRangeSeconds": [
@@ -14072,180 +14155,195 @@
         }
       ],
       "visualAssessment": {
-        "status": "requires_wrist_posture_and_game_geometry_refinement",
+        "status": "requires_gait_and_complete_grasp_review",
         "acceptedForGame": false,
         "frozen": true,
-        "recordedUtc": "2026-09-07T20:32:40.224170+00:00",
-        "reviewedBy": "Codex; actual source/raw/model screenshots and actual palm close views inspected in this task",
+        "recordedUtc": "2026-09-07T21:19:55.008856+00:00",
+        "reviewedBy": "Codex; actual source/raw/model screenshots and actual rendered palm close views inspected in this task",
         "models": [
           {
-            "path": "Models/FirstLevelCarryV13/Animation_LugouNra01FirstLevelCarry.glb",
-            "sha256": "336223136f3264f8a5e129eb35400a2296e2249b0a942d2c95dddfb95f5991b4"
+            "path": "Models/FirstLevelCarryV15/Animation_LugouNra01FirstLevelCarry.glb",
+            "sha256": "46a398532856dadd9c18fbb132b27d36f6ed29181bbc12d2df8f1bfb976657e8"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Animation_LugouNra02FirstLevelCarry.glb",
-            "sha256": "2f2ce10695e30ce1e8ff6bf79247c53e16090db95636f7dcec7fbcc947f38dae"
+            "path": "Models/FirstLevelCarryV15/Animation_LugouNra02FirstLevelCarry.glb",
+            "sha256": "d12f22913935793292110a47871cce6b3b5a18246d594281990917e4de866305"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Animation_LugouNra03FirstLevelCarry.glb",
-            "sha256": "99be4fb4d8dbf72f820159459e017c4326d4efd0ad820e066f12a0116e8a52e5"
+            "path": "Models/FirstLevelCarryV15/Animation_LugouNra03FirstLevelCarry.glb",
+            "sha256": "90186907d5fa0d90a439572f9554e2c5b29c2feba21d10f10a27588b944c09f5"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Animation_LugouNra04FirstLevelCarry.glb",
-            "sha256": "57d0a24bb35c37c5e624400435171449c546658601e03967d2a6df8c0d0dca04"
+            "path": "Models/FirstLevelCarryV15/Animation_LugouNra04FirstLevelCarry.glb",
+            "sha256": "70f3c2f3a99dab7c3488e7683503786fb4a69be5bf800706ff6413a11cb1c165"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Animation_LugouNra05FirstLevelCarry.glb",
-            "sha256": "2a803a34b39b5ba086314650ac1ffad04862ee7c18e1d9a95966a18b75c43101"
+            "path": "Models/FirstLevelCarryV15/Animation_LugouNra05FirstLevelCarry.glb",
+            "sha256": "ee9423349479698ed9db74d7233514258f5499d09c88843a9ce868b5053b7254"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Model_LugouNra01_CarryFront.glb",
-            "sha256": "be9b56aded10197735a43d2f07348ac51d3a41016752da6920c3fe20c9c15aa8"
+            "path": "Models/FirstLevelCarryV15/Model_LugouNra01_CarryFront.glb",
+            "sha256": "814d441c837bc3c1cb9e31b81953ecd9a73204c594cfbf8f3282cd631e6cb268"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Model_LugouNra01_CarryPair.glb",
-            "sha256": "ddcb18351eecae7c72f346a2ef87ef08d18092f82ce10bc3544e45f2e11b248a"
+            "path": "Models/FirstLevelCarryV15/Model_LugouNra01_CarryPair.glb",
+            "sha256": "b204eadaf06c57a063140c3a561f400186d9204c4d0f44f7ab424d736dea1fca"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Model_LugouNra01_CarryRear.glb",
-            "sha256": "e8a86983b7b9f3c542d91fae5c90288f32a63ac51890a7860b1962bdbce758ef"
+            "path": "Models/FirstLevelCarryV15/Model_LugouNra01_CarryRear.glb",
+            "sha256": "e5ecade9a229833c5b75de2de808d35a118c54de8ca93c3267429872f2b55fed"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Model_LugouNra02_CarryFront.glb",
-            "sha256": "e0e0c6026aa268459606617e8fd6d95fb5c2ca6b3ea0c9ba2869861c8bcb2d35"
+            "path": "Models/FirstLevelCarryV15/Model_LugouNra02_CarryFront.glb",
+            "sha256": "8bf8af357bf8445d06401744a69f0d709f270cb59b0478734d2130a636fdb47f"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Model_LugouNra02_CarryPair.glb",
-            "sha256": "5f640c55cf95edd0303e1c5e354e98ed24a012e53995e0cb78e580d0703e28df"
+            "path": "Models/FirstLevelCarryV15/Model_LugouNra02_CarryPair.glb",
+            "sha256": "abecf6e64633789270fd252538b115319f1ef7ddd0705edc900dba9cd986f11b"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Model_LugouNra02_CarryRear.glb",
-            "sha256": "78b58394c29fe8b1112724c27a88a556e9076ca366ce3feb6ac9bf555bd3a1b5"
+            "path": "Models/FirstLevelCarryV15/Model_LugouNra02_CarryRear.glb",
+            "sha256": "1d25fd9bc0e822d3d4a95a155256e751b8dbe38d0a8f13cb02d82be8bde23421"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Model_LugouNra03_CarryFront.glb",
-            "sha256": "c8a2e41cd2cab4053145cee763bc9252f90aaff921b88c72b1af110e05ff7d03"
+            "path": "Models/FirstLevelCarryV15/Model_LugouNra03_CarryFront.glb",
+            "sha256": "bfb1c0fec9d660cd67a7941369aab8319fbd7e5ff388838e89c748b431edd0bd"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Model_LugouNra03_CarryPair.glb",
-            "sha256": "377ccad2d42ba22febf38ed46de61cdeec00b94c4ae19bf07ae1af3f2e8bc633"
+            "path": "Models/FirstLevelCarryV15/Model_LugouNra03_CarryPair.glb",
+            "sha256": "183c3a5b72f93ad58f558c0a6856d0c13e0920533356c347422493045ee7ac2a"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Model_LugouNra03_CarryRear.glb",
-            "sha256": "82d36f789bc38f33eae0fff912e12def4095f3afc8833c8161f7bd4c2f97a741"
+            "path": "Models/FirstLevelCarryV15/Model_LugouNra03_CarryRear.glb",
+            "sha256": "a6ba83dc5339f41071ec5ed83df0963d9bc3585653350b80c71366637b376e3e"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Model_LugouNra04_CarryFront.glb",
-            "sha256": "117388c54eda886115c1c62115250ed30cb5e6ca07ab2b92fbf6ea8da349506d"
+            "path": "Models/FirstLevelCarryV15/Model_LugouNra04_CarryFront.glb",
+            "sha256": "b819ecd312068333aed8b5a7515fb8170e2448048420bce5dc2d03aa3cb0b918"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Model_LugouNra04_CarryPair.glb",
-            "sha256": "c0e8e63ae4e7c090c856852a40148ea2eb251c25b873b5997bcc18937b75ba7e"
+            "path": "Models/FirstLevelCarryV15/Model_LugouNra04_CarryPair.glb",
+            "sha256": "10664b98736a3f9d9530fa9a42c9801bdac2ca458119d697998dbef34cc47122"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Model_LugouNra04_CarryRear.glb",
-            "sha256": "794dabc7262cfbe324ded08fcf3a1e7ac1be360538fe13d7381c15303c9bec47"
+            "path": "Models/FirstLevelCarryV15/Model_LugouNra04_CarryRear.glb",
+            "sha256": "07fc0ad31a607512a9ab539a40a8d179c4724e65a83f2b42f7ae5006487ec3d8"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Model_LugouNra05_CarryFront.glb",
-            "sha256": "cc409e66941f18594105f18a1b184efa8d8dbe737adfacf24b618fcfccb7a351"
+            "path": "Models/FirstLevelCarryV15/Model_LugouNra05_CarryFront.glb",
+            "sha256": "f66dcba4e86a196e91533bbcc2ae12f55778759d69c64cd729cc4ab63d9cf316"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Model_LugouNra05_CarryPair.glb",
-            "sha256": "0de2bceb5e3c8181a1660aa889cd0ef6b2db8a9b906314443f737b0208d7c8bf"
+            "path": "Models/FirstLevelCarryV15/Model_LugouNra05_CarryPair.glb",
+            "sha256": "d13583326b20af4617f4c50e654e43c806a74f398ba00e61a1329ec13cdd18fe"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Model_LugouNra05_CarryRear.glb",
-            "sha256": "1af7457a2b1772713d18354bb412eb7d94965a461b2054ae960644633c52239c"
+            "path": "Models/FirstLevelCarryV15/Model_LugouNra05_CarryRear.glb",
+            "sha256": "1383091fd3e01d058c02a89a298c7964d6a8e8fdd9e4cf26f71d161280247e2c"
           }
         ],
         "evidence": [
           {
-            "path": "Models/FirstLevelCarryV13/Data_IndependentValidation.json",
-            "sha256": "9c5b39233f207cf0cbc8fff7a939c77190f2e1ce880be493203498d0e8da15c7"
+            "path": "Models/FirstLevelCarryV15/Data_IndependentValidation.json",
+            "sha256": "3e35f9121a4cf5b56e3444ebbff1168082c069c17cddacad7ddf083740783eb8"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Data_EditableProjects.json",
-            "sha256": "7e3630b5b51021e8cdb5a296649c2ca323b1dfbde2e590dc66907b87477597bb"
+            "path": "Models/FirstLevelCarryV15/Data_EditableProjects.json",
+            "sha256": "aa681cd05e6b953b58e65b6318040900c0e7463c0d2efb853a9c592ac41f2749"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Data_EditableProjectValidation.json",
-            "sha256": "75e81aec34a6d127f7f134bb82f313819ad6c5a0d661e2d8a0f792f670e355ff"
+            "path": "Models/FirstLevelCarryV15/Data_EditableProjectValidation.json",
+            "sha256": "4c7f1538aa887a0a6aed3a6a94661cecd3da38cb2a733e75ca88f92d84002334"
           },
           {
-            "path": "Models/FirstLevelCarryV13/Data_ProjectAndPlaybackValidation.json",
-            "sha256": "bd8488d337836300ad10707ab78ba7af971926524693c93792330066ca50c8ed"
+            "path": "Models/FirstLevelCarryV15/Data_ProjectAndPlaybackValidation.json",
+            "sha256": "cd9ac79e9d3e22f56194cf2427b3518cd5d8af5168ed24ab2b4cded2ac1000b7"
           }
         ],
         "viewed": [
           {
-            "path": "Preview/FirstLevelCarryV13/Texture_CarryStretcherFront_side_25.png",
-            "sha256": "6bfeede2a6e4e0d16df18547910f79298077d9a0133ad43f0ba8650fd41981d7"
+            "path": "Preview/FirstLevelCarryV15/Texture_StretcherPair_side_25.png",
+            "sha256": "d65f8b299974c4b3c4b054cc811fc69f1d7bdbc32da240bfd34d07bb6ab4566c"
           },
           {
-            "path": "Preview/FirstLevelCarryV13/Texture_CarryStretcherRear_three_25.png",
-            "sha256": "841b0ee275706045eb2fb66dd07a2207d20a89fa1984e521ac0abad47f62f64c"
+            "path": "Preview/FirstLevelCarryV15/Texture_StretcherPair_three_75.png",
+            "sha256": "d2bf5843c91419ee89f4c06f81882cd0dd073704e52e9f848dda94372fe3d6ba"
           },
           {
-            "path": "Preview/FirstLevelCarryV13/Texture_StretcherPair_side_25.png",
-            "sha256": "d3da8cb660d98af5e82be2d8c60832a15551806aa6ba3908f0f8eeff102d7a8f"
+            "path": "Preview/FirstLevelCarryV15/Texture_StretcherPair_front_0.png",
+            "sha256": "9e8e50040b527034ccdaf31dec914e399afb53e7030e10dd1b3412caf458da36"
           },
           {
-            "path": "Preview/FirstLevelCarryV13/Texture_StretcherPair_three_0.png",
-            "sha256": "525bc921ce2c1eb87498036b6a1b491f4ff36992a5b424ee41e06ce42faa5786"
+            "path": "Preview/FirstLevelCarryV15/Contacts/Texture_FrontL_outside_50.png",
+            "sha256": "0baca25659f2165593a19458009f475d9aa68865f1aa6053ff139d35da037c55"
           },
           {
-            "path": "Preview/FirstLevelCarryV13/Texture_StretcherPair_side_75.png",
-            "sha256": "4b474adf813bebbb6745cbc8e190a8b37ace028a537fa0dc6a8ab05397d9e3fe"
+            "path": "Preview/FirstLevelCarryV15/Contacts/Texture_RearR_inside_50.png",
+            "sha256": "6406bcaaf20d333bbca0a2182c71ce14251d5f251a195f35966fe8d592baa448"
           },
           {
-            "path": "Preview/FirstLevelCarryV13/Contacts/Texture_FrontL_outside_50.png",
-            "sha256": "6b16940c04ce2298e23a137f9df6b4648881d02ef13ddd6630dd10feb6071611"
+            "path": "Preview/FirstLevelCarryV15/Contacts/Texture_FrontR_inside_12.png",
+            "sha256": "1c9b45e0ca1ff77a9fe92c8f22854554183ad731f215ec54e363e6f599e0f00c"
           },
           {
-            "path": "Preview/FirstLevelCarryV13/Contacts/Texture_FrontR_above_50.png",
-            "sha256": "86cdb3dba66bb272ed029e4e735145028b80cce1eb48d238ec36454c338ae145"
+            "path": "Preview/FirstLevelCarryV15/Contacts/Texture_FrontL_above_75.png",
+            "sha256": "a5fe6534dac403c26fa3ef2d552b9abcabd7401e9c56383a45bfccceaf00c03a"
           },
           {
-            "path": "Preview/FirstLevelCarryV13/Contacts/Texture_RearL_inside_50.png",
-            "sha256": "1057c3dea8187853b3221438d132ac8d904c49ef6fb979b7dba75f1568118708"
+            "path": "Preview/FirstLevelCarryV15/Contacts/Texture_RearL_outside_75.png",
+            "sha256": "4ad7749642092d1f2cc4b9635912e007c3965c0a86102adcf508959ebd8ded99"
           },
           {
-            "path": "Preview/FirstLevelCarryV13/Contacts/Texture_RearR_above_50.png",
-            "sha256": "31e1ac669d7cf6d2dc1b62a6d4b8170ef3c2c3e8045df7f56b1e4abe9a44e028"
+            "path": "Preview/FirstLevelCarryV15/Contacts/Texture_RearR_above_12.png",
+            "sha256": "521d979fd217db1c3d1cc950d858ef9de696e961173fc8bb2c0830baa4631908"
           },
           {
-            "path": "Models/FirstLevelCarryFitV18/Texture_LugouNra05_Front_side_500.png",
-            "sha256": "1fa9c7215ba67e42a2143f25d414390913e2e53f0fb4e21f5ff7327068005875"
+            "path": "Preview/FirstLevelCarryV15/ContactsClearView/Texture_FrontR_inside_12.png",
+            "sha256": "3b33ee86231f30b0f2dd4e6798d8c7a653cc5526371f7ba5af05ff0fb06f9668"
           },
           {
-            "path": "Models/FirstLevelCarryFitV18/Texture_LugouNra05_Rear_three_500.png",
-            "sha256": "071907ff2f6e525ae78d9afccb5c143f7d7cffd74607a07bccc4a6ec458dc5b4"
+            "path": "Preview/FirstLevelCarryV15/ContactsClearView/Texture_FrontL_outside_50.png",
+            "sha256": "ec60a9d9115542ae660ae87b1695493a40a5838e6c234fb5e35c592c69731d4d"
+          },
+          {
+            "path": "Preview/FirstLevelCarryV15/ContactsClearView/Texture_RearL_inside_75.png",
+            "sha256": "4a9dabc223c6eaf2ec6994bfd875fd89deea5f6b0090fc42638e59605bf1276c"
+          },
+          {
+            "path": "Models/FirstLevelCarryFitV26/Texture_LugouNra01_Front_side_500.png",
+            "sha256": "4641f8adf24284b461e16861711c712dad31644515f321c4c2fc03f29a6ebe6d"
+          },
+          {
+            "path": "Models/FirstLevelCarryFitV26/Texture_LugouNra05_Rear_three_500.png",
+            "sha256": "f9fc4083815990b1e52fb63604afe4bef882d6bc66ca0165a29486722193b633"
           }
         ],
         "blockers": [
-          "Two-person cropped input remains experimental; original source and raw are unchanged.",
-          "Load-bearing elbows are lower, but the front bearer still leans backward and flexes the support knee; source upright gait is not visually matched.",
-          "Close views retain palm/finger contact but show excessive wrist bend and cuff occlusion. Hand orientation must be refit with the lowered elbow plane; contact distance is not naturalness acceptance.",
-          "Trial grip/bed heights are 1.04/0.92 m versus runtime 0.88/0.76 m. The 0.40 m/s reference is authored. Geometry, patient, first-person handles and loading consumers have not been changed or validated for this proposal.",
-          "No patient, double-support idle, start/stop, turn, slope, threshold or loading transition is accepted.",
-          "r12 still uses its existing original-rig carry clips; V13 is not runtime-enabled."
+          "Two-person cropped input remains experimental; source video and raw recovery are unchanged.",
+          "Support knees remain more flexed than the source upright walk; authored gait naturalness is not accepted.",
+          "Wrist bend is substantially reduced. Viewed palms/thumbs oppose across the rail, but fingertip pressure and skin clearance are not independently surface-validated on all five models. Some original inside views were occluded; clear views are preserved separately.",
+          "Trial grip/bed heights are 0.98/0.86 m versus runtime 0.88/0.76 m. The 0.40 m/s speed is authored; patient, first-person hands and loading consumers are not adapted to the proposed geometry.",
+          "No patient, double-support idle, pickup/release, start/stop, turn, slope, threshold or loading transition is accepted.",
+          "Latest master still consumes its existing original-rig carry clips; V15 is not enabled."
         ],
-        "note": "Numeric acceptance is limited to exported flat-ground contacts on five original rigs at three sizes; visual acceptance is withheld. NRA01 and NRA05 images were inspected; full naturalness acceptance for every variant is not claimed."
+        "measured": {
+          "samples": 7230,
+          "maxWristBendDeg": 12.594951867267953,
+          "maxPalmErrorM": 8.856793474940633e-05,
+          "maxContinuousSoleDriftM": 0.00013162262515345965,
+          "minSoleM": 0.0019445647512649211,
+          "maxFingerOffsetErrorM": 4.37700974300595e-06
+        },
+        "note": "Numeric contact checks do not constitute visual or gameplay acceptance. Torso-fit was disabled. All poses remain authored post-recovery candidates."
       },
       "productionFit": {
-        "validation": "Models/FirstLevelCarryV13/Data_IndependentValidation.json",
-        "trial": "Models/FirstLevelCarryFitV18/Data_ProductionFit.json",
+        "validation": "Models/FirstLevelCarryV15/Data_IndependentValidation.json",
+        "trial": "Models/FirstLevelCarryFitV26/Data_ProductionFit.json",
         "runtimeEnabled": false,
         "profiles": 30,
         "samples": 7230,
         "referenceSpeedPolicy": "0.40 m/s authoring reference; not calibrated monocular ground speed.",
-        "geometryStatus": "local_proposed_height_not_in_runtime",
-        "continuousContactValidation": {
-          "path": "Models/FirstLevelCarryV13/Data_ContinuousContactValidation.json",
-          "sha256": "13eb2759abef0128aa5ea4d9da0634991598811d97f266e4269792ec0ce7dbcd",
-          "maxDriftM": 0.00012892040000557026
-        }
+        "geometryStatus": "local_proposed_height_not_in_runtime"
       },
       "newSourceProduction": [
         {

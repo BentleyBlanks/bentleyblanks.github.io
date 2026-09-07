@@ -7,7 +7,10 @@ import {createHash} from 'node:crypto';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import {ServeRoot} from './Script_DevServer.mjs';
 await import('./_import/Script_FirstLevelTrainGameVerify.mjs');
-const project=path.dirname(fileURLToPath(import.meta.url)),version=JSON.parse(await fs.readFile(path.join(project,'Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json'),'utf8')).version,out=path.join(project,'_shots',version);
+const project=path.dirname(fileURLToPath(import.meta.url)),version=JSON.parse(await fs.readFile(path.join(project,'Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json'),'utf8')).version;
+const args=process.argv.slice(2),outputGroup=args.includes('--output-group')?args[args.indexOf('--output-group')+1]:version;
+assert.match(outputGroup,/^FirstLevelTrain[A-Za-z0-9]+$/);
+const out=path.join(project,'_shots',outputGroup);
 const runtimeFiles=['Script_FirstLevelTrainAnimation.mjs','Script_FirstLevelMissionTrainLife.mjs','Script_FirstLevelMissionTrain.mjs',
  'Script_FirstLevelMissionView.mjs','Script_FirstLevelMissionRuntime.mjs','Script_FirstLevelP012CastAppearance.mjs','Script_Main.mjs','Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json',
  'Data_FirstLevelMission.mjs','Data_FirstLevelMissionTrain.mjs','Data_FirstLevelMissionLayout.mjs',
