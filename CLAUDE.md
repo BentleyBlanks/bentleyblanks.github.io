@@ -1,33 +1,21 @@
 # CLAUDE.md
 
-**仓库规矩全在 [`AGENTS.md`](AGENTS.md)，动手前先读。** 这里只放两条最容易踩、且踩了代价最大的。
+仓库协作、任务边界、技能适用范围与交付要求以 [AGENTS.md](AGENTS.md) 为统一入口；修改项目时再读其 AGENTS.md。
 
-## 1. 一律在自己的 git worktree 里改
+## 工作区与交付
 
-主检出 `C:\Users\Bentl\Documents\Program\bentleyblanks.github.io` 由多个 agent 并发共用。**编辑、提交、推送、切分支一律不许在主检出进行**，每次任务用 `git worktree add -b <新分支>` 新建一棵树。完整规则见 AGENTS.md「Git Worktree Workflow」。
+- 用 Git 查询实际主检出路径和工作区状态，所有编辑、提交和推送在本任务独占 worktree 中进行；只读审查、续做和宿主已分配工作区的处理见根入口。
+- 发布前按根流程 fetch、必要时 rebase，再快进交付；推送后只有实际主检出位于 master 且干净时才同步。不要复制历史绝对路径或另建一套发布步骤。
 
-## 2. 验收走本地预览，别拿线上当预览环境
+## 本地预览
 
-站点 416MB / 2000+ 文件，每次推送都要整站打包上传 Pages，一轮几分钟且会互相抢占。
-
-```bash
-node scripts/Script_LocalPreview.mjs --no-open      # 起服；去掉 --no-open 会自动开浏览器
-```
-
-- 零 npm 依赖，只要有 node。索引页在 `http://127.0.0.1:8080/__preview/`，列出所有页面，并能把任意 worktree 挂到相邻端口。
-- 路径与线上一致、一律 no-store、支持 Range、MIME 覆盖 `.mjs/.wasm/.glb/.pck`。
-- 端口被别的 agent 占着时会自动往上让，**页面顶部会写明当前服的是哪棵树** —— 看之前先扫一眼，别对着别人的代码验收。
-- Claude Code 里也可以 `preview_start({ name: "preview" })`（配置在 `.claude/launch.json`），但它固定连 8080，多 agent 并行时同样要看页面顶部那行。
-- `node scripts/Script_LocalPreview.mjs --help` 有全部参数；`--shortcut` 在桌面放一个双击就起服的入口。
-
-**先本地看满意，再推一次 master。** 不要每改一版推一次去线上看。
-
-## 3. 推完 master，把主检出也 pull 到最新
-
-预览服务的是**主检出那棵树**。代码推上去了、主检出还停在旧提交，用户刷新看到的仍是旧版 —— 表现成「我让你加的东西怎么没有」，而他其实在照着一份过期界面提问。
+从本任务 worktree 根执行：
 
 ```powershell
-git -C C:\Users\Bentl\Documents\Program\bentleyblanks.github.io pull --ff-only origin master
+node scripts/Script_LocalPreview.mjs --no-open
 ```
 
-只在主检出**当前就在 `master` 且工作区干净**时这么做，且只用 `--ff-only`。停在别人分支上或有未提交改动就**别强来**（不 checkout、不 stash），如实说主检出被占着。完整条款见 AGENTS.md「推完 master 要把主检出也 pull 到最新」。
+- 默认端口 8080，被占用时按输出使用实际端口；`/__preview/` 顶部核对服务根目录，确保看到本任务的代码。
+- 无需 npm 安装；支持 Range、游戏资源 MIME、缓存与 Pages 兼容的隔离头。完整参数见 `node scripts/Script_LocalPreview.mjs --help`。
+- Claude Code 的 `preview_start({ name: "preview" })` 使用 `.claude/launch.json`，同样核对端口与服务根目录。
+- 页面变化先本地验收，再推送；纯说明修改按根入口做静态检查。

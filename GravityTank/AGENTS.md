@@ -174,9 +174,13 @@ Grep these first:
 5. RULE only if the **rule** changed (still no spoilers)
 
 ### Touching visuals / Pages
-1. Edit owner file
-2. Bump `?v=`
-3. Merge `master` + smoke `https://bentleyblanks.github.io/GravityTank/`
+
+1. Edit the affected files and validate in this task’s local preview; use the relevant regression checks above and below.
+2. Update cache-bust and any player-facing version fields before committing.
+3. Follow the root workflow to fetch/rebase and fast-forward to `master`.
+4. Verify the deployed commit and live version at `https://bentleyblanks.github.io/GravityTank/`.
+
+Instruction or documentation-only edits need content, link, command, and diff checks rather than game or browser regression.
 
 ### Easy mode / lives regression
 Run `node GravityTank/Script_EasyModeTest.mjs` after changes to self-hit collision, lives, damage, or mode checkpoint handling. Also preview the title selector and gameplay at desktop and mobile sizes.

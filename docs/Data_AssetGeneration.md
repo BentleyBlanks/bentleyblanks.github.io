@@ -2,6 +2,8 @@
 
 仅在需要 CLI 或回退供应商时查阅。供应商顺序、音频要求与密钥规则以 [根 AGENTS.md](../AGENTS.md) 为准；本文件的排障经验不额外授权付费或改变任务范围。
 
+这里的 `codex exec` 是内置工具的宿主入口，不是 imagegen 技能的 `scripts/image_gen.py`。后者直接使用图片 API、需要对应密钥与付费授权，不因“CLI”同名就替代本仓供应商顺序；不能把其中一种路径的要求套到另一种路径。
+
 ## 内置 imagegen 的 CLI 入口
 
 当前宿主已有内置 imagegen 时直接调用。需要 CLI 入口时，先检查当前 `codex exec --help` 和可用配置，再替换下面的占位符：

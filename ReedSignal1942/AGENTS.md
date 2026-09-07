@@ -55,6 +55,8 @@
 
 ## 交付检查
 
+遵循 [根流程](../AGENTS.md)。运行时变化执行冒烟与所改脚本的语法检查；交互、渲染、镜头或资产变化追加 RenderHealth。共享基础设施变化覆盖全部受影响的检查；纯说明整理只检查内容、引用、命令和 diff。
+
 ```text
 node ReedSignal1942/Script_SmokeTest.mjs
 node --check ReedSignal1942/Script_Game.mjs

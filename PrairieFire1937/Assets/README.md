@@ -1,10 +1,12 @@
 # PrairieFire1937 / Assets —— 可选外部资产投放处
 
-把文件按**精确文件名**放进本目录并提交仓库，游戏会自动加载使用；
+把文件按**精确文件名**放进本目录、记录来源与许可，并在 `?assets=1` 下验证；默认不会加载外部资产。
 文件缺失或加载失败时自动回退到程序化方案（合成配乐 / 程序化插画），不会报错。
 **任何子集都可以单独投放**，不需要一次配齐。完整清单以 `../Data_Assets.mjs` 为准。
 
-## 一、整轨背景音乐（5 首，找免费/可商用素材）
+用户提供的既有素材按来源许可检查；由 agent 离线生成的图片、音乐与音效遵循 [根 AGENTS.md](../../AGENTS.md) 的供应商及授权规则。运行时 WebAudio 回退保留。
+
+## 一、整轨背景音乐（5 首）
 
 | 文件名 | 时期 | 情绪参考 |
 |---|---|---|
@@ -24,9 +26,9 @@ Build / Harvest / Wind / Snow / Turn / Unlock / Bad / Good` + `.mp3`
 
 短促干声、每条尽量 < 2 秒；沿用游戏内的节流与并发限制。
 
-## 三、事件卡插画（8 张，LoveArt 生成）
+## 三、事件卡插画（8 张）
 
-统一风格建议提示词（在 LoveArt 里配合各行场景描述使用）：
+统一风格建议提示词（生成入口遵循根规范，配合各行场景描述使用）：
 > 1940s Chinese wartime archival photograph, north China Taihang mountains,
 > black and white with slight sepia, grainy film, documentary realism,
 > restrained composition, no gore, 16:9
@@ -51,7 +53,7 @@ Build / Harvest / Wind / Snow / Turn / Unlock / Bad / Good` + `.mp3`
 默认状态下游戏**不发任何资产探测请求**（保证控制台零 404）。
 投放文件并提交后，访问时在地址栏加 `?assets=1` 即启用加载：
 `https://bentleyblanks.github.io/PrairieFire1937/?assets=1`
-确认无误后告诉我，我把开关改为默认开启。
+默认启用会改变当前零请求契约；用户已授权默认启用时，在验证后同步开关与验收，否则保持按需加载。
 
 ## 五、许可（必须做）
 

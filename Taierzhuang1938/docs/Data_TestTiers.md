@@ -1,19 +1,19 @@
 # 台儿庄白盒测试分级（Data_TestTiers）
 
 > 统一入口：`node Taierzhuang1938/Script_TestRunner.mjs`。
-> 最后登记核对：2026-08-29，73/73 个 `Script_*Test.mjs` 已登记（以 `Script_TestRunnerTest.mjs` 的实数为准），另含高度图 verify。
+> 登记、领域和数量以 `Script_TestRunner.mjs --list` 与 `Script_TestRunnerTest.mjs` 为准，另含高度图 verify；这里不维护第二份固定测试总数。
 
 ## 一、目标与纪律
 
 测试按“执行时机 × 爆炸半径”分配。日常不再把十几分钟整机回归绑在每次编辑后：
 
-1. **quick（默认）**：11 个纯 Node 快测 + 命中领域的纯 Node 探针，供编辑循环；
-2. **prepush**：完整领域探针，并按具体文件风险追加 Boot/Play/Geo，供推送前验收；
+1. **quick（默认）**：`tier0Fast` 中的纯 Node 快测 + 命中领域的纯 Node 探针，供编辑循环；
+2. **prepush**：完整领域探针，并按具体文件风险追加 Boot/BootStall/Geo，供推送前验收；
 3. **full**：完整 Tier 0 + 命中领域，供共享底座、集成批和终验；
 4. **Tier 2**：性能实测与出图仍是低频人工审查，不由 `--changed` 自动执行。
 
-整局通关测试 `Script_PlayTest.mjs` 已随第一关到终章的废弃删除（2026-09-06，正片只剩序章）；
-跨模块安全网由 BootTest、领域专项与 P0/P1/P2 白盒的浏览器测试承担，领域专项仍负责深度，
+旧七章整局通关测试 `Script_PlayTest.mjs` 已删除。当前正片是新版第一关《往南的路》（`?whitebox=p012`），由 `FirstLevelMissionTest` 与 `FirstLevelMissionBrowserTest --campaign` 验证；旧 P0/P1/P2 浏览器测试只覆盖 `p012-archive`，不能替代新版通关。
+跨模块安全网由 BootTest、当前任务浏览器验收及领域专项承担，领域专项仍负责深度，
 例如伤害口径重放、整墙碰撞扫掠、碰撞盒与几何对账、AI 决策和编辑器数据契约。
 
 ## 二、推荐命令
@@ -50,17 +50,14 @@ node Taierzhuang1938/Script_TestRunner.mjs --only=DamageTest
 `--list` 显示完整分级；`--fail-fast` 第一条新增红即停；`--verbose` 透传全部输出；
 `--strict-baseline` 把登记过的历史红（`expectedFailures`）也计为失败；现在没有测试登记基线。
 
-纯文档、说明和源工程（`.blend/.py/.ps1`）改动在 `--changed` 下会明确跳过游戏测试；
+自动选测会忽略 Markdown 及 `.blend/.py/.ps1` 等路径；纯说明修改只做静态检查。生成脚本、源工程或文档中的可执行代码变化仍须按实际产物与消费链补充验证，忽略路径不代表免验收。
 未知运行时文件在 quick 显示警告，prepush 会保守补完整整机门禁。启动任何测试前会先检查
 `playwright-core`；缺依赖时立即退出，不再先跑几十秒后逐项失败。
 
 可以直接在 worktree 中运行上述 `node` 命令，也可以使用仓库的 npm scripts。
 npm 根入口也已拆档：`npm test` 只调度 Git 改动命中的游戏项目，`npm run test:all`
 才是明确的全仓冒烟；`npm run test:changed:dry` 只展示将运行哪些项目。
-npm 会以**向上找到的第一个** `package.json` 为项目根：worktree 根签出了 package.json
-时就是 worktree 自己（安全）；没签出、或在子目录里敲时会一路爬回共享主检出，测的是
-另一棵树。拿不准就先跑 `npm prefix` 看一眼，或干脆直接 `node`（详见
-`Data_TechRepoLessons.md` §3.0，2026-08-18 有一轮白跑的实案）。
+使用 npm 前以 `npm prefix` 核对实际项目根。正常 worktree 子目录仍能找到本树的 package.json；缺少它时可能找到其他祖先目录，不会仅因 worktree 身份就跳到共享主检出。优先从本任务 worktree 根直接 `node` 调脚本；依赖解析也按实际安装位置检查，见 `Data_TechRepoLessons.md` §3.0。
 
 ## 三、输出、超时与退出码
 
@@ -107,6 +104,7 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
 
 | 领域 | 自动探针 |
 |---|---|
+| firstLevel | FirstLevelMissionTest / FirstLevelMissionBrowserTest（`--campaign`；quick 只跑纯 Node，prepush 包含浏览器） |
 | terrain | HeightmapVerify → JieheTerrain → TengxianLayout → Physics → Jump → Destruction |
 | physics | Physics → Collider → Jump → Destruction → FractureBake |
 | combat | Damage → GunFeel → FixedCenterAim → ReticleCalibration → SprintCrosshair → SprintViewmodel → FpsArm → SprintMelee → Bayonet → Range → MeleeQte |
@@ -121,6 +119,8 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
 | infra | TestRunnerTest、ModuleGraphTest（测试入口与本地服务） |
 
 改 `Script_Main.mjs` 会保守选择所有有自动探针的领域。测试文件本身按其登记领域反向映射。
+
+新版第一关的配音完成验收另加 `node Taierzhuang1938/Script_FirstLevelMissionTest.mjs --audio` 与 `node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --audio --campaign`。默认套件通过不代表配音完成；来源与未完成项见 [重构验收](Data_FirstLevelRebuildAcceptance.md)。仅在声音资产或相应完成声明涉及本次任务时追加严格门禁。
 
 ## 六、Tier 2 —— 低频人工审查
 

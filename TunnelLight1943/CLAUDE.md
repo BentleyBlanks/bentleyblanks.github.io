@@ -26,8 +26,7 @@
 
 ## 开工三件事
 
-**① 先用命令行工作台定位，别一上来就读源码**（`SmokeTest.TestCliAnswersQuestions` 守着；
-由头见 `Data_DesignHistory.md`「先用命令行工作台」）：
+**① 优先复用命令行工作台定位**。`SmokeTest.TestCliAnswersQuestions` 验证 CLI 的定位与状态查询功能；已有明确位置时可直接阅读源码，诊断可跨模块追因。
 
 ```bash
 node TunnelLight1943/Script_Cli.mjs
@@ -43,7 +42,7 @@ node TunnelLight1943/Script_Cli.mjs
 | `anims [片段]` · `anim <名字>` | 骨架全部动作清单 · 一条动作的关键帧/驱动/用在哪几拍。**改动画先在这儿点名** |
 | `doctor` | 分支/上游落后/未提交/缓存戳/端口 |
 
-- 要问游戏状态先跑 `state`，**不许现写探针脚本**；缺子命令就往 `Script_Cli.mjs` 加，加完写回上表。
+- 查询游戏状态优先用 `state`；现有入口不足时允许定向探针，临时取证留在忽略目录。可复用的诊断能力补入 `Script_Cli.mjs` 并更新对应文档，不为一次性问题强制扩充 CLI。
 - 要拨游戏开关用 `--flag`／`@key=v`；一条命令拍好几拍；「画面上这块是哪张网格」走 `--eval`。
 - 过场对位以页面 F3 时间轴的「复制定位」为准（`c1_xx@line=N,at=T` 直接喂 `shot`）。
 - 用法细则（`--eval` 是表达式、`pre → eval → hold → 冻帧 → 截图` 的先后、`Settle`）见 `docs/Cli.md`。
@@ -57,7 +56,7 @@ node TunnelLight1943/Script_Cli.mjs
 | `Data_DepthSpec.mjs` | 深度带与尺度的**数值**（唯一一处） |
 | `Data_Scenes.mjs` | 加载 + 解析 + 开局校验（配错立即抛） |
 
-**③ 改完必跑「验证」一节。**
+**③ 按改动影响执行「验证」一节。**
 
 ## 硬规矩清单（一条一行；细则与判据在分册）
 
@@ -167,20 +166,21 @@ node TunnelLight1943/Script_Cli.mjs
 
 自动通关的驱动器要走进判定区才按得响：`GetBeatTarget` 交出 `reach`（＝zone 半宽），走位与按键用同一个数；新加窄判定区不用迁就常量，但 zone 半宽别小到人挤不进去。
 
-```bash
-npm run test:tunnelLight1943            # node：自动通关全 8 章双分支 + 机制断言 + 场景体检
-npm run scene:tunnelLight1943           # 场景清单：谁在哪、埋多深、用哪支画笔
-npm run test:tunnelLight1943:browser    # 浏览器：逐章渲染健康 + 跳幕体检
-node TunnelLight1943/Script_DepthAudit.mjs   # 落地体检（悬空/陷地）
-node TunnelLight1943/Script_Cli.mjs doctor   # 开工前：分支/落后/未提交/缓存戳/端口
+命令从本任务 worktree 根执行。运行时变化执行冒烟与场景体检；改章节入口或跳幕追加 DebugJump，改声音追加 BgmTest，改渲染追加 RenderHealth，改场景摆位追加深度体检。共享底座变化覆盖全部受影响的检查。
+
+```powershell
+node TunnelLight1943/Script_SmokeTest.mjs
+node TunnelLight1943/Script_SceneAudit.mjs --quiet
+# 以下按影响追加
+node TunnelLight1943/Script_DebugJumpTest.mjs
+node TunnelLight1943/Script_BgmTest.mjs
+node TunnelLight1943/Script_RenderHealthTest.mjs
+node TunnelLight1943/Script_DepthAudit.mjs
 ```
 
-**worktree 里跑测试要在 worktree 根目录跑**（2026-08-18 白跑了一整轮）：`npm run` 会把
-cwd 换到装着 package.json 的**主仓库**，于是 `npm run test:tunnelLight1943` 测的是主仓库那份
-签出，跟你改的这份没关系——全绿也说明不了任何事。worktree 里直接 `node` 调脚本：
-`node TunnelLight1943/Script_SmokeTest.mjs`（＋ `Script_SceneAudit.mjs --quiet` /
-`Script_RenderHealthTest.mjs` / `Script_DebugJumpTest.mjs` / `Script_BgmTest.mjs`），
-node_modules 靠模块解析往上走就能找到主仓库那份。
+纯说明整理检查内容、引用与 diff，不触发全八章回归；文档中的可执行示例有变化时核对相关脚本及参数。`Script_Cli.mjs doctor` 用于需要核查工作区、缓存或端口的任务。
+
+使用 npm scripts 前用 `npm prefix` 核对实际项目根；它按目录查找 package.json，并不会因为使用 worktree 或进入子目录就自动切到共享主检出。依赖按当前 Node 模块解析和安装位置检查，不假定兄弟 worktree 能继承主检出的 node_modules。
 
 改完某一拍，最快的自检是把它单独跑一遍再看一眼：
 

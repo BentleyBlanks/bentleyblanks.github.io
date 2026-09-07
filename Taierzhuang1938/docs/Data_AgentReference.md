@@ -81,7 +81,10 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   （SRTM 高程下载 / 采样 / 布设贴地 CLI，数据在 `Heightmap/`）。
 - 先读：`docs/Data_TaierzhuangHeightmap.md`（运行时契约）。
 
-### 滕县城 / 关卡
+### 滕县城 / 旧章节切片
+
+本节描述保留的城市和旧章节基础设施；新版第一关任务按上文「第一关《往南的路》」路由，不按旧章节表恢复正片。
+
 - `Script_TengxianCity.mjs` —— 整座城的生成器；数字全来自 `Data_Tengxian.mjs`（逐条带出处
   与「推定」标注），**任何尺寸不许在生成器里另起炉灶**。
 - `Script_TengxianOutfield.mjs`（城外鲁南平原）＋ `Script_TengxianField.mjs`
@@ -96,12 +99,12 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   （`Data_Menu.OVERVIEW_PHASE`，bounds = `Data_Battle.OVERVIEW_BOUNDS`，天光钉死 smokyDay）。
   它**不进 PHASES、不进选章**，只服务出图与自检 —— 采样点表八成的机位、Script_ShotTest
   的 Z 系列、Script_TownDressingDump 都从这条入口进。
-- 先读：`docs/Data_MissionRemake.md`（**本轮任务流程的唯一口径**，§10 是工程契约）、
+- 先读：`docs/Data_MissionRemake.md`（旧章节资料，§10 保留共享组件的工程背景）、
   `docs/Data_TengxianCity.md`（考据）。
 
-### 地标（14 个，并行工作包纪律）
-- `Script_LandmarkRegistry.mjs` —— kind → Build 函数注册表；并行制作期**冻结**，
-  新增 kind 由主会话统一加。`Script_Landmark_*.mjs` **一个工作包只改一个文件**。
+### 地标
+- `Script_LandmarkRegistry.mjs` —— kind → Build 函数注册表；`Script_Landmark_*.mjs` 实现各地标。
+  仅在本次明确并行分工时约定注册表写入人和文件归属；独立任务可同步修改注册表、地标与消费方。
 - 先读：注册表头注 + `docs/Data_TengxianCity.md` 对应地标小节（史实纪律逐条带可信度）。
 
 ### 布设 / 流送 / 外部资产
@@ -196,7 +199,9 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - 旧 `?whitebox=1` 关卡与选关入口已移除。`FirstLevelWhitebox` 数据、场景和规则模块仍供 P0/P1/P2 版本及纯逻辑回归复用。
 - `Script_FirstLevelWhiteboxBrowserTest.mjs` 验证旧链接回到正式菜单、旧卡片不再出现。
 
-### 第一关 P0/P1/P2 场景白盒（?whitebox=p012，额外独立版本）
+### 旧 P0/P1/P2 场景白盒（?whitebox=p012-archive，开发回归夹具）
+
+以下是归档版本的模块与玩法契约，仅用于该夹具或共享组件回归；不作为当前正片施工单。正式第一关使用 `FirstLevelMission` 系列，验证入口见上文。
 
 - `Data_FirstLevelP012Layout.mjs` 管 P2 坐标、体块、颜色语义和通行路线；
   `Data_FirstLevelP012Whitebox.mjs` 管独立 phase、现有角色/对白适配和节奏参数。
@@ -217,7 +222,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   原同班六人沿 `openingMarchRoute` 连续到前沿各侧位后才交防守；炮击反应须晚于真实弹着。
   本关 `hud.objectiveMarkers` 关闭全程悬浮地点和米数；跟随段由真实班长带路、停等与字幕引导，不能把内部测试目标重新画成玩家导航。
   B11/B14/B23 的局部指南经 `P012GuideApproach` 检查实体净空，到位才发字幕；拖拽由玩家完成，撤退烟幕由到位的班长施放，不占伤员身体、不代替玩家战斗。
-- 与正式第一关并存。旧 `?whitebox=1` 已移除。这个版本按用户要求使用
+- 仅保留开发入口，不进入玩家菜单。旧 `?whitebox=1` 已移除。归档版本使用
   灰地面、黄跨步、橙翻越、紫攀爬、蓝掩体、黑边界、红危险、绿任务路、青担架路。
   环境仍是程序化无贴图体块，人物及已烘焙声音复用现有配置。
 - `Script_FirstLevelP012ShellShot.mjs` 在首次远炮实际落地后，从玩家原地眼位展示九秒长焦观察；多发炮弹沿真实弹道落地，返还操控后接防目标持续遭受炮击。沿用过场输入封锁与释放，恢复原第一人称相机。
@@ -295,7 +300,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 ### 过场 / 剧情
 - `Script_Cutscene.mjs` —— 实机演出；只有用户点名的几场夺控制权，战斗内演出不夺。
   分镜数据在 `Data_Cutscene*.mjs`，纯 Node 自检 `Script_CutsceneCheck.mjs`。
-- `Script_Story.mjs` —— 把章节目标链 + 台词 + 分镜按章派发（2026-09-06 起玩家能进的正片只有第一关＝P0/P1/P2 白盒，它消费第一章内容；旧序章与第二到终章退出选章，只剩 ?phase=N 开发入口）；史实注记卡 `Data_History.mjs`，
+- `Script_Story.mjs` —— 保留章节目标、台词和分镜的派发接口；当前第一关任务由 `FirstLevelMission` 系列推进，旧章节与归档 P012 按各自入口保留共享组件回归。史实注记卡 `Data_History.mjs`，
   编剧红线在 `Data_Script.mjs` 头注与 `docs/Data_HistoryQuotes.md`。先读 `docs/Data_CutsceneRedo.md`。
 
 ### 玩家文本 / 调参表（数据驱动）
@@ -366,7 +371,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - 回归口 `Script_TelegraphTest.mjs`（纯 Node）；取证口 `Debug.Telegraph`，
   HUD 是报码纸 `.hudTelegraph`（**不压暗武器 UI** —— 发报不占手）。
 
-### 任务流程引擎钩子（集成批 INT1：章节内容与新系统之间的引擎侧原语；2026-09-06 起只有第一关内容还在用）
+### 任务流程引擎钩子（旧章节与共享组件接口）
 - **关中过场**：beats 的 `{ type:"cutscene", id }`、`story.Signal(名字)`
   （`Script_Story.SIGNAL_CUTSCENES`）、`Taierzhuang.PlayMidCutscene(id)` 三条路
   **共用同一个 RunCutscene**，所以 Esc 跳过与补卡语义与关首过场一致。
@@ -422,8 +427,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 
 ### 测试 / 出图
 - `Script_TestRunner.mjs` 分级入口；`Script_BootTest.mjs` 七片切片开机 + 性能红线；
-  整局通关测试 `Script_PlayTest.mjs` 已随第一关到终章的废弃删除（2026-09-06）；
-  40+ 专项 `Script_*Test.mjs` 按领域挂在 Tier 1/2。
+  旧七章整局通关测试 `Script_PlayTest.mjs` 已删除。新版第一关通关用
+  `Script_FirstLevelMissionBrowserTest.mjs --campaign`，旧 P012 测试只覆盖归档夹具；专项数量与分级以 runner 登记为准。
 - 出图七支 + `Script_SamplePoints.mjs`（一片一建的出图计划）+ `Data_SamplePoints.mjs`
   （机位表，用采样点编辑器逐点调，出图脚本不自己算机位）。
 - 先读：`docs/Data_TestTiers.md`、`Data_SamplePoints.md`、`Data_VisualReview.md`（评分表）。
@@ -434,13 +439,12 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Heightmap/`、`BgmReview/`、`_import/`（外部资产取源/烘焙）、`_blender/`（Blender 管线）、
   `_shots/`（出图产物，gitignore）、`vendor/`（three + rapier，别 grep 进去）。
 
-## docs/ 导读（39 篇：先分清「现状」与「留档」）
+## docs/ 导读（先分清「现状」与「留档」）
 
 **现状口径（改对应系统前必读）**：
 - `Data_TechRenderPipeline.md`（渲染管线唯一现状文档）、`Data_TechPhysics.md`、
   `Data_TestTiers.md`、`Data_Destruction.md`、`Data_EditorSuite.md`、`Data_AudioAssets.md`。
-- `Data_MissionRemake.md` —— **本轮任务流程的唯一口径**；`Data_MissionDesign.md` —— 关卡层宪法
-  （线性剧情关，优先级高于之前的 ER2 占点结构）；`Data_Traversal.md` —— 通行高度阶梯。
+- `Data_FirstLevelRebuildAcceptance.md` —— 新版第一关来源、范围决定和验收；`Data_MissionDesign.md` 保留线性剧情设计背景，涉及旧章节的内容须结合当前入口核对；`Data_Traversal.md` —— 通行高度阶梯。
 - `Data_Bayonet.md`、`Data_PlayerDamage.md`、`Data_GunFeelReview.md`（枪感相关改动或专项审查时使用）、
   `Data_MainMenu.md`、`Data_SamplePoints.md`、`Data_VisualReview.md`。
 - `Data_MocapPipeline.md`（视频转骨骼动画流水线：素材要求 / 提取 / 反解 / 接线点名单）。
@@ -457,11 +461,11 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Data_BattlefieldNumbers.md`（BF1/BFV datamine，是参考值不是口径）。
 
 **历史提案与留档（别按现状读）**：
+- `Data_MissionRemake.md` —— 旧七章任务规划，保留共享机制背景；`Data_FirstLevelP012Acceptance.md` / `Data_FirstLevelP012AnimationNeeds.md` —— 归档 P012 的验收与素材需求，历史分工不自动沿用到新任务。
 - 六篇 `Data_EasyRed2*.md`（约 380 KB，对标调研与提案，「现状」判断早已过期）、
   `Data_DesignFirstPass.md`（首轮设计书，**性能预算作废**，以开机红线为准）、
   `Data_GunFeelRound1.md`、`Data_StoryFlow.md`（台儿庄旧版剧情流程）。
-- `Data_TechRepoLessons.md` —— 开工前的代码考古报告；它的「坑」清单（缓存戳 / 色彩空间 /
-  指针锁 / WebAudio / worktree）至今全部有效，新 agent 值得通读一遍。
+- `Data_TechRepoLessons.md` —— 历史代码考古与排障背景；按问题查阅并核对当前实现，不要求新任务通读，不将旧探针禁令、测试提案或路径示例升级为现行规则。
 
 ## 维护约定
 

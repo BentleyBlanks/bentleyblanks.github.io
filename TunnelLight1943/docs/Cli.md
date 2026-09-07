@@ -5,7 +5,7 @@
 > 往这里加条目：**【规矩】一句 / 【为什么】一句 / 【守着它的】测试名或 shot 判据**；
 > 事故过程、日期、用户原话、实测数字写进 [`../Data_DesignHistory.md`](../Data_DesignHistory.md)，数值只写常量名。
 
-## 先用命令行工作台，别一上来就读源码
+## 优先复用命令行工作台
 
 ```bash
 node TunnelLight1943/Script_Cli.mjs
@@ -31,7 +31,7 @@ node TunnelLight1943/Script_Cli.mjs
   · **对过场说事，以它的「复制定位」为准**——第一行就是 `shot` 吃的那一串（`c1_thatday@line=5,at=1.20`），拍到的就是用户看到的同一格；「拍这一格」在本地 DevServer 上直接落 `_shots/cine_*.jpg`（定位＋路径一起进剪贴板）。
   · **时间的口径只有 Core 的 `CineTimeTable / CineLocator` 一处**（面板与 CLI 共用），别另立一套秒数。它**不改剧本**——改台词仍去 `Data_ScriptC*.mjs`。
   · 键：空格 播放/暂停、← → 逐帧（Shift ×10）、[ ] 上一句/下一句、Home/End；倍速 0.25~4×；`⟲句` 循环当前句。往回拖＝重跳这一拍再推；链里起的微过场只能往前推（它回不去）。钩子：`TunnelLight.CineTimeline.{Toggle,Seek,SeekTime,Locator,SetSpeed}`。
-- **要问游戏状态，先跑 `state`，不许现写探针脚本**；缺子命令就往 `Script_Cli.mjs` 里加，加完写回这张表。一次性脚本下一个 agent 还得重写一遍。
+- **查询游戏状态优先用 `state`**；已有明确位置时可直接读源码，现有入口不足时允许定向探针。临时产物留在忽略目录，可复用的诊断能力再补入 `Script_Cli.mjs` 并更新这张表。
 - **要拨游戏里的开关，用 `--flag`**（`state` 和 `shot` 都吃）：是/否的记号决定画面长什么样，要拍「没挖通 / 挖了一半 / 挖通了」这类对比图就得能手拨：
 
   ```bash
@@ -59,7 +59,7 @@ node TunnelLight1943/Script_Cli.mjs
 ## 工作目录、帧数、投掷实拍的几条坑（2026-08-18 从项目记忆并入）
 
 - 【规矩】**在 worktree 里干活必须在 worktree 根目录跑 `shot`**——它照当前工作目录那份仓库起服务，在主仓库路径下敲拍到的是旧代码且不报错（表现是「加的台词一句没出现、@line=N 溢出到下一拍」）；开拍前 `doctor` 看「仓库」那一行。
-- 【规矩】worktree 里默认没有 node_modules：`shot`/`Script_RenderHealthTest`/`Script_DepthAudit` 都要 playwright，先 `npm i -D playwright-core`，**跑完 `git checkout -- package.json`**，别把版本号漂移带进提交。
+- 【规矩】`shot` / `Script_RenderHealthTest` / `Script_DepthAudit` 需要浏览器依赖。先检查本任务的 package.json、锁文件和实际模块解析；缺失时安装既有声明的兼容依赖，不顺手升级，不用批量还原 package.json 或锁文件清掉已有改动。
 - 【规矩】`TunnelLight.Tick(n)` 的 n 是**帧数**（1/30s），不是秒；SmokeTest 的 DT=1/30，逐帧交互测试的帧数按它算。
 - 【规矩】浏览器实拍投掷类交互：屏幕坐标每次 move 前用当下相机重投影，相机跟随会漂，提前算好的一组坐标会拽歪。
 - 【规矩】`?fast=1` 只在静音时生效（开着声音旁白仍正常语速，每句被切在半截，像「台词没说完就切镜头」）；调完把预览页导回不带参数的 URL。

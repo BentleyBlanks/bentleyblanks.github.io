@@ -1,5 +1,7 @@
 # 代码考古：既有 three.js 项目里可直接搬进 Taierzhuang1938 FPS demo 的技法清单
 
+> 历史考古与排障参考，按问题查阅。原文中的目录状态、分工、数字、行号和候选脚本反映当时情况；不作为新任务的固定步骤或当前完成证据。现行任务边界与操作规则见 [根 AGENTS.md](../../AGENTS.md)、[项目入口](../AGENTS.md) 和 [测试分级](Data_TestTiers.md)，具体技术结论仍须核对当前实现。
+
 # 代码考古报告：可直接复用到 FPS demo 的技法
 
 考古范围：`TunnelLight1943/`（2.5D 横版叙事，代码量最大、事故记录最全）、`TunnelBell1942/`（分层纪律的样板）、`PrairieFire1937/`（三维六角策略，唯一一个真正做过 PBR / shader 注入 / 视觉审核的项目）、根目录 `AGENTS.md`。
@@ -211,7 +213,7 @@ for (const m of src.matchAll(/(?:from|import\()\s*["']\.\/([A-Za-z0-9_]+\.m?js)[
 
 ### 2.9 命令行工作台（★强烈推荐，FPS 只有 Probe/ShotTest 雏形）
 
-`TunnelLight1943/Script_Cli.mjs` + `docs/Cli.md`。核心思想（`CLAUDE.md:29-30`）：**「先用命令行工作台定位，别一上来就读源码」**，而且 **「要问游戏状态先跑 `state`，不许现写探针脚本；缺子命令就往 `Script_Cli.mjs` 加，加完写回表」**——理由很实在：*一次性脚本下一个 agent 还得重写一遍*。
+`TunnelLight1943/Script_Cli.mjs` 与其 `docs/Cli.md` 展示了可复用的定位、状态和截图入口。优先复用已有能力，已知源码位置时可直接阅读；现有入口不足时允许定向探针。可重复使用的诊断再收进工具，不把临时问题强制扩展为 CLI 开发任务。
 
 子命令语义值得照搬：`where <片段>`（这东西在哪 → `文件:行`）、`state <id>`（无头跑到那儿、喂真输入、打状态）、`shot <id ...>`（真浏览器真键盘实拍）、`anims/anim`（动作清单与关键帧）、`doctor`（分支/落后/未提交/缓存戳/端口）。
 
@@ -223,21 +225,21 @@ FPS 版本的等价物大概是：`where`、`probe <关卡> --at x,y,z --look ya
 
 ### 3.0 先说最重要的一条操作纪律
 
-**worktree 里默认直接 `node` 调脚本，想用 `npm run` 先验 `npm prefix`。** 机制说清楚（2026-08-26 实测补记）：`npm run` 把 cwd 切到**从当前目录向上找到的第一个 package.json** 所在目录。worktree 根签出了 package.json 时（本仓库现在的常态），`npm prefix` 就是 worktree 根，`npm run` 测的就是你这份签出，是安全的；但 worktree 没签出 package.json、或你人在子目录里敲时，npm 会一路爬到**主仓库**，测的是另一棵树——**全绿也说明不了任何事**。`TunnelLight1943/CLAUDE.md:178-183` 记的 2026-08-18 白跑一整轮就是这么来的（`docs/Data_TestTiers.md` 说"npm 以 worktree 为项目根"描述的是前一种情形，两篇并不矛盾，条件不同）。判据一条：**跑 `npm prefix`，输出不是你的 worktree 根就别用 npm run**。直接 `node` 调脚本永远没有这个坑，node_modules 靠模块解析往上走就能找到主仓库那份。
+**从本任务 worktree 根直接用 `node` 调用脚本；使用 npm scripts 前核对 `npm prefix`。** npm 按目录查找 package.json，正常 worktree 子目录仍会使用本树的入口；缺失时可能落到其他祖先目录，并非自动跳回共享主检出。检查实际解析结果与预览服务根，才能确认验的是本次代码。
 
-配套两条（`docs/Cli.md:61-62`）：
-- **在 worktree 里干活必须在 worktree 根目录跑 `shot`**——它照当前工作目录那份仓库起服务，在主仓库路径下敲拍到的是旧代码**且不报错**（表现是"加的东西一样没出现"）。
-- worktree 里默认没有 node_modules：要 playwright 的脚本先 `npm i -D playwright-core`，**跑完 `git checkout -- package.json`**，别把版本号漂移带进提交。
+- 出图脚本使用本任务检出和忽略目录，先确认启动服务的根目录。
+- 缺少依赖时先检查本任务 package.json、锁文件和可解析的已安装依赖；需要安装时使用已有声明与兼容版本，不为排障顺手升级。不得用无差别还原 package.json 或锁文件的命令清掉已有改动；只处理本次引入且确认无需保留的差异。兄弟 worktree 的 node_modules 不会因为 Git 关联就自动参与 Node 解析。
 
-所以 FPS demo 的自验一律写成：
+当前 FPS 选测入口如下；纯说明修改只检查内容、链接、命令和 diff：
 
-```bash
-node Taierzhuang1938/Script_SmokeTest.mjs
-node Taierzhuang1938/Script_RenderHealthTest.mjs
-node Taierzhuang1938/Script_ShotTest.mjs _shots
+```powershell
+node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=quick --dry-run
+node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=prepush --fail-fast
 ```
 
-### 3.1 建议的脚本清单
+### 3.1 建议的脚本清单（历史方案）
+
+以下是当时的候选分工，不保证每个文件在台儿庄存在；当前名称与覆盖面查 `Script_TestRunner.mjs --list`，不要照此表创建重复测试。
 
 | 脚本 | 测什么 | 依赖 | 判据来源 |
 |---|---|---|---|
@@ -250,7 +252,7 @@ node Taierzhuang1938/Script_ShotTest.mjs _shots
 
 ### 3.2 `LaunchBrowser` 的解析顺序（`PrairieFire1937/Script_BrowserTestKit.mjs:18-48`）
 
-不下载浏览器，优先用机器上已有的：`PF_BROWSER_PATH` 环境变量 → 云端沙箱预装 Chromium（带 `--use-gl=swiftshader --enable-unsafe-swiftshader`）→ 系统 Edge → Chrome → playwright 自带。**照抄这个候选链**，它已经处理了本机/沙箱两种环境。
+不下载浏览器，优先用机器上已有的：`PF_BROWSER_PATH` 环境变量 → 云端沙箱预装 Chromium（带 `--use-gl=swiftshader --enable-unsafe-swiftshader`）→ 系统 Edge → Chrome → playwright 自带。这是当时的候选链；复用当前 `LaunchBrowser`，浏览器路径和启动参数以本次环境及帮助信息为准。
 
 ### 3.3 渲染健康的三条核心断言
 
@@ -343,8 +345,8 @@ renderer.toneMapping = THREE.NoToneMapping;
 ### P13 · 实拍时序三连
 `docs/Cli.md:48-53`：`pre → eval → hold → 冻帧 → 截图` 的先后固定。推论：`--eval` 看不到"按住键才存在"的状态（它在按键之前跑）；光靠 `pre` 拍不到长按姿势（`pre` 跑完 rAF 还在跑无输入帧，状态一路衰减，截出来是站姿）。跳场景之后**等转场动画真的结束再拍**（轮询状态钩子），**死等固定秒数会拍到一个半开的圆洞，且等多久随机器快慢变**。
 
-### P14 · 一次性探针脚本是浪费
-`CLAUDE.md:46` / `docs/Cli.md:34`：「要问游戏状态先跑 `state`，**不许现写探针脚本**；缺子命令就往 CLI 里加。」理由：一次性脚本下一个 agent 还得重写一遍。
+### P14 · 优先复用诊断入口
+优先查询现有 CLI、测试与 Debug 接口；无法回答本次问题时允许定向探针。临时产物留在忽略目录，反复使用的能力再收进维护中的工具并记录入口。
 
 ### P15 · Worley 的 f1 当遮罩 = 波点，不是斑
 `Script_TexBake.BakeSteel` 的锈斑原来是 `SmoothStep(0.34, 0.06, w.f1)`。Worley 的单元本来就**均匀铺满**平面，拿单元中心的距离当遮罩等于「每个单元中心画一个圆点，而且每个单元都画」——钢盔一格贴图 0.35 m、14 个单元，落到盔顶就是 2.5 cm 等距的橙色波点（2026-08-26 用户实拍：「头盔上的红点是什么鬼」）。**斑要有两层**：低频 fbm 先决定「哪一片有」，Worley 只负责把那一片的边缘咬碎，而且取**单元交界**（`f2 − f1`）不取单元中心 —— 锈是从划痕与卷边爬开的。同一条适用于任何「随机长在表面上的东西」：弹孔、水渍、霉斑、剥漆。
@@ -447,12 +449,12 @@ renderer.toneMapping = THREE.NoToneMapping;
 - 【WebAudio·噪声】随机游走生成的布朗噪声天然带直流分量：听不见，却实打实吃掉动态余量，还会在包络起音处变成一下'噗'。必须先减均值、再按 RMS 归一（不归一的话音效响度会随刷新页面而变）、首尾还要交叉淡化否则循环点每圈'嗒'一下。
 - 【WebAudio·泄漏】带声像的音效若忘了把 StereoPannerNode 并进清理名单，每发一次就漏一个节点。必须有 Spawn 登记 + onended 主回收 + Purge 兜底（页面挂起时 onended 可能迟迟不来）+ 同时发声上限（宁可丢音也不能让节点数失控）。
 - 【WebAudio·重复感】每一两秒就响一次的音（脚步、弹壳）若固定从噪声缓冲起点起播，很快会听出'贴图'感。每次从随机位置起播；用采样时一个 cue 要存一组变体而不是单个 buffer，并轻微变速变调。
-- 【worktree】worktree 里不能用 npm run——npm 会把 cwd 换到装着 package.json 的主仓库，测的是另一棵树，全绿也说明不了任何事。必须直接 node 调脚本。同理 shot/实拍类脚本要在 worktree 根目录跑，在主仓库路径下敲会拍到旧代码且不报错。
-- 【worktree·依赖】worktree 里默认没有 node_modules，装 playwright-core 之后要 git checkout -- package.json，别把版本号漂移带进提交。
-- 【无头浏览器·指针锁会夹住真鼠标】Chromium on Windows 的指针锁实现是 `::ClipCursor(窗口矩形)`——全系统的光标夹具，不分有头无头。无头 Edge 的不可见窗口落在屏幕 (27,95)-(1297,805)，冒烟脚本一点「进城」抢到锁，开发机上真人的鼠标就被夹在屏幕左上角那一块动不了；而且**无头下 exitPointerLock 不解夹**（有头会），要等浏览器进程退出。症状是「开着游戏 / 跑着测试，鼠标隔一阵莫名其妙锁在左上角」，跟游戏逻辑毫无关系，读源码永远找不到。修法在游戏侧：`navigator.webdriver` 下一律走页内假指针锁（Script_Main `FAKE_POINTER_LOCK`），逻辑照常流转、冒烟照常验解锁通道、真锁一次不碰；PlayTest 第 14 节守着这条。任何新项目的浏览器测试只要会点进指针锁，都得先装这道闸。
+- 【worktree】从本任务根运行脚本，使用 npm 前核对 `npm prefix`；出图另核对服务根。详见 §3.0，不将一次路径错误推广为所有 worktree 禁用 npm。
+- 【worktree·依赖】按 §3.0 检查实际依赖解析，安装保留既有声明与锁文件；禁止用批量还原文件掩盖本次安装差异。
+- 【无头浏览器·指针锁会夹住真鼠标】Chromium on Windows 的指针锁实现是 `::ClipCursor(窗口矩形)`——全系统的光标夹具，不分有头无头。无头 Edge 的不可见窗口落在屏幕 (27,95)-(1297,805)，冒烟脚本一点「进城」抢到锁，开发机上真人的鼠标就被夹在屏幕左上角那一块动不了；而且**无头下 exitPointerLock 不解夹**（有头会），要等浏览器进程退出。症状是「开着游戏 / 跑着测试，鼠标隔一阵莫名其妙锁在左上角」，跟游戏逻辑毫无关系，读源码永远找不到。修法在游戏侧：`navigator.webdriver` 下一律走页内假指针锁（Script_Main `FAKE_POINTER_LOCK`），逻辑照常流转、冒烟照常验解锁通道、真锁一次不碰；原 PlayTest 第 14 节为历史验收记录；现行 Windows 假锁保护仍须遵守项目入口，旧测试已删除，不能作为本次通过证据。任何新项目的浏览器测试只要会点进指针锁，都得先装这道闸。
 - 【指针锁·鼠标推到一定距离镜头跳切】页内链路（mousemove → lookX → yaw → 相机）逐帧量过是连续的，跳的是浏览器送来的 movementX/Y 本身：Chromium on Windows 不开 raw input 时，锁内的隐藏光标仍按屏幕坐标走，被 ClipCursor 夹到窗口边或跨到另一块屏后被拉回窗口中心，那一下回拉会作为一个几百到上千像素的单帧 movement 送进来，玩家看到的就是「往一个方向推到某个程度，画面突然切到另一个角度」。修法两道（Script_Main `RequestPointerLock` / `AcceptLookMotion`）：抢锁先要 `{ unadjustedMovement: true }`（读 WM_INPUT 原始位移，与光标位置无关，NotSupportedError 才退回普通锁）；mousemove 入口再装尖刺闸门，单帧模长同时超过窗口短边三成（≥200 px）与最近四帧峰值五倍的孤立事件整个丢掉。`Debug.PointerLock()` 的 `rawInput` / `spikesDropped` 说明哪一道在起作用；MenuTest 守着闸门。真手是连续的、光标不会瞬移，所以 Playwright `page.mouse.move` 那种跳点会被计进 dropped，是预期的。
 - 【实拍时序】pre → eval → hold → 冻帧 → 截图 的先后是固定的。推论一：eval 看不到'按住键才存在'的状态（它在按键之前跑）；推论二：光靠 pre 拍不到长按姿势（pre 跑完 rAF 还在跑无输入帧，状态一路衰减，截出来是站姿）。跳场景后要轮询状态钩子等转场真的结束，死等固定秒数会拍到半开的转场且等多久随机器快慢变。
-- 【探针】不许现写一次性探针脚本——下一个 agent 还得重写一遍。缺什么就往 CLI 工作台里加子命令，加完写回文档的子命令表。
+- 【探针】按 §2.9 与 P14 优先复用工具；允许补充定向取证，只有可复用的能力才长期维护。
 - 【测试的价值边界】截图 + 程序化设置状态验证不了可点性；控制台无异常验证不了 shader 没炸；参数改了验证不了画面变了。交互用真实合成事件测，渲染用 GL 错误码测，视觉用像素差分测。
 - 【集成缝】闸门全部直调模块函数时，测的是零件不是装配——PrairieFire 曾冒烟 62/62 全绿而装配是断的。大机制必须配一条走真实主循环的全链路集成闸门。
 - 【导入资产·绝对阈值只对「恰好是真米」的那一份成立】外部枪模的收料流程里写死过一个绝对焊接距离（`ImportWeapons._Collect`）。它看着无害了很久，因为**源模的单位五花八门**：三八式进 Blender 是四千多单位长、大刀五个、驳壳枪六个多，缩放到史实全长是 `_Place` 之后的事 —— 对它们来说那个绝对值等于「不焊」。只有 Poly Haven 那支手枪是按真米作者化的（0.222 m），于是同一行代码在它身上是真的焊：顶点掉了四分之三，套筒、击锤、扳机糊进机匣；接着 `_BevelForFirstPerson` 把这坨糊涂几何炸到三倍面数、减面再压回预算，最后就是加载画面上那把认不出来的枪。**任何按长度/距离写的阈值，都要按模型自身尺度取**（现在走 `ImportWeapons._WeldDistance`）。

@@ -60,13 +60,13 @@ Canonical path: `/MountainEmber1941/`
 
 ## Verification
 
-Run after any change:
+Follow the [repository workflow](../AGENTS.md). For runtime changes, run:
 
 ```powershell
 node MountainEmber1941/Script_SmokeTest.mjs
 ```
 
-Also run a local browser capture at 1920x1080 and 390x844. Check that the squad, nearest patrol/vision cone, and telephone exchange are readable in that order; the HUD does not cover the central battlefield; the pause state freezes simulation; all mandatory objectives can be completed; and mission results can enter the camp screen.
+For interaction, UI, rendering, art, or operation changes, also run a local browser capture at 1920x1080 and 390x844. Check that the squad, nearest patrol/vision cone, and telephone exchange are readable in that order; the HUD does not cover the central battlefield; the pause state freezes simulation; all mandatory objectives can be completed; and mission results can enter the camp screen.
 
 For art and operation changes, also run:
 
@@ -80,3 +80,5 @@ For runtime, rendering, or asset-lifetime changes, also run:
 ```powershell
 node MountainEmber1941/Script_PerformanceContractTest.mjs
 ```
+
+For instruction or documentation-only edits, check content, links, commands, and the diff. Changes to executable examples or configuration need checks for their actual impact. Shared infrastructure changes require all affected runtime and browser checks.

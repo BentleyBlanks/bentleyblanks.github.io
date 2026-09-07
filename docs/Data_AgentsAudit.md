@@ -61,3 +61,15 @@ Codex 官方默认 `project_doc_max_bytes` 为合计 32 KiB。以上三份原子
 - 对照基线逐段确认 TaihangDemo 三个子页与 BehindTheLines 规则完整迁移；对照两份地道战参考及滕县路由，检查设计/API/验收内容保留。
 - 统计全仓入口路径的累计字节数，检查本仓库根到子目录的指令链低于官方默认 32 KiB（不含机器级个人指令与宿主额外注入）。
 - 纯文档整理使用结构、内容与差异验证，不启动游戏或浏览器回归。
+
+## 2026-09-07 增量审查：台儿庄与技能边界
+
+本轮基线 `675343992e6b246c254318a328b3100ffbfb644a`。用户先要求只读建议，随后确认其他项目按建议修改并重点审查台儿庄。仅修改指令与参考文档。依据仍为 [Astra 提示指南](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra#prompting-best-practices)；结论来自当前文件、入口接线与测试登记的静态核对，未做模型效果 A/B 实验。
+
+- 根入口补明确的审查/授权边界、技能造成阻塞时的来源说明、中途追加要求与简洁结果表达；GitHub Pages 与 Sites 的适用范围分开，Codex CLI 内置生图与 Python 图片 API 回退分开。根 CLAUDE.md 改为薄入口，移除旧主检出路径及重复流程。
+- 台儿庄统一新版 `FirstLevelMission` / `?whitebox=p012` 与旧 `p012-archive` 的文档和验收路由。旧七章 Notion 摘录、P012 动画任务分工及代码考古不再自称当前任务的唯一依据。地标分工限定本次协作；源码诊断与定向探针允许使用。
+- 台儿庄测试分级移除过期总数和旧通关口径，补第一关领域与按任务追加的严格音频门禁。生成脚本/源工程被自动选测忽略，不代表无需验证产物。修正 npm 路径与依赖解析的过度概括，移除安装后无差别还原 package.json 的操作建议。
+- PrairieFire 发布统一到根流程；历史评分、事故、机制和地形详情移入 `Data_AgentReference.md`，玩法与性能防线仍保留入口或对应参考。可选素材说明统一供应商与授权口径，不改变默认加载行为。TunnelLight 的 CLI 分册同步清理探针禁令与依赖还原命令；TunnelLight、MountainEmber、ReedSignal、EnemyRearCommand 按实际影响选测，GravityTank 快速清单补齐本地验收。
+- 保留台儿庄坐标、共享高度场、战斗、存档、数据驱动、缓存、Windows 假指针锁、浏览器释放及测试并发保护；保留视频转骨骼的专用源工程路径。未修改游戏代码、测试断言、资产或模型配置。仓库未有自有 SKILL.md；本轮不新增技能，也不修改插件缓存。MountainEmber 的 Blender 输出路径需联动导出脚本，留待单独处理。
+
+验证：核对修改文档的本地链接、可执行命令和参数；检查迁移章节完整性与关键契约保留；运行全仓与台儿庄选测 dry-run，核对纯 Markdown 差异；`git diff --check`。本轮没有页面行为变化，不运行游戏或浏览器回归。
