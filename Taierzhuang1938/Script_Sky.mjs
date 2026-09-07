@@ -1,14 +1,36 @@
-// 《台儿庄：血战滕县》程序化天空。
+// 《台儿庄：血战滕县》天空。
 //
 // 默认间接光由 Global SH Probe + 环境贴图共同提供：SH 托住漫反射的方向感，
 // PMREM 则给人物军装、钢盔和刀枪保留必要的反射。缺掉环境贴图时，背光的人物和
 // 金属会直接压成黑色；实时 GI 打开后再补上位置相关的反弹光。
 //
-// 天空本身是解析式的（不是 Preetham 原版，是一套可控的美术化模型）：
-// 天顶色 -> 地平线色的梯度 + 太阳盘 + 前向散射辉光 + 高空烟层 + 战场烟尘带。
-// 台儿庄打了半个月，天上是有烟的 —— 一片干净的蓝天反而失真。
+// ## 2026-09：天穹换成 Hillaire 2020 的物理大气
+// 原来是一套美术化的解析式（天顶→地平线梯度 + 太阳盘 + 前向散射辉光），
+// 问题不是"不好看"，是**没有结构**：一条单调渐变，太阳周围只有一个 pow 出来的
+// 圆晕，地平线附近既没有臭氧的青、也没有多次散射把黄昏托起来的那层亮。
+// 现在天顶到地平线这一段由 `Script_Atmosphere.mjs` 的天空视图 LUT 给
+// （瑞利 + Mie + 臭氧 + 多次散射），**美术层原样留在它上面**：
+// 高空烟／云、贴地的战场烟尘带、辉光加成、地面反照、星。
+// 台儿庄打了半个月，天上是有烟的 —— 一片干净的物理蓝天同样失真。
+//
+// 三条不许破的接线：
+//   1. `SkyRadiance(dir, sunDiskGain)` 的**签名不变** —— 探针体 GI 的漏空射线
+//      （Script_Gi 的 trace pass）复用同一段 GLSL，两处各抄一份的下场是
+//      改了天空预设、GI 还照着旧的天在积分。
+//   2. LUT 的纹理与参数 uniform 一并挂进 `sky.uniforms`；GI 的 `BuildPasses`
+//      把这张表整个拷进 trace 材质（**拷的是 uniform 对象本身**），所以
+//      换预设两边同时变，不需要 Script_Gi 改一个字。
+//   3. `BakeEnvironment` 仍从天穹烘 PMREM。`Apply()` 里三张静态 LUT 是
+//      **同步**算完的，烘焙拿到的一定是本预设的天，不是上一档的。
+//
+// `?skyLegacy=1` 走回旧的解析天空（A/B 对照与回退用）。切换是 uniform 分支，
+// 不重编译。
 
 import * as THREE from "three";
+import {
+  Atmosphere, ATMOSPHERE_SAMPLE_GLSL, ATMOSPHERE_EARTH,
+  MakeAtmospherePreset, PhysicalSunLight, SetActiveAtmosphere,
+} from "./Script_Atmosphere.mjs";
 
 const SKY_VERT = /* glsl */`
 varying vec3 vWorldDirection;
@@ -20,14 +42,14 @@ void main() {
 }
 `;
 
-// 天空的解析式本体。抽成独立的一段 GLSL 是因为**探针体的漏空射线也要问同一片天**
+// 天空的本体。抽成独立的一段 GLSL 是因为**探针体的漏空射线也要问同一片天**
 // （见 Script_Gi.mjs）：两处各抄一份的下场是改了天空预设、GI 还照着旧的天在积分，
 // 阴影侧的补光和天穹对不上色。uniform 声明一起抽出来，两边共用同一批 uniform 对象。
 //
 // sunDiskGain：天穹本体传 1.0；探针积分传 0.0 —— 太阳的直接光在材质里是
-// DirectionalLight 那一路算的，射线再撞上太阳盘就是双份，而且 0.003 大小的
+// DirectionalLight 那一路算的，射线再撞上太阳盘就是双份，而且 0.53° 的
 // 盘用 64 根射线去采必然爆方差（有的探针撞上、有的没撞上，闪成一片噪点）。
-export const SKY_RADIANCE_GLSL = /* glsl */`
+export const SKY_RADIANCE_GLSL = ATMOSPHERE_SAMPLE_GLSL + /* glsl */`
 uniform vec3 uSunDirection;
 uniform vec3 uZenith;
 uniform vec3 uHorizon;
@@ -42,6 +64,10 @@ uniform vec3 uSmokeColor;
 uniform float uSmokeHeight;
 uniform float uStars;
 uniform float uTime;
+// 物理天空之上的美术层强度：LUT 里已经有真的前向散射，这一层只补"辉光多亮"。
+uniform float uArtGlow;
+// 太阳盘吃多少透过率（1 = 完全物理，黄昏自然变橙变暗；0 = 沿用美术色）。
+uniform float uSunDiskT;
 
 float Hash31(vec3 p) {
   p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
@@ -66,19 +92,40 @@ float Fbm3(vec3 p) {
 
 vec3 SkyRadiance(vec3 dir, float sunDiskGain) {
   float up = dir.y;
-  float sunDot = dot(dir, normalize(uSunDirection));
+  vec3 sunDir = normalize(uSunDirection);
+  float sunDot = dot(dir, sunDir);
 
-  // --- 天顶到地平线的梯度：pow 决定"天有多高" ---
-  float t = pow(clamp(1.0 - max(up, 0.0), 0.0, 1.0), 2.6);
-  vec3 sky = mix(uZenith, uHorizon, t);
-
-  // --- 前向散射：靠近太阳的一大片天要亮起来，这是"有大气"的关键 ---
+  // --- 前向散射的**形状**：靠近太阳的一大片天要亮起来 ---
+  // 物理档里 LUT 已经给了真的 Mie 前向散射，这一层退成美术加成（uArtGlow）；
+  // 旧档里它是唯一的来源，所以 uArtGlow 在 legacy 分支不参与。
   float glow = pow(max(sunDot * 0.5 + 0.5, 0.0), uGlowSpread);
-  sky += uSunColor * glow * uGlowStrength;
+
+  vec3 sky;
+  if (uAtmoEnabled > 0.5) {
+    // --- 物理：天空视图 LUT（瑞利 + Mie + 臭氧 + 多次散射）---
+    sky = AtmoSkyView(dir, sunDir);
+    sky += uSunColor * glow * uGlowStrength * uArtGlow;
+  } else {
+    // --- 旧解析天空（?skyLegacy=1）：天顶到地平线的梯度，pow 决定"天有多高" ---
+    float t = pow(clamp(1.0 - max(up, 0.0), 0.0, 1.0), 2.6);
+    sky = mix(uZenith, uHorizon, t);
+    sky += uSunColor * glow * uGlowStrength;
+  }
 
   // --- 太阳盘：给足 HDR 值，泛光与 IBL 都靠它 ---
-  float disk = smoothstep(1.0 - uSunSize, 1.0 - uSunSize * 0.35, sunDot);
-  sky += uSunColor * disk * uSunIntensity * sunDiskGain;
+  if (sunDiskGain > 0.0) {
+    // 物理档是真角直径 0.5357° 的圆盘 + 临边昏暗（中心到边缘掉到约 0.4）；
+    // 旧档是 smoothstep 出来的软斑。两者角径几乎一样（旧的 uSunSize 1.2e-5
+    // 反解出来是 0.56° 直径），换过去泛光与拖影的量级不变。
+    float disk = uAtmoEnabled > 0.5
+      ? AtmoSunDisk(sunDot)
+      : smoothstep(1.0 - uSunSize, 1.0 - uSunSize * 0.35, sunDot);
+    vec3 diskColor = uSunColor * uSunIntensity;
+    if (uAtmoEnabled > 0.5) {
+      diskColor *= mix(vec3(1.0), AtmoSunTransmittance(sunDir), clamp(uSunDiskT, 0.0, 1.0));
+    }
+    sky += diskColor * disk * sunDiskGain;
+  }
 
   // --- 高空烟／云：拉长的 fbm，越靠地平线越压扁 ---
   if (uSmoke > 0.001) {
@@ -103,10 +150,16 @@ vec3 SkyRadiance(vec3 dir, float sunDiskGain) {
   // 这一层是**贴地的一条带**，不是罩住整个天穹的盖子：混合上限压到 0.62，
   // 底噪从 0.18 压到 0.04（没有烟的时候就该几乎没有这一层），
   // 再配合各预设把 smokeHeight 从 0.2—0.36 收到 0.10—0.13，它才退回地平线附近。
+  //
+  // 物理档里它仍然留着：大气透视 LUT 里的战场霾管的是**视线穿过霾看地物**，
+  // 这一条带管的是**天本身有多脏**，两件事。天空视图 LUT 刻意不含霾，
+  // 两处都放就是双份灰（那正是 2026-08 那次"单调白"的成因）。
   float haze = exp(-max(up, 0.0) / max(uSmokeHeight, 0.01));
   sky = mix(sky, uSmokeColor * (0.85 + glow * 0.6), haze * clamp(uSmoke * 0.55 + 0.04, 0.0, 0.62));
 
   // --- 地平线以下：地面反照（IBL 的下半球靠它，不然人物下巴死黑）---
+  // 物理档同样保留：LUT 的地面项只有朗伯反照，落到 PMREM 下半球会比
+  // 美术定的 uGround 暗一大截，人物下巴与檐下当场死黑。
   sky = mix(sky, uGround, smoothstep(0.0, -0.14, up));
 
   // --- 星（夜战关）---
@@ -134,6 +187,13 @@ void main() {
 /**
  * 时段预设。每一关按剧情选一个，关内可以插值过渡。
  * 数值单位是"线性 HDR"，配合 PostPipeline 的 exposure 一起看。
+ *
+ * ## `atmosphere` 这一块（2026-09 新增）
+ * 是物理大气的每预设参数，缺省值见 `Script_Atmosphere.ATMOSPHERE_PRESET_DEFAULTS`。
+ * 旧的 `zenith / horizon / glow / sunSize` 一个都没删：`?skyLegacy=1` 要用它们
+ * 做 A/B，水面（Script_Water）也仍借 `uZenith/uHorizon/uGround` 当反射底色。
+ * 数值由 `Script_AtmosphereCalibrate.mjs` 在真浏览器里拟合出来，
+ * 目标是**曝光后**的天顶/地平线/太阳侧亮度与旧天空相差 15% 以内。
  */
 // Shared test daylight: fixed world-space key + neutral shadow fill, clear air.
 // Linear HDR renderer units, not measured physical lux. Compare identical poses,
@@ -149,6 +209,11 @@ export const TEST_SCENE_DAY = {
     sky: [0.50, 0.56, 0.65], ground: [0.42, 0.44, 0.47], sunGain: 0,
     desat: 0, flatten: 0 },
   exposure: 0.62, godStrength: 0, bloom: 0, saturation: 1, contrast: 1,
+  // 测试场是"干净空气"的基准：Mie 不加倍，天顶该有的蓝留着；
+  // 灰卡基线（Script_TestSceneLightingTest）对这一档最敏感，标定优先保它。
+  atmosphere: { mie: 2.4, rayleigh: 2.0, groundAlbedo: 0.2, sunIrradiance: 14.04,
+    skyTint: [1.069, 0.922, 1.014], skyFloor: [0.069, 0.128, 0.238],
+    aerialBlend: 0.5, aerialGain: 0.532, artGlow: 0.35 },
 };
 
 export const SKY_PRESETS = {
@@ -173,6 +238,9 @@ export const SKY_PRESETS = {
       sky: [0.40, 0.44, 0.52], ground: [0.34, 0.35, 0.38], sunGain: 0.10,
       desat: 0.18, flatten: 0.04 },
     exposure: 0.40, godStrength: 0.05, bloom: 0.06, saturation: 0.92, contrast: 1.12,
+    atmosphere: { mie: 1.6, rayleigh: 2.0, groundAlbedo: 0.2, sunIrradiance: 18.91,
+      skyTint: [1.074, 0.903, 1.031], skyFloor: [0.077, 0.145, 0.273],
+      aerialBlend: 0.5, aerialGain: 0.336, artGlow: 0.35 },
   },
   // 完整场景编辑器专用的长视距白昼。县城总览机位离最远门外约 1.6 km，正片的
   // 历史硝烟档会把四关厢压成同一片灰；这一档把雾留作轻空气透视，但不遮掉地物。
@@ -189,6 +257,9 @@ export const SKY_PRESETS = {
       sky: [0.68, 0.67, 0.64], ground: [0.40, 0.40, 0.41], sunGain: 0.12,
       desat: 0.12, flatten: 0.04 },
     exposure: 0.54, godStrength: 0.12, bloom: 0.16, saturation: 1.0, contrast: 1.08,
+    atmosphere: { mie: 3.6, rayleigh: 2.0, groundAlbedo: 0.2, sunIrradiance: 36.05,
+      skyTint: [1.401, 0.973, 0.734], skyFloor: [0.117, 0.209, 0.393],
+      aerialBlend: 0.6, aerialGain: 0.266, artGlow: 0.35 },
   },
   // ==========================================================================
   // 太阳仰角这一栏是本作**最贵的一个数**，改之前先读这一段。
@@ -211,6 +282,9 @@ export const SKY_PRESETS = {
   // 所以白天档只能落在 41.5°—57° 这个窄窗里，写在下面每一档的注释里。
   // 抬仰角之后必须**同步压 envIntensity** —— 否则阴影侧被 IBL 提起来，
   // 明暗比又白调，等于只把整张图提亮。
+  //
+  // 【2026-09 物理大气】仰角同时是大气 LUT 的唯一自变量（太阳天顶角），
+  // 改它连带改整张天空视图 LUT 与平行光的物理推荐值 —— 这一栏比以前更贵了。
   // ==========================================================================
 
   // 3 月 23 日黄昏：部队进城布防
@@ -231,6 +305,11 @@ export const SKY_PRESETS = {
       sky: [0.86, 0.56, 0.34], ground: [0.40, 0.30, 0.24], sunGain: 0.42,
       desat: 0.40, flatten: 0.10 },
     exposure: 0.62, godStrength: 0.45, bloom: 0.42, saturation: 0.98, contrast: 1.08,
+    // 黄昏是臭氧唯一看得见的时候：太阳低到光线穿过 25 km 那层臭氧的路径最长，
+    // 地平线上方那条带因此偏青而不是纯橙。ozone 倍率就是这条带的浓淡。
+    atmosphere: { mie: 2.4, mieG: 0.78, rayleigh: 2.0, ozone: 1.4, groundAlbedo: 0.55,
+      sunIrradiance: 47.17, skyTint: [0.904, 0.894, 1.238], skyFloor: [0.127, 0.177, 0.249],
+      aerialBlend: 0.5, aerialGain: 0.435, artGlow: 0.45 },
   },
   // 3 月 24 日午后：日军攻北门，硝烟遮日
   smokyDay: {
@@ -269,6 +348,12 @@ export const SKY_PRESETS = {
       sky: [0.72, 0.70, 0.66], ground: [0.38, 0.39, 0.42], sunGain: 0.24,
       desat: 0.50, flatten: 0.15 },
     exposure: 0.46, godStrength: 0.28, bloom: 0.34, saturation: 0.90, contrast: 1.07,
+    // 硝烟遮日：Mie 倍率是这一档的主旋钮。它同时做两件事 ——
+    // 把天顶的蓝压掉（今天那份 1.90/2.35/3.20 本来就不蓝），
+    // 以及把地平线附近整片抬亮（真正的"硝烟天"就是这么白的）。
+    atmosphere: { mie: 5.4, mieG: 0.76, rayleigh: 2.0, groundAlbedo: 0.2, sunIrradiance: 61.17,
+      skyTint: [1.110, 0.915, 0.985], skyFloor: [0.264, 0.442, 0.785],
+      aerialBlend: 0.5, aerialGain: 0.129, artGlow: 0.30 },
   },
   // 出川序章（CS_Chuchuan）专用。**只有这一场引用它**，正片七关一律不用 ——
   // 加这一档而不是改 smokyDay，就是因为 smokyDay 被七关共用，动不得。
@@ -322,6 +407,11 @@ export const SKY_PRESETS = {
       sky: [0.68, 0.67, 0.64], ground: [0.40, 0.40, 0.41], sunGain: 0.18,
       desat: 0.26, flatten: 0.08 },
     exposure: 0.56, godStrength: 0.18, bloom: 0.16, saturation: 0.98, contrast: 1.08,
+    // 这一场唯一真正需要大气透视的地方是窗外那片两公里的田野 ——
+    // aerialBlend 给到 0.7，让远处村舍的偏蓝是算出来的而不是刷上去的。
+    atmosphere: { mie: 3.6, rayleigh: 1.5, groundAlbedo: 0.55, sunIrradiance: 78.89,
+      skyTint: [1.636, 1.017, 0.601], skyFloor: [0.144, 0.243, 0.469],
+      aerialBlend: 0.7, aerialGain: 0.096, artGlow: 0.35 },
   },
   // 阴天：鲁南三四月多西南风、浮尘大，天是一块均匀的亮。
   // 这一档没有硬阴影，形体感全靠 AO 与环境光——最难做，也最能看出管线水平。
@@ -337,6 +427,11 @@ export const SKY_PRESETS = {
       sky: [0.70, 0.71, 0.73], ground: [0.46, 0.44, 0.40], sunGain: 0.10,
       desat: 0.55, flatten: 0.18 },
     exposure: 0.88, godStrength: 0.0, bloom: 0.34, saturation: 0.86, contrast: 1.02,
+    // 阴天 = 极高 Mie + 多次散射托底。这是多次散射 LUT 最能证明自己的一档：
+    // 只有一阶散射的话，浮尘越厚天越暗；加上 Ψ 之后才是「越厚越均匀地亮」。
+    atmosphere: { mie: 18.0, mieG: 0.62, rayleigh: 2.0, groundAlbedo: 0.2, sunIrradiance: 38.9,
+      skyTint: [0.947, 0.997, 1.059], skyFloor: [0.228, 0.305, 0.457],
+      aerialBlend: 0.4, aerialGain: 0.161, artGlow: 0.25 },
   },
   // 3 月 27 日——4 月 2 日：城内巷战，一半的天被火烧着
   burningStreet: {
@@ -356,6 +451,11 @@ export const SKY_PRESETS = {
       sky: [0.74, 0.52, 0.36], ground: [0.42, 0.32, 0.26], sunGain: 0.38,
       desat: 0.45, flatten: 0.13 },
     exposure: 0.54, godStrength: 0.55, bloom: 0.50, saturation: 0.94, contrast: 1.10,
+    // 半个天被火烧着 = 极重的烟 + 偏暖的散射。skyTint 这里担的活最重：
+    // 物理大气本身不知道"烟是橙的"，那份橙由 tint 与美术烟层一起给。
+    atmosphere: { mie: 8.0, mieG: 0.74, rayleigh: 2.0, groundAlbedo: 0.2, sunIrradiance: 28.13,
+      skyTint: [1.358, 0.910, 0.809], skyFloor: [0.123, 0.190, 0.318],
+      aerialBlend: 0.45, aerialGain: 0.256, artGlow: 0.40 },
   },
   // 4 月 3 日夜：敢死队
   night: {
@@ -370,6 +470,13 @@ export const SKY_PRESETS = {
       sky: [0.055, 0.065, 0.095], ground: [0.030, 0.032, 0.040], sunGain: 0.04,
       desat: 0.35, flatten: 0.06 },
     exposure: 3.6, godStrength: 0.0, bloom: 0.85, saturation: 0.72, contrast: 1.14,
+    // 夜战关的"太阳"其实是月亮（预设里的 sunColor 就是冷蓝的）。
+    // 物理上这没问题：月光就是被反射的日光，只是辐照度小五个数量级。
+    // skyFloor 是气辉 + 星光的积分 —— 没有它整片天是纯黑，星星浮在黑纸上；
+    // 有了它天才有"夜的蓝"，而这一层物理模型本身给不出来。
+    atmosphere: { mie: 3.6, rayleigh: 2.0, groundAlbedo: 0.2, sunIrradiance: 1.67,
+      skyTint: [0.860, 0.860, 1.352], skyFloor: [0.006, 0.010, 0.018],
+      aerialBlend: 0.35, aerialGain: 0.710, artGlow: 0.5, sunDiskT: 0.0 },
   },
   // 4 月 7 日拂晓：总反攻
   dawn: {
@@ -389,8 +496,110 @@ export const SKY_PRESETS = {
       sky: [0.92, 0.60, 0.40], ground: [0.42, 0.33, 0.27], sunGain: 0.45,
       desat: 0.42, flatten: 0.11 },
     exposure: 0.56, godStrength: 0.60, bloom: 0.46, saturation: 0.96, contrast: 1.09,
+    // 与 dusk 同一套账（低太阳、长光路、臭氧带），只是方位在东。
+    atmosphere: { mie: 2.4, mieG: 0.78, rayleigh: 2.0, ozone: 1.4, groundAlbedo: 0.55,
+      sunIrradiance: 58.68, skyTint: [0.691, 0.880, 1.645], skyFloor: [0.149, 0.202, 0.277],
+      aerialBlend: 0.5, aerialGain: 0.437, artGlow: 0.45 },
   },
 };
+
+// ---------------------------------------------------------------------------
+// 天空取证探针（回归测试与标定脚本共用）
+//
+// 把 `SkyRadiance()` 按经纬展开渲到一张小靶上再读回来。**必须是这个函数本尊**，
+// 不能在 JS 里重算一遍：新旧两条天空是同一个着色器里的 uniform 分支，
+// 各写一份 JS 近似的话，标定出来的是那份近似，不是屏幕上的天。
+// ---------------------------------------------------------------------------
+
+const SKY_PROBE_FRAG = SKY_RADIANCE_GLSL + /* glsl */`
+uniform float uProbeSunDisk;
+varying vec2 vUv;
+void main() {
+  // 经度沿 x、纬度沿 y。方位口径与 SunDirectionFrom 完全一致
+  // （0 = +Z，90 = +X；本作 Z 向南、X 向东），所以采样端可以直接按度取格。
+  float lon = (vUv.x * 2.0 - 1.0) * 3.14159265359;
+  float lat = (vUv.y - 0.5) * 3.14159265359;
+  vec3 dir = vec3(cos(lat) * sin(lon), sin(lat), cos(lat) * cos(lon));
+  gl_FragColor = vec4(SkyRadiance(normalize(dir), uProbeSunDisk), 1.0);
+}
+`;
+
+/** 半浮点纹素 → float（readRenderTargetPixels 对 HalfFloatType 给的是 Uint16）。 */
+export function HalfToFloat(bits) {
+  const sign = (bits >> 15) & 1 ? -1 : 1;
+  const exponent = (bits >> 10) & 0x1f;
+  const mantissa = bits & 0x3ff;
+  if (exponent === 0) return sign * Math.pow(2, -14) * (mantissa / 1024);
+  if (exponent === 31) return mantissa ? NaN : sign * Infinity;
+  return sign * Math.pow(2, exponent - 15) * (1 + mantissa / 1024);
+}
+
+/**
+ * 建一台天空探针。`skyUniforms` 传 `sky.uniforms`（同一批对象，所以换预设、
+ * 切 `uAtmoEnabled` 之后不用重建）。
+ * @returns {{Render:Function, Sample:Function, Dispose:Function, width:number, height:number}}
+ */
+export function MakeSkyProbe(renderer, skyUniforms, { width = 64, height = 32 } = {}) {
+  const uniforms = { ...skyUniforms, uProbeSunDisk: { value: 0 } };
+  const material = new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader: `varying vec2 vUv;\nvoid main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+    fragmentShader: SKY_PROBE_FRAG,
+    depthTest: false, depthWrite: false,
+  });
+  const geometry = new THREE.PlaneGeometry(2, 2);
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.frustumCulled = false;
+  const scene = new THREE.Scene();
+  scene.add(mesh);
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const target = new THREE.WebGLRenderTarget(width, height, {
+    type: THREE.HalfFloatType, format: THREE.RGBAFormat,
+    minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
+    depthBuffer: false, stencilBuffer: false, generateMipmaps: false,
+  });
+  target.texture.colorSpace = THREE.NoColorSpace;
+  const raw = new Uint16Array(width * height * 4);
+  const rgb = new Float32Array(width * height * 3);
+
+  return {
+    width, height, target,
+    /** 渲一趟并读回。`sunDisk` 传 1 才含太阳盘（比亮度时一律传 0）。 */
+    Render(sunDisk = 0) {
+      uniforms.uProbeSunDisk.value = sunDisk;
+      const prev = renderer.getRenderTarget();
+      renderer.setRenderTarget(target);
+      renderer.render(scene, camera);
+      renderer.setRenderTarget(prev);
+      renderer.readRenderTargetPixels(target, 0, 0, width, height, raw);
+      for (let i = 0; i < width * height; i += 1) {
+        rgb[i * 3] = HalfToFloat(raw[i * 4]);
+        rgb[i * 3 + 1] = HalfToFloat(raw[i * 4 + 1]);
+        rgb[i * 3 + 2] = HalfToFloat(raw[i * 4 + 2]);
+      }
+      return rgb;
+    },
+    /**
+     * 按仰角/方位取一格（度）。方位 0 = −Z（北），90 = +X（东），
+     * 与 `SunDirectionFrom` 同一套口径。
+     */
+    Sample(elevationDeg, azimuthDeg) {
+      const wrapped = ((azimuthDeg % 360) + 360) % 360;
+      const signed = wrapped > 180 ? wrapped - 360 : wrapped;
+      const u = signed / 360 + 0.5;
+      const v = THREE.MathUtils.clamp(elevationDeg, -89.9, 89.9) / 180 + 0.5;
+      const x = Math.min(width - 1, Math.max(0, Math.round(u * width - 0.5)));
+      const y = Math.min(height - 1, Math.max(0, Math.round(v * height - 0.5)));
+      const i = (y * width + x) * 3;
+      return [rgb[i], rgb[i + 1], rgb[i + 2]];
+    },
+    Dispose() {
+      material.dispose();
+      geometry.dispose();
+      target.dispose();
+    },
+  };
+}
 
 function Vec3(a) { return new THREE.Vector3(a[0], a[1], a[2]); }
 
@@ -400,9 +609,29 @@ export function SunDirectionFrom(elevationDeg, azimuthDeg) {
   return new THREE.Vector3().setFromSphericalCoords(1, phi, theta);
 }
 
+/** URL 开关。`?skyLegacy=1` 走旧解析天空；`?aerial=full` 让物理大气接管消光。 */
+function UrlFlag(name) {
+  if (typeof location === "undefined") return null;
+  try {
+    return new URLSearchParams(location.search).get(name);
+  } catch {
+    return null;
+  }
+}
+
 export class SkyDome {
-  constructor(renderer, { radius = 4000 } = {}) {
+  constructor(renderer, { radius = 4000, quality = null } = {}) {
     this.renderer = renderer;
+    const qualityName = quality || UrlFlag("quality") || "high";
+    this.atmosphere = new Atmosphere(renderer, { quality: qualityName });
+    // 一页只有一台天空。合成 pass 的大气透视 pass 通过这个登记点找到它
+    // （与 Script_Water 的 SetWaterSkyUniforms 同一个先例：借同一批 uniform 对象）。
+    SetActiveAtmosphere(this.atmosphere);
+    this.legacy = UrlFlag("skyLegacy") === "1";
+    this.atmosphereEnabled = !this.legacy;
+    this.atmosphere.sampleUniforms.uAtmoEnabled.value = this.atmosphereEnabled ? 1 : 0;
+    if (UrlFlag("aerial") === "full") this.forceAerialMode = 1;
+
     this.uniforms = {
       uSunDirection: { value: new THREE.Vector3(0, 0.4, -1).normalize() },
       uZenith: { value: new THREE.Vector3(0.2, 0.3, 0.5) },
@@ -418,6 +647,11 @@ export class SkyDome {
       uSmokeHeight: { value: 0.25 },
       uStars: { value: 0 },
       uTime: { value: 0 },
+      uArtGlow: { value: 0.35 },
+      uSunDiskT: { value: 1 },
+      // 大气 LUT 的采样端。**同一批对象**并进来：Script_Gi 的 BuildPasses
+      // 把 sky.uniforms 整表拷进 trace 材质，于是探针的漏空射线自动问同一片天。
+      ...this.atmosphere.sampleUniforms,
     };
     this.material = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
@@ -451,10 +685,21 @@ export class SkyDome {
     this.envTarget = null;
     this.presetName = null;
     this.preset = null;
+    /** 物理推荐的平行光（PhysicalSunLight 的输出），面板与标定脚本读它。 */
+    this.physicalSun = null;
     this.sunDirection = new THREE.Vector3(0, 1, 0);
+    /** 画质面板的烟霾倍率（乘在预设的 Mie 上）。 */
+    this.hazeScale = 1;
   }
 
-  /** 直接套用一个预设（不插值）。 */
+  /**
+   * 直接套用一个预设（不插值）。
+   *
+   * 返回值是**给 LightRig 用的那一份**：`atmosphere.physicalSun` 打开时返回的是
+   * 一个派生副本（lightColor / lightIntensity 由透过率 LUT 推导），
+   * 默认关的时候返回的就是 `SKY_PRESETS[name]` 本尊（对象同一性不变 ——
+   * Script_TestSceneLightingTest 的别名共享断言靠它）。
+   */
   Apply(nameOrPreset) {
     const preset = typeof nameOrPreset === "string" ? SKY_PRESETS[nameOrPreset] : nameOrPreset;
     if (!preset) throw new Error(`未知天空预设：${nameOrPreset}`);
@@ -475,7 +720,43 @@ export class SkyDome {
     U.uSmokeColor.value.copy(Vec3(preset.smokeColor));
     U.uSmokeHeight.value = preset.smokeHeight;
     U.uStars.value = preset.stars;
+
+    const atmo = MakeAtmospherePreset(preset.atmosphere);
+    U.uArtGlow.value = atmo.artGlow ?? 0.35;
+    U.uSunDiskT.value = atmo.sunDiskT ?? 1;
+    // 画质面板的烟霾倍率乘在预设的 Mie 上；霾同时决定大气透视 LUT 里那一层。
+    const tuned = { ...atmo, mie: atmo.mie * this.hazeScale };
+    if (this.forceAerialMode != null) tuned.aerialMode = this.forceAerialMode;
+    // **同步**算三张 LUT：紧接着的 BakeEnvironment 要拿本预设的天去烘 PMREM，
+    // 慢一帧的话进关第一次的 IBL 是上一档的天（换时段时肉眼可见地闪一下）。
+    this.atmosphere.ApplyPreset(tuned, { sunDirection: this.sunDirection, fog: preset.fog });
+
+    this.physicalSun = PhysicalSunLight(
+      { ...ATMOSPHERE_EARTH }, preset.sunElevation, preset.lightIntensity);
+    if (atmo.physicalSun && this.atmosphereEnabled) {
+      // 派生副本：只换平行光那两项，别的原样带过去（exposure / fog / bloom
+      // 都是美术意图，不许被物理推导覆盖）。
+      return { ...preset, lightColor: this.physicalSun.colorHex, lightIntensity: this.physicalSun.intensity };
+    }
     return preset;
+  }
+
+  /** 物理大气总闸（画质面板 / `?skyLegacy=1`）。切换后调用方要重烘 IBL。 */
+  SetAtmosphereEnabled(on) {
+    const want = !!on && !this.legacy;
+    if (want === this.atmosphereEnabled) return false;
+    this.atmosphereEnabled = want;
+    this.atmosphere.sampleUniforms.uAtmoEnabled.value = want ? 1 : 0;
+    return true;
+  }
+
+  /** 画质面板的「烟霾」倍率。改了要重套预设（LUT 要重算）。 */
+  SetHazeScale(scale) {
+    const value = THREE.MathUtils.clamp(scale ?? 1, 0.1, 6);
+    if (Math.abs(value - this.hazeScale) < 1e-4) return false;
+    this.hazeScale = value;
+    if (this.preset) this.Apply(this.presetName === "custom" ? this.preset : this.presetName);
+    return true;
   }
 
   /**
@@ -507,5 +788,7 @@ export class SkyDome {
     this.mesh.geometry.dispose();
     if (this.envTarget) this.envTarget.dispose();
     if (this.pmrem) this.pmrem.dispose();
+    this.atmosphere.Dispose();
+    SetActiveAtmosphere(null);
   }
 }

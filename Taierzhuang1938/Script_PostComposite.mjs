@@ -30,6 +30,8 @@
 
 import * as THREE from "three";
 import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_PostCommon.mjs";
+// 物理大气（子系统 B4）：ApplyFog 段里的大气透视那几行用它。
+import { AERIAL_PERSPECTIVE_GLSL, BindAtmosphereUniforms } from "./Script_Atmosphere.mjs";
 
 const FRAG_COMPOSITE = /* glsl */`
 uniform sampler2D uHdr;
@@ -111,6 +113,7 @@ uniform float uFade;        // 黑场
 
 varying vec2 vUv;
 ${GLSL_COMMON}
+${AERIAL_PERSPECTIVE_GLSL}
 
 vec3 AcesFitted(vec3 x) {
   // Stephen Hill 的 ACES 拟合（比 Narkowicz 版在高光处更不容易偏色）
@@ -229,11 +232,32 @@ vec3 ApplyFog(vec3 color, vec2 uv, vec4 nd) {
     fogCol = scatter.rgb;
     fog = clamp(1.0 - scatter.a, 0.0, 1.0);
   } else {
-    if (uFogDensity <= 0.0 || nd.w <= 0.0) return color;
+    if (nd.w <= 0.0) return color;
     vec3 fogViewPos = ViewPos(uv, nd.w);
     vec4 worldPos = uInvView * vec4(fogViewPos, 1.0);
     vec3 camPos = uInvView[3].xyz;
     vec3 rayDir = normalize(worldPos.xyz - camPos);
+
+    // ===== 大气透视（子系统 B4：物理大气）=================================
+    // froxel LUT：rgb = 沿视线累积的散射，a = 透过率（已乘体积雾代理写进来的
+    // uVolumetricFarTransmittance —— 那位负责 0—uVolumetricFar，这里接它后面）。
+    // 大气关着时绑的是中性占位（散射 0 / 透过率 1 / blend 0），这两行等于不存在。
+    vec4 aerial = AerialPerspective(worldPos.xyz);
+    if (uAtmoAerialMode > 0.5) {
+      // 模式 1：物理接管消光。color × T + S，这是 3A 的标准写法。
+      // 仍吃 uFogMax 的上限 —— 「远处兵的剪影不许更糊」那条硬约束靠它。
+      float aeroFog = clamp(1.0 - aerial.a, 0.0, uFogMax);
+      float aeroLum = Luma(color);
+      color = mix(color, vec3(aeroLum), aeroFog * uDepthDesat);
+      color = mix(color, vec3(0.42), aeroFog * uDepthFlatten);
+      return color * (1.0 - aeroFog) + aerial.rgb;
+    }
+    // 模式 0（出厂）：**消光仍归下面那套美术雾**，物理大气只供雾色。
+    // 「先别动雾」是用户的定论：能见度一米都不许变，所以透过率一个字节都不动，
+    // 换的只是「这团空气散出来的光是什么颜色」—— 而那正是解析式那三行
+    // （按仰角在天/地色之间插值 + pow(sunDot,8) 的朝阳增益）最假的一处。
+    if (uFogDensity <= 0.0) return color;
+    // ======================================================================
     float fd = 1.0 - exp(-nd.w * uFogDensity);
     float hFall = exp(-max(worldPos.y - uFogBase, 0.0) / max(uFogFalloff, 0.5));
     fog = clamp(fd * hFall, 0.0, uFogMax);
@@ -241,6 +265,11 @@ vec3 ApplyFog(vec3 color, vec2 uv, vec4 nd) {
     // 朝太阳那一侧要亮 —— 这一笔是“雾里有阳光”与“屏幕发灰”的分界线。
     fogCol = mix(uFogColorGround, uFogColorSky, clamp(rayDir.y * 2.0 + 0.35, 0.0, 1.0));
     fogCol += uSunColorFog * pow(max(dot(rayDir, normalize(uSunDir)), 0.0), 8.0) * uFogSunGain;
+    // 物理散射色：LUT 的累积散射 ÷ 它自己的不透明度 = 单位不透明度的平均
+    // 散射辐射亮度，与 fogCol 同量纲，可以直接混。uAtmoAerialBlend 是每预设
+    // 标定出来的比例（0 = 完全用今天的美术雾色）。
+    float aeroOpacity = max(1.0 - aerial.a, 1.0e-4);
+    fogCol = mix(fogCol, aerial.rgb / aeroOpacity, clamp(uAtmoAerialBlend, 0.0, 1.0));
   }
   // 大气透视第二层：远处不只是被雾盖住，它自身的饱和与对比也在掉
   float fogLum = Luma(color);
@@ -402,6 +431,10 @@ export class CompositePass {
       uHighlightTint: { value: new THREE.Vector3(1.105, 1.015, 0.880) },
       uSplitShadow: { value: 1.0 }, uSplitHighlight: { value: 1.0 },
     };
+    // 大气透视的接线点。出厂绑中性占位（散射 0 / 透过率 1 / blend 0 = 恒等），
+    // AtmospherePass 在第一帧把 SkyDome 那台大气的**同一批 uniform 对象**换上来。
+    // 名字不变所以不触发重编译；大气整个关掉时这份占位仍然让着色器编得过。
+    BindAtmosphereUniforms(this.uniforms, null);
     this.material = MakeFullscreenMaterial(FRAG_COMPOSITE, this.uniforms);
     this.target = null;
   }

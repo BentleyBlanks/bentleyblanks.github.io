@@ -272,7 +272,7 @@ try {
 await browser.close();
 server.close();
 
-const EXPECTED_ORDER = ["prepass", "hzb", "ssao", "main", "wireframe", "debugOverlay",
+const EXPECTED_ORDER = ["atmosphere", "prepass", "hzb", "ssao", "main", "wireframe", "debugOverlay",
   "taa", "godPrepare", "bloom", "god", "composite", "fxaa"];
 
 const checks = [];

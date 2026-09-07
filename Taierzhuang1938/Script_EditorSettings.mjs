@@ -39,6 +39,12 @@ export function GraphicsDetailControls(post) {
       { key: "giIrradianceHistory", label: "光照历史权重", min: 0, max: 0.99, step: 0.01, value: 0.93 },
       { key: "giDistanceHistory", label: "遮挡历史权重", min: 0, max: 0.99, step: 0.01, value: 0.90 },
     ],
+    // 物理大气（子系统 B4）。烟霾倍率乘在每档预设的 Mie 密度上：
+    // 抬它天更白、远景更"隔"，压它天更蓝、远处地物更清楚。
+    // 它同时改天空视图 LUT 与大气透视 LUT，所以改一下要重算 LUT + 重烘 IBL。
+    atmosphere: [
+      { key: "atmosphereHaze", label: "烟霾倍率", min: 0.2, max: 4, step: 0.05, value: 1, prefix: "×" },
+    ],
     taa: [
       { key: "taaCurrentWeight", label: "当前帧权重", min: 0.01, max: 1, step: 0.01, value: 0.04 },
       { key: "taaJitterScale", label: "抖动幅度", min: 0, max: 1.5, step: 0.05, value: 1, prefix: "×" },
@@ -194,6 +200,14 @@ export class GraphicsSettings {
     Details(giBox, "gi");
     if (this.host.post?.quality === "low") Note(giBox, "GI 需 medium 及以上档位。");
 
+    const atmoBox = Section(body, "大气");
+    const atmoRow = document.createElement("div");
+    atmoRow.className = "edBtns";
+    atmoBox.appendChild(atmoRow);
+    Toggle(atmoRow, "物理大气", gfx.atmosphere !== false, (on) => { gfx.atmosphere = on; this.Apply(); });
+    Details(atmoBox, "atmosphere");
+    Note(atmoBox, "关掉退回旧的解析天空（等同 ?skyLegacy=1）。烟霾倍率乘在预设的 Mie 密度上。");
+
     const aa = Section(body, "抗锯齿 TAA");
     const aaRow = document.createElement("div");
     aaRow.className = "edBtns";
@@ -256,6 +270,7 @@ export class GraphicsSettings {
     gfx.renderScale = 1; gfx.shadows = true; gfx.shadowSize = 0;
     gfx.firstPersonSelfShadow = true;
     gfx.firstPersonSelfShadowSoft = false;
+    gfx.atmosphere = true;
     gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
     gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;
     gfx.gi = false; gfx.giStrength = 1;

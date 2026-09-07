@@ -16,7 +16,10 @@
 //   · velocity / hzb —— 2026-09 帧图重构新增：MRT 速度靶与 HZB 链。
 //        高低档都开：它们是后续 SSR / 体积雾 / 接触阴影的公共输入，
 //        关掉等于把八个并行子系统一起关掉；真要省，先关消费方。
-//   · 其余键（csm / gtao / ssil / ssr / volumetrics / atmosphere / autoExposure /
+//   · atmosphere —— 2026-09 物理大气（子系统 B4）。四档全开：透过率与多次散射
+//        两张 LUT 只在换预设时算一次，每帧的账只有天空视图（两万像素）与
+//        大气透视 froxel（低档 16³），low 档也给得起。关掉退回旧解析天空。
+//   · 其余键（csm / gtao / ssil / ssr / volumetrics / autoExposure /
 //     lensFlare / lut / dof / taaUpscale / clusteredLights / contactShadows）
 //     —— **本阶段全部为占位**，值 = 与今天等价（即「不启用新东西」）。
 //        对应子系统落地时把自己那一位改成实际档位，并在这里补出处注释。
@@ -47,7 +50,10 @@
  *   ssil          屏幕空间间接光
  *   ssr           屏幕空间反射
  *   volumetrics   froxel 体积雾（今天：合成 pass 里的解析式指数高度雾）
- *   atmosphere    物理大气（今天：SkyDome 的解析式天空）
+ *   atmosphere    物理大气（Hillaire 2020 四张 LUT）。关掉 = 退回旧的解析天空，
+ *                 天穹与大气透视都不再更新。LUT 分辨率不在这里，跟 `?quality=`
+ *                 走（见 Script_Atmosphere.ATMOSPHERE_TIERS）——
+ *                 它是构造期的靶尺寸，和 MSAA 采样数同一类，热切没有意义。
  *   autoExposure  自动曝光（今天：时段预设手调的常数曝光）
  *   lensFlare     镜头光晕
  *   lut           3D LUT 调色（今天：lift/gain + 分离调色）
@@ -65,7 +71,6 @@ const RESERVED_OFF = {
   ssil: false,
   ssr: false,
   volumetrics: false,
-  atmosphere: false,
   autoExposure: false,
   lensFlare: false,
   lut: false,
@@ -85,13 +90,13 @@ export const QUALITY_PRESETS = {
     ...RESERVED_OFF,
     ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
     aoScale: 0.5, sharpen: 0.14, taa: false,
-    velocity: true, hzb: true,
+    velocity: true, hzb: true, atmosphere: true,
   },
   medium: {
     ...RESERVED_OFF,
     ssao: true, bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.6, sharpen: 0.18, taa: true,
-    velocity: true, hzb: true,
+    velocity: true, hzb: true, atmosphere: true,
   },
   // high 的抗锯齿由 TAA 承担。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
   // 上百 MB 显存并重复抗锯齿；把 4× 留给主动选择 ultra 的玩家
@@ -100,13 +105,13 @@ export const QUALITY_PRESETS = {
     ...RESERVED_OFF,
     ssao: true, bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.75, sharpen: 0.22, taa: true,
-    velocity: true, hzb: true,
+    velocity: true, hzb: true, atmosphere: true,
   },
   ultra: {
     ...RESERVED_OFF,
     ssao: true, bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,
     aoScale: 1.0, sharpen: 0.22, taa: true,
-    velocity: true, hzb: true,
+    velocity: true, hzb: true, atmosphere: true,
   },
 };
 

@@ -452,6 +452,9 @@ const graphics = {
   // 实时探针体默认关。默认间接光由 Global SH Probe + AmbientColor 提供；打开时
   // 才跑五个 GI pass/帧，并在图集收敛后渐进接管室内与墙角的反弹光。
   gi: params.get("gi") === "1", giStrength: 1,
+  // 物理大气（Hillaire 2020 四张 LUT）。出厂跟画质档走；关掉退回旧解析天空
+  // （与 ?skyLegacy=1 等价）。烟霾倍率 atmosphereHaze 由 NormalizeGraphicsDetails 补。
+  atmosphere: post.preset.atmosphere !== false,
   fov: CAMERA.baseFovDeg,
 };
 NormalizeGraphicsDetails(graphics, post);
@@ -471,7 +474,7 @@ const library = new MaterialLibrary(renderer, {
   textureSize: QUALITY === "low" ? 256 : 512, ssao, gi: GI_ON ? giUniforms : null,
   destruction: destructionUniforms,
 });
-const sky = new SkyDome(renderer);
+const sky = new SkyDome(renderer, { quality: QUALITY });
 scene.add(sky.mesh);
 // 水面借天空 uniform：反射的天顶/地平线/太阳色随时段预设一起换（Script_Water）
 SetWaterSkyUniforms(sky.uniforms);
@@ -7498,6 +7501,16 @@ function ApplyGraphics() {
       if (preset) gi.ApplyPreset(preset, graphics.giStrength);
     }
   }
+  // 物理大气：总闸 + 烟霾倍率。任一变了都要**重烘 IBL** ——
+  // scene.environment 是从天穹烘出来的 PMREM，天换了 IBL 不换，
+  // 表现是「天亮了屋里没亮」（换时段那条老账的同一个坑）。
+  post.preset.atmosphere = graphics.atmosphere !== false;
+  const atmosphereChanged = [
+    sky.SetAtmosphereEnabled(graphics.atmosphere !== false),
+    sky.SetHazeScale(graphics.atmosphereHaze),
+  ].some(Boolean);
+  if (atmosphereChanged) sky.BakeEnvironment(scene);
+
   const shadowSize = graphics.shadowSize || lights.defaultShadowSize;
   if (lights.sun.shadow.mapSize.x !== shadowSize) {
     lights.sun.shadow.mapSize.set(shadowSize, shadowSize);

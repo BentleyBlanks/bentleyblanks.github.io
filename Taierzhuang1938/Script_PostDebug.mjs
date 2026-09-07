@@ -378,7 +378,9 @@ export class DebugPass {
       // （黑 = 没有探针 GI）—— 都是准确信息，不是"不可用"。
       case "giWorld": case "giConfidence":
         return { texture: T.hdr.texture, mode: 5, unavailable: !P.debugInjected };
-      default: return null;
+      // 子系统自带的视图（PostPipeline.RegisterDebugView）。八个并行子系统各加
+      // 两三个假彩色的话，上面这条 switch 会变成公共冲突点，所以留一个登记表。
+      default: return P.debugViewProviders?.get(P.debugView)?.(P) ?? null;
     }
   }
 
@@ -395,6 +397,14 @@ export class DebugPass {
       // 阴影框每帧都在滚（跟玩家 + 吸附纹素），矩阵必须现取。
       this.sunShadowRig?.SyncShadowUniforms?.();
       ctx.blitter.Blit(this.materialSunShadow, null);
+      return;
+    }
+    // 登记表里的视图可以自带材质（`{ material, Prepare(ctx) }`），
+    // 与上面的 SunShadow 同一条路 —— 那些是「拿预通道重算一遍」的图，
+    // 没有对应的中间靶可展示。
+    if (source.material && !source.unavailable) {
+      source.Prepare?.(ctx);
+      ctx.blitter.Blit(source.material, null);
       return;
     }
     // 雾量 / CoC 调试视图必须复用刚刚送进 Composite 的本帧参数。不要另存一份
