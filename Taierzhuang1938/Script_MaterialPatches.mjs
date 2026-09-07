@@ -33,10 +33,11 @@
 // | `#include <color_fragment>` | 片元 | `diffuseColor`（rgb = BaseColor × vertexColor，a = 不透明度）。 |
 // | `#include <roughnessmap_fragment>` | 片元 | `roughnessFactor`（真正进 BRDF 的那个标量）。 |
 // | `#include <metalnessmap_fragment>` | 片元 | `metalnessFactor`。 |
+// | `#include <normal_fragment_maps>` | 片元 | `normal`（**视空间**，法线贴图已扰动）、`nonPerturbedNormal`、`tbn`（切线基，`USE_NORMALMAP_TANGENTSPACE` 才有）、`faceDirection`。**改法线的最后机会** —— 再往后 `<lights_fragment_begin>` 的直射光循环就跑完了。2026-09 材质升级新增。 |
 // | `#include <lights_fragment_begin>` | 片元 | `geometryNormal`（**视空间**！）、`geometryViewDir`、`geometryPosition`、`material`、`vDirectionalShadowCoord[]`、`getShadow()`。直接光循环从这里开始。 |
 // | `#include <lights_fragment_maps>` | 片元 | `iblIrradiance`（漫反射 IBL，量纲 = π×辐射亮度）、`radiance`（镜面 IBL）、`irradiance`。**替换天空 IBL 就在这儿**。 |
 // | `#include <aomap_fragment>` | 片元 | `reflectedLight.{direct,indirect}{Diffuse,Specular}` 都已累加完，`aoMap` 也乘过。**SSAO 实际压间接光的位置**；再往后就是加总。 |
-// | `#include <lights_fragment_end>` | 片元 | 同上，最后一次能改 `reflectedLight` 的地方。 |
+// | `#include <lights_fragment_end>` | 片元 | 全部光照累加完、**`<aomap_fragment>` 之前**（r185 的片元 main 里顺序就是 end → aomap）。要压直射项就挂这儿：挂到 aomap 后面的话 GI 调试视图 10/11 抓到的是没压过的值。 |
 // | `#include <clipping_planes_fragment>` | 片元 | 最早能 `discard` 的地方（破口裁切用它）。 |
 // | `#include <dithering_fragment>` | 片元 | `gl_FragColor` 已成型。整帧覆盖输出（调试假彩色）用它。 |
 //
@@ -178,7 +179,7 @@ export function PatchKeysOf(material) {
  *        `FoldOrmMaps()` 的返回值。
  */
 export function MakeOrmPatch(orm) {
-  if (!orm || (!orm.metalness && !orm.ao)) return null;
+  if (!orm) return null;
   return MakePatch({
     key: `orm${orm.metalness ? "m" : ""}${orm.ao ? "a" : ""}`,
     uniforms: (uniforms) => { uniforms.uOrmAoIntensity = orm.aoIntensity; },
@@ -199,8 +200,10 @@ export function MakeOrmPatch(orm) {
       ["#include <roughnessmap_fragment>", /* glsl */`
         #ifdef USE_ROUGHNESSMAP
           gOrmTexel = texelRoughness;
-          gMaterialAo = gOrmTexel.r;
-        #endif`],
+        #endif
+${orm.ao ? `        gMaterialAo = gOrmTexel.r;` : `        #ifdef USE_AOMAP
+          gMaterialAo = texture2D(aoMap, vAoMapUv).r;
+        #endif`}`],
       ...(orm.metalness ? [["#include <metalnessmap_fragment>", /* glsl */`
         #ifdef USE_ROUGHNESSMAP
           metalnessFactor *= gOrmTexel.b;
@@ -249,14 +252,14 @@ export function FoldOrmMaps(material) {
   if (rough) {
     const metalness = material.metalnessMap === rough;
     const ao = material.aoMap === rough;
-    if (metalness || ao) {
-      folded = {
-        metalness, ao,
-        aoIntensity: { value: ao ? (material.aoMapIntensity ?? 1) : 1 },
-      };
-      if (metalness) material.metalnessMap = null;
-      if (ao) material.aoMap = null;
-    }
+    // 一个都没折也还回一份描述子（metalness / ao 都是 false）：那份补丁仍然声明
+    // `gOrmTexel` 与 `gMaterialAo`，B7 的微阴影就挂在后者上。
+    folded = {
+      metalness, ao,
+      aoIntensity: { value: ao ? (material.aoMapIntensity ?? 1) : 1 },
+    };
+    if (metalness) material.metalnessMap = null;
+    if (ao) material.aoMap = null;
   }
   material.userData.ormUniforms = folded;
   return folded;
@@ -731,7 +734,7 @@ export function MakeClusteredLightsPatch() {
  *     接屏幕空间接触阴影那张全屏图，以及把调试视图 9 改读级联可见度。
  */
 export function IndirectLightingPatches({
-  orm = null, ssao = null, gi = null, ssr = null, destruction = null,
+  orm = null, ssao = null, gi = null, ssr = null, destruction = null, shading = null,
 } = {}) {
   return [
     MakeOrmPatch(orm), MakeSsaoPatch(ssao), MakeGiPatch(gi),
@@ -741,6 +744,13 @@ export function IndirectLightingPatches({
     // `uSsilMap` 的 alpha（采样器预算，见 Script_Csm.CsmContactShadow）。没有 AO 补丁
     // 的材质编上 CSM_CONTACT 就是未声明标识符 —— 那一趟直接编译失败、什么都不画。
     MakeCsmPatch({ contact: ssao ? null : false, giDebug: !!gi }),
-    MakeSsrPatch(ssr), MakeClusteredLightsPatch(), MakeDestructionPatch(destruction),
+    MakeSsrPatch(ssr), MakeClusteredLightsPatch(),
+    // 材质着色升级（POM / 细节法线 / 微阴影 / 地平线镜面遮蔽 / 皮肤预积分）。
+    // 补丁由 `Script_MaterialShading.MakeMaterialShadingPatch` 造好后传进来 ——
+    // 那个模块要 `MakePatch`，从这里反向 import 会成环。
+    // 位置固定在 **簇光之后、破口之前**：它改的是表面本身（uv / 法线 / 直射项），
+    // 破口只做裁切；反过来排会让被裁掉的像素还白算一遍视差。
+    ...(Array.isArray(shading) ? shading : [shading]),
+    MakeDestructionPatch(destruction),
   ].filter(Boolean);
 }

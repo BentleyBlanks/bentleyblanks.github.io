@@ -13,6 +13,9 @@ import { SSIL } from "./Data_Tuning_Gtao.mjs";
 import { MakeBox, MakeSandbag, MakePlane, MakeBrokenWall, MakeRubbleField, MakeInstanced, TILE_METERS, CarveCraters } from "./Script_Geo.mjs";
 import { RECIPES } from "./Script_TexBake.mjs";
 import { ProbeVolume, MakeGiUniforms, MakeProbeDebugMesh } from "./Script_Gi.mjs";
+import {
+  MakeMaterialShadingUniforms, ApplyShadingQuality, SyncShadingKnobs,
+} from "./Script_MaterialShading.mjs";
 
 const params = new URLSearchParams(location.search);
 const presetName = params.get("preset") || "smokyDay";
@@ -53,10 +56,23 @@ const giUniforms = MakeGiUniforms();
 // 与正片同一套双层注入：gi=0 时材质只留调试视图基建（探针采样代码编译期剔除），
 // 与正片出厂默认档完全同构 —— GiTest 的「默认材质不含采样代码」就在这页上验。
 giUniforms.sampling = giEnabled;
+// 材质着色升级（POM / 细节法线 / 微阴影 / 地平线镜面遮蔽 / 皮肤）那一包。
+// 与正片同构：档位从 post.preset 取，?matView= 直连假彩色，
+// ?pom=0 关掉视差做 A/B（MaterialUpgradeTest 的对照组就走这条）。
+const shadingUniforms = MakeMaterialShadingUniforms();
+const shadingOverrides = {};
+for (const key of ["pom", "pomSelfShadow", "detailNormal", "microShadow", "horizonOcclusion", "skinSss"]) {
+  const raw = params.get(key);
+  if (raw !== null) shadingOverrides[key] = raw !== "0";
+}
+ApplyShadingQuality(shadingUniforms, post.preset, shadingOverrides);
+SyncShadingKnobs(shadingUniforms, {});
+shadingUniforms.debugView.value = parseFloat(params.get("matView") || "0") || 0;
 // SSR 的材质侧 uniform 包由 PostPipeline 持有；探针页与正片走同一条注入路，
 // 这样 SsrTest 在这里验到的补丁行为就是正片的补丁行为。
 const library = new MaterialLibrary(renderer, {
-  textureSize: 512, ssao, gi: giUniforms, ssr: post.SsrUniforms,
+  textureSize: post.preset.materialTexture || 512,
+  ssao, gi: giUniforms, ssr: post.SsrUniforms, shading: shadingUniforms,
 });
 
 const sky = new SkyDome(renderer);
@@ -103,6 +119,22 @@ async function Boot() {
     + `hdr=${post.hdrCapable} gi=${gi ? `on/${gi.probeCount}探针` : "off"}`;
   window.Probe = {
     renderer, scene, camera, post, sky, lights, library, gi, state, ssao, StepFrames, THREE,
+    // 材质着色升级：测试按它做开关 A/B 与假彩色取证。
+    shading: shadingUniforms,
+    ApplyShadingQuality: (overrides) => {
+      const changed = ApplyShadingQuality(shadingUniforms, post.preset, overrides || {});
+      if (changed) {
+        scene.traverse((object) => {
+          const material = object.material;
+          if (Array.isArray(material)) material.forEach((m) => { if (m) m.needsUpdate = true; });
+          else if (material) material.needsUpdate = true;
+        });
+        for (const material of library.materials.values()) material.needsUpdate = true;
+        for (const material of library.staticMaterials.values()) material.needsUpdate = true;
+      }
+      return changed;
+    },
+    SyncShadingKnobs: (knobs) => SyncShadingKnobs(shadingUniforms, knobs || {}),
   };
 }
 
@@ -125,6 +157,16 @@ function BuildMaterialScene() {
     slab.castShadow = true; slab.receiveShadow = true;
     scene.add(slab);
   });
+  // 视差专用的一面砖墙：材质球阵摆在 x∈[-3.8, 3.8]，这面墙站在 x=+7.5，
+  // 默认机位看不到它（`Probe_Materials` 的既有出图一个像素都不变），
+  // MaterialUpgradeTest 把相机挪过去，同一面墙拍两个视角比砖缝的屏幕位置。
+  const testWall = new THREE.Mesh(MakeBox(6, 3, 0.4, TILE_METERS.brick, "pomTestWall"),
+    library.Get("BrickWall"));
+  testWall.name = "PomTestWall";
+  testWall.position.set(7.5, 1.5, -3);
+  testWall.castShadow = true; testWall.receiveShadow = true;
+  scene.add(testWall);
+
   camera.position.set(0, 3.2, 6.5);
   camera.lookAt(0, 0.9, -3);
 }

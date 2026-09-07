@@ -12,6 +12,7 @@ import * as THREE from "three";
 import { Panel, Section, Chips, Facts, Note, Toggle, El } from "./Script_EditorUi.mjs";
 import { InjectDepthPull, SHADING_MODES } from "./Script_Post.mjs";
 import { GetActiveAtmosphere } from "./Script_Atmosphere.mjs";
+import { MATERIAL_DEBUG_VIEWS } from "./Data_Tuning_Materials.mjs";
 import { R } from "./Script_Physics.mjs";
 import { MakeClusterHeatOverlay, MakeClusterSphereOverlay } from "./Script_ClusteredLights.mjs";
 
@@ -38,6 +39,11 @@ const VIEWS = [
   { id: "baseColor", label: "BaseColor", group: "材质", note: "反照率（贴图×顶点色×材质色），光照之前的底色。" },
   { id: "roughness", label: "粗糙度", group: "材质", note: "ORM 采样后的 roughnessFactor；白 = 糙、黑 = 光。" },
   { id: "metalness", label: "金属度", group: "材质", note: "ORM 采样后的 metalnessFactor；这一关的世界大多是 0（黑），枪机、刺刀才亮。" },
+  { id: "pomOffset", label: "视差位移", group: "材质细节", note: "视差遮蔽把 uv 推了多远，单位是**屏幕像素**（红 = 位移大）。关掉 POM 的同一块墙这张图恒为纯黑 —— 两张一比就是「视差到底有没有在动」。没编 POM 的材质（人物、枪、low 档）也是黑。" },
+  { id: "pomHeight", label: "视差高度", group: "材质细节", note: "视差命中点落在高度场的哪一层：白 = 砖面，黑 = 缝底。ultra 的 POM 自阴影会把被挡住的缝再压暗一档。" },
+  { id: "detailNormal", label: "细节法线", group: "材质细节", note: "第二张高频法线实际扰动了多少（切线空间 xy 映射到 RG，中灰 = 无扰动）。超过淡出距离（4.5 m）应当整片中灰。" },
+  { id: "microShadow", label: "微阴影", group: "材质细节", note: "Chan 2018 的直射光微遮蔽因子：白 = 一点不压，黑 = 全压。平整表面（材质 AO ≈ 1）恒白，只有砖缝/木纹在斜射光下才暗下来。" },
+  { id: "skinCurvature", label: "皮肤曲率", group: "材质细节", note: "皮肤预积分散射查表用的曲率（1/米，红 = 尖）。只有被识别成皮肤的材质有值，其余全黑 —— 顺带能核对脸和手有没有被认出来。" },
   { id: "shadow", label: "太阳阴影", group: "光照", note: "平行光阴影因子：白 = 照到、黑 = 挡住。阴影框只有 66 m，框外恒白 —— 顺带能看到覆盖边界。不收影的材质显示黑。" },
   { id: "sunShadow", label: "SunShadow 采样", group: "光照", note: "用预通道重建世界坐标，走 Script_Light.SUN_SHADOW_GLSL 的公共接口采一遍太阳阴影：白 = 照到、黑 = 挡住、天空是深蓝底。体积雾/接触阴影/CSM 共用这条接口，这张图就是它的看门狗。" },
   { id: "csmCascade", label: "级联假彩色", group: "光照", note: "太阳阴影每一级的覆盖范围：红=第0级（最近、最密）、黄=1、绿=2、蓝=3（ultra 才有第 3 级），深灰=全部级联之外（那里恒为「照到」，靠雾盖）。底色乘了阴影可见度，所以同时能看到影子落在哪。相邻级之间有一条过渡带，颜色在带内渐变——那条带就是 cascade fade。" },
@@ -80,6 +86,14 @@ const MATERIAL_VIEW_MODES = {
   giWorld: 1, giConfidence: 3, baseColor: 6, roughness: 7, metalness: 8, shadow: 9,
   diffuseLighting: 10, specularLighting: 11, reflection: 12, indirectLighting: 13,
 };
+
+/**
+ * 材质着色升级（2026-09）那一路的假彩色编号，走**自己的** uniform
+ * （`Script_MaterialShading` 的 `uMatDebugView`），与上面 GI 那一包互不干扰：
+ * 两条注入链是分开的补丁，各自的 debugView 也就必须分开，否则关掉 GI
+ * 的档位连视差图都看不了。表里没有的视图必须归零，不然材质还在写上一个假彩色。
+ */
+const SHADING_VIEW_MODES = MATERIAL_DEBUG_VIEWS;
 
 /**
  * 视图 id -> 它正在显示的那张靶。与 Post._GetDebugSource 是同一张表，
@@ -126,6 +140,11 @@ const VIEW_TARGETS = {
   aerialScatter: (post) => post?.targets?.normalDepth,
   aerialTransmittance: (post) => post?.targets?.normalDepth,
   // 材质通道假彩色都是场景按调试口径重画进 hdr 靶再送屏
+  pomOffset: (post) => post?.targets?.hdr,
+  pomHeight: (post) => post?.targets?.hdr,
+  detailNormal: (post) => post?.targets?.hdr,
+  microShadow: (post) => post?.targets?.hdr,
+  skinCurvature: (post) => post?.targets?.hdr,
   baseColor: (post) => post?.targets?.hdr,
   roughness: (post) => post?.targets?.hdr,
   metalness: (post) => post?.targets?.hdr,
@@ -608,6 +627,8 @@ export class DebugRenderingEditor {
     this.host.post?.SetShadingMode?.("shaded");
     const pack = this.host.library?.gi;
     if (pack) pack.debugView.value = 0;
+    const shadingPack = this.host.library?.shading;
+    if (shadingPack) shadingPack.debugView.value = 0;
     this.SetColliders(false);
     // 先把「热图关掉要还原成哪个视图」清掉：上面已经把视图归位成 final 了，
     // 留着的话 SetClusterHeat(false) 会把退出前那个视图再装回去，正片带着调试图走。
@@ -660,25 +681,8 @@ export class DebugRenderingEditor {
     }
     physics.appendChild(legend);
 
-    // 簇状局部光的两层。它们是**叠加层**不是视图格：视图那条路要在
-    // Script_PostDebug.GetSource() 里加 case（那是后处理帧图的地盘），
-    // 而叠加层走 post.AddDebugOverlay，画进 hdr 靶、TAA 之前，与碰撞体线框同一条路。
-    const cluster = Section(body, "局部光源（簇状）");
-    const clusterBox = El("div", "edBtns");
-    this.clusterHeatToggle = Toggle(clusterBox, "簇灯数热图", false, (on) => this.SetClusterHeat(on));
-    this.clusterHeatToggle.root.dataset.role = "clusterHeat";
-    this.clusterHeatToggle.root.title = "每个片元实际要循环几盏局部光：蓝 0-2 / 绿 3-4 / 黄 5-6 / 红 ≥8。"
-      + "打开时自动切到「HDR 场景」视图 —— 那一档不过合成链，看到的才是色标本身";
-    this.clusterSphereToggle = Toggle(clusterBox, "光源球线框", false, (on) => this.SetClusterSpheres(on));
-    this.clusterSphereToggle.root.dataset.role = "clusterSpheres";
-    this.clusterSphereToggle.root.title = "本帧真正送进 GPU 的每盏灯的影响半径；聚光另画锥口圆与四根母线";
-    cluster.appendChild(clusterBox);
-    this.clusterFacts = Facts(cluster, ["局部光", "簇网格", "每片元灯数"]);
-    if (!this.host.lights?.clustered) Note(cluster, "当前画质档不跑簇（low 档保持固定灯池）。");
-
-    // 组名要与 VIEWS 里的 group 一一对上：漏掉一个组，那组的视图格根本不渲染，
-    // 面板上就选不到它（「反射」在 SSR 落地那一轮漏过一次）。
-    for (const group of ["输出", "后处理", "体积雾", "GBuffer", "材质", "光照", "反射", "AO", "GI", "大气"]) {
+    for (const group of ["输出", "后处理", "体积雾", "GBuffer", "材质", "材质细节",
+      "光照", "反射", "AO", "GI", "大气"]) {
       const section = Section(body, group);
       const options = VIEWS.filter((item) => item.group === group)
         .map((item) => ({ value: item.id, label: item.label, title: item.note }));
@@ -699,9 +703,12 @@ export class DebugRenderingEditor {
     // post 决定拿哪张靶、按哪种口径显示。只设一边就是「面板亮着、画面没变」。
     const pack = this.host.library?.gi;
     if (pack) pack.debugView.value = MATERIAL_VIEW_MODES[id] || 0;
+    const shadingPack = this.host.library?.shading;
+    if (shadingPack) shadingPack.debugView.value = SHADING_VIEW_MODES[id] || 0;
     // 第三参 = 材质注了调试层没有：GI 出厂默认关时探针体（host.gi）是 null，
     // 但材质/光照组的假彩色照样可用 —— 可用性要看 library.gi，不看探针体。
-    this.host.post?.SetDebugView?.(id, this.host.gi, !!pack);
+    // 材质细节那一组走另一包（library.shading），任一包在就算注入过。
+    this.host.post?.SetDebugView?.(id, this.host.gi, !!pack || !!shadingPack);
   }
 
   /** 着色模式：着色 / 线框 / 着色线框（Script_Post.SetShadingMode）。 */
@@ -846,6 +853,7 @@ export class DebugRenderingEditor {
     const target = VIEW_TARGETS[this.view]?.(this.host.post, this.host.gi) ?? null;
     let message = "";
     if (MATERIAL_VIEW_MODES[this.view] && !this.host.library?.gi) message = "当前画质不支持此视图。";
+    if (SHADING_VIEW_MODES[this.view] && !this.host.library?.shading) message = "当前画质不支持此视图。";
     else if (!target && this.view !== "final") message = "此视图暂不可用，请启用对应效果。";
     this.status.textContent = message;
     this.status.hidden = !message;

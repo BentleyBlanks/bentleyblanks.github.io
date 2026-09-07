@@ -336,7 +336,7 @@ ApplyPatches(material, [...IndirectLightingPatches({ ssao, gi, destruction }), s
 * 锚点一律**追加在 chunk 之后**；多个补丁挂同一个锚点按注册顺序拼接。
 * `customProgramCacheKey` = 各补丁 key 拼接。**改了代码不改 key = 两种档位共用同一份
   编译缓存**（现役三态：`gtao1` / `gtao1|gi1` / `gtao1|gi2`）。
-* 现役顺序固定 **ORM → AO → GI → CSM → SSR → 簇光 → 破口**（AO 那一路 2026-09 起是 GTAO 补丁，见 §17.4）：
+* 现役顺序固定 **ORM → AO → GI → CSM → SSR → 簇光 → 材质着色 → 破口**（AO 那一路 2026-09 起是 GTAO 补丁，见 §17.4）：
   ORM 三合一排最前（它把材质自带的遮蔽乘进 `indirectDiffuse`，等价于三方 `aomap_fragment`
   chunk 原来的位置）；`<aomap_fragment>` 上同时挂着 AO 的乘法与 GI 的
   光照分量取证，AO 先压、取证后抓，面板读到的才是正式画面的值。
@@ -371,11 +371,15 @@ ApplyPatches(material, [...IndirectLightingPatches({ ssao, gi, destruction }), s
 
 | 材质 | 打包前 | 打包后 | 占位（打包后） |
 |---|---:|---:|---|
-| 静态墙 / 地（`MaterialLibrary.Get`） | 18 | **13** | map / normalMap / roughnessMap(=ORM) / envMap / dfgLUT / 阴影×3 / uSsaoMap / uSsilMap / uGi×2 / uClusterData |
-| 砸坑地面（+ `CraterSoilV4`） | 20 | **15** | 上面那一排 + uCraterSoil + uCraterNormal |
-| 人物 GLB（蒙皮 / 皮肤） | 19 | **15** | boneTexture / specularIntensityMap / map / roughnessMap / envMap / dfgLUT / 阴影×3 / uSsaoMap / uSsilMap / uGi×2 / uSsrMap / uClusterData |
+| 静态墙 / 地（`MaterialLibrary.Get`） | 19 | **14** | map / normalMap / roughnessMap(=ORM) / envMap / dfgLUT / 阴影×3 / uSsaoMap / uSsilMap / uGi×2 / uClusterData / uMatDetailNormalMap |
+| 砸坑地面（+ `CraterSoilV4`） | 21 | **16** | 上面那一排 + uCraterSoil + uCraterNormal |
+| 人物 GLB・皮肤（+ 预积分 LUT） | 20 | **16** | boneTexture / specularIntensityMap / map / roughnessMap / envMap / dfgLUT / 阴影×3 / uSsaoMap / uSsilMap / uGi×2 / uSsrMap / uClusterData / uMatSkinLut |
+| 人物 GLB・布（sheen） | 19 | **15** | 同上去掉皮肤 LUT（外部 GLB 一律不吃细节法线，atlas UV） |
 | 第一人称视模 | 19 | **15** | 同上，把 uSsrMap 换成 uFirstPersonShadowMap（视模不挂 SSR，见坑表） |
 
+**八轮实测的上界**（`Script_SamplerBudgetTest`）：low 11 / medium・high・ultra `gi=0` 14 /
+medium・high・ultra `gi=1` **16**。gi=1 那三档是贴着上限跑的 —— 再加一路采样器
+之前必须先腾一个出来（候选见本表末尾）。
 **打包清单**（每一条都是**逐像素无差**的，没有一条是「关掉某个功能」）：
 
 | 改动 | 省 | 做法 |
@@ -385,6 +389,7 @@ ApplyPatches(material, [...IndirectLightingPatches({ ssao, gi, destruction }), s
 | **SSR 补丁死代码消除** | 1 | SSR 只在 `material.roughness <= 0.60`（`SSR.maxRoughness`）时动 `radiance`。本仓的墙/地/木/布/砂袋那批配方烘出来的粗糙度**下界**全在 0.75 以上（`OrmRoughnessFloor` 每个配方算一次，外部图走 `ExternalOrmRoughnessFloor` 用一张离屏 canvas 整张扫），那条分支永远不成立 —— 干脆不编。下一帧追踪端也自洽：不写 `gl_FragColor.a` 则 alpha 恒 1 = 粗糙度 1，追踪端本来就会跳过。 |
 | **接触阴影打进 SSIL 靶的 alpha** | 1 | 两张都是半分辨率的屏幕空间靶，而 SSIL 那张的 alpha 全链路没人读（GTAO 恒写 1）。`ContactShadowsPass` 末尾多一趟半分辨率 blit，把 `SSIL.rgb + 接触阴影` 合成一张 RGBA16F；`Script_Csm.CsmContactShadow()` 读 `uSsilMap.a`。**因此 `CSM_CONTACT` 只在挂了 AO 补丁的材质上定义**（`uSsilMap` / `uSsaoResolution` 由 AO 补丁的「屏幕空间输入公共声明块」声明）。关掉的那一帧走 `Idle()`：拿一张 1×1 纯白当接触源再合一次，alpha 就是 1 = 没挡住。 |
 | **探针 GI 的每探针元数据并进辐照度图集** | 1 | `uGiOffset`（每探针一个纹素的重定位偏移 + 有效位）不再是独立纹理，而是辐照度图集**右边多出来的 cx 列**。位置不需要新 uniform（`uGiCounts.x * (uGiIrrTexels + 2)`）；带与瓦片区不相交，而图集每帧整张搬（`copyScene`），ping-pong 自己把它带过去 —— 只有重定位（`Scroll`）与清图集之后要重写一次（`ProbeVolume._WriteMeta`）。 |
+| **B7 的两张图不同时出现** | — | 细节法线（uMatDetailNormalMap）只给库配方，皮肤 LUT（uMatSkinLut）只给被认成皮肤的外部 GLB；外部 GLB 一律不吃细节法线（atlas UV，一份 uv 摊在整个身体上）。所以 B7 对任一材质只是 **+1**，不是 +2。 |
 | **ultra 的级联 4 → 3（每级 2048 → 4096）** | 1（仅 ultra） | `directionalShadowMap[]` 是**采样器数组**，四级就是四个单元。这是唯一一条动了档位数值的：补偿是每级图翻四倍，同样 170 m 总距离下近级的每米纹素数反而更高（四级只是把同一些米分得更细），且一轮少烘一张。三角红线不受影响（分辨率不改三角数）。 |
 
 还没做、下一个要动的候选（按性价比）：砸坑的 `uCraterSoil` + `uCraterNormal`
@@ -1685,6 +1690,10 @@ Debug Rendering 的 GBuffer 组也就成了一团噪声。蒙皮双臂同理不�
 ---
 
 ## 11. 材质：CanvasTexture 程序化烘四张图 + 三平面
+
+> **现状看 §17「材质着色升级（2026-09）」。** 这一节是烘焙侧的旧稿（配方、
+> 颜色空间、ORM 打包），全部仍然成立；表面着色那一层（视差、细节法线、微阴影、
+> 地平线遮蔽、皮肤）2026-09 起在 §17。
 
 仓库里 `Script_TexBake.mjs` 已经做对了骨架（`BakeMaps` → albedo/normal(A=height)/orm），沿用即可。要点：
 
@@ -3170,6 +3179,8 @@ Debug Rendering 浮窗新增「大气」组六项（`Script_EditorDebugRendering
 
 后两张与合成 pass 问的是同一个函数、同一批 uniform —— 它们能证明 froxel 真的对上了像素。
 
+---
+
 ### 17.9 怎么验
 
 ```bash
@@ -3182,6 +3193,257 @@ node Taierzhuang1938/Script_PostFrameGraphTest.mjs        # 帧图顺序（atmos
 ```
 
 `Script_AtmosphereTest` 的三个阈值分别在守什么，写在那个文件的抬头 —— 改阈值之前先读它。
+
+---
+
+## 17. 材质着色升级（2026-09）
+
+> 这一节是**表面着色**的现状（§11 是烘焙侧的旧稿，仍然成立）。
+> 解决的是一句实拍评语：**「表面像塑料贴纸，近景缺凹凸与微阴影」** ——
+> 材质有法线贴图、有粗糙度变化，但法线贴图**不遮挡自己**，斜射光下砖缝里
+> 没有阴影，一米内看没有比一米外多出任何东西。
+
+### 17.1 五件事与它们对标的实现
+
+| 这里 | 对标 | 落在哪个锚点 | 有意的近似 |
+|---|---|---|---|
+| **视差遮蔽 POM** | 陡视差 + 二分细化（Tatarchuk 2006 / UE 的 `ParallaxOcclusionMapping` 节点） | `<clipping_planes_fragment>` | TBN 从**屏幕导数**现算（与 three 的 `getTangentFrame` 同一算式），不给静态几何烘切线属性 |
+| **细节法线** | UDN 混合（Barré-Brisebois & Hill 2012） | `<normal_fragment_maps>`（**新锚点**） | 只把细节的切线空间 xy 加到已扰动法线上，不重建 z |
+| **微阴影** | Chan 2018《Material Advances in Call of Duty: WWII》 | `<lights_fragment_end>` | 用**主平行光**的 NdotL 压全部直射项，不逐光源算 |
+| **地平线镜面遮蔽** | Lagarde / Frostbite `horizonOcclusion` | `<lights_fragment_maps>` | 无 |
+| **皮肤预积分 SSS** | Penner 2011 + 轻微 wrap | `<lights_fragment_end>` | 曲率从屏幕导数估；散射半径按美术量级放大（下详） |
+
+代码在 `Script_MaterialShading.mjs`（GLSL 与补丁工厂）、`Data_Tuning_Materials.mjs`
+（逐配方数值，纯数据）、`Script_TexBake.mjs`（细节法线 / 皮肤 LUT / 污渍层的烘焙）、
+`Script_Materials.mjs`（谁编哪几路 + 外部 GLB 材质分类与换类）。
+补丁在注册表里的位置固定为 **ORM → AO → GI → CSM → SSR → 簇光 → 材质着色 → 破口**（§1.8）。
+
+### 17.2 POM：三条必须知道的实现细节
+
+**① uv 是靠「局部变量遮蔽 varying」改的。**
+r185 把每张贴图的 uv 拆成了各自的 varying（`vMapUv` / `vNormalMapUv` /
+`vRoughnessMapUv` / `vMetalnessMapUv` / `vAoMapUv`），而 `#version 300 es` 里
+varying 是 `in`，**只读**。所以在 `main()` 里声明同名局部量把它们一次性接管：
+
+```glsl
+vec2 gMatPomUv = vNormalMapUv;   // 先存原值（此处还是 varying）
+{ ...行进 + 二分细化，写 gMatPomUv... }
+#ifdef USE_MAP
+vec2 vMapUv = gMatPomUv;         // 从这里往下，所有 chunk 采样的都是位移后的 uv
+#endif
+```
+
+顺序不能反：`vec2 vMapUv = vMapUv + d;` 在 GLSL 里是自引用，行为未定义。
+`<clipping_planes_fragment>` 是片元 `main()` 里唯一早于 `<map_fragment>` 的锚点，
+所以 POM 只能挂在那儿。ANGLE-D3D11 实测通过（读回像素验证：把条纹图偏移半个平铺，
+颜色确实换了），零 GL 错误。
+
+**五张 uv 必须一起位移**，少遮一张就是「颜色错位了但粗糙度没错位」。
+顺带澄清一条旧注释：`aoMap` 在 r185 里走的是 `texture.channel`，缺省 0 = `uv`，
+不是 `uv1`（本项目的 ORM 三槽同一张图、同一套 uv，所以能一起遮蔽）。
+
+**② 深度以「米」给，uv 换算是现算的。**
+`Data_Tuning_Materials.SURFACE_RECIPES[*].pomDepth` 是**米**（青砖灰缝 16 mm、
+瓦垄 24 mm、门板企口 6 mm）。着色器按屏幕导数现算「一米有多少 uv」：
+
+```glsl
+float pomUvPerMeter = max(length(dFdx(uv)) / length(dFdx(viewPos)),
+                          length(dFdy(uv)) / length(dFdy(viewPos)));
+```
+
+两个方向取大的：掠射面上有一个方向的导数会趋近 0，只取一个方向深度会发散。
+这样换 `repeat`、换物体缩放都不用重调数字。单步位移仍要封顶
+（`POM.maxUvPerStep`）—— uv 导数在接缝与极端拉伸处会炸，不钳的话一个像素能跑穿整张图。
+
+**③ 高度取自法线贴图的 A 通道**（`HeightToNormal` 写进去的）。外部下载的法线图
+若没有 alpha（webp 无 alpha → 恒 1），`hgt = 1 − 1 = 0`，第一次判定就退出、uv 一动不动
+—— **失败模式是「没有 POM」而不是「乱码」**，这是有意选的。
+
+步数按档位（`Data_Tuning_Graphics`）：low 0（不编）/ medium 8 / high 16 / ultra 32，
+命中后再做 4–6 次二分细化（只线性行进的话砖缝立面上是一格一格的台阶）。
+掠射角加权：正对表面只用 45% 的步数。距离 9 m 起淡出、15 m 完全退回普通法线贴图。
+
+**只给静态场景材质。** 人物、枪械、道具是 atlas UV，`pomDepth` 一律 0。
+
+### 17.3 微阴影为什么挂 `<lights_fragment_end>` 而不是 `<aomap_fragment>`
+
+r185 的片元 `main()` 里顺序是 `lights_fragment_end` → `aomap_fragment`，
+而 GI 补丁的调试视图 10/11（直射漫反射 / 直射镜面）是在 `<aomap_fragment>` 上抓的。
+挂在它后面的话，面板读到的是**没压过**的直射项，与正式画面不一致。
+§1.8 的锚点表已按这条更正。
+
+式子是 Chan 的原式：`aperture = 2·ao²`，`shadow = saturate(|NdotL| + aperture − 1)`。
+`ao = 1`（完全开阔）时 aperture = 2，式子恒为 1 —— 平整表面一点不受影响，
+只有 ao < 1 的砖缝 / 木纹 / 瓦垄才在斜射光下压出细阴影。
+
+### 17.4 皮肤：为什么 LUT 的轴是「散射半径（毫米）」而不是几何曲率
+
+d'Eon 六高斯剖面最宽一支方差 7.41 mm²（σ≈2.7 mm）。**照几何半径直接查**，
+一颗 90 mm 的人头上散射只摊开 2.7/90 ≈ 0.03 弧度 —— 物理上没错（真人脸上那圈红边
+确实只有几毫米宽），但在游戏分辨率下落到三四个像素，实测**与纯 Lambert 差不到一个色阶**，
+接上了等于没接。所有做预积分皮肤的引擎都在这里放大一次（UE 的 `WorldUnitScale`、
+Penner demo 的曲率轴），本项目的放大量是 `SKIN.radiusScale = 22`：
+人头曲率 ≈ 11 /m → 散射半径 ≈ 4 mm，落在剖面真正起作用的那一段。
+**这是有意的美术放大，不是 bug。**
+
+另外两条：
+- **LUT 的积分步长必须细到能采到最窄那支高斯**（σ≈0.08 mm）。Penner 原文的
+  `inc = 0.05` 在这个半径量程下会让 `a = 0` 那一个样本独吞全部权重，
+  LUT 退化成一张纯 Lambert（踩过）。现在是 1200 步 + 一张 4096 格的剖面查找表。
+- **加的是「预积分 − Lambert」的差**，不是整项替换：替换会把 three 已经算对的
+  阴影、光色和其余光源一起吃掉。差值乘 `getShadow()` 与光色再加回 `directDiffuse`。
+
+曲率由屏幕导数估：`length(fwidth(geometryNormal)) / length(fwidth(viewPos))`，单位 1/米。
+
+### 17.5 人物 / 枪械：外部 GLB 材质的分类与换类
+
+按**材质名**分类（`Data_Tuning_Materials.EXTERNAL_MATERIAL_CLASSES`，顺序
+皮肤 → 金属 → 布）。为什么按名字：卢沟桥那十套人物是混合 atlas，一个网格里同时有脸、
+军装和头发，几何上分不开，能分开的只有材质名。**命中不到就什么都不做** ——
+宁可少一层绒光，也不要把眼球或刺刀误判成棉布。
+
+- **布**（军装 / 棉衣）→ 换成 `MeshPhysicalMaterial`，`sheen = 0.55`、
+  `sheenRoughness = 0.72`、`sheenColor` 取布色去饱和后往白提（纯白绒光像蒙了塑料膜，
+  完全用布色又等于只是整体提亮）。
+- **金属**（枪管 / 刺刀 / 刀）→ 换类 + `anisotropy = 0.5`、`anisotropyRotation = 0`
+  （沿切线 U，也就是枪管方向）、粗糙度下限 0.28（全镜面时高光只是一个点，看不出方向）。
+  切线由 three 的 `getTangentFrame` 从屏幕导数补，不需要几何切线属性。
+- **皮肤** → **不换类**：预积分散射是自己的补丁，用不到任何 Physical 字段，
+  换类只会白吃一份 `PHYSICAL` 程序（`IOR` + `USE_SPECULAR` 两段）。
+
+换类要拿到**网格**才做得了（换类等于换对象，得挂回 `mesh.material`），所以
+`ConfigureExternalPbr(material, { …, mesh })` 多了一个 `mesh` 形参；四个调用点
+（`Script_CharacterModel` / `Script_RiggedModel` / `Script_FirstPersonBody` /
+`Script_Viewmodel`）都交出了网格。同一份源材质**只换一次**并记进对照表 —— 那些材质
+由加载器缓存共享，逐网格各换一份等于逐网格一份程序（换人那一帧要现编几十个）。
+
+**已知缺口：外部件不吃细节法线。** 它们是 atlas UV，一份 uv 摊在整个身体上，
+再乘 10 倍平铺只有二十厘米一个循环 —— 那不是微表面，那是花布。要给人物加细节法线，
+得先有一套按世界尺度走的 uv（或走三平面）。
+
+### 17.6 defines 是**写进材质本身**的（本轮最隐蔽的一个坑）
+
+three 的 `material.onBeforeCompile(parameters)` 里 `parameters.defines === material.defines`
+（同一个对象），补丁注册表的 `Object.assign(shader.defines, patch.defines)`
+因此是**写进材质本身**的。把某一位从 `patch.defines` 里拿掉**不会**让它从材质上消失：
+
+> 症状：画质面板关掉 POM，画面一点没变。而 cache key 已经换了、`renderer.info.programs`
+> 也真的多了一个、`material.needsUpdate` 也确实生效了 —— 从任何一个中间量都看不出问题。
+
+所以本路补丁在 `uniforms` 回调里先把自己的九个 define 全部 `delete` 一遍，
+再由注册表按当前的 `patch.defines` 重写。**任何做「运行时可关」的材质补丁都要照做。**
+回归口：`Script_MaterialUpgradeTest` 的每一条开/关对照。
+
+### 17.7 档位、面板与调试视图
+
+`Data_Tuning_Graphics.QUALITY_PRESETS`：
+
+| 档 | pom | pomRefine | pomSelfShadow | detailNormal | microShadow | horizonOcclusion | skinSss | materialTexture |
+|---|---|---|---|---|---|---|---|---|
+| low | 0（不编） | 0 | 否 | 否 | 是 | 是 | 否 | 256 |
+| medium | 8 | 4 | 否 | 是 | 是 | 是 | 是 | 512 |
+| high | 16 | 5 | 否 | 是 | 是 | 是 | 是 | 512 |
+| ultra | 32 | 6 | **是** | 是 | 是 | 是 | 是 | 1024 |
+
+low 保留微阴影与地平线遮蔽：它们各只有几条算术，却是「表面不像塑料贴纸」里最便宜的两条。
+`materialTexture` 是烘焙基准边长；砖类照旧翻倍，但 `Script_TexBake.MAX_BAKE_SIZE`
+把单张封在 1024²——ultra 不封顶的话是八个砖配方 × 三张 2048² = 四百多 MB 显存。
+
+画质面板「材质细节」一组：六个 Toggle（编译期，翻一次整场重编译几百毫秒，
+与阴影总闸、GI 采样层同一先例）+ 五根倍率滑杆（运行时，拖了立刻生效）。
+出厂值从画质档拷进 `graphics`（与 `taa` 同款写法），「恢复出厂」按当前档重取。
+
+Debug Rendering 新增「材质细节」一组四张取证图（`?matView=1..5` 直连）：
+
+| 视图 | 看什么 | 关掉对应开关时 |
+|---|---|---|
+| 视差位移 | uv 被推了多少**屏幕像素**（纯红斜坡，绿蓝恒 0） | 纯黑 |
+| 视差高度 | 命中点在高度场的哪一层（白 = 砖面，黑 = 缝底） | 纯白 |
+| 细节法线 | 切线空间扰动量（中灰 = 无扰动） | 中灰 |
+| 微阴影 | Chan 的遮蔽因子（白 = 不压） | 纯白 |
+| 皮肤曲率 | 进 LUT 的那一轴（红 = 尖） | 黑 |
+
+它走**自己的** `uMatDebugView`，与 GI 那一包的 `uGiDebugView` 各用各的 —— 两条注入链
+是分开的补丁，共用一个编号的话关掉 GI 的档位连视差图都看不了。
+
+### 17.8 与其它渲染子系统的接口
+
+- **GTAO 代理**：地平线镜面遮蔽（本节）与弯曲法线镜面遮蔽是**两件不同的事**。
+  前者裁的是「法线贴图把反射向量掰到几何面之下」，只用本像素的两个法线，纯局部；
+  后者裁的是「周围几何挡住了多少环境光」，要屏幕空间信息。两者各乘一次 `radiance`，
+  可以叠加，**不要合并成一项**。
+- **预通道（`Script_PostPrepass`）不跑材质补丁**（它用覆盖材质），所以
+  **POM 的位移不进预通道** —— GTAO / SSR / 接触阴影看到的是**未位移**的表面。
+  这是接受的近似：位移量最大只有两三个像素，而那三条消费方的空间尺度都在十像素以上。
+  真要修得给覆盖材质也编一份 POM（预通道成本翻倍），本轮不做。
+- **CSM 代理**：POM 自阴影与皮肤散射都调 `getShadow(directionalShadowMap[0], …)`
+  的 r185 六参签名。换级联时若签名变了，这两处要跟着改（`Script_MaterialShading.mjs`
+  里搜 `getShadow`）。
+- **预热（§16）**：新增的程序变体由 `WarmupShaders` / `WarmActorShaders` 自动覆盖 ——
+  材质换类发生在模型加载时（`ConfigureExternalPbr`），预热是在那之后按真实 Actor 出画的。
+  不需要另建组合表。
+
+### 17.9 怎么验
+
+```bash
+node Taierzhuang1938/Script_MaterialUpgradeTest.mjs [--shot]
+```
+
+十九条断言，分三级：源码契约（uv 遮蔽五张、Chan / Lagarde / Penner 的算式、补丁顺序）、
+纯 Node（皮肤 LUT 的红移、细节法线不是平图、污渍层真的改了像素、烘焙尺寸封顶）、
+真浏览器（探针页 `?scene=materials`）。浏览器那一级的口径：
+
+- **视差**：同一面砖墙、同一机位，POM 开/关两张 BaseColor 图做一维互相关求位移；
+  再把相机换到镜像的另一侧重做一遍。**位移必须两侧反号** —— 单侧有位移只能证明
+  「图变了」，反号才叫视差。正对表面时位移必须最小。
+- **距离淡出**：20 m 外 POM 开/关逐像素几乎相同，而近处差得多。
+- **微阴影**：砖墙上的直射漫反射（调试视图 10）均值下降 ≥ 5%，
+  且因子图上既有白（平面）又有暗（砖缝）。
+- **皮肤**：量的是**多出来的那份光是什么颜色**，不是整条交界带的颜色 ——
+  带子上大头是环境光（两张图一模一样），直接比带内 R/G 只能读到万分之一的变化。
+  在**线性域**里做差，`ΔR/ΔG` 必须 > 1.04。
+- **程序数**：同一条相机轨迹走两遍，第二遍不许再新建 program。
+
+`--shot` 把十二张开/关对照图写进 `_shots/materialUpgrade/`（已 gitignore）。
+
+### 17.9b GPU 成本（实测）
+
+**在探针街景上量，不在正片上量。** 正片这一侧同时跑着 AI / 流送 / 剔除，A/B 两组的
+draw call 都不一样（实测 891 vs 921），前提就不成立；而整帧 timer query 在这台机器上
+（同时有别的 agent 在跑浏览器测试）噪声是 ±3 ms，要测的量是零点几毫秒。
+探针街景是静态的：同一批 draw、同一批状态，唯一的变量就是材质编了哪几路。
+一次 query 里连画 32 帧再除以 32（单次外部打断只摊薄 1/32），四档交替各 6 轮取最小值
+（GPU 工作量确定，争用只会加时间，min 是真值的最好估计）。
+
+RTX 4070 SUPER / ANGLE-D3D11，**2560×1440 / high / `?scene=street`**，
+机位贴着街拍（砖墙占屏近半 —— POM 的最坏情形）：
+
+| 档 | 整帧 GPU | 相对 |
+|---|---:|---:|
+| 全关 | 2.306 ms | 基线 |
+| 细节法线 + 微阴影 + 地平线遮蔽（POM 关） | 2.291 ms | **−0.015 ms**（在噪声里，等于免费） |
+| 全开（POM 16 步） | 2.672 ms | **+0.381 ms** |
+| 全开 + POM 自阴影（ultra） | 2.846 ms | +0.173 ms（相对全开） |
+
+同一档内六轮的离散度 < 0.11 ms。**POM 16 步 +0.38 ms，在 0.6 ms 的预算内**；
+细节法线 / 微阴影 / 地平线遮蔽三项加起来量不出来（各只有几条算术，没有额外采样
+—— 微阴影那一次取样 2026-09 集成期已并进 ORM 那一次，一次取样都没多）。
+
+CPU 侧不变：材质补丁不新增 draw call（`calls` 348 / 348），也不新增每帧上传。
+
+**人物 Physical 变体的增量**：`Script_RespawnShaderWarmTest` 全绿 —— 进关预热
+`programs 9 → 132`，之后连死三次 `programs 139 → 139`，全部模型号摆到镜头前
+再转一圈仍 `programs 142`，一个都不新建。换类没有把预热覆盖不到的变体带进来。
+
+### 17.10 已知缺口（都是有意的，别当 bug 修）
+
+1. POM 不进深度法线预通道（见 17.8）。
+2. 外部 GLB（人物 / 枪械）不吃细节法线（见 17.5）。
+3. 微阴影用主平行光的 NdotL 压**全部**直射项，不逐光源算 —— 室内被火光照到的
+   砖缝，微阴影是按太阳方向算的。逐光源要改 three 的 `RE_Direct` 本体。
+4. POM 自阴影只有主平行光一路，且只有 ultra 编进去。
+5. 布料绒光只有换了类的那些材质有；`MaterialLibrary.Get()` 出来的程序化布
+   （`ClothNra` / `ClothIja`，旗面与背包用）仍是 `MeshStandardMaterial`。
 
 ---
 

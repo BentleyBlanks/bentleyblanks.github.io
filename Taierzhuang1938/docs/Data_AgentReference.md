@@ -77,8 +77,10 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - `Data_Tuning_Graphics.mjs` —— 画质档位表（纯数据，零 three）：每档每个 pass 的开关与旋钮，
   外加 `HZB` / `VELOCITY` 两组常量。`Script_Post` / `Script_Main` / `Script_EditorSettings` 只读它。
 - `Script_MaterialPatches.mjs` —— **材质补丁注册表**：所有往 `MeshStandardMaterial` 插 GLSL 的
-  事都走它（AO / GI 三态 / SSR / **簇状局部光** / 破口裁切，顺序固定），一个 `onBeforeCompile` 做完，
-  cache key 由补丁 key 拼。
+  事都走它（ORM 三合一 / AO / GI 三态 / CSM / SSR / **簇状局部光** / **材质着色升级** /
+  破口裁切，顺序固定），一个 `onBeforeCompile` 做完，cache key 由补丁 key 拼。
+  **采样器硬预算 16 个**，预算表与打包手段在 `docs/Data_TechRenderPipeline.md` §1.8，
+  门禁 `Script_SamplerBudgetTest.mjs`。
   `Script_Materials.InjectIndirectLighting` 只是它的薄封装。
 - `Script_FirstPersonSelfShadow.mjs` —— 第一人称手臂/武器专用 packed-depth + 3×3 PCF
   自阴影；与战场太阳阴影图隔离，禁止改成 Viewmodel 直接 `castShadow=true`。
@@ -112,9 +114,15 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   medium 32 盏 / high 64 盏 / ultra 128 盏；low 仍走固定灯池。
   回归口 `Script_ClusteredLightsTest.mjs`（`--node` 只跑纯 Node 段，`--perf` 加跑 1440p GPU 消融）。
   先读：`docs/Data_TechRenderPipeline.md` §17（§2.1 是它的历史稿）。
+- **材质着色升级（2026-09）**：`Script_MaterialShading.mjs`（视差遮蔽 POM / 细节法线 /
+  微阴影 Chan 2018 / 地平线镜面遮蔽 Lagarde / 皮肤预积分次表面散射 Penner 2011）。
+  它是补丁注册表里 **簇光之后、破口之前**那一路；逐材质数值在
+  `Data_Tuning_Materials.mjs`，档位开关在 `Data_Tuning_Graphics.mjs`。
+  回归口 `Script_MaterialUpgradeTest.mjs`；Debug Rendering 的「材质细节」组是它的取证图。
 - 回归口：`Script_PostFrameGraphTest.mjs`（帧图契约）、`Script_PostTest.mjs`、
   `Script_GtaoTest.mjs`（GTAO / 弯曲法线 / 镜面遮蔽 / SSIL）、
   `Script_CsmTest.mjs`（级联阴影 / PCSS / 接触阴影）、
+  `Script_MaterialUpgradeTest.mjs`（POM / 细节法线 / 微阴影 / 绒光与各向异性 / 皮肤散射）、
   `Script_SamplerBudgetTest.mjs`（采样器预算：四档×gi 八轮正片都 ≤ 16 个纹素单元）、
   `Script_SsrTest.mjs`（屏幕空间反射）、`Script_ClusteredLightsTest.mjs`（簇状局部光）、
   `Script_AtmosphereTest.mjs`（物理大气：四张 LUT + 十档标定 + 能见度闸；`--shot` 出 A/B 图）、
@@ -126,10 +134,16 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   各占一节 §17（并行落地，本轮不重编号），坑表在末尾）。
 
 ### 材质 / 贴图
-- `Script_TexBake.mjs`（纯 JS PBR 烘焙，每种材质出 albedo / normal / orm）→
-  `Script_Materials.mjs`（包成 three 纹理，SSAO 注入间接光）。
+- `Script_TexBake.mjs`（纯 JS PBR 烘焙，每种材质出 albedo / normal / orm；另出全场共用的
+  细节法线与皮肤预积分 LUT）→ `Script_Materials.mjs`（包成 three 纹理，注入间接光与表面着色）。
+- `Script_MaterialShading.mjs` —— **材质着色升级**（2026-09）：视差遮蔽 POM / 细节法线 /
+  微阴影（Chan 2018）/ 地平线镜面遮蔽（Lagarde）/ 皮肤预积分次表面散射（Penner 2011）。
+  它是补丁注册表里 **GI 之后、破口之前**那一路；逐材质数值在
+  `Data_Tuning_Materials.mjs`，档位开关在 `Data_Tuning_Graphics.mjs`。
+  回归口 `Script_MaterialUpgradeTest.mjs`；Debug Rendering 的「材质细节」组是它的取证图。
 - `Script_Noise.mjs` —— 确定性噪声全家桶，**一切散布参数的随机源**（不许 Math.random）。
-- 先读：`docs/Data_TechRenderPipeline.md` §11；城墙专用 PBR 见 `docs/Data_CityWallPbr.md`。
+- 先读：`docs/Data_TechRenderPipeline.md` 的「材质着色升级（2026-09）」一节（现状）与 §11
+  （烘焙旧稿）；城墙专用 PBR 见 `docs/Data_CityWallPbr.md`。
 
 ### 世界生成底座（台儿庄时期沉淀，滕县共用）
 - `Script_World.mjs` —— 鲁南民居 / 寨墙 / 清真寺建造器 + `BuildSink` 合批槽；尺寸全按

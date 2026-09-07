@@ -221,8 +221,12 @@ Check(CLUSTER_TIERS.low.enabled === false
 const patchSource = fs.readFileSync(path.join(projectDir, "Script_MaterialPatches.mjs"), "utf8");
 // 2026-09 合并后 SSR 补丁排在 GI 与簇光之间（它改的是 <lights_fragment_maps> 的 radiance，
 // 与簇光锚点不同）；这里锁的是「GI 之后、破口之前」，SSR 那一项可有可无。
-Check(/MakeOrmPatch\(orm\),\s*MakeSsaoPatch\(ssao\),\s*MakeGiPatch\(gi\),(?:\s*MakeSsrPatch\(ssr\),)?\s*MakeClusteredLightsPatch\(\),(?:\s*MakeMaterialShadingPatch\([^)]*\),)?\s*MakeDestructionPatch/.test(patchSource),
-  "补丁注册顺序：ORM → AO → GI → (SSR) → 簇光 → (材质着色) → 破口");
+// 注释不算数：先把注释行剔掉再匹配，否则每插一句“为什么这么排”都要改这条正则。
+const patchOrder = patchSource.slice(patchSource.indexOf("export function IndirectLightingPatches"))
+  .split(String.fromCharCode(10)).filter((line) => !line.trim().startsWith("//"))
+  .join(String.fromCharCode(10));
+Check(/MakeOrmPatch\(orm\),\s*MakeSsaoPatch\(ssao\),\s*MakeGiPatch\(gi\),\s*(?:MakeCsmPatch\([^;]*?\),\s*)?(?:MakeSsrPatch\(ssr\),\s*)?MakeClusteredLightsPatch\(\),\s*(?:\.\.\.\(Array\.isArray\(shading\)[^;]*?\),\s*)?MakeDestructionPatch/.test(patchOrder),
+  "补丁注册顺序：ORM → AO → GI → (CSM) → (SSR) → 簇光 → (材质着色) → 破口");
 const clusterSource = fs.readFileSync(path.join(projectDir, "Script_ClusteredLights.mjs"), "utf8");
 // 2026-09 集成期三张表合并成一张 RGBA32F（采样器预算）：整数那两段贴着 float
 // 的位型存，着色端 `floatBitsToUint` 取回。锁两条：只剩一个采样器；
