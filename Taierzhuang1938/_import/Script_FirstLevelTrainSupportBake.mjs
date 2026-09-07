@@ -23,8 +23,13 @@ function Accessor(json,chunks,values,type){
  json.bufferViews.push({buffer:0,byteOffset:chunks.reduce((n,b)=>n+b.length,0),byteLength:bytes.length});chunks.push(bytes);
  json.accessors.push({bufferView:json.bufferViews.length-1,componentType:5126,count:data.length/({SCALAR:1,VEC3:3,VEC4:4}[type]),type,...(type==='SCALAR'?{min:[data[0]],max:[data.at(-1)]}:{})});return json.accessors.length-1;
 }
-const results=[];
+const probe=args.includes('--probe'),probeRows=[],selected=args.includes('--ids')?args[args.indexOf('--ids')+1].split(','):null;
+if(selected&&selected.some(id=>!/^LugouNra0[1-4]$/.test(id)))throw Error('Invalid model selection');
+const reportFile=path.join(out,'Data_SupportBakeValidation.json');
+const results=selected&&fs.existsSync(reportFile)?JSON.parse(fs.readFileSync(reportFile)).results.filter(r=>!selected.includes(r.id)):[];
 for(let variant=1;variant<=4;variant++){
+ if(probe&&!selected&&variant!==2)continue;
+ if(selected&&!selected.includes(`LugouNra0${variant}`))continue;
  const id=`LugouNra0${variant}`,target=LoadGlb(path.join(project,`Model/Character/Model_${id}.glb`)),input=LoadGlb(path.join(inputFolder,`Animation_${id}FirstLevelTrain.glb`));
  const scene=new PoseScene(input),parts=BuildSkin(target),nodes=scene.nodes,at=p=>scene.NodeIndex('Bip002 '+p),pelvis=at('Pelvis');
  const descendants=nodes.map((_,i)=>scene.order.filter(j=>{for(let p=j;p>=0;p=scene.parent[p])if(p===i)return true;return false}));
@@ -92,10 +97,12 @@ for(let variant=1;variant<=4;variant++){
   return points;
  }
  const json={asset:{version:'2.0',generator:'FirstLevelTrainSupportBake'},scene:input.json.scene,scenes:structuredClone(input.json.scenes),nodes:structuredClone(nodes),animations:[],accessors:[],bufferViews:[],buffers:[]},chunks=[];
- const seatForwardOffsetM=.24,modelReport={id,nominalScale,seatForwardOffsetM,
+ // Per-model placement keeps each garment's support region on the board.
+ const seatForwardOffsetM=variant===3?.28:.24,modelReport={id,nominalScale,seatForwardOffsetM,
   originalModelSha256:Hash(path.join(project,`Model/Character/Model_${id}.glb`)),
   sourceAnimationSha256:Hash(path.join(inputFolder,`Animation_${id}FirstLevelTrain.glb`)),profiles:[]};
  for(const sizeScale of [.96,.98,1,1.02,1.04]){
+  if(probe&&sizeScale!==1)continue;
   const scale=nominalScale*sizeScale,seatTop=.48/scale,bounds=[[-.6/scale,.34/scale,(-.34-seatForwardOffsetM)/scale],[.6/scale,seatTop,(.34-seatForwardOffsetM)/scale]];
   scene.Apply(0,0);let world=scene.world.map(m=>new Matrix4().fromArray(m));const initial=Points(world);
   const targets={},feet={},palmOffsets={L:0,R:0},palmAxes={};for(const side of ['L','R']){
@@ -103,7 +110,7 @@ for(let variant=1;variant<=4;variant++){
    const min=Math.min(...initial.filter((_,i)=>flags[i].foot===side).map(p=>p.y));targets[side].y+=.002/scale-min;
    palmAxes[side]=new Vector3(0,1,0).applyQuaternion(Rotation(world[at(side+' Thigh')]).invert());
   }
-  const values=new Map(links.map(i=>[i,{translation:[],rotation:[],scale:[]}])),times=[],samples=[];
+  const values=new Map(links.map(i=>[i,{translation:[],rotation:[],scale:[]}])),times=[],samples=[];let previousDy=0,releaseDy=0;
   function TranslatePelvis(dy){for(const i of descendants[pelvis])world[i].elements[13]+=dy}
   function TransformBone(i,matrix){const delta=matrix.clone().multiply(world[i].clone().invert());for(const j of descendants[i])world[j].premultiply(delta)}
   function Aim(i,child,target){
@@ -134,6 +141,7 @@ for(let variant=1;variant<=4;variant++){
    min=Math.min(min,p.y+((outside*scale/.01)**2)*.12/scale);
   }return min}
   for(let sourceFrame=0;sourceFrame<=478;sourceFrame++){
+   if(probe&&![0,120,240,270,300,312,320,330,348].includes(sourceFrame))continue;
    const seconds=sourceFrame/60;times.push(seconds);scene.Apply(0,seconds);world=scene.world.map(m=>new Matrix4().fromArray(m));
    const originalPelvis=Pos(world[pelvis]),seated=1-Smooth((seconds-4.5)/1.3);
    const palmRelative={},originalHands={};for(const side of ['L','R']){
@@ -150,30 +158,40 @@ for(let variant=1;variant<=4;variant++){
     world=baseline.map(m=>m.clone());TranslatePelvis(dy);for(const side of ['L','R'])Leg(side);
     return SeatMinimum(Points(world))-seatTop-.002/scale;
    }
+   if(probe){
+    const values=[];for(let dy=-.15;dy<=maxDy;dy+=.002)values.push({dy,gap:SolveSupport(dy)});
+    probeRows.push({id,sizeScale,seconds,maxDy,originalPelvis:originalPelvis.toArray(),values});continue;
+   }
    if(seated>0){
-    let lo=Math.min(-.18,maxDy-.01),hi=maxDy;
-    // Garment clearance need not be monotonic all the way to a straight knee.
-    // Find the first feasible local bracket, then solve that contact boundary.
-    const lower=lo,upper=hi;let found=SolveSupport(lo)>=0;
-    if(found)hi=lo;
-    for(let step=1;!found&&step<=64;step++){
-     hi=lower+(upper-lower)*step/64;
-     if(SolveSupport(hi)>=0){found=true;break}
+    // Taller production skins can already float above the seat in the source
+    // pose. Allow downward fitting while seated; release that correction with
+    // the source rise so the solver cannot keep pulling the actor onto the seat.
+    const floor=Math.min(maxDy,seconds<=4.5?-.15/scale:Math.min(0,releaseDy)*seated),step=.002/scale;
+    let hi=Math.max(floor,Math.min(previousDy,maxDy)),lo=hi,clear=SolveSupport(hi)>=0;
+    if(sourceFrame===0){
+     // Select the upper seat-support branch consistently across body sizes.
+     // Starting at zero may already be inside a temporary low garment pocket.
+     hi=maxDy;clear=SolveSupport(hi)>=0;
+     while(!clear&&hi>floor){hi=Math.max(floor,hi-step);clear=SolveSupport(hi)>=0}
      lo=hi;
     }
-    if(!found)throw Error(`${id}/${sizeScale}/${seconds} no reachable bench support`);
-    for(let iteration=0;iteration<18;iteration++){const middle=(lo+hi)/2;if(SolveSupport(middle)<0)lo=middle;else hi=middle}
-    const supported=hi;let desired=Math.min(maxDy,Math.max(hi,hi*seated));
-    if(SolveSupport(desired)<0){
-     // Blending back toward the standing source can leave a feasible pocket
-     // at the bench lip. Stop at its boundary instead of passing through wood.
-     lo=supported;hi=desired;
-     for(let iteration=0;iteration<18;iteration++){const middle=(lo+hi)/2;if(SolveSupport(middle)>=0)lo=middle;else hi=middle}
-     desired=lo;
+    // Stay in the previous connected support interval. A second, lower
+    // garment-clearance pocket must not pull the body into a different pose.
+    while(!clear&&hi<maxDy){lo=hi;hi=Math.min(maxDy,hi+step);clear=SolveSupport(hi)>=0}
+    if(!clear)throw Error(`${id}/${sizeScale}/${seconds} previous support interval became unreachable`);
+    if(lo===hi){
+     while(lo>floor){const next=Math.max(floor,lo-step);if(SolveSupport(next)<0){lo=next;break}hi=lo=next}
     }
-    SolveSupport(desired);
+    for(let iteration=0;iteration<18&&hi-lo>1e-8;iteration++){const middle=(lo+hi)/2;if(SolveSupport(middle)<0)lo=middle;else hi=middle}
+    // A disappearing garment constraint must release smoothly. This limit
+    // changes authored support correction only, never the source root track.
+    if(sourceFrame>0){
+     const eased=Math.min(maxDy,Math.max(hi,previousDy-.4/scale/60));
+     if(SolveSupport(eased)>=0)hi=eased;
+    }
+    previousDy=hi;if(sourceFrame===270)releaseDy=hi;SolveSupport(previousDy);
    }else{
-    SolveSupport(Math.min(0,maxDy));
+    previousDy=Math.min(0,maxDy);SolveSupport(previousDy);
    }
    const contact=1-Smooth((seconds-5.2)/.5);
    if(contact>0)for(const side of ['L','R']){
@@ -200,6 +218,7 @@ for(let variant=1;variant<=4;variant++){
     v.translation.push(...t);v.rotation.push(...q);v.scale.push(...s);
    }
   }
+  if(probe)continue;
   const clipName='FirstLevelTrainBench'+Math.round(sizeScale*100),animation={name:clipName,channels:[],samplers:[],extras:{loop:false,sizeScale,scale,seatForwardOffsetM,sourceRangeSeconds:[0,478/60]}};
   const inputIndex=Accessor(json,chunks,times,'SCALAR');
   for(const i of links)for(const property of ['translation','rotation','scale']){
@@ -212,6 +231,8 @@ for(let variant=1;variant<=4;variant++){
   const summary={sizeScale,scale,clipName,palmOffsets,frames:samples.length,minSole:Math.min(...samples.flatMap(s=>Object.values(s.soles))),maxSole:Math.max(...samples.flatMap(s=>Object.values(s.soles))),maxSeatVertices:Math.max(...samples.map(s=>s.seatPenetratingVertices)),maxFootError:Math.max(...samples.map(s=>s.footError)),samples};
   modelReport.profiles.push(summary);console.log(JSON.stringify({...summary,samples:undefined}));
  }
+ if(probe)continue;
  const bin=Buffer.concat(chunks);json.buffers=[{byteLength:bin.length}];const outputFile=path.join(out,`Animation_${id}FirstLevelTrainSupport.glb`);fs.writeFileSync(outputFile,SerializeGlb(json,bin));modelReport.animationSha256=Hash(outputFile);results.push(modelReport);
 }
-fs.writeFileSync(path.join(out,'Data_SupportBakeValidation.json'),JSON.stringify({status:'support_fit_requires_independent_export_review',results},null,2));
+if(probe)fs.writeFileSync(path.join(out,'Data_SupportSurfaceProbe.json'),JSON.stringify(probeRows,null,2));
+else fs.writeFileSync(reportFile,JSON.stringify({status:'support_fit_requires_independent_export_review',results:results.sort((a,b)=>a.id.localeCompare(b.id))},null,2));

@@ -10,6 +10,9 @@ const project=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),re
 assert.ok(root);
 const group=args.includes('--group')?args[args.indexOf('--group')+1]:'FirstLevelTrainSupportV1';
 assert.match(group,/^FirstLevelTrainSupportV[1-9]\d*$/);
+const selected=args.includes('--ids')?args[args.indexOf('--ids')+1].split(','):null;
+if(selected)for(const id of selected)assert.match(id,/^LugouNra0[1-4]$/);
+const reportName=selected?'Data_ProductionSkinValidation_'+selected.join('_')+'.json':'Data_ProductionSkinValidation.json';
 const output=path.join(project,'_shots',group);await fs.mkdir(output,{recursive:true});
 for(let n=1;n<=4;n++)await fs.copyFile(path.join(root,`Models/${group}/Animation_LugouNra0${n}FirstLevelTrainSupport.glb`),path.join(output,`Animation_LugouNra0${n}FirstLevelTrainSupport.glb`));
 await fs.writeFile(path.join(output,'_check_Train.html'),`<!doctype html><html><head><script type="importmap">{"imports":{"three":"../../vendor/three/build/three.module.js"}}</script></head><body style="margin:0"><script type="module">
@@ -21,6 +24,7 @@ try{
  const page=await browser.newPage({viewport:{width:1400,height:1000}});page.on('pageerror',e=>errors.push(e.message));
  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/_shots/${group}/_check_Train.html`);await page.waitForFunction(()=>window.TrainSupport);
  for(const model of bake.results){
+  if(selected&&!selected.includes(model.id))continue;
   const exported=await fs.readFile(path.join(output,`Animation_${model.id}FirstLevelTrainSupport.glb`));
   assert.equal(createHash('sha256').update(exported).digest('hex'),model.animationSha256,'Verify exactly the recorded export');
   const data=await page.evaluate(async model=>{
@@ -49,10 +53,10 @@ try{
    }
    rig.rotation.y=Math.PI;
    for(const sizeScale of [.96,.97,.98,.99,1,1.01,1.02,1.03,1.04]){
-    rig.scale.setScalar(model.nominalScale*sizeScale);let minSole=Infinity,maxSole=-Infinity,penetrating=0,footDrift=0,lengthError=0,minPalmGap=Infinity,maxPalmGap=-Infinity,maxPelvisSpeed=0,previousPelvis=null;
+    rig.scale.setScalar(model.nominalScale*sizeScale);let minSole=Infinity,maxSole=-Infinity,penetrating=0,footDrift=0,lengthError=0,minPalmGap=Infinity,maxPalmGap=-Infinity,maxPelvisSpeed=0,previousPelvis=null,minSeatGap=Infinity,maxSeatGap=-Infinity;
     const feet={},lengths={},samples=[],palmAxes={};
     for(let frame=0;frame<=956;frame++){
-     const seconds=frame/120,checkPalms=frame%12===0&&seconds<=5.2;Sample(sizeScale,seconds);const soles={L:Infinity,R:Infinity},hands={L:[],R:[]},triangles={L:[],R:[]};let count=0;
+     const seconds=frame/120,checkPalms=frame%12===0&&seconds<=5.2;Sample(sizeScale,seconds);const soles={L:Infinity,R:Infinity},hands={L:[],R:[]},triangles={L:[],R:[]};let count=0,seatGap=Infinity;
      const pelvis=Pt('Pelvis');if(previousPelvis)maxPelvisSpeed=Math.max(maxPelvisSpeed,pelvis.distanceTo(previousPelvis)*120);previousPelvis=pelvis;
      if(frame===0)for(const side of ['L','R'])palmAxes[side]=new V(0,1,0).applyQuaternion(Find(side+' Thigh').getWorldQuaternion(new T.Quaternion()).invert());
      for(const {mesh,flags,triangles:indices} of prepared){
@@ -60,12 +64,16 @@ try{
       for(let i=0;i<flags.length;i++){
        const p=mesh.getVertexPosition(i,new V()).applyMatrix4(mesh.matrixWorld);points.push(p);
        if(flags[i].foot)soles[flags[i].foot]=Math.min(soles[flags[i].foot],p.y);
-       if(Math.abs(p.x)<.6&&p.z>model.seatForwardOffsetM-.34&&p.z<model.seatForwardOffsetM+.34&&p.y>.34&&p.y<.48)count++;
+       if(Math.abs(p.x)<.6&&p.z>model.seatForwardOffsetM-.34&&p.z<model.seatForwardOffsetM+.34){
+        if(p.y>.34&&p.y<.48)count++;
+        if(seconds<=4.5)seatGap=Math.min(seatGap,p.y-.48);
+       }
        if(checkPalms&&flags[i].hand)hands[flags[i].hand].push(p);
       }
       if(checkPalms)for(const s of ['L','R'])triangles[s].push(...indices[s].map(t=>new T.Triangle(...t.map(i=>points[i]))));
      }
      minSole=Math.min(minSole,soles.L,soles.R);maxSole=Math.max(maxSole,soles.L,soles.R);penetrating=Math.max(penetrating,count);
+     if(seconds<=4.5){minSeatGap=Math.min(minSeatGap,seatGap);maxSeatGap=Math.max(maxSeatGap,seatGap)}
      for(const s of ['L','R']){
       const p=Pt(s+' Foot');feet[s]??=p.clone();footDrift=Math.max(footDrift,p.distanceTo(feet[s]));
       for(const [a,b] of [['Thigh','Calf'],['Calf','Foot']]){const key=s+a,length=Pt(s+' '+a).distanceTo(Pt(s+' '+b));lengths[key]??=length;lengthError=Math.max(lengthError,Math.abs(length-lengths[key]))}
@@ -81,9 +89,9 @@ try{
       }
       gaps[side]=minimum;minPalmGap=Math.min(minPalmGap,minimum);maxPalmGap=Math.max(maxPalmGap,minimum);
      }
-     if(checkPalms||frame%60===0||frame===956)samples.push({sourceSeconds:seconds,soles,seatPenetratingVertices:count,palmGaps:gaps,pelvis:Pt('Pelvis').toArray()});
+     if(checkPalms||frame%60===0||frame===956)samples.push({sourceSeconds:seconds,soles,seatPenetratingVertices:count,seatGap:seconds<=4.5?seatGap:null,palmGaps:gaps,pelvis:Pt('Pelvis').toArray()});
     }
-    profiles.push({sizeScale,minSole,maxSole,penetrating,footDrift,lengthError,minPalmGap,maxPalmGap,maxPelvisSpeed,frames:957,samples});
+    profiles.push({sizeScale,minSole,maxSole,penetrating,footDrift,lengthError,minPalmGap,maxPalmGap,maxPelvisSpeed,minSeatGap,maxSeatGap,frames:957,samples});
    }
    const renderer=new T.WebGLRenderer({antialias:true});renderer.setSize(1400,1000);renderer.setClearColor(0x263237);document.body.replaceChildren(renderer.domElement);
    const scene=new T.Scene(),camera=new T.PerspectiveCamera(38,1.4,.01,50);scene.add(new T.HemisphereLight(0xffffff,0x555555,2.5));const key=new T.DirectionalLight(0xffffff,3);key.position.set(-3,5,4);scene.add(key);scene.add(new T.GridHelper(12,24));scene.add(rig);
@@ -103,14 +111,18 @@ try{
   if(!result.bindingPreserved)failures.push(`${result.id}: original bind/hierarchy`);
   for(const p of result.profiles){const id=`${result.id}/${p.sizeScale}`;
    if(p.penetrating!==0)failures.push(`${id}: ${p.penetrating} bench-intersecting vertices`);
+   if(!(p.minSeatGap>.0003&&p.maxSeatGap<.006))failures.push(`${id}: seated skin/board gap ${p.minSeatGap}..${p.maxSeatGap}`);
    if(!(p.minSole>.0015&&p.maxSole<.003))failures.push(`${id}: sole height ${p.minSole}..${p.maxSole}`);
    if(!(p.footDrift<.0005&&p.lengthError<.0005))failures.push(`${id}: foot drift ${p.footDrift}, length error ${p.lengthError}`);
    if(!(p.minPalmGap>.0003&&p.maxPalmGap<.002))failures.push(`${id}: palm support ${p.minPalmGap}..${p.maxPalmGap}`);
+   // Source pelvis peaks below .63 m/s at the largest game size. A branch
+   // change must not become a one-frame body jump hidden by grounded keyframes.
+   if(!(p.maxPelvisSpeed<.7))failures.push(`${id}: pelvis speed discontinuity ${p.maxPelvisSpeed}`);
   }
  }
- const report={status:failures.length||errors.length?'needs_correction':'numeric_checks_passed_pending_visual_and_runtime_review',runtimeEnabled:false,results,errors,failures};
- await fs.writeFile(path.join(output,'Data_ProductionSkinValidation.json'),JSON.stringify(report,null,2));
- await fs.copyFile(path.join(output,'Data_ProductionSkinValidation.json'),path.join(root,`Models/${group}/Data_ProductionSkinValidation.json`));
+ const report={status:failures.length||errors.length?'needs_correction':'numeric_checks_passed_pending_visual_and_runtime_review',scope:selected||'all_four_original_models',runtimeEnabled:false,results,errors,failures};
+ await fs.writeFile(path.join(output,reportName),JSON.stringify(report,null,2));
+ await fs.copyFile(path.join(output,reportName),path.join(root,`Models/${group}/${reportName}`));
  assert.deepEqual(errors,[]);
  assert.deepEqual(failures,[],'Actual production skin at nine heights and 120 fps');
  console.log(JSON.stringify(results.map(r=>({...r,profiles:r.profiles.map(({samples,...p})=>p)}))));

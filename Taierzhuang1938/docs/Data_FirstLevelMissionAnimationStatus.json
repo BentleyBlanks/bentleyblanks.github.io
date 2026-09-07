@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updated": "2026-09-07",
-  "baseCommit": "5d063711ed8f533da8ff5b873a5f5737daa19fae",
+  "baseCommit": "48993c13ce51b803bc989f825edcf32335b63002",
   "missionContract": {
     "version": "first-level-20260907-r11",
     "stages": [
@@ -433,8 +433,8 @@
     }
   },
   "libraryRoot": "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼",
-  "catalogSha256": "6a6e7884c1ac57481c25839873c1d727cf41359600c8b07d17c3db8ed86a96cf",
-  "requirementsSha256": "deddd14e74f519a269e04e714f8bb27edb8fb7daa9007b7e92a61de77fd4ec2b",
+  "catalogSha256": "dad60597201e3ca9d9b65fbe181e42a9bd3ea29d4a1f728983cc42f5a355cf2e",
+  "requirementsSha256": "91c051028686c09f060da1661042da781a33ca139efbd024cbc3176f9508c612",
   "missionBaselineFiles": {
     "Data_FirstLevelMission.mjs": "112fd1c53150b14478eb6be5a9748a9523cbd9b28d905c357d883c4663f9a8ee",
     "Data_FirstLevelMissionDialogue.mjs": "a62830fc97fedc1f5df3aacf0664c89edada411ae7689e1dbdaf3164550a5cda",
@@ -478,16 +478,16 @@
       "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources",
       "C:/Users/Bentl/Downloads/GVHMR"
     ],
-    "catalogActions": 51,
+    "catalogActions": 53,
     "newVideoGenerations": 60,
-    "newInferenceRuns": 4
+    "newInferenceRuns": 6
   },
   "sourceProduction": {
     "userScope": "Generate source coverage for all 48 requirements before completing individual retargets.",
     "plannedNewSources": 62,
     "expectedFirstPassCredits": 11360,
     "inspectionSummary": {
-      "updatedUnix": 1788782924.7544844,
+      "updatedUnix": 1788790362.7469223,
       "decoded": 60,
       "screened": 60,
       "retakeRequired": 17
@@ -824,32 +824,130 @@
                   "retargetReport": "Models/FirstLevelBenchV3/Data_TrainBenchRisePalmValidation.json",
                   "sourceRecoveryUnchanged": true
                 }
+              },
+              {
+                "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+                "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra01.json",
+                "assessment": {
+                  "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+                  "modelSha256": "401b540dc1c1854bc5ae0ec55cef909de05ef9c5d77c1bdb920c882e3297b23e",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+                  "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+                  "sourceId": "TrainBenchRise",
+                  "status": "support_and_playback_reviewed_pending_runtime_integration",
+                  "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    5.2,
+                    5.25,
+                    5.7,
+                    7.966666666666667
+                  ],
+                  "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+                }
+              },
+              {
+                "variantId": "Nra-v4-LugouNra02-TrainBenchRise",
+                "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra02.json",
+                "assessment": {
+                  "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+                  "modelSha256": "9da0f2c610fd64800853fd3d71e494b7e7a0d45811b8ebc54b9304455121e783",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+                  "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+                  "sourceId": "TrainBenchRise",
+                  "status": "support_and_playback_reviewed_pending_runtime_integration",
+                  "variantId": "Nra-v4-LugouNra02-TrainBenchRise",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    5.2,
+                    5.25,
+                    5.7,
+                    7.966666666666667
+                  ],
+                  "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+                }
+              },
+              {
+                "variantId": "Nra-v4-LugouNra03-TrainBenchRise",
+                "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra03.json",
+                "assessment": {
+                  "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+                  "modelSha256": "a3e504d3d5a9e73fad082a7c356b2766f8c6a4c276705f503154b263cbe64760",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+                  "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+                  "sourceId": "TrainBenchRise",
+                  "status": "support_and_playback_reviewed_pending_runtime_integration",
+                  "variantId": "Nra-v4-LugouNra03-TrainBenchRise",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    5.2,
+                    5.25,
+                    5.7,
+                    7.966666666666667
+                  ],
+                  "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+                }
+              },
+              {
+                "variantId": "Nra-v4-LugouNra04-TrainBenchRise",
+                "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra04.json",
+                "assessment": {
+                  "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+                  "modelSha256": "2fdf6313bc4dfa62cfb1a4c2ae740906a6d463c9846e4bee3979474b54898830",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+                  "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+                  "sourceId": "TrainBenchRise",
+                  "status": "support_and_playback_reviewed_pending_runtime_integration",
+                  "variantId": "Nra-v4-LugouNra04-TrainBenchRise",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    5.2,
+                    5.25,
+                    5.7,
+                    7.966666666666667
+                  ],
+                  "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+                }
               }
             ],
             "retargetAssessment": {
-              "sourceId": "TrainBenchRise",
-              "variantId": "Nra-v3-TrainBenchRise",
-              "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
               "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
-              "modelSha256": "bb9f7a2f709d4fca5616b2722f245e9faf121dd445e79d60a2f54bf945099a8d",
-              "status": "contact_reviewed_pending_runtime_scale_and_transition",
+              "modelSha256": "401b540dc1c1854bc5ae0ec55cef909de05ef9c5d77c1bdb920c882e3297b23e",
               "acceptedForGame": false,
-              "observed": "已看 0 秒正侧视及手部正面、斜侧近景，5.2 秒扶腿侧视近景和5.5秒松手侧视。双掌已贴上腿部衣面，原骨长保留；因原人物臂长限制将扶点移近髋部，腕点最大改动约0.340米，不能称原腕轨迹保真。手指放松与袖口可见，尚需游戏实际模型尺度、座位、转场和完整速度播放验收。",
+              "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+              "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+              "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+              "sourceId": "TrainBenchRise",
+              "status": "support_and_playback_reviewed_pending_runtime_integration",
+              "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+              "sourceRecoveryUnchanged": true,
               "reviewedSourceSeconds": [
                 0,
                 5.2,
-                5.5
+                5.25,
+                5.7,
+                7.966666666666667
               ],
-              "evidence": "Preview/FirstLevelBenchV3/Data_ExportPalmValidation.json",
-              "retargetReport": "Models/FirstLevelBenchV3/Data_TrainBenchRisePalmValidation.json",
-              "sourceRecoveryUnchanged": true
+              "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
             },
             "retargetCandidate": {
               "previewId": "TrainBenchRise",
-              "variantId": "Nra-v3-TrainBenchRise",
-              "status": "待审阅 · 掌腿接触",
-              "path": "Models/FirstLevelBenchV3/Animation_Nra_TrainBenchRise_V3.glb",
-              "blend": "Blender/FirstLevelBenchV3/Scene_Nra_TrainBenchRise_V3.blend",
+              "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+              "status": "待审阅 · 未接入游戏",
+              "path": "Models/FirstLevelTrainSupportV2/Model_LugouNra01TrainSupport.glb",
+              "blend": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra01TrainSupport.blend",
               "rawTracks": [
                 {
                   "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
@@ -1245,7 +1343,118 @@
               ],
               "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
             },
-            "retargetHistory": []
+            "denseAssessment": {
+              "observed": "已逐页查看 0–8 秒每 0.25 秒抽帧：完整单人、固定镜头，双掌扶腿；约 2–4 秒前倾，再回坐直，末态回到相近坐姿。无起身与真实行进。可继续二维关节点检查；循环边界、座凳和双足接触待恢复后验。 已查看 0–7.5 秒每 0.5 秒的真实输入二维关节点覆盖：同一人追踪，抽样中未见左右腿交换，膝踝点跟随原人物。二维可见稳定不能证明单目三维深度、手指或道具接触。",
+              "evidence": [
+                "Video/Sources/FirstLevelV1/TrainBenchRest/DenseReview/Texture_SourceDense_01.jpg",
+                "Video/Sources/FirstLevelV1/TrainBenchRest/DenseReview/Texture_SourceDense_02.jpg",
+                "Video/Sources/FirstLevelV1/TrainBenchRest/DenseReview/Texture_SourceDense_03.jpg"
+              ],
+              "acceptedForGame": false,
+              "reviewScope": "All PTS-labelled 0.25-second source sheets visually reviewed; no 3D, retarget or runtime acceptance",
+              "sourceId": "TrainBenchRest",
+              "reviewedSourceSeconds": [
+                0.0,
+                0.25,
+                0.5,
+                0.75,
+                1.0,
+                1.25,
+                1.5,
+                1.75,
+                2.0,
+                2.25,
+                2.5,
+                2.75,
+                3.0,
+                3.25,
+                3.5,
+                3.75,
+                4.0,
+                4.25,
+                4.5,
+                4.75,
+                5.0,
+                5.25,
+                5.5,
+                5.75,
+                6.0,
+                6.25,
+                6.5,
+                6.75,
+                7.0,
+                7.25,
+                7.5,
+                7.75,
+                8.0
+              ],
+              "status": "eligible_for_initial_3d_recovery_pending_depth_and_contact_review",
+              "approvedForObservationPreparation": true,
+              "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRest/88058387-d5be-453b-adb1-58c7b10414e0_video_1.mp4",
+              "sourceVideoSha256": "5c65f6ec76161384171e44735fb246b56088905c9c7b1f1ab642aa44e3ada796",
+              "keypointsSha256": "2e1dba828ef9ecdea6cc3f2c509fe05a6f9ba45e09891a23d78277f5559f8a2e",
+              "observationInputSha256": "d04bfbc6fe8aff0230d9b50c10a496b54d0962d6dc4c5ccab331fcfcc84482fa",
+              "observationEvidence": [
+                "Video/Sources/FirstLevelV1/TrainBenchRest/DenseReview/Texture_Observations_01.jpg"
+              ]
+            },
+            "retargetHistory": [
+              {
+                "variantId": "Nra-v1-TrainBenchRest",
+                "path": "Video/Sources/FirstLevelV1/TrainBenchRest/Data_RetargetAssessment_V1.json",
+                "assessment": {
+                  "sourceCacheSha256": "2d770a2738085bf4d108f260713dd2933dbf479c65379fc7230990bc7458131f",
+                  "modelSha256": "4c48266bbdc1588d2a5abc39658e52c0d6ab183c1888d2ba0fef2de8cb2ff35f",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/Data_FirstLevelTrainLifeV1PlaybackValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainLifeV1/Data_SelectedExportFidelityValidation.json",
+                  "sourceVideoSha256": "5c65f6ec76161384171e44735fb246b56088905c9c7b1f1ab642aa44e3ada796",
+                  "sourceId": "TrainBenchRest",
+                  "status": "needs_contact_and_depth_correction",
+                  "variantId": "Nra-v1-TrainBenchRest",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    3.9833333333333334
+                  ],
+                  "observed": "已看起始与约 3.98 秒三栏：坐姿和前倾可辨；没有凳子，双掌和双足还未校准接触，不能直接作游戏坐姿循环。"
+                }
+              }
+            ],
+            "retargetAssessment": {
+              "sourceCacheSha256": "2d770a2738085bf4d108f260713dd2933dbf479c65379fc7230990bc7458131f",
+              "modelSha256": "4c48266bbdc1588d2a5abc39658e52c0d6ab183c1888d2ba0fef2de8cb2ff35f",
+              "acceptedForGame": false,
+              "evidence": "Preview/Data_FirstLevelTrainLifeV1PlaybackValidation.json",
+              "retargetReport": "Models/FirstLevelTrainLifeV1/Data_SelectedExportFidelityValidation.json",
+              "sourceVideoSha256": "5c65f6ec76161384171e44735fb246b56088905c9c7b1f1ab642aa44e3ada796",
+              "sourceId": "TrainBenchRest",
+              "status": "needs_contact_and_depth_correction",
+              "variantId": "Nra-v1-TrainBenchRest",
+              "sourceRecoveryUnchanged": true,
+              "reviewedSourceSeconds": [
+                0,
+                3.9833333333333334
+              ],
+              "observed": "已看起始与约 3.98 秒三栏：坐姿和前倾可辨；没有凳子，双掌和双足还未校准接触，不能直接作游戏坐姿循环。"
+            },
+            "retargetCandidate": {
+              "previewId": "TrainBenchRest",
+              "variantId": "Nra-v1-TrainBenchRest",
+              "status": "待审阅",
+              "path": "Models/FirstLevelTrainLifeV1/Animation_Nra_TrainBenchRest_V1.glb",
+              "blend": "Blender/FirstLevelTrainLifeV1/Scene_Nra_TrainBenchRest_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_TrainBenchRestRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
           }
         },
         {
@@ -3407,7 +3616,118 @@
               ],
               "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
             },
-            "retargetHistory": []
+            "denseAssessment": {
+              "observed": "已逐页查看 0–8 秒每 0.25 秒抽帧：完整单人坐在凳上，右手先触肩，随后两手整理身体左侧同一背包，约 6.5 秒收手。双膝和双足在投影中很接近，必须核对左右腿追踪；道具、手指及包带不由身体骨骼恢复保证。 已查看 0–7.5 秒每 0.5 秒的真实输入二维关节点覆盖：同一人追踪，抽样中未见左右腿交换，膝踝点跟随原人物。二维可见稳定不能证明单目三维深度、手指或道具接触。",
+              "evidence": [
+                "Video/Sources/FirstLevelV1/TrainGearStow/DenseReview/Texture_SourceDense_01.jpg",
+                "Video/Sources/FirstLevelV1/TrainGearStow/DenseReview/Texture_SourceDense_02.jpg",
+                "Video/Sources/FirstLevelV1/TrainGearStow/DenseReview/Texture_SourceDense_03.jpg"
+              ],
+              "acceptedForGame": false,
+              "reviewScope": "All PTS-labelled 0.25-second source sheets visually reviewed; no 3D, retarget or runtime acceptance",
+              "sourceId": "TrainGearStow",
+              "reviewedSourceSeconds": [
+                0.0,
+                0.25,
+                0.5,
+                0.75,
+                1.0,
+                1.25,
+                1.5,
+                1.75,
+                2.0,
+                2.25,
+                2.5,
+                2.75,
+                3.0,
+                3.25,
+                3.5,
+                3.75,
+                4.0,
+                4.25,
+                4.5,
+                4.75,
+                5.0,
+                5.25,
+                5.5,
+                5.75,
+                6.0,
+                6.25,
+                6.5,
+                6.75,
+                7.0,
+                7.25,
+                7.5,
+                7.75,
+                8.0
+              ],
+              "status": "eligible_for_initial_3d_recovery_pending_depth_and_contact_review",
+              "approvedForObservationPreparation": true,
+              "sourceVideo": "Video/Sources/FirstLevelV1/TrainGearStow/4636306a-e3b9-4016-a195-dd926bc1aa16_video_1.mp4",
+              "sourceVideoSha256": "9b2d759d97d2b9d5101b89ccd5f991e4304915dd00f8d1f9a8785237bc9fc77e",
+              "keypointsSha256": "2e0a8c03406acc6747491538691bffe9e552eb3709838892e5a828e8c3c4220b",
+              "observationInputSha256": "4e8b29923d90cec1de6d75aad63802ecfbce810ee3f28c8f9e3a31ce88d307d3",
+              "observationEvidence": [
+                "Video/Sources/FirstLevelV1/TrainGearStow/DenseReview/Texture_Observations_01.jpg"
+              ]
+            },
+            "retargetHistory": [
+              {
+                "variantId": "Nra-v1-TrainGearStow",
+                "path": "Video/Sources/FirstLevelV1/TrainGearStow/Data_RetargetAssessment_V1.json",
+                "assessment": {
+                  "sourceCacheSha256": "2afa63cd1c9d9da3c90d6f5424c95ad8bd5b1877e8c0494d888034f55c0d079f",
+                  "modelSha256": "ebd8a04f579dfeb5d2aae17c09bc681d23df546134e1952f0f3c2ddc335aa9fb",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/Data_FirstLevelTrainLifeV1PlaybackValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainLifeV1/Data_SelectedExportFidelityValidation.json",
+                  "sourceVideoSha256": "9b2d759d97d2b9d5101b89ccd5f991e4304915dd00f8d1f9a8785237bc9fc77e",
+                  "sourceId": "TrainGearStow",
+                  "status": "needs_contact_and_depth_correction",
+                  "variantId": "Nra-v1-TrainGearStow",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    3.9833333333333334
+                  ],
+                  "observed": "已看起始与约 3.98 秒三栏：触肩后双臂向身体左侧整理动作可辨；原恢复的腿部深度把坐姿恢复得偏直，须保留 raw 并在新版本做坐姿修正。没有凳子/背包/包带，手指与道具接触未验。"
+                }
+              }
+            ],
+            "retargetAssessment": {
+              "sourceCacheSha256": "2afa63cd1c9d9da3c90d6f5424c95ad8bd5b1877e8c0494d888034f55c0d079f",
+              "modelSha256": "ebd8a04f579dfeb5d2aae17c09bc681d23df546134e1952f0f3c2ddc335aa9fb",
+              "acceptedForGame": false,
+              "evidence": "Preview/Data_FirstLevelTrainLifeV1PlaybackValidation.json",
+              "retargetReport": "Models/FirstLevelTrainLifeV1/Data_SelectedExportFidelityValidation.json",
+              "sourceVideoSha256": "9b2d759d97d2b9d5101b89ccd5f991e4304915dd00f8d1f9a8785237bc9fc77e",
+              "sourceId": "TrainGearStow",
+              "status": "needs_contact_and_depth_correction",
+              "variantId": "Nra-v1-TrainGearStow",
+              "sourceRecoveryUnchanged": true,
+              "reviewedSourceSeconds": [
+                0,
+                3.9833333333333334
+              ],
+              "observed": "已看起始与约 3.98 秒三栏：触肩后双臂向身体左侧整理动作可辨；原恢复的腿部深度把坐姿恢复得偏直，须保留 raw 并在新版本做坐姿修正。没有凳子/背包/包带，手指与道具接触未验。"
+            },
+            "retargetCandidate": {
+              "previewId": "TrainGearStow",
+              "variantId": "Nra-v1-TrainGearStow",
+              "status": "待审阅",
+              "path": "Models/FirstLevelTrainLifeV1/Animation_Nra_TrainGearStow_V1.glb",
+              "blend": "Blender/FirstLevelTrainLifeV1/Scene_Nra_TrainGearStow_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_TrainGearStowRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
           }
         },
         {
@@ -6884,10 +7204,13 @@
       ],
       "recoveryRevision": 1,
       "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
-      "clipName": "Animation_Nra_TrainBenchRise_V3",
+      "clipName": "FirstLevelTrainBench100",
       "faction": "Nra",
       "modelVariants": [
-        "LugouNra01"
+        "LugouNra01",
+        "LugouNra02",
+        "LugouNra03",
+        "LugouNra04"
       ],
       "loop": false,
       "referenceSpeedMps": null,
@@ -6897,9 +7220,9 @@
       "entryPose": "seated",
       "exitPose": "standing",
       "interruptPolicy": "Animation must not write mission facts, population, inventory, camera or patient identity.",
-      "blendFile": "Blender/FirstLevelBenchV3/Scene_Nra_TrainBenchRise_V3.blend",
+      "blendFile": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra01TrainSupport.blend",
       "previewId": "TrainBenchRise",
-      "revisionLabel": "Authored arm/finger rotations over V2 support, original recovery unchanged.",
+      "revisionLabel": "原模型 bind/层级/骨长保持；实际身高五档曲线，经九身高 120 fps 验证。根、腿、腕、掌指为后期支撑修正，未接入任务。",
       "status": "partially_retargeted_requires_contact_review",
       "runtimeBinding": {
         "enabled": false,
@@ -6911,15 +7234,20 @@
         "Models/FirstLevelTrainV1/Data_SelectedExportFidelityValidation.json",
         "Models/RecoveryPreview/Data_TrainBenchRiseRawRigValidation.json",
         "Preview/Data_FirstLevelTrainV1PlaybackValidation.json",
-        "Models/FirstLevelBenchV3/Data_TrainBenchRisePalmValidation.json",
+        "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
         "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V2.json",
-        "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V3.json"
+        "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V3.json",
+        "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra01.json",
+        "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra02.json",
+        "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra03.json",
+        "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra04.json"
       ],
       "blockers": [
         "Full bench sequence only; current contact corrections and naturalness require version-specific review. Idle/rise boundaries and game model scale still need integration validation.",
         "Other generated source targets require dense source review and recovery; first-pass retakes remain explicit.",
         "Not enabled in mission; preserve the same 41 passengers and real queue.",
-        "Production Support V1 fails temporal/height interpolation: retain its evidence and author a new version before runtime use."
+        "Support validation and past failures remain versioned; latest original-model support is not yet enabled in the physical queue.",
+        "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted."
       ],
       "newSourceProduction": [
         {
@@ -7049,32 +7377,130 @@
                   "retargetReport": "Models/FirstLevelBenchV3/Data_TrainBenchRisePalmValidation.json",
                   "sourceRecoveryUnchanged": true
                 }
+              },
+              {
+                "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+                "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra01.json",
+                "assessment": {
+                  "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+                  "modelSha256": "401b540dc1c1854bc5ae0ec55cef909de05ef9c5d77c1bdb920c882e3297b23e",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+                  "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+                  "sourceId": "TrainBenchRise",
+                  "status": "support_and_playback_reviewed_pending_runtime_integration",
+                  "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    5.2,
+                    5.25,
+                    5.7,
+                    7.966666666666667
+                  ],
+                  "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+                }
+              },
+              {
+                "variantId": "Nra-v4-LugouNra02-TrainBenchRise",
+                "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra02.json",
+                "assessment": {
+                  "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+                  "modelSha256": "9da0f2c610fd64800853fd3d71e494b7e7a0d45811b8ebc54b9304455121e783",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+                  "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+                  "sourceId": "TrainBenchRise",
+                  "status": "support_and_playback_reviewed_pending_runtime_integration",
+                  "variantId": "Nra-v4-LugouNra02-TrainBenchRise",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    5.2,
+                    5.25,
+                    5.7,
+                    7.966666666666667
+                  ],
+                  "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+                }
+              },
+              {
+                "variantId": "Nra-v4-LugouNra03-TrainBenchRise",
+                "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra03.json",
+                "assessment": {
+                  "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+                  "modelSha256": "a3e504d3d5a9e73fad082a7c356b2766f8c6a4c276705f503154b263cbe64760",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+                  "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+                  "sourceId": "TrainBenchRise",
+                  "status": "support_and_playback_reviewed_pending_runtime_integration",
+                  "variantId": "Nra-v4-LugouNra03-TrainBenchRise",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    5.2,
+                    5.25,
+                    5.7,
+                    7.966666666666667
+                  ],
+                  "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+                }
+              },
+              {
+                "variantId": "Nra-v4-LugouNra04-TrainBenchRise",
+                "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra04.json",
+                "assessment": {
+                  "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+                  "modelSha256": "2fdf6313bc4dfa62cfb1a4c2ae740906a6d463c9846e4bee3979474b54898830",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+                  "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+                  "sourceId": "TrainBenchRise",
+                  "status": "support_and_playback_reviewed_pending_runtime_integration",
+                  "variantId": "Nra-v4-LugouNra04-TrainBenchRise",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    5.2,
+                    5.25,
+                    5.7,
+                    7.966666666666667
+                  ],
+                  "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+                }
               }
             ],
             "retargetAssessment": {
-              "sourceId": "TrainBenchRise",
-              "variantId": "Nra-v3-TrainBenchRise",
-              "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
               "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
-              "modelSha256": "bb9f7a2f709d4fca5616b2722f245e9faf121dd445e79d60a2f54bf945099a8d",
-              "status": "contact_reviewed_pending_runtime_scale_and_transition",
+              "modelSha256": "401b540dc1c1854bc5ae0ec55cef909de05ef9c5d77c1bdb920c882e3297b23e",
               "acceptedForGame": false,
-              "observed": "已看 0 秒正侧视及手部正面、斜侧近景，5.2 秒扶腿侧视近景和5.5秒松手侧视。双掌已贴上腿部衣面，原骨长保留；因原人物臂长限制将扶点移近髋部，腕点最大改动约0.340米，不能称原腕轨迹保真。手指放松与袖口可见，尚需游戏实际模型尺度、座位、转场和完整速度播放验收。",
+              "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+              "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+              "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+              "sourceId": "TrainBenchRise",
+              "status": "support_and_playback_reviewed_pending_runtime_integration",
+              "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+              "sourceRecoveryUnchanged": true,
               "reviewedSourceSeconds": [
                 0,
                 5.2,
-                5.5
+                5.25,
+                5.7,
+                7.966666666666667
               ],
-              "evidence": "Preview/FirstLevelBenchV3/Data_ExportPalmValidation.json",
-              "retargetReport": "Models/FirstLevelBenchV3/Data_TrainBenchRisePalmValidation.json",
-              "sourceRecoveryUnchanged": true
+              "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
             },
             "retargetCandidate": {
               "previewId": "TrainBenchRise",
-              "variantId": "Nra-v3-TrainBenchRise",
-              "status": "待审阅 · 掌腿接触",
-              "path": "Models/FirstLevelBenchV3/Animation_Nra_TrainBenchRise_V3.glb",
-              "blend": "Blender/FirstLevelBenchV3/Scene_Nra_TrainBenchRise_V3.blend",
+              "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+              "status": "待审阅 · 未接入游戏",
+              "path": "Models/FirstLevelTrainSupportV2/Model_LugouNra01TrainSupport.glb",
+              "blend": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra01TrainSupport.blend",
               "rawTracks": [
                 {
                   "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
@@ -7150,7 +7576,118 @@
               ],
               "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
             },
-            "retargetHistory": []
+            "denseAssessment": {
+              "observed": "已逐页查看 0–8 秒每 0.25 秒抽帧：完整单人、固定镜头，双掌扶腿；约 2–4 秒前倾，再回坐直，末态回到相近坐姿。无起身与真实行进。可继续二维关节点检查；循环边界、座凳和双足接触待恢复后验。 已查看 0–7.5 秒每 0.5 秒的真实输入二维关节点覆盖：同一人追踪，抽样中未见左右腿交换，膝踝点跟随原人物。二维可见稳定不能证明单目三维深度、手指或道具接触。",
+              "evidence": [
+                "Video/Sources/FirstLevelV1/TrainBenchRest/DenseReview/Texture_SourceDense_01.jpg",
+                "Video/Sources/FirstLevelV1/TrainBenchRest/DenseReview/Texture_SourceDense_02.jpg",
+                "Video/Sources/FirstLevelV1/TrainBenchRest/DenseReview/Texture_SourceDense_03.jpg"
+              ],
+              "acceptedForGame": false,
+              "reviewScope": "All PTS-labelled 0.25-second source sheets visually reviewed; no 3D, retarget or runtime acceptance",
+              "sourceId": "TrainBenchRest",
+              "reviewedSourceSeconds": [
+                0.0,
+                0.25,
+                0.5,
+                0.75,
+                1.0,
+                1.25,
+                1.5,
+                1.75,
+                2.0,
+                2.25,
+                2.5,
+                2.75,
+                3.0,
+                3.25,
+                3.5,
+                3.75,
+                4.0,
+                4.25,
+                4.5,
+                4.75,
+                5.0,
+                5.25,
+                5.5,
+                5.75,
+                6.0,
+                6.25,
+                6.5,
+                6.75,
+                7.0,
+                7.25,
+                7.5,
+                7.75,
+                8.0
+              ],
+              "status": "eligible_for_initial_3d_recovery_pending_depth_and_contact_review",
+              "approvedForObservationPreparation": true,
+              "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRest/88058387-d5be-453b-adb1-58c7b10414e0_video_1.mp4",
+              "sourceVideoSha256": "5c65f6ec76161384171e44735fb246b56088905c9c7b1f1ab642aa44e3ada796",
+              "keypointsSha256": "2e1dba828ef9ecdea6cc3f2c509fe05a6f9ba45e09891a23d78277f5559f8a2e",
+              "observationInputSha256": "d04bfbc6fe8aff0230d9b50c10a496b54d0962d6dc4c5ccab331fcfcc84482fa",
+              "observationEvidence": [
+                "Video/Sources/FirstLevelV1/TrainBenchRest/DenseReview/Texture_Observations_01.jpg"
+              ]
+            },
+            "retargetHistory": [
+              {
+                "variantId": "Nra-v1-TrainBenchRest",
+                "path": "Video/Sources/FirstLevelV1/TrainBenchRest/Data_RetargetAssessment_V1.json",
+                "assessment": {
+                  "sourceCacheSha256": "2d770a2738085bf4d108f260713dd2933dbf479c65379fc7230990bc7458131f",
+                  "modelSha256": "4c48266bbdc1588d2a5abc39658e52c0d6ab183c1888d2ba0fef2de8cb2ff35f",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/Data_FirstLevelTrainLifeV1PlaybackValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainLifeV1/Data_SelectedExportFidelityValidation.json",
+                  "sourceVideoSha256": "5c65f6ec76161384171e44735fb246b56088905c9c7b1f1ab642aa44e3ada796",
+                  "sourceId": "TrainBenchRest",
+                  "status": "needs_contact_and_depth_correction",
+                  "variantId": "Nra-v1-TrainBenchRest",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    3.9833333333333334
+                  ],
+                  "observed": "已看起始与约 3.98 秒三栏：坐姿和前倾可辨；没有凳子，双掌和双足还未校准接触，不能直接作游戏坐姿循环。"
+                }
+              }
+            ],
+            "retargetAssessment": {
+              "sourceCacheSha256": "2d770a2738085bf4d108f260713dd2933dbf479c65379fc7230990bc7458131f",
+              "modelSha256": "4c48266bbdc1588d2a5abc39658e52c0d6ab183c1888d2ba0fef2de8cb2ff35f",
+              "acceptedForGame": false,
+              "evidence": "Preview/Data_FirstLevelTrainLifeV1PlaybackValidation.json",
+              "retargetReport": "Models/FirstLevelTrainLifeV1/Data_SelectedExportFidelityValidation.json",
+              "sourceVideoSha256": "5c65f6ec76161384171e44735fb246b56088905c9c7b1f1ab642aa44e3ada796",
+              "sourceId": "TrainBenchRest",
+              "status": "needs_contact_and_depth_correction",
+              "variantId": "Nra-v1-TrainBenchRest",
+              "sourceRecoveryUnchanged": true,
+              "reviewedSourceSeconds": [
+                0,
+                3.9833333333333334
+              ],
+              "observed": "已看起始与约 3.98 秒三栏：坐姿和前倾可辨；没有凳子，双掌和双足还未校准接触，不能直接作游戏坐姿循环。"
+            },
+            "retargetCandidate": {
+              "previewId": "TrainBenchRest",
+              "variantId": "Nra-v1-TrainBenchRest",
+              "status": "待审阅",
+              "path": "Models/FirstLevelTrainLifeV1/Animation_Nra_TrainBenchRest_V1.glb",
+              "blend": "Blender/FirstLevelTrainLifeV1/Scene_Nra_TrainBenchRest_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_TrainBenchRestRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
           }
         },
         {
@@ -7221,7 +7758,7 @@
       ],
       "reusedSourceCandidates": [],
       "sourceRetakeIds": [],
-      "variantId": "Nra-v3-TrainBenchRise",
+      "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
       "retargetHistory": [
         {
           "variantId": "Nra-v2-TrainBenchRise",
@@ -7266,39 +7803,137 @@
             "retargetReport": "Models/FirstLevelBenchV3/Data_TrainBenchRisePalmValidation.json",
             "sourceRecoveryUnchanged": true
           }
+        },
+        {
+          "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+          "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra01.json",
+          "assessment": {
+            "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+            "modelSha256": "401b540dc1c1854bc5ae0ec55cef909de05ef9c5d77c1bdb920c882e3297b23e",
+            "acceptedForGame": false,
+            "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+            "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+            "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+            "sourceId": "TrainBenchRise",
+            "status": "support_and_playback_reviewed_pending_runtime_integration",
+            "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+            "sourceRecoveryUnchanged": true,
+            "reviewedSourceSeconds": [
+              0,
+              5.2,
+              5.25,
+              5.7,
+              7.966666666666667
+            ],
+            "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+          }
+        },
+        {
+          "variantId": "Nra-v4-LugouNra02-TrainBenchRise",
+          "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra02.json",
+          "assessment": {
+            "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+            "modelSha256": "9da0f2c610fd64800853fd3d71e494b7e7a0d45811b8ebc54b9304455121e783",
+            "acceptedForGame": false,
+            "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+            "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+            "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+            "sourceId": "TrainBenchRise",
+            "status": "support_and_playback_reviewed_pending_runtime_integration",
+            "variantId": "Nra-v4-LugouNra02-TrainBenchRise",
+            "sourceRecoveryUnchanged": true,
+            "reviewedSourceSeconds": [
+              0,
+              5.2,
+              5.25,
+              5.7,
+              7.966666666666667
+            ],
+            "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+          }
+        },
+        {
+          "variantId": "Nra-v4-LugouNra03-TrainBenchRise",
+          "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra03.json",
+          "assessment": {
+            "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+            "modelSha256": "a3e504d3d5a9e73fad082a7c356b2766f8c6a4c276705f503154b263cbe64760",
+            "acceptedForGame": false,
+            "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+            "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+            "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+            "sourceId": "TrainBenchRise",
+            "status": "support_and_playback_reviewed_pending_runtime_integration",
+            "variantId": "Nra-v4-LugouNra03-TrainBenchRise",
+            "sourceRecoveryUnchanged": true,
+            "reviewedSourceSeconds": [
+              0,
+              5.2,
+              5.25,
+              5.7,
+              7.966666666666667
+            ],
+            "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+          }
+        },
+        {
+          "variantId": "Nra-v4-LugouNra04-TrainBenchRise",
+          "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra04.json",
+          "assessment": {
+            "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+            "modelSha256": "2fdf6313bc4dfa62cfb1a4c2ae740906a6d463c9846e4bee3979474b54898830",
+            "acceptedForGame": false,
+            "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+            "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+            "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+            "sourceId": "TrainBenchRise",
+            "status": "support_and_playback_reviewed_pending_runtime_integration",
+            "variantId": "Nra-v4-LugouNra04-TrainBenchRise",
+            "sourceRecoveryUnchanged": true,
+            "reviewedSourceSeconds": [
+              0,
+              5.2,
+              5.25,
+              5.7,
+              7.966666666666667
+            ],
+            "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+          }
         }
       ],
       "visualAssessment": {
-        "sourceId": "TrainBenchRise",
-        "variantId": "Nra-v3-TrainBenchRise",
-        "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
         "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
-        "modelSha256": "bb9f7a2f709d4fca5616b2722f245e9faf121dd445e79d60a2f54bf945099a8d",
-        "status": "contact_reviewed_pending_runtime_scale_and_transition",
+        "modelSha256": "401b540dc1c1854bc5ae0ec55cef909de05ef9c5d77c1bdb920c882e3297b23e",
         "acceptedForGame": false,
-        "observed": "已看 0 秒正侧视及手部正面、斜侧近景，5.2 秒扶腿侧视近景和5.5秒松手侧视。双掌已贴上腿部衣面，原骨长保留；因原人物臂长限制将扶点移近髋部，腕点最大改动约0.340米，不能称原腕轨迹保真。手指放松与袖口可见，尚需游戏实际模型尺度、座位、转场和完整速度播放验收。",
+        "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+        "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+        "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+        "sourceId": "TrainBenchRise",
+        "status": "support_and_playback_reviewed_pending_runtime_integration",
+        "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+        "sourceRecoveryUnchanged": true,
         "reviewedSourceSeconds": [
           0,
           5.2,
-          5.5
+          5.25,
+          5.7,
+          7.966666666666667
         ],
-        "evidence": "Preview/FirstLevelBenchV3/Data_ExportPalmValidation.json",
-        "retargetReport": "Models/FirstLevelBenchV3/Data_TrainBenchRisePalmValidation.json",
-        "sourceRecoveryUnchanged": true
+        "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
       },
       "productionSupportTrial": {
-        "group": "FirstLevelTrainSupportV1",
-        "status": "needs_correction",
+        "group": "FirstLevelTrainSupportV2",
+        "status": "numeric_checks_passed_pending_visual_and_runtime_review",
         "runtimeEnabled": false,
         "models": [
           {
             "id": "LugouNra01",
-            "model": "Models/FirstLevelTrainSupportV1/Model_LugouNra01TrainSupport.glb",
-            "modelSha256": "f3ade3f1d973373b246ea56dbcf18e1ff018886f04ae4f84342ab23d7d5176fc",
-            "animation": "Models/FirstLevelTrainSupportV1/Animation_LugouNra01FirstLevelTrainSupport.glb",
-            "animationSha256": "fa0173a0df5dd40d406c224681e10debb1f07c05a1463c3dd8c5712f57c0a4ee",
-            "blend": "Blender/FirstLevelTrainSupportV1/Scene_LugouNra01TrainSupport.blend",
-            "blendSha256": "42507705ae094bb5ba478ace3e134896094a504f17a0394c9c3ccf4a822bd842",
+            "model": "Models/FirstLevelTrainSupportV2/Model_LugouNra01TrainSupport.glb",
+            "modelSha256": "401b540dc1c1854bc5ae0ec55cef909de05ef9c5d77c1bdb920c882e3297b23e",
+            "animation": "Models/FirstLevelTrainSupportV2/Animation_LugouNra01FirstLevelTrainSupport.glb",
+            "animationSha256": "b53c894f0b7677e507b1b643b63225b41f6d2786f232324060a5e117b798ad90",
+            "blend": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra01TrainSupport.blend",
+            "blendSha256": "ce45b25c27b67b221b074c245c33fcbe965506595ff516470418417444af3def",
             "originalModelSha256": "d9c6c14884444ab18b61aa41ce4df32df81f1a2207295a26bc2c3683bcf4e170",
             "bones": 53,
             "tracks": [
@@ -7312,12 +7947,12 @@
           },
           {
             "id": "LugouNra02",
-            "model": "Models/FirstLevelTrainSupportV1/Model_LugouNra02TrainSupport.glb",
-            "modelSha256": "72f585afccf30fd6761bf23c85b56117b7bfce93e2b23f8669d5e56ab1a18d09",
-            "animation": "Models/FirstLevelTrainSupportV1/Animation_LugouNra02FirstLevelTrainSupport.glb",
-            "animationSha256": "9feeae01fdfe8e9d16f97adb93022e75311de2f0be8e8e0506ccde48828d81c7",
-            "blend": "Blender/FirstLevelTrainSupportV1/Scene_LugouNra02TrainSupport.blend",
-            "blendSha256": "2304c7c71cffa8760281a2ec2a7795c33284e7327c000144aa9d12f8db049ad7",
+            "model": "Models/FirstLevelTrainSupportV2/Model_LugouNra02TrainSupport.glb",
+            "modelSha256": "9da0f2c610fd64800853fd3d71e494b7e7a0d45811b8ebc54b9304455121e783",
+            "animation": "Models/FirstLevelTrainSupportV2/Animation_LugouNra02FirstLevelTrainSupport.glb",
+            "animationSha256": "5ff7f7d573dd5900f8487361cbdd859ca8bcf44359602bad4d896015cc51cd51",
+            "blend": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra02TrainSupport.blend",
+            "blendSha256": "e5df162ab7cac5a2f7cc72160be3c4138a45ecd7cea859ddd0b631b9a9263c46",
             "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225",
             "bones": 53,
             "tracks": [
@@ -7331,12 +7966,12 @@
           },
           {
             "id": "LugouNra03",
-            "model": "Models/FirstLevelTrainSupportV1/Model_LugouNra03TrainSupport.glb",
-            "modelSha256": "0cb9ccf8bb234de944de03652eb7c1dd17d4ba359507b1929498c15b5f28f2f1",
-            "animation": "Models/FirstLevelTrainSupportV1/Animation_LugouNra03FirstLevelTrainSupport.glb",
-            "animationSha256": "53f59f1f5836b8030a16ca5cc3f66ae28065c90f17f25f68db019d05fb132b6f",
-            "blend": "Blender/FirstLevelTrainSupportV1/Scene_LugouNra03TrainSupport.blend",
-            "blendSha256": "17d17ad2b708936557427a30bee33b8de18c4f10e5bbb7c158f100c995771574",
+            "model": "Models/FirstLevelTrainSupportV2/Model_LugouNra03TrainSupport.glb",
+            "modelSha256": "a3e504d3d5a9e73fad082a7c356b2766f8c6a4c276705f503154b263cbe64760",
+            "animation": "Models/FirstLevelTrainSupportV2/Animation_LugouNra03FirstLevelTrainSupport.glb",
+            "animationSha256": "d3c1e1d02138eadb2b566eef4a016ee4b0e880c94d92c67f38f16da4a27d0120",
+            "blend": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra03TrainSupport.blend",
+            "blendSha256": "24ef0e7ccd91a473fd8dcc8eaa7414c274c2bb13c0502e82432e7683bc6c03e6",
             "originalModelSha256": "d4b7b487387cca2e7758d1c0bbcd51a299ee7a500a193ea14d9754e6563aa74d",
             "bones": 54,
             "tracks": [
@@ -7350,12 +7985,12 @@
           },
           {
             "id": "LugouNra04",
-            "model": "Models/FirstLevelTrainSupportV1/Model_LugouNra04TrainSupport.glb",
-            "modelSha256": "d9a378c54ffef1dad80125a9f58fe2139a5b4192277bbecf099c68a794b38b55",
-            "animation": "Models/FirstLevelTrainSupportV1/Animation_LugouNra04FirstLevelTrainSupport.glb",
-            "animationSha256": "81bb61b8ec72a3618cc57b593c6ec07e481382665e8b77f75a2a919598e5f307",
-            "blend": "Blender/FirstLevelTrainSupportV1/Scene_LugouNra04TrainSupport.blend",
-            "blendSha256": "3f6f63039e841b965f5c166384c06b2a43f3f5f7c9adaf28f12e05cc2ff98576",
+            "model": "Models/FirstLevelTrainSupportV2/Model_LugouNra04TrainSupport.glb",
+            "modelSha256": "2fdf6313bc4dfa62cfb1a4c2ae740906a6d463c9846e4bee3979474b54898830",
+            "animation": "Models/FirstLevelTrainSupportV2/Animation_LugouNra04FirstLevelTrainSupport.glb",
+            "animationSha256": "39d919605a3200a76ab97af54e40335c2adeb2b0580cfd270f5a6e16da250dce",
+            "blend": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra04TrainSupport.blend",
+            "blendSha256": "56d0b3196eb4bbc59b98da3b06e528c257e1585ebf3f286c213ab8c50e78c208",
             "originalModelSha256": "06bfff4d100d766767f8516584de0c9ac62b2f50a6ac10ce3b4285f24889a073",
             "bones": 53,
             "tracks": [
@@ -7368,78 +8003,236 @@
             "originalBindAndHierarchyPreserved": true
           }
         ],
-        "failures": [
-          "LugouNra01/0.96: 2 bench-intersecting vertices",
-          "LugouNra01/0.96: foot drift 0.0006287176926570361, length error 0.000020531297356796152",
-          "LugouNra01/0.97: 4 bench-intersecting vertices",
-          "LugouNra01/0.97: sole height 0.001368134353261774..0.0020002215992740435",
-          "LugouNra01/0.97: foot drift 0.0008496647851064273, length error 0.000020725030327684024",
-          "LugouNra01/0.98: 2 bench-intersecting vertices",
-          "LugouNra01/0.98: foot drift 0.0005133063139425131, length error 0.000020918372435674293",
-          "LugouNra01/0.99: 4 bench-intersecting vertices",
-          "LugouNra01/0.99: sole height 0.0013427804418348899..0.002000229974825518",
-          "LugouNra01/0.99: foot drift 0.0009625848250750059, length error 0.000021134022604896163",
-          "LugouNra01/1: 2 bench-intersecting vertices",
-          "LugouNra01/1: foot drift 0.0006007985025373239, length error 0.00002134973420769848",
-          "LugouNra01/1.01: 4 bench-intersecting vertices",
-          "LugouNra01/1.01: foot drift 0.0006417471026014062, length error 0.000021565397485934223",
-          "LugouNra01/1.02: 2 bench-intersecting vertices",
-          "LugouNra01/1.03: 4 bench-intersecting vertices",
-          "LugouNra01/1.04: 2 bench-intersecting vertices",
-          "LugouNra02/0.96: 16 bench-intersecting vertices",
-          "LugouNra02/0.96: sole height -0.001242987196957035..0.002000077458627736",
-          "LugouNra02/0.96: foot drift 0.004883963533603129, length error 0.000020491074566086898",
-          "LugouNra02/0.97: 16 bench-intersecting vertices",
-          "LugouNra02/0.97: sole height -0.0019474680778551745..0.0020002504996277093",
-          "LugouNra02/0.97: foot drift 0.005201068936766276, length error 0.000020701759816943444",
-          "LugouNra02/0.97: palm support -0.0032132516714288295..0.0010349228496459029",
-          "LugouNra02/0.98: 15 bench-intersecting vertices",
-          "LugouNra02/0.98: sole height -0.0011029509781946834..0.0020000747990853718",
-          "LugouNra02/0.98: foot drift 0.004983782717600839, length error 0.000020913173422010267",
-          "LugouNra02/0.99: 16 bench-intersecting vertices",
-          "LugouNra02/0.99: sole height -0.001426536157299152..0.0020002494239564905",
-          "LugouNra02/0.99: foot drift 0.005681878527037822, length error 0.000021128610477705312",
-          "LugouNra02/0.99: palm support -0.0031610111895997717..0.0009927548552111087",
-          "LugouNra02/1: 14 bench-intersecting vertices",
-          "LugouNra02/1: sole height -0.0006849648946519737..0.002000088029030511",
-          "LugouNra02/1: foot drift 0.004585263708351301, length error 0.000021344074874918295",
-          "LugouNra02/1.01: 15 bench-intersecting vertices",
-          "LugouNra02/1.01: sole height -0.001102531264389306..0.0020002517393733488",
-          "LugouNra02/1.01: foot drift 0.005518384217038862, length error 0.000021559476375720976",
-          "LugouNra02/1.01: palm support -0.0026212812994528267..0.0010208245689784512",
-          "LugouNra02/1.02: 13 bench-intersecting vertices",
-          "LugouNra02/1.02: sole height -0.0004392671878576948..0.00200009636447529",
-          "LugouNra02/1.02: foot drift 0.00447137190998927, length error 0.000021774900455573398",
-          "LugouNra02/1.03: 14 bench-intersecting vertices",
-          "LugouNra02/1.03: sole height -0.0007255807407522408..0.0020002476253790924",
-          "LugouNra02/1.03: foot drift 0.005183062325224364, length error 0.00002199002900293845",
-          "LugouNra02/1.03: palm support -0.0026481364784444184..0.0010449418423786883",
-          "LugouNra02/1.04: 10 bench-intersecting vertices",
-          "LugouNra02/1.04: sole height -0.0001321725594300993..0.002000088008181744",
-          "LugouNra02/1.04: foot drift 0.004195674265217121, length error 0.00002220517586004611",
-          "LugouNra03/0.97: 1 bench-intersecting vertices",
-          "LugouNra03/0.99: 1 bench-intersecting vertices",
-          "LugouNra04/0.96: 2 bench-intersecting vertices",
-          "LugouNra04/0.96: foot drift 0.0005436682273589065, length error 0.000020638086556501456",
-          "LugouNra04/0.97: 4 bench-intersecting vertices",
-          "LugouNra04/0.97: sole height 0.0014464383588029817..0.0020002160726265705",
-          "LugouNra04/0.97: foot drift 0.0007524215016546439, length error 0.0000208327510966555",
-          "LugouNra04/0.98: 2 bench-intersecting vertices",
-          "LugouNra04/0.99: 4 bench-intersecting vertices",
-          "LugouNra04/0.99: sole height 0.0014273158320090573..0.002000237070701627",
-          "LugouNra04/0.99: foot drift 0.0008487099538199015, length error 0.000021243782551305657",
-          "LugouNra04/1: 2 bench-intersecting vertices",
-          "LugouNra04/1: foot drift 0.0005176019230750754, length error 0.00002146060602881139",
-          "LugouNra04/1.01: 4 bench-intersecting vertices",
-          "LugouNra04/1.01: foot drift 0.0007104325370130591, length error 0.000021677382120721678",
-          "LugouNra04/1.02: 2 bench-intersecting vertices",
-          "LugouNra04/1.03: 4 bench-intersecting vertices",
-          "LugouNra04/1.04: 2 bench-intersecting vertices"
-        ],
-        "validation": "Models/FirstLevelTrainSupportV1/Data_ProductionSkinValidation.json",
-        "editableValidation": "Models/FirstLevelTrainSupportV1/Data_EditableProjectValidation.json"
+        "failures": [],
+        "validation": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+        "editableValidation": "Models/FirstLevelTrainSupportV2/Data_EditableProjectValidation.json"
       },
-      "newRecoveryCandidates": []
+      "productionSupportHistory": [
+        {
+          "group": "FirstLevelTrainSupportV1",
+          "status": "needs_correction",
+          "runtimeEnabled": false,
+          "models": [
+            {
+              "id": "LugouNra01",
+              "model": "Models/FirstLevelTrainSupportV1/Model_LugouNra01TrainSupport.glb",
+              "modelSha256": "f3ade3f1d973373b246ea56dbcf18e1ff018886f04ae4f84342ab23d7d5176fc",
+              "animation": "Models/FirstLevelTrainSupportV1/Animation_LugouNra01FirstLevelTrainSupport.glb",
+              "animationSha256": "fa0173a0df5dd40d406c224681e10debb1f07c05a1463c3dd8c5712f57c0a4ee",
+              "blend": "Blender/FirstLevelTrainSupportV1/Scene_LugouNra01TrainSupport.blend",
+              "blendSha256": "42507705ae094bb5ba478ace3e134896094a504f17a0394c9c3ccf4a822bd842",
+              "originalModelSha256": "d9c6c14884444ab18b61aa41ce4df32df81f1a2207295a26bc2c3683bcf4e170",
+              "bones": 53,
+              "tracks": [
+                "FirstLevelTrainBench104",
+                "FirstLevelTrainBench102",
+                "FirstLevelTrainBench100",
+                "FirstLevelTrainBench98",
+                "FirstLevelTrainBench96"
+              ],
+              "originalBindAndHierarchyPreserved": true
+            },
+            {
+              "id": "LugouNra02",
+              "model": "Models/FirstLevelTrainSupportV1/Model_LugouNra02TrainSupport.glb",
+              "modelSha256": "72f585afccf30fd6761bf23c85b56117b7bfce93e2b23f8669d5e56ab1a18d09",
+              "animation": "Models/FirstLevelTrainSupportV1/Animation_LugouNra02FirstLevelTrainSupport.glb",
+              "animationSha256": "9feeae01fdfe8e9d16f97adb93022e75311de2f0be8e8e0506ccde48828d81c7",
+              "blend": "Blender/FirstLevelTrainSupportV1/Scene_LugouNra02TrainSupport.blend",
+              "blendSha256": "2304c7c71cffa8760281a2ec2a7795c33284e7327c000144aa9d12f8db049ad7",
+              "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225",
+              "bones": 53,
+              "tracks": [
+                "FirstLevelTrainBench104",
+                "FirstLevelTrainBench102",
+                "FirstLevelTrainBench100",
+                "FirstLevelTrainBench98",
+                "FirstLevelTrainBench96"
+              ],
+              "originalBindAndHierarchyPreserved": true
+            },
+            {
+              "id": "LugouNra03",
+              "model": "Models/FirstLevelTrainSupportV1/Model_LugouNra03TrainSupport.glb",
+              "modelSha256": "0cb9ccf8bb234de944de03652eb7c1dd17d4ba359507b1929498c15b5f28f2f1",
+              "animation": "Models/FirstLevelTrainSupportV1/Animation_LugouNra03FirstLevelTrainSupport.glb",
+              "animationSha256": "53f59f1f5836b8030a16ca5cc3f66ae28065c90f17f25f68db019d05fb132b6f",
+              "blend": "Blender/FirstLevelTrainSupportV1/Scene_LugouNra03TrainSupport.blend",
+              "blendSha256": "17d17ad2b708936557427a30bee33b8de18c4f10e5bbb7c158f100c995771574",
+              "originalModelSha256": "d4b7b487387cca2e7758d1c0bbcd51a299ee7a500a193ea14d9754e6563aa74d",
+              "bones": 54,
+              "tracks": [
+                "FirstLevelTrainBench104",
+                "FirstLevelTrainBench102",
+                "FirstLevelTrainBench100",
+                "FirstLevelTrainBench98",
+                "FirstLevelTrainBench96"
+              ],
+              "originalBindAndHierarchyPreserved": true
+            },
+            {
+              "id": "LugouNra04",
+              "model": "Models/FirstLevelTrainSupportV1/Model_LugouNra04TrainSupport.glb",
+              "modelSha256": "d9a378c54ffef1dad80125a9f58fe2139a5b4192277bbecf099c68a794b38b55",
+              "animation": "Models/FirstLevelTrainSupportV1/Animation_LugouNra04FirstLevelTrainSupport.glb",
+              "animationSha256": "81bb61b8ec72a3618cc57b593c6ec07e481382665e8b77f75a2a919598e5f307",
+              "blend": "Blender/FirstLevelTrainSupportV1/Scene_LugouNra04TrainSupport.blend",
+              "blendSha256": "3f6f63039e841b965f5c166384c06b2a43f3f5f7c9adaf28f12e05cc2ff98576",
+              "originalModelSha256": "06bfff4d100d766767f8516584de0c9ac62b2f50a6ac10ce3b4285f24889a073",
+              "bones": 53,
+              "tracks": [
+                "FirstLevelTrainBench104",
+                "FirstLevelTrainBench102",
+                "FirstLevelTrainBench100",
+                "FirstLevelTrainBench98",
+                "FirstLevelTrainBench96"
+              ],
+              "originalBindAndHierarchyPreserved": true
+            }
+          ],
+          "failures": [
+            "LugouNra01/0.96: 2 bench-intersecting vertices",
+            "LugouNra01/0.96: foot drift 0.0006287176926570361, length error 0.000020531297356796152",
+            "LugouNra01/0.97: 4 bench-intersecting vertices",
+            "LugouNra01/0.97: sole height 0.001368134353261774..0.0020002215992740435",
+            "LugouNra01/0.97: foot drift 0.0008496647851064273, length error 0.000020725030327684024",
+            "LugouNra01/0.98: 2 bench-intersecting vertices",
+            "LugouNra01/0.98: foot drift 0.0005133063139425131, length error 0.000020918372435674293",
+            "LugouNra01/0.99: 4 bench-intersecting vertices",
+            "LugouNra01/0.99: sole height 0.0013427804418348899..0.002000229974825518",
+            "LugouNra01/0.99: foot drift 0.0009625848250750059, length error 0.000021134022604896163",
+            "LugouNra01/1: 2 bench-intersecting vertices",
+            "LugouNra01/1: foot drift 0.0006007985025373239, length error 0.00002134973420769848",
+            "LugouNra01/1.01: 4 bench-intersecting vertices",
+            "LugouNra01/1.01: foot drift 0.0006417471026014062, length error 0.000021565397485934223",
+            "LugouNra01/1.02: 2 bench-intersecting vertices",
+            "LugouNra01/1.03: 4 bench-intersecting vertices",
+            "LugouNra01/1.04: 2 bench-intersecting vertices",
+            "LugouNra02/0.96: 16 bench-intersecting vertices",
+            "LugouNra02/0.96: sole height -0.001242987196957035..0.002000077458627736",
+            "LugouNra02/0.96: foot drift 0.004883963533603129, length error 0.000020491074566086898",
+            "LugouNra02/0.97: 16 bench-intersecting vertices",
+            "LugouNra02/0.97: sole height -0.0019474680778551745..0.0020002504996277093",
+            "LugouNra02/0.97: foot drift 0.005201068936766276, length error 0.000020701759816943444",
+            "LugouNra02/0.97: palm support -0.0032132516714288295..0.0010349228496459029",
+            "LugouNra02/0.98: 15 bench-intersecting vertices",
+            "LugouNra02/0.98: sole height -0.0011029509781946834..0.0020000747990853718",
+            "LugouNra02/0.98: foot drift 0.004983782717600839, length error 0.000020913173422010267",
+            "LugouNra02/0.99: 16 bench-intersecting vertices",
+            "LugouNra02/0.99: sole height -0.001426536157299152..0.0020002494239564905",
+            "LugouNra02/0.99: foot drift 0.005681878527037822, length error 0.000021128610477705312",
+            "LugouNra02/0.99: palm support -0.0031610111895997717..0.0009927548552111087",
+            "LugouNra02/1: 14 bench-intersecting vertices",
+            "LugouNra02/1: sole height -0.0006849648946519737..0.002000088029030511",
+            "LugouNra02/1: foot drift 0.004585263708351301, length error 0.000021344074874918295",
+            "LugouNra02/1.01: 15 bench-intersecting vertices",
+            "LugouNra02/1.01: sole height -0.001102531264389306..0.0020002517393733488",
+            "LugouNra02/1.01: foot drift 0.005518384217038862, length error 0.000021559476375720976",
+            "LugouNra02/1.01: palm support -0.0026212812994528267..0.0010208245689784512",
+            "LugouNra02/1.02: 13 bench-intersecting vertices",
+            "LugouNra02/1.02: sole height -0.0004392671878576948..0.00200009636447529",
+            "LugouNra02/1.02: foot drift 0.00447137190998927, length error 0.000021774900455573398",
+            "LugouNra02/1.03: 14 bench-intersecting vertices",
+            "LugouNra02/1.03: sole height -0.0007255807407522408..0.0020002476253790924",
+            "LugouNra02/1.03: foot drift 0.005183062325224364, length error 0.00002199002900293845",
+            "LugouNra02/1.03: palm support -0.0026481364784444184..0.0010449418423786883",
+            "LugouNra02/1.04: 10 bench-intersecting vertices",
+            "LugouNra02/1.04: sole height -0.0001321725594300993..0.002000088008181744",
+            "LugouNra02/1.04: foot drift 0.004195674265217121, length error 0.00002220517586004611",
+            "LugouNra03/0.97: 1 bench-intersecting vertices",
+            "LugouNra03/0.99: 1 bench-intersecting vertices",
+            "LugouNra04/0.96: 2 bench-intersecting vertices",
+            "LugouNra04/0.96: foot drift 0.0005436682273589065, length error 0.000020638086556501456",
+            "LugouNra04/0.97: 4 bench-intersecting vertices",
+            "LugouNra04/0.97: sole height 0.0014464383588029817..0.0020002160726265705",
+            "LugouNra04/0.97: foot drift 0.0007524215016546439, length error 0.0000208327510966555",
+            "LugouNra04/0.98: 2 bench-intersecting vertices",
+            "LugouNra04/0.99: 4 bench-intersecting vertices",
+            "LugouNra04/0.99: sole height 0.0014273158320090573..0.002000237070701627",
+            "LugouNra04/0.99: foot drift 0.0008487099538199015, length error 0.000021243782551305657",
+            "LugouNra04/1: 2 bench-intersecting vertices",
+            "LugouNra04/1: foot drift 0.0005176019230750754, length error 0.00002146060602881139",
+            "LugouNra04/1.01: 4 bench-intersecting vertices",
+            "LugouNra04/1.01: foot drift 0.0007104325370130591, length error 0.000021677382120721678",
+            "LugouNra04/1.02: 2 bench-intersecting vertices",
+            "LugouNra04/1.03: 4 bench-intersecting vertices",
+            "LugouNra04/1.04: 2 bench-intersecting vertices"
+          ],
+          "validation": "Models/FirstLevelTrainSupportV1/Data_ProductionSkinValidation.json",
+          "editableValidation": "Models/FirstLevelTrainSupportV1/Data_EditableProjectValidation.json"
+        }
+      ],
+      "newRecoveryCandidates": [
+        {
+          "sourceId": "TrainBenchRest",
+          "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRest/88058387-d5be-453b-adb1-58c7b10414e0_video_1.mp4",
+          "sourceVideoSha256": "5c65f6ec76161384171e44735fb246b56088905c9c7b1f1ab642aa44e3ada796",
+          "sourceRangeSeconds": [
+            0,
+            7.966666666666667
+          ],
+          "generationSubmitId": "88058387-d5be-453b-adb1-58c7b10414e0",
+          "recoveryFrames": 240,
+          "recoveryFps": 30.0,
+          "recoveryRevision": 1,
+          "sourceCache": "Models/_Cache/FirstLevelV1/TrainBenchRest/Data_GvhmrMotion.npz",
+          "sourceCacheSha256": "2d770a2738085bf4d108f260713dd2933dbf479c65379fc7230990bc7458131f",
+          "resultSha256": "5032474c97ded1bddbee46de275703f606df78f0cfb91f89d356c8f9203e608b",
+          "rawJointFile": "Models/RecoveryPreview/Data_V1_TrainBenchRestRawJoints.json",
+          "group": "FirstLevelTrainLifeV1",
+          "visualAssessment": {
+            "sourceCacheSha256": "2d770a2738085bf4d108f260713dd2933dbf479c65379fc7230990bc7458131f",
+            "modelSha256": "4c48266bbdc1588d2a5abc39658e52c0d6ab183c1888d2ba0fef2de8cb2ff35f",
+            "acceptedForGame": false,
+            "evidence": "Preview/Data_FirstLevelTrainLifeV1PlaybackValidation.json",
+            "retargetReport": "Models/FirstLevelTrainLifeV1/Data_SelectedExportFidelityValidation.json",
+            "sourceVideoSha256": "5c65f6ec76161384171e44735fb246b56088905c9c7b1f1ab642aa44e3ada796",
+            "sourceId": "TrainBenchRest",
+            "status": "needs_contact_and_depth_correction",
+            "variantId": "Nra-v1-TrainBenchRest",
+            "sourceRecoveryUnchanged": true,
+            "reviewedSourceSeconds": [
+              0,
+              3.9833333333333334
+            ],
+            "observed": "已看起始与约 3.98 秒三栏：坐姿和前倾可辨；没有凳子，双掌和双足还未校准接触，不能直接作游戏坐姿循环。"
+          },
+          "status": "raw_recovered_pending_retarget_and_contact_review",
+          "runtimeEnabled": false,
+          "retargetHistory": [
+            {
+              "variantId": "Nra-v1-TrainBenchRest",
+              "path": "Video/Sources/FirstLevelV1/TrainBenchRest/Data_RetargetAssessment_V1.json",
+              "assessment": {
+                "sourceCacheSha256": "2d770a2738085bf4d108f260713dd2933dbf479c65379fc7230990bc7458131f",
+                "modelSha256": "4c48266bbdc1588d2a5abc39658e52c0d6ab183c1888d2ba0fef2de8cb2ff35f",
+                "acceptedForGame": false,
+                "evidence": "Preview/Data_FirstLevelTrainLifeV1PlaybackValidation.json",
+                "retargetReport": "Models/FirstLevelTrainLifeV1/Data_SelectedExportFidelityValidation.json",
+                "sourceVideoSha256": "5c65f6ec76161384171e44735fb246b56088905c9c7b1f1ab642aa44e3ada796",
+                "sourceId": "TrainBenchRest",
+                "status": "needs_contact_and_depth_correction",
+                "variantId": "Nra-v1-TrainBenchRest",
+                "sourceRecoveryUnchanged": true,
+                "reviewedSourceSeconds": [
+                  0,
+                  3.9833333333333334
+                ],
+                "observed": "已看起始与约 3.98 秒三栏：坐姿和前倾可辨；没有凳子，双掌和双足还未校准接触，不能直接作游戏坐姿循环。"
+              }
+            }
+          ],
+          "retargetCandidate": {
+            "variantId": "Nra-v1-TrainBenchRest",
+            "modelSha256": "4c48266bbdc1588d2a5abc39658e52c0d6ab183c1888d2ba0fef2de8cb2ff35f",
+            "path": "Models/FirstLevelTrainLifeV1/Animation_Nra_TrainBenchRest_V1.glb",
+            "clip": "Animation_Nra_TrainBenchRest_V1",
+            "blend": "Blender/FirstLevelTrainLifeV1/Scene_Nra_TrainBenchRest_V1.blend",
+            "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainBenchRest",
+            "status": "待审阅"
+          }
+        }
+      ]
     },
     {
       "requirementId": "FL14",
@@ -8069,7 +8862,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "sources_generated_pending_review",
+      "status": "partially_retargeted_requires_contact_review",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -8078,7 +8871,8 @@
       },
       "reviewEvidence": [],
       "blockers": [
-        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated."
+        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated.",
+        "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted."
       ],
       "newSourceProduction": [
         {
@@ -8143,7 +8937,118 @@
               ],
               "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
             },
-            "retargetHistory": []
+            "denseAssessment": {
+              "observed": "已逐页查看 0–8 秒每 0.25 秒抽帧：完整单人、固定镜头，双掌扶腿；约 2–4 秒前倾，再回坐直，末态回到相近坐姿。无起身与真实行进。可继续二维关节点检查；循环边界、座凳和双足接触待恢复后验。 已查看 0–7.5 秒每 0.5 秒的真实输入二维关节点覆盖：同一人追踪，抽样中未见左右腿交换，膝踝点跟随原人物。二维可见稳定不能证明单目三维深度、手指或道具接触。",
+              "evidence": [
+                "Video/Sources/FirstLevelV1/TrainBenchRest/DenseReview/Texture_SourceDense_01.jpg",
+                "Video/Sources/FirstLevelV1/TrainBenchRest/DenseReview/Texture_SourceDense_02.jpg",
+                "Video/Sources/FirstLevelV1/TrainBenchRest/DenseReview/Texture_SourceDense_03.jpg"
+              ],
+              "acceptedForGame": false,
+              "reviewScope": "All PTS-labelled 0.25-second source sheets visually reviewed; no 3D, retarget or runtime acceptance",
+              "sourceId": "TrainBenchRest",
+              "reviewedSourceSeconds": [
+                0.0,
+                0.25,
+                0.5,
+                0.75,
+                1.0,
+                1.25,
+                1.5,
+                1.75,
+                2.0,
+                2.25,
+                2.5,
+                2.75,
+                3.0,
+                3.25,
+                3.5,
+                3.75,
+                4.0,
+                4.25,
+                4.5,
+                4.75,
+                5.0,
+                5.25,
+                5.5,
+                5.75,
+                6.0,
+                6.25,
+                6.5,
+                6.75,
+                7.0,
+                7.25,
+                7.5,
+                7.75,
+                8.0
+              ],
+              "status": "eligible_for_initial_3d_recovery_pending_depth_and_contact_review",
+              "approvedForObservationPreparation": true,
+              "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRest/88058387-d5be-453b-adb1-58c7b10414e0_video_1.mp4",
+              "sourceVideoSha256": "5c65f6ec76161384171e44735fb246b56088905c9c7b1f1ab642aa44e3ada796",
+              "keypointsSha256": "2e1dba828ef9ecdea6cc3f2c509fe05a6f9ba45e09891a23d78277f5559f8a2e",
+              "observationInputSha256": "d04bfbc6fe8aff0230d9b50c10a496b54d0962d6dc4c5ccab331fcfcc84482fa",
+              "observationEvidence": [
+                "Video/Sources/FirstLevelV1/TrainBenchRest/DenseReview/Texture_Observations_01.jpg"
+              ]
+            },
+            "retargetHistory": [
+              {
+                "variantId": "Nra-v1-TrainBenchRest",
+                "path": "Video/Sources/FirstLevelV1/TrainBenchRest/Data_RetargetAssessment_V1.json",
+                "assessment": {
+                  "sourceCacheSha256": "2d770a2738085bf4d108f260713dd2933dbf479c65379fc7230990bc7458131f",
+                  "modelSha256": "4c48266bbdc1588d2a5abc39658e52c0d6ab183c1888d2ba0fef2de8cb2ff35f",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/Data_FirstLevelTrainLifeV1PlaybackValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainLifeV1/Data_SelectedExportFidelityValidation.json",
+                  "sourceVideoSha256": "5c65f6ec76161384171e44735fb246b56088905c9c7b1f1ab642aa44e3ada796",
+                  "sourceId": "TrainBenchRest",
+                  "status": "needs_contact_and_depth_correction",
+                  "variantId": "Nra-v1-TrainBenchRest",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    3.9833333333333334
+                  ],
+                  "observed": "已看起始与约 3.98 秒三栏：坐姿和前倾可辨；没有凳子，双掌和双足还未校准接触，不能直接作游戏坐姿循环。"
+                }
+              }
+            ],
+            "retargetAssessment": {
+              "sourceCacheSha256": "2d770a2738085bf4d108f260713dd2933dbf479c65379fc7230990bc7458131f",
+              "modelSha256": "4c48266bbdc1588d2a5abc39658e52c0d6ab183c1888d2ba0fef2de8cb2ff35f",
+              "acceptedForGame": false,
+              "evidence": "Preview/Data_FirstLevelTrainLifeV1PlaybackValidation.json",
+              "retargetReport": "Models/FirstLevelTrainLifeV1/Data_SelectedExportFidelityValidation.json",
+              "sourceVideoSha256": "5c65f6ec76161384171e44735fb246b56088905c9c7b1f1ab642aa44e3ada796",
+              "sourceId": "TrainBenchRest",
+              "status": "needs_contact_and_depth_correction",
+              "variantId": "Nra-v1-TrainBenchRest",
+              "sourceRecoveryUnchanged": true,
+              "reviewedSourceSeconds": [
+                0,
+                3.9833333333333334
+              ],
+              "observed": "已看起始与约 3.98 秒三栏：坐姿和前倾可辨；没有凳子，双掌和双足还未校准接触，不能直接作游戏坐姿循环。"
+            },
+            "retargetCandidate": {
+              "previewId": "TrainBenchRest",
+              "variantId": "Nra-v1-TrainBenchRest",
+              "status": "待审阅",
+              "path": "Models/FirstLevelTrainLifeV1/Animation_Nra_TrainBenchRest_V1.glb",
+              "blend": "Blender/FirstLevelTrainLifeV1/Scene_Nra_TrainBenchRest_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_TrainBenchRestRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
           }
         },
         {
@@ -8207,13 +9112,263 @@
               ],
               "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
             },
-            "retargetHistory": []
+            "denseAssessment": {
+              "observed": "已逐页查看 0–8 秒每 0.25 秒抽帧：完整单人坐在凳上，右手先触肩，随后两手整理身体左侧同一背包，约 6.5 秒收手。双膝和双足在投影中很接近，必须核对左右腿追踪；道具、手指及包带不由身体骨骼恢复保证。 已查看 0–7.5 秒每 0.5 秒的真实输入二维关节点覆盖：同一人追踪，抽样中未见左右腿交换，膝踝点跟随原人物。二维可见稳定不能证明单目三维深度、手指或道具接触。",
+              "evidence": [
+                "Video/Sources/FirstLevelV1/TrainGearStow/DenseReview/Texture_SourceDense_01.jpg",
+                "Video/Sources/FirstLevelV1/TrainGearStow/DenseReview/Texture_SourceDense_02.jpg",
+                "Video/Sources/FirstLevelV1/TrainGearStow/DenseReview/Texture_SourceDense_03.jpg"
+              ],
+              "acceptedForGame": false,
+              "reviewScope": "All PTS-labelled 0.25-second source sheets visually reviewed; no 3D, retarget or runtime acceptance",
+              "sourceId": "TrainGearStow",
+              "reviewedSourceSeconds": [
+                0.0,
+                0.25,
+                0.5,
+                0.75,
+                1.0,
+                1.25,
+                1.5,
+                1.75,
+                2.0,
+                2.25,
+                2.5,
+                2.75,
+                3.0,
+                3.25,
+                3.5,
+                3.75,
+                4.0,
+                4.25,
+                4.5,
+                4.75,
+                5.0,
+                5.25,
+                5.5,
+                5.75,
+                6.0,
+                6.25,
+                6.5,
+                6.75,
+                7.0,
+                7.25,
+                7.5,
+                7.75,
+                8.0
+              ],
+              "status": "eligible_for_initial_3d_recovery_pending_depth_and_contact_review",
+              "approvedForObservationPreparation": true,
+              "sourceVideo": "Video/Sources/FirstLevelV1/TrainGearStow/4636306a-e3b9-4016-a195-dd926bc1aa16_video_1.mp4",
+              "sourceVideoSha256": "9b2d759d97d2b9d5101b89ccd5f991e4304915dd00f8d1f9a8785237bc9fc77e",
+              "keypointsSha256": "2e0a8c03406acc6747491538691bffe9e552eb3709838892e5a828e8c3c4220b",
+              "observationInputSha256": "4e8b29923d90cec1de6d75aad63802ecfbce810ee3f28c8f9e3a31ce88d307d3",
+              "observationEvidence": [
+                "Video/Sources/FirstLevelV1/TrainGearStow/DenseReview/Texture_Observations_01.jpg"
+              ]
+            },
+            "retargetHistory": [
+              {
+                "variantId": "Nra-v1-TrainGearStow",
+                "path": "Video/Sources/FirstLevelV1/TrainGearStow/Data_RetargetAssessment_V1.json",
+                "assessment": {
+                  "sourceCacheSha256": "2afa63cd1c9d9da3c90d6f5424c95ad8bd5b1877e8c0494d888034f55c0d079f",
+                  "modelSha256": "ebd8a04f579dfeb5d2aae17c09bc681d23df546134e1952f0f3c2ddc335aa9fb",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/Data_FirstLevelTrainLifeV1PlaybackValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainLifeV1/Data_SelectedExportFidelityValidation.json",
+                  "sourceVideoSha256": "9b2d759d97d2b9d5101b89ccd5f991e4304915dd00f8d1f9a8785237bc9fc77e",
+                  "sourceId": "TrainGearStow",
+                  "status": "needs_contact_and_depth_correction",
+                  "variantId": "Nra-v1-TrainGearStow",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    3.9833333333333334
+                  ],
+                  "observed": "已看起始与约 3.98 秒三栏：触肩后双臂向身体左侧整理动作可辨；原恢复的腿部深度把坐姿恢复得偏直，须保留 raw 并在新版本做坐姿修正。没有凳子/背包/包带，手指与道具接触未验。"
+                }
+              }
+            ],
+            "retargetAssessment": {
+              "sourceCacheSha256": "2afa63cd1c9d9da3c90d6f5424c95ad8bd5b1877e8c0494d888034f55c0d079f",
+              "modelSha256": "ebd8a04f579dfeb5d2aae17c09bc681d23df546134e1952f0f3c2ddc335aa9fb",
+              "acceptedForGame": false,
+              "evidence": "Preview/Data_FirstLevelTrainLifeV1PlaybackValidation.json",
+              "retargetReport": "Models/FirstLevelTrainLifeV1/Data_SelectedExportFidelityValidation.json",
+              "sourceVideoSha256": "9b2d759d97d2b9d5101b89ccd5f991e4304915dd00f8d1f9a8785237bc9fc77e",
+              "sourceId": "TrainGearStow",
+              "status": "needs_contact_and_depth_correction",
+              "variantId": "Nra-v1-TrainGearStow",
+              "sourceRecoveryUnchanged": true,
+              "reviewedSourceSeconds": [
+                0,
+                3.9833333333333334
+              ],
+              "observed": "已看起始与约 3.98 秒三栏：触肩后双臂向身体左侧整理动作可辨；原恢复的腿部深度把坐姿恢复得偏直，须保留 raw 并在新版本做坐姿修正。没有凳子/背包/包带，手指与道具接触未验。"
+            },
+            "retargetCandidate": {
+              "previewId": "TrainGearStow",
+              "variantId": "Nra-v1-TrainGearStow",
+              "status": "待审阅",
+              "path": "Models/FirstLevelTrainLifeV1/Animation_Nra_TrainGearStow_V1.glb",
+              "blend": "Blender/FirstLevelTrainLifeV1/Scene_Nra_TrainGearStow_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_TrainGearStowRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
           }
         }
       ],
       "reusedSourceCandidates": [],
       "sourceRetakeIds": [],
-      "newRecoveryCandidates": []
+      "newRecoveryCandidates": [
+        {
+          "sourceId": "TrainBenchRest",
+          "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRest/88058387-d5be-453b-adb1-58c7b10414e0_video_1.mp4",
+          "sourceVideoSha256": "5c65f6ec76161384171e44735fb246b56088905c9c7b1f1ab642aa44e3ada796",
+          "sourceRangeSeconds": [
+            0,
+            7.966666666666667
+          ],
+          "generationSubmitId": "88058387-d5be-453b-adb1-58c7b10414e0",
+          "recoveryFrames": 240,
+          "recoveryFps": 30.0,
+          "recoveryRevision": 1,
+          "sourceCache": "Models/_Cache/FirstLevelV1/TrainBenchRest/Data_GvhmrMotion.npz",
+          "sourceCacheSha256": "2d770a2738085bf4d108f260713dd2933dbf479c65379fc7230990bc7458131f",
+          "resultSha256": "5032474c97ded1bddbee46de275703f606df78f0cfb91f89d356c8f9203e608b",
+          "rawJointFile": "Models/RecoveryPreview/Data_V1_TrainBenchRestRawJoints.json",
+          "group": "FirstLevelTrainLifeV1",
+          "visualAssessment": {
+            "sourceCacheSha256": "2d770a2738085bf4d108f260713dd2933dbf479c65379fc7230990bc7458131f",
+            "modelSha256": "4c48266bbdc1588d2a5abc39658e52c0d6ab183c1888d2ba0fef2de8cb2ff35f",
+            "acceptedForGame": false,
+            "evidence": "Preview/Data_FirstLevelTrainLifeV1PlaybackValidation.json",
+            "retargetReport": "Models/FirstLevelTrainLifeV1/Data_SelectedExportFidelityValidation.json",
+            "sourceVideoSha256": "5c65f6ec76161384171e44735fb246b56088905c9c7b1f1ab642aa44e3ada796",
+            "sourceId": "TrainBenchRest",
+            "status": "needs_contact_and_depth_correction",
+            "variantId": "Nra-v1-TrainBenchRest",
+            "sourceRecoveryUnchanged": true,
+            "reviewedSourceSeconds": [
+              0,
+              3.9833333333333334
+            ],
+            "observed": "已看起始与约 3.98 秒三栏：坐姿和前倾可辨；没有凳子，双掌和双足还未校准接触，不能直接作游戏坐姿循环。"
+          },
+          "status": "raw_recovered_pending_retarget_and_contact_review",
+          "runtimeEnabled": false,
+          "retargetHistory": [
+            {
+              "variantId": "Nra-v1-TrainBenchRest",
+              "path": "Video/Sources/FirstLevelV1/TrainBenchRest/Data_RetargetAssessment_V1.json",
+              "assessment": {
+                "sourceCacheSha256": "2d770a2738085bf4d108f260713dd2933dbf479c65379fc7230990bc7458131f",
+                "modelSha256": "4c48266bbdc1588d2a5abc39658e52c0d6ab183c1888d2ba0fef2de8cb2ff35f",
+                "acceptedForGame": false,
+                "evidence": "Preview/Data_FirstLevelTrainLifeV1PlaybackValidation.json",
+                "retargetReport": "Models/FirstLevelTrainLifeV1/Data_SelectedExportFidelityValidation.json",
+                "sourceVideoSha256": "5c65f6ec76161384171e44735fb246b56088905c9c7b1f1ab642aa44e3ada796",
+                "sourceId": "TrainBenchRest",
+                "status": "needs_contact_and_depth_correction",
+                "variantId": "Nra-v1-TrainBenchRest",
+                "sourceRecoveryUnchanged": true,
+                "reviewedSourceSeconds": [
+                  0,
+                  3.9833333333333334
+                ],
+                "observed": "已看起始与约 3.98 秒三栏：坐姿和前倾可辨；没有凳子，双掌和双足还未校准接触，不能直接作游戏坐姿循环。"
+              }
+            }
+          ],
+          "retargetCandidate": {
+            "variantId": "Nra-v1-TrainBenchRest",
+            "modelSha256": "4c48266bbdc1588d2a5abc39658e52c0d6ab183c1888d2ba0fef2de8cb2ff35f",
+            "path": "Models/FirstLevelTrainLifeV1/Animation_Nra_TrainBenchRest_V1.glb",
+            "clip": "Animation_Nra_TrainBenchRest_V1",
+            "blend": "Blender/FirstLevelTrainLifeV1/Scene_Nra_TrainBenchRest_V1.blend",
+            "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainBenchRest",
+            "status": "待审阅"
+          }
+        },
+        {
+          "sourceId": "TrainGearStow",
+          "sourceVideo": "Video/Sources/FirstLevelV1/TrainGearStow/4636306a-e3b9-4016-a195-dd926bc1aa16_video_1.mp4",
+          "sourceVideoSha256": "9b2d759d97d2b9d5101b89ccd5f991e4304915dd00f8d1f9a8785237bc9fc77e",
+          "sourceRangeSeconds": [
+            0,
+            7.966666666666667
+          ],
+          "generationSubmitId": "4636306a-e3b9-4016-a195-dd926bc1aa16",
+          "recoveryFrames": 240,
+          "recoveryFps": 30.0,
+          "recoveryRevision": 1,
+          "sourceCache": "Models/_Cache/FirstLevelV1/TrainGearStow/Data_GvhmrMotion.npz",
+          "sourceCacheSha256": "2afa63cd1c9d9da3c90d6f5424c95ad8bd5b1877e8c0494d888034f55c0d079f",
+          "resultSha256": "23b200f8ddb478fb2c9fd8336fdc35e02e00e6c3c74c5eb7bd43f4988d78f823",
+          "rawJointFile": "Models/RecoveryPreview/Data_V1_TrainGearStowRawJoints.json",
+          "group": "FirstLevelTrainLifeV1",
+          "visualAssessment": {
+            "sourceCacheSha256": "2afa63cd1c9d9da3c90d6f5424c95ad8bd5b1877e8c0494d888034f55c0d079f",
+            "modelSha256": "ebd8a04f579dfeb5d2aae17c09bc681d23df546134e1952f0f3c2ddc335aa9fb",
+            "acceptedForGame": false,
+            "evidence": "Preview/Data_FirstLevelTrainLifeV1PlaybackValidation.json",
+            "retargetReport": "Models/FirstLevelTrainLifeV1/Data_SelectedExportFidelityValidation.json",
+            "sourceVideoSha256": "9b2d759d97d2b9d5101b89ccd5f991e4304915dd00f8d1f9a8785237bc9fc77e",
+            "sourceId": "TrainGearStow",
+            "status": "needs_contact_and_depth_correction",
+            "variantId": "Nra-v1-TrainGearStow",
+            "sourceRecoveryUnchanged": true,
+            "reviewedSourceSeconds": [
+              0,
+              3.9833333333333334
+            ],
+            "observed": "已看起始与约 3.98 秒三栏：触肩后双臂向身体左侧整理动作可辨；原恢复的腿部深度把坐姿恢复得偏直，须保留 raw 并在新版本做坐姿修正。没有凳子/背包/包带，手指与道具接触未验。"
+          },
+          "status": "raw_recovered_pending_retarget_and_contact_review",
+          "runtimeEnabled": false,
+          "retargetHistory": [
+            {
+              "variantId": "Nra-v1-TrainGearStow",
+              "path": "Video/Sources/FirstLevelV1/TrainGearStow/Data_RetargetAssessment_V1.json",
+              "assessment": {
+                "sourceCacheSha256": "2afa63cd1c9d9da3c90d6f5424c95ad8bd5b1877e8c0494d888034f55c0d079f",
+                "modelSha256": "ebd8a04f579dfeb5d2aae17c09bc681d23df546134e1952f0f3c2ddc335aa9fb",
+                "acceptedForGame": false,
+                "evidence": "Preview/Data_FirstLevelTrainLifeV1PlaybackValidation.json",
+                "retargetReport": "Models/FirstLevelTrainLifeV1/Data_SelectedExportFidelityValidation.json",
+                "sourceVideoSha256": "9b2d759d97d2b9d5101b89ccd5f991e4304915dd00f8d1f9a8785237bc9fc77e",
+                "sourceId": "TrainGearStow",
+                "status": "needs_contact_and_depth_correction",
+                "variantId": "Nra-v1-TrainGearStow",
+                "sourceRecoveryUnchanged": true,
+                "reviewedSourceSeconds": [
+                  0,
+                  3.9833333333333334
+                ],
+                "observed": "已看起始与约 3.98 秒三栏：触肩后双臂向身体左侧整理动作可辨；原恢复的腿部深度把坐姿恢复得偏直，须保留 raw 并在新版本做坐姿修正。没有凳子/背包/包带，手指与道具接触未验。"
+              }
+            }
+          ],
+          "retargetCandidate": {
+            "variantId": "Nra-v1-TrainGearStow",
+            "modelSha256": "ebd8a04f579dfeb5d2aae17c09bc681d23df546134e1952f0f3c2ddc335aa9fb",
+            "path": "Models/FirstLevelTrainLifeV1/Animation_Nra_TrainGearStow_V1.glb",
+            "clip": "Animation_Nra_TrainGearStow_V1",
+            "blend": "Blender/FirstLevelTrainLifeV1/Scene_Nra_TrainGearStow_V1.blend",
+            "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainGearStow",
+            "status": "待审阅"
+          }
+        }
+      ]
     },
     {
       "requirementId": "FL18",
@@ -8812,10 +9967,13 @@
       ],
       "recoveryRevision": 1,
       "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
-      "clipName": "Animation_Nra_TrainBenchRise_V3",
+      "clipName": "FirstLevelTrainBench100",
       "faction": "Nra",
       "modelVariants": [
-        "LugouNra01"
+        "LugouNra01",
+        "LugouNra02",
+        "LugouNra03",
+        "LugouNra04"
       ],
       "loop": false,
       "referenceSpeedMps": null,
@@ -8825,9 +9983,9 @@
       "entryPose": "seated",
       "exitPose": "standing",
       "interruptPolicy": "Animation must not write mission facts, population, inventory, camera or patient identity.",
-      "blendFile": "Blender/FirstLevelBenchV3/Scene_Nra_TrainBenchRise_V3.blend",
+      "blendFile": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra01TrainSupport.blend",
       "previewId": "TrainBenchRise",
-      "revisionLabel": "Authored arm/finger rotations over V2 support, original recovery unchanged.",
+      "revisionLabel": "原模型 bind/层级/骨长保持；实际身高五档曲线，经九身高 120 fps 验证。根、腿、腕、掌指为后期支撑修正，未接入任务。",
       "status": "partially_retargeted_requires_contact_review",
       "runtimeBinding": {
         "enabled": false,
@@ -8839,15 +9997,19 @@
         "Models/FirstLevelTrainV1/Data_SelectedExportFidelityValidation.json",
         "Models/RecoveryPreview/Data_TrainBenchRiseRawRigValidation.json",
         "Preview/Data_FirstLevelTrainV1PlaybackValidation.json",
-        "Models/FirstLevelBenchV3/Data_TrainBenchRisePalmValidation.json",
+        "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
         "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V2.json",
-        "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V3.json"
+        "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V3.json",
+        "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra01.json",
+        "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra02.json",
+        "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra03.json",
+        "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra04.json"
       ],
       "blockers": [
         "Full bench sequence only; current contact corrections and naturalness require version-specific review. Idle/rise boundaries and game model scale still need integration validation.",
         "Other generated source targets require dense source review and recovery; first-pass retakes remain explicit.",
         "Not enabled in mission; preserve the same 41 passengers and real queue.",
-        "Production Support V1 fails temporal/height interpolation: retain its evidence and author a new version before runtime use.",
+        "Support validation and past failures remain versioned; latest original-model support is not yet enabled in the physical queue.",
         "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted."
       ],
       "newSourceProduction": [
@@ -8978,32 +10140,130 @@
                   "retargetReport": "Models/FirstLevelBenchV3/Data_TrainBenchRisePalmValidation.json",
                   "sourceRecoveryUnchanged": true
                 }
+              },
+              {
+                "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+                "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra01.json",
+                "assessment": {
+                  "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+                  "modelSha256": "401b540dc1c1854bc5ae0ec55cef909de05ef9c5d77c1bdb920c882e3297b23e",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+                  "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+                  "sourceId": "TrainBenchRise",
+                  "status": "support_and_playback_reviewed_pending_runtime_integration",
+                  "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    5.2,
+                    5.25,
+                    5.7,
+                    7.966666666666667
+                  ],
+                  "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+                }
+              },
+              {
+                "variantId": "Nra-v4-LugouNra02-TrainBenchRise",
+                "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra02.json",
+                "assessment": {
+                  "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+                  "modelSha256": "9da0f2c610fd64800853fd3d71e494b7e7a0d45811b8ebc54b9304455121e783",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+                  "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+                  "sourceId": "TrainBenchRise",
+                  "status": "support_and_playback_reviewed_pending_runtime_integration",
+                  "variantId": "Nra-v4-LugouNra02-TrainBenchRise",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    5.2,
+                    5.25,
+                    5.7,
+                    7.966666666666667
+                  ],
+                  "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+                }
+              },
+              {
+                "variantId": "Nra-v4-LugouNra03-TrainBenchRise",
+                "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra03.json",
+                "assessment": {
+                  "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+                  "modelSha256": "a3e504d3d5a9e73fad082a7c356b2766f8c6a4c276705f503154b263cbe64760",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+                  "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+                  "sourceId": "TrainBenchRise",
+                  "status": "support_and_playback_reviewed_pending_runtime_integration",
+                  "variantId": "Nra-v4-LugouNra03-TrainBenchRise",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    5.2,
+                    5.25,
+                    5.7,
+                    7.966666666666667
+                  ],
+                  "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+                }
+              },
+              {
+                "variantId": "Nra-v4-LugouNra04-TrainBenchRise",
+                "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra04.json",
+                "assessment": {
+                  "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+                  "modelSha256": "2fdf6313bc4dfa62cfb1a4c2ae740906a6d463c9846e4bee3979474b54898830",
+                  "acceptedForGame": false,
+                  "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+                  "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+                  "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+                  "sourceId": "TrainBenchRise",
+                  "status": "support_and_playback_reviewed_pending_runtime_integration",
+                  "variantId": "Nra-v4-LugouNra04-TrainBenchRise",
+                  "sourceRecoveryUnchanged": true,
+                  "reviewedSourceSeconds": [
+                    0,
+                    5.2,
+                    5.25,
+                    5.7,
+                    7.966666666666667
+                  ],
+                  "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+                }
               }
             ],
             "retargetAssessment": {
-              "sourceId": "TrainBenchRise",
-              "variantId": "Nra-v3-TrainBenchRise",
-              "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
               "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
-              "modelSha256": "bb9f7a2f709d4fca5616b2722f245e9faf121dd445e79d60a2f54bf945099a8d",
-              "status": "contact_reviewed_pending_runtime_scale_and_transition",
+              "modelSha256": "401b540dc1c1854bc5ae0ec55cef909de05ef9c5d77c1bdb920c882e3297b23e",
               "acceptedForGame": false,
-              "observed": "已看 0 秒正侧视及手部正面、斜侧近景，5.2 秒扶腿侧视近景和5.5秒松手侧视。双掌已贴上腿部衣面，原骨长保留；因原人物臂长限制将扶点移近髋部，腕点最大改动约0.340米，不能称原腕轨迹保真。手指放松与袖口可见，尚需游戏实际模型尺度、座位、转场和完整速度播放验收。",
+              "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+              "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+              "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+              "sourceId": "TrainBenchRise",
+              "status": "support_and_playback_reviewed_pending_runtime_integration",
+              "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+              "sourceRecoveryUnchanged": true,
               "reviewedSourceSeconds": [
                 0,
                 5.2,
-                5.5
+                5.25,
+                5.7,
+                7.966666666666667
               ],
-              "evidence": "Preview/FirstLevelBenchV3/Data_ExportPalmValidation.json",
-              "retargetReport": "Models/FirstLevelBenchV3/Data_TrainBenchRisePalmValidation.json",
-              "sourceRecoveryUnchanged": true
+              "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
             },
             "retargetCandidate": {
               "previewId": "TrainBenchRise",
-              "variantId": "Nra-v3-TrainBenchRise",
-              "status": "待审阅 · 掌腿接触",
-              "path": "Models/FirstLevelBenchV3/Animation_Nra_TrainBenchRise_V3.glb",
-              "blend": "Blender/FirstLevelBenchV3/Scene_Nra_TrainBenchRise_V3.blend",
+              "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+              "status": "待审阅 · 未接入游戏",
+              "path": "Models/FirstLevelTrainSupportV2/Model_LugouNra01TrainSupport.glb",
+              "blend": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra01TrainSupport.blend",
               "rawTracks": [
                 {
                   "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
@@ -9242,7 +10502,7 @@
       ],
       "reusedSourceCandidates": [],
       "sourceRetakeIds": [],
-      "variantId": "Nra-v3-TrainBenchRise",
+      "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
       "retargetHistory": [
         {
           "variantId": "Nra-v2-TrainBenchRise",
@@ -9287,39 +10547,137 @@
             "retargetReport": "Models/FirstLevelBenchV3/Data_TrainBenchRisePalmValidation.json",
             "sourceRecoveryUnchanged": true
           }
+        },
+        {
+          "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+          "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra01.json",
+          "assessment": {
+            "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+            "modelSha256": "401b540dc1c1854bc5ae0ec55cef909de05ef9c5d77c1bdb920c882e3297b23e",
+            "acceptedForGame": false,
+            "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+            "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+            "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+            "sourceId": "TrainBenchRise",
+            "status": "support_and_playback_reviewed_pending_runtime_integration",
+            "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+            "sourceRecoveryUnchanged": true,
+            "reviewedSourceSeconds": [
+              0,
+              5.2,
+              5.25,
+              5.7,
+              7.966666666666667
+            ],
+            "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+          }
+        },
+        {
+          "variantId": "Nra-v4-LugouNra02-TrainBenchRise",
+          "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra02.json",
+          "assessment": {
+            "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+            "modelSha256": "9da0f2c610fd64800853fd3d71e494b7e7a0d45811b8ebc54b9304455121e783",
+            "acceptedForGame": false,
+            "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+            "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+            "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+            "sourceId": "TrainBenchRise",
+            "status": "support_and_playback_reviewed_pending_runtime_integration",
+            "variantId": "Nra-v4-LugouNra02-TrainBenchRise",
+            "sourceRecoveryUnchanged": true,
+            "reviewedSourceSeconds": [
+              0,
+              5.2,
+              5.25,
+              5.7,
+              7.966666666666667
+            ],
+            "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+          }
+        },
+        {
+          "variantId": "Nra-v4-LugouNra03-TrainBenchRise",
+          "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra03.json",
+          "assessment": {
+            "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+            "modelSha256": "a3e504d3d5a9e73fad082a7c356b2766f8c6a4c276705f503154b263cbe64760",
+            "acceptedForGame": false,
+            "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+            "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+            "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+            "sourceId": "TrainBenchRise",
+            "status": "support_and_playback_reviewed_pending_runtime_integration",
+            "variantId": "Nra-v4-LugouNra03-TrainBenchRise",
+            "sourceRecoveryUnchanged": true,
+            "reviewedSourceSeconds": [
+              0,
+              5.2,
+              5.25,
+              5.7,
+              7.966666666666667
+            ],
+            "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+          }
+        },
+        {
+          "variantId": "Nra-v4-LugouNra04-TrainBenchRise",
+          "path": "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra04.json",
+          "assessment": {
+            "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
+            "modelSha256": "2fdf6313bc4dfa62cfb1a4c2ae740906a6d463c9846e4bee3979474b54898830",
+            "acceptedForGame": false,
+            "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+            "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+            "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+            "sourceId": "TrainBenchRise",
+            "status": "support_and_playback_reviewed_pending_runtime_integration",
+            "variantId": "Nra-v4-LugouNra04-TrainBenchRise",
+            "sourceRecoveryUnchanged": true,
+            "reviewedSourceSeconds": [
+              0,
+              5.2,
+              5.25,
+              5.7,
+              7.966666666666667
+            ],
+            "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
+          }
         }
       ],
       "visualAssessment": {
-        "sourceId": "TrainBenchRise",
-        "variantId": "Nra-v3-TrainBenchRise",
-        "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
         "sourceCacheSha256": "171c39c7ec5e27ed8af06505aacd303237b5d1b97dec72687680489fc014e915",
-        "modelSha256": "bb9f7a2f709d4fca5616b2722f245e9faf121dd445e79d60a2f54bf945099a8d",
-        "status": "contact_reviewed_pending_runtime_scale_and_transition",
+        "modelSha256": "401b540dc1c1854bc5ae0ec55cef909de05ef9c5d77c1bdb920c882e3297b23e",
         "acceptedForGame": false,
-        "observed": "已看 0 秒正侧视及手部正面、斜侧近景，5.2 秒扶腿侧视近景和5.5秒松手侧视。双掌已贴上腿部衣面，原骨长保留；因原人物臂长限制将扶点移近髋部，腕点最大改动约0.340米，不能称原腕轨迹保真。手指放松与袖口可见，尚需游戏实际模型尺度、座位、转场和完整速度播放验收。",
+        "evidence": "Preview/FirstLevelTrainSupportV2/Data_ThreePaneValidation.json",
+        "retargetReport": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+        "sourceVideoSha256": "c6a9694aff0581d260372a02be8584636a705e154dd59c254949b646ba3a4362",
+        "sourceId": "TrainBenchRise",
+        "status": "support_and_playback_reviewed_pending_runtime_integration",
+        "variantId": "Nra-v4-LugouNra01-TrainBenchRise",
+        "sourceRecoveryUnchanged": true,
         "reviewedSourceSeconds": [
           0,
           5.2,
-          5.5
+          5.25,
+          5.7,
+          7.966666666666667
         ],
-        "evidence": "Preview/FirstLevelBenchV3/Data_ExportPalmValidation.json",
-        "retargetReport": "Models/FirstLevelBenchV3/Data_TrainBenchRisePalmValidation.json",
-        "sourceRecoveryUnchanged": true
+        "observed": "已看四型号真实皮肤的 0 秒侧视、03 号 5.25 秒起身与 5.2 秒掌面近景，以及实际三栏的 02 号正面 0 秒、03 号侧面 5.7 秒松手、01 号站稳末态。凳面、鞋底和双掌接触可见；数值检查覆盖 36 个型号/身高组合、每组合 957 个时刻。四型号完整 1 倍速播放和模型移动通过，源片时钟误差最大约 11 ms。该版本是后期根/腿/掌指支撑修正；原恢复不改，腕点不称保真。尚未验生活分层、真实车厢座位/命中骨架、装备与动作过渡，未接入任务。"
       },
       "productionSupportTrial": {
-        "group": "FirstLevelTrainSupportV1",
-        "status": "needs_correction",
+        "group": "FirstLevelTrainSupportV2",
+        "status": "numeric_checks_passed_pending_visual_and_runtime_review",
         "runtimeEnabled": false,
         "models": [
           {
             "id": "LugouNra01",
-            "model": "Models/FirstLevelTrainSupportV1/Model_LugouNra01TrainSupport.glb",
-            "modelSha256": "f3ade3f1d973373b246ea56dbcf18e1ff018886f04ae4f84342ab23d7d5176fc",
-            "animation": "Models/FirstLevelTrainSupportV1/Animation_LugouNra01FirstLevelTrainSupport.glb",
-            "animationSha256": "fa0173a0df5dd40d406c224681e10debb1f07c05a1463c3dd8c5712f57c0a4ee",
-            "blend": "Blender/FirstLevelTrainSupportV1/Scene_LugouNra01TrainSupport.blend",
-            "blendSha256": "42507705ae094bb5ba478ace3e134896094a504f17a0394c9c3ccf4a822bd842",
+            "model": "Models/FirstLevelTrainSupportV2/Model_LugouNra01TrainSupport.glb",
+            "modelSha256": "401b540dc1c1854bc5ae0ec55cef909de05ef9c5d77c1bdb920c882e3297b23e",
+            "animation": "Models/FirstLevelTrainSupportV2/Animation_LugouNra01FirstLevelTrainSupport.glb",
+            "animationSha256": "b53c894f0b7677e507b1b643b63225b41f6d2786f232324060a5e117b798ad90",
+            "blend": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra01TrainSupport.blend",
+            "blendSha256": "ce45b25c27b67b221b074c245c33fcbe965506595ff516470418417444af3def",
             "originalModelSha256": "d9c6c14884444ab18b61aa41ce4df32df81f1a2207295a26bc2c3683bcf4e170",
             "bones": 53,
             "tracks": [
@@ -9333,12 +10691,12 @@
           },
           {
             "id": "LugouNra02",
-            "model": "Models/FirstLevelTrainSupportV1/Model_LugouNra02TrainSupport.glb",
-            "modelSha256": "72f585afccf30fd6761bf23c85b56117b7bfce93e2b23f8669d5e56ab1a18d09",
-            "animation": "Models/FirstLevelTrainSupportV1/Animation_LugouNra02FirstLevelTrainSupport.glb",
-            "animationSha256": "9feeae01fdfe8e9d16f97adb93022e75311de2f0be8e8e0506ccde48828d81c7",
-            "blend": "Blender/FirstLevelTrainSupportV1/Scene_LugouNra02TrainSupport.blend",
-            "blendSha256": "2304c7c71cffa8760281a2ec2a7795c33284e7327c000144aa9d12f8db049ad7",
+            "model": "Models/FirstLevelTrainSupportV2/Model_LugouNra02TrainSupport.glb",
+            "modelSha256": "9da0f2c610fd64800853fd3d71e494b7e7a0d45811b8ebc54b9304455121e783",
+            "animation": "Models/FirstLevelTrainSupportV2/Animation_LugouNra02FirstLevelTrainSupport.glb",
+            "animationSha256": "5ff7f7d573dd5900f8487361cbdd859ca8bcf44359602bad4d896015cc51cd51",
+            "blend": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra02TrainSupport.blend",
+            "blendSha256": "e5df162ab7cac5a2f7cc72160be3c4138a45ecd7cea859ddd0b631b9a9263c46",
             "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225",
             "bones": 53,
             "tracks": [
@@ -9352,12 +10710,12 @@
           },
           {
             "id": "LugouNra03",
-            "model": "Models/FirstLevelTrainSupportV1/Model_LugouNra03TrainSupport.glb",
-            "modelSha256": "0cb9ccf8bb234de944de03652eb7c1dd17d4ba359507b1929498c15b5f28f2f1",
-            "animation": "Models/FirstLevelTrainSupportV1/Animation_LugouNra03FirstLevelTrainSupport.glb",
-            "animationSha256": "53f59f1f5836b8030a16ca5cc3f66ae28065c90f17f25f68db019d05fb132b6f",
-            "blend": "Blender/FirstLevelTrainSupportV1/Scene_LugouNra03TrainSupport.blend",
-            "blendSha256": "17d17ad2b708936557427a30bee33b8de18c4f10e5bbb7c158f100c995771574",
+            "model": "Models/FirstLevelTrainSupportV2/Model_LugouNra03TrainSupport.glb",
+            "modelSha256": "a3e504d3d5a9e73fad082a7c356b2766f8c6a4c276705f503154b263cbe64760",
+            "animation": "Models/FirstLevelTrainSupportV2/Animation_LugouNra03FirstLevelTrainSupport.glb",
+            "animationSha256": "d3c1e1d02138eadb2b566eef4a016ee4b0e880c94d92c67f38f16da4a27d0120",
+            "blend": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra03TrainSupport.blend",
+            "blendSha256": "24ef0e7ccd91a473fd8dcc8eaa7414c274c2bb13c0502e82432e7683bc6c03e6",
             "originalModelSha256": "d4b7b487387cca2e7758d1c0bbcd51a299ee7a500a193ea14d9754e6563aa74d",
             "bones": 54,
             "tracks": [
@@ -9371,12 +10729,12 @@
           },
           {
             "id": "LugouNra04",
-            "model": "Models/FirstLevelTrainSupportV1/Model_LugouNra04TrainSupport.glb",
-            "modelSha256": "d9a378c54ffef1dad80125a9f58fe2139a5b4192277bbecf099c68a794b38b55",
-            "animation": "Models/FirstLevelTrainSupportV1/Animation_LugouNra04FirstLevelTrainSupport.glb",
-            "animationSha256": "81bb61b8ec72a3618cc57b593c6ec07e481382665e8b77f75a2a919598e5f307",
-            "blend": "Blender/FirstLevelTrainSupportV1/Scene_LugouNra04TrainSupport.blend",
-            "blendSha256": "3f6f63039e841b965f5c166384c06b2a43f3f5f7c9adaf28f12e05cc2ff98576",
+            "model": "Models/FirstLevelTrainSupportV2/Model_LugouNra04TrainSupport.glb",
+            "modelSha256": "2fdf6313bc4dfa62cfb1a4c2ae740906a6d463c9846e4bee3979474b54898830",
+            "animation": "Models/FirstLevelTrainSupportV2/Animation_LugouNra04FirstLevelTrainSupport.glb",
+            "animationSha256": "39d919605a3200a76ab97af54e40335c2adeb2b0580cfd270f5a6e16da250dce",
+            "blend": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra04TrainSupport.blend",
+            "blendSha256": "56d0b3196eb4bbc59b98da3b06e528c257e1585ebf3f286c213ab8c50e78c208",
             "originalModelSha256": "06bfff4d100d766767f8516584de0c9ac62b2f50a6ac10ce3b4285f24889a073",
             "bones": 53,
             "tracks": [
@@ -9389,77 +10747,165 @@
             "originalBindAndHierarchyPreserved": true
           }
         ],
-        "failures": [
-          "LugouNra01/0.96: 2 bench-intersecting vertices",
-          "LugouNra01/0.96: foot drift 0.0006287176926570361, length error 0.000020531297356796152",
-          "LugouNra01/0.97: 4 bench-intersecting vertices",
-          "LugouNra01/0.97: sole height 0.001368134353261774..0.0020002215992740435",
-          "LugouNra01/0.97: foot drift 0.0008496647851064273, length error 0.000020725030327684024",
-          "LugouNra01/0.98: 2 bench-intersecting vertices",
-          "LugouNra01/0.98: foot drift 0.0005133063139425131, length error 0.000020918372435674293",
-          "LugouNra01/0.99: 4 bench-intersecting vertices",
-          "LugouNra01/0.99: sole height 0.0013427804418348899..0.002000229974825518",
-          "LugouNra01/0.99: foot drift 0.0009625848250750059, length error 0.000021134022604896163",
-          "LugouNra01/1: 2 bench-intersecting vertices",
-          "LugouNra01/1: foot drift 0.0006007985025373239, length error 0.00002134973420769848",
-          "LugouNra01/1.01: 4 bench-intersecting vertices",
-          "LugouNra01/1.01: foot drift 0.0006417471026014062, length error 0.000021565397485934223",
-          "LugouNra01/1.02: 2 bench-intersecting vertices",
-          "LugouNra01/1.03: 4 bench-intersecting vertices",
-          "LugouNra01/1.04: 2 bench-intersecting vertices",
-          "LugouNra02/0.96: 16 bench-intersecting vertices",
-          "LugouNra02/0.96: sole height -0.001242987196957035..0.002000077458627736",
-          "LugouNra02/0.96: foot drift 0.004883963533603129, length error 0.000020491074566086898",
-          "LugouNra02/0.97: 16 bench-intersecting vertices",
-          "LugouNra02/0.97: sole height -0.0019474680778551745..0.0020002504996277093",
-          "LugouNra02/0.97: foot drift 0.005201068936766276, length error 0.000020701759816943444",
-          "LugouNra02/0.97: palm support -0.0032132516714288295..0.0010349228496459029",
-          "LugouNra02/0.98: 15 bench-intersecting vertices",
-          "LugouNra02/0.98: sole height -0.0011029509781946834..0.0020000747990853718",
-          "LugouNra02/0.98: foot drift 0.004983782717600839, length error 0.000020913173422010267",
-          "LugouNra02/0.99: 16 bench-intersecting vertices",
-          "LugouNra02/0.99: sole height -0.001426536157299152..0.0020002494239564905",
-          "LugouNra02/0.99: foot drift 0.005681878527037822, length error 0.000021128610477705312",
-          "LugouNra02/0.99: palm support -0.0031610111895997717..0.0009927548552111087",
-          "LugouNra02/1: 14 bench-intersecting vertices",
-          "LugouNra02/1: sole height -0.0006849648946519737..0.002000088029030511",
-          "LugouNra02/1: foot drift 0.004585263708351301, length error 0.000021344074874918295",
-          "LugouNra02/1.01: 15 bench-intersecting vertices",
-          "LugouNra02/1.01: sole height -0.001102531264389306..0.0020002517393733488",
-          "LugouNra02/1.01: foot drift 0.005518384217038862, length error 0.000021559476375720976",
-          "LugouNra02/1.01: palm support -0.0026212812994528267..0.0010208245689784512",
-          "LugouNra02/1.02: 13 bench-intersecting vertices",
-          "LugouNra02/1.02: sole height -0.0004392671878576948..0.00200009636447529",
-          "LugouNra02/1.02: foot drift 0.00447137190998927, length error 0.000021774900455573398",
-          "LugouNra02/1.03: 14 bench-intersecting vertices",
-          "LugouNra02/1.03: sole height -0.0007255807407522408..0.0020002476253790924",
-          "LugouNra02/1.03: foot drift 0.005183062325224364, length error 0.00002199002900293845",
-          "LugouNra02/1.03: palm support -0.0026481364784444184..0.0010449418423786883",
-          "LugouNra02/1.04: 10 bench-intersecting vertices",
-          "LugouNra02/1.04: sole height -0.0001321725594300993..0.002000088008181744",
-          "LugouNra02/1.04: foot drift 0.004195674265217121, length error 0.00002220517586004611",
-          "LugouNra03/0.97: 1 bench-intersecting vertices",
-          "LugouNra03/0.99: 1 bench-intersecting vertices",
-          "LugouNra04/0.96: 2 bench-intersecting vertices",
-          "LugouNra04/0.96: foot drift 0.0005436682273589065, length error 0.000020638086556501456",
-          "LugouNra04/0.97: 4 bench-intersecting vertices",
-          "LugouNra04/0.97: sole height 0.0014464383588029817..0.0020002160726265705",
-          "LugouNra04/0.97: foot drift 0.0007524215016546439, length error 0.0000208327510966555",
-          "LugouNra04/0.98: 2 bench-intersecting vertices",
-          "LugouNra04/0.99: 4 bench-intersecting vertices",
-          "LugouNra04/0.99: sole height 0.0014273158320090573..0.002000237070701627",
-          "LugouNra04/0.99: foot drift 0.0008487099538199015, length error 0.000021243782551305657",
-          "LugouNra04/1: 2 bench-intersecting vertices",
-          "LugouNra04/1: foot drift 0.0005176019230750754, length error 0.00002146060602881139",
-          "LugouNra04/1.01: 4 bench-intersecting vertices",
-          "LugouNra04/1.01: foot drift 0.0007104325370130591, length error 0.000021677382120721678",
-          "LugouNra04/1.02: 2 bench-intersecting vertices",
-          "LugouNra04/1.03: 4 bench-intersecting vertices",
-          "LugouNra04/1.04: 2 bench-intersecting vertices"
-        ],
-        "validation": "Models/FirstLevelTrainSupportV1/Data_ProductionSkinValidation.json",
-        "editableValidation": "Models/FirstLevelTrainSupportV1/Data_EditableProjectValidation.json"
+        "failures": [],
+        "validation": "Models/FirstLevelTrainSupportV2/Data_ProductionSkinValidation.json",
+        "editableValidation": "Models/FirstLevelTrainSupportV2/Data_EditableProjectValidation.json"
       },
+      "productionSupportHistory": [
+        {
+          "group": "FirstLevelTrainSupportV1",
+          "status": "needs_correction",
+          "runtimeEnabled": false,
+          "models": [
+            {
+              "id": "LugouNra01",
+              "model": "Models/FirstLevelTrainSupportV1/Model_LugouNra01TrainSupport.glb",
+              "modelSha256": "f3ade3f1d973373b246ea56dbcf18e1ff018886f04ae4f84342ab23d7d5176fc",
+              "animation": "Models/FirstLevelTrainSupportV1/Animation_LugouNra01FirstLevelTrainSupport.glb",
+              "animationSha256": "fa0173a0df5dd40d406c224681e10debb1f07c05a1463c3dd8c5712f57c0a4ee",
+              "blend": "Blender/FirstLevelTrainSupportV1/Scene_LugouNra01TrainSupport.blend",
+              "blendSha256": "42507705ae094bb5ba478ace3e134896094a504f17a0394c9c3ccf4a822bd842",
+              "originalModelSha256": "d9c6c14884444ab18b61aa41ce4df32df81f1a2207295a26bc2c3683bcf4e170",
+              "bones": 53,
+              "tracks": [
+                "FirstLevelTrainBench104",
+                "FirstLevelTrainBench102",
+                "FirstLevelTrainBench100",
+                "FirstLevelTrainBench98",
+                "FirstLevelTrainBench96"
+              ],
+              "originalBindAndHierarchyPreserved": true
+            },
+            {
+              "id": "LugouNra02",
+              "model": "Models/FirstLevelTrainSupportV1/Model_LugouNra02TrainSupport.glb",
+              "modelSha256": "72f585afccf30fd6761bf23c85b56117b7bfce93e2b23f8669d5e56ab1a18d09",
+              "animation": "Models/FirstLevelTrainSupportV1/Animation_LugouNra02FirstLevelTrainSupport.glb",
+              "animationSha256": "9feeae01fdfe8e9d16f97adb93022e75311de2f0be8e8e0506ccde48828d81c7",
+              "blend": "Blender/FirstLevelTrainSupportV1/Scene_LugouNra02TrainSupport.blend",
+              "blendSha256": "2304c7c71cffa8760281a2ec2a7795c33284e7327c000144aa9d12f8db049ad7",
+              "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225",
+              "bones": 53,
+              "tracks": [
+                "FirstLevelTrainBench104",
+                "FirstLevelTrainBench102",
+                "FirstLevelTrainBench100",
+                "FirstLevelTrainBench98",
+                "FirstLevelTrainBench96"
+              ],
+              "originalBindAndHierarchyPreserved": true
+            },
+            {
+              "id": "LugouNra03",
+              "model": "Models/FirstLevelTrainSupportV1/Model_LugouNra03TrainSupport.glb",
+              "modelSha256": "0cb9ccf8bb234de944de03652eb7c1dd17d4ba359507b1929498c15b5f28f2f1",
+              "animation": "Models/FirstLevelTrainSupportV1/Animation_LugouNra03FirstLevelTrainSupport.glb",
+              "animationSha256": "53f59f1f5836b8030a16ca5cc3f66ae28065c90f17f25f68db019d05fb132b6f",
+              "blend": "Blender/FirstLevelTrainSupportV1/Scene_LugouNra03TrainSupport.blend",
+              "blendSha256": "17d17ad2b708936557427a30bee33b8de18c4f10e5bbb7c158f100c995771574",
+              "originalModelSha256": "d4b7b487387cca2e7758d1c0bbcd51a299ee7a500a193ea14d9754e6563aa74d",
+              "bones": 54,
+              "tracks": [
+                "FirstLevelTrainBench104",
+                "FirstLevelTrainBench102",
+                "FirstLevelTrainBench100",
+                "FirstLevelTrainBench98",
+                "FirstLevelTrainBench96"
+              ],
+              "originalBindAndHierarchyPreserved": true
+            },
+            {
+              "id": "LugouNra04",
+              "model": "Models/FirstLevelTrainSupportV1/Model_LugouNra04TrainSupport.glb",
+              "modelSha256": "d9a378c54ffef1dad80125a9f58fe2139a5b4192277bbecf099c68a794b38b55",
+              "animation": "Models/FirstLevelTrainSupportV1/Animation_LugouNra04FirstLevelTrainSupport.glb",
+              "animationSha256": "81bb61b8ec72a3618cc57b593c6ec07e481382665e8b77f75a2a919598e5f307",
+              "blend": "Blender/FirstLevelTrainSupportV1/Scene_LugouNra04TrainSupport.blend",
+              "blendSha256": "3f6f63039e841b965f5c166384c06b2a43f3f5f7c9adaf28f12e05cc2ff98576",
+              "originalModelSha256": "06bfff4d100d766767f8516584de0c9ac62b2f50a6ac10ce3b4285f24889a073",
+              "bones": 53,
+              "tracks": [
+                "FirstLevelTrainBench104",
+                "FirstLevelTrainBench102",
+                "FirstLevelTrainBench100",
+                "FirstLevelTrainBench98",
+                "FirstLevelTrainBench96"
+              ],
+              "originalBindAndHierarchyPreserved": true
+            }
+          ],
+          "failures": [
+            "LugouNra01/0.96: 2 bench-intersecting vertices",
+            "LugouNra01/0.96: foot drift 0.0006287176926570361, length error 0.000020531297356796152",
+            "LugouNra01/0.97: 4 bench-intersecting vertices",
+            "LugouNra01/0.97: sole height 0.001368134353261774..0.0020002215992740435",
+            "LugouNra01/0.97: foot drift 0.0008496647851064273, length error 0.000020725030327684024",
+            "LugouNra01/0.98: 2 bench-intersecting vertices",
+            "LugouNra01/0.98: foot drift 0.0005133063139425131, length error 0.000020918372435674293",
+            "LugouNra01/0.99: 4 bench-intersecting vertices",
+            "LugouNra01/0.99: sole height 0.0013427804418348899..0.002000229974825518",
+            "LugouNra01/0.99: foot drift 0.0009625848250750059, length error 0.000021134022604896163",
+            "LugouNra01/1: 2 bench-intersecting vertices",
+            "LugouNra01/1: foot drift 0.0006007985025373239, length error 0.00002134973420769848",
+            "LugouNra01/1.01: 4 bench-intersecting vertices",
+            "LugouNra01/1.01: foot drift 0.0006417471026014062, length error 0.000021565397485934223",
+            "LugouNra01/1.02: 2 bench-intersecting vertices",
+            "LugouNra01/1.03: 4 bench-intersecting vertices",
+            "LugouNra01/1.04: 2 bench-intersecting vertices",
+            "LugouNra02/0.96: 16 bench-intersecting vertices",
+            "LugouNra02/0.96: sole height -0.001242987196957035..0.002000077458627736",
+            "LugouNra02/0.96: foot drift 0.004883963533603129, length error 0.000020491074566086898",
+            "LugouNra02/0.97: 16 bench-intersecting vertices",
+            "LugouNra02/0.97: sole height -0.0019474680778551745..0.0020002504996277093",
+            "LugouNra02/0.97: foot drift 0.005201068936766276, length error 0.000020701759816943444",
+            "LugouNra02/0.97: palm support -0.0032132516714288295..0.0010349228496459029",
+            "LugouNra02/0.98: 15 bench-intersecting vertices",
+            "LugouNra02/0.98: sole height -0.0011029509781946834..0.0020000747990853718",
+            "LugouNra02/0.98: foot drift 0.004983782717600839, length error 0.000020913173422010267",
+            "LugouNra02/0.99: 16 bench-intersecting vertices",
+            "LugouNra02/0.99: sole height -0.001426536157299152..0.0020002494239564905",
+            "LugouNra02/0.99: foot drift 0.005681878527037822, length error 0.000021128610477705312",
+            "LugouNra02/0.99: palm support -0.0031610111895997717..0.0009927548552111087",
+            "LugouNra02/1: 14 bench-intersecting vertices",
+            "LugouNra02/1: sole height -0.0006849648946519737..0.002000088029030511",
+            "LugouNra02/1: foot drift 0.004585263708351301, length error 0.000021344074874918295",
+            "LugouNra02/1.01: 15 bench-intersecting vertices",
+            "LugouNra02/1.01: sole height -0.001102531264389306..0.0020002517393733488",
+            "LugouNra02/1.01: foot drift 0.005518384217038862, length error 0.000021559476375720976",
+            "LugouNra02/1.01: palm support -0.0026212812994528267..0.0010208245689784512",
+            "LugouNra02/1.02: 13 bench-intersecting vertices",
+            "LugouNra02/1.02: sole height -0.0004392671878576948..0.00200009636447529",
+            "LugouNra02/1.02: foot drift 0.00447137190998927, length error 0.000021774900455573398",
+            "LugouNra02/1.03: 14 bench-intersecting vertices",
+            "LugouNra02/1.03: sole height -0.0007255807407522408..0.0020002476253790924",
+            "LugouNra02/1.03: foot drift 0.005183062325224364, length error 0.00002199002900293845",
+            "LugouNra02/1.03: palm support -0.0026481364784444184..0.0010449418423786883",
+            "LugouNra02/1.04: 10 bench-intersecting vertices",
+            "LugouNra02/1.04: sole height -0.0001321725594300993..0.002000088008181744",
+            "LugouNra02/1.04: foot drift 0.004195674265217121, length error 0.00002220517586004611",
+            "LugouNra03/0.97: 1 bench-intersecting vertices",
+            "LugouNra03/0.99: 1 bench-intersecting vertices",
+            "LugouNra04/0.96: 2 bench-intersecting vertices",
+            "LugouNra04/0.96: foot drift 0.0005436682273589065, length error 0.000020638086556501456",
+            "LugouNra04/0.97: 4 bench-intersecting vertices",
+            "LugouNra04/0.97: sole height 0.0014464383588029817..0.0020002160726265705",
+            "LugouNra04/0.97: foot drift 0.0007524215016546439, length error 0.0000208327510966555",
+            "LugouNra04/0.98: 2 bench-intersecting vertices",
+            "LugouNra04/0.99: 4 bench-intersecting vertices",
+            "LugouNra04/0.99: sole height 0.0014273158320090573..0.002000237070701627",
+            "LugouNra04/0.99: foot drift 0.0008487099538199015, length error 0.000021243782551305657",
+            "LugouNra04/1: 2 bench-intersecting vertices",
+            "LugouNra04/1: foot drift 0.0005176019230750754, length error 0.00002146060602881139",
+            "LugouNra04/1.01: 4 bench-intersecting vertices",
+            "LugouNra04/1.01: foot drift 0.0007104325370130591, length error 0.000021677382120721678",
+            "LugouNra04/1.02: 2 bench-intersecting vertices",
+            "LugouNra04/1.03: 4 bench-intersecting vertices",
+            "LugouNra04/1.04: 2 bench-intersecting vertices"
+          ],
+          "validation": "Models/FirstLevelTrainSupportV1/Data_ProductionSkinValidation.json",
+          "editableValidation": "Models/FirstLevelTrainSupportV1/Data_EditableProjectValidation.json"
+        }
+      ],
       "newRecoveryCandidates": [
         {
           "sourceId": "TrainStairDisembark",

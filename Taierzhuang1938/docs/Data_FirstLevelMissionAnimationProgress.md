@@ -2,7 +2,32 @@
 
 当前用户要求为**先覆盖全部 48 项的素材生成**，随后继续恢复、重定向、协作装配和游戏接入。尚未完成全部动作，也没有替换正式关卡动画。逐项字段、来源哈希和运行时文件快照见 [状态 JSON](Data_FirstLevelMissionAnimationStatus.json)。需求仍以 [完整需求](Data_FirstLevelMissionAnimationRequirements.md) 和 [视频转骨骼标准](Data_VideoToSkeletonStandard.md) 为准。
 
-## 正式人物尺度试制：TrainSupport V1 未通过
+## 最新：四型号起身 V4 支撑验证通过，新增两条车厢恢复
+
+本轮没有新生成视频或扣费；数弹原任务和余额实查仍为 `querying`／30 积分。首轮 60 成功、1 失败、1 待对账及 17 条明确补拍保持，已知补拍费用缺约 3,370 积分；这不是全部后续修正的封顶费用。
+
+`Models/FirstLevelTrainSupportV2` 登记为起身审阅 **V4**：复用原片、raw 和 V3，四套原游戏模型每套五档身高、479 帧。修正稳定支撑区间与膝弯求解基线；较高人物允许坐姿下调，起身时平滑释放。凳板顶 .48 m、厚 .14 m、深 .68 m；试制身体朝过道偏移为 01/02/04 号 .24 m、03 号 .28 m，尚未写入真实车厢。旧 V1 失败和既有 V2/V3 审阅保留，新组已冻结。
+
+- 原网格 **4 型号 × 9 身高 × 957 时刻（120 fps）**通过：零顶点穿凳，坐姿间隙 **1.037–3.911 mm**，最低鞋底 **1.723 mm**，最大脚漂 **0.294 mm**，掌面间隙 **0.670–1.321 mm**，最大骨盆速度 **0.636 m/s**。原 bind、层级和骨长保持，骨段误差最高约 .02281 mm。这些有限采样不是任意时间／身高的数学证明。
+- 完整人物／动画／凳板 GLB 与“原游戏 GLB＋独立动画库”在每型号 81 个时间／身高组合逐骨、逐顶点一致，外层缩放未重复施加。四个 `.blend` 重新打开，20 条 NLA 与 120 个关键帧接触通过。
+- [起身最新三栏](http://127.0.0.1:8136/Preview/index.html?action=TrainBenchRise)默认 NRA01 V4，其余型号在效果历史选取。四型号实际播放完整 1 倍速，源片／模型时钟差最大约 **11 ms**，48 张正侧视事件图留本地。已看四型号坐姿侧视、03 号起身／掌面近景，以及三栏松手、正面和站稳末态。根、腿、腕和掌指是后期支撑修正，不能称全身／手腕恢复保真。
+- **V4 未接入任务**：真实车厢座位、命中骨架、装备、坐姿循环和生活分层、起身到物理行走的衔接、暂停中断及游戏验收仍待完成。41 人队列及 r11 实际 VoiceEvent 保持，未修改任务、人数、对白或运行时代码。
+
+新恢复 [长凳休息](http://127.0.0.1:8136/Preview/index.html?action=TrainBenchRest)和[整理背包](http://127.0.0.1:8136/Preview/index.html?action=TrainGearStow)：复用首轮原片，先查看 .25 秒源帧与 .5 秒二维关节点，再实际执行本机三维恢复。每条保留 240 帧原数组和独立 raw 工程，导出国军原骨架 V1 各 479 帧。958 帧导出保真通过，方向误差最大约 .000138°，关节点偏差最大约 .00155 mm；10 个三栏取景姿势通过。两条均未加凳子：休息缺掌腿／双足接触，整理背包的单目腿部深度偏直，另缺背包／包带／手指。已据起始与中段截图标为需修正，未启用。
+
+另密集查看“接食进食”：实际为从地面盘中取食，只能复用进食段；接食仍缺合格配对，待审查其他可复用来源，未冒充完成。当前库核验为 **46 份原数组、23 个 raw 工程、486 条文件链接、53 个目录动作**。全库 100 个最新阵营条目的三栏控件／播放检查通过；历史、逐帧、拖动、缺源提示和多人输入链接均保留，浏览器无脚本错误。交付清单核验 5,008 个私有文件，原历史归档哈希不变。
+
+新增复现入口（产物与图只留私有库）：
+
+```text
+node Taierzhuang1938/_import/Script_FirstLevelTrainSupportPackageVerify.mjs --root <库> --group FirstLevelTrainSupportV2
+python Taierzhuang1938/_import/Script_FirstLevelTrainSupportRegister.py --root <库>
+node Taierzhuang1938/_import/Script_FirstLevelTrainSupportReview.mjs --root <库>
+python Taierzhuang1938/_import/Script_FirstLevelRecoveryPrepare.py --root <库> --group FirstLevelTrainLifeV1 --ids TrainBenchRest,TrainGearStow
+node Taierzhuang1938/_import/Script_MotionFidelityVerify.mjs --root <库> --group FirstLevelTrainLifeV1 --revision 1 --factions Nra --ids TrainBenchRest,TrainGearStow
+```
+
+## 历史：正式人物尺度试制 TrainSupport V1 未通过
 
 2026-09-07 再次 fetch 后，需求仍为 r11 的 25 阶段。本轮没有修改任务、人数、对白时机或正式动画。即梦原 ID 查询仍返回 `querying`，实查余额仍为 **30 积分**；首轮保持 60 成功、1 失败、1 待对账，覆盖 47 个需求，FL16 缺成功来源。17 条补拍与医生重做合计预计 3,400 积分，现余额缺约 **3,370**；不含再次失败余量，未假设数弹退款，也未重新提交。
 

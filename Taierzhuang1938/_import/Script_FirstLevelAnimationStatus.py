@@ -107,17 +107,21 @@ def Main():
                 reviewEvidence=['Models/FirstLevelTrainV1/Data_SelectedExportFidelityValidation.json',
                     'Models/RecoveryPreview/Data_TrainBenchRiseRawRigValidation.json',
                     'Preview/Data_FirstLevelTrainV1PlaybackValidation.json',latest['review']['retargetReport']]+[h['path'] for h in history])
-            support=root/'Models/FirstLevelTrainSupportV1'
-            if (support/'Data_ProductionSkinValidation.json').exists():
+            trials=[]
+            for support in sorted((root/'Models').glob('FirstLevelTrainSupportV*'),key=lambda p:int(p.name.split('V')[-1])):
+                if not (support/'Data_ProductionSkinValidation.json').exists():continue
                 measured=Read(support/'Data_ProductionSkinValidation.json')
                 projects=Read(support/'Data_EditableProjects.json')
                 for result in measured['results']:
                     assert Hash(support/('Animation_'+result['id']+'FirstLevelTrainSupport.glb'))==result['animationSha256']
-                row['productionSupportTrial']=dict(group='FirstLevelTrainSupportV1',status=measured['status'],runtimeEnabled=False,
+                trials.append(dict(group=support.name,status=measured['status'],runtimeEnabled=False,
                     models=projects['results'],failures=measured['failures'],
-                    validation='Models/FirstLevelTrainSupportV1/Data_ProductionSkinValidation.json',
-                    editableValidation='Models/FirstLevelTrainSupportV1/Data_EditableProjectValidation.json')
-                row['blockers'].append('Production Support V1 fails temporal/height interpolation: retain its evidence and author a new version before runtime use.')
+                    validation=(support/'Data_ProductionSkinValidation.json').relative_to(root).as_posix(),
+                    editableValidation=(support/'Data_EditableProjectValidation.json').relative_to(root).as_posix()))
+            if trials:
+                row['productionSupportTrial']=trials[-1];row['productionSupportHistory']=trials[:-1]
+                row['modelVariants']=[model['id'] for model in trials[-1]['models']]
+                row['blockers'].append('Support validation and past failures remain versioned; latest original-model support is not yet enabled in the physical queue.')
         elif row['requirementId']!='FL26':
             statuses=[s['status'] for s in row['newSourceProduction']]
             row['status']=('video_generation_in_progress' if 'querying' in statuses else
