@@ -85,6 +85,7 @@ import { InputRouter } from "./Script_Input.mjs";
 import { MeleeCombatDirector } from "./Script_MeleeCombat.mjs";
 import { MELEE_SCENARIOS, MELEE_ENCOUNTERS } from "./Data_MeleeCombat.mjs";
 import { MeleeLab } from "./Script_MeleeLab.mjs";
+import { LoadMeleeAnimations, MeleeAnimationsLoaded } from "./Script_MeleeAnimationData.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
 import { CarrySystem } from "./Script_Carry.mjs";
@@ -1035,6 +1036,9 @@ async function Boot() {
   // （它们在 Actor 构造函数里被调），拿不到文档就一律退回程序化方块几何。
   // 十四个 .tzm.json 加起来不到 300 KB，这一步的成本远小于"跑起来才发现没换模"。
   const meshes = await actorFactory.PreloadMeshes();
+  // 白刃全身动画库（每阵营 7.7 MB）正常开机不等它：主菜单出现后才在后台拉
+  // （OpenMenu），进关前基本能到。白刃实验室与它的测试要一开机就能摆姿势，等。
+  if (MELEE_TEST) await LoadMeleeAnimations();
   if (meshes.missing.length) {
     // warn 不是 error：BootTest 把 console.error 当事故，而少一个模型只是降级不是崩
     console.warn(`[Main] 这些模型没读到，对应的人/枪退回方块几何：${meshes.missing.join(", ")}`);
@@ -1741,6 +1745,9 @@ async function Boot() {
     companion, checkpoint, setpieces,
     // 机队实例：出图脚本要能给任意一架摆手动姿态，核对模型机头朝向。
     get aircraft() { return aircraft; },
+    // 白刃全身动画库是否已灌入（Data_MeleeAnimationSets）；测试摆姿势前要看它。
+    get meleeAnimationsLoaded() { return MeleeAnimationsLoaded(); },
+    LoadMeleeAnimations,
     StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
     // 关中过场的宿主 API（story.Signal→过场 的等价入口）。玩法系统批直接调它，
     // 或者走 story.Signal("<名字>") 让登记表去派发 —— 两条路同一个实现。
@@ -5047,6 +5054,8 @@ function OpenMenu() {
   if (!menu) return;
   state.running = false;
   state.menu = true;
+  // 主菜单是开机后第一段带宽空闲：把白刃全身动画库拉下来（幂等，只拉一次）。
+  LoadMeleeAnimations();
   p012BinocularRaised = false;
   p012Binoculars?.Update({owned:false,raised:false},0);
   ReleasePointerLock();

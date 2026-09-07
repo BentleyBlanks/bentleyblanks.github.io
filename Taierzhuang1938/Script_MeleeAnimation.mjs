@@ -1,11 +1,13 @@
 // Blender-sampled melee clips. Retarget world-space rotation deltas onto each original bind skeleton.
 import * as THREE from 'three';
-import { MELEE_NRA_ANIMATIONS } from './Data_MeleeNraAnimations.mjs';
-import { MELEE_IJA_ANIMATIONS } from './Data_MeleeIjaAnimations.mjs';
+// 全身库表头在 Data_MeleeAnimationSets，帧数据由 Script_MeleeAnimationData 异步灌入（见该文件抬头）。
+import { MELEE_NRA_ANIMATIONS, MELEE_IJA_ANIMATIONS } from './Data_MeleeAnimationSets.mjs';
+import { LoadMeleeAnimations } from './Script_MeleeAnimationData.mjs';
 import { MELEE_VIDEO_ANIMATIONS } from './Data_MeleeVideoAnimations.mjs';
 const q0=new THREE.Quaternion(),q1=new THREE.Quaternion(),qr=new THREE.Quaternion(),qp=new THREE.Quaternion(),qd=new THREE.Quaternion();
 const v=new THREE.Vector3(),vp=new THREE.Vector3(),vs=new THREE.Vector3(),inv=new THREE.Matrix4();
 function Samples(data,pose) {
+  if(!data.loaded){LoadMeleeAnimations([data]);return null;}   // 数据未到：顺手开拉，本帧不摆
   const clip=data.clips[pose.clip]; if(!clip)return null;
   const looping=clip.loop && !['charge','qte'].includes(pose.state);
   const pressurePose=pose.state==='qte' && (pose.action==='Bind' || pose.action==='Pressure');

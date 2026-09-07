@@ -191,7 +191,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - `Data_MeleeCombat.mjs` 定义招式、参数、动作名与独立战斗；`Script_MeleeCombat.mjs` 是玩家和敌友军共用的纯规则状态机；多打一时 NPC 按 `MELEE_SQUAD` 分「正面牵制／侧翼」（史料与规则见 `docs/Data_MeleeQte.md`「多打一」）。
 - 左键轻击／蓄力重击，右键瞬时拨挡，F 贴身推架（零生命伤害）；`Script_MeleeQte.mjs` 只处理真实僵持与倒地压制的连按 F 抵抗，成功后对手仍活着。
 - `Script_MeleeLab.mjs` 与 `Debug.MeleeCombat` 只配置场景、预览动作和取证；专用章与正片共用 Soldier、Actor、伤害与死亡链。
-- 新源工程按根约定存于 OneDrive 的 `Blender/Taierzhuang1938/MeleeCombat_20260905/Scene_MeleeCombat.blend`，含敌友军和第一人称动作；`_blender/Script_Melee*` 设置 `MELEE_PROJECT_ROOT` 后烘焙到 `Data_Melee{Nra,Ija}Animations.mjs`，经 `Script_MeleeAnimation.mjs`、CharacterModel 与 Viewmodel 播放，详见 `docs/Data_MeleeQte.md`。
+- 新源工程按根约定存于 OneDrive 的 `Blender/Taierzhuang1938/MeleeCombat_20260905/Scene_MeleeCombat.blend`，含敌友军和第一人称动作；`_blender/Script_Melee*` 设置 `MELEE_PROJECT_ROOT` 后烘焙到 `Animation/Melee/Data_Melee{Nra,Ija}Animations.json`（纯 json，2026-09-07 起不再是 ES 模块：两份 15 MB 曾占 Pages 入口 bundle 的 6.5 MB，线上开机因此前 25 秒空白；表头在 `Data_MeleeAnimationSets.mjs`，`Script_MeleeAnimationData.mjs` 在主菜单出现后异步拉），经 `Script_MeleeAnimation.mjs`、CharacterModel 与 Viewmodel 播放，详见 `docs/Data_MeleeQte.md`。
 - 回归口：`Script_MeleeCombatTest.mjs`、`Script_MeleeAnimationTest.mjs`、`Script_MeleeQteTest.mjs`，并保留 Bayonet / Range / SprintMelee 的正片输入回归。先读 `docs/Data_MeleeQte.md` 与 `docs/Data_MeleeRebuildAcceptance.md`。
 
 ### 已移除的旧策划白盒
