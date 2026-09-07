@@ -1,6 +1,7 @@
 """Build an evidence-based mission handoff; missing source is never a fake clip."""
 from pathlib import Path
 import argparse, hashlib, json, re, subprocess
+from Script_FirstLevelRetargetEvidence import CollectRetargetEvidence
 
 
 def Main():
@@ -89,20 +90,23 @@ def Main():
         row['sourceRetakeIds']=[s['id'] for s in row['newSourceProduction'] if s.get('mediaInspection',{}).get('assessment',{}).get('retakeRequired')]
         if row['requirementId'] in ['FL13','FL21']:
             source=Read(root/'Video/Sources/FirstLevelV1/TrainBenchRise/Data_SourceAssessment.json')
+            bench=next(a for a in catalog['actions'] if a['id']=='TrainBenchRise')
+            latest=next(v for v in bench['variants'] if v['id']==bench['latestByFaction']['Nra'])
+            history,assessment=CollectRetargetEvidence(root,root/'Video/Sources/FirstLevelV1/TrainBenchRise',bench,source['sourceVideoSha256'])
             row.update(actorRoles=['train.recruit'],status='partially_retargeted_requires_contact_review',
                 sourceVideo=source['sourceVideo'],sourceVideoSha256=source['sourceVideoSha256'],
                 sourceRangeSeconds=source['sourceRangeSeconds'],recoveryRevision=1,
-                sourceCacheSha256=source['sourceCacheSha256'],clipName='Animation_Nra_TrainBenchRise_V1',
+                sourceCacheSha256=source['sourceCacheSha256'],clipName=latest['clip'],
                 faction='Nra',modelVariants=['LugouNra01'],loop=False,rootMotionMode='source_relative',
                 entryPose='seated',exitPose='standing',previewId='TrainBenchRise',
-                blendFile='Blender/FirstLevelTrainV1/Scene_Nra_TrainBenchRise_V1.blend',
-                revisionLabel='V1 full bench sequence; not cut into accepted idle/rise transitions',
-                blockers=['Full bench sequence only; seat/palm contact and knee depth require review.',
+                blendFile=latest['blend'],variantId=latest['id'],retargetHistory=history,visualAssessment=assessment,
+                revisionLabel=latest['review'].get('retargetNotes',latest['label']),
+                blockers=['Full bench sequence only; current contact corrections and naturalness require version-specific review. Idle/rise boundaries and game model scale still need integration validation.',
                     'Other generated source targets require dense source review and recovery; first-pass retakes remain explicit.',
                     'Not enabled in mission; preserve the same 41 passengers and real queue.'],
                 reviewEvidence=['Models/FirstLevelTrainV1/Data_SelectedExportFidelityValidation.json',
                     'Models/RecoveryPreview/Data_TrainBenchRiseRawRigValidation.json',
-                    'Preview/Data_FirstLevelTrainV1PlaybackValidation.json'])
+                    'Preview/Data_FirstLevelTrainV1PlaybackValidation.json',latest['review']['retargetReport']]+[h['path'] for h in history])
         elif row['requirementId']!='FL26':
             statuses=[s['status'] for s in row['newSourceProduction']]
             row['status']=('video_generation_in_progress' if 'querying' in statuses else
@@ -118,22 +122,23 @@ def Main():
             registration=root/'Video/Sources/FirstLevelV1'/source['id']/'Data_RecoveryRegistration.json'
             if not registration.exists():continue
             candidate=Read(registration)
-            visualPath=registration.with_name('Data_RetargetAssessment.json')
-            if visualPath.exists():candidate['visualAssessment']=json.loads(visualPath.read_text(encoding='utf-8-sig'))
             raw=Read(root/candidate['rawJointFile'])
             assert Hash(root/candidate['sourceVideo'])==candidate['sourceVideoSha256']
             assert Hash(root/raw['sourceCache'])==candidate['sourceCacheSha256']==raw['sourceCacheSha256']
             action=next((a for a in catalog['actions'] if a['id']==source['id']),None)
             if action:
+                history,assessment=CollectRetargetEvidence(root,registration.parent,action,candidate['sourceVideoSha256'])
+                candidate['retargetHistory']=history
+                if assessment:candidate['visualAssessment']=assessment
                 variant=next(v for v in action['variants'] if v['id']==action['latestByFaction']['Nra'])
-                candidate['retargetCandidate']=dict(path=variant['path'],clip=variant['clip'],blend=variant['blend'],
+                candidate['retargetCandidate']=dict(variantId=variant['id'],modelSha256=Hash(root/variant['path']),path=variant['path'],clip=variant['clip'],blend=variant['blend'],
                     previewUrl='http://127.0.0.1:8136/Preview/index.html?action='+source['id'],status=variant['status'])
                 if candidate.get('visualAssessment'):
                     assert Hash(root/variant['path'])==candidate['visualAssessment']['modelSha256']
             row['newRecoveryCandidates'].append(candidate)
         if row['newRecoveryCandidates']:
             row['status']='partially_retargeted_requires_contact_review' if all('retargetCandidate' in c for c in row['newRecoveryCandidates']) else 'partially_recovered_pending_retarget'
-            row['blockers'].append('New full source sequences retain raw depth/contact errors; props, clip boundaries and mission event binding are not accepted.')
+            row['blockers'].append('Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted.')
     files=['Data_FirstLevelMission.mjs','Data_FirstLevelMissionDialogue.mjs','Data_FirstLevelMissionTrain.mjs',
         'Data_Tuning_FirstLevel.mjs','Script_FirstLevelMissionRuntime.mjs','Script_FirstLevelMissionColumn.mjs',
         'Script_FirstLevelMissionVoice.mjs','Script_FirstLevelMissionTrain.mjs','Audio/FirstLevel/Data_FirstLevelVoiceManifest.json',

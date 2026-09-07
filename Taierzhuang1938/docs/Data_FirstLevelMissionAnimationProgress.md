@@ -2,7 +2,27 @@
 
 当前用户要求为**先覆盖全部 48 项的素材生成**，随后继续恢复、重定向、协作装配和游戏接入。尚未完成全部动作，也没有替换正式关卡动画。逐项字段、来源哈希和运行时文件快照见 [状态 JSON](Data_FirstLevelMissionAnimationStatus.json)。需求仍以 [完整需求](Data_FirstLevelMissionAnimationRequirements.md) 和 [视频转骨骼标准](Data_VideoToSkeletonStandard.md) 为准。
 
-## 最新进展：首轮 60 条视频与四条新增单人恢复
+## 最新进展：座凳支撑 V2 与双掌扶腿 V3
+
+- 本轮复用上述原视频和原恢复缓存，无新增视频费用或三维推理。切片递食与长凳起身的 `FirstLevelSeatedV2` 从明确的 V1 工程制作；原始数组、V1 工程与旧审阅记录保留。
+- 两条 V2 共 **1,078 帧**的实际 GLB 已验：完整凳板体积中无蒙皮顶点，鞋底最小点稳定在地面上方约 **2 mm**，棕色凳材质导出正确，inverse bind 矩阵与 V1 完全相同，原骨名、顺序、层级和骨长保持。原片时钟未改变。最大 root 修正为递食约 0.123 m、起身约 0.101 m，最大膝点修正约 0.151／0.176 m；这是明确的后期支撑修正，不是全身恢复保真。
+- 已查看两条坐姿的侧视，以及起身／站稳、7.5 秒递食。座面按原角色实际衣摆蒙皮求解，不能把审阅骨盆高度强行当作游戏历史占位的 0.60 m；运行时 `seatTopM=.48`、`pelvisAboveSeatM=.12` 本轮保持，接入时还须测实际模型尺度。
+- [长凳起身最新 V3 三栏](http://127.0.0.1:8136/Preview/index.html?action=TrainBenchRise)在 V2 上增加双掌扶腿、放松手指及起身松手。原人物手臂比例限制使扶点移近髋部，腕点最大改动约 **0.340 m**；原骨长不拉伸。0–5.2 秒扶持，5.2–5.7 秒渐放，按原片 0.25 秒抽帧对照选取，仅为源动作窗口，不写任务或对白事件。
+- V3 实际导出 **479 帧**的 V2 躯干与下肢矩阵差约 0.00000060，骨段长度误差小于 0.00024 mm；接触期每 0.1 秒共 **53 个采样时刻**核对实际手部／裤面三角形，最近距离为 **0.959–1.053 mm**。原 bind、骨名与层级保持。已看 0 秒正侧视与手部正面／斜侧近景，5.2 秒扶腿侧视近景及5.5秒松手；尚未完成游戏尺度、转场和完整速度播放验收，未启用。
+- V1／V2／V3 的视觉记录分别绑定对应 GLB SHA-256。状态生成和素材看板按模型哈希匹配历史，避免把 V1 缺凳记录套在 V2 或误报最新版本已接受。已审阅版本禁止原地重烘焙，后续修改须另建版本。
+- 私有产物：`Models/FirstLevelSeatedV2`、`Blender/FirstLevelSeatedV2`、`Models/FirstLevelBenchV3`、`Blender/FirstLevelBenchV3`；截图与导出验证位于对应 `Preview` 目录。切片仍缺食物／刀／包布与指握；逐阶下车及老周支撑仍待后续修正。48 项源片缺口和上次余额 30 保持不变。
+
+相关验证与制作入口（已审阅输出受防覆盖检查保护；继续修正时另建版本）：
+
+```text
+blender --background --python-exit-code 1 --python Taierzhuang1938/_import/Script_FirstLevelSeatedContactBake.py -- --root <库> --clip TrainMealCutOffer
+blender --background --python-exit-code 1 --python Taierzhuang1938/_import/Script_FirstLevelSeatedContactBake.py -- --root <库> --clip TrainBenchRise
+node Taierzhuang1938/_import/Script_FirstLevelSeatedContactVerify.mjs --root <库>
+blender --background --python-exit-code 1 --python Taierzhuang1938/_import/Script_FirstLevelBenchPalmBake.py -- --root <库>
+node Taierzhuang1938/_import/Script_FirstLevelBenchPalmVerify.mjs --root <库>
+```
+
+## 首轮 60 条视频与四条新增单人恢复
 
 - [48 项实时制作看板](http://127.0.0.1:8136/Preview/FirstLevelSourceBatchV1/index.html)读取私有库的真实回执，按 FL ID 展示已生成、生成中、待提交、复用来源及积分。该页不提交任务或扣费，视频与页面只留本地。
 - 逐片解码、哈希和带源秒数的九帧初筛分开记录。初筛已发现部分片源裁头、遮挡双腿、把前抬手拍成后位、踩上转运台等问题；看板明确列“需补拍”及具体证据。已生成数包含这些原件，不等于合格片源数；先跑完首轮，再集中补拍。解码采用两遍流式读取，避免批量持有全分辨率帧而挤占生成 CLI 内存。

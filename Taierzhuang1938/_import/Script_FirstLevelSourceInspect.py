@@ -10,6 +10,7 @@ import json
 import time
 import av
 from PIL import Image,ImageDraw
+from Script_FirstLevelRetargetEvidence import CollectRetargetEvidence
 
 
 def Main():
@@ -98,15 +99,14 @@ def Main():
         if dense.exists():
             record['denseAssessment']=json.loads(dense.read_text(encoding='utf-8-sig'))
             assert record['denseAssessment']['sourceVideoSha256']==record['sourceSha256']
-        retarget=directory/'Data_RetargetAssessment.json'
-        if retarget.exists():
-            record['retargetAssessment']=json.loads(retarget.read_text(encoding='utf-8-sig'))
-            assert record['retargetAssessment']['sourceVideoSha256']==record['sourceSha256']
+        history,latest=CollectRetargetEvidence(root,directory,catalogActions.get(request['id']),record['sourceSha256'])
+        record['retargetHistory']=history
+        if latest:record['retargetAssessment']=latest
         if request['id'] in catalogActions:
             action=catalogActions[request['id']]
             variant=next(v for v in action['variants'] if v['id']==action['latestByFaction']['Nra'])
             if variant.get('review',{}).get('sourceVideo')==record['sourceVideo']:
-                record['retargetCandidate']=dict(previewId=action['id'],status=variant['status'],
+                record['retargetCandidate']=dict(previewId=action['id'],variantId=variant['id'],status=variant['status'],
                     path=variant['path'],blend=variant['blend'],rawTracks=variant['review']['recoveryTracks'])
         inspection.append(record)
     report=dict(updatedUnix=time.time(),decoded=len(inspection),sources=inspection,

@@ -36,8 +36,10 @@ function ShowSource(name){const s=states.get(name),request=requests.get(name),re
  if(review){Link('初筛证据','../../'+(review.evidence||reviews.get(name).contactSheet),$('links'));Element('span',' · ',$('links'));}
  const dense=reviews.get(name)?.denseAssessment,retarget=reviews.get(name)?.retargetAssessment;
  if(dense){$('note').textContent='密集抽帧与二维追踪已审阅；仍待三维接触修正。'+dense.observed+' '+(retarget?.observed||'')+' 原提示词：'+(request?.prompt||'');Link('密集审阅记录','../../Video/Sources/FirstLevelV1/'+name+'/DenseReview/Data_VisualAssessment.json',$('links'));Element('span',' · ',$('links'));}
+ if(retarget&&!dense)$('note').textContent=retarget.observed+' 原提示词：'+(request?.prompt||'');
  Link('该原片收据','../../Video/Sources/FirstLevelV1/'+name+'/Data_GenerationSubmit.json',$('links'));
  const candidate=reviews.get(name)?.retargetCandidate;if(candidate){Element('span',' · ',$('links'));Link('原片／原始骨骼／原模型三栏 · 待审阅','../index.html?action='+encodeURIComponent(candidate.previewId),$('links'));}
+ for(const h of reviews.get(name)?.retargetHistory||[]){Element('span',' · ',$('links'));Link((h.variantId===candidate?.variantId?'当前审阅 · ':'历史审阅 · ')+h.variantId,'../../'+h.path,$('links'));}
 }
 function Show(rid){selected=rid;const row=plan.requirements.find(r=>r.requirementId===rid);$('title').textContent=rid+' '+labels.labels[rid];$('sources').replaceChildren();
  for(const name of row.newSources){const s=states.get(name),b=Element('button',name,$('sources'));b.className='source '+(s?.status==='success'?'ok':s?.status==='querying'?'active':'');Element('span',(reviews.get(name)?.assessment?.retakeRequired?'已生成 · 初筛需补拍':reviews.get(name)?.assessment?'已生成 · 已初筛待复核':statusLabels[s?.status]||'待提交')+' · '+requests.get(name).expectedCredits+' 积分',b);b.onclick=()=>ShowSource(name);}
