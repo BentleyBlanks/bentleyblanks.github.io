@@ -159,6 +159,9 @@ export class GraphicsSettings {
       format: (v) => `${Math.round(v * 100)}%`,
       onInput: (v) => { gfx.renderScale = v; this.Apply(); },
     });
+    Note(perf, this.host.post?.preset.taaUpscale
+      ? "TAA 开着时低于 100% 走 TAAU 超分：主场景在这个分辨率跑，TAA 解算回满分辨率，末趟不再有拉伸。"
+      : "本档没有 TAAU：低于 100% 时末趟做一次双线性放大。");
 
     const shadowBox = document.createElement("div");
     shadowBox.className = "edBtns";
@@ -253,7 +256,10 @@ export class GraphicsSettings {
 
   Reset() {
     const gfx = this.gfx;
-    gfx.renderScale = 1; gfx.shadows = true; gfx.shadowSize = 0;
+    // 渲染分辨率的出厂值跟画质档走（TAAU：medium 0.75 / high 0.8 / ultra 1.0），
+    // 不是固定的 1 —— 「恢复出厂」要回到这一档真正的出厂设置。
+    gfx.renderScale = this.host.post?.preset.renderScale ?? 1;
+    gfx.shadows = true; gfx.shadowSize = 0;
     gfx.firstPersonSelfShadow = true;
     gfx.firstPersonSelfShadowSoft = false;
     gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
@@ -285,12 +291,22 @@ export class GraphicsSettings {
     const f = this.facts;
     f.Set("帧率（渲染）", `${this.fps.value.toFixed(0)} fps`);
     if (this.host.post) {
-      f.Set("合成靶", `${this.host.post.width} × ${this.host.post.height}`);
-      f.Set("画质档", this.host.post.quality);
-      f.Set("HDR", this.host.post.hdrCapable ? "可用" : "退回 8 位");
+      const P = this.host.post;
+      f.Set("合成靶", `${P.width} × ${P.height}`);
+      // TAAU 开着时内部与输出是两组尺寸；只报一组会让人以为分辨率没生效。
+      f.Set("输出靶", `${P.resolveWidth ?? P.width} × ${P.resolveHeight ?? P.height}`);
+      f.Set("画质档", P.quality);
+      f.Set("HDR", P.hdrCapable ? "可用" : "退回 8 位");
       // 读的是**管线的实际状态**不是设置里那一位：历史靶没建起来时这里会照实说
       // FXAA，而不是跟着开关喊 TAA。
-      f.Set("抗锯齿", this.host.post.taaEnabled ? "TAA（FXAA 已让位）" : "FXAA");
+      f.Set("抗锯齿", P.taaEnabled
+        ? (P.taauActive ? "TAAU 超分（FXAA 已让位）" : "TAA（FXAA 已让位）") : "FXAA");
+      f.Set("锐化", `CAS ×${(P.sharpenStrength ?? 0).toFixed(2)}`);
+      f.Set("运动模糊", P.preset.motionBlur
+        ? `${P.motionBlurPass?.taps ?? 0} 抽样 · ${Math.round((P.motionBlurPass?.scale ?? 1) * 100)}%`
+        : "关");
+      f.Set("景深", P.preset.dof
+        ? `散景 · ${Math.round((P.dofPass?.scale ?? 0) * 50)}%` : "关");
     }
     void post;
     const canvas = this.host.canvas;

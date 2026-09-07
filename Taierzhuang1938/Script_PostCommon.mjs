@@ -199,7 +199,12 @@ export class RenderTargetPool {
  *   profiler                         Script_Profiler（可能是 null）
  *   options                          Render() 的第三参，原样透传
  *   frame                            帧序号（所有确定性噪声的种子）
- *   width / height / resolution      主靶尺寸
+ *   width / height / resolution      主靶尺寸（= **内部分辨率**：预通道/HZB/SSAO/主场景）
+ *   outputWidth / outputHeight / outputResolution
+ *                                    **输出分辨率**：TAA 之后那几趟（taa / motionBlur /
+ *                                    dof / composite / fxaa）的靶尺寸。TAAU 关着时
+ *                                    与内部分辨率相等，所以不关心上采样的 pass
+ *                                    继续只读 width/height 就对（2026-09 追加）
  *   jitterX / jitterY                本帧 TAA 抖动（像素，未乘 2/width）
  *   taaActive                        本帧 TAA 是否真的在跑
  *   projScale                        (1/tan(fov/2)/aspect, 1/tan(fov/2))
@@ -234,6 +239,10 @@ export class FrameContext {
     this.width = 2;
     this.height = 2;
     this.resolution = new THREE.Vector2(2, 2);
+    // 2026-09 TAAU 追加：输出分辨率（TAA 之后那几趟的靶尺寸）。
+    this.outputWidth = 2;
+    this.outputHeight = 2;
+    this.outputResolution = new THREE.Vector2(2, 2);
 
     this.jitterX = 0;
     this.jitterY = 0;
@@ -294,6 +303,10 @@ export class FrameContext {
     this.width = pipeline.width;
     this.height = pipeline.height;
     this.resolution.set(pipeline.width, pipeline.height);
+    // TAAU 关着时 resolveWidth/Height 就等于内部分辨率，所以这两行对旧 pass 是恒等式。
+    this.outputWidth = pipeline.resolveWidth ?? pipeline.width;
+    this.outputHeight = pipeline.resolveHeight ?? pipeline.height;
+    this.outputResolution.set(this.outputWidth, this.outputHeight);
 
     const tanHalf = Math.tan(THREE_MathUtils.degToRad(camera.fov * 0.5));
     const projScaleY = 1 / tanHalf;

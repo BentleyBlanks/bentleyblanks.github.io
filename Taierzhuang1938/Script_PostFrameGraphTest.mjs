@@ -272,8 +272,11 @@ try {
 await browser.close();
 server.close();
 
+// 2026-09 TAAU 那一轮在 taa 之后插了 motionBlur / dof 两个 pass（见
+// Script_Post 的 OUTPUT_DOMAIN_PASSES 与 docs §1.2）。新增 pass 的代理在这里
+// 按帧图语义补自己那一行 —— 这条断言的用途是「顺序不许被无意改掉」，不是「不许加」。
 const EXPECTED_ORDER = ["prepass", "hzb", "ssao", "main", "wireframe", "debugOverlay",
-  "taa", "godPrepare", "bloom", "god", "composite", "fxaa"];
+  "taa", "motionBlur", "dof", "godPrepare", "bloom", "god", "composite", "fxaa"];
 
 const checks = [];
 function Check(name, ok, detail = "") {

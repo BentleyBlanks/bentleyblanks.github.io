@@ -20,6 +20,10 @@ const VIEWS = [
   { id: "bloom", label: "Bloom 合成", group: "后处理", note: "多级降采样再 tent 升采样叠回的最终 Bloom 靶；与正式合成实际采样的是同一张。" },
   { id: "fog", label: "雾量", group: "后处理", note: "指数距离雾 × 高度衰减得到的实际混合系数；深蓝 = 无雾、暖黄 = 雾量高。" },
   { id: "dof", label: "景深 CoC", group: "后处理", note: "正式景深使用的散焦系数；蓝 = 锐利、暖黄 = 最大散焦。景深只在阵亡镜头启用。" },
+  // 2026-09 TAAU / 运动模糊 / 散景景深三个 pass 的中间量（由 Script_PostFxaa 送屏）。
+  { id: "dofCoc", label: "景深 CoC（物理）", group: "后处理", note: "散景景深实际使用的薄透镜 CoC：深蓝 = 合焦、暖黄 = 远景散焦、洋红 = 近景散焦、绿 = 第一人称前景标签（恒锐）。与上一项的区别是这一张是新 DofPass 的真实口径。" },
+  { id: "taaWeight", label: "TAA 权重", group: "后处理", note: "R = 当前帧权重（×4 显示，静止约 0.04）、G = 历史被邻域盒裁掉多少、B = responsive 掩码（第一人称）。全红 = 这一帧没有可用历史。" },
+  { id: "velocityTile", label: "速度 tile max", group: "GBuffer", note: "运动模糊的 tile 邻域最大速度（已乘快门）：R/G = 方向、B = 模糊长度。运动模糊没跑时显示不可用斜纹。" },
   { id: "normal", label: "法线", group: "GBuffer", note: "NormalDepth 预通道的视空间法线。" },
   { id: "depth", label: "视深", group: "GBuffer", note: "NormalDepth 预通道 alpha；近处亮、80 m 以外渐黑。第一人称的手与枪写的是常数 1 m 近景标签（它的几何带非等比深度压缩，视深不是世界视深），所以那一块是一片平的。" },
   { id: "motionVector", label: "Motion Vector", group: "GBuffer", note: "由深度反投影得到的相机屏幕速度：R/G = 水平/垂直方向，B = 像素速度。没有逐物体速度缓冲。" },
@@ -74,6 +78,10 @@ const VIEW_TARGETS = {
   depth: (post) => post?.targets?.normalDepth,
   motionVector: (post) => post?.targets?.normalDepth,
   velocity: (post) => post?.targets?.normalDepth,
+  // 2026-09 追加：这三张由 Script_PostFxaa 接管送屏（见那里的 TEMPORAL_DEBUG_VIEWS）。
+  dofCoc: (post) => post?.targets?.normalDepth,
+  taaWeight: (post) => post?.taaPass?.debugTarget ?? post?.targets?.taaA,
+  velocityTile: (post) => post?.targets?.velocityTile,
   sunShadow: (post) => post?.targets?.normalDepth,
   ao: (post) => post?.targets?.ao,
   aoBlur: (post) => post?.targets?.aoBlur,

@@ -614,14 +614,22 @@ const gfx = await page.evaluate(() => {
   g.gfx.fov = 62;
   g.Apply();
   window.Taierzhuang.StepFrames(4);
-  const after = { w: T.post.width, h: T.post.height };
+  const after = { w: T.post.width, h: T.post.height,
+    outW: T.post.outputWidth, outH: T.post.outputHeight, taau: !!T.post.taauActive };
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem("tengxian1938_graphics_v1")); } catch (e) { saved = null; }
-  return { id: T.editor.ActiveId, before, after, saved, fov: T.camera.fov };
+  return { id: T.editor.ActiveId, before, after, saved, fov: T.camera.fov,
+    inner: [window.innerWidth, window.innerHeight] };
 });
-Check("画质面板：渲染分辨率真的改到合成靶上",
-  gfx.id === "graphics" && gfx.after.w < gfx.before.w * 0.7,
-  `${gfx.before.w}×${gfx.before.h} → ${gfx.after.w}×${gfx.after.h}`);
+// 出厂 renderScale 跟画质档走（TAAU：high 是 0.8），所以不能拿「比出厂小 30%」当判据 ——
+// 直接对 0.6 × 窗口宽这个**绝对值**，比原来的相对判据更强。
+// 输出靶必须仍是满分辨率：TAAU 把画面解算回窗口大小，末趟不再拉伸。
+Check("画质面板：渲染分辨率真的改到合成靶上（内部 0.6×，输出仍满分辨率）",
+  gfx.id === "graphics"
+  && Math.abs(gfx.after.w - Math.round(gfx.inner[0] * 0.6)) <= 1
+  && gfx.after.outW === gfx.inner[0],
+  `${gfx.before.w}×${gfx.before.h} → ${gfx.after.w}×${gfx.after.h}`
+  + ` ｜ 输出 ${gfx.after.outW}×${gfx.after.outH} TAAU=${gfx.after.taau}`);
 Check("画质面板：设置落盘",
   !!gfx.saved && gfx.saved.renderScale === 0.6 && gfx.saved.bloom === 0.25,
   gfx.saved ? `renderScale=${gfx.saved.renderScale} bloom=${gfx.saved.bloom}` : "没存上");

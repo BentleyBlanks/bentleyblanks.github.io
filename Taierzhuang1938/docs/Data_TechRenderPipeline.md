@@ -82,13 +82,21 @@ function generateShadowMapTypeDefine( parameters ) {
  4  main          HDR 主场景（AO 由材质补丁注入间接光；ultra 才 4×MSAA）
  5  wireframe     着色模式非 shaded 时叠一层三角形边线
  6  debugOverlay  Rapier 碰撞体线框等（同一张 hdr 靶与深度）
- 7  taa           时域解算（先卸抖动）→ 线性 HDR 域，UE 的位置
- 8  godPrepare    只做决策不出画：太阳在不在屏内、拖影强度
- 9  bloom         亮部提取 → 13 抽样降采样 ×N → 9 抽样 tent 升采样
-10  god           屏幕空间太阳拖影（出厂关，`graphics.godEnabled`）
-11  composite     运动模糊→景深→+泛光/拖影→雾→曝光→ACES→调色→镜头→sRGB
-12  fxaa          FXAA + 锐化 → 屏幕（调试视图时改为把选中的中间靶送屏）
+——— 以上在**内部分辨率**（graphics.renderScale）；以下在**输出分辨率** ———
+ 7  taa           时域解算（先卸抖动）+ TAAU 上采样到输出网格
+ 8  motionBlur    tile max → neighbor max → 逐物体重建（McGuire 2012 / Jimenez 2014）
+ 9  dof           散景景深：CoC → 半分辨率 near/far gather → 填洞 → 合成（COD:AW）
+10  godPrepare    只做决策不出画：太阳在不在屏内、拖影强度
+11  bloom         亮部提取 → 13 抽样降采样 ×N → 9 抽样 tent 升采样
+12  god           屏幕空间太阳拖影（出厂关，`graphics.godEnabled`）
+13  composite     色差→+泛光/拖影→雾→曝光→ACES→调色→镜头→sRGB
+14  fxaa          FXAA + CAS 锐化 → 屏幕（调试视图时改为把选中的中间靶送屏）
 ```
+
+**两组分辨率（2026-09 TAAU）**：`SetSize(w, h, outW, outH)` 收「内部」与「输出」两套；
+`Script_Post.OUTPUT_DOMAIN_PASSES`（`taa` / `motionBlur` / `dof` / `composite` / `fxaa`）
+按输出分辨率建靶，其余按内部。TAAU 不跑时两者相等，**只读 `ctx.width/height` 的 pass
+一个字都不用改**。详见 §17。
 
 编排器对每个 pass 依次做：`Prepare?.(ctx)` → `Enabled(ctx)` → `GpuPush(name)` →
 `Render(ctx)` → `GpuPop()`。`Enabled` 为 false 的 pass **不产生 GPU 分段**
@@ -133,7 +141,8 @@ function generateShadowMapTypeDefine( parameters ) {
 | `profiler` | FrameProfiler \| null | 一般不用碰，编排器已经按 pass 包好了 |
 | `options` | object | `Render()` 的第三参，原样透传 |
 | `frame` | number | 帧序号。**所有确定性噪声的种子**，不许用 `Math.random` |
-| `width` / `height` / `resolution` | number / Vector2 | 主靶尺寸 |
+| `width` / `height` / `resolution` | number / Vector2 | 主靶尺寸 = **内部分辨率**（预通道 / HZB / SSAO / 主场景） |
+| `outputWidth` / `outputHeight` / `outputResolution` | number / Vector2 | **输出分辨率**：TAA 之后那几趟（taa / motionBlur / dof / composite / fxaa）的靶尺寸。TAAU 不跑时与内部相等（2026-09 追加，见 §17） |
 | `jitterX` / `jitterY` | number | 本帧 TAA 抖动（像素） |
 | `taaActive` | boolean | 本帧 TAA 是否真的在跑 |
 | `projScale` | Vector2 | `(1/tan(fov/2)/aspect, 1/tan(fov/2))` |
@@ -164,8 +173,12 @@ function generateShadowMapTypeDefine( parameters ) {
 | `bright` | 1/2 | RGBA16F | BloomPass | alpha 在拖影开着时打包天空遮挡 |
 | `bloomMips[]` | 逐级折半 ×2 | RGBA16F | BloomPass | 每级两张（降采样结果 + tent 回叠） |
 | `god` | 1/4，封顶 9.6 万像素 | RGBA16F | GodRaysPass | |
-| `ldr` | 全分辨率 | RGBA8 | CompositePass | 合成输出，FXAA 的输入 |
-| `taaA` / `taaB` | 全分辨率 | RGBA16F | TaaPass | 只在 `taaEnabled` 时存在（热切会建/还） |
+| `ldr` | **输出分辨率** | RGBA8 | CompositePass | 合成输出，FXAA/CAS 的输入 |
+| `taaA` / `taaB` | **输出分辨率** | RGBA16F | TaaPass | 只在 `taaEnabled` 时存在（热切会建/还）。TAAU 开着时 = 显示分辨率，这就是「解算到输出网格」 |
+| `motionBlur` | 输出分辨率 | RGBA16F | MotionBlurPass | 重建结果；`motionBlurScale < 1` 时另有一张半分辨率中转 |
+| `velocityTile` | ⌈W/20⌉ × ⌈H/20⌉ | RGBA16F | MotionBlurPass | neighbor max（调试视图「速度 tile max」看的就是它） |
+| `dof` | 输出分辨率 | RGBA16F | DofPass | 景深合成结果 |
+| `dofCoc` | 输出的 1/2 × `dofScale` | RGBA16F | DofPass | rgb = 降采样颜色，a = **带符号 CoC**（像素） |
 | HZB `levels[i]` | 1/2 起逐级折半 | RGBA16F（四通道同值） | PrepassPass | 见 §1.6 |
 
 **所有中间靶 `texture.colorSpace = NoColorSpace`**：three 渲进 RenderTarget 时不做
@@ -346,8 +359,8 @@ low 档没有 ssao，那些补丁要自带一份分辨率 uniform。
 **只替换自己那一段，不要往 `main()` 里插代码。**
 
 ```
-SEGMENT motion-blur      MotionBlur()            ← 逐物体速度 / 分块最大速度代理
-SEGMENT depth-of-field   DepthOfField()          ← 光圈形状 / 前后景分离代理
+SEGMENT motion-blur      MotionBlur()            ← **只剩色差**（运动模糊已搬进 Script_PostMotionBlur）
+SEGMENT depth-of-field   DepthOfField()          ← **空函数**（景深已搬进 Script_PostDof）
 SEGMENT fog              ApplyFog()              ← froxel 体积雾 / 物理大气代理
 SEGMENT exposure         ApplyExposureTonemap()  ← 自动曝光 / AgX / 别的 tonemap
 SEGMENT color-grade      ColorGrade()            ← 3D LUT 代理
@@ -364,8 +377,13 @@ SEGMENT encode           EncodeOutput()          ← 输出色彩空间 / 抖动
   产出这张图并把 `uFogSource` 置 1 即可；下面那三次 mix（去饱和、降对比、上色）
   是**大气透视的口径**，两条路共用。
 
-色差的通道偏移**融在 `MotionBlur()` 的同一趟圆盘采样里**（分开就要再来一趟全分辨率
-取样），语义上归 `LensEffects`。
+色差的通道偏移仍在 `MotionBlur()` 那一段里（它必须是对 `uHdr` 的第一次取样），
+语义上归 `LensEffects`。
+
+**2026-09 起 `MotionBlur()` / `DepthOfField()` 两段是空壳**：运动模糊与景深各自成了
+独立 pass（§17）。两段的 uniform（`uMotionScale` / `uDof*` / `uNearDof*`）**保留不删** ——
+`Script_PostDebug` 的「景深 CoC」视图、`Script_AdsSightTest`、`Script_DeathViewTest`
+把它们当「本帧意图」的取证口在读。
 
 ### 1.10 Data_Tuning_Graphics 结构
 
@@ -374,9 +392,11 @@ SEGMENT encode           EncodeOutput()          ← 输出色彩空间 / 抖动
 
 * **现役开关/旋钮**：`ssao` `aoScale` `bloomLevels` `godrays` `msaa` `motionBlur`
   `sharpen` `taa` `velocity` `hzb`；
+* **TAAU / 运动模糊 / 景深（2026-09 转正）**：`taaUpscale` `renderScale`
+  `motionBlurTaps` `motionBlurScale` `dof` `dofScale`（算法口径在
+  `Data_Tuning_TemporalDof.mjs`，见 §17）；
 * **占位位**（本阶段值 = 「等价于今天」）：`csm` `contactShadows` `gtao` `ssil` `ssr`
-  `volumetrics` `atmosphere` `autoExposure` `lensFlare` `lut` `dof` `taaUpscale`
-  `clusteredLights`；
+  `volumetrics` `atmosphere` `autoExposure` `lensFlare` `lut` `clusteredLights`；
 * 另有两组独立常量：`HZB`（`maxLevels` / `minSize`）、`VELOCITY`（`clampUv` /
   `skinnedPrev`）。
 
@@ -407,6 +427,7 @@ key 带上会在运行时翻的位。
 
 ```bash
 node Taierzhuang1938/Script_PostFrameGraphTest.mjs   # 帧图契约（新增）
+node Taierzhuang1938/Script_TaauTest.mjs             # TAAU / 运动模糊 / 散景景深（§17）
 node Taierzhuang1938/Script_PostTest.mjs             # 合成暗部 + TAA 基本盘
 node Taierzhuang1938/Script_GiTest.mjs               # GI 三态与调试视图
 node Taierzhuang1938/Script_EditorTest.mjs           # Debug Rendering 全部视图
@@ -964,7 +985,12 @@ void main() {
 }
 ```
 
-### 7.2 TAA（已实装，UE 缺省方案；medium 及以上默认开，FXAA 退为兜底）
+### 7.2 TAA（历史稿：2026-09 TAAU 之前的版本；现状以 §17 为准）
+
+> **这一节写的是「单分辨率 TAA」那一版。** 2026-09 起 TAA 吃预通道的逐物体速度靶、
+> 加了方差裁剪 / anti-flicker / responsive 掩码，并且解算到**输出分辨率**（TAAU）。
+> 抖动、Catmull-Rom 历史、YCoCg rounded AABB、Karis tonemap 域这四件事没变，
+> 下面的深挖仍然有效；改动与新口径见 §17。
 
 实装在 `Script_Post.mjs` 的 `FRAG_TAA` + `Render()` 第 0/3.5 段，方案与参数照搬
 UE 的缺省 Temporal AA（Karis SIGGRAPH 2014 + TemporalAA.usf 出厂 CVar），
@@ -1010,7 +1036,12 @@ UE 的缺省 Temporal AA（Karis SIGGRAPH 2014 + TemporalAA.usf 出厂 CVar）�
 
 ---
 
-## 8. 运动模糊
+## 8. 运动模糊（历史稿：设计期草案；现状以 §17 为准）
+
+> **实装走的不是这一节。** 2026-09 起运动模糊是独立 pass
+> （`Script_PostMotionBlur.mjs`，McGuire 2012 的 tile max → neighbor max → 重建
+> ＋ Jimenez 2014 的两向交替采样），快门由 `Data_Tuning_TemporalDof.MOTION_BLUR`
+> 定（180°）。下面这段单向采样的草案留作对照。
 
 有速度缓冲就直接沿速度方向采样；没有就用深度重建（只有相机运动）：
 
@@ -1849,3 +1880,191 @@ program 都没新建。涨出来的全是**卢沟桥人物 GLB 的材质**：`Jo
 —— 连死三次，落地那一帧 program 不涨、整帧 CPU < 50 ms；再把两个阵营四个模型号各配
 本阵营的枪摆到镜头前、镜头转一圈，仍一个 program 不新建。头一条只能证明「这次没撞上」，
 第二条才证明预热覆盖了全部模型号。
+
+---
+
+## 17. TAAU / 逐物体运动模糊 / 散景景深（2026-09）
+
+> 三件事共用同一条时域链（预通道速度靶 + TAA 历史 + 两组分辨率），所以写在一节里。
+> 算法口径全部在 `Data_Tuning_TemporalDof.mjs`（纯数据，零 three 依赖）；
+> 档位开关在 `Data_Tuning_Graphics.mjs`。**这一节是这三件事的唯一口径**，
+> §7.2 与 §8 是它们之前的版本，留作对照。
+
+### 17.1 两组分辨率：内部 vs 输出
+
+`PostPipeline.SetSize(width, height, outputWidth = width, outputHeight = height)`：
+
+| 名字 | 是什么 | 谁按它建靶 |
+|---|---|---|
+| `post.width` / `height` | **内部分辨率**（`graphics.renderScale` 缩过的） | prepass / hzb / ssao / main（`ctx.width/height`） |
+| `post.outputWidth` / `outputHeight` | **输出（显示）分辨率** | 由 `ApplyGraphics` 喂 `window.innerWidth/Height` |
+| `post.resolveWidth` / `resolveHeight` | 实际解算分辨率 = TAAU 在跑就取输出，否则取内部 | `taa` / `motionBlur` / `dof` / `composite` / `fxaa`（`ctx.outputWidth/outputHeight`） |
+| `post.taauActive` | TAA 开着 + 档位 `taaUpscale` + 两组尺寸不同 | — |
+
+分界线在 `Script_Post.OUTPUT_DOMAIN_PASSES`。**只读 `ctx.width/height` 的 pass 不用改
+一个字**：TAAU 不跑时两组相等，跑时它们本来就该在内部分辨率上工作。
+下游按 uv 采样，分辨率不同不影响正确性（泛光靶仍按内部分辨率建，它本来就是低频）。
+
+`SetTaaEnabled` 会在 TAAU 的「跑 / 不跑」翻转时整体 `SetSize` 一次（解算分辨率变了，
+下游五张靶都要重建）；不涉及 TAAU 的普通开关仍走惰性建靶那条便宜路。
+
+**出厂内部分辨率跟画质档走**（`QUALITY_PRESETS[*].renderScale`：low 1.0 / medium 0.75 /
+high 0.8 / ultra 1.0）。`Script_Main` 在 `graphics` 表建好之后立刻按它切一次两组尺寸 ——
+`ApplyGraphics` 只在 resize / 设置面板 / 存档回灌时跑，不补这一次的话出厂档位要等玩家
+改窗口大小才生效。
+
+### 17.2 TAA 吃速度缓冲 + TAAU 上采样
+
+`Script_PostTaa.mjs`。相对 §7.2 的四处改动：
+
+1. **速度来自预通道 RT1**（`ctx.velocityTexture`），仍做 3×3 最近片元膨胀。
+   深度反投影那条老路留着，只在没有浮点靶（`hdrCapable = false`）或 `velocity` 档位
+   关掉时兜底；`taaPass.forceDepthReprojection = true` 可以强制走它（A/B 取证用，
+   `Script_TaauTest` 靠它量鬼影）。
+2. **TAAU 上采样**。输出像素中心落在输入像素坐标系的哪里，决定它对周围 3×3 个输入
+   样本的权重：
+
+   ```
+   centerPos  = vUv * 内部分辨率              // 输出像素中心（输入像素为单位）
+   baseTexel  = floor(centerPos)              // 包含它的那个输入像素
+   baseOffset = (baseTexel + 0.5 + jitter) - centerPos
+   w(dx,dy)   = exp(-2.29 * |baseOffset + (dx,dy)|^2)
+   ```
+
+   距离**以输入像素度量**：换成输出像素会让核比输出采样间距还窄，某些输出像素整帧
+   只落到一个输入样本上，时域补不回来（会抖）。1:1 时这套公式退化成重构前那份
+   「offset + jitter」的 Blackman-Harris 重定心，逐项相同。
+   历史靶在输出分辨率，Catmull-Rom 5-tap 也在输出网格上做。
+3. **方差裁剪**（Salvi 2016 / UE4 `AA_VARIANCE`）：3×3 的 min/max 盒再按 μ ± γσ 收紧
+   （`TAAU.varianceGamma = 1.25`）。纯 min/max 对高频高光太松，萤火虫能一直留在盒里逐帧闪。
+4. **anti-flicker + responsive**：
+   * anti-flicker（HDRP 的 feedback 调制）—— 局部亮度对比越高，当前帧权重压得越低，
+     最低压到 `antiFlickerFloor`（0.35）倍。高对比像素上「这一帧恰好采到哪」本身就是噪声源。
+   * responsive（UE 的 Responsive AA）—— 第一人称手/枪走 `responsiveWeight`（0.5）。
+     它们在预通道里的视深是常数前景标签（`FOREGROUND_VIEW_DEPTH`）、速度恒 0，
+     世界在它们背后滑过时历史会把瞄具边缘拖出一条虚影。**没有 stencil 通道**，
+     掩码用 `|nd.w − 1.0| < 0.002` 认 —— 已知近似：世界里正好落在 1 m ± 2 mm 的实体
+     也会吃到 responsive 权重，那是一层 4 mm 厚的壳，肉眼不可见。
+
+### 17.3 逐物体运动模糊（独立 pass）
+
+`Script_PostMotionBlur.mjs`，排在 TAA 之后、泛光之前。四趟（半分辨率档五趟）：
+
+```
+tileMaxX  (⌈W/20⌉ × H)      沿 x 扫一个 tile，取速度模最大的那个向量
+tileMaxY  (⌈W/20⌉ × ⌈H/20⌉) 同上沿 y
+neighbor  (同上)             3×3 取最大（双线性过滤：tile 网格比屏幕粗 20 倍，
+                             最近邻会让模糊长度在 tile 边界跳变）
+reconstruct                  逐像素沿主导速度 8/12/16 抽样
+[resolve]                    motionBlurScale < 1 时把半分辨率结果按模糊长度回填
+```
+
+* **权重**是 McGuire 2012 的三项（前景糊过来 / 中心糊透出后面 / 两者都糊），
+  `SoftDepthCompare` 的过渡宽度是 `MOTION_BLUR.softZExtent`（0.6 m）。
+* **采样方向**在 neighborMax 与本像素速度之间交替（Jimenez 2014）：只沿前者会把静止
+  背景一起拉长，只沿后者又糊不出运动物体的轮廓。起点用交错梯度噪声抖动，防条带。
+* **快门**：速度靶记的是整帧位移，模糊长度 = 速度 × `shutterFraction`（0.5 = 180° 快门），
+  采样区间 ±(长度/2)。`options.motionBlur` 从「模糊长度倍率」改成了 **0–1 的总闸**
+  （`Script_Main` 现在传 `graphics.motionBlur * (1 - deathDof)`）。
+* **最大位移**钳在半个 tile：McGuire 的前提是「没有像素跑得比一个 tile 还远」，
+  越界会在 tile 边界露出硬边。
+* **前景（第一人称手/枪）两道闸**：① 预通道给它们写速度 0，cone/cylinder 权重让邻居的
+  模糊够不到；② 中心像素命中前景标签时**直接返回原色**，整个重建循环都不跑。
+  第二道是硬闸 —— FPS 手感的红线不靠权重公式碰运气。
+
+### 17.4 散景景深（独立 pass）
+
+`Script_PostDof.mjs`，COD:AW（Jimenez 2014）的四段式，排在运动模糊之后：
+
+```
+down      (输出的 1/2 × dofScale)  Karis 加权 2×2 降采样，a = 带符号 CoC（像素）
+gather    (同上，MRT ×2)           48 抽样同心环 8/16/24；近场与远场分开
+fill      (同上)                   近场 3×3 取覆盖度最大（半分辨率必然留空洞）
+composite (输出分辨率)             远场按本像素 CoC 混、近场按覆盖度 alpha 盖上去
+```
+
+**CoC 是薄透镜的**：`coc/coc(∞) = 1 − dF/d`，即**远景的形状只由焦平面决定，光圈只改幅度**。
+所以实装把「形状」交给薄透镜（远景随距离渐进逼近上限，而不是旧版 `smoothstep(focus,
+focus+range)` 那样在 focus+range 处一刀切平），把「幅度」归一到调用点原来给的
+`dofMaxPx` / `nearDofMaxPx`。**`Script_Main` 的调用点一个字没改，画面上限也没变**，
+变的是中间那段过渡曲线（更像真镜头）。`DOF.apertureDriven = true` 可切成真·光圈驱动
+（幅度直接来自 `focalLengthMm` / `fNumber` / `sensorWidthMm`）。
+
+近场的采集半径是**固定的最大近景 CoC**而不是本像素 CoC —— 近场必须往清楚的背景上渗，
+按本像素采的话前景根本盖不住背景（旧版 12 抽样圆盘就是这个毛病）。
+
+前景（第一人称手/枪）三处认标签：CoC 恒 0、不进近场采集、合成时直接返回原色。
+`dofStrength` 与 `nearDofStrength` 都是 0 时整个 pass `Enabled() === false`，**零成本**
+（实测省 4 个 draw call，GPU 段整个消失）。
+
+### 17.5 CAS 锐化
+
+`Script_PostFxaa.mjs` 的锐化从「减模糊」换成 **AMD FidelityFX Contrast Adaptive
+Sharpening 1.0**（`ffx_cas.h` 的 no-scaling 路径）：逐通道取 3×3 的 min/max，
+幅度 = `sqrt(saturate(min(mn, 2−mx) / mx))`。已经饱和的区域幅度自动趋近 0，
+所以不 ringing。强度沿用 `graphics.sharpen`（画质面板那根滑杆），峰值映射在 `CAS`。
+TAAU 之后必须补一次锐化 —— 任何重采样都会掉高频。
+
+### 17.6 分档
+
+| 档 | taa | taaUpscale | renderScale | motionBlur | 抽样 / 靶比例 | dof | dofScale |
+|---|---|---|---|---|---|---|---|
+| low | 关 | 关 | 1.0 | 关 | — | 关 | — |
+| medium | 开 | 开 | 0.75 | 开 | 8 / 0.5 | 开 | 0.5 |
+| high | 开 | 开 | 0.80 | 开 | 12 / 1.0 | 开 | 0.5 |
+| ultra | 开 | 开 | 1.0 | 开 | 16 / 1.0 | 开 | 1.0 |
+
+`taaUpscale` 在 ultra 上仍是 true：`renderScale` 是 1.0 所以上采样不生效，但玩家手动
+下调分辨率时它照样接上。low 档没有 TAA 也就没有 TAAU，抗锯齿由 FXAA + CAS 承担，
+`renderScale < 1` 时退回老行为（末趟送屏做一次双线性放大）。
+
+### 17.7 调试视图（Debug Rendering）
+
+三项新的，由 `Script_PostFxaa` 接管送屏（`TEMPORAL_DEBUG_VIEWS`）——
+`DebugPass.GetSource()` 只认它自己那张表，而这三张的靶在各自的 pass 里：
+
+| id | 看什么 |
+|---|---|
+| `velocityTile` | 运动模糊的 tile 邻域最大速度（已乘快门）：R/G 方向、B 模糊长度 |
+| `dofCoc` | 薄透镜 CoC：深蓝合焦、暖黄远景散焦、洋红近景散焦、**绿 = 第一人称前景标签** |
+| `taaWeight` | R = 当前帧权重（×4 显示）、G = 历史被邻域盒裁掉多少、B = responsive 掩码 |
+
+`taaWeight` 是**再跑一趟 TAA 材质**（只改 `uDebugMode`）写进池子的瞬时靶，只在选中时
+产出，平时零成本，且不污染历史乒乓。
+
+### 17.8 怎么验
+
+```bash
+node Taierzhuang1938/Script_TaauTest.mjs        # 本轮的回归口，17 条断言
+node Taierzhuang1938/Script_PostFrameGraphTest.mjs
+node Taierzhuang1938/Script_PostTest.mjs
+node Taierzhuang1938/Script_ActorDepthTest.mjs
+```
+
+`Script_TaauTest` 里有三条踩过的坑，改它之前先看：
+
+* **`readRenderTargetPixels` 是自下而上的**（WebGL 原点在左下）。按屏幕坐标取「上半屏」
+  量到的全是第一人称的枪，锐度指标变成纯噪声。
+* **量斜边锯齿要先关泛光**：纯黑板挨着亮天空时泛光会在边上铺出几十像素的软过渡，
+  逐行的 mid 阈值随左侧亮度漂移，量到的散布是泛光的不是锯齿的。
+* **`?shot=1` 只是跳过主菜单**，玩家还停在开机展示位上。不显式 `player.Spawn()` 的话
+  每一项量的都是开机屏那把枪，而且**数字看起来完全合理**。
+
+### 17.9 实测（RTX 4070 SUPER / ANGLE-D3D11，1600×900 输出、phase=1、high 档）
+
+| 指标 | 数字 | 怎么量的 |
+|---|---|---|
+| 斜边锯齿能量（亚像素边位残差） | TAA 关 0.287 px → **开 0.136 px** | 场景里插一条 20° 纯黑斜边，逐行求亮度中位的亚像素穿越点，对整条边做最小二乘直线拟合取残差 RMS。拟合斜率 −0.364 = tan 20°，证明量到的确实是那条边 |
+| TAAU 对 1.0 的 PSNR | 0.85 → 33.6 dB / **0.80 → 30.8 dB** / 0.75 → 29.5 dB / 0.67 → 29.2 dB | 同机位同帧数（各自滚满 28 帧），关掉颗粒 |
+| 速度靶消鬼影 | 最大 1% 像素偏差 26.7（开）vs 29.9（关） | 32 名走动的兵、相机不动；与**同一世界时刻**的无 TAA 参考图比 |
+| 运动模糊长度 ∝ 角速度 | 0.010 rad/帧 → 6.04 px；0.020 → 11.50 px（比 1.90） | tile 邻域最大速度的中位数 |
+| `motionBlur = 0` | pass 整个不跑，省 4 个 draw call | `renderer.info.render.calls` 差 |
+| `dofStrength = 0` | pass 整个不跑，省 4 个 draw call | 同上 |
+| CoC 正确性 | 焦平面 |CoC| = 0.000 px；天空 = 上限 11 px；前景标签恒 0（2200+ 样本） | 直接读半分辨率 CoC 靶的 alpha（半浮点解码） |
+
+**GPU 单段耗时本轮没有可信数字**：取证期间有别的代理在同一台机器上跑浏览器测试，
+同一配置的 `EXT_disjoint_timer_query_webgl2` 读数在 4.8–30 ms 之间跳，A/B 交替 6 轮
+取最小值仍然给出「1.0 比 0.8 更快」这种不可能的排序。已量到的**结构性**结论：
+`renderScale` 缩的是 prepass / SSAO / 主场景那一段（面积比就是它的比例），
+TAAU 把 TAA 之后那几趟留在满分辨率，运动模糊与景深各是 4 个 draw call、关掉即零。
+真机分段基线要等机器空下来再补一轮 `Script_FrameProfileTest`。

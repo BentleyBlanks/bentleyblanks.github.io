@@ -17,11 +17,16 @@
 //   4) main              （本文件）HDR 主场景，AO 由材质补丁注入间接光
 //   5) wireframe         Script_PostDebug    着色模式非 shaded 时叠一层线
 //   6) debugOverlay      Script_PostDebug    Rapier 碰撞体线框等
-//   7) taa               Script_PostTaa      时域解算（线性 HDR 域，UE 的位置）
-//   8) bloom             Script_PostBloom    亮部 + 降/升采样
-//   9) god               Script_PostBloom    太阳拖影（太阳在屏内才跑）
-//  10) composite         Script_PostComposite 运动模糊→景深→雾→曝光→ACES→调色→镜头→sRGB
-//  11) fxaa              Script_PostFxaa     FXAA + 锐化 → 屏幕（或调试视图送屏）
+//   7) taa               Script_PostTaa      时域解算 + TAAU 上采样到输出分辨率
+//   8) motionBlur        Script_PostMotionBlur tile max → neighbor max → 逐物体重建
+//   9) dof               Script_PostDof      散景景深（CoC → gather → 填洞 → 合成）
+//  10) bloom             Script_PostBloom    亮部 + 降/升采样
+//  11) god               Script_PostBloom    太阳拖影（太阳在屏内才跑）
+//  12) composite         Script_PostComposite 雾→曝光→ACES→调色→镜头→sRGB
+//  13) fxaa              Script_PostFxaa     FXAA + CAS 锐化 → 屏幕（或调试视图送屏）
+//
+// **两组分辨率**（2026-09 TAAU）：0–6 在内部分辨率（`graphics.renderScale`），
+// 7 起在输出分辨率。见 `SetSize` 与 `OUTPUT_DOMAIN_PASSES`。
 //
 // **加一个 pass = 新模块 + 这张列表里插一行 + `Data_Tuning_Graphics` 加一位开关。**
 // 不要往 `Render()` 里插代码，也不要去改别人的模块。
@@ -42,6 +47,8 @@ import {
 } from "./Script_PostPrepass.mjs";
 import { SsaoPass } from "./Script_PostSsao.mjs";
 import { TaaPass } from "./Script_PostTaa.mjs";
+import { MotionBlurPass } from "./Script_PostMotionBlur.mjs";
+import { DofPass } from "./Script_PostDof.mjs";
 import { BloomPass, GodRaysPass } from "./Script_PostBloom.mjs";
 import { CompositePass } from "./Script_PostComposite.mjs";
 import { FxaaPass } from "./Script_PostFxaa.mjs";
@@ -53,6 +60,15 @@ export { MarkNoPrepass, MarkForegroundPrepass, MarkDynamicPrepass, FOREGROUND_VI
 export { InjectDepthPull, SHADING_MODES };
 export { POST_QUALITY_KEYS };
 
+/**
+ * 跑在**输出分辨率**上的 pass（TAAU 开着时 ≠ 内部分辨率）。
+ *
+ * 分界线在 TAA：它把内部分辨率的主场景解算到输出网格，从它开始往后的靶都按
+ * 输出分辨率建。前面的（prepass / hzb / ssao / main）一律内部分辨率 ——
+ * 它们只读 `ctx.width/height`，不用改一个字。
+ */
+const OUTPUT_DOMAIN_PASSES = new Set(["taa", "motionBlur", "dof", "composite", "fxaa"]);
+
 export class PostPipeline {
   constructor(renderer, { width, height, quality = "high", destruction = null } = {}) {
     this.renderer = renderer;
@@ -61,6 +77,16 @@ export class PostPipeline {
     this.frame = 0;
     this.width = Math.max(2, width | 0);
     this.height = Math.max(2, height | 0);
+    // 输出（显示）分辨率。调用方不给就等于内部分辨率 —— 与 TAAU 落地之前完全一致。
+    this.outputWidth = this.width;
+    this.outputHeight = this.height;
+    // 解算分辨率：TAAU 真的在跑时 = 输出分辨率，否则 = 内部分辨率。
+    this.resolveWidth = this.width;
+    this.resolveHeight = this.height;
+    this.taauActive = false;
+    // 预通道给第一人称手/枪写的常数近景标签。TAA 的 responsive 掩码、运动模糊的
+    // 硬闸、景深的「枪不糊」三处都按它认前景，所以挂在编排器上统一发。
+    this.foregroundViewDepth = FOREGROUND_VIEW_DEPTH;
 
     // 半浮点渲染目标是整条链的地基：没有 HDR 就没有真正的泛光与曝光。
     // WebGL2 下 EXT_color_buffer_float / half_float 缺一不可，缺了就降级到 8 位，
@@ -114,6 +140,8 @@ export class PostPipeline {
     this.prepassPass = new PrepassPass(this, { destruction });
     this.ssaoPass = new SsaoPass(this);
     this.taaPass = new TaaPass(this);
+    this.motionBlurPass = new MotionBlurPass(this);
+    this.dofPass = new DofPass(this);
     this.bloomPass = new BloomPass(this);
     this.godRaysPass = new GodRaysPass(this, this.bloomPass);
     this.compositePass = new CompositePass(this);
@@ -153,6 +181,12 @@ export class PostPipeline {
         Dispose: () => {},
       },
       this.taaPass,
+      // 运动模糊与景深排在 TAA 之后、泛光之前（UE 与 COD:AW 同一位置）：
+      //   · 在 TAA 之后 —— 它们要吃解算干净的画面，且 TAAU 之后才是输出分辨率；
+      //   · 在泛光之前 —— 散景里的亮斑与拖影都该继续参与泛光，反过来会把
+      //     一坨已经晕开的光再糊一遍，成了"雾里开灯"。
+      this.motionBlurPass,
+      this.dofPass,
       {
         // 只做决策不出画：太阳拖影要在**亮部提取之前**定下来（亮部图的 alpha
         // 只在拖影开着时才顺手打包天空遮挡）。位置也不能提前 —— 太阳投影要用
@@ -207,11 +241,39 @@ export class PostPipeline {
     });
   }
 
-  SetSize(width, height) {
+  /** TAAU 这一帧到底该不该跑（历史靶尺寸与下游靶尺寸都按它定）。 */
+  _WantTaau() {
+    return !!(this.taaEnabled && this.preset.taaUpscale
+      && (this.outputWidth !== this.width || this.outputHeight !== this.height));
+  }
+
+  /**
+   * 改分辨率。
+   *
+   * **两组尺寸**（2026-09 TAAU）：
+   *   · `width` / `height`       —— **内部分辨率**：预通道、HZB、SSAO、主场景那一趟。
+   *     `graphics.renderScale` 缩的就是它，也是整帧最大的性能杠杆。
+   *   · `outputWidth` / `outputHeight` —— **输出（显示）分辨率**。不给就等于内部，
+   *     行为与 TAAU 落地之前完全一致。
+   *
+   * TAAU 真的在跑（TAA 开着 + 档位允许 + 两组尺寸不同）时，TAA 把画面解算到输出
+   * 网格，于是 `taa` / `motionBlur` / `dof` / `composite` / `fxaa` 五个 pass 的靶
+   * 按输出分辨率建，其余按内部。TAAU 不跑时两组相等，末趟送屏时由画布做那次
+   * 唯一的双线性放大 —— 与重构前一模一样。
+   */
+  SetSize(width, height, outputWidth = width, outputHeight = height) {
     this.width = Math.max(2, width | 0);
     this.height = Math.max(2, height | 0);
+    this.outputWidth = Math.max(2, outputWidth | 0);
+    this.outputHeight = Math.max(2, outputHeight | 0);
+    this.taauActive = this._WantTaau();
+    this.resolveWidth = this.taauActive ? this.outputWidth : this.width;
+    this.resolveHeight = this.taauActive ? this.outputHeight : this.height;
     this.pool.Resize();
-    for (const pass of this.passes) pass.Resize?.(this.width, this.height);
+    for (const pass of this.passes) {
+      if (OUTPUT_DOMAIN_PASSES.has(pass.name)) pass.Resize?.(this.resolveWidth, this.resolveHeight);
+      else pass.Resize?.(this.width, this.height);
+    }
     // 尺寸一变 TAA 历史与上一帧矩阵全部作废（uv 与视差都对不上位）
     this.taaFlip = false;
     this.hasTaaHistory = false;
@@ -234,6 +296,12 @@ export class PostPipeline {
     const want = !!on;
     if (want === this.taaEnabled) return;
     this.taaEnabled = want;
+    // TAAU 的开合会改变**解算分辨率**，下游五张靶都要跟着重建；只有不涉及
+    // TAAU 的普通开关才走惰性建靶那条便宜路。
+    if (this._WantTaau() !== this.taauActive) {
+      this.SetSize(this.width, this.height, this.outputWidth, this.outputHeight);
+      return;
+    }
     this.taaPass.SyncTargets();
     this.taaFlip = false;
     this.hasTaaHistory = false;

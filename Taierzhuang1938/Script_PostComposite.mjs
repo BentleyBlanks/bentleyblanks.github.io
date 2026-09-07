@@ -146,72 +146,43 @@ vec3 ViewPos(vec2 uv, float depth) {
 }
 
 // ===========================================================================
-// SEGMENT motion-blur —— 相机运动模糊（色差的通道偏移融在同一趟采样里）
+// SEGMENT motion-blur —— **已搬走**：运动模糊现在是独立 pass（Script_PostMotionBlur）
 //
-// 速度由深度反投影求上一帧的屏幕位置。预通道从 2026-09 起也产出逐物体速度靶，
-// 换过去只要把 velocity 那三行改成读那张图（并把 uPrevViewProjection 留给雾）。
+// 2026-09 TAAU 那一轮把它整段挪了出去：旧版是相机深度反投影 + 六抽样，
+// 只有相机在动才有模糊（走动的兵、开过去的大车纹丝不动），也没有 tile max，
+// 快速移动的物体糊不出自己的轮廓。新版走 McGuire 2012 + Jimenez 2014，
+// 吃预通道的逐物体速度靶，排在 TAA 之后、泛光之前。
+//
+// 这里只剩**色差**：它的通道偏移原本就融在同一趟圆盘采样里（分开就要再来一趟
+// 全分辨率取样），运动模糊走了之后它自己占这一段。语义上归 LensEffects，
+// 位置留在这里是因为它必须是**对 uHdr 的第一次取样**。
 // 色差只在画面边缘拉开、中心保持锐利 —— 真镜头就是这样。
 // ===========================================================================
 vec3 MotionBlur(vec2 uv, vec2 centered, float r2, vec4 nd) {
-  vec2 velocity = vec2(0.0);
-  if (uMotionScale > 0.0 && nd.w > 0.0) {
-    vec3 viewPos = ViewPos(uv, nd.w);
-    vec4 world = uInvView * vec4(viewPos, 1.0);
-    vec4 prevClip = uPrevViewProjection * world;
-    vec2 prevUv = (prevClip.xy / max(abs(prevClip.w), 1e-4)) * 0.5 + 0.5;
-    velocity = (uv - prevUv) * uMotionScale;
-    velocity = clamp(velocity, vec2(-0.05), vec2(0.05));
-  }
-
   float ca = uAberration * r2;
-  if (ca > 0.0001 || length(velocity) > 0.0005) {
-    vec3 acc = vec3(0.0);
-    const int TAPS = 6;
-    float jitter = Ign(gl_FragCoord.xy + uFrame * 7.13);
-    for (int i = 0; i < TAPS; i++) {
-      float t = (float(i) + jitter) / float(TAPS) - 0.5;
-      vec2 base = uv - velocity * t;
-      acc.r += texture2D(uHdr, base + centered * ca).r;
-      acc.g += texture2D(uHdr, base).g;
-      acc.b += texture2D(uHdr, base - centered * ca).b;
-    }
-    return acc / float(TAPS);
+  if (ca > 0.0001) {
+    return vec3(texture2D(uHdr, uv + centered * ca).r,
+                texture2D(uHdr, uv).g,
+                texture2D(uHdr, uv - centered * ca).b);
   }
   return texture2D(uHdr, uv).rgb;
 }
 
 // ===========================================================================
-// SEGMENT depth-of-field —— 阵亡虚化远景；开镜只轻微虚化贴眼近景
+// SEGMENT depth-of-field —— **已搬走**：散景景深现在是独立 pass（Script_PostDof）
 //
-// 不能用 CSS blur：那会把贴在镜头前的地面也一起糊掉，只剩一张均匀毛玻璃。
-// rtNormalDepth.w 是线性视深；视图模型由 MarkForegroundPrepass 显式写
-// FOREGROUND_VIEW_DEPTH（1 m）这个稳定的近景标签，而不是它自己被压缩过的视深 ——
-// 否则开镜近景 CoC 会把正在瞄的那支枪整支糊掉。法线仍是真的，SSAO 读得到。
+// 旧版是这一趟里的 12 抽样圆盘 + smoothstep CoC：抽样太少（大半径下能数出
+// 十二个亮点）、近景不会往外渗（gather 半径按本像素 CoC，前景盖不住背景）、
+// CoC 在 focus+range 处一刀切平（真镜头是渐进逼近）。
+// 新版走 COD:AW 的四段式（降采样 → 48 抽样 near/far 分离 gather → 填洞 → 合成），
+// CoC 用薄透镜公式，dofStrength / dofFocus / dofRange / dofMaxPx 与 nearDof*
+// 这一组调用点参数**语义不变**，由 DofPass.Prepare 映射过去。
+//
+// 下面这一组 uniform 保留不删：Script_PostDebug 的「景深 CoC」视图、
+// Script_AdsSightTest / Script_DeathViewTest 都直接读它们当本帧意图的取证口。
 // ===========================================================================
 vec3 DepthOfField(vec3 color, vec2 uv, vec4 nd) {
-  if (uDofStrength <= 0.001 && uNearDofStrength <= 0.001) return color;
-  float farCoc = nd.w <= 0.0 ? 1.0
-    : smoothstep(uDofFocus, uDofFocus + max(uDofRange, 0.01), nd.w);
-  farCoc *= uDofStrength;
-  float nearStart = max(0.0, uNearDofFocus - max(uNearDofRange, 0.01));
-  float nearCoc = nd.w <= 0.0 ? 0.0
-    : 1.0 - smoothstep(nearStart, uNearDofFocus, nd.w);
-  nearCoc *= uNearDofStrength;
-  float coc = max(farCoc, nearCoc);
-  if (coc <= 0.001) return color;
-  float radiusPx = max(uDofMaxPx * farCoc, uNearDofMaxPx * nearCoc);
-  vec2 radius = vec2(radiusPx) / uResolution;
-  float seed = Ign(gl_FragCoord.xy + uFrame * 3.17) * 6.2831853;
-  vec3 blur = vec3(0.0);
-  const int DOF_TAPS = 12;
-  for (int i = 0; i < DOF_TAPS; i++) {
-    float fi = float(i) + 0.5;
-    float angle = fi * 2.39996323 + seed;
-    float ring = sqrt(fi / float(DOF_TAPS));
-    vec2 offset = vec2(cos(angle), sin(angle)) * ring * radius;
-    blur += texture2D(uHdr, clamp(uv + offset, vec2(0.001), vec2(0.999))).rgb;
-  }
-  return mix(color, blur / float(DOF_TAPS), coc);
+  return color;
 }
 
 // ===========================================================================
@@ -421,6 +392,9 @@ export class CompositePass {
     U.uBloom.value = this.pipeline.BloomTarget.texture;
     U.uGod.value = this.pipeline.targets.god.texture;
     U.uNormalDepth.value = ctx.normalDepthTexture;
+    // **内部分辨率**，不是这一趟的靶尺寸：合成的 GLSL 自己已经不用它了
+    // （景深搬走之后），留着是给 `Script_PostDebug` 的 Motion Vector 视图
+    // 换算像素速度用 —— 那张图读的是内部分辨率的预通道靶。
     U.uResolution.value.set(ctx.width, ctx.height);
     U.uExposure.value = options.exposure ?? 1.0;
     U.uBloomStrength.value = options.bloom ?? 0.5;

@@ -51,10 +51,19 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - 帧图各段（2026-09 拆分，加 pass 只动自己那一个文件 + 编排器里插一行）：
   `Script_PostCommon.mjs`（blit / 靶工厂 / 靶池 / `FrameContext` / pass 契约）、
   `Script_PostPrepass.mjs`（MRT 预通道 + 速度缓冲 + HZB + 蒙皮上一帧骨矩阵）、
-  `Script_PostSsao.mjs`、`Script_PostTaa.mjs`、`Script_PostBloom.mjs`（含太阳拖影）、
-  `Script_PostComposite.mjs`（分段 GLSL）、`Script_PostFxaa.mjs`、`Script_PostDebug.mjs`。
+  `Script_PostSsao.mjs`、`Script_PostTaa.mjs`（TAA + **TAAU 上采样**）、
+  `Script_PostMotionBlur.mjs`（**逐物体运动模糊**：tile max → neighbor max → 重建）、
+  `Script_PostDof.mjs`（**散景景深**：CoC → near/far gather → 填洞 → 合成）、
+  `Script_PostBloom.mjs`（含太阳拖影）、`Script_PostComposite.mjs`（分段 GLSL）、
+  `Script_PostFxaa.mjs`（FXAA + **CAS 锐化** + 时域三视图送屏）、`Script_PostDebug.mjs`。
+- **两组分辨率**（2026-09 TAAU）：`post.width/height` 是**内部分辨率**、
+  `post.outputWidth/outputHeight` 是**输出分辨率**，分界线在 `Script_Post.OUTPUT_DOMAIN_PASSES`。
+  只读 `ctx.width/height` 的 pass 不用改；口径见 `docs/Data_TechRenderPipeline.md` §17。
 - `Data_Tuning_Graphics.mjs` —— 画质档位表（纯数据，零 three）：每档每个 pass 的开关与旋钮，
   外加 `HZB` / `VELOCITY` 两组常量。`Script_Post` / `Script_Main` / `Script_EditorSettings` 只读它。
+- `Data_Tuning_TemporalDof.mjs` —— TAAU / 运动模糊 / 景深 / CAS 的**算法口径**（纯数据）：
+  快门比例、方差裁剪 γ、anti-flicker、responsive 权重、薄透镜光圈、CAS 峰值。
+  与画质档位表的分工：那张表管「这台机器画多重」，这张管「算法怎么算」。
 - `Script_MaterialPatches.mjs` —— **材质补丁注册表**：所有往 `MeshStandardMaterial` 插 GLSL 的
   事都走它（AO / GI 三态 / 破口裁切），一个 `onBeforeCompile` 做完，cache key 由补丁 key 拼。
   `Script_Materials.InjectIndirectLighting` 只是它的薄封装。
@@ -65,9 +74,11 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   采样接口**：体积雾 / 接触阴影 / CSM 都从这条接口取，别自己采 `sun.shadow.map`）、
   `Script_Sky.mjs`（解析式天空 + PMREM）、`Script_Water.mjs`（Gerstner 护城河）。
 - 回归口：`Script_PostFrameGraphTest.mjs`（帧图契约）、`Script_PostTest.mjs`、
-  `Script_GiTest.mjs`、`Script_EditorTest.mjs`（Debug Rendering 全部视图）。
+  `Script_TaauTest.mjs`（TAAU 两组分辨率 / 斜边锯齿能量 / 速度靶消鬼影 / 运动模糊快门 /
+  散景 CoC 与「枪不糊」）、`Script_GiTest.mjs`、`Script_EditorTest.mjs`（Debug Rendering 全部视图）。
 - 先读：`docs/Data_TechRenderPipeline.md` **§1「帧图与模块契约」**（接入说明；
-  §1A 起是设计期草案与专题深挖，GI 在 §12，坑表在末尾）。
+  §1A 起是设计期草案与专题深挖，GI 在 §12，**TAAU / 运动模糊 / 散景景深在 §17**，
+  坑表在末尾）。
 
 ### 材质 / 贴图
 - `Script_TexBake.mjs`（纯 JS PBR 烘焙，每种材质出 albedo / normal / orm）→

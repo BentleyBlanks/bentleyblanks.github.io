@@ -40,6 +40,13 @@
  *   taa           时域抗锯齿的**出厂默认**（运行时可经 SetTaaEnabled 热切）
  *   velocity      预通道 MRT 的 RT1 屏幕空间速度靶
  *   hzb           预通道之后建线性视深 max-reduce mip 链（HZB）
+ *   ——— TAAU / 运动模糊 / 景深（2026-09 落地，Data_Tuning_TemporalDof 管算法口径）———
+ *   taaUpscale    TAA 超分（TAAU）。开着且内部分辨率 ≠ 输出分辨率时，TAA 解算到输出网格
+ *   renderScale   **该档的默认内部分辨率比例**（Script_Main 的 graphics.renderScale 出厂值）
+ *   motionBlurTaps  运动模糊的重建抽样数（0 = 不建 pass 也没意义，配合 motionBlur 用）
+ *   motionBlurScale 重建靶相对输出分辨率的比例（0.5 = 半分辨率 + 按模糊长度回填全分辨率）
+ *   dof           散景景深（阵亡远景虚化 + 开镜近景虚化两条用法共用）
+ *   dofScale      景深靶相对「输出的一半」再乘一档（1.0 = 半分辨率，0.5 = 四分之一）
  *   ——— 以下为后续子系统的占位位，本阶段一律「等价于今天」———
  *   csm           级联阴影（今天：单张 66 m 跟随框，false）
  *   contactShadows 屏幕空间接触阴影
@@ -51,8 +58,6 @@
  *   autoExposure  自动曝光（今天：时段预设手调的常数曝光）
  *   lensFlare     镜头光晕
  *   lut           3D LUT 调色（今天：lift/gain + 分离调色）
- *   dof           景深（今天恒开：阵亡与开镜两条都走 Composite 的圆盘采样）
- *   taaUpscale    TAA 超分（TAAU）
  *   clusteredLights 簇状多光源（今天：固定预算的 PointLight 池）
  * @typedef {Record<string, boolean|number>} QualityPreset
  */
@@ -69,10 +74,7 @@ const RESERVED_OFF = {
   autoExposure: false,
   lensFlare: false,
   lut: false,
-  taaUpscale: false,
   clusteredLights: false,
-  // 景深今天就在跑（阵亡远景虚化 + 开镜近景虚化），所以它不是 false。
-  dof: true,
 };
 
 export const QUALITY_PRESETS = {
@@ -86,12 +88,17 @@ export const QUALITY_PRESETS = {
     ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
     aoScale: 0.5, sharpen: 0.14, taa: false,
     velocity: true, hzb: true,
+    // TAA 关着就没有 TAAU；内部分辨率保持 1.0，抗锯齿由 FXAA + CAS 承担。
+    taaUpscale: false, renderScale: 1.0,
+    motionBlurTaps: 0, motionBlurScale: 1.0, dof: false, dofScale: 0.5,
   },
   medium: {
     ...RESERVED_OFF,
     ssao: true, bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.6, sharpen: 0.18, taa: true,
     velocity: true, hzb: true,
+    taaUpscale: true, renderScale: 0.75,
+    motionBlurTaps: 8, motionBlurScale: 0.5, dof: true, dofScale: 0.5,
   },
   // high 的抗锯齿由 TAA 承担。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
   // 上百 MB 显存并重复抗锯齿；把 4× 留给主动选择 ultra 的玩家
@@ -101,12 +108,18 @@ export const QUALITY_PRESETS = {
     ssao: true, bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.75, sharpen: 0.22, taa: true,
     velocity: true, hzb: true,
+    taaUpscale: true, renderScale: 0.8,
+    motionBlurTaps: 12, motionBlurScale: 1.0, dof: true, dofScale: 0.5,
   },
   ultra: {
     ...RESERVED_OFF,
     ssao: true, bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,
     aoScale: 1.0, sharpen: 0.22, taa: true,
     velocity: true, hzb: true,
+    // ultra 是「内部 = 输出」，TAA 退回纯抗锯齿（TAAU 的上采样部分不生效，
+    // 因为两组尺寸相等）。留 taaUpscale: true 是为了玩家手动下调分辨率时它照样接上。
+    taaUpscale: true, renderScale: 1.0,
+    motionBlurTaps: 16, motionBlurScale: 1.0, dof: true, dofScale: 1.0,
   },
 };
 
