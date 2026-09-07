@@ -6,9 +6,29 @@ automatic regeneration, or uncertain-submission retry is performed here.
 from pathlib import Path
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
+
+
+def AcquireBatchLock(directory):
+    """Allow one controller; the OS releases its lock if the process crashes."""
+    lease=(directory/'Data_Batch.lock').open('a+b')
+    if not lease.tell():
+        lease.write(b'0');lease.flush()
+    lease.seek(0)
+    try:
+        if os.name=='nt':
+            import msvcrt
+            msvcrt.locking(lease.fileno(),msvcrt.LK_NBLCK,1)
+        else:
+            import fcntl
+            fcntl.flock(lease.fileno(),fcntl.LOCK_EX|fcntl.LOCK_NB)
+    except OSError:
+        lease.close()
+        raise RuntimeError('This library already has an active source batch; observe that process.')
+    return lease
 
 
 def Main():
@@ -22,6 +42,7 @@ def Main():
     requests=json.loads((folder/'Data_FirstLevelSourceRequests.json').read_text(encoding='utf-8'))
     requestById={r['id']:r for r in requests}
     out=root/'Models/FirstLevelSourceBatchV1'
+    lease=AcquireBatchLock(out)
     plan=json.loads((out/'Data_CoveragePlan.json').read_text(encoding='utf-8'))
     # Cover every requirement before adding its remaining variants/role tracks.
     order=[]
@@ -52,6 +73,8 @@ def Main():
             value=result or submit
             state.update(status=value.get('gen_status','uncertain_submission'),submitId=submit.get('submit_id'),
                 committedCredits=submit.get('credit_count',request['expectedCredits'] if submit.get('submit_id') or submit.get('status')=='submitting' else 0))
+            if state['status']=='fail':
+                state['failReason']=value.get('fail_reason','No reason returned by the service')
             if state['status']=='success':
                 videos=value.get('result_json',{}).get('videos',[])
                 files=[directory/Path(v['path']).name for v in videos]
@@ -59,6 +82,11 @@ def Main():
                 if not files or not all(p.is_file() and p.stat().st_size>0 for p in files):
                     state['status']='success_download_missing'
                 state['sourceAcceptance']='not_reviewed' if not (directory/'Data_SourceAssessment.json').exists() else 'see_source_assessment'
+            reconciliation=Read(directory/'Data_GenerationReconciliation.json')
+            if reconciliation and reconciliation.get('status')=='needs_provider_reconciliation' and state['status']!='success':
+                assert reconciliation['submitId']==state['submitId'],'Reconciliation must identify the original request'
+                state.update(serviceStatus=state['status'],status='uncertain_submission',
+                    reconciliation='Video/Sources/FirstLevelV1/'+name+'/Data_GenerationReconciliation.json')
         return state
 
     def Run(name,query=False):
@@ -90,7 +118,7 @@ def Main():
             Run(state['id'])
             updated=Inspect(state['id'])
             committed+=updated['committedCredits']
-            if updated['submitId'] and updated['status']=='querying':
+            if updated['submitId'] and updated['status'] in ('querying','success_download_missing'):
                 active.append(updated)
         states=[Inspect(name) for name in order]
         committed=sum(s['committedCredits'] for s in states)
@@ -109,6 +137,7 @@ def Main():
         temporary.replace(ledgerPath)
         if not active:
             print(json.dumps(dict(event='batch_terminal',committedCredits=committed,summary=summary)),flush=True)
+            lease.close()
             return
         time.sleep(30)
 

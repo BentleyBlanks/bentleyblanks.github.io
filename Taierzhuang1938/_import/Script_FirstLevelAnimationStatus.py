@@ -86,6 +86,7 @@ def Main():
         planned=next(r for r in coverage['requirements'] if r['requirementId']==row['requirementId'])
         row['newSourceProduction']=[sourceStates[name] for name in planned['newSources']]
         row['reusedSourceCandidates']=planned['reused']
+        row['sourceRetakeIds']=[s['id'] for s in row['newSourceProduction'] if s.get('mediaInspection',{}).get('assessment',{}).get('retakeRequired')]
         if row['requirementId'] in ['FL13','FL21']:
             source=Read(root/'Video/Sources/FirstLevelV1/TrainBenchRise/Data_SourceAssessment.json')
             row.update(actorRoles=['train.recruit'],status='partially_retargeted_requires_contact_review',
@@ -104,7 +105,13 @@ def Main():
                     'Preview/Data_FirstLevelTrainV1PlaybackValidation.json'])
         elif row['requirementId']!='FL26':
             statuses=[s['status'] for s in row['newSourceProduction']]
-            row['status']='video_generation_in_progress' if 'querying' in statuses else 'sources_generated_pending_review' if statuses and all(s=='success' for s in statuses) else 'source_production_planned' if statuses else 'existing_source_requires_review'
+            row['status']=('video_generation_in_progress' if 'querying' in statuses else
+                'source_submission_needs_reconciliation' if 'uncertain_submission' in statuses else
+                'source_generation_failed_partial' if 'fail' in statuses else
+                'source_waiting_for_credit' if 'waiting_for_credit' in statuses else
+                'source_review_retake_required' if row['sourceRetakeIds'] else
+                'sources_generated_pending_review' if statuses and all(s=='success' for s in statuses) else
+                'source_production_planned' if statuses else 'existing_source_requires_review')
             row['blockers']=['Source targets/reused candidates do not prove this complete requirement is accepted or integrated.']
     files=['Data_FirstLevelMission.mjs','Data_FirstLevelMissionDialogue.mjs','Data_FirstLevelMissionTrain.mjs',
         'Data_Tuning_FirstLevel.mjs','Script_FirstLevelMissionRuntime.mjs','Script_FirstLevelMissionColumn.mjs',
@@ -123,6 +130,7 @@ def Main():
             catalogActions=len(catalog['actions']),newVideoGenerations=batch['summary'].get('success',0),newInferenceRuns=1),
         sourceProduction=dict(userScope='Generate source coverage for all 48 requirements before completing individual retargets.',
             plannedNewSources=coverage['requestedSources'],expectedFirstPassCredits=coverage['expectedFirstPassCredits'],
+            inspectionSummary={key:inspection[key] for key in ['updatedUnix','decoded','screened','retakeRequired']},
             batchSnapshot=batch,liveStatus='Models/FirstLevelSourceBatchV1/Data_BatchStatus.json',
             dashboardUrl='http://127.0.0.1:8136/Preview/FirstLevelSourceBatchV1/index.html'),
         priorityRequirementIds=[r['requirementId'] for r in rows],requirements=rows)

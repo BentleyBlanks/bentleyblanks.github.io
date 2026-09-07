@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "updated": "2026-09-07",
-  "baseCommit": "6a98f711099b7abb9c54f614e0fd5299b75f28ba",
+  "baseCommit": "633f1ea928c74b682482c3bf42d29afe231e1026",
   "libraryRoot": "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼",
   "catalogSha256": "720d1074f4a816f810bc4d3d235c61a35adf5ed1bf9a015a555b3d20cd4336fe",
-  "requirementsSha256": "49d9ae94a89afbca0ab72101e9da7ca806444bbd0cbfd53e9e7381a7b6a312e7",
+  "requirementsSha256": "95f286bddd727d1f2ceb0a70fe8ae5a3c26d115518deef7a83fb219de2a65cca",
   "missionBaselineFiles": {
-    "Data_FirstLevelMission.mjs": "4ebfae149ee507e4e9d37485ecbfff33f9c52e92d0fef1abf871a6fd89198223",
+    "Data_FirstLevelMission.mjs": "700b1641fb2b561aa7428e66205edad1e90290e874e92ac1836e7be90e194d03",
     "Data_FirstLevelMissionDialogue.mjs": "781f30e496377189894ab1d45fec9f123721ca14f11c8dd923ef143d29fef8a9",
     "Data_FirstLevelMissionTrain.mjs": "79884ae4f4975b37c1359dddb98db021cecacd5e123c275ddc25c65fa1cd89d2",
     "Data_Tuning_FirstLevel.mjs": "c25b2607a0312e202d507416ce29953354aa58df4ee06c7c0ba6bc71d47f3dac",
@@ -49,23 +49,29 @@
       "C:/Users/Bentl/Downloads/GVHMR"
     ],
     "catalogActions": 48,
-    "newVideoGenerations": 43,
+    "newVideoGenerations": 60,
     "newInferenceRuns": 1
   },
   "sourceProduction": {
     "userScope": "Generate source coverage for all 48 requirements before completing individual retargets.",
     "plannedNewSources": 62,
     "expectedFirstPassCredits": 11360,
+    "inspectionSummary": {
+      "updatedUnix": 1788777857.1149914,
+      "decoded": 60,
+      "screened": 60,
+      "retakeRequired": 17
+    },
     "batchSnapshot": {
-      "updatedUnix": 1788773983.2062154,
-      "status": "running",
-      "creditCeiling": 10960,
-      "committedCredits": 8360,
+      "updatedUnix": 1788777988.5712786,
+      "status": "stopped",
+      "creditCeiling": 11360,
+      "committedCredits": 11360,
       "creditPolicy": "Conservative reservation; failed-job refunds are not assumed.",
       "summary": {
-        "querying": 3,
-        "success": 43,
-        "unsubmitted": 16
+        "fail": 1,
+        "success": 60,
+        "uncertain_submission": 1
       },
       "sources": [
         {
@@ -475,9 +481,11 @@
             "FL16"
           ],
           "expectedCredits": 200,
-          "status": "querying",
+          "status": "uncertain_submission",
           "submitId": "370184c6-ecdf-467d-8c4c-fa67243dce8a",
-          "committedCredits": 200
+          "committedCredits": 200,
+          "serviceStatus": "querying",
+          "reconciliation": "Video/Sources/FirstLevelV1/TrainAmmoCount/Data_GenerationReconciliation.json"
         },
         {
           "id": "TrainBenchRest",
@@ -2400,7 +2408,7 @@
           "files": [
             "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\TrainFoodReceiveEat\\945a9492-899a-4ac0-8185-9c49b1d71716_video_1.mp4"
           ],
-          "sourceAcceptance": "not_reviewed",
+          "sourceAcceptance": "see_source_assessment",
           "mediaInspection": {
             "id": "TrainFoodReceiveEat",
             "status": "decoded_needs_action_review",
@@ -2425,7 +2433,30 @@
               8.0
             ],
             "contactSheet": "Video/Sources/FirstLevelV1/TrainFoodReceiveEat/Texture_SourceContactSheet.png",
-            "firstFrame": "Video/Sources/FirstLevelV1/TrainFoodReceiveEat/Texture_SourceFirstFrame.jpg"
+            "firstFrame": "Video/Sources/FirstLevelV1/TrainFoodReceiveEat/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/TrainFoodReceiveEat/945a9492-899a-4ac0-8185-9c49b1d71716_video_1.mp4",
+              "sourceVideoSha256": "f73c7352bf068b05251f0b7101a6bbf6c888a9243bcf9b05eab588e8a2c5df00",
+              "generationSubmitId": "945a9492-899a-4ac0-8185-9c49b1d71716",
+              "credits": 160,
+              "observed": "坐在长凳，从脚边盘中取食，小口咬后放低手。",
+              "limitations": "取食来自地面而非同伴；可切出吃食动作，接食配对需另装配。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/TrainFoodReceiveEat/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
           }
         },
         {
@@ -2440,7 +2471,7 @@
           "files": [
             "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\TrainGearStow\\4636306a-e3b9-4016-a195-dd926bc1aa16_video_1.mp4"
           ],
-          "sourceAcceptance": "not_reviewed",
+          "sourceAcceptance": "see_source_assessment",
           "mediaInspection": {
             "id": "TrainGearStow",
             "status": "decoded_needs_action_review",
@@ -2465,7 +2496,30 @@
               8.0
             ],
             "contactSheet": "Video/Sources/FirstLevelV1/TrainGearStow/Texture_SourceContactSheet.png",
-            "firstFrame": "Video/Sources/FirstLevelV1/TrainGearStow/Texture_SourceFirstFrame.jpg"
+            "firstFrame": "Video/Sources/FirstLevelV1/TrainGearStow/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/TrainGearStow/4636306a-e3b9-4016-a195-dd926bc1aa16_video_1.mp4",
+              "sourceVideoSha256": "9b2d759d97d2b9d5101b89ccd5f991e4304915dd00f8d1f9a8785237bc9fc77e",
+              "generationSubmitId": "4636306a-e3b9-4016-a195-dd926bc1aa16",
+              "credits": 160,
+              "observed": "坐姿整肩带，打开身侧包，放入小物并收好。",
+              "limitations": "手指、包袋和凳面接触需检查；不能随机打断分食或炮击。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/TrainGearStow/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
           }
         },
         {
@@ -2480,7 +2534,7 @@
           "files": [
             "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\TrainShellStartleBlock\\3b063129-fced-429c-bd4a-d73a62e067b0_video_1.mp4"
           ],
-          "sourceAcceptance": "not_reviewed",
+          "sourceAcceptance": "see_source_assessment",
           "mediaInspection": {
             "id": "TrainShellStartleBlock",
             "status": "decoded_needs_action_review",
@@ -2505,7 +2559,30 @@
               8.0
             ],
             "contactSheet": "Video/Sources/FirstLevelV1/TrainShellStartleBlock/Texture_SourceContactSheet.png",
-            "firstFrame": "Video/Sources/FirstLevelV1/TrainShellStartleBlock/Texture_SourceFirstFrame.jpg"
+            "firstFrame": "Video/Sources/FirstLevelV1/TrainShellStartleBlock/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/TrainShellStartleBlock/3b063129-fced-429c-bd4a-d73a62e067b0_video_1.mp4",
+              "sourceVideoSha256": "3c35ca8889755e2643def68507fdcdbb3c7a56bff0c3d34ea39021dd5bea5f18",
+              "generationSubmitId": "3b063129-fced-429c-bd4a-d73a62e067b0",
+              "credits": 160,
+              "observed": "门口短回头，屈膝护头并伸另一臂挡侧方，再恢复。",
+              "limitations": "仅为单人反应组合；需按真实炮击分段，不能令全车同步或让玩家被推走。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/TrainShellStartleBlock/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
           }
         },
         {
@@ -2520,7 +2597,7 @@
           "files": [
             "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\MedicArmCheck\\c93e567d-60a3-40b5-b1e0-f007402b238e_video_1.mp4"
           ],
-          "sourceAcceptance": "not_reviewed",
+          "sourceAcceptance": "see_source_assessment",
           "mediaInspection": {
             "id": "MedicArmCheck",
             "status": "decoded_needs_action_review",
@@ -2545,7 +2622,30 @@
               8.0
             ],
             "contactSheet": "Video/Sources/FirstLevelV1/MedicArmCheck/Texture_SourceContactSheet.png",
-            "firstFrame": "Video/Sources/FirstLevelV1/MedicArmCheck/Texture_SourceFirstFrame.jpg"
+            "firstFrame": "Video/Sources/FirstLevelV1/MedicArmCheck/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_rejected_for_intended_source",
+              "sourceVideo": "Video/Sources/FirstLevelV1/MedicArmCheck/c93e567d-60a3-40b5-b1e0-f007402b238e_video_1.mp4",
+              "sourceVideoSha256": "8ec558c66833a9f8199073965222ef45592ac3f37a56260fa2c0af0b4d2a5dcc",
+              "generationSubmitId": "c93e567d-60a3-40b5-b1e0-f007402b238e",
+              "credits": 160,
+              "observed": "走近长软垫，跪下抬扶检查，最后抬头。",
+              "limitations": "接近阶段大半上身出画，未满足完整起止；软垫遮挡近侧手部，检查阶段可再评估选段。",
+              "retakeRequired": true,
+              "evidence": "Video/Sources/FirstLevelV1/MedicArmCheck/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
           }
         },
         {
@@ -2560,7 +2660,7 @@
           "files": [
             "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\TrainBagKickAside\\fb1564f5-f191-4e80-b5a4-099262811464_video_1.mp4"
           ],
-          "sourceAcceptance": "not_reviewed",
+          "sourceAcceptance": "see_source_assessment",
           "mediaInspection": {
             "id": "TrainBagKickAside",
             "status": "decoded_needs_action_review",
@@ -2585,7 +2685,30 @@
               8.0
             ],
             "contactSheet": "Video/Sources/FirstLevelV1/TrainBagKickAside/Texture_SourceContactSheet.png",
-            "firstFrame": "Video/Sources/FirstLevelV1/TrainBagKickAside/Texture_SourceFirstFrame.jpg"
+            "firstFrame": "Video/Sources/FirstLevelV1/TrainBagKickAside/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_rejected_for_intended_source",
+              "sourceVideo": "Video/Sources/FirstLevelV1/TrainBagKickAside/fb1564f5-f191-4e80-b5a4-099262811464_video_1.mp4",
+              "sourceVideoSha256": "e5fe89dbe2ed20ab3221989c10e353f302fe98c659bffd89a616eb19fb84674d",
+              "generationSubmitId": "fb1564f5-f191-4e80-b5a4-099262811464",
+              "credits": 160,
+              "observed": "走近背包，用脚向凳边拨包，再向前离开。",
+              "limitations": "最后一帧双脚出画；踢包片段可能复用，离开段不满足全身范围，实物移动须交回游戏物件。",
+              "retakeRequired": true,
+              "evidence": "Video/Sources/FirstLevelV1/TrainBagKickAside/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
           }
         },
         {
@@ -2600,7 +2723,7 @@
           "files": [
             "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\TrainStairDisembark\\9c53ae4a-87f8-4861-96f8-a3fcbb3fdd54_video_1.mp4"
           ],
-          "sourceAcceptance": "not_reviewed",
+          "sourceAcceptance": "see_source_assessment",
           "mediaInspection": {
             "id": "TrainStairDisembark",
             "status": "decoded_needs_action_review",
@@ -2625,7 +2748,30 @@
               10.0
             ],
             "contactSheet": "Video/Sources/FirstLevelV1/TrainStairDisembark/Texture_SourceContactSheet.png",
-            "firstFrame": "Video/Sources/FirstLevelV1/TrainStairDisembark/Texture_SourceFirstFrame.jpg"
+            "firstFrame": "Video/Sources/FirstLevelV1/TrainStairDisembark/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/TrainStairDisembark/9c53ae4a-87f8-4861-96f8-a3fcbb3fdd54_video_1.mp4",
+              "sourceVideoSha256": "2a10e88f67c9308305b4bd1fb898203ec54b2d413338485de667bbcbfed93c0b",
+              "generationSubmitId": "9c53ae4a-87f8-4861-96f8-a3fcbb3fdd54",
+              "credits": 200,
+              "observed": "平台站稳、右手扶栏、依次下三阶、走开停稳。",
+              "limitations": "源台阶不等于三处游戏车梯尺寸；脚点、扶栏和步幅须逐一匹配，不能沿片源平移瞬移队列。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/TrainStairDisembark/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
           }
         },
         {
@@ -2641,7 +2787,56 @@
           "files": [
             "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\MedicSupportLegs\\eb076d99-b2d2-427c-888a-3dbcaedf6d0e_video_1.mp4"
           ],
-          "sourceAcceptance": "not_reviewed"
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "MedicSupportLegs",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/MedicSupportLegs/eb076d99-b2d2-427c-888a-3dbcaedf6d0e_video_1.mp4",
+            "sourceSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+            "submitId": "eb076d99-b2d2-427c-888a-3dbcaedf6d0e",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/MedicSupportLegs/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/MedicSupportLegs/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/MedicSupportLegs/eb076d99-b2d2-427c-888a-3dbcaedf6d0e_video_1.mp4",
+              "sourceVideoSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+              "generationSubmitId": "eb076d99-b2d2-427c-888a-3dbcaedf6d0e",
+              "credits": 200,
+              "observed": "灰色无脸人形抬起两条软圆垫，侧移后放下。",
+              "limitations": "非真人外观；双膝有台面遮挡，托腿手臂关系需复核，不代表已取得患者相对坐标。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/MedicSupportLegs/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "CarryFrontWalkTurn",
@@ -2649,9 +2844,62 @@
             "FL26"
           ],
           "expectedCredits": 200,
-          "status": "querying",
+          "status": "success",
           "submitId": "31b3e482-c0ff-43e1-b373-0f3caa14c308",
-          "committedCredits": 200
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\CarryFrontWalkTurn\\31b3e482-c0ff-43e1-b373-0f3caa14c308_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "CarryFrontWalkTurn",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/CarryFrontWalkTurn/31b3e482-c0ff-43e1-b373-0f3caa14c308_video_1.mp4",
+            "sourceSha256": "bf925d25328f82e6a622a757140df9cbbf8888e328a0451cbfbef56c02a1fe43",
+            "submitId": "31b3e482-c0ff-43e1-b373-0f3caa14c308",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/CarryFrontWalkTurn/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/CarryFrontWalkTurn/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_rejected_for_intended_source",
+              "sourceVideo": "Video/Sources/FirstLevelV1/CarryFrontWalkTurn/31b3e482-c0ff-43e1-b373-0f3caa14c308_video_1.mp4",
+              "sourceVideoSha256": "bf925d25328f82e6a622a757140df9cbbf8888e328a0451cbfbef56c02a1fe43",
+              "generationSubmitId": "31b3e482-c0ff-43e1-b373-0f3caa14c308",
+              "credits": 200,
+              "observed": "负重行走，末段手中横杆形态变化。",
+              "limitations": "生成角色没有头，非画框裁切；不符合完整单人恢复，手柄方向也不稳定。",
+              "retakeRequired": true,
+              "evidence": "Video/Sources/FirstLevelV1/CarryFrontWalkTurn/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "CarryRearWalkTurn",
@@ -2659,9 +2907,62 @@
             "FL26"
           ],
           "expectedCredits": 200,
-          "status": "querying",
+          "status": "success",
           "submitId": "27a78fcd-a558-4998-af15-2b04d127eabd",
-          "committedCredits": 200
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\CarryRearWalkTurn\\27a78fcd-a558-4998-af15-2b04d127eabd_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "CarryRearWalkTurn",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/CarryRearWalkTurn/27a78fcd-a558-4998-af15-2b04d127eabd_video_1.mp4",
+            "sourceSha256": "43161eb68995fca405884ee3a3e02e33995a8f5a989f8bae34b4b3f4f987a6a3",
+            "submitId": "27a78fcd-a558-4998-af15-2b04d127eabd",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/CarryRearWalkTurn/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/CarryRearWalkTurn/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_rejected_for_intended_source",
+              "sourceVideo": "Video/Sources/FirstLevelV1/CarryRearWalkTurn/27a78fcd-a558-4998-af15-2b04d127eabd_video_1.mp4",
+              "sourceVideoSha256": "43161eb68995fca405884ee3a3e02e33995a8f5a989f8bae34b4b3f4f987a6a3",
+              "generationSubmitId": "27a78fcd-a558-4998-af15-2b04d127eabd",
+              "credits": 200,
+              "observed": "持平行把手走动、转身后停稳。",
+              "limitations": "全程头部被画框裁掉，手臂更接近体侧下垂；不符合后位完整单人输入。",
+              "retakeRequired": true,
+              "evidence": "Video/Sources/FirstLevelV1/CarryRearWalkTurn/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "CarryThresholdSlope",
@@ -2669,9 +2970,62 @@
             "FL26"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "d5b45365-cb00-4d87-89b9-9bd808f79e53",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\CarryThresholdSlope\\d5b45365-cb00-4d87-89b9-9bd808f79e53_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "CarryThresholdSlope",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/CarryThresholdSlope/d5b45365-cb00-4d87-89b9-9bd808f79e53_video_1.mp4",
+            "sourceSha256": "6cacbd222df363bfc2f9a903152c6b82afbd1cc304fe9df12584dec4b277221f",
+            "submitId": "d5b45365-cb00-4d87-89b9-9bd808f79e53",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/CarryThresholdSlope/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/CarryThresholdSlope/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_rejected_for_intended_source",
+              "sourceVideo": "Video/Sources/FirstLevelV1/CarryThresholdSlope/d5b45365-cb00-4d87-89b9-9bd808f79e53_video_1.mp4",
+              "sourceVideoSha256": "6cacbd222df363bfc2f9a903152c6b82afbd1cc304fe9df12584dec4b277221f",
+              "generationSubmitId": "d5b45365-cb00-4d87-89b9-9bd808f79e53",
+              "credits": 200,
+              "observed": "无脸人形负重走过横挡后踩上高台。",
+              "limitations": "后段头部出画，目标缓坡变成高台；不符合要求，需补拍实际低门槛缓坡。",
+              "retakeRequired": true,
+              "evidence": "Video/Sources/FirstLevelV1/CarryThresholdSlope/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "WoundedArmWalk",
@@ -2679,9 +3033,62 @@
             "FL28"
           ],
           "expectedCredits": 160,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "f7376f29-9909-4255-9d2a-70bb8894c22d",
+          "committedCredits": 160,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\WoundedArmWalk\\f7376f29-9909-4255-9d2a-70bb8894c22d_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "WoundedArmWalk",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/WoundedArmWalk/f7376f29-9909-4255-9d2a-70bb8894c22d_video_1.mp4",
+            "sourceSha256": "7ac92eec498eaf7db82e00bb2d01fd4c00c26c9dbbced3b838dcbe38b9297888",
+            "submitId": "f7376f29-9909-4255-9d2a-70bb8894c22d",
+            "credits": 160,
+            "frames": 193,
+            "nominalFps": 24.074844074844076,
+            "lastFrameSeconds": 8.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.0,
+              2.0,
+              3.0,
+              4.0,
+              5.0,
+              6.0,
+              7.0,
+              8.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/WoundedArmWalk/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/WoundedArmWalk/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/WoundedArmWalk/f7376f29-9909-4255-9d2a-70bb8894c22d_video_1.mp4",
+              "sourceVideoSha256": "7ac92eec498eaf7db82e00bb2d01fd4c00c26c9dbbced3b838dcbe38b9297888",
+              "generationSubmitId": "f7376f29-9909-4255-9d2a-70bb8894c22d",
+              "credits": 160,
+              "observed": "右臂用三角巾吊住，缓步行走并停稳。",
+              "limitations": "空闲左手未扶右前臂；伤侧稳定，可作吊臂步态变体，不能直接替代双手护臂。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/WoundedArmWalk/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "RescuerDragRole",
@@ -2690,9 +3097,62 @@
             "FL37"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "c168281b-bbb4-4610-9d94-b2613deeab98",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\RescuerDragRole\\c168281b-bbb4-4610-9d94-b2613deeab98_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "RescuerDragRole",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/RescuerDragRole/c168281b-bbb4-4610-9d94-b2613deeab98_video_1.mp4",
+            "sourceSha256": "0eb17d8c135f858f2d92d8c3c7d368fc13d5d62f641d58a57d1aaad4d6e688c7",
+            "submitId": "c168281b-bbb4-4610-9d94-b2613deeab98",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/RescuerDragRole/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/RescuerDragRole/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/RescuerDragRole/c168281b-bbb4-4610-9d94-b2613deeab98_video_1.mp4",
+              "sourceVideoSha256": "0eb17d8c135f858f2d92d8c3c7d368fc13d5d62f641d58a57d1aaad4d6e688c7",
+              "generationSubmitId": "c168281b-bbb4-4610-9d94-b2613deeab98",
+              "credits": 200,
+              "observed": "蹲握软包端部，提起近端后连续后退拖走，再蹲下放稳。",
+              "limitations": "近端软包遮部分腿部，患者肩腋接触需另装配，不能把软包尺寸当人体尺度。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/RescuerDragRole/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "MedicTriageCheck",
@@ -2701,9 +3161,62 @@
             "FL43"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "f13d3902-a1dd-4230-b49a-fd773df3c747",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\MedicTriageCheck\\f13d3902-a1dd-4230-b49a-fd773df3c747_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "MedicTriageCheck",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/MedicTriageCheck/f13d3902-a1dd-4230-b49a-fd773df3c747_video_1.mp4",
+            "sourceSha256": "0a5e9df61296481357a8c6e55f3146dbc8877ed2b0fd5975154962e0dcfee41f",
+            "submitId": "f13d3902-a1dd-4230-b49a-fd773df3c747",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/MedicTriageCheck/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/MedicTriageCheck/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/MedicTriageCheck/f13d3902-a1dd-4230-b49a-fd773df3c747_video_1.mp4",
+              "sourceVideoSha256": "0a5e9df61296481357a8c6e55f3146dbc8877ed2b0fd5975154962e0dcfee41f",
+              "generationSubmitId": "f13d3902-a1dd-4230-b49a-fd773df3c747",
+              "credits": 200,
+              "observed": "先招停，俯身检查长垫，再示意并跪低。",
+              "limitations": "患者与队列不在片中，且最后跪姿部分下肢被台面遮挡；接入须消费真实人数与患者身份。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/MedicTriageCheck/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "CarryVehicleLoadRear",
@@ -2711,9 +3224,62 @@
             "FL31"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "6a6c78b0-b83b-44ec-ab99-c71ef247b0bc",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\CarryVehicleLoadRear\\6a6c78b0-b83b-44ec-ab99-c71ef247b0bc_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "CarryVehicleLoadRear",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/CarryVehicleLoadRear/6a6c78b0-b83b-44ec-ab99-c71ef247b0bc_video_1.mp4",
+            "sourceSha256": "645ea31d5102f968292f01529781e2d5ed75cf30442bd395b08d21a613a170a7",
+            "submitId": "6a6c78b0-b83b-44ec-ab99-c71ef247b0bc",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/CarryVehicleLoadRear/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/CarryVehicleLoadRear/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/CarryVehicleLoadRear/6a6c78b0-b83b-44ec-ab99-c71ef247b0bc_video_1.mp4",
+              "sourceVideoSha256": "645ea31d5102f968292f01529781e2d5ed75cf30442bd395b08d21a613a170a7",
+              "generationSubmitId": "6a6c78b0-b83b-44ec-ab99-c71ef247b0bc",
+              "credits": 200,
+              "observed": "双手托平板近端，抬高推上斜台后松手。",
+              "limitations": "平板替代担架，仅为近端角色动作；另一端支撑、四手相位与车辆接触未恢复。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/CarryVehicleLoadRear/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "BearerDropFall",
@@ -2721,9 +3287,62 @@
             "FL33"
           ],
           "expectedCredits": 160,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "59ebaff0-c6de-474f-84ac-f18bc90718a1",
+          "committedCredits": 160,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\BearerDropFall\\59ebaff0-c6de-474f-84ac-f18bc90718a1_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "BearerDropFall",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/BearerDropFall/59ebaff0-c6de-474f-84ac-f18bc90718a1_video_1.mp4",
+            "sourceSha256": "b4f6ad4516d77fcafd6a1322c4fa46f0602f359c6288c4b01b93607b7ad274a1",
+            "submitId": "59ebaff0-c6de-474f-84ac-f18bc90718a1",
+            "credits": 160,
+            "frames": 193,
+            "nominalFps": 24.074844074844076,
+            "lastFrameSeconds": 8.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.0,
+              2.0,
+              3.0,
+              4.0,
+              5.0,
+              6.0,
+              7.0,
+              8.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/BearerDropFall/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/BearerDropFall/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/BearerDropFall/59ebaff0-c6de-474f-84ac-f18bc90718a1_video_1.mp4",
+              "sourceVideoSha256": "b4f6ad4516d77fcafd6a1322c4fa46f0602f359c6288c4b01b93607b7ad274a1",
+              "generationSubmitId": "59ebaff0-c6de-474f-84ac-f18bc90718a1",
+              "credits": 160,
+              "observed": "持托盘，先失去一手控制，身体坐跌到垫上后躺倒保持。",
+              "limitations": "道具并非担架杆；须逐帧校验失握先于落架，不把倒地动画自身当伤亡事件。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/BearerDropFall/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "PatientDropReaction",
@@ -2731,9 +3350,62 @@
             "FL33"
           ],
           "expectedCredits": 160,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "306af6b5-b14e-4c2d-bead-77e3fcabe9ab",
+          "committedCredits": 160,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\PatientDropReaction\\306af6b5-b14e-4c2d-bead-77e3fcabe9ab_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "PatientDropReaction",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/PatientDropReaction/306af6b5-b14e-4c2d-bead-77e3fcabe9ab_video_1.mp4",
+            "sourceSha256": "e3d8acf8433db7c2ca942ad318ee5c65cbfbfdce6841aa91af0a46fc85649b63",
+            "submitId": "306af6b5-b14e-4c2d-bead-77e3fcabe9ab",
+            "credits": 160,
+            "frames": 193,
+            "nominalFps": 24.074844074844076,
+            "lastFrameSeconds": 8.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.0,
+              2.0,
+              3.0,
+              4.0,
+              5.0,
+              6.0,
+              7.0,
+              8.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/PatientDropReaction/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/PatientDropReaction/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/PatientDropReaction/306af6b5-b14e-4c2d-bead-77e3fcabe9ab_video_1.mp4",
+              "sourceVideoSha256": "e3d8acf8433db7c2ca942ad318ee5c65cbfbfdce6841aa91af0a46fc85649b63",
+              "generationSubmitId": "306af6b5-b14e-4c2d-bead-77e3fcabe9ab",
+              "credits": 160,
+              "observed": "平躺床面后双手抓栏，露出吃痛表情。",
+              "limitations": "九帧中未见清楚的床端砸落冲量；需密集确认颠簸是否成立，不能作为已完成摔落片段。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/PatientDropReaction/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "DitchCoverReturn",
@@ -2741,9 +3413,62 @@
             "FL34"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "42526a39-d2f3-4488-8b16-63b1584e65d0",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\DitchCoverReturn\\42526a39-d2f3-4488-8b16-63b1584e65d0_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "DitchCoverReturn",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/DitchCoverReturn/42526a39-d2f3-4488-8b16-63b1584e65d0_video_1.mp4",
+            "sourceSha256": "8660164a41a8db1eba446ad35047dffdf0278e30d82452eccb3159709386998b",
+            "submitId": "42526a39-d2f3-4488-8b16-63b1584e65d0",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/DitchCoverReturn/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/DitchCoverReturn/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_rejected_for_intended_source",
+              "sourceVideo": "Video/Sources/FirstLevelV1/DitchCoverReturn/42526a39-d2f3-4488-8b16-63b1584e65d0_video_1.mp4",
+              "sourceVideoSha256": "8660164a41a8db1eba446ad35047dffdf0278e30d82452eccb3159709386998b",
+              "generationSubmitId": "42526a39-d2f3-4488-8b16-63b1584e65d0",
+              "credits": 200,
+              "observed": "下沟后只露头和手臂，停留后撑上地面。",
+              "limitations": "沟体在主要片段遮住躯干与双腿，不能作为完整单人骨骼恢复输入。",
+              "retakeRequired": true,
+              "evidence": "Video/Sources/FirstLevelV1/DitchCoverReturn/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "CarryLookRelease",
@@ -2751,9 +3476,62 @@
             "FL35"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "98b92968-3b11-480d-bb2f-a36e3b44a842",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\CarryLookRelease\\98b92968-3b11-480d-bb2f-a36e3b44a842_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "CarryLookRelease",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/CarryLookRelease/98b92968-3b11-480d-bb2f-a36e3b44a842_video_1.mp4",
+            "sourceSha256": "7b329893373e328abc8974f69cda532cbc45790637c11150b83a636ca05e04c0",
+            "submitId": "98b92968-3b11-480d-bb2f-a36e3b44a842",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/CarryLookRelease/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/CarryLookRelease/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/CarryLookRelease/98b92968-3b11-480d-bb2f-a36e3b44a842_video_1.mp4",
+              "sourceVideoSha256": "7b329893373e328abc8974f69cda532cbc45790637c11150b83a636ca05e04c0",
+              "generationSubmitId": "98b92968-3b11-480d-bb2f-a36e3b44a842",
+              "credits": 200,
+              "observed": "灰色无脸人形握住支撑栏，微屈膝、短回头后放手。",
+              "limitations": "仅为静止握放；头部朝向与真实负重看回幅度未密集确认，必须替换支撑栏为刚性担架装配。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/CarryLookRelease/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "ZhouWeakeningDeath",
@@ -2762,9 +3540,62 @@
             "FL44"
           ],
           "expectedCredits": 240,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "adf629a1-d4f6-445f-9247-74c09f4a14b9",
+          "committedCredits": 240,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\ZhouWeakeningDeath\\adf629a1-d4f6-445f-9247-74c09f4a14b9_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "ZhouWeakeningDeath",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/adf629a1-d4f6-445f-9247-74c09f4a14b9_video_1.mp4",
+            "sourceSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+            "submitId": "adf629a1-d4f6-445f-9247-74c09f4a14b9",
+            "credits": 240,
+            "frames": 289,
+            "nominalFps": 24.0499306518724,
+            "lastFrameSeconds": 12.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.5,
+              3.0,
+              4.5,
+              6.0,
+              7.5,
+              9.0,
+              10.5,
+              12.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/adf629a1-d4f6-445f-9247-74c09f4a14b9_video_1.mp4",
+              "sourceVideoSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+              "generationSubmitId": "adf629a1-d4f6-445f-9247-74c09f4a14b9",
+              "credits": 240,
+              "observed": "躺在床上，头由看向侧方缓缓转回枕上，闭眼并保持。",
+              "limitations": "末段手是否完全松开、胸腹是否停止尚需逐帧确认，九帧不能证明死亡保持。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.5,
+                3.0,
+                4.5,
+                6.0,
+                7.5,
+                9.0,
+                10.5,
+                12.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "BearerReplacementApproach",
@@ -2772,9 +3603,62 @@
             "FL40"
           ],
           "expectedCredits": 160,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "92bf110f-c5ec-46ff-aa0d-7ba83a37f3fd",
+          "committedCredits": 160,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\BearerReplacementApproach\\92bf110f-c5ec-46ff-aa0d-7ba83a37f3fd_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "BearerReplacementApproach",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/BearerReplacementApproach/92bf110f-c5ec-46ff-aa0d-7ba83a37f3fd_video_1.mp4",
+            "sourceSha256": "451ea81b45dc39b5dfa41d350fe377b15c60997c4dcd78d791182e166aff421f",
+            "submitId": "92bf110f-c5ec-46ff-aa0d-7ba83a37f3fd",
+            "credits": 160,
+            "frames": 193,
+            "nominalFps": 24.074844074844076,
+            "lastFrameSeconds": 8.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.0,
+              2.0,
+              3.0,
+              4.0,
+              5.0,
+              6.0,
+              7.0,
+              8.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/BearerReplacementApproach/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/BearerReplacementApproach/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/BearerReplacementApproach/92bf110f-c5ec-46ff-aa0d-7ba83a37f3fd_video_1.mp4",
+              "sourceVideoSha256": "451ea81b45dc39b5dfa41d350fe377b15c60997c4dcd78d791182e166aff421f",
+              "generationSubmitId": "92bf110f-c5ec-46ff-aa0d-7ba83a37f3fd",
+              "credits": 160,
+              "observed": "走近床边，屈膝抓栏，提起近端后站稳。",
+              "limitations": "需按后位真实握点和患者重量装配；没有旧抬手，不包含健康或身份替换逻辑。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/BearerReplacementApproach/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "MedicDeathCheck",
@@ -2783,9 +3667,10 @@
             "FL44"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "fail",
+          "submitId": "7a179fda-6c6d-4654-902c-5f974f9af916",
+          "committedCredits": 200,
+          "failReason": "generation failed: final generation failed"
         },
         {
           "id": "CompanionLookBackAmmo",
@@ -2793,9 +3678,62 @@
             "FL45"
           ],
           "expectedCredits": 160,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "2808b8d1-5803-4d79-91c7-0537fdee068c",
+          "committedCredits": 160,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\CompanionLookBackAmmo\\2808b8d1-5803-4d79-91c7-0537fdee068c_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "CompanionLookBackAmmo",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/CompanionLookBackAmmo/2808b8d1-5803-4d79-91c7-0537fdee068c_video_1.mp4",
+            "sourceSha256": "08dfe9fb836da8ac731e30647e5ffad7f31c4245c9d4b9cb7f5d4e71f36b3d2f",
+            "submitId": "2808b8d1-5803-4d79-91c7-0537fdee068c",
+            "credits": 160,
+            "frames": 193,
+            "nominalFps": 24.074844074844076,
+            "lastFrameSeconds": 8.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.0,
+              2.0,
+              3.0,
+              4.0,
+              5.0,
+              6.0,
+              7.0,
+              8.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/CompanionLookBackAmmo/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/CompanionLookBackAmmo/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_rejected_for_intended_source",
+              "sourceVideo": "Video/Sources/FirstLevelV1/CompanionLookBackAmmo/2808b8d1-5803-4d79-91c7-0537fdee068c_video_1.mp4",
+              "sourceVideoSha256": "08dfe9fb836da8ac731e30647e5ffad7f31c4245c9d4b9cb7f5d4e71f36b3d2f",
+              "generationSubmitId": "2808b8d1-5803-4d79-91c7-0537fdee068c",
+              "credits": 160,
+              "observed": "抱箱走到门边，停住回望，再继续走。",
+              "limitations": "最后离开段脚部出画；门边停望片段可选，完整走离需要补拍。",
+              "retakeRequired": true,
+              "evidence": "Video/Sources/FirstLevelV1/CompanionLookBackAmmo/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "MedicNextPatient",
@@ -2803,9 +3741,62 @@
             "FL46"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "28ced60b-196a-4cb0-9dfb-125822987f68",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\MedicNextPatient\\28ced60b-196a-4cb0-9dfb-125822987f68_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "MedicNextPatient",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/MedicNextPatient/28ced60b-196a-4cb0-9dfb-125822987f68_video_1.mp4",
+            "sourceSha256": "8da38b386994b0f896a30d9904f65095c0cf4cd42041ba9f54939e07333fee3d",
+            "submitId": "28ced60b-196a-4cb0-9dfb-125822987f68",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/MedicNextPatient/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/MedicNextPatient/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/MedicNextPatient/28ced60b-196a-4cb0-9dfb-125822987f68_video_1.mp4",
+              "sourceVideoSha256": "8da38b386994b0f896a30d9904f65095c0cf4cd42041ba9f54939e07333fee3d",
+              "generationSubmitId": "28ced60b-196a-4cb0-9dfb-125822987f68",
+              "credits": 200,
+              "observed": "跪扶第一处软垫，起身走到第二处再俯身扶住。",
+              "limitations": "两处台面遮挡跪姿部分下肢，需按实际幸存患者装配，不能用两软垫虚构两名患者。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/MedicNextPatient/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "EnemySignalAdvance",
@@ -2813,9 +3804,62 @@
             "FL47"
           ],
           "expectedCredits": 160,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "0865e6c5-8575-4559-a5d1-fce656248164",
+          "committedCredits": 160,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\EnemySignalAdvance\\0865e6c5-8575-4559-a5d1-fce656248164_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "EnemySignalAdvance",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/EnemySignalAdvance/0865e6c5-8575-4559-a5d1-fce656248164_video_1.mp4",
+            "sourceSha256": "701667912bc999c83856e3329262ccd69bf2d1ad269a1f9238f69b9dec07d20d",
+            "submitId": "0865e6c5-8575-4559-a5d1-fce656248164",
+            "credits": 160,
+            "frames": 193,
+            "nominalFps": 24.074844074844076,
+            "lastFrameSeconds": 8.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.0,
+              2.0,
+              3.0,
+              4.0,
+              5.0,
+              6.0,
+              7.0,
+              8.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/EnemySignalAdvance/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/EnemySignalAdvance/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/EnemySignalAdvance/0865e6c5-8575-4559-a5d1-fce656248164_video_1.mp4",
+              "sourceVideoSha256": "701667912bc999c83856e3329262ccd69bf2d1ad269a1f9238f69b9dec07d20d",
+              "generationSubmitId": "0865e6c5-8575-4559-a5d1-fce656248164",
+              "credits": 160,
+              "observed": "持长枪招手后沿矮墙低姿前进，再起身据枪。",
+              "limitations": "枪托与双手需按日军原枪型校验，末端朝向与真实目标另绑定。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/EnemySignalAdvance/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "FatigueShoulderCough",
@@ -2823,9 +3867,62 @@
             "FL48"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "fcfb5a8c-5e8d-4dc3-8657-01759090e42a",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\FatigueShoulderCough\\fcfb5a8c-5e8d-4dc3-8657-01759090e42a_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "FatigueShoulderCough",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/FatigueShoulderCough/fcfb5a8c-5e8d-4dc3-8657-01759090e42a_video_1.mp4",
+            "sourceSha256": "e9a257a52d7a44555488623ed869030a9521e351707c2133293b8a70d9064bd2",
+            "submitId": "fcfb5a8c-5e8d-4dc3-8657-01759090e42a",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/FatigueShoulderCough/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/FatigueShoulderCough/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_rejected_for_intended_source",
+              "sourceVideo": "Video/Sources/FirstLevelV1/FatigueShoulderCough/fcfb5a8c-5e8d-4dc3-8657-01759090e42a_video_1.mp4",
+              "sourceVideoSha256": "e9a257a52d7a44555488623ed869030a9521e351707c2133293b8a70d9064bd2",
+              "generationSubmitId": "fcfb5a8c-5e8d-4dc3-8657-01759090e42a",
+              "credits": 200,
+              "observed": "现代室内男子坐桌后交谈，切成头部近景，有字幕及另一人前景。",
+              "limitations": "内容完全偏离单人灰棚全身疲惫、换肩与短咳要求；拒绝恢复，原回执与文件保留供对账。",
+              "retakeRequired": true,
+              "evidence": "Video/Sources/FirstLevelV1/FatigueShoulderCough/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         }
       ]
     },
@@ -3045,7 +4142,8 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL02",
@@ -3222,7 +4320,8 @@
             5.033333333333333
           ]
         }
-      ]
+      ],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL03",
@@ -3408,7 +4507,8 @@
             3.6333333333333333
           ]
         }
-      ]
+      ],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL04",
@@ -3494,7 +4594,8 @@
             3.6333333333333333
           ]
         }
-      ]
+      ],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL05",
@@ -3634,7 +4735,8 @@
             7.966666666666667
           ]
         }
-      ]
+      ],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL06",
@@ -3661,7 +4763,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "sources_generated_pending_review",
+      "status": "source_review_retake_required",
       "runtimeBinding": {
         "enabled": false,
         "stages": []
@@ -3820,6 +4922,9 @@
           "model": "Models/SourceCharacters/Model_LugouNra01.glb",
           "sourcePolicy": "Original BIP/FBX animation; video recovery is not applicable."
         }
+      ],
+      "sourceRetakeIds": [
+        "RifleLowReload"
       ]
     },
     {
@@ -3847,7 +4952,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "sources_generated_pending_review",
+      "status": "source_review_retake_required",
       "runtimeBinding": {
         "enabled": false,
         "stages": []
@@ -3999,6 +5104,9 @@
           "model": "Models/SourceCharacters/Model_LugouNra01.glb",
           "sourcePolicy": "Original BIP/FBX animation; video recovery is not applicable."
         }
+      ],
+      "sourceRetakeIds": [
+        "MachineGunMagazine"
       ]
     },
     {
@@ -4114,7 +5222,8 @@
             4.8
           ]
         }
-      ]
+      ],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL09",
@@ -4141,7 +5250,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "sources_generated_pending_review",
+      "status": "source_review_retake_required",
       "runtimeBinding": {
         "enabled": false,
         "stages": []
@@ -4324,6 +5433,9 @@
             2.433333333333333
           ]
         }
+      ],
+      "sourceRetakeIds": [
+        "MeleePushRecover"
       ]
     },
     {
@@ -4386,7 +5498,8 @@
             7.966666666666667
           ]
         }
-      ]
+      ],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL11",
@@ -4488,7 +5601,8 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL12",
@@ -4656,7 +5770,8 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL13",
@@ -4922,7 +6037,8 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL14",
@@ -5024,7 +6140,8 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL15",
@@ -5139,7 +6256,7 @@
           "files": [
             "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\TrainFoodReceiveEat\\945a9492-899a-4ac0-8185-9c49b1d71716_video_1.mp4"
           ],
-          "sourceAcceptance": "not_reviewed",
+          "sourceAcceptance": "see_source_assessment",
           "mediaInspection": {
             "id": "TrainFoodReceiveEat",
             "status": "decoded_needs_action_review",
@@ -5164,11 +6281,35 @@
               8.0
             ],
             "contactSheet": "Video/Sources/FirstLevelV1/TrainFoodReceiveEat/Texture_SourceContactSheet.png",
-            "firstFrame": "Video/Sources/FirstLevelV1/TrainFoodReceiveEat/Texture_SourceFirstFrame.jpg"
+            "firstFrame": "Video/Sources/FirstLevelV1/TrainFoodReceiveEat/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/TrainFoodReceiveEat/945a9492-899a-4ac0-8185-9c49b1d71716_video_1.mp4",
+              "sourceVideoSha256": "f73c7352bf068b05251f0b7101a6bbf6c888a9243bcf9b05eab588e8a2c5df00",
+              "generationSubmitId": "945a9492-899a-4ac0-8185-9c49b1d71716",
+              "credits": 160,
+              "observed": "坐在长凳，从脚边盘中取食，小口咬后放低手。",
+              "limitations": "取食来自地面而非同伴；可切出吃食动作，接食配对需另装配。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/TrainFoodReceiveEat/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL16",
@@ -5195,7 +6336,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "video_generation_in_progress",
+      "status": "source_submission_needs_reconciliation",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -5213,12 +6354,15 @@
             "FL16"
           ],
           "expectedCredits": 200,
-          "status": "querying",
+          "status": "uncertain_submission",
           "submitId": "370184c6-ecdf-467d-8c4c-fa67243dce8a",
-          "committedCredits": 200
+          "committedCredits": 200,
+          "serviceStatus": "querying",
+          "reconciliation": "Video/Sources/FirstLevelV1/TrainAmmoCount/Data_GenerationReconciliation.json"
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL17",
@@ -5333,7 +6477,7 @@
           "files": [
             "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\TrainGearStow\\4636306a-e3b9-4016-a195-dd926bc1aa16_video_1.mp4"
           ],
-          "sourceAcceptance": "not_reviewed",
+          "sourceAcceptance": "see_source_assessment",
           "mediaInspection": {
             "id": "TrainGearStow",
             "status": "decoded_needs_action_review",
@@ -5358,11 +6502,35 @@
               8.0
             ],
             "contactSheet": "Video/Sources/FirstLevelV1/TrainGearStow/Texture_SourceContactSheet.png",
-            "firstFrame": "Video/Sources/FirstLevelV1/TrainGearStow/Texture_SourceFirstFrame.jpg"
+            "firstFrame": "Video/Sources/FirstLevelV1/TrainGearStow/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/TrainGearStow/4636306a-e3b9-4016-a195-dd926bc1aa16_video_1.mp4",
+              "sourceVideoSha256": "9b2d759d97d2b9d5101b89ccd5f991e4304915dd00f8d1f9a8785237bc9fc77e",
+              "generationSubmitId": "4636306a-e3b9-4016-a195-dd926bc1aa16",
+              "credits": 160,
+              "observed": "坐姿整肩带，打开身侧包，放入小物并收好。",
+              "limitations": "手指、包袋和凳面接触需检查；不能随机打断分食或炮击。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/TrainGearStow/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL18",
@@ -5542,7 +6710,7 @@
           "files": [
             "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\TrainShellStartleBlock\\3b063129-fced-429c-bd4a-d73a62e067b0_video_1.mp4"
           ],
-          "sourceAcceptance": "not_reviewed",
+          "sourceAcceptance": "see_source_assessment",
           "mediaInspection": {
             "id": "TrainShellStartleBlock",
             "status": "decoded_needs_action_review",
@@ -5567,11 +6735,35 @@
               8.0
             ],
             "contactSheet": "Video/Sources/FirstLevelV1/TrainShellStartleBlock/Texture_SourceContactSheet.png",
-            "firstFrame": "Video/Sources/FirstLevelV1/TrainShellStartleBlock/Texture_SourceFirstFrame.jpg"
+            "firstFrame": "Video/Sources/FirstLevelV1/TrainShellStartleBlock/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/TrainShellStartleBlock/3b063129-fced-429c-bd4a-d73a62e067b0_video_1.mp4",
+              "sourceVideoSha256": "3c35ca8889755e2643def68507fdcdbb3c7a56bff0c3d34ea39021dd5bea5f18",
+              "generationSubmitId": "3b063129-fced-429c-bd4a-d73a62e067b0",
+              "credits": 160,
+              "observed": "门口短回头，屈膝护头并伸另一臂挡侧方，再恢复。",
+              "limitations": "仅为单人反应组合；需按真实炮击分段，不能令全车同步或让玩家被推走。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/TrainShellStartleBlock/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL19",
@@ -5598,7 +6790,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "sources_generated_pending_review",
+      "status": "source_review_retake_required",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -5684,7 +6876,7 @@
           "files": [
             "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\MedicArmCheck\\c93e567d-60a3-40b5-b1e0-f007402b238e_video_1.mp4"
           ],
-          "sourceAcceptance": "not_reviewed",
+          "sourceAcceptance": "see_source_assessment",
           "mediaInspection": {
             "id": "MedicArmCheck",
             "status": "decoded_needs_action_review",
@@ -5709,11 +6901,37 @@
               8.0
             ],
             "contactSheet": "Video/Sources/FirstLevelV1/MedicArmCheck/Texture_SourceContactSheet.png",
-            "firstFrame": "Video/Sources/FirstLevelV1/MedicArmCheck/Texture_SourceFirstFrame.jpg"
+            "firstFrame": "Video/Sources/FirstLevelV1/MedicArmCheck/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_rejected_for_intended_source",
+              "sourceVideo": "Video/Sources/FirstLevelV1/MedicArmCheck/c93e567d-60a3-40b5-b1e0-f007402b238e_video_1.mp4",
+              "sourceVideoSha256": "8ec558c66833a9f8199073965222ef45592ac3f37a56260fa2c0af0b4d2a5dcc",
+              "generationSubmitId": "c93e567d-60a3-40b5-b1e0-f007402b238e",
+              "credits": 160,
+              "observed": "走近长软垫，跪下抬扶检查，最后抬头。",
+              "limitations": "接近阶段大半上身出画，未满足完整起止；软垫遮挡近侧手部，检查阶段可再评估选段。",
+              "retakeRequired": true,
+              "evidence": "Video/Sources/FirstLevelV1/MedicArmCheck/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": [
+        "MedicArmCheck"
+      ]
     },
     {
       "requirementId": "FL20",
@@ -5740,7 +6958,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "sources_generated_pending_review",
+      "status": "source_review_retake_required",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -5827,7 +7045,7 @@
           "files": [
             "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\TrainBagKickAside\\fb1564f5-f191-4e80-b5a4-099262811464_video_1.mp4"
           ],
-          "sourceAcceptance": "not_reviewed",
+          "sourceAcceptance": "see_source_assessment",
           "mediaInspection": {
             "id": "TrainBagKickAside",
             "status": "decoded_needs_action_review",
@@ -5852,11 +7070,38 @@
               8.0
             ],
             "contactSheet": "Video/Sources/FirstLevelV1/TrainBagKickAside/Texture_SourceContactSheet.png",
-            "firstFrame": "Video/Sources/FirstLevelV1/TrainBagKickAside/Texture_SourceFirstFrame.jpg"
+            "firstFrame": "Video/Sources/FirstLevelV1/TrainBagKickAside/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_rejected_for_intended_source",
+              "sourceVideo": "Video/Sources/FirstLevelV1/TrainBagKickAside/fb1564f5-f191-4e80-b5a4-099262811464_video_1.mp4",
+              "sourceVideoSha256": "e5fe89dbe2ed20ab3221989c10e353f302fe98c659bffd89a616eb19fb84674d",
+              "generationSubmitId": "fb1564f5-f191-4e80-b5a4-099262811464",
+              "credits": 160,
+              "observed": "走近背包，用脚向凳边拨包，再向前离开。",
+              "limitations": "最后一帧双脚出画；踢包片段可能复用，离开段不满足全身范围，实物移动须交回游戏物件。",
+              "retakeRequired": true,
+              "evidence": "Video/Sources/FirstLevelV1/TrainBagKickAside/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": [
+        "TrainAisleSideStep",
+        "TrainBagKickAside"
+      ]
     },
     {
       "requirementId": "FL21",
@@ -6005,7 +7250,7 @@
           "files": [
             "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\TrainStairDisembark\\9c53ae4a-87f8-4861-96f8-a3fcbb3fdd54_video_1.mp4"
           ],
-          "sourceAcceptance": "not_reviewed",
+          "sourceAcceptance": "see_source_assessment",
           "mediaInspection": {
             "id": "TrainStairDisembark",
             "status": "decoded_needs_action_review",
@@ -6030,11 +7275,35 @@
               10.0
             ],
             "contactSheet": "Video/Sources/FirstLevelV1/TrainStairDisembark/Texture_SourceContactSheet.png",
-            "firstFrame": "Video/Sources/FirstLevelV1/TrainStairDisembark/Texture_SourceFirstFrame.jpg"
+            "firstFrame": "Video/Sources/FirstLevelV1/TrainStairDisembark/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/TrainStairDisembark/9c53ae4a-87f8-4861-96f8-a3fcbb3fdd54_video_1.mp4",
+              "sourceVideoSha256": "2a10e88f67c9308305b4bd1fb898203ec54b2d413338485de667bbcbfed93c0b",
+              "generationSubmitId": "9c53ae4a-87f8-4861-96f8-a3fcbb3fdd54",
+              "credits": 200,
+              "observed": "平台站稳、右手扶栏、依次下三阶、走开停稳。",
+              "limitations": "源台阶不等于三处游戏车梯尺寸；脚点、扶栏和步幅须逐一匹配，不能沿片源平移瞬移队列。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/TrainStairDisembark/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL22",
@@ -6138,7 +7407,8 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL23",
@@ -6241,7 +7511,8 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL24",
@@ -6268,7 +7539,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "sources_generated_pending_review",
+      "status": "source_review_retake_required",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -6358,7 +7629,56 @@
           "files": [
             "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\MedicSupportLegs\\eb076d99-b2d2-427c-888a-3dbcaedf6d0e_video_1.mp4"
           ],
-          "sourceAcceptance": "not_reviewed"
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "MedicSupportLegs",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/MedicSupportLegs/eb076d99-b2d2-427c-888a-3dbcaedf6d0e_video_1.mp4",
+            "sourceSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+            "submitId": "eb076d99-b2d2-427c-888a-3dbcaedf6d0e",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/MedicSupportLegs/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/MedicSupportLegs/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/MedicSupportLegs/eb076d99-b2d2-427c-888a-3dbcaedf6d0e_video_1.mp4",
+              "sourceVideoSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+              "generationSubmitId": "eb076d99-b2d2-427c-888a-3dbcaedf6d0e",
+              "credits": 200,
+              "observed": "灰色无脸人形抬起两条软圆垫，侧移后放下。",
+              "limitations": "非真人外观；双膝有台面遮挡，托腿手臂关系需复核，不代表已取得患者相对坐标。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/MedicSupportLegs/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "PatientAssistedSettle",
@@ -6425,7 +7745,10 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": [
+        "MedicSupportShoulders"
+      ]
     },
     {
       "requirementId": "FL25",
@@ -6452,7 +7775,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "sources_generated_pending_review",
+      "status": "source_review_retake_required",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -6598,7 +7921,11 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": [
+        "CarryFrontLiftHoldLower",
+        "CarryRearLiftHoldLower"
+      ]
     },
     {
       "requirementId": "FL26",
@@ -6779,9 +8106,62 @@
             "FL26"
           ],
           "expectedCredits": 200,
-          "status": "querying",
+          "status": "success",
           "submitId": "31b3e482-c0ff-43e1-b373-0f3caa14c308",
-          "committedCredits": 200
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\CarryFrontWalkTurn\\31b3e482-c0ff-43e1-b373-0f3caa14c308_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "CarryFrontWalkTurn",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/CarryFrontWalkTurn/31b3e482-c0ff-43e1-b373-0f3caa14c308_video_1.mp4",
+            "sourceSha256": "bf925d25328f82e6a622a757140df9cbbf8888e328a0451cbfbef56c02a1fe43",
+            "submitId": "31b3e482-c0ff-43e1-b373-0f3caa14c308",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/CarryFrontWalkTurn/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/CarryFrontWalkTurn/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_rejected_for_intended_source",
+              "sourceVideo": "Video/Sources/FirstLevelV1/CarryFrontWalkTurn/31b3e482-c0ff-43e1-b373-0f3caa14c308_video_1.mp4",
+              "sourceVideoSha256": "bf925d25328f82e6a622a757140df9cbbf8888e328a0451cbfbef56c02a1fe43",
+              "generationSubmitId": "31b3e482-c0ff-43e1-b373-0f3caa14c308",
+              "credits": 200,
+              "observed": "负重行走，末段手中横杆形态变化。",
+              "limitations": "生成角色没有头，非画框裁切；不符合完整单人恢复，手柄方向也不稳定。",
+              "retakeRequired": true,
+              "evidence": "Video/Sources/FirstLevelV1/CarryFrontWalkTurn/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "CarryRearWalkTurn",
@@ -6789,9 +8169,62 @@
             "FL26"
           ],
           "expectedCredits": 200,
-          "status": "querying",
+          "status": "success",
           "submitId": "27a78fcd-a558-4998-af15-2b04d127eabd",
-          "committedCredits": 200
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\CarryRearWalkTurn\\27a78fcd-a558-4998-af15-2b04d127eabd_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "CarryRearWalkTurn",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/CarryRearWalkTurn/27a78fcd-a558-4998-af15-2b04d127eabd_video_1.mp4",
+            "sourceSha256": "43161eb68995fca405884ee3a3e02e33995a8f5a989f8bae34b4b3f4f987a6a3",
+            "submitId": "27a78fcd-a558-4998-af15-2b04d127eabd",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/CarryRearWalkTurn/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/CarryRearWalkTurn/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_rejected_for_intended_source",
+              "sourceVideo": "Video/Sources/FirstLevelV1/CarryRearWalkTurn/27a78fcd-a558-4998-af15-2b04d127eabd_video_1.mp4",
+              "sourceVideoSha256": "43161eb68995fca405884ee3a3e02e33995a8f5a989f8bae34b4b3f4f987a6a3",
+              "generationSubmitId": "27a78fcd-a558-4998-af15-2b04d127eabd",
+              "credits": 200,
+              "observed": "持平行把手走动、转身后停稳。",
+              "limitations": "全程头部被画框裁掉，手臂更接近体侧下垂；不符合后位完整单人输入。",
+              "retakeRequired": true,
+              "evidence": "Video/Sources/FirstLevelV1/CarryRearWalkTurn/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "CarryThresholdSlope",
@@ -6799,9 +8232,62 @@
             "FL26"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "d5b45365-cb00-4d87-89b9-9bd808f79e53",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\CarryThresholdSlope\\d5b45365-cb00-4d87-89b9-9bd808f79e53_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "CarryThresholdSlope",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/CarryThresholdSlope/d5b45365-cb00-4d87-89b9-9bd808f79e53_video_1.mp4",
+            "sourceSha256": "6cacbd222df363bfc2f9a903152c6b82afbd1cc304fe9df12584dec4b277221f",
+            "submitId": "d5b45365-cb00-4d87-89b9-9bd808f79e53",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/CarryThresholdSlope/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/CarryThresholdSlope/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_rejected_for_intended_source",
+              "sourceVideo": "Video/Sources/FirstLevelV1/CarryThresholdSlope/d5b45365-cb00-4d87-89b9-9bd808f79e53_video_1.mp4",
+              "sourceVideoSha256": "6cacbd222df363bfc2f9a903152c6b82afbd1cc304fe9df12584dec4b277221f",
+              "generationSubmitId": "d5b45365-cb00-4d87-89b9-9bd808f79e53",
+              "credits": 200,
+              "observed": "无脸人形负重走过横挡后踩上高台。",
+              "limitations": "后段头部出画，目标缓坡变成高台；不符合要求，需补拍实际低门槛缓坡。",
+              "retakeRequired": true,
+              "evidence": "Video/Sources/FirstLevelV1/CarryThresholdSlope/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         }
       ],
       "reusedSourceCandidates": [
@@ -6841,6 +8327,11 @@
             6.566666666666666
           ]
         }
+      ],
+      "sourceRetakeIds": [
+        "CarryFrontWalkTurn",
+        "CarryRearWalkTurn",
+        "CarryThresholdSlope"
       ]
     },
     {
@@ -7011,7 +8502,8 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL28",
@@ -7038,7 +8530,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_production_planned",
+      "status": "source_review_retake_required",
       "runtimeBinding": {
         "enabled": false,
         "stages": []
@@ -7054,9 +8546,62 @@
             "FL28"
           ],
           "expectedCredits": 160,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "f7376f29-9909-4255-9d2a-70bb8894c22d",
+          "committedCredits": 160,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\WoundedArmWalk\\f7376f29-9909-4255-9d2a-70bb8894c22d_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "WoundedArmWalk",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/WoundedArmWalk/f7376f29-9909-4255-9d2a-70bb8894c22d_video_1.mp4",
+            "sourceSha256": "7ac92eec498eaf7db82e00bb2d01fd4c00c26c9dbbced3b838dcbe38b9297888",
+            "submitId": "f7376f29-9909-4255-9d2a-70bb8894c22d",
+            "credits": 160,
+            "frames": 193,
+            "nominalFps": 24.074844074844076,
+            "lastFrameSeconds": 8.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.0,
+              2.0,
+              3.0,
+              4.0,
+              5.0,
+              6.0,
+              7.0,
+              8.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/WoundedArmWalk/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/WoundedArmWalk/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/WoundedArmWalk/f7376f29-9909-4255-9d2a-70bb8894c22d_video_1.mp4",
+              "sourceVideoSha256": "7ac92eec498eaf7db82e00bb2d01fd4c00c26c9dbbced3b838dcbe38b9297888",
+              "generationSubmitId": "f7376f29-9909-4255-9d2a-70bb8894c22d",
+              "credits": 160,
+              "observed": "右臂用三角巾吊住，缓步行走并停稳。",
+              "limitations": "空闲左手未扶右前臂；伤侧稳定，可作吊臂步态变体，不能直接替代双手护臂。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/WoundedArmWalk/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "WoundedAssistRole",
@@ -7136,6 +8681,9 @@
             4.566666666666666
           ]
         }
+      ],
+      "sourceRetakeIds": [
+        "WoundedAssistRole"
       ]
     },
     {
@@ -7163,7 +8711,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_production_planned",
+      "status": "source_review_retake_required",
       "runtimeBinding": {
         "enabled": false,
         "stages": []
@@ -7244,9 +8792,62 @@
             "FL37"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "c168281b-bbb4-4610-9d94-b2613deeab98",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\RescuerDragRole\\c168281b-bbb4-4610-9d94-b2613deeab98_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "RescuerDragRole",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/RescuerDragRole/c168281b-bbb4-4610-9d94-b2613deeab98_video_1.mp4",
+            "sourceSha256": "0eb17d8c135f858f2d92d8c3c7d368fc13d5d62f641d58a57d1aaad4d6e688c7",
+            "submitId": "c168281b-bbb4-4610-9d94-b2613deeab98",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/RescuerDragRole/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/RescuerDragRole/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/RescuerDragRole/c168281b-bbb4-4610-9d94-b2613deeab98_video_1.mp4",
+              "sourceVideoSha256": "0eb17d8c135f858f2d92d8c3c7d368fc13d5d62f641d58a57d1aaad4d6e688c7",
+              "generationSubmitId": "c168281b-bbb4-4610-9d94-b2613deeab98",
+              "credits": 200,
+              "observed": "蹲握软包端部，提起近端后连续后退拖走，再蹲下放稳。",
+              "limitations": "近端软包遮部分腿部，患者肩腋接触需另装配，不能把软包尺寸当人体尺度。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/RescuerDragRole/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "PatientDraggedSettle",
@@ -7314,7 +8915,10 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": [
+        "WoundedAssistRole"
+      ]
     },
     {
       "requirementId": "FL30",
@@ -7341,7 +8945,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_production_planned",
+      "status": "sources_generated_pending_review",
       "runtimeBinding": {
         "enabled": false,
         "stages": []
@@ -7422,12 +9026,66 @@
             "FL43"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "f13d3902-a1dd-4230-b49a-fd773df3c747",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\MedicTriageCheck\\f13d3902-a1dd-4230-b49a-fd773df3c747_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "MedicTriageCheck",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/MedicTriageCheck/f13d3902-a1dd-4230-b49a-fd773df3c747_video_1.mp4",
+            "sourceSha256": "0a5e9df61296481357a8c6e55f3146dbc8877ed2b0fd5975154962e0dcfee41f",
+            "submitId": "f13d3902-a1dd-4230-b49a-fd773df3c747",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/MedicTriageCheck/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/MedicTriageCheck/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/MedicTriageCheck/f13d3902-a1dd-4230-b49a-fd773df3c747_video_1.mp4",
+              "sourceVideoSha256": "0a5e9df61296481357a8c6e55f3146dbc8877ed2b0fd5975154962e0dcfee41f",
+              "generationSubmitId": "f13d3902-a1dd-4230-b49a-fd773df3c747",
+              "credits": 200,
+              "observed": "先招停，俯身检查长垫，再示意并跪低。",
+              "limitations": "患者与队列不在片中，且最后跪姿部分下肢被台面遮挡；接入须消费真实人数与患者身份。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/MedicTriageCheck/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL31",
@@ -7454,7 +9112,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_production_planned",
+      "status": "sources_generated_pending_review",
       "runtimeBinding": {
         "enabled": false,
         "stages": []
@@ -7533,12 +9191,66 @@
             "FL31"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "6a6c78b0-b83b-44ec-ab99-c71ef247b0bc",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\CarryVehicleLoadRear\\6a6c78b0-b83b-44ec-ab99-c71ef247b0bc_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "CarryVehicleLoadRear",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/CarryVehicleLoadRear/6a6c78b0-b83b-44ec-ab99-c71ef247b0bc_video_1.mp4",
+            "sourceSha256": "645ea31d5102f968292f01529781e2d5ed75cf30442bd395b08d21a613a170a7",
+            "submitId": "6a6c78b0-b83b-44ec-ab99-c71ef247b0bc",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/CarryVehicleLoadRear/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/CarryVehicleLoadRear/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/CarryVehicleLoadRear/6a6c78b0-b83b-44ec-ab99-c71ef247b0bc_video_1.mp4",
+              "sourceVideoSha256": "645ea31d5102f968292f01529781e2d5ed75cf30442bd395b08d21a613a170a7",
+              "generationSubmitId": "6a6c78b0-b83b-44ec-ab99-c71ef247b0bc",
+              "credits": 200,
+              "observed": "双手托平板近端，抬高推上斜台后松手。",
+              "limitations": "平板替代担架，仅为近端角色动作；另一端支撑、四手相位与车辆接触未恢复。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/CarryVehicleLoadRear/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL32",
@@ -7639,7 +9351,8 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL33",
@@ -7666,7 +9379,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_production_planned",
+      "status": "sources_generated_pending_review",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -7750,9 +9463,62 @@
             "FL33"
           ],
           "expectedCredits": 160,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "59ebaff0-c6de-474f-84ac-f18bc90718a1",
+          "committedCredits": 160,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\BearerDropFall\\59ebaff0-c6de-474f-84ac-f18bc90718a1_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "BearerDropFall",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/BearerDropFall/59ebaff0-c6de-474f-84ac-f18bc90718a1_video_1.mp4",
+            "sourceSha256": "b4f6ad4516d77fcafd6a1322c4fa46f0602f359c6288c4b01b93607b7ad274a1",
+            "submitId": "59ebaff0-c6de-474f-84ac-f18bc90718a1",
+            "credits": 160,
+            "frames": 193,
+            "nominalFps": 24.074844074844076,
+            "lastFrameSeconds": 8.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.0,
+              2.0,
+              3.0,
+              4.0,
+              5.0,
+              6.0,
+              7.0,
+              8.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/BearerDropFall/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/BearerDropFall/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/BearerDropFall/59ebaff0-c6de-474f-84ac-f18bc90718a1_video_1.mp4",
+              "sourceVideoSha256": "b4f6ad4516d77fcafd6a1322c4fa46f0602f359c6288c4b01b93607b7ad274a1",
+              "generationSubmitId": "59ebaff0-c6de-474f-84ac-f18bc90718a1",
+              "credits": 160,
+              "observed": "持托盘，先失去一手控制，身体坐跌到垫上后躺倒保持。",
+              "limitations": "道具并非担架杆；须逐帧校验失握先于落架，不把倒地动画自身当伤亡事件。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/BearerDropFall/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "PatientDropReaction",
@@ -7760,12 +9526,66 @@
             "FL33"
           ],
           "expectedCredits": 160,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "306af6b5-b14e-4c2d-bead-77e3fcabe9ab",
+          "committedCredits": 160,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\PatientDropReaction\\306af6b5-b14e-4c2d-bead-77e3fcabe9ab_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "PatientDropReaction",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/PatientDropReaction/306af6b5-b14e-4c2d-bead-77e3fcabe9ab_video_1.mp4",
+            "sourceSha256": "e3d8acf8433db7c2ca942ad318ee5c65cbfbfdce6841aa91af0a46fc85649b63",
+            "submitId": "306af6b5-b14e-4c2d-bead-77e3fcabe9ab",
+            "credits": 160,
+            "frames": 193,
+            "nominalFps": 24.074844074844076,
+            "lastFrameSeconds": 8.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.0,
+              2.0,
+              3.0,
+              4.0,
+              5.0,
+              6.0,
+              7.0,
+              8.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/PatientDropReaction/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/PatientDropReaction/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/PatientDropReaction/306af6b5-b14e-4c2d-bead-77e3fcabe9ab_video_1.mp4",
+              "sourceVideoSha256": "e3d8acf8433db7c2ca942ad318ee5c65cbfbfdce6841aa91af0a46fc85649b63",
+              "generationSubmitId": "306af6b5-b14e-4c2d-bead-77e3fcabe9ab",
+              "credits": 160,
+              "observed": "平躺床面后双手抓栏，露出吃痛表情。",
+              "limitations": "九帧中未见清楚的床端砸落冲量；需密集确认颠簸是否成立，不能作为已完成摔落片段。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/PatientDropReaction/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL34",
@@ -7792,7 +9612,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_production_planned",
+      "status": "source_review_retake_required",
       "runtimeBinding": {
         "enabled": false,
         "stages": []
@@ -7873,12 +9693,68 @@
             "FL34"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "42526a39-d2f3-4488-8b16-63b1584e65d0",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\DitchCoverReturn\\42526a39-d2f3-4488-8b16-63b1584e65d0_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "DitchCoverReturn",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/DitchCoverReturn/42526a39-d2f3-4488-8b16-63b1584e65d0_video_1.mp4",
+            "sourceSha256": "8660164a41a8db1eba446ad35047dffdf0278e30d82452eccb3159709386998b",
+            "submitId": "42526a39-d2f3-4488-8b16-63b1584e65d0",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/DitchCoverReturn/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/DitchCoverReturn/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_rejected_for_intended_source",
+              "sourceVideo": "Video/Sources/FirstLevelV1/DitchCoverReturn/42526a39-d2f3-4488-8b16-63b1584e65d0_video_1.mp4",
+              "sourceVideoSha256": "8660164a41a8db1eba446ad35047dffdf0278e30d82452eccb3159709386998b",
+              "generationSubmitId": "42526a39-d2f3-4488-8b16-63b1584e65d0",
+              "credits": 200,
+              "observed": "下沟后只露头和手臂，停留后撑上地面。",
+              "limitations": "沟体在主要片段遮住躯干与双腿，不能作为完整单人骨骼恢复输入。",
+              "retakeRequired": true,
+              "evidence": "Video/Sources/FirstLevelV1/DitchCoverReturn/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": [
+        "DitchCoverReturn"
+      ]
     },
     {
       "requirementId": "FL35",
@@ -7905,7 +9781,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_production_planned",
+      "status": "source_review_retake_required",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -8055,12 +9931,69 @@
             "FL35"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "98b92968-3b11-480d-bb2f-a36e3b44a842",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\CarryLookRelease\\98b92968-3b11-480d-bb2f-a36e3b44a842_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "CarryLookRelease",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/CarryLookRelease/98b92968-3b11-480d-bb2f-a36e3b44a842_video_1.mp4",
+            "sourceSha256": "7b329893373e328abc8974f69cda532cbc45790637c11150b83a636ca05e04c0",
+            "submitId": "98b92968-3b11-480d-bb2f-a36e3b44a842",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/CarryLookRelease/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/CarryLookRelease/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/CarryLookRelease/98b92968-3b11-480d-bb2f-a36e3b44a842_video_1.mp4",
+              "sourceVideoSha256": "7b329893373e328abc8974f69cda532cbc45790637c11150b83a636ca05e04c0",
+              "generationSubmitId": "98b92968-3b11-480d-bb2f-a36e3b44a842",
+              "credits": 200,
+              "observed": "灰色无脸人形握住支撑栏，微屈膝、短回头后放手。",
+              "limitations": "仅为静止握放；头部朝向与真实负重看回幅度未密集确认，必须替换支撑栏为刚性担架装配。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/CarryLookRelease/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": [
+        "CarryFrontLiftHoldLower",
+        "CarryRearLiftHoldLower"
+      ]
     },
     {
       "requirementId": "FL36",
@@ -8163,7 +10096,8 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL37",
@@ -8190,7 +10124,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_production_planned",
+      "status": "source_review_retake_required",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -8279,7 +10213,56 @@
           "files": [
             "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\MedicSupportLegs\\eb076d99-b2d2-427c-888a-3dbcaedf6d0e_video_1.mp4"
           ],
-          "sourceAcceptance": "not_reviewed"
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "MedicSupportLegs",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/MedicSupportLegs/eb076d99-b2d2-427c-888a-3dbcaedf6d0e_video_1.mp4",
+            "sourceSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+            "submitId": "eb076d99-b2d2-427c-888a-3dbcaedf6d0e",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/MedicSupportLegs/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/MedicSupportLegs/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/MedicSupportLegs/eb076d99-b2d2-427c-888a-3dbcaedf6d0e_video_1.mp4",
+              "sourceVideoSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+              "generationSubmitId": "eb076d99-b2d2-427c-888a-3dbcaedf6d0e",
+              "credits": 200,
+              "observed": "灰色无脸人形抬起两条软圆垫，侧移后放下。",
+              "limitations": "非真人外观；双膝有台面遮挡，托腿手臂关系需复核，不代表已取得患者相对坐标。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/MedicSupportLegs/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "RescuerDragRole",
@@ -8288,9 +10271,62 @@
             "FL37"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "c168281b-bbb4-4610-9d94-b2613deeab98",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\RescuerDragRole\\c168281b-bbb4-4610-9d94-b2613deeab98_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "RescuerDragRole",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/RescuerDragRole/c168281b-bbb4-4610-9d94-b2613deeab98_video_1.mp4",
+            "sourceSha256": "0eb17d8c135f858f2d92d8c3c7d368fc13d5d62f641d58a57d1aaad4d6e688c7",
+            "submitId": "c168281b-bbb4-4610-9d94-b2613deeab98",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/RescuerDragRole/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/RescuerDragRole/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/RescuerDragRole/c168281b-bbb4-4610-9d94-b2613deeab98_video_1.mp4",
+              "sourceVideoSha256": "0eb17d8c135f858f2d92d8c3c7d368fc13d5d62f641d58a57d1aaad4d6e688c7",
+              "generationSubmitId": "c168281b-bbb4-4610-9d94-b2613deeab98",
+              "credits": 200,
+              "observed": "蹲握软包端部，提起近端后连续后退拖走，再蹲下放稳。",
+              "limitations": "近端软包遮部分腿部，患者肩腋接触需另装配，不能把软包尺寸当人体尺度。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/RescuerDragRole/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "PatientDraggedSettle",
@@ -8358,7 +10394,10 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": [
+        "MedicSupportShoulders"
+      ]
     },
     {
       "requirementId": "FL38",
@@ -8525,7 +10564,8 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL39",
@@ -8552,7 +10592,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_production_planned",
+      "status": "sources_generated_pending_review",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -8638,12 +10678,66 @@
             "FL44"
           ],
           "expectedCredits": 240,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "adf629a1-d4f6-445f-9247-74c09f4a14b9",
+          "committedCredits": 240,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\ZhouWeakeningDeath\\adf629a1-d4f6-445f-9247-74c09f4a14b9_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "ZhouWeakeningDeath",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/adf629a1-d4f6-445f-9247-74c09f4a14b9_video_1.mp4",
+            "sourceSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+            "submitId": "adf629a1-d4f6-445f-9247-74c09f4a14b9",
+            "credits": 240,
+            "frames": 289,
+            "nominalFps": 24.0499306518724,
+            "lastFrameSeconds": 12.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.5,
+              3.0,
+              4.5,
+              6.0,
+              7.5,
+              9.0,
+              10.5,
+              12.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/adf629a1-d4f6-445f-9247-74c09f4a14b9_video_1.mp4",
+              "sourceVideoSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+              "generationSubmitId": "adf629a1-d4f6-445f-9247-74c09f4a14b9",
+              "credits": 240,
+              "observed": "躺在床上，头由看向侧方缓缓转回枕上，闭眼并保持。",
+              "limitations": "末段手是否完全松开、胸腹是否停止尚需逐帧确认，九帧不能证明死亡保持。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.5,
+                3.0,
+                4.5,
+                6.0,
+                7.5,
+                9.0,
+                10.5,
+                12.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL40",
@@ -8670,7 +10764,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_production_planned",
+      "status": "source_review_retake_required",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -8756,12 +10850,68 @@
             "FL40"
           ],
           "expectedCredits": 160,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "92bf110f-c5ec-46ff-aa0d-7ba83a37f3fd",
+          "committedCredits": 160,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\BearerReplacementApproach\\92bf110f-c5ec-46ff-aa0d-7ba83a37f3fd_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "BearerReplacementApproach",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/BearerReplacementApproach/92bf110f-c5ec-46ff-aa0d-7ba83a37f3fd_video_1.mp4",
+            "sourceSha256": "451ea81b45dc39b5dfa41d350fe377b15c60997c4dcd78d791182e166aff421f",
+            "submitId": "92bf110f-c5ec-46ff-aa0d-7ba83a37f3fd",
+            "credits": 160,
+            "frames": 193,
+            "nominalFps": 24.074844074844076,
+            "lastFrameSeconds": 8.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.0,
+              2.0,
+              3.0,
+              4.0,
+              5.0,
+              6.0,
+              7.0,
+              8.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/BearerReplacementApproach/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/BearerReplacementApproach/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/BearerReplacementApproach/92bf110f-c5ec-46ff-aa0d-7ba83a37f3fd_video_1.mp4",
+              "sourceVideoSha256": "451ea81b45dc39b5dfa41d350fe377b15c60997c4dcd78d791182e166aff421f",
+              "generationSubmitId": "92bf110f-c5ec-46ff-aa0d-7ba83a37f3fd",
+              "credits": 160,
+              "observed": "走近床边，屈膝抓栏，提起近端后站稳。",
+              "limitations": "需按后位真实握点和患者重量装配；没有旧抬手，不包含健康或身份替换逻辑。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/BearerReplacementApproach/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": [
+        "CarryRearLiftHoldLower"
+      ]
     },
     {
       "requirementId": "FL41",
@@ -8862,7 +11012,8 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL42",
@@ -8963,7 +11114,8 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL43",
@@ -8990,7 +11142,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_production_planned",
+      "status": "source_generation_failed_partial",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -9141,9 +11293,62 @@
             "FL43"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "f13d3902-a1dd-4230-b49a-fd773df3c747",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\MedicTriageCheck\\f13d3902-a1dd-4230-b49a-fd773df3c747_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "MedicTriageCheck",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/MedicTriageCheck/f13d3902-a1dd-4230-b49a-fd773df3c747_video_1.mp4",
+            "sourceSha256": "0a5e9df61296481357a8c6e55f3146dbc8877ed2b0fd5975154962e0dcfee41f",
+            "submitId": "f13d3902-a1dd-4230-b49a-fd773df3c747",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/MedicTriageCheck/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/MedicTriageCheck/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/MedicTriageCheck/f13d3902-a1dd-4230-b49a-fd773df3c747_video_1.mp4",
+              "sourceVideoSha256": "0a5e9df61296481357a8c6e55f3146dbc8877ed2b0fd5975154962e0dcfee41f",
+              "generationSubmitId": "f13d3902-a1dd-4230-b49a-fd773df3c747",
+              "credits": 200,
+              "observed": "先招停，俯身检查长垫，再示意并跪低。",
+              "limitations": "患者与队列不在片中，且最后跪姿部分下肢被台面遮挡；接入须消费真实人数与患者身份。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/MedicTriageCheck/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "MedicDeathCheck",
@@ -9152,12 +11357,17 @@
             "FL44"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "fail",
+          "submitId": "7a179fda-6c6d-4654-902c-5f974f9af916",
+          "committedCredits": 200,
+          "failReason": "generation failed: final generation failed"
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": [
+        "CarryFrontLiftHoldLower",
+        "CarryRearLiftHoldLower"
+      ]
     },
     {
       "requirementId": "FL44",
@@ -9184,7 +11394,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_production_planned",
+      "status": "source_generation_failed_partial",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -9267,9 +11477,62 @@
             "FL44"
           ],
           "expectedCredits": 240,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "adf629a1-d4f6-445f-9247-74c09f4a14b9",
+          "committedCredits": 240,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\ZhouWeakeningDeath\\adf629a1-d4f6-445f-9247-74c09f4a14b9_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "ZhouWeakeningDeath",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/adf629a1-d4f6-445f-9247-74c09f4a14b9_video_1.mp4",
+            "sourceSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+            "submitId": "adf629a1-d4f6-445f-9247-74c09f4a14b9",
+            "credits": 240,
+            "frames": 289,
+            "nominalFps": 24.0499306518724,
+            "lastFrameSeconds": 12.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.5,
+              3.0,
+              4.5,
+              6.0,
+              7.5,
+              9.0,
+              10.5,
+              12.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/adf629a1-d4f6-445f-9247-74c09f4a14b9_video_1.mp4",
+              "sourceVideoSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+              "generationSubmitId": "adf629a1-d4f6-445f-9247-74c09f4a14b9",
+              "credits": 240,
+              "observed": "躺在床上，头由看向侧方缓缓转回枕上，闭眼并保持。",
+              "limitations": "末段手是否完全松开、胸腹是否停止尚需逐帧确认，九帧不能证明死亡保持。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.5,
+                3.0,
+                4.5,
+                6.0,
+                7.5,
+                9.0,
+                10.5,
+                12.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         },
         {
           "id": "MedicDeathCheck",
@@ -9278,9 +11541,10 @@
             "FL44"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "fail",
+          "submitId": "7a179fda-6c6d-4654-902c-5f974f9af916",
+          "committedCredits": 200,
+          "failReason": "generation failed: final generation failed"
         },
         {
           "id": "YaowaGriefRise",
@@ -9347,7 +11611,10 @@
           }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": [
+        "YaowaGriefRise"
+      ]
     },
     {
       "requirementId": "FL45",
@@ -9374,7 +11641,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_production_planned",
+      "status": "source_review_retake_required",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -9458,12 +11725,68 @@
             "FL45"
           ],
           "expectedCredits": 160,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "2808b8d1-5803-4d79-91c7-0537fdee068c",
+          "committedCredits": 160,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\CompanionLookBackAmmo\\2808b8d1-5803-4d79-91c7-0537fdee068c_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "CompanionLookBackAmmo",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/CompanionLookBackAmmo/2808b8d1-5803-4d79-91c7-0537fdee068c_video_1.mp4",
+            "sourceSha256": "08dfe9fb836da8ac731e30647e5ffad7f31c4245c9d4b9cb7f5d4e71f36b3d2f",
+            "submitId": "2808b8d1-5803-4d79-91c7-0537fdee068c",
+            "credits": 160,
+            "frames": 193,
+            "nominalFps": 24.074844074844076,
+            "lastFrameSeconds": 8.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.0,
+              2.0,
+              3.0,
+              4.0,
+              5.0,
+              6.0,
+              7.0,
+              8.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/CompanionLookBackAmmo/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/CompanionLookBackAmmo/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_rejected_for_intended_source",
+              "sourceVideo": "Video/Sources/FirstLevelV1/CompanionLookBackAmmo/2808b8d1-5803-4d79-91c7-0537fdee068c_video_1.mp4",
+              "sourceVideoSha256": "08dfe9fb836da8ac731e30647e5ffad7f31c4245c9d4b9cb7f5d4e71f36b3d2f",
+              "generationSubmitId": "2808b8d1-5803-4d79-91c7-0537fdee068c",
+              "credits": 160,
+              "observed": "抱箱走到门边，停住回望，再继续走。",
+              "limitations": "最后离开段脚部出画；门边停望片段可选，完整走离需要补拍。",
+              "retakeRequired": true,
+              "evidence": "Video/Sources/FirstLevelV1/CompanionLookBackAmmo/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": [
+        "CompanionLookBackAmmo"
+      ]
     },
     {
       "requirementId": "FL46",
@@ -9490,7 +11813,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_production_planned",
+      "status": "source_review_retake_required",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -9573,12 +11896,68 @@
             "FL46"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "28ced60b-196a-4cb0-9dfb-125822987f68",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\MedicNextPatient\\28ced60b-196a-4cb0-9dfb-125822987f68_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "MedicNextPatient",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/MedicNextPatient/28ced60b-196a-4cb0-9dfb-125822987f68_video_1.mp4",
+            "sourceSha256": "8da38b386994b0f896a30d9904f65095c0cf4cd42041ba9f54939e07333fee3d",
+            "submitId": "28ced60b-196a-4cb0-9dfb-125822987f68",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/MedicNextPatient/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/MedicNextPatient/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/MedicNextPatient/28ced60b-196a-4cb0-9dfb-125822987f68_video_1.mp4",
+              "sourceVideoSha256": "8da38b386994b0f896a30d9904f65095c0cf4cd42041ba9f54939e07333fee3d",
+              "generationSubmitId": "28ced60b-196a-4cb0-9dfb-125822987f68",
+              "credits": 200,
+              "observed": "跪扶第一处软垫，起身走到第二处再俯身扶住。",
+              "limitations": "两处台面遮挡跪姿部分下肢，需按实际幸存患者装配，不能用两软垫虚构两名患者。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/MedicNextPatient/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": [
+        "YaowaGriefRise"
+      ]
     },
     {
       "requirementId": "FL47",
@@ -9605,7 +11984,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_production_planned",
+      "status": "sources_generated_pending_review",
       "runtimeBinding": {
         "enabled": false,
         "stages": []
@@ -9685,9 +12064,62 @@
             "FL47"
           ],
           "expectedCredits": 160,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "0865e6c5-8575-4559-a5d1-fce656248164",
+          "committedCredits": 160,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\EnemySignalAdvance\\0865e6c5-8575-4559-a5d1-fce656248164_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "EnemySignalAdvance",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/EnemySignalAdvance/0865e6c5-8575-4559-a5d1-fce656248164_video_1.mp4",
+            "sourceSha256": "701667912bc999c83856e3329262ccd69bf2d1ad269a1f9238f69b9dec07d20d",
+            "submitId": "0865e6c5-8575-4559-a5d1-fce656248164",
+            "credits": 160,
+            "frames": 193,
+            "nominalFps": 24.074844074844076,
+            "lastFrameSeconds": 8.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.0,
+              2.0,
+              3.0,
+              4.0,
+              5.0,
+              6.0,
+              7.0,
+              8.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/EnemySignalAdvance/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/EnemySignalAdvance/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_screened_pending_motion_review",
+              "sourceVideo": "Video/Sources/FirstLevelV1/EnemySignalAdvance/0865e6c5-8575-4559-a5d1-fce656248164_video_1.mp4",
+              "sourceVideoSha256": "701667912bc999c83856e3329262ccd69bf2d1ad269a1f9238f69b9dec07d20d",
+              "generationSubmitId": "0865e6c5-8575-4559-a5d1-fce656248164",
+              "credits": 160,
+              "observed": "持长枪招手后沿矮墙低姿前进，再起身据枪。",
+              "limitations": "枪托与双手需按日军原枪型校验，末端朝向与真实目标另绑定。",
+              "retakeRequired": false,
+              "evidence": "Video/Sources/FirstLevelV1/EnemySignalAdvance/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+                8.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         }
       ],
       "reusedSourceCandidates": [
@@ -9727,7 +12159,8 @@
             4.166666666666667
           ]
         }
-      ]
+      ],
+      "sourceRetakeIds": []
     },
     {
       "requirementId": "FL48",
@@ -9754,7 +12187,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_production_planned",
+      "status": "source_review_retake_required",
       "runtimeBinding": {
         "enabled": false,
         "stages": []
@@ -9836,12 +12269,68 @@
             "FL48"
           ],
           "expectedCredits": 200,
-          "status": "unsubmitted",
-          "submitId": null,
-          "committedCredits": 0
+          "status": "success",
+          "submitId": "fcfb5a8c-5e8d-4dc3-8657-01759090e42a",
+          "committedCredits": 200,
+          "files": [
+            "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources\\FirstLevelV1\\FatigueShoulderCough\\fcfb5a8c-5e8d-4dc3-8657-01759090e42a_video_1.mp4"
+          ],
+          "sourceAcceptance": "see_source_assessment",
+          "mediaInspection": {
+            "id": "FatigueShoulderCough",
+            "status": "decoded_needs_action_review",
+            "sourceVideo": "Video/Sources/FirstLevelV1/FatigueShoulderCough/fcfb5a8c-5e8d-4dc3-8657-01759090e42a_video_1.mp4",
+            "sourceSha256": "e9a257a52d7a44555488623ed869030a9521e351707c2133293b8a70d9064bd2",
+            "submitId": "fcfb5a8c-5e8d-4dc3-8657-01759090e42a",
+            "credits": 200,
+            "frames": 241,
+            "nominalFps": 24.05990016638935,
+            "lastFrameSeconds": 10.0,
+            "width": 1280,
+            "height": 720,
+            "sampledSourceSeconds": [
+              0.0,
+              1.25,
+              2.5,
+              3.75,
+              5.0,
+              6.25,
+              7.5,
+              8.75,
+              10.0
+            ],
+            "contactSheet": "Video/Sources/FirstLevelV1/FatigueShoulderCough/Texture_SourceContactSheet.png",
+            "firstFrame": "Video/Sources/FirstLevelV1/FatigueShoulderCough/Texture_SourceFirstFrame.jpg",
+            "assessment": {
+              "status": "contact_sheet_rejected_for_intended_source",
+              "sourceVideo": "Video/Sources/FirstLevelV1/FatigueShoulderCough/fcfb5a8c-5e8d-4dc3-8657-01759090e42a_video_1.mp4",
+              "sourceVideoSha256": "e9a257a52d7a44555488623ed869030a9521e351707c2133293b8a70d9064bd2",
+              "generationSubmitId": "fcfb5a8c-5e8d-4dc3-8657-01759090e42a",
+              "credits": 200,
+              "observed": "现代室内男子坐桌后交谈，切成头部近景，有字幕及另一人前景。",
+              "limitations": "内容完全偏离单人灰棚全身疲惫、换肩与短咳要求；拒绝恢复，原回执与文件保留供对账。",
+              "retakeRequired": true,
+              "evidence": "Video/Sources/FirstLevelV1/FatigueShoulderCough/Texture_SourceContactSheet.png",
+              "sampledSourceSeconds": [
+                0.0,
+                1.25,
+                2.5,
+                3.75,
+                5.0,
+                6.25,
+                7.5,
+                8.75,
+                10.0
+              ],
+              "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            }
+          }
         }
       ],
-      "reusedSourceCandidates": []
+      "reusedSourceCandidates": [],
+      "sourceRetakeIds": [
+        "FatigueShoulderCough"
+      ]
     }
   ]
 }

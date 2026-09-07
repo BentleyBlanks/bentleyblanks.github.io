@@ -2,13 +2,16 @@
 
 当前用户要求为**先覆盖全部 48 项的素材生成**，随后继续恢复、重定向、协作装配和游戏接入。尚未完成全部动作，也没有替换正式关卡动画。逐项字段、来源哈希和运行时文件快照见 [状态 JSON](Data_FirstLevelMissionAnimationStatus.json)。需求仍以 [完整需求](Data_FirstLevelMissionAnimationRequirements.md) 和 [视频转骨骼标准](Data_VideoToSkeletonStandard.md) 为准。
 
-## 最新进展：48 项补片批次、长凳 V1 与担架 V10
+## 最新进展：首轮 60 条视频、长凳 V1 与担架 V10
 
 - [48 项实时制作看板](http://127.0.0.1:8136/Preview/FirstLevelSourceBatchV1/index.html)读取私有库的真实回执，按 FL ID 展示已生成、生成中、待提交、复用来源及积分。该页不提交任务或扣费，视频与页面只留本地。
 - 逐片解码、哈希和带源秒数的九帧初筛分开记录。初筛已发现部分片源裁头、遮挡双腿、把前抬手拍成后位、踩上转运台等问题；看板明确列“需补拍”及具体证据。已生成数包含这些原件，不等于合格片源数；先跑完首轮，再集中补拍。解码采用两遍流式读取，避免批量持有全分辨率帧而挤占生成 CLI 内存。
 - `TrainAmmoCount` 曾在提交时遇到 Windows VirtualAlloc 内存错误。已按完全相同提示词从本地任务库找回原 `submit_id` 并继续查询；服务完成和扣费尚未确认，保守预留 200，不重复提交。原错误日志和对账证据保留在对应来源目录。
 - [补片计划](../_import/Data_FirstLevelSourcePlan.json)覆盖 FL01–FL48，拆为 62 条新单人参考片；每项可含多个角色轨道，并复用现有步态、卧起、近战、受击和 BIP/FBX。**覆盖计划不等于效果验收通过**。协作源片使用各自单人角色练习，道具和相对站位在后期装配，不声称单目恢复取得可靠多人世界坐标。
-- 全批首轮预计 11,360 积分；首条已花 160 后实查余额 10,800，剩余首轮预计 11,200，缺 400，尚未计重做。批处理以本批累计 10,960 为上限，保守计入已提交费用，不假定失败任务退款；到上限保留缺项。来源已有收据就查询原 submit_id，不重复付费提交。
+- 全部 62 条首轮请求已有记录：**60 条成功落盘、1 条医生确认死亡片服务失败、1 条数弹请求待对账**，没有待提交项。连同旧库，47 个 FL 需求已有至少一个来源；FL16 暂无成功片源。来源覆盖不代表该需求的所有片段已经合格。
+- 60 条已完整解码并检查文件哈希，均完成九帧初筛；**17 条列为需补拍**，其余 43 条尚须密集动作、接触与恢复审阅。`FatigueShoulderCough` 返回了有切镜、字幕的现代室内交谈，已核实保存的实际提交提示词与计划一致，拒绝作为恢复输入。
+- 全批请求预计／保守预留合计 11,360 积分，含 200 失败与 200 待对账，不等于实际净扣费。最初按 10,960 上限运行；最后实查余额 430，已用其中 400 补齐原计划最后两条，现余额 **30**。没有充值、重复提交失败片或重提数弹。若 17 条按原时长重拍需 3,200，再补医生失败片需 200，按现余额还缺 **3,370**；假设均一次成功，数弹对账及后续深度审阅发现的新补拍另计。
+- 批控制器已正常结束；新增同库进程锁，异常提交始终保守计费并单独等待对账。源视频和服务回执保留不变；查询回执校验原任务编号并原子落盘，避免错配、重复支付和观察到半写文件。
 - [长凳坐姿与起身三栏](http://127.0.0.1:8136/Preview/index.html?action=TrainBenchRise)：新生成 8 秒单人片，真实恢复为 240 帧／30 fps，重定向到 NRA 原人物为 479 帧／60 fps，含完整坐→起→站过程；raw 数组、PT／NPZ 哈希和可编辑原骨骼工程已保存。逐帧原恢复骨段方向误差小于 0.000127°，GLB 关节与 Blender 报告误差小于 0.002 mm。生成视角偏正前方，座凳、掌部与膝盖深度仍需修正／审阅；没有用它冒充全部下车动作。
 - [担架最新 V10 三栏](http://127.0.0.1:8136/Preview/index.html?action=StretcherPair)：修正 V9 将杆中心放进掌部的问题，按真实 65 mm 方杆外表面设置掌距并调整相对包握的拇指和四指。保留 V7 躯干与下肢；V9 留在历史。36 张四手近景在 `Preview/FirstLevelCarryV10/Contacts`，仍需最终自然度验收。
 - V10 四套原游戏网格／八个片段重新加载，968 帧逐顶点验鞋底、骨架 bind／层级和循环。用前后位、全部原模型及共同道具一致的 **5.5034 mm 常量升降**适配鞋底厚度，不改逐帧脚步。NRA02/03 最低点约 1–1.4 mm，NRA01/04 约 9.5 mm，足底支撑与滑动尚未验收。共享道具接入时必须使用同一偏移。
@@ -21,7 +24,7 @@
 
 ```text
 python Taierzhuang1938/_import/Script_FirstLevelSourcePlan.py --root <库>
-python Taierzhuang1938/_import/Script_FirstLevelSourceBatch.py --root <库> --max-credits 10960 --concurrency 3
+python Taierzhuang1938/_import/Script_FirstLevelSourceBatch.py --root <库> --max-credits 11360 --concurrency 3
 python Taierzhuang1938/_import/Script_FirstLevelSourceDashboard.py --root <库>
 python Taierzhuang1938/_import/Script_FirstLevelSourceInspect.py --root <库>
 python Taierzhuang1938/_import/Script_FirstLevelBenchPrepare.py --root <库>

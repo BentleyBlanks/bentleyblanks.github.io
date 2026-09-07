@@ -35,6 +35,8 @@ def Main():
         stdout, stderr = Run(command)
         (output / 'Data_GenerationQueryLog.txt').write_text(stdout + '\n' + stderr, encoding='utf-8')
         value = json.loads(stdout)
+        if value.get('submit_id')!=submitted['submit_id']:
+            raise RuntimeError('Query receipt does not match the original submission')
         if value.get('gen_status')=='success':
             for video in value.get('result_json',{}).get('videos',[]):
                 reported=Path(video['path'])
@@ -44,7 +46,10 @@ def Main():
                 if str(resolved)!=video['path']:
                     video['cliReportedPath']=video['path']
                     video['path']=str(resolved)
-        (output / 'Data_GenerationResult.json').write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding='utf-8')
+        resultPath=output / 'Data_GenerationResult.json'
+        temporary=resultPath.with_suffix('.tmp')
+        temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding='utf-8')
+        temporary.replace(resultPath)
         print(json.dumps(value, ensure_ascii=False), flush=True)
         return
     if receipt.exists():
