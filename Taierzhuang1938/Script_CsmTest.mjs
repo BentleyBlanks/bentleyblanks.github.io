@@ -247,6 +247,10 @@ try {
     out.acne = { withNormalBias: acneDefault, withoutNormalBias: acneNoNormalBias };
 
     // --- 7) 级联假彩色 / SunShadow ----------------------------------------
+    // 先把 uniforms 打回未同步状态：`Unavailable` 跑在 `Prepare` 之前，
+    // 判据要是读了「Prepare 才会写的那个 uniform」，第一次进这张图就永远是斜纹。
+    // 这一条曾经真的漏出去过（出图脚本直接开级联图，全屏不可用红斜纹）。
+    post.debugPass.extraViews.get("csmCascade").material.uniforms.uSunShadowCount.value = 0;
     post.SetDebugView("csmCascade");
     P.StepFrames(2, 1 / 60);
     const cascadeShot = ReadScreen();

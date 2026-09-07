@@ -299,15 +299,18 @@ export function MakeShadowDebugViews(pipeline) {
       rig?.SyncShadowUniforms?.();
     },
     views: {
+      // **可用性判据不许读 uSunShadowCount** —— 那个值是 Prepare 里 SyncUniforms 写的，
+      // 而 GetSource 的 Unavailable 跑在 Prepare **之前**：第一次进这张图时它还是 0，
+      // 于是永远画不可用斜纹、Prepare 永远不会跑。问 rig 要「第一级烘了没有」才对。
       csmCascade: {
         material,
         Prepare: (ctx) => Prepare(ctx, 0),
-        Unavailable: () => uniforms.uSunShadowCount.value <= 0,
+        Unavailable: () => !rig?.sun?.shadow?.map,
       },
       csmPenumbra: {
         material,
         Prepare: (ctx) => Prepare(ctx, 1),
-        Unavailable: () => uniforms.uSunShadowCount.value <= 0,
+        Unavailable: () => !rig?.sun?.shadow?.map,
       },
       contactShadow: {
         Texture: () => pipeline.targets.contactShadow?.texture ?? null,
