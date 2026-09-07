@@ -899,7 +899,14 @@ export class SsrPass {
   Prepare(ctx) {
     this.live = !!(this.available && this.enabled && ctx.velocityTexture && this.historyA);
     this.surface.strength.value = this.live ? SSR.strength * this.strengthScale : 0;
-    if (!this.live) this.hasHistory = false;
+    if (!this.live) {
+      this.hasHistory = false;
+      // **自己追踪的消费方（水面）也要跟着停**。它们不读 targets.ssr，读的是
+      // 这一包追踪 uniform；这一趟不跑的话 Hi-Z 与场景色都停在上一次的内容上，
+      // 水里会留一片几十帧前的倒影。`uSsrHasColor` 是它们统一的第一道闸
+      //（`SsrSurfaceReflection` 开头就查它），SsrColorPass 下次出画再置回 1。
+      this.trace.uSsrHasColor.value = 0;
+    }
   }
 
   Enabled() {

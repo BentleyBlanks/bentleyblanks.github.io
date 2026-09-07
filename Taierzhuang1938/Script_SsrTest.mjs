@@ -256,6 +256,22 @@ try {
     post.SetDebugView(viewWas);
     P.StepFrames(2, 1 / 60);
 
+    // --- 8) 关掉之后：材质强度归零，自己追踪的消费方（水面）也断供 --------
+    // 水面读的不是 targets.ssr 而是那一包追踪 uniform；SSR 这一趟不跑的话
+    // Hi-Z 与场景色都停在上一次的内容上，水里会留一片几十帧前的倒影。
+    post.SetSsrEnabled(false);
+    P.StepFrames(3, 1 / 60);
+    out.disabled = {
+      strength: post.SsrUniforms.strength.value,
+      hasColor: post.ssrPass.trace.uSsrHasColor.value,
+    };
+    post.SetSsrEnabled(true);
+    P.StepFrames(6, 1 / 60);
+    out.reenabled = {
+      strength: post.SsrUniforms.strength.value,
+      hasColor: post.ssrPass.trace.uSsrHasColor.value,
+    };
+
     out.glError = gl.getError();
     P.scene.remove(floor);
     P.scene.remove(cube);
@@ -389,6 +405,12 @@ if (!result) {
     Check(`Debug Rendering「${view}」真的出画`,
       shot && shot.distinct > 3 && shot.nonBlackRatio > 0.05, JSON.stringify(shot));
   }
+  Check("关掉 SSR：材质强度归零、水面那条追踪也断供",
+    result.disabled && result.disabled.strength === 0 && result.disabled.hasColor === 0,
+    JSON.stringify(result.disabled));
+  Check("重新打开 SSR：两者都回来",
+    result.reenabled && result.reenabled.strength > 0 && result.reenabled.hasColor === 1,
+    JSON.stringify(result.reenabled));
   Check("无 GL 错误", result.glError === 0, `glError=${result.glError}`);
   for (const quality of ["medium", "ultra"]) {
     const v = variants[quality];
