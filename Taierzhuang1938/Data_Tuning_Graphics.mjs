@@ -82,7 +82,8 @@ const RESERVED_OFF = {
  *   autoExposure —— low 不开：四趟小 pass 加起来实测 ~0.09 ms（RTX 4070 SUPER
  *     1440p），对集显不是零；而 low 档的定位就是「能跑」。medium 及以上开。
  *     **打开不改变默认机位的亮度**：增益是相对锚点的（gain = 2^(evCal − evNow)），
- *     站在每张时段预设的标定机位上精确等于 1.0（口径见 Data_Tuning_Camera 抬头）。
+ *     站在**每一关出生机位**的标定值上精确等于 1.0
+ *     （口径见 Data_Tuning_Camera 抬头与 EXPOSURE_ANCHORS）。
  *   lensFlare —— 只在 high / ultra。它是加进来的光，不是省下来的；
  *     强度按档在 Data_Tuning_Camera.LENS_FLARE.byQuality 里（low/medium 是 0，
  *     所以就算这一位被打开也不出画）。

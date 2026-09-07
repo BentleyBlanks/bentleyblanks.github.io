@@ -444,8 +444,9 @@ const graphics = {
   firstPersonSelfShadowSoft: false,
   ssao: 1, bloom: 1, god: 1, motionBlur: 1, grain: 1, vignette: 1,
   // --- 相机曝光轮（2026-09）。出厂值跟画质档走，面板热切 ---------------------
-  // autoExposure 打开**不改变默认机位的亮度**：增益锚在每张时段预设实测的
-  // 平均场景亮度上（Data_Tuning_Camera.SKY_EXPOSURE），站在标定机位时精确是 1.0。
+  // autoExposure 打开**不改变默认机位的亮度**：增益锚在**每一关出生机位**
+  // 实测的平均场景亮度上（Data_Tuning_Camera.EXPOSURE_ANCHORS），
+  // 站在标定机位时增益精确是 1.0。
   autoExposure: post.preset.autoExposure !== false,
   // 曝光补偿（EV，正 = 更亮）。这是玩家能改画面明暗的唯一一根，别把它做成倍率 ——
   // 相机上就是 EV 刻度，一档就是一倍。

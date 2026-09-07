@@ -30,8 +30,9 @@
 //
 // 所以运行档的默认口径是 **anchored（锚定）**：
 //     gain = 2^(evCal − evNow)
-// `evCal` 是**该时段预设在默认机位上实测的 EV**（下面 SKY_EXPOSURE.logLum）。
-// 站在默认机位时 evNow == evCal，gain 精确等于 1.0 —— 画面与关掉自动曝光时
+// `evCal` 是**那一关在出生机位上实测的 EV**（下面 EXPOSURE_ANCHORS.logLum；
+// 为什么是逐关而不是逐时段，见那张表的抬头）。
+// 站在标定机位时 evNow == evCal，gain 精确等于 1.0 —— 画面与关掉自动曝光时
 // 一模一样；走进屋里、钻进地道、面对火光时才按实际亮度补偿。
 // `absolute` 模式仍然实现着（evCal 由 options.exposure 反推），只给验收用：
 // 喂一张 0.18 灰，输出必须落在中灰 sRGB 118 上。
@@ -88,19 +89,17 @@ export const AUTO_EXPOSURE = {
 };
 
 /**
- * 每个时段预设的曝光锚点与钳位。
+ * 每个时段预设的 **EV 钳位与曝光补偿**（锚点在下面 EXPOSURE_ANCHORS）。
  *
- *   logLum  默认机位上实测的**平均 log2 场景亮度**（百分位区间内）。
- *           由 `node Taierzhuang1938/Script_ExposureTest.mjs --calibrate` 量出来，
- *           它就是 anchored 模式的 evCal 来源。null = 进入该预设的第一帧自锚定
- *           （能跑但不可复现，只作兜底）。
+ *   logLum  兜底锚点：该预设没有逐关锚点时用它。null = **只测量不作用**
+ *           （增益恒 1，画面与关掉自动曝光完全一致）。
  *   evBias  曝光补偿（EV，正数 = 更亮）。美术意图的最后一道旋钮，默认 0 ——
  *           因为 SKY_PRESETS.exposure 已经把每一关调好了。
  *   evUp    允许自动曝光**提亮**的上限（EV）。
  *   evDown  允许自动曝光**压暗**的上限（EV）。
  *
  * 夜战那一档的钳位特别紧：evUp 0.6 意味着自动曝光最多把夜景提亮 1.5 倍，
- * 绝不可能把夜战拉成白天（用户明确要求）。
+ * 结构上不可能把夜战拉成白天（用户明确要求）。
  */
 export const SKY_EXPOSURE = {
   // logLum: null = **只测量不作用**（增益恒 1，画面与关掉自动曝光完全一致）。
