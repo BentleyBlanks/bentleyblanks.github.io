@@ -5,19 +5,27 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {LaunchBrowser} from '../../PrairieFire1937/Script_BrowserTestKit.mjs';
 const args=process.argv.slice(2),root=args[args.indexOf('--root')+1],group='ReviewV7';
+const ids=args.includes('--ids')?args[args.indexOf('--ids')+1].split(','):null;
 const recipes=JSON.parse(await fs.readFile(path.join(root,'Models',group,'Data_Recipes.json'),'utf8'));
+if(ids)for(const id of ids)assert.ok(recipes[id]&&recipes[id].kind!=='pair',`Unknown or non-body V7 action: ${id}`);
 const names=['Pelvis','L Thigh','R Thigh','Spine','L Calf','R Calf','Spine1','L Foot','R Foot','Spine2','L Toe0','R Toe0','Neck','L Clavicle','R Clavicle','Head','L UpperArm','R UpperArm','L Forearm','R Forearm','L Hand','R Hand'];
 const browser=await LaunchBrowser(),page=await browser.newPage({viewport:{width:1700,height:1000}}),errors=[],results=[];
 page.on('pageerror',e=>errors.push(e.message));
 try{
  for(const [name,cfg] of Object.entries(recipes)){
-  if(cfg.kind==='pair')continue;
+  if(cfg.kind==='pair'||ids&&!ids.includes(name))continue;
   const motion=JSON.parse(await fs.readFile(path.join(root,'Models','_Cache',group,`Data_${name}Motion.json`),'utf8'));
   for(const faction of ['Nra','Ija']){
    const report=JSON.parse(await fs.readFile(path.join(root,'Models',group,`Data_${faction}_${name}_Validation.json`),'utf8'));
    await page.goto('http://127.0.0.1:8136/Preview/index.html?action='+name);
    await page.waitForFunction(()=>window.MotionReview&&!MotionReview.loading);
    await page.locator('#faction').selectOption(faction);
+   await page.waitForFunction(faction=>!MotionReview.loading&&MotionReview.variant.faction===faction,faction);
+   // Verify the requested V7 source even after a contact revision becomes latest.
+   if(await page.evaluate(({name,faction})=>MotionReview.variant.id!==`${faction}-v7-${name}`,{name,faction})){
+    await page.locator('#history > summary').click();
+    await page.locator(`[data-variant="${faction}-v7-${name}"]`).click();
+   }
    await page.waitForFunction(({name,faction})=>!MotionReview.loading&&MotionReview.variant.id===`${faction}-v7-${name}`,{name,faction});
    const data=await page.evaluate(({names,motion,report})=>{
     const model=MotionReview.model,bones=names.map(part=>model.bones.find(b=>b.name.replaceAll('_',' ').endsWith(' '+part)));
@@ -62,6 +70,6 @@ try{
   }
  }
  assert.deepEqual(errors,[]);
- await fs.writeFile(path.join(root,'Models',group,'Data_ExportFidelityValidation.json'),JSON.stringify({status:'passed',results,errors},null,2));
+ await fs.writeFile(path.join(root,'Models',group,ids?'Data_SelectedExportFidelityValidation.json':'Data_ExportFidelityValidation.json'),JSON.stringify({status:'passed',selectedIds:ids,results,errors},null,2));
  console.log(JSON.stringify({status:'passed',variants:results.length,frames:results.reduce((n,r)=>n+r.frames,0),maxRawDirection:Math.max(...results.map(r=>r.maxRawDirection)),maxPosition:Math.max(...results.map(r=>r.maxPosition))}));
 }finally{await browser.close()}

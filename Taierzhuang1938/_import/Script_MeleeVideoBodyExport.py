@@ -2,8 +2,9 @@
 from mathutils import Quaternion
 import base64,struct
 project=Path(__file__).resolve().parents[1]
-path=project/f'Data_Melee{faction}Animations.mjs'
-library=json.loads(path.read_text(encoding='utf-8').split(' = ',1)[1].strip().rstrip(';'))
+# 帧数据是纯 json（Animation/Melee/），浏览器由 Script_MeleeAnimationData 异步拉；表头（parts 等）在 Data_MeleeAnimationSets.mjs，改骨骼列表两边都要改。
+path=project/'Animation'/'Melee'/f'Data_Melee{faction}Animations.json'
+library=json.loads(path.read_text(encoding='utf-8'))
 parts=library['parts'];convert=Matrix.Rotation(-math.pi/2,4,'X');rotConvert=convert.to_quaternion()
 sourceFrames=np.interp(np.linspace(0,1,31),motion['runtimeTimeKnots'],motion['sourceFrameKnots'])
 rows=[];propFrames=[]
@@ -47,5 +48,5 @@ aliases={'DadaoLight':['DadaoCompact'],'DadaoLightAlt':['DadaoCompactAlt'],'Dada
  'BayonetLight':['BayonetLightAlt','BayonetCompact','BayonetCompactAlt'],'BayonetParryLeft':['BayonetParry']}
 for alias in aliases.get(clip,[]):library['clips'][alias]={**{k:v for k,v in metadata.items() if k!='recoveredPose'},'aliasOf':clip}
 library['source']='BlenderMCP / original bind skeleton; melee attacks and parries from GVHMR video'
-path.write_text('// Original-skeleton Blender samples; video takes exported by Script_MeleeVideoBodyExport.py.\nexport const MELEE_'+faction.upper()+'_ANIMATIONS = '+json.dumps(library,separators=(',',':'))+';\n',encoding='utf-8')
+path.write_text(json.dumps(library,separators=(',',':')),encoding='utf-8')
 print('RUNTIME VIDEO TAKE',faction,clip,flush=True)

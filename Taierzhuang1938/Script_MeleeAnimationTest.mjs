@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {MELEE_NRA_ANIMATIONS as nra} from './Data_MeleeNraAnimations.mjs';
-import {MELEE_IJA_ANIMATIONS as ija} from './Data_MeleeIjaAnimations.mjs';
+import {MELEE_NRA_ANIMATIONS as nra,MELEE_IJA_ANIMATIONS as ija} from './Data_MeleeAnimationSets.mjs';
+import {InstallMeleeAnimations} from './Script_MeleeAnimationData.mjs';
 import {MELEE_VIDEO_ANIMATIONS as video} from './Data_MeleeVideoAnimations.mjs';
 import {MELEE_ANIMATION_ACTIONS as actions} from './Data_MeleeCombat.mjs';
 import {FPS_ARM_LIMITS} from './Data_FpsArmPoses.mjs';
@@ -12,6 +12,8 @@ import {MESHES,WeaponMeshId,WEAPON_MESH_VARIANTS} from './Data_Meshes.mjs';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import {ServeRoot} from './Script_DevServer.mjs';
 const project=path.dirname(fileURLToPath(import.meta.url));
+// 帧数据在 json 里（浏览器由 Script_MeleeAnimationData 异步拉）；Node 侧自己读文件灌入，顺带走一遍表头对账。
+for(const set of [nra,ija])InstallMeleeAnimations(set,JSON.parse(fs.readFileSync(path.join(project,set.url.split('?')[0]),'utf8')));
 assert.equal(WeaponMeshId('Dadao'),'Dadao');
 assert.equal(MESHES.Dadao.triangles,4199);
 assert.equal(WeaponMeshId('Dadao',1),'Dadao','retired variant must resolve to the historical sword');
@@ -51,7 +53,7 @@ const errors=[];page.on('pageerror',e=>errors.push(String(e)));
 try {
   await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//,r=>r.abort('blockedbyclient'));
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?shot=1&manual=1&melee=1&quality=medium&scale=small`,{waitUntil:'load',timeout:120000});
-  await page.waitForFunction(()=>window.Taierzhuang?.state?.ready&&window.Taierzhuang?.state?.running&&window.Taierzhuang?.Debug?.MeleeCombat,null,{timeout:120000});
+  await page.waitForFunction(()=>window.Taierzhuang?.state?.ready&&window.Taierzhuang?.state?.running&&window.Taierzhuang?.Debug?.MeleeCombat&&window.Taierzhuang.meleeAnimationsLoaded,null,{timeout:120000});
   const data=await page.evaluate(async({actions,bake})=>{
     const THREE=await import('./vendor/three/build/three.module.js');
     const T=Taierzhuang,L=T.Debug.MeleeCombat;

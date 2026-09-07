@@ -272,8 +272,11 @@ try {
 await browser.close();
 server.close();
 
-const EXPECTED_ORDER = ["prepass", "hzb", "ssao", "main", "wireframe", "debugOverlay",
-  "taa", "godPrepare", "bloom", "god", "composite", "fxaa"];
+// 2026-09 SSR 落地插了两行：`ssr`（min-Hi-Z + 追踪 + 解算 + 时域，必须在 main
+// 之前 —— 材质那一趟要采它的靶）与 `ssrColor`（TAA 解算后的 HDR 降成带 mip 的
+// 「上一帧场景色」，供下一帧取色）。
+const EXPECTED_ORDER = ["prepass", "hzb", "ssr", "ssao", "main", "wireframe", "debugOverlay",
+  "taa", "ssrColor", "godPrepare", "bloom", "god", "composite", "fxaa"];
 
 const checks = [];
 function Check(name, ok, detail = "") {

@@ -1,0 +1,67 @@
+# 第一关动画接力状态（2026-09-07）
+
+本批是**担架接触试制与接入候选验证**，尚未完成第一批全部动作，也没有替换正式关卡动画。基线为 `27f6ace0f`；逐项字段、来源哈希和运行时文件快照见 [状态 JSON](Data_FirstLevelMissionAnimationStatus.json)。需求仍以 [完整需求](Data_FirstLevelMissionAnimationRequirements.md) 和 [视频转骨骼标准](Data_VideoToSkeletonStandard.md) 为准。
+
+## 本地成果
+
+资产根：`C:\Users\Bentl\OneDrive\Sync\饮河\FPS\视频转骨骼`。
+
+- [前后抬架三栏实时预览](http://127.0.0.1:8136/Preview/index.html?action=StretcherPair)：原片、未经修正的原恢复、V9 原人物实时蒙皮。前位 `CarryStretcherFront`、后位 `CarryStretcherRear` 分别可选；旧 V7 保留在效果历史。
+- 可编辑装配：`Blender/FirstLevelCarryV9/Scene_Nra_StretcherPair_V9.blend`，前后两位原骨架独立轨道和一个刚性担架。
+- 审阅 GLB：`Models/FirstLevelCarryV9/Animation_Nra_{CarryStretcherFront,CarryStretcherRear,StretcherPair}_V9.glb`。
+- 四套原游戏模型的无网格曲线候选：`Models/FirstLevelCarryV9/GameIntegration/Animation_LugouNra01FirstLevelCarry.glb` 至 `04`。**仅留本地，未成为运行时消费资产。**
+
+复用 `Video/Sources/EarlyMocap/Video_StretcherWalk.mp4` 的 4.566667–6.566667 秒，以及 `Models/_Cache/ReviewV2/CarryStretcherFront` / `CarryStretcherRear` 原始 NPZ；没有重新生成视频、重新推理或重写原恢复。原片与两份裁剪输入保持不变，仍属多人拆分实验，不能称严格单人动作。
+
+V9 保留 V7 躯干与下肢，按游戏 `CreateP012StretcherGeometry` 的 0.58 m 杆距、2.15 m 杆长、纵向 ±1 m 握点调整双臂与手指。独立恢复不能提供可靠的相对站位，本次身体间距是后期装配。为避免衣摆进入床端并保留手臂可达余量，试制床面高度为约 1.1001 m（审阅原模型尺度），**不写回游戏的床高、玩家握持或路线参数**。腕部最大修正 0.369 m、肘部 0.111 m；这是明显的后期适配，不能标成双腕保真。
+
+## 首批逐项状态
+
+| 需求 | 状态 | 尚缺内容 |
+| --- | --- | --- |
+| FL13–17 车厢坐站、分食、接食、数弹、生活 | 未找到专用片源／恢复；保留现有程序化占位 | 长凳接触、刀／食物／弹药、成对交接及真实录音分段事件 |
+| FL18–20 炮击反应、查伤臂、过道让路 | 未找到专用片源／恢复 | 炮击事件后的反应、匿名伤兵固定伤侧、同伴接触 |
+| FL21 起身、队列挪步、逐阶下车 | 未找到专用片源／恢复 | 起身与脚点片段；不能拿地面坐姿或跪起替代 |
+| FL23–24 老周靠坐、抬上担架 | 未找到专用片源／恢复 | 同一 Litter11 患者、托肩扶腿、上架连续装配 |
+| FL25 握杆、抬起、持架静止、放下 | 待制 | 已有走路片段不等于双脚支撑待机；不能停在单脚悬空帧 |
+| FL26 前后负重行走 | **V9 已重定向并挂载四套原模型；需修正，未启用** | 拇指／指握／袖口近景、02/03 鞋底、步速依据、停走转弯、坡道门槛 |
+| FL27 患者喘息与运输反应 | 待制 | 当前原片患者未独立恢复；不借用担架员骨架假装患者 |
+| FL33、35–40 松手、扑沟、救回、递布、衰弱、补位 | 未找到专用片源／恢复 | 协作分角色轨道与同一布、接触／脱手窗口；第一人称另验 |
+| FL43–46 最后抬放、检查死亡、同伴反应与转救他人 | 未找到专用片源／恢复 | 死亡末态保持、医护离场、真实录音事件点 |
+
+其余 B/C 项在本批状态表中保持“未开始”，没有冒充已检查或已接受。
+
+## 验证与限制
+
+- 原库核验：40 份原关节数组逐值匹配 NPZ 且哈希一致，17 个原骨骼工程，434 条链接有效。
+- V7 前后位两军共 484 帧保真核验：原恢复骨段方向最大误差约 0.000152°；导出关节点位置误差小于 0.002 mm。
+- V9 三个审阅 GLB 共 363 帧：真实蒙皮播放、循环首尾、原片选段同步、骨长、四掌握点和完整入镜通过。掌点误差小于 0.001 mm；**该值不证明手指包握、自然度或脚接触合格**。
+- 四套游戏原网格、八个前后位片段共 968 帧重新加载并播放；bind、骨名与层级不变，NRA03 额外骨骼保留。按 SMPL 解剖骨段核对长度；BIP 的大腿父级是 Spine、锁骨父级是 Neck，不把跨躯干层级距离误当肢体骨长。最大解剖骨段误差约 0.036 mm。
+- 无网格候选保留源姿态。NRA02/03 鞋底约 4–5 mm 低于支撑面，接触高度还需适配；V9 拇指、握指、袖口与负重自然度未通过最终验收。因此不开启关卡消费，不用试制曲线覆盖正式动作。
+- 全库三栏验证：94 个最新阵营条目，播放暂停、半速、逐帧、拖动、选段、历史、缺源提示和多人输入链接通过；无浏览器脚本错误。
+- 原任务纯规则及音频校验通过：24 阶段事实门、41 NPC 的 8/24/8 下车、20 架队列与转运、原老周身份、41 段录音文件／提示词哈希均保持。
+- 本轮 `Script_FirstLevelMissionBrowserTest.mjs --audio --campaign` 以真实玩家输入完成全关，41 段语音实际解码播放；乘车相对漂移约 0.128 mm，TrainMeal 38.833 秒，南行 75.017 秒、转运 224.767 秒、死亡 12 秒，末句完成后到达 Complete。此项验证**原任务未回退**，不代表 V9 已在关卡启用。按改动运行的 33 项 quick 检查全部通过。
+
+当前 master 的 `Script_FirstLevelMissionVoice` 仍按整段时长与字数权重分配字幕，没有实际录音拆段表。本批没有据此猜手势时间，也未改变录音、台词、口令、任务时长、人数或镜头。取得最新 cue ID＋播放段 ID＋原 MP3 起止后再绑定动作事件；暂停／重试必须拒绝旧事件。
+
+检查报告在资产库 `Models/FirstLevelCarryV9`、`Preview/FirstLevelCarryV9` 与 worktree 的 `Taierzhuang1938/_shots/FirstLevelCarry`。报告、源工程、候选动画、预览和截图均留本地。
+
+## 复现入口
+
+以下命令从本任务 worktree 根执行；`<库>` 替换为上述资产根，Python 使用 `C:\Users\Bentl\Downloads\GVHMR\.venv\Scripts\python.exe`。
+
+```text
+blender --background --python-exit-code 1 --python Taierzhuang1938/_import/Script_FirstLevelCarryBake.py -- --root <库>
+python Taierzhuang1938/_import/Script_MotionIndexLibrary.py --root <库>
+node Taierzhuang1938/_import/Script_MotionFidelityVerify.mjs --root <库> --ids CarryStretcherFront,CarryStretcherRear
+node Taierzhuang1938/_import/Script_FirstLevelCarryVerify.mjs --root <库>
+node Taierzhuang1938/_import/Script_FirstLevelCarryRuntimeBake.mjs --root <库>
+node Taierzhuang1938/_import/Script_FirstLevelCarryIntegrationVerify.mjs --root <库>
+python Taierzhuang1938/_import/Script_MotionLibraryDataVerify.py --root <库>
+node Taierzhuang1938/_import/Script_MotionLibraryVerify.mjs --root <库>
+python Taierzhuang1938/_import/Script_FirstLevelAnimationStatus.py --root <库>
+node Taierzhuang1938/Script_FirstLevelMissionTest.mjs --audio
+node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --audio --campaign
+```
+
+新首批缺源动作需要补齐可用原片或确认其另存目录；查找范围已包括标准库和 Downloads/GVHMR。预览从资产库 `Preview/Open_Preview.cmd` 启动。索引器按版本数字合并持久清单，避免 `FirstLevelCarryV9` 这样的目录被字母排序靠后的旧 ReviewV7 覆盖取景元数据。

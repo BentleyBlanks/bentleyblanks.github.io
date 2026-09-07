@@ -50,13 +50,22 @@ function MakeTexture(bytes, size, { srgb = false, repeat = 1, anisotropy = 1 } =
  *   AO  —— 只压间接光，且只压「接触处」那种小尺度遮蔽（`<aomap_fragment>`）；
  *   GI  —— 直接**替换**天空 IBL 的漫反射项，镜面那一路按亮度比做遮蔽；
  *          采样层是**编译期**开关（`gi.sampling` 进了 cache key），调试层常在。
+ *   SSR —— 按置信度把镜面 IBL 的 `radiance` 换成屏幕空间反射，并把
+ *          `material.roughness` 写进 `gl_FragColor.a`（下一帧追踪端的粗糙度输入）。
+ *          **只给不透明材质**：往 alpha 里写数会改混合结果，所以下面每个
+ *          建材质的入口都按 `transparent` 分流。
  *   破口 —— 主材质 / 静态克隆 / 阴影深度三条链共用同一份 OBB。
  */
-export function InjectIndirectLighting(material, { ssao = null, gi = null, destruction = null } = {}) {
+export function InjectIndirectLighting(material,
+  { ssao = null, gi = null, ssr = null, destruction = null } = {}) {
+  // 半透明材质一律不挂 SSR：补丁要占用 gl_FragColor.a。这里再兜一次底，
+  // 调用点漏判也不会把混合搞坏。
+  const ssrUniforms = material.transparent ? null : ssr;
   material.userData.ssaoUniforms = ssao;
   material.userData.giUniforms = gi;
+  material.userData.ssrUniforms = ssrUniforms;
   material.userData.destructionUniforms = destruction;
-  ApplyPatches(material, IndirectLightingPatches({ ssao, gi, destruction }));
+  ApplyPatches(material, IndirectLightingPatches({ ssao, gi, ssr: ssrUniforms, destruction }));
   // 布尔标记只给运行时取证与幂等接入用。不要把 uniforms 包塞进新标记：
   // 里面有 Texture，material.clone()/toJSON 会为每个人刷一屏“Unable to serialize”。
   material.userData.indirectLightingInjected = true;
@@ -82,12 +91,15 @@ export function InjectScreenSpaceAo(material, aoUniforms) {
  * 加载条能真的动起来（一次性烘 15 张 512 会把主线程卡死 3 秒，白屏就是这么来的）。
  */
 export class MaterialLibrary {
-  constructor(renderer, { textureSize = 512, ssao = null, gi = null, destruction = null } = {}) {
+  constructor(renderer,
+    { textureSize = 512, ssao = null, gi = null, ssr = null, destruction = null } = {}) {
     this.renderer = renderer;
     this.textureSize = textureSize;
     this.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 1;
     this.ssao = ssao;         // { map: {value}, resolution: {value}, strength: {value} }
     this.gi = gi;             // MakeGiUniforms() 那一包，与 ProbeVolume 共用同一批对象
+    // SsrPass.SurfaceUniforms 那一包（SSR 关档时是 null，材质连补丁都不编）
+    this.ssr = ssr;
     this.destruction = destruction;
     this.baked = new Map();   // name -> { albedo, normal, orm }（three 纹理）
     this.materials = new Map();
@@ -126,8 +138,8 @@ export class MaterialLibrary {
       }
       const firstConfiguration = !this.externalPbrMaterials.has(item);
       if (firstConfiguration) {
-        if (this.ssao || this.gi) {
-          InjectIndirectLighting(item, { ssao: this.ssao, gi: this.gi });
+        if (this.ssao || this.gi || this.ssr) {
+          InjectIndirectLighting(item, { ssao: this.ssao, gi: this.gi, ssr: this.ssr });
         }
         this.externalPbrMaterials.add(item);
       }
@@ -304,7 +316,9 @@ export class MaterialLibrary {
       opacity: options.opacity ?? 1,
       flatShading: !!options.flatShading,
     });
-    if (this.ssao || this.gi) InjectIndirectLighting(material, { ssao: this.ssao, gi: this.gi });
+    if (this.ssao || this.gi || this.ssr) {
+      InjectIndirectLighting(material, { ssao: this.ssao, gi: this.gi, ssr: this.ssr });
+    }
     this.materials.set(key, material);
     return material;
   }
@@ -325,8 +339,8 @@ export class MaterialLibrary {
       flatShading: !!params.flatShading,
       depthWrite: params.depthWrite ?? true,
     });
-    if (!params.transparent && (this.ssao || this.gi)) {
-      InjectIndirectLighting(material, { ssao: this.ssao, gi: this.gi });
+    if (!params.transparent && (this.ssao || this.gi || this.ssr)) {
+      InjectIndirectLighting(material, { ssao: this.ssao, gi: this.gi, ssr: this.ssr });
     }
     this.materials.set(key, material);
     return material;
@@ -342,6 +356,7 @@ export class MaterialLibrary {
     InjectIndirectLighting(clone, {
       ssao: this.ssao,
       gi: this.gi,
+      ssr: this.ssr,
       destruction: this.destruction,
     });
     this.staticMaterials.set(key, clone);
