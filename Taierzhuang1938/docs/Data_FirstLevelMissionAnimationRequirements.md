@@ -2,11 +2,13 @@
 
 更新：2026-09-08。适用：主菜单第一关与 `?whitebox=p012`，序章已并入，共 25 个运行时阶段（含完成）。任务契约已同步 `5ba0a4b59`／r12；接手时拉取最新 master。本文是完整制作需求，**不是已完成动作清单**。跨电脑视频转骨骼与原骨架重定向接力须保留最新任务流程、对白时机与交互。
 
-本机接力实测见[逐项进度](Data_FirstLevelMissionAnimationProgress.md)和[状态清单](Data_FirstLevelMissionAnimationStatus.json)：最新用户要求先覆盖全部 48 项的素材生成；62 条首轮请求已有 60 条视频落盘、1 条服务失败、1 条待对账，复用旧库；60 条均已初筛，其中 17 条需补拍。四套原游戏人物的长凳扶腿起身 V4 已导出独立游戏动画库，接入 32 个侧凳坐席的身体支撑、起身、站立等队列和行走衔接。生活手势仍是有区别的程序化叠加；专用递食／数弹／背包手指接触和逐阶下车尚未接入。担架 V10、切片递食 V2，以及逐阶下车、老周撑起失败、长凳休息和整理背包 V1 继续保留为本地候选。
+本机接力实测见[逐项进度](Data_FirstLevelMissionAnimationProgress.md)和[状态清单](Data_FirstLevelMissionAnimationStatus.json)：最新用户要求先覆盖全部 48 项的素材生成；62 条首轮请求已有 60 条视频落盘、1 条服务失败、1 条待对账，复用旧库；60 条均已初筛，其中 17 条需补拍。四套原游戏人物的长凳扶腿起身 V4 已导出独立游戏动画库，接入 32 个侧凳坐席的身体支撑、起身、站立等队列和行走衔接。生活手势仍是有区别的程序化叠加；专用递食／数弹／背包手指接触和逐阶下车尚未接入。担架 V11（V10 留在历史）、切片递食 V2，以及逐阶下车、老周撑起失败、长凳休息和整理背包 V1 继续保留为本地候选。
 
 TrainSupport V1 的插值失败保留在历史；新组 TrainSupport V2 对应上述审阅 V4，原片、raw、工程和冻结审阅不覆盖。r11 游戏适配冻结为 FirstLevelTrainGameV1；合并 r12 后另记 FirstLevelTrainGameV2，接入验证与剩余范围逐项记录，不把坐姿支撑子集算作完整 FL13／FL17／FL21。原 48 项素材批次仍覆盖 47 个需求；FL16 数弹原请求继续待对账，不重复提交。详细证据和补拍预算见逐项进度。
 
 ## 先读与范围
+
+最新担架试制已到 V11：四套原人物、三档身高的平地握杆与脚支撑导出通过独立数值检查，三栏及可编辑双人工程已保存；但实际侧视仍有深蹲和抬肘，未接受接入。该版本对骨盆、步态支撑和手臂作了后期重建，不再沿用 V10“躯干下肢保留”的描述。r12 仍消费上游抬运片段；来源、修正及未完成项见逐项进度。
 
 按[项目 AGENTS](../AGENTS.md)和[根 AGENTS](../../AGENTS.md)使用独占 worktree。必读[视频转骨骼标准](Data_VideoToSkeletonStandard.md)、[新版剧情快照](Data_FirstLevelRebuildSource.md)、[重构验收](Data_FirstLevelRebuildAcceptance.md)、[任务与演员](../Data_FirstLevelMission.mjs)、[对白](../Data_FirstLevelMissionDialogue.mjs)。
 
@@ -14,7 +16,7 @@ TrainSupport V1 的插值失败保留在历史；新组 TrainSupport V2 对应�
 
 最新用户要求：车内玩家空手；车厢对白播放端按实际录音拆段、留合理停顿，字幕、炮击、卧倒口令对齐；Z 由玩家自己按。**整段生成的原始录音仍保留**。动画接力读取最新播放时间线，不按字数比例推测台词时间。美术／地形贴图暂缓，本轮先完善任务目标与流程因果。
 
-接入最新实现时，直接消费 [源录音对齐表](../Data_FirstLevelMissionVoiceAlignment.mjs)、[片段与事件表](../Data_FirstLevelMissionVoiceTiming.mjs) 和 Runtime 的 VoiceEvent。TrainFirstShell／TrainNearShell 后的弹着事实、TrainProneOrder、AircraftDiveOrder 与 deathMedicArrived 已接入任务；动画不能另起固定总时长抢跑这些事实。 r12 乘车改为 6 m/s 匀速进站及连续减速；Support 还须实际步枪掩护与炮击摧毁前沿机枪点，Orders 须撤回接令点。院落与转运区分散候场和真实原骨架担架员属于上游接入，本批 V10 接触修正候选尚未替换它们。
+接入最新实现时，直接消费 [源录音对齐表](../Data_FirstLevelMissionVoiceAlignment.mjs)、[片段与事件表](../Data_FirstLevelMissionVoiceTiming.mjs) 和 Runtime 的 VoiceEvent。TrainFirstShell／TrainNearShell 后的弹着事实、TrainProneOrder、AircraftDiveOrder 与 deathMedicArrived 已接入任务；动画不能另起固定总时长抢跑这些事实。 r12 乘车改为 6 m/s 匀速进站及连续减速；Support 还须实际步枪掩护与炮击摧毁前沿机枪点，Orders 须撤回接令点。院落与转运区分散候场和真实原骨架担架员属于上游接入，本批 V11 接触修正候选尚未替换它们。
 
 ## 全部演员与人数
 
@@ -74,7 +76,7 @@ TrainSupport V1 的插值失败保留在历史；新组 TrainSupport V2 对应�
 | FL23／A | 腿伤靠坐、撑起失败、跌回仍指前沿；老周 | TakeMachineGun；固定伤腿、侧壁支撑，补从机枪旁到担架的连续转换。待制。 |
 | FL24／A | 托腿扶肩、患者抓杆、移上担架 | 老周＋两人＋同一担架同步；支撑重心，不瞬移患者。ZhouLift，待制。 |
 | FL25／A | 前后位握杆、抬起、持架静止、放下、松手 | 成对单次＋待机，静止不冻结在单脚悬空帧；旧 CarryStretcher 复核。 |
-| FL26／A | 前后负重走停、缓转、坡道、门槛 | 20 副担架，共享相位和刚性道具，手不滑杆；r12 已用原骨架前后抬运片段与握点修正，本批 V10 尚未替换，停步、坡道和门槛接触待验。 |
+| FL26／A | 前后负重走停、缓转、坡道、门槛 | 20 副担架，共享相位和刚性道具，手不滑杆；r12 已用原骨架前后抬运片段与握点修正，本批 V11 尚未替换，停步、坡道和门槛接触待验。 |
 | FL27／A | 平躺喘气、抓杆吃痛、微抬头问话、运输颠簸 | 床面局部循环＋短反应，患者不自己在床上迈步、整身弹跳。 |
 | FL28／B | 固定伤侧跛行、护臂、互相搀扶、停步喘气 | 36 轻伤员；复核 WoundedLimp，协作另装配，不随机镜像伤侧。 |
 | FL29／B | 拖走倒地伤兵、搀起撤进沟 | 救者步态＋患者姿态＋接触；实际同一伤员，不用复制尸体装饰。 |

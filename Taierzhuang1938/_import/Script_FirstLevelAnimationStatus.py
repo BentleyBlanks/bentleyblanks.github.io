@@ -7,7 +7,7 @@ from Script_FirstLevelRetargetEvidence import CollectRetargetEvidence
 def Main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--root',type=Path,required=True)
-    parser.add_argument('--carry-revision',type=int,default=10)
+    parser.add_argument('--carry-revision',type=int,default=11)
     args=parser.parse_args()
     root=args.root.resolve()
     revision=args.carry_revision
@@ -77,12 +77,37 @@ def Main():
                     'A shared constant 5.5034 mm support offset clears NRA02/NRA03 soles; NRA01/NRA04 minimum remains approximately 9.5 mm above the plane. Foot sliding/support phases are not accepted.',
                     'No double-support idle, start/stop, turn, slope or threshold transition is available.',
                     'Nominal ground speed requires measurement; original monocular translation is not calibrated.',
-                    'Mission still renders whitebox bearers; candidates are not enabled.'],
+                    'r12 uses original production-rig bearers and existing carry clips; these contact candidates are not enabled.'],
                 reviewEvidence=['Models/ReviewV7/Data_SelectedExportFidelityValidation.json',
                     f'Models/{group}/Data_ContactValidation.json',
                     f'Preview/{group}/Data_ExportValidation.json',
                     f'Preview/{group}/Contacts/Data_ContactViews.json',
                     f'Models/{group}/GameIntegration/Data_BrowserValidation.json'])
+            if revision>=11:
+                visual=Read(root/f'Models/{group}/Data_VisualAssessment.json')
+                validation=Read(root/f'Models/{group}/Data_IndependentValidation.json')
+                assert visual['frozen'] and not visual['acceptedForGame']
+                for model in visual['models']:
+                    assert Hash(root/model['path'])==model['sha256']
+                row.update(rootMotionMode='authored_in_place_support_gait_with_original_rig',referenceSpeedMps=.55,
+                    revisionLabel=f'V{revision} production-scale contact trial; pelvis, support gait and hand contacts authored after recovery',
+                    visualAssessment=visual,
+                    productionFit=dict(validation=f'Models/{group}/Data_IndependentValidation.json',
+                        trial='Models/'+validation['fitReport'],runtimeEnabled=False,
+                        profiles=sum(len(m['profiles']) for m in validation['results']),
+                        samples=sum(p['samples'] for m in validation['results'] for p in m['profiles']),
+                        referenceSpeedPolicy='0.55 m/s authoring reference; not calibrated monocular ground speed.'),
+                    contacts=[dict(prop='CreateP012StretcherGeometry',railSpacingM=.58,railLengthM=2.15,
+                        longitudinalGripsM=[-1,1],bedHeightM=.76,gripHeightM=.88,
+                        correction='Authored pelvis placement, support gait, arms and fingers; original raw unchanged.')],
+                    blockers=['Two-person cropped input remains experimental, not strict single-person recovery.',
+                        'Flat-ground contact passed independent reimport, but side views show excessive crouch and high elbows; gait does not preserve the source upright walk.',
+                        'Palm/thumb wrap improved in sampled close views; this is not full contact/naturalness acceptance for all four model variants.',
+                        'No double-support idle clip, start/stop, turn, slope, threshold or loading transition is accepted.',
+                        f'r12 uses original production-rig bearers and existing carry clips; this V{revision} candidate is not enabled.'],
+                    reviewEvidence=[f'Models/{group}/'+name for name in ['Data_IndependentValidation.json','Data_EditableProjects.json',
+                        'Data_EditableProjectValidation.json','Data_ProjectAndPlaybackValidation.json','Data_VisualAssessment.json']]+
+                        [f'Preview/{group}/Contacts/Data_ContactViews.json'])
     for row in rows:
         planned=next(r for r in coverage['requirements'] if r['requirementId']==row['requirementId'])
         row['newSourceProduction']=[sourceStates[name] for name in planned['newSources']]

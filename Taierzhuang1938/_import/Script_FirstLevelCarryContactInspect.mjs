@@ -5,6 +5,8 @@ import {LaunchBrowser} from '../../PrairieFire1937/Script_BrowserTestKit.mjs';
 const args=process.argv.slice(2),root=args[args.indexOf('--root')+1];
 if(!root)throw Error('--root required');
 const revision=args.includes('--revision')?Number(args[args.indexOf('--revision')+1]):9;
+const frozen=await fs.readFile(path.join(root,`Models/FirstLevelCarryV${revision}/Data_VisualAssessment.json`),'utf8').then(s=>JSON.parse(s).frozen,()=>false);
+if(frozen)throw Error('Use another version; frozen contact captures must be preserved.');
 const output=path.join(root,`Preview/FirstLevelCarryV${revision}/Contacts`);
 await fs.mkdir(output,{recursive:true});
 const browser=await LaunchBrowser(),page=await browser.newPage({viewport:{width:1700,height:1000}});

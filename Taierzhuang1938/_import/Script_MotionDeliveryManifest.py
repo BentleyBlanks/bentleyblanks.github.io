@@ -26,7 +26,7 @@ for pattern in ['Models/ReviewV*','Blender/ReviewV*','Models/DeathCollapseV*','B
     'Models/NextTenV*','Blender/NextTenV*','Models/MeleeVideoV*','Blender/MeleeVideoV*',
     'Models/RecoveryPreview','Blender/RawRecovery','Models/SourceWeapons','Models/_Pipeline',
     'Models/FirstLevelSourceBatchV*','Models/FirstLevelSourceRetakeV*','Models/FirstLevelTrainSupportV*','Blender/FirstLevelTrainSupportV*','Models/FirstLevelTrainGameV*',
-    'Models/FirstLevelStairFitV*',
+    'Models/FirstLevelStairFitV*','Models/FirstLevelCarryFitV*',
     'Models/_Cache/*','Video/Sources/*','Preview']:
     for folder in root.glob(pattern):
         paths.update(p for p in folder.rglob('*') if p.is_file() and '__pycache__' not in p.parts and p.suffix not in ['.log'])

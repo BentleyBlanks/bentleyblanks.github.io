@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "updated": "2026-09-08",
-  "recordedUtc": "2026-09-07T18:49:40.238848+00:00",
-  "baseCommit": "2535caf5fa3e0a7b8d8a514c176cce0148a3c478",
+  "recordedUtc": "2026-09-07T19:42:34.684959+00:00",
+  "baseCommit": "7e5efc471e5ce179278affa75fda2d4ca713186e",
   "missionContract": {
     "version": "first-level-20260907-r12",
     "stages": [
@@ -437,8 +437,8 @@
     }
   },
   "libraryRoot": "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼",
-  "catalogSha256": "63ef0a43bb84b469765f1236ec58ccc504e58eec394b0fd607cf4a3e914d381b",
-  "requirementsSha256": "ee673c67ba9dc841c7b4298f9e85f0d3c0374017a4c7bfaa4dc22a3736f9d38c",
+  "catalogSha256": "85a729dce9a3ece9424f1e12885a08901f192481bdf06d4c63cab1c60b618cc4",
+  "requirementsSha256": "8493ffa60497a10b7ef945fc8054ccceb9a361279ad430a31f9bd2fa67865565",
   "missionBaselineFiles": {
     "Data_FirstLevelMission.mjs": "05d2b588248ceb494ee39d04a0734cb9702125b1a8156cc75d9575da41aa1eaf",
     "Data_FirstLevelMissionDialogue.mjs": "a62830fc97fedc1f5df3aacf0664c89edada411ae7689e1dbdaf3164550a5cda",
@@ -985,14 +985,14 @@
     "expectedFirstPassCredits": 11360,
     "lastCreditObservation": {
       "balance": 60,
-      "recordedUtc": "2026-09-07T18:40:10.040760+00:00"
+      "recordedUtc": "2026-09-07T19:39:38.221453+00:00"
     },
     "pendingAmmoQuery": {
       "resubmitted": false,
       "genStatus": "querying",
       "submitId": "370184c6-ecdf-467d-8c4c-fa67243dce8a",
       "downloadAvailable": false,
-      "recordedUtc": "2026-09-07T18:40:10.040760+00:00"
+      "recordedUtc": "2026-09-07T19:39:38.221453+00:00"
     },
     "retakeBudget": {
       "status": "prepared_not_submitted",
@@ -13899,7 +13899,7 @@
       "requirementId": "FL26",
       "priority": "A",
       "label": "前后负重走停、缓转、坡道、门槛",
-      "acceptanceRequirements": "20 副担架，共享相位和刚性道具，手不滑杆；r12 已用原骨架前后抬运片段与握点修正，本批 V10 尚未替换，停步、坡道和门槛接触待验。",
+      "acceptanceRequirements": "20 副担架，共享相位和刚性道具，手不滑杆；r12 已用原骨架前后抬运片段与握点修正，本批 V11 尚未替换，停步、坡道和门槛接触待验。",
       "actorRoles": [
         "litter.frontBearer",
         "litter.rearBearer"
@@ -13916,8 +13916,8 @@
         "e103cd1f078e777a9164f7dfc591c1b774ab6c10c5e5c1c11a469233a62679e1"
       ],
       "clipName": [
-        "Animation_Nra_CarryStretcherFront_V10",
-        "Animation_Nra_CarryStretcherRear_V10"
+        "FirstLevelCarryFrontWalk100",
+        "FirstLevelCarryRearWalk100"
       ],
       "faction": "Nra",
       "modelVariants": [
@@ -13927,8 +13927,8 @@
         "LugouNra04"
       ],
       "loop": true,
-      "referenceSpeedMps": null,
-      "rootMotionMode": "in_place_with_explicit_assembly_translation",
+      "referenceSpeedMps": 0.55,
+      "rootMotionMode": "authored_in_place_support_gait_with_original_rig",
       "contacts": [
         {
           "prop": "CreateP012StretcherGeometry",
@@ -13938,20 +13938,18 @@
             -1,
             1
           ],
-          "sourceSeconds": [
-            4.566666666666666,
-            6.566666666666666
-          ],
-          "correction": "authored arms and fingers, not raw GVHMR"
+          "bedHeightM": 0.76,
+          "gripHeightM": 0.88,
+          "correction": "Authored pelvis placement, support gait, arms and fingers; original raw unchanged."
         }
       ],
       "events": [],
       "entryPose": "walking",
       "exitPose": "walking",
       "interruptPolicy": "Animation must not write mission facts, population, inventory, camera or patient identity.",
-      "blendFile": "Blender/FirstLevelCarryV10/Scene_Nra_StretcherPair_V10.blend",
+      "blendFile": "Blender/FirstLevelCarryV11/Scene_LugouNra01_CarryPair_V11.blend",
       "previewId": "StretcherPair",
-      "revisionLabel": "V10 first-level rigid prop contact pilot; V7 body and lower limbs retained",
+      "revisionLabel": "V11 production-scale contact trial; pelvis, support gait and hand contacts authored after recovery",
       "status": "needs_correction",
       "runtimeBinding": {
         "enabled": false,
@@ -13966,27 +13964,27 @@
         ]
       },
       "reviewEvidence": [
-        "Models/ReviewV7/Data_SelectedExportFidelityValidation.json",
-        "Models/FirstLevelCarryV10/Data_ContactValidation.json",
-        "Preview/FirstLevelCarryV10/Data_ExportValidation.json",
-        "Preview/FirstLevelCarryV10/Contacts/Data_ContactViews.json",
-        "Models/FirstLevelCarryV10/GameIntegration/Data_BrowserValidation.json"
+        "Models/FirstLevelCarryV11/Data_IndependentValidation.json",
+        "Models/FirstLevelCarryV11/Data_EditableProjects.json",
+        "Models/FirstLevelCarryV11/Data_EditableProjectValidation.json",
+        "Models/FirstLevelCarryV11/Data_ProjectAndPlaybackValidation.json",
+        "Models/FirstLevelCarryV11/Data_VisualAssessment.json",
+        "Preview/FirstLevelCarryV11/Contacts/Data_ContactViews.json"
       ],
       "blockers": [
-        "Two-person cropped input is experimental, not strict single-person recovery.",
-        "V10 palm penetration improved using actual rail thickness; finger/thumb wrap and cuffs still require final close review.",
-        "A shared constant 5.5034 mm support offset clears NRA02/NRA03 soles; NRA01/NRA04 minimum remains approximately 9.5 mm above the plane. Foot sliding/support phases are not accepted.",
-        "No double-support idle, start/stop, turn, slope or threshold transition is available.",
-        "Nominal ground speed requires measurement; original monocular translation is not calibrated.",
-        "Mission still renders whitebox bearers; candidates are not enabled."
+        "Two-person cropped input remains experimental, not strict single-person recovery.",
+        "Flat-ground contact passed independent reimport, but side views show excessive crouch and high elbows; gait does not preserve the source upright walk.",
+        "Palm/thumb wrap improved in sampled close views; this is not full contact/naturalness acceptance for all four model variants.",
+        "No double-support idle clip, start/stop, turn, slope, threshold or loading transition is accepted.",
+        "r12 uses original production-rig bearers and existing carry clips; this V11 candidate is not enabled."
       ],
       "variants": [
         {
           "previewId": "CarryStretcherFront",
-          "variantId": "Nra-v10-CarryStretcherFront",
-          "clipName": "Animation_Nra_CarryStretcherFront_V10",
-          "path": "Models/FirstLevelCarryV10/Animation_Nra_CarryStretcherFront_V10.glb",
-          "blendFile": "Blender/FirstLevelCarryV10/Scene_Nra_StretcherPair_V10.blend",
+          "variantId": "Nra-v11-CarryStretcherFront",
+          "clipName": "FirstLevelCarryFrontWalk100",
+          "path": "Models/FirstLevelCarryV11/Model_LugouNra01_CarryFront.glb",
+          "blendFile": "Blender/FirstLevelCarryV11/Scene_LugouNra01_CarryPair_V11.blend",
           "sourceVideo": "Video/Sources/EarlyMocap/Video_StretcherWalk.mp4",
           "sourceVideoSha256": "7ea06eb51ffea12b012cac7a6e5987b9bf9ecd10860d8b28112e663ae4b0b69b",
           "sourceRangeSeconds": [
@@ -14009,10 +14007,10 @@
         },
         {
           "previewId": "CarryStretcherRear",
-          "variantId": "Nra-v10-CarryStretcherRear",
-          "clipName": "Animation_Nra_CarryStretcherRear_V10",
-          "path": "Models/FirstLevelCarryV10/Animation_Nra_CarryStretcherRear_V10.glb",
-          "blendFile": "Blender/FirstLevelCarryV10/Scene_Nra_StretcherPair_V10.blend",
+          "variantId": "Nra-v11-CarryStretcherRear",
+          "clipName": "FirstLevelCarryRearWalk100",
+          "path": "Models/FirstLevelCarryV11/Model_LugouNra01_CarryRear.glb",
+          "blendFile": "Blender/FirstLevelCarryV11/Scene_LugouNra01_CarryPair_V11.blend",
           "sourceVideo": "Video/Sources/EarlyMocap/Video_StretcherWalk.mp4",
           "sourceVideoSha256": "7ea06eb51ffea12b012cac7a6e5987b9bf9ecd10860d8b28112e663ae4b0b69b",
           "sourceRangeSeconds": [
@@ -14035,10 +14033,10 @@
         },
         {
           "previewId": "StretcherPair",
-          "variantId": "Nra-v10-StretcherPair",
-          "clipName": "Animation_Nra_StretcherPair_V10",
-          "path": "Models/FirstLevelCarryV10/Animation_Nra_StretcherPair_V10.glb",
-          "blendFile": "Blender/FirstLevelCarryV10/Scene_Nra_StretcherPair_V10.blend",
+          "variantId": "Nra-v11-StretcherPair",
+          "clipName": "FirstLevelCarryPair1",
+          "path": "Models/FirstLevelCarryV11/Model_LugouNra01_CarryPair.glb",
+          "blendFile": "Blender/FirstLevelCarryV11/Scene_LugouNra01_CarryPair_V11.blend",
           "sourceVideo": "Video/Sources/EarlyMocap/Video_StretcherWalk.mp4",
           "sourceVideoSha256": "7ea06eb51ffea12b012cac7a6e5987b9bf9ecd10860d8b28112e663ae4b0b69b",
           "sourceRangeSeconds": [
@@ -14068,6 +14066,147 @@
           "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=StretcherPair"
         }
       ],
+      "visualAssessment": {
+        "status": "requires_posture_and_gait_refinement",
+        "acceptedForGame": false,
+        "frozen": true,
+        "recordedUtc": "2026-09-07T19:39:38.221453+00:00",
+        "reviewedBy": "Codex; actual image inspection in this task",
+        "models": [
+          {
+            "path": "Models/FirstLevelCarryV11/Animation_LugouNra01FirstLevelCarry.glb",
+            "sha256": "70b5942e6b2be05cad491d5506c8da62215dfe8a83d9fd7dd2a9be4302a373fc"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Animation_LugouNra02FirstLevelCarry.glb",
+            "sha256": "3758b0393ad2a1c6d330d173c1caace098004c5672ed6f30fa3fa1852bce0164"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Animation_LugouNra03FirstLevelCarry.glb",
+            "sha256": "7b36142bfbccc2fc7f7b21650792234f77707db1dd98325e19a8f4eab40b25d0"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Animation_LugouNra04FirstLevelCarry.glb",
+            "sha256": "f81a9a0208b77e0110998a20c9634a229215324a5d96a35aa2ec80e83bcad46f"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Model_LugouNra01_CarryFront.glb",
+            "sha256": "b2379d601555d60b47a176397a314f3c077595289c18a8ead6a127da627f7c11"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Model_LugouNra01_CarryPair.glb",
+            "sha256": "4824a250725766bcb558be93d84d46b0ef22f23406d9ada58d4d5ddc27d0ffb4"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Model_LugouNra01_CarryRear.glb",
+            "sha256": "b15db08e680f79ae4ab7604ff9e6b17b86bb1c18425278005af804e7341ad268"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Model_LugouNra02_CarryFront.glb",
+            "sha256": "6c67b337aa0bd2000e6f706356a7a6ad20e005fb5f8a6508a6cba6bf9e8910ed"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Model_LugouNra02_CarryPair.glb",
+            "sha256": "b3ba413c730a16150a2995787278badd10e6c44cb30392bed9098852a975ce15"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Model_LugouNra02_CarryRear.glb",
+            "sha256": "71f0ecf8e027aeb5ce51309ea6eae7c6b1d0fa256755bf747e80a7a3de4bf7a3"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Model_LugouNra03_CarryFront.glb",
+            "sha256": "5f1d2be00b676b27ecc6308bb0d03be9e80509eea07a648f58f3ebe2dd64a416"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Model_LugouNra03_CarryPair.glb",
+            "sha256": "ca9181582724007af9977e0bd23eb0e9ea5541712c8fe3d8e1592d5a27b1d966"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Model_LugouNra03_CarryRear.glb",
+            "sha256": "bd514b242d878dacabd03b7e5c2fa781671cc6c6c7d9d9e92da113e726b7ca30"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Model_LugouNra04_CarryFront.glb",
+            "sha256": "a85c2cff0d30f4c480fd650d4508c2c32cb0b8f1e4a3e769a64ceffb689ec341"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Model_LugouNra04_CarryPair.glb",
+            "sha256": "4f6aa0db829fad15079b5bbe7f1bd61a819ee0c23ab1878f5f3f82a8f26f11c2"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Model_LugouNra04_CarryRear.glb",
+            "sha256": "d3589339d2a623ded3df124fe28e50dd6ad3331049e5a7350d7e2c95fe7920ba"
+          }
+        ],
+        "evidence": [
+          {
+            "path": "Models/FirstLevelCarryV11/Data_IndependentValidation.json",
+            "sha256": "ddb6a3df2280bd475bd6a787b4c82de7542768409745db76c534604ef45838f9"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Data_EditableProjects.json",
+            "sha256": "dacdfe655f297a41d0c5dfa2b0b6e73053566223dd638b0cc18e1bd1ce314eec"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Data_EditableProjectValidation.json",
+            "sha256": "db74e44e442efbf02daa4b4cf64ef11f44f6af90fe89df18864888a92f72589f"
+          },
+          {
+            "path": "Models/FirstLevelCarryV11/Data_ProjectAndPlaybackValidation.json",
+            "sha256": "a5d39e1b6b015bbddf69425e6d54b8cefc2aa5ee574114cbf48f93d9546b5081"
+          }
+        ],
+        "viewed": [
+          {
+            "path": "Preview/FirstLevelCarryV11/Texture_StretcherPair_three_25.png",
+            "sha256": "0d7eda6865ce6c8a879d4611f8913afda6d400410496e84db8ca6353adfbe25d"
+          },
+          {
+            "path": "Preview/FirstLevelCarryV11/Texture_StretcherPair_side_0.png",
+            "sha256": "5516b4cc258a629edb5e9c4da3a19ccb9f10e6d25f4c896c9a6c0090c445b22a"
+          },
+          {
+            "path": "Preview/FirstLevelCarryV11/Texture_StretcherPair_side_50.png",
+            "sha256": "3bf9b5139568a38b7d35021ab3a8a5b817439379f5e761607aa51003662bb411"
+          },
+          {
+            "path": "Preview/FirstLevelCarryV11/Texture_StretcherPair_front_75.png",
+            "sha256": "bebbb7a0c58c237c9217dd35b2c2c5d3da9e29e1c69f053f17df7a4df62011be"
+          },
+          {
+            "path": "Preview/FirstLevelCarryV11/Contacts/Texture_FrontL_outside_50.png",
+            "sha256": "802c5427de66435cd3642c111857aa6dd54c260141d1a2649fe5e48ab3c79ca1"
+          },
+          {
+            "path": "Preview/FirstLevelCarryV11/Contacts/Texture_FrontR_inside_50.png",
+            "sha256": "88221f0d4e3d3a37bbc9f84a3c12611ab71328560b67cfef0e735c90d467848f"
+          },
+          {
+            "path": "Preview/FirstLevelCarryV11/Contacts/Texture_RearL_above_50.png",
+            "sha256": "d707cbce3291f54b5d1a3f3ee24cdc9a9bb37aa3be9f52fdc1ad14c375bb8a76"
+          },
+          {
+            "path": "Preview/FirstLevelCarryV11/Contacts/Texture_RearR_outside_75.png",
+            "sha256": "f05f5b67d39e48719e9a1fdd45a6ae1b46c4b7b16d21adfcb6f8dd2e5e4e18b2"
+          }
+        ],
+        "observations": [
+          "Shared rigid stretcher and four palm contact locations stay together in sampled full and close views.",
+          "Thumb opposition and lower finger wrap are visible; remaining cuff, corner penetration and all-model close views are not fully accepted.",
+          "Side views at 0 and 1 seconds show sustained deep crouch with raised elbows; this does not match source upright load-bearing gait.",
+          "No patient, double-support idle clip, start/stop, slope, turning, threshold or loading transition has been accepted."
+        ],
+        "next": "Reconcile rail height and original-model proportions while preserving natural stance. Do not simply force lower pelvis to satisfy a point constraint.",
+        "sourcePolicy": "Two-person crop experiment. Original video, raw and prior versions unchanged; V11 pelvis and support gait are authored corrections."
+      },
+      "productionFit": {
+        "validation": "Models/FirstLevelCarryV11/Data_IndependentValidation.json",
+        "trial": "Models/FirstLevelCarryFitV6/Data_ProductionFit.json",
+        "runtimeEnabled": false,
+        "profiles": 24,
+        "samples": 5784,
+        "referenceSpeedPolicy": "0.55 m/s authoring reference; not calibrated monocular ground speed."
+      },
       "newSourceProduction": [
         {
           "id": "CarryFrontWalkTurn",
