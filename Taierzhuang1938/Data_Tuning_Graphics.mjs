@@ -16,8 +16,11 @@
 //   · velocity / hzb —— 2026-09 帧图重构新增：MRT 速度靶与 HZB 链。
 //        高低档都开：它们是后续 SSR / 体积雾 / 接触阴影的公共输入，
 //        关掉等于把八个并行子系统一起关掉；真要省，先关消费方。
-//   · 其余键（csm / gtao / ssil / ssr / volumetrics / atmosphere / autoExposure /
-//     lensFlare / lut / dof / taaUpscale / clusteredLights / contactShadows）
+//   · autoExposure / lensFlare / lut —— 2026-09 相机曝光轮落地，见下面各自的注释。
+//        相机侧的数值口径（测光、EV 钳位、光晕强度、LUT 尺寸）在
+//        `Data_Tuning_Camera.mjs`；这里只有「哪一档跑不跑」。
+//   · 其余键（csm / gtao / ssil / ssr / volumetrics / atmosphere /
+//     dof / taaUpscale / clusteredLights / contactShadows）
 //     —— **本阶段全部为占位**，值 = 与今天等价（即「不启用新东西」）。
 //        对应子系统落地时把自己那一位改成实际档位，并在这里补出处注释。
 //
@@ -48,12 +51,13 @@
  *   ssr           屏幕空间反射
  *   volumetrics   froxel 体积雾（今天：合成 pass 里的解析式指数高度雾）
  *   atmosphere    物理大气（今天：SkyDome 的解析式天空）
- *   autoExposure  自动曝光（今天：时段预设手调的常数曝光）
- *   lensFlare     镜头光晕
- *   lut           3D LUT 调色（今天：lift/gain + 分离调色）
  *   dof           景深（今天恒开：阵亡与开镜两条都走 Composite 的圆盘采样）
  *   taaUpscale    TAA 超分（TAAU）
  *   clusteredLights 簇状多光源（今天：固定预算的 PointLight 池）
+ *   ——— 2026-09 相机曝光轮（数值口径在 Data_Tuning_Camera.mjs）———
+ *   autoExposure  直方图自动曝光（Script_PostExposure；四趟极小的 pass + 一张 1×1）
+ *   lensFlare     镜头光晕 / 脏污 / 太阳眩光（Script_PostLensFlare；1/4 分辨率一趟）
+ *   lut           3D LUT 分级（Script_PostGrade 把既有分级数学原样烘成 64³）
  * @typedef {Record<string, boolean|number>} QualityPreset
  */
 
@@ -66,14 +70,32 @@ const RESERVED_OFF = {
   ssr: false,
   volumetrics: false,
   atmosphere: false,
-  autoExposure: false,
-  lensFlare: false,
-  lut: false,
   taaUpscale: false,
   clusteredLights: false,
   // 景深今天就在跑（阵亡远景虚化 + 开镜近景虚化），所以它不是 false。
   dof: true,
 };
+
+/**
+ * 相机曝光轮的三位（2026-09）。
+ *
+ *   autoExposure —— low 不开：四趟小 pass 加起来实测 ~0.09 ms（RTX 4070 SUPER
+ *     1440p），对集显不是零；而 low 档的定位就是「能跑」。medium 及以上开。
+ *     **打开不改变默认机位的亮度**：增益是相对锚点的（gain = 2^(evCal − evNow)），
+ *     站在每张时段预设的标定机位上精确等于 1.0（口径见 Data_Tuning_Camera 抬头）。
+ *   lensFlare —— 只在 high / ultra。它是加进来的光，不是省下来的；
+ *     强度按档在 Data_Tuning_Camera.LENS_FLARE.byQuality 里（low/medium 是 0，
+ *     所以就算这一位被打开也不出画）。
+ *   lut —— 四档全开。查一次三线性表比原来那套「两次 sRGB 幂 + 两次 pow 权重」
+ *     更便宜，而且分级从此是数据。与旧算式的差在灰阶与彩阶上实测 ≤ 1/255
+ *     （回归口：Script_ExposureTest 的 LUT 一致性断言）。
+ *
+ * 三位**全部关掉时，合成输出逐比特等于 2026-09 帧图重构后的版本** ——
+ * 这是本轮的硬约束（用户对画面明暗极敏感，历史事故「画面为什么这么黑」）。
+ */
+const CAMERA_OFF = { autoExposure: false, lensFlare: false, lut: true };
+const CAMERA_ON = { autoExposure: true, lensFlare: false, lut: true };
+const CAMERA_FULL = { autoExposure: true, lensFlare: true, lut: true };
 
 export const QUALITY_PRESETS = {
   // 抗锯齿分工：taa 是 medium 及以上的**出厂默认**（UE 的默认 AA 也是 TAA），
@@ -83,12 +105,14 @@ export const QUALITY_PRESETS = {
   // low 档玩家想要也给得了，靶到那时候才建。
   low: {
     ...RESERVED_OFF,
+    ...CAMERA_OFF,
     ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
     aoScale: 0.5, sharpen: 0.14, taa: false,
     velocity: true, hzb: true,
   },
   medium: {
     ...RESERVED_OFF,
+    ...CAMERA_ON,
     ssao: true, bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.6, sharpen: 0.18, taa: true,
     velocity: true, hzb: true,
@@ -98,12 +122,14 @@ export const QUALITY_PRESETS = {
   // （ultra 是 MSAA 喂更干净的几何边给 TAA，两层叠加不冲突，只是贵）。
   high: {
     ...RESERVED_OFF,
+    ...CAMERA_FULL,
     ssao: true, bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.75, sharpen: 0.22, taa: true,
     velocity: true, hzb: true,
   },
   ultra: {
     ...RESERVED_OFF,
+    ...CAMERA_FULL,
     ssao: true, bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,
     aoScale: 1.0, sharpen: 0.22, taa: true,
     velocity: true, hzb: true,

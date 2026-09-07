@@ -272,8 +272,19 @@ try {
 await browser.close();
 server.close();
 
+// Phase A 定下的**核心** pass 与它们的相对次序。八个并行子系统会往这张列表里
+// 插自己的 pass（自动曝光插在 taa 与 bloom 之间、光晕插在 god 与 composite 之间、
+// 体积雾插在 main 之前……），所以这里断言的是**子序列**而不是全等：
+// 核心 pass 一个都不许少、相对次序一个都不许换，插进来的新 pass 不算违约。
+// 全等断言会让「谁先合并谁不用改测试」变成一场竞赛，那不是契约该有的样子。
 const EXPECTED_ORDER = ["prepass", "hzb", "ssao", "main", "wireframe", "debugOverlay",
   "taa", "godPrepare", "bloom", "god", "composite", "fxaa"];
+
+/** order 里是否按序出现了 EXPECTED_ORDER 的全部名字（允许中间插入别的）。 */
+function CoreOrderOk(order) {
+  const core = order.filter((name) => EXPECTED_ORDER.includes(name));
+  return JSON.stringify(core) === JSON.stringify(EXPECTED_ORDER);
+}
 
 const checks = [];
 function Check(name, ok, detail = "") {
@@ -283,8 +294,9 @@ function Check(name, ok, detail = "") {
 if (!result) {
   Check("页面取证成功", false, problems.join(" | "));
 } else {
-  Check("帧图 pass 顺序未变",
-    JSON.stringify(result.passOrder) === JSON.stringify(EXPECTED_ORDER),
+  Check("帧图核心 pass 顺序未变（允许子系统插新 pass）",
+    CoreOrderOk(result.passOrder)
+      && new Set(result.passOrder).size === result.passOrder.length,
     JSON.stringify(result.passOrder));
   Check("预通道是 MRT（RT0 法线深度 + RT1 速度 + DepthTexture）",
     result.mrt.attachments === 2 && result.mrt.velocityTexture && result.mrt.velocityIsSecond

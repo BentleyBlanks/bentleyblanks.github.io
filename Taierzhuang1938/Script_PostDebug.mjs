@@ -229,6 +229,25 @@ export class DebugPass {
     BindSunShadowUniforms(this.uniformsSunShadow, null);
     this.materialSunShadow = MakeFullscreenMaterial(FRAG_SUN_SHADOW_VIEW, this.uniformsSunShadow);
     this.sunShadowRig = null;
+    /**
+     * 子系统自带的调试视图。
+     *
+     * 下面 `GetSource()` 那张 switch 表只认这个文件里的靶；八个并行子系统各自
+     * 有自己的中间产物（自动曝光的直方图、光晕靶、体积雾的 froxel …），它们的
+     * 材质与 uniform 都住在自己的模块里，硬塞进这张 switch 只会让这个文件
+     * 变成所有人的公共垃圾场。
+     *
+     * 契约：`RegisterView(id, resolver)`，resolver 收 pipeline、返回
+     *   { texture, mode, unavailable }                  —— 走通用展示 pass；
+     *   { material, Prepare?(ctx), unavailable }         —— 自带材质，直接送屏。
+     * 面板那一侧（Script_EditorDebugRendering 的 VIEWS）也要有对应一行。
+     */
+    this.extraViews = new Map();
+  }
+
+  /** 登记一个子系统自带的调试视图（见 extraViews 的契约）。 */
+  RegisterView(id, resolver) {
+    if (id && typeof resolver === "function") this.extraViews.set(id, resolver);
   }
 
   Resize() { /* 没有自己的靶 */ }
@@ -378,7 +397,11 @@ export class DebugPass {
       // （黑 = 没有探针 GI）—— 都是准确信息，不是"不可用"。
       case "giWorld": case "giConfidence":
         return { texture: T.hdr.texture, mode: 5, unavailable: !P.debugInjected };
-      default: return null;
+      default: {
+        // 子系统自带的视图（自动曝光直方图、镜头光晕、LUT 校验 …）
+        const resolver = this.extraViews.get(P.debugView);
+        return resolver ? (resolver(P) || null) : null;
+      }
     }
   }
 
@@ -395,6 +418,12 @@ export class DebugPass {
       // 阴影框每帧都在滚（跟玩家 + 吸附纹素），矩阵必须现取。
       this.sunShadowRig?.SyncShadowUniforms?.();
       ctx.blitter.Blit(this.materialSunShadow, null);
+      return;
+    }
+    // 子系统自带材质的视图：本帧参数由它自己在 Prepare 里摆，这里只负责送屏。
+    if (source.material && !source.unavailable) {
+      source.Prepare?.(ctx);
+      ctx.blitter.Blit(source.material, null);
       return;
     }
     // 雾量 / CoC 调试视图必须复用刚刚送进 Composite 的本帧参数。不要另存一份

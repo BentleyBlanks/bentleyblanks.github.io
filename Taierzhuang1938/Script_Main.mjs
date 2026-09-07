@@ -443,6 +443,23 @@ const graphics = {
   // 手背上的枪托/右手投影默认仍是 1024 图硬 3×3 那块；画质面板热切。
   firstPersonSelfShadowSoft: false,
   ssao: 1, bloom: 1, god: 1, motionBlur: 1, grain: 1, vignette: 1,
+  // --- 相机曝光轮（2026-09）。出厂值跟画质档走，面板热切 ---------------------
+  // autoExposure 打开**不改变默认机位的亮度**：增益锚在每张时段预设实测的
+  // 平均场景亮度上（Data_Tuning_Camera.SKY_EXPOSURE），站在标定机位时精确是 1.0。
+  autoExposure: post.preset.autoExposure !== false,
+  // 曝光补偿（EV，正 = 更亮）。这是玩家能改画面明暗的唯一一根，别把它做成倍率 ——
+  // 相机上就是 EV 刻度，一档就是一倍。
+  exposureCompensation: 0,
+  // 镜头光晕 / 脏污强度倍率（与 bloom/god 同一套约定，0 = 关）
+  lensFlare: 1, lensDirt: 1,
+  // 色调映射曲线："aces"（默认）/ "agx"
+  tonemap: "aces",
+  // 3D LUT 分级（关掉退回等价的着色器算式，画面差 ≤ 1/255）
+  lut: post.preset.lut !== false,
+  // 泛光第一级的 Karis 平均（压萤火虫）。出厂关：它会改变每一张画面。
+  bloomKaris: false,
+  // 输出抖动（1/255 的倍数）。出厂 0，同上。
+  dither: 0,
   // 抗锯齿：TAA 开着时末趟的 FXAA 自动让位（两层叠加只会糊）。出厂值跟画质档走
   // （medium 及以上默认开），但这是**布尔开关不是倍率** —— 它不决定"画多重"，
   // 决定的是走哪条抗锯齿路，所以不套 Mul 那套倍率约定。
@@ -7300,6 +7317,11 @@ function RenderScene(dt) {
     sunColor: preset.sunColor,
     fog: preset.fog,
     exposure: preset.exposure,
+    // 自动曝光要这两样：`skyPreset` 决定用哪一条实测锚点与 EV 钳位
+    // （Data_Tuning_Camera.SKY_EXPOSURE），`dt` 决定时域适应走多快。
+    // 过场自带天空时这里就是过场那一档 —— 与上面的 preset 同源，不会抄错。
+    skyPreset: skyName,
+    dt,
     bloom: preset.bloom * graphics.bloom,
     godStrength: graphics.godEnabled ? preset.godStrength * graphics.god : 0,
     saturation: preset.saturation * (1 - suppression * 0.35),
@@ -7452,6 +7474,16 @@ function ApplyGraphics() {
   if (post.taaJitterScale !== graphics.taaJitterScale) post.hasTaaHistory = false;
   post.taaJitterScale = graphics.taaJitterScale;
   post.sharpenStrength = graphics.sharpen;
+  // --- 相机曝光轮：三位开关 + 四根旋钮（口径见 graphics 表里的注释）---------
+  // 两位走管线的运行时状态（同 SetTaaEnabled 的先例），不写 preset ——
+  // preset 是「这一档的出厂值」，面板的「恢复出厂」要从它读回去。
+  post.SetAutoExposure(graphics.autoExposure !== false);
+  post.SetLutEnabled(graphics.lut !== false);
+  post.exposurePass.SetBiasEv(graphics.exposureCompensation ?? 0);
+  post.lensFlarePass.SetUserScale(graphics.lensFlare ?? 1, graphics.lensDirt ?? 1);
+  post.bloomPass.karis = graphics.bloomKaris === true;
+  post.uniformsComposite.uDither.value = graphics.dither ?? 0;
+  post.SetTonemap(graphics.tonemap || "aces");
   lights.sun.shadow.bias = graphics.shadowBias;
   lights.sun.shadow.normalBias = graphics.shadowNormalBias;
   lights.shadowExtent = graphics.shadowExtent;

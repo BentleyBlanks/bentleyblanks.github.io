@@ -18,10 +18,15 @@
 //   5) wireframe         Script_PostDebug    着色模式非 shaded 时叠一层线
 //   6) debugOverlay      Script_PostDebug    Rapier 碰撞体线框等
 //   7) taa               Script_PostTaa      时域解算（线性 HDR 域，UE 的位置）
-//   8) bloom             Script_PostBloom    亮部 + 降/升采样
-//   9) god               Script_PostBloom    太阳拖影（太阳在屏内才跑）
-//  10) composite         Script_PostComposite 运动模糊→景深→雾→曝光→ACES→调色→镜头→sRGB
-//  11) fxaa              Script_PostFxaa     FXAA + 锐化 → 屏幕（或调试视图送屏）
+//   8) exposure          Script_PostExposure 直方图自动曝光（→ 1×1 增益靶）
+//   9) bloom             Script_PostBloom    亮部 + 降/升采样（阈值跟随曝光增益）
+//  10) god               Script_PostBloom    太阳拖影（太阳在屏内才跑）
+//  11) lensFlare         Script_PostLensFlare 鬼影/光环/太阳星芒（读亮部图）
+//  12) composite         Script_PostComposite 运动模糊→景深→雾→镜头进光→曝光→tonemap→LUT→镜头→sRGB
+//  13) fxaa              Script_PostFxaa     FXAA + 锐化 → 屏幕（或调试视图送屏）
+//
+// `exposure` 必须排在 `bloom` 之前：泛光阈值要读本帧的曝光增益。
+// `lensFlare` 必须排在 `bloom` 之后：它读的就是泛光那一趟提取好的亮部图。
 //
 // **加一个 pass = 新模块 + 这张列表里插一行 + `Data_Tuning_Graphics` 加一位开关。**
 // 不要往 `Render()` 里插代码，也不要去改别人的模块。
@@ -43,7 +48,10 @@ import {
 import { SsaoPass } from "./Script_PostSsao.mjs";
 import { TaaPass } from "./Script_PostTaa.mjs";
 import { BloomPass, GodRaysPass } from "./Script_PostBloom.mjs";
+import { ExposurePass } from "./Script_PostExposure.mjs";
+import { LensFlarePass } from "./Script_PostLensFlare.mjs";
 import { CompositePass } from "./Script_PostComposite.mjs";
+import { LutCheckView } from "./Script_PostGrade.mjs";
 import { FxaaPass } from "./Script_PostFxaa.mjs";
 import { DebugPass, InjectDepthPull, SHADING_MODES, WIRE_BACKGROUND_PURE } from "./Script_PostDebug.mjs";
 
@@ -95,6 +103,14 @@ export class PostPipeline {
     // 出厂值来自画质档，但**运行时状态是这一位**（画质面板走 SetTaaEnabled 改它）。
     // 历史靶按它建，不按 preset 建 —— 否则 low 档打开开关也没有靶可写。
     this.taaEnabled = !!this.preset.taa;
+    // 色调映射曲线（"aces" 默认 / "agx"）。与画质档无关 —— 它是观感选择不是性能选择，
+    // 所以放在管线状态上由画质面板热切，不进 QUALITY_PRESETS。
+    this.tonemapMode = "aces";
+    // 自动曝光与 LUT 分级：出厂值来自画质档，但**运行时状态是这两位**
+    // （画质面板走 SetAutoExposure / SetLutEnabled 改它们）。与 taaEnabled 同一个
+    // 先例 —— 直接改 preset 的话「恢复出厂」就找不回档位默认值了。
+    this.autoExposureEnabled = !!this.preset.autoExposure;
+    this.lutEnabled = !!this.preset.lut;
     this.taaJitterScale = 1;
     this.sharpenStrength = this.preset.sharpen;
     this.taaFlip = false;
@@ -114,11 +130,19 @@ export class PostPipeline {
     this.prepassPass = new PrepassPass(this, { destruction });
     this.ssaoPass = new SsaoPass(this);
     this.taaPass = new TaaPass(this);
+    this.exposurePass = new ExposurePass(this);
     this.bloomPass = new BloomPass(this);
     this.godRaysPass = new GodRaysPass(this, this.bloomPass);
+    this.lensFlarePass = new LensFlarePass(this, this.bloomPass);
     this.compositePass = new CompositePass(this);
     this.fxaaPass = new FxaaPass(this);
     this.debugPass = new DebugPass(this);
+    // 子系统自带的调试视图（契约见 Script_PostDebug 的 extraViews）：
+    // 曝光直方图、镜头光晕/脏污、LUT 采样校验。
+    this.lutCheckView = new LutCheckView();
+    this.exposurePass.RegisterDebugViews(this.debugPass);
+    this.lensFlarePass.RegisterDebugViews(this.debugPass);
+    this.lutCheckView.RegisterDebugViews(this.debugPass, this.compositePass);
 
     // --- 有序帧图 ---------------------------------------------------------
     this.passes = [
@@ -153,6 +177,10 @@ export class PostPipeline {
         Dispose: () => {},
       },
       this.taaPass,
+      // 自动曝光排在泛光**之前**：泛光的阈值/软膝/钳制要除以本帧的曝光增益
+      // （物理化的阈值），所以那张 1×1 必须先写好。它读的是 TAA 解算之后的
+      // sceneColor —— 测光测的应该是玩家真看到的那一帧，不是抖动的那一帧。
+      this.exposurePass,
       {
         // 只做决策不出画：太阳拖影要在**亮部提取之前**定下来（亮部图的 alpha
         // 只在拖影开着时才顺手打包天空遮挡）。位置也不能提前 —— 太阳投影要用
@@ -166,6 +194,8 @@ export class PostPipeline {
       },
       this.bloomPass,
       this.godRaysPass,
+      // 镜头光晕读的是泛光那一趟提取好的亮部图，所以只能排在它后面
+      this.lensFlarePass,
       this.compositePass,
       this.fxaaPass,
     ];
@@ -249,6 +279,37 @@ export class PostPipeline {
   NotifyCameraCut() {
     this.hasTaaHistory = false;
     this.hasPrev = false;
+    // 曝光适应也要跟着切：硬切到一个亮度完全不同的机位时，慢慢"适应"过去
+    // 意味着切换后一两秒画面是错的曝光 —— 真相机换镜头也不会这样。
+    this.exposurePass.RequestReset();
+  }
+
+  /**
+   * 自动曝光当前那张 1×1 增益靶。**没在跑时返回一张纯白 1×1**，
+   * 乘出来精确等于 1.0 —— 合成与泛光两处都靠这条保证「关掉 = 逐比特不变」。
+   */
+  get ExposureTexture() { return this.exposurePass.Texture; }
+
+  /** 色调映射曲线：`"aces"`（默认）或 `"agx"`。 */
+  SetTonemap(mode) {
+    this.tonemapMode = mode === "agx" ? "agx" : "aces";
+    this.exposurePass.SetTonemap(this.tonemapMode);
+    return this.tonemapMode;
+  }
+
+  GetTonemap() { return this.tonemapMode; }
+
+  /** 自动曝光热切（画质面板）。关掉的下一帧合成就绑回纯白 1×1。 */
+  SetAutoExposure(on) {
+    this.autoExposureEnabled = !!on;
+    if (this.autoExposureEnabled) this.exposurePass.RequestReset();
+    return this.autoExposureEnabled;
+  }
+
+  /** 3D LUT 分级热切。关掉退回等价的着色器算式（差 ≤ 1/255）。 */
+  SetLutEnabled(on) {
+    this.lutEnabled = !!on;
+    return this.lutEnabled;
   }
 
   /** 屏幕空间 AO 贴图 —— 交给 Materials 层注入 MeshStandardMaterial 的间接光。 */
@@ -400,6 +461,7 @@ export class PostPipeline {
   Dispose() {
     for (const pass of this.passes) pass.Dispose?.();
     this.debugPass.Dispose();
+    this.lutCheckView.Dispose();
     this.pool.Dispose();
     this.targets = {};
     this.bloomMips = [];
