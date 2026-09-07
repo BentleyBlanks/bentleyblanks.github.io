@@ -32,6 +32,13 @@ import { VOICE_BASE, VOICE_LINES } from "./Data_Voice.mjs";
 
 // 包络地板。低于这个值当作静音（见文件头坑 2）。
 const FLOOR = 1e-4;
+// 多普勒用的声速（m/s）与变调夹。飞机 100 m/s 迎面按物理是 +42%，一听就是合成器；
+// 夹到 ±18% 左右：能听出「压过来 / 掠过去」的一升一降，又不至于像拧收音机。
+const SPEED_OF_SOUND = 340;
+const DOPPLER_RATE_MIN = 0.84;
+const DOPPLER_RATE_MAX = 1.18;
+// 会飞的引擎声从四五百米外就该听见（那是「远处有飞机」这一拍的全部），比通场那条还远一档。
+const PLANE_DRONE_CULL_M = 2600;
 
 // 同时存活的 WebAudio 节点上限。超了就丢掉新的低优先级声音 ——
 // 宁可少响一枪，也不能让音频线程卡出爆音（爆音比缺一枪难听得多）。
@@ -1426,6 +1433,36 @@ const RECIPES = {
     v.Live(dur + 0.2);
   },
 
+  // 引擎持续声（**会飞的源**）：给 MoveVoice 逐帧搬位置、按径向速度变调的那一条。
+  // 与 planeDive 分工：drone 从四五百米外一直响到离场，「由远及近、掠过、转弯」在耳朵里的
+  // 全部来源就是它的方位、响度与音高一起变；压到头顶那一下再叠 planeDive（录好多普勒的通场）。
+  // 没有时长：一直响到 StopVoice；SetDoppler 是它对 MoveVoice 的唯一承诺。
+  planeDrone(A, v) {
+    const t = v.t;
+    const base = v.F(92);
+    const o1 = v.Osc("sawtooth", base);
+    const o2 = v.Osc("sawtooth", base * 1.011);       // 双发 / 双桨的拍频，单条太干净像电锯
+    const o3 = v.Osc("triangle", base * 0.5);         // 低八度垫底，远处只剩这一层
+    const lp = v.Filter("lowpass", v.F(1500), 0.8);
+    const beat = v.Gain(0.75);
+    const lfo = v.Osc("sine", 21);                    // 螺旋桨拍频调幅
+    const lfoGain = v.Gain(0.22);
+    lfo.connect(lfoGain).connect(beat.gain);
+    const g = v.Gain(FLOOR);
+    g.gain.setTargetAtTime(0.5, t, 0.5);              // 起音慢一点，别"啪"地出现在天上
+    o1.connect(lp); o2.connect(lp); o3.connect(lp);
+    lp.connect(beat).connect(g).connect(v.out);
+    for (const o of [o1, o2, o3, lfo]) o.start(t);
+    v.wetGain.gain.value = 0.35;
+    v.Live(3600);
+    v.loop = true;
+    v.SetDoppler = (rate) => {
+      const cents = 1200 * Math.log2(Math.max(0.5, rate));
+      const at = A.ctx.currentTime;
+      for (const o of [o1, o2, o3]) o.detune.setTargetAtTime(cents, at, 0.12);
+    };
+  },
+
   // 空对地扫射（近）：航空机枪 ~900 rpm。**这条必须是一梭子**，
   // 不是一发 —— 一发就成了地面上有人在点射，扫射的身份全在射速上。
   // 逐发排会被节点预算吃掉一半，所以走 GunAuto（整条点射共用一套发声链）。
@@ -1584,6 +1621,8 @@ const CULL_DEFAULT_M = 400;
 
 /** 这一声还值不值得播（按名字分档，见上面三个常数）。 */
 function CullDistance(name) {
+  // 两条飞机声都按机身在几百米外起播（drone 在进入段第一帧、planeDive 在开火前 3.5 s），按默认距离剔除就一条都不响。
+  if (name === "planeDrone" || name === "planeDive") return PLANE_DRONE_CULL_M;
   if (FAR_CUE[name] || SAMPLE_BURST[name] || FAR_CUE_TARGET.has(name)) return GUN_CULL_M;
   if (name.startsWith("voice.")) return VOICE_CULL_M;
   return CULL_DEFAULT_M;
@@ -1643,6 +1682,8 @@ const NODE_COST = {
   execScream: 9, flareLaunch: 9, flareIgnite: 9,
   flareBurn: 8, telegraphKey: 8, telegraphHum: 8, mgOverheat: 8,
   painMoan: 7, hitGrunt: 7, planeDive: 7, flareOut: 6,
+  // 会飞的引擎持续声：三个振荡器 + 拍频 LFO + 滤波 + 两个 gain，整条航线只有一条。
+  planeDrone: 9,
 };
 const DEFAULT_COST = 19;
 
@@ -3117,6 +3158,10 @@ export class AudioEngine {
         panner.setPosition(position.x, position.y, position.z);
       }
       air.connect(panner).connect(this.sfxBus);
+      // MoveVoice 要搬的就是这三样：方位、空气低通、混响占比。
+      v.panner = panner;
+      v.air = air;
+      v.distance = distance;
       // 混响也要跟着距离掉，只是掉得比直达声慢一半（dB 上正好一半）。
       // 见 WetFalloff —— 这一行原来是 `1 + distance*0.03`，**方向是反的**。
       v.wetScale = WetFalloff(distance);
@@ -3146,14 +3191,62 @@ export class AudioEngine {
       this.FreeVoice(v);
       return null;
     }
+    v.wetBase = wet.gain.value;                    // 配方给的干湿比；MoveVoice 按新距离重乘
     wet.gain.value = Clamp01(wet.gain.value * v.wetScale);
     this.ReleaseVoice(v, v.life);
     return v;
   }
 
-  /** Timeline 拖动前掐掉上一播放头，避免旧对白与目标时间的对白叠在一起。 */
-  StopVoice(voice) {
+  /**
+   * 移动一条位置音（飞机引擎这类**会飞的源**）。Play 时的方位 / 空气低通 / 混响占比都是按
+   * 起始位置一次性算的，这里按新位置重算；velocity（m/s）给了就按径向速度做多普勒 ——
+   * 只对声明了 SetDoppler 的配方生效（合成引擎），实录通场那条录着自己的多普勒，不再叠一层。
+   * 听者速度不算：玩家跑 3 m/s 对 340 m/s 的声速是 1%，听不出来。
+   */
+  MoveVoice(voice, position, { velocity = null } = {}) {
+    if (!voice || !voice.panner || !position || !this.ctx || this.disposed) return false;
+    const t = this.ctx.currentTime, tau = 0.04;
+    const dx = position.x - this.listenerPos.x;
+    const dy = position.y - this.listenerPos.y;
+    const dz = position.z - this.listenerPos.z;
+    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const p = voice.panner;
+    if (p.positionX) {
+      p.positionX.setTargetAtTime(position.x, t, tau);
+      p.positionY.setTargetAtTime(position.y, t, tau);
+      p.positionZ.setTargetAtTime(position.z, t, tau);
+    } else if (p.setPosition) {
+      p.setPosition(position.x, position.y, position.z);
+    }
+    if (voice.air) voice.air.frequency.setTargetAtTime(Clamp(18000 / (1 + distance * 0.09), 700, 20000), t, tau);
+    if (voice.wetGain && voice.wetBase !== undefined) {
+      voice.wetGain.gain.setTargetAtTime(Clamp01(voice.wetBase * WetFalloff(distance)), t, tau);
+    }
+    voice.distance = distance;
+    if (velocity && typeof voice.SetDoppler === "function" && distance > 1e-3) {
+      // 朝听者为正：f' = f * c / (c - v_radial)
+      const radial = -(velocity.x * dx + velocity.y * dy + velocity.z * dz) / distance;
+      const rate = Clamp(SPEED_OF_SOUND / Math.max(60, SPEED_OF_SOUND - radial), DOPPLER_RATE_MIN, DOPPLER_RATE_MAX);
+      voice.SetDoppler(rate);
+      voice.doppler = rate;
+    }
+    return true;
+  }
+
+  /**
+   * 掐掉一条正在响的 voice。Timeline 拖动前用它避免旧对白叠在目标时间的对白上；
+   * 会飞的引擎离场时用它收尾。fadeS > 0 先把干声拉到零再停，免得留一道「咔」。
+   */
+  StopVoice(voice, fadeS = 0) {
     if (!voice || !Array.isArray(voice.nodes)) return false;
+    if (fadeS > 0 && voice.out && voice.out.gain && this.ctx && !voice.stopping) {
+      voice.stopping = true;
+      const t = this.ctx.currentTime;
+      voice.out.gain.cancelScheduledValues(t);
+      voice.out.gain.setTargetAtTime(0, t, fadeS / 4);
+      this.Later(fadeS * 1000, () => this.StopVoice(voice, 0));
+      return true;
+    }
     for (const node of voice.nodes) {
       try { if (typeof node.stop === "function") node.stop(); } catch (error) { /* 已经自然结束 */ }
     }

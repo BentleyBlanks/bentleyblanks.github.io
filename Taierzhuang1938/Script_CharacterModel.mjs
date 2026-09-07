@@ -8,6 +8,14 @@ import { InfantryAnimationController, INFANTRY_ANIMATION_IDS, INFANTRY_ANIMATION
 import { MeleeAnimationPlayer } from "./Script_MeleeAnimation.mjs";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
+
+// 中弹踉跄（_ApplyHurtTilt）的临时量。只在 hurt > 0 的那几帧用到。
+const HURT_ROOT_Q = new THREE.Quaternion();
+const HURT_PARENT_Q = new THREE.Quaternion();
+const HURT_R = new THREE.Quaternion();
+const HURT_RIGHT = new THREE.Vector3();
+const HURT_FWD = new THREE.Vector3();
+const HURT_LOCAL_AXIS = new THREE.Vector3();
 import { RaycastCapsule, RaycastEllipsoid, RaycastSphere } from "./Script_CharacterHitboxMath.mjs";
 
 export const LUGOU_ANIMATION_IDS = Object.freeze([
@@ -467,6 +475,7 @@ export class LugouCharacterRig {
       }))]));
     this.infantryPropWeight = 0;
     this.bones = {};
+    this.hurtTilt = [];            // 上一帧叠的踉跄旋转 {bone, q}，Update 开头先还原
     for (const [role, boneName] of Object.entries(asset.record.boneRoles || {})) {
       const bone = FindNode(this.root, boneName);
       if (bone) this.bones[role] = bone;
@@ -739,6 +748,7 @@ export class LugouCharacterRig {
 
   Update(dt, state = {}) {
     if (this.disposed) return;
+    this._RestoreHurtTilt();
     this.root.position.y -= this.infantryFloorOffset || 0;
     this.infantryFloorOffset = 0;
     this.meleeAnimation?.Restore();
@@ -760,11 +770,53 @@ export class LugouCharacterRig {
     this.infantry.AfterUpdate(previousId, previousTime);
     this.meleeAnimation?.Apply(state.meleeCombat);
     this._GroundInfantryBlend(state);
+    // 中弹踉跄：程序化 body 那套「胸后仰 / 头后甩」在有蒙皮骨架时不可见（body 被复位），
+    // 所以在 mixer 之后给胸/颈叠一记世界轴旋转；下一帧开头 _RestoreHurtTilt 先还原，
+    // 没有旋转轨道的骨头也不会越叠越歪。
+    const hurt = Math.min(1, Math.max(0, state.hurt || 0));
+    if (hurt > 0.001) this._ApplyHurtTilt(hurt, state.elapsed ?? 0);
     // First-person cutscenes place the camera at the eye socket.  The source is
     // one combined SkinnedMesh, so there is no detachable head object; collapse
     // the head bone after mixer evaluation instead.  Doing it before mixer.update
     // would be overwritten by the clip's sampled scale track on the same frame.
     if (!this.headVisible && this.bones.head) this.bones.head.scale.setScalar(0.001);
+  }
+
+  _ApplyHurtTilt(hurt, elapsed) {
+    const chest = this.bones.chest || this.bones.spine || null;
+    const neck = this.bones.neck || this.bones.head || null;
+    if (!chest && !neck) return;
+    // 轴取**演员**的朝向（Actor.root 局部 -Z 是正面、+X 是右手），不取 GLB 根 —— 资产正面 +Z，
+    // 桥接层在下面转了 180°，拿它的 +X 当右手会把「后仰」做成「前扑」。
+    const facing = this.actor?.root || this.root;
+    facing.getWorldQuaternion(HURT_ROOT_Q);
+    HURT_RIGHT.set(1, 0, 0).applyQuaternion(HURT_ROOT_Q);
+    HURT_FWD.set(0, 0, -1).applyQuaternion(HURT_ROOT_Q);
+    const shake = Math.sin(elapsed * 26) * hurt;
+    if (chest) {
+      this._TiltBone(chest, HURT_RIGHT, 0.34 * hurt);      // 上身被顶得后仰
+      this._TiltBone(chest, HURT_FWD, 0.16 * shake);       // 左右抖
+    }
+    if (neck) this._TiltBone(neck, HURT_RIGHT, 0.20 * hurt);   // 头往后甩
+  }
+
+  /** 绕世界轴旋转一根骨头：q' = (P^-1 R P) q，P 是父节点的世界旋转。记下原值供还原。 */
+  _TiltBone(bone, axisWorld, angle) {
+    if (!bone.parent || !(Math.abs(angle) > 1e-6)) return;
+    bone.parent.getWorldQuaternion(HURT_PARENT_Q);
+    HURT_LOCAL_AXIS.copy(axisWorld).applyQuaternion(HURT_PARENT_Q.invert()).normalize();
+    HURT_R.setFromAxisAngle(HURT_LOCAL_AXIS, angle);
+    this.hurtTilt.push({ bone, q: bone.quaternion.clone() });
+    bone.quaternion.premultiply(HURT_R);
+  }
+
+  /** 倒序还原（同一根骨头可能叠了两次）。 */
+  _RestoreHurtTilt() {
+    for (let i = this.hurtTilt.length - 1; i >= 0; i -= 1) {
+      const e = this.hurtTilt[i];
+      e.bone.quaternion.copy(e.q);
+    }
+    this.hurtTilt.length = 0;
   }
 
   SetHeadVisible(visible) {

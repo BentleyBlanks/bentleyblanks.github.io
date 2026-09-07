@@ -540,6 +540,18 @@ export class CombatSystem {
     const from = position.clone();
     from.y += BLAST.originRiseM;
 
+    // 震屏：与伤害判定分开算 —— 震感传得比弹片远（Script_CameraShake 按 reachScale 外推），
+    // 隔着墙也感觉得到，只是打折。伤害那一支仍然是「有墙挡着 = 完全免伤」。
+    const shaken = this.host.player;
+    if (shaken && shaken.Alive && shaken.shake) {
+      const eye = this.tmp.set(shaken.position.x, shaken.position.y + BLAST.playerHitRiseM, shaken.position.z);
+      const toEye = this.tmpB.subVectors(eye, from);
+      const eyeDist = toEye.length();
+      toEye.divideScalar(eyeDist || 1);
+      const wall = eyeDist > BLAST.wallMarginM ? bf.Raycast(from, toEye, eyeDist) : null;
+      shaken.shake.Explosion(eyeDist, radius * BLAST.radiusScale, !!(wall && wall.t < eyeDist - BLAST.wallMarginM));
+    }
+
     const affect = (targetPos, apply) => {
       const rel = this.tmp.subVectors(targetPos, from);
       const dist = rel.length();
@@ -579,7 +591,7 @@ export class CombatSystem {
     if (player && player.Alive) {
       const at = player.position.clone(); at.y += BLAST.playerHitRiseM;
       affect(at, (dmg, dir, falloff) => {
-        player.Suppress(BLAST.playerSuppression * falloff);
+        player.Suppress(BLAST.playerSuppression * falloff, "blast");
         // 爆炸对玩家的口径也回数据层（COMBAT.player.blastScale）——
         // 这里原来写死 0.7，和 Script_Ai 的 0.55、Script_Player 的部位倍率
         // 各改各的，谁也算不出"一发掷弹筒到底打掉多少血"。

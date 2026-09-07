@@ -17,8 +17,9 @@ import { COMBAT, NAME_POOL, DIFFICULTY } from "./Data_Battle.mjs";
 import { TRAVERSAL, TraversalPlan, TraversalCurve } from "./Data_Traversal.mjs";
 import { ActorCrowd } from "./Script_ActorCrowd.mjs";
 import {
-  SIGHT_BY_STANCE, SIGHT_SCALE_RANGE, SQUAD, ENGAGE, ACTOR_DETAIL,
+  SIGHT_BY_STANCE, SIGHT_SCALE_RANGE, SQUAD, ENGAGE, ACTOR_DETAIL, HURT_FLINCH,
 } from "./Data_Tuning_Ai.mjs";
+import { PlayerHitboxes, PlayerAimPoint, RaycastPlayerHitboxes, GaussianPair } from "./Script_PlayerHitbox.mjs";
 
 // 发现距离、班组队形、交火距离与人物 LOD 预算全在 `Data_Tuning_Ai.mjs`
 //（每一组的账跟着数搬过去了）。这里按原名 re-export —— 那两个名字是跨系统契约：
@@ -112,6 +113,7 @@ export class Soldier {
     this.stateTime = 0;
     this.combatModeUntil = -99;
     this.suppression = 0;
+    this.hurtPose = 0;                      // 中弹踉跄（Actor 的 hurt 覆盖姿势），Act 里按 HURT_FLINCH.decayS 衰减
     this.stance = 0;                        // 0 站 1 蹲 2 卧
     // 姿态决定是离散的，画面过渡必须是连续的。以前 Think 每 0.1 s 在阈值两侧切 0/1，
     // Actor 每次都直接吃满 0/1，于是整个人像电门一样反复蹲起。
@@ -313,6 +315,8 @@ export class Soldier {
     // Opt-in narrative cast protection; explicit scripted Kill remains authoritative.
     if (this.scriptEssential) this.health = Math.max(1, this.health);
     this.suppression = Clamp01(this.suppression + 0.45);
+    // 中弹踉跄：擦一下也晃，一发三八式基本满幅。以前这条从没接过线 —— 打中活人只有一团血。
+    this.hurtPose = Math.min(1, Math.max(this.hurtPose, HURT_FLINCH.base + (damage * mult) / HURT_FLINCH.damageDiv));
     if (this.health <= 0) return this.Kill(direction);
     // 中弹没死会喊。中日两侧各喊各的语言（side 由 Bark 侧过滤声库）。
     // 节流在引擎侧（全局 0.55 s / 同阵营同类 4.5 s）。
@@ -357,6 +361,11 @@ export class AiDirector {
     this.tickIndex = 0;
     this.time = 0;
     this.tmpA = new THREE.Vector3();
+    // 打玩家的部位几何（PlayerHitPart）用的临时量；boxes 复用一份，每发不产垃圾。
+    this.tmpAim = { x: 0, y: 0, z: 0 };
+    this.tmpU = new THREE.Vector3(); this.tmpW = new THREE.Vector3();
+    this.tmpT = new THREE.Vector3(); this.tmpD = new THREE.Vector3();
+    this.playerBoxes = [];
     this.tmpB = new THREE.Vector3();
     this.tmpC = new THREE.Vector3();
     this.playerTargetedBy = 0;
@@ -1378,6 +1387,7 @@ export class AiDirector {
     // 这一帧有没有走过物理。没走的（站着不动、在射击）也要补一次 ——
     // 不补的话站在墙头上的人在墙被炸掉之后会浮在半空。
     let stepped = false;
+    if (s.hurtPose > 0) s.hurtPose = Math.max(0, s.hurtPose - dt / HURT_FLINCH.decayS);
     if (s.scriptDefensive && s.state !== STATE.VAULT) this.ApplyScriptDefense(s);
 
     // 白刃演出接管整帧：不重新 Think、不走导航、不在格挡中途再开一枪。
@@ -1628,6 +1638,7 @@ export class AiDirector {
         verticalVelocity: s.velocityY,
         firing: this.time - s.lastFire < 0.12,
         fireSequence: s.fireSequence,
+        hurt: s.hurtPose,
         elapsed: this.time,
         lookYaw: s.lookYaw, lookPitch: 0,
         // 摆点层（EscortColumn）钉在 soldier 上的两个负重旗：担架员前/后位
@@ -1649,7 +1660,7 @@ export class AiDirector {
     s.body?.SetSize(.42,.58);s.body?.Teleport(s.position.x,s.position.y,s.position.z);
     if(s.actor){
       s.actor.root.position.copy(s.position);s.actor.root.rotation.y=s.yaw;
-      s.actor.Update(dt,{moveSpeed:0,aim:0,crouch:0,prone:1,grounded:true,
+      s.actor.Update(dt,{moveSpeed:0,aim:0,crouch:0,prone:1,grounded:true,hurt:s.hurtPose,
         elapsed:this.time,lookYaw:0,lookPitch:0});
     }
   }
@@ -1670,7 +1681,7 @@ export class AiDirector {
     const cadence = ActorAnimationCadence(s);
     if (s.actor.root.visible && (this.tickIndex + s.id) % cadence === 0) {
       s.actor.Update(dt * cadence, { moveSpeed: s.moveSpeed, aim: 0, crouch: 0,
-        prone: 0, grounded: true, elapsed: this.time, lookYaw: 0, lookPitch: 0 });
+        prone: 0, grounded: true, elapsed: this.time, lookYaw: 0, lookPitch: 0, hurt: s.hurtPose });
     }
     // RaycastHitboxes refreshes world matrices on demand, including detached
     // far actors, so roots stay exact without solving forty skeletons per frame.
@@ -2018,6 +2029,26 @@ export class AiDirector {
     };
   }
 
+  /**
+   * AI 命中玩家的部位。命中率那一掷已经说了「这发打中了」，几何只回答打中哪儿：
+   * 在瞄点周围按 COMBAT.player.aimScatterM（1σ，米）散一个点，从枪口向它射线，
+   * 碰到玩家的哪根胶囊就是哪个部位；散出去没碰到身体的那一支算躯干 ——
+   * 不能让几何把命中率偷偷再打一次折（那会让 docs/Data_PlayerDamage.md 的 TTK 账全部作废）。
+   */
+  PlayerHitPart(s, from, aim, dir, player) {
+    const sigma = COMBAT.player?.aimScatterM ?? 0.24;
+    const boxes = PlayerHitboxes(player.position, player.yaw, player.stance, this.playerBoxes);
+    const [g1, g2] = GaussianPair(s.rnd);
+    const u = this.tmpU.set(dir.z, 0, -dir.x);
+    if (u.lengthSq() < 1e-8) u.set(1, 0, 0);
+    u.normalize();
+    const w = this.tmpW.crossVectors(dir, u);
+    const target = this.tmpT.copy(aim).addScaledVector(u, g1 * sigma).addScaledVector(w, g2 * sigma);
+    const d = this.tmpD.subVectors(target, from).normalize();
+    const struck = RaycastPlayerHitboxes(from, d, boxes);
+    return struck ? struck.part : "torso";
+  }
+
   TryFire(s, dt, player) {
     if (s.unarmed) return;
     s.fireTimer -= dt;
@@ -2040,7 +2071,15 @@ export class AiDirector {
 
     const from = this.tmpA.set(s.position.x, s.position.y + (s.stance === 2 ? 0.5 : s.stance === 1 ? 1.1 : 1.5), s.position.z);
     const to = this.tmpB.copy(s.target.position);
-    to.y += 1.1;
+    const toPlayer = s.target.isPlayer && !!player;
+    if (toPlayer) {
+      // 玩家有自己的命中几何（Script_PlayerHitbox）：照躯干中点瞄 ——
+      // 趴着的人瞄的是背心，不是脚底往上 1.1 m 那团空气（以前曳光全从卧倒的玩家头顶飞过去）。
+      const aim = PlayerAimPoint(player.position, player.yaw, player.stance, this.tmpAim);
+      to.set(aim.x, aim.y, aim.z);
+    } else {
+      to.y += 1.1;
+    }
     const dir = this.tmpC.subVectors(to, from);
     const dist = dir.length();
     dir.divideScalar(dist || 1);
@@ -2110,16 +2149,16 @@ export class AiDirector {
     }
 
     if (hit) {
-      // 打玩家时爆头概率单独一档（0.035 而不是 0.08）：AI 是照胸口打的，
-      // 而在玩家这边"随机爆头"等于随机读盘 —— 部位倍率见 COMBAT.player。
-      const toPlayer = s.target.isPlayer && !!player;
-      const headChance = toPlayer ? (COMBAT.player?.headChance ?? 0.035) : 0.08;
-      const part = s.rnd() < headChance ? "head" : s.rnd() < 0.6 ? "torso" : (s.rnd() < 0.5 ? "arm" : "leg");
       if (toPlayer) {
+        // 打玩家的部位不抽概率：照 aimScatterM 在瞄点周围散一个点，射线去碰玩家自己的
+        // 命中几何 —— 站着基本打躯干，趴着头露在最前面（部位倍率见 COMBAT.player）。
+        const part = this.PlayerHitPart(s, from, to, dir, player);
         player.TakeHit(s.weapon.damage * (COMBAT.player?.bulletScale ?? 0.40), part, dir, {
           from: from.clone(), bullet: true,
         });
       } else if (s.target.ref) {
+        // AI 打 AI 仍按概率抽部位：那边的胶囊是给玩家的子弹用的，这条链一帧几十发不做几何。
+        const part = s.rnd() < 0.08 ? "head" : s.rnd() < 0.6 ? "torso" : (s.rnd() < 0.5 ? "arm" : "leg");
         const died = s.target.ref.TakeHit(s.weapon.damage, part, dir);
         if (vfx) vfx.Blood(to, dir, died ? 1 : 0.5);
       }

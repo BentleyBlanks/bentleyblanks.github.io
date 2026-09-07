@@ -156,6 +156,8 @@ export class FirstLevelP012Runtime {
   RecordDodgeIntent(position, view = null, carryKind = null) {
     this.dodgeIntent = { position: { x: position.x, z: position.z }, at: this.time };
     if (view?.player?.open && carryKind === "stretcher") this.host.ReleaseForDodge?.();
+    // B19 扑入路沟那一下：第一人称向下一栽（相机冲击），成不成功另说 —— 那是弹线到达时结算的事。
+    if (view?.player?.open) this.host.DiveCamera?.();
   }
   RecordGrenade(position) { this.grenadeThrows = (this.grenadeThrows || 0) + 1; this.lastGrenadePosition = { x: position.x, z: position.z }; }
   RecordAircraftShot(origin, aim, view) {

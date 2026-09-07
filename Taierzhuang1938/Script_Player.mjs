@@ -24,6 +24,7 @@ import {
   STANCE as STANCE_TUNING, JUMP, MOVE, STAMINA, FREE_AIM, RECOIL,
   SUPPRESSION, WOUNDS, SPAWN, HIT_FEEDBACK, SWAY, SPREAD, CAMERA,
 } from "./Data_Tuning_Player.mjs";
+import { CameraShake } from "./Script_CameraShake.mjs";
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -152,6 +153,9 @@ export class PlayerController {
     this.bandages = WOUNDS.bandages;
     this.suppression = 0;                   // 0..1，被打压的程度
     this.suppressedUpright = false;         // 压得很狠但还站着（只用于提示，不改姿态）
+    // 通用震屏（爆炸 / 近失弹 / 落地 / 中弹 / 日机弹着 / 扑沟）。数在 CAMERA_SHAKE，
+    // 偏移在 SyncCamera 最后一步叠上去，不改 yaw/pitch 本体。
+    this.shake = new CameraShake();
     this.stamina = 1;
     // 只由 Script_DebugOptions 经装配层写入。默认全关，保持正式玩法完全不变。
     this.debug = { noCollision: false, fastMove: false, invincible: false };
@@ -259,6 +263,7 @@ export class PlayerController {
     this.jump.airTime = 0;
     this.jump.landImpact = 0;
     this.jump.runK = 0;
+    this.shake.Reset();
     this.waterDepth = 0;
   }
 
@@ -689,6 +694,7 @@ export class PlayerController {
       this.jump.coyote = JUMP.coyoteS;
       if (!wasGrounded) {
         this.jump.landImpact = Clamp01((fallSpeed - JUMP.landImpactBaseMps) / JUMP.landImpactSpanMps);
+        this.shake.Landing(this.jump.landImpact);
         this.jump.landSerial += 1;
         this.jump.airTime = 0;
         // 落地以后要把重心重新接住，不能在同一帧把缓冲输入变成下一跳。
@@ -697,6 +703,7 @@ export class PlayerController {
     }
 
     // --- 脚步 / 晃动 --------------------------------------------------------
+    this.shake.Update(dt);
     const planar = Math.hypot(this.velocity.x, this.velocity.z);
     this.stepDistance += planar * dt;
     this.headBob = Math.sin(this.stepDistance
@@ -921,6 +928,14 @@ export class PlayerController {
     cam.rotation.z = -this.lean * CAMERA.leanRollRad
       + (shake > 0 ? Math.sin(this.stepDistance * 41 + this.suppression * 90) * shake : 0)
       + (focusing ? Math.sin(melee.t * 39) * (1 - melee.progress) * .013 : 0);
+
+    // 通用震屏（Script_CameraShake）：叠在最后，不改 yaw/pitch 本体 —— 枪口不会被震歪，
+    // 玩家松手后画面自己回来。
+    const sh = this.shake;
+    cam.position.y += sh.rise;
+    cam.rotation.x += sh.pitch;
+    cam.rotation.y += sh.yaw;
+    cam.rotation.z += sh.roll;
   }
 
   /**
@@ -1018,6 +1033,11 @@ export class PlayerController {
       kind: "hurt", part, damage: applied,
       severity: Clamp01(applied / HIT_FEEDBACK.severityDiv), blast: !!info?.blast,
     });
+    // 中弹的一歪：往来弹那一侧滚（右手 = (cos yaw, 0, -sin yaw)）。
+    const hitSide = from
+      ? Math.sign((from.x - this.position.x) * Math.cos(this.yaw) - (from.z - this.position.z) * Math.sin(this.yaw)) || 1
+      : 1;
+    this.shake.Hit(Clamp01(applied / HIT_FEEDBACK.severityDiv), hitSide);
 
     if (direction) {
       this.velocity.addScaledVector(direction, HIT_FEEDBACK.knockbackMps);
@@ -1075,9 +1095,15 @@ export class PlayerController {
     return true;
   }
 
-  /** 子弹从身边飞过：不掉血，但压得抬不起头。难度档的 suppressionScale 在这里生效。 */
-  Suppress(amount) {
-    this.suppression = Clamp01(this.suppression + amount * (DIFFICULTY.suppressionScale ?? 1));
+  /**
+   * 子弹从身边飞过：不掉血，但压得抬不起头。难度档的 suppressionScale 在这里生效。
+   * source = "bullet"（默认）时顺手震一下画面 —— 那一声破空本来就该在头上炸开；
+   * 爆炸传 "blast"：它的震屏在 Combat.Blast 里按距离与遮挡单独算，不在这儿叠第二遍。
+   */
+  Suppress(amount, source = "bullet") {
+    const scaled = amount * (DIFFICULTY.suppressionScale ?? 1);
+    this.suppression = Clamp01(this.suppression + scaled);
+    if (source === "bullet") this.shake.NearMiss(scaled);
   }
 
   /** 包扎：止血，不回满血。伤口留着，跑不快。 */

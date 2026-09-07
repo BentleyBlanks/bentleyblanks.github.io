@@ -217,6 +217,9 @@ export function MakeAircraftStrafeHost(deps = {}) {
       pos.set(opts.position.x, opts.position.y, opts.position.z);
       return deps.audio.Play(name, { ...opts, position: pos.clone() });
     },
+    // 会飞的引擎声：规则层每帧给机位与速度，音频层搬方位、算多普勒；离场淡出。
+    MoveVoice: (voice, point, opts) => deps.audio?.MoveVoice?.(voice, point, opts) ?? false,
+    StopVoice: (voice, fadeS) => deps.audio?.StopVoice?.(voice, fadeS) ?? false,
     Hint: (text, seconds) => deps.hud?.Hint(text, seconds),
     Say: (who, text, seconds) => deps.hud?.Say(who, text, seconds),
     Signal: (name) => deps.Story?.()?.Signal(name),
@@ -227,6 +230,11 @@ export function MakeAircraftStrafeHost(deps = {}) {
       deps.vfx.Tracer(from, to, opts);
     },
     Impact: (point, n, surface) => {
+      // 弹着落在玩家几米内：震一下（Script_CameraShake.Strafe 自己按距离衰减、封顶）。
+      const shaken = deps.player?.();
+      if (shaken?.shake && shaken.Alive) {
+        shaken.shake.Strafe(Math.hypot(point.x - shaken.position.x, point.z - shaken.position.z));
+      }
       if (!deps.vfx) return;
       at.set(point.x, point.y, point.z);
       normal.set(n.x, n.y, n.z);

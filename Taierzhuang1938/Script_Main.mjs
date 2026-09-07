@@ -1789,6 +1789,8 @@ async function Boot() {
       Tables: () => ({ COMBAT, DIFFICULTY }),
       // 受击反馈的运行时状态。红闪与来弹方位都是**事件**（自己衰减），
       // 不是血量的函数，所以必须从这里取证，不能从 health 反推。
+      /** 相机震动取证（Script_CameraShake）：创伤值、五个偏移、各类事件计数。 */
+      Shake: () => player?.shake?.State() ?? null,
       Hurt: () => ({
         health: player.health, bleeding: player.bleeding, flash: player.hitFlash,
         marks: player.hitMarks.map((m) => ({ x: m.x, z: m.z, life: m.life })),
@@ -3336,6 +3338,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     },
     Signalled: (name) => story.Signalled(name),
     Dodge: (reason) => strafe?.Dodge(reason),
+    DiveCamera: () => player.shake?.Dive(),
     ReleaseForDodge: () => { carry?.ForceRelease("diveAttempt"); if (setpieces) setpieces.mem.p012ReleaseAt = { ...player.position }; },
     Move: (actor, point, speed) => {
       actor.p012Guided = true; actor.scriptMoveSpeedMps = speed; actor.order = "advance";

@@ -408,7 +408,10 @@ export const COMBAT = {
     bulletScale: 0.33,          // AI 枪伤 → 玩家（三八式 72 → 23.8 躯干，四发多一条命）
     meleeScale: 0.42,           // 刺刀 110 → 46.2：重，但不是读盘
     blastScale: 0.55,           // 爆炸威力 → 玩家
-    headChance: 0.035,          // AI 打玩家爆头的概率（AI 打 AI 仍是 0.08）
+    // AI 打玩家的部位**不抽概率**（AI 打 AI 仍是 0.08 那一掷）：照躯干中点瞄，在瞄点周围按这个
+    // 1σ（米）散一个点，射线去碰玩家自己的命中几何（Script_PlayerHitbox）。0.24 m 在 45 m 上
+    // 站着约 5% 爆头、趴着约 15%（头露在最前面）—— 数见 Script_PlayerHitboxTest 的散点统计。
+    aimScatterM: 0.24,
     headMultiplier: 2.0,        // 爆头倍率（对 AI 仍是 3.4）
     torsoMultiplier: 1.0,
     limbMultiplier: 0.50,

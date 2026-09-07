@@ -11,6 +11,9 @@
  *   strafeDirt ← impactDirt     单发打土，连着触发就是一串
  */
 export const STRAFE_SFX = Object.freeze({
+  // drone：合成的持续引擎，从进入段第一帧挂在机身上、逐帧搬位置 + 多普勒（Script_Audio.MoveVoice）；
+  // engine：录好多普勒的实录通场，只在压到头顶前几秒放一次、也挂在机身上但不再变调。
+  drone: { names: ["planeDrone"], volume: 0.9 },
   engine: { names: ["planeDive", "amb.planeFar"], volume: 0.95 },
   gunNear: { names: ["strafeNear", "type92"], volume: 0.95, burst: 3 },
   gunFar: { names: ["strafeFar", "type11"], volume: 0.8, burst: 3 },

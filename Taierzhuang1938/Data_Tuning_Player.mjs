@@ -266,3 +266,41 @@ export const CAMERA = Object.freeze({
   leanOffsetM: 0.42,
   leanRollRad: 0.16,
 });
+
+/**
+ * 相机震动（`Script_CameraShake.mjs`）。
+ *
+ * 以前全仓库没有一条通用震屏：爆炸、近失弹、落地、日机压顶都不震，只有过场专用的
+ * `shakeAt` 与压制那一根正弦。这张表管的是「创伤值 → 噪声抖动」那一层加「定向冲击 →
+ * 弹簧回位」那一层；两层叠在 SyncCamera 最后，不改 yaw/pitch 本体，所以枪口不会被震歪、
+ * 玩家松手后画面自己回来。
+ *
+ * trauma      0..1 的创伤值，线性衰减；幅度 = trauma^traumaPower，小震几乎看不见、大震满幅。
+ * noiseHz     抖动的噪声频率（值噪声，确定性；出图可复现）。
+ * impulse*    定向冲击的弹簧：刚度 / 阻尼。过阻尼一点，回位不弹三下。
+ * explosion   按「到爆心的距离 / 伤害外沿」衰减；隔墙打 occludedScale 折。
+ * nearMiss    近失弹：按 Player.Suppress 收到的量换算，封顶防机枪连扫把画面抖成糊。
+ * landing     落地：按 landImpact（0..1）。
+ * strafe      日机机枪弹着在玩家几米内落一颗就抖一下；封顶。
+ * hit         中弹：按伤害严重度。
+ * dive        B19 扑入路沟那一下：一记向下的俯冲 + 侧滚 + 眼位下沉，弹簧回位。
+ */
+export const CAMERA_SHAKE = Object.freeze({
+  traumaDecayPerS: 1.7,
+  traumaPower: 2,
+  maxPitchRad: 0.048,
+  maxYawRad: 0.052,
+  maxRollRad: 0.036,
+  maxRiseM: 0.032,
+  noiseHz: 11,
+  impulseStiffness: 170,
+  impulseDamping: 24,
+  maxImpulseRad: 0.6,
+  maxImpulseM: 0.25,
+  explosion: Object.freeze({ traumaAtCenter: 0.95, reachScale: 3.2, minTrauma: 0.05, occludedScale: 0.55, pitchKickRad: -0.05 }),
+  nearMiss: Object.freeze({ traumaPerSuppress: 0.4, maxTrauma: 0.32 }),
+  landing: Object.freeze({ traumaScale: 0.3, pitchKickRad: -0.07 }),
+  strafe: Object.freeze({ reachM: 14, traumaPerImpact: 0.14, maxTrauma: 0.5 }),
+  hit: Object.freeze({ traumaScale: 0.45, rollKickRad: 0.09 }),
+  dive: Object.freeze({ pitchKickRad: -0.42, rollKickRad: 0.24, riseKickM: -0.12, trauma: 0.55 }),
+});

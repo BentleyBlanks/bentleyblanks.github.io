@@ -249,6 +249,16 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   回归口 `Script_JieheTerrainTest.mjs`（terrain 域）。
 
 ### 武器 / 战斗 / 刺刀
+- `Script_PlayerHitbox.mjs` —— **玩家自己的命中几何**（纯规则，不 import three）：按站/蹲/卧摆的头球 +
+  躯干/四肢胶囊，尺寸与 `Data_Tuning_Player.STANCE` 的 eye 同源。AI 打玩家的部位由 `AiDirector.PlayerHitPart`
+  在瞄点周围按 `COMBAT.player.aimScatterM` 散点、射线碰这几根胶囊判定，**不再抽 headChance**；
+  命中率那一掷不动（散出去没碰到身体的算躯干，几何不许把命中率再打一次折）。AI 打 AI 仍按概率抽部位。
+  回归口 `Script_PlayerHitboxTest.mjs`（纯 Node）；口径见 `docs/Data_PlayerDamage.md` §二。
+- `Script_CameraShake.mjs` —— **通用震屏**（纯规则）：创伤值噪声 + 定向冲击弹簧两层，数在
+  `Data_Tuning_Player.CAMERA_SHAKE`，`Script_Player.SyncCamera` 最后一步叠偏移（不改 yaw/pitch 本体）。
+  接线：`Combat.Blast`（爆炸，按距离与遮挡）、`Player.Suppress(…, "bullet")`（近失弹）、`Player.TakeHit`（中弹侧滚）、
+  落地 `landImpact`、日机弹着（`MakeAircraftStrafeHost.Impact`）、B19 扑沟（P012 `RecordDodgeIntent` → `host.DiveCamera`）。
+  过场专用的 `shakeAt` 与压制那根正弦仍各自独立。回归口 `Script_CameraShakeTest.mjs`；取证口 `Debug.Shake()`。
 - 三姿态统一走 `PlayerController.SetStance`：C/Z 切蹲/卧，低姿态 Space 站起，HUD 可直接选择。
   `Script_StanceTest` 验输入到相机/胶囊/移速；`ActorPoseTest` 验十套模型的低姿与开火交替。
 - `Script_Player.mjs`（移动/碰撞/姿态/**自由瞄准** —— 枪口在视野里滑动、不钉屏幕中心）、
@@ -322,6 +332,11 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   HUD 是 `.hudEmplacement`，武器 UI 禁用态挂在 `#hud.emplaced`。
 
 ### 日机扫射（第一关的核心演出）
+- **引擎声挂在机身上**（2026-09-07）：`STRAFE_SFX.drone`（合成 `planeDrone`）从进入段第一帧起播，
+  `AircraftStrafeDirector.TrackEngine` 每帧把机位与差分速度交给 `host.MoveVoice` → `Script_Audio.MoveVoice`
+  搬方位 / 空气低通 / 混响占比并按径向速度做多普勒（夹在 `DOPPLER_RATE_MIN..MAX`）；`engine`（实录 `planeDive`）
+  在开火前 `PASS_LEAD_S` 秒起播、只搬位置不变调；离场 `StopVoice(voice, 0.9)` 淡出。
+  以前只有一条挂在扫射线段中点的静态一次性音，飞机在四百米外接近时什么都听不到。
 - `Script_AircraftStrafe.mjs` —— 一条通场的状态机，四个节拍出 `OnPhase` 与 `story.Signal`。
   **纯规则，不 import three**；三条预设 `STRAFE_PRESETS`。
   牺牲**全靠白名单点名**（`victims` 必死、`immune` 必不死），**一次随机都不掷**

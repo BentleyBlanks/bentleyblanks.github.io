@@ -67,6 +67,10 @@
 // 都带一个「现有最近的源」当备胎（见 STRAFE_SFX），第一次播不响就换备胎并记住。
 
 import { Mulberry32, Clamp, Clamp01, SmoothStep } from "./Script_Noise.mjs";
+
+// 实录通场（STRAFE_SFX.engine，planeDive）在开火前多少秒起播：那条录音的响度峰值在 3.5 s 处，
+// 这样峰值正好落在飞机压到人头顶的那一帧，而不是四百米外的航线起点。
+const PASS_LEAD_S = 3.5;
 import { T } from "./Script_Text.mjs";
 import {
   STRAFE_SFX, STRAFE_DEFAULTS, STRAFE_PLAYER_DEFAULTS, STRAFE_PRESETS, GUN_NEAR_M,
@@ -293,21 +297,16 @@ export class AircraftStrafeDirector {
     this.stats.runs += 1;
     this.PlaceAircraft(0);
     this.Beat("enter");
-    // 引擎声由远及近：**多普勒是录出来的**（Data_SfxSources 的 PlaneDive 头注：
-    // 那条 7 秒的通场从 −36 dB 涨到 −9 dB 再落回 −34 dB），所以这里只放一条、
-    // 不做变调 —— 变调做出来的多普勒一听就是合成器。
-    //
-    // 定位取**扫射线段的中点**，不取航线起点：那条录音的响度峰值在 3.5 s 处，
-    // 而进入段本来就是几秒钟，峰值正好落在飞机压到人头顶的时候。挂在四百米外的
-    // 起点上的话，最响的那一下会从一个错误的方向传过来。
-    this.Sfx("engine", {
-      position: {
-        x: (from.x + to.x) * 0.5,
-        y: this.Ground((from.x + to.x) * 0.5, (from.z + to.z) * 0.5) + this.run.altitudeM,
-        z: (from.z + to.z) * 0.5,
-      },
-      volume: 0.9,
-    });
+    // 引擎声分两层，都**挂在机身上**、逐帧跟着飞（TrackEngine → host.MoveVoice）：
+    //   · drone：合成的持续引擎，从进入段第一帧就响，按径向速度做多普勒 —— 「远处有飞机、
+    //     它在过来、它掠过去了、它在拐回来」在耳朵里的全部来源是它的方位 + 响度 + 音高一起变。
+    //     以前只有一条挂在扫射线段中点的静态一次性音，飞机在四百米外接近时什么都听不到。
+    //   · engine（planeDive）：录好多普勒的实录通场（Data_SfxSources 的 PlaneDive 头注：7 秒
+    //     从 −36 dB 涨到 −9 dB 再落回），在开火前 PASS_LEAD_S 秒起播，只搬位置**不变调** ——
+    //     变调做出来的多普勒一听就是合成器，而这条本来就录着自己的。
+    this.run.airPrev = null;
+    this.run.drone = this.SfxHandle("drone", { position: this.AirPoint(), volume: 0.9, priority: true });
+    this.run.pass = null;
     return this.run.id;
   }
 
@@ -425,6 +424,7 @@ export class AircraftStrafeDirector {
         return null;
       }
     }
+    this.TrackEngine(step);
     // 玩家那一段的三拍与相位无关（提示可能落在进入段的尾巴上）。
     this.StepPlayerWindow();
     return this.View();
@@ -750,6 +750,27 @@ export class AircraftStrafeDirector {
     run.OnPhase?.(name, this.View());
   }
 
+  /**
+   * 引擎声跟着机身：drone 搬位置 + 径向速度（多普勒在音频层算），通场录音到点起播、之后只搬位置。
+   * 速度按这一步的位移差分，不另存航速矢量 —— 转弯段的切向速度才是听者真正感到的那个。
+   */
+  TrackEngine(step) {
+    const run = this.run;
+    if (!run) return;
+    const at = this.AirPoint();
+    const prev = run.airPrev;
+    const velocity = prev && step > 1e-4
+      ? { x: (at.x - prev.x) / step, y: (at.y - prev.y) / step, z: (at.z - prev.z) / step }
+      : null;
+    run.airPrev = at;
+    if (run.drone) this.host.MoveVoice?.(run.drone, at, { velocity });
+    if (run.pass === null) {
+      if (run.t >= run.fireFromS - PASS_LEAD_S) run.pass = this.SfxHandle("engine", { position: at, volume: 0.95 }) || false;
+    } else if (run.pass) {
+      this.host.MoveVoice?.(run.pass, at);
+    }
+  }
+
   /** 机枪声：按听者与飞机的距离挑近/远那条真的录音，不靠低通造。 */
   PlayGuns() {
     const run = this.run;
@@ -765,13 +786,18 @@ export class AircraftStrafeDirector {
    * 那时退到备胎，并**把结果记下来**：一条 key 只解析一次，不会每次都白试一遍。
    */
   Sfx(key, opts = {}) {
+    return this.SfxHandle(key, opts) ? this.sfxPick.get(key) : null;
+  }
+
+  /** 同 Sfx，但返回宿主给的 voice 句柄（给 TrackEngine 搬位置、给 Finish 停声用）。 */
+  SfxHandle(key, opts = {}) {
     const spec = STRAFE_SFX[key];
     if (!spec || typeof this.host.Play !== "function") return null;
     const picked = this.sfxPick.get(key);
     const names = picked ? [picked] : spec.names;
     for (const name of names) {
       const played = this.host.Play(name, { volume: spec.volume, burst: spec.burst, ...opts });
-      if (played) { this.sfxPick.set(key, name); return name; }
+      if (played) { this.sfxPick.set(key, name); return played; }
     }
     return null;
   }
@@ -780,6 +806,8 @@ export class AircraftStrafeDirector {
   Finish(reason, completed) {
     const run = this.run;
     if (!run) return null;
+    // 引擎离场：淡出而不是掐断。三条收尾路径（走完 / Abort / Reset）都从这儿过。
+    if (run.drone) { this.host.StopVoice?.(run.drone, 0.9); run.drone = null; }
     // 走完了但窗口还开着（exitS 短过 windowS 的极端配法）：**照样结算** ——
     // 提示已经给过了，玩家没躲就是没躲，不能靠航线走得快把这一下混过去。
     // Abort / Reset 那两条不结算：那是换关与跳过，不是「没躲开」。

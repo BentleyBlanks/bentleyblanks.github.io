@@ -99,3 +99,16 @@ export const ACTOR_DETAIL = Object.freeze({
   // 免得屏幕边缘上的人在转身时一格一格地闪出来。
   boundRadiusM: 1.6,
 });
+
+/**
+ * 中弹踉跄（Actor 的 `hurt` 覆盖姿势）。
+ *
+ * 姿势代码与编辑器预览一直都在（Script_Actor 的「上身被顶得后仰、头往后甩、脚下错半步」），
+ * 但 Script_Ai 的七处 actor.Update 从没传过 `hurt` —— 打中活着的人身上没有任何动作反馈，
+ * 只有一团血。现在 Soldier.TakeHit 抬一下、Act 每帧按 decayS 衰减、Update 带过去。
+ *
+ * base        挨一下最少抬到多少（擦一下腿也得晃一下）
+ * damageDiv   伤害 / 这个数 再叠上去（三八式 72 → +0.8，基本满幅）
+ * decayS      从 1 衰减到 0 用几秒
+ */
+export const HURT_FLINCH = Object.freeze({ base: 0.45, damageDiv: 90, decayS: 0.45 });
