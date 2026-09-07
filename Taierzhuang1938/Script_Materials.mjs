@@ -9,10 +9,9 @@
 
 import * as THREE from "three";
 import { RECIPES } from "./Script_TexBake.mjs";
-import { GI_SAMPLE_GLSL, BindGiUniforms } from "./Script_Gi.mjs";
 import {
-  BindDestructionUniforms, DestructionShaderGlsl,
-} from "./Script_Destruction.mjs";
+  ApplyPatches, IndirectLightingPatches, MakeDestructionPatch,
+} from "./Script_MaterialPatches.mjs";
 
 /**
  * 1×1 透明 GIF。给一张挂死的 `<img>` 换上它 = 当场放弃原来那条连接，
@@ -38,236 +37,26 @@ function MakeTexture(bytes, size, { srgb = false, repeat = 1, anisotropy = 1 } =
 }
 
 /**
- * 给材质挂上「间接光的两件事」：屏幕空间 AO 与探针体 GI。
+ * 给材质挂上「间接光的两件事」：屏幕空间 AO 与探针体 GI（外加破口裁切）。
  *
- * 两件事必须**在同一个 onBeforeCompile 里**做完 —— three 一个材质只有一个钩子，
- * 分两次写的话后一次会把前一次整个覆盖掉（AO 会静默消失，且没有任何报错）。
+ * 2026-09 帧图重构：**实现搬到了 `Script_MaterialPatches.mjs` 的补丁注册表**，
+ * 这里只剩一层薄封装（外部签名与 userData 标记一个字没变）。
  *
- * 分工：
- *   AO  —— 只压间接光，且只压「接触处」那种小尺度遮蔽（<aomap_fragment>）；
- *   GI  —— 直接**替换**天空 IBL 的漫反射项。探针体里已经含了天光，
- *          再加一份就是双份；而 iblIrradiance 本身没有位置概念，正是要被换掉的那个。
- *          镜面那一路（radiance）留给 IBL，但按 GI/天空的亮度比做一次遮蔽 ——
- *          否则屋里的金属件照样反着一片亮天。
+ * 为什么要注册表：three 一个材质只有一个 `onBeforeCompile` 钩子，分两次写的话
+ * 后一次会把前一次整个覆盖掉（AO 会静默消失，且没有任何报错）。注册表把所有
+ * 补丁在同一个钩子里按固定顺序做完，`customProgramCacheKey` 由各补丁的 key 拼出来。
  *
- * GI 注入分两层，**编译期**按 `gi.sampling` 二选一（cache key 里也带着它）：
- *   采样层 —— GI_SAMPLE_GLSL + 图集 uniforms + uGiEnabled 分支，只在探针体打开时
- *            编进去。即使 uGiEnabled 恒为 0 这坨代码也占着采样器与寄存器，
- *            实测整帧贵 ~2.7 ms（2026-08-26 FrameProfileTest，RTX 4070 SUPER）；
- *   调试层 —— uGiDebugView / gGiDebugColor / 材质通道视图 6-9、光照分量视图
- *            10-13 / 末端整帧覆盖。
- *            GI 关着也要在：?giView 与 Debug Rendering 面板不依赖探针体。
+ * 分工（细节与锚点表见 Script_MaterialPatches 抬头）：
+ *   AO  —— 只压间接光，且只压「接触处」那种小尺度遮蔽（`<aomap_fragment>`）；
+ *   GI  —— 直接**替换**天空 IBL 的漫反射项，镜面那一路按亮度比做遮蔽；
+ *          采样层是**编译期**开关（`gi.sampling` 进了 cache key），调试层常在。
+ *   破口 —— 主材质 / 静态克隆 / 阴影深度三条链共用同一份 OBB。
  */
 export function InjectIndirectLighting(material, { ssao = null, gi = null, destruction = null } = {}) {
   material.userData.ssaoUniforms = ssao;
   material.userData.giUniforms = gi;
   material.userData.destructionUniforms = destruction;
-  material.onBeforeCompile = (shader) => {
-    let vertex = shader.vertexShader;
-    let fragment = shader.fragmentShader;
-
-    if (ssao) {
-      shader.uniforms.uSsaoMap = ssao.map;
-      shader.uniforms.uSsaoResolution = ssao.resolution;
-      shader.uniforms.uSsaoStrength = ssao.strength;
-      fragment = fragment.replace("#include <common>", `#include <common>
-        uniform sampler2D uSsaoMap;
-        uniform vec2 uSsaoResolution;
-        uniform float uSsaoStrength;`);
-    }
-
-    if (gi && gi.sampling !== false) {
-      BindGiUniforms(shader.uniforms, gi);
-      // 世界坐标要自己传：three 的 worldPosition 只在开了阴影/envMap 时才有，
-      // 靠它等于把 GI 的生死系在别的开关上。实例化/骨骼的矩阵顺序照抄 <project_vertex>。
-      vertex = vertex
-        .replace("#include <common>", `#include <common>
-        varying vec3 vGiWorldPos;`)
-        .replace("#include <project_vertex>", `#include <project_vertex>
-        {
-          vec4 giWorld = vec4(transformed, 1.0);
-          #ifdef USE_BATCHING
-            giWorld = batchingMatrix * giWorld;
-          #endif
-          #ifdef USE_INSTANCING
-            giWorld = instanceMatrix * giWorld;
-          #endif
-          vGiWorldPos = (modelMatrix * giWorld).xyz;
-        }`);
-      fragment = fragment
-        .replace("#include <common>", `#include <common>
-        varying vec3 vGiWorldPos;
-        vec3 gGiDebugColor = vec3(0.0);
-${GI_SAMPLE_GLSL}`)
-        .replace("#include <lights_fragment_maps>", `#include <lights_fragment_maps>
-        #if defined( RE_IndirectDiffuse )
-        if (uGiEnabled > 0.001) {
-          // geometryNormal 是**视空间**的，不转回世界空间就会得到一张跟着镜头转的假 GI
-          vec3 giNormal = transformNormalByInverseViewMatrix(geometryNormal, viewMatrix);
-          vec3 giView = normalize(cameraPosition - vGiWorldPos);
-          float giConfidence;
-          vec3 giIrradiance = GiSampleIrradiance(vGiWorldPos, giNormal, giView, giConfidence) * uGiIntensity;
-          // uGiEnabled 是 0→1 的淡入量（图集收敛前是 0），不是开关
-          giConfidence *= uGiEnabled;
-          // 体积**外**的回退值。画质面板那根「间接光强度」已经乘进了 uGiIntensity
-          // （探针一侧），回退的天空 IBL 必须乘同一份 —— 少乘一边，×2 就等于
-          // 「体内两倍、体外一倍」，体积边界上凭空多出一圈硬色差，而且体积跟着
-          // 玩家滚，那圈色差就跟着人走。乘数跟着 uGiEnabled 淡入：图集还没收敛
-          // 就先把体外提亮的话，进关那一秒会先闪一下再落回来。
-          vec3 giFallback = iblIrradiance * mix(1.0, uGiGain, uGiEnabled);
-          // ?giView= 假彩色取证：1 材质最终采用的间接辐照度×0.05 /
-          // 2 被替换前的天空 IBL×0.05（不含上面那份增益，看的是「原样的天」）/
-          // 3 confidence / 4 探针 GI 与体外回退的亮度比×0.25（与曝光无关，
-          // 1.0 的比值显示为 0.25 灰；比值离 1 越远，体积边界那条缝越明显）。
-          // 在 mix 之前抓，末端 <dithering_fragment> 处整帧覆盖输出。
-          if (uGiDebugView > 0.5) {
-            // 正片在探针体外（confidence=0）会回退到天空 IBL。这里以前只画
-            // giIrradiance，体积边界外便整片纯黑，误报成“远处没有 GI”。调试图
-            // 必须复现下面实际写回 iblIrradiance 的同一条 mix，才能显示真实结果。
-            if (uGiDebugView < 1.5) {
-              gGiDebugColor = mix(giFallback, giIrradiance, giConfidence) * 0.05;
-            }
-            else if (uGiDebugView < 2.5) gGiDebugColor = iblIrradiance * 0.05;
-            else if (uGiDebugView < 3.5) gGiDebugColor = vec3(giConfidence);
-            else if (uGiDebugView < 4.5) {
-              float giDbgL = dot(giIrradiance, vec3(0.2126, 0.7152, 0.0722));
-              float iblDbgL = max(dot(giFallback, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
-              gGiDebugColor = vec3(giDbgL / iblDbgL * 0.25);
-            }
-            // 5.5 的上界不能省：6-9 是材质通道视图，值在更早的 chunk 里已经抓好，
-            // 这里兜底 else 一接就会把它们全冲成权重和（四个视图一模一样的灰）。
-            else if (uGiDebugView < 5.5) gGiDebugColor = vec3(gGiDbgWeightSum * 0.5);
-          }
-          #if defined( RE_IndirectSpecular )
-          if (giConfidence > 0.0) {
-            // 遮蔽比要拿**同倍**的两侧比，否则增益一开就恒等于 1（屋里的金属件
-            // 照样反着一片亮天）。giFallback 与 giIrradiance 都含增益，比值干净。
-            float giSkyLum = max(dot(giFallback, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
-            float giLum = dot(giIrradiance, vec3(0.2126, 0.7152, 0.0722));
-            float giOcclusion = clamp(giLum / giSkyLum, 0.0, 1.0);
-            radiance *= mix(1.0, mix(1.0, giOcclusion, giConfidence), uGiSpecularOcclusion);
-          }
-          #endif
-          // confidence=0 也要写回：那一路是 giFallback，增益在体外同样生效。
-          iblIrradiance = mix(giFallback, giIrradiance, giConfidence);
-        }
-        #endif`)
-        // 材质通道假彩色（6 BaseColor / 7 粗糙度 / 8 金属度 / 9 太阳阴影）。
-        // 前向管线没有延迟渲染的 GBuffer，这些通道只在材质自己的着色器里存在 ——
-        // 想看它们只有一条路：让材质把该通道当颜色写出去。各通道在它诞生的
-        // chunk 之后立刻抓（那时值刚算完、还没被后续光照消费掉）。
-        .replace("#include <color_fragment>", `#include <color_fragment>
-        if (uGiDebugView > 5.5 && uGiDebugView < 6.5) gGiDebugColor = diffuseColor.rgb;`)
-        .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
-        if (uGiDebugView > 6.5 && uGiDebugView < 7.5) gGiDebugColor = vec3(roughnessFactor);`)
-        .replace("#include <metalnessmap_fragment>", `#include <metalnessmap_fragment>
-        if (uGiDebugView > 7.5 && uGiDebugView < 8.5) gGiDebugColor = vec3(metalnessFactor);`)
-        // 太阳阴影因子：白 = 照到，黑 = 挡住。r185 的 getShadow 六参签名。
-        // 不收影的材质（USE_SHADOWMAP 未定义）保持 0 —— 黑 = 没参与收影，也是信息。
-        // 阴影框只有 66 m：框外 getShadow 的 frustumTest 不过、恒返回 1（纯白），
-        // 这个视图顺带能看到阴影覆盖范围的边。
-        .replace("#include <lights_fragment_begin>", `#include <lights_fragment_begin>
-        #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
-        if (uGiDebugView > 8.5 && uGiDebugView < 9.5) {
-          gGiDebugColor = vec3(getShadow(directionalShadowMap[0],
-            directionalLightShadows[0].shadowMapSize, directionalLightShadows[0].shadowIntensity,
-            directionalLightShadows[0].shadowBias, directionalLightShadows[0].shadowRadius,
-            vDirectionalShadowCoord[0]));
-        }
-        #endif`)
-        .replace("#include <dithering_fragment>", `#include <dithering_fragment>
-        if (uGiDebugView > 0.5) gl_FragColor = vec4(gGiDebugColor, diffuseColor.a);`);
-    } else if (gi) {
-      // 调试视图基建（无探针采样版）。视图语义按「GI 关闭时材质实际在用什么」走：
-      //   1/2 = 天空 IBL×0.05 —— 采样层没编进来，材质实际采用的间接辐照度**就是**
-      //         iblIrradiance，所以视图 1 与视图 2 在这个档位是同一张图；
-      //   3/4/5 = 黑 —— confidence / 亮度比 / 权重和都是探针量，没有探针 = 0，
-      //         黑不是坏视图，是准确信息（画面里没有探针 GI）；
-      //   6-9 材质通道、10-13 光照分量与采样版逐字节相同。
-      shader.uniforms.uGiDebugView = gi.debugView;
-      fragment = fragment
-        .replace("#include <common>", `#include <common>
-        uniform float uGiDebugView;
-        vec3 gGiDebugColor = vec3(0.0);`)
-        .replace("#include <lights_fragment_maps>", `#include <lights_fragment_maps>
-        #if defined( RE_IndirectDiffuse )
-        if (uGiDebugView > 0.5 && uGiDebugView < 2.5) gGiDebugColor = iblIrradiance * 0.05;
-        #endif`)
-        .replace("#include <color_fragment>", `#include <color_fragment>
-        if (uGiDebugView > 5.5 && uGiDebugView < 6.5) gGiDebugColor = diffuseColor.rgb;`)
-        .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
-        if (uGiDebugView > 6.5 && uGiDebugView < 7.5) gGiDebugColor = vec3(roughnessFactor);`)
-        .replace("#include <metalnessmap_fragment>", `#include <metalnessmap_fragment>
-        if (uGiDebugView > 7.5 && uGiDebugView < 8.5) gGiDebugColor = vec3(metalnessFactor);`)
-        .replace("#include <lights_fragment_begin>", `#include <lights_fragment_begin>
-        #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
-        if (uGiDebugView > 8.5 && uGiDebugView < 9.5) {
-          gGiDebugColor = vec3(getShadow(directionalShadowMap[0],
-            directionalLightShadows[0].shadowMapSize, directionalLightShadows[0].shadowIntensity,
-            directionalLightShadows[0].shadowBias, directionalLightShadows[0].shadowRadius,
-            vDirectionalShadowCoord[0]));
-        }
-        #endif`)
-        .replace("#include <dithering_fragment>", `#include <dithering_fragment>
-        if (uGiDebugView > 0.5) gl_FragColor = vec4(gGiDebugColor, diffuseColor.a);`);
-    }
-
-    // 光照分量必须在 <aomap_fragment> **之后**截取：这里正是 SSAO 实际压过
-    // indirectDiffuse / indirectSpecular 的位置；往 lights_fragment_end 前挪会把
-    // 未遮蔽的旧值拿去调试，面板反而和正式画面不一致。没有 SSAO 时仍替换该
-    // chunk，以便光照分量视图在 low/关闭 AO 的档位照常工作。
-    if (ssao || gi) {
-      fragment = fragment.replace("#include <aomap_fragment>", `#include <aomap_fragment>
-        ${ssao ? `{
-          float ssao = texture2D(uSsaoMap, gl_FragCoord.xy / uSsaoResolution).r;
-          ssao = mix(1.0, ssao, uSsaoStrength);
-          reflectedLight.indirectDiffuse *= ssao;
-          // 镜面遮蔽：粗糙面遮得多、光滑面遮得少（Lagarde 的近似）
-          reflectedLight.indirectSpecular *= clamp(pow(ssao, 1.0 + material.roughness * 2.0), 0.0, 1.0);
-        }` : ""}
-        ${gi ? `// 10 直射漫反射 / 11 直射镜面 / 12 IBL 反射 / 13 GI/IBL 漫反射。
-        // 四项都是 reflectedLight 的正式累积项；不要从最终 totalDiffuse/
-        // totalSpecular 再猜，后者已经把两条路径相加，无法定位是哪一路失衡。
-        if (uGiDebugView > 9.5 && uGiDebugView < 10.5) gGiDebugColor = reflectedLight.directDiffuse;
-        if (uGiDebugView > 10.5 && uGiDebugView < 11.5) gGiDebugColor = reflectedLight.directSpecular;
-        if (uGiDebugView > 11.5 && uGiDebugView < 12.5) gGiDebugColor = reflectedLight.indirectSpecular;
-        if (uGiDebugView > 12.5 && uGiDebugView < 13.5) gGiDebugColor = reflectedLight.indirectDiffuse;` : ""}`);
-    }
-
-    if (destruction) {
-      BindDestructionUniforms(shader.uniforms, destruction);
-      // 跟 GI 一样必须自己传世界坐标。这里不能拿 vViewPosition 反推：静态合批网格
-      // 分区之后 modelMatrix 虽然通常是单位阵，但编辑器与过场会真的移动整棵节点。
-      vertex = vertex
-        .replace("#include <common>", `#include <common>
-        varying vec3 vDamageWorldPos;`)
-        .replace("#include <project_vertex>", `#include <project_vertex>
-        {
-          vec4 damageWorld = vec4(transformed, 1.0);
-          #ifdef USE_BATCHING
-            damageWorld = batchingMatrix * damageWorld;
-          #endif
-          #ifdef USE_INSTANCING
-            damageWorld = instanceMatrix * damageWorld;
-          #endif
-          vDamageWorldPos = (modelMatrix * damageWorld).xyz;
-        }`);
-      fragment = fragment
-        .replace("#include <common>", `#include <common>
-        varying vec3 vDamageWorldPos;
-${DestructionShaderGlsl(destruction.maxVolumes)}`)
-        .replace("#include <clipping_planes_fragment>", `#include <clipping_planes_fragment>
-        ApplyDamageVolumes(vDamageWorldPos);`);
-    }
-
-    shader.vertexShader = vertex;
-    shader.fragmentShader = fragment;
-  };
-  // 缓存键必须跟着注入组合走：两种组合共用一份编译结果 = 有的材质拿不到 GI。
-  // GI 位是三态（0 无 / 1 只有调试层 / 2 带探针采样），且**每次编译现读** ——
-  // 运行时翻转 gi.sampling 再 needsUpdate，就能拿到另一套程序而不撞缓存。
-  material.customProgramCacheKey = () =>
-    `indirect:${ssao ? 1 : 0}${gi ? (gi.sampling !== false ? 2 : 1) : 0}${destruction ? 1 : 0}`;
+  ApplyPatches(material, IndirectLightingPatches({ ssao, gi, destruction }));
   // 布尔标记只给运行时取证与幂等接入用。不要把 uniforms 包塞进新标记：
   // 里面有 Texture，material.clone()/toJSON 会为每个人刷一屏“Unable to serialize”。
   material.userData.indirectLightingInjected = true;
@@ -277,30 +66,9 @@ ${DestructionShaderGlsl(destruction.maxVolumes)}`)
 /** 阴影深度也裁同一批洞；否则墙已经穿了，太阳底下还留一块完整墙影。 */
 function MakeDestructionDepthMaterial(uniforms) {
   const material = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
-  material.onBeforeCompile = (shader) => {
-    BindDestructionUniforms(shader.uniforms, uniforms);
-    shader.vertexShader = shader.vertexShader
-      .replace("#include <common>", `#include <common>
-      varying vec3 vDamageWorldPos;`)
-      .replace("#include <project_vertex>", `#include <project_vertex>
-      {
-        vec4 damageWorld = vec4(transformed, 1.0);
-        #ifdef USE_BATCHING
-          damageWorld = batchingMatrix * damageWorld;
-        #endif
-        #ifdef USE_INSTANCING
-          damageWorld = instanceMatrix * damageWorld;
-        #endif
-        vDamageWorldPos = (modelMatrix * damageWorld).xyz;
-      }`);
-    shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", `#include <common>
-      varying vec3 vDamageWorldPos;
-${DestructionShaderGlsl(uniforms.maxVolumes)}`)
-      .replace("#include <clipping_planes_fragment>", `#include <clipping_planes_fragment>
-      ApplyDamageVolumes(vDamageWorldPos);`);
-  };
-  material.customProgramCacheKey = () => `damageDepth:${uniforms.maxVolumes}`;
+  ApplyPatches(material, [MakeDestructionPatch(uniforms, {
+    key: "damageDepth:" + uniforms.maxVolumes,
+  })]);
   return material;
 }
 
