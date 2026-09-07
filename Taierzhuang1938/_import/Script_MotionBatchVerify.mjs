@@ -6,6 +6,8 @@ import {LaunchBrowser} from '../../PrairieFire1937/Script_BrowserTestKit.mjs';
 const args=process.argv.slice(2),root=args[args.indexOf('--root')+1];
 if(!root||root==='--root')throw Error('--root required');
 const group=args.includes('--group')?args[args.indexOf('--group')+1]:'NextTenV1';
+const factions=args.includes('--factions')?args[args.indexOf('--factions')+1].split(','):['Nra','Ija'];
+assert.ok(factions.length&&factions.every(f=>['Nra','Ija'].includes(f)),'Supported factions');
 const reportName=group==='NextTenV1'?'Data_BatchPlaybackValidation.json':`Data_${group}PlaybackValidation.json`;
 const recipes=JSON.parse(await fs.readFile(path.join(root,'Models',group,'Data_Recipes.json'),'utf8'));
 const reviewOutput=group==='MeleeVideoV1'?path.join(root,'Preview',group):path.join(root,'Preview');
@@ -20,7 +22,7 @@ try{
   const sourceMotion=recoveredRifle?JSON.parse(await fs.readFile(path.join(root,'Models','_Cache',group,`Data_${name}Motion.json`),'utf8')):null;
   await page.goto('http://127.0.0.1:8136/Preview/index.html?action='+name);
   await page.waitForFunction(()=>window.MotionReview&&!MotionReview.loading&&MotionReview.video.readyState>=2);
-  for(const faction of ['Nra','Ija']){
+  for(const faction of factions){
    await page.locator('#faction').selectOption(faction);
    await page.waitForFunction(f=>!MotionReview.loading&&MotionReview.variant.faction===f&&MotionReview.video.readyState>=2,faction);
    const samples=[];

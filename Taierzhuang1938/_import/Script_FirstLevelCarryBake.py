@@ -15,6 +15,7 @@ def Main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--group', default='FirstLevelCarryV9')
+    parser.add_argument('--revision', type=int, default=9)
     args = parser.parse_args(sys.argv[sys.argv.index('--') + 1:])
     root = args.root.resolve()
     out = root / 'Models' / args.group
@@ -114,7 +115,9 @@ def Main():
             wanted = Matrix((desiredF, desiredD, desiredF.cross(desiredD))).transposed()
             orientation = wanted @ native.transposed()
             handScale = World(arm, hand).to_scale()
-            palm = forward * .70 - dorsal * (.016 / handScale.x)
+            # V10 puts the rail centre behind the palm by its actual half width
+            # plus skin thickness. V9 placed that centre inside the palm mesh.
+            palm = forward * .70 - dorsal * ((.052 if args.revision >= 10 else .016) / handScale.x)
             calibration[role][side] = dict(orientation=orientation, palm=palm, sign=sign, scale=handScale)
         # Constant root placement is an assembly decision, not recovered spacing.
         mid = (Point(arm, 'L Hand') + Point(arm, 'R Hand')) * .5
@@ -192,6 +195,38 @@ def Main():
         Aim(arm, b, c, target)
         return reach
 
+    def WrapFingers(arm, side, grip, sign):
+        # Authored wrap around a circle enclosing the 65 mm square rail.
+        # Each FK rotation preserves the native segment length and twist;
+        # the thumb advances over the top, opposing the four lower fingers.
+        for index in range(5):
+            chain = [Bone(arm, side+' Finger'+str(index)+suffix) for suffix in ['', '1', '2']]
+            for bone in chain:
+                bone.matrix_basis = Matrix.Identity(4)
+            bpy.context.view_layer.update()
+            for joint, bone in enumerate(chain):
+                world = World(arm, bone)
+                start = world.translation
+                if joint < 2:
+                    vector = World(arm, chain[joint+1]).translation - start
+                else:
+                    previous = chain[joint-1]
+                    restVector = bone.bone.matrix_local.translation - previous.bone.matrix_local.translation
+                    localVector = bone.bone.matrix_local.to_3x3().inverted() @ restVector
+                    vector = world.to_3x3() @ localVector * .72
+                radius = .054 if index == 0 else .051
+                x, z = sign*(start.x-grip.x), start.z-grip.z
+                distance = math.hypot(x,z)
+                angle = math.atan2(z,x)
+                cosine = (distance*distance+radius*radius-vector.length_squared)/(2*distance*radius)
+                turn = math.acos(max(-1,min(1,cosine)))
+                angle += turn if index == 0 else -turn
+                target = Vector((grip.x+sign*radius*math.cos(angle),start.y,grip.z+radius*math.sin(angle)))
+                rotation = vector.rotation_difference(target-start).to_matrix().to_4x4() @ world
+                rotation.translation = start
+                bone.matrix = arm.matrix_world.inverted() @ rotation
+                bpy.context.view_layer.update()
+
     reports = []
     for frame in range(1, 122):
         scene.frame_set(frame)
@@ -213,7 +248,7 @@ def Main():
                 hand.matrix = arm.matrix_world.inverted() @ m
                 # Fingers keep original axes and lengths. Flex each knuckle
                 # toward the rail-facing palm, explicitly authored, not mocap.
-                for i in range(1, 5):
+                for i in (range(1, 5) if args.revision < 10 else []):
                     for depth, curl in [('', .75), ('1', 1.15), ('2', .75)]:
                         finger = Bone(arm, side + ' Finger' + str(i) + depth)
                         axisWorld = Vector((0, 1, 0))  # Shared rail axis.
@@ -221,6 +256,8 @@ def Main():
                         localAxis = World(arm, finger).to_quaternion().inverted() @ axisWorld
                         from mathutils import Quaternion
                         finger.rotation_quaternion = samples[role][frame-1][finger.name].to_quaternion() @ Quaternion(localAxis, curl * cfg['sign'])
+                if args.revision >= 10:
+                    WrapFingers(arm, side, grip, cfg['sign'])
                 bpy.context.view_layer.update()
                 actual = World(arm, hand) @ cfg['palm']
                 untouched = [b for b in arm.pose.bones if not any(t in b.name for t in ['UpperArm', 'Forearm', 'Hand', 'Finger'])]
@@ -274,7 +311,7 @@ def Main():
     scene['sourcePolicy'] = 'V7 body/lower limbs unchanged; authored arm contact and fingers; two-person crop experiment'
     scene['bedHeightMeters'] = bedHeight
     scene['sourceRangeSeconds'] = [137/30,197/30]
-    blend = blends / 'Scene_Nra_StretcherPair_V9.blend'
+    blend = blends / f'Scene_Nra_StretcherPair_V{args.revision}.blend'
     bpy.ops.wm.save_as_mainfile(filepath=str(blend), compress=True)
 
     variants = []
@@ -282,7 +319,7 @@ def Main():
         bpy.ops.object.select_all(action='DESELECT')
         for obj in selected:
             obj.select_set(True)
-        clip = 'Animation_Nra_' + name + '_V9'
+        clip = 'Animation_Nra_' + name + f'_V{args.revision}'
         path = out / (clip + '.glb')
         bpy.ops.export_scene.gltf(filepath=str(path), export_format='GLB', use_selection=True,
             export_animations=True, export_animation_mode='ACTIVE_ACTIONS',
@@ -296,8 +333,8 @@ def Main():
         variants.append(dict(id=name, label=source['label'], loop=True,
             cameraDistance=6.5,
             description='第一关 0.58 m 杆距／2.15 m 杆长；原身体与下肢保留，手臂接触修正版，非全身保真。',
-            variants=[dict(id='Nra-v9-'+name, faction='Nra', revisionOrder=9,
-                label='V9 · 第一关实物担架接触试制', status='实验 · 待审阅', propKind='carry',
+            variants=[dict(id=f'Nra-v{args.revision}-'+name, faction='Nra', revisionOrder=args.revision,
+                label=f'V{args.revision} · 第一关实物担架接触试制', status='实验 · 需修正', propKind='carry',
                 path=path.relative_to(root).as_posix(), clip=clip,
                 blend=blend.relative_to(root).as_posix(), review=review,
                 travelMeters=v7.get('travelMeters',[0,0,1.1]))]))

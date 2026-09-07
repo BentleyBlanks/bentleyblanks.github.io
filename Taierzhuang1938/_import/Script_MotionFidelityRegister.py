@@ -20,7 +20,7 @@ for a in inventory:
   review.pop('firstPersonBlend',None)
   review['retargetReport']=reportPath.relative_to(root).as_posix()
   review['retargetNotes']='复用已核验原始恢复；保留各骨段方向、肘膝与手腕位置，适配原人物骨长。手指及道具不是 GVHMR 原始输出。'
-  if cfg['category']!='split_experiment':review['sourceAssessment']='复用对应原片与原始恢复。新版保留原恢复的肘膝、手腕和身体姿态；手指握法与道具另行适配。'
+  if cfg['category']!='split_experiment':review.setdefault('sourceAssessment','复用对应原片与原始恢复。新版保留原恢复的肘膝、手腕和身体姿态；手指握法与道具另行适配。')
   previous=next((x for x in a['variants'] if x['id']==a['latestByFaction'].get(faction)),None)
   travel=previous.get('travelMeters') if previous else None
   if name!='StretcherPair':

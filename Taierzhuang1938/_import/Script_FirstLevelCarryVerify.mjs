@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import {LaunchBrowser} from '../../PrairieFire1937/Script_BrowserTestKit.mjs';
 const args=process.argv.slice(2),root=args[args.indexOf('--root')+1];
 if(!root)throw Error('--root required');
-const group='FirstLevelCarryV9',output=path.join(root,'Preview',group);
+const revision=args.includes('--revision')?Number(args[args.indexOf('--revision')+1]):9;
+const group=`FirstLevelCarryV${revision}`,output=path.join(root,'Preview',group);
 await fs.mkdir(output,{recursive:true});
 const report=JSON.parse(await fs.readFile(path.join(root,'Models',group,'Data_ContactValidation.json'),'utf8'));
 const browser=await LaunchBrowser(),page=await browser.newPage({viewport:{width:1700,height:1000}}),errors=[],results=[];
@@ -13,7 +14,7 @@ page.on('pageerror',e=>errors.push(e.message));
 try{
  for(const name of ['CarryStretcherFront','CarryStretcherRear','StretcherPair']){
   await page.goto('http://127.0.0.1:8136/Preview/index.html?action='+name);
-  await page.waitForFunction(name=>window.MotionReview&&!MotionReview.loading&&MotionReview.variant.id==='Nra-v9-'+name&&MotionReview.video.readyState>=2,name);
+  await page.waitForFunction(({name,revision})=>window.MotionReview&&!MotionReview.loading&&MotionReview.variant.id===`Nra-v${revision}-`+name&&MotionReview.video.readyState>=2,{name,revision});
   await page.evaluate(()=>MotionReview.setPhase(.5));
   await page.waitForFunction(()=>!MotionReview.video.seeking);
   const data=await page.evaluate(({name,report})=>{

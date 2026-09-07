@@ -7,7 +7,9 @@ import {LoadGlb,SerializeGlb,PoseScene,BuildSkin,MinSkinnedY,ReadAccessor} from 
 const project=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const args=process.argv.slice(2),root=args[args.indexOf('--root')+1];
 if(!root)throw Error('--root required');
-const output=path.join(root,'Models/FirstLevelCarryV9/GameIntegration');fs.mkdirSync(output,{recursive:true});
+const revision=args.includes('--revision')?Number(args[args.indexOf('--revision')+1]):9;
+const group=`FirstLevelCarryV${revision}`;
+const output=path.join(root,`Models/${group}/GameIntegration`);fs.mkdirSync(output,{recursive:true});
 const core=fs.readFileSync(path.join(project,'vendor/three/build/three.core.js'));
 const {Matrix4,Vector3,Quaternion}=await import(`data:text/javascript;base64,${core.toString('base64')}`);
 const Pos=m=>new Vector3().setFromMatrixPosition(m);
@@ -21,6 +23,7 @@ function Accessor(json,chunks,values,type){
  json.bufferViews.push({buffer:0,byteOffset:chunks.reduce((n,b)=>n+b.length,0),byteLength:bytes.length});chunks.push(bytes);
  json.accessors.push({bufferView:json.bufferViews.length-1,componentType:5126,count:data.length/({SCALAR:1,VEC3:3,VEC4:4}[type]),type,...(type==='SCALAR'?{min:[data[0]],max:[data.at(-1)]}:{})});return json.accessors.length-1;
 }
+function Bake(supportOffsetM,write){
 const results=[];
 for(let variant=1;variant<=4;variant++){
  const id=`LugouNra0${variant}`,target=LoadGlb(path.join(project,`Model/Character/Model_${id}.glb`));
@@ -30,7 +33,7 @@ for(let variant=1;variant<=4;variant++){
   animations:[],accessors:[],bufferViews:[],buffers:[]};
  const chunks=[];
  for(const role of ['Front','Rear']){
-  const name='CarryStretcher'+role,source=LoadGlb(path.join(root,`Models/FirstLevelCarryV9/Animation_Nra_${name}_V9.glb`));
+  const name='CarryStretcher'+role,source=LoadGlb(path.join(root,`Models/${group}/Animation_Nra_${name}_V${revision}.glb`));
   const src=new PoseScene(source),srcRest=BindRest(source,src);
   const pelvis=scene.NodeIndex('Bip002 Pelvis'),sourcePelvis=src.NodeIndex('Bip002 Pelvis');
   const offset=Pos(rest[pelvis]).sub(Pos(srcRest[sourcePelvis]));
@@ -45,6 +48,10 @@ for(let variant=1;variant<=4;variant++){
     if(correction.has(i))world[i]=new Matrix4().fromArray(src.world[mapping.get(i)]).multiply(correction.get(i));
     else if(scene.parent[i]>=0)world[i]=world[scene.parent[i]].clone().multiply(rest[scene.parent[i]].clone().invert().multiply(rest[i]));
    }
+   // One constant shared offset for all variants and both roles. It corrects
+   // skin thickness without flattening either foot trajectory or stretching
+   // a limb. The shared prop receives this same offset at assembly time.
+   for(const i of links)world[i].elements[13]+=supportOffsetM;
    world.forEach((m,i)=>scene.world[i].set(m.elements));minSkinY=Math.min(minSkinY,MinSkinnedY(scene,skin));
    for(const i of links){
     const parent=scene.parent[i],local=parent<0?world[i]:world[parent].clone().invert().multiply(world[i]);
@@ -61,7 +68,7 @@ for(let variant=1;variant<=4;variant++){
    }
   }
   if(maxLengthError>.0005)throw Error(`${id}/${name} original length error ${maxLengthError} ${lengthBone}`);
-  const animation={name:'FirstLevel'+name,channels:[],samplers:[],extras:{loop:true,status:'candidate_requires_visual_acceptance',sourceRangeSeconds:[137/30,197/30],rootMotionMode:'assembly_relative_in_place'}};
+  const animation={name:'FirstLevel'+name,channels:[],samplers:[],extras:{loop:true,status:'candidate_requires_visual_acceptance',sourceRangeSeconds:[137/30,197/30],rootMotionMode:'assembly_relative_in_place',supportOffsetM}};
   const input=Accessor(json,chunks,times,'SCALAR');
   for(const i of links)for(const property of ['translation','rotation','scale']){
    const data=values.get(i)[property],width=property==='rotation'?4:3,constant=data.every((v,k)=>Math.abs(v-data[k%width])<1e-7);
@@ -69,10 +76,17 @@ for(let variant=1;variant<=4;variant++){
    animation.channels.push({sampler:animation.samplers.length,target:{node:i,path:property}});
    animation.samplers.push({input:constant?Accessor(json,chunks,[0,2],'SCALAR'):input,output,interpolation:'LINEAR'});
   }
-  json.animations.push(animation);results.push({id,clip:animation.name,matchedOriginalBones:correction.size,targetBones:links.length,maxLengthError,minSkinY,sourceOffset:offset.toArray()});
+  json.animations.push(animation);results.push({id,clip:animation.name,matchedOriginalBones:correction.size,targetBones:links.length,maxLengthError,minSkinY,supportOffsetM,sourceOffset:offset.toArray()});
  }
  const bin=Buffer.concat(chunks);json.buffers=[{byteLength:bin.length}];
- fs.writeFileSync(path.join(output,`Animation_${id}FirstLevelCarry.glb`),SerializeGlb(json,bin));
+ if(write)fs.writeFileSync(path.join(output,`Animation_${id}FirstLevelCarry.glb`),SerializeGlb(json,bin));
 }
-fs.writeFileSync(path.join(output,'Data_RuntimeCandidateValidation.json'),JSON.stringify({status:'candidate_not_runtime_enabled',results},null,2));
-console.log(JSON.stringify({status:'candidate_not_runtime_enabled',results}));
+return results;
+}
+const before=Bake(0,false);
+const supportOffsetM=revision>=10?Math.max(0,.001-Math.min(...before.map(r=>r.minSkinY))):0;
+const results=Bake(supportOffsetM,true);
+const report={status:'candidate_not_runtime_enabled',revision,supportOffsetM,
+ supportPolicy:'Single constant translation shared by every original variant, bearer and prop; no per-frame foot correction.',before,results};
+fs.writeFileSync(path.join(output,'Data_RuntimeCandidateValidation.json'),JSON.stringify(report,null,2));
+console.log(JSON.stringify(report));

@@ -4,10 +4,14 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import {LaunchBrowser} from '../../PrairieFire1937/Script_BrowserTestKit.mjs';
-const args=process.argv.slice(2),root=args[args.indexOf('--root')+1],group='ReviewV7';
+const args=process.argv.slice(2),root=args[args.indexOf('--root')+1];
+const group=args.includes('--group')?args[args.indexOf('--group')+1]:'ReviewV7';
+const revision=args.includes('--revision')?Number(args[args.indexOf('--revision')+1]):7;
+const factions=args.includes('--factions')?args[args.indexOf('--factions')+1].split(','):['Nra','Ija'];
+assert.ok(factions.length&&factions.every(f=>['Nra','Ija'].includes(f)),'Supported factions');
 const ids=args.includes('--ids')?args[args.indexOf('--ids')+1].split(','):null;
 const recipes=JSON.parse(await fs.readFile(path.join(root,'Models',group,'Data_Recipes.json'),'utf8'));
-if(ids)for(const id of ids)assert.ok(recipes[id]&&recipes[id].kind!=='pair',`Unknown or non-body V7 action: ${id}`);
+if(ids)for(const id of ids)assert.ok(recipes[id]&&recipes[id].kind!=='pair',`Unknown or non-body action: ${id}`);
 const names=['Pelvis','L Thigh','R Thigh','Spine','L Calf','R Calf','Spine1','L Foot','R Foot','Spine2','L Toe0','R Toe0','Neck','L Clavicle','R Clavicle','Head','L UpperArm','R UpperArm','L Forearm','R Forearm','L Hand','R Hand'];
 const browser=await LaunchBrowser(),page=await browser.newPage({viewport:{width:1700,height:1000}}),errors=[],results=[];
 page.on('pageerror',e=>errors.push(e.message));
@@ -15,18 +19,18 @@ try{
  for(const [name,cfg] of Object.entries(recipes)){
   if(cfg.kind==='pair'||ids&&!ids.includes(name))continue;
   const motion=JSON.parse(await fs.readFile(path.join(root,'Models','_Cache',group,`Data_${name}Motion.json`),'utf8'));
-  for(const faction of ['Nra','Ija']){
+  for(const faction of factions){
    const report=JSON.parse(await fs.readFile(path.join(root,'Models',group,`Data_${faction}_${name}_Validation.json`),'utf8'));
    await page.goto('http://127.0.0.1:8136/Preview/index.html?action='+name);
    await page.waitForFunction(()=>window.MotionReview&&!MotionReview.loading);
    await page.locator('#faction').selectOption(faction);
    await page.waitForFunction(faction=>!MotionReview.loading&&MotionReview.variant.faction===faction,faction);
-   // Verify the requested V7 source even after a contact revision becomes latest.
-   if(await page.evaluate(({name,faction})=>MotionReview.variant.id!==`${faction}-v7-${name}`,{name,faction})){
+   // Verify the exact requested revision even when a newer contact edit exists.
+   if(await page.evaluate(({name,faction,revision})=>MotionReview.variant.id!==`${faction}-v${revision}-${name}`,{name,faction,revision})){
     await page.locator('#history > summary').click();
-    await page.locator(`[data-variant="${faction}-v7-${name}"]`).click();
+    await page.locator(`[data-variant="${faction}-v${revision}-${name}"]`).click();
    }
-   await page.waitForFunction(({name,faction})=>!MotionReview.loading&&MotionReview.variant.id===`${faction}-v7-${name}`,{name,faction});
+   await page.waitForFunction(({name,faction,revision})=>!MotionReview.loading&&MotionReview.variant.id===`${faction}-v${revision}-${name}`,{name,faction,revision});
    const data=await page.evaluate(({names,motion,report})=>{
     const model=MotionReview.model,bones=names.map(part=>model.bones.find(b=>b.name.replaceAll('_',' ').endsWith(' '+part)));
     if(bones.some(b=>!b))throw Error('Missing mapped bone');

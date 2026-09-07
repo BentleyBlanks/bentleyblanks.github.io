@@ -2,7 +2,7 @@
 
 更新：2026-09-07。适用：主菜单第一关与 `?whitebox=p012`，序章已并入，共 24 个运行时阶段。调查基线 `5f6ad124`；接手时拉取最新 master。本文是完整制作需求，**不是已完成动作清单**。用户将在另一台电脑用视频转骨骼、原骨架重定向接力；本任务继续完善任务流程、对白时机与交互。
 
-本机接力实测见[逐项进度](Data_FirstLevelMissionAnimationProgress.md)和[状态清单](Data_FirstLevelMissionAnimationStatus.json)：担架 V9 为需修正的本地接入候选；车厢、下车和救护缺专用片源，尚未完成或替换正式关卡动画。
+本机接力实测见[逐项进度](Data_FirstLevelMissionAnimationProgress.md)和[状态清单](Data_FirstLevelMissionAnimationStatus.json)：最新用户要求先覆盖全部 48 项的素材生成；已登记 62 条新单人片源计划并复用旧库，批次正在执行。担架 V10 和长凳坐姿起身 V1 为本地审阅候选，尚未完成全部动作或替换正式关卡动画。
 
 ## 先读与范围
 

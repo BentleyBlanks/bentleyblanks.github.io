@@ -6,12 +6,21 @@ import argparse, hashlib, json, re, subprocess
 def Main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--root',type=Path,required=True)
+    parser.add_argument('--carry-revision',type=int,default=10)
     args=parser.parse_args()
     root=args.root.resolve()
+    revision=args.carry_revision
+    group=f'FirstLevelCarryV{revision}'
     project=Path(__file__).resolve().parents[1]
     catalog=json.loads((root/'Preview/Data_Catalog.json').read_text(encoding='utf-8'))
     Hash=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
     Read=lambda p:json.loads(p.read_text(encoding='utf-8'))
+    batch=Read(root/'Models/FirstLevelSourceBatchV1/Data_BatchStatus.json')
+    coverage=Read(root/'Models/FirstLevelSourceBatchV1/Data_CoveragePlan.json')
+    sourceStates={s['id']:s for s in batch['sources']}
+    inspection=Read(root/'Models/FirstLevelSourceBatchV1/Data_SourceInspection.json')
+    for record in inspection['sources']:
+        sourceStates[record['id']]['mediaInspection']=record
     required=project/'docs/Data_FirstLevelMissionAnimationRequirements.md'
     priorities={f'FL{i:02}' for i in [13,14,15,16,17,18,19,20,21,23,24,25,26,27,33,35,36,37,38,39,40,43,44,45,46]}
     stageById={13:['Train'],14:['Train'],15:['Train'],16:['Train'],17:['Train'],
@@ -42,7 +51,7 @@ def Main():
             variants=[]
             for name in ['CarryStretcherFront','CarryStretcherRear','StretcherPair']:
                 action=next(a for a in catalog['actions'] if a['id']==name)
-                variant=next(v for v in action['variants'] if v['id']=='Nra-v9-'+name)
+                variant=next(v for v in action['variants'] if v['id']==f'Nra-v{revision}-'+name)
                 raw=Read(root/variant['review']['recoveryTracks'][0]['path'])
                 variants.append(dict(previewId=name,variantId=variant['id'],clipName=variant['clip'],
                     path=variant['path'],blendFile=variant['blend'],sourceVideo=variant['review']['sourceVideo'],
@@ -58,38 +67,69 @@ def Main():
                 sourceCacheSha256=[v['sourceCacheSha256'] for v in variants[:2]],
                 clipName=[v['clipName'] for v in variants[:2]],loop=True,rootMotionMode='in_place_with_explicit_assembly_translation',
                 referenceSpeedMps=None,entryPose='walking',exitPose='walking',
-                revisionLabel='V9 first-level rigid prop contact pilot; V7 body and lower limbs retained',
+                revisionLabel=f'V{revision} first-level rigid prop contact pilot; V7 body and lower limbs retained',
                 status='needs_correction',previewId='StretcherPair',blendFile=variants[-1]['blendFile'],variants=variants,
                 contacts=[dict(prop='CreateP012StretcherGeometry',railSpacingM=.58,railLengthM=2.15,
                     longitudinalGripsM=[-1,1],sourceSeconds=[137/30,197/30],correction='authored arms and fingers, not raw GVHMR')],
                 blockers=['Two-person cropped input is experimental, not strict single-person recovery.',
-                    'Finger/thumb wrap and forearm contact require close review; constrained palm points alone are insufficient.',
-                    'NRA02/NRA03 original skin soles penetrate ground by approximately 4–5 mm.',
+                    'V10 palm penetration improved using actual rail thickness; finger/thumb wrap and cuffs still require final close review.',
+                    'A shared constant 5.5034 mm support offset clears NRA02/NRA03 soles; NRA01/NRA04 minimum remains approximately 9.5 mm above the plane. Foot sliding/support phases are not accepted.',
                     'No double-support idle, start/stop, turn, slope or threshold transition is available.',
                     'Nominal ground speed requires measurement; original monocular translation is not calibrated.',
                     'Mission still renders whitebox bearers; candidates are not enabled.'],
                 reviewEvidence=['Models/ReviewV7/Data_SelectedExportFidelityValidation.json',
-                    'Models/FirstLevelCarryV9/Data_ContactValidation.json',
-                    'Preview/FirstLevelCarryV9/Data_ExportValidation.json',
-                    'Models/FirstLevelCarryV9/GameIntegration/Data_BrowserValidation.json'])
+                    f'Models/{group}/Data_ContactValidation.json',
+                    f'Preview/{group}/Data_ExportValidation.json',
+                    f'Preview/{group}/Contacts/Data_ContactViews.json',
+                    f'Models/{group}/GameIntegration/Data_BrowserValidation.json'])
+    for row in rows:
+        planned=next(r for r in coverage['requirements'] if r['requirementId']==row['requirementId'])
+        row['newSourceProduction']=[sourceStates[name] for name in planned['newSources']]
+        row['reusedSourceCandidates']=planned['reused']
+        if row['requirementId'] in ['FL13','FL21']:
+            source=Read(root/'Video/Sources/FirstLevelV1/TrainBenchRise/Data_SourceAssessment.json')
+            row.update(actorRoles=['train.recruit'],status='partially_retargeted_requires_contact_review',
+                sourceVideo=source['sourceVideo'],sourceVideoSha256=source['sourceVideoSha256'],
+                sourceRangeSeconds=source['sourceRangeSeconds'],recoveryRevision=1,
+                sourceCacheSha256=source['sourceCacheSha256'],clipName='Animation_Nra_TrainBenchRise_V1',
+                faction='Nra',modelVariants=['LugouNra01'],loop=False,rootMotionMode='source_relative',
+                entryPose='seated',exitPose='standing',previewId='TrainBenchRise',
+                blendFile='Blender/FirstLevelTrainV1/Scene_Nra_TrainBenchRise_V1.blend',
+                revisionLabel='V1 full bench sequence; not cut into accepted idle/rise transitions',
+                blockers=['Full bench sequence only; seat/palm contact and knee depth require review.',
+                    'Other source targets for this requirement are still in production.',
+                    'Not enabled in mission; preserve the same 41 passengers and real queue.'],
+                reviewEvidence=['Models/FirstLevelTrainV1/Data_SelectedExportFidelityValidation.json',
+                    'Models/RecoveryPreview/Data_TrainBenchRiseRawRigValidation.json',
+                    'Preview/Data_FirstLevelTrainV1PlaybackValidation.json'])
+        elif row['requirementId']!='FL26':
+            statuses=[s['status'] for s in row['newSourceProduction']]
+            row['status']='video_generation_in_progress' if 'querying' in statuses else 'sources_generated_pending_review' if statuses and all(s=='success' for s in statuses) else 'source_production_planned' if statuses else 'existing_source_requires_review'
+            row['blockers']=['Source targets/reused candidates do not prove this complete requirement is accepted or integrated.']
     files=['Data_FirstLevelMission.mjs','Data_FirstLevelMissionDialogue.mjs','Data_FirstLevelMissionTrain.mjs',
         'Data_Tuning_FirstLevel.mjs','Script_FirstLevelMissionRuntime.mjs','Script_FirstLevelMissionColumn.mjs',
-        'Script_FirstLevelMissionVoice.mjs','Script_FirstLevelMissionTrain.mjs','Audio/FirstLevel/Data_FirstLevelVoiceManifest.json']
+        'Script_FirstLevelMissionVoice.mjs','Script_FirstLevelMissionTrain.mjs','Audio/FirstLevel/Data_FirstLevelVoiceManifest.json',
+        'Data_FirstLevelMissionVoiceAlignment.mjs','Data_FirstLevelMissionVoiceTiming.mjs']
     report=dict(schemaVersion=1,updated='2026-09-07',baseCommit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=project,text=True).strip(),
         libraryRoot=str(root),catalogSha256=Hash(root/'Preview/Data_Catalog.json'),requirementsSha256=Hash(required),
         missionBaselineFiles={p:Hash(project/p) for p in files},
         population=dict(trainRecruits=40,trainNpcsIncludingLuo=41,carRecruits=[8,24,8],litters=20,
             walkingWounded=36,medics=14,civilians=8,guards=8,zhouPatientId='Litter11'),
-        timing=dict(status='recorded_segment_timeline_missing_in_current_master',
+        timing=dict(status='recorded_alignment_and_playback_events_available',
             retainedContinuousRecordings=True,animationDialogueOffsetsInvented=False,
-            note='Current voice player still allocates subtitle timing by text length. Wait for actual audio segment IDs and recorded source ranges before binding gesture offsets.'),
+            sources=['Data_FirstLevelMissionVoiceAlignment.mjs','Data_FirstLevelMissionVoiceTiming.mjs'],
+            note='Read current cue/segment/source seconds and Runtime VoiceEvent. Actual shell impacts, prone/dive orders and medic arrival remain authoritative. New animation clips are not bound yet.'),
         sourceSearch=dict(directories=[str(root/'Video/Sources'),'C:/Users/Bentl/Downloads/GVHMR'],
-            catalogActions=len(catalog['actions']),newVideoGenerations=0,newInferenceRuns=0),
-        priorityRequirementIds=sorted(priorities),requirements=rows)
+            catalogActions=len(catalog['actions']),newVideoGenerations=batch['summary'].get('success',0),newInferenceRuns=1),
+        sourceProduction=dict(userScope='Generate source coverage for all 48 requirements before completing individual retargets.',
+            plannedNewSources=coverage['requestedSources'],expectedFirstPassCredits=coverage['expectedFirstPassCredits'],
+            batchSnapshot=batch,liveStatus='Models/FirstLevelSourceBatchV1/Data_BatchStatus.json',
+            dashboardUrl='http://127.0.0.1:8136/Preview/FirstLevelSourceBatchV1/index.html'),
+        priorityRequirementIds=[r['requirementId'] for r in rows],requirements=rows)
     text=json.dumps(report,ensure_ascii=False,indent=2)+'\n'
     (project/'docs/Data_FirstLevelMissionAnimationStatus.json').write_text(text,encoding='utf-8')
-    (root/'Models/FirstLevelCarryV9/Data_MissionStatus.json').write_text(text,encoding='utf-8')
-    print(json.dumps(dict(requirements=len(rows),priority=len(priorities),status='partial_missing_sources'),ensure_ascii=False))
+    (root/f'Models/{group}/Data_MissionStatus.json').write_text(text,encoding='utf-8')
+    print(json.dumps(dict(requirements=len(rows),priority=len(rows),status='source_production_in_progress'),ensure_ascii=False))
 
 
 if __name__=='__main__':Main()
