@@ -454,6 +454,11 @@ const autoQuality = new AutoQuality();
  */
 const graphics = {
   renderScale: post.preset.renderScale ?? 1.0,
+  // 自动降档总闸（docs §13）。出厂开；面板可关，关掉时阶梯立刻收回第 0 级。
+  // 它必须是 `graphics` 上的一位，`ApplySavedSettings` 才认得（那边只回灌
+  // 已经存在于 graphics 上的键）。阶梯的级数本身**不存盘** —— 换台机器、
+  // 换个窗口大小，重新量就是了。
+  autoQuality: AUTO_QUALITY.enabled !== false,
   shadows: true,
   shadowSize: 0,          // 0 = 用出厂档位（级联之后这是**每一级**的图边长）
   // 独立小阴影图，只在第一人称手臂/武器材质内部采样；仍服从上面的阴影总闸。
@@ -7676,6 +7681,10 @@ function RecompileAllMaterials() {
 
 function ApplyGraphics() {
   NormalizeGraphicsDetails(graphics, post);
+  // 面板/存档改的是 graphics.autoQuality 那一位，这里同步到规则层。
+  // 必须排在下面读 autoQuality.scale 之前 —— 反过来的话「关掉自动降档」
+  // 要等下一次 ApplyGraphics 才还原分辨率。
+  autoQuality.SetEnabled(graphics.autoQuality !== false);
   // 自动降档给的是**倍率**不是绝对值：玩家在面板拉过的「渲染分辨率」仍然是
   // 他拉的那个数，阶梯只在它上面再乘一个 ≤1 的系数。两者分开之后，
   // 自动与手动不会互相覆盖，「恢复出厂」也不必知道阶梯当前在第几级。

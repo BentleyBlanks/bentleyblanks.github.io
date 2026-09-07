@@ -195,9 +195,9 @@ export class GraphicsSettings {
       const autoBox = document.createElement("div");
       autoBox.className = "edBtns";
       perf.appendChild(autoBox);
+      // 只写 gfx 那一位；同步到规则层是 ApplyGraphics 的事（存档回灌走同一条路）。
       Toggle(autoBox, "自动降档", gfx.autoQuality !== false, (on) => {
         gfx.autoQuality = on;
-        autoQuality.SetEnabled(on);
         this.Apply();
       });
       Note(perf, "帧时间中位数持续 >20 ms 就按阶梯往回收内部分辨率（必要时再摘 SSR /"
@@ -455,7 +455,6 @@ export class GraphicsSettings {
     // 自动降档出厂开（Data_Tuning_Graphics.AUTO_QUALITY.enabled），
     // 并把阶梯收回第 0 级 —— 否则「恢复出厂」之后画面还留在降过的分辨率上。
     gfx.autoQuality = true;
-    this.host.game?.autoQuality?.SetEnabled(true);
     this.host.game?.autoQuality?.Reset(0);
     gfx.shadows = true; gfx.shadowSize = 0;
     gfx.firstPersonSelfShadow = true;

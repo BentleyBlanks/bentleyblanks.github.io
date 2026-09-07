@@ -65,7 +65,8 @@ vec3 SourceDispersed(vec2 uv, vec2 direction, float amount) {
  * 用余弦调色板（Inigo Quilez）而不是一张 1D LUT —— 少一张纹理，且可复现。
  */
 vec3 LensTint(float t) {
-  return 0.62 + 0.38 * cos(6.28318 * (vec3(0.00, 0.16, 0.32) + clamp(t, 0.0, 1.0)));
+  return 0.62 + ${F.ghostTint.toFixed(4)}
+    * cos(6.28318 * (vec3(0.00, 0.16, 0.32) + clamp(t, 0.0, 1.0)));
 }
 
 /** 太阳是否被几何挡住：在太阳 uv 周围绕一圈取样，只有天空（视深 0）才算露出来。 */
