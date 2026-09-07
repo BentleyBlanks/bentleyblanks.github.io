@@ -14,14 +14,15 @@
 //   1) prepass           Script_PostPrepass  MRT：RT0 法线+视深 / RT1 速度 / DepthTexture
 //   2) hzb               Script_PostPrepass  线性视深 max-reduce 金字塔
 //   3) ssao              Script_PostSsao     半分辨率 + 双边模糊
-//   4) main              （本文件）HDR 主场景，AO 由材质补丁注入间接光
-//   5) wireframe         Script_PostDebug    着色模式非 shaded 时叠一层线
-//   6) debugOverlay      Script_PostDebug    Rapier 碰撞体线框等
-//   7) taa               Script_PostTaa      时域解算（线性 HDR 域，UE 的位置）
-//   8) bloom             Script_PostBloom    亮部 + 降/升采样
-//   9) god               Script_PostBloom    太阳拖影（太阳在屏内才跑）
-//  10) composite         Script_PostComposite 运动模糊→景深→雾→曝光→ACES→调色→镜头→sRGB
-//  11) fxaa              Script_PostFxaa     FXAA + 锐化 → 屏幕（或调试视图送屏）
+//   4) contactShadows    Script_ContactShadows 屏幕空间接触阴影（只压直射太阳）
+//   5) main              （本文件）HDR 主场景，AO 由材质补丁注入间接光
+//   6) wireframe         Script_PostDebug    着色模式非 shaded 时叠一层线
+//   7) debugOverlay      Script_PostDebug    Rapier 碰撞体线框等
+//   8) taa               Script_PostTaa      时域解算（线性 HDR 域，UE 的位置）
+//   9) bloom             Script_PostBloom    亮部 + 降/升采样
+//  10) god               Script_PostBloom    太阳拖影（太阳在屏内才跑）
+//  11) composite         Script_PostComposite 运动模糊→景深→雾→曝光→ACES→调色→镜头→sRGB
+//  12) fxaa              Script_PostFxaa     FXAA + 锐化 → 屏幕（或调试视图送屏）
 //
 // **加一个 pass = 新模块 + 这张列表里插一行 + `Data_Tuning_Graphics` 加一位开关。**
 // 不要往 `Render()` 里插代码，也不要去改别人的模块。
@@ -414,6 +415,7 @@ export class PostPipeline {
 
   Dispose() {
     for (const pass of this.passes) pass.Dispose?.();
+    this.shadowDebugViews?.Dispose?.();
     this.debugPass.Dispose();
     this.pool.Dispose();
     this.targets = {};

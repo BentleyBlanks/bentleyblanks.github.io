@@ -444,7 +444,7 @@ high 档 4096²（132 m 铺满 = **3.2 cm/texel**），`PCFShadowMap`（three �
 | 这一版做的 | 对应的参考实现 | 为什么 |
 |---|---|---|
 | N 盏同方向 `DirectionalLight` 各持一张阴影图，三方的 `WebGLShadowMap` 照常烘 | three CSM addon 的原理（本仓零 addon，自己写） | 复用三方的 `castShadow` / 蒙皮 / 实例化 / alphaTest / 自定义深度材质全套，不重写一遍阴影渲染 |
-| practical split（λ 混对数与均匀） | Zhang 2006，UE / Unity / DX 示例通用 | λ=0.92 偏对数：λ=0.7 在 far=220 上把最近一级推到 21 m（3.2 cm/texel），等于白改 |
+| practical split（λ 混对数与均匀） | Zhang 2006，UE / Unity / DX 示例通用 | λ=0.92 偏对数：λ=0.7 会把最近一级推到 3 cm/texel，等于白改 |
 | 视锥切片**包围球** + 光空间纹素吸附 + 半径量化到 1/16 m | UE 的 CSM 拟合、"Stable Cascaded Shadow Maps" | 球半径只依赖 `zn/zf/fov/aspect`，与相机位姿无关 → 转头不沸腾 |
 | 相邻级 **过渡带混合**（本级图边缘 10% 内按边距淡入下一级） | UE 的 cascade fade | 不混合 = 级边界一条硬缝，而且随相机移动扫过画面 |
 | **纹理空间选级**（第一张覆盖到本片元的图），不是按视深选 | — | 包围球被 `maxRadius` 封顶后「本级铺到多远」不再是常数，只有图自己知道 |
@@ -544,6 +544,12 @@ prepass → hzb → ssao → contactShadows → main → …
   ```
   **签名跨这次实现更换一个字没改**：调用方（Debug Rendering 的 SunShadow 视图、
   接触阴影、将来的体积雾）不用跟着改。
+* **`SyncShadowUniforms()` 目前由消费方自己在出画前调**（`DebugPass.RenderView`、
+  阴影调试视图的 `Prepare`），不在主循环里每帧调一次。原因是它必须排在**本帧阴影图
+  烘完之后** —— `shadow.map` 是三方在第一次 `shadowMap.render` 里才建的，
+  而那一趟发生在预通道里。体积雾落地时要么照样在自己的 `Render(ctx)` 开头调一次
+  （最简单，pass 排在预通道之后），要么由 `Script_Main.RenderScene` 在
+  `post.Render` 之前补一句。
 
 ### 1S.8 一帧只烘一张（单帧三角红线逼出来的口径）
 
@@ -641,13 +647,13 @@ Debug Rendering「光照」组新增三项（`Script_ContactShadows.MakeShadowDe
 1. **r185 没法给远级做逐级层剔除。** `WebGLShadowMap.renderObject( scene, camera,
    shadow.camera, light, type )` 里的判据是 `object.layers.test( camera.layers )` ——
    `camera` 是**主视图相机**不是阴影相机。任务书里「给远级阴影相机关掉小投影体那一层」
-   的前提不成立（已核实源码）。远级成本改用逐级节流压。
+   的前提不成立（已核实源码）。远级成本改用「一帧只烘一张」压（§1S.8）。
 2. **包围球封顶。** 超宽屏下切片包围球半径是切片远端距离的 ~1.5 倍
    （`k = tan(fovY/2)·√(1+aspect²)`）。`maxRadius` 给它封顶，封顶之后最远一级的四角
    落到覆盖外，那里返回「照到」，由雾接管。
-3. **中段纹素比重构前粗。** 25–70 m 从 3.2 cm 变到 ~8.5 cm。这是有意的取舍：
-   40 m 处 1 屏幕像素 ≈ 3.1 cm，8.5 cm ≈ 3 px，而那个距离的 PCSS 半影本来就更宽。
-   换来的是最近一级 1.3–1.7 cm（重构前 3.2 cm）与 66 m → 220 m 的覆盖。
+3. **中段纹素比重构前粗。** 40–90 m 从 3.2 cm 变到 ~8.8 cm。这是有意的取舍：
+   40 m 处 1 屏幕像素 ≈ 3.1 cm，8.8 cm ≈ 3 px，而那个距离的 PCSS 半影本来就更宽。
+   换来的是最近一级 1.3 cm（重构前 3.2 cm）与 66 m → 90 m 的覆盖。
 4. **过渡带只混两级。** 本级与下一级；三级同时相交的角落按本级算。
 5. **PCSS 只在最近两级。** 远级半影早就比一个屏幕像素宽，blocker search 是白花钱。
 6. **接触阴影是屏幕空间的。** 射线走出屏幕、或遮挡体在屏幕外就没有；深度缓冲只有一层，
@@ -662,10 +668,13 @@ Debug Rendering「光照」组新增三项（`Script_ContactShadows.MakeShadowDe
    （`Update` 置 `dirty`、`ScheduleShadowUpdate` 消 `dirty`，两者严格配对）。
    相机瞬移 / 换关 / 太阳转向由 `CsmRig.ForceUpdate()` 标脏，之后仍按轮转表
    一帧一张地补齐（`bakeOrder.length` 帧内收敛）。
-10. **近级阴影 ~30 Hz、远级 ~9 Hz。** 会动的人与车在近级里最多落后一帧；
-   远级里一个人只有几个像素宽，9 Hz 看不出来。
 9. **拟合用基准 FOV 不用当下 FOV。** 开镜把 fov 从 55 压到 20 会让包围球缩到三分之一，
    级联每帧变尺寸 = 阴影边缘随开镜呼吸。
+10. **近级阴影 ~30 Hz、远级 ~9 Hz。** 会动的人与车在近级里最多落后一帧；
+    远级里一个人只有几个像素宽，9 Hz 看不出来。
+11. **`CsmReceiverPlane` 的 `dFdx` 在级边界与覆盖边界处于非均匀控制流。**
+    那里同一个 quad 里的像素可能选了不同的级，导数是垃圾 —— 但梯度被钳在 ±0.02，
+    换算到 4 纹素的偏移上只有毫米级，落在过渡带里看不见。
 
 ### 1S.11 怎么验
 
