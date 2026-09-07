@@ -598,6 +598,12 @@ prepass → hzb → ssao → contactShadows → main → …
 先看这一格。`BootTest` 自己那一帧读到的是 7.28 M（它取的是固定的一帧，不是峰值），
 七关全过。
 
+**阴影 draw call 的 A/B**（phase 2 / high / scale=medium，包 `shadowMap.render` 记增量，
+交替各 5 轮取中位数）：级联 60.9/帧 vs 重构前那张 66 m 单框 49/帧，**+24%**
+（任务书给的上限是 1.8 倍）。整帧墙钟中位数两档都是 9.4 ms —— 这台机器上同时还跑着
+另外几个 agent 的浏览器测试，CPU 侧噪声远大于这点差别，所以只能说「量不出退步」，
+不能当成精确数字。
+
 ### 1S.8b 分档（`Data_Tuning_Shadows.SHADOW_PRESETS`）
 
 | 档 | 级数 | 每级图 | 覆盖上限 | 最远级半径 | bakeOrder | PCSS 级 | blocker / 盘抽样 | 接触阴影 |
@@ -714,7 +720,11 @@ node Taierzhuang1938/Script_TestRunnerTest.mjs
 node Taierzhuang1938/Script_CsmShot.mjs
 ```
 
-出 6 张：级联 vs 重构前那张 66 m 单框、级联假彩色、接触阴影开/关/靶本尊。
+出 7 张：级联 vs 重构前那张 66 m 单框、级联假彩色、PCSS 半影、接触阴影开/关/靶本尊。
+**拍的是探针页的 street 场景不是正片** —— 正片这一关的天光（smokyDay / dusk）
+环境光压得很高、雾很厚，街面上的太阳阴影本来就淡到几乎看不出（那是那一关的
+美术意图，见 `Script_Sky` 里 smokyDay 关于「6—8:1 照片感」的账），拿它当阴影
+证据什么也证不了。
 
 单帧提交量（三角红线）：
 
