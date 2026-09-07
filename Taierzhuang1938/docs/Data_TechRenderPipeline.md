@@ -2004,6 +2004,25 @@ Composite 侧只动了 `ApplyFog` 一段：体积路走**加法**（`color·T + 
   雾是低频量，遮挡变化时会有约 10 帧的拖尾；快速转身时网格边缘会短暂变噪
   （调试视图「体积重投影」看得到）。
 
+### 17.6b 光柱有多强：`sunScale` × `ambientScale` 这一对（**待定夺的美术口径**）
+
+出厂 `sunScale = 1.0`，含义是「正对太阳、无遮挡时，雾色与今天那条
+`pow(cos, 8) · fog.sunGain` 的峰值**完全相同**」。于是相对今天：
+**照到太阳的空气不变，被挡住的空气少掉那一份** —— 「建筑阴影处不发亮」成立，
+但读起来是「阴影里的空气暗下去了」，不是「光柱亮起来了」。
+实测 Probe 街景（dawn / burningStreet / night 九个机位）整帧均值只动 −0.4% ～ −1.7%；
+结构在「体积散射」调试视图上非常清楚（建筑把一条亮楔子切成两半），
+在正片画面上是含蓄的一层。
+
+想要更戏剧化的光柱，是**同一对旋钮**的事，而且可以保持整体雾量不变：
+把 `sunScale` 抬到 1.3–2.0，同时按「亮部占比 f ≈ 0.5」把 `ambientScale` 压
+`f × (sunScale − 1) × sunGain / ambient` 那么多。sunScale = 2 时 dawn 的
+亮/暗空气对比从 1.7× 拉到 3.0×。
+
+**没有出厂这么调**：那是把画面往「更戏剧」推的美术决定，用户在雾这件事上留过
+「先别动雾」的定论，不该由渲染这一侧单方面改。旋钮与算式都在
+`Data_Tuning_Volumetrics`，要哪一档改哪一档，一行的事。
+
 ### 17.7 调试视图（Debug Rendering 面板「体积雾」组）
 
 | 视图 | 看什么 |
@@ -2027,14 +2046,14 @@ RTX 4070 SUPER / ANGLE-D3D11，正片 `?shot=1&phase=1`，**3394×1348**，
 |---|---|---|---:|---:|---:|---:|---:|
 | medium | 120×68×48 | 960×408 | 0.040 ms | 0.050 ms | 0.122 ms | **0.212 ms** | +0.041 ms |
 | high | 160×90×64 | 1280×720 | 0.082 ms | 0.124 ms | 0.077 ms | **0.283 ms** | +0.035 ms |
-| ultra | 240×135×96 | 2880×1080 | — | — | — | 未测 | — |
+| ultra | 240×135×96 | 2880×1080 | 0.235 ms | 0.620 ms | 0.080 ms | **0.934 ms** | +0.037 ms |
 
-`apply` 是**全分辨率**的，与 froxel 网格无关（两档 0.08–0.12 ms 的差别是场景噪声，
-不是档位差别）；`inject` 与 `integrate` 跟 froxel 数走，high 是 medium 的 2.3 倍
-（921600 / 391680 = 2.35，对得上）。
-ultra 那一行是无头 Chromium 那一轮没拿到 `EXT_disjoint_timer_query_webgl2`（偶发），
-页面本身跑得起来（图集 2880×1080 建得出、画面正常）；按 froxel 数外推
-inject + integrate 约 0.6 ms，apply 不变，合计 0.7 ms 量级。补测再回填。
+`apply` 是**全分辨率**的，与 froxel 网格无关（三档都在 0.08–0.12 ms，差别是场景噪声）；
+`inject` 跟 froxel 数线性走（medium→high→ultra = 0.39 / 0.92 / 3.11 M froxel，
+0.040 / 0.082 / 0.235 ms，比例对得上）。
+`integrate` 涨得更快（0.050 / 0.124 / 0.620）：那一趟每个片元要从第 0 片循环到自己这一片，
+总取样数是 **froxel 数 × (NZ+1)/2**，NZ 从 48 涨到 96 时又多一倍。
+ultra 仍在 1 ms 以内，high 是它的三分之一。
 
 逐轮离散度很小（inject 0.080–0.088 / integrate 0.124–0.132 / apply 0.077–0.085），
 因为这三趟是纯全屏 blit，不受场景状态影响。**整帧 gpuTotal 的 on/off 差值不可用**：
@@ -2062,3 +2081,17 @@ node Taierzhuang1938/Script_FlareTest.mjs           # 照明弹（走火源池 =
 `output` / `half` / `noise1..4` …）编译失败时 three 只在控制台留一行，那一趟什么都不画。
 本轮还踩到一条 JS 侧的同类坑：**GLSL 模板字面量里的注释不能带反引号**
 （`` `mix(...)` `` 会把模板提前闭合，报 `Unexpected identifier 'mix'`）。
+
+### 17.10 本轮踩到的三条（都写进回归口了）
+
+1. **`uSunShadowMap` 为 null 会让整趟 draw 被丢掉。** three 绑的是它内部那张从没上传过的
+   `emptyShadowTexture`，ANGLE-D3D11 给 1282 INVALID_OPERATION，注入图集变成 clear 值 ——
+   画面上就是「雾突然没了」，而 `renderer.info` 一切正常。可达路径：开机头几帧阴影图还
+   没烘出来、画质面板把阴影整体关掉。现在有一张真的清过一次的 1×1 深度靶兜底。
+   回归口：`Script_VolumetricsTest` 的「阴影图不可用时仍照常出雾」。
+2. **A/B 对照必须钉死 `post.frame`。** froxel 的 xy/z 抖动与噪声漂移都由帧序驱动，
+   不钉的话两次注入是两批不同的抽样 —— 第一版量「关掉阴影」时反而有 10% 的 froxel
+   变亮了，那全是抖动噪声。钉死之后 `brighter` 精确为 0。
+3. **别拿 `castShadow = false` 当「关掉阴影」的 A/B。** 它会让 `SyncShadowUniforms`
+   把 `uSunShadowMap` 置 null，于是撞上第 1 条 —— 量到的不是「没有阴影」而是
+   「什么都没画」。正确做法是 `UnregisterShadowUniforms` 之后只翻 `uSunShadowEnabled`。
