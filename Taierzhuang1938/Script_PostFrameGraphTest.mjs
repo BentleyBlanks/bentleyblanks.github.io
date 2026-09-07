@@ -272,8 +272,10 @@ try {
 await browser.close();
 server.close();
 
-const EXPECTED_ORDER = ["prepass", "hzb", "ssao", "main", "wireframe", "debugOverlay",
-  "taa", "godPrepare", "bloom", "god", "composite", "fxaa"];
+// 2026-09：`ssao` 由 GTAO 整个替换（`Script_PostGtao`），并在 taa 之后多一趟
+// `ssilHistory`（把解算后的场景色降采样存下来，下一帧当近场反弹源）。
+const EXPECTED_ORDER = ["prepass", "hzb", "gtao", "main", "wireframe", "debugOverlay",
+  "taa", "ssilHistory", "godPrepare", "bloom", "god", "composite", "fxaa"];
 
 const checks = [];
 function Check(name, ok, detail = "") {

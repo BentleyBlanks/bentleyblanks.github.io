@@ -146,44 +146,156 @@ export function PatchKeysOf(material) {
 // ===========================================================================
 
 /**
- * 屏幕空间 AO。
+ * 环境光遮蔽 + 弯曲法线镜面遮蔽 + SSIL（2026-09 起，屏幕空间来源是
+ * `Script_PostGtao.mjs`）。
  *
- * `<common>` 那一段同时是**「屏幕空间输入」的公共声明块** —— SSR / 接触阴影 /
- * GTAO 要按 `gl_FragCoord.xy / 屏幕分辨率` 取自己的全屏图时，直接用这里已经声明
+ * `<common>` 那一段同时是**「屏幕空间输入」的公共声明块** —— SSR / 接触阴影
+ * 要按 `gl_FragCoord.xy / 屏幕分辨率` 取自己的全屏图时，直接用这里已经声明
  * 好的 `uScreenResolution`（就是 `uSsaoResolution`，`Script_Main` 喂的是**主渲染靶**
- * 的尺寸而不是 AO 靶的尺寸 —— 这条踩过两轮：喂错了整张 AO 会放大 1.333 倍并错位）。
- * 没有 ssao 的档位（low）不含这一段，那些补丁得自带一份分辨率 uniform。
+ * 的尺寸而不是 AO 靶的尺寸 —— 这条踩过两轮：喂错了整张 AO 会放大并错位）。
+ * 没有 AO 的档位（low 出厂）不含这一段，那些补丁得自带一份分辨率 uniform。
  *
- * `<aomap_fragment>` 那一段是**SSAO 唯一允许生效的位置**：那里 aoMap 已经乘过、
- * 直接光与间接光都累加完，往后就是加总。乘到最终颜色上等于连直接光一起压黑。
+ * `<aomap_fragment>` 那一段是**遮蔽唯一允许生效的位置**：那里 aoMap 已经乘过、
+ * 直接光与间接光都累加完（`lights_fragment_end` 在它前面），往后就是加总。
+ * 乘到最终颜色上等于连直接光一起压黑（契约 6）。
+ *
+ * 这一段做四件事，**顺序不能换**：
+ *   1) 联合双边升采样 —— AO 靶是半分辨率的（`aoScale`），直接双线性会在
+ *      深度断层上糊出一圈光晕。用 AO 靶 alpha 里存的线性视深做深度加权，
+ *      2×2 取样；`aoScale = 1` 时插值权重退化成 (1,0,0,0)，即精确直通。
+ *   2) 多次反弹 —— Jimenez 2016 的 `GTAOMultiBounce`。只乘可见度会把亮反照率
+ *      的凹角压得比现实黑（光在里面还会再弹几次）；这条三次多项式把它补回来，
+ *      对暗反照率退化成恒等（`max(ao, …)` 保证不会比可见度更暗）。
+ *   3) 镜面遮蔽 —— GTSO：可见性锥（轴 = 弯曲法线，张角来自 AO）与镜面锥
+ *      （轴 = 反射向量，张角来自粗糙度）的球冠相交。**替换了旧的
+ *      `pow(ao, 1+2·roughness)`** —— 那条只看 AO 标量，反射方向明明朝着开阔的
+ *      天空也照样压暗；有了弯曲法线才知道"被挡住的是哪半边"。
+ *   4) SSIL —— 近场反弹加进间接漫反射，**加在 AO 乘法之后**：AO 挖掉的正是
+ *      这一份，先加再乘等于把反弹光也压一遍（双重压暗）。
+ *
+ * uniform 包由 `Script_PostGtao.MakeAoUniforms` 造（正片与探针页共用）。
+ * 老调用点只传 `{ map, resolution, strength }` 也能编 —— 缺的那几项按"没有
+ * SSIL、AO 靶与主靶同尺寸"退化。
  */
-export function MakeSsaoPatch(ssao) {
+export function MakeAmbientOcclusionPatch(ssao) {
   if (!ssao) return null;
   return MakePatch({
-    key: "ssao1",
+    key: "gtao1",
     uniforms: (uniforms) => {
       uniforms.uSsaoMap = ssao.map;
       uniforms.uSsaoResolution = ssao.resolution;
+      uniforms.uAoTexelResolution = ssao.aoResolution ?? ssao.resolution;
       uniforms.uSsaoStrength = ssao.strength;
+      uniforms.uSsilMap = ssao.ssilMap ?? { value: null };
+      uniforms.uSsilStrength = ssao.ssilStrength ?? { value: 0 };
     },
     fragment: [
       ["#include <common>", /* glsl */`
-        uniform sampler2D uSsaoMap;
-        uniform vec2 uSsaoResolution;
+        uniform sampler2D uSsaoMap;        // R=可见度 G,B=弯曲法线(oct) A=线性视深
+        uniform vec2 uSsaoResolution;      // **主渲染靶**尺寸
+        uniform vec2 uAoTexelResolution;   // AO 靶自己的尺寸（升采样要）
         uniform float uSsaoStrength;
+        uniform sampler2D uSsilMap;        // RGB=近场反弹辐照度（关着时是 1×1 全黑）
+        uniform float uSsilStrength;
         // 屏幕空间输入的公共别名：AO / SSR / 接触阴影共用这一份主靶分辨率。
-        #define uScreenResolution uSsaoResolution`],
+        #define uScreenResolution uSsaoResolution
+
+        vec3 AoOctDecode(vec2 e) {
+          vec2 f = e * 2.0 - 1.0;
+          vec3 n = vec3(f.x, f.y, 1.0 - abs(f.x) - abs(f.y));
+          float t = max(-n.z, 0.0);
+          n.x += n.x >= 0.0 ? -t : t;
+          n.y += n.y >= 0.0 ? -t : t;
+          return normalize(n);
+        }
+
+        // Jimenez et al. 2016, "Practical Realtime Strategies for Accurate
+        // Indirect Occlusion"（Activision）的 GTAOMultiBounce。
+        vec3 AoMultiBounce(float visibility, vec3 albedo) {
+          vec3 a =  2.0404 * albedo - 0.3324;
+          vec3 b = -4.7951 * albedo + 0.6417;
+          vec3 c =  2.7552 * albedo + 0.6903;
+          return max(vec3(visibility), ((visibility * a + b) * visibility + c) * visibility);
+        }
+
+        float AoFastAcos(float x) {
+          float v = abs(x);
+          float res = (-0.156583 * v + 1.57079632679) * sqrt(max(1.0 - v, 0.0));
+          return x >= 0.0 ? res : 3.14159265359 - res;
+        }
+
+        // 两个球冠相交的面积（Oat & Sander 2007, "Ambient Aperture Lighting"）。
+        float AoCapIntersection(float cosCap1, float cosCap2, float cosDistance) {
+          float r1 = AoFastAcos(clamp(cosCap1, -1.0, 1.0));
+          float r2 = AoFastAcos(clamp(cosCap2, -1.0, 1.0));
+          float d = AoFastAcos(clamp(cosDistance, -1.0, 1.0));
+          if (min(r1, r2) <= max(r1, r2) - d) return 1.0 - max(cosCap1, cosCap2);
+          if (r1 + r2 <= d) return 0.0;
+          float delta = abs(r1 - r2);
+          float x = 1.0 - clamp((d - delta) / max(r1 + r2 - delta, 1e-4), 0.0, 1.0);
+          return (x * x * (-2.0 * x + 3.0)) * (1.0 - max(cosCap1, cosCap2));
+        }
+
+        // GTSO（Jimenez 2016 §4 的工程形式）。roughness→0 时镜面锥收成一根线，
+        // 分母趋 0，所以钳住并让极光滑面直接退回可见度（保守，不会漏光）。
+        float AoSpecularOcclusion(vec3 bentNormal, float visibility, float roughness, vec3 refl) {
+          float cosAv = sqrt(max(1.0 - visibility, 0.0));
+          float r2 = roughness * roughness;
+          float cosAs = exp2(-3.32193 * r2 * r2);
+          float open = 1.0 - cosAs;
+          if (open < 1e-3) return visibility;
+          return clamp(AoCapIntersection(cosAv, cosAs, dot(bentNormal, refl)) / open, 0.0, 1.0);
+        }
+
+        // 联合双边升采样：2×2 双线性权重 × 深度接近度。断层处只剩同深度的那几个
+        // 抽样，所以人物脚下的接触带不会在半分辨率下糊出一圈亮边。
+        const vec2 AO_TAPS[4] = vec2[4](vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(0.0, 1.0), vec2(1.0, 1.0));
+        float AoUpsample(vec2 screenUv, float receiverZ, out vec3 bentNormal) {
+          vec2 texel = screenUv * uAoTexelResolution - 0.5;
+          vec2 baseCoord = floor(texel);
+          vec2 aoFrac = texel - baseCoord;
+          vec2 invSize = 1.0 / uAoTexelResolution;
+          float visibility = 0.0;
+          vec3 bent = vec3(0.0);
+          float wsum = 0.0;
+          for (int i = 0; i < 4; i++) {
+            vec2 o = AO_TAPS[i];
+            vec4 t = texture2D(uSsaoMap, (baseCoord + o + 0.5) * invSize);
+            if (t.a <= 0.0) continue;               // 天空：没有 AO 数据
+            float bw = mix(1.0 - aoFrac.x, aoFrac.x, o.x) * mix(1.0 - aoFrac.y, aoFrac.y, o.y);
+            float dw = 1.0 / (1e-3 + abs(t.a - receiverZ) / max(receiverZ, 0.05));
+            float w = bw * dw;
+            visibility += t.r * w;
+            bent += AoOctDecode(t.gb) * w;
+            wsum += w;
+          }
+          // 一个有效抽样都没有（整块是天空）：可见度 1，弯曲法线交给调用点
+          // 用几何法线兜底 —— 这个函数拿不到 geometryNormal（它是 main 里的局部量）。
+          if (wsum <= 1e-5) { bentNormal = vec3(0.0, 0.0, 1.0); return 1.0; }
+          bentNormal = normalize(bent);
+          return visibility / wsum;
+        }`],
       ["#include <aomap_fragment>", /* glsl */`
         {
-          float ssao = texture2D(uSsaoMap, gl_FragCoord.xy / uSsaoResolution).r;
-          ssao = mix(1.0, ssao, uSsaoStrength);
-          reflectedLight.indirectDiffuse *= ssao;
-          // 镜面遮蔽：粗糙面遮得多、光滑面遮得少（Lagarde 的近似）
-          reflectedLight.indirectSpecular *= clamp(pow(ssao, 1.0 + material.roughness * 2.0), 0.0, 1.0);
+          vec2 aoScreenUv = gl_FragCoord.xy / uSsaoResolution;
+          vec3 aoBentNormal;
+          float aoVisibility = AoUpsample(aoScreenUv, vViewPosition.z, aoBentNormal);
+          aoVisibility = clamp(mix(1.0, aoVisibility, uSsaoStrength), 0.0, 1.0);
+          reflectedLight.indirectDiffuse *= AoMultiBounce(aoVisibility, material.diffuseContribution);
+          reflectedLight.indirectSpecular *= AoSpecularOcclusion(
+            aoBentNormal, aoVisibility, material.roughness,
+            reflect(-geometryViewDir, geometryNormal));
+          // SSIL 走一次普通双线性：它是低频量，边缘光晕远不如 AO 那样刺眼，
+          // 而再来一趟四抽样是全分辨率主 pass 上的实打实开销。
+          reflectedLight.indirectDiffuse += texture2D(uSsilMap, aoScreenUv).rgb
+            * uSsilStrength * material.diffuseContribution * RECIPROCAL_PI;
         }`],
     ],
   });
 }
+
+/** 旧名字（2026-09 之前叫 SSAO 补丁）。外部调用点只有 IndirectLightingPatches。 */
+export const MakeSsaoPatch = MakeAmbientOcclusionPatch;
 
 /**
  * 探针体 GI。**编译期三态**（key 每次编译现读 `gi.sampling`）：
@@ -388,5 +500,6 @@ ${DestructionShaderGlsl(destruction.maxVolumes)}`],
  * 取证，两者按这个顺序拼（AO 先压，取证后抓，面板读到的才是正式画面的值）。
  */
 export function IndirectLightingPatches({ ssao = null, gi = null, destruction = null } = {}) {
-  return [MakeSsaoPatch(ssao), MakeGiPatch(gi), MakeDestructionPatch(destruction)].filter(Boolean);
+  return [MakeAmbientOcclusionPatch(ssao), MakeGiPatch(gi), MakeDestructionPatch(destruction)]
+    .filter(Boolean);
 }

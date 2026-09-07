@@ -16,7 +16,15 @@
 //   · velocity / hzb —— 2026-09 帧图重构新增：MRT 速度靶与 HZB 链。
 //        高低档都开：它们是后续 SSR / 体积雾 / 接触阴影的公共输入，
 //        关掉等于把八个并行子系统一起关掉；真要省，先关消费方。
-//   · 其余键（csm / gtao / ssil / ssr / volumetrics / atmosphere / autoExposure /
+//   · gtao / ssil / aoScale —— 2026-09 GTAO 落地（`Script_PostGtao.mjs`）：
+//        `ssao` 保留为 **AO 总闸**（消融与调试面板的可用性都读它，语义不许变），
+//        `gtao` 存的是**档位名**（`Data_Tuning_Gtao.GTAO_TIERS` 的键），
+//        `ssil` 是屏幕空间近场间接光的构造期开关。
+//        `aoScale` 由 0.5/0.6/0.75/1.0 改为 0.5/0.5/0.5/1.0：GTAO 的每像素成本
+//        是旧 SSAO 的两倍多（地平线搜索 + 弯曲法线 + 位掩码），而它在半分辨率上
+//        配联合双边升采样的画质仍然明显好于旧 SSAO 的 0.75 —— 详见
+//        docs/Data_TechRenderPipeline.md「GTAO / SSIL / 镜面遮蔽」一节的实测表。
+//   · 其余键（csm / ssr / volumetrics / atmosphere / autoExposure /
 //     lensFlare / lut / dof / taaUpscale / clusteredLights / contactShadows）
 //     —— **本阶段全部为占位**，值 = 与今天等价（即「不启用新东西」）。
 //        对应子系统落地时把自己那一位改成实际档位，并在这里补出处注释。
@@ -30,7 +38,9 @@
  * 一档画质 = 一整套 pass 开关与旋钮。
  *
  * 键的语义（布尔 = 开关，数字 = 旋钮）：
- *   ssao          屏幕空间环境光遮蔽（半分辨率 + 双边模糊）
+ *   ssao          环境光遮蔽**总闸**（2026-09 起实现是 GTAO；false = 整趟不跑）
+ *   gtao          GTAO 档位名（Data_Tuning_Gtao.GTAO_TIERS 的键）；false = 关
+ *   ssil          屏幕空间近场间接光（构造期开关，与 GTAO 同一趟地平线搜索）
  *   aoScale       AO 靶相对主靶的边长比例
  *   bloomLevels   泛光金字塔级数
  *   godrays       屏幕空间太阳拖影（还要 options.godStrength > 0 才真跑）
@@ -43,8 +53,6 @@
  *   ——— 以下为后续子系统的占位位，本阶段一律「等价于今天」———
  *   csm           级联阴影（今天：单张 66 m 跟随框，false）
  *   contactShadows 屏幕空间接触阴影
- *   gtao          GTAO（将来替换 ssao 那一位）
- *   ssil          屏幕空间间接光
  *   ssr           屏幕空间反射
  *   volumetrics   froxel 体积雾（今天：合成 pass 里的解析式指数高度雾）
  *   atmosphere    物理大气（今天：SkyDome 的解析式天空）
@@ -61,8 +69,6 @@
 const RESERVED_OFF = {
   csm: false,
   contactShadows: false,
-  gtao: false,
-  ssil: false,
   ssr: false,
   volumetrics: false,
   atmosphere: false,
@@ -81,16 +87,22 @@ export const QUALITY_PRESETS = {
   // 在集显上是实打实的带宽，low 档的定位就是"能跑"。
   // 但这一位只是默认值不是上限 —— 画质面板可以运行时开关（SetTaaEnabled），
   // low 档玩家想要也给得了，靶到那时候才建。
+  // AO 分档（2026-09 GTAO）：low 出厂不开 AO（`ssao: false`），但 `gtao` 仍写
+  // "low" —— 玩家在 low 上手动打开时走 1 切片 4 步无时域的最便宜那一档，
+  // 而不是掉进 high 的 2×6。SSIL 只给 high / ultra：它要多一张颜色历史靶
+  // 与每采样一次颜色读，medium 的定位是"1080p 稳 60"。
   low: {
     ...RESERVED_OFF,
-    ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
+    ssao: false, gtao: "low", ssil: false,
+    bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
     aoScale: 0.5, sharpen: 0.14, taa: false,
     velocity: true, hzb: true,
   },
   medium: {
     ...RESERVED_OFF,
-    ssao: true, bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
-    aoScale: 0.6, sharpen: 0.18, taa: true,
+    ssao: true, gtao: "medium", ssil: false,
+    bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
+    aoScale: 0.5, sharpen: 0.18, taa: true,
     velocity: true, hzb: true,
   },
   // high 的抗锯齿由 TAA 承担。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
@@ -98,13 +110,15 @@ export const QUALITY_PRESETS = {
   // （ultra 是 MSAA 喂更干净的几何边给 TAA，两层叠加不冲突，只是贵）。
   high: {
     ...RESERVED_OFF,
-    ssao: true, bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
-    aoScale: 0.75, sharpen: 0.22, taa: true,
+    ssao: true, gtao: "high", ssil: true,
+    bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
+    aoScale: 0.5, sharpen: 0.22, taa: true,
     velocity: true, hzb: true,
   },
   ultra: {
     ...RESERVED_OFF,
-    ssao: true, bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,
+    ssao: true, gtao: "ultra", ssil: true,
+    bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,
     aoScale: 1.0, sharpen: 0.22, taa: true,
     velocity: true, hzb: true,
   },

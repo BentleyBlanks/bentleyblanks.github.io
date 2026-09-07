@@ -1,12 +1,15 @@
 // 渲染探针：把材质 / 光照 / 后处理单独摆出来看。开发与视觉审查专用。
 // URL 参数：?preset=dusk|smokyDay|burningStreet|night|dawn  &quality=low|medium|high|ultra
-//           &scene=materials|street  &gi=0|1（默认 1）  &giDebug=1（画探针球）
+//           &scene=materials|street|ssil  &gi=0|1（默认 1）  &giDebug=1（画探针球）
+//           &ssil=0（关掉 SSIL 的注入强度，那一趟照跑，调试视图仍可看）
 
 import * as THREE from "three";
 import { MaterialLibrary } from "./Script_Materials.mjs";
 import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
+import { MakeAoUniforms, SyncAoUniforms } from "./Script_PostGtao.mjs";
+import { SSIL } from "./Data_Tuning_Gtao.mjs";
 import { MakeBox, MakeSandbag, MakePlane, MakeBrokenWall, MakeRubbleField, MakeInstanced, TILE_METERS, CarveCraters } from "./Script_Geo.mjs";
 import { RECIPES } from "./Script_TexBake.mjs";
 import { ProbeVolume, MakeGiUniforms, MakeProbeDebugMesh } from "./Script_Gi.mjs";
@@ -17,6 +20,9 @@ const quality = params.get("quality") || "high";
 const sceneKind = params.get("scene") || "street";
 const giEnabled = params.get("gi") !== "0";
 const giDebug = params.get("giDebug") === "1";
+// ?ssil=0 关掉 SSIL 的**注入**（那一趟照跑，靶还在，调试视图仍然能看）。
+// GtaoTest 的「关 SSIL 时灰板不带色」就走这一条。
+const ssilScale = params.get("ssil") === "0" ? 0 : 1;
 
 const hint = document.getElementById("hint");
 const canvas = document.createElement("canvas");
@@ -39,11 +45,10 @@ const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerH
 camera.position.set(0, 1.68, 8);
 
 const post = new PostPipeline(renderer, { width: window.innerWidth, height: window.innerHeight, quality });
-const ssao = {
-  map: { value: post.AoTexture },
-  resolution: { value: new THREE.Vector2(post.targets.aoBlur.width, post.targets.aoBlur.height) },
-  strength: { value: 0.78 },
-};
+// AO / SSIL 的材质端 uniform 包，与正片同一份工厂（Script_PostGtao）。
+// 旧版这里喂的是 aoBlur 的尺寸 —— 那是错的：材质里 gl_FragCoord 跑在**主靶**
+// 的像素域，喂 AO 靶尺寸整张 AO 会放大并错位。工厂里已经分成两个 uniform。
+const ssao = MakeAoUniforms(post, { strength: 0.78, ssilStrength: SSIL.strength * ssilScale });
 const giUniforms = MakeGiUniforms();
 // 与正片同一套双层注入：gi=0 时材质只留调试视图基建（探针采样代码编译期剔除），
 // 与正片出厂默认档完全同构 —— GiTest 的「默认材质不含采样代码」就在这页上验。
@@ -77,7 +82,9 @@ async function Boot() {
   sky.BakeEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
   scene.fog = null;   // 雾收到合成 pass 里
-  if (sceneKind === "materials") BuildMaterialScene(); else BuildStreetScene();
+  if (sceneKind === "materials") BuildMaterialScene();
+  else if (sceneKind === "ssil") BuildSsilScene();
+  else BuildStreetScene();
   if (gi) {
     gi.ApplyPreset(preset);
     gi.SetWorld({ colliders: giColliders, GroundHeight: () => 0 });
@@ -87,7 +94,7 @@ async function Boot() {
   state.ready = true;
   hint.textContent = `preset=${presetName} quality=${quality} scene=${sceneKind}\n`
     + `hdr=${post.hdrCapable} gi=${gi ? `on/${gi.probeCount}探针` : "off"}`;
-  window.Probe = { renderer, scene, camera, post, sky, lights, library, gi, state, StepFrames };
+  window.Probe = { renderer, scene, camera, post, sky, lights, library, gi, state, ssao, StepFrames };
 }
 
 /** 材质球阵：每种配方一个球 + 一块板，看 PBR 反应。 */
@@ -111,6 +118,53 @@ function BuildMaterialScene() {
   });
   camera.position.set(0, 3.2, 6.5);
   camera.lookAt(0, 0.9, -3);
+}
+
+/**
+ * SSIL 的最小取证场（`?scene=ssil`）：一块**强色板**贴着一块中性灰板立着。
+ *
+ * 单独一个场景而不是往 `scene=materials` 里加东西 —— 那一页是既有截图基线，
+ * 加几何等于把所有历史对照图作废。这里只要三件事：
+ *   · 灰板靠近色板的那一端应该被染上色板的颜色（近场一次反弹）；
+ *   · 远离色板的那一端不该染色（半径是有限的）；
+ *   · SSIL 关掉时两端一样。
+ * 两块板成 90° L 形：色板是 x 面墙、灰板是 z 面墙，灰板左端离色板约 0.5 m
+ * （在 SSIL 半径 1.2 m 内）、右端约 3 m（半径外）。地面另给一个接触角，
+ * 顺带做 AO 的「墙根暗带 vs 空旷地」对照。
+ */
+function BuildSsilScene() {
+  const ground = new THREE.Mesh(MakePlane(40, 40, TILE_METERS.ground, 1),
+    library.Plain("SsilGround", { color: 0x6a6a6a, roughness: 0.95 }));
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // 发光的强色板（x 面墙，x ∈ [-0.66, -0.54]，z ∈ [-1.2, 1.2]）。
+  // **自发光**而不是靠太阳照：反弹源的亮度与颜色必须与时段预设、太阳角度无关，
+  // 否则这条取证会随天光预设漂。emissive 照样进 HDR，也照样进 SSIL 的颜色历史。
+  const emitter = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.4, 2.4),
+    library.Plain("SsilEmitter", {
+      color: 0xd21b12, roughness: 1.0, emissive: 0xd21b12, emissiveIntensity: 4.0,
+    }));
+  emitter.position.set(-0.6, 1.2, 0);
+  emitter.name = "SsilEmitter";
+  scene.add(emitter);
+
+  // 中性灰板（z 面墙，正面 z = -0.84，x ∈ [-0.4, 3.2]）：
+  // 左端离色板 0.5 m 左右（在 SSIL 半径内），右端 3 m 开外（半径外）。
+  const receiver = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.4, 0.12),
+    library.Plain("SsilReceiver", { color: 0x9a9a9a, roughness: 1.0 }));
+  receiver.position.set(1.4, 1.2, -0.9);
+  receiver.receiveShadow = true;
+  receiver.name = "SsilReceiver";
+  scene.add(receiver);
+
+  AddGiBox(-0.6, 0, 0, 0.06, 1.2, 1.2, "wall");
+  AddGiBox(1.4, 0, -0.9, 1.8, 1.2, 0.06, "wall");
+
+  // 机位压低看向地面：地面才是拿红墙反弹光最强的那个接收面（法线朝上，
+  // 到墙的方向仍有可观的余弦），灰墙正面法线朝 +Z、对着 -X 的红墙几乎是掠射。
+  camera.position.set(1.0, 1.4, 2.6);
+  camera.lookAt(0.8, 0.55, -0.9);
 }
 
 /**
@@ -242,8 +296,8 @@ function Frame(dt) {
   camera.getWorldDirection(forward);
   lights.UpdateShadowFrustum(camera.position, forward);
   if (gi) gi.Update(dt, camera.position, lights);
-  ssao.map.value = post.AoTexture;
-  ssao.resolution.value.set(post.targets.aoBlur.width, post.targets.aoBlur.height);
+  // 靶引用每帧重接（SetSize 会换靶）。分辨率的两个 uniform 在工厂里分好了。
+  SyncAoUniforms(ssao, post);
   const preset = SKY_PRESETS[presetName];
   post.Render(scene, camera, {
     sunDirection: sky.sunDirection,

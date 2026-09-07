@@ -322,6 +322,11 @@ export class DebugPass {
     if (P.debugView === "final" && P.shadingMode === "wireframe") {
       return { texture: T.hdr.texture, mode: 5 };
     }
+    // 自带展示材质的 pass 可以认领视图（返回 `{ material, Prepare, unavailable }`，
+    // 由下面 RenderView 的通用材质分支送屏）。GTAO 的弯曲法线 / SSIL / 镜面遮蔽
+    // 三个视图走这条：它们要的解码与锥相交只有那个模块自己知道。
+    const owned = P.gtaoPass?.GetDebugSource?.(P.debugView);
+    if (owned) return owned;
     switch (P.debugView) {
       case "normal": return { texture: T.normalDepth.texture, mode: 0 };
       case "depth": return { texture: T.normalDepth.texture, mode: 1 };
@@ -395,6 +400,14 @@ export class DebugPass {
       // 阴影框每帧都在滚（跟玩家 + 吸附纹素），矩阵必须现取。
       this.sunShadowRig?.SyncShadowUniforms?.();
       ctx.blitter.Blit(this.materialSunShadow, null);
+      return;
+    }
+    // 通用「自带展示材质」分支（见 GetSource 里认领视图那一段）。
+    // 不可用时也照样 Blit —— 那些材质自己画斜纹，与下面的通用路径一致。
+    if (source.material && source.material !== this.material
+      && source.material !== this.materialSunShadow) {
+      source.Prepare?.(ctx);
+      ctx.blitter.Blit(source.material, null);
       return;
     }
     // 雾量 / CoC 调试视图必须复用刚刚送进 Composite 的本帧参数。不要另存一份

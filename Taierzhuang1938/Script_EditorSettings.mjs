@@ -217,6 +217,12 @@ export class GraphicsSettings {
       onInput: (v) => { gfx[key] = v; this.Save(); },
     });
     Mul("ssao", "环境光遮蔽");
+    // SSIL 只在给了它的档位上才有意义（构造期开关，见 Data_Tuning_Graphics.ssil）。
+    // 档位没给就不画这一行 —— 一根拖了没反应的滑杆比没有滑杆更糟。
+    if (this.host.post?.preset?.ssil) {
+      Mul("ssil", "屏幕空间间接光");
+      Note(post, "SSIL 与 GTAO 共用同一趟地平线搜索；拖到 0 会把那一趟一起停掉。");
+    }
     Mul("bloom", "泛光");
     Mul("god", "体积光");
     Mul("motionBlur", "运动模糊");
@@ -256,7 +262,7 @@ export class GraphicsSettings {
     gfx.renderScale = 1; gfx.shadows = true; gfx.shadowSize = 0;
     gfx.firstPersonSelfShadow = true;
     gfx.firstPersonSelfShadowSoft = false;
-    gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
+    gfx.ssao = 1; gfx.ssil = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
     gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;
     gfx.gi = false; gfx.giStrength = 1;
     NormalizeGraphicsDetails(gfx, this.host.post, true);
