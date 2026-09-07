@@ -325,6 +325,11 @@ const ssrPatch = MakePatch({
 ApplyPatches(material, [...IndirectLightingPatches({ ssao, gi, destruction }), ssrPatch]);
 ```
 
+* **采样器有硬预算**：ANGLE-D3D11 上 `MAX_TEXTURE_IMAGE_UNITS = 16`，超了程序**不链接**
+  （日志一行 `texture image units count exceeds`），而 three 每帧照样 `useProgram` ——
+  症状是那只材质整个不画 + 每帧一次 1282。加一路补丁之前先数一遍最挤的那份材质
+  （第一人称视模，见末尾坑表那一条）：AO 1 / 探针 GI 3 / SSR 1 / 簇状光 3 / 自阴影 1，
+  再加三方自带的六七个，已经贴着上限。
 * 锚点一律**追加在 chunk 之后**；多个补丁挂同一个锚点按注册顺序拼接。
 * `customProgramCacheKey` = 各补丁 key 拼接。**改了代码不改 key = 两种档位共用同一份
   编译缓存**（现役三态：`ssao1` / `ssao1|gi1` / `ssao1|gi2`）。
@@ -2020,6 +2025,19 @@ draw call：905 → 899（+6，逐轮区间 +6…+11）= 六次 min-Hi-Z blit + 
 - 【2026-09】屏幕空间反射的锥角要按 **alpha = roughness²**（GGX 波瓣半角）算，不是按 roughness。写成 roughness 会把粗糙度 0.1 的地板按十倍锥角去糊 —— 一块近乎镜面的湿地采到 1/8 分辨率的场景色，倒影糊成一团、轮廓还在低分辨率 mip 上逐帧抖。三方 BRDF 里进 GGX 的同样是 `roughness²`。
 - 【2026-09】主 HDR 靶的 **alpha 通道全链路无人读**（Composite 只取 `.r/.g/.b` 与 `.rgb`，Bloom 全是 `.rgb`，TAA 写死 1，调试视图只看 rgb）—— SSR 把它当粗糙度 GBuffer 用了（§17.2）。**谁要动 alpha 之前先看那一节**：往里写别的东西会把下一帧的反射判据改掉，而且不透明材质写非 1 的 alpha 还会破坏半透明混合，所以那条补丁只挂不透明材质。
 - 运动模糊没排除武器/手臂 layer → 转身时枪身糊成一坨，FPS 手感直接塌。给第一人称模型单独 layer 并在速度缓冲里写 0。
+- 【2026-09 实测】**材质补丁一路加下去会撞 `MAX_TEXTURE_IMAGE_UNITS`（ANGLE-D3D11 上是 16），
+  撞了之后程序不链接、three 每帧照样 `useProgram`，症状是「那只材质整个不画 + 每帧一次 1282」。**
+  最挤的是第一人称视模那份：三方自带六七个 + AO 1 + 探针 GI 3（`uGiIrradiance` /
+  `uGiDistance` / `uGiOffset`）+ SSR 1 + 簇状光 3（两个是 `usampler2D`）+ 自阴影 1。
+  B3/B4/B5/B8 四个子系统各自单跑都在预算内，合到一起才越线 —— 所以这是**集成期**的坑，
+  各分支的回归口都抓不到。取证配方：把 `gl` 上每一个函数都包一层 `getError()`，
+  命中时读 `getProgramInfoLog(gl.getParameter(gl.CURRENT_PROGRAM))`，
+  再拿 `renderer.info.programs` 按 `program` 反查材质名与 cacheKey；
+  日志就一行 `FRAGMENT shader texture image units count exceeds MAX_TEXTURE_IMAGE_UNITS(16)`。
+  现在视模那份不挂 SSR（`Script_FirstPersonSelfShadow.CloneOwnedMaterial` 重挂一次补丁），
+  这既是腾槽也是修正 —— 视模走 `MarkForegroundPrepass`，`uSsrMap` 在它那些像素上存的
+  是**枪后面**那块几何的反射。谁要再加一路材质补丁，先数一遍这只材质的采样器。
+  回归口：`Script_EditorTest` 的「自阴影软化可热切」断言 `glError === 0`。
 
 ---
 
