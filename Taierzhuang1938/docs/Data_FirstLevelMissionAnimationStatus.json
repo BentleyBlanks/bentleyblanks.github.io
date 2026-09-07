@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "updated": "2026-09-08",
-  "recordedUtc": "2026-09-07T19:42:34.684959+00:00",
-  "baseCommit": "7e5efc471e5ce179278affa75fda2d4ca713186e",
+  "recordedUtc": "2026-09-07T20:38:01.953091+00:00",
+  "baseCommit": "5f7c51ed994cbd486d5ae8fa531897a707b62205",
   "missionContract": {
     "version": "first-level-20260907-r12",
     "stages": [
@@ -437,8 +437,8 @@
     }
   },
   "libraryRoot": "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼",
-  "catalogSha256": "85a729dce9a3ece9424f1e12885a08901f192481bdf06d4c63cab1c60b618cc4",
-  "requirementsSha256": "8493ffa60497a10b7ef945fc8054ccceb9a361279ad430a31f9bd2fa67865565",
+  "catalogSha256": "ed4f4ab87fb9f11193a6cf21ca70c67e643ac07125f96d42d0a46f599a1e47d5",
+  "requirementsSha256": "1d77602e3713829d591429682832a02f067d078e01ee0aad6df25837c68f69d2",
   "missionBaselineFiles": {
     "Data_FirstLevelMission.mjs": "05d2b588248ceb494ee39d04a0734cb9702125b1a8156cc75d9575da41aa1eaf",
     "Data_FirstLevelMissionDialogue.mjs": "a62830fc97fedc1f5df3aacf0664c89edada411ae7689e1dbdaf3164550a5cda",
@@ -985,14 +985,14 @@
     "expectedFirstPassCredits": 11360,
     "lastCreditObservation": {
       "balance": 60,
-      "recordedUtc": "2026-09-07T19:39:38.221453+00:00"
+      "recordedUtc": "2026-09-07T20:24:14.092357+00:00"
     },
     "pendingAmmoQuery": {
       "resubmitted": false,
       "genStatus": "querying",
       "submitId": "370184c6-ecdf-467d-8c4c-fa67243dce8a",
       "downloadAvailable": false,
-      "recordedUtc": "2026-09-07T19:39:38.221453+00:00"
+      "recordedUtc": "2026-09-07T20:24:14.092357+00:00"
     },
     "retakeBudget": {
       "status": "prepared_not_submitted",
@@ -13924,10 +13924,11 @@
         "LugouNra01",
         "LugouNra02",
         "LugouNra03",
-        "LugouNra04"
+        "LugouNra04",
+        "LugouNra05"
       ],
       "loop": true,
-      "referenceSpeedMps": 0.55,
+      "referenceSpeedMps": 0.4,
       "rootMotionMode": "authored_in_place_support_gait_with_original_rig",
       "contacts": [
         {
@@ -13938,8 +13939,10 @@
             -1,
             1
           ],
-          "bedHeightM": 0.76,
-          "gripHeightM": 0.88,
+          "bedHeightM": 0.92,
+          "gripHeightM": 1.04,
+          "runtimeBedHeightM": 0.76,
+          "runtimeGripHeightM": 0.88,
           "correction": "Authored pelvis placement, support gait, arms and fingers; original raw unchanged."
         }
       ],
@@ -13947,9 +13950,9 @@
       "entryPose": "walking",
       "exitPose": "walking",
       "interruptPolicy": "Animation must not write mission facts, population, inventory, camera or patient identity.",
-      "blendFile": "Blender/FirstLevelCarryV11/Scene_LugouNra01_CarryPair_V11.blend",
+      "blendFile": "Blender/FirstLevelCarryV13/Scene_LugouNra01_CarryPair_V13.blend",
       "previewId": "StretcherPair",
-      "revisionLabel": "V11 production-scale contact trial; pelvis, support gait and hand contacts authored after recovery",
+      "revisionLabel": "V13 production-scale contact trial; pelvis, support gait and hand contacts authored after recovery",
       "status": "needs_correction",
       "runtimeBinding": {
         "enabled": false,
@@ -13964,27 +13967,29 @@
         ]
       },
       "reviewEvidence": [
-        "Models/FirstLevelCarryV11/Data_IndependentValidation.json",
-        "Models/FirstLevelCarryV11/Data_EditableProjects.json",
-        "Models/FirstLevelCarryV11/Data_EditableProjectValidation.json",
-        "Models/FirstLevelCarryV11/Data_ProjectAndPlaybackValidation.json",
-        "Models/FirstLevelCarryV11/Data_VisualAssessment.json",
-        "Preview/FirstLevelCarryV11/Contacts/Data_ContactViews.json"
+        "Models/FirstLevelCarryV13/Data_IndependentValidation.json",
+        "Models/FirstLevelCarryV13/Data_EditableProjects.json",
+        "Models/FirstLevelCarryV13/Data_EditableProjectValidation.json",
+        "Models/FirstLevelCarryV13/Data_ProjectAndPlaybackValidation.json",
+        "Models/FirstLevelCarryV13/Data_VisualAssessment.json",
+        "Preview/FirstLevelCarryV13/Contacts/Data_ContactViews.json",
+        "Models/FirstLevelCarryV13/Data_ContinuousContactValidation.json"
       ],
       "blockers": [
-        "Two-person cropped input remains experimental, not strict single-person recovery.",
-        "Flat-ground contact passed independent reimport, but side views show excessive crouch and high elbows; gait does not preserve the source upright walk.",
-        "Palm/thumb wrap improved in sampled close views; this is not full contact/naturalness acceptance for all four model variants.",
-        "No double-support idle clip, start/stop, turn, slope, threshold or loading transition is accepted.",
-        "r12 uses original production-rig bearers and existing carry clips; this V11 candidate is not enabled."
+        "Two-person cropped input remains experimental; original source and raw are unchanged.",
+        "Load-bearing elbows are lower, but the front bearer still leans backward and flexes the support knee; source upright gait is not visually matched.",
+        "Close views retain palm/finger contact but show excessive wrist bend and cuff occlusion. Hand orientation must be refit with the lowered elbow plane; contact distance is not naturalness acceptance.",
+        "Trial grip/bed heights are 1.04/0.92 m versus runtime 0.88/0.76 m. The 0.40 m/s reference is authored. Geometry, patient, first-person handles and loading consumers have not been changed or validated for this proposal.",
+        "No patient, double-support idle, start/stop, turn, slope, threshold or loading transition is accepted.",
+        "r12 still uses its existing original-rig carry clips; V13 is not runtime-enabled."
       ],
       "variants": [
         {
           "previewId": "CarryStretcherFront",
-          "variantId": "Nra-v11-CarryStretcherFront",
+          "variantId": "Nra-v13-CarryStretcherFront",
           "clipName": "FirstLevelCarryFrontWalk100",
-          "path": "Models/FirstLevelCarryV11/Model_LugouNra01_CarryFront.glb",
-          "blendFile": "Blender/FirstLevelCarryV11/Scene_LugouNra01_CarryPair_V11.blend",
+          "path": "Models/FirstLevelCarryV13/Model_LugouNra01_CarryFront.glb",
+          "blendFile": "Blender/FirstLevelCarryV13/Scene_LugouNra01_CarryPair_V13.blend",
           "sourceVideo": "Video/Sources/EarlyMocap/Video_StretcherWalk.mp4",
           "sourceVideoSha256": "7ea06eb51ffea12b012cac7a6e5987b9bf9ecd10860d8b28112e663ae4b0b69b",
           "sourceRangeSeconds": [
@@ -14007,10 +14012,10 @@
         },
         {
           "previewId": "CarryStretcherRear",
-          "variantId": "Nra-v11-CarryStretcherRear",
+          "variantId": "Nra-v13-CarryStretcherRear",
           "clipName": "FirstLevelCarryRearWalk100",
-          "path": "Models/FirstLevelCarryV11/Model_LugouNra01_CarryRear.glb",
-          "blendFile": "Blender/FirstLevelCarryV11/Scene_LugouNra01_CarryPair_V11.blend",
+          "path": "Models/FirstLevelCarryV13/Model_LugouNra01_CarryRear.glb",
+          "blendFile": "Blender/FirstLevelCarryV13/Scene_LugouNra01_CarryPair_V13.blend",
           "sourceVideo": "Video/Sources/EarlyMocap/Video_StretcherWalk.mp4",
           "sourceVideoSha256": "7ea06eb51ffea12b012cac7a6e5987b9bf9ecd10860d8b28112e663ae4b0b69b",
           "sourceRangeSeconds": [
@@ -14033,10 +14038,10 @@
         },
         {
           "previewId": "StretcherPair",
-          "variantId": "Nra-v11-StretcherPair",
+          "variantId": "Nra-v13-StretcherPair",
           "clipName": "FirstLevelCarryPair1",
-          "path": "Models/FirstLevelCarryV11/Model_LugouNra01_CarryPair.glb",
-          "blendFile": "Blender/FirstLevelCarryV11/Scene_LugouNra01_CarryPair_V11.blend",
+          "path": "Models/FirstLevelCarryV13/Model_LugouNra01_CarryPair.glb",
+          "blendFile": "Blender/FirstLevelCarryV13/Scene_LugouNra01_CarryPair_V13.blend",
           "sourceVideo": "Video/Sources/EarlyMocap/Video_StretcherWalk.mp4",
           "sourceVideoSha256": "7ea06eb51ffea12b012cac7a6e5987b9bf9ecd10860d8b28112e663ae4b0b69b",
           "sourceRangeSeconds": [
@@ -14067,145 +14072,180 @@
         }
       ],
       "visualAssessment": {
-        "status": "requires_posture_and_gait_refinement",
+        "status": "requires_wrist_posture_and_game_geometry_refinement",
         "acceptedForGame": false,
         "frozen": true,
-        "recordedUtc": "2026-09-07T19:39:38.221453+00:00",
-        "reviewedBy": "Codex; actual image inspection in this task",
+        "recordedUtc": "2026-09-07T20:32:40.224170+00:00",
+        "reviewedBy": "Codex; actual source/raw/model screenshots and actual palm close views inspected in this task",
         "models": [
           {
-            "path": "Models/FirstLevelCarryV11/Animation_LugouNra01FirstLevelCarry.glb",
-            "sha256": "70b5942e6b2be05cad491d5506c8da62215dfe8a83d9fd7dd2a9be4302a373fc"
+            "path": "Models/FirstLevelCarryV13/Animation_LugouNra01FirstLevelCarry.glb",
+            "sha256": "336223136f3264f8a5e129eb35400a2296e2249b0a942d2c95dddfb95f5991b4"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Animation_LugouNra02FirstLevelCarry.glb",
-            "sha256": "3758b0393ad2a1c6d330d173c1caace098004c5672ed6f30fa3fa1852bce0164"
+            "path": "Models/FirstLevelCarryV13/Animation_LugouNra02FirstLevelCarry.glb",
+            "sha256": "2f2ce10695e30ce1e8ff6bf79247c53e16090db95636f7dcec7fbcc947f38dae"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Animation_LugouNra03FirstLevelCarry.glb",
-            "sha256": "7b36142bfbccc2fc7f7b21650792234f77707db1dd98325e19a8f4eab40b25d0"
+            "path": "Models/FirstLevelCarryV13/Animation_LugouNra03FirstLevelCarry.glb",
+            "sha256": "99be4fb4d8dbf72f820159459e017c4326d4efd0ad820e066f12a0116e8a52e5"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Animation_LugouNra04FirstLevelCarry.glb",
-            "sha256": "f81a9a0208b77e0110998a20c9634a229215324a5d96a35aa2ec80e83bcad46f"
+            "path": "Models/FirstLevelCarryV13/Animation_LugouNra04FirstLevelCarry.glb",
+            "sha256": "57d0a24bb35c37c5e624400435171449c546658601e03967d2a6df8c0d0dca04"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Model_LugouNra01_CarryFront.glb",
-            "sha256": "b2379d601555d60b47a176397a314f3c077595289c18a8ead6a127da627f7c11"
+            "path": "Models/FirstLevelCarryV13/Animation_LugouNra05FirstLevelCarry.glb",
+            "sha256": "2a803a34b39b5ba086314650ac1ffad04862ee7c18e1d9a95966a18b75c43101"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Model_LugouNra01_CarryPair.glb",
-            "sha256": "4824a250725766bcb558be93d84d46b0ef22f23406d9ada58d4d5ddc27d0ffb4"
+            "path": "Models/FirstLevelCarryV13/Model_LugouNra01_CarryFront.glb",
+            "sha256": "be9b56aded10197735a43d2f07348ac51d3a41016752da6920c3fe20c9c15aa8"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Model_LugouNra01_CarryRear.glb",
-            "sha256": "b15db08e680f79ae4ab7604ff9e6b17b86bb1c18425278005af804e7341ad268"
+            "path": "Models/FirstLevelCarryV13/Model_LugouNra01_CarryPair.glb",
+            "sha256": "ddcb18351eecae7c72f346a2ef87ef08d18092f82ce10bc3544e45f2e11b248a"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Model_LugouNra02_CarryFront.glb",
-            "sha256": "6c67b337aa0bd2000e6f706356a7a6ad20e005fb5f8a6508a6cba6bf9e8910ed"
+            "path": "Models/FirstLevelCarryV13/Model_LugouNra01_CarryRear.glb",
+            "sha256": "e8a86983b7b9f3c542d91fae5c90288f32a63ac51890a7860b1962bdbce758ef"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Model_LugouNra02_CarryPair.glb",
-            "sha256": "b3ba413c730a16150a2995787278badd10e6c44cb30392bed9098852a975ce15"
+            "path": "Models/FirstLevelCarryV13/Model_LugouNra02_CarryFront.glb",
+            "sha256": "e0e0c6026aa268459606617e8fd6d95fb5c2ca6b3ea0c9ba2869861c8bcb2d35"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Model_LugouNra02_CarryRear.glb",
-            "sha256": "71f0ecf8e027aeb5ce51309ea6eae7c6b1d0fa256755bf747e80a7a3de4bf7a3"
+            "path": "Models/FirstLevelCarryV13/Model_LugouNra02_CarryPair.glb",
+            "sha256": "5f640c55cf95edd0303e1c5e354e98ed24a012e53995e0cb78e580d0703e28df"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Model_LugouNra03_CarryFront.glb",
-            "sha256": "5f1d2be00b676b27ecc6308bb0d03be9e80509eea07a648f58f3ebe2dd64a416"
+            "path": "Models/FirstLevelCarryV13/Model_LugouNra02_CarryRear.glb",
+            "sha256": "78b58394c29fe8b1112724c27a88a556e9076ca366ce3feb6ac9bf555bd3a1b5"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Model_LugouNra03_CarryPair.glb",
-            "sha256": "ca9181582724007af9977e0bd23eb0e9ea5541712c8fe3d8e1592d5a27b1d966"
+            "path": "Models/FirstLevelCarryV13/Model_LugouNra03_CarryFront.glb",
+            "sha256": "c8a2e41cd2cab4053145cee763bc9252f90aaff921b88c72b1af110e05ff7d03"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Model_LugouNra03_CarryRear.glb",
-            "sha256": "bd514b242d878dacabd03b7e5c2fa781671cc6c6c7d9d9e92da113e726b7ca30"
+            "path": "Models/FirstLevelCarryV13/Model_LugouNra03_CarryPair.glb",
+            "sha256": "377ccad2d42ba22febf38ed46de61cdeec00b94c4ae19bf07ae1af3f2e8bc633"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Model_LugouNra04_CarryFront.glb",
-            "sha256": "a85c2cff0d30f4c480fd650d4508c2c32cb0b8f1e4a3e769a64ceffb689ec341"
+            "path": "Models/FirstLevelCarryV13/Model_LugouNra03_CarryRear.glb",
+            "sha256": "82d36f789bc38f33eae0fff912e12def4095f3afc8833c8161f7bd4c2f97a741"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Model_LugouNra04_CarryPair.glb",
-            "sha256": "4f6aa0db829fad15079b5bbe7f1bd61a819ee0c23ab1878f5f3f82a8f26f11c2"
+            "path": "Models/FirstLevelCarryV13/Model_LugouNra04_CarryFront.glb",
+            "sha256": "117388c54eda886115c1c62115250ed30cb5e6ca07ab2b92fbf6ea8da349506d"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Model_LugouNra04_CarryRear.glb",
-            "sha256": "d3589339d2a623ded3df124fe28e50dd6ad3331049e5a7350d7e2c95fe7920ba"
+            "path": "Models/FirstLevelCarryV13/Model_LugouNra04_CarryPair.glb",
+            "sha256": "c0e8e63ae4e7c090c856852a40148ea2eb251c25b873b5997bcc18937b75ba7e"
+          },
+          {
+            "path": "Models/FirstLevelCarryV13/Model_LugouNra04_CarryRear.glb",
+            "sha256": "794dabc7262cfbe324ded08fcf3a1e7ac1be360538fe13d7381c15303c9bec47"
+          },
+          {
+            "path": "Models/FirstLevelCarryV13/Model_LugouNra05_CarryFront.glb",
+            "sha256": "cc409e66941f18594105f18a1b184efa8d8dbe737adfacf24b618fcfccb7a351"
+          },
+          {
+            "path": "Models/FirstLevelCarryV13/Model_LugouNra05_CarryPair.glb",
+            "sha256": "0de2bceb5e3c8181a1660aa889cd0ef6b2db8a9b906314443f737b0208d7c8bf"
+          },
+          {
+            "path": "Models/FirstLevelCarryV13/Model_LugouNra05_CarryRear.glb",
+            "sha256": "1af7457a2b1772713d18354bb412eb7d94965a461b2054ae960644633c52239c"
           }
         ],
         "evidence": [
           {
-            "path": "Models/FirstLevelCarryV11/Data_IndependentValidation.json",
-            "sha256": "ddb6a3df2280bd475bd6a787b4c82de7542768409745db76c534604ef45838f9"
+            "path": "Models/FirstLevelCarryV13/Data_IndependentValidation.json",
+            "sha256": "9c5b39233f207cf0cbc8fff7a939c77190f2e1ce880be493203498d0e8da15c7"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Data_EditableProjects.json",
-            "sha256": "dacdfe655f297a41d0c5dfa2b0b6e73053566223dd638b0cc18e1bd1ce314eec"
+            "path": "Models/FirstLevelCarryV13/Data_EditableProjects.json",
+            "sha256": "7e3630b5b51021e8cdb5a296649c2ca323b1dfbde2e590dc66907b87477597bb"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Data_EditableProjectValidation.json",
-            "sha256": "db74e44e442efbf02daa4b4cf64ef11f44f6af90fe89df18864888a92f72589f"
+            "path": "Models/FirstLevelCarryV13/Data_EditableProjectValidation.json",
+            "sha256": "75e81aec34a6d127f7f134bb82f313819ad6c5a0d661e2d8a0f792f670e355ff"
           },
           {
-            "path": "Models/FirstLevelCarryV11/Data_ProjectAndPlaybackValidation.json",
-            "sha256": "a5d39e1b6b015bbddf69425e6d54b8cefc2aa5ee574114cbf48f93d9546b5081"
+            "path": "Models/FirstLevelCarryV13/Data_ProjectAndPlaybackValidation.json",
+            "sha256": "bd8488d337836300ad10707ab78ba7af971926524693c93792330066ca50c8ed"
           }
         ],
         "viewed": [
           {
-            "path": "Preview/FirstLevelCarryV11/Texture_StretcherPair_three_25.png",
-            "sha256": "0d7eda6865ce6c8a879d4611f8913afda6d400410496e84db8ca6353adfbe25d"
+            "path": "Preview/FirstLevelCarryV13/Texture_CarryStretcherFront_side_25.png",
+            "sha256": "6bfeede2a6e4e0d16df18547910f79298077d9a0133ad43f0ba8650fd41981d7"
           },
           {
-            "path": "Preview/FirstLevelCarryV11/Texture_StretcherPair_side_0.png",
-            "sha256": "5516b4cc258a629edb5e9c4da3a19ccb9f10e6d25f4c896c9a6c0090c445b22a"
+            "path": "Preview/FirstLevelCarryV13/Texture_CarryStretcherRear_three_25.png",
+            "sha256": "841b0ee275706045eb2fb66dd07a2207d20a89fa1984e521ac0abad47f62f64c"
           },
           {
-            "path": "Preview/FirstLevelCarryV11/Texture_StretcherPair_side_50.png",
-            "sha256": "3bf9b5139568a38b7d35021ab3a8a5b817439379f5e761607aa51003662bb411"
+            "path": "Preview/FirstLevelCarryV13/Texture_StretcherPair_side_25.png",
+            "sha256": "d3da8cb660d98af5e82be2d8c60832a15551806aa6ba3908f0f8eeff102d7a8f"
           },
           {
-            "path": "Preview/FirstLevelCarryV11/Texture_StretcherPair_front_75.png",
-            "sha256": "bebbb7a0c58c237c9217dd35b2c2c5d3da9e29e1c69f053f17df7a4df62011be"
+            "path": "Preview/FirstLevelCarryV13/Texture_StretcherPair_three_0.png",
+            "sha256": "525bc921ce2c1eb87498036b6a1b491f4ff36992a5b424ee41e06ce42faa5786"
           },
           {
-            "path": "Preview/FirstLevelCarryV11/Contacts/Texture_FrontL_outside_50.png",
-            "sha256": "802c5427de66435cd3642c111857aa6dd54c260141d1a2649fe5e48ab3c79ca1"
+            "path": "Preview/FirstLevelCarryV13/Texture_StretcherPair_side_75.png",
+            "sha256": "4b474adf813bebbb6745cbc8e190a8b37ace028a537fa0dc6a8ab05397d9e3fe"
           },
           {
-            "path": "Preview/FirstLevelCarryV11/Contacts/Texture_FrontR_inside_50.png",
-            "sha256": "88221f0d4e3d3a37bbc9f84a3c12611ab71328560b67cfef0e735c90d467848f"
+            "path": "Preview/FirstLevelCarryV13/Contacts/Texture_FrontL_outside_50.png",
+            "sha256": "6b16940c04ce2298e23a137f9df6b4648881d02ef13ddd6630dd10feb6071611"
           },
           {
-            "path": "Preview/FirstLevelCarryV11/Contacts/Texture_RearL_above_50.png",
-            "sha256": "d707cbce3291f54b5d1a3f3ee24cdc9a9bb37aa3be9f52fdc1ad14c375bb8a76"
+            "path": "Preview/FirstLevelCarryV13/Contacts/Texture_FrontR_above_50.png",
+            "sha256": "86cdb3dba66bb272ed029e4e735145028b80cce1eb48d238ec36454c338ae145"
           },
           {
-            "path": "Preview/FirstLevelCarryV11/Contacts/Texture_RearR_outside_75.png",
-            "sha256": "f05f5b67d39e48719e9a1fdd45a6ae1b46c4b7b16d21adfcb6f8dd2e5e4e18b2"
+            "path": "Preview/FirstLevelCarryV13/Contacts/Texture_RearL_inside_50.png",
+            "sha256": "1057c3dea8187853b3221438d132ac8d904c49ef6fb979b7dba75f1568118708"
+          },
+          {
+            "path": "Preview/FirstLevelCarryV13/Contacts/Texture_RearR_above_50.png",
+            "sha256": "31e1ac669d7cf6d2dc1b62a6d4b8170ef3c2c3e8045df7f56b1e4abe9a44e028"
+          },
+          {
+            "path": "Models/FirstLevelCarryFitV18/Texture_LugouNra05_Front_side_500.png",
+            "sha256": "1fa9c7215ba67e42a2143f25d414390913e2e53f0fb4e21f5ff7327068005875"
+          },
+          {
+            "path": "Models/FirstLevelCarryFitV18/Texture_LugouNra05_Rear_three_500.png",
+            "sha256": "071907ff2f6e525ae78d9afccb5c143f7d7cffd74607a07bccc4a6ec458dc5b4"
           }
         ],
-        "observations": [
-          "Shared rigid stretcher and four palm contact locations stay together in sampled full and close views.",
-          "Thumb opposition and lower finger wrap are visible; remaining cuff, corner penetration and all-model close views are not fully accepted.",
-          "Side views at 0 and 1 seconds show sustained deep crouch with raised elbows; this does not match source upright load-bearing gait.",
-          "No patient, double-support idle clip, start/stop, slope, turning, threshold or loading transition has been accepted."
+        "blockers": [
+          "Two-person cropped input remains experimental; original source and raw are unchanged.",
+          "Load-bearing elbows are lower, but the front bearer still leans backward and flexes the support knee; source upright gait is not visually matched.",
+          "Close views retain palm/finger contact but show excessive wrist bend and cuff occlusion. Hand orientation must be refit with the lowered elbow plane; contact distance is not naturalness acceptance.",
+          "Trial grip/bed heights are 1.04/0.92 m versus runtime 0.88/0.76 m. The 0.40 m/s reference is authored. Geometry, patient, first-person handles and loading consumers have not been changed or validated for this proposal.",
+          "No patient, double-support idle, start/stop, turn, slope, threshold or loading transition is accepted.",
+          "r12 still uses its existing original-rig carry clips; V13 is not runtime-enabled."
         ],
-        "next": "Reconcile rail height and original-model proportions while preserving natural stance. Do not simply force lower pelvis to satisfy a point constraint.",
-        "sourcePolicy": "Two-person crop experiment. Original video, raw and prior versions unchanged; V11 pelvis and support gait are authored corrections."
+        "note": "Numeric acceptance is limited to exported flat-ground contacts on five original rigs at three sizes; visual acceptance is withheld. NRA01 and NRA05 images were inspected; full naturalness acceptance for every variant is not claimed."
       },
       "productionFit": {
-        "validation": "Models/FirstLevelCarryV11/Data_IndependentValidation.json",
-        "trial": "Models/FirstLevelCarryFitV6/Data_ProductionFit.json",
+        "validation": "Models/FirstLevelCarryV13/Data_IndependentValidation.json",
+        "trial": "Models/FirstLevelCarryFitV18/Data_ProductionFit.json",
         "runtimeEnabled": false,
-        "profiles": 24,
-        "samples": 5784,
-        "referenceSpeedPolicy": "0.55 m/s authoring reference; not calibrated monocular ground speed."
+        "profiles": 30,
+        "samples": 7230,
+        "referenceSpeedPolicy": "0.40 m/s authoring reference; not calibrated monocular ground speed.",
+        "geometryStatus": "local_proposed_height_not_in_runtime",
+        "continuousContactValidation": {
+          "path": "Models/FirstLevelCarryV13/Data_ContinuousContactValidation.json",
+          "sha256": "13eb2759abef0128aa5ea4d9da0634991598811d97f266e4269792ec0ce7dbcd",
+          "maxDriftM": 0.00012892040000557026
+        }
       },
       "newSourceProduction": [
         {

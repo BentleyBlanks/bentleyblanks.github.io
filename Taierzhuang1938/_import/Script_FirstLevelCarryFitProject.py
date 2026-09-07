@@ -38,10 +38,12 @@ def Main():
     assert not (out/'Data_EditableProjects.json').exists(),'Preserve existing projects; use another version'
     validation=json.loads((out/'Data_IndependentValidation.json').read_text(encoding='utf-8'))
     assert validation['status']=='export_matches_trial_requires_visual_acceptance'
+    expected=json.loads((root/'Models'/validation['fitReport']).read_text(encoding='utf-8'))
+    grip_height=expected.get('gripHeightM',.88);bed_height=grip_height-.12;speed=expected.get('referenceSpeedMps',.55)
     blends.mkdir(parents=True,exist_ok=True);records=[]
     Hash=lambda file:hashlib.sha256(file.read_bytes()).hexdigest()
-    for number in range(1,5):
-        name=f'LugouNra0{number}';bpy.ops.wm.read_factory_settings(use_empty=True)
+    for model in expected['results']:
+        name=model['id'];number=int(name[-2:]);bpy.ops.wm.read_factory_settings(use_empty=True)
         scene=bpy.context.scene;scene.name='Scene_'+name+'_CarryPair';scene.render.fps=60;scene.frame_start=0;scene.frame_end=120
         sources=[]
         for role in ['Front','Rear']:
@@ -61,14 +63,15 @@ def Main():
         material=bpy.data.materials.new('Material_ActualGameStretcher');material.use_nodes=True
         shader=material.node_tree.nodes.get('Principled BSDF');shader.inputs['Base Color'].default_value=(.32,.19,.075,1);shader.inputs['Metallic'].default_value=0;shader.inputs['Roughness'].default_value=.85
         # Blender Z up, original game GLB +Z maps to Blender -Y.
-        boxes=[('Bed',(0,0,.76),(.58,1.85,.14))]
+        boxes=[('Bed',(0,0,bed_height),(.58,1.85,.14))]
         for sign in [-1,1]:
-            boxes.append((f'Rail{sign}',(sign*.29,0,.88),(.065,2.15,.065)))
-            boxes.append((f'Cross{sign}',(0,sign*.68,.835),(.65,.065,.06)))
+            boxes.append((f'Rail{sign}',(sign*.29,0,grip_height),(.065,2.15,.065)))
+            boxes.append((f'Cross{sign}',(0,sign*.68,grip_height-.045),(.65,.065,.06)))
         for suffix,position,size in boxes:
             bpy.ops.mesh.primitive_cube_add(size=1,location=position);obj=bpy.context.object;obj.name='Prop_FirstLevel'+suffix;obj.scale=size;obj.data.materials.append(material)
         scene['sourcePolicy']='V10-derived torso; pelvis placement and lower-limb support gait authored after recovery. Two-person source crop experiment. Not gameplay accepted.'
-        scene['sourceRangeSeconds']=[137/30,197/30];scene['referenceSpeedMps']=.55;scene['gameBedHeightM']=.76
+        scene['sourceRangeSeconds']=[137/30,197/30];scene['referenceSpeedMps']=speed;scene['trialBedHeightM']=bed_height;scene['trialGripHeightM']=grip_height
+        scene['geometryStatus']=expected.get('geometryStatus','current_r12')
         scene.frame_set(30);bpy.context.view_layer.update()
         for img in bpy.data.images:
             if img.source=='FILE' and img.has_data and not img.packed_file:img.pack()
@@ -85,14 +88,14 @@ def Main():
         source=next(a for a in catalog['actions'] if a['id']==actionId)
         v10=next(v for v in source['variants'] if v['id']=='Nra-v10-'+actionId)
         variant=copy.deepcopy(v10);variant.update(id=f'Nra-v{revision}-'+actionId,revisionOrder=revision,
-            label=f'V{revision} · 游戏尺寸接触试制',status='实验 · 待动作与近景审阅',
+            label=f'V{revision} · 原骨架接触试制（握高 {grip_height:.2f} 米）',status='实验 · 待动作与近景审阅',
             path=f'Models/{group}/Model_LugouNra01_Carry{role}.glb',
             clip='FirstLevelCarryPair1' if role=='Pair' else 'FirstLevelCarry'+role+'Walk100',
-            blend=records[0]['blend'],travelMeters=[0,0,1.1])
+            blend=records[0]['blend'],travelMeters=[0,0,speed*2])
         variant['review']['retargetReport']=f'Models/{group}/Data_IndependentValidation.json'
-        variant['review']['retargetNotes']='原视频及 raw 保留。按原游戏人物归一化，骨盆位置、双脚支撑步态与手臂接触为后期重建；0.55 m/s 为制作参考速度，非单目实测地速。未接入游戏。'
+        variant['review']['retargetNotes']=f'原视频及 raw 保留。按原游戏人物归一化，骨盆位置、双脚支撑步态与手臂接触为后期重建；{speed:.2f} m/s 为制作参考速度，非单目实测地速。试制握高 {grip_height:.2f} 米，床面 {bed_height:.2f} 米；游戏尺寸尚未改动。未接入游戏。'
         actions.append(dict(id=actionId,label=source['label'],loop=True,cameraDistance=6.5,
-            description='四套原人物／三档身高接触试制；当前预览为 NRA01 标准身高。仍需姿态与掌指近景验收。',variants=[variant]))
+            description=f'{len(records)} 套原人物／三档身高接触试制；当前预览为 NRA01 标准身高。仍需姿态与掌指近景验收。',variants=[variant]))
     (out/'Data_EditableProjects.json').write_text(json.dumps(dict(status='editable_candidate_not_game_accepted',results=records),ensure_ascii=False,indent=2),encoding='utf-8')
     (out/'Data_Versions.json').write_text(json.dumps(dict(actions=actions),ensure_ascii=False,indent=2),encoding='utf-8')
     print(json.dumps(dict(group=group,projects=len(records),registeredActions=len(actions))),flush=True)

@@ -7,7 +7,7 @@ from Script_FirstLevelRetargetEvidence import CollectRetargetEvidence
 def Main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--root',type=Path,required=True)
-    parser.add_argument('--carry-revision',type=int,default=11)
+    parser.add_argument('--carry-revision',type=int,default=13)
     args=parser.parse_args()
     root=args.root.resolve()
     revision=args.carry_revision
@@ -86,28 +86,39 @@ def Main():
             if revision>=11:
                 visual=Read(root/f'Models/{group}/Data_VisualAssessment.json')
                 validation=Read(root/f'Models/{group}/Data_IndependentValidation.json')
+                trial=Read(root/'Models'/validation['fitReport'])
+                speed=trial.get('referenceSpeedMps',.55);grip_height=trial.get('gripHeightM',.88)
                 assert visual['frozen'] and not visual['acceptedForGame']
                 for model in visual['models']:
                     assert Hash(root/model['path'])==model['sha256']
-                row.update(rootMotionMode='authored_in_place_support_gait_with_original_rig',referenceSpeedMps=.55,
+                row.update(rootMotionMode='authored_in_place_support_gait_with_original_rig',referenceSpeedMps=speed,
+                    modelVariants=[m['id'] for m in validation['results']],
                     revisionLabel=f'V{revision} production-scale contact trial; pelvis, support gait and hand contacts authored after recovery',
                     visualAssessment=visual,
                     productionFit=dict(validation=f'Models/{group}/Data_IndependentValidation.json',
                         trial='Models/'+validation['fitReport'],runtimeEnabled=False,
                         profiles=sum(len(m['profiles']) for m in validation['results']),
                         samples=sum(p['samples'] for m in validation['results'] for p in m['profiles']),
-                        referenceSpeedPolicy='0.55 m/s authoring reference; not calibrated monocular ground speed.'),
+                        referenceSpeedPolicy=f'{speed:.2f} m/s authoring reference; not calibrated monocular ground speed.',
+                        geometryStatus=trial.get('geometryStatus','current_r12')),
                     contacts=[dict(prop='CreateP012StretcherGeometry',railSpacingM=.58,railLengthM=2.15,
-                        longitudinalGripsM=[-1,1],bedHeightM=.76,gripHeightM=.88,
+                        longitudinalGripsM=[-1,1],bedHeightM=grip_height-.12,gripHeightM=grip_height,
+                        runtimeBedHeightM=.76,runtimeGripHeightM=.88,
                         correction='Authored pelvis placement, support gait, arms and fingers; original raw unchanged.')],
-                    blockers=['Two-person cropped input remains experimental, not strict single-person recovery.',
+                    blockers=visual.get('blockers',['Two-person cropped input remains experimental, not strict single-person recovery.',
                         'Flat-ground contact passed independent reimport, but side views show excessive crouch and high elbows; gait does not preserve the source upright walk.',
                         'Palm/thumb wrap improved in sampled close views; this is not full contact/naturalness acceptance for all four model variants.',
                         'No double-support idle clip, start/stop, turn, slope, threshold or loading transition is accepted.',
-                        f'r12 uses original production-rig bearers and existing carry clips; this V{revision} candidate is not enabled.'],
+                        f'r12 uses original production-rig bearers and existing carry clips; this V{revision} candidate is not enabled.']),
                     reviewEvidence=[f'Models/{group}/'+name for name in ['Data_IndependentValidation.json','Data_EditableProjects.json',
                         'Data_EditableProjectValidation.json','Data_ProjectAndPlaybackValidation.json','Data_VisualAssessment.json']]+
                         [f'Preview/{group}/Contacts/Data_ContactViews.json'])
+                continuous=root/f'Models/{group}/Data_ContinuousContactValidation.json'
+                if continuous.exists():
+                    check=Read(continuous);assert not check['failures'] and not check['errors']
+                    row['productionFit']['continuousContactValidation']=dict(path=continuous.relative_to(root).as_posix(),
+                        sha256=Hash(continuous),maxDriftM=max(p['maxStanceDrift'] for m in check['results'] for p in m['profiles']))
+                    row['reviewEvidence'].append(continuous.relative_to(root).as_posix())
     for row in rows:
         planned=next(r for r in coverage['requirements'] if r['requirementId']==row['requirementId'])
         row['newSourceProduction']=[sourceStates[name] for name in planned['newSources']]

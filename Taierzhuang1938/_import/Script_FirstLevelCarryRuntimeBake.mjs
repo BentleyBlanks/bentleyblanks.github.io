@@ -1,4 +1,4 @@
-// Local integration candidate: mesh-free curves for the four original NRA rigs.
+// Local integration candidate: mesh-free curves for selected original NRA rigs.
 // Does not replace a production library or change a mission state.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,7 +9,13 @@ const args=process.argv.slice(2),root=args[args.indexOf('--root')+1];
 if(!root)throw Error('--root required');
 const revision=args.includes('--revision')?Number(args[args.indexOf('--revision')+1]):9;
 const group=`FirstLevelCarryV${revision}`;
-const output=path.join(root,`Models/${group}/GameIntegration`);fs.mkdirSync(output,{recursive:true});
+const outputGroup=args.includes('--output-group')?args[args.indexOf('--output-group')+1]:group;
+if(!/^FirstLevelCarry[A-Za-z0-9]+$/.test(outputGroup))throw Error('Invalid output group');
+const modelNumbers=(args.includes('--models')?args[args.indexOf('--models')+1]:'1,2,3,4').split(',').map(Number);
+if(!modelNumbers.length||modelNumbers.some(n=>!Number.isInteger(n)||n<1||n>5)||new Set(modelNumbers).size!==modelNumbers.length)throw Error('Invalid NRA models');
+const output=path.join(root,`Models/${outputGroup}/GameIntegration`);
+if(fs.existsSync(path.join(output,'Data_RuntimeCandidateValidation.json'))||modelNumbers.some(n=>fs.existsSync(path.join(output,`Animation_LugouNra0${n}FirstLevelCarry.glb`))))throw Error('Preserve earlier exports; select a new output group');
+fs.mkdirSync(output,{recursive:true});
 const core=fs.readFileSync(path.join(project,'vendor/three/build/three.core.js'));
 const {Matrix4,Vector3,Quaternion}=await import(`data:text/javascript;base64,${core.toString('base64')}`);
 const Pos=m=>new Vector3().setFromMatrixPosition(m);
@@ -25,7 +31,7 @@ function Accessor(json,chunks,values,type){
 }
 function Bake(supportOffsetM,write){
 const results=[];
-for(let variant=1;variant<=4;variant++){
+for(const variant of modelNumbers){
  const id=`LugouNra0${variant}`,target=LoadGlb(path.join(project,`Model/Character/Model_${id}.glb`));
  const scene=new PoseScene(target),rest=BindRest(target,scene),skin=BuildSkin(target);
  const json={asset:{version:'2.0',generator:'FirstLevelCarryRuntimeBake'},scene:target.json.scene,
@@ -86,7 +92,7 @@ return results;
 const before=Bake(0,false);
 const supportOffsetM=revision>=10?Math.max(0,.001-Math.min(...before.map(r=>r.minSkinY))):0;
 const results=Bake(supportOffsetM,true);
-const report={status:'candidate_not_runtime_enabled',revision,supportOffsetM,
+const report={status:'candidate_not_runtime_enabled',revision,sourceGroup:group,outputGroup,modelNumbers,supportOffsetM,
  supportPolicy:'Single constant translation shared by every original variant, bearer and prop; no per-frame foot correction.',before,results};
 fs.writeFileSync(path.join(output,'Data_RuntimeCandidateValidation.json'),JSON.stringify(report,null,2));
 console.log(JSON.stringify(report));
