@@ -3,6 +3,8 @@ import {
   MISSION_STAGES,
   MISSION_TUNING as R,
   MISSION_ENCOUNTERS,
+  MISSION_TACTICS,
+  MISSION_GUIDANCE,
   MISSION_VERSION,
 } from "./Data_FirstLevelMission.mjs";
 import {
@@ -18,7 +20,7 @@ import {
   FirstLevelMissionColumn,
   MissionRoutePoint,
   MissionRouteLength,
-  MissionGuideSpeed, MissionSquadRoute, MissionSquadPace,
+  MissionGuideSpeed, MissionSquadRoute, MissionSquadPace, MissionRouteLookahead,
 } from "./Script_FirstLevelMissionColumn.mjs";
 import { FirstLevelMissionView } from "./Script_FirstLevelMissionView.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
@@ -66,7 +68,7 @@ export class FirstLevelMissionRuntime {
       battlefield: this.battlefield,
       physics: this.physics,
       column: this.column,
-      actorFactory:this.actorFactory,library:this.library,
+      actorFactory:this.actorFactory,library:this.library,hud:this.hud,
     });
     this.oldBlast = this.combat.host.onBlast;
     this.combat.host.onBlast = (event) => {
@@ -109,13 +111,13 @@ export class FirstLevelMissionRuntime {
       : this.companion.Handle(who)?.position || this.Point(this.flow.stage.target, 1);
   }
   get EmptyHands() {
-    return ["Train","Unloading"].includes(this.flow.stage.id) && !this.Has("unloaded");
+    return this.controls?.kind === "death" || (["Train","Unloading"].includes(this.flow.stage.id) && !this.Has("unloaded"));
   }
   get ReceivingFood() {
     return this.flow.stage.id === "Train" && !this.Has("trainFoodReceived");
   }
   OpeningPrompt() {
-    if (!this.EmptyHands) return null;
+    if (!this.EmptyHands || !["Train","Unloading"].includes(this.flow.stage.id)) return null;
     if (this.ReceivingFood) return {keys:T("input.guide.move.look.keys"),
       label:T("firstLevel.hint.receiveFood"),kind:"look",text:true};
     if (this.Has("trainStopped")) return this.player.stance==="prone"
@@ -179,6 +181,7 @@ export class FirstLevelMissionRuntime {
     if (id === "ZhouLift") this.Record("zhouOnLitter");
     if (id === "SouthHope") this.Record("southHopeHeard");
     if (id === "FollowVehicle") this.Record("followVehicleHeard");
+    if (id === "TransferHope") this.Record("transferHopeHeard");
   }
   PlaceActor(actor, point) {
     if (!actor) return;
@@ -333,6 +336,8 @@ export class FirstLevelMissionRuntime {
       });
       if (!actor) continue;
       actor.missionId = spec.id;
+      if (MISSION_TACTICS[spec.id]) actor.missionTactic = { index: 0, elapsed: 0, hold: 0,
+        movingSeconds: 0, distance: 0, last: { x: spec.x, z: spec.z }, shelter: {x:spec.x,z:spec.z}, mode: "cover" };
       if(spec.id.startsWith("Flank")||["front","tank"].includes(id))actor.scriptedNoncombatant=true;
       actor.missionFrontStandby=["front","tank"].includes(id)&&!spec.id.startsWith("Flank");
       if(actor.missionFrontStandby)this.ai.SetStance(actor,1,4+actor.id%3,true);
@@ -357,7 +362,8 @@ export class FirstLevelMissionRuntime {
       )
         return false;
       if (Distance(actor.position, point) > R.passageRangeM) return false;
-      const from = actor.position.clone().add(new THREE.Vector3(0, 1.35, 0)),
+      const eye = actor.stance === 2 ? .35 : actor.stance === 1 ? .9 : 1.35;
+      const from = actor.position.clone().add(new THREE.Vector3(0, eye, 0)),
         to = this.Point(point, 1.1),
         delta = to.sub(from),
         length = delta.length();
@@ -387,10 +393,10 @@ export class FirstLevelMissionRuntime {
       "MissionBundle",
       A.bundle,
       () => this.Text("bundle"),
-      () => this.flow.stage.id === "Tank" && !this.tank.immobilized,
+      () => this.flow.stage.id === "Tank" && (!this.tank.immobilized || !this.Has("bundleTaken")),
       () => {
-        if (this.Inventory().bundles >= 2) return false;
-        this.GiveSupply({ bundles: 2 });
+        const missing = Math.max(0, R.bundleSupplyCount - this.Inventory().bundles);
+        if (missing) this.GiveSupply({ bundles: missing });
         this.Record("bundleTaken");
         return true;
       },
@@ -558,6 +564,10 @@ export class FirstLevelMissionRuntime {
         this.Guide(MISSION_ROUTES.village.slice(2, 6));
         this.SpawnEncounter("courtyard");
         break;
+      case "TransferApproach":
+        this.Guide(MISSION_ROUTES.village.slice(-4));
+        this.column.loading = true;
+        break;
       case "Transfer":
         this.Guide(MISSION_ROUTES.village.slice(-4));
         this.SpawnEncounter("transfer");
@@ -611,6 +621,7 @@ export class FirstLevelMissionRuntime {
           .filter((w) => w.kind === "medic" && w.health > 0 && !w.assigned)
           .sort((a, b) => Distance(a, A.zhouDrop) - Distance(b, A.zhouDrop))[0];
         if(this.deathMedic)this.deathMedic.treating=true;
+        this.deathCareRoute=null;
         break;
       case "FinalDefense":
         this.guideRoute = null;
@@ -647,12 +658,7 @@ export class FirstLevelMissionRuntime {
           actor,
           progress: 0,
           safe: false,
-          route: [
-            { x: actor.position.x, z: actor.position.z },
-            { x: -20 + i*.45, z: -137 + i*.35 },
-            { x: -20 + i*.35, z: -124 + i*.2 },
-            { x: -8 + i%2*2, z: -112 + Math.floor(i/2)*2.1 },
-          ],
+          route: P.guardWithdrawalRoutes[i],
         });
       }
     }
@@ -672,7 +678,7 @@ export class FirstLevelMissionRuntime {
         }
         const target=guard.route[guard.progress],p=guard.actor.position;
         const distance=Distance(p,target)||1,dx=(target.x-p.x)/distance,dz=(target.z-p.z)/distance;
-        const blocked=this.guards.some(other=>other!==guard&&other.actor.alive&&
+        const blocked=this.guards.some(other=>other!==guard&&!other.safe&&other.actor.alive&&
           (other.actor.position.x-p.x)*dx+(other.actor.position.z-p.z)*dz>0&&
           Math.abs((other.actor.position.x-p.x)*dz-(other.actor.position.z-p.z)*dx)<.65&&
           Distance(other.actor.position,p)<1.4);
@@ -717,6 +723,9 @@ export class FirstLevelMissionRuntime {
     const hit = this.battlefield.Raycast(from, delta.normalize(), distance);
     if (hit && hit.box?.tag !== "missionTank" && hit.t < distance - 0.25) return;
     this.tank.immobilized = true;
+    this.tank.moving = false;
+    // A real thrown bundle is also proof of acquisition, including after checkpoint resume.
+    this.Record("bundleTaken", { source: "playerBundleBlast" });
     this.Record("tankImmobilized", { position: { x: position.x, z: position.z }, explosiveId });
     this.Say("TankStopped");
     this.Say("JapaneseFlank");
@@ -748,6 +757,58 @@ export class FirstLevelMissionRuntime {
       actor.scriptedNoncombatant = this.flow.stage.id === "South";
     }
   }
+  UpdateRelief(dt) {
+    if(!this.Has("unloaded") || !this.train.entries.every(entry=>entry.arrived||!entry.actor.alive))return;
+    if(!this.relief) {
+      this.relief=this.train.entries.filter(entry=>entry.carIndex===2&&entry.actor.alive).map((entry,i)=>({
+        actor:entry.actor, route:[...P.reliefApproach,{x:P.reliefPositions[i].x,z:-123},P.reliefPositions[i]], index:0, delay:i*R.reliefDelaySeconds,
+        arrived:false, distance:0, last:{x:entry.actor.position.x,z:entry.actor.position.z}
+      }));
+    }
+    for(const entry of this.relief) {
+      const actor=entry.actor;
+      if(!actor.alive||entry.arrived)continue;
+      entry.distance+=Distance(actor.position,entry.last);entry.last={x:actor.position.x,z:actor.position.z};
+      if(entry.delay>0){entry.delay-=dt;continue;}
+      while(entry.index<entry.route.length&&Distance(actor.position,entry.route[entry.index])<1)entry.index++;
+      if(entry.index>=entry.route.length){entry.arrived=true;this.Defend(actor,actor.position);this.ai.SetStance(actor,1,2);continue;}
+      actor.scriptedNoncombatant=Distance(actor.position,A.front)>30;
+      this.ai.SetStance(actor,0,.4,true);
+      this.MoveActor(actor,entry.route[entry.index],R.reliefSpeedMps);
+    }
+  }
+  UpdateTactics(dt) {
+    const stage = this.flow.stage.id;
+    for (const [id, actor] of this.enemies) {
+      const plan = MISSION_TACTICS[id], state = actor.missionTactic;
+      if (!actor.alive || !state || actor.scriptedNoncombatant ||
+        ((id.startsWith("Air") || id.startsWith("Retreat")) && stage.startsWith("Retreat"))) continue;
+      state.distance += Distance(actor.position, state.last);
+      state.last = { x: actor.position.x, z: actor.position.z };
+      state.elapsed += dt;
+      const target = plan.points[state.index];
+      if (!target || state.elapsed < plan.delay || actor.suppression >= R.tacticalSuppression) {
+        const suppressed=actor.suppression>=R.tacticalSuppression;
+        if(suppressed && Distance(actor.position,state.shelter)>R.tacticalArrivalM){
+          this.MoveActor(actor,state.shelter,R.tacticalMoveMps);state.mode="fallback";
+        }else {this.Defend(actor, actor.position);state.mode=suppressed?"suppressed":"cover";}
+        if (suppressed) this.ai.SetStance(actor, 1, 1, true);
+        continue;
+      }
+      if (Distance(actor.position, target) < R.tacticalArrivalM) {
+        this.Defend(actor, target);
+        state.shelter={...target};
+        state.mode = "cover";
+        state.hold += dt;
+        if (state.hold >= R.tacticalHoldSeconds) { state.index++; state.hold = 0; }
+      } else {
+        state.mode = "advance";
+        this.ai.SetStance(actor, 0, .4, true);
+        this.MoveActor(actor, target, R.tacticalMoveMps);
+        state.movingSeconds += dt;
+      }
+    }
+  }
   UpdateFront() {
     if(!["Support","MachineGun","Tank","Orders"].includes(this.flow.stage.id))return;
     if(!this.Has("frontBattleStarted")&&this.Near(A.front,R.frontEngageDistanceM)){
@@ -759,8 +820,19 @@ export class FirstLevelMissionRuntime {
   }
   UpdateTank() {
     const tank = this.tank;
-    if (!tank.active || this.flow.index >= 6) return;
-    if (!tank.immobilized) tank.z = Math.min(R.tankStopZ, tank.z + this.delta * R.tankSpeedMps);
+    if (!tank.active || this.flow.index >= 6) {
+      if(this.tankDust!=null){this.vfx.RemoveSmokeSource(this.tankDust);this.tankDust=null;}
+      return;
+    }
+    tank.advanceTime = (tank.advanceTime || 0) + this.delta;
+    const cycle = R.tankAdvanceSeconds + R.tankFiringHaltSeconds;
+    tank.moving = !tank.immobilized && tank.z < R.tankStopZ && tank.advanceTime % cycle < R.tankAdvanceSeconds;
+    if (tank.moving) tank.z = Math.min(R.tankStopZ, tank.z + this.delta * R.tankSpeedMps);
+    if(tank.moving){
+      const point=this.Point({x:tank.x,z:tank.z-2},.2);
+      if(this.tankDust==null)this.tankDust=this.vfx.SmokeSource(point,R.tankDust);
+      else this.vfx.MoveSmokeSource(this.tankDust,point);
+    }else if(this.tankDust!=null){this.vfx.RemoveSmokeSource(this.tankDust);this.tankDust=null;}
     const targets = P.tankTargets;
     const target = targets[tank.shots % targets.length];
     const desiredYaw=Math.atan2(tank.x-target.x,tank.z-target.z);
@@ -845,6 +917,13 @@ export class FirstLevelMissionRuntime {
       yaw: this.player.yaw,
       pitch: this.player.pitch,
     };
+    if(kind==="death") {
+      const zhou=this.column.zhou,eye=this.player.EyePosition;
+      const target=this.Point({x:zhou.x-Math.sin(zhou.yaw)*.7,z:zhou.z-Math.cos(zhou.yaw)*.7},R.deathLookHeightM);
+      this.controls.startYaw=this.player.yaw;this.controls.startPitch=this.player.pitch;
+      this.controls.yaw=Math.atan2(eye.x-target.x,eye.z-target.z);
+      this.controls.pitch=Math.atan2(target.y-eye.y,Math.hypot(target.x-eye.x,target.z-eye.z));
+    }
     this.Control?.(true, kind);
   }
   BeforePlayer(dt, input) {
@@ -864,6 +943,13 @@ export class FirstLevelMissionRuntime {
     input.crouchPressed = false;
     input.pronePressed = false;
     input.stanceRequested = null;
+    if(control.kind==="death" && control.time<R.deathLookSeconds) {
+      const t=Clamp(control.time/R.deathLookSeconds,0,1),smooth=t*t*(3-2*t);
+      const yaw=Math.atan2(Math.sin(control.yaw-control.startYaw),Math.cos(control.yaw-control.startYaw));
+      this.player.yaw=control.startYaw+yaw*smooth;
+      this.player.pitch=control.startPitch+(control.pitch-control.startPitch)*smooth;
+      return;
+    }
     const yawDelta = Math.atan2(
       Math.sin(this.player.yaw - control.yaw),
       Math.cos(this.player.yaw - control.yaw),
@@ -959,6 +1045,31 @@ export class FirstLevelMissionRuntime {
       else this.Record("secondAirPassComplete");
     }
   }
+  CurrentGuide() {
+    const stage=this.flow.stage, spec=MISSION_GUIDANCE[stage.id];
+    if(!spec || this.failed || this.controls || this.completed)return null;
+    let target=stage.target, label=spec.label;
+    if(spec.route)target=MissionRouteLookahead(MISSION_ROUTES[spec.route],this.player.position);
+    if(stage.id==='Unloading') {
+      if(!this.Has('trainStopped'))return null;
+      if(this.battlefield.TrainContains(this.player.position)) {
+        const car=MISSION_TRAIN.cars.slice().sort((a,b)=>Math.abs(a.z-this.player.position.z)-Math.abs(b.z-this.player.position.z))[0];
+        target={x:-72,z:car.z};
+      }
+    }
+    if(stage.id==='Tank' && this.Inventory().bundles>0){target=A.throw;label='throw';}
+    if(stage.id==='Courtyard' && this.Has('courtyardGateOpen') && this.Threatens(A.gate)) {target={x:A.gate.x,z:A.gate.z+4};label='gateThreat';}
+    if(['Carry','FinalCarry'].includes(stage.id)) {
+      if(this.carry.Active) {target=stage.id==='Carry'?A.ditchMouth:A.zhouDrop;label=stage.id==='Carry'?'ditch':'place';}
+      else {const z=this.column.zhou;target={x:z.x+Math.sin(z.yaw)*1.6,z:z.z+Math.cos(z.yaw)*1.6};}
+    }
+    if(stage.id==="FinalDefense")target=MissionRouteLookahead(MISSION_ROUTES.exit.slice(0,5),this.player.position);
+    let status=null;
+    if(stage.id==="MachineGun"&&this.emplacement.Mounted)status=T("firstLevel.hint.guards",{safe:this.guards.filter(g=>g.safe).length,remaining:this.guards.filter(g=>g.actor.alive&&!g.safe).length});
+    if(["Courtyard","TransferApproach","Transfer"].includes(stage.id))status=T("firstLevel.hint.queue",{passed:this.column.litters.filter(l=>l.passedGate).length,total:this.column.litters.filter(l=>l.health>0||l.passedGate).length,loaded:this.column.loadEvents.length});
+    if(stage.id==="FinalDefense")status=T("firstLevel.hint.rearQueue",{remaining:this.column.litters.filter(l=>l.health>0&&!l.zhou&&!l.loaded&&!l.escaped).length});
+    return {target,label:T(`firstLevel.guide.${label}`),status};
+  }
   Update(dt) {
     if (this.completed || this.failed) return;
     this.delta = dt;
@@ -969,6 +1080,8 @@ export class FirstLevelMissionRuntime {
     if(this.Has("trainProneOrder") && this.player.stance==="prone")this.Record("trainPlayerProne");
     this.UpdateSquad();
     this.UpdateFront();
+    this.UpdateTactics(dt);
+    this.UpdateRelief(dt);
     this.UpdateTank();
     this.UpdateFlank();
     this.UpdateAir(dt);
@@ -976,18 +1089,25 @@ export class FirstLevelMissionRuntime {
     const stage = this.flow.stage.id,
       t = this.flow.stageTime;
     if (stage === "Death") {
-      const medic = this.deathMedic,
-        zhou = this.column.zhou;
-      if (medic) {
-        const target = { x: zhou.x - 1, z: zhou.z },
-          distance = Distance(medic, target),
-          step = Math.min(1, (dt * R.medicApproachMps) / (distance || 1));
-        medic.x += (target.x - medic.x) * step;
-        medic.z += (target.z - medic.z) * step;
-        medic.yaw = Math.PI / 2;
-        medic.crouch = distance < 1.5;
-        if(distance<1.2 && !this.Has("deathMedicArrived")){
-          this.Record("deathMedicArrived");
+      if (this.deathMedic?.health<=0) {this.deathMedic.treating=false;this.deathMedic=null;this.deathCareRoute=null;}
+      const medic=this.deathMedic, zhou=this.column.zhou;
+      const helper=medic || this.squad.find(actor=>actor.alive);
+      if (helper) {
+        const p=medic?helper:helper.position, finish={x:zhou.x-1,z:zhou.z};
+        if(!this.deathCareRoute) {
+          const ward=P.wardInterior, inWard=p.x>ward.minX&&p.x<ward.maxX&&p.z<ward.maxZ&&p.z>ward.minZ;
+          this.deathCareRoute=[...(inWard?[]:MISSION_ROUTES.reception.slice(2)),finish];
+        }
+        while(this.deathCareRoute.length>1&&Distance(p,this.deathCareRoute[0])<.5)this.deathCareRoute.shift();
+        const target=this.deathCareRoute[0],distance=Distance(p,target);
+        if(medic){
+          const step=Math.min(1,dt*R.medicApproachMps/(distance||1));
+          medic.x+=(target.x-medic.x)*step;medic.z+=(target.z-medic.z)*step;
+          medic.yaw=Math.atan2(p.x-target.x,p.z-target.z);
+          medic.crouch=this.deathCareRoute.length===1&&distance<1.5;
+        }else this.MoveActor(helper,target,R.medicApproachMps);
+        if(this.deathCareRoute.length===1&&distance<1.2&&!this.Has("deathMedicArrived")){
+          this.Record("deathMedicArrived",{helper:medic?.id||helper.castId});
           this.BeginControl("death",R.deathSeconds);
           this.Say("ZhouDeath",{urgent:true});
         }
@@ -1045,11 +1165,21 @@ export class FirstLevelMissionRuntime {
         this.Record("frontContact");
     }
     if (stage === "MachineGun") {
+      if (Math.floor(t / 8) !== this.lastGuardHint) {
+        this.lastGuardHint = Math.floor(t / 8);
+        const gun=this.emplacement.Emplacement(this.gunId);
+        this.hud.Hint(gun?.rounds===0 && gun?.belts===0 ? T("firstLevel.hint.gunSupply") : T("firstLevel.hint.guards", {
+          safe:this.guards.filter(g=>g.safe).length, remaining:this.guards.filter(g=>g.actor.alive&&!g.safe).length}), 5);
+      }
       if (this.emplacement.stats.shots > 0) this.Record("gunUsed");
       this.UpdateGuards(dt);
       const gun = this.emplacement.Emplacement(this.gunId);
       if (gun?.belts === 3) this.Say("ThreeMagazines");
       if (gun?.belts === 2) this.Say("TwoMagazines");
+    }
+    if (stage === "Tank" && Math.floor(t / 10) !== this.lastTankHint) {
+      this.lastTankHint=Math.floor(t / 10);
+      this.hud.Hint(this.Inventory().bundles>0?T("firstLevel.hint.bundle"):T("firstLevel.hint.bundleEmpty"),5);
     }
     if (stage === "South") {
       if (t > R.southVehiclesAtS) this.Say("SouthVehicles");
@@ -1077,6 +1207,7 @@ export class FirstLevelMissionRuntime {
     let moving = [
         "South",
         "Courtyard",
+        "TransferApproach",
         "Transfer",
         "RetreatFirst",
         "RetreatWall",
@@ -1085,6 +1216,7 @@ export class FirstLevelMissionRuntime {
       ].includes(stage),
       safe = true,
       maxProgress = Infinity;
+    let safeAt = null;
     if (stage === "Courtyard") {
       if (Math.floor(t / 10) !== this.lastQueueHint) {
         this.lastQueueHint = Math.floor(t / 10);
@@ -1099,7 +1231,7 @@ export class FirstLevelMissionRuntime {
       }
       const gun = this.enemies.get("VillageGunner");
       if (gun && !gun.alive) this.Record("villageGunSilent");
-      safe = this.Has("villageGunSilent") && !this.Threatens(A.gate);
+      safeAt = point => Distance(point,A.gate) > R.passageRangeM || (this.Has("villageGunSilent") && !this.Threatens(point));
       if (this.Has("courtyardGateOpen") && this.Has("villageGunSilent")) this.Say("CourtyardOpen");
       const pending=this.column.litters.filter(litter=>litter.health>0&&!litter.passedGate);
       if(this.column.zhou.passedGate)this.Say("ZhouThreshold");
@@ -1111,6 +1243,7 @@ export class FirstLevelMissionRuntime {
         this.Say("TransferHope");
       }
     }
+    if (stage === "TransferApproach" && this.Near(A.transfer,14)) this.Record("transferApproachReached");
     if (stage === "Transfer") {
       if (this.Near(A.transfer, 14)) {
         this.Record("transferArrived");
@@ -1118,7 +1251,8 @@ export class FirstLevelMissionRuntime {
         this.guideRoute = null;
       }
       safe = !this.Threatens(A.transfer, ["TransferRifleA", "TransferRifleB", "TransferRifleC"]);
-      if (this.column.departed >= 2) this.Record("vehiclesDeparted", { count: this.column.departed });
+      if (this.column.TransferReady()) this.Record("vehiclesDeparted", { count: this.column.departed,
+        survivingAhead: this.column.litters.slice(0, R.zhouQueueIndex).filter(litter => litter.health > 0).length });
       if (this.column.QueueAhead() === 3) this.Say("TransferQueue");
       if (this.column.QueueAhead() === 2) this.Say("TransferTwo");
       if (this.column.QueueAhead() === 0 && t >= R.transferSeconds - R.followVehicleLeadS) {
@@ -1131,16 +1265,25 @@ export class FirstLevelMissionRuntime {
     if (stage === "Rescue") {
       safe = !this.Threatens(A.ditch);
       const zhou = this.column.zhou;
-      for (const id of ["yaowa", "liuwencai"])
-        this.MoveActor(this.companion.Handle(id), zhou, R.rescuerApproachMps);
       const rescuers = ["yaowa", "liuwencai"].map((id) => this.companion.Handle(id));
+      for(const [index,actor] of rescuers.entries()) {
+        if(actor)actor.scriptedNoncombatant=true;
+        const side=index===0?-1:1;
+        const target={x:zhou.x+Math.cos(zhou.yaw)*side*R.rescuerLateralM,
+          z:zhou.z-Math.sin(zhou.yaw)*side*R.rescuerLateralM};
+        const arrived=actor?.alive&&Distance(actor.position,target)<R.rescuerArrivalM;
+        if(arrived){this.MoveActor(actor,actor.position,0);this.ai.SetStance(actor,1,.5,true);actor.yaw=Math.atan2(actor.position.x-zhou.x,actor.position.z-zhou.z);}
+        else {this.MoveActor(actor,target,R.rescuerApproachMps);this.ai.SetStance(actor,0,.5,true);}
+        if(actor)actor.missionRescueReady=arrived;
+      }
       if (
         this.Has("zhouStrafed") &&
         safe &&
-        rescuers.every((actor) => actor?.alive && Distance(actor.position, zhou) < R.rescueReachM)
+        rescuers.every((actor) => actor?.alive && actor.missionRescueReady && Distance(actor.position, zhou) < R.rescueReachM)
       )
         this.rescueTime += dt;
       if (this.rescueTime >= R.rescueSeconds) {
+        for(const actor of rescuers)if(actor)actor.scriptedNoncombatant=false;
         zhou.state = "waiting";
         zhou.bearers = [75, 75];
         for (const litter of this.column.litters)
@@ -1182,21 +1325,22 @@ export class FirstLevelMissionRuntime {
     }
     if (stage === "FinalDefense") {
       safe = !this.Threatens(A.rearExit);
+      safeAt = point => !this.Threatens(point);
       if (safe) this.Record("rearLaneClear");
       const medics = this.column.walkers.filter((walker) => walker.kind === "medic" && walker.health > 0);
       const litters = this.column.litters.filter(
         (litter) => litter.health > 0 && !litter.zhou && !litter.loaded,
       );
       if (
-        medics.length &&
         medics.every((walker) => walker.escaped) &&
         litters.every((litter) => litter.escaped)
       )
-        this.Record("medicsEscaped");
+        this.Record("medicsEscaped", {survivingMedics:medics.length});
     }
     if (stage === "Exit" && this.Near(A.end, 5)) this.Record("playerAtHandoff");
-    this.column.Update(dt, { moving, routeSafe: safe, maxProgress, player: this.player.position });
+    this.column.Update(dt, { moving, routeSafe: safe, maxProgress, player: this.player.position, ...(safeAt ? {SafeAt:safeAt} : {}) });
     this.view.Update(this.time, { tank: this.tank });
+    this.view.UpdateNavigation(this.CurrentGuide(),this.player);
     this.flow.Update(dt);
   }
   SaveCheckpoint() {
@@ -1272,6 +1416,7 @@ export class FirstLevelMissionRuntime {
       playerExplosions: this.playerExplosions || [],
       column: this.column.State(),
       train: this.train?.State(),
+      relief: this.relief?.map(entry=>({id:entry.actor.id,alive:entry.actor.alive,arrived:entry.arrived,distance:entry.distance,index:entry.index,x:entry.actor.position.x,z:entry.actor.position.z})) || [],
       voice: this.voice.State(),
       battleSound: this.battleSound.State(),
       enemies: [...this.enemies].map(([id, actor]) => ({
@@ -1281,16 +1426,20 @@ export class FirstLevelMissionRuntime {
         y: actor.position.y,
         z: actor.position.z,
         suppression: actor.suppression,
+        tactic: actor.missionTactic ? { ...actor.missionTactic } : null,
       })),
       guards: this.guards.map((guard) => ({
         id: guard.actor.id,
         safe: guard.safe,
         alive: guard.actor.alive,
+        x: guard.actor.position.x, z: guard.actor.position.z,
+        progress: guard.progress, threatened: this.Threatens(guard.actor.position),
       })),
       air: this.air && { ...this.air },
     };
   }
   Dispose() {
+    if(this.tankDust!=null)this.vfx.RemoveSmokeSource(this.tankDust);
     this.voice.Dispose();
     this.battleSound.Dispose();
     this.view.Dispose();

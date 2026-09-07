@@ -11,6 +11,7 @@ const here = path.dirname(fileURLToPath(import.meta.url)),
   root = path.resolve(here, "..");
 const output = path.join(here, "_shots", "FirstLevelMission");
 const audioCheck = process.argv.includes("--audio");
+const capturedActivities = new Set();
 await fs.mkdir(output, { recursive: true });
 const server = await ServeRoot(root, 0),
   browser = await LaunchBrowser();
@@ -60,6 +61,17 @@ async function Capture(name) {
       2,
     ),
   );
+}
+async function CaptureFocus(name,point) {
+  const view=await page.evaluate(point=>{
+    const g=window.Tengxian,p=g.player.position,eye=g.player.EyePosition;
+    const previous={yaw:g.player.yaw,pitch:g.player.pitch};
+    g.player.yaw=Math.atan2(p.x-point.x,p.z-point.z);
+    g.player.pitch=Math.atan2(g.battlefield.GroundHeight(point.x,point.z)+(point.height||1.2)-eye.y,Math.hypot(p.x-point.x,p.z-point.z));
+    return previous;
+  },point);
+  await Capture(name);
+  await page.evaluate(view=>Object.assign(window.Tengxian.player,view),view);
 }
 async function Route(points, label, { fight = false, stance = "stand", sprint = false } = {}) {
   await page.evaluate(
@@ -175,6 +187,8 @@ async function WaitStage(expected, seconds = 240, { fight = false } = {}) {
           }
           if (g.player.bleeding && g.player.health < 80) g.Debug.Key("KeyB");
           g.StepFrames(1, 1 / 60, false);
+          if(g.Debug.FirstLevelMission().stage==="Rescue"&&!window.rescueWitnessCaptured &&
+            ['yaowa','liuwencai'].every(id=>g.ai.soldiers.find(a=>a.castId===id)?.missionRescueReady))break;
         }
         g.Debug.Mouse(0, false);
         g.Debug.Mouse(2, false);
@@ -182,6 +196,33 @@ async function WaitStage(expected, seconds = 240, { fight = false } = {}) {
       },
       { expected, fight },
     );
+    if(state.mission.stage==="Transfer" && state.mission.column.loaded>0 && !capturedActivities.has("TransferLoading")) {
+      capturedActivities.add("TransferLoading");
+      const cart=state.mission.column.vehicles.find(c=>!c.departed);
+      await CaptureFocus("TransferLoading",cart);
+      const collision=await page.evaluate(id=>{
+        const g=window.Tengxian,box=g.battlefield.colliders.find(b=>b.id===id);
+        const origin=g.player.position.clone().set(box.max[0]+.3,box.c[1],box.c[2]);
+        const direction=origin.clone().set(-1,0,0),hit=g.battlefield.Raycast(origin,direction,8);
+        return {id:hit?.box?.id,solid:g.physics.Overlaps(box.c[0],box.c[1],box.c[2],.2,.5)};
+      },cart.id);
+      assert.equal(collision.id,cart.id,"Moving transport remains a real bullet blocker at its current position");
+      assert.ok(collision.solid,"The visible transport occupies the physical world");
+    }
+    if(state.mission.stage==="Death" && state.mission.control==="death" && !capturedActivities.has("ZhouDeath")) {
+      capturedActivities.add("ZhouDeath");await Capture("ZhouDeath");
+      const focus=await page.evaluate(()=>{
+        const g=window.Tengxian,eye=g.player.EyePosition,z=g.Debug.FirstLevelMission().column.litters.find(l=>l.zhou);
+        const desiredPitch=Math.atan2(g.battlefield.GroundHeight(z.x,z.z)+.44-eye.y,Math.hypot(z.x-eye.x,z.z-.7-eye.z));
+        return {empty:g.Debug.FirstLevelMission().emptyHands,prompt:g.Debug.FirstLevelMission().openingPrompt,pitchError:Math.abs(g.player.pitch-desiredPitch)};
+      });
+      assert.ok(focus.empty&&focus.prompt===null&&focus.pitchError<.29,'death scene looks down at Zhou with the weapon put away');
+    }
+    if(state.mission.stage==="Rescue" && !capturedActivities.has("MedicalRescue") &&
+      await page.evaluate(()=>['yaowa','liuwencai'].every(id=>window.Tengxian.ai.soldiers.find(a=>a.castId===id)?.missionRescueReady))) {
+      await page.evaluate(()=>{window.rescueWitnessCaptured=true;});
+      capturedActivities.add("MedicalRescue");await CaptureFocus("MedicalRescue",state.mission.column.litters.find(l=>l.zhou));
+    }
     if (state.mission.stage === expected || !state.alive) break;
   }
   console.log(
@@ -427,7 +468,22 @@ try {
   );
   await page.screenshot({ path: path.join(output, "Scene_Unloading.png") });
   assert.deepEqual(errors, []);
-  console.log("ok moving train, shelling and stop; output", output);
+  const craterColors=await page.evaluate(async()=>{
+    const g=window.Tengxian, {Color,SRGBColorSpace}=await import('three');
+    const expected=new Color();let vertices=0,maxError=0;
+    for(const mesh of g.battlefield.deformation.tileMeshes.values()) {
+      const positions=mesh.geometry.attributes.position,colors=mesh.geometry.attributes.color;
+      for(let i=0;i<positions.count;i++) {
+        expected.setRGB(...g.battlefield.SampleGroundColor(positions.getX(i),positions.getZ(i)),SRGBColorSpace);
+        maxError=Math.max(maxError,Math.abs(colors.getX(i)-expected.r),Math.abs(colors.getY(i)-expected.g),Math.abs(colors.getZ(i)-expected.b));
+        vertices++;
+      }
+    }
+    return {vertices,maxError};
+  });
+  assert.ok(craterColors.vertices>0 && craterColors.maxError<1e-6,
+    'Real shell craters preserve the same base surface colors: '+JSON.stringify(craterColors));
+  console.log("ok moving train, shelling, stop and persistent ground colors; output", output);
   await Route([{x:-73,z:MISSION_TRAIN.player.z},{x:-71,z:MISSION_TRAIN.player.z},{x:-71,z:110}], "TrainExitApron");
   for(let i=0;i<30;i++) {
     const train=await page.evaluate(()=>{window.Tengxian.StepFrames(300,1/60,false);return window.Tengxian.Debug.FirstLevelMission().train;});
@@ -444,7 +500,12 @@ try {
     await page.evaluate(() => {
       const g = window.Tengxian;
       window.MissionInputDriver = {
+        blocked: new Map(),
         Target() {
+          if(this.observedShot!==g.state.playerShots) {
+            this.observedShot=g.state.playerShots;
+            if(this.lastTarget && g.state.lastShot?.hitKind==="wall")this.blocked.set(this.lastTarget,g.ai.time+4);
+          }
           const eye = g.player.EyePosition;
           return g.ai.soldiers
             .filter(
@@ -452,6 +513,8 @@ try {
                 a.side === "ija" &&
                 a.alive &&
                 a.missionId !== "MeleeTutor" &&
+                !a.scriptedNoncombatant &&
+                (this.blocked.get(a.id)||0) < g.ai.time &&
                 a.position.distanceTo(eye) < 90,
             )
             .sort((a, b) => a.position.distanceToSquared(eye) - b.position.distanceToSquared(eye))
@@ -460,11 +523,12 @@ try {
               to.y += a.stance === 2 ? 0.3 : a.stance === 1 ? 0.85 : 1.2;
               const d = to.sub(eye),
                 length = d.length(),
-                hit = g.battlefield.Raycast(eye, d.normalize(), length);
+                hit = g.battlefield.Raycast(eye, d.normalize(), length, {terrain:true});
               return !hit || hit.t >= length - 0.25;
             });
         },
         Shoot(foe) {
+          this.lastTarget=foe.id;
           g.Debug.Mouse(0, false);
           if (g.state.activeSlot !== "primary") g.Debug.Key("Digit1");
           const eye = g.player.EyePosition,
@@ -722,6 +786,18 @@ try {
       { stance: "crouch" },
     );
     console.log("bundle interaction", await Interact());
+    const fullBundleCount=await page.evaluate(()=>window.Tengxian.state.bundles);
+    await Interact();
+    assert.equal(await page.evaluate(()=>window.Tengxian.state.bundles),fullBundleCount,"repeated pickup never adds beyond the crate reserve");
+    const spentBundles=await page.evaluate(()=>{
+      const g=window.Tengxian;g.player.yaw=-Math.PI/2;g.player.pitch=.55;
+      for(let i=0;i<2;i++){g.Debug.Key("KeyH",true);g.StepFrames(24,1/60,false);g.Debug.Key("KeyH",false);g.StepFrames(420,1/60,false);}
+      return {count:g.state.bundles,mission:g.Debug.FirstLevelMission(),alive:g.player.alive};
+    });
+    assert.ok(spentBundles.alive&&spentBundles.count===0&&!spentBundles.mission.tank.immobilized,"two missed real throws leave the tank objective active");
+    await Interact();
+    assert.equal(await page.evaluate(()=>window.Tengxian.state.bundles),fullBundleCount,"an empty player can physically return to the same crate and retry");
+    console.log("ok full inventory, two missed throws, empty inventory and actual resupply recovery");
     await Route(
       [
         { x: 15, z: -111 },
@@ -880,7 +956,8 @@ try {
       ),
       "F opens the actual courtyard door",
     );
-    await WaitStage("Transfer", 360, { fight: true });
+    await Route([{x:53,z:38},{x:57,z:38}], "CourtyardOuterCover", {fight:true});
+    await WaitStage("TransferApproach", 360, { fight: true });
     await Route(
       [
         { x: 53, z: 37 },
@@ -893,6 +970,7 @@ try {
       "TransferDefense",
       { fight: true },
     );
+    await WaitStage("Transfer", 120, { fight: true });
     await Route([{ x: 95, z: 110 }], "TransferSupply", { fight: true });
     await Interact();
     await Route([{ x: 95, z: 103 }], "TransferPosition", { fight: true });
@@ -1000,6 +1078,7 @@ try {
       "FinalDefensePosition",
       { fight: true },
     );
+    await Route([{x:-172,z:54}],"RearLaneRearguard",{fight:true});
     await WaitStage("Exit", 160, { fight: true });
     await Route(
       [
@@ -1023,6 +1102,10 @@ try {
     assert.ok(
       pacing.South >= 60 && pacing.South <= 120,
       "Calm southbound travel fits the authored 1–2 minutes",
+    );
+    assert.ok(
+      pacing.TransferApproach >= 30 && pacing.TransferApproach <= 60,
+      "After the village, the visible second hope lasts 30–60 seconds",
     );
     assert.ok(
       pacing.Transfer >= 120 && pacing.Transfer <= 240,

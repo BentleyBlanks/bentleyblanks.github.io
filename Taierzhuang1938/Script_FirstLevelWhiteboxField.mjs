@@ -82,6 +82,7 @@ export class FirstLevelWhiteboxField {
     this.scene = scene;
     this.levelId = levelId;
     this.layout = whiteboxLayout || FIRST_LEVEL_WHITEBOX_LAYOUT;
+    this.SampleGroundColor = this.layout.SampleGroundColor;
     this.walkableSurfaces = CompileWhiteboxWalkableSurfaces(this.layout);
     this.terrain = this.layout.terrain === "P012Heightfield" ? CreateP012Terrain(this.layout) : null;
     this.bounds = bounds
@@ -150,6 +151,16 @@ export class FirstLevelWhiteboxField {
     // adapter can replace its surface without touching walls or elevated floors.
     for (const mesh of sink.Flush(this.scene, { Get: (key) => this.materials.get(key) || this.whiteMaterial })) {
       mesh.name = "FirstLevelWhitebox_Ground"; mesh.userData.deformableTerrain = true;
+      if (this.layout.SampleGroundColor) {
+        const positions=mesh.geometry.attributes.position, colors=new Float32Array(positions.count*3);
+        const color=new THREE.Color();
+        for(let i=0;i<positions.count;i++) {
+          const sample=this.layout.SampleGroundColor(positions.getX(i),positions.getZ(i));
+          color.setRGB(...sample,THREE.SRGBColorSpace).toArray(colors,i*3);
+        }
+        mesh.geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
+        mesh.material.vertexColors=true; mesh.material.color.setHex(0xffffff);
+      }
       this.meshes.push(mesh);
       this.stats.groundChunks++;
     }

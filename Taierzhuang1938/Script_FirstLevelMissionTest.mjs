@@ -8,8 +8,8 @@ import fs from "node:fs";
 import crypto from "node:crypto";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
 import { FirstLevelMissionColumn, MissionGuideSpeed, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
-import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE } from "./Data_FirstLevelMission.mjs";
-import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
+import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
 import { MISSION_DIALOGUE, MissionVoicePrompt } from "./Data_FirstLevelMissionDialogue.mjs";
@@ -40,8 +40,13 @@ for (const [x, z] of [
 for (const point of Object.values(A)) assert.ok(Number.isFinite(terrain.SampleHeight(point.x, point.z)));
 assert.ok(!MISSION_LAYOUT.blocks.some((block) => block.semantic === "ground"));
 assert.equal(FIRST_LEVEL_MISSION_PHASE.whitebox.fullMission, true);
+assert.ok(SampleMissionTerrain(135,90)>2.8 && SampleMissionTerrain(-204,90)>3.8,
+  "Peripheral earth banks frame the plain through the same physical heightfield");
 console.log("ok shared terrain, excavated trenches, structural floors only");
-for (const [name, route] of Object.entries(MISSION_ROUTES)) {
+const tacticalRoutes = Object.fromEntries(Object.entries(MISSION_TACTICS).map(([id, plan]) => [id,
+  [Object.values(MISSION_ENCOUNTERS).flat().find(spec => spec.id === id), ...plan.points]]));
+const reliefRoutes=Object.fromEntries(P.reliefPositions.map((point,i)=>["Relief"+i,[MISSION_TRAIN.cars[2].muster[i],...P.reliefApproach,{x:point.x,z:-123},point]]));
+for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...tacticalRoutes, ...reliefRoutes, ...Object.fromEntries(P.guardWithdrawalRoutes.map((route,i)=>["Guard"+i,route])) })) {
   for (let i = 1; i < route.length; i++) {
     const a = route[i - 1],
       b = route[i],
@@ -53,9 +58,10 @@ for (const [name, route] of Object.entries(MISSION_ROUTES)) {
         y = SampleMissionTerrain(x, z);
       for (const box of MISSION_LAYOUT.blocks) {
         if (MISSION_LAYOUT.walkableSurfaces.some((surface) => surface.id === box.id)) continue;
+        const dx=x-box.x, dz=z-box.z, cosine=Math.cos(box.ry||0), sine=Math.sin(box.ry||0);
         const blocked =
-          Math.abs(x - box.x) < box.w / 2 + 0.35 &&
-          Math.abs(z - box.z) < box.d / 2 + 0.35 &&
+          Math.abs(dx*cosine-dz*sine) < box.w / 2 + 0.35 &&
+          Math.abs(dx*sine+dz*cosine) < box.d / 2 + 0.35 &&
           box.y + box.h / 2 > y + 0.3 &&
           box.y - box.h / 2 < y + 1.7;
         assert.equal(
@@ -97,6 +103,8 @@ const saved = c.Snapshot(),
 copy.Restore(saved);
 assert.deepEqual(copy.State(), c.State());
 c.AirDamage();
+const originalBearerBodies=structuredClone(c.bearerCasualties);
+assert.equal(originalBearerBodies.length,3,"three raid casualties are recorded where they fell");
 assert.equal(c.litters.filter((l) => l.state === "fallen").length, 2);
 assert.ok(c.vehicles.some((cart) => cart.overturned));
 c.zhou.state = "waiting";
@@ -120,9 +128,81 @@ assert.ok(Math.hypot(c.zhou.x - A.zhouPickup.x, c.zhou.z - A.zhouPickup.z) < 0.0
 c.StartFinalExit();
 for (let i = 0; i < 4000; i++) c.Update(0.1);
 assert.ok(c.walkers.filter((w) => w.kind === "medic" && w.health > 0).every((w) => w.escaped));
+assert.deepEqual(c.bearerCasualties.slice(0,originalBearerBodies.length),originalBearerBodies,"fallen bearers stay at the original position after rescue and departure");
 console.log(
   "ok 20 litters, closed gate, physical load queue, 2 departing carts, interrupted transfer, three passages, reception and actual rear exit",
 );
+// Survivor counts change the number of useful loads; missing people cannot fill a cart.
+for (const lost of [1, 6, 7, 10, 11]) {
+  const reduced = new FirstLevelMissionColumn();
+  reduced.Activate(); reduced.gateOpen = true; reduced.loading = true;
+  for (let i = 0; i < lost; i++) reduced.litters[i].health = 0;
+  for (let i = 0; i < 10000; i++) reduced.Update(.1);
+  assert.ok(reduced.TransferReady(), 'Surviving transport reaches a real departure after '+lost+' losses');
+  assert.ok(reduced.litters.slice(0, R.zhouQueueIndex).filter(l => l.health > 0).every(l => l.loaded));
+  assert.ok(reduced.litters.slice(0, lost).every(l => l.health === 0 && !l.loaded), 'Casualties are never manufactured as passengers');
+  assert.ok(reduced.BeginZhouBoarding());
+}
+const movingCartColumn = new FirstLevelMissionColumn();
+movingCartColumn.Activate(); movingCartColumn.gateOpen = true; movingCartColumn.loading = true;
+let sawApproach = false, sawLift = false;
+for (let i = 0; i < 10000; i++) {
+  movingCartColumn.Update(.1);
+  sawApproach ||= movingCartColumn.vehicles.some(cart => cart.state === 'approaching' && cart.approachProgress > 0);
+  sawLift ||= movingCartColumn.litters.some(l => l.liftFraction > 0 && l.liftFraction < 1);
+}
+assert.ok(sawApproach && sawLift, 'Next cart drives into the bay and litters visibly lift aboard');
+console.log('ok partial survivor loads, sequential bay arrivals and continuous boarding');
+const rescueColumn=new FirstLevelMissionColumn();
+rescueColumn.Activate();rescueColumn.gateOpen=true;
+for(let i=0;i<5000;i++)rescueColumn.Update(.1);
+const walkerPoints=rescueColumn.walkers.map(w=>[w.x,w.z]);
+for(let i=0;i<walkerPoints.length;i++)for(let j=i+1;j<walkerPoints.length;j++)
+  assert.ok(Math.hypot(walkerPoints[i][0]-walkerPoints[j][0],walkerPoints[i][1]-walkerPoints[j][1])>1,'walking wounded hold distinct queue positions');
+const lostBearerLitter=rescueColumn.litters[4];lostBearerLitter.bearers[0]=0;
+rescueColumn.Update(.1);
+const helper=rescueColumn.walkers.find(w=>w.rescueTarget?.litter===lostBearerLitter.id);
+assert.ok(helper&&lostBearerLitter.bearers[0]===0,'requesting a helper does not instantly replace a casualty');
+let approachTravel=0;
+for(let i=0;i<3000&&!helper.assigned;i++){
+  const before={x:helper.x,z:helper.z};rescueColumn.Update(.1);
+  const step=Math.hypot(helper.x-before.x,helper.z-before.z);approachTravel+=step;
+  assert.ok(step<=R.bearerApproachMps*.1+R.bearerReachM+R.litterSpeedMps*.1+.001,'helper walks every metre to the actual handle');
+}
+assert.ok(helper.assigned===lostBearerLitter.id&&approachTravel>3,'the same medical worker takes the vacant handle');
+rescueColumn.StartRetreat();for(let i=0;i<7000;i++)rescueColumn.Update(.1);
+assert.ok(Math.hypot(helper.x-lostBearerLitter.x,helper.z-lostBearerLitter.z)<1.7,'assigned helper travels with the same litter');
+rescueColumn.StartReception();for(let i=0;i<4000;i++)rescueColumn.Update(.1);
+rescueColumn.StartFinalExit();for(let i=0;i<4000;i++)rescueColumn.Update(.1);
+assert.ok(helper.escaped&&lostBearerLitter.escaped,'medical identity completes the physical rear exit with its patient');
+console.log('ok separate queues, physical medical approach and continuous bearer identity');
+const lateRecovery=new FirstLevelMissionColumn();lateRecovery.Restore(saved);
+lateRecovery.StartRetreat();for(let i=0;i<6000;i++)lateRecovery.Update(.1);
+lateRecovery.StartReception();lateRecovery.Update(.1);
+for(const mode of ['reception','exit']) {
+  if(mode==='exit')lateRecovery.StartFinalExit();
+  const patient=lateRecovery.litters.find(l=>!l.loaded&&!l.zhou&&l.health>0&&!(mode==='reception'?l.received:l.escaped));
+  assert.ok(patient,'a surviving patient still travels in '+mode);
+  const before={x:patient.x,z:patient.z};patient.bearers[0]=0;
+  lateRecovery.Update(.1);
+  assert.equal(Math.hypot(patient.x-before.x,patient.z-before.z),0,'a litter cannot travel without its bearer in '+mode);
+  const substitute=lateRecovery.walkers.find(w=>w.rescueTarget?.litter===patient.id);
+  assert.ok(substitute,'an available medical worker responds in '+mode);
+  for(let i=0;i<5000&&patient.bearers[0]<=0;i++)lateRecovery.Update(.1);
+  assert.ok(patient.bearers[0]>0&&substitute.assigned===patient.id,'actual replacement resumes '+mode);
+  for(let i=0;i<6000;i++)lateRecovery.Update(.1);
+  assert.ok(mode==='reception'?patient.received:patient.escaped,'the same patient finishes '+mode);
+}
+console.log('ok bearer casualties recover during reception and the final exit');
+const localThreatColumn=new FirstLevelMissionColumn();localThreatColumn.Restore(saved);
+localThreatColumn.StartRetreat();for(let i=0;i<6000;i++)localThreatColumn.Update(.1);
+localThreatColumn.StartReception();for(let i=0;i<6000;i++)localThreatColumn.Update(.1);
+localThreatColumn.StartFinalExit();
+const departingPatients=localThreatColumn.litters.filter(l=>!l.zhou&&!l.loaded&&l.health>0);
+localThreatColumn.Update(.2,{routeSafe:false,SafeAt:entry=>entry.id!==departingPatients[0].id});
+assert.equal(departingPatients[0].exitProgress,0,'a patient in a threatened lane holds');
+assert.ok(departingPatients[1].exitProgress>0,'sheltered patients still advance while another lane is threatened');
+console.log('ok final evacuation responds to local threats without freezing the whole ward');
 const casualtyColumn = new FirstLevelMissionColumn();
 casualtyColumn.litters[0].health = 0;
 casualtyColumn.litters[1].health = 12;
@@ -300,8 +380,9 @@ console.log("ok paused audio ranges, subtitle source timing, queued cues and she
       assert.ok(Number.isFinite(terrain.SampleHeight(p.x,p.z)));
       for(const box of MISSION_LAYOUT.blocks){
         if(MISSION_LAYOUT.walkableSurfaces.some(surface=>surface.id===box.id))continue;
-        const y=terrain.SampleHeight(p.x,p.z);
-        assert.ok(!(Math.abs(p.x-box.x)<box.w/2+.4&&Math.abs(p.z-box.z)<box.d/2+.4&&box.y+box.h/2>y+.3&&box.y-box.h/2<y+1.7),"personal squad route clears "+box.id);
+        const y=terrain.SampleHeight(p.x,p.z),dx=p.x-box.x,dz=p.z-box.z;
+        const c=Math.cos(box.ry||0),s=Math.sin(box.ry||0),localX=dx*c-dz*s,localZ=dx*s+dz*c;
+        assert.ok(!(Math.abs(localX)<box.w/2+.4&&Math.abs(localZ)<box.d/2+.4&&box.y+box.h/2>y+.3&&box.y-box.h/2<y+1.7),"personal squad route clears rotated geometry "+box.id);
       }
     }
   }

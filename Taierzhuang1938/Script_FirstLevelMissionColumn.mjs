@@ -17,6 +17,31 @@ export function MissionRoutePoint(route, distance) {
   }
   return { ...route[0], yaw: 0 };
 }
+export function MissionRouteProjection(route, point) {
+  let nearest=Infinity, progress=0, bestProgress=0;
+  for(let i=1;i<route.length;i++) {
+    const a=route[i-1],b=route[i],dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz);
+    const t=Math.max(0,Math.min(1,((point.x-a.x)*dx+(point.z-a.z)*dz)/(length*length||1)));
+    const distance=Math.hypot(point.x-a.x-dx*t,point.z-a.z-dz*t);
+    if(distance<nearest){nearest=distance;bestProgress=progress+t*length;}
+    progress+=length;
+  }
+  return { progress: bestProgress, distance: nearest };
+}
+export function MissionRouteLookahead(route, point, lead=R.guideLookaheadM) {
+  return MissionRoutePoint(route, MissionRouteProjection(route,point).progress+lead);
+}
+export function MissionRouteBetween(route, from, to) {
+  const start=MissionRouteProjection(route,from).progress, end=MissionRouteProjection(route,to).progress;
+  let progress=0;
+  const middle=[];
+  for(let i=1;i<route.length;i++){
+    progress+=Math.hypot(route[i].x-route[i-1].x,route[i].z-route[i-1].z);
+    if(progress>Math.min(start,end)&&progress<Math.max(start,end))middle.push(route[i]);
+  }
+  if(start>end)middle.reverse();
+  return [{x:from.x,z:from.z},MissionRoutePoint(route,start),...middle,MissionRoutePoint(route,end),{x:to.x,z:to.z}];
+}
 export class FirstLevelMissionColumn {
   constructor() {
     this.route = [...MISSION_ROUTES.south, ...MISSION_ROUTES.village.slice(1)];
@@ -55,6 +80,9 @@ export class FirstLevelMissionColumn {
       departed: false,
       progress: 0,
       overturned: false,
+      state: i === 0 ? "loading" : "waiting",
+      approachRoute: [point, { x: 86, z: 123 }, { x: 80, z: 123 }, { x: 80, z: 120 }],
+      approachProgress: 0,
     }));
     this.traffic = Array.from({ length: 3 }, (_, i) => ({
       id: `SouthCart${i}`,
@@ -70,6 +98,7 @@ export class FirstLevelMissionColumn {
     this.loadEvents = [];
     this.mode = "south";
     this.replacements = 0;
+    this.bearerCasualties = [];
     this.retreatDistance = 0;
   }
   get zhou() {
@@ -108,7 +137,7 @@ export class FirstLevelMissionColumn {
     for (const entry of [...this.litters, ...this.walkers].filter(
       (entry) => entry.health > 0 && !entry.zhou && !entry.loaded && !entry.evacuated,
     )) {
-      entry.assigned = null;
+      if(entry.assigned)continue;
       const door = entry.bearers
         ? [
             { x: -151, z: 40 },
@@ -178,8 +207,9 @@ export class FirstLevelMissionColumn {
       entry.progress = this.length - entry.joinLength;
     }
   }
-  Update(dt, { moving = true, routeSafe = true, maxProgress = Infinity, player = null } = {}) {
+  Update(dt, { moving = true, routeSafe = true, maxProgress = Infinity, player = null, SafeAt = () => routeSafe } = {}) {
     if (!this.active) return;
+    this.CaptureBearerLosses();
     for (const litter of this.litters.filter((l) => l.unloadTarget && !l.unloadedFromCart)) {
       const distance = Math.hypot(litter.x - litter.unloadTarget.x, litter.z - litter.unloadTarget.z);
       const step = Math.min(1, (dt * R.litterSpeedMps) / (distance || 1));
@@ -188,7 +218,13 @@ export class FirstLevelMissionColumn {
       if (distance < 0.2) {
         litter.unloadedFromCart = true;
         litter.state = "waiting";
+        litter.liftFraction = 0;
       }
+    }
+    for(const cart of this.vehicles) if(cart.boltedTeam) {
+      const team=cart.boltedTeam;
+      team.progress=Math.min(team.length,team.progress+dt*R.boltedTeamSpeedMps);
+      Object.assign(team,MissionRoutePoint(team.route,team.progress));
     }
     for (const cart of this.traffic)
       if (cart.visible) {
@@ -196,11 +232,15 @@ export class FirstLevelMissionColumn {
         Object.assign(cart, MissionRoutePoint(MISSION_ROUTES.southTraffic, cart.progress));
         if (cart.progress >= MissionRouteLength(MISSION_ROUTES.southTraffic)) cart.visible = false;
       }
+    this.UpdateBearers(dt, routeSafe, SafeAt);
     if (this.mode === "reception") {
       for (const entry of [...this.litters, ...this.walkers].filter(
-        (entry) => entry.receiveRoute && !entry.received && !entry.treating,
+        (entry) => entry.receiveRoute && !entry.received && !entry.treating && !entry.assigned,
       )) {
-        if (routeSafe)
+        if(entry.bearers && entry.health>0 && entry.bearers.some(health=>health<=0)) {
+          entry.state="waiting";this.RequestBearer(entry);continue;
+        }
+        if (SafeAt(entry))
           entry.receiveProgress = Math.min(
             entry.receiveLength,
             entry.receiveProgress + (entry.bearers ? R.litterSpeedMps : R.walkSpeedMps) * dt,
@@ -212,13 +252,17 @@ export class FirstLevelMissionColumn {
           entry.state = "waiting";
         }
       }
+      this.SyncAssignedBearers();
       return;
     }
     if (this.mode === "exit") {
       for (const entry of [...this.litters, ...this.walkers].filter(
-        (entry) => entry.exitRoute && !entry.escaped,
+        (entry) => entry.exitRoute && !entry.escaped && !entry.assigned,
       )) {
-        if (routeSafe)
+        if(entry.bearers && entry.health>0 && entry.bearers.some(health=>health<=0)) {
+          entry.state="waiting";this.RequestBearer(entry);continue;
+        }
+        if (SafeAt(entry))
           entry.exitProgress = Math.min(
             entry.exitLength,
             entry.exitProgress + (entry.bearers ? R.litterSpeedMps : R.finalEvacSpeedMps) * dt,
@@ -231,6 +275,7 @@ export class FirstLevelMissionColumn {
           entry.visible = false;
         }
       }
+      this.SyncAssignedBearers();
       return;
     }
     const gateLimit = this.gateOpen ? Infinity : this.GateProgress() - 3;
@@ -241,23 +286,10 @@ export class FirstLevelMissionColumn {
       if (["carried", "fallen", "critical", "placed", "loading", "unloading"].includes(litter.state))
         continue;
       if (litter.unloadedFromCart && this.mode !== "retreat") continue;
-      const lost = litter.bearers.findIndex((health) => health <= 0);
-      if (lost >= 0) {
-        const replacement = this.walkers.find(
-          (walker) =>
-            walker.kind === "medic" &&
-            walker.health > 0 &&
-            !walker.assigned &&
-            Math.hypot(walker.x - litter.x, walker.z - litter.z) < 8,
-        );
-        if (replacement) {
-          replacement.assigned = litter.id;
-          litter.bearers[lost] = 75;
-          this.replacements++;
-        } else {
-          litter.state = "waiting";
-          continue;
-        }
+      if (litter.bearers.some(health => health <= 0)) {
+        litter.state = "waiting";
+        this.RequestBearer(litter);
+        continue;
       }
       const ownRoute = litter.joinRoute || this.route,
         ownLength = litter.joinLength || this.length;
@@ -269,7 +301,7 @@ export class FirstLevelMissionColumn {
         limit = Math.min(limit, front.progress + offset - R.litterSpacingM);
       // Keep a real queue of separate litters at transfer, with room for player/NPC passage.
       if (!litter.joinRoute) limit = Math.min(limit, this.length - i * R.queueSpacingM);
-      const canMove = moving && routeSafe && litter[progressKey] < limit - 0.05;
+      const canMove = moving && SafeAt(litter) && litter[progressKey] < limit - 0.05;
       if (canMove) litter[progressKey] = Math.min(limit, litter[progressKey] + R.litterSpeedMps * dt);
       const at = MissionRoutePoint(ownRoute, litter[progressKey]);
       Object.assign(litter, at, { state: canMove ? "moving" : "waiting" });
@@ -277,13 +309,14 @@ export class FirstLevelMissionColumn {
       if (litter.joinRoute) litter.progress = this.length - (ownLength - litter.joinProgress);
     }
     for (const [i, walker] of this.walkers.entries()) {
-      if (!walker.visible || walker.health <= 0 || walker.assigned || walker.treating) continue;
+      if (!walker.visible || walker.health <= 0 || walker.assigned || walker.treating || walker.rescueTarget) continue;
       const route = walker.joinRoute || this.route,
         key = walker.joinRoute ? "joinProgress" : "progress";
       const ownLength = walker.joinLength || this.length,
         offset = ownLength - this.length;
-      const cap = Math.min(ownLength, gateLimit + offset, maxProgress + offset);
-      if (moving && routeSafe) walker[key] = Math.min(cap, walker[key] + R.walkSpeedMps * dt);
+      const waitingGap = walker.joinRoute ? 0 : Math.floor(i / 2) * R.walkerSpacingM;
+      const cap = Math.min(ownLength - waitingGap, gateLimit + offset - waitingGap, maxProgress + offset);
+      if (moving && SafeAt(walker)) walker[key] = Math.min(cap, walker[key] + R.walkSpeedMps * dt);
       const point = MissionRoutePoint(route, walker[key]);
       const side = (i % 2 ? 1 : -1) * 1.15;
       Object.assign(walker, {
@@ -294,6 +327,7 @@ export class FirstLevelMissionColumn {
       if (walker.joinRoute)
         walker.progress = Math.max(0, this.length - (walker.joinLength - walker.joinProgress));
     }
+    if(this.loading)this.UpdateLoadingBay(dt);
     if (this.loading && routeSafe) this.Load(dt);
     for (const cart of this.vehicles) {
       if (cart.departed && !cart.overturned) {
@@ -313,13 +347,122 @@ export class FirstLevelMissionColumn {
         }
       }
     }
+    this.SyncAssignedBearers();
+  }
+  CaptureBearerLosses() {
+    for(const litter of this.litters) {
+      litter.bearerLossRecorded ||= [false,false];
+      for(let slot=0;slot<2;slot++) {
+        if(litter.bearers[slot]>0){litter.bearerLossRecorded[slot]=false;continue;}
+        if(litter.bearerLossRecorded[slot])continue;
+        litter.bearerLossRecorded[slot]=true;
+        if(!litter.visible)continue;
+        const side=slot===0?-1:1;
+        this.bearerCasualties.push({litter:litter.id,slot,
+          x:litter.x-Math.sin(litter.yaw||0)*side*1.6,
+          z:litter.z-Math.cos(litter.yaw||0)*side*1.6,yaw:litter.yaw||0});
+        const helper=this.walkers.find(w=>w.assigned===litter.id&&w.assignedSlot===slot);
+        if(helper)helper.casualtyRepresented=true;
+      }
+    }
+  }
+  SyncAssignedBearers() {
+    for(const helper of this.walkers.filter(w=>w.assigned)) {
+      const litter=this.litters.find(l=>l.id===helper.assigned);
+      if(!litter)continue;
+      if(helper.health<=0){helper.assigned=null;continue;}
+      const side=helper.assignedSlot===0?-1:1;
+      helper.x=litter.x-Math.sin(litter.yaw)*side*1.6;
+      helper.z=litter.z-Math.cos(litter.yaw)*side*1.6;
+      helper.yaw=litter.yaw;helper.progress=litter.progress;
+      for(const key of ["joinRoute","joinProgress","joinLength","receiveRoute","receiveProgress","receiveLength","exitRoute","exitProgress","exitLength"])
+        if(litter[key]!=null)helper[key]=litter[key];
+      helper.health=Math.min(helper.health,litter.bearers[helper.assignedSlot]);
+      helper.escaped=!!(litter.escaped||litter.evacuated);
+      helper.evacuated=helper.escaped;
+      if(helper.escaped)helper.visible=false;
+      if(litter.health<=0){
+        helper.assigned=null;
+        const path=helper.joinRoute||this.route;
+        helper[helper.joinRoute?"joinProgress":"progress"]=MissionRouteProjection(path,helper).progress;
+      }
+    }
+  }
+  RequestBearer(litter) {
+    const slot=litter.bearers.findIndex(health=>health<=0);
+    if(slot<0 || this.walkers.some(w=>w.rescueTarget?.litter===litter.id))return;
+    const helper=this.walkers.filter(w=>w.visible&&w.health>0&&!w.assigned&&!w.rescueTarget&&!w.treating&&['medic','civilian'].includes(w.kind))
+      .sort((a,b)=>Math.hypot(a.x-litter.x,a.z-litter.z)-Math.hypot(b.x-litter.x,b.z-litter.z))[0];
+    if(!helper)return;
+    const side=slot===0?-1:1, target={x:litter.x-Math.sin(litter.yaw)*side*1.6,z:litter.z-Math.cos(litter.yaw)*side*1.6};
+    helper.rescueTarget={litter:litter.id,slot};
+    const path=litter.exitRoute||litter.receiveRoute||helper.joinRoute||this.route;
+    helper.rescueRoute=MissionRouteBetween(path,helper,target);
+    const ward=MISSION_PLACEMENT.wardInterior;
+    const inside=p=>p.x>ward.minX&&p.x<ward.maxX&&p.z>ward.minZ&&p.z<ward.maxZ;
+    if(["reception","exit"].includes(this.mode) && inside(target)) {
+      if(inside(helper))helper.rescueRoute=[{x:helper.x,z:helper.z},target];
+      else if(helper.x>-166&&helper.x<-123&&helper.z>=43&&helper.z<55)
+        helper.rescueRoute=[{x:helper.x,z:helper.z},{x:helper.x,z:49},{x:-151,z:49},{x:-151,z:40},target];
+    }
+    helper.rescueProgress=0;
+  }
+  UpdateBearers(dt,routeSafe,SafeAt=()=>routeSafe) {
+    for(const helper of this.walkers.filter(w=>w.rescueTarget)) {
+      const target=this.litters.find(l=>l.id===helper.rescueTarget.litter);
+      if(helper.health<=0 || !target || target.health<=0 || target.bearers[helper.rescueTarget.slot]>0) {
+        delete helper.rescueTarget;continue;
+      }
+      if(!SafeAt(helper)){helper.crouch=true;continue;}
+      helper.crouch=false;
+      const length=MissionRouteLength(helper.rescueRoute);
+      helper.rescueProgress=Math.min(length,helper.rescueProgress+dt*R.bearerApproachMps);
+      Object.assign(helper,MissionRoutePoint(helper.rescueRoute,helper.rescueProgress));
+      if(length-helper.rescueProgress<R.bearerReachM) {
+        target.bearers[helper.rescueTarget.slot]=Math.min(75,helper.health);
+        helper.assigned=target.id;
+        helper.assignedSlot=helper.rescueTarget.slot;
+        delete helper.rescueTarget;
+        this.replacements++;
+      }
+    }
+  }
+  UpdateLoadingBay(dt) {
+    const cart = this.vehicles.find(cart => !cart.departed && !cart.overturned);
+    if (!cart || cart.state === "loading") return;
+    const previous = this.vehicles[this.vehicles.indexOf(cart) - 1];
+    if (previous && previous.progress < R.cartClearanceM) return;
+    cart.state = "approaching";
+    cart.approachProgress = Math.min(MissionRouteLength(cart.approachRoute),
+      cart.approachProgress + dt * R.cartApproachSpeedMps);
+    Object.assign(cart, MissionRoutePoint(cart.approachRoute, cart.approachProgress));
+    if (cart.approachProgress >= MissionRouteLength(cart.approachRoute)) cart.state = "loading";
+  }
+  Depart(cart) {
+    if (cart.departed || !cart.load.length) return;
+    cart.departed = true;
+    cart.state = "departing";
+    cart.route = [{ x: cart.x, z: cart.z }, { x: 76, z: 145 }, { x: 76, z: 174 }, { x: 76, z: 198 }];
+    cart.routeLength = MissionRouteLength(cart.route);
+    this.departed++;
+  }
+  TransferReady() {
+    const ahead = this.litters.slice(0, R.zhouQueueIndex).filter(litter => litter.health > 0);
+    const required = Math.min(R.cartCapacity * 2, ahead.length);
+    const departing = this.vehicles.filter(cart => cart.departed).flatMap(cart => cart.load);
+    return this.QueueAhead() === 0 && ahead.filter(litter => departing.includes(litter.id)).length >= required;
   }
   Load(dt) {
     const cart = this.vehicles.find(
-      (cart) => !cart.departed && !cart.overturned && cart.load.length < R.cartCapacity,
+      (cart) => !cart.departed && !cart.overturned && cart.state === "loading" && cart.load.length < R.cartCapacity,
     );
     if (!cart) return;
     const next = this.litters.find((litter) => !litter.loaded && !litter.evacuated && litter.health > 0);
+    // A reduced surviving queue must not wait forever for passengers who died.
+    if (cart.load.length && this.QueueAhead() === 0 && !this.TransferReady() && cart.load.length < R.cartCapacity) {
+      this.Depart(cart);
+      return;
+    }
     if (
       !next ||
       (next.zhou && !this.zhouBoarding) ||
@@ -330,34 +473,48 @@ export class FirstLevelMissionColumn {
     next.state = "loading";
     const target = { x: cart.x - 2, z: cart.z },
       distance = Math.hypot(target.x - next.x, target.z - next.z);
-    if (distance > R.loadingReachM) {
+    if (!next.loadOrigin && distance > R.loadingReachM) {
       const step = Math.min(1, (R.litterSpeedMps * dt) / distance);
       next.yaw = Math.atan2(next.x - target.x, next.z - target.z);
       next.x += (target.x - next.x) * step;
       next.z += (target.z - next.z) * step;
       return;
     }
+    // The medic leaves the walking column and reaches the loading crew before checking each patient.
+    if (!this.triageMedic || this.triageMedic.health<=0 || this.triageMedic.assigned) {
+      this.triageMedic=this.walkers.filter(w=>w.visible&&w.health>0&&w.kind==="medic"&&!w.assigned&&!w.rescueTarget)
+        .sort((a,b)=>Math.hypot(a.x-next.x,a.z-next.z)-Math.hypot(b.x-next.x,b.z-next.z))[0];
+      if(this.triageMedic){
+        this.triageMedic.treating=true;
+        this.triageMedic.careRoute=MissionRouteBetween(this.route,this.triageMedic,{x:cart.x-3,z:cart.z});
+        this.triageMedic.careProgress=0;
+      }
+    }
+    if(this.triageMedic) {
+      const medic=this.triageMedic, length=MissionRouteLength(medic.careRoute);
+      medic.careProgress=Math.min(length,medic.careProgress+dt*R.medicApproachMps);
+      Object.assign(medic,MissionRoutePoint(medic.careRoute,medic.careProgress));
+      medic.crouch=medic.careProgress>=length;
+      if(!medic.crouch)return;
+    }
     // Zhou reaches the same loading bay physically; the air raid interrupts his lift aboard.
     if (next.zhou) return;
-    this.loadingTime += dt;
+    next.loadOrigin ||= { x: next.x, z: next.z };
+    next.loadTime = (next.loadTime || 0) + dt;
     const duration = R.vehicleLoadSeconds / R.cartCapacity;
-    if (this.loadingTime < duration) return;
-    this.loadingTime -= duration;
+    next.liftFraction = Math.min(1, Math.max(0, (next.loadTime - R.triageSeconds) / duration));
+    const side = cart.load.length % 2 ? 0.7 : -0.7, back = Math.floor(cart.load.length / 2) * 2.5 - 1.25;
+    const seat = { x: cart.x + Math.cos(cart.yaw) * side - Math.sin(cart.yaw) * back,
+      z: cart.z - Math.sin(cart.yaw) * side - Math.cos(cart.yaw) * back };
+    next.x = next.loadOrigin.x + (seat.x - next.loadOrigin.x) * next.liftFraction;
+    next.z = next.loadOrigin.z + (seat.z - next.loadOrigin.z) * next.liftFraction;
+    if (next.liftFraction < 1) return;
+    delete next.loadOrigin;
     next.loaded = true;
     next.state = "loaded";
     cart.load.push(next.id);
     this.loadEvents.push({ litter: next.id, cart: cart.id });
-    if (cart.load.length === R.cartCapacity) {
-      cart.departed = true;
-      cart.route = [
-        { x: cart.x, z: cart.z },
-        { x: 76, z: 145 },
-        { x: 76, z: 174 },
-        { x: 76, z: 198 },
-      ];
-      cart.routeLength = MissionRouteLength(cart.route);
-      this.departed++;
-    }
+    if (cart.load.length === R.cartCapacity) this.Depart(cart);
   }
   Blast(point, radius, damage, Exposed = () => true) {
     for (const litter of this.litters) {
@@ -370,6 +527,7 @@ export class FirstLevelMissionColumn {
       if (litter.health === 0) litter.state = "casualty";
     }
     for (const walker of this.walkers) {
+      if(walker.assigned)continue;
       const d = Math.hypot(point.x - walker.x, point.z - walker.z);
       if (d < radius && Exposed(walker))
         walker.health = Math.max(0, walker.health - damage * (1 - d / radius) ** 2);
@@ -377,8 +535,13 @@ export class FirstLevelMissionColumn {
   }
   AirDamage() {
     this.loading = false;
+    if(this.triageMedic){this.triageMedic.treating=false;this.triageMedic.crouch=false;}
+    this.triageMedic=null;
     const cart = this.vehicles.find((cart) => !cart.departed) || this.vehicles.at(-1);
     cart.overturned = true;
+    const team={x:cart.x-Math.sin(cart.yaw)*4.8,z:cart.z-Math.cos(cart.yaw)*4.8};
+    const route=[team,{x:94,z:134},{x:119,z:169}];
+    cart.boltedTeam={...team,yaw:cart.yaw,route,progress:0,length:MissionRouteLength(route)};
     for (const litter of this.litters
       .filter((litter) => !litter.evacuated && !litter.loaded && !litter.zhou && litter.health > 0)
       .slice(0, 2)) {
@@ -395,6 +558,7 @@ export class FirstLevelMissionColumn {
       litter.unloadTarget = { x: cart.x - 5, z: cart.z + (i - 1) * R.litterSpacingM };
     }
     cart.load = [];
+    this.CaptureBearerLosses();
   }
   Snapshot() {
     return structuredClone({ ...this });
@@ -409,6 +573,7 @@ export class FirstLevelMissionColumn {
       departed: this.departed,
       loaded: this.loadEvents.length,
       replacements: this.replacements,
+      bearerCasualties: this.bearerCasualties.map(body=>({...body})),
       queueAhead: this.QueueAhead(),
       zhouBoarding: !!this.zhouBoarding,
       gatePassed: this.litters.filter((litter) => litter.passedGate).length,

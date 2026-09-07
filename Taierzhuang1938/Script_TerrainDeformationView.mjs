@@ -269,6 +269,7 @@ export class TerrainDeformationView {
   constructor(field, scene, library) {
     this.field = field; this.scene = scene; this.physics = null;
     this.originalHeight = field.GroundHeight.bind(field);
+    this.groundColor = new THREE.Color();
     this.originalGeometry = new Map(); this.tileMeshes = new Map();
     this.overlayTiles = new Map(); this.overlayMaterials = new Map();
     this.blastPages = new Map();
@@ -548,7 +549,10 @@ export class TerrainDeformationView {
           const nx = heights[local - 1] - heights[local + 1], nz = heights[local - w] - heights[local + w];
           const norm = Math.hypot(nx, 2 * s, nz);
           nrm[at * 3] = nx / norm; nrm[at * 3 + 1] = 2 * s / norm; nrm[at * 3 + 2] = nz / norm;
-          col[at * 3] = 1; col[at * 3 + 1] = 1; col[at * 3 + 2] = 1;
+          // Rebuilt soil inherits the field's base albedo before blast wear is applied.
+          const rgb = this.field.SampleGroundColor?.(pos[at * 3], pos[at * 3 + 2]);
+          if (rgb) this.groundColor.setRGB(...rgb, THREE.SRGBColorSpace).toArray(col, at * 3);
+          else { col[at * 3] = 1; col[at * 3 + 1] = 1; col[at * 3 + 2] = 1; }
           let soil = Math.abs(deltas[local]);
           for (let dz = -w; dz <= w; dz += w) for (let dx = -1; dx <= 1; dx++) {
             const v = Math.abs(deltas[local + dz + dx]) * 0.85;

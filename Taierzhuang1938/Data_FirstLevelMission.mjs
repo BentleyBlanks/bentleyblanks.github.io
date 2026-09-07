@@ -1,7 +1,7 @@
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-export const MISSION_VERSION = "first-level-20260907-r5";
+export const MISSION_VERSION = "first-level-20260907-r11";
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 const Stage = (id, objective, target, requirements, cue, extra = {}) =>
@@ -59,6 +59,14 @@ export const MISSION_STAGES = Object.freeze([
     A.gate,
     ["villageGunSilent", "courtyardGateOpen", "courtyardPassed"],
     "CourtyardOpen",
+  ),
+  Stage(
+    "TransferApproach",
+    "沿院后道路前往转运棚，掩护伤员交接。",
+    A.transfer,
+    ["transferApproachReached", "transferHopeHeard"],
+    "TransferHope",
+    { minimumSeconds: MISSION_TUNING.transferApproachSeconds },
   ),
   Stage(
     "Transfer",
@@ -178,7 +186,7 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   ],
   reception: [
     { id: "ReceptionGunner", x: -111, z: 32, weapon: "Type11", hold: true },
-    { id: "ReceptionRifleA", x: -111, z: 43 },
+    { id: "ReceptionRifleA", x: -111, z: 46 },
     { id: "ReceptionRifleB", x: -117, z: 47 },
   ],
   final: [
@@ -186,6 +194,38 @@ export const MISSION_ENCOUNTERS = Object.freeze({
     { id: "FinalFlankerB", x: -155, z: 69 },
     { id: "FinalStreetGunner", x: -112, z: 34, weapon: "Type11", hold: true },
   ],
+});
+// Finite squads cross authored openings while the shared AI owns fire and damage.
+export const MISSION_GUIDANCE = Object.freeze({
+  Unloading: {label:'unload'}, Support:{label:'support',route:'support'},
+  MachineGun:{label:'gun'},Tank:{label:'bundle'},Orders:{label:'support'},
+  South:{label:'south',route:'south'},Village:{label:'village',route:'village'},
+  Courtyard:{label:'gate'},TransferApproach:{label:'transfer',route:'village'},Transfer:{label:'transfer'},AirFirst:{label:'transfer'},
+  Carry:{label:'carry'},Rescue:{label:'ditch'},
+  RetreatFirst:{label:'retreat'},RetreatWall:{label:'retreat'},RetreatYard:{label:'retreat'},
+  Reception:{label:'reception'},FinalCarry:{label:'carry'},FinalDefense:{label:'rearCover'},Exit:{label:'exit',route:'exit'},
+});
+export const MISSION_TACTICS = Object.freeze({
+  FrontRifleA: { delay: 2, points: [{x:-16,z:-154},{x:-16,z:-151}] },
+  FrontRifleB: { delay: 7, points: [{x:-8,z:-156},{x:-8,z:-153}] },
+  FrontRifleC: { delay: 5, points: [{x:12,z:-155},{x:12,z:-153}] },
+  FrontRifleD: { delay: 11, points: [{x:27,z:-155},{x:23,z:-153}] },
+  FrontRifleE: { delay: 16, points: [{x:-33,z:-169},{x:-33,z:-160},{x:-32,z:-155}] },
+  FrontRifleG: { delay: 20, points: [{x:-7,z:-175},{x:-7,z:-164},{x:-6,z:-160}] },
+  CourtyardPursuerA: { delay: 1, points: [{x:86,z:37},{x:62,z:40},{x:53,z:38}] },
+  CourtyardPursuerB: { delay: 12, points: [{x:89,z:39},{x:66,z:43},{x:59,z:40}] },
+  CourtyardPursuerC: { delay: 25, points: [{x:91,z:41},{x:70,z:44},{x:64,z:40}] },
+  TransferRifleA: { delay: 5, points: [{x:108,z:90},{x:102,z:91}] },
+  TransferRifleB: { delay: 38, points: [{x:112,z:106},{x:104,z:112}] },
+  TransferRifleC: { delay: 65, points: [{x:114,z:90},{x:107,z:94}] },
+  AirPursuerA: { delay: 0, points: [{x:106,z:90},{x:102,z:92}] },
+  AirPursuerB: { delay: 3, points: [{x:105,z:98},{x:104,z:111}] },
+  AirPursuerC: { delay: 5, points: [{x:109,z:109},{x:100,z:114}] },
+  AirPursuerD: { delay: 8, points: [{x:106,z:113},{x:99,z:115}] },
+  ReceptionRifleA: { delay: 3, points: [{x:-116,z:46},{x:-121,z:46}] },
+  ReceptionRifleB: { delay: 10, points: [{x:-121,z:47},{x:-131,z:47}] },
+  FinalFlankerA: { delay: 2, points: [{x:-143,z:62},{x:-147,z:56}] },
+  FinalFlankerB: { delay: 9, points: [{x:-165,z:65},{x:-170,z:48}] },
 });
 export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
   id: "FirstLevelP012Whitebox",

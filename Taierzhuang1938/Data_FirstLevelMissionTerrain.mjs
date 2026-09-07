@@ -140,7 +140,12 @@ export const MISSION_TERRAIN = Object.freeze({
   ],
 });
 export function SampleMissionNaturalHeight(x, z) {
-  return 0.12 * Math.sin(x / 22) * Math.cos(z / 28) + 0.07 * Math.sin((x + z) / 12);
+  const field = 0.12 * Math.sin(x / 22) * Math.cos(z / 28) + 0.07 * Math.sin((x + z) / 12);
+  // Low field banks enclose the playable plain; authored roads and trench floors stay shared.
+  const east = 4.2 * Smooth((x - 116) / 21) * (.88 + .12 * Math.cos(z / 35));
+  const west = 4.3 * Smooth((-x - 190) / 15);
+  const north = 3.1 * Smooth((-z - 184) / 18) * (.86 + .14 * Math.cos(x / 31));
+  return field + east + west + north;
 }
 export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {
   const natural = SampleMissionNaturalHeight(x, z);
@@ -180,4 +185,27 @@ export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {
     height = height * (1 - blend) + natural * blend;
   }
   return height;
+}
+
+// Greybox surface identity uses the same authored road and trench corridors.
+export function SampleMissionGroundColor(x, z) {
+  const mix=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
+  const variation=.94+.06*Math.sin(x*.37)*Math.sin(z*.29);
+  const field=[.48,.50,.43], dust=[.64,.60,.51], soil=[.40,.36,.29];
+  let color=field.map(v=>v*variation);
+  for(const road of MISSION_TERRAIN.roads) {
+    const d=MissionPathDistance({x,z},road.points);
+    color=mix(color,dust,1-Smooth((d-road.width/2)/1.8));
+  }
+  for(const pad of MISSION_TERRAIN.pads) {
+    const d=Math.hypot(Math.max(0,Math.abs(x-pad.x)-pad.w/2),Math.max(0,Math.abs(z-pad.z)-pad.d/2));
+    color=mix(color,dust,.75*(1-Smooth(d/3)));
+  }
+  for(const trench of MISSION_TERRAIN.trenches) {
+    const d=MissionPathDistance({x,z},trench.points);
+    color=mix(color,soil,1-Smooth((d-trench.bottom/2)/trench.bank));
+  }
+  const rail=Math.abs(x+77);
+  color=mix(color,[.43,.44,.41],1-Smooth((rail-2.4)/1.5));
+  return color;
 }

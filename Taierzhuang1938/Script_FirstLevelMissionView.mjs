@@ -1,11 +1,13 @@
 // Instanced whitebox crowd. Critical characters still use the game's shared actor rigs.
 import * as THREE from "three";
+import { T } from "./Script_Text.mjs";
+import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { CreateP012StretcherGeometry } from "./Script_FirstLevelP012CarryView.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { PlaceGeometry } from "./Script_Geo.mjs";
 import { MISSION_PLACEMENT, MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
 export class FirstLevelMissionView {
-  constructor({ scene, battlefield, physics, column, actorFactory, library }) {
+  constructor({ scene, battlefield, physics, column, actorFactory, library, hud }) {
     Object.assign(this, { scene, battlefield, physics, column, actorFactory, library });
     this.root = new THREE.Group();
     this.root.name = "FirstLevelMissionWhitebox";
@@ -13,19 +15,28 @@ export class FirstLevelMissionView {
     this.materials = [];
     this.meshes = [];
     this.colliders = [];
+    this.cartColliders = new Map();
+    this.cartRotation = new THREE.Quaternion();
+    this.localRotation = new THREE.Quaternion();
     this.walkerPositions = new Map();
     this.matrix = new THREE.Matrix4();
     this.position = new THREE.Vector3();
     this.rotation = new THREE.Quaternion();
     this.scale = new THREE.Vector3();
     this.parts = {};
+    this.personColor = new THREE.Color();
     for (const [key, geometry, color, count] of [
       ["ration", new THREE.BoxGeometry(.10,.045,.13), 0xa47752, 20],
       ["pouch", new THREE.BoxGeometry(.14,.07,.12), 0x857a56, 20],
       ["cartridge", new THREE.BoxGeometry(.018,.018,.07), 0xc2a45d, 32],
       ["body", new THREE.BoxGeometry(0.42, 0.65, 0.25), 0x87958d, 160],
       ["head", new THREE.SphereGeometry(0.13, 7, 5), 0xc9bda7, 160],
-      ["limb", new THREE.BoxGeometry(0.13, 0.64, 0.14), 0x747c72, 480],
+      ["limb", new THREE.BoxGeometry(0.13, 0.64, 0.14), 0x747c72, 640],
+      ["cartRail", new THREE.BoxGeometry(.12,.3,5.8), 0x665a48, 56],
+      ["cartShaft", new THREE.BoxGeometry(.10,.1,3.5), 0x75634c, 14],
+      ["muleBody", new THREE.BoxGeometry(.62,.72,1.5), 0x6c6457, 7],
+      ["muleHead", new THREE.BoxGeometry(.25,.56,.44), 0x746c5e, 7],
+      ["spoke", new THREE.BoxGeometry(.12,.80,.07), 0x8b816d, 112],
       ["bed", CreateP012StretcherGeometry(), 0xd1d0be, 20],
       ["patient", new THREE.BoxGeometry(0.49, 0.19, 1.55), 0xd9d7cb, 26],
       ["medical", new THREE.BoxGeometry(0.24, 0.2, 0.12), 0xe1e2d5, 32],
@@ -62,6 +73,11 @@ export class FirstLevelMissionView {
     this.zhouRoot.visible = false;
     this.BuildTank();
     this.BuildSupplies();
+    this.navigation=document.createElement("div");
+    this.navigation.dataset.missionNavigation="true";
+    this.navigation.style.cssText="position:absolute;top:84px;left:22px;padding:6px 10px;color:#eee5d0;background:#202720bb;border-left:2px solid #d6be84;font:14px/1.5 sans-serif;max-width:430px;white-space:pre-line;pointer-events:none";
+    this.navigation.hidden=true;
+    hud?.root?.append(this.navigation);
   }
   Box(root, w, h, d, x, y, z, color) {
     const material = new THREE.MeshStandardMaterial({ color, roughness: 0.9 });
@@ -140,7 +156,7 @@ export class FirstLevelMissionView {
     this.SyncTank(tank);
     return this.tankModel.nodes.get(node).getWorldPosition(new THREE.Vector3());
   }
-  Instance(key, x, y, z, yaw = 0, sx = 1, sy = 1, sz = 1, rx = 0) {
+  Instance(key, x, y, z, yaw = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) {
     const mesh = this.parts[key],
       index = mesh.count++;
     if (index >= mesh.instanceMatrix.count) {
@@ -148,21 +164,49 @@ export class FirstLevelMissionView {
       return;
     }
     this.position.set(x, y, z);
-    this.rotation.setFromEuler(new THREE.Euler(rx, yaw, 0));
+    this.rotation.setFromEuler(new THREE.Euler(rx, yaw, rz, "YXZ"));
     this.scale.set(sx, sy, sz);
     this.matrix.compose(this.position, this.rotation, this.scale);
     mesh.setMatrixAt(index, this.matrix);
+  }
+  CartInstance(key,cart,ground,x,y,z,rx=0,rz=0) {
+    const mesh=this.parts[key],index=mesh.count++;
+    if(index>=mesh.instanceMatrix.count){mesh.count--;return;}
+    this.cartRotation.setFromEuler(new THREE.Euler(0,cart.yaw,cart.overturned?1.1:0,"YXZ"));
+    this.position.set(x,y,z).applyQuaternion(this.cartRotation);
+    this.position.add(new THREE.Vector3(cart.x,ground+(cart.overturned?1.6:1),cart.z));
+    this.localRotation.setFromEuler(new THREE.Euler(rx,0,rz));
+    this.rotation.copy(this.cartRotation).multiply(this.localRotation);
+    this.scale.set(1,1,1);this.matrix.compose(this.position,this.rotation,this.scale);
+    mesh.setMatrixAt(index,this.matrix);
+  }
+  SyncCartCollider(cart,ground) {
+    let box=this.cartColliders.get(cart.id);
+    if(box&&box.overturned!==cart.overturned){
+      this.physics.RemoveSolid(box._physicsHandle);
+      const old=this.battlefield.colliders.indexOf(box);if(old>=0)this.battlefield.colliders.splice(old,1);
+      this.colliders.splice(this.colliders.indexOf(box),1);box=null;
+    }
+    const hx=cart.overturned?1.27:1.5, hy=cart.overturned?1.64:.65;
+    const c=[cart.x,ground+(cart.overturned?1.6:1),cart.z],h=[hx,hy,2.9];
+    const cosine=Math.abs(Math.cos(cart.yaw)),sine=Math.abs(Math.sin(cart.yaw));
+    const extent=[cosine*hx+sine*2.9,hy,sine*hx+cosine*2.9];
+    const values={id:cart.id,tag:"missionCart",c,h,ry:cart.yaw,overturned:cart.overturned,
+      min:c.map((v,i)=>v-extent[i]),max:c.map((v,i)=>v+extent[i])};
+    if(!box){box=values;this.cartColliders.set(cart.id,box);this.physics.AddSolid(box);this.colliders.push(box);this.battlefield.colliders.push(box);}
+    else {Object.assign(box,values);this.physics.MoveSolid(box);}
   }
   Person(
     x,
     z,
     yaw,
     time,
-    { kind = "bearer", alive = true, moving = false, crouch = false, carrying = false } = {},
+    { kind = "bearer", alive = true, moving = false, crouch = false, carrying = false, carrySide = -1 } = {},
   ) {
     const y = this.battlefield.GroundHeight(x, z),
       height = alive ? (crouch ? 0.95 : 1.35) : 0.18;
     this.Instance("body", x, y + height - 0.24, z, yaw, 1, alive ? 1 : 0.45, alive ? 1 : 2.2);
+    this.parts.body.setColorAt(this.parts.body.count-1,this.personColor.setHex({medic:0xd8ddd2,wounded:0xa9a08a,civilian:0x947d64,bearer:0x93a39b}[kind]||0x93a39b));
     this.Instance("head", x, y + height + 0.24, z, yaw);
     const c = Math.cos(yaw),
       s = Math.sin(yaw),
@@ -186,7 +230,7 @@ export class FirstLevelMissionView {
         0.85,
         carrying ? 0.65 : 0.85,
         1,
-        carrying ? -1 : 0,
+        carrying ? carrySide : kind === "wounded" && side === -1 ? -.8 : crouch ? -.7 : -swing * side,
       );
     }
     if (kind === "medic") this.Instance("medical", x + c * 0.33, y + 0.8, z - s * 0.33, yaw);
@@ -221,7 +265,7 @@ export class FirstLevelMissionView {
           ? 1.2
           : litter.state === "fallen" || litter.state === "critical" || litter.state === "placed"
             ? 0.22
-            : 0.82;
+            : 0.82 + (litter.liftFraction || 0) * 0.38;
       const yaw = litter.yaw || 0;
       if (litter.zhou) {
         this.zhouRoot.visible = true;
@@ -241,7 +285,7 @@ export class FirstLevelMissionView {
       }
       if (!litter.loaded && litter.state !== "placed")
         for (const [index, side] of [-1, 1].entries()) {
-          if (litter.state === "carried" && side === 1) continue;
+          if (litter.bearers[index] <= 0 || (litter.state === "carried" && side === 1)) continue;
           this.Person(
             litter.x - Math.sin(yaw) * side * 1.6,
             litter.z - Math.cos(yaw) * side * 1.6,
@@ -251,15 +295,18 @@ export class FirstLevelMissionView {
               alive: litter.bearers[index] > 0,
               moving: ["moving", "loading"].includes(litter.state),
               carrying: true,
+              carrySide: side,
             },
           );
         }
     }
+    for(const body of this.column.bearerCasualties)
+      this.Person(body.x,body.z,body.yaw,time,{alive:false});
     for (const walker of this.column.walkers) {
       const last=this.walkerPositions.get(walker.id);
       const moving=!!last&&Math.hypot(walker.x-last.x,walker.z-last.z)>.0001;
       this.walkerPositions.set(walker.id,{x:walker.x,z:walker.z});
-      if (walker.visible && !walker.assigned)
+      if (walker.visible && !walker.assigned && !(walker.health<=0&&walker.casualtyRepresented))
         this.Person(walker.x, walker.z, walker.yaw, time, {
           kind: walker.kind,
           alive: walker.health > 0,
@@ -270,34 +317,32 @@ export class FirstLevelMissionView {
     for (const cart of [...this.column.vehicles, ...this.column.traffic.filter((cart) => cart.visible)]) {
       if (cart.z > 178) continue;
       const y = this.battlefield.GroundHeight(cart.x, cart.z);
-      this.Instance(
-        "cart",
-        cart.x,
-        y + (cart.overturned ? 0.45 : 1),
-        cart.z,
-        cart.yaw,
-        1,
-        1,
-        1,
-        cart.overturned ? 1.1 : 0,
-      );
-      const c = Math.cos(cart.yaw),
-        s = Math.sin(cart.yaw);
-      for (const side of [-1, 1])
-        for (const end of [-1, 1])
-          this.Instance(
-            "wheel",
-            cart.x + c * side * 1.55 - s * end * 1.8,
-            y + 0.49,
-            cart.z - s * side * 1.55 - c * end * 1.8,
-            cart.yaw + Math.PI / 2,
-            1,
-            1,
-            1,
-            Math.PI / 2,
-          );
+      this.SyncCartCollider(cart,y);
+      this.CartInstance("cart",cart,y,0,0,0);
+      const c=Math.cos(cart.yaw),s=Math.sin(cart.yaw);
+      const moving=!cart.overturned&&(cart.departed||cart.state==="approaching"||cart.id.startsWith("SouthCart"));
+      const travel=(cart.progress||0)+(cart.approachProgress||0);
+      for(const side of [-1,1]){
+        this.CartInstance("cartRail",cart,y,side*1.4,.45,0);
+        this.CartInstance("cartShaft",cart,y,side*.58,-.16,-3.75);
+      }
+      const team=cart.boltedTeam;
+      if(!cart.overturned || team&&team.progress<team.length){
+        const yaw=team?.yaw??cart.yaw, mc=Math.cos(yaw),ms=Math.sin(yaw);
+        const mx=team?.x??cart.x-s*4.8,mz=team?.z??cart.z-c*4.8,my=this.battlefield.GroundHeight(mx,mz);
+        this.Instance("muleBody",mx,my+1,mz,yaw);
+        this.Instance("muleHead",mx-ms*.8,my+1.5,mz-mc*.8,yaw);
+        for(const side of [-1,1])for(const end of [-1,1]){
+          const swing=moving||team?Math.sin(time*(team?10:6)+side*end*Math.PI/2)*.32:0;
+          this.Instance("limb",mx+mc*side*.21-ms*end*.52,my+.37,mz-ms*side*.21-mc*end*.52,yaw,.8,1.1,.8,swing);
+        }
+        this.Person(mx+mc*1.1,mz-ms*1.1,yaw,time,{kind:"medic",moving:moving||!!team});
+      }
+      for(const side of [-1,1])for(const end of [-1,1]){
+        this.CartInstance("wheel",cart,y,side*1.55,-.51,-end*1.8,0,Math.PI/2);
+        for(const phase of [0,Math.PI/2])this.CartInstance("spoke",cart,y,side*1.635,-.51,-end*1.8,travel/.48+phase);
+      }
       if (cart.id.startsWith("SouthCart")) {
-        this.Person(cart.x - s * 3.5, cart.z - c * 3.5, cart.yaw, time, { kind: "medic", moving: true });
         for (const side of [-1, 1]) {
           this.Instance("patient", cart.x + c * side * 0.65, y + 1.35, cart.z - s * side * 0.65, cart.yaw);
           this.Instance(
@@ -310,7 +355,16 @@ export class FirstLevelMissionView {
         }
       }
     }
-    for (const mesh of Object.values(this.parts)) mesh.instanceMatrix.needsUpdate = true;
+    const visibleCarts=new Set([...this.column.vehicles,...this.column.traffic.filter(c=>c.visible)].filter(c=>c.z<=178).map(c=>c.id));
+    for(const [id,box] of this.cartColliders)if(!visibleCarts.has(id)){
+      this.physics.RemoveSolid(box._physicsHandle);
+      this.battlefield.colliders.splice(this.battlefield.colliders.indexOf(box),1);
+      this.colliders.splice(this.colliders.indexOf(box),1);this.cartColliders.delete(id);
+    }
+    for (const mesh of Object.values(this.parts)) {
+      mesh.instanceMatrix.needsUpdate = true;
+      if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;
+    }
     if (tank) {
       this.tank.visible = tank.present || tank.active;
       this.SyncTank(tank);
@@ -328,7 +382,19 @@ export class FirstLevelMissionView {
       }
     }
   }
+  UpdateNavigation(guide,player) {
+    const distance=guide?Math.hypot(guide.target.x-player.position.x,guide.target.z-player.position.z):0;
+    this.navigation.hidden=!guide || !player.Alive || (distance<MISSION_TUNING.guideHideDistanceM&&!guide.status);
+    if(this.navigation.hidden)return;
+    const angle=Math.atan2(player.position.x-guide.target.x,player.position.z-guide.target.z)-player.yaw;
+    const delta=Math.atan2(Math.sin(angle),Math.cos(angle));
+    const arrow=Math.abs(delta)<.45?'↑':Math.abs(delta)>2.6?'↓':delta>0?'←':'→';
+    const direction=distance>=MISSION_TUNING.guideHideDistanceM?arrow+' '+T('firstLevel.guide.distance',{label:guide.label,distance:Math.round(distance)}):'';
+    const text=[direction,guide.status].filter(Boolean).join('\n');
+    if(this.navigation.textContent!==text)this.navigation.textContent=text;
+  }
   Dispose() {
+    this.navigation?.remove();
     for (const collider of this.colliders) {
       if (collider._physicsHandle != null) this.physics.RemoveSolid(collider._physicsHandle);
       const index=this.battlefield.colliders.indexOf(collider);

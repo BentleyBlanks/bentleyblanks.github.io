@@ -1,6 +1,6 @@
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { P012_STATION_BLOCKS } from "./Data_FirstLevelP012Station.mjs";
-import { MISSION_TERRAIN, SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
+import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance, SampleMissionGroundColor } from "./Data_FirstLevelMissionTerrain.mjs";
 const blocks = [],
   gates = [],
   surfaces = [];
@@ -44,7 +44,7 @@ function Room(id, x, z, w, d, { southDoor = true, northDoor = true, eastWindow =
     });
   } else Wall(`${id}East`, x + w / 2, z, 0.6, 2.9, d);
   // Cut-away whitebox roof leaves rooms legible while retaining actual cover.
-  Block(`${id}Roof`, x - w * 0.28, z, w * 0.4, 0.22, d, "structure", { y: 3.05 });
+  Block(`${id}Roof`, x - w * 0.28, z, w * 0.4, 0.22, d, "structure", { y: SampleMissionTerrain(x,z) + 3.05 });
 }
 // Reuse the accepted P012 open freight-wagon boards, ribs and undercarriage.
 // Only the east door is recentered on this mission's existing unloading lane.
@@ -204,8 +204,10 @@ for (const [i, x, z, w] of [
   [3, 35, -82, 14],
 ])
   Wall(`FieldRuin${i}`, x, z, w, i<2?.75:1.3, 0.7);
-for(const x of [-28,-13,2])Wall(`WithdrawCover${x}`,x,-150,3.8,.72,.65);
+for(const x of [-28,-23,-18,-13,-8,-3,2,7])Wall(`WithdrawCover${x}`,x,-150,3.8,.88,.65);
 for(const x of [-20,0,20])Wall(`EnemyForwardCover${x}`,x,-173,4.2,.62,.7);
+for(const [i,x,z] of [[0,-16,-149.5],[1,-8,-151.5],[2,12,-151.5],[3,23,-151.5],[4,-32,-153.5],[5,-6,-158.5]])
+  Wall("AssaultApproachCover"+i,x,z,2.6,.58,.6);
 // The village route passes through a kitchen, inner courtyard and connected rooms.
 Room("Kitchen", 58, -9, 12, 15, { northDoor: true, southDoor: true });
 Room("ConnectedHouse", 58, 8, 12, 15, { northDoor: true, southDoor: true, eastWindow: true });
@@ -260,6 +262,107 @@ Wall("ReceptionWest", -166, 35, 0.7, 2.8, 34);
 Block("ReceptionMedicine", -156, 36, 1, 0.7, 1, "missionRoute");
 Wall("RearExitCover", -169.5, 29, 6, 1.05, 0.7);
 Wall("FinalAlleyCover", -185, 10, 0.7, 1.2, 12);
+// Human-scale work areas, connected landmarks and trench construction remain pure geometry.
+// Small surface details have no separate collision; functional furniture and walls do.
+function Detail(id, x, z, w, h, d, semantic = "timber", extra = {}) {
+  return Block(id, x, z, w, h, d, semantic, {solid:false, ...extra});
+}
+function SupplyStack(id, x, z, rows = 2) {
+  for (let row = 0; row < rows; row++) for (let col = 0; col < 2; col++) {
+    const cx = x + col * .95, y = SampleMissionTerrain(cx,z) + .25 + row * .51;
+    Block(id+row+col,cx,z,.84,.5,.66,"timber",{y});
+    for (const side of [-1,1]) Detail(id+'Strap'+row+col+side,cx+side*.27,z,.055,.51,.68,"metal",{y});
+  }
+}
+for (const [id,x,z,rows] of [["StationSupply",-54,64,3],["StationMedical",-60,82,2],
+  ["KitchenStores",61,-12,2],["CourtStores",37,22,2],["TransferStores",66,124,3],
+  ["ReceptionStores",-160,21,2]]) SupplyStack(id,x,z,rows);
+// Slatted revetment follows the real excavated bank, with a clear middle corridor.
+for (const trench of MISSION_TERRAIN.trenches) {
+  for (let segment = 1; segment < trench.points.length; segment++) {
+    const a = trench.points[segment-1], b = trench.points[segment], dx = b.x-a.x, dz = b.z-a.z;
+    const length = Math.hypot(dx,dz), yaw = Math.atan2(dx,dz);
+    for (let distance = 4; distance < length-3; distance += 5) {
+      for (const side of [-1,1]) {
+        const x=a.x+dx*distance/length+dz/length*side*(trench.bottom/2+.18);
+        const z=a.z+dz*distance/length-dx/length*side*(trench.bottom/2+.18);
+        if (MISSION_TERRAIN.trenches.some(other => other !== trench &&
+          MissionPathDistance({x,z},other.points) < other.bottom/2+2)) continue;
+        const id=trench.id+'Revetment'+segment+'_'+distance+'_'+side;
+        Detail(id+'Post',x,z,.13,.96,.17,"timber",{ry:yaw});
+        for (const level of [0,1,2]) Detail(id+'Slat'+level,x,z,.07,.16,3.5,"timber",
+          {ry:yaw,y:SampleMissionTerrain(x,z)+.15+level*.29});
+      }
+    }
+  }
+}
+// Repeated sandbag seams provide scale without changing the proven solid envelope.
+for (const wall of blocks.filter(b=>b.semantic==='cover' && b.h<1.21 && b.w>2 && b.d<1)) {
+  for (let x=wall.x-wall.w/2+.25,i=0;x<wall.x+wall.w/2-.2;x+=.65,i++)
+    Detail(wall.id+'BagSeam'+i,x,wall.z-.01,.035,wall.h+.018,wall.d+.024,'earthDark');
+}
+// Station telegraph line, water tower and damaged outbuildings establish direction and depth.
+for (let z=-184;z<157;z+=28) {
+  Block('TelegraphPole'+z,-86,z,.22,6,.22,'timber');
+  Detail('TelegraphCrossarm'+z,-86,z,2.6,.14,.16,'timber',{y:SampleMissionTerrain(-86,z)+5.35});
+  for(const side of [-1,1]) Detail('TelegraphWire'+z+side,-86+side*.9,z+14,.018,.018,28,'metal',
+    {y:SampleMissionTerrain(-86,z)+5.48});
+}
+for (const x of [-1,1]) for(const z of [-1,1]) Block('WaterTowerLeg'+x+z,-98+x*1.3,68+z*1.3,.32,5,.32,'timber');
+Block('WaterTowerTank',-98,68,3.8,2.3,3.8,'metal',{y:6.1});
+function FarmSilhouette(id,x,z,w,d,h=3.8) {
+  Room(id,x,z,w,d);
+  const ground=SampleMissionTerrain(x,z);
+  Block(id+'Gable',x,z,w*.36,h-2.6,d,'plaster',{y:ground+3.1+(h-2.6)/2});
+  Detail(id+'RoofRidge',x,z,.3,.28,d+.6,'roof',{y:ground+h+.4});
+  for(const side of [-1,1]) Detail(id+'RoofEave'+side,x+side*w*.42,z,w*.18,.25,d+.7,'roof',{y:ground+3.25});
+}
+FarmSilhouette('NorthFarm',-51,-184,15,11,4.3);
+FarmSilhouette('NorthRuin',59,-192,16,9,4);
+FarmSilhouette('EastFarm',110,-169,17,12,5);
+FarmSilhouette('VillageEdgeHouse',106,40,16,12,4.4);
+FarmSilhouette('VillageRearHouse',39,65,13,11,4);
+FarmSilhouette('RearFarm',-66,27,13,11,4.1);
+FarmSilhouette('TransferFieldStore',120,126,13,12,4.6);
+FarmSilhouette('WestFieldHouse',-113,99,15,10,4.2);
+FarmSilhouette('SouthFieldHouse',60,-60,12,9,4);
+FarmSilhouette('RearOrchardHouse',-120,-20,13,11,4.1);
+// Poplar rows mark the field edge and break long empty sightlines without closing combat lanes.
+for(const [row,points] of [
+  ['East',[-180,-151,-116,-81,-43,-5,36,71,104,142,167].map((z,i)=>({x:125+(i%3)*2,z}))],
+  ['West',[-165,-131,-97,-63,-29,6,84,122,151].map((z,i)=>({x:-117-(i%2)*5,z}))],
+  ['SouthRoad',[-83,-51,-20,12,43,71].map((z,i)=>({x:18+(i%2)*3,z}))],
+]) for(const [i,p] of points.entries()) {
+  const id='FieldPoplar'+row+i, ground=SampleMissionTerrain(p.x,p.z),height=6+(i%3)*.7;
+  Block(id+'Trunk',p.x,p.z,.28,height*.65,.3,'timber');
+  Detail(id+'Crown',p.x,p.z,1.8,height*.6,1.6,'foliage',{y:ground+height*.75});
+  Detail(id+'CrownTip',p.x+.15,p.z,1.1,1.2,1,'foliage',{y:ground+height*1.06});
+}
+// Interior props sit beside movement lanes and identify kitchen, ward and sorting station.
+Block('KitchenStove',54,-10,1.6,1.05,1.2,'earthDark');
+Detail('KitchenFlue',53.6,-10,.36,1.8,.4,'earthDark',{y:2});
+Block('KitchenTable',61,-5,1.6,.8,.8,'timber');
+Block('CourtyardBench',36,27,1,.45,3.4,'timber');
+for(const x of [65,68]) {
+  Block('TriageBench'+x,x,119,1.5,.45,.6,'timber');
+  Detail('TriageBlankets'+x,x,119,1.2,.18,.55,'canvas',{y:.61});
+}
+for(const z of [111,114,117]) {
+  Detail('SortingRailPost'+z,70,z,.12,1.1,.12,'timber');
+  Detail('SortingRope'+z,70,z+1.4,.035,.035,2.8,'canvas',{y:.95});
+}
+for(const x of [-153,-150,-147]) {
+  Block('WardShelf'+x,x,25.8,2,.8,.55,'timber');
+  Detail('WardMedicalRoll'+x,x,25.8,1.3,.25,.42,'canvas',{y:1.02});
+}
+// Field boundaries and split fence sections leave the tank and infantry corridors open.
+for(const [id,x,z,length] of [['WestFieldFence',-58,-120,36],['VillageFieldFence',12,43,22],
+  ['SouthFieldFence',102,151,26]]) {
+  for(let i=0;i<length;i+=3) {
+    Block(id+'Post'+i,x,z+i,.14,1.05,.14,'timber');
+    Detail(id+'Rail'+i,x,z+i+1.35,.09,.12,2.7,'timber',{y:SampleMissionTerrain(x,z+i)+.72});
+  }
+}
 export const MISSION_ANCHORS = Object.freeze({
   train: MISSION_TRAIN.player,
   unload: { x: -66, z: 66 },
@@ -283,7 +386,7 @@ export const MISSION_ANCHORS = Object.freeze({
   reception: { x: -131, z: 31 },
   zhouPickup: { x: -139, z: 47 },
   zhouDrop: { x: -150, z: 42 },
-  finalCover: { x: -160, z: 46 },
+  finalCover: { x: -172, z: 54 },
   rearExit: { x: -171, z: 35 },
   end: { x: -186, z: -8 },
 });
@@ -358,6 +461,17 @@ export const MISSION_PLACEMENT = Object.freeze({
     { x: -64, z: 77, yaw: 2.1, health: 28 },
   ],
   squadFrontPositions:[{x:-1.7,z:-129},{x:1.7,z:-128.7},{x:14,z:-129},{x:16,z:-127.5}],
+  reliefApproach: [{x:-69,z:106},{x:-71,z:74},{x:-66,z:66},...MISSION_ROUTES.support,{x:6,z:-123}],
+  reliefPositions: Array.from({length:8},(_,i)=>({x:-32+i*3,z:-124})),
+  // First arrivals move furthest down the communication trench; the mouth stays open.
+  guardWithdrawalRoutes: Array.from({length:8},(_,i)=>[
+    {x:-28+i*5,z:-148+(i%2)*.7},
+    {x:-20+i*.45,z:-137+i*.35},
+    {x:-20+i*.35,z:-124+i*.2},
+    {x:-8,z:-112},
+    {x:-8+(i%2?1:-1),z:-92-Math.floor(i/2)*2.8},
+  ]),
+  wardInterior: {minX:-157,maxX:-145,minZ:25,maxZ:43},
   tankStart: { x: 36, z: -173 },
   tankTargets: [
     { x: -24, z: -130 },
@@ -366,9 +480,9 @@ export const MISSION_PLACEMENT = Object.freeze({
   ],
   cartBays: [
     { x: 80, z: 120 },
-    { x: 86, z: 120 },
-    { x: 80, z: 127 },
-    { x: 86, z: 127 },
+    { x: 86, z: 123 },
+    { x: 86, z: 132 },
+    { x: 86, z: 141 },
   ],
 });
 export const MISSION_SUPPLIES = Object.freeze([
@@ -378,13 +492,36 @@ export const MISSION_SUPPLIES = Object.freeze([
   {id:"Retreat",x:-53.2,z:82,supportHeight:null},
   {id:"Reception",x:-132.8,z:31,supportHeight:null},
 ]);
+// Leave continuous openings wherever a return route or stretcher corridor crosses a revetment.
+for (let i = blocks.length - 1; i >= 0; i--) {
+  const block = blocks[i];
+  if (!block.id.includes('Revetment')) continue;
+  const c = Math.cos(block.ry||0), s = Math.sin(block.ry||0);
+  const crosses = [...Object.values(MISSION_ROUTES), ...MISSION_PLACEMENT.guardWithdrawalRoutes].some(route => route.slice(1).some((b,index) => {
+    const a=route[index], length=Math.hypot(b.x-a.x,b.z-a.z);
+    for(let d=0;d<=length;d+=.5) {
+      const x=a.x+(b.x-a.x)*d/length-block.x, z=a.z+(b.z-a.z)*d/length-block.z;
+      if(Math.abs(x*c-z*s)<block.w/2+.9 && Math.abs(x*s+z*c)<block.d/2+.9)return true;
+    }
+    return false;
+  }));
+  if(crosses)blocks.splice(i,1);
+}
 export const MISSION_LAYOUT = Object.freeze({
   id: "FirstLevelMissionSeptember07",
   terrain: "P012Heightfield",
   terrainSpec: MISSION_TERRAIN,
+  SampleGroundColor: SampleMissionGroundColor,
   bounds: { minX: -205, maxX: 137, minZ: -202, maxZ: 180 },
   ground: { x: -34, z: -11, w: 342, d: 382, h: 1, y: -0.5, semantic: "ground" },
   semanticColors: {
+    foliage: 0x68715f,
+    timber: 0x746956,
+    metal: 0x535b57,
+    earthDark: 0x696452,
+    plaster: 0xaaa69b,
+    roof: 0x686c68,
+    canvas: 0xa4a393,
     trainWood: 0x82715c,
     trainCanvas: 0x747c67,
     trainMetal: 0x59625e,
