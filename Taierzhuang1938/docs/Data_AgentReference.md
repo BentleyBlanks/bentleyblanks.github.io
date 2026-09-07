@@ -53,6 +53,13 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Script_PostPrepass.mjs`（MRT 预通道 + 速度缓冲 + HZB + 蒙皮上一帧骨矩阵）、
   `Script_PostSsao.mjs`、`Script_PostTaa.mjs`、`Script_PostBloom.mjs`（含太阳拖影）、
   `Script_PostComposite.mjs`（分段 GLSL）、`Script_PostFxaa.mjs`、`Script_PostDebug.mjs`。
+- **物理相机（曝光 / 光晕 / 分级，2026-09）**：`Script_PostExposure.mjs`（直方图自动曝光
+  ＋ ACES/AgX 两条 tonemap 曲线及其 JS 镜像）、`Script_PostLensFlare.mjs`（鬼影/光环/
+  受遮挡的太阳星芒 ＋ 程序化镜头脏污）、`Script_PostGrade.mjs`（把分级数学烘成 64³ LUT，
+  包含它的 JS 镜像与 LUT 采样校验视图）；口径表 `Data_Tuning_Camera.mjs`（纯数据，含
+  测光参数、**逐关曝光锚点** `EXPOSURE_ANCHORS`、EV 钳位、光晕与 LUT 尺寸）。
+  铁律：自动曝光**全 GPU、一次 readback 都不允许**；增益锤在每关出生机位的实测亮度上，
+  所以打开它不改变默认机位的亮度（改关卡布设/天光后要重跑 `--calibrate`）。
 - `Data_Tuning_Graphics.mjs` —— 画质档位表（纯数据，零 three）：每档每个 pass 的开关与旋钮，
   外加 `HZB` / `VELOCITY` 两组常量。`Script_Post` / `Script_Main` / `Script_EditorSettings` 只读它。
 - `Script_MaterialPatches.mjs` —— **材质补丁注册表**：所有往 `MeshStandardMaterial` 插 GLSL 的
@@ -65,6 +72,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   采样接口**：体积雾 / 接触阴影 / CSM 都从这条接口取，别自己采 `sun.shadow.map`）、
   `Script_Sky.mjs`（解析式天空 + PMREM）、`Script_Water.mjs`（Gerstner 护城河）。
 - 回归口：`Script_PostFrameGraphTest.mjs`（帧图契约）、`Script_PostTest.mjs`、
+  `Script_ExposureTest.mjs`（自动曝光 / 光晕 / LUT；`--calibrate` 量锚点、
+  `--shots` 出开关对照图、`--baseline=<根目录>` 与另一份检出逐比特比对）、
   `Script_GiTest.mjs`、`Script_EditorTest.mjs`（Debug Rendering 全部视图）。
 - 先读：`docs/Data_TechRenderPipeline.md` **§1「帧图与模块契约」**（接入说明；
   §1A 起是设计期草案与专题深挖，GI 在 §12，坑表在末尾）。

@@ -236,11 +236,18 @@ export class GradeLutCache {
 // 「暗部有点脏」，肉眼分辨不出是哪一种。
 //
 // 这张图把它们逼出来：绑一张**恒等 LUT**，让一条 sRGB 灰阶/彩阶过一遍查表，
-// 上半屏画输入、下半屏画 |查表结果 − 输入| × 32。采样正确 = 下半屏全黑。
+// 上半屏画输入、下半屏画 |查表结果 − 输入| × 16。
 // 中间那一条是正在生效的那张 LUT 条带本尊（看得见分级往哪边偏）。
+//
+// **下半屏不是纯黑，是一层均匀的暗色**：恒等表自己就有 8 位量化的半个
+// LSB（±0.5/255），×16 之后就是看得见的灏。要抳的是**块状结构**：
+// flipY 反了 = 上下镜像的大色块；colorSpace 设成 sRGB = 整体偏亮；
+// 切片索引错一格 = 沿 x 方向的锥形条带；没内缩半纹素 = 格边的彩色缝。
 // ===========================================================================
 const FRAG_LUT_CHECK = /* glsl */`
-uniform sampler2D uLut;          // 正在生效的那张（只作展示）
+// uLut / uLutAmount 由下面 include 进来的 LUT_GLSL 声明 —— 这里**不许再声明一遍**。
+// 重复声明 = 'uLut' : redefinition，整个片元着色器编译不过，视图恒为纯黑，
+// 而 three 只在控制台留一行。（这一条是被 ExposureTest 的「视图真的出画」抓出来的。）
 uniform sampler2D uIdentityLut;  // 恒等表（用来量采样误差）
 uniform float uAmplify;
 varying vec2 vUv;
@@ -296,7 +303,7 @@ void main() {
     // 中：正在生效的 LUT 条带（1024×32 直接铺开）
     color = SrgbToLinear(texture2D(uLut, vec2(vUv.x, (vUv.y - 0.58) / 0.08)).rgb);
   } else {
-    // 下：恒等表的采样误差 × uAmplify。采样正确 = 全黑。
+    // 下：恒等表的采样误差 × uAmplify（底噪 = 8 位量化，看的是有没有块状结构）。
     vec2 uv = vec2(vUv.x, vUv.y / 0.58);
     vec3 reference = Pattern(uv);
     vec3 through = SampleIdentity(reference);
@@ -314,9 +321,10 @@ export class LutCheckView {
   constructor() {
     this.identity = null;
     this.uniforms = {
-      uLut: { value: null },
+      uLut: { value: null },          // LUT_GLSL 里声明的那一个
+      uLutAmount: { value: 1 },       // 同上（这张视图不用它，但必须给值）
       uIdentityLut: { value: null },
-      uAmplify: { value: 32 },
+      uAmplify: { value: 16 },
     };
     this.material = MakeFullscreenMaterial(FRAG_LUT_CHECK, this.uniforms);
   }

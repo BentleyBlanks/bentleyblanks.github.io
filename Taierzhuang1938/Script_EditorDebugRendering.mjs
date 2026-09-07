@@ -21,7 +21,7 @@ const VIEWS = [
   { id: "exposure", label: "曝光直方图", group: "后处理", note: "自动曝光的 64 桶亮度直方图（对数纵轴）+ 当前 EV（青）/ 目标 EV（橙）/ 增益（白）。自动曝光关着时显示不可用斜纹。" },
   { id: "lensFlare", label: "镜头光晕", group: "后处理", note: "鬼影 / 光环 / 太阳星芒层（1/4 分辨率 HDR 靶）。黑场输入时必须全黑；太阳被墙挡住时星芒消失。" },
   { id: "lensDirt", label: "镜头脏污", group: "后处理", note: "程序化烘的油斑 + 划痕灰度图，只乘在泛光的高亮处。" },
-  { id: "lutCheck", label: "LUT 采样校验", group: "后处理", note: "上：测试彩阶/灰阶；中：正在生效的 LUT 条带；下：恒等表的采样误差 ×32。采样正确 = 下半屏全黑。" },
+  { id: "lutCheck", label: "LUT 采样校验", group: "后处理", note: "上：测试彩阶/灰阶；中：正在生效的 LUT 条带；下：恒等表的采样误差 ×16。采样正确 = 下半屏只剩一层均匀的量化底噪；出现块状结构就是 flipY / 切片索引 / 半纹素内缩 出了错。" },
   { id: "fog", label: "雾量", group: "后处理", note: "指数距离雾 × 高度衰减得到的实际混合系数；深蓝 = 无雾、暖黄 = 雾量高。" },
   { id: "dof", label: "景深 CoC", group: "后处理", note: "正式景深使用的散焦系数；蓝 = 锐利、暖黄 = 最大散焦。景深只在阵亡镜头启用。" },
   { id: "normal", label: "法线", group: "GBuffer", note: "NormalDepth 预通道的视空间法线。" },

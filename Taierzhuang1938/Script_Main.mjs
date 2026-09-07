@@ -7321,6 +7321,9 @@ function RenderScene(dt) {
     // （Data_Tuning_Camera.SKY_EXPOSURE），`dt` 决定时域适应走多快。
     // 过场自带天空时这里就是过场那一档 —— 与上面的 preset 同源，不会抄错。
     skyPreset: skyName,
+    // 逐关锚点：`smokyDay` 被三关共用，而三关出生机位的实测亮度差 0.38 EV。
+    // 过场自带天空时不传（镜头已经不在这一关的出生点上，锚点对不上）。
+    exposureAnchor: cutsceneSky ? null : phase.id,
     dt,
     bloom: preset.bloom * graphics.bloom,
     godStrength: graphics.godEnabled ? preset.godStrength * graphics.god : 0,

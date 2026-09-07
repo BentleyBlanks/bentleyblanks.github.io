@@ -127,9 +127,40 @@ export const SKY_EXPOSURE = {
   p012WhiteboxDay: { logLum: null, evBias: 0, evUp: 1.0, evDown: 1.0 },
 };
 
-/** 取一份锚点（未登记的预设退回 `_default`）。 */
-export function SkyExposureFor(name) {
-  return { ...SKY_EXPOSURE._default, ...(SKY_EXPOSURE[name] || null) };
+/**
+ * **逐关**的曝光锚点（键 = `Data_Levels` 的关卡 id，也就是 `PHASE_TABLE[i].id`）。
+ *
+ * 为什么不能只按时段预设锚：`smokyDay` 被三关共用，而三关的出生机位实测平均
+ * 场景亮度差了 0.38 EV（L1 0.93 / L2 0.63 / L3 1.01）。按预设取平均的话，
+ * 最暗那一关一打开自动曝光就整体提亮 17% —— 正是本轮明令禁止的那种事。
+ * 所以锚点跟着**关**走，时段预设那张表只留 EV 钳位与补偿。
+ *
+ * 数据来自 `node Taierzhuang1938/Script_ExposureTest.mjs --calibrate`
+ * （2026-09-07，RTX 4070 SUPER / 1280×720 / high / 出生机位 / 预热 240 帧）。
+ * 换关卡布设、改天光预设、改 SSAO 或 GI 之后要重跑并更新这里；
+ * 没有登记的关一律走时段预设那条，再没有就是 null = 只测量不作用。
+ */
+export const EXPOSURE_ANCHORS = {
+  CH0_Chuchuan: { logLum: 0.23 },        // chuchuanDay
+  CH1_NanLu: { logLum: 0.93 },           // smokyDay
+  CH2_Shouliudan: { logLum: 0.63 },      // smokyDay
+  CH3_Jiuhusuo: { logLum: 1.01 },        // smokyDay
+  CH4_DongguanYe: { logLum: -3.28 },     // night
+  CH5_Chengqiang: { logLum: 0.13 },      // dawn
+  CH6_Zuihou: { logLum: 0.36 },          // burningStreet
+};
+
+/**
+ * 取一份锚点。三层合并：`_default` ← 时段预设 ← 逐关锚点。
+ * @param {string|null} skyName    时段预设名（EV 钳位与补偿从这里来）
+ * @param {string|null} anchorKey  关卡 id（实测 logLum 从这里来，优先）
+ */
+export function SkyExposureFor(skyName, anchorKey = null) {
+  return {
+    ...SKY_EXPOSURE._default,
+    ...(SKY_EXPOSURE[skyName] || null),
+    ...(anchorKey ? EXPOSURE_ANCHORS[anchorKey] || null : null),
+  };
 }
 
 /**

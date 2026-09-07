@@ -433,7 +433,10 @@ void main() {
     if (abs(t.x - evTarget) < lineWidth) color = vec3(1.00, 0.62, 0.10);
   }
 
-  // 数字：EV（青）在上、目标 EV（橙）在下、增益（白）再下一行
+  // 数字（屏幕坐标 y 向上，所以列出来是从下往上）：
+  //   最下行 = 当前 EV（青，与直方图里那条青线同色）
+  //   中间行 = 目标 EV（橙，同橙线）
+  //   最上行 = 曝光增益（白）—— 1.00 就是「跟关掉一模一样」
   vec2 cell = vec2(0.011 / max(uAspect / 1.7778, 0.35), 0.026);
   float inkNow = DrawNumber(vUv, vec2(0.034, 0.330), cell, state.g);
   float inkTarget = DrawNumber(vUv, vec2(0.034, 0.366), cell, state.b);
@@ -476,6 +479,7 @@ export class ExposurePass {
     this.active = false;             // 本帧真的跑过（Texture 取值器按它选）
     this.snapFrames = AUTO_EXPOSURE.snapFrames;
     this.skyName = null;
+    this.anchorKey = null;           // 关卡 id（逐关锚点优先于时段预设）
     this.anchorOverride = null;      // 测试/工具直接摆一份锚点
     this.anchor = SkyExposureFor(null);
     this.mode = "anchored";          // "anchored" | "absolute"
@@ -656,11 +660,13 @@ export class ExposurePass {
       return;
     }
     const skyName = ctx.options.skyPreset || null;
-    if (skyName !== this.skyName) {
+    const anchorKey = ctx.options.exposureAnchor || null;
+    if (skyName !== this.skyName || anchorKey !== this.anchorKey) {
       this.skyName = skyName;
+      this.anchorKey = anchorKey;
       this.RequestReset();
     }
-    this.anchor = this.anchorOverride || SkyExposureFor(skyName);
+    this.anchor = this.anchorOverride || SkyExposureFor(skyName, anchorKey);
   }
 
   Render(ctx) {

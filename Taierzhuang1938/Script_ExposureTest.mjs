@@ -23,6 +23,7 @@
 // ===========================================================================
 
 import path from "node:path";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
@@ -34,6 +35,12 @@ const argv = process.argv.slice(2);
 const CALIBRATE = argv.includes("--calibrate");
 const PROBE_ONLY = argv.includes("--probe-only");
 const BASELINE = (argv.find((a) => a.startsWith("--baseline=")) || "").slice(11);
+/** `--shots[=目录]`：出一组「开/关」对照图（默认落 _shots/Exposure_<日期>/）。 */
+const SHOTS_ARG = argv.find((a) => a === "--shots" || a.startsWith("--shots="));
+const SHOTS_DIR = SHOTS_ARG
+  ? (SHOTS_ARG.includes("=") ? path.resolve(SHOTS_ARG.slice(8))
+    : path.join(projectDir, "_shots", `Exposure_${new Date().toISOString().slice(0, 10).replace(/-/g, ".")}`))
+  : null;
 /** 正片侧要跑的切片。天光预设映射见 Data_Levels（0 白天硝烟 / 3 夜战）。 */
 const GAME_PHASES = CALIBRATE ? [0, 1, 2, 3, 4, 5, 6] : [0, 3];
 
@@ -49,6 +56,9 @@ function WatchPage(page, tag) {
     if (message.type() !== "error") return;
     const url = message.location()?.url || "";
     if (/fonts\.(googleapis|gstatic)\.com/.test(url)) return;
+    // 基线树是 `git archive` 导出的两个子目录，仓库根的图标 / 样式不在里面，
+    // 它们的 404 与本轮改动无关 —— 真正的断言是那一页的像素读回。
+    if (tag === "baseline" && /Failed to load resource/.test(message.text())) return;
     problems.push(`CONSOLE[${tag}] ${message.text().slice(0, 240)}`);
   });
 }
@@ -293,9 +303,12 @@ async function ProbeSection(page) {
       U.uExposure.value = 0.46;
       U.uExposureTex.value = exposure.whitePixel;
       const grade = await import("./Script_PostGrade.mjs");
-      const bakeStart = performance.now();
       U.uLut.value = post.compositePass.lutCache.Get(grade.GradeFromUniforms(U));
+      // 烘一张的真实代价：缓存里那张早就烘好了，另烘一张才量得到
+      const bakeStart = performance.now();
+      const throwaway = grade.BakeGradeLut(grade.GradeFromUniforms(U));
       const bakeMs = performance.now() - bakeStart;
+      throwaway.dispose();
 
       U.uLutAmount.value = 0;
       post._Blit(post.matComposite, post.targets.ldr);
@@ -485,6 +498,40 @@ async function ProbeSection(page) {
       };
     }
 
+    // --- 9) 四张新调试视图真的出画 -------------------------------------
+    // GLSL ES 3.00 保留字编译失败时 three 只在控制台留一行，那一趟什么都不画，
+    // 屏幕留着上一次 clear 的颜色 —— 表现是「某个视图恒为纯黑」而正式链毫发无损。
+    // 所以每一张都要读回屏幕像素，并且要求它**有层次**（不是一块平色）。
+    {
+      const viewWas = post.GetDebugView();
+      const ReadScreen = () => {
+        const w = gl.drawingBufferWidth;
+        const h = gl.drawingBufferHeight;
+        const pixels = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        let min = 255;
+        let max = 0;
+        let sum = 0;
+        let count = 0;
+        for (let i = 0; i < pixels.length; i += 4 * 17) {
+          const v = pixels[i];
+          min = Math.min(min, v);
+          max = Math.max(max, v);
+          sum += v;
+          count += 1;
+        }
+        return { min, max, mean: sum / count };
+      };
+      out.debugViews = {};
+      for (const id of ["exposure", "lensFlare", "lensDirt", "lutCheck"]) {
+        post.SetDebugView(id);
+        P.StepFrames(3, 1 / 60);
+        out.debugViews[id] = ReadScreen();
+      }
+      post.SetDebugView(viewWas);
+      P.StepFrames(2, 1 / 60);
+    }
+
     // 复位到正常状态，别把测试留下的 uniform 带进后面的取证
     exposure.SetMode("anchored");
     exposure.SetAnchorOverride(null);
@@ -559,8 +606,18 @@ async function GameSection(page, port, phase) {
     const meanOn = ReadMean();
     const state = post.exposurePass.ReadState(renderer);
     const skyName = game.sky.presetName;
+    // 关卡 id 直接问曝光 pass：`options.exposureAnchor` 就是 `phase.id`，
+    // 读它顺带验证了那条接线真的通到了 pass 里。
+    const levelId = post.exposurePass.anchorKey;
+    // 活性取证：抬头看天（亮度差很大），看自动曝光真的跟不跟、钳不钳。
+    const pitchWas = game.player.pitch;
+    game.player.pitch = 1.15;
+    game.StepFrames(120);
+    const lookUp = post.exposurePass.ReadState(renderer);
+    game.player.pitch = pitchWas;
+    game.StepFrames(90);
     return {
-      skyName, meanOff, meanOn, state,
+      skyName, levelId, meanOff, meanOn, state, lookUp,
       delta: Math.abs(meanOn - meanOff) / Math.max(meanOff, 1e-3),
       anchor: post.exposurePass.anchor,
       autoActive: post.exposurePass.active,
@@ -569,66 +626,163 @@ async function GameSection(page, port, phase) {
 }
 
 // ===========================================================================
+// 视觉对照图：三个时段 × （自动曝光开/关、光晕开/关、机位换到亮处）
+//
+// 走探针页而不是正片：一是十几秒就能建好场，二是这三个时段里 `dusk` 根本没有
+// 哪一关在用（正片七关只有 chuchuanDay/smokyDay×3/night/dawn/burningStreet），
+// 只有探针页能把它摆出来。锚点用**当前机位实测值**现装 —— 于是默认机位那两张
+// 必然重合（这正是要给人看的），而抬头看天那两张必然分开。
+// ===========================================================================
+
+async function ShotSection(page, port, preset) {
+  await page.goto(
+    `http://127.0.0.1:${port}/Taierzhuang1938/Probe.html?quality=high&preset=${preset}&scene=street&gi=0`,
+    { waitUntil: "load", timeout: 180000 },
+  );
+  await page.waitForFunction(() => window.Probe?.state?.ready, null, { timeout: 240000 });
+
+  const Setup = (options) => page.evaluate((o) => {
+    const P = window.Probe;
+    const post = P.post;
+    post.SetDebugView(o.view || "final");
+    post.SetAutoExposure(o.auto);
+    post.preset.lensFlare = o.flare;
+    P.camera.rotation.x = o.pitch;
+    // 锚点 = 默认机位（pitch 0）实测的平均场景亮度。先在默认机位量一次再装上。
+    if (o.anchor !== null) {
+      post.exposurePass.SetAnchorOverride({ logLum: o.anchor, evUp: 2, evDown: 2 });
+    }
+    post.exposurePass.RequestReset();
+    P.StepFrames(40, 1 / 60);
+    return post.exposurePass.ReadState(P.renderer);
+  }, options);
+
+  // 1) 先在默认机位量锚点（自动曝光跑着，但没有锚 = 只测量不作用）
+  const base = await Setup({ auto: true, flare: false, pitch: 0, anchor: null });
+  const anchor = base.avgLog;
+
+  const Shot = async (name, options) => {
+    const state = await Setup({ ...options, anchor });
+    await page.waitForTimeout(220);
+    const file = path.join(SHOTS_DIR, `${preset}_${name}.png`);
+    await page.screenshot({ path: file });
+    console.log(`shot ${preset}_${name}`.padEnd(38)
+      + ` gain=${state.gain.toFixed(3)} ev=${state.ev.toFixed(2)}`
+      + ` avgLog=${state.avgLog.toFixed(2)}  ${file}`);
+  };
+
+  // 默认机位：开/关必须看不出差别（增益锚在这儿，精确 1.0）
+  await Shot("A_default_autoOff", { auto: false, flare: false, pitch: 0 });
+  await Shot("B_default_autoOn", { auto: true, flare: false, pitch: 0 });
+  // 抬头看天：亮度差一大截，自动曝光必须压下来
+  await Shot("C_skyward_autoOff", { auto: false, flare: false, pitch: 0.62 });
+  await Shot("D_skyward_autoOn", { auto: true, flare: false, pitch: 0.62 });
+  // 镜头光晕开/关（同一机位、同一曝光）
+  await Shot("E_skyward_flareOff", { auto: true, flare: false, pitch: 0.62 });
+  await Shot("F_skyward_flareOn", { auto: true, flare: true, pitch: 0.62 });
+  // 调试视图各留一张（直方图条 + EV 数字、LUT 采样校验）
+  await Shot("G_debugExposure", { auto: true, flare: false, pitch: 0, view: "exposure" });
+  await Shot("H_debugLutCheck", { auto: true, flare: false, pitch: 0, view: "lutCheck" });
+  await Shot("I_debugLensFlare", { auto: true, flare: true, pitch: 0.62, view: "lensFlare" });
+  await page.evaluate(() => window.Probe.post.SetDebugView("final"));
+}
+
+// ===========================================================================
 // 跑
 // ===========================================================================
 
 const server = await ServeRoot(rootDir, 0);
 const port = server.address().port;
-const browser = await LaunchBrowser();
 
 let probe = null;
 let probeBaseline = null;
 let probeCurrent = null;
 const gameRows = [];
 
+/**
+ * **每一段各起一个浏览器**（跑完就关），不是同一个浏览器开三个页面。
+ *
+ * 事故：探针页 + 基线页 + 正片页挤在同一个 headless Chromium 里跑完之后，
+ * 第三个上下文会零星冒出 `THREE.WebGLProgram: Shader Error ... VALIDATE_STATUS
+ * false`（Program Info Log 是空的）并把 GL 推进 1282，紧接着的半浮点
+ * readRenderTargetPixels 全读回 0 —— 表现是「phase=0 的曝光增益是 0」，
+ * 而同一个页面单独跑一遍完全正常（增益 1.0029）。那不是渲染缺陷，是上下文压力。
+ */
+async function WithBrowser(tag, run) {
+  const browser = await LaunchBrowser();
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  WatchPage(page, tag);
+  try {
+    await run(page);
+  } finally {
+    await browser.close();
+  }
+}
+
 try {
   if (!CALIBRATE) {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-    WatchPage(page, "probe");
-    await page.goto(
-      `http://127.0.0.1:${port}/Taierzhuang1938/Probe.html?quality=high&preset=smokyDay&scene=street&gi=0`,
-      { waitUntil: "load", timeout: 180000 },
-    );
-    await page.waitForFunction(() => window.Probe?.state?.ready, null, { timeout: 240000 });
-    // 逐比特基线要在动过任何 uniform **之前**取
-    if (BASELINE) {
-      await page.evaluate(() => { window.Probe.post.SetAutoExposure(false); window.Probe.post.SetLutEnabled(false); });
-      probeCurrent = await DeterministicLdr(page);
-      await page.evaluate(() => { window.Probe.post.SetAutoExposure(true); window.Probe.post.SetLutEnabled(true); });
-    }
-    probe = await ProbeSection(page);
-    await page.close();
+    await WithBrowser("probe", async (page) => {
+      await page.goto(
+        `http://127.0.0.1:${port}/Taierzhuang1938/Probe.html?quality=high&preset=smokyDay&scene=street&gi=0`,
+        { waitUntil: "load", timeout: 180000 },
+      );
+      await page.waitForFunction(() => window.Probe?.state?.ready, null, { timeout: 240000 });
+      // 逐比特基线要在动过任何 uniform **之前**取。三位新开关全部关掉 ——
+      // 探针页没有 graphics 表，high 档的 preset.lensFlare 出厂是开的。
+      if (BASELINE) {
+        await page.evaluate(() => {
+          const post = window.Probe.post;
+          post.SetAutoExposure(false);
+          post.SetLutEnabled(false);
+          post.preset.lensFlare = false;
+        });
+        probeCurrent = await DeterministicLdr(page);
+        await page.evaluate(() => {
+          const post = window.Probe.post;
+          post.SetAutoExposure(true);
+          post.SetLutEnabled(true);
+          post.preset.lensFlare = true;
+        });
+      }
+      probe = await ProbeSection(page);
+    });
   }
 
   if (BASELINE) {
     const baselineServer = await ServeRoot(path.resolve(BASELINE), 0);
     const basePort = baselineServer.address().port;
-    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-    WatchPage(page, "baseline");
-    await page.goto(
-      `http://127.0.0.1:${basePort}/Taierzhuang1938/Probe.html?quality=high&preset=smokyDay&scene=street&gi=0`,
-      { waitUntil: "load", timeout: 180000 },
-    );
-    await page.waitForFunction(() => window.Probe?.state?.ready, null, { timeout: 240000 });
-    probeBaseline = await DeterministicLdr(page);
-    await page.close();
+    await WithBrowser("baseline", async (page) => {
+      await page.goto(
+        `http://127.0.0.1:${basePort}/Taierzhuang1938/Probe.html?quality=high&preset=smokyDay&scene=street&gi=0`,
+        { waitUntil: "load", timeout: 180000 },
+      );
+      await page.waitForFunction(() => window.Probe?.state?.ready, null, { timeout: 240000 });
+      probeBaseline = await DeterministicLdr(page);
+    });
     baselineServer.close();
   }
 
-  if (!PROBE_ONLY) {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-    WatchPage(page, "game");
-    for (const phase of GAME_PHASES) {
+  if (SHOTS_DIR) {
+    fs.mkdirSync(SHOTS_DIR, { recursive: true });
+    for (const preset of ["dusk", "night", "burningStreet"]) {
       // eslint-disable-next-line no-await-in-loop
-      gameRows.push({ phase, ...(await GameSection(page, port, phase)) });
+      await WithBrowser(`shots:${preset}`, (page) => ShotSection(page, port, preset));
     }
-    await page.close();
+    console.log(`note 对照图落在 ${SHOTS_DIR}`);
+  }
+
+  if (!PROBE_ONLY) {
+    await WithBrowser("game", async (page) => {
+      for (const phase of GAME_PHASES) {
+        // eslint-disable-next-line no-await-in-loop
+        gameRows.push({ phase, ...(await GameSection(page, port, phase)) });
+      }
+    });
   }
 } catch (error) {
   problems.push(`THROW ${String(error).slice(0, 500)}`);
 }
 
-await browser.close();
 server.close();
 
 // ---------------------------------------------------------------------------
@@ -638,17 +792,23 @@ if (CALIBRATE) {
   console.log("\n=== 曝光锚点标定（填进 Data_Tuning_Camera.SKY_EXPOSURE.logLum）===");
   const byPreset = new Map();
   for (const row of gameRows) {
-    console.log(`phase=${row.phase} sky=${row.skyName}`
+    console.log(`phase=${row.phase} level=${row.levelId} sky=${row.skyName}`
       + ` avgLog=${row.state.avgLog.toFixed(4)}`
       + ` ev=${row.state.ev.toFixed(3)} gain=${row.state.gain.toFixed(4)}`
       + ` meanOff=${row.meanOff.toFixed(2)} meanOn=${row.meanOn.toFixed(2)}`);
     if (!byPreset.has(row.skyName)) byPreset.set(row.skyName, []);
     byPreset.get(row.skyName).push(row.state.avgLog);
   }
-  console.log("\n汇总（同一预设多关时取平均）：");
+  console.log("\n逐关锚点（抄进 Data_Tuning_Camera.EXPOSURE_ANCHORS）：");
+  for (const row of gameRows) {
+    console.log(`  ${row.levelId}: { logLum: ${row.state.avgLog.toFixed(2)} },`
+      + `   // ${row.skyName}`);
+  }
+  console.log("\n按时段预设汇总（只供参考：共用预设的多关亮度差很大）：");
   for (const [name, values] of byPreset) {
     const mean = values.reduce((a, b) => a + b, 0) / values.length;
-    console.log(`  ${name}: { logLum: ${mean.toFixed(2)}, … }`);
+    const spread = Math.max(...values) - Math.min(...values);
+    console.log(`  ${name}: mean=${mean.toFixed(2)} spread=${spread.toFixed(2)} EV`);
   }
   for (const problem of problems) console.log(`WARN ${problem}`);
   process.exit(0);
@@ -696,6 +856,11 @@ if (!probe) {
     && probe.passOrder.indexOf("lensFlare") > probe.passOrder.indexOf("bloom")
     && probe.passOrder.indexOf("lensFlare") < probe.passOrder.indexOf("composite"),
     JSON.stringify(probe.passOrder));
+  for (const [id, view] of Object.entries(probe.debugViews)) {
+    // 有层次 = 真的在画（恒黑 / 恒平色都会被这一条拓住）
+    Check(`调试视图「${id}」真的出画`,
+      view.max - view.min > 24 && view.mean > 2, JSON.stringify(view));
+  }
   Check("无 GL 错误", probe.glError === 0, `glError=${probe.glError}`);
   if (probe.perf.available) {
     Check("自动曝光 GPU ≤ 0.15 ms",
@@ -736,11 +901,32 @@ if (BASELINE) {
 }
 
 for (const row of gameRows) {
-  Check(`phase=${row.phase}（${row.skyName}）自动曝光开/关的默认机位亮度差 < 5%`,
+  Check(`phase=${row.phase}（${row.levelId} / ${row.skyName}）自动曝光开/关的默认机位亮度差 < 5%`,
     row.delta < 0.05,
     `meanOff=${row.meanOff.toFixed(2)} meanOn=${row.meanOn.toFixed(2)}`
     + ` delta=${(row.delta * 100).toFixed(2)}% gain=${row.state.gain.toFixed(4)}`
     + ` avgLog=${row.state.avgLog.toFixed(3)} anchor=${JSON.stringify(row.anchor)}`);
+  Check(`phase=${row.phase} 锚点已登记且出生机位增益 ≈ 1.0`,
+    Number.isFinite(row.anchor.logLum) && Math.abs(row.state.gain - 1) < 0.03,
+    `logLum=${row.anchor.logLum} gain=${row.state.gain.toFixed(4)}`);
+  // 活性 + 钳位：抬头看天后场景亮度变了，增益必须跟着动，
+  // 且不得越过该时段的 EV 钳。亮度没真变时这一条自动跳过。
+  const moved = Math.abs(row.lookUp.avgLog - row.state.avgLog);
+  const gainMin = Math.pow(2, -(row.anchor.evDown ?? 1.5)) - 0.02;
+  const gainMax = Math.pow(2, row.anchor.evUp ?? 1.5) + 0.02;
+  const inClamp = row.lookUp.gain >= gainMin && row.lookUp.gain <= gainMax;
+  if (moved > 0.3) {
+    const right = row.lookUp.avgLog > row.state.avgLog
+      ? row.lookUp.gain < row.state.gain : row.lookUp.gain > row.state.gain;
+    Check(`phase=${row.phase} 抬头看天时增益方向正确且在 EV 钳内`,
+      right && inClamp,
+      `avgLog ${row.state.avgLog.toFixed(2)}→${row.lookUp.avgLog.toFixed(2)}`
+      + ` gain ${row.state.gain.toFixed(3)}→${row.lookUp.gain.toFixed(3)}`
+      + ` 钳[${gainMin.toFixed(3)}, ${gainMax.toFixed(3)}]`);
+  } else {
+    Check(`phase=${row.phase} 抬头看天时增益仍在 EV 钳内`, inClamp,
+      `gain=${row.lookUp.gain.toFixed(3)} 钳[${gainMin.toFixed(3)}, ${gainMax.toFixed(3)}]`);
+  }
 }
 
 Check("页面无控制台报错", problems.length === 0, problems.slice(0, 4).join(" | "));
