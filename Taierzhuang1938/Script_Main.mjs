@@ -2430,16 +2430,11 @@ async function Boot() {
       get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },
       // 物理同理走取值器：换关重建 PhysicsWorld，Debug Rendering 的碰撞体线框要跟着换
       get physics() { return physics; },
-      // 场景编辑器的「序章 · 出川」是一段独立过场，不能用 JumpToLevel(0)
-      // 冒充。跳转到稳定预览入口，同时清掉会把编辑器测试/直跳关带过去的
-      // query，避免新序章又落到界河战斗切片。
-      OpenProloguePreview: () => {
-        const url = new URL(window.location.href);
-        url.searchParams.set("preview", "CS_Chuchuan");
-        url.searchParams.delete("phase");
-        url.searchParams.delete("menu");
-        window.location.assign(url.toString());
-      },
+      // 这里原来挂着 `OpenProloguePreview`：场景编辑器「关卡切片」列表第一条是
+      // 「序章 · 出川（车厢）」，点了跳去 `?preview=CS_Chuchuan`。序章 2026-09-06 起
+      // 退出选章、要并进第一关，那条列表项与这个跳转 2026-09-07 一并摘掉
+      //（见 Script_EditorScene.BuildLevelUi）。`?preview=CS_Chuchuan` 这条 URL 本身
+      // 仍然管用 —— 审片、Script_CutsceneShot 出图与 EditorTest 第 9 节都直接 goto。
       sceneMode: FULL_SCENE ? FULL_SCENE_VIEW : "level",
       ApplyEnvironment: (name) => ApplySkyPreset(name),
       GetEnvironmentState: () => ({
@@ -2627,9 +2622,8 @@ function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField;
  * 进／出玩法测试靶场：改 `?range=1` 再重载。
  *
  * 顺带清掉三个会把上一趟状态带过去的 query：`phase`（靶场只有一关，带过去会被
- * 夹成 0；从靶场退出时又会把玩家按到某一关的切片上）、`preview`（新序章预览与
+ * 夹成 0；从靶场退出时又会把玩家按到某一关的切片上）、`preview`（序章预览与
  * 靶场是互斥的两条旁路）、`menu=0`（进去就没有暂停菜单，也就没有退出靶场的路）。
- * 与编辑器那条 OpenProloguePreview 同一个套路。
  */
 function GoToSandbox(key) {
   const url = new URL(window.location.href);

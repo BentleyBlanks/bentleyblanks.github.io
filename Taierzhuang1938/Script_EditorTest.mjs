@@ -2525,11 +2525,17 @@ Check("车厢静态场景保留布景种子数据与环境测试",
   `${carriageEditor.seedValues.length} 项`);
 
 // ---------------------------------------------------------------------------
-// 10) 新版序章预览入口：独立收口、单次交接、无旧 L0 AI
+// 10) 序章预览（URL 直达）：独立收口、单次交接、无旧 L0 AI
 // ---------------------------------------------------------------------------
-const previewHref = await page.getAttribute("#bootPreview", "href").catch(() => null);
-Check("开发入口明确指向新版序章预览",
-  previewHref === "?preview=CS_Chuchuan&autoplay=1", `href=${previewHref}`);
+// 加载画面上**不许**再挂序章入口。序章 2026-09-06 起退出选章、要并进第一关；
+// 原来 #bootFoot 里那条「新版序章预览（开发）」链接 2026-09-07 摘掉，玩家看得见的
+// 入口一条都不指向已退出正片的内容。这一条守住它不被顺手加回来 ——
+// 下面整节验的预览起播与收口全部走 `?preview=CS_Chuchuan` 直达，不依赖任何按钮。
+// 走 evaluate 而不是 getAttribute：后者对**不存在**的选择器要等满默认超时才 reject，
+// 一条「东西不在」的断言不该花三十秒。
+const previewHref = await page.evaluate(() =>
+  document.getElementById("bootPreview")?.getAttribute("href") ?? null);
+Check("加载画面上不再挂序章预览入口", previewHref === null, `href=${previewHref}`);
 
 // Esc 跳过之后要把**补出来的卡片**也读完才算收口（`cardHold`，出川那张 8.4 s）。
 // 原来写的 500 帧 = 8.33 s，比卡片还短 —— 能不能过全看那一刻真实 rAF 多插了几帧，
@@ -2645,22 +2651,26 @@ Check("从主菜单打开场景编辑器会交还菜单相机",
   !menuToEditor.menu && !menuToEditor.menuVisible && menuToEditor.editor === "scene"
     && menuToEditor.capturing, JSON.stringify(menuToEditor));
 
+// 「关卡切片」列表只列切片。序章（CS_Chuchuan）是一段过场、不是切片，2026-09-07
+// 连同 `game.OpenProloguePreview` 一起摘掉 —— 编辑器里也不再留一条通往已退出正片
+// 内容的入口。这一条同时守住：摘掉之后列表仍然从 PHASES[0] 起完整列出，
+// 点战斗切片走的还是 JumpToLevel（下面 waitForFunction 验它真的换了切片）。
 const prologueRow = await page.evaluate(() => {
   const active = window.Taierzhuang.editor.active;
-  let requested = false;
-  // 不在这一条真的重载页面；替身只验证列表项会走独立的新版序章入口，
-  // 而不是误落到某一片战斗切片。真正预览页的完整起播与收口已在第 9 节验证。
-  active.host.game.OpenProloguePreview = () => { requested = true; };
   const rows = [...active.levelList.root.children];
   const prologue = rows.find((row) => row.textContent.includes("序章 · 出川（车厢）"));
   const battleRow = rows.find((row) => row.textContent.includes("往南的路"));
-  prologue?.click();
   // 走 ListBox 行的真实 click，不直接调 JumpToLevel，确保 UI 选关链路也在测试内。
   battleRow?.click();
-  return { requested, present: !!prologue, battleRowPresent: !!battleRow };
+  return {
+    present: !!prologue,
+    battleRowPresent: !!battleRow,
+    hasPrologueHook: typeof active.host.game.OpenProloguePreview === "function",
+    firstRow: rows[0]?.textContent || null,
+  };
 });
-Check("场景编辑器列出新版车厢序章并走独立入口",
-  prologueRow.present && prologueRow.requested && prologueRow.battleRowPresent,
+Check("场景编辑器的关卡切片列表不再列序章过场",
+  !prologueRow.present && !prologueRow.hasPrologueHook && prologueRow.battleRowPresent,
   JSON.stringify(prologueRow));
 await page.waitForFunction(() => {
   const T = window.Taierzhuang;

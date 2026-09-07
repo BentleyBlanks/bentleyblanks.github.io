@@ -102,6 +102,15 @@ Profiler 独立窗口复制入口的主题样式 URL，与主页面使用同一�
 界河白盒与过场预览不再列入选章，避免测试入口越积越多。它们的内部直达 query 仍保留：
 `?jiehe=1` 服务地形回归与人工验收，`?preview=CS_Chuchuan` 服务序章预览。
 
+**玩家看得见的入口一条都不许指向已退出正片的内容。** 2026-09-07 按这条清了两处：
+加载画面页脚那条「新版序章预览（开发）」链接（`#bootPreview`，`index.html` + `Style_Game.css`），
+与场景编辑器「关卡切片」列表第一条「序章 · 出川（车厢）」及其 `game.OpenProloguePreview`
+跳转（`Script_EditorScene` + `Script_Main`）。序章 2026-09-06 起退出选章、要并进第一关，
+留着这两条只会让人以为它还是一关。加载画面页脚现在只有「进 城」一颗按钮；
+审片、出图与 `Script_EditorTest` 第 10 节仍从 `?preview=CS_Chuchuan` 直达，一样也没少。
+两条闸在 `Script_EditorTest`：「加载画面上不再挂序章预览入口」与
+「场景编辑器的关卡切片列表不再列序章过场」。
+
 这些入口都**不进 `phases`**：菜单另有一份 `entries = [...phases, ...sandboxes]`
 专给列表与键盘上下用，而进度、「继续」、「下一关」标记与 `DefaultLevel()` 一律只按七章数。
 沙盒简报直接读各自的 phase；预览使用程序化靶标与入口标识，显示“不计入战役进度”。

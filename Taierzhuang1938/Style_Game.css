@@ -719,12 +719,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 #bootStart[disabled] { opacity: 0.3; cursor: default; }
 #bootStart:not([disabled]):hover { background: var(--ui-selection); color: var(--ui-gold); border-color: var(--ui-gold); }
-#bootPreview {
-  color: var(--dim); font-size: 11px; letter-spacing: 0.12em;
-  text-decoration: none; border-bottom: 1px solid rgba(230,223,205,0.24);
-  padding-bottom: 2px; opacity: 0.82;
-}
-#bootPreview:hover { color: var(--paper); border-color: var(--warn); opacity: 1; }
+/* `#bootPreview`（序章预览链接）2026-09-07 随加载画面上的入口一起摘掉，见 index.html。 */
 
 /* 章节卡：阶段开场那一行大字 */
 .hudTitle {
