@@ -30,8 +30,15 @@
 //   · volumetrics —— 2026-09 froxel 体积雾落地：medium/high/ultra 开，low 保留解析雾。
 //        网格与时段参数在 `Data_Tuning_Volumetrics.mjs`（这张表只留开关位，
 //        免得画质档与美术意图又混成一张表）。
-//   · 其余键（csm / gtao / ssil / autoExposure /
-//     lensFlare / lut / dof / taaUpscale / contactShadows）
+//   · gtao / ssil / aoScale —— 2026-09 GTAO 落地（`Script_PostGtao.mjs`）：
+//        `ssao` 保留为 **AO 总闸**（消融与调试面板的可用性都读它，语义不许变），
+//        `gtao` 存的是**档位名**（`Data_Tuning_Gtao.GTAO_TIERS` 的键），
+//        `ssil` 是屏幕空间近场间接光的构造期开关。
+//        `aoScale` 由 0.5/0.6/0.75/1.0 改为 0.5/0.5/0.5/1.0：GTAO 的每像素成本
+//        是旧 SSAO 的两倍多（地平线搜索 + 弯曲法线 + 位掩码），而它在半分辨率上
+//        配联合双边升采样的画质仍然明显好于旧 SSAO 的 0.75 —— 详见
+//        docs/Data_TechRenderPipeline.md「GTAO / SSIL / 镜面遮蔽」一节的实测表。
+//   · 其余键（csm / autoExposure / lensFlare / lut / dof / taaUpscale / contactShadows）
 //     —— **本阶段全部为占位**，值 = 与今天等价（即「不启用新东西」）。
 //        对应子系统落地时把自己那一位改成实际档位，并在这里补出处注释。
 //
@@ -44,7 +51,9 @@
  * 一档画质 = 一整套 pass 开关与旋钮。
  *
  * 键的语义（布尔 = 开关，数字 = 旋钮）：
- *   ssao          屏幕空间环境光遮蔽（半分辨率 + 双边模糊）
+ *   ssao          环境光遮蔽**总闸**（2026-09 起实现是 GTAO；false = 整趟不跑）
+ *   gtao          GTAO 档位名（Data_Tuning_Gtao.GTAO_TIERS 的键）；false = 关
+ *   ssil          屏幕空间近场间接光（构造期开关，与 GTAO 同一趟地平线搜索）
  *   aoScale       AO 靶相对主靶的边长比例
  *   bloomLevels   泛光金字塔级数
  *   godrays       屏幕空间太阳拖影（还要 options.godStrength > 0 才真跑）
@@ -64,12 +73,6 @@
  *   ——— 以下为后续子系统的占位位，本阶段一律「等价于今天」———
  *   csm           级联阴影（今天：单张 66 m 跟随框，false）
  *   contactShadows 屏幕空间接触阴影
- *   gtao          GTAO（将来替换 ssao 那一位）
- *   ssil          屏幕空间间接光
- *   atmosphere    物理大气（Hillaire 2020 四张 LUT）。关掉 = 退回旧的解析天空，
- *                 天穹与大气透视都不再更新。LUT 分辨率不在这里，跟 `?quality=`
- *                 走（见 Script_Atmosphere.ATMOSPHERE_TIERS）——
- *                 它是构造期的靶尺寸，和 MSAA 采样数同一类，热切没有意义。
  *   autoExposure  自动曝光（今天：时段预设手调的常数曝光）
  *   lensFlare     镜头光晕
  *   lut           3D LUT 调色（今天：lift/gain + 分离调色）
@@ -85,8 +88,6 @@
 const RESERVED_OFF = {
   csm: false,
   contactShadows: false,
-  gtao: false,
-  ssil: false,
   autoExposure: false,
   lensFlare: false,
   lut: false,
@@ -101,9 +102,14 @@ export const QUALITY_PRESETS = {
   // 在集显上是实打实的带宽，low 档的定位就是"能跑"。
   // 但这一位只是默认值不是上限 —— 画质面板可以运行时开关（SetTaaEnabled），
   // low 档玩家想要也给得了，靶到那时候才建。
+  // AO 分档（2026-09 GTAO）：low 出厂不开 AO（`ssao: false`），但 `gtao` 仍写
+  // "low" —— 玩家在 low 上手动打开时走 1 切片 4 步无时域的最便宜那一档，
+  // 而不是掉进 high 的 2×6。SSIL 只给 high / ultra：它要多一张颜色历史靶
+  // 与每采样一次颜色读，medium 的定位是"1080p 稳 60"。
   low: {
     ...RESERVED_OFF,
-    ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
+    ssao: false, gtao: "low", ssil: false,
+    bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
     aoScale: 0.5, sharpen: 0.14, taa: false,
     velocity: true, hzb: true, atmosphere: true,
     // low 不跑 SSR：连靶都不建，材质也不编入补丁（`ssr` 进 cache key）。
@@ -119,8 +125,9 @@ export const QUALITY_PRESETS = {
   medium: {
     ...RESERVED_OFF,
     clusteredLights: true,   // 局部光预算 32 盏（Data_Tuning_Lights.CLUSTER_TIERS.medium）
-    ssao: true, bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
-    aoScale: 0.6, sharpen: 0.18, taa: true,
+    ssao: true, gtao: "medium", ssil: false,
+    bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
+    aoScale: 0.5, sharpen: 0.18, taa: true,
     velocity: true, hzb: true, atmosphere: true,
     // medium：半分辨率 32 步，**不做空间解算**（只有中心那一条随机射线），
     // 噪声全交给时域累积压。静止画面收敛得和 high 一样干净，动起来会脏一点。
@@ -133,8 +140,9 @@ export const QUALITY_PRESETS = {
   high: {
     ...RESERVED_OFF,
     clusteredLights: true,   // 局部光预算 64 盏（Data_Tuning_Lights.CLUSTER_TIERS.high）
-    ssao: true, bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
-    aoScale: 0.75, sharpen: 0.22, taa: true,
+    ssao: true, gtao: "high", ssil: true,
+    bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
+    aoScale: 0.5, sharpen: 0.22, taa: true,
     velocity: true, hzb: true, atmosphere: true,
     // high：半分辨率 48 步 + 4 抽样 ratio estimator + 时域。这一档是性能红线所在
     //（3394×1348 实测 hiz+trace+resolve+temporal 合计见 docs「屏幕空间反射」）。
@@ -144,7 +152,8 @@ export const QUALITY_PRESETS = {
   ultra: {
     ...RESERVED_OFF,
     clusteredLights: true,   // 局部光预算 128 盏（Data_Tuning_Lights.CLUSTER_TIERS.ultra）
-    ssao: true, bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,
+    ssao: true, gtao: "ultra", ssil: true,
+    bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,
     aoScale: 1.0, sharpen: 0.22, taa: true,
     velocity: true, hzb: true, atmosphere: true,
     // ultra：全分辨率追踪（不再有半分辨率上采样的边缘渗色）+ 64 步 + 8 抽样解算。

@@ -143,51 +143,278 @@ export function PatchKeysOf(material) {
 }
 
 // ===========================================================================
-// 现役补丁四路：屏幕空间 AO / 探针体 GI（含三态与全部调试视图）/
-// 簇状局部光（2026-09 新增，见 Script_ClusteredLights）/ 破口裁切。
-// 前三路里的 AO 与 GI 是 2026-09 帧图重构从 `Script_Materials.InjectIndirectLighting`
+// 现役补丁：ORM 三合一 / 屏幕空间 AO+SSIL / 探针体 GI（含三态与全部调试视图）/
+// 屏幕空间反射 / 簇状局部光 / 破口裁切。
+// AO 与 GI 是 2026-09 帧图重构从 `Script_Materials.InjectIndirectLighting`
 // 原样搬来的，GLSL 一个字没改（拼接顺序与空白有差异，编译结果相同）。
 // ===========================================================================
 
 /**
- * 屏幕空间 AO。
+ * ORM 三合一：把 `metalnessMap` / `aoMap` 从材质上摘掉，改成从 `roughnessMap`
+ * 那一个采样器里读 `.b` / `.r`。**这是采样器预算的头号腾槽手段（省 2 个单元）。**
  *
- * `<common>` 那一段同时是**「屏幕空间输入」的公共声明块** —— SSR / 接触阴影 /
- * GTAO 要按 `gl_FragCoord.xy / 屏幕分辨率` 取自己的全屏图时，直接用这里已经声明
- * 好的 `uScreenResolution`（就是 `uSsaoResolution`，`Script_Main` 喂的是**主渲染靶**
- * 的尺寸而不是 AO 靶的尺寸 —— 这条踩过两轮：喂错了整张 AO 会放大 1.333 倍并错位）。
- * 没有 ssao 的档位（low）不含这一段，那些补丁得自带一份分辨率 uniform。
+ * ## 为什么必须摘
+ * 本仓的 ORM 是一张图喂三个槽（glTF 的 metallic-roughness 打包约定）。
+ * three **不做去重**：`roughnessMap` / `metalnessMap` / `aoMap` 各声明一个
+ * `uniform sampler2D`，即使绑的是同一张纹理也各占一个纹理单元。ANGLE-D3D11 上
+ * `MAX_TEXTURE_IMAGE_UNITS = 16`，八个子系统合流之后静态墙材质要 17 个 ——
+ * 超了程序不链接、那只材质整只不画（口径见 docs §1.8 的采样器预算表）。
  *
- * `<aomap_fragment>` 那一段是**SSAO 唯一允许生效的位置**：那里 aoMap 已经乘过、
- * 直接光与间接光都累加完，往后就是加总。乘到最终颜色上等于连直接光一起压黑。
+ * ## 为什么是「留 roughnessMap、摘另外两个」而不是自己声明一张 uOrmMap
+ * 留着三方那一个的话，采样器、uv varying（`vRoughnessMapUv`）与 uv 变换矩阵
+ * 全部由 three 自己维护，一个字都不用猜。自己声明 `uOrmMap` 就得自己接 uv：
+ * `repeat` 是逐材质克隆的，猜错一次整张贴图就错位。
+ *
+ * ## 逐像素等价的依据
+ *   · `metalnessMap` 与 `roughnessMap` 是**同一个 Texture 对象**（下面按对象相等
+ *     判定，不等就不折叠），所以 uv 变换矩阵与通道号一定相同；
+ *   · `aoMap` 同理。r152 起 aoMap 走的是 `texture.channel`（缺省 0 = `uv`），
+ *     **不再硬绑 uv1**，与 roughnessMap 落在同一套 `vRoughnessMapUv` 上；
+ *   · 下面 `<aomap_fragment>` 那一段是三方 `aomap_fragment` chunk 的逐行搬运
+ *     （含 clearcoat / sheen / `computeSpecularOcclusion` 三个分支）。
+ *
+ * @param {{metalness:boolean, ao:boolean, aoIntensity:{value:number}}|null} orm
+ *        `FoldOrmMaps()` 的返回值。
  */
-export function MakeSsaoPatch(ssao) {
+export function MakeOrmPatch(orm) {
+  if (!orm || (!orm.metalness && !orm.ao)) return null;
+  return MakePatch({
+    key: `orm${orm.metalness ? "m" : ""}${orm.ao ? "a" : ""}`,
+    uniforms: (uniforms) => { uniforms.uOrmAoIntensity = orm.aoIntensity; },
+    // **不加 define**：`onBeforeCompile` 里的 `shader.defines` 就是 `material.defines`
+    // 本身，往里写一位会永久留在材质上，而 `getParameters` 是在 onBeforeCompile
+    // **之前**读它的 —— 于是同一份材质会先按"没有这一位"编一次、重编时再按
+    // "有这一位"编一次，`renderer.info.programs` 里凭空多出一份重复程序。
+    // 下游（B7 的微阴影）要知道 ORM 折没折，走 JS 侧的补丁参数，不走 define。
+    fragment: [
+      ["#include <common>", /* glsl */`
+        uniform float uOrmAoIntensity;
+        // 本像素的 ORM texel 与材质自带的遮蔽量。后者给 B7 的微阴影用
+        // （它挂在 <lights_fragment_end>，比 <aomap_fragment> 早，读不到下面算的值）。
+        vec4 gOrmTexel = vec4(1.0);
+        float gMaterialAo = 1.0;`],
+      // texelRoughness 是三方在 <roughnessmap_fragment> 里声明的**函数作用域**变量，
+      // chunk 之后仍在作用域内 —— 直接接过来，一次纹理取样都不多花。
+      ["#include <roughnessmap_fragment>", /* glsl */`
+        #ifdef USE_ROUGHNESSMAP
+          gOrmTexel = texelRoughness;
+          gMaterialAo = gOrmTexel.r;
+        #endif`],
+      ...(orm.metalness ? [["#include <metalnessmap_fragment>", /* glsl */`
+        #ifdef USE_ROUGHNESSMAP
+          metalnessFactor *= gOrmTexel.b;
+        #endif`]] : []),
+      // 三方 aomap_fragment 的逐行搬运。**必须排在 GTAO 之前**（补丁列表里 ORM 是
+      // 第一路）：材质自带的遮蔽是烘进贴图的小尺度细节，屏幕空间那一份压的是
+      // 同一批间接光，顺序反了等于把屏幕空间 AO 又乘了一遍材质 AO 的倒数。
+      ...(orm.ao ? [["#include <aomap_fragment>", /* glsl */`
+        #ifdef USE_ROUGHNESSMAP
+        {
+          float ormAo = (gOrmTexel.r - 1.0) * uOrmAoIntensity + 1.0;
+          reflectedLight.indirectDiffuse *= ormAo;
+          #if defined( USE_CLEARCOAT )
+            clearcoatSpecularIndirect *= ormAo;
+          #endif
+          #if defined( USE_SHEEN )
+            sheenSpecularIndirect *= ormAo;
+          #endif
+          #if defined( USE_ENVMAP ) && defined( STANDARD )
+            float ormDotNV = saturate(dot(geometryNormal, geometryViewDir));
+            reflectedLight.indirectSpecular *= computeSpecularOcclusion(ormDotNV, ormAo, material.roughness);
+          #endif
+          gMaterialAo = ormAo;
+        }
+        #endif`]] : []),
+    ],
+  });
+}
+
+/**
+ * 把一份材质的 ORM 折成一个采样器：摘掉 `metalnessMap` / `aoMap`（仅当它们与
+ * `roughnessMap` 是同一个 Texture 对象），返回给 `MakeOrmPatch` 的描述子。
+ *
+ * **幂等**：结果记在 `material.userData.ormUniforms`（纯 JSON，`clone()` 的
+ * `JSON.parse(JSON.stringify(userData))` 能原样带过去），第二次调用直接取回 ——
+ * 静态克隆、第一人称克隆、外部 GLB 重复配置三条路都会二次注入。
+ *
+ * 不折叠的情形（原样返回 null，材质保持三方默认）：没有 `roughnessMap`；
+ * 或者 `metalnessMap` / `aoMap` 是**另一张**图（那就不是打包 ORM，各读各的）。
+ */
+export function FoldOrmMaps(material) {
+  if (!material) return null;
+  if (material.userData.ormUniforms !== undefined) return material.userData.ormUniforms;
+  const rough = material.roughnessMap || null;
+  let folded = null;
+  if (rough) {
+    const metalness = material.metalnessMap === rough;
+    const ao = material.aoMap === rough;
+    if (metalness || ao) {
+      folded = {
+        metalness, ao,
+        aoIntensity: { value: ao ? (material.aoMapIntensity ?? 1) : 1 },
+      };
+      if (metalness) material.metalnessMap = null;
+      if (ao) material.aoMap = null;
+    }
+  }
+  material.userData.ormUniforms = folded;
+  return folded;
+}
+
+/**
+ * 环境光遮蔽 + 弯曲法线镜面遮蔽 + SSIL（2026-09 起，屏幕空间来源是
+ * `Script_PostGtao.mjs`）。
+ *
+ * `<common>` 那一段同时是**「屏幕空间输入」的公共声明块** —— SSR / 接触阴影
+ * 要按 `gl_FragCoord.xy / 屏幕分辨率` 取自己的全屏图时，直接用这里已经声明
+ * 好的 `uScreenResolution`（就是 `uSsaoResolution`，`Script_Main` 喂的是**主渲染靶**
+ * 的尺寸而不是 AO 靶的尺寸 —— 这条踩过两轮：喂错了整张 AO 会放大并错位）。
+ * 没有 AO 的档位（low 出厂）不含这一段，那些补丁得自带一份分辨率 uniform。
+ *
+ * `<aomap_fragment>` 那一段是**遮蔽唯一允许生效的位置**：那里 aoMap 已经乘过、
+ * 直接光与间接光都累加完（`lights_fragment_end` 在它前面），往后就是加总。
+ * 乘到最终颜色上等于连直接光一起压黑（契约 6）。
+ *
+ * 这一段做四件事，**顺序不能换**：
+ *   1) 联合双边升采样 —— AO 靶是半分辨率的（`aoScale`），直接双线性会在
+ *      深度断层上糊出一圈光晕。用 AO 靶 alpha 里存的线性视深做深度加权，
+ *      2×2 取样；`aoScale = 1` 时插值权重退化成 (1,0,0,0)，即精确直通。
+ *   2) 多次反弹 —— Jimenez 2016 的 `GTAOMultiBounce`。只乘可见度会把亮反照率
+ *      的凹角压得比现实黑（光在里面还会再弹几次）；这条三次多项式把它补回来，
+ *      对暗反照率退化成恒等（`max(ao, …)` 保证不会比可见度更暗）。
+ *   3) 镜面遮蔽 —— GTSO：可见性锥（轴 = 弯曲法线，张角来自 AO）与镜面锥
+ *      （轴 = 反射向量，张角来自粗糙度）的球冠相交。**替换了旧的
+ *      `pow(ao, 1+2·roughness)`** —— 那条只看 AO 标量，反射方向明明朝着开阔的
+ *      天空也照样压暗；有了弯曲法线才知道"被挡住的是哪半边"。
+ *   4) SSIL —— 近场反弹加进间接漫反射，**加在 AO 乘法之后**：AO 挖掉的正是
+ *      这一份，先加再乘等于把反弹光也压一遍（双重压暗）。
+ *
+ * uniform 包由 `Script_PostGtao.MakeAoUniforms` 造（正片与探针页共用）。
+ * 老调用点只传 `{ map, resolution, strength }` 也能编 —— 缺的那几项按"没有
+ * SSIL、AO 靶与主靶同尺寸"退化。
+ */
+export function MakeAmbientOcclusionPatch(ssao) {
   if (!ssao) return null;
   return MakePatch({
-    key: "ssao1",
+    key: "gtao1",
     uniforms: (uniforms) => {
       uniforms.uSsaoMap = ssao.map;
       uniforms.uSsaoResolution = ssao.resolution;
+      uniforms.uAoTexelResolution = ssao.aoResolution ?? ssao.resolution;
       uniforms.uSsaoStrength = ssao.strength;
+      uniforms.uSsilMap = ssao.ssilMap ?? { value: null };
+      uniforms.uSsilStrength = ssao.ssilStrength ?? { value: 0 };
     },
     fragment: [
       ["#include <common>", /* glsl */`
-        uniform sampler2D uSsaoMap;
-        uniform vec2 uSsaoResolution;
+        uniform sampler2D uSsaoMap;        // R=可见度 G,B=弯曲法线(oct) A=线性视深
+        uniform vec2 uSsaoResolution;      // **主渲染靶**尺寸
+        uniform vec2 uAoTexelResolution;   // AO 靶自己的尺寸（升采样要）
         uniform float uSsaoStrength;
+        uniform sampler2D uSsilMap;        // RGB=近场反弹辐照度（关着时是 1×1 全黑）
+        uniform float uSsilStrength;
         // 屏幕空间输入的公共别名：AO / SSR / 接触阴影共用这一份主靶分辨率。
-        #define uScreenResolution uSsaoResolution`],
+        #define uScreenResolution uSsaoResolution
+
+        vec3 AoOctDecode(vec2 e) {
+          vec2 f = e * 2.0 - 1.0;
+          vec3 n = vec3(f.x, f.y, 1.0 - abs(f.x) - abs(f.y));
+          float t = max(-n.z, 0.0);
+          n.x += n.x >= 0.0 ? -t : t;
+          n.y += n.y >= 0.0 ? -t : t;
+          return normalize(n);
+        }
+
+        // Jimenez et al. 2016, "Practical Realtime Strategies for Accurate
+        // Indirect Occlusion"（Activision）的 GTAOMultiBounce。
+        vec3 AoMultiBounce(float visibility, vec3 albedo) {
+          vec3 a =  2.0404 * albedo - 0.3324;
+          vec3 b = -4.7951 * albedo + 0.6417;
+          vec3 c =  2.7552 * albedo + 0.6903;
+          return max(vec3(visibility), ((visibility * a + b) * visibility + c) * visibility);
+        }
+
+        float AoFastAcos(float x) {
+          float v = abs(x);
+          float res = (-0.156583 * v + 1.57079632679) * sqrt(max(1.0 - v, 0.0));
+          return x >= 0.0 ? res : 3.14159265359 - res;
+        }
+
+        // 两个球冠相交的面积（Oat & Sander 2007, "Ambient Aperture Lighting"）。
+        float AoCapIntersection(float cosCap1, float cosCap2, float cosDistance) {
+          float r1 = AoFastAcos(clamp(cosCap1, -1.0, 1.0));
+          float r2 = AoFastAcos(clamp(cosCap2, -1.0, 1.0));
+          float d = AoFastAcos(clamp(cosDistance, -1.0, 1.0));
+          if (min(r1, r2) <= max(r1, r2) - d) return 1.0 - max(cosCap1, cosCap2);
+          if (r1 + r2 <= d) return 0.0;
+          float delta = abs(r1 - r2);
+          float x = 1.0 - clamp((d - delta) / max(r1 + r2 - delta, 1e-4), 0.0, 1.0);
+          return (x * x * (-2.0 * x + 3.0)) * (1.0 - max(cosCap1, cosCap2));
+        }
+
+        // GTSO（Jimenez 2016 §4 的工程形式）。roughness→0 时镜面锥收成一根线，
+        // 分母趋 0，所以钳住并让极光滑面直接退回可见度（保守，不会漏光）。
+        float AoSpecularOcclusion(vec3 bentNormal, float visibility, float roughness, vec3 refl) {
+          float cosAv = sqrt(max(1.0 - visibility, 0.0));
+          float r2 = roughness * roughness;
+          float cosAs = exp2(-3.32193 * r2 * r2);
+          float open = 1.0 - cosAs;
+          if (open < 1e-3) return visibility;
+          return clamp(AoCapIntersection(cosAv, cosAs, dot(bentNormal, refl)) / open, 0.0, 1.0);
+        }
+
+        // 联合双边升采样：2×2 双线性权重 × 深度接近度。断层处只剩同深度的那几个
+        // 抽样，所以人物脚下的接触带不会在半分辨率下糊出一圈亮边。
+        const vec2 AO_TAPS[4] = vec2[4](vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(0.0, 1.0), vec2(1.0, 1.0));
+        float AoUpsample(vec2 screenUv, float receiverZ, vec3 fallbackNormal, out vec3 bentNormal) {
+          vec2 texel = screenUv * uAoTexelResolution - 0.5;
+          vec2 baseCoord = floor(texel);
+          vec2 aoFrac = texel - baseCoord;
+          vec2 invSize = 1.0 / uAoTexelResolution;
+          float visibility = 0.0;
+          vec3 bent = vec3(0.0);
+          float wsum = 0.0;
+          for (int i = 0; i < 4; i++) {
+            vec2 o = AO_TAPS[i];
+            vec4 t = texture2D(uSsaoMap, (baseCoord + o + 0.5) * invSize);
+            if (t.a <= 0.0) continue;               // 天空：没有 AO 数据
+            float bw = mix(1.0 - aoFrac.x, aoFrac.x, o.x) * mix(1.0 - aoFrac.y, aoFrac.y, o.y);
+            float dw = 1.0 / (1e-3 + abs(t.a - receiverZ) / max(receiverZ, 0.05));
+            float w = bw * dw;
+            visibility += t.r * w;
+            bent += AoOctDecode(t.gb) * w;
+            wsum += w;
+          }
+          // 一个有效抽样都没有：可见度 1、弯曲法线退回几何法线。
+          // 这条不是只为天空留的 —— **low 档（preset.ssao = false）AO 那一趟根本不跑**，
+          // 靶里躺的是建靶时的全零，A 通道 = 0 会整片走到这里。退回几何法线之后
+          // 镜面遮蔽也恒等于 1（可见性锥张满半球、轴与反射向量同侧），画面与"没有 AO"
+          // 完全一致；退回一个常数视向量的话掠射面会凭空多出一层假遮蔽。
+          if (wsum <= 1e-5) { bentNormal = fallbackNormal; return 1.0; }
+          bentNormal = normalize(bent);
+          return visibility / wsum;
+        }`],
       ["#include <aomap_fragment>", /* glsl */`
         {
-          float ssao = texture2D(uSsaoMap, gl_FragCoord.xy / uSsaoResolution).r;
-          ssao = mix(1.0, ssao, uSsaoStrength);
-          reflectedLight.indirectDiffuse *= ssao;
-          // 镜面遮蔽：粗糙面遮得多、光滑面遮得少（Lagarde 的近似）
-          reflectedLight.indirectSpecular *= clamp(pow(ssao, 1.0 + material.roughness * 2.0), 0.0, 1.0);
+          vec2 aoScreenUv = gl_FragCoord.xy / uSsaoResolution;
+          vec3 aoBentNormal;
+          float aoVisibility = AoUpsample(aoScreenUv, vViewPosition.z, geometryNormal, aoBentNormal);
+          aoVisibility = clamp(mix(1.0, aoVisibility, uSsaoStrength), 0.0, 1.0);
+          reflectedLight.indirectDiffuse *= AoMultiBounce(aoVisibility, material.diffuseContribution);
+          reflectedLight.indirectSpecular *= AoSpecularOcclusion(
+            aoBentNormal, aoVisibility, material.roughness,
+            reflect(-geometryViewDir, geometryNormal));
+          // SSIL 走一次普通双线性：它是低频量，边缘光晕远不如 AO 那样刺眼，
+          // 而再来一趟四抽样是全分辨率主 pass 上的实打实开销。
+          reflectedLight.indirectDiffuse += texture2D(uSsilMap, aoScreenUv).rgb
+            * uSsilStrength * material.diffuseContribution * RECIPROCAL_PI;
         }`],
     ],
   });
 }
+
+/** 旧名字（2026-09 之前叫 SSAO 补丁）。外部调用点只有 IndirectLightingPatches。 */
+export const MakeSsaoPatch = MakeAmbientOcclusionPatch;
 
 /**
  * 探针体 GI。**编译期三态**（key 每次编译现读 `gi.sampling`）：
@@ -484,8 +711,10 @@ export function MakeClusteredLightsPatch() {
 }
 
 /**
- * 现役间接光补丁组：顺序固定 **AO → GI → SSR → 簇光 → 破口**。
+ * 现役间接光补丁组：顺序固定 **ORM → AO → GI → SSR → 簇光 → 破口**。
  * 新补丁插在哪儿要想清楚：
+ *   · ORM 三合一排**最前**：它把材质自带的遮蔽（烘进贴图的小尺度细节）乘进
+ *     `indirectDiffuse`，等价于三方 `aomap_fragment` chunk 原来的位置；
  *   · `<aomap_fragment>` 上挂着 AO 的乘法与 GI 的光照分量取证，两者按这个顺序拼
  *     （AO 先压、取证后抓，面板读到的才是正式画面的值）；
  *   · `<lights_fragment_maps>` 上挂着 GI 的 `radiance *= 遮蔽比` 与 SSR 的
@@ -496,10 +725,10 @@ export function MakeClusteredLightsPatch() {
  *     是必须的 —— 局部光是直接光，不该被 SSAO 压。
  */
 export function IndirectLightingPatches({
-  ssao = null, gi = null, ssr = null, destruction = null,
+  orm = null, ssao = null, gi = null, ssr = null, destruction = null,
 } = {}) {
   return [
-    MakeSsaoPatch(ssao), MakeGiPatch(gi), MakeSsrPatch(ssr), MakeClusteredLightsPatch(),
-    MakeDestructionPatch(destruction),
+    MakeOrmPatch(orm), MakeSsaoPatch(ssao), MakeGiPatch(gi), MakeSsrPatch(ssr),
+    MakeClusteredLightsPatch(), MakeDestructionPatch(destruction),
   ].filter(Boolean);
 }

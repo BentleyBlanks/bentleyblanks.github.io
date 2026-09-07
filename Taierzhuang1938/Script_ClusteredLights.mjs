@@ -11,7 +11,8 @@
 //   1. 视锥切成 tilesX × tilesY × slices 个**簇**，深度按指数分布（近密远疏）；
 //   2. CPU 每帧把每盏灯的包围球分配到它覆盖的簇里，产出两张表：
 //      簇表（每簇一个 `offset<<8 | count`）与光索引表；
-//   3. 三张 DataTexture 上传（光源数据 RGBA32F / 簇表 R32UI / 光索引 R16UI）；
+//   3. **一张** RGBA32F DataTexture 上传（簇表 / 光索引 / 光源数据 三段拼在一块内存里，
+//      整数那两段贴着 float 的位型存；2026-09 集成期为了 16 个纹素单元的硬预算合并的）；
 //   4. 材质补丁在 `<lights_fragment_begin>` 之后接一段循环：由 `gl_FragCoord`
 //      与线性视深算出簇号，只对**这一簇里登记过的灯**算 `RE_Direct`。
 //
@@ -47,7 +48,7 @@
 import * as THREE from "three";
 import {
   ClusterGrid, ConeBoundingSphere, LIGHT_TYPE, LIGHT_DECAY,
-  CLUSTER_NEAR, CLUSTER_INDEX_TEX_WIDTH, MakeClusterTier,
+  CLUSTER_NEAR, CLUSTER_DATA_TEX_WIDTH, MakeClusterTier,
 } from "./Data_Tuning_Lights.mjs";
 
 /** 一帧最多接收多少个候选光源（超出的按分数丢掉，不扩容、不 GC）。 */
@@ -98,12 +99,27 @@ export function GetActiveClusteredLights() {
  * 一盏灯、甚至整套簇光，都不许改 defines（那会触发整城重编译）。
  */
 export const CLUSTER_COMMON_GLSL = /* glsl */`
-uniform highp sampler2D uClusterLights;
-uniform highp usampler2D uClusterTable;
-uniform highp usampler2D uClusterIndex;
+uniform highp sampler2D uClusterData;
 uniform vec4 uClusterParams;
 uniform vec4 uClusterDepth;
-uniform vec2 uClusterScreen;`;
+uniform vec2 uClusterScreen;
+// x = 索引带的起始**分量号** y = 光源数据带的起始**纹素号**
+uniform vec2 uClusterBands;
+
+// 分量寻址：一张 RGBA32F 里的第 n 个 32 位格。簇表与索引存的是整数，
+// 贴着 float 的位型放进去（floatBitsToUint 取回）—— 因为三张表合并成一张是
+// 采样器预算的硬需求（见 docs §1.8 的采样器预算表），而光源数据必须保持
+// 「一个 texelFetch 拿一个 vec4」（它在最内层循环里，拆成四次标量取样会真的贵）。
+uint ClusterUnit(int unit) {
+  int clusterTexel = unit >> 2;
+  return floatBitsToUint(texelFetch(uClusterData,
+      ivec2(clusterTexel & 1023, clusterTexel >> 10), 0)[unit & 3]);
+}
+
+// 整个纹素（光源数据带用，一次取样拿四个 float）。
+vec4 ClusterTexel(int clusterTexel) {
+  return texelFetch(uClusterData, ivec2(clusterTexel & 1023, clusterTexel >> 10), 0);
+}`;
 
 /**
  * `<lights_fragment_begin>` 之后那段循环。
@@ -122,17 +138,19 @@ if (uClusterParams.w > 0.5) {
   int clusterTileY = clamp(int(gl_FragCoord.y * uClusterScreen.y), 0, int(uClusterParams.y) - 1);
   int clusterSlice = clamp(int(floor(log(clusterViewDepth) * uClusterDepth.x + uClusterDepth.y)),
                            0, int(uClusterParams.z) - 1);
-  uint clusterCell = texelFetch(uClusterTable,
-      ivec2(clusterTileY * clusterTilesX + clusterTileX, clusterSlice), 0).r;
+  uint clusterCell = ClusterUnit(
+      (clusterSlice * int(uClusterParams.y) + clusterTileY) * clusterTilesX + clusterTileX);
   uint clusterOffset = clusterCell >> 8u;
   int clusterCount = int(clusterCell & 255u);
   IncidentLight clusterLight;
   for (int clusterIter = 0; clusterIter < ${bound}; clusterIter ++) {
     if (clusterIter >= clusterCount) break;
     uint clusterSlot = clusterOffset + uint(clusterIter);
-    int clusterId = int(texelFetch(uClusterIndex,
-        ivec2(int(clusterSlot & ${CLUSTER_INDEX_TEX_WIDTH - 1}u), int(clusterSlot >> ${Math.log2(CLUSTER_INDEX_TEX_WIDTH)}u)), 0).r);
-    vec4 clusterT0 = texelFetch(uClusterLights, ivec2(0, clusterId), 0);
+    // 索引是 16 位，两个塑进一个 32 位格（小端：偶号在低半）。
+    uint clusterPair = ClusterUnit(int(uClusterBands.x) + int(clusterSlot >> 1u));
+    int clusterId = int((clusterSlot & 1u) == 0u ? (clusterPair & 65535u) : (clusterPair >> 16u));
+    int clusterTexel0 = int(uClusterBands.y) + clusterId * ${TEXELS_PER_LIGHT};
+    vec4 clusterT0 = ClusterTexel(clusterTexel0);
     vec3 clusterVector = clusterT0.xyz - geometryPosition;
     float clusterRange = abs(clusterT0.w);
     // t0.w 的**符号**就是「是不是纯点光」：正 = 点光（绝大多数），负 = 聚光/管光。
@@ -141,14 +159,14 @@ if (uClusterParams.w > 0.5) {
     // 所以点光可以在**取颜色那一次 texelFetch 之前**就退掉，连整个 BRDF 一起省。
     // 聚光/管光的有效范围与代表点/锥有关，不能这么早退。
     if (clusterT0.w > 0.0 && dot(clusterVector, clusterVector) >= clusterRange * clusterRange) continue;
-    vec4 clusterT1 = texelFetch(uClusterLights, ivec2(1, clusterId), 0);
+    vec4 clusterT1 = ClusterTexel(clusterTexel0 + 1);
     float clusterKind = clusterT1.w;
     if (clusterKind > 1.5) {
       // 管状光：把着色点投到线段上取最近点当代表点（Karis 2013 representative point）。
       // 面积光的正解要积分整条线段，代表点法是电影级引擎里通用的一档近似：
       // 高光形状会略短，漫反射几乎无差别，而成本只是一次 dot + 一次 clamp。
-      vec4 clusterT2 = texelFetch(uClusterLights, ivec2(2, clusterId), 0);
-      vec4 clusterT3 = texelFetch(uClusterLights, ivec2(3, clusterId), 0);
+      vec4 clusterT2 = ClusterTexel(clusterTexel0 + 2);
+      vec4 clusterT3 = ClusterTexel(clusterTexel0 + 3);
       float clusterAlong = clamp(-dot(clusterVector, clusterT2.xyz), -clusterT3.z, clusterT3.z);
       clusterVector += clusterT2.xyz * clusterAlong;
     }
@@ -157,8 +175,8 @@ if (uClusterParams.w > 0.5) {
     clusterLight.color = clusterT1.rgb
       * getDistanceAttenuation(clusterDist, clusterRange, ${LIGHT_DECAY.toFixed(1)});
     if (clusterKind > 0.5 && clusterKind < 1.5) {
-      vec4 clusterT2 = texelFetch(uClusterLights, ivec2(2, clusterId), 0);
-      vec4 clusterT3 = texelFetch(uClusterLights, ivec2(3, clusterId), 0);
+      vec4 clusterT2 = ClusterTexel(clusterTexel0 + 2);
+      vec4 clusterT3 = ClusterTexel(clusterTexel0 + 3);
       clusterLight.color *= getSpotAttenuation(clusterT2.w, clusterT3.x,
           dot(clusterLight.direction, clusterT2.xyz));
     }
@@ -180,9 +198,8 @@ if (uClusterParams.w > 0.5) {
 export function BindClusterUniforms(uniforms, cluster) {
   if (!cluster) return uniforms;
   const u = cluster.uniforms;
-  uniforms.uClusterLights = u.uClusterLights;
-  uniforms.uClusterTable = u.uClusterTable;
-  uniforms.uClusterIndex = u.uClusterIndex;
+  uniforms.uClusterData = u.uClusterData;
+  uniforms.uClusterBands = u.uClusterBands;
   uniforms.uClusterParams = u.uClusterParams;
   uniforms.uClusterDepth = u.uClusterDepth;
   uniforms.uClusterScreen = u.uClusterScreen;
@@ -221,57 +238,57 @@ export class ClusteredLights {
 
     // --- 送进 GPU 的那一批 -------------------------------------------------
     this.spheres = new Float64Array(this.maxLights * 4);   // 视空间 x,y,深度,半径
-    this.lightData = new Float32Array(this.maxLights * TEXELS_PER_LIGHT * 4);
     this.selected = new Int32Array(this.maxLights);
     this.activeCount = 0;
 
-    // --- 纹理 ---------------------------------------------------------------
-    // 光源数据：RGBA32F 必须 NearestFilter（浮点纹理的线性过滤要
-    // OES_texture_float_linear，而我们是 texelFetch，本来也不该插值）。
-    this.lightTexture = new THREE.DataTexture(
-      this.lightData, TEXELS_PER_LIGHT, this.maxLights, THREE.RGBAFormat, THREE.FloatType);
-    this.lightTexture.minFilter = THREE.NearestFilter;
-    this.lightTexture.magFilter = THREE.NearestFilter;
-    this.lightTexture.generateMipmaps = false;
-    this.lightTexture.colorSpace = THREE.NoColorSpace;
-    this.lightTexture.needsUpdate = true;
+    // --- 一张表（采样器预算）-------------------------------------------
+    // 2026-09 集成期把**三张 DataTexture 合成一张** RGBA32F：
+    // 八个子系统合流之后，静态墙材质在 ANGLE-D3D11 的 16 个纹素单元上超了线，
+    // 而超了之后程序不链接、那只材质整只不画（口径与预算表见
+    // docs/Data_TechRenderPipeline.md §1.8）。这里省下的两个单元是性价比最高的一笔。
+    //
+    // 布局（单位是**分量**，即 4 字节一格；纹素宽 1024，每行 4096 分量）：
+    //   [0, clusterCount)                 簇表（uint32：offset<<8 | count）
+    //   [indexBase, +ceil(maxIndices/2))  光索引（两个 16 位塑一格，与旧的 R16UI 等量）
+    //   [lightBase, +maxLights*16)        光源数据（float，四个分量一个 texel）
+    // 整数带贴着 float 的位型存（着色端 `floatBitsToUint` 取回）—— 这样光源数据
+    // 仍然是「一次 texelFetch 拿一个 vec4」，最内层循环的取样次数一次都没多。
+    // 每帧上传量与三张表时代相同（ultra 约 450 KB）。
+    const indexUnits = Math.ceil(this.grid.maxIndices / 2);
+    const indexBase = this.grid.clusterCount;
+    // 光源数据带要对齐到 texel 边界（四个分量），不然 vec4 取样会错位。
+    const lightBase = (indexBase + indexUnits + 3) & ~3;
+    const lightUnits = this.maxLights * TEXELS_PER_LIGHT * 4;
+    const rowUnits = CLUSTER_DATA_TEX_WIDTH * 4;
+    const totalUnits = Math.ceil((lightBase + lightUnits) / rowUnits) * rowUnits;
+    this.dataUnits = totalUnits;
+    this.indexBase = indexBase;
+    this.lightBase = lightBase;
 
-    // 簇表：R32UI（`RedIntegerFormat` + `UnsignedIntType` → three 的
-    // getInternalFormat 会挑 R32UI）。宽 = tilesX*tilesY，高 = slices。
-    this.tableTexture = new THREE.DataTexture(
-      this.grid.table, this.grid.tilesX * this.grid.tilesY, this.grid.slices,
-      THREE.RedIntegerFormat, THREE.UnsignedIntType);
-    this.tableTexture.internalFormat = "R32UI";
-    this.tableTexture.minFilter = THREE.NearestFilter;
-    this.tableTexture.magFilter = THREE.NearestFilter;
-    this.tableTexture.generateMipmaps = false;
-    this.tableTexture.needsUpdate = true;
+    const buffer = new ArrayBuffer(totalUnits * 4);
+    // 三段视图共用同一块内存：网格就地写自己那两段，零拷贝。
+    this.grid.table = new Uint32Array(buffer, 0, this.grid.clusterCount);
+    // 小端：偶号索引落在 uint32 的低 16 位，与着色端 `slot & 1u` 那一行对得上。
+    this.grid.indices = new Uint16Array(buffer, indexBase * 4, indexUnits * 2);
+    this.grid.maxIndices = indexUnits * 2;
+    this.lightData = new Float32Array(buffer, lightBase * 4, lightUnits);
+    this.dataArray = new Float32Array(buffer);
 
-    // 光索引：R16UI。灯号 < 1024，16 位绰绰有余，而每帧上传量减半
-    // （ultra 的 98304 条索引：Uint32 是 393 KB/帧，Uint16 是 197 KB/帧）。
-    const indexRows = Math.max(1, Math.ceil(this.grid.maxIndices / CLUSTER_INDEX_TEX_WIDTH));
-    this.indexRows = indexRows;
-    this.indexTexture = new THREE.DataTexture(
-      this.grid.indices, CLUSTER_INDEX_TEX_WIDTH, indexRows,
-      THREE.RedIntegerFormat, THREE.UnsignedShortType);
-    this.indexTexture.internalFormat = "R16UI";
-    this.indexTexture.minFilter = THREE.NearestFilter;
-    this.indexTexture.magFilter = THREE.NearestFilter;
-    this.indexTexture.generateMipmaps = false;
-    this.indexTexture.needsUpdate = true;
-    // grid.indices 的容量必须正好铺满纹理，否则 texSubImage2D 读越界。
-    if (this.grid.indices.length !== CLUSTER_INDEX_TEX_WIDTH * indexRows) {
-      const padded = new Uint16Array(CLUSTER_INDEX_TEX_WIDTH * indexRows);
-      padded.set(this.grid.indices.subarray(0, Math.min(padded.length, this.grid.indices.length)));
-      this.grid.indices = padded;
-      this.grid.maxIndices = padded.length;
-      this.indexTexture.image.data = padded;
-    }
+    this.dataTexture = new THREE.DataTexture(
+      this.dataArray, CLUSTER_DATA_TEX_WIDTH, totalUnits / rowUnits,
+      THREE.RGBAFormat, THREE.FloatType);
+    // 浮点纹理的线性过滤要 OES_texture_float_linear，而我们是 texelFetch，
+    // 本来也不该插值。
+    this.dataTexture.minFilter = THREE.NearestFilter;
+    this.dataTexture.magFilter = THREE.NearestFilter;
+    this.dataTexture.generateMipmaps = false;
+    this.dataTexture.colorSpace = THREE.NoColorSpace;
+    this.dataTexture.needsUpdate = true;
 
     this.uniforms = {
-      uClusterLights: { value: this.lightTexture },
-      uClusterTable: { value: this.tableTexture },
-      uClusterIndex: { value: this.indexTexture },
+      uClusterData: { value: this.dataTexture },
+      // x = 索引带起始分量号 y = 光源数据带起始**纹素**号
+      uClusterBands: { value: new THREE.Vector2(indexBase, lightBase >> 2) },
       // x=tilesX y=tilesY z=slices w=运行时开关
       uClusterParams: { value: new THREE.Vector4(
         this.grid.tilesX, this.grid.tilesY, this.grid.slices, 0) },
@@ -457,11 +474,9 @@ export class ClusteredLights {
     this.grid.SetProjection(pe[0], pe[5], pe[8], pe[9]);
     const gridStats = this.grid.Build(spheres, active);
 
-    // [4] 上传。三张表都小（high 档合计约 200 KB），整表传即可 ——
+    // [4] 上传。三段在同一块内存里，一次传完（ultra 约 450 KB，与三张表时代相同）——
     // three 对已分配过的 DataTexture 走 texSubImage2D，不重新分配显存。
-    this.lightTexture.needsUpdate = true;
-    this.tableTexture.needsUpdate = true;
-    this.indexTexture.needsUpdate = true;
+    this.dataTexture.needsUpdate = true;
 
     params.set(this.grid.tilesX, this.grid.tilesY, this.grid.slices, active > 0 ? 1 : 0);
     const depth = this.uniforms.uClusterDepth.value;
@@ -528,9 +543,7 @@ export class ClusteredLights {
   }
 
   Dispose() {
-    this.lightTexture.dispose();
-    this.tableTexture.dispose();
-    this.indexTexture.dispose();
+    this.dataTexture.dispose();
     if (activeClusteredLights === this) activeClusteredLights = null;
   }
 }
@@ -597,8 +610,8 @@ void main() {
   int clusterTileY = clamp(int(gl_FragCoord.y * uClusterScreen.y), 0, int(uClusterParams.y) - 1);
   int clusterSlice = clamp(int(floor(log(clusterViewDepth) * uClusterDepth.x + uClusterDepth.y)),
                            0, int(uClusterParams.z) - 1);
-  uint clusterCell = texelFetch(uClusterTable,
-      ivec2(clusterTileY * clusterTilesX + clusterTileX, clusterSlice), 0).r;
+  uint clusterCell = ClusterUnit(
+      (clusterSlice * int(uClusterParams.y) + clusterTileY) * clusterTilesX + clusterTileX);
   float clusterCount = float(clusterCell & 255u);
   if (clusterCount <= 0.0) discard;
   vec3 heat = ClusterHeatRamp(clusterCount / max(uClusterHeatScale, 1.0));

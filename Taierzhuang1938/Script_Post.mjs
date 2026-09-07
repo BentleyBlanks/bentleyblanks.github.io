@@ -15,20 +15,21 @@
 //   2) prepass              Script_PostPrepass     MRT：RT0 法线+视深 / RT1 速度 / DepthTexture
 //   3) hzb                  Script_PostPrepass     线性视深 max-reduce 金字塔
 //   4) ssr                  Script_PostSsr         min-Hi-Z + 随机 GGX 追踪 + 解算 + 时域
-//   5) ssao                 Script_PostSsao        半分辨率 + 双边模糊
-//   6) main                 （本文件）HDR 主场景，AO / SSR / 簇状局部光由材质补丁注入
+//   5) gtao                 Script_PostGtao        地平线基 AO + 弯曲法线 + SSIL（半分辨率）
+//   6) main                 （本文件）HDR 主场景，AO / SSIL / SSR / 簇状局部光由材质补丁注入
 //   7) wireframe            Script_PostDebug       着色模式非 shaded 时叠一层线
 //   8) debugOverlay         Script_PostDebug       Rapier 碰撞体线框等
 //   9) volumetricInject     Script_PostVolumetrics froxel 注入 + 光照 + 时域重投影
 //  10) volumetricIntegrate  Script_PostVolumetrics 沿 z 积分（散射 + 透过率）
 //  11) volumetricApply      Script_PostVolumetrics → Composite 的 uFogScatter
 //  12) taa                  Script_PostTaa         时域解算（线性 HDR 域，UE 的位置）
-//  13) ssrColor             Script_PostSsr         解算后的 HDR 降采样成带 mip 的「上一帧场景色」
-//  14) godPrepare           Script_PostBloom       只做决策：太阳在不在屏内、拖影强度
-//  15) bloom                Script_PostBloom       亮部 + 降/升采样
-//  16) god                  Script_PostBloom       太阳拖影（太阳在屏内才跑）
-//  17) composite            Script_PostComposite   运动模糊→景深→雾→曝光→ACES→调色→镜头→sRGB
-//  18) fxaa                 Script_PostFxaa        FXAA + 锐化 → 屏幕（或调试视图送屏）
+//  13) ssilHistory          Script_PostGtao        解算后的场景色降采样 → 下一帧的反弹源
+//  14) ssrColor             Script_PostSsr         解算后的 HDR 降采样成带 mip 的「上一帧场景色」
+//  15) godPrepare           Script_PostBloom       只做决策：太阳在不在屏内、拖影强度
+//  16) bloom                Script_PostBloom       亮部 + 降/升采样
+//  17) god                  Script_PostBloom       太阳拖影（太阳在屏内才跑）
+//  18) composite            Script_PostComposite   运动模糊→景深→雾→曝光→ACES→调色→镜头→sRGB
+//  19) fxaa                 Script_PostFxaa        FXAA + 锐化 → 屏幕（或调试视图送屏）
 //
 // 体积雾三趟排在 main 之后：它只读预通道的法线/视深靶，与主场景颜色无关，
 // 而 Composite 要它产出的 `uFogScatter`。排在 wireframe / debugOverlay 之后是因为
@@ -51,7 +52,7 @@ import { MakeQualityPreset, POST_QUALITY_KEYS } from "./Data_Tuning_Graphics.mjs
 import {
   PrepassPass, MarkNoPrepass, MarkForegroundPrepass, MarkDynamicPrepass, FOREGROUND_VIEW_DEPTH,
 } from "./Script_PostPrepass.mjs";
-import { SsaoPass } from "./Script_PostSsao.mjs";
+import { GtaoPass } from "./Script_PostGtao.mjs";
 import { SsrPass, SsrColorPass } from "./Script_PostSsr.mjs";
 import { VolumetricsPass } from "./Script_PostVolumetrics.mjs";
 import { TaaPass } from "./Script_PostTaa.mjs";
@@ -135,7 +136,8 @@ export class PostPipeline {
     this.prepassPass = new PrepassPass(this, { destruction });
     this.ssrPass = new SsrPass(this);
     this.ssrColorPass = new SsrColorPass(this, this.ssrPass);
-    this.ssaoPass = new SsaoPass(this);
+    // GTAO + 弯曲法线 + SSIL（子系统 B2）。替掉了旧的 Script_PostSsao。
+    this.gtaoPass = new GtaoPass(this);
     this.taaPass = new TaaPass(this);
     this.bloomPass = new BloomPass(this);
     this.godRaysPass = new GodRaysPass(this, this.bloomPass);
@@ -164,7 +166,7 @@ export class PostPipeline {
       // 法线/视深/HZB/速度（预通道已经跑完），只有「命中点是什么颜色」取的是
       // 上一帧 —— 口径与 UE 的 SSR 相同，详见 Script_PostSsr 抬头。
       this.ssrPass,
-      this.ssaoPass,
+      this.gtaoPass,
       {
         name: "main",
         Enabled: () => true,
@@ -195,6 +197,16 @@ export class PostPipeline {
       this.volumetricsPass.integratePass,
       this.volumetricsPass.applyPass,
       this.taaPass,
+      {
+        // SSIL 的反弹源：把**解算之后**的线性 HDR 降采样存下来，下一帧的
+        // gtao 拿它当近场辐亮度。必须排在 taa 之后（要干净的画面）、
+        // bloom 之前（bloom 只读不写 sceneColor，排哪都行，这里贴着 taa 最好理解）。
+        name: "ssilHistory",
+        Enabled: (ctx) => this.gtaoPass.ColorHistoryEnabled(ctx),
+        Resize: () => {},
+        Render: (ctx) => this.gtaoPass.CaptureColorHistory(ctx),
+        Dispose: () => {},
+      },
       // 排在 TAA 之后：取的是时域解算过、已卸抖动的那一张 HDR，
       // 比主靶原图干净，下一帧的 SSR 反射里也就少一层噪。
       this.ssrColorPass,
@@ -219,10 +231,12 @@ export class PostPipeline {
     this.normalDepthMaterial = this.prepassPass.material;
     this.wireframeMaterial = this.debugPass.wireframeMaterial;
     this.uniformsSsr = this.ssrPass.uniformsTrace;
-    this.uniformsAo = this.ssaoPass.uniforms;
-    this.matAo = this.ssaoPass.material;
-    this.uniformsAoBlur = this.ssaoPass.uniformsBlur;
-    this.matAoBlur = this.ssaoPass.materialBlur;
+    // 旧名字指向 GTAO 的对应件（trace / 双边）：外部调用点按名字取的是"AO 那一趟"。
+    this.ssaoPass = this.gtaoPass;
+    this.uniformsAo = this.gtaoPass.uniformsTrace;
+    this.matAo = this.gtaoPass.materialTrace;
+    this.uniformsAoBlur = this.gtaoPass.uniformsBlur;
+    this.matAoBlur = this.gtaoPass.materialBlur;
     this.uniformsBright = this.bloomPass.uniformsBright;
     this.matBright = this.bloomPass.matBright;
     this.uniformsDown = this.bloomPass.uniformsDown;
@@ -298,10 +312,22 @@ export class PostPipeline {
     // SSR 的历史与颜色金字塔同样作废：硬切之后重投影全部对不上位，
     // 不清的话镜面上会挂一帧上一场戏的倒影。
     this.ssrPass.hasHistory = false;
+    // GTAO 的时域累积与 SSIL 的颜色历史同理：瞬移之后那两张图里是别的地方。
+    this.gtaoPass.NotifyCameraCut();
   }
 
-  /** 屏幕空间 AO 贴图 —— 交给 Materials 层注入 MeshStandardMaterial 的间接光。 */
+  /**
+   * 屏幕空间 AO 贴图 —— 交给 Materials 层注入 MeshStandardMaterial 的间接光。
+   * 通道布局（2026-09 起是 GTAO）：R = 可见度、G/B = 弯曲法线（视空间八面体）、
+   * A = 线性视深（材质端的联合双边升采样要它）。
+   */
   get AoTexture() { return this.targets.aoBlur.texture; }
+
+  /** SSIL（屏幕空间近场间接光）的 RGB 辐照度。关着时是一张 1×1 全黑，永远不为 null。 */
+  get SsilTexture() { return this.gtaoPass.SsilTexture; }
+
+  /** 运行时开关 SSIL（重建 GTAO 的材质与靶；不是每帧的事）。 */
+  SetSsilEnabled(on) { this.gtaoPass.SetSsilEnabled(on); }
 
   /**
    * 深度法线预通道 RT0（RGBA16F：xyz = 视空间法线，w = 线性视深度）。全分辨率，

@@ -98,11 +98,17 @@ export const CLUSTER_NEAR = 0.5;
 export const CLUSTER_MAX_PER_CLUSTER = 255;
 
 /**
- * 光索引表纹理的宽度。索引是一维的，但纹理是二维的，所以按 1024 折行
- * （`ivec2(i & 1023, i >> 10)`，GLSL 侧同一条式子）。
+ * 簇数据表纹理的宽度（纹素）。簇表 / 光索引 / 光源数据三段都是一维的，
+ * 而纹理是二维的，所以按 1024 个纹素折行（`ivec2(i & 1023, i >> 10)`，GLSL 侧同一条式子）。
  * 1024 是 2 的幂，位运算取模；也远小于任何 WebGL2 实现的最大纹理宽度。
+ *
+ * 2026-09 集成期三张表合并成一张 RGBA32F（采样器预算，见 Script_ClusteredLights
+ * 构造器里的布局注释），所以一行是 1024 纹素 = 4096 个 32 位分量。
  */
-export const CLUSTER_INDEX_TEX_WIDTH = 1024;
+export const CLUSTER_DATA_TEX_WIDTH = 1024;
+
+/** 旧名（合并前只给光索引表用）。外部调用点已经没了，保留一行免得旧测试断 import。 */
+export const CLUSTER_INDEX_TEX_WIDTH = CLUSTER_DATA_TEX_WIDTH;
 
 /** 拿一档簇配置的副本（调用方会往上写运行时状态）。 */
 export function MakeClusterTier(quality) {

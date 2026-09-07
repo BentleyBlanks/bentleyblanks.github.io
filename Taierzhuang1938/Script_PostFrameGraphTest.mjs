@@ -277,16 +277,18 @@ server.close();
 // 的是「子序列 + 名字不重复」而不是「全等」。全等断言会让每一个新 pass 都把别人的
 // 回归口撞红，等于逼着大家改这一行 —— 而真正要守的东西（相对次序）子序列一样守得住。
 //
-// 已经落地的四条插入（写全，好让「谁被谁挤走了」在这一行里就看得出来）：
+// 已经落地的插入（写全，好让「谁被谁挤走了」在这一行里就看得出来）：
 //   · atmosphere —— B4 物理大气，排在最前：天穹与材质都要采它刷的两张 LUT；
 //   · ssr / ssrColor —— B5 屏幕空间反射。ssr 必须在 main **之前**（材质那一趟要采
 //     它的靶），ssrColor 在 taa 之后（取的是解算过、已卸抖动的那一张）；
 //   · volumetricInject / volumetricIntegrate / volumetricApply —— B3 froxel 体积雾，
 //     在 main 之后（要本帧烘好的太阳阴影图）、composite 之前（apply 那一趟才把
-//     uFogScatter 与 uFogSource 接上）。
-const EXPECTED_ORDER = ["atmosphere", "prepass", "hzb", "ssr", "ssao", "main", "wireframe", "debugOverlay",
+//     uFogScatter 与 uFogSource 接上）；
+//   · gtao / ssilHistory —— B2：旧的 `ssao` 那一行被 GTAO 整个替换（名字也改成 `gtao`），
+//     并在 taa 之后多一趟 `ssilHistory`（把解算后的场景色降采样存下来，下一帧当近场反弹源）。
+const EXPECTED_ORDER = ["atmosphere", "prepass", "hzb", "ssr", "gtao", "main", "wireframe", "debugOverlay",
   "volumetricInject", "volumetricIntegrate", "volumetricApply",
-  "taa", "ssrColor", "godPrepare", "bloom", "god", "composite", "fxaa"];
+  "taa", "ssilHistory", "ssrColor", "godPrepare", "bloom", "god", "composite", "fxaa"];
 
 /** EXPECTED_ORDER 是不是 actual 的子序列（顺序不许乱，中间可以插新 pass）。 */
 function IsOrderedSubsequence(expected, actual) {

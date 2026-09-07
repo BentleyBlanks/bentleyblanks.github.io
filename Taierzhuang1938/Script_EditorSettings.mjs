@@ -284,6 +284,12 @@ export class GraphicsSettings {
       onInput: (v) => { gfx[key] = v; this.Save(); },
     });
     Mul("ssao", "环境光遮蔽");
+    // SSIL 只在给了它的档位上才有意义（构造期开关，见 Data_Tuning_Graphics.ssil）。
+    // 档位没给就不画这一行 —— 一根拖了没反应的滑杆比没有滑杆更糟。
+    if (this.host.post?.preset?.ssil) {
+      Mul("ssil", "屏幕空间间接光");
+      Note(post, "SSIL 与 GTAO 共用同一趟地平线搜索；拖到 0 会把那一趟一起停掉。");
+    }
     Mul("bloom", "泛光");
     Mul("god", "体积光");
     Mul("motionBlur", "运动模糊");
@@ -324,7 +330,7 @@ export class GraphicsSettings {
     gfx.firstPersonSelfShadow = true;
     gfx.firstPersonSelfShadowSoft = false;
     gfx.atmosphere = true;
-    gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
+    gfx.ssao = 1; gfx.ssil = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
     // 体积雾的出厂值跟画质档走（medium 及以上开），不是固定的 true —— 同 TAA 那条先例。
     // 读的是 froxel 网格在不在（VOLUMETRIC_GRIDS 里 low 是 null），不是 preset 那一位：
     // 后者已经被 ApplyGraphics 按当前开关改写过，拿它当出厂值等于恢复了个寂寞。

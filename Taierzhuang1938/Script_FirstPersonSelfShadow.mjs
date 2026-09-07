@@ -136,6 +136,10 @@ function CloneOwnedMaterial(material) {
   if (clone.userData.indirectLightingInjected && clone.userData.ssrUniforms) {
     clone.userData.ssrUniforms = null;
     ApplyPatches(clone, IndirectLightingPatches({
+      // ORM 三合一的描述子是纯 JSON，material.clone() 的 userData 深拷能原样带过来；
+      // 这里必须一并传，否则视模那份材质会丢掉金属度与材质自带遮蔽（它的
+      // metalnessMap / aoMap 已经在底材上被摘掉了，补丁是唯一的读取路径）。
+      orm: clone.userData.ormUniforms || null,
       ssao: clone.userData.ssaoUniforms || null,
       gi: clone.userData.giUniforms || null,
       ssr: null,

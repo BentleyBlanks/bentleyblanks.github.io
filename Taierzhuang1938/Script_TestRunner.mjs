@@ -205,6 +205,10 @@ export const testDefs = {
     desc: "物理大气：四张 LUT / 十档预设的辐照度与色相标定 / 70 m 能见度不许降 / 大气透视近远端" },
   VolumetricsTest: { file: "Script_VolumetricsTest.mjs", timeoutMs: 25 * 60 * 1000,
     desc: "froxel 体积雾：能见度不变差 / 图集单调 / 阴影切光柱 / 时域收敛 / 局部光与雾体" },
+  GtaoTest: { file: "Script_GtaoTest.mjs", timeoutMs: 15 * 60 * 1000,
+    desc: "GTAO / 弯曲法线 / 镜面遮蔽 / SSIL：接触暗带、时域收敛、无重投影残影、色板反弹" },
+  SamplerBudgetTest: { file: "Script_SamplerBudgetTest.mjs", timeoutMs: 40 * 60 * 1000,
+    desc: "采样器预算：四档×gi 八轮正片，每个程序都链接成功且 sampler uniform ≤ MAX_TEXTURE_IMAGE_UNITS" },
   PerformanceTest: { file: "Script_PerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "帧率/负载实测（对机器敏感）" },
   FrameProfileTest: { file: "Script_FrameProfileTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "整帧 CPU/GPU 剖析消融（对机器敏感）" },
   GodRaysPerformanceTest: { file: "Script_GodRaysPerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "体积光方向性性能回归（对机器敏感）" },
@@ -229,7 +233,8 @@ export const browserTests = new Set([
   "AudioTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
-  "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GunFeelTest",
+  "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
+  "SamplerBudgetTest",
   "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MenuTest",
   "ClusteredLightsTest",
   "PerformanceTest", "PhysicsTest", "PostTest", "PostFrameGraphTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ProfilerTest", "PropInstancingTest",
@@ -350,7 +355,7 @@ export const domains = {
     //（UpdateFire / MoveSmokeSource），所以碰灯光或粒子的改动也要连着 FlareTest 跑。
     // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
-    tests: ["TestSceneLightingTest", "PostTest", "PostFrameGraphTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
+    tests: ["TestSceneLightingTest", "PostTest", "PostFrameGraphTest", "GtaoTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {

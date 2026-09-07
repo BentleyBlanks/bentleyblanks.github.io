@@ -324,7 +324,8 @@ export class DebugPass {
     }
     // ------------------------------------------------------------------
     // 查找顺序（2026-09 三条登记路合流之后，**只有这一处仲裁**）：
-    //   ① 帧图里的 pass 自带的视图 —— `pass.GetDebugSource(view)`（B3 体积雾四项）；
+    //   ① 帧图里的 pass 自带的视图 —— `pass.GetDebugSource(view)`（B3 体积雾四项，
+    //      B2 GTAO 的弯曲法线 / SSIL / 镜面遮蔽三项 —— 后者返回自带材质）；
     //   ② 下面那条 switch 的内置表 —— 预通道 / AO / Bloom / 材质假彩色 / SunShadow /
     //      SSR 三视图（SSR 走 `P.ssrPass.DebugSource(view)`，是内置表里的一行）；
     //   ③ 登记表 `PostPipeline.RegisterDebugView(id, resolve)` —— 给「持有者不是 pass」
@@ -430,6 +431,14 @@ export class DebugPass {
     // 不可用时不走这条，落到下面的斜纹路径 —— 把一张没内容的靶送屏跟
     //「渲染坏了」长得一模一样。
     if (source.material && !source.unavailable) {
+      source.Prepare?.(ctx);
+      ctx.blitter.Blit(source.material, null);
+      return;
+    }
+    // 通用「自带展示材质」分支（见 GetSource 里认领视图那一段）。
+    // 不可用时也照样 Blit —— 那些材质自己画斜纹，与下面的通用路径一致。
+    if (source.material && source.material !== this.material
+      && source.material !== this.materialSunShadow) {
       source.Prepare?.(ctx);
       ctx.blitter.Blit(source.material, null);
       return;

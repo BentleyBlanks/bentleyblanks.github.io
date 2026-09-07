@@ -51,7 +51,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - 帧图各段（2026-09 拆分，加 pass 只动自己那一个文件 + 编排器里插一行）：
   `Script_PostCommon.mjs`（blit / 靶工厂 / 靶池 / `FrameContext` / pass 契约）、
   `Script_PostPrepass.mjs`（MRT 预通道 + 速度缓冲 + HZB + 蒙皮上一帧骨矩阵）、
-  `Script_PostSsao.mjs`、`Script_PostSsr.mjs`（Hi-Z 随机 SSR）、`Script_PostTaa.mjs`、
+  `Script_PostGtao.mjs`、`Script_PostSsr.mjs`（Hi-Z 随机 SSR）、`Script_PostTaa.mjs`、
   `Script_PostBloom.mjs`（含太阳拖影）、
   `Script_PostComposite.mjs`（分段 GLSL）、`Script_PostFxaa.mjs`、`Script_PostDebug.mjs`。
 - `Script_PostSsr.mjs` —— **屏幕空间反射**：自建 min-reduce Hi-Z（共享 HZB 是 max-reduce，
@@ -66,6 +66,13 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   （物理大气把 aerial perspective 乘上去的接口）。**能见度只许变好不许变差**是硬约束，
   出厂 `legacyTransmittance` 让透过率与解析雾逐像素相同。口径见
   `docs/Data_TechRenderPipeline.md` §17，回归口 `Script_VolumetricsTest.mjs`。
+- `Script_PostGtao.mjs` + `Data_Tuning_Gtao.mjs` —— **GTAO（地平线基 AO）+ 弯曲法线 +
+  SSIL（可见性位掩码近场间接光）**，2026-09 整个替换掉旧的 `Script_PostSsao.mjs`。
+  一趟地平线搜索出四个通道（R 可见度 / GB 弯曲法线八面体 / A 线性视深 / 附件 1 SSIL）；
+  多次反弹与 GTSO 镜面遮蔽在 `Script_MaterialPatches.MakeAmbientOcclusionPatch` 里做。
+  数值全在 `Data_Tuning_Gtao.mjs`（带文献出处），分档位名在 `Data_Tuning_Graphics.gtao`。
+  回归口 `Script_GtaoTest.mjs`；口径与实测见 `docs/Data_TechRenderPipeline.md` §17
+  （§4 是被它替换掉的旧 SSAO，已标历史稿）。
 - `Data_Tuning_Graphics.mjs` —— 画质档位表（纯数据，零 three）：每档每个 pass 的开关与旋钮，
   外加 `HZB` / `VELOCITY` 两组常量。`Script_Post` / `Script_Main` / `Script_EditorSettings` 只读它。
 - `Script_MaterialPatches.mjs` —— **材质补丁注册表**：所有往 `MeshStandardMaterial` 插 GLSL 的
@@ -94,6 +101,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   回归口 `Script_ClusteredLightsTest.mjs`（`--node` 只跑纯 Node 段，`--perf` 加跑 1440p GPU 消融）。
   先读：`docs/Data_TechRenderPipeline.md` §17（§2.1 是它的历史稿）。
 - 回归口：`Script_PostFrameGraphTest.mjs`（帧图契约）、`Script_PostTest.mjs`、
+  `Script_GtaoTest.mjs`（GTAO / 弯曲法线 / 镜面遮蔽 / SSIL）、
   `Script_SsrTest.mjs`（屏幕空间反射）、`Script_ClusteredLightsTest.mjs`（簇状局部光）、
   `Script_AtmosphereTest.mjs`（物理大气：四张 LUT + 十档标定 + 能见度闸；`--shot` 出 A/B 图）、
   `Script_VolumetricsTest.mjs`（体积雾：能见度不变差 / 阴影切光柱 / 时域收敛）、

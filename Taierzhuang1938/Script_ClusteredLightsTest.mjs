@@ -221,12 +221,18 @@ Check(CLUSTER_TIERS.low.enabled === false
 const patchSource = fs.readFileSync(path.join(projectDir, "Script_MaterialPatches.mjs"), "utf8");
 // 2026-09 合并后 SSR 补丁排在 GI 与簇光之间（它改的是 <lights_fragment_maps> 的 radiance，
 // 与簇光锚点不同）；这里锁的是「GI 之后、破口之前」，SSR 那一项可有可无。
-Check(/MakeSsaoPatch\(ssao\),\s*MakeGiPatch\(gi\),(?:\s*MakeSsrPatch\(ssr\),)?\s*MakeClusteredLightsPatch\(\),\s*MakeDestructionPatch/.test(patchSource),
-  "补丁注册顺序：AO → GI → (SSR) → 簇光 → 破口");
+Check(/MakeOrmPatch\(orm\),\s*MakeSsaoPatch\(ssao\),\s*MakeGiPatch\(gi\),(?:\s*MakeSsrPatch\(ssr\),)?\s*MakeClusteredLightsPatch\(\),(?:\s*MakeMaterialShadingPatch\([^)]*\),)?\s*MakeDestructionPatch/.test(patchSource),
+  "补丁注册顺序：ORM → AO → GI → (SSR) → 簇光 → (材质着色) → 破口");
 const clusterSource = fs.readFileSync(path.join(projectDir, "Script_ClusteredLights.mjs"), "utf8");
-Check(clusterSource.includes("uniform highp usampler2D uClusterTable")
-  && clusterSource.includes("uniform highp usampler2D uClusterIndex"),
-  "整数采样器写了 highp（GLSL ES 3.00 对 usampler2D 没有默认精度）");
+// 2026-09 集成期三张表合并成一张 RGBA32F（采样器预算）：整数那两段贴着 float
+// 的位型存，着色端 `floatBitsToUint` 取回。锁两条：只剩一个采样器；
+// 光源数据仍然是「一次 texelFetch 拿一个 vec4」（拆成四次标量取样会把最内层循环拖慢）。
+Check(clusterSource.includes("uniform highp sampler2D uClusterData")
+  && !clusterSource.includes("uClusterTable") && !clusterSource.includes("uClusterIndex"),
+  "簇表 / 光索引 / 光源数据 合并成一个采样器 uClusterData");
+Check(/vec4 ClusterTexel\(int clusterTexel\) \{\s*return texelFetch\(uClusterData/.test(clusterSource)
+  && clusterSource.includes("floatBitsToUint(texelFetch(uClusterData"),
+  "光源数据一次 texelFetch 拿一个 vec4；整数带走 floatBitsToUint");
 Check(clusterSource.includes("getDistanceAttenuation(clusterDist, clusterRange,")
   && clusterSource.includes("getSpotAttenuation(clusterT2.w, clusterT3.x,"),
   "衰减调的是 three 自己的 getDistanceAttenuation / getSpotAttenuation");

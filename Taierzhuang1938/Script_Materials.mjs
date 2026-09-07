@@ -9,8 +9,9 @@
 
 import * as THREE from "three";
 import { RECIPES } from "./Script_TexBake.mjs";
+import { SSR } from "./Data_Tuning_Graphics.mjs";
 import {
-  ApplyPatches, IndirectLightingPatches, MakeDestructionPatch,
+  ApplyPatches, IndirectLightingPatches, MakeDestructionPatch, FoldOrmMaps,
 } from "./Script_MaterialPatches.mjs";
 
 /**
@@ -34,6 +35,36 @@ function MakeTexture(bytes, size, { srgb = false, repeat = 1, anisotropy = 1 } =
   texture.anisotropy = anisotropy;
   texture.needsUpdate = true;
   return texture;
+}
+
+/**
+ * 一张烘好的 ORM 里粗糙度（绿通道）的最小值，0..1。扫一遍字节，每个配方只算一次。
+ */
+function OrmRoughnessFloor(orm) {
+  let min = 255;
+  for (let i = 1; i < orm.length; i += 4) if (orm[i] < min) min = orm[i];
+  return min / 255;
+}
+
+/**
+ * 这份材质的粗糙度有没有**可能**落进 SSR 的区间。
+ *
+ * SSR 的材质侧只在 `material.roughness <= uSsrMaxRoughness`（出厂 0.60）时才动
+ * `radiance`。而本仓的墙 / 地 / 木 / 布 / 砸袋那一批配方，烘出来的粗糙度
+ * 下界都在 0.75 以上（实测表见 docs §1.8）—— 那条分支永远不成立。
+ * 所以这些材质**根本不编 SSR 补丁**：逐像素逐比特无差别，而每一份省一个
+ * 纹理单元（`uSsrMap`）—— 这是 16 个单元硬预算里性价比最高的一笔之一。
+ *
+ * 下一帧追踪端的粗糙度输入也自洽：不挂补丁 = 不往 `gl_FragColor.a` 写粗糙度，
+ * 不透明材质的 alpha 恒为 1，追踪端读到 1.0 就跳过那些像素 —— 与“它太糙，
+ * 不值得追”是同一个结论。
+ *
+ * **前提：这一位是构造期定的。** 谁要在运行时把一份库材质的 `roughness` 调到
+ * 0.60 以下（比如淠水效果），得连着重新 `InjectIndirectLighting` 一次，否则那份
+ * 材质不会突然长出 SSR 来。外部 GLB（自带 roughnessMap，下界未知）一律保留 SSR。
+ */
+function SsrEligible(minRoughness) {
+  return !(minRoughness > SSR.maxRoughness);
 }
 
 /**
@@ -61,11 +92,15 @@ export function InjectIndirectLighting(material,
   // 半透明材质一律不挂 SSR：补丁要占用 gl_FragColor.a。这里再兜一次底，
   // 调用点漏判也不会把混合搞坏。
   const ssrUniforms = material.transparent ? null : ssr;
+  // ORM 三合一：把 metalnessMap / aoMap 从材质上摘掉，改成从 roughnessMap 那一个
+  // 采样器读 .b / .r（省两个纹理单元，口径见 Script_MaterialPatches.MakeOrmPatch）。
+  // 幂等：结果记在 userData.ormUniforms，静态克隆与外部 GLB 二次注入都取回同一份。
+  const orm = FoldOrmMaps(material);
   material.userData.ssaoUniforms = ssao;
   material.userData.giUniforms = gi;
   material.userData.ssrUniforms = ssrUniforms;
   material.userData.destructionUniforms = destruction;
-  ApplyPatches(material, IndirectLightingPatches({ ssao, gi, ssr: ssrUniforms, destruction }));
+  ApplyPatches(material, IndirectLightingPatches({ orm, ssao, gi, ssr: ssrUniforms, destruction }));
   // 布尔标记只给运行时取证与幂等接入用。不要把 uniforms 包塞进新标记：
   // 里面有 Texture，material.clone()/toJSON 会为每个人刷一屏“Unable to serialize”。
   material.userData.indirectLightingInjected = true;
@@ -164,6 +199,8 @@ export class MaterialLibrary {
         albedo: MakeTexture(maps.albedo, maps.size, { srgb: true, anisotropy: this.anisotropy }),
         normal: MakeTexture(maps.normal, maps.size, { anisotropy: this.anisotropy }),
         orm: MakeTexture(maps.orm, maps.size, { anisotropy: this.anisotropy }),
+        // 这张 ORM 的粗糙度下界（绿通道最小值）。给 SSR 补丁的死代码消除用，见 SsrEligible。
+        roughMin: OrmRoughnessFloor(maps.orm),
       });
       yield name;
     }
@@ -302,7 +339,9 @@ export class MaterialLibrary {
       map: albedo,
       normalMap: normal,
       normalScale: new THREE.Vector2(options.normalScale ?? 1, options.normalScale ?? 1),
-      // 同一张 ORM 喂三个槽 —— glTF 的打包约定，three 原生支持，省两个采样器
+      // 同一张 ORM 喂三个槽（glTF 的打包约定）。**注意 three 不做去重** ——
+      // 三个槽各占一个纹理单元；InjectIndirectLighting 里的 FoldOrmMaps 会把
+      // metalnessMap / aoMap 摘掉，改由材质补丁从 roughnessMap 一份采样里读。
       aoMap: orm,
       roughnessMap: orm,
       metalnessMap: orm,
@@ -317,7 +356,10 @@ export class MaterialLibrary {
       flatShading: !!options.flatShading,
     });
     if (this.ssao || this.gi || this.ssr) {
-      InjectIndirectLighting(material, { ssao: this.ssao, gi: this.gi, ssr: this.ssr });
+      // 粗糙度下界 = 标量×ORM 绿通道最小值。超过 SSR 上限就不编那一路（见 SsrEligible）。
+      const roughFloor = (options.roughness ?? 1) * (set.roughMin ?? 0);
+      const ssr = SsrEligible(roughFloor) ? this.ssr : null;
+      InjectIndirectLighting(material, { ssao: this.ssao, gi: this.gi, ssr });
     }
     this.materials.set(key, material);
     return material;
@@ -340,7 +382,9 @@ export class MaterialLibrary {
       depthWrite: params.depthWrite ?? true,
     });
     if (!params.transparent && (this.ssao || this.gi || this.ssr)) {
-      InjectIndirectLighting(material, { ssao: this.ssao, gi: this.gi, ssr: this.ssr });
+      // 纯色材质没有 roughnessMap，粗糙度就是那一个标量，下界精确。
+      const ssr = SsrEligible(params.roughness ?? 0.85) ? this.ssr : null;
+      InjectIndirectLighting(material, { ssao: this.ssao, gi: this.gi, ssr });
     }
     this.materials.set(key, material);
     return material;
@@ -356,7 +400,9 @@ export class MaterialLibrary {
     InjectIndirectLighting(clone, {
       ssao: this.ssao,
       gi: this.gi,
-      ssr: this.ssr,
+      // 跟底材的判定走：底材没挂 SSR（太糙）的话，可裁切克隆也不该挂，
+      // 否则同一块墙的完整版与破口版会是两套采样器预算。
+      ssr: material.userData.ssrUniforms ? this.ssr : null,
       destruction: this.destruction,
     });
     this.staticMaterials.set(key, clone);

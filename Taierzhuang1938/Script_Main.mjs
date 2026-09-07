@@ -20,6 +20,8 @@ import { NormalizeGraphicsDetails } from "./Script_EditorSettings.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "./Script_Gi.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
+import { MakeAoUniforms, SyncAoUniforms } from "./Script_PostGtao.mjs";
+import { SSIL } from "./Data_Tuning_Gtao.mjs";
 import { SetWaterSkyUniforms, SetWaterSsr, UpdateWaterSurfaces } from "./Script_Water.mjs";
 import { TengxianField } from "./Script_TengxianField.mjs";
 import { InitPhysics, PhysicsWorld } from "./Script_Physics.mjs";
@@ -390,7 +392,10 @@ const scene = new THREE.Scene();
 // 注意：以后任何在 RenderScene 之外要读 matrixWorld / getWorldPosition 的新代码，
 // 拿到的仍是「上一次出画时」的位姿 —— 这一点和改之前完全一样（原来也是渲染时才更新）。
 scene.matrixWorldAutoUpdate = false;
-// SSAO 的出厂强度。设置面板按倍率乘它，所以要有个名字。
+// AO 的出厂强度。设置面板按倍率乘它，所以要有个名字。
+// 2026-09 换成 GTAO 之后这一位的语义不变（`mix(1.0, 可见度, strength)`），
+// 但底下那张图已经是解析积分的真可见度而不是半球计数，所以 0.80 压出来的
+// 暗带比旧 SSAO 的同一个数更贴根、更少整墙发灰。
 const SSAO_BASE = 0.80;
 const camera = new THREE.PerspectiveCamera(CAMERA.baseFovDeg,
   window.innerWidth / window.innerHeight, 0.06, 620);
@@ -402,20 +407,13 @@ const post = new PostPipeline(renderer, {
   width: window.innerWidth, height: window.innerHeight, quality: QUALITY,
   destruction: destructionUniforms,
 });
-const ssao = {
-  map: { value: post.AoTexture },
-  // 这里必须是**主渲染靶**的尺寸，不是 AO 缓冲的尺寸。
-  // 事故（连吃两轮）：Script_Materials 注入的采样是
-  //   texture2D(uSsaoMap, gl_FragCoord.xy / uSsaoResolution)
-  // gl_FragCoord 跑在 hdr 靶上（1600×900），而这里曾经喂 aoBlur 的尺寸 ——
-  // high 档 aoScale=0.75，也就是 1200×675，UV 最大到 1.333：整张 AO 被放大
-  // 1.333 倍并往左下错位，右上四分之一恒取边缘值。上一轮反复调 uRadius /
-  // uIntensity 之所以毫无效果，是在调一张贴错位置的图。
-  resolution: { value: new THREE.Vector2(post.width, post.height) },
-  // 0.80：贴图位置修正后 AO 真的落在几何转折上了，1.85/0.95 那套是为了
-  // 「错位之后还想看见点什么」硬抬起来的补偿值，退回正常量级
-  strength: { value: SSAO_BASE },
-};
+// AO / SSIL 的材质端 uniform 包。**构造与同步都走 Script_PostGtao 的共用工厂**
+// （探针页用的是同一份），免得两边各写一套分辨率：材质里的取样是
+//   texture2D(uSsaoMap, gl_FragCoord.xy / uSsaoResolution)
+// 而 gl_FragCoord 跑在**主渲染靶**的像素域里 —— 喂 AO 靶尺寸会把整张 AO
+// 放大并往左下错位（这条连吃两轮，上一轮反复调半径/强度毫无效果就是因为
+// 在调一张贴错位置的图）。
+const ssao = MakeAoUniforms(post, { strength: SSAO_BASE, ssilStrength: SSIL.strength });
 // 屏幕空间反射的材质侧 uniform 包。**归 PostPipeline 所有**（SsrPass 每帧刷新
 // map / resolution / strength），这里只是把同一批对象交给 MaterialLibrary。
 // SSR 关档（low / 无浮点靶）时是 null，材质连补丁都不编 —— 与 GI 的编译期
@@ -451,6 +449,10 @@ const graphics = {
   // 屏幕空间反射：布尔总闸 + 强度倍率。出厂跟画质档走（medium 及以上开），
   // 关掉不重编译材质（强度归零，材质那一行等价于「radiance 原样」）。
   ssr: !!post.preset.ssr, ssrStrength: 1,
+  // 屏幕空间近场间接光（SSIL）的倍率。**只是强度，不是总闸** —— 位掩码那一趟
+  // 与 GTAO 共用同一次地平线搜索，开不开是构造期的事（画质档的 ssil 那一位），
+  // 滑到 0 只是不出效果、不省时间。low / medium 档没有它，面板那一行会自己藏起来。
+  ssil: 1,
   // 抗锯齿：TAA 开着时末趟的 FXAA 自动让位（两层叠加只会糊）。出厂值跟画质档走
   // （medium 及以上默认开），但这是**布尔开关不是倍率** —— 它不决定"画多重"，
   // 决定的是走哪条抗锯齿路，所以不套 Mul 那套倍率约定。
@@ -7253,10 +7255,18 @@ function RenderScene(dt) {
   // 这一帧的阴影图在下面第一次 renderer.render 时烘，烘完 three 自己把
   // needsUpdate 清掉（autoUpdate 已在渲染器那里关掉，见那一行的账）。
   renderer.shadowMap.needsUpdate = true;
-  ssao.map.value = post.AoTexture;
-  // gl_FragCoord 在主靶的像素域里，喂 AO 靶尺寸会整张错位
-  ssao.resolution.value.set(post.width, post.height);
-  ssao.strength.value = SSAO_BASE * graphics.ssao;
+  // AO / SSIL 的靶引用每帧重接：SetSize 会重建靶，纹理引用随时可能换。
+  // uSsaoResolution 是**主靶**尺寸、uAoTexelResolution 才是 AO 靶尺寸（升采样用），
+  // 两者的分工写在 Script_PostGtao.SyncAoUniforms 里。
+  //
+  // SSIL 与探针体 GI 打开时会有一段重叠：探针体本来就带一份多次反弹的间接光，
+  // 近场那一米会被算两遍。按 GI 的淡入量整体降 SSIL.giScale（−40%，实测见
+  // docs/Data_TechRenderPipeline.md「GTAO / SSIL」一节），GI 关着时不打折。
+  const giBlend = gi ? (giUniforms.enabled.value || 0) : 0;
+  SyncAoUniforms(ssao, post, {
+    strength: SSAO_BASE * graphics.ssao,
+    ssilStrength: SSIL.strength * graphics.ssil * (1 - (1 - SSIL.giScale) * giBlend),
+  });
   // 天空穹跟着相机走。它是一只半径 4000 m 的球，原来钉在原点 ——
   // 过场把独立布景摆到 (4000,4000) 之后相机就在球**外面**，画面上是一块
   // 黑底上的大亮盘（出川过场那张「什么鬼背景」就是这个）。着色器用的是
@@ -7495,6 +7505,9 @@ function ApplyGraphics() {
   post.SetTaaEnabled(graphics.taa !== false);
   post.SetSsrEnabled(graphics.ssr !== false);
   post.SetSsrStrength(graphics.ssrStrength ?? 1);
+  // SSIL：档位给不给是构造期的（`preset.ssil`），倍率滑到 0 时把整趟也停掉 ——
+  // 材质端那一次取样会自动顶上一张 1×1 全黑，不用重编译任何材质。
+  post.SetSsilEnabled(!!post.preset.ssil && graphics.ssil > 0);
   post.uniformsTaa.uCurrentWeight.value = graphics.taaCurrentWeight;
   if (post.taaJitterScale !== graphics.taaJitterScale) post.hasTaaHistory = false;
   post.taaJitterScale = graphics.taaJitterScale;

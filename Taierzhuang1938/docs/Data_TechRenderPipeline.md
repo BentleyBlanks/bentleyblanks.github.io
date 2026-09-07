@@ -62,7 +62,8 @@ function generateShadowMapTypeDefine( parameters ) {
 | `Script_Post.mjs` | **编排器**。持有有序 pass 列表、具名靶、运行时状态（TAA 开关/历史、调试视图、着色模式）。所有旧的公共 API 都还在这里。 | `PostPipeline`、`MarkNoPrepass`、`MarkForegroundPrepass`、`MarkDynamicPrepass`、`InjectDepthPull`、`FOREGROUND_VIEW_DEPTH`、`SHADING_MODES`、`POST_QUALITY_KEYS` |
 | `Script_PostCommon.mjs` | 地基：全屏 blit、`GLSL_COMMON`、靶工厂、瞬时靶池、`FrameContext`、pass 契约文档 | `Blitter`、`RenderTargetPool`、`FrameContext`、`MakeRenderTarget`、`MakeFullscreenMaterial`、`QUAD_GEOMETRY/CAMERA`、`VERT_QUAD`、`GLSL_COMMON`、`GLSL_VIEW_POS` |
 | `Script_PostPrepass.mjs` | 深度法线预通道（MRT）+ 速度缓冲 + HZB + 蒙皮上一帧骨矩阵 | `PrepassPass`、`MarkNoPrepass`、`MarkForegroundPrepass`、`MarkDynamicPrepass`、`FOREGROUND_VIEW_DEPTH` |
-| `Script_PostSsao.mjs` | SSAO（半分辨率 + 双边模糊）。**GTAO 落地时整个替换这个模块** | `SsaoPass` |
+| `Script_PostGtao.mjs` | **GTAO**（地平线基 AO + 弯曲法线 + SSIL 位掩码）+ 时域累积 + 双边去噪。2026-09 整个替换了旧的 `Script_PostSsao.mjs`，口径见 §17 | `GtaoPass`、`MakeAoUniforms`、`SyncAoUniforms` |
+| `Data_Tuning_Gtao.mjs` | GTAO / SSIL 的数值表（纯数据，零 three 依赖） | `GTAO`、`SSIL`、`GTAO_TIERS`、`MakeGtaoTier` |
 | `Script_PostSsr.mjs` | 屏幕空间反射：自建 min-Hi-Z + 随机 GGX 追踪 + 解算 + 时域 | `SsrPass`、`SsrColorPass` |
 | `Script_PostVolumetrics.mjs` | froxel 体积雾 / 体积光（注入 / 积分 / apply 三行帧图） | `VolumetricsPass`、`VOLUMETRIC_SAMPLE_GLSL`（含 `SampleVolumetricFog` / `VolumetricFarTransmittance`）、`BindVolumetricUniforms`、`MakeVolumetricNoiseTexture` |
 | `Data_Tuning_Volumetrics.mjs` | 体积雾的网格分档与时段参数（纯数据，零 three 依赖） | `VOLUMETRIC_GRIDS`、`VOLUMETRIC_PRESETS`、`MakeVolumetricParams`、`AnalyticTransmittance`、`FroxelTransmittance`、`VISIBILITY_REFERENCE` |
@@ -72,7 +73,7 @@ function generateShadowMapTypeDefine( parameters ) {
 | `Script_PostComposite.mjs` | 合成（分段函数，见 §1.9） | `CompositePass` |
 | `Script_PostFxaa.mjs` | FXAA + 锐化 → 屏幕（调试视图时让位给 DebugPass） | `FxaaPass` |
 | `Script_PostDebug.mjs` | 中间靶展示 pass、线框着色模式、调试叠加层、SunShadow 验证图 | `DebugPass`、`InjectDepthPull`、`SHADING_MODES`、`WIRE_BACKGROUND_PURE` |
-| `Script_MaterialPatches.mjs` | 材质补丁注册表 + 现役三路补丁（AO / GI / 破口） | `MakePatch`、`ApplyPatches`、`PatchKeysOf`、`MakeSsaoPatch`、`MakeGiPatch`、`MakeDestructionPatch`、`IndirectLightingPatches` |
+| `Script_MaterialPatches.mjs` | 材质补丁注册表 + 现役三路补丁（AO / GI / 破口） | `MakePatch`、`ApplyPatches`、`PatchKeysOf`、`MakeAmbientOcclusionPatch`（旧名 `MakeSsaoPatch` 仍导出）、`MakeGiPatch`、`MakeDestructionPatch`、`IndirectLightingPatches` |
 | `Data_Tuning_Graphics.mjs` | 画质档位表（纯数据，零 three 依赖） | `QUALITY_PRESETS`、`POST_QUALITY_KEYS`、`MakeQualityPreset`、`HZB`、`VELOCITY` |
 | `Script_Light.mjs` | 太阳阴影的公共采样接口（新增） | `SUN_SHADOW_GLSL`、`BindSunShadowUniforms`、`LightRig.RegisterShadowUniforms/SyncShadowUniforms` |
 
@@ -84,20 +85,21 @@ function generateShadowMapTypeDefine( parameters ) {
  2  prepass               MRT：RT0 法线+线性视深 / RT1 屏幕空间速度 / DepthTexture
  3  hzb                   RT0.w 的 max-reduce 金字塔（SSR / 体积雾 / 接触阴影共用）
  4  ssr                   自建 min-Hi-Z + 随机 GGX 追踪 + 解算 + 时域（在 main 之前：材质要采它）
- 5  ssao                  半分辨率半球采样 + 双边模糊 → rtAoBlur
- 6  main                  HDR 主场景（AO / SSR / 簇状局部光由材质补丁注入；ultra 才 4×MSAA）
+ 5  gtao                  地平线搜索（AO + 弯曲法线 + SSIL）→ 时域 → 双边 → rtAoBlur（§17）
+ 6  main                  HDR 主场景（AO / SSIL / SSR / 簇状局部光由材质补丁注入；ultra 才 4×MSAA）
  7  wireframe             着色模式非 shaded 时叠一层三角形边线
  8  debugOverlay          Rapier 碰撞体线框等（同一张 hdr 靶与深度）
  9  volumetricInject      froxel 注入 + 太阳阴影 + HG 相函数 + 局部光 + 时域重投影
 10  volumetricIntegrate   沿 z 解析积分（散射 + 透过率）
 11  volumetricApply       全分辨率 apply → Composite 的 uFogScatter / uFogSource=1
 12  taa                   时域解算（先卸抖动）→ 线性 HDR 域，UE 的位置
-13  ssrColor              解算后的 HDR 降采样成带 mip 的「上一帧场景色」
-14  godPrepare            只做决策不出画：太阳在不在屏内、拖影强度
-15  bloom                 亮部提取 → 13 抽样降采样 ×N → 9 抽样 tent 升采样
-16  god                   屏幕空间太阳拖影（出厂关；体积雾开着时也一律不给，会双份）
-17  composite             运动模糊→景深→+泛光/拖影→雾→曝光→ACES→调色→镜头→sRGB
-18  fxaa                  FXAA + 锐化 → 屏幕（调试视图时改为把选中的中间靶送屏）
+13  ssilHistory           解算后的场景色降采样 → 下一帧 SSIL 的反弹源（§17）
+14  ssrColor              解算后的 HDR 降采样成带 mip 的「上一帧场景色」
+15  godPrepare            只做决策不出画：太阳在不在屏内、拖影强度
+16  bloom                 亮部提取 → 13 抽样降采样 ×N → 9 抽样 tent 升采样
+17  god                   屏幕空间太阳拖影（出厂关；体积雾开着时也一律不给，会双份）
+18  composite             运动模糊→景深→+泛光/拖影→雾→曝光→ACES→调色→镜头→sRGB
+19  fxaa                  FXAA + 锐化 → 屏幕（调试视图时改为把选中的中间靶送屏）
 ```
 
 体积雾三趟排在 main 之后（注入要本帧烘好的太阳阴影图）、composite 之前（apply 那一趟
@@ -175,7 +177,7 @@ function generateShadowMapTypeDefine( parameters ) {
 |---|---|---|---|---|
 | `normalDepth` | 全分辨率 | **MRT**：RT0 RGBA16F、RT1 RG16F，+ `DepthTexture(UnsignedInt)` | PrepassPass | `minFilter=Nearest / magFilter=Linear`（这一对是历史口径，改了 SSAO 读数就变） |
 | `hdr` | 全分辨率 | RGBA16F（ultra 4×MSAA） | 编排器 | 主场景。**别往 MSAA 靶上挂 DepthTexture** |
-| `ao` / `aoTmp` / `aoBlur` | `aoScale ×` | RGBA8 | SsaoPass | R=遮蔽量、G=线性视深（双边模糊要） |
+| `ao` / `aoTmp` / `aoBlur` | `aoScale ×` | RGBA16F ×(1 或 2) | GtaoPass | R=可见度、G/B=弯曲法线（八面体）、A=线性视深；附件 1 = SSIL（§17.6） |
 | `bright` | 1/2 | RGBA16F | BloomPass | alpha 在拖影开着时打包天空遮挡 |
 | `bloomMips[]` | 逐级折半 ×2 | RGBA16F | BloomPass | 每级两张（降采样结果 + tent 回叠） |
 | `god` | 1/4，封顶 9.6 万像素 | RGBA16F | GodRaysPass | |
@@ -327,13 +329,15 @@ ApplyPatches(material, [...IndirectLightingPatches({ ssao, gi, destruction }), s
 
 * **采样器有硬预算**：ANGLE-D3D11 上 `MAX_TEXTURE_IMAGE_UNITS = 16`，超了程序**不链接**
   （日志一行 `texture image units count exceeds`），而 three 每帧照样 `useProgram` ——
-  症状是那只材质整个不画 + 每帧一次 1282。加一路补丁之前先数一遍最挤的那份材质
-  （第一人称视模，见末尾坑表那一条）：AO 1 / 探针 GI 3 / SSR 1 / 簇状光 3 / 自阴影 1，
-  再加三方自带的六七个，已经贴着上限。
+  症状是那只材质整个不画 + 每帧一次 1282。**门禁在 `Script_SamplerBudgetTest.mjs`**
+  （四档 × `gi=0/1` 各起一次正片，遍历 `renderer.info.programs` 数每个程序的 sampler
+  uniform，断言全部链接成功且 ≤ 16）。详见下面的预算表。
 * 锚点一律**追加在 chunk 之后**；多个补丁挂同一个锚点按注册顺序拼接。
 * `customProgramCacheKey` = 各补丁 key 拼接。**改了代码不改 key = 两种档位共用同一份
-  编译缓存**（现役三态：`ssao1` / `ssao1|gi1` / `ssao1|gi2`）。
-* 现役顺序固定 **AO → GI → 破口**：`<aomap_fragment>` 上同时挂着 AO 的乘法与 GI 的
+  编译缓存**（现役三态：`gtao1` / `gtao1|gi1` / `gtao1|gi2`）。
+* 现役顺序固定 **ORM → AO → GI → SSR → 簇光 → 破口**（AO 那一路 2026-09 起是 GTAO 补丁，见 §17.4）：
+  ORM 三合一排最前（它把材质自带的遮蔽乘进 `indirectDiffuse`，等价于三方 `aomap_fragment`
+  chunk 原来的位置）；`<aomap_fragment>` 上同时挂着 AO 的乘法与 GI 的
   光照分量取证，AO 先压、取证后抓，面板读到的才是正式画面的值。
 * `Script_Materials.InjectIndirectLighting` 只是这套的薄封装，外部签名没变；
   `MaterialLibrary.Get/Plain/Static/ConfigureExternalPbr` 与 `ActorFactory` 那条路
@@ -355,7 +359,32 @@ ApplyPatches(material, [...IndirectLightingPatches({ ssao, gi, destruction }), s
 | `#include <clipping_planes_fragment>` | 片元 | 最早能 `discard`（破口裁切用它） |
 | `#include <dithering_fragment>` | 片元 | `gl_FragColor` 已成型。整帧覆盖输出（调试假彩色）用它 |
 
-「屏幕空间输入」的公共声明块在 `MakeSsaoPatch` 的 `<common>` 段：`uSsaoMap` /
+#### 采样器预算表（2026-09 集成期实测，ANGLE-D3D11 / MAX = 16）
+
+八个子系统合流之后这条线是**真的会撞**的：各分支单跑都在预算内，合到一起才越线，
+所以各分支自己的回归口一条都抓不到。下面是最挤的几类材质在 `high` + `?gi=1`
+（最挤的组合；出厂默认 gi=0）下的实测数：
+
+| 材质 | 打包前 | 打包后 | 占位（打包后） |
+|---|---:|---:|---|
+| 静态墙 / 地（`MaterialLibrary.Get`） | 18 | **13** | map / normalMap / roughnessMap（=ORM）/ envMap / dfgLUT / 太阳阴影 / uSsaoMap / uSsilMap / uGi×3 / uClusterData |
+| 砸坑地面（+ `CraterSoilV4`） | 20 | **15** | 上面那一排 + uSsrMap + uCraterSoil + uCraterNormal |
+| 人物 GLB（蓙皮） | 17 | **14** | boneTexture / specularIntensityMap / map / normalMap / envMap / dfgLUT / 阴影 / uSsaoMap / uSsilMap / uGi×3 / uSsrMap / uClusterData |
+| 第一人称视模 | 17 | **14** | 同上，把 uSsrMap 换成 uFirstPersonShadowMap（视模不挂 SSR，见坑表） |
+
+已做的打包（每一条都是**逐像素无差**的，不是“关掉某个功能”）：
+
+| 改动 | 省 | 做法 |
+|---|---:|---|
+| **ORM 三合一** | 2 | 一张 ORM 喂三个槽时 three **不去重**，三个槽各占一个单元。`FoldOrmMaps` 把 `metalnessMap` / `aoMap` 从材质上摘掉，`MakeOrmPatch` 改从 `roughnessMap` 那一份采样里读 `.b` / `.r`（`aomap_fragment` chunk 逐行搬运） |
+| **簇表三合一** | 2 | 簇表 / 光索引 / 光源数据 合成一张 RGBA32F（`uClusterData`），整数那两段贴着 float 的位型存，`floatBitsToUint` 取回；光源数据仍然一次 `texelFetch` 拿一个 vec4（最内层循环的取样次数一次没多） |
+| **SSR 补丁死代码消除** | 1 | SSR 只在 `material.roughness <= 0.60` 时动 `radiance`。墙/地/木/布/砸袋那一批配方烘出来的粗糙度下界全在 0.75 以上（`OrmRoughnessFloor` 每个配方算一次），那条分支永远不成立 —— 干脆不编。下一帧追踪端也自洽：不写 `gl_FragColor.a` 则 alpha 恒 1 = 粗糙度 1，追踪端本来就会跳过 |
+
+还没做、下一个要动的候选（按性价比）：探针 GI 的 `uGiOffset`（每探针一个纹素的元数据，
+CPU 侧 DataTexture，合进图集要一趟写回）；砸坑的 `uCraterSoil` + `uCraterNormal`（5 个通道，
+合不进一张 RGBA，只能做图集 + `textureGrad`）。
+
+「屏幕空间输入」的公共声明块在 `MakeAmbientOcclusionPatch` 的 `<common>` 段：`uSsaoMap` /
 `uSsaoResolution` / `uSsaoStrength`，外加 `#define uScreenResolution uSsaoResolution`
 （`Script_Main` 喂的是**主渲染靶**尺寸而不是 AO 靶尺寸 —— 这条踩过两轮）。
 low 档没有 ssao，那些补丁要自带一份分辨率 uniform。
@@ -394,9 +423,9 @@ SEGMENT encode           EncodeOutput()          ← 输出色彩空间 / 抖动
 纯数据、零 three 依赖（契约 2）。`QUALITY_PRESETS[low|medium|high|ultra]` 每档是一张
 平表，键分三类：
 
-* **现役开关/旋钮**：`ssao` `aoScale` `bloomLevels` `godrays` `msaa` `motionBlur`
-  `sharpen` `taa` `velocity` `hzb`；
-* **占位位**（本阶段值 = 「等价于今天」）：`csm` `contactShadows` `gtao` `ssil` `ssr`
+* **现役开关/旋钮**：`ssao`（AO 总闸）`gtao`（档位名）`ssil` `aoScale` `bloomLevels`
+  `godrays` `msaa` `motionBlur` `sharpen` `taa` `velocity` `hzb`；
+* **占位位**（本阶段值 = 「等价于今天」）：`csm` `contactShadows` `ssr`
   `volumetrics` `atmosphere` `autoExposure` `lensFlare` `lut` `dof` `taaUpscale`
   `clusteredLights`；
 * 另有两组独立常量：`HZB`（`maxLevels` / `minSize`）、`VELOCITY`（`clampUv` /
@@ -645,7 +674,13 @@ particleMaterial.allowOverride = false;   // r165+ 的正规做法
 
 ---
 
-## 4. SSAO（半球采样 + 噪声旋转 + 双边模糊）
+## 4. SSAO（半球采样 + 噪声旋转 + 双边模糊）〔历史稿：2026-09 已被 GTAO 整个替换〕
+
+> **这一节讲的实现已经不在仓库里了。** `Script_PostSsao.mjs` 于 2026-09 删除，
+> 帧图里那一格换成了 `Script_PostGtao.mjs`（地平线基 AO + 弯曲法线 + SSIL）。
+> 现状看文末的「17. GTAO / SSIL / 镜面遮蔽（2026-09）」。这一节留着是因为它记着
+> 半球采样那一版踩过的坑（核向量长度、z 为负、双半径），换算法之后仍然是有用的
+> 反面教材 —— 但**别照它调参**，GTAO 一个 uniform 都不叫这些名字。
 
 参数取舍（1600×900，半分辨率 800×450）：
 - **样本数 14**：低于 10 会出现明显噪点带；高于 24 收益递减，成本线性上升。
@@ -3079,3 +3114,202 @@ node Taierzhuang1938/Script_FlareTest.mjs           # 照明弹（走火源池 =
 3. **别拿 `castShadow = false` 当「关掉阴影」的 A/B。** 它会让 `SyncShadowUniforms`
    把 `uSunShadowMap` 置 null，于是撞上第 1 条 —— 量到的不是「没有阴影」而是
    「什么都没画」。正确做法是 `UnregisterShadowUniforms` 之后只翻 `uSunShadowEnabled`。
+---
+
+## 17. GTAO / SSIL / 镜面遮蔽（2026-09）
+
+> 这一节是 AO 那一格的**现状**。§4 是它之前那一版（半球采样 SSAO），已标历史稿。
+> 代码：`Script_PostGtao.mjs`（pass）、`Script_MaterialPatches.MakeAmbientOcclusionPatch`
+> （材质端）、`Data_Tuning_Gtao.mjs`（全部数值）。
+
+### 17.1 一趟地平线搜索，三样产物
+
+帧图里 `ssao` 那一格换成了 `gtao`，并在 `taa` 之后多一趟 `ssilHistory`：
+
+```
+prepass → hzb → gtao → main → wireframe → debugOverlay → taa → ssilHistory
+        → godPrepare → bloom → god → composite → fxaa
+```
+
+`gtao` 一趟出四个通道（MRT 两张附件，半分辨率 RGBA16F）：
+
+| 通道 | 内容 |
+|---|---|
+| R | 可见度 V ∈ [0,1]（GTAO 的解析 cos 加权积分） |
+| G,B | 弯曲法线，**视空间**，八面体编码到 [0,1]² |
+| A | 线性视深（双边去噪 / 时域重投影 / 材质端联合双边升采样都要它） |
+| 附件 1 RGB | SSIL：近场一次反弹的**辐照度** |
+
+四样共用同一批深度取样 —— 地平线搜索是这一 pass 的成本主体，AO、弯曲法线、
+SSIL 只是同一次行军的三份账。
+
+### 17.2 方案与文献
+
+| 部件 | 出处 | 落地位置 |
+|---|---|---|
+| GTAO 本体（切片 + 地平线角 + 解析积分） | Jimenez, Wu, Pesce, Jarabo, *Practical Realtime Strategies for Accurate Indirect Occlusion*, SIGGRAPH 2016（Activision） | `Script_PostGtao` 的 trace 着色器 |
+| 参数命名与取值区间 | Intel **XeGTAO**（同一篇论文最完整的公开实现） | `Data_Tuning_Gtao.GTAO` |
+| 弯曲法线闭式解（t0 / t1） | 同课程附录 | trace 着色器切片循环末尾 |
+| 多次反弹 `GTAOMultiBounce` | 同课程 | 材质补丁（屏幕空间没有反照率，只能在材质里做） |
+| 镜面遮蔽 GTSO | 同课程 §4，工程形式取 Oat & Sander 2007 的球冠相交 | 材质补丁 `AoSpecularOcclusion` |
+| SSIL 可见性位掩码 | Vardis et al. 2023, *Screen-Space Indirect Lighting with Visibility Bitmask* | trace 着色器的 `occupied` 位掩码 |
+
+**与论文有意的两处不同**：
+
+1. **不照抄 XeGTAO 的 `RotFromToMatrix`。** 它的视向量在 DX 左手系里是 `(0,0,-1)`，
+   搬到 OpenGL 视空间会撞上 180° 的退化旋转（`1/(1+cosθ)` 除零）。这里改成显式切片基
+   `bent = t0·axisT + t1·viewVec`，数学等价、没有奇点。自检：平地无遮挡时
+   `t0 = 0, t1 = 2/3`，归一化后正好是几何法线。
+2. **没有深度 mip 金字塔。** XeGTAO 用一条**加权平均**的深度 mip 降低大半径时的缓存
+   缺失；仓库里的 HZB 是 **max-reduce**（给 SSR / 体积雾用的保守远深度），拿它做 AO 会
+   系统性压低地平线、整体欠遮蔽。代价由 `GTAO.maxPixelRadius`（96 半分辨率像素）兜住。
+
+### 17.3 去噪与时域
+
+```
+trace(MRT) → temporal(MRT，重投影上一帧) → 双边 H → 双边 V → targets.aoBlur
+```
+
+* **时域**：位置用**速度靶**（蒙皮人物逐骨骼精确），有效性判据是「历史像素记的视深」
+  与「这块表面上一帧应该在多远」对不上就整份作废 —— 后者由
+  `prevViewProjection * worldPos` 的 `clip.w` 直接给出（透视矩阵的 w 就是线性视深），
+  **不需要往 FrameContext 上加 prevView 矩阵**。本帧权重 `GTAO.temporalAlpha = 0.10`。
+* **空间**：可分离 5 抽样双边，边缘由「相对视深差」与「几何法线夹角」双重把关；
+  弯曲法线是**解码后**加权再归一化，不是直接混编码值（八面体编码不能线性混）。
+* **噪声**：空间交错梯度（IGN）+ 帧序 R2 轮转，周期 `temporalCycle`（medium/high 6、
+  ultra 8、low 不轮转）。全部由 `ctx.frame` 驱动，截图逐像素可复现。
+
+### 17.4 材质端做的四件事（顺序不能换）
+
+`Script_MaterialPatches.MakeAmbientOcclusionPatch`，锚点 `<aomap_fragment>`（契约 6：
+只压间接光；那里 `lights_fragment_end` 已经跑完，直接光不在场）：
+
+1. **联合双边升采样** —— 2×2 双线性权重 × 深度接近度（深度取自 AO 靶的 alpha）。
+   `aoScale = 1`（ultra）时插值权重退化成 (1,0,0,0)，即精确直通，不会白糊一遍。
+2. **多次反弹** —— `AoMultiBounce(visibility, material.diffuseContribution)`。
+3. **镜面遮蔽** —— `AoSpecularOcclusion(bentNormal, visibility, roughness, reflect(...))`，
+   **替换了旧的 `pow(ao, 1+2·roughness)`**：那条只看 AO 标量，反射方向明明朝着开阔的
+   天空也照样压暗；有了弯曲法线才知道「被挡住的是哪半边」。
+4. **SSIL** —— `indirectDiffuse += ssil × strength × diffuseContribution / π`，
+   **加在 AO 乘法之后**（AO 挖掉的正是这一份，先加再乘等于双重压暗）。
+
+### 17.5 SSIL 的量纲与「不双份」
+
+着色器里已经按 **π²/(2·切片数)** 归一化，估计量对「被辐亮度 L 的朗伯面铺满的半球」
+给出 πL（推导写在 `Script_PostGtao` 那一行注释里）。所以 `SSIL.strength` 是一根
+**艺术旋钮**（1.0 = 物理量），出厂 0.70。
+
+与探针体 GI 的分工：探针体本来就带一份多次反弹的间接光，近场那一米会被算两遍。
+`Script_Main` 按 GI 的淡入量把 SSIL 整体乘 `SSIL.giScale = 0.60`（−40%），GI 关着时不打折。
+接线在 `RenderScene` 的 `SyncAoUniforms(...)` 那一处，一行。
+
+### 17.6 RT / uniform / 分档
+
+| 靶 | 尺寸 | 格式 | 备注 |
+|---|---|---|---|
+| `targets.ao` | `aoScale ×` | RGBA16F ×(1 或 2) | trace 原始输出；两趟模糊时还兼作横向中转 |
+| `targets.aoTmp` | 同上 | 同上 | 别名（两趟时 = `ao`，一趟时 = `aoBlur`） |
+| `targets.aoBlur` | 同上 | 同上 | **最终结果**；`post.AoTexture` / `post.SsilTexture` 读它 |
+| history ×2 | 同上 | 同上 | 只在 `temporal` 档建 |
+| colorHistory | `min(aoScale, 0.5) ×` | RGBA16F | 上一帧解算后的 HDR，SSIL 的辐亮度源 |
+
+材质端 uniform（由 `Script_PostGtao.MakeAoUniforms` 造，正片与探针页共用）：
+`uSsaoMap`（名字保留，§1.8 那条 `#define uScreenResolution uSsaoResolution` 的公共别名
+不变）、`uSsaoResolution`（**主靶**尺寸）、`uAoTexelResolution`（AO 靶尺寸）、
+`uSsaoStrength`、`uSsilMap`、`uSsilStrength`。SSIL 关着时 `uSsilMap` 指向一张
+**1×1 全黑**，所以开关 SSIL **不需要重编译任何材质**。
+
+分档（`Data_Tuning_Graphics` 的 `gtao` 存档位名、`ssil` 是构造期开关；
+切片/步数/时域在 `Data_Tuning_Gtao.GTAO_TIERS`；靶比例仍是 `aoScale`）：
+
+| 档 | ssao | gtao | 切片×步 | 时域 | ssil | aoScale |
+|---|---|---|---|---|---|---|
+| low | false | "low" | 1×4 | 无 | false | 0.5 |
+| medium | true | "medium" | 2×4 | 有（周期 6） | false | 0.5 |
+| high | true | "high" | 2×6 | 有（周期 6） | **true** | 0.5 |
+| ultra | true | "ultra" | 3×8 | 有（周期 8） | **true** | 1.0 |
+
+`aoScale` 由 0.5/0.6/0.75/1.0 改成 0.5/0.5/0.5/1.0：GTAO 每像素比旧 SSAO 贵一倍多，
+而它在半分辨率 + 联合双边升采样下仍然明显好于旧 SSAO 的 0.75（见下面的实测与截图）。
+
+### 17.7 实测（RTX 4070 SUPER / ANGLE-D3D11，正片 `phase=overview` 的 `Wall_EastOuterFace` 机位，A/B/C 交替五轮取中位数）
+
+| 视口 | AO 段 | SSIL 增量（AO 段差 + ssilHistory） |
+|---|---:|---:|
+| 1600×900 GTAO | 0.224 ms | +0.079 ms |
+| 2560×1440 GTAO | **0.615 ms** | **+0.117 ms**（0.096 + 0.021） |
+| 2560×1440 旧 SSAO（`aoScale` 0.75） | 0.498 ms | — |
+
+预算是「high 档 1440p，GTAO+去噪 ≤ 0.9 ms、SSIL 增量 ≤ 0.6 ms」，两条都过。
+**跨进程的绝对值别直接比**：旧版那一轮的 `prepass`（代码完全没动）也比新版低了约 20%，
+是别的 agent 同时在跑浏览器测试抢 GPU。按 `prepass` 归一化之后
+GTAO ≈ 旧 SSAO 的 1.08 倍、GTAO+SSIL ≈ 1.23 倍 —— 也就是说**多出弯曲法线、时域累积、
+多次反弹、GTSO 与近场反弹，只多花两成**。
+
+SSIL 在这一关的实际量级（探针页街景，逐像素读 SSIL 靶 / 同帧 HDR 亮度）：
+
+| 预设 | SSIL 亮度均值 | 峰值 | >0.05 的像素占比 | 画面 HDR 亮度 |
+|---|---:|---:|---:|---:|
+| smokyDay | 0.0197 | 0.545 | 15.2% | 0.503 |
+| dusk | 0.0102 | 0.228 | 7.3% | 0.314 |
+| burningStreet | 0.0132 | 0.351 | 11.1% | 0.364 |
+| night | 0.0014 | 0.028 | 0% | 0.032 |
+
+**说清楚**：这一关的外景是阴天灰砖，源辐亮度本来就低，所以 SSIL 的平均贡献是
+零点几个百分点、局部峰值几个百分点 —— 这是**物理上正确的量**，不是实现弱。
+取证场（`Probe.html?scene=ssil`，一堵自发光红墙 + 一块中性灰地）上量到的是
+HDR 红通道 +3.5%、蓝通道 +0.14%、三米外 +0.09%，红/蓝选择性 25:1、近/远 39:1。
+旋钮线性（×4 时增量正好翻四倍），要更响就抬 `SSIL.strength`。
+
+**试过但退回的**：把地平线搜索半径与 AO 衰减半径拆开、SSIL 走 1.8 m。
+正片两个采样点上 SSIL 读数一位没动（0.0086 / 0.0034 → 0.0086 / 0.0034），
+墙根接触带反而被摊薄（可见度 0.751 → 0.836）—— 步数没加、每步跨得更远。
+`uAoRadius` 那条接线留着了（`SSIL.radius` 出厂 = `GTAO.radius`），
+真要给 SSIL 更远的手必须同时加 `GTAO_TIERS.steps`。
+
+### 17.8 调试视图
+
+Debug Rendering 面板「AO」组：
+
+| 视图 | 看什么 |
+|---|---|
+| AO 原始 | trace 的原始输出（还没时域累积与双边）。噪点是逐帧轮转的采样相位 |
+| AO 模糊 | 实际注入材质的那张可见度 |
+| 弯曲法线 | 八面体解码后按 RGB 显示：开阔平地 ≈ 几何法线，墙角朝开阔的一侧偏 |
+| SSIL 间接光 | 近场一次反弹（HDR 映射）。high/ultra 才有，低档画不可用斜纹 |
+| 镜面遮蔽 | GTSO 结果，为了看空间梯度统一取 0.35 粗糙度（正片按各自材质的真粗糙度算） |
+
+后三个由 `GtaoPass.GetDebugSource()` 自己认领，走 `Script_PostDebug.RenderView` 的
+**通用材质分支**（`{ material, Prepare, unavailable }`）—— 新 pass 要加自带展示材质的
+视图照这条走，不用往 `FRAG_DEBUG_VIEW` 的 else 链里插 uMode。
+
+### 17.9 已知近似（都是有意的，别当 bug 修）
+
+1. 没有深度 mip（理由见 17.2）。
+2. 八面体编码的缝在 z = 0（掠射面），双线性跨缝会插值出错误方向。可见面的弯曲法线
+   基本都在 +z 半球，实测无可见伪影。
+3. SSIL 的辐亮度源**滞后一帧**，且按相机运动重投影；逐物体运动在反弹源里按静止处理
+   （与 TAA / 运动模糊现役的同一条近似）。
+4. 位掩码只在切片内做、不跨切片（论文亦然）。
+5. 第一人称的手与枪在预通道里写的是 `FOREGROUND_VIEW_DEPTH` 常数深度，那一块的 GTAO
+   是「一片等深平面」= 无遮蔽。与旧 SSAO 同一条口径。
+6. 时域拒绝用的是相机重投影得到的期望深度，快速位移的表面会被判为 disocclusion 而丢历史
+   （运动中的角色 AO 略噪）。这是安全的一侧：宁可噪一点，也不要拖影。
+7. SSIL 忽略了切片的 `projectedNormalLength` 权重，掠射面上会略微高估。
+
+### 17.10 怎么验
+
+```bash
+node Taierzhuang1938/Script_GtaoTest.mjs            # 本节的看门狗（19 条）
+node Taierzhuang1938/Script_PostFrameGraphTest.mjs  # 帧图顺序（gtao / ssilHistory 在不在）
+node Taierzhuang1938/Script_GiTest.mjs              # 材质补丁三态 + GI 双份
+node Taierzhuang1938/Script_PostTest.mjs
+node Taierzhuang1938/Script_EditorTest.mjs          # Debug Rendering 全部视图
+node Taierzhuang1938/Script_BootTest.mjs
+node Taierzhuang1938/Script_ProfilerTest.mjs
+```
+
+`Script_GtaoTest` 的门槛全是**实测标定**的，跑起来会先把读数整份打出来 ——
+下一次调参的人要能一眼看到当前落在哪儿、离门槛还有多远。取证机位是
+`Probe.html?scene=ssil`：世界坐标已知，每一条断言都用 `camera.project()` 把世界点
+投到屏幕上再去读那一块像素，不靠「画面左下角大概是地面」。
