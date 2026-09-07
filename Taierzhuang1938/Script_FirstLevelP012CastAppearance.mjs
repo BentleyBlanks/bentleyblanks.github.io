@@ -25,7 +25,9 @@ export function InstallP012OpeningPose(soldier) {
     for(const [bone,rotation] of saved)bone.quaternion.copy(rotation);
     saved.clear();
     const result=original.call(this,dt,state);
-    if(!soldier.p012AwaitingWeapon)return result;
+    const trainRest = soldier.missionTrainPassenger && !soldier.missionTrainReady && (state.moveSpeed ?? 0) < .025
+      && !state.firing && !state.carryRole && !state.meleeCombat && !(state.prone > .35 || state.crouch > .35);
+    if(!soldier.p012AwaitingWeapon && !trainRest)return result;
     time+=Math.max(0,dt);
     const basis=actor.root||rig.root,world=basis.getWorldQuaternion(basis.quaternion.clone());
     // Actor receives normalized speed (3.6 m/s = 1), not metres per second.
@@ -68,19 +70,20 @@ export function InstallP012ActorMotion(soldier) {
     const elapsed=Number.isFinite(state.elapsed)?state.elapsed:null;
     const step=elapsed!==null&&lastElapsed!==null?elapsed-lastElapsed:dt;
     const distance=previous?Math.hypot(at.x-previous.x,at.z-previous.z):0;
-    const speed=previous&&step>0&&distance<Math.max(2,step*8)
+    const measuredSpeed=previous&&step>0&&distance<Math.max(2,step*8)
       ? Math.min(6,distance/step):0;
-    this.p012ActualSpeedMps=soldier.p012OnMovingTrain?0:speed;
+    const speed=soldier.p012OnMovingTrain?0:measuredSpeed;
+    this.p012ActualSpeedMps=speed;
     // Zero-dt pose reads (including stretcher sockets) must not consume motion.
     if(dt>0){previous={x:at.x,z:at.z};lastElapsed=elapsed;}
     if(this.forcedClip){this.currentAction?.setEffectiveTimeScale(1);return original.call(this,dt,state);}
     const next={...state,moveSpeed:dt>0?this.p012ActualSpeedMps/3.6:state.moveSpeed};
-    const emptyIdle=soldier.p012AwaitingWeapon&&next.moveSpeed<.025
+    const emptyIdle=(soldier.p012AwaitingWeapon || soldier.missionTrainPassenger && !soldier.missionTrainReady)&&next.moveSpeed<.025
       &&!state.firing&&!state.carryRole&&!(state.prone>.35||state.crouch>.35)
       &&!state.meleeCombat;
     // The command clip at 25% has both feet down and a near-upright torso.
     // The opening arm override lowers its gesture. It is a held placeholder,
-    // not a new train-balancing animation and never applies once armed.
+    // not a new train-balancing animation. Mission passengers also use it while waiting.
     if(emptyIdle)next.reach=1;
     const id=this._ActionForState(next);
     this.Play(id,dt===0?0:.12);

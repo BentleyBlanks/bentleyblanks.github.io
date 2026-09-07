@@ -39,6 +39,7 @@ async function Main() {
   for (const cue of MISSION_DIALOGUE.filter((cue) => !selected || selected.includes(cue.id))) {
     const prompt = MissionVoicePrompt(cue),
       hash = crypto.createHash("sha256").update(prompt).digest("hex");
+    if (prompt.length > 3000) throw new Error(`Seed Audio prompt exceeds 3000 characters: ${cue.id}`);
     const output = path.join(out, cue.file);
     if (dry) {
       console.log(`${cue.id}: ${cue.lines.length} lines, ONE request, ${prompt.length} characters`);
@@ -58,13 +59,13 @@ async function Main() {
     try {
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
+        headers: { "Content-Type": "application/json", "X-Api-Key": apiKey, "X-Api-Request-Id": crypto.randomUUID() },
         body: JSON.stringify({
           model,
           text_prompt: prompt,
           audio_config: {
             format: "mp3",
-            sample_rate: 48000,
+            sample_rate: 44100,
             pitch_rate: 0,
             speech_rate: 0,
             loudness_rate: 0,

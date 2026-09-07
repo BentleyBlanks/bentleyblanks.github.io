@@ -1,3 +1,4 @@
+import { HURT_FLINCH } from "./Data_Tuning_Ai.mjs";
 // Execute production AI spawn/combat entry points with lightweight host stubs.
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -114,10 +115,11 @@ function Method(name){return source.match(new RegExp(`  ${name}\\([^\\n]*\\{[\\s
 let serial=0;
 class SoldierStub {constructor(side,options){this.id=serial++;this.side=side;this.alive=true;this.weaponId=options.weapon||"HanYang";this.weapon={};this.position={x:options.x,z:options.z,y:0};}}
 const calls=[];
-const hit=vm.runInNewContext(`({${Method("TakeHit")}})`,{Clamp01:(n)=>Math.min(1,Math.max(0,n))}).TakeHit;
+const hit=vm.runInNewContext(`({${Method("TakeHit")}})`,{HURT_FLINCH,Clamp01:(n)=>Math.min(1,Math.max(0,n))}).TakeHit;
 for(const essential of [false,true]){
- const casualty={alive:true,health:20,suppression:0,scriptEssential:essential,Kill(){this.alive=false;return true;}};
+ const casualty={alive:true,health:20,hurtPose:0,suppression:0,scriptEssential:essential,Kill(){this.alive=false;return true;}};
  assert.equal(hit.call(casualty,100,"head",null),!essential);
+ assert.ok(Number.isFinite(casualty.hurtPose) && casualty.hurtPose > 0 && casualty.hurtPose <= 1);
  assert.equal(casualty.alive,essential);assert.equal(casualty.suppression,.45);
  if(essential){assert.equal(casualty.health,1);casualty.Kill();assert.equal(casualty.alive,false,"explicit scripted death remains possible");}
 }

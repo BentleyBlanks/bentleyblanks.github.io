@@ -1,3 +1,5 @@
+import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
+import { FirstLevelMissionTrain } from "./Script_FirstLevelMissionTrain.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
@@ -172,3 +174,32 @@ assert.deepEqual(
   [0, 0.3, 0],
   "Resume plays the same uncut cue from its paused offset before queued dialogue",
 );
+
+// Regression: 40 real recruit bodies plus Luo, stable carriage-local positions, all three doors.
+{
+  const dt = 1/60, actors = [];
+  const Make = () => { const a = { id: actors.length, alive: true, position: {x:0,y:1.17,z:0}, goal:{x:0,z:0} }; actors.push(a); return a; };
+  const originals = Array.from({length:6}, Make), guide = Make();
+  let offset = R.trainTravelM, player = {...MISSION_TRAIN.player,z:MISSION_TRAIN.player.z+offset};
+  const train = new FirstLevelMissionTrain({ Originals:()=>originals, Guide:()=>guide, Spawn:Make,
+    Offset:()=>offset, Place:(a,p)=>Object.assign(a.position,p), Hold:a=>Object.assign(a.goal,a.position),
+    Move:(a,p,speed)=>{const d=Math.hypot(p.x-a.position.x,p.z-a.position.z);if(d>MISSION_TRAIN.arrivalRadiusM){const step=Math.min(speed*dt,d)/d;a.position.x+=(p.x-a.position.x)*step;a.position.z+=(p.z-a.position.z)*step;}},
+    Player:()=>player, Exited:()=>{},
+  });
+  train.Initialize(); train.Initialize();
+  assert.equal(actors.length,41);assert.deepEqual(train.State().counts,[8,24,8]);
+  const local=actors.map(a=>({x:a.position.x,z:a.position.z-offset}));
+  for(let i=0;i<120;i++){offset-=R.trainTravelM/120;train.Translate(-R.trainTravelM/120);train.Update(dt,false);}
+  for(const [i,a] of actors.entries()) {assert.ok(Math.abs(a.position.z-offset-local[i].z)<1e-8);assert.equal(a.position.x,local[i].x);assert.ok(a.p012OnMovingTrain);}
+  player={x:-71,z:110};
+  let ticks=0;
+  for(;ticks<180/dt;ticks++) {
+    train.Update(dt,true);
+    for(let i=0;i<actors.length;i++)for(let j=i+1;j<actors.length;j++)assert.ok(Math.hypot(actors[i].position.x-actors[j].position.x,actors[i].position.z-actors[j].position.z)>=.899,'train queue bodies do not overlap');
+    if(train.entries.every(e=>e.arrived))break;
+  }
+  assert.equal(train.State().exited,40,JSON.stringify(train.State()));
+  assert.ok(train.entries.every(e=>e.arrived),'all passengers physically reach their own muster point: '+JSON.stringify(train.State().entries.filter(e=>!e.arrived)));
+  assert.ok(actors.every(a=>!a.p012OnMovingTrain&&a.missionUnloaded));
+  console.log('ok train 8/24/8, Luo separate, unchanged local positions while moving, all physical exits in '+(ticks*dt).toFixed(1)+'s');
+}

@@ -1,3 +1,4 @@
+import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
 export const MISSION_VERSION = "first-level-20260907-r1";
@@ -239,6 +240,6 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
     friendlyLimit: 4,
     actualEventsOnly: true,
     storyBeats: [],
-    activities: { arrivalGuideStart: { x: -76, z: 71 }, trainColumn: { extraCount: 0 } },
+    activities: { arrivalGuideStart: { x: -76, z: 71 }, trainColumn: { extraCount: MISSION_TRAIN.extraCount } },
   },
 });

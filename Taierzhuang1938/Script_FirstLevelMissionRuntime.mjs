@@ -10,6 +10,8 @@ import {
   MISSION_ROUTES,
   MISSION_PLACEMENT as P,
 } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
+import { FirstLevelMissionTrain } from "./Script_FirstLevelMissionTrain.mjs";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
 import {
   FirstLevelMissionColumn,
@@ -64,7 +66,6 @@ export class FirstLevelMissionRuntime {
       this.OnBlast(event);
     };
     this.Register();
-    this.PlaceSquad();
     this.flow.Start();
     this.voiceReady = this.voice.Load();
     this.SaveCheckpoint();
@@ -105,24 +106,29 @@ export class FirstLevelMissionRuntime {
     actor.actor?.root.position.copy(actor.position);
   }
   PlaceSquad() {
-    const positions = P.squadAboard;
-    this.squad = ["luo", "yaowa", "heyoutian", "liuwencai"]
-      .map((id, i) => {
-        const actor = this.companion.Handle(id);
-        if (!actor) return null;
-        this.PlaceActor(actor, { x: positions[i][0], z: positions[i][1] + this.battlefield.trainOffsetM });
-        actor.scriptEssential = true;
-        actor.p012Guided = true;
-        actor.missionExitIndex = 0;
-        actor.missionExitZ = Clamp(positions[i][1], 72.7, 75.3);
-        actor.missionUnloaded = false;
-        actor.scriptedNoncombatant = true;
-        actor.manualGoalUntil = Infinity;
-        actor.goal.copy(actor.position);
-        actor.scriptArrivalRadius = 0.45;
-        return actor;
-      })
-      .filter(Boolean);
+    this.squad = ["luo", "yaowa", "heyoutian", "liuwencai"].map(id => this.companion.Handle(id)).filter(Boolean);
+    for (const actor of this.squad) actor.scriptEssential = true;
+    const originals = this.squad.filter(actor => actor.castId !== "luo");
+    while (originals.length < 6) originals.push(this.ai.Spawn("nra", MISSION_TRAIN.centerX, A.train.z + R.trainTravelM, {
+      weapon: "HanYang", scriptedNoncombatant: true, squadId: "MissionTrainOriginals",
+    }));
+    this.trainWounded = originals[3];
+    this.train = new FirstLevelMissionTrain({
+      Originals: () => originals, Guide: () => this.companion.Handle("luo"),
+      Spawn: (car) => this.ai.Spawn("nra", MISSION_TRAIN.centerX, car.z + this.battlefield.trainOffsetM, {
+        weapon: "HanYang", scriptedNoncombatant: true, squadId: "MissionTrain" + car.carIndex,
+      }),
+      Offset: () => this.battlefield.trainOffsetM,
+      Place: (actor, point) => { this.PlaceActor(actor, point); actor.yaw = Math.PI / 2; },
+      Hold: (actor) => { actor.scriptedNoncombatant = true; this.MoveActor(actor, actor.position, 0); },
+      Move: (actor, point, speed) => {
+        this.ai.SetStance(actor, 0, 0.5, true);
+        this.MoveActor(actor, point, speed);
+        actor.scriptArrivalRadius = MISSION_TRAIN.arrivalRadiusM;
+      },
+      Exited: () => {}, Player: () => this.player.position,
+    });
+    this.train.Initialize();
   }
   MoveActor(actor, point, speed = R.squadSpeedMps) {
     if (!actor?.alive) return;
@@ -175,25 +181,7 @@ export class FirstLevelMissionRuntime {
     const stage = this.flow.stage.id;
     if (["Train", "Unloading"].includes(stage) && !this.Has("trainStopped")) return;
     for (const actor of [...this.squad, this.trainWounded].filter(Boolean)) {
-      if (!actor.missionUnloaded) {
-        const order = this.squad.indexOf(actor);
-        if (this.time < (this.trainStoppedAt || 0) + Math.max(0, order) * R.unloadStaggerSeconds) {
-          this.MoveActor(actor, actor.position, 0);
-          continue;
-        }
-        const exit = [
-          { x: -74.2, z: actor.missionExitZ || 74 },
-          { x: -72, z: actor.missionExitZ || 74 },
-          A.unload,
-        ];
-        if (Distance(actor.position, exit[actor.missionExitIndex]) < 0.8) actor.missionExitIndex++;
-        if (actor.missionExitIndex < exit.length) {
-          this.ai.SetStance(actor, 0, 0.5, true);
-          this.MoveActor(actor, exit[actor.missionExitIndex]);
-          continue;
-        }
-        actor.missionUnloaded = true;
-      }
+      if (!actor.missionTrainReady) continue;
       if (actor === this.trainWounded) {
         this.ai.SetStance(actor, 1, Infinity, true);
         continue;
@@ -398,18 +386,6 @@ export class FirstLevelMissionRuntime {
         this.Say(stage.cue);
         this.battlefield.SetTrainOffset(R.trainTravelM);
         this.PlaceSquad();
-        this.trainWounded = this.ai.Spawn("nra", -77, 80 + R.trainTravelM, {
-          weapon: "HanYang",
-          squadId: "MissionTrainWounded",
-        });
-        if (this.trainWounded) {
-          this.PlaceActor(this.trainWounded, { x: -77, z: 80 + R.trainTravelM });
-          this.trainWounded.scriptedNoncombatant = true;
-          this.trainWounded.p012Guided = true;
-          this.trainWounded.manualGoalUntil = Infinity;
-          this.trainWounded.goal.copy(this.trainWounded.position);
-          this.trainWounded.missionExitIndex = 0;
-        }
         this.PlacePlayerTrain();
         this.audio.Ambience("trainInterior");
         break;
@@ -848,6 +824,7 @@ export class FirstLevelMissionRuntime {
     this.delta = dt;
     this.time += dt;
     this.voice.Update(dt);
+    this.train?.Update(dt, this.Has("trainStopped"));
     this.UpdateSquad();
     this.UpdateTank();
     this.UpdateFlank();
@@ -900,12 +877,10 @@ export class FirstLevelMissionRuntime {
         this.player.position.z += delta;
         this.player.body?.Teleport(this.player.position.x, this.player.position.y, this.player.position.z);
       }
-      for (const actor of [...this.squad, this.trainWounded].filter(Boolean))
-        if (this.battlefield.TrainContains(actor.position, before)) {
-          actor.position.z += delta;
-          actor.body?.Teleport(actor.position.x, actor.position.y, actor.position.z);
-          actor.goal.copy(actor.position);
-        }
+      if (Math.abs(delta) > 1e-9) {
+        this.train.Translate(delta);
+        if (aboard) this.player.SyncCamera(0);
+      }
       if (this.time > start && !this.Has("trainShelling")) {
         this.trainShellStartedAt = this.time;
         this.shellTrainOffset = offset;
@@ -923,7 +898,7 @@ export class FirstLevelMissionRuntime {
         !this.Has("trainNearShell")
       ) {
         this.Record("trainNearShell");
-        this.combat.FireShell(new THREE.Vector3(-35, 20, 40), this.Point({ x: -73, z: 79 + offset }), {
+        this.combat.FireShell(new THREE.Vector3(-35, 20, 40), this.Point({ x: -73, z: A.train.z + 5 + offset }), {
           flight: 1,
           kind: "Shell75",
           radius: 5,
@@ -1179,6 +1154,7 @@ export class FirstLevelMissionRuntime {
       tank: { ...this.tank },
       playerExplosions: this.playerExplosions || [],
       column: this.column.State(),
+      train: this.train?.State(),
       voice: this.voice.State(),
       enemies: [...this.enemies].map(([id, actor]) => ({
         id,

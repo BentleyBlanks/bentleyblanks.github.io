@@ -1,3 +1,4 @@
+import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { P012_STATION_BLOCKS } from "./Data_FirstLevelP012Station.mjs";
 import { MISSION_TERRAIN, SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 const blocks = [],
@@ -249,7 +250,7 @@ Block("ReceptionMedicine", -156, 36, 1, 0.7, 1, "missionRoute");
 Wall("RearExitCover", -169.5, 29, 6, 1.05, 0.7);
 Wall("FinalAlleyCover", -185, 10, 0.7, 1.2, 12);
 export const MISSION_ANCHORS = Object.freeze({
-  train: { x: -77, z: 74 },
+  train: MISSION_TRAIN.player,
   unload: { x: -66, z: 66 },
   front: { x: 0, z: -124 },
   gun: { x: 0, z: -128 },
@@ -344,12 +345,6 @@ export const MISSION_PLACEMENT = Object.freeze({
     { x: -62, z: 69, yaw: -0.4, health: 35 },
     { x: -69, z: 70, yaw: 1.2, health: 0 },
     { x: -64, z: 77, yaw: 2.1, health: 28 },
-  ],
-  squadAboard: [
-    [-77, 70],
-    [-77, 72.5],
-    [-77, 75],
-    [-77, 78],
   ],
   tankStart: { x: 36, z: -173 },
   tankTargets: [

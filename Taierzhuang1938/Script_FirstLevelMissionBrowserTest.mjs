@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { SCENE_RENDER_LIMITS } from "./Data_AssetStandards.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url)),
   root = path.resolve(here, "..");
@@ -131,7 +132,7 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
         ammo: g.state.ammo,
         clips: g.state.clips,
         lastShot: g.state.lastShot,
-        foe: window.MissionInputDriver.Target()?.missionId,
+        foe: window.MissionInputDriver?.Target()?.missionId,
       };
     }, fight);
     if (chunk % 4 === 0 || result.done || !result.alive) console.log(label, JSON.stringify(result));
@@ -237,6 +238,29 @@ try {
     "ok initial mission",
     JSON.stringify({ stage: initial.mission.stage, position: initial.position, slots: initial.slots }),
   );
+  assert.deepEqual(initial.mission.train.counts, [8, 24, 8]);
+  assert.equal(initial.mission.train.entries.length, 41, "40 recruits plus Luo, player separate");
+  const ride = await page.evaluate(() => {
+    const g = window.Tengxian;
+    g.StepFrames(120, 1/60, true);
+    const actors = g.ai.soldiers.filter(a => a.missionTrainPassenger);
+    const start = actors.map(a => ({x:a.position.x, z:a.position.z-g.battlefield.trainOffsetM}));
+    let maxLocalDrift=0, maxAnimationSpeed=0, maxRootError=0;
+    const offsetBefore=g.battlefield.trainOffsetM;
+    const poses=actors.map(a=>({clip:a.actor.characterRig?.currentPlaybackId,rate:a.actor.characterRig?.currentAction?.getEffectiveTimeScale()}));
+    for(let frame=0;frame<480;frame++) {
+      g.StepFrames(1,1/60,true);
+      actors.forEach((a,i)=>{
+        maxLocalDrift=Math.max(maxLocalDrift,Math.hypot(a.position.x-start[i].x,a.position.z-g.battlefield.trainOffsetM-start[i].z));
+        maxAnimationSpeed=Math.max(maxAnimationSpeed,a.actor.characterRig?.p012ActualSpeedMps||0);
+        maxRootError=Math.max(maxRootError,a.actor.root.position.distanceTo(a.position));
+      });
+    }
+    return {count:actors.length,travel:offsetBefore-g.battlefield.trainOffsetM,maxLocalDrift,maxAnimationSpeed,maxRootError,poses};
+  });
+  console.log("TRAIN_RIDE",JSON.stringify(ride));
+  assert.ok(ride.poses.every(p=>p.clip==="AttackCommand"&&p.rate===0), "moving train passengers hold the existing planted-foot pose");
+  assert.ok(ride.travel>1 && ride.maxLocalDrift<.08 && ride.maxAnimationSpeed<.05 && ride.maxRootError<.08, "train-local bodies and rendered roots stay still without a walking cycle: "+JSON.stringify(ride));
   await Capture("Train");
   const pause = await page.evaluate(() => {
     const g = window.Tengxian;
@@ -292,7 +316,7 @@ try {
   assert.equal(retry.stage, "Unloading");
   assert.deepEqual(retry.facts, retry.beforeFacts);
   assert.equal(retry.ammo, retry.beforeAmmo);
-  assert.ok(Math.abs(retry.position.z - 74) < 1, "Train checkpoint follows the same carriage as it moves");
+  assert.ok(Math.abs(retry.position.z - MISSION_TRAIN.player.z) < 1, "Train checkpoint follows the same carriage as it moves");
   const menuCheckpoint = await page.evaluate(() => {
     const g = window.Tengxian,
       before = g.Debug.FirstLevelMission(),
@@ -329,6 +353,17 @@ try {
   await page.screenshot({ path: path.join(output, "Scene_Unloading.png") });
   assert.deepEqual(errors, []);
   console.log("ok moving train, shelling and stop; output", output);
+  await Route([{x:-73,z:MISSION_TRAIN.player.z},{x:-71,z:MISSION_TRAIN.player.z},{x:-71,z:110}], "TrainExitApron");
+  for(let i=0;i<30;i++) {
+    const train=await page.evaluate(()=>{window.Tengxian.StepFrames(300,1/60,false);return window.Tengxian.Debug.FirstLevelMission().train;});
+    if(train.entries.every(e=>e.arrived))break;
+  }
+  const trainExit=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().train);
+  await Capture("TrainAllDisembarked");
+  await fs.writeFile(path.join(output,"Data_TrainDisembark.json"),JSON.stringify({ride,train:trainExit},null,2));
+  assert.equal(trainExit.exited,40,"all 40 original recruit bodies leave via the three real stairways");
+  assert.ok(trainExit.entries.every(e=>e.arrived),"all train bodies arrive without respawning: "+JSON.stringify(trainExit.entries.filter(e=>!e.arrived)));
+  console.log("ok all 40 recruits and Luo physically disembarked and reached individual muster points");
   if (process.argv.includes("--campaign")) {
     await page.evaluate(() => {
       const g = window.Tengxian;
@@ -376,8 +411,7 @@ try {
       const { MISSION_ROUTES } = await import("./Data_FirstLevelMissionLayout.mjs");
       window.missionBot = {
         route: [
-          { x: -73, z: 74 },
-          { x: -70, z: 74 },
+          { x: -71, z: 74 },
           { x: -66, z: 66 },
           ...MISSION_ROUTES.support,
           { x: 0, z: -124 },
