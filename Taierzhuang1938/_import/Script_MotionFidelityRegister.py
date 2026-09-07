@@ -5,6 +5,7 @@ parser=argparse.ArgumentParser();parser.add_argument('--root',type=Path,required
 args=parser.parse_args();root=args.root;out=root/'Models'/args.group
 inventory=json.loads((out/'Data_SourceInventory.json').read_text(encoding='utf-8'))['actions']
 recipes=json.loads((out/'Data_Recipes.json').read_text(encoding='utf-8'));entries=[]
+rawRigs=[json.loads(p.read_text(encoding='utf-8')) for p in (root/'Models/RecoveryPreview').glob('Data_*RawRigValidation.json')]
 for a in inventory:
  name=a['id'];cfg=recipes[name];entry={k:copy.deepcopy(v) for k,v in a.items() if k not in ['variants','latestByFaction']};entry['variants']=[]
  entry['description']='保留恢复姿态与原角色骨长；道具适配手部。循环仅末端过渡，地面修正整体抬落。'
@@ -19,6 +20,12 @@ for a in inventory:
   # cannot be relabelled as this new third-person body retarget.
   review.pop('firstPersonBlend',None)
   review['retargetReport']=reportPath.relative_to(root).as_posix()
+  if len(review.get('recoveryTracks',[]))==1:
+   raw=json.loads((root/review['recoveryTracks'][0]['path']).read_text(encoding='utf-8'))
+   rig=next((r for r in rawRigs if r['sourceCacheSha256']==raw['sourceCacheSha256'] and r['frames']==len(raw['positions'])),None)
+   if rig:
+    assert (root/rig['blend']).is_file() and (root/rig['glb']).is_file()
+    review.update(recoveryBlend=rig['blend'],recoveryGlb=rig['glb'])
   review['retargetNotes']='复用已核验原始恢复；保留各骨段方向、肘膝与手腕位置，适配原人物骨长。手指及道具不是 GVHMR 原始输出。'
   if cfg['category']!='split_experiment':review.setdefault('sourceAssessment','复用对应原片与原始恢复。新版保留原恢复的肘膝、手腕和身体姿态；手指握法与道具另行适配。')
   previous=next((x for x in a['variants'] if x['id']==a['latestByFaction'].get(faction)),None)

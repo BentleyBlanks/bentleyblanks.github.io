@@ -82,6 +82,8 @@ def Main():
     # Publish a separate, non-acceptance review index for the live dashboard.
     # Read all recorded reports even when this run inspected only selected IDs.
     inspection=[]
+    catalog=json.loads((root/'Preview/Data_Catalog.json').read_text(encoding='utf-8'))
+    catalogActions={a['id']:a for a in catalog['actions']}
     for request in requests:
         directory=root/'Video/Sources/FirstLevelV1'/request['id']
         media=directory/'Data_SourceMedia.json'
@@ -92,6 +94,20 @@ def Main():
         if assessment.exists():
             record['assessment']=json.loads(assessment.read_text(encoding='utf-8'))
             assert record['assessment']['sourceVideoSha256']==record['sourceSha256'],'Review/source mismatch'
+        dense=directory/'DenseReview/Data_VisualAssessment.json'
+        if dense.exists():
+            record['denseAssessment']=json.loads(dense.read_text(encoding='utf-8-sig'))
+            assert record['denseAssessment']['sourceVideoSha256']==record['sourceSha256']
+        retarget=directory/'Data_RetargetAssessment.json'
+        if retarget.exists():
+            record['retargetAssessment']=json.loads(retarget.read_text(encoding='utf-8-sig'))
+            assert record['retargetAssessment']['sourceVideoSha256']==record['sourceSha256']
+        if request['id'] in catalogActions:
+            action=catalogActions[request['id']]
+            variant=next(v for v in action['variants'] if v['id']==action['latestByFaction']['Nra'])
+            if variant.get('review',{}).get('sourceVideo')==record['sourceVideo']:
+                record['retargetCandidate']=dict(previewId=action['id'],status=variant['status'],
+                    path=variant['path'],blend=variant['blend'],rawTracks=variant['review']['recoveryTracks'])
         inspection.append(record)
     report=dict(updatedUnix=time.time(),decoded=len(inspection),sources=inspection,
         screened=sum('assessment' in r for r in inspection),

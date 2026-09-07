@@ -113,6 +113,27 @@ def Main():
                 'sources_generated_pending_review' if statuses and all(s=='success' for s in statuses) else
                 'source_production_planned' if statuses else 'existing_source_requires_review')
             row['blockers']=['Source targets/reused candidates do not prove this complete requirement is accepted or integrated.']
+        row['newRecoveryCandidates']=[]
+        for source in row['newSourceProduction']:
+            registration=root/'Video/Sources/FirstLevelV1'/source['id']/'Data_RecoveryRegistration.json'
+            if not registration.exists():continue
+            candidate=Read(registration)
+            visualPath=registration.with_name('Data_RetargetAssessment.json')
+            if visualPath.exists():candidate['visualAssessment']=json.loads(visualPath.read_text(encoding='utf-8-sig'))
+            raw=Read(root/candidate['rawJointFile'])
+            assert Hash(root/candidate['sourceVideo'])==candidate['sourceVideoSha256']
+            assert Hash(root/raw['sourceCache'])==candidate['sourceCacheSha256']==raw['sourceCacheSha256']
+            action=next((a for a in catalog['actions'] if a['id']==source['id']),None)
+            if action:
+                variant=next(v for v in action['variants'] if v['id']==action['latestByFaction']['Nra'])
+                candidate['retargetCandidate']=dict(path=variant['path'],clip=variant['clip'],blend=variant['blend'],
+                    previewUrl='http://127.0.0.1:8136/Preview/index.html?action='+source['id'],status=variant['status'])
+                if candidate.get('visualAssessment'):
+                    assert Hash(root/variant['path'])==candidate['visualAssessment']['modelSha256']
+            row['newRecoveryCandidates'].append(candidate)
+        if row['newRecoveryCandidates']:
+            row['status']='partially_retargeted_requires_contact_review' if all('retargetCandidate' in c for c in row['newRecoveryCandidates']) else 'partially_recovered_pending_retarget'
+            row['blockers'].append('New full source sequences retain raw depth/contact errors; props, clip boundaries and mission event binding are not accepted.')
     files=['Data_FirstLevelMission.mjs','Data_FirstLevelMissionDialogue.mjs','Data_FirstLevelMissionTrain.mjs',
         'Data_Tuning_FirstLevel.mjs','Script_FirstLevelMissionRuntime.mjs','Script_FirstLevelMissionColumn.mjs',
         'Script_FirstLevelMissionVoice.mjs','Script_FirstLevelMissionTrain.mjs','Audio/FirstLevel/Data_FirstLevelVoiceManifest.json',
@@ -133,7 +154,8 @@ def Main():
             sources=['Data_FirstLevelMissionVoiceAlignment.mjs','Data_FirstLevelMissionVoiceTiming.mjs'],
             note='Read current cue/segment/source seconds and Runtime VoiceEvent. TrainFoodReceived releases opening movement after the actual response; free look remains available. Actual shell impacts, train stop, prone/dive orders, TransferHope and medic arrival remain authoritative. New animation clips are not bound yet.'),
         sourceSearch=dict(directories=[str(root/'Video/Sources'),'C:/Users/Bentl/Downloads/GVHMR'],
-            catalogActions=len(catalog['actions']),newVideoGenerations=batch['summary'].get('success',0),newInferenceRuns=1),
+            catalogActions=len(catalog['actions']),newVideoGenerations=batch['summary'].get('success',0),
+            newInferenceRuns=len(list((root/'Models/_Cache/FirstLevelV1').glob('*/Data_Recovery.json')))),
         sourceProduction=dict(userScope='Generate source coverage for all 48 requirements before completing individual retargets.',
             plannedNewSources=coverage['requestedSources'],expectedFirstPassCredits=coverage['expectedFirstPassCredits'],
             inspectionSummary={key:inspection[key] for key in ['updatedUnix','decoded','screened','retakeRequired']},

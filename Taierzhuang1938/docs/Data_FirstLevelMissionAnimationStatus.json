@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updated": "2026-09-07",
-  "baseCommit": "6425c5eeb9d35f12244a72690b309bef03dfacc4",
+  "baseCommit": "5dd3fe8bbb844cabc108a4adba77f03ba612d451",
   "missionContract": {
     "version": "first-level-20260907-r11",
     "stages": [
@@ -433,8 +433,8 @@
     }
   },
   "libraryRoot": "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼",
-  "catalogSha256": "720d1074f4a816f810bc4d3d235c61a35adf5ed1bf9a015a555b3d20cd4336fe",
-  "requirementsSha256": "61986df45369309975fcd5efd6a56056919768e3e920f1cb80aca6f6f898a980",
+  "catalogSha256": "7708efb3a9bdc2234eba2835768f2e280702c5fe70222804c16f5d6d4243ee8e",
+  "requirementsSha256": "1a3a01b4cdbb9e528427c48a8e12983326b6381174a7329c7755b87dbdf126a0",
   "missionBaselineFiles": {
     "Data_FirstLevelMission.mjs": "112fd1c53150b14478eb6be5a9748a9523cbd9b28d905c357d883c4663f9a8ee",
     "Data_FirstLevelMissionDialogue.mjs": "a62830fc97fedc1f5df3aacf0664c89edada411ae7689e1dbdaf3164550a5cda",
@@ -478,16 +478,16 @@
       "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources",
       "C:/Users/Bentl/Downloads/GVHMR"
     ],
-    "catalogActions": 48,
+    "catalogActions": 51,
     "newVideoGenerations": 60,
-    "newInferenceRuns": 1
+    "newInferenceRuns": 4
   },
   "sourceProduction": {
     "userScope": "Generate source coverage for all 48 requirements before completing individual retargets.",
     "plannedNewSources": 62,
     "expectedFirstPassCredits": 11360,
     "inspectionSummary": {
-      "updatedUnix": 1788777857.1149914,
+      "updatedUnix": 1788780409.271134,
       "decoded": 60,
       "screened": 60,
       "retakeRequired": 17
@@ -776,6 +776,22 @@
                 }
               ],
               "eventPolicy": "Visual observations for selecting clips, not mission/dialogue timing. Do not speed up the entire performance to force the current 1.25-second rise placeholder."
+            },
+            "retargetCandidate": {
+              "previewId": "TrainBenchRise",
+              "status": "待审阅",
+              "path": "Models/FirstLevelTrainV1/Animation_Nra_TrainBenchRise_V1.glb",
+              "blend": "Blender/FirstLevelTrainV1/Scene_Nra_TrainBenchRise_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
             }
           }
         },
@@ -838,6 +854,142 @@
                 10.0
               ],
               "reviewScope": "Nine decoded PTS-labelled frames inspected; not a final dense-frame, recovery, retarget or game acceptance."
+            },
+            "denseAssessment": {
+              "sourceId": "TrainMealCutOffer",
+              "sourceVideoSha256": "4f88f0e4a607c572ecba1d62cea91f7b8d1573e10a7f9e3523fbc92b151ff33d",
+              "status": "eligible_for_initial_3d_recovery_pending_depth_and_contact_review",
+              "sourceSampleIntervalSeconds": 0.25,
+              "observationSampleIntervalSeconds": 0.5,
+              "sourceSheets": [
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainMealCutOffer/DenseReview/Texture_SourceDense_01.jpg",
+                  "sourceSeconds": [
+                    0.0,
+                    0.25,
+                    0.5,
+                    0.75,
+                    1.0,
+                    1.25,
+                    1.5,
+                    1.75,
+                    2.0,
+                    2.25,
+                    2.5,
+                    2.75,
+                    3.0,
+                    3.25,
+                    3.5,
+                    3.75
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainMealCutOffer/DenseReview/Texture_SourceDense_02.jpg",
+                  "sourceSeconds": [
+                    4.0,
+                    4.25,
+                    4.5,
+                    4.75,
+                    5.0,
+                    5.25,
+                    5.5,
+                    5.75,
+                    6.0,
+                    6.25,
+                    6.5,
+                    6.75,
+                    7.0,
+                    7.25,
+                    7.5,
+                    7.75
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainMealCutOffer/DenseReview/Texture_SourceDense_03.jpg",
+                  "sourceSeconds": [
+                    8.0,
+                    8.25,
+                    8.5,
+                    8.75,
+                    9.0,
+                    9.25,
+                    9.5,
+                    9.75,
+                    10.0
+                  ]
+                }
+              ],
+              "observationSheets": [
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainMealCutOffer/DenseReview/Texture_Observations_01.jpg",
+                  "sourceSeconds": [
+                    0.0,
+                    0.5,
+                    1.0,
+                    1.5,
+                    2.0,
+                    2.5,
+                    3.0,
+                    3.5,
+                    4.0,
+                    4.5,
+                    5.0,
+                    5.5,
+                    6.0,
+                    6.5,
+                    7.0,
+                    7.5
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainMealCutOffer/DenseReview/Texture_Observations_02.jpg",
+                  "sourceSeconds": [
+                    8.0,
+                    8.5,
+                    9.0,
+                    9.5
+                  ]
+                }
+              ],
+              "keypointsSha256": "cc866d4a87874df3514447646aa0fb9b63aa42baf045ca16cd482f35967317e9",
+              "observed": "0–1.5 秒展开包布，1.75–5.75 秒切片，6.25–9.25 秒递出，之后收手。全身与双腿可见，二维追踪稳定；膝上包布遮住部分髋部，切片手指和小刀尚不能由人体关节恢复证明。",
+              "observationInput": "Models/_Cache/FirstLevelV1/TrainMealCutOffer/0_input_video.mp4",
+              "observationInputSha256": "585bc3b065b0ea6a3ad0bf940eda10ea51c5bcda441aee0fbaf8fa6b143af0aa",
+              "acceptedForGame": false
+            },
+            "retargetAssessment": {
+              "sourceId": "TrainMealCutOffer",
+              "sourceVideoSha256": "4f88f0e4a607c572ecba1d62cea91f7b8d1573e10a7f9e3523fbc92b151ff33d",
+              "sourceCacheSha256": "bfb4ff5127a13559e3fffaf10de9ed69d917f44c43e2559e797af745a6677c9c",
+              "modelSha256": "42505bc192dd3f4410da76c423f47fa92b2e9780b69619b12fe9bd1c5cc9e3b9",
+              "status": "needs_contact_correction",
+              "acceptedForGame": false,
+              "observed": "已查看起点、中点、终点及 3 秒切片、7.5 秒递出侧视。坐姿与递出腕轨迹存在；无座凳、包布、食物和刀，手指保持通用张开姿态，座面与足底支撑、握刀切片和递食接触需修正。",
+              "evidence": "Preview/FirstLevelPriorityV1/Data_EventViewValidation.json",
+              "exportFidelity": "Models/FirstLevelPriorityV1/Data_SelectedExportFidelityValidation.json",
+              "reviewedSourceSeconds": [
+                0,
+                3,
+                4.983333,
+                7.5,
+                9.966667
+              ]
+            },
+            "retargetCandidate": {
+              "previewId": "TrainMealCutOffer",
+              "status": "待审阅",
+              "path": "Models/FirstLevelPriorityV1/Animation_Nra_TrainMealCutOffer_V1.glb",
+              "blend": "Blender/FirstLevelPriorityV1/Scene_Nra_TrainMealCutOffer_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_TrainMealCutOfferRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
             }
           }
         },
@@ -1297,6 +1449,142 @@
                 10.0
               ],
               "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            },
+            "denseAssessment": {
+              "sourceId": "ZhouSeatedAttempt",
+              "sourceVideoSha256": "d132124b56e4eaf16f0f0af0a5d00940e9050e6362cf0edf85edd272d55baf48",
+              "status": "eligible_for_initial_3d_recovery_pending_depth_and_contact_review",
+              "sourceSampleIntervalSeconds": 0.25,
+              "observationSampleIntervalSeconds": 0.5,
+              "sourceSheets": [
+                {
+                  "path": "Video/Sources/FirstLevelV1/ZhouSeatedAttempt/DenseReview/Texture_SourceDense_01.jpg",
+                  "sourceSeconds": [
+                    0.0,
+                    0.25,
+                    0.5,
+                    0.75,
+                    1.0,
+                    1.25,
+                    1.5,
+                    1.75,
+                    2.0,
+                    2.25,
+                    2.5,
+                    2.75,
+                    3.0,
+                    3.25,
+                    3.5,
+                    3.75
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/ZhouSeatedAttempt/DenseReview/Texture_SourceDense_02.jpg",
+                  "sourceSeconds": [
+                    4.0,
+                    4.25,
+                    4.5,
+                    4.75,
+                    5.0,
+                    5.25,
+                    5.5,
+                    5.75,
+                    6.0,
+                    6.25,
+                    6.5,
+                    6.75,
+                    7.0,
+                    7.25,
+                    7.5,
+                    7.75
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/ZhouSeatedAttempt/DenseReview/Texture_SourceDense_03.jpg",
+                  "sourceSeconds": [
+                    8.0,
+                    8.25,
+                    8.5,
+                    8.75,
+                    9.0,
+                    9.25,
+                    9.5,
+                    9.75,
+                    10.0
+                  ]
+                }
+              ],
+              "observationSheets": [
+                {
+                  "path": "Video/Sources/FirstLevelV1/ZhouSeatedAttempt/DenseReview/Texture_Observations_01.jpg",
+                  "sourceSeconds": [
+                    0.0,
+                    0.5,
+                    1.0,
+                    1.5,
+                    2.0,
+                    2.5,
+                    3.0,
+                    3.5,
+                    4.0,
+                    4.5,
+                    5.0,
+                    5.5,
+                    6.0,
+                    6.5,
+                    7.0,
+                    7.5
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/ZhouSeatedAttempt/DenseReview/Texture_Observations_02.jpg",
+                  "sourceSeconds": [
+                    8.0,
+                    8.5,
+                    9.0,
+                    9.5
+                  ]
+                }
+              ],
+              "keypointsSha256": "fa48b807742211d85d6d82f5a159b6cdff758350c1f47625f802f8262fd1484e",
+              "observed": "右腿伸出、左膝弯曲；2.25 秒右手抓侧扶杆，2.5–4 秒撑起失败，4.25 秒回落，7.75 秒起左手指前方。全身入镜，二维追踪沿同一身体；视角偏正前方，坐姿深度、右腿伤侧与手掌承重需验。",
+              "observationInput": "Models/_Cache/FirstLevelV1/ZhouSeatedAttempt/0_input_video.mp4",
+              "observationInputSha256": "3730c6b64bb992ad62fbfa07c7ec95e8e6b898a30330d142c0b75aba3e022f00",
+              "acceptedForGame": false
+            },
+            "retargetAssessment": {
+              "sourceId": "ZhouSeatedAttempt",
+              "sourceVideoSha256": "d132124b56e4eaf16f0f0af0a5d00940e9050e6362cf0edf85edd272d55baf48",
+              "sourceCacheSha256": "6fb6c7a40b2d712c18210de295cb668acc1e599328e194076e32ae1de990a8ef",
+              "modelSha256": "90e17ecbfd292e02f41eced92b6c4b62e819d1a49c0a5268a8a31707c2efae4a",
+              "status": "needs_contact_correction",
+              "acceptedForGame": false,
+              "observed": "已查看起点、中点、终点及 0、3.25、8.75 秒侧视。右腿伸展、左膝弯曲、撑扶尝试与指前方动作存在；屈膝侧足部偏离支撑面，臀部、撑地掌面与扶杆接触不足，需修正后才可装配到 Litter11。",
+              "evidence": "Preview/FirstLevelPriorityV1/Data_EventViewValidation.json",
+              "exportFidelity": "Models/FirstLevelPriorityV1/Data_SelectedExportFidelityValidation.json",
+              "reviewedSourceSeconds": [
+                0,
+                3.25,
+                4.983333,
+                8.75,
+                9.966667
+              ]
+            },
+            "retargetCandidate": {
+              "previewId": "ZhouSeatedAttempt",
+              "status": "待审阅",
+              "path": "Models/FirstLevelPriorityV1/Animation_Nra_ZhouSeatedAttempt_V1.glb",
+              "blend": "Blender/FirstLevelPriorityV1/Scene_Nra_ZhouSeatedAttempt_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_ZhouSeatedAttemptRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
             }
           }
         },
@@ -3201,6 +3489,141 @@
                 10.0
               ],
               "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            },
+            "denseAssessment": {
+              "sourceId": "TrainStairDisembark",
+              "sourceVideoSha256": "2a10e88f67c9308305b4bd1fb898203ec54b2d413338485de667bbcbfed93c0b",
+              "status": "eligible_for_initial_3d_recovery_pending_depth_and_contact_review",
+              "sourceSampleIntervalSeconds": 0.25,
+              "observationSampleIntervalSeconds": 0.5,
+              "sourceSheets": [
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainStairDisembark/DenseReview/Texture_SourceDense_01.jpg",
+                  "sourceSeconds": [
+                    0.0,
+                    0.25,
+                    0.5,
+                    0.75,
+                    1.0,
+                    1.25,
+                    1.5,
+                    1.75,
+                    2.0,
+                    2.25,
+                    2.5,
+                    2.75,
+                    3.0,
+                    3.25,
+                    3.5,
+                    3.75
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainStairDisembark/DenseReview/Texture_SourceDense_02.jpg",
+                  "sourceSeconds": [
+                    4.0,
+                    4.25,
+                    4.5,
+                    4.75,
+                    5.0,
+                    5.25,
+                    5.5,
+                    5.75,
+                    6.0,
+                    6.25,
+                    6.5,
+                    6.75,
+                    7.0,
+                    7.25,
+                    7.5,
+                    7.75
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainStairDisembark/DenseReview/Texture_SourceDense_03.jpg",
+                  "sourceSeconds": [
+                    8.0,
+                    8.25,
+                    8.5,
+                    8.75,
+                    9.0,
+                    9.25,
+                    9.5,
+                    9.75,
+                    10.0
+                  ]
+                }
+              ],
+              "observationSheets": [
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainStairDisembark/DenseReview/Texture_Observations_01.jpg",
+                  "sourceSeconds": [
+                    0.0,
+                    0.5,
+                    1.0,
+                    1.5,
+                    2.0,
+                    2.5,
+                    3.0,
+                    3.5,
+                    4.0,
+                    4.5,
+                    5.0,
+                    5.5,
+                    6.0,
+                    6.5,
+                    7.0,
+                    7.5
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainStairDisembark/DenseReview/Texture_Observations_02.jpg",
+                  "sourceSeconds": [
+                    8.0,
+                    8.5,
+                    9.0,
+                    9.5
+                  ]
+                }
+              ],
+              "keypointsSha256": "6fb7eb303edbad58a2b4dc1cd3ba8e6b3066f89c19df912331ba3fcd287aa1fa",
+              "observed": "0–3 秒台面站稳并扶栏；3.25–7 秒逐阶下行，7–10 秒走开停稳。头手脚全程入镜，二维髋膝踝沿同一人物，未见跳到扶栏。台阶接触高度和步幅仍待三维与游戏车梯匹配。",
+              "observationInput": "Models/_Cache/FirstLevelV1/TrainStairDisembark/0_input_video.mp4",
+              "observationInputSha256": "909b76cd70109dc1c7caa4d2728fb112344cdaedb19ffdca99d41e1940b182cf",
+              "acceptedForGame": false
+            },
+            "retargetAssessment": {
+              "sourceId": "TrainStairDisembark",
+              "sourceVideoSha256": "2a10e88f67c9308305b4bd1fb898203ec54b2d413338485de667bbcbfed93c0b",
+              "sourceCacheSha256": "889c0a0de489c2eb2180c1857883426608ac8a596ffc7026f4c67e294b2954db",
+              "modelSha256": "7d0c4e2eeb83ed1c0fa577c2b17182daaae31feea8ca176d6558ae8f27243ce5",
+              "status": "needs_contact_correction",
+              "acceptedForGame": false,
+              "observed": "已查看起点、中点、终点及 4.5 秒侧视。逐阶腿部动作存在，模型全程取景已修；尚无真实车梯与扶栏接触，根位移未按三车梯校准，不能直接用于 41 人下车队列。",
+              "evidence": "Preview/FirstLevelPriorityV1/Data_EventViewValidation.json",
+              "exportFidelity": "Models/FirstLevelPriorityV1/Data_SelectedExportFidelityValidation.json",
+              "reviewedSourceSeconds": [
+                0,
+                4.5,
+                4.983333,
+                9.966667
+              ]
+            },
+            "retargetCandidate": {
+              "previewId": "TrainStairDisembark",
+              "status": "待审阅",
+              "path": "Models/FirstLevelPriorityV1/Animation_Nra_TrainStairDisembark_V1.glb",
+              "blend": "Blender/FirstLevelPriorityV1/Scene_Nra_TrainStairDisembark_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_TrainStairDisembarkRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
             }
           }
         },
@@ -4573,7 +4996,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL02",
@@ -4751,7 +5175,8 @@
           ]
         }
       ],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL03",
@@ -4938,7 +5363,8 @@
           ]
         }
       ],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL04",
@@ -5025,7 +5451,8 @@
           ]
         }
       ],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL05",
@@ -5166,7 +5593,8 @@
           ]
         }
       ],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL06",
@@ -5355,7 +5783,8 @@
       ],
       "sourceRetakeIds": [
         "RifleLowReload"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL07",
@@ -5537,7 +5966,8 @@
       ],
       "sourceRetakeIds": [
         "MachineGunMagazine"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL08",
@@ -5653,7 +6083,8 @@
           ]
         }
       ],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL09",
@@ -5866,7 +6297,8 @@
       ],
       "sourceRetakeIds": [
         "MeleePushRecover"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL10",
@@ -5929,7 +6361,8 @@
           ]
         }
       ],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL11",
@@ -6032,7 +6465,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL12",
@@ -6201,7 +6635,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL13",
@@ -6335,6 +6770,22 @@
                 }
               ],
               "eventPolicy": "Visual observations for selecting clips, not mission/dialogue timing. Do not speed up the entire performance to force the current 1.25-second rise placeholder."
+            },
+            "retargetCandidate": {
+              "previewId": "TrainBenchRise",
+              "status": "待审阅",
+              "path": "Models/FirstLevelTrainV1/Animation_Nra_TrainBenchRise_V1.glb",
+              "blend": "Blender/FirstLevelTrainV1/Scene_Nra_TrainBenchRise_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
             }
           }
         },
@@ -6468,7 +6919,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL14",
@@ -6495,7 +6947,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "sources_generated_pending_review",
+      "status": "partially_retargeted_requires_contact_review",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -6504,7 +6956,8 @@
       },
       "reviewEvidence": [],
       "blockers": [
-        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated."
+        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated.",
+        "New full source sequences retain raw depth/contact errors; props, clip boundaries and mission event binding are not accepted."
       ],
       "newSourceProduction": [
         {
@@ -6566,12 +7019,195 @@
                 10.0
               ],
               "reviewScope": "Nine decoded PTS-labelled frames inspected; not a final dense-frame, recovery, retarget or game acceptance."
+            },
+            "denseAssessment": {
+              "sourceId": "TrainMealCutOffer",
+              "sourceVideoSha256": "4f88f0e4a607c572ecba1d62cea91f7b8d1573e10a7f9e3523fbc92b151ff33d",
+              "status": "eligible_for_initial_3d_recovery_pending_depth_and_contact_review",
+              "sourceSampleIntervalSeconds": 0.25,
+              "observationSampleIntervalSeconds": 0.5,
+              "sourceSheets": [
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainMealCutOffer/DenseReview/Texture_SourceDense_01.jpg",
+                  "sourceSeconds": [
+                    0.0,
+                    0.25,
+                    0.5,
+                    0.75,
+                    1.0,
+                    1.25,
+                    1.5,
+                    1.75,
+                    2.0,
+                    2.25,
+                    2.5,
+                    2.75,
+                    3.0,
+                    3.25,
+                    3.5,
+                    3.75
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainMealCutOffer/DenseReview/Texture_SourceDense_02.jpg",
+                  "sourceSeconds": [
+                    4.0,
+                    4.25,
+                    4.5,
+                    4.75,
+                    5.0,
+                    5.25,
+                    5.5,
+                    5.75,
+                    6.0,
+                    6.25,
+                    6.5,
+                    6.75,
+                    7.0,
+                    7.25,
+                    7.5,
+                    7.75
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainMealCutOffer/DenseReview/Texture_SourceDense_03.jpg",
+                  "sourceSeconds": [
+                    8.0,
+                    8.25,
+                    8.5,
+                    8.75,
+                    9.0,
+                    9.25,
+                    9.5,
+                    9.75,
+                    10.0
+                  ]
+                }
+              ],
+              "observationSheets": [
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainMealCutOffer/DenseReview/Texture_Observations_01.jpg",
+                  "sourceSeconds": [
+                    0.0,
+                    0.5,
+                    1.0,
+                    1.5,
+                    2.0,
+                    2.5,
+                    3.0,
+                    3.5,
+                    4.0,
+                    4.5,
+                    5.0,
+                    5.5,
+                    6.0,
+                    6.5,
+                    7.0,
+                    7.5
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainMealCutOffer/DenseReview/Texture_Observations_02.jpg",
+                  "sourceSeconds": [
+                    8.0,
+                    8.5,
+                    9.0,
+                    9.5
+                  ]
+                }
+              ],
+              "keypointsSha256": "cc866d4a87874df3514447646aa0fb9b63aa42baf045ca16cd482f35967317e9",
+              "observed": "0–1.5 秒展开包布，1.75–5.75 秒切片，6.25–9.25 秒递出，之后收手。全身与双腿可见，二维追踪稳定；膝上包布遮住部分髋部，切片手指和小刀尚不能由人体关节恢复证明。",
+              "observationInput": "Models/_Cache/FirstLevelV1/TrainMealCutOffer/0_input_video.mp4",
+              "observationInputSha256": "585bc3b065b0ea6a3ad0bf940eda10ea51c5bcda441aee0fbaf8fa6b143af0aa",
+              "acceptedForGame": false
+            },
+            "retargetAssessment": {
+              "sourceId": "TrainMealCutOffer",
+              "sourceVideoSha256": "4f88f0e4a607c572ecba1d62cea91f7b8d1573e10a7f9e3523fbc92b151ff33d",
+              "sourceCacheSha256": "bfb4ff5127a13559e3fffaf10de9ed69d917f44c43e2559e797af745a6677c9c",
+              "modelSha256": "42505bc192dd3f4410da76c423f47fa92b2e9780b69619b12fe9bd1c5cc9e3b9",
+              "status": "needs_contact_correction",
+              "acceptedForGame": false,
+              "observed": "已查看起点、中点、终点及 3 秒切片、7.5 秒递出侧视。坐姿与递出腕轨迹存在；无座凳、包布、食物和刀，手指保持通用张开姿态，座面与足底支撑、握刀切片和递食接触需修正。",
+              "evidence": "Preview/FirstLevelPriorityV1/Data_EventViewValidation.json",
+              "exportFidelity": "Models/FirstLevelPriorityV1/Data_SelectedExportFidelityValidation.json",
+              "reviewedSourceSeconds": [
+                0,
+                3,
+                4.983333,
+                7.5,
+                9.966667
+              ]
+            },
+            "retargetCandidate": {
+              "previewId": "TrainMealCutOffer",
+              "status": "待审阅",
+              "path": "Models/FirstLevelPriorityV1/Animation_Nra_TrainMealCutOffer_V1.glb",
+              "blend": "Blender/FirstLevelPriorityV1/Scene_Nra_TrainMealCutOffer_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_TrainMealCutOfferRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
             }
           }
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": [
+        {
+          "sourceId": "TrainMealCutOffer",
+          "sourceVideo": "Video/Sources/FirstLevelV1/TrainMealCutOffer/04429854-cda1-422f-817b-81343ecbe382_video_1.mp4",
+          "sourceVideoSha256": "4f88f0e4a607c572ecba1d62cea91f7b8d1573e10a7f9e3523fbc92b151ff33d",
+          "sourceRangeSeconds": [
+            0,
+            9.966666666666667
+          ],
+          "generationSubmitId": "04429854-cda1-422f-817b-81343ecbe382",
+          "recoveryFrames": 300,
+          "recoveryFps": 30.0,
+          "recoveryRevision": 1,
+          "sourceCache": "Models/_Cache/FirstLevelV1/TrainMealCutOffer/Data_GvhmrMotion.npz",
+          "sourceCacheSha256": "bfb4ff5127a13559e3fffaf10de9ed69d917f44c43e2559e797af745a6677c9c",
+          "resultSha256": "358db943b013f9da0301fb3b289d917f7cbc8288b3990cc9042a31b5e7e1a51d",
+          "rawJointFile": "Models/RecoveryPreview/Data_V1_TrainMealCutOfferRawJoints.json",
+          "group": "FirstLevelPriorityV1",
+          "visualAssessment": {
+            "sourceId": "TrainMealCutOffer",
+            "sourceVideoSha256": "4f88f0e4a607c572ecba1d62cea91f7b8d1573e10a7f9e3523fbc92b151ff33d",
+            "sourceCacheSha256": "bfb4ff5127a13559e3fffaf10de9ed69d917f44c43e2559e797af745a6677c9c",
+            "modelSha256": "42505bc192dd3f4410da76c423f47fa92b2e9780b69619b12fe9bd1c5cc9e3b9",
+            "status": "needs_contact_correction",
+            "acceptedForGame": false,
+            "observed": "已查看起点、中点、终点及 3 秒切片、7.5 秒递出侧视。坐姿与递出腕轨迹存在；无座凳、包布、食物和刀，手指保持通用张开姿态，座面与足底支撑、握刀切片和递食接触需修正。",
+            "evidence": "Preview/FirstLevelPriorityV1/Data_EventViewValidation.json",
+            "exportFidelity": "Models/FirstLevelPriorityV1/Data_SelectedExportFidelityValidation.json",
+            "reviewedSourceSeconds": [
+              0,
+              3,
+              4.983333,
+              7.5,
+              9.966667
+            ]
+          },
+          "status": "raw_recovered_pending_retarget_and_contact_review",
+          "runtimeEnabled": false,
+          "retargetCandidate": {
+            "path": "Models/FirstLevelPriorityV1/Animation_Nra_TrainMealCutOffer_V1.glb",
+            "clip": "Animation_Nra_TrainMealCutOffer_V1",
+            "blend": "Blender/FirstLevelPriorityV1/Scene_Nra_TrainMealCutOffer_V1.blend",
+            "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealCutOffer",
+            "status": "待审阅"
+          }
+        }
+      ]
     },
     {
       "requirementId": "FL15",
@@ -6739,7 +7375,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL16",
@@ -6792,7 +7429,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL17",
@@ -6960,7 +7598,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL18",
@@ -7193,7 +7832,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL19",
@@ -7361,7 +8001,8 @@
       "reusedSourceCandidates": [],
       "sourceRetakeIds": [
         "MedicArmCheck"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL20",
@@ -7531,7 +8172,8 @@
       "sourceRetakeIds": [
         "TrainAisleSideStep",
         "TrainBagKickAside"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL21",
@@ -7580,7 +8222,8 @@
       "blockers": [
         "Full bench sequence only; seat/palm contact and knee depth require review.",
         "Other generated source targets require dense source review and recovery; first-pass retakes remain explicit.",
-        "Not enabled in mission; preserve the same 41 passengers and real queue."
+        "Not enabled in mission; preserve the same 41 passengers and real queue.",
+        "New full source sequences retain raw depth/contact errors; props, clip boundaries and mission event binding are not accepted."
       ],
       "newSourceProduction": [
         {
@@ -7665,6 +8308,22 @@
                 }
               ],
               "eventPolicy": "Visual observations for selecting clips, not mission/dialogue timing. Do not speed up the entire performance to force the current 1.25-second rise placeholder."
+            },
+            "retargetCandidate": {
+              "previewId": "TrainBenchRise",
+              "status": "待审阅",
+              "path": "Models/FirstLevelTrainV1/Animation_Nra_TrainBenchRise_V1.glb",
+              "blend": "Blender/FirstLevelTrainV1/Scene_Nra_TrainBenchRise_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
             }
           }
         },
@@ -7728,12 +8387,193 @@
                 10.0
               ],
               "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            },
+            "denseAssessment": {
+              "sourceId": "TrainStairDisembark",
+              "sourceVideoSha256": "2a10e88f67c9308305b4bd1fb898203ec54b2d413338485de667bbcbfed93c0b",
+              "status": "eligible_for_initial_3d_recovery_pending_depth_and_contact_review",
+              "sourceSampleIntervalSeconds": 0.25,
+              "observationSampleIntervalSeconds": 0.5,
+              "sourceSheets": [
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainStairDisembark/DenseReview/Texture_SourceDense_01.jpg",
+                  "sourceSeconds": [
+                    0.0,
+                    0.25,
+                    0.5,
+                    0.75,
+                    1.0,
+                    1.25,
+                    1.5,
+                    1.75,
+                    2.0,
+                    2.25,
+                    2.5,
+                    2.75,
+                    3.0,
+                    3.25,
+                    3.5,
+                    3.75
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainStairDisembark/DenseReview/Texture_SourceDense_02.jpg",
+                  "sourceSeconds": [
+                    4.0,
+                    4.25,
+                    4.5,
+                    4.75,
+                    5.0,
+                    5.25,
+                    5.5,
+                    5.75,
+                    6.0,
+                    6.25,
+                    6.5,
+                    6.75,
+                    7.0,
+                    7.25,
+                    7.5,
+                    7.75
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainStairDisembark/DenseReview/Texture_SourceDense_03.jpg",
+                  "sourceSeconds": [
+                    8.0,
+                    8.25,
+                    8.5,
+                    8.75,
+                    9.0,
+                    9.25,
+                    9.5,
+                    9.75,
+                    10.0
+                  ]
+                }
+              ],
+              "observationSheets": [
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainStairDisembark/DenseReview/Texture_Observations_01.jpg",
+                  "sourceSeconds": [
+                    0.0,
+                    0.5,
+                    1.0,
+                    1.5,
+                    2.0,
+                    2.5,
+                    3.0,
+                    3.5,
+                    4.0,
+                    4.5,
+                    5.0,
+                    5.5,
+                    6.0,
+                    6.5,
+                    7.0,
+                    7.5
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/TrainStairDisembark/DenseReview/Texture_Observations_02.jpg",
+                  "sourceSeconds": [
+                    8.0,
+                    8.5,
+                    9.0,
+                    9.5
+                  ]
+                }
+              ],
+              "keypointsSha256": "6fb7eb303edbad58a2b4dc1cd3ba8e6b3066f89c19df912331ba3fcd287aa1fa",
+              "observed": "0–3 秒台面站稳并扶栏；3.25–7 秒逐阶下行，7–10 秒走开停稳。头手脚全程入镜，二维髋膝踝沿同一人物，未见跳到扶栏。台阶接触高度和步幅仍待三维与游戏车梯匹配。",
+              "observationInput": "Models/_Cache/FirstLevelV1/TrainStairDisembark/0_input_video.mp4",
+              "observationInputSha256": "909b76cd70109dc1c7caa4d2728fb112344cdaedb19ffdca99d41e1940b182cf",
+              "acceptedForGame": false
+            },
+            "retargetAssessment": {
+              "sourceId": "TrainStairDisembark",
+              "sourceVideoSha256": "2a10e88f67c9308305b4bd1fb898203ec54b2d413338485de667bbcbfed93c0b",
+              "sourceCacheSha256": "889c0a0de489c2eb2180c1857883426608ac8a596ffc7026f4c67e294b2954db",
+              "modelSha256": "7d0c4e2eeb83ed1c0fa577c2b17182daaae31feea8ca176d6558ae8f27243ce5",
+              "status": "needs_contact_correction",
+              "acceptedForGame": false,
+              "observed": "已查看起点、中点、终点及 4.5 秒侧视。逐阶腿部动作存在，模型全程取景已修；尚无真实车梯与扶栏接触，根位移未按三车梯校准，不能直接用于 41 人下车队列。",
+              "evidence": "Preview/FirstLevelPriorityV1/Data_EventViewValidation.json",
+              "exportFidelity": "Models/FirstLevelPriorityV1/Data_SelectedExportFidelityValidation.json",
+              "reviewedSourceSeconds": [
+                0,
+                4.5,
+                4.983333,
+                9.966667
+              ]
+            },
+            "retargetCandidate": {
+              "previewId": "TrainStairDisembark",
+              "status": "待审阅",
+              "path": "Models/FirstLevelPriorityV1/Animation_Nra_TrainStairDisembark_V1.glb",
+              "blend": "Blender/FirstLevelPriorityV1/Scene_Nra_TrainStairDisembark_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_TrainStairDisembarkRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
             }
           }
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": [
+        {
+          "sourceId": "TrainStairDisembark",
+          "sourceVideo": "Video/Sources/FirstLevelV1/TrainStairDisembark/9c53ae4a-87f8-4861-96f8-a3fcbb3fdd54_video_1.mp4",
+          "sourceVideoSha256": "2a10e88f67c9308305b4bd1fb898203ec54b2d413338485de667bbcbfed93c0b",
+          "sourceRangeSeconds": [
+            0,
+            9.966666666666667
+          ],
+          "generationSubmitId": "9c53ae4a-87f8-4861-96f8-a3fcbb3fdd54",
+          "recoveryFrames": 300,
+          "recoveryFps": 30.0,
+          "recoveryRevision": 1,
+          "sourceCache": "Models/_Cache/FirstLevelV1/TrainStairDisembark/Data_GvhmrMotion.npz",
+          "sourceCacheSha256": "889c0a0de489c2eb2180c1857883426608ac8a596ffc7026f4c67e294b2954db",
+          "resultSha256": "eb8b8cc2962f4f87f269b7891f8922f91b314ec405653510c3ee5b6797e95663",
+          "rawJointFile": "Models/RecoveryPreview/Data_V1_TrainStairDisembarkRawJoints.json",
+          "group": "FirstLevelPriorityV1",
+          "visualAssessment": {
+            "sourceId": "TrainStairDisembark",
+            "sourceVideoSha256": "2a10e88f67c9308305b4bd1fb898203ec54b2d413338485de667bbcbfed93c0b",
+            "sourceCacheSha256": "889c0a0de489c2eb2180c1857883426608ac8a596ffc7026f4c67e294b2954db",
+            "modelSha256": "7d0c4e2eeb83ed1c0fa577c2b17182daaae31feea8ca176d6558ae8f27243ce5",
+            "status": "needs_contact_correction",
+            "acceptedForGame": false,
+            "observed": "已查看起点、中点、终点及 4.5 秒侧视。逐阶腿部动作存在，模型全程取景已修；尚无真实车梯与扶栏接触，根位移未按三车梯校准，不能直接用于 41 人下车队列。",
+            "evidence": "Preview/FirstLevelPriorityV1/Data_EventViewValidation.json",
+            "exportFidelity": "Models/FirstLevelPriorityV1/Data_SelectedExportFidelityValidation.json",
+            "reviewedSourceSeconds": [
+              0,
+              4.5,
+              4.983333,
+              9.966667
+            ]
+          },
+          "status": "raw_recovered_pending_retarget_and_contact_review",
+          "runtimeEnabled": false,
+          "retargetCandidate": {
+            "path": "Models/FirstLevelPriorityV1/Animation_Nra_TrainStairDisembark_V1.glb",
+            "clip": "Animation_Nra_TrainStairDisembark_V1",
+            "blend": "Blender/FirstLevelPriorityV1/Scene_Nra_TrainStairDisembark_V1.blend",
+            "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainStairDisembark",
+            "status": "待审阅"
+          }
+        }
+      ]
     },
     {
       "requirementId": "FL22",
@@ -7838,7 +8678,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL23",
@@ -7865,7 +8706,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "sources_generated_pending_review",
+      "status": "partially_retargeted_requires_contact_review",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -7874,7 +8715,8 @@
       },
       "reviewEvidence": [],
       "blockers": [
-        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated."
+        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated.",
+        "New full source sequences retain raw depth/contact errors; props, clip boundaries and mission event binding are not accepted."
       ],
       "newSourceProduction": [
         {
@@ -7937,12 +8779,195 @@
                 10.0
               ],
               "reviewScope": "Nine decoded PTS-labelled frames inspected; not dense-frame, recovery, retarget or game acceptance."
+            },
+            "denseAssessment": {
+              "sourceId": "ZhouSeatedAttempt",
+              "sourceVideoSha256": "d132124b56e4eaf16f0f0af0a5d00940e9050e6362cf0edf85edd272d55baf48",
+              "status": "eligible_for_initial_3d_recovery_pending_depth_and_contact_review",
+              "sourceSampleIntervalSeconds": 0.25,
+              "observationSampleIntervalSeconds": 0.5,
+              "sourceSheets": [
+                {
+                  "path": "Video/Sources/FirstLevelV1/ZhouSeatedAttempt/DenseReview/Texture_SourceDense_01.jpg",
+                  "sourceSeconds": [
+                    0.0,
+                    0.25,
+                    0.5,
+                    0.75,
+                    1.0,
+                    1.25,
+                    1.5,
+                    1.75,
+                    2.0,
+                    2.25,
+                    2.5,
+                    2.75,
+                    3.0,
+                    3.25,
+                    3.5,
+                    3.75
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/ZhouSeatedAttempt/DenseReview/Texture_SourceDense_02.jpg",
+                  "sourceSeconds": [
+                    4.0,
+                    4.25,
+                    4.5,
+                    4.75,
+                    5.0,
+                    5.25,
+                    5.5,
+                    5.75,
+                    6.0,
+                    6.25,
+                    6.5,
+                    6.75,
+                    7.0,
+                    7.25,
+                    7.5,
+                    7.75
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/ZhouSeatedAttempt/DenseReview/Texture_SourceDense_03.jpg",
+                  "sourceSeconds": [
+                    8.0,
+                    8.25,
+                    8.5,
+                    8.75,
+                    9.0,
+                    9.25,
+                    9.5,
+                    9.75,
+                    10.0
+                  ]
+                }
+              ],
+              "observationSheets": [
+                {
+                  "path": "Video/Sources/FirstLevelV1/ZhouSeatedAttempt/DenseReview/Texture_Observations_01.jpg",
+                  "sourceSeconds": [
+                    0.0,
+                    0.5,
+                    1.0,
+                    1.5,
+                    2.0,
+                    2.5,
+                    3.0,
+                    3.5,
+                    4.0,
+                    4.5,
+                    5.0,
+                    5.5,
+                    6.0,
+                    6.5,
+                    7.0,
+                    7.5
+                  ]
+                },
+                {
+                  "path": "Video/Sources/FirstLevelV1/ZhouSeatedAttempt/DenseReview/Texture_Observations_02.jpg",
+                  "sourceSeconds": [
+                    8.0,
+                    8.5,
+                    9.0,
+                    9.5
+                  ]
+                }
+              ],
+              "keypointsSha256": "fa48b807742211d85d6d82f5a159b6cdff758350c1f47625f802f8262fd1484e",
+              "observed": "右腿伸出、左膝弯曲；2.25 秒右手抓侧扶杆，2.5–4 秒撑起失败，4.25 秒回落，7.75 秒起左手指前方。全身入镜，二维追踪沿同一身体；视角偏正前方，坐姿深度、右腿伤侧与手掌承重需验。",
+              "observationInput": "Models/_Cache/FirstLevelV1/ZhouSeatedAttempt/0_input_video.mp4",
+              "observationInputSha256": "3730c6b64bb992ad62fbfa07c7ec95e8e6b898a30330d142c0b75aba3e022f00",
+              "acceptedForGame": false
+            },
+            "retargetAssessment": {
+              "sourceId": "ZhouSeatedAttempt",
+              "sourceVideoSha256": "d132124b56e4eaf16f0f0af0a5d00940e9050e6362cf0edf85edd272d55baf48",
+              "sourceCacheSha256": "6fb6c7a40b2d712c18210de295cb668acc1e599328e194076e32ae1de990a8ef",
+              "modelSha256": "90e17ecbfd292e02f41eced92b6c4b62e819d1a49c0a5268a8a31707c2efae4a",
+              "status": "needs_contact_correction",
+              "acceptedForGame": false,
+              "observed": "已查看起点、中点、终点及 0、3.25、8.75 秒侧视。右腿伸展、左膝弯曲、撑扶尝试与指前方动作存在；屈膝侧足部偏离支撑面，臀部、撑地掌面与扶杆接触不足，需修正后才可装配到 Litter11。",
+              "evidence": "Preview/FirstLevelPriorityV1/Data_EventViewValidation.json",
+              "exportFidelity": "Models/FirstLevelPriorityV1/Data_SelectedExportFidelityValidation.json",
+              "reviewedSourceSeconds": [
+                0,
+                3.25,
+                4.983333,
+                8.75,
+                9.966667
+              ]
+            },
+            "retargetCandidate": {
+              "previewId": "ZhouSeatedAttempt",
+              "status": "待审阅",
+              "path": "Models/FirstLevelPriorityV1/Animation_Nra_ZhouSeatedAttempt_V1.glb",
+              "blend": "Blender/FirstLevelPriorityV1/Scene_Nra_ZhouSeatedAttempt_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_ZhouSeatedAttemptRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
             }
           }
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": [
+        {
+          "sourceId": "ZhouSeatedAttempt",
+          "sourceVideo": "Video/Sources/FirstLevelV1/ZhouSeatedAttempt/c82f761c-f661-49c3-96f1-3dcc355dd4a8_video_1.mp4",
+          "sourceVideoSha256": "d132124b56e4eaf16f0f0af0a5d00940e9050e6362cf0edf85edd272d55baf48",
+          "sourceRangeSeconds": [
+            0,
+            9.966666666666667
+          ],
+          "generationSubmitId": "c82f761c-f661-49c3-96f1-3dcc355dd4a8",
+          "recoveryFrames": 300,
+          "recoveryFps": 30.0,
+          "recoveryRevision": 1,
+          "sourceCache": "Models/_Cache/FirstLevelV1/ZhouSeatedAttempt/Data_GvhmrMotion.npz",
+          "sourceCacheSha256": "6fb6c7a40b2d712c18210de295cb668acc1e599328e194076e32ae1de990a8ef",
+          "resultSha256": "ca01587606b17a9d21c0d6fb7be026b69c275557c13baf77a0d2273e79630700",
+          "rawJointFile": "Models/RecoveryPreview/Data_V1_ZhouSeatedAttemptRawJoints.json",
+          "group": "FirstLevelPriorityV1",
+          "visualAssessment": {
+            "sourceId": "ZhouSeatedAttempt",
+            "sourceVideoSha256": "d132124b56e4eaf16f0f0af0a5d00940e9050e6362cf0edf85edd272d55baf48",
+            "sourceCacheSha256": "6fb6c7a40b2d712c18210de295cb668acc1e599328e194076e32ae1de990a8ef",
+            "modelSha256": "90e17ecbfd292e02f41eced92b6c4b62e819d1a49c0a5268a8a31707c2efae4a",
+            "status": "needs_contact_correction",
+            "acceptedForGame": false,
+            "observed": "已查看起点、中点、终点及 0、3.25、8.75 秒侧视。右腿伸展、左膝弯曲、撑扶尝试与指前方动作存在；屈膝侧足部偏离支撑面，臀部、撑地掌面与扶杆接触不足，需修正后才可装配到 Litter11。",
+            "evidence": "Preview/FirstLevelPriorityV1/Data_EventViewValidation.json",
+            "exportFidelity": "Models/FirstLevelPriorityV1/Data_SelectedExportFidelityValidation.json",
+            "reviewedSourceSeconds": [
+              0,
+              3.25,
+              4.983333,
+              8.75,
+              9.966667
+            ]
+          },
+          "status": "raw_recovered_pending_retarget_and_contact_review",
+          "runtimeEnabled": false,
+          "retargetCandidate": {
+            "path": "Models/FirstLevelPriorityV1/Animation_Nra_ZhouSeatedAttempt_V1.glb",
+            "clip": "Animation_Nra_ZhouSeatedAttempt_V1",
+            "blend": "Blender/FirstLevelPriorityV1/Scene_Nra_ZhouSeatedAttempt_V1.blend",
+            "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=ZhouSeatedAttempt",
+            "status": "待审阅"
+          }
+        }
+      ]
     },
     {
       "requirementId": "FL24",
@@ -8178,7 +9203,8 @@
       "reusedSourceCandidates": [],
       "sourceRetakeIds": [
         "MedicSupportShoulders"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL25",
@@ -8355,7 +9381,8 @@
       "sourceRetakeIds": [
         "CarryFrontLiftHoldLower",
         "CarryRearLiftHoldLower"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL26",
@@ -8763,7 +9790,8 @@
         "CarryFrontWalkTurn",
         "CarryRearWalkTurn",
         "CarryThresholdSlope"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL27",
@@ -8935,7 +9963,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL28",
@@ -9116,7 +10145,8 @@
       ],
       "sourceRetakeIds": [
         "WoundedAssistRole"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL29",
@@ -9350,7 +10380,8 @@
       "reusedSourceCandidates": [],
       "sourceRetakeIds": [
         "WoundedAssistRole"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL30",
@@ -9517,7 +10548,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL31",
@@ -9682,7 +10714,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL32",
@@ -9784,7 +10817,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL33",
@@ -10017,7 +11051,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL34",
@@ -10186,7 +11221,8 @@
       "reusedSourceCandidates": [],
       "sourceRetakeIds": [
         "DitchCoverReturn"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL35",
@@ -10425,7 +11461,8 @@
       "sourceRetakeIds": [
         "CarryFrontLiftHoldLower",
         "CarryRearLiftHoldLower"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL36",
@@ -10529,7 +11566,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL37",
@@ -10829,7 +11867,8 @@
       "reusedSourceCandidates": [],
       "sourceRetakeIds": [
         "MedicSupportShoulders"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL38",
@@ -10997,7 +12036,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL39",
@@ -11169,7 +12209,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL40",
@@ -11343,7 +12384,8 @@
       "reusedSourceCandidates": [],
       "sourceRetakeIds": [
         "CarryRearLiftHoldLower"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL41",
@@ -11445,7 +12487,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL42",
@@ -11547,7 +12590,8 @@
         }
       ],
       "reusedSourceCandidates": [],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL43",
@@ -11799,7 +12843,8 @@
       "sourceRetakeIds": [
         "CarryFrontLiftHoldLower",
         "CarryRearLiftHoldLower"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL44",
@@ -12046,7 +13091,8 @@
       "reusedSourceCandidates": [],
       "sourceRetakeIds": [
         "YaowaGriefRise"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL45",
@@ -12218,7 +13264,8 @@
       "reusedSourceCandidates": [],
       "sourceRetakeIds": [
         "CompanionLookBackAmmo"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL46",
@@ -12389,7 +13436,8 @@
       "reusedSourceCandidates": [],
       "sourceRetakeIds": [
         "YaowaGriefRise"
-      ]
+      ],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL47",
@@ -12592,7 +13640,8 @@
           ]
         }
       ],
-      "sourceRetakeIds": []
+      "sourceRetakeIds": [],
+      "newRecoveryCandidates": []
     },
     {
       "requirementId": "FL48",
@@ -12762,7 +13811,8 @@
       "reusedSourceCandidates": [],
       "sourceRetakeIds": [
         "FatigueShoulderCough"
-      ]
+      ],
+      "newRecoveryCandidates": []
     }
   ]
 }

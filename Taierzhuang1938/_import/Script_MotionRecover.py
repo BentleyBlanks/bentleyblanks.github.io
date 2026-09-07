@@ -5,7 +5,9 @@ parser=argparse.ArgumentParser()
 parser.add_argument('--name',required=True);parser.add_argument('--source',type=Path,required=True)
 parser.add_argument('--output',type=Path,required=True);parser.add_argument('--cache',type=Path)
 parser.add_argument('--runtime',type=Path,default=Path.home()/'Downloads/GVHMR')
-parser.add_argument('--crop',type=float,nargs=2);args=parser.parse_args()
+parser.add_argument('--crop',type=float,nargs=2)
+parser.add_argument('--preprocess-only',action='store_true',help='Save observations for source tracking review before any 3D prediction')
+args=parser.parse_args()
 os.environ['GVHMR_CHECKPOINTS']=str(args.runtime/'Checkpoints')
 os.environ['GVHMR_BODY_MODELS']=str(args.runtime/'Checkpoints/body_models')
 os.environ['GVHMR_DEVICE']='cuda';os.environ['GVHMR_PREDICT_DEVICE']='cuda'
@@ -41,6 +43,14 @@ if args.cache:
 started=time.perf_counter();run_preprocess(cfg);observations=load_data_dict(cfg)
 for key,value in observations.items():
     if torch.is_tensor(value):assert torch.isfinite(value).all(),key
+if args.preprocess_only:
+    report={'status':'observations_prepared_pending_visual_review','source':str(args.source),
+        'sourceSha256':hashlib.sha256(args.source.read_bytes()).hexdigest(),
+        'staticCameraAssumption':True,'cropFraction':args.crop,'predictionRun':False,
+        'seconds':time.perf_counter()-started,'cache':str(capture)}
+    (capture/'Data_ObservationPreparation.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
+    print(json.dumps(report),flush=True)
+    raise SystemExit(0)
 torch.cuda.empty_cache()
 model=GVHMR.from_pretrained(ckpt_path=args.runtime/'Checkpoints/gvhmr/gvhmr_siga24_release.ckpt',device='cuda')
 # Never reuse an earlier prediction: this command is an explicit recovery revision.

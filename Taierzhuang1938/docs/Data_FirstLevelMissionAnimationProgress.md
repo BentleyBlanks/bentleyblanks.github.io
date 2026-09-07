@@ -2,7 +2,7 @@
 
 当前用户要求为**先覆盖全部 48 项的素材生成**，随后继续恢复、重定向、协作装配和游戏接入。尚未完成全部动作，也没有替换正式关卡动画。逐项字段、来源哈希和运行时文件快照见 [状态 JSON](Data_FirstLevelMissionAnimationStatus.json)。需求仍以 [完整需求](Data_FirstLevelMissionAnimationRequirements.md) 和 [视频转骨骼标准](Data_VideoToSkeletonStandard.md) 为准。
 
-## 最新进展：首轮 60 条视频、长凳 V1 与担架 V10
+## 最新进展：首轮 60 条视频与四条新增单人恢复
 
 - [48 项实时制作看板](http://127.0.0.1:8136/Preview/FirstLevelSourceBatchV1/index.html)读取私有库的真实回执，按 FL ID 展示已生成、生成中、待提交、复用来源及积分。该页不提交任务或扣费，视频与页面只留本地。
 - 逐片解码、哈希和带源秒数的九帧初筛分开记录。初筛已发现部分片源裁头、遮挡双腿、把前抬手拍成后位、踩上转运台等问题；看板明确列“需补拍”及具体证据。已生成数包含这些原件，不等于合格片源数；先跑完首轮，再集中补拍。解码采用两遍流式读取，避免批量持有全分辨率帧而挤占生成 CLI 内存。
@@ -18,6 +18,11 @@
 - V10 三个审阅 GLB 共 363 帧通过真实蒙皮、原骨长、选段同步、循环及完整入镜验证。掌点误差约 0.0011 mm，不能替代手指、袖口或负重自然度。V10 腕点最大修正约 0.384 m、肘点约 0.126 m，身体矩阵误差为零，仍是有明显接触修正的实验版。
 - 原库新增长凳原恢复后：41 份原数组逐值匹配、18 个可编辑原骨骼工程、442 条登记链接通过。其他新片先验源片，再恢复；视频生成成功不会自动标成已接受或已接入。
 
+- 首轮结束后新增三条重点恢复：[逐阶下车](http://127.0.0.1:8136/Preview/index.html?action=TrainStairDisembark)、[幺娃切片递食](http://127.0.0.1:8136/Preview/index.html?action=TrainMealCutOffer)、[老周撑起失败](http://127.0.0.1:8136/Preview/index.html?action=ZhouSeatedAttempt)。每条先看 0.25 秒间隔源帧及 0.5 秒间隔二维追踪，再复用这些观察缓存做首次三维推理；没有新增付费请求。各为 300 帧／30 fps 原恢复和 599 帧／60 fps 国军原骨架候选，完整序列保持非循环。工程与 GLB 位于私有库 `FirstLevelPriorityV1`，原始数组、推理缓存和可编辑 raw rig 分开保留。
+- 三条共 1,797 帧真实 GLB 导出保真通过：原恢复骨段方向最大误差约 0.001253°，GLB 与 Blender 关节位置最大误差约 0.00172 mm。15 个取景姿势与 26 个源动作事件／正侧视同步截图已生成；实际查看了每条起、中、末帧及下车 4.5 秒、切片 3 秒、递食 7.5 秒、老周 0／3.25／8.75 秒侧视。首轮下车越出预览画面的失败已通过相机中心与距离修正，未改动作位移。
+- **三条均需接触修正，尚未接入游戏。** 下车未匹配三处车梯／扶栏；切片未装配座凳、包布、刀与食物，手指仍是通用张开姿态；老周屈膝侧足部、臀部和双掌支撑不足。侧别和动作存在不等于接触合格，V1 保留这些问题供三栏审阅。对应 `Data_RetargetAssessment.json` 按原片、原恢复与模型哈希绑定。
+- 本地库目前 44 份 raw 数组逐值匹配、21 个可编辑原骨骼工程、460 条文件链接通过，目录含 51 个动作。48 项看板已增加新三栏链接与密集／重定向审阅记录；首轮仍为 60 成功／1 失败／1 待对账、17 条补拍，积分余额沿用上次实查的 30。
+
 最新 master 已有 `Data_FirstLevelMissionVoiceAlignment.mjs`、`Data_FirstLevelMissionVoiceTiming.mjs` 与 Runtime VoiceEvent。后续动作读实际 cue／segment／源秒数和真实事件；本轮没有改对白录音、人数、任务状态或原演员身份。
 
 任务快照已同步另一台电脑的 `d9d373f35`／r11：25 阶段含新增 `TransferApproach`，村后接近至少 45 秒且等待实际抵达与 `TransferHope` 完成。开场保留自由转头，`TrainFoodReceived` 在 TrainMeal 第二句实际录音结束时释放走位；受袭后紧急制动，停稳并听到下车命令后才下车。最新 TrainShelling 原录音为 **20.036 秒**：2.12 秒进入 BrakeAndCover 并发出 TrainProneOrder，17–20.036 秒 EmergencyUnload 受 trainStopped 事实门约束。动作不得沿用旧 22.544 秒时间表。
@@ -31,6 +36,10 @@ python Taierzhuang1938/_import/Script_FirstLevelSourcePlan.py --root <库>
 python Taierzhuang1938/_import/Script_FirstLevelSourceBatch.py --root <库> --max-credits 11360 --concurrency 3
 python Taierzhuang1938/_import/Script_FirstLevelSourceDashboard.py --root <库>
 python Taierzhuang1938/_import/Script_FirstLevelSourceInspect.py --root <库>
+python Taierzhuang1938/_import/Script_FirstLevelSourceDenseInspect.py --root <库> --ids TrainStairDisembark,TrainMealCutOffer,ZhouSeatedAttempt
+python Taierzhuang1938/_import/Script_FirstLevelSourceDenseInspect.py --root <库> --ids TrainStairDisembark,TrainMealCutOffer,ZhouSeatedAttempt --observations --interval .5
+python Taierzhuang1938/_import/Script_FirstLevelRecoveryPrepare.py --root <库> --ids TrainStairDisembark,TrainMealCutOffer,ZhouSeatedAttempt
+node Taierzhuang1938/_import/Script_FirstLevelPriorityInspect.mjs --root <库>
 python Taierzhuang1938/_import/Script_FirstLevelBenchPrepare.py --root <库>
 python Taierzhuang1938/_import/Script_MotionFidelityPrepare.py --root <库> --group FirstLevelTrainV1
 blender --background --python-exit-code 1 --python Taierzhuang1938/_import/Script_MotionFidelityBake.py -- --root <库> --group FirstLevelTrainV1 --revision 1 --faction Nra --clip TrainBenchRise
@@ -42,6 +51,8 @@ node Taierzhuang1938/_import/Script_FirstLevelCarryIntegrationVerify.mjs --root 
 ```
 
 批处理已有进程时继续观察原进程，不重启副本；消费记录与实时状态分别位于 `Video/Sources/FirstLevelV1/<SourceId>` 与 `Models/FirstLevelSourceBatchV1/Data_BatchStatus.json`。暂停观察、窗口无输出或查询超时不能当成服务任务已失败。下面保留首轮 V9 的历史证据，不代表当前补片仍全部缺源。
+
+新源的观察准备可用 `Script_MotionRecover.py --preprocess-only`，只生成二维检测／特征，不跑三维预测；查看实际输入与关节点后再进入恢复。已存在 `Data_GvhmrMotion.npz` 的动作复用原缓存，不能为刷新登记重跑推理。密集抽帧脚本仅出图，人工审阅记录独立保存，不自动判定合格。
 
 ## 首轮 V9 历史成果
 
