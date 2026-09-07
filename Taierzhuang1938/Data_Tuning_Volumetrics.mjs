@@ -143,8 +143,15 @@ export const VOLUMETRIC_PRESETS = {
   },
   // 黄昏 12°：逆光时整条街的空气都会亮起来，g 要大。街底全在阴影里 ——
   // 光柱只从屋脊与山墙的缺口打进来，这正是 SunShadowVisibility 要切出来的东西。
+  // 2026-09-08 美术定稿：sunScale 1.0 → 1.8，ambientScale 1.0 → 0.83。
+  // 抬的是**散射项里太阳那一半**，透过率一个字没动（消光仍走 legacyTransmittance
+  // 的那条解析式，「70 m 能见度」那道闸是逐像素恒等式，不受这一对影响）。
+  // ambientScale 按 docs §17.6b 的配方补偿：Δ = f·(sunScale−1)·sunGain，
+  // f ≈ 0.5（亮部占比），sunGain = 0.42 → 0.5×0.8×0.42 = 0.168。
+  // 于是整帧雾量基本不变，变的只是「照到的空气」与「被挡住的空气」的对比。
   dusk: {
-    densityScale: 0.93, albedo: 0.94, anisotropy: 0.58, sunScale: 1.0,
+    densityScale: 0.93, albedo: 0.94, anisotropy: 0.58,
+    sunScale: 1.8, ambientScale: 0.83,
     noiseAmount: 0.26, noiseWind: [0.75, 0.06, 0.30], far: 240, pointScale: 0.07,
   },
   // 硝烟遮日的午后 52°：太阳越过峡谷线，街上有一条晒地。光柱短、方向陡，
@@ -167,8 +174,12 @@ export const VOLUMETRIC_PRESETS = {
   },
   // 巷战：一半的天被火烧着。这一档是局部光进雾的主战场 ——
   // 着火的房子要在自己周围烧出一团亮的热烟，pointScale 与 fireSmoke 都要给足。
+  // 2026-09-08 美术定稿：sunScale 1.0 → 1.7，ambientScale 1.0 → 0.87
+  // （sunGain = 0.38 → 0.5×0.7×0.38 = 0.133）。比 dawn/dusk 保守一档：
+  // 这一档的空气本来就被火光点着，太阳项再抬满会把两套光源叠成一片白。
   burningStreet: {
-    densityScale: 0.88, albedo: 0.90, anisotropy: 0.55, sunScale: 1.0,
+    densityScale: 0.88, albedo: 0.90, anisotropy: 0.55,
+    sunScale: 1.7, ambientScale: 0.87,
     noiseAmount: 0.32, noiseScale: 0.024, noiseWind: [0.85, 0.12, 0.35],
     pointScale: 0.10, fireSmoke: 2.4, fireSmokeRadius: 1.25, far: 240,
   },
@@ -182,8 +193,12 @@ export const VOLUMETRIC_PRESETS = {
   },
   // 拂晓总反攻 11°：全场画面权重最高的一档。低太阳 + 街底冷影，
   // g 给到 0.58，斜射光柱穿过巷口是这一关的招牌画面。
+  // 2026-09-08 美术定稿：sunScale 1.0 → 1.8，ambientScale 1.0 → 0.82
+  // （sunGain = 0.45 → 0.5×0.8×0.45 = 0.18）。全场画面权重最高的一档，
+  // 「斜射光柱穿过巷口」是它的招牌，含蓄那一版在正片里几乎读不出来。
   dawn: {
-    densityScale: 0.92, albedo: 0.94, anisotropy: 0.58, sunScale: 1.0,
+    densityScale: 0.92, albedo: 0.94, anisotropy: 0.58,
+    sunScale: 1.8, ambientScale: 0.82,
     noiseAmount: 0.24, noiseWind: [0.70, 0.06, 0.28], far: 260, pointScale: 0.08,
   },
 };

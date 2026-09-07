@@ -91,6 +91,8 @@ void main() {
   vec2 ghostStep = toCenter * ${F.ghostSpacing.toFixed(4)};
   vec2 direction = normalize(toCenter + vec2(1e-6));
   vec3 result = vec3(0.0);
+  // 鬼影与光环单独一层：它们乘 ghostScale，太阳眩光不乘（见 Data_Tuning_Camera）。
+  vec3 ghosts = vec3(0.0);
 
   // --- 鬼影 ---------------------------------------------------------------
   for (int i = 1; i <= ${F.ghostCount}; i++) {
@@ -100,7 +102,7 @@ void main() {
     float radial = length(vec2(0.5) - uv) / 0.70710678;
     float weight = pow(clamp(1.0 - radial, 0.0, 1.0), 8.0) * inside;
     vec3 texel = SourceDispersed(uv, direction, ${F.ghostDispersal.toFixed(5)} * float(i));
-    result += texel * weight * LensTint(radial);
+    ghosts += texel * weight * LensTint(radial);
   }
 
   // --- 光环（镜筒内壁的一次反射）------------------------------------------
@@ -109,9 +111,10 @@ void main() {
     float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
     float radial = length(vec2(0.5) - uv) / 0.70710678;
     float ring = pow(clamp(1.0 - abs(radial - 0.5) / ${F.haloWidth.toFixed(4)}, 0.0, 1.0), 3.0);
-    result += SourceDispersed(uv, direction, ${F.haloChroma.toFixed(5)})
+    ghosts += SourceDispersed(uv, direction, ${F.haloChroma.toFixed(5)})
       * ring * inside * LensTint(radial * 0.6 + 0.2);
   }
+  result += ghosts * ${F.ghostScale.toFixed(4)};
 
   // --- 太阳眩光（星芒 + 核心）---------------------------------------------
   if (uGlare > 0.0001 && ${F.starPoints} > 0) {

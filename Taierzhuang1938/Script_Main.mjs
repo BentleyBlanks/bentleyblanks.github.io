@@ -102,6 +102,7 @@ import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction.mjs";
 import { FrameProfiler } from "./Script_Profiler.mjs";
 import { AutoQuality } from "./Script_AutoQuality.mjs";
+import { LENS_FLARE } from "./Data_Tuning_Camera.mjs";
 import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
 import { BootProp } from "./Script_BootProp.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
@@ -7522,6 +7523,10 @@ function RenderScene(dt) {
     dofFocus: 1.5,
     dofRange: 2.8,
     dofMaxPx: 11.0,
+    // 镜头光晕：开镜时按 ADS 过渡压到 LENS_FLARE.adsScale（出厂 0.3×）。
+    // 铁瞄那一小块正是准星所在，彩虹扇压上去是直接的手感损失；
+    // 不整个关掉是因为「太阳还在那儿」这条信息本身对构图有用。
+    lensFlare: 1 - adsNearDof * (1 - LENS_FLARE.adsScale),
     nearDofStrength: WEAPON_RANGE ? 0 : adsNearDof * ADS_NEAR_DOF_STRENGTH,
     nearDofFocus: ADS_NEAR_DOF_FOCUS_M,
     nearDofRange: ADS_NEAR_DOF_RANGE_M,

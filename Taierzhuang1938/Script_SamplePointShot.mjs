@@ -53,6 +53,8 @@ const VIEWPORT = {
   height: Number(args.get("height") || 900),
 };
 const WRITE_JPEG = args.get("jpeg") !== "0";
+/** 追加到页面 URL 上的额外查询串（诊断用，见下面 url 那一行的注释）。 */
+const EXTRA_PARAMS = args.get("params") || "";
 const QUALITY = args.get("quality") || "high";
 const SCALE = args.get("scale") || "medium";
 /** 相机跳到新机位后推多少帧再拍。GI 探针、雾与阴影都要这几十帧才落定。 */
@@ -295,8 +297,11 @@ let failures = 0;
 const started = Date.now();
 
 for (const batch of plan) {
+  // `--params=a=1&b=2` 原样追加到 URL 上。取证用：同一批机位在 `skyLegacy=1`
+  // （旧解析天空）或 `gi=1` 下再拍一遍，才分得清「这一档亮了」是谁干的。
   const url = `http://127.0.0.1:${port}/Taierzhuang1938/`
-    + `?shot=1&phase=${batch.phase}&quality=${QUALITY}&scale=${SCALE}`;
+    + `?shot=1&phase=${batch.phase}&quality=${QUALITY}&scale=${SCALE}`
+    + (EXTRA_PARAMS ? `&${EXTRA_PARAMS}` : "");
   console.log(`\n=== ${batch.phaseId} ${batch.phaseLabel}（${batch.points.length} 个点位）===`);
   pageProblems.length = 0;
   await page.goto(url, { waitUntil: "load", timeout: 180000 });

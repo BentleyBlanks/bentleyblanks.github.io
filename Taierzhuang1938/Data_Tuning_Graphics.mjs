@@ -195,9 +195,11 @@ export const QUALITY_PRESETS = {
     pom: 8, pomRefine: 4, pomSelfShadow: false, detailNormal: true,
     microShadow: true, horizonOcclusion: true, skinSss: true,
     materialTexture: 512,
-    // 2026-09-08 分档定稿：0.75 → 0.70。medium 的定位是「笔记本独显 1080p 稳 60」，
-    // 而它与 high 的差价主要就在这一项（其余几位是构造期开关，省的是编译不是像素）。
-    taaUpscale: true, renderScale: 0.70,
+    // 2026-09-08 分档定稿复核：**保持 0.75**。试过 0.70，但这一轮的实测说明
+    // 3394×1348 下整帧根本不是像素受限（见 docs §13 的分档表：四档的下界都压在
+    // 同一个 ~11.4 ms 上，而 CPU 提交是 12–16 ms），压内部分辨率买不到时间、
+    // 只买到更软的画面。真要在 medium 上再省，省的是 draw call 不是像素。
+    taaUpscale: true, renderScale: 0.75,
     motionBlurTaps: 8, motionBlurScale: 0.5, dof: true, dofScale: 0.5,
   },
   // high 的抗锯齿由 TAA 承担。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
