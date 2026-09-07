@@ -51,12 +51,19 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - 帧图各段（2026-09 拆分，加 pass 只动自己那一个文件 + 编排器里插一行）：
   `Script_PostCommon.mjs`（blit / 靶工厂 / 靶池 / `FrameContext` / pass 契约）、
   `Script_PostPrepass.mjs`（MRT 预通道 + 速度缓冲 + HZB + 蒙皮上一帧骨矩阵）、
-  `Script_PostSsao.mjs`、`Script_PostTaa.mjs`、`Script_PostBloom.mjs`（含太阳拖影）、
+  `Script_PostSsao.mjs`、`Script_PostSsr.mjs`（Hi-Z 随机 SSR）、`Script_PostTaa.mjs`、
+  `Script_PostBloom.mjs`（含太阳拖影）、
   `Script_PostComposite.mjs`（分段 GLSL）、`Script_PostFxaa.mjs`、`Script_PostDebug.mjs`。
+- `Script_PostSsr.mjs` —— **屏幕空间反射**：自建 min-reduce Hi-Z（共享 HZB 是 max-reduce，
+  语义相反）+ GGX VNDF 随机追踪 + ratio estimator 解算 + 时域累积，另出一条「上一帧 TAA
+  解算后场景色」的 mip 链。粗糙度取自主 HDR 靶的 alpha（材质补丁写进去的免费 GBuffer）。
+  水面走同一份追踪 GLSL 自己采（它 skipNormalDepth，SSR 靶在水面位置算的是河床）。
+  口径见 `docs/Data_TechRenderPipeline.md` §17，回归口 `Script_SsrTest.mjs`。
 - `Data_Tuning_Graphics.mjs` —— 画质档位表（纯数据，零 three）：每档每个 pass 的开关与旋钮，
   外加 `HZB` / `VELOCITY` 两组常量。`Script_Post` / `Script_Main` / `Script_EditorSettings` 只读它。
 - `Script_MaterialPatches.mjs` —— **材质补丁注册表**：所有往 `MeshStandardMaterial` 插 GLSL 的
-  事都走它（AO / GI 三态 / 破口裁切），一个 `onBeforeCompile` 做完，cache key 由补丁 key 拼。
+  事都走它（AO / GI 三态 / SSR / 破口裁切，顺序固定），一个 `onBeforeCompile` 做完，
+  cache key 由补丁 key 拼。
   `Script_Materials.InjectIndirectLighting` 只是它的薄封装。
 - `Script_FirstPersonSelfShadow.mjs` —— 第一人称手臂/武器专用 packed-depth + 3×3 PCF
   自阴影；与战场太阳阴影图隔离，禁止改成 Viewmodel 直接 `castShadow=true`。
@@ -65,6 +72,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   采样接口**：体积雾 / 接触阴影 / CSM 都从这条接口取，别自己采 `sun.shadow.map`）、
   `Script_Sky.mjs`（解析式天空 + PMREM）、`Script_Water.mjs`（Gerstner 护城河）。
 - 回归口：`Script_PostFrameGraphTest.mjs`（帧图契约）、`Script_PostTest.mjs`、
+  `Script_SsrTest.mjs`（屏幕空间反射）、
   `Script_GiTest.mjs`、`Script_EditorTest.mjs`（Debug Rendering 全部视图）。
 - 先读：`docs/Data_TechRenderPipeline.md` **§1「帧图与模块契约」**（接入说明；
   §1A 起是设计期草案与专题深挖，GI 在 §12，坑表在末尾）。

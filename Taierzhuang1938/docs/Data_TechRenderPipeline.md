@@ -1660,6 +1660,268 @@ baseline 11.1 ms vs 无 GI 8.4 ms，差 ~2.7 ms，且 CPU 分项里 `gi=0.00` �
 
 ---
 
+## 17. 屏幕空间反射（2026-09）
+
+> 模块 `Script_PostSsr.mjs` / 材质补丁 `Script_MaterialPatches.MakeSsrPatch` /
+> 档位 `Data_Tuning_Graphics.SSR` + `QUALITY_PRESETS[*].ssr*` /
+> 回归口 `Script_SsrTest.mjs`。落地之前镜面间接光全部来自天空 PMREM：
+> 钢盔、刺刀、湿地和屋里的金属件反的都是同一片均匀的天。
+
+### 17.1 帧图里的位置与那一帧延迟
+
+```
+prepass → hzb → **ssr** → ssao → main → … → taa → **ssrColor** → bloom → …
+```
+
+* `ssr` 排在 `main` **之前**，因为它的结果是被主场景那一趟的**材质**采样的。
+* 排在 `prepass`/`hzb` **之后**，所以法线、线性视深、HZB、速度**全是本帧的** ——
+  **追踪没有延迟**，只有「命中点那里是什么颜色」取的是上一帧。本帧的颜色还没
+  画出来（画它正需要 SSR），这是前向管线里绕不过去的循环，UE 的 SSR 同样取
+  上一帧场景色。补偿三条：
+  1. 命中点按**速度缓冲重投影**到上一帧的 uv 再取色，动的东西也对得上；
+  2. 取的是 **TAA 解算之后**（`ssrColor` 排在 `taa` 后面）的那一张，已经时域
+     降噪、已卸抖动，比主靶原图干净；
+  3. 镜头硬切（`NotifyCameraCut` → `ctx.hasPrev === false`）当帧清历史，
+     否则镜面上会挂一帧上一场戏的倒影。
+
+### 17.2 粗糙度从哪来：主 HDR 靶的 alpha 通道
+
+这是前向管线，**没有 GBuffer**；预通道 RT0 的四个通道（xyz 视空间法线 + w
+线性视深）也满了。但**主 HDR 靶的 alpha 全链路无人读** —— 逐个查过：
+Composite 只取 `.r/.g/.b` 与 `.rgb`，Bloom 全是 `.rgb`，TAA 写死 `alpha = 1`，
+调试视图也只看 rgb。所以 SSR 补丁在 `<dithering_fragment>` 处写一行
+
+```glsl
+if (diffuseColor.a >= 0.999) gl_FragColor.a = clamp(material.roughness, 0.0, 1.0);
+```
+
+alpha 就成了这条管线里唯一一张免费的粗糙度 GBuffer。SSR 在 `main` 之前跑，
+此时 `targets.hdr` 里躺的正是**上一帧**画完的内容 —— 与颜色同一份延迟，同样
+按速度缓冲重投影读。
+
+四条要记住的后果：
+
+* **没挂补丁的东西 alpha 是 1**（清屏值 1，或它们自己写的不透明度）→ 读出
+  roughness = 1 > 上限 → **自动没有 SSR**。天空穹、粒子、烟、第一人称、
+  外部未接入的材质全在这一档。这个失败方向是安全的：宁可漏，不可在天上反出东西。
+* **半透明材质不挂这条补丁**（`Script_Materials` 按 `material.transparent` 分流，
+  补丁自己再兜一道 `diffuseColor.a >= 0.999`）。往 alpha 里写粗糙度会直接改
+  混合结果。所有混合模式都只把 dstAlpha 往 1 推（Normal 是
+  `srcA + dstA(1-srcA)`，Additive 是 `srcA + dstA`），所以半透明盖过去的地方
+  只会「关掉 SSR」，不会假装光滑。
+* **第一人称的手与枪**在预通道里写的是常数近景标签 `FOREGROUND_VIEW_DEPTH`，
+  不是真视深；拿它反投影会得到一个不存在的世界位置。追踪端按
+  `abs(depth - uSsrForegroundDepth) < 1e-3` 排除，误伤只是「正好在 1 m ± 1 mm
+  的世界几何没有 SSR」。
+* **第一帧没有上一帧**：`uHasRoughness` / `uSsrHasColor` 为 0 时整趟输出 0。
+
+### 17.3 为什么 SSR 不用共享 HZB，而自己再建一条
+
+`ctx.hzb` 是 **max-reduce**（每级取 2×2 的最远视深，天空记 `camera.far`）——
+遮挡剔除的语义。Hi-Z 追踪要的是反过来的东西：**一格里最近的那个面**。
+只有「射线当前深度 < 格内最近面」才能安全地整格跳过；拿 max 去判会漏掉格子里
+所有比最远面近的几何，反射直接穿墙。
+
+所以 `SsrPass` 自己建一条 **min-reduce** 链（六级，半分辨率起步，
+1440p 下约 3 MB，实测 0.05 ms 摊在 `ssr` 段里）。**合并方案**：共享 HZB 是
+RGBA16F 且四通道同值，把 min 塞进 `.g` 是零显存零带宽的事 —— 那一步归预通道
+的所有者做，做完本模块删掉自己这条链、改成读 `.g` 即可。
+
+采样端有一条 WebGL2 的硬约束：**GLSL ES 3.00 不许用变量下标取 sampler 数组**
+（只允许常量表达式；动态一致下标要 ES 3.10）。所以六级是六个 `sampler2D` +
+一段 if 梯（`SsrHizMin`），不是一个数组、也不是一张纹理的多个 mip
+（往同一张纹理的另一级写、同时采它是 feedback loop，WebGL2 直接
+`INVALID_OPERATION`）。级数不足时多余的槽绑成最后一级 —— 采样器必须都绑到
+有效纹理，否则某些驱动上整趟静默不画。
+
+**上一帧场景色**那条链没有这个问题：它是**一张**带真 mip 的 RT，
+`generateMipmaps = true` + `LinearMipmapLinearFilter`，three 在每次 blit 末尾
+（`renderer.render` → `updateRenderTargetMipmap`）自动生成整条链，采样用
+`textureLod(uSsrColor, uv, lod)`，lod 可以是变量。
+
+### 17.4 四步链
+
+| 步 | 做什么 | 输出 |
+|---|---|---|
+| min-Hi-Z | RT0.w 的 2×2 min-reduce ×6 级 | 六张 RGBA16F（四通道同值） |
+| trace | 每像素按 GGX VNDF 采一条随机反射线，Hi-Z 跳格 + 二分细化 | RGBA16F：rg = 命中 uv，b = pdf，a = 置信度 |
+| resolve | 邻域 4/8 抽样按 BRDF/pdf 的 ratio estimator 互相重用射线 | RGBA16F：rgb = 镜面辐亮度，a = 置信度 |
+| temporal | 速度重投影 + YCoCg 方差裁剪 + 与历史混合 | RGBA16F = `targets.ssr`，材质采的就是它 |
+
+**追踪**（`SsrTraceGlsl`，步数与细化步数是编译期常量，按档位生成一份）：
+
+* 屏幕空间里 `1/视深` 是仿射的，所以整条射线可以用一个标量参数 `s` 表达，
+  `uv(s) = mix(uv0, uv1, s)`、`depth(s) = 1 / mix(invZ0, invZ1, s)`。
+  对透视相机这是**精确的**，不是近似。
+* 每步读当前级的格内最近面 `cellMin`：
+  * `rayZ < cellMin` → 射线在这一格所有面前面 → 取「追上 cellMin 的参数」与
+    「离开本格的参数」中较小的那个；前者到得了就**下沉一级**细化，到不了就
+    **上浮一级**跳更大的格；
+  * 否则 → 已经到达/穿过格内最近面 → 到第 0 级就是命中，否则**下沉一级**（`s` 不动，
+    层数单调降，必然终止）。
+* 命中之后 4 步二分细化到亚纹素，再过两道判据：命中天空（`sceneZ >= far*0.999`）
+  不算；`hitRayZ - sceneZ > thickness + thicknessSlope * sceneZ` 算「从物体背后
+  穿过去了」，也不算。厚度随视深放宽，因为远处一个像素本来就覆盖几十厘米。
+* 起步推开一个纹素**再加抖动**：不推的话第 0 步落在自己那一格，深度比较必然
+  判「已经在面后面」，全屏立刻自命中；不抖的话 Hi-Z 的格状台阶会显成同心带。
+* 置信度三项相乘：屏幕边缘淡出、射线朝相机走的淡出（那部分信息在相机后面，
+  屏幕空间根本没有）、命中面背朝射线的淡出（打在薄片背面）。
+
+**采样与解算**（Stachowiak 2015）：VNDF（Heitz 2018）比经典 NDF 采样不产生
+朝向背面的半程向量，低样本数下方差小得多。邻域重用的权重是
+
+```
+w_i = D_c(H_i) · G2_c(NoV, NoL_i) / (4·NoV) / pdf_i
+```
+
+即「**本**像素的 BRDF 除以**邻居**的 pdf」—— 一条随机线也能干净就靠它。
+菲涅尔 F **不进权重**：三方的 `RE_IndirectSpecular_Physical` 会在材质里乘，
+这里再乘一次就是双份。邻域盘每帧转一个角，不转会在光滑面上留下十字状结构噪声。
+
+**采色的 mip** 按锥角选：锥半径 ≈ `coneScale × alpha(= roughness²) × 行程`，
+换算成金字塔像素数再取 log2。**用 alpha 不用 roughness**：写成 roughness 会把
+粗糙度 0.1 的地板按十倍的锥角去糊，一块近乎镜面的湿地会采到 1/8 分辨率的
+场景色，倒影糊成一团而且轮廓在低分辨率 mip 上逐帧抖。
+
+**时域**与 TAA 同一套手法但**独立的历史**（SSR 关着 TAA 时也要收敛，而且它的
+噪声来源是随机方向，不是子像素抖动）：3×3 一阶/二阶矩算 `均值 ± σ` 盒（比
+min/max 盒紧，遮挡变化时鬼影少得多），历史裁进盒里再按速度权重混合。
+
+> **踩过的**：YCoCg 里混完必须**先转回 RGB 再卸 Karis 权重**。漏掉中间那一步
+> （直接把 YCoCg 送进 `TonemapUnweight`）不报任何错，但 `Luma(YCoCg)` 是一串
+> 没有意义的数，除数一旦逼近 0 结果就炸到上千 —— 表现是「反射一片惨白而且
+> 每帧乱跳」。回归口：`Script_SsrTest` 的「静止逐帧差」那一条。
+
+### 17.5 材质侧：只换 `radiance`
+
+```glsl
+// <lights_fragment_maps> 之后
+if (uSsrStrength > 0.0 && material.roughness <= uSsrMaxRoughness) {
+  vec4 ssrTexel = texture2D(uSsrMap, gl_FragCoord.xy / uSsrResolution);
+  float ssrFade = 1.0 - smoothstep(uSsrFadeAt, uSsrMaxRoughness, material.roughness);
+  radiance = mix(radiance, ssrTexel.rgb, clamp(ssrTexel.a * uSsrStrength * ssrFade, 0.0, 1.0));
+}
+```
+
+* **换不是加**：加就是天空反射与屏幕空间反射双份。
+* 补丁顺序固定在 **GI 之后、破口之前**。GI 会按「探针亮度 / 天空亮度」的比值压
+  `radiance`（屋里的金属件不该反一片亮天）；SSR 拿到的是真实屏幕空间的光，
+  不该再吃那一层近似遮蔽，所以它排在后面直接覆盖。
+* 镜面遮蔽那一行（`<aomap_fragment>` 里的 `indirectSpecular *= pow(ssao, …)`）
+  仍归 AO/GTAO，SSR 的贡献照样吃它 —— 那是「间接镜面被小尺度几何挡住多少」，
+  与反射来源无关。
+* `uSsrResolution` 是**主渲染靶**尺寸而不是 SSR 靶尺寸（SSR 靶是半分辨率的，
+  靠双线性放大）。**不共用 SSAO 那份 `uScreenResolution`**：探针页喂给
+  `uSsaoResolution` 的是 AO 靶尺寸，共用会连坐。
+
+### 17.6 水面
+
+水面**不能**走 SSR 靶：它 `transparent + depthWrite=false`，而且整只
+`skipNormalDepth` 藏出了预通道，所以它那一像素在 RT0 里存的是**河床**的法线
+与深度 —— SSR 靶在水面位置算的是河床的反射。
+
+让水面写进预通道也不行：`Script_Water` 的浅水吸收与岸线泡沫正是靠
+`BehindSurfaceDepth`「读自己身后那个面的深度」工作的，把水面自己写进去，
+那套立刻退化成全河 0 深度（而且 MRT 之后它还得改成两输出材质）。
+
+所以水面走 `SsrSurfaceBlockGlsl`：**自己按平面反射假设追同一条 Hi-Z**，
+用它自己的波浪法线（含 Gerstner 与细节法线）当反射面，按置信度与解析天空反射
+混合。接线点是 `Script_Water.SetWaterSsr(post.ssrPass.trace)`，**必须在任何水面
+材质建出来之前调**（材质按 preset+flow 缓存，建完就定型）；传 null 时那份
+着色器与接 SSR 之前**逐字节相同**。水面按 32 步追踪 —— 一条护城河宽十米，
+反射线斜着打到对岸城墙足够了，而水面是半透明大面，步数直接乘在填充率上。
+
+### 17.7 分档与面板
+
+| 档 | ssr | 追踪分辨率 | Hi-Z 步数 | 解算抽样 |
+|---|---|---|---|---|
+| low | 关（连靶都不建，材质不编补丁） | — | — | — |
+| medium | 开 | 1/2 | 32 | 0（只走时域） |
+| high | 开 | 1/2 | 48 | 4 |
+| ultra | 开 | 1/1 | 64 | 8 |
+
+与档位无关的常数在 `Data_Tuning_Graphics.SSR`（粗糙度上限 0.60、淡出起点 0.45、
+厚度 0.32 m + 0.020/m、细化 4 步、六级 min-Hi-Z、四级场景色、锥角系数 2.0、
+边缘淡出 0.12 uv、法线偏置 0.02 m、时域权重 0.08→0.50、方差 σ 1.25）。
+
+画质面板：「屏幕空间反射 SSR」一节，布尔总闸 + 强度倍率。**运行时开关不重编译
+材质** —— 强度归零时材质那一行等价于「radiance 原样」，成本只剩一次纹理取样。
+（GI 那种编译期开关是因为探针采样层占着一堆采样器与寄存器，SSR 的补丁没有那个
+体量。）low 档面板会标「本档不可用」。
+
+Debug Rendering「反射」组三张图：**SSR 辐亮度**（HDR 映射）、**SSR 置信度**
+（深蓝 0 → 暖黄 1）、**SSR 命中距离**（绿 = 近、品红 = 30 m 以上、深灰 = 未命中）。
+三张都走 `DebugPass.RenderView` 新开的「自带材质」通道（视图自己给一份全屏材质
+和一个 `Prepare` 钩子），不去改那份按 `uMode` 分档的通用可视化着色器。
+
+### 17.8 成本（RTX 4070 SUPER / ANGLE-D3D11，3394×1348 / high / phase=2）
+
+口径：SSR 开/关**交替** 5 轮（`_shots/SsrPerf.mjs`，一次性脚本不进仓库），每轮
+用运行时剖析器跑 60 帧、逐 pass GPU 分段取中位数，再对 5 轮取中位数。
+**必须交替** —— 单向先后测会把场景漂移（AI、烟、火光）整个算成特性开销。
+
+| GPU 分段 | SSR 开 | SSR 关 | Δ |
+|---|---:|---:|---:|
+| hzb（共享） | 0.084 | 0.069 | +0.015 |
+| **ssr**（min-Hi-Z + 追踪 + 解算 + 时域） | **0.525** | — | **+0.525** |
+| ssao | 0.579 | 0.713 | −0.134 |
+| main | 11.320 | 11.646 | −0.326 |
+| taa | 0.634 | 0.711 | −0.077 |
+| **ssrColor**（上一帧场景色 + mip） | **0.077** | — | **+0.077** |
+| bloom / composite / fxaa | 0.090 / 0.279 / 0.080 | 0.132 / 0.295 / 0.080 | −0.042 / −0.016 / 0.000 |
+| prepass / shadow / firstPersonShadow | 6.444 / 5.165 / 2.328 | 7.070 / 5.390 / 2.031 | −0.626 / −0.225 / +0.297 |
+| gpuTotal | 28.706 | 28.498 | +0.208 |
+
+**可归因的新增成本 = 0.525 + 0.077 ≈ 0.60 ms/帧**（预算 1.2 ms，逐轮区间
+`ssr` 0.26–0.71 ms）。其余每一段的 Δ 都是负的或零 —— 那是场景漂移（AI、烟、
+火光）的本底噪声，不是 SSR 省了别人的时间；`gpuTotal` 的 +0.21 ms 同样落在
+±3 ms 的本底里，所以**整帧口径量不出 0.6 ms**，只有逐段能量。这正是「交替
+A/B + 逐段计时」的理由。
+
+材质补丁那一行（一次 `texture2D` + 一次 `mix`）落在 `main` 段里，被同一份噪声
+盖住，量不出来 —— 它是每个不透明片元一次半分辨率取样，量级本来就在 0.05 ms 以下。
+
+draw call：905 → 899（+6，逐轮区间 +6…+11）= 六次 min-Hi-Z blit + 追踪 + 解算 +
+时域 + 场景色各一次。**没有增加 `renderer.render(scene, camera)` 的次数**
+（全是全屏四边形），CPU 提交侧不受影响。
+
+显存（1440p，high）：min-Hi-Z 六级约 3 MB + 命中/解算/两张历史各 1697×674×8 B
+约 4×9.2 MB + 场景色金字塔约 12 MB ≈ **52 MB**。ultra 全分辨率追踪时约 4 倍。
+
+### 17.9 已知的近似（都是有意的，别当 bug 修）
+
+* **颜色是上一帧的**（见 17.1）。快速横移时反射里的物体会比正片落后一帧；
+  速度重投影把大部分补回来，剩下的靠方差裁剪压掉。
+* **粗糙度是上一帧的**（见 17.2）。运动中的物体轮廓上会有一像素宽的粗糙度错位，
+  表现是轮廓外一圈偶尔多/少一点反射；置信度与方差裁剪把它压在一帧之内。
+* **半分辨率上采样**（medium/high）：材质那一趟按 `gl_FragCoord / 主靶尺寸`
+  双线性采半分辨率靶，深度边界上会有半像素级的渗色。置信度在边缘本来就淡出，
+  所以渗过去的量也跟着淡。ultra 全分辨率追踪没有这一条。
+* **屏幕外的信息没有**。命中点越靠屏幕边、射线越朝相机走，置信度越低，
+  最终回退到天空 PMREM。这是屏幕空间方法的定义域，不是 bug。
+* **只替换镜面间接光**。漫反射间接光仍归探针体 GI / 天空 IBL；SSR 不产出
+  漫反射弹跳（那是 SSIL 那一轮的活）。
+* **`InstancedMesh` 与远景人群在速度靶里是静止的**（预通道的已知近似），
+  所以它们在反射里的重投影只有相机速度那一份。
+
+### 17.10 怎么看出它在起作用（视觉验收）
+
+数值全绿不等于画面对。看图的规矩是**同机位开/关两张对照**，再对两张做逐块差
+（8×8 分块的平均通道差），因为「反射有没有变强」肉眼在雾天场景里很不敏感。
+2026-09 落地那一轮的读数（1600×900，high，`_shots/Ssr_<日期>/`，已 gitignore）：
+
+| 对照 | 整图平均通道差 | 最强块 | 差在哪 |
+|---|---:|---:|---|
+| 探针页材质球阵 + 湿地板（roughness 0.14 / metal 0.85） | 8.12 | 64.6 | 全部集中在地板那三行；球体与天空那几行是 0.3–0.5 的本底 |
+| 东濠 `Wall_MoatEast` | 1.76 | 7.8 | 只有水面那几块（第 2–5 行右半），岸上与天空是 1.0 的本底 |
+| 十字街口（全是干燥粗糙面） | 0.81 | 1.11 | **哪儿都没变** —— 粗糙度全部超上限，这是正确的负对照 |
+
+三条一起看才算过：光滑面上有明显变化、水面上有变化、粗糙面上没有变化。
+只看前两条会漏掉「粗糙度上限失灵、整城都在反射」这种坏法；只看第三条则什么
+都证明不了。本底 ~1.0 是 TAA 与场景动画的跨轮噪声（见 §1.12 末尾那段账）。
+
+---
+
 ## 坑
 
 - 【本仓库现役 bug】`renderer.shadowMap.type = THREE.PCFSoftShadowMap` 在 r185 = 硬阴影。源码 `shadowMapTypeDefines` 只有 `PCFShadowMap→SHADOWMAP_TYPE_PCF` 和 `VSMShadowMap→SHADOWMAP_TYPE_VSM` 两个 key，`PCFSoftShadowMap`(=2) 落到 `|| 'SHADOWMAP_TYPE_BASIC'`；且 `WebGLShadowMap` 只在 `type === PCFShadowMap` 时设 `compareFunction = LessEqualCompare` + `LinearFilter`，否则是 `NearestFilter` + 无比较。`Script_Probe.mjs:26` 正踩这条 —— 改成 `THREE.PCFShadowMap` 即可拿到硬件 PCF + Vogel 5 抽样。
@@ -1685,6 +1947,11 @@ baseline 11.1 ms vs 无 GI 8.4 ms，差 ~2.7 ms，且 CPU 分项里 `gi=0.00` �
 - LUT 的 CanvasTexture 必须 `flipY = false` + `ClampToEdgeWrapping` + `generateMipmaps = false` + `NoColorSpace`，采样时每格内缩半纹素。任一条漏掉 → 相邻切片互相渗色，暗部出现彩色斑块。
 - 颗粒/抖动用 `Math.random()` 会让逐轮截图对比失效（画面自己在抖，判断不了“这一版比上一版好”）。全部用 `frameIndex` 驱动的确定性噪声（interleavedGradientNoise + 黄金比推进），视觉审查 agent 才能打分。
 - god rays / 体积 raymarch 不抖动起点 → 明显的同心环带（banding）。抖动了但不随帧变 → 静态噪点固定在屏幕上，看起来像脏镜头。两者都要：`Ign(gl_FragCoord.xy + frame * k)`。
+- 【2026-09 实测】**GLSL ES 3.00 不许用变量下标取 sampler 数组** —— 只允许常量整型表达式（动态一致下标要 ES 3.10/GLSL 4.00，WebGL2 没有）。Hi-Z 追踪要按当前层级取金字塔，这条直接把「一个 `uniform sampler2D u[8]` 加个变量下标」的写法否掉了。三条出路：①摊成 if 梯（SSR 的 min-Hi-Z 就是六个 sampler + `SsrHizMin` 的 if 梯）；②做成**一张**带真 mip 的纹理用 `textureLod(tex, uv, lod)`（lod 可以是变量 —— SSR 的「上一帧场景色」金字塔就是这么做的，`generateMipmaps = true` + mipmap minFilter，three 在 `renderer.render` 末尾自动 `updateRenderTargetMipmap`）；③打进一张图集自己算偏移。**别想着「往同一张纹理的 level i 写、同时采它的 level i-1」** —— 那是 feedback loop，WebGL2 直接 `INVALID_OPERATION`，整趟不画。
+- 【2026-09 实测】SSR 的 Hi-Z 追踪要的是 **min-reduce**（一格里最近的面），共享 HZB（`ctx.hzb`）是 **max-reduce**（一格里最远的面，遮挡剔除语义）。拿 max 去做「射线在整格前面就跳过」的判据，会漏掉格子里所有比最远面近的几何 —— 症状是反射穿墙，而且只在有前后层次的地方穿，极容易被当成「厚度参数没调好」。`Script_PostSsr` 因此自建一条 min 链；合并方案见 `Data_Tuning_Graphics.SSR` 的注释。
+- 【2026-09 实测】YCoCg 邻域裁剪那一套的三步（`RgbToYcocg(TonemapWeight(c))` → 混合 → `TonemapUnweight(YcocgToRgb(x))`）**漏掉中间的 `YcocgToRgb` 不报任何错**，但 `TonemapUnweight` 里的 `1 - Luma(c)` 拿到的是一串没有意义的数，除数逼近 0 时结果炸到上千。表现是「反射/画面一片惨白而且每帧乱跳」，看着像 HDR 曝光坏了。SSR 落地时踩过一次，回归口是 `Script_SsrTest` 的「静止逐帧差」。
+- 【2026-09】屏幕空间反射的锥角要按 **alpha = roughness²**（GGX 波瓣半角）算，不是按 roughness。写成 roughness 会把粗糙度 0.1 的地板按十倍锥角去糊 —— 一块近乎镜面的湿地采到 1/8 分辨率的场景色，倒影糊成一团、轮廓还在低分辨率 mip 上逐帧抖。三方 BRDF 里进 GGX 的同样是 `roughness²`。
+- 【2026-09】主 HDR 靶的 **alpha 通道全链路无人读**（Composite 只取 `.r/.g/.b` 与 `.rgb`，Bloom 全是 `.rgb`，TAA 写死 1，调试视图只看 rgb）—— SSR 把它当粗糙度 GBuffer 用了（§17.2）。**谁要动 alpha 之前先看那一节**：往里写别的东西会把下一帧的反射判据改掉，而且不透明材质写非 1 的 alpha 还会破坏半透明混合，所以那条补丁只挂不透明材质。
 - 运动模糊没排除武器/手臂 layer → 转身时枪身糊成一坨，FPS 手感直接塌。给第一人称模型单独 layer 并在速度缓冲里写 0。
 
 ---

@@ -265,6 +265,72 @@ try {
   problems.push(`THROW ${String(error).slice(0, 400)}`);
 }
 
+// --- 分档变体也要真的编得过 --------------------------------------------------
+// 步数与解算抽样数是**编译期常量**（GLSL 的循环上限、TAP_OFFSETS 的数组长度），
+// 所以 medium(32 步 / 0 抽样) 与 ultra(64 步 / 8 抽样) 是**另外两份着色器**。
+// GLSL 编译失败 three 只在控制台留一行、那一趟什么都不画 —— 只测 high 等于
+// 三份里只验了一份。这里各开一次探针页，读回 SSR 靶确认真的出了东西。
+const variants = {};
+for (const quality of ["medium", "ultra"]) {
+  try {
+    await page.goto(
+      `http://127.0.0.1:${port}/Taierzhuang1938/Probe.html?quality=${quality}&preset=smokyDay&scene=materials&gi=0`,
+      { waitUntil: "load", timeout: 180000 },
+    );
+    await page.waitForFunction(() => window.Probe?.state?.ready, null, { timeout: 240000 });
+    variants[quality] = await page.evaluate(async () => {
+      const P = window.Probe;
+      const THREE = P.THREE;
+      const post = P.post;
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40),
+        P.library.Plain("SsrVariantFloor", { color: 0x9aa0a8, roughness: 0.10, metalness: 0.9 }));
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = 0.02;
+      P.scene.add(floor);
+      const cube = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 1.4),
+        P.library.Plain("SsrVariantCube", {
+          color: 0x050505, roughness: 0.85, metalness: 0,
+          emissive: 0xff0000, emissiveIntensity: 10,
+        }));
+      cube.position.set(0, 1.15, 0);
+      P.scene.add(cube);
+      P.camera.position.set(0, 1.9, 5.2);
+      P.camera.lookAt(0, 0.35, 0);
+      P.StepFrames(40, 1 / 60);
+      const rt = post.targets.ssr;
+      if (!rt) return { available: post.ssrPass.available, hasTarget: false };
+      const buffer = new Uint16Array(rt.width * rt.height * 4);
+      P.renderer.readRenderTargetPixels(rt, 0, 0, rt.width, rt.height, buffer);
+      const HalfToFloat = (bits) => {
+        const sign = (bits >> 15) & 1 ? -1 : 1;
+        const exponent = (bits >> 10) & 0x1f;
+        const mantissa = bits & 0x3ff;
+        if (exponent === 0) return sign * Math.pow(2, -14) * (mantissa / 1024);
+        if (exponent === 31) return mantissa ? NaN : sign * Infinity;
+        return sign * Math.pow(2, exponent - 15) * (1 + mantissa / 1024);
+      };
+      let confMax = 0;
+      let redMax = 0;
+      let nan = 0;
+      for (let i = 0; i < buffer.length; i += 4) {
+        const r = HalfToFloat(buffer[i]);
+        const a = HalfToFloat(buffer[i + 3]);
+        if (!Number.isFinite(r) || !Number.isFinite(a)) { nan += 1; continue; }
+        confMax = Math.max(confMax, a);
+        redMax = Math.max(redMax, r);
+      }
+      return {
+        available: post.ssrPass.available, hasTarget: true,
+        size: [rt.width, rt.height],
+        steps: post.preset.ssrSteps, taps: post.preset.ssrResolveTaps, scale: post.preset.ssrScale,
+        confMax, redMax, nan, glError: P.renderer.getContext().getError(),
+      };
+    });
+  } catch (error) {
+    problems.push(`VARIANT ${quality} ${String(error).slice(0, 200)}`);
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -324,6 +390,12 @@ if (!result) {
       shot && shot.distinct > 3 && shot.nonBlackRatio > 0.05, JSON.stringify(shot));
   }
   Check("无 GL 错误", result.glError === 0, `glError=${result.glError}`);
+  for (const quality of ["medium", "ultra"]) {
+    const v = variants[quality];
+    Check(`${quality} 档的着色器变体真的出画（步数/抽样数是编译期常量）`,
+      v && v.hasTarget && v.confMax > 0.5 && v.redMax > 0.5 && v.nan === 0 && v.glError === 0,
+      JSON.stringify(v));
+  }
   Check("页面无控制台报错", problems.length === 0, problems.slice(0, 4).join(" | "));
 }
 
