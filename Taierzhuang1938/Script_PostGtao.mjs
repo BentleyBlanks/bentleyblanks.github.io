@@ -130,7 +130,8 @@ uniform vec2 uProjScale;
 uniform mat4 uInvView;
 uniform mat4 uPrevViewProjection;
 uniform float uHasPrevColor;
-uniform float uRadius;
+uniform float uRadius;        // 地平线搜索走多远（SSIL 开着时 > uAoRadius）
+uniform float uAoRadius;      // AO 的衰减半径：超过它的采样点不再抬地平线
 uniform float uFalloffRange;
 uniform float uThinOccluder;
 uniform float uFinalPower;
@@ -183,9 +184,11 @@ void main() {
   vec3 viewVec = normalize(-pixelPos);
   float minS = uPixelTooClose / screenRadiusPx;
 
-  float falloffRange = max(uFalloffRange * uRadius, 1e-4);
+  // 衰减按 **AO 半径**算，不是按搜索半径：SSIL 开着时这一趟走到 1.8 m，
+  // 但 1.2 m 之外的采样点权重已经是 0（只喂反弹光，不喂遮蔽）。
+  float falloffRange = max(uFalloffRange * uAoRadius, 1e-4);
   float falloffMul = -1.0 / falloffRange;
-  float falloffAdd = (uRadius - falloffRange) / falloffRange + 1.0;
+  float falloffAdd = (uAoRadius - falloffRange) / falloffRange + 1.0;
 
   // 空间噪声（交错梯度）+ 帧序轮转（R2 低差异序列）。两者相加保证：
   // 同一帧里相邻像素取到不同的切片相位（空间去噪能吃掉），
@@ -636,6 +639,7 @@ export class GtaoPass {
       uPrevViewProjection: { value: new THREE.Matrix4() },
       uHasPrevColor: { value: 0 },
       uRadius: { value: GTAO.radius },
+      uAoRadius: { value: GTAO.radius },
       uFalloffRange: { value: GTAO.falloffRange },
       uThinOccluder: { value: GTAO.thinOccluder },
       uFinalPower: { value: GTAO.finalPower },
@@ -800,7 +804,11 @@ export class GtaoPass {
     U.uHasPrevColor.value = this.hasColorHistory && ctx.hasPrev ? 1 : 0;
     U.uFrame.value = ctx.frame;
     // 半径与强度允许调用方逐帧改（编辑器旋钮 / 测试消融），默认取数值表。
-    U.uRadius.value = ctx.options.aoRadius ?? GTAO.radius;
+    // SSIL 开着时**搜索半径**放大到 SSIL.radius：巷子对面那堵墙要进得来。
+    // AO 的衰减半径不跟着放大，否则整面墙会发灰（那正是旧 SSAO 的老毛病）。
+    U.uAoRadius.value = ctx.options.aoRadius ?? GTAO.radius;
+    U.uRadius.value = Math.max(U.uAoRadius.value,
+      this.ssilEnabled ? (ctx.options.ssilRadius ?? SSIL.radius) : 0);
     U.uFinalPower.value = ctx.options.aoPower ?? GTAO.finalPower;
     ctx.blitter.Blit(this.materialTrace, this.raw);
 

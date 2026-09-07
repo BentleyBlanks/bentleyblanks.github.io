@@ -51,8 +51,15 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - 帧图各段（2026-09 拆分，加 pass 只动自己那一个文件 + 编排器里插一行）：
   `Script_PostCommon.mjs`（blit / 靶工厂 / 靶池 / `FrameContext` / pass 契约）、
   `Script_PostPrepass.mjs`（MRT 预通道 + 速度缓冲 + HZB + 蒙皮上一帧骨矩阵）、
-  `Script_PostSsao.mjs`、`Script_PostTaa.mjs`、`Script_PostBloom.mjs`（含太阳拖影）、
+  `Script_PostGtao.mjs`、`Script_PostTaa.mjs`、`Script_PostBloom.mjs`（含太阳拖影）、
   `Script_PostComposite.mjs`（分段 GLSL）、`Script_PostFxaa.mjs`、`Script_PostDebug.mjs`。
+- `Script_PostGtao.mjs` + `Data_Tuning_Gtao.mjs` —— **GTAO（地平线基 AO）+ 弯曲法线 +
+  SSIL（可见性位掩码近场间接光）**，2026-09 整个替换掉旧的 `Script_PostSsao.mjs`。
+  一趟地平线搜索出四个通道（R 可见度 / GB 弯曲法线八面体 / A 线性视深 / 附件 1 SSIL）；
+  多次反弹与 GTSO 镜面遮蔽在 `Script_MaterialPatches.MakeAmbientOcclusionPatch` 里做。
+  数值全在 `Data_Tuning_Gtao.mjs`（带文献出处），分档位名在 `Data_Tuning_Graphics.gtao`。
+  回归口 `Script_GtaoTest.mjs`；口径与实测见 `docs/Data_TechRenderPipeline.md` §17
+  （§4 是被它替换掉的旧 SSAO，已标历史稿）。
 - `Data_Tuning_Graphics.mjs` —— 画质档位表（纯数据，零 three）：每档每个 pass 的开关与旋钮，
   外加 `HZB` / `VELOCITY` 两组常量。`Script_Post` / `Script_Main` / `Script_EditorSettings` 只读它。
 - `Script_MaterialPatches.mjs` —— **材质补丁注册表**：所有往 `MeshStandardMaterial` 插 GLSL 的
@@ -65,6 +72,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   采样接口**：体积雾 / 接触阴影 / CSM 都从这条接口取，别自己采 `sun.shadow.map`）、
   `Script_Sky.mjs`（解析式天空 + PMREM）、`Script_Water.mjs`（Gerstner 护城河）。
 - 回归口：`Script_PostFrameGraphTest.mjs`（帧图契约）、`Script_PostTest.mjs`、
+  `Script_GtaoTest.mjs`（GTAO / 弯曲法线 / 镜面遮蔽 / SSIL）、
   `Script_GiTest.mjs`、`Script_EditorTest.mjs`（Debug Rendering 全部视图）。
 - 先读：`docs/Data_TechRenderPipeline.md` **§1「帧图与模块契约」**（接入说明；
   §1A 起是设计期草案与专题深挖，GI 在 §12，坑表在末尾）。
