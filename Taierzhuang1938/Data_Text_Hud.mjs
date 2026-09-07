@@ -7,15 +7,12 @@
 // 免得再开一张只服务一个文件的表。开机加载与菜单相关的那部分在 Data_Text_Boot / Data_Text_Menu。
 export const TEXT = Object.freeze({
   "hud.hint.checkpointResumed": "已从当前检查点继续",
-  // --- 姿态 -----------------------------------------------------------------
-  "hud.stance.stand": "站立",
-  "hud.stance.crouch": "下蹲",
-  "hud.stance.prone": "趴下",
+  // 姿态（站 / 蹲 / 趴）不再上 HUD：对标 COD《战争世界》，姿态由镜头高度与
+  // 视图模型自己说话，右下角只留弹药与手榴弹数（见 docs/Data_HudLinearLevel.md）。
 
   // --- 键名（提示条上的按键框；「左键」这类是文本，不是 code） ---------------
   "hud.key.mouseLeft": "左键",
   "hud.key.mouseRight": "右键",
-  "hud.key.space": "空格",
   "hud.key.holdF": "按住 F",
 
   // --- 顶部目标与兵员池 -----------------------------------------------------
@@ -25,8 +22,6 @@ export const TEXT = Object.freeze({
 
   // --- 右下战斗区 -----------------------------------------------------------
   "hud.aria.ammo": "弹药",
-  "hud.aria.stanceGroup": "切换姿态",
-  "hud.aria.stanceHint": "按住 Alt 后点击，或使用对应键位",
   "hud.equipment.grenade": "手榴弹",
   "hud.equipment.bundle": "集束手榴弹",
   "hud.equipment.mortar": "迫击炮支援",
@@ -191,12 +186,10 @@ export const GATED_MODULES = Object.freeze([
 
 /**
  * 运行时拼出来的键前缀。
- *   hud.stance.   —— 姿态 id（stand/crouch/prone，与 Script_Player.STANCE 同一套）
  *   hud.faction.  —— 阵营 id（nra/ija，与 Script_Ai 的 side 同一套）
  *   hud.unit.ija. —— 番号按 Script_Identify.IJA_REGIMENTS 这张表的下标取
  */
 export const DYNAMIC_PREFIXES = Object.freeze([
-  "hud.stance.",
   "hud.faction.",
   "hud.unit.ija.",
 ]);

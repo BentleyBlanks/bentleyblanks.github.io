@@ -109,26 +109,52 @@ try {
   assert.equal(prompts.icons, 2);
   assert.ok(prompts.titles.some((title) => title === "包扎止血"));
 
+  // COD《战争世界》式右下角：没有姿态人形与姿态按钮；投掷物数与弹药同一行；
+  // 弹药块只在交互后亮几秒（IDLE_FADE.combatS），空膛 / 低弹钉住不淡。
   const combatHud = await page.evaluate(() => {
     const T = window.Taierzhuang;
-    T.state.ammo = 1;
-    T.state.clips = 3;
+    const combat = document.querySelector(".hudCombat");
+    const Awake = () => combat.classList.contains("awake");
     T.player.stance = "crouch";
-    T.StepFrames(3);
-    const stance = document.querySelector(".combatStance");
+    T.state.ammo = 5;
+    T.state.clips = 3;
+    T.StepFrames(3, 1 / 60, false);
+    const changed = { awake: Awake(), ...T.hud.IdleState() };
+    T.StepFrames(240, 1 / 60, false);              // 4 s 不碰任何东西
+    const idle = { awake: Awake(), ...T.hud.IdleState() };
+    T.hud.Touch("combat");                         // 扣扳机 / 开镜：数字没变也要亮
+    T.StepFrames(1, 1 / 60, false);
+    const touched = { awake: Awake(), ...T.hud.IdleState() };
+    T.StepFrames(240, 1 / 60, false);
+    const idleAgain = { awake: Awake(), ...T.hud.IdleState() };
+    T.state.ammo = 1;                              // 低弹：钉住
+    T.StepFrames(240, 1 / 60, false);
+    const pinned = { awake: Awake(), ...T.hud.IdleState() };
     return {
       current: document.querySelector(".ammoCurrent")?.textContent,
       reserve: document.querySelector(".ammoReserve")?.textContent,
-      stance: stance?.dataset.stance,
-      stanceLabel: stance?.getAttribute("aria-label"),
-      low: document.querySelector(".hudCombat")?.classList.contains("lowAmmo"),
+      low: combat.classList.contains("lowAmmo"),
+      stanceNodes: document.querySelectorAll(".combatStance, [data-player-stance], .combatStanceChoices").length,
+      grenadeCount: document.querySelector(".combatMain .combatEquipment .equipment.grenade b")?.textContent,
+      grenadesHeld: String(Math.max(0, Math.floor(T.state.grenades || 0))),
+      background: getComputedStyle(document.querySelector(".combatMain")).backgroundImage,
+      strokeWidth: Number.parseFloat(getComputedStyle(document.querySelector(".ammoCurrent")).webkitTextStrokeWidth),
+      changed, idle, touched, idleAgain, pinned,
     };
   });
   assert.equal(combatHud.current, "01");
   assert.equal(combatHud.reserve, "15");
-  assert.equal(combatHud.stance, "crouch");
-  assert.equal(combatHud.stanceLabel, "下蹲");
   assert.equal(combatHud.low, true);
+  assert.equal(combatHud.stanceNodes, 0, "HUD 不再显示站 / 蹲 / 趴");
+  assert.equal(combatHud.grenadeCount, combatHud.grenadesHeld, "手榴弹数与弹药同一行，读的是身上真实的数");
+  assert.equal(combatHud.background, "none", "COD 式弹药块没有底板");
+  assert.ok(combatHud.strokeWidth >= 0.9, "弹药数字要有硬黑描边");
+  assert.equal(combatHud.changed.awake, true, "弹药数一变就亮");
+  assert.equal(combatHud.idle.awake, false, `几秒不交互就隐掉，实际 ${JSON.stringify(combatHud.idle)}`);
+  assert.equal(combatHud.touched.awake, true, "Touch 之后要亮");
+  assert.equal(combatHud.idleAgain.awake, false, "Touch 也会过期");
+  assert.equal(combatHud.pinned.awake, true, "低弹钉住不淡");
+  assert.equal(combatHud.pinned.combatPinned, true);
 
   const codObjective = await page.evaluate(async () => {
     const T = window.Taierzhuang;

@@ -259,7 +259,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   接线：`Combat.Blast`（爆炸，按距离与遮挡）、`Player.Suppress(…, "bullet")`（近失弹）、`Player.TakeHit`（中弹侧滚）、
   落地 `landImpact`、日机弹着（`MakeAircraftStrafeHost.Impact`）、B19 扑沟（P012 `RecordDodgeIntent` → `host.DiveCamera`）。
   过场专用的 `shakeAt` 与压制那根正弦仍各自独立。回归口 `Script_CameraShakeTest.mjs`；取证口 `Debug.Shake()`。
-- 三姿态统一走 `PlayerController.SetStance`：C/Z 切蹲/卧，低姿态 Space 站起，HUD 可直接选择。
+- 三姿态统一走 `PlayerController.SetStance`：C/Z 切蹲/卧，低姿态 Space 站起；姿态**不上 HUD**（对标 COD《战争世界》，见 `docs/Data_HudLinearLevel.md`）。
   `Script_StanceTest` 验输入到相机/胶囊/移速；`ActorPoseTest` 验十套模型的低姿与开火交替。
 - `Script_Player.mjs`（移动/碰撞/姿态/**自由瞄准** —— 枪口在视野里滑动、不钉屏幕中心）、
   `Script_Viewmodel.mjs`（第一人称手与枪，几乎每个数字都是手感数字）、
@@ -305,7 +305,9 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 ### HUD / 菜单 / 输入
 - `Style_Interface.css` —— 主菜单、加载、选章、暂停、设置与工具窗口的共用主题；
   各窗口布局在 `Style_Menu.css` / `Style_Editor.css`，验收 `Script_MenuTest.mjs --interface-only`。
-- `Script_Hud.mjs` —— 纯 DOM/CSS，不进 three 渲染；层级参考战地，含阵亡卡片。
+- `Script_Hud.mjs` —— 纯 DOM/CSS，不进 three 渲染；线性关卡对标 COD《战争世界》单人战役
+  （目标通知只在推进时浮出再淡掉、弹药与手榴弹数几秒不交互就隐掉、无姿态图标），
+  对照表与时长口径在 [docs/Data_HudLinearLevel.md](Data_HudLinearLevel.md)，数在 `Data_Tuning_Hud.IDLE_FADE`；含阵亡卡片。
 - `Script_Menu.mjs` + `Data_Menu.mjs` —— 主菜单（活战场打底 + 相机导演）；`Data_Menu` 还放着
   **两片不进 PHASES 的切片**：全城俯瞰 `OVERVIEW_PHASE` 与界河白盒 `JIEHE_SANDBOX_PHASE`。
 - `Script_Input.mjs`（键位表 + 路由器）、`Script_Interact.mjs`（F 键分流）、

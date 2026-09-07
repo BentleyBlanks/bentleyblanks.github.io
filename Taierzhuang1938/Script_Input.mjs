@@ -27,7 +27,7 @@ import { T } from "./Script_Text.mjs";
 const GUIDE = [
   {
     id: "move",
-    rows: ["wasd", "look", "sprint", "lean", "crouch", "prone", "traverse", "stancePick"],
+    rows: ["wasd", "look", "sprint", "lean", "crouch", "prone", "traverse"],
   },
   {
     id: "combat",

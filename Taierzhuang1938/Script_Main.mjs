@@ -5587,8 +5587,6 @@ function ReadKeys() {
   if (SHOT_FIRE) input.fire = true;
 }
 
-hud.onStanceSelect = (stance) => router.OnAction(`stance:${stance}`, {});
-
 const _aimDir = new THREE.Vector3();
 const _aimPoint = new THREE.Vector3();
 function AimPoint(maxDist = 120) {
@@ -7052,7 +7050,6 @@ function Frame(dt, render = true) {
   profiler.B("hud");
   hud.SetObjective(state.storyObjective || phase.label, phase.whitebox?.fullMission?null:state.nraPool, null);
   hud.SetState({
-    stance: player.stance,
     wounded: player.wounds.length > 0,
     bleeding: player.bleeding,
     bandages: player.bandages,
@@ -7080,6 +7077,10 @@ function Frame(dt, render = true) {
   const empView = emplacement?.View() || null;
   const firearm = empView ? true : Number(weapon?.spreadHipDeg) > 0;
   const spreadDeg = empView ? empView.spreadDeg : (firearm ? player.SpreadDeg(weapon) : 0);
+  // 弹药块的闲置自隐（COD《战争世界》）：数字变了由 Hud.SetState 自己拨；
+  // 数字没变的交互 —— 扣着扳机、开镜看一眼 —— 在这里拨。架着机枪时手上那支枪的
+  // 数字没有意义，不拨。
+  if (player.Alive && firearm && !empView && (input.fire || input.ads)) hud.Touch("combat");
   hud.SetCrosshair({
     // 抬着东西时准心收掉：枪不在手上，画一个散布锥就是在骗人。
     // 架着机枪反过来**要**留着：弹道收敛到准心指着的那个点上（EMPLACED_CONVERGE_M）。

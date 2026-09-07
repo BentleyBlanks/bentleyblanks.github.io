@@ -1,7 +1,9 @@
 // 《台儿庄：血战滕县》HUD —— 纯 DOM/CSS，**不进 three 渲染**。
 //
-// 战术信息层级参考《战地》：顶部只留目标与兵力，左下地图，右下武器、弹药和姿态；
-// 中央只出现眼下可执行的操作、准心与真正紧急的反馈，不打歼敌数字。
+// 线性关卡的信息层级对标 COD《战争世界》单人战役（对照表见 docs/Data_HudLinearLevel.md）：
+// 左上只在目标推进时浮出一句动作 + 「目标已更新」再一起淡掉；右下弹药与手榴弹数
+// 只在开枪、装填、换枪、拿弹时亮起，几秒不碰就整块隐掉（IDLE_FADE）；
+// 姿态不上 HUD；中央只出现眼下可执行的操作、准心与真正紧急的反馈，不打歼敌数字。
 //
 // 唯一一处比 ER2 多的是「阵亡卡片」——倒地后的战场留在半透明去色层下面，
 // 生平打出刚才那个人的名字、籍贯、生卒年。ER2 有这个设计，而在台儿庄它有额外的分量：
@@ -11,7 +13,7 @@ import { T, Localize } from "./Script_Text.mjs";
 import { LevelBriefId, LevelFieldId } from "./Script_TextIds.mjs";
 import {
   TITLE_CARD, TIMING, GRENADE_WARNING, HITMARK, HITDIR, VIGNETTE, SUPPRESSION,
-  PROMPTS, MINIMAP, FPS,
+  PROMPTS, MINIMAP, FPS, IDLE_FADE,
 } from "./Data_Tuning_Hud.mjs";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -51,13 +53,6 @@ function SetClass(el, name, on) {
  */
 const MARKER_SEP_Y = 40;
 const MARKER_SEP_X = 130;
-
-/** 姿态 id → 文本键。id 与 Script_Player 的 STANCE 同一套。 */
-const STANCE_TEXT = {
-  stand: "hud.stance.stand",
-  crouch: "hud.stance.crouch",
-  prone: "hud.stance.prone",
-};
 
 /**
  * 动态准心的几何常数。**距离单位全是像素，基准是视口高度**（不是宽度）：
@@ -316,6 +311,47 @@ export class Hud {
     this.fpsAccum = 0;
     this.fpsFrames = 0;
     this.fpsLast = 0;
+    /**
+     * 闲置自隐（COD《战争世界》的 hud_fade_*）：右下弹药块与伤情行各有一只倒数。
+     * 只有**变化**才把它拨满 —— 每帧 SetState 喂进来的都是同一组数时什么也不做，
+     * 于是「几秒不交互就隐掉」自然成立；显式交互（扣扳机、开镜、装填）走 Touch()。
+     * `pinned` 是空膛 / 低弹那一档：这时候数字本身就是警告，不许它淡掉。
+     */
+    this.idle = { combat: 0, state: 0 };
+    this.idleAwake = { combat: false, state: false };
+    this.combatPinned = false;
+    this.combatSignature = "";
+    this.stateSignature = "";
+  }
+
+  /**
+   * 玩家刚跟武器打了交道：开枪 / 干扣扳机 / 开镜 / 装填 / 换枪。
+   * 数字没变也算（对着空膛扣扳机、开镜看一眼都在「看弹药」），所以装配层在
+   * 输入边沿上调它；数字变了的那一路由 SetState 自己拨。每帧调都行 —— 就改一个数。
+   */
+  Touch(channel = "combat") {
+    if (!(channel in this.idle)) return;
+    const span = channel === "state" ? IDLE_FADE.stateS : IDLE_FADE.combatS;
+    this.idle[channel] = Math.max(this.idle[channel], span);
+    this._SetAwake(channel, true);
+  }
+
+  _SetAwake(channel, on) {
+    if (this.idleAwake[channel] === !!on) return;
+    this.idleAwake[channel] = !!on;
+    const el = channel === "state" ? this.el.state : this.el.combat;
+    SetClass(el, "awake", on);
+  }
+
+  /** 闲置自隐的运行时真值，给冒烟取证（别去解析 class 字符串）。 */
+  IdleState() {
+    return {
+      combatAwake: this.idleAwake.combat,
+      combatPinned: this.combatPinned,
+      combatLeftS: this.idle.combat,
+      stateAwake: this.idleAwake.state,
+      stateLeftS: this.idle.state,
+    };
   }
 
   Build() {
@@ -345,41 +381,21 @@ export class Hud {
     this.el.forceStatus.setAttribute("aria-live", "polite");
     this.el.state = mk("hudState");
     this.el.combat = mk("hudCombat");
+    // COD《战争世界》右下角那一排：投掷物（图标 + 数）在左，弹药大数在右，同一行。
+    // 没有姿态人形、没有姿态按钮、没有底板 —— 只有硬黑描边的字。
     this.el.combat.innerHTML = `
       <div class="combatWeapon"></div>
       <div class="combatMain">
-        <div class="combatStance" data-stance="stand" role="img" aria-label="${T("hud.stance.stand")}">
-          <svg class="stanceStand" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="5.5" r="3"/><path d="M16 9v10m0-7-6 6m6-6 6 5m-6 2-5 10m5-10 6 10"/></svg>
-          <svg class="stanceCrouch" viewBox="0 0 32 32" aria-hidden="true"><circle cx="20.5" cy="7" r="3"/><path d="m19 10-6 7m2-4 8 4m-10 0 6 5m0 0 7 1m-7-1-6 7m13-6 3 6"/></svg>
-          <svg class="stanceProne" viewBox="0 0 32 32" aria-hidden="true"><circle cx="25.5" cy="17" r="3"/><path d="M22 18h-9l-7 5m8-5-5-5m5 5 7 5m-12 0H3"/></svg>
+        <div class="combatEquipment">
+          <span class="equipment grenade" aria-label="${T("hud.equipment.grenade")}">${EQUIPMENT_ICONS.grenade}<b>0</b></span>
+          <span class="equipment bundle" aria-label="${T("hud.equipment.bundle")}">${EQUIPMENT_ICONS.bundle}<b>0</b></span>
+          <span class="equipment mortar" aria-label="${T("hud.equipment.mortar")}">${EQUIPMENT_ICONS.mortar}<b>0</b></span>
         </div>
         <div class="combatAmmo" aria-label="${T("hud.aria.ammo")}">
           <span class="ammoCurrent">00</span><span class="ammoDivider"></span><span class="ammoReserve">00</span>
         </div>
-      </div>
-      <div class="combatStanceChoices" role="group" aria-label="${T("hud.aria.stanceGroup")}" title="${T("hud.aria.stanceHint")}">
-        <button type="button" data-player-stance="stand" aria-pressed="true">${T("hud.stance.stand")}<kbd>${T("hud.key.space")}</kbd></button>
-        <button type="button" data-player-stance="crouch" aria-pressed="false">${T("hud.stance.crouch")}<kbd>C</kbd></button>
-        <button type="button" data-player-stance="prone" aria-pressed="false">${T("hud.stance.prone")}<kbd>Z</kbd></button>
-      </div>
-      <div class="combatEquipment">
-        <span class="equipment grenade" aria-label="${T("hud.equipment.grenade")}">${EQUIPMENT_ICONS.grenade}<b>0</b></span>
-        <span class="equipment bundle" aria-label="${T("hud.equipment.bundle")}">${EQUIPMENT_ICONS.bundle}<b>0</b></span>
-        <span class="equipment mortar" aria-label="${T("hud.equipment.mortar")}">${EQUIPMENT_ICONS.mortar}<b>0</b></span>
       </div>`;
     this.el.combatWeapon = this.el.combat.querySelector(".combatWeapon");
-    this.el.combatStance = this.el.combat.querySelector(".combatStance");
-    this.el.stanceChoices = [...this.el.combat.querySelectorAll("[data-player-stance]")];
-    for (const button of this.el.stanceChoices) {
-      // 点 HUD 不抢指针锁、不同时打出一枪；触控与鼠标共用 click。
-      button.addEventListener("pointerdown", (event) => event.stopPropagation());
-      button.addEventListener("mousedown", (event) => event.stopPropagation());
-      button.addEventListener("click", (event) => {
-        event.stopPropagation();
-        this.onStanceSelect?.(button.dataset.playerStance);
-        button.blur();
-      });
-    }
     this.el.ammoCurrent = this.el.combat.querySelector(".ammoCurrent");
     this.el.ammoReserve = this.el.combat.querySelector(".ammoReserve");
     this.el.equipment = {
@@ -619,9 +635,12 @@ export class Hud {
 
   MeleeQteState() { return this.meleeQteState ? { ...this.meleeQteState } : null; }
 
-  /** 常驻 HUD 不再展示姓名与队伍；人物身份只在阵亡卡里出现。 */
+  /** 常驻 HUD 不再展示姓名与队伍；人物身份只在阵亡卡里出现。换枪本身算一次交互。 */
   SetWeaponName(weaponName) {
-    this.el.combatWeapon.textContent = weaponName;
+    const text = String(weaponName ?? "");
+    if (this.el.combatWeapon.textContent === text) return;
+    this.el.combatWeapon.textContent = text;
+    this.Touch("combat");
   }
 
   /**
@@ -733,33 +752,39 @@ export class Hud {
       : null;
   }
 
-  /** 右下是姿态、弹药和装备；文字状态栏只保留伤情、屏息与命令。 */
-  SetState({ stance = "stand", wounded, bleeding, bandages, breath, order,
+  /**
+   * 右下是弹药和投掷物数；文字状态栏只保留伤情、屏息与命令。姿态不上 HUD。
+   * 两块都受闲置自隐管：数一变就拨满倒数，之后由 Update 慢慢数到隐掉。
+   */
+  SetState({ wounded, bleeding, bandages, breath, order,
     ammo = 0, clips = 0, magazine = 0, armed = true,
     infiniteAmmo = false, infiniteReserve = false,
     grenades = 0, bundles = 0, mortar = 0, cooking = 0 }) {
-    const stanceKey = STANCE_TEXT[stance] ? stance : "stand";
-    if (this.el.combatStance.dataset.stance !== stanceKey) {
-      this.el.combatStance.dataset.stance = stanceKey;
-      this.el.combatStance.setAttribute("aria-label", T(STANCE_TEXT[stanceKey]));
-      for (const button of this.el.stanceChoices) {
-        button.setAttribute("aria-pressed", String(button.dataset.playerStance === stanceKey));
-      }
-    }
-
     const rounds = AmmoReadout({ ammo, clips, magazine, armed, infiniteAmmo, infiniteReserve });
     SetText(this.el.ammoCurrent, String(rounds.current));
     SetText(this.el.ammoReserve, String(rounds.reserve));
     SetClass(this.el.combat, "lowAmmo", rounds.low);
     SetClass(this.el.combat, "emptyAmmo", rounds.empty);
 
+    const counts = [];
     for (const [key, value] of Object.entries({ grenades, bundles, mortar })) {
       const count = Math.max(0, Math.floor(Number(value) || 0));
       const item = this.el.equipment[key];
       if (!item.countEl) item.countEl = item.querySelector("b");
       SetText(item.countEl, String(count));
       SetClass(item, "empty", count <= 0);
+      counts.push(count);
     }
+    // 空膛 / 低弹钉住不淡：这会儿那个红数字就是警告本身。
+    // 赤手（armed=false）不钉：没枪的时候「— | —」没有任何信息。
+    this.combatPinned = rounds.empty || rounds.low;
+    const combatSignature = `${rounds.current}|${rounds.reserve}|${armed ? 1 : 0}|${counts.join(",")}|${cooking > 0 ? 1 : 0}`;
+    if (combatSignature !== this.combatSignature) {
+      // 第一次喂数（开局）不算交互：进关那一刻屏幕上不该先亮一块弹药。
+      if (this.combatSignature) this.Touch("combat");
+      this.combatSignature = combatSignature;
+    }
+    if (this.combatPinned) this._SetAwake("combat", true);
 
     const bits = [];
     if (bleeding > 0) bits.push(`<span class="b">${T("hud.state.bleeding")}</span>`);
@@ -772,6 +797,7 @@ export class Hud {
       this.stateHtml = stateHtml;
       this.el.state.innerHTML = stateHtml;
       SetClass(this.el.state, "on", bits.length > 0);
+      if (bits.length > 0) this.Touch("state");
     }
     // 蓄力条：攥着数几秒再扔，扔得远但引信也在烧。这一对取舍要看得见。
     SetStyle(this.el.cook, "width", cooking > 0 ? `${Math.round(cooking * 120)}px` : "0px");
@@ -1439,6 +1465,15 @@ export class Hud {
 
   Update(dt) {
     this.UpdateFps(dt);
+    // 闲置自隐：倒数归零就收；钉住（空膛 / 低弹）的那一块由 SetState 每帧重新点亮。
+    for (const channel of ["combat", "state"]) {
+      if (this.idle[channel] <= 0) continue;
+      this.idle[channel] -= dt;
+      if (this.idle[channel] > 0) continue;
+      this.idle[channel] = 0;
+      if (channel === "combat" && this.combatPinned) continue;
+      this._SetAwake(channel, false);
+    }
     // 命中记号：往外弹 + 淡出。用 JS 补间而不是 CSS 动画，因为同一记号会被
     // 连续两发连点重播，CSS 动画重启要靠强制回流那一套 hack，在这里不值当。
     if (this.hitmarkTimer > 0) {

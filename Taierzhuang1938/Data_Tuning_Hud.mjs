@@ -90,6 +90,26 @@ export const VIGNETTE = Object.freeze({
 /** 压制暗角。压制值指数衰减永远到不了 0，所以另有千分位截断（在代码里）。 */
 export const SUPPRESSION = Object.freeze({ gain: 1.15 });
 
+/**
+ * 常驻信息的「闲置自隐」（对标 COD《战争世界》单人战役）。
+ *
+ * COD4 / WaW 引擎里这一族叫 `hud_fade_ammodisplay` / `hud_fade_offhand` /
+ * `hud_fade_stance` / `hud_fade_sprint`（单位秒，0＝永不淡出；`hud_fadeout_speed`
+ * 管淡出快慢）。单人战役实机：弹药与手榴弹数只在开枪、装填、换枪、拿弹时亮起，
+ * 几秒不碰就整块淡掉，屏幕上只剩准心、路标与真正紧急的反馈。多人模式把这几个
+ * 数归零让它常驻 —— 我们是线性战役，照单人那一档。
+ *
+ * 数是我们自己的：WaW 出厂 archive 值里 stance/sprint 是 1.7 s，弹药那一档由关卡
+ * 脚本另设。1.7 s 对读一次「05 | 30」偏紧（中文玩家还要读一行武器名），放宽到 3 s；
+ * 淡出本身的时长是画法，在 Style_Game.css 的 transition 里。
+ */
+export const IDLE_FADE = Object.freeze({
+  /** 弹药 / 手榴弹 / 武器名那一块：最后一次交互之后挂多久（秒）。 */
+  combatS: 3.0,
+  /** 伤情 / 屏息 / 命令那一行：状态变化之后挂多久（秒）。 */
+  stateS: 3.0,
+});
+
 /** 情境操作提示条。 */
 export const PROMPTS = Object.freeze({
   /** 最多同时挂几条。三条以上就没人读了 —— 提示条不是操作说明书。 */

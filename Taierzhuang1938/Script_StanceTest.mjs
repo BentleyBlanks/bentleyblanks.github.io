@@ -19,8 +19,7 @@ try {
   await page.evaluate(() => window.Taierzhuang.StepFrames(40));
   const Snapshot = () => page.evaluate(() => {
     const p = window.Taierzhuang.player;
-    return { stance: p.stance, eye: p.eyeHeight, body: p.body.height, jump: p.jump.count,
-      selected: document.querySelector('[data-player-stance][aria-pressed="true"]')?.dataset.playerStance };
+    return { stance: p.stance, eye: p.eyeHeight, body: p.body.height, jump: p.jump.count };
   });
   const Press = async (key) => {
     await page.keyboard.press(key);
@@ -33,7 +32,6 @@ try {
   const upright = await Press("Space");
   assert.deepEqual([stand.stance, crouch.stance, prone.stance, upright.stance], ["stand", "crouch", "prone", "stand"]);
   assert.equal(upright.jump, prone.jump, "Space 站起不能顺手跳跃");
-  for (const row of [stand, crouch, prone, upright]) assert.equal(row.selected, row.stance, "HUD 与真实姿态一致");
   assert.ok(stand.eye > crouch.eye + 0.5 && crouch.eye > prone.eye + 0.5, "视线随姿态真实降低");
   assert.ok(stand.body > crouch.body + 0.4 && crouch.body > prone.body + 0.25, "碰撞体随姿态真实缩小");
   assert.equal((await Press("c")).stance, "crouch");
@@ -47,11 +45,9 @@ try {
   await page.evaluate(() => window.Taierzhuang.StepFrames(15));
   assert.equal((await Snapshot()).stance, "crouch", "长按重复事件不能反复切姿态");
   await page.keyboard.up("c");
-  for (const stance of ["prone", "crouch", "stand", "stand"]) {
-    await page.locator(`[data-player-stance="${stance}"]`).click();
-    await page.evaluate(() => window.Taierzhuang.StepFrames(50));
-    assert.equal((await Snapshot()).stance, stance, "按钮是直接选择而非翻转");
-  }
+  // 对标 COD《战争世界》：姿态不上 HUD —— 没有人形、没有按钮，镜头高度与视图模型自己说话。
+  assert.equal(await page.locator(".combatStance, [data-player-stance], .combatStanceChoices").count(), 0,
+    "HUD 不再显示站 / 蹲 / 趴");
   const speeds = await page.evaluate(() => {
     const T = window.Taierzhuang;
     return ["stand", "crouch", "prone"].map((stance) => {
@@ -68,27 +64,25 @@ try {
     T.player.SetStance("crouch"); T.player.bipod = true;
     T.player.SetStance("stand"); const bipodReleased = !T.player.bipod;
     T.state.menu = true; T.Debug.Key("KeyZ");
-    document.querySelector('[data-player-stance="prone"]').click();
     T.state.menu = false; T.StepFrames(30);
     return { bipodReleased, stance: T.player.stance, invalid: T.player.SetStance("unknown") };
   });
   assert.deepEqual(guarded, { bipodReleased: true, stance: "stand", invalid: false });
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 720 });
-    const layout = await page.locator(".combatStanceChoices").evaluate((element) => {
+    const layout = await page.locator(".hudCombat").evaluate((element) => {
       const r = element.getBoundingClientRect();
-      const combat = document.querySelector(".hudCombat").getBoundingClientRect();
       const state = document.querySelector(".hudState").getBoundingClientRect();
       return { left: r.left, right: r.right, bottom: r.bottom, width: window.innerWidth,
-        statusClear: state.bottom <= combat.top };
+        statusClear: state.bottom <= r.top };
     });
-    assert.ok(layout.left >= 0 && layout.right <= layout.width && layout.bottom <= 720, "姿态按钮不能出屏");
-    assert.ok(layout.statusClear, "伤情/绷带文字不能压到武器和姿态面板");
+    assert.ok(layout.left >= 0 && layout.right <= layout.width && layout.bottom <= 720, "弹药块不能出屏");
+    assert.ok(layout.statusClear, "伤情/绷带文字不能压到弹药块");
     const outDir = path.join(projectDir, "_shots", "stance"); fs.mkdirSync(outDir, { recursive: true });
     await page.screenshot({ path: path.join(outDir, `StanceHud${width}.png`) });
   }
   assert.deepEqual(errors, []);
-  console.log(`StanceTest PASS: 六向切换、站起不跳、长按、按钮、视线/碰撞/移速、暂停隔离、桌面/窄屏；速度 ${speeds.map((v) => v.toFixed(2)).join(" / ")}`);
+  console.log(`StanceTest PASS: 六向切换、站起不跳、长按、HUD 无姿态、视线/碰撞/移速、暂停隔离、桌面/窄屏；速度 ${speeds.map((v) => v.toFixed(2)).join(" / ")}`);
 } finally {
   await page.close(); await browser.close(); await new Promise((resolve) => server.close(resolve));
 }

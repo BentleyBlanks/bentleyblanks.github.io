@@ -23,8 +23,6 @@ export const TEXT = Object.freeze({
   "input.guide.move.prone.label": "趴下；再按一次站立",
   "input.guide.move.traverse.keys": "Space",
   "input.guide.move.traverse.label": "低姿态时站起；站立时翻越 / 跳跃",
-  "input.guide.move.stancePick.keys": "按住 Alt + 点击姿态",
-  "input.guide.move.stancePick.label": "直接选择站立 / 下蹲 / 趴下",
 
   // --- 武器与救治 -----------------------------------------------------------
   "input.guide.combat.title": "武器与救治",

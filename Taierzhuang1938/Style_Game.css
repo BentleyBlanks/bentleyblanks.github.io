@@ -1,5 +1,6 @@
 /* 《台儿庄：血战滕县》HUD 样式。
-   战术层级参考《战地》：目标在上、地图在左、武器与弹药在右，中央只留即时反馈。 */
+   线性关卡对标 COD《战争世界》单人战役（docs/Data_HudLinearLevel.md）：目标通知在左上、
+   弹药与手榴弹数在右下且几秒不交互就隐掉、没有姿态图标，中央只留即时反馈。 */
 
 :root {
   --ink: #0d0c0a;
@@ -125,70 +126,68 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 .hudObjective.changed { animation: hudObjectiveChanged 6.4s ease-out both; }
 
-/* 右下偏上：只有出现伤情、屏息或命令时才亮，不再常驻姿态文字。 */
+/* 右下偏上：只有出现伤情、屏息或命令时才亮，且几秒不变就隐掉（Data_Tuning_Hud.IDLE_FADE.stateS）。
+   `.on` 是「有东西可写」，`.awake` 是「刚变过」，两者都在才亮。淡入快、淡出慢，与弹药块同一手感。 */
 .hudState {
-  position: absolute; right: 18px; bottom: 158px;
+  position: absolute; right: 22px; bottom: 96px;
   display: flex; justify-content: flex-end; gap: 9px; max-width: 360px;
-  padding: 3px 7px; font: 600 11px/1.4 var(--ui-font);
-  color: var(--dim); background: rgba(8,10,12,0.48); opacity: 0;
+  padding: 0; font: 700 11px/1.4 var(--ui-font);
+  color: rgba(224,223,217,0.9); opacity: 0; transition: opacity 0.6s ease;
+  -webkit-text-stroke: 0.7px rgba(0,0,0,0.92); paint-order: stroke fill;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.9);
 }
-.hudState.on { opacity: 1; }
+.hudState.on.awake { opacity: 1; transition: opacity 0.12s ease; }
 .hudState .b { color: #d6604a; }
 .hudState .w { color: var(--warn); }
 .hudState .h { color: var(--ours); }
 .hudState .c { color: var(--paper); }
 
-/* 右下战斗信息。大号当前弹、细分隔、小号备弹，姿态用人形而不是“站/蹲/趴”文字。 */
+/* 右下战斗信息，照 COD《战争世界》单人战役：投掷物（图标 + 数）在左、当前弹大数在右、
+   备弹小数跟在斜线后，同一行；上面一行小字是武器名。没有底板、没有姿态人形 ——
+   全靠硬黑描边压在画面上（与左上目标通知同一套画法）。
+   整块只在交互后亮几秒（IDLE_FADE.combatS，由 Script_Hud 拨 `.awake`），
+   空膛 / 低弹钉住不淡；淡入 0.12 s、淡出 0.6 s。 */
 .hudCombat {
-  position: absolute; right: 18px; bottom: 18px; width: 190px;
-  color: var(--paper); font-family: var(--ui-font);
-  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.68));
+  position: absolute; right: 22px; bottom: 20px;
+  display: flex; flex-direction: column; align-items: flex-end;
+  color: rgba(224,223,217,0.96); font-family: var(--ui-font);
+  opacity: 0; transition: opacity 0.6s ease;
+  -webkit-text-stroke: 1px rgba(0,0,0,0.96); paint-order: stroke fill;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.9);
 }
+.hudCombat.awake { opacity: 1; transition: opacity 0.12s ease; }
 .combatWeapon {
-  min-height: 17px; padding: 0 5px 3px; text-align: right;
-  color: rgba(230,223,205,0.62); font-size: 10px; letter-spacing: 0.12em;
+  min-height: 15px; padding: 0 2px 3px; text-align: right;
+  color: rgba(224,223,217,0.74); font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  -webkit-text-stroke-width: 0.7px;
 }
-.combatMain {
-  height: 53px; display: grid; grid-template-columns: 52px 1fr; align-items: stretch;
-  background: linear-gradient(105deg, rgba(13,16,19,0.78), rgba(13,16,19,0.54));
-  border-top: 1px solid rgba(230,223,205,0.23);
-  clip-path: polygon(7px 0, 100% 0, 100% 100%, 0 100%, 0 7px);
+.combatMain { display: flex; align-items: flex-end; gap: 18px; }
+.combatAmmo { display: flex; align-items: baseline; }
+.ammoCurrent { font: 700 38px/1 "Cascadia Mono", Consolas, monospace; letter-spacing: -0.04em; }
+.ammoDivider {
+  width: 2px; height: 26px; margin: 0 9px; align-self: center;
+  background: rgba(224,223,217,0.72); transform: skewX(-14deg);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.75);
 }
-.combatStance { display: grid; place-items: center; border-right: 1px solid rgba(230,223,205,0.13); }
-.combatStance svg {
-  display: none; width: 35px; height: 35px; fill: none; stroke: currentColor;
-  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
-}
-.combatStance[data-stance="stand"] .stanceStand,
-.combatStance[data-stance="crouch"] .stanceCrouch,
-.combatStance[data-stance="prone"] .stanceProne { display: block; }
-.combatStanceChoices { display: flex; gap: 3px; padding-top: 4px; pointer-events: auto; }
-.combatStanceChoices button {
-  flex: 1; min-width: 0; min-height: 38px; padding: 4px 2px; cursor: pointer;
-  border: 1px solid rgba(230,223,205,0.2); border-radius: 3px;
-  color: var(--paper); background: rgba(13,16,19,0.78); font: inherit; font-size: 11px;
-}
-.combatStanceChoices button[aria-pressed="true"] { border-color: var(--paper); background: rgba(90,96,73,0.88); }
-.combatStanceChoices button:focus-visible { outline: 2px solid var(--paper); outline-offset: 2px; }
-.combatStanceChoices kbd { display: block; font-family: inherit; font-size: 10px; line-height: 1.3; opacity: 0.65; }
-.combatAmmo { display: flex; align-items: center; justify-content: flex-end; padding: 0 10px; }
-.ammoCurrent { font: 600 31px/1 "Cascadia Mono", Consolas, monospace; letter-spacing: -0.06em; }
-.ammoDivider { width: 1px; height: 28px; margin: 0 9px; background: rgba(230,223,205,0.24); transform: skewX(-12deg); }
-.ammoReserve { align-self: flex-end; margin-bottom: 9px; color: rgba(230,223,205,0.66); font: 600 14px/1 "Cascadia Mono", Consolas, monospace; }
+.ammoReserve { color: rgba(224,223,217,0.8); font: 700 18px/1 "Cascadia Mono", Consolas, monospace; }
 .hudCombat.lowAmmo .ammoCurrent { color: var(--warn); }
 .hudCombat.emptyAmmo .ammoCurrent { color: var(--theirs); animation: hudAmmoPulse 0.9s ease-in-out infinite; }
 @keyframes hudAmmoPulse { 50% { opacity: 0.48; } }
 .combatEquipment {
-  display: flex; justify-content: flex-end; gap: 13px; padding: 5px 7px 0;
-  color: rgba(230,223,205,0.78);
+  display: flex; align-items: flex-end; gap: 12px; padding-bottom: 5px;
+  color: rgba(224,223,217,0.92);
 }
-.equipment { display: flex; align-items: center; gap: 4px; min-width: 28px; }
+.equipment { display: flex; align-items: center; gap: 4px; }
 .equipment svg {
-  width: 16px; height: 16px; fill: none; stroke: currentColor;
-  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+  width: 20px; height: 20px; fill: none; stroke: currentColor;
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+  filter: drop-shadow(1px 1px 0 rgba(0,0,0,0.9)) drop-shadow(-1px -1px 0 rgba(0,0,0,0.7));
 }
-.equipment b { font: 600 11px/1 "Cascadia Mono", Consolas, monospace; }
-.equipment.empty { opacity: 0.27; }
+.equipment b { font: 700 15px/1 "Cascadia Mono", Consolas, monospace; }
+/* 空的格子整个不画（集束 / 迫击炮平时都是 0，摆一排灰 0 只是噪音）；
+   手榴弹是 COD 里常驻的那一格，打光了压暗留着 —— 「没弹了」本身是信息。 */
+.equipment.empty { display: none; }
+.equipment.grenade.empty { display: flex; opacity: 0.3; }
 
 /* 字幕 */
 .hudSubtitle {
@@ -483,6 +482,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    剧本正让班长说「跟着走」，此刻唯一要做的事就是跟上。 */
 #hud.staging .hudMarkers, #hud.staging .hudActions,
 #hud.staging .hudInteractRing, #hud.staging .hudCarry,
+#hud.staging .hudCombat, #hud.staging .hudState,
 #hud.staging .hudTarget { opacity: 0; }
 .hudMarkers { transition: opacity 0.4s ease; }
 
@@ -558,11 +558,9 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   }
   .hudForceStatus { top: max(30px, calc(env(safe-area-inset-top) + 20px)); right: 10px; font-size: 9px; }
   .hudMinimap { left: 10px; bottom: max(10px, env(safe-area-inset-bottom)); width: 124px; height: 124px; }
-  .hudCombat { right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); width: 166px; }
-  .combatMain { height: 48px; grid-template-columns: 46px 1fr; }
-  .combatStance svg { width: 31px; height: 31px; }
-  .ammoCurrent { font-size: 27px; }
-  .hudState { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 136px); max-width: 230px; }
+  .hudCombat { right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); }
+  .ammoCurrent { font-size: 30px; }
+  .hudState { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 74px); max-width: 230px; }
   .hudCarry { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 170px); }
   .hudTelegraph { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 170px); width: 132px; }
   .hudInteractRing { transform: translate(-50%, 38px); }
