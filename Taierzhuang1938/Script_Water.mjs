@@ -38,6 +38,7 @@
 
 import * as THREE from "three";
 import { MarkNoPrepass } from "./Script_Post.mjs";
+import { BindSsrTraceUniforms, SsrSurfaceBlockGlsl } from "./Script_PostSsr.mjs";
 
 // ---------------------------------------------------------------------------
 // 共享 uniform：所有水面材质引用同一批对象，UpdateWaterSurfaces 改一次全生效。
@@ -48,6 +49,9 @@ const sharedUniforms = {
   uSceneDepth: { value: null },          // PostPipeline.NormalDepthTexture（xyz 法线 / w 线性视深）
   uDepthValid: { value: 0 },             // 深度源还没接上时按深水处理，岸线泡沫静默关闭
   uResolution: { value: new THREE.Vector2(1, 1) },
+  // SSR 用：世界 → 视空间。水面在世界空间算光，Hi-Z 追踪在视空间。
+  // 放在共享包里而不是逐材质：UpdateWaterSurfaces 每帧写一次就全生效。
+  uWaterViewMatrix: { value: new THREE.Matrix4() },
 };
 
 // Crest 用可平铺法线贴图承载高频细浪。这里不引入来源不明的外部资产：启动时
@@ -99,6 +103,22 @@ function GetWaterNormalTexture() {
 /** 借 SkyDome 的 uniform（Script_Main 在建完天空后调一次）。 */
 let skyUniformsRef = null;
 export function SetWaterSkyUniforms(skyUniforms) { skyUniformsRef = skyUniforms; }
+
+/**
+ * 借 SSR 的追踪端 uniform（`Script_PostSsr.MakeSsrTraceUniforms` 那一包）。
+ *
+ * 水面**不能**走 SSR 靶：它 `transparent + depthWrite=false`，而且整只
+ * `skipNormalDepth` 藏出了预通道，所以它那一像素在 RT0 里存的是**河床**的法线
+ * 与深度 —— SSR 靶在水面位置算的是河床的反射。让水面写进预通道也不行：上面
+ * `BehindSurfaceDepth` 那套浅水吸收与岸线泡沫正是靠「读自己身后那个面」工作的。
+ * 所以水面自己按平面反射假设追同一条 Hi-Z（`SsrSurfaceBlockGlsl`），拿它自己
+ * 的波浪法线当反射面，再按置信度与解析天空反射混合。
+ *
+ * 传 null（或压根不调）= 今天的行为，一个字节都不变。
+ * **必须在任何水面材质建出来之前调**：材质按 preset+flow 缓存，建完就定型。
+ */
+let ssrTraceRef = null;
+export function SetWaterSsr(traceUniforms) { ssrTraceRef = traceUniforms || null; }
 
 // ---------------------------------------------------------------------------
 // 两档预设。颜色一律从 Data_Tengxian.PALETTE.moatWater（浑浊 #6B7060）派生，
@@ -229,6 +249,9 @@ uniform float uAbsorb;
 uniform float uFoamWidth;
 uniform float uFoamStrength;
 uniform float uDetailStrength;
+uniform float uSsrWaterStrength;
+uniform mat4 uWaterViewMatrix;
+__SSR_BLOCK__
 
 varying vec3 vWorldPos;
 varying vec3 vWaveNormal;
@@ -319,6 +342,12 @@ void main() {
   float sunDot = max(dot(R, normalize(uSunDirection)), 0.0);
   vec3 spec = uSunColor * (pow(sunDot, 420.0) * 1.9 + pow(sunDot, 42.0) * 0.18);
 
+  // --- 屏幕空间反射：护城河要倒映城墙，不是一片均匀的天 -------------------
+  // 只换反射项本身（refl），菲涅尔在下面照旧决定「反射占多少」。
+  // 置信度掉到 0 的地方（屏幕边缘、射线打空、上一帧还没有颜色）自动是原来
+  // 那份解析天空反射，所以最坏情况就是今天的画面。
+  __SSR_REFLECT__
+
   float fresnel = 0.022 + 0.978 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
 
   // --- 合成 ---
@@ -334,6 +363,40 @@ void main() {
   gl_FragColor = vec4(col, alpha);
 }
 `;
+
+/**
+ * 水面 SSR 的口径。步数比场景 SSR 少：一条护城河宽十米，反射线从水面斜着
+ * 打到对岸城墙上，三十二步的 Hi-Z 足够跨过去；水面又是半透明大面，步数直接
+ * 乘在填充率上，多给没有画面收益。
+ *   strength  水面反射项里 SSR 能占的最大比例（其余仍是解析天空反射）
+ *   roughness 采上一帧场景色 mip 用的粗糙度：三月枯水的濠面不是镜子
+ */
+const WATER_SSR = { steps: 32, refine: 3, strength: 0.92, roughness: 0.035 };
+
+/**
+ * 水面片元着色器。SSR 关着时两个锚点替换成空串 —— 那份着色器与接 SSR 之前
+ * **逐字节相同**，所以「水面看起来变了」永远只可能是 SSR 那一档的锅。
+ */
+function WaterFragment(withSsr) {
+  if (!withSsr) {
+    return WATER_FRAG.replace("__SSR_BLOCK__", "").replace("__SSR_REFLECT__", "");
+  }
+  return WATER_FRAG
+    .replace("__SSR_BLOCK__", SsrSurfaceBlockGlsl({
+      steps: WATER_SSR.steps, refine: WATER_SSR.refine, name: "SsrWaterReflection",
+    }))
+    .replace("__SSR_REFLECT__", /* glsl */`
+  if (uSsrWaterStrength > 0.0) {
+    // 水面在世界空间算光，SSR 追踪在视空间 —— 这里转一次。法线用的是含
+    // Gerstner 波与细节法线的那一份 N，所以浪峰上的倒影会跟着晃。
+    vec3 ssrViewPos = (uWaterViewMatrix * vec4(vWorldPos, 1.0)).xyz;
+    vec3 ssrViewNormal = normalize(mat3(uWaterViewMatrix) * N);
+    float ssrNoise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453
+      + uSsrFrame * 0.618034);
+    vec4 waterSsr = SsrWaterReflection(ssrViewPos, ssrViewNormal, ${WATER_SSR.roughness.toFixed(4)}, ssrNoise);
+    refl = mix(refl, waterSsr.rgb, clamp(waterSsr.a * uSsrWaterStrength, 0.0, 1.0));
+  }`);
+}
 
 /** 把一波表展开成 GLSL 常量数组（ShaderMaterial 里手写循环要下标常量）。 */
 function WaveTableGlsl(waves) {
@@ -365,6 +428,7 @@ function GetWaterMaterial(presetName, flowKey) {
   const preset = WATER_PRESETS[presetName];
   if (!preset) throw new Error(`未知水面预设：${presetName}`);
   const skyU = skyUniformsRef;
+  const ssrTrace = ssrTraceRef;
   const fallbackSkyUniforms = {
     uZenith: { value: new THREE.Vector3(1.9, 2.35, 3.2) },
     uHorizon: { value: new THREE.Vector3(2.4, 2.46, 2.62) },
@@ -394,9 +458,12 @@ function GetWaterMaterial(presetName, flowKey) {
       uFlow: { value: new THREE.Vector2(
         flowKey ? Number(flowKey.split("_")[0]) : preset.flow[0],
         flowKey ? Number(flowKey.split("_")[1]) : preset.flow[1]) },
+      // SSR 关着时这两项也留着（值恒 0 / 单位阵），着色器里那一段整块不编。
+      uSsrWaterStrength: { value: ssrTrace ? WATER_SSR.strength : 0 },
+      ...(ssrTrace ? BindSsrTraceUniforms({}, ssrTrace) : {}),
     },
     vertexShader: WATER_VERT.replace("__WAVE_TABLE__", WaveTableGlsl(preset.waves)),
-    fragmentShader: WATER_FRAG,
+    fragmentShader: WaterFragment(!!ssrTrace),
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,     // 蹲进濠里抬头还要看得见水面
@@ -434,8 +501,11 @@ export function CreateWaterSurface({ geometry, scene, preset = "moat", flow = nu
  *（与 vfx.SetDepthSource 同一批账：预通道靶会被 SetSize 重建，纹理引用
  * 每帧都可能换，不能只在初始化接一次）。
  */
-export function UpdateWaterSurfaces(dt, depthTexture, width, height) {
+export function UpdateWaterSurfaces(dt, depthTexture, width, height, camera = null) {
   sharedUniforms.uTime.value += Math.min(Math.max(dt, 0.0), 0.1);
+  // 世界→视空间：SSR 追踪要它。相机为空时保持上一帧那份（探针页/首帧），
+  // 追踪端本来就靠 uSsrHasColor 兜底，不会因此画出错的东西。
+  if (camera) sharedUniforms.uWaterViewMatrix.value.copy(camera.matrixWorldInverse);
   if (depthTexture) {
     sharedUniforms.uSceneDepth.value = depthTexture;
     sharedUniforms.uDepthValid.value = 1;

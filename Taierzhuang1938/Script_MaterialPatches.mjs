@@ -346,6 +346,69 @@ ${GI_SAMPLE_GLSL}`],
 }
 
 /**
+ * 屏幕空间反射（`Script_PostSsr.mjs`）。补丁只做两件事：
+ *
+ *   1) `<lights_fragment_maps>` 之后按置信度把镜面 IBL 的 `radiance` **换成**
+ *      SSR 的辐亮度。换而不是加 —— 加就是天空反射与屏幕空间反射双份。
+ *      菲涅尔 / 能量补偿由三方后面的 `RE_IndirectSpecular_Physical` 负责，
+ *      镜面遮蔽由 AO 补丁在 `<aomap_fragment>` 负责，这里**都不许再乘一次**。
+ *   2) `<dithering_fragment>` 处把 `material.roughness` 写进 `gl_FragColor.a`。
+ *      主 HDR 靶的 alpha 通道全链路无人读（composite 只取 .r/.g/.b 与 .rgb，
+ *      bloom 全是 .rgb，TAA 写死 1，调试视图也只看 rgb），于是它就是这条
+ *      前向管线里唯一一张免费的粗糙度 GBuffer —— 下一帧的 SSR 追踪端读它决定
+ *      每个像素的 GGX 波瓣有多宽、要不要追。没有它，SSR 只能对全屏假设一个
+ *      粗糙度，光滑地板与旧钢盔就分不开了。
+ *
+ * **只能挂在不透明材质上**：往 alpha 里写粗糙度会直接改混合结果。分流在
+ * `Script_Materials`（`transparent` 的材质不传 ssr）。补丁自己再加一道
+ * `diffuseColor.a >= 0.999` 的保险，两道都失手时也只会写回 1.0。
+ *
+ * 顺序固定在 **GI 之后**：GI 会按「探针亮度 / 天空亮度」的比值压 `radiance`
+ * （屋里的金属件不该反一片亮天）。SSR 拿到的是真实屏幕空间的光，不该再吃
+ * 那一层近似遮蔽，所以它排在后面、直接覆盖。
+ */
+export function MakeSsrPatch(ssr) {
+  if (!ssr) return null;
+  return MakePatch({
+    key: "ssr1",
+    uniforms: (uniforms) => {
+      uniforms.uSsrMap = ssr.map;
+      uniforms.uSsrResolution = ssr.resolution;
+      uniforms.uSsrStrength = ssr.strength;
+      uniforms.uSsrMaxRoughness = ssr.maxRoughness;
+      uniforms.uSsrFadeAt = ssr.fadeAt;
+    },
+    fragment: [
+      ["#include <common>", /* glsl */`
+        uniform sampler2D uSsrMap;
+        // **主渲染靶**尺寸，不是 SSR 靶尺寸。SSR 靶是半分辨率的，采样按
+        // gl_FragCoord / 主靶尺寸做、靠双线性放大 —— 喂错就整张错位放大两倍
+        // （SSAO 那条 uSsaoResolution 踩过两轮，这里不共用它：探针页喂给
+        // uSsaoResolution 的是 AO 靶尺寸，共用会连坐）。
+        uniform vec2 uSsrResolution;
+        uniform float uSsrStrength;
+        uniform float uSsrMaxRoughness;
+        uniform float uSsrFadeAt;`],
+      ["#include <lights_fragment_maps>", /* glsl */`
+        #if defined( RE_IndirectSpecular )
+        if (uSsrStrength > 0.0 && material.roughness <= uSsrMaxRoughness) {
+          vec4 ssrTexel = texture2D(uSsrMap, gl_FragCoord.xy / uSsrResolution);
+          // 追踪端已经按同一条曲线淡出过一次；材质这边再算一次是为了那些
+          // 追踪端读到的粗糙度（上一帧 alpha）与本帧不一致的像素（运动边缘）。
+          float ssrFade = 1.0 - smoothstep(uSsrFadeAt, uSsrMaxRoughness, material.roughness);
+          float ssrWeight = clamp(ssrTexel.a * uSsrStrength * ssrFade, 0.0, 1.0);
+          radiance = mix(radiance, max(ssrTexel.rgb, vec3(0.0)), ssrWeight);
+        }
+        #endif`],
+      ["#include <dithering_fragment>", /* glsl */`
+        // 下一帧 SSR 的粗糙度输入。写在最后：这时 gl_FragColor 已经成型，
+        // 而 alpha 对不透明材质本来就恒等于 1，没人读。
+        if (diffuseColor.a >= 0.999) gl_FragColor.a = clamp(material.roughness, 0.0, 1.0);`],
+    ],
+  });
+}
+
+/**
  * 破口裁切。主材质、静态克隆与阴影深度材质三条链共用同一份 OBB + 断裂图案，
  * 少接一条就会出现「墙已经穿了，太阳底下还留一块完整墙影」这类不自洽。
  *
@@ -383,10 +446,17 @@ ${DestructionShaderGlsl(destruction.maxVolumes)}`],
 }
 
 /**
- * 现役间接光补丁组：顺序固定 **AO → GI → 破口**。
- * 新补丁插在哪儿要想清楚：`<aomap_fragment>` 上挂着 AO 的乘法与 GI 的光照分量
- * 取证，两者按这个顺序拼（AO 先压，取证后抓，面板读到的才是正式画面的值）。
+ * 现役间接光补丁组：顺序固定 **AO → GI → SSR → 破口**。
+ * 新补丁插在哪儿要想清楚：
+ *   · `<aomap_fragment>` 上挂着 AO 的乘法与 GI 的光照分量取证，两者按这个顺序拼
+ *     （AO 先压、取证后抓，面板读到的才是正式画面的值）；
+ *   · `<lights_fragment_maps>` 上挂着 GI 的 `radiance *= 遮蔽比` 与 SSR 的
+ *     `radiance = mix(...)`，SSR 必须在后（它是真实屏幕空间的光，不该再吃一层
+ *     「探针亮度／天空亮度」的近似遮蔽）。
  */
-export function IndirectLightingPatches({ ssao = null, gi = null, destruction = null } = {}) {
-  return [MakeSsaoPatch(ssao), MakeGiPatch(gi), MakeDestructionPatch(destruction)].filter(Boolean);
+export function IndirectLightingPatches({
+  ssao = null, gi = null, ssr = null, destruction = null,
+} = {}) {
+  return [MakeSsaoPatch(ssao), MakeGiPatch(gi), MakeSsrPatch(ssr), MakeDestructionPatch(destruction)]
+    .filter(Boolean);
 }

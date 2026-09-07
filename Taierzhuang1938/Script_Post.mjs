@@ -13,12 +13,14 @@
 //   0) TAA 抖动          Script_PostTaa.ApplyJitter
 //   1) prepass           Script_PostPrepass  MRT：RT0 法线+视深 / RT1 速度 / DepthTexture
 //   2) hzb               Script_PostPrepass  线性视深 max-reduce 金字塔
-//   3) ssao              Script_PostSsao     半分辨率 + 双边模糊
-//   4) main              （本文件）HDR 主场景，AO 由材质补丁注入间接光
+//   3) ssr               Script_PostSsr      min-Hi-Z + 随机 GGX 追踪 + 解算 + 时域
+//   4) ssao              Script_PostSsao     半分辨率 + 双边模糊
+//   5) main              （本文件）HDR 主场景，AO 与 SSR 由材质补丁注入间接光
 //   5) wireframe         Script_PostDebug    着色模式非 shaded 时叠一层线
 //   6) debugOverlay      Script_PostDebug    Rapier 碰撞体线框等
-//   7) taa               Script_PostTaa      时域解算（线性 HDR 域，UE 的位置）
-//   8) bloom             Script_PostBloom    亮部 + 降/升采样
+//   8) taa               Script_PostTaa      时域解算（线性 HDR 域，UE 的位置）
+//   9) ssrColor          Script_PostSsr      解算后的 HDR 降采样成带 mip 的「上一帧场景色」
+//  10) bloom             Script_PostBloom    亮部 + 降/升采样
 //   9) god               Script_PostBloom    太阳拖影（太阳在屏内才跑）
 //  10) composite         Script_PostComposite 运动模糊→景深→雾→曝光→ACES→调色→镜头→sRGB
 //  11) fxaa              Script_PostFxaa     FXAA + 锐化 → 屏幕（或调试视图送屏）
@@ -41,6 +43,7 @@ import {
   PrepassPass, MarkNoPrepass, MarkForegroundPrepass, MarkDynamicPrepass, FOREGROUND_VIEW_DEPTH,
 } from "./Script_PostPrepass.mjs";
 import { SsaoPass } from "./Script_PostSsao.mjs";
+import { SsrPass, SsrColorPass } from "./Script_PostSsr.mjs";
 import { TaaPass } from "./Script_PostTaa.mjs";
 import { BloomPass, GodRaysPass } from "./Script_PostBloom.mjs";
 import { CompositePass } from "./Script_PostComposite.mjs";
@@ -112,6 +115,8 @@ export class PostPipeline {
 
     // --- pass 实例 ---------------------------------------------------------
     this.prepassPass = new PrepassPass(this, { destruction });
+    this.ssrPass = new SsrPass(this);
+    this.ssrColorPass = new SsrColorPass(this, this.ssrPass);
     this.ssaoPass = new SsaoPass(this);
     this.taaPass = new TaaPass(this);
     this.bloomPass = new BloomPass(this);
@@ -130,6 +135,10 @@ export class PostPipeline {
         Render: (ctx) => this.prepassPass.RenderHzb(ctx),
         Dispose: () => {},
       },
+      // SSR 必须排在 main **之前**：材质那一趟要采它的靶。追踪吃的是本帧的
+      // 法线/视深/HZB/速度（预通道已经跑完），只有「命中点是什么颜色」取的是
+      // 上一帧 —— 口径与 UE 的 SSR 相同，详见 Script_PostSsr 抬头。
+      this.ssrPass,
       this.ssaoPass,
       {
         name: "main",
@@ -153,6 +162,9 @@ export class PostPipeline {
         Dispose: () => {},
       },
       this.taaPass,
+      // 排在 TAA 之后：取的是时域解算过、已卸抖动的那一张 HDR，
+      // 比主靶原图干净，下一帧的 SSR 反射里也就少一层噪。
+      this.ssrColorPass,
       {
         // 只做决策不出画：太阳拖影要在**亮部提取之前**定下来（亮部图的 alpha
         // 只在拖影开着时才顺手打包天空遮挡）。位置也不能提前 —— 太阳投影要用
@@ -173,6 +185,7 @@ export class PostPipeline {
     // 旧名字的别名（测试与编辑器直接读它们，重构不许断）
     this.normalDepthMaterial = this.prepassPass.material;
     this.wireframeMaterial = this.debugPass.wireframeMaterial;
+    this.uniformsSsr = this.ssrPass.uniformsTrace;
     this.uniformsAo = this.ssaoPass.uniforms;
     this.matAo = this.ssaoPass.material;
     this.uniformsAoBlur = this.ssaoPass.uniformsBlur;
@@ -249,6 +262,9 @@ export class PostPipeline {
   NotifyCameraCut() {
     this.hasTaaHistory = false;
     this.hasPrev = false;
+    // SSR 的历史与颜色金字塔同样作废：硬切之后重投影全部对不上位，
+    // 不清的话镜面上会挂一帧上一场戏的倒影。
+    this.ssrPass.hasHistory = false;
   }
 
   /** 屏幕空间 AO 贴图 —— 交给 Materials 层注入 MeshStandardMaterial 的间接光。 */
@@ -270,6 +286,18 @@ export class PostPipeline {
 
   /** HZB：`{ source, texture, levels, sizes, mipCount, size }` 或 null。 */
   get Hzb() { return this.prepassPass.hzb; }
+
+  /**
+   * 屏幕空间反射的材质侧 uniform 包（`{ map, resolution, strength, maxRoughness, fadeAt }`）。
+   * 交给 `MaterialLibrary` 的 `ssr` 参数；SSR 关档时是 null，材质连补丁都不编。
+   */
+  get SsrUniforms() { return this.ssrPass.SurfaceUniforms; }
+
+  /** 运行时开关 SSR（画质面板）。不重编译材质，见 SsrPass.Prepare 的账。 */
+  SetSsrEnabled(on) { this.ssrPass.SetEnabled(on); }
+
+  /** SSR 强度倍率（画质面板的滑杆；0 = 这一趟直接不跑）。 */
+  SetSsrStrength(scale) { this.ssrPass.SetStrength(scale); }
 
   /** 合成 pass 实际采样的那一级泛光靶。调试面板与 uBloom 必须指同一张。 */
   get BloomTarget() { return this.bloomPass.BloomTarget; }

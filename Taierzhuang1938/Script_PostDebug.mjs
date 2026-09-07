@@ -344,6 +344,12 @@ export class DebugPass {
         texture: P.prepassPass.velocityTexture, mode: 9,
         unavailable: !P.prepassPass.velocityTexture,
       };
+      // 2026-09 新增：屏幕空间反射三视图（辐亮度 / 置信度 / 命中距离）。
+      // 它们**自带展示材质**（见下面 RenderView 的「自带材质」通道）：SSR 的
+      // 命中距离要从命中缓冲现算，塞不进 FRAG_DEBUG_VIEW 那套按 uMode 分档的
+      // 通用可视化里。新子系统要加自己的展示图照这条路走，别去改那份通用着色器。
+      case "ssr": case "ssrConfidence": case "ssrHitDistance":
+        return P.ssrPass.DebugSource(P.debugView);
       // 2026-09 新增：太阳阴影采样接口的最小验证图（CSM 代理换接口后必须照旧可用）。
       case "sunShadow": return {
         material: this.materialSunShadow, unavailable: !this.sunShadowRig?.sun?.shadow?.map,
@@ -387,14 +393,20 @@ export class DebugPass {
     const P = this.pipeline;
     const U = this.uniforms;
     const C = P.compositePass.uniforms;
-    if (source.material === this.materialSunShadow && !source.unavailable) {
-      const S = this.uniformsSunShadow;
-      S.uNormalDepth.value = ctx.normalDepthTexture;
-      S.uInvView.value.copy(ctx.invView);
-      S.uProjScale.value.copy(ctx.projScale);
-      // 阴影框每帧都在滚（跟玩家 + 吸附纹素），矩阵必须现取。
-      this.sunShadowRig?.SyncShadowUniforms?.();
-      ctx.blitter.Blit(this.materialSunShadow, null);
+    // 「自带材质」通道：视图自己提供一份全屏材质 + 一个 Prepare 钩子，
+    // 展示逻辑留在它自己的模块里。SunShadow 是第一位用户，SSR 三视图是第二位。
+    if (source.material && !source.unavailable) {
+      if (source.material === this.materialSunShadow) {
+        const S = this.uniformsSunShadow;
+        S.uNormalDepth.value = ctx.normalDepthTexture;
+        S.uInvView.value.copy(ctx.invView);
+        S.uProjScale.value.copy(ctx.projScale);
+        // 阴影框每帧都在滚（跟玩家 + 吸附纹素），矩阵必须现取。
+        this.sunShadowRig?.SyncShadowUniforms?.();
+      } else {
+        source.Prepare?.(ctx);
+      }
+      ctx.blitter.Blit(source.material, null);
       return;
     }
     // 雾量 / CoC 调试视图必须复用刚刚送进 Composite 的本帧参数。不要另存一份

@@ -205,6 +205,23 @@ export class GraphicsSettings {
 
     Details(aa, "taa");
 
+    // 屏幕空间反射：布尔总闸 + 强度倍率。**不重编译材质** —— 强度归零时材质
+    // 那一行等价于「radiance 原样」，成本只剩一次纹理取样（GI 那种编译期开关
+    // 是因为探针采样层占着一堆采样器与寄存器，SSR 的补丁没有那个体量）。
+    const reflect = Section(body, "屏幕空间反射 SSR");
+    const ssrRow = document.createElement("div");
+    ssrRow.className = "edBtns";
+    reflect.appendChild(ssrRow);
+    Toggle(ssrRow, "屏幕空间反射", gfx.ssr !== false, (on) => { gfx.ssr = on; this.Apply(); });
+    Slider(reflect, {
+      label: "反射强度", min: 0, max: 2, step: 0.05, value: gfx.ssrStrength ?? 1,
+      format: (v) => `×${v.toFixed(2)}`,
+      onInput: (v) => { gfx.ssrStrength = v; this.Apply(); },
+    });
+    if (this.host.post && !this.host.post.preset.ssr) {
+      Note(reflect, "SSR 需 medium 及以上档位（low 档连追踪靶都不建）。");
+    }
+
     const post = Section(body, "后处理强度（倍率）");
     const godBox = document.createElement("div");
     godBox.className = "edBtns";
@@ -259,6 +276,10 @@ export class GraphicsSettings {
     gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
     gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;
     gfx.gi = false; gfx.giStrength = 1;
+    // SSR 的出厂值跟画质档走（medium 及以上开），和 TAA 同一个先例：
+    // 在 low 档按「恢复出厂」应该回到关，而不是给它开一个建不出靶的开关。
+    gfx.ssr = this.host.post ? !!this.host.post.preset.ssr : true;
+    gfx.ssrStrength = 1;
     NormalizeGraphicsDetails(gfx, this.host.post, true);
     // TAA 的出厂值跟画质档走（medium 及以上开），不是固定的 true/false ——
     // 在 low 档上按「恢复出厂」应该回到关，而不是给它按上一份历史靶。
@@ -291,6 +312,13 @@ export class GraphicsSettings {
       // 读的是**管线的实际状态**不是设置里那一位：历史靶没建起来时这里会照实说
       // FXAA，而不是跟着开关喊 TAA。
       f.Set("抗锯齿", this.host.post.taaEnabled ? "TAA（FXAA 已让位）" : "FXAA");
+      // 读管线的实际状态而不是设置里那一位：档位不支持时这里照实说「不可用」
+      const ssrPass = this.host.post.ssrPass;
+      f.Set("屏幕空间反射", ssrPass?.available
+        ? (ssrPass.enabled
+          ? `开（${this.host.post.preset.ssrScale === 1 ? "全" : "半"}分辨率 · ${this.host.post.preset.ssrSteps} 步）`
+          : "关")
+        : "本档不可用");
     }
     void post;
     const canvas = this.host.canvas;

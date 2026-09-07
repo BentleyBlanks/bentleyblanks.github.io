@@ -37,6 +37,9 @@ const VIEWS = [
   { id: "indirectLighting", label: "Indirect Lighting", group: "光照", note: "正式 reflectedLight.indirectDiffuse：探针 GI 或天空 IBL 的漫反射，已包含正式 SSAO。" },
   { id: "giWorld", label: "GI 辐照度", group: "光照", note: "材质最终采用的间接辐照度（×0.05）；探针体外按正式渲染回退到天空 IBL，不应为黑。" },
   { id: "giConfidence", label: "GI 置信度", group: "光照", note: "取样置信度：1 = 全用探针，0 = 退回天空 IBL；体积边缘的淡出带就在这里看。探针体关着（出厂默认）时恒 0，全黑是准确信息。" },
+  { id: "ssr", label: "SSR 辐亮度", group: "反射", note: "屏幕空间反射解算 + 时域累积后的镜面辐亮度（HDR 映射显示）。材质在 <lights_fragment_maps> 处按置信度用它替换天空 PMREM 的 radiance。" },
+  { id: "ssrConfidence", label: "SSR 置信度", group: "反射", note: "0 = 完全回退天空 PMREM，1 = 完全用屏幕空间结果。深蓝 = 0、暖黄 = 1。屏幕边缘、朝向相机的射线、命中背面与粗糙度超上限的像素都会掉到 0。" },
+  { id: "ssrHitDistance", label: "SSR 命中距离", group: "反射", note: "Hi-Z 追踪的行程（绿 = 近、品红 = 30 m 以上）；深灰 = 未命中。反射穿墙或起点自交时，这张图上会看到成片的极短行程。" },
   { id: "giIrradiance", label: "辐照度图集", group: "GI", note: "实时探针体的 RGB 辐照度 atlas；探针体没开时显示不可用斜纹（去「画质」里打开）。" },
   { id: "giDistance", label: "距离图集", group: "GI", note: "实时探针体的 R/G 距离矩；探针体没开时显示不可用斜纹。" },
 ];
@@ -77,6 +80,9 @@ const VIEW_TARGETS = {
   sunShadow: (post) => post?.targets?.normalDepth,
   ao: (post) => post?.targets?.ao,
   aoBlur: (post) => post?.targets?.aoBlur,
+  ssr: (post) => post?.targets?.ssr,
+  ssrConfidence: (post) => post?.targets?.ssr,
+  ssrHitDistance: (post) => post?.targets?.ssrHit,
   giIrradiance: (post, gi) => gi?.irradiance?.[gi.pingPong],
   giDistance: (post, gi) => gi?.distanceMoments?.[gi.pingPong],
   // 材质通道假彩色都是场景按调试口径重画进 hdr 靶再送屏

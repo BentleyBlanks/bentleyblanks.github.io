@@ -16,7 +16,10 @@
 //   · velocity / hzb —— 2026-09 帧图重构新增：MRT 速度靶与 HZB 链。
 //        高低档都开：它们是后续 SSR / 体积雾 / 接触阴影的公共输入，
 //        关掉等于把八个并行子系统一起关掉；真要省，先关消费方。
-//   · 其余键（csm / gtao / ssil / ssr / volumetrics / atmosphere / autoExposure /
+//   · ssr / ssrScale / ssrSteps / ssrResolveTaps —— 2026-09 屏幕空间反射落地。
+//        档位口径见 §「SSR 分档」注释与 docs/Data_TechRenderPipeline.md
+//        「屏幕空间反射」一节；不随天光预设变。
+//   · 其余键（csm / gtao / ssil / volumetrics / atmosphere / autoExposure /
 //     lensFlare / lut / dof / taaUpscale / clusteredLights / contactShadows）
 //     —— **本阶段全部为占位**，值 = 与今天等价（即「不启用新东西」）。
 //        对应子系统落地时把自己那一位改成实际档位，并在这里补出处注释。
@@ -40,12 +43,15 @@
  *   taa           时域抗锯齿的**出厂默认**（运行时可经 SetTaaEnabled 热切）
  *   velocity      预通道 MRT 的 RT1 屏幕空间速度靶
  *   hzb           预通道之后建线性视深 max-reduce mip 链（HZB）
+ *   ssr           屏幕空间反射（Hi-Z 追踪 + 随机 GGX + 解算 + 时域累积）
+ *   ssrScale      SSR 追踪靶相对主靶的边长比例（0.5 = 半分辨率）
+ *   ssrSteps      Hi-Z 追踪的最大迭代次数（编译期常量，进 shader 的循环上限）
+ *   ssrResolveTaps 解算（ratio estimator）的邻域样本数；0 = 不解算，只走时域
  *   ——— 以下为后续子系统的占位位，本阶段一律「等价于今天」———
  *   csm           级联阴影（今天：单张 66 m 跟随框，false）
  *   contactShadows 屏幕空间接触阴影
  *   gtao          GTAO（将来替换 ssao 那一位）
  *   ssil          屏幕空间间接光
- *   ssr           屏幕空间反射
  *   volumetrics   froxel 体积雾（今天：合成 pass 里的解析式指数高度雾）
  *   atmosphere    物理大气（今天：SkyDome 的解析式天空）
  *   autoExposure  自动曝光（今天：时段预设手调的常数曝光）
@@ -63,7 +69,6 @@ const RESERVED_OFF = {
   contactShadows: false,
   gtao: false,
   ssil: false,
-  ssr: false,
   volumetrics: false,
   atmosphere: false,
   autoExposure: false,
@@ -86,12 +91,17 @@ export const QUALITY_PRESETS = {
     ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
     aoScale: 0.5, sharpen: 0.14, taa: false,
     velocity: true, hzb: true,
+    // low 不跑 SSR：连靶都不建，材质也不编入补丁（`ssr` 进 cache key）。
+    ssr: false, ssrScale: 0.5, ssrSteps: 32, ssrResolveTaps: 0,
   },
   medium: {
     ...RESERVED_OFF,
     ssao: true, bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.6, sharpen: 0.18, taa: true,
     velocity: true, hzb: true,
+    // medium：半分辨率 32 步，**不做空间解算**（只有中心那一条随机射线），
+    // 噪声全交给时域累积压。静止画面收敛得和 high 一样干净，动起来会脏一点。
+    ssr: true, ssrScale: 0.5, ssrSteps: 32, ssrResolveTaps: 0,
   },
   // high 的抗锯齿由 TAA 承担。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
   // 上百 MB 显存并重复抗锯齿；把 4× 留给主动选择 ultra 的玩家
@@ -101,12 +111,17 @@ export const QUALITY_PRESETS = {
     ssao: true, bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.75, sharpen: 0.22, taa: true,
     velocity: true, hzb: true,
+    // high：半分辨率 48 步 + 4 抽样 ratio estimator + 时域。这一档是性能红线所在
+    //（3394×1348 实测 hiz+trace+resolve+temporal 合计见 docs「屏幕空间反射」）。
+    ssr: true, ssrScale: 0.5, ssrSteps: 48, ssrResolveTaps: 4,
   },
   ultra: {
     ...RESERVED_OFF,
     ssao: true, bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,
     aoScale: 1.0, sharpen: 0.22, taa: true,
     velocity: true, hzb: true,
+    // ultra：全分辨率追踪（不再有半分辨率上采样的边缘渗色）+ 64 步 + 8 抽样解算。
+    ssr: true, ssrScale: 1.0, ssrSteps: 64, ssrResolveTaps: 8,
   },
 };
 
@@ -134,3 +149,59 @@ export const HZB = { maxLevels: 8, minSize: 8 };
  *   skinnedPrev    蒙皮上一帧骨骼矩阵（doubled boneTexture，见 Script_PostPrepass）
  */
 export const VELOCITY = { clampUv: 0.25, skinnedPrev: true };
+
+/**
+ * 屏幕空间反射（`Script_PostSsr.mjs`）。与档位无关的那一套常数都在这里，
+ * 档位只管「画多重」（分辨率 / 步数 / 解算样本数）。
+ *
+ * 出处：Stachowiak 2015《Stochastic Screen-Space Reflections》（随机 GGX +
+ * ratio estimator 解算 + 时域累积）、Uludag 2014《Hi-Z Screen-Space Cone Tracing》
+ * （层级 Z 跳跃）、Heitz 2018（VNDF 采样与 G2/G1 权重）、UE 的 SSR
+ * （上一帧场景色 + 粗糙度上限 + 屏幕边缘淡出）。数字全部是本作实测调出来的。
+ *
+ *   maxRoughness    粗糙度上限。超过它整片元不进 SSR（a 恒 0，回退天空 PMREM）。
+ *                   0.6 是本作 ORM 里「湿泥地 / 旧钢盔」的粗糙度带上沿；再高
+ *                   反射本身已经糊成 PMREM 那一档，追踪只是白花钱。
+ *   roughnessFadeAt 从这个粗糙度起线性淡出到 maxRoughness（没有这一段，
+ *                   粗糙度贴图上的一条等值线会变成画面上一条硬边）。
+ *   thickness       命中判据的厚度（米）：射线视深与场景视深之差小于它才算命中。
+ *   thicknessSlope  厚度随视深线性放宽的斜率 —— 远处一个像素本来就覆盖几十厘米，
+ *                   固定厚度会把远景全判成「穿过去了」。
+ *   refineSteps     Hi-Z 命中之后的二分细化步数。
+ *   hizLevels       SSR 自己那条 **min-reduce** 金字塔的级数（见下面那段账）。
+ *   colorLods       上一帧场景色金字塔的可用级数（含第 0 级）。
+ *   coneScale       锥角系数：锥半径 ≈ coneScale × alpha(=roughness²) × 行程。
+ *                   **按 alpha 不按 roughness** —— 按 roughness 会把 0.1 的地板
+ *                   当 1.0 的锥角糊，湿地上的倒影直接变成一团。
+ *   edgeFade        屏幕边缘淡出带宽（uv）。命中点越靠边置信度越低。
+ *   normalBias      射线起点沿法线推出去的距离（米），防自交。
+ *   temporalWeight  时域累积里当前帧的最小权重（静止时）。
+ *   temporalMaxWeight 快动时抬到的权重上限（对着 40 px/帧标定，与 TAA 同口径）。
+ *   varianceClip    邻域方差裁剪的 sigma 倍数（YCoCg）。
+ *   strength        出厂强度。画质面板那根滑杆按倍率乘它。
+ *
+ * ## 为什么 SSR 不用共享 HZB（`ctx.hzb`）而自己再建一条
+ * 共享 HZB 是 **max-reduce**（每一级取 2×2 的最远视深，天空记 camera.far）——
+ * 那是遮挡剔除的语义。Hi-Z 追踪要的是反过来的东西：**一格里最近的那个面**。
+ * 只有「射线当前深度 < 格内最近面」才能安全地整格跳过；拿 max 去判会漏掉
+ * 格子里所有比最远面近的几何，反射直接穿墙。所以本模块自己建一条
+ * min-reduce 链（六级，半分辨率起步，~3 MB@1440p，实测 0.05 ms）。
+ * **将来的合并方案**：共享 HZB 是 RGBA16F 且四通道同值，把 min 塞进 .g 是
+ * 零显存零带宽的事 —— 那一步归预通道的所有者做，做完本模块删掉自己这条链即可。
+ */
+export const SSR = {
+  maxRoughness: 0.60,
+  roughnessFadeAt: 0.45,
+  thickness: 0.32,
+  thicknessSlope: 0.020,
+  refineSteps: 4,
+  hizLevels: 6,
+  colorLods: 4,
+  coneScale: 2.0,
+  edgeFade: 0.12,
+  normalBias: 0.02,
+  temporalWeight: 0.08,
+  temporalMaxWeight: 0.50,
+  varianceClip: 1.25,
+  strength: 1.0,
+};

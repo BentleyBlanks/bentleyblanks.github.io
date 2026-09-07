@@ -20,7 +20,7 @@ import { NormalizeGraphicsDetails } from "./Script_EditorSettings.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "./Script_Gi.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
-import { SetWaterSkyUniforms, UpdateWaterSurfaces } from "./Script_Water.mjs";
+import { SetWaterSkyUniforms, SetWaterSsr, UpdateWaterSurfaces } from "./Script_Water.mjs";
 import { TengxianField } from "./Script_TengxianField.mjs";
 import { InitPhysics, PhysicsWorld } from "./Script_Physics.mjs";
 import { JieheField, JIEHE_LEVEL_ID, JIEHE_CAMERA_FAR } from "./Script_JieheField.mjs";
@@ -416,6 +416,11 @@ const ssao = {
   // 「错位之后还想看见点什么」硬抬起来的补偿值，退回正常量级
   strength: { value: SSAO_BASE },
 };
+// 屏幕空间反射的材质侧 uniform 包。**归 PostPipeline 所有**（SsrPass 每帧刷新
+// map / resolution / strength），这里只是把同一批对象交给 MaterialLibrary。
+// SSR 关档（low / 无浮点靶）时是 null，材质连补丁都不编 —— 与 GI 的编译期
+// 开关同一个先例，只是 SSR 的补丁小到不必为它做运行时重编译（关掉 = 强度归零）。
+const ssrUniforms = post.SsrUniforms;
 
 // 运行时性能剖析器。构造免费、常态休眠（Enable 由编辑器「性能剖析」叠加层调）；
 // Frame/RenderScene 里的 B/E/Gpu* 标记在它关着时只是一次布尔检查。
@@ -443,6 +448,9 @@ const graphics = {
   // 手背上的枪托/右手投影默认仍是 1024 图硬 3×3 那块；画质面板热切。
   firstPersonSelfShadowSoft: false,
   ssao: 1, bloom: 1, god: 1, motionBlur: 1, grain: 1, vignette: 1,
+  // 屏幕空间反射：布尔总闸 + 强度倍率。出厂跟画质档走（medium 及以上开），
+  // 关掉不重编译材质（强度归零，材质那一行等价于「radiance 原样」）。
+  ssr: !!post.preset.ssr, ssrStrength: 1,
   // 抗锯齿：TAA 开着时末趟的 FXAA 自动让位（两层叠加只会糊）。出厂值跟画质档走
   // （medium 及以上默认开），但这是**布尔开关不是倍率** —— 它不决定"画多重"，
   // 决定的是走哪条抗锯齿路，所以不套 Mul 那套倍率约定。
@@ -470,8 +478,13 @@ giUniforms.debugView.value = parseFloat(params.get("giView") || "0") || 0;
 giUniforms.sampling = GI_ON && graphics.gi;
 const library = new MaterialLibrary(renderer, {
   textureSize: QUALITY === "low" ? 256 : 512, ssao, gi: GI_ON ? giUniforms : null,
+  ssr: ssrUniforms,
   destruction: destructionUniforms,
 });
+// 水面不能走 SSR 靶（它 skipNormalDepth，那一像素在预通道里是河床）——
+// 它自己按平面反射假设采同一条 Hi-Z，见 Script_PostSsr.SsrSurfaceGlsl。
+// 必须排在任何水面材质建出来之前（材质按预设缓存，建完就定型）。
+SetWaterSsr(ssrUniforms ? post.ssrPass.trace : null);
 const sky = new SkyDome(renderer);
 scene.add(sky.mesh);
 // 水面借天空 uniform：反射的天顶/地平线/太阳色随时段预设一起换（Script_Water）
@@ -7247,7 +7260,7 @@ function RenderScene(dt) {
   vfx.SetFog(preset.fog, preset.sunColor);
   vfx.SetSun(sky.sunDirection);
   // 水面与粒子层同一批账：时间推进 + 深度源每帧重接（SetSize 会换纹理引用）
-  UpdateWaterSurfaces(dt, post.NormalDepthTexture, post.width, post.height);
+  UpdateWaterSurfaces(dt, post.NormalDepthTexture, post.width, post.height, camera);
   // 音频听者也在这儿接 —— 和上面三行同一类账：接口写好了，没人调。
   //
   // 事故：AudioEngine.SetListener 全仓库零调用点，于是 WebAudio 的 listener
@@ -7448,6 +7461,8 @@ function ApplyGraphics() {
   // 排在 SetSize 之后：SetSize 按当前的 taaEnabled 建靶，这一行才是改它的人。
   // 反过来的话，刚打开 TAA 的那一次 SetSize 会漏建历史靶（要等下一次改分辨率才补）。
   post.SetTaaEnabled(graphics.taa !== false);
+  post.SetSsrEnabled(graphics.ssr !== false);
+  post.SetSsrStrength(graphics.ssrStrength ?? 1);
   post.uniformsTaa.uCurrentWeight.value = graphics.taaCurrentWeight;
   if (post.taaJitterScale !== graphics.taaJitterScale) post.hasTaaHistory = false;
   post.taaJitterScale = graphics.taaJitterScale;

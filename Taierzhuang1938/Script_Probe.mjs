@@ -48,7 +48,11 @@ const giUniforms = MakeGiUniforms();
 // 与正片同一套双层注入：gi=0 时材质只留调试视图基建（探针采样代码编译期剔除），
 // 与正片出厂默认档完全同构 —— GiTest 的「默认材质不含采样代码」就在这页上验。
 giUniforms.sampling = giEnabled;
-const library = new MaterialLibrary(renderer, { textureSize: 512, ssao, gi: giUniforms });
+// SSR 的材质侧 uniform 包由 PostPipeline 持有；探针页与正片走同一条注入路，
+// 这样 SsrTest 在这里验到的补丁行为就是正片的补丁行为。
+const library = new MaterialLibrary(renderer, {
+  textureSize: 512, ssao, gi: giUniforms, ssr: post.SsrUniforms,
+});
 
 const sky = new SkyDome(renderer);
 scene.add(sky.mesh);
@@ -87,7 +91,9 @@ async function Boot() {
   state.ready = true;
   hint.textContent = `preset=${presetName} quality=${quality} scene=${sceneKind}\n`
     + `hdr=${post.hdrCapable} gi=${gi ? `on/${gi.probeCount}探针` : "off"}`;
-  window.Probe = { renderer, scene, camera, post, sky, lights, library, gi, state, StepFrames };
+  window.Probe = {
+    renderer, scene, camera, post, sky, lights, library, gi, state, StepFrames, THREE,
+  };
 }
 
 /** 材质球阵：每种配方一个球 + 一块板，看 PBR 反应。 */
