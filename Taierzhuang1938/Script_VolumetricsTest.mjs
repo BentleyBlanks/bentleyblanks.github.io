@@ -528,8 +528,19 @@ try {
       if (on > off * 1.25 + 1e-7) lit += 1;
       if (off > 1e-7 && on / off > maxGain) maxGain = on / off;
     }
+    // 局部光是从哪条路来的。三条退化路径长得都「有灯」，只有这个字段说得清
+    // 簇状多光源（B8 的 GetClusterLightData）到底接上了没有 —— 顺带把簇那边
+    // 报的灯数也读回来对一次。
+    const rig = vp.sunShadowRig;
+    const cluster = typeof rig?.GetClusterLightData === "function" ? rig.GetClusterLightData() : null;
     return { slots, counted, litFrac: lit / counted,
-      meanOn: sumOn / counted, meanOff: sumOff / counted, maxGain };
+      meanOn: sumOn / counted, meanOff: sumOff / counted, maxGain,
+      lightSource: vp.lightSource, lightCount: vp.lightCount,
+      clusterEnabled: !!cluster?.enabled, clusterLights: cluster?.lights?.length ?? -1,
+      firstClusterLight: cluster?.lights?.[0]
+        ? { position: cluster.lights[0].position, radius: cluster.lights[0].radius,
+            color: cluster.lights[0].color }
+        : null };
   `);
 } catch (error) {
   problems.push(`THROW night ${String(error).slice(0, 400)}`);
@@ -538,10 +549,21 @@ try {
 if (!night) {
   Check("night 取证成功", false, problems.slice(0, 3).join(" | "));
 } else {
-  Check("局部点光（LightRig 火源池）真的照亮了雾",
+  Check("局部点光真的照亮了雾",
     night.slots >= 1 && night.litFrac > 0.001 && night.maxGain > 1.5
     && night.meanOn > night.meanOff,
     JSON.stringify(night));
+  // B8 簇状前向光照合进来之后，雾里的局部光必须走 GetClusterLightData() 那条
+  //（世界坐标 + 已乘强度的线性色 + 半径，按镜头贡献排过序）。退化到火源池
+  // 或 GetEffectLightState 都只是兜底 —— 这一条就是「真路径」的看门狗。
+  Check("局部光走的是簇状多光源那条真路径（GetClusterLightData）",
+    night.clusterEnabled === true && night.clusterLights > 0
+    && night.lightSource === "cluster" && night.lightCount >= 1
+    && Array.isArray(night.firstClusterLight?.position)
+    && night.firstClusterLight.radius > 0,
+    JSON.stringify({ lightSource: night.lightSource, lightCount: night.lightCount,
+      clusterEnabled: night.clusterEnabled, clusterLights: night.clusterLights,
+      firstClusterLight: night.firstClusterLight }));
 }
 
 // --- B4: burningStreet —— 火源热烟 + AddFogVolume ---------------------------
@@ -604,6 +626,215 @@ if (!burning) {
   Check("AddFogVolume 的烟幕挡得住视线（局部雾体是允许降能见度的那一类）",
     burning.wallT < burning.clearT * 0.75,
     JSON.stringify({ wallT: burning.wallT, clearT: burning.clearT }));
+}
+
+// --- B5: 体积雾 × 物理大气 —— 远段那条接缝 ----------------------------------
+// froxel 只铺到 uVolumetricFar（各时段 200–300 m），那之外归大气透视。合成 pass 的
+// ApplyFog 把远段的**颜色**按 uAtmoAerialBlend 换成物理散射色（换色不加能量）。
+// 这一节验的就是那几行真的接上了：
+//   · Probe 的街景只有 75 m 深，够不着 far —— 所以先在 600 m 处立一面无光照平板。
+//     它是**真几何**：照常写进预通道、照常过合成 pass，量到的是正式画面那条链。
+//   · 远段确实有份额（最远切片的透过率 > 整条视线的透过率）；
+//   · 那个像素的散射项非零；
+//   · 把大气关掉（preset.atmosphere = false，AtmospherePass.Prepare 当帧把 blend
+//     摘成 0），同一个像素的颜色必须变 —— 变了才证明大气透视真的进了体积雾这条路。
+//   · 与此同时 70 m 处的透过率一个字节都不许动（能见度闸不受这一改影响）。
+let seam = null;
+try {
+  // 用 chuchuanDay：它是唯一一档真正看得到远景的天光（density 0.0011 /
+  // falloff 520 / 视距 2.9 km）。雾大的时段（smokyDay）近段 280 m 就吃掉九成六的
+  // 光，大气在那后面本来就该看不见 —— 那是对的，但它证不了接缝在不在。
+  await OpenProbe("chuchuanDay");
+  seam = await Run(`
+    const out = {};
+    const THREE = await import("three");
+    const composite = post.uniformsComposite;
+    // A/B 之间不许有任何随时间漂的东西：TAA 历史关掉、烟尘噪声的风速归零、
+    // 每次读回之前把帧序钉死并清掉 froxel 历史 —— 这样两次注入是同一批抽样，
+    // 量到的差别只可能来自被测的那一项（B1 的抬头里记着第一版栽在这儿）。
+    const taaWas = post.taaEnabled;
+    post.SetTaaEnabled(false);
+    const windWas = tuning.VOLUMETRIC_PRESETS.chuchuanDay.noiseWind;
+    tuning.VOLUMETRIC_PRESETS.chuchuanDay.noiseWind = [0, 0, 0];
+
+    const cam = P.camera;
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(4000, 2000),
+      new THREE.MeshBasicMaterial({ color: 0x808080 }));
+    wall.position.copy(cam.position).addScaledVector(forward, 600);
+    wall.lookAt(cam.position);
+    wall.frustumCulled = false;
+    P.scene.add(wall);
+    vp.hasHistory = false;
+    P.StepFrames(8, 1 / 60);
+
+    out.volFar = vp.lastParams ? vp.lastParams.far : null;
+    out.blendOn = composite.uAtmoAerialBlend.value;
+    out.aerialMode = composite.uAtmoAerialMode.value;
+
+    // 挑两个像素：一个真的落在 600 m 的平板上（远段有份额），
+    // 一个在 froxel 范围之内（远段份额为 0 —— 它必须一动不动）。
+    const nd = ReadRt(post.targets.normalDepth);
+    const w = post.targets.normalDepth.width, h = post.targets.normalDepth.height;
+    let pick = -1, pickDepth = 0, farPixels = 0;
+    let nearPick = -1, nearDepth = 0;
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        const d = nd[(y * w + x) * 4 + 3];
+        if (d > 400 && d < 800) {
+          farPixels += 1;
+          // 挑中间一块，别贴着屏幕边（大气透视 froxel 在边缘有半纹素内缩）
+          if (pick < 0 && x > w * 0.2 && x < w * 0.8 && y > h * 0.2) { pick = y * w + x; pickDepth = d; }
+        } else if (nearPick < 0 && d > 25 && d < 60 && x > w * 0.2 && x < w * 0.8) {
+          nearPick = y * w + x; nearDepth = d;
+        }
+      }
+    }
+    out.farPixels = farPixels;
+    out.pickDepth = pickDepth;
+    out.nearDepth = nearDepth;
+    if (pick < 0 || nearPick < 0) return out;
+
+    // 远段份额：最远切片的透过率（VolumetricFarTransmittance 给合成 pass 的那个数）
+    // 与整条视线的透过率之差，就是 froxel 铺不到的那一段。
+    const grid = vp.grid, atlas = vp.atlasSize;
+    const scatter = ReadRt(vp.fogScatter);
+    const integrated = ReadRt(vp.integrated);
+    const px = pick % w, py = Math.floor(pick / w);
+    const cx = Math.min(grid.x - 1, Math.floor(px / w * grid.x));
+    const cy = Math.min(grid.y - 1, Math.floor(py / h * grid.y));
+    const kLast = grid.z - 1;
+    const tx = kLast % grid.tiles[0], ty = Math.floor(kLast / grid.tiles[0]);
+    const ci = ((ty * grid.y + cy) * atlas[0] + (tx * grid.x + cx)) * 4;
+    out.nearT = integrated[ci + 3];
+    out.totalT = scatter[pick * 4 + 3];
+    out.scatterSum = scatter[pick * 4] + scatter[pick * 4 + 1] + scatter[pick * 4 + 2];
+
+    // 能见度闸：画面里所有 40—78 m 的像素，它们的透过率在开关大气前后必须一模一样
+    //（远段换色不加能量、也一个字节都不碰透过率）。
+    const Gate = (buffer) => {
+      let sum = 0, n = 0;
+      for (let i = 0; i < w * h; i += 1) {
+        const d = nd[i * 4 + 3];
+        if (d > 20 && d < 78) { sum += buffer[i * 4 + 3]; n += 1; }
+      }
+      return { mean: n ? sum / n : null, n };
+    };
+
+    const Ldr = () => {
+      const rt = post.targets.ldr;
+      const buffer = new Uint8Array(rt.width * rt.height * 4);
+      P.renderer.readRenderTargetPixels(rt, 0, 0, rt.width, rt.height, buffer);
+      return {
+        far: [buffer[pick * 4], buffer[pick * 4 + 1], buffer[pick * 4 + 2]],
+        near: [buffer[nearPick * 4], buffer[nearPick * 4 + 1], buffer[nearPick * 4 + 2]],
+        all: buffer,
+      };
+    };
+    // 稳三帧（LUT 每帧重算，开关那一帧还没稳），再钉死帧序单帧注入一次才读。
+    const Shot = () => {
+      P.StepFrames(3, 1 / 60);
+      vp.hasHistory = false;
+      post.frame = 900;
+      P.StepFrames(1, 1 / 60);
+      return Ldr();
+    };
+
+    out.pixelOn = Shot();
+    out.gateOn = Gate(ReadRt(vp.fogScatter));
+
+    // 关掉大气：AtmospherePass.Prepare 当帧把 uAtmoAerialBlend 摘成 0，
+    // 远段换色的权重归零，散射退回纯 B3 的那一份。
+    post.preset.atmosphere = false;
+    out.pixelOff = Shot();
+    out.blendOff = composite.uAtmoAerialBlend.value;
+    out.gateOff = Gate(ReadRt(vp.fogScatter));
+
+    post.preset.atmosphere = true;
+    out.pixelBack = Shot();
+
+    // 逐像素分群统计：换色是**只**发生在 froxel 覆盖之外的。
+    // 单个像素只差 2/255（aerialBlend 本来就是照着美术雾色标定的，物理色与它很近），
+    // 但「远段那 N 万个像素几乎全变了、近段一个都没变」这条是躲不掉的证据。
+    // 边界留余量：nd.w 是**视深**，而 froxel 的 far 按**路程**算，斜着看时两者差一个余弦。
+    const farLo = out.volFar * 1.2, nearHi = out.volFar * 0.9;
+    let farTotal = 0, farChanged = 0, farDelta = 0;
+    let nearTotal = 0, nearChanged = 0, nearDelta = 0;
+    for (let i = 0; i < w * h; i += 1) {
+      const d = nd[i * 4 + 3];
+      if (d <= 0) continue;
+      const delta = Math.abs(out.pixelOn.all[i * 4] - out.pixelOff.all[i * 4])
+        + Math.abs(out.pixelOn.all[i * 4 + 1] - out.pixelOff.all[i * 4 + 1])
+        + Math.abs(out.pixelOn.all[i * 4 + 2] - out.pixelOff.all[i * 4 + 2]);
+      if (d > farLo && d < 800) {
+        farTotal += 1; farDelta += delta;
+        if (delta > 0) farChanged += 1;
+      } else if (d < nearHi) {
+        nearTotal += 1; nearDelta += delta;
+        if (delta > 0) nearChanged += 1;
+      }
+    }
+    out.population = { farTotal, farChanged, farMeanDelta: farTotal ? farDelta / farTotal : 0,
+      nearTotal, nearChanged, nearMeanDelta: nearTotal ? nearDelta / nearTotal : 0 };
+    // 大缓冲不带回 Node：只留三个取样点的颜色。
+    delete out.pixelOn.all; delete out.pixelOff.all; delete out.pixelBack.all;
+
+    P.scene.remove(wall);
+    wall.geometry.dispose();
+    wall.material.dispose();
+    post.SetTaaEnabled(taaWas);
+    tuning.VOLUMETRIC_PRESETS.chuchuanDay.noiseWind = windWas;
+    out.glError = gl.getError();
+    return out;
+  `);
+} catch (error) {
+  problems.push(`THROW seam ${String(error).slice(0, 400)}`);
+}
+
+if (!seam) {
+  Check("体积雾 × 大气透视接缝取证成功", false, problems.slice(0, 3).join(" | "));
+} else {
+  const Diff = (a, b) => (a && b)
+    ? Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) : -1;
+  Check("600 m 的平板真的进了预通道（远近两个取样点都拿到了）",
+    seam.farPixels > 200 && seam.pickDepth > 400 && seam.pickDepth < 800 && seam.nearDepth > 25,
+    JSON.stringify({ farPixels: seam.farPixels, pickDepth: seam.pickDepth,
+      nearDepth: seam.nearDepth, volFar: seam.volFar }));
+  // 远段份额 > 0 才谈得上「远段换色」：最远切片还透着，而整条视线更不透。
+  Check("远段确实有份额（最远切片透过率 > 整条视线透过率）",
+    seam.nearT > seam.totalT + 1e-4,
+    JSON.stringify({ nearT: seam.nearT, totalT: seam.totalT }));
+  Check("uVolumetricFar 之外那个像素的散射项非零",
+    seam.scatterSum > 1e-4, JSON.stringify({ scatterSum: seam.scatterSum }));
+  // 出厂 aerialMode = 0（大气只供色不接管消光）——这一条同时看住那位没有被翻掉。
+  Check("大气出厂仍是「只供雾色」模式（aerialMode = 0，用户定论「先别动雾」）",
+    seam.aerialMode === 0, `aerialMode=${seam.aerialMode}`);
+  // 这一条就是「体积雾 + 大气都开着时，远段散射里真的含大气透视贡献」：
+  // 关掉大气那个像素必须变，开回来必须变回去（±1 是 8 位量化的余量）。
+  Check("体积雾开着时远段散射含大气透视贡献（关掉大气那一群像素就变，开回来逐比特复原）",
+    seam.blendOn > 0 && seam.blendOff === 0
+    && seam.population?.farTotal > 5000
+    && seam.population.farChanged / seam.population.farTotal > 0.9
+    && Diff(seam.pixelOn?.far, seam.pixelOff?.far) >= 1
+    && Diff(seam.pixelOn?.far, seam.pixelBack?.far) === 0,
+    JSON.stringify({ blendOn: seam.blendOn, blendOff: seam.blendOff,
+      population: seam.population, on: seam.pixelOn, off: seam.pixelOff, back: seam.pixelBack }));
+  // froxel 范围之内的像素远段份额恰好为 0，那几行一个乘除都不做 —— ApplyFog 给近段
+  // 的结果逐比特不变。**但整帧不是**：泛光与 SSR 是屏幕空间的，远处那面墙一变色，
+  // 贴着它轮廓的近景像素会跟着动一两个色阶（实测约 0.7% 的近景像素、均差 < 0.01）。
+  // 所以这里认「几乎全都没动 + 均差近零 + 取样点逐比特相同」，不认绝对零。
+  Check("froxel 范围内的像素不受大气开关影响（近段的雾逐比特不变）",
+    seam.population?.nearTotal > 5000
+    && seam.population.nearChanged / seam.population.nearTotal < 0.02
+    && seam.population.nearMeanDelta < 0.05
+    && Diff(seam.pixelOn?.near, seam.pixelOff?.near) === 0,
+    JSON.stringify({ population: seam.population,
+      on: seam.pixelOn?.near, off: seam.pixelOff?.near }));
+  // 远段换色不加能量、也不碰透过率：能见度那一档开关大气前后必须一模一样。
+  Check("20—78 m 的透过率不受大气开关影响（能见度闸继续绿）",
+    seam.gateOn?.n > 500 && Math.abs(seam.gateOn.mean - seam.gateOff.mean) < 1e-6,
+    JSON.stringify({ on: seam.gateOn, off: seam.gateOff }));
+  Check("接缝取证期间无 GL 错误", seam.glError === 0, `glError=${seam.glError}`);
 }
 
 await browser.close();

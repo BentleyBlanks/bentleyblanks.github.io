@@ -63,6 +63,10 @@ function generateShadowMapTypeDefine( parameters ) {
 | `Script_PostCommon.mjs` | 地基：全屏 blit、`GLSL_COMMON`、靶工厂、瞬时靶池、`FrameContext`、pass 契约文档 | `Blitter`、`RenderTargetPool`、`FrameContext`、`MakeRenderTarget`、`MakeFullscreenMaterial`、`QUAD_GEOMETRY/CAMERA`、`VERT_QUAD`、`GLSL_COMMON`、`GLSL_VIEW_POS` |
 | `Script_PostPrepass.mjs` | 深度法线预通道（MRT）+ 速度缓冲 + HZB + 蒙皮上一帧骨矩阵 | `PrepassPass`、`MarkNoPrepass`、`MarkForegroundPrepass`、`MarkDynamicPrepass`、`FOREGROUND_VIEW_DEPTH` |
 | `Script_PostSsao.mjs` | SSAO（半分辨率 + 双边模糊）。**GTAO 落地时整个替换这个模块** | `SsaoPass` |
+| `Script_PostSsr.mjs` | 屏幕空间反射：自建 min-Hi-Z + 随机 GGX 追踪 + 解算 + 时域 | `SsrPass`、`SsrColorPass` |
+| `Script_PostVolumetrics.mjs` | froxel 体积雾 / 体积光（注入 / 积分 / apply 三行帧图） | `VolumetricsPass`、`VOLUMETRIC_SAMPLE_GLSL`（含 `SampleVolumetricFog` / `VolumetricFarTransmittance`）、`BindVolumetricUniforms`、`MakeVolumetricNoiseTexture` |
+| `Data_Tuning_Volumetrics.mjs` | 体积雾的网格分档与时段参数（纯数据，零 three 依赖） | `VOLUMETRIC_GRIDS`、`VOLUMETRIC_PRESETS`、`MakeVolumetricParams`、`AnalyticTransmittance`、`FroxelTransmittance`、`VISIBILITY_REFERENCE` |
+| `Script_Atmosphere.mjs` | 物理大气（Hillaire 2020 四张 LUT）+ 帧图第一个 pass | `AtmospherePass`、`AERIAL_PERSPECTIVE_GLSL`、`BindAtmosphereUniforms`、`GetActiveAtmosphere` |
 | `Script_PostTaa.mjs` | TAA（UE 缺省方案）+ 子像素抖动的上/卸 | `TaaPass`、`TAA_JITTER`、`TAA_SAMPLES`、`TAA_CURRENT_FRAME_WEIGHT` |
 | `Script_PostBloom.mjs` | 亮部提取 + 多级降/升采样；太阳拖影 | `BloomPass`、`GodRaysPass` |
 | `Script_PostComposite.mjs` | 合成（分段函数，见 §1.9） | `CompositePass` |
@@ -76,19 +80,30 @@ function generateShadowMapTypeDefine( parameters ) {
 
 ```
  0  （不是 pass）TaaPass.ApplyJitter —— Halton(2,3) 子像素抖动写进 projectionMatrix
- 1  prepass       MRT：RT0 法线+线性视深 / RT1 屏幕空间速度 / DepthTexture
- 2  hzb           RT0.w 的 max-reduce 金字塔（SSR / 体积雾 / 接触阴影共用）
- 3  ssao          半分辨率半球采样 + 双边模糊 → rtAoBlur
- 4  main          HDR 主场景（AO 由材质补丁注入间接光；ultra 才 4×MSAA）
- 5  wireframe     着色模式非 shaded 时叠一层三角形边线
- 6  debugOverlay  Rapier 碰撞体线框等（同一张 hdr 靶与深度）
- 7  taa           时域解算（先卸抖动）→ 线性 HDR 域，UE 的位置
- 8  godPrepare    只做决策不出画：太阳在不在屏内、拖影强度
- 9  bloom         亮部提取 → 13 抽样降采样 ×N → 9 抽样 tent 升采样
-10  god           屏幕空间太阳拖影（出厂关，`graphics.godEnabled`）
-11  composite     运动模糊→景深→+泛光/拖影→雾→曝光→ACES→调色→镜头→sRGB
-12  fxaa          FXAA + 锐化 → 屏幕（调试视图时改为把选中的中间靶送屏）
+ 1  atmosphere            刷天空视图 LUT + 大气透视 froxel LUT（天穹与材质都要采）
+ 2  prepass               MRT：RT0 法线+线性视深 / RT1 屏幕空间速度 / DepthTexture
+ 3  hzb                   RT0.w 的 max-reduce 金字塔（SSR / 体积雾 / 接触阴影共用）
+ 4  ssr                   自建 min-Hi-Z + 随机 GGX 追踪 + 解算 + 时域（在 main 之前：材质要采它）
+ 5  ssao                  半分辨率半球采样 + 双边模糊 → rtAoBlur
+ 6  main                  HDR 主场景（AO / SSR / 簇状局部光由材质补丁注入；ultra 才 4×MSAA）
+ 7  wireframe             着色模式非 shaded 时叠一层三角形边线
+ 8  debugOverlay          Rapier 碰撞体线框等（同一张 hdr 靶与深度）
+ 9  volumetricInject      froxel 注入 + 太阳阴影 + HG 相函数 + 局部光 + 时域重投影
+10  volumetricIntegrate   沿 z 解析积分（散射 + 透过率）
+11  volumetricApply       全分辨率 apply → Composite 的 uFogScatter / uFogSource=1
+12  taa                   时域解算（先卸抖动）→ 线性 HDR 域，UE 的位置
+13  ssrColor              解算后的 HDR 降采样成带 mip 的「上一帧场景色」
+14  godPrepare            只做决策不出画：太阳在不在屏内、拖影强度
+15  bloom                 亮部提取 → 13 抽样降采样 ×N → 9 抽样 tent 升采样
+16  god                   屏幕空间太阳拖影（出厂关；体积雾开着时也一律不给，会双份）
+17  composite             运动模糊→景深→+泛光/拖影→雾→曝光→ACES→调色→镜头→sRGB
+18  fxaa                  FXAA + 锐化 → 屏幕（调试视图时改为把选中的中间靶送屏）
 ```
+
+体积雾三趟排在 main 之后（注入要本帧烘好的太阳阴影图）、composite 之前（apply 那一趟
+才把 `uFogScatter` 接上）；它只读预通道的法线/视深靶，所以 `wireframe` /
+`debugOverlay` 在它前后逐比特相同。回归口 `Script_PostFrameGraphTest` 断言的是
+**有序子序列 + 名字不重复**，不是全等 —— 并行子系统各插各的，全等断言会天天互撞。
 
 编排器对每个 pass 依次做：`Prepare?.(ctx)` → `Enabled(ctx)` → `GpuPush(name)` →
 `Render(ctx)` → `GpuPop()`。`Enabled` 为 false 的 pass **不产生 GPU 分段**
@@ -355,14 +370,16 @@ SEGMENT lens             LensEffects()           ← 镜头光晕 / 脏污 / 暗
 SEGMENT encode           EncodeOutput()          ← 输出色彩空间 / 抖动
 ```
 
-两个**已经在、但还没有生产者**的接口：
-
-* **曝光** `uExposure`（float）× `uExposureTex`（1×1 靶，出厂纯白 = 精确 1.0）。
-  自动曝光落地时往那张 1×1 写增益即可，手调偏移仍走 `uExposure`。
-* **雾** `uFogScatter`（全分辨率，rgb = 沿视线累积的散射色，a = 透过率）+
-  `uFogSource`（0 = 用内联的解析式高度雾自算，1 = 读那张图）。体积雾 / 大气代理
-  产出这张图并把 `uFogSource` 置 1 即可；下面那三次 mix（去饱和、降对比、上色）
-  是**大气透视的口径**，两条路共用。
+* **曝光**（还没有生产者）`uExposure`（float）× `uExposureTex`（1×1 靶，出厂纯白
+  = 精确 1.0）。自动曝光落地时往那张 1×1 写增益即可，手调偏移仍走 `uExposure`。
+* **雾**（2026-09 起有三个生产者，全部接上了）：
+  `uFogScatter`（全分辨率，rgb = 沿视线累积的**绝对散射亮度**，a = 透过率）+
+  `uFogSource`（0 = 用内联的解析式高度雾自算，1 = 读那张图）。
+  `uFogSource` **只有一个仲裁点** —— `VolumetricsPass.Prepare` / `RenderApply`。
+  下面那三次 mix（去饱和、降对比、上色）是**大气透视的口径**，两条路共用。
+  谁在里面：froxel 体积雾（近段散射）、物理大气（远段换色 + 解析路的雾色）、
+  内联解析式（low 档与体积雾关掉时的永久回退）。三者怎么分工写在 `ApplyFog` 的
+  抬头注释里，以及本文件「体积雾 / 体积光（froxel）」一节的「与物理大气的接缝」。
 
 色差的通道偏移**融在 `MotionBlur()` 的同一趟圆盘采样里**（分开就要再来一趟全分辨率
 取样），语义上归 `LensEffects`。
@@ -402,6 +419,27 @@ SEGMENT encode           EncodeOutput()          ← 输出色彩空间 / 抖动
 **加一个材质补丁**：写 `MakePatch({...})`（§1.8），加进
 `Script_MaterialPatches.IndirectLightingPatches` 的返回数组（或调用方自己的列表），
 key 带上会在运行时翻的位。
+
+**加一个调试视图**（Debug Rendering 面板）。`Script_PostDebug.GetSource()` 是唯一的
+仲裁点，查找顺序固定三步：
+
+1. **帧图里的 pass 自带的** —— 在自己的 pass 上实现 `GetDebugSource(view)`，
+   不认识的视图名返回 `null`。froxel 体积雾那四项走这条。**优先级最高**：
+   pass 是自己那张靶的所有者，它说不可用就是不可用。
+2. **`GetSource()` 里那条内置 switch** —— 预通道 / AO / Bloom / 材质假彩色 /
+   SunShadow / SSR 三视图。这是 Phase A 就有的表，别往里加新子系统的东西。
+3. **`PostPipeline.RegisterDebugView(id, resolve)` 登记表** —— 给「持有者不是 pass」
+   的子系统用（物理大气那四张 LUT 归 `Script_Atmosphere` 自己持有，不在
+   `post.targets` 里）。名字撞了先到先得。
+
+三条路返回的都是同一种结构 `{ texture, mode, unavailable?, material?, Prepare?(ctx) }`。
+给了 `material` 就走 `RenderView` 的「自带材质」通道 —— **那条分支只有一个**，
+参数在自己的 `Prepare(ctx)` 里现取（SunShadow 也一样，没有特例）。
+没给 `material` 就按 `texture + mode` 送进通用可视化着色器。
+`unavailable` 为 true 时一律画不可用斜纹：**把一张没内容的靶送屏跟「渲染坏了」
+长得一模一样**。视图还要在 `Script_EditorDebugRendering` 的 `VIEWS`、`VIEW_TARGETS`
+与那条**组名列表**里各登记一次 —— 组名漏登记的话那一组的视图格根本不渲染，
+面板上选不到（「反射」在 SSR 落地那一轮就漏过一次）。
 
 ### 1.12 怎么验（本轮的回归口）
 
@@ -2564,14 +2602,31 @@ fogCol = mix(今天的 mix(ground, sky, 仰角) + pow(sunDot,8)*sunGain,
 `color × T + S`，仍吃 `uFogMax` 上限（「远处兵的剪影不许更糊」那条硬约束靠它）。
 **出厂不开**：它会把能见度整条曲线换成物理的，那是要用户拍板的一次画面变化。
 
-与体积雾代理的分工，两条都要接：
+与体积雾代理的分工 —— **2026-09 两边合流之后已经接上了，口径以这一条为准**
+（实现在 `Script_PostComposite.ApplyFog` 的 `uFogSource > 0.5` 那一支，
+回归口是 `Script_VolumetricsTest` 的「体积雾 × 大气透视接缝」那一组）：
 
-1. `uVolumetricFarTransmittance` 由体积雾那一侧写（它负责 0—`uVolumetricFar`），
-   这里把它乘进 `aerial.a`。没人接线时恒为 1，本代理按 1 处理。
-2. **体积雾一旦把 `uFogSource` 置 1，ApplyFog 就走另一支，下面这段大气透视根本不会
-   被调用。** 所以体积雾那张 `uFogScatter` 必须自己把 `AerialPerspectiveUv(uv, dist)`
-   乘进去，否则表现是「近处有雾、远处的空气不见了」。这一条写在
-   `Script_PostComposite` 那一支的注释里，别只看这里。
+* `uFogSource = 0`（low 档 / 体积雾关掉）：走上面那条，一个字没变。
+* `uFogSource = 1`：ApplyFog 绕过上面那条，所以大气透视得在体积那一支里自己接。
+  接法是**给远段换色**，不是再加一层雾：froxel 只铺到 `uVolumetricFar`（各时段
+  200—300 m），那之后 B3 用同一条解析式高度雾把尾段续上（各向同性 + 美术雾色）；
+  合成 pass 把**那一段的颜色**按 `uAtmoAerialBlend` 混向 `AerialPerspectiveUv` 的
+  物理散射色，总散射量守恒。远段占多少由两段的物理不透明度算：
+
+  ```glsl
+  float farT = VolumetricFarTransmittance(uv);                       // B3 最远切片
+  float tailT = exp(-max(dist - uVolumetricRange.y, 0.0) * uFogDensity);
+  float farShare = farT * (1.0 - tailT)
+                 / max((1.0 - farT) + farT * (1.0 - tailT), 1.0e-4);
+  ```
+
+  `farShare` 在 froxel 范围之内恰好是 0，所以近段的光柱与被切断的暗带逐比特不变。
+* `uVolumetricFarTransmittance`（标量 uniform）**留着但恒为 1**：合成 pass 用的是
+  上面那个**逐像素**的 `VolumetricFarTransmittance(uv)`，比一个全屏常数准。
+  第三方材质（粒子 / 水面）要按自己的口径接时，那个标量仍是可用的口子。
+
+**别拿 `fog` 去减 `1 − farT`**：`fog` 走的是 `legacyTransmittance` 那条重映射
+（比物理的薄），两个数不同量纲，相减会算出负数、远段当场消失。这条踩过一次。
 
 ### 17.5 每预设标定表
 
@@ -2834,6 +2889,28 @@ froxel 网格存成一张 **2D 图集**（切片平铺），不是 `Data3DTextur
 Composite 侧只动了 `ApplyFog` 一段：体积路走**加法**（`color·T + scatter`），
 解析路仍走 `mix`（`scatterAdd` 恒 0，逐比特不变）。反过来做
 （`scatter/(1-T)` 反推 fogCol 再 mix）在 `T→1` 的近处会除零炸成白斑。
+
+**`uFogSource` 只有一个仲裁点**：`VolumetricsPass.Prepare`（关掉 / 还没产出图时归零）
+与 `RenderApply`（真的产出图之后置 1）。别的模块一个字都不许写它 —— 两边各写一次的
+下场是「关了开关画面还在雾里」或者「开着却在读一张陈旧的散射图」。
+
+#### 与物理大气的接缝（2026-09 B3/B4 合流）
+
+froxel 铺到 `uVolumetricFar` 为止（各时段 200—300 m），那之外的空气归 B4。合成 pass
+把远段那一份的**颜色**换成 `AerialPerspectiveUv(uv, dist)` 的物理散射色，权重是
+`uAtmoAerialBlend × farShare`，`farShare` 由 `VolumetricFarTransmittance(uv)` 与同一条
+解析式的尾段透过率算出来（式子见「物理大气与大气透视」那一节的「与体积雾代理的分工」）。
+
+三条性质，都在 `Script_VolumetricsTest` 的接缝那一组里钉着：
+
+* **换色不加能量**：先除以各自的不透明度还原成单位散射亮度，混完再乘回 `fog`。
+  所以透过率、雾量、70 m 能见度一个字节都不动 —— 与用户定论「先别动雾」一致。
+* **只动远段**：`farShare` 在 froxel 范围内恰好是 0，权重为 0 时那几行一个乘除都不做。
+  实测（chuchuanDay + 600 m 平板）：关掉大气后 600 m 那 4.36 万个像素 95.8% 都变了
+  （均差 8.9/255），froxel 范围内的近景 99.3% 逐比特不变
+  （剩下的 0.7% 是泛光与 SSR 这两个屏幕空间效果从远景渗过来的，均差 < 0.01）。
+* **雾大的时段本来就看不见大气**：smokyDay 的近段 280 m 已经吃掉九成六的光，
+  `farShare` 只有百分之二 —— 这是对的，不是接线没接上。验接缝要用 chuchuanDay。
 
 ### 17.5 三条硬约束（用户定论「先别动雾」）
 

@@ -280,17 +280,27 @@ vec3 ApplyFog(vec3 color, vec2 uv, vec4 nd) {
     //
     // 天空（nd.w <= 0）不进这一支：天穹自己采天空视图 LUT，深度 0 像素吃多少
     // 体积雾由 B3 的 skyScale 决定（出厂 0 = 与今天逐比特相同）。
-    if (nd.w > 0.0 && fog > 1.0e-4) {
-      // VolumetricFarTransmittance 是 B3 最远切片的透过率 —— apply 那一趟没有把
-      // 它硬归零，正是为了留这个接口。1 − 它 = 近段已经吃掉的不透明度。
-      float nearOpacity = 1.0 - VolumetricFarTransmittance(uv);
-      float farShare = clamp((fog - nearOpacity) / fog, 0.0, 1.0);
+    if (nd.w > 0.0 && fog > 1.0e-4 && uFogDensity > 0.0) {
+      float dist = length(ViewPos(uv, nd.w));
+      // 远段占这条视线的雾多大一份？两段都在**物理**域算，两个数才可比：
+      //   · 近段 0—uVolumetricFar：froxel 自己积出来的。VolumetricFarTransmittance
+      //     是最远切片的透过率 —— apply 那一趟没有把它硬归零，正是为了留这个接口。
+      //   · 远段：同一条解析式的距离衰减，而且它散出来的光还要先穿过近段才到相机。
+      // （别拿 fog 去减 nearOpacity：fog 走的是 legacyTransmittance 那条重映射，
+      //   与 froxel 的物理透过率不同量纲，相减会算出负数、远段当场消失。）
+      float farT = VolumetricFarTransmittance(uv);
+      float tailT = exp(-max(dist - uVolumetricRange.y, 0.0) * uFogDensity);
+      float nearOpacity = 1.0 - farT;
+      float farOpacity = farT * (1.0 - tailT);
+      float farShare = farOpacity / max(nearOpacity + farOpacity, 1.0e-4);
       float aeroWeight = clamp(uAtmoAerialBlend, 0.0, 1.0) * farShare;
-      // 权重恰好为 0（近景像素 / 大气关着）时一个乘除都不做：近段光柱逐比特不变。
+      // 权重恰好为 0（像素在 froxel 范围内 / 大气关着）时一个乘除都不做：
+      // 近段的光柱与被切断的暗带逐比特不变。
       if (aeroWeight > 0.0) {
-        float dist = length(ViewPos(uv, nd.w));
         vec4 aerial = AerialPerspectiveUv(uv, dist);
         float aeroOpacity = max(1.0 - aerial.a, 1.0e-4);
+        // 除以各自的不透明度 = 单位不透明度的平均散射亮度，两边同量纲；
+        // 混完再乘回 fog，总散射量守恒（换色不加能量）。
         scatterAdd = mix(scatterAdd / fog, aerial.rgb / aeroOpacity, aeroWeight) * fog;
       }
     }

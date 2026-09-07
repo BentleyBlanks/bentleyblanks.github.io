@@ -722,6 +722,10 @@ export class VolumetricsPass {
     this.ready = false;
     this.lastParams = null;
     this.sunShadowRig = null;
+    // 本帧局部光的来源与盏数（"cluster" / "pool" / "state" / "none"）。
+    // `_UploadLights` 每帧重写；回归口与编辑器面板读它，不猜。
+    this.lightSource = "none";
+    this.lightCount = 0;
     this.sampleClients = new Set();
     this.currentVolume = null;
     this.viewProjection = new THREE.Matrix4();
@@ -1122,6 +1126,10 @@ export class VolumetricsPass {
     const color = U.uLightColor.value;
     pos.fill(0); color.fill(0);
     const rig = this.sunShadowRig;
+    // 本帧的局部光取自哪一条路。**取证用，别当装饰**：三条退化路径长得都「有灯」，
+    // 只有这个字段能说清簇状多光源到底接上了没有（回归口读它）。
+    this.lightSource = "none";
+    this.lightCount = 0;
     if (!rig || params.pointScale <= 0) return;
     let slot = 0;
     const Push = (position, hex, intensity, radius) => {
@@ -1144,6 +1152,7 @@ export class VolumetricsPass {
     //  ③ 公共取证接口 `GetEffectLightState().active`（有分配，只当兜底）。
     const cluster = typeof rig.GetClusterLightData === "function" ? rig.GetClusterLightData() : null;
     if (cluster?.enabled && Array.isArray(cluster.lights) && cluster.lights.length) {
+      this.lightSource = "cluster";
       for (const light of cluster.lights) {
         if (slot >= MAX_VOLUMETRIC_LIGHTS) break;
         const p = light.position;
@@ -1157,19 +1166,23 @@ export class VolumetricsPass {
         color[slot * 4 + 2] = c[2];
         slot += 1;
       }
+      this.lightCount = slot;
       return;
     }
     const lights = Array.isArray(rig.fireLights) ? rig.fireLights : null;
     if (lights) {
+      this.lightSource = "pool";
       for (const light of lights) Push(light.position, light.color.getHex(), light.intensity, light.distance);
       if (rig.muzzle) Push(rig.muzzle.position, rig.muzzle.color.getHex(), rig.muzzle.intensity, rig.muzzle.distance);
     } else if (typeof rig.GetEffectLightState === "function") {
+      this.lightSource = "state";
       const state = rig.GetEffectLightState();
       for (const light of state.active || []) {
         Push({ x: light.position[0], y: light.position[1], z: light.position[2] },
           light.color, light.intensity, light.radius);
       }
     }
+    this.lightCount = slot;
   }
 
   /**
