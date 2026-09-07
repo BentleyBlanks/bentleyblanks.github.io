@@ -75,8 +75,19 @@ export const VOLUMETRIC_GRIDS = {
  *   noiseWind         噪声场的漂移速度（m/s，世界坐标）。烟尘要在动，不然像贴纸
  *   noiseFar          噪声在这个距离淡出（米）。远景严格按基础密度走，
  *                     「七十米外看不看得见」那条线不受噪声影响
- *   skyScale          天空像素吃多少最远切片的雾。1.0 = 完整（地平线白化，
- *                     屋脊线与天之间不再有硬边）；0 = 退回今天的「天空不吃雾」
+ *   skyScale          深度 0 的像素吃多少「最远切片」的雾。
+ *                     **出厂 0 —— 也就是退回今天的「深度 0 不吃雾」。**
+ *                     1.0 那条路整套都实装了（apply 里那一支、调试视图、
+ *                     `Script_VolumetricsTest` 逐像素对过账），画面上也确实更好：
+ *                     地平线白化、屋脊线与天之间那条硬边没了。但**不能出厂开**，
+ *                     因为「深度 0」不只是天空：粒子、烟、水面这些 skipNormalDepth
+ *                     的东西在预通道里都是隐身的，落进同一个桶。给这一桶上整整一列
+ *                     280 m 的雾，五十米外那根烟柱就被当成天边的霾；而它自己那份
+ *                     `AERIAL` 解析雾还照旧在算（`Script_Vfx`，BootTest 的
+ *                     「粒子层的雾接上了」看的就是它），于是变成双份。
+ *                     要开它得先让半透明件也有深度（另开一张覆盖靶），或者让天穹
+ *                     自己在着色器里吃这份雾 —— 后者是物理大气代理的地盘，
+ *                     `VolumetricFarTransmittance()` 就是给它留的接口。
  *   reprojection      时域重投影的历史权重（0.9 = UE/Frostbite 缺省）
  *   fireSmoke         LightRig 火源自动挂的「热烟」密度（× 基础密度）。0 = 不挂
  *   fireSmokeRadius   热烟半径 = 火光 radius × 它
@@ -96,7 +107,7 @@ export const VOLUMETRIC_DEFAULT = {
   noiseDetail: 0.075,
   noiseWind: [0.55, 0.05, 0.22],
   noiseFar: 95,
-  skyScale: 1.0,
+  skyScale: 0.0,
   reprojection: 0.9,
   fireSmoke: 0,
   fireSmokeRadius: 1.15,
@@ -122,13 +133,13 @@ export const VOLUMETRIC_PRESETS = {
   // 关卡策划白盒：环境体块全白，空气里再加光柱会盖掉形体。只留很淡的一层。
   whiteboxDay: {
     densityScale: 0.99, albedo: 0.9, anisotropy: 0.25, sunScale: 0.4,
-    noiseAmount: 0.08, skyScale: 0.35, far: 220,
+    noiseAmount: 0.08, far: 220,
   },
   // 完整场景编辑器的长视距白昼：1.6 km 总览，雾只做空气透视，噪声几乎关掉
   // （55 m 的团在这个尺度上会变成一片斑）。
   editorClear: {
     densityScale: 1.0, anisotropy: 0.35, noiseAmount: 0.08, noiseScale: 0.006,
-    noiseFar: 260, skyScale: 0.5, far: 300, pointScale: 0.04,
+    noiseFar: 260, far: 300, pointScale: 0.04,
   },
   // 黄昏 12°：逆光时整条街的空气都会亮起来，g 要大。街底全在阴影里 ——
   // 光柱只从屋脊与山墙的缺口打进来，这正是 SunShadowVisibility 要切出来的东西。
@@ -147,7 +158,7 @@ export const VOLUMETRIC_PRESETS = {
   // 噪声压到很小：这一场的空气本来就干净，加烟团等于给窗外糊上斑。
   chuchuanDay: {
     densityScale: 1.0, albedo: 0.94, anisotropy: 0.42, sunScale: 0.9,
-    noiseAmount: 0.10, noiseScale: 0.008, noiseFar: 200, far: 300, skyScale: 0.45,
+    noiseAmount: 0.10, noiseScale: 0.008, noiseFar: 200, far: 300,
   },
   // 阴天：没有方向性主光，g 必须小。形体全靠 AO 与环境光，雾也只做各向同性的一层。
   overcast: {
@@ -167,7 +178,7 @@ export const VOLUMETRIC_PRESETS = {
   night: {
     densityScale: 0.84, albedo: 0.88, anisotropy: 0.30, sunScale: 0.35,
     ambientScale: 1.0, pointScale: 0.18, noiseAmount: 0.28, noiseScale: 0.016,
-    fireSmoke: 1.4, far: 220, skyScale: 0.55,
+    fireSmoke: 1.4, far: 220,
   },
   // 拂晓总反攻 11°：全场画面权重最高的一档。低太阳 + 街底冷影，
   // g 给到 0.58，斜射光柱穿过巷口是这一关的招牌画面。

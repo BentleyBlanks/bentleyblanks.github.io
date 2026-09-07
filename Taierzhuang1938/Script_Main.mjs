@@ -7240,15 +7240,12 @@ function RenderScene(dt) {
   // 预通道靶（判断背景是不是天空 + 软粒子）、雾参数、太阳方向（雾的朝阳增益）。
   // SetSize 会重建靶，纹理引用每帧都可能换，所以每帧重接，不能只在初始化接一次。
   vfx.SetDepthSource(post.NormalDepthTexture, post.width, post.height);
-  // 粒子那份解析雾只补「背景是天空」的那一半（合成 pass 明写深度 0 不吃雾）。
-  // **froxel 体积雾把这一半也接管了**（天空像素取最远切片），粒子再自带一份就是双份 ——
-  // 烟柱跨过屋脊线会裂成深浅两截，正是 Script_Vfx 文件头那条注释要避免的东西。
-  // 所以体积雾真的在跑时把粒子那份停掉（SetFog(null) = uFogDensity 归零），
-  // 雾只由合成 pass 一处产出。读的是 pass 的实际状态而不是设置里那一位：
-  // 开机前几帧、这一档天光 density = 0 时它是 false，粒子照旧自带雾。
-  // 水面不受影响 —— 它是 skipNormalDepth，雾吃的是身后河床的深度，不落进「天空」那一桶。
-  const volumetricFogLive = !!(post.preset.volumetrics && post.volumetricsPass?.ready);
-  vfx.SetFog(volumetricFogLive ? null : preset.fog, preset.sunColor);
+  // 粒子那份解析雾照常接（BootTest 的「粒子层的雾接上了」就是看它）。froxel 体积雾
+  // **不碰深度 0 那一桶**（`Data_Tuning_Volumetrics` 的 skyScale 出厂为 0）：
+  // 天空、天空前的烟、任何 skipNormalDepth 的半透明件都还归粒子/天穹自己管。
+  // 理由见 docs/Data_TechRenderPipeline.md §17.6 —— 合成 pass 认不出「天空」和
+  // 「五十米外那根烟柱」，给这一桶上最远切片的雾会让烟柱吃到整整一列的雾量。
+  vfx.SetFog(preset.fog, preset.sunColor);
   vfx.SetSun(sky.sunDirection);
   // 水面与粒子层同一批账：时间推进 + 深度源每帧重接（SetSize 会换纹理引用）
   UpdateWaterSurfaces(dt, post.NormalDepthTexture, post.width, post.height);

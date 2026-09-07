@@ -242,20 +242,46 @@ try {
     out.calibration = { checked, worst, worstAt, meanAbs: sumAbs / Math.max(checked, 1),
       foggier, alphaBad, negativeRgb };
 
-    // --- 3) 天空像素 = 最远切片 -------------------------------------------
-    let skyChecked = 0, skyWorst = 0;
+    // --- 3) 深度 0 的像素 -------------------------------------------------
+    // 出厂 skyScale = 0：这一桶（天空 / 粒子 / 水面等 skipNormalDepth 的东西）
+    // 与今天逐比特相同 —— 一点雾都不吃。理由见 Data_Tuning_Volumetrics 的 skyScale。
+    // 但「取最远切片」那条路本身是实装的，所以把 skyScale 顶到 1 再验一遍：
+    // 只关掉出厂开关不等于那段代码是对的。
+    const SkyStats = () => {
+      const buf = ReadRt(vp.fogScatter);
+      let checked = 0, worst = 0;
+      for (let y = 2; y < h; y += 5) {
+        for (let x = 4; x < w; x += 17) {
+          const i = (y * w + x) * 4;
+          if (normalDepth[i + 3] > 0.0) continue;
+          const cx = Math.min(grid.x - 1, Math.floor((x + 0.5) / w * grid.x));
+          const cy = Math.min(grid.y - 1, Math.floor((y + 0.5) / h * grid.y));
+          const far = Cell(ReadRt(vp.integrated), cx, cy, grid.z - 1);
+          checked += 1;
+          worst = Math.max(worst, Math.abs(buf[i + 3] - far[3]));
+        }
+      }
+      return { checked, worst };
+    };
+    let skyShipped = 0, skyShippedChecked = 0;
     for (let y = 2; y < h; y += 5) {
       for (let x = 4; x < w; x += 17) {
         const i = (y * w + x) * 4;
         if (normalDepth[i + 3] > 0.0) continue;
-        const cx = Math.min(grid.x - 1, Math.floor((x + 0.5) / w * grid.x));
-        const cy = Math.min(grid.y - 1, Math.floor((y + 0.5) / h * grid.y));
-        const far = Cell(integrated, cx, cy, grid.z - 1);
-        skyChecked += 1;
-        skyWorst = Math.max(skyWorst, Math.abs(applyBuf[i + 3] - far[3]));
+        skyShippedChecked += 1;
+        skyShipped = Math.max(skyShipped, Math.abs(applyBuf[i + 3] - 1));
       }
     }
-    out.sky = { checked: skyChecked, worst: skyWorst };
+    const skyScaleWas = tuning.VOLUMETRIC_PRESETS.smokyDay.skyScale;
+    tuning.VOLUMETRIC_PRESETS.smokyDay.skyScale = 1;
+    P.StepFrames(4, 1 / 60);
+    const skyFull = SkyStats();
+    tuning.VOLUMETRIC_PRESETS.smokyDay.skyScale = skyScaleWas;
+    P.StepFrames(4, 1 / 60);
+    out.sky = {
+      shippedChecked: skyShippedChecked, shippedWorstDelta: skyShipped,
+      fullChecked: skyFull.checked, fullWorst: skyFull.worst,
+    };
 
     // --- 4) 静止 32 帧后逐帧差 -------------------------------------------
     P.StepFrames(32, 1 / 60);
@@ -358,8 +384,14 @@ if (!smoky) {
     smoky.calibration.checked > 5000 && smoky.calibration.foggier === 0
     && smoky.calibration.meanAbs < 0.01,
     JSON.stringify(smoky.calibration));
-  Check("天空像素的雾量 = 最远切片",
-    smoky.sky.checked > 20 && smoky.sky.worst < 0.02, JSON.stringify(smoky.sky));
+  // 出厂：深度 0 那一桶（天空 / 粒子 / 水面）一点雾都不吃 —— 与今天逐比特相同。
+  // 这一条同时看住「体积雾没有偷偷去动粒子和水面」。
+  Check("出厂 skyScale = 0：深度 0 的像素透过率恒为 1（与今天相同）",
+    smoky.sky.shippedChecked > 20 && smoky.sky.shippedWorstDelta < 0.005,
+    JSON.stringify(smoky.sky));
+  // 把 skyScale 顶到 1 再验「取最远切片」那条路本身是对的（只关掉开关不算验过）。
+  Check("skyScale = 1 时天空像素的雾量 = 最远切片",
+    smoky.sky.fullChecked > 20 && smoky.sky.fullWorst < 0.02, JSON.stringify(smoky.sky));
   Check("静止 32 帧后逐帧差极小（时域重投影收敛）",
     smoky.stability.relative < 0.02, JSON.stringify(smoky.stability));
   Check("相机平移 2.4 m 后没有拖影块（与清历史的参考帧比）",
