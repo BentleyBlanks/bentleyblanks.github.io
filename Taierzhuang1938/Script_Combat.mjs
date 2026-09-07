@@ -616,6 +616,8 @@ export class CombatSystem {
    */
   GrenadeThreats(playerPosition) {
     const threats = [];
+    // 够得着、看得见、引信还来得及的那一颗（与 F 交互同一判据，不另起一套「附近」）。
+    const returnable = this.ReturnCandidate();
     for (const p of this.projectiles) {
       if (!p.alive || p.fuse <= 0) continue;
       if (p.owner === "player" && p.age < THREAT.ownGraceS) continue;
@@ -631,6 +633,7 @@ export class CombatSystem {
         fuse: p.fuse,
         distance,
         dangerRadius,
+        returnable: p === returnable,
       });
     }
     // 先保命：更快爆的排前面；同一引信下更近的排前面。

@@ -7142,11 +7142,16 @@ function Frame(dt, render = true) {
   // 单独再投影一次最多只有四颗，避免把目标路标与爆炸警告绑成一套生命周期。
   hud.UpdateGrenadeWarnings(combat.GrenadeThreats(player.position), player, (x, y, z) => {
     _proj.set(x, y, z);
-    _proj.project(camera);
+    // 先在视空间判「在镜头前还是身后」：身后的点经透视除法会翻到对面，
+    // 屏幕坐标不能再当方向用（HUD 那边对身后的弹退回按 yaw 算方位）。
+    _proj.applyMatrix4(camera.matrixWorldInverse);
+    const behind = _proj.z >= 0;
+    _proj.set(x, y, z).project(camera);
     return {
       x: (_proj.x * 0.5 + 0.5) * window.innerWidth,
       y: (-_proj.y * 0.5 + 0.5) * window.innerHeight,
-      visible: _proj.z > -1 && _proj.z < 1 && Math.abs(_proj.x) < 1 && Math.abs(_proj.y) < 1,
+      visible: !behind && _proj.z > -1 && _proj.z < 1 && Math.abs(_proj.x) < 1 && Math.abs(_proj.y) < 1,
+      behind,
     };
   });
   hud.UpdateMinimap(dt, {

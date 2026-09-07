@@ -11,7 +11,7 @@
 | 手榴弹桌 | F 领取；种类从 `WEAPONS` 的 throwable 项自动列出，使用正式库存与模型 |
 | 木柄 / 集束手榴弹 | 按住 G / H 蓄力，松开投出；走正式投掷物、引信、伤害与爆炸链 |
 | 横排日军战车 | 到车尾按 F，每次交互仅发射一枚向前飞行的炮弹；目录跟随 `WEAPONS` 的日军 vehicle 项 |
-| 绿色台 | 投来一枚活手榴弹，练习靠近后 F 拾起返掷 |
+| 绿色台 | 投来一枚活手榴弹，练习靠近后 F 拾起返掷；台子 4.5 s 冷却期间不再出 F 提示 |
 | 橙色台 | 呼叫远程炮击；每发发射时按玩家当前位置采样圆盘落点，范围读 `EXPLOSION_BARRAGE.radiusM` |
 | 紫色台 | 召唤飞机进场，从机腹释放测试弹，然后爬升飞离；散布读 `EXPLOSION_AIRSTRIKE.radiusM` |
 | 蓝色台 | 取消炮击与空袭，清除在途弹、尾迹、预警粒子、炮坑与土沿；将坑内人物抬回恢复的地面 |
@@ -55,6 +55,15 @@
 - `Script_GrenadeReturn.mjs` 给各关注册高优先级交互。距离、垂直差、遮挡、离手宽限、
   剩余引信与拾取动作时长由 `GRENADE_RETURN` 管。F 拾起后按当前瞄准方向自动返掷，
   **沿用同一枚 Projectile 与原引信**，不补库存、不重置倒计时；已经来不及的弹不给交互。
+- HUD 两处口径（2026-09-07 前两处都只有图标、没有字，玩家在爆炸测试场里读不出「能捡」）：
+  准星旁的 F 提示对 `kind: "grenade"` 的交互把「拾起并掷回 · N秒」整句上屏
+  （`ContextualActionPrompts` 的 `text`，其余交互仍只给按键框 + 图标）；近弹警告
+  （`CombatSystem.GrenadeThreats` → `Hud.UpdateGrenadeWarnings`）对同一颗返掷候选标
+  `returnable`，文字换成 `hud.grenade.returnable`（「手榴弹 2m · F 拾起掷回」）。
+  图标位置由 `GrenadeWarningScreenPoint` 决定：投影弹体本身、只在屏幕空间上提固定像素
+  （以前抬 0.45 m 再投影，脚边一米的弹会被透视放大成飘在屏幕边上）；弹在镜头前但出了
+  视野就沿屏幕方向贴边（脚边 → 下沿），只有身后的弹才按 yaw 算方位。
+  验收：`Script_HudPromptTest.mjs`（纯函数）与 `Script_ExplosionRangeTest.mjs` 的返掷段。
 - `TerrainDeformation` 存稀疏的有符号高度差：正值挖土，负值是坑外的堆积土沿。
   基础高度仍由关卡提供；界河仍来自
   `SampleJieheHeight`，没有第二套地形公式。基础节点缓存随 Reset / 换关清除。

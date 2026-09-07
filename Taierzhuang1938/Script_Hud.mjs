@@ -174,8 +174,41 @@ const ACTION_ICONS = {
   leaflet: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>`,
   // 一张被撕开的布：撕短褂
   tear: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h5l-2 4 2 3-2 4 2 3-1 4H5zM19 3h-5l2 4-2 3 2 4-2 3 1 4h4z"/></svg>`,
+  // 一枚木柄手榴弹：拾起脚边的活雷掷回去（Script_GrenadeReturn 登记的 kind）
+  grenade: EQUIPMENT_ICONS.grenade,
 };
 ACTION_ICONS.action = ACTION_ICONS.interact;
+
+/**
+ * 近弹图标该钉在屏幕哪里。纯函数，HudPromptTest 直接验。
+ *
+ * `projected` 是装配层投影出来的 {x, y, visible, behind}：屏内就钉在弹上
+ * （再往上提 `liftPx`，像素量——以前是抬 0.45 m 再投影，弹落在脚边一米时
+ * 那 0.45 m 会被近距离透视放大成半个屏幕，图标飘到手雷八丈远的空地上）。
+ * 屏外分两种：还在镜头前面（低头就能看见）就沿屏幕方向贴边——脚边的弹落到
+ * **下沿**；在身后才退回按 yaw 算水平方位（背后 → 下沿，左右 → 侧沿）。
+ */
+export function GrenadeWarningScreenPoint(projected, threat, player, width, height, { liftPx = 26 } = {}) {
+  const centerX = width * 0.5, centerY = height * 0.5;
+  const edgeX = Math.max(40, centerX - 58), edgeY = Math.max(40, centerY - 76);
+  if (projected.visible) {
+    return { x: Math.max(42, Math.min(width - 42, projected.x)), y: Math.max(48, Math.min(height - 48, projected.y - liftPx)), offscreen: false };
+  }
+  let dirX, dirY;
+  if (!projected.behind) {
+    dirX = projected.x - centerX; dirY = projected.y - centerY;
+  } else {
+    const dx = threat.position.x - player.position.x, dz = threat.position.z - player.position.z;
+    const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
+    const forward = dx * -sin + dz * -cos, right = dx * cos + dz * -sin;
+    dirX = right; dirY = -forward;
+  }
+  const length = Math.hypot(dirX, dirY) || 1;
+  dirX /= length; dirY /= length;
+  // 矩形贴边：沿这个方向走到 edgeX × edgeY 的框上，图标永远落在可读区内。
+  const scale = 1 / Math.max(Math.abs(dirX) / edgeX, Math.abs(dirY) / edgeY, 1e-6);
+  return { x: centerX + dirX * scale, y: centerY + dirY * scale, offscreen: true };
+}
 
 /** Scene-owned presentation; identity queries and normal scenes stay unchanged. */
 export function TargetCardPresentation(card, { targetDistance = true } = {}) {
@@ -209,7 +242,10 @@ export function ContextualActionPrompts({
     return prompts;
   }
   if (interaction?.label) {
-    prompts.push({ keys: "F", label: interaction.label, kind: interaction.kind || "interact" });
+    // 拾雷掷回是唯一带倒计时的交互：标签里那个「· 2.9秒」就是决定按不按的信息，
+    // 光一个图标读不出来，所以这一条把字也上屏（其余交互仍只给按键框 + 图标）。
+    const kind = interaction.kind || "interact";
+    prompts.push({ keys: "F", label: interaction.label, kind, text: kind === "grenade" });
   }
   if (Number(bleeding) > 0 && Number(bandages) > 0) {
     prompts.push({ keys: "B", label: T("hud.prompt.bandage"), kind: "bandage" });
@@ -1279,33 +1315,16 @@ export class Hud {
     const box = this.el.grenadeWarnings;
     const width = window.innerWidth;
     const height = window.innerHeight;
-    const centerX = width * 0.5;
-    const centerY = height * 0.5;
-    const edgeX = Math.max(40, centerX - 58);
-    const edgeY = Math.max(40, centerY - 76);
     const count = Math.min(GRENADE_WARNING.maxIcons, threats.length);
 
     for (let i = 0; i < GRENADE_WARNING.maxIcons; i += 1) {
       const el = box.children[i];
       if (i >= count) { el.style.display = "none"; continue; }
       const threat = threats[i];
-      const p = project(threat.position.x, threat.position.y + 0.45, threat.position.z);
-      let x = p.x;
-      let y = p.y;
-      let offscreen = !p.visible;
-
-      if (offscreen) {
-        const dx = threat.position.x - player.position.x;
-        const dz = threat.position.z - player.position.z;
-        const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
-        const forward = dx * -sin + dz * -cos;
-        const right = dx * cos + dz * -sin;
-        const angle = Math.atan2(right, forward);
-        x = centerX + Math.sin(angle) * edgeX;
-        y = centerY - Math.cos(angle) * edgeY;
-      }
-      x = Math.max(42, Math.min(width - 42, x));
-      y = Math.max(48, Math.min(height - 48, y));
+      // 投影的是弹体本身；往上提那一截在屏幕空间里做（见 GrenadeWarningScreenPoint）。
+      const point = GrenadeWarningScreenPoint(
+        project(threat.position.x, threat.position.y, threat.position.z), threat, player, width, height);
+      const { x, y, offscreen } = point;
 
       const urgent = threat.fuse <= GRENADE_WARNING.urgentFuseS;
       const lethal = threat.distance <= threat.dangerRadius * GRENADE_WARNING.lethalRadiusFrac;
@@ -1313,12 +1332,15 @@ export class Hud {
       el.style.left = `${x.toFixed(1)}px`;
       el.style.top = `${y.toFixed(1)}px`;
       el.className = `hudGrenadeWarning${offscreen ? " edge" : ""}`
-        + `${urgent ? " urgent" : ""}${lethal ? " lethal" : ""}`;
+        + `${urgent ? " urgent" : ""}${lethal ? " lethal" : ""}${threat.returnable ? " returnable" : ""}`;
       const kind = threat.kind === "GrenadeBundle"
         ? T("hud.grenade.bundle") : T("hud.grenade.single");
-      el.children[1].textContent = T("hud.grenade.warning", {
-        kind, metres: Math.max(1, Math.ceil(threat.distance)),
-      });
+      // 够得着、还来得及拾起的那一颗，警告本身就写明「F 掷回」——
+      // 玩家看的是脚边那颗弹，不是准星旁的提示条。
+      const metres = Math.max(1, Math.ceil(threat.distance));
+      el.children[1].textContent = threat.returnable
+        ? T("hud.grenade.returnable", { kind, metres })
+        : T("hud.grenade.warning", { kind, metres });
       el.setAttribute("aria-label", T("hud.grenade.aria", { warning: el.children[1].textContent }));
     }
   }

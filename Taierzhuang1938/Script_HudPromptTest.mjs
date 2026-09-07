@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { CONTROL_GUIDE } from "./Script_Input.mjs";
 import {
-  AmmoReadout, ContextualActionPrompts, CrosshairGeometry, ShowTelegraphPaper, TargetCardPresentation,
+  AmmoReadout, ContextualActionPrompts, CrosshairGeometry, GrenadeWarningScreenPoint, ShowTelegraphPaper, TargetCardPresentation,
 } from "./Script_Hud.mjs";
 import { IdentifySystem, TargetCard, IDENTIFY } from "./Script_Identify.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
@@ -81,8 +81,31 @@ const stacked = ContextualActionPrompts({
   slots: { primary: "HanYang", secondary: "ServicePistol" },
 });
 assert.deepEqual(stacked.map((prompt) => prompt.kind), ["pickup", "bandage", "switchWeapon"]);
+// 只有拾雷掷回把字上屏（标签里带引信倒计时）；拾枪那一条仍是按键框 + 图标。
+assert.equal(stacked[0].text, false, "pickup prompt stays icon-only");
+const grenadePrompt = ContextualActionPrompts({ interaction: { label: "拾起并掷回 · 2.9秒", kind: "grenade" } });
+assert.deepEqual(grenadePrompt.map((prompt) => [prompt.kind, prompt.text, prompt.label]), [["grenade", true, "拾起并掷回 · 2.9秒"]]);
 
 console.log("ok  操作说明与情境 HUD 提示条件通过");
+
+// --- 近弹图标钉在哪 ---------------------------------------------------------
+// 以前抬 0.45 m 再投影：弹落在脚边一米时透视把那 0.45 m 放大成半个屏幕，
+// 图标飘到空地上。现在投影弹体本身、只在屏幕空间往上提固定像素。
+const north = { position: { x: 0, y: 0, z: -1.4 } }, guy = { position: { x: 0, y: 0, z: 0 }, yaw: 0 };
+const onScreen = GrenadeWarningScreenPoint({ x: 167, y: 653, visible: true, behind: false }, north, guy, 1440, 900);
+assert.deepEqual(onScreen, { x: 167, y: 653 - 26, offscreen: false }, "visible grenade: icon sits a fixed few px above it");
+// 镜头前、视野下沿之外（平视时脚边的弹）→ 贴**下**沿，不是按 yaw 算成「正前方 → 上沿」。
+const below = GrenadeWarningScreenPoint({ x: 720, y: 1400, visible: false, behind: false }, north, guy, 1440, 900);
+assert.ok(below.offscreen && Math.abs(below.x - 720) < 1 && below.y > 900 * 0.5 + 300, JSON.stringify(below));
+// 身后的弹：屏幕坐标已翻面不可信，退回按 yaw 算 → 下沿。
+const south = { position: { x: 0, y: 0, z: 5 } };
+const behind = GrenadeWarningScreenPoint({ x: 720, y: -300, visible: false, behind: true }, south, guy, 1440, 900);
+assert.ok(behind.offscreen && Math.abs(behind.x - 720) < 1 && behind.y > 450, JSON.stringify(behind));
+// 身后偏右 → 右侧贴边（x 在中心右边、落在框上）。
+const rear = GrenadeWarningScreenPoint({ x: 0, y: 0, visible: false, behind: true }, { position: { x: 5, y: 0, z: 1 } }, guy, 1440, 900);
+assert.ok(rear.x > 720 + 400 && rear.y > 450 && rear.x <= 1440 - 58 + 1, JSON.stringify(rear));
+
+console.log("ok  近弹图标钉在弹上，脚边的弹贴下沿");
 
 // --- 负重时提示条被接管：只剩「怎么把它放下」 --------------------------------
 // 规则那一侧（状态机本身）在 Script_CarryTest；这里只验 HUD 的读法。

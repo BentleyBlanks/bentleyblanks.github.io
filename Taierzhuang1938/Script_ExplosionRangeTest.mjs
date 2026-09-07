@@ -158,12 +158,36 @@ try {
     const p = t.combat.ReturnCandidate();
     if (!p) return { candidate: false, grenades: t.combat.projectiles.map((g) => ({ at: g.position.toArray(), fuse: g.fuse })), player: t.player.position.toArray() };
     const before = { fuse: p.fuse, inventory: t.state.grenades };
+    // HUD 口径：准星旁的 F 提示要把「拾起并掷回 · N秒」的字上屏（不是只有图标），
+    // 近弹警告要写明「F 拾起掷回」；低头看弹时图标必须钉在弹体上，不是飘在屏幕边。
+    const Warning = () => [...document.querySelectorAll(".hudGrenadeWarning")].filter((e) => e.style.display !== "none")
+      .map((e) => ({ cls: e.className, text: e.textContent, x: parseFloat(e.style.left), y: parseFloat(e.style.top) }));
+    const action = document.querySelector(".hudActions .hudAction.grenade");
+    const hud = { actionsOn: document.querySelector(".hudActions").classList.contains("on"),
+      actionText: action?.querySelector(".actionText")?.textContent || null, level: Warning() };
+    const savedPitch = t.player.pitch; t.player.pitch = -0.75; t.StepFrames(2);
+    const q = p.position.clone().project(t.camera);
+    hud.projected = { x: (q.x * 0.5 + 0.5) * innerWidth, y: (-q.y * 0.5 + 0.5) * innerHeight };
+    hud.down = Warning(); t.player.pitch = savedPitch; t.StepFrames(1);
     t.Debug.Key("KeyF"); const claimed = p.returning; t.StepFrames(30);
     const after = { fuse: p.fuse, inventory: t.state.grenades, returned: p.returned, owner: p.owner, attached: !!p.body };
     t.StepFrames(210);
-    return { candidate: true, claimed, before, after, expired: !t.combat.projectiles.includes(p), count: t.combat.returnCount };
+    return { candidate: true, claimed, before, after, expired: !t.combat.projectiles.includes(p), count: t.combat.returnCount, hud };
   });
   assert.ok(result.return.candidate, JSON.stringify(result.return));
+  {
+    const hud = result.return.hud;
+    assert.ok(hud.actionsOn && /掷回/.test(hud.actionText || "") && /秒/.test(hud.actionText || ""), `return prompt shows its label and countdown: ${JSON.stringify(hud)}`);
+    assert.equal(hud.level.length, 1, `one live-grenade warning: ${JSON.stringify(hud.level)}`);
+    assert.ok(/returnable/.test(hud.level[0].cls) && /F/.test(hud.level[0].text), `warning names the return key: ${JSON.stringify(hud.level)}`);
+    // 平视时弹在视野下沿之外：图标贴下沿，不许按 yaw 算成「正前方 → 上沿」。
+    assert.ok(/edge/.test(hud.level[0].cls) && hud.level[0].y > 450, `grenade at the feet pins to the bottom edge: ${JSON.stringify(hud.level)}`);
+    // 低头看见弹：图标钉在弹体投影上方几十像素内，不在屏幕边。
+    assert.equal(hud.down.length, 1);
+    assert.ok(!/edge/.test(hud.down[0].cls) && Math.abs(hud.down[0].x - hud.projected.x) < 8 && hud.projected.y - hud.down[0].y > 10 && hud.projected.y - hud.down[0].y < 60,
+      `warning pins on the visible grenade: ${JSON.stringify({ down: hud.down, projected: hud.projected })}`);
+  }
+  console.log("PASS HUD return prompt text / warning pinned on the grenade");
   assert.ok(result.return.claimed && result.return.after.returned && result.return.after.attached && result.return.expired);
   assert.equal(result.return.after.inventory, result.return.before.inventory, "return does not mint inventory");
   assert.ok(result.return.after.fuse < result.return.before.fuse - 0.45, "return never resets the live fuse");

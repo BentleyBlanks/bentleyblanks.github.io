@@ -102,6 +102,8 @@ export const TEXT = Object.freeze({
   "hud.grenade.single": "手榴弹",
   "hud.grenade.bundle": "集束",
   "hud.grenade.warning": "{kind} {metres}m",
+  // 够得着、还来得及拾起的那一颗：警告本身写明按键（Script_GrenadeReturn 的候选）。
+  "hud.grenade.returnable": "{kind} {metres}m · F 拾起掷回",
   "hud.grenade.aria": "{warning}，附近爆炸物",
 
   // --- 阵亡卡 ---------------------------------------------------------------

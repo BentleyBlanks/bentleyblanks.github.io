@@ -511,6 +511,10 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 .hudGrenadeWarning.edge .ico { border-width: 3px; }
 .hudGrenadeWarning.lethal { color: #e79a63; }
+/* 够得着能掷回的那颗：换成拾雷台那一路的青色，文字里带「F 拾起掷回」，
+   与「离远点」的橙/红警告一眼分开。urgent 的红色脉冲仍压过它。 */
+.hudGrenadeWarning.returnable { color: #7fe3c6; }
+.hudGrenadeWarning.returnable .txt { border: 1px solid rgba(127,227,198,0.55); }
 .hudGrenadeWarning.urgent { color: #e65e46; animation: hudGrenadePulse 0.42s ease-in-out infinite; }
 @keyframes hudGrenadePulse {
   0%, 100% { opacity: 0.72; transform: translate(-50%, -50%) scale(0.94); }
