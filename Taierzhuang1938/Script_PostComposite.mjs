@@ -20,18 +20,29 @@
 // 本次重构**没有改任何一个算式**：分段只是把 main() 里原来的顺序写法搬进函数，
 // 逐比特结果与重构前相同（回归口：探针页三档 ldr 靶逐像素比对）。
 //
-// ## 两个新接口（本阶段都是「接线点在、生产者还没接上」）
+// ## 曝光接口（接线点在、生产者还没接上）
 //   · **曝光** `uExposure`（float）× `uExposureTex`（1×1 靶）。自动曝光落地时
 //     往那张 1×1 里写平均亮度换算出的增益即可，手调偏移仍走 uExposure。
 //     出厂绑一张纯白 1×1，乘出来精确等于 1.0，不改一个比特。
-//   · **雾** `uFogScatter`（全分辨率，rgb = 沿视线累积的散射色，a = 透过率）
-//     + `uFogSource`（0 = 用下面这段解析式自算，1 = 读那张图）。
-//     体积雾 / 物理大气代理只要产出这张图并把 uFogSource 置 1，不用碰 main()。
+//
+// ## 雾这一段现在有三个生产者（2026-09 三个并行子系统汇合，口径见 ApplyFog）
+//   · **B3 froxel 体积雾** —— `uFogScatter`（全分辨率，rgb = 沿视线累积的**绝对散射
+//     亮度**，a = 透过率）+ `uFogSource`（0 = 用内联的解析式自算，1 = 读那张图）。
+//     `uFogSource` **只有一个仲裁点**：`VolumetricsPass.Prepare` 关时归零、
+//     `RenderApply` 真的产出图之后置 1。别的模块一个字都不许写它。
+//   · **B4 物理大气** —— `AERIAL_PERSPECTIVE_GLSL`。出厂只供**雾色**不接管消光
+//     （`uAtmoAerialMode = 0`，用户定论「先别动雾」）。两条雾路都要它：解析路混进
+//     `fogCol`，体积路换远段散射色。
+//   · **取样接口** —— `VOLUMETRIC_SAMPLE_GLSL` 的 `VolumetricFarTransmittance(uv)`：
+//     froxel 只铺到 `uVolumetricFar`，远段归大气，这个函数给的是两段的分界透过率。
 
 import * as THREE from "three";
 import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_PostCommon.mjs";
 // 物理大气（子系统 B4）：ApplyFog 段里的大气透视那几行用它。
 import { AERIAL_PERSPECTIVE_GLSL, BindAtmosphereUniforms } from "./Script_Atmosphere.mjs";
+// froxel 体积雾（子系统 B3）：ApplyFog 要 VolumetricFarTransmittance(uv) 才知道
+// 「这条视线上有多少雾是 froxel 铺不到的远段」—— 远段换色靠它分权重。
+import { VOLUMETRIC_SAMPLE_GLSL, BindVolumetricUniforms } from "./Script_PostVolumetrics.mjs";
 
 const FRAG_COMPOSITE = /* glsl */`
 uniform sampler2D uHdr;
@@ -81,7 +92,8 @@ uniform vec3 uSunDir;
 uniform vec3 uSunColorFog;
 uniform float uDepthDesat;
 uniform float uDepthFlatten;
-// 体积雾 / 物理大气的接线点：rgb = 散射色，a = 透过率。uFogSource=0 时不采样。
+// B3 体积雾的接线点：rgb = 绝对散射亮度（不是可以 mix 的颜色），a = 透过率。
+// uFogSource = 0 时一次都不采样（low 档与体积雾关掉时走内联解析式那一支）。
 uniform sampler2D uFogScatter;
 uniform float uFogSource;
 
@@ -114,6 +126,7 @@ uniform float uFade;        // 黑场
 varying vec2 vUv;
 ${GLSL_COMMON}
 ${AERIAL_PERSPECTIVE_GLSL}
+${VOLUMETRIC_SAMPLE_GLSL}
 
 vec3 AcesFitted(vec3 x) {
   // Stephen Hill 的 ACES 拟合（比 Narkowicz 版在高光处更不容易偏色）
@@ -221,22 +234,66 @@ vec3 DepthOfField(vec3 color, vec2 uv, vec4 nd) {
 // SEGMENT fog —— 距离雾 × 高度雾 + 大气透视（去饱和 / 降对比）
 //
 // 天空（深度 0）不吃解析雾 —— 它自己的着色器里已经有霾了，再叠一层会糊成一块白饼。
-// 体积雾 / 物理大气接上之后走 uFogSource = 1 那条：只换「散射色与透过率从哪来」，
 // 下面那三次 mix（去饱和、降对比、上色）是**大气透视的口径**，两条路共用。
+//
+// 两条路（分界只有 uFogSource 这一位，仲裁点在 VolumetricsPass）：
+//
+//   uFogSource = 1（medium 及以上，B3 在跑）
+//     透过率 T   = uFogScatter.a —— 出厂 legacyTransmittance，与今天那条解析式
+//                  逐像素相同，只把局部雾体（烟幕 / 热烟）的额外光学厚度乘上去。
+//                  所以「同一像素的雾不透明度 ≤ 今天」是恒等式，70 m 能见度不会变差。
+//     散射     = 近段 uFogScatter.rgb（froxel，光柱与被切断的暗带都在这里）
+//                + 远段按 uAtmoAerialBlend 换成 AerialPerspectiveUv 的物理散射色
+//                （换色不加能量，见下面 farShare 那几行）。
+//     组合     = color·T + scatter（**加法**：rgb 是绝对亮度，不是能 mix 的颜色）。
+//
+//   uFogSource = 0（low 档 / 体积雾关掉 / 开机前几帧图集还没产出）
+//     透过率与雾量走内联的解析式高度雾（一个字节都没动），
+//     雾色按 uAtmoAerialBlend 混向物理大气的散射色（B4 出厂模式 0：只供色）。
+//     组合     = mix(color, fogCol, fog)，与 2026-09 之前逐比特相同。
 // ===========================================================================
 vec3 ApplyFog(vec3 color, vec2 uv, vec4 nd) {
   vec3 fogCol;
   float fog;
+  // B3 froxel 体积雾：图里的 rgb 是**已积分的绝对散射亮度**，不是一个可以 mix 的颜色。
+  // 所以体积那条走加法（color·T + scatter），解析那条仍走 mix（scatterAdd 恒 0，逐比特不变）。
+  // 反过来做（scatter / (1-T) 反推 fogCol 再 mix）在 T→1 的近处会除零炸成白斑。
+  vec3 scatterAdd = vec3(0.0);
   if (uFogSource > 0.5) {
-    // 体积雾代理接管：整条视线的散射与透过率由它那张图给。
-    // **它必须自己把大气透视乘进去**（调 AerialPerspectiveUv(uv, 距离)）——
-    // 走到这一支时下面那段大气透视根本不会被调用，只写体积雾就等于
-    // 「近处有雾、远处的空气不见了」。接口与口径见 §17.4。
+    // ===== 近段（0 — uVolumetricFar）：B3 的 froxel 积分 ====================
     // （注释里不许出现反引号：这一整段是 JS 模板字符串，一个反引号就把它截断，
     //   表现是整个模块 SyntaxError、页面白屏 —— 2026-09 已经踩过一次。）
-    vec4 scatter = texture2D(uFogScatter, uv);
-    fogCol = scatter.rgb;
-    fog = clamp(1.0 - scatter.a, 0.0, 1.0);
+    vec4 volume = texture2D(uFogScatter, uv);        // B3 体积采样
+    fog = clamp(1.0 - volume.a, 0.0, 1.0);           // B3 a = 透过率（出厂 legacyTransmittance）
+    scatterAdd = max(volume.rgb, vec3(0.0));         // B3 rgb = 绝对散射亮度
+    fogCol = vec3(0.0);                              // 颜色已经含在 scatterAdd 里
+
+    // ===== 远段（uVolumetricFar 之外）：B4 的大气透视换色 ===================
+    // froxel 只铺到 uVolumetricFar；那之后 B3 在 apply 里用同一条解析式高度雾
+    // 把尾段续上（各向同性 + 美术雾色）。这里把**那一段的颜色**换成物理大气
+    // 算出来的散射色 —— 不接上的话就是 B4 说的「近处有雾、远处的空气不见了」。
+    //
+    // 换色**不加能量**：与解析那一支的 uAtmoAerialBlend 是同一条口径
+    //（用户定论「先别动雾」——透过率与雾量一个字节都不动，换的只是
+    // 「这团空气散出来的光是什么颜色」）。所以下面先把绝对散射除回
+    // 「单位不透明度的平均散射亮度」，混完再乘回去，总量守恒。
+    //
+    // 天空（nd.w <= 0）不进这一支：天穹自己采天空视图 LUT，深度 0 像素吃多少
+    // 体积雾由 B3 的 skyScale 决定（出厂 0 = 与今天逐比特相同）。
+    if (nd.w > 0.0 && fog > 1.0e-4) {
+      // VolumetricFarTransmittance 是 B3 最远切片的透过率 —— apply 那一趟没有把
+      // 它硬归零，正是为了留这个接口。1 − 它 = 近段已经吃掉的不透明度。
+      float nearOpacity = 1.0 - VolumetricFarTransmittance(uv);
+      float farShare = clamp((fog - nearOpacity) / fog, 0.0, 1.0);
+      float aeroWeight = clamp(uAtmoAerialBlend, 0.0, 1.0) * farShare;
+      // 权重恰好为 0（近景像素 / 大气关着）时一个乘除都不做：近段光柱逐比特不变。
+      if (aeroWeight > 0.0) {
+        float dist = length(ViewPos(uv, nd.w));
+        vec4 aerial = AerialPerspectiveUv(uv, dist);
+        float aeroOpacity = max(1.0 - aerial.a, 1.0e-4);
+        scatterAdd = mix(scatterAdd / fog, aerial.rgb / aeroOpacity, aeroWeight) * fog;
+      }
+    }
   } else {
     if (nd.w <= 0.0) return color;
     vec3 fogViewPos = ViewPos(uv, nd.w);
@@ -281,7 +338,9 @@ vec3 ApplyFog(vec3 color, vec2 uv, vec4 nd) {
   float fogLum = Luma(color);
   color = mix(color, vec3(fogLum), fog * uDepthDesat);
   color = mix(color, vec3(0.42), fog * uDepthFlatten);
-  return mix(color, fogCol, fog);
+  // B3：解析路 scatterAdd = 0，mix(color, fogCol, fog) 原样保留；
+  // 体积路 fogCol = 0，mix 退化成 color·(1−fog) = color·T，再加上积分出来的散射。
+  return mix(color, fogCol, fog) + scatterAdd;
 }
 
 // ===========================================================================
@@ -441,6 +500,10 @@ export class CompositePass {
     // AtmospherePass 在第一帧把 SkyDome 那台大气的**同一批 uniform 对象**换上来。
     // 名字不变所以不触发重编译；大气整个关掉时这份占位仍然让着色器编得过。
     BindAtmosphereUniforms(this.uniforms, null);
+    // 体积雾的取样接口（`VolumetricFarTransmittance`）。这里只建条目、置
+    // uVolumetricEnabled = 0；真正的登记与逐帧同步由 VolumetricsPass 的构造器接手
+    // （它比本 pass 后建，`BindVolumetricUniforms` 是幂等的，条目对象不会被换掉）。
+    BindVolumetricUniforms(this.uniforms, null);
     this.material = MakeFullscreenMaterial(FRAG_COMPOSITE, this.uniforms);
     this.target = null;
   }

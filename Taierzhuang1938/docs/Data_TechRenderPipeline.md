@@ -827,7 +827,14 @@ void main() {
 ```
 `uDecay` 0.95–0.97、`uWeight` 4–6、`uDensity` 0.7–0.95。合成时用 **screen 混合**而非直加，避免天空过曝：`col = 1.0 - (1.0 - col) * (1.0 - god * uGodStrength)`。
 
-### 6.2 raymarch 体积雾（光柱穿过烟尘）
+### 6.2 raymarch 体积雾（历史稿：**没有实装这一版**，现状见 §17）
+
+> **这一节是 2026-09 之前的设计期草案，实际落地的是 §17 的 froxel 方案。**
+> 差别不只是「半分辨率 raymarch」换成「froxel 网格」：这里这一版没有时域重投影
+> （单帧 28 步必然是噪点或环带）、没有局部光、没有局部雾体、也没有把
+> **透过率**与今天的解析雾对齐（那是用户硬约束「先别动雾」的落点）。
+> 留着它是因为下面那段 `sampler2DShadow` 的坑仍然成立，而且 §17 就是从它长出来的。
+
 这是"3A 感"里性价比最高的一项，因为它同时给出**景深层次**和**光的可见形状**。半分辨率、24–32 步、吃 CSM cascade0 的阴影图。
 
 **关键坑**：三方给阴影 `DepthTexture` 设了 `compareFunction = LessEqualCompare`（只在 `PCFShadowMap` 下），此时它是一张 **shadow 采样器纹理**，用 `sampler2D` 绑定是 UB（多数驱动返回 0 → 全屏黑雾）。必须声明成 `sampler2DShadow`：
@@ -2738,3 +2745,242 @@ node Taierzhuang1938/Script_PostFrameGraphTest.mjs        # 帧图顺序（atmos
 ```
 
 `Script_AtmosphereTest` 的三个阈值分别在守什么，写在那个文件的抬头 —— 改阈值之前先读它。
+
+---
+
+## 17. 体积雾 / 体积光（froxel，2026-09）
+
+> 2026-09 这一轮有八个并行子系统各自往这份文档追加章节，**节号会撞**。
+> 认文件名不认节号：本节对应 `Script_PostVolumetrics.mjs`。
+
+`Script_PostVolumetrics.mjs` / `Data_Tuning_Volumetrics.mjs` / `Script_VolumetricsTest.mjs`。
+出厂 medium 及以上开；low 保留合成 pass 里的解析式高度雾（fallback 路径永久保留）。
+**旧的 §6.2 是设计期草案，没有实装。**
+
+### 17.0 一句话：不是换了一套雾，是把同一套雾的散射项拆开按位置着色
+
+今天的解析雾：`out = mix(color, fogCol, fog)`，`fog = clamp((1-exp(-d·ρ))·hFall, 0, max)`。
+体积雾：`out = color·T + ∫σ_s·L·T(t)dt`。均匀介质、`L = fogCol`、反照率 1 时那个积分
+**恰好等于** `fogCol·(1-T)`，而 `T = 1-fog` —— 两条式子同一个答案。
+
+所以 froxel 体积雾在本作里的定位是：把 `fogCol` 从「整条视线上的一个常数」变成
+「逐 froxel 着色」。晒得到太阳的 froxel 多一份 HG 前向散射（**光柱**），
+被墙挡住的没有（**光柱被几何切断**），火与照明弹周围的多一份点光散射。
+雾的**量**不变，变的是雾**在哪儿亮**。
+
+这条等价关系是整个模块的校准锚点，`Script_VolumetricsTest` 逐像素验它。
+
+### 17.1 文献与对应关系
+
+| 出处 | 这里怎么用的 | 有意的偏离 |
+|---|---|---|
+| Wronski, *Volumetric Fog: Unified Compute Shader Based Solution to Atmospheric Scattering*（AC4, SIGGRAPH 2014） | froxel 网格 + 注入/积分两趟 + 时域重投影 | 没有 compute shader（WebGL2 没有）：网格平铺成 2D 图集，两趟都是全屏 blit |
+| Hillaire, *Physically Based and Unified Volumetric Rendering in Frostbite*（SIGGRAPH 2015） | 解析切片积分 `S·(1-exp(-σ·dz))/σ`、散射/消光分离、局部雾体 | 单次散射，没有多次散射近似；相函数只有 HG 一项 |
+| UE *Volumetric Fog* | 指数深度分布、0.9 历史权重、局部雾体 + 局部光进雾 | 没有体素化的间接光（本作的 GI 是探针体，不进雾）；阴影只有太阳一盏 |
+| Henyey & Greenstein 1941 | 相函数 | 按**峰值**归一（`uPhase.y = (1-g)²/(1+g)`），让 `sunGain` 的口径与今天的 `pow(cos,8)·sunGain` 峰值相同 |
+
+### 17.2 帧内位置
+
+帧图里是**三行**（profiler 逐段归账才看得出钱花在哪），插在 `main` 之后、
+`wireframe` 之前：
+
+```
+ prepass → hzb → ssao → main
+   → volumetricInject → volumetricIntegrate → volumetricApply        ← 本节
+   → wireframe → debugOverlay → taa → godPrepare → bloom → god
+   → composite → fxaa
+```
+
+排在 `main` 之后是因为注入那一趟要采**本帧**的太阳阴影图，而阴影是 three 在第一次
+`renderer.render` 里烘的。它不读场景颜色（只读预通道的法线深度靶），所以放在 TAA
+之前之后都行；挑这里是为了让「关掉体积雾」在剖析器里干净地少三行。
+
+**屏幕空间太阳拖影（`god`）在体积雾开着时一律不给**（`Script_Main.RenderScene` 的
+`godStrength` 那一行）：两者叠加是双份前向散射，而径向模糊不认遮挡 ——
+光柱被建筑切断的那条线会被它重新糊回去。low 档是它保留下来的唯一场合。
+
+### 17.3 图集布局
+
+froxel 网格存成一张 **2D 图集**（切片平铺），不是 `Data3DTexture`：WebGL2 的 FBO
+一次只能挂 3D 纹理的**一层**，逐层 `setRenderTarget` 就是 z 次 draw call（high 档 64 次），
+而本作的瓶颈正是 CPU 提交（~15 ms/帧）。平铺之后注入与积分各只要一次全屏 blit。
+
+| 档 | froxel | tile 平铺 | 图集 | RGBA16F 显存（×3 张） |
+|---|---|---|---|---|
+| low | —（解析雾） | — | — | 0 |
+| medium | 120×68×48 | 8×6 | 960×408 | 3.1 MB ×3 |
+| high | 160×90×64 | 8×8 | 1280×720 | 7.4 MB ×3 |
+| ultra | 240×135×96 | 12×8 | 2880×1080 | 24.9 MB ×3 |
+
+三张 = 注入乒乓两张（时域重投影的历史）+ 积分一张。另有一张全分辨率 RGBA16F
+的 `volumetricFog`（apply 的输出，Composite 的 `uFogScatter`）。
+
+深度切片按**指数**分布：`depth(t) = near·(far/near)^t`，`t = (k + jitter)/NZ`。
+积分图集里切片 k 存的是 **0 到它远边界 `b(k+1)`** 的积分，所以采样下标要 −1。
+**双线性不许跨 tile 渗色**：`VolAtlasUv` 把 cell uv 夹在 tile 内半纹素。
+
+### 17.4 uniform 与对外接口
+
+| 名字 | 谁产出 | 谁消费 |
+|---|---|---|
+| `uFogScatter`（全分辨率 RGBA16F：rgb = 绝对散射亮度，a = 透过率）+ `uFogSource = 1` | `volumetricApply` | `Script_PostComposite.ApplyFog` |
+| `post.targets.volumetricScatter` / `volumetricIntegrated` / `volumetricFog` | 本模块 | 调试面板、集成方 |
+| `VOLUMETRIC_SAMPLE_GLSL` + `BindVolumetricUniforms(uniforms, pass)` | 本模块 | 粒子 / 水面 / 透明件按**自身世界坐标**取同一份雾：`vec4 SampleVolumetricFog(vec3 worldPos)` |
+| `VolumetricFarTransmittance(vec2 uv)` | 同上那块 GLSL | **物理大气代理**：体积雾覆盖 0..`far`，把 aerial perspective 乘上这个值即可。apply 在最远切片处**没有把透过率硬归零**，就是为了留这个接口 |
+| `post.volumetricsPass.AddFogVolume / UpdateFogVolume / RemoveFogVolume` | 玩法侧 | 烟幕、炮击烟、着火房屋的热烟、河面薄雾 |
+| `SunShadowVisibilityCheap(vec3 worldPos)` | **CSM 代理**（未落地时本模块自带 `#ifndef SUN_SHADOW_HAS_CHEAP` 的 fallback） | 注入那一趟 |
+| 局部点光列表 | `LightRig`。三选一按「灯多的优先」：① `GetClusterLightData().lights[]`（**簇状多光源**，世界坐标 + 已乘强度的线性色 + 半径，按镜头贡献排过序）② `fireLights` + `muzzle`（今天的定长灯池，零分配）③ `GetEffectLightState().active`（兜底） | 注入那一趟，取前 `MAX_VOLUMETRIC_LIGHTS`（8）盏 |
+
+Composite 侧只动了 `ApplyFog` 一段：体积路走**加法**（`color·T + scatter`），
+解析路仍走 `mix`（`scatterAdd` 恒 0，逐比特不变）。反过来做
+（`scatter/(1-T)` 反推 fogCol 再 mix）在 `T→1` 的近处会除零炸成白斑。
+
+### 17.5 三条硬约束（用户定论「先别动雾」）
+
+七十米外能不能看见敌人由雾决定。**体积雾增加的是近处光柱与空气层次，不是能见度损失。**
+三道闸，缺一不可：
+
+1. **噪声只做减法**：`σ *= 1 - noiseAmount·fbm`（fbm∈[0,1]）。最浓的 froxel
+   恰好等于基础密度，绝不会比今天更浓。噪声还在 `noiseFar`（默认 95 m）之外淡出，
+   远景严格按基础密度走。
+2. **`densityScale ≤ 1`**，逐预设算出来的（`Data_Tuning_Volumetrics` 里每一行都有）：
+   解析雾是 `(1-exp(-ρd))·hFall`（高度因子按**着色点**乘在整段上），物理积分是
+   `exp(-∫ρ·hFall(y)ds)`，两者只在 `y = fog.base` 处相等，眼高处物理式略浓；
+   densityScale 就是把那点差补回来的系数。
+3. **`legacyTransmittance`（出厂 true）**：apply 那一趟把**透过率**换回今天那条解析式，
+   只把**局部雾体多出来的**光学厚度乘上去。于是「同一像素的雾不透明度 ≤ 今天」是
+   **逐像素恒等式**，不是靠调参保证的。烟幕、热烟仍照常挡视线 —— 它们本来就该挡。
+
+关掉第 3 道闸（走纯物理）时，第 1、2 道仍保证眼高 ~2.6 m 以内、70 m 处的透过率
+不低于今天。`Script_VolumetricsTest` 的 A 段（纯 Node）逐预设把两个数都算出来对账。
+
+### 17.6 已知的近似（都是有意的，别当 bug 修）
+
+* **单次散射**。没有多次散射近似（Frostbite 那套 `σ_s·albedo^n` 的多重反弹叠加）。
+  厚烟里应该有的「烟自己发亮」靠 `albedo` 与局部点光近似。
+* **只有太阳投影进雾**。局部点光不投阴影 —— 一盏火在墙那边，雾照样被它照亮。
+  簇光代理扩容灯池之后这条不变（阴影预算仍只有太阳一张图）。
+* **froxel 只有 `MAX_VOLUMETRIC_LIGHTS` = 8 盏局部光、`MAX_FOG_VOLUMES` = 8 块雾体**，
+  按到相机的距离裁。密集炮击时远处的火会被裁掉。
+* **`far` 之外是解析尾段**：同一条高度雾闭式（4 点中点积分）续上，只有各向同性项，
+  没有光柱。260 m 之外本来也看不出光柱。再远交给物理大气的 aerial perspective。
+* **高度雾的积分口径与解析雾不同**（见 17.5 第 2 条）：解析雾把 hFall 按**着色点**
+  乘在整段上，froxel 是真的沿射线积分。离地 1 个 falloff 以上的射线（屋顶、城墙、
+  飞机）物理版更浓 —— 这是修正不是回归，而且出厂的 legacyTransmittance 把透过率
+  钉在今天那条上，只有走纯物理模式才看得到。
+* **深度 0 的像素出厂不吃雾**（`skyScale = 0`，与今天逐比特相同）。
+  「取最远切片」那条路整套都实装了、也验过（`Script_VolumetricsTest` 把 skyScale 顶到
+  1 逐像素对账），画面上确实更好 —— 实测 Probe 街景开了之后地平线白化、屋脊线与天
+  之间那条硬边没了，整体均值只降 1.4%–9%，全部落在最亮那两档（天）上。
+  **但不能出厂开**：预通道里「深度 0」不只是天空 —— 粒子、烟、水面这些
+  `skipNormalDepth` 的东西全在同一个桶里。给这一桶上整整一列 280 m 的雾，
+  五十米外那根烟柱就被当成天边的霾；而它自己那份 `AERIAL` 解析雾还照旧在算
+  （BootTest 的「粒子层的雾接上了」看的就是它），于是变成双份。
+  试过「体积雾在跑时把粒子那份停掉」——**BootTest 七关全红**，那条断言守的正是
+  「粒子层的雾必须接上」，不该为了让自己变绿去动它。
+  要开 skyScale 得先解决其中之一：让半透明件也有深度（另开一张覆盖靶），
+  或者让天穹自己在着色器里吃这份雾（物理大气代理的地盘，
+  `VolumetricFarTransmittance()` 就是给它留的接口）。
+* **噪声按帧序漂移**（`ctx.frame/60`），不是按真实秒。30 fps 下烟走得慢一半。
+  换成秒会让逐轮截图比对失效 —— 决定论优先（本仓库的老规矩）。
+* **粒子与半透明件仍走它们自己那份解析雾**（`Script_Vfx` 的 `AERIAL`）。
+  上一条已经说明为什么：体积雾不碰深度 0 那一桶，所以两者不会双份，也不会互相冲突。
+  `VOLUMETRIC_SAMPLE_GLSL` 已经导出，粒子要换成按自身世界坐标采体积雾随时能接 ——
+  换的时候要连着把 `skyScale` 一起想清楚，两件事是同一个问题的两半。
+  **水面本来就不在这条里** —— 它虽然也是 `skipNormalDepth`，但 `nd.w` 上留的是
+  身后河床的深度（不是 0），照常走 legacy 那条，与今天逐比特相同。
+* **时域重投影只做出界降权**，没有做邻域裁剪（TAA 那套 YCoCg AABB）。
+  雾是低频量，遮挡变化时会有约 10 帧的拖尾；快速转身时网格边缘会短暂变噪
+  （调试视图「体积重投影」看得到）。
+
+### 17.6b 光柱有多强：`sunScale` × `ambientScale` 这一对（**待定夺的美术口径**）
+
+出厂 `sunScale = 1.0`，含义是「正对太阳、无遮挡时，雾色与今天那条
+`pow(cos, 8) · fog.sunGain` 的峰值**完全相同**」。于是相对今天：
+**照到太阳的空气不变，被挡住的空气少掉那一份** —— 「建筑阴影处不发亮」成立，
+但读起来是「阴影里的空气暗下去了」，不是「光柱亮起来了」。
+实测 Probe 街景（dawn / burningStreet / night 九个机位）整帧均值只动 −0.4% ～ −1.7%；
+结构在「体积散射」调试视图上非常清楚（建筑把一条亮楔子切成两半），
+在正片画面上是含蓄的一层。
+
+想要更戏剧化的光柱，是**同一对旋钮**的事，而且可以保持整体雾量不变：
+把 `sunScale` 抬到 1.3–2.0，同时按「亮部占比 f ≈ 0.5」把 `ambientScale` 压
+`f × (sunScale − 1) × sunGain / ambient` 那么多。sunScale = 2 时 dawn 的
+亮/暗空气对比从 1.7× 拉到 3.0×。
+
+**没有出厂这么调**：那是把画面往「更戏剧」推的美术决定，用户在雾这件事上留过
+「先别动雾」的定论，不该由渲染这一侧单方面改。旋钮与算式都在
+`Data_Tuning_Volumetrics`，要哪一档改哪一档，一行的事。
+
+### 17.7 调试视图（Debug Rendering 面板「体积雾」组）
+
+| 视图 | 看什么 |
+|---|---|
+| 体积密度 `volumetricDensity` | 这一像素背后那颗 froxel 的 σ_t（0–0.15 /m 满量程）。烟幕/热烟铺得对不对看它 |
+| 体积散射 `volumetricScatter` | 积分出来的绝对散射亮度。光柱、被建筑切断的暗带、火照亮的空气全在这张上 |
+| 体积透过率 `volumetricTransmittance` | 合成 pass 实际吃到的透过率。legacy 模式下它与今天的解析雾**逐像素相同** |
+| 体积重投影 `volumetricReproject` | 历史权重：绿 = 采纳，红 = 只能用本帧抽样 |
+
+pass 自带调试视图的登记方式是 `GetDebugSource(view)`（`Script_PostDebug.GetSource`
+会遍历 `passes` 问一遍）—— 八个并行子系统各带两三个视图，集中在一张表里必然天天冲突，
+所以 2026-09 这一轮把它改成了 pass 自己登记。
+
+### 17.8 成本（实测）
+
+RTX 4070 SUPER / ANGLE-D3D11，正片 `?shot=1&phase=1`，**3394×1348**，
+逐 pass GPU 计时（`FrameProfiler` 的 `EXT_disjoint_timer_query_webgl2`），
+体积雾开/关**交替各 5 轮**取中位数：
+
+| 档 | froxel | 图集 | inject | integrate | apply | 合计 | composite Δ |
+|---|---|---|---:|---:|---:|---:|---:|
+| medium | 120×68×48 | 960×408 | 0.040 ms | 0.050 ms | 0.122 ms | **0.212 ms** | +0.041 ms |
+| high | 160×90×64 | 1280×720 | 0.082 ms | 0.124 ms | 0.077 ms | **0.283 ms** | +0.035 ms |
+| ultra | 240×135×96 | 2880×1080 | 0.235 ms | 0.620 ms | 0.080 ms | **0.934 ms** | +0.037 ms |
+
+`apply` 是**全分辨率**的，与 froxel 网格无关（三档都在 0.08–0.12 ms，差别是场景噪声）；
+`inject` 跟 froxel 数线性走（medium→high→ultra = 0.39 / 0.92 / 3.11 M froxel，
+0.040 / 0.082 / 0.235 ms，比例对得上）。
+`integrate` 涨得更快（0.050 / 0.124 / 0.620）：那一趟每个片元要从第 0 片循环到自己这一片，
+总取样数是 **froxel 数 × (NZ+1)/2**，NZ 从 48 涨到 96 时又多一倍。
+ultra 仍在 1 ms 以内，high 是它的三分之一。
+
+逐轮离散度很小（inject 0.080–0.088 / integrate 0.124–0.132 / apply 0.077–0.085），
+因为这三趟是纯全屏 blit，不受场景状态影响。**整帧 gpuTotal 的 on/off 差值不可用**：
+它被 prepass 与 main 的几毫秒漂移（AI、烟火、别的 agent 同时在跑浏览器测试）盖过，
+单向先后测会把那点漂移算成特性开销 —— 逐段计时才是这一项的正确量法。
+
+CPU 侧：draw call +4（三趟 blit 与它们的靶切换），提交耗时在噪声以内。
+
+**计时查询的坑**：ANGLE/D3D11 上 `QUERY_RESULT_AVAILABLE` 要**过一个 event-loop turn**
+才翻过来。在一个 `page.evaluate` 里连着 `StepFrames` 推几十帧的话，`FrameProfiler._Poll`
+一次都收不到结果，`pending > 8 就丢最老的` 会把整批扔掉（症状是逐段全 null）。
+每帧之间 `await setTimeout(0)` 才量得到。
+
+### 17.9 怎么验
+
+```bash
+node Taierzhuang1938/Script_VolumetricsTest.mjs     # 本节的看门狗（Node 对账 + 四时段真浏览器）
+node Taierzhuang1938/Script_PostFrameGraphTest.mjs  # 帧图地基（pass 顺序现在断言的是子序列）
+node Taierzhuang1938/Script_PostTest.mjs            # 合成暗部 + TAA 基本盘
+node Taierzhuang1938/Script_EditorTest.mjs          # Debug Rendering 全部视图
+node Taierzhuang1938/Script_FlareTest.mjs           # 照明弹（走火源池 = 体积雾的局部光）
+```
+
+**展示类 pass 一定要读回像素**：GLSL ES 3.00 保留字（`sample` / `filter` / `input` /
+`output` / `half` / `noise1..4` …）编译失败时 three 只在控制台留一行，那一趟什么都不画。
+本轮还踩到一条 JS 侧的同类坑：**GLSL 模板字面量里的注释不能带反引号**
+（`` `mix(...)` `` 会把模板提前闭合，报 `Unexpected identifier 'mix'`）。
+
+### 17.10 本轮踩到的三条（都写进回归口了）
+
+1. **`uSunShadowMap` 为 null 会让整趟 draw 被丢掉。** three 绑的是它内部那张从没上传过的
+   `emptyShadowTexture`，ANGLE-D3D11 给 1282 INVALID_OPERATION，注入图集变成 clear 值 ——
+   画面上就是「雾突然没了」，而 `renderer.info` 一切正常。可达路径：开机头几帧阴影图还
+   没烘出来、画质面板把阴影整体关掉。现在有一张真的清过一次的 1×1 深度靶兜底。
+   回归口：`Script_VolumetricsTest` 的「阴影图不可用时仍照常出雾」。
+2. **A/B 对照必须钉死 `post.frame`。** froxel 的 xy/z 抖动与噪声漂移都由帧序驱动，
+   不钉的话两次注入是两批不同的抽样 —— 第一版量「关掉阴影」时反而有 10% 的 froxel
+   变亮了，那全是抖动噪声。钉死之后 `brighter` 精确为 0。
+3. **别拿 `castShadow = false` 当「关掉阴影」的 A/B。** 它会让 `SyncShadowUniforms`
+   把 `uSunShadowMap` 置 null，于是撞上第 1 条 —— 量到的不是「没有阴影」而是
+   「什么都没画」。正确做法是 `UnregisterShadowUniforms` 之后只翻 `uSunShadowEnabled`。

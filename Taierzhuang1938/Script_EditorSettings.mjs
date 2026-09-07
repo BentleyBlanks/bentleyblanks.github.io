@@ -258,11 +258,25 @@ export class GraphicsSettings {
       Note(reflect, "SSR 需 medium 及以上档位（low 档连追踪靶都不建）。");
     }
 
+    // froxel 体积雾。low 档没有 froxel 网格，这一位打开也只是空转；面板照常给，
+    // 因为「读数」那一栏会照实说当前用的是体积雾还是解析雾（不跟着开关喊）。
+    const fogSection = Section(body, "体积雾 / 体积光");
+    const fogBox = document.createElement("div");
+    fogBox.className = "edBtns";
+    fogSection.appendChild(fogBox);
+    Toggle(fogBox, "froxel 体积雾", gfx.volumetrics !== false, (on) => {
+      gfx.volumetrics = on;
+      this.Apply();
+    });
+    Note(fogSection, "带阴影的体积雾：光柱会被建筑切断，火与照明弹会照亮周围的空气。"
+      + "关掉退回合成 pass 里的解析式高度雾（low 档出厂就是那一条）。"
+      + "透过率与解析雾逐像素相同，开关它不改变七十米外的能见度。");
+
     const post = Section(body, "后处理强度（倍率）");
     const godBox = document.createElement("div");
     godBox.className = "edBtns";
     post.appendChild(godBox);
-    Toggle(godBox, "体积光", gfx.godEnabled === true,
+    Toggle(godBox, "屏幕空间体积光（体积雾关时才生效）", gfx.godEnabled === true,
       (on) => { gfx.godEnabled = on; this.Save(); });
     const Mul = (key, label) => Slider(post, {
       label, min: 0, max: 2, step: 0.05, value: gfx[key],
@@ -311,6 +325,10 @@ export class GraphicsSettings {
     gfx.firstPersonSelfShadowSoft = false;
     gfx.atmosphere = true;
     gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
+    // 体积雾的出厂值跟画质档走（medium 及以上开），不是固定的 true —— 同 TAA 那条先例。
+    // 读的是 froxel 网格在不在（VOLUMETRIC_GRIDS 里 low 是 null），不是 preset 那一位：
+    // 后者已经被 ApplyGraphics 按当前开关改写过，拿它当出厂值等于恢复了个寂寞。
+    gfx.volumetrics = !!this.host.post?.volumetricsPass?.grid;
     gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;
     gfx.gi = false; gfx.giStrength = 1;
     // SSR 的出厂值跟画质档走（medium 及以上开），和 TAA 同一个先例：
@@ -360,6 +378,14 @@ export class GraphicsSettings {
           ? `开（${this.host.post.preset.ssrScale === 1 ? "全" : "半"}分辨率 · ${this.host.post.preset.ssrSteps} 步）`
           : "关")
         : "本档不可用");
+      // 读的是管线**实际在跑**的那条路（uFogSource），不是设置里那一位：
+      // 网格没有、这一档天光 density = 0、开机前几帧都会照实说「解析式高度雾」。
+      const volumetrics = this.host.post.volumetricsPass;
+      const grid = volumetrics?.grid;
+      const on = this.host.post.uniformsComposite?.uFogSource.value > 0.5;
+      f.Set("雾", on && grid
+        ? `froxel 体积雾 ${grid.x}×${grid.y}×${grid.z}`
+        : "解析式高度雾（合成 pass 内联）");
     }
     void post;
     const canvas = this.host.canvas;

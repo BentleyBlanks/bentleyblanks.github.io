@@ -457,7 +457,12 @@ const graphics = {
   taa: post.taaEnabled,
   // 体积光临时关停（性能观察期）：god 仍是强度倍率，godEnabled 是整个 pass 的总闸，
   // 关掉时连径向模糊那一趟都不跑。想恢复把出厂值改回 true 即可。
+  // **froxel 体积雾开着时它一律不生效**（见 RenderScene 的 godStrength 那一行）：
+  // 屏幕空间径向模糊与真体积光柱叠加就是双份，而且前者的拖影不认遮挡。
   godEnabled: false,
+  // froxel 体积雾 / 体积光。出厂值跟画质档走（medium 及以上开，low 保留解析式高度雾），
+  // 与 TAA 同一个先例：布尔开关不是倍率，所以不套 Mul 那套约定。
+  volumetrics: !!post.preset.volumetrics,
   // 实时探针体默认关。默认间接光由 Global SH Probe + AmbientColor 提供；打开时
   // 才跑五个 GI pass/帧，并在图集收敛后渐进接管室内与墙角的反弹光。
   gi: params.get("gi") === "1", giStrength: 1,
@@ -7267,6 +7272,11 @@ function RenderScene(dt) {
   // 预通道靶（判断背景是不是天空 + 软粒子）、雾参数、太阳方向（雾的朝阳增益）。
   // SetSize 会重建靶，纹理引用每帧都可能换，所以每帧重接，不能只在初始化接一次。
   vfx.SetDepthSource(post.NormalDepthTexture, post.width, post.height);
+  // 粒子那份解析雾照常接（BootTest 的「粒子层的雾接上了」就是看它）。froxel 体积雾
+  // **不碰深度 0 那一桶**（`Data_Tuning_Volumetrics` 的 skyScale 出厂为 0）：
+  // 天空、天空前的烟、任何 skipNormalDepth 的半透明件都还归粒子/天穹自己管。
+  // 理由见 docs/Data_TechRenderPipeline.md §17.6 —— 合成 pass 认不出「天空」和
+  // 「五十米外那根烟柱」，给这一桶上最远切片的雾会让烟柱吃到整整一列的雾量。
   vfx.SetFog(preset.fog, preset.sunColor);
   vfx.SetSun(sky.sunDirection);
   // 水面与粒子层同一批账：时间推进 + 深度源每帧重接（SetSize 会换纹理引用）
@@ -7329,7 +7339,14 @@ function RenderScene(dt) {
     fog: preset.fog,
     exposure: preset.exposure,
     bloom: preset.bloom * graphics.bloom,
-    godStrength: graphics.godEnabled ? preset.godStrength * graphics.god : 0,
+    // 屏幕空间太阳拖影：**froxel 体积雾开着时一律不给**。两者叠加是双份前向散射，
+    // 而径向模糊不认遮挡 —— 光柱被建筑切断的那条线会被它重新糊回去。
+    // low 档（没有体积雾）仍可用，这是它保留下来的唯一场合。
+    godStrength: (graphics.godEnabled && !post.preset.volumetrics)
+      ? preset.godStrength * graphics.god : 0,
+    // 体积雾按预设名查 Data_Tuning_Volumetrics（相函数、烟尘噪声、覆盖距离）。
+    // pass 也能靠 fog 块的对象同一性反查，这里显式给一份更稳（过场自带天光时尤其）。
+    skyPreset: skyName,
     saturation: preset.saturation * (1 - suppression * 0.35),
     contrast: preset.contrast,
     grain: (skyName === "night" ? 0.020 : 0.014) * graphics.grain,
@@ -7482,6 +7499,12 @@ function ApplyGraphics() {
   if (post.taaJitterScale !== graphics.taaJitterScale) post.hasTaaHistory = false;
   post.taaJitterScale = graphics.taaJitterScale;
   post.sharpenStrength = graphics.sharpen;
+  // froxel 体积雾：只是一位开关（靶与材质在 PostPipeline 构造期按画质档定死）。
+  // 关掉时 VolumetricsPass.Prepare 会把 Composite 的 uFogSource 归零，
+  // 合成 pass 当帧就退回解析式高度雾 —— 不留一张陈旧的散射图在那儿。
+  // low 档没有 froxel 网格（VOLUMETRIC_GRIDS.low = null），pass 自己就恒不跑，
+  // 所以这里不用再查一遍档位表 —— 玩家在 low 上打开这一位也只是空转一个布尔。
+  post.preset.volumetrics = graphics.volumetrics !== false;
   lights.sun.shadow.bias = graphics.shadowBias;
   lights.sun.shadow.normalBias = graphics.shadowNormalBias;
   lights.shadowExtent = graphics.shadowExtent;

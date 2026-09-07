@@ -272,12 +272,28 @@ try {
 await browser.close();
 server.close();
 
-// 2026-09 SSR 落地插了两行：`ssr`（min-Hi-Z + 追踪 + 解算 + 时域，必须在 main
-// 之前 —— 材质那一趟要采它的靶）与 `ssrColor`（TAA 解算后的 HDR 降成带 mip 的
-// 「上一帧场景色」，供下一帧取色）。物理大气的 `atmosphere`（刷天空视图 / 大气透视 LUT）
-// 排在最前：天穹与材质都要采它。
+// **相对顺序**才是契约（AO 在主场景之前、泛光在 tonemap 之前、抗锯齿在 sRGB 之后
+// —— 错一条画面立刻塑料）；并行子系统按 §1.11 往这张列表里插自己那几行，所以断言
+// 的是「子序列 + 名字不重复」而不是「全等」。全等断言会让每一个新 pass 都把别人的
+// 回归口撞红，等于逼着大家改这一行 —— 而真正要守的东西（相对次序）子序列一样守得住。
+//
+// 已经落地的四条插入（写全，好让「谁被谁挤走了」在这一行里就看得出来）：
+//   · atmosphere —— B4 物理大气，排在最前：天穹与材质都要采它刷的两张 LUT；
+//   · ssr / ssrColor —— B5 屏幕空间反射。ssr 必须在 main **之前**（材质那一趟要采
+//     它的靶），ssrColor 在 taa 之后（取的是解算过、已卸抖动的那一张）；
+//   · volumetricInject / volumetricIntegrate / volumetricApply —— B3 froxel 体积雾，
+//     在 main 之后（要本帧烘好的太阳阴影图）、composite 之前（apply 那一趟才把
+//     uFogScatter 与 uFogSource 接上）。
 const EXPECTED_ORDER = ["atmosphere", "prepass", "hzb", "ssr", "ssao", "main", "wireframe", "debugOverlay",
+  "volumetricInject", "volumetricIntegrate", "volumetricApply",
   "taa", "ssrColor", "godPrepare", "bloom", "god", "composite", "fxaa"];
+
+/** EXPECTED_ORDER 是不是 actual 的子序列（顺序不许乱，中间可以插新 pass）。 */
+function IsOrderedSubsequence(expected, actual) {
+  let cursor = 0;
+  for (const name of actual) if (name === expected[cursor]) cursor += 1;
+  return cursor === expected.length;
+}
 
 const checks = [];
 function Check(name, ok, detail = "") {
@@ -287,8 +303,11 @@ function Check(name, ok, detail = "") {
 if (!result) {
   Check("页面取证成功", false, problems.join(" | "));
 } else {
-  Check("帧图 pass 顺序未变",
-    JSON.stringify(result.passOrder) === JSON.stringify(EXPECTED_ORDER),
+  Check("帧图地基 pass 的相对顺序未变（新 pass 可以插进来，次序不许乱）",
+    IsOrderedSubsequence(EXPECTED_ORDER, result.passOrder),
+    JSON.stringify(result.passOrder));
+  Check("pass 名字不重复（profiler 按名字归账，重名会把两段账混在一起）",
+    new Set(result.passOrder).size === result.passOrder.length,
     JSON.stringify(result.passOrder));
   Check("预通道是 MRT（RT0 法线深度 + RT1 速度 + DepthTexture）",
     result.mrt.attachments === 2 && result.mrt.velocityTexture && result.mrt.velocityIsSecond

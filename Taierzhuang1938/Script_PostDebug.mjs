@@ -322,6 +322,23 @@ export class DebugPass {
     if (P.debugView === "final" && P.shadingMode === "wireframe") {
       return { texture: T.hdr.texture, mode: 5 };
     }
+    // ------------------------------------------------------------------
+    // 查找顺序（2026-09 三条登记路合流之后，**只有这一处仲裁**）：
+    //   ① 帧图里的 pass 自带的视图 —— `pass.GetDebugSource(view)`（B3 体积雾四项）；
+    //   ② 下面那条 switch 的内置表 —— 预通道 / AO / Bloom / 材质假彩色 / SunShadow /
+    //      SSR 三视图（SSR 走 `P.ssrPass.DebugSource(view)`，是内置表里的一行）；
+    //   ③ 登记表 `PostPipeline.RegisterDebugView(id, resolve)` —— 给「持有者不是 pass」
+    //      的子系统用（B4 的四张 LUT 归 Script_Atmosphere 自己持有，不在 post.targets 里）。
+    // ① 排最前：pass 是自己那张靶的所有者，它说不可用就是不可用；②③ 是名字表，
+    // 名字撞了先到先得。三条路返回的都是同一种结构：
+    //   `{ texture, mode, unavailable?, material?, Prepare?(ctx) }`
+    // 给了 `material` 就走 RenderView 的「自带材质」通道（**只有一条**），
+    // 没给就按 texture + mode 送进通用可视化着色器。
+    // ------------------------------------------------------------------
+    for (const pass of P.passes) {
+      const custom = pass.GetDebugSource?.(P.debugView);
+      if (custom) return custom;
+    }
     switch (P.debugView) {
       case "normal": return { texture: T.normalDepth.texture, mode: 0 };
       case "depth": return { texture: T.normalDepth.texture, mode: 1 };
@@ -351,9 +368,19 @@ export class DebugPass {
       case "ssr": case "ssrConfidence": case "ssrHitDistance":
         return P.ssrPass.DebugSource(P.debugView);
       // 2026-09 新增：太阳阴影采样接口的最小验证图（CSM 代理换接口后必须照旧可用）。
+      // 它也走「自带材质」通道，参数在自己的 Prepare 里现取 —— 与 SSR / 体积雾
+      // 同一条路，RenderView 里不再为它留特例分支。
       case "sunShadow": return {
         material: this.materialSunShadow, unavailable: !this.sunShadowRig?.sun?.shadow?.map,
         texture: T.normalDepth.texture, mode: 0,
+        Prepare: (ctx) => {
+          const S = this.uniformsSunShadow;
+          S.uNormalDepth.value = ctx.normalDepthTexture;
+          S.uInvView.value.copy(ctx.invView);
+          S.uProjScale.value.copy(ctx.projScale);
+          // 阴影框每帧都在滚（跟玩家 + 吸附纹素），矩阵必须现取。
+          this.sunShadowRig?.SyncShadowUniforms?.();
+        },
       };
       // enabled 为 false 时图集是上一次收敛留下的陈旧内容，或者干脆一片全黑
       // （画质档从没开过 GI 就是这一种）。这种情况要显式报"不可用"斜纹，
@@ -395,25 +422,13 @@ export class DebugPass {
     const P = this.pipeline;
     const U = this.uniforms;
     const C = P.compositePass.uniforms;
-    // 「自带材质」通道：视图自己提供一份全屏材质 + 一个 Prepare 钩子，
-    // 展示逻辑留在它自己的模块里。SunShadow 是第一位用户，SSR 三视图是第二位。
-    if (source.material && !source.unavailable) {
-      if (source.material === this.materialSunShadow) {
-        const S = this.uniformsSunShadow;
-        S.uNormalDepth.value = ctx.normalDepthTexture;
-        S.uInvView.value.copy(ctx.invView);
-        S.uProjScale.value.copy(ctx.projScale);
-        // 阴影框每帧都在滚（跟玩家 + 吸附纹素），矩阵必须现取。
-        this.sunShadowRig?.SyncShadowUniforms?.();
-      } else {
-        source.Prepare?.(ctx);
-      }
-      ctx.blitter.Blit(source.material, null);
-      return;
-    }
-    // 登记表里的视图可以自带材质（`{ material, Prepare(ctx) }`），
-    // 与上面的 SunShadow 同一条路 —— 那些是「拿预通道重算一遍」的图，
-    // 没有对应的中间靶可展示。
+    // 「自带材质」通道 —— **只有这一条**（2026-09 三个并行子系统各写了一份，
+    // 合并时收成一条）。视图自己提供一份全屏材质 + 一个 Prepare 钩子，展示逻辑
+    // 留在它自己的模块里：SunShadow（本文件）、SSR 三视图（Script_PostSsr）、
+    // 体积雾四视图（Script_PostVolumetrics）、以及登记表里那些「拿预通道重算一遍」
+    // 的图（Script_Atmosphere）。它们没有对应的中间靶可以直接送屏。
+    // 不可用时不走这条，落到下面的斜纹路径 —— 把一张没内容的靶送屏跟
+    //「渲染坏了」长得一模一样。
     if (source.material && !source.unavailable) {
       source.Prepare?.(ctx);
       ctx.blitter.Blit(source.material, null);

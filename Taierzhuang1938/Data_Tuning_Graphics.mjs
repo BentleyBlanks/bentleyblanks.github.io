@@ -27,7 +27,10 @@
 //   · atmosphere —— 2026-09 物理大气（子系统 B4）。四档全开：透过率与多次散射
 //        两张 LUT 只在换预设时算一次，每帧的账只有天空视图（两万像素）与
 //        大气透视 froxel（低档 16³），low 档也给得起。关掉退回旧解析天空。
-//   · 其余键（csm / gtao / ssil / volumetrics / autoExposure /
+//   · volumetrics —— 2026-09 froxel 体积雾落地：medium/high/ultra 开，low 保留解析雾。
+//        网格与时段参数在 `Data_Tuning_Volumetrics.mjs`（这张表只留开关位，
+//        免得画质档与美术意图又混成一张表）。
+//   · 其余键（csm / gtao / ssil / autoExposure /
 //     lensFlare / lut / dof / taaUpscale / contactShadows）
 //     —— **本阶段全部为占位**，值 = 与今天等价（即「不启用新东西」）。
 //        对应子系统落地时把自己那一位改成实际档位，并在这里补出处注释。
@@ -55,12 +58,14 @@
  *   ssrScale      SSR 追踪靶相对主靶的边长比例（0.5 = 半分辨率）
  *   ssrSteps      Hi-Z 追踪的最大迭代次数（编译期常量，进 shader 的循环上限）
  *   ssrResolveTaps 解算（ratio estimator）的邻域样本数；0 = 不解算，只走时域
+ *   volumetrics   froxel 体积雾 / 体积光（medium 及以上开；low 保留解析式高度雾）。
+ *                 froxel 网格尺寸不在这张表里，在 `Data_Tuning_Volumetrics.VOLUMETRIC_GRIDS`
+ *                 （按同名档位查），时段参数在同文件的 VOLUMETRIC_PRESETS
  *   ——— 以下为后续子系统的占位位，本阶段一律「等价于今天」———
  *   csm           级联阴影（今天：单张 66 m 跟随框，false）
  *   contactShadows 屏幕空间接触阴影
  *   gtao          GTAO（将来替换 ssao 那一位）
  *   ssil          屏幕空间间接光
- *   volumetrics   froxel 体积雾（今天：合成 pass 里的解析式指数高度雾）
  *   atmosphere    物理大气（Hillaire 2020 四张 LUT）。关掉 = 退回旧的解析天空，
  *                 天穹与大气透视都不再更新。LUT 分辨率不在这里，跟 `?quality=`
  *                 走（见 Script_Atmosphere.ATMOSPHERE_TIERS）——
@@ -82,7 +87,6 @@ const RESERVED_OFF = {
   contactShadows: false,
   gtao: false,
   ssil: false,
-  volumetrics: false,
   autoExposure: false,
   lensFlare: false,
   lut: false,
@@ -107,6 +111,10 @@ export const QUALITY_PRESETS = {
     // low 不跑簇：每帧几千次球-AABB 判定 + 三张表上传，换来的画面收益抵不过
     // 它在 CPU 上的占用（low 档本来就卡在 CPU 提交）。这一档仍是两盏三方点光。
     clusteredLights: false,
+    // low 唯一保留解析式高度雾的一档（Composite 的 uFogSource = 0 那条路永久保留）。
+    // 也是唯一还能开屏幕空间太阳拖影（godrays）的一档 —— 体积雾开着时两者会双份。
+    // 这一档的雾色仍由大气透视供（atmosphere 开着），只是散射按解析式一条常数走。
+    volumetrics: false,
   },
   medium: {
     ...RESERVED_OFF,
@@ -117,6 +125,7 @@ export const QUALITY_PRESETS = {
     // medium：半分辨率 32 步，**不做空间解算**（只有中心那一条随机射线），
     // 噪声全交给时域累积压。静止画面收敛得和 high 一样干净，动起来会脏一点。
     ssr: true, ssrScale: 0.5, ssrSteps: 32, ssrResolveTaps: 0,
+    volumetrics: true,
   },
   // high 的抗锯齿由 TAA 承担。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
   // 上百 MB 显存并重复抗锯齿；把 4× 留给主动选择 ultra 的玩家
@@ -130,6 +139,7 @@ export const QUALITY_PRESETS = {
     // high：半分辨率 48 步 + 4 抽样 ratio estimator + 时域。这一档是性能红线所在
     //（3394×1348 实测 hiz+trace+resolve+temporal 合计见 docs「屏幕空间反射」）。
     ssr: true, ssrScale: 0.5, ssrSteps: 48, ssrResolveTaps: 4,
+    volumetrics: true,
   },
   ultra: {
     ...RESERVED_OFF,
@@ -139,6 +149,7 @@ export const QUALITY_PRESETS = {
     velocity: true, hzb: true, atmosphere: true,
     // ultra：全分辨率追踪（不再有半分辨率上采样的边缘渗色）+ 64 步 + 8 抽样解算。
     ssr: true, ssrScale: 1.0, ssrSteps: 64, ssrResolveTaps: 8,
+    volumetrics: true,
   },
 };
 

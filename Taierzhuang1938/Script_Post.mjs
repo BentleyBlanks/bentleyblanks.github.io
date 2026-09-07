@@ -10,20 +10,29 @@
 // （契约与 FrameContext 字段表写在 `Script_PostCommon.mjs` 抬头）。编排器持有一张
 // **有序 pass 列表**，逐个 `Enabled → GpuPush(name) → Render → GpuPop`：
 //
-//   0) TAA 抖动          Script_PostTaa.ApplyJitter
-//   1) prepass           Script_PostPrepass  MRT：RT0 法线+视深 / RT1 速度 / DepthTexture
-//   2) hzb               Script_PostPrepass  线性视深 max-reduce 金字塔
-//   3) ssr               Script_PostSsr      min-Hi-Z + 随机 GGX 追踪 + 解算 + 时域
-//   4) ssao              Script_PostSsao     半分辨率 + 双边模糊
-//   5) main              （本文件）HDR 主场景，AO 与 SSR 由材质补丁注入间接光
-//   5) wireframe         Script_PostDebug    着色模式非 shaded 时叠一层线
-//   6) debugOverlay      Script_PostDebug    Rapier 碰撞体线框等
-//   8) taa               Script_PostTaa      时域解算（线性 HDR 域，UE 的位置）
-//   9) ssrColor          Script_PostSsr      解算后的 HDR 降采样成带 mip 的「上一帧场景色」
-//  10) bloom             Script_PostBloom    亮部 + 降/升采样
-//   9) god               Script_PostBloom    太阳拖影（太阳在屏内才跑）
-//  10) composite         Script_PostComposite 运动模糊→景深→雾→曝光→ACES→调色→镜头→sRGB
-//  11) fxaa              Script_PostFxaa     FXAA + 锐化 → 屏幕（或调试视图送屏）
+//   0) TAA 抖动             Script_PostTaa.ApplyJitter
+//   1) atmosphere           Script_Atmosphere      天空视图 + 大气透视两张 LUT
+//   2) prepass              Script_PostPrepass     MRT：RT0 法线+视深 / RT1 速度 / DepthTexture
+//   3) hzb                  Script_PostPrepass     线性视深 max-reduce 金字塔
+//   4) ssr                  Script_PostSsr         min-Hi-Z + 随机 GGX 追踪 + 解算 + 时域
+//   5) ssao                 Script_PostSsao        半分辨率 + 双边模糊
+//   6) main                 （本文件）HDR 主场景，AO / SSR / 簇状局部光由材质补丁注入
+//   7) wireframe            Script_PostDebug       着色模式非 shaded 时叠一层线
+//   8) debugOverlay         Script_PostDebug       Rapier 碰撞体线框等
+//   9) volumetricInject     Script_PostVolumetrics froxel 注入 + 光照 + 时域重投影
+//  10) volumetricIntegrate  Script_PostVolumetrics 沿 z 积分（散射 + 透过率）
+//  11) volumetricApply      Script_PostVolumetrics → Composite 的 uFogScatter
+//  12) taa                  Script_PostTaa         时域解算（线性 HDR 域，UE 的位置）
+//  13) ssrColor             Script_PostSsr         解算后的 HDR 降采样成带 mip 的「上一帧场景色」
+//  14) godPrepare           Script_PostBloom       只做决策：太阳在不在屏内、拖影强度
+//  15) bloom                Script_PostBloom       亮部 + 降/升采样
+//  16) god                  Script_PostBloom       太阳拖影（太阳在屏内才跑）
+//  17) composite            Script_PostComposite   运动模糊→景深→雾→曝光→ACES→调色→镜头→sRGB
+//  18) fxaa                 Script_PostFxaa        FXAA + 锐化 → 屏幕（或调试视图送屏）
+//
+// 体积雾三趟排在 main 之后：它只读预通道的法线/视深靶，与主场景颜色无关，
+// 而 Composite 要它产出的 `uFogScatter`。排在 wireframe / debugOverlay 之后是因为
+// 那两趟画进同一张 hdr 靶、与体积雾互不相干 —— 谁先谁后逐比特相同。
 //
 // **加一个 pass = 新模块 + 这张列表里插一行 + `Data_Tuning_Graphics` 加一位开关。**
 // 不要往 `Render()` 里插代码，也不要去改别人的模块。
@@ -44,6 +53,7 @@ import {
 } from "./Script_PostPrepass.mjs";
 import { SsaoPass } from "./Script_PostSsao.mjs";
 import { SsrPass, SsrColorPass } from "./Script_PostSsr.mjs";
+import { VolumetricsPass } from "./Script_PostVolumetrics.mjs";
 import { TaaPass } from "./Script_PostTaa.mjs";
 import { BloomPass, GodRaysPass } from "./Script_PostBloom.mjs";
 import { CompositePass } from "./Script_PostComposite.mjs";
@@ -135,6 +145,9 @@ export class PostPipeline {
     // 物理大气（子系统 B4）：每帧刷天空视图与大气透视两张 LUT。
     // 排在最前是因为主场景那一趟要画天穹，天穹采的就是天空视图 LUT。
     this.atmospherePass = new AtmospherePass(this);
+    // froxel 体积雾（子系统 B3）。三行帧图共用这一个实例（注入 / 积分 / apply），
+    // 局部雾体 API 也挂在它身上：`post.volumetricsPass.AddFogVolume({...})`。
+    this.volumetricsPass = new VolumetricsPass(this);
 
     // --- 有序帧图 ---------------------------------------------------------
     this.passes = [
@@ -173,6 +186,14 @@ export class PostPipeline {
         Render: (ctx) => this.debugPass.RenderOverlays(ctx),
         Dispose: () => {},
       },
+      // froxel 体积雾（B3）。排在 main 之后：注入那一趟要采本帧的太阳阴影图，
+      // 而阴影是 three 在第一次 renderer.render 里烘的。它不读场景颜色，只读
+      // 预通道的法线深度靶，所以 wireframe / debugOverlay 在它前后都逐比特相同；
+      // 挑这里是为了让「关掉体积雾」在剖析器里干净地少三行，不影响别人的顺序。
+      // **必须排在 composite 之前**：apply 那一趟才把 uFogScatter 与 uFogSource 接上。
+      this.volumetricsPass,
+      this.volumetricsPass.integratePass,
+      this.volumetricsPass.applyPass,
       this.taaPass,
       // 排在 TAA 之后：取的是时域解算过、已卸抖动的那一张 HDR，
       // 比主靶原图干净，下一帧的 SSR 反射里也就少一层噪。
@@ -329,13 +350,24 @@ export class PostPipeline {
 
   GetDebugView() { return this.debugView; }
 
-  /** 登记一个子系统自带的调试视图（见 `debugViewProviders`）。 */
+  /**
+   * 登记一个子系统自带的调试视图（见 `debugViewProviders`）。
+   * 这是**第三条**登记路，给「不是 pass」的持有者用（Script_Atmosphere 的四张 LUT
+   * 归它自己持有，不在 post.targets 里）。查找顺序见 `Script_PostDebug.GetSource()`。
+   */
   RegisterDebugView(id, resolve) {
     if (id && typeof resolve === "function") this.debugViewProviders.set(id, resolve);
   }
 
-  /** 接一台 LightRig：`sunShadow` 调试视图要采它的阴影图（见 Script_Light）。 */
-  SetSunShadowSource(lightRig) { this.debugPass.SetSunShadowSource(lightRig); }
+  /**
+   * 接一台 LightRig：`sunShadow` 调试视图要采它的阴影图（见 Script_Light），
+   * froxel 体积雾要它的阴影图（光柱被建筑切断）与局部光表
+   * （`GetClusterLightData()` 优先，退化到火源池 / `GetEffectLightState()`）。
+   */
+  SetSunShadowSource(lightRig) {
+    this.debugPass.SetSunShadowSource(lightRig);
+    this.volumetricsPass.SetSunShadowSource(lightRig);
+  }
 
   /**
    * 着色模式：
