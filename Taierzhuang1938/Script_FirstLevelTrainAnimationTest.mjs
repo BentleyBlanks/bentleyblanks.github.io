@@ -7,9 +7,13 @@ import {createHash} from 'node:crypto';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import {ServeRoot} from './Script_DevServer.mjs';
 await import('./_import/Script_FirstLevelTrainGameVerify.mjs');
-const project=path.dirname(fileURLToPath(import.meta.url)),out=path.join(project,'_shots/FirstLevelTrainGameV1');
+const project=path.dirname(fileURLToPath(import.meta.url)),version=JSON.parse(await fs.readFile(path.join(project,'Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json'),'utf8')).version,out=path.join(project,'_shots',version);
 const runtimeFiles=['Script_FirstLevelTrainAnimation.mjs','Script_FirstLevelMissionTrainLife.mjs','Script_FirstLevelMissionTrain.mjs',
- 'Script_FirstLevelMissionView.mjs','Script_FirstLevelMissionRuntime.mjs','Script_FirstLevelP012CastAppearance.mjs','Script_Main.mjs','Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json'];
+ 'Script_FirstLevelMissionView.mjs','Script_FirstLevelMissionRuntime.mjs','Script_FirstLevelP012CastAppearance.mjs','Script_Main.mjs','Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json',
+ 'Data_FirstLevelMission.mjs','Data_FirstLevelMissionTrain.mjs','Data_FirstLevelMissionLayout.mjs',
+ 'Data_FirstLevelMissionCrowd.mjs','Data_FirstLevelMissionFront.mjs','Data_Tuning_FirstLevel.mjs',
+ 'Data_FirstLevelMissionVoiceTiming.mjs','Data_FirstLevelMissionVoiceAlignment.mjs','Data_FirstLevelMissionDialogue.mjs',
+ 'Script_FirstLevelMissionColumn.mjs','Script_FirstLevelMissionPeople.mjs','Script_FirstLevelMissionVoice.mjs','index.html'];
 const runtimeHashes=Object.fromEntries(await Promise.all(runtimeFiles.map(async p=>[p,createHash('sha256').update(await fs.readFile(path.join(project,p))).digest('hex')])));
 const server=await ServeRoot(path.dirname(project),0),browser=await LaunchBrowser(),errors=[];
 try{
@@ -28,6 +32,14 @@ try{
   }
   const start=g.Debug.FirstLevelMission();
   const rows=passengers.map(a=>({id:a.id,kind:a.missionTrainLife.kind,model:a.actor.characterRig.modelId,seated:a.missionTrainLife.seated,samples:[]}));
+  for(const a of passengers){
+   const rig=a.actor.characterRig,sampler=rig?.firstLevelTrainAnimation;if(!sampler)continue;
+   const sample=sampler.Sample;sampler.Sample=function(...args){
+    a.actor.root.updateMatrixWorld(true);const b=rig.bones.pelvis;
+    rig.trainNativeSample={worldY:b.getWorldPosition(new T.Vector3()).y,p:b.position.toArray(),q:b.quaternion.toArray(),s:b.scale.toArray()};
+    return sample.apply(this,args);
+   };
+  }
   window.TrainTransitionProbe={passengers,rows,Snapshot,ProbeFirstLevelTrainContact,start,T,clone,native:new Map()};
   return {count:passengers.length,open:start.train.open,counts:start.train.counts,log:start.log};
  });
@@ -53,7 +65,7 @@ try{
       weight:a.missionTrainLife.weight,poseWeight:rig.missionTrainLifeActive?pose.poseWeight:0,
       walkReleaseTime:rig.missionTrainLifeActive?pose.walkReleaseTime:rig.firstLevelTrainAnimation.config.releaseSeconds,source:pose.sourceSeconds,
       scale:a.actor.root.scale.y,physical:a.position.toArray(),deckY:a.missionTrainLife.deckY,yaw:a.yaw,pelvis:local('pelvis'),feet:['footL','footR'].map(local)};
-     if(!rig.missionTrainLifeActive){
+     if(row.walkReleaseTime>0){
       let native=p.native.get(a.id);
       if(!native){const root=p.clone(rig.asset.gltf.scene);native={root,mixer:new p.T.AnimationMixer(root)};p.native.set(a.id,native)}
       native.mixer.stopAllAction();
@@ -62,7 +74,10 @@ try{
        action.clampWhenFinished=true;action.setEffectiveWeight(source.getEffectiveWeight());action.play();action.time=source.time;action.paused=true;
       }
       native.mixer.update(0);
-      const source=rig.bones.pelvis,expected=native.root.getObjectByName(source.name);
+      const bone=rig.bones.pelvis,base=rig.missionTrainLifeActive?rig.trainNativeSample:null;
+      const source=base?{name:bone.name,position:new p.T.Vector3(...base.p),quaternion:new p.T.Quaternion(...base.q),scale:new p.T.Vector3(...base.s)}:bone;
+      const expected=native.root.getObjectByName(source.name);
+      row.nativeWorldY=base?base.worldY:bone.getWorldPosition(new p.T.Vector3()).y;
       const q=source.quaternion.toArray(),expectedQ=expected.quaternion.toArray();
       const rotationError=Math.min(Math.hypot(...q.map((v,i)=>v-expectedQ[i])),Math.hypot(...q.map((v,i)=>v+expectedQ[i])));
       row.nativePelvisError=Math.max(source.position.distanceTo(expected.position),rotationError,source.scale.distanceTo(expected.scale));

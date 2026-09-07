@@ -6,7 +6,7 @@ const Smooth=x=>{x=Clamp(x,0,1);return x*x*(3-2*x)};
 let libraryPromise,library;
 export function LoadFirstLevelTrainAnimation(base='./Animation/FirstLevelTrain/') {
  return libraryPromise ||= (async()=>{
-  const response=await fetch(base+'Data_FirstLevelTrainAnimation.json?v=20260907TrainGameV1');
+  const response=await fetch(base+'Data_FirstLevelTrainAnimation.json?v=20260908TrainGameV2');
   if(!response.ok)throw Error('First-level train animation manifest HTTP '+response.status);
   const config=await response.json(),loader=new GLTFLoader();
   const models=await Promise.all(config.models.map(async record=>({record,gltf:await loader.loadAsync(base+record.file+'?v='+record.sourceAnimationSha256)})));

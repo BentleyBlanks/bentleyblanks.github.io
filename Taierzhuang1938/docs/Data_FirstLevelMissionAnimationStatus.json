@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "updated": "2026-09-08",
-  "recordedUtc": "2026-09-07T17:19:18.876722+00:00",
-  "baseCommit": "6460c638e8cc6d952c0bc9b8be508f8bcad2758f",
+  "recordedUtc": "2026-09-07T18:49:40.238848+00:00",
+  "baseCommit": "2535caf5fa3e0a7b8d8a514c176cce0148a3c478",
   "missionContract": {
-    "version": "first-level-20260907-r11",
+    "version": "first-level-20260907-r12",
     "stages": [
       {
         "id": "Train",
@@ -41,7 +41,9 @@
         },
         "requirements": [
           "frontReached",
-          "frontContact"
+          "frontContact",
+          "frontRifleDefense",
+          "forwardNestDestroyed"
         ],
         "cue": "SupportOrder"
       },
@@ -73,12 +75,13 @@
       },
       {
         "id": "Orders",
-        "objective": "随罗班长接收后送命令，带老周离开阵地。",
+        "objective": "撤回交通壕，与罗班长接令，带老周离开阵地。",
         "target": {
-          "x": 0,
-          "z": -124
+          "x": -8,
+          "z": -102
         },
         "requirements": [
+          "ordersReached",
           "volunteerHeard",
           "zhouOnLitter"
         ],
@@ -434,22 +437,22 @@
     }
   },
   "libraryRoot": "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼",
-  "catalogSha256": "dad60597201e3ca9d9b65fbe181e42a9bd3ea29d4a1f728983cc42f5a355cf2e",
-  "requirementsSha256": "36673d95de12e210376782d9b35fac7dc8ad0dbdb2d7956cd0c69704bce9f966",
+  "catalogSha256": "63ef0a43bb84b469765f1236ec58ccc504e58eec394b0fd607cf4a3e914d381b",
+  "requirementsSha256": "ee673c67ba9dc841c7b4298f9e85f0d3c0374017a4c7bfaa4dc22a3736f9d38c",
   "missionBaselineFiles": {
-    "Data_FirstLevelMission.mjs": "112fd1c53150b14478eb6be5a9748a9523cbd9b28d905c357d883c4663f9a8ee",
+    "Data_FirstLevelMission.mjs": "05d2b588248ceb494ee39d04a0734cb9702125b1a8156cc75d9575da41aa1eaf",
     "Data_FirstLevelMissionDialogue.mjs": "a62830fc97fedc1f5df3aacf0664c89edada411ae7689e1dbdaf3164550a5cda",
-    "Data_FirstLevelMissionTrain.mjs": "79884ae4f4975b37c1359dddb98db021cecacd5e123c275ddc25c65fa1cd89d2",
-    "Data_Tuning_FirstLevel.mjs": "57b05e49999a13146229c24847b342faa5880a18157e66019623e5064df9c7a4",
-    "Script_FirstLevelMissionRuntime.mjs": "694575619277bacd6e9e5f2e4b5404fa6b42414b3062e77650ae23322665eaba",
-    "Script_FirstLevelMissionColumn.mjs": "061aaed5fbfd87063b53ec5b178569023d9ed4cc1956c112ec4a244de75582dc",
+    "Data_FirstLevelMissionTrain.mjs": "adfd567c006889c6d1e48470ba002622d4c119d6741dfa6d9d4fe9ac118698d9",
+    "Data_Tuning_FirstLevel.mjs": "fbc29f88f02489f58e25663ebc41a17448c250d0777288c915a9082fbaa16d75",
+    "Script_FirstLevelMissionRuntime.mjs": "a185d7624695a91ad21e3ca97100ab7c9aab57e4e38d930b358671c64185f3f0",
+    "Script_FirstLevelMissionColumn.mjs": "bbcee070b8d4faf20417973dfadcf87328877f926014b8186dc7a57bbd89ef24",
     "Script_FirstLevelMissionVoice.mjs": "f875246b5de9b224acb27ea58c17e84863898257a6f72417b26f14b657ec2dc5",
-    "Script_FirstLevelMissionTrain.mjs": "f679fbe90aca8a4375aec7983d9a839dc601c3f57155dfa08e7f0f425e3a7899",
+    "Script_FirstLevelMissionTrain.mjs": "a1b81b6240c1ff41d07a7f0d36e52ea1e93d43896025a8799a1f227dd9775cbb",
     "Audio/FirstLevel/Data_FirstLevelVoiceManifest.json": "3a0b13601f63726dcd2ff112fdb7c332e3ac3f5064d714bf632833c6df2dffc8",
     "Data_FirstLevelMissionVoiceAlignment.mjs": "af8cdc555cdd92c227e999ce07198b2f17f7d5ee3ad044faa29bdf09f5bf4146",
     "Data_FirstLevelMissionVoiceTiming.mjs": "414c2270c3b93d5116eb48ec59335a67d5a0e4a2ca0efc4ff780d2e439e57091",
-    "Script_FirstLevelTrainAnimation.mjs": "48b871e3862723a02c1ac1dad7fbc0d736951306cb57b91ea00bc9d89932825a",
-    "Script_FirstLevelMissionTrainLife.mjs": "37a0ea3bf400fa7562e00fb072af8d868ef11254a250c6163c577858e6a73c51"
+    "Script_FirstLevelTrainAnimation.mjs": "2a15df1c03f49c47186ddaf2efddabd074d0f407a1b8f781adeb67f697c8a34f",
+    "Script_FirstLevelMissionTrainLife.mjs": "db3a9de87116a057b6ee8fdd546af674e6954172ae994b6d0f4e561a571abf3d"
   },
   "population": {
     "trainRecruits": 40,
@@ -478,17 +481,31 @@
   },
   "gameIntegration": {
     "status": "partially_integrated",
-    "recordedUtc": "2026-09-07T17:17:32.336868+00:00",
-    "version": "FirstLevelTrainGameV1",
+    "recordedUtc": "2026-09-07T18:39:00.635935+00:00",
+    "version": "FirstLevelTrainGameV2",
+    "missionVersion": "first-level-20260907-r12",
     "runtimeHashes": {
-      "Script_FirstLevelTrainAnimation.mjs": "48b871e3862723a02c1ac1dad7fbc0d736951306cb57b91ea00bc9d89932825a",
-      "Script_FirstLevelMissionTrainLife.mjs": "37a0ea3bf400fa7562e00fb072af8d868ef11254a250c6163c577858e6a73c51",
-      "Script_FirstLevelMissionTrain.mjs": "f679fbe90aca8a4375aec7983d9a839dc601c3f57155dfa08e7f0f425e3a7899",
-      "Script_FirstLevelMissionView.mjs": "f4e1be81b472258161c753bfe72237d6b0fa287a7beafea4f873106c19675ab5",
-      "Script_FirstLevelMissionRuntime.mjs": "694575619277bacd6e9e5f2e4b5404fa6b42414b3062e77650ae23322665eaba",
-      "Script_FirstLevelP012CastAppearance.mjs": "4694fab4ea2569c44a31ee567842b7b68c114d051baf888d611ceff509f27586",
-      "Script_Main.mjs": "c1057006fca92ee04ffd834366c8d107f2ce14824d869795219432836417d368",
-      "Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json": "237aadf40ebd1ef55f82d4c92a89dceffaf9a3848b74be3329ade256878555e6"
+      "Script_FirstLevelTrainAnimation.mjs": "2a15df1c03f49c47186ddaf2efddabd074d0f407a1b8f781adeb67f697c8a34f",
+      "Script_FirstLevelMissionTrainLife.mjs": "db3a9de87116a057b6ee8fdd546af674e6954172ae994b6d0f4e561a571abf3d",
+      "Script_FirstLevelMissionTrain.mjs": "a1b81b6240c1ff41d07a7f0d36e52ea1e93d43896025a8799a1f227dd9775cbb",
+      "Script_FirstLevelMissionView.mjs": "28dfe8dca190b46a0042083c4f087977e043adef1b11ec4b385288dc397059f8",
+      "Script_FirstLevelMissionRuntime.mjs": "a185d7624695a91ad21e3ca97100ab7c9aab57e4e38d930b358671c64185f3f0",
+      "Script_FirstLevelP012CastAppearance.mjs": "de0433e6c5f4e0a8752c121055ebc4bfd7692c968201bea381fb0b248b91724c",
+      "Script_Main.mjs": "4c14f71185a8f0b8b5fb868279f046ce4a0001efbf30b835efad708ada34a7b5",
+      "Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json": "e6a8b7088774f86f97ce2c03462a377f90ae91e98fc39530f13f0d1e5a204595",
+      "Data_FirstLevelMission.mjs": "05d2b588248ceb494ee39d04a0734cb9702125b1a8156cc75d9575da41aa1eaf",
+      "Data_FirstLevelMissionTrain.mjs": "adfd567c006889c6d1e48470ba002622d4c119d6741dfa6d9d4fe9ac118698d9",
+      "Data_FirstLevelMissionLayout.mjs": "861183d55d818e28128aebb9d5583a60bf3d6d11f9478328fb5ad76256dd5898",
+      "Data_FirstLevelMissionCrowd.mjs": "f6607e5ee2422c188572cd10551882c7dae5058ea5717c88821862c0d4fe0796",
+      "Data_FirstLevelMissionFront.mjs": "34daf759e4f01aeeccfd62f4bea97cdb169dc2bcc08207ffdfad6fa8220db52d",
+      "Data_Tuning_FirstLevel.mjs": "fbc29f88f02489f58e25663ebc41a17448c250d0777288c915a9082fbaa16d75",
+      "Data_FirstLevelMissionVoiceTiming.mjs": "414c2270c3b93d5116eb48ec59335a67d5a0e4a2ca0efc4ff780d2e439e57091",
+      "Data_FirstLevelMissionVoiceAlignment.mjs": "af8cdc555cdd92c227e999ce07198b2f17f7d5ee3ad044faa29bdf09f5bf4146",
+      "Data_FirstLevelMissionDialogue.mjs": "a62830fc97fedc1f5df3aacf0664c89edada411ae7689e1dbdaf3164550a5cda",
+      "Script_FirstLevelMissionColumn.mjs": "bbcee070b8d4faf20417973dfadcf87328877f926014b8186dc7a57bbd89ef24",
+      "Script_FirstLevelMissionPeople.mjs": "fcf5b40287c18692897a0f85fe45f590488e117039688ffdaf34708e2a07557f",
+      "Script_FirstLevelMissionVoice.mjs": "f875246b5de9b224acb27ea58c17e84863898257a6f72417b26f14b657ec2dc5",
+      "index.html": "1d456d535c389a6bb7cc6b74510018c652ae733357760442271a1337ac81c564"
     },
     "models": [
       {
@@ -549,276 +566,54 @@
       }
     ],
     "regression": {
-      "status": "passed_after_investigation",
+      "status": "passed_targeted_after_rebase",
       "requiredTests": [
-        "TextTest",
-        "TextGatherCheck",
-        "BootPayloadTest",
-        "AssetStandardsTest",
-        "ModelFacingTest",
-        "TestRunnerTest",
-        "ModuleGraphTest",
-        "HudPromptTest",
-        "RiggedModelTest",
-        "CharacterModelTest",
-        "CharacterHitboxMathTest",
-        "PlayerHitboxTest",
-        "CameraShakeTest",
-        "FractureBakeTest",
-        "CutsceneControlTest",
-        "RoadPathTest",
-        "WallPlanTest",
         "FirstLevelMissionTest",
-        "FirstLevelMissionBrowserTest",
         "FirstLevelTrainAnimationTest",
-        "FirstLevelP012ShellShotTest",
-        "ActorPoseTest",
-        "CutscenePoseTest",
-        "MissionHooksTest",
-        "MissionSetpiecesTest",
-        "StanceTest",
-        "DamageTest",
-        "GunFeelTest",
-        "FixedCenterAimTest",
-        "ReticleCalibrationTest",
-        "SprintCrosshairTest",
-        "FirstPersonEmbodimentTest",
-        "AdsSightTest",
-        "SprintViewmodelTest",
-        "FpsArmTest",
-        "FpsHandContactTest",
-        "FpsGripEditorTest",
-        "SprintMeleeTest",
-        "BayonetTest",
-        "RangeTest",
-        "WeaponRangeTest",
-        "MeleeQteTest",
-        "MeleeCombatTest",
-        "MeleeAnimationTest",
-        "CarryTest",
-        "EmplacementTest",
-        "AircraftStrafeTest",
-        "AiBehaviorTest",
-        "VisibilityTest",
-        "FlareTest",
-        "FirstLevelP012OpeningTest",
-        "FirstLevelP012FamilyTest",
-        "FirstLevelP012RestingTest",
-        "FirstLevelP012AnimationTest",
-        "FirstLevelP012MarchTest",
-        "FirstLevelP012TrainColumnTest",
-        "FirstLevelP012ArrivalTest",
-        "FirstLevelP012VillageLifeTest",
-        "FirstLevelP012CastTest",
-        "HeightmapVerify",
-        "JieheTerrainTest",
-        "TengxianLayoutTest",
-        "TengxianZoneTest",
-        "SamplePointTest",
-        "FirstLevelWhiteboxTest",
-        "FirstLevelWhiteboxSurfaceTest",
-        "FirstLevelWhiteboxBrowserTest",
-        "FirstLevelP012LayoutTest",
-        "FirstLevelP012TerrainTest",
-        "FirstLevelP012TerrainBrowserTest",
-        "FirstLevelP012FlowTest",
-        "FirstLevelP012RuntimeTest",
+        "FirstLevelMissionBrowserTest",
+        "FirstLevelMissionPresentationTest",
         "FirstLevelP012ActorTest",
-        "FirstLevelP012VisibilityTest",
-        "FirstLevelP012BrowserTest",
-        "PhysicsTest",
-        "JumpTest",
-        "DestructionTest",
-        "BackRifleRunTest",
-        "InfantryAnimationTest",
-        "ExplosionRulesTest",
-        "ExplosionRangeTest",
-        "CraterSurfaceTest",
-        "MovementRangeTest",
-        "ColliderTest",
-        "HudPromptBrowserTest",
-        "FirstLevelP012BinocularsTest",
-        "TargetInfoTest",
-        "TelegraphTest",
-        "AudioTest",
-        "VoiceTest",
-        "FirstLevelP012DebugTest",
-        "MenuTest",
-        "BootPropTest",
-        "WorldInfoEditorTest",
-        "EditorTest",
-        "PropPcgTest",
-        "PropPcgEditorTest",
-        "DestructionEditorTest",
-        "WestDistrictCoverageTest",
-        "WestSuburbBlocksTest",
-        "TestSceneLightingTest",
-        "PostTest",
-        "ActorDepthTest",
-        "ActorBatchTest",
-        "PropInstancingTest",
-        "ProfilerTest",
-        "ExternalPropAssetTest",
-        "TownDressingTest",
-        "EastSuburbBlocksTest",
-        "EastSuburbNavTest",
-        "WestStationTest",
-        "DressingProbeTest",
-        "RespawnShaderWarmTest",
+        "ActorPoseTest",
+        "ModuleGraphTest",
+        "TestRunnerTest",
+        "TextTest",
+        "AssetStandardsTest",
         "BrowserBundleTest",
-        "TrainLibraryTest",
         "BootTest"
       ],
       "passedTests": [
-        "ActorBatchTest",
-        "ActorDepthTest",
         "ActorPoseTest",
-        "AdsSightTest",
-        "AiBehaviorTest",
-        "AircraftStrafeTest",
         "AssetStandardsTest",
-        "AudioTest",
-        "BackRifleRunTest",
-        "BayonetTest",
-        "BootPayloadTest",
-        "BootPropTest",
         "BootTest",
         "BrowserBundleTest",
-        "CameraShakeTest",
-        "CarryTest",
-        "CharacterHitboxMathTest",
-        "CharacterModelTest",
-        "ColliderTest",
-        "CraterSurfaceTest",
-        "CutsceneControlTest",
-        "CutscenePoseTest",
-        "DamageTest",
-        "DestructionEditorTest",
-        "DestructionTest",
-        "DressingProbeTest",
-        "EastSuburbBlocksTest",
-        "EastSuburbNavTest",
-        "EditorTest",
-        "EmplacementTest",
-        "ExplosionRangeTest",
-        "ExplosionRulesTest",
-        "ExternalPropAssetTest",
         "FirstLevelMissionBrowserTest",
+        "FirstLevelMissionPresentationTest",
         "FirstLevelMissionTest",
         "FirstLevelP012ActorTest",
-        "FirstLevelP012AnimationTest",
-        "FirstLevelP012ArrivalTest",
-        "FirstLevelP012BinocularsTest",
-        "FirstLevelP012BrowserTest",
-        "FirstLevelP012CastTest",
-        "FirstLevelP012DebugTest",
-        "FirstLevelP012FamilyTest",
-        "FirstLevelP012FlowTest",
-        "FirstLevelP012LayoutTest",
-        "FirstLevelP012MarchTest",
-        "FirstLevelP012OpeningTest",
-        "FirstLevelP012RestingTest",
-        "FirstLevelP012RuntimeTest",
-        "FirstLevelP012ShellShotTest",
-        "FirstLevelP012TerrainBrowserTest",
-        "FirstLevelP012TerrainTest",
-        "FirstLevelP012TrainColumnTest",
-        "FirstLevelP012VillageLifeTest",
-        "FirstLevelP012VisibilityTest",
         "FirstLevelTrainAnimationTest",
-        "FirstLevelWhiteboxBrowserTest",
-        "FirstLevelWhiteboxSurfaceTest",
-        "FirstLevelWhiteboxTest",
-        "FirstPersonEmbodimentTest",
-        "FixedCenterAimTest",
-        "FlareTest",
-        "FpsArmTest",
-        "FpsGripEditorTest",
-        "FpsHandContactTest",
-        "FractureBakeTest",
-        "GunFeelTest",
-        "HeightmapVerify",
-        "HudPromptBrowserTest",
-        "HudPromptTest",
-        "InfantryAnimationTest",
-        "JieheTerrainTest",
-        "JumpTest",
-        "MeleeAnimationTest",
-        "MeleeCombatTest",
-        "MeleeQteTest",
-        "MenuTest",
-        "MissionHooksTest",
-        "MissionSetpiecesTest",
-        "ModelFacingTest",
         "ModuleGraphTest",
-        "MovementRangeTest",
-        "PhysicsTest",
-        "PlayerHitboxTest",
-        "PostTest",
-        "ProfilerTest",
-        "PropInstancingTest",
-        "PropPcgEditorTest",
-        "PropPcgTest",
-        "RangeTest",
-        "RespawnShaderWarmTest",
-        "ReticleCalibrationTest",
-        "RiggedModelTest",
-        "RoadPathTest",
-        "SamplePointTest",
-        "SprintCrosshairTest",
-        "SprintMeleeTest",
-        "SprintViewmodelTest",
-        "StanceTest",
-        "TargetInfoTest",
-        "TelegraphTest",
-        "TengxianLayoutTest",
-        "TengxianZoneTest",
         "TestRunnerTest",
-        "TestSceneLightingTest",
-        "TextGatherCheck",
-        "TextTest",
-        "TownDressingTest",
-        "TrainLibraryTest",
-        "VisibilityTest",
-        "VoiceTest",
-        "WallPlanTest",
-        "WeaponRangeTest",
-        "WestDistrictCoverageTest",
-        "WestStationTest",
-        "WestSuburbBlocksTest",
-        "WorldInfoEditorTest"
+        "TextTest"
       ],
+      "upstreamRevision": "5ba0a4b597b67e3383fb06edcb106c3d18752beb",
+      "previousReview": {
+        "path": "Models/FirstLevelTrainGameV1/Data_GameIntegration.json",
+        "sha256": "7c9290e34fcebd855ab22905d195dc96c675f270778c507192a2c419255d25c8"
+      },
       "initialFailures": [
+        "FirstLevelTrainAnimationTest",
+        "FirstLevelMissionBrowserTest:host_timeout_600s"
+      ],
+      "hostExecutionBudget": {
+        "test": "FirstLevelMissionBrowserTest",
+        "originalTimeoutMs": 600000,
+        "localTimeoutMs": 1800000,
+        "reason": "Initial r12 run made real progress through Courtyard but was killed by the wall-clock host limit; game timing and assertions remain unchanged."
+      },
+      "previousInitialFailures": [
         "PhysicsTest"
       ],
-      "baselineRevision": "6460c638e8cc6d952c0bc9b8be508f8bcad2758f",
-      "defaultCurrentAi": {
-        "alive": 40,
-        "bodies": 40,
-        "inside": 0,
-        "median": 24.833038615123026,
-        "movedAtAll": 37,
-        "total": 39
-      },
-      "defaultBaselineAi": {
-        "alive": 40,
-        "bodies": 40,
-        "inside": 1,
-        "median": 23.753758590712273,
-        "movedAtAll": 37,
-        "total": 40
-      },
-      "controlledAi": {
-        "alive": 40,
-        "bodies": 40,
-        "inside": 0,
-        "median": 28.847707903138016,
-        "movedAtAll": 37,
-        "total": 39
-      },
-      "controlledStateSamples": 10,
-      "diagnosticSetupRetry": "First controlled pair stopped before browser launch because the runner changes cwd; the private hook now resolves its workspace explicitly. Setup failure logs retained.",
-      "note": "Initial phase-5 overlap failure retained. Default current and HEAD reruns pass unchanged thresholds; equal navigation scheduling must produce identical physical states. Navigation uses wall-clock search budgets. This is not a zero-failure first run or a default baseline failure."
+      "note": "The previous 117-test result and its initial Physics failure remain frozen historical evidence. These targeted checks were run again on the merged r12 runtime; the full historical suite was not rerun. Initial r12 train transition failed at 1.986 m/s; independent native-mixer probes localized a sudden release of blended shoe-floor lift. The temporary lift now settles over 0.12 seconds; the original 1.6 m/s gate is unchanged. The first full r12 campaign exceeded the 600-second host wall-clock limit in Courtyard; a private runner gives that unchanged test 1800 seconds."
     },
     "enabledComponents": [
       "Original-model seated support",
@@ -835,7 +630,7 @@
       "41 original NPCs and 8/24/8 recruits",
       "Original bone names, hierarchy and inverse binds",
       "Original physical AI movement",
-      "r11 mission facts and voice events",
+      "first-level-20260907-r12 mission facts and voice events",
       "Distinct procedural carriage activities and attached equipment"
     ],
     "incomplete": [
@@ -849,80 +644,316 @@
     "localGamePreview": "http://127.0.0.1:8137/Taierzhuang1938/?whitebox=p012",
     "evidence": [
       {
-        "path": "Models/FirstLevelTrainGameV1/Data_SamplerValidation.json",
+        "path": "Models/FirstLevelTrainGameV2/Data_SamplerValidation.json",
         "sha256": "4a59004475b19118be10f658690106f5588c35dc693f58d9a6566ca315fc0c65"
       },
       {
-        "path": "Models/FirstLevelTrainGameV1/Data_RealTrainTransition.json",
-        "sha256": "53394c6bfb3214caeaa9957bf4bf480914a026dc6de3af20472a30642c0985b1"
+        "path": "Models/FirstLevelTrainGameV2/Data_RealTrainTransition.json",
+        "sha256": "0d9bbe77bd3dc0566ebf7e80c3260cb9c60eaa4819ff8bbd5931c9d5799fb78d"
       },
       {
-        "path": "Models/FirstLevelTrainGameV1/Data_PrepushRun.log",
-        "sha256": "42251119dff06b74f3ab5ac7cbde96cbef4b6aba030489a26845220957a074ed"
+        "path": "Models/FirstLevelTrainGameV2/Data_RebaseRun.log",
+        "sha256": "1adbaaa5f6b2fcf52520986dc041dbe011da7ae145b95070efe6a10260f1c26c"
       },
       {
-        "path": "Models/FirstLevelTrainGameV1/Data_PrepushRemaining.log",
-        "sha256": "04ca45b835b326f50a190d4ab02dbbe7df4ec749906073e0bef369a06a61d15e"
+        "path": "Models/FirstLevelTrainGameV2/Data_RebaseValidationPlan.json",
+        "sha256": "d364cb271a7f2ddfd58e133992cfd3d11b3679a24e2bc933a9a25be705501ac4"
       },
       {
-        "path": "Models/FirstLevelTrainGameV1/Data_PhysicsComparison_current.json",
-        "sha256": "3398e2da2bb3ae7c1bf8389ebb505c620bbcf62183285925b1c83a8f0c82eb99"
+        "path": "Models/FirstLevelTrainGameV2/Script_HostCampaignRunner.mjs",
+        "sha256": "01788ea961ce4c651c60216d1244b6cef15c8cfeb9980af35b400654eb153588"
       },
       {
-        "path": "Models/FirstLevelTrainGameV1/Data_PhysicsComparison_baseline.json",
-        "sha256": "7dd6641e72dbddf01bf6166111db1ebe4c4c61f145cf1cefea493d43ddacc305"
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_AirFirst.json",
+        "sha256": "d100317ba547a618111c9b08fdda6b4c77d2ee59af2196c01900fd22a4908de9"
       },
       {
-        "path": "Models/FirstLevelTrainGameV1/Data_PhysicsComparisonCurrent.log",
-        "sha256": "b5e68587da74aea4933f90649a0a1db357d8fbff9a2b123282c2b3cc3bb9e13d"
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_BundleSupply.json",
+        "sha256": "c36e9e008cf6515fb0a6c333ecaf3dbd1071d0dd1df05fd21d8757e90160a7a4"
       },
       {
-        "path": "Models/FirstLevelTrainGameV1/Data_PhysicsComparisonBaseline.log",
-        "sha256": "34f50088fc6d444bf751c75f7b2c6a444ed2711b44d86248fd4567e07cdce1db"
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_Carry.json",
+        "sha256": "42d856a17549ec8e6f2628480fba7d0846d5fb6a4ad4fb9b5e67377c8564e8c6"
       },
       {
-        "path": "Models/FirstLevelTrainGameV1/Data_PhysicsComparison_current_nav0.2.json",
-        "sha256": "49aacfc68d691812878f06fe9b9e5b7d86de866b96227d2fdbd93da254b1f0da"
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_CarryToDitch.json",
+        "sha256": "cd55504eabce31b7c68686f4620c55a6f85eb440beab94743c84e277040d54f3"
       },
       {
-        "path": "Models/FirstLevelTrainGameV1/Data_PhysicsComparison_baseline_nav0.2.json",
-        "sha256": "92d78d0c348db014d7620dcfda8ad381cf14f5f58b4d68702b81f2b7543eb761"
-      },
-      {
-        "path": "Models/FirstLevelTrainGameV1/Data_PhysicsControlledCurrent.log",
-        "sha256": "4cd5fd92644918f89d7c89219f3cbf6234fb4e96928ed54f00634c519c5a2452"
-      },
-      {
-        "path": "Models/FirstLevelTrainGameV1/Data_PhysicsControlledBaseline.log",
-        "sha256": "f0bcc050f2019f1d241db915b8f63492a2c3b848866f5f3280e333355b622cae"
-      },
-      {
-        "path": "Models/FirstLevelTrainGameV1/Script_PhysicsComparisonHook.mjs",
-        "sha256": "724b88b9d60771bdce8ceef39c8575016a5750d738cfe7d8f997c9381187f123"
-      },
-      {
-        "path": "Models/FirstLevelTrainGameV1/Data_PrepushFinalSelection.log",
-        "sha256": "ccc529e1c4af40f41b5b5d3b6f89ceac816e9242986d1f37a6ac313e560c66d6"
-      },
-      {
-        "path": "Models/FirstLevelTrainGameV1/Data_PhysicsControlledCurrentSetupFailure.log",
-        "sha256": "e789a737a5fa0c8c7b3f86c8c5bbbdbca6f14e2fe695b24ad0388d8444d1cc26"
-      },
-      {
-        "path": "Models/FirstLevelTrainGameV1/Data_PhysicsControlledBaselineSetupFailure.log",
-        "sha256": "c0edf1828b2fc5259fa5a7f5e370522057c4749da2c00f264ececd0e77e2a334"
-      },
-      {
-        "path": "Models/FirstLevelTrainGameV1/Data_TrainRide.json",
-        "sha256": "50b3b191ec7720bffeec36ae6e6f352c126060eee3ce98dfc596541ed91b087a"
-      },
-      {
-        "path": "Models/FirstLevelTrainGameV1/Data_TrainDisembark.json",
-        "sha256": "6b99d7ee38baf4990278e5dc280af3a69cc3fbf1acf9341386392b9647b83350"
-      },
-      {
-        "path": "Models/FirstLevelTrainGameV1/Data_Complete.json",
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_Complete.json",
         "sha256": "1a78173bf395184d2511f39856f4aabf76a5ea0da7ee0bc4aef37bb71f1bf211"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_Courtyard.json",
+        "sha256": "23df87f7749a2184d8b9906f6fade785cd03724b50790017136f63ebf2736fff"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_CourtyardColumn.json",
+        "sha256": "c6eb318f346314fb4f10a5cf21de19cf1176c4afea7813379f5e988b2103fc68"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_CourtyardDressings.json",
+        "sha256": "c58c4082bfcbc762a6a4db8ba0f4b0e72d2aa8166fe7659fa899a5f84dacac65"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_CourtyardGate.json",
+        "sha256": "258a9796332472b9cfdf8f18f1642726dbe37a0bcf04007511de604019044485"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_CourtyardOuterCover.json",
+        "sha256": "c00035f4fc4efee467b9f9ae67a1f8d9811f3f150bd7a2b19e943b92a7fb5638"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_CourtyardWatch.json",
+        "sha256": "4815498102878bd31a4c78e149e127c405abb032a540fe638fc2b6bb37ba5e0a"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_Defense.json",
+        "sha256": "425c1d4aa9a25efa8fabd7bbb5314d85f59df39721f15c33f1dcb3d28f8d274a"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_DeliverZhou.json",
+        "sha256": "4fa4541f12dfcb0fc6d652025c3442ad9d77a545565e1aa94f85f4fce060b2f6"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_EscortOrders.json",
+        "sha256": "39a7db8b3e501a8bf702bcd7d95125302fadd15109a93db2d56bd95bfe6030d9"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_Exit.json",
+        "sha256": "86edc98f22261e71adb52ef42365c8c0fc967c288b6dc2c19779b45f9993cbac"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_FinalCarry.json",
+        "sha256": "b12e4315553d717bef8e752aa5059d152bf9b4dc6ad0f7c2f0368157dc611d76"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_FinalCarryPickup.json",
+        "sha256": "f9a430ca3e54a0aeeb542fe08e58a7412725266efd191f92295a80abef42da65"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_FinalDefense.json",
+        "sha256": "779f15c211beaef748ad5db5d14444c692c5e26378dd5032f34ffa22b7e9071f"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_FinalDefensePosition.json",
+        "sha256": "9b1079c86d90d0ad51c00b97e773347cbccab1c92c4bb4196a891783583766f4"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_FirstCarryPickup.json",
+        "sha256": "3e52d55ea03fca1a62b199b1c3b89b5960aa11afa81bb369e0734d5585e7d2a7"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_FirstRearguard.json",
+        "sha256": "8c75bdf7b04ce840c5c75f5cf3eea2d8c28d2a7841a16a99dcbe0c744bce158b"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_FrontResupply.json",
+        "sha256": "46b023b9727df3c825a1940c5443f16d2c9fe72b0cfaef25bad8192be3476566"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_FrontVisual.json",
+        "sha256": "83f1b8b9988e5a965eabd9bdeb0335d1649ff9b221888e0cab27f5d0f2c28653"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_Initial.json",
+        "sha256": "4b1e56bae745b38944c4ff5d85b4570b539bbdbcac21e6c7248e6d54ba8a42aa"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_MachineGun.json",
+        "sha256": "f5f191ca90a0607b9ce0f6789261028b6f5bfaa8f0026e4a7180440d412a4634"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_MedicalRescue.json",
+        "sha256": "41ff9e5f79884c415e3eeb8011148a9e573cdf15463ba54337efb650fe076947"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_MeleeResult.json",
+        "sha256": "bf6f00eae7fb6bb45600d683a3daf7bb34aa59d2582bb21e5a4bad1e09cb3456"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_Navigation.json",
+        "sha256": "f23327a02271a5077af1f5488192fd5dea09806d4adb928e7ec132ea52762f3b"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_OpeningInteraction.json",
+        "sha256": "2588baa881517fa5f32aac220465bf6c2b416fac39a68425444caaed770e04e9"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_Orders.json",
+        "sha256": "a9cb59eea8e451bdf4411d3a0f277a7a382a77a969278c3931d023e91a740689"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_PersonalExit.json",
+        "sha256": "1a78173bf395184d2511f39856f4aabf76a5ea0da7ee0bc4aef37bb71f1bf211"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_RearLaneRearguard.json",
+        "sha256": "90b51c9ab440770226eb3a1ff425f7d88dd780c6d12bef22e37fc15b5330d687"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_RebaseRun.log",
+        "sha256": "6792227e2e80ae02e62e3ec92a08a2b9f531ece4e42285d1bc8acb996fa5a6eb"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_Reception.json",
+        "sha256": "15ed86298c7fc830e31dc33f6d6711d5c4235a5c3bfd5f2d4c22f5e9a3bd8f43"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_ReceptionDefense.json",
+        "sha256": "379cea401bdaf30938386b4ddfda26bfcf50d5333a6c9dbaa559e7257b818486"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_Rescue.json",
+        "sha256": "7abf1b10d5c11bca18f6aefe22d33ab63c3693cc800587e547c37688b44a746e"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_RetreatFirst.json",
+        "sha256": "bdb059e71512918f22a57d34246c516fdf7bb44e3431b8373b6d8f73f0570de9"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_RetreatWall.json",
+        "sha256": "efd030d5cd8a47def4c3ab58b74a4a13e2e1bcc7551e750203089767b71953f9"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_RetreatYard.json",
+        "sha256": "915fb70004071fdbd0b04c8f1b26caf93601e42a6c622eb58a60ddde17ebbe45"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_South.json",
+        "sha256": "7947599cfe4fa9752ace64dd93667254c5d84cc2288aebd2c8192f0fcd1b3f9c"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_SouthRoad.json",
+        "sha256": "05fd3fff25f345658d7a37ee11bce2229c98246bff348b4db30d7d6e0c7fbb0f"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_TankFlank.json",
+        "sha256": "e24034f2328ba9ecb46f8aa10f8b6cf2545bdf2ec1c336f9c026a132e44d1558"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_TankShellCraters.json",
+        "sha256": "87cc7e6d948c3242a7a48dd0e898bb09949017b90d2be0183afb041b79b0b701"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_Train.json",
+        "sha256": "1f10c41f1aa27c2a1c774bb843c726bd3d50858af0b5332378c68c8e37df5094"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_TrainAllDisembarked.json",
+        "sha256": "e24a29aa5355adb63c845d6b94b20249a259f8e3f6d1e55316888cf3caba79dc"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_TrainDisembark.json",
+        "sha256": "3400c1c1b97c8dad18cac969c30fe3e6a8afb21c8899c657196544f43a58e7e7"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_TrainExitApron.json",
+        "sha256": "e12645454579eec949a4d87cadb50a007e652bd6c88e62d09cad4ba59b05772c"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_TrainRide.json",
+        "sha256": "026ef4222a955701c5bc7993cf794c34b7ee75703a178d134ffd04fe1b70b19c"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_Transfer.json",
+        "sha256": "248a5ee2eacc6d5553155952d45785100440367c0a42570aa77ba27a4bda96f9"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_TransferApproach.json",
+        "sha256": "93095957705426b6c5ece56666f83852fcb8437fc686c287a9fbe246957c158b"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_TransferDefense.json",
+        "sha256": "06d26ed1da9dc64cf38637da3ccdcaa39783a2c74f07df5e675979df562d68af"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_TransferLoading.json",
+        "sha256": "6db96191841103e61a47c93621ddda3af836fa267475d0004e85dedb2cdd0e13"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_TransferPosition.json",
+        "sha256": "a8d27aeb822c58035c3c6ec99f9e856d32b6fc165df03989efa06922cdd6b253"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_TransferSupply.json",
+        "sha256": "3f94c1a588d83f92dd0fc7afac27d1f7ef824c9be490253e293d0c4958176e5b"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_TrenchCombatSound.json",
+        "sha256": "ddc431b1b631d248c2381878965383adaf2e3a0eadcba699329eb252058aee32"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_Village.json",
+        "sha256": "87619fe71da7bd876950b2a78a0240a95e3ec990cde7a28d18669540d19daa71"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_VillageKitchen.json",
+        "sha256": "3602df41444fd59792912239cd8a7ccb591d3367d0aea300fa0c5846dbf20594"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_WallRearguard.json",
+        "sha256": "e71c9a7d5c048bd6222d6a7177cd8d1e385b33d7ebebdeb22095c9fae05bcf13"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_YardRearguard.json",
+        "sha256": "e4ce4558d04ff2955098d7f9a6c9a9e2416857a471b2c0722eb7fa9b0351d49a"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/CampaignHostTimeout/Data_ZhouDeath.json",
+        "sha256": "3ce58ce49868d34672a0b6f9fc3bda803047c601b83c617bd6ec3d2c3aedec44"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/InitialR12/Data_FirstLevelTrainAnimation.json",
+        "sha256": "70ae7f6e508a9fbd39d91371d8ffa901be6c96c889501c288e81040364d6cb6b"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/InitialR12/Data_RealTrainTransition.json",
+        "sha256": "d3a41184901f0e11dcd759c5139f971ca9e6fa2ed0e5031fe799b461a0dd8a41"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/InitialR12/Data_RebaseRun.log",
+        "sha256": "dd0a53787fec203df7bb053848182a9eadcbddea09b15e1bb709ff5dae43c92a"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/InitialR12/Data_RebaseValidationPlan.json",
+        "sha256": "33aad4e51eae1bafa45256e7153ea11c0c1075b1bb8401cce48c60af3131a0c5"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/InitialR12/Data_SamplerValidation.json",
+        "sha256": "4a59004475b19118be10f658690106f5588c35dc693f58d9a6566ca315fc0c65"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/NativeAttribution/Data_NativeAttributionDiagnostic.log",
+        "sha256": "193db4850e0837afe05bd9e48b6b681f1c3049aceef3886b5029d10883224a3f"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/NativeAttribution/Data_RealTrainTransition.json",
+        "sha256": "ff2a782f818a86e41072e5aa4e390b7c509c5bf79f8434d8d800c77b3e456681"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/NativeAttribution/Data_SamplerValidation.json",
+        "sha256": "4a59004475b19118be10f658690106f5588c35dc693f58d9a6566ca315fc0c65"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/RelativeLiftTrial/Data_FloorReleaseFix.log",
+        "sha256": "5cc2868f1b27a67c7fdde06436eab834ee80923f8f13162b3f6e84f04ba46829"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Attempts/RelativeLiftTrial/Data_RealTrainTransition.json",
+        "sha256": "df6229e7aec40059b843ba3645a1d4dfcb2651d6910df8b0e4058ad95995f161"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Data_TrainRide.json",
+        "sha256": "026ef4222a955701c5bc7993cf794c34b7ee75703a178d134ffd04fe1b70b19c"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Data_TrainDisembark.json",
+        "sha256": "3400c1c1b97c8dad18cac969c30fe3e6a8afb21c8899c657196544f43a58e7e7"
+      },
+      {
+        "path": "Models/FirstLevelTrainGameV2/Data_Complete.json",
+        "sha256": "654368136f836ad93bfb20bb37787732cbf3589dce303177c836941a5ef0063e"
       }
     ],
     "measured": {
@@ -930,28 +961,52 @@
       "minSeatGapM": 0.0009326356274448333,
       "maxSeatGapM": 0.0022276961940734807,
       "maxStationaryFootDriftM": 8.920203090579404e-05,
-      "maxPelvisVerticalSpeedMps": 1.1406299932958568,
-      "maxNativePelvisVerticalSpeedMps": 3.707670465844053,
+      "maxPelvisVerticalSpeedMps": 0.7352142289960435,
+      "maxPostHandoffRenderedPelvisVerticalSpeedMps": 1.348614718781752,
+      "postHandoffHeightNote": "Rendered world height includes shared floor correction and temporary release settling; only the local pelvis transform is compared to an independent native mixer.",
       "maxNativePelvisLocalError": 0,
-      "observedRiseActors": 14,
+      "observedRiseActors": 16,
       "disembarkedNpcs": 41
     }
   },
+  "gameIntegrationPending": null,
   "sourceSearch": {
     "directories": [
       "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources",
       "C:/Users/Bentl/Downloads/GVHMR"
     ],
-    "catalogActions": 53,
+    "catalogActions": 57,
     "newVideoGenerations": 60,
-    "newInferenceRuns": 6
+    "newInferenceRuns": 10
   },
   "sourceProduction": {
     "userScope": "Generate source coverage for all 48 requirements before completing individual retargets.",
     "plannedNewSources": 62,
     "expectedFirstPassCredits": 11360,
+    "lastCreditObservation": {
+      "balance": 60,
+      "recordedUtc": "2026-09-07T18:40:10.040760+00:00"
+    },
+    "pendingAmmoQuery": {
+      "resubmitted": false,
+      "genStatus": "querying",
+      "submitId": "370184c6-ecdf-467d-8c4c-fa67243dce8a",
+      "downloadAvailable": false,
+      "recordedUtc": "2026-09-07T18:40:10.040760+00:00"
+    },
+    "retakeBudget": {
+      "status": "prepared_not_submitted",
+      "recordedUtc": "2026-09-07T17:36:43.639926+00:00",
+      "submitted": false,
+      "spentCredits": 0,
+      "sourceCount": 18,
+      "expectedCredits": 3400,
+      "observedBalance": 60,
+      "additionalCreditsAtObservedBalance": 3340,
+      "estimateScope": "One attempt at original duration/model per known retake/failure; excludes unresolved submissions and later review findings."
+    },
     "inspectionSummary": {
-      "updatedUnix": 1788800573.5055406,
+      "updatedUnix": 1788806979.3332822,
       "decoded": 60,
       "screened": 60,
       "retakeRequired": 17
@@ -2121,7 +2176,99 @@
                 7.5
               ]
             },
-            "retargetHistory": []
+            "retargetHistory": [
+              {
+                "variantId": "Nra-v1-TrainWoundedArm",
+                "path": "Video/Sources/FirstLevelV1/TrainWoundedArm/Data_RetargetAssessmentV1.json",
+                "assessment": {
+                  "status": "requires_contact_and_depth_refinement",
+                  "frozen": true,
+                  "acceptedForGame": false,
+                  "recordedUtc": "2026-09-07T18:47:46.774035+00:00",
+                  "variantId": "Nra-v1-TrainWoundedArm",
+                  "sourceVideoSha256": "b9a31eba942cb8d0c97421882f14195f9e71e49b8b602a0e319b7f1ba26678c9",
+                  "sourceCacheSha256": "11ffe0f28d0b998d085450f424dcf5ab129fe46292f732ad7ea16ea9295d202f",
+                  "modelSha256": "9e81dfc9cbe5f0d6c1f2bef5e59f4bd75e022f6b97f2b5ea90e8cf11044c10a7",
+                  "observed": "实际查看正面 1 秒与侧面 0、4、7.9 秒。右臂跨胸保护左伤臂的方向保留，随后降低骨盆进入坐姿；原片坐木凳，候选尚无匹配凳面，侧视脚部支撑和身体深度未验收。右掌相对左上臂的位置、手指包覆及坐姿接凳需要修正，不能登记成坐地或已完成医护检查。",
+                  "reviewedSamples": [
+                    {
+                      "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Front_1000.png",
+                      "sha256": "a17d18da8b03bda9f6b81d671f1cacdecb6fea742a32d0a8580d3e8a303d2381"
+                    },
+                    {
+                      "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_0.png",
+                      "sha256": "ba029ee65d0717354b312f986f067ed312b31ea4490660272edac7cb68ab37e2"
+                    },
+                    {
+                      "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_4000.png",
+                      "sha256": "8f181cf72d6d9a58747a63248214f79ffd16c0a33903a25494bb06e38c7deb2a"
+                    },
+                    {
+                      "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_7900.png",
+                      "sha256": "b480fa979c5a9a12c5a2bb560cd2dde3fcf23ca756f4d359c25eea19a7ff1f3f"
+                    }
+                  ],
+                  "sampleScope": "Four actually viewed frame/view pairs per clip; all 24 automated captures are synchronization evidence only.",
+                  "remaining": [
+                    "Original-character source depth and support contacts",
+                    "Palm orientation and finger contact",
+                    "Real game props, event timing and role coordination"
+                  ]
+                }
+              }
+            ],
+            "retargetAssessment": {
+              "status": "requires_contact_and_depth_refinement",
+              "frozen": true,
+              "acceptedForGame": false,
+              "recordedUtc": "2026-09-07T18:47:46.774035+00:00",
+              "variantId": "Nra-v1-TrainWoundedArm",
+              "sourceVideoSha256": "b9a31eba942cb8d0c97421882f14195f9e71e49b8b602a0e319b7f1ba26678c9",
+              "sourceCacheSha256": "11ffe0f28d0b998d085450f424dcf5ab129fe46292f732ad7ea16ea9295d202f",
+              "modelSha256": "9e81dfc9cbe5f0d6c1f2bef5e59f4bd75e022f6b97f2b5ea90e8cf11044c10a7",
+              "observed": "实际查看正面 1 秒与侧面 0、4、7.9 秒。右臂跨胸保护左伤臂的方向保留，随后降低骨盆进入坐姿；原片坐木凳，候选尚无匹配凳面，侧视脚部支撑和身体深度未验收。右掌相对左上臂的位置、手指包覆及坐姿接凳需要修正，不能登记成坐地或已完成医护检查。",
+              "reviewedSamples": [
+                {
+                  "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Front_1000.png",
+                  "sha256": "a17d18da8b03bda9f6b81d671f1cacdecb6fea742a32d0a8580d3e8a303d2381"
+                },
+                {
+                  "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_0.png",
+                  "sha256": "ba029ee65d0717354b312f986f067ed312b31ea4490660272edac7cb68ab37e2"
+                },
+                {
+                  "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_4000.png",
+                  "sha256": "8f181cf72d6d9a58747a63248214f79ffd16c0a33903a25494bb06e38c7deb2a"
+                },
+                {
+                  "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_7900.png",
+                  "sha256": "b480fa979c5a9a12c5a2bb560cd2dde3fcf23ca756f4d359c25eea19a7ff1f3f"
+                }
+              ],
+              "sampleScope": "Four actually viewed frame/view pairs per clip; all 24 automated captures are synchronization evidence only.",
+              "remaining": [
+                "Original-character source depth and support contacts",
+                "Palm orientation and finger contact",
+                "Real game props, event timing and role coordination"
+              ]
+            },
+            "retargetCandidate": {
+              "previewId": "TrainWoundedArm",
+              "variantId": "Nra-v1-TrainWoundedArm",
+              "status": "需修正 · 接触与深度待验",
+              "path": "Models/FirstLevelTrainReactionV1/Animation_Nra_TrainWoundedArm_V1.glb",
+              "blend": "Blender/FirstLevelTrainReactionV1/Scene_Nra_TrainWoundedArm_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_TrainWoundedArmRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
           }
         },
         {
@@ -4403,7 +4550,99 @@
                 7.5
               ]
             },
-            "retargetHistory": []
+            "retargetHistory": [
+              {
+                "variantId": "Nra-v1-TrainShellStartleBlock",
+                "path": "Video/Sources/FirstLevelV1/TrainShellStartleBlock/Data_RetargetAssessmentV1.json",
+                "assessment": {
+                  "status": "requires_contact_and_depth_refinement",
+                  "frozen": true,
+                  "acceptedForGame": false,
+                  "recordedUtc": "2026-09-07T18:47:46.774035+00:00",
+                  "variantId": "Nra-v1-TrainShellStartleBlock",
+                  "sourceVideoSha256": "3c35ca8889755e2643def68507fdcdbb3c7a56bff0c3d34ea39021dd5bea5f18",
+                  "sourceCacheSha256": "a6435d6ad2ae0a9c439907e78f5d23443663f629b9fd8b2ea742ed605d7738ef",
+                  "modelSha256": "c07e8ccccfbac5183dd10a1494ca90ea5d3c367ee8b04b7ad9974a162d515048",
+                  "observed": "实际查看正面 2.5 秒与侧面 0、4、7.9 秒。回头、屈膝惊缩和抬臂能跟随原恢复；护头手掌悬在帽顶上方，左掌未与实际门柱接触，侧视身体有后仰。手头间隙、门柱高度、脚部支撑和屈膝深度需要修正。原片没有真实同伴，拦人动作与实际炮击事件还须独立装配。",
+                  "reviewedSamples": [
+                    {
+                      "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Front_2500.png",
+                      "sha256": "1109bf704ca528651724baf4d87d41bcd794b538a338396daf266095e35845a1"
+                    },
+                    {
+                      "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_0.png",
+                      "sha256": "42d85b2edee94237e152c0b97b8ca1faaae14503639d46e131b42c5c6ce7275b"
+                    },
+                    {
+                      "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_4000.png",
+                      "sha256": "cd9689ac530e24b1a394ee64a4f56fabac975f3c6cda3bd72429da7624ba1aa5"
+                    },
+                    {
+                      "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_7900.png",
+                      "sha256": "2c8f13e11953b74c7cd2e9e0e15540180af9ca9a93de2f90ba5addeb605d0350"
+                    }
+                  ],
+                  "sampleScope": "Four actually viewed frame/view pairs per clip; all 24 automated captures are synchronization evidence only.",
+                  "remaining": [
+                    "Original-character source depth and support contacts",
+                    "Palm orientation and finger contact",
+                    "Real game props, event timing and role coordination"
+                  ]
+                }
+              }
+            ],
+            "retargetAssessment": {
+              "status": "requires_contact_and_depth_refinement",
+              "frozen": true,
+              "acceptedForGame": false,
+              "recordedUtc": "2026-09-07T18:47:46.774035+00:00",
+              "variantId": "Nra-v1-TrainShellStartleBlock",
+              "sourceVideoSha256": "3c35ca8889755e2643def68507fdcdbb3c7a56bff0c3d34ea39021dd5bea5f18",
+              "sourceCacheSha256": "a6435d6ad2ae0a9c439907e78f5d23443663f629b9fd8b2ea742ed605d7738ef",
+              "modelSha256": "c07e8ccccfbac5183dd10a1494ca90ea5d3c367ee8b04b7ad9974a162d515048",
+              "observed": "实际查看正面 2.5 秒与侧面 0、4、7.9 秒。回头、屈膝惊缩和抬臂能跟随原恢复；护头手掌悬在帽顶上方，左掌未与实际门柱接触，侧视身体有后仰。手头间隙、门柱高度、脚部支撑和屈膝深度需要修正。原片没有真实同伴，拦人动作与实际炮击事件还须独立装配。",
+              "reviewedSamples": [
+                {
+                  "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Front_2500.png",
+                  "sha256": "1109bf704ca528651724baf4d87d41bcd794b538a338396daf266095e35845a1"
+                },
+                {
+                  "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_0.png",
+                  "sha256": "42d85b2edee94237e152c0b97b8ca1faaae14503639d46e131b42c5c6ce7275b"
+                },
+                {
+                  "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_4000.png",
+                  "sha256": "cd9689ac530e24b1a394ee64a4f56fabac975f3c6cda3bd72429da7624ba1aa5"
+                },
+                {
+                  "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_7900.png",
+                  "sha256": "2c8f13e11953b74c7cd2e9e0e15540180af9ca9a93de2f90ba5addeb605d0350"
+                }
+              ],
+              "sampleScope": "Four actually viewed frame/view pairs per clip; all 24 automated captures are synchronization evidence only.",
+              "remaining": [
+                "Original-character source depth and support contacts",
+                "Palm orientation and finger contact",
+                "Real game props, event timing and role coordination"
+              ]
+            },
+            "retargetCandidate": {
+              "previewId": "TrainShellStartleBlock",
+              "variantId": "Nra-v1-TrainShellStartleBlock",
+              "status": "需修正 · 接触与深度待验",
+              "path": "Models/FirstLevelTrainReactionV1/Animation_Nra_TrainShellStartleBlock_V1.glb",
+              "blend": "Blender/FirstLevelTrainReactionV1/Scene_Nra_TrainShellStartleBlock_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_TrainShellStartleBlockRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
           }
         },
         {
@@ -4897,7 +5136,99 @@
                 0.2313297986984253
               ]
             },
-            "retargetHistory": []
+            "retargetHistory": [
+              {
+                "variantId": "Nra-v1-MedicSupportLegs",
+                "path": "Video/Sources/FirstLevelV1/MedicSupportLegs/Data_RetargetAssessmentV1.json",
+                "assessment": {
+                  "status": "requires_contact_and_depth_refinement",
+                  "frozen": true,
+                  "acceptedForGame": false,
+                  "recordedUtc": "2026-09-07T18:06:05.964520+00:00",
+                  "variantId": "Nra-v1-MedicSupportLegs",
+                  "sourceVideoSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+                  "sourceCacheSha256": "417687080252e48c5ddd8f7bed5f0886d32f38f5ba5c947dcb12b33281b7f228",
+                  "modelSha256": "e70b8a3e22a4b068e679db644a17a59dd999b0b45fa886fab3841bb7b3694f8a",
+                  "observed": "实际查看原片／原恢复／原角色的 0、4、6、9.9 秒选点。起身、侧移和再次下蹲能跟随原恢复；双掌尚未适配患者小腿或替代圆垫，脚部支撑与下肢深度仍需修正。初次侧面末段手部超出视口，另调整查看中心与距离；没有改动模型、原片或 raw。",
+                  "reviewedSamples": [
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Front_4000.png",
+                      "sha256": "b41799d3a6f6f2ad1155bbb50fa2644dcc39103123f6f53db6d4c64f81905a8a"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_6000.png",
+                      "sha256": "fb4e8f103d5a39fc2acfb0a983a380e7b0a7d31b500398217f6fee051e695c34"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_0.png",
+                      "sha256": "6bd1693cba064359eae00272b98d2f8d2006c6600733f2329d90b0752ab1f9d2"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_9900.png",
+                      "sha256": "e006127b3c90813c215479938038d8a32e4a28f18490c67c8b51954e89ed2156"
+                    }
+                  ],
+                  "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+                  "remaining": [
+                    "Original character source-depth and foot/body support review",
+                    "Actual patient, stretcher, palms and finger contacts",
+                    "Role pairing, mission events and interruption behavior"
+                  ]
+                }
+              }
+            ],
+            "retargetAssessment": {
+              "status": "requires_contact_and_depth_refinement",
+              "frozen": true,
+              "acceptedForGame": false,
+              "recordedUtc": "2026-09-07T18:06:05.964520+00:00",
+              "variantId": "Nra-v1-MedicSupportLegs",
+              "sourceVideoSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+              "sourceCacheSha256": "417687080252e48c5ddd8f7bed5f0886d32f38f5ba5c947dcb12b33281b7f228",
+              "modelSha256": "e70b8a3e22a4b068e679db644a17a59dd999b0b45fa886fab3841bb7b3694f8a",
+              "observed": "实际查看原片／原恢复／原角色的 0、4、6、9.9 秒选点。起身、侧移和再次下蹲能跟随原恢复；双掌尚未适配患者小腿或替代圆垫，脚部支撑与下肢深度仍需修正。初次侧面末段手部超出视口，另调整查看中心与距离；没有改动模型、原片或 raw。",
+              "reviewedSamples": [
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Front_4000.png",
+                  "sha256": "b41799d3a6f6f2ad1155bbb50fa2644dcc39103123f6f53db6d4c64f81905a8a"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_6000.png",
+                  "sha256": "fb4e8f103d5a39fc2acfb0a983a380e7b0a7d31b500398217f6fee051e695c34"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_0.png",
+                  "sha256": "6bd1693cba064359eae00272b98d2f8d2006c6600733f2329d90b0752ab1f9d2"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_9900.png",
+                  "sha256": "e006127b3c90813c215479938038d8a32e4a28f18490c67c8b51954e89ed2156"
+                }
+              ],
+              "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+              "remaining": [
+                "Original character source-depth and foot/body support review",
+                "Actual patient, stretcher, palms and finger contacts",
+                "Role pairing, mission events and interruption behavior"
+              ]
+            },
+            "retargetCandidate": {
+              "previewId": "MedicSupportLegs",
+              "variantId": "Nra-v1-MedicSupportLegs",
+              "status": "需修正 · 接触与深度待验",
+              "path": "Models/FirstLevelMedicalV1/Animation_Nra_MedicSupportLegs_V1.glb",
+              "blend": "Blender/FirstLevelMedicalV1/Scene_Nra_MedicSupportLegs_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_MedicSupportLegsRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
           }
         },
         {
@@ -5769,7 +6100,99 @@
               ],
               "observationInputSha256": "ac41a3bff5e47378c6a822e87c81afbb86e84ba3d8cb03e6010bb71178c06938"
             },
-            "retargetHistory": []
+            "retargetHistory": [
+              {
+                "variantId": "Nra-v1-ZhouWeakeningDeath",
+                "path": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/Data_RetargetAssessmentV1.json",
+                "assessment": {
+                  "status": "requires_contact_and_depth_refinement",
+                  "frozen": true,
+                  "acceptedForGame": false,
+                  "recordedUtc": "2026-09-07T18:06:05.970815+00:00",
+                  "variantId": "Nra-v1-ZhouWeakeningDeath",
+                  "sourceVideoSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+                  "sourceCacheSha256": "c8e6159789433bf2be1e92117def8bb423ddb86128f6df9e8f880ad23da9785e",
+                  "modelSha256": "cf59dd3d38a6a20aaede4cb2822358384f89d0ec0d71f46331c86f9353bbb336",
+                  "observed": "实际查看 0、3、5、11.9 秒的正侧视选点。卧姿身体与双臂跟随原恢复，但模型倾斜、没有担架与枕部承托；单目卧姿深度、胸背支撑、近手松握和远臂遮挡仍待检查，不能据此认定死亡保持完成。",
+                  "reviewedSamples": [
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Front_5000.png",
+                      "sha256": "d60f480a6f94f8712804698266eb465f712f92545905e7ba71c31cb588e96006"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_11900.png",
+                      "sha256": "2c8cbebf36e4232d3cb9345570b2e2183189134561101e818d96ae26b486e46f"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_0.png",
+                      "sha256": "75d649d73415ac345b6123d994d24ff577ab95ce956263b11fdfcb21a3f8e2da"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_3000.png",
+                      "sha256": "3401efb4a5cf20d7e2add89a4b51f598f9f4309a2367d895baebd1376525b0c4"
+                    }
+                  ],
+                  "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+                  "remaining": [
+                    "Original character source-depth and foot/body support review",
+                    "Actual patient, stretcher, palms and finger contacts",
+                    "Role pairing, mission events and interruption behavior"
+                  ]
+                }
+              }
+            ],
+            "retargetAssessment": {
+              "status": "requires_contact_and_depth_refinement",
+              "frozen": true,
+              "acceptedForGame": false,
+              "recordedUtc": "2026-09-07T18:06:05.970815+00:00",
+              "variantId": "Nra-v1-ZhouWeakeningDeath",
+              "sourceVideoSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+              "sourceCacheSha256": "c8e6159789433bf2be1e92117def8bb423ddb86128f6df9e8f880ad23da9785e",
+              "modelSha256": "cf59dd3d38a6a20aaede4cb2822358384f89d0ec0d71f46331c86f9353bbb336",
+              "observed": "实际查看 0、3、5、11.9 秒的正侧视选点。卧姿身体与双臂跟随原恢复，但模型倾斜、没有担架与枕部承托；单目卧姿深度、胸背支撑、近手松握和远臂遮挡仍待检查，不能据此认定死亡保持完成。",
+              "reviewedSamples": [
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Front_5000.png",
+                  "sha256": "d60f480a6f94f8712804698266eb465f712f92545905e7ba71c31cb588e96006"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_11900.png",
+                  "sha256": "2c8cbebf36e4232d3cb9345570b2e2183189134561101e818d96ae26b486e46f"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_0.png",
+                  "sha256": "75d649d73415ac345b6123d994d24ff577ab95ce956263b11fdfcb21a3f8e2da"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_3000.png",
+                  "sha256": "3401efb4a5cf20d7e2add89a4b51f598f9f4309a2367d895baebd1376525b0c4"
+                }
+              ],
+              "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+              "remaining": [
+                "Original character source-depth and foot/body support review",
+                "Actual patient, stretcher, palms and finger contacts",
+                "Role pairing, mission events and interruption behavior"
+              ]
+            },
+            "retargetCandidate": {
+              "previewId": "ZhouWeakeningDeath",
+              "variantId": "Nra-v1-ZhouWeakeningDeath",
+              "status": "需修正 · 接触与深度待验",
+              "path": "Models/FirstLevelMedicalV1/Animation_Nra_ZhouWeakeningDeath_V1.glb",
+              "blend": "Blender/FirstLevelMedicalV1/Scene_Nra_ZhouWeakeningDeath_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_ZhouWeakeningDeathRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
           }
         },
         {
@@ -8022,8 +8445,8 @@
           "Train"
         ],
         "scope": "原骨架侧凳身体支撑；站姿扶稳和第二版表演待制",
-        "evidence": "Models/FirstLevelTrainGameV1/Data_GameIntegration.json",
-        "version": "FirstLevelTrainGameV1"
+        "evidence": "Models/FirstLevelTrainGameV2/Data_GameIntegration.json",
+        "version": "FirstLevelTrainGameV2"
       },
       "reviewEvidence": [
         "Models/FirstLevelTrainV1/Data_SelectedExportFidelityValidation.json",
@@ -8036,7 +8459,7 @@
         "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra02.json",
         "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra03.json",
         "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra04.json",
-        "Models/FirstLevelTrainGameV1/Data_GameIntegration.json"
+        "Models/FirstLevelTrainGameV2/Data_GameIntegration.json"
       ],
       "blockers": [
         "Other generated source targets require dense source review and recovery; first-pass retakes remain explicit.",
@@ -9664,11 +10087,11 @@
           "Train"
         ],
         "scope": "复用原骨架坐姿支撑；专用生活表演与手中道具待接",
-        "evidence": "Models/FirstLevelTrainGameV1/Data_GameIntegration.json",
-        "version": "FirstLevelTrainGameV1"
+        "evidence": "Models/FirstLevelTrainGameV2/Data_GameIntegration.json",
+        "version": "FirstLevelTrainGameV2"
       },
       "reviewEvidence": [
-        "Models/FirstLevelTrainGameV1/Data_GameIntegration.json"
+        "Models/FirstLevelTrainGameV2/Data_GameIntegration.json"
       ],
       "blockers": [
         "Source targets/reused candidates do not prove this complete requirement is accepted or integrated.",
@@ -10196,7 +10619,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "sources_generated_pending_review",
+      "status": "partially_retargeted_requires_contact_review",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -10205,7 +10628,8 @@
       },
       "reviewEvidence": [],
       "blockers": [
-        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated."
+        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated.",
+        "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted."
       ],
       "newSourceProduction": [
         {
@@ -10474,13 +10898,211 @@
                 7.5
               ]
             },
-            "retargetHistory": []
+            "retargetHistory": [
+              {
+                "variantId": "Nra-v1-TrainShellStartleBlock",
+                "path": "Video/Sources/FirstLevelV1/TrainShellStartleBlock/Data_RetargetAssessmentV1.json",
+                "assessment": {
+                  "status": "requires_contact_and_depth_refinement",
+                  "frozen": true,
+                  "acceptedForGame": false,
+                  "recordedUtc": "2026-09-07T18:47:46.774035+00:00",
+                  "variantId": "Nra-v1-TrainShellStartleBlock",
+                  "sourceVideoSha256": "3c35ca8889755e2643def68507fdcdbb3c7a56bff0c3d34ea39021dd5bea5f18",
+                  "sourceCacheSha256": "a6435d6ad2ae0a9c439907e78f5d23443663f629b9fd8b2ea742ed605d7738ef",
+                  "modelSha256": "c07e8ccccfbac5183dd10a1494ca90ea5d3c367ee8b04b7ad9974a162d515048",
+                  "observed": "实际查看正面 2.5 秒与侧面 0、4、7.9 秒。回头、屈膝惊缩和抬臂能跟随原恢复；护头手掌悬在帽顶上方，左掌未与实际门柱接触，侧视身体有后仰。手头间隙、门柱高度、脚部支撑和屈膝深度需要修正。原片没有真实同伴，拦人动作与实际炮击事件还须独立装配。",
+                  "reviewedSamples": [
+                    {
+                      "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Front_2500.png",
+                      "sha256": "1109bf704ca528651724baf4d87d41bcd794b538a338396daf266095e35845a1"
+                    },
+                    {
+                      "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_0.png",
+                      "sha256": "42d85b2edee94237e152c0b97b8ca1faaae14503639d46e131b42c5c6ce7275b"
+                    },
+                    {
+                      "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_4000.png",
+                      "sha256": "cd9689ac530e24b1a394ee64a4f56fabac975f3c6cda3bd72429da7624ba1aa5"
+                    },
+                    {
+                      "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_7900.png",
+                      "sha256": "2c8f13e11953b74c7cd2e9e0e15540180af9ca9a93de2f90ba5addeb605d0350"
+                    }
+                  ],
+                  "sampleScope": "Four actually viewed frame/view pairs per clip; all 24 automated captures are synchronization evidence only.",
+                  "remaining": [
+                    "Original-character source depth and support contacts",
+                    "Palm orientation and finger contact",
+                    "Real game props, event timing and role coordination"
+                  ]
+                }
+              }
+            ],
+            "retargetAssessment": {
+              "status": "requires_contact_and_depth_refinement",
+              "frozen": true,
+              "acceptedForGame": false,
+              "recordedUtc": "2026-09-07T18:47:46.774035+00:00",
+              "variantId": "Nra-v1-TrainShellStartleBlock",
+              "sourceVideoSha256": "3c35ca8889755e2643def68507fdcdbb3c7a56bff0c3d34ea39021dd5bea5f18",
+              "sourceCacheSha256": "a6435d6ad2ae0a9c439907e78f5d23443663f629b9fd8b2ea742ed605d7738ef",
+              "modelSha256": "c07e8ccccfbac5183dd10a1494ca90ea5d3c367ee8b04b7ad9974a162d515048",
+              "observed": "实际查看正面 2.5 秒与侧面 0、4、7.9 秒。回头、屈膝惊缩和抬臂能跟随原恢复；护头手掌悬在帽顶上方，左掌未与实际门柱接触，侧视身体有后仰。手头间隙、门柱高度、脚部支撑和屈膝深度需要修正。原片没有真实同伴，拦人动作与实际炮击事件还须独立装配。",
+              "reviewedSamples": [
+                {
+                  "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Front_2500.png",
+                  "sha256": "1109bf704ca528651724baf4d87d41bcd794b538a338396daf266095e35845a1"
+                },
+                {
+                  "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_0.png",
+                  "sha256": "42d85b2edee94237e152c0b97b8ca1faaae14503639d46e131b42c5c6ce7275b"
+                },
+                {
+                  "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_4000.png",
+                  "sha256": "cd9689ac530e24b1a394ee64a4f56fabac975f3c6cda3bd72429da7624ba1aa5"
+                },
+                {
+                  "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_7900.png",
+                  "sha256": "2c8f13e11953b74c7cd2e9e0e15540180af9ca9a93de2f90ba5addeb605d0350"
+                }
+              ],
+              "sampleScope": "Four actually viewed frame/view pairs per clip; all 24 automated captures are synchronization evidence only.",
+              "remaining": [
+                "Original-character source depth and support contacts",
+                "Palm orientation and finger contact",
+                "Real game props, event timing and role coordination"
+              ]
+            },
+            "retargetCandidate": {
+              "previewId": "TrainShellStartleBlock",
+              "variantId": "Nra-v1-TrainShellStartleBlock",
+              "status": "需修正 · 接触与深度待验",
+              "path": "Models/FirstLevelTrainReactionV1/Animation_Nra_TrainShellStartleBlock_V1.glb",
+              "blend": "Blender/FirstLevelTrainReactionV1/Scene_Nra_TrainShellStartleBlock_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_TrainShellStartleBlockRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
           }
         }
       ],
       "reusedSourceCandidates": [],
       "sourceRetakeIds": [],
-      "newRecoveryCandidates": []
+      "newRecoveryCandidates": [
+        {
+          "sourceId": "TrainShellStartleBlock",
+          "sourceVideo": "Video/Sources/FirstLevelV1/TrainShellStartleBlock/3b063129-fced-429c-bd4a-d73a62e067b0_video_1.mp4",
+          "sourceVideoSha256": "3c35ca8889755e2643def68507fdcdbb3c7a56bff0c3d34ea39021dd5bea5f18",
+          "sourceRangeSeconds": [
+            0,
+            7.966666666666667
+          ],
+          "generationSubmitId": "3b063129-fced-429c-bd4a-d73a62e067b0",
+          "recoveryFrames": 240,
+          "recoveryFps": 30.0,
+          "recoveryRevision": 1,
+          "sourceCache": "Models/_Cache/FirstLevelV1/TrainShellStartleBlock/Data_GvhmrMotion.npz",
+          "sourceCacheSha256": "a6435d6ad2ae0a9c439907e78f5d23443663f629b9fd8b2ea742ed605d7738ef",
+          "resultSha256": "6b1d1857ce5c5aa6114765c0bec4e46ff6e41853116d73e8ffa1e02c69be31d7",
+          "rawJointFile": "Models/RecoveryPreview/Data_V1_TrainShellStartleBlockRawJoints.json",
+          "group": "FirstLevelTrainReactionV1",
+          "visualAssessment": {
+            "status": "requires_contact_and_depth_refinement",
+            "frozen": true,
+            "acceptedForGame": false,
+            "recordedUtc": "2026-09-07T18:47:46.774035+00:00",
+            "variantId": "Nra-v1-TrainShellStartleBlock",
+            "sourceVideoSha256": "3c35ca8889755e2643def68507fdcdbb3c7a56bff0c3d34ea39021dd5bea5f18",
+            "sourceCacheSha256": "a6435d6ad2ae0a9c439907e78f5d23443663f629b9fd8b2ea742ed605d7738ef",
+            "modelSha256": "c07e8ccccfbac5183dd10a1494ca90ea5d3c367ee8b04b7ad9974a162d515048",
+            "observed": "实际查看正面 2.5 秒与侧面 0、4、7.9 秒。回头、屈膝惊缩和抬臂能跟随原恢复；护头手掌悬在帽顶上方，左掌未与实际门柱接触，侧视身体有后仰。手头间隙、门柱高度、脚部支撑和屈膝深度需要修正。原片没有真实同伴，拦人动作与实际炮击事件还须独立装配。",
+            "reviewedSamples": [
+              {
+                "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Front_2500.png",
+                "sha256": "1109bf704ca528651724baf4d87d41bcd794b538a338396daf266095e35845a1"
+              },
+              {
+                "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_0.png",
+                "sha256": "42d85b2edee94237e152c0b97b8ca1faaae14503639d46e131b42c5c6ce7275b"
+              },
+              {
+                "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_4000.png",
+                "sha256": "cd9689ac530e24b1a394ee64a4f56fabac975f3c6cda3bd72429da7624ba1aa5"
+              },
+              {
+                "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_7900.png",
+                "sha256": "2c8f13e11953b74c7cd2e9e0e15540180af9ca9a93de2f90ba5addeb605d0350"
+              }
+            ],
+            "sampleScope": "Four actually viewed frame/view pairs per clip; all 24 automated captures are synchronization evidence only.",
+            "remaining": [
+              "Original-character source depth and support contacts",
+              "Palm orientation and finger contact",
+              "Real game props, event timing and role coordination"
+            ]
+          },
+          "status": "raw_recovered_pending_retarget_and_contact_review",
+          "runtimeEnabled": false,
+          "retargetHistory": [
+            {
+              "variantId": "Nra-v1-TrainShellStartleBlock",
+              "path": "Video/Sources/FirstLevelV1/TrainShellStartleBlock/Data_RetargetAssessmentV1.json",
+              "assessment": {
+                "status": "requires_contact_and_depth_refinement",
+                "frozen": true,
+                "acceptedForGame": false,
+                "recordedUtc": "2026-09-07T18:47:46.774035+00:00",
+                "variantId": "Nra-v1-TrainShellStartleBlock",
+                "sourceVideoSha256": "3c35ca8889755e2643def68507fdcdbb3c7a56bff0c3d34ea39021dd5bea5f18",
+                "sourceCacheSha256": "a6435d6ad2ae0a9c439907e78f5d23443663f629b9fd8b2ea742ed605d7738ef",
+                "modelSha256": "c07e8ccccfbac5183dd10a1494ca90ea5d3c367ee8b04b7ad9974a162d515048",
+                "observed": "实际查看正面 2.5 秒与侧面 0、4、7.9 秒。回头、屈膝惊缩和抬臂能跟随原恢复；护头手掌悬在帽顶上方，左掌未与实际门柱接触，侧视身体有后仰。手头间隙、门柱高度、脚部支撑和屈膝深度需要修正。原片没有真实同伴，拦人动作与实际炮击事件还须独立装配。",
+                "reviewedSamples": [
+                  {
+                    "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Front_2500.png",
+                    "sha256": "1109bf704ca528651724baf4d87d41bcd794b538a338396daf266095e35845a1"
+                  },
+                  {
+                    "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_0.png",
+                    "sha256": "42d85b2edee94237e152c0b97b8ca1faaae14503639d46e131b42c5c6ce7275b"
+                  },
+                  {
+                    "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_4000.png",
+                    "sha256": "cd9689ac530e24b1a394ee64a4f56fabac975f3c6cda3bd72429da7624ba1aa5"
+                  },
+                  {
+                    "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainShellStartleBlock_Side_7900.png",
+                    "sha256": "2c8f13e11953b74c7cd2e9e0e15540180af9ca9a93de2f90ba5addeb605d0350"
+                  }
+                ],
+                "sampleScope": "Four actually viewed frame/view pairs per clip; all 24 automated captures are synchronization evidence only.",
+                "remaining": [
+                  "Original-character source depth and support contacts",
+                  "Palm orientation and finger contact",
+                  "Real game props, event timing and role coordination"
+                ]
+              }
+            }
+          ],
+          "retargetCandidate": {
+            "variantId": "Nra-v1-TrainShellStartleBlock",
+            "modelSha256": "c07e8ccccfbac5183dd10a1494ca90ea5d3c367ee8b04b7ad9974a162d515048",
+            "path": "Models/FirstLevelTrainReactionV1/Animation_Nra_TrainShellStartleBlock_V1.glb",
+            "clip": "Animation_Nra_TrainShellStartleBlock_V1",
+            "blend": "Blender/FirstLevelTrainReactionV1/Scene_Nra_TrainShellStartleBlock_V1.blend",
+            "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainShellStartleBlock",
+            "status": "需修正 · 接触与深度待验"
+          }
+        }
+      ]
     },
     {
       "requirementId": "FL19",
@@ -10507,7 +11129,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_review_retake_required",
+      "status": "partially_retargeted_requires_contact_review",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -10516,7 +11138,8 @@
       },
       "reviewEvidence": [],
       "blockers": [
-        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated."
+        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated.",
+        "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted."
       ],
       "newSourceProduction": [
         {
@@ -10653,7 +11276,99 @@
                 7.5
               ]
             },
-            "retargetHistory": []
+            "retargetHistory": [
+              {
+                "variantId": "Nra-v1-TrainWoundedArm",
+                "path": "Video/Sources/FirstLevelV1/TrainWoundedArm/Data_RetargetAssessmentV1.json",
+                "assessment": {
+                  "status": "requires_contact_and_depth_refinement",
+                  "frozen": true,
+                  "acceptedForGame": false,
+                  "recordedUtc": "2026-09-07T18:47:46.774035+00:00",
+                  "variantId": "Nra-v1-TrainWoundedArm",
+                  "sourceVideoSha256": "b9a31eba942cb8d0c97421882f14195f9e71e49b8b602a0e319b7f1ba26678c9",
+                  "sourceCacheSha256": "11ffe0f28d0b998d085450f424dcf5ab129fe46292f732ad7ea16ea9295d202f",
+                  "modelSha256": "9e81dfc9cbe5f0d6c1f2bef5e59f4bd75e022f6b97f2b5ea90e8cf11044c10a7",
+                  "observed": "实际查看正面 1 秒与侧面 0、4、7.9 秒。右臂跨胸保护左伤臂的方向保留，随后降低骨盆进入坐姿；原片坐木凳，候选尚无匹配凳面，侧视脚部支撑和身体深度未验收。右掌相对左上臂的位置、手指包覆及坐姿接凳需要修正，不能登记成坐地或已完成医护检查。",
+                  "reviewedSamples": [
+                    {
+                      "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Front_1000.png",
+                      "sha256": "a17d18da8b03bda9f6b81d671f1cacdecb6fea742a32d0a8580d3e8a303d2381"
+                    },
+                    {
+                      "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_0.png",
+                      "sha256": "ba029ee65d0717354b312f986f067ed312b31ea4490660272edac7cb68ab37e2"
+                    },
+                    {
+                      "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_4000.png",
+                      "sha256": "8f181cf72d6d9a58747a63248214f79ffd16c0a33903a25494bb06e38c7deb2a"
+                    },
+                    {
+                      "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_7900.png",
+                      "sha256": "b480fa979c5a9a12c5a2bb560cd2dde3fcf23ca756f4d359c25eea19a7ff1f3f"
+                    }
+                  ],
+                  "sampleScope": "Four actually viewed frame/view pairs per clip; all 24 automated captures are synchronization evidence only.",
+                  "remaining": [
+                    "Original-character source depth and support contacts",
+                    "Palm orientation and finger contact",
+                    "Real game props, event timing and role coordination"
+                  ]
+                }
+              }
+            ],
+            "retargetAssessment": {
+              "status": "requires_contact_and_depth_refinement",
+              "frozen": true,
+              "acceptedForGame": false,
+              "recordedUtc": "2026-09-07T18:47:46.774035+00:00",
+              "variantId": "Nra-v1-TrainWoundedArm",
+              "sourceVideoSha256": "b9a31eba942cb8d0c97421882f14195f9e71e49b8b602a0e319b7f1ba26678c9",
+              "sourceCacheSha256": "11ffe0f28d0b998d085450f424dcf5ab129fe46292f732ad7ea16ea9295d202f",
+              "modelSha256": "9e81dfc9cbe5f0d6c1f2bef5e59f4bd75e022f6b97f2b5ea90e8cf11044c10a7",
+              "observed": "实际查看正面 1 秒与侧面 0、4、7.9 秒。右臂跨胸保护左伤臂的方向保留，随后降低骨盆进入坐姿；原片坐木凳，候选尚无匹配凳面，侧视脚部支撑和身体深度未验收。右掌相对左上臂的位置、手指包覆及坐姿接凳需要修正，不能登记成坐地或已完成医护检查。",
+              "reviewedSamples": [
+                {
+                  "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Front_1000.png",
+                  "sha256": "a17d18da8b03bda9f6b81d671f1cacdecb6fea742a32d0a8580d3e8a303d2381"
+                },
+                {
+                  "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_0.png",
+                  "sha256": "ba029ee65d0717354b312f986f067ed312b31ea4490660272edac7cb68ab37e2"
+                },
+                {
+                  "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_4000.png",
+                  "sha256": "8f181cf72d6d9a58747a63248214f79ffd16c0a33903a25494bb06e38c7deb2a"
+                },
+                {
+                  "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_7900.png",
+                  "sha256": "b480fa979c5a9a12c5a2bb560cd2dde3fcf23ca756f4d359c25eea19a7ff1f3f"
+                }
+              ],
+              "sampleScope": "Four actually viewed frame/view pairs per clip; all 24 automated captures are synchronization evidence only.",
+              "remaining": [
+                "Original-character source depth and support contacts",
+                "Palm orientation and finger contact",
+                "Real game props, event timing and role coordination"
+              ]
+            },
+            "retargetCandidate": {
+              "previewId": "TrainWoundedArm",
+              "variantId": "Nra-v1-TrainWoundedArm",
+              "status": "需修正 · 接触与深度待验",
+              "path": "Models/FirstLevelTrainReactionV1/Animation_Nra_TrainWoundedArm_V1.glb",
+              "blend": "Blender/FirstLevelTrainReactionV1/Scene_Nra_TrainWoundedArm_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_TrainWoundedArmRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
           }
         },
         {
@@ -10725,7 +11440,113 @@
       "sourceRetakeIds": [
         "MedicArmCheck"
       ],
-      "newRecoveryCandidates": []
+      "newRecoveryCandidates": [
+        {
+          "sourceId": "TrainWoundedArm",
+          "sourceVideo": "Video/Sources/FirstLevelV1/TrainWoundedArm/5c7f8172-d52c-43c8-8645-1b05eb8ed40f_video_1.mp4",
+          "sourceVideoSha256": "b9a31eba942cb8d0c97421882f14195f9e71e49b8b602a0e319b7f1ba26678c9",
+          "sourceRangeSeconds": [
+            0,
+            7.966666666666667
+          ],
+          "generationSubmitId": "5c7f8172-d52c-43c8-8645-1b05eb8ed40f",
+          "recoveryFrames": 240,
+          "recoveryFps": 30.0,
+          "recoveryRevision": 1,
+          "sourceCache": "Models/_Cache/FirstLevelV1/TrainWoundedArm/Data_GvhmrMotion.npz",
+          "sourceCacheSha256": "11ffe0f28d0b998d085450f424dcf5ab129fe46292f732ad7ea16ea9295d202f",
+          "resultSha256": "6944a86e3db8bc122b07a32caa2991411acc8fb13c381a1de11132037143903b",
+          "rawJointFile": "Models/RecoveryPreview/Data_V1_TrainWoundedArmRawJoints.json",
+          "group": "FirstLevelTrainReactionV1",
+          "visualAssessment": {
+            "status": "requires_contact_and_depth_refinement",
+            "frozen": true,
+            "acceptedForGame": false,
+            "recordedUtc": "2026-09-07T18:47:46.774035+00:00",
+            "variantId": "Nra-v1-TrainWoundedArm",
+            "sourceVideoSha256": "b9a31eba942cb8d0c97421882f14195f9e71e49b8b602a0e319b7f1ba26678c9",
+            "sourceCacheSha256": "11ffe0f28d0b998d085450f424dcf5ab129fe46292f732ad7ea16ea9295d202f",
+            "modelSha256": "9e81dfc9cbe5f0d6c1f2bef5e59f4bd75e022f6b97f2b5ea90e8cf11044c10a7",
+            "observed": "实际查看正面 1 秒与侧面 0、4、7.9 秒。右臂跨胸保护左伤臂的方向保留，随后降低骨盆进入坐姿；原片坐木凳，候选尚无匹配凳面，侧视脚部支撑和身体深度未验收。右掌相对左上臂的位置、手指包覆及坐姿接凳需要修正，不能登记成坐地或已完成医护检查。",
+            "reviewedSamples": [
+              {
+                "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Front_1000.png",
+                "sha256": "a17d18da8b03bda9f6b81d671f1cacdecb6fea742a32d0a8580d3e8a303d2381"
+              },
+              {
+                "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_0.png",
+                "sha256": "ba029ee65d0717354b312f986f067ed312b31ea4490660272edac7cb68ab37e2"
+              },
+              {
+                "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_4000.png",
+                "sha256": "8f181cf72d6d9a58747a63248214f79ffd16c0a33903a25494bb06e38c7deb2a"
+              },
+              {
+                "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_7900.png",
+                "sha256": "b480fa979c5a9a12c5a2bb560cd2dde3fcf23ca756f4d359c25eea19a7ff1f3f"
+              }
+            ],
+            "sampleScope": "Four actually viewed frame/view pairs per clip; all 24 automated captures are synchronization evidence only.",
+            "remaining": [
+              "Original-character source depth and support contacts",
+              "Palm orientation and finger contact",
+              "Real game props, event timing and role coordination"
+            ]
+          },
+          "status": "raw_recovered_pending_retarget_and_contact_review",
+          "runtimeEnabled": false,
+          "retargetHistory": [
+            {
+              "variantId": "Nra-v1-TrainWoundedArm",
+              "path": "Video/Sources/FirstLevelV1/TrainWoundedArm/Data_RetargetAssessmentV1.json",
+              "assessment": {
+                "status": "requires_contact_and_depth_refinement",
+                "frozen": true,
+                "acceptedForGame": false,
+                "recordedUtc": "2026-09-07T18:47:46.774035+00:00",
+                "variantId": "Nra-v1-TrainWoundedArm",
+                "sourceVideoSha256": "b9a31eba942cb8d0c97421882f14195f9e71e49b8b602a0e319b7f1ba26678c9",
+                "sourceCacheSha256": "11ffe0f28d0b998d085450f424dcf5ab129fe46292f732ad7ea16ea9295d202f",
+                "modelSha256": "9e81dfc9cbe5f0d6c1f2bef5e59f4bd75e022f6b97f2b5ea90e8cf11044c10a7",
+                "observed": "实际查看正面 1 秒与侧面 0、4、7.9 秒。右臂跨胸保护左伤臂的方向保留，随后降低骨盆进入坐姿；原片坐木凳，候选尚无匹配凳面，侧视脚部支撑和身体深度未验收。右掌相对左上臂的位置、手指包覆及坐姿接凳需要修正，不能登记成坐地或已完成医护检查。",
+                "reviewedSamples": [
+                  {
+                    "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Front_1000.png",
+                    "sha256": "a17d18da8b03bda9f6b81d671f1cacdecb6fea742a32d0a8580d3e8a303d2381"
+                  },
+                  {
+                    "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_0.png",
+                    "sha256": "ba029ee65d0717354b312f986f067ed312b31ea4490660272edac7cb68ab37e2"
+                  },
+                  {
+                    "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_4000.png",
+                    "sha256": "8f181cf72d6d9a58747a63248214f79ffd16c0a33903a25494bb06e38c7deb2a"
+                  },
+                  {
+                    "path": "Preview/FirstLevelTrainReactionV1/Texture_TrainWoundedArm_Side_7900.png",
+                    "sha256": "b480fa979c5a9a12c5a2bb560cd2dde3fcf23ca756f4d359c25eea19a7ff1f3f"
+                  }
+                ],
+                "sampleScope": "Four actually viewed frame/view pairs per clip; all 24 automated captures are synchronization evidence only.",
+                "remaining": [
+                  "Original-character source depth and support contacts",
+                  "Palm orientation and finger contact",
+                  "Real game props, event timing and role coordination"
+                ]
+              }
+            }
+          ],
+          "retargetCandidate": {
+            "variantId": "Nra-v1-TrainWoundedArm",
+            "modelSha256": "9e81dfc9cbe5f0d6c1f2bef5e59f4bd75e022f6b97f2b5ea90e8cf11044c10a7",
+            "path": "Models/FirstLevelTrainReactionV1/Animation_Nra_TrainWoundedArm_V1.glb",
+            "clip": "Animation_Nra_TrainWoundedArm_V1",
+            "blend": "Blender/FirstLevelTrainReactionV1/Scene_Nra_TrainWoundedArm_V1.blend",
+            "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainWoundedArm",
+            "status": "需修正 · 接触与深度待验"
+          }
+        }
+      ]
     },
     {
       "requirementId": "FL20",
@@ -10942,8 +11763,8 @@
           "Unloading"
         ],
         "scope": "扶腿起身、直立等队列与行走衔接；逐阶下车待接",
-        "evidence": "Models/FirstLevelTrainGameV1/Data_GameIntegration.json",
-        "version": "FirstLevelTrainGameV1"
+        "evidence": "Models/FirstLevelTrainGameV2/Data_GameIntegration.json",
+        "version": "FirstLevelTrainGameV2"
       },
       "reviewEvidence": [
         "Models/FirstLevelTrainV1/Data_SelectedExportFidelityValidation.json",
@@ -10956,7 +11777,7 @@
         "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra02.json",
         "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra03.json",
         "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra04.json",
-        "Models/FirstLevelTrainGameV1/Data_GameIntegration.json"
+        "Models/FirstLevelTrainGameV2/Data_GameIntegration.json"
       ],
       "blockers": [
         "Other generated source targets require dense source review and recovery; first-pass retakes remain explicit.",
@@ -12401,7 +13222,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_review_retake_required",
+      "status": "partially_retargeted_requires_contact_review",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -12411,7 +13232,8 @@
       },
       "reviewEvidence": [],
       "blockers": [
-        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated."
+        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated.",
+        "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted."
       ],
       "newSourceProduction": [
         {
@@ -12620,7 +13442,99 @@
                 0.2313297986984253
               ]
             },
-            "retargetHistory": []
+            "retargetHistory": [
+              {
+                "variantId": "Nra-v1-MedicSupportLegs",
+                "path": "Video/Sources/FirstLevelV1/MedicSupportLegs/Data_RetargetAssessmentV1.json",
+                "assessment": {
+                  "status": "requires_contact_and_depth_refinement",
+                  "frozen": true,
+                  "acceptedForGame": false,
+                  "recordedUtc": "2026-09-07T18:06:05.964520+00:00",
+                  "variantId": "Nra-v1-MedicSupportLegs",
+                  "sourceVideoSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+                  "sourceCacheSha256": "417687080252e48c5ddd8f7bed5f0886d32f38f5ba5c947dcb12b33281b7f228",
+                  "modelSha256": "e70b8a3e22a4b068e679db644a17a59dd999b0b45fa886fab3841bb7b3694f8a",
+                  "observed": "实际查看原片／原恢复／原角色的 0、4、6、9.9 秒选点。起身、侧移和再次下蹲能跟随原恢复；双掌尚未适配患者小腿或替代圆垫，脚部支撑与下肢深度仍需修正。初次侧面末段手部超出视口，另调整查看中心与距离；没有改动模型、原片或 raw。",
+                  "reviewedSamples": [
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Front_4000.png",
+                      "sha256": "b41799d3a6f6f2ad1155bbb50fa2644dcc39103123f6f53db6d4c64f81905a8a"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_6000.png",
+                      "sha256": "fb4e8f103d5a39fc2acfb0a983a380e7b0a7d31b500398217f6fee051e695c34"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_0.png",
+                      "sha256": "6bd1693cba064359eae00272b98d2f8d2006c6600733f2329d90b0752ab1f9d2"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_9900.png",
+                      "sha256": "e006127b3c90813c215479938038d8a32e4a28f18490c67c8b51954e89ed2156"
+                    }
+                  ],
+                  "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+                  "remaining": [
+                    "Original character source-depth and foot/body support review",
+                    "Actual patient, stretcher, palms and finger contacts",
+                    "Role pairing, mission events and interruption behavior"
+                  ]
+                }
+              }
+            ],
+            "retargetAssessment": {
+              "status": "requires_contact_and_depth_refinement",
+              "frozen": true,
+              "acceptedForGame": false,
+              "recordedUtc": "2026-09-07T18:06:05.964520+00:00",
+              "variantId": "Nra-v1-MedicSupportLegs",
+              "sourceVideoSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+              "sourceCacheSha256": "417687080252e48c5ddd8f7bed5f0886d32f38f5ba5c947dcb12b33281b7f228",
+              "modelSha256": "e70b8a3e22a4b068e679db644a17a59dd999b0b45fa886fab3841bb7b3694f8a",
+              "observed": "实际查看原片／原恢复／原角色的 0、4、6、9.9 秒选点。起身、侧移和再次下蹲能跟随原恢复；双掌尚未适配患者小腿或替代圆垫，脚部支撑与下肢深度仍需修正。初次侧面末段手部超出视口，另调整查看中心与距离；没有改动模型、原片或 raw。",
+              "reviewedSamples": [
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Front_4000.png",
+                  "sha256": "b41799d3a6f6f2ad1155bbb50fa2644dcc39103123f6f53db6d4c64f81905a8a"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_6000.png",
+                  "sha256": "fb4e8f103d5a39fc2acfb0a983a380e7b0a7d31b500398217f6fee051e695c34"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_0.png",
+                  "sha256": "6bd1693cba064359eae00272b98d2f8d2006c6600733f2329d90b0752ab1f9d2"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_9900.png",
+                  "sha256": "e006127b3c90813c215479938038d8a32e4a28f18490c67c8b51954e89ed2156"
+                }
+              ],
+              "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+              "remaining": [
+                "Original character source-depth and foot/body support review",
+                "Actual patient, stretcher, palms and finger contacts",
+                "Role pairing, mission events and interruption behavior"
+              ]
+            },
+            "retargetCandidate": {
+              "previewId": "MedicSupportLegs",
+              "variantId": "Nra-v1-MedicSupportLegs",
+              "status": "需修正 · 接触与深度待验",
+              "path": "Models/FirstLevelMedicalV1/Animation_Nra_MedicSupportLegs_V1.glb",
+              "blend": "Blender/FirstLevelMedicalV1/Scene_Nra_MedicSupportLegs_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_MedicSupportLegsRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
           }
         },
         {
@@ -12693,7 +13607,113 @@
       "sourceRetakeIds": [
         "MedicSupportShoulders"
       ],
-      "newRecoveryCandidates": []
+      "newRecoveryCandidates": [
+        {
+          "sourceId": "MedicSupportLegs",
+          "sourceVideo": "Video/Sources/FirstLevelV1/MedicSupportLegs/eb076d99-b2d2-427c-888a-3dbcaedf6d0e_video_1.mp4",
+          "sourceVideoSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+          "sourceRangeSeconds": [
+            0,
+            9.966666666666667
+          ],
+          "generationSubmitId": "eb076d99-b2d2-427c-888a-3dbcaedf6d0e",
+          "recoveryFrames": 300,
+          "recoveryFps": 30.0,
+          "recoveryRevision": 1,
+          "sourceCache": "Models/_Cache/FirstLevelV1/MedicSupportLegs/Data_GvhmrMotion.npz",
+          "sourceCacheSha256": "417687080252e48c5ddd8f7bed5f0886d32f38f5ba5c947dcb12b33281b7f228",
+          "resultSha256": "38d0819e6f69ef415c0203137aa770adad46f55f5d648d7af912841c9833a822",
+          "rawJointFile": "Models/RecoveryPreview/Data_V1_MedicSupportLegsRawJoints.json",
+          "group": "FirstLevelMedicalV1",
+          "visualAssessment": {
+            "status": "requires_contact_and_depth_refinement",
+            "frozen": true,
+            "acceptedForGame": false,
+            "recordedUtc": "2026-09-07T18:06:05.964520+00:00",
+            "variantId": "Nra-v1-MedicSupportLegs",
+            "sourceVideoSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+            "sourceCacheSha256": "417687080252e48c5ddd8f7bed5f0886d32f38f5ba5c947dcb12b33281b7f228",
+            "modelSha256": "e70b8a3e22a4b068e679db644a17a59dd999b0b45fa886fab3841bb7b3694f8a",
+            "observed": "实际查看原片／原恢复／原角色的 0、4、6、9.9 秒选点。起身、侧移和再次下蹲能跟随原恢复；双掌尚未适配患者小腿或替代圆垫，脚部支撑与下肢深度仍需修正。初次侧面末段手部超出视口，另调整查看中心与距离；没有改动模型、原片或 raw。",
+            "reviewedSamples": [
+              {
+                "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Front_4000.png",
+                "sha256": "b41799d3a6f6f2ad1155bbb50fa2644dcc39103123f6f53db6d4c64f81905a8a"
+              },
+              {
+                "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_6000.png",
+                "sha256": "fb4e8f103d5a39fc2acfb0a983a380e7b0a7d31b500398217f6fee051e695c34"
+              },
+              {
+                "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_0.png",
+                "sha256": "6bd1693cba064359eae00272b98d2f8d2006c6600733f2329d90b0752ab1f9d2"
+              },
+              {
+                "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_9900.png",
+                "sha256": "e006127b3c90813c215479938038d8a32e4a28f18490c67c8b51954e89ed2156"
+              }
+            ],
+            "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+            "remaining": [
+              "Original character source-depth and foot/body support review",
+              "Actual patient, stretcher, palms and finger contacts",
+              "Role pairing, mission events and interruption behavior"
+            ]
+          },
+          "status": "raw_recovered_pending_retarget_and_contact_review",
+          "runtimeEnabled": false,
+          "retargetHistory": [
+            {
+              "variantId": "Nra-v1-MedicSupportLegs",
+              "path": "Video/Sources/FirstLevelV1/MedicSupportLegs/Data_RetargetAssessmentV1.json",
+              "assessment": {
+                "status": "requires_contact_and_depth_refinement",
+                "frozen": true,
+                "acceptedForGame": false,
+                "recordedUtc": "2026-09-07T18:06:05.964520+00:00",
+                "variantId": "Nra-v1-MedicSupportLegs",
+                "sourceVideoSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+                "sourceCacheSha256": "417687080252e48c5ddd8f7bed5f0886d32f38f5ba5c947dcb12b33281b7f228",
+                "modelSha256": "e70b8a3e22a4b068e679db644a17a59dd999b0b45fa886fab3841bb7b3694f8a",
+                "observed": "实际查看原片／原恢复／原角色的 0、4、6、9.9 秒选点。起身、侧移和再次下蹲能跟随原恢复；双掌尚未适配患者小腿或替代圆垫，脚部支撑与下肢深度仍需修正。初次侧面末段手部超出视口，另调整查看中心与距离；没有改动模型、原片或 raw。",
+                "reviewedSamples": [
+                  {
+                    "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Front_4000.png",
+                    "sha256": "b41799d3a6f6f2ad1155bbb50fa2644dcc39103123f6f53db6d4c64f81905a8a"
+                  },
+                  {
+                    "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_6000.png",
+                    "sha256": "fb4e8f103d5a39fc2acfb0a983a380e7b0a7d31b500398217f6fee051e695c34"
+                  },
+                  {
+                    "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_0.png",
+                    "sha256": "6bd1693cba064359eae00272b98d2f8d2006c6600733f2329d90b0752ab1f9d2"
+                  },
+                  {
+                    "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_9900.png",
+                    "sha256": "e006127b3c90813c215479938038d8a32e4a28f18490c67c8b51954e89ed2156"
+                  }
+                ],
+                "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+                "remaining": [
+                  "Original character source-depth and foot/body support review",
+                  "Actual patient, stretcher, palms and finger contacts",
+                  "Role pairing, mission events and interruption behavior"
+                ]
+              }
+            }
+          ],
+          "retargetCandidate": {
+            "variantId": "Nra-v1-MedicSupportLegs",
+            "modelSha256": "e70b8a3e22a4b068e679db644a17a59dd999b0b45fa886fab3841bb7b3694f8a",
+            "path": "Models/FirstLevelMedicalV1/Animation_Nra_MedicSupportLegs_V1.glb",
+            "clip": "Animation_Nra_MedicSupportLegs_V1",
+            "blend": "Blender/FirstLevelMedicalV1/Scene_Nra_MedicSupportLegs_V1.blend",
+            "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=MedicSupportLegs",
+            "status": "需修正 · 接触与深度待验"
+          }
+        }
+      ]
     },
     {
       "requirementId": "FL25",
@@ -12879,7 +13899,7 @@
       "requirementId": "FL26",
       "priority": "A",
       "label": "前后负重走停、缓转、坡道、门槛",
-      "acceptanceRequirements": "20 副担架，共享相位和刚性道具，手不滑杆；当前白盒摆臂，骨架待制。",
+      "acceptanceRequirements": "20 副担架，共享相位和刚性道具，手不滑杆；r12 已用原骨架前后抬运片段与握点修正，本批 V10 尚未替换，停步、坡道和门槛接触待验。",
       "actorRoles": [
         "litter.frontBearer",
         "litter.rearBearer"
@@ -15109,7 +16129,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_review_retake_required",
+      "status": "partially_retargeted_requires_contact_review",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -15118,7 +16138,8 @@
       },
       "reviewEvidence": [],
       "blockers": [
-        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated."
+        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated.",
+        "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted."
       ],
       "newSourceProduction": [
         {
@@ -15327,7 +16348,99 @@
                 0.2313297986984253
               ]
             },
-            "retargetHistory": []
+            "retargetHistory": [
+              {
+                "variantId": "Nra-v1-MedicSupportLegs",
+                "path": "Video/Sources/FirstLevelV1/MedicSupportLegs/Data_RetargetAssessmentV1.json",
+                "assessment": {
+                  "status": "requires_contact_and_depth_refinement",
+                  "frozen": true,
+                  "acceptedForGame": false,
+                  "recordedUtc": "2026-09-07T18:06:05.964520+00:00",
+                  "variantId": "Nra-v1-MedicSupportLegs",
+                  "sourceVideoSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+                  "sourceCacheSha256": "417687080252e48c5ddd8f7bed5f0886d32f38f5ba5c947dcb12b33281b7f228",
+                  "modelSha256": "e70b8a3e22a4b068e679db644a17a59dd999b0b45fa886fab3841bb7b3694f8a",
+                  "observed": "实际查看原片／原恢复／原角色的 0、4、6、9.9 秒选点。起身、侧移和再次下蹲能跟随原恢复；双掌尚未适配患者小腿或替代圆垫，脚部支撑与下肢深度仍需修正。初次侧面末段手部超出视口，另调整查看中心与距离；没有改动模型、原片或 raw。",
+                  "reviewedSamples": [
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Front_4000.png",
+                      "sha256": "b41799d3a6f6f2ad1155bbb50fa2644dcc39103123f6f53db6d4c64f81905a8a"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_6000.png",
+                      "sha256": "fb4e8f103d5a39fc2acfb0a983a380e7b0a7d31b500398217f6fee051e695c34"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_0.png",
+                      "sha256": "6bd1693cba064359eae00272b98d2f8d2006c6600733f2329d90b0752ab1f9d2"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_9900.png",
+                      "sha256": "e006127b3c90813c215479938038d8a32e4a28f18490c67c8b51954e89ed2156"
+                    }
+                  ],
+                  "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+                  "remaining": [
+                    "Original character source-depth and foot/body support review",
+                    "Actual patient, stretcher, palms and finger contacts",
+                    "Role pairing, mission events and interruption behavior"
+                  ]
+                }
+              }
+            ],
+            "retargetAssessment": {
+              "status": "requires_contact_and_depth_refinement",
+              "frozen": true,
+              "acceptedForGame": false,
+              "recordedUtc": "2026-09-07T18:06:05.964520+00:00",
+              "variantId": "Nra-v1-MedicSupportLegs",
+              "sourceVideoSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+              "sourceCacheSha256": "417687080252e48c5ddd8f7bed5f0886d32f38f5ba5c947dcb12b33281b7f228",
+              "modelSha256": "e70b8a3e22a4b068e679db644a17a59dd999b0b45fa886fab3841bb7b3694f8a",
+              "observed": "实际查看原片／原恢复／原角色的 0、4、6、9.9 秒选点。起身、侧移和再次下蹲能跟随原恢复；双掌尚未适配患者小腿或替代圆垫，脚部支撑与下肢深度仍需修正。初次侧面末段手部超出视口，另调整查看中心与距离；没有改动模型、原片或 raw。",
+              "reviewedSamples": [
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Front_4000.png",
+                  "sha256": "b41799d3a6f6f2ad1155bbb50fa2644dcc39103123f6f53db6d4c64f81905a8a"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_6000.png",
+                  "sha256": "fb4e8f103d5a39fc2acfb0a983a380e7b0a7d31b500398217f6fee051e695c34"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_0.png",
+                  "sha256": "6bd1693cba064359eae00272b98d2f8d2006c6600733f2329d90b0752ab1f9d2"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_9900.png",
+                  "sha256": "e006127b3c90813c215479938038d8a32e4a28f18490c67c8b51954e89ed2156"
+                }
+              ],
+              "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+              "remaining": [
+                "Original character source-depth and foot/body support review",
+                "Actual patient, stretcher, palms and finger contacts",
+                "Role pairing, mission events and interruption behavior"
+              ]
+            },
+            "retargetCandidate": {
+              "previewId": "MedicSupportLegs",
+              "variantId": "Nra-v1-MedicSupportLegs",
+              "status": "需修正 · 接触与深度待验",
+              "path": "Models/FirstLevelMedicalV1/Animation_Nra_MedicSupportLegs_V1.glb",
+              "blend": "Blender/FirstLevelMedicalV1/Scene_Nra_MedicSupportLegs_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_MedicSupportLegsRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
           }
         },
         {
@@ -15466,7 +16579,113 @@
       "sourceRetakeIds": [
         "MedicSupportShoulders"
       ],
-      "newRecoveryCandidates": []
+      "newRecoveryCandidates": [
+        {
+          "sourceId": "MedicSupportLegs",
+          "sourceVideo": "Video/Sources/FirstLevelV1/MedicSupportLegs/eb076d99-b2d2-427c-888a-3dbcaedf6d0e_video_1.mp4",
+          "sourceVideoSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+          "sourceRangeSeconds": [
+            0,
+            9.966666666666667
+          ],
+          "generationSubmitId": "eb076d99-b2d2-427c-888a-3dbcaedf6d0e",
+          "recoveryFrames": 300,
+          "recoveryFps": 30.0,
+          "recoveryRevision": 1,
+          "sourceCache": "Models/_Cache/FirstLevelV1/MedicSupportLegs/Data_GvhmrMotion.npz",
+          "sourceCacheSha256": "417687080252e48c5ddd8f7bed5f0886d32f38f5ba5c947dcb12b33281b7f228",
+          "resultSha256": "38d0819e6f69ef415c0203137aa770adad46f55f5d648d7af912841c9833a822",
+          "rawJointFile": "Models/RecoveryPreview/Data_V1_MedicSupportLegsRawJoints.json",
+          "group": "FirstLevelMedicalV1",
+          "visualAssessment": {
+            "status": "requires_contact_and_depth_refinement",
+            "frozen": true,
+            "acceptedForGame": false,
+            "recordedUtc": "2026-09-07T18:06:05.964520+00:00",
+            "variantId": "Nra-v1-MedicSupportLegs",
+            "sourceVideoSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+            "sourceCacheSha256": "417687080252e48c5ddd8f7bed5f0886d32f38f5ba5c947dcb12b33281b7f228",
+            "modelSha256": "e70b8a3e22a4b068e679db644a17a59dd999b0b45fa886fab3841bb7b3694f8a",
+            "observed": "实际查看原片／原恢复／原角色的 0、4、6、9.9 秒选点。起身、侧移和再次下蹲能跟随原恢复；双掌尚未适配患者小腿或替代圆垫，脚部支撑与下肢深度仍需修正。初次侧面末段手部超出视口，另调整查看中心与距离；没有改动模型、原片或 raw。",
+            "reviewedSamples": [
+              {
+                "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Front_4000.png",
+                "sha256": "b41799d3a6f6f2ad1155bbb50fa2644dcc39103123f6f53db6d4c64f81905a8a"
+              },
+              {
+                "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_6000.png",
+                "sha256": "fb4e8f103d5a39fc2acfb0a983a380e7b0a7d31b500398217f6fee051e695c34"
+              },
+              {
+                "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_0.png",
+                "sha256": "6bd1693cba064359eae00272b98d2f8d2006c6600733f2329d90b0752ab1f9d2"
+              },
+              {
+                "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_9900.png",
+                "sha256": "e006127b3c90813c215479938038d8a32e4a28f18490c67c8b51954e89ed2156"
+              }
+            ],
+            "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+            "remaining": [
+              "Original character source-depth and foot/body support review",
+              "Actual patient, stretcher, palms and finger contacts",
+              "Role pairing, mission events and interruption behavior"
+            ]
+          },
+          "status": "raw_recovered_pending_retarget_and_contact_review",
+          "runtimeEnabled": false,
+          "retargetHistory": [
+            {
+              "variantId": "Nra-v1-MedicSupportLegs",
+              "path": "Video/Sources/FirstLevelV1/MedicSupportLegs/Data_RetargetAssessmentV1.json",
+              "assessment": {
+                "status": "requires_contact_and_depth_refinement",
+                "frozen": true,
+                "acceptedForGame": false,
+                "recordedUtc": "2026-09-07T18:06:05.964520+00:00",
+                "variantId": "Nra-v1-MedicSupportLegs",
+                "sourceVideoSha256": "ec9f4a7684ba7b8747fe5e1480cdf117ad6e2c10bdf9cbb35f698ada9fc0ffe6",
+                "sourceCacheSha256": "417687080252e48c5ddd8f7bed5f0886d32f38f5ba5c947dcb12b33281b7f228",
+                "modelSha256": "e70b8a3e22a4b068e679db644a17a59dd999b0b45fa886fab3841bb7b3694f8a",
+                "observed": "实际查看原片／原恢复／原角色的 0、4、6、9.9 秒选点。起身、侧移和再次下蹲能跟随原恢复；双掌尚未适配患者小腿或替代圆垫，脚部支撑与下肢深度仍需修正。初次侧面末段手部超出视口，另调整查看中心与距离；没有改动模型、原片或 raw。",
+                "reviewedSamples": [
+                  {
+                    "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Front_4000.png",
+                    "sha256": "b41799d3a6f6f2ad1155bbb50fa2644dcc39103123f6f53db6d4c64f81905a8a"
+                  },
+                  {
+                    "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_6000.png",
+                    "sha256": "fb4e8f103d5a39fc2acfb0a983a380e7b0a7d31b500398217f6fee051e695c34"
+                  },
+                  {
+                    "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_0.png",
+                    "sha256": "6bd1693cba064359eae00272b98d2f8d2006c6600733f2329d90b0752ab1f9d2"
+                  },
+                  {
+                    "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_MedicSupportLegs_Side_9900.png",
+                    "sha256": "e006127b3c90813c215479938038d8a32e4a28f18490c67c8b51954e89ed2156"
+                  }
+                ],
+                "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+                "remaining": [
+                  "Original character source-depth and foot/body support review",
+                  "Actual patient, stretcher, palms and finger contacts",
+                  "Role pairing, mission events and interruption behavior"
+                ]
+              }
+            }
+          ],
+          "retargetCandidate": {
+            "variantId": "Nra-v1-MedicSupportLegs",
+            "modelSha256": "e70b8a3e22a4b068e679db644a17a59dd999b0b45fa886fab3841bb7b3694f8a",
+            "path": "Models/FirstLevelMedicalV1/Animation_Nra_MedicSupportLegs_V1.glb",
+            "clip": "Animation_Nra_MedicSupportLegs_V1",
+            "blend": "Blender/FirstLevelMedicalV1/Scene_Nra_MedicSupportLegs_V1.blend",
+            "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=MedicSupportLegs",
+            "status": "需修正 · 接触与深度待验"
+          }
+        }
+      ]
     },
     {
       "requirementId": "FL38",
@@ -15664,7 +16883,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "sources_generated_pending_review",
+      "status": "partially_retargeted_requires_contact_review",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -15676,7 +16895,8 @@
       },
       "reviewEvidence": [],
       "blockers": [
-        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated."
+        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated.",
+        "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted."
       ],
       "newSourceProduction": [
         {
@@ -15907,13 +17127,211 @@
               ],
               "observationInputSha256": "ac41a3bff5e47378c6a822e87c81afbb86e84ba3d8cb03e6010bb71178c06938"
             },
-            "retargetHistory": []
+            "retargetHistory": [
+              {
+                "variantId": "Nra-v1-ZhouWeakeningDeath",
+                "path": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/Data_RetargetAssessmentV1.json",
+                "assessment": {
+                  "status": "requires_contact_and_depth_refinement",
+                  "frozen": true,
+                  "acceptedForGame": false,
+                  "recordedUtc": "2026-09-07T18:06:05.970815+00:00",
+                  "variantId": "Nra-v1-ZhouWeakeningDeath",
+                  "sourceVideoSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+                  "sourceCacheSha256": "c8e6159789433bf2be1e92117def8bb423ddb86128f6df9e8f880ad23da9785e",
+                  "modelSha256": "cf59dd3d38a6a20aaede4cb2822358384f89d0ec0d71f46331c86f9353bbb336",
+                  "observed": "实际查看 0、3、5、11.9 秒的正侧视选点。卧姿身体与双臂跟随原恢复，但模型倾斜、没有担架与枕部承托；单目卧姿深度、胸背支撑、近手松握和远臂遮挡仍待检查，不能据此认定死亡保持完成。",
+                  "reviewedSamples": [
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Front_5000.png",
+                      "sha256": "d60f480a6f94f8712804698266eb465f712f92545905e7ba71c31cb588e96006"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_11900.png",
+                      "sha256": "2c8cbebf36e4232d3cb9345570b2e2183189134561101e818d96ae26b486e46f"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_0.png",
+                      "sha256": "75d649d73415ac345b6123d994d24ff577ab95ce956263b11fdfcb21a3f8e2da"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_3000.png",
+                      "sha256": "3401efb4a5cf20d7e2add89a4b51f598f9f4309a2367d895baebd1376525b0c4"
+                    }
+                  ],
+                  "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+                  "remaining": [
+                    "Original character source-depth and foot/body support review",
+                    "Actual patient, stretcher, palms and finger contacts",
+                    "Role pairing, mission events and interruption behavior"
+                  ]
+                }
+              }
+            ],
+            "retargetAssessment": {
+              "status": "requires_contact_and_depth_refinement",
+              "frozen": true,
+              "acceptedForGame": false,
+              "recordedUtc": "2026-09-07T18:06:05.970815+00:00",
+              "variantId": "Nra-v1-ZhouWeakeningDeath",
+              "sourceVideoSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+              "sourceCacheSha256": "c8e6159789433bf2be1e92117def8bb423ddb86128f6df9e8f880ad23da9785e",
+              "modelSha256": "cf59dd3d38a6a20aaede4cb2822358384f89d0ec0d71f46331c86f9353bbb336",
+              "observed": "实际查看 0、3、5、11.9 秒的正侧视选点。卧姿身体与双臂跟随原恢复，但模型倾斜、没有担架与枕部承托；单目卧姿深度、胸背支撑、近手松握和远臂遮挡仍待检查，不能据此认定死亡保持完成。",
+              "reviewedSamples": [
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Front_5000.png",
+                  "sha256": "d60f480a6f94f8712804698266eb465f712f92545905e7ba71c31cb588e96006"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_11900.png",
+                  "sha256": "2c8cbebf36e4232d3cb9345570b2e2183189134561101e818d96ae26b486e46f"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_0.png",
+                  "sha256": "75d649d73415ac345b6123d994d24ff577ab95ce956263b11fdfcb21a3f8e2da"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_3000.png",
+                  "sha256": "3401efb4a5cf20d7e2add89a4b51f598f9f4309a2367d895baebd1376525b0c4"
+                }
+              ],
+              "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+              "remaining": [
+                "Original character source-depth and foot/body support review",
+                "Actual patient, stretcher, palms and finger contacts",
+                "Role pairing, mission events and interruption behavior"
+              ]
+            },
+            "retargetCandidate": {
+              "previewId": "ZhouWeakeningDeath",
+              "variantId": "Nra-v1-ZhouWeakeningDeath",
+              "status": "需修正 · 接触与深度待验",
+              "path": "Models/FirstLevelMedicalV1/Animation_Nra_ZhouWeakeningDeath_V1.glb",
+              "blend": "Blender/FirstLevelMedicalV1/Scene_Nra_ZhouWeakeningDeath_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_ZhouWeakeningDeathRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
           }
         }
       ],
       "reusedSourceCandidates": [],
       "sourceRetakeIds": [],
-      "newRecoveryCandidates": []
+      "newRecoveryCandidates": [
+        {
+          "sourceId": "ZhouWeakeningDeath",
+          "sourceVideo": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/adf629a1-d4f6-445f-9247-74c09f4a14b9_video_1.mp4",
+          "sourceVideoSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+          "sourceRangeSeconds": [
+            0,
+            11.966666666666667
+          ],
+          "generationSubmitId": "adf629a1-d4f6-445f-9247-74c09f4a14b9",
+          "recoveryFrames": 360,
+          "recoveryFps": 30.0,
+          "recoveryRevision": 1,
+          "sourceCache": "Models/_Cache/FirstLevelV1/ZhouWeakeningDeath/Data_GvhmrMotion.npz",
+          "sourceCacheSha256": "c8e6159789433bf2be1e92117def8bb423ddb86128f6df9e8f880ad23da9785e",
+          "resultSha256": "9e19e0ec681b26170dc2e3fea9291a0dfa382c00938a33ccdb40cc697f3a8141",
+          "rawJointFile": "Models/RecoveryPreview/Data_V1_ZhouWeakeningDeathRawJoints.json",
+          "group": "FirstLevelMedicalV1",
+          "visualAssessment": {
+            "status": "requires_contact_and_depth_refinement",
+            "frozen": true,
+            "acceptedForGame": false,
+            "recordedUtc": "2026-09-07T18:06:05.970815+00:00",
+            "variantId": "Nra-v1-ZhouWeakeningDeath",
+            "sourceVideoSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+            "sourceCacheSha256": "c8e6159789433bf2be1e92117def8bb423ddb86128f6df9e8f880ad23da9785e",
+            "modelSha256": "cf59dd3d38a6a20aaede4cb2822358384f89d0ec0d71f46331c86f9353bbb336",
+            "observed": "实际查看 0、3、5、11.9 秒的正侧视选点。卧姿身体与双臂跟随原恢复，但模型倾斜、没有担架与枕部承托；单目卧姿深度、胸背支撑、近手松握和远臂遮挡仍待检查，不能据此认定死亡保持完成。",
+            "reviewedSamples": [
+              {
+                "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Front_5000.png",
+                "sha256": "d60f480a6f94f8712804698266eb465f712f92545905e7ba71c31cb588e96006"
+              },
+              {
+                "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_11900.png",
+                "sha256": "2c8cbebf36e4232d3cb9345570b2e2183189134561101e818d96ae26b486e46f"
+              },
+              {
+                "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_0.png",
+                "sha256": "75d649d73415ac345b6123d994d24ff577ab95ce956263b11fdfcb21a3f8e2da"
+              },
+              {
+                "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_3000.png",
+                "sha256": "3401efb4a5cf20d7e2add89a4b51f598f9f4309a2367d895baebd1376525b0c4"
+              }
+            ],
+            "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+            "remaining": [
+              "Original character source-depth and foot/body support review",
+              "Actual patient, stretcher, palms and finger contacts",
+              "Role pairing, mission events and interruption behavior"
+            ]
+          },
+          "status": "raw_recovered_pending_retarget_and_contact_review",
+          "runtimeEnabled": false,
+          "retargetHistory": [
+            {
+              "variantId": "Nra-v1-ZhouWeakeningDeath",
+              "path": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/Data_RetargetAssessmentV1.json",
+              "assessment": {
+                "status": "requires_contact_and_depth_refinement",
+                "frozen": true,
+                "acceptedForGame": false,
+                "recordedUtc": "2026-09-07T18:06:05.970815+00:00",
+                "variantId": "Nra-v1-ZhouWeakeningDeath",
+                "sourceVideoSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+                "sourceCacheSha256": "c8e6159789433bf2be1e92117def8bb423ddb86128f6df9e8f880ad23da9785e",
+                "modelSha256": "cf59dd3d38a6a20aaede4cb2822358384f89d0ec0d71f46331c86f9353bbb336",
+                "observed": "实际查看 0、3、5、11.9 秒的正侧视选点。卧姿身体与双臂跟随原恢复，但模型倾斜、没有担架与枕部承托；单目卧姿深度、胸背支撑、近手松握和远臂遮挡仍待检查，不能据此认定死亡保持完成。",
+                "reviewedSamples": [
+                  {
+                    "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Front_5000.png",
+                    "sha256": "d60f480a6f94f8712804698266eb465f712f92545905e7ba71c31cb588e96006"
+                  },
+                  {
+                    "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_11900.png",
+                    "sha256": "2c8cbebf36e4232d3cb9345570b2e2183189134561101e818d96ae26b486e46f"
+                  },
+                  {
+                    "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_0.png",
+                    "sha256": "75d649d73415ac345b6123d994d24ff577ab95ce956263b11fdfcb21a3f8e2da"
+                  },
+                  {
+                    "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_3000.png",
+                    "sha256": "3401efb4a5cf20d7e2add89a4b51f598f9f4309a2367d895baebd1376525b0c4"
+                  }
+                ],
+                "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+                "remaining": [
+                  "Original character source-depth and foot/body support review",
+                  "Actual patient, stretcher, palms and finger contacts",
+                  "Role pairing, mission events and interruption behavior"
+                ]
+              }
+            }
+          ],
+          "retargetCandidate": {
+            "variantId": "Nra-v1-ZhouWeakeningDeath",
+            "modelSha256": "cf59dd3d38a6a20aaede4cb2822358384f89d0ec0d71f46331c86f9353bbb336",
+            "path": "Models/FirstLevelMedicalV1/Animation_Nra_ZhouWeakeningDeath_V1.glb",
+            "clip": "Animation_Nra_ZhouWeakeningDeath_V1",
+            "blend": "Blender/FirstLevelMedicalV1/Scene_Nra_ZhouWeakeningDeath_V1.blend",
+            "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=ZhouWeakeningDeath",
+            "status": "需修正 · 接触与深度待验"
+          }
+        }
+      ]
     },
     {
       "requirementId": "FL40",
@@ -16581,7 +17999,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "source_generation_failed_partial",
+      "status": "partially_retargeted_requires_contact_review",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
@@ -16590,7 +18008,8 @@
       },
       "reviewEvidence": [],
       "blockers": [
-        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated."
+        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated.",
+        "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted."
       ],
       "newSourceProduction": [
         {
@@ -16821,7 +18240,99 @@
               ],
               "observationInputSha256": "ac41a3bff5e47378c6a822e87c81afbb86e84ba3d8cb03e6010bb71178c06938"
             },
-            "retargetHistory": []
+            "retargetHistory": [
+              {
+                "variantId": "Nra-v1-ZhouWeakeningDeath",
+                "path": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/Data_RetargetAssessmentV1.json",
+                "assessment": {
+                  "status": "requires_contact_and_depth_refinement",
+                  "frozen": true,
+                  "acceptedForGame": false,
+                  "recordedUtc": "2026-09-07T18:06:05.970815+00:00",
+                  "variantId": "Nra-v1-ZhouWeakeningDeath",
+                  "sourceVideoSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+                  "sourceCacheSha256": "c8e6159789433bf2be1e92117def8bb423ddb86128f6df9e8f880ad23da9785e",
+                  "modelSha256": "cf59dd3d38a6a20aaede4cb2822358384f89d0ec0d71f46331c86f9353bbb336",
+                  "observed": "实际查看 0、3、5、11.9 秒的正侧视选点。卧姿身体与双臂跟随原恢复，但模型倾斜、没有担架与枕部承托；单目卧姿深度、胸背支撑、近手松握和远臂遮挡仍待检查，不能据此认定死亡保持完成。",
+                  "reviewedSamples": [
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Front_5000.png",
+                      "sha256": "d60f480a6f94f8712804698266eb465f712f92545905e7ba71c31cb588e96006"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_11900.png",
+                      "sha256": "2c8cbebf36e4232d3cb9345570b2e2183189134561101e818d96ae26b486e46f"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_0.png",
+                      "sha256": "75d649d73415ac345b6123d994d24ff577ab95ce956263b11fdfcb21a3f8e2da"
+                    },
+                    {
+                      "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_3000.png",
+                      "sha256": "3401efb4a5cf20d7e2add89a4b51f598f9f4309a2367d895baebd1376525b0c4"
+                    }
+                  ],
+                  "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+                  "remaining": [
+                    "Original character source-depth and foot/body support review",
+                    "Actual patient, stretcher, palms and finger contacts",
+                    "Role pairing, mission events and interruption behavior"
+                  ]
+                }
+              }
+            ],
+            "retargetAssessment": {
+              "status": "requires_contact_and_depth_refinement",
+              "frozen": true,
+              "acceptedForGame": false,
+              "recordedUtc": "2026-09-07T18:06:05.970815+00:00",
+              "variantId": "Nra-v1-ZhouWeakeningDeath",
+              "sourceVideoSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+              "sourceCacheSha256": "c8e6159789433bf2be1e92117def8bb423ddb86128f6df9e8f880ad23da9785e",
+              "modelSha256": "cf59dd3d38a6a20aaede4cb2822358384f89d0ec0d71f46331c86f9353bbb336",
+              "observed": "实际查看 0、3、5、11.9 秒的正侧视选点。卧姿身体与双臂跟随原恢复，但模型倾斜、没有担架与枕部承托；单目卧姿深度、胸背支撑、近手松握和远臂遮挡仍待检查，不能据此认定死亡保持完成。",
+              "reviewedSamples": [
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Front_5000.png",
+                  "sha256": "d60f480a6f94f8712804698266eb465f712f92545905e7ba71c31cb588e96006"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_11900.png",
+                  "sha256": "2c8cbebf36e4232d3cb9345570b2e2183189134561101e818d96ae26b486e46f"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_0.png",
+                  "sha256": "75d649d73415ac345b6123d994d24ff577ab95ce956263b11fdfcb21a3f8e2da"
+                },
+                {
+                  "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_3000.png",
+                  "sha256": "3401efb4a5cf20d7e2add89a4b51f598f9f4309a2367d895baebd1376525b0c4"
+                }
+              ],
+              "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+              "remaining": [
+                "Original character source-depth and foot/body support review",
+                "Actual patient, stretcher, palms and finger contacts",
+                "Role pairing, mission events and interruption behavior"
+              ]
+            },
+            "retargetCandidate": {
+              "previewId": "ZhouWeakeningDeath",
+              "variantId": "Nra-v1-ZhouWeakeningDeath",
+              "status": "需修正 · 接触与深度待验",
+              "path": "Models/FirstLevelMedicalV1/Animation_Nra_ZhouWeakeningDeath_V1.glb",
+              "blend": "Blender/FirstLevelMedicalV1/Scene_Nra_ZhouWeakeningDeath_V1.blend",
+              "rawTracks": [
+                {
+                  "path": "Models/RecoveryPreview/Data_V1_ZhouWeakeningDeathRawJoints.json",
+                  "offset": [
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
           }
         },
         {
@@ -16906,7 +18417,113 @@
       "sourceRetakeIds": [
         "YaowaGriefRise"
       ],
-      "newRecoveryCandidates": []
+      "newRecoveryCandidates": [
+        {
+          "sourceId": "ZhouWeakeningDeath",
+          "sourceVideo": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/adf629a1-d4f6-445f-9247-74c09f4a14b9_video_1.mp4",
+          "sourceVideoSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+          "sourceRangeSeconds": [
+            0,
+            11.966666666666667
+          ],
+          "generationSubmitId": "adf629a1-d4f6-445f-9247-74c09f4a14b9",
+          "recoveryFrames": 360,
+          "recoveryFps": 30.0,
+          "recoveryRevision": 1,
+          "sourceCache": "Models/_Cache/FirstLevelV1/ZhouWeakeningDeath/Data_GvhmrMotion.npz",
+          "sourceCacheSha256": "c8e6159789433bf2be1e92117def8bb423ddb86128f6df9e8f880ad23da9785e",
+          "resultSha256": "9e19e0ec681b26170dc2e3fea9291a0dfa382c00938a33ccdb40cc697f3a8141",
+          "rawJointFile": "Models/RecoveryPreview/Data_V1_ZhouWeakeningDeathRawJoints.json",
+          "group": "FirstLevelMedicalV1",
+          "visualAssessment": {
+            "status": "requires_contact_and_depth_refinement",
+            "frozen": true,
+            "acceptedForGame": false,
+            "recordedUtc": "2026-09-07T18:06:05.970815+00:00",
+            "variantId": "Nra-v1-ZhouWeakeningDeath",
+            "sourceVideoSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+            "sourceCacheSha256": "c8e6159789433bf2be1e92117def8bb423ddb86128f6df9e8f880ad23da9785e",
+            "modelSha256": "cf59dd3d38a6a20aaede4cb2822358384f89d0ec0d71f46331c86f9353bbb336",
+            "observed": "实际查看 0、3、5、11.9 秒的正侧视选点。卧姿身体与双臂跟随原恢复，但模型倾斜、没有担架与枕部承托；单目卧姿深度、胸背支撑、近手松握和远臂遮挡仍待检查，不能据此认定死亡保持完成。",
+            "reviewedSamples": [
+              {
+                "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Front_5000.png",
+                "sha256": "d60f480a6f94f8712804698266eb465f712f92545905e7ba71c31cb588e96006"
+              },
+              {
+                "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_11900.png",
+                "sha256": "2c8cbebf36e4232d3cb9345570b2e2183189134561101e818d96ae26b486e46f"
+              },
+              {
+                "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_0.png",
+                "sha256": "75d649d73415ac345b6123d994d24ff577ab95ce956263b11fdfcb21a3f8e2da"
+              },
+              {
+                "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_3000.png",
+                "sha256": "3401efb4a5cf20d7e2add89a4b51f598f9f4309a2367d895baebd1376525b0c4"
+              }
+            ],
+            "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+            "remaining": [
+              "Original character source-depth and foot/body support review",
+              "Actual patient, stretcher, palms and finger contacts",
+              "Role pairing, mission events and interruption behavior"
+            ]
+          },
+          "status": "raw_recovered_pending_retarget_and_contact_review",
+          "runtimeEnabled": false,
+          "retargetHistory": [
+            {
+              "variantId": "Nra-v1-ZhouWeakeningDeath",
+              "path": "Video/Sources/FirstLevelV1/ZhouWeakeningDeath/Data_RetargetAssessmentV1.json",
+              "assessment": {
+                "status": "requires_contact_and_depth_refinement",
+                "frozen": true,
+                "acceptedForGame": false,
+                "recordedUtc": "2026-09-07T18:06:05.970815+00:00",
+                "variantId": "Nra-v1-ZhouWeakeningDeath",
+                "sourceVideoSha256": "8515d62bff4e93254c8be05c297e5e36075d183da762d228ef99a254af0e0e3d",
+                "sourceCacheSha256": "c8e6159789433bf2be1e92117def8bb423ddb86128f6df9e8f880ad23da9785e",
+                "modelSha256": "cf59dd3d38a6a20aaede4cb2822358384f89d0ec0d71f46331c86f9353bbb336",
+                "observed": "实际查看 0、3、5、11.9 秒的正侧视选点。卧姿身体与双臂跟随原恢复，但模型倾斜、没有担架与枕部承托；单目卧姿深度、胸背支撑、近手松握和远臂遮挡仍待检查，不能据此认定死亡保持完成。",
+                "reviewedSamples": [
+                  {
+                    "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Front_5000.png",
+                    "sha256": "d60f480a6f94f8712804698266eb465f712f92545905e7ba71c31cb588e96006"
+                  },
+                  {
+                    "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_11900.png",
+                    "sha256": "2c8cbebf36e4232d3cb9345570b2e2183189134561101e818d96ae26b486e46f"
+                  },
+                  {
+                    "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_0.png",
+                    "sha256": "75d649d73415ac345b6123d994d24ff577ab95ce956263b11fdfcb21a3f8e2da"
+                  },
+                  {
+                    "path": "Preview/FirstLevelMedicalV1/InitialFraming/Texture_ZhouWeakeningDeath_Side_3000.png",
+                    "sha256": "3401efb4a5cf20d7e2add89a4b51f598f9f4309a2367d895baebd1376525b0c4"
+                  }
+                ],
+                "sampleScope": "Four actual viewed frame/view pairs; 24 automated captures across the two clips are not 24 visually accepted samples.",
+                "remaining": [
+                  "Original character source-depth and foot/body support review",
+                  "Actual patient, stretcher, palms and finger contacts",
+                  "Role pairing, mission events and interruption behavior"
+                ]
+              }
+            }
+          ],
+          "retargetCandidate": {
+            "variantId": "Nra-v1-ZhouWeakeningDeath",
+            "modelSha256": "cf59dd3d38a6a20aaede4cb2822358384f89d0ec0d71f46331c86f9353bbb336",
+            "path": "Models/FirstLevelMedicalV1/Animation_Nra_ZhouWeakeningDeath_V1.glb",
+            "clip": "Animation_Nra_ZhouWeakeningDeath_V1",
+            "blend": "Blender/FirstLevelMedicalV1/Scene_Nra_ZhouWeakeningDeath_V1.blend",
+            "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=ZhouWeakeningDeath",
+            "status": "需修正 · 接触与深度待验"
+          }
+        }
+      ]
     },
     {
       "requirementId": "FL45",

@@ -44,7 +44,9 @@ const report={status:'measured_pending_contact_fit',acceptedForGame:false,record
     'Source shows a top platform and two lower treads, then floor; game has four exit treads after the car deck.',
     'The source handrail and phase timing cannot be copied onto the physical queue without separate fitting.',
     'Do not change original bone lengths, actor movement authority, mission facts or source clock to disguise this mismatch.']};
-const out=path.join(root,'Models/FirstLevelStairFitV1');fs.mkdirSync(out,{recursive:true});
+const group=args.includes('--group')?args[args.indexOf('--group')+1]:'FirstLevelStairFitV2';
+assert.match(group,/^FirstLevelStairFitV[1-9]\d*$/);
+const out=path.join(root,'Models',group);fs.mkdirSync(out,{recursive:true});
 fs.writeFileSync(path.join(out,'Data_StairFitInspection.json'),JSON.stringify(report,null,2)+'\n');
 // Dense ankle/toe trajectories are kinematic measurements, not inferred sole
 // contacts. Keeping both feet separate exposes missing descents and foot drift

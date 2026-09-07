@@ -154,7 +154,9 @@ def Main():
         if row['newRecoveryCandidates']:
             row['status']='partially_retargeted_requires_contact_review' if all('retargetCandidate' in c for c in row['newRecoveryCandidates']) else 'partially_recovered_pending_retarget'
             row['blockers'].append('Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted.')
-    gameReport=root/'Models/FirstLevelTrainGameV1/Data_GameIntegration.json'
+    gameVersion=Read(project/'Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json')['version']
+    assert re.fullmatch(r'FirstLevelTrainGameV[1-9]\d*',gameVersion)
+    gameReport=root/'Models'/gameVersion/'Data_GameIntegration.json'
     integration=Read(gameReport) if gameReport.exists() else None
     if integration:
         visual=Read(gameReport.with_name('Data_VisualAssessment.json'))
@@ -174,6 +176,21 @@ def Main():
             if row.get('productionSupportTrial',{}).get('group')=='FirstLevelTrainSupportV2':
                 row['productionSupportTrial']['runtimeEnabled']=True
                 row['productionSupportTrial']['runtimeScope']='The recorded carriage support/rise subset only'
+    pendingPath=gameReport.with_name('Data_ValidationProgress.json')
+    pending=Read(pendingPath) if not integration and pendingPath.exists() else None
+    if pending:
+        assert pending['validationPending'] and not pending['acceptedForGame']
+        for name,digest in pending['runtimeHashes'].items():
+            assert Hash(project/name)==digest, f'Pending runtime changed: {name}'
+        for row in rows:
+            if row['requirementId'] not in pending['requirementScopes']:continue
+            row['status']='runtime_subset_enabled_campaign_validation_pending'
+            row['runtimeBinding'].update(enabled=True,validationPending=True,version=pending['version'],
+                scope=pending['requirementScopes'][row['requirementId']],evidence=pendingPath.relative_to(root).as_posix())
+            row['blockers']=[b for b in row['blockers'] if not b.startswith(('Not enabled in mission;','Support validation and past failures','Full bench sequence only;'))]
+            row['blockers'].append(pending['note'])
+            if row.get('productionSupportTrial',{}).get('group')=='FirstLevelTrainSupportV2':
+                row['productionSupportTrial'].update(runtimeEnabled=True,runtimeScope='Support/rise subset; r12 campaign validation pending')
     files=['Data_FirstLevelMission.mjs','Data_FirstLevelMissionDialogue.mjs','Data_FirstLevelMissionTrain.mjs',
         'Data_Tuning_FirstLevel.mjs','Script_FirstLevelMissionRuntime.mjs','Script_FirstLevelMissionColumn.mjs',
         'Script_FirstLevelMissionVoice.mjs','Script_FirstLevelMissionTrain.mjs','Audio/FirstLevel/Data_FirstLevelVoiceManifest.json',
@@ -184,6 +201,8 @@ def Main():
         "import {MISSION_VOICE_TIMING} from './Data_FirstLevelMissionVoiceTiming.mjs';"
         "console.log(JSON.stringify({version:MISSION_VERSION,stages:MISSION_STAGES,voiceTiming:MISSION_VOICE_TIMING}));"],
         cwd=project,text=True,encoding='utf-8'))
+    reconciliation=Read(root/'Video/Sources/FirstLevelV1/TrainAmmoCount/Data_GenerationReconciliation.json')
+    retake=Read(root/'Models/FirstLevelSourceRetakeV2/Data_RetakePlan.json')
     report=dict(schemaVersion=1,updated=datetime.datetime.now().date().isoformat(),recordedUtc=datetime.datetime.now(datetime.timezone.utc).isoformat(),baseCommit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=project,text=True).strip(),
         missionContract=missionContract,
         libraryRoot=str(root),catalogSha256=Hash(root/'Preview/Data_Catalog.json'),requirementsSha256=Hash(required),
@@ -193,13 +212,15 @@ def Main():
         timing=dict(status='recorded_alignment_and_playback_events_available',
             retainedContinuousRecordings=True,animationDialogueOffsetsInvented=False,
             sources=['Data_FirstLevelMissionVoiceAlignment.mjs','Data_FirstLevelMissionVoiceTiming.mjs'],
-            note='Read current cue/segment/source seconds and Runtime VoiceEvent. TrainFoodReceived releases opening movement after the actual response; free look remains available. Actual shell impacts, train stop, prone/dive orders, TransferHope and medic arrival remain authoritative. '+('Only the recorded bench-support/rise subset is enabled.' if integration else 'New animation clips are not bound yet.')),
-        gameIntegration=integration,
+            note='Read current cue/segment/source seconds and Runtime VoiceEvent. TrainFoodReceived releases opening movement after the actual response; free look remains available. Actual shell impacts, train stop, prone/dive orders, TransferHope and medic arrival remain authoritative. '+('Only the recorded bench-support/rise subset is enabled.' if integration else 'Carriage subset is enabled, with r12 campaign validation still pending.' if pending else 'New animation clips are not bound yet.')),
+        gameIntegration=integration,gameIntegrationPending=pending,
         sourceSearch=dict(directories=[str(root/'Video/Sources'),'C:/Users/Bentl/Downloads/GVHMR'],
             catalogActions=len(catalog['actions']),newVideoGenerations=batch['summary'].get('success',0),
             newInferenceRuns=len(list((root/'Models/_Cache/FirstLevelV1').glob('*/Data_Recovery.json')))),
         sourceProduction=dict(userScope='Generate source coverage for all 48 requirements before completing individual retargets.',
             plannedNewSources=coverage['requestedSources'],expectedFirstPassCredits=coverage['expectedFirstPassCredits'],
+            lastCreditObservation=reconciliation.get('lastCreditObservation'),pendingAmmoQuery=reconciliation.get('lastQuery'),
+            retakeBudget={k:retake[k] for k in ['status','recordedUtc','submitted','spentCredits','sourceCount','expectedCredits','observedBalance','additionalCreditsAtObservedBalance','estimateScope']},
             inspectionSummary={key:inspection[key] for key in ['updatedUnix','decoded','screened','retakeRequired']},
             batchSnapshot=batch,liveStatus='Models/FirstLevelSourceBatchV1/Data_BatchStatus.json',
             dashboardUrl='http://127.0.0.1:8136/Preview/FirstLevelSourceBatchV1/index.html'),

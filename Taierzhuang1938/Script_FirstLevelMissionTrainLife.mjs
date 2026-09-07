@@ -40,13 +40,22 @@ export class MissionTrainLifePose {
       node.quaternion.copy(node.parent.getWorldQuaternion(node.quaternion.clone()).invert().multiply(world));
     }
   }
-  GroundReleasedPose(state){
+  SettleReleaseFloor(dt){
+    const rig=this.rig,ideal=this.World(rig.bones.pelvis).y;
+    // Settle the resulting body height, since the native clip's own floor
+    // correction can change while the temporary blend correction is released.
+    const lift=Math.max(0,(this.releasePelvisY??ideal)-ideal)*Math.exp(-Math.max(0,dt)/this.animation.config.floorReleaseSeconds);
+    if(lift>1e-6){this.Save(rig.root);rig.root.position.y+=lift/this.soldier.actor.root.scale.y;rig.root.updateWorldMatrix(true,true)}
+    this.releasePelvisY=this.walkReleaseDone&&lift<=1e-6?null:ideal+lift;
+  }
+  GroundReleasedPose(state,dt){
     const animation=this.animation,soldier=this.soldier;
     if(!this.walkReleaseDone||!animation?.groundAt||!soldier.alive||state.dead||state.grounded===false
       ||state.prone>.35||state.crouch>.35||state.meleeCombat||this.rig.forcedClip||this.rig.actor?.ragdollState)return;
     const ground=animation.groundAt(soldier.position.x,soldier.position.z);
     const lift=Math.max(0,ground+animation.config.floorClearanceM-animation.FootFloor());
     if(lift>0){this.Save(this.rig.root);this.rig.root.position.y+=lift/soldier.actor.root.scale.y;this.rig.root.updateWorldMatrix(true,true)}
+    if(this.releasePelvisY!=null)this.SettleReleaseFloor(dt);
   }
   Apply(dt,state) {
     const life=this.soldier.missionTrainLife, rig=this.rig, b=rig.bones;
@@ -80,8 +89,11 @@ export class MissionTrainLifePose {
         // endpoint clearance, including genuine elevation of the running clip.
         const supportFloor=life.deckY+this.animation.config.floorClearanceM;
         const target=supportFloor*poseWeight+Math.max(supportFloor,baseFloor)*(1-poseWeight);
+        // A change of the lowest blended shoe vertex can abruptly release the
+        // temporary lift. Let that lift settle while preserving full clearance.
         rig.root.position.y+=Math.max(0,target-this.animation.FootFloor())/this.basis.scale.y;
         rig.root.updateWorldMatrix(true,true);
+        this.SettleReleaseFloor(dt);
       }
     }else{
     const feet=['L','R'].map(s=>({s, point:this.World(b['foot'+s]),q:b['foot'+s].getWorldQuaternion(b['foot'+s].quaternion.clone())}));

@@ -28,7 +28,7 @@ export function InstallP012OpeningPose(soldier) {
     saved.clear();
     const result=original.call(this,dt,state);
     if(lifePose.Apply(dt,state))return result;
-    lifePose.GroundReleasedPose(state);
+    lifePose.GroundReleasedPose(state,dt);
     const trainRest = soldier.missionTrainPassenger && !soldier.missionTrainReady && (state.moveSpeed ?? 0) < .025
       && !state.firing && !state.carryRole && !state.meleeCombat && !(state.prone > .35 || state.crouch > .35);
     if(!soldier.p012AwaitingWeapon && !trainRest)return result;
