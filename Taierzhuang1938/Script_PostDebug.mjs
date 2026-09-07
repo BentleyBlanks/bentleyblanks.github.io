@@ -237,6 +237,19 @@ export class DebugPass {
     this.sunShadowClients = new Set();
   }
 
+  /**
+   * 登记一个子系统自带的调试视图。**这是 ③ 那条登记表的别名**，
+   * 转发到 `PostPipeline.RegisterDebugView` —— B6a 的三个视图
+   * （曝光直方图 / 镜头光晕 / LUT 校验）在自己的模块里调的是这个名字，
+   * 而登记表只有一张：`GetSource()` 的查找顺序仍是三条路，不是四条。
+   *
+   * 契约（两条路共用）：resolver 收 pipeline、返回
+   *   { texture, mode, unavailable }              —— 走通用展示 pass；
+   *   { material, Prepare?(ctx), unavailable }    —— 自带材质，直接送屏。
+   * 面板那一侧（Script_EditorDebugRendering 的 VIEWS + 组名列表）也要各登记一次。
+   */
+  RegisterView(id, resolver) { this.pipeline.RegisterDebugView(id, resolver); }
+
   Resize() { /* 没有自己的靶 */ }
 
   /** 登记一个要跟着 LightRig 换阴影图的外部客户（实现 `SetSunShadowSource(rig)`）。 */
@@ -435,6 +448,7 @@ export class DebugPass {
         return { texture: T.hdr.texture, mode: 5, unavailable: !P.debugInjected };
       // 子系统自带的视图（PostPipeline.RegisterDebugView）。八个并行子系统各加
       // 两三个假彩色的话，上面这条 switch 会变成公共冲突点，所以留一个登记表。
+      // B6a 的曝光直方图 / 镜头光晕 / LUT 校验也在这张表里（走 RegisterView 别名）。
       default: return P.debugViewProviders?.get(P.debugView)?.(P) ?? null;
     }
   }
@@ -460,6 +474,12 @@ export class DebugPass {
     // 不可用时也照样 Blit —— 那些材质自己画斜纹，与下面的通用路径一致。
     if (source.material && source.material !== this.material
       && source.material !== this.materialSunShadow) {
+      source.Prepare?.(ctx);
+      ctx.blitter.Blit(source.material, null);
+      return;
+    }
+    // 子系统自带材质的视图：本帧参数由它自己在 Prepare 里摆，这里只负责送屏。
+    if (source.material && !source.unavailable) {
       source.Prepare?.(ctx);
       ctx.blitter.Blit(source.material, null);
       return;

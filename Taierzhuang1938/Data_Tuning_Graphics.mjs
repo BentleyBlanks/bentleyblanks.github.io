@@ -48,7 +48,10 @@
 //     （子系统 B7）。数值背书见 `docs/Data_TechRenderPipeline.md` 的
 //     「材质着色升级（2026-09）」一节与 `Data_Tuning_Materials.mjs`。
 //     POM 的步数是**编译期常量**（进 cache key），运行时只能整档开关。
-//   · 其余键（autoExposure / lensFlare / lut / dof / taaUpscale）
+//   · autoExposure / lensFlare / lut —— 2026-09 相机曝光轮（子系统 B6a）落地，
+//        见下面各自的注释。相机侧的数值口径（测光、EV 钳位、光晕强度、LUT 尺寸）
+//        在 `Data_Tuning_Camera.mjs`；这里只有「哪一档跑不跑」。
+//   · 其余键（dof / taaUpscale）
 //     —— **本阶段全部为占位**，值 = 与今天等价（即「不启用新东西」）。
 //        对应子系统落地时把自己那一位改成实际档位，并在这里补出处注释。
 //
@@ -82,27 +85,47 @@
  *                 （按同名档位查），时段参数在同文件的 VOLUMETRIC_PRESETS
  *   csm           级联阴影总闸（级数/尺寸/分割/节流见 Data_Tuning_Shadows）
  *   contactShadows 屏幕空间接触阴影（帧图里排在 gtao 之后、main 之前）
- *   ——— 以下为后续子系统的占位位，本阶段一律「等价于今天」———
- *   autoExposure  自动曝光（今天：时段预设手调的常数曝光）
- *   lensFlare     镜头光晕
- *   lut           3D LUT 调色（今天：lift/gain + 分离调色）
- *   dof           景深（今天恒开：阵亡与开镜两条都走 Composite 的圆盘采样）
- *   taaUpscale    TAA 超分（TAAU）
  *   clusteredLights 簇状多光源：视锥切簇 + CPU 每帧建簇表 + 材质补丁里的局部光循环。
  *                   medium 32 盏 / high 64 盏 / ultra 128 盏；low 仍是固定预算的
  *                   PointLight 池。网格与预算见 Data_Tuning_Lights.CLUSTER_TIERS
+ *   ——— 2026-09 相机曝光轮 B6a（数值口径在 Data_Tuning_Camera.mjs）———
+ *   autoExposure  直方图自动曝光（Script_PostExposure；四趟极小的 pass + 一张 1×1）
+ *   lensFlare     镜头光晕 / 脏污 / 太阳眩光（Script_PostLensFlare；1/4 分辨率一趟）
+ *   lut           3D LUT 分级（Script_PostGrade 把既有分级数学原样烘成 64³）
+ *   ——— 以下为后续子系统的占位位，本阶段一律「等价于今天」———
+ *   dof           景深（今天恒开：阵亡与开镜两条都走 Composite 的圆盘采样）
+ *   taaUpscale    TAA 超分（TAAU）
  * @typedef {Record<string, boolean|number>} QualityPreset
  */
 
 /** 后续子系统的占位位。四档共用同一份「等价于今天」的取值。 */
 const RESERVED_OFF = {
-  autoExposure: false,
-  lensFlare: false,
-  lut: false,
   taaUpscale: false,
   // 景深今天就在跑（阵亡远景虚化 + 开镜近景虚化），所以它不是 false。
   dof: true,
 };
+
+/**
+ * 相机曝光轮的三位（2026-09）。
+ *
+ *   autoExposure —— low 不开：四趟小 pass 加起来实测 ~0.09 ms（RTX 4070 SUPER
+ *     1440p），对集显不是零；而 low 档的定位就是「能跑」。medium 及以上开。
+ *     **打开不改变默认机位的亮度**：增益是相对锚点的（gain = 2^(evCal − evNow)），
+ *     站在**每一关出生机位**的标定值上精确等于 1.0
+ *     （口径见 Data_Tuning_Camera 抬头与 EXPOSURE_ANCHORS）。
+ *   lensFlare —— 只在 high / ultra。它是加进来的光，不是省下来的；
+ *     强度按档在 Data_Tuning_Camera.LENS_FLARE.byQuality 里（low/medium 是 0，
+ *     所以就算这一位被打开也不出画）。
+ *   lut —— 四档全开。查一次三线性表比原来那套「两次 sRGB 幂 + 两次 pow 权重」
+ *     更便宜，而且分级从此是数据。与旧算式的差在灰阶与彩阶上实测 ≤ 1/255
+ *     （回归口：Script_ExposureTest 的 LUT 一致性断言）。
+ *
+ * 三位**全部关掉时，合成输出逐比特等于 2026-09 帧图重构后的版本** ——
+ * 这是本轮的硬约束（用户对画面明暗极敏感，历史事故「画面为什么这么黑」）。
+ */
+const CAMERA_OFF = { autoExposure: false, lensFlare: false, lut: true };
+const CAMERA_ON = { autoExposure: true, lensFlare: false, lut: true };
+const CAMERA_FULL = { autoExposure: true, lensFlare: true, lut: true };
 
 export const QUALITY_PRESETS = {
   // 抗锯齿分工：taa 是 medium 及以上的**出厂默认**（UE 的默认 AA 也是 TAA），
@@ -116,6 +139,7 @@ export const QUALITY_PRESETS = {
   // 与每采样一次颜色读，medium 的定位是"1080p 稳 60"。
   low: {
     ...RESERVED_OFF,
+    ...CAMERA_OFF,
     ssao: false, gtao: "low", ssil: false,
     bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
     aoScale: 0.5, sharpen: 0.14, taa: false,
@@ -140,6 +164,7 @@ export const QUALITY_PRESETS = {
   },
   medium: {
     ...RESERVED_OFF,
+    ...CAMERA_ON,
     clusteredLights: true,   // 局部光预算 32 盏（Data_Tuning_Lights.CLUSTER_TIERS.medium）
     ssao: true, gtao: "medium", ssil: false,
     bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
@@ -159,6 +184,7 @@ export const QUALITY_PRESETS = {
   // （ultra 是 MSAA 喂更干净的几何边给 TAA，两层叠加不冲突，只是贵）。
   high: {
     ...RESERVED_OFF,
+    ...CAMERA_FULL,
     clusteredLights: true,   // 局部光预算 64 盏（Data_Tuning_Lights.CLUSTER_TIERS.high）
     ssao: true, gtao: "high", ssil: true,
     bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
@@ -175,6 +201,7 @@ export const QUALITY_PRESETS = {
   },
   ultra: {
     ...RESERVED_OFF,
+    ...CAMERA_FULL,
     clusteredLights: true,   // 局部光预算 128 盏（Data_Tuning_Lights.CLUSTER_TIERS.ultra）
     ssao: true, gtao: "ultra", ssil: true,
     bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,

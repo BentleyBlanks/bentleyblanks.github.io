@@ -213,6 +213,8 @@ export const testDefs = {
     desc: "级联阴影 / PCSS / 接触阴影：逐级图与分割 / 纹素吸附 / 级间重叠 / 节流排班 / 痤疮比例 / 三张调试图" },
   MaterialUpgradeTest: { file: "Script_MaterialUpgradeTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "材质着色升级：视差位移随视角反号 / 距离淡出 / 微阴影压直射 / 细节法线淡入 / 布绒光与金属各向异性 / 皮肤散射红移 / 程序数稳态" },
+  ExposureTest: { file: "Script_ExposureTest.mjs", timeoutMs: 30 * 60 * 1000,
+    desc: "直方图自动曝光 / 镜头光晕 / 3D LUT 分级（中灰标定、适应曲线、LUT ≤ 1/255、开关不改默认机位亮度）" },
   PerformanceTest: { file: "Script_PerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "帧率/负载实测（对机器敏感）" },
   FrameProfileTest: { file: "Script_FrameProfileTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "整帧 CPU/GPU 剖析消融（对机器敏感）" },
   GodRaysPerformanceTest: { file: "Script_GodRaysPerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "体积光方向性性能回归（对机器敏感）" },
@@ -241,7 +243,7 @@ export const browserTests = new Set([
   "SamplerBudgetTest",
   "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MenuTest",
   "ClusteredLightsTest", "MaterialUpgradeTest",
-  "PerformanceTest", "PhysicsTest", "PostTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ProfilerTest", "PropInstancingTest",
+  "PerformanceTest", "PhysicsTest", "PostTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
   "TestSceneLightingTest", "RangeTest", "WeaponRangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
   "FirstPersonEmbodimentTest", "SprintViewmodelTest", "TargetInfoTest", "VisibilityTest", "VoiceTest",
@@ -359,7 +361,7 @@ export const domains = {
     //（UpdateFire / MoveSmokeSource），所以碰灯光或粒子的改动也要连着 FlareTest 跑。
     // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
-    tests: ["TestSceneLightingTest", "PostTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
+    tests: ["TestSceneLightingTest", "PostTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -415,6 +417,9 @@ const changedDomainRules = [
   // 级联阴影 / 接触阴影：Csm 与 ContactShadows 被上面 render 那条的 Light/Post
   // 覆盖不到（文件名里没有那两个词），单独补一条。
   { domain: "render", pattern: /(Script_Csm|ContactShadows)/i },
+  // Data_Tuning_Camera 同理：它是相机曝光 / 色调映射 / LUT 的口径表，
+  // 不是玩法数值，但会命中 text 域的 Data_Tuning_ 那一条。
+  { domain: "render", pattern: /Data_Tuning_Camera/i },
   { domain: "perf", pattern: /(Performance|FrameProfile|GodRays|Lod|Visibility|ActorBatch|Smoke)/i },
   { domain: "physics", pattern: /vendor\/rapier/i },
   { domain: "infra", pattern: /(Script_TestRunner|Script_DevServer|Script_BuildBrowserBundle|Script_BrowserBundle)/i },

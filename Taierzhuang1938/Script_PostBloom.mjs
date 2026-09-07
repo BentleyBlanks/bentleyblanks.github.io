@@ -10,11 +10,21 @@
 
 import * as THREE from "three";
 import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_PostCommon.mjs";
+import { BLOOM } from "./Data_Tuning_Camera.mjs";
 
 // --- 泛光：亮部提取 + 13 抽样降采样 + 3x3 tent 升采样 -----------------------
+//
+// ## 2026-09：阈值跟随曝光（物理化，且不改一个像素）
+// 阈值/软膝/钳制仍是 HDR 域的数，但运行时**除以自动曝光增益**。
+// 自动曝光关着时增益精确等于 1.0（绑的是纯白 1×1），所以这条改动在今天的
+// 画面上是恒等式；自动曝光把暗处提亮两倍时阈值同步降到 0.59 ——
+// 「显示上一样亮的东西泛光一样多」，这就是物理化的全部意思。
+// 不走 UE 那条「无阈值 + 强度 0.675」：九张时段预设的 `preset.bloom`
+// 全是按「有阈值」调出来的，换掉等于要求美术重调九档，那是内容决定不是渲染决定。
 const FRAG_BRIGHT = /* glsl */`
 uniform sampler2D uSource;
 uniform sampler2D uNormalDepth;
+uniform sampler2D uExposureTex;
 uniform float uThreshold;
 uniform float uKnee;
 uniform float uClamp;
@@ -23,12 +33,16 @@ varying vec2 vUv;
 ${GLSL_COMMON}
 void main() {
   vec3 c = texture2D(uSource, vUv).rgb;
-  c = min(c, vec3(uClamp));                 // 防单个超亮像素把整屏糊成白饼
+  // 增益 1.0（自动曝光关着 = 纯白 1×1）时下面三行精确等于旧版
+  float invGain = 1.0 / max(texture2D(uExposureTex, vec2(0.5)).r, 1e-4);
+  float threshold = uThreshold * invGain;
+  float knee = uKnee * invGain;
+  c = min(c, vec3(uClamp * invGain));       // 防单个超亮像素把整屏糊成白饼
   float br = max(c.r, max(c.g, c.b));
   // 软膝：硬阈值会在爆点边缘切出一圈生硬的轮廓
-  float soft = clamp(br - uThreshold + uKnee, 0.0, 2.0 * uKnee);
-  soft = soft * soft / (4.0 * uKnee + 1e-4);
-  float contrib = max(soft, br - uThreshold) / max(br, 1e-4);
+  float soft = clamp(br - threshold + knee, 0.0, 2.0 * knee);
+  soft = soft * soft / (4.0 * knee + 1e-4);
+  float contrib = max(soft, br - threshold) / max(br, 1e-4);
   // 太阳拖影开时借 alpha 带一张低分辨率天空遮挡图。这一趟本来就在读 HDR，
   // 顺手多读一次深度，可以让后面的径向模糊每步从“亮部+全分辨率深度”
   // 两次随机访存变成只读这一张图。关拖影时统一写 1，动态分支不读深度。
@@ -44,7 +58,15 @@ void main() {
 const FRAG_DOWNSAMPLE = /* glsl */`
 uniform sampler2D uSource;
 uniform vec2 uTexel;
+uniform float uKaris;
 varying vec2 vUv;
+${GLSL_COMMON}
+// Karis 平均（COD:AW 那篇里的 partial Karis average）：把 13 抽样先分成五个
+// 2×2 组，按 1/(1+luma) 加权。一个几百倍亮的镜面点（刺刀反光、玻璃碴）在普通
+// 盒式下会被整级带走，放大后就是一颗**逐帧跳动的萤火虫**。
+// 只在 mip0→mip1 这一级开（更小的级上它会把亮部整体压暗）。
+// 出厂关：它改变每一张画面，而本轮验收要求「新开关全关时逐比特等于改动前」。
+float KarisWeight(vec3 c) { return 1.0 / (1.0 + Luma(c)); }
 void main() {
   // COD:AW 那套 13 抽样：比 2x2 盒式稳得多，镜头一动泛光不会"沸腾"
   vec3 a = texture2D(uSource, vUv + uTexel * vec2(-2.0,  2.0)).rgb;
@@ -60,6 +82,18 @@ void main() {
   vec3 k = texture2D(uSource, vUv + uTexel * vec2( 1.0,  1.0)).rgb;
   vec3 l = texture2D(uSource, vUv + uTexel * vec2(-1.0, -1.0)).rgb;
   vec3 m = texture2D(uSource, vUv + uTexel * vec2( 1.0, -1.0)).rgb;
+  if (uKaris > 0.5) {
+    vec3 g0 = (a + b + d + e) * 0.25;
+    vec3 g1 = (b + c + e + f) * 0.25;
+    vec3 g2 = (d + e + g + h) * 0.25;
+    vec3 g3 = (e + f + h + i) * 0.25;
+    vec3 g4 = (j + k + l + m) * 0.25;
+    float w0 = KarisWeight(g0); float w1 = KarisWeight(g1); float w2 = KarisWeight(g2);
+    float w3 = KarisWeight(g3); float w4 = KarisWeight(g4);
+    gl_FragColor = vec4((g0 * w0 + g1 * w1 + g2 * w2 + g3 * w3 + g4 * w4)
+      / (w0 + w1 + w2 + w3 + w4 + 1e-4), 1.0);
+    return;
+  }
   vec3 result = e * 0.125;
   result += (a + c + g + i) * 0.03125;
   result += (b + d + f + h) * 0.0625;
@@ -126,12 +160,18 @@ export class BloomPass {
     this.pipeline = pipeline;
     this.uniformsBright = {
       uSource: { value: null }, uNormalDepth: { value: null },
+      uExposureTex: { value: null },
       uThreshold: { value: 1.18 }, uKnee: { value: 0.55 }, uClamp: { value: 40 },
       uPackSky: { value: 0 },
     };
     this.matBright = MakeFullscreenMaterial(FRAG_BRIGHT, this.uniformsBright);
-    this.uniformsDown = { uSource: { value: null }, uTexel: { value: new THREE.Vector2() } };
+    this.uniformsDown = {
+      uSource: { value: null }, uTexel: { value: new THREE.Vector2() },
+      uKaris: { value: 0 },
+    };
     this.matDown = MakeFullscreenMaterial(FRAG_DOWNSAMPLE, this.uniformsDown);
+    /** Karis 平均（出厂关，见 FRAG_DOWNSAMPLE 抬头）。画质面板可热切。 */
+    this.karis = !!BLOOM.karis;
     this.uniformsUp = {
       uSource: { value: null }, uPrevious: { value: null },
       uTexel: { value: new THREE.Vector2() }, uRadius: { value: 1.0 },
@@ -167,6 +207,8 @@ export class BloomPass {
   Render(ctx) {
     this.uniformsBright.uSource.value = ctx.sceneColor.texture;
     this.uniformsBright.uNormalDepth.value = ctx.normalDepthTexture;
+    // 阈值跟随曝光：自动曝光关着时这张是纯白 1×1，除出来精确等于旧版
+    this.uniformsBright.uExposureTex.value = this.pipeline.ExposureTexture;
     this.uniformsBright.uPackSky.value = ctx.godActive ? 1 : 0;
     this.uniformsBright.uThreshold.value = ctx.options.bloomThreshold ?? 1.18;
     ctx.blitter.Blit(this.matBright, this.bright);
@@ -177,9 +219,12 @@ export class BloomPass {
       const dst = this.mips[i * 2];
       this.uniformsDown.uSource.value = source.texture;
       this.uniformsDown.uTexel.value.set(1 / source.width, 1 / source.height);
+      // Karis 只在第一级：更小的级上它会把亮部整体压暗
+      this.uniformsDown.uKaris.value = (this.karis && i === 0) ? 1 : 0;
       ctx.blitter.Blit(this.matDown, dst);
       source = dst;
     }
+    this.uniformsDown.uKaris.value = 0;
     // 从最小一级往回叠：每一级 = 本级降采样结果 + 上一级(更小)的 tent 放大
     let carried = this.mips[(levels - 1) * 2];
     for (let i = levels - 2; i >= 0; i -= 1) {

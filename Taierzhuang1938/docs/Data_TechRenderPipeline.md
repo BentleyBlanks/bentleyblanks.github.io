@@ -416,8 +416,12 @@ SEGMENT lens             LensEffects()           ← 镜头光晕 / 脏污 / 暗
 SEGMENT encode           EncodeOutput()          ← 输出色彩空间 / 抖动
 ```
 
-* **曝光**（还没有生产者）`uExposure`（float）× `uExposureTex`（1×1 靶，出厂纯白
-  = 精确 1.0）。自动曝光落地时往那张 1×1 写增益即可，手调偏移仍走 `uExposure`。
+* **曝光**（2026-09 生产者已接上：`Script_PostExposure` 的直方图自动曝光，见 §17
+  「相机：自动曝光 / 镜头光晕 / LUT 分级」一节）`uExposure`（float）×
+  `uExposureTex`（1×1 靶，关着时绑纯白 = 精确 1.0）。手调偏移仍走 `uExposure`；
+  同一段里还有 `uTonemap`（0 = ACES Hill / 1 = AgX）与镜头进光（`uFlare` / `uDirt`），
+  `SEGMENT color-grade` 改成查 64³ LUT（`uLut` / `uLutAmount`；`uLutAmount = 0`
+  退回原来那套算式，两条路差 ≤ 1/255）。
 * **雾**（2026-09 起有三个生产者，全部接上了）：
   `uFogScatter`（全分辨率，rgb = 沿视线累积的**绝对散射亮度**，a = 透过率）+
   `uFogSource`（0 = 用内联的解析式高度雾自算，1 = 读那张图）。
@@ -2420,6 +2424,22 @@ draw call：905 → 899（+6，逐轮区间 +6…+11）= 六次 min-Hi-Z blit + 
   链接时间随程序体量走，不随程序个数走。`Script_ShotTest` 的开机闸已从 90 s 抬到 300 s；
   真要把开机拉回去，要动的是预热的**组合表**（§16）而不是哪一个子系统。
 
+- 【2026-09 实测】ShaderMaterial 里**重复声明同名 uniform** 会把整个片元着色器废掉。
+  把一段公用 GLSL（例如 `LUT_GLSL`，它自己声明了 `uniform sampler2D uLut;`）include 进来之后，
+  调用方千万别再写一遍 —— `ERROR: 'uLut' : redefinition`，而 three 只在控制台留一行
+  `Shader Error 0 - VALIDATE_STATUS false`，那一趟什么都不画（视图恒为纯黑）。
+  同一类错法还有「公用段引用了调用方才定义的函数」（LUT 段靠 `LinearToSrgb`）——
+  拼字符串的顺序就是依赖顺序。回归口：`Script_ExposureTest` 的「调试视图真的出画」。
+- 【2026-09 实测】**半浮点靶上的加法混合只能精确累到 2048**（fp16 尾数 10 位）。
+  直方图把 14400 个点往同一个桶里累时，超过 2048 的那部分就开始丢计数，而且不报错。
+  解法是把直方图摊成 64×16（行号按顶点序号轮转）再列归约，并在归约时**归一化**；
+  直接存计数的话，14400 那个量级上 fp16 的 ulp 已经是 8。
+  （fp32 靶的混合要 `EXT_float_blend`，不是核心功能，所以不能靠它。）
+- 【2026-09 实测】**一个 headless Chromium 里连开三个 WebGL 上下文**，第三个会零星冒出
+  `THREE.WebGLProgram: Shader Error ... VALIDATE_STATUS false`（Program Info Log 是空的）
+  并把 GL 推进 1282，紧接着的**半浮点 `readRenderTargetPixels` 全读回 0**。
+  表现是「某一关的数值恒为 0」而同一页面单独跑一遍完全正常。
+  多段取证的测试要**每段各起一个浏览器、跑完就关**，不是同一个浏览器开三个页面。
 ---
 
 ## CPU 提交量：2026-08-21 那一轮无损优化
@@ -3912,3 +3932,289 @@ node Taierzhuang1938/Script_ProfilerTest.mjs
 下一次调参的人要能一眼看到当前落在哪儿、离门槛还有多远。取证机位是
 `Probe.html?scene=ssil`：世界坐标已知，每一条断言都用 `camera.project()` 把世界点
 投到屏幕上再去读那一块像素，不靠「画面左下角大概是地面」。
+---
+
+## 17. 相机曝光 / 泛光光晕 / LUT 分级（2026-09）
+
+> 代码：`Script_PostExposure.mjs`、`Script_PostLensFlare.mjs`、`Script_PostGrade.mjs`、
+> `Script_PostBloom.mjs`、`Script_PostComposite.mjs` 的四段；口径表 `Data_Tuning_Camera.mjs`；
+> 回归口 `Script_ExposureTest.mjs`。
+> §1.9 留的 `uExposureTex` 接线点从这一轮起**有生产者了**。
+
+### 17.1 帧内位置与渲染靶
+
+```
+… taa → exposure → godPrepare → bloom → god → lensFlare → composite → fxaa
+```
+
+* `exposure` 排在 `bloom` **之前**：泛光的阈值/软膝/钳制要除以本帧的曝光增益。
+* `lensFlare` 排在 `bloom` **之后**：它读的就是泛光那一趟提取好的亮部图（`bright`），
+  不再为它扫一遍全屏 HDR。
+* 光晕在**曝光与 tonemap 之前**加进 HDR（`SEGMENT exposure` 的 `LensLight()`）——
+  它是进到镜头里的光，要跟场景光一起吃曝光；放到 tonemap 之后只能是一块假亮斑。
+
+| 靶 | 尺寸 | 格式 | 说明 |
+|---|---|---|---|
+| `exposurePass.lumTarget` | 160×90 固定 | RGBA16F | R = log2(luminance)，2×2 盒式抽样 |
+| `exposurePass.histTarget` | 64×16 | RGBA16F | 点图元 + 加法混合累出的直方图 |
+| `exposurePass.binsTarget` | 64×1 | RGBA16F | 列归约后的**归一化频度** |
+| `exposurePass.stateTargets[2]` | 1×1 | RGBA16F | ping-pong：R 增益 / G 当前 EV / B 目标 EV / A 平均 log 亮度 |
+| `targets.flare` | ≤9.6 万像素（同太阳拖影） | RGBA16F | 鬼影 + 光环 + 太阳星芒 |
+| 分级 LUT | 4096×64 | RGBA8 DataTexture | 64³ 条带，sRGB 索引域，只在换时段时重烘 |
+
+### 17.2 直方图自动曝光（UE5 的那一套，WebGL2 无 compute 版）
+
+四趟：**亮度降采样 → 点图元直方图 → 列归约 → 1×1 解算**。
+
+1. 主 HDR → 160×90 的 log2 亮度图（每个输出像素 4 抽样）。
+2. 14400 个 `THREE.Points`，顶点着色器 `texelFetch` 亮度、算桶号、把点落到
+   `(bucket, row)` 那一格，`CustomBlending` One/One 累加。
+   **为什么是 64×16 而不是 64×1**：半浮点只能精确表示到 2048 的整数，14400 个点
+   全落一个桶时会溢出精度；分 16 行后单格最多 900。行号由顶点序号轮转。
+3. 列归约成 64×1，并**除以总像素数**变成频度 —— 存计数的话半浮点在 14400 那个
+   量级上 ulp 已经是 8，「桶和 = 像素数」这条断言自己先破。
+4. 1×1 pass：取 50%–95% 百分位区间的平均 log 亮度（UE 的
+   `ComputeAverageLuminaneWithoutOutlier`，掐掉大片纯黑与少量镜面高光）→
+   `EV100 = log2(L·100/K)`，K = 12.5（Lagarde & de Rousiers, Frostbite PBR §5.1）→
+   按预设钳位 → 时域适应（暗→亮 3.0/s、亮→暗 1.0/s，UE 默认值）→ 增益。
+
+**全 GPU，渲染路径上一次 readback 都没有**（同步版 `readRenderTargetPixels` 是 GPU
+同步点，每帧调一次直接掉到 20fps）。`ReadState()` / `ReadHistogram()` 只给标定工具与
+验收断言用。
+
+#### 桶格钉在中灰上
+
+`AUTO_EXPOSURE.binWidth = 0.30 EV`、`midGreyBin = 32`，于是
+`minLog = log2(0.18) − 32×0.30 = −12.07`，覆盖 −12.07 … +6.83 EV。
+量化误差有半个桶宽（0.15 EV ≈ 11% 亮度），**它落在哪儿是可以选的** —— 把
+log2(0.18) 钉在桶心上，中灰就完全不吃量化偏移，「喂一张 0.18 灰、输出必须是
+中灰 sRGB 118」这条标定链因此是精确的（实测 118/118/118）而不是「差不多」。
+UE 是拿 min/max 定格子的，中灰落在哪儿全看运气。
+
+#### 增益是「相对锚点」，不是绝对物理值
+
+绝对物理曝光 `exposure = 1/(1.2·2^EV100)` 直接用上去，九张时段预设调出来的
+`exposure`（白天 0.40–0.62、夜战 3.6）全部作废，「画面为什么这么黑」会立刻重演。
+所以运行档走 **anchored**：
+
+```
+gain = 2^(evCal − evNow)
+```
+
+`evCal` 来自**每一关出生机位实测的平均 log 场景亮度**
+（`Data_Tuning_Camera.EXPOSURE_ANCHORS`）。站在标定机位时 `evNow == evCal`，
+增益精确等于 1.0 —— 打开自动曝光**不改变**美术调好的那一帧；走进屋里、钻进
+地道、抬头看天时才按实际亮度补偿。
+
+**锚点必须逐关而不是逐时段**：`smokyDay` 被三关共用，而三关出生机位的实测亮度
+差 0.70 EV（CH1 1.29 / CH2 0.77 / CH3 1.47）。按预设取平均的话，最暗那一关
+一打开自动曝光就整体提亮三成。
+
+**锚点跟着整条管线走，不是跟着相机走。** 2026-09-08 集成期重标过一次：B6a 单跑那份
+检出还没有 CSM / GTAO+SSIL / SSR / froxel 体积雾 / 物理大气 / 簇状光 / 材质着色，
+七个子系统合流之后同一个出生机位整体亮了约 0.4 EV（夜战反过来暗了 0.15 EV）。
+沿用旧锚点的话，「打开自动曝光」当场把 CH0 提亮 15.6%、把 CH3 压暗 12.0% ——
+正是本轮明令禁止的那件事，`Script_ExposureTest` 的「开/关默认机位亮度差 < 5%」
+把它抓住了。**任何改变场景亮度的渲染改动（间接光、阴影、雾、tonemap）之后
+都要重跑 `--calibrate`。**
+
+`absolute` 模式仍然实现着（`evCal` 由 `options.exposure` 反推），只给验收用。
+两种模式共用同一个公式，差别只是 `evCal` 从哪来。
+
+#### 中灰补偿 EV
+
+物理公式给的是「什么亮度会被映射成白」，而每条 tonemap 曲线把中灰放在不同位置：
+ACES Hill 直出会把 0.18 压到 0.045（sRGB 60，明显偏暗）。
+`Script_PostExposure` 在模块加载时**数值求解** `tonemap(x) = 0.18`，再反解
+`comp = EV100(0.18) + log2(1.2·x/0.18)`：ACES **+1.3370 EV**、AgX **+0.4820 EV**
+（不写死数字，换曲线自动跟着变）。它只影响 absolute 模式 —— anchored 的
+增益是比值，补偿量约掉了。
+
+#### 曝光补偿标定表（**2026-09-08 集成期重标**，RTX 4070 SUPER / 1280×720 / high / 出生机位 / 预热 240 帧）
+
+| 关卡 | 时段预设 | 实测 avgLog | B6a 单跑时 | evUp | evDown |
+|---|---|---|---|---|---|
+| CH0_Chuchuan | chuchuanDay | −0.13 | 0.23 | 1.8 | 1.2 |
+| CH1_NanLu | smokyDay | 1.29 | 0.93 | 1.6 | 1.4 |
+| CH2_Shouliudan | smokyDay | 0.77 | 0.63 | 1.6 | 1.4 |
+| CH3_Jiuhusuo | smokyDay | 1.47 | 1.01 | 1.6 | 1.4 |
+| CH4_DongguanYe | night | −3.13 | −3.28 | **0.6** | 0.8 |
+| CH5_Chengqiang | dawn | 0.59 | 0.13 | 1.4 | 1.2 |
+| CH6_Zuihou | burningStreet | 0.54 | 0.36 | 1.6 | 1.4 |
+
+「B6a 单跑时」那一列留着是为了让下一个人看见**合流会移动锚点**这件事本身。
+同一台机器两次独立标定的差是 1 个半浮点 ulp（0.9282 / 0.9287），可复现。
+夜战那一档的 `evUp` 只有 0.6 EV = 自动曝光最多把夜景提亮 1.5 倍，
+**结构上不可能把夜战拉成白天**。
+重量的命令：`node Taierzhuang1938/Script_ExposureTest.mjs --calibrate`
+（改关卡布设、天光预设、SSAO 或 GI 之后必须重跑）。
+没有登记的时段预设（dusk / overcast / 白盒 / 编辑器 / 靶场）`logLum` 是 null =
+**只测量不作用**（增益恒 1）—— 没有实测数据就不许它动画面。
+
+### 17.3 色调映射：ACES Hill（默认）+ AgX
+
+`uTonemap` 一位 uniform 选曲线，GLSL 与 JS 镜像都在
+`Script_PostExposure.TONEMAP_GLSL` / `TONEMAP_JS`。AgX 逐系数对齐 three r185 的
+`AgXToneMapping` chunk（同一组 inset/outset 矩阵与六阶拟合），免得哪天换用内置
+tonemapping 时观感突变。默认仍是 ACES —— AgX 高光去色更「胶片」但整体更平，
+这一关的黄土与硝烟在它下面会更灰。
+
+### 17.4 泛光：阈值跟随曝光 + Karis（出厂关）
+
+阈值/软膝/钳制仍是 HDR 域的数，但运行时**除以自动曝光增益**：
+增益 1.0（自动曝光关着 = 绑纯白 1×1）时是恒等式，逐比特不变；
+自动曝光把暗处提亮两倍时阈值同步降到 0.59 —— 「显示上一样亮的东西泛光一样多」，
+这就是物理化的全部意思，一张时段预设都不用改。
+
+**没走 UE 那条「无阈值 + 强度 0.675」**：九张时段预设的 `preset.bloom` 全是按
+「有阈值」调出来的，换掉等于要求美术重调九档，那是内容决定不是渲染决定。
+
+Karis 平均（第一级降采样按 1/(1+luma) 加权压萤火虫，docs §5 早就写着该做）
+已经接上，`Data_Tuning_Camera.BLOOM.karis` **出厂 false**：它改变每一张画面，
+而本轮的硬约束是「新开关全关时逐比特等于改动前」。画质面板可以热切。
+
+### 17.5 镜头光晕 / 脏污 / 太阳眩光
+
+John Chapman《Pseudo Lens Flare》(2013) 那一套，读亮部图、四分之一分辨率：
+
+* **鬼影** 沿「像素→屏幕中心」方向重复采样，RGB 用不同半径得到镜片色散；
+  权重按到中心的距离衰减，画面外的采样点整只丢掉（clamp 会拉出一条亮边）。
+* **光环** 固定半径的环（镜筒内壁一次反射）。
+* **太阳眩光** 星芒 + 核心辉光，**受屏幕空间遮挡**：在太阳 uv 周围绕一圈取样，
+  只有预通道视深为 0（天空）的那些方向才算露出来。太阳被墙/屋檐挡住时眩光
+  必须消失，否则整关都糊着一颗假太阳。
+  太阳投影**自己算**，不借 `ctx.sunUv` —— 那一份由太阳拖影 pass 写，而拖影出厂
+  是关着的（`graphics.godEnabled = false`），借它等于跟着一个从不更新的坐标走。
+* **镜头脏污** 程序化烘的油斑 + 划痕灰度图（确定性 LCG，不用 `Math.random`），
+  **只乘在泛光的高亮处**（`smoothstep(0.25, 1.60, Luma(bloom))`）。那道门槛是
+  「有强光才脏」与「整屏永远糊着一层灰」的分界线。
+  它在合成 pass 里写成等价的加法项（`+ bloom·strength·dirt·门槛`），
+  因为 `main()` 已经加过一次 `bloom×uBloomStrength` —— 与 docs §5 的
+  `bloom *= (1 + dirt·strength·smoothstep(…))` 完全等价。
+
+强度按档：low/medium 0、high 0.55、ultra 0.70（`LENS_FLARE.byQuality`）。
+战争片不是赛博朋克 —— 实测三个时段的开/关对照，整屏平均亮度差 1.3–2.0/255。
+
+### 17.6 3D LUT 分级
+
+把 `lift/gain → 分离调色 → 感知域对比` 这一段**原样**烘成 64³ 的 4096×64 条带，
+合成 pass 的 `ColorGrade` 改查表（`uLutAmount`：0 = 原算式、1 = 全查表、中间是过渡）。
+
+三条不显然的决定：
+
+* **索引域是 sRGB 不是线性**。格子铺在线性域上时第一格覆盖 0—1/63 线性亮度
+  = sRGB 0—0.14，画面里几乎所有暗部都挤在第一格里，三线性插值当场糊掉 ——
+  而这一关最敏感的正是暗部。存的值同样 sRGB 编码，8 位量化因此正好落在最终输出
+  （也是 8 位 sRGB）的同一个量化格上。
+* **64³ 而不是 docs §9 老稿的 32³**。实测 32³ 的最大误差是 3/255：分离调色的
+  权重折角（两个 `clamp` 拐点，它们是 RGB 立方体里的斜面）三线性接不住，
+  而折角的误差是 O(h) 不是 O(h²)，只能加分辨率。64³ 在 B6a 单跑时落回
+  **maxDiff = 1/255、超 1/255 的通道 0/2764800**；烘一张约 90 ms，只在换时段预设时跑一次。
+  **2026-09-08 集成期复测：maxDiff = 2/255、越线 4/2764800、均差 0.154**（单跑时均差
+  0.162，比它还大一点）。变的不是这段代码而是它的**输入** —— 合流后的 composite 里
+  ApplyFog 接上了 froxel 体积雾与大气透视，同一张测试图送进 ColorGrade 的颜色已经不同，
+  于是有 4 个通道正好压在折角上。要把峰值压回 1/255 只能上 128³（8 MB + 8 倍烘焙时间），
+  而 2/255 落在输出抖动（`uDither`，以 1/255 计）的幅度之下。回归口因此改成三条一起看：
+  峰值 ≤ 2/255、越线占比 ≤ 1e-5、均差 ≤ 0.25（后两条是这一轮新加的，只放宽峰值一条）。
+* **饱和度不进 LUT**。它每帧都在动（压制去饱和）。好在饱和可乘：
+  `mix(L, mix(L,c,s1), s2) = mix(L, c, s1·s2)`（因为 `Luma(mix(L,c,s)) = L`），
+  所以 LUT 只烘到「饱和之前」，着色器照旧做那一步；`gradedLuma`（受伤去色要用）
+  就是 LUT 输出的 `Luma`，一个比特不差。
+
+用 `DataTexture` 而不是 docs §9 老稿的 `CanvasTexture`：2D canvas 的后备存储是
+预乘 alpha 的，一旦想往 alpha 里塞东西（比如 `gradedLuma`）颜色就被就地改写。
+四条铁律照旧：`NoColorSpace` / `ClampToEdge` / 无 mipmap / `flipY=false`，
+采样时每格内缩半纹素。
+
+外部 `.cube` 的载入口在 `GradeLutCache.SetExternal(texture)`。**文本解析故意没做**：
+外部表通常是线性或 log 索引域的，接进来前必须先重采样到本文件的 sRGB 索引域，
+否则暗部会整片错位 —— 那是资产管线的事。
+
+### 17.7 分档
+
+`Data_Tuning_Graphics` 三位；数值口径全在 `Data_Tuning_Camera`。
+
+| 档 | autoExposure | lensFlare | lut |
+|---|---|---|---|
+| low | ✗ | ✗ | ✓ |
+| medium | ✓ | ✗ | ✓ |
+| high / ultra | ✓ | ✓ | ✓ |
+
+`autoExposure` / `lut` 的**运行时状态**在管线上（`post.SetAutoExposure` /
+`SetLutEnabled`，同 `SetTaaEnabled` 的先例），不写 `preset` —— preset 是「这一档的
+出厂值」，面板的「恢复出厂」要从它读回去。
+
+出厂关着、已接线、面板可切的三项：泛光 Karis 平均、输出抖动（`OUTPUT.dither`，
+三角分布、幅度以 1/255 计，压 8 位渐变的色带）、`AUTO_EXPOSURE.centerWeight`
+（中心加权测光；0 时直方图各桶之和精确等于降采样像素数，验收断言压在这条上）。
+
+画质面板新增一栏「相机」：自动曝光 / 3D LUT / 泛光 Karis 三个开关、曝光补偿
+（−3…+3 EV）、色调映射 chips、镜头光晕与镜头脏污两根倍率、输出抖动。
+
+### 17.8 调试视图
+
+Debug Rendering 面板「后处理」组新增四项，实现挂在各自的模块里 ——
+`Script_PostDebug` 这一轮加了一张 `extraViews` 注册表（`RegisterView(id, resolver)`），
+子系统自带的视图不必再往那张 switch 里挤。契约：resolver 收 pipeline，返回
+`{ texture, mode, unavailable }`（走通用展示 pass）或
+`{ material, Prepare?(ctx), unavailable }`（自带材质，直接送屏）。
+
+| 视图 | 看什么 |
+|---|---|
+| 曝光直方图 | 64 桶对数纵轴柱状图 + 当前 EV（青线/青字）、目标 EV（橙）、增益（白）。数字是着色器里画的 3×5 点阵，截图能直接当证据 |
+| 镜头光晕 | 光晕层本尊。黑场输入必须全黑；太阳被墙挡住时星芒消失 |
+| 镜头脏污 | 程序化烘的油斑 + 划痕图 |
+| LUT 采样校验 | 上=测试彩阶/灰阶、中=正在生效的 LUT 条带、下=恒等表的采样误差 ×16。下半屏只该剩一层均匀的量化底噪；出现**块状结构**就是 flipY / 切片索引 / 半纹素内缩出了错 |
+
+### 17.9 已知的近似（都是有意的）
+
+* 测光是**开环**的：亮度图取自 HDR 主靶，而增益作用在合成 pass，所以增益不反馈
+  进测光。好处是绝不振荡，代价是「曝光过的画面亮度」不是被直接控制的量。
+* 160×90 的测光图对全屏是**欠采样**（约 1/100 的像素）。作为分布的估计量无偏，
+  但一个 3 像素的爆闪可能整帧测不到 —— 这正是要的：曝光不该被单帧爆闪拉走。
+* 时域适应用的是 `exp(−dt·speed)` 的一阶逼近，不是 UE 那条带「速度上限」的曲线；
+  镜头硬切与换关走 `NotifyCameraCut()` / `RequestReset()` 直接吸附。
+* 光晕的鬼影权重是经验曲线（`pow(1−r, 8)`），不是真的镜片组光路追踪。
+* 太阳遮挡是 8 个方向、半径 0.012 uv 的一圈采样：半个太阳被檐口切掉时眩光会
+  按露出比例减半，但更细的边缘（电线、树枝）判不出来。
+* LUT 的三线性插值在分离调色的两个权重折角处仍有 ≤1/255 的残差（见 §17.6）。
+* 过场自带天空（`cutsceneSky`）时不传逐关锚点 —— 镜头已经不在这一关的出生点上，
+  锚点对不上。那几场走时段预设那一条，多半是 null = 只测量不作用。
+
+### 17.10 怎么验
+
+```bash
+node Taierzhuang1938/Script_ExposureTest.mjs                 # 全套（探针页 + 正片两关）
+node Taierzhuang1938/Script_ExposureTest.mjs --probe-only    # 只跑探针页，约 90 秒
+node Taierzhuang1938/Script_ExposureTest.mjs --calibrate     # 量七关的曝光锚点
+node Taierzhuang1938/Script_ExposureTest.mjs --shots         # 出开/关对照图到 _shots/
+node Taierzhuang1938/Script_ExposureTest.mjs --baseline=<另一份检出的根目录>
+node Taierzhuang1938/Script_PostTest.mjs                     # 合成暗部保真
+node Taierzhuang1938/Script_PostFrameGraphTest.mjs           # 帧图契约
+```
+
+`--baseline` 那一条是本轮最硬的证据：把 Phase A 的树导出到一个临时目录，
+两边各起一个服务、各起一个浏览器，把探针页的时间与帧序全部钉死
+（`elapsed = 0; post.frame = 0; hasTaaHistory = hasPrev = false;` 再 `StepFrames(16)`），
+读回 `targets.ldr` 逐像素比对 —— 三位新开关全关时 **maxDelta = 0**。
+（导出用 `git archive <提交> Taierzhuang1938 PrairieFire1937 | tar -x -C <目录>`；
+仓库根的图标与样式不在里面，那几个 404 与本轮改动无关，测试里已按 tag 过滤。）
+
+**每一段各起一个浏览器**（跑完就关），不是同一个浏览器开三个页面：
+探针页 + 基线页 + 正片页挤在同一个 headless Chromium 里跑完之后，第三个上下文
+会零星冒出 `THREE.WebGLProgram: Shader Error … VALIDATE_STATUS false`
+（Program Info Log 是空的）并把 GL 推进 1282，紧接着的半浮点
+`readRenderTargetPixels` 全读回 0 —— 表现是「phase=0 的曝光增益是 0」，
+而同一个页面单独跑一遍完全正常（增益 1.0029）。那不是渲染缺陷，是上下文压力。
+
+### 17.11 性能（RTX 4070 SUPER / 1280×720 / high，GPU 计时查询，40 次取平均 ×5 轮取中位数）
+
+| 段 | 中位数 |
+|---|---|
+| `exposure`（四趟合计） | **0.032–0.059 ms** |
+| `lensFlare` | **0.0026–0.0048 ms** |
+| LUT 烘一张（JS，换时段时一次） | 85–110 ms |
+
+预算是自动曝光 ≤ 0.15 ms、光晕 ≤ 0.30 ms，两项都留着一个数量级的余量。
+两趟的成本几乎与主分辨率无关：测光图固定 160×90，光晕靶封顶 9.6 万像素。
+`renderer.render` 次数只多了一次（直方图那一趟点图元），不是场景提交。

@@ -356,6 +356,50 @@ export class GraphicsSettings {
     Mul("grain", "颗粒");
     Mul("vignette", "暗角");
 
+    // --- 相机（曝光 / 色调映射 / 光晕 / 分级）--------------------------------
+    // 与上面那一栏分开：那一栏是「后处理开多重」，这一栏是「这是一台什么相机」。
+    const camera = Section(body, "相机");
+    const cameraRow = document.createElement("div");
+    cameraRow.className = "edBtns";
+    camera.appendChild(cameraRow);
+    Toggle(cameraRow, "自动曝光", gfx.autoExposure !== false, (on) => {
+      gfx.autoExposure = on;
+      this.Apply();
+    });
+    Toggle(cameraRow, "3D LUT 分级", gfx.lut !== false, (on) => { gfx.lut = on; this.Apply(); });
+    Toggle(cameraRow, "泛光 Karis 平均", gfx.bloomKaris === true, (on) => {
+      gfx.bloomKaris = on;
+      this.Apply();
+    });
+    Slider(camera, {
+      label: "曝光补偿", min: -3, max: 3, step: 0.1, value: gfx.exposureCompensation ?? 0,
+      format: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)} EV`,
+      onInput: (v) => { gfx.exposureCompensation = v; this.Apply(); },
+    });
+    const tone = Section(camera, "色调映射");
+    Chips(tone, [
+      { value: "aces", label: "ACES" },
+      { value: "agx", label: "AgX" },
+    ], gfx.tonemap || "aces", (v) => { gfx.tonemap = String(v); this.Apply(); });
+    Slider(camera, {
+      label: "镜头光晕", min: 0, max: 2, step: 0.05, value: gfx.lensFlare ?? 1,
+      format: (v) => `×${v.toFixed(2)}`,
+      onInput: (v) => { gfx.lensFlare = v; this.Apply(); },
+    });
+    Slider(camera, {
+      label: "镜头脏污", min: 0, max: 2, step: 0.05, value: gfx.lensDirt ?? 1,
+      format: (v) => `×${v.toFixed(2)}`,
+      onInput: (v) => { gfx.lensDirt = v; this.Apply(); },
+    });
+    Slider(camera, {
+      label: "输出抖动", min: 0, max: 2, step: 0.1, value: gfx.dither ?? 0,
+      format: (v) => (v <= 0 ? "关" : `${v.toFixed(1)} / 255`),
+      onInput: (v) => { gfx.dither = v; this.Apply(); },
+    });
+    if (this.host.post && !this.host.post.preset.lensFlare) {
+      Note(camera, "镜头光晕需 high 及以上档位。");
+    }
+
     const view = Section(body, "视场");
     Slider(view, {
       label: "视野角度", min: 40, max: 90, step: 1, value: gfx.fov,
@@ -417,6 +461,15 @@ export class GraphicsSettings {
     gfx.skinSss = !!matPreset.skinSss;
     gfx.pomDepth = 1; gfx.detailNormalStrength = 1; gfx.microShadowStrength = 1;
     gfx.horizonStrength = 1; gfx.skinStrength = 1; gfx.pomSelfShadowStrength = 1;
+    // 相机那一栏：自动曝光与 LUT 的出厂值**跟画质档走**（同 TAA 的先例），
+    // 不是固定的 true/false —— 在 low 档按「恢复出厂」应该回到关。
+    gfx.exposureCompensation = 0;
+    gfx.lensFlare = 1; gfx.lensDirt = 1;
+    gfx.tonemap = "aces";
+    gfx.bloomKaris = false;
+    gfx.dither = 0;
+    gfx.autoExposure = this.host.post ? this.host.post.preset.autoExposure !== false : true;
+    gfx.lut = this.host.post ? this.host.post.preset.lut !== false : true;
     NormalizeGraphicsDetails(gfx, this.host.post, true);
     // TAA 的出厂值跟画质档走（medium 及以上开），不是固定的 true/false ——
     // 在 low 档上按「恢复出厂」应该回到关，而不是给它按上一份历史靶。
