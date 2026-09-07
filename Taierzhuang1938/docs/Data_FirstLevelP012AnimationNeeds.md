@@ -1,6 +1,6 @@
 # 第一关白盒：人物动画制作需求
 
-2026-09-05 的旧 P012 动画需求记录；该版本现位于 `?whitebox=p012-archive`。当前正片 `?whitebox=p012` 已使用新版第一关，需求和验收见 [重构验收](Data_FirstLevelRebuildAcceptance.md)。当时的“用户制作、任务检查接入”分工仅用于追溯，不自动限制后续任务。
+2026-09-05 的旧 P012 动画需求记录；该版本现位于 `?whitebox=p012-archive`。当前完整人物接力见 [新版全部动作需求](Data_FirstLevelMissionAnimationRequirements.md)。当前正片 `?whitebox=p012` 已使用新版第一关，需求和验收见 [重构验收](Data_FirstLevelRebuildAcceptance.md)。当时的“用户制作、任务检查接入”分工仅用于追溯，不自动限制后续任务。
 本清单来自实际 GLB 片段检查、开场 40 人的运行时状态和渲染联系图；不表示这些动画已经完成。
 
 ## 先做的动作
