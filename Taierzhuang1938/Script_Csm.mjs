@@ -671,10 +671,8 @@ export class CsmRig {
     // 两者必须严格配对：只要出现「矩阵是新的、图是旧的」，影子就整体平移半个身位，
     // 而且只在移动时出现，是最难查的一类阴影 bug。
     this.dirty = new Array(this.count).fill(true);
-    this.pendingForce = true;
     this.lastFitCenter = [];
     for (let i = 0; i < this.count; i += 1) this.lastFitCenter.push(new THREE.Vector3());
-    this.lastSunDir = new THREE.Vector3(0, 1, 0);
     // 面板基准值（逐级按纹素尺度缩放，见 _ApplyBias）
     this.baseBias = -0.0004;
     this.baseNormalBias = 0.035;
@@ -699,13 +697,23 @@ export class CsmRig {
     }
     if (missing.length) return missing;
     const order = this.preset.bakeOrder;
-    return [order[this.frame % order.length] % this.count];
+    const slot = ((this.frame % order.length) + order.length) % order.length;
+    return [order[slot] % this.count];
   }
 
-  /** 相机瞬移 / 太阳转向 / 换档：下一帧全级重烘并重拟合。 */
+  /**
+   * 相机瞬移 / 太阳转向 / 换关 / 改设置：把轮转相位清零，让最近一级先跟上，
+   * 其余级在一轮 `bakeOrder` 之内补齐。
+   *
+   * **不能在这里把所有级一次标脏** —— 那样下一帧要烘 N 张，直接顶穿单帧三角
+   * 红线（账在 `Data_Tuning_Shadows` 抬头）。而且也没必要：每一级的矩阵只在它
+   * 自己重拟合的那一帧才变，和它自己的图永远配对，所以「还没轮到的级」拿的是
+   * 一套自洽的旧矩阵 + 旧图 —— 只是内容旧几帧，不会错位。
+   */
   ForceUpdate() {
-    this.pendingForce = true;
-    this.dirty.fill(true);
+    // 下一次 Update 会先 +1，所以 -1 让它落回 bakeOrder[0]（约定：最近一级）
+    this.frame = -1;
+    for (const center of this.lastFitCenter) center.set(0, 0, 0);
   }
 
   SetIntensity(value) {
@@ -782,12 +790,6 @@ export class CsmRig {
    */
   Update(camera, sunDirection, fallbackFocus = null, fallbackForward = null) {
     this.frame += 1;
-    // 太阳转向 = 所有级的矩阵全废（阴影方向变了），必须整体重烘。
-    if (1 - Math.abs(this.lastSunDir.dot(sunDirection)) > SHADOW_COMMON.sunDirEpsilon) {
-      this.pendingForce = true;
-      this.lastSunDir.copy(sunDirection);
-    }
-
     let origin;
     let forward;
     let tanHalfFovY;
@@ -814,13 +816,9 @@ export class CsmRig {
     const far = Math.min(cameraFar, this.preset.maxDistance);
     this.splits = CascadeSplits(SHADOW_COMMON.splitNear, far, this.count, this.preset.lambda);
 
-    // 相机瞬移（过场硬切 / 换关 / 传送）：所有级重拟合，别让旧框拖一帧。
-    if (!this.pendingForce && this.lastFitCenter[0].lengthSq() > 0) {
-      if (this.lastFitCenter[0].distanceTo(origin) > SHADOW_COMMON.teleportMeters) {
-        this.pendingForce = true;
-      }
-    }
-
+    // 相机瞬移 / 太阳转向不用特判：轮转表里最近一级隔帧就到（bakeOrder 的第 0 格），
+    // 其余级在一轮之内补齐；而每一级的矩阵与它自己的图永远同一帧更新，
+    // 所以「还没轮到的级」是一套自洽的旧数据，不会错位，只是内容旧几帧。
     const lightDir = sunDirection;
     const up = Math.abs(lightDir.y) > 0.98 ? _altUp : _worldUp;
     _right.crossVectors(up, lightDir).normalize();
@@ -879,8 +877,9 @@ export class CsmRig {
   ScheduleShadowUpdate(renderer) {
     let pending = 0;
     for (let level = 0; level < this.count; level += 1) {
-      // **不要在这里重算节流判据**：Update 里 pendingForce 可能已经被消掉，
-      // 两处各算一次就会出现「拟合了但没排烘」。以 dirty 为准。
+      // **不要在这里重算轮转判据**：Update 与本函数之间隔着半帧，两处各算一次
+      // 就可能出现「拟合了但没排烘」（矩阵新、图旧 = 影子整体平移半个身位，
+      // 而且只在移动时出现）。以 Update 置下的 dirty 为准。
       const want = this.dirty[level];
       this.dirty[level] = false;
       this.lights[level].shadow.needsUpdate = want;
@@ -890,7 +889,6 @@ export class CsmRig {
       if (want) pending += 1;
     }
     if (renderer?.shadowMap) renderer.shadowMap.needsUpdate = pending > 0;
-    this.pendingForce = false;
     return pending;
   }
 

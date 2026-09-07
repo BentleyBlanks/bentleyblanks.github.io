@@ -595,7 +595,8 @@ prepass → hzb → ssao → contactShadows → main → …
 | phase 6 最后 | 6.32 M | 6.02 M | 1207 | — |
 
 红线 8.10 M / 5000 draw。**phase 2 只剩 0.35 M（4%）余量** —— 谁往城里再加几何，
-先看这一格。
+先看这一格。`BootTest` 自己那一帧读到的是 7.28 M（它取的是固定的一帧，不是峰值），
+七关全过。
 
 ### 1S.8b 分档（`Data_Tuning_Shadows.SHADOW_PRESETS`）
 
@@ -640,7 +641,16 @@ Debug Rendering「光照」组新增三项（`Script_ContactShadows.MakeShadowDe
 * **接触阴影**（`contactShadow`）：接触阴影靶本尊。只该出现在贴地那一圈与缝隙里。
 
 「SunShadow 采样」（`sunShadow`）与「太阳阴影」（材质假彩色视图 9）照旧可用，
-两者现在都显示级联结果。
+两者现在都显示级联结果 —— 视图 9 原来调的是 `getShadow(directionalShadowMap[0], …)`，
+级联之后那只是第 0 级；`Script_Csm.MakeCsmPatch` 在同一个锚点**追加**一段覆盖，
+改读 `gCsmSunVisibility`（已经把接触阴影 min 进去了），GI 补丁一个字没动。
+
+**`DebugPass.RegisterView(id, spec)` 是给别的子系统开的口子**：
+`{ material?, Prepare?(ctx), Texture?(), mode?, Unavailable?() }`。带 `material` 的
+自己出画（像 sunShadow 那样），只给 `Texture` 的走通用展示 pass。
+配套的 `RegisterSunShadowClient(client)` 让外部视图跟着 `SetSunShadowSource` 换 LightRig。
+这样新增一张调试图 = 自己模块里写材质 + `Script_Post` 里登记一行，
+不用改 `Script_PostDebug` 的开关表。
 
 ### 1S.10 已知近似（都是有意的，别当 bug 修）
 

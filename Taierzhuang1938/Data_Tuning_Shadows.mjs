@@ -148,10 +148,6 @@ export const SHADOW_COMMON = {
    * `sun.shadow.camera.far` 的值 —— 保持面板上那根滑杆的手感不变。
    */
   referenceDepthRange: 259.5,
-  /** 相机一帧内移动超过它就强制全级重烘（米）。硬切/传送/换关。 */
-  teleportMeters: 12,
-  /** 太阳方向变化超过它（点积差）就强制全级重烘。 */
-  sunDirEpsilon: 1e-4,
   /**
    * 接触阴影：步数、总长（米）、厚度判据（米）、强度。
    * 只压直射太阳，与级联阴影取 min（见 Script_Csm 的材质 chunk）。

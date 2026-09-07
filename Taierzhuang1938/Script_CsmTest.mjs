@@ -4,7 +4,7 @@
 // 断的都是**数值**不是观感：
 //   1. N 张级联图真的烘出来了、尺寸对；只有第 0 盏灯带强度（能量守恒的安全网）
 //   2. 分割严格单调、铺到 min(camera.far, 档位上限)、逐级纹素单调变粗
-//   3. 光空间纹素吸附：相机平移 0.37 个纹素之后各级的光空间中心一格没动
+//   3. 光空间纹素吸附：相机平移 0.37 个纹素之后各级的光空间中心只**整纹素**地跳
 //   4. 相邻级重叠：本级过渡带的边界投进下一级仍在图内（「无硬缝」的几何前提）
 //   5. 一帧只烘一张（城里每趟烘焙有 ~1.45 M 三角的地板，单帧红线只剩 2.59 M 余量），
 //      且一轮 bakeOrder 之内每一级都被烘到
@@ -125,9 +125,9 @@ try {
     const cameraWas = P.camera.position.clone();
     const texel0 = state.texelWorld[0];
     P.camera.position.addScaledVector(right, texel0 * 0.37);
-    // 强制全级重拟合，否则被节流的级本来就不动，测不出吸附
+    // 一帧只烘一张，所以要跑满一轮 bakeOrder 才每一级都重拟合过一次
     csm.ForceUpdate();
-    P.StepFrames(1, 1 / 60);
+    P.StepFrames(csm.preset.bakeOrder.length + 1, 1 / 60);
     const afterCenters = LightSpaceCenters();
     // 吸附生效 = 中心只会**整纹素**地跳（0 或 ±1 格），永远不会跟着相机走
     // 一个零头。0.37 格的平移刚好可能跨过一次四舍五入的分界，所以判据不是
@@ -143,7 +143,7 @@ try {
     }
     P.camera.position.copy(cameraWas);
     csm.ForceUpdate();
-    P.StepFrames(2, 1 / 60);
+    P.StepFrames(csm.preset.bakeOrder.length + 1, 1 / 60);
     out.snap = {
       texel0,
       moved: texel0 * 0.37,
@@ -186,6 +186,8 @@ try {
     const counts = new Array(csm.count).fill(0);
     const perFrame = [];
     const FRAMES = state.bakeOrder.length * 3;
+    // 先跑满一轮，让开机那次「缺图就立刻烘」的爆发过去
+    P.StepFrames(state.bakeOrder.length, 1 / 60);
     for (let i = 0; i < FRAMES; i += 1) {
       P.StepFrames(1, 1 / 60);
       let baked = 0;
@@ -332,7 +334,6 @@ try {
       if (delta > 0) { shadowCalls += delta; shadowFrames += 1; }
       return value;
     };
-    csm.pendingForce = false;
     P.StepFrames(12, 1 / 60);
     shadowMap.render = original;
     out.shadowDraw = {
