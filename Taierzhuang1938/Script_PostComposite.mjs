@@ -229,9 +229,11 @@ vec3 ApplyFog(vec3 color, vec2 uv, vec4 nd) {
   float fog;
   if (uFogSource > 0.5) {
     // 体积雾代理接管：整条视线的散射与透过率由它那张图给。
-    // **它必须自己把大气透视乘进去**（`AerialPerspectiveUv(uv, dist)`）——
+    // **它必须自己把大气透视乘进去**（调 AerialPerspectiveUv(uv, 距离)）——
     // 走到这一支时下面那段大气透视根本不会被调用，只写体积雾就等于
     // 「近处有雾、远处的空气不见了」。接口与口径见 §17.4。
+    // （注释里不许出现反引号：这一整段是 JS 模板字符串，一个反引号就把它截断，
+    //   表现是整个模块 SyntaxError、页面白屏 —— 2026-09 已经踩过一次。）
     vec4 scatter = texture2D(uFogScatter, uv);
     fogCol = scatter.rgb;
     fog = clamp(1.0 - scatter.a, 0.0, 1.0);

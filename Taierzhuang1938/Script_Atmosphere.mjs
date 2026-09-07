@@ -498,6 +498,7 @@ AtmoMedium AtmoSampleMedium(float heightKm) {
 const FRAG_TRANSMITTANCE = ATMOSPHERE_CONST_GLSL + ATMOSPHERE_MEDIUM_GLSL + /* glsl */`
 uniform vec2 uAtmoTransSize;
 uniform float uAtmoSteps;
+uniform int uAtmoStepCount;
 varying vec2 vUv;
 void main() {
   vec2 unit = vec2(AtmoFromSubUv(vUv.x, uAtmoTransSize.x), AtmoFromSubUv(vUv.y, uAtmoTransSize.y));
@@ -507,8 +508,11 @@ void main() {
   float steps = max(uAtmoSteps, 4.0);
   float dt = tMax / steps;
   vec3 tau = vec3(0.0);
-  for (int i = 0; i < 64; i++) {
-    if (float(i) >= steps) break;
+  // 循环上界是 **int uniform** 不是常数：常数上界会被驱动整段展开，
+  // 多次散射那一份展开出来是 8×8×24 = 1536 个带纹理取样的循环体，
+  // 编译一次要几百毫秒到几秒 —— 而这一整套是在**进关那一趟**编的
+  // （见 §16 着色器预热那笔账）。GLSL ES 3.00 允许非常量上界，用它。
+  for (int i = 0; i < uAtmoStepCount; i++) {
     float t = (float(i) + 0.5) * dt;
     float height = sqrt(max(r * r + t * t + 2.0 * r * t * mu, 0.0)) - ATMO_BOTTOM;
     AtmoMedium m = AtmoSampleMedium(height);
@@ -530,7 +534,9 @@ uniform sampler2D uAtmoTrans;
 uniform vec2 uAtmoTransSize;
 uniform vec2 uAtmoMultiSize;
 uniform float uAtmoSteps;
-uniform float uAtmoDirs;      // 每个方向轴的采样数，总方向数 = dirs * dirs * 2
+uniform float uAtmoDirs;      // 每个方向轴的采样数，总方向数 = dirs × dirs
+uniform int uAtmoStepCount;
+uniform int uAtmoDirCount;
 varying vec2 vUv;
 
 vec3 AtmoTransLut(float r, float mu) {
@@ -552,10 +558,8 @@ void main() {
   vec3 fMs = vec3(0.0);
   float dirCount = 0.0;
 
-  for (int a = 0; a < 8; a++) {
-    if (float(a) >= dirs) break;
-    for (int b = 0; b < 8; b++) {
-      if (float(b) >= dirs) break;
+  for (int a = 0; a < uAtmoDirCount; a++) {
+    for (int b = 0; b < uAtmoDirCount; b++) {
       // 球面均匀采样：cosθ 均匀、方位均匀
       float cosTheta = 1.0 - 2.0 * (float(a) + 0.5) / dirs;
       float sinTheta = sqrt(max(1.0 - cosTheta * cosTheta, 0.0));
@@ -568,8 +572,7 @@ void main() {
       bool ground = AtmoHitsGround(r, mu);
       float dt = tMax / steps;
       vec3 throughput = vec3(1.0);
-      for (int i = 0; i < 24; i++) {
-        if (float(i) >= steps) break;
+      for (int i = 0; i < uAtmoStepCount; i++) {
         float t = (float(i) + 0.5) * dt;
         vec3 p = origin + dir * t;
         float height = length(p) - ATMO_BOTTOM;
@@ -615,6 +618,7 @@ uniform vec2 uAtmoSkyViewSize;
 uniform float uAtmoViewHeight;
 uniform float uAtmoSunCosZenith;
 uniform float uAtmoSteps;
+uniform int uAtmoStepCount;
 varying vec2 vUv;
 
 vec3 AtmoTransLut(float r, float mu) { return texture2D(uAtmoTrans, AtmoTransUv(r, mu)).rgb; }
@@ -644,8 +648,7 @@ void main() {
   vec3 luminance = vec3(0.0);
   vec3 throughput = vec3(1.0);
   // 步长按 t² 分布：贴地那几百米的密度变化最大，均匀步长会在地平线上出台阶
-  for (int i = 0; i < 48; i++) {
-    if (float(i) >= steps) break;
+  for (int i = 0; i < uAtmoStepCount; i++) {
     float t0 = pow(float(i) / steps, 2.0) * tMax;
     float t1 = pow((float(i) + 1.0) / steps, 2.0) * tMax;
     float dt = max(t1 - t0, 1e-6);
@@ -689,6 +692,7 @@ uniform vec2 uAtmoMultiSize;
 uniform vec3 uAtmoAerialSize;
 uniform float uAtmoAerialFarM;
 uniform float uAtmoSteps;
+uniform int uAtmoStepCount;
 uniform mat4 uAtmoInvView;
 uniform vec2 uAtmoProjScale;
 uniform vec3 uAtmoSunDirLocal;
@@ -736,8 +740,7 @@ void main() {
 
   vec3 luminance = vec3(0.0);
   vec3 throughput = vec3(1.0);
-  for (int i = 0; i < 16; i++) {
-    if (float(i) >= steps) break;
+  for (int i = 0; i < uAtmoStepCount; i++) {
     float t = (float(i) + 0.5) * dtM;
     vec3 world = camWorld + dir * t;
     float heightKm = uAtmoSiteKm + world.y * 0.001;
@@ -860,10 +863,12 @@ export class Atmosphere {
     const transSize = this.sampleUniforms.uAtmoTransSize;
     const multiSize = { value: new THREE.Vector2(T.multi[0], T.multi[1]) };
 
-    this.transUniforms = { ...S, uAtmoTransSize: transSize, uAtmoSteps: { value: T.transSteps } };
+    this.transUniforms = { ...S, uAtmoTransSize: transSize,
+      uAtmoSteps: { value: T.transSteps }, uAtmoStepCount: { value: T.transSteps } };
     this.multiUniforms = {
       ...S, uAtmoTrans: trans, uAtmoTransSize: transSize, uAtmoMultiSize: multiSize,
       uAtmoSteps: { value: T.multiSteps }, uAtmoDirs: { value: T.multiDirs },
+      uAtmoStepCount: { value: T.multiSteps }, uAtmoDirCount: { value: T.multiDirs },
     };
     this.skyViewUniforms = {
       ...S, uAtmoTrans: trans, uAtmoMulti: multi,
@@ -871,13 +876,14 @@ export class Atmosphere {
       uAtmoSkyViewSize: this.sampleUniforms.uAtmoSkyViewSize,
       uAtmoViewHeight: this.sampleUniforms.uAtmoViewHeight,
       uAtmoSunCosZenith: { value: 0.5 }, uAtmoSteps: { value: T.skySteps },
+      uAtmoStepCount: { value: T.skySteps },
     };
     this.aerialGenUniforms = {
       ...S, uAtmoTrans: trans, uAtmoMulti: multi,
       uAtmoTransSize: transSize, uAtmoMultiSize: multiSize,
       uAtmoAerialSize: this.aerialUniforms.uAtmoAerialSize,
       uAtmoAerialFarM: this.aerialUniforms.uAtmoAerialFarM,
-      uAtmoSteps: { value: T.apSteps },
+      uAtmoSteps: { value: T.apSteps }, uAtmoStepCount: { value: T.apSteps },
       uAtmoInvView: { value: new THREE.Matrix4() },
       uAtmoProjScale: { value: new THREE.Vector2(1, 1) },
       uAtmoSunDirLocal: { value: new THREE.Vector3(0, 1, 0) },
