@@ -10,6 +10,18 @@ root=args.root.resolve()
 target=root/'Data_DeliveryManifest.json'
 previous=json.loads(target.read_text(encoding='utf-8')) if target.exists() else {'files':[]}
 paths={root/item['path'] for item in previous['files']}
+# Follow registered version directories as well as historical naming patterns.
+# Mission batches such as FirstLevelCarryV9 are valid without a ReviewV prefix.
+catalogPath=root/'Preview/Data_Catalog.json'
+if catalogPath.exists():
+    catalog=json.loads(catalogPath.read_text(encoding='utf-8'))
+    for action in catalog['actions']:
+        for variant in action['variants']:
+            for key in ['path','blend']:
+                if not variant.get(key):continue
+                folder=(root/variant[key]).resolve().parent
+                assert folder.is_relative_to(root),folder
+                paths.update(p for p in folder.rglob('*') if p.is_file() and '__pycache__' not in p.parts and p.suffix!='.log')
 for pattern in ['Models/ReviewV*','Blender/ReviewV*','Models/DeathCollapseV*','Blender/DeathCollapseV*',
     'Models/NextTenV*','Blender/NextTenV*','Models/MeleeVideoV*','Blender/MeleeVideoV*',
     'Models/RecoveryPreview','Blender/RawRecovery','Models/SourceWeapons','Models/_Pipeline',
