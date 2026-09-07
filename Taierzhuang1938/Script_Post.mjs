@@ -49,6 +49,7 @@ import { BloomPass, GodRaysPass } from "./Script_PostBloom.mjs";
 import { CompositePass } from "./Script_PostComposite.mjs";
 import { FxaaPass } from "./Script_PostFxaa.mjs";
 import { DebugPass, InjectDepthPull, SHADING_MODES, WIRE_BACKGROUND_PURE } from "./Script_PostDebug.mjs";
+import { AtmospherePass } from "./Script_Atmosphere.mjs";
 
 // 预通道语义（材质/对象怎么进这一趟）与深度偏置/着色模式仍从这里导出：
 // 十几个模块 import 的是 `./Script_Post.mjs`，实现搬家不该让它们跟着改。
@@ -94,6 +95,13 @@ export class PostPipeline {
     this.debugView = "final";
     this.debugGi = null;
     this.debugInjected = false;
+    /**
+     * 子系统自带的调试视图。键 = 视图 id，值 = `(pipeline) => GetSource() 的返回值`
+     * （`{ texture, mode }` 或 `{ material, Prepare(ctx) }`）。
+     * 有了它，新 pass 加自己的假彩色就不必去改 `Script_PostDebug` 的 switch ——
+     * 八个并行子系统各加两三个视图的话，那条 switch 会变成公共冲突点。
+     */
+    this.debugViewProviders = new Map();
 
     // 出厂值来自画质档，但**运行时状态是这一位**（画质面板走 SetTaaEnabled 改它）。
     // 历史靶按它建，不按 preset 建 —— 否则 low 档打开开关也没有靶可写。
@@ -124,9 +132,13 @@ export class PostPipeline {
     this.compositePass = new CompositePass(this);
     this.fxaaPass = new FxaaPass(this);
     this.debugPass = new DebugPass(this);
+    // 物理大气（子系统 B4）：每帧刷天空视图与大气透视两张 LUT。
+    // 排在最前是因为主场景那一趟要画天穹，天穹采的就是天空视图 LUT。
+    this.atmospherePass = new AtmospherePass(this);
 
     // --- 有序帧图 ---------------------------------------------------------
     this.passes = [
+      this.atmospherePass,
       this.prepassPass,
       {
         name: "hzb",
@@ -316,6 +328,11 @@ export class PostPipeline {
   }
 
   GetDebugView() { return this.debugView; }
+
+  /** 登记一个子系统自带的调试视图（见 `debugViewProviders`）。 */
+  RegisterDebugView(id, resolve) {
+    if (id && typeof resolve === "function") this.debugViewProviders.set(id, resolve);
+  }
 
   /** 接一台 LightRig：`sunShadow` 调试视图要采它的阴影图（见 Script_Light）。 */
   SetSunShadowSource(lightRig) { this.debugPass.SetSunShadowSource(lightRig); }

@@ -70,7 +70,13 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - `Script_Gi.mjs`（半实时辐照度探针体 + `Data_GlobalShProbe.mjs`，回归口 `Script_GiTest.mjs`）、
   `Script_Light.mjs`（太阳 + 跟随式阴影框 + 火光池 + 枪口闪光 + **`SUN_SHADOW_GLSL` 公共阴影
   采样接口**：体积雾 / 接触阴影 / CSM 都从这条接口取，别自己采 `sun.shadow.map`）、
-  `Script_Sky.mjs`（解析式天空 + PMREM）、`Script_Water.mjs`（Gerstner 护城河）。
+  `Script_Sky.mjs`（天穹 + `SKY_PRESETS` + `SKY_RADIANCE_GLSL` + PMREM 烘焙）、
+  `Script_Water.mjs`（Gerstner 护城河）。
+- `Script_Atmosphere.mjs` —— **物理大气**（Hillaire 2020 / UE SkyAtmosphere 那一套）：
+  透过率 / 多次散射 / 天空视图 / 大气透视 froxel 四张 LUT，帧图第一个 pass 刷后两张。
+  天穹与探针体 GI 的漏空射线共用同一批采样 uniform；`AERIAL_PERSPECTIVE_GLSL` 供
+  合成 pass 的 ApplyFog 段。每预设参数在 `SKY_PRESETS[...].atmosphere`，
+  由 `Script_AtmosphereCalibrate.mjs` 在真浏览器里拟合。`?skyLegacy=1` 退回旧解析天空。
 - **局部光源（簇状前向光照，2026-09）**：`Script_ClusteredLights.mjs`（视锥切簇 + 三张
   DataTexture + 材质补丁里的局部光循环 + 两层调试叠加）＋ `Data_Tuning_Lights.mjs`
   （档位 + `ClusterGrid` 纯几何，零 three，纯 Node 单测直接 import 它）。
@@ -82,9 +88,10 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   先读：`docs/Data_TechRenderPipeline.md` §17（§2.1 是它的历史稿）。
 - 回归口：`Script_PostFrameGraphTest.mjs`（帧图契约）、`Script_PostTest.mjs`、
   `Script_SsrTest.mjs`（屏幕空间反射）、`Script_ClusteredLightsTest.mjs`（簇状局部光）、
+  `Script_AtmosphereTest.mjs`（物理大气：四张 LUT + 十档标定 + 能见度闸；`--shot` 出 A/B 图）、
   `Script_GiTest.mjs`、`Script_EditorTest.mjs`（Debug Rendering 全部视图）。
 - 先读：`docs/Data_TechRenderPipeline.md` **§1「帧图与模块契约」**（接入说明；
-  §1A 起是设计期草案与专题深挖，GI 在 §12，坑表在末尾）。
+  §1A 起是设计期草案与专题深挖，GI 在 §12，物理大气与大气透视在 §17，坑表在末尾）。
 
 ### 材质 / 贴图
 - `Script_TexBake.mjs`（纯 JS PBR 烘焙，每种材质出 albedo / normal / orm）→

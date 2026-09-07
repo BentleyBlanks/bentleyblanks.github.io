@@ -468,6 +468,9 @@ const graphics = {
   // 英雄光的立方体阴影：整城几何要多画六遍，出厂关。打开会重编译一次
   // （NUM_POINT_LIGHTS 0↔1），与阴影总闸、GI 采样层同一个先例。
   clusterHeroShadow: false,
+  // 物理大气（Hillaire 2020 四张 LUT）。出厂跟画质档走；关掉退回旧解析天空
+  // （与 ?skyLegacy=1 等价）。烟霾倍率 atmosphereHaze 由 NormalizeGraphicsDetails 补。
+  atmosphere: post.preset.atmosphere !== false,
   fov: CAMERA.baseFovDeg,
 };
 NormalizeGraphicsDetails(graphics, post);
@@ -492,7 +495,7 @@ const library = new MaterialLibrary(renderer, {
 // 它自己按平面反射假设采同一条 Hi-Z，见 Script_PostSsr.SsrSurfaceGlsl。
 // 必须排在任何水面材质建出来之前（材质按预设缓存，建完就定型）。
 SetWaterSsr(ssrUniforms ? post.ssrPass.trace : null);
-const sky = new SkyDome(renderer);
+const sky = new SkyDome(renderer, { quality: QUALITY });
 scene.add(sky.mesh);
 // 水面借天空 uniform：反射的天顶/地平线/太阳色随时段预设一起换（Script_Water）
 SetWaterSkyUniforms(sky.uniforms);
@@ -7548,6 +7551,16 @@ function ApplyGraphics() {
       else material.needsUpdate = true;
     });
   }
+  // 物理大气：总闸 + 烟霾倍率。任一变了都要**重烘 IBL** ——
+  // scene.environment 是从天穹烘出来的 PMREM，天换了 IBL 不换，
+  // 表现是「天亮了屋里没亮」（换时段那条老账的同一个坑）。
+  post.preset.atmosphere = graphics.atmosphere !== false;
+  const atmosphereChanged = [
+    sky.SetAtmosphereEnabled(graphics.atmosphere !== false),
+    sky.SetHazeScale(graphics.atmosphereHaze),
+  ].some(Boolean);
+  if (atmosphereChanged) sky.BakeEnvironment(scene);
+
   const shadowSize = graphics.shadowSize || lights.defaultShadowSize;
   if (lights.sun.shadow.mapSize.x !== shadowSize) {
     lights.sun.shadow.mapSize.set(shadowSize, shadowSize);

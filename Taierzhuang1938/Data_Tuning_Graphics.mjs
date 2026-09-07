@@ -24,7 +24,10 @@
 //        的 enabled 也是 false，两处都关才是真关）。网格与光源预算不在这张表里，
 //        它们在 `Data_Tuning_Lights.CLUSTER_TIERS`（那张表是纯数值 + 纯几何，
 //        纯 Node 单测直接 import 它）。
-//   · 其余键（csm / gtao / ssil / volumetrics / atmosphere / autoExposure /
+//   · atmosphere —— 2026-09 物理大气（子系统 B4）。四档全开：透过率与多次散射
+//        两张 LUT 只在换预设时算一次，每帧的账只有天空视图（两万像素）与
+//        大气透视 froxel（低档 16³），low 档也给得起。关掉退回旧解析天空。
+//   · 其余键（csm / gtao / ssil / volumetrics / autoExposure /
 //     lensFlare / lut / dof / taaUpscale / contactShadows）
 //     —— **本阶段全部为占位**，值 = 与今天等价（即「不启用新东西」）。
 //        对应子系统落地时把自己那一位改成实际档位，并在这里补出处注释。
@@ -58,7 +61,10 @@
  *   gtao          GTAO（将来替换 ssao 那一位）
  *   ssil          屏幕空间间接光
  *   volumetrics   froxel 体积雾（今天：合成 pass 里的解析式指数高度雾）
- *   atmosphere    物理大气（今天：SkyDome 的解析式天空）
+ *   atmosphere    物理大气（Hillaire 2020 四张 LUT）。关掉 = 退回旧的解析天空，
+ *                 天穹与大气透视都不再更新。LUT 分辨率不在这里，跟 `?quality=`
+ *                 走（见 Script_Atmosphere.ATMOSPHERE_TIERS）——
+ *                 它是构造期的靶尺寸，和 MSAA 采样数同一类，热切没有意义。
  *   autoExposure  自动曝光（今天：时段预设手调的常数曝光）
  *   lensFlare     镜头光晕
  *   lut           3D LUT 调色（今天：lift/gain + 分离调色）
@@ -77,7 +83,6 @@ const RESERVED_OFF = {
   gtao: false,
   ssil: false,
   volumetrics: false,
-  atmosphere: false,
   autoExposure: false,
   lensFlare: false,
   lut: false,
@@ -96,7 +101,7 @@ export const QUALITY_PRESETS = {
     ...RESERVED_OFF,
     ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
     aoScale: 0.5, sharpen: 0.14, taa: false,
-    velocity: true, hzb: true,
+    velocity: true, hzb: true, atmosphere: true,
     // low 不跑 SSR：连靶都不建，材质也不编入补丁（`ssr` 进 cache key）。
     ssr: false, ssrScale: 0.5, ssrSteps: 32, ssrResolveTaps: 0,
     // low 不跑簇：每帧几千次球-AABB 判定 + 三张表上传，换来的画面收益抵不过
@@ -108,7 +113,7 @@ export const QUALITY_PRESETS = {
     clusteredLights: true,   // 局部光预算 32 盏（Data_Tuning_Lights.CLUSTER_TIERS.medium）
     ssao: true, bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.6, sharpen: 0.18, taa: true,
-    velocity: true, hzb: true,
+    velocity: true, hzb: true, atmosphere: true,
     // medium：半分辨率 32 步，**不做空间解算**（只有中心那一条随机射线），
     // 噪声全交给时域累积压。静止画面收敛得和 high 一样干净，动起来会脏一点。
     ssr: true, ssrScale: 0.5, ssrSteps: 32, ssrResolveTaps: 0,
@@ -121,7 +126,7 @@ export const QUALITY_PRESETS = {
     clusteredLights: true,   // 局部光预算 64 盏（Data_Tuning_Lights.CLUSTER_TIERS.high）
     ssao: true, bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.75, sharpen: 0.22, taa: true,
-    velocity: true, hzb: true,
+    velocity: true, hzb: true, atmosphere: true,
     // high：半分辨率 48 步 + 4 抽样 ratio estimator + 时域。这一档是性能红线所在
     //（3394×1348 实测 hiz+trace+resolve+temporal 合计见 docs「屏幕空间反射」）。
     ssr: true, ssrScale: 0.5, ssrSteps: 48, ssrResolveTaps: 4,
@@ -131,7 +136,7 @@ export const QUALITY_PRESETS = {
     clusteredLights: true,   // 局部光预算 128 盏（Data_Tuning_Lights.CLUSTER_TIERS.ultra）
     ssao: true, bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,
     aoScale: 1.0, sharpen: 0.22, taa: true,
-    velocity: true, hzb: true,
+    velocity: true, hzb: true, atmosphere: true,
     // ultra：全分辨率追踪（不再有半分辨率上采样的边缘渗色）+ 64 步 + 8 抽样解算。
     ssr: true, ssrScale: 1.0, ssrSteps: 64, ssrResolveTaps: 8,
   },

@@ -274,8 +274,9 @@ server.close();
 
 // 2026-09 SSR 落地插了两行：`ssr`（min-Hi-Z + 追踪 + 解算 + 时域，必须在 main
 // 之前 —— 材质那一趟要采它的靶）与 `ssrColor`（TAA 解算后的 HDR 降成带 mip 的
-// 「上一帧场景色」，供下一帧取色）。
-const EXPECTED_ORDER = ["prepass", "hzb", "ssr", "ssao", "main", "wireframe", "debugOverlay",
+// 「上一帧场景色」，供下一帧取色）。物理大气的 `atmosphere`（刷天空视图 / 大气透视 LUT）
+// 排在最前：天穹与材质都要采它。
+const EXPECTED_ORDER = ["atmosphere", "prepass", "hzb", "ssr", "ssao", "main", "wireframe", "debugOverlay",
   "taa", "ssrColor", "godPrepare", "bloom", "god", "composite", "fxaa"];
 
 const checks = [];

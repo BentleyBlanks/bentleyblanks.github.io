@@ -11,6 +11,7 @@
 import * as THREE from "three";
 import { Panel, Section, Chips, Facts, Note, Toggle, El } from "./Script_EditorUi.mjs";
 import { InjectDepthPull, SHADING_MODES } from "./Script_Post.mjs";
+import { GetActiveAtmosphere } from "./Script_Atmosphere.mjs";
 import { R } from "./Script_Physics.mjs";
 import { MakeClusterHeatOverlay, MakeClusterSphereOverlay } from "./Script_ClusteredLights.mjs";
 
@@ -43,6 +44,13 @@ const VIEWS = [
   { id: "ssrHitDistance", label: "SSR 命中距离", group: "反射", note: "Hi-Z 追踪的行程（绿 = 近、品红 = 30 m 以上）；深灰 = 未命中。反射穿墙或起点自交时，这张图上会看到成片的极短行程。" },
   { id: "giIrradiance", label: "辐照度图集", group: "GI", note: "实时探针体的 RGB 辐照度 atlas；探针体没开时显示不可用斜纹（去「画质」里打开）。" },
   { id: "giDistance", label: "距离图集", group: "GI", note: "实时探针体的 R/G 距离矩；探针体没开时显示不可用斜纹。" },
+  // 物理大气（子系统 B4）。四张 LUT + 两张屏幕空间的大气透视。
+  { id: "atmoTransmittance", label: "透过率 LUT", group: "大气", note: "Hillaire 透过率表（256×64）：横轴是天顶角映射、纵轴是海拔。天顶方向（左上）应接近白，掠地平线（右下）明显偏红 —— 蓝光先被散掉。" },
+  { id: "atmoMultiScatter", label: "多次散射 LUT", group: "大气", note: "二阶以上散射的等比级数和 Ψ（32×32）：横轴是太阳天顶余弦、纵轴海拔。阴天与黄昏地平线不死黑靠它。" },
+  { id: "atmoSkyView", label: "天空视图 LUT", group: "大气", note: "相机高度处的整片天（192×108）：横轴是相对太阳的方位（右侧朝太阳），纵轴天顶角、地平线两侧各加密一次。不含太阳盘与美术烟层。" },
+  { id: "atmoAerialLut", label: "大气透视 LUT", group: "大气", note: "32×32×32 froxel 打成的 2D 图集（切片沿横向平铺，越靠右越远）。rgb = 累积散射，a = 透过率。" },
+  { id: "aerialScatter", label: "大气透视 散射", group: "大气", note: "屏幕空间：拿预通道重建世界坐标再问一次 AerialPerspective()，与合成 pass 同一个函数同一批 uniform。Reinhard 显示；天空是深蓝底。" },
+  { id: "aerialTransmittance", label: "大气透视 透过率", group: "大气", note: "同上，显示的是透过率：深蓝 = 全通（近处），暖黄 = 被空气吃光（远处）。近处贴脸必须是深蓝，出现暖黄就是 froxel 切片对错位了。" },
 ];
 
 /** 着色模式 chips。id 与 Script_Post.SHADING_MODES 一致。 */
@@ -86,6 +94,14 @@ const VIEW_TARGETS = {
   ssrHitDistance: (post) => post?.targets?.ssrHit,
   giIrradiance: (post, gi) => gi?.irradiance?.[gi.pingPong],
   giDistance: (post, gi) => gi?.distanceMoments?.[gi.pingPong],
+  // 物理大气：四张 LUT 归 Script_Atmosphere 持有，不在 post.targets 里
+  atmoTransmittance: () => GetActiveAtmosphere()?.transTarget,
+  atmoMultiScatter: () => GetActiveAtmosphere()?.multiTarget,
+  atmoSkyView: () => GetActiveAtmosphere()?.skyViewTarget,
+  atmoAerialLut: () => GetActiveAtmosphere()?.aerialTarget,
+  // 屏幕空间那两张没有独立靶：与 fog/dof 同一条路，按预通道尺寸报数
+  aerialScatter: (post) => post?.targets?.normalDepth,
+  aerialTransmittance: (post) => post?.targets?.normalDepth,
   // 材质通道假彩色都是场景按调试口径重画进 hdr 靶再送屏
   baseColor: (post) => post?.targets?.hdr,
   roughness: (post) => post?.targets?.hdr,
@@ -637,7 +653,7 @@ export class DebugRenderingEditor {
     this.clusterFacts = Facts(cluster, ["局部光", "簇网格", "每片元灯数"]);
     if (!this.host.lights?.clustered) Note(cluster, "当前画质档不跑簇（low 档保持固定灯池）。");
 
-    for (const group of ["输出", "后处理", "GBuffer", "材质", "光照", "AO", "GI"]) {
+    for (const group of ["输出", "后处理", "GBuffer", "材质", "光照", "AO", "GI", "大气"]) {
       const section = Section(body, group);
       const options = VIEWS.filter((item) => item.group === group)
         .map((item) => ({ value: item.id, label: item.label, title: item.note }));

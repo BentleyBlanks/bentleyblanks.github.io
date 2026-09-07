@@ -1958,6 +1958,15 @@ draw call：905 → 899（+6，逐轮区间 +6…+11）= 六次 min-Hi-Z blit + 
 - MSAA 目标（`samples > 0`）+ 挂 `depthTexture` 读回是脆的：需要额外的 depth blit（`resolveDepthBuffer`），部分驱动上直接得到未定义深度。稳妥做法是预通道用**独立的非 MSAA RT**（现有 `Script_Post.mjs` 正是这么做的，保持）。
 - `aoMap` 走的是 `uv1`（r152+ 更名，不再叫 uv2）。程序化几何忘了 `geometry.setAttribute('uv1', geometry.attributes.uv.clone())` → AO 贴图完全不生效，而且不报错。
 - LUT 的 CanvasTexture 必须 `flipY = false` + `ClampToEdgeWrapping` + `generateMipmaps = false` + `NoColorSpace`，采样时每格内缩半纹素。任一条漏掉 → 相邻切片互相渗色，暗部出现彩色斑块。
+- 【2026-09 实测】**GLSL 注释里写一个反引号，整个模块当场 SyntaxError**。本仓的
+  着色器全部是 JS 模板字符串（`const FRAG_X = /* glsl */` 开头那种），注释里为了
+  引用一个函数名顺手打了一对反引号，模板就在那里被截断，后面的 GLSL 变成 JS 代码 ——
+  表现是**页面白屏、控制台一行 SyntaxError**，而那一行指的是注释里的标识符，
+  看着完全不像渲染的事。已发生：`Script_PostComposite` 的 ApplyFog 段注释里引用了
+  AerialPerspectiveUv，Script_BootTest 在第 5、6 关抓到（前四关是改文件之前加载的，
+  所以还绿着 —— 这种"绿一半"最容易被当成偶发）。
+  规矩：GLSL 注释里引用标识符**不加反引号**；改完着色器文件先跑一次
+  `node --check <文件>`（毫秒级，它就是干这个的）。
 - 颗粒/抖动用 `Math.random()` 会让逐轮截图对比失效（画面自己在抖，判断不了“这一版比上一版好”）。全部用 `frameIndex` 驱动的确定性噪声（interleavedGradientNoise + 黄金比推进），视觉审查 agent 才能打分。
 - god rays / 体积 raymarch 不抖动起点 → 明显的同心环带（banding）。抖动了但不随帧变 → 静态噪点固定在屏幕上，看起来像脏镜头。两者都要：`Ign(gl_FragCoord.xy + frame * k)`。
 - 【2026-09 实测】**GLSL ES 3.00 不许用变量下标取 sampler 数组** —— 只允许常量整型表达式（动态一致下标要 ES 3.10/GLSL 4.00，WebGL2 没有）。Hi-Z 追踪要按当前层级取金字塔，这条直接把「一个 `uniform sampler2D u[8]` 加个变量下标」的写法否掉了。三条出路：①摊成 if 梯（SSR 的 min-Hi-Z 就是六个 sampler + `SsrHizMin` 的 if 梯）；②做成**一张**带真 mip 的纹理用 `textureLod(tex, uv, lod)`（lod 可以是变量 —— SSR 的「上一帧场景色」金字塔就是这么做的，`generateMipmaps = true` + mipmap minFilter，three 在 `renderer.render` 末尾自动 `updateRenderTargetMipmap`）；③打进一张图集自己算偏移。**别想着「往同一张纹理的 level i 写、同时采它的 level i-1」** —— 那是 feedback loop，WebGL2 直接 `INVALID_OPERATION`，整趟不画。
@@ -2447,3 +2456,285 @@ ShaderMaterial 编译失败同样是静默的，热图又用了 `usampler2D` + `
 
 截图：`_shots/ClusteredLights_{burningStreet,night}_{on,off}.png`（14 处火 + 一枚
 照明弹 + 一盏探照灯，簇光开/关对照）。
+## 17. 物理大气与大气透视（2026-09）
+
+> 接入契约在 §1。这一节是「天空这一块换成了什么、每一个数从哪来、哪些是有意的近似」。
+> 代码：`Script_Atmosphere.mjs`（LUT 与采样 GLSL）、`Script_Sky.mjs`（天穹 / 预设 /
+> `SKY_RADIANCE_GLSL` / PMREM 烘焙）、`Script_PostComposite.mjs` 的 ApplyFog 段。
+
+### 17.0 换掉的是什么
+
+原来的天是一套美术化的解析式：`mix(zenith, horizon, pow(1−up, 2.6))` + 太阳盘 +
+`pow(sunDot, glowSpread)` 的辉光 + 高空烟 + 贴地烟尘带。它的问题不是「不好看」，
+是**没有结构**：
+
+- 一条单调渐变。天顶到地平线之间没有任何可读的层次，评分表「远近景有可读的
+  雾/大气层次」那一条只能靠雾去凑；
+- 太阳周围只有一个 pow 出来的圆晕。真正的前向散射是**整片天**朝太阳那一侧抬起来，
+  而且抬的量随 Mie 密度变；
+- 黄昏/拂晓的地平线只能靠把 `horizon` 手调成 `[4.20, 2.30, 1.05]` 这种数来模拟，
+  于是那一档的天顶到地平线是一条橙棕线，臭氧那条青带根本不存在；
+- **雾色是另一套算式**（按视线仰角在 `fog.sky`/`fog.ground` 之间插值，再加
+  `pow(sunDot, 8) * sunGain`），和天穹各算各的 —— 远景的颜色与天的颜色对不上号。
+
+### 17.1 方案：Hillaire 2020 的四张 LUT
+
+参考实现是 Sébastien Hillaire《A Scalable and Production Ready Sky and Atmosphere
+Rendering Technique》(EGSR 2020)，也就是 UE4.26+ `SkyAtmosphere` 的算法；介质参数与
+LUT 参数化沿用 Bruneton & Neyret 2008 / Bruneton 2017 的标准值。
+
+| LUT | 尺寸（high） | 参数化 | 何时算 | 内容 |
+|---|---|---|---|---|
+| 透过率 | 256×64 | (到大气顶的距离映射, 海拔) | **换预设时一次** | 从 (r, μ) 出发到大气顶的三通道透过率 |
+| 多次散射 | 32×32 | (cos 太阳天顶角, 海拔) | **换预设时一次** | 二阶以上散射的等比级数和 Ψ = L₂/(1−f_ms) |
+| 天空视图 | 192×108 | (相对太阳的方位, 天顶角；地平线两侧各加密一次) | 相机海拔或太阳天顶角变了才算（见 17.6.1） | 相机高度处的整片天，不含太阳盘 |
+| 大气透视 | 32×32×32 → 1024×32 图集 | 视锥对齐 froxel，切片按 √ 分布 | 每帧 | rgb = 沿视线累积散射，a = 透过率均值 |
+
+介质：地球半径 6360 km、大气顶 6460 km；瑞利 (5.802, 13.558, 33.100)×10⁻³ /km、
+标高 8 km；Mie 散射 3.996×10⁻³、消光 4.400×10⁻³ /km、标高 1.2 km、g = 0.8
+（Cornette-Shanks 相函数）；臭氧 (0.650, 1.881, 0.085)×10⁻³ /km，帐篷分布 10—40 km、
+峰在 25 km。滕县城关海拔按 60 m 记，相机高度 = 它 + 世界 Y。
+
+**为什么单位是 km**：大气厚度 100 km、瑞利标高 8 km，而游戏世界是米。全部换算成 km
+之后系数表可以直接抄文献，不必自己乘 1e-3 到处飘。
+
+### 17.2 天穹：物理层 + 保留的美术层
+
+`SkyRadiance(dir, sunDiskGain)` 的**签名没变**（探针体 GI 的漏空射线复用同一段 GLSL）。
+里面变成：
+
+```
+物理：AtmoSkyView(dir)                    ← 天空视图 LUT（瑞利+Mie+臭氧+多次散射）
+    + 辉光加成 × uArtGlow                 ← 美术层，出厂 0.25—0.5（LUT 里已有真前向散射）
+    + 太阳盘 × AtmoSunTransmittance()     ← 真角直径 0.5357° + 临边昏暗，吃透过率
+美术：高空烟／云（fbm）                    ← 原样
+    + 贴地战场烟尘带                       ← 原样
+    + 地平线以下的地面反照 uGround         ← 原样
+    + 星（night）                          ← 原样
+```
+
+**美术层为什么全留着**：1938 年三月的滕县打了半个月，天上是有烟的 —— 一片干净的物理
+蓝天和一条平渐变一样失真。分工是：**天空视图 LUT 管"这片空气本身散出什么光"，
+贴地烟尘带管"天有多脏"**。天空视图 LUT 里刻意**不含**战场霾，两处都放就是双份灰
+（那正是 2026-08 那次「白天四张的天全是一块 sRGB 234 的死白」的成因）。
+
+`uAtmoEnabled` 是一个 uniform 分支，不是 define：`?skyLegacy=1` 与画质面板的「物理大气」
+开关都走它，**运行时切换不重编译**。旧的 `zenith / horizon / glow / sunSize` 一个都没删
+——`?skyLegacy=1` 要用它们做 A/B，水面（`Script_Water`）也仍借
+`uZenith/uHorizon/uGround` 当反射底色。
+
+### 17.3 与 GI / IBL 的接线（零改动那一侧）
+
+- **探针体 GI**：`Script_Gi.BuildPasses` 把 `sky.uniforms` 整表拷进 trace 材质，
+  拷的是 **uniform 对象本身**。LUT 的采样器与参数一并挂在 `sky.uniforms` 上，
+  所以漏空射线自动问同一片天，`Script_Gi.mjs` 一个字没改。回归口 `Script_GiTest`。
+- **IBL**：`BakeEnvironment` 仍从天穹烘 PMREM。`SkyDome.Apply()` 里三张静态 LUT 是
+  **同步**算完的 —— 慢一帧的话进关第一次烘到的是上一档的天，换时段肉眼可见地闪一下。
+- **水面**：只借那五个美术 uniform，不受影响。
+
+### 17.4 大气透视接进 ApplyFog：出厂只供色
+
+`AERIAL_PERSPECTIVE_GLSL` 导出 `vec4 AerialPerspective(vec3 worldPos)`
+（rgb = 累积散射，a = 透过率）与 `AerialPerspectiveUv(screenUv, distanceMeters)`。
+`BindAtmosphereUniforms(uniforms, atmosphere)` 把那一批 uniform 挂到任何 pass 上。
+
+**`uAtmoAerialMode = 0`（出厂）：消光仍归美术雾，物理大气只供雾色。**
+
+用户对雾有一条定论：「先别动雾」。所以透过率一个字节都不动 —— 那三行
+（`1 − exp(−depth·density)` × 高度衰减，钳在 `fog.max`）原样保留，能见度逐米与今天相同。
+换掉的只是**雾色**：
+
+```glsl
+fogCol = mix(今天的 mix(ground, sky, 仰角) + pow(sunDot,8)*sunGain,
+             aerial.rgb / (1 − aerial.a),          // 单位不透明度的平均散射辐射亮度
+             uAtmoAerialBlend);                    // 每预设 0.35—0.7
+```
+
+`aerial.rgb / (1 − aerial.a)` 与 `fogCol` 同量纲，可以直接混。这样买到的是
+**真的前向散射halo、随距离变化的色相、黄昏正确的橙-青分离**，而不是一个 `pow(sunDot,8)`。
+
+`uAtmoAerialMode = 1`（`?aerial=full` 或每预设 `atmosphere.aerialMode: 1`）是完整的
+`color × T + S`，仍吃 `uFogMax` 上限（「远处兵的剪影不许更糊」那条硬约束靠它）。
+**出厂不开**：它会把能见度整条曲线换成物理的，那是要用户拍板的一次画面变化。
+
+与体积雾代理的分工，两条都要接：
+
+1. `uVolumetricFarTransmittance` 由体积雾那一侧写（它负责 0—`uVolumetricFar`），
+   这里把它乘进 `aerial.a`。没人接线时恒为 1，本代理按 1 处理。
+2. **体积雾一旦把 `uFogSource` 置 1，ApplyFog 就走另一支，下面这段大气透视根本不会
+   被调用。** 所以体积雾那张 `uFogScatter` 必须自己把 `AerialPerspectiveUv(uv, dist)`
+   乘进去，否则表现是「近处有雾、远处的空气不见了」。这一条写在
+   `Script_PostComposite` 那一支的注释里，别只看这里。
+
+### 17.5 每预设标定表
+
+标定脚本：`node Taierzhuang1938/Script_AtmosphereCalibrate.mjs`（真浏览器、真 GPU）。
+
+**为什么必须在浏览器里做**：新旧两条天空是同一个着色器里的 uniform 分支，而新的那条要
+读四张 GPU 上的 LUT。在 Node 里照着算式重写一份 JS 近似，标定出来的是那份近似。
+
+**一条观察省掉 99% 的 GPU 往返**：天穹的最终辐射亮度对 `skyTint`/`skyFloor` 是**仿射**的
+（美术层是 `mix()`，系数与 tint/floor 无关）：
+
+```
+sky = A · (LUT · tint + floor) + B
+```
+
+所以每个 (mie, rayleigh, groundAlbedo) 组合只要探三次（tint=0、tint=1、floor=1）就能把
+A·LUT、A、B 全解出来，之后整段拟合在 JS 里跑。10 档 × 150 个组合，一共约三分钟。
+
+**三个形状参数**（其余都只能整体缩放）：Mie 倍率（天有多白、地平线相对天顶抬多少）、
+瑞利倍率（天顶有多蓝；它同时是压平天顶/地平线比最省力的一条 —— 地平线方向早就光学厚了，
+抬它只抬得动天顶）、地面反照（亮地面把光反回大气、经多次散射再抬一次天顶）。
+
+**目标函数**：上半球**余弦加权辐照度**（权重 1.0）+ 天顶 / 地平线四向均值 / 太阳侧
+（各 0.45）+ 色相（0.25）+ Mie 先验（0.05）。辐照度是主项，因为它正比于 PMREM 烘出来那张
+IBL 的量级 —— 「整幅画有多亮」是用户唯一真正敏感的一维（历史事故：「画面为什么这么黑」）。
+
+| 预设 | mie | rayleigh | groundAlbedo | sunIrradiance | skyTint | aerialBlend | 辐照度比 | 天顶 | 地平线 | 太阳侧 |
+|---|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|
+| testSceneDay | 2.4 | 2.0 | 0.20 | 14.04 | 1.069 / 0.922 / 1.014 | 0.50 | 1.016 | 0.888 | 1.225 | 0.903 |
+| whiteboxDay | 1.6 | 2.0 | 0.20 | 18.91 | 1.074 / 0.903 / 1.031 | 0.50 | 1.014 | 0.875 | 1.227 | 0.926 |
+| editorClear | 3.6 | 2.0 | 0.20 | 36.05 | 1.401 / 0.973 / 0.734 | 0.60 | 1.002 | 0.929 | 1.022 | 0.934 |
+| dusk | 2.4 | 2.0 | 0.55 | 47.17 | 0.904 / 0.894 / 1.238 | 0.50 | 1.015 | 0.993 | 0.991 | 1.004 |
+| smokyDay | 5.4 | 2.0 | 0.20 | 61.17 | 1.110 / 0.915 / 0.985 | 0.50 | 1.003 | 0.940 | 1.111 | 0.986 |
+| chuchuanDay | 3.6 | 1.5 | 0.55 | 78.89 | 1.636 / 1.017 / 0.601 | 0.70 | 1.018 | 0.999 | 0.718 | 1.003 |
+| overcast | 18.0 | 2.0 | 0.20 | 38.90 | 0.947 / 0.997 / 1.059 | 0.40 | 1.001 | 0.955 | 1.016 | 0.998 |
+| burningStreet | 8.0 | 2.0 | 0.20 | 28.13 | 1.358 / 0.910 / 0.809 | 0.45 | 1.004 | 0.915 | 1.073 | 0.998 |
+| night | 3.6 | 2.0 | 0.20 | 1.67 | 0.860 / 0.860 / 1.352 | 0.35 | 1.016 | 0.927 | 1.135 | 0.913 |
+| dawn | 2.4 | 2.0 | 0.55 | 58.68 | 0.691 / 0.880 / 1.645 | 0.50 | 1.043 | 0.983 | 1.065 | 0.997 |
+
+各档另有 `skyFloor`（见源码）：加在 LUT 采样上的常数，上限压在上半球均值的 25%。
+夜档它是气辉 + 星光（模型本来就不含）；白天档它补的是「手调的那张天比物理的平」那一份。
+
+**三条读得出来的账**：
+
+1. **辐照度全部落在 ±5%**。天变了，IBL 的量级没变 —— 灰卡基线
+   （`Script_TestSceneLightingTest`）四个方位 88.5 / 95.3 / 85.3 / 66.6，仍在 (45, 190) 的
+   窗口里、最大最小比 1.43 < 2.5。
+2. **天顶普遍暗 6—12%、地平线普遍亮 2—23%**。这不是拟合没收敛，是物理天空**本来就该**
+   这样：水平视线的光学厚度是竖直的十几倍。逼这两项也进 ±15% 等于把物理模型重新拟合成
+   旧模型 —— 那正是这一轮要买掉的东西。所以 `Script_AtmosphereTest` 对这三项给的是 ±40%
+   的软闸（只拦「整档跑飞」），硬闸只压在辐照度上。
+3. **`rayleigh` 被拟合顶到 2.0**（网格上限）。手调的天比真实的天平，而抬瑞利
+   （在地平线方向已经光学厚、在天顶还没有）是压平天顶/地平线比最省力的一条。
+   它在这里是**形状参数不是物理密度**，别当成「这颗星球有两倍大气」。
+
+**物理平行光推荐值**（`atmosphere.physicalSun: true` 才生效，**出厂全部 false**）。
+颜色 = 太阳方向透过率归一化到最亮通道；强度 = 现值 × 亮度比／0.72：
+
+| 预设 | 物理推荐 | 现值（手调） |
+|---|---|---|
+| testSceneDay | #fff4e3 × 3.76 | #fffaf0 × 3.20 |
+| whiteboxDay | #fff3e0 × 4.39 | #fff3df × 3.80 |
+| editorClear | #fff4e4 × 7.83 | #ffe8cc × 6.60 |
+| dusk | #ffd9a5 × 6.76 | #ffb072 × 8.80 |
+| smokyDay | #fff4e3 × 10.12 | #ffe6c4 × 8.60 |
+| chuchuanDay | #fff4e4 × 7.83 | #ffe8cc × 6.60 |
+| overcast | #fff2de × 1.83 | #f0f2f5 × 1.60 |
+| burningStreet | #fff3e0 × 8.77 | #ffbb80 × 7.60 |
+| night | #fff0d8 × 0.46 | #9fb4e8 × 0.42 |
+| dawn | #ffd69f × 6.01 | #ffc890 × 8.20 |
+
+**建议**：白天四档（testSceneDay / whiteboxDay / editorClear / chuchuanDay）可以直接翻开
+——物理值与手调值差 10—20%，色相几乎一样。**黄昏与拂晓不要翻**：`dusk` 手调的
+#ffb072 与 `dawn` 的 #ffc890 是刻意压过的橙，物理推导给的 #ffd9a5/#ffd69f 明显偏白
+——真实的低太阳确实没那么橙（那份橙一半来自散射而不是直射），但那是这两档形体分层的全部
+来源（见 `SKY_PRESETS` 里太阳仰角那段长注释）。`night` 更不能翻：那盏"太阳"其实是月亮，
+物理推导按日光算，会把冷蓝月光变成暖白。
+
+### 17.6 画质分档
+
+`Data_Tuning_Graphics` 的 `atmosphere` 位四档**全开**：透过率与多次散射只在换预设时算
+一次，每帧的账只有天空视图与大气透视两张。LUT 分辨率不在那张表里，跟 `?quality=` 走
+（`Script_Atmosphere.ATMOSPHERE_TIERS`）—— 它是构造期的靶尺寸，和 MSAA 采样数同一类，
+热切没有意义。
+
+| 档 | 透过率 | 多次散射（方向数×步数） | 天空视图（步数） | 大气透视（步数） |
+|---|---|---|---|---|
+| low | 128×32 | 16×16（4²×12） | 96×54（14） | 16³（6） |
+| medium | 256×64 | 32×32（6²×16） | 128×72（22） | 24³（8） |
+| high | 256×64 | 32×32（8²×20） | 192×108（32） | 32³（10） |
+| ultra | 256×64 | 32×32（8²×24） | 192×108（40） | 32³（14） |
+
+画质面板「大气」组：**物理大气**总闸（关掉 = 旧解析天空）+ **烟霾倍率**
+（乘在每档预设的 Mie 上）。两者任一变了 `ApplyGraphics` 都会重烘 IBL ——
+`scene.environment` 是从天穹烘出来的，天换了 IBL 不换就是「天亮了屋里没亮」。
+
+**关掉总闸要摘两处**：`uAtmoEnabled`（天穹退回解析式）与合成 pass 的
+`uAtmoAerialBlend`（雾色退回美术式）。只摘前一处的话 LUT 不再更新、而合成仍按
+blend 混一张**冻在上一帧**的散射图 —— 表现是「关了开关雾色还跟着走」。
+`AtmospherePass.Prepare` 跑在 `Enabled` 之前，摘干净这件事就写在那里。
+
+### 17.6.1 每帧的账（实测）
+
+1600×900 / high / `?phase=1`，运行时剖析器逐段 A/B/A/B 交替、各 518 帧取均值再取中位数：
+
+| GPU 段 | atmosphere=on | atmosphere=off | Δ |
+|---|---:|---:|---:|
+| **atmosphere** | 0.136 / 0.157 ms | — | **+0.15 ms** |
+| composite | 0.223 | 0.240 | −0.02（噪声；大气透视多两次纹理取样） |
+| 其余各段 | —— | —— | 全部落在 ±0.3 ms 的本底噪声里 |
+
+**这一笔本来是 0.4—1.2 ms**：天空视图 LUT 原来每帧无条件重算，占了 atmosphere 段的
+六成。它只有两个自变量（相机海拔、太阳天顶角），而本作的太阳一关之内不动、相机海拔
+是米级变化（大气标高 8 km）—— 改成脏标记（阈值 2 m / 1e-5）之后正常游玩里它每关只算
+个位数次。大气透视那张是视锥对齐的，必须每帧重算，剩下的 0.15 ms 基本就是它。
+
+透过率与多次散射两张只在 `SkyDome.Apply()` 里算（换关 / 换时段 / 调烟霾倍率）。
+探针页 `gl.finish()` 同步实测（high 档）：`RenderStatic` 0.050 ms、
+`RenderSkyView` 0.033 ms、`RenderAerial` 0.030 ms、`SkyDome.Apply()` 全套 0.220 ms
+（后者含 uniform 装配）。与 PMREM 烘焙（10—20 ms）在同一趟里，感知不到。
+
+**LUT 生成着色器的循环上界是 int uniform 不是常数**，这一条是有意的：常数上界会被驱动
+整段展开，多次散射那一份展开出来是 8×8×24 = 1536 个带纹理取样的循环体，编译一次要
+几百毫秒到几秒 —— 而这一整套正是在**进关那一趟**编的（§16 那笔账）。
+GLSL ES 3.00 允许非常量上界，用它。
+
+### 17.7 已知的近似（都是有意的，别当 bug 修）
+
+- **大气透视 alpha 只存透过率的三通道均值**（Hillaire 的口径）。逐通道透过率要三张图，
+  在本作 3 km 的视距上色差小于半个色阶，不值那份带宽。
+- **froxel 只覆盖到 `aerialFarM`（出厂 4 km）**。更远的地形（`FarLand` 铺到 2.9 km）
+  在范围内；再远就钳在最后一片。
+- **天空视图 LUT 不含战场霾**。霾只进大气透视 LUT（那是"穿过霾看地物"），
+  天上那层由美术烟尘带负责。两处都放就是双份灰。
+- **多次散射只保留各向同性项**（Hillaire 的核心近似）。二阶以上的相函数信息丢掉了，
+  换来的是一张 32×32 的表就能让黄昏地平线不死黑、阴天"越厚越均匀地亮"。
+- **`rayleigh` / `groundAlbedo` 是拟合出来的形状参数**，不是这颗星球的真实值（见 17.5）。
+- **消光出厂仍归美术雾**（17.4）。物理接管消光的那条路实装了、可切换、有测试，
+  但不出厂 —— 那是一次要用户拍板的画面变化。
+- **相机高度只影响天空视图 LUT**，大气透视 froxel 逐格按世界 Y 取密度（那一条是准的）。
+- **水面的反射底色仍走美术 uniform**（`Script_Water` 借的是 `uZenith/uHorizon/uGround`
+  那三个，不是天空视图 LUT）。护城河与荆河在画面里都只占很小一块，而接过去要在水面
+  着色器里再编一份 LUT 采样；留作后续。
+- **粒子层的雾仍是解析雾**（`Script_Vfx.SetFog(preset.fog, ...)`）。出厂档消光本来就归
+  美术雾，两边一致；等哪天 `aerialMode` 翻成 1，粒子层要跟着换成 `AerialPerspectiveUv`。
+
+### 17.8 调试视图
+
+Debug Rendering 浮窗新增「大气」组六项（`Script_EditorDebugRendering.VIEWS`）：
+
+| 视图 | 看什么 |
+|---|---|
+| 透过率 LUT | 天顶方向（左上）接近白、掠地平线（右下）明显偏红 —— 瑞利 λ⁻⁴ 的直接证据 |
+| 多次散射 LUT | 横轴太阳天顶余弦、纵轴海拔。阴天与黄昏地平线不死黑靠它 |
+| 天空视图 LUT | 相机高度处的整片天。地平线两侧各加密一次，所以中间那条横线是地平线 |
+| 大气透视 LUT | froxel 图集，越靠右越远 |
+| 大气透视 散射 | **屏幕空间**：拿预通道重建世界坐标再问一次 `AerialPerspective()` |
+| 大气透视 透过率 | 同上，深蓝 = 全通（近处），暖黄 = 被吃光（远处）。**贴脸出现暖黄就是 froxel 切片对错位了** |
+
+后两张与合成 pass 问的是同一个函数、同一批 uniform —— 它们能证明 froxel 真的对上了像素。
+
+### 17.9 怎么验
+
+```bash
+node Taierzhuang1938/Script_AtmosphereTest.mjs            # 四张 LUT + 十档标定 + 能见度闸
+node Taierzhuang1938/Script_AtmosphereTest.mjs --shot     # 再出 14 张 A/B 对照图
+node Taierzhuang1938/Script_AtmosphereCalibrate.mjs       # 重标定（不改源码，只打表）
+node Taierzhuang1938/Script_GiTest.mjs                    # 漏空射线仍问同一片天
+node Taierzhuang1938/Script_TestSceneLightingTest.mjs --scenes   # 灰卡基线
+node Taierzhuang1938/Script_PostFrameGraphTest.mjs        # 帧图顺序（atmosphere 排第一）
+```
+
+`Script_AtmosphereTest` 的三个阈值分别在守什么，写在那个文件的抬头 —— 改阈值之前先读它。
