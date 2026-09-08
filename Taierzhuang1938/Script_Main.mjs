@@ -83,6 +83,7 @@ import { Viewmodel } from "./Script_Viewmodel.mjs";
 import { FirstPersonSelfShadow } from "./Script_FirstPersonSelfShadow.mjs";
 import { VfxSystem } from "./Script_Vfx.mjs";
 import { AudioEngine } from "./Script_Audio.mjs";
+import { AudioWiring, WeaponClassOf } from "./Script_AudioWiring.mjs";
 import { Hud, ContextualActionPrompts, CrosshairGeometry } from "./Script_Hud.mjs";
 import { StoryDirector, CHAPTER_RELEASE_SIGNAL } from "./Script_Story.mjs";
 import { CutsceneDirector } from "./Script_Cutscene.mjs";
@@ -603,6 +604,22 @@ const hud = new Hud(hudRoot);
 const audio = new AudioEngine({ enabled: AUDIO_ENABLED });
 audio.allowAutonomousBark = () => AllowAutonomousBark(PHASE_TABLE[state.phaseIndex],
   (signal) => story?.Signalled(signal) || false);
+/**
+ * 音频接线层（Script_AudioWiring）：把已经存在的声音接到真正发生的事情上。
+ *
+ * 用**取值器**接进去而不是拷引用：battlefield / player / vfx / ai 都随换关重建，
+ * 拷一份出来的话换一次关这一层就整体哑了（而且是静默的 —— 没有任何报错）。
+ * 引擎侧的 SetProbes 与这一批并行推进，所以调用一律判空：探针接不上时
+ * 混响仍按 AMBIENCE_PRESETS 的固定 space 走，只是没有逐位置的空间档。
+ */
+const audioWiring = new AudioWiring({
+  audio,
+  get battlefield() { return battlefield; },
+  get player() { return player; },
+  get vfx() { return vfx; },
+  get ai() { return ai; },
+});
+audio.SetProbes?.(audioWiring.Probes());
 
 const state = {
   ready: false,
@@ -1216,7 +1233,7 @@ async function Boot() {
   destruction = new DestructionSystem(scene, library, destructionUniforms, { vfx, audio });
   destruction.SetWorld(battlefield, physics, navGrid);
   ai = new AiDirector({
-    battlefield, actorFactory, scene, vfx, audio, player, nav, physics, destruction,
+    battlefield, actorFactory, scene, vfx, audio, player, nav, physics, destruction, audioWiring,
     onActorSpawn: (soldier) => {
       if(PHASE_TABLE[state.phaseIndex]?.whitebox?.p012)InstallP012ActorMotion(soldier);
     },
@@ -1474,6 +1491,7 @@ async function Boot() {
   });
   combat = new CombatSystem({
     battlefield, ai, vfx, audio, lights, player, library, scene, story, physics, destruction, grenadeAsset,
+    audioWiring,
     // 玩家自己的手榴弹/集束/呼来的迫击炮炸中人时的回执（见 ConfirmHit）。
     // 一次爆炸只回一条，Combat.Blast 那边已经并好了。
     onPlayerHit: (died) => ConfirmHit(died),
@@ -1861,6 +1879,9 @@ async function Boot() {
     materialShading: shadingUniforms, RecompileAllMaterials,
     get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, actorBatch, input,
+    // 音频接线层：取证走 Debug.AudioZone，专项冒烟要直接摸缓存与限速器
+    // （Script_AudioWiringTest 换探针世界之前必须先把 1 m 网格缓存清掉）。
+    audioWiring,
     get meleeCombat() { return meleeCombat; },
     story, combat, destruction, interact, carry, emplacement, wheel, strafe, flare, telegraph,
     companion, checkpoint, setpieces,
@@ -2268,6 +2289,16 @@ async function Boot() {
        *   SetCombatBed  —— 交火声床的整层淡入淡出归音频批（INT3）。
        */
       Setpieces: () => (setpieces ? setpieces.State() : null),
+      /**
+       * 音频空间取证：玩家当前空间档（interior / courtyard / street / open）、
+       * 六米内数到几面墙、到最近几个兵的遮挡值（1 = 挡住）。
+       *
+       * 「隔着一堵墙为什么还这么亮」「屋里怎么没有室内混响」这类问题，
+       * 只有把两条探针的**实际返回值**摆出来才答得了 —— 光听分不出
+       * 「探针没接上」与「探针接上了但判错了」。
+       * `probesInstalled:false` = 引擎侧的 SetProbes 还没合进来（判空生效中）。
+       */
+      AudioZone: (limit) => audioWiring.Report(limit),
       P012: () => missionRuntime?.State() || p012Flow?.State() || null,
       FirstLevelMission: () => missionRuntime?.State() || null,
       // 性能取证与专项测试直接读运行时对象（敌人表、事实、列队）；不是玩法入口。
@@ -3177,9 +3208,14 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     ai.ctx.battlefield = battlefield;
     ai.ctx.physics = physics;
     ai.ctx.nav = navGrid;
+    ai.ctx.audioWiring = audioWiring;
     ai.insideWalls = levelBounds;
     combat.host.battlefield = battlefield;
     combat.host.physics = physics;
+    combat.host.audioWiring = audioWiring;
+    // 探针缓存里存的是**上一张地图的墙**，火焰点声源挂的是上一关的烟源。
+    // 不清的话换关之后头几百毫秒的遮挡判断全是错的，而且四条火声会一直挂着。
+    audioWiring.Reset();
     player.AttachPhysics(physics);
     player.world = {
       colliders: battlefield.colliders,
@@ -6115,8 +6151,7 @@ function CallMortar() {
 // ---------------------------------------------------------------------------
 // 开火
 // ---------------------------------------------------------------------------
-let lastFootstepAt = 0;
-let lastLandSerial = 0;
+// 脚步与落地的边沿状态搬进 Script_AudioWiring（那里还要按脚下材质挑 cue）。
 let fireCooldown = 0;
 let fireEdge = false;                 // 这一帧是不是"刚按下"（单发模式与投掷物槽要用）
 const _muzzle = new THREE.Vector3();
@@ -6246,6 +6281,18 @@ function BulletNearMissBlocked(from,to){
   const hit=battlefield.Raycast(_suppressionFrom,_suppressionDir.multiplyScalar(1/distance),distance,TERRAIN_RAY);
   return !!hit&&hit.t<distance-.01;
 }
+/**
+ * 一次 March 的近失弹结算：压制照旧，另外给**玩家**播一条弹啸。
+ *
+ * 只给玩家播：AI 之间的近失弹是压制规则的输入，不是听者听得见的事 ——
+ * 满场三十个兵互相打，每一发都播的话一秒钟几十条 crack，而且全都不该存在。
+ * 限速（同帧 2 条、100 ms 3 条）与遮挡判据都在 Script_AudioWiring 里，
+ * 与压制走的是**同一个 Blocked** —— 子弹没到那儿，就既不压制也不响。
+ */
+function ResolveNearMisses(nearMisses, directHit=null) {
+  ApplyBulletNearMisses(nearMisses,BulletNearMissBlocked,directHit);
+  audioWiring.BulletNearMissesForPlayer(nearMisses,BulletNearMissBlocked);
+}
 function MarchBullet(from, dir, weapon, targets, sourceCollider=null) {
   const nearMisses=new Map();
   const muzzle = AMMO[weapon.ammo]?.muzzle || 700;
@@ -6299,19 +6346,19 @@ function MarchBullet(from, dir, weapon, targets, sourceCollider=null) {
     const solidDistance=Math.min(segLen,bestSoldier?bestT:Infinity,wallHit?.t??Infinity);
     CollectBulletNearMisses(_bulletPos,_segDir,solidDistance,targets,nearMisses);
     if (bestSoldier && (!wallHit || bestT < wallHit.t)) {
-      ApplyBulletNearMisses(nearMisses,BulletNearMissBlocked,bestSoldier);
+      ResolveNearMisses(nearMisses,bestSoldier);
       _hitPoint.copy(_bulletPos).addScaledVector(_segDir, bestT);
       return { soldier: bestSoldier, part: bestPart, dist: travelled + bestT, dir: _segDir };
     }
     if (wallHit) {
-      ApplyBulletNearMisses(nearMisses,BulletNearMissBlocked);
+      ResolveNearMisses(nearMisses);
       _hitPoint.copy(_bulletPos).addScaledVector(_segDir, wallHit.t);
       return { wall: wallHit, dist: travelled + wallHit.t, dir: _segDir };
     }
     _bulletPos.addScaledVector(_segDir, segLen);
     travelled += segLen;
   }
-  ApplyBulletNearMisses(nearMisses,BulletNearMissBlocked);
+  ResolveNearMisses(nearMisses);
   _hitPoint.copy(_bulletPos);
   return { dist: travelled, dir: _segDir };
 }
@@ -6433,10 +6480,22 @@ function TryFire(dt, returningGrenade = false) {
     ? aimAtTrigger : player.AimDirection(_aimDir).clone();
 
   viewmodel.MuzzleWorld(_muzzle);
-  audio.Play(currentWeapon === "Zb26" ? "zb26" : "rifleNra",
-    // priority：与几十个 AI 共用同一个 22 ms 去重窗口时，玩家自己的枪声实测丢 8.3%。
-    // 别的都可以丢，自己扣的扳机不许没声。
-    { position: _muzzle.clone(), priority: true });
+  // 玩家自己那一枪走**分层**：枪口那一下由 PlayGunshot 决定近/远与枪尾
+  //（firstPerson 让引擎跳过距离衰减那一整套，weaponClass 决定挑哪条尾巴）。
+  // 引擎侧那批还没合进来时 PlayGunshot 不认识这些字段也无所谓 ——
+  // 它会原样落回 Play()，行为与改之前一模一样；连 PlayGunshot 都没有才退回 Play。
+  // priority：与几十个 AI 共用同一个 22 ms 去重窗口时，玩家自己的枪声实测丢 8.3%。
+  // 别的都可以丢，自己扣的扳机不许没声。
+  const playerGunCue = currentWeapon === "Zb26" ? "zb26" : "rifleNra";
+  const playerGunOpts = {
+    position: _muzzle.clone(), priority: true,
+    firstPerson: true, weaponClass: WeaponClassOf(currentWeapon),
+  };
+  if (audio.PlayGunshot) audio.PlayGunshot(playerGunCue, playerGunOpts);
+  else audio.Play(playerGunCue, playerGunOpts);
+  // 开枪压环境：短暂让环境床退一半。不压的话枪声是"贴在一片底噪上面"的，
+  // 压一下才"炸得开" —— 这是全套枪感里最便宜也最明显的一条。数在 Data_Tuning_Audio。
+  audioWiring.GunDuck();
   // 枪感方子 1：**每发之后的自动拉栓要有声音。**
   // bolt 那条配方 19 节点三段式做得极好，而全仓库只有空扣扳机与架两脚架会播它 ——
   // 打完一发之后一声不响。这条听觉信息通道原来整个关着：玩家既听不出自己
@@ -6540,6 +6599,9 @@ function TryFire(dt, returningGrenade = false) {
     const surface = SURFACE_BY_TAG[shot.wall.box.tag] || "brick";
     vfx.Impact(_hitPoint, n, surface);
     audio.Play(IMPACT_CUE[surface] || "impactBrick", { position: _hitPoint.clone(), volume: 0.55 });
+    // 跳弹：打在硬面上四分之一的概率削飞出去。种子跟着射击序号走（不是 Math.random）——
+    // 逐轮录音比对要可复现，与曳光按 playerShots 取模是同一条理由。
+    audioWiring.Ricochet(_hitPoint, surface, state.playerShots);
     // 子弹不再只留贴花：同一位置持续受击会按砖／木／土耐久形成真实破口。
     // 解析地表的虚拟记录不在破坏层里（它没有可替换的 Rapier 盒）。
     if (destruction && shot.wall.box && shot.wall.box.tag !== "dirt") {
@@ -6577,7 +6639,9 @@ const EMPLACED_CONVERGE_M = 160;
 
 function FireVehicleBullet(from,direction,{weaponId="Type11",damageScale=1,sourceCollider=null}={}) {
   const boxes=PlayerHitboxes(player.position,player.yaw,player.stance,[],player.LeanOffsetM);
-  const playerTarget={alive:player.Alive,position:player.position,preciseHitboxes:true,
+  // isPlayer：给近失弹那条链认人用（Script_AudioWiring.BulletNearMissesForPlayer）。
+  // 玩家在弹道链上从来不是本人，而是这个临时代理，所以标记只能挂在这儿。
+  const playerTarget={alive:player.Alive,position:player.position,preciseHitboxes:true,isPlayer:true,
     stance:player.stance==="prone"?2:player.stance==="crouch"?1:0,
     get suppression(){return player.suppression;},
     set suppression(value){player.Suppress(Math.max(0,value-player.suppression));},
@@ -6636,6 +6700,7 @@ function FireEmplacedShot(shot) {
     const surface = SURFACE_BY_TAG[result.wall.box.tag] || "brick";
     vfx.Impact(_hitPoint, n, surface);
     audio.Play(IMPACT_CUE[surface] || "impactBrick", { position: _hitPoint.clone(), volume: 0.5 });
+    audioWiring.Ricochet(_hitPoint, surface, shot.index);
     if (destruction && result.wall.box && result.wall.box.tag !== "dirt") {
       destruction.Hit(result.wall.box, _hitPoint, shot.damage, { kind: "bullet", normal: n });
     }
@@ -7007,26 +7072,16 @@ function Frame(dt, render = true) {
   input.lookX = 0; input.lookY = 0;
   input.crouchPressed = false; input.pronePressed = false; input.stanceRequested = null;
 
-  // 落地是一次边沿事件，不能拿 grounded 每帧播。轻跳只给靴底闷响，
-  // 高处跌落才叠 bodyFall；声音强度读实际下落速度折出的 impact。
-  if (player.jump.landSerial !== lastLandSerial) {
-    lastLandSerial = player.jump.landSerial;
-    const impact = player.jump.landImpact;
-    audio.Play("footstepRubble", { volume: 0.42 + impact * 0.38 });
-    if (impact > 0.55) audio.Play("bodyFall", { volume: 0.22 + impact * 0.35 });
-  }
-
-  // 脚步。Script_Audio 里 footstepDirt / footstepRubble 一直没有任何地方调用过。
-  // 快速匍匐那条"更快也更响"的取舍没有脚步声就不存在 —— 玩家听不见自己变响了。
-  if (player.Alive && player.grounded && player.stepDistance - lastFootstepAt > 1.0) {
-    const stride = player.stance === "prone" ? 1.0 : (player.sprint > 0.5 ? 2.4 : 1.9);
-    if (player.stepDistance - lastFootstepAt > stride) {
-      lastFootstepAt = player.stepDistance;
-      audio.Play(state.frame % 3 === 0 ? "footstepRubble" : "footstepDirt", {
-        volume: (player.stance === "prone" ? 0.22 : 0.45) * (player.fastCrawl ? 1.8 : 1),
-      });
-    }
-  }
+  // 脚步、落地、身体 foley 全部交给 Script_AudioWiring。
+  //
+  // 【2026-09-08】原来这里是两段写死的逻辑，各有一处硬伤：
+  //   · 落地固定播 footstepRubble + bodyFall —— bodyFall 是**一个人倒下**
+  //     （装具散开、四肢先后落地），于是每次跳窗台都像旁边有人被打死；
+  //   · 脚步按 `state.frame % 3` 在瓦砾与土路之间轮 —— 听感是「每走三步换一次地面」，
+  //     而脚底下到底是什么从来没有人问过。
+  // 现在按脚下真实材质查（射线拿碰撞盒 tag + 水深），姿态与冲刺分别给音量与步距，
+  // 姿态切换/翻越出布料声、冲刺出装具声、跑久了或伤重出喘息。
+  audioWiring.Update(dt, state.frame, SURFACE_BY_TAG);
 
   // 情境操作提示：每六帧扫一次。F 查询会遍历全场士兵，0.1 s 一次已经足够跟手；
   // 同一轮也重算换枪与包扎条件，保证 HUD 不会提示一个实际做不了的动作。

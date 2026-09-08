@@ -351,6 +351,19 @@ export class CombatSystem {
       OnImpact: (point) => { options.OnImpact?.(point); this.host.story?.Signal("shelling"); } });
     if (this.host.vfx) this.host.vfx.IncomingMarker(at, flight, { radius: spec.radius });
     if (this.host.audio) {
+      // 【2026-09-08】`launcherPop` 这条配方从来没有被播过 —— 掷弹筒是**先响后到**的：
+      // 那一记闷响就在几十米外的院墙后头，接着才是 3.2 秒飞行与落点啸声。
+      // 少了它，玩家听到的是「凭空来的一发炮弹」，而不是「有人在那边打我」；
+      // 「原地不动就是靶子」这条规则也就失去了唯一的预警。
+      // 位置给发射点而不是落点：这一声的全部价值就是告诉你**它从哪儿来**。
+      // 但 `from` 是**画弹道用的**假起点（120 m 外、24 m 高），高度不能照抄 ——
+      // 掷弹筒是抵着地打的，一个从二十四米高空传来的发射声会把方位读成「天上」。
+      // 取同一个方位、把 y 落回地面。
+      if (kind !== "artillery") {
+        const pop = from.clone();
+        pop.y = this.host.battlefield.GroundHeight(pop.x, pop.z) + 0.6;
+        this.host.audio.Play("launcherPop", { position: pop, volume: 0.9 });
+      }
       this.host.audio.Play("shellIncoming", { position: at.clone(),
         volume: kind === "artillery" ? INDIRECT.artilleryAudioVolume : INDIRECT.launcherAudioVolume });
     }
@@ -403,6 +416,11 @@ export class CombatSystem {
         physics.ClampToGround(p.body, dt);
         const t = p.body.translation();
         p.position.set(t.x, t.y, t.z);
+        // 弹跳与滚动的声音。刚体不发接触事件，所以按速度的突变判 ——
+        // 判据与限频都在 Script_AudioWiring.GrenadeContact（数在 Data_Tuning_Audio）。
+        // 这一层原来一声都没有：玩家看得见弹在滚，听不见它在哪儿，
+        // 于是「有一枚落在我脚边」这件事只能靠眼睛，而那时候你多半正在看别处。
+        this.host.audioWiring?.GrenadeContact(p, dt);
         const q = p.body.rotation();
         if (p.mesh) {
           p.mesh.position.copy(p.position);
@@ -436,6 +454,8 @@ export class CombatSystem {
           p.spin += dt * GRENADE_BODY.fallbackSpinRadPerS;
           p.mesh.rotation.set(p.spin, p.spin * 0.7, 0);
         }
+        // 无物理兜底那条路也要有声音：它在编辑器切片重建的空档里是唯一在跑的一条。
+        this.host.audioWiring?.GrenadeContact(p, dt);
       }
       if (p.fuse <= 0) {
         p.alive = false;
@@ -517,17 +537,6 @@ export class CombatSystem {
   Blast(position, radius, damage, kind, hurtSide = null, byPlayer = false, onHit = null, explosiveId = kind) {
     this.host.onBlast?.({position:position.clone(),radius,damage,kind,hurtSide,byPlayer,explosiveId});
     if (this.host.vfx) this.host.vfx.Explosion(position, { radius, kind });
-    if (this.host.audio) {
-      // 近/远两条**不同的录音**（城区爆炸 vs 远处爆炸），按**听者的距离**挑，
-      // 不按爆炸半径挑 —— 原来那行是 `radius > 8 ? "explosionNear" : "explosionNear"`，
-      // 三元的两边一模一样，于是两百米外的一颗手榴弹也拿贴脸那条 2.4 秒的城区爆炸播。
-      const audio = this.host.audio;
-      const L = audio.listenerPos || { x: 0, y: 0, z: 0 };
-      const d = Math.hypot(position.x - L.x, position.y - L.y, position.z - L.z);
-      audio.Play(d > BLAST.nearAudioM ? "explosionFar" : "explosionNear",
-        { position: position.clone(),
-          volume: Clamp(radius / BLAST.audioVolumeRadiusDiv, BLAST.audioVolumeMin, BLAST.audioVolumeMax) });
-    }
     // 先改场景拓扑、再算人物遮挡：爆压把墙打穿的同一瞬间，洞口后面的人应该吃到
     // 剩余冲击，而不是等下一颗弹。Destruction.Blast 内部会把同一次爆炸批量提交，
     // 空间散列与导航只重建一次。
@@ -543,13 +552,34 @@ export class CombatSystem {
     // 震屏：与伤害判定分开算 —— 震感传得比弹片远（Script_CameraShake 按 reachScale 外推），
     // 隔着墙也感觉得到，只是打折。伤害那一支仍然是「有墙挡着 = 完全免伤」。
     const shaken = this.host.player;
-    if (shaken && shaken.Alive && shaken.shake) {
+    // 遮挡只算一次，震屏与音频共用。
+    //
+    // 【2026-09-08】音频这一支原来算在**破坏结算之前**，而且根本没有遮挡这一项：
+    // 隔着一堵墙的爆炸与炸在脸上的是同一条声音，只是距离衰减小一点。
+    // 现在挪到这儿有两个作用：拿到同一个 occluded（判据与震屏完全一致，
+    // 不会出现「震得到听不到」这种自相矛盾），以及**先改场景拓扑再算遮挡** ——
+    // 爆压把墙打穿的同一瞬间，洞口后面的人应该听到没被削过的那一声。
+    let blastOccluded = false;
+    if (shaken && shaken.Alive) {
       const eye = this.tmp.set(shaken.position.x, shaken.position.y + BLAST.playerHitRiseM, shaken.position.z);
       const toEye = this.tmpB.subVectors(eye, from);
       const eyeDist = toEye.length();
       toEye.divideScalar(eyeDist || 1);
       const wall = eyeDist > BLAST.wallMarginM ? bf.Raycast(from, toEye, eyeDist, {terrain:true}) : null;
-      shaken.shake.Explosion(eyeDist, radius * BLAST.radiusScale, !!(wall && wall.t < eyeDist - BLAST.wallMarginM));
+      blastOccluded = !!(wall && wall.t < eyeDist - BLAST.wallMarginM);
+      if (shaken.shake) shaken.shake.Explosion(eyeDist, radius * BLAST.radiusScale, blastOccluded);
+    }
+    // 三档（near < 40 / mid 40—120 / far）+ 近炸后的落屑 + 十二米内的耳鸣，
+    // 全在 Script_AudioWiring.Blast 里；这里只负责把「炸在哪、多大、挡没挡住」交出去。
+    // 接线层缺席时（编辑器裸跑规则层）退回原来那条两档判断，一声不少。
+    if (this.host.audioWiring) this.host.audioWiring.Blast(position, radius, blastOccluded);
+    else if (this.host.audio) {
+      const audio = this.host.audio;
+      const L = audio.listenerPos || { x: 0, y: 0, z: 0 };
+      const d = Math.hypot(position.x - L.x, position.y - L.y, position.z - L.z);
+      audio.Play(d > BLAST.nearAudioM ? "explosionFar" : "explosionNear",
+        { position: position.clone(),
+          volume: Clamp(radius / BLAST.audioVolumeRadiusDiv, BLAST.audioVolumeMin, BLAST.audioVolumeMax) });
     }
 
     const affect = (targetPos, apply) => {

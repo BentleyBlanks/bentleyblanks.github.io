@@ -1207,6 +1207,10 @@ export class AiDirector {
         if (this.ctx.audio) {
           this.ctx.audio.Bark("ammo", { position: s.position.clone(), seed: s.id | 0, side: s.side });
         }
+        // 换弹的**手上动作**：固定弹仓压桥夹 / 捷克式换弹匣。喊话是意图，
+        // 这一声是事实 —— 喊话有 0.55 s 全局闸与 4.5 s 同类闸，十有八九被吃掉，
+        // 于是「他在换弹」这条战术信息一直只有字幕没有声音。
+        this.ctx.audioWiring?.AiReload(s, s.weapon.kind);
       }
     } else if (s.target && bestDist < engageRange + (wasEngaged ? ENGAGE.hysteresisM : 0)) {
       // 六人组内不再人人同一种打法：突击位先压、侧翼位次之，步枪位只在贴脸时冲，
@@ -1972,6 +1976,7 @@ export class AiDirector {
     if (!body) {
       const bf = this.ctx.battlefield;
       const cap = s.childCapsules?.[s.stance] || s.childCapsules?.[0];
+      this.ctx.audioWiring?.AiStep(s, dx, dz);
       if (!this.Blocked(s.position.x + dx, s.position.z, s.position.y, cap)) s.position.x += dx;
       if (!this.Blocked(s.position.x, s.position.z + dz, s.position.y, cap)) s.position.z += dz;
       s.position.y = bf.StandHeight(s.position.x, s.position.z, s.position.y);
@@ -1980,6 +1985,7 @@ export class AiDirector {
     // 有人绕过物理直接改了 position（撒兵、剧本摆位、冒烟脚本摆人）就认外面那份。
     // 不对账的话表现很怪：把人挪到某处，下一帧他自己"弹"回胶囊所在的老位置 ——
     // 通关冒烟里「圈里留一个敌人」那一条就是这么失效的（人被弹回去，圈里没人了）。
+    this.ctx.audioWiring?.AiStep(s, dx, dz);
     body.ReconcileTo(s.position.x, s.position.y, s.position.z);
     const capsules = s.childCapsules || CAPSULE;
     const cap = capsules[s.stance] || capsules[0];
@@ -2024,7 +2030,10 @@ export class AiDirector {
       return;
     }
     if (s.ammo <= 0) {
-      if (s.state !== STATE.RELOAD) s.reloadTimer = s.weapon.reloadTimeS || 3.2;
+      if (s.state !== STATE.RELOAD) {
+        s.reloadTimer = s.weapon.reloadTimeS || 3.2;
+        this.ctx.audioWiring?.AiReload(s, s.weapon.kind);
+      }
       s.state = STATE.RELOAD;
     } else s.state = s.target ? STATE.FIRE : STATE.IDLE;
   }
@@ -2156,6 +2165,11 @@ export class AiDirector {
       // 步枪走两层交叉淡入，机枪没有远场素材、内部自动落回 Play()。
       audio.PlayGunshot(name, { position: from.clone(), volume: 1 });
     }
+    // 每发之后的拉栓。玩家自己那一支早就有了（Script_Main.TryFire），
+    // 而**满场几十个兵一条 foley 都没有** —— 于是敌人开枪只是一记枪声，
+    // 听不出他是栓动还是自动、也听不出他打完了这一发正在低头拉栓。
+    // 只有栓动才有：捷克式、歪把子、九二式自己上膛。
+    this.ctx.audioWiring?.AiBolt(s, s.weapon.kind === "boltRifle");
 
     if (hit) {
       if (toPlayer) {
@@ -2176,6 +2190,14 @@ export class AiDirector {
       if (s.target.isPlayer && player) {
         const miss = 0.4 + s.rnd() * 1.4;
         if (miss < COMBAT.suppressRadius) player.Suppress(COMBAT.suppressPerNearMiss * (1 - miss / COMBAT.suppressRadius) * 3);
+        // **打偏的这一发要听得见。**
+        //
+        // 这条链上没有真实弹道（AI 打人是概率判定，见上面 acc 那一段），
+        // 所以近失点是照 miss 距离在瞄点旁边摆出来的：方向取瞄准方向的水平法线，
+        // 高度略高于瞄点 —— 「从头边过去」正是这一发该有的位置。
+        // 挡住就不播：子弹根本没到那儿，而 targetVisible 只保证开枪那一刻能看见，
+        // 弹道上后来挡进来的东西（塌下来的墙、走过去的人）它管不着。
+        this.ctx.audioWiring?.AiNearMissAtPlayer(s, from, dir, to, miss);
       } else if (s.target.ref) {
         s.target.ref.suppression = Clamp01(s.target.ref.suppression + COMBAT.suppressPerNearMiss);
       }
