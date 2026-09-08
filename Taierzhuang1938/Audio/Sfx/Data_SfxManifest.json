@@ -25,74 +25,90 @@
   "cues": {
     "rifleNra": {
       "files": [
-        "AudioSfx_RifleNra_01.mp3"
+        "AudioSfx_RifleNra_01.mp3",
+        "AudioSfx_RifleNra_02.mp3",
+        "AudioSfx_RifleNra_03.mp3",
+        "AudioSfx_RifleNra_04.mp3"
       ],
       "seconds": 1.3,
-      "credit": "Watson Wu · 毛瑟 8 mm 中距离实录 · Sonniss Game Audio Monthly #3",
+      "credit": "Watson Wu · 毛瑟 8 mm 中距离实录 · Sonniss Game Audio Monthly #3 ／ Pole Position Production · K98k 7.92×57 连续实录（同一支枪的另外三发）· Sonniss GDC 2020",
       "license": "sonniss"
     },
     "rifleNraFar": {
       "files": [
-        "AudioSfx_RifleNraFar_01.mp3"
+        "AudioSfx_RifleNraFar_01.mp3",
+        "AudioSfx_RifleNraFar_02.mp3",
+        "AudioSfx_RifleNraFar_03.mp3"
       ],
       "seconds": 1.8,
-      "credit": "FLYSOUND · 莫辛纳甘长距离混录 · Sonniss GDC 2020",
+      "credit": "FLYSOUND · 莫辛纳甘长距离混录 · Sonniss GDC 2020 ／ FLYSOUND · 莫辛纳甘 50 m 外（同一次拍摄的连续十发）· Sonniss GDC 2020",
       "license": "sonniss"
     },
     "rifleIja": {
       "files": [
-        "AudioSfx_RifleIja_01.mp3"
+        "AudioSfx_RifleIja_01.mp3",
+        "AudioSfx_RifleIja_02.mp3",
+        "AudioSfx_RifleIja_03.mp3",
+        "AudioSfx_RifleIja_04.mp3"
       ],
       "seconds": 1.045,
-      "credit": "Watson Wu · M1 Garand .30-06 近射 · Sonniss Game Audio Monthly #3",
+      "credit": "Watson Wu · M1 Garand .30-06 近射 · Sonniss Game Audio Monthly #3 ／ Pole Position Production · 斯普林菲尔德 M1903A3 .30-06 连续实录 · Sonniss GDC 2020",
       "license": "sonniss"
     },
     "rifleIjaFar": {
       "files": [
-        "AudioSfx_RifleIjaFar_01.mp3"
+        "AudioSfx_RifleIjaFar_01.mp3",
+        "AudioSfx_RifleIjaFar_02.mp3",
+        "AudioSfx_RifleIjaFar_03.mp3"
       ],
       "seconds": 1.389,
-      "credit": "Pole Position Production · BAR .30cal 300 m 正面 · Sonniss GDC 2016",
+      "credit": "Pole Position Production · BAR .30cal 300 m 正面 · Sonniss GDC 2016 ／ Pole Position Production · 50 m 外、经建筑反射的步枪射击 · Sonniss GDC 2018",
       "license": "sonniss"
     },
     "zb26": {
       "files": [
-        "AudioSfx_Zb26_01.mp3"
+        "AudioSfx_Zb26_01.mp3",
+        "AudioSfx_Zb26_02.mp3"
       ],
       "seconds": 0.9,
-      "credit": "Pole Position Production · L7A2 GPMG 7.62×51 单发 · Sonniss GDC 2016",
+      "credit": "Pole Position Production · L7A2 GPMG 7.62×51 单发 · Sonniss GDC 2016 ／ Pole Position Production · Enfield L86 LSW（弹匣供弹轻机，1 m）· Sonniss GDC 2016",
       "license": "sonniss"
     },
     "type11": {
       "files": [
-        "AudioSfx_Type11_01.mp3"
+        "AudioSfx_Type11_01.mp3",
+        "AudioSfx_Type11_02.mp3"
       ],
       "seconds": 0.696,
-      "credit": "Pole Position Production · BAR .30cal 近场 · Sonniss GDC 2016",
+      "credit": "Pole Position Production · BAR .30cal 近场 · Sonniss GDC 2016 ／ Pole Position Production · BAR .30cal 近场（同一次双发的第二发）· Sonniss GDC 2016",
       "license": "sonniss"
     },
     "type92": {
       "files": [
-        "AudioSfx_Type92_01.mp3"
+        "AudioSfx_Type92_01.mp3",
+        "AudioSfx_Type92_02.mp3",
+        "AudioSfx_Type92_03.mp3"
       ],
       "seconds": 1.165,
-      "credit": "Pole Position Production · M1919A4 .30cal 200 m 侧后 · Sonniss GDC 2016",
+      "credit": "Pole Position Production · M1919A4 .30cal 200 m 侧后 · Sonniss GDC 2016 ／ Pole Position Production · M1919A4 .30cal（5 m 侧后）· Sonniss GDC 2016 ／ Pole Position Production · M1919A4 .30cal（枪架，1 m 左）· Sonniss GDC 2016",
       "license": "sonniss"
     },
     "bolt": {
       "files": [
-        "AudioSfx_Bolt_01.mp3"
+        "AudioSfx_Bolt_01.mp3",
+        "AudioSfx_Bolt_02.mp3"
       ],
       "seconds": 1.25,
-      "credit": "Pole Position Production · M1903A3 拉栓 · Sonniss GDC 2020",
+      "credit": "Pole Position Production · M1903A3 拉栓 · Sonniss GDC 2020 ／ Pole Position Production · 莫辛纳甘 M38 拉栓 · Sonniss GDC 2020",
       "license": "sonniss"
     },
     "stripperLoad": {
       "files": [
-        "AudioSfx_StripperLoad_01.mp3"
+        "AudioSfx_StripperLoad_01.mp3",
+        "AudioSfx_StripperLoad_02.mp3"
       ],
       "seconds": 1.1,
-      "credit": "Pole Position Production · K98k 操作音 · Sonniss GDC 2020",
+      "credit": "Pole Position Production · K98k 操作音 · Sonniss GDC 2020 ／ Pole Position Production · K98k 操作音（同一条素材的另一个动作）· Sonniss GDC 2020",
       "license": "sonniss"
     },
     "magIn": {
@@ -131,10 +147,12 @@
     },
     "explosionFar": {
       "files": [
-        "AudioSfx_ExplosionFar_01.mp3"
+        "AudioSfx_ExplosionFar_01.mp3",
+        "AudioSfx_ExplosionFar_02.mp3",
+        "AudioSfx_ExplosionFar_03.mp3"
       ],
       "seconds": 2.6,
-      "credit": "Gamemaster Audio · 远处爆炸 · Sonniss GDC 2017",
+      "credit": "Gamemaster Audio · 远处爆炸 · Sonniss GDC 2017 ／ Bluezone Corporation · 榴弹炮射击与远处的落点 · Sonniss Game Audio Monthly #1 ／ Pole Position Production · 远处的火炮 · Sonniss GDC 2017",
       "license": "sonniss"
     },
     "shellIncoming": {
@@ -233,10 +251,12 @@
     "footstepDirt": {
       "files": [
         "AudioSfx_FootstepDirt_01.mp3",
-        "AudioSfx_FootstepDirt_02.mp3"
+        "AudioSfx_FootstepDirt_02.mp3",
+        "AudioSfx_FootstepDirt_03.mp3",
+        "AudioSfx_FootstepDirt_04.mp3"
       ],
       "seconds": 0.4,
-      "credit": "PMSFX · 土路单步 · Sonniss GDC 2019 ／ PMSFX · 土路单步 · Sonniss GDC 2019",
+      "credit": "PMSFX · 土路单步 · Sonniss GDC 2019 ／ PMSFX · 土路单步 · Sonniss GDC 2019 ／ PMSFX · 土路连续行走 · Sonniss GDC 2019",
       "license": "sonniss"
     },
     "footstepRubble": {
@@ -493,13 +513,258 @@
       "license": "sonniss"
     }
   },
-  "bakedAt": "2026-08-28",
+  "bakedAt": "2026-09-08",
   "normalization": {
-    "normalizedAt": "2026-08-25",
+    "normalizedAt": "2026-09-08",
     "tool": "Script_AudioNormalize.mjs",
     "peakCeilingDbfs": -1,
     "metric": "activeRmsDbfs",
     "targetDbfs": -25,
     "toleranceDb": 0.5
-  }
+  },
+  "pendingCues": {
+    "zb26Far": {
+      "files": [
+        "AudioSfx_Zb26Far_01.mp3",
+        "AudioSfx_Zb26Far_02.mp3"
+      ],
+      "seconds": 1.5,
+      "credit": "Pole Position Production · L7A2 GPMG 7.62×51 单发（50 m 后方机位）· Sonniss GDC 2016",
+      "license": "sonniss"
+    },
+    "type11Far": {
+      "files": [
+        "AudioSfx_Type11Far_01.mp3"
+      ],
+      "seconds": 1.25,
+      "credit": "Pole Position Production · BAR .30cal 300 m 正面 · Sonniss GDC 2016",
+      "license": "sonniss"
+    },
+    "type92Far": {
+      "files": [
+        "AudioSfx_Type92Far_01.mp3",
+        "AudioSfx_Type92Far_02.mp3"
+      ],
+      "seconds": 1.553,
+      "credit": "Pole Position Production · M1919A4 .30cal（枪架，300 m 正前）· Sonniss GDC 2016",
+      "license": "sonniss"
+    },
+    "gunTailOpenRifle": {
+      "files": [
+        "AudioSfx_GunTailOpenRifle_01.mp3",
+        "AudioSfx_GunTailOpenRifle_02.mp3"
+      ],
+      "seconds": 0.9,
+      "credit": "Pole Position Production · 开阔地步枪射击的空间尾音 · Sonniss GDC 2018",
+      "license": "sonniss"
+    },
+    "gunTailStreetRifle": {
+      "files": [
+        "AudioSfx_GunTailStreetRifle_01.mp3",
+        "AudioSfx_GunTailStreetRifle_02.mp3"
+      ],
+      "seconds": 1.2,
+      "credit": "Pole Position Production · 建筑之间的步枪射击尾音 · Sonniss GDC 2018",
+      "license": "sonniss"
+    },
+    "gunTailInteriorRifle": {
+      "files": [
+        "AudioSfx_GunTailInteriorRifle_01.mp3",
+        "AudioSfx_GunTailInteriorRifle_02.mp3"
+      ],
+      "seconds": 1.2,
+      "credit": "Pole Position Production · 长走廊里的步枪单发尾音（AK4 7.62 全威力弹）· Sonniss GDC 2018",
+      "license": "sonniss"
+    },
+    "gunTailOpenMg": {
+      "files": [
+        "AudioSfx_GunTailOpenMg_01.mp3",
+        "AudioSfx_GunTailOpenMg_02.mp3"
+      ],
+      "seconds": 1.1,
+      "credit": "Pole Position Production · 大野地里机枪射击的弹道与尾音 · Sonniss GDC 2017",
+      "license": "sonniss"
+    },
+    "gunTailInteriorMg": {
+      "files": [
+        "AudioSfx_GunTailInteriorMg_01.mp3",
+        "AudioSfx_GunTailInteriorMg_02.mp3"
+      ],
+      "seconds": 1.6,
+      "credit": "Audiobeast · 中型仓库里的重机枪连发尾音（The London Warehouse Firearms Library）· Sonniss GDC 2016",
+      "license": "sonniss"
+    },
+    "bulletCrack": {
+      "files": [
+        "AudioSfx_BulletCrack_01.mp3",
+        "AudioSfx_BulletCrack_02.mp3",
+        "AudioSfx_BulletCrack_03.mp3",
+        "AudioSfx_BulletCrack_04.mp3"
+      ],
+      "seconds": 0.22,
+      "credit": "PMSFX · 弹丸掠过（音爆一段）· Sonniss GDC 2020",
+      "license": "sonniss"
+    },
+    "bulletWhizz": {
+      "files": [
+        "AudioSfx_BulletWhizz_01.mp3",
+        "AudioSfx_BulletWhizz_02.mp3",
+        "AudioSfx_BulletWhizz_03.mp3",
+        "AudioSfx_BulletWhizz_04.mp3"
+      ],
+      "seconds": 0.5,
+      "credit": "PMSFX · 弹丸掠过（啸声一段）· Sonniss GDC 2020",
+      "license": "sonniss"
+    },
+    "ricochet": {
+      "files": [
+        "AudioSfx_Ricochet_01.mp3",
+        "AudioSfx_Ricochet_02.mp3",
+        "AudioSfx_Ricochet_03.mp3",
+        "AudioSfx_Ricochet_04.mp3"
+      ],
+      "seconds": 0.65,
+      "credit": "Justsoundeffects · 跳弹撞击与金属余韵 · Sonniss GDC 2024",
+      "license": "sonniss"
+    },
+    "footstepWood": {
+      "files": [
+        "AudioSfx_FootstepWood_01.mp3",
+        "AudioSfx_FootstepWood_02.mp3",
+        "AudioSfx_FootstepWood_03.mp3",
+        "AudioSfx_FootstepWood_04.mp3"
+      ],
+      "seconds": 0.4,
+      "credit": "The Sound Pack Tree · 木楼梯下行（80 步/分）· Sonniss GDC 2018",
+      "license": "sonniss"
+    },
+    "footstepStone": {
+      "files": [
+        "AudioSfx_FootstepStone_01.mp3",
+        "AudioSfx_FootstepStone_02.mp3",
+        "AudioSfx_FootstepStone_03.mp3",
+        "AudioSfx_FootstepStone_04.mp3"
+      ],
+      "seconds": 0.3,
+      "credit": "Tovusound · 军靴走硬地（近距离）· Sonniss GDC 2017",
+      "license": "sonniss"
+    },
+    "footstepGrass": {
+      "files": [
+        "AudioSfx_FootstepGrass_01.mp3",
+        "AudioSfx_FootstepGrass_02.mp3",
+        "AudioSfx_FootstepGrass_03.mp3",
+        "AudioSfx_FootstepGrass_04.mp3"
+      ],
+      "seconds": 0.34,
+      "credit": "Tovusound · 草地行走（近距离）· Sonniss GDC 2017",
+      "license": "sonniss"
+    },
+    "footstepMud": {
+      "files": [
+        "AudioSfx_FootstepMud_01.mp3",
+        "AudioSfx_FootstepMud_02.mp3",
+        "AudioSfx_FootstepMud_03.mp3",
+        "AudioSfx_FootstepMud_04.mp3"
+      ],
+      "seconds": 0.38,
+      "credit": "Wav Junction · 踩进水洼的单步溅水 · Sonniss GDC 2020",
+      "license": "sonniss"
+    },
+    "clothMove": {
+      "files": [
+        "AudioSfx_ClothMove_01.mp3",
+        "AudioSfx_ClothMove_02.mp3",
+        "AudioSfx_ClothMove_03.mp3"
+      ],
+      "seconds": 0.5,
+      "credit": "The Soundcatcher · 厚棉布衣物摩擦 · Sonniss Game Audio Monthly #5",
+      "license": "sonniss"
+    },
+    "gearRattle": {
+      "files": [
+        "AudioSfx_GearRattle_01.mp3",
+        "AudioSfx_GearRattle_02.mp3",
+        "AudioSfx_GearRattle_03.mp3"
+      ],
+      "seconds": 0.6,
+      "credit": "Joshua Reinhardt · 全套军用装具行走时的晃动 · Sonniss GDC 2017",
+      "license": "sonniss"
+    },
+    "breathHeavy": {
+      "files": [
+        "AudioSfx_BreathHeavy_01.mp3"
+      ],
+      "seconds": 3,
+      "loop": true,
+      "credit": "Gamemaster Audio · 男性奔跑时的粗喘（可循环）· Sonniss GDC 2018",
+      "license": "sonniss"
+    },
+    "bodyLand": {
+      "files": [
+        "AudioSfx_BodyLand_01.mp3",
+        "AudioSfx_BodyLand_02.mp3"
+      ],
+      "seconds": 0.7,
+      "credit": "Tovusound · 双脚落地（碎石地面，近距离）· Sonniss GDC 2017",
+      "license": "sonniss"
+    },
+    "grenadeBounce": {
+      "files": [
+        "AudioSfx_GrenadeBounce_01.mp3",
+        "AudioSfx_GrenadeBounce_02.mp3",
+        "AudioSfx_GrenadeBounce_03.mp3"
+      ],
+      "seconds": 1.3,
+      "credit": "Coll Anderson · 金属件落地弹跳（户外实录）· Sonniss GDC 2015 ／ Christophe Davaille · 十公斤铸铁片落地 · Sonniss GDC 2018 ／ Sound Ex Machina · 金属罐在水泥地上弹跳 · Sonniss GDC 2019",
+      "license": "sonniss"
+    },
+    "grenadeRoll": {
+      "files": [
+        "AudioSfx_GrenadeRoll_01.mp3"
+      ],
+      "seconds": 1.8,
+      "credit": "Sound Ex Machina · 金属球在水泥地上滚动 · Sonniss GDC 2019",
+      "license": "sonniss"
+    },
+    "explosionMid": {
+      "files": [
+        "AudioSfx_ExplosionMid_01.mp3",
+        "AudioSfx_ExplosionMid_02.mp3"
+      ],
+      "seconds": 2.2,
+      "credit": "Bluezone Corporation · 户外大型爆炸 · Sonniss GDC 2020 ／ Bluezone Corporation · 迫击炮弹爆炸 · Sonniss GDC 2023",
+      "license": "sonniss"
+    },
+    "debrisFall": {
+      "files": [
+        "AudioSfx_DebrisFall_01.mp3",
+        "AudioSfx_DebrisFall_02.mp3",
+        "AudioSfx_DebrisFall_03.mp3"
+      ],
+      "seconds": 2.2,
+      "credit": "Bluezone Corporation · 爆炸后落下的碎石 · Sonniss Game Audio Monthly #2 ／ Bluezone Corporation · 爆炸后落下的金属碎片 · Sonniss Game Audio Monthly #2 ／ Bluezone Corporation · 爆炸后混合瓦砾落地 · Sonniss Game Audio Monthly #2",
+      "license": "sonniss"
+    },
+    "fireSpot": {
+      "files": [
+        "AudioSfx_FireSpot_01.mp3"
+      ],
+      "seconds": 10,
+      "loop": true,
+      "credit": "Pole Position Production · 房屋燃烧（低强度、带噼啪）· Sonniss GDC 2018",
+      "license": "sonniss"
+    },
+    "impactStone": {
+      "files": [
+        "AudioSfx_ImpactStone_01.mp3",
+        "AudioSfx_ImpactStone_02.mp3",
+        "AudioSfx_ImpactStone_03.mp3"
+      ],
+      "seconds": 0.45,
+      "credit": "Olivier Girardot · 子弹打在石头上 · Sonniss GDC 2020 ／ PMSFX · 单块石头受击 · Sonniss GDC 2020 ／ PMSFX · 单块石头受击（更闷）· Sonniss GDC 2020",
+      "license": "sonniss"
+    }
+  },
+  "pendingNote": "素材已烘好，但 Script_Audio.RECIPES 里还没有同名配方，运行时不会加载（LoadSfxPack 只遍历 cues）。配方补齐后把 Data_SfxSources 对应组的 pending 去掉重烘。"
 }
