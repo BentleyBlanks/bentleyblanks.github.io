@@ -1,6 +1,6 @@
 # 第一关人物动画跨电脑接力点
 
-更新：2026-09-08。此文件描述实际交付边界，不表示 48 项已经制作完成。当前用户要求：**只复用现有视频／缓存，不再生成视频；候选独立交付，不以整关回归或游戏采用为上传前提。**
+更新：2026-09-08。此文件描述实际交付边界，不表示 48 项已经制作完成。最新用户要求：**“这一版做完就结束”**。本机在 `FirstLevelMealAuthorV1` 切食／递接食候选打包交付后结束制作；后续工作由用户在另一台电脑继续。沿用要求：只复用现有视频／缓存，不再生成视频；候选独立交付，不以整关回归或游戏采用为上传前提。
 
 ## 另一台电脑可以继续
 
@@ -17,17 +17,20 @@
 | 侧凳身体支撑／扶腿起身 | FirstLevelTrainSupportV2、FirstLevelTrainGameV2 | 四套原人物，32 个侧凳子集已接；不能算全部车厢生活或专用逐阶下车完成。 |
 | 身体动作恢复 | FirstLevelLifePatientV1、FirstLevelRescueLocomotionV1、FirstLevelRemainingBodyV1、FirstLevelSourceLimitedV1 | 四批共 33 条新身体候选；首轮累计 43 条 raw 恢复。道具、协作、接触和演员绑定未全部完成。 |
 | 数弹 | FirstLevelAmmoAuthorV3 | 四个模型与工程，袋体、五个弹药道具和点数／找弹／抬头回应；手指自然度、真实道具与事件装配待做。 |
+| 切食／递接食 | **FirstLevelMealAuthorV1** | 最后批次：八个单人、四个双人 GLB，12 个实际重开的工程，三个三栏入口。双人版一片食物完成交接；掌指、口部、布料及真实场景装配待完善，无回归和新游戏接入。 |
 | 侧身让路／踢包 | FirstLevelAisleAuthorV2 | 八个模型、八个工程、两个三栏入口；实景净空、背包碰撞、职责装配待做。 |
 | 前后抬担架／持稳 | FirstLevelCarryV17、FirstLevelCarryHoldV2 | 原骨架成对候选；掌指、肩部、患者与转场待完成，试制尺寸未替换游戏。 |
 | 四级车梯下车 | **FirstLevelStairAuthorV2** | 本轮四个 12 秒 GLB、四个可编辑工程、48 张三栏截图已生成；实际查看五张。V1 冻结工作稿保留。V2 没有运行导出密集检查或整关回归。 |
 
 四级下车入口为 `/Preview/index.html?action=TrainStairDescentAuthored`。原片和 raw 固定在已恢复站姿 7.9666667 秒，模型独立播放后期逐级落脚；不是从两级台阶原片直接恢复出的四级动作。V2 当前落地轮廓以第 0 车地形为基准，另两车地面高度已记录但尚未制作独立适配。`Data_EditableProjects.json` 记录工程真实保存并重新打开；`Data_PreviewCaptures.json` 是出图记录，不是整关通过报告。
 
+切食入口为 `/Preview/index.html?action=TrainMealGiverAuthored`、`TrainMealReceiverAuthored`、`TrainMealPairAuthored`。原视频／raw 固定在坐姿 0 秒，模型播放 12 秒后期动作；已有切食／接食原片及 SHA 在 `Data_AuthoredBake.json` 的 `semanticReferences` 中。双人坐距 1.14 m、交接 8.3 秒均为作者试制值，不能直接套用现场或触发任务。来源、工程、出图与未完项冻结于本批 `Data_DeliveryStatus.json`；`Pipeline` 包含制作脚本。另一台拉取 Git 后仍需同步这些私有文件，尚未确认跨电脑云同步完成。
+
 ## 还没完成的主体工作
 
 | 优先工作 | 需求范围 | 下一步 |
 | --- | --- | --- |
-| 完整车厢生活 | FL13–22 | 切食／递食／接食的单次交接和手指道具，完整数弹与背景变体，捂臂检查配对、炮击反应和让门装配；下车补上肢与重心过渡、另两车落点。 |
+| 完整车厢生活 | FL13–22 | 切食／递接食已有单次交接候选，继续修完整掌指、口部、布料与现场装配；完整数弹与背景变体，捂臂检查配对、炮击反应和让门装配；下车补上肢与重心过渡、另两车落点。 |
 | 担架全套 | FL24–27、31、33、35–36、40、43 | 完整掌指与肩袖，患者／前后抬手同一刚性担架；抬起、放下、起停、转弯、坡道、门槛、装卸、失握、扑沟与补位。第一人称双手另做。 |
 | 老周救护与死亡 | FL23–24、37–39、43–46 | 伤腿靠坐与起身失败、抬上／拖回、递布持续按压、渐弱到死亡保持、医生检查、幺娃起身转救；演员职责和同一患者连续性。 |
 | 其他单人与协作动作 | FL01–12、28–30、32、34、41–42、47–48 | 在已有身体／战斗动作上补枪械、车辆、包裹、箱体、搀扶等接触和出入过渡。受限视频的缺失姿态由后期补做，不再补拍。 |
@@ -39,7 +42,7 @@
 
 25 阶段；41 列车 NPC（40 新兵加罗班长，三车 8／24／8）、20 副担架、36 轻伤、14 医护、8 百姓、8 守军；老周固定为同一 `Litter11`。对白以当前 VoiceAlignment、VoiceTiming 和运行时 VoiceEvent 为准，保留整段源录音；不要按作者片段秒数触发任务事实或改库存。玩家松手扑沟仍为 2 秒、3.8 m，不能用作者根位移替换真实路径。
 
-本机已经合入 `81dcb2624`／`77be2bd96` 渲染更新。旧 `FirstLevelTrainR13Campaign` 是此前构建完整通过的历史；新渲染 `FirstLevelTrainRenderCampaignV1` 在近战段玩家倒地失败，V2 重试按用户要求停止。`FirstLevelTrainRenderV1` 的原骨架采样器通过，**不等于当前整关通过**。继续候选制作不需要再跑这段回归。
+本机已经合入 `e1f235703` 渲染更新。旧 `FirstLevelTrainR13Campaign` 是此前构建完整通过的历史；新渲染 `FirstLevelTrainRenderCampaignV1` 在近战段玩家倒地失败，V2 重试按用户要求停止。此前 `FirstLevelTrainRenderV1` 的原骨架采样器通过，**不等于当前整关通过**；后续渲染更新未重验，状态保留上游变化记录。本次不再跑这段回归。
 
 ## 本轮复现入口
 
@@ -53,3 +56,12 @@ node Taierzhuang1938/_import/Script_FirstLevelStairPreview.mjs --root <私有库
 ```
 
 Preview 命令当前使用本机 8136 服务；接手机按实际地址调整脚本或复用该端口。预览中的四套模型通过“效果历史”切换。同源未修改资产可以直接复用，无须为了执行以上命令再生成一遍。
+
+切食 V1 已冻结。如需下一版，使用新 revision：
+
+```powershell
+node Taierzhuang1938/_import/Script_FirstLevelMealAuthor.mjs --root <私有库> --revision 2
+& <Blender路径> --background --python-exit-code 1 --python Taierzhuang1938/_import/Script_FirstLevelMealProject.py -- --root <私有库> --revision 2
+python <私有库>/Preview/Script_IndexLibrary.py --root <私有库>
+node Taierzhuang1938/_import/Script_FirstLevelMealPreview.mjs --root <私有库> --revision 2 --url http://127.0.0.1:8136
+```

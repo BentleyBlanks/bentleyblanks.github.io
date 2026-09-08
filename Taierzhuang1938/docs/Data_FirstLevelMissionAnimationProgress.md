@@ -1,6 +1,14 @@
 # 第一关动画接力状态（2026-09-08）
 
-当前用户要求为**48 项继续制作，只用已有视频，不重新生成或补拍**；复用恢复缓存、原游戏动作，后期补姿态、接触和协作装配，再做游戏接入。尚未完成全部动作；本轮接入侧凳支撑与扶腿起身子集。逐项字段、来源哈希和运行时文件快照见 [状态 JSON](Data_FirstLevelMissionAnimationStatus.json)。需求仍以 [完整需求](Data_FirstLevelMissionAnimationRequirements.md) 和 [视频转骨骼标准](Data_VideoToSkeletonStandard.md) 为准。
+最新用户要求为**“这一版做完就结束”**；本机在切食／递接食 V1 候选打包交付后结束。48 项仍未全部完成，完整剩余范围供另一台电脑接力。只用已有视频，不重新生成或补拍；候选是否采用与回归不作为此次上传前提。逐项字段、来源哈希和运行时快照见 [状态 JSON](Data_FirstLevelMissionAnimationStatus.json)，续做见 [跨电脑接力点](Data_FirstLevelAnimationHandoff.md)。
+
+## 最后交付：切食／递接食候选 V1
+
+`FirstLevelMealAuthorV1` 保存四套原人物的递食者／接食者八个单人 GLB，另有四个双人 GLB，均为 12 秒；12 份工程实际保存并重新打开。复用 `FirstLevelTrainSupportV2` 的 0 秒坐姿，原 bind／层级／骨长和坐姿腿脚支撑保持。展布、单次切片、放刀、递出、交接、小口吃和收手为后期制作，既有切食视频只作语义参考。双人版用同一食物对象交接，1.14 m 对坐间距为作者试制值；8.3 秒为作者时间点，不触发任务、库存或对白。
+
+三个入口为 [切食递出](http://127.0.0.1:8136/Preview/index.html?action=TrainMealGiverAuthored)、[接食进食](http://127.0.0.1:8136/Preview/index.html?action=TrainMealReceiverAuthored)、[双人交接](http://127.0.0.1:8136/Preview/index.html?action=TrainMealPairAuthored)。原片及 raw 固定在来源坐姿 0 秒，实时模型独立播放。最终 59 张出图实际查看 8 张，涵盖四型号，浏览器错误为零；出图前修正了布边悬空和到嘴偏侧，旧图另留 History。手指握持、自然度、布料变形、逐型号口部接触及真实场景装配仍待完善；冻结为未接入候选，不能当作 FL14／FL15 最终完成。
+
+已合入 `e1f235703` 的渲染修改，任务、人数和对白表未改；本轮没有回归或游戏接入。旧 R13 通关仍为历史，新渲染 V1 近战倒地失败与 V2 按用户要求取消的记录保留。以下为此前批次的时间记录，不能把其中“本轮通过”解释成当前构建的新回归。本机到此结束制作。
 
 ## 当前上传：按用户要求停止回归
 

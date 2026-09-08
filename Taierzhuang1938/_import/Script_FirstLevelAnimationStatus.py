@@ -312,6 +312,33 @@ def Main():
             row['blockers'].append('Four-tread authored models, editable projects and held-source preview are available. Remaining: natural arm/weight transitions, other-car terrain landing profiles and optional physical queue integration. No new regression was run.')
         else:
             row['blockers'].append('Four-tread authored GLBs are unverified work in progress; editable projects, three-pane registration and physical queue integration are not complete.')
+    mealGroups=sorted((p for p in (root/'Models').glob('FirstLevelMealAuthorV*') if (p/'Data_DeliveryStatus.json').exists()),key=lambda p:int(p.name.split('V')[-1]))
+    currentDelivery=None
+    if mealGroups:
+        folder=mealGroups[-1];delivery=Read(folder/'Data_DeliveryStatus.json')
+        assert delivery['frozen'] and not delivery['acceptedForGame']
+        editable=Read(folder/'Data_EditableProjects.json')
+        versions=Read(folder/'Data_Versions.json')['actions']
+        for requirementId,role in [('FL14','Giver'),('FL15','Receiver')]:
+            candidates=[]
+            for action in versions:
+                if action['id'] not in [f'TrainMeal{role}Authored','TrainMealPairAuthored']:continue
+                for variant in action['variants']:
+                    record=next(r for r in editable['results'] if r['model']==variant['path'])
+                    assert Hash(root/variant['path'])==record['modelSha256']
+                    assert Hash(root/variant['blend'])==record['blendSha256'] and record['reopened']
+                    candidates.append(dict(variantId=variant['id'],path=variant['path'],modelSha256=record['modelSha256'],
+                        blend=variant['blend'],clip=variant['clip'],status=variant['status'],review=variant['review'],
+                        previewUrl='http://127.0.0.1:8136/Preview/index.html?action='+action['id']))
+            row=next(r for r in rows if r['requirementId']==requirementId)
+            row.update(status='authored_candidate_packaged_not_integrated',previewId=f'TrainMeal{role}Authored',
+                newAuthoredCandidates=candidates,authoredMealDelivery=delivery)
+            row['blockers'].extend(delivery['remaining'])
+            row['reviewEvidence'].extend(f'Models/{folder.name}/'+name for name in ['Data_AuthoredBake.json','Data_EditableProjects.json','Data_DeliveryStatus.json'])
+        currentDelivery=dict(userInstruction=delivery.get('userInstruction'),
+            status='current_meal_candidate_packaged_local_production_closed' if delivery.get('localProductionClosed') else 'current_meal_candidate_packaged',
+            group=folder.name,all48Complete=False,newVideoGeneration=False,regressionTestRun=False,
+            optionalGameAdoptionPending=True,handoff='docs/Data_FirstLevelAnimationHandoff.md')
     gameVersion=Read(project/'Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json')['version']
     assert re.fullmatch(r'FirstLevelTrainGameV[1-9]\d*',gameVersion)
     gameReport=root/'Models'/gameVersion/'Data_GameIntegration.json'
@@ -389,7 +416,7 @@ def Main():
             retainedContinuousRecordings=True,animationDialogueOffsetsInvented=False,
             sources=['Data_FirstLevelMissionVoiceAlignment.mjs','Data_FirstLevelMissionVoiceTiming.mjs'],
             note='Read current cue/segment/source seconds and Runtime VoiceEvent. TrainFoodReceived releases opening movement after the actual response; free look remains available. Actual shell impacts, train stop, prone/dive orders, TransferHope and medic arrival remain authoritative. '+('Only the recorded bench-support/rise subset is enabled.' if integration else 'Carriage subset is enabled, with r12 campaign validation still pending.' if pending else 'New animation clips are not bound yet.')),
-        gameIntegration=integration,gameIntegrationPending=pending,gameIntegrationCompatibility=compatibility,
+        gameIntegration=integration,gameIntegrationPending=pending,gameIntegrationCompatibility=compatibility,currentDelivery=currentDelivery,
         sourceSearch=dict(directories=[str(root/'Video/Sources'),'C:/Users/Bentl/Downloads/GVHMR'],
             catalogActions=len(catalog['actions']),newVideoGenerations=batch['summary'].get('success',0),
             newInferenceRuns=len(list((root/'Models/_Cache/FirstLevelV1').glob('*/Data_Recovery.json')))),

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "updated": "2026-09-08",
-  "recordedUtc": "2026-09-08T05:27:03.415651+00:00",
-  "baseCommit": "e864e09d34a8d30d79a60c1a9add53d531b44544",
+  "recordedUtc": "2026-09-08T06:04:27.037764+00:00",
+  "baseCommit": "e1f2357035e1a8b13b3c426506c21c9a41c83e3b",
   "missionContract": {
     "version": "first-level-20260907-r12",
     "stages": [
@@ -437,8 +437,8 @@
     }
   },
   "libraryRoot": "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼",
-  "catalogSha256": "5abf266e666675138c037f298f8ca7d6f63d1339c0123b27537cc847d347909d",
-  "requirementsSha256": "b14fd206144709f7e0a425c08c52645252a3757bce7c42dac9c2c5b0e01909dd",
+  "catalogSha256": "2d0e730443d11dff6b5f2df2e4e67d2a7cb5d166692b17c7e60bbd001cfa238e",
+  "requirementsSha256": "35708eed04baa3ee6a57459d93f8423cf6e4d0eba6375d0dabc7625776ed2074",
   "missionBaselineFiles": {
     "Data_FirstLevelMission.mjs": "933174877ea1595b60221e57fd3d0a46e0431ce60ab08460c3ee8267e09ab44b",
     "Data_FirstLevelMissionDialogue.mjs": "a62830fc97fedc1f5df3aacf0664c89edada411ae7689e1dbdaf3164550a5cda",
@@ -971,7 +971,7 @@
   },
   "gameIntegrationPending": null,
   "gameIntegrationCompatibility": {
-    "status": "sampler_passed_campaign_failed_retry_cancelled_by_user",
+    "status": "upstream_changed_revalidation_pending",
     "changedFiles": [
       "Script_FirstLevelMissionView.mjs",
       "Script_FirstLevelMissionRuntime.mjs",
@@ -983,61 +983,24 @@
       "index.html"
     ],
     "fullCampaignCurrent": false,
-    "historicalIntegration": "Models/FirstLevelTrainGameV2/Data_GameIntegration.json",
-    "recordedUtc": "2026-09-08T05:15:03.079583+00:00",
-    "baseCommit": "15225ff7ca721693c8885c2ed36b11dfd02fabc7",
-    "historicalIntegrationSha256": "6eec122e72d7213c7afce8b91566bbeb780f206458581d3a86e44b6e2ce17be8",
-    "runtimeHashes": {
-      "Script_FirstLevelTrainAnimation.mjs": "2a15df1c03f49c47186ddaf2efddabd074d0f407a1b8f781adeb67f697c8a34f",
-      "Script_FirstLevelMissionTrainLife.mjs": "db3a9de87116a057b6ee8fdd546af674e6954172ae994b6d0f4e561a571abf3d",
-      "Script_FirstLevelMissionTrain.mjs": "a1b81b6240c1ff41d07a7f0d36e52ea1e93d43896025a8799a1f227dd9775cbb",
-      "Script_FirstLevelMissionView.mjs": "8a8a19465f3fbd4139c437910b763ea7a910e938deb9d9008d90f4c609fca83a",
-      "Script_FirstLevelMissionRuntime.mjs": "8bd7ec7a94ef9d7650aeeda8af2bccf73c1a2a9cd157d37dd780262b5f5d4707",
-      "Script_FirstLevelP012CastAppearance.mjs": "de0433e6c5f4e0a8752c121055ebc4bfd7692c968201bea381fb0b248b91724c",
-      "Script_Main.mjs": "e67cc3d32d6ddcd973ba42c0b0bcd5d5e6eb77444d33a9b620f7247d28d42485",
-      "Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json": "e6a8b7088774f86f97ce2c03462a377f90ae91e98fc39530f13f0d1e5a204595",
-      "Data_FirstLevelMission.mjs": "933174877ea1595b60221e57fd3d0a46e0431ce60ab08460c3ee8267e09ab44b",
-      "Data_FirstLevelMissionTrain.mjs": "adfd567c006889c6d1e48470ba002622d4c119d6741dfa6d9d4fe9ac118698d9",
-      "Data_FirstLevelMissionLayout.mjs": "861183d55d818e28128aebb9d5583a60bf3d6d11f9478328fb5ad76256dd5898",
-      "Data_FirstLevelMissionCrowd.mjs": "f6607e5ee2422c188572cd10551882c7dae5058ea5717c88821862c0d4fe0796",
-      "Data_FirstLevelMissionFront.mjs": "1c5d0f23600a6f860a5977e745f4fd6d2ac6d14d9c60338d01a5aad09d447f99",
-      "Data_Tuning_FirstLevel.mjs": "792c3019f190dbfd800a03f47bbde0daf9ab6a9fc92f0fbcd02a7e94ca934c44",
-      "Data_FirstLevelMissionVoiceTiming.mjs": "414c2270c3b93d5116eb48ec59335a67d5a0e4a2ca0efc4ff780d2e439e57091",
-      "Data_FirstLevelMissionVoiceAlignment.mjs": "af8cdc555cdd92c227e999ce07198b2f17f7d5ee3ad044faa29bdf09f5bf4146",
-      "Data_FirstLevelMissionDialogue.mjs": "a62830fc97fedc1f5df3aacf0664c89edada411ae7689e1dbdaf3164550a5cda",
-      "Script_FirstLevelMissionColumn.mjs": "bbcee070b8d4faf20417973dfadcf87328877f926014b8186dc7a57bbd89ef24",
-      "Script_FirstLevelMissionPeople.mjs": "0d1b3f7a34676f21252ad33e779a3c7e3271b6fb27f513f8ebcc04f4de5d674b",
-      "Script_FirstLevelMissionVoice.mjs": "f875246b5de9b224acb27ea58c17e84863898257a6f72417b26f14b657ec2dc5",
-      "index.html": "2f84cec205ffbefc37b459e1ff37523e8da9fb2fcae3881ea166c3676e01a7ba"
-    },
-    "evidence": [
-      {
-        "path": "Models/FirstLevelTrainRenderV1/Data_SamplerValidation.json",
-        "sha256": "4a59004475b19118be10f658690106f5588c35dc693f58d9a6566ca315fc0c65"
-      },
-      {
-        "path": "Models/FirstLevelTrainRenderCampaignV1/Data_CampaignValidation.json",
-        "sha256": "fa3bc883f851f550dbd9fca090e5af4accf824cbba5da98544b8a0ae72c41658"
-      },
-      {
-        "path": "Models/FirstLevelTrainRenderCampaignV2/Data_CampaignValidation.json",
-        "sha256": "24ae20a95bebf0d355e1601cd399812d6e8fd255c84d4518b24fd9064c8d2cda"
-      }
-    ],
-    "testScope": [
-      "Existing original-rig sampler: four production models by nine height profiles.",
-      "First-level rules/audio and module graph passed before user stopped further regression.",
-      "Full campaign V1 failed with player down at Melee; V2 cancelled at user request."
-    ],
-    "note": "User requested upload without further regression or mandatory game integration. Current render campaign is not accepted; old successful campaign remains historical.",
-    "evidencePath": "Models/FirstLevelTrainRenderV1/Data_CompatibilityValidation.json"
+    "historicalIntegration": "Models/FirstLevelTrainGameV2/Data_GameIntegration.json"
+  },
+  "currentDelivery": {
+    "userInstruction": "这一版做完就结束",
+    "status": "current_meal_candidate_packaged_local_production_closed",
+    "group": "FirstLevelMealAuthorV1",
+    "all48Complete": false,
+    "newVideoGeneration": false,
+    "regressionTestRun": false,
+    "optionalGameAdoptionPending": true,
+    "handoff": "docs/Data_FirstLevelAnimationHandoff.md"
   },
   "sourceSearch": {
     "directories": [
       "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources",
       "C:/Users/Bentl/Downloads/GVHMR"
     ],
-    "catalogActions": 97,
+    "catalogActions": 100,
     "newVideoGenerations": 60,
     "newInferenceRuns": 43
   },
@@ -19777,7 +19740,7 @@
         "evidence": "Models/FirstLevelTrainGameV2/Data_GameIntegration.json",
         "version": "FirstLevelTrainGameV2",
         "fullCampaignCurrent": false,
-        "compatibilityStatus": "sampler_passed_campaign_failed_retry_cancelled_by_user"
+        "compatibilityStatus": "upstream_changed_revalidation_pending"
       },
       "reviewEvidence": [
         "Models/FirstLevelTrainV1/Data_SelectedExportFidelityValidation.json",
@@ -21140,19 +21103,28 @@
       "exitPose": null,
       "interruptPolicy": "Animation must not write mission facts, population, inventory, camera or patient identity.",
       "blendFile": null,
-      "previewId": null,
+      "previewId": "TrainMealGiverAuthored",
       "revisionLabel": null,
-      "status": "partially_retargeted_requires_contact_review",
+      "status": "authored_candidate_packaged_not_integrated",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
           "Train"
         ]
       },
-      "reviewEvidence": [],
+      "reviewEvidence": [
+        "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+        "Models/FirstLevelMealAuthorV1/Data_EditableProjects.json",
+        "Models/FirstLevelMealAuthorV1/Data_DeliveryStatus.json"
+      ],
       "blockers": [
         "Source targets/reused candidates do not prove this complete requirement is accepted or integrated.",
-        "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted."
+        "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted.",
+        "Finger/thumb wrap, knife grip, overlap at handoff and natural wrist/shoulder poses are not accepted; further contact authoring is required.",
+        "Cloth remains rigid geometric flaps, not a deforming wrap. The cut piece is a proxy; cutting topology and realistic bite deformation are not complete.",
+        "Mouth/food surface contact needs per-character refinement; no dense export or surface penetration validation was run.",
+        "Pair seat spacing of 1.14 m is an authoring trial, not current carriage placement. Actor roles, additional recipients, transitions and actual nearby-distance handoffs remain unbound.",
+        "Optional game adoption must preserve current TrainFoodReceived/VoiceEvent and player movement timing. The local 8.3-second marker does not trigger those events."
       ],
       "productionPolicy": "existing_sources_only",
       "existingSourceResolutions": [],
@@ -21609,7 +21581,643 @@
           }
         }
       ],
-      "newVideoSubmissionRequired": false
+      "newVideoSubmissionRequired": false,
+      "newAuthoredCandidates": [
+        {
+          "variantId": "Nra-v1-LugouNra01-TrainMealGiverAuthored",
+          "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra01MealGiver.glb",
+          "modelSha256": "4ecd34f2ff20f1c79820d8904119691a0a57710c53eb8fe9a1ec69fdbe402556",
+          "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra01MealGiver.blend",
+          "clip": "FirstLevelTrainMealGiver",
+          "status": "已打包作者候选 · 未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片及 raw 固定为已恢复坐姿的 0 秒。展开布、切食、交接和进食为后期作者动作；切食原片另在制作报告中列作语义参考。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": -0.65,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 0
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealGiverAuthored"
+        },
+        {
+          "variantId": "Nra-v1-LugouNra02-TrainMealGiverAuthored",
+          "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra02MealGiver.glb",
+          "modelSha256": "b0abccd3f8830351d1b5acaf9932353abb950891468aeca9a9ff3caa0ab2d026",
+          "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra02MealGiver.blend",
+          "clip": "FirstLevelTrainMealGiver",
+          "status": "已打包作者候选 · 未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片及 raw 固定为已恢复坐姿的 0 秒。展开布、切食、交接和进食为后期作者动作；切食原片另在制作报告中列作语义参考。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": -0.65,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 0
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealGiverAuthored"
+        },
+        {
+          "variantId": "Nra-v1-LugouNra03-TrainMealGiverAuthored",
+          "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra03MealGiver.glb",
+          "modelSha256": "20c8da14f3a543fdcc37d8895bfe1b41b109b19552d49f4281849cd6b3aab206",
+          "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra03MealGiver.blend",
+          "clip": "FirstLevelTrainMealGiver",
+          "status": "已打包作者候选 · 未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片及 raw 固定为已恢复坐姿的 0 秒。展开布、切食、交接和进食为后期作者动作；切食原片另在制作报告中列作语义参考。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": -0.65,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 0
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealGiverAuthored"
+        },
+        {
+          "variantId": "Nra-v1-LugouNra04-TrainMealGiverAuthored",
+          "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra04MealGiver.glb",
+          "modelSha256": "ea532663087d7a96da28cfeee294549f612acf37b78fae786c06050168d7af13",
+          "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra04MealGiver.blend",
+          "clip": "FirstLevelTrainMealGiver",
+          "status": "已打包作者候选 · 未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片及 raw 固定为已恢复坐姿的 0 秒。展开布、切食、交接和进食为后期作者动作；切食原片另在制作报告中列作语义参考。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": -0.65,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 0
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealGiverAuthored"
+        },
+        {
+          "variantId": "Nra-v1-LugouNra01-TrainMealPairAuthored",
+          "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra01MealPair.glb",
+          "modelSha256": "8d18aaf021e1d62094b00d000143e504ab4768c58699ccfa423e130ebb0d55c3",
+          "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra01MealPair.blend",
+          "clip": "FirstLevelTrainMealPair1",
+          "status": "已打包作者候选 · 未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片及 raw 固定为已恢复坐姿的 0 秒。展开布、切食、交接和进食为后期作者动作；切食原片另在制作报告中列作语义参考。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": -0.65,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 0
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealPairAuthored"
+        },
+        {
+          "variantId": "Nra-v1-LugouNra02-TrainMealPairAuthored",
+          "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra02MealPair.glb",
+          "modelSha256": "c34e09bc3704bd70662a1519141c87143e5477727e579d376d7031261dda3c88",
+          "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra02MealPair.blend",
+          "clip": "FirstLevelTrainMealPair2",
+          "status": "已打包作者候选 · 未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片及 raw 固定为已恢复坐姿的 0 秒。展开布、切食、交接和进食为后期作者动作；切食原片另在制作报告中列作语义参考。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": -0.65,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 0
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealPairAuthored"
+        },
+        {
+          "variantId": "Nra-v1-LugouNra03-TrainMealPairAuthored",
+          "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra03MealPair.glb",
+          "modelSha256": "64e1386a7ee8a4dc871b3a787754c083ddc784f2d06a5e1df25cd93d011bbf72",
+          "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra03MealPair.blend",
+          "clip": "FirstLevelTrainMealPair3",
+          "status": "已打包作者候选 · 未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片及 raw 固定为已恢复坐姿的 0 秒。展开布、切食、交接和进食为后期作者动作；切食原片另在制作报告中列作语义参考。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": -0.65,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 0
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealPairAuthored"
+        },
+        {
+          "variantId": "Nra-v1-LugouNra04-TrainMealPairAuthored",
+          "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra04MealPair.glb",
+          "modelSha256": "653a33a6c9eaa0570a1737e242db467c491f0aac874259ef8f02259ea0772f72",
+          "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra04MealPair.blend",
+          "clip": "FirstLevelTrainMealPair4",
+          "status": "已打包作者候选 · 未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片及 raw 固定为已恢复坐姿的 0 秒。展开布、切食、交接和进食为后期作者动作；切食原片另在制作报告中列作语义参考。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": -0.65,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 0
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealPairAuthored"
+        }
+      ],
+      "authoredMealDelivery": {
+        "status": "candidate_packaged_for_cross_machine_review",
+        "frozen": true,
+        "acceptedForGame": false,
+        "recordedUtc": "2026-09-08T06:04:15.353866+00:00",
+        "userInstruction": "这一版做完就结束",
+        "localProductionClosed": true,
+        "all48Complete": false,
+        "group": "FirstLevelMealAuthorV1",
+        "sourcePoseSeconds": 0,
+        "authoredScope": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+        "semanticReferences": [
+          {
+            "id": "TrainMealCutOffer",
+            "video": "Video/Sources/FirstLevelV1/TrainMealCutOffer/04429854-cda1-422f-817b-81343ecbe382_video_1.mp4",
+            "sha256": "4f88f0e4a607c572ecba1d62cea91f7b8d1573e10a7f9e3523fbc92b151ff33d",
+            "range": [
+              0,
+              9.966666666666667
+            ]
+          },
+          {
+            "id": "TrainFoodReceiveEat",
+            "video": "Video/Sources/FirstLevelV1/TrainFoodReceiveEat/945a9492-899a-4ac0-8185-9c49b1d71716_video_1.mp4",
+            "sha256": "f73c7352bf068b05251f0b7101a6bbf6c888a9243bcf9b05eab588e8a2c5df00",
+            "range": [
+              0,
+              7.966666666666667
+            ]
+          }
+        ],
+        "timingPolicy": "The 8.3-second handoff is a local authoring marker only. Runtime TrainFoodReceived and current voice alignment remain authoritative. No player movement, inventory or mission facts are changed.",
+        "models": [
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra01MealGiver.glb",
+            "bytes": 11413144,
+            "sha256": "4ecd34f2ff20f1c79820d8904119691a0a57710c53eb8fe9a1ec69fdbe402556"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra01MealReceiver.glb",
+            "bytes": 11321488,
+            "sha256": "952ace590db17c8b6f47c9d52d112f960634b088a70877886af5c1c65c79f83d"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra02MealGiver.glb",
+            "bytes": 11968596,
+            "sha256": "b0abccd3f8830351d1b5acaf9932353abb950891468aeca9a9ff3caa0ab2d026"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra02MealReceiver.glb",
+            "bytes": 11876944,
+            "sha256": "e442a4c2e2a64b52b3c55013a9f2262828b1e4fb4eed825cfafd7a0628703089"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra03MealGiver.glb",
+            "bytes": 11596876,
+            "sha256": "20c8da14f3a543fdcc37d8895bfe1b41b109b19552d49f4281849cd6b3aab206"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra03MealReceiver.glb",
+            "bytes": 11505216,
+            "sha256": "e31b8c1b938490836289b025b7a4501b62302e80ce37b7d3f1570fe25ba9609f"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra04MealGiver.glb",
+            "bytes": 11947824,
+            "sha256": "ea532663087d7a96da28cfeee294549f612acf37b78fae786c06050168d7af13"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra04MealReceiver.glb",
+            "bytes": 11856168,
+            "sha256": "306e2f8aa6f70e116dbd18a80304460a92ce22bdf42372d39c1fe6e43f4e7f07"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra01MealPair.glb",
+            "bytes": 3817192,
+            "sha256": "8d18aaf021e1d62094b00d000143e504ab4768c58699ccfa423e130ebb0d55c3"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra02MealPair.glb",
+            "bytes": 4043280,
+            "sha256": "c34e09bc3704bd70662a1519141c87143e5477727e579d376d7031261dda3c88"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra03MealPair.glb",
+            "bytes": 3579088,
+            "sha256": "64e1386a7ee8a4dc871b3a787754c083ddc784f2d06a5e1df25cd93d011bbf72"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra04MealPair.glb",
+            "bytes": 4113136,
+            "sha256": "653a33a6c9eaa0570a1737e242db467c491f0aac874259ef8f02259ea0772f72"
+          }
+        ],
+        "editableProjects": [
+          {
+            "id": "LugouNra01",
+            "role": "Giver",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra01MealGiver.glb",
+            "modelSha256": "4ecd34f2ff20f1c79820d8904119691a0a57710c53eb8fe9a1ec69fdbe402556",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra01MealGiver.blend",
+            "blendSha256": "2a01d2de7deaa7cd5a39fc250ba330466d37b020a05a425733d5de6d466ce0ee",
+            "reopened": true,
+            "animatedArmatures": 1,
+            "clip": "FirstLevelTrainMealGiver"
+          },
+          {
+            "id": "LugouNra01",
+            "role": "Receiver",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra01MealReceiver.glb",
+            "modelSha256": "952ace590db17c8b6f47c9d52d112f960634b088a70877886af5c1c65c79f83d",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra01MealReceiver.blend",
+            "blendSha256": "74afc41df39dfff2729be34a2a84910fde57fe5e97c5f40c35523efa0d4f02d1",
+            "reopened": true,
+            "animatedArmatures": 1,
+            "clip": "FirstLevelTrainMealReceiver"
+          },
+          {
+            "id": "LugouNra02",
+            "role": "Giver",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra02MealGiver.glb",
+            "modelSha256": "b0abccd3f8830351d1b5acaf9932353abb950891468aeca9a9ff3caa0ab2d026",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra02MealGiver.blend",
+            "blendSha256": "e880e509dc94b3901806bbf352520cf1c687e1a1042a06a2f9968fdbb086bffa",
+            "reopened": true,
+            "animatedArmatures": 1,
+            "clip": "FirstLevelTrainMealGiver"
+          },
+          {
+            "id": "LugouNra02",
+            "role": "Receiver",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra02MealReceiver.glb",
+            "modelSha256": "e442a4c2e2a64b52b3c55013a9f2262828b1e4fb4eed825cfafd7a0628703089",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra02MealReceiver.blend",
+            "blendSha256": "c8dbfed449058f5506c478c4f5ee8388268db1e298d11b3c351c01cb2f621cd7",
+            "reopened": true,
+            "animatedArmatures": 1,
+            "clip": "FirstLevelTrainMealReceiver"
+          },
+          {
+            "id": "LugouNra03",
+            "role": "Giver",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra03MealGiver.glb",
+            "modelSha256": "20c8da14f3a543fdcc37d8895bfe1b41b109b19552d49f4281849cd6b3aab206",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra03MealGiver.blend",
+            "blendSha256": "d4c64cb401d6f49ba62cb8c424d17274c3b8f36d1e85d757784cccdcd3ad6f5f",
+            "reopened": true,
+            "animatedArmatures": 1,
+            "clip": "FirstLevelTrainMealGiver"
+          },
+          {
+            "id": "LugouNra03",
+            "role": "Receiver",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra03MealReceiver.glb",
+            "modelSha256": "e31b8c1b938490836289b025b7a4501b62302e80ce37b7d3f1570fe25ba9609f",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra03MealReceiver.blend",
+            "blendSha256": "3e9978242657e3a8d74596534253b35422f4b096d6d7a0a51125dc23d0e1603c",
+            "reopened": true,
+            "animatedArmatures": 1,
+            "clip": "FirstLevelTrainMealReceiver"
+          },
+          {
+            "id": "LugouNra04",
+            "role": "Giver",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra04MealGiver.glb",
+            "modelSha256": "ea532663087d7a96da28cfeee294549f612acf37b78fae786c06050168d7af13",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra04MealGiver.blend",
+            "blendSha256": "a2666f3370f307c96d7e2e063710f7b27864b46d1ba393e2e28815883a5a2069",
+            "reopened": true,
+            "animatedArmatures": 1,
+            "clip": "FirstLevelTrainMealGiver"
+          },
+          {
+            "id": "LugouNra04",
+            "role": "Receiver",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra04MealReceiver.glb",
+            "modelSha256": "306e2f8aa6f70e116dbd18a80304460a92ce22bdf42372d39c1fe6e43f4e7f07",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra04MealReceiver.blend",
+            "blendSha256": "1f9312053bf48ab3e74e5c4350651a55b00e6653656472840b787cd6c1f1c364",
+            "reopened": true,
+            "animatedArmatures": 1,
+            "clip": "FirstLevelTrainMealReceiver"
+          },
+          {
+            "id": "LugouNra01",
+            "role": "Pair",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra01MealPair.glb",
+            "modelSha256": "8d18aaf021e1d62094b00d000143e504ab4768c58699ccfa423e130ebb0d55c3",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra01MealPair.blend",
+            "blendSha256": "2d1ee8d8ed9f3c4c44d8d44c19e9fb13dd2d208689b660a9868e45dff5598594",
+            "reopened": true,
+            "animatedArmatures": 2,
+            "clip": "FirstLevelTrainMealPair1"
+          },
+          {
+            "id": "LugouNra02",
+            "role": "Pair",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra02MealPair.glb",
+            "modelSha256": "c34e09bc3704bd70662a1519141c87143e5477727e579d376d7031261dda3c88",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra02MealPair.blend",
+            "blendSha256": "eef6533104e7b905d0f54d6c2e38af8de77da824b9eada2e1f81a363f83f2f96",
+            "reopened": true,
+            "animatedArmatures": 2,
+            "clip": "FirstLevelTrainMealPair2"
+          },
+          {
+            "id": "LugouNra03",
+            "role": "Pair",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra03MealPair.glb",
+            "modelSha256": "64e1386a7ee8a4dc871b3a787754c083ddc784f2d06a5e1df25cd93d011bbf72",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra03MealPair.blend",
+            "blendSha256": "b66e7c69790bae1938ad81128da66bcb82bab92cbe3567c24167d074c6f97c2c",
+            "reopened": true,
+            "animatedArmatures": 2,
+            "clip": "FirstLevelTrainMealPair3"
+          },
+          {
+            "id": "LugouNra04",
+            "role": "Pair",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra04MealPair.glb",
+            "modelSha256": "653a33a6c9eaa0570a1737e242db467c491f0aac874259ef8f02259ea0772f72",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra04MealPair.blend",
+            "blendSha256": "300d040bbbdb135397f7384385705562f7ae5ba47bb5dd6b5d2e5c72ea6112ce",
+            "reopened": true,
+            "animatedArmatures": 2,
+            "clip": "FirstLevelTrainMealPair4"
+          }
+        ],
+        "threePanePreviews": [
+          "http://127.0.0.1:8136/Preview/index.html?action=TrainMealGiverAuthored",
+          "http://127.0.0.1:8136/Preview/index.html?action=TrainMealReceiverAuthored",
+          "http://127.0.0.1:8136/Preview/index.html?action=TrainMealPairAuthored"
+        ],
+        "pairSharedProp": "One Transform_SharedFoodSlice remains throughout each combined clip; giver/receiver duplicate slices are removed during assembly.",
+        "productionBoundaryChecks": "8 x 721 original-rig authoring frames passed reachable-arm and unchanged seated-lower-body assertions. This is bake-time evidence, not independent export or game regression.",
+        "previewCaptures": 59,
+        "previewErrors": [],
+        "visualReadImages": [
+          {
+            "path": "Preview/FirstLevelMealAuthorV1/Texture_LugouNra01_Giver_Detail_3200.png",
+            "bytes": 474277,
+            "sha256": "0c986fb75ef36086420cec9583c91b4f99f01ce706ddd4de800c4ed7dffe9a2c"
+          },
+          {
+            "path": "Preview/FirstLevelMealAuthorV1/Texture_LugouNra01_Receiver_Detail_9900.png",
+            "bytes": 474497,
+            "sha256": "b66fefdc10895ef6b998fe217d4d533d98348a9ff6ecc9f6cc39ebb2c5bec2a7"
+          },
+          {
+            "path": "Preview/FirstLevelMealAuthorV1/Texture_LugouNra02_Pair_side_7900.png",
+            "bytes": 404802,
+            "sha256": "06b443934f9ac410756f709a09e99878bde3d7d136b16b7ea76b7e197e9d51ee"
+          },
+          {
+            "path": "Preview/FirstLevelMealAuthorV1/Texture_LugouNra03_Pair_three_9900.png",
+            "bytes": 416305,
+            "sha256": "250946c33f5fc563b33fb63c2e497b71e04e32225a727b547c3ac404a296d6bd"
+          },
+          {
+            "path": "Preview/FirstLevelMealAuthorV1/Texture_LugouNra01_Pair_Detail_7900.png",
+            "bytes": 533295,
+            "sha256": "71044182e0ca63ca9bfc5e54df3d82cb00f75bdf7ff0f80f4aabeb0377d6944d"
+          },
+          {
+            "path": "Preview/FirstLevelMealAuthorV1/Texture_LugouNra04_Pair_side_3200.png",
+            "bytes": 398045,
+            "sha256": "a8f48462d4dda249d12a1a860762e0e9de0d0e5a9f7c6e89ee7f2d7ac7c04f48"
+          },
+          {
+            "path": "Preview/FirstLevelMealAuthorV1/Texture_LugouNra04_Pair_side_11800.png",
+            "bytes": 399023,
+            "sha256": "53896e2e37385f68002ef09fa4be3e99160af51bfd8b84069ec6cda1d4b2ec75"
+          },
+          {
+            "path": "Preview/FirstLevelMealAuthorV1/Texture_LugouNra01_Pair_side_0.png",
+            "bytes": 398230,
+            "sha256": "f2dbf3aeeefb5508c23a5cce25288bf2a871046e4352aeda76db2b75e242d010"
+          }
+        ],
+        "observed": "Reviewed eight final captures across all four character variants: cutting, offer/receive, bite and return. Corrected raised cloth flaps and lateral mouth target before final packaging. Contact and naturalness remain candidate work.",
+        "remaining": [
+          "Finger/thumb wrap, knife grip, overlap at handoff and natural wrist/shoulder poses are not accepted; further contact authoring is required.",
+          "Cloth remains rigid geometric flaps, not a deforming wrap. The cut piece is a proxy; cutting topology and realistic bite deformation are not complete.",
+          "Mouth/food surface contact needs per-character refinement; no dense export or surface penetration validation was run.",
+          "Pair seat spacing of 1.14 m is an authoring trial, not current carriage placement. Actor roles, additional recipients, transitions and actual nearby-distance handoffs remain unbound.",
+          "Optional game adoption must preserve current TrainFoodReceived/VoiceEvent and player movement timing. The local 8.3-second marker does not trigger those events."
+        ],
+        "regressionTestRun": false,
+        "denseExportValidationRun": false,
+        "newVideoGeneration": false,
+        "newRecoveryInference": false,
+        "runtimeEnabled": false,
+        "remoteSyncConfirmed": false,
+        "sourceReports": [
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "bytes": 4208860,
+            "sha256": "de4a1079b433f3dd21c938e12c8949c2ef8cfb6a65aa74067fd83e80ea515c59"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Data_EditableProjects.json",
+            "bytes": 6313,
+            "sha256": "3c9263c84a4b5ec8ba1e81817bc39bf59e982ba0142391451c603c88132483d2"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Data_Versions.json",
+            "bytes": 25622,
+            "sha256": "6bf5db4f625e5bebaed46e474c986e4085056acf5087ca4edf73e4e8589811d5"
+          }
+        ],
+        "pipeline": [
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Pipeline/Data_ReadMe.md",
+            "bytes": 346,
+            "sha256": "396abf865ec98c3f3a21016b9163ec09963266bddcfdfaf34ac5c46faa9ea1fa"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Pipeline/Script_FirstLevelMealAuthor.mjs",
+            "bytes": 16433,
+            "sha256": "371bcce7d4bb61cd262614a8827edd5396b56e9e6901838720ca2d922c96b12a"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Pipeline/Script_FirstLevelMealPreview.mjs",
+            "bytes": 4133,
+            "sha256": "c73da7e3ac12667707085a9acaa94978251520ca3c51afaae2482d29f7c01be6"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Pipeline/Script_FirstLevelMealProject.py",
+            "bytes": 8028,
+            "sha256": "f5139f048699018078893e1200cebbc2c824432b6c856fd7626ede44b2568976"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Pipeline/Script_LugouGlbPose.mjs",
+            "bytes": 16246,
+            "sha256": "eb46583182c952ab30ed95da898d5bfc4b046c63f548094835698f7792b3eeee"
+          }
+        ]
+      }
     },
     {
       "requirementId": "FL15",
@@ -21634,19 +22242,28 @@
       "exitPose": null,
       "interruptPolicy": "Animation must not write mission facts, population, inventory, camera or patient identity.",
       "blendFile": null,
-      "previewId": null,
+      "previewId": "TrainMealReceiverAuthored",
       "revisionLabel": null,
-      "status": "partially_retargeted_requires_contact_review",
+      "status": "authored_candidate_packaged_not_integrated",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
           "Train"
         ]
       },
-      "reviewEvidence": [],
+      "reviewEvidence": [
+        "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+        "Models/FirstLevelMealAuthorV1/Data_EditableProjects.json",
+        "Models/FirstLevelMealAuthorV1/Data_DeliveryStatus.json"
+      ],
       "blockers": [
         "Source targets/reused candidates do not prove this complete requirement is accepted or integrated.",
-        "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted."
+        "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted.",
+        "Finger/thumb wrap, knife grip, overlap at handoff and natural wrist/shoulder poses are not accepted; further contact authoring is required.",
+        "Cloth remains rigid geometric flaps, not a deforming wrap. The cut piece is a proxy; cutting topology and realistic bite deformation are not complete.",
+        "Mouth/food surface contact needs per-character refinement; no dense export or surface penetration validation was run.",
+        "Pair seat spacing of 1.14 m is an authoring trial, not current carriage placement. Actor roles, additional recipients, transitions and actual nearby-distance handoffs remain unbound.",
+        "Optional game adoption must preserve current TrainFoodReceived/VoiceEvent and player movement timing. The local 8.3-second marker does not trigger those events."
       ],
       "productionPolicy": "existing_sources_only",
       "existingSourceResolutions": [],
@@ -22313,7 +22930,643 @@
           }
         }
       ],
-      "newVideoSubmissionRequired": false
+      "newVideoSubmissionRequired": false,
+      "newAuthoredCandidates": [
+        {
+          "variantId": "Nra-v1-LugouNra01-TrainMealReceiverAuthored",
+          "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra01MealReceiver.glb",
+          "modelSha256": "952ace590db17c8b6f47c9d52d112f960634b088a70877886af5c1c65c79f83d",
+          "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra01MealReceiver.blend",
+          "clip": "FirstLevelTrainMealReceiver",
+          "status": "已打包作者候选 · 未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片及 raw 固定为已恢复坐姿的 0 秒。展开布、切食、交接和进食为后期作者动作；切食原片另在制作报告中列作语义参考。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": -0.65,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 0
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealReceiverAuthored"
+        },
+        {
+          "variantId": "Nra-v1-LugouNra02-TrainMealReceiverAuthored",
+          "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra02MealReceiver.glb",
+          "modelSha256": "e442a4c2e2a64b52b3c55013a9f2262828b1e4fb4eed825cfafd7a0628703089",
+          "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra02MealReceiver.blend",
+          "clip": "FirstLevelTrainMealReceiver",
+          "status": "已打包作者候选 · 未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片及 raw 固定为已恢复坐姿的 0 秒。展开布、切食、交接和进食为后期作者动作；切食原片另在制作报告中列作语义参考。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": -0.65,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 0
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealReceiverAuthored"
+        },
+        {
+          "variantId": "Nra-v1-LugouNra03-TrainMealReceiverAuthored",
+          "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra03MealReceiver.glb",
+          "modelSha256": "e31b8c1b938490836289b025b7a4501b62302e80ce37b7d3f1570fe25ba9609f",
+          "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra03MealReceiver.blend",
+          "clip": "FirstLevelTrainMealReceiver",
+          "status": "已打包作者候选 · 未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片及 raw 固定为已恢复坐姿的 0 秒。展开布、切食、交接和进食为后期作者动作；切食原片另在制作报告中列作语义参考。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": -0.65,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 0
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealReceiverAuthored"
+        },
+        {
+          "variantId": "Nra-v1-LugouNra04-TrainMealReceiverAuthored",
+          "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra04MealReceiver.glb",
+          "modelSha256": "306e2f8aa6f70e116dbd18a80304460a92ce22bdf42372d39c1fe6e43f4e7f07",
+          "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra04MealReceiver.blend",
+          "clip": "FirstLevelTrainMealReceiver",
+          "status": "已打包作者候选 · 未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片及 raw 固定为已恢复坐姿的 0 秒。展开布、切食、交接和进食为后期作者动作；切食原片另在制作报告中列作语义参考。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": -0.65,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 0
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealReceiverAuthored"
+        },
+        {
+          "variantId": "Nra-v1-LugouNra01-TrainMealPairAuthored",
+          "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra01MealPair.glb",
+          "modelSha256": "8d18aaf021e1d62094b00d000143e504ab4768c58699ccfa423e130ebb0d55c3",
+          "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra01MealPair.blend",
+          "clip": "FirstLevelTrainMealPair1",
+          "status": "已打包作者候选 · 未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片及 raw 固定为已恢复坐姿的 0 秒。展开布、切食、交接和进食为后期作者动作；切食原片另在制作报告中列作语义参考。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": -0.65,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 0
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealPairAuthored"
+        },
+        {
+          "variantId": "Nra-v1-LugouNra02-TrainMealPairAuthored",
+          "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra02MealPair.glb",
+          "modelSha256": "c34e09bc3704bd70662a1519141c87143e5477727e579d376d7031261dda3c88",
+          "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra02MealPair.blend",
+          "clip": "FirstLevelTrainMealPair2",
+          "status": "已打包作者候选 · 未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片及 raw 固定为已恢复坐姿的 0 秒。展开布、切食、交接和进食为后期作者动作；切食原片另在制作报告中列作语义参考。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": -0.65,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 0
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealPairAuthored"
+        },
+        {
+          "variantId": "Nra-v1-LugouNra03-TrainMealPairAuthored",
+          "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra03MealPair.glb",
+          "modelSha256": "64e1386a7ee8a4dc871b3a787754c083ddc784f2d06a5e1df25cd93d011bbf72",
+          "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra03MealPair.blend",
+          "clip": "FirstLevelTrainMealPair3",
+          "status": "已打包作者候选 · 未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片及 raw 固定为已恢复坐姿的 0 秒。展开布、切食、交接和进食为后期作者动作；切食原片另在制作报告中列作语义参考。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": -0.65,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 0
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealPairAuthored"
+        },
+        {
+          "variantId": "Nra-v1-LugouNra04-TrainMealPairAuthored",
+          "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra04MealPair.glb",
+          "modelSha256": "653a33a6c9eaa0570a1737e242db467c491f0aac874259ef8f02259ea0772f72",
+          "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra04MealPair.blend",
+          "clip": "FirstLevelTrainMealPair4",
+          "status": "已打包作者候选 · 未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片及 raw 固定为已恢复坐姿的 0 秒。展开布、切食、交接和进食为后期作者动作；切食原片另在制作报告中列作语义参考。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": -0.65,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 0
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainMealPairAuthored"
+        }
+      ],
+      "authoredMealDelivery": {
+        "status": "candidate_packaged_for_cross_machine_review",
+        "frozen": true,
+        "acceptedForGame": false,
+        "recordedUtc": "2026-09-08T06:04:15.353866+00:00",
+        "userInstruction": "这一版做完就结束",
+        "localProductionClosed": true,
+        "all48Complete": false,
+        "group": "FirstLevelMealAuthorV1",
+        "sourcePoseSeconds": 0,
+        "authoredScope": "Frozen seated support reused; unwrap, one cut, put knife down, offer, one shared handoff, receive and bite authored. Existing meal videos inform action order, not new recovery.",
+        "semanticReferences": [
+          {
+            "id": "TrainMealCutOffer",
+            "video": "Video/Sources/FirstLevelV1/TrainMealCutOffer/04429854-cda1-422f-817b-81343ecbe382_video_1.mp4",
+            "sha256": "4f88f0e4a607c572ecba1d62cea91f7b8d1573e10a7f9e3523fbc92b151ff33d",
+            "range": [
+              0,
+              9.966666666666667
+            ]
+          },
+          {
+            "id": "TrainFoodReceiveEat",
+            "video": "Video/Sources/FirstLevelV1/TrainFoodReceiveEat/945a9492-899a-4ac0-8185-9c49b1d71716_video_1.mp4",
+            "sha256": "f73c7352bf068b05251f0b7101a6bbf6c888a9243bcf9b05eab588e8a2c5df00",
+            "range": [
+              0,
+              7.966666666666667
+            ]
+          }
+        ],
+        "timingPolicy": "The 8.3-second handoff is a local authoring marker only. Runtime TrainFoodReceived and current voice alignment remain authoritative. No player movement, inventory or mission facts are changed.",
+        "models": [
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra01MealGiver.glb",
+            "bytes": 11413144,
+            "sha256": "4ecd34f2ff20f1c79820d8904119691a0a57710c53eb8fe9a1ec69fdbe402556"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra01MealReceiver.glb",
+            "bytes": 11321488,
+            "sha256": "952ace590db17c8b6f47c9d52d112f960634b088a70877886af5c1c65c79f83d"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra02MealGiver.glb",
+            "bytes": 11968596,
+            "sha256": "b0abccd3f8830351d1b5acaf9932353abb950891468aeca9a9ff3caa0ab2d026"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra02MealReceiver.glb",
+            "bytes": 11876944,
+            "sha256": "e442a4c2e2a64b52b3c55013a9f2262828b1e4fb4eed825cfafd7a0628703089"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra03MealGiver.glb",
+            "bytes": 11596876,
+            "sha256": "20c8da14f3a543fdcc37d8895bfe1b41b109b19552d49f4281849cd6b3aab206"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra03MealReceiver.glb",
+            "bytes": 11505216,
+            "sha256": "e31b8c1b938490836289b025b7a4501b62302e80ce37b7d3f1570fe25ba9609f"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra04MealGiver.glb",
+            "bytes": 11947824,
+            "sha256": "ea532663087d7a96da28cfeee294549f612acf37b78fae786c06050168d7af13"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra04MealReceiver.glb",
+            "bytes": 11856168,
+            "sha256": "306e2f8aa6f70e116dbd18a80304460a92ce22bdf42372d39c1fe6e43f4e7f07"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra01MealPair.glb",
+            "bytes": 3817192,
+            "sha256": "8d18aaf021e1d62094b00d000143e504ab4768c58699ccfa423e130ebb0d55c3"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra02MealPair.glb",
+            "bytes": 4043280,
+            "sha256": "c34e09bc3704bd70662a1519141c87143e5477727e579d376d7031261dda3c88"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra03MealPair.glb",
+            "bytes": 3579088,
+            "sha256": "64e1386a7ee8a4dc871b3a787754c083ddc784f2d06a5e1df25cd93d011bbf72"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Model_LugouNra04MealPair.glb",
+            "bytes": 4113136,
+            "sha256": "653a33a6c9eaa0570a1737e242db467c491f0aac874259ef8f02259ea0772f72"
+          }
+        ],
+        "editableProjects": [
+          {
+            "id": "LugouNra01",
+            "role": "Giver",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra01MealGiver.glb",
+            "modelSha256": "4ecd34f2ff20f1c79820d8904119691a0a57710c53eb8fe9a1ec69fdbe402556",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra01MealGiver.blend",
+            "blendSha256": "2a01d2de7deaa7cd5a39fc250ba330466d37b020a05a425733d5de6d466ce0ee",
+            "reopened": true,
+            "animatedArmatures": 1,
+            "clip": "FirstLevelTrainMealGiver"
+          },
+          {
+            "id": "LugouNra01",
+            "role": "Receiver",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra01MealReceiver.glb",
+            "modelSha256": "952ace590db17c8b6f47c9d52d112f960634b088a70877886af5c1c65c79f83d",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra01MealReceiver.blend",
+            "blendSha256": "74afc41df39dfff2729be34a2a84910fde57fe5e97c5f40c35523efa0d4f02d1",
+            "reopened": true,
+            "animatedArmatures": 1,
+            "clip": "FirstLevelTrainMealReceiver"
+          },
+          {
+            "id": "LugouNra02",
+            "role": "Giver",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra02MealGiver.glb",
+            "modelSha256": "b0abccd3f8830351d1b5acaf9932353abb950891468aeca9a9ff3caa0ab2d026",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra02MealGiver.blend",
+            "blendSha256": "e880e509dc94b3901806bbf352520cf1c687e1a1042a06a2f9968fdbb086bffa",
+            "reopened": true,
+            "animatedArmatures": 1,
+            "clip": "FirstLevelTrainMealGiver"
+          },
+          {
+            "id": "LugouNra02",
+            "role": "Receiver",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra02MealReceiver.glb",
+            "modelSha256": "e442a4c2e2a64b52b3c55013a9f2262828b1e4fb4eed825cfafd7a0628703089",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra02MealReceiver.blend",
+            "blendSha256": "c8dbfed449058f5506c478c4f5ee8388268db1e298d11b3c351c01cb2f621cd7",
+            "reopened": true,
+            "animatedArmatures": 1,
+            "clip": "FirstLevelTrainMealReceiver"
+          },
+          {
+            "id": "LugouNra03",
+            "role": "Giver",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra03MealGiver.glb",
+            "modelSha256": "20c8da14f3a543fdcc37d8895bfe1b41b109b19552d49f4281849cd6b3aab206",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra03MealGiver.blend",
+            "blendSha256": "d4c64cb401d6f49ba62cb8c424d17274c3b8f36d1e85d757784cccdcd3ad6f5f",
+            "reopened": true,
+            "animatedArmatures": 1,
+            "clip": "FirstLevelTrainMealGiver"
+          },
+          {
+            "id": "LugouNra03",
+            "role": "Receiver",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra03MealReceiver.glb",
+            "modelSha256": "e31b8c1b938490836289b025b7a4501b62302e80ce37b7d3f1570fe25ba9609f",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra03MealReceiver.blend",
+            "blendSha256": "3e9978242657e3a8d74596534253b35422f4b096d6d7a0a51125dc23d0e1603c",
+            "reopened": true,
+            "animatedArmatures": 1,
+            "clip": "FirstLevelTrainMealReceiver"
+          },
+          {
+            "id": "LugouNra04",
+            "role": "Giver",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra04MealGiver.glb",
+            "modelSha256": "ea532663087d7a96da28cfeee294549f612acf37b78fae786c06050168d7af13",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra04MealGiver.blend",
+            "blendSha256": "a2666f3370f307c96d7e2e063710f7b27864b46d1ba393e2e28815883a5a2069",
+            "reopened": true,
+            "animatedArmatures": 1,
+            "clip": "FirstLevelTrainMealGiver"
+          },
+          {
+            "id": "LugouNra04",
+            "role": "Receiver",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra04MealReceiver.glb",
+            "modelSha256": "306e2f8aa6f70e116dbd18a80304460a92ce22bdf42372d39c1fe6e43f4e7f07",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra04MealReceiver.blend",
+            "blendSha256": "1f9312053bf48ab3e74e5c4350651a55b00e6653656472840b787cd6c1f1c364",
+            "reopened": true,
+            "animatedArmatures": 1,
+            "clip": "FirstLevelTrainMealReceiver"
+          },
+          {
+            "id": "LugouNra01",
+            "role": "Pair",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra01MealPair.glb",
+            "modelSha256": "8d18aaf021e1d62094b00d000143e504ab4768c58699ccfa423e130ebb0d55c3",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra01MealPair.blend",
+            "blendSha256": "2d1ee8d8ed9f3c4c44d8d44c19e9fb13dd2d208689b660a9868e45dff5598594",
+            "reopened": true,
+            "animatedArmatures": 2,
+            "clip": "FirstLevelTrainMealPair1"
+          },
+          {
+            "id": "LugouNra02",
+            "role": "Pair",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra02MealPair.glb",
+            "modelSha256": "c34e09bc3704bd70662a1519141c87143e5477727e579d376d7031261dda3c88",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra02MealPair.blend",
+            "blendSha256": "eef6533104e7b905d0f54d6c2e38af8de77da824b9eada2e1f81a363f83f2f96",
+            "reopened": true,
+            "animatedArmatures": 2,
+            "clip": "FirstLevelTrainMealPair2"
+          },
+          {
+            "id": "LugouNra03",
+            "role": "Pair",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra03MealPair.glb",
+            "modelSha256": "64e1386a7ee8a4dc871b3a787754c083ddc784f2d06a5e1df25cd93d011bbf72",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra03MealPair.blend",
+            "blendSha256": "b66e7c69790bae1938ad81128da66bcb82bab92cbe3567c24167d074c6f97c2c",
+            "reopened": true,
+            "animatedArmatures": 2,
+            "clip": "FirstLevelTrainMealPair3"
+          },
+          {
+            "id": "LugouNra04",
+            "role": "Pair",
+            "model": "Models/FirstLevelMealAuthorV1/Model_LugouNra04MealPair.glb",
+            "modelSha256": "653a33a6c9eaa0570a1737e242db467c491f0aac874259ef8f02259ea0772f72",
+            "blend": "Blender/FirstLevelMealAuthorV1/Scene_LugouNra04MealPair.blend",
+            "blendSha256": "300d040bbbdb135397f7384385705562f7ae5ba47bb5dd6b5d2e5c72ea6112ce",
+            "reopened": true,
+            "animatedArmatures": 2,
+            "clip": "FirstLevelTrainMealPair4"
+          }
+        ],
+        "threePanePreviews": [
+          "http://127.0.0.1:8136/Preview/index.html?action=TrainMealGiverAuthored",
+          "http://127.0.0.1:8136/Preview/index.html?action=TrainMealReceiverAuthored",
+          "http://127.0.0.1:8136/Preview/index.html?action=TrainMealPairAuthored"
+        ],
+        "pairSharedProp": "One Transform_SharedFoodSlice remains throughout each combined clip; giver/receiver duplicate slices are removed during assembly.",
+        "productionBoundaryChecks": "8 x 721 original-rig authoring frames passed reachable-arm and unchanged seated-lower-body assertions. This is bake-time evidence, not independent export or game regression.",
+        "previewCaptures": 59,
+        "previewErrors": [],
+        "visualReadImages": [
+          {
+            "path": "Preview/FirstLevelMealAuthorV1/Texture_LugouNra01_Giver_Detail_3200.png",
+            "bytes": 474277,
+            "sha256": "0c986fb75ef36086420cec9583c91b4f99f01ce706ddd4de800c4ed7dffe9a2c"
+          },
+          {
+            "path": "Preview/FirstLevelMealAuthorV1/Texture_LugouNra01_Receiver_Detail_9900.png",
+            "bytes": 474497,
+            "sha256": "b66fefdc10895ef6b998fe217d4d533d98348a9ff6ecc9f6cc39ebb2c5bec2a7"
+          },
+          {
+            "path": "Preview/FirstLevelMealAuthorV1/Texture_LugouNra02_Pair_side_7900.png",
+            "bytes": 404802,
+            "sha256": "06b443934f9ac410756f709a09e99878bde3d7d136b16b7ea76b7e197e9d51ee"
+          },
+          {
+            "path": "Preview/FirstLevelMealAuthorV1/Texture_LugouNra03_Pair_three_9900.png",
+            "bytes": 416305,
+            "sha256": "250946c33f5fc563b33fb63c2e497b71e04e32225a727b547c3ac404a296d6bd"
+          },
+          {
+            "path": "Preview/FirstLevelMealAuthorV1/Texture_LugouNra01_Pair_Detail_7900.png",
+            "bytes": 533295,
+            "sha256": "71044182e0ca63ca9bfc5e54df3d82cb00f75bdf7ff0f80f4aabeb0377d6944d"
+          },
+          {
+            "path": "Preview/FirstLevelMealAuthorV1/Texture_LugouNra04_Pair_side_3200.png",
+            "bytes": 398045,
+            "sha256": "a8f48462d4dda249d12a1a860762e0e9de0d0e5a9f7c6e89ee7f2d7ac7c04f48"
+          },
+          {
+            "path": "Preview/FirstLevelMealAuthorV1/Texture_LugouNra04_Pair_side_11800.png",
+            "bytes": 399023,
+            "sha256": "53896e2e37385f68002ef09fa4be3e99160af51bfd8b84069ec6cda1d4b2ec75"
+          },
+          {
+            "path": "Preview/FirstLevelMealAuthorV1/Texture_LugouNra01_Pair_side_0.png",
+            "bytes": 398230,
+            "sha256": "f2dbf3aeeefb5508c23a5cce25288bf2a871046e4352aeda76db2b75e242d010"
+          }
+        ],
+        "observed": "Reviewed eight final captures across all four character variants: cutting, offer/receive, bite and return. Corrected raised cloth flaps and lateral mouth target before final packaging. Contact and naturalness remain candidate work.",
+        "remaining": [
+          "Finger/thumb wrap, knife grip, overlap at handoff and natural wrist/shoulder poses are not accepted; further contact authoring is required.",
+          "Cloth remains rigid geometric flaps, not a deforming wrap. The cut piece is a proxy; cutting topology and realistic bite deformation are not complete.",
+          "Mouth/food surface contact needs per-character refinement; no dense export or surface penetration validation was run.",
+          "Pair seat spacing of 1.14 m is an authoring trial, not current carriage placement. Actor roles, additional recipients, transitions and actual nearby-distance handoffs remain unbound.",
+          "Optional game adoption must preserve current TrainFoodReceived/VoiceEvent and player movement timing. The local 8.3-second marker does not trigger those events."
+        ],
+        "regressionTestRun": false,
+        "denseExportValidationRun": false,
+        "newVideoGeneration": false,
+        "newRecoveryInference": false,
+        "runtimeEnabled": false,
+        "remoteSyncConfirmed": false,
+        "sourceReports": [
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Data_AuthoredBake.json",
+            "bytes": 4208860,
+            "sha256": "de4a1079b433f3dd21c938e12c8949c2ef8cfb6a65aa74067fd83e80ea515c59"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Data_EditableProjects.json",
+            "bytes": 6313,
+            "sha256": "3c9263c84a4b5ec8ba1e81817bc39bf59e982ba0142391451c603c88132483d2"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Data_Versions.json",
+            "bytes": 25622,
+            "sha256": "6bf5db4f625e5bebaed46e474c986e4085056acf5087ca4edf73e4e8589811d5"
+          }
+        ],
+        "pipeline": [
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Pipeline/Data_ReadMe.md",
+            "bytes": 346,
+            "sha256": "396abf865ec98c3f3a21016b9163ec09963266bddcfdfaf34ac5c46faa9ea1fa"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Pipeline/Script_FirstLevelMealAuthor.mjs",
+            "bytes": 16433,
+            "sha256": "371bcce7d4bb61cd262614a8827edd5396b56e9e6901838720ca2d922c96b12a"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Pipeline/Script_FirstLevelMealPreview.mjs",
+            "bytes": 4133,
+            "sha256": "c73da7e3ac12667707085a9acaa94978251520ca3c51afaae2482d29f7c01be6"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Pipeline/Script_FirstLevelMealProject.py",
+            "bytes": 8028,
+            "sha256": "f5139f048699018078893e1200cebbc2c824432b6c856fd7626ede44b2568976"
+          },
+          {
+            "path": "Models/FirstLevelMealAuthorV1/Pipeline/Script_LugouGlbPose.mjs",
+            "bytes": 16246,
+            "sha256": "eb46583182c952ab30ed95da898d5bfc4b046c63f548094835698f7792b3eeee"
+          }
+        ]
+      }
     },
     {
       "requirementId": "FL16",
@@ -22707,7 +23960,7 @@
         "evidence": "Models/FirstLevelTrainGameV2/Data_GameIntegration.json",
         "version": "FirstLevelTrainGameV2",
         "fullCampaignCurrent": false,
-        "compatibilityStatus": "sampler_passed_campaign_failed_retry_cancelled_by_user"
+        "compatibilityStatus": "upstream_changed_revalidation_pending"
       },
       "reviewEvidence": [
         "Models/FirstLevelTrainGameV2/Data_GameIntegration.json"
@@ -25721,7 +26974,7 @@
         "evidence": "Models/FirstLevelTrainGameV2/Data_GameIntegration.json",
         "version": "FirstLevelTrainGameV2",
         "fullCampaignCurrent": false,
-        "compatibilityStatus": "sampler_passed_campaign_failed_retry_cancelled_by_user"
+        "compatibilityStatus": "upstream_changed_revalidation_pending"
       },
       "reviewEvidence": [
         "Models/FirstLevelTrainV1/Data_SelectedExportFidelityValidation.json",

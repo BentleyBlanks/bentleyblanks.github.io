@@ -79,6 +79,8 @@ $('search').oninput=RenderRows;$('reload').onclick=Refresh;await Refresh();setIn
     html=html.replace("missionStatus.requirements.find(r=>r.requirementId===row.requirementId)?.newRecoveryCandidates?.length||0", "(missionStatus.requirements.find(r=>r.requirementId===row.requirementId)?.newRecoveryCandidates?.length||0)+(missionStatus.requirements.find(r=>r.requirementId===row.requirementId)?.newAuthoredCandidates?.length||0)")
     html=html.replace('<th>复用条目</th>', '<th>可复用动作</th>')
     html=html.replace('row.reused.length,integration', "new Set([...row.reused.map(r=>r.id),...(missionStatus.requirements.find(r=>r.requirementId===row.requirementId)?.existingSourceResolutions||[]).flatMap(r=>r.reuseActionIds)]).size,integration")
+    if status.get('currentDelivery',{}).get('status')=='current_meal_candidate_packaged_local_production_closed':
+        html=html.replace('<h1>第一关 · 48 项素材制作</h1>', '<h1>第一关 · 48 项素材制作</h1><p><strong>本机已在切食／递接食 V1 候选打包后结束制作。</strong>48 项尚未全部完成，当前清单供另一台电脑接力；FL14／FL15 可查看单人与双人作者候选。</p>')
     assert '需补拍' not in html and '提交预留积分' not in html
     (out/'index.html').write_text(html,encoding='utf-8')
     print(str(out/'index.html'))
