@@ -42,6 +42,7 @@ import { DestructionEditor } from "./Script_EditorDestruction.mjs";
 import { DebugRenderingEditor } from "./Script_EditorDebugRendering.mjs";
 import { WorldInfoEditor } from "./Script_EditorWorldInfo.mjs";
 import { ProfilerEditor } from "./Script_EditorProfiler.mjs";
+import { AiEditor } from "./Script_EditorAi.mjs";
 import {
   GraphicsSettings, AudioSettings, ControlsSettings, ApplySavedSettings,
 } from "./Script_EditorSettings.mjs";
@@ -62,7 +63,7 @@ const EDITORS = [
 const ALL = [...SETTINGS, ...EDITORS];
 // 渲染调试只读地观察后处理靶，不接管相机，因此允许叠在任意一个互斥编辑器上。
 // 性能剖析同理：它甚至要求玩法照跑（量的就是战斗中的帧），读数在独立窗口里。
-const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, WorldInfoEditor];
+const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, WorldInfoEditor, AiEditor];
 
 export class EditorSuite {
   /**
@@ -143,6 +144,7 @@ export class EditorSuite {
       CloseDebugRendering: () => suite.CloseOverlay(DebugRenderingEditor.id),
       CloseProfiler: () => suite.CloseOverlay(ProfilerEditor.id),
       CloseWorldInfo: () => suite.CloseOverlay(WorldInfoEditor.id),
+      CloseAi: () => suite.CloseOverlay(AiEditor.id),
       // 性能剖析在面板关着（玩法进行中）时要把自己的页面内小面板收起来
       get launcherOpen() { return suite.panelOpen; },
     };

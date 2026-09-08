@@ -17,5 +17,8 @@ node scripts/Script_LocalPreview.mjs --no-open
 
 - 默认端口 8080，被占用时按输出使用实际端口；`/__preview/` 顶部核对服务根目录，确保看到本任务的代码。
 - 无需 npm 安装；支持 Range、游戏资源 MIME、缓存与 Pages 兼容的隔离头。完整参数见 `node scripts/Script_LocalPreview.mjs --help`。
+- 另有两个**只在回环上可用**的调参口（滕县的敌军 AI 编辑器用，见 `Taierzhuang1938/docs/Data_EnemyAi.md` §14.3）：
+  `GET /__tuning/status` 报可不可写；`POST /__tuning/save` 就地改 `Taierzhuang1938/Data_Tuning_*.mjs` 里的**那一个数字字面量**
+  （注释与格式一个字不动）。线上（Pages）没有这个口，编辑器自动退化成「复制 mjs 片段」。
 - Claude Code 的 `preview_start({ name: "preview" })` 使用 `.claude/launch.json`，同样核对端口与服务根目录。
 - 页面变化先本地验收，再推送；纯说明修改按根入口做静态检查。

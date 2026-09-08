@@ -63,6 +63,9 @@ try {
 
   const sample = await page.evaluate(async (anchors) => {
     const T = window.Tengxian;
+    // 受控场（找墙 / 撒班 / 清场 / 摆玩家 / 无敌）整套搬进了 `Script_AiProbeScene`，
+    // 编辑器的「试验场」分节用的是**同一份**：这里量到的行为，设计师能一键复现。
+    const probe = await import("./Script_AiProbeScene.mjs");
     const coverTable = await import("./Data_Tuning_AiCover.mjs");
     const tacticsTable = await import("./Data_Tuning_AiTactics.mjs");
     const firstTable = await import("./Data_Tuning_FirstLevel.mjs");
@@ -81,18 +84,8 @@ try {
 
     const Step = (n) => { for (let i = 0; i < n; i += 1) T.StepFrames(1, 1 / 60, false); };
     const Ground = (x, z) => T.battlefield.GroundHeight(x, z);
-    const Teleport = (x, z, stance = "stand", yaw = 0) => {
-      const p = T.player.position;
-      p.set(x, Ground(x, z) + 0.1, z);
-      T.player.body?.Teleport(p.x, p.y, p.z);
-      T.player.stance = stance;
-      T.player.yaw = yaw;
-      T.player.velocity.set(0, 0, 0);
-      T.player.health = 1e9;
-      T.player.bleeding = 0;
-    };
-    /** 伤亡会把「谁还在掩体里」的分母搅乱：整场无敌，只量行为。 */
-    const Immortal = () => { for (const s of T.ai.soldiers) if (s.alive) s.health = 1e9; };
+    const Teleport = (x, z, stance = "stand", yaw = 0) => probe.PlacePlayer(T, { x, z }, stance, yaw);
+    const Immortal = () => probe.Immortal(T);
     const InCover = (s) => !!s.cover && s.cover.validated
       && Math.hypot(s.cover.hidePos.x - s.position.x, s.cover.hidePos.z - s.position.z)
         < COVER_CYCLE.arriveRadiusM;
@@ -161,85 +154,14 @@ try {
     // ======================================================================
     // B 受控实验：找一堵真墙 + 现撒一支没有剧本旗的普通班
     // ======================================================================
-    // 「墙挡住了」只认碰撞体；「看不看得见」还要过 AI 自己那条判据
-    //（`ctx.BlocksSight` 走第一关运行时，**含地形**）——
-    // 两条不一致的话，挑出来的空地在 AI 眼里可能仍然是看不见的，
-    // 对照组就会量成「同一批枪打不到他」，那是地形不是 AI。
-    const Blocked = (from, to) => {
-      const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
-      const len = Math.hypot(dx, dy, dz) || 1;
-      const hit = T.battlefield.Raycast(from, { x: dx / len, y: dy / len, z: dz / len }, len);
-      return !!hit && hit.t < len - 0.4;
-    };
-    const Unseen = (from, to) => Blocked(from, to) || T.ai.aiHost.BlocksSight(from, to);
-    /**
-     * 挑一堵真的能挡住人的墙：从 22 m 外的射手眼位打过来，
-     * 墙这一侧的蹲姿胸口**打不到**、墙另一侧的站姿胸口**打得到**。
-     * 用射线挑而不是写死坐标：换了地形也不会变成「量地形不量 AI」。
-     *
-     * 射手那一侧还要求身边有掩体点可用 —— 「探头有没有节奏」这条要在
-     * **有掩体的地方**量，站在空地上的人本来就没有 hide/peek 可言。
-     */
-    /** 整班横排的撒兵偏移（米）。挑站点与真正撒兵用的是同一份。 */
-    const SQUAD_OFFSETS = [-4, -2.4, -0.8, 0.8, 2.4, 4];
-    /** 每个撒兵位身边多远之内必须有掩体点（够一两秒走到，量的才是行为）。 */
-    const SEAT_COVER_M = 6;
+    // 「找一堵真的挡得住的墙」整段搬进了 Script_AiProbeScene.PickSite（判据与数一个都没改）：
+    // 「墙挡住了」只认碰撞体，「看不看得见」还要过 AI 自己那条判据（aiHost.BlocksSight，**含地形**）——
+    // 两条不一致的话，挑出来的空地在 AI 眼里可能仍然是看不见的，对照组就会量成
+    // 「同一批枪打不到他」，那是地形不是 AI。射手三档眼高逐档验、整班六个撒兵位逐个验、
+    // 每个位子身边还得有掩体点可进（探头节奏要在有掩体的地方量）。
     /** 投弹那一段把人挪到离玩家多远（落在 GRENADE 的 [minM, maxM] 中段）。 */
     const GRENADE_RANGE_M = 16;
-    const PickSite = (cx, cz) => {
-      // 射手三姿态的眼高（Script_Ai.StanceEye）与玩家站/蹲的眼高。
-      // 站点必须对**每一档**都成立，否则人一蹲下通视就没了 ——
-      // 实测就栽在这儿：挑站点时按 1.35 m 量的，而 AI 蹲下之后眼高只有 1.0 m。
-      const SHOOTER_EYES = [1.5, 1.35, 1.0, 0.85];
-      const PLAYER_STAND_EYE = 1.63;
-      const PLAYER_CROUCH_EYE = 1.15;
-      const list = T.ai.covers.Nearby(cx, cz, 110).filter((c) => c.height >= 1.5);
-      for (const c of list) {
-        for (const sign of [1, -1]) {
-          // 距离要拉到**自动冲锋距离以外**（突击位 24 m 是最远的一档，
-          // 见 Script_Ai 的 chargeRange）：十三米上日军会上刺刀冲过来，
-          // 那时量到的是「会不会冲」不是「会不会躲」。
-          for (const range of [34, 30, 26]) {
-            const shoot = { x: c.x, z: c.z - sign * range };
-            if (T.nav && !T.nav.Walkable(shoot.x, shoot.z)) continue;
-            const hideAt = { x: c.x, z: c.z + sign * 1.2 };
-            const openAt = { x: c.x, z: c.z - sign * 1.8 };
-            const shootY = Ground(shoot.x, shoot.z);
-            const hide = { x: hideAt.x, y: Ground(hideAt.x, hideAt.z) + PLAYER_CROUCH_EYE, z: hideAt.z };
-            const open = { x: openAt.x, y: Ground(openAt.x, openAt.z) + PLAYER_STAND_EYE, z: openAt.z };
-            let ok = true;
-            for (const eye of SHOOTER_EYES) {
-              const from = { x: shoot.x, y: shootY + eye, z: shoot.z };
-              // 墙那一侧：每一档眼高都不许通（真挡得住）
-              if (!Blocked(from, hide)) { ok = false; break; }
-              // 空地那一侧：每一档眼高都要通（含地形与剧本遮挡）
-              if (Unseen(from, open)) { ok = false; break; }
-            }
-            if (!ok) continue;
-            // 整班是横着一排撒的，通视要**逐个撒兵位**验：只验中心那一个的话，
-            // 两翼的人可能被土坎挡着，量出来就是「一个班只有一个人在打」。
-            const seats = SQUAD_OFFSETS.filter((dx) => {
-              const sx = shoot.x + dx;
-              const sy = Ground(sx, shoot.z);
-              for (const eye of SHOOTER_EYES) {
-                if (Unseen({ x: sx, y: sy + eye, z: shoot.z }, open)) return false;
-              }
-              // 身边要真的有掩体可进：站在离最近的墙八米开外，量出来的是「跑了多久」
-              // 而不是「会不会躲」——被压制趴下的人爬八米要十秒以上。
-              return T.ai.covers.Nearby(sx, shoot.z, SEAT_COVER_M).length > 0;
-            });
-            if (seats.length < 4) continue;
-            // 玩家要面朝那支班：侧翼锥按玩家朝向算，背对着他们的话「绕出正面锥」
-            // 一开始就成立，量出来的是零。yaw=0 面朝 -Z，yaw=π 面朝 +Z。
-            return { cover: { x: c.x, z: c.z, height: c.height }, hide: hideAt, open: openAt, shoot,
-              rangeM: range, yaw: sign > 0 ? 0 : Math.PI, seats,
-              coversAtShoot: T.ai.covers.Nearby(shoot.x, shoot.z, 12).length };
-          }
-        }
-      }
-      return null;
-    };
-    const site = PickSite(anchors.village.x, anchors.village.z);
+    const site = probe.PickSite(T, anchors.village.x, anchors.village.z);
     out.site = site ? {
       cover: { x: +site.cover.x.toFixed(1), z: +site.cover.z.toFixed(1), h: +site.cover.height.toFixed(2) },
       hide: { x: +site.hide.x.toFixed(1), z: +site.hide.z.toFixed(1) },
@@ -250,35 +172,20 @@ try {
     } : null;
     if (!site) return out;
 
-    // 人口上限是给正片配的（同屏 56 人）；探针要在正片之外再加一支班。
-    T.ai.maxAlive = 200;
-    // **B 段把场上清成「一个班对一个玩家」**（事后原样还原）。三个理由，每一个都
-    // 足以单独否掉「就在正片里量」：
-    //   · `COMBAT.maxShootersOnPlayer` 是全场共享的三个名额，正片前沿在 A 段已经占满，
-    //     这支班一个都拿不到，于是转去打一百米外的国军；
-    //   · 具名同伴会跟着玩家跑，探针班眼前最近的敌人变成同伴而不是玩家；
-    //   · `ai.fireCount` 是全场计数，混着前沿几十号人根本读不出「这支班打了几发」。
+    // 撒班与清场也在 `Script_AiProbeScene` 里（人口上限、波次预算、花名册的存取一字未改）：
+    //   · 人口上限是给正片配的（同屏 56 人），撒兵那几行临时抬一下；
+    //   · **B 段把场上清成「一个班对一个玩家」**（事后由 Restore 原样还原）。三个理由，
+    //     每一个都足以单独否掉「就在正片里量」：`COMBAT.maxShootersOnPlayer` 是全场共享的
+    //     三个名额（A 段已经占满，这支班转去打一百米外的国军）；具名同伴会跟着玩家跑，
+    //     探针班眼前最近的敌人变成同伴；`ai.fireCount` 是全场计数，混着前沿读不出这支班打了几发。
+    //   · 补兵会往清空后的表里塞人（`UpdateWaves`），所以先把这一关的波次预算用光。
     // 与 `Script_AiBehaviorTest` 里过热对账那一段是同一类归一化：把要量的东西单独拎出来。
-    const roster = T.ai.soldiers.slice();
-    // 补兵会往清空后的表里塞人（`UpdateWaves`）：先把这一关的波次预算用光。
-    rt.waves = { spawned: 1e9, squads: 0, nextAt: 1e18 };
-    const squad = [];
-    for (let i = 0; i < 6; i += 1) {
-      const s = T.ai.Spawn("ija", site.shoot.x - 7 + i * 2.8, site.shoot.z,
-        { weapon: "Type38", squadId: "AiProbeSquad" });
-      if (!s) continue;
-      s.health = 1e9;
-      s.grenades = R.enemyGrenades;
-      // 先钉住：隔墙那一对实验要的是同一批枪、同一个距离，不能让他们绕过来。
-      s.holdZone = { id: "AiProbeHold", x: s.position.x, z: s.position.z, radius: 2 };
-      s.scriptCoverSlackM = R.defendCoverSlackM;
-      s.order = "hold";
-      squad.push(s);
-    }
+    const squad = probe.SpawnProbeSquad(T, site, {
+      count: 6, weapon: "Type38", grenades: R.enemyGrenades, coverSlackM: R.defendCoverSlackM,
+    });
     out.squad = squad.length;
     // 清场：只留这支班。玩家不在 ai.soldiers 里，所以他照常存在。
-    T.ai.soldiers.length = 0;
-    for (const s of squad) T.ai.soldiers.push(s);
+    const RestoreRoster = probe.IsolateSquad(T, squad, { runtime: rt });
     out.nearestFriendly = (() => {
       let d = 1e9;
       for (const s of T.ai.soldiers) {
@@ -483,11 +390,8 @@ try {
       };
     }
 
-    // 还原场上人口（新撒的那一班留着，方便覆盖层与快照有东西可看）。
-    const kept = T.ai.soldiers.slice();
-    T.ai.soldiers.length = 0;
-    for (const s of roster) T.ai.soldiers.push(s);
-    for (const s of kept) if (!roster.includes(s)) T.ai.soldiers.push(s);
+    // 还原场上人口 / 波次预算 / 人口上限（新撒的那一班留着，方便覆盖层与快照有东西可看）。
+    RestoreRoster();
     out.debug = T.Debug.Ai.State();
     out.debugOne = squad.length ? T.Debug.Ai.State(squad[0].id) : null;
     // 覆盖层：把玩家挪到班边上、面朝他们，再开一次、推一帧、数标签 ——

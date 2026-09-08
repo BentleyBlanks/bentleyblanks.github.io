@@ -353,3 +353,63 @@ body.edToolsOpen:has(#edRoot:not(.off)) #menu:not(.off) .mnTitle { visibility: h
 
 /* Empty status messages do not take up space in compact testing panels. */
 .edNote:empty { display: none; }
+
+/* --- 敌军 AI 编辑器（叠加层） -------------------------------------------- */
+/* 位置：让开左侧入口面板与 Debug Rendering（left:238，宽 368），也不占右侧互斥
+   编辑器的位子 —— 这三样常常同时开着。窄屏由下面的媒体查询接管。 */
+.edPanel.ai { left: 620px; right: auto; width: 420px; bottom: 18px; }
+
+/* 六个分节常驻 DOM（外部按 [data-page] 数得到六个），只有当前那一页显示。 */
+.edAiPage { display: none; }
+.edAiPage.on { display: block; }
+.edAiPages { position: sticky; top: -12px; z-index: 1; background: var(--ui-panel); padding: 2px 0 4px; margin: -2px 0 4px; }
+
+/* 直方图：名字 / 横条 / 数字三列，只改宽度与文字，不重建行。 */
+.edAiBars .r { display: flex; align-items: center; gap: 6px; padding: 1px 0; font-size: 11.5px; }
+.edAiBars .r > .n { flex: 0 0 92px; color: var(--ui-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.edAiBars .r > .t { flex: 1 1 auto; height: 8px; background: rgba(214, 217, 209, 0.10); position: relative; }
+.edAiBars .r > .t > i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--ui-gold); }
+.edAiBars .r > .v { flex: 0 0 30px; text-align: right; }
+
+/* 行为图 */
+.edAiGraph { border: 1px solid rgba(214, 217, 209, 0.14); background: rgba(0, 0, 0, 0.3); margin: 4px 0; }
+.edAiGraph svg { display: block; width: 100%; height: auto; }
+.edAiGraph .e { stroke: rgba(214, 217, 209, 0.26); stroke-width: 1; fill: none; }
+.edAiGraph .e.hot { stroke: var(--ui-gold); stroke-width: 2; }
+.edAiGraph .hit { stroke: transparent; stroke-width: 9; fill: none; }
+.edAiGraph .n rect { fill: rgba(10, 12, 12, 0.88); stroke: rgba(214, 217, 209, 0.3); stroke-width: 1; }
+.edAiGraph .n.hot rect { fill: rgba(30, 34, 30, 0.95); stroke-width: 1.6; }
+.edAiGraph .n.sel rect { fill: var(--ui-selection); stroke: var(--ui-gold); stroke-width: 2; }
+.edAiGraph text { fill: var(--ui-text); font: 8px var(--ui-font); text-anchor: middle; }
+.edAiGraph text.c { fill: var(--ui-muted); font: 8px ui-monospace, Consolas, monospace; }
+.edAiGraph .n.sel text { fill: var(--ui-gold); }
+
+/* 状态时间带：一格一次状态切换，宽度按持续时长 */
+.edAiBand {
+  position: relative; height: 18px; margin: 5px 0 2px; overflow: hidden;
+  border: 1px solid rgba(214, 217, 209, 0.18); background: rgba(0, 0, 0, 0.35);
+}
+.edAiBand > i { position: absolute; top: 0; bottom: 0; }
+
+/* 调参：一次只显示一张表 */
+.edAiTable { display: none; }
+.edAiTable.on { display: block; }
+/* 表选择器钉在分页 Chips 底下（那一条高 32 px、起点 −12 px，所以正好 20 px）：
+   两百多根滑杆滚起来，找不到「我现在在哪张表」比找不到某一根还难受。 */
+.edAiTables { position: sticky; top: 20px; z-index: 1; background: var(--ui-panel); padding: 4px 0; margin: 0 0 4px; }
+/* 行为图点边跳过来的那一行闪一下 —— 二百多根滑杆里找不到「就是这根」 */
+@keyframes edAiFlash {
+  0%, 100% { background: transparent; }
+  20%, 60% { background: rgba(223, 189, 104, 0.28); }
+}
+.edAiFlash { animation: edAiFlash 1.1s linear 1; }
+
+@media (max-width: 1200px) {
+  .edPanel.ai { left: 238px; width: min(420px, calc(100vw - 266px)); }
+}
+@media (max-width: 900px) {
+  .edPanel.ai { left: 174px; width: min(360px, calc(100% - 188px)); }
+}
+@media (max-width: 600px) {
+  .edPanel.ai { left: 10px; right: 10px; width: auto; top: 84px; bottom: 10px; z-index: 1; }
+}

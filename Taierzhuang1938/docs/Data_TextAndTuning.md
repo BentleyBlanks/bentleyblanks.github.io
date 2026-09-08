@@ -95,6 +95,7 @@ export const JUMP = Object.freeze({
 - 一个系统一张表，导出**分组的冻结对象**（`JUMP` / `STANCE` / `SIGHT` …），不是一个大杂烩。
 - **注释跟着数走**：原来写在代码常量旁的「为什么是这个数」整段搬进表文件，代码里不留孤儿注释。
 - 表是纯数据：不 import three、不 import 规则代码、不含函数（派生量由代码算，或表里写公式的输入而不是输出）。
+- 冻结由环境定：`Data_Tuning_Ai*.mjs` 顶部一行 `Freeze`，本机预览或 `?aiedit=1` 时不冻结，敌军 AI 编辑器才能就地改数并存回源码（`docs/Data_EnemyAi.md` §14.4）；线上与纯 Node 测试里照旧冻结。
 - 代码 `import { JUMP } from "./Data_Tuning_Player.mjs"`，读 `JUMP.speedMps`；**不复制到本地常量再用**
   （否则热改表不生效、测试读到两个真相）。
 - 测试断言从表里读期望值，不抄数（JumpTest 那条「判据取 `Debug.Traversal()`、断言里不抄数」的规矩推广到所有表）。

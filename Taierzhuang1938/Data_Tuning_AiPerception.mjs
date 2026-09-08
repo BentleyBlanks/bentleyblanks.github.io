@@ -40,9 +40,13 @@
  * engagedTargetOmni  已经 ENGAGED 的人对**当前目标**全向感知（他一直盯着那个人，
  *              背对着也知道对方在哪）。**对新目标仍然走视锥** —— 不然又变回旧的 360° 全知。
  */
-export const FOV = Object.freeze({
-  halfAngleDeg: Object.freeze({ unaware: 60, suspicious: 78, alert: 100, engaged: 115 }),
-  stanceScale: Object.freeze([1.0, 0.95, 0.70]),
+// 表在本地可编辑（docs/Data_EnemyAi.md §14.4）：index.html 在本机预览或 ?aiedit=1 时置起
+// TAIERZHUANG_TUNING_EDITABLE，敌军 AI 编辑器才能就地改数；线上与纯 Node 测试里照旧冻结。
+const Freeze = (typeof globalThis === "object" && globalThis.TAIERZHUANG_TUNING_EDITABLE) ? (value) => value : Object.freeze;
+
+export const FOV = Freeze({
+  halfAngleDeg: Freeze({ unaware: 60, suspicious: 78, alert: 100, engaged: 115 }),
+  stanceScale: Freeze([1.0, 0.95, 0.70]),
   muzzleFlashBonusDeg: 25,
   omniRadiusM: 6,
   engagedTargetOmni: true,
@@ -85,7 +89,7 @@ export const FOV = Object.freeze({
  * minDwellS 0.5：两次级别变化的最小间隔。级别可以**跨级跳**（贴脸枪焰 unaware→engaged
  *   一步到位），所以这条不会拖慢反应，只挡抖动。
  */
-export const AWARENESS = Object.freeze({
+export const AWARENESS = Freeze({
   riseBasePerS: 1.5,
   nearGain: 2.6,
   edgeGain: 0.55,
@@ -95,8 +99,8 @@ export const AWARENESS = Object.freeze({
   firingFillsTo: 1,
   decayDelayS: 0.8,
   decayPerS: 0.30,
-  thresholds: Object.freeze({ suspicious: 0.25, alert: 0.55, engaged: 0.85 }),
-  release: Object.freeze({ suspicious: 0.15, alert: 0.42, engaged: 0.70 }),
+  thresholds: Freeze({ suspicious: 0.25, alert: 0.55, engaged: 0.85 }),
+  release: Freeze({ suspicious: 0.15, alert: 0.42, engaged: 0.70 }),
   minDwellS: 0.5,
 });
 
@@ -124,8 +128,8 @@ export const AWARENESS = Object.freeze({
  *   听觉写入的 LKP 带定位误差，随距离比线性放大。这就是玩家能感觉到的
  *   「他们朝我刚才那边打，但没打准地方」；误差用 `host.Rnd()` 出（确定性）。
  */
-export const HEARING = Object.freeze({
-  loudnessM: Object.freeze({
+export const HEARING = Freeze({
+  loudnessM: Freeze({
     gunshot: 150, machinegun: 200, explosion: 260, footstep: 9, bark: 35, impact: 60,
   }),
   minLoudnessM: 1,
@@ -133,7 +137,7 @@ export const HEARING = Object.freeze({
   confidenceEdge: 0.20,
   curveExp: 1.35,
   awarenessCap: 0.72,
-  localizationErrorM: Object.freeze({ near: 0.4, edge: 7.0 }),
+  localizationErrorM: Freeze({ near: 0.4, edge: 7.0 }),
 });
 
 /**
@@ -152,7 +156,7 @@ export const HEARING = Object.freeze({
  *   （当前锁定的目标永不被淘汰）。
  * seenConfidence 1：亲眼看见时写入的置信度上限。
  */
-export const MEMORY = Object.freeze({
+export const MEMORY = Freeze({
   memoryS: 12,
   confidenceDecayPerS: 0.075,
   minConfidence: 0.05,
@@ -174,7 +178,7 @@ export const MEMORY = Object.freeze({
  * visibleRangeSlack 1.12：复核**旧目标**时的距离余量，与 Script_Ai 的 `* 1.12` 同源：
  *   已经锁上的人不该因为退后一米跨出发现距离就凭空消失。
  */
-export const LOCK = Object.freeze({
+export const LOCK = Freeze({
   keepBlindS: 1.2,
   forgetS: 5.0,
   switchDistanceRatio: 0.50,
@@ -192,22 +196,22 @@ export const LOCK = Object.freeze({
  * 这个先验只用来让「要不要现在开火 / 要不要先换个位置」这类**决策**有个便宜的输入。
  * 看不见时恒为 0 —— 对应 §4.3 的「fraction = 0 不许结算命中，只能压制射击」。
  */
-export const EXPOSURE = Object.freeze({
-  byStance: Object.freeze([1.0, 0.62, 0.34]),
+export const EXPOSURE = Freeze({
+  byStance: Freeze([1.0, 0.62, 0.34]),
 });
 
 /**
  * 宿主回调缺席时的兜底。纯 Node 测试与早期集成会出现 host 没接全的情况；
  * 静默用站姿的发现距离比抛异常好 —— 感知层坏掉不该让整场仗停下来。
  */
-export const FALLBACK = Object.freeze({
+export const FALLBACK = Freeze({
   sightRangeM: 120,
   eyeM: 1.5,
   rnd: 0.5,
 });
 
 /** 一张表一个入口：规则层 `import { PERCEPTION }` 读这一个对象。 */
-export const PERCEPTION = Object.freeze({
+export const PERCEPTION = Freeze({
   fov: FOV,
   awareness: AWARENESS,
   hearing: HEARING,

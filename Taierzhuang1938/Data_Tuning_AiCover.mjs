@@ -20,7 +20,11 @@
  *   ② 其它条件相同，法线更正对威胁的分更高 → alignment > 0；
  *   ③ 其它条件相同，射线验证「真的挡住了」的分更高 → validatedCrouched > validatedFail。
  */
-export const COVER_WEIGHTS = Object.freeze({
+// 表在本地可编辑（docs/Data_EnemyAi.md §14.4）：index.html 在本机预览或 ?aiedit=1 时置起
+// TAIERZHUANG_TUNING_EDITABLE，敌军 AI 编辑器才能就地改数；线上与纯 Node 测试里照旧冻结。
+const Freeze = (typeof globalThis === "object" && globalThis.TAIERZHUANG_TUNING_EDITABLE) ? (value) => value : Object.freeze;
+
+export const COVER_WEIGHTS = Freeze({
   /** 每米直线距离。旧 `FindCover` 是 -0.5/m，配 6 分的高度项 —— 于是二十米外
    *  高半米的墙能压过身边的墙。这里把标尺定成 1 分/米，别的项按它重新配。 */
   distanceM: -1.0,
@@ -79,7 +83,7 @@ export const COVER_WEIGHTS = Object.freeze({
  * 性能口径（docs/Data_EnemyAi.md §7）：Query 走空间散列邻域，候选 ≤ maxCandidates，
  * 射线验证 ≤ maxValidate 个 × 2 条，结果按 validCacheS 缓存。
  */
-export const COVER = Object.freeze({
+export const COVER = Freeze({
   /** 「高掩体」阈值：站姿眼高 1.5 m（StanceEye(0)）+ 0.05 m 余量。
    *  ≥ 这个高度才藏得住一个站着的人，于是才谈得上「贴墙站 + 侧步探头」；
    *  以下的一律当矮掩体（蹲藏 / 跪射探头）。
@@ -165,7 +169,7 @@ export const COVER = Object.freeze({
  * `Script_AiCover` 自己不读；放在同一张表里是因为「探头多久」和「侧步多远」是同一件事的两半，
  * 分到两个文件里改一半忘一半。
  */
-export const COVER_CYCLE = Object.freeze({
+export const COVER_CYCLE = Freeze({
   /** 两次重选掩体的最小间隔（秒）。被判侧翼 / 压制爆表 / 掩体被炸是例外，可以立刻重选。 */
   reselectMinS: 2.5,
 

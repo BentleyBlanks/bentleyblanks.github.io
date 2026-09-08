@@ -2682,6 +2682,10 @@ async function Boot() {
       FinishEditorSession: () => FinishEditorSession(),
       get battlefield() { return battlefield; },
       get player() { return player; },
+      // 敌军 AI 编辑器（Script_EditorAi）读这三样：导演、投掷链、导航场。
+      get ai() { return ai; },
+      get combat() { return combat; },
+      get nav() { return ai?.ctx?.nav ?? null; },
       get currentWeapon() { return currentWeapon; },
       get currentWeaponVariant() { return SlotWeaponVariant(state.activeSlot); },
     },

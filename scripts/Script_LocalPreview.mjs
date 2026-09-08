@@ -26,6 +26,9 @@ import path from "node:path";
 import os from "node:os";
 import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+// 敌军 AI 编辑器的「保存到源码」（docs/Data_EnemyAi.md §14.3）。改写器是纯 Node、
+// 不认识 http：这一层只负责回环校验、白名单与原子写回。
+import { ApplyTuningChanges, TUNING_FILE_RE } from "../Taierzhuang1938/Script_TuningWriter.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "..");
@@ -357,6 +360,14 @@ function CreateServer(rootDir, context) {
       return;
     }
 
+    // 调参表的读写口（敌军 AI 编辑器；只在回环上可写）。必须排在下面那道
+    // 「只收 GET/HEAD」之前 —— 排在后面的话 POST 永远被 405 挡掉。
+    if (route === "/__tuning/status") {
+      SendJson(response, 200, { writable: IsLoopback(request), root: rootDir });
+      return;
+    }
+    if (route === "/__tuning/save") { await HandleTuningSave(request, response, rootDir); return; }
+
     if (request.method !== "GET" && request.method !== "HEAD") { response.writeHead(405).end(); return; }
     const filePath = path.join(rootDir, route);
     if (!filePath.startsWith(rootDir)) { response.writeHead(403).end(); return; }
@@ -381,6 +392,105 @@ function CreateServer(rootDir, context) {
       SendFile(request, response, filePath, stat);
     });
   });
+}
+
+// -------------------------------------------------- 调参表保存（只在本地）
+//
+// 敌军 AI 编辑器拖完滑杆要能存回源码（docs/Data_EnemyAi.md §14.3）：
+//   GET  /__tuning/status → { writable: true }
+//   POST /__tuning/save   { file: "Taierzhuang1938/Data_Tuning_AiCover.mjs",
+//                           changes: [{ path: "COVER.standoffM", value: 0.7 }] }
+//                        → { ok: true, applied: 1, changes: [{path, from, to}], missing: [] }
+//
+// 这是一个**能写用户仓库的端点**，所以四道闸一道都不能省：
+//   ① 只接回环地址（`--lan` 起服时局域网上的人拿不到写权限，status 直接回 writable:false）；
+//   ② 文件名必须匹配 `Taierzhuang1938/Data_Tuning_*.mjs`（正则本身就排除了 `..`）；
+//   ③ 解析出来的绝对路径必须落在这次服务的根之下；
+//   ④ body ≤ 256 KB。
+// 写回走「先写 .tmp 再 rename」：Ctrl+C 落在写一半的那一瞬时，表要么是旧的要么是新的，
+// 不会变成半个文件 —— 那会让整个页面白屏，而且看起来像编辑器把表写坏了。
+const TUNING_BODY_LIMIT = 256 * 1024;
+
+function IsLoopback(request) {
+  const address = request.socket?.remoteAddress || "";
+  return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
+}
+
+function SendJson(response, status, payload) {
+  response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+  response.end(JSON.stringify(payload));
+}
+
+// 超限之后**继续把流读完再报错**，不 destroy 请求：半路掐断连接，客户端拿到的是
+// 一个 socket 错误而不是那句「body 超过 256 KB」，看起来就像本地服务器崩了。
+// 只有夸张到 32 倍上限时才真掐（那已经不是「改错了一个数」，是在灌数据）。
+function ReadBody(request, limit) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    let overflow = false;
+    request.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        overflow = true;
+        chunks.length = 0;
+        if (size > limit * 32) { request.destroy(); reject(new Error("body 太大")); }
+        return;
+      }
+      chunks.push(chunk);
+    });
+    request.on("end", () => {
+      if (overflow) reject(new Error("body 超过 256 KB"));
+      else resolve(Buffer.concat(chunks).toString("utf8"));
+    });
+    request.on("error", reject);
+  });
+}
+
+async function HandleTuningSave(request, response, rootDir) {
+  if (request.method !== "POST") { SendJson(response, 405, { ok: false, error: "只收 POST" }); return; }
+  if (!IsLoopback(request)) { SendJson(response, 403, { ok: false, error: "只接受回环地址" }); return; }
+  let body;
+  try { body = await ReadBody(request, TUNING_BODY_LIMIT); } catch (error) {
+    SendJson(response, 400, { ok: false, error: error.message });
+    return;
+  }
+  let payload;
+  try { payload = JSON.parse(body); } catch { SendJson(response, 400, { ok: false, error: "body 不是 JSON" }); return; }
+  const file = payload && typeof payload.file === "string" ? payload.file : "";
+  if (!TUNING_FILE_RE.test(file)) {
+    SendJson(response, 403, { ok: false, error: "file 必须是 Taierzhuang1938/Data_Tuning_*.mjs" });
+    return;
+  }
+  if (!Array.isArray(payload.changes) || payload.changes.length === 0) {
+    SendJson(response, 400, { ok: false, error: "changes 要是非空数组" });
+    return;
+  }
+  const filePath = path.resolve(rootDir, file);
+  if (filePath !== path.join(rootDir, file) || !filePath.startsWith(rootDir + path.sep)) {
+    SendJson(response, 403, { ok: false, error: "路径不在服务根之下" });
+    return;
+  }
+  let source;
+  try { source = fs.readFileSync(filePath, "utf8"); } catch {
+    SendJson(response, 400, { ok: false, error: `这棵树里没有 ${file}` });
+    return;
+  }
+  try {
+    const result = ApplyTuningChanges(source, payload.changes);
+    if (result.source !== source) {
+      const temporary = `${filePath}.tmp`;
+      fs.writeFileSync(temporary, result.source, "utf8");
+      fs.renameSync(temporary, filePath);
+    }
+    console.log(`  /__tuning/save ${file}：改了 ${result.applied.length} 个`
+      + `${result.missing.length ? `，${result.missing.length} 个没对上（${result.missing.join(", ")}）` : ""}`);
+    SendJson(response, 200, {
+      ok: true, file, applied: result.applied.length, changes: result.applied, missing: result.missing,
+    });
+  } catch (error) {
+    SendJson(response, 500, { ok: false, error: String(error && error.message ? error.message : error) });
+  }
 }
 
 function LanAddresses(port) {
@@ -450,7 +560,10 @@ const HELP = `本地预览服 —— 按线上同款路径把整棵树跑在 127
   node scripts/Script_LocalPreview.mjs --no-open    不自动开浏览器（跑测试/给 agent 用）
   node scripts/Script_LocalPreview.mjs --root=<dir> 指定要服务的目录
 
-索引页在 http://127.0.0.1:<port>/__preview/ ：列出所有页面，并能把任意 worktree 挂到相邻端口。`;
+索引页在 http://127.0.0.1:<port>/__preview/ ：列出所有页面，并能把任意 worktree 挂到相邻端口。
+调参表保存口（敌军 AI 编辑器，只在回环上可写）：GET /__tuning/status；POST /__tuning/save
+  { file: "Taierzhuang1938/Data_Tuning_AiCover.mjs", changes: [{ path: "COVER.standoffM", value: 0.7 }] }
+  只替换那一个数字字面量，注释与格式一个字不动（Taierzhuang1938/Script_TuningWriter.mjs）。`;
 
 async function Main() {
   const args = process.argv.slice(2);

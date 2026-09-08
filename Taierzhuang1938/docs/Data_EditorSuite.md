@@ -11,7 +11,7 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 外观与操作验收见 [主菜单文档](Data_MainMenu.md) 的 `--interface-only`；相机、设置持久化与
 编辑工具功能继续由 `Script_EditorTest.mjs` 验证。
 
-开发用的十五个互斥编辑器、两个可叠加渲染工具 + 一个入口面板。**不对玩家开放**：出图模式（`?shot=1`）下整棵
+开发用的十五个互斥编辑器、四个可叠加工具（Debug Rendering / Profiler / WorldInfo / 敌军 AI）+ 一个入口面板。**不对玩家开放**：出图模式（`?shot=1`）下整棵
 DOM 是 `display:none`，任何截图里都不会有它。
 
 ## 精简测试界面
@@ -466,6 +466,50 @@ TAA 之前用同一张 hdr 靶与深度再画一遍）：画的是 Rapier 世界
 
 只读玩家控制器，不跟随编辑器/过场相机，也不修改角色。读数每 0.1 秒刷新；场景加载时清空旧数据。关闭工具目录或切换其他编辑器时保留，关闭独立窗口、再次点击入口或「全部关掉」时退出；宿主页面离开和套件销毁时关闭窗口。浏览器拦截弹窗时开关恢复关闭。
 
+### 敌军 AI `Script_EditorAi.mjs`（叠加层）
+
+入口：设置 · 工具 → 调试 → 敌军 AI。与 Debug Rendering / Profiler 同组：不接管相机、不暂停玩法、
+不碰指针锁，`static keepOnClose = true` —— 它要看的东西（谁选了哪个掩体、谁探头、谁拿到攻击令牌）
+**只在打仗时存在**，关面板回去打正是主用例。停它：面板里再点一次、叉掉浮窗，或「全部关掉」。
+设计口径与验收在 [Data_EnemyAi.md §14](Data_EnemyAi.md)。
+
+六个分节用 Chips 切页，DOM 常驻（冒烟按 `.edPanel.ai [data-page]` 数得到六个）：
+
+| 分节 | 有什么 | 读的是谁 |
+| --- | --- | --- |
+| 概览 | 存活/掩体/令牌/射线每秒/压制:瞄准/探头的读数板 + 状态、任务、警戒三张横条直方图 | `AiDirector.DebugState()` |
+| 行为图 | `Data_AiBrainGraph.BRAIN_GRAPH` 画成 SVG：节点=状态（显示当前人数）、边=转移（`when` 在 title 里）；选中的兵所在节点与他最近走过的边高亮；**点边跳到「调参」里那根滑杆并闪一下** | `BRAIN_GRAPH` + `DebugState().states` + `stateLog` |
+| 单兵 | 按到相机距离排序的活人列表（前 40）、「跟随最近的敌人」开关、`DebugSoldier` 全字段读数、30 s 状态时间带 | `AiDirector.DebugSoldier(s)` |
+| 世界 | 七个图层开关 + 掩体点色例 + 开销读数；「头顶标签」直接开关 `?aidebug=1` 那套 DOM 标签 | 见下 |
+| 调参 | 五张表的数值叶子自动列成滑杆（布尔给开关），按表 Chips 切、按导出名分节；「重置到文件值 / 复制 mjs 片段 / 保存到源码」 | 见下 |
+| 试验场 | 「撒一个班（对面有墙）/ 玩家无敌 / 清场还原 / 重置本局 AI 记忆」 | `Script_AiProbeScene.mjs` |
+
+**世界叠加**画的是：选中者的标杆、水平视锥（半角 = `FOV.halfAngleDeg[警戒] × stanceScale[姿态]`，
+远弧在当前 `SightRange` 上、近弧 15 m，脚下一圈是 `omniRadiusM`）、到目标的通视线（通=绿/挡=红）、
+LKP 十字、掩体的隐蔽位/射击位/法线、`task.point`、班组连到本班重心、相机 60 m 内的掩体点
+（验证过=绿 / 选上未验证=黄 / 被占=蓝 / 无=灰）。
+
+三条实现纪律，改的时候别破坏：
+
+- **线段与点不进 `scene`。** 走 `post.AddDebugOverlay`（没有后处理管线时才退回 `scene.add`）——
+  进了场景图会被预通道当几何写法线、被线框着色模式的覆盖材质换掉、被 SSAO 当遮挡物。
+  查「挂上了没有」用 `tool.OverlayAttached()`：post 那条路是一个 Set，`root.parent` 永远是 null。
+- **每帧只写属性，不建对象。** 两块预分配的 `BufferGeometry` + `setDrawRange`；`Nearby` 与掩体点的
+  地表采样一起限流到 0.5 s、最多 400 个点；面板 DOM 4 Hz、行为图 2 Hz。实测每帧 0.1–0.2 ms。
+- **曝光补偿峰值压到 0.75**，不是补满 1.0。补满会被 ACES 拉成白色，「绿=通视/红=被挡」这类
+  靠颜色说话的层当场作废（实拍过）。
+
+**调参**枚举五张表（`Data_Tuning_Ai` 只收 `BRAIN / ENGAGE / SQUAD`，其余四张全收）的 270 个数值叶子。
+两条枚举口径：同一个对象只列一次；**凡是自己有导出名的对象，聚合根一律不往里走**
+（`COVER.weights === COVER_WEIGHTS`，不这么办那十四个权重会被叫成 `COVER.weights.*`，
+行为图点边就跳不过去）。滑杆量程默认 0—4×文件值（文件值为 0 时 0—1）。改动**直接写回表对象**，
+四个模块都在调用时读表，下一次 Think 就生效 —— 前提是表没被冻住（`Data_EnemyAi.md` §14.4：
+本机 localhost / `?aiedit=1` 才不冻）；冻着时面板顶部写明「只读」并禁用全部滑杆。
+「保存到源码」先问 `GET /__tuning/status`，可写才按文件分组 `POST /__tuning/save`；
+404 或失败一律**退化为复制片段**并把原因写在面板上，不静默失败。
+
+冒烟：`node Taierzhuang1938/Script_AiEditorTest.mjs`（浏览器，29 条）。
+
 ### Profiler `Script_EditorProfiler.mjs`（叠加层，独立窗口）
 
 与 Debug Rendering 同在「调试」组，不接管相机、不暂停玩法 ——
@@ -570,6 +614,7 @@ battlefield 取值器 / PHASES / JumpToLevel），以及 `studio` / `flycam` / `
 ```
 node Taierzhuang1938/Script_EditorTest.mjs
 node Taierzhuang1938/Script_DestructionEditorTest.mjs
+node Taierzhuang1938/Script_AiEditorTest.mjs
 ```
 
 编辑器套件 169 条断言（2026-09-05 计），另有破坏预览专项取证；退出码即成败。重点不是「能不能打开」，

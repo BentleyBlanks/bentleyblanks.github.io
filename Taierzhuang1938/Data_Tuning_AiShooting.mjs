@@ -68,17 +68,21 @@
  * halfRad          `AimErrorCurve` 的半衰误差：超出 floor 这么多时命中率打对折。
  *                  0.030 rad 与 initial−floor 同量级 —— 刚探头那一发约为满值的 0.3 倍。
  */
-export const AIM = Object.freeze({
-  initialErrorRad: Object.freeze({
+// 表在本地可编辑（docs/Data_EnemyAi.md §14.4）：index.html 在本机预览或 ?aiedit=1 时置起
+// TAIERZHUANG_TUNING_EDITABLE，敌军 AI 编辑器才能就地改数；线上与纯 Node 测试里照旧冻结。
+const Freeze = (typeof globalThis === "object" && globalThis.TAIERZHUANG_TUNING_EDITABLE) ? (value) => value : Object.freeze;
+
+export const AIM = Freeze({
+  initialErrorRad: Freeze({
     boltRifle: 0.055, lmg: 0.070, hmg: 0.050, pistol: 0.095, default: 0.060,
   }),
-  floorRad: Object.freeze({
+  floorRad: Freeze({
     boltRifle: 0.0090, lmg: 0.0165, hmg: 0.0110, pistol: 0.0320, default: 0.0140,
   }),
-  convergePerS: Object.freeze({
+  convergePerS: Freeze({
     boltRifle: 1.70, lmg: 1.35, hmg: 1.15, pistol: 2.20, default: 1.50,
   }),
-  stanceScale: Object.freeze([1.0, 0.86, 0.74]),
+  stanceScale: Freeze([1.0, 0.86, 0.74]),
   suppressedInitialScale: 1.6,
   disturbMovingPerS: 0.085,
   disturbSuppressionPerS: 0.070,
@@ -142,7 +146,7 @@ export const AIM = Object.freeze({
  *                  最小 0.12 m 保证**打偏的弹着点绝不与瞄点重合**（重合的话曳光会直穿目标，
  *                  画面上像"打中了但没扣血"）；最大 6 m 免得压制弹飞到另一条街上。
  */
-export const SHOOTING = Object.freeze({
+export const SHOOTING = Freeze({
   exposureSamples: 3,
   exposureCacheS: 0.25,
   exposureCacheMoveM: 0.5,
@@ -156,7 +160,7 @@ export const SHOOTING = Object.freeze({
   suppressVerticalScatterM: 0.10,
   suppressLkpChestM: 1.10,
   muzzleDropM: 0.15,
-  stanceEyeM: Object.freeze([1.5, 1.0, 0.5]),
+  stanceEyeM: Freeze([1.5, 1.0, 0.5]),
   lookPitchMinRad: -1.0,
   lookPitchMaxRad: 0.9,
   missSpreadScale: 1.0,
@@ -177,15 +181,15 @@ export const SHOOTING = Object.freeze({
  *                  只会让人在 0.24 s 内打出两发，读起来是半自动步枪。
  * maxShots         上限，防止有人往武器表里填一个 200。
  */
-export const BURST = Object.freeze({
-  byKind: Object.freeze({
-    boltRifle: Object.freeze({ min: 1, max: 1, pauseMinS: 0.0, pauseMaxS: 0.0 }),
-    pistol: Object.freeze({ min: 1, max: 2, pauseMinS: 0.35, pauseMaxS: 0.90 }),
-    lmg: Object.freeze({ min: 4, max: 9, pauseMinS: 0.60, pauseMaxS: 1.40 }),
-    hmg: Object.freeze({ min: 5, max: 14, pauseMinS: 0.90, pauseMaxS: 2.00 }),
-    default: Object.freeze({ min: 1, max: 1, pauseMinS: 0.0, pauseMaxS: 0.0 }),
+export const BURST = Freeze({
+  byKind: Freeze({
+    boltRifle: Freeze({ min: 1, max: 1, pauseMinS: 0.0, pauseMaxS: 0.0 }),
+    pistol: Freeze({ min: 1, max: 2, pauseMinS: 0.35, pauseMaxS: 0.90 }),
+    lmg: Freeze({ min: 4, max: 9, pauseMinS: 0.60, pauseMaxS: 1.40 }),
+    hmg: Freeze({ min: 5, max: 14, pauseMinS: 0.90, pauseMaxS: 2.00 }),
+    default: Freeze({ min: 1, max: 1, pauseMinS: 0.0, pauseMaxS: 0.0 }),
   }),
-  singleShotKinds: Object.freeze(["boltRifle"]),
+  singleShotKinds: Freeze(["boltRifle"]),
   maxShots: 20,
 });
 
@@ -214,11 +218,11 @@ export const BURST = Object.freeze({
  *          膝盖取腿胶囊的中点。默认预算（3 条线）用不到它们，
  *          `SHOOTING.exposureSamples` 调到 5 时自动生效。
  */
-export const SAMPLES = Object.freeze({
-  soldier: Object.freeze([
-    Object.freeze({ head: 1.62, chest: 1.25, pelvis: 0.95 }),
-    Object.freeze({ head: 1.15, chest: 0.85, pelvis: 0.60 }),
-    Object.freeze({ head: 0.45, chest: 0.30 }),
+export const SAMPLES = Freeze({
+  soldier: Freeze([
+    Freeze({ head: 1.62, chest: 1.25, pelvis: 0.95 }),
+    Freeze({ head: 1.15, chest: 0.85, pelvis: 0.60 }),
+    Freeze({ head: 0.45, chest: 0.30 }),
   ]),
   playerChestT: 0.25,
   playerPelvisT: 0.95,

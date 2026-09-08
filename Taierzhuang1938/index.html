@@ -13,6 +13,9 @@
        修法是 import map 把每一个第一方模块重映射到带版本的 URL；
        版本只写在这一张表里，源码里一律不许自己写 ?v=（同一模块两个 URL = 加载两份）。
        **新增模块必须登记在这里。** -->
+  <!-- 调参表在本地可编辑（docs/Data_EnemyAi.md §14.4）：本机预览或地址栏带 ?aiedit=1 时不冻结 Data_Tuning_* 表，
+       敌军 AI 编辑器才能就地改数、下一次 Think 就生效；线上（Pages）与纯 Node 测试里表仍然冻结。 -->
+  <script>window.TAIERZHUANG_TUNING_EDITABLE = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) || new URLSearchParams(location.search).has("aiedit");</script>
   <script type="importmap">
     {
       "imports": {
@@ -223,15 +226,18 @@
         "./Script_Identify.mjs": "./Script_Identify.mjs?v=202609062340",
         "./Script_Player.mjs": "./Script_Player.mjs?v=202609082300",
     "./Script_CoverLean.mjs": "./Script_CoverLean.mjs?v=202609081430",
-        "./Script_Ai.mjs": "./Script_Ai.mjs?v=202609091500",
+        "./Script_Ai.mjs": "./Script_Ai.mjs?v=202609091800",
+        "./Script_EditorAi.mjs": "./Script_EditorAi.mjs?v=202609091800",
+        "./Data_AiBrainGraph.mjs": "./Data_AiBrainGraph.mjs?v=202609091800",
+        "./Script_AiProbeScene.mjs": "./Script_AiProbeScene.mjs?v=202609091800",
         "./Script_AiPerception.mjs": "./Script_AiPerception.mjs?v=202609091300",
         "./Script_AiCover.mjs": "./Script_AiCover.mjs?v=202609091300",
         "./Script_AiShooting.mjs": "./Script_AiShooting.mjs?v=202609091300",
         "./Script_AiTactics.mjs": "./Script_AiTactics.mjs?v=202609091300",
-        "./Data_Tuning_AiPerception.mjs": "./Data_Tuning_AiPerception.mjs?v=202609091300",
-        "./Data_Tuning_AiCover.mjs": "./Data_Tuning_AiCover.mjs?v=202609091300",
-        "./Data_Tuning_AiShooting.mjs": "./Data_Tuning_AiShooting.mjs?v=202609091300",
-        "./Data_Tuning_AiTactics.mjs": "./Data_Tuning_AiTactics.mjs?v=202609091300",
+        "./Data_Tuning_AiPerception.mjs": "./Data_Tuning_AiPerception.mjs?v=202609091800",
+        "./Data_Tuning_AiCover.mjs": "./Data_Tuning_AiCover.mjs?v=202609091800",
+        "./Data_Tuning_AiShooting.mjs": "./Data_Tuning_AiShooting.mjs?v=202609091800",
+        "./Data_Tuning_AiTactics.mjs": "./Data_Tuning_AiTactics.mjs?v=202609091800",
         "./Script_Actor.mjs": "./Script_Actor.mjs?v=202609082300",
 
         "./Script_ActorCrowd.mjs": "./Script_ActorCrowd.mjs?v=202609081200",
@@ -326,7 +332,7 @@
         "./Script_EditorDebugRendering.mjs": "./Script_EditorDebugRendering.mjs?v=32",
         "./Script_EditorProfiler.mjs": "./Script_EditorProfiler.mjs?v=5",
         "./Script_EditorWorldInfo.mjs": "./Script_EditorWorldInfo.mjs?v=1",
-        "./Script_Editor.mjs": "./Script_Editor.mjs?v=29",
+        "./Script_Editor.mjs": "./Script_Editor.mjs?v=202609091800",
         "./Data_AircraftStrafe.mjs": "./Data_AircraftStrafe.mjs?v=202609071600",
         "./Data_Carry.mjs": "./Data_Carry.mjs?v=202609062340",
         "./Data_Companions.mjs": "./Data_Companions.mjs?v=202609062340",
@@ -336,7 +342,7 @@
         "./Data_Setpieces_Ch1.mjs": "./Data_Setpieces_Ch1.mjs?v=202609062340",
         "./Data_Telegraph.mjs": "./Data_Telegraph.mjs?v=202609062340",
         "./Data_TengxianOutfield.mjs": "./Data_TengxianOutfield.mjs?v=202609062340",
-        "./Data_Tuning_Ai.mjs": "./Data_Tuning_Ai.mjs?v=202609091300",
+        "./Data_Tuning_Ai.mjs": "./Data_Tuning_Ai.mjs?v=202609091800",
         "./Data_Tuning_Audio.mjs": "./Data_Tuning_Audio.mjs?v=202609091800",
         "./Data_Tuning_Combat.mjs": "./Data_Tuning_Combat.mjs?v=202609062340",
         "./Data_Tuning_Cutscene.mjs": "./Data_Tuning_Cutscene.mjs?v=202609062340",
@@ -405,7 +411,7 @@
   <!-- 菜单、加载与工具窗共用 Style_Interface.css；各表只定义对应布局。 -->
   <link rel="stylesheet" href="./Style_Menu.css?v=202609070130">
   <!-- 编辑器套件的样式。出图模式下整棵 DOM 是 display:none，进不了任何一张截图。 -->
-  <link rel="stylesheet" href="./Style_Editor.css?v=13">
+  <link rel="stylesheet" href="./Style_Editor.css?v=14">
 </head>
 <body>
   <canvas id="view"></canvas>

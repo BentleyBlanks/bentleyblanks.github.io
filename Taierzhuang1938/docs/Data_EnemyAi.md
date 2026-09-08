@@ -685,3 +685,129 @@ P012 冒烟认 fire/charge/bayonet/melee）。新增七个：
 - `ai` 桶拆段剖析，收回前沿机位那 ~0.7 ms。
 - `lost` 类喊话补音频；日军侧喊话表只有四类。
 - 翻越起手的转向过 `ApproachAngle`（见 13.4 第 3 条）。
+
+---
+
+## 14. 敌军 AI 编辑器（2026-09-08 第二轮：看得见、改得动）
+
+### 14.1 3A 是怎么配置敌军 AI 的
+
+| 层 | 3A 的做法 | 工具 |
+| --- | --- | --- |
+| 行为结构 | 行为树（UE Behavior Tree、Halo 的行为 DSL、GOAP/HTN 规划器：F.E.A.R.、Horizon） | 可视化的树/图编辑器，运行时**高亮当前节点**，能看到为什么选了这条分支 |
+| 黑板 | 感知写、行为读的共享状态（目标、最后目击位置、警戒级别、掩体、任务） | 黑板检视器：逐字段实时值 |
+| 感知 | 视锥 / 听觉 / 记忆的参数化模型 | 视锥、通视线、LKP 标记画在世界里（UE Gameplay Debugger、TLOU 的 AI debug draw） |
+| 战术位置 | 掩体点 / EQS 查询 | 掩体点按验证结果与占用上色，能看到候选打分 |
+| 档案 / 数值 | 数据资产（DataTable / 原型 archetype）：命中、反应、攻击性、掩体偏好、投弹 | 属性面板 + 曲线，改完热更新，存回资产文件走版本管理 |
+| 遭遇编排 | 关卡设计师的 encounter 工具：出生、波次、目标区、剧本旗 | 关卡编辑器里的体积与触发器 |
+| 验证 | 固定试验场（AI arena）+ 指标（掩体率、命中、暴露时长） | 一键复现的沙盒 + 数据面板 |
+
+本项目对应：行为结构是 `Script_Ai` 的状态选择（§5、§12.2），黑板是 `SquadBlackboard` + 每人的 `perception / task / cover / shooting`
+字段，感知/掩体/射击/战术四张表就是「数据资产」，`Script_AiCombatBrowserTest` 的受控场就是 AI arena。
+缺的是把这些**画出来、连起来、改得动、存得回**的那一层——本轮做的就是它。
+
+### 14.2 目标
+
+`Script_EditorAi.mjs`：编辑器套件里的一个**叠加层**（与 Debug Rendering / Profiler 同组：不接管相机、不暂停玩法、`keepOnClose`），
+在正片里边打边看。六个分节：
+
+1. **概览**：全场状态直方图（每个状态多少人）、任务直方图、警戒分布、掩体统计（选上/验证过/隐蔽中）、令牌、射线/秒、压制:瞄准比、探头数。
+2. **行为图**：`Data_AiBrainGraph.mjs` 声明的状态节点与转移边画成 SVG；节点上显示当前人数；选中一个兵时高亮他所在节点与最近走过的边；
+   边上写触发条件与它读的表键，点边跳到「调参」里对应的滑杆。
+3. **单兵**：按距离排序的活人列表（或「跟随最近的敌人」），Facts 显示 `Debug.Ai.State(id)` 的全部字段（状态/任务/警戒/觉察/目标/LKP/掩体/相位/探头/令牌/暴露/瞄准误差/携弹），
+   下面一条 30 s 的状态时间带（每次状态切换一格）。
+4. **世界叠加**：three 线段/点（不用 addon）画选中者的视锥、到目标的通视线（通=绿/挡=红）、LKP 标记、掩体的隐蔽位/射击位、任务点、班组连线；
+   附近掩体点全部按「验证过=绿 / 选上未验证=黄 / 被占=蓝 / 无=灰」上色；每层一个开关；头顶标签复用 `?aidebug=1` 那套。
+5. **调参**：把五张表（`Data_Tuning_AiPerception / AiCover / AiShooting / AiTactics`、`Data_Tuning_Ai` 的 `BRAIN / ENGAGE / SQUAD`）的数值叶子
+   自动列成滑杆（按表/组分组，范围按默认值推 0—4 倍，布尔用开关）。**改了立刻生效**（表在本地是可变的，见 14.4）。
+   「重置到文件值」「复制 mjs 片段」「保存到源码」三个动作；保存只在本地预览服务器可用，Pages 上退化成复制。
+6. **试验场**：`Script_AiProbeScene.mjs`（从 `AiCombatBrowserTest` 抽出来的那套）：一键「找一堵墙、对面 34 m 撒一个班、玩家无敌」，
+   加「清场 / 还原」，让设计师在固定场景里反复看改动。
+
+### 14.3 契约
+
+`Data_AiBrainGraph.mjs`（纯数据）：
+
+```js
+export const BRAIN_GRAPH = Object.freeze({
+  states: [{ id: "cover_engage", label: "掩体对射", group: "combat", desc: "…", x: 0.6, y: 0.4 }],   // id 必须是 Script_Ai.STATE 的值
+  edges:  [{ from: "advance", to: "cover_engage", when: "有目标且身边有验证过的掩体", keys: ["COVER.defaultRadiusM", "ENGAGE.defaultM"], priority: 5 }],
+  phases: { cover_engage: ["approach", "hide", "peek"] },
+  tasks:  [{ id: "flank", label: "绕后" }],                                                        // id 必须是 Script_AiTactics.TASK 的值
+  keyOwners: { "COVER.defaultRadiusM": "Data_Tuning_AiCover" },                                // 表键 → 文件（编辑器由此知道保存到哪）
+});
+```
+闸门 `Script_AiBrainGraphTest.mjs`：每个 `STATE` 值都有节点、每条边两端都存在、每个 `keys` 都能在五张表里解析到一个数、`tasks` 与 `TASK` 一致。
+
+保存链路（`scripts/Script_LocalPreview.mjs`，只在本地）：
+
+```
+GET  /__tuning/status                → { writable: true }
+POST /__tuning/save  { file: "Taierzhuang1938/Data_Tuning_AiCover.mjs", changes: [{ path: "COVER.standoffM", value: 0.7 }] }
+                                     → { ok: true, applied: 1, missing: [] }
+```
+文件名必须匹配 `Taierzhuang1938/Data_Tuning_*.mjs`，只接受回环地址；改写由 `Script_TuningWriter.mjs`（纯 Node）完成：
+按 `export const GROUP = Freeze({ … sub: Freeze({ key: <数> }) })` 的花括号层级定位 `GROUP.sub.key`，只替换那个数字字面量，**注释与格式一个字不动**。
+闸门 `Script_TuningWriterTest.mjs`。
+
+试验场 `Script_AiProbeScene.mjs`：`PickSite(T, cx, cz)`、`SpawnProbeSquad(T, site, opts)`、`IsolateSquad(T, squad)` → 还原函数、
+`PlacePlayer(T, at, stance, yaw)`、`Immortal(T)`；`AiCombatBrowserTest` 改为 import 它们，行为与断言不变。
+
+#### 实装后的补充（2026-09-09，与上面的骨架一致，只是把边界写死）
+
+**行为图**（`Data_AiBrainGraph`，16 节点 / 50 边 / 117 个表键）：
+
+- `priority` 就是判定梯里的位置：0–1 剧本旗短路；2–7 守点单位子梯（`ApplyScriptDefense`，Think 在那里 return）；
+  8–17 主状态机（压制 → 空弹 → 机动任务 → 冲锋 → 投弹 → 掩体对射 → 对射 → 压制射击 → 推进）；18–19 命令覆盖（潜行 / 上刺刀）；
+  20+ 不在 Think 里的转移（Act 的换弹计时、`TryGrenade`、`TryVault`/`StepVault`、`Kill`、`IssueOrder`）。
+- 边多了一个**可选**的 `global: true`：判定梯每拍都从头跑，所以「压制 > 0.50 → SUPPRESSED」这类判据从任何状态都能进，
+  `from` 写的是实际打起来最常见的那个起点。面板照常把它画成一条边就行，`when` 里也写了「任何状态」。
+- 图是**多重图**：同一对起止点可以有多条边（例如 `fire → advance` 既是「交火结束」也是「潜行覆盖」）。
+- `keys` 是这条判定**真正读到**的表键。硬编码在 `Script_Ai` 里的数（压制阈值 0.50 / 0.32、角色冲锋距离 24/18/13/10、
+  cohesion 的 34 m / 20 m）在五张表里没有对应键，那几条边的 `keys` 是空数组 —— 空数组是取证，不是漏写。
+- `phases` 不止 `cover_engage`：`suppress` / `bound` 也走完整周期，`reload` / `suppressed` 被强制压在 hide 那一半。
+- `keyOwners` 登记的是五张表的**全部 31 个导出名**（不只是边上用到的 18 个），面板据此把任意一个叶子存回它自己的文件。
+  查法是「**第一个点之前那一段**」，不是字符串前缀 —— `ENGAGE` 与 `ENGAGE_PRIORITY` 是两个组。
+
+**改写器 / 保存端点**：
+
+- `ApplyTuningChanges(source, changes)` 的 `applied` 是**数组** `[{path, from, to}]`；HTTP 响应里的 `applied` 是**条数**（与上面的例子一致），
+  明细在 `changes` 字段：`{ ok: true, file, applied: 1, changes: [{path, from, to}], missing: [] }`。
+- 类型必须对得上：数字位只收有限数、布尔位只收布尔，否则进 `missing`（往 `steerPathProbe` 里写个 0 比拒绝它更糟）。
+  引用（`COVER.weights` → `COVER_WEIGHTS`）、表达式、字符串同理 —— 所以面板枚举叶子时要按**自己那个导出名**给路径。
+- `GET /__tuning/status` 回 `{ writable, root }`；非回环地址上 `writable:false`（`--lan` 起服时局域网上的人只能复制片段）。
+  `POST /__tuning/save` 的四道闸：回环地址、`^Taierzhuang1938/Data_Tuning_[A-Za-z0-9]+\.mjs$`、解析后落在服务根之下、body ≤ 256 KB；
+  失败是 400 / 403 / 405 / 500 带 `{ok:false, error}`。写回走「先写 `.tmp` 再 rename」，换行风格（CRLF）原样保留。
+
+**试验场**：`PickSite` 返回的场地上多带三个字段 `playerAt / playerStance / playerYaw`（「玩家该站哪儿、什么姿势、朝哪边」是场地的属性，
+不该让每个调用方各猜一份）；`SpawnProbeSquad(T, site, { count, weapon, grenades, coverSlackM, holdRadius, squadId })`
+只在撒兵那几行临时抬 `maxAlive`；`IsolateSquad(T, squad, { runtime, maxAlive })` 的 `Restore()` 会把花名册、波次预算与 `maxAlive` 一起放回去；
+`Immortal(T)` 连玩家血量一起顶满（编辑器那颗按钮就叫「玩家无敌」）；另加一个组合入口 `SetupArena(T, { cx, cz, count })` → `{ site, squad, Restore }`。
+
+### 14.4 表在本地可编辑
+
+五张表顶部各一行 `const Freeze = globalThis.TAIERZHUANG_TUNING_EDITABLE ? (v) => v : Object.freeze;`，
+`index.html` 在 import map 之前用一段内联脚本把这个旗设成「本机（localhost / 127.0.0.1）或地址栏带 `?aiedit=1`」。
+线上（Pages）与纯 Node 测试里表仍然是冻结的；本地预览里编辑器可以就地改数，四个模块都在调用时读表（不缓存），改了下一次 Think 就生效。
+这不违反「表是纯数据」：没有 import、没有函数值，只是冻不冻由环境定。
+
+### 14.5 验收
+
+- `AiBrainGraphTest` / `TuningWriterTest` 纯 Node 绿；`EditorTest` 入口数 23；`AiCombatBrowserTest` 仍 11/11。
+- `AiEditorTest`（浏览器）：`Debug.OpenEditor("ai")` 打开、六个分节在、选中一个兵后世界里有视锥/通视/掩体线段且 Exit 后全部移除、
+  拖一根滑杆后表里的数真的变了且下一次 Think 读到、「重置」还原、「复制 mjs 片段」文本含改过的键、没有保存端点时按钮退化为复制、行为图节点数 == STATE 数。
+- 手工：本地 `node scripts/Script_LocalPreview.mjs` 开 `?whitebox=p012`，按 `` ` `` → 调试 → 敌军 AI，改 `COVER_CYCLE.peekMinS`，保存，`git diff` 只动那一个数。
+
+### 14.6 验收记录（2026-09-09）
+
+- 纯 Node：`AiBrainGraphTest` 760 条（16 节点 / 50 边 / 117 表键 / 8 任务，与 `Script_Ai.STATE`、`Script_AiTactics.TASK` 逐个对账）、
+  `TuningWriterTest` 373 条（五张真表 288 个叶子逐个解析回原值；真起服的保存端点：改一个数只动那一行，非白名单 / 越界 / 大 body / 非回环全部被拒）、
+  `ModuleGraphTest` / `TextTest` / `TestRunnerTest` 绿。
+- 浏览器：`AiEditorTest` 32/32（六节在、叠加物进出还干净且 `geometries` 不涨、滑杆改 `COVER_CYCLE.peekMinS` 下一次 `UpdateCoverCycle` 读到、重置还原、
+  片段含改过的键、无端点时保存退化为复制、行为图 16/16、试验场撒兵→隔离→还原）、`EditorTest` 172/172（入口 23）、`WorldInfoEditorTest`、
+  `AiCombatBrowserTest` 11/11（改为 import 试验场模块后断言不变）、`AiBehaviorTest` 12/12。
+- 真实保存回路（验收批手工）：起 `Script_LocalPreview`，`POST /__tuning/save` 改 `COVER_CYCLE.peekMinS` 0.7→0.91，`git diff` 只有那一行；`Data_Battle.mjs` 被拒 403；随后 `git checkout` 还原。
+- 实拍：前沿开战 20 s 开面板，行为图显示 16 个节点带实时人数、选中的兵所在节点高亮并列出最近转移；调参页列出 270 个键（按五张表分组）；
+  世界叠加画出视锥、通视线、掩体隐蔽/射击位与附近掩体点着色。截图在本地 `_shots/EnemyAi/editor_*.png`。
+- 已知边界：`SIGHT_BY_STANCE` 不在调参页（它不是 `Freeze` 包的裸数组，线上也可改，故不开放）；压制阈值 0.50/0.32、角色冲锋距离、cohesion 半径仍硬编码在 `Script_Ai`，
+  行为图里对应边的 `keys` 为空——要调得先搬进表；叠加层几何走 `post.AddDebugOverlay` 而不是 `scene.add`（不进预通道 / SSAO / 线框换材质）。

@@ -22,6 +22,10 @@
  *
  * 下标 0 站 / 1 蹲 / 2 卧，与 CAPSULE、Script_Identify 同一套。
  */
+// 表在本地可编辑（docs/Data_EnemyAi.md §14.4）：index.html 在本机预览或 ?aiedit=1 时置起
+// TAIERZHUANG_TUNING_EDITABLE，敌军 AI 编辑器才能就地改数；线上与纯 Node 测试里照旧冻结。
+const Freeze = (typeof globalThis === "object" && globalThis.TAIERZHUANG_TUNING_EDITABLE) ? (value) => value : Object.freeze;
+
 export const SIGHT_BY_STANCE = [120, 80, 45];
 
 /**
@@ -35,7 +39,7 @@ export const SIGHT_BY_STANCE = [120, 80, 45];
  * 照明弹底下趴着仍然比站着难被看见。谁要是改成「照明弹期间一律 200 m」，
  * 这条机制当场作废。
  */
-export const SIGHT_SCALE_RANGE = Object.freeze({ min: 0.25, max: 4 });
+export const SIGHT_SCALE_RANGE = Freeze({ min: 0.25, max: 4 });
 
 /**
  * 六人战斗组。不是给 HUD 看的职业系统，而是让一群人不再对着同一个点做同一个动作：
@@ -48,18 +52,18 @@ export const SIGHT_SCALE_RANGE = Object.freeze({ min: 0.25, max: 4 });
  * turnPerUpdate   组方向每次决策最多转多少弧度（不许一帧掉头）
  * slots           每个位置相对组方向的横向 / 纵深偏移（米）
  */
-export const SQUAD = Object.freeze({
+export const SQUAD = Freeze({
   size: 6,
   enemyFocusM: 92,
   lookaheadM: 22,
   turnPerUpdate: 0.72,
-  slots: Object.freeze([
-    Object.freeze({ role: "leader", lateral: 0, depth: 1 }),
-    Object.freeze({ role: "assault", lateral: -2.5, depth: -4 }),
-    Object.freeze({ role: "rifleman", lateral: 4, depth: 1 }),
-    Object.freeze({ role: "support", lateral: -3, depth: 9 }),
-    Object.freeze({ role: "rifleman", lateral: -6, depth: 3 }),
-    Object.freeze({ role: "flank", lateral: 9, depth: -1 }),
+  slots: Freeze([
+    Freeze({ role: "leader", lateral: 0, depth: 1 }),
+    Freeze({ role: "assault", lateral: -2.5, depth: -4 }),
+    Freeze({ role: "rifleman", lateral: 4, depth: 1 }),
+    Freeze({ role: "support", lateral: -3, depth: 9 }),
+    Freeze({ role: "rifleman", lateral: -6, depth: 3 }),
+    Freeze({ role: "flank", lateral: 9, depth: -1 }),
   ]),
 });
 
@@ -68,7 +72,7 @@ export const SQUAD = Object.freeze({
  * 机枪 / 掷弹筒手（support）压后，射程也更远，所以单开一档。
  * hysteresisM 是已经在交火中的人多给的余量 —— 不给的话人会在边界上开一枪停一枪。
  */
-export const ENGAGE = Object.freeze({
+export const ENGAGE = Freeze({
   defaultM: 74,
   supportM: 95,
   hysteresisM: 12,
@@ -86,7 +90,7 @@ export const ENGAGE = Object.freeze({
  * enterM / exitM 之间留迟滞，玩家在边界前后走动时不会反复切换。
  * 尸体没有步态、瞄准或足部 IK 可读，所以它的两档比活人近得多。
  */
-export const ACTOR_DETAIL = Object.freeze({
+export const ACTOR_DETAIL = Freeze({
   enterM: 46,
   exitM: 56,
   corpseEnterM: 24,
@@ -117,7 +121,7 @@ export const ACTOR_DETAIL = Object.freeze({
  * damageDiv   伤害 / 这个数 再叠上去（三八式 72 → +0.8，基本满幅）
  * decayS      从 1 衰减到 0 用几秒
  */
-export const HURT_FLINCH = Object.freeze({ base: 0.45, damageDiv: 90, decayS: 0.45 });
+export const HURT_FLINCH = Freeze({ base: 0.45, damageDiv: 90, decayS: 0.45 });
 
 /**
  * 大脑接线（docs/Data_EnemyAi.md §5）。
@@ -142,7 +146,7 @@ export const HURT_FLINCH = Object.freeze({ base: 0.45, damageDiv: 90, decayS: 0.
  * allyCorridorM   射击走廊要查多远之内的友军（超过它的人挡不住这一枪）。
  * grenadeDodgeM   敌方手榴弹落在隐蔽位这个半径内就换掩体 / 后撤。
  */
-export const BRAIN = Object.freeze({
+export const BRAIN = Freeze({
   movingSignal: 0.08,
   movingMps: 0.4,
   firingRecentS: 0.35,

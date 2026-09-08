@@ -168,6 +168,21 @@ export class Soldier {
     this.health = 100;
     this.state = STATE.IDLE;
     this.stateTime = 0;
+    /**
+     * 最近 32 次状态切换的环形记录（敌军 AI 编辑器的「30 s 状态时间带」读它）。
+     *
+     * 为什么记在人身上而不是导演身上：时间带问的是「**这一个人**刚才经历了什么」，
+     * 全局事件流要按 id 过滤一遍才能回答，而 70 个人 × 每秒几次切换会把那条流
+     * 冲得只剩最近半秒。为什么是环形复用槽而不是 push/shift：这条记录每帧都可能写，
+     * 数组增删与对象字面量都会产生垃圾 —— 调试设施不许把 GC 压力算进玩法的帧预算。
+     * 槽在第一次真的发生切换时才建（`AiDirector._LogStateChange`），
+     * 木桩兵与平民一辈子不切状态，就一个字节都不占。
+     */
+    this.stateLog = null;
+    this.stateLogHead = 0;
+    this.stateLogCount = 0;
+    /** 上一次写进 stateLog 的状态。与 `state` 不同就说明该记一条了。 */
+    this.stateLogged = this.state;
     this.combatModeUntil = -99;
     this.suppression = 0;
     this.hurtPose = 0;                      // 中弹踉跄（Actor 的 hurt 覆盖姿势），Act 里按 HURT_FLINCH.decayS 衰减
@@ -1078,6 +1093,11 @@ export class AiDirector {
 
     for (let i = 0; i < this.soldiers.length; i += 1) {
       const s = this.soldiers[i];
+      // 状态切换记一条。放在循环最前面而不是 Think 里：`s.state` 有二十多个赋值点
+      // （Think / Act / 换弹 / 翻墙 / 投弹 / Kill 各一处），逐点插桩必漏，
+      // 而且 DEAD 那一条根本不走 Think。这里一次比较就盖全，代价是记录晚一帧 ——
+      // 对一条 30 秒的时间带无所谓。
+      if (s.state !== s.stateLogged) this._LogStateChange(s);
       if (!s.alive) {
         s.deadTime += dt;
         this.StepCorpse(s, dt);
@@ -3361,6 +3381,49 @@ export class AiDirector {
     };
   }
 
+  /** 每人最多留多少条状态切换记录。32 条在实测里够盖住 30 秒（每秒约 0.6 次切换）。 */
+  static STATE_LOG_SIZE = 32;
+
+  /**
+   * 记一条状态切换（`Update` 里每人每帧一次比较，真的变了才进来）。
+   *
+   * **零分配**：槽是首次切换时一次建好的定长环，之后只改三个字段。
+   */
+  _LogStateChange(s) {
+    let log = s.stateLog;
+    if (!log) {
+      log = [];
+      for (let i = 0; i < AiDirector.STATE_LOG_SIZE; i += 1) log.push({ t: -1, from: "", to: "" });
+      s.stateLog = log;
+      s.stateLogHead = 0;
+      s.stateLogCount = 0;
+    }
+    const slot = log[s.stateLogHead];
+    slot.t = this.time;
+    slot.from = s.stateLogged;
+    slot.to = s.state;
+    s.stateLogHead = (s.stateLogHead + 1) % AiDirector.STATE_LOG_SIZE;
+    if (s.stateLogCount < AiDirector.STATE_LOG_SIZE) s.stateLogCount += 1;
+    s.stateLogged = s.state;
+  }
+
+  /**
+   * 把环形记录按时间顺序（旧 → 新）读出来。**只在调试路径上调**，允许分配。
+   * @return {Array<{t:number, from:string, to:string}>}
+   */
+  static ReadStateLog(s) {
+    const log = s.stateLog;
+    if (!log || !s.stateLogCount) return [];
+    const size = AiDirector.STATE_LOG_SIZE;
+    const out = [];
+    const start = (s.stateLogHead - s.stateLogCount + size) % size;
+    for (let i = 0; i < s.stateLogCount; i += 1) {
+      const slot = log[(start + i) % size];
+      out.push({ t: slot.t, from: slot.from, to: slot.to });
+    }
+    return out;
+  }
+
   /** 一个人的快照（感知 / 任务 / 掩体 / 令牌 / 暴露 / 瞄准）。 */
   DebugSoldier(s) {
     const ex = s.shooting && s.shooting.exposure;
@@ -3392,6 +3455,8 @@ export class AiDirector {
       aimFloorRad: s.shooting ? +s.shooting.floorRad.toFixed(4) : null,
       grenades: TacticsDirector.GrenadeCount(s),
       x: +s.position.x.toFixed(1), z: +s.position.z.toFixed(1),
+      // 编辑器的状态时间带与「最近走过的边」都读它；时刻是 `this.time` 的绝对秒。
+      stateLog: AiDirector.ReadStateLog(s),
     };
   }
 

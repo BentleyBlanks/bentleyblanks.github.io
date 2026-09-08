@@ -42,7 +42,11 @@
  *                       侧翼点每秒抽十几个候选，全走 Steer 会把场缓存冲垮。
  *                       直线采样 + Walkable 便宜且够用；要精确估路时再单独打开。
  */
-export const TACTICS = Object.freeze({
+// 表在本地可编辑（docs/Data_EnemyAi.md §14.4）：index.html 在本机预览或 ?aiedit=1 时置起
+// TAIERZHUANG_TUNING_EDITABLE，敌军 AI 编辑器才能就地改数；线上与纯 Node 测试里照旧冻结。
+const Freeze = (typeof globalThis === "object" && globalThis.TAIERZHUANG_TUNING_EDITABLE) ? (value) => value : Object.freeze;
+
+export const TACTICS = Freeze({
   maxShootersPerTarget: 2,
   tokenLeaseS: 3.0,
   coverSearchM: 22,
@@ -64,7 +68,7 @@ export const TACTICS = Object.freeze({
  * 组长咬住正面、突击手跃进、机枪手压制、侧翼手绕、步枪手填空缺。
  * "fill" = 没有偏好，谁缺人补谁。noncombatant（伙夫、担架队）不参与战术分配。
  */
-export const ROLE_PREFERENCE = Object.freeze({
+export const ROLE_PREFERENCE = Freeze({
   leader: "engage",
   assault: "bound",
   support: "suppress",
@@ -77,7 +81,7 @@ export const ROLE_PREFERENCE = Object.freeze({
  * 抢令牌的顺序。前面的人先要，要不到的往后转压制 / 机动。
  * 组长排第一是有意的：一个班的正面火力应该从组长身上起。
  */
-export const ENGAGE_PRIORITY = Object.freeze(["leader", "rifleman", "assault", "flank", "support"]);
+export const ENGAGE_PRIORITY = Freeze(["leader", "rifleman", "assault", "flank", "support"]);
 
 /**
  * 侧翼。
@@ -106,7 +110,7 @@ export const ENGAGE_PRIORITY = Object.freeze(["leader", "rifleman", "assault", "
  *                   没有这一条，人一到位就转 ENGAGE，下一秒又被派去绕下一个点 ——
  *                   来回横跳比不绕还难看。
  */
-export const FLANK = Object.freeze({
+export const FLANK = Freeze({
   flankers: 2,
   flankRadiusM: 18,
   flankSamples: 12,
@@ -131,7 +135,7 @@ export const FLANK = Object.freeze({
  * phaseS        多久互换一次 mover / coverer。1 s 一换太碎（跑三步就趴下），
  *               4 s 够一个人从这个掩体跑到下一个掩体再进入射击。
  */
-export const BOUND = Object.freeze({
+export const BOUND = Freeze({
   maxPairs: 3,
   maxPairDistM: 26,
   phaseS: 4.0,
@@ -156,7 +160,7 @@ export const BOUND = Object.freeze({
  * gravityMps2         抛物线粗验用的重力（与物理世界同一量级即可，这里只做量纲估算）。
  * rangeSafety         按初速算出的理论射程要打的折：真人不是 45° 满力抛。
  */
-export const GRENADE = Object.freeze({
+export const GRENADE = Freeze({
   // 【2026-09-08 验收调整】原 holdS 3.0 / squadCooldownS 12：正片前沿实拍 40 s 里日军投出 12 枚，
   // 玩家在空地上站定十来秒就有两枚落在脚边（1 m / 4 m）。手榴弹要保持「事件」的分量，
   // 不能变成 COD 式的雨点；每班 20 s 一枚、对方钉住 5 s 才值得扔，验收探针
@@ -194,7 +198,7 @@ export const GRENADE = Object.freeze({
  * fallbackM            撤退点：全班重心背敌方向再退这么远。
  * holdS                一旦决定撤退，任务至少保持这么久，不许下一秒又转头。
  */
-export const RETREAT = Object.freeze({
+export const RETREAT = Freeze({
   retreatCohesion: 0.45,
   retreatSuppression: 0.85,
   lonelyS: 6,
@@ -216,7 +220,7 @@ export const RETREAT = Object.freeze({
  * holdS                  任务有效期：走过去要时间，别每秒重下一次决心。
  * arriveM                到点判定半径。
  */
-export const INVESTIGATE = Object.freeze({
+export const INVESTIGATE = Freeze({
   investigateConfidence: 0.35,
   investigateMaxM: 45,
   minM: 3.0,
@@ -237,7 +241,7 @@ export const INVESTIGATE = Object.freeze({
  *                    这两条一起消掉「两个距离相近的敌人让六把枪一起左右摆」。
  * maxEnemies         黑板最多记几个目标，超了丢最旧的一条。
  */
-export const BLACKBOARD = Object.freeze({
+export const BLACKBOARD = Freeze({
   blackboardMemoryS: 12,
   focusHoldS: 4.0,
   switchRatio: 1.3,
