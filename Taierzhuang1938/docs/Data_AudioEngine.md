@@ -135,6 +135,119 @@ audio.SetProbes({
 
 ---
 
+## 2.5 「炮弹爆炸没声音 / 人物讲话发虚」的定论（2026-09-09）
+
+用户实听报的两条，取证入口是 phase=1（CH1_NanLu，起伏白盒 + 真撒兵），
+钩住 `audio.Play` / `AudioWiring.Occlusion` / `AudioWiring.Zone` 逐条记
+cue、距离、遮挡值、低通、干声节点、总线路由。四条假设里成立两条。
+
+**两条都是 2026-09-08 那一轮新引入的。** `e1f235703`（那一轮之前的 master）里
+`Script_AudioWiring.mjs` 这个文件根本不存在，`SetProbes` / `OCCLUSION_DRY_DB` /
+`ZONE_BOUNDARY_OCC` / `StealVoices` 在 `Script_Audio.mjs` 里一次都搜不到 ——
+不是老 bug 浮出来，是这一轮自己带进来的。
+
+### 一、爆炸：同一堵墙被两个人各算一遍
+
+`Script_Combat.Blast` 算了一次遮挡（爆心抬 0.35 m → 玩家眼睛、余量 0.5 m），
+交给 `AudioWiring.Blast` 压 `volume × 0.5` + `airCut 900`；
+而 `Script_Audio.Play` 拿**同一条探针**又问了一遍，再给 −12 dB 干声 + 800 Hz 低通。
+
+实测（20 m 一发，radius 6.5）：
+
+| | 干声有效电平 | 空气低通 |
+| --- | --- | --- |
+| 通透 | 0.1925 | 6402 Hz |
+| 两层遮挡 | 0.0242 | 800 Hz |
+
+**−18.0 dB 加一道 800 Hz 砖墙**。32 发取样里 13 发吃了双份 —— 那不是
+「隔着一堵墙的爆炸」，那是没响。
+
+而且两层的判据根本不是同一条（起点、方向、余量都不同）：32 发里 3 发
+「引擎说挡了、宿主说没挡」，1 发反过来。所以问题不是"压狠了"，是重复计算。
+
+**改法**：探针在场时遮挡由**引擎独占一层**，接线层那两行只留给「引擎侧没探针」
+的场合（编辑器裸跑规则层），写法与 `blastAutoDeafen` / `gunAutoDuck` 同一套判空。
+
+### 二、探针本身在假报：射线终点贴着地皮
+
+宿主交给探针的是事件的**几何原点** —— 迫击炮弹的爆心就是 `GroundHeight()` 本身
+（`Script_Combat` 那两行 `at.y = GroundHeight(...)`），兵的 `position` 是脚底。
+于是从听者眼睛（1.6 m）打到那个点的射线全程只降 1.6 m，一路擦着地皮走。
+
+72 个采样点 × 6 档距离，只改射线终点的抬高：
+
+| 终点抬高 | 0 m | 0.35 m | 1.0 m | 1.5 m | 2.0 m |
+| --- | --- | --- | --- | --- | --- |
+| 判成"挡住" | 29 | 26 | 23 | 21 | 18 |
+
+那 11 条假阳性撞的全是 `embankment`（0.3—0.7 m 厚的路基板）、`villageStraw`
+这类矮碰撞盒，**一条地形都没有** —— 别去改 `RaycastTerrain`，坑不在那儿。
+
+**改法**（在 `AudioWiring.Occlusion` 里，见 `Data_Tuning_Audio.PROBE`）：
+射线抬到声源自己地面之上 `sourceRiseM = 1.2` 再打；挡住了再问一次
+`clearRiseM = 2.6`（鲁南民房檐口高度）那一档 —— 那一档通了就只算
+`partialOcc = 0.45`（−5.4 dB + 4.7 kHz，声音从矮东西上面绕过去），
+两条都挡住才是 1。通透时仍然只花一条射线。
+
+改完同一批爆炸：32 发里 23 发通透、4 发部分、5 发真挡死，双层计数 0，
+最凶的一发 −12.0 dB（引擎单层的上限）。
+
+### 三、讲话发虚：路基被当成了屋顶
+
+`Zone()` 从被问的位置往上打 6 m，撞到东西就查 `IsCeiling`，
+而 `IsCeiling` 的兜底判据是「横向 ≥ 2.5 × 2.5 m 就是屋顶」。
+津浦路路基那块板实测 **9.3 × 15.2 m，却只有 0.34 m 厚** —— 站在它上面
+（或者旁边，脚底那一点）一律被判成 interior。
+
+40 个开阔地采样点，按查询高度统计：
+
+| 查询高度 | 0 m | 0.5 m | 1.0 m | 1.35 m | 1.6 m |
+| --- | --- | --- | --- | --- | --- |
+| 判成 interior | 12 | 12 | 7 | 4 | 1 |
+
+后果是双份的：混响换成室内 IR（`REVERB_RETURN` 0.9 vs open 0.7），
+而且听者在 `open`、声源在 `interior` 会叠一档 `ZONE_BOUNDARY_OCC = 0.35`
+（干声 −4.2 dB + 低通压到 6.5 kHz）。三米外一句耳语被这么一过，当然发闷发虚。
+
+实测一句台词，同一个 X/Z、只差声源高度：
+
+```
+脚底（up=0）     occ 0.35  zone interior  低通 6483 Hz  干声 ×0.617
+嘴高（up=1.35）  occ 0     zone open      低通 13921 Hz 干声 ×1
+```
+
+**改法三条**：
+
+1. `IsCeiling` 加一道最低净空 `ceilingMinClearM = 2.0` —— 屋顶总在头顶两米开外，
+   贴着脚背的那块板是地面。（**只收紧屋顶这一条**：试过把整个采样点抬到 1.2 m
+   再问，但 `CountWalls` 的 `box.max[1] < position.y + 0.4` 那道闸会把一米五的
+   院墙一起筛掉，40 个点里 7 个 street 直接掉成 open。坏的只有屋顶判据一条。）
+2. `Bark()` 把坐标抬到嘴的高度 `BARK_MOUTH_Y = 1.52`（与
+   `Data_Companions.COMPANION_TUNING.mouthY` 同值）。剧情台词那一路早就抬了
+   （`Companion.Locate`），喊话这一路一直没抬 —— 同一个人的两句话走两套坐标。
+3. 语音在三处走另一条规矩（见 `IsVoiceCue`）：**不进远声组**、**不许被
+   voice stealing 偷**、**遮挡封顶 `OCCLUSION_MAX_VOICE = 0.5`**。
+   理由都不是配平是可懂度：五十米外那句喊话是给玩家的信息，不是背景里的远处战斗；
+   台词是长音、电平低、离得远，正好是偷声部算法眼里最该丢的那一条；
+   隔着一堵墙的喊话本来就该听得见，那正是「喊」的意义。
+   实测 50 m 一句喊话：`occ 1 → 0.5`，干声 ×0.251 → ×0.501，低通 800 → 3272 Hz。
+
+### 排除掉的两条
+
+* **voice stealing / 去重窗吃掉了爆炸** —— 不成立。`AudioWiring.Blast` 走
+  `priority: true`，两道闸都绕过；32 发取样 `dropped` 全为 null。
+* **传播延迟让爆炸和画面对不上** —— 不成立，同样因为 `priority`：
+  32 发的 `propagation` 全是 0。（顺带记下来：这意味着 160 m 外的炮弹目前是
+  **闪光与声音同时到**，与 §4 的设计相反。那是另一件事，不在这一轮里改。）
+
+### 回归口
+
+`Script_AudioWiringTest.mjs` 新增四条断言（8.6 / 8.7 两节）。
+把接线层那一层遮挡改回无条件生效，立刻红两条，报的就是
+`60m#5 -18.0dB occ=1` —— 断言不是摆设，是量出来的。
+
+---
+
 ## 3. 分区混响（四档 IR）
 
 IR 仍然是**现场程序生成**、种子确定（`HashString("ir:" + kind)`），一个外部文件都不用。
@@ -429,6 +542,8 @@ gunTail{Open|Street|Interior}{Rifle|Mg}      courtyard 用 Street 那条
 | `OCCLUSION_DRY_DB` / `OCCLUSION_WET_DB` | −12 / −4 dB | 2 |
 | `OCCLUSION_REFRESH_S` | 0.25 s | 2 |
 | `ZONE_BOUNDARY_OCC` | 0.35 | 2 |
+| `OCCLUSION_MAX_VOICE` | 0.5（`voice.*` 的遮挡封顶）| 2.5 |
+| `BARK_MOUTH_Y` | 1.52 m（喊话坐标从脚底抬到嘴）| 2.5 |
 | `REVERB_SPACES` / `REVERB_RETURN` | 四档 / 0.90·0.86·0.85·0.70 | 3 |
 | `ZONE_CACHE_S` | 0.2 s | 3 |
 | `PROPAGATION_MIN_M` / `PROPAGATION_MAX_S` | 30 m / 1.4 s | 4 |
@@ -436,8 +551,8 @@ gunTail{Open|Street|Interior}{Rifle|Mg}      courtyard 用 Street 那条
 | `DUCK_MIN_AMOUNT` | 0.06 | 5 |
 | `DEAFEN_M` | 12 m | 5 |
 | `FIRE_DUCK_AMOUNT` / `ATTACK` / `HOLD` / `RELEASE` | 0.5 / 40 / 60 / 300 ms | 6 |
-| `FAR_GROUP_M` | 45 m | 6 |
-| `STEAL_FADE_S` / `STEAL_MAX_PER_PLAY` | 0.02 s / 3 | 7 |
+| `FAR_GROUP_M` | 45 m（`voice.*` 不进这一组，见 §2.5）| 6 |
+| `STEAL_FADE_S` / `STEAL_MAX_PER_PLAY` | 0.02 s / 3（`voice.*` 与 priority 一样永不被偷，见 §2.5）| 7 |
 | `NODE_BUDGET`（→ `this.nodeBudget`）| 120 | 7 |
 | `BUS_COMP` / `BUS_MAKEUP` / `PEAK_LIMITER` | 见 §8 | 8 |
 | `GUN_TAIL_GAIN` | 0.55 | 9 |

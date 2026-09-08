@@ -2313,6 +2313,32 @@ const VOICE_CULL_M = 90;
  */
 const CULL_DEFAULT_M = 400;
 
+/**
+ * 这一声是不是**人在说话**（喊话口令 + 章节台词，两者都是 `voice.<key>`）。
+ *
+ * 【2026-09-09】单开一个判据，因为语音在三处要**走另一条规矩**（见各处引用）：
+ *   1. 不进远声组 —— 远声组是给「远处那一片战斗」让路用的，玩家一开枪整组压
+ *      −6 dB。把台词扔进去的结果是「班长在五十米外喊话，我一开枪他就没声了」。
+ *   2. 不许被 voice stealing 偷 —— 台词是长音、电平低，正好是偷声部算法眼里
+ *      最该丢的那一条；而漏听一句台词是玩家会报的 bug，漏一记远处的脚步不是。
+ *   3. 遮挡封顶（OCCLUSION_MAX_VOICE）—— 隔着一堵墙的喊话本来就该听得见，
+ *      那正是「喊」的意义。
+ * 这三条都不是配平，是**可懂度**：语音要么听得清，要么等于没有。
+ */
+function IsVoiceCue(name) { return typeof name === "string" && name.startsWith("voice."); }
+
+/**
+ * 语音的遮挡上限。1.0 折 −12 dB + 800 Hz，那时一句「顺哥！机枪停了！」
+ * 只剩下一团闷响；0.5 折 −6 dB + 4.0 kHz —— 明显在墙那头，但每个字都还在。
+ */
+const OCCLUSION_MAX_VOICE = 0.5;
+
+/**
+ * 喊话的嘴离脚底多高。与 `Data_Companions.COMPANION_TUNING.mouthY`（1.52）同值 ——
+ * 剧情台词走那一条，战场口令走这一条，同一个人的两句话不能站在两个高度上。
+ */
+const BARK_MOUTH_Y = 1.52;
+
 /** 这一声还值不值得播（按名字分档，见上面三个常数）。 */
 function CullDistance(name) {
   // 两条飞机声都按机身在几百米外起播（drone 在进入段第一帧、planeDive 在开火前 3.5 s），按默认距离剔除就一条都不响。
@@ -3820,7 +3846,13 @@ export class AudioEngine {
     this.lastBarkAt = now;
     this.lastBarkKindAt.set(kindKey, now);
     this.lastBarkPickKey = pick.key;
-    return this.Play("voice." + pick.key, { position, volume, pitch, priority });
+    // 【2026-09-09】抬到嘴的高度再定位。调用方（Script_Ai）给的一律是 `s.position`，
+    // 也就是**脚底**：近处听感是「趴在地上说话」，而且遮挡与分区那两条探针都从这个
+    // 点出发去问，贴地的点会被判成「头顶有屋顶」（实测开阔地 30%）与「被挡住」。
+    // 剧情台词那一路早就抬了（Script_Companion.Locate → COMPANION_TUNING.mouthY = 1.52），
+    // 喊话这一路一直没抬 —— 同一个人的两句话走两套坐标，这里补齐。
+    const at = position ? { x: position.x, y: position.y + BARK_MOUTH_Y, z: position.z } : null;
+    return this.Play("voice." + pick.key, { position: at, volume, pitch, priority });
   }
 
   /**
@@ -4138,6 +4170,10 @@ export class AudioEngine {
       let victim = null;
       for (const v of this.activeVoices) {
         if (v.priority || v.stopping || v.reclaimed || !v.nodes || !v.nodes.length) continue;
+        // 人说话不许被偷（见 IsVoiceCue 第 2 条）。台词是长音、电平低、离得远，
+        // 三条排序判据全都指向它 —— 不排除的话，越是打得凶的时候越听不到口令，
+        // 而那正是最需要口令的时刻。
+        if (IsVoiceCue(v.name)) continue;
         if (!(v.effectiveGain < effectiveGain)) continue;
         if (!(v.distance > distance)) continue;
         if (!victim || v.effectiveGain < victim.effectiveGain) victim = v;
@@ -4277,6 +4313,11 @@ export class AudioEngine {
       // 室内/室外的分界再叠一档 —— 射线回答不了「你在屋里」这件事（门开着射线就是通的）。
       let occ = occlusion !== null ? Clamp01(occlusion) : this.Occlusion(position, distance);
       if (this.ZoneBoundary(zone)) occ = Clamp01(occ + ZONE_BOUNDARY_OCC);
+      // 人说话封顶（见 IsVoiceCue 第 3 条）。放在 ZoneBoundary **之后**：
+      // 那一档加的 0.35 本来就常常是探针把开阔地判成室内加出来的
+      //（实测贴地采样点 30% 被判成 interior，见 Data_Tuning_Audio.PROBE），
+      // 在它之前封顶等于封了个寂寞。
+      if (IsVoiceCue(name)) occ = Math.min(occ, OCCLUSION_MAX_VOICE);
       v.occ = occ;
       v.occAt = now;
       // 空气吸收：距离越远高频掉得越快。20 m 上还有 8 kHz，200 m 上只剩 1 kHz 出头。
@@ -4317,7 +4358,12 @@ export class AudioEngine {
         air.connect(panner);
       }
       // 远声组：远处那一片单独走一条总线，玩家开枪时整组让路（见 DuckAmbience）。
-      panner.connect(bus === "sfx" && distance > FAR_GROUP_M ? this.farGain : this.Bus(bus));
+      // **语音不进这一组**（见 IsVoiceCue 第 1 条）：五十米外那句喊话是给玩家的
+      // 信息，不是背景里的远处战斗，压掉它就等于把命令删了。
+      // farGrouped 是**取证字段**：WebAudio 读不出一个节点接到哪儿去了，
+      // 而「这句喊话有没有被扔进远声组」正是 Script_AudioWiringTest 要断言的事。
+      v.farGrouped = bus === "sfx" && distance > FAR_GROUP_M && !IsVoiceCue(name);
+      panner.connect(v.farGrouped ? this.farGain : this.Bus(bus));
       // MoveVoice 要搬的就是这几样：方位、空气低通、混响占比、遮挡。
       v.panner = panner;
       v.air = air;
@@ -4413,6 +4459,7 @@ export class AudioEngine {
         voice.occAt = t;
         let occ = this.Occlusion(position, distance);
         if (this.ZoneBoundary(voice.reverbZone || this.space)) occ = Clamp01(occ + ZONE_BOUNDARY_OCC);
+        if (IsVoiceCue(voice.name)) occ = Math.min(occ, OCCLUSION_MAX_VOICE);   // 与 Play 同一道封顶
         voice.occ = occ;
         // occGain 是起播那一刻按 occ > 0 才建的。起播时通透、飞到墙后面去的那种
         // 只能靠低通与湿声表达 —— 中途插节点要断开重接一条正在响的链，

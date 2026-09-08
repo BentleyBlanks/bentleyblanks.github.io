@@ -449,6 +449,161 @@ Check("火场挂上循环点声源，同时最多四条", fire.voices === 4 && f
 Check("火头被摘掉之后声音跟着停", fire.after === 0, `还剩 ${fire.after} 条`);
 
 // ---------------------------------------------------------------------------
+// 8.6) 遮挡只算一层：起伏地面上的炮弹必须响，而且不许被压两遍
+//
+// 用户原话「有时候经常炮弹爆炸都没声音」。取证（2026-09-09，phase=1）：
+//   · 宿主 Script_Combat 算一遍遮挡 → 接线层 ×0.5 + airCut 900；
+//   · 引擎 Script_Audio.Play 拿**同一条探针**又算一遍 → −12 dB 干声 + 800 Hz。
+//   两层叠起来 −18.0 dB + 一道 800 Hz 砖墙。32 发取样里 13 发吃了双份。
+//   而且探针本身还在假报：射线终点就是爆心那个**贴地**的点，六十米的射线全程
+//   只降 1.6 m，30 cm 厚的路基板都拦得住 —— 72 个采样点 29 个判成挡住，
+//   把终点抬到 2 m 只剩 18 个。
+//
+// 这条断言盯三件事，缺一件都会让那个 bug 悄悄回来：
+//   ① 出声率 100%（priority 的爆炸本来就不该被任何一道闸吃掉）；
+//   ② 探针说通透的那些，干声与"强制 occlusion=0"的参考值**一模一样**（−3 dB 以内）；
+//   ③ 任何一发的干声都不许低于参考值 −12.5 dB —— 那是引擎单层的上限，
+//      低于它就说明又有人在别处加了第二层。
+// ---------------------------------------------------------------------------
+const shellOcc = await page.evaluate(async () => {
+  const T = window.Taierzhuang, a = T.audio, w = T.audioWiring;
+  const P = T.player.position;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  a.Ambience("silence"); a.Music(null);
+  await sleep(200);
+  const rows = [];
+  const Dry = (v) => (v ? v.effectiveGain * (v.occGain ? v.occGain.gain.value : 1) : 0);
+  for (const dist of [60, 120]) {
+    for (let b = 0; b < 6; b += 1) {
+      const ang = (b / 6) * Math.PI * 2 + 0.31;
+      const x = P.x + Math.cos(ang) * dist, z = P.z + Math.sin(ang) * dist;
+      const y = T.battlefield.GroundHeight(x, z);
+      // 真实一发：走 Combat.Blast → AudioWiring.Blast → Play 的完整链路。
+      w.occCache.clear(); a.occCache.clear();
+      const seen = [];
+      const origPlay = a.Play.bind(a);
+      a.Play = (n, o = {}) => { const v = origPlay(n, o); if (n.startsWith("explosion")) seen.push({ n, o, v }); return v; };
+      try { T.combat.Blast(P.clone().set(x, y, z), 6.5, 0, "shell", null, false, null, "Shell82"); }
+      finally { a.Play = origPlay; }
+      const got = seen[0] || null;
+      const cue = got ? got.n : null;
+      const eye = a.listenerPos;
+      await sleep(150);
+      // 参考：**同一条 cue**（三档分界由接线层挑，不在这儿重算一遍）、同一位置、
+      // 同一音量、显式 occlusion=0（那一路不查探针）。
+      w.occCache.clear(); a.occCache.clear();
+      // 音量写死成接线层该给的那一份（Clamp(radius/8, .5, 1.2)，半径 6.5 → 0.8125），
+      // **不许抄 got.o.volume** —— 双层遮挡回归时正是这个值被偷偷减半的，
+      // 抄它等于拿被改过的值当基准，那条断言就永远绿。
+      const ref = cue
+        ? a.Play(cue, { position: { x, y, z }, volume: 0.8125, priority: true, occlusion: 0 })
+        : null;
+      const refDry = Dry(ref);
+      if (ref) a.StopVoice(ref);
+      w.occCache.clear();
+      rows.push({
+        dist, b, cue,
+        played: !!(got && got.v),
+        probe: w.Occlusion({ x: eye.x, y: eye.y, z: eye.z }, { x, y, z }),
+        volIn: got ? (got.o.volume ?? 1) : null,
+        airCutIn: got ? (got.o.airCut || 0) : null,
+        occ: got && got.v ? got.v.occ : null,
+        db: got && got.v && refDry > 0 ? 20 * Math.log10(Dry(got.v) / refDry) : null,
+      });
+      await sleep(150);
+    }
+  }
+  return rows;
+});
+const blastSilent = shellOcc.filter((r) => !r.played);
+Check("60/120 m 落在起伏地面上的炮弹，出声率 100%", blastSilent.length === 0,
+  blastSilent.length ? `哑的：${blastSilent.map((r) => `${r.dist}m#${r.b}`).join(" ")}`
+    : `${shellOcc.length} 发全响`);
+const doubled = shellOcc.filter((r) => r.volIn !== null && (r.volIn < 0.8 || r.airCutIn > 0));
+Check("接线层不再叠第二层遮挡（音量与 airCut 原样交给引擎）", doubled.length === 0,
+  doubled.length ? doubled.map((r) => `${r.dist}m#${r.b} vol=${r.volIn} airCut=${r.airCutIn}`).join(" ")
+    : `${shellOcc.length} 发都是原音量、airCut=0`);
+const clearRows = shellOcc.filter((r) => r.probe === 0 && r.db !== null);
+const clearBad = clearRows.filter((r) => r.db < -3);
+Check(`探针说通透的 ${clearRows.length} 发，干声不低于无遮挡值 −3 dB`, clearBad.length === 0,
+  clearBad.length ? clearBad.map((r) => `${r.dist}m#${r.b} ${r.db.toFixed(1)}dB`).join(" ")
+    : `最差 ${clearRows.length ? Math.min(...clearRows.map((r) => r.db)).toFixed(2) : 0} dB`);
+// 引擎单层的地板是 OCCLUSION_DRY_DB = −12 dB；比它还低就是又冒出来一层。
+const overAtten = shellOcc.filter((r) => r.db !== null && r.db < -12.5);
+Check("最凶的一发也只吃一层遮挡（≥ −12.5 dB）", overAtten.length === 0,
+  overAtten.length ? overAtten.map((r) => `${r.dist}m#${r.b} ${r.db.toFixed(1)}dB occ=${r.occ}`).join(" ")
+    : `最低 ${Math.min(...shellOcc.filter((r) => r.db !== null).map((r) => r.db)).toFixed(1)} dB`);
+
+// ---------------------------------------------------------------------------
+// 8.7) 三米外同伴的一句轻声台词：不许被空间链改味
+//
+// 用户原话「人物讲话那个轻的也非常奇怪」。取证：喊话与台词的坐标是**脚底**，
+// 而 Zone 探针从脚底往上打的那条射线会撞在自己脚下那块路基板（`embankment`，
+// 实测 9.3 × 15.2 m 却只有 0.34 m 厚）的上表面上 —— 开阔地 40 个采样点里
+// 贴地那一档 12 个（30%）被判成 interior。后果是混响换成室内 IR，
+// 而且听者在 open、声源在 interior 会叠一档 ZONE_BOUNDARY_OCC：
+// −4.2 dB 干声 + 低通压到 6.5 kHz。三米外的一句耳语被这么一过，当然发闷发虚。
+//
+// **电平那一档不在这里测**：每条录音的有声段 RMS 与 Data_Voice.VOICE_DELIVERY
+// 对不对得上由 Script_VoiceTest 守着（它离线解码全部 157 条）。这一层守的是
+// 「运行时链路有没有把那个电平改掉」—— 干声不许被遮挡节点动，
+// 也不许被扔进远声组（玩家一开枪整组 −6 dB）。
+// ---------------------------------------------------------------------------
+// 声库是异步解码的（157 条 MP3），开机 20 帧之后远没有载完。
+// 连续几次采样 size 不变才算稳 —— 只等 `size > 0` 会拿到前几条战场口令，
+// 里面一条章节台词都没有（delivery 字段只在 story 行上）。
+await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  let last = -1, same = 0;
+  for (let i = 0; i < 120 && same < 4; i += 1) {
+    await new Promise((r) => setTimeout(r, 500));
+    if (a.voiceBank.size === last) same += 1; else { same = 0; last = a.voiceBank.size; }
+  }
+});
+const speak = await page.evaluate(async () => {
+  const T = window.Taierzhuang, a = T.audio, w = T.audioWiring;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const P = T.player.position;
+  const rows = [];
+  const bank = [...a.voiceBank.values()];
+  for (const delivery of ["whisper", "weak", "normal", "shout"]) {
+    const e = bank.find((q) => q.delivery === delivery && q.kind === "story");
+    if (!e) { rows.push({ delivery, missing: true }); continue; }
+    // 三米外的同伴。y 就是**脚底**（Script_Ai 的 Bark 与宿主给的坐标都是这个）。
+    const x = P.x + 2.6, z = P.z + 1.5, y = T.battlefield.GroundHeight(x, z);
+    w.occCache.clear(); w.zoneCache.clear(); a.occCache.clear(); a.listenerZone = null;
+    a.StopStoryVoice();
+    const r = a.PlayStoryVoice(e.key, { position: { x, y, z } });
+    const v = r && r.voice;
+    rows.push({
+      delivery, key: e.key, played: !!v,
+      occ: v ? v.occ : null,
+      zone: v ? v.reverbZone : null,
+      farGrouped: v ? !!v.farGrouped : null,
+      // 干声有没有被遮挡节点动过：occ = 0 时 Play 根本不建这个节点。
+      dryTouched: !!(v && v.occGain),
+      // 运行时电平 = 调用方音量 × MIX_GAIN（声库条目的 gain，缺省 1）。
+      // 四档 delivery 的差是**烘进录音**的，运行时不许再动。
+      gain: v ? +v.baseGain.toFixed(4) : null,
+      mix: e.gain ?? 1,
+    });
+    await sleep(150);
+    a.StopStoryVoice();
+  }
+  return rows;
+});
+const speakGot = speak.filter((r) => !r.missing);
+Check("四档 delivery 各取一条章节台词", speakGot.length === 4,
+  speak.filter((r) => r.missing).map((r) => r.delivery).join(" ") || "四档齐");
+const speakBad = speakGot.filter((r) => !r.played || r.occ !== 0 || r.zone === "interior"
+  || r.farGrouped || r.dryTouched || Math.abs(r.gain - r.mix) > 1e-6);
+Check("三米外同伴的台词：遮挡 0、不在室内档、不进远声组、干声未被改",
+  speakBad.length === 0,
+  speakBad.length ? speakBad.map((r) => `${r.delivery} occ=${r.occ} zone=${r.zone} `
+    + `far=${r.farGrouped} dry=${r.dryTouched} gain=${r.gain}/${r.mix}`).join("；")
+    : speakGot.map((r) => `${r.delivery}:${r.zone}`).join(" "));
+
+// ---------------------------------------------------------------------------
 // 9) 每个新 cue 都真的能发声（合成回落这条路）
 //
 // 素材还没到，所以现在走的就是回落配方。这条与 Script_AudioTest 的"逐条播一遍"

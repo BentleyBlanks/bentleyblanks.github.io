@@ -70,10 +70,17 @@ const CEILING_TAGS = new Set([
  * 于是玩家站在街心也会被判成在屋里，整条街的混响换成室内 IR ——
  * 「不知道从哪儿来的音效」会以另一种形式再来一次。所以要么 tag 明说是屋顶/楼板，
  * 要么这块盖子横向至少 2.5 m 见方（那就只能是房顶或城门洞了）。
+ *
+ * 【2026-09-09】还要**够高**。只看横向尺寸的话，津浦路路基那种
+ * 9.3 × 15.2 m、只有 0.34 m 厚的板会被当成屋顶 —— 实测开阔地上 40 个采样点，
+ * 贴地那一档 12 个（30%）判成 interior，而抬到 1.35 m 只剩 4 个。
+ * 屋顶总在人头顶上方两米开外；贴着脚背的那块板是**地面**。
+ * `t` 是那一击距射线起点的距离，起点就是被问的那个位置（见 Zone）。
  */
 function IsCeiling(hit) {
   const box = hit?.box;
   if (!box || !box.min || !box.max) return false;
+  if (!(hit.t >= PROBE.ceilingMinClearM)) return false;
   if (box.tag && CEILING_TAGS.has(box.tag)) return true;
   return (box.max[0] - box.min[0]) >= 2.5 && (box.max[2] - box.min[2]) >= 2.5;
 }
@@ -161,21 +168,50 @@ export class AudioWiring {
 
   /**
    * 听者 → 声源之间有没有实体（墙 / 建筑 / 地形）。
-   * @returns {number|undefined} 1 = 挡住，0 = 通透，undefined = 这一帧没有战场可问
+   *
+   * 【2026-09-09 大修】原来是「从听者眼睛打到宿主给的那个点，撞到就是 1」。
+   * 两处都错：
+   *
+   *   1. **终点贴地**。宿主给的是事件的几何原点 —— 迫击炮弹的爆心就是
+   *      `GroundHeight()` 本身，兵的 position 是脚底。于是六十米的射线全程只降
+   *      1.6 m，一路擦着地皮走，30 cm 厚的路基板都拦得住。实测 72 个采样点里
+   *      29 个判成挡住，把终点抬到 +2.0 m 只剩 18 个 —— 那 11 条假阳性撞的全是
+   *      `embankment` / `villageStraw` 这类矮碰撞盒，**一条地形都没有**。
+   *   2. **0/1 两档**。真实的墙分两种：一米二的院墙（声音从上面绕过去，只掉高频）
+   *      和一整间砖房（真的闷）。一律按 1 算，前者被压掉 −12 dB + 800 Hz，
+   *      听感就是「没响」。
+   *
+   * 现在：射线抬到声源自己地面之上 sourceRiseM 再打；挡住了再问一次
+   * clearRiseM 那一档，那一档通了就只算 partialOcc（矮东西绕得过去）。
+   * 常见情形（通透）仍然只花一条射线，被挡时才花第二条。
+   *
+   * @param {object} [opts]
+   * @param {boolean} [opts.rise=true] 抬不抬高终点。**只有问「这条线本身通不通」的
+   *   调用方才给 false** —— 见 `AiNearMissAtPlayer`：那里问的是一颗子弹的实际弹道
+   *   有没有被挡住，抬高会让越过矮墙的那一发变成"没挡住"，于是墙后面的玩家听见
+   *   一条根本不存在的弹啸。两个问题只是碰巧共用一条射线，不是同一件事。
+   * @returns {number|undefined} 0 通透 / partialOcc 矮挡 / 1 挡死；
+   *   undefined = 这一帧没有战场可问
    */
-  Occlusion(from, to) {
+  Occlusion(from, to, { rise = true } = {}) {
     const bf = this.Battlefield;
     if (!bf || !from || !to) return undefined;
     const g = PROBE.gridM;
-    const key = `${Math.round(from.x / g)},${Math.round(from.y / g)},${Math.round(from.z / g)}`
+    const key = `${rise ? "s" : "r"}|`
+      + `${Math.round(from.x / g)},${Math.round(from.y / g)},${Math.round(from.z / g)}`
       + `|${Math.round(to.x / g)},${Math.round(to.y / g)},${Math.round(to.z / g)}`;
     const cached = this.occCache.get(key);
     if (cached !== undefined && cached.at > this.time - PROBE.ttlS) return cached.v;
 
-    const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
-    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    let value = 0;
-    if (dist > 0.05) {
+    // 声源自己那块地面。抬高是**相对它的地面**算的，不是相对声源坐标 ——
+    // 天上的飞机（y 已经两百米）不该再被抬一次。
+    const ground = rise && typeof bf.GroundHeight === "function"
+      ? bf.GroundHeight(to.x, to.z) : null;
+    const Shoot = (riseM) => {
+      const ty = ground === null ? to.y : Math.max(to.y, ground + riseM);
+      const dx = to.x - from.x, dy = ty - from.y, dz = to.z - from.z;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (!(dist > 0.05)) return false;
       // terrain:true 不能漏 —— 不带这个标志的射线只跟碰撞盒求交，土坎、河堤、
       // 路基一律穿过去（与弹道、识别那两条是同一个坑）。
       const hit = bf.Raycast(
@@ -184,7 +220,13 @@ export class AudioWiring {
         dist, { terrain: true },
       );
       // 留 0.4 m 余量：擦着声源旁边的墙角不算挡住。
-      value = hit && hit.t < dist - 0.4 ? 1 : 0;
+      return !!(hit && hit.t < dist - 0.4);
+    };
+    let value = 0;
+    if (Shoot(PROBE.sourceRiseM)) {
+      // 不抬高的那一路（弹道）没有"矮挡"这一档：子弹要么打在墙上要么没有，
+      // 所以也不必再花第二条射线。
+      value = !rise || Shoot(PROBE.clearRiseM) ? 1 : PROBE.partialOcc;
     }
     if (this.occCache.size > PROBE.maxEntries) this.occCache.clear();
     this.occCache.set(key, { v: value, at: this.time });
@@ -206,6 +248,12 @@ export class AudioWiring {
     let zone = "open";
     // 先向上打一条：头顶有屋顶/楼板 = 在屋里。这一条要先判 —— 屋里当然也被墙围着，
     // 但「屋里」与「院子里」的混响差得远（一个有天花板，一个没有）。
+    //
+    // 【2026-09-09】**立面数不动，只收紧屋顶那一条**（见 IsCeiling）。
+    // 想过把整个采样点抬到 1.2 m 再问，但那样 CountWalls 会把一米五的院墙
+    // （`box.max[1] < position.y + 0.4` 那道闸）一起筛掉，街巷全变成开阔地 ——
+    // 实测抬到 1.35 m 之后 40 个点里 7 个 street 直接掉成 open。
+    // 坏的只有屋顶判据一条，别顺手改掉对的那两条。
     const up = bf.Raycast({ x: position.x, y: position.y + 0.1, z: position.z },
       { x: 0, y: 1, z: 0 }, PROBE.ceilingProbeM, { terrain: false });
     if (IsCeiling(up)) {
@@ -362,7 +410,11 @@ export class AudioWiring {
       y: aim.y + 0.15,
       z: aim.z + uz * missM * side,
     };
-    const blocked = this.Occlusion({ x: from.x, y: from.y, z: from.z }, point) === 1;
+    // `rise: false`：这里问的是**这颗子弹的实际弹道**通不通，不是「这个声音听起来
+    // 有多闷」。抬高终点会让越过矮墙的那一发变成"没挡住"，于是墙后面的玩家
+    // 听见一条根本不存在的弹啸（那一发早就打在墙上了）。
+    const blocked = this.Occlusion({ x: from.x, y: from.y, z: from.z }, point,
+      { rise: false }) === 1;
     return this.BulletPass(point, missM, blocked);
   }
 
@@ -656,7 +708,9 @@ export class AudioWiring {
    *
    * @param {object} position 爆心
    * @param {number} radius   武器半径（配平用，不是听得见的半径）
-   * @param {boolean} occluded 宿主已经算过的遮挡（与震屏那条同一个判据）
+   * @param {boolean} occluded 宿主已经算过的遮挡（与震屏那条同一个判据）。
+   *   **只在引擎侧没注册遮挡探针时才用**：探针在场时遮挡由引擎独占一层，
+   *   见下面那段注释。
    */
   Blast(position, radius, occluded = false) {
     const audio = this.Audio;
@@ -666,7 +720,24 @@ export class AudioWiring {
       : d < BLAST_AUDIO.midM ? "explosionMid" : "explosionFar";
     let volume = Clamp(radius / 8, 0.5, 1.2);
     const opts = { position: { x: position.x, y: position.y, z: position.z }, volume, priority: true };
-    if (occluded) {
+    // 遮挡**只许算一层**。
+    //
+    // 【2026-09-09】这是用户报的「炮弹爆炸经常没声音」的直接成因：引擎侧
+    // （Script_Audio.Play）会拿同一条 Occlusion 探针自己再问一遍，给 −12 dB 干声
+    // + 800 Hz 低通；这里再压 ×0.5 + airCut 900，两层叠起来是 **−18.0 dB 干声
+    // 加一道 800 Hz 砖墙**。实测 phase=1，20 m 的一发：干声有效电平
+    // 0.1925（通透）→ 0.0242（两层），空气低通 6402 Hz → 800 Hz。
+    // 那不是「隔着一堵墙的爆炸」，那是没响。
+    //
+    // 而且两层的判据根本不是同一条：宿主这条是「爆心抬 0.35 m → 眼睛、余量 0.5 m」，
+    // 引擎那条是「眼睛 → 爆心原点、余量 0.4 m」。32 发取样里 3 发「引擎说挡了、
+    // 宿主说没挡」，1 发反过来。所以不是"压狠了"，是同一堵墙被两个不同的人各算一遍。
+    //
+    // 取舍：探针在场时**由引擎独占**（它的那条现在是分级的 0/0.45/1，而且射线抬到
+    // 1.2 m 打，见 Occlusion）。这里的两行只留给「引擎侧没有探针」的场合
+    // ——编辑器裸跑规则层、以及探针注册之前的那几帧，与 blastAutoDeafen / gunAutoDuck
+    // 同一套判空写法。
+    if (occluded && !audio.probes?.occlusion) {
       // 隔着一堵墙的爆炸仍然听得见（低频绕射得过去），但**高频全没了**。
       // 只压音量不削高频的话，听感是「小一点的同一声爆炸」，读不出那堵墙。
       opts.volume = volume * BLAST_AUDIO.occludedGain;
