@@ -29,8 +29,30 @@ const C = AUTO_QUALITY;
     previous = knobs.scale;
   }
   assert.equal(AutoQualityKnobs(0).scale, 1, "第 0 级 = 出厂配置，倍率必须正好是 1");
+  assert.equal(AutoQualityKnobs(0).nearShadowBake, true);
   assert.equal(AutoQualityKnobs(0).ssr, true);
   assert.equal(AutoQualityKnobs(0).contactShadows, true);
+  // 三个布尔旋钮都必须**只往下摘、不往回加**：阶梯上出现「降一级反而多开一样东西」
+  // 就意味着降级不再单调省时间，掉帧时会越降越乱。
+  for (const key of ["nearShadowBake", "ssr", "contactShadows"]) {
+    let on = true;
+    for (let step = 0; step < C.ladder.length; step += 1) {
+      const value = AutoQualityKnobs(step)[key];
+      assert.ok(!(value && !on), `第 ${step} 级把已经摘掉的 ${key} 又加了回来`);
+      on = value;
+    }
+  }
+  // 近级每帧烘是这条阶梯上唯一按 draw call 计价的一项，掉帧多半卡在提交上 ——
+  // 所以在几个效果开关里它排第一个（实测账见 AUTO_QUALITY.ladder 注释）。
+  const FirstOff = (key) => C.ladder.findIndex((rung) => rung[key] === false);
+  assert.ok(FirstOff("nearShadowBake") >= 0, "阶梯里必须有一级摘掉近级每帧烘");
+  assert.ok(FirstOff("nearShadowBake") <= FirstOff("ssr")
+    && FirstOff("nearShadowBake") <= FirstOff("contactShadows"),
+    "近级每帧烘不得比 SSR / 接触阴影更晚摘（它买的是 draw call，那两样买的是像素）");
+  // 但也不许摘得太早：第一关车厢在实机上稳定落在第 2 级（--live 实测帧间隔中位数
+  // 35 ms），第 2 级就摘 = 玩家最常待着的那一幕永远享受不到它，这件事就白做了。
+  assert.ok(FirstOff("nearShadowBake") >= 3,
+    "近级每帧烘不许在第 3 级之前摘：车厢实机就停在第 2 级");
   // 钳位：越界一律夹回阶梯里，不抛也不返回 undefined
   assert.equal(AutoQualityKnobs(-5).step, 0);
   assert.equal(AutoQualityKnobs(999).step, C.ladder.length - 1);
@@ -192,7 +214,7 @@ function Run(auto, intervalMs, ms, state) {
 
   // Summary 是面板与剖析器共用的那一行，字段齐全
   const summary = new AutoQuality().Summary();
-  for (const key of ["enabled", "step", "steps", "scale", "ssr",
+  for (const key of ["enabled", "step", "steps", "scale", "nearShadowBake", "ssr",
     "contactShadows", "medianMs", "locked", "lockRemainMs", "events"]) {
     assert.ok(key in summary, `Summary 缺字段 ${key}`);
   }

@@ -517,6 +517,20 @@ async function StrictProbe({ A, rounds, views, ablate }) {
     noFirstPersonShadow: Flip("firstPersonSelfShadow", false),
     noShadows: Flip("shadows", false),
     shadow1024: Flip("shadowSize", 1024),
+    // 阴影排班退回「一帧一张」（见 Data_Tuning_Shadows 抬头「近级每帧烘」）。
+    // 这一关默认是两张（第 0 级每帧 + 远级轮转），所以这一项量的就是那第二张的账。
+    // 锁要一起钉死，否则实测反馈会在批次中途把它切回去。
+    // **批长注意**：升档之后远级的轮转周期是 `cascades − 1`（= 2 帧），
+    // 21 帧不再是整数轮；逐项比这一项时把 `--rounds` 拉大靠中位数压掉那半轮。
+    oneShadowBakePerFrame: { Apply: () => {
+      const csm = g.lights?.csm;
+      if (!csm) return () => {};
+      const was = csm.nearEveryFrame;
+      const lock = csm.bakeModeLock;
+      csm.nearEveryFrame = false;
+      csm.bakeModeLock = Number.MAX_SAFE_INTEGER;
+      return () => { csm.nearEveryFrame = was; csm.bakeModeLock = lock; };
+    } },
     noPom: Flip("pom", false),
     noSkinSss: Flip("skinSss", false),
     // 诊断项：不是画质旋钮，用来把「人物那一份」从整帧里抠出来。

@@ -307,9 +307,16 @@ export const VELOCITY = { clampUv: 0.25, skinnedPrev: true };
  * 玩家感受到的是「越卡越卡」。所以阶梯只动运行时旋钮：
  *   · `scale`          内部分辨率**倍率**（乘在玩家/档位的 renderScale 上，
  *                      不覆盖它 —— 玩家拉过的滑杆仍然是他拉的那个数）
+ *   · `nearShadowBake` 允不允许「近级每帧烘」那第二张阴影图
+ *                      （`Data_Tuning_Shadows` 抬头那一节）。**效果开关里第一个摘的是它** ——
+ *                      第一关车厢实测它值 +163 draw / +2.09 ms（3394×1348 / high，
+ *                      `Script_FirstLevelFrameProbe --strict --ablate=oneShadowBakePerFrame`），
+ *                      而 `scale` 那几档只买得到像素、买不到 draw，这一帧偏偏是提交受限的。
+ *                      摘掉的代价是近处会动的人在地板上的影子退回 30 Hz（会看出来一点跳），
+ *                      所以放在第 3 级而不是更早 —— 见 ladder 里那条注释。
  *   · `ssr`            屏幕空间反射（`SetSsrEnabled`，运行时开关不重编译）
  *   · `contactShadows` 屏幕空间接触阴影（`preset.contactShadows`，同上）
- * 三者都是 `ApplyGraphics` 里一句话的事，没有一处会触发 `RecompileAllMaterials`。
+ * 四者都是 `ApplyGraphics` 里一句话的事，没有一处会触发 `RecompileAllMaterials`。
  *
  * ## 出厂开、面板可关
  * 它是**保底**不是画质策略：出厂配置本身已经按 docs §17 的表定过，
@@ -339,11 +346,17 @@ export const AUTO_QUALITY = {
    * 低于它 TAAU 已经补不回来了（1440p 输出 × 0.5 = 720p 内部）。
    */
   ladder: [
-    { scale: 1.00, ssr: true, contactShadows: true },
-    { scale: 0.92, ssr: true, contactShadows: true },
-    { scale: 0.85, ssr: true, contactShadows: true },
-    { scale: 0.78, ssr: false, contactShadows: true },
-    { scale: 0.70, ssr: false, contactShadows: false },
+    { scale: 1.00, nearShadowBake: true, ssr: true, contactShadows: true },
+    { scale: 0.92, nearShadowBake: true, ssr: true, contactShadows: true },
+    { scale: 0.85, nearShadowBake: true, ssr: true, contactShadows: true },
+    // 第 3 级起摘掉第二张阴影烘焙。它是这条阶梯上**唯一按 draw call 计价**的一项，
+    // 到这一级还没救回来的机器多半卡在提交上，压像素买不回 draw —— 所以在几个
+    // 效果开关里它排第一个。
+    // **不放在第 2 级**：第一关车厢在这台机器上实机就稳定落在第 2 级
+    //（3394×1348、帧间隔中位数 35 ms，`Script_FirstLevelFrameProbe --live` 实测），
+    // 放第 2 级等于「玩家最常待着的那一幕永远享受不到近级每帧烘」，这件事就白做了。
+    { scale: 0.78, nearShadowBake: false, ssr: false, contactShadows: true },
+    { scale: 0.70, nearShadowBake: false, ssr: false, contactShadows: false },
   ],
   /** 内部分辨率倍率乘完之后的绝对下限（相对输出分辨率）。 */
   floor: 0.50,

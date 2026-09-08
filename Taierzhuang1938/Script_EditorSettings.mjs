@@ -200,9 +200,9 @@ export class GraphicsSettings {
         gfx.autoQuality = on;
         this.Apply();
       });
-      Note(perf, "帧时间中位数持续 >20 ms 就按阶梯往回收内部分辨率（必要时再摘 SSR /"
-        + " 接触阴影），<13 ms 持续 8 s 才升回去，每次降级锁 30 s。只动运行时旋钮，"
-        + "不整档切换 —— 换档要重编译全场材质，在已经掉帧时更糟。");
+      Note(perf, "帧时间中位数持续 >20 ms 就按阶梯往回收内部分辨率（再往下依次摘掉"
+        + "近级每帧阴影烘焙、SSR、接触阴影），<13 ms 持续 8 s 才升回去，每次降级锁 30 s。"
+        + "只动运行时旋钮，不整档切换 —— 换档要重编译全场材质，在已经掉帧时更糟。");
     }
 
     const shadowBox = document.createElement("div");
@@ -570,6 +570,7 @@ export class GraphicsSettings {
       // 「近级每帧烘」）。这一栏是那个决定的取证口：看得见它现在烘几张、
       // 凭的是多少三角，才不用去猜「这一关的近影为什么跳」。
       f.Set("阴影烘焙", `${csm.nearEveryFrame ? "近级每帧 + 远级轮转" : "一帧一张（轮转）"}`
+        + `${csm.nearBakeAllowed ? "" : " · 自动降档已摘"}`
         + ` · ${(csm.bakeTriangles / 1e6).toFixed(2)}M / ${(csm.bakeTriangleBudget / 1e6).toFixed(2)}M 三角`);
     }
     const fpShadow = this.host.game?.firstPersonSelfShadow?.Status?.();

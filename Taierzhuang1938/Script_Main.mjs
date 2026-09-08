@@ -8178,6 +8178,10 @@ function ApplyGraphics() {
     mapSize: graphics.shadowSize || lights.defaultShadowSize,
   });
   lights.SetShadowDistance(graphics.shadowDistance);
+  // 「近级每帧烘」那第二张阴影图：三角预算由 CsmRig 自己实测（见 Data_Tuning_Shadows
+  // 抬头），这里给的是自动降档那道闸 —— 它是阶梯上唯一按 draw call 计价的一项，
+  // 第 2 级起摘掉（车厢实测 +163 draw / +2.09 ms）。
+  lights.SetNearShadowBakeAllowed(!autoQuality.enabled || autoQuality.nearShadowBake);
   // 接触阴影：只是「这一趟 pass 跑不跑」。关掉时 ContactShadowsPass.Idle 会把
   // 材质那边还原成 1×1 纯白，不重编译。
   post.preset.contactShadows = CONTACT_SHADOWS_SUPPORTED

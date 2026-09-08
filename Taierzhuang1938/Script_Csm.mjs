@@ -716,6 +716,12 @@ export class CsmRig {
      * 出厂 false：第一次实测回来之前一律走最保守的一帧一张。
      */
     this.nearEveryFrame = false;
+    /**
+     * 外部闸：自动降档从第 2 级起把这一位关掉（`AUTO_QUALITY.ladder` 的
+     * `nearShadowBake`）。三角预算说得起不代表这台机器跑得动 —— 这第二张烘焙
+     * 是按 **draw call** 计价的，而掉帧的机器多半卡在提交上。
+     */
+    this.nearBakeAllowed = true;
     /** 上一帧阴影烘焙实测的三角数（取证与测试读它）。 */
     this.bakeTriangles = 0;
     /** 升/降档之后的锁（帧）。 */
@@ -773,9 +779,21 @@ export class CsmRig {
     const lock = SHADOW_COMMON.bakeModeLockFrames;
     if (this.nearEveryFrame) {
       if (triangles > budget) { this.nearEveryFrame = false; this.bakeModeLock = lock; }
-    } else if (triangles * 2 <= budget * 0.9) {
+    } else if (this.nearBakeAllowed && triangles * 2 <= budget * 0.9) {
       this.nearEveryFrame = true; this.bakeModeLock = lock;
     }
+  }
+
+  /**
+   * 自动降档那道外部闸（`AUTO_QUALITY.ladder` 的 `nearShadowBake`）。
+   * 关掉立刻退回一帧一张并解锁，让实测在重新允许时马上判一次。
+   */
+  SetNearBakeAllowed(on) {
+    const want = !!on;
+    if (this.nearBakeAllowed === want) return;
+    this.nearBakeAllowed = want;
+    this.bakeModeLock = 0;
+    if (!want) this.nearEveryFrame = false;
   }
 
   /**
@@ -1028,6 +1046,7 @@ export class CsmRig {
       bakeOrder: this.preset.bakeOrder.slice(),
       // 近级每帧烘的档位与它的实测依据（见 Data_Tuning_Shadows 抬头）
       nearEveryFrame: this.nearEveryFrame,
+      nearBakeAllowed: this.nearBakeAllowed,
       bakeTriangles: this.bakeTriangles,
       bakeTriangleBudget: SHADOW_COMMON.bakeTriangleBudget,
       intensity: this.intensity,

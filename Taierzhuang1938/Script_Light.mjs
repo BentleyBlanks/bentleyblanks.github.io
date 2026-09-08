@@ -195,6 +195,15 @@ export class LightRig {
     this.csm.SetMaxDistance(meters);
   }
 
+  /**
+   * 允不允许「近级每帧烘」那第二张阴影图。自动降档第 2 级起关掉
+   * （`AUTO_QUALITY.ladder` 的 `nearShadowBake`）—— 三角预算说得起不代表这台
+   * 机器跑得动，那一张是按 draw call 计价的。口径见 `Data_Tuning_Shadows` 抬头。
+   */
+  SetNearShadowBakeAllowed(on) {
+    this.csm.SetNearBakeAllowed(on);
+  }
+
   /** 让一份 uniforms 跟着本 rig 的阴影图走。一般由 `BindSunShadowUniforms` 代调。 */
   RegisterShadowUniforms(uniforms) {
     if (uniforms) this.shadowUniformClients.add(uniforms);

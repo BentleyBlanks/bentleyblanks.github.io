@@ -8,7 +8,8 @@
 //     临界点上的机器会在两级之间每两秒抖一次，而每次抖动本身都要重建靶。
 //
 // ## 它调什么、不调什么
-// 只调**运行时旋钮**：内部分辨率倍率、SSR、接触阴影（见 `AUTO_QUALITY.ladder`）。
+// 只调**运行时旋钮**：内部分辨率倍率、近级每帧阴影烘焙、SSR、接触阴影
+// （见 `AUTO_QUALITY.ladder`）。
 // 不整档切换 —— 换档要重编译全场材质（POM / SSIL / 簇状光都是编译期开关），
 // 在已经掉帧的时候再送一次几百毫秒的编译卡顿只会更糟。
 // 也不动曝光 / 雾 / 阴影总闸：那几样一动画面明暗就漂了（历史事故「画面为什么这么黑」）。
@@ -30,7 +31,7 @@ const Clamp = (value, low, high) => Math.min(high, Math.max(low, value));
  * 第 `step` 级对应的旋钮。纯函数，测试直接调。
  * @param {number} step 阶梯级数（会自己钳进 ladder 范围）
  * @param {object} [config] 覆盖 AUTO_QUALITY（测试用）
- * @returns {{step:number, scale:number, ssr:boolean, contactShadows:boolean}}
+ * @returns {{step:number, scale:number, nearShadowBake:boolean, ssr:boolean, contactShadows:boolean}}
  */
 export function AutoQualityKnobs(step, config = AUTO_QUALITY) {
   const ladder = config.ladder;
@@ -39,6 +40,7 @@ export function AutoQualityKnobs(step, config = AUTO_QUALITY) {
   return {
     step: index,
     scale: rung.scale,
+    nearShadowBake: rung.nearShadowBake !== false,
     ssr: rung.ssr !== false,
     contactShadows: rung.contactShadows !== false,
   };
@@ -76,8 +78,11 @@ export class AutoQuality {
     this.log = [];
   }
 
-  /** 当前级的三个旋钮。`ApplyGraphics` 直接读这三个。 */
+  /** 当前级的四个旋钮。`ApplyGraphics` 直接读这几个。 */
   get scale() { return AutoQualityKnobs(this.step, this.config).scale; }
+
+  /** 允不允许「近级每帧烘」那第二张阴影图（掉帧时第一个摘的就是它）。 */
+  get nearShadowBake() { return AutoQualityKnobs(this.step, this.config).nearShadowBake; }
 
   get ssr() { return AutoQualityKnobs(this.step, this.config).ssr; }
 
@@ -193,6 +198,7 @@ export class AutoQuality {
       step: this.step,
       steps: this.config.ladder.length,
       scale: knobs.scale,
+      nearShadowBake: knobs.nearShadowBake,
       ssr: knobs.ssr,
       contactShadows: knobs.contactShadows,
       medianMs: this.Median(),
