@@ -415,13 +415,16 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --label=x   # 第一关三�
 
 ### 音频
 - `Script_Audio.mjs` —— 合成配方打底 + 实录采样逐条盖同名配方，盖不上就回落合成。
+  引擎侧模型（遮挡 / 四档分区混响按声源选 IR / 传播延迟 / 采样路径 duck+耳鸣 / 玩家开枪压环境 /
+  voice stealing / 两级限幅 / 枪尾按区）与宿主探针契约 `audio.SetProbes({occlusion, zone})`
+  全在 `docs/Data_AudioEngine.md`，闸门 `Script_AudioTest.mjs`。
 - 来源表 `Data_SfxSources` / `Data_AmbSources` / `Data_MusicSources` / `Data_Voice`
   （川军口令是**四川话**）；烘焙 `Script_{Sfx,Amb,Music,Voice,SeedAudio*}Bake`，
   响度对齐 `Script_AudioNormalize`，产物在 `Audio/`。
 - `Script_AudioWiring.mjs` + `Data_Tuning_Audio.mjs` —— **接线层**：什么时候值得响一声
   （宿主探针 / 逐弹弹啸 / 跳弹 / AI foley / 脚下材质 / 身体 foley / 手榴弹 / 爆炸三档 /
   火场点声源）。取证 `Debug.AudioZone()`，闸门 `Script_AudioWiringTest.mjs`。
-- 先读：`docs/Data_AudioAssets.md`（素材与烘焙）、`docs/Data_AudioWiring.md`（触发条件与限频）。
+- 先读：`docs/Data_AudioAssets.md`（素材与烘焙）、`docs/Data_AudioEngine.md`（引擎模型与探针契约）、`docs/Data_AudioWiring.md`（触发条件与限频）。
 
 ### 过场 / 剧情
 - `Script_Cutscene.mjs` —— 实机演出；只有用户点名的几场夺控制权，战斗内演出不夺。
@@ -570,7 +573,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --label=x   # 第一关三�
 **现状口径（改对应系统前必读）**：
 - `Data_TechRenderPipeline.md`（渲染管线唯一现状文档）、`Data_TechPhysics.md`、
   `Data_TestTiers.md`、`Data_Destruction.md`、`Data_EditorSuite.md`、`Data_AudioAssets.md`、
-  `Data_AudioWiring.md`。
+  `Data_AudioEngine.md`、`Data_AudioWiring.md`。
 - `Data_FirstLevelRebuildAcceptance.md` —— 新版第一关来源、范围决定和验收；`Data_MissionDesign.md` 保留线性剧情设计背景，涉及旧章节的内容须结合当前入口核对；`Data_Traversal.md` —— 通行高度阶梯。
 - `Data_Bayonet.md`、`Data_PlayerDamage.md`、`Data_GunFeelReview.md`（枪感相关改动或专项审查时使用）、
   `Data_MainMenu.md`、`Data_SamplePoints.md`、`Data_VisualReview.md`。
