@@ -58,6 +58,13 @@ export const SFX_LICENSES = {
   },
 };
 
+/**
+ * 枪声 / 爆炸 / 弹道三类成品的码率（2026-09-08 起）。其余仍走 `Script_SfxBake` 的默认 72k。
+ * 为什么只抬这三类：它们的辨识度全在**瞬态与低频**上，而 72 kbps 恰好在这两处最弱
+ * （逐条理由写在 `Script_SfxBake.mjs` 头注）。组或 cut 上写 `bitrate` 生效。
+ */
+export const BITRATE_TRANSIENT = "112k";
+
 const ARCHIVE = "https://archive.org/download/";
 
 /** 把 (item, path) 拼成 archive.org 的直链。 */
@@ -739,6 +746,735 @@ export const SFX_SOURCES = [
     // 需要两段式的话由接线侧触发两次。
     cuts: [{ cue: "mgCharge", exactAtS: 18.47, tail: 0.90, gain: 0.9,
       fadeOutS: 0.15, alignDbfs: -25 }],
+  },
+
+  // =========================================================================
+  // 对标 3A 素材补缺批（2026-09-08）
+  //
+  // 本批只走 Sonniss 实录（archive.org 镜像），**一条生成音都没有** —— 找不到的
+  // 记进 docs/Data_AudioAssets.md 的「Sonniss 缺口清单」，不拿模型顶。
+  //
+  // ## 镜像的形状决定了怎么选材
+  // archive.org 上的 Sonniss 镜像是**每家厂商每个库只放三四个文件**的抽样。
+  // 「同厂商同枪的另一个 take」这条最优解因此**大半时候不成立** —— 一个库里
+  // 常常只剩一条枪声。于是本批按两级来：
+  //   1. **同一条长片里的另一发**。这是本批最大的收获：Pole Position 的
+  //      `K98k, Firing`（40 s / 10 发）、`M1903A3, Firing`（20 s / 5 发）、
+  //      FLYSOUND 的 `NAGANT 50m distant`（56 s / 10 发）都是**几十秒的连续实录**，
+  //      同一支枪、同一支麦、同一天，切出来的变体之间只差真实的发发抖动 ——
+  //      这正是「多变体」想要的那种差别，比任何变调都真。
+  //   2. **按频谱挑**（谱心 / >4 kHz 占比 / 降 20 dB 时长，做法同 explosionNear
+  //      那三条）。拿现有成品当靶子量一遍镜像，选夹住靶子的。
+  //
+  // ## 远近一律是两条真的录音
+  // 新增的三条机枪远场（zb26Far / type11Far / type92Far）与已有的近场是
+  // **同一次射击的另一支麦**：L7A2 的 1 m 与 50 m、BAR 的 0.1 m 与 300 m、
+  // M1919A4 枪架的 1 m 与 300 m。选材硬标准第 3 条在这里是字面成立的。
+  //
+  // ## 枪尾按「声源在哪个空间」选，不按枪选
+  // gunTail* 六条要的是**空间的回声**，不是枪。所以取 Pole Position 的
+  // Indoor / Outdoor Gun Acoustics 两个库 —— 那两个库存在的理由就是这个：
+  // 同一支枪在开阔地 / 建筑之间 / 长走廊里各录一遍。切法是**从起音后 48 ms 落刀**，
+  // 把枪口爆音让给 body 层，只留后面的空间。口径因此不是这几条的判据
+  //（走廊的混响不会因为换一支枪而变成另一条走廊），但仍尽量取全威力弹的那几支。
+  //
+  // 本批新增的 cue 一律带 `pending: true`：`Script_Audio.RECIPES` 里还没有同名配方，
+  // 直接进 `manifest.cues` 会让 `LoadSfxPack` 每次开机抛一堆 sfxErrors 并顶红
+  // `Script_AudioTest` 的计数断言（理由与 2026-08-28 那一批逐字相同）。
+  // **给已有 cue 补变体的组不带 pending** —— 它们 append 进现成的 cue，运行时立刻可用。
+  // =========================================================================
+
+  // --- 步枪：中正式（7.92×57 毛瑟）-----------------------------------------
+  {
+    id: "RifleNraK98kTakes",
+    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
+    path: "Pole Position - Mauser Karabiner 98 kurz K98k bolt-action rifle/K98k, Firing, t2, MKH416.mp3",
+    credit: "Pole Position Production · K98k 7.92×57 连续实录（同一支枪的另外三发）· Sonniss GDC 2020",
+    license: "sonniss",
+    bitrate: BITRATE_TRANSIENT,
+    // **中正式就是毛瑟标准型的中国版**，K98k 与它同弹同枪机 —— 选材硬标准第 1 条
+    // 在这一条上是字面成立的，不需要任何折算。这条素材 39.5 s 里有十发独立射击
+    //（间隔 3—5 s，中间是拉栓），实测谱心 3900—4070 Hz、>4 kHz 占 34—38 %，
+    // 与现有 `_01`（Watson Wu 毛瑟 8 mm 中距离，谱心 3573 Hz / 33.0 %）同一档。
+    // 三个变体之间只差**真实的发发抖动**，不是同一份 wav 变调。
+    cuts: [{ cue: "rifleNra", tail: 1.30, gain: 0.94, variants: 3, minGap: 0.8,
+      append: true, alignDbfs: -25 }],
+  },
+  // --- 步枪：三八式（6.5×50，用 .30-06 的 M1903A3 升调顶）---------------------
+  {
+    id: "RifleIjaSpringfieldTakes",
+    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
+    path: "Pole Position - Springfield 1903A3 bolt-action rifle/M1903A3, Firing, t2, 1m, Right, Above, MKH8060.mp3",
+    credit: "Pole Position Production · 斯普林菲尔德 M1903A3 .30-06 连续实录 · Sonniss GDC 2020",
+    license: "sonniss",
+    bitrate: BITRATE_TRANSIENT,
+    // 沿用 docs 里定过的那条折算：三八式 6.5×50「又尖又脆」→ .30-06 升调 10 %。
+    // **比现有 `_01`（M1 Garand）更对的一点是枪机**：M1903A3 与三八式一样是旋转
+    // 后拉枪机，Garand 是半自动 —— 每发后面那记自动机复进声本来就不该有。
+    // 20 s 里五发，间隔 3.5—4.4 s。
+    cuts: [{ cue: "rifleIja", tail: 1.05, gain: 0.92, rate: 1.10, variants: 3, minGap: 0.8,
+      append: true, alignDbfs: -25 }],
+  },
+  // --- 轻机：捷克式 ZB-26（弹匣供弹的全威力弹轻机）---------------------------
+  {
+    id: "Zb26L86Lsw",
+    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
+    path: "Pole Position Production - Enfield L86 LSW 5.56mm/Enfield_L86_LSW_5.56mm_1m_right_MKH8040_2_clean_Triple_shots_x_1.mp3",
+    credit: "Pole Position Production · Enfield L86 LSW（弹匣供弹轻机，1 m）· Sonniss GDC 2016",
+    license: "sonniss",
+    bitrate: BITRATE_TRANSIENT,
+    // **这是一条妥协，写清楚为什么。** 现用的 L7A2 GPMG 那条素材整整 7.5 s 里
+    // 只有**一发**（前 4 s 是数字静音），镜像里没有第二发可切；而全库再没有第二条
+    // 7.92 级别的弹匣供弹轻机近录。
+    // 于是按「机构对得上」选：L86 LSW 与 ZB-26 一样是**弹匣供弹、两脚架、班用轻机**，
+    // 同一家厂商、同样的 1 m clean 录法，差的是口径（5.56 对 7.92）。
+    // rate 0.94 把它往下压一档 —— 不敢压更多：实测原声谱心 5023 Hz、zcr 6500，
+    // 与现有 `_01`（5907 Hz / 6728）已经很近，再降就跑到 4600 以下、听着不像同一挺枪了。
+    // 只取三发里的**末发**（0.656 s）：前两发的尾巴都压着下一发。
+    cuts: [{ cue: "zb26", exactAtS: 0.656, tail: 0.90, gain: 0.90, rate: 0.94,
+      append: true, alignDbfs: -25 }],
+  },
+  // --- 轻机：十一年式（用 BAR 顶）-------------------------------------------
+  {
+    id: "Type11BarSecondShot",
+    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
+    path: "Pole Position Production - M1918 Browning Automatic Rifle .30cal/M1918_Browning_Automatic_Rifle_.30cal_0.1m_to_right_Double_shots_x_1.mp3",
+    credit: "Pole Position Production · BAR .30cal 近场（同一次双发的第二发）· Sonniss GDC 2016",
+    license: "sonniss",
+    bitrate: BITRATE_TRANSIENT,
+    // 与 `_01` 同一条素材、同一次双发，但落刀在**第二发自己的起音**（0.501 s）上，
+    // 而 `_01` 落在 0.658 s —— 那是双发的共同尾巴。所以这两条不是同一份波形变调，
+    // 一条有冲头一条没有，轮播时听得出是两下不同的枪。
+    cuts: [{ cue: "type11", exactAtS: 0.501, tail: 0.78, gain: 0.86, rate: 1.12,
+      append: true, alignDbfs: -25 }],
+  },
+  // --- 重机：九二式（M1919A4）------------------------------------------------
+  {
+    id: "Type92M1919Near5m",
+    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
+    path: "Pole Position Production - M1919A4 Browning Machine Gun .30cal/M1919A4_Browning_Machine_Gun_.30cal_5m_behind_ORTF_blanks_Triple_shots_x_1.mp3",
+    credit: "Pole Position Production · M1919A4 .30cal（5 m 侧后）· Sonniss GDC 2016",
+    license: "sonniss",
+    bitrate: BITRATE_TRANSIENT,
+    // 同一挺枪、同一批录音的另一支麦（5 m）。只取三连发的**末发**（0.251 s）。
+    cuts: [{ cue: "type92", exactAtS: 0.251, tail: 1.10, gain: 0.92, rate: 1.03,
+      append: true, alignDbfs: -25 }],
+  },
+  {
+    id: "Type92M1919Turret1m",
+    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
+    path: "Pole Position Production - M1919A4 Browning Machine Gun .30cal on turret/M1919A4_Browning_Machine_Gun_.30cal_on_turret_1m_left_blanks_Triple_shots_x_2.mp3",
+    credit: "Pole Position Production · M1919A4 .30cal（枪架，1 m 左）· Sonniss GDC 2016",
+    license: "sonniss",
+    bitrate: BITRATE_TRANSIENT,
+    // **架在枪架上那版**，正是 docs 说的「重机与轻机在听感上真正的分界」——
+    // 每发后面那记金属余振。素材里两组三连发，取第二组的末发（4.605 s）：
+    // 它后面 3.4 s 没有别的动作压着，尾巴最干净。
+    cuts: [{ cue: "type92", exactAtS: 4.605, tail: 1.10, gain: 0.92, rate: 1.03,
+      append: true, alignDbfs: -25 }],
+  },
+
+  // --- 远场步枪 -------------------------------------------------------------
+  {
+    id: "RifleNraFarNagant50m",
+    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
+    path: "FLYSOUND - Mosin Nagant/NAGANT 50m distant front left shots.mp3",
+    credit: "FLYSOUND · 莫辛纳甘 50 m 外（同一次拍摄的连续十发）· Sonniss GDC 2020",
+    license: "sonniss",
+    bitrate: BITRATE_TRANSIENT,
+    // 与 `_01`（同厂同枪的 mixed long distance）是**同一批素材**，这条是 50 m 机位、
+    // 56 s 里十发。实测谱心 4610—4910 Hz，`_01` 是 4100 —— 同一档。
+    // 远场的价值全在尾巴上，所以 tail 给到 1.8 s。
+    cuts: [{ cue: "rifleNraFar", tail: 1.80, gain: 0.80, variants: 2, minGap: 1.0,
+      append: true, alignDbfs: -25 }],
+  },
+  {
+    id: "RifleIjaFarBuildings",
+    item: "sonniss-gdc-2018-game-audio-bundle-normalized",
+    path: "Pole Position - The Outdoor Gun Acoustics Library/AK5_valley_field_forest_50m_behind_gun_off_axis_behind_buildings_M10.mp3",
+    credit: "Pole Position Production · 50 m 外、经建筑反射的步枪射击 · Sonniss GDC 2018",
+    license: "sonniss",
+    bitrate: BITRATE_TRANSIENT,
+    // **按频谱选的，不是按枪名选的**（做法同 explosionNear 的第 2/3 变体）：
+    // 拿现有 `_01`（BAR 300 m，谱心 2623 Hz / >4 kHz 22.7 %）当靶子把镜像量了一遍，
+    // 这条 71 s 素材中段那几发实测 2651 / 2679 Hz、21.8—22.4 %，是全表最近的。
+    // 它录的正是「五十米外一支步枪、声音从几栋房子之间绕回来」——
+    // 滕县城里听见的每一发日军步枪都是这个形状，滤波器造不出来。
+    // atS 20 把落点钉在中段那一串一致的射击上，避开首尾三发明显更响的（峰值差一倍）。
+    cuts: [{ cue: "rifleIjaFar", tail: 1.50, gain: 0.78, rate: 1.08, variants: 2,
+      atS: 20.0, minGap: 1.0, append: true, alignDbfs: -25 }],
+  },
+
+  // --- 新增：机枪远场（与近场是同一次射击的另一支麦）-------------------------
+  {
+    id: "Zb26Far",
+    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
+    path: "Pole Position Production - L7A2 GPMG 7.62x51mm/L7A2_GPMG_7.62x51mm_belt_fed_50m_behind_Schoeps_B_clean_Single_shots_tracer_x_2.mp3",
+    credit: "Pole Position Production · L7A2 GPMG 7.62×51 单发（50 m 后方机位）· Sonniss GDC 2016",
+    license: "sonniss",
+    pending: true,
+    bitrate: BITRATE_TRANSIENT,
+    // `zb26` 用的是同一次射击的 **1 m** 机位，这条是 **50 m** 机位 —— 选材硬标准第 3 条
+    // 「远近是两条真的录音」在这里是字面成立的。素材里两发（0.10 s 与 4.12 s），
+    // minGap 2.0 保证一发只取一次（后面那几个候选是同一发的反射）。
+    cuts: [{ cue: "zb26Far", tail: 1.50, gain: 0.80, variants: 2, minGap: 2.0,
+      alignDbfs: -25 }],
+  },
+  {
+    id: "Type11Far",
+    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
+    path: "Pole Position Production - M1918 Browning Automatic Rifle .30cal/M1918_Browning_Automatic_Rifle_.30cal_300m_in_front_Double_shots_x_1.mp3",
+    credit: "Pole Position Production · BAR .30cal 300 m 正面 · Sonniss GDC 2016",
+    license: "sonniss",
+    pending: true,
+    bitrate: BITRATE_TRANSIENT,
+    // `type11` 是这挺枪的 0.1 m 机位，这条是 300 m 机位，同一次双发。
+    // **已知的重复**：`rifleIjaFar_01` 也切自这条素材的末发（rate 1.08）。
+    // 镜像里没有第二条 300 m 的全威力自动武器实录 —— 这一条记在缺口清单里，
+    // 别当没看见（三百米外一支步枪和一挺轻机本来也难分，真正的区别由引擎排的射速给）。
+    cuts: [{ cue: "type11Far", exactAtS: 0.578, tail: 1.40, gain: 0.78, rate: 1.12,
+      alignDbfs: -25 }],
+  },
+  {
+    id: "Type92Far",
+    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
+    path: "Pole Position Production - M1919A4 Browning Machine Gun .30cal on turret/M1919A4_Browning_Machine_Gun_.30cal_on_turret_300m_in_front_blanks_Triple_shots_x_2.mp3",
+    credit: "Pole Position Production · M1919A4 .30cal（枪架，300 m 正前）· Sonniss GDC 2016",
+    license: "sonniss",
+    pending: true,
+    bitrate: BITRATE_TRANSIENT,
+    // 与 `type92` 的枪架近场是同一挺枪、同样的架法，300 m 机位。
+    // 两组三连发各取末发（0.271 s / 4.590 s），间隔钉死避开前两发的叠音。
+    cuts: [
+      { cue: "type92Far", exactAtS: 0.271, tail: 1.60, gain: 0.80, rate: 1.03, alignDbfs: -25 },
+      { cue: "type92Far", exactAtS: 4.590, tail: 1.60, gain: 0.80, rate: 1.03, append: true, alignDbfs: -25 },
+    ],
+  },
+
+  // --- 新增：枪尾（第一人称枪声分层用）---------------------------------------
+  // 六条按**声源所在的空间**分，不按枪分。切法统一：`exactAtS` 落在起音后 60 ms
+  //（CutOne 再往回让 12 ms，实际是起音后 48 ms），把枪口爆音整个让给 body 层，
+  // 留下的就是这个空间的回声。fadeInS 30 ms 把落刀处磨平 —— 硬起就是第二记冲头。
+  {
+    id: "GunTailOpenRifle",
+    item: "sonniss-gdc-2018-game-audio-bundle-normalized",
+    path: "Pole Position - The Outdoor Gun Acoustics Library/AK47_big_open_area_2m_above_behind_gun_RSM191_M.mp3",
+    credit: "Pole Position Production · 开阔地步枪射击的空间尾音 · Sonniss GDC 2018",
+    license: "sonniss",
+    pending: true,
+    bitrate: BITRATE_TRANSIENT,
+    // 「大开阔地」= 城外的野地与河滩。这种地方没有近处反射面，尾巴是一层
+    // 迅速摊开、几乎不回来的空气声（实测降 20 dB 只要 0.02—0.14 s）。
+    cuts: [
+      { cue: "gunTailOpenRifle", exactAtS: 5.613, tail: 0.90, gain: 0.80,
+        fadeInS: 0.03, fadeOutS: 0.25, alignDbfs: -25 },
+      { cue: "gunTailOpenRifle", exactAtS: 9.602, tail: 0.90, gain: 0.80,
+        fadeInS: 0.03, fadeOutS: 0.25, append: true, alignDbfs: -25 },
+    ],
+  },
+  {
+    id: "GunTailStreetRifle",
+    item: "sonniss-gdc-2018-game-audio-bundle-normalized",
+    path: "Pole Position - The Outdoor Gun Acoustics Library/AK5_valley_field_forest_50m_behind_gun_off_axis_behind_buildings_M10.mp3",
+    credit: "Pole Position Production · 建筑之间的步枪射击尾音 · Sonniss GDC 2018",
+    license: "sonniss",
+    pending: true,
+    bitrate: BITRATE_TRANSIENT,
+    // 「街」在这个镜像里唯一能对上的实录就是这条：麦克风在建筑背后，
+    // 收到的是**从房子上弹回来的那一层**。不是城市峡谷，但反射面的性质对得上，
+    // 而合成一层假的街道混响正是本项目 2026-08-20 那一轮定论要避免的东西。
+    cuts: [
+      { cue: "gunTailStreetRifle", exactAtS: 27.612, tail: 1.20, gain: 0.80,
+        fadeInS: 0.03, fadeOutS: 0.35, alignDbfs: -25 },
+      { cue: "gunTailStreetRifle", exactAtS: 34.012, tail: 1.20, gain: 0.80,
+        fadeInS: 0.03, fadeOutS: 0.35, append: true, alignDbfs: -25 },
+    ],
+  },
+  {
+    id: "GunTailInteriorRifle",
+    item: "sonniss-gdc-2018-game-audio-bundle-normalized",
+    path: "Pole Position - The Indoor Gun Acoustics Library/AK4_long_corridor_single_shots_blanks_behind_gun_in_corner_M10.mp3",
+    credit: "Pole Position Production · 长走廊里的步枪单发尾音（AK4 7.62 全威力弹）· Sonniss GDC 2018",
+    license: "sonniss",
+    pending: true,
+    bitrate: BITRATE_TRANSIENT,
+    // 全批里最合身的一条：AK4 是 7.62 全威力弹（口径这一档也对上了），
+    // 79 s 里十发独立单发，每发降 20 dB 要 0.20—0.33 s —— 那就是屋里开枪的样子。
+    cuts: [
+      { cue: "gunTailInteriorRifle", exactAtS: 15.575, tail: 1.20, gain: 0.82,
+        fadeInS: 0.03, fadeOutS: 0.30, alignDbfs: -25 },
+      { cue: "gunTailInteriorRifle", exactAtS: 31.506, tail: 1.20, gain: 0.82,
+        fadeInS: 0.03, fadeOutS: 0.30, append: true, alignDbfs: -25 },
+    ],
+  },
+  {
+    id: "GunTailOpenMg",
+    item: "sonniss-gdc-2017-game-audio-bundle-normalized",
+    path: "Pole Position - The Warfare Library/warfare_t2_mg_firing_close_projectile_tail_large_field_Telinga_w_MKH8020_or_MKH8060.mp3",
+    credit: "Pole Position Production · 大野地里机枪射击的弹道与尾音 · Sonniss GDC 2017",
+    license: "sonniss",
+    pending: true,
+    bitrate: BITRATE_TRANSIENT,
+    // 素材名里就写着 `projectile_tail_large_field` —— 这个库存在的理由就是这一层。
+    //
+    // **落刀位置必须在一梭子的最后一发之后。** 第一版按「起音后 60 ms」落在 0.075 s，
+    // 贴图一看是八记连发排在一秒里 —— 这挺枪从 0 打到 5.0 s 就没停过（约 460 rpm、
+    // 每 130 ms 一发），起音后 60 ms 还在下一发之前。那不是尾音，那是连发。
+    // 现在钉在两梭子各自的**末发之后**：第一梭最后一发在 5.032 s（之后静到 12.69 s），
+    // 第二梭最后一发在 17.273 s（之后静到 23.57 s）。
+    cuts: [
+      { cue: "gunTailOpenMg", exactAtS: 5.100, tail: 1.10, gain: 0.82,
+        fadeInS: 0.03, fadeOutS: 0.35, alignDbfs: -25 },
+      { cue: "gunTailOpenMg", exactAtS: 17.340, tail: 1.10, gain: 0.82,
+        fadeInS: 0.03, fadeOutS: 0.35, append: true, alignDbfs: -25 },
+    ],
+  },
+  {
+    id: "GunTailInteriorMg",
+    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
+    path: "Audiobeast - The London Warehouse Firearms Library/Audiobeast_Medium_Warehouse_Browning_M2_.50_Machine_Gun_03m_RSM191_MS_Raw_002_Burst_x2.mp3",
+    credit: "Audiobeast · 中型仓库里的重机枪连发尾音（The London Warehouse Firearms Library）· Sonniss GDC 2016",
+    license: "sonniss",
+    pending: true,
+    bitrate: BITRATE_TRANSIENT,
+    // 这个库整库都是「同一批枪在同一座仓库里打」，要的正是那座仓库。
+    // 两组点射（19.57 s 与 23.13 s）各取一条尾，实测降 20 dB 分别要 0.76 s 与 0.89 s ——
+    // 屋里架一挺重机枪就是这么久才安静下来。口径（.50）比九二式大一档，
+    // 但这一层只承担空间，枪本身由 `type92` 出。
+    cuts: [
+      { cue: "gunTailInteriorMg", exactAtS: 19.629, tail: 1.60, gain: 0.82,
+        fadeInS: 0.03, fadeOutS: 0.40, alignDbfs: -25 },
+      { cue: "gunTailInteriorMg", exactAtS: 23.187, tail: 1.60, gain: 0.82,
+        fadeInS: 0.03, fadeOutS: 0.40, append: true, alignDbfs: -25 },
+    ],
+  },
+  // `gunTailStreetMg` 没有做 —— 见 docs 的缺口清单：镜像里唯一带 "Urban_Exterior"
+  // 的枪声是 SoundMorph 一条 3.8 s 的 9 mm 冲锋枪点射（还是设计库），
+  // 拿它当重机枪的街道尾音是错的材料，宁可空着。
+
+  // --- 新增：弹道 -----------------------------------------------------------
+  // 三条都切自 PMSFX 那条 2 分钟的**弹丸掠过**实录。为什么一条素材出两个 cue：
+  // 一发超音速弹从头上过，物理上就是**先一记音爆（crack）再一段气流啸声（whizz）**，
+  // 同一次录音里两样都在。所以按频谱把事件分成两堆、用两种长度切：
+  //   · crack —— 谱心 3400—4200 Hz 的那几记，只留 0.22 s，收得快；
+  //   · whizz —— 谱心 5600—6100 Hz、>4 kHz 占 55—61 % 的那几记，留 0.50 s。
+  // 与已有的 `amb.whizz`（Pole Position 的 Warfare Library）不同源，撒在环境里的
+  // 那条和贴着头皮过的这条本来就该是两种声音。
+  {
+    id: "BulletCrack",
+    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
+    path: "PMSFX - Bullet Bys &Impacts/PM_BBI_Bullet_Passby_Whizzby_Airy_5.mp3",
+    credit: "PMSFX · 弹丸掠过（音爆一段）· Sonniss GDC 2020",
+    license: "sonniss",
+    pending: true,
+    bitrate: BITRATE_TRANSIENT,
+    // hp 250：这条素材的 200 Hz 以下全是录音棚的地噪，抬到 −25 dBFS 之后会变成
+    // 每次擦头都跟一记闷响。音爆本身 500 Hz 以下没有东西。
+    cuts: [
+      { cue: "bulletCrack", exactAtS: 4.711, tail: 0.22, gain: 0.90, hp: 250, fadeOutS: 0.09, alignDbfs: -25 },
+      { cue: "bulletCrack", exactAtS: 8.013, tail: 0.22, gain: 0.90, hp: 250, fadeOutS: 0.09, append: true, alignDbfs: -25 },
+      { cue: "bulletCrack", exactAtS: 11.501, tail: 0.22, gain: 0.90, hp: 250, fadeOutS: 0.09, append: true, alignDbfs: -25 },
+      { cue: "bulletCrack", exactAtS: 12.553, tail: 0.22, gain: 0.90, hp: 250, fadeOutS: 0.09, append: true, alignDbfs: -25 },
+    ],
+  },
+  {
+    id: "BulletWhizz",
+    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
+    path: "PMSFX - Bullet Bys &Impacts/PM_BBI_Bullet_Passby_Whizzby_Airy_5.mp3",
+    credit: "PMSFX · 弹丸掠过（啸声一段）· Sonniss GDC 2020",
+    license: "sonniss",
+    pending: true,
+    bitrate: BITRATE_TRANSIENT,
+    cuts: [
+      { cue: "bulletWhizz", exactAtS: 0.561, tail: 0.50, gain: 0.85, hp: 300, fadeOutS: 0.20, alignDbfs: -25 },
+      { cue: "bulletWhizz", exactAtS: 2.616, tail: 0.50, gain: 0.85, hp: 300, fadeOutS: 0.20, append: true, alignDbfs: -25 },
+      { cue: "bulletWhizz", exactAtS: 5.267, tail: 0.50, gain: 0.85, hp: 300, fadeOutS: 0.20, append: true, alignDbfs: -25 },
+      { cue: "bulletWhizz", exactAtS: 6.264, tail: 0.50, gain: 0.85, hp: 300, fadeOutS: 0.20, append: true, alignDbfs: -25 },
+    ],
+  },
+  {
+    id: "Ricochet",
+    item: "sonniss-gdc-2024-game-audio-bundle-normalized",
+    path: "Justsoundeffects - Steampunk Gadgets/MECHMisc_Ricochet Hits 01_JSE_SG.mp3",
+    credit: "Justsoundeffects · 跳弹撞击与金属余韵 · Sonniss GDC 2024",
+    license: "sonniss",
+    pending: true,
+    bitrate: BITRATE_TRANSIENT,
+    // 库名是「蒸汽朋克小机件」，但这个文件是**素材录音**（SOURCE 那一类）：
+    // 九记金属被打中之后的余韵，谱心 6300—7500 Hz、zcr 5000—10000、
+    // 衰减 0.10—0.50 s —— 跳弹「嘤——」那条尾巴的谱形就长这样，全镜像里没有更像的。
+    // 每一记后面 0.25 s 左右都跟着第二下，tail 0.65 把这一对一起带上：
+    // 真实的跳弹本来就是一记撞击加一串乱窜的余音，切成孤零零一下反而假。
+    //
+    // **位置改过一次**：`_02` 原来钉在 2.476 s，贴图上是前 40 % 全空、真正那一下
+    // 到第 45 % 才出来（起音 451 ms）—— 触发之后半秒才响，玩法上等于没有反馈。
+    // 现在四条都钉在**那一串里最响的那一下**上（峰值 0.066 / 0.085 / 0.223 / 0.088）。
+    cuts: [
+      { cue: "ricochet", exactAtS: 0.010, tail: 0.65, gain: 0.88, fadeOutS: 0.22, alignDbfs: -25 },
+      { cue: "ricochet", exactAtS: 2.735, tail: 0.65, gain: 0.88, fadeOutS: 0.22, append: true, alignDbfs: -25 },
+      { cue: "ricochet", exactAtS: 4.830, tail: 0.65, gain: 0.88, fadeOutS: 0.22, append: true, alignDbfs: -25 },
+      { cue: "ricochet", exactAtS: 7.195, tail: 0.65, gain: 0.88, fadeOutS: 0.22, append: true, alignDbfs: -25 },
+    ],
+  },
+
+  // --- 脚步：按材质分 --------------------------------------------------------
+  // 每种四条。**脚步每秒响一两下，一个固定样本循环起来就是机关枪** —— 这条旧规矩
+  // 在这里是硬要求，所以每一种都从一段连续行走的实录里切四步，而不是找四个厂商。
+  {
+    id: "FootstepDirtLoop",
+    item: "sonniss-gdc-2019-game-audio-bundle-normalized",
+    path: "PMSFX - STEPS Dirt & Gravel/PM_SDNG_Stereo_Walk_Seamless_Loop_1.mp3",
+    credit: "PMSFX · 土路连续行走 · Sonniss GDC 2019",
+    license: "sonniss",
+    // 把 `footstepDirt` 从两条补到四条。与已有那两条同厂同库（PMSFX STEPS Dirt & Gravel），
+    // 只是这条是连续行走的长片，能切出更多不重样的落脚。
+    cuts: [{ cue: "footstepDirt", tail: 0.40, gain: 0.60, variants: 2, minGap: 0.45,
+      decay: [0.02, 0.35], append: true, alignDbfs: -25 }],
+  },
+  {
+    id: "FootstepWood",
+    item: "sonniss-gdc-2018-game-audio-bundle-normalized",
+    path: "The Sound Pack Tree - Footstep Loops/1879 - Footsteps - Wooden Stairs - Down - 80 fpm - Loop.mp3",
+    credit: "The Sound Pack Tree · 木楼梯下行（80 步/分）· Sonniss GDC 2018",
+    license: "sonniss",
+    pending: true,
+    // 城里的木板：民房的门板地、望楼的梯子、拆下来铺战壕的檩条。
+    // 30 s 里四十步，间隔 0.75 s，实测谱心 690—1250 Hz —— 木头的闷是它的身份证
+    //（对照：砖石那条 2200—3300，泥水那条 4900—7900）。
+    cuts: [{ cue: "footstepWood", tail: 0.40, gain: 0.62, variants: 4, minGap: 0.6,
+      decay: [0.03, 0.4], alignDbfs: -25 }],
+  },
+  {
+    id: "FootstepStone",
+    item: "sonniss-gdc-2017-game-audio-bundle-normalized",
+    path: "Tovusound - Edward – Foleyart Collection Add-On Extended Footsteps/015_Foley_Footsteps_Asphalt_Boot_Walk_Fast_Run_Jog_Close.mp3",
+    credit: "Tovusound · 军靴走硬地（近距离）· Sonniss GDC 2017",
+    license: "sonniss",
+    pending: true,
+    // 砖石与石板路。选它是因为**穿的是靴子**：全镜像里硬地面的连续行走多半是
+    // 运动鞋或皮鞋，只有这条是靴。滕县城里的兵穿的是布鞋草鞋，但靴子的「硬底压在
+    // 硬面上」比运动鞋的橡胶闷响近得多。22 s 里十七步。
+    // **tail 从 0.40 收到 0.30**：素材后半段是快走与小跑，步距压到 0.36 s，
+    // 0.40 s 的窗口会把**下一步的头**切进来（贴图上看得很清楚，`_01` 就是这么翻的）。
+    cuts: [{ cue: "footstepStone", tail: 0.30, gain: 0.60, variants: 4, minGap: 0.5,
+      decay: [0.01, 0.35], fadeOutS: 0.08, alignDbfs: -25 }],
+  },
+  {
+    id: "FootstepGrass",
+    item: "sonniss-gdc-2017-game-audio-bundle-normalized",
+    path: "Tovusound - Edward – Foleyart Collection Add-On Extended Footsteps/169_Foley_Footsteps_Grass_Sneaker_Walk_Fast_Run_Jog_Close.mp3",
+    credit: "Tovusound · 草地行走（近距离）· Sonniss GDC 2017",
+    license: "sonniss",
+    pending: true,
+    // 麦田与河滩草。与砖石那条同厂同一套录法（同一个拟音师、同一支麦、同一间棚），
+    // 换材质不换录音风格 —— 玩家在两种地面之间走过去时，变的应该只是地面。
+    // PMSFX 的 STEPS Dry Grass 库也在镜像里，但只有三个文件、每个一步，凑不满四条。
+    // tail 0.34：与砖石那条同一个理由，素材后段步距压到 0.38 s。
+    cuts: [{ cue: "footstepGrass", tail: 0.34, gain: 0.62, variants: 4, minGap: 0.5,
+      decay: [0.05, 0.5], fadeOutS: 0.10, alignDbfs: -25 }],
+  },
+  {
+    id: "FootstepMud",
+    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
+    path: "Wav Junction Sound Effects - Footsteps/0014_Footsteps_water_puddle_single_splashes.mp3",
+    credit: "Wav Junction · 踩进水洼的单步溅水 · Sonniss GDC 2020",
+    license: "sonniss",
+    pending: true,
+    // 泥地与浅水。素材名里的 `single_splashes` 是关键：26 s 里十六**下独立的**踩水，
+    // 不是连着趟水走 —— 连着走的那种切开每一步都带着上一步的水声。
+    cuts: [{ cue: "footstepMud", tail: 0.38, gain: 0.62, variants: 4, minGap: 0.6,
+      decay: [0.01, 0.4], fadeOutS: 0.10, alignDbfs: -25 }],
+  },
+
+  // --- 身体 foley -----------------------------------------------------------
+  {
+    id: "ClothMove",
+    item: "game-audio-monthly",
+    path: "Sonniss.com - Game Audio Monthly - #5/The Soundcatcher -  Cloth Foley /PANTS_JEANS_MOVEMENT_HANDLING_OFF_ON_1.mp3",
+    credit: "The Soundcatcher · 厚棉布衣物摩擦 · Sonniss Game Audio Monthly #5",
+    license: "sonniss",
+    pending: true,
+    // 姿态变化与翻越时的衣物摩擦。取牛仔布而不是尼龙夹克：一九三八年的棉军装、
+    // 绑腿、粗布褂子都是**厚而干的织物**，尼龙那条一开口就是化纤的「唰」。
+    // 位置钉死不走自动挑法 —— 衣物摩擦是连续的，没有起音点可挑（实测 20 s 里
+    // 自动挑法只认出五处，还都挑在拉链上）。
+    cuts: [
+      { cue: "clothMove", exactAtS: 1.077, tail: 0.50, gain: 0.70, fadeInS: 0.02, fadeOutS: 0.14, alignDbfs: -25 },
+      { cue: "clothMove", exactAtS: 9.617, tail: 0.50, gain: 0.70, fadeInS: 0.02, fadeOutS: 0.14, append: true, alignDbfs: -25 },
+      { cue: "clothMove", exactAtS: 15.951, tail: 0.50, gain: 0.70, fadeInS: 0.02, fadeOutS: 0.14, append: true, alignDbfs: -25 },
+    ],
+  },
+  {
+    id: "GearRattle",
+    item: "sonniss-gdc-2017-game-audio-bundle-normalized",
+    path: "Joshua Reinhardt - Ultimate Cloth and Prop Collection/PR ARMY GEAR ROOM_WALK_C414.mp3",
+    credit: "Joshua Reinhardt · 全套军用装具行走时的晃动 · Sonniss GDC 2017",
+    license: "sonniss",
+    pending: true,
+    // 冲刺时的装具晃动。素材录的就是**背着整套军用装具走路**：水壶、弹袋、
+    // 刺刀鞘、皮带扣一起响，而不是单件金属碰撞 —— 后者听着像有人在摇钥匙。
+    cuts: [
+      { cue: "gearRattle", exactAtS: 1.188, tail: 0.60, gain: 0.72, fadeInS: 0.02, fadeOutS: 0.16, alignDbfs: -25 },
+      { cue: "gearRattle", exactAtS: 2.265, tail: 0.60, gain: 0.72, fadeInS: 0.02, fadeOutS: 0.16, append: true, alignDbfs: -25 },
+      { cue: "gearRattle", exactAtS: 4.721, tail: 0.60, gain: 0.72, fadeInS: 0.02, fadeOutS: 0.16, append: true, alignDbfs: -25 },
+    ],
+  },
+  {
+    id: "BreathHeavy",
+    item: "sonniss-gdc-2018-game-audio-bundle-normalized",
+    path: "Gamemaster Audio - Punch and Combat Sounds/voice_male_breathing_mask_loop_run_02.mp3",
+    credit: "Gamemaster Audio · 男性奔跑时的粗喘（可循环）· Sonniss GDC 2018",
+    license: "sonniss",
+    pending: true,
+    // **只有一条**。镜像里成年男性的持续喘息实录就这一个文件（另一条 Funky Rustic
+    // 的是女声，Eiravaein 的 ASMR 呼吸录得太轻、抬到 −25 dBFS 会把底噪一起抬起来）。
+    // 3.04 s 里四次呼吸（约 0.6 s 一次），首尾各 30 ms 淡入淡出接得上循环。
+    // 文件名里的 mask 是录法标注不是面具音色：实测谱心 3200 Hz、无稳态共振峰，
+    // 没有防毒面具那种管腔嗡声。**第二条变体是缺口，记在 docs 里。**
+    cuts: [{ cue: "breathHeavy", exactAtS: 0.02, tail: 3.00, gain: 0.85, loop: true,
+      fadeInS: 0.03, fadeOutS: 0.03, alignDbfs: -25 }],
+  },
+  {
+    id: "BodyLand",
+    item: "sonniss-gdc-2017-game-audio-bundle-normalized",
+    path: "Tovusound - Edward – Foleyart Collection Add-On Extended Footsteps/289_Foley_Footsteps_Rocks_Sneaker_Jump_Land_On_Two_Feet_Close.mp3",
+    credit: "Tovusound · 双脚落地（碎石地面，近距离）· Sonniss GDC 2017",
+    license: "sonniss",
+    pending: true,
+    // 翻墙跳下来那一下。**双脚同时落地**，不是两步 —— 素材名点明了这件事，
+    // 而这正是它与脚步的区别：一记，重，没有第二下。9.7 s 里八次，
+    // 每次前面 1 s 干净（实测 quiet 0.000）。
+    cuts: [
+      { cue: "bodyLand", exactAtS: 2.040, tail: 0.70, gain: 0.80, fadeOutS: 0.22, alignDbfs: -25 },
+      { cue: "bodyLand", exactAtS: 5.061, tail: 0.70, gain: 0.80, fadeOutS: 0.22, append: true, alignDbfs: -25 },
+    ],
+  },
+
+  // --- 手榴弹落地 -----------------------------------------------------------
+  // 三条各出自一次不同的金属件落硬地实录。为什么不用同一条素材切三刀：
+  // 弹跳是**一整串**（落、弹、再弹、停），一条素材里只有一整串，切开就散了。
+  //
+  // **淘汰过两条，理由写在这儿别再走回头路。** 第一版用的是 Airborne 的钢筋落水泥地
+  // 与 Sounds Great 的金属管落地：两条的贴图上都是**整条横着的谐波梯**（钢筋 5426 Hz、
+  // 管子 2929 Hz，比邻域高 33 / 31 dB），听感是「一根钢筋在响」「一根管子在响」——
+  // 细长中空的东西会唱，手榴弹是个几百克的实心疙瘩，落地只该「咚」一下带一串跳。
+  // 判据就用这个：**谐波梯超过邻域 22 dB 的一律不要**。
+  {
+    id: "GrenadeBounceCarMetal",
+    item: "sonniss-gdc-2015-game-audio-bundle-normalized",
+    path: "Coll Anderson - Car Destruction/EFX EXT Metal Impact Drop 01 A.mp3",
+    credit: "Coll Anderson · 金属件落地弹跳（户外实录）· Sonniss GDC 2015",
+    license: "sonniss",
+    pending: true,
+    // 一整串真的弹跳：实测 0.005 / 0.321 / 0.722 / 1.118 s 四下，峰值 0.29→0.06
+    // 逐次衰减 —— 落、弹、再弹、停。户外录的，没有房间残响要跟我们自己那层打架。
+    cuts: [{ cue: "grenadeBounce", exactAtS: 0.005, tail: 1.30, gain: 0.80,
+      fadeOutS: 0.30, alignDbfs: -25 }],
+  },
+  {
+    id: "GrenadeBounceWeightPlate",
+    item: "sonniss-gdc-2018-game-audio-bundle-normalized",
+    path: "Christophe Davaille – The Gym - Sounds Of Bodybuilding/TG_Weight Metal Plate 10kg_Dropped_01.mp3",
+    credit: "Christophe Davaille · 十公斤铸铁片落地 · Sonniss GDC 2018",
+    license: "sonniss",
+    pending: true,
+    // 第二个变体：**落地就死**的那一种（实测降 20 dB 只要 0.05 s、谱心 1376 Hz、
+    // >4 kHz 占 10 %）。一块实心铸铁砸在硬地上不会唱 —— 这正是上面淘汰钢筋和管子
+    // 之后要找的那个质地。取 14.30 s 那一下（全条最响，前面 2.8 s 干净）。
+    cuts: [{ cue: "grenadeBounce", exactAtS: 14.302, tail: 0.55, gain: 0.80,
+      fadeOutS: 0.18, append: true, alignDbfs: -25 }],
+  },
+  {
+    id: "GrenadeBounceCan",
+    item: "sonniss-gdc-2019-game-audio-bundle-normalized",
+    path: "Sound Ex Machina - Rolling Objects/Aluminum can rolling and bouncing on concrete.mp3",
+    credit: "Sound Ex Machina · 金属罐在水泥地上弹跳 · Sonniss GDC 2019",
+    license: "sonniss",
+    pending: true,
+    // 第三个变体：更轻、更脆的一串。取 0.727 s 那一段（连着三下，前后都干净）。
+    cuts: [{ cue: "grenadeBounce", exactAtS: 0.727, tail: 0.60, gain: 0.78,
+      fadeOutS: 0.18, append: true, alignDbfs: -25 }],
+  },
+  {
+    id: "GrenadeRoll",
+    item: "sonniss-gdc-2019-game-audio-bundle-normalized",
+    path: "Sound Ex Machina - Rolling Objects/Metallic ball rolling on concrete 02.mp3",
+    credit: "Sound Ex Machina · 金属球在水泥地上滚动 · Sonniss GDC 2019",
+    license: "sonniss",
+    pending: true,
+    // 滚动。取 0.551 s 起 1.8 s —— 那一段是纯滚动（实测降 20 dB 要 1.20 s，
+    // 中间没有撞击冲头），玩家听到它的意思是「那颗弹还在往我这边来」。
+    cuts: [{ cue: "grenadeRoll", exactAtS: 0.551, tail: 1.80, gain: 0.75,
+      fadeInS: 0.03, fadeOutS: 0.30, alignDbfs: -25 }],
+  },
+
+  // --- 爆炸：中距与远距，以及炸完之后的碎屑 -----------------------------------
+  // 三档的分界按**频谱**定，不按文件名：现有 `explosionNear` 谱心 3069 Hz、
+  // >4 kHz 占 28.4 %；`explosionFar` 是 238 Hz / 0.3 %（它自己带 lp 2200）。
+  // 中距那两条落在中间：素材本身就是有距离的户外实录，再用 lp 5000 收一收高频，
+  // 相当于六十到一百五十米空气吸收掉的那一段。
+  {
+    id: "ExplosionMidOutdoor",
+    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
+    path: "Bluezone - Tank - Explosion Sound Effects/Bluezone_BC0271_explosion_outdoors_large_005.mp3",
+    credit: "Bluezone Corporation · 户外大型爆炸 · Sonniss GDC 2020",
+    license: "sonniss",
+    pending: true,
+    bitrate: BITRATE_TRANSIENT,
+    // 降 20 dB 要 1.20 s —— 尾巴比近距那三条都长，那是距离给的，不是加出来的。
+    cuts: [{ cue: "explosionMid", tail: 2.20, gain: 0.88, whole: true, lp: 5000, alignDbfs: -25 }],
+  },
+  {
+    id: "ExplosionMidMortar",
+    item: "sonniss-gdc-2023-game-audio-bundle-normalized",
+    path: "BluezoneCorp - Detonation - Explosion/Bluezone_BC0277_explosion_mortar_002_01.mp3",
+    credit: "Bluezone Corporation · 迫击炮弹爆炸 · Sonniss GDC 2023",
+    license: "sonniss",
+    pending: true,
+    bitrate: BITRATE_TRANSIENT,
+    // 与 `explosionNear_01` **同一个库**（BC0277），底噪与房间感是一路的；
+    // 而滕县城里落的绝大多数就是迫击炮弹。
+    cuts: [{ cue: "explosionMid", tail: 2.00, gain: 0.88, whole: true, lp: 5000,
+      append: true, alignDbfs: -25 }],
+  },
+  {
+    id: "ExplosionFarHowitzer",
+    item: "game-audio-monthly",
+    path: "Sonniss.com - Game Audio Monthy - #1/Bluezone - Artillery Designed Howitzer and Explosion Sound Effects/Bluezone-BC0200-howitzer-shot-distant-explosion-003.mp3",
+    credit: "Bluezone Corporation · 榴弹炮射击与远处的落点 · Sonniss Game Audio Monthly #1",
+    license: "sonniss",
+    pending: false,   // 补的是已有 cue 的变体，运行时立刻可用
+    bitrate: BITRATE_TRANSIENT,
+    // `explosionFar` 的第二个变体。素材前 2 s 是炮口，3 s 起才是**远处的落点**
+    //（实测谱心 653 Hz、>4 kHz 只剩 0.3 %），所以从 3.0 s 落刀。
+    // lp 2200 与 `_01` 同参数，三条远爆的高频截点必须一致，否则轮播时忽远忽近。
+    cuts: [{ cue: "explosionFar", exactAtS: 3.00, tail: 2.60, gain: 0.70, lp: 2200,
+      append: true, alignDbfs: -25 }],
+  },
+  {
+    id: "ExplosionFarCannon",
+    item: "sonniss-gdc-2017-game-audio-bundle-normalized",
+    path: "Pole Position - The Warfare Library/warfare_t1b_cannon_firing_forest_distant_MKH8060_2.mp3",
+    credit: "Pole Position Production · 远处的火炮 · Sonniss GDC 2017",
+    license: "sonniss",
+    bitrate: BITRATE_TRANSIENT,
+    // 第三个变体。这条素材已经是 `amb.shellingFar` 的来源（那边是把二十六记叠成床），
+    // 这里切**单独一记有头有尾的**。实测谱心 314 Hz —— 三条远爆里最闷的一条，
+    // 与 Gamemaster 那条（`_01`）一亮一闷把中间夹住。
+    cuts: [{ cue: "explosionFar", exactAtS: 0.50, tail: 2.60, gain: 0.70, lp: 2200,
+      append: true, alignDbfs: -25 }],
+  },
+  {
+    id: "DebrisFallStone",
+    item: "game-audio-monthly",
+    path: "Sonniss.com - Game Audio Monthy - #2/Bluezone-Bomb-Blast-Explosion-and-Debris-Sound-Elements/Bluezone-BC0197-falling-stone-debris-032.mp3",
+    credit: "Bluezone Corporation · 爆炸后落下的碎石 · Sonniss Game Audio Monthly #2",
+    license: "sonniss",
+    pending: true,
+    // 爆完之后天上掉下来的东西。这个库整库都是「炸完之后」，三条一石一铁一混合，
+    // 接线时按落点材质挑（带 position 播，空气低通由引擎按距离算）。
+    cuts: [{ cue: "debrisFall", tail: 2.20, gain: 0.78, whole: true, fadeOutS: 0.4, alignDbfs: -25 }],
+  },
+  {
+    id: "DebrisFallMetal",
+    item: "game-audio-monthly",
+    path: "Sonniss.com - Game Audio Monthy - #2/Bluezone-Bomb-Blast-Explosion-and-Debris-Sound-Elements/Bluezone-BC0197-falling-metal-debris-018.mp3",
+    credit: "Bluezone Corporation · 爆炸后落下的金属碎片 · Sonniss Game Audio Monthly #2",
+    license: "sonniss",
+    pending: true,
+    cuts: [{ cue: "debrisFall", tail: 2.20, gain: 0.78, whole: true, fadeOutS: 0.4,
+      append: true, alignDbfs: -25 }],
+  },
+  {
+    id: "DebrisFallRubble",
+    item: "game-audio-monthly",
+    path: "Sonniss.com - Game Audio Monthy - #2/Bluezone-Bomb-Blast-Explosion-and-Debris-Sound-Elements/Bluezone-BC0197-mixed-falling-rubble-explosion-impact-007.mp3",
+    credit: "Bluezone Corporation · 爆炸后混合瓦砾落地 · Sonniss Game Audio Monthly #2",
+    license: "sonniss",
+    pending: true,
+    cuts: [{ cue: "debrisFall", tail: 2.40, gain: 0.78, whole: true, fadeOutS: 0.5,
+      append: true, alignDbfs: -25 }],
+  },
+
+  // --- 火 -------------------------------------------------------------------
+  {
+    id: "FireSpot",
+    item: "sonniss-gdc-2018-game-audio-bundle-normalized",
+    path: "Pole Position - The Burning House Library/Burning_House_t4_Fire_low_intensity_with_crackling_MKH8060.mp3",
+    credit: "Pole Position Production · 房屋燃烧（低强度、带噼啪）· Sonniss GDC 2018",
+    license: "sonniss",
+    pending: true,
+    // 近处的火堆。选「烧房子」而不是「篝火」：这一关烧的是民房的檩条门板，
+    // 篝火那条素材里有柴堆塌陷和松枝爆裂，是野营的声音不是城里的。
+    // 取哪一段按 docs 的老规矩 ——「找最无聊的一段」：全条 93.8 s 按 0.1 s 一格量
+    // 十秒滑窗，46.5 s 起那一窗电平方差 1.66 dB（全条最小），十秒里没有一次塌陷。
+    // 两头各 20 ms 淡入淡出：循环用的床两头都不能长，长了每圈一个坑。
+    cuts: [{ cue: "fireSpot", exactAtS: 46.50, tail: 10.00, gain: 0.85, loop: true,
+      fadeInS: 0.02, fadeOutS: 0.02, alignDbfs: -25 }],
+  },
+
+  // --- 弹着：石头 -----------------------------------------------------------
+  // 城墙、石板与门礅。与已有的 `impactBrick`（青砖碎裂）分开：砖是会碎的，
+  // 石头是会崩一小片然后余下一记闷响。
+  {
+    id: "ImpactStoneBullet",
+    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
+    path: "Olivier Girardot - Hand Guns Sound Effects Pack/Bullet rock Impact 4.mp3",
+    credit: "Olivier Girardot · 子弹打在石头上 · Sonniss GDC 2020",
+    license: "sonniss",
+    pending: true,
+    // 全批唯一一条名字里同时有「子弹」和「石头」的实录，第一变体理所当然是它。
+    cuts: [{ cue: "impactStone", exactAtS: 0.005, tail: 0.45, gain: 0.86,
+      fadeOutS: 0.15, alignDbfs: -25 }],
+  },
+  {
+    id: "ImpactStoneRocky53",
+    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
+    path: "PMSFX - Rocky Impacts/PM_RI_Source_53 Rocks Impact Hit Single Stone.mp3",
+    credit: "PMSFX · 单块石头受击 · Sonniss GDC 2020",
+    license: "sonniss",
+    pending: true,
+    // 素材里 0.251 s 处还有第二下，tail 只留 0.24 s 把它挡在外面 ——
+    // 弹着是一记，不是两记。
+    cuts: [{ cue: "impactStone", exactAtS: 0.005, tail: 0.24, gain: 0.86,
+      fadeOutS: 0.09, append: true, alignDbfs: -25 }],
+  },
+  {
+    id: "ImpactStoneRocky92",
+    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
+    path: "PMSFX - Rocky Impacts/PM_RI_Source_92 Rocks Impact Hit Single Stone.mp3",
+    credit: "PMSFX · 单块石头受击（更闷）· Sonniss GDC 2020",
+    license: "sonniss",
+    pending: true,
+    // 第三条，谱心 2279 Hz —— 与前两条（2410 / 3016）拉开一档，三条一亮一中一闷。
+    cuts: [{ cue: "impactStone", exactAtS: 0.005, tail: 0.42, gain: 0.86,
+      fadeOutS: 0.14, append: true, alignDbfs: -25 }],
+  },
+
+  // --- 机械音补变体 ---------------------------------------------------------
+  {
+    id: "BoltCycleM38",
+    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
+    path: "Pole Position - Mosin-Nagant M38 bolt-action rifle/M38, Handling, Various, t2, 1m, Above, Right, MKH8060.mp3",
+    credit: "Pole Position Production · 莫辛纳甘 M38 拉栓 · Sonniss GDC 2020",
+    license: "sonniss",
+    // `bolt` 的第二个变体。与 `_01`（M1903A3）一样是旋转后拉枪机、同一家厂商的
+    // handling 录法。素材里每次拉栓是**间隔 0.25 s 的一对**（开、闭），
+    // 12.90 s 那一对前后各有 3 s 干净 —— 一整个循环切在一条里才是「拉了一下栓」。
+    cuts: [{ cue: "bolt", exactAtS: 12.90, tail: 0.85, gain: 0.95, hp: 180,
+      append: true, alignDbfs: -25 }],
+  },
+  {
+    id: "StripperLoadK98kSecond",
+    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
+    path: "Pole Position - Mauser Karabiner 98 kurz K98k bolt-action rifle/K98k, Handling, Various, t2, 1m, Right, MKH8060.mp3",
+    credit: "Pole Position Production · K98k 操作音（同一条素材的另一个动作）· Sonniss GDC 2020",
+    license: "sonniss",
+    // `stripperLoad` 的第二个变体：**同一支枪、同一次录音的另一个动作**，
+    // 这是本批最理想的那种变体来源。`_01` 落在 2.00 s，这条落在 4.95 s
+    //（实测峰值 0.073、前面 0.5 s 干净）。压弹每关要响几十次，独苗一定露馅。
+    cuts: [{ cue: "stripperLoad", exactAtS: 4.95, tail: 1.10, gain: 0.92,
+      append: true, alignDbfs: -25 }],
   },
 ];
 

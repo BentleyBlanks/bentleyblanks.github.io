@@ -32,6 +32,17 @@
 //   · `loop` —— 只写进清单当元数据，供接线时判断这条能不能循环。
 //   · 组上的 `pending` —— 素材烘好了但 `Script_Audio.RECIPES` 里还没有同名配方，
 //     写进 `manifest.pendingCues`（运行时看不见）。见 Main() 里那段注释。
+//
+// ## 2026-09-08（3A 素材补缺批）加的 `bitrate`
+//   枪声、爆炸、弹道这三类改用 **112 kbps 单声道**，其余仍是 72 kbps。
+//   72k 是照「短促的一次性音、体积优先」定的，对这三类不够：
+//     · 枪口爆音的信息全在头 10 ms 的**瞬态**里，72k 的心理声学模型会把这一下
+//       当成瞬时噪声抹掉一部分，出来是「啪」而不是「炸」——正是当初从合成换实录
+//       要解决的那个问题，在编码这一步又丢了一次；
+//     · 爆炸的能量集中在 60—200 Hz，低码率把低频段的量化噪声抬到能听见；
+//     · 弹道（音爆、跳弹）是 0.02 s 的宽带冲头，前后都是安静，预回声最明显。
+//   代价是这三类的体积涨 55%，全批合计只多几十 KB —— 这个换得过。
+//   落到组或 cut 上（`bitrate: "112k"`），不写就是 72k。
 
 import fs from "node:fs";
 import path from "node:path";
@@ -49,6 +60,7 @@ const FFMPEG = process.env.FFMPEG || "ffmpeg";
 
 // 采样率 44.1k：枪口爆音的辨识度在 8—14 kHz 那一段，降到 32k 就开始发闷。
 const SR = 44100;
+// 默认码率。枪声 / 爆炸 / 弹道在素材表里写 `bitrate: BITRATE_TRANSIENT`（112k），见头注。
 const BITRATE = "72k";      // 单声道 72 kbps，一个 0.8 秒的音约 7 KB
 const UA = "TaierzhuangSfxBake/1.0 (https://bentleyblanks.github.io)";
 
@@ -271,10 +283,10 @@ function MeasureMp3(file) {
 }
 
 /** 把 filters 与 stage.wav 编成成品 mp3。每次都从**同一份 stage.wav** 重编，永远只有一代 mp3。 */
-function EncodeMp3(tmpWav, outMp3, filters) {
+function EncodeMp3(tmpWav, outMp3, filters, bitrate = BITRATE) {
   const args = ["-y", "-v", "error", "-i", tmpWav];
   if (filters.length) args.push("-af", filters.join(","));
-  args.push("-ac", "1", "-ar", String(SR), "-b:a", BITRATE, outMp3);
+  args.push("-ac", "1", "-ar", String(SR), "-b:a", bitrate, outMp3);
   execFileSync(FFMPEG, args);
 }
 
@@ -289,7 +301,7 @@ const ALIGN_LIMIT_DBFS = -1.5;   // 给 mp3 重建留余量，与 AudioNormalize
  * 把成品对齐到 `cut.alignDbfs`。老 cue 不带这个字段 —— 它们的响度是
  * `Script_AudioNormalize.mjs --write` 事后拉平的，这里一个字节都不碰。
  */
-function AlignLoudness(tmpWav, outMp3, filters, targetDbfs) {
+function AlignLoudness(tmpWav, outMp3, filters, targetDbfs, bitrate = BITRATE) {
   let gainDb = 0;
   let last = MeasureMp3(outMp3);
   for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -299,7 +311,7 @@ function AlignLoudness(tmpWav, outMp3, filters, targetDbfs) {
     const limit = Math.pow(10, ALIGN_LIMIT_DBFS / 20).toFixed(8);
     EncodeMp3(tmpWav, outMp3, [...filters,
       `volume=${gainDb.toFixed(4)}dB`,
-      `alimiter=limit=${limit}:attack=2:release=50:level=false`]);
+      `alimiter=limit=${limit}:attack=2:release=50:level=false`], bitrate);
     last = MeasureMp3(outMp3);
   }
   return last;
@@ -341,8 +353,10 @@ function CutOne(pcm, hit, cut, tmpWav, outMp3) {
   if (cut.rate && cut.rate !== 1) filters.push(`asetrate=${Math.round(SR * cut.rate)}`, `aresample=${SR}`);
   if (cut.hp) filters.push(`highpass=f=${cut.hp}`);
   if (cut.lp) filters.push(`lowpass=f=${cut.lp}`);
-  EncodeMp3(tmpWav, outMp3, filters);
-  const level = cut.alignDbfs != null ? AlignLoudness(tmpWav, outMp3, filters, cut.alignDbfs) : null;
+  const bitrate = cut.bitrate || BITRATE;
+  EncodeMp3(tmpWav, outMp3, filters, bitrate);
+  const level = cut.alignDbfs != null
+    ? AlignLoudness(tmpWav, outMp3, filters, cut.alignDbfs, bitrate) : null;
   fs.rmSync(tmpWav, { force: true });
 
   const seconds = (seg.length / SR) / (cut.rate || 1);
@@ -397,6 +411,13 @@ function GenerateSyntheticSfx(cue, durS, tmpWav, outMp3) {
 }
 
 const Pascal = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** 把新来源并进已有 credit，同一条来源只留一份。 */
+function MergeCredit(existing, incoming) {
+  if (!existing) return incoming;
+  const parts = existing.split(" ／ ");
+  return parts.includes(incoming) ? existing : [...parts, incoming].join(" ／ ");
+}
 
 // ---------------------------------------------------------------------------
 async function Main() {
@@ -493,7 +514,9 @@ async function Main() {
 
     const used = new Set();
     const table = CueTable(group);
-    for (const cut of group.cuts) {
+    for (const rawCut of group.cuts) {
+      // 组上的 bitrate 是这一组的默认值，cut 上写的优先。整组都是枪声/爆炸时写在组上省事。
+      const cut = group.bitrate && !rawCut.bitrate ? { ...rawCut, bitrate: group.bitrate } : rawCut;
       const n = Math.max(1, cut.variants || 1);
       const prev = (cut.append && table[cut.cue]?.files) || [];
       const files = prev.slice();
@@ -525,9 +548,10 @@ async function Main() {
         seconds: Number(seconds.toFixed(3)),
         ...(tone ? { toneHz: tone } : {}),
         ...(cut.loop ? { loop: true } : {}),
-        credit: cut.append && table[cut.cue]?.credit
-          ? `${table[cut.cue].credit} ／ ${group.credit}`
-          : group.credit,
+        // credit 是**来源清单**，不是拼接日志：同一组里给一个 cue 切好几刀时
+        //（bulletCrack 一次切四条），原来的写法会把同一句厂商说明重复拼四遍。
+        // 已经在里面的就不再拼。
+        credit: MergeCredit(cut.append ? table[cut.cue]?.credit : null, group.credit),
         license: group.license,
       };
     }
