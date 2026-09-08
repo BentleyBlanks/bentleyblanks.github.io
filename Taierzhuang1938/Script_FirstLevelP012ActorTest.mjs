@@ -150,6 +150,14 @@ methods.ApplyScriptDefense(defender);assert.equal(defender.state,"cover_engage")
 const bareDefender={state:"idle",order:"advance",cover:null,bayonetFixed:false,ammo:5,target:{},weapon:{}};
 methods.ApplyScriptDefense(bareDefender);assert.equal(bareDefender.state,"fire","身边没有掩体的守点单位仍然是原地对射");
 defender.ammo=0;methods.ApplyScriptDefense(defender);assert.equal(defender.state,"reload");assert.equal(defender.reloadTimer,3.2);
+// 弹尽换弹会喊一声（`Script_Ai` 走 `this.ctx?.audioWiring`）：喊一次、带枪种，
+// 换弹途中不逐帧重喊，宿主没接音频也不许崩。
+const reloadCues=[],cueHost={ctx:{audioWiring:{AiReload(s,kind){reloadCues.push(kind);}}}};
+const dry={state:"fire",order:"hold",cover:null,bayonetFixed:false,ammo:0,target:{},weapon:{reloadTimeS:3.2,kind:"HanYang"}};
+methods.ApplyScriptDefense.call(cueHost,dry);assert.equal(dry.state,"reload");assert.deepEqual(reloadCues,["HanYang"],"换弹喊一声并带上枪种");
+dry.reloadTimer=1.1;methods.ApplyScriptDefense.call(cueHost,dry);
+assert.equal(dry.reloadTimer,1.1,"换弹途中不重置计时");assert.equal(reloadCues.length,1,"换弹途中不逐帧重喊");
+methods.ApplyScriptDefense.call({},dry);assert.equal(dry.state,"reload","宿主没接音频也不崩");
 assert.equal(methods.ScriptFireFactors({}).accuracy,1);assert.equal(methods.ScriptFireFactors({}).interval,1);
 assert.equal(methods.ScriptFireFactors({scriptAccuracyScale:0.2}).accuracy,0.2);assert.equal(methods.ScriptFireFactors({scriptFireIntervalScale:3}).interval,3);
 console.log("PASS P012 actual spawn identity forwarding, no visual gun, combat hard guards, unchanged armed defaults");

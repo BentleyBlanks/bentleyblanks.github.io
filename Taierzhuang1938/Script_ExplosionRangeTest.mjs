@@ -27,11 +27,16 @@ try {
   assert.equal(result.boot.level, "ExplosionRange"); assert.equal(result.boot.models.length, EXPLOSION_VEHICLES.length);
   assert.ok(result.boot.pinned && result.boot.ground > 0);
   assert.ok(result.boot.invincible, "the explosion range forces the invincible debug option");
-  // The proxies retire through a microtask after their first rendered frame, so
-  // read them from a fresh evaluate rather than the one that stepped the frames.
+  // The proxies retire through a microtask once a real shadow pass has drawn
+  // them, so read them from a fresh evaluate rather than the one that stepped
+  // the frames. Waiting for the shadow pass is the point: renderer.compile()
+  // only prepares object.material, so the debris' customDepthMaterial program
+  // is linked there and nowhere else.
   result.warm = await page.evaluate(() => ({ proxies: window.Taierzhuang.Debug.Explosions.State().terrain.warmProxies,
-    inScene: window.Taierzhuang.scene.children.filter((c) => c.userData.terrainWarm).length }));
-  assert.deepEqual(result.warm, { proxies: 0, inScene: 0 }, "crater shader warm-up proxies remove themselves after the first frame");
+    inScene: window.Taierzhuang.scene.children.filter((c) => c.userData.terrainWarm).length,
+    shadowed: window.Taierzhuang.Debug.Explosions.State().terrain.warmRetired?.shadowed }));
+  assert.deepEqual(result.warm, { proxies: 0, inScene: 0, shadowed: true },
+    "crater warm-up proxies retire on a real shadow pass, not on the leak cap");
   assert.equal(await page.evaluate(() => window.Taierzhuang.scene.children.filter((m) =>
     m.material?.isMeshBasicMaterial && /^Static_ExplosionStations/.test(m.name) && m.castShadow).length), 0,
   "instruction boards do not cast bands over crater inspection surfaces");

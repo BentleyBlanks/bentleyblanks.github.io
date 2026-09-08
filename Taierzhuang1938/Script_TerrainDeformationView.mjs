@@ -10,6 +10,11 @@ import { CraterDebris } from "./Script_CraterDebris.mjs";
 import { TERRAIN_DEFORMATION } from "./Data_Explosives.mjs";
 import { ValueNoise2 } from "./Script_Noise.mjs";
 
+// How many renders a crater warm-up proxy may wait for its first shadow pass
+// before it retires anyway. Only a leak guard: on a level whose cascades bake
+// (all of them are dirty on the first gameplay frame) the wait is a few frames.
+const WARM_MAX_RENDERS = 240;
+
 function ClipByDistance(polygon, Distance) {
   const inside = [], outside = [];
   for (let i = 0; i < polygon.length; i++) {
@@ -292,7 +297,7 @@ export class TerrainDeformationView {
     field.GroundHeight = (x, z) => this.model.GroundHeight(x, z);
     field.deformation = this;
     this.maskColliders = field.colliders?.length ?? 0;
-    this.warmProxies = [];
+    this.warmProxies = []; this.warmState = null; this.warmRetired = null;
     const w = this.model.config.tileCells + 3;
     this._heights = new Float64Array(w * w); this._deltas = new Float32Array(w * w); this._wear = new Float32Array(w * w);
     this.lastUpdateMs = null; this.lastStepSerial = -1;
@@ -337,6 +342,7 @@ export class TerrainDeformationView {
   Warm(renderer, camera) {
     this.RemoveWarmProxies();
     if (!renderer || !camera || !this.sources.length) return this.warmProxies;
+    this.warmState = { renderer, shadowed: false, renders: 0, lastFrame: -1 };
     const b = this.field.bounds, materials = [this.material, ...this.debris.materials, ...new Set(this.overlayMaterials.values())];
     const group = new THREE.Group();
     for (const [i, material] of materials.entries()) {
@@ -353,12 +359,8 @@ export class TerrainDeformationView {
       if (this.debris.materials.includes(material)) mesh.customDepthMaterial = this.debris.library.StaticDepth();
       mesh.position.set((b.minX + b.maxX) * 0.5, -500, (b.minZ + b.maxZ) * 0.5);
       mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.userData.terrainWarm = true;
-      mesh.onAfterRender = () => {
-        if (mesh.userData.warmed) return;
-        mesh.userData.warmed = true;
-        // Not inside the render: the other passes of this frame still draw it.
-        queueMicrotask(() => this.RemoveWarmProxies());
-      };
+      mesh.onAfterShadow = () => { if (this.warmState) this.warmState.shadowed = true; };
+      mesh.onAfterRender = () => this.NoteWarmRender();
       group.add(mesh); this.warmProxies.push(mesh);
     }
     try { renderer.compile(group, camera, this.scene); }
@@ -366,9 +368,42 @@ export class TerrainDeformationView {
     for (const mesh of this.warmProxies) this.scene.add(mesh);
     return this.warmProxies;
   }
+  /**
+   * Retire the proxies once they have been through every pass that actually
+   * links a program.
+   *
+   * `renderer.compile()` covers the surface programs, but it only ever prepares
+   * `object.material` — three never compiles a `customDepthMaterial`, so the
+   * crater debris' shadow program (`damageDepth:*`) is linked by the first real
+   * shadow pass and by nothing else. Retiring on the first render is not enough:
+   * boot renders the level many times for probe/GI baking with the cascades
+   * suppressed, so the proxies used to be gone long before a cascade baked, and
+   * the first blast paid for that program. Wait for the shadow pass, and cap the
+   * wait so a level that never bakes one cannot leak the proxies.
+   *
+   * Compiling the depth material directly instead does not work: the shadow pass
+   * renders into a linear target and copies the surface material's map onto the
+   * depth material, so a standalone compile links a twin program under a
+   * different cache key and the real one still compiles late.
+   */
+  NoteWarmRender() {
+    const state = this.warmState;
+    if (!state || !this.warmProxies.length) return;
+    const frame = state.renderer.info.render.frame;
+    if (frame !== state.lastFrame) { state.lastFrame = frame; state.renders += 1; }
+    if (!state.shadowed && state.renders < WARM_MAX_RENDERS) return;
+    // Not inside the render: the other passes of this frame still draw it.
+    queueMicrotask(() => this.RemoveWarmProxies());
+  }
   RemoveWarmProxies() {
+    // Forensics for the acceptance tests: did the proxies get their shadow pass,
+    // and how many renders did they have to wait for it?
+    if (this.warmState && this.warmProxies.length) {
+      this.warmRetired = { renders: this.warmState.renders, shadowed: this.warmState.shadowed };
+    }
     for (const mesh of this.warmProxies) { this.scene.remove(mesh); mesh.geometry.dispose(); }
     this.warmProxies.length = 0;
+    this.warmState = null;
   }
   SoilWear(x, z) {
     const ix = Math.round(x / this.model.config.cellM), iz = Math.round(z / this.model.config.cellM);
@@ -599,6 +634,7 @@ export class TerrainDeformationView {
   }
   State() { return { ...this.model.State(), meshes: this.tileMeshes.size,
     debris: this.debris.State(), lastUpdateMs: this.lastUpdateMs || null, warmProxies: this.warmProxies.length,
+    warmRetired: this.warmRetired,
     overlays: [...this.overlayTiles.values()].reduce((sum, meshes) => sum + meshes.length, 0),
     colliderTiles: this.physics?.terrainTiles.size || 0 }; }
   Dispose() {

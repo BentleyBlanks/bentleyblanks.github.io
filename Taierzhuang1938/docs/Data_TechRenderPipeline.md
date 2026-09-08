@@ -5128,6 +5128,22 @@ HLSL 编译器把整棵树内联展平，链接一份带破口的墙材质要 1.
 出来的整数，`floor(sector + 0.5)` 与 `sector < k+0.5` 在整数上选同一格；
 131072 点扫描（含两侧越界值）`floatBitsToUint` 完全一致。
 
+**⑤ `renderer.compile` 从不碰 `customDepthMaterial`。** 它遍历时只对
+`object.material` 调 `prepareMaterial`，所以给预热代理挂上
+`mesh.customDepthMaterial = library.StaticDepth()` **一点用都没有** ——
+那份影子深度 program（`damageDepth:*`）只有**真的跑过一趟 shadow pass** 才链接。
+炮坑碎屑就是这么漏的：表面材质预热到了，深度那份等到第一次爆炸才编
+（`Script_ExplosionRangeTest` 的「第一帧不许新编 program」因此红，差值只有 +1）。
+想绕开、单独拿深度材质当 `material` 编一个代理**行不通**，理由同②：shadow pass
+渲进线性靶，而且 `WebGLShadowMap.getDepthMaterial` 会把表面材质的 `map` 抄过来，
+两处参数不同 → 又是一份孪生 program，真正那份照样迟到（实测两个键差在
+`srgb` vs `srgb-linear` 与属性 `` vs `uv`）。
+所以 `TerrainDeformationView.Warm` 的代理改成**跑过 shadow pass 再退休**
+（`onAfterShadow` 置位，`onAfterRender` 里判），并留一个渲染次数上限兜底。
+注意不能按「第一帧」退休：开机那几趟 render 是探针/GI 烘焙，级联是压着的
+（`Script_Csm` 自排 `bakeOrder`，`shadowMap.autoUpdate=false`），
+正片实测代理等 2 趟 render 才等到第一次烘焙。
+
 #### 量过但**不是**瓶颈的（别再重做一遍）
 
 拿真实 dump 出来的那份 115 KB 片元着色器做消融，交替 A/B 九轮取中位数

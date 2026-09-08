@@ -48,28 +48,59 @@ try {
   assert.ok(terrain.tallestFragment > 0.02 && terrain.tallestFragment < 0.24, "repeated impacts re-ground boot-sized surface fragments");
   assert.ok(terrain.receivesShadows && terrain.textureSize === 1024, "authored crater material and shadowed geometry are in the actual scene");
 
+  // Freezing the world does not freeze the picture: GTAO/SSIL and SSR carry
+  // temporal history that advances one step per Render even with taa:false, so
+  // reading one render per side compares two half-settled pictures. Same rule as
+  // the batching gates (docs/Data_TechRenderPipeline.md): idle each side to the
+  // fixed point first, then read. Measured on this scene and camera, 1080x675
+  // half-float HDR, as changed pixels of 729000 / peak channel step:
+  //
+  //     idle draws   identical-config noise   crater decal   bullet decal
+  //         1            1656 / 7                93 / 7      4096 / 29021
+  //        20           32231 / 119            6226 / 14
+  //        45            3800 / 11                0 / 0      4096 / 29021
+  //        60             428 / 3                 0 / 0
+  //        96               0 / 0                 0 / 0      4096 / 29021
+  //
+  // Partway is worse than not settling at all — the mid-transient is the loudest
+  // part. At 96 both sides read byte-identical, so this compares exactly and
+  // needs no tolerance. Settling both sides also matters for strictness, not
+  // just quiet: history is mix(hist, cur, 0.1), so the first render after the
+  // toggle carries only a tenth of any real difference.
+  const SETTLE_DRAWS = 96;
+
   async function CompareDecals(eye, target, label) {
-    const difference = await page.evaluate(({ eye, target }) => {
+    const difference = await page.evaluate(({ eye, target, settle }) => {
       const t = window.Taierzhuang, decal = t.vfx.pools.decal.mesh;
       t.camera.position.set(...eye); t.camera.lookAt(...target); t.camera.updateMatrixWorld(true);
       // Freeze postprocess time and AO sampling. Compare the HDR scene itself,
       // before grain/TAA/UI, so only the switched decal layer can change pixels.
       const frame = t.post.frame, hdr = t.post.targets.hdr;
-      const Render = (visible) => {
+      const Draw = (visible) => {
         decal.visible = visible; t.post.frame = frame;
         t.post.Render(t.scene, t.camera, { taa: false, motionBlur: 0, grain: 0 });
+      };
+      const Sample = (visible) => {
+        for (let i = 0; i < settle; i++) Draw(visible);
         const pixels = new Uint16Array(hdr.width * hdr.height * 4);
         t.renderer.readRenderTargetPixels(hdr, 0, 0, hdr.width, hdr.height, pixels);
         return pixels;
       };
-      Render(true); const before = Render(true), after = Render(false);
-      let changedPixels = 0;
-      for (let i = 0; i < before.length; i += 4) {
-        if (before[i] !== after[i] || before[i + 1] !== after[i + 1] || before[i + 2] !== after[i + 2]) changedPixels++;
-      }
-      Render(true);
-      return { changedPixels, totalPixels: hdr.width * hdr.height };
-    }, { eye, target });
+      const Differences = (a, b) => {
+        let changed = 0;
+        for (let i = 0; i < a.length; i += 4) {
+          if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2]) changed++;
+        }
+        return changed;
+      };
+      // Two settled reads of the same configuration are the noise floor; the
+      // third switches the layer off from an equally settled start.
+      const shown = Sample(true), again = Sample(true), hidden = Sample(false);
+      const result = { changedPixels: Differences(again, hidden),
+        noisePixels: Differences(shown, again), totalPixels: hdr.width * hdr.height };
+      Draw(true);
+      return result;
+    }, { eye, target, settle: SETTLE_DRAWS });
     await page.screenshot({ path: path.join(out, `Scene_${label}.png`) });
     return difference;
   }
@@ -134,6 +165,8 @@ try {
   const report = { terrain, crater, bullet, overlap, reset, errors };
   fs.writeFileSync(path.join(out, "Data_Acceptance.json"), JSON.stringify(report, null, 2));
   assert.deepEqual(errors, [], "no browser/GLSL errors");
+  assert.equal(crater.noisePixels, 0, `the temporal chain did not settle, so this says nothing about decals: ${JSON.stringify(crater)}`);
+  assert.equal(bullet.noisePixels, 0, `the temporal chain did not settle, so this says nothing about decals: ${JSON.stringify(bullet)}`);
   assert.ok(crater.changedPixels <= 4, `persistent flat decals must not cut rings through crater walls: ${JSON.stringify(crater)}`);
   assert.ok(bullet.changedPixels > 20, `ordinary bullet marks remain visible: ${JSON.stringify(bullet)}`);
   assert.ok(overlap.impacts === 9 && overlap.disturbedPixels > 100000, "real offset shells and grenades exercise intersecting shallow lips");
