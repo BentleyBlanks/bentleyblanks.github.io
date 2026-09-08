@@ -110,6 +110,8 @@ export class AudioWiring {
     this.crackFrame = -1;
     this.crackInFrame = 0;
     this.crackTimes = [];
+    this.lastCrackAt = -99;      // 上一条弹啸的时刻（限速窗口的起点）
+    this.lastCrackM = 99;        // 上一条掠过多近（「更近的可以插队」拿它比）
 
     // --- 玩家 foley 的状态 -----------------------------------------------
     this.lastFootstepAt = 0;
@@ -141,6 +143,10 @@ export class AudioWiring {
   Reset() {
     this.occCache.clear();
     this.zoneCache.clear();
+    // 弹啸限速的窗口也要归零：换一张地图之后「上一条离得多近」是上一局的事。
+    this.lastCrackAt = -99;
+    this.lastCrackM = 99;
+    this.crackTimes.length = 0;
     this.StopAllFire();
     this.StopBreath(0);
     this.lastFootstepAt = 0;
@@ -324,13 +330,61 @@ export class AudioWiring {
   // 二、逐弹弹啸
   // =========================================================================
 
-  /** 这一帧还许不许再播一条弹啸（同帧 2 条、100 ms 内 3 条）。 */
-  CrackAllowed() {
+  /**
+   * 这一帧还许不许再播一条弹啸：**150 ms 一条**，外加一条「更近的可以插队」。
+   *
+   * 旧规则是同帧 2 条 + 100 ms 内 3 条，也就是上限 **30 条/秒**，而且每条都带
+   * `priority`（去重窗与预算闸两道全绕）—— 密集交火时耳边是一串削顶的白噪。
+   * 现在按到耳朵的时刻限速，并且**不是先到先得**：窗口里来了一发明显更近的
+   * （近到只有上一条的 `closerRatio` 倍），让它插队 —— 玩家要听的是最近那一条，
+   * 而不是二十毫秒前那发六米外的擦边球。
+   *
+   * @param {number} passM 这一发掠过听者多近（m）
+   */
+  CrackAllowed(passM = 99) {
     if (this.frame !== this.crackFrame) { this.crackFrame = this.frame; this.crackInFrame = 0; }
     if (this.crackInFrame >= NEAR_MISS.perFrame) return false;
-    const cut = this.time - NEAR_MISS.windowS;
-    while (this.crackTimes.length && this.crackTimes[0] < cut) this.crackTimes.shift();
-    return this.crackTimes.length < NEAR_MISS.perWindow;
+    const since = this.time - this.lastCrackAt;
+    if (since >= NEAR_MISS.minIntervalS) return true;
+    // 插队：明显更近，而且两条不许挤在 50 ms 里（那是一声糊，不是两声）。
+    return passM < this.lastCrackM * NEAR_MISS.closerRatio
+      && since >= NEAR_MISS.closerMinIntervalS;
+  }
+
+  /**
+   * 弹啸的音量：近场电平律 + **相对同一发子弹枪声本体的上限**。
+   *
+   * 两条各修一件事：
+   *   · 近场律 —— 改之前弹啸的电平是个常数（干声有效电平恒 0.765），
+   *     贴着头皮过去的那一发与六米外的擦边球一样响；
+   *   · 本体上限 —— 改之前 30/80/150 m 的本体枪声是 0.110/0.033/0.012，
+   *     弹啸比它们高 17/27/36 dB，实拍峰值 0.338 甚至比**玩家自己那一枪**
+   *     （0.214）还高 4 dB。一发一百五十米外的流弹在耳边炸成这样就是「难听」。
+   *
+   * 上限拿不到（没给枪声 cue、或引擎侧没有 `GunReportLevelAt`）时只走近场律 ——
+   * 判空是设计：车载机枪那条链上没有「开枪的人在多远」这个数。
+   *
+   * @param {number} baseVolume  NEAR_MISS.crackVolume / whizzVolume
+   * @param {string} cue         "bulletCrack" | "bulletWhizz"
+   * @param {number} passM       掠过距离
+   * @param {string|null} gunCue 同一发子弹的枪声本体 cue
+   * @param {number} shooterM    开枪的人离听者多远
+   */
+  CrackVolume(baseVolume, cue, passM, gunCue = null, shooterM = 0) {
+    const audio = this.Audio;
+    const near = NEAR_MISS.nearRefM / (NEAR_MISS.nearRefM + Math.max(0, passM));
+    let volume = baseVolume * near;
+    if (!audio || !gunCue || !(shooterM > 0) || typeof audio.GunReportLevelAt !== "function"
+      || typeof audio.LevelAt !== "function") return volume;
+    const report = audio.GunReportLevelAt(gunCue, shooterM);
+    const own = audio.LevelAt(cue, passM);
+    if (!(report > 0) || !(own > 0)) return volume;
+    // overReportDb 折成倍率（−2 dB ≈ ×0.79）。**不是「干声有效电平持平」那条**：
+    // 弹啸是十几毫秒的瞬态、本体是带尾巴的长音，两者的「峰值/有效电平」比不是一个数，
+    // 有效电平持平时实拍峰值仍然高 1.3—1.9 dB。这个数是照实拍峰值调出来的，
+    // 四档实测在 Data_Tuning_Audio.NEAR_MISS.overReportDb 的注释里。
+    const ceiling = report * Math.pow(10, NEAR_MISS.overReportDb / 20) / own;
+    return Math.min(volume, ceiling);
   }
 
   /**
@@ -342,21 +396,45 @@ export class AudioWiring {
    * @param {object} point    最近点（弹道上离身体最近的那一点）
    * @param {number} distance 掠过的距离（m）
    * @param {boolean} blocked 这一段弹道被实体挡住了（子弹根本没到这儿）
+   * @param {string|null} gunCue  同一发子弹的枪声本体 cue（拿它算电平上限）
+   * @param {number} shooterM     开枪的人离听者多远（同上）
    */
-  BulletPass(point, distance, blocked = false) {
+  BulletPass(point, distance, blocked = false, gunCue = null, shooterM = 0) {
     const audio = this.Audio;
     if (!audio || blocked || !point) return false;
-    if (!this.CrackAllowed()) return false;
+    if (!this.CrackAllowed(distance)) return false;
     this.crackInFrame += 1;
+    // crackTimes 只剩取证一个用途（Debug.AudioZone 的 `cracks`：最近一秒响了几条）。
+    // 限速本身已经改成读 lastCrackAt —— 但这张表**必须自己修剪**，
+    // 否则一局下来它就是一条只涨不落的数组（限速那条 shift 顺手做了这件事）。
+    const cut = this.time - 1.0;
+    while (this.crackTimes.length && this.crackTimes[0] < cut) this.crackTimes.shift();
     this.crackTimes.push(this.time);
+    this.lastCrackAt = this.time;
+    this.lastCrackM = distance;
     const at = { x: point.x, y: point.y, z: point.z };
     // 步枪与机枪弹初速 700—800 m/s，**全部超音速**：掠过的是弹头自己的激波，
-    // 所以不分枪种，只分远近。
-    audio.Play("bulletCrack", { position: at, volume: NEAR_MISS.crackVolume, priority: true });
+    // 所以不分枪种，只分远近。电平律与本体上限见 CrackVolume。
+    const crackVol = this.CrackVolume(NEAR_MISS.crackVolume, "bulletCrack", distance, gunCue, shooterM);
+    audio.Play("bulletCrack", { position: at, priority: true, volume: crackVol });
     if (distance < NEAR_MISS.whizzWithinM) {
       // 擦着头皮那一档再叠一条「咻」——激波之后跟着的是弹头搅动空气的湍流声，
-      // 一米半以外就听不出来了。
-      audio.Play("bulletWhizz", { position: at, volume: NEAR_MISS.whizzVolume, delay: 0.015 });
+      // 一米以外就听不出来了。
+      //
+      // **它必须垫在激波下面**（whizzUnderDb）。只让它各自去撞本体上限的话，
+      // 两条会被压到**同一个电平**（实拍：干声有效电平都是 0.0695），叠起来比
+      // 激波单独一条高 3 dB —— 于是「掠过 0.5 m」整体比「掠过 2 m」响 5 dB，
+      // 而多出来的那 5 dB 全是「咻」。物理上也反了：湍流声是激波的尾巴。
+      let whizzVol = this.CrackVolume(NEAR_MISS.whizzVolume, "bulletWhizz", distance, gunCue, shooterM);
+      if (typeof audio.LevelAt === "function") {
+        const own = audio.LevelAt("bulletWhizz", distance);
+        if (own > 0) {
+          const cap = crackVol * audio.LevelAt("bulletCrack", distance)
+            * Math.pow(10, NEAR_MISS.whizzUnderDb / 20) / own;
+          whizzVol = Math.min(whizzVol, cap);
+        }
+      }
+      audio.Play("bulletWhizz", { position: at, delay: 0.015, volume: whizzVol });
     }
     return true;
   }
@@ -384,38 +462,53 @@ export class AudioWiring {
   /**
    * AI 朝玩家打偏的那一发。
    *
-   * 这条链上**没有真实弹道** —— AI 打人是概率判定（Script_Ai 的 acc 那一段），
-   * 打偏只有一个 `miss` 距离。所以近失点是照那个距离在瞄点旁边摆出来的：
-   * 方向取瞄准方向的水平法线（左右由射击序号定，不用随机 —— 逐轮回放要可复现），
-   * 再抬高一点点，「从头边过去」正是这一发该有的位置。
+   * 【2026-09-09 重做】近失点改成**这条子弹真弹道上离听者最近的那一点**。
+   *
+   * 旧写法是照 `Script_Ai` 的抽象 `miss`（`0.4 + rnd × 1.4`）在瞄点旁边摆一个点，
+   * 左右由 `fireSequence` 奇偶定。三条都是错的：
+   *   · **与开枪的人多远无关**：三十米与一百五十米上的弹啸落点完全同分布。
+   *     实测 12 s 连续射击，真弹道到听者的最近距离中位数 30 m 上 1.89 m、
+   *     80 m 上 5.91 m、150 m 上 3.81 m —— 80/150 m 两档一发都没进过 2.6 m。
+   *     也就是说：**一百五十米外每一发流弹都在玩家耳边炸一记激波**，那是假的。
+   *   · **左右机械交替**：奇偶定边 = 左右左右地弹乒乓球。实拍两侧 HRTF 差 6.0 dB、
+   *     频心 1676 Hz ↔ 3176 Hz，交替起来是一条谁都听得出的机械感。
+   *   · **高度贴着胸口**：`aim.y + 0.15` 比耳朵低 1.45 m，HRTF 拿到的是 −52° 仰角，
+   *     短瞬态过一遍仰角 HRIR 就是「空、有梳状缺口」。
+   *
+   * 真弹道这条现成就有：`Script_Ai` 传进来的 `dir` 已经是 `shot.missDir`
+   * （`Script_AiShooting.Resolve` 按**瞄准误差 × 距离**的高斯散布算的真方向），
+   * 拿它对听者求垂足即可 —— 距离、方位、高度三样一次全对，还自动带上了
+   * 「打得越远散得越开」。**压制账不动**：那一层仍读它自己的 `missM`。
    *
    * **挡住就不播**：从枪口到那一点如果有墙，子弹根本没到过那儿。
    * 这一条不能靠 `targetVisible` 代替 —— 那只保证开枪那一刻看得见。
    *
-   * @param {object} soldier 开枪的人（要它的 fireSequence 定左右）
+   * @param {object} soldier 开枪的人（这一版不再读它；留着是为了调用点不用改签名）
    * @param {object} from    枪口
-   * @param {object} dir     射击方向（已归一化）
-   * @param {object} aim     瞄点（玩家躯干或露出来的头）
-   * @param {number} missM   偏了多少米
+   * @param {object} dir     这一发真正飞出去的方向（已归一化，= shot.missDir）
+   * @param {object} aim     瞄点（引擎还没建 AudioContext、拿不到听者时的兜底原点）
+   * @param {number} missM   压制账里的偏离量。**这一层不再读它** —— 留着是提醒
+   *                         「压制与弹啸从此是两个数」，改一个不会自动改另一个
+   * @param {string|null} gunCue 这一发的枪声本体 cue（电平上限用）
    */
-  AiNearMissAtPlayer(soldier, from, dir, aim, missM) {
-    if (!this.Audio || !(missM < NEAR_MISS.crackWithinM)) return false;
-    // 水平法线：dir 绕 Y 转 90°。dir 近乎竖直时退回 X 轴（那种角度上左右已无意义）。
-    let ux = dir.z, uz = -dir.x;
-    const un = Math.hypot(ux, uz);
-    if (un < 1e-4) { ux = 1; uz = 0; } else { ux /= un; uz /= un; }
-    const side = ((soldier?.fireSequence || 0) & 1) ? 1 : -1;
-    const point = {
-      x: aim.x + ux * missM * side,
-      y: aim.y + 0.15,
-      z: aim.z + uz * missM * side,
-    };
+  AiNearMissAtPlayer(soldier, from, dir, aim, missM, gunCue = null) {
+    const audio = this.Audio;
+    if (!audio) return false;
+    // 听者 = 玩家的耳朵。拿它求垂足，弹啸才落在**耳朵这个平面**上而不是胸口下面。
+    const L = audio.listenerPos || aim;
+    const vx = L.x - from.x, vy = L.y - from.y, vz = L.z - from.z;
+    // 垂足参数夹到 ≥ 0：枪口后面那一段不是弹道。
+    const t = Math.max(0, vx * dir.x + vy * dir.y + vz * dir.z);
+    const point = { x: from.x + dir.x * t, y: from.y + dir.y * t, z: from.z + dir.z * t };
+    const passM = Math.hypot(L.x - point.x, L.y - point.y, L.z - point.z);
+    if (!(passM < NEAR_MISS.crackWithinM)) return false;
+    const shooterM = Math.hypot(L.x - from.x, L.y - from.y, L.z - from.z);
     // `rise: false`：这里问的是**这颗子弹的实际弹道**通不通，不是「这个声音听起来
     // 有多闷」。抬高终点会让越过矮墙的那一发变成"没挡住"，于是墙后面的玩家
     // 听见一条根本不存在的弹啸（那一发早就打在墙上了）。
     const blocked = this.Occlusion({ x: from.x, y: from.y, z: from.z }, point,
       { rise: false }) === 1;
-    return this.BulletPass(point, missM, blocked);
+    return this.BulletPass(point, passM, blocked, gunCue, shooterM);
   }
 
   // =========================================================================

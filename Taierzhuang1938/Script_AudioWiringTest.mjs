@@ -28,6 +28,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+// 环境床的撒播表与弹啸的接线数：8.8 节最后那条「两套弹啸不许同时撒」在 node 侧判 ——
+// 那是一张**静态表**，跑进浏览器里再问一遍只会把一条确定的断言变成一次采样。
+import { AMBIENCE_PRESETS } from "./Script_Audio.mjs";
+import { NEAR_MISS } from "./Data_Tuning_Audio.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -126,7 +130,10 @@ const crack = await page.evaluate(() => {
     soldier.suppression = 0;
     soldier.order = "hold";
     soldier.playerLockAt = T.ai.time;      // 宽限期内 acc = 0 → 这一发必偏
-    soldier.rnd = () => 0.0714;            // miss = 0.4 + 0.0714×1.4 ≈ 0.5 m
+    // 【2026-09-09】近失点改读**真弹道**（shot.missDir）之后，这个焊死的 rnd
+    // 决定的是 Box–Muller 那一对高斯：10 m 上落点离瞄点 1.3 m 上下，
+    // 弹道到耳朵的最近距离在 crackWithinM = 6 m 以内 —— 仍然是「从身边过去」。
+    soldier.rnd = () => 0.0714;
     T.audioWiring.occCache.clear();        // 1 m 网格缓存里存着上一次的答案
   };
 
@@ -153,9 +160,11 @@ const crack = await page.evaluate(() => {
 
   bf.Raycast = realRaycast;
 
-  // ③ 限速：同一帧连开五枪，最多只许出 2 条
+  // ③ 限速：同一帧连开五枪，**只许出 1 条**（2026-09-09：150 ms 一条）
   T.audioWiring.crackFrame = -1;
   T.audioWiring.crackTimes.length = 0;
+  T.audioWiring.lastCrackAt = -99;
+  T.audioWiring.lastCrackM = 99;
   bf.Raycast = () => null;
   const before3 = Count();
   for (let i = 0; i < 5; i += 1) {
@@ -170,7 +179,7 @@ if (crack.error) Check("逐弹弹啸", false, crack.error);
 else {
   Check("弹道从头边 0.5 m 过 → 请求 bulletCrack", crack.clear === 1, `请求 ${crack.clear} 条`);
   Check("同样一发隔着墙 → 一条都不请求", crack.blocked === 0, `请求 ${crack.blocked} 条`);
-  Check("同帧连开五枪，弹啸最多出 2 条（限速生效）", crack.burst === 2, `出了 ${crack.burst} 条`);
+  Check("同帧连开五枪，弹啸只出 1 条（150 ms 一条）", crack.burst === 1, `出了 ${crack.burst} 条`);
 }
 
 // ---------------------------------------------------------------------------
@@ -602,6 +611,255 @@ Check("三米外同伴的台词：遮挡 0、不在室内档、不进远声组�
   speakBad.length ? speakBad.map((r) => `${r.delivery} occ=${r.occ} zone=${r.zone} `
     + `far=${r.farGrouped} dry=${r.dryTouched} gain=${r.gain}/${r.mix}`).join("；")
     : speakGot.map((r) => `${r.delivery}:${r.zone}`).join(" "));
+
+// ---------------------------------------------------------------------------
+// 8.8) 弹啸不许比开枪那个人还响，也不许连成一片
+//
+// 用户原话「子弹呼啸而过这声音也很难听」。取证（2026-09-09，phase=1，实拍峰值）：
+//   · 干声有效电平**恒为 0.765**，与开枪的人在 30 / 80 / 150 m 完全无关，
+//     而那三档的本体枪声分别只有 0.110 / 0.033 / 0.012 —— 高出 17 / 27 / 36 dB；
+//     实拍峰值 0.338 对**玩家自己那一枪的 0.214**，耳边一发擦过去比自己扣扳机还响 4 dB。
+//   · 近失点是照 `miss = 0.4 + rnd × 1.4` 摆的，与距离无关。真弹道到听者的最近距离
+//     中位数：30 m 上 1.89 m、80 m 上 5.91 m、150 m 上 3.81 m ——
+//     **80 / 150 m 两档一发都没进过 2.6 m**，那两档的弹啸从来就不该存在。
+//   · 限速上限是 30 条/秒（同帧 2 + 100 ms 内 3），每条都带 priority 绕开两道闸。
+//   · 环境床还在按 perMin 5 撒另一条 `amb.whizz`（非空间化、随机 pan、不吃空气低通，
+//     实拍峰值 0.209），与逐弹那套同时在响。
+//
+// 这一节盯四件事，缺一件那个 bug 就能悄悄回来：
+//   ① 150 m 上连续射击 20 s，弹啸 ≤ 7 条/秒（限速 150 ms 一条的上限是 6.7）；
+//   ② 弹啸的实拍峰值 ≤ **同一发子弹的枪声本体**峰值（30 / 150 m 各量一遍）；
+//   ③ 20 s 里末端限幅的 reduction 不到 −3 dB（弹啸不再把总线顶到限幅器里）；
+//   ④ 30 m 外那一枪的**本体**比弹啸晚 d/340 到（priority 不再免传播延迟）。
+// `amb.whizz` 那一条在 node 侧读 AMBIENCE_PRESETS 直接判（见文件末）。
+//
+// **量的是峰值不是请求数**：这一节与 8.6 / 8.7 同一类 —— 用户报的是「声音在，
+// 但被链路改得难听」，请求数对这类事没有分辨力（改之前 37 条断言全绿）。
+// ---------------------------------------------------------------------------
+const whiz = await page.evaluate(async () => {
+  const T = window.Taierzhuang, a = T.audio, w = T.audioWiring;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // 素材包是异步 fetch 的：不等它，量到的是合成回落那条路（配平是另一张表）。
+  for (let i = 0; i < 120; i += 1) {
+    if (a.sampleCues?.has("bulletCrack") && a.sampleCues?.has("rifleIja")) break;
+    await sleep(500);
+  }
+  // 让整场仗闭嘴：峰值这种判据经不起旁边有人开枪。三件事缺一不可 ——
+  //   · **停掉 ai.Update**：只把 ammo 清零是不够的，没子弹的兵会喊「换弹」、
+  //     会拼刺刀，实测底噪 0.341（voice.ija_ammo_reload / dadaoHit / stripperLoad）。
+  //     停掉之后场上只剩这一节自己调的那几发 —— 开火照旧由本节直调 TryFire。
+  //   · `w.Reset()`：上面 8.5 节点了一整场火、冲刺那一节把玩家喘了起来，
+  //     那两样都是**一直在响**的循环，不停掉底噪就有 0.035（≈ 150 m 那一枪的量级）。
+  //   · 环境床与音乐清掉。
+  const origAiUpdate = T.ai.Update.bind(T.ai);
+  T.ai.Update = () => {};
+  for (const s of T.ai.soldiers) { s.ammo = 0; s.coolUntil = 1e9; }
+  w.Reset();
+  a.Ambience("silence"); a.Music(null); a.StopStoryVoice?.();
+  const savedBudget = a.nodeBudget;
+  a.nodeBudget = 4000;                 // 这一节量电平，不量预算闸
+  await sleep(700);
+
+  const ana = a.ctx.createAnalyser();
+  ana.fftSize = 1024;
+  a.outGain.connect(ana);
+  const buf = new Float32Array(ana.fftSize);
+  // **量峰值的那 400 ms 里只许这一条 cue 发声。** 停掉 ai.Update 还不够干净：
+  // 白刃、剧情语音、上一节留下来的尾巴都还在总线上（实测底噪 0.26，
+  // 已经超过 150 m 那一枪本身），拿被污染的窗口比两条 cue 的峰值等于抛硬币。
+  // 白名单是最省事也最确定的做法：进窗前把还在响的全部淡掉，窗内挡住所有别的 cue。
+  const realPlay = a.Play.bind(a);
+  let allow = null;                    // null = 全放行（量完就还回去）
+  a.Play = (n, o = {}) => (allow && !allow.test(n) ? null : realPlay(n, o));
+  async function Peak(fn, ms = 420, only = /^$/) {
+    allow = only;
+    for (const v of [...a.activeVoices]) { try { a.StopVoice(v, 0.01); } catch (e) { /* ok */ } }
+    await sleep(220);
+    let pk = 0;
+    if (fn) fn();
+    const t0 = performance.now();
+    while (performance.now() - t0 < ms) {
+      ana.getFloatTimeDomainData(buf);
+      for (let i = 0; i < buf.length; i += 1) { const x = Math.abs(buf[i]); if (x > pk) pk = x; }
+      await new Promise((r) => setTimeout(r, 4));
+    }
+    allow = null;
+    return pk;
+  }
+  const CRACK_ONLY = /^bullet(Crack|Whizz)$/;
+  const GUN_ONLY = /^(rifleIja|rifleIjaFar|gunTail)/;
+  // **八次的平均峰值**。白名单把窗口清干净之后（底噪 0.0015）污染没有了，
+  // 剩下的抖动全部来自**变体**：弹啸四条、rifleIja 也是四条，逐条峰值本来就差几个 dB。
+  //   · 取最小 / 中位数 = 在两组随机抽样之间比大小，同一份代码跑两遍差 4 dB；
+  //   · 取最大值也不稳 —— 本体那四条是**随机挑**的（弹啸已经进 SAMPLE_CYCLE 轮播），
+  //     六次里抽不到最响那条的概率 (3/4)^6 = 18%，抽不到就把基准量低了。
+  // 八次取平均：弹啸那边正好轮满两圈（确定值），本体那边八次抽样的均值已经很稳。
+  const Med = (xs) => xs.reduce((p, q) => p + q, 0) / xs.length;
+
+  const L = a.listenerPos;
+  const floor = Med([await Peak(null), await Peak(null), await Peak(null)]);
+  // 底噪超标时要能一眼看出是谁在响，否则这条断言只会变成一句「不知道为什么红了」。
+  const floorVoices = [...new Set([...a.activeVoices].map((v) => v.name))].join(" ");
+
+  // ② 峰值对比：走**真的 BulletPass**（近场律 + 本体上限都在里面），
+  //    对照同一把枪同一距离的 PlayGunshot。
+  const levels = [];
+  for (const [shooterM, passM] of [[30, 0.5], [30, 2.0], [150, 0.5], [150, 2.0]]) {
+    const at = { x: L.x + passM, y: L.y, z: L.z };
+    const crack = [], gun = [];
+    for (let i = 0; i < 8; i += 1) {
+      w.lastCrackAt = -99; w.lastCrackM = 99; w.crackFrame = -1; w.crackInFrame = 0;
+      a.lastPlayAt.delete("bulletCrack"); a.lastPlayAt.delete("bulletWhizz");
+      crack.push(await Peak(() => w.BulletPass(at, passM, false, "rifleIja", shooterM),
+        420, CRACK_ONLY));
+      a.lastPlayAt.delete("rifleIja"); a.lastPlayAt.delete("rifleIjaFar");
+      gun.push(await Peak(() => a.PlayGunshot("rifleIja",
+        { position: { x: L.x, y: L.y - 1.0, z: L.z - shooterM }, volume: 1 }), 900, GUN_ONLY));
+    }
+    levels.push({ shooterM, passM,
+      crack: +Med(crack).toFixed(4), gun: +Med(gun).toFixed(4),
+      db: +(20 * Math.log10((Med(crack) + 1e-9) / (Med(gun) + 1e-9))).toFixed(1) });
+  }
+
+  // 玩家自己那一枪：整局里玩家听得最多、也最响的一条参照。用户原话
+  // 「子弹呼啸而过这声音也很难听」对应的正是这条比值 —— 改之前弹啸实拍峰值 0.338
+  // 比自己扣扳机的 0.214 还高 4.0 dB。
+  const own = Med(await Promise.all([]).then(async () => {
+    const xs = [];
+    for (let i = 0; i < 8; i += 1) {
+      a.lastPlayAt.clear();
+      xs.push(await Peak(() => a.PlayGunshot("rifleNra",
+        { position: { x: L.x, y: L.y, z: L.z - 0.4 }, volume: 1,
+          priority: true, firstPerson: true, weaponClass: "rifle" }), 900,
+      /^(rifleNra|rifleNraFar|gunTail)/));
+    }
+    return xs;
+  }));
+
+  // ①③ 150 m 连续射击 20 s：密度与限幅。
+  // **要一支栓动步枪**：第一个活着的日军实测抽到的是九二式重机枪手（weapon.kind
+  // "hmg" → cue `type92`），拿它量「本体晚多少到」会去等一条根本没播的 rifleIja。
+  const soldier = T.ai.soldiers.find((s) => s.side === "ija" && !s.unarmed
+    && s.weapon?.kind === "boltRifle") || T.ai.soldiers.find((s) => s.side === "ija" && !s.unarmed);
+  soldier.alive = true; soldier.hp = 100;
+  const player = T.player;
+  const Arm = (D) => {
+    soldier.position.set(player.position.x, player.position.y, player.position.z - D);
+    soldier.target = { isPlayer: true, position: player.position };
+    soldier.targetVisible = true;
+    soldier.yaw = Math.atan2(-(player.position.x - soldier.position.x),
+      -(player.position.z - soldier.position.z));
+    soldier.ammo = 99; soldier.coolUntil = -1; soldier.suppression = 0;
+    soldier.order = "hold"; soldier.burstLeft = 0;
+  };
+  const before = a.RequestedCount("bulletCrack");
+  let redMin = 0;
+  const t0 = performance.now();
+  while (performance.now() - t0 < 20000) {
+    Arm(150); T.ai.time += 1 / 60;
+    T.ai.TryFire(soldier, 1 / 60, player);
+    if (a.limiter.reduction < redMin) redMin = a.limiter.reduction;
+    await sleep(16);
+  }
+  const secs = (performance.now() - t0) / 1000;
+  const far = { cracks: a.RequestedCount("bulletCrack") - before, secs: +secs.toFixed(1),
+    perSec: +((a.RequestedCount("bulletCrack") - before) / secs).toFixed(2),
+    redMinDb: +redMin.toFixed(2) };
+
+  // ④ 30 m 外那一枪：弹啸先到、本体晚 d/340。34 m 是因为 PROPAGATION_MIN_M = 30
+  //    （正好 30 m 上传播延迟按设计就是 0，量那个点等于量了个寂寞）。
+  const seen = [];
+  // 真地图上三十四米开外多半横着一堵墙 / 一道路基：那是布设层的账，
+  // 这一条量的是「拿到通透这个回答之后，两声的先后差多少」。
+  const bf = T.ai.ctx.battlefield;
+  const realRaycast = bf.Raycast.bind(bf);
+  bf.Raycast = () => null;
+  // 「射击线上有自己人就不扣扳机」是队形的账。这一节量的是**两声的先后**，
+  // 而三分钟仗打下来三十四米那条线上多半站着自己人（实测 200 次只扣出 1 发扳机，
+  // 同一套摆法在 150 m 上一路开火）—— 把这道闸换成「路上没人」。
+  const realFriendly = T.ai.FriendlyTorsos.bind(T.ai);
+  T.ai.FriendlyTorsos = () => [];
+  let fired = 0;
+  a.Play = realPlay;                   // 白名单那一层用完了，还回去再钩自己的
+  const origPlay = a.Play.bind(a);
+  a.Play = (n, o = {}) => {
+    const v = origPlay(n, o);
+    if (v && /^(bulletCrack|rifleIja|rifleIjaFar|type92|type11|zb26)$/.test(n)) {
+      seen.push({ n, startAt: v.startAt, distance: v.distance, prop: v.propagation });
+    }
+    return v;
+  };
+  soldier.aimTime = 99; soldier.fireTimer = 0;
+  for (let i = 0; i < 200 && !seen.some((e) => e.n === "bulletCrack"); i += 1) {
+    Arm(34);
+    soldier.playerLockAt = T.ai.time;     // 宽限期内 acc = 0 → 必偏 → 必有近失
+    soldier.aimTime = 99; soldier.fireTimer = 0;
+    w.lastCrackAt = -99; w.crackFrame = -1; w.crackInFrame = 0;
+    w.occCache.clear(); a.occCache.clear();
+    a.lastPlayAt.delete("rifleIja"); a.lastPlayAt.delete("rifleIjaFar");
+    seen.length = 0;
+    const before34 = T.ai.fireCount;
+    T.ai.time += 1 / 60;
+    T.ai.TryFire(soldier, 1 / 60, player);
+    fired += T.ai.fireCount - before34;
+    await sleep(20);
+  }
+  a.Play = origPlay;
+  bf.Raycast = realRaycast;
+  T.ai.FriendlyTorsos = realFriendly;
+  const c = seen.find((e) => e.n === "bulletCrack");
+  const g = seen.find((e) => e.n !== "bulletCrack");
+  const order = c && g ? { gap: +(g.startAt - c.startAt).toFixed(4),
+    want: +(g.distance / 340).toFixed(4), crackProp: c.prop, gunProp: g.prop, fired } : { fired };
+
+  try { a.outGain.disconnect(ana); } catch (e) { /* ok */ }
+  a.nodeBudget = savedBudget;
+  T.ai.Update = origAiUpdate;
+  return { floor: +floor.toFixed(4), floorVoices, levels, far, order,
+    own: +own.toFixed(4),
+    cycled: !!a.sampleCues?.has("bulletCrack") };
+});
+Check("测峰值时总线是静的（底噪 < 0.02）", whiz.floor < 0.02,
+  `底噪峰值 ${whiz.floor}${whiz.floorVoices ? "，还在响：" + whiz.floorVoices : ""}`);
+const loud = whiz.levels.filter((r) => r.crack > r.gun);
+Check("弹啸峰值 ≤ 同一发子弹的枪声本体峰值（30 / 150 m × 掠过 0.5 / 2.0 m）",
+  loud.length === 0,
+  loud.length ? loud.map((r) => `${r.shooterM}m/掠${r.passM}m ${r.crack}>${r.gun}（+${r.db}dB）`).join("；")
+    : whiz.levels.map((r) => `${r.shooterM}m/掠${r.passM}m ${r.db}dB`).join(" "));
+// 用户原话对应的那条比值：耳边一发擦过去不许比自己扣扳机还响（改之前高 4.0 dB）。
+const loudestCrack = Math.max(...whiz.levels.map((r) => r.crack));
+const ownDb = 20 * Math.log10((loudestCrack + 1e-9) / (whiz.own + 1e-9));
+Check("最响的一条弹啸比玩家自己那一枪低 6 dB 以上", ownDb <= -6,
+  `弹啸 ${loudestCrack.toFixed(4)} / 自己那一枪 ${whiz.own}（${ownDb.toFixed(1)} dB）`);
+Check(`150 m 连续射击 ${whiz.far.secs} s，弹啸 ≤ 7 条/秒`, whiz.far.perSec <= 7,
+  `${whiz.far.cracks} 条 / ${whiz.far.perSec} 条每秒`);
+Check("这 20 s 里末端限幅没被顶到 −3 dB", whiz.far.redMinDb > -3,
+  `最深 ${whiz.far.redMinDb} dB`);
+// `amb.whizz`：环境床按概率撒的那条弹啸。逐弹那套按每一发结算，两套同时在响的话
+// 玩家听到的一半弹啸没有位置、没有空气低通、pan 是随机数 —— 那正是「凭空一记」。
+// 判据：要么整张表里没人撒它，要么撒播电平比逐弹弹啸低 12 dB 以上。
+const ambMix = await page.evaluate(() => {
+  const a = window.Taierzhuang.audio;
+  return typeof a.LevelAt === "function"
+    ? { whizz: a.LevelAt("amb.whizz", 0), crack: a.LevelAt("bulletCrack", 0.5) } : null;
+});
+const sprinkled = [];
+for (const [preset, cfg] of Object.entries(AMBIENCE_PRESETS)) {
+  for (const ev of cfg.events || []) {
+    if (ev.name !== "amb.whizz") continue;
+    const level = (ev.volume || 0) * (ambMix ? ambMix.whizz : 1);
+    const ref = NEAR_MISS.crackVolume * (ambMix ? ambMix.crack : 1);
+    const db = 20 * Math.log10((level + 1e-9) / (ref + 1e-9));
+    if (db > -12) sprinkled.push(`${preset} ${db.toFixed(1)}dB`);
+  }
+}
+Check("环境床不再与逐弹弹啸同时撒 amb.whizz（或低 12 dB 以上）", sprinkled.length === 0,
+  sprinkled.length ? sprinkled.join(" ") : `${Object.keys(AMBIENCE_PRESETS).length} 档预设都干净`);
+Check("34 m 外：弹啸先到，本体枪声晚 d/340",
+  !!whiz.order && whiz.order.gap > 0 && Math.abs(whiz.order.gap - whiz.order.want) < 0.02,
+  whiz.order && whiz.order.gap !== undefined
+    ? `间隔 ${whiz.order.gap} s（应为 ${whiz.order.want} s，弹啸延迟 ${whiz.order.crackProp}）`
+    : `这一轮没抓到成对的弹啸与枪声（开了 ${whiz.order?.fired ?? "?"} 枪）`);
 
 // ---------------------------------------------------------------------------
 // 9) 每个新 cue 都真的能发声（合成回落这条路）

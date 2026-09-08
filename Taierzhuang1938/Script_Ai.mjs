@@ -3241,10 +3241,13 @@ export class AiDirector {
         kind: s.side === "nra" ? "nra" : "ija",
       });
     }
+    // 这一发的枪声本体 cue。**在 if (audio) 外面算**：近失弹那条链要拿它算
+    // 「弹啸不许比自己这一枪还响」的上限（见 AudioWiring.CrackVolume）。
+    const gunCue = s.side === "nra"
+      ? (s.weaponId === "Zb26" ? "zb26" : "rifleNra")
+      : (s.weaponId === "Type11" ? "type11" : s.weaponId === "Type92Hmg" ? "type92" : "rifleIja");
     if (audio) {
-      const name = s.side === "nra"
-        ? (s.weaponId === "Zb26" ? "zb26" : "rifleNra")
-        : (s.weaponId === "Type11" ? "type11" : s.weaponId === "Type92Hmg" ? "type92" : "rifleIja");
+      const name = gunCue;
       // PlayGunshot 而不是 Play：一百米外那一枪要换成**另一段录音**，
       // 不是同一段加低通（Script_Audio.FAR_CUE 那段注释）。
       // 步枪走两层交叉淡入，机枪没有远场素材、内部自动落回 Play()。
@@ -3278,12 +3281,14 @@ export class AiDirector {
         if (miss < COMBAT.suppressRadius) player.Suppress(COMBAT.suppressPerNearMiss * (1 - miss / COMBAT.suppressRadius) * 3);
         // **打偏的这一发要听得见。**
         //
-        // 这条链上没有真实弹道（AI 打人是概率判定，见上面 acc 那一段），
-        // 所以近失点是照 miss 距离在瞄点旁边摆出来的：方向取瞄准方向的水平法线，
-        // 高度略高于瞄点 —— 「从头边过去」正是这一发该有的位置。
+        // `dir` 这时已经是 `shot.missDir` —— 这一发**真正飞出去的方向**
+        //（散布按瞄准误差 × 距离算，见 Script_AiShooting.Resolve）。
+        // 接线层拿它对听者求垂足，得到真的掠过点与掠过距离；上面那个 `miss`
+        // 只喂压制账（它与距离无关，拿来定位弹啸会让一百五十米外的流弹
+        // 也在耳边炸，见 AudioWiring.AiNearMissAtPlayer 的头注）。
         // 挡住就不播：子弹根本没到那儿，而 targetVisible 只保证开枪那一刻能看见，
         // 弹道上后来挡进来的东西（塌下来的墙、走过去的人）它管不着。
-        this.ctx.audioWiring?.AiNearMissAtPlayer(s, from, dir, aimV, miss);
+        this.ctx.audioWiring?.AiNearMissAtPlayer(s, from, dir, aimV, miss, gunCue);
       } else if (s.target.ref) {
         s.target.ref.suppression = Clamp01(s.target.ref.suppression + COMBAT.suppressPerNearMiss);
       }

@@ -266,6 +266,21 @@ function DryFalloff(distance) {
   return 3.5 / (3.5 + 0.9 * Math.max(0, distance - 3.5));
 }
 
+/**
+ * PannerNode 的**最小距离**：比这更近的声源沿自己的方向推出去（见 Play 里的注释）。
+ * 不改电平（inverse 在 refDistance 以内恒 1），改的是 HRTF 的极端方位着色。
+ */
+const PANNER_MIN_M = 1.0;
+function ClampNearField(position, listener, distance) {
+  if (!(distance < PANNER_MIN_M)) return position;
+  const dx = position.x - listener.x, dy = position.y - listener.y, dz = position.z - listener.z;
+  const d = Math.hypot(dx, dy, dz);
+  // 正好压在听者头上时没有方向可推，往前推一米（前方是这一档唯一不会误导的方位）。
+  if (!(d > 1e-4)) return { x: listener.x, y: listener.y, z: listener.z - PANNER_MIN_M };
+  const k = PANNER_MIN_M / d;
+  return { x: listener.x + dx * k, y: listener.y + dy * k, z: listener.z + dz * k };
+}
+
 // ---------------------------------------------------------------------------
 // 噪声缓冲：白/粉/棕。按「种类 + 时长档」缓存，一次生成反复用。
 // 变化靠播放时的随机 offset，而不是每次重新生成（生成 4 秒 48k 的噪声要 8ms，
@@ -2654,9 +2669,15 @@ const SAMPLE_MIX = {
   // 重机枪两件都是玩法反馈：卡壳清没清、还能不能打。拉柄与 bolt 同一档。
   mgCharge: 0.95, mgOverheat: 0.7,
   // --- 对标 3A 素材补缺批（2026-09-08 接线）-------------------------------
-  // 弹啸是压制反馈，必须盖过远处的枪：bulletCrack 与本体枪声同档；掠过的呼啸低一档。
-  // 跳弹是弹着的「追加音」，比弹着本身轻，否则每四发就多一声比弹着还响的东西。
-  bulletCrack: 0.9, bulletWhizz: 0.7, ricochet: 0.5, impactStone: 0.55,
+  // 【2026-09-09】弹啸从 0.9 / 0.7 压到 0.55 / 0.42。
+  // 原来的理由是「弹啸是压制反馈，必须盖过远处的枪，所以与本体枪声同档」——
+  // 那条理由在实拍面前站不住：弹啸走的是**近失点**（离听者 0.5—2 m，
+  // panner 的 inverse 在 refDistance 3.5 m 以内一律不衰减），本体枪声走的是
+  // 三十米开外，同一个混音档在耳朵里差 17 dB。实拍峰值 0.338 对
+  // **玩家自己那一枪的 0.214** —— 耳边一发擦过去比自己扣扳机还响 4 dB，那是「难听」。
+  // 现在两条都压到本体枪声（rifleNra 0.88 / rifleIja 0.86）以下，
+  // 远近之分交给接线层的近场律与本体上限（Data_Tuning_Audio.NEAR_MISS）。
+  bulletCrack: 0.55, bulletWhizz: 0.42, ricochet: 0.5, impactStone: 0.55,
   // 四种材质脚步与 dirt/rubble 同一档：木板与石板本来就比土路响一点，草与泥更闷。
   footstepWood: 0.3, footstepStone: 0.3, footstepGrass: 0.22, footstepMud: 0.26,
   // 身体 foley 全是「贴着自己」的小动作，比脚步略低；喘息一直在响，按床配平。
@@ -2770,8 +2791,14 @@ const AMB_AIR = {   // → Play 的 airCut
  * 敲二十下必然连出两次同一条，那一刻听感就从「有人在发报」塌成「打字机在响」。
  * 逐发变调同样不行：0.2 秒的金属敲击 ±3% 是听得出来的，而这三条的音色差别
  * 本来就只有一点点，变调会把它糊成「同一下敲得不太准」。
+ *
+ * 【2026-09-09】`bulletCrack` / `bulletWhizz` 加进来，理由与电键同一条：
+ * 激波那一下有声段只有十几毫秒，±3% 的 `playbackRate` 直接把音高与瞬态一起拧走，
+ * 连着来两条听感是「同一记敲得不太准」而不是「两发子弹」；而随机挑四条里的一条，
+ * 一梭子下来必然连出两次同一条 —— 那恰恰是切四条想避开的事。轮播两样都不占。
  */
-const SAMPLE_CYCLE = new Set(["dadaoSwing", "dadaoHit", "bayonetHit", "telegraphKey"]);
+const SAMPLE_CYCLE = new Set(["dadaoSwing", "dadaoHit", "bayonetHit", "telegraphKey",
+  "bulletCrack", "bulletWhizz"]);
 
 /**
  * 把一组 AudioBuffer 包成配方。
@@ -2887,7 +2914,12 @@ export const AMBIENCE_PRESETS = {
       { bed: "shellingFar", gain: 0.20, seg: 9 },
     ],
     events: [
-      { name: "amb.whizz", perMin: 5.0, volume: 0.5 },
+      // 【2026-09-09】`amb.whizz`（perMin 5.0 / volume 0.5）从这一档撤掉：
+      // 逐弹弹啸已经按每一发结算（Script_AudioWiring.BulletPass），两套同时撒的结果是
+      // **一条有位置、一条没有**在同一秒里响 —— 后者非空间化、随机 pan、不吃空气低通，
+      // 实拍峰值 0.209，几乎等于玩家自己那一枪（0.214），而它「从哪儿来」是随机数。
+      // 那正是用户说的「凭空一记难听的呼啸」。cue、配方、混音、AMB_WET 全部留着，
+      // 哪天做一段「远处在打、但没打到我」的过场再撒。
       { name: "amb.cannonFar", perMin: 3.0, volume: 0.55 },
       { name: "rifleNraFar", perMin: 5.0, volume: 0.10 },
       { name: "rifleIjaFar", perMin: 4.0, volume: 0.10 },
@@ -2928,7 +2960,12 @@ export const AMBIENCE_PRESETS = {
     events: [
       { name: "amb.debris", perMin: 4.0, volume: 0.4 },
       { name: "amb.creak", perMin: 3.0, volume: 0.34 },
-      { name: "amb.whizz", perMin: 4.0, volume: 0.45 },
+      // 【2026-09-09】`amb.whizz`（perMin 4.0 / volume 0.45）从这一档撤掉：
+      // 逐弹弹啸已经按每一发结算（Script_AudioWiring.BulletPass），两套同时撒的结果是
+      // **一条有位置、一条没有**在同一秒里响 —— 后者非空间化、随机 pan、不吃空气低通，
+      // 实拍峰值 0.209，几乎等于玩家自己那一枪（0.214），而它「从哪儿来」是随机数。
+      // 那正是用户说的「凭空一记难听的呼啸」。cue、配方、混音、AMB_WET 全部留着，
+      // 哪天做一段「远处在打、但没打到我」的过场再撒。
       { name: "rifleIjaFar", perMin: 4.0, volume: 0.10 },
       { name: "rifleNraFar", perMin: 3.5, volume: 0.10 },
       { name: "zb26", perMin: 1.5, volume: 0.07, burst: 5 },
@@ -2977,7 +3014,12 @@ export const AMBIENCE_PRESETS = {
       { bed: "shellingFar", gain: 0.16, seg: 9 },
     ],
     events: [
-      { name: "amb.whizz", perMin: 3.0, volume: 0.45 },
+      // 【2026-09-09】`amb.whizz`（perMin 3.0 / volume 0.45）从这一档撤掉：
+      // 逐弹弹啸已经按每一发结算（Script_AudioWiring.BulletPass），两套同时撒的结果是
+      // **一条有位置、一条没有**在同一秒里响 —— 后者非空间化、随机 pan、不吃空气低通，
+      // 实拍峰值 0.209，几乎等于玩家自己那一枪（0.214），而它「从哪儿来」是随机数。
+      // 那正是用户说的「凭空一记难听的呼啸」。cue、配方、混音、AMB_WET 全部留着，
+      // 哪天做一段「远处在打、但没打到我」的过场再撒。
       { name: "rifleNraFar", perMin: 4.0, volume: 0.10 },
       { name: "rifleIjaFar", perMin: 3.5, volume: 0.10 },
       { name: "amb.debris", perMin: 2.0, volume: 0.34 },
@@ -4036,6 +4078,38 @@ export class AudioEngine {
   /** 某个 cue 被请求过多少次。取证专用（见 this.playRequests 的抬头）。 */
   RequestedCount(name) { return this.playRequests.get(name) || 0; }
 
+  /**
+   * 某条 cue 以 `volume = 1` 在这个距离上的**干声有效电平**（混音表 × 距离衰减）。
+   *
+   * 与 `Play` 里那个 `effectiveGain` 是同一条式子，只是不真的发声 ——
+   * 接线层要在**决定音量之前**知道「这一声按现在的配平会有多响」。
+   * 混音表在采样盖上去之后会被 `LoadSfxPack` 重写，所以这里必须读运行时的
+   * `MIX_GAIN`，不能读 `SAMPLE_MIX`（那张表只是采样路径的来源）。
+   */
+  LevelAt(name, distance = 0) {
+    return (MIX_GAIN[name] ?? 1) * DryFalloff(Math.max(0, distance));
+  }
+
+  /**
+   * 一枪的**本体**电平：近/远两层等功率交叉之后的那一份（与 `PlayGunshot` 同一条式子）。
+   *
+   * 为什么不能直接 `LevelAt(name, d)`：一百三十米外那一枪播的其实是
+   * `rifleIjaFar`（混音 0.46），近场那条早就淡出了 —— 拿近场的 0.86 去算，
+   * 「弹啸不许比本体还响」这条上限会一路虚高一倍。
+   * 尾巴（`gunTail*`）不算进来：它是垫在本体后面的一层，不是本体。
+   */
+  GunReportLevelAt(name, distance = 0) {
+    const d = Math.max(0, distance);
+    const far = FAR_CUE[name];
+    const fall = DryFalloff(d);
+    if (!far) return (MIX_GAIN[name] ?? 1) * fall;
+    const t = Clamp((d - GUN_NEAR_M) / (GUN_FAR_M - GUN_NEAR_M), 0, 1);
+    const nearGain = Math.cos(t * Math.PI * 0.5) * (MIX_GAIN[name] ?? 1);
+    const farGain = Math.sin(t * Math.PI * 0.5) * (MIX_GAIN[far] ?? 1);
+    // 两层是**不相关**的两段录音，功率相加而不是幅度相加。
+    return Math.sqrt(nearGain * nearGain + farGain * farGain) * fall;
+  }
+
   // --- 空间探针 -----------------------------------------------------------
 
   /**
@@ -4219,9 +4293,17 @@ export class AudioEngine {
     if (position && distance > (soundField ? 1000 : CullDistance(name))) { this.drops.distance += 1; return null; }
 
     // 传播延迟：闪光先到、声音后到（见 PROPAGATION_DELAY）。
-    // priority 与第一人称不延迟 —— 玩家自己扣的扳机必须跟手，
-    // 而命中回执延后到达等于把「打中了」这条信息推后了半秒。
-    const propagation = (priority || firstPerson) ? 0 : this.PropagationDelay(name, distance);
+    //
+    // 【2026-09-09】**`priority` 不再免延迟**，只有 `firstPerson` 免。
+    // `priority` 说的是「这一声不许被去重窗和预算闸吃掉」，与「它多久到耳朵」
+    // 完全是两件事，把两件事绑在一个标上带来两个真 bug：
+    //   · `AudioWiring.Blast` 走 priority，于是 160 m 外的炮弹**闪光与声音同时到**
+    //     （docs/Data_AudioEngine.md §2.5 末尾记过这条，一直没改）；
+    //   · 弹啸（priority）与它自己那一枪的本体（非 priority）之间的先后关系
+    //     只是「碰巧对了」——一旦哪天本体也标上 priority 就整条塌掉。
+    // 玩家自己那一枪照旧跟手：它带 `firstPerson`（Script_Main 的 playerGunOpts）。
+    // 命中/击杀回执不带 position，distance 恒 0，本来就走不到这一条。
+    const propagation = firstPerson ? 0 : this.PropagationDelay(name, distance);
     const startDelay = Math.max(0, delay) + propagation;
     const startAt = now + startDelay;
 
@@ -4340,12 +4422,22 @@ export class AudioEngine {
       panner.refDistance = soundField ? 64 : 3.5;
       panner.maxDistance = soundField ? 1000 : 600;
       panner.rolloffFactor = 0.9;
+      // 【2026-09-09】**极近场钳位**（PANNER_MIN_M）：贴到听者身上的声源沿自己的
+      // 方向推到 1 m 外再交给 panner。方位不变，距离衰减也不变
+      //（inverse 在 refDistance 3.5 m 以内本来就是恒 1 —— 顺带记下来：
+      // 「<1 m 的 inverse 会爆增益」这条**不成立**，Chrome 按规范把距离夹到
+      // refDistance，实测 0.3 m 与 1.0 m 的 effectiveGain 同为 0.765）。
+      // 要钳的是 **HRTF 的行为**：同一条 bulletCrack 摆在 1.0 m 时左右耳差 6.0 dB，
+      // 摆到 0.3 m 就变成 8.6 dB，而且仰角越极端谱上的梳状缺口越深 ——
+      // 十几毫秒的瞬态过一遍那种 HRIR 就是「空、发梳、忽左忽右」。3A 的做法一样：
+      // panner 给一个最小距离，近到贴脸的东西交给非空间化那条路（firstPerson）。
+      const pp = ClampNearField(position, this.listenerPos, distance);
       if (panner.positionX) {
-        panner.positionX.value = position.x;
-        panner.positionY.value = position.y;
-        panner.positionZ.value = position.z;
+        panner.positionX.value = pp.x;
+        panner.positionY.value = pp.y;
+        panner.positionZ.value = pp.z;
       } else if (panner.setPosition) {
-        panner.setPosition(position.x, position.y, position.z);
+        panner.setPosition(pp.x, pp.y, pp.z);
       }
       // 遮挡的干声衰减单独一个节点 —— **不能折进 src**：src 同时喂着湿声那一路，
       // 而湿声只掉 −4 dB（文件头坑 4）。occ 为 0 时不建这个节点，
@@ -4445,12 +4537,14 @@ export class AudioEngine {
     const dz = position.z - this.listenerPos.z;
     const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
     const p = voice.panner;
+    // 与 Play 同一道极近场钳位：跟位的源飞到听者身上时不许把 HRTF 逼到极端方位。
+    const pp = ClampNearField(position, this.listenerPos, distance);
     if (p.positionX) {
-      p.positionX.setTargetAtTime(position.x, t, tau);
-      p.positionY.setTargetAtTime(position.y, t, tau);
-      p.positionZ.setTargetAtTime(position.z, t, tau);
+      p.positionX.setTargetAtTime(pp.x, t, tau);
+      p.positionY.setTargetAtTime(pp.y, t, tau);
+      p.positionZ.setTargetAtTime(pp.z, t, tau);
     } else if (p.setPosition) {
-      p.setPosition(position.x, position.y, position.z);
+      p.setPosition(pp.x, pp.y, pp.z);
     }
     // 遮挡每 OCCLUSION_REFRESH_S 重查一次。**不能每帧查**：会飞的源是持续声，
     // 每帧一条射线 × 整条航线 = 上千次；而飞机从遮到不遮本来也就是零点几秒的事。

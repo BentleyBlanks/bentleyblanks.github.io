@@ -81,6 +81,36 @@ audio.SetProbes({
 
 ---
 
+## 1.5 极近场钳位与两条电平查询 API（2026-09-09）
+
+### `PANNER_MIN_M = 1.0`
+
+比 1 m 更近的位置音，**沿自己的方向推到 1 m 外**再交给 `PannerNode`
+（`Play` 与 `MoveVoice` 两处同一道）。方位不变，电平也不变。
+
+**「<1 m 的 inverse 会爆增益」这条假设不成立**，实测排除：Chrome 按规范把
+inverse 模型的距离夹到 `refDistance`，同一条 `bulletCrack` 摆在 0.3 m 与 1.0 m
+的 `effectiveGain` 同为 **0.765**。
+
+要钳的是 **HRTF 在极端方位上的着色**：同一条 cue 摆在 1.0 m 时左右耳峰值差
+**6.0 dB**，摆到 0.3 m 变成 **8.6 dB**；而仰角越极端谱上的梳状缺口越深 ——
+十几毫秒的瞬态过一遍那种 HRIR 就是「空、发梳、忽左忽右」。
+3A 的做法一样：panner 给一个最小距离，真的贴脸的东西走非空间化那条路
+（`firstPerson`）。
+
+### `LevelAt(name, distance)` / `GunReportLevelAt(name, distance)`
+
+接线层要在**决定音量之前**知道「这一声按现在的配平会有多响」——
+逐弹弹啸的「不许比开枪那个人自己那一枪还响」就靠它。
+
+* `LevelAt` = `MIX_GAIN[name] × DryFalloff(distance)`，与 `Play` 里那个
+  `effectiveGain` 是同一条式子。**必须读运行时的 `MIX_GAIN`**：
+  采样盖上去之后 `LoadSfxPack` 会把它整张重写，读 `SAMPLE_MIX` 会在
+  「素材还没到」的那条路上给出另一套数。
+* `GunReportLevelAt` 按 `PlayGunshot` 的近/远等功率交叉再算一遍：
+  130 m 外那一枪播的其实是 `rifleIjaFar`（混音 0.46），拿近场的 0.86 去算，
+  上限会一路虚高一倍。尾巴（`gunTail*`）不算进来 —— 它是垫在本体后面的一层。
+
 ## 2. 遮挡
 
 ### 模型
@@ -239,6 +269,7 @@ cue、距离、遮挡值、低通、干声节点、总线路由。四条假设�
 * **传播延迟让爆炸和画面对不上** —— 不成立，同样因为 `priority`：
   32 发的 `propagation` 全是 0。（顺带记下来：这意味着 160 m 外的炮弹目前是
   **闪光与声音同时到**，与 §4 的设计相反。那是另一件事，不在这一轮里改。）
+  **2026-09-09 改了**：`priority` 不再免传播延迟，见 §4。
 
 ### 回归口
 
@@ -288,8 +319,16 @@ delay = clamp(distance / 340, 0, 1.4)      distance > 30 m 且 cue 属于「看�
   外加 `PROPAGATION_CUES`（`shellImpact` / `shellIncoming` / `launcherPop` / `amb.cannonFar`）。
 * **不走**的：脚步、拉栓、喊话、环境床 —— 玩家看不见它们「发生的那一刻」，
   延后到达只会变成音画不同步。
-* **`priority` 与 `firstPerson` 不延迟**：玩家自己扣的扳机必须跟手，
-  命中回执延后半秒等于把「打中了」这条信息推后了。
+* **只有 `firstPerson` 不延迟**（2026-09-09 改）。原来 `priority` 也免延迟，
+  那是把两件事绑在一个标上：`priority` 说的是「不许被去重窗和预算闸吃掉」，
+  与「多久到耳朵」毫无关系。绑在一起带来两个真 bug ——
+  `AudioWiring.Blast` 走 priority，于是 160 m 外的炮弹闪光与声音同时到（§2.5 记过）；
+  逐弹弹啸（priority）比它自己那一枪的本体（非 priority）先到只是**碰巧对了**，
+  哪天本体也标上 priority 就整条塌掉。
+  玩家自己那一枪照旧跟手：它带 `firstPerson`（`Script_Main` 的 `playerGunOpts`）。
+  命中/击杀回执不带 position，`distance` 恒 0，本来就走不到这一条。
+  实测（2026-09-09）：34 m 外一个日军的本体枪声比它那一发的弹啸晚
+  **0.100 s** 到（34/340 = 0.100），80 m 上 0.235 s、150 m 上 0.441 s。
 * `gunTail*` 必须跟着走，而且与本体用同一个 `distance` 算 —— 两者因此必然同时到。
   尾巴赶在本体之前是彻底的穿帮。
 
@@ -556,6 +595,7 @@ gunTail{Open|Street|Interior}{Rifle|Mg}      courtyard 用 Street 那条
 | `NODE_BUDGET`（→ `this.nodeBudget`）| 120 | 7 |
 | `BUS_COMP` / `BUS_MAKEUP` / `PEAK_LIMITER` | 见 §8 | 8 |
 | `GUN_TAIL_GAIN` | 0.55 | 9 |
+| `PANNER_MIN_M` | 1.0 m（panner 的最小距离，不改电平只改 HRTF 方位）| 1.5 |
 
 ---
 
