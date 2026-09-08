@@ -73,7 +73,10 @@ export class FirstLevelTrainAnimation {
   rig.root.position.y-=(rig.infantryFloorOffset||0)*weight;
   this.value.copy(this.anchor).multiply(rig.root.scale).applyQuaternion(rig.root.quaternion);
   rig.root.position.addScaledVector(this.value,-weight);
-  rig.root.updateWorldMatrix(true,true);
+  // 【2026-09-08 帧成本】这里原来收尾一句 `rig.root.updateWorldMatrix(true,true)`，
+  // 而两个调用方（MissionTrainLifePose.Apply、_import 的 TrainGameVerify）在返回后
+  // **立刻**又各自做一次全量更新 —— 车厢内 22 个乘客每人每帧就是两趟 137 个节点的
+  // 递归。矩阵一个字不变，只是少走一趟；调用方负责在读世界矩阵前自己更新。
  }
  State(riseSeconds=0){
   const c=this.config,r=Clamp(riseSeconds,0,this.duration);

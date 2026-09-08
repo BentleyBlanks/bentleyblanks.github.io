@@ -149,10 +149,6 @@ function CloneOwnedMaterial(material) {
   return clone;
 }
 
-function EnableShadowLayerOnLight(object) {
-  if (object.isLight) object.layers.enable(FIRST_PERSON_SHADOW_LAYER);
-}
-
 export class FirstPersonSelfShadow {
   /**
    * @param {object} [options]
@@ -195,6 +191,12 @@ export class FirstPersonSelfShadow {
 
     this.target = null;
     this._BuildTarget(this.size);
+
+    // 深度趟的空壳场景：每帧临时把 `this.root` 借进 children（不改它的 parent），
+    // 见 Render 里那一大段。矩阵由主循环的 scene.updateMatrixWorld 负责，这里关掉自动更新。
+    this._depthScene = new THREE.Scene();
+    this._depthScene.name = "FirstPersonSelfShadowDepthScene";
+    this._depthScene.matrixWorldAutoUpdate = false;
 
     this.depthMaterial = new THREE.MeshDepthMaterial({
       depthPacking: THREE.RGBADepthPacking,
@@ -382,7 +384,6 @@ ${SHADOW_FRAGMENT_GLSL}`)
 
     const renderer = this.renderer;
     const previousTarget = renderer.getRenderTarget();
-    const previousOverride = this.scene.overrideMaterial;
     const previousClearAlpha = renderer.getClearAlpha();
     renderer.getClearColor(this._clearColor);
     this._hidden.length = 0;
@@ -408,28 +409,46 @@ ${SHADOW_FRAGMENT_GLSL}`)
       }
     }
 
-    // 灯也要挂进本层。three 按「相机看得见的灯」算光照哈希，而这台相机只看
-    // FIRST_PERSON_SHADOW_LAYER：灯留在第 0 层的话，这一趟看到 0 盏灯、主通道又
-    // 看到全部灯，同一个 scene 的 lights.state.version 每帧被顶两次，全场每份带光照
-    // 材质在每个 pass 都重走一遍 getProgram（含 onBeforeCompile.toString() 的
-    // 缓存键）—— 爆炸测试场空场实测 0.44 ms/帧，占主线程 13%。深度覆盖材质不读灯，
-    // 多收进来的灯只让哈希稳定，画面不变。每帧遍历是为了接住运行时新挂的灯
-    // （过场道具自带点光），代价约 0.03 ms。
-    this.scene.traverse(EnableShadowLayerOnLight);
-    // 灯进了本层，three 会想在这一趟顺手烘战场阴影图：那是主通道的事，别搬过来。
+    // 【2026-09-08】**这一趟只提交视模那棵子树，不再提交整个 scene。**
+    //
+    // 原来是 `renderer.render(this.scene, shadowCamera)`：画出来的确实只有两件
+    // （相机只看 FIRST_PERSON_SHADOW_LAYER），但 three 的 projectObject 是**先递归、
+    // 后按层判**，所以第一关车厢里那四千多个节点每帧照样被走一遍；再加上原来那句
+    // 为了稳住光照哈希而做的 `scene.traverse` 又是一遍。第一关三机位实测这一段
+    // 的 CPU 提交是 1.3—3.4 ms/帧（**只有 2—8 个 draw call**），全花在两趟遍历上。
+    //
+    // 换成一只**空壳 Scene**（`_depthScene`）而不是直接把 `this.root` 当 scene 传：
+    // r185 的 `renderObjects` 里那一句是
+    // `const overrideMaterial = scene.isScene === true ? scene.overrideMaterial : null;`
+    // —— 传裸 Object3D 时覆盖材质会被**静默忽略**，深度图上写的就成了视模自己的
+    // PBR 颜色，手和枪上的自阴影随之整片走样（逐像素比对里就是画面下方那两格）。
+    // 空壳只借用 children 数组，不改 `root.parent`，`matrixWorldAutoUpdate = false`
+    // 让它不再重算矩阵（主循环的 `scene.updateMatrixWorld()` 已经算过）。
+    //
+    // 好处照旧：`renderStates` / `renderLists` 按传进去的对象取，**主场景那份光照
+    // 状态根本不被这一趟碰到** —— 「同一个 scene 的 lights.state.version 每帧被顶
+    // 两次、全场材质每 pass 重走 getProgram」那条老账因此从根上消失，不用再给全场
+    // 的灯挂层（EnableShadowLayerOnLight 已删）。空壳里没有灯，`shadowMap.render`
+    // 自己在 lights.length === 0 时早退，战场阴影图不会被搬到这一趟来烘
+    //（原来那句 needsUpdate 的保险仍留着）。
     const shadowMap = renderer.shadowMap;
     const previousShadowNeedsUpdate = shadowMap.needsUpdate;
+    const depthScene = this._depthScene;
+    depthScene.children.length = 0;
+    depthScene.children.push(this.root);   // 借用不接管：this.root.parent 仍是相机
+    depthScene.fog = this.scene.fog || null;
+    depthScene.overrideMaterial = this.depthMaterial;
     try {
-      this.scene.overrideMaterial = this.depthMaterial;
       shadowMap.needsUpdate = false;
       renderer.setRenderTarget(this.target);
       renderer.setClearColor(0xffffff, 1);
       renderer.clear(true, true, true);
-      renderer.render(this.scene, this.shadowCamera);
+      renderer.render(depthScene, this.shadowCamera);
       this.renderedFrames += 1;
     } finally {
       shadowMap.needsUpdate = previousShadowNeedsUpdate;
-      this.scene.overrideMaterial = previousOverride;
+      depthScene.overrideMaterial = null;
+      depthScene.children.length = 0;
       for (const [material, allowOverride] of this._overrideStates) material.allowOverride = allowOverride;
       for (const mesh of this._hidden) mesh.visible = true;
       renderer.setRenderTarget(previousTarget);

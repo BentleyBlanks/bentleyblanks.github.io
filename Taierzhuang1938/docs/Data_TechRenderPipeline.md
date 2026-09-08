@@ -4671,6 +4671,243 @@ CPU 采样（Profiler，300 帧）里排前面的是 `updateMatrixWorld` 17%、`
 
 ---
 
+### 17.10 第一关《往南的路》三机位账（2026-09-08）
+
+3A 管线合并之后另一会话在第一关（`?whitebox=p012`）量到「车厢内 26.9 / 朝北 45.8 /
+朝东 47.9 fps」。这一节是把它量准、找到去处、压回去的全过程。
+
+**取证入口**：`Script_FirstLevelFrameProbe.mjs` 本轮加了四个模式，全都在
+3394×1348 / high 上跑，机位与 r13 那张表同一套（车厢内 / 前沿朝北 / 前沿朝东，
+见 `docs/Data_FirstLevelRebuildAcceptance.md` r13）：
+
+```bash
+node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --strict            # §17.1 同口径：dt=0、21 帧一批、多轮取 min
+node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --strict --ablate=noSsr,noGtao,…   # 配对 A/B 消融
+node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --counts            # 只数不计时（见下「怎么在有负载的机器上比」）
+node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile        # CDP JS 采样，指名道姓
+node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --live              # 真 rAF 45 s：自动降档落到第几级 + 帧间隔中位数
+node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --shot ; --diff=a,b # 定帧出图 + 逐像素比对（含 8×6 粗网格定位）
+```
+`--root=<另一棵检出>` 服务别的树，页面内的取证代码仍是本树注入的那一份 ——
+两棵树因此是同一把尺子。
+
+#### 13.9.1 怎么在有负载的机器上比（这条先读）
+
+这台机器上常年还跑着别的 agent 的浏览器测试。同一棵树、同一个机位，连续三轮
+`--strict` 的整帧 GPU 下界实测是 **19.67 / 33.07 / 36.51 ms**（差 1.9 倍），
+**比要测的旋钮差还大**。第一版消融表因此整张作废：baseline 从 19.7 漂到 45.9，
+「关掉 GTAO」量出来是**变慢 5.4 ms**。
+
+所以本节的判据分两级：
+
+* **可信（确定性计数，与墙钟无关）**：`renderer.info` 的 draw / 三角、
+  `--counts` 数出来的每帧 `updateWorldMatrix` 节点访问数、`scene.traverse` 回调数、
+  场景节点数。同一份代码跑两次逐位相同。
+* **参考（墙钟）**：`--strict` 的 GPU / submit 与 `--live` 的帧间隔中位数。
+  `--live` 取的是 45 秒、七百多帧的中位数，比 21 帧一批更能吸收负载抖动。
+
+#### 13.9.2 改前基线（低负载那一轮，3394×1348 / high，自动降档第 0 级 = 内部 2715×1078）
+
+| 机位 | 整帧 GPU 下界 | submit | draw | 三角/帧 | 纯逻辑 submit |
+|---|---:|---:|---:|---:|---:|
+| 车厢内 | **39.05** | **45.33** | **1498** | 2.89 M | 12.42 |
+| 前沿朝北 | 19.72 | 28.25 | 566 | 3.12 M | 6.11 |
+| 前沿朝东 | 22.32 | 23.88 | 551 | 1.67 M | 5.34 |
+
+逐 pass（GPU 中位数 / CPU 提交 / draw，车厢内）：
+
+| 段 | GPU | submit | draw |
+|---|---:|---:|---:|
+| main | 11.52 | 13.4 | 669 |
+| prepass | 5.21 | 8.6 | 599 |
+| shadow（级联烘焙） | 5.17 | 4.9 | 181 |
+| firstPersonShadow | 1.59 | **1.8** | **2** |
+| gtao | 0.43 | 0.1 | 4 |
+| taa 0.30 / ssr 0.23 / motionBlur 0.20 / composite 0.19 / contactShadows 0.14 | | | |
+| fxaa 0.09 / bloom 0.066 / hzb 0.044 / exposure 0.042 / ssrColor 0.030 | | | |
+| ssilHistory 0.019 / lensFlare 0.015 / atmosphere 0.011 | | | |
+
+CPU 分桶（中位数，车厢内）：`post` 28.5、`ai` 11.1、`matrix` 2.3、
+`firstPersonShadow` 1.8、`viewmodel` 0.7、`story` 0.6、`hud` 0.3。
+
+**第一条结论：3A 那一整排新 pass 不是账。** SSR + GTAO + 体积雾 + TAA + 运动模糊 +
+泛光 + 曝光 + 光晕 + 接触阴影 + 大气，十项加起来 **< 1.5 ms GPU**。贵的是
+`main`（材质变厚）、`prepass`、`shadow`（三级轮转）与 **submit**：车厢内 submit
+45.3 ms > GPU 39.1 ms，**帧是被 CPU 提交挡住的**，与 §17.2 的推论一字不差。
+
+#### 13.9.3 那 1498 个 draw 是谁提交的
+
+`--strict` 会按「pass 分段 × 场景直属子树」把 draw 归账（包 `renderer.renderBufferDirect`，
+游戏代码一个字没改）。车厢内改前：
+
+| 子树 | prepass | main | shadow | 合计 | 占比 |
+|---|---:|---:|---:|---:|---:|
+| `FirstLevelWhitebox_Ground`（地形） | 378 | 378 | 33 | **789** | **53%** |
+| `Actor_nra_*`（车厢里 22 个近景人物） | 127 | 175 | 119 | 421 | 28% |
+| `FirstLevelMissionWhitebox`（摆设） | 73 | 93 | 16 | 182 | 12% |
+| 军列 / 静态盒 / 粒子 / 远景人群 / 全屏 pass | | | | ≈106 | 7% |
+
+**一半的 draw 是地形，而机位在车厢里。** 车厢是敞篷的，顺着车往前看就是整片平原。
+
+CDP 采样（车厢内，自身时间 ms/帧）把 CPU 侧点了名：
+
+```
+6.62 updateWorldMatrix   6.41 projectObject     3.61 multiplyMatrices  3.53 updateMatrixWorld
+2.80 renderObject(阴影)  2.36 evaluate(mixer)   2.08 renderBufferDirect 1.75 traverse
+1.39 setProgram          1.39 getParameters     1.11 TrainAnimation.Sample
+```
+
+#### 13.9.3b 消融表：这一轮**没能**量出可用的材质侧数字
+
+`--strict --ablate=` 会给每一项自带前后两次 baseline、只报配对差（同一台机器上
+一条龙跑下来后面的项会整体慢十几毫秒）。即使这样，本轮 15 项 × 3 机位的表仍然
+不可用：车厢内「关掉 SSR」量出 **+43.7 ms**、「关掉 GTAO」量出 **+5.4 ms** ——
+负号项与正号项混在一起，量级也对不上逐 pass 的中位数（SSR 0.23 ms / GTAO 0.43 ms）。
+**结论是这张表要等一台空闲的机器重跑，不是这些开关真的免费。**
+
+表里唯一可信的是 draw 差（确定性）：
+
+| 消融项 | 车厢内 Δdraw | 朝北 | 朝东 |
+|---|---:|---:|---:|
+| `noShadows`（关阴影总闸） | −179 | −89 | −82 |
+| `hideActors`（摘掉全部人物子树） | −421 | −170 | −129 |
+| `noSsr` | −10 | −10 | −10 |
+| `noGtao` | −5 | −5 | −5 |
+| `noMotionBlur` | −4 | −4 | −4 |
+| `noContactShadows` | −3 | −3 | −3 |
+| `noVolumetrics` / `noClusteredLights` / `noBloom` / `shadow1024` / `noPom` | 0 | 0 | 0 |
+
+**逐 pass GPU 中位数（13.9.2 那张表）才是这一轮「谁贵」的答案**：它按帧图分段
+直接量，不需要开关任何功能，也不受一条龙里的负载漂移影响。它量不到的只有
+材质内部那几段（SSIL / 簇光 / POM / CSM 采样都编在 `main` 里），那几项仍然只能
+靠消融，因此留在上面那条待办里。
+
+#### 13.9.4 三条根因
+
+1. **地形分块按「格」不按「米」。** `Data_FirstLevelP012Terrain` 的 `chunkCells`
+   写死 32 **格**，而正片第一关 `MISSION_TERRAIN.cellM = 0.75 m`（旧 P012 夹具是 2 m），
+   于是同一句代码在正片上切出 24 m 的小块 —— 342 × 732 m 的地块 = **465 只网格**，
+   车厢内 378 只同时进视锥，预通道与主通道各提交一次。
+2. **第一人称自阴影每帧两趟全场遍历，只为 2 个 draw。** `renderer.render(this.scene, …)`
+   的 `projectObject` 是**先递归后按层判**，车厢里四千多个节点每帧照走一遍；
+   外加一句 `scene.traverse` 给全场的灯挂层（那是为了稳住 `lights.state.version`）。
+   CPU 提交实测 1.3—3.4 ms/帧。
+3. **车厢乘客每人每帧四趟全量世界矩阵递归。** `MissionTrainLifePose.Apply` 里
+   `basis.updateWorldMatrix(true,true)` → `FirstLevelTrainAnimation.Sample` 收尾
+   一趟 → 调用方紧接着又一趟 → 收尾 IK 再一趟；`CharacterModel._GroundInfantryBlend`
+   还有 `updateWorldMatrix(true,true)` + `updateMatrixWorld(true)` 这对重复。
+   22 个人 × 一百多个节点 × 四趟。
+
+#### 13.9.5 改了什么、为什么
+
+| 改动 | 文件 | 理由 |
+|---|---|---|
+| 地形分块改成**按米**（48 m，下限 32 格保持 2 m 格的旧夹具不变） | `Data_FirstLevelP012Terrain.mjs` | 465 → 128 只网格；三角总数一个不变（分块只改接缝顶点复制量），法线仍按全局邻居算。没一路开到 96 m 是因为块越大 `CutTerrainRectangles` 挖弹坑要扫的三角越多 |
+| 自阴影只提交视模那棵子树（借一只**空壳 Scene**，不改 `root.parent`） | `Script_FirstPersonSelfShadow.mjs` | 四千多节点的遍历 → 一百来个；顺带把「同一个 scene 的 `lights.state.version` 每帧被顶两次」从根上消掉（空壳有自己的 renderState），全场挂灯层那句因此可以删 |
+| `Sample` 收尾那趟全量更新删掉，交给调用方 | `Script_FirstLevelTrainAnimation.mjs` | 两个调用方返回后**立刻**各自又做一次全量更新，矩阵一个字不变 |
+| `basis.updateWorldMatrix(true, !this.animation)` | `Script_FirstLevelMissionTrainLife.mjs` | 走采样动画时子树由 `FootFloor` / `Sample` 之后那句负责，父链仍更新 |
+| `updateWorldMatrix(true,true)` → `(true,false)`；三只临时对象提到模块作用域 | `Script_CharacterModel.mjs` | 紧跟着的 `updateMatrixWorld(true)` 已经强制刷过整棵子树；每帧 66 次分配也省了 |
+
+**踩到的坑，写在这里免得下一个人再踩**：第一版把 `this.root` 直接当 scene 传给
+`renderer.render` —— r185 的 `renderObjects` 里那一句是
+`const overrideMaterial = scene.isScene === true ? scene.overrideMaterial : null;`，
+**传裸 `Object3D` 时覆盖材质被静默忽略**，深度图上写的成了视模自己的 PBR 颜色。
+数值门禁全绿（`AuditDepth` 照样有内容），是逐像素比对的 8×6 粗网格把它揪出来的：
+差异整整齐齐落在画面下方那两三格 —— 手和枪。所以换成空壳 `THREE.Scene`。
+
+#### 13.9.6 效果（确定性计数，`--counts`，每帧）
+
+| | 车厢内 | 前沿朝北 | 前沿朝东 |
+|---|---|---|---|
+| draw | 1541 → **1009**（−35%） | 579 → 549 | 563 → **493**（−12%） |
+| `scene.traverse` 回调 | 8936 → **4182**（−53%） | 6523 → 2989 | 5765 → 2484 |
+| `updateWorldMatrix` 节点访问 | 28831 → 25361（−12%） | 7194 → 7194 | 6872 → 6767 |
+| 场景节点 | 6370 → 6033 | 3197 → 2860 | 2818 → 2355 |
+| 三角/帧 | 2.89 → 3.02 M | 3.11 → 3.17 M | 1.67 → 1.75 M |
+
+三角略涨（分块变粗，视锥剔除的粒度也变粗），离 `SCENE_RENDER_LIMITS` 的 8.10 M
+红线还有三分之二余量；draw 换来的是纯赚。
+
+**真 rAF 45 秒，车厢内，3394×1348 / high**（`--live`，中位帧间隔）：
+
+| | 帧间隔中位数 | 自动降档 |
+|---|---:|---|
+| 改前 | 50.0 ms（20.0 fps） | 第 **2** 级（×0.85 → 内部 2308×917），SSR 开、接触阴影开 |
+| 改后 | **30.1 ms（33.2 fps）** | 同样第 2 级、同样的内部分辨率 |
+
+两次都稳定停在阶梯第 2 级，所以这是同分辨率下的对照。**车厢内没有达到 16.6 ms**
+（见下「还欠着的」），前沿两个机位在同一轮里是 20 ms 上下。
+
+`--strict` 那一路的墙钟（改前 / 改后各三轮交替，取 min 与中位）**没有结论**，
+如实记在这里：
+
+| 机位 | 改前 GPU min/中位 | 改后 | 改前 submit min/中位 | 改后 |
+|---|---:|---:|---:|---:|
+| 车厢内 | 19.67 / 33.07 | 30.38 / 31.08 | 26.41 / 37.96 | 32.05 / 39.90 |
+| 前沿朝北 | 17.41 / 22.46 | 15.89 / 16.46 | 22.40 / 23.30 | 19.27 / 22.57 |
+| 前沿朝东 | 13.87 / 17.08 | 16.66 / 17.29 | 16.34 / 17.33 | 18.05 / 18.35 |
+
+改前那一轮在车厢内正好撞上一段空闲（19.67），改后三轮都没撞上 —— 三轮的
+min-of-N 在 1.9 倍的负载抖动面前不够用。要拿这张表定论，得在一台空闲的机器上
+把两棵树各跑够轮数；本轮的判据因此落在上面的确定性计数与 45 秒中位数上。
+
+#### 13.9.7 画面不变的证据
+
+同机位定帧（`dt = 0` 推 150 帧，TAA 历史与自动曝光都收敛）逐像素比对，1920×1080：
+
+| | 噪声底（同一棵树跑两次） | 改前 vs 改后 |
+|---|---|---|
+| 车厢内 | meanAbs 0.054，>8 的像素 0.21%，max 46 | **0.007 / 0.00% / max 25** |
+| 前沿朝北 | 0.019 / 0.03% / max 61 | **0.003 / 0.00% / max 56** |
+| 前沿朝东 | 0.002 / 0.00% / max 53 | **0.001 / 0.00% / max 54** |
+
+**三个机位的改前/改后差都压在同一棵树自比的噪声底之下，且没有一个像素差超过 8。**
+剩下的那点差全在粗网格左上角那一格 —— 字幕与 FPS 读数的抗锯齿，噪声底里同样有。
+中间那次「传裸 Object3D」的版本则是 0.082 / 0.41%（车厢）与 0.463 / 2.26%（朝北），
+粗网格把它定位在画面下方两三格：手和枪。数值门禁当时全绿，**是逐像素比对抓住的**。
+
+#### 13.9.7b 这一轮怎么验的
+
+```bash
+node Taierzhuang1938/Script_BootTest.mjs                       # 七关 + 三角红线
+node Taierzhuang1938/Script_SamplerBudgetTest.mjs              # 四档 × GI 开关的采样器数与 GL 错误
+node Taierzhuang1938/Script_EditorTest.mjs                     # 含第一人称自阴影的 Status / AuditDepth / 软化热切
+node Taierzhuang1938/Script_FirstLevelP012TerrainBrowserTest.mjs  # 换了分块之后的地形与弹坑
+node Taierzhuang1938/Script_FirstLevelTrainAnimationTest.mjs   # 车厢乘客的原骨架对照
+node Taierzhuang1938/Script_CsmTest.mjs ; …ClusteredLightsTest ; …GtaoTest ; …SsrTest ; …VolumetricsTest
+node Taierzhuang1938/Script_PostFrameGraphTest.mjs ; …RespawnShaderWarmTest ; …ActorDepthTest
+node Taierzhuang1938/Script_FrameProfileTest.mjs --tiers       # phase=2 的 draw / 三角没动（782 / 7.31 M）
+```
+
+**`SamplerBudgetTest` 是这一轮唯一抓到真问题的数值门禁**：自阴影那一趟传裸
+`Object3D` 时，视模的 PBR 材质被画进一张单靶 RGBA8，`getError` 每帧 1282
+（`INVALID_OPERATION`，与 §3 里 MRT 那条同一个成因）。换成空壳 Scene 之后八档全 0。
+
+`Script_FirstLevelMissionBrowserTest --campaign` 在本轮的机器负载下**两棵树都
+通不过**（改后死在 VillageKitchen、改前死在 CourtyardDressings，都是机器人在
+实时交火里被打死）—— 与 `docs/Data_FirstLevelRebuildAcceptance.md` r13 末段记的
+是同一条：那一项在同机跑着别的浏览器测试时本来就跑不完，不是本轮回归。
+
+#### 13.9.8 还欠着的（按收益排序，都要动到本子系统之外）
+
+1. **人物节点数**。车厢内 22 个近景人物 = 三千个场景节点（其中一千五百根骨头），
+   `projectObject` 每帧要走两遍（预通道 + 主通道）、阴影的 `renderObject` 再走一遍。
+   三方的遍历是先递归后判层，**没有便宜的绕法**：把骨骼根 `visible = false` 能剪掉
+   递归，但插槽（手上的枪）就挂在骨头下面，一起被剪。真正的解是把插槽挪出骨骼层级、
+   或者减少每具骨架的骨头数（现在约 70 根，含手指）。
+2. **人物 draw**。车厢内 421 个（每人 8—10 只分件 × 三趟）。`Script_ActorBatch`
+   的实例化对这一关**完全不生效** —— 军人已经全是蒙皮 GLB，整人跳过该模块
+   （实测 `batch.instances = 0`）。要么按材质把分件再合一层，要么给蒙皮件另做一套合批。
+3. **`ai` 桶 11.1 ms**（车厢内）。里面是 22 个近景人物的动画 + IK；
+   `logicOnly` 的 submit 因此是 12.4 ms —— **哪怕渲染免费，车厢内也到不了 16.6 ms**。
+   这条要在动画侧解（分频、简化车厢内的 IK），不在渲染管线里。
+4. **远级级联要不要剔近景人物**。§1S.10 第 1 条已核实 r185 的层剔除对阴影相机
+   无效；可行的替代是烘远级那一帧临时改 `castShadow`，但它与 `Actor.SetShadowEnabled`
+   每帧按距离改的那一位会打架，收益（约 51 个 draw）不值这个风险，先记在这儿。
+
+---
+
+
 ## 18. 预热账：进过场与开机的着色器编译
 
 > 三段账合在一节：进过场那十几秒（2026-08 的原始做法）、八子系统合流之后的开机

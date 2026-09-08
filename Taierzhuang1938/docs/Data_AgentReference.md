@@ -20,6 +20,9 @@ node Taierzhuang1938/Script_TzmShot.mjs --id Type89Tank         # TZM 三视图�
 ```powershell
 node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐项消融 GI/SSAO/阴影/MSAA
 node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --label=x   # 第一关三机位帧取证（CPU/GPU 分桶、GC、日军位移）
+node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --strict    # 同 §17.1 口径：3394×1348/high、dt=0、逐 pass GPU/submit/draw 归账（可加 --ablate= / --root=）
+node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --counts    # 只数不计时：draw / traverse / updateWorldMatrix 节点访问（有负载的机器上唯一可信的对照）
+node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --shot ; --diff=a,b
 ```
 
 **实机常驻剖析器**：编辑器面板「调试 → Profiler」弹独立窗口，玩法照跑
@@ -44,7 +47,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --label=x   # 第一关三�
 - `Data_FirstLevelMissionCrowd`：院落/转运区分散停靠点、错峰汇流和轻伤员等候区域。
 - `Data_FirstLevelMissionFront`：前沿增援、沿途火力、友军据点和战场遗体布局；`FRONT_ASSAULT` / `FrontAssaultLane` 是跃进冲击的跳线与落点几何（禁行列、增援落点）。`Script_FirstLevelMissionAftermath`：八种烘焙姿势按实例化三级距离层绘制（全模 / 5 cm / 14 cm 聚类），每帧自做视锥与距离压表，材质克隆自人物材质（`Script_Materials.CloneShadedMaterial`，别再与蒙皮网格共用同一材质对象，three 会每次切换 skinning/instancing 重算着色器参数；克隆体按 `Script_MaterialPatches.PatchesOf` 取同一份补丁列表重新 `ApplyPatches`，不是抄钩子——抄过来的 defines / SyncDefines 仍指向源材质，会出孪生程序）。距离与聚类粒度在 `Data_Tuning_FirstLevel.MISSION_PEOPLE_TUNING`。
 - 首战节奏（2026-09-08）：前沿步枪兵按 `FRONT_ASSAULT.lines` 跃进（`UpdateAssault`：冲—跪射—被压制卧倒回退—最后一线守 `assaultFinalHoldS` 后退回 `assaultRegroupLine` 再来），`UpdateWaves` 在 Support / MachineGun / Tank 期间每 `waveIntervalS` 从北缘投一个班，直到 `waveBudget` 或活着的冲击兵达到 `waveAliveCap`；机枪手（`hold`）仍是固定火力点。遭遇刷兵走 `spawnQueue` 每帧 `spawnPerFrame` 个，不再一帧建四十多具骨骼。
-- 帧取证：`node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --label=<名字>`（车厢 / 前沿朝北 / 前沿朝东三机位的 CPU 分桶、GPU 分段、GC、draw call 与日军位移），结果落 `_shots/FirstLevelFrame/`；`Debug.FirstLevelMissionRuntime()` 直接给运行时对象。
+- 帧取证：`node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --label=<名字>`（车厢 / 前沿朝北 / 前沿朝东三机位的 CPU 分桶、GPU 分段、GC、draw call 与日军位移），结果落 `_shots/FirstLevelFrame/`；`Debug.FirstLevelMissionRuntime()` 直接给运行时对象。2026-09-08 加了五个模式：`--strict`（§13.1 同口径，逐 pass GPU/submit/draw 归账 + `--ablate=` 配对消融 + `--root=` 服务另一棵检出）、`--counts`（只数不计时）、`--cpuprofile`（CDP 采样）、`--live`（真 rAF 45 s 看自动降档落到第几级）、`--shot` / `--diff=a,b`（定帧出图 + 逐像素比对，带 8×6 粗网格定位）。账与结论在 [渲染管线](Data_TechRenderPipeline.md) §13.9。
 - `Script_FirstLevelMissionPeople`：真实担架员/轻伤员角色、抬运握持校正、停步接地、警戒观察与按距离降低远景动画频率。
 - `Script_FirstLevelTrainAnimation` / `MissionTrainLife` / `MissionTrain`：四型号原骨架侧凳支撑、扶腿起身、生活手势和物理队列衔接。库在 `Animation/FirstLevelTrain`，接入门禁为 `Script_FirstLevelTrainAnimationTest.mjs`；其余动作和缺口见 [动画进度](Data_FirstLevelMissionAnimationProgress.md)。
 - `Data_FirstLevelMissionDialogue` / `Script_FirstLevelMissionVoice`：整段连续对白。`Script_SeedAudioFirstLevelBake.mjs` 仅从环境变量取密钥，每段一个请求、一个音频文件；`--dry` 审核请求，`Script_FirstLevelMissionTest.mjs --audio` 验实际资产。

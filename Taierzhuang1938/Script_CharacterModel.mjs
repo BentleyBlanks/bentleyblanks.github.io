@@ -375,6 +375,11 @@ export const CHARACTER_HITBOX_PROFILE = Object.freeze([
 
 const WORLD_SCALE = new THREE.Vector3();
 const WORLD_QUATERNION = new THREE.Quaternion();
+// `_GroundInfantryBlend` 每帧每个混合中的人物各调一次；原来这三只是函数里 new 出来的，
+// 车厢内 22 人同时混合就是每帧 66 次分配（每帧分配速率实测 1.8 MB，GC 每 90 帧一次）。
+const GROUND_BLEND_INVERSE = new THREE.Matrix4();
+const GROUND_BLEND_TRANSFORM = new THREE.Matrix4();
+const GROUND_BLEND_POINT = new THREE.Vector3();
 
 /**
  * Runtime cranial centre carried by the animated Head bone.
@@ -730,12 +735,19 @@ export class LugouCharacterRig {
       return;
     }
     if (!(this.infantryPropWeight > 0) || weight >= .99999) return;
-    this.root.updateWorldMatrix(true, true);
+    // 【2026-09-08 帧成本】`updateWorldMatrix(true, true)` 的第二个 true 会把整棵
+    // 人物子树（约 137 个节点，其中 60 多根骨头）递归重算一遍，而紧跟着的
+    // `updateMatrixWorld(true)` 又强制重算了同一棵树 —— **同一帧里两趟全量矩阵**。
+    // 第一关车厢内 22 个近景人物同时走这条混合分支，CDP 采样里
+    // `updateWorldMatrix` 自身 6.6 ms/帧 + `multiplyMatrices` 3.6 ms/帧，是整帧
+    // 最大的单项。这里只保留「往上更新父链」（第二个参数给 false）：子树由
+    // 下面那句 force 的 updateMatrixWorld 负责，最终矩阵逐比特相同，少走一趟。
+    this.root.updateWorldMatrix(true, false);
     // SkinnedMesh refreshes bindMatrixInverse in updateMatrixWorld, not updateWorldMatrix.
     // CPU contact sampling must use this frame's bind inverse, just as the renderer does.
     this.root.updateMatrixWorld(true);
-    const inverse = new THREE.Matrix4().copy(this.root.matrixWorld).invert();
-    const point = new THREE.Vector3(), transform = new THREE.Matrix4();
+    const inverse = GROUND_BLEND_INVERSE.copy(this.root.matrixWorld).invert();
+    const point = GROUND_BLEND_POINT, transform = GROUND_BLEND_TRANSFORM;
     let floor = Infinity;
     for (const { mesh, vertices } of this.infantryGroundProbes) {
       mesh.skeleton.update(); transform.multiplyMatrices(inverse, mesh.matrixWorld);

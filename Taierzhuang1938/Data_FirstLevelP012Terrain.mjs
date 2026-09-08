@@ -4,8 +4,26 @@ import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 const Clamp01 = value => Math.max(0, Math.min(1, value));
 const Smooth = value => { const t = Clamp01(value); return t * t * (3 - 2 * t); };
 
+/**
+ * 渲染分块的边长（米）。**按米不按格**：分块常数原来写死 32 **格**，
+ * 而正片第一关的 `MISSION_TERRAIN.cellM` 是 0.75 m（旧 P012 夹具是 2 m），
+ * 于是同一句代码在正片上切出的是 24 m 的小块 —— 342 × 732 m 的地块被切成
+ * 465 只网格。车厢内那个机位顺着车厢往前看，**378 只地块同时进视锥**，
+ * 预通道与主通道各提交一次 = 756 个 draw call，占整帧 1498 个的一半
+ *（`Script_FirstLevelFrameProbe --strict` 的逐 pass draw 归账）。而这一帧是
+ * CPU 提交受限的（docs/Data_TechRenderPipeline.md §13.2），所以这一半是纯亏。
+ *
+ * 48 m 一块：正片 465 → 128 只，视锥内 378 → 约 100；三角总数一个不变
+ *（分块只改接缝处的顶点复制量），法线仍按全局邻居算，接缝照旧无缝。
+ * 下限 32 格保证 2 m 格的旧夹具维持原来的 64 m 分块，行为不变。
+ * 上限的取舍：块越大，`CutTerrainRectangles` 挖弹坑时要扫的三角越多
+ *（一块 2048 → 8192），所以没有一路开到 96 m。
+ */
+const CHUNK_METRES = 48;
+
 export function CreateP012Terrain(layout) {
-  const {x, z, w, d} = layout.ground, cellM = layout.terrainSpec?.cellM || 2, chunkCells = 32;
+  const {x, z, w, d} = layout.ground, cellM = layout.terrainSpec?.cellM || 2;
+  const chunkCells = Math.max(32, Math.round(CHUNK_METRES / cellM));
   const minX = x - w / 2, minZ = z - d / 2;
   const cols = Math.ceil(w / cellM), rows = Math.ceil(d / cellM);
   const stepX = w / cols, stepZ = d / rows, width = cols + 1;

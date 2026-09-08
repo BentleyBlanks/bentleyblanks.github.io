@@ -75,7 +75,12 @@ export class MissionTrainLifePose {
     if(finishing&&poseWeight<=0){this.walkReleaseDone=true;return false}
     const weight=life.weight*(animationState?.gestureWeight??1), seated=life.seated?weight:0, brace=life.brace*weight;
     const t=this.time+life.phase*C.gesturePeriodS, cycle=(1-Math.cos(t*2*Math.PI/C.gesturePeriodS))/2;
-    this.basis.updateWorldMatrix(true,true);
+    // 【2026-09-08 帧成本】子树那一趟只有**没有采样动画**的程序化分支要用
+    //（下面 else 里的 this.World(foot/pelvis) 直接读骨头世界矩阵）。走采样动画时
+    // FootFloor 的 `updateMatrixWorld(true)` 与 Sample 之后那句
+    // `rig.root.updateWorldMatrix(true,true)` 已经把整棵子树更新过，这里再递归一遍
+    // 是纯重复：父链仍然更新（第一个参数保持 true），只是不再往下走。
+    this.basis.updateWorldMatrix(true,!this.animation);
     if(this.animation){
       const baseFloor=release>0?this.animation.FootFloor():null;
       this.animation.Sample(life.riseSeconds?animationState.seconds:0,poseWeight);
