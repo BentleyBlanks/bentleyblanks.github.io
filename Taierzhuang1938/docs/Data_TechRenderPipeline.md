@@ -73,7 +73,7 @@ function generateShadowMapTypeDefine( parameters ) {
 | `Script_PostComposite.mjs` | 合成（分段函数，见 §1.9） | `CompositePass` |
 | `Script_PostFxaa.mjs` | FXAA + 锐化 → 屏幕（调试视图时让位给 DebugPass） | `FxaaPass` |
 | `Script_PostDebug.mjs` | 中间靶展示 pass、线框着色模式、调试叠加层、SunShadow 验证图 | `DebugPass`、`InjectDepthPull`、`SHADING_MODES`、`WIRE_BACKGROUND_PURE` |
-| `Script_MaterialPatches.mjs` | 材质补丁注册表 + 现役三路补丁（AO / GI / 破口） | `MakePatch`、`ApplyPatches`、`PatchKeysOf`、`MakeAmbientOcclusionPatch`（旧名 `MakeSsaoPatch` 仍导出）、`MakeGiPatch`、`MakeDestructionPatch`、`IndirectLightingPatches` |
+| `Script_MaterialPatches.mjs` | 材质补丁注册表 + 现役三路补丁（AO / GI / 破口） | `MakePatch`、`ApplyPatches`、`PatchKeysOf`、`PatchesOf`、`MakeAmbientOcclusionPatch`（旧名 `MakeSsaoPatch` 仍导出）、`MakeGiPatch`、`MakeDestructionPatch`、`IndirectLightingPatches` |
 | `Data_Tuning_Graphics.mjs` | 画质档位表（纯数据，零 three 依赖） | `QUALITY_PRESETS`、`POST_QUALITY_KEYS`、`MakeQualityPreset`、`HZB`、`VELOCITY` |
 | `Script_Light.mjs` | 太阳阴影的公共采样接口（新增） | `SUN_SHADOW_GLSL`、`BindSunShadowUniforms`、`LightRig.RegisterShadowUniforms/SyncShadowUniforms` |
 
@@ -361,6 +361,12 @@ ApplyPatches(material, [...IndirectLightingPatches({ ssao, gi, destruction }), s
   里再同步一次（`Script_MaterialShading.RefreshDefines` 会在改画质档时原地改
   `patch.defines`，两边必须同源），补丁列表换了以后不再要的位 `delete` 掉。
   账见 §16.0。
+* **克隆经注册表装过补丁的材质，走 `Script_Materials.CloneShadedMaterial`**（第一关
+  尸体 / 远景人群实例表各拿一份，避免蒙皮与实例共用一个材质对象、每帧重算着色器参数）。
+  它按 `PatchesOf(source)` 取同一份补丁列表对克隆体重新 `ApplyPatches`，而不是把
+  `onBeforeCompile` / `customProgramCacheKey` 抄过去：`Material.clone()` 会把 `defines`
+  重置成 STANDARD / PHYSICAL、`userData` 走一遍 JSON（函数 key 全丢），抄来的 SyncDefines
+  闭包又只认源材质 —— 克隆体第一次 getProgram 的键里少补丁位，照样孪生。
 * 现役顺序固定 **ORM → AO → GI → CSM → SSR → 簇光 → 材质着色 → 破口**（AO 那一路 2026-09 起是 GTAO 补丁，见 §17.4）：
   ORM 三合一排最前（它把材质自带的遮蔽乘进 `indirectDiffuse`，等价于三方 `aomap_fragment`
   chunk 原来的位置）；`<aomap_fragment>` 上同时挂着 AO 的乘法与 GI 的
