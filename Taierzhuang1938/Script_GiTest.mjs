@@ -52,7 +52,10 @@ function Check(ok, label, detail = "") {
 // “GI 辐照度”显示的是材质最终真正采用的间接光，不是有限探针体的裸值。
 // 体积外 confidence=0，正式着色会退回 IBL；调试色若绕过同一条 mix，远处
 // 就会被误画成纯黑。shader 编译只保证语法正确，这条源契约锁住显示口径。
-const materialSource = await readFile(path.join(projectDir, "Script_Materials.mjs"), "utf8");
+// 2026-09 帧图重构：这几行 GLSL 从 `Script_Materials.InjectIndirectLighting`
+// 搬进了补丁注册表 `Script_MaterialPatches.MakeGiPatch`（一个字没改）。
+// 断言的**内容**不变，只是换了读哪个文件。
+const materialSource = await readFile(path.join(projectDir, "Script_MaterialPatches.mjs"), "utf8");
 Check(materialSource.includes(
   "gGiDebugColor = mix(giFallback, giIrradiance, giConfidence) * 0.05;"),
 "GI 辐照度视图在探针体外回退天空 IBL");

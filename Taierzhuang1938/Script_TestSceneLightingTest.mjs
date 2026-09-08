@@ -66,8 +66,11 @@ try {
         g.StepFrames(1);
       }
       const pixels = new Uint8Array(9 * 9 * 4);
-      g.renderer.readRenderTargetPixels(g.post.targets.ldr, Math.floor(g.post.width / 2) - 4,
-        Math.floor(g.post.height / 2) - 4, 9, 9, pixels);
+      // 取 **ldr 靶自己的**中心：2026-09 起 TAAU 让内部分辨率（post.width）与
+      // 合成输出分辨率（ldr 靶）不再相等，按 post.width 取会偏出中心。
+      const ldr = g.post.targets.ldr;
+      g.renderer.readRenderTargetPixels(ldr, Math.floor(ldr.width / 2) - 4,
+        Math.floor(ldr.height / 2) - 4, 9, 9, pixels);
       let sum = 0;
       for (let i = 0; i < pixels.length; i += 4) sum += .2126 * pixels[i] + .7152 * pixels[i + 1] + .0722 * pixels[i + 2];
       samples.push({ yaw, luma: sum / 81 });

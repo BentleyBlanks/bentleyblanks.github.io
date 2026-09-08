@@ -45,8 +45,11 @@ try {
     P.StepFrames(12);
     const e = P.camera.projectionMatrix.elements;
     const rgba = new Uint8Array(4);
-    P.renderer.readRenderTargetPixels(post.targets.ldr,
-      Math.floor(post.width / 2), Math.floor(post.height / 2), 1, 1, rgba);
+    // 取 **ldr 靶自己的**中心：2026-09 起 TAAU 让内部分辨率（post.width）与合成
+    // 输出分辨率（ldr 靶）可以不相等。探针页两者相等，所以这一改不动任何读数。
+    const ldrTaa = post.targets.ldr;
+    P.renderer.readRenderTargetPixels(ldrTaa,
+      Math.floor(ldrTaa.width / 2), Math.floor(ldrTaa.height / 2), 1, 1, rgba);
     return {
       presetOn: !!post.preset.taa,
       historyRolling: !!post.hasTaaHistory && !!post.targets.taaA && !!post.targets.taaB,
@@ -105,8 +108,9 @@ try {
     post._Blit(post.matComposite, post.targets.ldr);
 
     const rgba = new Uint8Array(4);
-    P.renderer.readRenderTargetPixels(post.targets.ldr,
-      Math.floor(post.width / 2), Math.floor(post.height / 2), 1, 1, rgba);
+    const ldrDark = post.targets.ldr;
+    P.renderer.readRenderTargetPixels(ldrDark,
+      Math.floor(ldrDark.width / 2), Math.floor(ldrDark.height / 2), 1, 1, rgba);
     const glError = P.renderer.getContext().getError();
     dark.dispose();
     black.dispose();

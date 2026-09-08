@@ -1438,7 +1438,9 @@ export class Viewmodel {
       this.root.traverse((object) => {
         if (!object.isMesh || !object.userData.firstPersonExternalGlb) return;
         object.userData.firstPersonPbrSurface = true;
-        library?.ConfigureExternalPbr?.(object.material, { metalness: 0, minRoughness: 0.55 });
+        library?.ConfigureExternalPbr?.(object.material, {
+          metalness: 0, minRoughness: 0.55, mesh: object,
+        });
       });
       return MarkForegroundPrepass(this.root);
     };

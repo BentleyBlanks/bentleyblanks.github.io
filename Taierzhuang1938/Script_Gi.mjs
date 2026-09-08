@@ -158,7 +158,6 @@ vec3 GiRayDirection(float index) {
 export const GI_SAMPLE_GLSL = GI_OCT_GLSL + /* glsl */`
 uniform sampler2D uGiIrradiance;
 uniform sampler2D uGiDistance;
-uniform sampler2D uGiOffset;
 uniform vec3 uGiOrigin;
 uniform vec3 uGiCounts;
 uniform vec3 uGiBaseCell;
@@ -193,9 +192,21 @@ vec2 GiAtlasUv(vec3 storage, vec3 dir, float texels, vec2 atlasSize) {
   vec2 inner = (GiOctEncode(normalize(dir)) * 0.5 + 0.5) * texels;
   return (tile + 1.0 + inner) / atlasSize;
 }
+// 每探针一个纹素的元数据（xyz = 重定位偏移，w = 有效位）。
+//
+// **它不是一张独立纹理，而是辐照度图集右边多出来的一条带**（宽 cx 纹素、
+// 高 cy*cz 纹素，贴在 x = cx*(irrTexels+2) 处）。合并的理由是采样器预算：
+// ANGLE-D3D11 上一份材质只能绑 16 个纹素单元，八个子系统合流之后探针 GI 的
+// 三张图（辐照度 / 距离矩 / 元数据）里最小的那一张必须腾出来
+// （预算表见 docs/Data_TechRenderPipeline.md §1.8）。
+// 带的位置不需要新 uniform：cx 与 irrTexels 都已经在上面了。
+// 带与瓦片区不相交，而图集每帧是整张搬过去的（copyScene），所以 ping-pong
+// 自己就把它带过去了；只有重定位（Scroll）与清图集之后要重写一次。
+vec2 GiMetaTexel(vec3 storage) {
+  return vec2(uGiCounts.x * (uGiIrrTexels + 2.0) + storage.x, GiTileIndex(storage).y) + 0.5;
+}
 vec4 GiProbeMeta(vec3 storage) {
-  vec2 t = GiTileIndex(storage) + 0.5;
-  return texture2D(uGiOffset, t / vec2(uGiCounts.x, uGiCounts.y * uGiCounts.z));
+  return texture2D(uGiIrradiance, GiMetaTexel(storage) / uGiIrrAtlas);
 }
 
 /**
@@ -527,7 +538,6 @@ export function MakeGiUniforms() {
   return {
     irradiance: { value: blank },
     distance: { value: blank },
-    offset: { value: blank },
     origin: { value: new THREE.Vector3() },
     counts: { value: new THREE.Vector3(1, 1, 1) },
     baseCell: { value: new THREE.Vector3() },
@@ -565,7 +575,6 @@ export function MakeGiUniforms() {
 export function BindGiUniforms(target, gi) {
   target.uGiIrradiance = gi.irradiance;
   target.uGiDistance = gi.distance;
-  target.uGiOffset = gi.offset;
   target.uGiOrigin = gi.origin;
   target.uGiCounts = gi.counts;
   target.uGiBaseCell = gi.baseCell;
@@ -616,7 +625,10 @@ export class ProbeVolume {
     const irrTile = config.irrTexels + 2;
     const distTile = config.distTexels + 2;
     const rows = cy * cz;
-    this.irrAtlasSize = new THREE.Vector2(cx * irrTile, rows * irrTile);
+    // 右边多 cx 列：每探针一个纹素的重定位元数据带（代替了独立的 uGiOffset 采样器，
+    // 理由见 GiProbeMeta）。多出来的显存是 cx × rows*irrTile 个半浮点纹素，几十 KB。
+    this.irrAtlasSize = new THREE.Vector2(cx * irrTile + cx, rows * irrTile);
+    this.metaOriginX = cx * irrTile;
     this.distAtlasSize = new THREE.Vector2(cx * distTile, rows * distTile);
     this.irradiance = [this.MakeAtlas(this.irrAtlasSize), this.MakeAtlas(this.irrAtlasSize)];
     this.distanceMoments = [this.MakeAtlas(this.distAtlasSize), this.MakeAtlas(this.distAtlasSize)];
@@ -656,6 +668,7 @@ export class ProbeVolume {
     this.world = null;
 
     this.BuildPasses(skyUniforms);
+    this._BuildMetaPass();
     this.ClearAtlases();
     this.SyncUniforms();
   }
@@ -679,6 +692,8 @@ export class ProbeVolume {
     }
     renderer.setClearColor(previousColor, previousAlpha);
     renderer.setRenderTarget(previousTarget);
+    // 清图集同时把元数据带也抹了，下一帧要重写。
+    this.metaDirty = true;
   }
 
   /**
@@ -691,6 +706,58 @@ export class ProbeVolume {
     // 玩家那根「间接光强度」要单独留一份给取样端：体积外的天空 IBL 回退乘同一份，
     // 两边同倍才不会在体积边界上留下一条色差（见 MakeGiUniforms 的 gain）。
     this.uniforms.gain.value = gain;
+  }
+
+  /**
+   * 把 CPU 侧的每探针元数据写进辐照度图集右边那条带的一小块四边形。
+   * 四边形的 NDC 坐标直接按带的纹素矩形算 —— 不动 viewport / scissor，
+   * 与图集里其它几趟（瓦片写入）同一个套路。
+   */
+  _BuildMetaPass() {
+    const [cx, cy, cz] = this.config.counts;
+    const rows = cy * cz;
+    const w = this.irrAtlasSize.x, h = this.irrAtlasSize.y;
+    const x0 = (this.metaOriginX / w) * 2 - 1;
+    const x1 = ((this.metaOriginX + cx) / w) * 2 - 1;
+    const y0 = -1;
+    const y1 = (rows / h) * 2 - 1;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array([
+      x0, y0, 0, x1, y0, 0, x1, y1, 0, x0, y1, 0,
+    ]), 3));
+    geometry.setAttribute("uv", new THREE.BufferAttribute(new Float32Array([
+      0, 0, 1, 0, 1, 1, 0, 1,
+    ]), 2));
+    geometry.setIndex([0, 1, 2, 0, 2, 3]);
+    this.metaGeometry = geometry;
+    this.metaMaterial = new THREE.ShaderMaterial({
+      uniforms: { uSource: { value: this.offsetTexture } },
+      vertexShader: /* glsl */`varying vec2 vUv;
+        void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+      fragmentShader: /* glsl */`uniform sampler2D uSource;
+        varying vec2 vUv;
+        void main() { gl_FragColor = texture2D(uSource, vUv); }`,
+      depthTest: false, depthWrite: false,
+    });
+    this.metaScene = MakeTileScene(geometry, this.metaMaterial);
+    this.metaDirty = true;
+  }
+
+  /**
+   * 每探针元数据带写进**当前读的那张**辐照度图集（重定位 / 清图集之后才跑）。
+   * 下一次图集更新的 copyScene 是整张搬的，会把这条带一并搬到 ping-pong 对面。
+   */
+  _WriteMeta() {
+    if (!this.metaDirty || !this.metaScene || !this.renderer) return;
+    const renderer = this.renderer;
+    const previousTarget = renderer.getRenderTarget();
+    const previousAutoClear = renderer.autoClear;
+    renderer.autoClear = false;
+    renderer.setRenderTarget(this.irradiance[this.pingPong]);
+    renderer.render(this.metaScene, QUAD_CAMERA);
+    renderer.setRenderTarget(previousTarget);
+    renderer.autoClear = previousAutoClear;
+    this.metaDirty = false;
   }
 
   MakeAtlas(size) {
@@ -788,7 +855,6 @@ export class ProbeVolume {
     const u = this.uniforms;
     u.irradiance.value = this.irradiance[this.pingPong].texture;
     u.distance.value = this.distanceMoments[this.pingPong].texture;
-    u.offset.value = this.offsetTexture;
     u.origin.value.copy(this.origin);
     u.counts.value.copy(this.counts);
     u.baseCell.value.set(
@@ -971,6 +1037,8 @@ export class ProbeVolume {
       }
     }
     this.offsetTexture.needsUpdate = true;
+    // 重定位改了元数据，下一次 Update 重写图集里那条带。
+    this.metaDirty = true;
     this.placed = true;
     return true;
   }
@@ -1000,6 +1068,10 @@ export class ProbeVolume {
   Update(dt, focus, lights) {
     if (!this.enabled || !this.world) return;
     this.Scroll(focus);
+    // 元数据带要在「本帧有没有探针要算」**之前**写：重定位之后若正好一个有效探针都
+    // 没排上（或者整个体积都埋在几何里），下面那条早退会把写入跳掉，
+    // 而材质端还在按旧带里的偏移取探针。
+    this._WriteMeta();
     const batch = this.PickBatch();
     if (batch.length === 0) return;
 
@@ -1130,6 +1202,8 @@ export class ProbeVolume {
     for (const t of this.distanceMoments) t.dispose();
     this.rayTarget.dispose();
     this.offsetTexture.dispose();
+    this.metaGeometry?.dispose();
+    this.metaMaterial?.dispose();
     this.boxTexture.dispose();
     this.traceMaterial.dispose();
     this.copyMaterial.dispose();
@@ -1191,7 +1265,9 @@ export function MakeProbeDebugMesh(volume) {
       uniform vec3 uGiCounts;
       uniform vec3 uGiBaseCell;
       uniform float uGiSpacing;
-      uniform sampler2D uGiOffset;
+      uniform sampler2D uGiIrradiance;
+      uniform float uGiIrrTexels;
+      uniform vec2 uGiIrrAtlas;
       varying vec3 vNormalW;
       varying vec3 vStorage;
       varying float vActive;
@@ -1202,8 +1278,9 @@ export function MakeProbeDebugMesh(volume) {
         float sy = floor(aProbe / (cx * cz));
         vec3 storage = vec3(sx, sy, sz);
         vec3 grid = mod(storage - uGiBaseCell, uGiCounts);
-        vec2 t = vec2(sx, sz + cz * sy) + 0.5;
-        vec4 meta = texture2D(uGiOffset, t / vec2(cx, uGiCounts.y * cz));
+        // 元数据带贴在辐照度图集右边（采样器预算，见 GiProbeMeta）。
+        vec2 t = vec2(cx * (uGiIrrTexels + 2.0) + sx, sz + cz * sy) + 0.5;
+        vec4 meta = texture2D(uGiIrradiance, t / uGiIrrAtlas);
         vec3 center = uGiOrigin + grid * uGiSpacing + meta.xyz;
         vStorage = storage;
         vActive = meta.w;

@@ -16,6 +16,7 @@ export const TEXT = Object.freeze({
   // 进过场时那条独立的预热条（WarmupShaders 的四步）
   "boot.step.dressSet": "搭布景……",
   "boot.step.submitShaders": "提交着色器…… {done}/{total}",
+  "boot.step.linkShaders": "等待着色器就绪…… {done}/{total}",
   "boot.step.relightScene": "重编场景光照…… {done}/{total}",
   "boot.step.warmMaterials": "预热材质…… {done}/{total}",
   "boot.step.loadMeshes": "载入网格…… {done}/{total}",

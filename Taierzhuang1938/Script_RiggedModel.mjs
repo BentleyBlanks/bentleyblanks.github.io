@@ -223,6 +223,8 @@ export class FpsArmRig {
       this.materialLibrary?.ConfigureExternalPbr?.(object.material, {
         metalness: 0,
         minRoughness: 0.78,
+        // 手是皮肤、袖子是布：交出网格，材质库才换得了类并接上预积分散射。
+        mesh: object,
       });
       const materials = Array.isArray(object.material) ? object.material : [object.material];
       for (const material of materials) {

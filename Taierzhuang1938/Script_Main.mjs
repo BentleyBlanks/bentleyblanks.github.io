@@ -16,12 +16,17 @@ import { CollectBulletNearMisses, ApplyBulletNearMisses } from "./Script_Ballist
 
 import * as THREE from "three";
 import { MaterialLibrary } from "./Script_Materials.mjs";
+import {
+  MakeMaterialShadingUniforms, ApplyShadingQuality, SyncShadingKnobs,
+} from "./Script_MaterialShading.mjs";
 import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
 import { NormalizeGraphicsDetails } from "./Script_EditorSettings.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "./Script_Gi.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
-import { SetWaterSkyUniforms, UpdateWaterSurfaces } from "./Script_Water.mjs";
+import { MakeAoUniforms, SyncAoUniforms } from "./Script_PostGtao.mjs";
+import { SSIL } from "./Data_Tuning_Gtao.mjs";
+import { SetWaterSkyUniforms, SetWaterSsr, UpdateWaterSurfaces } from "./Script_Water.mjs";
 import { TengxianField } from "./Script_TengxianField.mjs";
 import { InitPhysics, PhysicsWorld } from "./Script_Physics.mjs";
 import { JieheField, JIEHE_LEVEL_ID, JIEHE_CAMERA_FAR } from "./Script_JieheField.mjs";
@@ -99,6 +104,9 @@ import { MainMenu, Progress } from "./Script_Menu.mjs";
 import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction.mjs";
 import { FrameProfiler } from "./Script_Profiler.mjs";
+import { AutoQuality } from "./Script_AutoQuality.mjs";
+import { LENS_FLARE } from "./Data_Tuning_Camera.mjs";
+import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
 import { BootProp } from "./Script_BootProp.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
 import { AddTrimProps, ClearTrimProps } from "./Script_TrimProps.mjs";
@@ -372,6 +380,9 @@ renderer.debug.checkShaderErrors = !!SHOT;
 renderer.shadowMap.enabled = true;
 // r185 的 shadowMapTypeDefines 里只有 PCFShadowMap 与 VSMShadowMap；
 // 写 PCFSoftShadowMap 会掉进 SHADOWMAP_TYPE_BASIC（硬阴影 + 最近邻）。
+// 2026-09：真正的口径由 LightRig -> Script_Csm.ApplyRendererShadowSettings 定
+// （BasicShadowMap，裸深度，PCSS 要读深度值）。这一行只是 LightRig 建起来之前的
+// 兜底，别把它当成现役设置。
 renderer.shadowMap.type = THREE.PCFShadowMap;
 // 阴影图一帧只烘一次。three 默认 autoUpdate = true，意思是**每一次
 // renderer.render() 都把所有灯的阴影图重烘一遍** —— 而我们一帧里
@@ -393,7 +404,10 @@ const scene = new THREE.Scene();
 // 注意：以后任何在 RenderScene 之外要读 matrixWorld / getWorldPosition 的新代码，
 // 拿到的仍是「上一次出画时」的位姿 —— 这一点和改之前完全一样（原来也是渲染时才更新）。
 scene.matrixWorldAutoUpdate = false;
-// SSAO 的出厂强度。设置面板按倍率乘它，所以要有个名字。
+// AO 的出厂强度。设置面板按倍率乘它，所以要有个名字。
+// 2026-09 换成 GTAO 之后这一位的语义不变（`mix(1.0, 可见度, strength)`），
+// 但底下那张图已经是解析积分的真可见度而不是半球计数，所以 0.80 压出来的
+// 暗带比旧 SSAO 的同一个数更贴根、更少整墙发灰。
 const SSAO_BASE = 0.80;
 const camera = new THREE.PerspectiveCamera(CAMERA.baseFovDeg,
   window.innerWidth / window.innerHeight, 0.06, 620);
@@ -405,24 +419,25 @@ const post = new PostPipeline(renderer, {
   width: window.innerWidth, height: window.innerHeight, quality: QUALITY,
   destruction: destructionUniforms,
 });
-const ssao = {
-  map: { value: post.AoTexture },
-  // 这里必须是**主渲染靶**的尺寸，不是 AO 缓冲的尺寸。
-  // 事故（连吃两轮）：Script_Materials 注入的采样是
-  //   texture2D(uSsaoMap, gl_FragCoord.xy / uSsaoResolution)
-  // gl_FragCoord 跑在 hdr 靶上（1600×900），而这里曾经喂 aoBlur 的尺寸 ——
-  // high 档 aoScale=0.75，也就是 1200×675，UV 最大到 1.333：整张 AO 被放大
-  // 1.333 倍并往左下错位，右上四分之一恒取边缘值。上一轮反复调 uRadius /
-  // uIntensity 之所以毫无效果，是在调一张贴错位置的图。
-  resolution: { value: new THREE.Vector2(post.width, post.height) },
-  // 0.80：贴图位置修正后 AO 真的落在几何转折上了，1.85/0.95 那套是为了
-  // 「错位之后还想看见点什么」硬抬起来的补偿值，退回正常量级
-  strength: { value: SSAO_BASE },
-};
+// AO / SSIL 的材质端 uniform 包。**构造与同步都走 Script_PostGtao 的共用工厂**
+// （探针页用的是同一份），免得两边各写一套分辨率：材质里的取样是
+//   texture2D(uSsaoMap, gl_FragCoord.xy / uSsaoResolution)
+// 而 gl_FragCoord 跑在**主渲染靶**的像素域里 —— 喂 AO 靶尺寸会把整张 AO
+// 放大并往左下错位（这条连吃两轮，上一轮反复调半径/强度毫无效果就是因为
+// 在调一张贴错位置的图）。
+const ssao = MakeAoUniforms(post, { strength: SSAO_BASE, ssilStrength: SSIL.strength });
+// 屏幕空间反射的材质侧 uniform 包。**归 PostPipeline 所有**（SsrPass 每帧刷新
+// map / resolution / strength），这里只是把同一批对象交给 MaterialLibrary。
+// SSR 关档（low / 无浮点靶）时是 null，材质连补丁都不编 —— 与 GI 的编译期
+// 开关同一个先例，只是 SSR 的补丁小到不必为它做运行时重编译（关掉 = 强度归零）。
+const ssrUniforms = post.SsrUniforms;
 
 // 运行时性能剖析器。构造免费、常态休眠（Enable 由编辑器「性能剖析」叠加层调）；
 // Frame/RenderScene 里的 B/E/Gpu* 标记在它关着时只是一次布尔检查。
 const profiler = new FrameProfiler(renderer, { post });
+// 自动降档（docs §13）。出厂开、画质面板可关；只在**真实 rAF 帧**上喂数据，
+// StepFrames（出图 / 测试 / 过场手动步进）一律不喂 —— 那些帧的间隔不是帧率。
+const autoQuality = new AutoQuality();
 
 /**
  * 画质旋钮。
@@ -433,32 +448,106 @@ const profiler = new FrameProfiler(renderer, { post });
  * 混在一张表里的下场是玩家把画质调低之后夜战关变成纯黑（预设 exposure 3.6 被当成
  * 画质项一起压了）。
  *
- * renderScale 是唯一真正省时间的那一项：整条合成链（法线深度、AO、泛光六级、
- * 体积光、运动模糊）都按 post 靶的尺寸走，它减半等于这一整条链省四分之三。
+ * renderScale 是唯一真正省时间的那一项：法线深度预通道、AO、主场景那一趟都按
+ * 它缩，减半等于这一整段省四分之三。
+ *
+ * **2026-09 起它是 TAAU 的输入分辨率**：出厂值跟画质档走（medium 0.75 / high 0.8 /
+ * ultra 1.0），TAA 把画面解算回满分辨率，所以低于 1 也不再是"整帧被拉伸"。
+ * 关掉 TAA（或 low 档）时退回老行为：末趟送屏做一次双线性放大。
  */
 const graphics = {
-  renderScale: 1.0,
+  renderScale: post.preset.renderScale ?? 1.0,
+  // 自动降档总闸（docs §13）。出厂开；面板可关，关掉时阶梯立刻收回第 0 级。
+  // 它必须是 `graphics` 上的一位，`ApplySavedSettings` 才认得（那边只回灌
+  // 已经存在于 graphics 上的键）。阶梯的级数本身**不存盘** —— 换台机器、
+  // 换个窗口大小，重新量就是了。
+  autoQuality: AUTO_QUALITY.enabled !== false,
   shadows: true,
-  shadowSize: 0,          // 0 = 用出厂档位
+  shadowSize: 0,          // 0 = 用出厂档位（级联之后这是**每一级**的图边长）
   // 独立小阴影图，只在第一人称手臂/武器材质内部采样；仍服从上面的阴影总闸。
   firstPersonSelfShadow: true,
   // 自阴影软化：2048 图 + 双线性 Poisson PCF + receiver-plane 偏置。出厂关（2026-09-05），
   // 手背上的枪托/右手投影默认仍是 1024 图硬 3×3 那块；画质面板热切。
   firstPersonSelfShadowSoft: false,
   ssao: 1, bloom: 1, god: 1, motionBlur: 1, grain: 1, vignette: 1,
+  // 屏幕空间反射：布尔总闸 + 强度倍率。出厂跟画质档走（medium 及以上开），
+  // 关掉不重编译材质（强度归零，材质那一行等价于「radiance 原样」）。
+  ssr: !!post.preset.ssr, ssrStrength: 1,
+  // 屏幕空间近场间接光（SSIL）的倍率。**只是强度，不是总闸** —— 位掩码那一趟
+  // 与 GTAO 共用同一次地平线搜索，开不开是构造期的事（画质档的 ssil 那一位），
+  // 滑到 0 只是不出效果、不省时间。low / medium 档没有它，面板那一行会自己藏起来。
+  ssil: 1,
+  // --- 相机曝光轮（2026-09 子系统 B6a）。出厂值跟画质档走，面板热切 ---------------------
+  // autoExposure 打开**不改变默认机位的亮度**：增益锚在**每一关出生机位**
+  // 实测的平均场景亮度上（Data_Tuning_Camera.EXPOSURE_ANCHORS），
+  // 站在标定机位时增益精确是 1.0。
+  autoExposure: post.preset.autoExposure !== false,
+  // 曝光补偿（EV，正 = 更亮）。这是玩家能改画面明暗的唯一一根，别把它做成倍率 ——
+  // 相机上就是 EV 刻度，一档就是一倍。
+  exposureCompensation: 0,
+  // 镜头光晕 / 脏污强度倍率（与 bloom/god 同一套约定，0 = 关）
+  lensFlare: 1, lensDirt: 1,
+  // 色调映射曲线："aces"（默认）/ "agx"
+  tonemap: "aces",
+  // 3D LUT 分级（关掉退回等价的着色器算式，画面差 ≤ 1/255）
+  lut: post.preset.lut !== false,
+  // 泛光第一级的 Karis 平均（压萤火虫）。出厂关：它会改变每一张画面。
+  bloomKaris: false,
+  // 输出抖动（1/255 的倍数）。出厂 0，同上。
+  dither: 0,
   // 抗锯齿：TAA 开着时末趟的 FXAA 自动让位（两层叠加只会糊）。出厂值跟画质档走
   // （medium 及以上默认开），但这是**布尔开关不是倍率** —— 它不决定"画多重"，
   // 决定的是走哪条抗锯齿路，所以不套 Mul 那套倍率约定。
   taa: post.taaEnabled,
   // 体积光临时关停（性能观察期）：god 仍是强度倍率，godEnabled 是整个 pass 的总闸，
   // 关掉时连径向模糊那一趟都不跑。想恢复把出厂值改回 true 即可。
+  // **froxel 体积雾开着时它一律不生效**（见 RenderScene 的 godStrength 那一行）：
+  // 屏幕空间径向模糊与真体积光柱叠加就是双份，而且前者的拖影不认遮挡。
   godEnabled: false,
+  // froxel 体积雾 / 体积光。出厂值跟画质档走（medium 及以上开，low 保留解析式高度雾），
+  // 与 TAA 同一个先例：布尔开关不是倍率，所以不套 Mul 那套约定。
+  volumetrics: !!post.preset.volumetrics,
   // 实时探针体默认关。默认间接光由 Global SH Probe + AmbientColor 提供；打开时
   // 才跑五个 GI pass/帧，并在图集收敛后渐进接管室内与墙角的反弹光。
   gi: params.get("gi") === "1", giStrength: 1,
+  // 簇状前向光照（局部光源）。medium 及以上出厂开：它不是"多一层效果"，
+  // 而是把动态光预算从 6 盏解到 32/64/128 盏（low 档的 CLUSTER_TIERS 是 enabled:false，
+  // 打开也仍走旧的固定灯池）。运行时开关，不重编译。
+  clusteredLights: true,
+  // 英雄光的立方体阴影：整城几何要多画六遍，出厂关。打开会重编译一次
+  // （NUM_POINT_LIGHTS 0↔1），与阴影总闸、GI 采样层同一个先例。
+  clusterHeroShadow: false,
+  // 物理大气（Hillaire 2020 四张 LUT）。出厂跟画质档走；关掉退回旧解析天空
+  // （与 ?skyLegacy=1 等价）。烟霾倍率 atmosphereHaze 由 NormalizeGraphicsDetails 补。
+  atmosphere: post.preset.atmosphere !== false,
+  // 材质着色升级（子系统 B7）。
+  // 布尔位是**编译期**的：翻一次要把全场材质重编译（几百毫秒，一次性），
+  // 与阴影总闸、GI 采样层同一个先例。出厂值跟画质档走（与 taa 同款写法）——
+  // 写成常量的话 low 档一进来就会给自己编上 32 步 POM。
+  pom: (post.preset.pom || 0) > 0,
+  pomSelfShadow: !!post.preset.pomSelfShadow,
+  detailNormal: !!post.preset.detailNormal,
+  microShadow: !!post.preset.microShadow,
+  horizonOcclusion: !!post.preset.horizonOcclusion,
+  skinSss: !!post.preset.skinSss,
+  // 带 Strength / Depth 的是运行时倍率，拖了立刻生效、不重编译。
+  pomDepth: 1, detailNormalStrength: 1, microShadowStrength: 1,
+  horizonStrength: 1, skinStrength: 1, pomSelfShadowStrength: 1,
   fov: CAMERA.baseFovDeg,
 };
 NormalizeGraphicsDetails(graphics, post);
+// 本档位到底编没编接触阴影那段材质 GLSL（编译期，见 Script_Csm.SetCsmContactCompiled）。
+// 面板那个开关只能在「编过」的档位上生效；low 档打开也没用，所以两者取与。
+const CONTACT_SHADOWS_SUPPORTED = !!post.preset.contactShadows;
+// 出厂内部分辨率来自画质档（TAAU：medium 0.75 / high 0.8 / ultra 1.0）。
+// PostPipeline 是按满分辨率建起来的，这里立刻按档切一次「内部 + 输出」两组尺寸 ——
+// ApplyGraphics 只在 resize / 设置面板 / 存档回灌时跑，不在这儿补一次的话出厂档位的
+// renderScale 要等玩家改窗口大小才生效（症状：high 档默认仍旧满分辨率跑）。
+{
+  const bootScale = Clamp(graphics.renderScale, 0.4, 1.6);
+  post.SetSize(Math.round(window.innerWidth * bootScale),
+    Math.round(window.innerHeight * bootScale), window.innerWidth, window.innerHeight);
+}
 // 探针体（GI）。默认关到底：ProbeVolume 不构造（省掉图集/靶与每帧 Update），
 // 材质也**不编入**探针采样代码 —— GI_SAMPLE_GLSL 占着采样器与寄存器，
 // 即使 uGiEnabled 恒为 0 也让整帧贵 ~2.7 ms（2026-08-26 FrameProfileTest 实测）。
@@ -471,15 +560,39 @@ const giUniforms = MakeGiUniforms();
 giUniforms.debugView.value = parseFloat(params.get("giView") || "0") || 0;
 // 编译期开关：false = 材质不含探针采样代码（进了 cache key，翻转要整场重编译）
 giUniforms.sampling = GI_ON && graphics.gi;
+// 材质着色升级（POM / 细节法线 / 微阴影 / 地平线镜面遮蔽 / 皮肤预积分）那一包。
+// 与 ssao / gi 同一个模式：全场共用一份 uniform，档位是**编译期**的（进 cache key），
+// 运行时翻转要连着把材质全部 needsUpdate（见 ApplyGraphics 里那一段）。
+const shadingUniforms = MakeMaterialShadingUniforms();
+ApplyShadingQuality(shadingUniforms, post.preset, graphics);
+SyncShadingKnobs(shadingUniforms, graphics);
+shadingUniforms.debugView.value = parseFloat(params.get("matView") || "0") || 0;
 const library = new MaterialLibrary(renderer, {
-  textureSize: QUALITY === "low" ? 256 : 512, ssao, gi: GI_ON ? giUniforms : null,
+  // 烘焙基准边长跟画质档走（ultra 1024，砖类翻倍后仍由 Script_TexBake 封在 1024）。
+  textureSize: post.preset.materialTexture || (QUALITY === "low" ? 256 : 512),
+  ssao, gi: GI_ON ? giUniforms : null,
+  ssr: ssrUniforms,
   destruction: destructionUniforms,
+  shading: shadingUniforms,
 });
-const sky = new SkyDome(renderer);
+// 水面不能走 SSR 靶（它 skipNormalDepth，那一像素在预通道里是河床）——
+// 它自己按平面反射假设采同一条 Hi-Z，见 Script_PostSsr.SsrSurfaceGlsl。
+// 必须排在任何水面材质建出来之前（材质按预设缓存，建完就定型）。
+SetWaterSsr(ssrUniforms ? post.ssrPass.trace : null);
+const sky = new SkyDome(renderer, { quality: QUALITY });
 scene.add(sky.mesh);
 // 水面借天空 uniform：反射的天顶/地平线/太阳色随时段预设一起换（Script_Water）
 SetWaterSkyUniforms(sky.uniforms);
-const lights = new LightRig(scene, { quality: QUALITY, shadowExtent: 66 });
+// 级联阴影（Script_Csm）：renderer 交给 LightRig 是为了让它把阴影口径切成
+// BasicShadowMap（PCSS 的 blocker search 必须读到裸深度；采样器类型必须与
+// Script_Csm.SHADOW_MAP_TYPE 一致，不一致是未定义行为）。
+const lights = new LightRig(scene, { quality: QUALITY, shadowExtent: 66, renderer });
+// 接主相机：级联按真实视锥切片的包围球拟合（半径只依赖 fov/aspect/分割距离，
+// 不依赖相机位姿 —— 转头不沸腾）。开镜压 fov 用基准 FOV，不然阴影边缘随开镜呼吸。
+lights.SetViewCamera(camera);
+// 太阳阴影的公共采样接口（Script_Light.SUN_SHADOW_GLSL）：Debug Rendering 的
+// 「SunShadow 采样」视图靠它出图，将来体积雾 / 接触阴影 / CSM 也从这条接口取。
+post.SetSunShadowSource(lights);
 // 天空 uniform 借给探针体：漏空的射线问的是同一片天，换预设两边同时变。
 // let 不是 const：默认关不构造，运行时打开由 ApplyGraphics 惰性补建。
 let gi = (GI_ON && graphics.gi)
@@ -958,7 +1071,9 @@ async function Boot() {
 
   setStep(T("boot.step.bakeTextures"), BOOT.progress.bakeTextures.from);
   let baked = 0;
-  const total = bakeNames.length;
+  // 细节法线与皮肤 LUT 是全场共用的两张图，由 PrepareSteps 排在配方前面先烘；
+  // 进度条的分母要把它们算进去，否则第一格就跳到 13%。
+  const total = bakeNames.length + library.PendingShadingSteps();
   for (const name of library.PrepareSteps(bakeNames)) {
     baked += 1;
     setStep(T("boot.step.bakeTexturesProgress", { done: baked, total, name }),
@@ -1741,6 +1856,9 @@ async function Boot() {
     // gi 是取值器：探针体默认不构造，运行时打开（ApplyGraphics）才补建，
     // 拷值出去的话冒烟与剖析脚本拿到的永远是 boot 时那个 null
     renderer, scene, camera, post, sky, lights, library, profiler,
+    // 材质着色升级那一包（POM / 细节法线 / 微阴影 / 地平线 / 皮肤）：
+    // Debug Rendering 面板按它设假彩色编号，MaterialUpgradeTest 按它做 A/B。
+    materialShading: shadingUniforms, RecompileAllMaterials,
     get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, actorBatch, input,
     get meleeCombat() { return meleeCombat; },
@@ -1756,7 +1874,7 @@ async function Boot() {
     // 或者走 story.Signal("<名字>") 让登记表去派发 —— 两条路同一个实现。
     PlayMidCutscene,
     // FrameProfileTest 的 GI 消融走设置面板同一条路（graphics.gi + ApplyGraphics）
-    graphics, ApplyGraphics,
+    graphics, ApplyGraphics, autoQuality,
     // 通关冒烟用的口子：直接驱动动作，不必去合成键盘事件
     Debug: {
       Reload, DoMelee, CallMortar, EndBattle,
@@ -2438,7 +2556,9 @@ async function Boot() {
     ReturnToMainMenu: MENU_AT_BOOT ? () => OpenMenu() : null,
     game: {
       // gi 走取值器：惰性构造后 Debug Rendering 面板才能看见新建的探针体
-      state, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics,
+      state, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics, autoQuality,
+      // 材质着色升级那一包：Debug Rendering 的「材质细节」组按它设假彩色编号。
+      materialShading: shadingUniforms,
       get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },
       // 物理同理走取值器：换关重建 PhysicsWorld，Debug Rendering 的碰撞体线框要跟着换
       get physics() { return physics; },
@@ -3622,6 +3742,37 @@ function EndOfficialCampaign(phase) {
 }
 
 /**
+ * 从一批网格里挑「每个 program 一件」的代表。
+ *
+ * 去重键是材质加上几条会进 program cache key 的物体特征（蒙皮 / 实例化 / 顶点色）；
+ * 键漏了某一维只意味着那个 program 退回老路（用到它的第一帧现编），不会出错。
+ * 已经热着的整件跳过 —— 判据与 three 自己在 setProgram 里的一样（有 currentProgram
+ * 且版本没变），漏判同样只是退回老路。
+ *
+ * @param {THREE.Object3D[]} objects 候选
+ * @param {Set<string>} seen 跨批共用的去重集（同一个 program 只留一件）
+ */
+function SelectShaderRepresentatives(objects, seen) {
+  const picks = [];
+  for (const object of objects) {
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    let novel = false;
+    for (const material of materials) {
+      if (!material) continue;
+      const properties = renderer.properties.get(material);
+      if (properties && properties.currentProgram && properties.__version === material.version) continue;
+      const key = `${material.uuid}|${object.isSkinnedMesh ? 1 : 0}|${object.isInstancedMesh ? 1 : 0}`
+        + `|${object.geometry?.attributes?.color ? 1 : 0}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      novel = true;
+    }
+    if (novel) picks.push(object);
+  }
+  return picks;
+}
+
+/**
  * 预编译一棵子树的着色器 —— **进序章那十几秒的黑屏就是这一步**。
  *
  * 车厢序章的布景一口气往场景里加三千多个网格、几十种新材质。three 是惰性编译的：
@@ -3652,28 +3803,9 @@ async function WarmupShaders(root, onStep = null, shouldStop = null) {
   });
   if (!meshes.length) return 0;
 
-  // 代表网格：同一个 program 只画一次。去重键是材质加上几条会进 program cache key
-  // 的物体特征（蒙皮 / 实例化 / 顶点色）；键漏了某一维只意味着那个 program 退回
-  // 老路（用到它的第一帧现编），不会出错。三千六百件收敛到三百来个代表。
+  // 代表网格：同一个 program 只画一次。三千六百件收敛到三百来个代表。
   const seen = new Set();
-  const picks = [];
-  for (const object of meshes) {
-    const materials = Array.isArray(object.material) ? object.material : [object.material];
-    let novel = false;
-    for (const material of materials) {
-      if (!material) continue;
-      // 已经热着的跳过。判据与 three 自己在 setProgram 里的一样（有 currentProgram
-      // 且版本没变）—— 只是个省事的过滤，漏判同样只是退回老路。
-      const properties = renderer.properties.get(material);
-      if (properties && properties.currentProgram && properties.__version === material.version) continue;
-      const key = `${material.uuid}|${object.isSkinnedMesh ? 1 : 0}|${object.isInstancedMesh ? 1 : 0}`
-        + `|${object.geometry?.attributes?.color ? 1 : 0}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      novel = true;
-    }
-    if (novel) picks.push(object);
-  }
+  const picks = SelectShaderRepresentatives(meshes, seen);
   if (!picks.length) return 0;
 
   // 藏起来用的是**层**不是 visible：visible 是层级的（父物体一藏，整棵子树连同
@@ -3682,6 +3814,17 @@ async function WarmupShaders(root, onStep = null, shouldStop = null) {
   const HIDDEN_LAYER = 31;
   const masks = new Map(meshes.map((object) => [object, object.layers.mask]));
   for (const object of meshes) object.layers.set(HIDDEN_LAYER);
+
+  // 场上原有的那批（第二段要重编的城）**在第一段就一起提交**。理由见第一段的抬头：
+  // 「提交」不等链接，只有「用到」才等；把两边的 program 全在开画之前交出去，
+  // 驱动的编译线程池才有活可并行。以前这批是第二段渲染时才现建的 —— 建一个等一个，
+  // 整座城的链接被排成一条队（实测那一段占了整条预热链的一多半）。
+  const outside = [];
+  scene.traverse((object) => {
+    if (!(object.isMesh || object.isPoints || object.isLine || object.isSprite)) return;
+    if (!masks.has(object)) outside.push(object);
+  });
+  const outsidePicks = SelectShaderRepresentatives(outside, seen);
 
   // 每次让帧都问一句还要不要继续：玩家在预热里按了 Esc（Skip 会放开 held）、
   // 这一场已经收了、或者换了一场 —— 就地收工，剩下的照旧退回「用到时现编」。
@@ -3692,37 +3835,76 @@ async function WarmupShaders(root, onStep = null, shouldStop = null) {
 
   try {
     // --- 一、提交编译 -------------------------------------------------------
-    // renderer.compile 是同步的（ANGLE 在这一步做 HLSL 翻译），整包一次交上去就是
-    // 四五秒的长任务；分批交、批间让一帧，进度条才动得起来。交完不等它链完 ——
-    // 链接在驱动的编译线程上继续跑，第三段出画时正好陆续到货。
-    const SUBMIT = 16;
-    for (let i = 0; i < picks.length; i += SUBMIT) {
-      const proxy = new THREE.Group();
-      // 代理组只借 children 走一趟 traverse，**不进场景树**，也不动这些网格的
-      // parent —— compile 只读不写，这一层是安全的。
-      proxy.children = picks.slice(i, i + SUBMIT);
-      try {
-        renderer.compile(proxy, camera, scene);
-      } catch (error) {
-        console.warn("[Main] 着色器提交编译失败（退回逐帧编译）", error);
-        break;
+    // `renderer.compile` 只**建** program（compileShader + linkProgram），一次都不等：
+    // ANGLE 把 GLSL→HLSL 翻译和 D3D 编译都甩给驱动的工作线程池，两个调用加起来
+    // 实测全场不到 5 ms。真正的账全在「第一次用到它」那一下 ——
+    // `setProgram → getUniforms → onFirstUse` 会一直阻塞到那一个 program 链接完成
+    // （2026-09 取证：整条开机链 130 s 里 100% 落在这一条）。
+    //
+    // **所以顺序就是一切**：建一个立刻用一个 = 链接被排成一条队，每个 1 s 上下、
+    // 一百六十多个就是两分半；把全部 program 先交出去再统一等，驱动的线程池才有活
+    // 可并行（本机实测 8 份同样的着色器：逐个等 12.6 s / 先全交再等 3.5 s，3.6×）。
+    // 场上原有的那批（第二段要重编的城）因此**也在这一段一起交**。
+    //
+    // **提交时必须把主渲染靶绑上。** three 的 program cache key 里带
+    // `outputColorSpace`，而它是按「当前绑着的靶」算的：绑着画布 = `srgb`，
+    // 绑着任意离屏靶 = 工作色彩空间 `srgb-linear`。场景网格实际上只画进 HDR 靶，
+    // 所以不绑靶就 compile 出来的是**另一份用不上的 program** —— 白链一遍，
+    // 真正那份到第一帧还得现编现等。（改之前每个材质因此各多一份 `srgb` 变体。）
+    const submitList = picks.concat(outsidePicks);
+    const SUBMIT = 24;
+    const restoreTarget = renderer.getRenderTarget();
+    if (post?.targets?.hdr) renderer.setRenderTarget(post.targets.hdr);
+    try {
+      for (let i = 0; i < submitList.length; i += SUBMIT) {
+        const proxy = new THREE.Group();
+        // 代理组只借 children 走一趟 traverse，**不进场景树**，也不动这些网格的
+        // parent —— compile 只读不写，这一层是安全的。
+        proxy.children = submitList.slice(i, i + SUBMIT);
+        try {
+          renderer.compile(proxy, camera, scene);
+        } catch (error) {
+          console.warn("[Main] 着色器提交编译失败（退回逐帧编译）", error);
+          break;
+        }
+        const submitted = Math.min(submitList.length, i + SUBMIT);
+        onStep?.(T("boot.step.submitShaders", { done: submitted, total: submitList.length }),
+          BootProgress(BOOT.warm.submitShaders, (submitted / submitList.length) * 0.5));
+        if (!await Yield()) return picks.length;
       }
-      const submitted = Math.min(picks.length, i + SUBMIT);
-      onStep?.(T("boot.step.submitShaders", { done: submitted, total: picks.length }),
-        BootProgress(BOOT.warm.submitShaders, submitted / picks.length));
-      if (!await Yield()) return picks.length;
+    } finally {
+      renderer.setRenderTarget(restoreTarget);
+    }
+
+    // --- 一之二、等链接（并行） ---------------------------------------------
+    // `KHR_parallel_shader_compile` 的 `COMPLETION_STATUS_KHR` 是**不阻塞**的一问，
+    // three 把它包成了 `WebGLProgram.isReady()`。逐帧问一遍全表，进度条跟着走 ——
+    // 这几秒里主线程完全空着，驱动的四条编译线程在满负荷跑。
+    // 没有这一段的话，同样这笔账会在第二段渲染时一个一个被同步逼出来。
+    // 兜底：驱动不给这个扩展时 isReady() 恒真，这一段直接空过；卡住超过 90 s 也放行
+    // （剩下的照旧退回「用到时现编」，慢但不会挂）。
+    {
+      const linking = renderer.info.programs.slice();
+      const deadline = performance.now() + 90000;
+      let ready = 0;
+      while (ready < linking.length) {
+        ready = 0;
+        for (const program of linking) {
+          if (typeof program.isReady !== "function" || program.isReady()) ready += 1;
+        }
+        onStep?.(T("boot.step.linkShaders", { done: ready, total: linking.length }),
+          BootProgress(BOOT.warm.submitShaders, 0.5 + (ready / Math.max(1, linking.length)) * 0.5));
+        if (ready >= linking.length || performance.now() > deadline) break;
+        if (!await Yield()) return picks.length;
+      }
     }
 
     // --- 二、场上原有材质的重编 ---------------------------------------------
     // 过场一开场就换天光（Play 里 applySky 排在建布景之前），场上那座城的材质整批
-    // 作废要重编。这笔账与新布景无关，却同样落在「进过场」这一下，而且是最大的一
-    // 块（实测六七秒）。同样按批放出来摊平；八批就够 —— 城里上万件，逐件跑的开销
+    // 作废要重编。这笔账与新布景无关，却同样落在「进过场」这一下。它的 program 已经
+    // 在第一段交过、第一段之二等过了，这里只剩「真画一遍」把顶点缓冲与各 pass 的
+    // 状态过一遍。同样按批放出来摊平；八批就够 —— 城里上万件，逐件跑的开销
     // 比它省下的还大。累加式放出，最后一批放完城就是完整的一座。
-    const outside = [];
-    scene.traverse((object) => {
-      if (!(object.isMesh || object.isPoints || object.isLine || object.isSprite)) return;
-      if (!masks.has(object)) outside.push(object);
-    });
     const outsideMasks = new Map(outside.map((object) => [object, object.layers.mask]));
     for (const object of outside) object.layers.set(HIDDEN_LAYER);
     try {
@@ -7344,13 +7526,22 @@ function RenderScene(dt) {
     profiler.GpuPop();
     profiler.E("gi");
   }
-  // 这一帧的阴影图在下面第一次 renderer.render 时烘，烘完 three 自己把
-  // needsUpdate 清掉（autoUpdate 已在渲染器那里关掉，见那一行的账）。
-  renderer.shadowMap.needsUpdate = true;
-  ssao.map.value = post.AoTexture;
-  // gl_FragCoord 在主靶的像素域里，喂 AO 靶尺寸会整张错位
-  ssao.resolution.value.set(post.width, post.height);
-  ssao.strength.value = SSAO_BASE * graphics.ssao;
+  // 这一帧要烘哪几级级联阴影图（逐级节流：近级每帧、远级 2–3 帧一次，
+  // 相机瞬移 / 换关 / 太阳转向时 CsmRig 会强制全更）。真正的烘焙发生在下面
+  // 第一次 renderer.render 里，烘完 three 自己把逐灯的 needsUpdate 清掉。
+  lights.ScheduleShadowUpdate(renderer);
+  // AO / SSIL 的靶引用每帧重接：SetSize 会重建靶，纹理引用随时可能换。
+  // uSsaoResolution 是**主靶**尺寸、uAoTexelResolution 才是 AO 靶尺寸（升采样用），
+  // 两者的分工写在 Script_PostGtao.SyncAoUniforms 里。
+  //
+  // SSIL 与探针体 GI 打开时会有一段重叠：探针体本来就带一份多次反弹的间接光，
+  // 近场那一米会被算两遍。按 GI 的淡入量整体降 SSIL.giScale（−40%，实测见
+  // docs/Data_TechRenderPipeline.md「GTAO / SSIL」一节），GI 关着时不打折。
+  const giBlend = gi ? (giUniforms.enabled.value || 0) : 0;
+  SyncAoUniforms(ssao, post, {
+    strength: SSAO_BASE * graphics.ssao,
+    ssilStrength: SSIL.strength * graphics.ssil * (1 - (1 - SSIL.giScale) * giBlend),
+  });
   // 天空穹跟着相机走。它是一只半径 4000 m 的球，原来钉在原点 ——
   // 过场把独立布景摆到 (4000,4000) 之后相机就在球**外面**，画面上是一块
   // 黑底上的大亮盘（出川过场那张「什么鬼背景」就是这个）。着色器用的是
@@ -7366,10 +7557,15 @@ function RenderScene(dt) {
   // 预通道靶（判断背景是不是天空 + 软粒子）、雾参数、太阳方向（雾的朝阳增益）。
   // SetSize 会重建靶，纹理引用每帧都可能换，所以每帧重接，不能只在初始化接一次。
   vfx.SetDepthSource(post.NormalDepthTexture, post.width, post.height);
+  // 粒子那份解析雾照常接（BootTest 的「粒子层的雾接上了」就是看它）。froxel 体积雾
+  // **不碰深度 0 那一桶**（`Data_Tuning_Volumetrics` 的 skyScale 出厂为 0）：
+  // 天空、天空前的烟、任何 skipNormalDepth 的半透明件都还归粒子/天穹自己管。
+  // 理由见 docs/Data_TechRenderPipeline.md §17.6 —— 合成 pass 认不出「天空」和
+  // 「五十米外那根烟柱」，给这一桶上最远切片的雾会让烟柱吃到整整一列的雾量。
   vfx.SetFog(preset.fog, preset.sunColor);
   vfx.SetSun(sky.sunDirection);
   // 水面与粒子层同一批账：时间推进 + 深度源每帧重接（SetSize 会换纹理引用）
-  UpdateWaterSurfaces(dt, post.NormalDepthTexture, post.width, post.height);
+  UpdateWaterSurfaces(dt, post.NormalDepthTexture, post.width, post.height, camera);
   // 音频听者也在这儿接 —— 和上面三行同一类账：接口写好了，没人调。
   //
   // 事故：AudioEngine.SetListener 全仓库零调用点，于是 WebAudio 的 listener
@@ -7385,6 +7581,11 @@ function RenderScene(dt) {
   // 但三者都从 RenderScene 出画（见上面那段注释），接在这儿一次覆盖三种镜头。
   camera.updateWorldMatrix(true, false);   // 取的是这一帧的位姿，不是上一帧的
   audio.SetListener(camera);
+  // 簇状光照的簇表：每帧一次，**必须排在出画之前**。和上面音频听者同一类账 ——
+  // 出画的路有四条（玩法 / 过场 / 菜单 / 编辑器），只有 RenderScene 是四条都过的
+  // 那一处；挂在玩法分支上的话，一进过场街上的火就整体错位。
+  // 接在 camera.updateWorldMatrix 之后：它要的是这一帧的 matrixWorldInverse。
+  lights.UpdateClusters(camera, post.width, post.height);
   // 整帧唯一一次世界矩阵更新（见 scene.matrixWorldAutoUpdate = false 那里的账）。
   // 必须排在天空穹跟位、相机 updateWorldMatrix 之后 —— 它们改的是这一帧的位姿。
   profiler.B("matrix");
@@ -7422,19 +7623,44 @@ function RenderScene(dt) {
     sunColor: preset.sunColor,
     fog: preset.fog,
     exposure: preset.exposure,
+    // 自动曝光要这两样：`skyPreset` 决定用哪一条实测锚点与 EV 钳位
+    // （Data_Tuning_Camera.SKY_EXPOSURE），`dt` 决定时域适应走多快。
+    // 过场自带天空时这里就是过场那一档 —— 与上面的 preset 同源，不会抄错。
+    skyPreset: skyName,
+    // 逐关锚点：`smokyDay` 被三关共用，而三关出生机位的实测亮度差 0.38 EV。
+    // 过场自带天空时不传（镜头已经不在这一关的出生点上，锚点对不上）。
+    exposureAnchor: cutsceneSky ? null : phase.id,
+    dt,
     bloom: preset.bloom * graphics.bloom,
-    godStrength: graphics.godEnabled ? preset.godStrength * graphics.god : 0,
+    // 泛光阈值是**每时段**的（缺省 1.18 = 出厂常数；目前只有 dawn 写了值）。
+    // 理由见 SKY_PRESETS.dawn 的 bloomThreshold 注释：物理天穹把太阳侧与整圈地平线
+    // 抬到了 1.7—6.5，一个全局常数会让**整片下半天空**都变成泛光源。
+    bloomThreshold: preset.bloomThreshold,
+    // 屏幕空间太阳拖影：**froxel 体积雾开着时一律不给**。两者叠加是双份前向散射，
+    // 而径向模糊不认遮挡 —— 光柱被建筑切断的那条线会被它重新糊回去。
+    // low 档（没有体积雾）仍可用，这是它保留下来的唯一场合。
+    godStrength: (graphics.godEnabled && !post.preset.volumetrics)
+      ? preset.godStrength * graphics.god : 0,
+    // 体积雾按预设名查 Data_Tuning_Volumetrics（相函数、烟尘噪声、覆盖距离）。
+    // pass 也能靠 fog 块的对象同一性反查，这里显式给一份更稳（过场自带天光时尤其）。
+    skyPreset: skyName,
     saturation: preset.saturation * (1 - suppression * 0.35),
     contrast: preset.contrast,
     grain: (skyName === "night" ? 0.020 : 0.014) * graphics.grain,
     vignette: (0.42 + suppression * 0.22) * graphics.vignette,
     damage: Clamp01(1 - health / 62) * 0.55,
-    // DOF 要把近景钉清楚；死亡时再叠相机运动模糊会把前景也抹掉，焦点层级就没了。
-    motionBlur: WEAPON_RANGE ? 0 : 0.15 * graphics.motionBlur * (1 - deathDof),
+    // DOF 要把近景钉清楚；死亡时再叠运动模糊会把前景也抹掉，焦点层级就没了。
+    // 2026-09 起这是 **0–1 的总闸**，不再是「模糊长度倍率」——
+    // 长度由物理快门（Data_Tuning_TemporalDof.MOTION_BLUR.shutterFraction，180°）定。
+    motionBlur: WEAPON_RANGE ? 0 : graphics.motionBlur * (1 - deathDof),
     dofStrength: deathDof,
     dofFocus: 1.5,
     dofRange: 2.8,
     dofMaxPx: 11.0,
+    // 镜头光晕：开镜时按 ADS 过渡压到 LENS_FLARE.adsScale（出厂 0.3×）。
+    // 铁瞄那一小块正是准星所在，彩虹扇压上去是直接的手感损失；
+    // 不整个关掉是因为「太阳还在那儿」这条信息本身对构图有用。
+    lensFlare: 1 - adsNearDof * (1 - LENS_FLARE.adsScale),
     nearDofStrength: WEAPON_RANGE ? 0 : adsNearDof * ADS_NEAR_DOF_STRENGTH,
     nearDofFocus: ADS_NEAR_DOF_FOCUS_M,
     nearDofRange: ADS_NEAR_DOF_RANGE_M,
@@ -7523,6 +7749,12 @@ function Loop(now) {
   // window.Taierzhuang.StepFrames() 推进，不能让 rAF 在两次截图之间偷偷加
   // 时间。普通 ?shot 页面不带 manual，仍按实时循环运行。
   if (MANUAL_STEP) return;
+  // 自动降档只吃**玩法帧**：菜单/加载/暂停帧要么便宜得离谱要么长得离谱，
+  // 混进窗口只会让阶梯在进出菜单时来回跳。跳过的那一帧留下的长间隔会被
+  // maxIntervalMs 自己滤掉，不用额外清状态。
+  if (state.running && !state.menu && !state.warming) {
+    if (autoQuality.Frame(now)) ApplyGraphics();
+  }
   // 剖析帧边界包在分支外面：LoopStep 的三条早退路径（菜单帧 / 停摆）也各是一帧。
   profiler.BeginFrame(now);
   LoopStep(dt);
@@ -7559,26 +7791,99 @@ requestAnimationFrame(Loop);
  * 去采一张已经不再更新的图 —— 画面会留着一层永不变化的假阴影。
  * 重编译是一次性的（几百毫秒），而这是个设置动作，不是每帧的事。
  */
+/**
+ * 把**全部**材质标脏。编译期开关（阴影总闸 / GI 采样层 / 材质着色升级那几位）
+ * 翻转之后必须走一遍：只改标志位不重编译的话，画面还跑着旧程序。
+ * 库缓存里暂不在场的材质也要标 —— 它们换关会被挂回来，而 three 不会为
+ * 没有 needsUpdate 的材质重查 cache key。
+ */
+function RecompileAllMaterials() {
+  const Mark = (material) => { if (material) material.needsUpdate = true; };
+  scene.traverse((object) => {
+    const material = object.material;
+    if (Array.isArray(material)) material.forEach(Mark); else Mark(material);
+  });
+  for (const material of library.materials.values()) Mark(material);
+  for (const material of library.staticMaterials.values()) Mark(material);
+  for (const material of library.upgradedExternal.values()) Mark(material);
+}
+
 function ApplyGraphics() {
   NormalizeGraphicsDetails(graphics, post);
-  const scale = Clamp(graphics.renderScale, 0.4, 1.6);
+  // 面板/存档改的是 graphics.autoQuality 那一位，这里同步到规则层。
+  // 必须排在下面读 autoQuality.scale 之前 —— 反过来的话「关掉自动降档」
+  // 要等下一次 ApplyGraphics 才还原分辨率。
+  autoQuality.SetEnabled(graphics.autoQuality !== false);
+  // 自动降档给的是**倍率**不是绝对值：玩家在面板拉过的「渲染分辨率」仍然是
+  // 他拉的那个数，阶梯只在它上面再乘一个 ≤1 的系数。两者分开之后，
+  // 自动与手动不会互相覆盖，「恢复出厂」也不必知道阶梯当前在第几级。
+  const manualScale = Clamp(graphics.renderScale, 0.4, 1.6);
+  const autoScale = autoQuality.enabled ? autoQuality.scale : 1;
+  // 阶梯不许把内部分辨率压到 floor 以下（TAAU 补不回来了），但也不许反过来
+  // 把玩家自己调低的那个数抬上去 —— 所以下限取两者的小者。
+  const scale = autoScale >= 1 ? manualScale
+    : Math.max(manualScale * autoScale, Math.min(manualScale, AUTO_QUALITY.floor));
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   const width = Math.round(window.innerWidth * scale), height = Math.round(window.innerHeight * scale);
-  if (post.width !== width || post.height !== height) post.SetSize(width, height);
+  // 两组尺寸：内部（renderScale 缩过的）与输出（画布满分辨率）。TAAU 开着时
+  // TAA 把画面解算到后者，composite 与末趟都在满分辨率上跑；关着时两者由
+  // SetSize 内部拉平，行为与 TAAU 落地之前一致。
+  if (post.width !== width || post.height !== height
+    || post.outputWidth !== window.innerWidth || post.outputHeight !== window.innerHeight) {
+    post.SetSize(width, height, window.innerWidth, window.innerHeight);
+  }
   // 排在 SetSize 之后：SetSize 按当前的 taaEnabled 建靶，这一行才是改它的人。
   // 反过来的话，刚打开 TAA 的那一次 SetSize 会漏建历史靶（要等下一次改分辨率才补）。
   post.SetTaaEnabled(graphics.taa !== false);
+  // 自动降档的第 3 级起摘 SSR、第 4 级起摘接触阴影（两者都是运行时开关，
+  // 不重编译 —— 在已经掉帧的时候送一次几百毫秒的编译只会更糟）。
+  const autoSsr = !autoQuality.enabled || autoQuality.ssr;
+  const autoContact = !autoQuality.enabled || autoQuality.contactShadows;
+  post.SetSsrEnabled(graphics.ssr !== false && autoSsr);
+  post.SetSsrStrength(graphics.ssrStrength ?? 1);
+  // SSIL：档位给不给是构造期的（`preset.ssil`），倍率滑到 0 时把整趟也停掉 ——
+  // 材质端那一次取样会自动顶上一张 1×1 全黑，不用重编译任何材质。
+  post.SetSsilEnabled(!!post.preset.ssil && graphics.ssil > 0);
   post.uniformsTaa.uCurrentWeight.value = graphics.taaCurrentWeight;
   if (post.taaJitterScale !== graphics.taaJitterScale) post.hasTaaHistory = false;
   post.taaJitterScale = graphics.taaJitterScale;
   post.sharpenStrength = graphics.sharpen;
-  lights.sun.shadow.bias = graphics.shadowBias;
-  lights.sun.shadow.normalBias = graphics.shadowNormalBias;
-  lights.shadowExtent = graphics.shadowExtent;
+  // froxel 体积雾：只是一位开关（靶与材质在 PostPipeline 构造期按画质档定死）。
+  // 关掉时 VolumetricsPass.Prepare 会把 Composite 的 uFogSource 归零，
+  // 合成 pass 当帧就退回解析式高度雾 —— 不留一张陈旧的散射图在那儿。
+  // low 档没有 froxel 网格（VOLUMETRIC_GRIDS.low = null），pass 自己就恒不跑，
+  // 所以这里不用再查一遍档位表 —— 玩家在 low 上打开这一位也只是空转一个布尔。
+  post.preset.volumetrics = graphics.volumetrics !== false;
+  // 级联阴影：面板给的是**第 0 级的基准**，往外逐级按纹素尺度缩放
+  // （见 Script_Csm.CsmRig._ApplyBias）。shadowSize 是**每一级**的图边长。
+  lights.SetShadowTuning({
+    bias: graphics.shadowBias,
+    normalBias: graphics.shadowNormalBias,
+    intensity: graphics.shadowIntensity,
+    mapSize: graphics.shadowSize || lights.defaultShadowSize,
+  });
+  lights.SetShadowDistance(graphics.shadowDistance);
+  // 接触阴影：只是「这一趟 pass 跑不跑」。关掉时 ContactShadowsPass.Idle 会把
+  // 材质那边还原成 1×1 纯白，不重编译。
+  post.preset.contactShadows = CONTACT_SHADOWS_SUPPORTED
+    && graphics.contactShadows !== false && autoContact;
+  // --- 相机曝光轮：三位开关 + 四根旋钮（口径见 graphics 表里的注释）---------
+  // 两位走管线的运行时状态（同 SetTaaEnabled 的先例），不写 preset ——
+  // preset 是「这一档的出厂值」，面板的「恢复出厂」要从它读回去。
+  post.SetAutoExposure(graphics.autoExposure !== false);
+  post.SetLutEnabled(graphics.lut !== false);
+  post.exposurePass.SetBiasEv(graphics.exposureCompensation ?? 0);
+  post.lensFlarePass.SetUserScale(graphics.lensFlare ?? 1, graphics.lensDirt ?? 1);
+  post.bloomPass.karis = graphics.bloomKaris === true;
+  post.uniformsComposite.uDither.value = graphics.dither ?? 0;
+  post.SetTonemap(graphics.tonemap || "aces");
   giUniforms.normalBias.value = graphics.giNormalBias;
   giUniforms.specularOcclusion.value = graphics.giSpecularOcclusion;
+  // 材质着色升级：倍率直接写 uniform（免费），开关变了才整场重编译。
+  SyncShadingKnobs(shadingUniforms, graphics);
+  if (ApplyShadingQuality(shadingUniforms, post.preset, graphics)) RecompileAllMaterials();
 
   // 玩家可单关第一人称自阴影，但「阴影」总闸关闭时它也必须一起停：否则面板说
   // 阴影已关，枪上却还留着一层独立阴影，会成为两套互相矛盾的设置语义。
@@ -7629,6 +7934,30 @@ function ApplyGraphics() {
       if (preset) gi.ApplyPreset(preset, graphics.giStrength);
     }
   }
+  // 簇状局部光：总闸是**运行时** uniform（不重编译），英雄光阴影才是编译期的。
+  lights.SetClusteredEnabled(graphics.clusteredLights !== false);
+  const wantHero = !!graphics.clusterHeroShadow;
+  if (lights.heroShadow !== wantHero) {
+    lights.SetHeroShadow(wantHero);
+    // NUM_POINT_LIGHTS / NUM_POINT_LIGHT_SHADOWS 翻了，整场材质要重编译一次
+    // （与上面阴影总闸同一个先例）。不重编译的话着色器还按老的灯数跑。
+    scene.traverse((object) => {
+      const material = object.material;
+      if (!material) return;
+      if (Array.isArray(material)) material.forEach((m) => { m.needsUpdate = true; });
+      else material.needsUpdate = true;
+    });
+  }
+  // 物理大气：总闸 + 烟霾倍率。任一变了都要**重烘 IBL** ——
+  // scene.environment 是从天穹烘出来的 PMREM，天换了 IBL 不换，
+  // 表现是「天亮了屋里没亮」（换时段那条老账的同一个坑）。
+  post.preset.atmosphere = graphics.atmosphere !== false;
+  const atmosphereChanged = [
+    sky.SetAtmosphereEnabled(graphics.atmosphere !== false),
+    sky.SetHazeScale(graphics.atmosphereHaze),
+  ].some(Boolean);
+  if (atmosphereChanged) sky.BakeEnvironment(scene);
+
   const shadowSize = graphics.shadowSize || lights.defaultShadowSize;
   if (lights.sun.shadow.mapSize.x !== shadowSize) {
     lights.sun.shadow.mapSize.set(shadowSize, shadowSize);

@@ -199,6 +199,30 @@ export const testDefs = {
   },
   GiTest: { file: "Script_GiTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "全局光照开关对照" },
   PostTest: { file: "Script_PostTest.mjs", desc: "后处理感知域对比：暗部信息不被裁成纯黑" },
+  AutoQualityTest: { file: "Script_AutoQualityTest.mjs",
+    desc: "自动降档（纯 Node）：阶梯映射 / 持续 2 s 才降 / 降后锁 30 s / 升档要 8 s / 死区不抖" },
+  ClusteredLightsTest: { file: "Script_ClusteredLightsTest.mjs", timeoutMs: 20 * 60 * 1000,
+    desc: "簇状前向光照：簇分配与暴力法逐簇相等（纯 Node）+ 24 盏彩色点光逐盏读回、聚光锥内外、不重编译（真浏览器）" },
+  PostFrameGraphTest: { file: "Script_PostFrameGraphTest.mjs", timeoutMs: 15 * 60 * 1000,
+    desc: "渲染帧图地基契约：pass 顺序 / MRT 速度靶 / HZB / 太阳阴影接口 / 材质补丁三态 / 不重编译" },
+  SsrTest: { file: "Script_SsrTest.mjs", timeoutMs: 15 * 60 * 1000,
+    desc: "屏幕空间反射：受控场景倒影 / 置信度边界 / 粗糙度上限 / 时域收敛与拖影 / 三张调试图" },
+  AtmosphereTest: { file: "Script_AtmosphereTest.mjs", timeoutMs: 15 * 60 * 1000,
+    desc: "物理大气：四张 LUT / 十档预设的辐照度与色相标定 / 70 m 能见度不许降 / 大气透视近远端" },
+  VolumetricsTest: { file: "Script_VolumetricsTest.mjs", timeoutMs: 25 * 60 * 1000,
+    desc: "froxel 体积雾：能见度不变差 / 图集单调 / 阴影切光柱 / 时域收敛 / 局部光与雾体" },
+  GtaoTest: { file: "Script_GtaoTest.mjs", timeoutMs: 15 * 60 * 1000,
+    desc: "GTAO / 弯曲法线 / 镜面遮蔽 / SSIL：接触暗带、时域收敛、无重投影残影、色板反弹" },
+  SamplerBudgetTest: { file: "Script_SamplerBudgetTest.mjs", timeoutMs: 40 * 60 * 1000,
+    desc: "采样器预算：四档×gi 八轮正片，每个程序都链接成功且 sampler uniform ≤ MAX_TEXTURE_IMAGE_UNITS" },
+  CsmTest: { file: "Script_CsmTest.mjs", timeoutMs: 15 * 60 * 1000,
+    desc: "级联阴影 / PCSS / 接触阴影：逐级图与分割 / 纹素吸附 / 级间重叠 / 节流排班 / 痤疮比例 / 三张调试图" },
+  MaterialUpgradeTest: { file: "Script_MaterialUpgradeTest.mjs", timeoutMs: 15 * 60 * 1000,
+    desc: "材质着色升级：视差位移随视角反号 / 距离淡出 / 微阴影压直射 / 细节法线淡入 / 布绒光与金属各向异性 / 皮肤散射红移 / 程序数稳态" },
+  ExposureTest: { file: "Script_ExposureTest.mjs", timeoutMs: 30 * 60 * 1000,
+    desc: "直方图自动曝光 / 镜头光晕 / 3D LUT 分级（中灰标定、适应曲线、LUT ≤ 1/255、开关不改默认机位亮度）" },
+  TaauTest: { file: "Script_TaauTest.mjs", timeoutMs: 20 * 60 * 1000,
+    desc: "TAAU 两组分辨率 / 斜边锯齿能量 / 速度靶消鬼影 / 运动模糊快门 / 散景 CoC 与枪不糊" },
   PerformanceTest: { file: "Script_PerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "帧率/负载实测（对机器敏感）" },
   FrameProfileTest: { file: "Script_FrameProfileTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "整帧 CPU/GPU 剖析消融（对机器敏感）" },
   GodRaysPerformanceTest: { file: "Script_GodRaysPerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "体积光方向性性能回归（对机器敏感）" },
@@ -225,9 +249,11 @@ export const browserTests = new Set([
   "AudioTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
-  "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GunFeelTest",
+  "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
+  "SamplerBudgetTest",
   "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MenuTest",
-  "PerformanceTest", "PhysicsTest", "PostTest", "ProfilerTest", "PropInstancingTest",
+  "ClusteredLightsTest", "MaterialUpgradeTest",
+  "PerformanceTest", "PhysicsTest", "PostTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
   "TestSceneLightingTest", "RangeTest", "WeaponRangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
   "FirstPersonEmbodimentTest", "SprintViewmodelTest", "TargetInfoTest", "VisibilityTest", "VoiceTest",
@@ -241,6 +267,7 @@ export const browserTests = new Set([
 
 export const tier0Fast = [
   "TextTest",
+  "AutoQualityTest",
   "TextGatherCheck",
   "BootPayloadTest",
   "AssetStandardsTest",
@@ -345,7 +372,7 @@ export const domains = {
     //（UpdateFire / MoveSmokeSource），所以碰灯光或粒子的改动也要连着 FlareTest 跑。
     // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
-    tests: ["TestSceneLightingTest", "PostTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
+    tests: ["TestSceneLightingTest", "PostTest", "AutoQualityTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -392,7 +419,24 @@ const changedDomainRules = [
   { domain: "menu", pattern: /(Menu|Style_Interface|BootProp|index\.html|Font_Title|\/Font\/)/i },
   { domain: "editor", pattern: /(Editor|Style_Interface|AssetStandards|Pcg|Data_Levels|SamplePoint|Data_Dressing|Data_ExternalAssets|WestSuburbBlocks|_import)/i },
   { domain: "cutscene", pattern: /(Cutscene|Story|Data_Script|TengxianScript|Mission|ActorPose|Train|Data_MissionCh|Companion|Checkpoint)/i },
-  { domain: "render", pattern: /(Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|FirstLevelP012CarryView|Vfx|Post|Light|Gi|GlobalShProbe|FirstPersonSelfShadow|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Pcg|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|Mocap|EscortLitter|TexBake|Pbr|PropBatch|PropStreaming|Profiler|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },
+  { domain: "render", pattern: /(Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|FirstLevelP012CarryView|Vfx|Post|Light|Gi|GlobalShProbe|FirstPersonSelfShadow|Atmosphere|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Pcg|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|Mocap|EscortLitter|TexBake|Pbr|PropBatch|PropStreaming|Profiler|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },
+  // Data_Tuning_Graphics 是渲染帧图的档位表（不是玩法数值）：它同时命中 text 的
+  // Data_Tuning_ 那条，这里再补一条把 render 域也拉进来。
+  { domain: "render", pattern: /Data_Tuning_Graphics/i },
+  // 自动降档是渲染档位的规则层：它读 Data_Tuning_Graphics.AUTO_QUALITY，
+  // 由 Script_Main 的 rAF 循环驱动、由 ApplyGraphics 落地。
+  { domain: "render", pattern: /AutoQuality/i },
+  // 同理：Data_Tuning_Volumetrics 是 froxel 体积雾的时段参数与网格分档；
+  // Data_Tuning_Shadows 是级联阴影的分割 / 图尺寸 / PCSS 抽样数；
+  // Data_Tuning_Gtao 是 GTAO / SSIL 的数值表。
+  { domain: "render", pattern: /Data_Tuning_(Volumetrics|Shadows|Gtao)|Volumetric/i },
+  // 级联阴影 / 接触阴影：Csm 与 ContactShadows 被上面 render 那条的 Light/Post
+  // 覆盖不到（文件名里没有那两个词），单独补一条。
+  { domain: "render", pattern: /(Script_Csm|ContactShadows)/i },
+  // Data_Tuning_Camera 同理：它是相机曝光 / 色调映射 / LUT 的口径表，
+  // Data_Tuning_TemporalDof 是 TAAU / 运动模糊 / 散景景深的算法口径 ——
+  // 两张都不是玩法数值，但会命中 text 域的 Data_Tuning_ 那一条。
+  { domain: "render", pattern: /Data_Tuning_(Camera|TemporalDof)/i },
   { domain: "perf", pattern: /(Performance|FrameProfile|GodRays|Lod|Visibility|ActorBatch|Smoke)/i },
   { domain: "physics", pattern: /vendor\/rapier/i },
   { domain: "infra", pattern: /(Script_TestRunner|Script_DevServer|Script_BuildBrowserBundle|Script_BrowserBundle)/i },
@@ -787,7 +831,9 @@ function PreflightSelection(selection) {
 }
 
 const estimatedSeconds = {
+  CsmTest: 70,
   BootTest: 100,
+  ClusteredLightsTest: 150,
   BootStallTest: 15,
   GeoTest: 20,
   ShotTest: 390,
@@ -795,6 +841,7 @@ const estimatedSeconds = {
   PerformanceTest: 600,
   DeathViewTest: 240,
   RespawnShaderWarmTest: 150,
+  AtmosphereTest: 130,
   FrameProfileTest: 600,
   GodRaysPerformanceTest: 600,
 };

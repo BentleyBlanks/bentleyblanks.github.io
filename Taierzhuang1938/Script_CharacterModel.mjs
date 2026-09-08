@@ -530,6 +530,10 @@ export class LugouCharacterRig {
       materialLibrary?.ConfigureExternalPbr?.(object.material, {
         metalness: 0,
         minRoughness: 0.58,
+        // 交出网格：军装要换成 MeshPhysicalMaterial 才有绒光（three 的 sheen
+        // uniform 只在 isMeshPhysicalMaterial 时上传），换类等于换对象，
+        // 拿不到网格就挂不回去。同一份源材质只换一次并被所有网格共用。
+        mesh: object,
       });
       object.castShadow = true;
       object.receiveShadow = true;

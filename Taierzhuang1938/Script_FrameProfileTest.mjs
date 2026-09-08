@@ -6,14 +6,38 @@
 // CPU submit 是主线程把一帧提交给驱动所花的时间，wall 是提交后 gl.finish 的总墙钟。
 //
 // 用法：node Taierzhuang1938/Script_FrameProfileTest.mjs
+//
+// ## 2026-09-08 Phase C-1 追加的四个开关（不给就是原来的门禁行为）
+//   --quality=high     画质档（`?quality=`）。默认 high。
+//   --gi               强制 `?gi=1` 开机就带探针体（用来量 high+GI 那一档）。
+//   --root=<abs>       服务另一棵检出的仓库根（量大修前基线树时用；**不改那棵树**）。
+//   --tiers            分档模式：跳过 GI/SSAO/MSAA/70% 那四个消融，只留 baseline，
+//                      但把**逐 pass GPU 中位数**（Script_Profiler 的分段计时）打出来。
+//                      分档定稿要的是「这一档每个 pass 花多少」，不是消融对比。
+//   --phase=N          换一关的切片（`?phase=`）。默认 2 —— 分档那张表全是在
+//                      phase=2 上量的，换关就不能与它逐行比。逐关排查（例如
+//                      「城墙关是不是真的贵一倍」）才传别的值。
+// 逐 pass 的口径：profiler.Enable() 之后一帧一帧推（每帧让出一个 event-loop turn，
+// 否则 ANGLE 的 TIME_ELAPSED 查询读不回来、_pending 会被上限截掉），
+// 从 profiler.history 里逐段取中位数。
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 
+const argv = process.argv.slice(2);
+const Arg = (name, fallback = "") => {
+  const hit = argv.find((item) => item.startsWith(`--${name}=`));
+  return hit ? hit.slice(name.length + 3) : fallback;
+};
+const QUALITY = Arg("quality", "high");
+const FORCE_GI = argv.includes("--gi");
+const TIER_MODE = argv.includes("--tiers");
+const PHASE = Arg("phase", "2");
+
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(projectDir, "..");
+const rootDir = Arg("root") ? path.resolve(Arg("root")) : path.resolve(projectDir, "..");
 const server = await ServeRoot(rootDir, 0);
 const port = server.address().port;
 const browser = await LaunchBrowser();
@@ -30,11 +54,19 @@ page.on("console", (message) => {
 
 let result = null;
 try {
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=high&scale=small`,
+  const giParam = FORCE_GI ? "&gi=1" : "";
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=${PHASE}&quality=${QUALITY}&scale=small${giParam}`,
     { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 300000 });
-  result = await page.evaluate(async () => {
+  result = await page.evaluate(async (options) => {
+    const { tierMode } = options;
     const T = window.Taierzhuang;
+    // 分档定稿要的是「同一批 draw 在这一档里花多少」，而正片是活的：AI 在走、
+    // 烟在飘，两批之间 draw call 能差几十个（实测 737 → 812）。噪声因此有 ±25%，
+    // 比要测的旋钮差还大。**dt = 0 把世界钉住**：所有系统按零时间推进，
+    // 画的仍是完整一帧，但每一批的工作量真的相同。消融那条路仍走 1/60
+    //（门禁历来的口径，GI 收敛与探针滚动都要真时间）。
+    const STEP_DT = tierMode ? 0 : 1 / 60;
     const gl = T.renderer.getContext();
     const timer = gl.getExtension("EXT_disjoint_timer_query_webgl2");
     const debug = gl.getExtension("WEBGL_debug_renderer_info");
@@ -60,7 +92,7 @@ try {
       T.renderer.info.autoReset = false;
       T.renderer.info.reset();
       const started = performance.now();
-      T.StepFrames(1, 1 / 60, render);
+      T.StepFrames(1, STEP_DT, render);
       const submitted = performance.now();
       if (query) gl.endQuery(timer.TIME_ELAPSED_EXT);
       gl.finish();
@@ -89,20 +121,67 @@ try {
       return sample;
     };
 
+    // 一次 query 罩 BATCH 帧再除以 BATCH。**必须成批**：级联阴影是
+    // `bakeOrder` 七帧一轮（high 是 [0,1,0,2,0,1,0]），最远那一级 2.24 M 三角、
+    // 最近那一级只有它的零头 —— 单帧采样于是是七峰分布，中位数在两个峰之间
+    // 来回跳，实测同一份代码两次跑能差 1.5 ms。批长取 21（7 的倍数）保证每批
+    // 正好含整数轮，批与批之间的工作量才真的相同。
+    const BATCH = 21;
+    const Batch = async (render) => {
+      gl.finish();
+      const query = timer ? gl.createQuery() : null;
+      if (query) gl.beginQuery(timer.TIME_ELAPSED_EXT, query);
+      T.renderer.info.autoReset = false;
+      T.renderer.info.reset();
+      const started = performance.now();
+      T.StepFrames(BATCH, STEP_DT, render);
+      const submitted = performance.now();
+      if (query) gl.endQuery(timer.TIME_ELAPSED_EXT);
+      gl.finish();
+      const finished = performance.now();
+      let gpuMs = null;
+      if (query) {
+        for (let retry = 0; retry < 40
+          && !gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE); retry += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+        const available = gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE);
+        const disjoint = gl.getParameter(timer.GPU_DISJOINT_EXT);
+        if (available && !disjoint) {
+          gpuMs = gl.getQueryParameter(query, gl.QUERY_RESULT) / 1e6 / BATCH;
+        }
+        gl.deleteQuery(query);
+      }
+      const sample = {
+        submitMs: (submitted - started) / BATCH,
+        wallMs: (finished - started) / BATCH,
+        gpuMs,
+        calls: T.renderer.info.render.calls / BATCH,
+        triangles: T.renderer.info.render.triangles / BATCH,
+      };
+      T.renderer.info.autoReset = true;
+      return sample;
+    };
+
+    // 批与批之间取 **min**：GPU 的工作量是确定的，外部争用只会加时间
+    //（docs §17.9b 立的口径）。同时留下 all 让报告能看离散度。
     const Sample = async (label, render = true) => {
-      T.StepFrames(5, 1 / 60, render);
+      T.StepFrames(8, STEP_DT, render);
       const rows = [];
-      for (let i = 0; i < 7; i += 1) rows.push(await One(render));
+      for (let i = 0; i < 5; i += 1) rows.push(await Batch(render));
+      const gpuList = rows.map((row) => row.gpuMs).filter((v) => v != null);
       return {
         label,
-        submitMs: Median(rows.map((row) => row.submitMs)),
-        wallMs: Median(rows.map((row) => row.wallMs)),
-        gpuMs: rows[0].gpuMs == null ? null : Median(rows.map((row) => row.gpuMs)),
+        submitMs: Math.min(...rows.map((row) => row.submitMs)),
+        wallMs: Math.min(...rows.map((row) => row.wallMs)),
+        gpuMs: gpuList.length ? Math.min(...gpuList) : null,
+        gpuAll: gpuList.map((v) => +v.toFixed(2)),
         calls: Median(rows.map((row) => row.calls)),
         triangles: Median(rows.map((row) => row.triangles)),
         size: [T.post.width, T.post.height],
       };
     };
+    void One;
 
     // 主线程分项：包住现有公开对象的方法，不改游戏代码。post 是 GPU 提交大项，
     // scene matrix / actor batch / AI / GI 是它外面的 CPU 固定开销。
@@ -133,11 +212,31 @@ try {
     const rows = [];
     rows.push(await Sample("baseline"));
 
+    // --- 逐 pass GPU 中位数（分档定稿用；--tiers 才跑）-----------------------
+    // Script_Profiler 的分段计时。**一帧一让出**：ANGLE/D3D11 的 TIME_ELAPSED
+    // 结果要过几个 event-loop turn 才可读，紧凑同步循环会让 _pending（上限 8 帧）
+    // 整批被丢，量出来的是空表。
+    let passes = null;
+    if (tierMode && T.profiler) {
+      T.profiler.Enable();
+      for (let i = 0; i < 110; i += 1) {
+        T.StepFrames(1);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      const history = T.profiler.history.filter((row) => row.gpu);
+      const names = new Set();
+      for (const row of history) for (const key in row.gpu) names.add(key);
+      passes = { __frames: history.length };
+      for (const name of names) passes[name] = Median(history.map((row) => row.gpu[name] || 0));
+      passes.__total = Median(history.map((row) => row.gpuTotal || 0));
+      T.profiler.Disable();
+    }
+
     // GI 出厂默认关：baseline 里连采样代码都没编进材质。消融方向反过来 ——
     // 强制打开，走设置面板同一条路（惰性构造 ProbeVolume + 材质重编译），
     // 既持续追踪 GI 的真实成本，也顺手回归了运行时「关 → 开」这条链。
     const giScrollMs = [];
-    if (T.graphics && T.ApplyGraphics) {
+    if (!tierMode && T.graphics && T.ApplyGraphics) {
       T.graphics.gi = true;
       T.ApplyGraphics();
       // 重编译一次全场材质 + 全体探针按 batch/帧扫满一遍 + 半秒淡入：
@@ -162,21 +261,23 @@ try {
       T.StepFrames(10);
     }
 
-    const oldSsao = T.post.preset.ssao;
-    T.post.preset.ssao = false;
-    rows.push(await Sample("no SSAO"));
-    T.post.preset.ssao = oldSsao;
+    if (!tierMode) {
+      const oldSsao = T.post.preset.ssao;
+      T.post.preset.ssao = false;
+      rows.push(await Sample("no SSAO"));
+      T.post.preset.ssao = oldSsao;
 
-    const oldMsaa = T.post.preset.msaa;
-    T.post.preset.msaa = 4;
-    T.post.SetSize(3394, 1348);
-    rows.push(await Sample("forced 4x MSAA"));
-    T.post.preset.msaa = oldMsaa;
-    T.post.SetSize(3394, 1348);
+      const oldMsaa = T.post.preset.msaa;
+      T.post.preset.msaa = 4;
+      T.post.SetSize(3394, 1348);
+      rows.push(await Sample("forced 4x MSAA"));
+      T.post.preset.msaa = oldMsaa;
+      T.post.SetSize(3394, 1348);
 
-    T.post.SetSize(Math.round(3394 * 0.7), Math.round(1348 * 0.7));
-    rows.push(await Sample("70% scale"));
-    T.post.SetSize(3394, 1348);
+      T.post.SetSize(Math.round(3394 * 0.7), Math.round(1348 * 0.7));
+      rows.push(await Sample("70% scale"));
+      T.post.SetSize(3394, 1348);
+    }
 
     // 真正的纯玩法主线程：不出画。GI 默认已关（上面消融完退回默认档），
     // 再保险性地按住 enabled，避免它的五个 GL pass 混进来。
@@ -187,6 +288,7 @@ try {
       rendererName,
       timerAvailable: !!timer,
       rows,
+      passes,
       cpuBreakdown: {
         total: breakdownTotal / 90,
         ai: cpuTimes.ai / 90,
@@ -202,8 +304,10 @@ try {
       } : null,
       programs: T.renderer.info.programs.length,
       memory: { ...T.renderer.info.memory },
+      internalSize: [T.post.width, T.post.height],
+      outputSize: [T.post.outputWidth ?? T.post.width, T.post.outputHeight ?? T.post.height],
     };
-  });
+  }, { tierMode: TIER_MODE });
 } finally {
   await browser.close();
   server.close();
@@ -211,13 +315,16 @@ try {
 
 if (result) {
   console.log(`GPU ${result.rendererName}`);
+  console.log(`quality=${QUALITY}${FORCE_GI ? "+gi" : ""} phase=${PHASE} root=${rootDir}`
+    + ` internal=${result.internalSize.join("x")} output=${result.outputSize.join("x")}`);
   console.log(`timer=${result.timerAvailable} programs=${result.programs}`
     + ` geometries=${result.memory.geometries} textures=${result.memory.textures}`);
   for (const row of result.rows) {
     const gpu = row.gpuMs == null ? "n/a" : `${row.gpuMs.toFixed(2)} ms`;
     console.log(`${row.label.padEnd(12)} ${row.size.join("x").padEnd(10)}`
       + ` submit=${row.submitMs.toFixed(2)} ms gpu=${gpu.padEnd(10)} wall=${row.wallMs.toFixed(2)} ms`
-      + ` calls=${row.calls.toFixed(0)} tris=${(row.triangles / 1e6).toFixed(2)}M`);
+      + ` calls=${row.calls.toFixed(0)} tris=${(row.triangles / 1e6).toFixed(2)}M`
+      + ` gpuAll=[${(row.gpuAll || []).join(", ")}]`);
   }
   const c = result.cpuBreakdown;
   console.log(`CPU breakdown total=${c.total.toFixed(2)} ai=${c.ai.toFixed(2)}`
@@ -225,6 +332,16 @@ if (result) {
     + ` batch=${c.actorBatch.toFixed(2)} post=${c.post.toFixed(2)} ms/frame`);
   if (result.giScroll) console.log(`GI scroll median=${result.giScroll.median.toFixed(3)}`
     + ` p95=${result.giScroll.p95.toFixed(3)} max=${result.giScroll.max.toFixed(3)} ms`);
+  if (result.passes) {
+    const entries = Object.entries(result.passes)
+      .filter(([name]) => !name.startsWith("__"))
+      .sort((a, b) => b[1] - a[1]);
+    console.log(`PASS gpu medians over ${result.passes.__frames} frames`
+      + ` (sum ${result.passes.__total.toFixed(2)} ms)`);
+    for (const [name, ms] of entries) {
+      console.log(`  ${name.padEnd(20)} ${ms.toFixed(3)} ms`);
+    }
+  }
 }
 for (const error of errors) console.log(error);
 process.exit(errors.length || !result ? 1 : 0);

@@ -11,32 +11,70 @@
 import * as THREE from "three";
 import { Panel, Section, Chips, Facts, Note, Toggle, El } from "./Script_EditorUi.mjs";
 import { InjectDepthPull, SHADING_MODES } from "./Script_Post.mjs";
+import { GetActiveAtmosphere } from "./Script_Atmosphere.mjs";
+import { MATERIAL_DEBUG_VIEWS } from "./Data_Tuning_Materials.mjs";
 import { R } from "./Script_Physics.mjs";
+import { MakeClusterHeatOverlay, MakeClusterSphereOverlay } from "./Script_ClusteredLights.mjs";
 
 const VIEWS = [
   { id: "final", label: "最终画面", group: "输出", note: "正式的合成 + FXAA 输出。" },
   { id: "hdr", label: "HDR 场景", group: "输出", note: "泛光、雾和调色之前的主场景 HDR 靶。" },
   { id: "bloomExtract", label: "Bloom 提取", group: "后处理", note: "按阈值、软膝与亮度钳制后的半分辨率亮部；黑色区域不会进入 Bloom。" },
   { id: "bloom", label: "Bloom 合成", group: "后处理", note: "多级降采样再 tent 升采样叠回的最终 Bloom 靶；与正式合成实际采样的是同一张。" },
+  { id: "exposure", label: "曝光直方图", group: "后处理", note: "自动曝光的 64 桶亮度直方图（对数纵轴）+ 当前 EV（青）/ 目标 EV（橙）/ 增益（白）。自动曝光关着时显示不可用斜纹。" },
+  { id: "lensFlare", label: "镜头光晕", group: "后处理", note: "鬼影 / 光环 / 太阳星芒层（1/4 分辨率 HDR 靶）。黑场输入时必须全黑；太阳被墙挡住时星芒消失。" },
+  { id: "lensDirt", label: "镜头脏污", group: "后处理", note: "程序化烘的油斑 + 划痕灰度图，只乘在泛光的高亮处。" },
+  { id: "lutCheck", label: "LUT 采样校验", group: "后处理", note: "上：测试彩阶/灰阶；中：正在生效的 LUT 条带；下：恒等表的采样误差 ×16。采样正确 = 下半屏只剩一层均匀的量化底噪；出现块状结构就是 flipY / 切片索引 / 半纹素内缩 出了错。" },
   { id: "fog", label: "雾量", group: "后处理", note: "指数距离雾 × 高度衰减得到的实际混合系数；深蓝 = 无雾、暖黄 = 雾量高。" },
   { id: "dof", label: "景深 CoC", group: "后处理", note: "正式景深使用的散焦系数；蓝 = 锐利、暖黄 = 最大散焦。景深只在阵亡镜头启用。" },
+  { id: "volumetricDensity", label: "体积密度", group: "体积雾", note: "这一像素背后那颗 froxel 的消光系数 σ_t（0–0.15 /m 满量程：深蓝无、暖黄浓、红爆表）。基础高度雾 + 烟尘噪声 + 局部雾体三项之和；看烟幕/热烟铺得对不对就看它。" },
+  { id: "volumetricScatter", label: "体积散射", group: "体积雾", note: "沿视线积分出来的绝对散射亮度（Reinhard + sRGB 显示）。光柱、被建筑切断的暗带、火照亮的空气全在这一张上；被墙挡住的地方只剩环境项，不发亮。" },
+  { id: "volumetricTransmittance", label: "体积透过率", group: "体积雾", note: "合成 pass 实际吃到的透过率（白 = 全透、黑 = 全挡）。出厂走 legacyTransmittance：这一张与今天的解析雾**逐像素相同**，局部烟幕才会额外压暗 —— 用它核对「七十米外能不能看见敌人」没有变差。" },
+  { id: "volumetricReproject", label: "体积重投影", group: "体积雾", note: "时域重投影的历史权重：绿 = 历史被采纳，红 = 只能用本帧抽样（会更噪）。相机快速转身、froxel 网格边缘、镜头硬切之后应当短暂变红再收敛回绿。" },
+  // 2026-09 TAAU / 运动模糊 / 散景景深三个 pass 的中间量（由 Script_PostFxaa 认领）。
+  { id: "dofCoc", label: "景深 CoC（物理）", group: "后处理", note: "散景景深实际使用的薄透镜 CoC：深蓝 = 合焦、暖黄 = 远景散焦、洋红 = 近景散焦、绿 = 第一人称前景标签（恒锐）。与上一项的区别是这一张是新 DofPass 的真实口径。" },
+  { id: "taaWeight", label: "TAA 权重", group: "后处理", note: "R = 当前帧权重（×4 显示，静止约 0.04）、G = 历史被邻域盒裁掉多少、B = responsive 掩码（第一人称）。全红 = 这一帧没有可用历史。" },
+  { id: "velocityTile", label: "速度 tile max", group: "GBuffer", note: "运动模糊的 tile 邻域最大速度（已乘快门）：R/G = 方向、B = 模糊长度。运动模糊没跑时显示不可用斜纹。" },
   { id: "normal", label: "法线", group: "GBuffer", note: "NormalDepth 预通道的视空间法线。" },
   { id: "depth", label: "视深", group: "GBuffer", note: "NormalDepth 预通道 alpha；近处亮、80 m 以外渐黑。第一人称的手与枪写的是常数 1 m 近景标签（它的几何带非等比深度压缩，视深不是世界视深），所以那一块是一片平的。" },
   { id: "motionVector", label: "Motion Vector", group: "GBuffer", note: "由深度反投影得到的相机屏幕速度：R/G = 水平/垂直方向，B = 像素速度。没有逐物体速度缓冲。" },
-  { id: "ao", label: "AO 原始", group: "AO", note: "SSAO 尚未双边模糊的半分辨率结果。" },
-  { id: "aoBlur", label: "AO 模糊", group: "AO", note: "实际注入材质间接光的 AO 结果。" },
+  { id: "velocity", label: "速度缓冲", group: "GBuffer", note: "预通道 MRT 的 RT1：逐物体屏幕速度（R/G = 水平/垂直，B = 像素速度）。蒙皮人物走上一帧骨矩阵，实例化布设与远景人群只有相机速度（已知近似），前景枪械与天空恒 0。" },
+  { id: "ao", label: "AO 原始", group: "AO", note: "GTAO 地平线搜索的原始输出（尚未时域累积与双边去噪）。噪点是逐帧轮转的采样相位，去噪之后才是正式画面用的那张。" },
+  { id: "aoBlur", label: "AO 模糊", group: "AO", note: "实际注入材质间接光的 AO 结果：时域累积 + 双边去噪之后的可见度。" },
+  { id: "bentNormal", label: "弯曲法线", group: "AO", note: "GTAO 的弯曲法线（视空间，八面体解码后按 RGB 显示）：开阔平地上等于几何法线，墙角处朝开阔的一侧偏。镜面遮蔽用的就是它。" },
+  { id: "ssil", label: "SSIL 间接光", group: "AO", note: "屏幕空间近场间接光：与 GTAO 同一趟地平线搜索、按可见性位掩码从上一帧的已光照 HDR 采到的一次反弹（HDR 映射显示）。high/ultra 才有，低档显示不可用斜纹。" },
+  { id: "specularOcclusion", label: "镜面遮蔽", group: "AO", note: "GTSO：可见性锥（弯曲法线 + AO）与镜面锥（固定 0.35 粗糙度）的球冠相交。白 = 反射方向开阔、黑 = 被挡。正式画面按各自材质的真粗糙度算，这张图为了看空间梯度统一取 0.35。" },
   { id: "baseColor", label: "BaseColor", group: "材质", note: "反照率（贴图×顶点色×材质色），光照之前的底色。" },
   { id: "roughness", label: "粗糙度", group: "材质", note: "ORM 采样后的 roughnessFactor；白 = 糙、黑 = 光。" },
   { id: "metalness", label: "金属度", group: "材质", note: "ORM 采样后的 metalnessFactor；这一关的世界大多是 0（黑），枪机、刺刀才亮。" },
+  { id: "pomOffset", label: "视差位移", group: "材质细节", note: "视差遮蔽把 uv 推了多远，单位是**屏幕像素**（红 = 位移大）。关掉 POM 的同一块墙这张图恒为纯黑 —— 两张一比就是「视差到底有没有在动」。没编 POM 的材质（人物、枪、low 档）也是黑。" },
+  { id: "pomHeight", label: "视差高度", group: "材质细节", note: "视差命中点落在高度场的哪一层：白 = 砖面，黑 = 缝底。ultra 的 POM 自阴影会把被挡住的缝再压暗一档。" },
+  { id: "detailNormal", label: "细节法线", group: "材质细节", note: "第二张高频法线实际扰动了多少（切线空间 xy 映射到 RG，中灰 = 无扰动）。超过淡出距离（4.5 m）应当整片中灰。" },
+  { id: "microShadow", label: "微阴影", group: "材质细节", note: "Chan 2018 的直射光微遮蔽因子：白 = 一点不压，黑 = 全压。平整表面（材质 AO ≈ 1）恒白，只有砖缝/木纹在斜射光下才暗下来。" },
+  { id: "skinCurvature", label: "皮肤曲率", group: "材质细节", note: "皮肤预积分散射查表用的曲率（1/米，红 = 尖）。只有被识别成皮肤的材质有值，其余全黑 —— 顺带能核对脸和手有没有被认出来。" },
   { id: "shadow", label: "太阳阴影", group: "光照", note: "平行光阴影因子：白 = 照到、黑 = 挡住。阴影框只有 66 m，框外恒白 —— 顺带能看到覆盖边界。不收影的材质显示黑。" },
+  { id: "sunShadow", label: "SunShadow 采样", group: "光照", note: "用预通道重建世界坐标，走 Script_Light.SUN_SHADOW_GLSL 的公共接口采一遍太阳阴影：白 = 照到、黑 = 挡住、天空是深蓝底。体积雾/接触阴影/CSM 共用这条接口，这张图就是它的看门狗。" },
+  { id: "csmCascade", label: "级联假彩色", group: "光照", note: "太阳阴影每一级的覆盖范围：红=第0级（最近、最密）、黄=1、绿=2、蓝=3（ultra 才有第 3 级），深灰=全部级联之外（那里恒为「照到」，靠雾盖）。底色乘了阴影可见度，所以同时能看到影子落在哪。相邻级之间有一条过渡带，颜色在带内渐变——那条带就是 cascade fade。" },
+  { id: "csmPenumbra", label: "阴影半影", group: "光照", note: "PCSS 估计出的半影宽度（本级纹素）：蓝 = 硬（贴着遮挡体）、橙 = 软（离遮挡体远）。墙根、屋檐下应该是蓝，开阔地面是橙；整屏一个颜色说明 blocker search 没生效或这一级不跑 PCSS（medium 及以下、以及最远那一级都是固定盘）。图上的抖动是 blocker search 的 IGN 随机盘，正片里由 TAA 抹平。" },
+  { id: "contactShadow", label: "接触阴影", group: "光照", note: "屏幕空间接触阴影靶：白 = 没挡住、黑 = 沿太阳方向短距离追踪命中。只应该出现在物体贴地那一圈与缝隙里；大面积发黑说明厚度判据或步长不对。low 档不跑，显示不可用斜纹。" },
   { id: "diffuseLighting", label: "Diffuse Lighting", group: "光照", note: "正式 reflectedLight.directDiffuse：太阳/局部直射的漫反射贡献（HDR 映射显示）。" },
   { id: "specularLighting", label: "Specular Lighting", group: "光照", note: "正式 reflectedLight.directSpecular：太阳/局部直射的镜面高光贡献（HDR 映射显示）。" },
   { id: "reflection", label: "Reflection", group: "光照", note: "正式 reflectedLight.indirectSpecular：环境 IBL 的粗糙反射，已包含正式 SSAO/GI 镜面遮蔽。" },
   { id: "indirectLighting", label: "Indirect Lighting", group: "光照", note: "正式 reflectedLight.indirectDiffuse：探针 GI 或天空 IBL 的漫反射，已包含正式 SSAO。" },
   { id: "giWorld", label: "GI 辐照度", group: "光照", note: "材质最终采用的间接辐照度（×0.05）；探针体外按正式渲染回退到天空 IBL，不应为黑。" },
   { id: "giConfidence", label: "GI 置信度", group: "光照", note: "取样置信度：1 = 全用探针，0 = 退回天空 IBL；体积边缘的淡出带就在这里看。探针体关着（出厂默认）时恒 0，全黑是准确信息。" },
+  { id: "ssr", label: "SSR 辐亮度", group: "反射", note: "屏幕空间反射解算 + 时域累积后的镜面辐亮度（HDR 映射显示）。材质在 <lights_fragment_maps> 处按置信度用它替换天空 PMREM 的 radiance。" },
+  { id: "ssrConfidence", label: "SSR 置信度", group: "反射", note: "0 = 完全回退天空 PMREM，1 = 完全用屏幕空间结果。深蓝 = 0、暖黄 = 1。屏幕边缘、朝向相机的射线、命中背面与粗糙度超上限的像素都会掉到 0。" },
+  { id: "ssrHitDistance", label: "SSR 命中距离", group: "反射", note: "Hi-Z 追踪的行程（绿 = 近、品红 = 30 m 以上）；深灰 = 未命中。反射穿墙或起点自交时，这张图上会看到成片的极短行程。" },
   { id: "giIrradiance", label: "辐照度图集", group: "GI", note: "实时探针体的 RGB 辐照度 atlas；探针体没开时显示不可用斜纹（去「画质」里打开）。" },
   { id: "giDistance", label: "距离图集", group: "GI", note: "实时探针体的 R/G 距离矩；探针体没开时显示不可用斜纹。" },
+  // 物理大气（子系统 B4）。四张 LUT + 两张屏幕空间的大气透视。
+  { id: "atmoTransmittance", label: "透过率 LUT", group: "大气", note: "Hillaire 透过率表（256×64）：横轴是天顶角映射、纵轴是海拔。天顶方向（左上）应接近白，掠地平线（右下）明显偏红 —— 蓝光先被散掉。" },
+  { id: "atmoMultiScatter", label: "多次散射 LUT", group: "大气", note: "二阶以上散射的等比级数和 Ψ（32×32）：横轴是太阳天顶余弦、纵轴海拔。阴天与黄昏地平线不死黑靠它。" },
+  { id: "atmoSkyView", label: "天空视图 LUT", group: "大气", note: "相机高度处的整片天（192×108）：横轴是相对太阳的方位（右侧朝太阳），纵轴天顶角、地平线两侧各加密一次。不含太阳盘与美术烟层。" },
+  { id: "atmoAerialLut", label: "大气透视 LUT", group: "大气", note: "32×32×32 froxel 打成的 2D 图集（切片沿横向平铺，越靠右越远）。rgb = 累积散射，a = 透过率。" },
+  { id: "aerialScatter", label: "大气透视 散射", group: "大气", note: "屏幕空间：拿预通道重建世界坐标再问一次 AerialPerspective()，与合成 pass 同一个函数同一批 uniform。Reinhard 显示；天空是深蓝底。" },
+  { id: "aerialTransmittance", label: "大气透视 透过率", group: "大气", note: "同上，显示的是透过率：深蓝 = 全通（近处），暖黄 = 被空气吃光（远处）。近处贴脸必须是深蓝，出现暖黄就是 froxel 切片对错位了。" },
 ];
 
 /** 着色模式 chips。id 与 Script_Post.SHADING_MODES 一致。 */
@@ -58,6 +96,14 @@ const MATERIAL_VIEW_MODES = {
 };
 
 /**
+ * 材质着色升级（2026-09）那一路的假彩色编号，走**自己的** uniform
+ * （`Script_MaterialShading` 的 `uMatDebugView`），与上面 GI 那一包互不干扰：
+ * 两条注入链是分开的补丁，各自的 debugView 也就必须分开，否则关掉 GI
+ * 的档位连视差图都看不了。表里没有的视图必须归零，不然材质还在写上一个假彩色。
+ */
+const SHADING_VIEW_MODES = MATERIAL_DEBUG_VIEWS;
+
+/**
  * 视图 id -> 它正在显示的那张靶。与 Post._GetDebugSource 是同一张表，
  * 改一边必须改另一边，否则面板报的尺寸不是屏幕上那张图的尺寸。
  */
@@ -66,16 +112,56 @@ const VIEW_TARGETS = {
   hdr: (post) => post?.targets?.hdr,
   bloomExtract: (post) => post?.targets?.bright,
   bloom: (post) => post?.BloomTarget,
+  exposure: (post) => post?.targets?.ldr,
+  lensFlare: (post) => post?.targets?.flare,
+  lensDirt: (post) => post?.lensFlarePass?.DirtTexture,
+  lutCheck: (post) => post?.targets?.ldr,
   fog: (post) => post?.targets?.normalDepth,
   dof: (post) => post?.targets?.normalDepth,
+  // 体积雾四视图都是全分辨率重算（Debug pass 现查图集），面板报的是积分图集的尺寸 ——
+  // 那才是「这一档到底有多少 froxel」的读数。
+  volumetricDensity: (post) => post?.targets?.volumetricScatter,
+  volumetricScatter: (post) => post?.targets?.volumetricIntegrated,
+  volumetricTransmittance: (post) => post?.targets?.volumetricIntegrated,
+  volumetricReproject: (post) => post?.targets?.volumetricScatter,
   normal: (post) => post?.targets?.normalDepth,
   depth: (post) => post?.targets?.normalDepth,
   motionVector: (post) => post?.targets?.normalDepth,
+  velocity: (post) => post?.targets?.normalDepth,
+  // 2026-09 追加：这三张由 Script_PostFxaa 的 GetDebugSource 认领（① 那条路，
+  // 见那里的 TEMPORAL_DEBUG_VIEWS）；这里报的是面板上那一行的尺寸标注。
+  dofCoc: (post) => post?.targets?.normalDepth,
+  taaWeight: (post) => post?.taaPass?.debugTarget ?? post?.targets?.taaA,
+  velocityTile: (post) => post?.targets?.velocityTile,
+  sunShadow: (post) => post?.targets?.normalDepth,
+  csmCascade: (post) => post?.targets?.normalDepth,
+  csmPenumbra: (post) => post?.targets?.normalDepth,
+  contactShadow: (post) => post?.targets?.contactShadow,
   ao: (post) => post?.targets?.ao,
   aoBlur: (post) => post?.targets?.aoBlur,
+  ssr: (post) => post?.targets?.ssr,
+  ssrConfidence: (post) => post?.targets?.ssr,
+  ssrHitDistance: (post) => post?.targets?.ssrHit,
+  // 弯曲法线 / SSIL / 镜面遮蔽都是从最终 AO 靶实时解码出来的，没有独立 RT。
+  bentNormal: (post) => post?.targets?.aoBlur,
+  ssil: (post) => post?.targets?.aoBlur,
+  specularOcclusion: (post) => post?.targets?.aoBlur,
   giIrradiance: (post, gi) => gi?.irradiance?.[gi.pingPong],
   giDistance: (post, gi) => gi?.distanceMoments?.[gi.pingPong],
+  // 物理大气：四张 LUT 归 Script_Atmosphere 持有，不在 post.targets 里
+  atmoTransmittance: () => GetActiveAtmosphere()?.transTarget,
+  atmoMultiScatter: () => GetActiveAtmosphere()?.multiTarget,
+  atmoSkyView: () => GetActiveAtmosphere()?.skyViewTarget,
+  atmoAerialLut: () => GetActiveAtmosphere()?.aerialTarget,
+  // 屏幕空间那两张没有独立靶：与 fog/dof 同一条路，按预通道尺寸报数
+  aerialScatter: (post) => post?.targets?.normalDepth,
+  aerialTransmittance: (post) => post?.targets?.normalDepth,
   // 材质通道假彩色都是场景按调试口径重画进 hdr 靶再送屏
+  pomOffset: (post) => post?.targets?.hdr,
+  pomHeight: (post) => post?.targets?.hdr,
+  detailNormal: (post) => post?.targets?.hdr,
+  microShadow: (post) => post?.targets?.hdr,
+  skinCurvature: (post) => post?.targets?.hdr,
   baseColor: (post) => post?.targets?.hdr,
   roughness: (post) => post?.targets?.hdr,
   metalness: (post) => post?.targets?.hdr,
@@ -521,6 +607,13 @@ export class DebugRenderingEditor {
     this.colliderXray = false;
     this.colliderFilters = { solid: true, terrain: true, character: true, dynamic: true, sensor: true };
     this.colliderToggle = null;
+    /** 簇状局部光的两层叠加：灯数热图 / 光源球线框。关着时是 null。 */
+    this.clusterHeat = null;
+    this.clusterSpheres = null;
+    this.clusterHeatToggle = null;
+    this.clusterSphereToggle = null;
+    this.clusterViewBefore = null;
+    this.clusterFacts = null;
     this._cameraWorld = new THREE.Vector3();
   }
 
@@ -551,13 +644,23 @@ export class DebugRenderingEditor {
     this.host.post?.SetShadingMode?.("shaded");
     const pack = this.host.library?.gi;
     if (pack) pack.debugView.value = 0;
+    const shadingPack = this.host.library?.shading;
+    if (shadingPack) shadingPack.debugView.value = 0;
     this.SetColliders(false);
+    // 先把「热图关掉要还原成哪个视图」清掉：上面已经把视图归位成 final 了，
+    // 留着的话 SetClusterHeat(false) 会把退出前那个视图再装回去，正片带着调试图走。
+    this.clusterViewBefore = null;
+    this.SetClusterHeat(false);
+    this.SetClusterSpheres(false);
     this.panel?.root.remove();
     this.panel = null;
     this.status = null;
     this.chipGroups = [];
     this.shadingChips = null;
     this.colliderToggle = null;
+    this.clusterHeatToggle = null;
+    this.clusterSphereToggle = null;
+    this.clusterFacts = null;
   }
 
   BuildUi(body) {
@@ -595,7 +698,8 @@ export class DebugRenderingEditor {
     }
     physics.appendChild(legend);
 
-    for (const group of ["输出", "后处理", "GBuffer", "材质", "光照", "AO", "GI"]) {
+    for (const group of ["输出", "后处理", "体积雾", "GBuffer", "材质", "材质细节",
+      "光照", "反射", "AO", "GI", "大气"]) {
       const section = Section(body, group);
       const options = VIEWS.filter((item) => item.group === group)
         .map((item) => ({ value: item.id, label: item.label, title: item.note }));
@@ -616,9 +720,12 @@ export class DebugRenderingEditor {
     // post 决定拿哪张靶、按哪种口径显示。只设一边就是「面板亮着、画面没变」。
     const pack = this.host.library?.gi;
     if (pack) pack.debugView.value = MATERIAL_VIEW_MODES[id] || 0;
+    const shadingPack = this.host.library?.shading;
+    if (shadingPack) shadingPack.debugView.value = SHADING_VIEW_MODES[id] || 0;
     // 第三参 = 材质注了调试层没有：GI 出厂默认关时探针体（host.gi）是 null，
     // 但材质/光照组的假彩色照样可用 —— 可用性要看 library.gi，不看探针体。
-    this.host.post?.SetDebugView?.(id, this.host.gi, !!pack);
+    // 材质细节那一组走另一包（library.shading），任一包在就算注入过。
+    this.host.post?.SetDebugView?.(id, this.host.gi, !!pack || !!shadingPack);
   }
 
   /** 着色模式：着色 / 线框 / 着色线框（Script_Post.SetShadingMode）。 */
@@ -649,6 +756,54 @@ export class DebugRenderingEditor {
     }
     this.colliderToggle?.Set(want);
     return this.colliders;
+  }
+
+  /**
+   * 簇灯数热图。打开时顺手把视图切到「HDR 场景」—— 那一档是
+   * `Script_PostDebug` 的 uMode 4（Reinhard + sRGB，**不过合成链**），
+   * 热图色标才不会被雾、曝光与 ACES 改掉。关掉时把视图还回去。
+   */
+  SetClusterHeat(on) {
+    const want = !!on && !!this.host.lights?.clustered;
+    if (want === !!this.clusterHeat) {
+      this.clusterHeatToggle?.Set(want);
+      return this.clusterHeat;
+    }
+    if (want) {
+      this.clusterHeat = MakeClusterHeatOverlay(this.host.lights.clustered);
+      this.clusterHeat.userData.SetSource(this.host.post?.NormalDepthTexture || null);
+      this.host.post?.AddDebugOverlay?.(this.clusterHeat);
+      this.clusterViewBefore = this.host.post?.GetDebugView?.() || "final";
+      this.SetView("hdr");
+    } else {
+      this.host.post?.RemoveDebugOverlay?.(this.clusterHeat);
+      this.clusterHeat.userData.Dispose();
+      this.clusterHeat = null;
+      if (this.clusterViewBefore) this.SetView(this.clusterViewBefore);
+      this.clusterViewBefore = null;
+    }
+    this.clusterHeatToggle?.Set(want);
+    return this.clusterHeat;
+  }
+
+  /** 光源球线框：本帧真正送进 GPU 的每盏局部光的影响半径。 */
+  SetClusterSpheres(on) {
+    const want = !!on && !!this.host.lights?.clustered;
+    if (want === !!this.clusterSpheres) {
+      this.clusterSphereToggle?.Set(want);
+      return this.clusterSpheres;
+    }
+    if (want) {
+      this.clusterSpheres = MakeClusterSphereOverlay(this.host.lights.clustered);
+      this.clusterSpheres.userData.Update();
+      this.host.post?.AddDebugOverlay?.(this.clusterSpheres);
+    } else {
+      this.host.post?.RemoveDebugOverlay?.(this.clusterSpheres);
+      this.clusterSpheres.userData.Dispose();
+      this.clusterSpheres = null;
+    }
+    this.clusterSphereToggle?.Set(want);
+    return this.clusterSpheres;
   }
 
   SetColliderXray(on) {
@@ -691,10 +846,31 @@ export class DebugRenderingEditor {
 
   Update() {
     if (this.colliders) this.colliders.Update(this.host.physics, this.CameraWorldPosition());
+    // 热图要现接预通道靶：SetSize 会重建它，纹理引用每帧都可能换（与 RenderScene
+    // 里 vfx.SetDepthSource 那三行同一类账，只在打开时接一次就会指向已废弃的靶）。
+    if (this.clusterHeat) this.clusterHeat.userData.SetSource(this.host.post?.NormalDepthTexture || null);
+    if (this.clusterSpheres) this.clusterSpheres.userData.Update();
+    if (this.clusterFacts) {
+      const cluster = this.host.lights?.clustered;
+      const cf = this.clusterFacts;
+      if (!cluster) {
+        cf.Set("局部光", "固定灯池（本档不跑簇）");
+        cf.Set("簇网格", "—");
+        cf.Set("每片元灯数", "—");
+      } else {
+        const s = cluster.stats;
+        const g = cluster.grid;
+        cf.Set("局部光", `${s.active} / ${cluster.maxLights}${cluster.enabled ? "" : "（已关）"}`);
+        cf.Set("簇网格", `${g.tilesX}×${g.tilesY}×${g.slices} · ${g.near.toFixed(1)}–${g.far.toFixed(0)} m`);
+        cf.Set("每片元灯数", `均 ${s.meanPerOccupied.toFixed(2)} / 峰 ${s.maxPerCluster}`
+          + ` · 索引 ${s.indexCount}${s.overflow ? `（溢出 ${s.overflow}）` : ""}`);
+      }
+    }
     if (!this.status) return;
     const target = VIEW_TARGETS[this.view]?.(this.host.post, this.host.gi) ?? null;
     let message = "";
     if (MATERIAL_VIEW_MODES[this.view] && !this.host.library?.gi) message = "当前画质不支持此视图。";
+    if (SHADING_VIEW_MODES[this.view] && !this.host.library?.shading) message = "当前画质不支持此视图。";
     else if (!target && this.view !== "final") message = "此视图暂不可用，请启用对应效果。";
     this.status.textContent = message;
     this.status.hidden = !message;

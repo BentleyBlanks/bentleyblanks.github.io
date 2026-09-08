@@ -349,7 +349,14 @@ async function ShootGroup(group) {
   if (group.shots.length > 1) console.log(`--- ${group.query}（${group.shots.length} 张同页连拍）---`);
   try {
     await page.goto(url, { waitUntil: "load", timeout: 90000 });
-    await page.waitForFunction((g) => window[g] !== undefined, group.globalName, { timeout: 90000 });
+    // 开机闸 2026-09-08 从 300 s 收回 **120 s**。那个 300 s 是合流当时「预热要
+    // 145 s」留下的应急值；§16.0 的三条优化（并行提交 program / 不建孪生程序 /
+    // 预热排班）落地之后，冷缓存实测就绪 **29.6 s 中位**（27.8 / 30.1 / 29.6，
+    // 每轮全新浏览器 + `--disable-gpu-shader-disk-cache --disable-gpu-program-cache
+    // --disk-cache-size=1`），热缓存 14.2 s。120 s 是冷缓存的 4 倍余量 ——
+    // 既能挡住「预热又退化了」，也不会像 300 s 那样把退化藏到五分钟以后。
+    // 开机耗时本身的回归口仍在 Script_BootStallTest / Script_BootTest。
+    await page.waitForFunction((g) => window[g] !== undefined, group.globalName, { timeout: 120000 });
     // 先让加载/烘焙走完，再推进固定帧数把时序相关效果（火焰闪烁、运动模糊历史）稳住
     // 先推逻辑帧把战场跑活（AI 铺开、粒子起来），再让 rAF 真渲染若干帧。
     // 推逻辑帧 != 推渲染帧：镜头缓动、材质淡出、光照换挡全在渲染侧。

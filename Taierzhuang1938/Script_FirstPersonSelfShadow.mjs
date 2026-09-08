@@ -11,6 +11,8 @@
 // 世界不采这张图，Viewmodel 也仍保持 castShadow=false，所以两张阴影图绝不串线。
 
 import * as THREE from "three";
+// 视模那一份材质要重挂一次间接光补丁（去掉 SSR，见 CloneOwnedMaterial 的账）。
+import { ApplyPatches, IndirectLightingPatches } from "./Script_MaterialPatches.mjs";
 
 export const FIRST_PERSON_SHADOW_LAYER = 29;
 
@@ -109,13 +111,41 @@ float FirstPersonSelfShadow() {
 }
 `;
 
-/** 复制一份材质，保留材质库已经装好的 AO/GI 编译钩子，但不把新阴影注入共享底材。 */
+/**
+ * 复制一份材质，保留材质库已经装好的 AO/GI 编译钩子，但不把新阴影注入共享底材。
+ *
+ * **视模这一份不挂 SSR**，两个理由（2026-09 三个子系统合流时定的）：
+ *  1. **它读的本来就是错的数**。手与枪走 `MarkForegroundPrepass`，在预通道里写的是
+ *     一个常数 1 m 近景标签，不参与 SSR 追踪；`uSsrMap` 在这些像素上存的是**枪后面
+ *     那块几何**算出来的反射。把它当成枪自己的 radiance 是纯粹的串味。
+ *  2. **采样器预算**。这一份材质是全场最挤的一只：三方自带的六七个 + AO 1 + 探针 GI 3
+ *     + SSR 1 + 簇状光 3 + 自阴影 1。ANGLE-D3D11 的 `MAX_TEXTURE_IMAGE_UNITS` 是 16，
+ *     超了之后**程序链接失败**（日志只有一行 "texture image units count exceeds"），
+ *     three 每帧照样 useProgram → 每帧一次 1282，而那一趟什么都不画 ——
+ *     表现就是**开着探针 GI 时第一人称的手和枪整只不见**。
+ *     ⚠️ 这是逼出来的取舍，不是 SSR 的设计意图：谁要把 SSR 还给视模，得先给这只材质
+ *     腾出一个采样器槽（合并 ORM、簇表打包成一张、或探针 GI 的三张合并）。
+ *     回归口：`Script_EditorTest` 的「自阴影软化可热切」那一条断言 `glError === 0`。
+ */
 function CloneOwnedMaterial(material) {
   const clone = material.clone();
   clone.name = `${material.name || material.type}_FirstPerson`;
   clone.onBeforeCompile = material.onBeforeCompile;
   clone.customProgramCacheKey = material.customProgramCacheKey;
   clone.userData = { ...(material.userData || {}) };
+  if (clone.userData.indirectLightingInjected && clone.userData.ssrUniforms) {
+    clone.userData.ssrUniforms = null;
+    ApplyPatches(clone, IndirectLightingPatches({
+      // ORM 三合一的描述子是纯 JSON，material.clone() 的 userData 深拷能原样带过来；
+      // 这里必须一并传，否则视模那份材质会丢掉金属度与材质自带遮蔽（它的
+      // metalnessMap / aoMap 已经在底材上被摘掉了，补丁是唯一的读取路径）。
+      orm: clone.userData.ormUniforms || null,
+      ssao: clone.userData.ssaoUniforms || null,
+      gi: clone.userData.giUniforms || null,
+      ssr: null,
+      destruction: clone.userData.destructionUniforms || null,
+    }));
+  }
   return clone;
 }
 

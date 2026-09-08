@@ -23,7 +23,7 @@ export class FirstPersonBody {
       node.receiveShadow = true;
       node.userData.firstPersonBody = true;
       node.material = Array.isArray(node.material) ? node.material.map((m) => m.clone()) : node.material.clone();
-      library?.ConfigureExternalPbr?.(node.material, {metalness: 0, minRoughness: 0.78});
+      library?.ConfigureExternalPbr?.(node.material, {metalness: 0, minRoughness: 0.78, mesh: node});
     });
   }
 

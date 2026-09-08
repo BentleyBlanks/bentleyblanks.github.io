@@ -402,13 +402,22 @@ const debugShading = await page.evaluate(() => {
   panel.SetShading("shaded");
   const base = Grab();
   const out = {};
+  // **漂移对照**：什么都不做，走与下面 round-trip 一样多的帧。
+  // 这一关的世界是活的（AI 在走、烟在飘、火在闪），而 round-trip 要花十几帧；
+  // 「切回着色后画面一致」只能是「不比场景自己漂的多」，钉一个绝对阈值的话
+  // 哪天 AI 走得勤一点就翻红。2026-09 集成期实测：漂移 0.006，round-trip 0.008。
+  Grab(); Grab();
+  T.StepFrames(2);
+  out.drift = Diff(base, Grab());
+  // round-trip 的基准紧挨着它自己取，别拿二十帧前那一张当参照
+  const baseRound = Grab();
   panel.SetShading("shadedWireframe");
-  out.shadedWireframe = { mode: T.post.GetShadingMode(), diff: Diff(base, Grab()) };
+  out.shadedWireframe = { mode: T.post.GetShadingMode(), diff: Diff(baseRound, Grab()) };
   panel.SetShading("wireframe");
   const wire = Grab();
   const source = T.post._GetDebugSource();
   out.wireframe = {
-    mode: T.post.GetShadingMode(), diff: Diff(base, wire),
+    mode: T.post.GetShadingMode(), diff: Diff(baseRound, wire),
     passThrough: source?.texture === T.post.targets.hdr.texture && source?.mode === 5,
   };
   panel.SetView("normal");
@@ -416,7 +425,7 @@ const debugShading = await page.evaluate(() => {
   out.wireframeNormalView = T.post._GetDebugSource()?.texture === T.post.targets.normalDepth.texture;
   panel.SetView("final");
   panel.SetShading("shaded");
-  out.backToShaded = { mode: T.post.GetShadingMode(), diff: Diff(base, Grab()) };
+  out.backToShaded = { mode: T.post.GetShadingMode(), diff: Diff(baseRound, Grab()) };
   out.shadingChipsOn = document.querySelectorAll(".edPanel.debugRendering .edShadingChips .edChip.on").length;
 
   panel.SetColliders(true);
@@ -447,10 +456,17 @@ Check("Debug Rendering：线框模式换成深灰底亮线、hdr 靶直通送屏
   debugShading.wireframe.mode === "wireframe" && debugShading.wireframe.diff > 0.8
   && debugShading.wireframe.passThrough && debugShading.wireframeNormalView,
   JSON.stringify({ ...debugShading.wireframe, normalView: debugShading.wireframeNormalView }));
+// 阈值 = max(1%, 场景自身漂移 × 2)：绝对下限一个字没松，另加一条相对界，
+// 免得「世界活着」被当成「画面没还原」。切着色模式对测光是**硬切**
+// （线框那一档整幅画换成深灰底 + 亮线），`PostPipeline.SetShadingMode` 因此
+// 调 exposurePass.RequestReset() —— 不这么做的话自动曝光要按适应时间常数
+// 爬回来，这一条会量到 0.038（2026-09 集成期实测，修好之后 0.008）。
 Check("Debug Rendering：切回着色后画面与原正片一致、着色 chips 只亮一格",
-  debugShading.backToShaded.mode === "shaded" && debugShading.backToShaded.diff < 0.01
+  debugShading.backToShaded.mode === "shaded"
+  && debugShading.backToShaded.diff <= Math.max(0.01, debugShading.drift * 2)
   && debugShading.shadingChipsOn === 1,
-  JSON.stringify({ ...debugShading.backToShaded, chips: debugShading.shadingChipsOn }));
+  JSON.stringify({ ...debugShading.backToShaded, drift: debugShading.drift,
+    chips: debugShading.shadingChipsOn }));
 Check("Debug Rendering：碰撞体线框按 Rapier 世界的形状画到屏幕上（静态盒全数、角色胶囊、玩家自己的不画）",
   debugShading.colliders.overlays === 1 && debugShading.colliders.diff > 0.003
   && debugShading.colliders.unsupported === 0
@@ -614,14 +630,22 @@ const gfx = await page.evaluate(() => {
   g.gfx.fov = 62;
   g.Apply();
   window.Taierzhuang.StepFrames(4);
-  const after = { w: T.post.width, h: T.post.height };
+  const after = { w: T.post.width, h: T.post.height,
+    outW: T.post.outputWidth, outH: T.post.outputHeight, taau: !!T.post.taauActive };
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem("tengxian1938_graphics_v1")); } catch (e) { saved = null; }
-  return { id: T.editor.ActiveId, before, after, saved, fov: T.camera.fov };
+  return { id: T.editor.ActiveId, before, after, saved, fov: T.camera.fov,
+    inner: [window.innerWidth, window.innerHeight] };
 });
-Check("画质面板：渲染分辨率真的改到合成靶上",
-  gfx.id === "graphics" && gfx.after.w < gfx.before.w * 0.7,
-  `${gfx.before.w}×${gfx.before.h} → ${gfx.after.w}×${gfx.after.h}`);
+// 出厂 renderScale 跟画质档走（TAAU：high 是 0.8），所以不能拿「比出厂小 30%」当判据 ——
+// 直接对 0.6 × 窗口宽这个**绝对值**，比原来的相对判据更强。
+// 输出靶必须仍是满分辨率：TAAU 把画面解算回窗口大小，末趟不再拉伸。
+Check("画质面板：渲染分辨率真的改到合成靶上（内部 0.6×，输出仍满分辨率）",
+  gfx.id === "graphics"
+  && Math.abs(gfx.after.w - Math.round(gfx.inner[0] * 0.6)) <= 1
+  && gfx.after.outW === gfx.inner[0],
+  `${gfx.before.w}×${gfx.before.h} → ${gfx.after.w}×${gfx.after.h}`
+  + ` ｜ 输出 ${gfx.after.outW}×${gfx.after.outH} TAAU=${gfx.after.taau}`);
 Check("画质面板：设置落盘",
   !!gfx.saved && gfx.saved.renderScale === 0.6 && gfx.saved.bloom === 0.25,
   gfx.saved ? `renderScale=${gfx.saved.renderScale} bloom=${gfx.saved.bloom}` : "没存上");
