@@ -1344,13 +1344,15 @@ export class AiDirector {
   HasLineOfSight(s, cand) {
     const id = cand.id;
     const cache = s.losCache;
+    const lean = cand.isPlayer ? (cand.ref?.LeanOffsetM || 0) : 0;
     for (const entry of cache) {
-      if (entry.id === id && this.time - entry.time < 0.25) return entry.clear;
+      if (entry.id === id && entry.lean === lean && this.time - entry.time < 0.25) return entry.clear;
     }
     const from = this.tmpA.set(s.position.x,
       s.position.y + AiDirector.StanceEye(s.stance, s), s.position.z);
     const to = this.tmpB.set(cand.position.x,
       cand.position.y + AiDirector.StanceEye(cand.stance, cand), cand.position.z);
+    if (lean) to.copy(cand.ref.EyePosition);
     if (this.ctx.BlocksSight?.(from, to)) return false;
     const dir = this.tmpC.subVectors(to, from);
     const dist = dir.length();
@@ -1359,7 +1361,7 @@ export class AiDirector {
     const hit = this.ctx.battlefield.Raycast(from, dir, dist);
     const clear = !hit || hit.t >= dist - 0.4;
     const entry = cache[s.losSlot % cache.length];
-    entry.id = id; entry.time = this.time; entry.clear = clear;
+    entry.id = id; entry.time = this.time; entry.clear = clear; entry.lean = lean;
     s.losSlot = (s.losSlot + 1) % cache.length;
     return clear;
   }
@@ -2042,7 +2044,7 @@ export class AiDirector {
    */
   PlayerHitPart(s, from, aim, dir, player) {
     const sigma = COMBAT.player?.aimScatterM ?? 0.24;
-    const boxes = PlayerHitboxes(player.position, player.yaw, player.stance, this.playerBoxes);
+    const boxes = PlayerHitboxes(player.position, player.yaw, player.stance, this.playerBoxes, player.LeanOffsetM);
     const [g1, g2] = GaussianPair(s.rnd);
     const u = this.tmpU.set(dir.z, 0, -dir.x);
     if (u.lengthSq() < 1e-8) u.set(1, 0, 0);
@@ -2080,8 +2082,10 @@ export class AiDirector {
     if (toPlayer) {
       // 玩家有自己的命中几何（Script_PlayerHitbox）：照躯干中点瞄 ——
       // 趴着的人瞄的是背心，不是脚底往上 1.1 m 那团空气（以前曳光全从卧倒的玩家头顶飞过去）。
-      const aim = PlayerAimPoint(player.position, player.yaw, player.stance, this.tmpAim);
+      const aim = PlayerAimPoint(player.position, player.yaw, player.stance, this.tmpAim, player.LeanOffsetM);
       to.set(aim.x, aim.y, aim.z);
+      // At a wall edge the exposed head is the visible target; the torso stays covered.
+      if (player.LeanOffsetM) to.copy(player.EyePosition);
     } else {
       to.y += 1.1;
     }

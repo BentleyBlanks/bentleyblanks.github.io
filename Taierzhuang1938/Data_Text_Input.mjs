@@ -16,7 +16,7 @@ export const TEXT = Object.freeze({
   "input.guide.move.sprint.keys": "Shift",
   "input.guide.move.sprint.label": "冲刺；开镜时屏息",
   "input.guide.move.lean.keys": "Q / E",
-  "input.guide.move.lean.label": "向左 / 右探身",
+  "input.guide.move.lean.label": "向左 / 右探身；墙角按住右键自动探身",
   "input.guide.move.crouch.keys": "C",
   "input.guide.move.crouch.label": "下蹲；再按一次站立",
   "input.guide.move.prone.keys": "Z",

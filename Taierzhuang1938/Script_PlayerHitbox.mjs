@@ -65,7 +65,7 @@ function Place(out, position, b, f, r, y) {
  * @param {Array} [out] 复用的输出数组（每帧调用不产垃圾）
  * @returns {Array<{part:string,kind:string,center?:object,start?:object,end?:object,radius:number}>}
  */
-export function PlayerHitboxes(position, yaw, stance, out = []) {
+export function PlayerHitboxes(position, yaw, stance, out = [], leanOffsetM = 0) {
   const spec = PLAYER_HITBOX[stance] || PLAYER_HITBOX.stand;
   const b = Basis(yaw);
   out.length = 0;
@@ -81,15 +81,29 @@ export function PlayerHitboxes(position, yaw, stance, out = []) {
       });
     }
   }
+  // Lean the upper body from the hips; feet and collision capsule stay planted.
+  if (stance !== "prone" && leanOffsetM) {
+    const headY = spec.find((s) => s.part === "head").y;
+    const pivotY = spec.find((s) => s.part === "torso").y0;
+    for (const box of out) {
+      if (box.part === "leg") continue;
+      for (const point of box.center ? [box.center] : [box.start, box.end]) {
+        const k = Math.max(0, Math.min(1, (point.y - position.y - pivotY) / (headY - pivotY)));
+        point.x += b.rx * leanOffsetM * k; point.z += b.rz * leanOffsetM * k;
+      }
+    }
+  }
   return out;
 }
 
 /** AI 瞄的点：躯干胶囊的中点（站着是胸口，趴着是背心）。 */
-export function PlayerAimPoint(position, yaw, stance, out = { x: 0, y: 0, z: 0 }) {
+export function PlayerAimPoint(position, yaw, stance, out = { x: 0, y: 0, z: 0 }, leanOffsetM = 0) {
   const spec = PLAYER_HITBOX[stance] || PLAYER_HITBOX.stand;
   const torso = spec.find((s) => s.part === "torso");
   const b = Basis(yaw);
-  return Place(out, position, b, (torso.f0 + torso.f1) * 0.5, (torso.r0 + torso.r1) * 0.5, (torso.y0 + torso.y1) * 0.5);
+  const headY = spec.find((s) => s.part === "head").y;
+  const shift = stance === "prone" ? 0 : leanOffsetM * (torso.y1 - torso.y0) * 0.5 / (headY - torso.y0);
+  return Place(out, position, b, (torso.f0 + torso.f1) * 0.5, (torso.r0 + torso.r1) * 0.5 + shift, (torso.y0 + torso.y1) * 0.5);
 }
 
 /**

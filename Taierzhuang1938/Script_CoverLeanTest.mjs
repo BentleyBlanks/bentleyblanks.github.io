@@ -1,0 +1,20 @@
+import assert from "node:assert/strict";
+import { CoverLean, LeanClearance } from "./Script_CoverLean.mjs";
+import { CAMERA } from "./Data_Tuning_Player.mjs";
+const eye = { x: 0, y: 1.62, z: 0 }, forward = { x: 0, y: 0, z: -1 }, right = { x: 1, y: 0, z: 0 };
+const state = new CoverLean();
+const sample = {enabled:true,eye,forward,right,clearance:()=>CAMERA.leanOffsetM,
+  raycast:(p)=>p.x < 0.15 ? {t:0.5,normal:[0,0,1]} : null};
+const Step = (s=sample,n=20)=>{let result;for(let i=0;i<n;i++)result=state.Update(1/60,s);return result;};
+assert.equal(Step(),1,"right edge opens");
+assert.equal(Step(sample,120),1,"stable while unshifted body remains behind wall");
+assert.equal(Step({...sample,enabled:false},1),0,"release clears intent immediately");
+assert.equal(Step({...sample,raycast:()=>null}),0,"open field does not lean");
+assert.equal(Step({...sample,raycast:()=>({t:.5,normal:[0,0,1]})}),0,"solid wall has no edge");
+assert.equal(Step({...sample,raycast:p=>p.x > -.15 ? {t:.5,normal:[0,0,1]}:null}),-1,"left edge mirrors right");
+assert.equal(Step({...sample,clearance:()=>.1}),0,"blocked head sweep prevents automatic lean");
+assert.equal(Step({...sample,raycast:p=>p.x < .15 ? {t:.5,normal:[0,1,0]}:null}),0,"ground/low roof is not a wall edge");
+assert.equal(LeanClearance(eye,right,.42,()=>false,()=>null),.42,"empty sweep fully open");
+assert.ok(LeanClearance(eye,right,.42,(x)=>x>=.2,()=>null)<.2,"obstacle clamps the transition");
+assert.ok(LeanClearance(eye,right,-.42,null,()=>({t:.25}))<.13,"manual lean toward a wall is clipped");
+console.log("CoverLeanTest OK — edge selection / stable side / release / no wall / no opening / swept head clearance");

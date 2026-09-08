@@ -115,3 +115,19 @@ for (const stance of ["stand", "crouch", "prone"]) {
 }
 
 console.log("PlayerHitboxTest OK — 三姿态分段/正面部位次序/卧倒藏躯干/瞄点/散点分布/高斯对");
+
+// The exposed head and shoulders move; the feet stay in cover. Both yaw and stance mirror.
+for (const stance of ["stand", "crouch"]) for (const yaw of [0, Math.PI / 2]) for (const offset of [-.42, .42]) {
+  const base = PlayerHitboxes(feet, yaw, stance);
+  const leaned = PlayerHitboxes(feet, yaw, stance, [], offset);
+  const h0 = base[0].center, h1 = leaned[0].center;
+  assert.ok(Math.abs(h1.x-h0.x-Math.cos(yaw)*offset)<1e-9);
+  assert.ok(Math.abs(h1.z-h0.z+Math.sin(yaw)*offset)<1e-9);
+  assert.deepEqual(leaned.filter(b=>b.part==="leg"),base.filter(b=>b.part==="leg"));
+  const torso=leaned.find(b=>b.part==="torso"),aim=PlayerAimPoint(feet,yaw,stance,{},offset);
+  assert.ok(Math.hypot(aim.x-(torso.start.x+torso.end.x)/2,aim.z-(torso.start.z+torso.end.z)/2)<1e-9);
+  const from={x:h1.x,y:h1.y+10,z:h1.z};
+  assert.equal(RaycastPlayerHitboxes(from,{x:0,y:-1,z:0},leaned).part,"head");
+}
+assert.deepEqual(PlayerHitboxes(feet,0,"prone",[],.42),PlayerHitboxes(feet,0,"prone"));
+console.log("PlayerHitboxTest OK — leaning head hittable / torso follows / feet planted / prone unchanged");

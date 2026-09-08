@@ -168,6 +168,10 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --label=x   # 第一关三�
 ### 测试场共享光照
 - 六个测试场共用 `Script_Sky.TEST_SCENE_DAY`；参数、角色比较条件与灰卡/全角色回归见 [测试场光照基准](Data_TestSceneLighting.md)。
 
+### 靠墙自动探身
+- `Script_CoverLean` / `Data_Tuning_Player.COVER_LEAN`：通用右键墙角探身，沿用 Q/E 手动控制；镜头、射击和受击共用偏移。
+- 回归：`Script_CoverLeanTest` / `Script_CoverLeanBrowserTest` / `Script_PlayerHitboxTest`；现状见 [靠墙自动探身](Data_CoverLean.md)。
+
 ### 操作交互测试场（?movement=1）
 - `Data_MovementRange.mjs` 定义五区实体与边界档；`Script_MovementRangeField.mjs` 按同一尺寸合批几何、碰撞和米制标尺。
 - `Script_MovementRange.mjs` 观察正式玩家动作，分开记录跳跃、助跑跳、翻越和攀爬；Home 复位，PageUp / PageDown 切区。

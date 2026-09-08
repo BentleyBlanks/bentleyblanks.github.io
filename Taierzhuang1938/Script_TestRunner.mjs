@@ -122,6 +122,8 @@ export const testDefs = {
   CharacterModelTest: { file: "Script_CharacterModelTest.mjs", desc: "十名蒙皮士兵：16 动作、骨骼挂点、命中体与阵营分配契约（纯 Node）" },
   CharacterHitboxMathTest: { file: "Script_CharacterHitboxMathTest.mjs", desc: "人物子弹代理：精确球/胶囊首交点（纯 Node）" },
   PlayerHitboxTest: { file: "Script_PlayerHitboxTest.mjs", desc: "玩家命中几何：三姿态分段 / 正面部位次序 / 卧倒藏躯干 / 瞄点 / 散点部位分布（纯 Node，毫秒级）" },
+  CoverLeanTest: { file: "Script_CoverLeanTest.mjs", desc: "墙角自动探身规则、侧向稳定性和头部扫掠（纯 Node）" },
+  CoverLeanBrowserTest: { file: "Script_CoverLeanBrowserTest.mjs", timeoutMs: 240000, desc: "真实右键墙角探身、射击遮挡、手动控制和退出还原" },
   CameraShakeTest: { file: "Script_CameraShakeTest.mjs", desc: "相机震动：创伤漏光 / 弹簧回位 / 幅度封顶 / 距离与遮挡衰减 / 扑沟栽向下 / 确定性（纯 Node，毫秒级）" },
   ActorDepthTest: { file: "Script_ActorDepthTest.mjs", desc: "蒙皮人物写入 NormalDepth，防 TAA 把背景叠回军装" },
   ExternalPropAssetTest: { file: "Script_ExternalPropAssetTest.mjs", desc: "外部构件 GLB 节点、尺度与面数预算（纯 Node）" },
@@ -214,7 +216,7 @@ export const browserTests = new Set([
   "FirstLevelTrainAnimationTest",
   "BrowserBundleTest",
 
-  "MovementRangeTest",
+  "CoverLeanBrowserTest", "MovementRangeTest",
   'FirstLevelP012AnimationTest',
   'FirstLevelP012TerrainBrowserTest',
   "TrainLibraryTest",
@@ -286,7 +288,7 @@ export const domains = {
   },
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
-    tests: ["StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
+    tests: ["CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
       "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "MeleeQteTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest", "ModelFacingTest",
       // 玩家自己的命中几何（AI 打玩家的部位由它判）与通用震屏（爆炸/近失/中弹/落地/扫射/扑沟）：
@@ -362,6 +364,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  { domain: "combat", pattern: /CoverLean/i },
   {domain:"combat",pattern:/BallisticSuppression/},
   {domain:'firstLevel',pattern:/FirstLevelMission|FirstLevelTrain|FirstLevelVoiceAlign|SeedAudioFirstLevel|Audio\/FirstLevel/},
   { domain: "menu", pattern: /FirstLevelP012Debug/i },

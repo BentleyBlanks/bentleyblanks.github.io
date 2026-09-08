@@ -6322,7 +6322,9 @@ function TryFire(dt, returningGrenade = false) {
     if (s.position.distanceTo(from) > range + 4) continue;
     _marchTargets.push(s);
   }
-  const shot = MarchBullet(from, dir, weapon, _marchTargets);
+  const obstruction = player.MuzzleObstruction(from);
+  if (obstruction) _hitPoint.copy(obstruction.point);
+  const shot = obstruction || MarchBullet(from, dir, weapon, _marchTargets);
   const targetHealthBefore = shot.soldier?.health ?? 0;
 
   // 弹道取证：落差是相对**实际射出的那条直线**算的，跟散布无关，只跟重力有关
@@ -6335,6 +6337,7 @@ function TryFire(dt, returningGrenade = false) {
     muzzleOffsetM: muzzleOffset,
     hitKind: shot.soldier ? "soldier" : shot.wall ? "wall" : "none",
     fromY: from.y, endY: _hitPoint.y,
+    from: from.toArray(), end: _hitPoint.toArray(), muzzleBlocked: !!obstruction,
     // Read-only trigger/ballistic evidence. Keep spread and recoil separate:
     // aimDirection excludes random dispersion; direction is the fired ray.
     aimAtTrigger: aimAtTrigger.toArray(), aimDirection: shotAimDirection.toArray(), direction: dir.toArray(),
@@ -6391,7 +6394,7 @@ const _empTargets = [];
 const EMPLACED_CONVERGE_M = 160;
 
 function FireVehicleBullet(from,direction,{weaponId="Type11",damageScale=1,sourceCollider=null}={}) {
-  const boxes=PlayerHitboxes(player.position,player.yaw,player.stance);
+  const boxes=PlayerHitboxes(player.position,player.yaw,player.stance,[],player.LeanOffsetM);
   const playerTarget={alive:player.Alive,position:player.position,preciseHitboxes:true,
     stance:player.stance==="prone"?2:player.stance==="crouch"?1:0,
     get suppression(){return player.suppression;},
@@ -6776,7 +6779,12 @@ function Frame(dt, render = true) {
   input.diveSpeedMps = p012Runtime?.DiveSpeed(strafe?.View());
   player.meleePose = meleeCombat?.ViewPose();
   missionRuntime?.BeforePlayer(dt,input);
-  player.Update(dt, input, WEAPONS[currentWeapon], WEAPON_RANGE ? WEAPON_RANGE_PHASE.whitebox : null);
+  player.Update(dt, input, WEAPONS[currentWeapon], {
+    allowUndeployedAds: WEAPON_RANGE && WEAPON_RANGE_PHASE.whitebox.allowUndeployedAds,
+    blockLean: !!emplacement?.Mounted || !!carry?.Blocking || !!missionRuntime?.EmptyHands
+      || !!state.cooking || !!meleeCombat?.Blocking
+      || ["reload", "melee", "meleeWind", "fixBayonet", "throw"].includes(viewmodel.action?.kind),
+  });
   movementRange?.Update(dt);
   profiler.E("player");
   // 架设机枪同样排在 player.Update **之后**：射界限位要夹的是这一帧的视线，

@@ -22,8 +22,9 @@ import { TRAVERSAL, TraversalPlan, TraversalCurve } from "./Data_Traversal.mjs";
 import { T } from "./Script_Text.mjs";
 import {
   STANCE as STANCE_TUNING, JUMP, MOVE, STAMINA, FREE_AIM, RECOIL,
-  SUPPRESSION, WOUNDS, SPAWN, HIT_FEEDBACK, SWAY, SPREAD, CAMERA,
+  SUPPRESSION, WOUNDS, SPAWN, HIT_FEEDBACK, SWAY, SPREAD, CAMERA, COVER_LEAN,
 } from "./Data_Tuning_Player.mjs";
+import { CoverLean, LeanClearance } from "./Script_CoverLean.mjs";
 import { CameraShake } from "./Script_CameraShake.mjs";
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -143,6 +144,8 @@ export class PlayerController {
     this.sprint = 0;
     this.ads = 0;
     this.wantAds = false;      // 开镜意图（相机侧的 FOV 过渡读它）
+    this.coverLean = new CoverLean();
+    this.autoLean = 0;
     this.lean = 0;                          // -1 左, +1 右
     this.breath = 0;                        // 屏息剩余
     this.breathHold = false;
@@ -205,6 +208,7 @@ export class PlayerController {
    * 旧的那具胶囊跟着旧世界一起没了，这里只管建新的。
    */
   AttachPhysics(physics) {
+    this.ResetLean();
     this.physics = physics;
     this.body = physics
       ? physics.MakeCharacter({
@@ -230,6 +234,7 @@ export class PlayerController {
     this.aimYaw = 0;
     this.aimPitch = 0;
     this.lookIdle = 0;
+    this.ResetLean();
     this.velocity.set(0, 0, 0);
     this.health = 100;
     this.bleeding = 0;
@@ -284,7 +289,49 @@ export class PlayerController {
     }
   }
   get EyePosition() {
-    return this._tmp.set(this.position.x, this.position.y + this.eyeHeight, this.position.z);
+    const offset = this.LeanOffsetM;
+    return this._tmp.set(this.position.x + Math.cos(this.yaw) * offset,
+      this.position.y + this.eyeHeight, this.position.z - Math.sin(this.yaw) * offset);
+  }
+
+  get LeanOffsetM() { return this.lean * CAMERA.leanOffsetM * (1 - this.stanceBlend.prone); }
+
+  ResetLean() { this.lean = 0; this.autoLean = 0; this.coverLean?.Reset(); }
+
+  UpdateLean(dt, input, weapon, aiming) {
+    const eye = { x: this.position.x, y: this.position.y + this.eyeHeight, z: this.position.z };
+    const right = { x: Math.cos(this.yaw), y: 0, z: -Math.sin(this.yaw) };
+    const queries = this.physics || this.world;
+    const raycast = queries.Raycast?.bind(queries);
+    const overlaps = this.physics?.Overlaps.bind(this.physics);
+    const clearance = (at, axis, offset) => LeanClearance(at, axis, offset, overlaps, raycast);
+    const allowed = this.alive && this.grounded && this.stance !== "prone" && !this.Busy
+      && !this.InWater && this.carrySpeedScale >= 1 && !this.bipod && !aiming?.blockLean
+      && this.sprint < COVER_LEAN.maxSprint;
+    const manual = allowed ? Clamp(input.lean || 0, -1, 1) : 0;
+    this.autoLean = this.coverLean.Update(dt, {
+      enabled: allowed && !manual && this.wantAds && !!weapon?.magazine && weapon.kind !== "throwable"
+        && Math.abs(this.pitch) <= COVER_LEAN.maxPitchRad
+        && Math.hypot(this.velocity.x, this.velocity.z) <= COVER_LEAN.maxSpeedMps,
+      eye, right, forward: this.AimDirection(this._forward), raycast, clearance,
+    });
+    const target = manual || this.autoLean;
+    this.lean += (target - this.lean) * (1 - Math.exp(-dt * MOVE.leanRate));
+    if (Math.abs(this.lean) < COVER_LEAN.stopEpsilon) this.lean = 0;
+    // A newly reached wall clips even an outgoing transition immediately.
+    const offset = this.LeanOffsetM;
+    if (offset && raycast) this.lean *= Math.min(1, clearance(eye, right, offset) / Math.abs(offset));
+  }
+
+  /** The gun cannot start a bullet beyond a wall crossed by its barrel. */
+  MuzzleObstruction(muzzle) {
+    const eye = this.EyePosition.clone();
+    const direction = muzzle.clone().sub(eye), distance = direction.length();
+    const queries = this.physics || this.world;
+    if (distance <= COVER_LEAN.skinM || !queries.Raycast) return null;
+    direction.divideScalar(distance);
+    const wall = queries.Raycast(eye, direction, distance, { terrain: true });
+    return wall ? { wall, point: eye.addScaledVector(direction, wall.t), dist: wall.t, dir: direction } : null;
   }
 
   /** 视线方向（相机朝向）。 */
@@ -481,7 +528,7 @@ export class PlayerController {
       return;
     }
     // 翻越期间接管整帧：不读输入、不走碰撞、不开火（Busy 为真）
-    if (this.vault.active) return this._StepVault(dt, input);
+    if (this.vault.active) { this.ResetLean(); return this._StepVault(dt, input); }
 
     this.jump.cooldown = Math.max(0, this.jump.cooldown - dt);
     if (this.jump.buffer > 0) {
@@ -619,7 +666,6 @@ export class PlayerController {
     // 恢复的上限受 staminaCeiling 夹（五关终局的章节作用域旋钮，常态 1；消耗不受它管）。
     this.stamina = Math.max(0, Math.min(this.staminaCeiling ?? 1,
       this.stamina + ((canSprint || this.fastCrawl) ? -dt * burn : dt * STAMINA.regenPerS)));
-    this.lean += ((input.lean || 0) - this.lean) * (1 - Math.exp(-dt * MOVE.leanRate));
 
     // 屏息：只在开镜时有意义，能压住摇摆，但会很快耗尽
     this.breathHold = !!input.breathHold && this.ads > STAMINA.breathHoldAds
@@ -686,6 +732,7 @@ export class PlayerController {
     this.velocity.y -= JUMP.gravityMps2 * dt;
 
     this.MoveWithCollision(dt);
+    this.UpdateLean(dt, input, weapon, aiming);
 
     if (!this.grounded) {
       this.jump.airTime += dt;
@@ -893,8 +940,8 @@ export class PlayerController {
     const bobY = Math.sin(this.stepDistance * CAMERA.bobYFreq) * bobAmp;
     const bobX = Math.sin(this.stepDistance * CAMERA.bobXFreq) * bobAmp * CAMERA.bobXScale;
     // 侧身：身体横移 + 相机滚转，探头出去看的那一下必须有位移，不然只是画面歪了
-    const leanOffset = this.lean * CAMERA.leanOffsetM * (1 - this.stanceBlend.prone);
-    const rightVec = this._right.set(-Math.cos(this.yaw), 0, Math.sin(this.yaw));
+    const leanOffset = this.LeanOffsetM;
+    const rightVec = this._right.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
 
     cam.position.set(
       this.position.x + bobX + rightVec.x * leanOffset,

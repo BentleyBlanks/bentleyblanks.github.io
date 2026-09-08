@@ -251,6 +251,15 @@ export const SPREAD = Object.freeze({
 });
 
 /** 步伐晃动与侧身。开镜压到 20%，卧倒几乎没有。 */
+// COD14 campaign contextual ADS is the interaction reference; these distances and
+// timings are authored for this game's metre-scale collision and are not extracted COD values.
+export const COVER_LEAN = Object.freeze({
+  nearM: 0.95, clearAheadM: 0.45, shoulderInsetM: 0.18, shoulderDropM: 0.18,
+  wallNormalY: 0.35, enterS: 0.07, headRadiusM: 0.13, sampleStepM: 0.06,
+  skinM: 0.01, maxSprint: 0.25, maxSpeedMps: 2.1, maxPitchRad: 0.85,
+  stopEpsilon: 0.001,
+});
+
 export const CAMERA = Object.freeze({
   bobAmp: 0.028,
   bobAdsDamp: 0.8,
