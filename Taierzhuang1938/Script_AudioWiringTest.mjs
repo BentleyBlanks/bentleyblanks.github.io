@@ -420,6 +420,35 @@ Check("冲刺五秒 → 装具声约每 0.9 s 一记（4—7 记）",
 Check("冲刺过三秒 → 开始喘", body.breath >= 1, `请求 ${body.breath} 条`);
 
 // ---------------------------------------------------------------------------
+// 8.5) 火焰点声源：挂在 vfx 的火焰发射器上，同时最多四条（最近的优先）
+// ---------------------------------------------------------------------------
+const fire = await page.evaluate(async () => {
+  const T = window.Taierzhuang, w = T.audioWiring, a = T.audio;
+  const L = a.listenerPos;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // 摆六个火头（上限是四条）：三个近的、三个远一点的，全在可听半径内。
+  const handles = [];
+  for (let i = 0; i < 6; i += 1) {
+    handles.push(T.vfx.SceneEffect(
+      { x: L.x + 4 + i * 3, y: L.y - 1, z: L.z + 4 }, "FireMedium", { scale: 1 }));
+  }
+  const before = a.RequestedCount("fireSpot");
+  // 一帧只起一条（同名 cue 的 22 ms 去重窗），所以要推够帧数。
+  for (let i = 0; i < 10; i += 1) { w.Update(1 / 60, T.state.frame + i); await sleep(16); }
+  const started = a.RequestedCount("fireSpot") - before;
+  const voices = w.fireVoices.size;
+  // 摘掉火头之后声音要跟着停
+  for (const h of handles) T.vfx.RemoveSceneEffect(h);
+  w.fireRescanAt = 0;
+  w.Update(1 / 60, T.state.frame + 99);
+  const after = w.fireVoices.size;
+  return { started, voices, after };
+});
+Check("火场挂上循环点声源，同时最多四条", fire.voices === 4 && fire.started >= 1,
+  `起了 ${fire.started} 条、在挂 ${fire.voices} 条`);
+Check("火头被摘掉之后声音跟着停", fire.after === 0, `还剩 ${fire.after} 条`);
+
+// ---------------------------------------------------------------------------
 // 9) 每个新 cue 都真的能发声（合成回落这条路）
 //
 // 素材还没到，所以现在走的就是回落配方。这条与 Script_AudioTest 的"逐条播一遍"
