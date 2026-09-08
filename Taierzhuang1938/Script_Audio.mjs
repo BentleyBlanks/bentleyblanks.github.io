@@ -3134,6 +3134,13 @@ export class AudioEngine {
      * 计数器（不是「失败」，是「做了多少次」）。取证与预算调参用。
      * occlusionQueries 是宿主最关心的一条：它等于每秒真正打出去的射线数。
      */
+    // 爆炸类 cue 的耳鸣由 Play 按 DEAFEN_ON / DEAFEN_M 自动触发（见 Reactions）。
+    // 这个标志告诉宿主接线层（Script_AudioWiring.Blast）别再手动 Deafen 一次 ——
+    // 两条各自都对，合在一起就是同一记爆炸把耳鸣自动化写两遍。
+    this.blastAutoDeafen = true;
+    // 同理：玩家自己的枪（priority + 枪类 cue）由 Play 自动 DuckAmbience，
+    // 接线层的 GunDuck 看到这个标志就不再压第二次（实测双压是 2 次调用叠在 40 ms 里）。
+    this.gunAutoDuck = true;
     this.stats = {
       occlusionQueries: 0, occlusionCached: 0, occlusionSkipped: 0,
       zoneQueries: 0, propagationDelays: 0,

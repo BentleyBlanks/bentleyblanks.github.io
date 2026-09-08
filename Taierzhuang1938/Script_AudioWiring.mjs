@@ -712,6 +712,9 @@ export class AudioWiring {
    * （Data_Tuning_Audio.BLAST_AUDIO），而调用点只知道"我开了一枪"。
    */
   GunDuck() {
+    // 引擎侧（Script_Audio.Play）接上「玩家枪自动压环境」之后会置 gunAutoDuck；
+    // 那时这里再压一次就是同一枪叠两次 ramp。没接上时这里仍是唯一的一道。
+    if (this.Audio?.gunAutoDuck) return;
     this.Audio?.DuckAmbience?.(BLAST_AUDIO.gunDuckS, BLAST_AUDIO.gunDuckAmount);
   }
 
