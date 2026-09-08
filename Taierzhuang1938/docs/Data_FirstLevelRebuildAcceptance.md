@@ -184,3 +184,17 @@ TrainShelling 按“突然遭炮击→下令司机停车→车未停不得跳车
 验证：`Script_FirstLevelMissionTest`（含跳线相交检查）、`Script_ModuleGraphTest`、`Script_TextTest`、`Script_FirstLevelMissionPresentationTest` 通过；`Script_FirstLevelMissionBrowserTest --campaign` 真实输入连续通关通过（25 个运行阶段，Support 88.6 s、Tank 61.6 s、South 83.7 s；第一次跑在死亡短镜头被侧翼打死，即上文保护规则的由来）。截图与过程 JSON 在忽略目录 `_shots/FirstLevelMission`、`_shots/FirstLevelFrame`。
 
 推送前门禁（`--changed=origin/master --profile=prepush`，118 项）：116 通过、历史基线 0、未通过 2。`BrowserBundleTest` 因共享 node_modules 缺 esbuild 在 0.1 s 内退出（环境问题，package.json 仍声明 0.28.2）；`FirstLevelMissionBrowserTest` 在运行器 600 s 上限内没跑完。为分清原因，把基线提交 5ba0a4b59 与本版在同一台机器上顺序各跑一次 `--campaign --audio`：基线 1554 s、本版 1584 s，两者都通过、都远超 600 s——是本机当前负载下该项本来就跑不进上限（同期用户在跑 Edge / Codex），不是本轮回归；直接运行该测试的完整通关记录见上文。
+
+## r14 对象池、每帧垃圾与关卡预热（2026-09-08）
+
+用户在 r13 之后从优先级清单里选了四项：人物对象池、每帧垃圾清理、新增预热环节、MRT 主通道砍掉深度法线预通道。前三项落地；第四项在同一天被 master 的 3A 渲染大修（`81dcb2624`，帧图 + GTAO/SSIL + Hi-Z SSR + 级联阴影 + 体积雾）截断：新管线的预通道本身就是 MRT（法线视深 / 速度 / 深度纹理），HZB → SSR / GTAO / 接触阴影都在主通道**之前**消费它，「主通道一次写完、不再预通道」在这套结构下等于把 GTAO / SSR 改成延迟解算，是另一个量级的改动，本轮不做。旧管线上的实装（含四附件 / AO 延后解算 / 遮罩钩子 / 贴花深度拷贝时机等踩坑）留在分支 `claude/level-one-mrt-archive-3b567c`（提交 1cd20aca0），只作参考。
+
+- **人物对象池**：`ActorFactory.Prewarm(kind, count)` / `_FromPool`，`Data_FirstLevelMission.whitebox.actorPool = { ija: 64, nra: 32 }`。进关后所有 `Create` 优先取池（指定 `modelVariant` 的名册人物只在池里恰有同号时命中；rank / 百姓分身 / 小孩不进池），刷兵只剩换枪与登记合批。`spawnPerFrame` 回到 4。
+- **每帧垃圾**：`MissionTrainLifePose` 与 `FirstLevelTrainAnimation` 的保存记录池化、内部临时量复用（World / Local 仍返回新对象，外部持有它们）；`SetTrainOffset` 只搬车厢记录不再整张重建碰撞网格；`_GroundInfantryBlend` 的矩阵改成模块级复用。旧管线上量得车厢 2.13 MB → 1.43 MB / 帧，前沿 1.49 → 0.92 MB（含 r13 的材质克隆）。剩余大头是 three 自己的 uniform 上传与排序、AI 决策，不再动。
+- **关卡预热（`Script_Main.WarmLevel`）**：人物预热之后加一段，加载画面后面依次做：建对象池 → 第一人称每把枪各装一次出一帧（含自阴影深度材质与手榴弹）→ 把临时手榴弹与人物材质的刚体代理放进场景后对整个 scene 跑 `WarmupShaders` → 把场上藏着的普通网格、空实例表（给 1 个实例）、任务根下的隐藏组、第一人称身体全部打开画一帧 → 以 `state.ready = true` 推 12 帧真实玩法帧并 `gl.finish()`。旧管线取证：开机后进关不再有新 program 现编（原先车厢 3 个 / 阵地 5 个 / 投弹 3 个，单帧最坏 960 ms）。进度条区间 `BOOT.progress.actorPool / warmViewmodel / warmLevel`。
+- **预热的编译方式**：三步「第一人称各枪 / 人物材质刚体代理 / 全场强制出画」都先 `renderer.compile`（绑着 hdr 靶提交，交给 KHR_parallel_shader_compile 的线程）、逐帧轮询 `isReady()`，就绪后才真画一帧；提交完就画等于逐个 program 阻塞等链接，3A 管线上 41 份代理这么等了 27 s。收尾的真实帧最多 12 帧，连续两帧 80 ms 内即停。
+- **r14 在 3A 管线上的复测（2026-09-08 14:30–14:40，机器同时有别的浏览器测试在跑，绝对值偏低）**：
+  - 进关前几帧（第一关白盒 1080p，按下开始后逐帧 ms / 新 program）：master 第 1 帧 3766 ms / 7 个，之后 13 帧里 6 帧超过 400 ms（最坏 1034），首次开火 813 ms，切枪 1962 ms；本版第 1 帧 154 ms / 6 个（全是投影深度变体），之后每帧 46–111 ms，开火 98 ms，切枪 129 ms。`WarmLevel` 总计 6.0 s（对象池 0.3、第一人称 2.1、代理 1.8、WarmupShaders 0.8、强制出画 1.0、收尾 4 帧 0.07），开机总时长 31.3 → 29.0 s（同一机器两次，差在噪声内）。
+  - 三机位交替 A/B（master → 本版 → master → 本版）：车厢 21.5 / 24.3 → 27.1 / 23.2 fps，前沿朝北 28.6 / 38.0 → 43.4 / 35.5，朝东 34.7 / 46.4 → 54.1 / 42.8 —— 同版两次相差 3–11 fps，帧率结论只能是「没变差」；每帧分配 KB：车厢 1840 / 1848 → 1520 / 1172，前沿 1285 / 1298 → 1081 / 990，朝东 987 / 997 → 831 / 848。3A 管线本身在这台机器上第一关只有 21–46 fps（`post` CPU 桶 11–39 ms 是新的大头），第一关帧预算要另开一轮。
+  - `Script_BootTest` 全过（236 s，紧贴运行器 240 s 上限，主因是 3A 管线各章的着色器预热）。
+  - 推送前门禁（`--changed=origin/master --profile=prepush`，134 项，与另一 worktree 的门禁共用浏览器槽，共 4471 s）：127 通过、未通过 7。`TextTest` 是预热里两条 console.warn 标签用了中文，改 ASCII 后单跑通过；`FirstLevelMissionBrowserTest` 仍是本机负载下跑不进 600 s（r13 记录的基线 1554 s）；`ActorBatchTest` / `PropInstancingTest`（像素差 0.04–0.10% 与噪声底相当）、`FirstLevelP012ActorTest`（`ApplyScriptDefense` 读 `this.ctx.audioWiring` 抛错）、`ExplosionRangeTest`（首个弹坑帧多编 1 个 program）、`CraterSurfaceTest`（弹坑壁贴花环 93 像素）五项在未改动的 master 检出（5a2eb4ed2）上逐一复跑、同样失败，是 3A / 音频合并遗留，不属本轮。

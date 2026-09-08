@@ -54,7 +54,11 @@ export const BOOT = Object.freeze({
     field: Object.freeze({ from: 0.24, to: 0.62 }),
     actors: 0.90,
     actorMeshes: 0.92,
-    warmActors: Object.freeze({ from: 0.94, span: 0.06 }),
+    warmActors: Object.freeze({ from: 0.94, span: 0.02 }),
+    // 关卡预热（Script_Main.WarmLevel）：人物对象池、第一人称各把枪、场上首见材质。
+    actorPool: Object.freeze({ from: 0.96, span: 0.01 }),
+    warmViewmodel: Object.freeze({ from: 0.97, span: 0.01 }),
+    warmLevel: Object.freeze({ from: 0.98, span: 0.02 }),
     ready: 1.0,
   }),
   /**

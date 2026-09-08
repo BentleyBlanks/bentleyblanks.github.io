@@ -284,6 +284,9 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
     routes: MISSION_ROUTES,
     friendlyLimit: 4,
     actorCapacity:144,
+    // Pre-built rigs for everything the mission spawns after boot (Support 46 IJA + waves 42;
+    // defenders / guards / relief NRA). Script_Main.WarmLevel builds them behind the loading screen.
+    actorPool: { ija: 64, nra: 32 },
     actualEventsOnly: true,
     storyBeats: [],
     activities: { arrivalGuideStart: { x: -76, z: 71 }, trainColumn: { extraCount: MISSION_TRAIN.extraCount } },

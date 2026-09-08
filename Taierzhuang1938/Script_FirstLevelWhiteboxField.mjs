@@ -216,8 +216,25 @@ export class FirstLevelWhiteboxField {
     for(const gate of this.gates.values())if(gate.spec.signal==="P012TrainDoor"||gate.spec.signal==="MissionTrainStopped"){
       gate.mesh.position.z+=delta;if(!gate.open)records.push(gate.collider);
     }
-    for(const record of records){record.c[2]+=delta;record.min[2]+=delta;record.max[2]+=delta;this.physics?.MoveSolid(record);}
-    this.BuildCollisionGrid();this.physics?.RefreshStaticQueries();
+    // Move only the train records inside the spatial hash: rebuilding the whole grid
+    // (4.6k boxes) every frame of the 390 m ride was a steady CPU and garbage cost.
+    for(const record of records){
+      this._GridRemove(record);
+      record.c[2]+=delta;record.min[2]+=delta;record.max[2]+=delta;this.physics?.MoveSolid(record);
+      this._GridInsert(record);
+    }
+    this.physics?.RefreshStaticQueries();
+  }
+  _GridCells(box,fn){
+    const size=this.gridSize;
+    const x0=Math.floor(box.min[0]/size),x1=Math.floor(box.max[0]/size),z0=Math.floor(box.min[2]/size),z1=Math.floor(box.max[2]/size);
+    for(let x=x0;x<=x1;x+=1)for(let z=z0;z<=z1;z+=1)fn(x*100003+z);
+  }
+  _GridRemove(box){
+    this._GridCells(box,(key)=>{const list=this.grid.get(key);if(!list)return;const i=list.indexOf(box);if(i>=0)list.splice(i,1);});
+  }
+  _GridInsert(box){
+    this._GridCells(box,(key)=>{let list=this.grid.get(key);if(!list){list=[];this.grid.set(key,list);}list.push(box);});
   }
 
   BuildGates() {

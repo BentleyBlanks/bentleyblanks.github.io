@@ -3124,6 +3124,7 @@ export class ActorFactory {
     this.quality = quality === "low" || quality === "medium" ? quality : "high";
     this.batcher = null;             // 人物合批层，见 SetBatcher
     this.kindCache = new Map();      // kind -> { dims, bones }
+    this.pool = new Map();           // kind -> 预建好的 Actor[]，见 Prewarm
     // weaponId|variant|quality -> { geometries, muzzle, ... }
     // 键的格式**别在外面自己拼**，读 source 走 WeaponSource()。
     this.weaponCache = new Map();
@@ -3269,11 +3270,57 @@ export class ActorFactory {
    * options: { seed, weapon (Data_Weapons 的 id 或 null), rank }
    */
   Create(kind, options = {}) {
-    const actor = new Actor(this, KIND_SPEC[kind] ? kind : "nra", options);
+    const resolved = KIND_SPEC[kind] ? kind : "nra";
+    const actor = this._FromPool(resolved, options) || new Actor(this, resolved, options);
     // 合批层（Script_ActorBatch）在这里挂钩：造出来就登记，Dispose 时摘掉。
     // 挂在工厂上而不是各个调用点上 —— 人物有五个建造口（AI／过场／人群／
     // 编辑器两处），漏掉一个的后果是那批人在画面上整个消失，而不是掉帧。
     if (this.batcher) this.batcher.Add(actor);
+    return actor;
+  }
+
+  /**
+   * 人物对象池：加载画面还盖着的时候把整关要刷的兵先建好。
+   *
+   * 为什么：一具卢沟桥 GLB 骨骼从 clone 到材质接线要 5–8 ms，第一关 Support 一进就是
+   * 四十多具，再加增援波次 —— 分帧刷也是每帧一两具的顿。预建之后 Create 只剩换枪与
+   * 登记合批，进关后再没有「造人」这笔账。
+   *
+   * 池里的人 seed 是预建时定的（身高、脸、模型号随之定下来），取用时忽略调用方的
+   * seed；要求指定 modelVariant 的（名册人物）只在池里恰好有同号时命中，否则照旧现造。
+   * rank / 百姓分身 / 小孩不进池。
+   *
+   * @param {string} kind
+   * @param {number} count
+   * @returns {number} 池里现有的人数
+   */
+  Prewarm(kind, count, options = {}) {
+    if (!KIND_SPEC[kind]) return 0;
+    let pool = this.pool.get(kind);
+    if (!pool) { pool = []; this.pool.set(kind, pool); }
+    for (let i = 0; i < count; i += 1) {
+      const serial = (this.poolSerial = (this.poolSerial || 0) + 1);
+      pool.push(new Actor(this, kind, { ...options, seed: 70000 + serial * 7919, weapon: null }));
+    }
+    return pool.length;
+  }
+
+  /** 池里还有几个（取证与预热进度用）。 */
+  PoolSize(kind) { return this.pool.get(kind)?.length || 0; }
+
+  _FromPool(kind, options) {
+    const pool = this.pool.get(kind);
+    if (!pool || !pool.length || options.noPool) return null;
+    if (options.rank || options.variant || options.actorVariant) return null;
+    let index = pool.length - 1;
+    if (options.modelVariant != null) {
+      index = pool.findIndex((actor) => actor.modelVariant === options.modelVariant);
+      if (index < 0) return null;
+    }
+    const actor = pool.splice(index, 1)[0];
+    actor.bayonetFixed = options.bayonetFixed === true;
+    actor.SetWeapon(options.weapon === undefined ? actor.spec.defaultWeapon : options.weapon);
+    actor.pooled = true;
     return actor;
   }
 
@@ -3674,6 +3721,8 @@ export class ActorFactory {
 
   Dispose() {
     if (this.disposed) return;
+    for (const pool of this.pool.values()) for (const actor of pool) actor.Dispose();
+    this.pool.clear();
     for (const entry of this.kindCache.values()) {
       for (const bone of Object.values(entry.bones)) {
         if (!bone) continue;

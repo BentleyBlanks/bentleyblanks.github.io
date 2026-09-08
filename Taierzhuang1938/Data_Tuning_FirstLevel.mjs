@@ -53,7 +53,7 @@ export const MISSION_TUNING = Object.freeze({
   waveBudget:42,
   waveAliveCap:30,
   // Encounter spawns are drained a few per frame: 46 rigs in one frame was a 200 ms hitch at stage entry.
-  spawnPerFrame:2,
+  spawnPerFrame:4,
   tankSpeedMps: 1.55,
   tankAdvanceSeconds: 11,
   tankFiringHaltSeconds: 5,

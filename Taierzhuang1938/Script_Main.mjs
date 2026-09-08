@@ -88,7 +88,7 @@ import { Hud, ContextualActionPrompts, CrosshairGeometry } from "./Script_Hud.mj
 import { StoryDirector, CHAPTER_RELEASE_SIGNAL } from "./Script_Story.mjs";
 import { CutsceneDirector } from "./Script_Cutscene.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
-import { LoadGrenadeAsset } from "./Script_GrenadeAsset.mjs";
+import { LoadGrenadeAsset, CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { InputRouter } from "./Script_Input.mjs";
 import { MeleeCombatDirector } from "./Script_MeleeCombat.mjs";
 import { MELEE_SCENARIOS, MELEE_ENCOUNTERS } from "./Data_MeleeCombat.mjs";
@@ -3740,6 +3740,17 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     }
   }
 
+  // 关卡预热（2026-09-08）：人物对象池 + 进关后才首见的着色器。人物预热只盖住通用人物；
+  // 第一关实测名册人物的布料在车厢头几秒现编（960 ms 一帧）、第一人称枪模与自阴影在进阵地时
+  // （766 ms）、手榴弹在第一次投掷时（391 ms）。全部挪到加载画面后面付掉。
+  if (!cutsceneOnly && !PREVIEW && phase.whitebox?.fullMission) {
+    try {
+      await WarmLevel(phase);
+    } catch (error) {
+      console.warn("[Main] 关卡预热失败（退回用到时现编）", error);
+    }
+  }
+
   if (!initial) {
     ShowBoot(false);
     bootStart.textContent = BootStartLabel();
@@ -4121,6 +4132,253 @@ async function WarmActorShaders(phase, onStep = null) {
     programsBefore, programs: renderer.info.programs.length,
   };
   return picks;
+}
+
+/**
+ * 关卡预热：三件事，全部在加载画面后面。
+ *   1) 人物对象池 —— 按 phase.whitebox.actorPool 预建整关要刷的骨骼（ActorFactory.Prewarm）；
+ *   2) 第一人称 —— 每个槽位的枪（含集束手榴弹）各装一次、各出一帧，把枪模几何变体与
+ *      自阴影深度材质逼出来；
+ *   3) 场上首见材质 —— 临时把一枚手榴弹放进场景，对整个 scene 跑一遍 WarmupShaders
+ *      （名册人物布料、任务视图实例表、遗体三级表、战车、担架伤员都在这一趟）。
+ * 结束后把手上装备还原成任务要求的状态（车厢里是空手）。
+ */
+async function WarmLevel(phase) {
+  const started = performance.now();
+  const report = { pool: {}, viewmodel: 0, picks: 0, ms: 0, stepMs: {} };
+  let stepStart = started;
+  const Lap = (name) => { const now = performance.now(); report.stepMs[name] = Math.round(now - stepStart); stepStart = now; };
+  // 提交编译 + 轮询就绪，与 WarmupShaders 同一套：compile 时必须绑着 hdr 靶（否则编出来的是
+  // 另一份用不上的 srgb 变体），链接交给 KHR_parallel_shader_compile 的线程，主线程逐帧问
+  // isReady()，就绪后再真画一帧。直接 compile 完就画 = 逐个 program 阻塞等链接：实测 3A 管线
+  // 上 41 份人物材质的刚体代理这么等了 27 s。
+  const SubmitCompile = (root, label) => {
+    const restoreTarget = renderer.getRenderTarget();
+    if (post?.targets?.hdr) renderer.setRenderTarget(post.targets.hdr);
+    try { renderer.compile(root, camera, scene); } catch (error) { console.warn(`[Main] 关卡预热：${label} 提交编译失败`, error); }
+    finally { renderer.setRenderTarget(restoreTarget); }
+  };
+  const WaitProgramsReady = async (limitMs) => {
+    const start = performance.now();
+    for (;;) {
+      const programs = renderer.info.programs;
+      let ready = 0;
+      for (const program of programs) if (typeof program.isReady !== "function" || program.isReady()) ready += 1;
+      if (ready >= programs.length || performance.now() - start > limitMs) return programs.length - ready;
+      await NextFrame();
+    }
+  };
+  // --- 一、人物对象池 ---------------------------------------------------------
+  const pool = phase.whitebox?.actorPool || null;
+  if (pool && actorFactory?.characterAssets) {
+    const total = Object.values(pool).reduce((n, c) => n + c, 0);
+    let built = 0;
+    for (const [kind, count] of Object.entries(pool)) {
+      for (let done = 0; done < count; done += 6) {
+        const chunk = Math.min(6, count - done);
+        actorFactory.Prewarm(kind, chunk);
+        built += chunk;
+        SetBootStep(T("boot.step.actorPool", { done: built, total }), BootProgress(BOOT.progress.actorPool, built / total));
+        await NextFrame();
+      }
+      report.pool[kind] = actorFactory.PoolSize(kind);
+    }
+  }
+  Lap("pool");
+  // --- 二、第一人称各把枪 ---------------------------------------------------------
+  const wasWarming = state.warming, wasMenu = state.menu;
+  const savedWeapon = viewmodel?.weaponId ?? null, savedVariant = viewmodel?.weaponVariant ?? 0;
+  state.warming = true; state.menu = false;
+  try {
+    if (viewmodel && player?.Alive) {
+      const ids = [...new Set([
+        ...SLOT_ORDER.map((slot) => SlotWeaponId(slot)),
+        "Grenade", "GrenadeBundle",
+      ].filter((id) => id && WEAPONS[id]))];
+      for (const id of ids) {
+        viewmodel.Equip(id, 0);
+        SubmitCompile(viewmodel.root, id);
+      }
+      await WaitProgramsReady(20000);
+      for (const [i, id] of ids.entries()) {
+        viewmodel.Equip(id, 0);
+        SetBootStep(T("boot.step.warmViewmodel", { done: i + 1, total: ids.length }), BootProgress(BOOT.progress.warmViewmodel, (i + 1) / ids.length));
+        RenderScene(0);
+        await NextFrame();
+        report.viewmodel += 1;
+      }
+    }
+    Lap("viewmodel");
+    // --- 三、场上其余首见材质 -----------------------------------------------------
+    const proxy = new THREE.Group();
+    proxy.name = "ShaderWarm_Level";
+    const grenade = CloneGrenadeAsset(combat?.grenadeAsset || null);
+    if (grenade) proxy.add(grenade);
+    // 人物 GLB 材质的**非蒙皮**变体：背枪 / 担架伤员 / 遗体这类刚体网格复用同一份材质，
+    // program 缓存键不同（无 skinning）。实测车厢里第一次出现背枪时一个物理材质 program
+    // 链接等了 2.8 s；这里用小盒子把每份材质的刚体变体先逼出来（含投影深度变体）。
+    const seen = new Set();
+    const boxGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+    for (const kind of Object.keys(phase.whitebox?.actorPool || {})) {
+      for (const actor of actorFactory.pool.get(kind) || []) {
+        actor.characterRig?.root?.traverse((object) => {
+          if (!object.isMesh) return;
+          for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+            if (!material || seen.has(material)) continue;
+            seen.add(material);
+            const mesh = new THREE.Mesh(boxGeometry, material);
+            mesh.castShadow = true; mesh.receiveShadow = true;
+            mesh.position.set((seen.size % 8) * 0.3, 0.5, Math.floor(seen.size / 8) * 0.3);
+            proxy.add(mesh);
+          }
+        });
+      }
+    }
+    report.materialProxies = seen.size;
+    // WarmupShaders 按材质去重时会跳过「已经有 program」的材质，而这里要的正是同一材质的
+    // 另一个变体，所以代理件自己提交编译并画一帧把链接逼出来。
+    proxy.traverse((object) => { if (object.isMesh) object.frustumCulled = false; });
+    scene.add(proxy);
+    proxy.updateMatrixWorld(true);
+    SubmitCompile(proxy, "proxy");
+    report.proxyUnready = await WaitProgramsReady(20000);
+    RenderScene(0);
+    await NextFrame();
+    proxy.position.set(player.position.x, player.position.y + 1, player.position.z);
+    scene.add(proxy);
+    proxy.updateMatrixWorld(true);
+    SetBootStep(T("boot.step.warmLevel"), BOOT.progress.warmLevel.from);
+    Lap("materialProxies");
+    try {
+      report.picks = await WarmupShaders(scene,
+        (label, progress) => SetBootStep(label, BootProgress(BOOT.progress.warmLevel, progress)), null);
+      Lap("warmupShaders");
+      // --- 四、全场强制出画一帧 -------------------------------------------------------
+      // WarmupShaders 按材质去重：同一材质已经有 program 就跳过，可同一材质在蒙皮 / 刚体 /
+      // 实例化、有无 tangent 顶点色等几何特征下各是一个 program。车厢里背枪之类的刚体件
+      // 用的正是人物材质的另一变体，实测进关第 6 帧一次 2.8 s 的链接等待就是它。
+      // 这里把场上现有物体的视锥剔除全部关掉画一帧：每个存在的变体都在这一帧编译并链接。
+      // 藏着的普通网格（背枪吊带、第一人称弹匣 / 手榴弹道具、担架、战车零件）也画这一帧：
+      // 它们第一次露面时各自还有一个 program 要编，实测车厢里第 6 帧那 2.8 s 就是吊带。
+      // 实例表不碰（count=0 的表没有实例矩阵可画），父链藏着的也不碰。
+      // 空的实例表（远景人群、遗体三级表、担架伤员）同样各是一个 program：临时给 1 个实例
+      // （未写过的槽位是零矩阵，画出来是退化三角形）画一帧，之后把 count 与 visible 还回去。
+      // 任务视图的人（担架员 / 轻伤员 / 车站伤亡）是按需现造的：先推一次视图更新把首帧会出现的
+      // 那批建出来，这一帧才编得到它们的 program（实测按下开始后第一帧 3.7 s 就是这批）。
+      try {
+        missionRuntime?.view?.Update(missionRuntime.time, { tank: missionRuntime.tank, player, camera });
+      } catch (error) {
+        console.warn("[Main] 关卡预热：任务视图预建失败", error);
+      }
+      // 任务根节点下藏着的组（战车、担架、补给箱）整组打开画一帧；编辑器 / 菜单的隐藏树不碰。
+      const hiddenGroups = [];
+      scene.getObjectByName("FirstLevelMissionWhitebox")?.traverse((object) => {
+        if (!object.isMesh && !object.visible) { hiddenGroups.push(object); object.visible = true; }
+      });
+      // 第一人称身体（视模的 body）要到第一次 Update 才挂进场景、才可见：它的蒙皮材质是
+      // 自己克隆的一份，program 没人替它编过 —— 实测按下开始后第一帧 3.5 s 就是它。
+      const body = viewmodel?.body?.root || null;
+      const bodyDetached = body && !body.parent;
+      if (body) {
+        if (bodyDetached) scene.add(body);
+        body.position.copy(player.position);
+        if (!body.visible) { hiddenGroups.push(body); body.visible = true; }
+      }
+      const culled = [], hidden = [], instanced = [];
+      scene.traverse((object) => {
+        if (!(object.isMesh || object.isPoints || object.isSprite || object.isLine)) return;
+        if (object.frustumCulled) { culled.push(object); object.frustumCulled = false; }
+        if (object.isInstancedMesh) {
+          if (!object.visible || object.count === 0) { instanced.push({ object, count: object.count, visible: object.visible }); object.visible = true; object.count = Math.max(1, object.count); }
+        } else if (!object.visible && object.isMesh && object.material) { hidden.push(object); object.visible = true; }
+      });
+      try {
+        SubmitCompile(scene, "scene");
+        report.forcedUnready = await WaitProgramsReady(20000);
+        RenderScene(0);
+      } finally {
+        for (const object of culled) object.frustumCulled = true;
+        for (const object of hidden) object.visible = false;
+        for (const entry of instanced) { entry.object.count = entry.count; entry.object.visible = entry.visible; }
+        for (const object of hiddenGroups) object.visible = false;
+        if (bodyDetached) scene.remove(body);
+      }
+      report.forcedDraw = culled.length;
+      report.hiddenDraw = hidden.length + instanced.length;
+      await NextFrame();
+      Lap("forcedDraw");
+      // --- 五、把驱动的账也结掉 ---------------------------------------------------------
+      // D3D11 驱动把着色器真正的本机编译推迟到命令流里第一次用到它，MRT 那批四输出的物理
+      // 材质 program 合计约 3 s（实测进关第 5 帧 uniformMatrix4fv 阻塞 1.3 s、GPU 队列排空）。
+      // 这里连画几帧并 finish，让那笔账在加载画面后面付掉。
+      // 走的是**玩法整帧**（dt = 0：世界不动，但 AI / 视模 / 自阴影 / 后处理都按正式路径出画），
+      // 只出画不推时间 —— RenderScene(0) 不够，驱动按管线状态组合 JIT，玩法帧的组合与纯出画不同。
+      // 粒子系统的着色器在 dt = 0 的帧里一颗粒子都不会活：在镜头前放一枚爆炸、一段烟、
+      // 枪口焰 / 曳光 / 弹着 / 血雾各一份，自己推粒子时钟，让它们在 MRT 的遮罩布局下真画出来。
+      // ANGLE 按输出布局给每个 program 现编一份像素着色器变体，这一批在预热里不画的话，
+      // 进关后第一次冒烟就是一秒多的停顿（GL 层看不到新 program，卡在 GPU 进程里）。
+      let smokeHandle = null;
+      try {
+        if (vfx) {
+          const eye = player.EyePosition.clone();
+          const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+          const spot = eye.clone().addScaledVector(forward, 3);
+          const groundY = battlefield.GroundHeight(spot.x, spot.z);
+          vfx.Explosion(spot.clone().setY(groundY + 0.2), { radius: 4, kind: "grenade", groundY });
+          smokeHandle = vfx.SmokeSource({ x: spot.x, y: groundY + 0.5, z: spot.z }, { kind: "dust", rate: 12, radius: 0.6, rise: 0.4, life: 1.5, opacity: 0.2 });
+          vfx.MuzzleFlash(eye.clone().addScaledVector(forward, 0.6), forward, { kind: "rifle" });
+          vfx.Tracer(eye.clone().addScaledVector(forward, 0.6), spot.clone(), { kind: "nra" });
+          vfx.Impact(spot.clone().setY(groundY), new THREE.Vector3(0, 1, 0), "dirt");
+          vfx.Blood(spot.clone().setY(groundY + 1), forward, 1);
+        }
+      } catch (error) {
+        console.warn("[Main] 关卡预热：粒子预热失败", error);
+      }
+      // 最后推十二帧**真实**玩法帧（0.2 s 游戏时间）：dt = 0 的帧驱动不出与实战相同的管线状态
+      // 组合（实测 dt = 0 预热八帧后，正式第 2 帧仍卡 1.9 s；换成真帧后停顿留在加载画面后面）。
+      // 代价是开场前世界走了 0.2 s：接物时点在 5.4 s，不受影响。
+      // Frame() 在 state.ready = false 时只出画不跑玩法（见 EnterLevel 的抬头），所以这几帧临时
+      // 把 ready 抬起来：视模摆动 / AI 姿态 / 弹道 / HUD 走的都是正式路径，管线状态组合才对得上。
+      // 帧数上限 12、时长上限 12 s；账结清的信号是**连续两帧都在 80 ms 内**（含 finish），
+      // 至少推 4 帧（粒子 / 第一次开火的组合要几帧才轮到）就停，别把 3A 管线的开机再拖长。
+      const glWarm = renderer.getContext();
+      const settleStart = performance.now();
+      const wasReady = state.ready;
+      state.ready = true;
+      report.settleFrames = [];
+      try {
+        let quiet = 0;
+        for (let i = 0; i < 12; i += 1) {
+          const frameStart = performance.now();
+          StepFrames(1, 1 / 60, true);
+          glWarm.finish();
+          const frameMs = performance.now() - frameStart;
+          report.settleFrames.push(Math.round(frameMs));
+          await NextFrame();
+          quiet = frameMs < 80 ? quiet + 1 : 0;
+          if (i >= 3 && quiet >= 2) break;
+          if (performance.now() - settleStart > 12000) break;
+        }
+      } finally {
+        state.ready = wasReady;
+      }
+      if (smokeHandle != null) vfx.RemoveSmokeSource(smokeHandle);
+      report.settleMs = Math.round(performance.now() - settleStart);
+      Lap("settle");
+    } finally {
+      scene.remove(proxy);
+    }
+  } finally {
+    state.warming = wasWarming; state.menu = wasMenu;
+    if (viewmodel) {
+      viewmodel.Equip(savedWeapon, savedVariant);
+      SyncBayonet();
+      SyncMissionHands();
+    }
+  }
+  report.ms = Math.round(performance.now() - started);
+  state.levelWarm = report;
+  return report;
 }
 
 /** WarmCutscene 的场次号（见那里的注释）。 */

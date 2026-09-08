@@ -1,5 +1,6 @@
 // Original-rig local tracks; animation never writes a Soldier/Actor world root.
 import {Vector3,Quaternion} from 'three';
+const SAVE_POOL=[];
 import {GLTFLoader} from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
 const Clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const Smooth=x=>{x=Clamp(x,0,1);return x*x*(3-2*x)};
@@ -38,8 +39,9 @@ export class FirstLevelTrainAnimation {
   this.anchor=new Vector3(...record.sourceAnchor);this.value=new Vector3();this.value2=new Vector3();this.q=new Quaternion();this.q2=new Quaternion();
   this.duration=config.approachSeconds+config.sourceEndSeconds-config.riseSourceStartSeconds+config.releaseSeconds;
  }
- Save(node){if(!this.saved.has(node))this.saved.set(node,{p:node.position.clone(),q:node.quaternion.clone(),s:node.scale.clone()})}
- Restore(){for(const [node,p] of this.saved){node.position.copy(p.p);node.quaternion.copy(p.q);node.scale.copy(p.s)}this.saved.clear()}
+ // Saved transforms are pooled records: 41 riders x ~60 tracks of clone() was 300 KB of garbage per frame.
+ Save(node){if(this.saved.has(node))return;const r=SAVE_POOL.pop()||{p:new Vector3(),q:new Quaternion(),s:new Vector3()};r.p.copy(node.position);r.q.copy(node.quaternion);r.s.copy(node.scale);this.saved.set(node,r)}
+ Restore(){for(const [node,p] of this.saved){node.position.copy(p.p);node.quaternion.copy(p.q);node.scale.copy(p.s);SAVE_POOL.push(p)}this.saved.clear()}
  SeatOffset(){
   // Actor-space metres, before yaw but after actor size. The original seat is fixed.
   const scale=this.record.nominalScale*this.sizeScale;
