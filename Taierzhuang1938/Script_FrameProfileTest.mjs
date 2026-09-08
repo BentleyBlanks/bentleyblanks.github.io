@@ -14,6 +14,9 @@
 //   --tiers            分档模式：跳过 GI/SSAO/MSAA/70% 那四个消融，只留 baseline，
 //                      但把**逐 pass GPU 中位数**（Script_Profiler 的分段计时）打出来。
 //                      分档定稿要的是「这一档每个 pass 花多少」，不是消融对比。
+//   --phase=N          换一关的切片（`?phase=`）。默认 2 —— 分档那张表全是在
+//                      phase=2 上量的，换关就不能与它逐行比。逐关排查（例如
+//                      「城墙关是不是真的贵一倍」）才传别的值。
 // 逐 pass 的口径：profiler.Enable() 之后一帧一帧推（每帧让出一个 event-loop turn，
 // 否则 ANGLE 的 TIME_ELAPSED 查询读不回来、_pending 会被上限截掉），
 // 从 profiler.history 里逐段取中位数。
@@ -31,6 +34,7 @@ const Arg = (name, fallback = "") => {
 const QUALITY = Arg("quality", "high");
 const FORCE_GI = argv.includes("--gi");
 const TIER_MODE = argv.includes("--tiers");
+const PHASE = Arg("phase", "2");
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = Arg("root") ? path.resolve(Arg("root")) : path.resolve(projectDir, "..");
@@ -51,7 +55,7 @@ page.on("console", (message) => {
 let result = null;
 try {
   const giParam = FORCE_GI ? "&gi=1" : "";
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=${QUALITY}&scale=small${giParam}`,
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=${PHASE}&quality=${QUALITY}&scale=small${giParam}`,
     { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 300000 });
   result = await page.evaluate(async (options) => {
@@ -311,7 +315,7 @@ try {
 
 if (result) {
   console.log(`GPU ${result.rendererName}`);
-  console.log(`quality=${QUALITY}${FORCE_GI ? "+gi" : ""} root=${rootDir}`
+  console.log(`quality=${QUALITY}${FORCE_GI ? "+gi" : ""} phase=${PHASE} root=${rootDir}`
     + ` internal=${result.internalSize.join("x")} output=${result.outputSize.join("x")}`);
   console.log(`timer=${result.timerAvailable} programs=${result.programs}`
     + ` geometries=${result.memory.geometries} textures=${result.memory.textures}`);

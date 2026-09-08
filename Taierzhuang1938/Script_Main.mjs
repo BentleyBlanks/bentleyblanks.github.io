@@ -7507,6 +7507,10 @@ function RenderScene(dt) {
     exposureAnchor: cutsceneSky ? null : phase.id,
     dt,
     bloom: preset.bloom * graphics.bloom,
+    // 泛光阈值是**每时段**的（缺省 1.18 = 出厂常数；目前只有 dawn 写了值）。
+    // 理由见 SKY_PRESETS.dawn 的 bloomThreshold 注释：物理天穹把太阳侧与整圈地平线
+    // 抬到了 1.7—6.5，一个全局常数会让**整片下半天空**都变成泛光源。
+    bloomThreshold: preset.bloomThreshold,
     // 屏幕空间太阳拖影：**froxel 体积雾开着时一律不给**。两者叠加是双份前向散射，
     // 而径向模糊不认遮挡 —— 光柱被建筑切断的那条线会被它重新糊回去。
     // low 档（没有体积雾）仍可用，这是它保留下来的唯一场合。
