@@ -124,7 +124,11 @@ for(const essential of [false,true]){
  if(essential){assert.equal(casualty.health,1);casualty.Kill();assert.equal(casualty.alive,false,"explicit scripted death remains possible");}
 }
 const context={Soldier:SoldierStub,WEAPONS:{},CAPSULE:[{radius:0.34,height:1.78}],SQUAD:{size:6,slots:Array.from({length:6},()=>({role:"rifleman"}))}};
-context.COMBAT={suppressDecayPerS:0.1};context.STATE={VAULT:"vault",ADVANCE:"advance",RELOAD:"reload",FIRE:"fire",IDLE:"idle"};
+context.COMBAT={suppressDecayPerS:0.1};
+// 2026-09-08 敌军 AI 基建接入之后 Think / ApplyScriptDefense 多认三个状态与投弹任务。
+context.STATE={VAULT:"vault",ADVANCE:"advance",RELOAD:"reload",FIRE:"fire",IDLE:"idle",
+ COVER_ENGAGE:"cover_engage",SUPPRESSED:"suppressed",GRENADE:"grenade"};
+context.TASK={GRENADE:"grenade"};
 const methods=vm.runInNewContext(`({${Method("Spawn")},${Method("TryFire")},${Method("TryBayonet")},${Method("Think")},${Method("ApplyScriptDefense")},${Method("ScriptFireFactors")}})`,context);
 const host={aliveCount:0,maxAlive:32,insideWalls:null,spawnSerial:{nra:0,ija:0},soldiers:[],ctx:{battlefield:{GroundHeight:()=>0},scene:{add(){}},actorFactory:{Create(kind,options){calls.push({kind,...options});return {kind,variant:options.variant||null,root:{position:{copy(){}}}};}}}};
 for(const variant of ["male","female"]){const actor=methods.Spawn.call(host,"nra",0,0,{actorKind:"civilian",actorVariant:variant,unarmed:true});assert.equal(actor.unarmed,true);assert.equal(actor.actorKind,"civilian");assert.equal(actor.actorVariant,variant);assert.ok(actor.weapon);assert.equal(calls.at(-1).weapon,null);}
@@ -134,9 +138,17 @@ const unarmed=new Proxy({unarmed:true},{get(target,key){if(key!=="unarmed")throw
 methods.TryFire.call({},unarmed,1,null);methods.TryBayonet.call({},unarmed,1,null);
 let meleeRequests=0;const meleeHost={ctx:{meleeCombat:{Fighter(){meleeRequests++;}}}};const soldier={unarmed:false,bayonetFixed:false,target:{}};methods.TryBayonet.call(meleeHost,soldier,0.5,null);assert.equal(meleeRequests,0);soldier.bayonetFixed=true;methods.TryBayonet.call(meleeHost,soldier,0.5,null);assert.equal(meleeRequests,1);
 const evacuee={scriptedNoncombatant:true,state:"fire",suppression:1,target:{},cover:{},bayonetFixed:true,aimBlend:1};
-methods.Think.call({},evacuee,0.1,null);assert.equal(evacuee.state,"advance");assert.equal(evacuee.target,null);assert.equal(evacuee.cover,null);assert.equal(evacuee.bayonetFixed,false);
+// 掩体与记忆的归还改由 AiDirector 统一做（掩体注册表要收回占用、感知要清记忆），
+// 所以这个纯规则沙箱要补两个桩；断言本身一个字没动。
+const evacuationHost={ReleaseCover(s){s.cover=null;},perception:{ForgetAll(){}}};
+methods.Think.call(evacuationHost,evacuee,0.1,null);assert.equal(evacuee.state,"advance");assert.equal(evacuee.target,null);assert.equal(evacuee.cover,null);assert.equal(evacuee.bayonetFixed,false);
 const defender={state:"charge",order:"charge",cover:{x:100,z:0},bayonetFixed:true,ammo:5,target:{},weapon:{reloadTimeS:3.2}};
-methods.ApplyScriptDefense(defender);assert.equal(defender.state,"fire");assert.equal(defender.order,"hold");assert.equal(defender.cover,null);assert.equal(defender.bayonetFixed,false);
+// 【2026-09-08】守点**不再等于禁掩体**：`ApplyScriptDefense` 开头那句 `s.cover = null`
+// 正是 docs/Data_EnemyAi.md §2.2 的第一条病根（正片里的敌人在设计上被禁止找掩体）。
+// 现在有掩体就进掩体打，没掩体才是原地对射；scriptDefensive 只管「不许追击 / 绕后 / 跃进出区」。
+methods.ApplyScriptDefense(defender);assert.equal(defender.state,"cover_engage");assert.equal(defender.order,"hold");assert.ok(defender.cover,"守点单位保留掩体");assert.equal(defender.bayonetFixed,false);
+const bareDefender={state:"idle",order:"advance",cover:null,bayonetFixed:false,ammo:5,target:{},weapon:{}};
+methods.ApplyScriptDefense(bareDefender);assert.equal(bareDefender.state,"fire","身边没有掩体的守点单位仍然是原地对射");
 defender.ammo=0;methods.ApplyScriptDefense(defender);assert.equal(defender.state,"reload");assert.equal(defender.reloadTimer,3.2);
 assert.equal(methods.ScriptFireFactors({}).accuracy,1);assert.equal(methods.ScriptFireFactors({}).interval,1);
 assert.equal(methods.ScriptFireFactors({scriptAccuracyScale:0.2}).accuracy,0.2);assert.equal(methods.ScriptFireFactors({scriptFireIntervalScale:3}).interval,3);

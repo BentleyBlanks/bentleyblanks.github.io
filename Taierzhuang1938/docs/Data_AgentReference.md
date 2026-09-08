@@ -225,6 +225,10 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   蒙皮会在 SSAO 里塌成原点，见头注）；`Script_ActorBatch.mjs` 收成 InstancedMesh，
   `Script_ActorCrowd.mjs` 管远景人群。
 - `Script_Ai.mjs`（士兵 AI 与战斗结算）、`Script_Navigation.mjs`（「哪儿站得住」位图 + 下坡场）。
+- **敌军 AI 的四件基建**（感知 / 掩体 / 射击 / 班组战术）：`Script_AiPerception` `Script_AiCover`
+  `Script_AiShooting` `Script_AiTactics` + 各自的 `Data_Tuning_Ai*`；接线、状态机与第一关接法
+  见 [敌军 AI 基建方案](Data_EnemyAi.md)（§5 大脑重排、§6 第一关、§12 实装记录）。
+  验收口：四条纯 Node 探针 + `Script_AiCombatBrowserTest`（会躲 / 有节奏 / 不隔墙打人 / 会绕会扔）。
 - 先读：`docs/Data_TechPhysics.md`（角色 IK 部分）。
 
 ### 测试场共享光照

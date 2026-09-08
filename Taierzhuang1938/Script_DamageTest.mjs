@@ -159,6 +159,11 @@ if (arena.rifles < 3) {
 // ===========================================================================
 await page.evaluate(() => {
   const T = window.Taierzhuang;
+  // 挑射手方位时用的两个近似高度：站姿枪口（眼高 1.5 − 枪管在瞄准线下方 0.15）
+  // 与玩家胸口（Script_PlayerHitbox 的躯干胶囊在 0.95–1.40 之间）。
+  // 只用来判「这条线通不通」，不参与任何伤害结算。
+  const RANGE_MUZZLE_Y = 1.35;
+  const RANGE_CHEST_Y = 1.29;
   const Mulberry32 = (seed) => {
     let a = seed >>> 0;
     return () => {
@@ -229,8 +234,44 @@ await page.evaluate(() => {
       player.spawnGrace = 0;                       // 出生保护另有断言，这里不测它
       player.stance = opt.stance ?? "stand";
       const d = opt.distance ?? 25;
+      // 【2026-09-08 敌军 AI 基建接入】射手状态多了两样，靶场同样要归零 ——
+      // 理由与下面那些 `s.suppression = 0 / s.heat = 0` 完全一致：这台靶场的定义是
+      // 「三个人瞄着你打」，不该被场上**别人**的状态改变读数。
+      //   · 攻击令牌：`COMBAT.maxShootersOnPlayer` 的名额是全局的，开局那一帧里
+      //     场上别的日军可能已经握着租约；靶场循环里时间不推进，租约永远不过期，
+      //     于是三个射手里有一两个抢不到名额、整趟只能压制射击（打不死人）。
+      //   · 瞄准误差：`ShootingModel` 的收敛状态挂在 soldier 上，跨局残留会让
+      //     第 n 局借到第 n−1 局的收敛结果，配对采样就不配对了。
+      ai.tactics.Reset();
+      // 三个射手摆在同一个 25 m 圆上、互隔 120°，但**圆的起始方位要挑过**：
+      // 这一关的空地上就有院墙，随手取 0° 的话总有一两个人正对着一堵墙
+      //（实测 8.4 m 处 tag=wall）。旧代码看不出来 —— 它不验射线，隔着墙照样打中；
+      // 新的暴露判定会把那个人变成只会压制射击的哑巴，整台靶场少三分之一火力。
+      // 所以按十二个方位扫一遍，取「三个人都看得见玩家」的那一个（找不到就取最好的）。
+      // 距离、间隔、姿态一律不动，量的还是同一件事。
+      const eyeY = player.position.y + RANGE_MUZZLE_Y;
+      const chest = { x: player.position.x, y: player.position.y + RANGE_CHEST_Y, z: player.position.z };
+      const Clear = (x, z) => {
+        const dx = chest.x - x, dy = chest.y - eyeY, dz = chest.z - z;
+        const len = Math.hypot(dx, dy, dz) || 1;
+        const hit = T.battlefield.Raycast({ x, y: eyeY, z },
+          { x: dx / len, y: dy / len, z: dz / len }, len);
+        return !hit || hit.t >= len - 0.4;
+      };
+      let bearing = 0;
+      let bestSeen = -1;
+      for (let k = 0; k < 12; k += 1) {
+        const at = (k / 12) * Math.PI * 2;
+        let seen = 0;
+        for (let i = 0; i < shooters.length; i += 1) {
+          const a = at + (i / shooters.length) * Math.PI * 2;
+          if (Clear(player.position.x + Math.cos(a) * d, player.position.z + Math.sin(a) * d)) seen += 1;
+        }
+        if (seen > bestSeen) { bestSeen = seen; bearing = at; }
+        if (seen === shooters.length) break;
+      }
       shooters.forEach((s, i) => {
-        const a = (i / shooters.length) * Math.PI * 2;
+        const a = bearing + (i / shooters.length) * Math.PI * 2;
         s.position.set(player.position.x + Math.cos(a) * d, player.position.y,
           player.position.z + Math.sin(a) * d);
         s.suppression = 0;
@@ -243,6 +284,8 @@ await page.evaluate(() => {
         s.yaw = Math.atan2(-(player.position.x - s.position.x),
           -(player.position.z - s.position.z));
         s.playerLockAt = opt.fresh ? ai.time : -999;   // fresh=首发必偏那一发
+        ai.shooting.Detach(s);                       // 瞄准收敛从这一局的第一发重新开始
+        s.moveSpeed = 0;                             // 靶场里的人是站定的（Act 不跑，这一位会冻住）
         // 按局播种（见上面"骰盅"那段）。同一个 opt.seed 永远掷同一串骰。
         s.rnd = Mulberry32((Math.imul((opt.seed ?? 1) + 1, 2654435761)
           ^ Math.imul(i + 1, 0x9E3779B1)) >>> 0);
@@ -262,6 +305,12 @@ await page.evaluate(() => {
         const s = shooters[idx % shooters.length];
         idx += 1;
         s.fireTimer = 0; s.aimTime = 99; s.suppression = 0;
+        // 玩家的速度**每一步都要归零**：靶场不跑 player.Update，而 `TakeHit` 会往
+        // velocity 上加一记 knockback（HIT_FEEDBACK.knockbackMps）—— 没有摩擦把它衰减掉，
+        // 挨过一发之后这个数就一路攒到 9 m/s。新的射击模型按「目标在动」扩散瞄准误差
+        //（AIM.disturbTargetMovingPerS），冻住的那一位会让三个射手全程按
+        // 「打一个正在冲刺的人」结算，命中率直接腰斩。靶场量的是站定对射，不是追击。
+        player.velocity.set(0, 0, 0);
         const before = player.health;
         ai.TryFire(s, step, player);
         shots += 1;

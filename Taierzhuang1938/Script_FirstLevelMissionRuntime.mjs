@@ -31,6 +31,8 @@ import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
 import { EmplacementInteraction } from "./Script_Emplacement.mjs";
 import { Localize, T } from "./Script_Text.mjs";
 import { FirstLevelStageTextId } from "./Script_TextIds.mjs";
+// Only for `emplaced`: a man married to a machine gun never carries throwables here.
+import { WEAPONS } from "./Data_Weapons.mjs";
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const Clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 export class FirstLevelMissionRuntime {
@@ -241,7 +243,20 @@ export class FirstLevelMissionRuntime {
       actor.position.z + (point.z - actor.position.z) * fraction,
     );
   }
-  Defend(actor, point) {
+  /**
+   * Hold this spot and fight from it.
+   *
+   * 2026-09-08 (docs/Data_EnemyAi.md §6): this is an **anchor plus a radius**, not a pin.
+   * `scriptDefensive` still forbids every manoeuvre task (no chasing, no flanking, no bounding
+   * out of the zone) and still owns the firing cadence, but the man may now take a cover point
+   * whose hide position lies inside `radius + coverSlackM` and run the hide/peek cycle there.
+   * Before this change `AiDirector.ApplyScriptDefense` opened with `s.cover = null`, so every
+   * front-line Japanese soldier in this level was **forbidden by design** from taking cover.
+   *
+   * @param {number} [radius] hold zone radius; the assault bounds pass their own (cover search) radius
+   * @param {number} [coverSlackM] how far outside the zone a cover hide position may sit
+   */
+  Defend(actor, point, radius = R.defendHoldRadiusM, coverSlackM = R.defendCoverSlackM) {
     if (!actor?.alive) return;
     actor.scriptedNoncombatant = false;
     actor.p012Guided = false;
@@ -252,7 +267,8 @@ export class FirstLevelMissionRuntime {
     actor.scriptAccuracyScale = actor.missionAccuracyScale ?? 0.5;
     actor.scriptFireIntervalScale = actor.missionFireIntervalScale ?? 1.5;
     actor.order = "hold";
-    actor.holdZone = { id: "MissionDefense", ...point, radius: 2 };
+    actor.holdZone = { id: "MissionDefense", ...point, radius };
+    actor.scriptCoverSlackM = coverSlackM;
     actor.goal.set(point.x, 0, point.z);
   }
   Guide(route) {
@@ -393,6 +409,13 @@ export class FirstLevelMissionRuntime {
       actor.manualGoalUntil = Infinity;
       actor.order = "hold";
       actor.holdZone = { id: `Mission_${spec.id}`, x: spec.x, z: spec.z, radius: spec.hold ? 0.4 : 2 };
+      // Emplaced gunners keep their firing position: the hide/peek side step is all they may do.
+      // Everyone else may take cover inside their zone plus the ordinary slack.
+      actor.scriptCoverSlackM = spec.hold ? R.defendHoldFixedSlackM : R.defendCoverSlackM;
+      // Two Type 91/97 grenades apiece (Data_Tuning_FirstLevel.enemyGrenades). The tactics layer decides
+      // when one is worth throwing (target pinned in one place, 8-26 m, squad and personal cooldowns);
+      // gunners on an emplacement never throw, they are married to the gun.
+      if (!spec.hold && !WEAPONS[spec.weapon || "Type38"]?.emplaced) actor.grenades = R.enemyGrenades;
       if (spec.hold) {actor.scriptDefensive=true;actor.scriptSuppressible=true;}
       if (id === "front" && !spec.hold) actor.missionAssault = this.MakeAssault(spec.x, spec.z);
       this.enemies.set(spec.id, actor);
@@ -415,7 +438,13 @@ export class FirstLevelMissionRuntime {
         continue;
       }
       if (actor.suppression >= R.tacticalSuppression) {
-        if (s.mode !== "pinned") { this.Defend(actor, actor.position); this.ai.SetStance(actor, 2, 1.5, true); s.mode = "pinned"; }
+        // Pinned: the anchor is where he already is, but the cover search radius stays open so he
+        // crawls into whatever is nearby instead of lying flat in the open until he dies.
+        if (s.mode !== "pinned") {
+          this.Defend(actor, actor.position, R.defendHoldRadiusM, R.assaultCoverSearchM);
+          this.ai.SetStance(actor, 2, 1.5, true);
+          s.mode = "pinned";
+        }
         s.pinned += dt;
         // Long enough under fire: crawl back one bound instead of dying in the open.
         if (s.pinned > R.assaultPinnedS && s.index > 0) { s.index--; s.hold = 0; s.pinned = 0; s.mode = "rush"; }
@@ -428,7 +457,14 @@ export class FirstLevelMissionRuntime {
         this.ai.SetStance(actor, 0, .4, true);
         this.MoveActor(actor, target, R.assaultRushMps);
       } else {
-        if (s.mode !== "hold") { this.Defend(actor, target); this.ai.SetStance(actor, 1, 1, true); s.mode = "hold"; s.hold = 0; }
+        if (s.mode !== "hold") {
+          // Reaching a bound line no longer means "kneel here in the open": hold the line as an anchor
+          // with assaultCoverSearchM of slack so the AI takes any cover near it and works the peek cycle.
+          // Kneeling stays the fallback for a line that has nothing to hide behind.
+          this.Defend(actor, target, R.defendHoldRadiusM, R.assaultCoverSearchM);
+          this.ai.SetStance(actor, 1, 1, true);
+          s.mode = "hold"; s.hold = 0;
+        }
         s.hold += dt;
         const last = s.index === s.points.length - 1;
         if (s.hold >= (last ? R.assaultFinalHoldS : R.assaultHoldS) * s.jitter) {
@@ -463,6 +499,8 @@ export class FirstLevelMissionRuntime {
         actor.manualGoalUntil = Infinity;
         actor.order = "hold";
         actor.holdZone = { id: `Mission_${id}`, x, z, radius: 2 };
+        actor.scriptCoverSlackM = R.defendCoverSlackM;
+        if (actor.weapon?.kind === "boltRifle") actor.grenades = R.enemyGrenades;
         actor.missionAssault = this.MakeAssault(x, z);
         this.enemies.set(id, actor);
       });

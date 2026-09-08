@@ -46,6 +46,21 @@ export const MISSION_TUNING = Object.freeze({
   assaultRegroupCycles:3,
   assaultArrivalM:.9,
   assaultPinnedS:7,
+  // Enemy AI integration (2026-09-08, docs/Data_EnemyAi.md §6). Defend() no longer means "pinned to a point with no
+  // cover": it is an anchor plus a radius. The soldier may take any cover whose hide position falls inside
+  // holdZone.radius + defendCoverSlackM, then run the hide/peek cycle there; he still never chases, flanks or bounds
+  // out of the zone (scriptDefensive keeps blocking every manoeuvre task).
+  defendHoldRadiusM:2,
+  defendCoverSlackM:6,
+  // Emplaced machine gunners (spec.hold) keep their firing position: only the side step of a peek is allowed,
+  // never a relocation. 0.9 m covers COVER.sideStepM (0.55) plus the standoff jitter.
+  defendHoldFixedSlackM:.9,
+  // After a bound the man looks for cover this far from the line before settling for a kneeling position in the open.
+  assaultCoverSearchM:9,
+  // Japanese infantry carried two Type 91/97 fragmentation grenades apiece (the Type 91 doubled as the grenade
+  // discharger round, so a squad's stock was pooled with the launcher man). Two per rifleman is the conservative
+  // reading and it is also what the pacing wants: a man who has thrown twice is out, so grenades stay an event.
+  enemyGrenades:2,
   // Reinforcement waves drop at FRONT_ASSAULT.spawnZ while the front stages run and fewer than waveAliveCap assault men live.
   waveFirstDelayS:18,
   waveIntervalS:26,

@@ -17,22 +17,79 @@ import { COMBAT, NAME_POOL, DIFFICULTY } from "./Data_Battle.mjs";
 import { TRAVERSAL, TraversalPlan, TraversalCurve, TraversalLanding } from "./Data_Traversal.mjs";
 import { ActorCrowd } from "./Script_ActorCrowd.mjs";
 import {
-  SIGHT_BY_STANCE, SIGHT_SCALE_RANGE, SQUAD, ENGAGE, ACTOR_DETAIL, HURT_FLINCH,
+  SIGHT_BY_STANCE, SIGHT_SCALE_RANGE, SQUAD, ENGAGE, ACTOR_DETAIL, HURT_FLINCH, BRAIN,
 } from "./Data_Tuning_Ai.mjs";
 import { PlayerHitboxes, PlayerAimPoint, RaycastPlayerHitboxes, GaussianPair } from "./Script_PlayerHitbox.mjs";
+// 敌军 AI 的四件基建（docs/Data_EnemyAi.md §4）。四个模块都不 import three，
+// 只吃普通对象 `{x,y,z}` 与本文件组装的 host 回调 —— Script_Ai 仍是唯一的 three 适配层。
+import { PerceptionModel, PLAYER_TRACK_ID } from "./Script_AiPerception.mjs";
+import { CoverRegistry } from "./Script_AiCover.mjs";
+import { COVER, COVER_CYCLE } from "./Data_Tuning_AiCover.mjs";
+import { ShootingModel } from "./Script_AiShooting.mjs";
+import { TacticsDirector, TASK, IsManeuverTask } from "./Script_AiTactics.mjs";
+// 只读 TACTICS：压制射击的情报门槛与守区掩体余量。侧翼 / 投弹 / 查看的那几张表
+// 由 `TacticsDirector` 自己消费 —— 大脑只按 `task.kind` 选状态，不重复读它们的数。
+import { TACTICS } from "./Data_Tuning_AiTactics.mjs";
 
 // 发现距离、班组队形、交火距离与人物 LOD 预算全在 `Data_Tuning_Ai.mjs`
 //（每一组的账跟着数搬过去了）。这里按原名 re-export —— 那两个名字是跨系统契约：
 // 照明弹按 SIGHT_SCALE_RANGE 夹倍率，人物动作编辑器与 FlareTest 都按名字找它们。
 export { SIGHT_BY_STANCE, SIGHT_SCALE_RANGE };
 
+// 状态字符串是跨系统契约：`Threatens` 认 "suppressed"、`EnemyCombatState` 认 "suppressed"、
+// `AiBehaviorTest` 认 "charge"/"advance"、P012 冒烟认 fire/charge/bayonet/melee。
+// 所以第二波（docs/Data_EnemyAi.md §5）**只增不改**：旧的九个值一个字都没动。
 const STATE = {
   IDLE: "idle", ADVANCE: "advance", COVER: "cover", FIRE: "fire",
   SUPPRESSED: "suppressed", RELOAD: "reload", DEAD: "dead", CHARGE: "charge",
   VAULT: "vault",
+  // --- 第二波新增 ---------------------------------------------------------
+  /** 在掩体里打：hide → peek → 点射 → hide 的周期（COVER_CYCLE 定节拍）。 */
+  COVER_ENGAGE: "cover_engage",
+  /** 目标藏起来了 / 没拿到攻击令牌：向 LKP 或掩体沿压制射击。 */
+  SUPPRESS: "suppress",
+  /** 跃进：跑向下一个掩体，到位转 COVER_ENGAGE。 */
+  BOUND: "bound",
+  /** 绕侧翼：沿导航去 Tactics 给的点。 */
+  FLANK: "flank",
+  /** 去查看最后目击位置。 */
+  INVESTIGATE: "investigate",
+  /** 散伙后撤。 */
+  RETREAT: "retreat",
+  /** 投弹（走 actor.BeginGrenadeThrow + combat.Throw）。 */
+  GRENADE: "grenade",
 };
 
 
+
+/**
+ * 行为 → 喊话的对照表（docs/Data_EnemyAi.md §8）。
+ *
+ * 键全部是 `Data_Voice.mjs` 里**已经烘出来的**行，一条新词都没加：
+ * 中方走「找掩护 / 左手边绕过去 / 手榴弹 / 打莫歇气」，日方走对应的
+ * `ija_warn_cover` / `ija_move_flank` / `ija_warn_grenade` / `ija_rally_suppress`。
+ * `lost`（跟丢了）两侧都没有现成的词 —— 于是它**不在表里**，Bark 直接返回 null，
+ * 等 Script_VoiceBake 补了词再加一行就行（这就是「静默降级」的形状）。
+ */
+const BARK_LINES = Object.freeze({
+  spot: { nra: { kind: "spot" }, ija: { kind: "spot" } },
+  cover: {
+    nra: { kind: "move", key: "move_cover" },
+    ija: { kind: "warn", key: "ija_warn_cover" },
+  },
+  flank: {
+    nra: { kind: "move", key: "move_flank" },
+    ija: { kind: "move", key: "ija_move_flank" },
+  },
+  grenade: {
+    nra: { kind: "warn", key: "warn_grenade" },
+    ija: { kind: "warn", key: "ija_warn_grenade" },
+  },
+  suppress: {
+    nra: { kind: "rally", key: "rally_shoot" },
+    ija: { kind: "rally", key: "ija_rally_suppress" },
+  },
+});
 
 function AngleDelta(from, to) {
   return Math.atan2(Math.sin(to - from), Math.cos(to - from));
@@ -260,6 +317,41 @@ export class Soldier {
     this.emplacementId = null;
     this.muzzle = new THREE.Vector3();
     this.lastFire = -99;
+    // --- 第二波（docs/Data_EnemyAi.md §5）在士兵上新增的字段 ------------------
+    // 全部在构造器里定死，不靠第一次赋值凭空长出来：V8 的隐藏类每多一次形状变更
+    // 就是一次去优化，而这些字段每一帧都在热路径上被读。
+    this.perception = null;      // PerceptionModel 的记忆（Attach 建）
+    this.shooting = null;        // ShootingModel 的瞄准 / 暴露状态
+    this.task = null;            // TacticsDirector 每秒写的班组任务
+    this.alert = "unaware";      // 士兵级警戒（ALERT.*）
+    this.awareness = 0;          // 当前目标的觉察度 0..1
+    this.lkp = null;             // 最后目击位置（复用对象）
+    this.lkpTime = -99;
+    this.lkpConfidence = 0;
+    this.targetMoving = false;
+    this.targetFromMemory = false;   // 目标是从记忆里接回来的（只压制射击，不冲锋）
+    this.targetExposedS = 0;     // 目标连续暴露了几秒（瞄准收敛加速）
+    this.muzzleWorld = null;     // 这一发的枪口（UpdateMuzzle 写，对不上账时为 null）
+    this.muzzleStore = null;
+    this.lookPitch = 0;          // TryFire 算出来的抬枪角（向上为正）
+    this.lookPitchBlend = 0;     // 限速之后真正喂给 Actor 的那个
+    this.burstLeft = 0;          // 这一梭子还剩几发（BurstPlan 排的）
+    this.burstIntervalS = 0;
+    this.burstPauseS = 0;
+    this.moveOrder = null;       // 这一帧的走位命令 {x,z,speed}（Act 的 switch 读它）
+    this.moveStore = { x: 0, z: 0, speed: 0 };
+    this.moveArriveM = NaN;      // 这一次走位的到位半径（掩体微走位要 0.12 m，默认 1.2 m 判不出探头）
+    this.stationaryS = 0;        // 在原地待了多久（投弹判据「对方钉在一处」读它）
+    this.coverStore = null;      // s.cover 的复用容器（不每次选点都新建）
+    this.grenadeThreatAt = -99;  // 上一次「敌方手榴弹落在我掩体边上」的时刻
+    this.coverPhase = "none";    // "hide" | "peek" | "none"
+    this.coverPhaseUntil = -99;
+    this.coverPickAt = -99;      // 上一次（重）选掩体的时刻，reselectMinS 限流
+    this.coverThreatX = 0;       // 上一次选点时威胁在哪（挪远了才值得重算）
+    this.coverThreatZ = 0;
+    this.peekCount = 0;          // hide→peek 循环次数（验收探针数它）
+    this.lastGrenadeAt = -99;
+    this.grenades = 0;           // 携行手榴弹（第一关编成发弹，见 Data_Tuning_FirstLevel）
     // 不能只给 Actor 一个持续 0.12 s 的 firing 布尔。500 rpm 机枪恰好每 0.12 s
     // 一发，布尔会从第一发起一直为 true，人物后坐只触发一次。序号让每发都有边沿。
     this.fireSequence = 0;
@@ -368,6 +460,11 @@ export class AiDirector {
     this.playerBoxes = [];
     this.tmpB = new THREE.Vector3();
     this.tmpC = new THREE.Vector3();
+    // PlayerHitPart 的散点方向（**不许再借 tmpD**，那是 Act 的 desired）、
+    // 曳光终点、枪口世界坐标：三个都只在 TryFire 里活一发的时间。
+    this.tmpHit = new THREE.Vector3();
+    this.tmpEnd = new THREE.Vector3();
+    this.tmpMuzzle = new THREE.Vector3();
     this.playerTargetedBy = 0;
     // 本帧有多少人把玩家当目标。上限见 COMBAT.maxShootersOnPlayer ——
     // 没有这个闸门，一条街上的人会全部焊死玩家一个，出生点 27 m 上九支枪
@@ -390,11 +487,101 @@ export class AiDirector {
     this.spawnSerial = { nra: 0, ija: 0 };
     this.squadCenters = new Map();
     // 取最近三个敌人的固定槽位。每次 Think 现造数组会在 70 人规模下产生可观的 GC。
+    // `visible / moving / firingRecently` 是感知层要的三个字段：**visible 不给就当被挡住**
+    // （Script_AiPerception 头注偏离 b），漏填不会静默退回旧的全知行为。
     this.nearSlots = [
-      { ref: null, isPlayer: false, id: 0, dist: 1e9, stance: 0, position: null },
-      { ref: null, isPlayer: false, id: 0, dist: 1e9, stance: 0, position: null },
-      { ref: null, isPlayer: false, id: 0, dist: 1e9, stance: 0, position: null },
+      { ref: null, isPlayer: false, id: 0, dist: 1e9, stance: 0, position: null,
+        visible: false, moving: false, firingRecently: false },
+      { ref: null, isPlayer: false, id: 0, dist: 1e9, stance: 0, position: null,
+        visible: false, moving: false, firingRecently: false },
+      { ref: null, isPlayer: false, id: 0, dist: 1e9, stance: 0, position: null,
+        visible: false, moving: false, firingRecently: false },
     ];
+    /** Sense 要的稠密候选数组（只放有 ref 的槽，长度每拍重写，不新建）。 */
+    this.senseCandidates = [];
+
+    // ---------------------------------------------------------------- 四件基建
+    // 宿主回调：四个模块共用同一份形状（docs/Data_EnemyAi.md §3）。
+    // **射线只认静态世界**：Script_Physics 的默认 `IG_RAY_WORLD` 是
+    // `InteractionGroups(QUERY, WORLD)`，人物胶囊是 `IG_CHARACTER`，射手与目标自己的
+    // 碰撞体都不在里面；`terrain` 默认 false，所以田坎、河堤也不挡视线 ——
+    // 与 `HasLineOfSight` 用的是同一条判据，暴露采样不会跟通视各说各话。
+    this._hostFrom = new THREE.Vector3();
+    this._hostDir = new THREE.Vector3();
+    this._hostTo = new THREE.Vector3();
+    const host = {
+      Time: () => this.time,
+      Rnd: () => this.rnd(),
+      Raycast: (from, dir, maxDist) => {
+        const bf = this.ctx.battlefield;
+        if (!bf || typeof bf.Raycast !== "function") return null;
+        // 模块给的是普通对象，battlefield 只读 .x/.y/.z —— 但 Rapier 那一侧要
+        // 的是能直接取分量的量，拷进复用向量最稳（也让将来换实现不必再查一遍）。
+        this._hostFrom.set(from.x, from.y, from.z);
+        this._hostDir.set(dir.x, dir.y, dir.z);
+        return bf.Raycast(this._hostFrom, this._hostDir, maxDist);
+      },
+      BlocksSight: (from, to) => {
+        const blocks = this.ctx.BlocksSight;
+        if (typeof blocks !== "function") return false;
+        this._hostFrom.set(from.x, from.y, from.z);
+        this._hostTo.set(to.x, to.y, to.z);
+        return blocks(this._hostFrom, this._hostTo) === true;
+      },
+      GroundHeight: (x, z) => (this.ctx.battlefield ? this.ctx.battlefield.GroundHeight(x, z) : 0),
+      Walkable: (x, z) => (this.ctx.nav ? this.ctx.nav.Walkable(x, z) !== false : true),
+      Steer: (x, z, tx, tz, out) => (this.ctx.nav
+        ? this.ctx.nav.Steer(x, z, tx, tz, out) : false),
+      // 照明弹倍率的唯一入口。感知层不再自己乘一次（Script_AiPerception 硬约束 3）。
+      SightRange: (stance) => this.SightRange(stance),
+      StanceEye: (stance, subject) => AiDirector.StanceEye(stance, subject),
+    };
+    this.aiHost = host;
+    this.perception = new PerceptionModel(host);
+    this.covers = new CoverRegistry(this.ctx.battlefield?.covers || [], host);
+    /** `battlefield.covers` 换了引用（Destruction filter 之后）就重建注册表。 */
+    this.coversSource = this.ctx.battlefield?.covers || null;
+    this.shooting = new ShootingModel(host);
+    this.tactics = new TacticsDirector(host, this.covers);
+    /** 掩体查询的复用出参（Query 返回的是复用槽，必须当场拷出来）。 */
+    this._coverThreat = { x: 0, y: 0, z: 0, stance: 0, id: null };
+    this._coverThreats = [this._coverThreat];
+    this._coverOpts = {
+      radiusM: COVER.defaultRadiusM, maxCandidates: COVER.maxCandidates,
+      maxValidate: COVER.maxValidate, soldierId: null, suppression: 0,
+      allies: null, minAllySpacingM: COVER.minAllySpacingM,
+      towardX: NaN, towardZ: NaN,
+    };
+    this._coverAllies = [];
+    /** TryFire 的复用容器：友军躯干（射击走廊）、枪口、瞄点。 */
+    this._fireAllies = [];
+    this._muzzleWorld = { x: 0, y: 0, z: 0 };
+    this._aimPoint = { x: 0, y: 0, z: 0 };
+    this._lkpPoint = { x: 0, y: 0, z: 0 };
+    /** 玩家在原地钉了多久（投弹判据用；玩家没有 soldier.cover 可查）。 */
+    this.playerStationaryS = 0;
+    /** 取证计数：压制射击发数、掩体重选次数、投弹数（Debug.Ai 与验收探针读）。 */
+    this.stats = { suppressShots: 0, aimedShots: 0, coverPicks: 0, grenades: 0, peeks: 0 };
+  }
+
+  /**
+   * 全场刺激上报口（装配层调：玩家开枪、AI 开枪、爆炸）。
+   *
+   * 距离预筛在 `PerceptionModel.Hear` 里做（比平方，绝大多数听者在那一行被弹掉），
+   * 所以这里把全场数组直接交出去即可。`side` 是**声源那一方** —— 同阵营的枪声不写敌情。
+   *
+   * @param {string} kind "gunshot" | "machinegun" | "explosion" | "footstep" | "bark" | "impact"
+   * @param {object} at `{x,y,z}`
+   */
+  NoteStimulus(kind, at, { side = null, sourceId = null, isPlayer = false, loudnessM, ref = null } = {}) {
+    if (!at || !this.perception) return 0;
+    // `ref` 是声源那个人（玩家对象 / soldier）。**必须带上**：记忆里没有 ref 的那条
+    // Track 只能当一个坐标用，大脑没法把它接回成一个目标 —— 表现就是
+    // 「听见背后一枪，人站在原地不动」（那正是 §2.1 要修的病根）。
+    return this.perception.Hear({
+      kind, x: at.x, y: at.y ?? 0, z: at.z, side, sourceId, isPlayer,
+      time: this.time, loudnessM, ref,
+    }, this.soldiers);
   }
 
   get aliveCount() { return this.soldiers.reduce((n, s) => n + (s.alive ? 1 : 0), 0); }
@@ -526,6 +713,14 @@ export class AiDirector {
   }
 
   Remove(soldier) {
+    // 出场也要把手上的东西交回去（阵亡走 NotifyDeath，撤场走这里）。
+    // 漏一样就会有「掩体永远有人占」「令牌被一个已经不在场上的人握着」这类
+    // 不报错的慢性病 —— 换关时全场撤场，一次能漏掉几十个名额。
+    this.ReleaseCover(soldier);
+    this.tactics.ReleaseToken(soldier.id);
+    this.tactics.ReleaseTokensForTarget(soldier.id);
+    this.perception.ForgetAll(soldier);
+    soldier.task = null;
     if (soldier.body) { soldier.body.Remove(); soldier.body = null; }
     if (soldier.corpse) {
       if (this.ctx.physics) this.ctx.physics.RemoveBody(soldier.corpse);
@@ -547,6 +742,15 @@ export class AiDirector {
    */
   NotifyDeath(soldier) {
     this.deaths[soldier.side] = (this.deaths[soldier.side] || 0) + 1;
+    // 死人要**把手上的东西全部交出去**：占着的掩体、攻击令牌、班组任务、记忆。
+    // 漏一样就会出现「掩体永远有人占」「令牌上限被尸体占满」这类不报错的慢性病。
+    this.ReleaseCover(soldier);
+    this.tactics.ReleaseToken(soldier.id);
+    this.tactics.ReleaseTokensForTarget(soldier.id);
+    this.perception.ForgetAll(soldier);
+    soldier.task = null;
+    soldier.target = null;
+    soldier.targetVisible = false;
     if (this.ctx.onSoldierDeath) this.ctx.onSoldierDeath(soldier.side, soldier);
   }
 
@@ -565,6 +769,14 @@ export class AiDirector {
 
   /** 每秒汇总两侧重心与当前任务路标；随后统一更新小队意图。 */
   UpdateFront() {
+    // 掩体表被炸掉一段之后 `Script_Destruction` 会**换掉整个数组**（filter 出新的一份），
+    // 所以按引用比就能认出来。旧表里那些贴在洞口上的点必须作废 ——
+    // 不重建的话人会蹲在一堵已经不存在的墙后面。
+    const covers = this.ctx.battlefield?.covers;
+    if (covers && covers !== this.coversSource) {
+      this.coversSource = covers;
+      this.covers.Rebuild(covers);
+    }
     const list = this.ctx.battlefield?.objectives;
     if (!list || !list.length) return;
     const mission = this.CurrentMissionObjective();
@@ -706,6 +918,10 @@ export class AiDirector {
         const autoAdvance = !s.holdZone && s.order === "advance" && this.time >= s.manualGoalUntil;
         if (focus && autoAdvance) this.SetSquadGoal(s, group);
       }
+
+      // 班组战术：每秒给这个班派一次活（压制 / 侧翼 / 跃进 / 投弹 / 撤退 / 守）。
+      // **必须排在队形与焦点之后** —— Tactics 吃的就是这里刚算好的 group。
+      this.tactics.UpdateSquad(group, player);
     }
     this.squadCenters = groups;
   }
@@ -844,10 +1060,21 @@ export class AiDirector {
     // 不能每帧清零 —— 清零的话上限只对当帧被 Think 的那六分之一生效。
     this.playerTargetedBy = 0;
     for (const s2 of this.soldiers) {
-      if (s2.alive && s2.target && s2.target.isPlayer) this.playerTargetedBy += 1;
+      // 只数**真的看见他**的人：靠记忆压制射击的不占名额，否则听见一声枪响的三个人
+      // 会把射手上限占满，真正看得见的人反而选不上他（那正是旧版集体抽搐的一条源头）。
+      if (s2.alive && s2.target && s2.target.isPlayer && !s2.targetFromMemory) this.playerTargetedBy += 1;
+    }
+    // 玩家在原地钉了多久。投弹判据（TacticsDirector.ShouldGrenade 的第②条
+    //「对方钉在一处」）读它 —— 玩家没有 `soldier.cover` 可查，只能看他挪没挪窝。
+    {
+      const p = this.ctx.player;
+      const v = p && p.velocity;
+      const moving = !!v && Math.sqrt(v.x * v.x + v.z * v.z) > BRAIN.movingMps;
+      this.playerStationaryS = moving ? 0 : this.playerStationaryS + dt;
     }
     const slice = this.tickIndex % 6;
     const player = this.ctx.player;
+    this.UpdateGrenadeThreats();
 
     for (let i = 0; i < this.soldiers.length; i += 1) {
       const s = this.soldiers[i];
@@ -880,6 +1107,35 @@ export class AiDirector {
   }
 
   /**
+   * 在飞的敌方手榴弹：落在谁的隐蔽位附近，谁就该换个地方（方案 §4.4 末条）。
+   *
+   * 每帧扫一遍，但**在途投掷物通常是 0—2 枚**，所以这是一条几乎恒为空的循环；
+   * 真有弹的时候才付 O(弹 × 人) 的账。标记只写一个时刻戳，
+   * 由 `UpdateCover` 当成「紧急重选」的触发条件（不吃 reselectMinS 限流）。
+   */
+  UpdateGrenadeThreats() {
+    const list = this.ctx.combat && this.ctx.combat.projectiles;
+    if (!list || !list.length) return;
+    const r2 = BRAIN.grenadeDodgeM * BRAIN.grenadeDodgeM;
+    for (let i = 0; i < list.length; i += 1) {
+      const p = list[i];
+      if (!p.alive || p.fuse <= 0) continue;
+      for (let j = 0; j < this.soldiers.length; j += 1) {
+        const s = this.soldiers[j];
+        if (!s.alive) continue;
+        // owner 是 "player" | "nra" | "ija"：只有**不是自己这一方**扔的才算威胁。
+        if (p.owner === s.side || (p.owner === "player" && s.side === "nra")) continue;
+        const at = s.cover ? s.cover.hidePos : s.position;
+        const dx = p.position.x - at.x;
+        const dz = p.position.z - at.z;
+        if (dx * dx + dz * dz > r2) continue;
+        if (this.time - s.grenadeThreatAt > 1) this.Bark(s, "grenade");
+        s.grenadeThreatAt = this.time;
+      }
+    }
+  }
+
+  /**
    * 只剔除真正落在镜头视锥外的人。视锥内不分阵营、不分生死、不设数量名额；
    * 只按投影尺寸近似值（距离）选完整 Actor / 合批远景层。
    */
@@ -908,6 +1164,13 @@ export class AiDirector {
       s.actor.allowFootIk = distanceSq <= ACTOR_DETAIL.footIkM ** 2;
       s.actor.SetShadowEnabled(distanceSq <= ACTOR_DETAIL.shadowM ** 2);
       const settledCorpse = !s.alive && s.deadTime >= 0.9;
+      // 远景层里的尸体有距离上限（ACTOR_DETAIL.corpseCrowdMaxM 那段账）；活人没有。
+      if (settledCorpse && distanceSq > ACTOR_DETAIL.corpseCrowdMaxM * ACTOR_DETAIL.corpseCrowdMaxM) {
+        this._SetDetailedAttached(s.actor, false);
+        s.actor.allowFootIk = false;
+        s.renderLod = "culled";
+        continue;
+      }
       const detailLimit = settledCorpse
         ? (s.renderLod === "detail" ? ACTOR_DETAIL.corpseExitM : ACTOR_DETAIL.corpseEnterM)
         : (s.renderLod === "detail" ? ACTOR_DETAIL.exitM : ACTOR_DETAIL.enterM);
@@ -1027,7 +1290,12 @@ export class AiDirector {
       s.targetVisible = true;
       return false;
     }
-    if (s.target) s.targetChanges += 1;
+    if (s.target) {
+      s.targetChanges += 1;
+      // 换人就把名额让出来：不还的话上限会被一个已经不打他的人占着，
+      // 后面的人一律拿不到令牌、集体转压制射击。
+      this.tactics.ReleaseToken(s.id);
+    }
     const wasPlayer = !!(s.target && s.target.isPlayer);
     s.target = {
       position: candidate.position, isPlayer: candidate.isPlayer, ref: candidate.ref,
@@ -1038,6 +1306,46 @@ export class AiDirector {
     s.targetLockUntil = this.time + 3.0 + s.rnd() * 0.8;
     if (candidate.isPlayer && !wasPlayer) s.playerLockAt = this.time;
     return true;
+  }
+
+  /**
+   * 丢掉当前目标。**只此一条出口** —— 攻击令牌、瞄准状态与目标字段必须一起清，
+   * 少清一样就会出现「令牌被一个已经不打他的人占着」，上限一满全班转去压制射击。
+   */
+  DropTarget(s) {
+    if (s.target) this.tactics.ReleaseToken(s.id);
+    s.target = null;
+    s.targetVisible = false;
+    s.targetExposedS = 0;
+    s.targetFromMemory = false;
+  }
+
+  /** 放掉这个人占的掩体（死亡 / 换关 / 进白刃 / 上战位 / 剧本接管都要走它）。 */
+  ReleaseCover(s) {
+    if (s.cover) this.covers.Release(s.id);
+    s.cover = null;
+    s.coverMove = null;
+    s.coverPhase = "none";
+    s.coverPhaseUntil = -99;
+  }
+
+  /**
+   * 行为喊话（docs/Data_EnemyAi.md §8）。
+   *
+   * 中日两套声库各有自己的键名，而 `Audio.Bark` 按 `side` 过滤池子、按 `key` 点名。
+   * **没有音频的类静默降级**：`Bark` 找不到 key 时 pool 为空、直接返回 null，
+   * 行为一步都不会被挡住（这一条是硬要求：喊话是可读性，不是玩法闸门）。
+   */
+  Bark(s, kind) {
+    const audio = this.ctx.audio;
+    if (!audio || typeof audio.Bark !== "function") return null;
+    const line = BARK_LINES[kind];
+    if (!line) return null;
+    const pick = line[s.side] || null;
+    if (!pick) return null;
+    return audio.Bark(pick.kind, {
+      position: s.position.clone(), seed: s.id | 0, side: s.side, key: pick.key,
+    });
   }
 
   /** 把一个候选敌人塞进"最近三个"的槽位里（插入排序，不产生垃圾）。 */
@@ -1065,8 +1373,10 @@ export class AiDirector {
     // Opt-in scene actors follow the host's evacuation goals, never a combat cover/target.
     // Physics, suppression accounting, wounded poses and death remain on the normal path.
     if (s.scriptedNoncombatant) {
-      s.target = null; s.targetVisible = false; s.cover = null; s.bayonetFixed = false;
+      s.target = null; s.targetVisible = false; s.bayonetFixed = false;
       s.state = STATE.ADVANCE; s.aimBlend = 0;
+      this.ReleaseCover(s);
+      this.perception.ForgetAll(s);
       return;
     }
 
@@ -1075,7 +1385,10 @@ export class AiDirector {
     // 70 名 AI 每一次采样都是 {advance: 70}，开火计数恒为 0。
     const enemySide = s.side === "nra" ? "ija" : "nra";
     const slots = this.nearSlots;
-    for (const slot of slots) { slot.dist = 1e9; slot.ref = null; slot.position = null; }
+    for (const slot of slots) {
+      slot.dist = 1e9; slot.ref = null; slot.position = null;
+      slot.visible = false; slot.moving = false; slot.firingRecently = false;
+    }
     // 距离门槛按**目标的姿态**缩放：站着的人一百二十米外就看得见，趴下的四十五米。
     // 这是姿态第一次真的影响"会不会被打"，也是潜行命令能成立的前提。
     // 玩家能不能被选中，取决于三件事：活着、出生保护过了、**已经锁他的人还没到上限**。
@@ -1089,7 +1402,9 @@ export class AiDirector {
     if (enemySide === "nra" && playerOpen) {
       const d = s.position.distanceTo(player.position);
       const st = player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0;
-      if (d < this.SightRange(st)) this._PushNear(d, player, true, -1, st, player.position);
+      if (d < this.SightRange(st)) {
+        this._PushNear(d, player, true, PLAYER_TRACK_ID, st, player.position);
+      }
     }
     for (const other of this.soldiers) {
       if (other.side !== enemySide || !other.alive) continue;
@@ -1099,65 +1414,93 @@ export class AiDirector {
       }
     }
 
-    let acquired = null, bestDist = 1e9;
+    // 通视与「在动 / 刚开过枪」三个字段由这一层填：感知层一条射线都不打
+    // （§7 的射线预算分给了掩体验证与暴露采样），它只消费 `candidate.visible`。
+    // 不给 visible 一律当被挡住 —— 漏填只会让 AI 变瞎，不会静默恢复成旧的全知。
+    const cands = this.senseCandidates;
+    let candCount = 0;
     for (const slot of slots) {
       if (!slot.ref) continue;
-      if (!this.HasLineOfSight(s, slot)) continue;
-      acquired = slot; bestDist = slot.dist;
-      break;
-    }
-
-    // 先问旧目标还在不在、还看不看得见。旧目标不必是最近三个之一：交火中略近一米
-    // 的人不该让枪口立刻甩过去。只有锁定期已过且新目标近到一半，才允许主动换人。
-    let currentVisible = false;
-    let currentDist = 1e9;
-    if (s.target) {
-      const alive = s.target.isPlayer ? !!(player && player.Alive) : !!s.target.ref?.alive;
-      if (!alive) { s.target = null; s.targetVisible = false; }
-      else {
-        s.target.position = s.target.isPlayer ? player.position : s.target.ref.position;
-        s.target.stance = s.target.isPlayer
-          ? (player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0)
-          : s.target.ref.stance;
-        currentDist = s.position.distanceTo(s.target.position);
-        currentVisible = currentDist < this.SightRange(s.target.stance) * 1.12
-          && this.HasLineOfSight(s, s.target);
+      slot.visible = this.HasLineOfSight(s, slot);
+      if (slot.isPlayer) {
+        const v = slot.ref.velocity;
+        // Math.hypot 会给剩余参数建数组，热路径一律 sqrt（Script_AiCover 头注同款账）。
+        slot.moving = !!v && Math.sqrt(v.x * v.x + v.z * v.z) > BRAIN.movingMps;
+        slot.firingRecently = this.time - (slot.ref.lastShotAt ?? -99) < BRAIN.firingRecentS;
+      } else {
+        slot.moving = slot.ref.moveSpeed > BRAIN.movingSignal;
+        slot.firingRecently = this.time - slot.ref.lastFire < BRAIN.firingRecentS;
       }
+      cands[candCount] = slot;
+      candCount += 1;
     }
-    const sameAcquired = acquired && s.target && (acquired.isPlayer
-      ? s.target.isPlayer
-      : !s.target.isPlayer && acquired.ref === s.target.ref);
-    const muchBetter = acquired && s.target && !sameAcquired
-      && this.time >= s.targetLockUntil && acquired.dist < currentDist * 0.50;
+    cands.length = candCount;
 
-    if (currentVisible && !muchBetter) {
-      bestDist = currentDist;
-      s.targetLostTime = 0;
-      s.targetVisible = true;
-    } else if (s.target && !currentVisible && s.targetLostTime < 1.2) {
-      // 墙角、烟尘、队友身体会让通视短暂闪断。至少等 1.2 秒再把枪口甩给别人；
-      // 目标已死亡时上面已清空，不会因此对尸体发呆。
-      s.targetLostTime += dt;
-      bestDist = currentDist;
-      s.targetVisible = false;
-    } else if (acquired) {
-      const hadTarget = !!s.target;
-      const changed = this.SetTarget(s, acquired);
-      bestDist = acquired.dist;
+    // 目标锁迟滞（1.2 s 保持 / 5 s 遗忘 / 0.5 倍距离才换人）已经整段搬进 Sense，
+    // 这里不再写第二份（docs/Data_EnemyAi.md §4.1 最后一条）。
+    const sense = this.perception.Sense(s, cands, dt);
+    const hadTarget = !!s.target;
+    let bestDist = sense.dist;
+    // **最后目击位置先落地**：下面的「从记忆里把目标接回来」与压制射击都读 `s.lkp`。
+    if (sense.lkp) {
+      s.lkp = s.lkp || { x: 0, y: 0, z: 0 };
+      s.lkp.x = sense.lkp.x; s.lkp.y = sense.lkp.y; s.lkp.z = sense.lkp.z;
+      s.lkpTime = sense.lkp.time;
+      s.lkpConfidence = sense.lkp.confidence;
+    } else {
+      s.lkpConfidence = 0;
+    }
+    if (sense.target) {
+      const changed = this.SetTarget(s, sense.target);
+      s.targetVisible = sense.visible === true;
+      s.targetMoving = sense.target.moving === true;
+      // 换了人就重新举枪：误差回到初值（`ShootingModel.BeginAim` 幂等，
+      // 同一个目标反复调不会重置 —— 那会让 AI 永远瞄不准）。
+      if (changed) this.shooting.BeginAim(s, sense.trackId);
+      s.targetFromMemory = false;
       // 「发现敌情」只在从无到有那一下喊；目标切换不重复喊。
-      if (!hadTarget && changed && this.ctx.audio) {
-        this.ctx.audio.Bark("spot", { position: s.position.clone(), seed: s.id | 0, side: s.side });
+      if (!hadTarget && changed) this.Bark(s, "spot");
+    } else if (sense.track && sense.track.ref) {
+      // 锁着的人这一拍没出现在候选里（跑出筛选半径 / 被更近的人挤掉槽位）：
+      // 目标保住，位置退回记忆里的最后目击点，TryFire 那边会走压制射击。
+      const ref = sense.track.ref;
+      const stillAlive = sense.track.isPlayer ? !!(player && player.Alive) : ref.alive !== false;
+      if (stillAlive) {
+        if (!s.target || s.target.id !== sense.trackId) {
+          s.target = {
+            position: ref.position || sense.lkp, isPlayer: !!sense.track.isPlayer,
+            ref, id: sense.trackId, stance: sense.track.stance | 0,
+          };
+        }
+        s.target.stance = sense.track.stance | 0;
+        s.targetVisible = false;
+        s.targetFromMemory = false;
+      } else {
+        this.DropTarget(s);
+        bestDist = 1e9;
       }
-    } else if (s.target) {
-      s.targetLostTime += dt;
-      s.targetVisible = false;
-      // 保留较长的「最后所见目标」记忆，重新露头时仍是同一个锁，不经历 null→目标
-      // 的二次甩枪口。看不见时 TryFire 有独立闸门，不会隔墙射击。
-      if (s.targetLostTime > 5) s.target = null;
-      else bestDist = s.position.distanceTo(s.target.position);
+    } else if (!this.ReviveTargetFromMemory(s, sense)) {
+      this.DropTarget(s);
+      bestDist = 1e9;
+    } else {
+      bestDist = Math.sqrt((s.lkp.x - s.position.x) ** 2 + (s.lkp.z - s.position.z) ** 2);
     }
+    // 旧字段仍要有值：SoldierInfo / 覆盖层 / 关卡脚本读它们。
+    s.targetLostTime = s.targetVisible ? 0 : s.targetLostTime + dt;
+    s.alert = sense.alert;
+    s.awareness = sense.awareness;
+    // 目标连续暴露了多久 —— ShootingModel.UpdateAim 拿它加速收敛（老兵越打越准）。
+    s.targetExposedS = s.targetVisible ? (s.targetExposedS || 0) + dt : 0;
 
-    if (s.scriptDefensive) { this.ApplyScriptDefense(s); return; }
+    if (s.scriptDefensive) {
+      // 守点单位一样要选掩体、一样走探头周期 —— 变的只是「不许离开锚点半径」。
+      // 掩体查询在 Think 里（1/6 分帧、带 reselectMinS 限流），Act 每帧只读结果。
+      this.ShareTrack(s, sense);
+      this.UpdateCover(s);
+      this.ApplyScriptDefense(s);
+      this.UpdateMoveOrder(s, null);
+      return;
+    }
 
     // cohesion：34 m 内还有几个同侧活人。这是班组密度，不是士气，永不出 UI。
     let mates = 0, close = 0;
@@ -1170,10 +1513,21 @@ export class AiDirector {
     s.cohesion = Clamp01(0.35 + mates / 8);
     s.lonelyTime = close > 0 ? 0 : s.lonelyTime + dt;
 
+    // 班组黑板：谁看见都算全班看见。这一条是「敌人会追打你最后露头的地方」的数据底座
+    //（现状里一个人被打冷枪，旁边五个人一无所知，见 docs/Data_EnemyAi.md §2.1）。
+    this.ShareTrack(s, sense);
+    // 任务过期就当没派活：Tactics 每秒写一次，中间掉帧不该让人抱着一分钟前的活不放。
+    const task = s.task && s.task.kind && this.time < s.task.until ? s.task : null;
+
+    // 掩体：先选点，状态机才知道有没有「躲得住的地方」可选。
+    this.UpdateCover(s);
+
     // 状态机。压制门槛从 0.72 降到 0.50：ER2 的 allowFindCoverWhenSuppressed
     // 是一条**独立行为**，被打得抬不起头的表现是往掩体里缩，不是站着不动。
     const engageRange = s.tacticalRole === "support" ? ENGAGE.supportM : ENGAGE.defaultM;
-    const wasEngaged = s.state === STATE.FIRE || s.state === STATE.CHARGE;
+    const wasEngaged = s.state === STATE.FIRE || s.state === STATE.CHARGE
+      || s.state === STATE.COVER_ENGAGE || s.state === STATE.SUPPRESS;
+    const prevState = s.state;
     if (s.suppression > 0.50 || (s.state === STATE.SUPPRESSED && s.suppression > 0.32)) {
       // 被压制打断的冲锋是失败的冲锋：这一轮不再自动重起。冷却带抖动，
       // 免得全班同一秒重新站起来吃同一轮齐射。玩家下的刺刀令不受此限。
@@ -1210,8 +1564,18 @@ export class AiDirector {
         // 换弹的**手上动作**：固定弹仓压桥夹 / 捷克式换弹匣。喊话是意图，
         // 这一声是事实 —— 喊话有 0.55 s 全局闸与 4.5 s 同类闸，十有八九被吃掉，
         // 于是「他在换弹」这条战术信息一直只有字幕没有声音。
-        this.ctx.audioWiring?.AiReload(s, s.weapon.kind);
+        this.ctx?.audioWiring?.AiReload(s, s.weapon.kind);
       }
+    } else if (task && IsManeuverTask(task.kind) && task.point) {
+      // **班组的机动任务优先于「就地对射」**（方案 §5 的状态表就是这么排的）。
+      // 排在对射后面的话，交战距离（74 m）之内永远轮不到它 —— 侧翼手拿了任务
+      // 却站在原地开枪，「会绕」这条机制等于没有。
+      // 谁能拿到机动任务由 Tactics 决定：剧本旗与守区的人一条都拿不到，
+      // 每班最多 `FLANK.flankers` 个人去绕，正面仍然有人咬着。
+      s.state = task.kind === TASK.FLANK ? STATE.FLANK
+        : task.kind === TASK.BOUND ? STATE.BOUND
+          : task.kind === TASK.INVESTIGATE ? STATE.INVESTIGATE : STATE.RETREAT;
+      this.SetStance(s, s.suppression > 0.55 ? 1 : 0, 1.0);
     } else if (s.target && bestDist < engageRange + (wasEngaged ? ENGAGE.hysteresisM : 0)) {
       // 六人组内不再人人同一种打法：突击位先压、侧翼位次之，步枪位只在贴脸时冲，
       // 支援位永不自行冲锋，留在后方持续射击。
@@ -1226,23 +1590,53 @@ export class AiDirector {
       // 已在冲锋中的不看这些 —— 一发近失弹不该打散端着刺刀的人。
       const chargeReady = this.time >= s.chargeCooldownUntil && s.suppression < 0.25
         && (s.stance === 0 || this.time >= s.stanceUntil);
-      const charge = chargeRange > 0
+      // 记忆目标（只听见、没看见）不许发起白刃冲锋：端着刺刀冲向一个影子既不好看
+      // 也不合理；已经在冲的那一支不受影响（wasAutoCharge 那一档）。
+      const charge = chargeRange > 0 && !s.targetFromMemory
         && (wasAutoCharge ? bestDist < chargeRange + 7 : chargeReady && bestDist < chargeRange)
         && s.cohesion > 0.5 && s.squadMateCount > 0;
       if (charge && !wasAutoCharge) s.combatModeUntil = this.time + 1.4;
       const committedCharge = charge || (wasAutoCharge && this.time < s.combatModeUntil
         && bestDist < chargeRange + 10);
-      s.state = committedCharge ? STATE.CHARGE : STATE.FIRE;
-      // 对射姿势的承诺期 2.2 秒：FireStance 的迟滞带挡得住近失弹的小波动，
-      // 挡不住压制在带宽两侧的慢波 —— 1.35 秒时实测还剩 1.4–1.8 秒节奏的
-      // 站蹲微调。卧倒（emergencyDrop）与冲锋（force）都不吃这条承诺。
-      this.SetStance(s, committedCharge ? 0 : this.FireStance(s, bestDist),
-        committedCharge ? 1.0 : 2.2, committedCharge);
+      if (committedCharge) {
+        s.state = STATE.CHARGE;
+        this.SetStance(s, 0, 1.0, true);
+      } else if (task && task.kind === TASK.GRENADE && this.CanThrowGrenade(s)) {
+        // 投弹：走投掷通道，投出去之后由 Tactics 的冷却把他放回交火。
+        s.state = STATE.GRENADE;
+        this.SetStance(s, 0, 0.8, true);
+      } else if (s.cover) {
+        // **有掩体就进掩体打**：hide → peek → 点射 → hide（§5 的 COVER_ENGAGE）。
+        // 姿态由掩体决定（矮掩体蹲藏跪射 / 高掩体贴墙侧步），所以这里不调 FireStance ——
+        // 那条问的是「对射要不要蹲」，这条问的是「这堵墙该怎么藏、怎么探头」，
+        // 两个问题两套阈值（1.25 m vs COVER.tallM 1.55 m），故意不合并。
+        s.state = s.targetVisible || (s.lkpConfidence || 0) >= TACTICS.suppressConfidence
+          ? STATE.COVER_ENGAGE : STATE.FIRE;
+      } else if (!s.targetVisible && (s.lkpConfidence || 0) >= TACTICS.suppressConfidence) {
+        // 看不见但知道他在哪：向最后目击位置压制射击，不再闭嘴发呆。
+        s.state = STATE.SUPPRESS;
+        this.SetStance(s, this.FireStance(s, bestDist), 2.2);
+      } else {
+        s.state = STATE.FIRE;
+        // 对射姿势的承诺期 2.2 秒：FireStance 的迟滞带挡得住近失弹的小波动，
+        // 挡不住压制在带宽两侧的慢波 —— 1.35 秒时实测还剩 1.4–1.8 秒节奏的
+        // 站蹲微调。卧倒（emergencyDrop）与冲锋（force）都不吃这条承诺。
+        this.SetStance(s, this.FireStance(s, bestDist), 2.2);
+      }
     } else {
       // 推进途中的蹲行门槛从 0.3 提到 0.55：0.3 一发近失弹就能压到，
       // 于是整条推进线都在以 0.6 倍速半蹲着蹭。真被打住了才蹲着走。
       s.state = STATE.ADVANCE;
       this.SetStance(s, s.suppression > 0.55 ? 1 : 0, 1.0);
+    }
+
+    // 行为喊话（docs/Data_EnemyAi.md §8）：只在**状态真的换了**那一下喊。
+    // `Audio.Bark` 自己还有 0.55 s 全局闸与 4.5 s 同类闸，所以不会变成一街的复读；
+    // 没有对应音频的类（比如「跟丢了」）在 Bark 里静默返回 null，不阻塞行为。
+    if (s.state !== prevState) {
+      if (s.state === STATE.COVER_ENGAGE) this.Bark(s, "cover");
+      else if (s.state === STATE.FLANK) this.Bark(s, "flank");
+      else if (s.state === STATE.SUPPRESS) this.Bark(s, "suppress");
     }
 
     // 潜行：跟着班长（玩家）的姿态走，跟着他的位置走，而且**不开枪**。
@@ -1277,13 +1671,91 @@ export class AiDirector {
     }
     if (s.state === STATE.CHARGE) s.bayonetFixed = true;
 
-    // 掩体：朝目标方向找一个 1 米内能挡住的点。被压住的人尤其需要。
-    if ((s.state === STATE.FIRE || s.state === STATE.SUPPRESSED)
-      && (!s.cover || this.time >= s.coverUntil)) {
-      const nextCover = this.FindCover(s, s.target ? s.target.position : null);
-      if (nextCover) s.cover = nextCover;
-      s.coverUntil = this.time + 4 + s.rnd() * 2;
+    // 这一拍要往哪儿挪。**必须排在最后**：走位是状态的结果，不是原因，
+    // 而潜行 / 上刺刀这两条会在状态机之后再改一次状态。
+    this.UpdateMoveOrder(s, task);
+  }
+
+  /**
+   * 把当前状态翻译成这一帧的走位命令（`s.moveOrder` / `s.moveArriveM`）。
+   * `Act` 的 switch 只读这两个字段 —— 那一段被 `Script_FirstLevelP012RuntimeTest`
+   * 抽出源码放进沙箱重放，所以它里面**不许出现新的方法调用与模块常量**。
+   */
+  UpdateMoveOrder(s, task) {
+    s.moveOrder = null;
+    s.moveArriveM = NaN;
+    switch (s.state) {
+      case STATE.COVER_ENGAGE:
+        // 换弹与压制爆表都先缩头（方案 §5：换弹只在 hide）。
+        this.UpdateCoverCycle(s, s.suppression > COVER.suppressionProneAt ? "hide" : null);
+        break;
+      case STATE.SUPPRESS:
+        // 压制射击要看得见掩体沿：进掩体的人保持射击位，没掩体的原地打。
+        if (s.cover) this.UpdateCoverCycle(s, null);
+        break;
+      case STATE.RELOAD:
+        // 换弹先回 hide；没掩体就地蹲下换（方案 §5 的 RELOAD 行）。
+        if (s.cover) this.UpdateCoverCycle(s, "hide");
+        else this.SetStance(s, 1, s.weapon.reloadTimeS || 3.2);
+        break;
+      case STATE.SUPPRESSED:
+        // 被压住的人**优先爬向验证过的掩体**：这是「往掩体里缩」而不是「站着不动」。
+        if (s.cover && s.cover.validated) this.UpdateCoverCycle(s, "hide");
+        break;
+      case STATE.BOUND:
+        // 跃进：下一个掩体已经由 UpdateCover 带 toward 查过了，跑过去就是。
+        if (s.cover) this.UpdateCoverCycle(s, null);
+        break;
+      case STATE.FLANK:
+      case STATE.INVESTIGATE:
+      case STATE.RETREAT:
+        if (task && task.point) this.MoveTo(s, task.point.x, task.point.z, BRAIN.taskMoveMps);
+        break;
+      default:
+        break;
     }
+  }
+
+  /**
+   * 把这个兵知道的敌情并进班组黑板。
+   *
+   * 用的是**锁定目标那一条 Track 自己的**位置与置信度，不混 `sense.lkp`
+   * （后者可能指向另一条置信度更高的记忆，两边拼在一起就是一条不存在的情报）。
+   */
+  ShareTrack(s, sense) {
+    const track = sense.track;
+    if (!track || sense.trackId === null || sense.trackId === undefined) return;
+    const e = this._share || (this._share = {
+      id: 0, isPlayer: false, lkp: { x: 0, y: 0, z: 0, time: -1e9, confidence: 0 },
+      lastSeenAt: -1e9, awareness: 0, yaw: NaN, ref: null, coverId: null, stationaryS: 0,
+    });
+    e.id = sense.trackId;
+    e.isPlayer = !!track.isPlayer;
+    e.lkp.x = track.lkp.x; e.lkp.y = track.lkp.y; e.lkp.z = track.lkp.z;
+    e.lkp.time = track.lkpTime;
+    e.lkp.confidence = track.confidence;
+    e.lastSeenAt = track.lastSeenAt;
+    e.awareness = track.awareness;
+    e.ref = track.ref;
+    // 投弹判据要的两项：他躲在哪个掩体后、在原地钉了多久。
+    // 玩家没有 `cover`，「钉在一处」就只能靠他自己有没有挪窝（Update 里累计）。
+    if (track.isPlayer) {
+      e.yaw = Number.isFinite(track.ref?.yaw) ? track.ref.yaw : NaN;
+      e.coverId = null;
+      e.stationaryS = this.playerStationaryS;
+    } else {
+      e.yaw = Number.isFinite(track.ref?.yaw) ? track.ref.yaw : NaN;
+      e.coverId = track.ref && track.ref.cover ? track.ref.cover.id : null;
+      e.stationaryS = track.ref ? (track.ref.stationaryS || 0) : 0;
+    }
+    this.tactics.Blackboard(s.squadId, s.side).Share(s, e);
+  }
+
+  /** 身上还有手榴弹、也不在白刃里，才走投掷通道。 */
+  CanThrowGrenade(s) {
+    if (s.meleeCombat || s.unarmed) return false;
+    if (!this.ctx.combat || !s.actor) return false;
+    return TacticsDirector.GrenadeCount(s) > 0;
   }
 
   /**
@@ -1313,28 +1785,269 @@ export class AiDirector {
     return bestDist < 26 ? 1 : 0;
   }
 
-  FindCover(s, threatPos) {
-    const covers = this.ctx.battlefield.covers;
-    if (!covers || !covers.length) return null;
-    let best = null, bestScore = -1e9;
-    // 只在附近抽样看 24 个 —— 全场几千个掩体点，全扫会卡
-    const start = Math.floor(s.rnd() * covers.length);
-    for (let i = 0; i < 24; i += 1) {
-      const c = covers[(start + i * 37) % covers.length];
-      const d = Math.hypot(c.x - s.position.x, c.z - s.position.z);
-      if (d > 22) continue;
-      let score = -d * 0.5 + Math.min(c.height, 1.4) * 6;
-      if (threatPos) {
-        // 掩体要在自己与威胁之间
-        const toThreat = Math.atan2(threatPos.x - s.position.x, threatPos.z - s.position.z);
-        const toCover = Math.atan2(c.x - s.position.x, c.z - s.position.z);
-        const diff = Math.abs(((toCover - toThreat + Math.PI) % (Math.PI * 2)) - Math.PI);
-        score -= diff * 6;
-      }
-      if (score > bestScore) { bestScore = score; best = c; }
+  /**
+   * 这一拍的威胁点：能看见就是目标本人，看不见就是最后目击位置。
+   * 写进复用的 `_coverThreat` 并返回它；两样都没有时返回 null。
+   */
+  ThreatPoint(s) {
+    const t = this._coverThreat;
+    if (s.target && s.targetVisible) {
+      t.x = s.target.position.x; t.y = s.target.position.y; t.z = s.target.position.z;
+      t.stance = s.target.stance | 0;
+      t.id = s.target.id;
+      return t;
     }
-    return best;
+    if (s.lkp && (s.lkpConfidence || 0) >= TACTICS.suppressConfidence) {
+      t.x = s.lkp.x; t.y = s.lkp.y; t.z = s.lkp.z;
+      t.stance = s.target ? (s.target.stance | 0) : 0;
+      t.id = s.target ? s.target.id : null;
+      return t;
+    }
+    return null;
   }
+
+  /**
+   * 这个人允许离锚点多远（守区半径 + 掩体余量）。没有守区就是 NaN（不限）。
+   *
+   * 余量来自关卡编排（`scriptCoverSlackM`）：普通守兵 6 m 能进旁边那堵墙，
+   * 机枪位只有 0.9 m —— 够一个探头的侧步，不够换点。缺省时退回战术层的
+   * `TACTICS.holdCoverSlackM`，与 Tactics 写在 task 上的提示同源。
+   */
+  CoverReachM(s) {
+    const zone = s.holdZone;
+    if (!zone && !s.scriptDefensive) return NaN;
+    const base = zone && Number.isFinite(zone.radius) ? zone.radius : 0;
+    const slack = Number.isFinite(s.scriptCoverSlackM) ? s.scriptCoverSlackM : TACTICS.holdCoverSlackM;
+    return base + slack;
+  }
+
+  /** 这个候选掩体的隐蔽位与射击位是不是都还在守区允许的范围里。 */
+  CoverAllowed(s, cand) {
+    const reach = this.CoverReachM(s);
+    if (!Number.isFinite(reach)) return true;
+    const anchor = s.holdZone || s.position;
+    const hx = cand.hidePos.x - anchor.x, hz = cand.hidePos.z - anchor.z;
+    if (hx * hx + hz * hz > reach * reach) return false;
+    const fx = cand.firePos.x - anchor.x, fz = cand.firePos.z - anchor.z;
+    return fx * fx + fz * fz <= reach * reach;
+  }
+
+  /** 掩体打分要避开的友军（间距惩罚）。返回复用数组。 */
+  CoverAllies(s) {
+    const out = this._coverAllies;
+    let n = 0;
+    const r2 = COVER.defaultRadiusM * COVER.defaultRadiusM;
+    for (let i = 0; i < this.soldiers.length; i += 1) {
+      const o = this.soldiers[i];
+      if (o === s || o.side !== s.side || !o.alive) continue;
+      const dx = o.position.x - s.position.x;
+      const dz = o.position.z - s.position.z;
+      if (dx * dx + dz * dz > r2) continue;
+      let slot = out[n];
+      if (!slot) { slot = { x: 0, z: 0, id: 0 }; out[n] = slot; }
+      slot.x = o.position.x; slot.z = o.position.z; slot.id = o.id;
+      n += 1;
+    }
+    out.length = n;
+    return out;
+  }
+
+  /**
+   * 选 / 重选掩体（docs/Data_EnemyAi.md §4.2 / §7）。
+   *
+   * 什么时候查：首次接敌、被判抄侧翼、压制越阈值、敌方手榴弹落在身边、
+   * 掩体被炸没了、跃进要带推进方向。其余一律按 `COVER_CYCLE.reselectMinS` 限流 ——
+   * 每次 Query 最多三条验证射线，不限流的话 110 个人每拍就是三百条。
+   *
+   * @returns {boolean} 这一拍有没有换点
+   */
+  UpdateCover(s) {
+    // 正走剧本路线的人（P012 的护送、第一关跃进途中的冲击）**不选掩体**：
+    // 他的位移由 `Act` 的 scriptedPathFollower 分支接管，选了也走不过去 ——
+    // 只会占着一个点不去（实测前沿 21 个人各占一个掩体、12 秒里 20 个一步没挪）。
+    if (s.p012Guided === true && Number.isFinite(s.scriptMoveSpeedMps)) {
+      this.ReleaseCover(s);
+      return false;
+    }
+    const threat = this.ThreatPoint(s);
+    if (!threat) { this.ReleaseCover(s); return false; }
+    const now = this.time;
+    const task = s.task;
+    const bounding = !!task && task.kind === TASK.BOUND;
+    const cover = s.cover;
+
+    // ① 紧急重选：这几条不吃限流，因为它们说的都是「现在这个点已经不管用了」。
+    // **「身上没有掩体」不在这一档里**：那正是「附近根本没有掩体」的常态
+    //（第一关前沿的日军身边 11 m 内实测 0 个点），当成紧急的话每次 Think 都要重查一遍，
+    //  52 个人就是每秒五百次 Query、上千条验证射线 —— 直接把 §7 的预算烧穿。
+    let urgent = false;
+    if (cover) {
+      if (!this.covers.index.has(cover.id)) urgent = true;                       // 掩体被炸没了
+      else if (this.covers.IsFlanked(cover, threat, s.position)) urgent = true;
+      else if (s.suppression > COVER.suppressionProneAt) urgent = true;          // 压得抬不起头
+      else if (now - s.grenadeThreatAt < COVER_CYCLE.reselectMinS) urgent = true;
+    }
+    // ② 常规重选：威胁挪远了才值得重算（他还在原地的话上一次的账仍然成立）。
+    let want = urgent || bounding || !cover;
+    if (!want && cover
+      && Math.sqrt((threat.x - s.coverThreatX) ** 2 + (threat.z - s.coverThreatZ) ** 2) > BRAIN.threatMoveM) {
+      want = true;
+    }
+    if (!want) return false;
+    if (!urgent && now - s.coverPickAt < COVER_CYCLE.reselectMinS) return false;
+
+    const opts = this._coverOpts;
+    let radiusM = task && Number.isFinite(task.coverRadiusM) ? task.coverRadiusM : COVER.defaultRadiusM;
+    // 守区的人只在区里找：查得比走得远，人就会一直朝一个到不了的点「接近」，
+    // 探头周期永远起不来（机枪位那 0.4 m 的圈尤其明显）。
+    //
+    // **半径以关卡给的余量为准，不以战术层的提示为准**：`task.coverRadiusM` 是
+    // `TACTICS.holdCoverSlackM`（6 m）算的，而第一关给跃进到线的人放的是
+    // `assaultCoverSearchM`（9 m）。取小的那个会把唯一那个合格点筛在半径之外 ——
+    // 实测前沿有人手工重跑 Query 找得到、正式路径却找不到，差的就是这 3 m。
+    // 查询圆以人为心、守区圆以锚点为心，所以还要把人离锚点的漂移补进半径。
+    const allowed = this.CoverReachM(s);
+    if (Number.isFinite(allowed)) {
+      const anchor = s.holdZone || s.position;
+      const dx = s.position.x - anchor.x;
+      const dz = s.position.z - anchor.z;
+      radiusM = Math.min(COVER.defaultRadiusM, allowed + Math.sqrt(dx * dx + dz * dz));
+    }
+    opts.radiusM = radiusM;
+    opts.soldierId = s.id;
+    opts.suppression = s.suppression;
+    opts.allies = this.CoverAllies(s);
+    if (bounding && (task.towardX || task.towardZ)) {
+      // Tactics 只给方向（跃进往哪儿压），`Query` 要的是一个点：往前推一个 towardCapM。
+      opts.towardX = s.position.x + task.towardX * COVER.towardCapM;
+      opts.towardZ = s.position.z + task.towardZ * COVER.towardCapM;
+    } else {
+      opts.towardX = NaN; opts.towardZ = NaN;
+    }
+    const found = this.covers.Query(s, this._coverThreats, opts);
+    s.coverPickAt = now;
+    s.coverThreatX = threat.x;
+    s.coverThreatZ = threat.z;
+    // 守区的人得挑一个**隐蔽位与射击位都还在区里**的点：查询半径是以人为圆心的，
+    // 而守区是以锚点为圆心的，两个圆不重合时前几名有可能落在区外。
+    let best = null;
+    for (let i = 0; i < found.length; i += 1) {
+      if (this.CoverAllowed(s, found[i])) { best = found[i]; break; }
+    }
+    if (!best) { this.ReleaseCover(s); return false; }
+    if (cover && best.cover.id === cover.id) {
+      // 还是同一个点：把姿势与验证结果刷新一遍就行，不重新登记占用。
+      this.WriteCover(s, best, now);
+      return false;
+    }
+    // **先 Release 再 Claim**，否则一个人会同时占着新旧两个点（注册表头注）。
+    this.covers.Release(s.id);
+    this.covers.Claim(best.cover.id, s.id);
+    this.WriteCover(s, best, now);
+    s.coverPhase = "approach";
+    s.coverPhaseUntil = -99;
+    this.stats.coverPicks += 1;
+    return true;
+  }
+
+  /**
+   * 把候选槽拷进 `s.cover`。**旧三个字段 `{x, z, height}` 一个都不许删** ——
+   * `FireStance`、`Debug.SoldierInfo` 与第一关的剧本都在读它们（方案 §5 兼容表）。
+   */
+  WriteCover(s, cand, now) {
+    const c = s.coverStore || (s.coverStore = {
+      x: 0, z: 0, height: 0, id: 0, nx: 0, nz: 0,
+      hidePos: { x: 0, z: 0 }, firePos: { x: 0, z: 0 },
+      side: "over", hideStance: 1, fireStance: 1,
+      validated: false, blockedCrouched: false, blockedStanding: false, at: -99,
+    });
+    c.x = cand.cover.x; c.z = cand.cover.z; c.height = cand.cover.height;
+    c.id = cand.cover.id; c.nx = cand.cover.nx; c.nz = cand.cover.nz;
+    c.hidePos.x = cand.hidePos.x; c.hidePos.z = cand.hidePos.z;
+    c.firePos.x = cand.firePos.x; c.firePos.z = cand.firePos.z;
+    c.side = cand.side;
+    c.hideStance = cand.hideStance;
+    c.fireStance = cand.fireStance;
+    c.validated = cand.validated;
+    c.blockedCrouched = cand.blockedCrouched;
+    c.blockedStanding = cand.blockedStanding;
+    c.at = now;
+    s.cover = c;
+    return c;
+  }
+
+  /**
+   * 掩体周期：缩头（hide）→ 探头（peek）→ 点射 → 缩头（`COVER_CYCLE` 定节拍）。
+   *
+   * 写的是 `s.moveOrder` 与 `s.moveArriveM`，由 `Act` 的状态分支消费 ——
+   * **到位半径必须单独给**：hide↔peek 的侧步只有 `sideStepM`（0.55 m），
+   * 而 Act 的默认到位半径是 1.2 m，拿默认值判的话人永远「已经到了」，探头一次都不会发生。
+   *
+   * @param {string} force "hide" 时强制缩头（换弹、压制爆表）
+   */
+  UpdateCoverCycle(s, force) {
+    s.moveOrder = null;
+    s.moveArriveM = NaN;
+    const c = s.cover;
+    if (!c) { s.coverPhase = "none"; return; }
+    const move = s.moveStore;
+    const dx = c.hidePos.x - s.position.x;
+    const dz = c.hidePos.z - s.position.z;
+    if (Math.sqrt(dx * dx + dz * dz) > COVER_CYCLE.arriveRadiusM) {
+      // 还在路上：跑过去（正常速度、正常到位半径，走导航场）。
+      s.coverPhase = "approach";
+      move.x = c.hidePos.x; move.z = c.hidePos.z; move.speed = BRAIN.coverApproachMps;
+      s.moveOrder = move;
+      return;
+    }
+    if (force === "hide") {
+      s.coverPhase = "hide";
+      s.coverPhaseUntil = this.time + COVER_CYCLE.hideDwellMinS;
+    } else if (s.coverPhase !== "hide" && s.coverPhase !== "peek") {
+      s.coverPhase = "hide";
+      s.coverPhaseUntil = this.time
+        + COVER_CYCLE.hideDwellMinS + s.rnd() * (COVER_CYCLE.hideDwellMaxS - COVER_CYCLE.hideDwellMinS);
+    } else if (this.time >= s.coverPhaseUntil) {
+      if (s.coverPhase === "peek") {
+        s.coverPhase = "hide";
+        s.coverPhaseUntil = this.time
+          + COVER_CYCLE.hideDwellMinS + s.rnd() * (COVER_CYCLE.hideDwellMaxS - COVER_CYCLE.hideDwellMinS);
+      } else {
+        s.coverPhase = "peek";
+        s.coverPhaseUntil = this.time
+          + COVER_CYCLE.peekMinS + s.rnd() * (COVER_CYCLE.peekMaxS - COVER_CYCLE.peekMinS);
+        s.peekCount += 1;
+        this.stats.peeks += 1;
+        // 每次探头都是重新举枪：误差回到初值，探头本身有代价（§4.3）。
+        if (s.target) this.shooting.BeginAim(s, s.target.id, { force: true });
+      }
+    }
+    const peeking = s.coverPhase === "peek";
+    const at = peeking ? c.firePos : c.hidePos;
+    move.x = at.x; move.z = at.z; move.speed = BRAIN.coverMoveMps;
+    s.moveOrder = move;
+    s.moveArriveM = BRAIN.coverArriveM;
+    this.SetStance(s, peeking ? c.fireStance : c.hideStance, COVER_CYCLE.peekMinS);
+  }
+
+  /** 走到一个点（侧翼 / 查看 / 后撤 / 跃进都用它）。写复用的 moveOrder。 */
+  MoveTo(s, x, z, speed, arriveM = NaN) {
+    const move = s.moveStore;
+    move.x = x; move.z = z; move.speed = speed;
+    s.moveOrder = move;
+    s.moveArriveM = arriveM;
+    return move;
+  }
+
+  /**
+   * 【已由 `Script_AiCover.CoverRegistry` 取代，2026-09-08】
+   *
+   * 旧的 `FindCover` 抽 24 个随机点按「距离 / 高度 / 朝向夹角」打分，**不验证掩体
+   * 真的挡住威胁**、不看掩体朝向、不记占用、到位后不探头不缩头（docs/Data_EnemyAi.md §2.2）。
+   * 那三件事现在分别是注册表的 `Validate` / `PeekPose` / `Claim`，选点入口是 `UpdateCover`。
+   * 这个函数整段删掉而不是留着当兜底：留着就会有人在某条分支上把它接回去，
+   * 于是同一场仗里两套掩体逻辑并存，谁也说不清人为什么蹲在那儿。
+   */
 
   /**
    * 通视。cand 是 nearSlots 里的一个槽（带 id 与目标姿态）。
@@ -1418,7 +2131,13 @@ export class AiDirector {
     if (s.holdZone && s.order !== "charge") {
       const dx = s.position.x - s.holdZone.x, dz = s.position.z - s.holdZone.z;
       const d = Math.hypot(dx, dz);
-      if (d > s.holdZone.radius) {
+      // 【2026-09-08】守区半径在**有掩体时**按 `CoverReachM` 放宽（守区 + 掩体余量）。
+      // 不放宽的话会死锁：`CoverAllowed` 允许他进区外 6 m 的那堵墙，走过去之后
+      // 这一段又判他「出区了」、把目标点拽回守位，人在两点之间来回蹭，
+      // 掩体永远到不了位（实测整班 anyCover=6 而 inCover=0）。
+      const reach = s.cover ? this.CoverReachM(s) : NaN;
+      const limit = Number.isFinite(reach) ? Math.max(s.holdZone.radius, reach) : s.holdZone.radius;
+      if (d > limit) {
         strayed = true;
         if (this.time - s.regoalTime > 1.5) {
           s.regoalTime = this.time;
@@ -1434,7 +2153,7 @@ export class AiDirector {
     }
 
     switch (s.state) {
-      case STATE.SUPPRESSED:
+      case STATE.SUPPRESSED: {
         // 三档：0.50–0.75 卧倒并往掩体里爬（还能还击）；
         //       0.75 以上停火、保持姿态；
         //       0.90 以上且 20 m 内五秒没有友军 —— 往后缩。这不是投降，是被打散。
@@ -1443,23 +2162,70 @@ export class AiDirector {
             s.position.x * 2 - s.target.position.x, 0, s.position.z * 2 - s.target.position.z);
           speed = 2.0;
         } else if (s.suppression <= 0.75) {
-          if (s.cover) {
+          // 优先爬向**验证过的**掩体（moveOrder 由 UpdateMoveOrder 排好）；
+          // 没有验证过的点时退回旧行为：朝掩体本身挪。
+          const m = s.moveOrder;
+          if (m) { desired = this.tmpD.set(m.x, 0, m.z); speed = 1.8; }
+          else if (s.cover) {
             const d = Math.hypot(s.cover.x - s.position.x, s.cover.z - s.position.z);
             if (d > 1.1) { desired = this.tmpD.set(s.cover.x, 0, s.cover.z); speed = 1.8; }
           }
           this.TryFire(s, dt, player);
         }
         break;
-      case STATE.RELOAD:
+      }
+      case STATE.RELOAD: {
         s.reloadTimer -= dt;
+        // 换弹时先缩回掩体（方案 §5：换弹只在 hide 做）。
+        const m = s.moveOrder;
+        if (m) { desired = this.tmpD.set(m.x, 0, m.z); speed = m.speed; }
         if (s.reloadTimer <= 0) { s.ammo = s.weapon.magazine || 5; s.state = STATE.IDLE; }
         break;
+      }
       case STATE.FIRE:
         if (s.cover) {
-          const d = Math.hypot(s.cover.x - s.position.x, s.cover.z - s.position.z);
-          if (d > 1.1) { desired = this.tmpD.set(s.cover.x, 0, s.cover.z); speed = 2.4; }
+          // 有 hidePos 就奔隐蔽位（掩体点本身是墙心，不是站人的地方）；
+          // 没有的话仍按掩体坐标走，跟旧行为一字不差。
+          const cx = s.cover.hidePos ? s.cover.hidePos.x : s.cover.x;
+          const cz = s.cover.hidePos ? s.cover.hidePos.z : s.cover.z;
+          const d = Math.hypot(cx - s.position.x, cz - s.position.z);
+          if (d > 1.1) { desired = this.tmpD.set(cx, 0, cz); speed = 2.4; }
         }
         this.TryFire(s, dt, player);
+        break;
+      case STATE.COVER_ENGAGE: {
+        // 缩头 → 探头 → 点射 → 缩头。**只在探头相位开火** ——
+        // 缩着头还打枪的话，「躲」就退化成一个不影响任何事的动画。
+        const m = s.moveOrder;
+        if (m) { desired = this.tmpD.set(m.x, 0, m.z); speed = m.speed; }
+        if (s.coverPhase === "peek") this.TryFire(s, dt, player);
+        break;
+      }
+      case STATE.SUPPRESS: {
+        // 压制射击：向最后目击位置 / 掩体沿打。命中恒 false，近失弹压制照旧。
+        const m = s.moveOrder;
+        if (m) { desired = this.tmpD.set(m.x, 0, m.z); speed = m.speed; }
+        this.TryFire(s, dt, player);
+        break;
+      }
+      case STATE.BOUND: {
+        // 跃进：跑向下一个掩体，到位由 Think 转回 COVER_ENGAGE。跑动中不开枪。
+        const m = s.moveOrder;
+        if (m) { desired = this.tmpD.set(m.x, 0, m.z); speed = m.speed; }
+        break;
+      }
+      case STATE.FLANK:
+      case STATE.INVESTIGATE:
+      case STATE.RETREAT: {
+        // 走到班组给的点。途中仍走 TryFire —— 它自己的枪口方向闸会挡住
+        // 「一边横着跑一边往侧后方开枪」，所以不必在这儿再判一次。
+        const m = s.moveOrder;
+        if (m) { desired = this.tmpD.set(m.x, 0, m.z); speed = m.speed; }
+        this.TryFire(s, dt, player);
+        break;
+      }
+      case STATE.GRENADE:
+        this.TryGrenade(s, player);
         break;
       case STATE.CHARGE: {
         // 守点的人平时不冲锋（冲出去就是把点让出来），但玩家下的"上刺刀"是例外。
@@ -1486,11 +2252,19 @@ export class AiDirector {
     // 独立复核实测带 holdZone 时位移 0.00 m，正是被这一行盖回去的。
     if (strayed && s.order !== "charge") { desired = this.tmpD.copy(s.goal); speed = Math.max(speed, 2.2); }
     // Scripted defence can fire in place, but never pursue an enemy or remote cover.
+    // 【2026-09-08】守点从「钉在一个点上」改成「锚点 + 半径」（docs/Data_EnemyAi.md §6）：
+    // 掩体微走位（进隐蔽位、探头、缩头）只要落在允许半径内就放行，其余照旧回锚点。
+    // `ScriptDefenseSpot` 在纯规则重放（P012RuntimeTest 把这段源码抽进沙箱）里不存在，
+    // 那时整段自动退回旧行为 —— 这也是它写成可缺省调用的原因。
     if (s.scriptDefensive) {
       const anchor = s.holdZone || s.position;
-      const outside = Math.hypot(s.position.x - anchor.x, s.position.z - anchor.z) > 2;
-      desired = outside ? this.tmpD.set(anchor.x, 0, anchor.z) : null;
-      speed = outside ? 2.2 : 0;
+      const spot = this.ScriptDefenseSpot ? this.ScriptDefenseSpot(s, anchor) : null;
+      const goX = spot ? spot.x : anchor.x;
+      const goZ = spot ? spot.z : anchor.z;
+      const reach = spot ? spot.arriveM : 2;
+      const outside = Math.hypot(s.position.x - goX, s.position.z - goZ) > reach;
+      desired = outside ? this.tmpD.set(goX, 0, goZ) : null;
+      speed = outside ? (spot ? spot.speed : 2.2) : 0;
     }
 
     // 移动：直奔目标 + 撞墙就沿墙滑 + **卡住就拐弯绕**。
@@ -1519,7 +2293,10 @@ export class AiDirector {
     if (desired && speed > 0) {
       const dx = desired.x - s.position.x, dz = desired.z - s.position.z;
       const d = Math.hypot(dx, dz);
-      const arrivalRadius = Number.isFinite(s.scriptArrivalRadius) ? Math.max(0.05, s.scriptArrivalRadius) : 1.2;
+      // 掩体微走位要自己的到位半径：hide↔peek 的侧步只有 sideStepM（0.55 m），
+      // 拿默认的 1.2 m 判的话人永远「已经到了」，探头一次都不会发生。
+      const arrivalRadius = Number.isFinite(s.moveArriveM) ? Math.max(0.05, s.moveArriveM)
+        : (Number.isFinite(s.scriptArrivalRadius) ? Math.max(0.05, s.scriptArrivalRadius) : 1.2);
       if (d > arrivalRadius) {
         let nx = dx / d, nz = dz / d;
         // 远目标走导航场：直奔目标在这座城里等于直奔一堵院墙。
@@ -1548,7 +2325,11 @@ export class AiDirector {
         this.StepBody(s, nx * step, nz * step, dt);
         stepped = true;
         const moved = Math.hypot(s.position.x - beforeX, s.position.z - beforeZ);
-        if (moved < step * 0.4) {
+        // 掩体微走位（半米的侧步）不参与「卡住就翻墙 / 卡住就绕路」那一套：
+        // 一帧只挪两三厘米，胶囊求解的余量本来就吃得下，判成"卡住"的话
+        // 探头探到一半会去翻墙。
+        const microStep = Number.isFinite(s.moveArriveM);
+        if (moved < step * 0.4 && !microStep) {
           s.stuckTime += dt;
           // 挡在前面的要是一堵翻得过去的墙，就翻过去 —— 别沿着院墙兜半圈找门洞。
           // 门槛比"卡住就绕"的 0.8 s 早一点：能翻就不该先绕。
@@ -1598,12 +2379,19 @@ export class AiDirector {
 
     // FIRE/ADVANCE 是离散战术状态，枪托不是电门。短暂离开 FIRE 仍保留 0.35 s
     // 的据枪承诺，再用连续 blend 上肩/放下，距离阈值两侧不会横着甩枪。
-    const mayAim = s.state === STATE.FIRE
+    const mayAim = s.state === STATE.FIRE || s.state === STATE.COVER_ENGAGE
+      || s.state === STATE.SUPPRESS
       || (s.state === STATE.SUPPRESSED && s.target && s.suppression <= 0.75);
     if (mayAim && s.target) s.aimUntil = this.time + 0.35;
     const wantedAim = s.target && this.time < s.aimUntil ? 1 : 0;
     const aimRate = wantedAim ? 5.5 : 4.0;
     s.aimBlend += Clamp(wantedAim - s.aimBlend, -aimRate * dt, aimRate * dt);
+    // 抬枪 / 压枪。`s.lookPitch` 由 TryFire 按「枪口 → 瞄点」算出来（向上为正），
+    // 这里跟 lookYaw 同一套做法：不据枪时回零，且**限速** ——
+    // 一发打完立刻把枪甩平，画面上就是每开一枪抖一下头。
+    const wantedPitch = s.target && this.time < s.aimUntil ? (s.lookPitch || 0) : 0;
+    s.lookPitchBlend = (s.lookPitchBlend || 0)
+      + Clamp(wantedPitch - (s.lookPitchBlend || 0), -3.2 * dt, 3.2 * dt);
 
     // 0.24—0.32 秒完成一次姿态过渡。胶囊仍立刻采用战术姿态，视觉骨架连续插值。
     const blendStep = dt / (s.stance === 2 || s.proneBlend > 0.01 ? 0.32 : 0.24);
@@ -1628,6 +2416,9 @@ export class AiDirector {
     } else {
       s.idleStepDt = 0;
     }
+    // 在原地钉了多久。班组黑板把它交给 `ShouldGrenade` 的第②条
+    //「对方钉在一处 ≥ holdS」—— 蹲在同一堵墙后面不动的人才会挨手榴弹。
+    s.stationaryS = s.moveSpeed > BRAIN.movingSignal ? 0 : s.stationaryS + dt;
 
     if (s.actor) {
       s.actor.root.position.copy(s.position);
@@ -1646,7 +2437,7 @@ export class AiDirector {
         fireSequence: s.fireSequence,
         hurt: s.hurtPose,
         elapsed: this.time,
-        lookYaw: s.lookYaw, lookPitch: 0,
+        lookYaw: s.lookYaw, lookPitch: s.lookPitchBlend || 0,
         // 摆点层（EscortColumn）钉在 soldier 上的两个负重旗：担架员前/后位
         // 与「能走的轻伤员」。姿态取用在 CharacterModel._ActionForState。
         carryRole: s.carryRole || null,
@@ -2018,6 +2809,51 @@ export class AiDirector {
   }
 
   /**
+   * 投一枚手榴弹（docs/Data_EnemyAi.md §4.4）。
+   *
+   * 走的是**玩家那条投掷链**：`actor.BeginGrenadeThrow(release)` 把弹压到动画的
+   * 脱手帧，脱手时 `combat.Throw` 造一枚真的投掷物（弹道、刚体、爆炸、返掷全都一样）。
+   * 范本是剧本齐投 `VolleyThrow`，两处唯一的差别是 owner —— 见下面那段。
+   *
+   * **owner 必须传对**：`Combat.Throw` 的 owner 以前写死 "player"，而 `Detonate`
+   * 按 owner 决定 `hurtSide`（伤哪一方）与 `byPlayer`（算不算玩家的战绩）。
+   * 日军的弹传 `owner:"ija"` 之后：伤中方与玩家（玩家在 Blast 里单独结算，
+   * 不受 hurtSide 约束）、不给玩家记击杀、HUD 的返掷提示按 owner!=="player"
+   * 立刻报警（不吃 0.35 s 的己方宽限）。
+   */
+  TryGrenade(s, player) {
+    if (!s.target || !this.CanThrowGrenade(s)) { s.state = STATE.FIRE; return; }
+    const actor = s.actor;
+    if (actor.pendingGrenadeThrow || actor.characterRig?.infantry?.IsThrowing()) return;
+    // 瞄点：目标此刻的位置（看得见）或最后目击位置。抛物线的落点由 Combat 自己解。
+    const at = s.targetVisible || !s.lkp ? s.target.position : s.lkp;
+    const dir = this.tmpD.set(at.x - s.position.x, 0, at.z - s.position.z);
+    if (dir.lengthSq() < 1e-4) { s.state = STATE.FIRE; return; }
+    dir.normalize();
+    // **不许直接把 yaw 掰过去**：人体一帧转不了 180°，而 `AiBehaviorTest` 有一条
+    // 「身体没有逐帧瞬转」的硬闸。GRENADE 状态本来就不移动，Act 里的
+    // `moveSpeed < 0.08 → wantedYaw = targetYaw` 会按转速把他转过去；
+    // 这里只等他转到位（与 TryFire 的枪口方向闸同一条口径）。
+    if (Math.abs(AngleDelta(s.yaw, Math.atan2(-dir.x, -dir.z))) > BRAIN.faceTargetRad) return;
+    const combat = this.ctx.combat;
+    const from = this.tmpB.set(s.position.x, s.position.y + BRAIN.grenadeReleaseY, s.position.z);
+    const dirCopy = dir.clone();          // 脱手回调在几帧之后才跑，不能借复用向量
+    const fromCopy = from.clone();
+    const power = BRAIN.grenadePowerMin + s.rnd() * (BRAIN.grenadePowerMax - BRAIN.grenadePowerMin);
+    const Release = (handPosition) => {
+      if (!s.alive) return;
+      combat.Throw("Grenade", power, handPosition || fromCopy, dirCopy, 0,
+        { owner: s.side, ownerId: s.id });
+    };
+    if (!actor.BeginGrenadeThrow(Release)) Release(fromCopy);
+    // 冷却由 Tactics 记（班组一枚一枚地扔，不是一起扔）；携行也由它扣。
+    this.tactics.NoteGrenadeThrown(s, this.time, true);
+    this.stats.grenades += 1;
+    this.Bark(s, "grenade");
+    s.state = STATE.FIRE;
+  }
+
+  /**
    * 白刃。上了刺刀冲到 2 m 以内是真的捅，不是跑过去继续开枪 ——
    * 「上刺刀」按下去只是让人跑快一点的话，这个动词就还是假的。
    */
@@ -2028,8 +2864,17 @@ export class AiDirector {
     this.ctx.meleeCombat?.Fighter(s);
   }
 
+  /**
+   * 剧本守点单位的状态（第一关的前沿日军全走这一支）。
+   *
+   * **`s.cover = null` 那一句删掉了**（docs/Data_EnemyAi.md §2.2 的第一条病根）：
+   * 它是「正片里的敌人在设计上被禁止找掩体」的字面原因 —— 第一关每一个前沿日军
+   * 都被 `Defend()` 置了 scriptDefensive，而这个函数第一句就把刚选好的掩体扔掉。
+   * 现在守点只管**不许追击、不许绕后、不许跃进出区**（scriptDefensive 这个旗
+   * 在 `Script_AiTactics.IsScripted` 里就是这个意思），能不能躲另说。
+   */
   ApplyScriptDefense(s) {
-    s.order = "hold"; s.cover = null; s.bayonetFixed = false;
+    s.order = "hold"; s.bayonetFixed = false;
     if(s.scriptSuppressible && s.suppression>=.5){
       s.state=STATE.SUPPRESSED;
       this.SetStance(s,s.suppression>.8?2:1,1.5,s.suppression>.8);
@@ -2038,10 +2883,47 @@ export class AiDirector {
     if (s.ammo <= 0) {
       if (s.state !== STATE.RELOAD) {
         s.reloadTimer = s.weapon.reloadTimeS || 3.2;
-        this.ctx.audioWiring?.AiReload(s, s.weapon.kind);
+        this.ctx?.audioWiring?.AiReload(s, s.weapon.kind);
       }
       s.state = STATE.RELOAD;
-    } else s.state = s.target ? STATE.FIRE : STATE.IDLE;
+    } else if (!s.target) {
+      s.state = STATE.IDLE;
+    } else if (s.task && s.task.kind === TASK.GRENADE && this.time < s.task.until
+      && this.CanThrowGrenade(s)) {
+      // 投弹是**原地能做的事**，所以剧本守点单位也许可（Script_AiTactics 的
+      // `HOLD_SAFE_TASKS` 就是这么定的：守区的人不许绕后、不许跃进，但可以扔）。
+      s.state = STATE.GRENADE;
+    } else if (s.cover) {
+      // 有掩体就在掩体里打：缩头 → 探头 → 点射 → 缩头，走位半径由 holdZone 管着。
+      s.state = STATE.COVER_ENGAGE;
+    } else {
+      s.state = STATE.FIRE;
+    }
+  }
+
+  /**
+   * 守点单位这一帧允许挪到哪儿（`Act` 的 scriptDefensive 分支读它）。
+   *
+   * 允许的范围是「锚点半径 + `scriptCoverSlackM`」：机枪位只放行一个侧步（探头），
+   * 普通守兵放行进掩体、换掩体。超出范围一律不给 —— 守点纪律没有松动。
+   *
+   * 这个方法**故意不写在 Act 的那段源码里**：`Script_FirstLevelP012RuntimeTest`
+   * 会把 Act 的 `switch (s.state)` 到 `if (desired && speed > 0)` 之间整段抽出来
+   * 放进纯 JS 沙箱重放，沙箱里没有 AiDirector 实例，所以那段只许出现
+   * `this.xxx ? this.xxx(...) : 兜底` 这种可缺省的调用。
+   */
+  ScriptDefenseSpot(s, anchor) {
+    const m = s.moveOrder;
+    if (!m) return null;
+    const limit = (Number.isFinite(anchor.radius) ? anchor.radius : 0)
+      + (Number.isFinite(s.scriptCoverSlackM) ? s.scriptCoverSlackM : 0);
+    const dx = m.x - anchor.x;
+    const dz = m.z - anchor.z;
+    if (Math.sqrt(dx * dx + dz * dz) > limit) return null;
+    const out = this._defenseSpot || (this._defenseSpot = { x: 0, z: 0, speed: 0, arriveM: 1.2 });
+    out.x = m.x; out.z = m.z; out.speed = m.speed;
+    out.arriveM = Number.isFinite(s.moveArriveM) ? s.moveArriveM : 1.2;
+    return out;
   }
 
   ScriptFireFactors(s) {
@@ -2066,9 +2948,136 @@ export class AiDirector {
     u.normalize();
     const w = this.tmpW.crossVectors(dir, u);
     const target = this.tmpT.copy(aim).addScaledVector(u, g1 * sigma).addScaledVector(w, g2 * sigma);
-    const d = this.tmpD.subVectors(target, from).normalize();
+    // **不能借 tmpD**：Act 的 `desired` 用的就是它（构造器里那段注释说的正是这件事），
+    // 而 TryFire 是在 `case STATE.FIRE:` 把 desired 摆好之后才调的 ——
+    // 借了就等于把「去掩体」的目标点就地改成一条归一化的射击方向。
+    const d = this.tmpHit.subVectors(target, from).normalize();
     const struck = RaycastPlayerHitboxes(from, d, boxes);
     return struck ? struck.part : "torso";
+  }
+
+  /**
+   * 把这一发的枪口写进 `s.muzzleWorld`（`ShootingModel.MuzzleOrigin` 读它）。
+   *
+   * Actor 的世界矩阵是 `Act` 每帧从 `s.position` 同步的。规则层直调 TryFire 的场合
+   * （伤害靶场、AiBehaviorTest 的过热对账）人被瞬移过，而 actor.root 还停在出生点 ——
+   * 拿那个枪口去打射线就是从几十米外开枪。所以先对一次账，对不上就**不写**，
+   * 让 MuzzleOrigin 走它自己的姿态高兜底（眼高 − muzzleDropM）。
+   */
+  UpdateMuzzle(s) {
+    s.muzzleWorld = null;
+    const root = s.actor && s.actor.root;
+    if (!root) return;
+    // **骨架没在更新的人，枪口是假的**：`Act` 只在 `root.visible` 时调 `actor.Update`，
+    // 而远景层与镜头外的人 `visible = false`（`CullActors` 把整棵子树摘掉了）。
+    // 那时 weaponGroup 的局部变换还停在上一次更新甚至出生姿势上，
+    // `MuzzleWorld` 会把枪口算到脚底下 —— 暴露采样的射线从地里射出去，
+    // 一条都通不过，整条战线静默退化成「只会压制射击」。
+    if (!root.visible) return;
+    const dx = root.position.x - s.position.x;
+    const dy = root.position.y - s.position.y;
+    const dz = root.position.z - s.position.z;
+    if (dx * dx + dy * dy + dz * dz > BRAIN.muzzleSyncM * BRAIN.muzzleSyncM) return;
+    const m = s.actor.MuzzleWorld(this.tmpMuzzle);
+    const out = s.muzzleStore || (s.muzzleStore = { x: 0, y: 0, z: 0 });
+    out.x = m.x; out.y = m.y; out.z = m.z;
+    s.muzzleWorld = out;
+  }
+
+  /**
+   * 射击走廊要避开的友军躯干。返回**复用数组**（槽也是复用的）。
+   *
+   * 只收 `allyCorridorM` 内的活人：更远的人挡不住这一枪，而全场扫一遍
+   * 在 110 人规模下是每发一次的 O(N)。
+   */
+  FriendlyTorsos(s) {
+    const out = this._fireAllies;
+    let n = 0;
+    const r2 = BRAIN.allyCorridorM * BRAIN.allyCorridorM;
+    for (let i = 0; i < this.soldiers.length; i += 1) {
+      const o = this.soldiers[i];
+      if (o === s || o.side !== s.side || !o.alive) continue;
+      const dx = o.position.x - s.position.x;
+      const dz = o.position.z - s.position.z;
+      if (dx * dx + dz * dz > r2) continue;
+      let slot = out[n];
+      if (!slot) { slot = { x: 0, y: 0, z: 0, radius: 0 }; out[n] = slot; }
+      slot.x = o.position.x;
+      slot.y = o.position.y + AiDirector.StanceEye(o.stance, o) - BRAIN.torsoBelowEyeM;
+      slot.z = o.position.z;
+      slot.radius = (o.childCapsules?.[o.stance] || CAPSULE[o.stance] || CAPSULE[0]).radius;
+      n += 1;
+    }
+    out.length = n;
+    return out;
+  }
+
+  /**
+   * 目标锁掉了，但记忆里还留着一条够新的敌情 —— 把它接回来当「记忆目标」。
+   *
+   * 修的是 §2.1 那条病根的后半段：**看不见就发呆**。听见背后一枪、跟丢了一个人之后，
+   * 旧代码（与第二波接入前的这一版）会把 `s.target` 清成 null，于是状态机落回
+   * ADVANCE —— 有守区的人连挪都不挪，站在原地等下一发。现在他会进掩体、
+   * 向最后目击位置压制射击，直到记忆过期。
+   *
+   * 三条硬规矩：
+   *   · 位置用 `s.lkp`（我们**知道**的位置），不用 ref 的真坐标 —— 那是开天眼；
+   *   · `targetVisible` 恒 false ⇒ `TryFire` 只走压制射击（baseAccuracy = 0，永不命中）；
+   *   · 打上 `targetFromMemory` 标记：不占「同时锁玩家的人数」名额，也不许发起白刃冲锋。
+   *
+   * @returns {boolean} 有没有接回来
+   */
+  ReviveTargetFromMemory(s, sense) {
+    if ((s.lkpConfidence || 0) < TACTICS.suppressConfidence) return false;
+    const mem = s.perception;
+    if (!mem || !mem.list) return false;
+    // 两条不同的尺（迟滞）：**接一个新的**要够可信，**留住手上这个**只要记忆还在。
+    // 一把尺量到底的话，两条记忆的置信度一交叉就换一次人、跌破阈值就丢一次目标，
+    // 十二秒能换十几次 —— `AiBehaviorTest` 的「不来回甩枪口」当场翻红，
+    // 玩家看到的也是枪口在两个方向之间抽。
+    let best = null;
+    let keep = null;
+    for (let i = 0; i < mem.list.length; i += 1) {
+      const t = mem.list[i];
+      if (!t.ref) continue;
+      if (t.isPlayer ? !(this.ctx.player && this.ctx.player.Alive) : t.ref.alive === false) continue;
+      if (s.target && t.id === s.target.id) { keep = t; continue; }
+      if (t.confidence < TACTICS.suppressConfidence) continue;
+      if (!best || t.confidence > best.confidence) best = t;
+    }
+    if (keep) best = keep;
+    if (!best) return false;
+    if (!s.target || s.target.id !== best.id) {
+      if (s.target) this.tactics.ReleaseToken(s.id);
+      s.target = {
+        position: s.lkp, isPlayer: !!best.isPlayer, ref: best.ref,
+        id: best.id, stance: best.stance | 0,
+      };
+    } else {
+      s.target.position = s.lkp;
+      s.target.stance = best.stance | 0;
+    }
+    s.targetVisible = false;
+    s.targetFromMemory = true;
+    void sense;
+    return true;
+  }
+
+  /** 目标这一帧在不在动（瞄准扩散用）。玩家读 velocity，AI 读动作信号 moveSpeed。 */
+  TargetMoving(s, player) {
+    const t = s.target;
+    if (!t) return false;
+    if (t.isPlayer) {
+      const v = player && player.velocity;
+      return !!v && Math.sqrt(v.x * v.x + v.z * v.z) > BRAIN.movingMps;
+    }
+    return !!t.ref && t.ref.moveSpeed > BRAIN.movingSignal;
+  }
+
+  /** 身高缩放（童子军的胶囊比成人矮）。暴露采样按它摆采样柱。 */
+  static HeightScale(ref) {
+    const h = ref?.childCapsules?.[0]?.height;
+    return Number.isFinite(h) && h > 0 ? h / CAPSULE[0].height : 1;
   }
 
   TryFire(s, dt, player) {
@@ -2079,8 +3088,21 @@ export class AiDirector {
     // 过热：Type11.overheatShots = 200 / coolDownS = 8.0 以前是死字段。
     // 冷却期间枪口冒白烟并且**真的打不出去** —— 这就是玩家冲过街口的那个窗口。
     if (this.time < s.coolUntil) return;
+    // 瞄准误差每帧收敛。**必须排在 fireTimer 那道闸前面** —— 两发之间的等待
+    // 正是瞄准收敛的时间；排在后面的话误差永远停在初值，AI 再也瞄不准。
+    if (s.target) {
+      this.shooting.UpdateAim(s, dt, {
+        moving: s.moveSpeed > BRAIN.movingSignal,
+        suppression: s.suppression,
+        stance: s.stance,
+        // **现算，不吃 Think 的隔夜数据**：瞄准扩散每帧都在用这一位，
+        // 而 Think 是 1/6 分帧的，拿它的缓存会让「目标停下来了」晚 0.1 s 才生效，
+        // 更糟的是规则层直调（靶场）根本不跑 Think，那一位会一直冻在开局的值上。
+        targetMoving: this.TargetMoving(s, player),
+        exposedS: s.targetExposedS || 0,
+      });
+    }
     if (s.fireTimer > 0 || !s.target || s.ammo <= 0) return;
-    if (s.targetVisible === false) return;
     s.aimTime += dt;
     const aimNeeded = s.weapon.aiAimTimeS ?? 0.8;
     if (s.aimTime < aimNeeded * (1 + s.suppression)) return;
@@ -2091,30 +3113,72 @@ export class AiDirector {
     const targetYaw = Math.atan2(-tx, -tz);
     if (Math.abs(AngleDelta(s.yaw, targetYaw)) > 0.34) return;
 
-    const from = this.tmpA.set(s.position.x, s.position.y + (s.stance === 2 ? 0.5 : s.stance === 1 ? 1.1 : 1.5), s.position.z);
-    const to = this.tmpB.copy(s.target.position);
+    // --- 这一发是瞄准射击还是压制射击 -------------------------------------
+    // 三道闸，任何一道不过就转压制：看不见 / 没抢到攻击令牌 / 暴露采样全被挡。
+    // 压制射击**不占令牌**（否则「没令牌→去压制→压制又要令牌」是死循环）。
+    this.UpdateMuzzle(s);
+    const from = this.shooting.MuzzleOrigin(s);
     const toPlayer = s.target.isPlayer && !!player;
-    if (toPlayer) {
-      // 玩家有自己的命中几何（Script_PlayerHitbox）：照躯干中点瞄 ——
-      // 趴着的人瞄的是背心，不是脚底往上 1.1 m 那团空气（以前曳光全从卧倒的玩家头顶飞过去）。
-      const aim = PlayerAimPoint(player.position, player.yaw, player.stance, this.tmpAim, player.LeanOffsetM);
-      to.set(aim.x, aim.y, aim.z);
-      // At a wall edge the exposed head is the visible target; the torso stays covered.
-      if (player.LeanOffsetM) to.copy(player.EyePosition);
-    } else {
-      to.y += 1.1;
+    const targetId = s.target.isPlayer ? PLAYER_TRACK_ID : s.target.id;
+    let exposure = 0;
+    let aimed = null;
+    if (s.targetVisible !== false
+      && this.tactics.AcquireToken(targetId, s.id, s.target.isPlayer)) {
+      const samples = toPlayer
+        ? this.shooting.PlayerSamples(player)
+        : this.shooting.SoldierSamples(s.target.position, s.target.stance, undefined,
+          AiDirector.HeightScale(s.target.ref));
+      const seen = this.shooting.Exposure(s, from, samples, { targetId, now: this.time });
+      exposure = seen.fraction;
+      aimed = seen.aimPoint;
     }
-    const dir = this.tmpC.subVectors(to, from);
+
+    const aimV = this.tmpB;
+    if (aimed) {
+      aimV.set(aimed.x, aimed.y, aimed.z);
+    } else {
+      // 打不着人就打他躲的那个地方：最后目击位置 / 掩体沿上方 0.3 m。
+      // 情报太旧或太不可信就干脆闭嘴 —— 那才是「没有目标」，不是「盲射」。
+      // **看得见就一定够可信**：没抢到令牌的人照样要开火压住对面，
+      // 否则「令牌满了 → 转压制 → 压制又被情报闸挡掉 → 干脆不打」。
+      if (!s.targetVisible && (s.lkpConfidence || 0) < TACTICS.suppressConfidence) return;
+      const lkp = s.targetVisible ? s.target.position : (s.lkp || s.target.position);
+      const hideCover = !s.target.isPlayer && s.target.ref ? s.target.ref.cover : null;
+      const point = this.shooting.SuppressPoint(lkp, hideCover);
+      aimV.set(point.x, point.y, point.z);
+    }
+    // 玩家有自己的命中几何（Script_PlayerHitbox）：暴露采样已经按那套几何挑好了
+    // 瞄点（趴着瞄背心、探身瞄露出来的头），这里不再另算一次 PlayerAimPoint。
+    const fromV = this.tmpA.set(from.x, from.y, from.z);
+    const dir = this.tmpC.subVectors(aimV, fromV);
     const dist = dir.length();
     dir.divideScalar(dist || 1);
 
+    // 射击线上有自己人就不扣扳机（后排隔着前排的后脑勺开枪）。
+    if (!this.shooting.LineOfFireClear(from, aimV, this.FriendlyTorsos(s))) return;
+
     s.ammo -= 1;
     const scriptFactors = this.ScriptFireFactors(s);
-    s.fireTimer = (s.weapon.fireIntervalS ?? 1.2) * scriptFactors.interval;
+    // 点射：BurstPlan 消费 Data_Weapons 的 aiBurstMin/Max（这一轮之前是死字段）。
+    // 步枪恒 1 发 + 0 停顿 ⇒ fireTimer 与旧式子逐位相同；机枪打完一梭子才加停顿。
+    if (!(s.burstLeft > 0)) {
+      const plan = this.shooting.BurstPlan(s.weapon, s.rnd);
+      s.burstLeft = plan.shots;
+      s.burstIntervalS = plan.intervalS;
+      s.burstPauseS = plan.pauseS;
+    }
+    s.burstLeft -= 1;
+    s.fireTimer = (s.burstIntervalS + (s.burstLeft > 0 ? 0 : s.burstPauseS)) * scriptFactors.interval;
     s.lastFire = this.time;
     s.fireSequence += 1;
     s.aimTime = 0;
     this.fireCount += 1;              // 通关冒烟要的是"仗真的打起来了"的运行时证据
+    if (aimed) this.stats.aimedShots += 1; else this.stats.suppressShots += 1;
+    // 人物抬枪 / 压枪：Actor 的 lookPitch 向上为正（Script_AiShooting.LookPitch 头注）。
+    s.lookPitch = this.shooting.LookPitch(from, aimV);
+    // AI 的枪声也是刺激：一条街上的人听得见谁在开火（docs/Data_EnemyAi.md §4.1）。
+    this.NoteStimulus(s.weapon.rpm ? "machinegun" : "gunshot", s.position,
+      { side: s.side, sourceId: s.id, ref: s });
 
     // 打满 overheatShots 就强制冷却。挂一根白烟在枪口上，让"它现在打不了"看得见。
     if (DIFFICULTY.overheat && s.weapon.overheatShots) {
@@ -2150,15 +3214,30 @@ export class AiDirector {
       && this.time - (s.playerLockAt ?? -99) < (COMBAT.player?.firstShotGraceS ?? 0);
     if (firstShot) acc = 0;
 
-    const hit = s.rnd() < acc;
+    // **只有这一行换成了 Resolve**：整条命中率链（难度 / 剧本 / 距离衰减 / 压制 /
+    // COMBAT.player 各项 / firstShotGrace）原样留在上面，Resolve 只在它上面叠
+    // 暴露曲线与瞄准误差曲线两条 —— 满暴露、误差收敛到底时两条都精确等于 1，
+    // 也就是说这一套只会让 AI 变得没那么准，绝不会缩短 TTK（docs/Data_PlayerDamage.md 的账）。
+    // 压制射击传 baseAccuracy = 0 且 exposure = 0：永不命中，但近失弹压制照旧。
+    const shot = this.shooting.Resolve(s, from, aimV, {
+      baseAccuracy: aimed ? acc : 0,
+      exposure: aimed ? exposure : 0,
+      distance: dist,
+      rnd: s.rnd,
+    });
+    const hit = shot.hit;
+    // 曳光与弹着都跟着**真正飞出去的那条线**走：打偏时是 missDir，不再是瞄点方向
+    // 加一团随机偏移（那会让曳光穿过目标、弹着却出现在别处）。
+    const flight = hit ? shot.dir : shot.missDir;
+    dir.set(flight.x, flight.y, flight.z);
     const vfx = this.ctx.vfx;
     const audio = this.ctx.audio;
     if (vfx) {
-      vfx.MuzzleFlash(from, dir, {
+      vfx.MuzzleFlash(fromV, dir, {
         scale: s.weapon.kind === "lmg" ? 1.15 : 1,
         kind: s.weapon.kind,
       });
-      vfx.Tracer(from, this.tmpB.clone().copy(from).addScaledVector(dir, dist), {
+      vfx.Tracer(fromV, this.tmpEnd.copy(fromV).addScaledVector(dir, dist), {
         kind: s.side === "nra" ? "nra" : "ija",
       });
     }
@@ -2169,7 +3248,7 @@ export class AiDirector {
       // PlayGunshot 而不是 Play：一百米外那一枪要换成**另一段录音**，
       // 不是同一段加低通（Script_Audio.FAR_CUE 那段注释）。
       // 步枪走两层交叉淡入，机枪没有远场素材、内部自动落回 Play()。
-      audio.PlayGunshot(name, { position: from.clone(), volume: 1 });
+      audio.PlayGunshot(name, { position: fromV.clone(), volume: 1 });
     }
     // 每发之后的拉栓。玩家自己那一支早就有了（Script_Main.TryFire），
     // 而**满场几十个兵一条 foley 都没有** —— 于是敌人开枪只是一记枪声，
@@ -2181,18 +3260,19 @@ export class AiDirector {
       if (toPlayer) {
         // 打玩家的部位不抽概率：照 aimScatterM 在瞄点周围散一个点，射线去碰玩家自己的
         // 命中几何 —— 站着基本打躯干，趴着头露在最前面（部位倍率见 COMBAT.player）。
-        const part = this.PlayerHitPart(s, from, to, dir, player);
+        const part = this.PlayerHitPart(s, fromV, aimV, dir, player);
         player.TakeHit(s.weapon.damage * (COMBAT.player?.bulletScale ?? 0.40), part, dir, {
-          from: from.clone(), bullet: true,
+          from: fromV.clone(), bullet: true,
         });
       } else if (s.target.ref) {
         // AI 打 AI 仍按概率抽部位：那边的胶囊是给玩家的子弹用的，这条链一帧几十发不做几何。
         const part = s.rnd() < 0.08 ? "head" : s.rnd() < 0.6 ? "torso" : (s.rnd() < 0.5 ? "arm" : "leg");
         const died = s.target.ref.TakeHit(s.weapon.damage, part, dir);
-        if (vfx) vfx.Blood(to, dir, died ? 1 : 0.5);
+        if (vfx) vfx.Blood(aimV, dir, died ? 1 : 0.5);
       }
     } else {
       // 打偏了：仍然要压制。近失弹从耳边过去，那声音本身就是武器。
+      // 压制射击走的也是这一支 —— 「藏起来也有子弹擦着掩体过」就是它。
       if (s.target.isPlayer && player) {
         const miss = 0.4 + s.rnd() * 1.4;
         if (miss < COMBAT.suppressRadius) player.Suppress(COMBAT.suppressPerNearMiss * (1 - miss / COMBAT.suppressRadius) * 3);
@@ -2203,16 +3283,17 @@ export class AiDirector {
         // 高度略高于瞄点 —— 「从头边过去」正是这一发该有的位置。
         // 挡住就不播：子弹根本没到那儿，而 targetVisible 只保证开枪那一刻能看见，
         // 弹道上后来挡进来的东西（塌下来的墙、走过去的人）它管不着。
-        this.ctx.audioWiring?.AiNearMissAtPlayer(s, from, dir, to, miss);
+        this.ctx.audioWiring?.AiNearMissAtPlayer(s, from, dir, aimV, miss);
       } else if (s.target.ref) {
         s.target.ref.suppression = Clamp01(s.target.ref.suppression + COMBAT.suppressPerNearMiss);
       }
       if (vfx) {
-        const missPoint = to.clone().add(new THREE.Vector3((s.rnd() - 0.5) * 2.2, (s.rnd() - 0.5) * 1.6, (s.rnd() - 0.5) * 2.2));
+        // 弹着点由 Resolve 给：散布是按**瞄准误差 × 距离**算的高斯，
+        // 不再是围着瞄点撒的一团各向同性随机数（那个数跟枪、跟距离都没关系）。
         const bf = this.ctx.battlefield;
-        const h = bf.Raycast(from, missPoint.sub(from).normalize(), dist + 6);
+        const h = bf.Raycast(fromV, dir, dist + 6);
         if (h) {
-          const p = from.clone().addScaledVector(missPoint, h.t);
+          const p = fromV.clone().addScaledVector(dir, h.t);
           const normal = new THREE.Vector3(h.normal[0], h.normal[1], h.normal[2]);
           const tag = h.box ? h.box.tag : "wall";
           const surface = tag === "prop" || tag === "balk" || tag === "bridge" || tag === "platform"
@@ -2229,9 +3310,93 @@ export class AiDirector {
     }
   }
 
+  /**
+   * 敌军 AI 的运行时取证口（`window.Taierzhuang.Debug.Ai.State()`）。
+   *
+   * **只在调试路径上调**，所以这里允许分配。给 id 就出一个人的完整快照，
+   * 不给就出全场直方图 —— 验收探针（`Script_AiCombatBrowserTest`）与
+   * `?aidebug=1` 覆盖层读的都是它。
+   *
+   * 字段全是英文：这条路径是开发者诊断，不进 `Script_Text` 的字符串表
+   * （docs/Data_TextAndTuning.md：闸门模块里不许再有玩家可见中文）。
+   */
+  DebugState(id = null) {
+    if (id !== null && id !== undefined) {
+      const s = this.soldiers.find((x) => x.id === id);
+      return s ? this.DebugSoldier(s) : null;
+    }
+    const states = {};
+    const tasks = {};
+    const alerts = {};
+    let inCover = 0;
+    let validatedCover = 0;
+    let hiding = 0;
+    let alive = 0;
+    for (const s of this.soldiers) {
+      if (!s.alive) continue;
+      alive += 1;
+      states[s.state] = (states[s.state] || 0) + 1;
+      const kind = s.task && s.task.kind ? s.task.kind : "none";
+      tasks[kind] = (tasks[kind] || 0) + 1;
+      alerts[s.alert || "unaware"] = (alerts[s.alert || "unaware"] || 0) + 1;
+      if (s.cover) {
+        inCover += 1;
+        if (s.cover.validated) validatedCover += 1;
+        if (s.coverPhase === "hide") hiding += 1;
+      }
+    }
+    return {
+      time: this.time, alive, states, tasks, alerts,
+      inCover, validatedCover, hiding,
+      covers: this.covers.Stats(),
+      shooting: { rays: this.shooting.rayCount },
+      perception: { ...this.perception.stats },
+      tactics: this.tactics.State(),
+      stats: { ...this.stats },
+    };
+  }
+
+  /** 一个人的快照（感知 / 任务 / 掩体 / 令牌 / 暴露 / 瞄准）。 */
+  DebugSoldier(s) {
+    const ex = s.shooting && s.shooting.exposure;
+    return {
+      id: s.id, side: s.side, squad: s.squadId, role: s.tacticalRole,
+      state: s.state, stance: s.stance, suppression: +s.suppression.toFixed(2),
+      alert: s.alert, awareness: +(s.awareness || 0).toFixed(2),
+      target: s.target ? { id: s.target.id, isPlayer: !!s.target.isPlayer, visible: !!s.targetVisible } : null,
+      lkp: s.lkp ? { x: +s.lkp.x.toFixed(1), z: +s.lkp.z.toFixed(1),
+        ageS: +(this.time - s.lkpTime).toFixed(1), confidence: +(s.lkpConfidence || 0).toFixed(2) } : null,
+      task: s.task && s.task.kind ? {
+        kind: s.task.kind, targetId: s.task.targetId, partnerId: s.task.partnerId,
+        point: s.task.point ? { x: +s.task.point.x.toFixed(1), z: +s.task.point.z.toFixed(1) } : null,
+        leftS: +(s.task.until - this.time).toFixed(1),
+      } : null,
+      cover: s.cover ? {
+        id: s.cover.id, x: +s.cover.x.toFixed(1), z: +s.cover.z.toFixed(1),
+        height: +s.cover.height.toFixed(2), side: s.cover.side,
+        validated: s.cover.validated, blockedCrouched: s.cover.blockedCrouched,
+        phase: s.coverPhase, peeks: s.peekCount,
+        hideDistM: +Math.sqrt((s.cover.hidePos.x - s.position.x) ** 2
+          + (s.cover.hidePos.z - s.position.z) ** 2).toFixed(2),
+        occupant: this.covers.OccupantOf(s.cover.id),
+      } : null,
+      token: this.tactics.TokenTarget(s.id),
+      exposure: ex ? +ex.fraction.toFixed(2) : 0,
+      visibleParts: ex ? ex.visibleParts.join("/") : "",
+      aimErrorRad: s.shooting ? +s.shooting.errorRad.toFixed(4) : null,
+      aimFloorRad: s.shooting ? +s.shooting.floorRad.toFixed(4) : null,
+      grenades: TacticsDirector.GrenadeCount(s),
+      x: +s.position.x.toFixed(1), z: +s.position.z.toFixed(1),
+    };
+  }
+
   Dispose() {
     for (const s of [...this.soldiers]) this.Remove(s);
     this.soldiers.length = 0;
+    // 换关：黑板、令牌、班记录全清。留着的话下一关开局就带着上一关的敌情。
+    this.tactics.Reset();
+    this.covers.Rebuild([]);
+    this.coversSource = null;
     if (this.crowd) this.crowd.Dispose();
     this.crowd = undefined;
   }

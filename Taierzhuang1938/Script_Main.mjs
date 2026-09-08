@@ -1495,7 +1495,28 @@ async function Boot() {
     // 玩家自己的手榴弹/集束/呼来的迫击炮炸中人时的回执（见 ConfirmHit）。
     // 一次爆炸只回一条，Combat.Blast 那边已经并好了。
     onPlayerHit: (died) => ConfirmHit(died),
+    // 爆炸也是刺激（docs/Data_EnemyAi.md §4.1）。`hurtSide` 是**挨炸的那一方**，
+    // 声源那一方是它的反面 —— 感知层按 side 过滤「同阵营的响动不算敌情」。
+    onBlast: (e) => {
+      if (!ai || !e) return;
+      // 投掷者本人（玩家 / 某个兵）要跟着传：没有 ref 的那条记忆只是一个坐标，
+      // 大脑接不回成目标，人听见炸响也只会原地发呆。
+      const thrower = e.byPlayer ? player
+        : (e.ownerId === null || e.ownerId === undefined ? null
+          : ai.soldiers.find((s) => s.id === e.ownerId) || null);
+      ai.NoteStimulus("explosion", e.position, {
+        side: e.hurtSide === "nra" ? "ija" : "nra",
+        isPlayer: !!e.byPlayer,
+        sourceId: e.ownerId ?? null,
+        ref: thrower,
+      });
+    },
   });
+
+  // AI 投弹走的是**玩家那条投掷链**（actor.BeginGrenadeThrow → combat.Throw），
+  // 所以 AiDirector 要拿得到 combat。与上面的 meleeCombat 同一条接线方式：
+  // 构造 AiDirector 时 combat 还不存在，只能事后补挂。
+  ai.ctx.combat = combat;
 
   // F 通用交互。槽位与弹仓的账在装配层手里（state.slots / state.mags），
   // 所以规则在 Script_Interact，改状态的那三下通过 hooks 交回这里。
@@ -2117,6 +2138,23 @@ async function Boot() {
           ...telegraph.State(),
           hud: hud.TelegraphState(),
         }),
+      },
+      /**
+       * 敌军 AI 的取证口（docs/Data_EnemyAi.md §8）。
+       *   Debug.Ai.State()        全场直方图：状态 / 任务 / 警戒 / 掩体 / 令牌 / 计数
+       *   Debug.Ai.State(id)      某一个人的完整快照
+       *   Debug.Ai.Overlay(true)  打开头顶覆盖层（等价于地址栏 ?aidebug=1）
+       *   Debug.Ai.Overlay()      查询开关状态
+       * 覆盖层的文字**一律英文**：这条是开发者诊断，不进 Script_Text 的字符串表。
+       */
+      Ai: {
+        State: (id = null) => ai?.DebugState(id) ?? null,
+        Overlay: (on) => {
+          if (on === undefined) return aiDebugOverlay;
+          aiDebugOverlay = !!on;
+          if (!aiDebugOverlay) ClearAiDebugOverlay();
+          return aiDebugOverlay;
+        },
       },
       Prompts: () => hud.actionPrompts.map((prompt) => ({ ...prompt })),
       /**
@@ -6720,6 +6758,14 @@ function TryFire(dt, returningGrenade = false) {
   const aimAtTrigger = player.AimDirection(_aimDir).clone();
   state.playerShots += 1;
   p012Runtime?.RecordAircraftShot(player.EyePosition, player.AimDirection(_aimDir), strafe?.View());
+  // 玩家的枪声是**刺激**：背后打一枪，附近的日军会把最后目击位置写在这儿
+  // （docs/Data_EnemyAi.md §4.1）。`lastShotAt` 让感知层认出「枪口焰＝瞬间拉满」
+  // ——那一条以前只有 AI 有（s.lastFire），玩家开枪反而没人反应。
+  if (ai) {
+    player.lastShotAt = ai.time;
+    ai.NoteStimulus(WEAPONS[currentWeapon]?.rpm ? "machinegun" : "gunshot",
+      player.position, { side: "nra", isPlayer: true, ref: player });
+  }
   fireCooldown = weapon.fireIntervalS ?? 1.2;
 
   viewmodel.TriggerFire();
@@ -7146,6 +7192,69 @@ function ReachObjective(index) {
 // ---------------------------------------------------------------------------
 const _forward = new THREE.Vector3();
 const _proj = new THREE.Vector3();
+
+// ---------------------------------------------------------------------------
+// 敌军 AI 调试覆盖层（?aidebug=1 或 Debug.Ai.Overlay(true)）
+//
+// 每个活人头顶一行英文诊断：state / task / alert / exposure / cover；
+// 掩体点按占用与验证结果上色。**只用 DOM**，不引 three 的 addon，也不进渲染管线 ——
+// 覆盖层不该改变它要观察的那一帧（GI、深度、合批统计一样都不能动）。
+// 标签池化：一次建好、之后只改 style 与 textContent，关掉时整块 display:none。
+// ---------------------------------------------------------------------------
+let aiDebugOverlay = params.get("aidebug") === "1";
+let aiDebugBox = null;
+const AI_DEBUG_MAX = 40;
+
+function AiDebugBox() {
+  if (aiDebugBox) return aiDebugBox;
+  aiDebugBox = document.createElement("div");
+  aiDebugBox.id = "aiDebugOverlay";
+  aiDebugBox.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;"
+    + "pointer-events:none;z-index:60;font:11px/13px ui-monospace,Consolas,monospace;";
+  document.body.appendChild(aiDebugBox);
+  return aiDebugBox;
+}
+
+function ClearAiDebugOverlay() {
+  if (!aiDebugBox) return;
+  for (const child of aiDebugBox.children) child.style.display = "none";
+}
+
+function UpdateAiDebugOverlay() {
+  if (!aiDebugOverlay || !ai || !camera) { ClearAiDebugOverlay(); return; }
+  const box = AiDebugBox();
+  let n = 0;
+  for (const s of ai.soldiers) {
+    if (n >= AI_DEBUG_MAX) break;
+    if (!s.alive) continue;
+    _proj.set(s.position.x, s.position.y + 2.0, s.position.z);
+    const dist = _proj.distanceTo(camera.position);
+    _proj.project(camera);
+    if (_proj.z >= 1 || Math.abs(_proj.x) > 1 || Math.abs(_proj.y) > 1 || dist > 120) continue;
+    let el = box.children[n];
+    if (!el) {
+      el = document.createElement("div");
+      el.style.cssText = "position:absolute;transform:translate(-50%,-100%);white-space:pre;"
+        + "text-shadow:0 0 3px #000,0 0 3px #000;";
+      box.appendChild(el);
+    }
+    const cover = s.cover;
+    // 掩体的颜色就是「这个点靠不靠得住」：验证过=绿，占了但没验证=黄，没掩体=红。
+    const tint = !cover ? "#ff8f7a" : (cover.validated ? "#8ef0a0" : "#f0d98e");
+    el.style.display = "";
+    el.style.left = `${((_proj.x * 0.5 + 0.5) * window.innerWidth).toFixed(0)}px`;
+    el.style.top = `${((-_proj.y * 0.5 + 0.5) * window.innerHeight).toFixed(0)}px`;
+    el.style.color = tint;
+    const ex = s.shooting ? s.shooting.exposure.fraction.toFixed(2) : "-";
+    const task = s.task && s.task.kind ? s.task.kind : "-";
+    el.textContent = `${s.side}#${s.id} ${s.state}/${task}\n`
+      + `${s.alert} exp=${ex} sup=${s.suppression.toFixed(2)}\n`
+      + (cover ? `cover ${cover.side} ${s.coverPhase} peek=${s.peekCount}${cover.validated ? " ok" : ""}`
+        : "cover none");
+    n += 1;
+  }
+  for (let i = n; i < box.children.length; i += 1) box.children[i].style.display = "none";
+}
 
 /**
  * @param {number} dt 步长
@@ -7782,6 +7891,9 @@ function Frame(dt, render = true) {
     player, objectives: battlefield.objectives, soldiers: ai.soldiers, bounds: battlefield.bounds,
   });
   hud.Update(dt);
+  // 敌军 AI 覆盖层排在 HUD 之后、渲染之前：它读的是这一帧决策完的状态。
+  // 默认关；开着的时候也只是 DOM，画面本身一个像素都不动。
+  UpdateAiDebugOverlay();
   profiler.E("hud");
 
   // --- 渲染 ---

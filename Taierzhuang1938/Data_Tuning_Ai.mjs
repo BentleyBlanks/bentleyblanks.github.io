@@ -91,6 +91,12 @@ export const ACTOR_DETAIL = Object.freeze({
   exitM: 56,
   corpseEnterM: 24,
   corpseExitM: 30,
+  // 【2026-09-08 验收】远景层里的尸体到这个距离就不画了。第一关走到院落回望前沿时，
+  // 两百米外还躺着六七十具尸体、每具都按远景层的整模烘（一具约一万面），
+  // 光尸体就吃掉一百多万面，整帧越过 SCENE_RENDER_LIMITS（master 自身在那一帧就已经贴线 8.16 M）。
+  // 160 m 上一具卧倒的尸体在 900 px 高的画面里只剩三个像素高，看不见；
+  // **活人不受这条限制**（视锥内每个活人都必须看得见，那是内容硬规则）。
+  corpseCrowdMaxM: 160,
   animation60HzM: 20,
   animation30HzM: 32,
   footIkM: 18,
@@ -112,3 +118,63 @@ export const ACTOR_DETAIL = Object.freeze({
  * decayS      从 1 衰减到 0 用几秒
  */
 export const HURT_FLINCH = Object.freeze({ base: 0.45, damageDiv: 90, decayS: 0.45 });
+
+/**
+ * 大脑接线（docs/Data_EnemyAi.md §5）。
+ *
+ * 这一组不属于四个新模块中的任何一个 —— 它们是**适配层自己**要的阈值：
+ * 「什么算在动」「什么算刚开过枪」「掩体微走位算到位没有」。
+ * 放在这里而不是塞进 `Data_Tuning_Ai*.mjs`，是因为那四张表要跟着模块走，
+ * 而模块在纯 Node 里不知道 Script_Ai 用什么信号喂它们。
+ *
+ * movingSignal    AI 的 `moveSpeed` 是 0..1 的**动作信号**（速度 / 3.6），
+ *                 0.08 与 Act 里判「移动中转向」用的是同一条线。
+ * movingMps       玩家侧只有 `velocity`（米/秒）：0.4 m/s 大约是「挪了半步」，
+ *                 站着微调枪口不算动。
+ * firingRecentS   枪口焰的有效窗口。0.35 s 略长于最快机枪的射击间隔（0.12 s），
+ *                 短于步枪的一个循环（2.2 s）—— 「他刚才那一下开枪了」而不是
+ *                 「他这一分钟里开过枪」。
+ * coverArriveM    掩体隐蔽位 ↔ 射击位的侧步只有 sideStepM（0.55 m），
+ *                 而 Act 的默认到位半径是 1.2 m：拿默认值判，人永远「已经到了」，
+ *                 **探头一次都不会发生**。这条是这一轮最容易漏的一个坑。
+ * coverMoveMps    在掩体边上挪半步的速度。比冲向掩体（2.4）慢得多：
+ *                 探头是探出去，不是冲出去。
+ * allyCorridorM   射击走廊要查多远之内的友军（超过它的人挡不住这一枪）。
+ * grenadeDodgeM   敌方手榴弹落在隐蔽位这个半径内就换掩体 / 后撤。
+ */
+export const BRAIN = Object.freeze({
+  movingSignal: 0.08,
+  movingMps: 0.4,
+  firingRecentS: 0.35,
+  coverArriveM: 0.12,
+  coverMoveMps: 1.5,
+  allyCorridorM: 26,
+  /** 跑向掩体的速度（与旧 FIRE 分支冲掩体的 2.4 一致，别顺手改成散步）。 */
+  coverApproachMps: 2.4,
+  /** 侧翼 / 查看 / 后撤这三类走位的速度（跑，不是冲）。 */
+  taskMoveMps: 2.8,
+  /** 躯干中心在眼位下方多少米。射击走廊拿它摆友军的躯干点。 */
+  torsoBelowEyeM: 0.25,
+  grenadeDodgeM: 7,
+  /**
+   * 「枪口 / 手已经转到目标身上了」的角度闸。与 `TryFire` 里那道 0.34 同一条口径：
+   * 转身—瞄准—开火要看得懂，不能身体原地转圈、东西照样四面飞。
+   */
+  faceTargetRad: 0.34,
+  /**
+   * 投弹三个数（走的是玩家那条 `Combat.Throw`）。
+   * releaseY   动画没接上时的兜底脱手高度（与 VolleyThrow 的 1.2 同源）。
+   * powerMin/Max  蓄力 0..1。别给满力：满力是「拼命扔出去」，
+   *              日军步兵扔的是二十来米的战术投掷，不是掷远比赛。
+   */
+  grenadeReleaseY: 1.2,
+  grenadePowerMin: 0.5,
+  grenadePowerMax: 0.8,
+  /** 掩体查询的重选闸之外，还要求跟上一次的威胁点差出这么远才值得重算。 */
+  threatMoveM: 4,
+  /**
+   * actor.root 与 s.position 差出这么远就不信 Actor 的枪口。
+   * 0.35 m 比一帧的位移大得多，比「人被瞬移到靶场」小得多。
+   */
+  muzzleSyncM: 0.35,
+});

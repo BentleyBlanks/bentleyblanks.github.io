@@ -182,12 +182,23 @@ try {
       gunner.targetVisible = true; gunner.yaw = -Math.PI * 0.5;
       gunner.heat = 0; gunner.coolUntil = -99;
       overheatShots = 0;
+      // 过热是**武器**的账，不是班组的账。2026-09-08 接入敌军 AI 基建之后
+      // TryFire 多了一道「射击走廊里有自己人就不扣扳机」的闸（不打自己人），
+      // 而这里的目标是正东三十米外的一个虚构点 —— 打到第几发取决于那一刻
+      // 恰好有没有同伴站在东边，实测 500 次尝试里 313 次被自己人挡住。
+      // 所以这一段把场上暂时只留下机枪手本人（事后原样还原），
+      // 量的仍然是「打满 overheatShots 发才强制冷却」这一条。
+      const roster = T.ai.soldiers.slice();
+      T.ai.soldiers.length = 0;
+      T.ai.soldiers.push(gunner);
       for (let i = 0; i < 500 && gunner.coolUntil <= T.ai.time; i += 1) {
         const before = T.ai.fireCount;
         gunner.ammo = 30; gunner.fireTimer = 0; gunner.aimTime = 9; gunner.suppression = 0;
         T.ai.TryFire(gunner, 0.05, T.player);
         overheatShots += T.ai.fireCount - before;
       }
+      T.ai.soldiers.length = 0;
+      for (const soldier of roster) T.ai.soldiers.push(soldier);
     }
 
     // 把日军临时从规则层隐藏，强制走「没有近敌」分支：仍在自动推进的友军小队

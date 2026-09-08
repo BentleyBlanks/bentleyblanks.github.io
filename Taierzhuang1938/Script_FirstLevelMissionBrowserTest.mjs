@@ -31,9 +31,20 @@ async function Capture(name) {
     info.reset();
     g.StepFrames(1, 1 / 60, true);
     const result = { drawCalls: info.render.calls, triangles: info.render.triangles };
+    // 预算读数旁边带上「谁在花」：活人 / 尸体 / LOD 分布、蒙皮数，以及按场景根节点拆的三角形。
+    // 超预算时光看一个总数定不了责任，A/B 两棵树各跑一遍就能看出是布景、人物还是尸体在涨。
+    const soldiers = g.ai ? g.ai.soldiers : [];
+    const lod = {};
+    for (const s of soldiers) { const k = (s.alive ? "" : "dead:") + (s.renderLod || "none"); lod[k] = (lod[k] || 0) + 1; }
+    let skinned = 0, meshes = 0;
+    g.scene.traverse((o) => { if (o.isSkinnedMesh) skinned++; if (o.isMesh && o.visible) meshes++; });
+    result.actors = { total: soldiers.length, alive: soldiers.filter((s) => s.alive).length,
+      ija: soldiers.filter((s) => s.alive && s.side === "ija").length, nra: soldiers.filter((s) => s.alive && s.side === "nra").length, lod, skinned, meshes };
+    result.roots = g.scene.children.map((c) => { let tris = 0, m = 0; c.traverse((o) => { if (o.isMesh && o.visible) { m++; const geo = o.geometry; const n = (geo.index ? geo.index.count : geo.attributes.position?.count || 0) / 3; tris += n * (o.isInstancedMesh ? o.count : 1); } }); return { name: c.name || c.type, m, tris: Math.round(tris) }; }).filter((r) => r.tris > 20000).sort((a, b) => b.tris - a.tris).slice(0, 14);
     info.autoReset = reset;
     return result;
   });
+  console.log("BUDGET", name, JSON.stringify(render));
   assert.ok(
     render.drawCalls <= SCENE_RENDER_LIMITS.drawCalls && render.triangles <= SCENE_RENDER_LIMITS.triangles,
     `${name} must fit the shared whole-frame rendering budget: ${JSON.stringify(render)}`,

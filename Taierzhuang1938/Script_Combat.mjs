@@ -33,12 +33,17 @@ const GRAVITY = 19.6;
 
 /** 一枚在飞的投掷物。 */
 class Projectile {
-  constructor(kind, position, velocity, weapon, owner) {
+  constructor(kind, position, velocity, weapon, owner, ownerId = null) {
     this.kind = kind;                 // "Grenade" | "GrenadeBundle"
     this.position = position.clone();
     this.velocity = velocity.clone();
     this.weapon = weapon;
-    this.owner = owner;               // "player" | "ija"
+    this.owner = owner;               // "player" | "nra" | "ija"
+    /**
+     * 投掷者的 `soldier.id`（玩家为 null）。感知层要它才能把这一声爆炸
+     * 写成「那个方向有个敌人」而不是一条无主的响动（docs/Data_EnemyAi.md §4.1）。
+     */
+    this.ownerId = ownerId;
     this.fuse = weapon.fuseS ?? THROW.fuseFallbackS;
     // 刚脱手的己方弹会在镜头前掠过；给它一点离手宽限，避免每次正常投掷都闪一下警告。
     // 如果弹落回脚边，宽限结束后仍会按真实杀伤范围报警。
@@ -138,7 +143,7 @@ export class CombatSystem {
    * @param {string} kind "Grenade" | "GrenadeBundle"
    * @param {number} power 0..1 蓄力
    */
-  Throw(kind, power, fromPosition, direction, cookedFor = 0) {
+  Throw(kind, power, fromPosition, direction, cookedFor = 0, options = null) {
     const weapon = WEAPONS[kind];
     if (!weapon) return null;
     const speed = weapon.throwSpeedMin
@@ -147,7 +152,12 @@ export class CombatSystem {
     velocity.y += speed * THROW.arcLift;            // 抛物线：手榴弹是抛出去的，不是打出去的
     const start = fromPosition.clone().addScaledVector(direction, THROW.muzzleAheadM);
     start.y += THROW.muzzleRiseM;
-    const p = new Projectile(kind, start, velocity, weapon, "player");
+    // owner 决定伤谁、算不算玩家的战绩（见 Detonate）。**默认仍是 "player"** ——
+    // 玩家投掷与剧本齐投（VolleyThrow）那两条老路径一个字都不用改；
+    // 日军投弹显式传 { owner: "ija", ownerId } 才会走另一条分支。
+    const owner = (options && options.owner) || "player";
+    const p = new Projectile(kind, start, velocity, weapon, owner,
+      options && options.ownerId !== undefined ? options.ownerId : null);
     this.Attach(p);
     // 攥着数几秒再扔（cook）：老兵的做法，落地即炸不给对面时间踢回来
     p.fuse = Math.max(THROW.cookedFuseMinS, p.fuse - cookedFor);
@@ -189,7 +199,8 @@ export class CombatSystem {
     if (!player.Alive) { p.velocity.set(0, 0, 0); this.Attach(p); return; }
     const speed = p.weapon.throwSpeedMin + (p.weapon.throwSpeedMax - p.weapon.throwSpeedMin) * GRENADE_RETURN.power;
     p.velocity.copy(direction).multiplyScalar(speed); p.velocity.y += speed * THROW.arcLift;
-    p.owner = "player"; p.age = 0; p.returned = true;
+    // 返掷回去的那一颗从此归玩家：伤日军、算玩家的战绩，投掷者 id 也要清掉。
+    p.owner = "player"; p.ownerId = null; p.age = 0; p.returned = true;
     this.Attach(p); this.returnCount++;
     this.host.audio?.Play("grenadeThrow", { position: p.position.clone(), volume: 0.8 });
   }
@@ -525,8 +536,11 @@ export class CombatSystem {
 
   Detonate(p) {
     const isBundle = p.kind === "GrenadeBundle";
+    // hurtSide 是**挨炸的那一方**：玩家/中方的弹伤日军，日军的弹伤中方。
+    // 玩家本人不受 hurtSide 约束（Blast 里单独结算），所以日军手榴弹照样炸得到他。
+    // byPlayer 只管「算不算玩家的战绩」，日军的弹一律 false。
     this.Blast(p.position, p.weapon.radiusM, p.weapon.damage, isBundle ? "tank" : "grenade",
-      p.owner === "player" ? "ija" : "nra", p.owner === "player", p.OnHit, p.kind);
+      p.owner === "ija" ? "nra" : "ija", p.owner === "player", p.OnHit, p.kind, p.ownerId);
   }
 
   /**
@@ -534,8 +548,8 @@ export class CombatSystem {
    * 伤害按距离平方衰减，并且**被墙挡住就不吃伤害** —— 隔一堵墙互相扔手榴弹是
    * 台儿庄巷战的标准打法，如果墙不挡弹片，那堵墙就白存在了。
    */
-  Blast(position, radius, damage, kind, hurtSide = null, byPlayer = false, onHit = null, explosiveId = kind) {
-    this.host.onBlast?.({position:position.clone(),radius,damage,kind,hurtSide,byPlayer,explosiveId});
+  Blast(position, radius, damage, kind, hurtSide = null, byPlayer = false, onHit = null, explosiveId = kind, ownerId = null) {
+    this.host.onBlast?.({position:position.clone(),radius,damage,kind,hurtSide,byPlayer,explosiveId,ownerId});
     if (this.host.vfx) this.host.vfx.Explosion(position, { radius, kind });
     // 先改场景拓扑、再算人物遮挡：爆压把墙打穿的同一瞬间，洞口后面的人应该吃到
     // 剩余冲击，而不是等下一颗弹。Destruction.Blast 内部会把同一次爆炸批量提交，

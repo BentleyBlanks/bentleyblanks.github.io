@@ -141,6 +141,16 @@ export const testDefs = {
   StanceTest: { file: "Script_StanceTest.mjs", desc: "站/蹲/卧真实输入、相机/碰撞/移速与姿态按钮" },
   DestructionTest: { file: "Script_DestructionTest.mjs", desc: "墙体破坏状态机" },
   AiBehaviorTest: { file: "Script_AiBehaviorTest.mjs", desc: "AI 行为决策深度探针" },
+  // 敌军 AI 基建四件（docs/Data_EnemyAi.md §4）：纯 Node 规则层，毫秒级，进 tier0Fast。
+  AiPerceptionTest: { file: "Script_AiPerceptionTest.mjs", desc: "感知：视锥/觉察迟滞/听觉 LKP/目标锁" },
+  AiCoverTest: { file: "Script_AiCoverTest.mjs", desc: "掩体注册表：归一/散列/验证射线/侧翼/占用/探头" },
+  AiShootingTest: { file: "Script_AiShootingTest.mjs", desc: "射击模型：误差收敛/暴露采样/走廊/点射/压制点" },
+  AiTacticsTest: { file: "Script_AiTacticsTest.mjs", desc: "班组战术：令牌/侧翼点/跃进配对/投弹/撤退" },
+  AiCombatBrowserTest: {
+    file: "Script_AiCombatBrowserTest.mjs",
+    timeoutMs: 25 * 60 * 1000,
+    desc: "敌军 AI 实战验收：会躲/有节奏/不隔墙打人/掩体里换弹/会绕/会扔",
+  },
   VisibilityTest: { file: "Script_VisibilityTest.mjs", desc: "战场内容预算：名额/空洞/尸体上限" },
   DamageTest: { file: "Script_DamageTest.mjs", desc: "伤害口径重放（TTK 对照）" },
   GunFeelTest: { file: "Script_GunFeelTest.mjs", desc: "枪感短链八条" },
@@ -248,6 +258,7 @@ export const browserTests = new Set([
   "TrainLibraryTest",
   'BackRifleRunTest', 'MeleeAnimationTest', 'InfantryAnimationTest',
   "ActorBatchTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
+  "AiCombatBrowserTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
@@ -269,6 +280,10 @@ export const browserTests = new Set([
 
 export const tier0Fast = [
   "TextTest",
+  "AiPerceptionTest",
+  "AiCoverTest",
+  "AiShootingTest",
+  "AiTacticsTest",
   "AutoQualityTest",
   "TextGatherCheck",
   "BootPayloadTest",
@@ -323,6 +338,9 @@ export const domains = {
       // 玩家自己的命中几何（AI 打玩家的部位由它判）与通用震屏（爆炸/近失/中弹/落地/扫射/扑沟）：
       // 两条都是纯 Node 毫秒级，碰伤害口径或相机的改动连着跑。
       "PlayerHitboxTest", "CameraShakeTest",
+      // 射击模型叠在 COMBAT.aiAccuracyBase 那条链上（暴露曲线 × 误差曲线），
+      // 碰伤害口径的改动要连着它一起跑（纯 Node 毫秒级）。
+      "AiShootingTest",
       // 负重会封掉开火/开镜/冲刺三条（Player 的 carrySpeedScale + TryFire 的闸），
       // 碰这三样的改动要连着枪感串一起跑，所以它同时挂在 combat 与 interact 两个域。
       "CarryTest",
@@ -342,7 +360,8 @@ export const domains = {
     label: "AI 与战场内容预算",
     // 具名同伴（罗班长、幺娃…）是从 nra 名额里出的人，goal 直接写进 AiDirector，
     // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
-    tests: ["AiBehaviorTest", "VisibilityTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
+    tests: ["AiBehaviorTest", "AiCombatBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiShootingTest", "AiTacticsTest",
+      "VisibilityTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
       "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012AnimationTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest", "FirstLevelP012ArrivalTest", "FirstLevelP012VillageLifeTest", "FirstLevelP012CastTest"],
   },
   hud: {
@@ -400,6 +419,8 @@ const changedDomainRules = [
   { domain: "text", pattern: /(Script_Text|Data_Text_|Data_Locale_|Data_Tuning_|Data_Mission|Data_Cutscene|Data_History|Data_Voice|Data_Weapons|TengxianScript)/i },
   { domain: "ai", pattern: /Data_Setpieces_|Data_Companions|Data_Flares|Data_AircraftStrafe|Data_Telegraph|Data_Emplacements|Data_Carry/i },
   { domain: "physics", pattern: /MovementRange/i },
+  // 四张 AI 调参表（感知/掩体/射击/战术）：改数就要跑 AI 域。
+  { domain: "ai", pattern: /Data_Tuning_Ai/i },
   { domain: "editor", pattern: /Script_EditorWorldInfo|Script_WorldInfoEditorTest/i },
   { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },
   { domain: 'animation', pattern: /BackRifleRun|Melee.*Animation|MeleeAnimation|Infantry/i },
