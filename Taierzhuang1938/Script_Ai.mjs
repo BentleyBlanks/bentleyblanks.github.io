@@ -14,7 +14,7 @@ import * as THREE from "three";
 import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { COMBAT, NAME_POOL, DIFFICULTY } from "./Data_Battle.mjs";
-import { TRAVERSAL, TraversalPlan, TraversalCurve } from "./Data_Traversal.mjs";
+import { TRAVERSAL, TraversalPlan, TraversalCurve, TraversalLanding } from "./Data_Traversal.mjs";
 import { ActorCrowd } from "./Script_ActorCrowd.mjs";
 import {
   SIGHT_BY_STANCE, SIGHT_SCALE_RANGE, SQUAD, ENGAGE, ACTOR_DETAIL, HURT_FLINCH,
@@ -1724,6 +1724,7 @@ export class AiDirector {
     const probeZ = s.position.z + nz * 0.7;
     let top = -Infinity;
     let wall = false;
+    const climbed = new Set();
     for (const b of bf.NearbyColliders(probeX, probeZ, 1.0)) {
       if (probeX < b.min[0] - 0.35 || probeX > b.max[0] + 0.35) continue;
       if (probeZ < b.min[2] - 0.35 || probeZ > b.max[2] + 0.35) continue;
@@ -1737,6 +1738,7 @@ export class AiDirector {
         continue;
       }
       if (rel < TRAVERSAL.vaultMin) continue;
+      climbed.add(b);                             // 正在翻的那几只，落点检查里不算挡路
       if (b.max[1] > top) top = b.max[1];
     }
     if (wall || !Number.isFinite(top)) return false;
@@ -1744,8 +1746,12 @@ export class AiDirector {
     if (!plan) return false;
     const landX = s.position.x + nx * plan.reach;
     const landZ = s.position.z + nz * plan.reach;
-    const landY = bf.StandHeight(landX, landZ, top);
-    if (landY > top + 0.05) return false;
+    // 落点判据与玩家共用一份（Data_Traversal.TraversalLanding）：盖住落点、
+    // 顶面容得下人的才算落脚面。原来只问 StandHeight，擦着落点的一条板沿
+    // 也会被当成地面，人就站到了半空里。
+    const landY = TraversalLanding(bf.NearbyColliders(landX, landZ, 0.95),
+      s.position, { x: landX, z: landZ }, bf.GroundHeight(landX, landZ), top + 0.05, 0.35, climbed);
+    if (landY === null) return false;
     if (this.Blocked(landX, landZ, landY)) return false;
     s.state = STATE.VAULT;
     s.vaultT = 0;

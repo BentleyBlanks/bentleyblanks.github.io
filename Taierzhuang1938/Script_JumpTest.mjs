@@ -339,13 +339,91 @@ try {
     vaults.length
       ? `${vaults.length} 次翻越：最长 ${Math.max(...vaults.map((a) => a.durS)).toFixed(2)} s`
       : "这一批样本里没有腰高档（不算失败）");
+
+  // --- 车厢里按空格（用户报的那条）-----------------------------------------
+  // 第一关的军列是三节敞车：车厢地板 4.8 × 12.8 m，四周围着 1.4 m 高、0.2 m 厚的
+  // 挡板，两节车之间只隔 1.2 m 和一根车钩。挡板正落在「攀爬」那一档里，于是
+  // 旧的落点判据在车厢里连中两条：
+  //   · 车厢**头尾**按空格 —— 落点蹭到隔壁车厢的挡板，那条 0.2 m 的板沿被当成脚下的
+  //     地面，人被放到板顶上（实测停在车厢地板之上 1.22 m）；
+  //   · 贴着挡板站着按空格 —— 前方探测按半径收东西，旁边那块挡板也算"前面有东西"，
+  //     人沿着它腾空一米四又落回车厢原地；
+  //   两条读出来都是「在车厢边缘起跳会飞起来」。
+  // 现在车厢里按空格只剩两种结果：原地跳，或者正对着挡板翻出车厢、落到下面的地面上。
+  // **人绝不能比起跳点更高地结束。**
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=low&scale=small`,
+    { waitUntil: "domcontentloaded", timeout: 180000 });
+  await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 240000 });
+  const carriage = await page.evaluate(async () => {
+    const T = window.Taierzhuang, D = T.Debug;
+    // 军列进站那一段整节车厢都在平移，等它停稳再量，免得把平移算进落点
+    for (let i = 0; i < 14 && T.battlefield.trainOffsetM > 0.01; i += 1) T.StepFrames(600, 1 / 60, false);
+    const { MISSION_TRAIN } = await import("./Data_FirstLevelMissionTrain.mjs");
+    const car = MISSION_TRAIN.cars[MISSION_TRAIN.mainCar];
+    // 站得进去的机位才算数：车厢里还摆着货箱，胶囊埋在货箱里的点真人走不到，
+    // 而运动学角色控制器没有脱困能力，量出来的是"卡在箱子里"，不是玩法。
+    const Buried = () => {
+      const p = T.player.position, r = T.player.radius + 0.02, head = p.y + 1.6;
+      for (const b of T.battlefield.NearbyColliders(p.x, p.z, r + 1)) {
+        if (p.x + r <= b.min[0] || p.x - r >= b.max[0]) continue;
+        if (p.z + r <= b.min[2] || p.z - r >= b.max[2]) continue;
+        if (head <= b.min[1] || p.y + 0.05 >= b.max[1]) continue;
+        return true;
+      }
+      return false;
+    };
+    const rows = [];
+    let buried = 0;
+    // 贴着挡板与车厢头尾那几排是重点：dz = ±5.9 已经顶到 0.2 m 厚的挡板前，
+    // dx = ±1.8 已经顶到两侧的腰板前（再往外胶囊就埋进板里，真人到不了）。
+    for (const dz of [-5.9, -4.5, -2, 0, 2, 4.5, 5.9]) {
+      for (const dx of [-1.8, 0, 1.8]) {
+        for (const yaw of [0, Math.PI, Math.PI / 2, -Math.PI / 2]) {
+          const x = MISSION_TRAIN.centerX + dx, z = car.z + T.battlefield.trainOffsetM + dz;
+          T.player.vault.active = false;
+          T.player.position.set(x, T.battlefield.GroundHeight(x, z) + 0.02, z);
+          T.player.velocity.set(0, 0, 0);
+          T.player.yaw = yaw;
+          T.player.stance = "stand";
+          T.player.stamina = 1;
+          T.player.jump.cooldown = 0;
+          T.player.body?.Teleport(x, T.player.position.y, z);
+          T.StepFrames(12, 1 / 60, false);
+          if (Buried()) { buried += 1; continue; }
+          const y0 = T.player.position.y;
+          const before = D.Vault().count;
+          D.Key("Space");
+          let peak = y0;
+          for (let i = 0; i < 80; i += 1) {
+            T.StepFrames(1, 1 / 60, false);
+            peak = Math.max(peak, T.player.position.y);
+          }
+          rows.push({ dx, dz, yaw: +yaw.toFixed(2), traversed: D.Vault().count > before,
+            rise: +(peak - y0).toFixed(3), end: +(T.player.position.y - y0).toFixed(3) });
+        }
+      }
+    }
+    return { rows, buried, deck: T.battlefield.GroundHeight(MISSION_TRAIN.centerX, car.z + T.battlefield.trainOffsetM) };
+  });
+  const lifted = carriage.rows.filter((row) => row.end > 0.05);
+  const floaty = carriage.rows.filter((row) => !row.traversed && row.rise > ladder.TR.jumpRiseMax);
+  // 真翻出去的那些必须是**往下**走：落到车厢地板一米以下，也就是车外的地面上
+  const halfOut = carriage.rows.filter((row) => row.traversed && row.end > -1);
+  Check("车厢里按空格：不许被挡板抬起来又落回车厢（头尾边缘那条）",
+    carriage.rows.length >= 60 && lifted.length === 0 && floaty.length === 0 && halfOut.length === 0,
+    `${carriage.rows.length} 个机位（车厢地板 ${carriage.deck.toFixed(2)} m，另有 ${carriage.buried} 个埋在货箱里的点不计）：`
+      + `落点高过起跳点 ${lifted.length} 次 / 没翻越却抬过红线 ${floaty.length} 次 / `
+      + `翻越却没落到车外 ${halfOut.length} 次；`
+      + `翻出车厢 ${carriage.rows.filter((row) => row.traversed).length} 次，`
+      + `最高抬升 ${Math.max(...carriage.rows.map((row) => row.rise)).toFixed(3)} m`
+      + `${lifted.length ? `，最坏 ${JSON.stringify(lifted[0])}` : ""}`);
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
 }
 
 if (failures.length) {
-  console.error(`\n跳跃专项：${14 - failures.length}/14 过；失败：${failures.join("、")}`);
+  console.error(`\n跳跃专项：${15 - failures.length}/15 过；失败：${failures.join("、")}`);
   process.exit(1);
 }
 console.log("\n跳跃专项全过。");

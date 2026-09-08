@@ -18,7 +18,7 @@
 import * as THREE from "three";
 import { Clamp, Clamp01, Mulberry32, SmoothStep } from "./Script_Noise.mjs";
 import { DIFFICULTY, COMBAT } from "./Data_Battle.mjs";
-import { TRAVERSAL, TraversalPlan, TraversalCurve } from "./Data_Traversal.mjs";
+import { TRAVERSAL, TraversalPlan, TraversalCurve, TraversalLanding } from "./Data_Traversal.mjs";
 import { T } from "./Script_Text.mjs";
 import {
   STANCE as STANCE_TUNING, JUMP, MOVE, STAMINA, FREE_AIM, RECOIL,
@@ -379,6 +379,7 @@ export class PlayerController {
     //    的话直接判死 —— 通行阶梯的硬顶是关卡设计的承诺，不许用别处的矮台阶绕开。
     let top = -Infinity;
     let wall = false;
+    const obstacles = new Set();
     const near = this.world.NearbyColliders
       ? this.world.NearbyColliders(probeX, probeZ, r + 1.2)
       : this.world.colliders;
@@ -399,6 +400,9 @@ export class PlayerController {
         continue;
       }
       if (rel < TRAVERSAL.vaultMin) continue;
+      // 记下"正在翻的是哪几只盒"。落点检查要把它们摘出去 —— 人正是从它们上面
+      // 过来的，厚墙的盒子伸进落点那一格是应当的，不能反过来判自己落不下去。
+      obstacles.add(box);
       if (box.max[1] > top) top = box.max[1];
     }
     if (wall || !Number.isFinite(top)) return false;
@@ -406,23 +410,18 @@ export class PlayerController {
     if (!plan) return false;
     if (this.stamina < plan.stamina) return false;           // 喘不上气就扒不动墙头
 
-    // 2) 顶面往前落得下脚吗（方案的"顶面往前 0.7 m 无遮挡"，这里按落点整体查）
+    // 2) 顶面往前落得下脚吗。判据在 `Data_Traversal.TraversalLanding`，与 AI 共用：
+    //    盖住落点、顶面容得下人的才算地面，落点这一格里不许有支棱着的东西。
+    //    这里原来是"半径 r 的光晕蹭到就算脚下的地面"，于是车厢头尾那块 0.2 m 的
+    //    挡板成了落脚面，人被放到板顶上——那就是"车厢边缘起跳会飞起来"。
     const landX = this.position.x + fx * plan.reach;
     const landZ = this.position.z + fz * plan.reach;
-    let landY = this.world.GroundHeight(landX, landZ);
     const landNear = this.world.NearbyColliders
       ? this.world.NearbyColliders(landX, landZ, r + 0.6)
       : this.world.colliders;
-    for (const box of landNear) {
-      if (landX + r < box.min[0] || landX - r > box.max[0]) continue;
-      if (landZ + r < box.min[2] || landZ - r > box.max[2]) continue;
-      if (box.max[1] <= top + 0.05) {                        // 落在另一个台面上也行
-        if (box.max[1] > landY) landY = box.max[1];
-        continue;
-      }
-      return false;                                          // 墙那边还是墙：翻过去没地方站
-    }
-    if (landY > top + 0.05) return false;
+    const landY = TraversalLanding(landNear, this.position, { x: landX, z: landZ },
+      this.world.GroundHeight(landX, landZ), top + 0.05, r, obstacles);
+    if (landY === null) return false;                        // 墙那边还是墙：翻过去没地方站
 
     this._vaultFrom.copy(this.position);
     this._vaultTo.set(landX, landY, landZ);
