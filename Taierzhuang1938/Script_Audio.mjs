@@ -1801,10 +1801,429 @@ const RECIPES = {
     v.wetGain.gain.value = 0.1;
     v.Live(0.85);
   },
+
+  // =========================================================================
+  // 接线批 INT4（2026-09-08）：合成**回落**配方。
+  //
+  // 这一批的实录素材正由素材侧从 Sonniss 实录里切；名字是先定死的契约
+  // （见 docs/Data_AudioWiring.md 的 cue 表）。素材落地之前这些配方就是实际发声的
+  // 那一层，所以要求是**能听见、听得出是什么**，不要求好听 ——
+  // 接线红不红不能取决于素材到没到。
+  // =========================================================================
+
+  // --- 弹道 ---------------------------------------------------------------
+  // 超音速弹头掠过耳边：那是**弹头自己的锥形激波**，不是枪声。
+  // 它极短（几毫秒）、极亮（能量在 2—8 kHz）、**没有尾巴**——尾巴属于枪口，
+  // 而枪口在几十米外，晚得多才到。把这一条做长做闷就成了「远处有人开枪」。
+  bulletCrack(A, v) {
+    const t = v.t;
+    const src = v.Noise("white", 0.05);
+    const hp = v.Filter("highpass", v.F(1400), 0.7);
+    const band = v.Filter("bandpass", v.F(v.R(3200, 5200)), 1.4);
+    const g = v.Gain(FLOOR);
+    Hit(g.gain, t, 0.85, 0.0006, 0.016);
+    src.connect(hp).connect(band).connect(g).connect(v.out);
+    v.Start(src, t, 0.05);
+    // 激波后面那一点点低频「顶」——胸口感觉到的那一下。
+    Thud(v, t + 0.004, 260, 120, 0.05, 0.16, 700);
+    v.wetGain.gain.value = 0.1;      // 贴着耳朵过去的东西不该有房间
+    v.Live(0.16);
+  },
+
+  // 擦着头皮过去那一档：激波之后跟着的是弹头搅动空气的湍流，
+  // 频心从高往低扫（弹头正在离开），一米半以外就听不出来了。
+  bulletWhizz(A, v) {
+    const t = v.t, dur = 0.2;
+    const src = v.Noise("pink", dur + 0.05);
+    const band = v.Filter("bandpass", v.F(2600), 4.5);
+    Glide(band.frequency, t, v.F(3400), v.F(900), dur);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t, 0.3, 0.012, dur * 0.35, dur * 0.6);
+    src.connect(band).connect(g).connect(v.out);
+    v.Start(src, t, dur + 0.05);
+    v.wetGain.gain.value = 0.12;
+    v.Live(0.34);
+  },
+
+  // 跳弹：削飞出去的弹头**在转**，所以是一条带颤的下滑哨音，不是「叮」。
+  // 电影里那条经典的「piu」就是这个 —— 它之所以站得住，是因为真的存在。
+  ricochet(A, v) {
+    const t = v.t, dur = v.R(0.32, 0.5);
+    const osc = v.Osc("sawtooth", v.F(2600));
+    Glide(osc.frequency, t, v.F(v.R(2400, 3400)), v.F(v.R(600, 900)), dur);
+    // 转速带来的调幅（弹头翻滚，声音一颤一颤的）。
+    const wobble = v.Osc("sine", v.R(28, 46));
+    const wobbleGain = v.Gain(0.35);
+    const band = v.Filter("bandpass", v.F(2000), 3.0);
+    const g = v.Gain(FLOOR);
+    wobble.connect(wobbleGain).connect(g.gain);
+    Hit(g.gain, t, 0.34, 0.002, dur);
+    osc.connect(band).connect(g).connect(v.out);
+    v.Start(wobble, t, dur);
+    v.Start(osc, t, dur + 0.05);
+    v.wetGain.gain.value = 0.4;      // 跳弹的尾巴是在巷子里荡出来的
+    v.Live(dur + 0.3);
+  },
+
+  // 打在石头/条石上：比青砖硬、比铁闷。碎屑更少更细。
+  impactStone(A, v) {
+    const t = v.t;
+    Thud(v, t, 210, 110, 0.05, 0.3, 620);
+    const src = v.Noise("white", 0.1);
+    const band = v.Filter("bandpass", v.F(v.R(2600, 4200)), 2.2);
+    const g = v.Gain(FLOOR);
+    Hit(g.gain, t, 0.3, 0.001, 0.06);
+    src.connect(band).connect(g).connect(v.out);
+    v.Start(src, t, 0.1);
+    Grains(v, t + 0.02, 4, 0.12, 3000, 7000, 0.09);
+    v.wetGain.gain.value = 0.3;
+    v.Live(0.34);
+  },
+
+  // --- 脚步（四种地面）-----------------------------------------------------
+  // 木地板/木桥：落地那一下之后是**板子自己的共振**，这条共振就是「空的」的听感来源。
+  footstepWood(A, v) {
+    const t = v.t;
+    Thud(v, t, v.R(130, 170), 78, 0.06, 0.26, 520);
+    const ring = v.Osc("triangle", v.F(v.R(190, 260)));
+    const rg = v.Gain(FLOOR);
+    Hit(rg.gain, t + 0.006, 0.09, 0.003, 0.16);
+    ring.connect(rg).connect(v.out);
+    v.Start(ring, t + 0.006, 0.2);
+    v.wetGain.gain.value = 0.16;
+    v.Live(0.3);
+  },
+
+  // 青石板/砖地：硬、亮、短，鞋钉带一记高频。
+  footstepStone(A, v) {
+    const t = v.t;
+    Thud(v, t, v.R(150, 190), 90, 0.045, 0.24, 700);
+    const src = v.Noise("white", 0.07);
+    const band = v.Filter("bandpass", v.F(v.R(3200, 5000)), 3.0);
+    const g = v.Gain(FLOOR);
+    Hit(g.gain, t + 0.002, 0.13, 0.001, 0.045);
+    src.connect(band).connect(g).connect(v.out);
+    v.Start(src, t + 0.002, 0.07);
+    v.wetGain.gain.value = 0.24;     // 石板街两侧有墙，这一记是有回声的
+    v.Live(0.26);
+  },
+
+  // 草地/田埂：几乎没有低频冲击，全是干草被压下去的沙沙。
+  footstepGrass(A, v) {
+    const t = v.t;
+    Thud(v, t, 100, 62, 0.05, 0.12, 220);
+    const src = v.Noise("pink", 0.14);
+    const band = v.Filter("bandpass", v.F(v.R(1800, 2800)), 1.0);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t, 0.13, 0.008, 0.05, 0.08);
+    src.connect(band).connect(g).connect(v.out);
+    v.Start(src, t, 0.14);
+    v.wetGain.gain.value = 0.08;
+    v.Live(0.3);
+  },
+
+  // 泥地/水田：**吸**。落地闷得几乎没有瞬态，抬脚才是这条音的主角
+  // （黏着的那一下「啵」），所以两段之间要留 90 ms。
+  footstepMud(A, v) {
+    const t = v.t;
+    Thud(v, t, 95, 52, 0.09, 0.28, 190);
+    const suck = v.Noise("brown", 0.16);
+    const lp = v.Filter("lowpass", v.F(900), 1.4);
+    Glide(lp.frequency, t + 0.09, v.F(500), v.F(1300), 0.1);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t + 0.09, 0.16, 0.02, 0.03, 0.09);
+    suck.connect(lp).connect(g).connect(v.out);
+    v.Start(suck, t + 0.09, 0.16);
+    v.wetGain.gain.value = 0.06;
+    v.Live(0.36);
+  },
+
+  // --- 身体 foley ---------------------------------------------------------
+  // 布料摩擦：起身、趴下、翻墙。带通噪声两段（收紧 → 放开），中间不留空。
+  clothMove(A, v) {
+    const t = v.t;
+    const src = v.Noise("pink", 0.34);
+    const band = v.Filter("bandpass", v.F(1500), 0.9);
+    Glide(band.frequency, t, v.F(v.R(1100, 1500)), v.F(v.R(2200, 2900)), 0.26);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t, 0.17, 0.03, 0.12, 0.16);
+    src.connect(band).connect(g).connect(v.out);
+    v.Start(src, t, 0.34);
+    v.wetGain.gain.value = 0.05;     // 就在自己身上
+    v.Live(0.42);
+  },
+
+  // 装具晃动：水壶、弹带、饭盒互相磕。**是一串不规则的碰撞**，不是一条噪声。
+  gearRattle(A, v) {
+    const t = v.t;
+    Ticks(v, t, 5, 0.26, 900, 2600, 0.16, 0.05, 5);
+    const cloth = v.Noise("pink", 0.3);
+    const band = v.Filter("bandpass", v.F(1300), 0.8);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t, 0.07, 0.03, 0.14, 0.12);
+    cloth.connect(band).connect(g).connect(v.out);
+    v.Start(cloth, t, 0.3);
+    v.wetGain.gain.value = 0.05;
+    v.Live(0.42);
+  },
+
+  // 粗喘：一吸一呼两段，吸短促、呼长而闷。频心比人声低（这是气流不是声带），
+  // 所以不做任何共振峰 —— 加了就成了「有人在你耳边哼」。
+  breathHeavy(A, v) {
+    const t = v.t;
+    const src = v.Noise("pink", 2.4);
+    const band = v.Filter("bandpass", v.F(620), 1.2);
+    const g = v.Gain(FLOOR);
+    src.connect(band).connect(g).connect(v.out);
+    v.Start(src, t, 2.4);
+    // 两个完整的呼吸周期，每周期 1.15 s：吸 0.28 s、呼 0.42 s、停 0.45 s。
+    for (let i = 0; i < 2; i += 1) {
+      const at = t + i * 1.15;
+      band.frequency.setValueAtTime(v.F(900), at);
+      Swell(g.gain, at, 0.22, 0.09, 0.06, 0.13);
+      band.frequency.setValueAtTime(v.F(480), at + 0.34);
+      Swell(g.gain, at + 0.34, 0.3, 0.05, 0.14, 0.23);
+    }
+    v.wetGain.gain.value = 0;        // 自己的肺，没有房间
+    v.Live(2.5);
+  },
+
+  // 玩家落地。**不是 bodyFall**（那是一个人倒下：装具散开、四肢先后落地）——
+  // 这条是两只脚同时着地 + 一身装备被顿了一下，短得多。
+  bodyLand(A, v) {
+    const t = v.t;
+    Thud(v, t, 130, 58, 0.12, 0.42, 240);
+    Ticks(v, t + 0.02, 3, 0.09, 700, 2200, 0.12, 0.04, 5);
+    const cloth = v.Noise("pink", 0.2);
+    const band = v.Filter("bandpass", v.F(1200), 0.9);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t + 0.01, 0.1, 0.02, 0.05, 0.11);
+    cloth.connect(band).connect(g).connect(v.out);
+    v.Start(cloth, t + 0.01, 0.2);
+    v.wetGain.gain.value = 0.12;
+    v.Live(0.38);
+  },
+
+  // --- 手榴弹落地与滚动 ----------------------------------------------------
+  // 木柄弹弹在砖地上：木柄先着地（一记干脆的木响），弹体跟着「当」一下。
+  grenadeBounce(A, v) {
+    const t = v.t;
+    const wood = v.Osc("triangle", v.F(v.R(320, 430)));
+    Glide(wood.frequency, t, v.F(400), v.F(200), 0.07);
+    const wg = v.Gain(FLOOR);
+    Hit(wg.gain, t, 0.3, 0.001, 0.07);
+    wood.connect(wg).connect(v.out);
+    v.Start(wood, t, 0.1);
+    MetalClick(v, t + 0.012, v.R(1500, 2200), 0.16, 0.04, 10);
+    v.wetGain.gain.value = 0.3;      // 巷子里那一记回声正是「它落在哪」的线索
+    v.Live(0.26);
+  },
+
+  // 滚：木柄在砖地上翻着走，是一串越来越慢的短促摩擦。
+  grenadeRoll(A, v) {
+    const t = v.t;
+    Ticks(v, t, 7, 0.55, 500, 1600, 0.1, 0.035, 6);
+    const scrape = v.Noise("pink", 0.6);
+    const band = v.Filter("bandpass", v.F(1100), 1.6);
+    Glide(band.frequency, t, v.F(1400), v.F(700), 0.55);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t, 0.07, 0.04, 0.25, 0.28);
+    scrape.connect(band).connect(g).connect(v.out);
+    v.Start(scrape, t, 0.6);
+    v.wetGain.gain.value = 0.28;
+    v.Live(0.72);
+  },
+
+  // --- 爆炸中距与落屑 ------------------------------------------------------
+  // 40—120 m：**这条街那头**。既没有近炸那层碎砖，也不是城外那记闷响 ——
+  // 冲击还在（低频推得动胸口），高频已经被空气吃掉一半，尾巴带方位。
+  explosionMid(A, v) {
+    const t = v.t;
+    Thud(v, t, 120, 34, 0.5, 0.62, 260);
+    const body = v.Noise("brown", 0.9);
+    const lp = v.Filter("lowpass", v.F(1600), 0.8);
+    Glide(lp.frequency, t, v.F(1600), v.F(320), 0.7);
+    const bg = v.Gain(FLOOR);
+    Hit(bg.gain, t, 0.42, 0.004, 0.7);
+    body.connect(lp).connect(bg).connect(v.out);
+    v.Start(body, t, 0.9);
+    // 尾巴：城里一次爆炸的回声要在墙之间来回滚一秒多。
+    const tail = v.Noise("brown", 1.4);
+    const tailLp = v.Filter("lowpass", v.F(600), 0.6);
+    const tg = v.Gain(FLOOR);
+    Hit(tg.gain, t + 0.06, 0.14, 0.05, 1.1);
+    tail.connect(tailLp).connect(tg).connect(v.out);
+    v.Start(tail, t + 0.06, 1.35);
+    v.wetGain.gain.value = 0.55;
+    v.Live(1.55);
+  },
+
+  // 落屑：爆炸之后半秒到一秒，砖屑瓦片才落回地面。一串颗粒 + 一点点土。
+  debrisFall(A, v) {
+    const t = v.t;
+    Grains(v, t, 9, 0.7, 900, 4200, 0.17);
+    const dust = v.Noise("pink", 0.5);
+    const band = v.Filter("bandpass", v.F(700), 1.1);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t + 0.05, 0.08, 0.05, 0.2, 0.22);
+    dust.connect(band).connect(g).connect(v.out);
+    v.Start(dust, t + 0.05, 0.5);
+    v.wetGain.gain.value = 0.2;
+    v.Live(0.95);
+  },
+
+  // --- 火焰点声源 ---------------------------------------------------------
+  // 烧着的房子。**不是一条噪声**：火的听感由两层给 —— 一层持续的低频呼呼
+  // （空气被抽进火里），一层随机的爆裂（木头炸开）。缺后者就是电吹风。
+  fireSpot(A, v) {
+    const t = v.t, dur = 2.2;
+    const roar = v.Noise("brown", dur);
+    const band = v.Filter("bandpass", v.F(320), 0.8);
+    // 1.7 Hz 的慢飘：火是**呼吸**的，频心钉死立刻露馅（与 flareBurn 同一条理由）。
+    const drift = v.Osc("sine", 1.7);
+    const driftGain = v.Gain(v.F(120));
+    drift.connect(driftGain).connect(band.frequency);
+    v.Start(drift, t, dur);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t, 0.26, 0.35, dur - 1.1, 0.7);
+    roar.connect(band).connect(g).connect(v.out);
+    v.Start(roar, t, dur);
+    // 木头炸开：整段撒 12 记，各自不同频率。
+    Ticks(v, t + 0.2, 10, dur - 0.6, 1200, 4800, 0.1, 0.04, 8);
+    v.wetGain.gain.value = 0.3;
+    v.Live(dur + 0.2);
+  },
+
+  // --- 机枪远场（三条）----------------------------------------------------
+  // 与 rifleNraFar / rifleIjaFar 同一条道理：远处那一梭子不是把近处的调小，
+  // 而是只剩低频的「咚咚咚」加一条长尾。射速仍按史实排（GunAuto 的 interval）。
+  // **不走 GunAuto**：那条链有一层「机械层」（抛壳、供弹机构），两百米外根本
+  // 听不见供弹机构 —— 那是贴着枪才有的东西。少这一层同时省下三个节点，
+  // 而远场这三条与近场是**同时在响**的（交叉淡入带），预算上必须便宜。
+  zb26Far(A, v) {
+    GunFarAuto(v, { blastFreq: 380, blastLevel: 0.3, blastDecay: 0.09,
+      thumpHi: 130, thumpLo: 56, thumpLevel: 0.24,
+      tailDur: 0.6, tailLevel: 0.16, wet: 0.75 }, Clamp(v.burst ?? 3, 1, 8), 60 / 500);
+  },
+  type11Far(A, v) {
+    GunFarAuto(v, { blastFreq: 420, blastLevel: 0.28, blastDecay: 0.085,
+      thumpHi: 140, thumpLo: 60, thumpLevel: 0.22,
+      tailDur: 0.6, tailLevel: 0.15, wet: 0.75 }, Clamp(v.burst ?? 4, 1, 8), 60 / 500);
+  },
+  type92Far(A, v) {
+    GunFarAuto(v, { blastFreq: 330, blastLevel: 0.34, blastDecay: 0.11,
+      thumpHi: 115, thumpLo: 48, thumpLevel: 0.28,
+      tailDur: 0.8, tailLevel: 0.18, wet: 0.8 }, Clamp(v.burst ?? 3, 1, 8), 60 / 200);
+  },
+
+  // --- 枪尾（按空间档 × 枪种，六条）---------------------------------------
+  // 这一层是**枪声之后那条尾巴**，与枪本身分开播：同一支枪在院子里、街上、
+  // 屋里、开阔地留下的尾巴完全不同，而尾巴才是玩家读「我在什么地方打枪」的依据。
+  // 分开的另一半理由是节点账：尾巴可以被预算闸单独丢掉，枪声不能。
+  //
+  // 早期反射一律**两记封顶**，屋里与街巷的差别写在**延迟与强度**上，不写在条数上：
+  //   街巷 —— 两侧墙相距几米，反射在 15—25 ms 上，比直达声轻一半；
+  //   屋里 —— 墙就在一米开外，反射挤在 5—12 ms 上，强度几乎与直达声相当。
+  // 原来屋内那两条各建五条支路（20 个节点），实测把 Script_AudioTest 的
+  // 「逐条播一遍」压过节点预算 —— 而多出来的三记反射在 8 ms 的间隔上根本分辨不出，
+  // 花的是预算，买的是零。
+  gunTailOpenRifle(A, v) { GunTail(v, { hz: 620, dur: 1.2, level: 0.16, wet: 0.8, taps: 0 }); },
+  gunTailOpenMg(A, v) { GunTail(v, { hz: 460, dur: 1.4, level: 0.2, wet: 0.85, taps: 0 }); },
+  gunTailStreetRifle(A, v) {
+    GunTail(v, { hz: 900, dur: 0.7, level: 0.2, wet: 0.5, taps: 2, tapGap: 0.011, tapLevel: 0.4 });
+  },
+  gunTailStreetMg(A, v) {
+    GunTail(v, { hz: 700, dur: 0.85, level: 0.24, wet: 0.55, taps: 2, tapGap: 0.011, tapLevel: 0.44 });
+  },
+  gunTailInteriorRifle(A, v) {
+    GunTail(v, { hz: 1400, dur: 0.45, level: 0.26, wet: 0.32, taps: 2, tapGap: 0.0045, tapLevel: 0.72 });
+  },
+  gunTailInteriorMg(A, v) {
+    GunTail(v, { hz: 1100, dur: 0.5, level: 0.3, wet: 0.36, taps: 2, tapGap: 0.0045, tapLevel: 0.78 });
+  },
 };
 
 /** 对外暴露的音效名清单，给冒烟测试与关卡编辑器用。 */
 export const SOUND_NAMES = Object.keys(RECIPES);
+
+/**
+ * 枪尾（接线批 INT4 的六条 gunTail* 共用）。
+ *
+ * 一条按空间档变形的衰减噪声：开阔地是稀疏而长的散开，街巷是几记离散的早期反射
+ * 之后很快糊掉，屋里几乎只剩那几记反射本身（墙太近，时间差不到 10 ms）。
+ * 早期反射用 taps 条延迟支路做 —— 卷积混响给不了这个：那一层是**弥散**的，
+ * 而「墙就在旁边」恰恰要的是听得出个数的几下。
+ *
+ * 定义写在 RECIPES 之后：函数声明会提升，配方运行时它一定已经存在，
+ * 而放在这里能把这一批的改动全部收在文件尾部（与并行改引擎的那一批不打架）。
+ */
+function GunTail(v, { hz, dur, level, wet, taps, tapGap = 0.0075, tapLevel = 0.42 }) {
+  const t = v.t;
+  const src = v.Noise("brown", dur);
+  const lp = v.Filter("lowpass", v.F(hz), 0.7);
+  Glide(lp.frequency, t, v.F(hz), v.F(Math.max(160, hz * 0.35)), dur * 0.8);
+  const g = v.Gain(FLOOR);
+  Hit(g.gain, t, level, 0.02, dur);
+  src.connect(lp).connect(g).connect(v.out);
+  v.Start(src, t, dur);
+  // 早期反射：6—38 ms 上几记离散的强反射（与 BuildImpulse 的 street IR 同一组延迟）。
+  // **全部支路共用一条低通**：反射比直达声闷是因为多走了一趟墙面，
+  // 而那趟墙面对每一记反射是一样的 —— 每条支路各挂一条滤波器听感上分辨不出，
+  // 只是白花节点（屋内那两条因此从 20 个降到 16 个，实测预算峰值差得出来）。
+  if (taps > 0) {
+    const tapLp = v.Filter("lowpass", v.F(hz * 0.8), 0.6);
+    tapLp.connect(v.out);
+    for (let i = 0; i < taps; i += 1) {
+      const delay = v.Delay(0.005 + i * tapGap + v.rng() * 0.003);
+      const tapGain = v.Gain(tapLevel / (i + 1));
+      g.connect(delay).connect(tapGain).connect(tapLp);
+    }
+  }
+  v.wetGain.gain.value = wet;
+  v.Live(dur + 0.25);
+}
+
+/**
+ * 机枪的**远场**连发（zb26Far / type11Far / type92Far）。
+ *
+ * 与 GunAuto 的差别只有一处，但那一处是有理由的：**没有机械层**。
+ * 抛壳与供弹机构是贴着枪才听得见的东西，两百米外只剩下爆音、低频冲击与尾巴。
+ * 少这一层同时把节点从 14 降到 10 —— 远场与近场在 45—130 m 的交叉带里是
+ * **同时在响**的，两条链一起进预算，所以远场这一条必须便宜。
+ */
+function GunFarAuto(v, p, shots, interval) {
+  const t0 = v.t;
+  const span = interval * (shots - 1);
+  const srcDur = span + 0.25;
+
+  const blast = v.Noise("white", srcDur);
+  const band = v.Filter("bandpass", v.F(p.blastFreq), 1.0);
+  const blastGain = v.Gain(FLOOR);
+  blast.connect(band).connect(blastGain).connect(v.out);
+
+  const thump = v.Osc("sine", v.F(p.thumpHi));
+  const thumpGain = v.Gain(FLOOR);
+  thump.connect(thumpGain).connect(v.out);
+
+  for (let i = 0; i < shots; i += 1) {
+    const at = t0 + i * interval;
+    Hit(blastGain.gain, at, p.blastLevel * v.R(0.88, 1.06), 0.001, p.blastDecay);
+    Glide(thump.frequency, at, v.F(p.thumpHi * v.R(0.96, 1.04)), v.F(p.thumpLo), 0.11);
+    Hit(thumpGain.gain, at, p.thumpLevel, 0.002, 0.11);
+  }
+  v.Start(blast, t0, srcDur);
+  v.Start(thump, t0, srcDur);
+
+  const tail = v.Noise("brown", span + p.tailDur + 0.1);
+  const tailLp = v.Filter("lowpass", v.F(620), 0.6);
+  const tailGain = v.Gain(FLOOR);
+  Swell(tailGain.gain, t0 + 0.02, p.tailLevel, 0.03, span, p.tailDur);
+  tail.connect(tailLp).connect(tailGain).connect(v.out);
+  v.Start(tail, t0 + 0.02, span + p.tailDur + 0.1);
+
+  v.wetGain.gain.value = p.wet;
+  v.Live(span + p.tailDur + 0.35);
+}
 
 // 连发武器的默认点射长度。游戏逻辑若逐发驱动，传 { burst: 1 } 即可。
 const BURST_DEFAULT = { zb26: 3, type11: 4, type92: 3 };
@@ -1817,6 +2236,17 @@ const BURST_DEFAULT = { zb26: 3, type11: 4, type92: 3 };
 const LOW_PRIORITY = new Set([
   "footstepDirt", "footstepRubble", "impactDirt", "impactBrick",
   "impactWood", "shellDrop",
+  // --- 接线批 INT4（2026-09-08）-------------------------------------------
+  // 新接的四类脚步与全部身体 / 装具 foley 同一档：丢一记没人发现。
+  // **bulletCrack / bulletWhizz / ricochet 故意不列进来** —— 弹啸是「有人在打我」
+  // 的唯一线索，把它列进「预算紧张先丢」，等于交火最激烈时玩家反而听不出被瞄着；
+  // 它的节流由 Data_Tuning_Audio.NEAR_MISS 那三个数管（同帧 2 条 / 100 ms 3 条），
+  // 那是**限速**，不是「有位置才响」。
+  "footstepWood", "footstepStone", "footstepGrass", "footstepMud",
+  "clothMove", "gearRattle", "debrisFall",
+  // 枪尾同理：它是枪声后面那一层，丢了只损失空间感，不损失「有人开枪」这件事。
+  "gunTailOpenRifle", "gunTailOpenMg", "gunTailStreetRifle", "gunTailStreetMg",
+  "gunTailInteriorRifle", "gunTailInteriorMg",
 ]);
 const LOW_PRIORITY_HEADROOM = 0.62;
 
@@ -1975,6 +2405,25 @@ const NODE_COST = {
   painMoan: 7, hitGrunt: 7, planeDive: 7, flareOut: 6,
   // 会飞的引擎持续声：三个振荡器 + 拍频 LFO + 滤波 + 两个 gain，整条航线只有一条。
   planeDrone: 9,
+  // --- 接线批 INT4（2026-09-08）：照各自建了几个节点数出来，再往上留两格 -----
+  // 这一档里 **bulletCrack 是要紧的那一条**：它按每一发结算，一梭子机枪能在
+  // 100 ms 内请求三条（限速见 Data_Tuning_Audio.NEAR_MISS）。写小了会让弹啸挤掉枪声。
+  bulletCrack: 9, bulletWhizz: 5, ricochet: 7, impactStone: 11,
+  footstepWood: 7, footstepStone: 8, footstepGrass: 8, footstepMud: 8,
+  clothMove: 5, gearRattle: 8, breathHeavy: 5, bodyLand: 11,
+  grenadeBounce: 7, grenadeRoll: 8,
+  explosionMid: 11, debrisFall: 8,
+  // 一直烧着的东西：同时最多四条（FIRE_SPOT.maxVoices），四条就是 40 个节点，
+  // 已经是三分之一预算 —— 这也是那个 4 的由来。
+  fireSpot: 10,
+  // 远场三条走 GunFarAuto（没有机械层），比近场的 GunAuto 少四个节点。
+  zb26Far: 10, type11Far: 10, type92Far: 10,
+  // 枪尾：开阔地只有一条衰减噪声；街巷与屋内各两记早期反射（共用一条低通），
+  // 差别在延迟与强度不在条数 —— 见 GunTail 的注释，那也是这一批全部压到 ≤ 11 的原因：
+  // 逐条播一遍（Script_AudioTest）时，一条 20 节点的音会在预算最紧的时刻被丢掉。
+  gunTailOpenRifle: 5, gunTailOpenMg: 5,
+  gunTailStreetRifle: 10, gunTailStreetMg: 10,
+  gunTailInteriorRifle: 10, gunTailInteriorMg: 10,
 };
 const DEFAULT_COST = 19;
 
@@ -2002,6 +2451,28 @@ const MIX_GAIN = {
   // 回执不空间化，整条链上没有距离衰减也没有空气低通，配平只能靠这里。
   // 0.55 是"枪响完那 40 ms 的空当里听得见、但绝不盖过枪声"的量。
   hitConfirm: 0.55, killConfirm: 0.62,
+  // --- 接线批 INT4（2026-09-08）的合成回落配平 -----------------------------
+  // 只对**合成那一层**有效：采样盖上去之后 LoadSfxPack 会把 MIX_GAIN[cue] 重写成
+  // SAMPLE_MIX[cue] ?? 1（见 LoadSfxPack）。素材落地时那张表要一起补，
+  // 不补的话新 cue 会以 1.0 出场，比脚步响四倍。
+  //
+  // 弹啸要**站得很高**：它是「有人在打我」这件事的唯一线索，
+  // 而它只有十几毫秒 —— 与枪声同一个响度它仍然会被盖过去。
+  bulletCrack: 1.35, bulletWhizz: 1.1, ricochet: 1.2,
+  impactStone: 1.5,
+  // 脚步与身体 foley 一律压到脚步那一档：每秒响一两下的东西不能与枪声同量级。
+  footstepWood: 1.0, footstepStone: 1.0, footstepGrass: 1.1, footstepMud: 1.0,
+  clothMove: 1.6, gearRattle: 1.6, breathHeavy: 1.4, bodyLand: 0.8,
+  // 手榴弹落在脚边那两声是**玩法反馈**（还有几秒、往哪儿躲），要听得见。
+  grenadeBounce: 2.2, grenadeRoll: 2.0,
+  explosionMid: 1.0, debrisFall: 1.3,
+  // 一直在响的东西按 flareBurn 那一档（比脚步略高），不按事件配平。
+  fireSpot: 0.9,
+  zb26Far: 2.0, type11Far: 2.0, type92Far: 2.0,
+  // 枪尾是**贴在枪声后面的一层**，不是独立的声音：站高了就成了两枪。
+  gunTailOpenRifle: 0.9, gunTailOpenMg: 0.9,
+  gunTailStreetRifle: 0.9, gunTailStreetMg: 0.9,
+  gunTailInteriorRifle: 0.9, gunTailInteriorMg: 0.9,
 };
 
 // ===========================================================================
@@ -2107,6 +2578,14 @@ const SAMPLE_BURST = {
   zb26: 60 / 500,      // 捷克式 500 rpm
   type11: 60 / 500,    // 十一年式 500 rpm
   type92: 60 / 200,    // 九二式 200 rpm ——「啄木鸟」的间隔
+  // --- 接线批 INT4（2026-09-08）：三挺机枪的远场 --------------------------
+  // **射速与近场是同一组数**（同一挺枪，只是听的位置换了）。
+  // 登记在这儿还有一件副作用是要的：CullDistance 会因此把这三条按枪声那一档
+  // （GUN_CULL_M 160 m）剔除，而不是按默认的 400 m —— 它们本来就是远场那一层，
+  // 再往外没有任何东西还在变化。
+  zb26Far: 60 / 500,
+  type11Far: 60 / 500,
+  type92Far: 60 / 200,
 };
 
 /**
@@ -2168,6 +2647,25 @@ const SAMPLE_WET = {
   // 远近是两条真的录音，湿度也要分开：300 m 外那一梭子的价值全在尾巴上。
   planeDive: 0.5, strafeFar: 0.55, strafeNear: 0.35, strafeDirt: 0.25,
   mgOverheat: 0.1, mgCharge: 0.1,
+  // --- 接线批 INT4（2026-09-08）-------------------------------------------
+  // 三条铁律照旧：**贴身的动作几乎全干**（给了混响就成了「隔壁有人在动」），
+  // **远处的东西几乎全湿**，**一直在响的东西介于两者之间**。
+  // 弹啸最极端：它从你耳朵边上过去，给 0.1 已经偏多 —— 只是完全干听着像在耳机里。
+  bulletCrack: 0.1, bulletWhizz: 0.12,
+  // 跳弹反过来：削飞出去的弹头是往巷子深处走的，尾巴正是「它飞哪儿去了」。
+  ricochet: 0.4, impactStone: 0.3,
+  footstepWood: 0.14, footstepStone: 0.24, footstepGrass: 0.08, footstepMud: 0.06,
+  clothMove: 0.05, gearRattle: 0.05, bodyLand: 0.12,
+  breathHeavy: 0,                    // 自己的肺没有房间
+  grenadeBounce: 0.3, grenadeRoll: 0.28,
+  explosionMid: 0.55, debrisFall: 0.2,
+  fireSpot: 0.3,
+  zb26Far: 0.55, type11Far: 0.55, type92Far: 0.6,
+  // 枪尾本身就是「房间的回答」：再往卷积混响里送一份等于房间套房间。
+  // 开阔地那两条例外 —— 那里没有早期反射可做，尾巴只能由混响给。
+  gunTailOpenRifle: 0.8, gunTailOpenMg: 0.85,
+  gunTailStreetRifle: 0.5, gunTailStreetMg: 0.55,
+  gunTailInteriorRifle: 0.32, gunTailInteriorMg: 0.36,
 };
 
 /**
@@ -2206,6 +2704,11 @@ const AMB_AIR = {   // → Play 的 airCut
   // 撒进 AMBIENCE_PRESETS.events 的那一刻这两行才起作用；先备着，
   // 免得接线侧只加了事件、忘了这一层，于是远处那一梭子带着全套高频蹦出来。
   strafeFar: 1100, planeDive: 2200,
+  // --- 接线批 INT4（2026-09-08）：三挺机枪的远场 --------------------------
+  // 与近场那三行（zb26 1100 / type92 1000 / type11 1100）差一档：
+  // 远场素材录于更远处，本来就该更闷。同样只在**没有 position** 地撒进环境床时
+  // 才起作用；接线侧带着位置播时空气低通由 Play 按距离自己算。
+  zb26Far: 950, type11Far: 950, type92Far: 850,
 };
 
 /**
