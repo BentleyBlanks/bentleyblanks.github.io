@@ -297,13 +297,21 @@ def Main():
         row.update(status='authored_candidate_requires_scene_clearance_review',previewId='TrainAisleSideStepAuthored',newAuthoredCandidates=candidates,
             visualAssessment=assessment,blockers=assessment['blockers'])
         row['reviewEvidence'].extend(f'Models/{folder.name}/'+name for name in ['Data_AuthoredBake.json','Data_ExportValidation.json','Data_EditableProjectValidation.json','Data_VisualAssessment.json'])
-    stairDelivery=root/'Models/FirstLevelStairAuthorV1/Data_DeliveryStatus.json'
-    if stairDelivery.exists():
+    stairGroups=sorted((p for p in (root/'Models').glob('FirstLevelStairAuthorV*') if (p/'Data_DeliveryStatus.json').exists()),key=lambda p:int(p.name.split('V')[-1]))
+    if stairGroups:
+        stairDelivery=stairGroups[-1]/'Data_DeliveryStatus.json'
         stair=Read(stairDelivery)
         row=next(r for r in rows if r['requirementId']=='FL21')
         row['authoredStairWorkInProgress']=stair
         row['reviewEvidence'].append(stairDelivery.relative_to(root).as_posix())
-        row['blockers'].append('Four-tread authored GLBs are delivered as unverified work in progress. Export check was stopped at user request; editable projects, three-pane registration and physical queue integration are not complete.')
+        versions=stairDelivery.with_name('Data_Versions.json')
+        if versions.exists():
+            variants=Read(versions)['actions'][0]['variants']
+            row['newAuthoredCandidates']=[dict(variantId=v['id'],path=v['path'],modelSha256=Hash(root/v['path']),blend=v['blend'],
+                clip=v['clip'],status=v['status'],review=v['review'],previewUrl='http://127.0.0.1:8136/Preview/index.html?action=TrainStairDescentAuthored') for v in variants]
+            row['blockers'].append('Four-tread authored models, editable projects and held-source preview are available. Remaining: natural arm/weight transitions, other-car terrain landing profiles and optional physical queue integration. No new regression was run.')
+        else:
+            row['blockers'].append('Four-tread authored GLBs are unverified work in progress; editable projects, three-pane registration and physical queue integration are not complete.')
     gameVersion=Read(project/'Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json')['version']
     assert re.fullmatch(r'FirstLevelTrainGameV[1-9]\d*',gameVersion)
     gameReport=root/'Models'/gameVersion/'Data_GameIntegration.json'

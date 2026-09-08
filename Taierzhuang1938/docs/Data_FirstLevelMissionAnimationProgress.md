@@ -363,3 +363,7 @@ node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --audio --campaign
 后续流程版本已提供 [源录音对齐表](../Data_FirstLevelMissionVoiceAlignment.mjs) 与 [播放段／事件表](../Data_FirstLevelMissionVoiceTiming.mjs)。下一批动作接入使用这两个最新接口；上面的 V9 未启用状态与原批验证结果保持不变。
 
 首战运行时接力注意：第一关已将 8 名撤退守军提前布置，等待时还击、受压伏低、通过后分散停留；具名同伴走向各自射击踏步。机枪射手随枪托调整位置。替换动画须保留这些实际运动、目标、开火与接触事件，不把它们烘成固定播放时间轴。
+
+### 四级下车 V2 与跨电脑接力（2026-09-08）
+
+`FirstLevelStairAuthorV2` 已补齐四个 GLB、四个可编辑并重开的 Blender 工程，以及独立三栏预览。48 张出图中实际查看五张；原片与 raw 固定在 7.9666667 秒来源站姿。没有新增视频或整关回归。上肢／重心自然度、另两车落地适配及可选游戏队列绑定仍待完成，不能认定完整 FL21 已完成。V1 工作稿保留。另一台电脑续做时见[跨电脑接力点](Data_FirstLevelAnimationHandoff.md)，须同时同步完整私有库，GitHub 不包含候选大文件。

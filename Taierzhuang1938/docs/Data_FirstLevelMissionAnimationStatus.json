@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "updated": "2026-09-08",
-  "recordedUtc": "2026-09-08T05:15:07.656001+00:00",
-  "baseCommit": "15225ff7ca721693c8885c2ed36b11dfd02fabc7",
+  "recordedUtc": "2026-09-08T05:27:03.415651+00:00",
+  "baseCommit": "e864e09d34a8d30d79a60c1a9add53d531b44544",
   "missionContract": {
     "version": "first-level-20260907-r12",
     "stages": [
@@ -437,8 +437,8 @@
     }
   },
   "libraryRoot": "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼",
-  "catalogSha256": "7aef343a9483c9156a5a3dcb574fba3db31f2ebbb14badb6f040f07a35db8c0e",
-  "requirementsSha256": "9b1e3b469a3ad37d367c62c95e4596c6f1a7eb8bc764c61414714a5a69acb179",
+  "catalogSha256": "5abf266e666675138c037f298f8ca7d6f63d1339c0123b27537cc847d347909d",
+  "requirementsSha256": "b14fd206144709f7e0a425c08c52645252a3757bce7c42dac9c2c5b0e01909dd",
   "missionBaselineFiles": {
     "Data_FirstLevelMission.mjs": "933174877ea1595b60221e57fd3d0a46e0431ce60ab08460c3ee8267e09ab44b",
     "Data_FirstLevelMissionDialogue.mjs": "a62830fc97fedc1f5df3aacf0664c89edada411ae7689e1dbdaf3164550a5cda",
@@ -1037,7 +1037,7 @@
       "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources",
       "C:/Users/Bentl/Downloads/GVHMR"
     ],
-    "catalogActions": 96,
+    "catalogActions": 97,
     "newVideoGenerations": 60,
     "newInferenceRuns": 43
   },
@@ -25734,13 +25734,13 @@
         "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra02.json",
         "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra03.json",
         "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra04.json",
-        "Models/FirstLevelStairAuthorV1/Data_DeliveryStatus.json",
+        "Models/FirstLevelStairAuthorV2/Data_DeliveryStatus.json",
         "Models/FirstLevelTrainGameV2/Data_GameIntegration.json"
       ],
       "blockers": [
         "Other generated source targets require dense source review and recovery; first-pass retakes remain explicit.",
         "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted.",
-        "Four-tread authored GLBs are delivered as unverified work in progress. Export check was stopped at user request; editable projects, three-pane registration and physical queue integration are not complete.",
+        "Four-tread authored models, editable projects and held-source preview are available. Remaining: natural arm/weight transitions, other-car terrain landing profiles and optional physical queue integration. No new regression was run.",
         "The frozen full campaign validates the previous runtime. Current upstream compatibility evidence has its own scope; it does not replace a current full campaign.",
         "Only the recorded carriage subset is enabled; dedicated life gestures, prop/finger contact and stair-down are still pending."
       ],
@@ -26827,37 +26827,257 @@
       ],
       "newVideoSubmissionRequired": false,
       "authoredStairWorkInProgress": {
-        "status": "work_in_progress_uploaded_without_regression",
+        "status": "candidate_packaged_for_cross_machine_review",
         "frozen": true,
         "acceptedForGame": false,
-        "recordedUtc": "2026-09-08T05:15:03.079583+00:00",
+        "recordedUtc": "2026-09-08T05:26:57.173345+00:00",
+        "sourcePoseSeconds": 7.966666666666667,
+        "authoredScope": "Frozen stand endpoint reused. Ten cautious step-to foot placements and pelvis descent are authored against four actual tread boxes; source/raw remain fixed.",
         "models": [
           {
-            "path": "Models/FirstLevelStairAuthorV1/Model_LugouNra01StairDescent.glb",
+            "path": "Models/FirstLevelStairAuthorV2/Model_LugouNra01StairDescent.glb",
             "sha256": "3d419739f97f194341500b26276d5b454ed7495fa53d03660bcda75a773d58a2"
           },
           {
-            "path": "Models/FirstLevelStairAuthorV1/Model_LugouNra02StairDescent.glb",
+            "path": "Models/FirstLevelStairAuthorV2/Model_LugouNra02StairDescent.glb",
             "sha256": "c8b797c653fd8aa6f0d9eac149f4d656f20007e462190cd38b1a763c1cb87b92"
           },
           {
-            "path": "Models/FirstLevelStairAuthorV1/Model_LugouNra03StairDescent.glb",
+            "path": "Models/FirstLevelStairAuthorV2/Model_LugouNra03StairDescent.glb",
             "sha256": "2b59f5e751eba8e83bbfa0530e9c28254ad36b88cc5156ccd65e00449fe1f24f"
           },
           {
-            "path": "Models/FirstLevelStairAuthorV1/Model_LugouNra04StairDescent.glb",
+            "path": "Models/FirstLevelStairAuthorV2/Model_LugouNra04StairDescent.glb",
             "sha256": "ff14d45adb8d73bcb8fad3197a5c8dd6057a935e982db280b75f6b9e1d55289f"
           }
         ],
-        "sourcePoseSeconds": 7.966666666666667,
-        "source": "FirstLevelTrainSupportV2: original standing endpoint; no new video or recovery.",
-        "authoredScope": "Frozen stand endpoint reused. Ten cautious step-to foot placements and pelvis descent are authored against four actual tread boxes; source/raw remain fixed.",
-        "exportVerification": "Interrupted at user request; no passing claim.",
-        "editableProject": null,
-        "threePanePreview": null,
+        "editableProject": [
+          {
+            "id": "LugouNra01",
+            "mode": "StairDescent",
+            "model": "Models/FirstLevelStairAuthorV2/Model_LugouNra01StairDescent.glb",
+            "modelSha256": "3d419739f97f194341500b26276d5b454ed7495fa53d03660bcda75a773d58a2",
+            "blend": "Blender/FirstLevelStairAuthorV2/Scene_LugouNra01StairDescent.blend",
+            "blendSha256": "6dddc9e6b3310d0be1b9c3f033d0569c3f85050069bf98e326cf68daab473895",
+            "reopened": true,
+            "animatedArmatures": 1
+          },
+          {
+            "id": "LugouNra02",
+            "mode": "StairDescent",
+            "model": "Models/FirstLevelStairAuthorV2/Model_LugouNra02StairDescent.glb",
+            "modelSha256": "c8b797c653fd8aa6f0d9eac149f4d656f20007e462190cd38b1a763c1cb87b92",
+            "blend": "Blender/FirstLevelStairAuthorV2/Scene_LugouNra02StairDescent.blend",
+            "blendSha256": "ee4a978799b96b0a362644af80ee86db521dd3ea877c67894c28c6ea2541da8c",
+            "reopened": true,
+            "animatedArmatures": 1
+          },
+          {
+            "id": "LugouNra03",
+            "mode": "StairDescent",
+            "model": "Models/FirstLevelStairAuthorV2/Model_LugouNra03StairDescent.glb",
+            "modelSha256": "2b59f5e751eba8e83bbfa0530e9c28254ad36b88cc5156ccd65e00449fe1f24f",
+            "blend": "Blender/FirstLevelStairAuthorV2/Scene_LugouNra03StairDescent.blend",
+            "blendSha256": "c17ede8f3148de5894186d83cea8fe207afce47c53b09509f46b7facbf8b7a4a",
+            "reopened": true,
+            "animatedArmatures": 1
+          },
+          {
+            "id": "LugouNra04",
+            "mode": "StairDescent",
+            "model": "Models/FirstLevelStairAuthorV2/Model_LugouNra04StairDescent.glb",
+            "modelSha256": "ff14d45adb8d73bcb8fad3197a5c8dd6057a935e982db280b75f6b9e1d55289f",
+            "blend": "Blender/FirstLevelStairAuthorV2/Scene_LugouNra04StairDescent.blend",
+            "blendSha256": "14b2dc9066877103c0da4690b0ae15f4a0dd8d66397b75dc392291d30593f3b6",
+            "reopened": true,
+            "animatedArmatures": 1
+          }
+        ],
+        "threePanePreview": "http://127.0.0.1:8136/Preview/index.html?action=TrainStairDescentAuthored",
+        "previewCaptures": 48,
+        "previewErrors": [],
+        "regressionTestRun": false,
         "runtimeEnabled": false,
-        "note": "Four 12-second GLBs were authored. They remain unverified work in progress; no editable .blend or new three-pane registration has been made. Existing TrainStairDisembark preview is a separate earlier candidate."
-      }
+        "visualReadImages": [
+          {
+            "path": "Preview/FirstLevelStairAuthorV2/Texture_LugouNra01_side_1250.png",
+            "sha256": "22ea7d815b4bd25605ca6fc3828faddc57c95b95ce68cd13a4f872b414b47fe5"
+          },
+          {
+            "path": "Preview/FirstLevelStairAuthorV2/Texture_LugouNra01_side_4600.png",
+            "sha256": "85d545d506a78f6df23d111fb669c768d7af401443ca41fb482e194a66b9dff5"
+          },
+          {
+            "path": "Preview/FirstLevelStairAuthorV2/Texture_LugouNra01_side_9300.png",
+            "sha256": "a927dda00042e76ba58890d75bfda633fc00fb49bab5627aa6eadd754dba7313"
+          },
+          {
+            "path": "Preview/FirstLevelStairAuthorV2/Texture_LugouNra01_front_11800.png",
+            "sha256": "f8d638724d4edfc11a484dbbaceb418ff0beb1d2d6bf457b3b0132f690201e9a"
+          },
+          {
+            "path": "Preview/FirstLevelStairAuthorV2/Texture_LugouNra04_side_7250.png",
+            "sha256": "e54ade7c9119a74f8177d4398cecbeb0b084f77a91c9d1fdaa975bcf9378cbc4"
+          }
+        ],
+        "observed": "Viewed five captures: the character descends successive treads and settles at the landing. Arms remain largely static; this is a cautious step-to candidate, not a final crowd disembark performance.",
+        "remaining": [
+          "Natural arm/weight transitions and crowd rhythm.",
+          "Separate landing adaptation for car 1 and car 2 terrain heights.",
+          "Optional physical queue binding; unchanged actor counts, dialogue and routes."
+        ],
+        "note": "Four models and editable projects exist and reopen. Forty-eight images were captured; five inspected. No dense export verification or new campaign regression was run."
+      },
+      "newAuthoredCandidates": [
+        {
+          "variantId": "Nra-v2-LugouNra01-TrainStairDescentAuthored",
+          "path": "Models/FirstLevelStairAuthorV2/Model_LugouNra01StairDescent.glb",
+          "modelSha256": "3d419739f97f194341500b26276d5b454ed7495fa53d03660bcda75a773d58a2",
+          "blend": "Blender/FirstLevelStairAuthorV2/Scene_LugouNra01StairDescent.blend",
+          "clip": "FirstLevelTrainStairDescent",
+          "status": "作者候选 · 可编辑 · 尚未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片和 raw 仅展示已恢复的站稳来源；四级下降、脚步和骨盆位移均为后期制作。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": 0,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelStairAuthorV2/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen stand endpoint reused. Ten cautious step-to foot placements and pelvis descent are authored against four actual tread boxes; source/raw remain fixed.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 7.966666666666667
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainStairDescentAuthored"
+        },
+        {
+          "variantId": "Nra-v2-LugouNra02-TrainStairDescentAuthored",
+          "path": "Models/FirstLevelStairAuthorV2/Model_LugouNra02StairDescent.glb",
+          "modelSha256": "c8b797c653fd8aa6f0d9eac149f4d656f20007e462190cd38b1a763c1cb87b92",
+          "blend": "Blender/FirstLevelStairAuthorV2/Scene_LugouNra02StairDescent.blend",
+          "clip": "FirstLevelTrainStairDescent",
+          "status": "作者候选 · 可编辑 · 尚未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片和 raw 仅展示已恢复的站稳来源；四级下降、脚步和骨盆位移均为后期制作。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": 0,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelStairAuthorV2/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen stand endpoint reused. Ten cautious step-to foot placements and pelvis descent are authored against four actual tread boxes; source/raw remain fixed.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 7.966666666666667
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainStairDescentAuthored"
+        },
+        {
+          "variantId": "Nra-v2-LugouNra03-TrainStairDescentAuthored",
+          "path": "Models/FirstLevelStairAuthorV2/Model_LugouNra03StairDescent.glb",
+          "modelSha256": "2b59f5e751eba8e83bbfa0530e9c28254ad36b88cc5156ccd65e00449fe1f24f",
+          "blend": "Blender/FirstLevelStairAuthorV2/Scene_LugouNra03StairDescent.blend",
+          "clip": "FirstLevelTrainStairDescent",
+          "status": "作者候选 · 可编辑 · 尚未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片和 raw 仅展示已恢复的站稳来源；四级下降、脚步和骨盆位移均为后期制作。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": 0,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelStairAuthorV2/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen stand endpoint reused. Ten cautious step-to foot placements and pelvis descent are authored against four actual tread boxes; source/raw remain fixed.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 7.966666666666667
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainStairDescentAuthored"
+        },
+        {
+          "variantId": "Nra-v2-LugouNra04-TrainStairDescentAuthored",
+          "path": "Models/FirstLevelStairAuthorV2/Model_LugouNra04StairDescent.glb",
+          "modelSha256": "ff14d45adb8d73bcb8fad3197a5c8dd6057a935e982db280b75f6b9e1d55289f",
+          "blend": "Blender/FirstLevelStairAuthorV2/Scene_LugouNra04StairDescent.blend",
+          "clip": "FirstLevelTrainStairDescent",
+          "status": "作者候选 · 可编辑 · 尚未游戏接入",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "原片和 raw 仅展示已恢复的站稳来源；四级下降、脚步和骨盆位移均为后期制作。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": 0,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelStairAuthorV2/Data_AuthoredBake.json",
+            "retargetNotes": "Frozen stand endpoint reused. Ten cautious step-to foot placements and pelvis descent are authored against four actual tread boxes; source/raw remain fixed.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 7.966666666666667
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainStairDescentAuthored"
+        }
+      ]
     },
     {
       "requirementId": "FL22",
