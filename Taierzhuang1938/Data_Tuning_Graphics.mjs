@@ -1,5 +1,11 @@
 // 《台儿庄：血战滕县》画质档位表（纯数据，零 three 依赖 —— 契约 2）。
 //
+// **口径文档：`docs/Data_TechRenderPipeline.md` §1.10「Data_Tuning_Graphics 结构」**
+// （这张表在帧图里的角色），分档实测与自动降档在 §17，逐子系统的档位表在各自那一章
+// （§2 大气 / §4 SSR / §5 GTAO / §6 阴影 / §7 材质 / §8 体积雾 / §9 TAAU / §10 曝光 /
+// §15 簇光）。**加一个 pass 先在这里加一位开关（四档都要给值），再去 §1.11 走登记路。**
+// 跨系统契约见项目 AGENTS.md 第 12 条。
+//
 // 这张表是**渲染帧图唯一的开关与旋钮来源**：`Script_Post.mjs` 的编排器按它决定
 // 每个 pass 建不建靶、跑不跑；`Script_Main.mjs` 与 `Script_EditorSettings.mjs`
 // 只读，不写。想加一个 pass，先在这里加一位开关（四档都要给值），再去帧图里插一行。
@@ -17,8 +23,8 @@
 //        高低档都开：它们是后续 SSR / 体积雾 / 接触阴影的公共输入，
 //        关掉等于把八个并行子系统一起关掉；真要省，先关消费方。
 //   · ssr / ssrScale / ssrSteps / ssrResolveTaps —— 2026-09 屏幕空间反射落地。
-//        档位口径见 §「SSR 分档」注释与 docs/Data_TechRenderPipeline.md
-//        「屏幕空间反射」一节；不随天光预设变。
+//        档位口径见 §「SSR 分档」注释与 docs/Data_TechRenderPipeline.md §4
+//        「屏幕空间反射」一章；不随天光预设变。
 //   · clusteredLights —— 2026-09 簇状前向光照落地：medium 及以上开。
 //        low 保持 2026-09 之前的固定灯池（`Data_Tuning_Lights.CLUSTER_TIERS.low`
 //        的 enabled 也是 false，两处都关才是真关）。网格与光源预算不在这张表里，
@@ -37,7 +43,7 @@
 //        `aoScale` 由 0.5/0.6/0.75/1.0 改为 0.5/0.5/0.5/1.0：GTAO 的每像素成本
 //        是旧 SSAO 的两倍多（地平线搜索 + 弯曲法线 + 位掩码），而它在半分辨率上
 //        配联合双边升采样的画质仍然明显好于旧 SSAO 的 0.75 —— 详见
-//        docs/Data_TechRenderPipeline.md「GTAO / SSIL / 镜面遮蔽」一节的实测表。
+//        docs/Data_TechRenderPipeline.md §5「GTAO / SSIL / 镜面遮蔽」的实测表。
 //   · csm / contactShadows —— 2026-09 阴影子系统落地：
 //        csm 四档全开（级数、图尺寸、分割、节流、PCSS 抽样数在
 //        `Data_Tuning_Shadows.SHADOW_PRESETS`，这里只是「跑不跑」的总闸）；
@@ -45,8 +51,8 @@
 //        在集显上不值那个钱，而且 low 的阴影本来就只铺 70 m）。
 //   · pom / pomRefine / pomSelfShadow / detailNormal / microShadow /
 //     horizonOcclusion / skinSss / materialTexture —— 2026-09 材质着色升级
-//     （子系统 B7）。数值背书见 `docs/Data_TechRenderPipeline.md` 的
-//     「材质着色升级（2026-09）」一节与 `Data_Tuning_Materials.mjs`。
+//     （子系统 B7）。数值背书见 `docs/Data_TechRenderPipeline.md` §7.3 起的
+//     「材质着色升级（2026-09）」与 `Data_Tuning_Materials.mjs`。
 //     POM 的步数是**编译期常量**（进 cache key），运行时只能整档开关。
 //   · autoExposure / lensFlare / lut —— 2026-09 相机曝光轮（子系统 B6a）落地，
 //        见下面各自的注释。相机侧的数值口径（测光、EV 钳位、光晕强度、LUT 尺寸）
@@ -55,7 +61,7 @@
 //     —— **本阶段全部为占位**，值 = 与今天等价（即「不启用新东西」）。
 //        对应子系统落地时把自己那一位改成实际档位，并在这里补出处注释。
 //
-// ## 2026-09-08 分档定稿的实测（口径与全表见 docs §13）
+// ## 2026-09-08 分档定稿的实测（口径与全表见 docs §17）
 // 3394×1348 输出、`?shot=1&phase=2&scale=small`、RTX 4070 SUPER / ANGLE-D3D11，
 // 一次 TIME_ELAPSED 罩 21 帧（级联 bakeOrder 七帧一轮，批长必须是 7 的倍数）、
 // 多轮取 min、`dt = 0` 把世界钉住：
@@ -114,7 +120,7 @@
  *                 2026-09-08 集成期实测（3394×1348 输出 / high / phase=2，14 轮 A/B 交替、
  *                 逐轮配对差取中位数）：内部 0.8 相对 1.0 **省 3.76 ms GPU（−24.2%）**，
  *                 IQR [2.48, 5.09]、14 轮只有 1 轮负号。TAAU 把画面解算回满分辨率，
- *                 画质代价约 3 dB PSNR（见 docs §17 的 TAAU 表），所以 high 保持 0.8。
+ *                 画质代价约 3 dB PSNR（见 docs §9.9 的 TAAU 表），所以 high 保持 0.8。
  *                 重量的规矩：**输出分辨率必须钉死、只动内部**，并在每次 SetSize
  *                 之后推 24 帧滚满 TAA 历史 —— 两组一起缩量到的是别的东西。
  *   motionBlurTaps  运动模糊的重建抽样数（0 = 不建 pass 也没意义，配合 motionBlur 用）
@@ -169,7 +175,7 @@ export const QUALITY_PRESETS = {
     bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
     aoScale: 0.5, sharpen: 0.14, taa: false,
     velocity: true, hzb: true, atmosphere: true,
-    // TAA 关着就没有 TAAU，末趟做一次双线性放大。0.85 是 docs §13「自动降档」
+    // TAA 关着就没有 TAAU，末趟做一次双线性放大。0.85 是 docs §17.5「自动降档」
     // 那一段为低配档写死的那个数（「集显同时把 setPixelRatio(1) 并允许 0.85×
     // 内部分辨率 + FXAA 拉回来」）。2026-09-08 分档定稿把它从 1.0 落到 0.85：
     // low 出厂**没有** TAAU，1.0 意味着这一档反而在比 high（0.8）更多的像素上
@@ -212,7 +218,7 @@ export const QUALITY_PRESETS = {
     microShadow: true, horizonOcclusion: true, skinSss: true,
     materialTexture: 512,
     // 2026-09-08 分档定稿复核：**保持 0.75**。试过 0.70，但这一轮的实测说明
-    // 3394×1348 下整帧根本不是像素受限（见 docs §13 的分档表：四档的下界都压在
+    // 3394×1348 下整帧根本不是像素受限（见 docs §17.2 的分档表：四档的下界都压在
     // 同一个 ~11.4 ms 上，而 CPU 提交是 12–16 ms），压内部分辨率买不到时间、
     // 只买到更软的画面。真要在 medium 上再省，省的是 draw call 不是像素。
     taaUpscale: true, renderScale: 0.75,
@@ -230,7 +236,7 @@ export const QUALITY_PRESETS = {
     aoScale: 0.5, sharpen: 0.22, taa: true,
     velocity: true, hzb: true, atmosphere: true,
     // high：半分辨率 48 步 + 4 抽样 ratio estimator + 时域。这一档是性能红线所在
-    //（3394×1348 实测 hiz+trace+resolve+temporal 合计见 docs「屏幕空间反射」）。
+    //（3394×1348 实测 hiz+trace+resolve+temporal 合计见 docs §4.8）。
     ssr: true, ssrScale: 0.5, ssrSteps: 48, ssrResolveTaps: 4,
     volumetrics: true,
     csm: true, contactShadows: true,
@@ -291,7 +297,7 @@ export const HZB = { maxLevels: 8, minSize: 8 };
 export const VELOCITY = { clampUv: 0.25, skinnedPrev: true };
 
 /**
- * 自动降档（`Script_AutoQuality.mjs`）。docs §13 的那一条落地：
+ * 自动降档（`Script_AutoQuality.mjs`）。docs §17.5 的那一条落地：
  * 滑动窗口的帧间隔中位数 >20 ms 持续 2 s 降一级、<13 ms 持续 8 s 升一级、
  * **降级后锁 30 s**（避免在临界点来回抖）。
  *
@@ -306,26 +312,26 @@ export const VELOCITY = { clampUv: 0.25, skinnedPrev: true };
  * 三者都是 `ApplyGraphics` 里一句话的事，没有一处会触发 `RecompileAllMaterials`。
  *
  * ## 出厂开、面板可关
- * 它是**保底**不是画质策略：出厂配置本身已经按 docs §13 的表定过，
+ * 它是**保底**不是画质策略：出厂配置本身已经按 docs §17 的表定过，
  * 自动降档只在实际机器跑不动时才动手，并且一路只往回收 `scale`（画面变软），
  * 不动曝光、不动雾、不动阴影总闸 —— 那几样一动，画面明暗就漂了。
  */
 export const AUTO_QUALITY = {
   /** 出厂开。画质面板「分辨率与阴影」组第一行可关。 */
   enabled: true,
-  /** 滑动窗口的帧数（60 fps 下 1.5 秒）。docs §13 写的是 90。 */
+  /** 滑动窗口的帧数（60 fps 下 1.5 秒）。docs §17.5 写的是 90。 */
   window: 90,
   /** 超过它的帧间隔当作「页面被切走 / 加载卡顿」，不进窗口（与剖析器同口径）。 */
   maxIntervalMs: 250,
-  /** 中位数高于它才算「跑不动」（docs §13：20 ms）。 */
+  /** 中位数高于它才算「跑不动」（docs §17.5：20 ms）。 */
   downMedianMs: 20,
   /** 要连续满足多久才降一级（毫秒）。 */
   downSustainMs: 2000,
-  /** 中位数低于它才算「有余量」（docs §13：13 ms）。升档比降档保守。 */
+  /** 中位数低于它才算「有余量」（docs §17.5：13 ms）。升档比降档保守。 */
   upMedianMs: 13,
   /** 要连续满足多久才升一级（毫秒）。 */
   upSustainMs: 8000,
-  /** 降一级之后锁多久，期间既不降也不升（docs §13：30 s）。 */
+  /** 降一级之后锁多久，期间既不降也不升（docs §17.5：30 s）。 */
   lockMs: 30000,
   /**
    * 阶梯。第 0 级 = 出厂配置（倍率 1、什么都不摘）。

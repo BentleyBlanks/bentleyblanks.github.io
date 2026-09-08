@@ -54,131 +54,79 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --label=x   # 第一关三�
 - 来源与逐项验收见 [Data_FirstLevelRebuildAcceptance.md](Data_FirstLevelRebuildAcceptance.md)。
 
 ### 渲染管线 / GI / 灯光天空
-- `Script_Post.mjs` —— **帧图编排器**：持有有序 pass 列表与具名靶，公共 API 全在这里。
-  顺序错一条画面就「塑料」（AO 只压间接光 / 泛光在 tonemap 之前 / sRGB 在最后一趟）。
-- 帧图各段（2026-09 拆分，加 pass 只动自己那一个文件 + 编排器里插一行）：
-  `Script_PostCommon.mjs`（blit / 靶工厂 / 靶池 / `FrameContext` / pass 契约）、
-  `Script_PostPrepass.mjs`（MRT 预通道 + 速度缓冲 + HZB + 蒙皮上一帧骨矩阵）、
-  `Script_PostGtao.mjs`、`Script_PostSsr.mjs`（Hi-Z 随机 SSR）、
-  `Script_PostTaa.mjs`（TAA + **TAAU 上采样**）、
-  `Script_PostMotionBlur.mjs`（**逐物体运动模糊**：tile max → neighbor max → 重建）、
-  `Script_PostDof.mjs`（**散景景深**：CoC → near/far gather → 填洞 → 合成）、
-  `Script_PostBloom.mjs`（含太阳拖影）、
-  `Script_PostComposite.mjs`（分段 GLSL）、
-  `Script_PostFxaa.mjs`（FXAA + **CAS 锐化** + 时域三视图）、`Script_PostDebug.mjs`、
-  `Script_ContactShadows.mjs`（屏幕空间接触阴影 + 阴影系统的三张调试图）。
-- `Script_PostSsr.mjs` —— **屏幕空间反射**：自建 min-reduce Hi-Z（共享 HZB 是 max-reduce，
-  语义相反）+ GGX VNDF 随机追踪 + ratio estimator 解算 + 时域累积，另出一条「上一帧 TAA
-  解算后场景色」的 mip 链。粗糙度取自主 HDR 靶的 alpha（材质补丁写进去的免费 GBuffer）。
-  水面走同一份追踪 GLSL 自己采（它 skipNormalDepth，SSR 靶在水面位置算的是河床）。
-  口径见 `docs/Data_TechRenderPipeline.md` §17，回归口 `Script_SsrTest.mjs`。
-- `Script_PostVolumetrics.mjs` + `Data_Tuning_Volumetrics.mjs` —— **froxel 体积雾 / 体积光**
-  （注入+光照 / 沿 z 积分 / apply 三行帧图，2D 图集，时域重投影，局部雾体 `AddFogVolume`，
-  局部点光进雾）。产出 Composite 的 `uFogScatter`；对外还给 `VOLUMETRIC_SAMPLE_GLSL`
-  （粒子/水面/透明件按自身世界坐标取同一份雾）与 `VolumetricFarTransmittance`
-  （物理大气把 aerial perspective 乘上去的接口）。**能见度只许变好不许变差**是硬约束，
-  出厂 `legacyTransmittance` 让透过率与解析雾逐像素相同。口径见
-  `docs/Data_TechRenderPipeline.md` §17，回归口 `Script_VolumetricsTest.mjs`。
-- `Script_PostGtao.mjs` + `Data_Tuning_Gtao.mjs` —— **GTAO（地平线基 AO）+ 弯曲法线 +
-  SSIL（可见性位掩码近场间接光）**，2026-09 整个替换掉旧的 `Script_PostSsao.mjs`。
-  一趟地平线搜索出四个通道（R 可见度 / GB 弯曲法线八面体 / A 线性视深 / 附件 1 SSIL）；
-  多次反弹与 GTSO 镜面遮蔽在 `Script_MaterialPatches.MakeAmbientOcclusionPatch` 里做。
-  数值全在 `Data_Tuning_Gtao.mjs`（带文献出处），分档位名在 `Data_Tuning_Graphics.gtao`。
-  回归口 `Script_GtaoTest.mjs`；口径与实测见 `docs/Data_TechRenderPipeline.md` §17
-  （§4 是被它替换掉的旧 SSAO，已标历史稿）。
-- **物理相机（曝光 / 光晕 / 分级，2026-09）**：`Script_PostExposure.mjs`（直方图自动曝光
-  ＋ ACES/AgX 两条 tonemap 曲线及其 JS 镜像）、`Script_PostLensFlare.mjs`（鬼影/光环/
-  受遮挡的太阳星芒 ＋ 程序化镜头脏污）、`Script_PostGrade.mjs`（把分级数学烘成 64³ LUT，
-  包含它的 JS 镜像与 LUT 采样校验视图）；口径表 `Data_Tuning_Camera.mjs`（纯数据，含
-  测光参数、**逐关曝光锚点** `EXPOSURE_ANCHORS`、EV 钳位、光晕与 LUT 尺寸）。
-  铁律：自动曝光**全 GPU、一次 readback 都不允许**；增益锤在每关出生机位的实测亮度上，
-  所以打开它不改变默认机位的亮度（改关卡布设/天光后要重跑 `--calibrate`）。
-- **TAAU / 运动模糊 / 散景景深（2026-09）**：`Script_PostTaa.mjs` 吃速度靶解算到输出网格，
-  `Script_PostMotionBlur.mjs` / `Script_PostDof.mjs` 两个新 pass，口径表
-  `Data_Tuning_TemporalDof.mjs`；`Script_PostFxaa.mjs` 的锐化换成 CAS。
-- **两组分辨率**（2026-09 TAAU）：`post.width/height` 是**内部分辨率**、
-  `post.outputWidth/outputHeight` 是**输出分辨率**，分界线在 `Script_Post.OUTPUT_DOMAIN_PASSES`
-  （TAA 起 + 泛光/拖影/光晕/合成/送屏在输出域；预通道 / HZB / SSR / GTAO / 接触阴影 /
-  体积雾 / ssilHistory / ssrColor 仍在内部域）。只读 `ctx.width/height` 的 pass 不用改；
-  逐 pass 的域表见 `docs/Data_TechRenderPipeline.md` §17 的「分辨率域」一节。
-- `Data_Tuning_Graphics.mjs` —— 画质档位表（纯数据，零 three）：每档每个 pass 的开关与旋钮，
-  外加 `HZB` / `VELOCITY` 两组常量。`Script_Post` / `Script_Main` / `Script_EditorSettings` 只读它。
-- `Data_Tuning_TemporalDof.mjs` —— TAAU / 运动模糊 / 景深 / CAS 的**算法口径**（纯数据）：
-  快门比例、方差裁剪 γ、anti-flicker、responsive 权重、薄透镜光圈、CAS 峰值。
-  与画质档位表的分工：那张表管「这台机器画多重」，这张管「算法怎么算」。
-- `Script_MaterialPatches.mjs` —— **材质补丁注册表**：所有往 `MeshStandardMaterial` 插 GLSL 的
-  事都走它（ORM 三合一 / AO / GI 三态 / CSM / SSR / **簇状局部光** / **材质着色升级** /
-  破口裁切，顺序固定），一个 `onBeforeCompile` 做完，cache key 由补丁 key 拼。
-  **采样器硬预算 16 个**，预算表与打包手段在 `docs/Data_TechRenderPipeline.md` §1.8，
-  门禁 `Script_SamplerBudgetTest.mjs`。
-  `Script_Materials.InjectIndirectLighting` 只是它的薄封装。
-- `Script_FirstPersonSelfShadow.mjs` —— 第一人称手臂/武器专用 packed-depth + 3×3 PCF
-  自阴影；与战场太阳阴影图隔离，禁止改成 Viewmodel 直接 `castShadow=true`。
-- `Script_Gi.mjs`（半实时辐照度探针体 + `Data_GlobalShProbe.mjs`，回归口 `Script_GiTest.mjs`）、
-  `Script_Light.mjs`（太阳 + 级联阴影框 + 火光池 + 枪口闪光 + **`SUN_SHADOW_GLSL` 公共阴影
-  采样接口**：体积雾 / 接触阴影 / 簇光都从这条接口取，别自己采 `sun.shadow.map`）、
-  `Script_Sky.mjs`（天穹 + `SKY_PRESETS` + `SKY_RADIANCE_GLSL` + PMREM 烘焙）、
-  `Script_Water.mjs`（Gerstner 护城河）。
-- `Script_Atmosphere.mjs` —— **物理大气**（Hillaire 2020 / UE SkyAtmosphere 那一套）：
-  透过率 / 多次散射 / 天空视图 / 大气透视 froxel 四张 LUT，帧图第一个 pass 刷后两张。
-  天穹与探针体 GI 的漏空射线共用同一批采样 uniform；`AERIAL_PERSPECTIVE_GLSL` 供
-  合成 pass 的 ApplyFog 段。每预设参数在 `SKY_PRESETS[...].atmosphere`，
-  由 `Script_AtmosphereCalibrate.mjs` 在真浏览器里拟合。`?skyLegacy=1` 退回旧解析天空。
-- **阴影（级联 CSM + PCSS + 屏幕空间接触阴影，2026-09）**：`Script_Csm.mjs`
-  （N 盏同方向灯 + 拟合/吸附/节流 + **整段替换 `ShaderChunk.lights_fragment_begin`** 的
-  级联采样 chunk + 全屏采样接口 GLSL）、`Data_Tuning_Shadows.mjs`（级数/图尺寸/分割/
-  节流/PCSS 抽样数/接触阴影，全部数值）、`Script_ContactShadows.mjs`（pass）。
-  四条铁律：级联本体走 chunk 不走材质补丁（补丁漏材质 = 那份材质吃 N 份太阳）；
-  只有第 0 盏灯带强度（能量守恒的安全网）；阴影图是 `BasicShadowMap` 裸深度
-  （PCSS 的 blocker search 要读深度值，采样器类型两边必须一致）；
-  **一帧只烘一张**（城里每趟阴影烘焙有 ~1.45 M 三角的地板，`SCENE_RENDER_LIMITS`
-  的 8.10 M 单帧红线只剩 2.59 M 余量 —— 多烘一张 BootTest 就红）。
-  回归口 `Script_CsmTest.mjs` + `Script_BootTest.mjs`（三角红线）；
-  出图 `Script_CsmShot.mjs`；先读 `docs/Data_TechRenderPipeline.md` **§1S**。
-- **局部光源（簇状前向光照，2026-09）**：`Script_ClusteredLights.mjs`（视锥切簇 + 三张
-  DataTexture + 材质补丁里的局部光循环 + 两层调试叠加）＋ `Data_Tuning_Lights.mjs`
-  （档位 + `ClusterGrid` 纯几何，零 three，纯 Node 单测直接 import 它）。
-  接口在 `Script_Light.mjs`：`AddFire/UpdateFire/RemoveFire` 签名一个字没变，
-  新增 `AddSpot/UpdateSpot/RemoveSpot`、`UpdateClusters(camera, w, h)`（每帧一次，
-  正片挂在 `RenderScene`）、`GetClusterLightData()`（**世界坐标**的当前光源表，给体积雾/大气）。
-  medium 32 盏 / high 64 盏 / ultra 128 盏；low 仍走固定灯池。
-  回归口 `Script_ClusteredLightsTest.mjs`（`--node` 只跑纯 Node 段，`--perf` 加跑 1440p GPU 消融）。
-  先读：`docs/Data_TechRenderPipeline.md` §17（§2.1 是它的历史稿）。
-- **材质着色升级（2026-09）**：`Script_MaterialShading.mjs`（视差遮蔽 POM / 细节法线 /
-  微阴影 Chan 2018 / 地平线镜面遮蔽 Lagarde / 皮肤预积分次表面散射 Penner 2011）。
-  它是补丁注册表里 **簇光之后、破口之前**那一路；逐材质数值在
-  `Data_Tuning_Materials.mjs`，档位开关在 `Data_Tuning_Graphics.mjs`。
-  回归口 `Script_MaterialUpgradeTest.mjs`；Debug Rendering 的「材质细节」组是它的取证图。
-- 回归口：`Script_PostFrameGraphTest.mjs`（帧图契约）、`Script_PostTest.mjs`、
-  `Script_GtaoTest.mjs`（GTAO / 弯曲法线 / 镜面遮蔽 / SSIL）、
-  `Script_CsmTest.mjs`（级联阴影 / PCSS / 接触阴影）、
-  `Script_MaterialUpgradeTest.mjs`（POM / 细节法线 / 微阴影 / 绒光与各向异性 / 皮肤散射）、
-  `Script_SamplerBudgetTest.mjs`（采样器预算：四档×gi 八轮正片都 ≤ 16 个纹素单元）、
-  `Script_SsrTest.mjs`（屏幕空间反射）、`Script_ClusteredLightsTest.mjs`（簇状局部光）、
-  `Script_AtmosphereTest.mjs`（物理大气：四张 LUT + 十档标定 + 能见度闸；`--shot` 出 A/B 图）、
-  `Script_VolumetricsTest.mjs`（体积雾：能见度不变差 / 阴影切光柱 / 时域收敛）、
-  `Script_ExposureTest.mjs`（自动曝光 / 光晕 / LUT；`--calibrate` 量锚点、
-  `--shots` 出开关对照图、`--baseline=<根目录>` 与另一份检出逐比特比对）、
-  `Script_TaauTest.mjs`（TAAU 两组分辨率 / 斜边锯齿能量 / 速度靶消鬼影 / 运动模糊快门 /
-  散景 CoC 与「枪不糊」）、
-  `Script_GiTest.mjs`、`Script_EditorTest.mjs`（Debug Rendering 全部视图）。
-- 先读：`docs/Data_TechRenderPipeline.md` **§1「帧图与模块契约」**（接入说明，
-  采样器预算表在 §1.8）与 **§1S「阴影：CSM / PCSS / 接触阴影」**（阴影现状；§10 是它的历史稿）；
-  §1A 起是设计期草案与专题深挖，GI 在 §12，SSR / 簇状光 / 物理大气 / froxel 体积雾 / GTAO /
-  相机曝光 / **TAAU + 运动模糊 + 散景景深** 各占一节 §17（并行落地，本轮不重编号），
-  坑表在末尾）。
+
+**先读 [`docs/Data_TechRenderPipeline.md`](Data_TechRenderPipeline.md) 的 §1「帧图与模块契约」**
+—— 那是渲染侧唯一的接入说明（加 pass / 加材质补丁 / 加调试视图的三条登记路都在 §1.11，
+采样器预算表在 §1.8）。正文 §2–§18 **按帧图顺序**一子系统一章，全部是现状；
+设计期草案压在文末「附录 A」，不要拿它当现状。
+
+`Script_Post.mjs` 是**帧图编排器**：持有有序 pass 列表与具名靶，公共 API 全在这里。
+顺序错一条画面就「塑料」（AO 只压间接光 / 泛光在 tonemap 之前 / sRGB 在最后一趟）。
+加一个 pass = 新模块 + 编排器里插一行 + `Data_Tuning_Graphics` 加一位开关。
+
+#### 路由表：模块 → 归属章 → 回归口
+
+| 子系统 | 模块 | 章 | 回归口 |
+|---|---|---|---|
+| 帧图编排 / 靶池 / FrameContext | `Script_Post.mjs`、`Script_PostCommon.mjs` | §1 | `Script_PostFrameGraphTest.mjs` |
+| 采样器预算（16 个纹素单元的硬线） | `Script_MaterialPatches.mjs` | §1.8 | `Script_SamplerBudgetTest.mjs` |
+| 物理大气 / 大气透视 | `Script_Atmosphere.mjs`、`Script_Sky.mjs` | §2 | `Script_AtmosphereTest.mjs`（`--shot` 出 A/B 图）；标定 `Script_AtmosphereCalibrate.mjs` |
+| 深度法线预通道 + 速度 + HZB | `Script_PostPrepass.mjs` | §3 | `Script_PostFrameGraphTest.mjs`、`Script_ActorDepthTest.mjs` |
+| 屏幕空间反射 | `Script_PostSsr.mjs` | §4 | `Script_SsrTest.mjs` |
+| GTAO + 弯曲法线 + SSIL | `Script_PostGtao.mjs`、`Data_Tuning_Gtao.mjs` | §5 | `Script_GtaoTest.mjs` |
+| 级联阴影 + PCSS + 接触阴影 | `Script_Csm.mjs`、`Script_ContactShadows.mjs`、`Data_Tuning_Shadows.mjs` | §6 | `Script_CsmTest.mjs` ＋ `Script_BootTest.mjs`（三角红线）；出图 `Script_CsmShot.mjs` |
+| 主场景 / 材质烘焙 / 材质着色升级 | `Script_Materials.mjs`、`Script_TexBake.mjs`、`Script_MaterialShading.mjs`、`Data_Tuning_Materials.mjs` | §7 | `Script_MaterialUpgradeTest.mjs`（`--shot`） |
+| froxel 体积雾 / 体积光 | `Script_PostVolumetrics.mjs`、`Data_Tuning_Volumetrics.mjs` | §8 | `Script_VolumetricsTest.mjs` |
+| TAA / TAAU / FXAA / CAS | `Script_PostTaa.mjs`、`Script_PostFxaa.mjs`、`Data_Tuning_TemporalDof.mjs` | §9 | `Script_TaauTest.mjs` |
+| 直方图自动曝光 | `Script_PostExposure.mjs`、`Data_Tuning_Camera.mjs` | §10 | `Script_ExposureTest.mjs` |
+| 逐物体运动模糊 | `Script_PostMotionBlur.mjs` | §11 | `Script_TaauTest.mjs` |
+| 散景景深 | `Script_PostDof.mjs` | §12 | `Script_TaauTest.mjs` |
+| 泛光 / 太阳拖影 / 镜头光晕 | `Script_PostBloom.mjs`、`Script_PostLensFlare.mjs` | §13 | `Script_ExposureTest.mjs` |
+| Composite（雾段 / tonemap / LUT / 镜头） | `Script_PostComposite.mjs`、`Script_PostGrade.mjs` | §14 | `Script_PostTest.mjs`、`Script_ExposureTest.mjs` |
+| 簇状前向光照 | `Script_ClusteredLights.mjs`、`Data_Tuning_Lights.mjs` | §15 | `Script_ClusteredLightsTest.mjs`（`--node` / `--perf`） |
+| 探针体 GI | `Script_Gi.mjs`、`Data_GlobalShProbe.mjs` | §16 | `Script_GiTest.mjs` |
+| 画质分档 / 自动降档 | `Data_Tuning_Graphics.mjs`、`Script_AutoQuality.mjs` | §17 | `Script_AutoQualityTest.mjs`、`Script_FrameProfileTest.mjs` |
+| 着色器预热（进过场 / 开机 / 换人） | `Script_Main.WarmupShaders` / `WarmActorShaders` | §18 | `Script_RespawnShaderWarmTest.mjs`、`Script_BootTest.mjs`（`warm=` 只打印） |
+| 全部调试视图 | `Script_PostDebug.mjs`、`Script_EditorDebugRendering.mjs` | §1.11 三条登记路 | `Script_EditorTest.mjs` |
+| 第一人称自阴影 | `Script_FirstPersonSelfShadow.mjs` | §6.12 | `Script_EditorTest.mjs`（自阴影软化热切） |
+
+#### 改之前必须知道的几条
+
+- **材质补丁只走 `Script_MaterialPatches` 注册表**（three 一个材质只有一个 `onBeforeCompile`，
+  谁后写谁静默覆盖前面的）。现役顺序固定
+  **ORM → AO → GI → CSM → SSR → 簇光 → 材质着色 → 破口**；克隆材质走
+  `Script_Materials.CloneShadedMaterial`（它按 `PatchesOf(source)` 重挂，不能抄
+  `onBeforeCompile`）。**采样器硬预算 16 个**，预算表与打包手段在 §1.8。
+- **画质旋钮只在 `Data_Tuning_Graphics.mjs` 与各 `Data_Tuning_*`**；
+  `Script_Post` / `Script_Main` / `Script_EditorSettings` 只读，不写。
+  `Data_Tuning_TemporalDof` 管「算法怎么算」，`Data_Tuning_Graphics` 管「这台机器画多重」。
+- **两组分辨率**：`post.width/height` 是内部分辨率、`post.outputWidth/outputHeight` 是输出
+  分辨率，分界在 `Script_Post.mjs` 的模块内常量 `OUTPUT_DOMAIN_PASSES`（不导出）。
+  只读 `ctx.width/height` 的 pass 不用改；逐 pass 的域表见 §9.1。
+  **要源图的纹素就问源图（`ctx.sceneColor.width/height`），别问 `ctx`。**
+- **太阳阴影统一走 `Script_Light.SUN_SHADOW_GLSL` / `BindSunShadowUniforms`**，
+  别自己采 `sun.shadow.map`；级联本体是整段替换 `ShaderChunk.lights_fragment_begin`
+  而不是材质补丁（补丁漏一份材质 = 那份材质吃 N 份太阳）。**一帧只烘一张**
+  （城里每趟阴影烘焙有 ~1.45 M 三角的地板，`SCENE_RENDER_LIMITS` 的 8.10 M 单帧红线
+  只剩 2.59 M 余量 —— 多烘一张 BootTest 就红）。
+- **自动曝光全 GPU、一次 readback 都不允许**；增益锤在每关出生机位的实测亮度上
+  （`Data_Tuning_Camera.EXPOSURE_ANCHORS`），改关卡布设或天光后要重跑 `--calibrate`。
+- **体积雾的能见度只许变好不许变差**（用户定论「先别动雾」）：出厂
+  `legacyTransmittance` 让透过率与解析雾逐像素相同，物理大气出厂只供雾色不接管消光。
+- 出厂**关**着的三样：探针体 GI（§16.10）、太阳拖影 god rays、簇光的英雄光阴影。
+  它们不是坏的，是选择不开 —— 改默认前先读对应章的账。
 
 ### 材质 / 贴图
 - `Script_TexBake.mjs`（纯 JS PBR 烘焙，每种材质出 albedo / normal / orm；另出全场共用的
   细节法线与皮肤预积分 LUT）→ `Script_Materials.mjs`（包成 three 纹理，注入间接光与表面着色）。
 - `Script_MaterialShading.mjs` —— **材质着色升级**（2026-09）：视差遮蔽 POM / 细节法线 /
   微阴影（Chan 2018）/ 地平线镜面遮蔽（Lagarde）/ 皮肤预积分次表面散射（Penner 2011）。
-  它是补丁注册表里 **GI 之后、破口之前**那一路；逐材质数值在
+  它是补丁注册表里 **簇光之后、破口之前**那一路；逐材质数值在
   `Data_Tuning_Materials.mjs`，档位开关在 `Data_Tuning_Graphics.mjs`。
   回归口 `Script_MaterialUpgradeTest.mjs`；Debug Rendering 的「材质细节」组是它的取证图。
 - `Script_Noise.mjs` —— 确定性噪声全家桶，**一切散布参数的随机源**（不许 Math.random）。
-- 先读：`docs/Data_TechRenderPipeline.md` 的「材质着色升级（2026-09）」一节（现状）与 §11
-  （烘焙旧稿）；城墙专用 PBR 见 `docs/Data_CityWallPbr.md`。
+- 先读：`docs/Data_TechRenderPipeline.md` **§7「主场景与材质」** —— §7.2 是烘焙侧，
+  §7.3 起是表面着色；城墙专用 PBR 见 `docs/Data_CityWallPbr.md`。
 
 ### 世界生成底座（台儿庄时期沉淀，滕县共用）
 - `Script_World.mjs` —— 鲁南民居 / 寨墙 / 清真寺建造器 + `BuildSink` 合批槽；尺寸全按

@@ -85,6 +85,7 @@ npm 根入口也已拆档：`npm test` 只调度 Git 改动命中的游戏项目
 | 测试 | 守什么 |
 |---|---|
 | BootPayloadTest | 开机贴图字节红线：`PBR_SETS` 的总量与单张上限、URL 存在性、fallback 指向真配方（纯 Node）|
+| AutoQualityTest | 自动降档规则层：阶梯映射 / 持续 2 s 才降 / 降后锁 30 s / 升档要 8 s / 死区不抖（纯 Node，毫秒级） |
 | TestRunnerTest | 分级选择、Git 映射、历史基线、登记完整性 |
 | ModuleGraphTest | 从入口递归走模块图与 index.html import map 对账：新模块必登记、源码禁自写 ?v=（纯 Node） |
 | HudPromptTest | HUD 提示纯逻辑 |
@@ -114,11 +115,35 @@ npm 根入口也已拆档：`npm test` 只调度 Git 改动命中的游戏项目
 | menu | MenuTest、BootPropTest |
 | editor | EditorTest、DestructionEditorTest |
 | cutscene | CutsceneControl、ActorPose |
-| render | ActorBatch → PropInstancing → ExternalPropAsset → TownDressing → EastSuburbBlocks → EastSuburbNav → WestDistrictCoverage → WestSuburbBlocks → WestStation → DressingProbe → RespawnShaderWarm（换人 / 人物模型号首次进画面不现编着色器）；另提示相关 Tier 2 |
+| render | 渲染子系统专项（下表）→ ActorBatch → PropInstancing → ExternalPropAsset → TownDressing → EastSuburbBlocks → EastSuburbNav → WestDistrictCoverage → WestSuburbBlocks → WestStation → DressingProbe → RespawnShaderWarm（换人 / 人物模型号首次进画面不现编着色器）；另提示相关 Tier 2 |
 | perf | 不自动跑机器敏感测试，只提示 Tier 2 |
 | infra | TestRunnerTest、ModuleGraphTest（测试入口与本地服务） |
 
 改 `Script_Main.mjs` 会保守选择所有有自动探针的领域。测试文件本身按其登记领域反向映射。
+
+### 渲染子系统专项（2026-09 3A 大修新增，全部登记在 `render` 领域）
+
+对应章节见 [渲染管线](Data_TechRenderPipeline.md) 的 §1.12「逐章的回归口」。
+「时长量级」是本机历史观测的量级，不是保证值；括号里是 runner 登记的超时上限。
+
+| 测试 | 守什么 | 时长量级 | 真浏览器 |
+|---|---|---|---|
+| AutoQualityTest | 自动降档阶梯（Tier 0 快测，也在 render 领域里） | 毫秒级（默认 10 分钟） | 否，纯 Node |
+| PostFrameGraphTest | 帧图地基契约：pass 顺序 / MRT 速度靶 / HZB / 太阳阴影接口 / 材质补丁三态 / 不重编译 | 分钟级（15 分钟） | 是 |
+| SamplerBudgetTest | 采样器预算：四档 × `gi=0/1` 八轮正片，每个程序都链接成功且 sampler uniform ≤ `MAX_TEXTURE_IMAGE_UNITS` | **十分钟级**（40 分钟；八次开正片） | 是 |
+| GtaoTest | GTAO / 弯曲法线 / 镜面遮蔽 / SSIL：接触暗带、时域收敛、无重投影残影、色板反弹 | 分钟级（15 分钟） | 是 |
+| CsmTest | 级联阴影 / PCSS / 接触阴影：逐级图与分割、纹素吸附、级间重叠、节流排班、痤疮比例、三张调试图，末尾四档各加载一遍 | ~70 秒（15 分钟） | 是 |
+| MaterialUpgradeTest | 材质着色升级：视差位移随视角反号 / 距离淡出 / 微阴影压直射 / 细节法线淡入 / 绒光与各向异性 / 皮肤散射红移 / 程序数稳态 | 分钟级（15 分钟） | 是（源码契约与纯 Node 两级也在同一进程里） |
+| SsrTest | 屏幕空间反射：受控场景倒影 / 置信度边界 / 粗糙度上限 / 时域收敛与拖影 / 三张调试图 | 分钟级（15 分钟） | 是 |
+| ClusteredLightsTest | 簇分配与暴力法逐簇相等（纯 Node）＋ 24 盏彩色点光逐盏读回、聚光锥内外、不重编译（真浏览器） | ~150 秒（20 分钟） | 混合：`--node` 只跑纯 Node 段（秒级），`--perf` 另加 1440p GPU/CPU 消融 |
+| VolumetricsTest | froxel 体积雾：能见度不变差 / 图集单调 / 阴影切光柱 / 时域收敛 / 局部光与雾体 | 分钟级（25 分钟） | 是 |
+| AtmosphereTest | 物理大气：四张 LUT / 十档预设的辐照度与色相标定 / 70 m 能见度不许降 / 大气透视近远端 | ~130 秒（15 分钟） | 是；`--shot` 再出 14 张 A/B 对照图 |
+| ExposureTest | 直方图自动曝光 / 镜头光晕 / 3D LUT 分级（中灰标定、适应曲线、LUT ≤ 1/255、开关不改默认机位亮度） | 分钟级（30 分钟） | 是；`--calibrate` 量锚点、`--shots` 出对照图、`--baseline=<根目录>` 与另一份检出逐比特比对 |
+| TaauTest | TAAU 两组分辨率 / 斜边锯齿能量 / 速度靶消鬼影 / 运动模糊快门 / 散景 CoC 与「枪不糊」 | 分钟级（20 分钟） | 是 |
+
+这一组里除 AutoQualityTest 外都占**全局浏览器槽**（跨 worktree 串行，见第三节）。
+单跑排障直接 `node Taierzhuang1938/Script_<名字>.mjs`；`SamplerBudgetTest` 最贵，
+只有碰材质补丁 / 新增采样器时才必须跑。
 
 新版第一关的配音完成验收另加 `node Taierzhuang1938/Script_FirstLevelMissionTest.mjs --audio` 与 `node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --audio --campaign`。默认套件通过不代表配音完成；来源与未完成项见 [重构验收](Data_FirstLevelRebuildAcceptance.md)。仅在声音资产或相应完成声明涉及本次任务时追加严格门禁。
 

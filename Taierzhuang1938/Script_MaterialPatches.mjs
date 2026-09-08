@@ -1,5 +1,20 @@
 // 《台儿庄：血战滕县》材质补丁注册表。
 //
+// **口径文档：`docs/Data_TechRenderPipeline.md` §1.8「材质补丁注册表」**
+// （锚点表、采样器预算表与打包清单、cache key 三条规矩都在那里；
+// 加一个补丁的流程在 §1.11）。跨系统契约见项目 AGENTS.md 第 11 条。
+//
+// 三条硬线，改这个文件之前先看：
+//   · **现役顺序固定 ORM → AO → GI → CSM → SSR → 簇光 → 材质着色 → 破口**
+//     （见本文件末尾的 `IndirectLightingPatches`，每一条为什么排在那儿都写了）。
+//   · **采样器有硬预算**：ANGLE-D3D11 上 `MAX_TEXTURE_IMAGE_UNITS = 16`，超了程序
+//     不链接、只有一行日志，而 three 每帧照样 `useProgram` —— 那只材质整个不画 +
+//     每帧一次 1282。门禁 `Script_SamplerBudgetTest.mjs`。
+//   · **补丁的 `defines` 由 `ApplyPatches` 写进 `material.defines`**，不是在
+//     `onBeforeCompile` 里写：three 的 `getProgramCacheKey` 早于钩子从材质现读，
+//     在钩子里写等于同一份 GLSL 被认成两个程序各链接一遍。克隆装过补丁的材质走
+//     `Script_Materials.CloneShadedMaterial`（按 `PatchesOf(source)` 重挂）。
+//
 // ## 为什么要有它
 // three 一个材质**只有一个** `onBeforeCompile` 钩子。谁后写谁把前面的整个覆盖掉，
 // 而且没有任何报错 —— SSAO 曾经就这么静默消失过。于是「往 MeshStandardMaterial

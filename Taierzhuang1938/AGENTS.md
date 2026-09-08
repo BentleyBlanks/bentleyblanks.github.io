@@ -18,11 +18,13 @@
 3. 新静态几何走 `BuildSink` 分区合批，不零散 add Mesh；开机预算统一取 `SCENE_RENDER_LIMITS`。涉及场景预算时按七关检查，验收：`Script_BootTest.mjs`。
 4. 世界坐标 X 向东、Z 向南、Y 向上，单位米，原点为城中心十字街口。人物正面、枪口、车头与机首一律为局部 -Z。外部 FBX/GLB/glTF 的源朝向**用顶点云量出来并写进数据**（飞机 `Data_AircraftAssets.noseDir`、导入战车 `ImportVehicles.SOURCES.sourceNose` / `Data_Meshes.facing`），由桥接层对齐；不以目测印象或源站默认约定替代朝向测量。验收：CharacterModelTest、ActorPoseTest，飞机与战车走 `Script_ModelFacingTest.mjs`（新增外部模型必须登记进它）。
 5. 地面由共享采样器决定；界河 `L0_Jiehe` 统一使用 `SampleJieheHeight(x,z)` / 注入的 `groundAt`，渲染、角色、AI、弹道和布设不得另写高度公式或硬编码绝对 y。改高度图或界河地形时运行 HeightmapCli verify、JieheTerrainTest、BootTest；下载、贴地与原始数据规则见 [高度图说明](docs/Data_TaierzhuangHeightmap.md) 及系统参考末节。
-6. 材质 albedo 为 `SRGBColorSpace`，normal/orm 为 `NoColorSpace`；SSAO 只乘间接光。验收与依据：`Script_Materials.mjs`、`docs/Data_TechRenderPipeline.md`。
+6. 材质 albedo 为 `SRGBColorSpace`，normal/orm 为 `NoColorSpace`；**GTAO / SSIL 只乘间接光**（直射项归微阴影与接触阴影，不在 `<aomap_fragment>` 上压直射）。验收与依据：`Script_GtaoTest.mjs`、`docs/Data_TechRenderPipeline.md` §5 与 §7。
 7. 枪械、战车减面按 `WEAPON_TRIANGLE_LIMIT` / `VEHICLE_TRIANGLE_LIMIT`；先排除展示件、备用状态及重复壳，超阈值才减面，降幅不超过 5% 时保留原始拓扑。特例与登记取 `SPECIAL_TRIANGLE_TARGETS` / `EXTERNAL_GLB_STANDARDS`，全场预算同步进 `SCENE_RENDER_LIMITS`。验收：AssetStandardsTest。
 8. 新增 `Script_*Test.mjs` 登记 `Script_TestRunner.mjs` 的 `testDefs` 与 tier/domain，新模块补 `changedDomainRules`；验收：`Script_TestRunnerTest.mjs`。数值以代码常量为准，不在多份说明里复制易过时的预算。
 9. 大刀与装刺刀武器统一走 `Script_MeleeCombat.mjs`，玩家、敌友军及白盒不得另建伤害判定。F 推架零生命伤害；QTE 只在真实僵持或倒地压制时触发，成功不自动杀敌。动画与验收入口见 [白刃战说明](docs/Data_MeleeQte.md)。
 10. **玩家可见文本与玩法数值一律数据驱动。** 代码里不写玩家能看见的中文：HUD / 菜单 / 目标 / 交互标签 / 系统字幕走 `Script_Text.T("domain.key")`，表在 `Data_Text_<Domain>.mjs`（由 `Data_Locale_zhCN.mjs` 拼成基准语言；加语言只加一份 `Data_Locale_<id>.mjs`）；章节台词、过场、史料卡的原稿仍在各 `Data_Mission*` / `Data_Cutscene*`，经 `Script_Text.Localize(id, text)` 可被译文覆盖，翻译清单由 `Script_TextGather.mjs` 导出。手感 / 平衡 / 节奏数值放 `Data_Tuning_<System>.mjs`（纯数据、带出处注释），代码只读表；任务编排（拍表、交互点、指引、名册）是数据不是代码。开发者诊断（console / throw / 编辑器面板）不走文本表。验收：`Script_TextTest.mjs`（各表 `GATED_MODULES` 登记的模块零中文字面量），口径见 [docs/Data_TextAndTuning.md](docs/Data_TextAndTuning.md)。
+11. **往 `MeshStandardMaterial` 插 GLSL 只走 `Script_MaterialPatches` 注册表**（three 一个材质只有一个 `onBeforeCompile`，谁后写谁静默覆盖前一个）。克隆已装补丁的材质用 `Script_Materials.CloneShadedMaterial`，它按 `PatchesOf(source)` 重挂补丁，不抄钩子。每个材质变体的 sampler uniform ≤ `MAX_TEXTURE_IMAGE_UNITS`（ANGLE-D3D11 上是 16；超了程序不链接、只有一行日志，那只材质整个不画）。验收：`Script_SamplerBudgetTest.mjs`；预算表与打包手段见 [渲染管线](docs/Data_TechRenderPipeline.md) §1.8。
+12. **画质旋钮与分档只在 `Data_Tuning_Graphics.mjs` 与各 `Data_Tuning_*`**（纯数据、零 three），`Script_Post` / `Script_Main` / `Script_EditorSettings` 只读不写。新增帧图 pass 按 [渲染管线](docs/Data_TechRenderPipeline.md) §1.3 的 pass 契约接入、调试视图按 §1.11 的三条登记路登记，不往 `Render()` 里插代码。验收：`Script_PostFrameGraphTest.mjs`、`Script_EditorTest.mjs`。
 
 ## 调查与工具
 
@@ -60,6 +62,8 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=pre
 ## 系统索引
 
 [系统参考](docs/Data_AgentReference.md) 保留原路由表、截图/性能命令和分册导读：引导、渲染、材质、地形、模型、AI、白盒、战斗、物理、音频、过场、交互、编辑器及资产。旧文档引用 AGENTS.md 中这些章节时，对应内容已迁到该参考。
+
+渲染侧另有唯一现状文档 [渲染管线](docs/Data_TechRenderPipeline.md)：§1 是接入契约，§2–§16 按帧图顺序一子系统一章（大气 / 预通道 / SSR / GTAO / 阴影 / 主场景材质 / 体积雾 / TAA-TAAU / 曝光 / 运动模糊 / 景深 / 泛光光晕 / composite / 簇光 / GI），§17 性能与分档、§18 预热、§19 坑、§20 3A 验收清单，设计期草案在文末附录 A。系统参考里的渲染路由表按这个章号走。
 
 新增系统更新参考中的路由；改变跨系统契约更新本入口与测试。历史提案、事故记录和操作细节留在分册，不升级为所有任务的固定步骤。
 
