@@ -348,27 +348,37 @@ Sonniss 的许可不要求署名，但 `Data_SfxSources.mjs` 仍然逐条记着�
 
 ## 成品
 
-72 个文件 / 747 KB（44.1 kHz 单声道 72 kbps MP3），在 `Audio/Sfx/`，
-清单 `Audio/Sfx/Data_SfxManifest.json`。下面这张表是 2026-08-19 那一批的 33 个 cue；
-2026-08-28 缺口批 A2 补的 15 个 cue 另有一张表，见本文末「重制新增音效」。
+**94 个文件 / 1126 KB**（44.1 kHz 单声道；枪声、爆炸、弹道 112 kbps，其余 72 kbps），
+在 `Audio/Sfx/`，清单 `Audio/Sfx/Data_SfxManifest.json`。另有 65 个文件 / 722 KB
+落在 `pendingCues`（素材烘好但还没接线，运行时看不见）。下面这张表是 2026-08-19
+那一批的 33 个 cue，数字已按 2026-09-08 的补缺批更新；
+2026-08-28 缺口批 A2 补的 15 个 cue 另有一张表，见本文「重制新增音效」，
+2026-09-08 那一批见本文末。
+
+> **这张表和清单曾经对不上，2026-09-08 已按清单修正。** 前八行原来写着
+> `rifleNra` 3 变体 · Pole Position K98k、`rifleIja` 3 变体 · M1903A3、
+> `rifleIjaFar` 1 变体 · Watson Wu —— 而清单里 `rifleNra` 只有一个文件、
+> 来源是 Watson Wu 的毛瑟 8 mm，`rifleIjaFar` 才是 Pole Position 的 BAR 300 m。
+> 那是 2026-08-19 之后按用户试听结果（G01/G04/G05/G07/G09/G11）换过素材、
+> 但没回来改文档留下的。**以 `Data_SfxManifest.json` 为准**，文档跟着它走。
 
 | cue | 变体 | 时长 | 体积 | 素材 |
 | --- | --- | --- | --- | --- |
-| `rifleNra` | 3 | 1.15 s | 28.9 KB | Pole Position Production · K98k 7.92×57 毛瑟 · Sonniss GDC 2020 |
-| `rifleNraFar` | 3 | 1.50 s | 36.9 KB | FLYSOUND · 莫辛纳甘 50 m 外 · Sonniss GDC 2020 |
-| `rifleIja` | 3 | 0.86 s | 22.2 KB | Pole Position Production · 斯普林菲尔德 M1903A3 · Sonniss GDC 2020 |
-| `rifleIjaFar` | 1 | 0.85 s | 7.2 KB | Watson Wu · 两次大战步枪（来弹视角）· Sonniss Game Audio Monthly #3 |
-| `zb26` | 1 | 0.90 s | 7.6 KB | Pole Position Production · L7A2 GPMG 7.62×51 单发 · Sonniss GDC 2016 |
-| `type11` | 1 | 0.54 s | 4.7 KB | Pole Position Production · M1919A4 .30cal · Sonniss GDC 2016 |
-| `type92` | 1 | 0.92 s | 7.8 KB | Pole Position Production · M1919A4 .30cal（枪架）· Sonniss GDC 2016 |
+| `rifleNra` | 4 | 1.30 s | 66.5 KB | Watson Wu · 毛瑟 8 mm 中距离 · Game Audio Monthly #3 ／ Pole Position · K98k 7.92×57 连续实录（另外三发）· GDC 2020 |
+| `rifleNraFar` | 3 | 1.80 s | 65.3 KB | FLYSOUND · 莫辛纳甘长距离混录 ／ 同厂同枪 50 m 机位 · Sonniss GDC 2020 |
+| `rifleIja` | 4 | 1.05 s | 50.7 KB | Watson Wu · M1 Garand .30-06 近射 · Game Audio Monthly #3 ／ Pole Position · M1903A3 .30-06 连续实录（另外三发）· GDC 2020 |
+| `rifleIjaFar` | 3 | 1.39 s | 51.6 KB | Pole Position · BAR .30cal 300 m ／ 50 m 外经建筑反射的步枪射击 · GDC 2016 / 2018 |
+| `zb26` | 2 | 0.90 s | 21.6 KB | Pole Position · L7A2 GPMG 7.62×51 单发 ／ Enfield L86 LSW（弹匣供弹轻机，1 m）· GDC 2016 |
+| `type11` | 2 | 0.70 s | 16.4 KB | Pole Position · BAR .30cal 近场（同一次双发的两发）· Sonniss GDC 2016 |
+| `type92` | 3 | 1.17 s | 40.4 KB | Pole Position · M1919A4 .30cal 200 m ／ 5 m ／ 枪架 1 m · Sonniss GDC 2016 |
 | `shellDrop` | 3 | 0.99 s | 24.6 KB | SculpTunes · 弹壳落在水泥地上（户外）· Sonniss GDC 2020 |
-| `bolt` | 1 | 1.25 s | 10.2 KB | Pole Position Production · M1903A3 拉栓 · Sonniss GDC 2020 |
-| `stripperLoad` | 1 | 1.10 s | 9.2 KB | Pole Position Production · K98k 操作音 · Sonniss GDC 2020 |
+| `bolt` | 2 | 1.25 s | 17.4 KB | Pole Position Production · M1903A3 拉栓 ／ 莫辛纳甘 M38 拉栓 · Sonniss GDC 2020 |
+| `stripperLoad` | 2 | 1.10 s | 18.5 KB | Pole Position Production · K98k 操作音（同一条素材的两个动作）· Sonniss GDC 2020 |
 | `magIn` | 1 | 0.65 s | 5.6 KB | Dramatic Cat · 步枪弹匣入位 · Sonniss GDC 2024 |
 | `grenadePin` | 1 | 0.60 s | 5.1 KB | TS Sound · 火柴摩擦点燃 · Sonniss Game Audio Monthly #4 |
 | `grenadeThrow` | 1 | 0.55 s | 4.9 KB | David Dumais Audio · 重挥破风 · Sonniss GDC 2020 |
 | `explosionNear` | 3 | 2.40 s | 57.6 KB | Bluezone Corporation · 城区爆炸 · Sonniss GDC 2023 ／ Gamemaster Audio · 近距爆炸（偏亮 / 偏闷长尾）· Sonniss GDC 2017 |
-| `explosionFar` | 1 | 2.60 s | 20.9 KB | Gamemaster Audio · 远处爆炸 · Sonniss GDC 2017 |
+| `explosionFar` | 3 | 2.60 s | 93.8 KB | Gamemaster Audio · 远处爆炸 · GDC 2017 ／ Bluezone · 榴弹炮远处落点 · Game Audio Monthly #1 ／ Pole Position · 远处的火炮 · GDC 2017 |
 | `shellIncoming` | 1 | 2.00 s | 16.2 KB | Bluezone Corporation · 炮弹飞行啸声 · Sonniss GDC 2020 |
 | `shellImpact` | 1 | 2.80 s | 22.5 KB | Coll Anderson · 野外迫击炮爆炸实录 · Sonniss GDC 2015 |
 | `launcherPop` | 1 | 0.90 s | 7.6 KB | Bluezone Corporation · 榴弹发射 · Sonniss GDC 2023 |
@@ -380,7 +390,7 @@ Sonniss 的许可不要求署名，但 `Data_SfxSources.mjs` 仍然逐条记着�
 | `impactWood` | 2 | 0.45 s | 8.7 KB | Double Trouble Audio · 木料受击（软/硬两条）· Sonniss GDC 2017 |
 | `impactMetal` | 1 | 0.75 s | 6.4 KB | Gamemaster Audio · 弹着厚金属 · Sonniss GDC 2017 |
 | `impactFlesh` | 1 | 0.50 s | 4.5 KB | PMSFX · 弹着人体 · Sonniss GDC 2020 |
-| `footstepDirt` | 2 | 0.40 s | 7.4 KB | PMSFX · 土路单步 · Sonniss GDC 2019 |
+| `footstepDirt` | 4 | 0.40 s | 14.9 KB | PMSFX · 土路单步 ×2 ／ 土路连续行走里的另外两步 · Sonniss GDC 2019 |
 | `footstepRubble` | 4 | 0.40 s | 14.9 KB | Studio 23 · 碎石路行走 · Sonniss GDC 2019 |
 | `bodyFall` | 1 | 1.10 s | 9.2 KB | Red Libraries · 人体倒地（土地面）· Sonniss GDC 2019 |
 | `hurt` | 2 | 0.58 s | 8.7 KB | Articulated Sounds · 男性痛呼 · GDC 2019 ／ 344 Audio · 士兵闷哼 · GDC 2020 |
@@ -1080,9 +1090,201 @@ node Taierzhuang1938/Script_SfxBake.mjs --recut \
 要撤销豁免，先撤销上面那条设计决定，别从 `EXEMPTIONS` 那张表下手。
 
 ```
-SFX: 72 files, activeRmsDbfs -25.48..-24.58 dBFS, spread 0.90 dB, target -25 dBFS（另有 5 个按人工档验收，不计入散布）
+SFX: 94 files, activeRmsDbfs -25.48..-24.58 dBFS, spread 0.90 dB, target -25 dBFS（另有 5 个按人工档验收，不计入散布）
 Ambience cues: 24 files, activeRmsDbfs -25.49..-24.85 dBFS, spread 0.64 dB, target -25 dBFS
 Ambience beds: 10 files, rmsDbfs -27.47..-27.23 dBFS, spread 0.24 dB, target -27 dBFS
 Music: 9 files, rmsDbfs -27.45..-27.43 dBFS, spread 0.02 dB, target -27 dBFS
 Audio native levels are aligned.
 ```
+
+---
+
+# 2026-09-08 对标 3A 素材补缺批
+
+一次补 **85 个文件 / 1.04 MB**：给 11 个已有 cue 补变体（+20 个文件 / 341 KB，进 `cues`，
+运行时立刻可用），另建 **25 个新 cue**（65 个文件 / 722 KB，落 `pendingCues`）。
+来源与切割参数在 `Data_SfxSources.mjs` 末尾那一段。
+
+**这一批只走 Sonniss 实录（archive.org 镜像），一条生成音都没有。** 找不到、
+或者找到了但质量不合格的，一律记进下面的「Sonniss 缺口清单」，不拿模型顶。
+
+## 三条改动的口径
+
+1. **枪声、爆炸、弹道改用 112 kbps 单声道**（其余仍是 72k）。
+   72k 是照「短促的一次性音、体积优先」定的，对这三类不够：枪口爆音的信息全在
+   头 10 ms 的瞬态里，低码率的心理声学模型会把这一下当瞬时噪声抹掉一部分 ——
+   出来是「啪」不是「炸」，正是当初从合成换实录要解决的那个问题，在编码这一步
+   又丢了一次；爆炸的能量集中在 60—200 Hz，低码率把这一段的量化噪声抬到能听见；
+   弹道是 0.02 s 的宽带冲头、前后都安静，预回声最明显。
+   代价是这三类体积涨 55 %，全批合计多几十 KB。落在组或 cut 的 `bitrate` 上。
+2. **变体优先从同一条几十秒的连续实录里取另一发。** archive.org 上的 Sonniss 镜像
+   是「每家厂商每个库只放三四个文件」的抽样，「同厂商同枪的另一个 take」这条最优解
+   大半时候不成立。但有几条素材本身就是**几十秒的连续射击**：Pole Position 的
+   `K98k, Firing`（40 s / 10 发）、`M1903A3, Firing`（20 s / 5 发）、FLYSOUND 的
+   `NAGANT 50m distant`（56 s / 10 发）。同一支枪、同一支麦、同一天，切出来的变体
+   之间只差真实的发发抖动 —— 这比任何变调都真，是本批最大的收获。
+3. **远近一律是同一次射击的两支麦。** 新增的三条机枪远场与已有的近场是同一次录音：
+   L7A2 的 1 m 与 50 m、BAR 的 0.1 m 与 300 m、M1919A4 枪架的 1 m 与 300 m。
+   选材硬标准第 3 条在这里是字面成立的。
+
+## 补变体（进 `cues`，运行时立刻可用）
+
+| cue | 变体 | 时长 | 体积 | 补的是什么 |
+| --- | ---: | ---: | ---: | --- |
+| `rifleNra` | 1 → 4 | 1.30 s | 66.5 KB | Pole Position 40 s K98k 连续实录里的另外三发（中正式与 K98k 同弹同枪机） |
+| `rifleIja` | 1 → 4 | 1.05 s | 50.7 KB | M1903A3 20 s 里的另外三发；比原来的 Garand 多一条对：同为旋转后拉枪机，没有复进声 |
+| `zb26` | 1 → 2 | 0.90 s | 21.6 KB | Enfield L86 LSW 三连发的末发（弹匣供弹轻机、同厂 1 m clean 录法；口径是妥协） |
+| `type11` | 1 → 2 | 0.70 s | 16.4 KB | 同一次 BAR 双发的**第二发起音**（`_01` 落在双发的共同尾巴上，两条不是同一份波形） |
+| `type92` | 1 → 3 | 1.17 s | 40.4 KB | M1919A4 的 5 m 机位与枪架 1 m 机位各一发（都取三连发末发） |
+| `rifleNraFar` | 1 → 3 | 1.80 s | 65.3 KB | 同厂同枪 50 m 机位、56 s 里的另外两发 |
+| `rifleIjaFar` | 1 → 3 | 1.39 s | 51.6 KB | 按频谱选的「50 m 外经建筑反射」两发（谱心 2651/2679 Hz 对靶子 2623 Hz） |
+| `footstepDirt` | 2 → 4 | 0.40 s | 14.9 KB | 同厂同库的连续行走长片里另切两步 |
+| `explosionFar` | 1 → 3 | 2.60 s | 93.8 KB | 榴弹炮的远处落点、远处的火炮；三条同一道 `lp 2200` |
+| `bolt` | 1 → 2 | 1.25 s | 17.4 KB | 莫辛纳甘 M38 的一次完整拉栓（同为旋转后拉枪机、同厂 handling 录法） |
+| `stripperLoad` | 1 → 2 | 1.10 s | 18.5 KB | **同一支枪、同一次录音的另一个动作** —— 本批最理想的那种变体来源 |
+
+## 新增 cue（`pendingCues`，接线后才可见）
+
+| cue | 变体 | 时长 | 体积 | 用在哪 | 素材 |
+| --- | ---: | ---: | ---: | --- | --- |
+| `zb26Far` | 2 | 1.50 s | 42.9 KB | 捷克式远场 | Pole Position · L7A2 GPMG 50 m 后方机位 · GDC 2016 |
+| `type11Far` | 1 | 1.25 s | 17.9 KB | 十一年式远场 | Pole Position · BAR .30cal 300 m 正面 · GDC 2016 |
+| `type92Far` | 2 | 1.55 s | 44.4 KB | 九二式远场 | Pole Position · M1919A4 枪架 300 m 正前 · GDC 2016 |
+| `gunTailOpenRifle` | 2 | 0.90 s | 26.5 KB | 开阔地步枪尾音 | Pole Position · Outdoor Gun Acoustics（大开阔地）· GDC 2018 |
+| `gunTailStreetRifle` | 2 | 1.20 s | 34.4 KB | 街巷步枪尾音 | 同上（麦在建筑背后，收的是房子弹回来那层） |
+| `gunTailInteriorRifle` | 2 | 1.20 s | 34.4 KB | 屋内步枪尾音 | Pole Position · Indoor Gun Acoustics 长走廊（AK4 7.62 全威力弹）· GDC 2018 |
+| `gunTailOpenMg` | 2 | 1.10 s | 32.2 KB | 开阔地机枪尾音 | Pole Position · The Warfare Library `projectile_tail_large_field` · GDC 2017 |
+| `gunTailInteriorMg` | 2 | 1.60 s | 45.8 KB | 屋内机枪尾音 | Audiobeast · The London Warehouse Firearms Library（中型仓库）· GDC 2016 |
+| `bulletCrack` | 4 | 0.22 s | 15.9 KB | 超音速弹擦头的音爆 | PMSFX · Bullet Passby Whizzby（音爆一段）· GDC 2020 |
+| `bulletWhizz` | 4 | 0.50 s | 31.6 KB | 近距掠过的呼啸 | 同上（啸声一段） |
+| `ricochet` | 4 | 0.65 s | 38.7 KB | 跳弹 | Justsoundeffects · 跳弹撞击与金属余韵 · GDC 2024 |
+| `footstepWood` | 4 | 0.40 s | 14.9 KB | 木板地 | The Sound Pack Tree · 木楼梯下行 80 步/分 · GDC 2018 |
+| `footstepStone` | 4 | 0.30 s | 11.6 KB | 砖石/石板 | Tovusound · 军靴走硬地 · GDC 2017 |
+| `footstepGrass` | 4 | 0.34 s | 13.2 KB | 麦田河滩草 | Tovusound · 草地行走（同厂同录法）· GDC 2017 |
+| `footstepMud` | 4 | 0.38 s | 14.0 KB | 泥地浅水 | Wav Junction · 踩进水洼的单步溅水 · GDC 2020 |
+| `clothMove` | 3 | 0.50 s | 13.6 KB | 姿态变化/翻越 | The Soundcatcher · 厚棉布衣物摩擦 · Game Audio Monthly #5 |
+| `gearRattle` | 3 | 0.60 s | 15.4 KB | 冲刺时装具晃动 | Joshua Reinhardt · 全套军用装具行走 · GDC 2017 |
+| `breathHeavy` | 1 **loop** | 3.00 s | 23.9 KB | 男性粗喘 | Gamemaster Audio · 男性奔跑粗喘 · GDC 2018 |
+| `bodyLand` | 2 | 0.70 s | 11.9 KB | 落地/翻越落地 | Tovusound · 双脚同时落地（碎石地）· GDC 2017 |
+| `grenadeBounce` | 3 | 1.30 s | 20.7 KB | 手榴弹落地弹跳 | Coll Anderson · 金属件户外落地弹跳 · GDC 2015 ／ Christophe Davaille · 十公斤铸铁片 · GDC 2018 ／ Sound Ex Machina · 金属罐 · GDC 2019 |
+| `grenadeRoll` | 1 | 1.80 s | 14.5 KB | 手榴弹滚动 | Sound Ex Machina · 金属球滚水泥地 · GDC 2019 |
+| `explosionMid` | 2 | 2.20 s | 59.4 KB | 中距爆炸 60—150 m | Bluezone · 户外大型爆炸 · GDC 2020 ／ 迫击炮弹爆炸 · GDC 2023 |
+| `debrisFall` | 3 | 2.20 s | 54.8 KB | 爆后碎屑落地 | Bluezone · 碎石 / 金属碎片 / 混合瓦砾 · Game Audio Monthly #2 |
+| `fireSpot` | 1 **loop** | 10.00 s | 78.6 KB | 近处火堆 | Pole Position · The Burning House Library（低强度带噼啪）· GDC 2018 |
+| `impactStone` | 3 | 0.45 s | 10.5 KB | 城墙/石板弹着 | Olivier Girardot · 子弹打在石头上 · GDC 2020 ／ PMSFX · 单块石头受击 ×2 · GDC 2020 |
+
+选材上的两条特别说明：
+
+- **枪尾按「声源在哪个空间」选，不按枪选。** 六条要的是空间的回声，不是枪，
+  所以取 Pole Position 的 Indoor / Outdoor Gun Acoustics 两个库 —— 那两个库存在的
+  理由就是这个：同一支枪在开阔地 / 建筑之间 / 长走廊里各录一遍。切法是
+  **从起音后 48 ms 落刀**，把枪口爆音整个让给 body 层，再用 30 ms 淡入把落刀处磨平。
+  口径因此不是这几条的判据（走廊的混响不会因为换一支枪就变成另一条走廊）。
+- **`bulletCrack` 与 `bulletWhizz` 同源是故意的。** 一发超音速弹从头上过，物理上
+  就是先一记音爆再一段气流啸声，同一次录音里两样都在。按频谱把 PMSFX 那条 2 分钟
+  实录里的事件分成两堆（谱心 3400—4200 Hz 的切 0.22 s、5600—6100 Hz 的切 0.50 s），
+  不是把同一条切两遍。与已有的 `amb.whizz`（Pole Position 的 Warfare Library）不同源。
+
+## Sonniss 缺口清单
+
+**这一节是本批的主要产出之一：下面这些是镜像里真的没有的，别再翻一遍。**
+
+| 缺口 | 目标 | 实际 | 为什么 |
+| --- | ---: | ---: | --- |
+| `gunTailStreetMg` | ≥2 | **0** | 镜像里唯一带 `Urban_Exterior` 的枪声是 SoundMorph INTERVENTION 一条 3.8 s 的 9 mm 冲锋枪点射（还是设计库）。重机枪的街道尾音用 9 mm SMG 是**错的材料**，宁可空着。Pole Position 的 Outdoor Gun Acoustics 只录了开阔地 / 山谷树林 / 森林公路三种，没有城市街道。 |
+| `zb26` | ≥3 | 2 | L7A2 GPMG 那条 1 m 素材整整 7.5 s 里**只有一发**（前 4 s 是数字静音），抽样只给这一条；全库再没有第二条 7.92 级别的弹匣供弹轻机近录。第二变体已经是妥协（L86 LSW 5.56 mm，机构对得上、口径不对）。 |
+| `type11` | ≥3 | 2 | BAR 0.1 m 那条是「双发」，两发只隔 94 ms，第一发的尾巴整个压在第二发上 —— 只能各取一次起音，切不出第三条。 |
+| `type11Far` | ≥2 | 1 | BAR 300 m 同理只有一次双发。**而且 `rifleIjaFar_01` 与 `type11Far_01` 出自这条素材的同一发**，只差变速（1.08 对 1.12）。镜像里没有第二条 300 m 的全威力自动武器实录。三百米外一支步枪和一挺轻机本来也难分，真正的区别由引擎排的射速给 —— 但这一笔要记着。 |
+| `breathHeavy` | ≥2 | 1 | 镜像里成年男性的**持续喘息**实录只有 Gamemaster 那一个 3 s 文件。另两条候选不合格：Funky Rustic 的是女声；Eiravaein 的 ASMR 呼吸整段 RMS −51…−57 dBFS，抬到 −25 会把底噪一起抬 27 dB。 |
+| `type92` 的距离不齐 | — | 待定夺 | 三条变体分别是 200 m（`_01`，用户 G11 试听选定）、5 m、枪架 1 m。同一挺枪同一批录音，但距离感不一致；四文件抽样里没有第二条同距离的可用发。要么把 `_01` 换成 5 m 那一档，要么接受这组的散布 —— **这是设计决定，等人工试听。** |
+| `gunTailInteriorMg` 的口径 | — | 妥协 | 用的是 .50 cal（仓库里那挺 M2），比九二式大一档。这一层只承担空间，枪本身由 `type92` 出。 |
+| `footstepStone` / `footstepGrass` 的鞋 | — | 妥协 | 砖石那条是军靴（全镜像硬地面连续行走里唯一穿靴的），草地那条是运动鞋 —— 同厂同录法，换材质不换录音风格。滕县城里的兵穿布鞋草鞋，两者都不是。 |
+
+## 频谱验收（我听不见，靠看）
+
+85 条逐条渲染「波形 + 对数频谱」贴图看过，配四个数（时长 / 有声段 RMS / 峰值 /
+端点电平）与三条筛查（稳态纯音突起、二次冲头、起音时间）。**淘汰并重切了四处：**
+
+1. **`gunTailOpenMg` 原来落在连发中间。** 第一版按「起音后 60 ms」钉在 0.075 s，
+   贴图一看是**八记连发排在一秒里** —— 这挺枪从 0 打到 5.0 s 就没停过（约 460 rpm、
+   每 130 ms 一发），起音后 60 ms 还在下一发之前。那不是尾音，那是连发。
+   改钉在两梭子各自的**末发之后**（5.10 s / 17.34 s，之后各有六七秒静音）。
+2. **手榴弹弹跳的头两条会「唱」。** 第一版用 Airborne 的钢筋落水泥地与 Sounds Great
+   的金属管落地，贴图上都是**整条横着的谐波梯**（钢筋 5426 Hz、管子 2929 Hz，
+   比邻域高 33 / 31 dB）。细长中空的东西会唱，手榴弹是几百克的实心疙瘩，
+   落地只该「咚」一下带一串跳。换成金属件户外落地弹跳与十公斤铸铁片
+   （后者实测降 20 dB 只要 0.05 s、谱心 1376 Hz、>4 kHz 占 10 % —— 落地就死）。
+   **判据留下来：谐波梯超过邻域 22 dB 的一律不要。**
+3. **四种材质脚步的窗口太长。** `footstepGrass_01/04`、`footstepStone_01`、
+   `footstepMud_02` 的贴图上，第 80—85 % 处清清楚楚是**下一步的头** ——
+   素材后段是快走与小跑，步距压到 0.36—0.38 s，而原来的 tail 是 0.40—0.45 s。
+   收到 0.30—0.38 s 并补上淡出之后，四种材质十六条全干净。
+4. **`ricochet_02` 起音要 451 ms。** 位置钉在了那一串里较轻的一下上，触发之后
+   半秒才响 —— 玩法上等于没有反馈。四条重新钉在**那一串里最响的那一下**。
+
+其余逐条结论：
+
+- `rifleNra` / `rifleIja` 的三条新变体 —— 陡起音、宽带、快速衰减，没有横条纹。
+  谱心 3900—4135 Hz，与各自 `_01`（3573 / 5058 Hz）同一档。
+- 三条机枪远场 —— 冲头之后是一段真实的场地拖尾，`zb26Far` 与 `zb26` 摆一起
+  就是「远近是两条真的录音」这条标准的样子。
+- 六条枪尾 —— 都是**没有冲头的衰减**（把爆音让给 body 层了）；`gunTailInteriorRifle`
+  降 20 dB 要 0.20—0.33 s（长走廊），`gunTailOpenRifle` 只要 0.02—0.14 s（开阔地）。
+- `bulletCrack` —— 一记宽带冲头带一条下滑的扫频（超音速 N 波的多普勒），
+  0.22 s 内收完。`bulletWhizz` 是同一现象的另一半：没有硬冲头，一段 5600 Hz 以上的气流。
+- `breathHeavy` —— 3 s 里五次呼吸、全是宽带噪声，**没有稳态共振峰**：
+  文件名里的 `mask` 是录法标注不是面具音色，没有防毒面具那种管腔嗡声。
+- `fireSpot` —— 10 s 逐 0.1 s 量方差 1.66 dB（全条 93.8 s 里最小的一窗），
+  十秒里没有一次塌陷，两头各 20 ms 淡入淡出。
+- 15 kHz 以上那些「纯音突起」是 **mp3 的低通肩部**，不是啸叫：编码器在 15—16 kHz
+  截断，最后一个还活着的 bin 相对上方的零自然高出二十几 dB。筛查阈值只看 14 kHz 以下。
+
+**仍需人工试听的三处**（机器判不了）：`breathHeavy` 是不是「累得喘」而不是「病人喘」、
+`ricochet` 四条的金属味会不会太「玩具」、`type92` 三条的距离散布能不能接受。
+
+## 验收数字
+
+响度口径与 `Script_AudioNormalize.mjs` 的「一次性音」组逐字相同（20 ms 帧、
+门限取最响帧的 10 %、目标 −25 dBFS、峰值上限 −1 dBFS），由 `alignDbfs` 在烘焙期
+量成品补差：
+
+- 85 个新文件的有声段 RMS：**−25.29 … −24.59 dBFS**，散布 0.70 dB（容差 ±0.5）；
+- 峰值：**−17.04 … −1.68 dBFS**，全部在 −1 dBFS 之下。
+
+搬进 `cues` 的那 20 个文件让 `Script_AudioNormalize.mjs`（只读验收）实测直接是绿的：
+
+```
+SFX: 94 files, activeRmsDbfs -25.48..-24.58 dBFS, spread 0.90 dB, target -25 dBFS（另有 5 个按人工档验收，不计入散布）
+Audio native levels are aligned.
+```
+
+`Script_AudioTest.mjs` 全绿且**一条断言都不用改**：清单仍是 56 个 cue、
+56 条全部盖住配方、载入零报错 —— 25 个新 cue 在 `pendingCues` 里，运行时看不见
+（`LoadSfxPack` 只遍历 `cues`）。接线批把 `Data_SfxSources` 里对应组的 `pending`
+删掉、照组名重烘，产物就从 `pendingCues` 挪进 `cues`，那时才需要动 `RECIPE_COUNT`。
+
+## 重新烘焙
+
+原始长片仍落 `Audio/Sfx/_raw/`（已 gitignore，约 30 MB）。**一律照组名点名**，
+不带组名的全量会从零重建清单并重切全库（连没有 `alignDbfs` 的老 cue 一起）。
+
+```bash
+# 补变体的十三组（append，重复跑会把变体追加成 _05/_06，重跑前先还原清单与成品）
+node Taierzhuang1938/Script_SfxBake.mjs RifleNraK98kTakes RifleIjaSpringfieldTakes \
+  Zb26L86Lsw Type11BarSecondShot Type92M1919Near5m Type92M1919Turret1m \
+  RifleNraFarNagant50m RifleIjaFarBuildings FootstepDirtLoop \
+  ExplosionFarHowitzer ExplosionFarCannon BoltCycleM38 StripperLoadK98kSecond
+
+# 新 cue 的三十二组（共 45 组，全量清单见 Data_SfxSources 末段）（pending，每次从空表重建，可以放心重跑）
+node Taierzhuang1938/Script_SfxBake.mjs Zb26Far Type11Far Type92Far \
+  GunTailOpenRifle GunTailStreetRifle GunTailInteriorRifle GunTailOpenMg GunTailInteriorMg \
+  BulletCrack BulletWhizz Ricochet FootstepWood FootstepStone FootstepGrass FootstepMud \
+  ClothMove GearRattle BreathHeavy BodyLand GrenadeBounceCarMetal GrenadeBounceWeightPlate \
+  GrenadeBounceCan GrenadeRoll ExplosionMidOutdoor ExplosionMidMortar \
+  DebrisFallStone DebrisFallMetal DebrisFallRubble FireSpot \
+  ImpactStoneBullet ImpactStoneRocky53 ImpactStoneRocky92
+```
+
+> **`append` 的组不能重复跑。** 它们把新变体接在清单已有的 `files` 后面，
+> 跑第二遍会接出 `_05` / `_06`。要重来先 `git checkout` 还原
+> `Audio/Sfx/Data_SfxManifest.json` 与那几个 cue 的成品，再烘。
