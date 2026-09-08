@@ -151,8 +151,8 @@
         "AudioSfx_ExplosionNear_02.mp3",
         "AudioSfx_ExplosionNear_03.mp3"
       ],
-      "seconds": 2.4,
-      "credit": "Bluezone Corporation · 城区爆炸 · Sonniss GDC 2023 ／ Gamemaster Audio · 近距爆炸（偏亮） · Sonniss GDC 2017 ／ Gamemaster Audio · 近距爆炸（偏闷、长尾） · Sonniss GDC 2017",
+      "seconds": 2.6,
+      "credit": "Bluezone Corporation · 野外大型爆炸 · Sonniss GDC 2020 ／ David Dumais · 中型实拍爆炸 · Sonniss GDC 2024 ／ Rock The Speakerbox · 带爆裂的近爆 · Sonniss GDC 2019",
       "license": "sonniss"
     },
     "explosionFar": {
@@ -162,7 +162,7 @@
         "AudioSfx_ExplosionFar_03.mp3"
       ],
       "seconds": 2.6,
-      "credit": "Gamemaster Audio · 远处爆炸 · Sonniss GDC 2017 ／ Bluezone Corporation · 榴弹炮射击与远处的落点 · Sonniss Game Audio Monthly #1 ／ Pole Position Production · 远处的火炮 · Sonniss GDC 2017",
+      "credit": "Airborne Sound · M101 105 mm 榜弹炮（远处） · Sonniss GDC 2019 ／ Lukas Tvrdon · 远处爆炸 · Sonniss GDC 2018 ／ Pole Position Production · 远处的火炮 · Sonniss GDC 2017",
       "license": "sonniss"
     },
     "shellIncoming": {
@@ -178,7 +178,7 @@
         "AudioSfx_ShellImpact_01.mp3"
       ],
       "seconds": 2.8,
-      "credit": "Coll Anderson · 野外迫击炮爆炸实录 · Sonniss GDC 2015",
+      "credit": "Bluezone Corporation · 榜弹炮弹着与碎砖 · Sonniss Game Audio Monthly #1",
       "license": "sonniss"
     },
     "launcherPop": {
@@ -732,7 +732,7 @@
         "AudioSfx_ExplosionMid_02.mp3"
       ],
       "seconds": 2.2,
-      "credit": "Bluezone Corporation · 户外大型爆炸 · Sonniss GDC 2020 ／ Bluezone Corporation · 迫击炮弹爆炸 · Sonniss GDC 2023",
+      "credit": "Lukas Tvrdon · 中距爆炸 · Sonniss GDC 2018 ／ Bluezone Corporation · 迫击炮弹爆炸 · Sonniss GDC 2023",
       "license": "sonniss"
     },
     "debrisFall": {

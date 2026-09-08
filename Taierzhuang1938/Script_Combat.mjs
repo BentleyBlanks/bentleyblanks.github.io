@@ -208,7 +208,23 @@ export class CombatSystem {
   /** Shared visible ballistic shell: no delayed explosion disconnected from a projectile. */
   FireShell(from, target, { flight = SHELL.flightFallbackS, kind = "Shell75",
     radius = SHELL.radiusFallbackM, damage = SHELL.damageFallback,
-    OnImpact = null, byPlayer = false, sourceCollider = null } = {}) {
+    OnImpact = null, byPlayer = false, sourceCollider = null,
+    incoming = true, report = false } = {}) {
+    // 一发炮弹的三声里的前两声（第三声是落地，走 Blast）。**写在这儿而不是调用点**：
+    // 见 SHELL.incomingCue 的抬头 —— 原来只有序章那两处自己补了啸声，
+    // 第一关的军列炮击、前沿弹着点、战车主炮全程是哑的。
+    const audio = this.host.audio;
+    if (audio) {
+      if (report) {
+        audio.Play(SHELL.reportCue, { position: from.clone(), volume: SHELL.reportVolume, priority: true });
+      }
+      // 啸声摆在落点上、延到「正好压在落地之前」响：一条不会动的 Panner 位置比
+      // 逐帧搬一条两秒的音便宜得多，而听感上的差别只在最后半秒。
+      if (incoming && flight >= SHELL.incomingMinFlightS) {
+        audio.Play(SHELL.incomingCue, { position: target.clone(), volume: SHELL.incomingVolume,
+          delay: Math.max(0, flight - SHELL.incomingSeconds) });
+      }
+    }
     const velocity = target.clone().sub(from).divideScalar(flight);
     velocity.y += GRAVITY * flight * 0.5;
     const shell = { id: ++this.shellSerial, from: from.clone(), target: target.clone(), position: from.clone(),
@@ -358,7 +374,9 @@ export class CombatSystem {
     const from = at.clone().add(new THREE.Vector3(
       Math.cos(angle) * INDIRECT.incomingOriginM, INDIRECT.incomingOriginHeightM,
       Math.sin(angle) * INDIRECT.incomingOriginM));
-    this.FireShell(from, at, { flight, kind, radius: spec.radius, damage: spec.damage,
+    // incoming:false —— 这一条自己有一套**预警**用的啸声（见下面：早响、按兵器
+    // 分音量），与 FireShell 那条「压在落地之前」的是两码事，不能叠。
+    this.FireShell(from, at, { flight, kind, radius: spec.radius, damage: spec.damage, incoming: false,
       OnImpact: (point) => { options.OnImpact?.(point); this.host.story?.Signal("shelling"); } });
     if (this.host.vfx) this.host.vfx.IncomingMarker(at, flight, { radius: spec.radius });
     if (this.host.audio) {

@@ -377,10 +377,10 @@ Sonniss 的许可不要求署名，但 `Data_SfxSources.mjs` 仍然逐条记着�
 | `magIn` | 1 | 0.65 s | 5.6 KB | Dramatic Cat · 步枪弹匣入位 · Sonniss GDC 2024 |
 | `grenadePin` | 1 | 0.60 s | 5.1 KB | TS Sound · 火柴摩擦点燃 · Sonniss Game Audio Monthly #4 |
 | `grenadeThrow` | 1 | 0.55 s | 4.9 KB | David Dumais Audio · 重挥破风 · Sonniss GDC 2020 |
-| `explosionNear` | 3 | 2.40 s | 57.6 KB | Bluezone Corporation · 城区爆炸 · Sonniss GDC 2023 ／ Gamemaster Audio · 近距爆炸（偏亮 / 偏闷长尾）· Sonniss GDC 2017 |
-| `explosionFar` | 3 | 2.60 s | 93.8 KB | Gamemaster Audio · 远处爆炸 · GDC 2017 ／ Bluezone · 榴弹炮远处落点 · Game Audio Monthly #1 ／ Pole Position · 远处的火炮 · GDC 2017 |
+| `explosionNear` | 3 | 2.36—2.60 s | 103.4 KB | **2026-09-09 整组换过**：Bluezone · 野外大型爆炸 · GDC 2020 ／ David Dumais · 中型实拍爆炸 · GDC 2024 ／ Rock The Speakerbox · 带爆裂的近爆 · GDC 2019 |
+| `explosionFar` | 3 | 2.60 s | 109.5 KB | **2026-09-09 换掉前两条**：Airborne Sound · M101 105 mm 榴弹炮（远处）· GDC 2019 ／ Lukas Tvrdon · 远处爆炸 · GDC 2018 ／ Pole Position · 远处的火炮 · GDC 2017 |
 | `shellIncoming` | 1 | 2.00 s | 16.2 KB | Bluezone Corporation · 炮弹飞行啸声 · Sonniss GDC 2020 |
-| `shellImpact` | 1 | 2.80 s | 22.5 KB | Coll Anderson · 野外迫击炮爆炸实录 · Sonniss GDC 2015 |
+| `shellImpact` | 1 | 2.80 s | 39.3 KB | **2026-09-09 换过**：Bluezone · 榴弹炮弹着与碎砖 · Game Audio Monthly #1（这条 cue 目前没有玩法代码在播）|
 | `launcherPop` | 1 | 0.90 s | 7.6 KB | Bluezone Corporation · 榴弹发射 · Sonniss GDC 2023 |
 | `dadaoSwing` | 3 | 0.55 s | 11.1 KB | Volcengine SeedAudio 1.0 · 大刀挥空（木质厚实 / 长嘶 / 刃嘶明亮）|
 | `dadaoHit` | 1 | 0.67 s | 5.8 KB | Volcengine SeedAudio 1.0 · 大刀砍入人体 |
@@ -400,6 +400,36 @@ Sonniss 的许可不要求署名，但 `Data_SfxSources.mjs` 仍然逐条记着�
 
 变体多的那几条不是随便给的：**每秒都在响的音必须多变体**（脚步、弹着砖、
 中弹闷哼、步枪），一个固定样本循环起来就是机关枪。
+
+### 2026-09-09｜九条爆炸/弹着换素材 + 38 Hz 高通
+
+用户报「这几个爆炸音效太难听了」。量了一遍，**三条近爆各坏各的，而且坏法互不相同** ——
+轮播时每三发换一种爆炸，这才是「难听」的直接来源。判据用一组带宽占比
+（onset 起 0.8 s，去直流）加一个「小喇叭上还剩多少」的指标
+（100 Hz—8 kHz 的 RMS 比全带宽 RMS，记作 aud dB）：
+
+| 成品 | 换之前（<40 / 40—120 / 120—400 / 400—2k） | aud dB | 换之后 | aud dB |
+| --- | --- | --- | --- | --- |
+| `explosionNear_01` | 0.01 / 0.17 / 0.21 / **0.55** | −1.4 | 0.01 / 0.56 / 0.21 / 0.20 | −2.1 |
+| `explosionNear_02` | **0.58** / 0.18 / 0.12 / 0.11 | −4.6 | 0.05 / 0.65 / 0.18 / 0.09 | −3.6 |
+| `explosionNear_03` | **0.64** / 0.09 / 0.17 / 0.09 | −3.4 | 0.06 / 0.42 / 0.34 / 0.17 | −2.4 |
+| `explosionFar_01` | **1.00** / 0.00 / 0.00 / 0.00 | **−26.1** | 0.01 / 0.60 / 0.30 / 0.08 | −3.1 |
+| `explosionFar_02` | **0.48** / 0.46 / 0.04 / 0.01 | −8.3 | 0.05 / 0.50 / 0.30 / 0.14 | −4.0 |
+| `shellImpact_01` | 0.00 / 0.40 / 0.14 / 0.25（>2k **0.21**） | −1.5 | 0.10 / 0.78 / 0.08 / 0.03 | −6.0 |
+
+**`explosionFar_01` 的能量 100 % 在 40 Hz 以下** —— 没有低音炮的机器上那一条
+字面意义上放不出声音，而它占远爆轮播的三分之一。旧 `_02` 与两条近爆同一个毛病，
+只是轻一档。次低频还有第二重伤害：`alignDbfs` 归一的是**有声段 RMS**，
+听不见的那一段照样参与，于是听得见的部分被按了下去。
+
+所以除了换素材，九条爆炸/弹着的切割参数统一加了 `hp: 38`。近爆三条现在
+（40—120 / 120—400 / 400—2k）分别是 0.56·0.21·0.20 / 0.65·0.18·0.09 /
+0.42·0.34·0.17 —— 是同一场爆炸的三个角度，不是三种不同的爆炸。
+
+`SFX_PACK_VERSION` 同批 9 → 10：**文件名一个没变**，不抬戳玩家听到的永远是缓存里的旧爆炸。
+
+混音那一半（爆炸在总线上站多高、遮挡封顶、耳鸣起音期）不在这儿，
+见 `docs/Data_AudioWiring.md` §二.9。
 
 ### 白刃三音为什么是生成的，不是实录的
 

@@ -2,6 +2,16 @@
 // Direct fire still comes from actual AI. Positions remain fixed in world space.
 export const MISSION_BATTLE_SOUND = Object.freeze({
   profiles: {
+    // 【2026-09-09】车厢那两档原来**不在表里**，而 Update 遇到没有档的 stage 直接
+    // return —— 于是开场的一分钟里，外面那条前线一声都没有，然后第一发直接炸在
+    // 车边上。用户问的「一开始进车厢怎么就有炮弹爆炸」就是这个：没有由远及近的
+    // 铺垫，炮击是**凭空**开始的。
+    //   · startAfterS —— 头二十四秒完全留给车厢自己的动静与班里那顿饭的对话；
+    //   · rampFromGain / rampS —— 军列正往北开，前线从「几乎听不见」长到「就在前头」；
+    //   · airCut —— 隔着木板与铁皮，外面只剩低频（落地那一发不吃这一条，它走 Blast）。
+    Train: {gain:.62,interval:1.9,startAfterS:24,rampFromGain:.3,rampS:30,airCut:340},
+    // 第一发落在车边之后：门开了，人往外跑，外面不再是闷的。
+    Unloading:{gain:1,interval:.85,airCut:1400},
     Support: {gain:1,interval:1}, MachineGun:{gain:.55,interval:1.2}, Tank:{gain:.55,interval:1.2},
     Orders:{gain:.7,interval:1.15}, South:{gain:.46,interval:1.7},
     Village:{gain:.7,interval:1.25}, Melee:{gain:.6,interval:1.3}, Courtyard:{gain:.75,interval:1.2},

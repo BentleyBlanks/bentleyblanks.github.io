@@ -87,6 +87,27 @@ export const SHELL = Object.freeze({
   damageFallback: 120,
   substepsPerS: 120,          // 一秒切多少步做射线积分
   expireAfterFlightS: 3,      // 打空了就在半空过期，绝不把爆炸瞬移到地上
+
+  /**
+   * 一发炮弹该发出的两声（落地那一声是 Blast 的事，不在这儿）。
+   *
+   * 【2026-09-09】在此之前，`FireShell` 是**哑的**：全场只有序章那两处调用点
+   * 自己补了一句 `Play("shellIncoming")`，第一关的军列炮击、前沿弹着点、
+   * 战车主炮一律只有炮口火光与落地的爆炸 —— 用户报的「炮弹还是没有声音」。
+   * 声音属于「打出了一发炮弹」这件事，不属于某一个调用点，所以搬进这儿。
+   *
+   * 炮口那一声是**逐调用点报名**（FireShell 的 report 选项），不是按距离猜：
+   * 曲射的 from 多半是个假原点（脚本在头顶三四十米外造一个点让弹道好看），
+   * 给它配一声真的炮口就等于告诉玩家「有门炮架在你侧面三十米」。
+   * 只有看得见炮的那些（战车主炮）才报名。
+   * incomingMinFlightS：平射弹道（战车 0.2 s 就到）配不上两秒的啸声。
+   */
+  incomingCue: "shellIncoming",
+  incomingSeconds: 1.9,       // 素材长度：啸声要正好压在落地之前
+  incomingMinFlightS: 1.0,
+  incomingVolume: 0.85,
+  reportCue: "explosionMid",
+  reportVolume: 0.7,
 });
 
 /**

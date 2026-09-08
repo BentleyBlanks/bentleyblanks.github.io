@@ -1199,10 +1199,17 @@ export class AudioWiring {
     // 战场密度：炮击那一拍枪声反而稀，光靠枪声速率强度会掉下去 —— 而那一刻
     // 恰恰是最不该安静的时候。
     this.NoteBlast(d);
-    const cue = d < BLAST_AUDIO.nearM ? "explosionNear"
-      : d < BLAST_AUDIO.midM ? "explosionMid" : "explosionFar";
-    let volume = Clamp(radius / 8, 0.5, 1.2);
-    const opts = { position: { x: position.x, y: position.y, z: position.z }, volume, priority: true };
+    const near = d < BLAST_AUDIO.nearM, mid = !near && d < BLAST_AUDIO.midM;
+    const cue = near ? "explosionNear" : mid ? "explosionMid" : "explosionFar";
+    // 三档各自的量级（见 BLAST_AUDIO.bandScale）：一发落在身边的炮弹是全场最响的
+    // 那件事，它该把总线顶到限幅器上去 —— 原来它比一句台词还小 15 dB。
+    let volume = Clamp(radius / 8, 0.5, 1.2)
+      * (near ? BLAST_AUDIO.bandScale.near : mid ? BLAST_AUDIO.bandScale.mid : BLAST_AUDIO.bandScale.far);
+    // sourceSizeM：爆炸不是一个枪口，它的近场有火球那么大（见 Script_Audio 的
+    // IsBlastCue 抬头）。不给这一条的话，11 m 外的一发 75 炮要吃 Panner 按
+    // refDistance 3.5 m 算出来的 −9.4 dB —— 那正是「炮弹没有声音」的最大一块。
+    const opts = { position: { x: position.x, y: position.y, z: position.z }, volume, priority: true,
+      sourceSizeM: Math.max(BLAST_AUDIO.sourceSizeFloorM, radius * BLAST_AUDIO.sourceSizeScale) };
     // 遮挡**只许算一层**。
     //
     // 【2026-09-09】这是用户报的「炮弹爆炸经常没声音」的直接成因：引擎侧

@@ -181,6 +181,11 @@ const DUCK_MIN_AMOUNT = 0.06;
 const DEAFEN_ON = { explosionNear: 0.42, explosionMid: 0.3, shellImpact: 0.3 };
 /** 炸到这么近才耳鸣。12 m 是手榴弹的杀伤半径量级：再远只是很响，不是被震。 */
 const DEAFEN_M = 12;
+/**
+ * 耳鸣的起音期（秒）：这段时间里总线仍是全带宽的。
+ * 一发炮弹的爆裂全在头 0.1 s 里，耳鸣该发生在它**之后**（见 Deafen）。
+ */
+const DEAFEN_ATTACK_HOLD_S = 0.13;
 
 /**
  * 玩家开枪压环境（HDR-lite）。
@@ -2406,6 +2411,29 @@ function IsVoiceCue(name) { return typeof name === "string" && name.startsWith("
 const OCCLUSION_MAX_VOICE = 0.5;
 
 /**
+ * 爆炸类 cue，以及它们的遮挡上限。
+ *
+ * 【2026-09-09 为什么爆炸要单开一条】用户第三次报「炮弹还是没有声音」，这次
+ * 量出来了：军列旁边 11 m 落一发 75 炮，主线输出峰值 −23.6 dB —— 比同一场里
+ * 一句台词（−11.2 dB）**低 12 dB**，与玩家自己那一枪（−21.1 dB）同档。
+ * 一发落在十一米外的炮弹在物理上比说话响一百多分贝；游戏里它比说话小，
+ * 那就不是「压得狠」，那是**这件事没有发生**。
+ *
+ * 三处叠出来的：
+ *   1. Panner 的 refDistance 3.5 m —— 按「一个枪口」配的。爆炸不是点声源：
+ *      火球本身就有好几米，近场比一支枪大一个数量级。改由调用侧交
+ *      `sourceSizeM`（接线层给的就是爆炸半径）。11 m 上 −9.4 → −3.6 dB。
+ *   2. 遮挡 —— 木板车厢让探针给了 0.45，折 −5.4 dB 加一道低通。低频**绕得过**
+ *      一层木板，冲击波更是直接穿过去；封到 0.25。
+ *   3. 耳鸣（Deafen）30 ms 内把总线低通压到 520 Hz —— 把**触发它的那一声自己**
+ *      的高频吃掉了。现在留一段起音期（见 Deafen 的 holdS）。
+ */
+function IsBlastCue(name) {
+  return name === "explosionNear" || name === "explosionMid" || name === "shellImpact";
+}
+const OCCLUSION_MAX_BLAST = 0.25;
+
+/**
  * 喊话的嘴离脚底多高。与 `Data_Companions.COMPANION_TUNING.mouthY`（1.52）同值 ——
  * 剧情台词走那一条，战场口令走这一条，同一个人的两句话不能站在两个高度上。
  */
@@ -2596,7 +2624,9 @@ export const AMB_BASE = "Audio/Amb/";
 export const MUSIC_BASE = "Audio/Music/";
 // 7 → 8：缺口批 A2 的十五个 cue 从 pendingCues 搬进 cues（2026-08-29）。
 // 清单本身换了内容，戳不动的话浏览器会拿着旧清单去要新文件（或者反过来）。
-export const SFX_PACK_VERSION = "9";
+// 9 → 10：九条爆炸/弹着成品换了素材并加了 38 Hz 高通（2026-09-09）。
+// **文件名一个没变**，所以不抬这个戳的话，玩家听到的永远是缓存里的旧爆炸。
+export const SFX_PACK_VERSION = "10";
 export const AMB_PACK_VERSION = "1";
 export const MUSIC_PACK_VERSION = "5";
 
@@ -2640,10 +2670,29 @@ export function AudioAssetUrl(url) {
 }
 
 /**
+ * 开机预取下来、还没人要的那些字节（url → ArrayBuffer）。
+ *
+ * 【2026-09-09 为什么要有这张表】解码需要 AudioContext，而 AudioContext 要等
+ * 用户手势 —— 但**下载不需要**。原来三个包整整齐齐排在 Unlock 之后，于是玩家
+ * 按下「进城」的那一刻才开始拉 4.3 MB（Amb 2.0 + Sfx 2.3）。线上实测：点下去
+ * 到第一声环境床 **10.4 s**，而第一关开场是车厢，`trainInterior` 的 fallbackWind
+ * 是 0 —— 这十秒是**全静音**，玩家报的「安安静静了 10 s 才开始有声音」就是它。
+ *
+ * 开机本来就要几十秒（大部分时间网络是闲的：烘图、建物理、装骨架都是 CPU），
+ * 把这两包的下载挪进那段时间里。解码仍然在 Unlock 之后，一行语义都没变。
+ *
+ * 取走就删：`decodeAudioData` 会**吞掉**（detach）传进去的 ArrayBuffer，
+ * 同一份不能给两个人。
+ */
+const PREFETCHED_AUDIO = new Map();
+
+/**
  * 取一份音频资产（ArrayBuffer），带并发闸与重试。
  * 失败时抛出的异常里带绝对 URL —— 上层一律把它原样计进 *Errors。
  */
 export async function FetchAudioAsset(url, retries = 2) {
+  const prefetched = PREFETCHED_AUDIO.get(url);
+  if (prefetched) { PREFETCHED_AUDIO.delete(url); return prefetched; }
   let last = null;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     await AudioFetchAcquire();
@@ -3000,9 +3049,23 @@ export const AMBIENCE_PRESETS = {
   // 序章｜出川：车厢静止，窗外布景由过场时间轴移动。制动不是第二套环境系统，
   // 而是同一床上的明确事件 cue；新版 102 秒序章在 0:40—0:56 触发 trainBrake 一次。
   trainInterior: {
-    space: "street", fallbackWind: 0,
+    // 【2026-09-09】fallbackWind 原来是 0，events 是空的 —— 于是这一档在实录床
+    // 到位之前是**字面意义上的全静音**（线上实测：点「进城」到第一声 10.4 s，
+    // 用户报的「安安静静了 10 s」）。两条一起改：
+    //   · 下载提前到开机（AudioEngine.PrefetchPacks），治的是根；
+    //   · 兜底给一层很闷的低频（轮轨的滚动就是低频），治的是「万一还是没到」。
+    // 180 Hz 而不是别档的 4—500 Hz：闷罐车厢里听见的是脚底下的滚动，不是风。
+    space: "street", fallbackWind: 0.06, fallbackCut: 180,
     layers: [{ bed: "trainInterior", gain: 0.82, seg: 12 }],
-    events: [],
+    // 车里坐着四十个新兵：咳嗽、装具磕碰、车体咯吱。**没有一条是战斗声** ——
+    // 外面那条前线由 Data_FirstLevelMissionBattleSound 的 Train 档按世界坐标撒，
+    // 那样它才有方位、才会随军列往北开而变响。
+    events: [
+      { name: "carriageRattle", perMin: 5.0, volume: 0.22 },
+      { name: "coughLow", perMin: 2.2, volume: 0.26 },
+      { name: "gearRustle", perMin: 3.0, volume: 0.24 },
+      { name: "clothMove", perMin: 2.4, volume: 0.18 },
+    ],
     transition: { brake: { cue: "trainBrake", atS: 50, endS: 68, mode: "oneShot" } },
   },
 
@@ -3695,6 +3758,46 @@ export class AudioEngine {
     // 三个包在这儿载入而不是在构造里：解锁之前根本没有 AudioContext，
     // decodeAudioData 无处可去。放在手势之后也顺带避免了"页面一开就拉 300 KB"。
     this.LoadPacks();
+  }
+
+  /**
+   * 开机时把音效包与环境包的字节先下下来（见 PREFETCHED_AUDIO 的抬头）。
+   *
+   * 只预取这两包：环境床决定「有没有底噪」，音效决定「第一脚、第一枪响不响」。
+   * 音乐 5.6 MB、剧情人声 5.3 MB **不在这里** —— 第一关的 music 是 null，
+   * 而人声那一支有自己的清单与惰性加载；把它们也塞进开机会真的把开机拖长。
+   *
+   * 失败一律吞掉：Unlock 之后的 LoadPacks 会照常自己再拉一次（那时这张表是空的，
+   * 走的就是原来的老路）。
+   */
+  async PrefetchPacks() {
+    if (!this.enabled || this.disposed || this.prefetching) return 0;
+    this.prefetching = true;
+    let ok = 0;
+    const Take = async (url) => {
+      try {
+        const bytes = await FetchAudioAsset(url, 1);
+        PREFETCHED_AUDIO.set(url, bytes);
+        ok += 1;
+        return bytes;
+      } catch { return null; }
+    };
+    const Pack = async (base, manifestFile, version, Files) => {
+      // 清单只解不吞：TextDecoder 读一遍不会 detach，所以它照样留在表里给 Load*Pack 用。
+      const bytes = await Take(`${base}${manifestFile}?v=${version}`);
+      if (!bytes) return;
+      let manifest = null;
+      try { manifest = JSON.parse(new TextDecoder().decode(new Uint8Array(bytes))); } catch { return; }
+      await Promise.all(Files(manifest).map((file) => Take(`${base}${file}?v=${version}`)));
+    };
+    const ManifestFiles = (groups) => groups.flatMap((group) => Object.values(group || {})
+      .flatMap((entry) => entry.files || (entry.file ? [entry.file] : [])));
+    await Promise.all([
+      Pack(SFX_BASE, "Data_SfxManifest.json", SFX_PACK_VERSION, (m) => ManifestFiles([m.cues])),
+      Pack(AMB_BASE, "Data_AmbManifest.json", AMB_PACK_VERSION, (m) => ManifestFiles([m.beds, m.cues])),
+    ]);
+    this.prefetchedCount = ok;
+    return ok;
   }
 
   /**
@@ -4507,7 +4610,8 @@ export class AudioEngine {
   }
 
   Play(name, { position = null, volume = 1, pitch = 1, delay = 0, offset = 0, maxDuration = Infinity, pan = 0, burst = null, priority = false,
-    bus = "sfx", airCut = 0, soundField = false, firstPerson = false, occlusion = null, weaponClass = null } = {}) {
+    bus = "sfx", airCut = 0, soundField = false, firstPerson = false, occlusion = null,
+    weaponClass = null, sourceSizeM = 0 } = {}) {
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
     // "rifleNra" 这一个去重 key，22 ms 窗口内谁先谁得。
@@ -4643,6 +4747,8 @@ export class AudioEngine {
       //（实测贴地采样点 30% 被判成 interior，见 Data_Tuning_Audio.PROBE），
       // 在它之前封顶等于封了个寂寞。
       if (IsVoiceCue(name)) occ = Math.min(occ, OCCLUSION_MAX_VOICE);
+      // 爆炸封顶（见 IsBlastCue）：一层木板挡不住冲击波，低频照样绕得过来。
+      if (IsBlastCue(name)) occ = Math.min(occ, OCCLUSION_MAX_BLAST);
       v.occ = occ;
       v.occAt = now;
       // 空气吸收：距离越远高频掉得越快。20 m 上还有 8 kHz，200 m 上只剩 1 kHz 出头。
@@ -4662,7 +4768,9 @@ export class AudioEngine {
       panner.panningModel = (!firstPerson && distance < 25) ? "HRTF" : "equalpower";
       panner.distanceModel = "inverse";
       // A distant battle sector is an extended field, not a one-metre muzzle.
-      panner.refDistance = soundField ? 64 : 3.5;
+      // 爆炸同理，只是尺度小两档：火球本身就有好几米，近场不是一个枪口
+      //（sourceSizeM 由调用侧给，接线层交的就是爆炸半径，见 IsBlastCue 的抬头）。
+      panner.refDistance = soundField ? 64 : Math.max(3.5, sourceSizeM || 0);
       panner.maxDistance = soundField ? 1000 : 600;
       panner.rolloffFactor = 0.9;
       // 【2026-09-09】**极近场钳位**（PANNER_MIN_M）：贴到听者身上的声源沿自己的
@@ -5021,25 +5129,32 @@ export class AudioEngine {
    * 这个方法**保留**成手动 API：编辑器要能单独试听，过场也可能要在没有爆炸的
    * 地方来一下（比如被埋在土里那一拍）。
    */
-  Deafen(seconds = 0.4) {
+  Deafen(seconds = 0.4, holdS = DEAFEN_ATTACK_HOLD_S) {
     if (!this.ctx) return;
     const ctx = this.ctx;
     const t = ctx.currentTime;
     const f = this.deafFilter.frequency;
     f.cancelScheduledValues(t);
     f.setValueAtTime(Math.max(f.value, 200), t);
-    f.exponentialRampToValueAtTime(520, t + 0.03);
-    f.setValueAtTime(520, t + seconds);
-    f.exponentialRampToValueAtTime(20000, t + seconds + 0.9);
+    // 【2026-09-09】起音期：原来 30 ms 就压到 520 Hz，于是**触发这次耳鸣的那一声
+    // 自己**的高频先被吃掉了 —— 爆炸听着像隔壁的闷响，而耳鸣是「之后」的事。
+    // 先原样放过起音的那 0.13 s（一发炮弹的爆裂全在这一段里），再关门。
+    f.setValueAtTime(Math.max(f.value, 200), t + holdS);
+    f.exponentialRampToValueAtTime(520, t + holdS + 0.05);
+    f.setValueAtTime(520, t + holdS + seconds);
+    f.exponentialRampToValueAtTime(20000, t + holdS + seconds + 0.9);
 
     if (this.liveNodes + 4 > this.nodeBudget) return;   // 预算紧就只做闷响
     const osc = ctx.createOscillator();
     osc.type = "sine";
     osc.frequency.value = 4000;
     const g = ctx.createGain();
-    const total = seconds + 1.4;
+    const total = holdS + seconds + 1.4;
+    // 脑子里那声也等起音期过去再进来：它 0.055 的电平（−25 dB）本来就在
+    // 爆炸的量级上，压在爆裂那一瞬间等于给自己加了一层遮罩。
     g.gain.setValueAtTime(FLOOR, t);
-    g.gain.linearRampToValueAtTime(0.055, t + 0.02);
+    g.gain.setValueAtTime(FLOOR, t + holdS);
+    g.gain.linearRampToValueAtTime(0.055, t + holdS + 0.02);
     g.gain.exponentialRampToValueAtTime(FLOOR, t + total);
     // 接在耳鸣低通**之后** —— 接在前面的话它自己也被压掉，就没有「脑子里那声」了。
     osc.connect(g).connect(this.outGain);

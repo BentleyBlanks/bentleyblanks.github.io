@@ -1134,6 +1134,12 @@ async function Boot() {
       + pbrFailed.join("、"));            // @text-ok console.warn 的续行，是诊断输出
   }
 
+  // 音效包与环境包的字节在这儿就开始拉（解码仍等手势，见 AudioEngine.PrefetchPacks）。
+  // 排在这里而不是模块顶：前面几步（外部 PBR / GLB）正把网络占满，
+  // 而从建物理到装骨架这一段网络是闲的。不 await —— 它自己失败自己算，
+  // 拉不到时 Unlock 之后的 LoadPacks 会照原路再来一次。
+  audio.PrefetchPacks?.();
+
   // 物理引擎的 wasm（2.8 MB，本地 vendor 里）。**必须排在建关之前** ——
   // BuildField 末尾就要拿它建碰撞体了。
   setStep(T("boot.step.physics"), BOOT.progress.physics);
@@ -3580,7 +3586,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
           p012Resting?.OnImpact({event:"P012NorthNearMissImpact",position:impact});
           OnImpact(impact);
         }});
-      audio.Play("shellIncoming", { position: from }); return point;
+      // 啸声由 Combat.FireShell 统一发（见 SHELL.incomingCue）；这里再补一句就是两条。
+      return point;
     },
   }, phase.whitebox) : null;
   p012Runtime?.SaveSafePoint("Start",phase.spawn,"stand",phase.spawn.ry || 0);
@@ -3588,7 +3595,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     runtime:p012Runtime, config:phase.whitebox, ambience:phase.ambience||phase.sky,
     Flow:()=>p012Flow, Carry:()=>carry,
     FireShell:(from,at,options)=>{
-      audio.Play("shellIncoming",{position:from,volume:.8});
+      // 同上：啸声在 Combat.FireShell 里，摆在落点上按飞行时间延迟。
       return combat.FireShell(from,at,{...options,kind:"Shell75",radius:7,damage:0});
     },
     Capture: cut => cutscene.onCapture(cut), Release: () => {input.lookX=0;input.lookY=0;cutscene.onRelease();},

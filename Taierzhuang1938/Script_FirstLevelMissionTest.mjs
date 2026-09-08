@@ -380,8 +380,24 @@ for(const preparedAnimation of [false,true]) {
 
 {
  const calls=[], sound=new FirstLevelMissionBattleSound({Play:(cue,options)=>{calls.push({cue,...options});return null;}});
- for(let i=0;i<120;i++)sound.Update(.5,"Train");
- assert.equal(calls.length,0,"the carriage stays clear of premature front sound");
+ // 【2026-09-09 这一条改了口径】原来断言的是「车厢里一声前线都不许有」。
+ // 实测下来那正是用户报的问题：整整一分钟的车厢里只有三句对白，然后第一发
+ // 凭空炸在车边上。现在的口径是**由远及近**，闸门有三道，一道都不能松：
+ //   1. 头 24 秒仍然一声不许有（车厢自己的动静与那顿饭的对话独占）；
+ //   2. 之后只许是**闷的**（airCut ≤ 340 Hz —— 隔着木板与铁皮）；
+ //   3. 头一段必须比后一段轻（军列在往前线开，不是前线在靠近）。
+ for(let i=0;i<48;i++)sound.Update(.5,"Train");
+ assert.equal(calls.length,0,"the carriage stays clear of front sound for the first 24s");
+ for(let i=0;i<40;i++)sound.Update(.5,"Train");
+ const early=calls.slice();
+ assert.ok(early.length>0,"the front creeps in through the carriage wall before the shelling");
+ assert.ok(early.every(c=>c.airCut<=340&&c.soundField&&c.bus==="ambience"),
+   "everything heard from inside the carriage is muffled: "+JSON.stringify(early[0]));
+ for(let i=0;i<40;i++)sound.Update(.5,"Train");
+ const late=calls.slice(early.length), Loudest=(rows,cue)=>Math.max(0,...rows.filter(c=>c.cue===cue).map(c=>c.volume));
+ assert.ok(Loudest(late,"amb.cannonFar")>Loudest(early,"amb.cannonFar"),
+   "the front grows as the train rolls north: "+JSON.stringify({early:Loudest(early,"amb.cannonFar"),late:Loudest(late,"amb.cannonFar")}));
+ calls.length=0;
  for(let i=0;i<120;i++)sound.Update(.5,"Support");
  assert.ok(calls.some(c=>c.cue==="amb.cannonFar")&&calls.some(c=>c.cue==="type92")&&calls.some(c=>c.cue==="rifleNraFar"));
  assert.ok(calls.every(c=>c.position.z< -190&&c.soundField&&c.bus==="ambience"));

@@ -279,6 +279,49 @@ cue、距离、遮挡值、低通、干声节点、总线路由。四条假设�
 
 ---
 
+## 2.6 「一进车厢安安静静十秒」的定论（2026-09-09）
+
+用户报「进车厢之后安安静静了 10 s 才开始有声音」。线上（GitHub Pages）实拍，
+时间戳取「点『进城』的那一刻」为零点：
+
+| 事件 | t |
+| --- | --- |
+| 点「进城」（`Unlock` → `LoadPacks` 从这里才开始拉包） | 0.00 s |
+| 环境床第一层起播（`ambLayers.length` 0 → 1） | **+10.47 s** |
+
+三件事凑在一起，缺一条都不会这么响（准确地说是不会这么**不**响）：
+
+1. **三个实录包的下载排在手势之后。** 原注释的理由是「解码要 AudioContext」——
+   那是对的，但**下载不需要**。Sfx 2.3 MB + Amb 2.0 MB 在 Pages 的带宽上就是十秒。
+2. **第一关开场是车厢**，`trainInterior` 这一档 `fallbackWind` 是 `0`：
+   实录床没到位时，别的档还有一层合成的风垫底，这一档**什么都没有**。
+3. `trainInterior` 的 `events` 是空的，而 `MISSION_BATTLE_SOUND.profiles` 里
+   没有 `Train` / `Unloading` 两档（`Update` 遇到没有档的 stage 直接 return）——
+   于是开场那一分钟里，除了三句对白，一条声音都不该有。
+
+改法：
+
+- `AudioEngine.PrefetchPacks()`：**开机就把 Sfx / Amb 两包的字节拉下来**
+  （`Script_Main` 在 `boot.step.physics` 那一步 fire-and-forget 调它），
+  存在模块级 `PREFETCHED_AUDIO`，`FetchAudioAsset` 命中就取走并删掉
+  （`decodeAudioData` 会 detach，同一份不能给两个人）。解码仍在 `Unlock` 之后，
+  语义一行没变；拉不到就退回原来的老路。开机本来就要几十秒，而建物理、装骨架
+  那几步网络是闲的。本地实测同一条链路：10.47 s → **0.34 s**。
+  音乐 5.6 MB 与剧情人声 5.3 MB **不预取**（第一关 music 是 null，人声有自己的清单）。
+- `trainInterior` 补 `fallbackWind: 0.06 / fallbackCut: 180`（闷罐车厢听见的是脚底下的
+  滚动，不是风），再补四条车厢自己的 `events`（车体咯吱、咳嗽、装具、布料）。
+- 外面那条前线交给 `MISSION_BATTLE_SOUND` 的新档，见
+  `docs/Data_AudioWiring.md` 与 `Data_FirstLevelMissionBattleSound.mjs` 的注释。
+
+### 回归口
+
+`Script_AudioTest.mjs`（`trainInterior` 床与 preset）＋
+`Script_FirstLevelMissionTest.mjs`「车厢里的前线三道闸」。
+线上那条时间差没有自动化断言 —— 它要真实带宽，取证脚本留在会话记录里
+（hook `audio.Ambience` 记 `ambLayers.length` 0 → 1 的时刻）。
+
+---
+
 ## 3. 分区混响（四档 IR）
 
 IR 仍然是**现场程序生成**、种子确定（`HashString("ir:" + kind)`），一个外部文件都不用。

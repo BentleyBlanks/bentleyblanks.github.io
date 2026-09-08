@@ -247,6 +247,29 @@ export const GRENADE_FOLEY = Object.freeze({
 export const BLAST_AUDIO = Object.freeze({
   nearM: 40,
   midM: 120,
+  /**
+   * 爆炸的**声源尺寸**（米），交给 Play 当 Panner 的 refDistance。
+   *
+   * 【2026-09-09】用户第三次报「炮弹还是没有声音」，这次量出来了：军列旁 11 m
+   * 落一发 75 炮，主线峰值 −23.6 dB，比同场一句台词（−11.2 dB）低 12 dB。
+   * 最大的一块出在 Panner 的默认 refDistance 3.5 m —— 那是按「一个枪口」配的。
+   * 爆炸是有体积的源：火球好几米，冲击波与低频在近场几乎不衰减。
+   * 半径 ×1.6（75 炮 radius 7 → 11 m）：十来米内基本不掉，出了这个范围
+   * 仍按 inverse 正常衰减，远处的爆炸不会因此变响。
+   */
+  sourceSizeScale: 1.6,
+  sourceSizeFloorM: 6,
+  /**
+   * 三档爆炸的量级。素材烘焙时统一归一化过（峰值 0.85—0.97），所以这一组数
+   * 就是「一发炮弹在混音里站多高」。
+   *
+   * near 3.2 是量出来的，不是配出来的：改这一条之前，11 m 外一发 75 炮的
+   * 主线真峰值是 −17.8 dB，同一场里一句台词是 −3.0 dB、玩家自己那一枪 −9.7 dB。
+   * 顺序整个是反的。近炸现在会把母线压缩器与末端限幅器一起顶上去 ——
+   * 那正是想要的：炸的那一下，别的东西都得让路（Duck / Deafen 早就接好了）。
+   * mid / far 只微调：它们本来就靠距离衰减站在该在的位置上。
+   */
+  bandScale: Object.freeze({ near: 3.2, mid: 1.8, far: 1.15 }),
   // 遮挡：隔着一堵墙的爆炸仍然听得见（低频绕射），但高频全没了。
   occludedGain: 0.5,
   occludedAirCutHz: 900,

@@ -1049,6 +1049,9 @@ export class FirstLevelMissionRuntime {
       this.combat.FireShell(from, impactTarget, {
         flight: Math.max(.06,from.distanceTo(impactTarget)/R.tankShellSpeedMps),
         kind: "Shell57",
+        // 看得见的那门炮：炮口要响（见 SHELL 的抬头）。原来这一发从头到尾只有
+        // 火光与落点，中间那一声炮口是空的。
+        report: true,
         sourceCollider: this.view.tankCollider,
         radius: 5,
         damage: 85,

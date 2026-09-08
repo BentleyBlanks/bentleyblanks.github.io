@@ -677,7 +677,12 @@ const duck = await page.evaluate(async () => {
   const ducks = a.stats.ducks, deafens = a.stats.deafens;
   // 脚边那一颗：不给 position = 满量
   a.Play("explosionNear", { priority: true, volume: 0.02 });
-  await sleep(120);
+  // 【2026-09-09】起音期（Script_Audio.DEAFEN_ATTACK_HOLD_S = 0.13 s）：这一段里
+  // 总线仍是全带宽的 —— 原来 30 ms 就压到 520 Hz，把**触发耳鸣的那一声自己**
+  // 的高频吃掉了。所以要量两次：起音期内还开着，起音期过后才闷。
+  await sleep(60);
+  const attack = { deaf: a.deafFilter.frequency.value };
+  await sleep(200);
   const near = { gain: a.duckGain.gain.value, deaf: a.deafFilter.frequency.value };
   await sleep(2600);
   // 二百米外那一颗：按距离缩放之后应该几乎不压，也绝不许震聋玩家
@@ -689,10 +694,11 @@ const duck = await page.evaluate(async () => {
   a.Play("explosionNear", { position: { x: L.x + 200, y: L.y, z: L.z }, priority: true, volume: 0.02 });
   await sleep(120);
   const far = { gain: a.duckGain.gain.value, deaf: a.deafFilter.frequency.value };
-  return { sampled, before, near, far, ducks: a.stats.ducks - ducks, deafens: a.stats.deafens - deafens };
+  return { sampled, before, attack, near, far, ducks: a.stats.ducks - ducks, deafens: a.stats.deafens - deafens };
 });
 if (!duck.sampled) Fail("explosionNear 还没被采样盖住 —— 这条断言测的正是采样路径，先修上面那条");
 else if (!(duck.near.gain < 0.6)) Fail(`采样路径下 explosionNear 没有 duck：duckGain ${duck.near.gain.toFixed(3)}（应 < 0.6）`);
+else if (!(duck.attack.deaf > 15000)) Fail(`耳鸣把爆炸自己的起音吃掉了：60 ms 时低通已到 ${duck.attack.deaf.toFixed(0)} Hz（起音期内应 > 15000）`);
 else if (!(duck.near.deaf < 2000)) Fail(`脚边那颗没有耳鸣：耳鸣低通 ${duck.near.deaf.toFixed(0)} Hz（应 < 2000）`);
 else if (!(duck.far.gain > 0.9)) Fail(`二百米外那颗把配乐压到了 ${duck.far.gain.toFixed(3)} —— duck 没按距离缩放`);
 else if (!(duck.far.deaf > 15000)) Fail(`二百米外那颗把玩家震聋了：耳鸣低通 ${duck.far.deaf.toFixed(0)} Hz`);

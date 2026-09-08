@@ -257,51 +257,66 @@ export const SFX_SOURCES = [
     license: "sonniss",
     cuts: [{ cue: "grenadeThrow", tail: 0.55, gain: 0.85, whole: true }],
   },
+  // --- 近距爆炸的三个变体（2026-09-09 换素材批）---------------------------
+  // 【为什么整组换掉】用户报「这几个爆炸音效太难听了」。量了一遍，三条各坏各的，
+  // 而且坏法**互不相同**——轮播时每三发就换一种爆炸，这才是「难听」的直接来源：
+  //   · 旧 _01（BC0277 城区爆炸）：40—120 Hz 只占 17 %，400—2 k 占 55 %——没有下盘，
+  //     只有一记「啪」；
+  //   · 旧 _02 / _03（Gamemaster 设计音）：**58 % / 64 % 的能量在 40 Hz 以下**。
+  //     那一段绝大多数扬声器放不出来，却照样参与 `alignDbfs` 的响度归一 ——
+  //     等于把听得见的那部分按下去。实测「100 Hz—8 kHz 的 RMS 比全带宽 RMS」
+  //     低 4.6 / 3.4 dB。
+  // 新的三条按同一组带宽指标挑（40—120 Hz 占 0.42—0.66、120—400 占 0.18—0.34、
+  // 400—2 k 占 0.09—0.20、>2 k < 0.03），互相之间是**同一场爆炸的不同角度**，
+  // 不是三种不同的爆炸；三条都加 `hp: 38` 把听不见的那段次低频削掉，
+  // 归一化的电平于是全部落在听得见的地方。
   {
-    id: "ExplosionUrban",
-    item: "sonniss-gdc-2023-game-audio-bundle-normalized",
-    path: "BluezoneCorp - Detonation - Explosion/Bluezone_BC0277_explosion_urban_004_02.mp3",
-    credit: "Bluezone Corporation · 城区爆炸 · Sonniss GDC 2023",
+    id: "ExplosionOutdoorLarge",
+    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
+    path: "Bluezone - Tank - Explosion Sound Effects/Bluezone_BC0271_explosion_outdoors_large_005.mp3",
+    credit: "Bluezone Corporation · 野外大型爆炸 · Sonniss GDC 2020",
     license: "sonniss",
-    // 城区版而不是旷野版：这场仗打在滕县城里，冲击之后应该有墙面反射与碎砖。
-    cuts: [{ cue: "explosionNear", tail: 2.4, gain: 0.97, whole: true }],
-  },
-  // --- explosionNear 的第 2/3 个变体（2026-08-29 抛光批 P3）------------------
-  // 手榴弹雨那一段每秒都在响 explosionNear，独苗变体会被听成「同一个 wav 在复读」——
-  // 本表自己的规矩就是「每秒都在响的音必须多变体」，这里是最后一处没做到的。
-  //
-  // **为什么不是 Bluezone 的另外几条**：archive.org 那份镜像是**每家厂商只放四个文件**
-  // 的抽样，Bluezone 的 Detonation 目录里带 urban 的就 BC0277 这一条，没有第二条同库的。
-  // 于是改按**频谱选**，不按文件名选：拿现成的 BC0277（谱心 1772 Hz、>4 kHz 占 11.9 %、
-  // 降 20 dB 用 0.72 s）当靶子，把镜像里所有非科幻的爆炸量了一遍，
-  // Gamemaster 这两条一深一亮把靶子夹在中间（1453 / 1807 Hz），是全表最近的两条；
-  // 而且这个包已经是 explosionFar 的来源，三个变体出自同两家厂商，底噪与房间感是一路的。
-  //
-  // 三条都不许「越炸越大」：alignDbfs −25 是 Script_AudioNormalize 的一次性音口径，
-  // BC0277 那条实测 −24.92 dBFS，新的两条对齐到同一条线上，轮播时只换音色不换音量。
-  {
-    id: "ExplosionUrbanLarge",
-    item: "sonniss-gdc-2017-game-audio-bundle-normalized",
-    path: "Gamemaster Audio -  Explosion Sound Pack/explosion_large_08.mp3",
-    credit: "Gamemaster Audio · 近距爆炸（偏亮） · Sonniss GDC 2017",
-    license: "sonniss",
-    cuts: [{ cue: "explosionNear", tail: 2.4, gain: 0.97, whole: true, append: true, alignDbfs: -25 }],
+    bitrate: BITRATE_TRANSIENT,
+    // 起音 4.6 ms、降 20 dB 用 1.55 s：三条里最「完整」的一条 —— 冲击、火球、尾巴都在。
+    cuts: [{ cue: "explosionNear", tail: 2.6, gain: 0.97, whole: true, hp: 38, alignDbfs: -25 }],
   },
   {
-    id: "ExplosionUrbanLongTail",
-    item: "sonniss-gdc-2017-game-audio-bundle-normalized",
-    path: "Gamemaster Audio -  Explosion Sound Pack/explosion_med_long_tail_01.mp3",
-    credit: "Gamemaster Audio · 近距爆炸（偏闷、长尾） · Sonniss GDC 2017",
+    id: "ExplosionRealMedium",
+    item: "sonniss-gdc-2024-game-audio-bundle-normalized",
+    path: "DavidDumais - Explosion SFX Pack/EXPLReal_Medium Realistic Explosion 15_DDUMAIS_NONE.mp3",
+    credit: "David Dumais · 中型实拍爆炸 · Sonniss GDC 2024",
     license: "sonniss",
-    cuts: [{ cue: "explosionNear", tail: 2.4, gain: 0.97, whole: true, append: true, alignDbfs: -25 }],
+    bitrate: BITRATE_TRANSIENT,
+    // 最短的一条（0.78 s 降 20 dB），下盘最重（40—120 Hz 占 66 %）：贴着落的那一发。
+    cuts: [{ cue: "explosionNear", tail: 2.4, gain: 0.97, whole: true, hp: 38,
+      append: true, alignDbfs: -25 }],
   },
   {
-    id: "ExplosionFar",
-    item: "sonniss-gdc-2017-game-audio-bundle-normalized",
-    path: "Gamemaster Audio -  Explosion Sound Pack/explosion_far_distant_02.mp3",
-    credit: "Gamemaster Audio · 远处爆炸 · Sonniss GDC 2017",
+    id: "ExplosionBoomyCrack",
+    item: "sonniss-gdc-2019-game-audio-bundle-normalized",
+    path: "Rock The Speakerbox - Broken/BROKEN - CK - EXPLOSION Boomy Crack.mp3",
+    credit: "Rock The Speakerbox · 带爆裂的近爆 · Sonniss GDC 2019",
     license: "sonniss",
-    cuts: [{ cue: "explosionFar", tail: 2.6, gain: 0.7, whole: true, lp: 2200 }],
+    bitrate: BITRATE_TRANSIENT,
+    // 42 秒的素材里是四条独立的 take（0.06 / 7.60 / 15.85 / 24.48 s），取第二条 ——
+    // 全表里 120—400 Hz 最厚的一条（34 %），补上另外两条缺的那记「炸裂」。
+    cuts: [{ cue: "explosionNear", exactAtS: 7.55, tail: 2.4, gain: 0.97, hp: 38,
+      append: true, alignDbfs: -25 }],
+  },
+  {
+    id: "ExplosionFarHowitzerReal",
+    item: "sonniss-gdc-2019-game-audio-bundle-normalized",
+    path: "Airborne Sound - Battlefield Howitzers/Howitzer,M101,C1,105 mm,Distant,Right Side,Shot,Pound,Thick.mp3",
+    credit: "Airborne Sound · M101 105 mm 榜弹炮（远处） · Sonniss GDC 2019",
+    license: "sonniss",
+    bitrate: BITRATE_TRANSIENT,
+    // 【2026-09-09 换掉了 Gamemaster 那条】旧 `_01` 的能量**100 % 在 40 Hz 以下**：
+    // 实测「100 Hz—8 kHz 的 RMS」比全带宽低 26.1 dB —— 没有低音炮的机器上
+    // 那一条**字面意义上放不出声音**，而它占三分之一的轮播。
+    // 换成真的 105 mm 榴弹炮远场实录：40—120 Hz 占 60 %、120—400 占 30 %，
+    // 该有的下盘一点没少，但听得见了。
+    cuts: [{ cue: "explosionFar", tail: 2.6, gain: 0.7, whole: true, hp: 38, lp: 2200,
+      alignDbfs: -25 }],
   },
   {
     id: "ShellTrajectory",
@@ -314,12 +329,18 @@ export const SFX_SOURCES = [
     cuts: [{ cue: "shellIncoming", tail: 2.0, gain: 0.85, whole: true, fromEnd: true }],
   },
   {
-    id: "MortarExplosion",
-    item: "sonniss-gdc-2015-game-audio-bundle-normalized",
-    path: "Coll Anderson - Guns/EFX EXT Mortar Explosion 08.mp3",
-    credit: "Coll Anderson · 野外迫击炮爆炸实录 · Sonniss GDC 2015",
+    id: "HowitzerImpactRubble",
+    item: "game-audio-monthly",
+    path: "Sonniss.com - Game Audio Monthy - #1/Bluezone - Artillery Designed Howitzer and Explosion Sound Effects/Bluezone-BC0200-howitzer-falling-rubble-explosion-impact-016.mp3",
+    credit: "Bluezone Corporation · 榜弹炮弹着与碎砖 · Sonniss Game Audio Monthly #1",
     license: "sonniss",
-    cuts: [{ cue: "shellImpact", tail: 2.8, gain: 0.95, whole: true }],
+    bitrate: BITRATE_TRANSIENT,
+    // 【2026-09-09 换掉了 Coll Anderson 那条】旧素材起音要 2.4 s、>2 kHz 占 21 %、
+    // 谱心 2503 Hz —— 那是一记「哗」，不是炮弹落地。这条是弹着 + 天上掉下来的砖屑，
+    // 名字与声音总算对得上了。
+    // **这条 cue 目前没有任何玩法代码在播**（落点那一声走 `explosionNear/Mid/Far`），
+    // 它只活在编辑器的音频表里；配方、DUCK_ON、DEAFEN_ON 都还留着，接线时直接用。
+    cuts: [{ cue: "shellImpact", tail: 2.8, gain: 0.95, whole: true, hp: 38, alignDbfs: -25 }],
   },
   {
     id: "LauncherPop",
@@ -1307,14 +1328,18 @@ export const SFX_SOURCES = [
   // 中距那两条落在中间：素材本身就是有距离的户外实录，再用 lp 5000 收一收高频，
   // 相当于六十到一百五十米空气吸收掉的那一段。
   {
-    id: "ExplosionMidOutdoor",
-    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
-    path: "Bluezone - Tank - Explosion Sound Effects/Bluezone_BC0271_explosion_outdoors_large_005.mp3",
-    credit: "Bluezone Corporation · 户外大型爆炸 · Sonniss GDC 2020",
+    id: "ExplosionMidDistantBlast",
+    item: "sonniss-gdc-2018-game-audio-bundle-normalized",
+    path: "Lukas Tvrdon - Distant Blast/Distant Blast 26.mp3",
+    credit: "Lukas Tvrdon · 中距爆炸 · Sonniss GDC 2018",
     license: "sonniss",
     bitrate: BITRATE_TRANSIENT,
-    // 降 20 dB 要 1.20 s —— 尾巴比近距那三条都长，那是距离给的，不是加出来的。
-    cuts: [{ cue: "explosionMid", tail: 2.20, gain: 0.88, whole: true, lp: 5000, alignDbfs: -25 }],
+    // 【2026-09-09】原来这一格是 BC0271 户外大爆炸 —— 那条已经调去当 `explosionNear`
+    // 的第一变体了（它是一记完整的近爆，摆在中距那一档是浪费）。
+    // 换上这条本来就录在几百米外的：40—120 Hz 占 49 %、400—2 k 占 26 %，
+    // 与同档的迫击炮那条一闷一亮，中间的距离感对得上。
+    cuts: [{ cue: "explosionMid", tail: 2.20, gain: 0.88, whole: true, hp: 38, lp: 5000,
+      alignDbfs: -25 }],
   },
   {
     id: "ExplosionMidMortar",
@@ -1325,21 +1350,21 @@ export const SFX_SOURCES = [
     bitrate: BITRATE_TRANSIENT,
     // 与 `explosionNear_01` **同一个库**（BC0277），底噪与房间感是一路的；
     // 而滕县城里落的绝大多数就是迫击炮弹。
-    cuts: [{ cue: "explosionMid", tail: 2.00, gain: 0.88, whole: true, lp: 5000,
+    cuts: [{ cue: "explosionMid", tail: 2.00, gain: 0.88, whole: true, hp: 38, lp: 5000,
       append: true, alignDbfs: -25 }],
   },
   {
-    id: "ExplosionFarHowitzer",
-    item: "game-audio-monthly",
-    path: "Sonniss.com - Game Audio Monthy - #1/Bluezone - Artillery Designed Howitzer and Explosion Sound Effects/Bluezone-BC0200-howitzer-shot-distant-explosion-003.mp3",
-    credit: "Bluezone Corporation · 榴弹炮射击与远处的落点 · Sonniss Game Audio Monthly #1",
+    id: "ExplosionFarDistantBlast",
+    item: "sonniss-gdc-2018-game-audio-bundle-normalized",
+    path: "Lukas Tvrdon - Distant Blast/Distant Blast 05.mp3",
+    credit: "Lukas Tvrdon · 远处爆炸 · Sonniss GDC 2018",
     license: "sonniss",
-    pending: false,   // 补的是已有 cue 的变体，运行时立刻可用
     bitrate: BITRATE_TRANSIENT,
-    // `explosionFar` 的第二个变体。素材前 2 s 是炮口，3 s 起才是**远处的落点**
-    //（实测谱心 653 Hz、>4 kHz 只剩 0.3 %），所以从 3.0 s 落刀。
-    // lp 2200 与 `_01` 同参数，三条远爆的高频截点必须一致，否则轮播时忽远忽近。
-    cuts: [{ cue: "explosionFar", exactAtS: 3.00, tail: 2.60, gain: 0.70, lp: 2200,
+    // 【2026-09-09】原来这一格是 BC0200「炮口 + 远处落点」从 3.0 s 落刀那一条。
+    // 它与旧 `_01` 是同一个毛病，只是轻一档：**48 % 的能量在 40 Hz 以下**，
+    // 听得见的那段比全带宽低 8.3 dB。换成录在几公里外的这条（40—120 占 50 %、
+    // 120—400 占 30 %），lp 2200 与另外两条同参数，轮播时距离感不跳。
+    cuts: [{ cue: "explosionFar", tail: 2.60, gain: 0.70, hp: 38, lp: 2200, whole: true,
       append: true, alignDbfs: -25 }],
   },
   {
@@ -1352,7 +1377,7 @@ export const SFX_SOURCES = [
     // 第三个变体。这条素材已经是 `amb.shellingFar` 的来源（那边是把二十六记叠成床），
     // 这里切**单独一记有头有尾的**。实测谱心 314 Hz —— 三条远爆里最闷的一条，
     // 与 Gamemaster 那条（`_01`）一亮一闷把中间夹住。
-    cuts: [{ cue: "explosionFar", exactAtS: 0.50, tail: 2.60, gain: 0.70, lp: 2200,
+    cuts: [{ cue: "explosionFar", exactAtS: 0.50, tail: 2.60, gain: 0.70, hp: 38, lp: 2200,
       append: true, alignDbfs: -25 }],
   },
   {
