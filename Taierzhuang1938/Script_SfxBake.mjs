@@ -475,8 +475,15 @@ async function Main() {
       }
       continue;
     }
-    const ext = group.generated ? ".wav" : (path.extname(new URL(SourceUrl(group)).pathname) || ".mp3");
-    const rawFile = path.join(RAW_DIR, `${group.id}${ext}`);
+    // `local` 组的素材不是下载来的（见 Data_SfxSources 的 refvideo 许可）：文件名直接
+    // 写在配方里，落在 _raw/ 下。_raw/ 是 gitignore 的，所以换台机器重烘拿不到 ——
+    // 缺文件时不静默跳过，把 `source` 里记的出处打出来。
+    const ext = group.generated ? ".wav"
+      : group.local ? (path.extname(group.local) || ".wav")
+      : (path.extname(new URL(SourceUrl(group)).pathname) || ".mp3");
+    const rawFile = group.local
+      ? path.join(RAW_DIR, group.local)
+      : path.join(RAW_DIR, `${group.id}${ext}`);
     if (group.generated) {
       console.log(`[生成] ${group.id}（本地确定性程序合成）`);
       if (report) { for (const cut of group.cuts) console.log(`   · ${cut.cue} ${cut.durS}s`); continue; }
@@ -492,6 +499,11 @@ async function Main() {
       continue;
     }
     if (!fs.existsSync(rawFile)) {
+      if (group.local) {
+        console.error(`[缺素材] ${group.id}：需要 Audio/Sfx/_raw/${group.local}`);
+        console.error(`          出处：${group.source || "（配方未记 source）"}`);
+        continue;
+      }
       if (recut) { console.log(`[跳过] ${group.id}：--recut 但本地没有素材`); continue; }
       process.stdout.write(`[下载] ${group.id} … `);
       const bytes = Download(group, rawFile);

@@ -20,6 +20,11 @@
       "name": "Volcengine SeedAudio 1.0",
       "terms": "由本项目账户经火山引擎 API 生成；使用受该服务条款约束",
       "via": "https://openspeech.bytedance.com/api/v3/tts/create"
+    },
+    "refvideo": {
+      "name": "参考视频实录（B 站）",
+      "terms": "**非免版税**：版权归原视频上传者，本项目未获授权。仅供原型阶段手感对齐；对外发布前必须替换或取得授权。",
+      "via": "BV1cG411m7Vz（三八大盖有盖版实弹射击）· BV1GMojB3EFP（汉阳造 88 式步枪）"
     }
   },
   "cues": {
@@ -28,11 +33,14 @@
         "AudioSfx_RifleNra_01.mp3",
         "AudioSfx_RifleNra_02.mp3",
         "AudioSfx_RifleNra_03.mp3",
-        "AudioSfx_RifleNra_04.mp3"
+        "AudioSfx_RifleNra_04.mp3",
+        "AudioSfx_RifleNra_05.mp3",
+        "AudioSfx_RifleNra_06.mp3",
+        "AudioSfx_RifleNra_07.mp3"
       ],
       "seconds": 1.3,
-      "credit": "Watson Wu · 毛瑟 8 mm 中距离实录 · Sonniss Game Audio Monthly #3 ／ Pole Position Production · K98k 7.92×57 连续实录（同一支枪的另外三发）· Sonniss GDC 2020",
-      "license": "sonniss"
+      "credit": "Watson Wu · 毛瑟 8 mm 中距离实录 · Sonniss Game Audio Monthly #3 ／ Pole Position Production · K98k 7.92×57 连续实录（同一支枪的另外三发）· Sonniss GDC 2020 ／ 汉阳造 88 式步枪实弹射击 · 参考视频实录",
+      "license": "refvideo"
     },
     "rifleNraFar": {
       "files": [
@@ -49,11 +57,12 @@
         "AudioSfx_RifleIja_01.mp3",
         "AudioSfx_RifleIja_02.mp3",
         "AudioSfx_RifleIja_03.mp3",
-        "AudioSfx_RifleIja_04.mp3"
+        "AudioSfx_RifleIja_04.mp3",
+        "AudioSfx_RifleIja_05.mp3"
       ],
       "seconds": 1.045,
-      "credit": "Watson Wu · M1 Garand .30-06 近射 · Sonniss Game Audio Monthly #3 ／ Pole Position Production · 斯普林菲尔德 M1903A3 .30-06 连续实录 · Sonniss GDC 2020",
-      "license": "sonniss"
+      "credit": "Watson Wu · M1 Garand .30-06 近射 · Sonniss Game Audio Monthly #3 ／ Pole Position Production · 斯普林菲尔德 M1903A3 .30-06 连续实录 · Sonniss GDC 2020 ／ 三八式步枪（三八大盖，有盖版）实弹射击 · 参考视频实录",
+      "license": "refvideo"
     },
     "rifleIjaFar": {
       "files": [
@@ -96,11 +105,12 @@
     "bolt": {
       "files": [
         "AudioSfx_Bolt_01.mp3",
-        "AudioSfx_Bolt_02.mp3"
+        "AudioSfx_Bolt_02.mp3",
+        "AudioSfx_Bolt_03.mp3"
       ],
       "seconds": 1.25,
-      "credit": "Pole Position Production · M1903A3 拉栓 · Sonniss GDC 2020 ／ Pole Position Production · 莫辛纳甘 M38 拉栓 · Sonniss GDC 2020",
-      "license": "sonniss"
+      "credit": "Pole Position Production · M1903A3 拉栓 · Sonniss GDC 2020 ／ Pole Position Production · 莫辛纳甘 M38 拉栓 · Sonniss GDC 2020 ／ 三八式步枪（三八大盖，有盖版）实弹射击 · 参考视频实录",
+      "license": "refvideo"
     },
     "stripperLoad": {
       "files": [
