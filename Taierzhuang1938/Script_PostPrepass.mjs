@@ -629,12 +629,20 @@ export class PrepassPass {
  * 这样的重传（进/出各一次）。几十只以内不值一提，成百上千就会撞上
  * 「整帧卡在 CPU 提交」那条红线。
  *
- * 与 `MarkForegroundPrepass` 互斥：那条路已经占用了同一对钩子。
+ * 与 `MarkForegroundPrepass` 互斥：那条路是**直接赋值**同一对钩子。
+ *
+ * 反过来，本函数是**链式**的：`BuildSink.Flush` 出来的静态网格早就占着这一对钩子
+ * （破口裁切的逐 draw 开关），直接赋值等于把它静默摘掉 —— 墙上打了洞照样投一块
+ * 完整的墙影，而且没有任何报错。所以这里先存下原钩子再包一层，并且**幂等**：
+ * 同一只标两次不会把自己套两层。
  */
 export function MarkDynamicPrepass(object) {
-  if (!object || !object.isMesh) return object;
+  if (!object || !object.isMesh || object.userData.prepassDynamic) return object;
   object.userData.prepassDynamic = true;
-  object.onBeforeRender = function DynamicPrepassOn(renderer, scene, camera, geometry, material) {
+  const chainedBefore = object.onBeforeRender;   // 缺省是 Object3D 原型上的空函数
+  const chainedAfter = object.onAfterRender;
+  object.onBeforeRender = function DynamicPrepassOn(renderer, scene, camera, geometry, material, group) {
+    chainedBefore.call(this, renderer, scene, camera, geometry, material, group);
     const uniforms = material?.uniforms;
     if (!uniforms || !uniforms.uPrevModelMatrix) return;
     const prev = object.userData.prepassPrevMatrix;
@@ -642,7 +650,8 @@ export function MarkDynamicPrepass(object) {
     uniforms.uPrevModelValid.value = 1;
     material.uniformsNeedUpdate = true;
   };
-  object.onAfterRender = function DynamicPrepassOff(renderer, scene, camera, geometry, material) {
+  object.onAfterRender = function DynamicPrepassOff(renderer, scene, camera, geometry, material, group) {
+    chainedAfter.call(this, renderer, scene, camera, geometry, material, group);
     const uniforms = material?.uniforms;
     if (!uniforms || !uniforms.uPrevModelValid) return;
     uniforms.uPrevModelValid.value = 0;

@@ -295,7 +295,7 @@ sRGB 编码，最后一趟必须自己手写（Composite 的 `EncodeOutput`）�
 | 静态几何 | 相机速度（精确） | prevWorld = curWorld |
 | **蒙皮人物（SkinnedMesh）** | **逐骨骼（精确）** | `skeleton.boneTexture` 换成**高度翻倍**的图：上半是本帧骨矩阵（three 每帧自己写），下半是上一帧的副本（`PrepassPass._SnapshotSkeletons` 在 Render 末尾 `copyWithin`）。取样端 `GetPrevBoneMatrix(i)` = three 的 `getBoneMatrix(i)` 把纹素下标 +`size*size`。**零逐 draw 成本** —— `boneTexture` 本来就是 three 逐 draw 塞的 |
 | InstancedMesh / BatchedMesh | **只有相机速度（近似）** | 实例矩阵当不变。`Script_ActorBatch` 的远景人群、流送的布设件每帧改写 `instanceMatrix`，所以它们在 RT1 里是「静止物体」。要修得给每只实例网格再挂一份上一帧 `instanceMatrix`（显存翻倍 + 每帧多一次上传） |
-| 非蒙皮刚体运动件（大车、列车、载具、碎块） | **只有相机速度（近似）** | 接线点是 `uPrevModelMatrix` + `MarkDynamicPrepass(object)`；**当前没有消费方**。它逐 draw 置 `material.uniformsNeedUpdate = true`，会把整份 uniform（含 24 组破口数组）重传一遍，几十只以内不值一提，成百上千会撞「CPU 提交是瓶颈」那条红线 |
+| 非蒙皮刚体运动件（大车、列车、载具、碎块） | **标了就精确，没标只有相机速度** | `uPrevModelMatrix` + `MarkDynamicPrepass(object)`。**已有两个消费方**（2026-09-09）：第一关移动车厢的体块与车门（`Script_FirstLevelWhiteboxField` 的 `trainMeshes` / 车门 gate，6 只）、P012 背枪座下的枪与背带（`Script_FirstLevelP012BackRifle`，车厢内满编 66 只）。它逐 draw 置 `material.uniformsNeedUpdate = true`，会把整份 uniform（含 24 组破口数组）重传一遍，几十只以内不值一提（这 72 只实测墙钟 35.53 → 35.19 ms/帧，在噪声里），成百上千会撞「CPU 提交是瓶颈」那条红线 |
 
 主 pass 读到的骨骼纹理**逐纹素不变**（宽度没动，`getBoneMatrix(i)` 对
 `i < size²/4` 落点完全一样），所以换成翻倍纹理对画面零影响。显存与上传：一具 50 骨的
@@ -324,10 +324,35 @@ sRGB 编码，最后一趟必须自己手写（Composite 的 `EncodeOutput`）�
 > 没有 tile 顶到钳位。回滚着色器那一行验证过：两条都红（98 / 109 个 tile 顶到
 > 0.354 uv = 钳位的对角）。
 
-**TAA 与运动模糊本阶段仍走深度反投影**（只有相机运动）。切换到速度靶的接线点已经
-留好：`TaaPass` 的 `uVelocity` + `uUseVelocityBuffer`（置 1 即切换），Composite 的
-`MotionBlur()` 段注释里写了改哪三行。切换要连着重新标定邻域裁剪与 `velocityPx/40`
-那条曲线，属于 TAAU 那一轮。
+> **事故（2026-09-09 修）：坐在开动的军列里，整个车厢一路都是糊的。**
+> 玩家玩到第一关开场（`?whitebox=p012` 的「随军列前行」）反馈「整个车厢场景都在变模糊」。
+> 根子和上面那条是**同一类**、位置不同：车厢体块（`Script_FirstLevelWhiteboxField`
+> 的 `trainMeshes`，每帧 `mesh.position.z = offset`）与挂在胸骨上的背枪 / 背带
+> （`P012BackRifleMount` 下的刚体网格）都**不是蒙皮网格**，预通道于是按静止几何
+> 给它们写速度（`prevWorld = curWorld` = 整份相机速度）。可玩家就坐在这节车厢里，
+> 相机跟着车一起走 —— 车厢与背枪在屏幕上**一动不动**，速度靶上却写着十几到三十几
+> 像素/帧。运动模糊照着糊、TAA 照着去十几像素外取历史，于是「整个车厢」一起软。
+>
+> 取证（1600×900 / high，`velocity` 调试视图逐像素数）：**车厢几何速度中位数
+> 12.42 px/帧、边上顶到 32 px 的编码上限**，而同一幅画里的蒙皮人物与静止世界是 0；
+> 速度超过 4 px/帧的像素占整幅画的 **19.2%**。同页 A/B（只切 `MarkDynamicPrepass`
+> 的钩子，场景一个字不变）：标上之后 **2.4%**，再把背枪也标上 **0.59%**，
+> 速度靶均值 3.34 → 0.12 px。墙钟 35.53 → 35.19 ms/帧（72 只，在噪声里）。
+>
+> 修法：`MarkDynamicPrepass` 终于有了消费方 —— 车厢体块、两扇车门、背枪与背带。
+>
+> **为什么没被测出来**：所有「速度靶该是 0」的断言都建立在「相机不动」上，而这一幕
+> 恰恰是**相机和被摄物一起动**。已补门禁（`Script_FirstLevelMissionBrowserTest` 的
+> 行车段）：车厢体块必须全部标了逐物体速度，且真跑一段之后画面上速度 > 4 px/帧的
+> 像素少于 6%（修前 19%）。**剩下的已知缺口**：帽子这类挂在头骨上的刚体件仍是相机
+> 速度（车厢内占画面 0.08%，肉眼看不出），InstancedMesh 那条见上表。
+
+**TAA 与运动模糊现在都吃速度靶**（这一段原来写的是「仍走深度反投影」，TAAU 那一轮
+落地后没跟着改，2026-09-09 更正）：`TaaPass` 的 `uUseVelocityBuffer` 在
+`ctx.velocityTexture` 存在且没开 `forceDepthReprojection` 时置 1，运动模糊
+（`Script_PostMotionBlur`）直接读 `ctx.velocityTexture`。深度反投影只剩两个用处：
+`forceDepthReprojection` 的对照路径，和 `motionVector` 那张调试图（它按定义就是
+「相机速度的近似」，与 `velocity` 那张不是一回事，排查时别拿它当速度靶看）。
 
 **HZB**
 
@@ -3174,13 +3199,15 @@ scale=medium、玩家在西关大街）：
 
 两条各自的拦路石：
 
-* **非蒙皮刚体**：`MarkDynamicPrepass` 是**直接赋值** `object.onBeforeRender`，
+* **非蒙皮刚体**：当时 `MarkDynamicPrepass` 是**直接赋值** `object.onBeforeRender`，
   而 432 只可见网格里 **一只空闲的都没有** —— 419 只被破口裁切占着、13 只被前景
   标签占着。挂上去等于把破口裁切静默摘掉（墙上打了洞照样是完整的墙）。
-  改成链式调用是可行的，但成本那一条仍在：逐 draw 置 `uniformsNeedUpdate` 会把
-  整份 uniform（含 24 组破口数组、288 个 float）重传，419 只 × 进出各一次 =
-  每帧 838 次全量重传，正好撞在「CPU 提交是瓶颈」那条红线上（`FrameProfileTest`
-  的 baseline 是 submit ≈ 15 ms）。
+  **2026-09-09 已改成链式**（先调原钩子再做自己的事，且幂等），上面那条拦路石
+  没了；剩下的仍是成本那一条：逐 draw 置 `uniformsNeedUpdate` 会把整份 uniform
+  （含 24 组破口数组、288 个 float）重传，419 只 × 进出各一次 = 每帧 838 次全量
+  重传，正好撞在「CPU 提交是瓶颈」那条红线上（`FrameProfileTest` 的 baseline 是
+  submit ≈ 15 ms）。所以**照旧只给真的在世界里动的那几只标**（第一关车厢体块 6 只
+  + 背枪 66 只，实测在噪声里），不给整城静态几何标 —— 它们本来就该只有相机速度。
 * **实例化**：显存不是问题（0.15 MB）。问题是预通道的覆盖材质**全场只有一份**，
   自定义属性的 `#define` 是材质级不是对象级 —— 要么 161 只 InstancedMesh
   （以及布设流送、`Script_ActorBatch` 之后新建的每一只）**都**带上第二份
@@ -3194,8 +3221,9 @@ scale=medium、玩家在西关大街）：
 
 **要做的话该怎么做**（留给拥有 `Script_ActorBatch` / `BuildSink` 的人）：
 ① 在 InstancedMesh 的建构处统一挂 `aPrevInstanceMatrix`（缺一只就塌，所以必须在
-建构处而不是在预通道里补）；② 把 `MarkDynamicPrepass` 改成链式钩子，并把破口裁切
-那一组 uniform 挪进 UBO 或独立材质，让逐 draw 只重传一个矩阵。
+建构处而不是在预通道里补）；② 链式钩子已经做了（见上），还差把破口裁切那一组
+uniform 挪进 UBO 或独立材质，让逐 draw 只重传一个矩阵 —— 那一步做完才谈得上
+「给几百只静态件也标」。
 
 ---
 

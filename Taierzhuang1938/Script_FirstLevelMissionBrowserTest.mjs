@@ -368,7 +368,23 @@ try {
       if(frame%60===0)contacts.push(...actors.filter(a=>a.missionTrainLife.seated).map(a=>({...ProbeFirstLevelTrainContact(g,a),frame})));
     }
     for(const key of ["KeyW","KeyD","ShiftLeft"])g.Debug.Key(key,false);
-    return {count:actors.length,travel:offsetBefore-g.battlefield.trainOffsetM,maxLocalDrift,maxAnimationSpeed,maxRootError,poses,life,contacts,
+    // 行程在这里结账：下面的速度靶取证要多推两帧，会把 travel 多算 0.2 m。
+    const travel=offsetBefore-g.battlefield.trainOffsetM;
+    // 车厢与玩家一起沿 z 走，所以车上的东西在屏幕上是不动的 —— 速度靶上必须也是。
+    // 漏标 MarkDynamicPrepass 时预通道按静止几何写速度，整个车厢会拿到整份相机速度
+    // （实测 1600×900/high 有五分之一的画面顶到 4 px/帧以上），运动模糊与 TAA 照着糊。
+    // 读的是 velocity 调试视图：蓝通道 = |速度| / 32 px，>32/255 即超过 4 px/帧。
+    const canvas=g.renderer.domElement,W=canvas.width,H=canvas.height;
+    g.post.SetDebugView("velocity");g.StepFrames(1,1/60,true);
+    const readback=document.createElement("canvas");readback.width=W;readback.height=H;
+    const ctx=readback.getContext("2d",{willReadFrequently:true});ctx.drawImage(canvas,0,0);
+    const pixels=ctx.getImageData(0,0,W,H).data;
+    g.post.SetDebugView("final");g.StepFrames(1,1/60,true);
+    let fast=0;for(let i=0;i<W*H;i+=1)if(pixels[i*4+2]>32)fast+=1;
+    const velocity={fast:fast/(W*H),size:[W,H],
+      marked:g.battlefield.trainMeshes.filter(mesh=>mesh.userData.prepassDynamic).length,
+      meshes:g.battlefield.trainMeshes.length};
+    return {count:actors.length,travel,maxLocalDrift,maxAnimationSpeed,maxRootError,poses,life,contacts,velocity,
       handoff:{canLook,playerDrift,playerRise,stance:g.player.stance,locked:g.Debug.FirstLevelMission().receivingFood}};
   });
   await fs.writeFile(path.join(output,'Data_TrainRide.json'),JSON.stringify(ride,null,2));
@@ -376,6 +392,9 @@ try {
   assert.ok(ride.handoff.canLook&&ride.handoff.playerDrift<.04&&ride.handoff.playerRise<.08&&ride.handoff.stance==="stand"&&ride.handoff.locked,
     "receiving food holds walking, sprinting, jumping and stance, while retaining free look: "+JSON.stringify(ride.handoff));
   assert.ok(ride.poses.every(p=>p.clip==="AttackCommand"&&p.rate===0), "the sampled base pose never treats train travel as walking");
+  assert.ok(ride.velocity.marked===ride.velocity.meshes&&ride.velocity.fast<0.06,
+    "the moving carriage carries per-object velocity, so a train-locked view stays out of the velocity buffer: "
+    +JSON.stringify(ride.velocity));
   assert.ok(Math.abs(ride.travel-48)<.05 && ride.maxLocalDrift<.08 && ride.maxAnimationSpeed<.05 && ride.maxRootError<.08, "train-local bodies and rendered roots stay still without a walking cycle: "+JSON.stringify(ride));
   assert.equal(ride.life.filter(p=>p.seated).length,32,'32 actual side-bench seats, eight standing recruits and Luo');
   assert.ok(ride.life.every(p=>p.active && p.footDrift<.025),'procedural upper-body activity keeps boot contacts fixed');

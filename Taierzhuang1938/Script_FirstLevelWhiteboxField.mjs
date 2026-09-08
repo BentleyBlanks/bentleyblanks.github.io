@@ -11,6 +11,7 @@ import * as THREE from "three";
 import { Clamp } from "./Script_Noise.mjs";
 import { RayAabb, MakeBox, PlaceGeometry } from "./Script_Geo.mjs";
 import { BuildSink } from "./Script_World.mjs";
+import { MarkDynamicPrepass } from "./Script_Post.mjs";
 import { T } from "./Script_Text.mjs";
 import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
 import {
@@ -18,6 +19,10 @@ import {
 } from "./Data_FirstLevelWhitebox.mjs";
 
 export function IsP012TrainBlock(id) { return /^Station(?:Car\d|Engine|ExitStep)/.test(id); }
+/** 跟着车厢一起平移的那两扇门（SetTrainOffset 每帧改它们的 z）。 */
+export function IsTrainGate(spec) {
+  return spec?.signal === "P012TrainDoor" || spec?.signal === "MissionTrainStopped";
+}
 const GRID_SIZE = 12;
 const CAMERA_FAR = 430;
 
@@ -195,7 +200,14 @@ export class FirstLevelWhiteboxField {
       this.meshes.push(mesh);
     }
     this.trainMeshes = trainSink.Flush(this.scene, { Get: key => this.materials.get(key) || this.whiteMaterial });
-    for (const mesh of this.trainMeshes) { mesh.name="P012MovingTrain"; mesh.castShadow=true; mesh.receiveShadow=true; this.meshes.push(mesh); }
+    // MarkDynamicPrepass：车厢每帧沿 z 平移（SetTrainOffset），玩家又坐在车上跟着一起走。
+    // 不标它，预通道就按「静止几何」写速度（prevWorld = curWorld），于是速度靶里
+    // 整个车厢都是相机速度 —— 而它在屏幕上其实一动不动。见 SetTrainOffset 的注释。
+    for (const mesh of this.trainMeshes) {
+      mesh.name="P012MovingTrain"; mesh.castShadow=true; mesh.receiveShadow=true;
+      MarkDynamicPrepass(mesh);
+      this.meshes.push(mesh);
+    }
     this.trainColliders = trainSink.colliders;
     this.colliders = [...sink.colliders, ...this.trainColliders];
     this.covers = sink.covers.slice();
@@ -207,13 +219,21 @@ export class FirstLevelWhiteboxField {
       && position.y>=surface.y+surface.h/2-.25 && position.y<surface.y+surface.h/2+3);
   }
 
+  /**
+   * 车厢沿 z 平移。玩家坐在车上，所以相机跟着一起走 —— **车厢在屏幕上是不动的**，
+   * 速度靶里就必须是 0。做到这件事全靠 BuildWhiteBoxes / BuildGates 里那两句
+   * `MarkDynamicPrepass`：没有它，预通道按静止几何写速度（prevWorld = curWorld），
+   * 车厢每个像素都会拿到整份相机速度（1.6 K 输出实测中位数 12 px/帧、边上顶到
+   * 32 px 的钳位），运动模糊照着糊、TAA 照着去十几像素外取历史，
+   * 结果就是「整个车厢一路都是糊的」。
+   */
   SetTrainOffset(offset) {
     const delta=offset-this.trainOffsetM;if(Math.abs(delta)<1e-9)return;
     this.trainOffsetM=offset;
     for(const mesh of this.trainMeshes)mesh.position.z=offset;
     for(const surface of this.walkableSurfaces)if(IsP012TrainBlock(surface.id))surface.z+=delta;
     const records=[...this.trainColliders];
-    for(const gate of this.gates.values())if(gate.spec.signal==="P012TrainDoor"||gate.spec.signal==="MissionTrainStopped"){
+    for(const gate of this.gates.values())if(IsTrainGate(gate.spec)){
       gate.mesh.position.z+=delta;if(!gate.open)records.push(gate.collider);
     }
     // Move only the train records inside the spatial hash: rebuilding the whole grid
@@ -249,6 +269,8 @@ export class FirstLevelWhiteboxField {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.name = `FirstLevelWhitebox_${spec.id}`;
+      // 车门跟着车厢一起平移，速度靶的账与车厢体块同一本（见 BuildWhiteBoxes）。
+      if (IsTrainGate(spec)) MarkDynamicPrepass(mesh);
       this.scene.add(mesh);
       this.meshes.push(mesh);
       const collider = ColliderRecord(spec);
