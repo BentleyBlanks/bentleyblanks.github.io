@@ -511,18 +511,7 @@
       "seconds": 0.9,
       "credit": "Pole Position Production · 重型枪机拉柄（近距离）· Sonniss GDC 2016",
       "license": "sonniss"
-    }
-  },
-  "bakedAt": "2026-09-08",
-  "normalization": {
-    "normalizedAt": "2026-09-08",
-    "tool": "Script_AudioNormalize.mjs",
-    "peakCeilingDbfs": -1,
-    "metric": "activeRmsDbfs",
-    "targetDbfs": -25,
-    "toleranceDb": 0.5
-  },
-  "pendingCues": {
+    },
     "zb26Far": {
       "files": [
         "AudioSfx_Zb26Far_01.mp3",
@@ -765,6 +754,15 @@
       "credit": "Olivier Girardot · 子弹打在石头上 · Sonniss GDC 2020 ／ PMSFX · 单块石头受击 · Sonniss GDC 2020 ／ PMSFX · 单块石头受击（更闷）· Sonniss GDC 2020",
       "license": "sonniss"
     }
+  },
+  "bakedAt": "2026-09-08",
+  "normalization": {
+    "normalizedAt": "2026-09-08",
+    "tool": "Script_AudioNormalize.mjs",
+    "peakCeilingDbfs": -1,
+    "metric": "activeRmsDbfs",
+    "targetDbfs": -25,
+    "toleranceDb": 0.5
   },
   "pendingNote": "素材已烘好，但 Script_Audio.RECIPES 里还没有同名配方，运行时不会加载（LoadSfxPack 只遍历 cues）。配方补齐后把 Data_SfxSources 对应组的 pending 去掉重烘。"
 }

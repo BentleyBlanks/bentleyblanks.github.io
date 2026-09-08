@@ -2498,7 +2498,7 @@ export const AMB_BASE = "Audio/Amb/";
 export const MUSIC_BASE = "Audio/Music/";
 // 7 → 8：缺口批 A2 的十五个 cue 从 pendingCues 搬进 cues（2026-08-29）。
 // 清单本身换了内容，戳不动的话浏览器会拿着旧清单去要新文件（或者反过来）。
-export const SFX_PACK_VERSION = "8";
+export const SFX_PACK_VERSION = "9";
 export const AMB_PACK_VERSION = "1";
 export const MUSIC_PACK_VERSION = "5";
 
@@ -2627,6 +2627,24 @@ const SAMPLE_MIX = {
   planeDive: 0.9, strafeNear: 0.85, strafeDirt: 0.6, strafeFar: 0.5,
   // 重机枪两件都是玩法反馈：卡壳清没清、还能不能打。拉柄与 bolt 同一档。
   mgCharge: 0.95, mgOverheat: 0.7,
+  // --- 对标 3A 素材补缺批（2026-09-08 接线）-------------------------------
+  // 弹啸是压制反馈，必须盖过远处的枪：bulletCrack 与本体枪声同档；掠过的呼啸低一档。
+  // 跳弹是弹着的「追加音」，比弹着本身轻，否则每四发就多一声比弹着还响的东西。
+  bulletCrack: 0.9, bulletWhizz: 0.7, ricochet: 0.5, impactStone: 0.55,
+  // 四种材质脚步与 dirt/rubble 同一档：木板与石板本来就比土路响一点，草与泥更闷。
+  footstepWood: 0.3, footstepStone: 0.3, footstepGrass: 0.22, footstepMud: 0.26,
+  // 身体 foley 全是「贴着自己」的小动作，比脚步略低；喘息一直在响，按床配平。
+  clothMove: 0.22, gearRattle: 0.2, breathHeavy: 0.3, bodyLand: 0.5,
+  grenadeBounce: 0.45, grenadeRoll: 0.35,
+  // 中距爆炸夹在近（1.0）与远（0.5）之间；落屑是爆炸之后的余音，不能抢爆炸本身。
+  explosionMid: 0.72, debrisFall: 0.4,
+  // 火堆循环与照明弹燃烧同一条理由（一直在响）。
+  fireSpot: 0.35,
+  // 机枪远场与步枪远场两条同档。
+  zb26Far: 0.4, type11Far: 0.4, type92Far: 0.44,
+  // 枪尾在 PlayGunshot 里已按 0.55 追加，这里只做素材间的齐平。
+  gunTailOpenRifle: 0.6, gunTailStreetRifle: 0.6, gunTailInteriorRifle: 0.6,
+  gunTailOpenMg: 0.6, gunTailStreetMg: 0.6, gunTailInteriorMg: 0.6,
 };
 
 /** 混响 send。远的、开阔的给多，贴身的小动作几乎不给。 */

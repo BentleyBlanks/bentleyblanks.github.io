@@ -791,7 +791,9 @@ send 分在 Panner **之前**，那是对的（湿信号不该跟着头转，见
 可这两者根本不是一回事 —— 远处那一枪本来就只剩一层糊音，眼前那一枪缺了就是穿帮。
 现在超过 45 m（近场素材的作用边界）的位置音一律按低优先级算，**先丢远的**。
 
-三道闸各自吃掉多少现在都记在 `audio.drops`（`{ dedupe, budget, distance }`）——
+三道闸各自吃掉多少现在都记在 `audio.drops`（`{ dedupe, budget, distance }`；2026-09-08 起
+预算这一档拆成 `stolen`（偷了别人的声部补上）与 `starved`（实在偷不到、丢了），`budget` 是
+`starved` 的别名，见 `docs/Data_AudioEngine.md`）——
 一条音「没响」有三种完全不同的原因，混在一个数里就查不出该去调哪一个。
 这一轮就是靠它分清「远处的枪是被距离闸掐掉的还是被 22 ms 去重窗吃掉的」。
 
@@ -1143,7 +1145,7 @@ Audio native levels are aligned.
 | `bolt` | 1 → 2 | 1.25 s | 17.4 KB | 莫辛纳甘 M38 的一次完整拉栓（同为旋转后拉枪机、同厂 handling 录法） |
 | `stripperLoad` | 1 → 2 | 1.10 s | 18.5 KB | **同一支枪、同一次录音的另一个动作** —— 本批最理想的那种变体来源 |
 
-## 新增 cue（`pendingCues`，接线后才可见）
+## 新增 cue（烘焙时落 `pendingCues`，2026-09-08 接线批已搬进 `cues`）
 
 | cue | 变体 | 时长 | 体积 | 用在哪 | 素材 |
 | --- | ---: | ---: | ---: | --- | --- |
@@ -1258,10 +1260,13 @@ SFX: 94 files, activeRmsDbfs -25.48..-24.58 dBFS, spread 0.90 dB, target -25 dBF
 Audio native levels are aligned.
 ```
 
-`Script_AudioTest.mjs` 全绿且**一条断言都不用改**：清单仍是 56 个 cue、
-56 条全部盖住配方、载入零报错 —— 25 个新 cue 在 `pendingCues` 里，运行时看不见
-（`LoadSfxPack` 只遍历 `cues`）。接线批把 `Data_SfxSources` 里对应组的 `pending`
-删掉、照组名重烘，产物就从 `pendingCues` 挪进 `cues`，那时才需要动 `RECIPE_COUNT`。
+烘焙那一轮 `Script_AudioTest.mjs` 全绿且一条断言都不用改：清单 56 个 cue、25 个新 cue
+在 `pendingCues` 里运行时看不见。**同日接线批已毕业**：`Data_SfxSources` 里 32 个组的 `pending`
+删掉、清单里 25 条从 `pendingCues` 搬进 `cues`（mp3 逐字节不变，只动清单）、`RECIPE_COUNT`
+56 → 81、`SFX_PACK_VERSION` 8 → 9，并给这 25 条补了 `Script_Audio.SAMPLE_MIX`（不补的话
+`LoadSfxPack` 会把它们的 MIX_GAIN 重写成 1.0，比脚步响四倍）。合成回落配方在
+`Script_AudioWiring` 那一批（`docs/Data_AudioWiring.md`），引擎侧模型在 `docs/Data_AudioEngine.md`。
+`gunTailStreetMg` 是唯一没有素材的 cue（Sonniss 缺口，见上表），照旧走合成回落。
 
 ## 重新烘焙
 

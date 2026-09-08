@@ -778,10 +778,11 @@ export const SFX_SOURCES = [
   // 把枪口爆音让给 body 层，只留后面的空间。口径因此不是这几条的判据
   //（走廊的混响不会因为换一支枪而变成另一条走廊），但仍尽量取全威力弹的那几支。
   //
-  // 本批新增的 cue 一律带 `pending: true`：`Script_Audio.RECIPES` 里还没有同名配方，
-  // 直接进 `manifest.cues` 会让 `LoadSfxPack` 每次开机抛一堆 sfxErrors 并顶红
-  // `Script_AudioTest` 的计数断言（理由与 2026-08-28 那一批逐字相同）。
-  // **给已有 cue 补变体的组不带 pending** —— 它们 append 进现成的 cue，运行时立刻可用。
+  // 本批新增的 cue 烘焙时带过 `pending: true`（`Script_Audio.RECIPES` 里当时还没有同名配方，
+  // 直接进 `manifest.cues` 会让 `LoadSfxPack` 每次开机抛一堆 sfxErrors）。
+  // 2026-09-08 接线批（Script_AudioWiring 的 26 条合成回落配方）落地后 pending 已删光，
+  // 产物从 `manifest.pendingCues` 搬进了 `cues`；切法确定性，mp3 逐字节不变，只动了清单。
+  // 给已有 cue 补变体的组从来不带 pending —— 它们 append 进现成的 cue。
   // =========================================================================
 
   // --- 步枪：中正式（7.92×57 毛瑟）-----------------------------------------
@@ -912,7 +913,6 @@ export const SFX_SOURCES = [
     path: "Pole Position Production - L7A2 GPMG 7.62x51mm/L7A2_GPMG_7.62x51mm_belt_fed_50m_behind_Schoeps_B_clean_Single_shots_tracer_x_2.mp3",
     credit: "Pole Position Production · L7A2 GPMG 7.62×51 单发（50 m 后方机位）· Sonniss GDC 2016",
     license: "sonniss",
-    pending: true,
     bitrate: BITRATE_TRANSIENT,
     // `zb26` 用的是同一次射击的 **1 m** 机位，这条是 **50 m** 机位 —— 选材硬标准第 3 条
     // 「远近是两条真的录音」在这里是字面成立的。素材里两发（0.10 s 与 4.12 s），
@@ -926,7 +926,6 @@ export const SFX_SOURCES = [
     path: "Pole Position Production - M1918 Browning Automatic Rifle .30cal/M1918_Browning_Automatic_Rifle_.30cal_300m_in_front_Double_shots_x_1.mp3",
     credit: "Pole Position Production · BAR .30cal 300 m 正面 · Sonniss GDC 2016",
     license: "sonniss",
-    pending: true,
     bitrate: BITRATE_TRANSIENT,
     // `type11` 是这挺枪的 0.1 m 机位，这条是 300 m 机位，同一次双发。
     // **已知的重复**：`rifleIjaFar_01` 也切自这条素材的末发（rate 1.08）。
@@ -941,7 +940,6 @@ export const SFX_SOURCES = [
     path: "Pole Position Production - M1919A4 Browning Machine Gun .30cal on turret/M1919A4_Browning_Machine_Gun_.30cal_on_turret_300m_in_front_blanks_Triple_shots_x_2.mp3",
     credit: "Pole Position Production · M1919A4 .30cal（枪架，300 m 正前）· Sonniss GDC 2016",
     license: "sonniss",
-    pending: true,
     bitrate: BITRATE_TRANSIENT,
     // 与 `type92` 的枪架近场是同一挺枪、同样的架法，300 m 机位。
     // 两组三连发各取末发（0.271 s / 4.590 s），间隔钉死避开前两发的叠音。
@@ -961,7 +959,6 @@ export const SFX_SOURCES = [
     path: "Pole Position - The Outdoor Gun Acoustics Library/AK47_big_open_area_2m_above_behind_gun_RSM191_M.mp3",
     credit: "Pole Position Production · 开阔地步枪射击的空间尾音 · Sonniss GDC 2018",
     license: "sonniss",
-    pending: true,
     bitrate: BITRATE_TRANSIENT,
     // 「大开阔地」= 城外的野地与河滩。这种地方没有近处反射面，尾巴是一层
     // 迅速摊开、几乎不回来的空气声（实测降 20 dB 只要 0.02—0.14 s）。
@@ -978,7 +975,6 @@ export const SFX_SOURCES = [
     path: "Pole Position - The Outdoor Gun Acoustics Library/AK5_valley_field_forest_50m_behind_gun_off_axis_behind_buildings_M10.mp3",
     credit: "Pole Position Production · 建筑之间的步枪射击尾音 · Sonniss GDC 2018",
     license: "sonniss",
-    pending: true,
     bitrate: BITRATE_TRANSIENT,
     // 「街」在这个镜像里唯一能对上的实录就是这条：麦克风在建筑背后，
     // 收到的是**从房子上弹回来的那一层**。不是城市峡谷，但反射面的性质对得上，
@@ -996,7 +992,6 @@ export const SFX_SOURCES = [
     path: "Pole Position - The Indoor Gun Acoustics Library/AK4_long_corridor_single_shots_blanks_behind_gun_in_corner_M10.mp3",
     credit: "Pole Position Production · 长走廊里的步枪单发尾音（AK4 7.62 全威力弹）· Sonniss GDC 2018",
     license: "sonniss",
-    pending: true,
     bitrate: BITRATE_TRANSIENT,
     // 全批里最合身的一条：AK4 是 7.62 全威力弹（口径这一档也对上了），
     // 79 s 里十发独立单发，每发降 20 dB 要 0.20—0.33 s —— 那就是屋里开枪的样子。
@@ -1013,7 +1008,6 @@ export const SFX_SOURCES = [
     path: "Pole Position - The Warfare Library/warfare_t2_mg_firing_close_projectile_tail_large_field_Telinga_w_MKH8020_or_MKH8060.mp3",
     credit: "Pole Position Production · 大野地里机枪射击的弹道与尾音 · Sonniss GDC 2017",
     license: "sonniss",
-    pending: true,
     bitrate: BITRATE_TRANSIENT,
     // 素材名里就写着 `projectile_tail_large_field` —— 这个库存在的理由就是这一层。
     //
@@ -1035,7 +1029,6 @@ export const SFX_SOURCES = [
     path: "Audiobeast - The London Warehouse Firearms Library/Audiobeast_Medium_Warehouse_Browning_M2_.50_Machine_Gun_03m_RSM191_MS_Raw_002_Burst_x2.mp3",
     credit: "Audiobeast · 中型仓库里的重机枪连发尾音（The London Warehouse Firearms Library）· Sonniss GDC 2016",
     license: "sonniss",
-    pending: true,
     bitrate: BITRATE_TRANSIENT,
     // 这个库整库都是「同一批枪在同一座仓库里打」，要的正是那座仓库。
     // 两组点射（19.57 s 与 23.13 s）各取一条尾，实测降 20 dB 分别要 0.76 s 与 0.89 s ——
@@ -1066,7 +1059,6 @@ export const SFX_SOURCES = [
     path: "PMSFX - Bullet Bys &Impacts/PM_BBI_Bullet_Passby_Whizzby_Airy_5.mp3",
     credit: "PMSFX · 弹丸掠过（音爆一段）· Sonniss GDC 2020",
     license: "sonniss",
-    pending: true,
     bitrate: BITRATE_TRANSIENT,
     // hp 250：这条素材的 200 Hz 以下全是录音棚的地噪，抬到 −25 dBFS 之后会变成
     // 每次擦头都跟一记闷响。音爆本身 500 Hz 以下没有东西。
@@ -1083,7 +1075,6 @@ export const SFX_SOURCES = [
     path: "PMSFX - Bullet Bys &Impacts/PM_BBI_Bullet_Passby_Whizzby_Airy_5.mp3",
     credit: "PMSFX · 弹丸掠过（啸声一段）· Sonniss GDC 2020",
     license: "sonniss",
-    pending: true,
     bitrate: BITRATE_TRANSIENT,
     cuts: [
       { cue: "bulletWhizz", exactAtS: 0.561, tail: 0.50, gain: 0.85, hp: 300, fadeOutS: 0.20, alignDbfs: -25 },
@@ -1098,7 +1089,6 @@ export const SFX_SOURCES = [
     path: "Justsoundeffects - Steampunk Gadgets/MECHMisc_Ricochet Hits 01_JSE_SG.mp3",
     credit: "Justsoundeffects · 跳弹撞击与金属余韵 · Sonniss GDC 2024",
     license: "sonniss",
-    pending: true,
     bitrate: BITRATE_TRANSIENT,
     // 库名是「蒸汽朋克小机件」，但这个文件是**素材录音**（SOURCE 那一类）：
     // 九记金属被打中之后的余韵，谱心 6300—7500 Hz、zcr 5000—10000、
@@ -1137,7 +1127,6 @@ export const SFX_SOURCES = [
     path: "The Sound Pack Tree - Footstep Loops/1879 - Footsteps - Wooden Stairs - Down - 80 fpm - Loop.mp3",
     credit: "The Sound Pack Tree · 木楼梯下行（80 步/分）· Sonniss GDC 2018",
     license: "sonniss",
-    pending: true,
     // 城里的木板：民房的门板地、望楼的梯子、拆下来铺战壕的檩条。
     // 30 s 里四十步，间隔 0.75 s，实测谱心 690—1250 Hz —— 木头的闷是它的身份证
     //（对照：砖石那条 2200—3300，泥水那条 4900—7900）。
@@ -1150,7 +1139,6 @@ export const SFX_SOURCES = [
     path: "Tovusound - Edward – Foleyart Collection Add-On Extended Footsteps/015_Foley_Footsteps_Asphalt_Boot_Walk_Fast_Run_Jog_Close.mp3",
     credit: "Tovusound · 军靴走硬地（近距离）· Sonniss GDC 2017",
     license: "sonniss",
-    pending: true,
     // 砖石与石板路。选它是因为**穿的是靴子**：全镜像里硬地面的连续行走多半是
     // 运动鞋或皮鞋，只有这条是靴。滕县城里的兵穿的是布鞋草鞋，但靴子的「硬底压在
     // 硬面上」比运动鞋的橡胶闷响近得多。22 s 里十七步。
@@ -1165,7 +1153,6 @@ export const SFX_SOURCES = [
     path: "Tovusound - Edward – Foleyart Collection Add-On Extended Footsteps/169_Foley_Footsteps_Grass_Sneaker_Walk_Fast_Run_Jog_Close.mp3",
     credit: "Tovusound · 草地行走（近距离）· Sonniss GDC 2017",
     license: "sonniss",
-    pending: true,
     // 麦田与河滩草。与砖石那条同厂同一套录法（同一个拟音师、同一支麦、同一间棚），
     // 换材质不换录音风格 —— 玩家在两种地面之间走过去时，变的应该只是地面。
     // PMSFX 的 STEPS Dry Grass 库也在镜像里，但只有三个文件、每个一步，凑不满四条。
@@ -1179,7 +1166,6 @@ export const SFX_SOURCES = [
     path: "Wav Junction Sound Effects - Footsteps/0014_Footsteps_water_puddle_single_splashes.mp3",
     credit: "Wav Junction · 踩进水洼的单步溅水 · Sonniss GDC 2020",
     license: "sonniss",
-    pending: true,
     // 泥地与浅水。素材名里的 `single_splashes` 是关键：26 s 里十六**下独立的**踩水，
     // 不是连着趟水走 —— 连着走的那种切开每一步都带着上一步的水声。
     cuts: [{ cue: "footstepMud", tail: 0.38, gain: 0.62, variants: 4, minGap: 0.6,
@@ -1193,7 +1179,6 @@ export const SFX_SOURCES = [
     path: "Sonniss.com - Game Audio Monthly - #5/The Soundcatcher -  Cloth Foley /PANTS_JEANS_MOVEMENT_HANDLING_OFF_ON_1.mp3",
     credit: "The Soundcatcher · 厚棉布衣物摩擦 · Sonniss Game Audio Monthly #5",
     license: "sonniss",
-    pending: true,
     // 姿态变化与翻越时的衣物摩擦。取牛仔布而不是尼龙夹克：一九三八年的棉军装、
     // 绑腿、粗布褂子都是**厚而干的织物**，尼龙那条一开口就是化纤的「唰」。
     // 位置钉死不走自动挑法 —— 衣物摩擦是连续的，没有起音点可挑（实测 20 s 里
@@ -1210,7 +1195,6 @@ export const SFX_SOURCES = [
     path: "Joshua Reinhardt - Ultimate Cloth and Prop Collection/PR ARMY GEAR ROOM_WALK_C414.mp3",
     credit: "Joshua Reinhardt · 全套军用装具行走时的晃动 · Sonniss GDC 2017",
     license: "sonniss",
-    pending: true,
     // 冲刺时的装具晃动。素材录的就是**背着整套军用装具走路**：水壶、弹袋、
     // 刺刀鞘、皮带扣一起响，而不是单件金属碰撞 —— 后者听着像有人在摇钥匙。
     cuts: [
@@ -1225,7 +1209,6 @@ export const SFX_SOURCES = [
     path: "Gamemaster Audio - Punch and Combat Sounds/voice_male_breathing_mask_loop_run_02.mp3",
     credit: "Gamemaster Audio · 男性奔跑时的粗喘（可循环）· Sonniss GDC 2018",
     license: "sonniss",
-    pending: true,
     // **只有一条**。镜像里成年男性的持续喘息实录就这一个文件（另一条 Funky Rustic
     // 的是女声，Eiravaein 的 ASMR 呼吸录得太轻、抬到 −25 dBFS 会把底噪一起抬起来）。
     // 3.04 s 里四次呼吸（约 0.6 s 一次），首尾各 30 ms 淡入淡出接得上循环。
@@ -1240,7 +1223,6 @@ export const SFX_SOURCES = [
     path: "Tovusound - Edward – Foleyart Collection Add-On Extended Footsteps/289_Foley_Footsteps_Rocks_Sneaker_Jump_Land_On_Two_Feet_Close.mp3",
     credit: "Tovusound · 双脚落地（碎石地面，近距离）· Sonniss GDC 2017",
     license: "sonniss",
-    pending: true,
     // 翻墙跳下来那一下。**双脚同时落地**，不是两步 —— 素材名点明了这件事，
     // 而这正是它与脚步的区别：一记，重，没有第二下。9.7 s 里八次，
     // 每次前面 1 s 干净（实测 quiet 0.000）。
@@ -1265,7 +1247,6 @@ export const SFX_SOURCES = [
     path: "Coll Anderson - Car Destruction/EFX EXT Metal Impact Drop 01 A.mp3",
     credit: "Coll Anderson · 金属件落地弹跳（户外实录）· Sonniss GDC 2015",
     license: "sonniss",
-    pending: true,
     // 一整串真的弹跳：实测 0.005 / 0.321 / 0.722 / 1.118 s 四下，峰值 0.29→0.06
     // 逐次衰减 —— 落、弹、再弹、停。户外录的，没有房间残响要跟我们自己那层打架。
     cuts: [{ cue: "grenadeBounce", exactAtS: 0.005, tail: 1.30, gain: 0.80,
@@ -1277,7 +1258,6 @@ export const SFX_SOURCES = [
     path: "Christophe Davaille – The Gym - Sounds Of Bodybuilding/TG_Weight Metal Plate 10kg_Dropped_01.mp3",
     credit: "Christophe Davaille · 十公斤铸铁片落地 · Sonniss GDC 2018",
     license: "sonniss",
-    pending: true,
     // 第二个变体：**落地就死**的那一种（实测降 20 dB 只要 0.05 s、谱心 1376 Hz、
     // >4 kHz 占 10 %）。一块实心铸铁砸在硬地上不会唱 —— 这正是上面淘汰钢筋和管子
     // 之后要找的那个质地。取 14.30 s 那一下（全条最响，前面 2.8 s 干净）。
@@ -1290,7 +1270,6 @@ export const SFX_SOURCES = [
     path: "Sound Ex Machina - Rolling Objects/Aluminum can rolling and bouncing on concrete.mp3",
     credit: "Sound Ex Machina · 金属罐在水泥地上弹跳 · Sonniss GDC 2019",
     license: "sonniss",
-    pending: true,
     // 第三个变体：更轻、更脆的一串。取 0.727 s 那一段（连着三下，前后都干净）。
     cuts: [{ cue: "grenadeBounce", exactAtS: 0.727, tail: 0.60, gain: 0.78,
       fadeOutS: 0.18, append: true, alignDbfs: -25 }],
@@ -1301,7 +1280,6 @@ export const SFX_SOURCES = [
     path: "Sound Ex Machina - Rolling Objects/Metallic ball rolling on concrete 02.mp3",
     credit: "Sound Ex Machina · 金属球在水泥地上滚动 · Sonniss GDC 2019",
     license: "sonniss",
-    pending: true,
     // 滚动。取 0.551 s 起 1.8 s —— 那一段是纯滚动（实测降 20 dB 要 1.20 s，
     // 中间没有撞击冲头），玩家听到它的意思是「那颗弹还在往我这边来」。
     cuts: [{ cue: "grenadeRoll", exactAtS: 0.551, tail: 1.80, gain: 0.75,
@@ -1319,7 +1297,6 @@ export const SFX_SOURCES = [
     path: "Bluezone - Tank - Explosion Sound Effects/Bluezone_BC0271_explosion_outdoors_large_005.mp3",
     credit: "Bluezone Corporation · 户外大型爆炸 · Sonniss GDC 2020",
     license: "sonniss",
-    pending: true,
     bitrate: BITRATE_TRANSIENT,
     // 降 20 dB 要 1.20 s —— 尾巴比近距那三条都长，那是距离给的，不是加出来的。
     cuts: [{ cue: "explosionMid", tail: 2.20, gain: 0.88, whole: true, lp: 5000, alignDbfs: -25 }],
@@ -1330,7 +1307,6 @@ export const SFX_SOURCES = [
     path: "BluezoneCorp - Detonation - Explosion/Bluezone_BC0277_explosion_mortar_002_01.mp3",
     credit: "Bluezone Corporation · 迫击炮弹爆炸 · Sonniss GDC 2023",
     license: "sonniss",
-    pending: true,
     bitrate: BITRATE_TRANSIENT,
     // 与 `explosionNear_01` **同一个库**（BC0277），底噪与房间感是一路的；
     // 而滕县城里落的绝大多数就是迫击炮弹。
@@ -1370,7 +1346,6 @@ export const SFX_SOURCES = [
     path: "Sonniss.com - Game Audio Monthy - #2/Bluezone-Bomb-Blast-Explosion-and-Debris-Sound-Elements/Bluezone-BC0197-falling-stone-debris-032.mp3",
     credit: "Bluezone Corporation · 爆炸后落下的碎石 · Sonniss Game Audio Monthly #2",
     license: "sonniss",
-    pending: true,
     // 爆完之后天上掉下来的东西。这个库整库都是「炸完之后」，三条一石一铁一混合，
     // 接线时按落点材质挑（带 position 播，空气低通由引擎按距离算）。
     cuts: [{ cue: "debrisFall", tail: 2.20, gain: 0.78, whole: true, fadeOutS: 0.4, alignDbfs: -25 }],
@@ -1381,7 +1356,6 @@ export const SFX_SOURCES = [
     path: "Sonniss.com - Game Audio Monthy - #2/Bluezone-Bomb-Blast-Explosion-and-Debris-Sound-Elements/Bluezone-BC0197-falling-metal-debris-018.mp3",
     credit: "Bluezone Corporation · 爆炸后落下的金属碎片 · Sonniss Game Audio Monthly #2",
     license: "sonniss",
-    pending: true,
     cuts: [{ cue: "debrisFall", tail: 2.20, gain: 0.78, whole: true, fadeOutS: 0.4,
       append: true, alignDbfs: -25 }],
   },
@@ -1391,7 +1365,6 @@ export const SFX_SOURCES = [
     path: "Sonniss.com - Game Audio Monthy - #2/Bluezone-Bomb-Blast-Explosion-and-Debris-Sound-Elements/Bluezone-BC0197-mixed-falling-rubble-explosion-impact-007.mp3",
     credit: "Bluezone Corporation · 爆炸后混合瓦砾落地 · Sonniss Game Audio Monthly #2",
     license: "sonniss",
-    pending: true,
     cuts: [{ cue: "debrisFall", tail: 2.40, gain: 0.78, whole: true, fadeOutS: 0.5,
       append: true, alignDbfs: -25 }],
   },
@@ -1403,7 +1376,6 @@ export const SFX_SOURCES = [
     path: "Pole Position - The Burning House Library/Burning_House_t4_Fire_low_intensity_with_crackling_MKH8060.mp3",
     credit: "Pole Position Production · 房屋燃烧（低强度、带噼啪）· Sonniss GDC 2018",
     license: "sonniss",
-    pending: true,
     // 近处的火堆。选「烧房子」而不是「篝火」：这一关烧的是民房的檩条门板，
     // 篝火那条素材里有柴堆塌陷和松枝爆裂，是野营的声音不是城里的。
     // 取哪一段按 docs 的老规矩 ——「找最无聊的一段」：全条 93.8 s 按 0.1 s 一格量
@@ -1422,7 +1394,6 @@ export const SFX_SOURCES = [
     path: "Olivier Girardot - Hand Guns Sound Effects Pack/Bullet rock Impact 4.mp3",
     credit: "Olivier Girardot · 子弹打在石头上 · Sonniss GDC 2020",
     license: "sonniss",
-    pending: true,
     // 全批唯一一条名字里同时有「子弹」和「石头」的实录，第一变体理所当然是它。
     cuts: [{ cue: "impactStone", exactAtS: 0.005, tail: 0.45, gain: 0.86,
       fadeOutS: 0.15, alignDbfs: -25 }],
@@ -1433,7 +1404,6 @@ export const SFX_SOURCES = [
     path: "PMSFX - Rocky Impacts/PM_RI_Source_53 Rocks Impact Hit Single Stone.mp3",
     credit: "PMSFX · 单块石头受击 · Sonniss GDC 2020",
     license: "sonniss",
-    pending: true,
     // 素材里 0.251 s 处还有第二下，tail 只留 0.24 s 把它挡在外面 ——
     // 弹着是一记，不是两记。
     cuts: [{ cue: "impactStone", exactAtS: 0.005, tail: 0.24, gain: 0.86,
@@ -1445,7 +1415,6 @@ export const SFX_SOURCES = [
     path: "PMSFX - Rocky Impacts/PM_RI_Source_92 Rocks Impact Hit Single Stone.mp3",
     credit: "PMSFX · 单块石头受击（更闷）· Sonniss GDC 2020",
     license: "sonniss",
-    pending: true,
     // 第三条，谱心 2279 Hz —— 与前两条（2410 / 3016）拉开一档，三条一亮一中一闷。
     cuts: [{ cue: "impactStone", exactAtS: 0.005, tail: 0.42, gain: 0.86,
       fadeOutS: 0.14, append: true, alignDbfs: -25 }],
