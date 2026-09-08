@@ -418,7 +418,10 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --label=x   # 第一关三�
 - 来源表 `Data_SfxSources` / `Data_AmbSources` / `Data_MusicSources` / `Data_Voice`
   （川军口令是**四川话**）；烘焙 `Script_{Sfx,Amb,Music,Voice,SeedAudio*}Bake`，
   响度对齐 `Script_AudioNormalize`，产物在 `Audio/`。
-- 先读：`docs/Data_AudioAssets.md`。
+- `Script_AudioWiring.mjs` + `Data_Tuning_Audio.mjs` —— **接线层**：什么时候值得响一声
+  （宿主探针 / 逐弹弹啸 / 跳弹 / AI foley / 脚下材质 / 身体 foley / 手榴弹 / 爆炸三档 /
+  火场点声源）。取证 `Debug.AudioZone()`，闸门 `Script_AudioWiringTest.mjs`。
+- 先读：`docs/Data_AudioAssets.md`（素材与烘焙）、`docs/Data_AudioWiring.md`（触发条件与限频）。
 
 ### 过场 / 剧情
 - `Script_Cutscene.mjs` —— 实机演出；只有用户点名的几场夺控制权，战斗内演出不夺。
@@ -427,7 +430,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --label=x   # 第一关三�
   编剧红线在 `Data_Script.mjs` 头注与 `docs/Data_HistoryQuotes.md`。先读 `docs/Data_CutsceneRedo.md`。
 
 ### 玩家文本 / 调参表（数据驱动）
-- 玩家可见文本一律 `Script_Text.T("domain.key")`，表在 `Data_Text_<Domain>.mjs`，`Data_Locale_zhCN.mjs` 拼成基准语言；内容原稿（台词 / 分镜 / 史料 / 武器名 / 关卡字段）留在数据文件，显示时经 `Localize(id, text)`，id 口径只在 `Script_TextIds.mjs`；翻译清单 `node Script_TextGather.mjs`。手感 / 平衡 / 节奏数在 `Data_Tuning_<System>.mjs`（Player / Ai / Combat / Interact / Hud / Main / Menu / Story / Cutscene / P012）。
+- 玩家可见文本一律 `Script_Text.T("domain.key")`，表在 `Data_Text_<Domain>.mjs`，`Data_Locale_zhCN.mjs` 拼成基准语言；内容原稿（台词 / 分镜 / 史料 / 武器名 / 关卡字段）留在数据文件，显示时经 `Localize(id, text)`，id 口径只在 `Script_TextIds.mjs`；翻译清单 `node Script_TextGather.mjs`。手感 / 平衡 / 节奏数在 `Data_Tuning_<System>.mjs`（Player / Ai / Audio / Combat / Interact / Hud / Main / Menu / Story / Cutscene / P012）。
 - 闸门 `Script_TextTest.mjs`（各表 `GATED_MODULES` 零中文字面量）+ `Script_TextGather.mjs --check`。先读：`docs/Data_TextAndTuning.md`。
 
 ### HUD / 菜单 / 输入
@@ -566,7 +569,8 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --label=x   # 第一关三�
 
 **现状口径（改对应系统前必读）**：
 - `Data_TechRenderPipeline.md`（渲染管线唯一现状文档）、`Data_TechPhysics.md`、
-  `Data_TestTiers.md`、`Data_Destruction.md`、`Data_EditorSuite.md`、`Data_AudioAssets.md`。
+  `Data_TestTiers.md`、`Data_Destruction.md`、`Data_EditorSuite.md`、`Data_AudioAssets.md`、
+  `Data_AudioWiring.md`。
 - `Data_FirstLevelRebuildAcceptance.md` —— 新版第一关来源、范围决定和验收；`Data_MissionDesign.md` 保留线性剧情设计背景，涉及旧章节的内容须结合当前入口核对；`Data_Traversal.md` —— 通行高度阶梯。
 - `Data_Bayonet.md`、`Data_PlayerDamage.md`、`Data_GunFeelReview.md`（枪感相关改动或专项审查时使用）、
   `Data_MainMenu.md`、`Data_SamplePoints.md`、`Data_VisualReview.md`。
