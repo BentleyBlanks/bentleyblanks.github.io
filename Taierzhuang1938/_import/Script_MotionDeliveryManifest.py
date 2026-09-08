@@ -26,7 +26,7 @@ for pattern in ['Models/ReviewV*','Blender/ReviewV*','Models/DeathCollapseV*','B
     'Models/NextTenV*','Blender/NextTenV*','Models/MeleeVideoV*','Blender/MeleeVideoV*',
     'Models/RecoveryPreview','Blender/RawRecovery','Models/SourceWeapons','Models/_Pipeline',
     'Models/FirstLevelSourceBatchV*','Models/FirstLevelSourceRetakeV*','Models/FirstLevelTrainSupportV*','Blender/FirstLevelTrainSupportV*','Models/FirstLevelTrainGameV*',
-    'Models/FirstLevelStairFitV*','Models/FirstLevelCarry*','Models/FirstLevelTrainR*',
+    'Models/FirstLevelStairFitV*','Models/FirstLevelCarry*','Models/FirstLevelTrainR*','Models/FirstLevelObservationBatchV*',
     'Models/_Cache/*','Video/Sources/*','Preview']:
     for folder in root.glob(pattern):
         paths.update(p for p in folder.rglob('*') if p.is_file() and '__pycache__' not in p.parts and p.suffix not in ['.log'])
@@ -57,11 +57,12 @@ for candidate in root.glob('Models/FirstLevelTrainGameV*/Data_GameIntegration.js
     accepted=json.loads(candidate.read_text(encoding='utf-8'))
     integrations.append({'path':candidate.relative_to(root).as_posix(),'sha256':digest,
         'status':accepted['status'],'requirementScopes':accepted['requirementScopes']})
-previewVersion=re.search(r'Script_SourceReview\.mjs\?v=([^"\s]+)',(root/'Preview/index.html').read_text(encoding='utf-8'))
+previewVersion=re.search(r'(Script_SourceReview(?:HeldPose)?\.mjs)\?v=([^"\s]+)',(root/'Preview/index.html').read_text(encoding='utf-8'))
 report={'schemaVersion':2,'updatedAt':datetime.now(timezone.utc).isoformat(),
     'status':'partial_runtime_integration_remaining_local_review' if integrations else 'local_review_not_accepted_for_production',
     'runtimeIntegrations':integrations,'defaultView':'source-recovery-latest',
-    'previewRevision':'SourceRecoveryLatest_'+previewVersion.group(1) if previewVersion else None,'groups':groups,
+    'previewRevision':'SourceRecoveryLatest_'+previewVersion.group(2) if previewVersion else None,
+    'previewScript':previewVersion.group(1) if previewVersion else None,'groups':groups,
     'glbCount':sum(Path(f['path']).suffix=='.glb' for f in records),
     'blendCount':sum(Path(f['path']).suffix=='.blend' for f in records),
     'rawJointFileCount':len(list((root/'Models/RecoveryPreview').glob('Data_*RawJoints.json'))),

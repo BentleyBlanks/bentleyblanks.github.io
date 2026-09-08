@@ -1,0 +1,252 @@
+{
+  "schemaVersion": 1,
+  "updated": "2026-09-08",
+  "policy": "existing_sources_only",
+  "newVideoGenerationAllowed": false,
+  "acceptance": "Production plan only; reuse bases are not evidence that the complete requirement is accepted or integrated.",
+  "resolutions": [
+    {
+      "sourceId": "RifleLowReload",
+      "requirementIds": [
+        "FL06"
+      ],
+      "reuseActionIds": [
+        "RifleBoltReload",
+        "KneelHold"
+      ],
+      "method": "沿用既有枪械装填规则；从机匣与腰侧取弹片段取上身参考，在原骨架补低姿及手指接触。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "MachineGunMagazine",
+      "requirementIds": [
+        "FL07"
+      ],
+      "reuseActionIds": [
+        "MachineGunEnterLeave",
+        "MachineGunFire"
+      ],
+      "method": "沿用游戏换匣事实，原片仅参考可见手部顺序，装配原枪匣和枪架；被遮腿用已有据枪姿态补做。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "MeleePushRecover",
+      "requirementIds": [
+        "FL09"
+      ],
+      "reuseActionIds": [
+        "BayonetParryLeft",
+        "BayonetParryRight",
+        "HitStagger"
+      ],
+      "method": "复用现有白刃动作和失衡，按真实接触补推开恢复，不用源片假人定义战斗结果。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "MedicArmCheck",
+      "requirementIds": [
+        "FL19"
+      ],
+      "reuseActionIds": [
+        "TrainWoundedArm",
+        "MedicTriageCheck"
+      ],
+      "method": "采用原片末段可见俯身检查作参考，按同一伤臂配对并补脚部及掌臂接触。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "TrainAisleSideStep",
+      "requirementIds": [
+        "FL20"
+      ],
+      "reuseActionIds": [
+        "NeutralIdleWalkStop",
+        "TrainStandBrace"
+      ],
+      "method": "原片可见侧身片段作参考，按真实过道宽度在原骨架补侧步及让路。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "TrainBagKickAside",
+      "requirementIds": [
+        "FL20"
+      ],
+      "reuseActionIds": [
+        "NeutralIdleWalkStop"
+      ],
+      "method": "保留原片踢包的可见段，后期制作摆腿与包体真实移位，舍弃离场出画尾段。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "MedicSupportShoulders",
+      "requirementIds": [
+        "FL24",
+        "FL37"
+      ],
+      "reuseActionIds": [
+        "MedicSupportLegs",
+        "RescuerDragRole",
+        "PatientAssistedSettle"
+      ],
+      "method": "以原片可见托肩动作补上身，组合现有救者与患者轨道，作者处理双人同步和腿脚支撑。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "CarryFrontLiftHoldLower",
+      "requirementIds": [
+        "FL25",
+        "FL35",
+        "FL43"
+      ],
+      "reuseActionIds": [
+        "CarryStretcherFrontHold",
+        "CarryStretcherFront",
+        "CarryLookRelease"
+      ],
+      "method": "用已有前位持稳和行走，加原片可见起落时序参考；后期制作抬放转场并核实职责朝向。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "CarryRearLiftHoldLower",
+      "requirementIds": [
+        "FL25",
+        "FL35",
+        "FL40",
+        "FL43"
+      ],
+      "reuseActionIds": [
+        "CarryStretcherRearHold",
+        "CarryStretcherRear",
+        "CarryLookRelease"
+      ],
+      "method": "用已有后位持稳和行走制作起落松手，源片头部缺失不作为完整身体恢复输入。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "CarryFrontWalkTurn",
+      "requirementIds": [
+        "FL26"
+      ],
+      "reuseActionIds": [
+        "CarryStretcherFront",
+        "StretcherPair"
+      ],
+      "method": "复用已有前位步态及共用担架，作者制作缓转和支撑脚；舍弃无头假人的完整恢复。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "CarryRearWalkTurn",
+      "requirementIds": [
+        "FL26"
+      ],
+      "reuseActionIds": [
+        "CarryStretcherRear",
+        "StretcherPair"
+      ],
+      "method": "复用已有后位步态，按共同担架相位补缓转；源片只参考可见负重节律。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "CarryThresholdSlope",
+      "requirementIds": [
+        "FL26"
+      ],
+      "reuseActionIds": [
+        "StretcherPair",
+        "TrainStairDisembark"
+      ],
+      "method": "利用已有双人步态与抬脚参考，依据游戏真实坡面和门槛补足接触。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "WoundedAssistRole",
+      "requirementIds": [
+        "FL28",
+        "FL29"
+      ],
+      "reuseActionIds": [
+        "WoundedLimp",
+        "WoundedArmWalk",
+        "RescuerDragRole"
+      ],
+      "method": "组合已有伤侧固定步态及救者上身，原片只参考承重，补肩肘支撑的共同约束。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "DitchCoverReturn",
+      "requirementIds": [
+        "FL34"
+      ],
+      "reuseActionIds": [
+        "StandToProne",
+        "ProneCoverReaction",
+        "ProneToStand"
+      ],
+      "method": "用现有卧倒起身与护头片段，按真实沟形制作进出及脚步，原沟内遮挡片仅参考节拍。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "YaowaGriefRise",
+      "requirementIds": [
+        "FL44",
+        "FL46"
+      ],
+      "reuseActionIds": [
+        "ClothReceivePress",
+        "ConversationFatigue",
+        "KneelToStand"
+      ],
+      "method": "保留原片可见跪姿悲伤反应，结合已有起身；压布持续至离手并依对白事件转救下一人。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "CompanionLookBackAmmo",
+      "requirementIds": [
+        "FL45"
+      ],
+      "reuseActionIds": [
+        "ConversationFatigue",
+        "BoxCarrySetDown"
+      ],
+      "method": "用原片门边停顿回望的可见段，结合已有抱箱身体参考，补弹药与掌胸接触。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "FatigueShoulderCough",
+      "requirementIds": [
+        "FL48"
+      ],
+      "reuseActionIds": [
+        "ConversationFatigue",
+        "TrainBenchRest"
+      ],
+      "method": "复用已有疲惫擦额和休息，后期补短咳换肩；原片多人字幕不作为单人恢复输入。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "MedicDeathCheck",
+      "requirementIds": [
+        "FL43",
+        "FL44"
+      ],
+      "reuseActionIds": [
+        "MedicTriageCheck",
+        "MedicNextPatient"
+      ],
+      "method": "失败医生请求不重做；复用检查及转救身体参考，后期补跪下、停手与抬头，依deathMedicArrived和原对白驱动。",
+      "status": "planned_existing_source_and_authored_completion"
+    },
+    {
+      "sourceId": "TrainAmmoCount",
+      "requirementIds": [
+        "FL16"
+      ],
+      "reuseActionIds": [
+        "TrainGearStow",
+        "TrainBenchRest"
+      ],
+      "method": "原请求未有可用视频，不再提交；保留现有CountAmmo程序化手势为基础，在原骨架补拨弹、找弹及抬头，手指接触标为后期制作。",
+      "status": "planned_existing_source_and_authored_completion"
+    }
+  ]
+}

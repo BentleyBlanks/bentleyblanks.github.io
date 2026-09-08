@@ -104,7 +104,8 @@ def Main():
         if latest:record['retargetAssessment']=latest
         if request['id'] in catalogActions:
             action=catalogActions[request['id']]
-            variant=next(v for v in action['variants'] if v['id']==action['latestByFaction']['Nra'])
+            latestId=action['latestByFaction'].get('Nra') or next(iter(action['latestByFaction'].values()))
+            variant=next(v for v in action['variants'] if v['id']==latestId)
             if variant.get('review',{}).get('sourceVideo')==record['sourceVideo']:
                 record['retargetCandidate']=dict(previewId=action['id'],variantId=variant['id'],status=variant['status'],
                     path=variant['path'],blend=variant['blend'],rawTracks=variant['review']['recoveryTracks'])

@@ -2,13 +2,32 @@
 import {MissionTrainLifePose} from '../Script_FirstLevelMissionTrainLife.mjs';
 
 export class FirstLevelCarryContactFit {
-  constructor({T,actor,rig,role,palms,probes,neutralFeet,neutralToes,gripHeightM=.88,bodyTowardGripM=.12,footCalibration,referenceSpeedMps=.55,wristFit=false,torsoFit=false}){
-    Object.assign(this,{T,actor,rig,role,palms,probes,neutralFeet,neutralToes,footCalibration});
+  constructor({T,actor,rig,role,palms,probes,neutralFeet,neutralToes,neutralArms=null,gripHeightM=.88,gripOffsetM=1,bodyTowardGripM=.12,footCalibration,referenceSpeedMps=.55,wristFit=false,torsoFit=false}){
+    Object.assign(this,{T,actor,rig,role,palms,probes,neutralFeet,neutralToes,neutralArms,footCalibration});
     actor.characterRig=rig;this.pose=new MissionTrainLifePose({actor});this.pose.basis=actor.root;
     this.end=role==='Front'?1:-1;this.referenceSpeedMps=referenceSpeedMps;this.duration=2;this.supportFraction=.6;
-    this.bodyTowardGripM=bodyTowardGripM;this.gripHeightM=gripHeightM;this.wristFit=wristFit;this.torsoFit=torsoFit;
+    this.bodyTowardGripM=bodyTowardGripM;this.gripHeightM=gripHeightM;this.gripOffsetM=gripOffsetM;this.wristFit=wristFit;this.torsoFit=torsoFit;
   }
   World(node){return node.getWorldPosition(new this.T.Vector3());}
+  ArmChain(a,b,c,target,pole){
+    // A two-point swing leaves the upper arm's axial rotation unconstrained.
+    // Match the original bind elbow plane as well, so the sleeve and elbow
+    // retain their anatomical bend direction after lowering a recovered arm.
+    const {T,pose}=this,start=this.World(a),middle=this.World(b),end=this.World(c);
+    const l1=start.distanceTo(middle),l2=middle.distanceTo(end),line=target.clone().sub(start),distance=line.length();line.normalize();
+    const bend=pole.clone().sub(start);bend.addScaledVector(line,-bend.dot(line)).normalize();
+    const along=(l1*l1-l2*l2+distance*distance)/(2*distance);
+    const elbow=start.clone().addScaledVector(line,along).addScaledVector(bend,Math.sqrt(Math.max(0,l1*l1-along*along)));
+    pose.Aim(a,b,elbow);this.actor.root.updateMatrixWorld(true);
+    const axis=elbow.clone().sub(start).normalize(),from=this.World(c).sub(this.World(b)),to=target.clone().sub(elbow);
+    from.addScaledVector(axis,-from.dot(axis));to.addScaledVector(axis,-to.dot(axis));
+    if(from.lengthSq()>1e-10&&to.lengthSq()>1e-10){
+      from.normalize();to.normalize();const twist=Math.atan2(axis.dot(from.clone().cross(to)),from.dot(to));
+      const world=a.getWorldQuaternion(new T.Quaternion()).premultiply(new T.Quaternion().setFromAxisAngle(axis,twist));
+      a.quaternion.copy(a.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(world));this.actor.root.updateMatrixWorld(true);
+    }
+    pose.Aim(b,c,target);
+  }
   Restore(){this.pose.Restore();}
   PrepareBody(){
     if(!this.torsoFit)return;
@@ -20,7 +39,7 @@ export class FirstLevelCarryContactFit {
     const correction=new T.Quaternion().setFromAxisAngle(new T.Vector3(1,0,0),this.torsoPitchCorrection),q=b.pelvis.getWorldQuaternion(new T.Quaternion()).premultiply(correction);
     pose.Save(b.pelvis);b.pelvis.quaternion.copy(b.pelvis.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(q));actor.root.updateMatrixWorld(true);
   }
-  Grip(side){return new this.T.Vector3(this.palms[side].sign*.29,this.gripHeightM,-this.end);}
+  Grip(side){return new this.T.Vector3(this.palms[side].sign*.29,this.gripHeightM,-this.end*this.gripOffsetM);}
   FootPlan(side,time,hold=false){
     const phase=((time-(side==='L'?.3:1.3))%2+2)%2,stance=hold||phase<1.2,half=this.referenceSpeedMps*.6;let z=0,lift=0;
     const Smooth=x=>{const u=Math.max(0,Math.min(1,x));return u*u*(3-2*u)};
@@ -90,7 +109,7 @@ export class FirstLevelCarryContactFit {
     }
   }
   RequiredDrop(time=0,hold=false){
-    let drop=0;
+    let drop=0;this.dropComponents=[];
     for(const side of ['L','R']){
       const b=this.rig.bones,shoulder=this.World(b['upperArm'+side]),elbow=this.World(b['forearm'+side]),wrist=this.World(b['hand'+side]);
       const hand=b['hand'+side],offset=new this.T.Vector3(...this.palms[side].point).multiply(hand.getWorldScale(new this.T.Vector3())).applyQuaternion(this.referenceHandQ?.[side]||hand.getWorldQuaternion(new this.T.Quaternion()));
@@ -110,13 +129,14 @@ export class FirstLevelCarryContactFit {
       if(!Number.isFinite(armDrop))throw Error('Horizontal arm reach needs body placement correction');
       drop=Math.max(drop,armDrop);
       const hip=this.World(b['thigh'+side]),knee=this.World(b['calf'+side]),ankle=this.World(b['foot'+side]);
-      const legReach=(hip.distanceTo(knee)+knee.distanceTo(ankle))*.98;
+      const legReach=(hip.distanceTo(knee)+knee.distanceTo(ankle))*.995;
       hip.z+=this.end*this.bodyTowardGripM;
       const foot=this.FootPlan(side,time,hold).target,horizontalLeg=Math.hypot(hip.x-foot.x,hip.z-foot.z);
       if(horizontalLeg>=legReach)throw Error('Foot plan exceeds original leg reach');
-      // Keep a small flexion reserve, including the independently measured
-      // shoe thickness correction that follows the initial ankle placement.
-      drop=Math.max(drop,hip.y-foot.y-Math.sqrt(legReach*legReach-horizontalLeg*horizontalLeg)+.008);
+      // The inverse-bind sole markers already account for shoe thickness.
+      // Keep a small reach reserve without lowering the body by another 8 mm.
+      const legDrop=hip.y-foot.y-Math.sqrt(legReach*legReach-horizontalLeg*horizontalLeg)+.001;
+      this.dropComponents.push({side,armDrop,legDrop});drop=Math.max(drop,legDrop);
     }
     return drop;
   }
@@ -146,6 +166,7 @@ export class FirstLevelCarryContactFit {
     const handContacts={};
     for(const side of ['L','R']){
       const hand=b['hand'+side],goal=this.Grip(side);
+      if(this.neutralArms){for(const part of ['upperArm','forearm']){const bone=b[part+side];pose.Save(bone);bone.quaternion.fromArray(this.neutralArms[side][part]);}actor.root.updateMatrixWorld(true);}
       const wristSolution=this.wristFit?this.SolveGripOrientation(side,handQ[side]):null;
       if(wristSolution)handQ[side]=wristSolution.q;
       pose.Save(hand);hand.quaternion.copy(hand.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(handQ[side]));actor.root.updateMatrixWorld(true);
@@ -158,13 +179,14 @@ export class FirstLevelCarryContactFit {
       // elevated elbow is not a suitable pole after changing wrist height.
       // Keep only a small source variation around the anatomical hanging plane.
       const pole=wristSolution?.pole||new T.Vector3(start.x+this.palms[side].sign*.08,target.y-.32,(start.z+target.z)*.5).lerp(elbow,.05);
-      pose.Chain(b['upperArm'+side],b['forearm'+side],hand,target,pole);
+      if(this.neutralArms)this.ArmChain(b['upperArm'+side],b['forearm'+side],hand,target,pole);
+      else pose.Chain(b['upperArm'+side],b['forearm'+side],hand,target,pole);
       hand.quaternion.copy(hand.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(handQ[side]));actor.root.updateMatrixWorld(true);
       if(this.wristFit)this.WrapFingers(side);
       const actual=hand.localToWorld(new T.Vector3(...this.palms[side].point));
       const forward=new T.Vector3(...this.palms[side].forward).applyQuaternion(handQ[side]);
       handContacts[side]={reachRatio,palmError:actual.distanceTo(goal),wristCorrection:beforeWrists[side].distanceTo(this.World(hand)),wristBendDeg:this.World(hand).sub(this.World(b['forearm'+side])).angleTo(forward)*180/Math.PI,handRollRadians:wristSolution?.roll||0,handPitchRadians:wristSolution?.pitch||0};
     }
-    return {dropM,hold,footContacts,handContacts,torsoPitchCorrection:this.torsoPitchCorrection||0,pelvisCorrection:beforePelvis.distanceTo(this.World(b.pelvis))};
+    return {dropM,requiredDropComponents:this.dropComponents,hold,footContacts,handContacts,torsoPitchCorrection:this.torsoPitchCorrection||0,pelvisCorrection:beforePelvis.distanceTo(this.World(b.pelvis))};
   }
 }

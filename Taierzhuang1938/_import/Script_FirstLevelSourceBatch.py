@@ -39,6 +39,9 @@ def Main():
     args=parser.parse_args()
     root=args.root.resolve()
     folder=Path(__file__).resolve().parent
+    policy=json.loads((folder/'Data_FirstLevelSourcePolicy.json').read_text(encoding='utf-8'))
+    if not policy['allowNewVideoGeneration']:
+        raise RuntimeError('Current user policy is existing_sources_only; use existing receipts/raw caches instead of a generation batch')
     requests=json.loads((folder/'Data_FirstLevelSourceRequests.json').read_text(encoding='utf-8'))
     requestById={r['id']:r for r in requests}
     out=root/'Models/FirstLevelSourceBatchV1'

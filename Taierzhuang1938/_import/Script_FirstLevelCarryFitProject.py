@@ -10,7 +10,7 @@ def Main():
     parser.add_argument('--group',default='FirstLevelCarryV11')
     parser.add_argument('--verify',action='store_true')
     args=parser.parse_args(sys.argv[sys.argv.index('--')+1:])
-    root=args.root.resolve();group=args.group;assert re.fullmatch(r'FirstLevelCarryV[1-9]\d*',group)
+    root=args.root.resolve();group=args.group;assert re.fullmatch(r'FirstLevelCarry(?:Hold)?V[1-9]\d*',group)
     revision=int(group.split('V')[-1]);out=root/'Models'/group;blends=root/'Blender'/group
     if args.verify:
         from mathutils import Vector
@@ -40,6 +40,7 @@ def Main():
     assert validation['status']=='export_matches_trial_requires_visual_acceptance'
     expected=json.loads((root/'Models'/validation['fitReport']).read_text(encoding='utf-8'))
     grip_height=expected.get('gripHeightM',.88);bed_height=grip_height-.12;speed=expected.get('referenceSpeedMps',.55)
+    hold=expected.get('hold',False);mode='Hold' if hold else 'Walk';rail_length=expected.get('railLengthM',2.15)
     blends.mkdir(parents=True,exist_ok=True);records=[]
     Hash=lambda file:hashlib.sha256(file.read_bytes()).hexdigest()
     for model in expected['results']:
@@ -65,18 +66,20 @@ def Main():
         # Blender Z up, original game GLB +Z maps to Blender -Y.
         boxes=[('Bed',(0,0,bed_height),(.58,1.85,.14))]
         for sign in [-1,1]:
-            boxes.append((f'Rail{sign}',(sign*.29,0,grip_height),(.065,2.15,.065)))
+            boxes.append((f'Rail{sign}',(sign*.29,0,grip_height),(.065,rail_length,.065)))
             boxes.append((f'Cross{sign}',(0,sign*.68,grip_height-.045),(.65,.065,.06)))
         for suffix,position,size in boxes:
             bpy.ops.mesh.primitive_cube_add(size=1,location=position);obj=bpy.context.object;obj.name='Prop_FirstLevel'+suffix;obj.scale=size;obj.data.materials.append(material)
         scene['sourcePolicy']='V10-derived torso; pelvis placement and lower-limb support gait authored after recovery. Two-person source crop experiment. Not gameplay accepted.'
         scene['sourceRangeSeconds']=[137/30,197/30];scene['referenceSpeedMps']=speed;scene['trialBedHeightM']=bed_height;scene['trialGripHeightM']=grip_height
+        scene['trialRailLengthM']=rail_length
+        if hold:scene['sourcePoseSeconds']=expected['sourcePoseSeconds']
         scene['geometryStatus']=expected.get('geometryStatus','current_r12')
         scene.frame_set(30);bpy.context.view_layer.update()
         for img in bpy.data.images:
             if img.source=='FILE' and img.has_data and not img.packed_file:img.pack()
         blend=blends/f'Scene_{name}_CarryPair_V{revision}.blend';bpy.ops.wm.save_as_mainfile(filepath=str(blend),compress=True)
-        file=out/f'Model_{name}_CarryPair.glb';clip=f'FirstLevelCarryPair{number}'
+        file=out/f'Model_{name}_CarryPair.glb';clip=f'FirstLevelCarry{"Hold" if hold else ""}Pair{number}'
         bpy.ops.export_scene.gltf(filepath=str(file),export_format='GLB',export_animations=True,
             export_animation_mode='ACTIVE_ACTIONS',export_nla_strips_merged_animation_name=clip,
             export_frame_range=True,export_force_sampling=True,export_anim_slide_to_zero=True,export_yup=True)
@@ -84,17 +87,22 @@ def Main():
         records.append(dict(id=name,sources=sources,path=file.relative_to(root).as_posix(),sha256=Hash(file),clip=clip,
             blend=blend.relative_to(root).as_posix(),blendSha256=Hash(blend)))
     catalog=json.loads((root/'Preview/Data_Catalog.json').read_text(encoding='utf-8'));actions=[]
-    for actionId,role in [('CarryStretcherFront','Front'),('CarryStretcherRear','Rear'),('StretcherPair','Pair')]:
-        source=next(a for a in catalog['actions'] if a['id']==actionId)
-        v10=next(v for v in source['variants'] if v['id']=='Nra-v10-'+actionId)
+    for sourceActionId,role in [('CarryStretcherFront','Front'),('CarryStretcherRear','Rear'),('StretcherPair','Pair')]:
+        source=next(a for a in catalog['actions'] if a['id']==sourceActionId)
+        actionId=sourceActionId+('Hold' if hold else '')
+        v10=next(v for v in source['variants'] if v['id']=='Nra-v10-'+sourceActionId)
         variant=copy.deepcopy(v10);variant.update(id=f'Nra-v{revision}-'+actionId,revisionOrder=revision,
             label=f'V{revision} · 原骨架接触试制（握高 {grip_height:.2f} 米）',status='实验 · 待动作与近景审阅',
             path=f'Models/{group}/Model_LugouNra01_Carry{role}.glb',
-            clip='FirstLevelCarryPair1' if role=='Pair' else 'FirstLevelCarry'+role+'Walk100',
+            clip='FirstLevelCarry'+('Hold' if hold else '')+'Pair1' if role=='Pair' else 'FirstLevelCarry'+role+mode+'100',
             blend=records[0]['blend'],travelMeters=[0,0,speed*2])
         variant['review']['retargetReport']=f'Models/{group}/Data_IndependentValidation.json'
         variant['review']['retargetNotes']=f'原视频及 raw 保留。按原游戏人物归一化，骨盆位置、双脚支撑步态与手臂接触为后期重建；{speed:.2f} m/s 为制作参考速度，非单目实测地速。试制握高 {grip_height:.2f} 米，床面 {bed_height:.2f} 米；游戏尺寸尚未改动。未接入游戏。'
-        actions.append(dict(id=actionId,label=source['label'],loop=True,cameraDistance=6.5,
+        variant['review']['retargetNotes']+=f' 试制杆长 {rail_length:.2f} 米，纵向握点 ±{expected.get("gripOffsetM",1):.2f} 米。'
+        if hold:
+            variant['review']['sourcePoseSeconds']=expected['sourcePoseSeconds']
+            variant['review']['sourceAssessment']='固定原片与原始恢复姿态作为参考；双脚支撑、手臂接触与微小呼吸为后期制作的持架待机，不是恢复出的新动作。'
+        actions.append(dict(id=actionId,label=source['label']+(' · 持架待机' if hold else ''),loop=True,cameraDistance=6.5,
             description=f'{len(records)} 套原人物／三档身高接触试制；当前预览为 NRA01 标准身高。仍需姿态与掌指近景验收。',variants=[variant]))
     (out/'Data_EditableProjects.json').write_text(json.dumps(dict(status='editable_candidate_not_game_accepted',results=records),ensure_ascii=False,indent=2),encoding='utf-8')
     (out/'Data_Versions.json').write_text(json.dumps(dict(actions=actions),ensure_ascii=False,indent=2),encoding='utf-8')

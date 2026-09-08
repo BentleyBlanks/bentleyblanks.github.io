@@ -14,6 +14,10 @@ assert.match(version,/^FirstLevelTrainGameV[1-9]\d*$/);
 const outputGroup=args.includes('--output-group')?args[args.indexOf('--output-group')+1]:version;
 assert.match(outputGroup,/^FirstLevelTrain[A-Za-z0-9]+$/);
 const out=path.join(project,'_shots',outputGroup),folder=root?path.join(root,'Models',version):path.join(project,'Animation/FirstLevelTrain');
+const reportFolder=root?path.join(root,'Models',outputGroup):out;
+assert.equal(await fs.stat(path.join(reportFolder,'Data_VisualAssessment.json')).then(()=>true,()=>false),false,'Frozen game evidence requires a new --output-group');
+if(outputGroup!==version)assert.equal(await fs.stat(path.join(reportFolder,'Data_SamplerValidation.json')).then(()=>true,()=>false),false,'Preserve the previous named sampler validation');
+await fs.mkdir(reportFolder,{recursive:true});
 await fs.mkdir(out,{recursive:true});
 const config=JSON.parse(await fs.readFile(path.join(folder,'Data_FirstLevelTrainAnimation.json'),'utf8'));
 for(const record of config.models){
@@ -92,6 +96,6 @@ try{
   console.log(JSON.stringify({id:result.id,profiles:result.profiles.length,failures:failures.filter(f=>f.id===result.id)}));
  }
  assert.deepEqual(errors,[]);
- await fs.writeFile(path.join(root?folder:out,'Data_SamplerValidation.json'),JSON.stringify({status:failures.length?'needs_correction':'sampler_matches_frozen_library_on_production_rig',results,failures,errors},null,2));
+ await fs.writeFile(path.join(reportFolder,'Data_SamplerValidation.json'),JSON.stringify({status:failures.length?'needs_correction':'sampler_matches_frozen_library_on_production_rig',results,failures,errors},null,2));
  assert.deepEqual(failures,[]);
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve))}

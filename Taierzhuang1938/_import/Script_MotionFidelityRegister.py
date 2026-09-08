@@ -33,8 +33,9 @@ for a in inventory:
   if name!='StretcherPair':
    m=json.loads((root/'Models/_Cache'/args.group/f'Data_{name}Motion.json').read_text(encoding='utf-8'));t=m['sourceTravelMeters'];ratio=report['retargetScale'];travel=[t[0]*ratio,0,-t[1]*ratio] if cfg['loop'] else None
    review['seamBlendSeconds']=m['seamFrames']/60
-  entry['variants'].append({'id':f'{faction}-v{args.revision}-{name}','faction':faction,'label':f'V{args.revision} · 全身保真重定向','revisionOrder':args.revision,
-   'status':'实验 · 待审阅' if cfg['category']=='split_experiment' else '待审阅','propKind':cfg['kind'],'path':v['path'],'clip':v['clip'],'blend':v['blend'],'review':review,'travelMeters':travel})
+  sourceLimited=review.get('sourceQuality')=='source_limited_single_person_experiment'
+  entry['variants'].append({'id':f'{faction}-v{args.revision}-{name}','faction':faction,'label':f'V{args.revision} · '+('来源受限身体实验' if sourceLimited else '全身保真重定向'),'revisionOrder':args.revision,
+   'status':'来源受限实验 · 待修正' if sourceLimited else '实验 · 待审阅' if cfg['category']=='split_experiment' else '待审阅','propKind':cfg['kind'],'path':v['path'],'clip':v['clip'],'blend':v['blend'],'review':review,'travelMeters':travel})
  if entry['variants']:entries.append(entry)
 (out/'Data_Versions.json').write_text(json.dumps({'actions':entries},ensure_ascii=False,indent=2),encoding='utf-8')
 print('Registered',len(entries),'actions',sum(len(a['variants']) for a in entries),'variants')

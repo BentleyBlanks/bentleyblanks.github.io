@@ -23,6 +23,9 @@ def Main():
     parser.add_argument('--id', required=True)
     parser.add_argument('--query', action='store_true')
     args = parser.parse_args()
+    policy=json.loads(Path(__file__).with_name('Data_FirstLevelSourcePolicy.json').read_text(encoding='utf-8'))
+    if not args.query and not policy['allowNewVideoGeneration']:
+        raise RuntimeError('Current user policy is existing_sources_only; new video submissions are disabled')
     requests = json.loads(Path(__file__).with_name('Data_FirstLevelSourceRequests.json').read_text(encoding='utf-8'))
     request = next(item for item in requests if item['id'] == args.id)
     output = args.root.resolve() / 'Video' / 'Sources' / 'FirstLevelV1' / args.id

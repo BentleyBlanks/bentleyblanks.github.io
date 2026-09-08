@@ -14,11 +14,14 @@ const project=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const args=process.argv.slice(2),Arg=(key,fallback)=>args.includes(key)?args[args.indexOf(key)+1]:fallback;
 const root=Arg('--root'),group=Arg('--group','FirstLevelCarryFitV1'),revision=Number(Arg('--revision','10'));
 const fit=args.includes('--fit'),hold=args.includes('--hold'),wristFit=args.includes('--wrist-fit'),torsoFit=args.includes('--torso-fit');
+const neutralArms=args.includes('--neutral-arms');
 const gripHeightM=Number(Arg('--grip-height','.88')),bodyTowardGripM=Number(Arg('--body-offset','.12'));
+const gripOffsetM=Number(Arg('--grip-offset','1')),railLengthM=2*(gripOffsetM+.075);
+assert.ok(gripOffsetM>=1&&gripOffsetM<=1.5);
 assert.ok(gripHeightM>=.7&&gripHeightM<=1.4&&bodyTowardGripM>=0&&bodyTowardGripM<=.2);
 const referenceSpeedMps=Number(Arg('--speed','.55'));assert.ok(referenceSpeedMps>=.2&&referenceSpeedMps<=.7);
 const exportGroup=Arg('--export-group',null);
-if(exportGroup){assert.ok(fit);assert.ok(!hold,'Hold is diagnostic only; its own export/review contract is not implemented.');assert.match(exportGroup,/^FirstLevelCarryV[1-9]\d*$/);}
+if(exportGroup){assert.ok(fit);assert.match(exportGroup,hold?/^FirstLevelCarryHoldV[1-9]\d*$/:/^FirstLevelCarryV[1-9]\d*$/);}
 assert.ok(root,'--root required');assert.match(group,/^FirstLevelCarryFitV[1-9]\d*$/);
 const sourceGroup='FirstLevelCarryV'+revision,folder=path.join(root,'Models',group),out=path.join(project,'_shots',group);
 const libraryGroup=Arg('--library-group',sourceGroup),modelNumbers=Arg('--models','1,2,3,4').split(',').map(Number);
@@ -64,7 +67,10 @@ for(const n of modelNumbers){
       palms[role][side]={point:new Vector3(...contact.calibration[role][side].palmLocal).applyMatrix4(correction.invert()).toArray(),forward:fingerCenter.multiplyScalar(.25).normalize().toArray(),fingers,sign:-contact.calibration[role][side].sign};
     }
   }
-  const footCalibration={};
+  const footCalibration={},armCalibration={};
+  for(const side of ['L','R']){armCalibration[side]={};for(const [part,suffix] of [['upperArm','UpperArm'],['forearm','Forearm']]){
+    const node=scene.NodeIndex('Bip002 '+side+' '+suffix),local=rest[scene.parent[node]].clone().invert().multiply(rest[node]),q=new Quaternion();local.decompose(new Vector3(),q,new Vector3());armCalibration[side][part]=q.toArray();
+  }}
   for(const side of ['L','R']){
     const foot=scene.NodeIndex('Bip002 '+side+' Foot'),p=new Vector3(),q=new Quaternion(),s=new Vector3();rest[foot].decompose(p,q,s);
     const toes=scene.order.filter(i=>scene.nodes[i].name?.startsWith('Bip002 '+side+' Toe')).map(i=>{const local=rest[scene.parent[i]].clone().invert().multiply(rest[i]),t=new Vector3(),r=new Quaternion(),k=new Vector3();local.decompose(t,r,k);return {name:scene.nodes[i].name,rotation:r.toArray()}});
@@ -85,7 +91,7 @@ for(const n of modelNumbers){
     const heel=sole.reduce((a,b)=>a.point[2]>b.point[2]?a:b),toe=sole.reduce((a,b)=>a.point[2]<b.point[2]?a:b);
     footCalibration[side]={footWorldRotation:q.toArray(),toes,sole:{heel,toe,relativeFloor:floor}};
   }
-  records.push({id,file,animationSha256:Hash(bytes),modelSha256:Hash(target.buffer),assetRecord:manifest.models.find(m=>m.id===id),palms,footCalibration,nodeNames:target.json.nodes.map(n=>n.name),topNodes:target.json.scenes[target.json.scene||0].nodes});
+  records.push({id,file,animationSha256:Hash(bytes),modelSha256:Hash(target.buffer),assetRecord:manifest.models.find(m=>m.id===id),palms,footCalibration,armCalibration,nodeNames:target.json.nodes.map(n=>n.name),topNodes:target.json.scenes[target.json.scene||0].nodes});
 }
 function CurvesGlb(original,profiles){
   const json={asset:{version:'2.0',generator:'FirstLevelCarryContactFit'},scene:original.json.scene,scenes:structuredClone(original.json.scenes),nodes:original.json.nodes.map(node=>{const n=structuredClone(node);for(const key of ['mesh','skin','camera','extensions'])delete n[key];return n}),animations:[],accessors:[],bufferViews:[],buffers:[]},chunks=[];let offset=0;
@@ -119,7 +125,7 @@ try{
   const page=await browser.newPage({viewport:{width:1400,height:1000}});page.on('pageerror',e=>errors.push(e.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/_shots/${group}/_check_Fit.html`);await page.waitForFunction(()=>window.CarryFit);
   for(const record of records){
-    const result=await page.evaluate(async({record,bearerOffsetM,fit,hold,exportGroup,gripHeightM,bodyTowardGripM,referenceSpeedMps,wristFit,torsoFit})=>{
+    const result=await page.evaluate(async({record,bearerOffsetM,fit,hold,exportGroup,gripHeightM,gripOffsetM,railLengthM,bodyTowardGripM,referenceSpeedMps,wristFit,torsoFit,neutralArms})=>{
       const {T,loader,LugouCharacterRig,FirstLevelCarryContactFit}=CarryFit;
       const [gltf,library]=await Promise.all([loader.loadAsync('../../Model/Character/Model_'+record.id+'.glb'),loader.loadAsync('./'+record.file)]);
       const profiles=[];const V=()=>new T.Vector3();
@@ -154,13 +160,14 @@ try{
           // A single initial anchor retains the recovered sway. It does not
           // cancel each frame's pelvis translation or invent root motion.
           anchor??=new T.Vector3(pelvis.x,0,pelvis.z-end*.06);rig.root.position.x-=anchor.x;rig.root.position.z-=anchor.z;actor.root.updateMatrixWorld(true);fitter?.PrepareBody();
+          if(hold&&fitter){fitter.pose.Tilt(rig.bones.chest,Math.sin(time*Math.PI)*.004,0,0);actor.root.updateMatrixWorld(true);}
         };
         if(fit){
-          fitter=new FirstLevelCarryContactFit({T,actor,rig,role,palms:record.palms[role],probes,neutralFeet,neutralToes,gripHeightM,bodyTowardGripM,footCalibration:record.footCalibration,referenceSpeedMps,wristFit,torsoFit});
+          fitter=new FirstLevelCarryContactFit({T,actor,rig,role,palms:record.palms[role],probes,neutralFeet,neutralToes,neutralArms:neutralArms?record.armCalibration:null,gripHeightM,gripOffsetM,bodyTowardGripM,footCalibration:record.footCalibration,referenceSpeedMps,wristFit,torsoFit});
           const needed=[];for(let frame=0;frame<120;frame++){Sample(frame/60);needed.push(fitter.RequiredDrop(frame/60,hold));}
           // A periodic smooth upper envelope preserves reach at every frame
           // without holding the whole cycle at its single deepest correction.
-          dropCurve=needed.map((_,i)=>{const terms=[];for(let d=-8;d<=8;d++)terms.push(needed[(i+d+120)%120]-.0006*d*d);const maximum=Math.max(...terms);return maximum+.004*Math.log(terms.reduce((sum,v)=>sum+Math.exp((v-maximum)/.004),0))+.004;});
+          dropCurve=needed.map((_,i)=>{const terms=[];for(let d=-8;d<=8;d++)terms.push(needed[(i+d+120)%120]-.0006*d*d);const maximum=Math.max(...terms);return maximum+.001*Math.log(terms.reduce((sum,v)=>sum+Math.exp((v-maximum)/.001),0))+.002;});
           dropCurve.push(dropCurve[0]);dropM=Math.max(...dropCurve);
         }
         const Drop=time=>dropCurve?dropCurve[Math.round(time*60)%120]:0;
@@ -176,7 +183,7 @@ try{
             const palm=rig.bones['hand'+side].localToWorld(new T.Vector3(...record.palms[role][side].point)),palmOffset=palm.clone().sub(wrist),sign=record.palms[role][side].sign;
             const lengthsArm=[shoulder.distanceTo(elbow),elbow.distanceTo(wrist)];
             hands[side]={palm:palm.toArray(),wrist:wrist.toArray(),elbow:elbow.toArray(),shoulder:shoulder.toArray(),armLengths:lengthsArm,targets:[gripHeightM,1.32,.34].map(height=>{
-              const grip=new T.Vector3(sign*.29,height,-end),target=grip.clone().sub(palmOffset),horizontal=Math.hypot(target.x-shoulder.x,target.z-shoulder.z),maxReach=lengthsArm[0]+lengthsArm[1];
+              const grip=new T.Vector3(sign*.29,height,-end*gripOffsetM),target=grip.clone().sub(palmOffset),horizontal=Math.hypot(target.x-shoulder.x,target.z-shoulder.z),maxReach=lengthsArm[0]+lengthsArm[1];
               return {height,palmError:palm.distanceTo(grip),reachRatio:shoulder.distanceTo(target)/maxReach,minReachableGripHeight:horizontal<maxReach?shoulder.y-Math.sqrt(maxReach**2-horizontal**2)+palmOffset.y:null};
             })};
             lengths.push(...lengthsArm,rig.bones['thigh'+side].getWorldPosition(V()).distanceTo(rig.bones['calf'+side].getWorldPosition(V())),rig.bones['calf'+side].getWorldPosition(V()).distanceTo(rig.bones['foot'+side].getWorldPosition(V())));
@@ -200,7 +207,7 @@ try{
           for(const mesh of meshes){for(const m of Array.isArray(mesh.material)?mesh.material:[mesh.material]){m.metalness=0;m.roughness=Math.max(.58,m.roughness);}}
           const light=new T.DirectionalLight(0xffffff,3);light.position.set(3,6,-2);scene.add(light,new T.GridHelper(8,40));
           const material=new T.MeshStandardMaterial({color:0x9b703c,roughness:.85});
-          for(const x of [-.29,.29]){const mesh=new T.Mesh(new T.BoxGeometry(.065,.065,2.15),material);mesh.position.set(x,gripHeightM,0);scene.add(mesh);}
+          for(const x of [-.29,.29]){const mesh=new T.Mesh(new T.BoxGeometry(.065,.065,railLengthM),material);mesh.position.set(x,gripHeightM,0);scene.add(mesh);}
           const bed=new T.Mesh(new T.BoxGeometry(.58,.14,1.85),material);bed.position.y=gripHeightM-.12;scene.add(bed);
           const camera=new T.PerspectiveCamera(36,1.4,.01,100),renderer=new T.WebGLRenderer({antialias:true});renderer.setSize(1400,1000);
           const worst=frames.reduce((best,f)=>{const knee=Math.max(...['L','R'].filter(s=>f.correction?.footContacts[s].stance).map(s=>f.feet[s].kneeFlexionDeg));return knee>best.knee?{time:f.time,knee}:best},{time:0,knee:-1});
@@ -213,7 +220,7 @@ try{
         }
       }
       return {id:record.id,profiles};
-    },{record,bearerOffsetM:MISSION_TUNING.litterBearerOffsetM,fit,hold,exportGroup,gripHeightM,bodyTowardGripM,referenceSpeedMps,wristFit,torsoFit});
+    },{record,bearerOffsetM:MISSION_TUNING.litterBearerOffsetM,fit,hold,exportGroup,gripHeightM,gripOffsetM,railLengthM,bodyTowardGripM,referenceSpeedMps,wristFit,torsoFit,neutralArms});
     for(const p of result.profiles){assert.ok(p.bindingUnchanged,'original binding/hierarchy');assert.ok(p.summary.maxLengthDelta<.0001,'fixed original limb lengths');assert.ok(Number.isFinite(p.summary.minSole)&&Number.isFinite(p.summary.maxLowestSole),'finite actual shoe samples');}
     if(fit)for(const p of result.profiles){assert.ok(p.summary.minSole>=.0018,'no boot penetration');assert.ok(p.summary.targets[0].maxPalmError<.0001,'actual rail contact');}
     if(exportGroup){
@@ -230,7 +237,7 @@ try{
   }
   assert.deepEqual(errors,[]);
   const runtimeHashes={};for(const name of ['Script_CharacterModel.mjs','Script_FirstLevelMissionPeople.mjs','Script_FirstLevelMissionView.mjs','Data_Tuning_FirstLevel.mjs'])runtimeHashes[name]=Hash(await fs.readFile(path.join(project,name)));
-  await fs.writeFile(reportPath,JSON.stringify({status:fit?'authored_contact_trial_requires_review':'measured_requires_contact_correction',fit,hold,wristFit,torsoFit,gripHeightM,bodyTowardGripM,referenceSpeedMps,geometryStatus:gripHeightM===.88?'current_r12':'local_proposed_height_not_in_runtime',createdUtc:new Date().toISOString(),sourceGroup,libraryGroup,modelNumbers,sourceContactReportSha256:Hash(await fs.readFile(path.join(root,'Models',sourceGroup,'Data_ContactValidation.json'))),
+  await fs.writeFile(reportPath,JSON.stringify({status:fit?'authored_contact_trial_requires_review':'measured_requires_contact_correction',fit,hold,wristFit,torsoFit,neutralArms,gripHeightM,gripOffsetM,railLengthM,bedLengthM:1.85,bodyTowardGripM,referenceSpeedMps:hold?0:referenceSpeedMps,sourcePoseSeconds:hold?137/30+.5:null,supportReachRatio:.995,supportSafetyM:.001,bodyEnvelopeM:.001,geometryStatus:gripHeightM===.88&&gripOffsetM===1?'current_r12':'local_proposed_geometry_not_in_runtime',createdUtc:new Date().toISOString(),sourceGroup,libraryGroup,modelNumbers,sourceContactReportSha256:Hash(await fs.readFile(path.join(root,'Models',sourceGroup,'Data_ContactValidation.json'))),
     scope:fit?`Authored flat-ground ${gripHeightM} m contact trial on ${results.reduce((n,r)=>n+r.profiles.length,0)} production profiles; original V10 and raw untouched. Periodic body-height reach envelope, constant longitudinal placement correction, reconstructed ${referenceSpeedMps} m/s support gait and authored IK. Foot orientation comes from original inverse bind matrices. Not game acceptance.`:'24 real production rig profiles; flat terrain, constant first-frame pelvis anchor. No per-frame ground or hand correction. Moving .88, loading 1.32, fallen .34 metre grips use r12 geometry. Reach uses the V10 hand orientation and is a geometric bound, not a naturalness verdict.',
     newVideoGenerations:0,newInferenceRuns:0,bearerOffsetM:MISSION_TUNING.litterBearerOffsetM,records:records.map(({assetRecord,...r})=>r),runtimeHashes,results,errors},null,2));
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

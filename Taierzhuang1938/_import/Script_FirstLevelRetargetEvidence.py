@@ -14,6 +14,7 @@ def CollectRetargetEvidence(root,directory,action,sourceSha256):
         variant=matches[0]
         if assessment.get('variantId'):assert assessment['variantId']==variant['id'],path
         history.append(dict(variantId=variant['id'],path=path.relative_to(root).as_posix(),assessment=assessment))
-    latestId=action.get('latestByFaction',{}).get('Nra') if action else None
+    latestByFaction=action.get('latestByFaction',{}) if action else {}
+    latestId=latestByFaction.get('Nra') or next(iter(latestByFaction.values()),None)
     latest=next((e['assessment'] for e in history if e['variantId']==latestId),None)
     return history,latest

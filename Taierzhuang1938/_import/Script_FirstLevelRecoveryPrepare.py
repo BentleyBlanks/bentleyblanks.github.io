@@ -4,17 +4,49 @@ import argparse, hashlib, json
 import numpy as np
 
 
+def ReadReviewedSource(source,allowLimits=False):
+    path=source/'DenseReview/Data_VisualAssessment.json'
+    assessment=json.loads(path.read_text(encoding='utf-8-sig'))
+    if assessment['status']=='eligible_for_initial_3d_recovery_pending_depth_and_contact_review':
+        return assessment,False
+    assert allowLimits,'Source limits require explicit experimental reuse'
+    decision=json.loads((source/'Data_SourceReuseDecision.json').read_text(encoding='utf-8-sig'))
+    assert decision['mode']=='experimental_existing_source' and decision['acceptedForGame'] is False
+    assert decision['sourceReviewSha256']==hashlib.sha256(path.read_bytes()).hexdigest()
+    assert decision['sourceVideoSha256']==assessment['sourceVideoSha256']
+    assert decision['observedLimitations'] and decision['requiredAuthoredCorrections']
+    return {**assessment,'observed':assessment['observed']+' 来源受限实验：'+decision['observedLimitations']},True
+
+
 def Main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--root',type=Path,required=True)
     parser.add_argument('--ids',required=True)
     parser.add_argument('--group',default='FirstLevelPriorityV1')
+    parser.add_argument('--allow-reviewed-source-limits',action='store_true')
     args=parser.parse_args();root=args.root.resolve()
     labels={'TrainStairDisembark':'车梯逐阶下车与走停','TrainMealCutOffer':'幺娃展开食物切片递出',
         'ZhouSeatedAttempt':'老周腿伤撑起失败与指前沿',
         'TrainBenchRest':'车厢长凳休息与前倾','TrainGearStow':'车厢整理背包',
         'MedicSupportLegs':'医护托腿与侧移放下','ZhouWeakeningDeath':'老周卧姿衰弱与松手',
-        'TrainShellStartleBlock':'车厢炮击惊缩与抬臂','TrainWoundedArm':'车厢保护左伤臂与坐下'}
+        'TrainShellStartleBlock':'车厢炮击惊缩与抬臂','TrainWoundedArm':'车厢保护左伤臂与坐下',
+        'TrainStandBrace':'车厢站姿扶杆与撑墙','TrainFoodReceiveEat':'车厢坐姿取食与小口吃',
+        'PatientLitterBreath':'患者平躺抓杆与抬头','PatientAssistedSettle':'患者抓杆靠坐与躺回',
+        'ClothSearchOffer':'寻找展开布料与递出',
+        'NeutralIdleTurn':'空手待机与转向','NeutralIdleWalkStop':'空手起步行走与站稳',
+        'CommandDirections':'招停指向与转身','WoundedArmWalk':'吊臂慢行与短停',
+        'RescuerDragRole':'救者后退拖动负载','BearerDropFall':'抬手失握与倒地保持',
+        'CarryEmergencyDive':'松手前扑与双手撑地','BearerReplacementApproach':'补位者靠近与握栏',
+        'BackRifleWalkStop':'背枪走近与站稳','RifleCombatTurnStop':'持枪低姿转向与停稳',
+        'RifleSlingExchange':'收枪背后与重新取枪','HandReachReceive':'伸手取放与收回',
+        'ConversationFatigue':'侧看低语与疲惫擦额','ProneCoverReaction':'伏地护头与撑起反应',
+        'PatientDropReaction':'卧姿患者抓栏反应','CarryVehicleLoadRear':'装车承重与松手',
+        'CartPushPull':'推车行走与持把停稳','CarryLookRelease':'持栏侧看与放下松手',
+        'CivilianBundleEvacuate':'百姓抱包蹲避与撤离','EnemySignalAdvance':'日军示意与低姿前进',
+        'ClothReceivePress':'接布与俯身按压','PatientDraggedSettle':'患者卧姿滑移与安置',
+        'MedicTriageCheck':'医护俯身分流检查','MedicNextPatient':'医护转向下一位',
+        'RifleBoltReload':'步枪机匣与腰侧取弹动作','MachineGunEnterLeave':'机枪靠近据枪与离位',
+        'CarryVehicleLoadFront':'推架上台与松手','BoxCarrySetDown':'抱箱走近与放下'}
     names=['Pelvis','LeftHip','RightHip','Spine1','LeftKnee','RightKnee','Spine2','LeftAnkle',
         'RightAnkle','Spine3','LeftFoot','RightFoot','Neck','LeftCollar','RightCollar','Head',
         'LeftShoulder','RightShoulder','LeftElbow','RightElbow','LeftWrist','RightWrist']
@@ -29,8 +61,7 @@ def Main():
         assert receipt['gen_status']=='success'
         video=source/Path(receipt['result_json']['videos'][0]['path']).name
         assert video.is_file() and receipt['submit_id'] in video.name
-        assessment=Read(source/'DenseReview/Data_VisualAssessment.json')
-        assert assessment['status']=='eligible_for_initial_3d_recovery_pending_depth_and_contact_review'
+        assessment,sourceLimited=ReadReviewedSource(source,args.allow_reviewed_source_limits)
         assert assessment['sourceVideoSha256']==Hash(video)
         cache=root/'Models/_Cache/FirstLevelV1'/name/'Data_GvhmrMotion.npz'
         recovery=Read(cache.with_name('Data_Recovery.json'))
@@ -52,7 +83,7 @@ def Main():
         review=dict(sourceVideo=video.relative_to(root).as_posix(),sourceRangeSeconds=[0,(len(positions)-1)/raw['fps']],
             recoveryTracks=[dict(path=rawPath.relative_to(root).as_posix(),offset=[0,0,0])],
             recoveryLabel='GVHMR 原始恢复 · 未重定向、未修脚',recoveryFps=raw['fps'],
-            sourceAssessment=assessment['observed'],sourceQuality='single_person_pending_depth_and_contact_review',
+            sourceAssessment=assessment['observed'],sourceQuality='source_limited_single_person_experiment' if sourceLimited else 'single_person_pending_depth_and_contact_review',
             defaultCameraYawRadians=0,cameraElevationRadians=.35,sideCameraYawRadians=-np.pi/2)
         entry=dict(id=name,label=labels[name],loop=False,category='video_recovery',cameraDistance=5.5,
             latestByFaction={'Nra':'source-'+name},variants=[dict(id='source-'+name,faction='Nra',review=review)])
@@ -69,6 +100,9 @@ def Main():
             rawJointFile=rawPath.relative_to(root).as_posix(),group=args.group,
             visualAssessment=(source/'DenseReview/Data_VisualAssessment.json').relative_to(root).as_posix(),
             status='raw_recovered_pending_retarget_and_contact_review',runtimeEnabled=False)
+        if sourceLimited:
+            registration.update(sourceReuseDecision=(source/'Data_SourceReuseDecision.json').relative_to(root).as_posix(),
+                sourceLimited=True,status='experimental_raw_recovered_requires_authored_missing_pose')
         (source/'Data_RecoveryRegistration.json').write_text(json.dumps(registration,ensure_ascii=False,indent=2),encoding='utf-8')
         print(json.dumps(dict(id=name,frames=len(positions),raw=registration['rawJointFile'])))
     inventory.write_text(json.dumps(dict(actions=list(actions.values())),ensure_ascii=False,indent=2),encoding='utf-8')

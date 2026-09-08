@@ -6,7 +6,12 @@ import {pathToFileURL} from 'node:url';
 const args=process.argv.slice(2);
 function Arg(name,fallback){const i=args.indexOf(name);return i<0?fallback:args[i+1]}
 const root=Arg('--root'),url=Arg('--url','http://127.0.0.1:8136/Preview/index.html');
+const reportName=Arg('--report-name','Data_Validation.json');assert.match(reportName,/^Data_[A-Za-z0-9]+\.json$/);
 if(!root)throw Error('--root is required');
+const outputReport=path.join(root,'Preview',reportName);
+if(reportName!=='Data_Validation.json')assert.equal(await fs.stat(outputReport).then(()=>true,()=>false),false,'Preserve previous named validation');
+const captureFolder=reportName==='Data_Validation.json'?path.join(root,'Preview'):path.join(root,'Preview',reportName.replace(/\.json$/,''));
+await fs.mkdir(captureFolder,{recursive:true});
 const project=Arg('--project');
 const {LaunchBrowser}=await import((project?pathToFileURL(path.join(project,'PrairieFire1937/Script_BrowserTestKit.mjs')):new URL('../../PrairieFire1937/Script_BrowserTestKit.mjs',import.meta.url)).href);
 const browser=await LaunchBrowser(),page=await browser.newPage({viewport:{width:1700,height:1000}}),errors=[],results=[],controls={};
@@ -16,7 +21,7 @@ async function Snapshot(phase){
  await page.evaluate(t=>MotionReview.setPhase(t),phase);await page.waitForFunction(()=>!MotionReview.video.seeking);
  await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
  return page.evaluate(()=>{
-  const m=MotionReview,time=m.range?m.range[0]+m.phase*(m.range[1]-m.range[0]):null;let rawError=0;
+  const m=MotionReview,time=m.review?.sourcePoseSeconds??(m.range?m.range[0]+m.phase*(m.range[1]-m.range[0]):null);let rawError=0;
   for(const track of m.recovery.tracks){
    const frame=Math.min(time*track.data.fps,track.data.positions.length-1),a=Math.floor(frame),b=Math.min(a+1,track.data.positions.length-1),t=frame-a;
    for(let j=0;j<track.joints.length;j++){
@@ -39,7 +44,7 @@ function CheckSync(s,v){
  assert.equal(s.videoSource,new URL('../'+v.review.sourceVideo,url).href);assert.equal(s.rawTracks,v.review.recoveryTracks.length);assert.ok(s.rawError<1e-10,'Raw viewing transform');
  for(const frame of s.trackFrames)assert.ok(Math.abs(frame-s.time*v.review.recoveryFps)<1e-7,'Recovery frame');
 }
-async function LatestReady(action,faction='Nra'){const id=await page.evaluate(({action,faction})=>MotionReview.catalog.actions.find(e=>e.id===action).latestByFaction[faction],{action,faction});await Ready(id)}
+async function LatestReady(action,faction='Nra'){await page.waitForFunction(()=>window.MotionReview);const id=await page.evaluate(({action,faction})=>MotionReview.catalog.actions.find(e=>e.id===action).latestByFaction[faction],{action,faction});await Ready(id)}
 async function Select(action,id){await page.locator('#list details').evaluateAll(nodes=>nodes.forEach(n=>n.open=true));await page.locator(`#list button[data-id="${action}"]`).click();await page.locator('#faction').selectOption('Nra');if(id)await Ready(id);else await LatestReady(action)}
 try{
  await page.goto(url+'?action=RifleCrouchAdvance');await LatestReady('RifleCrouchAdvance');const actions=await page.evaluate(()=>MotionReview.catalog.actions);
@@ -53,10 +58,10 @@ try{
    const variant=entry.variants.find(v=>v.id===id),a=await Snapshot(.15),b=await Snapshot(.7);CheckSync(b,variant);
    const movement=Delta(a.matrices,b.matrices),rawMovement=Delta(a.rawPositions,b.rawPositions);let seam=null;
    if(Number(id.match(/-v(\d+)-/)?.[1]||0)>=2||variant.path.includes('/NextTenV1/'))assert.ok(movement>.0001,'Animated latest model '+id);
-   if(b.rawTracks)assert.ok(rawMovement>.0001,'Moving raw recovery '+id);
+   if(b.rawTracks){if(Number.isFinite(variant.review?.sourcePoseSeconds)){assert.equal(rawMovement,0,'Held raw pose '+id);assert.ok(movement>.0001,'Authored hold model moves '+id);}else assert.ok(rawMovement>.0001,'Moving raw recovery '+id);}
    if(entry.loop&&(Number(id.match(/-v(\d+)-/)?.[1]||0)>=2||variant.path.includes('/NextTenV1/'))){seam=Delta((await Snapshot(0)).matrices,(await Snapshot(1)).matrices);assert.ok(seam<.001,'Loop endpoints '+id+' '+seam)}
    results.push({id,duration:b.duration,bones:b.bones,movement,seam,range:b.range,rawTracks:b.rawTracks,rawError:b.rawError,rawMovement});
-   if(faction==='Nra'&&['RifleCrouchAdvance','KneelHold','KneelSequence','StretcherPair'].includes(entry.id)){await Snapshot(.45);await page.screenshot({path:path.join(root,'Preview',`Texture_SourceRecoveryLatest_${entry.id}.png`)})}
+   if(faction==='Nra'&&['RifleCrouchAdvance','KneelHold','KneelSequence','StretcherPair','StretcherPairHold'].includes(entry.id)){await Snapshot(.45);await page.screenshot({path:path.join(captureFolder,`Texture_SourceRecoveryLatest_${entry.id}.png`)})}
   }
  }
  await Select('RifleCrouchAdvance');await page.locator('#history > summary').click();await page.locator('[data-variant="Nra-v1-RifleCrouchAdvance"]').click();await Ready('Nra-v1-RifleCrouchAdvance');
@@ -86,6 +91,20 @@ try{
  await Select('StretcherPair');assert.match(await page.locator('#status').textContent(),/不符合严格单人/);controls.splitInputLinks=await page.locator('#references a').filter({hasText:'实际裁剪推理输入'}).count();assert.equal(controls.splitInputLinks,2);
  const source=actions.find(e=>e.id==='WoundedLimp').variants.find(v=>v.id==='Nra-v2-WoundedLimp').review.sourceVideo;
  const response=await fetch(new URL('../'+source,url),{headers:{Range:'bytes=0-63'}});assert.equal(response.status,206);assert.equal((await response.arrayBuffer()).byteLength,64);controls.referenceRangeStatus=206;
+ if(actions.some(e=>e.id==='StretcherPairHold')){
+  await Select('StretcherPairHold');const hold=await Snapshot(.2);
+  await page.locator('#next').click();const step=await Snapshot(await page.evaluate(()=>MotionReview.phase));
+  assert.ok(Math.abs(step.modelTime-hold.modelTime-1/60)<.00001,'Held pose model frame step');
+  assert.equal(step.videoTime,hold.videoTime);assert.equal(Delta(step.rawPositions,hold.rawPositions),0);
+  await page.locator('#speed').selectOption('0.5');await page.locator('#play').click();
+  await page.waitForFunction(()=>MotionReview.playing&&MotionReview.phase>.35&&MotionReview.video.paused);
+  await page.locator('#play').click();const paused=await Snapshot(await page.evaluate(()=>MotionReview.phase));
+  assert.equal(paused.videoTime,hold.videoTime);assert.equal(Delta(paused.rawPositions,hold.rawPositions),0);
+  assert.ok(Delta(paused.matrices,hold.matrices)>.0001,'Breathing hold plays independently of fixed raw pose');
+  assert.match(await page.locator('#sourceMeta').innerText(),/固定源帧/);
+  await Snapshot(.995);await page.locator('#play').click();await page.waitForFunction(()=>MotionReview.playing&&MotionReview.phase<.25);
+  controls.heldPose={sourceSeconds:hold.videoTime,modelFrameStep:1/60,rawStayedOriginal:true,independentPlayback:true,loop:true};
+ }
  assert.deepEqual(errors,[]);const report={status:'passed',rendering:'Original video + untouched GVHMR joints + latest GLTFLoader/AnimationMixer model',variants:results,controls,errors};
- await fs.writeFile(path.join(root,'Preview','Data_Validation.json'),JSON.stringify(report,null,2));console.log(JSON.stringify({status:'passed',variants:results.length,rawVariants:results.filter(r=>r.rawTracks).length,maxLoopEndpointMatrixDelta:Math.max(...results.map(r=>r.seam||0)),controls,errors}));
-}catch(error){await fs.writeFile(path.join(root,'Preview','Data_Validation.json'),JSON.stringify({status:'failed',failure:error.stack,variants:results,controls,errors},null,2));throw error}finally{await browser.close()}
+ await fs.writeFile(path.join(root,'Preview',reportName),JSON.stringify(report,null,2));console.log(JSON.stringify({status:'passed',variants:results.length,rawVariants:results.filter(r=>r.rawTracks).length,maxLoopEndpointMatrixDelta:Math.max(...results.map(r=>r.seam||0)),controls,errors}));
+}catch(error){await fs.writeFile(path.join(root,'Preview',reportName),JSON.stringify({status:'failed',failure:error.stack,variants:results,controls,errors},null,2));throw error}finally{await browser.close()}

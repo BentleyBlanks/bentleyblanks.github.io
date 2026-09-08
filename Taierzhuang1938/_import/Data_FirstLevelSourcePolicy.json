@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "updated": "2026-09-08",
+  "userInstruction": "不用重新生成视频了 有什么就用什么",
+  "allowNewVideoGeneration": false,
+  "allowRetakes": false,
+  "mode": "existing_sources_only",
+  "missingMotionStrategy": "Reuse existing video/raw/game clips; author missing contact and pose corrections with explicit provenance. Do not treat source defects as recovery acceptance.",
+  "previousRetakeBudget": "Historical estimate only; cancelled as an active production plan."
+}
