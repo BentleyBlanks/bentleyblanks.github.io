@@ -6,8 +6,8 @@
 //   2. 分割严格单调、铺到 min(camera.far, 档位上限)、逐级纹素单调变粗
 //   3. 光空间纹素吸附：相机平移 0.37 个纹素之后各级的光空间中心只**整纹素**地跳
 //   4. 相邻级重叠：本级过渡带的边界投进下一级仍在图内（「无硬缝」的几何前提）
-//   5. 一帧只烘一张（城里每趟烘焙有 ~1.45 M 三角的地板，单帧红线只剩 2.59 M 余量），
-//      且一轮 bakeOrder 之内每一级都被烘到
+//   5. 阴影烘焙守在三角预算之内（城里每趟烘焙有 ~1.45 M 三角的地板，单帧红线只剩
+//      2.59 M 余量），排班恒定（一张档恒一张 / 两张档恒两张），一轮之内每一级都被烘到
 //   6. 地面没有大面积痤疮（数「孤立暗点」，normalBias 归零时也要守住）
 //   7. 级联假彩色图上至少看得到两级；SunShadow 图有黑有白
 //   8. 接触阴影图有黑有白，且关掉之后材质那边退回纯白
@@ -182,28 +182,44 @@ try {
     }
     out.overlap = { fade, worstMargin: overlap, allInside: overlap.every((m) => m > 0.001) };
 
-    // --- 5) 一帧只烘一张（单帧三角红线的硬约束） --------------------------
+    // --- 5) 烘焙排班守在三角预算之内（单帧三角红线的硬约束） --------------
+    // 2026-09-08 起排班有两档（见 Data_Tuning_Shadows 抬头「近级每帧烘」）：
+    //   一张 —— 保底，`bakeOrder` 轮转；
+    //   两张 —— 实测说烘两张仍在 bakeTriangleBudget 之内时，第 0 级每帧 + 远级轮转。
+    // 所以断言不再是「恒等于一张」，而是**实测的阴影三角守在预算里**（那才是
+    // 当初写「一帧一张」要保护的东西），外加「一轮之内每一级都被烘到」。
     const counts = new Array(csm.count).fill(0);
     const perFrame = [];
+    const bakeTriangles = [];
+    const nearFlags = [];
     const FRAMES = state.bakeOrder.length * 3;
-    // 先跑满一轮，让开机那次「缺图就立刻烘」的爆发过去
-    P.StepFrames(state.bakeOrder.length, 1 / 60);
+    // 先跑满一轮，让开机那次「缺图就立刻烘」的爆发与升档的锁都过去
+    P.StepFrames(state.bakeOrder.length + 4, 1 / 60);
     for (let i = 0; i < FRAMES; i += 1) {
       P.StepFrames(1, 1 / 60);
       let baked = 0;
       csm.lastScheduled.forEach((on, level) => { if (on) { counts[level] += 1; baked += 1; } });
       perFrame.push(baked);
+      bakeTriangles.push(csm.bakeTriangles);
+      nearFlags.push(csm.nearEveryFrame);
     }
+    const nearEveryFrame = nearFlags.every(Boolean);
     out.throttle = {
       frames: FRAMES,
       counts,
       perFrameMax: Math.max(...perFrame),
       bakeOrder: state.bakeOrder,
-      // 城里每趟烘焙有 ~1.45 M 三角的地板，单帧三角红线只剩 2.59 M 余量 ——
-      // 一帧烘两张就顶穿（BootTest 会红）。这一条是那道闸。
-      onePerFrame: perFrame.every((n) => n === 1),
+      nearEveryFrame,
+      budget: state.bakeTriangleBudget,
+      maxBakeTriangles: Math.max(...bakeTriangles),
+      // 真正要守的那条线：本帧阴影烘焙画的三角不许越过预算。
+      withinBudget: bakeTriangles.every((n) => n <= state.bakeTriangleBudget),
+      // 一张档恒一张；两张档恒两张（第 0 级 + 一个远级）。两档都不许出现三张。
+      perFrameOk: perFrame.every((n) => n === (nearEveryFrame ? Math.min(2, csm.count) : 1)),
+      // 升到两张时第 0 级必须每帧都在
+      nearCovered: !nearEveryFrame || counts[0] === FRAMES,
       allCovered: counts.every((c) => c > 0),
-      matchesOrder: counts.every((c, level) => {
+      matchesOrder: nearEveryFrame || counts.every((c, level) => {
         const slots = state.bakeOrder.filter((v) => v === level).length;
         return Math.abs(c - slots * 3) <= 1;
       }),
@@ -457,10 +473,11 @@ if (!result) {
     result.snap.snapped, JSON.stringify(result.snap));
   Check("相邻级重叠：本级过渡带外沿投进下一级仍在图内",
     result.overlap.allInside, JSON.stringify(result.overlap));
-  Check("一帧只烘一张（单帧三角红线的硬约束）",
-    result.throttle.onePerFrame, JSON.stringify(result.throttle));
-  Check("一轮之内每一级都被烘到且比例对得上 bakeOrder",
-    result.throttle.allCovered && result.throttle.matchesOrder, JSON.stringify(result.throttle));
+  Check("阴影烘焙守在三角预算之内，且排班恒定（一张档一张 / 两张档两张）",
+    result.throttle.withinBudget && result.throttle.perFrameOk, JSON.stringify(result.throttle));
+  Check("一轮之内每一级都被烘到（升到两张时第 0 级每帧都在）",
+    result.throttle.allCovered && result.throttle.matchesOrder && result.throttle.nearCovered,
+    JSON.stringify(result.throttle));
   Check("地面没有大面积痤疮（孤立暗点 < 0.5%）",
     result.acne.withNormalBias.ratio < 0.005, JSON.stringify(result.acne.withNormalBias));
   Check("normalBias 归零时仍没有大面积痤疮（receiver-plane 偏置顶住）",

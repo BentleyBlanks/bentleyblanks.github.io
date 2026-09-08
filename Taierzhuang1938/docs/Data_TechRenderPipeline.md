@@ -68,7 +68,7 @@ function generateShadowMapTypeDefine( parameters ) {
 
 | 事实 | 后果 | 出处 |
 |---|---|---|
-| **r185 的阴影 pass 用「主视图相机」判 layers。** `WebGLShadowMap.renderObject( scene, camera, shadow.camera, light, type )` 里的判据是 `object.layers.test( camera.layers )`，那个 `camera` 是**主视图相机**，不是阴影相机 | 「给远级阴影相机关掉小投影体那一层」这条优化**做不到**。远级成本只能用「一帧只烘一张」压（§6.8） | 实读 `vendor/three` 源码 |
+| **r185 的阴影 pass 用「主视图相机」判 layers。** `WebGLShadowMap.renderObject( scene, camera, shadow.camera, light, type )` 里的判据是 `object.layers.test( camera.layers )`，那个 `camera` 是**主视图相机**，不是阴影相机 | 「给远级阴影相机关掉小投影体那一层」这条优化**做不到**。远级成本只能用「按三角预算烘一张或两张」压（§6.8） | 实读 `vendor/three` 源码 |
 | **ANGLE-D3D11 上 `MAX_TEXTURE_IMAGE_UNITS = 16`。** 超了程序**不链接**（日志只有一行 `FRAGMENT shader texture image units count exceeds MAX_TEXTURE_IMAGE_UNITS(16)`），而 three 每帧照样 `useProgram` | 症状是「那只材质整个不画 + 每帧一次 1282」。门禁 `Script_SamplerBudgetTest.mjs`，预算表与打包手段见 §1.8 | 2026-09 集成期实测 |
 | **`material.onBeforeCompile(parameters)` 里 `parameters.defines === material.defines`** —— 同一个对象。而 `getProgramCacheKey` 是在钩子**之前**从 `material.defines` 现读的 | 在钩子里写 defines = 同一份 GLSL 被认成两个程序各链接一遍（实测 188 个 program 里 95 个是这么白建的）；反过来，从 `patch.defines` 拿掉一位**不会**让它从材质上消失，要显式 `delete`。口径见 §1.8 与 §7.10 | 2026-09 实测 |
 | **`getProgramInfoLog` 的首次调用是同步阻塞点。** ANGLE 把 `compileShader` / `linkProgram` 全甩给驱动线程池（两者加起来不到 5 ms），阻塞的是「第一次用到这个 program」那一下：`onFirstUse ← WebGLProgram.getUniforms ← setProgram ← renderBufferDirect` | 预热的正解是**提交与等待分家**（全部先交、再统一轮询 `isReady()`），不是逐个建逐个等。账见 §18.2 | 2026-09 逐 WebGL 调用计时 |
@@ -300,6 +300,29 @@ sRGB 编码，最后一趟必须自己手写（Composite 的 `EncodeOutput`）�
 主 pass 读到的骨骼纹理**逐纹素不变**（宽度没动，`getBoneMatrix(i)` 对
 `i < size²/4` 落点完全一样），所以换成翻倍纹理对画面零影响。显存与上传：一具 50 骨的
 骨骼从 16×16 RGBA32F（4 KB）变成 16×32（8 KB）；本关 69 名士兵满编约 0.55 MB/帧上传。
+
+> **事故（2026-09-08 修）：上一帧骨矩阵喂错了顶点，蒙皮人物整整一轮没有正确的速度。**
+> 覆盖材质的顶点着色器里，速度那一段排在 `#include <skinning_vertex>` **之后**，
+> 而它拿 `transformed` 去乘 `bindMatrix` 当「上一帧要蒙皮的顶点」—— 那时候
+> `transformed` 已经是**本帧蒙皮完**的位置（three 的 chunk 最后一行就是
+> `transformed = (bindMatrixInverse * skinned).xyz`），于是上一帧骨矩阵被叠了第二遍，
+> 算出来的「上一帧世界位置」在几百米外，速度整条钳到 `VELOCITY.clampUv`（0.25 uv）。
+>
+> 症状（三条看起来毫不相干，其实同一个根）：**站着不动的人也一身鬼影**（TAA 按
+> 那条假速度去四分之一屏外取历史）、**周身一圈恒定的运动模糊**（tile max 把假速度
+> 摊到 3×3 个 tile，画面上是每个人外扩 60 px 的糊边）、**人多的地方阴影像在闪**。
+> 实测（第一关车厢，相机钉死）：修前 52×29 的 tile 网格上有 **562 个 tile 顶到速度
+> 钳位**，修后 **0**；把世界钉住（dt = 0）之后速度靶**整片精确为 0**。
+>
+> 修法：在 `#include <skinning_vertex>` 之前把蒙皮前的 `transformed` 存进
+> `vPreSkinPosition`，速度那一段吃它。
+>
+> **为什么没被测出来**：`Script_PostFrameGraphTest` 的「相机静止时速度靶≈0」跑在
+> Probe 的街景上，那一幕里一只蒙皮网格都没有；`Script_TaauTest` 的鬼影一条只比
+> 「换速度来源会不会改动在动的像素」，两条路都错也照样过。**已补两条断言**
+> （`Script_TaauTest` 5b，有兵的画面上）：世界钉住时速度靶整片为 0、世界照跑时
+> 没有 tile 顶到钳位。回滚着色器那一行验证过：两条都红（98 / 109 个 tile 顶到
+> 0.354 uv = 钳位的对角）。
 
 **TAA 与运动模糊本阶段仍走深度反投影**（只有相机运动）。切换到速度靶的接线点已经
 留好：`TaaPass` 的 `uVelocity` + `uUseVelocityBuffer`（置 1 即切换），Composite 的
@@ -1787,7 +1810,7 @@ high 档 4096²（132 m 铺满 = **3.2 cm/texel**），`PCFShadowMap`（three �
 | **receiver-plane 深度偏置**（梯度钳住） | Isidoro 2006（本仓第一人称自阴影已经在用同一套） | 盘上偏出去的抽样点比较的是「同一个平面在那儿该有多深」，掠射角不必把常数 bias 调到顶飞影子 |
 | 逐级 bias / normalBias 按**纹素世界尺寸**缩放 | 通用做法 | 远级纹素粗四倍、痤疮台阶也粗四倍，同一个绝对偏移必然「近处彼得潘 + 远处痤疮」二选一 |
 | **屏幕空间接触阴影**：沿太阳方向短距离 raymarch | UE Contact Shadows / Frostbite SSCS / COD screen-space shadows | 补 `normalBias` 把着色点推出地面造成的贴地漏光，以及远级纹素够不到的接触带 |
-| **一帧只烘一张**（`shadow.autoUpdate=false` + 按 `bakeOrder` 轮转点 `needsUpdate`） | UE 的 per-cascade update frequency | 城里每趟烘焙有 1.45 M 三角的地板，单帧红线只剩 2.59 M 余量（见 §6.8） |
+| **按三角预算烘一张或两张**（`shadow.autoUpdate=false` + 自己点 `needsUpdate`；够就第 0 级每帧 + 远级轮转，不够退回 `bakeOrder` 一帧一张） | UE 的 per-cascade update frequency | 城里每趟烘焙有 1.45 M 三角的地板，单帧红线只剩 2.59 M 余量；预算与实测表见 §6.8 |
 
 ### 6.3 为什么是「替换 chunk」不是「材质补丁」
 
@@ -1886,7 +1909,7 @@ prepass → hzb → ssao → contactShadows → main → …
   （最简单，pass 排在预通道之后），要么由 `Script_Main.RenderScene` 在
   `post.Render` 之前补一句。
 
-### 6.8 一帧只烘一张（单帧三角红线逼出来的口径）
+### 6.8 阴影烘焙的三角预算（一帧一张 / 两张）
 
 **这一条是本轮最重的一个实测发现，改级联参数前必读。**
 
@@ -1905,12 +1928,45 @@ prepass → hzb → ssao → contactShadows → main → …
 
 而 `Data_AssetStandards.SCENE_RENDER_LIMITS.triangles` 的单帧红线是 **8.10 M**，
 这一关不带阴影是 5.51 M（`BootTest` 那一帧含预通道 + 主场景 + GI），
-**留给阴影的余量只有 2.59 M —— 也就是一帧一张**。四张一起烘是 8.4 M，
+**留给阴影的余量只有 2.59 M —— 在城里也就是一帧一张**。四张一起烘是 8.4 M，
 第一版就是这么把 BootTest 的四关顶红的（phase 2/4/5/6，最高 11.07 M）。
 
-所以调度不是「每级隔几帧」而是 `bakeOrder`：**一条逐帧轮转表，每帧恰好烘一张**，
-最近一级在表里占的格子最多（它扛着会动的人和车）。副作用：近级阴影按 ~30 Hz 刷新
-（60 fps 下最多落后一帧，看不出来），远级按 ~9 Hz（那里一个人只有几个像素宽）。
+所以调度不是「每级隔几帧」而是 `bakeOrder`：**一条逐帧轮转表**，
+最近一级在表里占的格子最多（它扛着会动的人和车）。
+
+#### 近级每帧烘（2026-09-08 补：那条「看不出来」是错的）
+
+原本这里写「近级 ~30 Hz 刷新，60 fps 下最多落后一帧，看不出来」。**不是**：
+一屋子会动的人贴着相机时，那一帧的落后会在地板上跳出肉眼可见的一下。
+第一关车厢（P012 开场，十几个人坐在两侧一米内）逐帧取证 —— 只量「速度≈0 的静态
+几何像素」、颗粒关掉、相机钉死、960×540 / high：
+
+| 排班 | 逐帧差均值 | 单帧跳变 >8/255 的像素 | 三角/帧 | draw/帧 |
+|---|---:|---:|---:|---:|
+| `[0,1,0,2,0,1,0]`（原） | 0.105 | 858 | 2.87 M | 1456 |
+| `[0,1,0,2]` | 0.219 | 1802 | 2.90 M | 1462 |
+| **近级每帧 + 远级轮转** | **0.014** | **10** | 3.20 M | 1639 |
+| 三级全烘 | 0.017 | 2 | 3.55 M | 1844 |
+
+近级每帧把「地板上跳一下」的像素少掉 **86 倍**，代价 +0.32 M 三角 / +183 draw；
+三级全烘再买不到什么，却要再掏一倍。（顺带：把轮转表改成 `[0,1,0,2]` 让近级间隔
+规整反而更糟 —— 远级掉到 15 Hz，而画面里大半地面归远级管。）
+
+所以规矩改成：**能烘两张就烘两张 —— 第 0 级每帧，远级在第二个名额上轮转。**
+「能不能」由 `SHADOW_COMMON.bakeTriangleBudget`（2.59 M）说了算，而且是**实测**不是猜：
+`Script_Csm` 包了一层 `renderer.shadowMap.render`，读 `renderer.info` 的前后差，
+拿到本帧阴影烘焙真的画了多少三角（three 在 `render()` 里的顺序是
+`info.reset()` → `shadowMap.render(...)`，所以这个差就是烘焙自己的账，
+**不用动 `info.autoReset`** —— 那一位是剖析器的）。
+升档要 `2 × 实测 ≤ 0.9 × 预算`，降档要 `实测 > 预算`，中间压 120 帧的锁。实测落点：
+
+| 场景 | 一张的实测三角 | 结果 | 整帧三角 / draw |
+|---|---:|---|---:|
+| 第一关车厢（`?whitebox=p012`） | 0.34 M | **升到两张** | 3.20 M / 1643 |
+| 城里 `phase=2&scale=small` | 1.46 M | 留在一张 | 7.20 M / 704 |
+
+排班在 `ScheduleShadowUpdate` 里改，只影响**下一次** `Update` —— 本帧的矩阵与图
+仍然严格配对（「矩阵是新的、图是旧的」是最难查的一类阴影错位，见下面第 8 条）。
 
 **例外**：`shadow.map === null` 的级必须立刻烘 —— 三方给材质绑的是空纹理，
 裸深度读到 0 = 那一级覆盖的区域整片死黑。开机与换阴影图尺寸那一帧允许一次性烘满
@@ -2000,7 +2056,7 @@ Debug Rendering「光照」组新增三项（`Script_ContactShadows.MakeShadowDe
 1. **r185 没法给远级做逐级层剔除。** `WebGLShadowMap.renderObject( scene, camera,
    shadow.camera, light, type )` 里的判据是 `object.layers.test( camera.layers )` ——
    `camera` 是**主视图相机**不是阴影相机。任务书里「给远级阴影相机关掉小投影体那一层」
-   的前提不成立（已核实源码）。远级成本改用「一帧只烘一张」压（§6.8）。
+   的前提不成立（已核实源码）。远级成本改用「按三角预算烘一张或两张」压（§6.8）。
 2. **包围球封顶。** 超宽屏下切片包围球半径是切片远端距离的 ~1.5 倍
    （`k = tan(fovY/2)·√(1+aspect²)`）。`maxRadius` 给它封顶，封顶之后最远一级的四角
    落到覆盖外，那里返回「照到」，由雾接管。
@@ -2023,8 +2079,10 @@ Debug Rendering「光照」组新增三项（`Script_ContactShadows.MakeShadowDe
    一帧一张地补齐（`bakeOrder.length` 帧内收敛）。
 9. **拟合用基准 FOV 不用当下 FOV。** 开镜把 fov 从 55 压到 20 会让包围球缩到三分之一，
    级联每帧变尺寸 = 阴影边缘随开镜呼吸。
-10. **近级阴影 ~30 Hz、远级 ~9 Hz。** 会动的人与车在近级里最多落后一帧；
-    远级里一个人只有几个像素宽，9 Hz 看不出来。
+10. **近级阴影按帧预算走两档**（见 §6.8「近级每帧烘」）：三角预算够时第 0 级
+    每帧烘、远级 ~30 Hz；预算不够（城里那种一张 1.46 M 的场）退回一帧一张，
+    近级 ~30 Hz、远级 ~9 Hz。**「近级 30 Hz 看不出来」那条已经证伪**：
+    一屋子会动的人贴着相机时，地板上是跳得出来的。
 11. **`CsmReceiverPlane` 的 `dFdx` 在级边界与覆盖边界处于非均匀控制流。**
     那里同一个 quad 里的像素可能选了不同的级，导数是垃圾 —— 但梯度被钳在 ±0.02，
     换算到 4 纹素的偏移上只有毫米级，落在过渡带里看不见。
@@ -2044,7 +2102,7 @@ node Taierzhuang1938/Script_TestRunnerTest.mjs
 
 `Script_CsmTest` 断的是数值不是观感：逐级图与尺寸、只有第 0 盏带强度、
 分割单调与纹素单调、相机平移 0.37 纹素后各级光空间中心**只整纹素地跳**、
-相邻级过渡带外沿投进下一级仍在图内、**一帧只烘一张**且一轮之内每级都被烘到、
+相邻级过渡带外沿投进下一级仍在图内、**烘焙守在三角预算之内**且一轮之内每级都被烘到、
 地面孤立暗点比例（痤疮）在有/无 normalBias 两种设置下都守得住、
 三张调试图都有内容、60 帧不重编译、GL 无错。
 末尾还会把 low / medium / ultra 各加载一遍 —— **每一档生成的是另一套 GLSL**
@@ -4427,6 +4485,10 @@ baseline 11.1 ms vs 无 GI 8.4 ms，差 ~2.7 ms，且 CPU 分项里 `gi=0.00` �
   最远那一级 2.24 M 三角、最近那一级只有它的零头。单帧采样于是是**七峰分布**，
   中位数在两个峰之间来回跳 —— 同一份代码两次跑实测能差 1.5 ms。21 是 7 的倍数，
   每批正好含整数轮。
+  （2026-09-08 起排班有两档，见 §6.8：**升到「近级每帧 + 远级轮转」之后周期是
+  `cascades − 1` = 2 帧**，21 就不再是整数轮了 —— 在那种场里批长要取 2 的倍数，
+  或者先把 `csm.nearEveryFrame` 钉死再量。分档定稿那一轮量的是城里 phase=2，
+  它留在一张档，所以上面那张表照旧成立。）
 * **取 min**：GPU 的工作量是确定的，外部争用只会**加**时间（§7.11b 立的口径）。
 * **`dt = 0`**：正片是活的，AI 在走、烟在飘，两批之间 draw call 实测能差几十个
   （737 → 812）。分档要比的是「同一批 draw 在这一档里花多少」。
@@ -4475,7 +4537,7 @@ draw call 与状态切换（布设实例化、预通道的合批、第一人称�
 两条值得记的账：
 
 1. **级联阴影比重构前那张单图便宜一半**（1.28 vs 2.59）。三级 2048² 听起来更贵，
-   但「一帧只烘一张」（§6.8）把峰值摊平了，而旧版是每帧重烘一张 4096²。
+   但「按三角预算烘一张或两张」（§6.8）把峰值摊平了，而旧版是每帧重烘一张 4096²。
 2. **GTAO 比旧 SSAO 便宜**（0.36 vs 0.50），还多产出弯曲法线与 SSIL 位掩码 ——
    `aoScale` 从 0.75 降到 0.5 那一步买回来的（Data_Tuning_Graphics 的注释里有账）。
 

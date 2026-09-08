@@ -85,6 +85,37 @@ export function ApplyRendererShadowSettings(renderer) {
   renderer.shadowMap.autoUpdate = false;
 }
 
+/**
+ * 阴影烘焙的三角计量表（`renderer.shadowMap` → 累加器）。
+ *
+ * 排班要按「这一帧的阴影烘焙真的画了多少三角」决定升不升到两张
+ * （见 `Data_Tuning_Shadows` 抬头「近级每帧烘」），而这个数只有渲染器知道。
+ * three 在 `WebGLRenderer.render` 里的顺序是
+ * `info.render.frame++` → `if (autoReset) info.reset()` → `shadowMap.render(...)`，
+ * 所以**包一层 `shadowMap.render`、读 `info.render.triangles` 的前后差**，
+ * 拿到的就是这一趟烘焙的三角数，不需要动 `info.autoReset`
+ *（那一位是剖析器的，谁都不许背着它改）。
+ *
+ * 一帧里 `renderer.render` 要跑二十几次，没排到烘焙的那些趟在 three 自己的
+ * 早退里返回，前后差是 0 —— 所以这里**累加**，由 `ScheduleShadowUpdate` 读完清零。
+ */
+const _bakeMeters = new WeakMap();
+function BakeMeter(renderer) {
+  const shadowMap = renderer?.shadowMap;
+  if (!shadowMap || !renderer.info || typeof shadowMap.render !== "function") return null;
+  const existing = _bakeMeters.get(shadowMap);
+  if (existing) return existing;
+  const original = shadowMap.render;
+  const meter = { triangles: 0 };
+  shadowMap.render = function CsmMeteredShadowRender(lights, scene, camera) {
+    const before = renderer.info.render.triangles;
+    original.call(this, lights, scene, camera);
+    meter.triangles += renderer.info.render.triangles - before;
+  };
+  _bakeMeters.set(shadowMap, meter);
+  return meter;
+}
+
 // ===========================================================================
 // GLSL
 // ===========================================================================
@@ -679,6 +710,16 @@ export class CsmRig {
     // 两者必须严格配对：只要出现「矩阵是新的、图是旧的」，影子就整体平移半个身位，
     // 而且只在移动时出现，是最难查的一类阴影 bug。
     this.dirty = new Array(this.count).fill(true);
+    /**
+     * 第 0 级每帧烘（远级在第二个名额上轮转）。由实测的阴影三角数决定，
+     * 见 `Data_Tuning_Shadows` 抬头「近级每帧烘」与 `_UpdateBakeMode`。
+     * 出厂 false：第一次实测回来之前一律走最保守的一帧一张。
+     */
+    this.nearEveryFrame = false;
+    /** 上一帧阴影烘焙实测的三角数（取证与测试读它）。 */
+    this.bakeTriangles = 0;
+    /** 升/降档之后的锁（帧）。 */
+    this.bakeModeLock = 0;
     this.lastFitCenter = [];
     for (let i = 0; i < this.count; i += 1) this.lastFitCenter.push(new THREE.Vector3());
     // 面板基准值（逐级按纹素尺度缩放，见 _ApplyBias）
@@ -690,9 +731,13 @@ export class CsmRig {
   }
 
   /**
-   * 这一帧烘哪一级。**每帧恰好一张**（`bakeOrder` 轮转表）——
-   * 城里每趟阴影烘焙有 ~1.45 M 三角的地板（合批块剔不掉），单帧三角红线只剩
-   * 2.59 M 余量，多烘一张就顶穿。账在 `Data_Tuning_Shadows` 抬头。
+   * 这一帧烘哪几级。
+   *
+   *   · 保底 —— **每帧一张**（`bakeOrder` 轮转表）。城里每趟阴影烘焙有 ~1.45 M
+   *     三角的地板（合批块剔不掉），单帧三角红线只剩 2.59 M 余量，两张就顶穿。
+   *   · `nearEveryFrame` —— 实测说这一关烘两张仍在预算里时，**第 0 级每帧烘**，
+   *     远级在第二个名额上轮转。近处会动的人投在地板上的影子从 30 Hz 变 60 Hz，
+   *     「跳一下」的像素少 86 倍。实测表在 `Data_Tuning_Shadows` 抬头。
    *
    * 例外：**还没有图的级必须立刻烘**。`shadow.map === null` 时三方给材质绑的是
    * 空纹理，裸深度读到 0 → 那一级覆盖的区域整片死黑。开机/换图尺寸那一帧
@@ -706,7 +751,31 @@ export class CsmRig {
     if (missing.length) return missing;
     const order = this.preset.bakeOrder;
     const slot = ((this.frame % order.length) + order.length) % order.length;
-    return [order[slot] % this.count];
+    if (!this.nearEveryFrame || this.count < 2) return [order[slot] % this.count];
+    // 第二个名额只在远级之间轮（1..count-1）：让它也去烘第 0 级是白花一张。
+    const spread = this.count - 1;
+    return [0, 1 + (((this.frame % spread) + spread) % spread)];
+  }
+
+  /**
+   * 按上一帧**实测**的阴影三角数决定烘一张还是两张。
+   *
+   * 升档判据用 `×2`（两张的成本）再留一成余量，降档判据用整条预算 —— 两个门槛
+   * 错开半条预算，中间还压 `bakeModeLockFrames` 帧的锁，不会在临界点来回抖
+   *（抖起来本身就是一种闪）。实测：第一关车厢一张 0.34 M → 升档；
+   * 城里 phase=2 一张 ~1.95 M → 永远留在一张。
+   */
+  _UpdateBakeMode(triangles) {
+    this.bakeTriangles = triangles;
+    if (this.bakeModeLock > 0) { this.bakeModeLock -= 1; return; }
+    if (!(triangles > 0)) return;     // 这一帧压根没烘（castShadow 关着 / 还没排到）
+    const budget = SHADOW_COMMON.bakeTriangleBudget;
+    const lock = SHADOW_COMMON.bakeModeLockFrames;
+    if (this.nearEveryFrame) {
+      if (triangles > budget) { this.nearEveryFrame = false; this.bakeModeLock = lock; }
+    } else if (triangles * 2 <= budget * 0.9) {
+      this.nearEveryFrame = true; this.bakeModeLock = lock;
+    }
   }
 
   /**
@@ -883,6 +952,13 @@ export class CsmRig {
    * @returns {number} 这一帧真的要烘的级数（取证/测试读它）
    */
   ScheduleShadowUpdate(renderer) {
+    // 先把**上一帧**的账收了：计量表累的是上一次排烘之后那一整帧的阴影三角。
+    // 排班在这里改只影响下一次 Update —— 本帧的矩阵与图仍然严格配对。
+    const meter = BakeMeter(renderer);
+    if (meter) {
+      this._UpdateBakeMode(meter.triangles);
+      meter.triangles = 0;
+    }
     let pending = 0;
     for (let level = 0; level < this.count; level += 1) {
       // **不要在这里重算轮转判据**：Update 与本函数之间隔着半帧，两处各算一次
@@ -950,6 +1026,10 @@ export class CsmRig {
       pending: this.lights.map((light) => !!light.shadow.needsUpdate),
       scheduled: this.lastScheduled.slice(),
       bakeOrder: this.preset.bakeOrder.slice(),
+      // 近级每帧烘的档位与它的实测依据（见 Data_Tuning_Shadows 抬头）
+      nearEveryFrame: this.nearEveryFrame,
+      bakeTriangles: this.bakeTriangles,
+      bakeTriangleBudget: SHADOW_COMMON.bakeTriangleBudget,
       intensity: this.intensity,
       bias: this.lights.map((light) => light.shadow.bias),
       normalBias: this.lights.map((light) => light.shadow.normalBias),

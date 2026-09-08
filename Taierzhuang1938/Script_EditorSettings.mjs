@@ -566,6 +566,11 @@ export class GraphicsSettings {
     if (csm) {
       f.Set("最近级纹素", `${(csm.texelWorld[0] * 100).toFixed(2)} cm`);
       f.Set("阴影覆盖", `${(csm.splits[csm.splits.length - 1] || 0).toFixed(0)} m`);
+      // 烘焙排班是按**实测**三角数自己升降档的（见 Data_Tuning_Shadows 抬头
+      // 「近级每帧烘」）。这一栏是那个决定的取证口：看得见它现在烘几张、
+      // 凭的是多少三角，才不用去猜「这一关的近影为什么跳」。
+      f.Set("阴影烘焙", `${csm.nearEveryFrame ? "近级每帧 + 远级轮转" : "一帧一张（轮转）"}`
+        + ` · ${(csm.bakeTriangles / 1e6).toFixed(2)}M / ${(csm.bakeTriangleBudget / 1e6).toFixed(2)}M 三角`);
     }
     const fpShadow = this.host.game?.firstPersonSelfShadow?.Status?.();
     f.Set("第一人称自阴影", fpShadow?.enabled ? `开（${fpShadow.size}${fpShadow.soft ? " · 软化" : " · 硬 3×3"}）` : "关");

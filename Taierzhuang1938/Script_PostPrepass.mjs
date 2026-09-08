@@ -189,7 +189,12 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) 
           vec4 worldPrev = worldNow;
           #ifdef USE_SKINNING
             // 上一帧骨矩阵在同一张 boneTexture 的下半张（见文件头「逐物体速度」）。
-            vec4 prevSkinVertex = bindMatrix * vec4(transformed, 1.0);
+            // **喂给它的必须是蒙皮前的顶点**（vPreSkinPosition，在 skinning_vertex
+            // 之前存下）。这里若用 transformed，那已经是本帧蒙皮完的位置，
+            // 再乘一遍上一帧骨矩阵 = 把骨骼的世界变换叠了两次 —— 上一帧位置会被
+            // 甩到几百米外，速度整条钳到 uVelocityClamp（0.25 uv）。表现是
+            // 人物一动就拖一串鬼影、周身一圈恒定的运动模糊。
+            vec4 prevSkinVertex = bindMatrix * vec4(vPreSkinPosition, 1.0);
             vec4 prevSkinned = vec4(0.0);
             prevSkinned += GetPrevBoneMatrix(skinIndex.x) * prevSkinVertex * skinWeight.x;
             prevSkinned += GetPrevBoneMatrix(skinIndex.y) * prevSkinVertex * skinWeight.y;
@@ -243,6 +248,7 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) 
         vViewNormal = normalize(transformedNormal);
         #include <begin_vertex>
         #include <morphtarget_vertex>
+        ${velocity ? "vec3 vPreSkinPosition = transformed;   // 蒙皮前（上一帧骨矩阵要吃它）" : ""}
         #include <skinning_vertex>
         #include <project_vertex>
         vViewDepth = -mvPosition.z;

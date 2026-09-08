@@ -13,6 +13,9 @@
 //   5. **速度靶对鬼影**：走动的兵在「速度靶开 / 关（退回深度反投影）」两版下
 //      与同一瞬间无 TAA 参考图的偏差 —— 关掉必然更大（相机不动时深度反投影的
 //      速度恒为 0，历史把兵的旧位置整个叠回来）。
+//   5b. **蒙皮人物的速度靶本身**：世界钉住时整片为 0；世界照跑、相机不动时
+//      没有 tile 顶到速度钳位。2026-09-08 的事故（上一帧骨矩阵喂了蒙皮完的顶点，
+//      速度整条钳死 → 人身上恒定鬼影与糊边）就是从这两条底下漏过去的。
 //   6. **运动模糊**：相机匀速转身，tile 邻域最大速度的像素长度与角速度成正比；
 //      `motionBlur = 0` 时整个 pass 不跑（draw call 不涨）。
 //   7. **景深**：CoC 图在焦平面为 0、天空饱和；`dofStrength = 0` 时零 draw call；
@@ -354,6 +357,44 @@ try {
     FreezeAi(true);
 
     // =====================================================================
+    // 5b) 蒙皮人物的速度靶本身对不对
+    //
+    // 事故（2026-09-08）：覆盖材质拿**蒙皮完**的 `transformed` 去喂上一帧骨矩阵，
+    // 等于把骨骼的世界变换叠了两遍，「上一帧位置」落到几百米外，速度整条钳到
+    // `uVelocityClamp`。画面上是「站着不动的人也一身鬼影 + 周身一圈恒定糊边」，
+    // 而当时的两条速度断言都只覆盖静态几何，一条都没红。
+    //
+    // 这里断两件事（都在**有兵**的画面上）：
+    //   a) 世界钉住（dt = 0）+ 相机不动 → 速度靶必须**整片精确为 0**；
+    //   b) 世界照跑 + 相机不动 → 没有任何 tile 顶到速度钳位（顶到就是算错了，
+    //      不是「兵跑得快」—— 钳位是四分之一屏，一帧谁也走不了那么远）。
+    // =====================================================================
+    const clampUv = P.prepassPass.material.uniforms.uVelocityClamp?.value ?? 0.25;
+    const ReadTileMaxUv = () => {
+      const rt = P.motionBlurPass.neighbor;
+      const raw = new Uint16Array(rt.width * rt.height * 4);
+      T.renderer.readRenderTargetPixels(rt, 0, 0, rt.width, rt.height, raw);
+      let max = 0, clamped = 0, nonzero = 0;
+      for (let i = 0; i < raw.length; i += 4) {
+        const len = Math.hypot(HalfToFloat(raw[i]), HalfToFloat(raw[i + 1]));
+        if (len > max) max = len;
+        if (len > 1e-6) nonzero += 1;
+        if (len >= clampUv * 0.8) clamped += 1;
+      }
+      return { max: +max.toFixed(5), clamped, nonzero, tiles: raw.length / 4 };
+    };
+    // 屏幕上真的有蒙皮人物才谈得上「蒙皮速度对不对」
+    let skinnedOnScreen = 0;
+    T.scene.traverse((object) => { if (object.isSkinnedMesh && object.visible) skinnedOnScreen += 1; });
+    T.StepFrames(6, 0);                 // 世界钉住：骨矩阵不再变
+    out.skinnedVelocity = { skinnedOnScreen, clampUv, frozen: ReadTileMaxUv() };
+    FreezeAi(false);
+    T.StepFrames(24, 1 / 60);           // 世界照跑、相机不动
+    out.skinnedVelocity.live = ReadTileMaxUv();
+    FreezeAi(true);
+    T.StepFrames(2);
+
+    // =====================================================================
     // 6) 运动模糊
     // =====================================================================
     SetScale(0.8);
@@ -617,6 +658,15 @@ Check("TAA 真的在读速度靶，而且换掉它只动在动的像素",
   `uUseVelocityBuffer=${R.ghost.usesVelocityBuffer}`
   + ` ｜ 在动像素差 ${R.ghost.movingDiff}（${R.ghost.movingPixels} px）`
   + ` vs 静止像素差 ${R.ghost.stillDiff}（${R.ghost.stillPixels} px，兵 ${R.soldiers} 名）`);
+
+Check("蒙皮人物：世界钉住时速度靶整片为 0（上一帧骨矩阵没喂错顶点）",
+  R.skinnedVelocity.skinnedOnScreen > 0 && R.skinnedVelocity.frozen.nonzero === 0,
+  `蒙皮网格 ${R.skinnedVelocity.skinnedOnScreen} 只 ｜ 非零 tile ${R.skinnedVelocity.frozen.nonzero}`
+  + ` / ${R.skinnedVelocity.frozen.tiles} ｜ 最大 ${R.skinnedVelocity.frozen.max} uv`);
+Check("蒙皮人物：世界照跑、相机不动时没有 tile 顶到速度钳位",
+  R.skinnedVelocity.live.clamped === 0 && R.skinnedVelocity.live.max < R.skinnedVelocity.clampUv * 0.8,
+  `顶到钳位的 tile ${R.skinnedVelocity.live.clamped} / ${R.skinnedVelocity.live.tiles}`
+  + ` ｜ 最大 ${R.skinnedVelocity.live.max} uv（钳位 ${R.skinnedVelocity.clampUv}）`);
 
 const mt = R.motionTilePx;
 Check("运动模糊：tile 最大速度与角速度成正比（两档 2×）",
