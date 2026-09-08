@@ -425,6 +425,37 @@ DuckAmbience(seconds = 0.06, amount = 0.5)
 
 实测：`1.00 → 0.50 → 1.00`（环境与远声组同步）。计数 `audio.stats.ambienceDucks`。
 
+### 【2026-09-09】远声组那一半收敛了
+
+用户原话「打起来整个战场安安静静的」有一半是这条：远声组装的是「远处那一片仗」
+（> `FAR_GROUP_M` 的全部位置音，加上新的远枪扇区层），而玩家一秒能扣三四次扳机 ——
+每一枪压 −6 dB、放 300 ms，**连着打的时候那一层一直被摁在 −6 dB 上**。
+镫骨肌反射本身没错，错的是幅度和触发条件：
+
+| | 改前 | 改后 |
+| --- | --- | --- |
+| 环境床 | −6.02 dB | −6.02 dB（不动：它是底噪，压狠了只有好处） |
+| 远声组 | −6.02 dB，**每一枪都压** | `FIRE_DUCK_FAR_AMOUNT` = **−3.01 dB**，且只有自动武器或连着打时才压 |
+| 判据 | 无 | `weaponClass === "mg"`，或上一枪在 `FIRE_DUCK_SUSTAIN_S = 0.9 s` 以内 |
+
+实测 `farGain` 平均值（phase=1，玩家自己连打 6 s）：
+栓动单发 **0.904 → 1.000**（完全不动），自动连发 **0.521 → 0.719**。
+
+栓动单发不压远声组是有意的：打一枪之后玩家要听的正是**别人的回应**，
+而那些回应十有八九在四十五米外。
+
+`DuckAmbience(seconds, amount, farAmount)` 的 `farAmount = 0` 走的是
+「**完全不碰**」那条路，不是「压 0 再放回来」——后者也会 `cancelScheduledValues`
+掉上一枪还没放完的斜坡，等于把它硬拽回 1，连发时听感是远处那一层在抖。
+
+### 战场密度（同一轮）
+
+`SetBattleIntensity(x)` / `SetGunObserver(fn)` 两条新 API 与它们驱动的
+`battle: true` 层与撒播，口径在 **`docs/Data_AudioWiring.md` 二之二**
+（强度怎么算是接线层的账 —— 那要读 AI 状态，引擎不认识 AI）。
+引擎这边只有三条曲线常量：`BATTLE_BED_FLOOR` 0.34、`BATTLE_EVENT_RATE_FLOOR` 0.35、
+`BATTLE_EVENT_VOL_FLOOR` 0.62，斜坡 `BATTLE_BED_RAMP_S` 1.4 s。
+
 ### 量这一层时的坑
 
 Chrome 对「上游全静音」的子图会整段跳过处理，于是 `AudioParam` 的自动化压根不推进，
@@ -590,6 +621,9 @@ gunTail{Open|Street|Interior}{Rifle|Mg}      courtyard 用 Street 那条
 | `DUCK_MIN_AMOUNT` | 0.06 | 5 |
 | `DEAFEN_M` | 12 m | 5 |
 | `FIRE_DUCK_AMOUNT` / `ATTACK` / `HOLD` / `RELEASE` | 0.5 / 40 / 60 / 300 ms | 6 |
+| `FIRE_DUCK_FAR_AMOUNT` / `FIRE_DUCK_SUSTAIN_S` | 0.29（−3.01 dB）/ 0.9 s | 6 |
+| `BATTLE_BED_FLOOR` / `GAMMA` / `RAMP_S` | 0.34 / 0.7 / 1.4 s | 6 |
+| `BATTLE_EVENT_RATE_FLOOR` / `VOL_FLOOR` / `GAMMA` | 0.35 / 0.62 / 0.8 | 6 |
 | `FAR_GROUP_M` | 45 m（`voice.*` 不进这一组，见 §2.5）| 6 |
 | `STEAL_FADE_S` / `STEAL_MAX_PER_PLAY` | 0.02 s / 3（`voice.*` 与 priority 一样永不被偷，见 §2.5）| 7 |
 | `NODE_BUDGET`（→ `this.nodeBudget`）| 120 | 7 |

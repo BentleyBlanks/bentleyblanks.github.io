@@ -20,7 +20,7 @@
 import { Mulberry32, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import {
   PROBE, NEAR_MISS, RICOCHET, AI_FOLEY, PLAYER_STEP, BODY_FOLEY,
-  GRENADE_FOLEY, BLAST_AUDIO, FIRE_SPOT,
+  GRENADE_FOLEY, BLAST_AUDIO, FIRE_SPOT, BATTLE_DENSITY, SUPPRESSION_DIRT,
 } from "./Data_Tuning_Audio.mjs";
 
 /**
@@ -43,6 +43,19 @@ const FOOTSTEP_BY_SURFACE = {
  * 踩上去是碎砖滑动（rubble）；`villageStraw` 挨枪是土，踩上去是麦秸。
  * 这里只列**踩得到顶面**的那些 tag，其余落回 SURFACE_BY_TAG 再落回 dirt。
  */
+/**
+ * 脚下 / 掩体材质 → **弹着**音。与 FOOTSTEP_BY_SURFACE 是两张表（同一个 tag
+ * 踩上去与挨枪不是一回事，见文件头那段），键与 `Script_Main.IMPACT_CUE` 同一套。
+ * 压制甜味剂拿它挑「打在我身边这块地上的是什么声音」。
+ */
+const IMPACT_BY_SURFACE = {
+  dirt: "impactDirt", sandbag: "impactDirt", mud: "impactDirt", water: "impactDirt",
+  grass: "impactDirt", rubble: "impactBrick", brick: "impactBrick",
+  stone: "impactStone", metal: "impactMetal", wood: "impactWood",
+};
+/** 打在这几种面上才可能跳弹（与 RICOCHET.surfaces 同一条判据）。 */
+const HARD_SURFACES = new Set(["brick", "stone", "metal"]);
+
 const STEP_BY_TAG = {
   rubble: "rubble",
   villageStraw: "grass", fieldBank: "grass", kan: "grass", grave: "grass",
@@ -86,6 +99,24 @@ function IsCeiling(hit) {
 }
 
 /** 武器 id → PlayGunshot 的 weaponClass（引擎侧按它挑枪尾）。 */
+/**
+ * 近场枪 cue → **远场**那条录音。远枪扇区层（一片仗，两百多米外）只用远场素材：
+ * 近场那几条是 1 m 近距录音，摆在两百米外只是"变小的同一记啪"，
+ * 而远场那几条本身就带着地面反射拖出来的尾巴（见 Script_Audio.FAR_CUE 的抬头）。
+ *
+ * 没有远场素材的（十一年式）落到日军步枪那条上：一片远处的仗里分不出是哪一挺。
+ */
+const FAR_SECTOR_CUE = {
+  rifleNra: "rifleNraFar", rifleNraFar: "rifleNraFar",
+  rifleIja: "rifleIjaFar", rifleIjaFar: "rifleIjaFar",
+  zb26: "zb26Far", zb26Far: "zb26Far",
+  type11: "type11Far", type11Far: "type11Far",
+  type92: "type92Far", type92Far: "type92Far",
+};
+function FarSectorCue(cue) { return FAR_SECTOR_CUE[cue] || null; }
+/** 这几条是连发的远场（SAMPLE_BURST 里有射速），扇区层要给 burst 发数。 */
+const BURST_CUES = new Set(["zb26Far", "type11Far", "type92Far"]);
+
 export function WeaponClassOf(weaponId) {
   return weaponId === "Zb26" || weaponId === "Type11" || weaponId === "Type92Hmg"
     ? "mg" : "rifle";
@@ -132,6 +163,28 @@ export class AudioWiring {
     // --- 手榴弹接触 -------------------------------------------------------
     this.grenadeState = new WeakMap();
 
+    // --- 战场密度（见 Data_Tuning_Audio.BATTLE_DENSITY）-------------------
+    /** 最近 gunWindowS 内的枪：[时刻, 距离权重]。含被 GUN_CULL_M 剔掉的那些。 */
+    this.gunLog = [];
+    this.battleIntensity = 0;      // 平滑之后的 0..1
+    this.battleRaw = 0;            // 平滑之前（取证：分得清「没打起来」与「落得太慢」）
+    this.lastBlastAt = -99;
+    this.lastBlastM = 999;
+    /** 六个扇区各自的被剔枪：{ times: [], cue: 最近一条的远场 cue, lastPlayAt } */
+    this.sectors = Array.from({ length: BATTLE_DENSITY.sectors }, () => ({
+      times: [], cue: null, lastPlayAt: -99, plays: 0,
+    }));
+    this.sectorBudget = [];        // 最近一秒起过的扇区声（预算闸）
+    this.sectorPlays = 0;          // 取证累计
+
+    // --- 压制甜味剂 -------------------------------------------------------
+    this.lastDirtAt = -99;
+    this.dirtDebt = 0;             // 攒够一条就撒一记（频率是小数，不能按帧取整）
+    this.dirtCount = 0;            // 取证累计
+    this.firedAtPlayerAt = -99;    // 最近一次「确实有人朝玩家开火」的时刻
+    this.firedAtPlayerFrom = null; // 那个人在哪儿（撒在射手对面那一侧）
+    this.surfaceByTag = null;      // Update 递进来的弹着表面表（压制弹着查材质要用）
+
     this.playCounter = 0;
   }
 
@@ -152,6 +205,19 @@ export class AudioWiring {
     this.lastFootstepAt = 0;
     this.lastStance = null;
     this.sprintHeldS = 0;
+    // 战场密度：换一张地图之后「刚才打得多凶」是上一局的事。**强度也要归零**，
+    // 不归零的话新关卡开头会顶着上一关结尾的那一片仗（慢落要九秒）。
+    this.gunLog.length = 0;
+    this.battleIntensity = 0;
+    this.battleRaw = 0;
+    this.lastBlastAt = -99;
+    for (const s of this.sectors) { s.times.length = 0; s.cue = null; s.lastPlayAt = -99; }
+    this.sectorBudget.length = 0;
+    this.Audio?.SetBattleIntensity?.(0);
+    this.lastDirtAt = -99;
+    this.dirtDebt = 0;
+    this.firedAtPlayerAt = -99;
+    this.firedAtPlayerFrom = null;
   }
 
   // =========================================================================
@@ -323,7 +389,317 @@ export class AudioWiring {
       })),
       fireVoices: this.fireVoices.size,
       cracks: this.crackTimes.length,
+      battleIntensity: +this.battleIntensity.toFixed(3),
     };
+  }
+
+  // =========================================================================
+  // 一之二、战场密度（2026-09-09）
+  //
+  // 用户原话：「打起来整个战场安安静静的」。这一节回答「现在打得有多凶」，
+  // 引擎拿这个 0..1 驱动远处的床与撒播（Script_Audio.SetBattleIntensity），
+  // 这一层自己拿它驱动远枪扇区。数在 Data_Tuning_Audio.BATTLE_DENSITY。
+  //
+  // 为什么强度算在这一层而不是引擎里：它要读 AI 状态（谁在打、打了多久），
+  // 而引擎不认识 AI —— 这正是「接线层」这三个字的意思。
+  // =========================================================================
+
+  /**
+   * 每一枪都报一次（`audio.SetGunObserver` 装的观察者，见 Script_Audio）。
+   *
+   * **被 GUN_CULL_M 剔掉的那些照收**，而且它们是这一层最值钱的原料：
+   * 那批枪原来只进 `drops.distance` 就没了，于是一百六十米以外的整条战线
+   * 在玩家耳朵里完全不存在。GUN_CULL_M 那道闸本身是对的（三百米外一发单响
+   * 只是往混响里倒一勺）—— 错的是剔完之后什么都不留下。
+   *
+   * @param {string} cue      枪声 cue（rifleNra / rifleIja / zb26 / …）
+   * @param {number} distance 到听者多远
+   * @param {object} position 枪口位置（可能为空）
+   * @param {boolean} culled  这一枪被距离闸剔掉了
+   */
+  NoteGunshot(cue, distance, position = null, culled = false) {
+    const d = Math.max(0, distance || 0);
+    // 距离权重：近的算满，远的**不算零** —— 三百米外那条战线听不见单发，
+    // 但它正是「远处一直在打」的来源，权重给 0 等于宣称它不存在。
+    const t = Clamp01((d - BATTLE_DENSITY.gunNearM)
+      / Math.max(1, BATTLE_DENSITY.gunFarM - BATTLE_DENSITY.gunNearM));
+    const weight = 1 - (1 - BATTLE_DENSITY.gunMinWeight) * t;
+    this.gunLog.push([this.time, weight]);
+    if (!culled || !position) return weight;
+
+    // 被剔掉的：按方位归到六个扇区里的一个。方位用**水平**角，
+    // 高度不进来 —— 一片远处的仗在地平线上，不在天上。
+    const audio = this.Audio;
+    const L = audio?.listenerPos;
+    if (!L) return weight;
+    const dx = position.x - L.x, dz = position.z - L.z;
+    if (!(dx * dx + dz * dz > 1)) return weight;
+    const idx = this.SectorOf(Math.atan2(dx, dz));
+    const s = this.sectors[idx];
+    s.times.push(this.time);
+    s.cue = FarSectorCue(cue) || s.cue;
+    return weight;
+  }
+
+  /**
+   * 水平方位角（`atan2(dx, dz)`，−π..π）→ 扇区号。
+   *
+   * **必须与 `SectorAngle` 严格互逆**：这一层的全部价值就是「方位对得上」，
+   * 两条式子差半格，播出来的那一片仗就在真实交火的**反方向**上
+   * （第一版正是这么错的：205 m 那一组摆在 +57°，扇区却播在 −90°，
+   * 实测方位误差 147°，而听感上"远处有仗"照样成立 —— 只有量方位才发现得了）。
+   */
+  SectorOf(angle) {
+    const n = BATTLE_DENSITY.sectors;
+    const turn = (angle / (Math.PI * 2) + 0.5 + 1) % 1;
+    return Math.min(n - 1, Math.max(0, Math.floor(turn * n)));
+  }
+
+  /** 扇区号 → 它的中心方位角（弧度，与 SectorOf 互逆）。取证与摆位都用它。 */
+  SectorAngle(index) {
+    const n = BATTLE_DENSITY.sectors;
+    return ((index + 0.5) / n - 0.5) * Math.PI * 2;
+  }
+
+  /** 一次爆炸：抬强度用（接线点在 Blast 里）。 */
+  NoteBlast(distance) {
+    this.lastBlastAt = this.time;
+    this.lastBlastM = Math.max(0, distance || 0);
+  }
+
+  /**
+   * 每帧算一次强度：**快升慢落**。
+   *
+   * 三项输入（都在 BATTLE_DENSITY 里配权重）：
+   *   · 最近 6 s 的**加权枪声速率**（含被剔掉的）——「有多少枪在响」；
+   *   · 正在交火的敌我人数 ——「有多少人卷进来了」。只数枪声会被一挺机枪骗到：
+   *     一个人一梭子的速率能顶得上十个人对射，但那不是「一片战场」；
+   *   · 最近一次爆炸 —— 炮击那一拍枪声反而稀，光靠前两项会掉下去。
+   *
+   * 平滑用一阶低通，升 0.5 s / 落 9 s。落得快听感是「有人把音量拧小了」：
+   * 一片打完的战场不会在两秒内安静下来，它是慢慢稀下去的。
+   */
+  BattleIntensity(dt) {
+    const cut = this.time - BATTLE_DENSITY.gunWindowS;
+    while (this.gunLog.length && this.gunLog[0][0] < cut) this.gunLog.shift();
+    let sum = 0;
+    for (const [, w] of this.gunLog) sum += w;
+    const gunTerm = Clamp01(sum / BATTLE_DENSITY.gunWindowS / BATTLE_DENSITY.gunRefPerS);
+
+    // 正在交火的人数。**读 AI 的 lastFire，不改 AI 一行**（`ai.time` 与
+    // `this.time` 是两条时钟，所以这里比的是 ai 自己的时刻差）。
+    //
+    // **一枪都没听见就一律算 0 个人在交火**（`this.gunLog.length` 那道闸）。
+    // 不加这道闸的话，`ai.time` 一旦不再前进（暂停、过场、编辑器停掉 AI、
+    // 测试里把 `ai.Update` 换掉），`ai.time − 6 s` 就冻在原地，上一场仗里
+    // 开过枪的每一个人**永远**算在交火 —— 实测停火 12 s 之后强度还挂在 0.67，
+    // 因为这一项自己顶着 0.30 下不来。语义上也该这样：六秒没听见一枪，
+    // 「有多少人卷进来了」这个数就是 0。
+    const ai = this.host.ai;
+    let engaged = 0;
+    if (this.gunLog.length && ai && Array.isArray(ai.soldiers)) {
+      const aiCut = (ai.time || 0) - BATTLE_DENSITY.engagedWindowS;
+      for (const s of ai.soldiers) {
+        if (s && s.alive && (s.lastFire || -99) > aiCut) engaged += 1;
+      }
+    }
+    const engagedTerm = Clamp01(engaged / BATTLE_DENSITY.engagedRefCount);
+
+    const blastAge = this.time - this.lastBlastAt;
+    const blastTerm = blastAge < BATTLE_DENSITY.blastWindowS
+      ? Clamp01(1 - this.lastBlastM / BATTLE_DENSITY.blastRefM)
+        * (1 - blastAge / BATTLE_DENSITY.blastWindowS)
+      : 0;
+
+    const raw = Clamp01(gunTerm * BATTLE_DENSITY.wGun
+      + engagedTerm * BATTLE_DENSITY.wEngaged
+      + blastTerm * BATTLE_DENSITY.wBlast);
+    this.battleRaw = raw;
+    const tau = raw > this.battleIntensity ? BATTLE_DENSITY.attackS : BATTLE_DENSITY.releaseS;
+    const k = 1 - Math.exp(-Math.max(0, dt) / Math.max(0.01, tau));
+    this.battleIntensity = Clamp01(this.battleIntensity + (raw - this.battleIntensity) * k);
+    this.Audio?.SetBattleIntensity?.(this.battleIntensity);
+    return this.battleIntensity;
+  }
+
+  /**
+   * 远枪汇总层：六个扇区，每个扇区在听者 220 m 外那个方向上放一条
+   * `soundField` 扩展声源。
+   *
+   * **驱动它的是真实 AI 的交火**（被剔掉的那批枪的方位），所以方位对得上 ——
+   * 与环境床上那些「随机 pan 的假枪声」是两回事，后者正是 2026-08-20
+   * 那一轮认定的「不知道从哪儿来的音效」。
+   *
+   * 三道闸缺一不可：窗口（最近 2 s）、同扇区最短间隔（0.9 s）、
+   * 整层每秒 ≤ 3 条。第三道是硬的 —— 原料是被剔掉的枪，那个数在视野拉开的
+   * 关卡里可以是每秒几十，不封顶就等于把刚拆掉的「远处逐发播」搬回来。
+   */
+  FarSectors() {
+    const audio = this.Audio;
+    if (!audio || typeof audio.Play !== "function") return 0;
+    const L = audio.listenerPos;
+    if (!L) return 0;
+    const cut = this.time - BATTLE_DENSITY.sectorWindowS;
+    // 预算窗：最近一秒起过几条。
+    while (this.sectorBudget.length && this.sectorBudget[0] < this.time - 1) this.sectorBudget.shift();
+
+    let started = 0;
+    for (let i = 0; i < this.sectors.length; i += 1) {
+      const s = this.sectors[i];
+      while (s.times.length && s.times[0] < cut) s.times.shift();
+      if (s.times.length < BATTLE_DENSITY.sectorMinShots) continue;
+      if (this.time - s.lastPlayAt < BATTLE_DENSITY.sectorMinIntervalS) continue;
+      if (this.sectorBudget.length >= BATTLE_DENSITY.sectorBudgetPerS) break;
+      const cue = s.cue || "rifleIjaFar";
+      const angle = this.SectorAngle(i);
+      const r = BATTLE_DENSITY.sectorRangeM;
+      // 摆在听者所在高度上：远处那一片仗在地平线上，抬高只会让 HRTF 把它推到天上去。
+      const at = { x: L.x + Math.sin(angle) * r, y: L.y, z: L.z + Math.cos(angle) * r };
+      // 密度越高这一条越响（但仍然乘强度曲线：整场没打起来的时候它只是"零星"）。
+      const dense = Clamp01(s.times.length / 6);
+      const voice = audio.Play(cue, {
+        position: at,
+        // soundField：refDistance 64 m 的扩展声源，而且绕过 GUN_CULL_M
+        // （那道闸管的是"逐发播"，这一条是"一片"）。
+        soundField: true,
+        volume: BATTLE_DENSITY.sectorVolume * (0.55 + 0.45 * dense)
+          * (0.4 + 0.6 * this.battleIntensity),
+        burst: BURST_CUES.has(cue) ? BATTLE_DENSITY.sectorBurst : undefined,
+      });
+      s.lastPlayAt = this.time;
+      s.times.length = 0;
+      if (voice) { s.plays += 1; this.sectorPlays += 1; this.sectorBudget.push(this.time); started += 1; }
+    }
+    return started;
+  }
+
+  /**
+   * 取证：`Debug.BattleIntensity()`。
+   * 「远处怎么还是不响」有四种原因（强度没涨、床没接上、事件被闸掉、扇区没料），
+   * 混在一起看不出是哪一件 —— 这一条把四样一次摆出来。
+   */
+  BattleReport() {
+    const audio = this.Audio;
+    let sum = 0;
+    for (const [, w] of this.gunLog) sum += w;
+    return {
+      intensity: +this.battleIntensity.toFixed(3),
+      raw: +this.battleRaw.toFixed(3),
+      guns: this.gunLog.length,
+      gunPerS: +(sum / BATTLE_DENSITY.gunWindowS).toFixed(2),
+      blastAgeS: +(this.time - this.lastBlastAt).toFixed(2),
+      bedScale: audio?.stats ? +(audio.stats.battleBedScale ?? 0).toFixed(3) : null,
+      battleLayers: audio?.ambLayers
+        ? audio.ambLayers.filter((l) => l.battle).map((l) => +(l.levelScale ?? 0).toFixed(3)) : null,
+      battleEvents: audio?.stats?.battleEvents ?? null,
+      sectors: this.sectors.map((s, i) => ({
+        i, deg: Math.round(this.SectorAngle(i) * 180 / Math.PI),
+        pending: s.times.length, plays: s.plays, cue: s.cue,
+      })),
+      sectorPlays: this.sectorPlays,
+      dirt: this.dirtCount,
+      suppression: this.Player ? +(this.Player.suppression || 0).toFixed(2) : null,
+      firedAtAgeS: +(this.time - this.firedAtPlayerAt).toFixed(2),
+    };
+  }
+
+  // =========================================================================
+  // 一之三、压制甜味剂：被压制时身边的弹着
+  // =========================================================================
+
+  /**
+   * 记一次「有人朝玩家开火」。压制甜味剂的**闸**就是它：
+   * 安静的时候脚边冒尘土，比没有还糟。
+   *
+   * 两个来源：逐弹近失（`AiNearMissAtPlayer`，最准），
+   * 以及每帧扫 AI「谁的目标是玩家、刚开过枪」（打偏得远、没进近失半径的那些）。
+   */
+  NoteFiredAtPlayer(from = null) {
+    this.firedAtPlayerAt = this.time;
+    if (from) this.firedAtPlayerFrom = { x: from.x, y: from.y, z: from.z };
+  }
+
+  /** 每帧扫一次：有没有人正拿玩家当目标、而且刚开过枪。 */
+  ScanFiredAtPlayer() {
+    const ai = this.host.ai;
+    if (!ai || !Array.isArray(ai.soldiers)) return;
+    const aiCut = (ai.time || 0) - 1.5;
+    for (const s of ai.soldiers) {
+      if (!s || !s.alive || !s.target || !s.target.isPlayer) continue;
+      if (!((s.lastFire || -99) > aiCut)) continue;
+      this.NoteFiredAtPlayer(s.position);
+      return;
+    }
+  }
+
+  /**
+   * 压制时在玩家身边 1—3 m、**射手对面那一侧**的地面上撒弹着。
+   *
+   * 为什么值得单独做一层：压制原来只有画面（vignette / 摇晃 / 减速）与偶尔
+   * 一条弹啸 —— 弹啸是「打偏了但很近」，而被一挺机枪压在土坎后面的时候
+   * 子弹根本不从耳边过，全打在你面前那块地上。**那才是压制的声音**。
+   *
+   * 频率随压制涨（0.4 → 1.5 条/秒，0.9 → 3.5 条/秒），保底每秒至少一记：
+   * 保底那一记走 `priority`（绕开去重与预算），其余走普通优先级 ——
+   * 交火最凶的时候恰恰是预算最紧、也最需要这条信息的时候。
+   */
+  SuppressionDirt(dt) {
+    const audio = this.Audio;
+    const player = this.Player;
+    if (!audio || !player || !player.Alive) return 0;
+    const sup = player.suppression || 0;
+    if (sup < SUPPRESSION_DIRT.minSuppression) { this.dirtDebt = 0; return 0; }
+    // **只在真有人朝玩家开火时撒。** 压制会自己慢慢衰减，衰减的那几秒里
+    // 没人在打了 —— 那时候脚边还在冒土就是穿帮。
+    if (this.time - this.firedAtPlayerAt > SUPPRESSION_DIRT.firedAtWindowS) return 0;
+
+    const t = Clamp01((sup - SUPPRESSION_DIRT.loSuppression)
+      / Math.max(0.01, SUPPRESSION_DIRT.hiSuppression - SUPPRESSION_DIRT.loSuppression));
+    const perS = SUPPRESSION_DIRT.loPerS + (SUPPRESSION_DIRT.hiPerS - SUPPRESSION_DIRT.loPerS) * t;
+    this.dirtDebt += perS * Math.max(0, dt);
+    const overdue = this.time - this.lastDirtAt >= SUPPRESSION_DIRT.guaranteeS;
+    if (this.dirtDebt < 1 && !overdue) return 0;
+    this.dirtDebt = Math.max(0, this.dirtDebt - 1);
+    return this.PlaceImpact(overdue) ? 1 : 0;
+  }
+
+  /** 撒一记弹着（位置、材质、跳弹、尘土都在这儿）。 */
+  PlaceImpact(guaranteed = false) {
+    const audio = this.Audio;
+    const player = this.Player;
+    const bf = this.Battlefield;
+    const rng = Mulberry32((Math.imul(this.playCounter += 1, 2654435761) ^ 0x9e3779b9) >>> 0);
+    // 射手在哪边：子弹从那一侧来，土也该从那一侧飞起来。不知道射手时朝玩家前方撒。
+    const from = this.firedAtPlayerFrom;
+    let base = from
+      ? Math.atan2(from.x - player.position.x, from.z - player.position.z)
+      : (player.yaw ?? 0);
+    base += (rng() * 2 - 1) * SUPPRESSION_DIRT.spreadRad;
+    const r = SUPPRESSION_DIRT.minRadiusM
+      + rng() * (SUPPRESSION_DIRT.maxRadiusM - SUPPRESSION_DIRT.minRadiusM);
+    const x = player.position.x + Math.sin(base) * r;
+    const z = player.position.z + Math.cos(base) * r;
+    const y = (bf && typeof bf.GroundHeight === "function" ? bf.GroundHeight(x, z) : player.position.y) + 0.05;
+    const at = { x, y, z };
+    const surface = this.SurfaceUnder({ x, y: y + 0.5, z }, this.surfaceByTag);
+    const cue = IMPACT_BY_SURFACE[surface] || "impactDirt";
+    audio.Play(cue, {
+      position: at,
+      volume: SUPPRESSION_DIRT.volume * (0.8 + rng() * 0.4),
+      // 保底那一记不许被去重窗与预算闸吃掉（见 SUPPRESSION_DIRT.guaranteeS）。
+      priority: !!guaranteed,
+    });
+    // 尘土用现成的 vfx.Impact：法线朝上（打在地上），材质与声音同一套。
+    this.host.vfx?.Impact?.(at, { x: 0, y: 1, z: 0 }, surface);
+    if (HARD_SURFACES.has(surface) && rng() < SUPPRESSION_DIRT.ricochetChance) {
+      audio.Play("ricochet", { position: at, volume: RICOCHET.volume * 0.8,
+        delay: RICOCHET.delayS, pitch: 0.9 + rng() * 0.3 });
+    } else if (rng() < SUPPRESSION_DIRT.debrisChance) {
+      audio.Play("debrisFall", { position: at, volume: 0.3, delay: 0.15 + rng() * 0.2 });
+    }
+    this.lastDirtAt = this.time;
+    this.dirtCount += 1;
+    return true;
   }
 
   // =========================================================================
@@ -503,6 +879,9 @@ export class AudioWiring {
     const passM = Math.hypot(L.x - point.x, L.y - point.y, L.z - point.z);
     if (!(passM < NEAR_MISS.crackWithinM)) return false;
     const shooterM = Math.hypot(L.x - from.x, L.y - from.y, L.z - from.z);
+    // 压制甜味剂的闸：这一发是**真的**朝玩家来的（不管进不进近失半径）。
+    // 记在这儿而不是等 BulletPass —— 打偏得远的那些同样是「有人在打我」。
+    this.NoteFiredAtPlayer(from);
     // `rise: false`：这里问的是**这颗子弹的实际弹道**通不通，不是「这个声音听起来
     // 有多闷」。抬高终点会让越过矮墙的那一发变成"没挡住"，于是墙后面的玩家
     // 听见一条根本不存在的弹啸（那一发早就打在墙上了）。
@@ -626,9 +1005,17 @@ export class AudioWiring {
   Update(dt, frame, surfaceByTag = null) {
     this.time += Math.max(0, dt);
     this.frame = frame;
+    // 弹着表面表存一份：压制甜味剂在 Update 之外的路径上也要查材质。
+    this.surfaceByTag = surfaceByTag;
     const player = this.Player;
     const audio = this.Audio;
     if (!audio || !player) return;
+
+    // 战场密度先算：远枪扇区与压制甜味剂都读这一帧的强度。
+    this.BattleIntensity(dt);
+    this.FarSectors();
+    this.ScanFiredAtPlayer();
+    this.SuppressionDirt(dt);
 
     this.Footsteps(surfaceByTag);
     this.Landing(surfaceByTag);
@@ -809,6 +1196,9 @@ export class AudioWiring {
     const audio = this.Audio;
     if (!audio || !position) return null;
     const d = this.DistanceToListener(position);
+    // 战场密度：炮击那一拍枪声反而稀，光靠枪声速率强度会掉下去 —— 而那一刻
+    // 恰恰是最不该安静的时候。
+    this.NoteBlast(d);
     const cue = d < BLAST_AUDIO.nearM ? "explosionNear"
       : d < BLAST_AUDIO.midM ? "explosionMid" : "explosionFar";
     let volume = Clamp(radius / 8, 0.5, 1.2);

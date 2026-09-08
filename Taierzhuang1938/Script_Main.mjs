@@ -620,6 +620,11 @@ const audioWiring = new AudioWiring({
   get ai() { return ai; },
 });
 audio.SetProbes?.(audioWiring.Probes());
+// 每一枪都报一次（**含被 GUN_CULL_M 剔掉的**）：接线层拿它算战场强度，
+// 并把剔掉的那批按方位汇总成远处的交火层。判空同 SetProbes ——
+// 引擎侧没有这条 API 时整套战场密度静默退回「床恒定、没有远枪扇区」。
+audio.SetGunObserver?.((cue, distance, position, culled) =>
+  audioWiring.NoteGunshot(cue, distance, position, culled));
 
 const state = {
   ready: false,
@@ -2337,6 +2342,15 @@ async function Boot() {
        * `probesInstalled:false` = 引擎侧的 SetProbes 还没合进来（判空生效中）。
        */
       AudioZone: (limit) => audioWiring.Report(limit),
+      /**
+       * 战场密度取证（2026-09-09）：强度、它的三项输入、战斗床当前的倍率、
+       * 六个扇区各自的方位与播放数、压制弹着条数。
+       *
+       * 「远处怎么还是不响」有四种完全不同的原因 —— 强度没涨（没打起来 / 权重不对）、
+       * 床没接上（battleFar 没载到 / 预设里没这一层）、撒播被闸掉、扇区没料 ——
+       * 光听分不出是哪一件。
+       */
+      BattleIntensity: () => audioWiring.BattleReport(),
       P012: () => missionRuntime?.State() || p012Flow?.State() || null,
       FirstLevelMission: () => missionRuntime?.State() || null,
       // 性能取证与专项测试直接读运行时对象（敌人表、事实、列队）；不是玩法入口。

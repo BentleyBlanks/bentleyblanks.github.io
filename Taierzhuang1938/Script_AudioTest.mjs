@@ -699,7 +699,12 @@ else if (!(duck.far.deaf > 15000)) Fail(`二百米外那颗把玩家震聋了：
 else Ok(`采样路径下 duck 与耳鸣照常触发且按距离缩放（贴脸 ${duck.near.gain.toFixed(2)}/`
   + `${duck.near.deaf.toFixed(0)} Hz，200 m ${duck.far.gain.toFixed(2)}/${duck.far.deaf.toFixed(0)} Hz）`);
 
-// 玩家开枪压环境（HDR-lite）：环境总线与远声组一起让路，40 ms 压、300 ms 放。
+// 玩家开枪压环境（HDR-lite）：环境床让路 −6 dB，40 ms 压、300 ms 放。
+//
+// 【2026-09-09】**远声组不再跟着一起走**：栓动步枪单发只压环境床，
+// 自动武器 / 连着打才另压远声组，而且只 −3 dB（FIRE_DUCK_FAR_AMOUNT）。
+// 原来两条共用一个 −6 dB，于是玩家一连打远处那一片就一直被摁在下面 ——
+// 用户报的「打起来整个战场安安静静的」有一半是它。
 //
 // **必须先给这两条总线喂一路输入**：Chrome 对「上游全静音」的子图会整段跳过处理，
 // 于是 AudioParam 的自动化压根不推进，`gain.value` 一直读到你写进去的那个静态值 ——
@@ -721,20 +726,34 @@ const hdr = await page.evaluate(async () => {
   await sleep(120);
   const before = { amb: a.ambienceDuck.gain.value, far: a.farGain.gain.value, n: a.stats.ambienceDucks };
   const L = a.listenerPos;
-  a.Play("rifleNra", { position: { x: L.x, y: L.y, z: L.z - 0.4 }, priority: true, volume: 0.02, firstPerson: true });
+  const at = { x: L.x, y: L.y, z: L.z - 0.4 };
+  // ① 栓动单发：**上一枪要足够久以前**，否则被判成「连着打」。
+  a.lastSelfShotAt = -99;
+  a.Play("rifleNra", { position: at, priority: true, volume: 0.02, firstPerson: true, weaponClass: "rifle" });
   await sleep(70);
-  const pressed = { amb: a.ambienceDuck.gain.value, far: a.farGain.gain.value };
+  const single = { amb: a.ambienceDuck.gain.value, far: a.farGain.gain.value };
   await sleep(600);
   const released = { amb: a.ambienceDuck.gain.value, far: a.farGain.gain.value };
+  // ② 自动武器那一枪：远声组这一次要动，而且只动 −3 dB。
+  a.farGain.gain.cancelScheduledValues(a.ctx.currentTime); a.farGain.gain.value = 1;
+  a.lastPlayAt.delete("zb26");
+  a.Play("zb26", { position: at, priority: true, volume: 0.02, firstPerson: true, weaponClass: "mg" });
+  await sleep(70);
+  const mg = { amb: a.ambienceDuck.gain.value, far: a.farGain.gain.value };
   for (const cs of keepAlive) { try { cs.stop(); cs.disconnect(); } catch (err) { /* 已停 */ } }
-  return { before, pressed, released, n: a.stats.ambienceDucks - before.n };
+  return { before, single, released, mg, n: a.stats.ambienceDucks - before.n };
 });
 if (!hdr.n) Fail("玩家开枪没有触发 DuckAmbience（stats.ambienceDucks 没动）");
-else if (!(hdr.pressed.amb < 0.7)) Fail(`开枪后环境总线只压到 ${hdr.pressed.amb.toFixed(3)}（应 < 0.7，约 −6 dB）`);
-else if (!(hdr.pressed.far < 0.7)) Fail(`开枪后远声组只压到 ${hdr.pressed.far.toFixed(3)}（应 < 0.7）`);
+else if (!(hdr.single.amb < 0.7)) Fail(`开枪后环境总线只压到 ${hdr.single.amb.toFixed(3)}（应 < 0.7，约 −6 dB）`);
+else if (!(hdr.single.far > 0.95)) Fail(`栓动单发把远声组压到了 ${hdr.single.far.toFixed(3)} —— 单发不许动远声组`);
 else if (!(hdr.released.amb > 0.95)) Fail(`开枪 0.67 s 之后环境还压着 ${hdr.released.amb.toFixed(3)} —— 放不回来`);
-else Ok(`玩家开枪压环境与远声组：${hdr.before.amb.toFixed(2)} → ${hdr.pressed.amb.toFixed(2)} → `
-  + `${hdr.released.amb.toFixed(2)}（远声组同步 ${hdr.pressed.far.toFixed(2)}）`);
+else if (!(hdr.mg.far < 0.85 && hdr.mg.far > 0.55)) {
+  Fail(`自动武器那一枪远声组压到 ${hdr.mg.far.toFixed(3)}（应在 0.55—0.85，约 −3 dB）`);
+} else {
+  Ok(`玩家开枪压环境：${hdr.before.amb.toFixed(2)} → ${hdr.single.amb.toFixed(2)} → `
+    + `${hdr.released.amb.toFixed(2)}；远声组 单发 ${hdr.single.far.toFixed(2)}（不动）/ `
+    + `自动 ${hdr.mg.far.toFixed(2)}（−3 dB）`);
+}
 
 // Voice stealing：预算打满时玩家的 priority 枪必须 100% 出声，而且是**偷**出来的位置。
 //

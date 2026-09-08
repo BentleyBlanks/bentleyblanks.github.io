@@ -862,6 +862,199 @@ Check("34 m 外：弹啸先到，本体枪声晚 d/340",
     : `这一轮没抓到成对的弹啸与枪声（开了 ${whiz.order?.fired ?? "?"} 枪）`);
 
 // ---------------------------------------------------------------------------
+// 8.9) 战场密度（2026-09-09）
+//
+// 用户原话「打起来整个战场安安静静的」。这一节量的是那条控制器与它驱动的三层：
+// 环境床、远枪扇区、压制弹着，外加 HDR-lite 那条收敛。
+//
+// **换的是输入不是规则**（与本文件其余几节同一条口径）：AI 的开火节奏、
+// 谁在打谁，那是 Script_Ai 与关卡摆兵的账，各有各的闸。这一层量的是
+// 「拿到这些输入之后，强度怎么走、床跟不跟、扇区播在哪个方位」。
+//
+// 时间**按帧推**（`w.Update(1/60, …)`），不等墙钟：二十秒的衰减用真实时间等
+// 是二十秒，而且会被这一关自己的 AI 插队 —— 那样的断言是抛硬币不是闸。
+// 只有 farGain 那一项必须等真时间（AudioParam 的斜坡在时间轴上跑）。
+// ---------------------------------------------------------------------------
+const density = await page.evaluate(async () => {
+  const T = window.Taierzhuang, a = T.audio, w = T.audioWiring;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  for (let i = 0; i < 60; i += 1) { if (a.ambBuffers?.size) break; await sleep(300); }
+  // 整场仗停掉：这一节量的是控制器，不是这一关此刻的战况。
+  const origAiUpdate = T.ai.Update.bind(T.ai);
+  T.ai.Update = () => {};
+  for (const s of T.ai.soldiers) { s.ammo = 0; s.coolUntil = 1e9; s.target = null; s.lastFire = -999; }
+  a.Ambience("smokyDay");                 // 有 battle 床的一档
+  a.Music(null);
+  await sleep(400);
+  const battleLayers = a.ambLayers.filter((l) => l.battle).length;
+  const P = T.player;
+  let frame = 100000;
+  const Step = (seconds) => { for (let i = 0; i < seconds * 60; i += 1) w.Update(1 / 60, frame += 1); };
+
+  // ① 无人开火 20 s。**从满强度起**：要量的是「落得下来没有」。
+  w.gunLog.length = 0;
+  w.battleIntensity = 1;
+  w.lastBlastAt = -99;
+  Step(20);
+  const quiet = {
+    intensity: +w.battleIntensity.toFixed(3),
+    bed: +(a.stats.battleBedScale ?? 0).toFixed(3),
+    layers: a.ambLayers.filter((l) => l.battle).map((l) => +(l.levelScale ?? 0).toFixed(3)),
+    sectorPlays: w.sectorPlays,
+  };
+
+  // ② 20 人交火 10 s。喂的是**真的 NoteGunshot**（引擎观察者走的同一条），
+  //    8 条/秒、70 m —— 与实机取证里量到的加权速率同一量级。
+  const roster = T.ai.soldiers.slice(0, 20);
+  const L = a.listenerPos;
+  const shotAt = { x: L.x + 40, y: L.y, z: L.z + 57 };     // 70 m 外
+  let acc = 0;
+  for (let i = 0; i < 10 * 60; i += 1) {
+    for (const s of roster) { s.alive = true; s.lastFire = T.ai.time; }
+    acc += 8 / 60;
+    while (acc >= 1) { acc -= 1; w.NoteGunshot("rifleIja", 70, shotAt, false); }
+    w.Update(1 / 60, frame += 1);
+  }
+  const fight = {
+    intensity: +w.battleIntensity.toFixed(3),
+    bed: +(a.stats.battleBedScale ?? 0).toFixed(3),
+    layers: a.ambLayers.filter((l) => l.battle).map((l) => +(l.levelScale ?? 0).toFixed(3)),
+    gunPerS: w.BattleReport().gunPerS,
+  };
+  // 停火 15 s
+  for (const s of roster) s.lastFire = -999;
+  Step(15);
+  const after = {
+    intensity: +w.battleIntensity.toFixed(3),
+    bed: +(a.stats.battleBedScale ?? 0).toFixed(3),
+  };
+
+  // ③ 200 m 外的枪：被 GUN_CULL_M 剔掉之后，对应扇区要有远场播放，方位要对。
+  //    走**引擎的真闸**（PlayGunshot 自己判距离、自己调观察者），不直接喂扇区。
+  for (const s of w.sectors) { s.times.length = 0; s.cue = null; s.lastPlayAt = -99; }
+  w.sectorBudget.length = 0;
+  const realPlay = a.Play.bind(a);
+  const fieldPlays = [];
+  a.Play = (n, o = {}) => {
+    if (o.soundField && o.position) fieldPlays.push({ n, x: o.position.x, z: o.position.z });
+    return realPlay(n, o);
+  };
+  const BEARINGS = [0.35, 2.1, -1.25, -2.9];      // 20° / 120° / −72° / −166°
+  const bearingRows = [];
+  for (const bearing of BEARINGS) {
+    fieldPlays.length = 0;
+    for (const s of w.sectors) { s.times.length = 0; s.lastPlayAt = -99; }
+    w.sectorBudget.length = 0;
+    const far = { x: L.x + Math.sin(bearing) * 200, y: L.y, z: L.z + Math.cos(bearing) * 200 };
+    const culledBefore = a.drops.distance;
+    for (let i = 0; i < 4; i += 1) a.PlayGunshot("rifleIja", { position: far, volume: 0.02 });
+    w.Update(1 / 60, frame += 1);
+    const play = fieldPlays[0] || null;
+    const deg = (r) => r * 180 / Math.PI;
+    // 两个方位角的最小夹角（跨 ±180° 那条缝要绕过去）。
+    const AngDiff = (p, q) => Math.abs(((p - q + 540) % 360) - 180);
+    const gotDeg = play ? deg(Math.atan2(play.x - L.x, play.z - L.z)) : null;
+    bearingRows.push({
+      want: Math.round(deg(bearing)),
+      got: gotDeg === null ? null : Math.round(gotDeg),
+      err: gotDeg === null ? null : +AngDiff(gotDeg, deg(bearing)).toFixed(1),
+      cue: play ? play.n : null,
+      culled: a.drops.distance - culledBefore,
+    });
+  }
+  a.Play = realPlay;
+
+  // ④ 压制弹着：无人开火时**一记都不许有**；有人在打时每秒 ≥ 1 记。
+  w.firedAtPlayerAt = -99; w.lastDirtAt = -99; w.dirtDebt = 0;
+  const dirt0 = w.dirtCount;
+  for (let i = 0; i < 3 * 60; i += 1) { P.suppression = 0.7; w.Update(1 / 60, frame += 1); }
+  const dirtQuiet = w.dirtCount - dirt0;
+  const shooter = { x: P.position.x, y: P.position.y, z: P.position.z - 30 };
+  const dirt1 = w.dirtCount;
+  for (let i = 0; i < 4 * 60; i += 1) {
+    P.suppression = 0.7;
+    w.NoteFiredAtPlayer(shooter);
+    w.Update(1 / 60, frame += 1);
+  }
+  const dirtFiring = w.dirtCount - dirt1;
+  P.suppression = 0;
+
+  // ⑥ farGain：玩家栓动单发不许压远声组。**这一项要等真时间** ——
+  //    AudioParam 的斜坡在时间轴上跑，按帧推是推不动它的。
+  const keep = [a.farGain].map((dst) => {
+    const cs = a.ctx.createConstantSource(); cs.offset.value = 1e-6; cs.connect(dst); cs.start(); return cs;
+  });
+  const FarProbe = async (cue, wc, intervalMs, shots) => {
+    a.farGain.gain.cancelScheduledValues(a.ctx.currentTime);
+    a.farGain.gain.value = 1;
+    a.lastSelfShotAt = -99;
+    await sleep(150);
+    let lo = 1;
+    for (let i = 0; i < shots; i += 1) {
+      a.lastPlayAt.delete(cue);
+      a.PlayGunshot(cue, { position: { x: a.listenerPos.x, y: a.listenerPos.y, z: a.listenerPos.z - 0.4 },
+        volume: 0.02, priority: true, firstPerson: true, weaponClass: wc });
+      for (let k = 0; k * 20 < intervalMs; k += 1) {
+        lo = Math.min(lo, a.farGain.gain.value);
+        await sleep(20);
+      }
+    }
+    return +lo.toFixed(3);
+  };
+  const farBolt = await FarProbe("rifleNra", "rifle", 1400, 4);
+  const farMg = await FarProbe("zb26", "mg", 130, 12);
+  for (const cs of keep) { try { cs.stop(); cs.disconnect(); } catch (e) { /* ok */ } }
+
+  // 还原：后面还有一节要跑。
+  T.ai.Update = origAiUpdate;
+  w.Reset();
+  a.Ambience("silence");
+  await sleep(200);
+  return { battleLayers, quiet, fight, after, bearingRows, dirtQuiet, dirtFiring, farBolt, farMg };
+});
+
+Check("有 battle 床的环境档真的起了 battle 层", density.battleLayers >= 1,
+  `smokyDay 起了 ${density.battleLayers} 条随强度涨落的床`);
+// 床倍率的判据是 **0.5**，不是 floor 那个 0.34：BattleBedScale 是
+// `0.34 + 0.66 × x^0.7`，强度 0.082 上折出来就是 0.455 —— 0.42 那道线是算错的，
+// 它要求的是强度严格为 0，而慢落（tau 8 s）按设计二十秒也只落到 0.08。
+// 0.5 与交火段的 0.96 之间差 6 dB，「只剩基线」这件事分得清清楚楚。
+Check("无人开火 20 s：强度 ≤ 0.1，远层落到基线", density.quiet.intensity <= 0.1 && density.quiet.bed < 0.5,
+  `强度 ${density.quiet.intensity}，床倍率 ${density.quiet.bed}（层 ${JSON.stringify(density.quiet.layers)}，floor 0.34）`);
+Check("无人开火时远枪扇区一条都不播", density.quiet.sectorPlays === 0,
+  `${density.quiet.sectorPlays} 条`);
+Check("20 人交火 10 s：强度 ≥ 0.6", density.fight.intensity >= 0.6,
+  `强度 ${density.fight.intensity}，加权枪声 ${density.fight.gunPerS} 条/秒`);
+Check("battleFar 的增益跟着强度升", density.fight.bed > density.quiet.bed + 0.2
+  && density.fight.layers.every((v) => Math.abs(v - density.fight.bed) < 0.02),
+  `床倍率 ${density.quiet.bed} → ${density.fight.bed}（层 ${JSON.stringify(density.fight.layers)}）`);
+Check("停火 15 s 之后强度与床一起回落", density.after.intensity < density.fight.intensity - 0.2
+  && density.after.bed < density.fight.bed - 0.1,
+  `强度 ${density.fight.intensity} → ${density.after.intensity}，床 ${density.fight.bed} → ${density.after.bed}`);
+const badBearing = density.bearingRows.filter((r) => r.got === null || r.err > 30);
+Check("200 m 外被剔除的枪 → 对应扇区有远场播放，方位误差 ≤ 30°", badBearing.length === 0,
+  badBearing.length
+    ? badBearing.map((r) => `${r.want}° → ${r.got === null ? "没播" : r.got + "°"}`).join("；")
+    : density.bearingRows.map((r) => `${r.want}°→${r.got}°(误差${r.err}°,${r.cue})`).join(" "));
+Check("没人朝玩家开火时不冒尘土（suppression 0.7 空跑 3 s）", density.dirtQuiet === 0,
+  `${density.dirtQuiet} 条`);
+Check("suppression 0.7 且有人在打：每秒 ≥ 1 记弹着", density.dirtFiring / 4 >= 1,
+  `4 s ${density.dirtFiring} 条（${(density.dirtFiring / 4).toFixed(2)} 条/秒）`);
+Check("玩家栓动单发不压远声组（farGain ≥ 0.7）", density.farBolt >= 0.7,
+  `单发最低 ${density.farBolt}；自动连发 ${density.farMg}（该压，约 −3 dB）`);
+Check("自动连发仍然压远声组，但只压 −3 dB 一档", density.farMg < 0.9 && density.farMg > 0.55,
+  `最低 ${density.farMg}`);
+// firstLevelFront / South 的 events：node 侧的静态判。这两档原来是空的 ——
+// 「第一关整场只有一条风」是用户报的那句话的头号成因，而空表在浏览器里
+// 量不出任何异常（没有报错、没有掉音，就是没有声音）。
+const frontEmpty = ["firstLevelFront", "firstLevelSouth"].filter(
+  (k) => !(AMBIENCE_PRESETS[k]?.events || []).length);
+Check("firstLevelFront / firstLevelSouth 的 events 非空", frontEmpty.length === 0,
+  frontEmpty.length ? `空的：${frontEmpty.join(" ")}`
+    : `${(AMBIENCE_PRESETS.firstLevelFront.events || []).length} / `
+      + `${(AMBIENCE_PRESETS.firstLevelSouth.events || []).length} 条`);
+
+// ---------------------------------------------------------------------------
 // 9) 每个新 cue 都真的能发声（合成回落这条路）
 //
 // 素材还没到，所以现在走的就是回落配方。这条与 Script_AudioTest 的"逐条播一遍"

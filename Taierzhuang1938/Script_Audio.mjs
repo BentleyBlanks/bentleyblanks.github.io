@@ -192,12 +192,69 @@ const DEAFEN_M = 12;
  * 只压环境与远声组，**不压近处的音效**：把身边的脚步和喊话一起压掉，
  * 听感会变成「开一枪世界静音一下」，那是另一种穿帮。
  */
-const FIRE_DUCK_AMOUNT = 0.5;      // 剩 0.50 = −6.02 dB
+const FIRE_DUCK_AMOUNT = 0.5;      // 环境床：剩 0.50 = −6.02 dB
 const FIRE_DUCK_ATTACK_S = 0.04;   // 压：40 ms，跟得上枪口那一下
 const FIRE_DUCK_HOLD_S = 0.06;
 const FIRE_DUCK_RELEASE_S = 0.30;  // 放：300 ms，慢到听不出是个自动过程
+/**
+ * 【2026-09-09】**远声组单独一档，而且比环境床松一半**：剩 0.71 = −3.01 dB。
+ *
+ * 用户原话「打起来整个战场安安静静的」有一半是这条造成的：远声组装的是
+ * 「远处那一片仗」（> FAR_GROUP_M 的全部位置音 + 新的远枪扇区层），而玩家
+ * 一秒能扣三四次扳机 —— 每一枪压 −6 dB、放 300 ms，连着打的时候那一层
+ * **一直被摁在 −6 dB 上**，也就是「越打越静”。
+ *
+ * 镫骨肌反射本身是对的，改的是两件事：
+ *   · 幅度收到 −3 dB（环境床那条 −6 dB 不动 —— 它是底噪，压狠了只有好处）；
+ *   · 栓动步枪**单发不压远声组**（见 FIRE_DUCK_SUSTAIN_S）。
+ */
+const FIRE_DUCK_FAR_AMOUNT = 0.29;   // 剩 0.71 = −3.01 dB
+/**
+ * 「连续开火」的判据：上一枪在这么久以内就算连着打。
+ *
+ * 自动武器（weaponClass "mg"）无条件算连续；栓动步枪要真的在连着打
+ * （0.9 s ≈ 中正式拉一次栓再打出去的最快节奏）才压远声组。
+ * 单发不压是有意的：一发之后玩家要听的正是**别人的回应**，而那些回应
+ * 十有八九在四十五米外 —— 压掉它等于把「打回来了」这条信息删掉。
+ */
+const FIRE_DUCK_SUSTAIN_S = 0.9;
 /** 超过这个距离的位置音统一走远声组（farGain），玩家开枪时整组一起让路。 */
 const FAR_GROUP_M = 45;
+
+/**
+ * 战场密度（2026-09-09）：远处那一层随「打得有多凶」涨落。
+ *
+ * 用户原话：「打起来整个战场安安静静的」。取证下来是三件事叠在一起 ——
+ * 第一关两档预设（firstLevelFront / firstLevelSouth）的 `events` 是**空的**、
+ * `layers` 只有一条 windPlain 0.3；GUN_CULL_M 剔掉的枪只记进 `drops.distance`
+ * 就没了；远声组被玩家自己的枪一直摁着（见 FIRE_DUCK_FAR_AMOUNT）。
+ *
+ * 这一组常量只回答「拿到一个 0..1 的强度之后，床与撒播该怎么变」——
+ * **强度本身怎么算是接线层的账**（`Script_AudioWiring.BattleIntensity`，
+ * 数在 `Data_Tuning_Audio.BATTLE_DENSITY`）：那要读 AI 状态，引擎不认识 AI。
+ *
+ * 两条 floor 都**不是 0**：用户要的是「远处一直有枪炮声」，
+ * 强度 0 时留的是「远处零星」，不是死寂。
+ */
+const BATTLE_BED_FLOOR = 0.34;     // 强度 0 时床还剩三分之一（−9.4 dB）
+const BATTLE_BED_GAMMA = 0.7;      // < 1：中段涨得快一点，0.3 的强度就听得出来
+const BATTLE_BED_RAMP_S = 1.4;     // 床的增益斜坡 ≥ 1 s：别一枪一跳
+const BATTLE_EVENT_RATE_FLOOR = 0.35;
+const BATTLE_EVENT_VOL_FLOOR = 0.62;
+const BATTLE_EVENT_GAMMA = 0.8;
+
+/** 强度 → 战斗床的增益倍率。 */
+function BattleBedScale(x) {
+  return BATTLE_BED_FLOOR + (1 - BATTLE_BED_FLOOR) * Math.pow(Clamp01(x), BATTLE_BED_GAMMA);
+}
+/** 强度 → 战斗类环境事件的频次倍率。 */
+function BattleEventRate(x) {
+  return BATTLE_EVENT_RATE_FLOOR + (1 - BATTLE_EVENT_RATE_FLOOR) * Math.pow(Clamp01(x), BATTLE_EVENT_GAMMA);
+}
+/** 强度 → 战斗类环境事件的音量倍率（比频次浅：远处零星那一档也要听得见）。 */
+function BattleEventVolume(x) {
+  return BATTLE_EVENT_VOL_FLOOR + (1 - BATTLE_EVENT_VOL_FLOOR) * Math.pow(Clamp01(x), BATTLE_EVENT_GAMMA);
+}
 
 /**
  * Voice stealing：预算不够时腾位置而不是丢新的。
@@ -2876,7 +2933,18 @@ const AMB_TICKS_PER_MIN = 60000 / AMB_TICK_MS;
  *   layers[].gain  这一层的音量（**层间的配平就是全部的调音**：
  *                  同样几条素材，火 0.8 与火 0.3 是两个不同的战场）
  *   layers[].seg   一条播放头放多久再换到下一个随机位置（秒，默认 11）
+ *   layers[].battle  这一层随**战场强度**涨落（BattleBedScale：强度 0 时剩 0.34，
+ *                  1.4 s 斜坡，见 SetBattleIntensity）。不带这个标的层是固定电平。
  *   events[].perMin 一分钟平均响几次
+ *   events[].battle  这一条撒播随强度涨落（频次 ×BattleEventRate、
+ *                  音量 ×BattleEventVolume）。**强度 0 时不是零**，是「远处零星」。
+ *
+ * **`explosionFar` 不许撒进 events**（试过，撤了）：它在 `DUCK_ON` 表里
+ * （0.8 s / 0.30 / range 140），而环境事件是**非空间化**的 —— `Reactions` 里
+ * 那行 `spatial ? Clamp01(1 - distance/range) : 1` 会按**满量**触发，
+ * 于是一分钟几次「配乐和环境床整体掉三成再浮回来」。远处的炮由
+ * `shellingFar` 床（连绵闷雷）+ `amb.cannonFar` 事件（单记炮响，不在 DUCK_ON 里）
+ * 两条表达，听感是一样的，代价是零。
  *   events[].volume  一次多响 —— **枪声那几条 2026-08-20 整体压了 7 dB 并减了次数**。
  *                    它们代表的是「比 GUN_CULL_M（160 m）还远的那些枪」，
  *                    所以绝对电平必须**低于**一发真的一百六十米外的枪
@@ -2889,8 +2957,45 @@ const AMB_TICKS_PER_MIN = 60000 / AMB_TICK_MS;
  */
 export const AMBIENCE_PRESETS = {
   silence: { space: "street", layers: [], events: [], fallbackWind: 0 },
-  firstLevelFront: {space:"open",fallbackWind:.045,fallbackCut:480,layers:[{bed:"windPlain",gain:.3,seg:13}],events:[]},
-  firstLevelSouth: {space:'open',fallbackWind:.04,fallbackCut:480,layers:[{bed:'windPlain',gain:.3,seg:13}],events:[]},
+
+  // 【2026-09-09】第一关两档补齐 —— **这是「打起来整个战场安安静静的」的头号原因**。
+  // 改之前两档都是 `layers: [windPlain 0.3]` + `events: []`：整场仗除了眼前
+  // 一百六十米以内那几个兵，一点远处的东西都没有。城北的仗（津浦线正面）在
+  // 玩家听得见的范围之外，可它一直在打。
+  //
+  // South 段（潜行接近津浦路南段）的基线比 Front 低一档：那一段玩家在绕，
+  // 场上没有己方在还击，远处那一片应该更薄。
+  firstLevelFront: {
+    space: "open", fallbackWind: 0.045, fallbackCut: 480,
+    layers: [
+      { bed: "windPlain", gain: 0.30, seg: 13 },
+      { bed: "battleFar", gain: 0.26, seg: 11, battle: true },
+      { bed: "shellingFar", gain: 0.22, seg: 9, battle: true },
+    ],
+    events: [
+      { name: "amb.cannonFar", perMin: 3.2, volume: 0.55, battle: true },
+      { name: "rifleNraFar", perMin: 5.5, volume: 0.10, battle: true },
+      { name: "rifleIjaFar", perMin: 5.0, volume: 0.10, battle: true },
+      { name: "zb26Far", perMin: 2.0, volume: 0.08, burst: 5, battle: true },
+      { name: "type92Far", perMin: 1.6, volume: 0.08, burst: 4, battle: true },
+      { name: "amb.crow", perMin: 0.7, volume: 0.3 },
+    ],
+  },
+  firstLevelSouth: {
+    space: "open", fallbackWind: 0.04, fallbackCut: 480,
+    layers: [
+      { bed: "windPlain", gain: 0.30, seg: 13 },
+      { bed: "battleFar", gain: 0.17, seg: 11, battle: true },
+      { bed: "shellingFar", gain: 0.16, seg: 9, battle: true },
+    ],
+    events: [
+      { name: "amb.cannonFar", perMin: 2.2, volume: 0.48, battle: true },
+      { name: "rifleNraFar", perMin: 3.0, volume: 0.09, battle: true },
+      { name: "rifleIjaFar", perMin: 3.0, volume: 0.09, battle: true },
+      { name: "type92Far", perMin: 1.0, volume: 0.07, burst: 4, battle: true },
+      { name: "amb.dogFar", perMin: 0.8, volume: 0.26 },
+    ],
+  },
 
   // 序章｜出川：车厢静止，窗外布景由过场时间轴移动。制动不是第二套环境系统，
   // 而是同一床上的明确事件 cue；新版 102 秒序章在 0:40—0:56 触发 trainBrake 一次。
@@ -2904,6 +3009,16 @@ export const AMBIENCE_PRESETS = {
   // 2026-08-29 无人声环境基线：默认环境绝不播放 battleFar / crowdFar / amb.moanFar。
   // 这三条仍保留在素材包，方便日后做明确、单独审核的剧情场景；不能再悄悄垫在全场。
   // 各床整体压低，让玩家的定位枪声、脚步和剧情台词始终优先。
+  //
+  // 【2026-09-09 修订】用户实听报「打起来整个战场安安静静的」，明确要求
+  // **远处一直有枪炮声、打得越激烈越响**。于是这条决定改成两条：
+  //   · `battleFar`（远处交火人群床）**回来了**，但只作为 `battle: true` 的层 ——
+  //     它的电平由战场强度驱动（强度 0 时 ×0.34，也就是比 08-29 那次否决的
+  //     那一版还轻一档），而且从此**不再是「垫在全场的一层」**：不打仗的时候
+  //     它自己会退下去。08-29 否决的是「拿人群床当默认底噪」，那一条仍然成立。
+  //   · `crowdFar` 与 `amb.moanFar` **仍然不放**。那两条是纯人声（骚动与呻吟），
+  //     没有交火掩着，低通再狠也是「听不清在说什么的一群人」——
+  //     08-29 人工试听否决的正是这个听感，这一轮不翻案。
 
   // 序 · 上墙（L0，smokyDay）：站在北寨墙上，墙北是护城河与开阔地。
   // 开阔冷风是默认底；远炮只留很轻的一层，战线压力交给场上的真实交火。
@@ -2911,7 +3026,8 @@ export const AMBIENCE_PRESETS = {
     space: "open", fallbackWind: 0.075, fallbackCut: 520,
     layers: [
       { bed: "windPlain", gain: 0.42, seg: 13 },
-      { bed: "shellingFar", gain: 0.20, seg: 9 },
+      { bed: "shellingFar", gain: 0.20, seg: 9, battle: true },
+      { bed: "battleFar", gain: 0.24, seg: 11, battle: true },
     ],
     events: [
       // 【2026-09-09】`amb.whizz`（perMin 5.0 / volume 0.5）从这一档撤掉：
@@ -2920,10 +3036,13 @@ export const AMBIENCE_PRESETS = {
       // 实拍峰值 0.209，几乎等于玩家自己那一枪（0.214），而它「从哪儿来」是随机数。
       // 那正是用户说的「凭空一记难听的呼啸」。cue、配方、混音、AMB_WET 全部留着，
       // 哪天做一段「远处在打、但没打到我」的过场再撒。
-      { name: "amb.cannonFar", perMin: 3.0, volume: 0.55 },
-      { name: "rifleNraFar", perMin: 5.0, volume: 0.10 },
-      { name: "rifleIjaFar", perMin: 4.0, volume: 0.10 },
-      { name: "type92", perMin: 1.5, volume: 0.07, burst: 4 },
+      { name: "amb.cannonFar", perMin: 3.0, volume: 0.55, battle: true },
+      { name: "rifleNraFar", perMin: 5.0, volume: 0.10, battle: true },
+      { name: "rifleIjaFar", perMin: 4.0, volume: 0.10, battle: true },
+      // 【2026-09-09】`type92` → `type92Far`：撒进环境床的那一梭子代表的是
+      // GUN_CULL_M 以外的机枪，本来就该走远场那条录音（AMB_AIR 也是按远场钉的
+      // 850 Hz，近场那条是 1000）。近场 cue 撒在远处是上一版留下的错配。
+      { name: "type92Far", perMin: 1.5, volume: 0.08, burst: 4, battle: true },
       { name: "amb.crow", perMin: 0.8, volume: 0.3 },
       { name: "amb.planeFar", perMin: 0.5, volume: 0.4 },
     ],
@@ -2937,13 +3056,14 @@ export const AMBIENCE_PRESETS = {
       { bed: "dawnField", gain: 0.30, seg: 15 },
       { bed: "windPlain", gain: 0.32, seg: 12 },
       { bed: "fireFar", gain: 0.13, seg: 7 },
+      { bed: "battleFar", gain: 0.20, seg: 11, battle: true },
     ],
     events: [
       { name: "amb.rooster", perMin: 0.7, volume: 0.34 },
       { name: "amb.crow", perMin: 1.2, volume: 0.3 },
-      { name: "rifleNraFar", perMin: 3.0, volume: 0.09 },
-      { name: "rifleIjaFar", perMin: 2.5, volume: 0.09 },
-      { name: "amb.cannonFar", perMin: 1.2, volume: 0.4 },
+      { name: "rifleNraFar", perMin: 3.0, volume: 0.09, battle: true },
+      { name: "rifleIjaFar", perMin: 2.5, volume: 0.09, battle: true },
+      { name: "amb.cannonFar", perMin: 1.2, volume: 0.4, battle: true },
       { name: "amb.dogFar", perMin: 0.8, volume: 0.26 },
     ],
   },
@@ -2956,6 +3076,7 @@ export const AMBIENCE_PRESETS = {
       { bed: "fireNear", gain: 0.36, seg: 7 },
       { bed: "windStreet", gain: 0.34, seg: 11 },
       { bed: "fireFar", gain: 0.16, seg: 6 },
+      { bed: "battleFar", gain: 0.22, seg: 11, battle: true },
     ],
     events: [
       { name: "amb.debris", perMin: 4.0, volume: 0.4 },
@@ -2966,10 +3087,11 @@ export const AMBIENCE_PRESETS = {
       // 实拍峰值 0.209，几乎等于玩家自己那一枪（0.214），而它「从哪儿来」是随机数。
       // 那正是用户说的「凭空一记难听的呼啸」。cue、配方、混音、AMB_WET 全部留着，
       // 哪天做一段「远处在打、但没打到我」的过场再撒。
-      { name: "rifleIjaFar", perMin: 4.0, volume: 0.10 },
-      { name: "rifleNraFar", perMin: 3.5, volume: 0.10 },
-      { name: "zb26", perMin: 1.5, volume: 0.07, burst: 5 },
-      { name: "amb.cannonFar", perMin: 1.5, volume: 0.42 },
+      { name: "rifleIjaFar", perMin: 4.0, volume: 0.10, battle: true },
+      { name: "rifleNraFar", perMin: 3.5, volume: 0.10, battle: true },
+      // `zb26` → `zb26Far`：同 smokyDay 那条，撒在远处的机枪该走远场录音。
+      { name: "zb26Far", perMin: 1.5, volume: 0.08, burst: 5, battle: true },
+      { name: "amb.cannonFar", perMin: 1.5, volume: 0.42, battle: true },
     ],
   },
 
@@ -2980,14 +3102,18 @@ export const AMBIENCE_PRESETS = {
     space: "open", fallbackWind: 0.045, fallbackCut: 340,
     layers: [
       { bed: "windNight", gain: 0.34, seg: 17 },
-      { bed: "shellingFar", gain: 0.12, seg: 9 },
+      { bed: "shellingFar", gain: 0.12, seg: 9, battle: true },
       { bed: "fireFar", gain: 0.08, seg: 7 },
+      // 夜里那条战斗床压得最低（0.14）：这一档的主角仍然是「静」，
+      // 打起来的时候它才浮出来 —— 而那一刻场上本来就吵。
+      { bed: "battleFar", gain: 0.14, seg: 11, battle: true },
     ],
     events: [
       { name: "amb.dogFar", perMin: 1.5, volume: 0.3 },
       { name: "amb.creak", perMin: 1.6, volume: 0.28 },
-      { name: "rifleIjaFar", perMin: 2.0, volume: 0.09 },
-      { name: "amb.cannonFar", perMin: 0.8, volume: 0.34 },
+      { name: "rifleIjaFar", perMin: 2.0, volume: 0.09, battle: true },
+      { name: "rifleNraFar", perMin: 1.6, volume: 0.09, battle: true },
+      { name: "amb.cannonFar", perMin: 0.8, volume: 0.34, battle: true },
     ],
   },
 
@@ -2999,11 +3125,13 @@ export const AMBIENCE_PRESETS = {
     layers: [
       { bed: "windPlain", gain: 0.34, seg: 13 },
       { bed: "fireFar", gain: 0.15, seg: 7 },
+      { bed: "battleFar", gain: 0.20, seg: 11, battle: true },
     ],
     events: [
       { name: "amb.crow", perMin: 1.5, volume: 0.32 },
-      { name: "rifleNraFar", perMin: 3.0, volume: 0.09 },
-      { name: "amb.cannonFar", perMin: 1.0, volume: 0.36 },
+      { name: "rifleNraFar", perMin: 3.0, volume: 0.09, battle: true },
+      { name: "rifleIjaFar", perMin: 2.4, volume: 0.09, battle: true },
+      { name: "amb.cannonFar", perMin: 1.0, volume: 0.36, battle: true },
       { name: "amb.dogFar", perMin: 0.7, volume: 0.24 },
     ],
   },
@@ -3011,7 +3139,8 @@ export const AMBIENCE_PRESETS = {
     space: "street", fallbackWind: 0.06, fallbackCut: 460,
     layers: [
       { bed: "windStreet", gain: 0.34, seg: 12 },
-      { bed: "shellingFar", gain: 0.16, seg: 9 },
+      { bed: "shellingFar", gain: 0.16, seg: 9, battle: true },
+      { bed: "battleFar", gain: 0.22, seg: 11, battle: true },
     ],
     events: [
       // 【2026-09-09】`amb.whizz`（perMin 3.0 / volume 0.45）从这一档撤掉：
@@ -3020,10 +3149,10 @@ export const AMBIENCE_PRESETS = {
       // 实拍峰值 0.209，几乎等于玩家自己那一枪（0.214），而它「从哪儿来」是随机数。
       // 那正是用户说的「凭空一记难听的呼啸」。cue、配方、混音、AMB_WET 全部留着，
       // 哪天做一段「远处在打、但没打到我」的过场再撒。
-      { name: "rifleNraFar", perMin: 4.0, volume: 0.10 },
-      { name: "rifleIjaFar", perMin: 3.5, volume: 0.10 },
+      { name: "rifleNraFar", perMin: 4.0, volume: 0.10, battle: true },
+      { name: "rifleIjaFar", perMin: 3.5, volume: 0.10, battle: true },
       { name: "amb.debris", perMin: 2.0, volume: 0.34 },
-      { name: "amb.cannonFar", perMin: 1.5, volume: 0.4 },
+      { name: "amb.cannonFar", perMin: 1.5, volume: 0.4, battle: true },
     ],
   },
 };
@@ -3099,12 +3228,41 @@ class LoopLayer {
     this.stopped = false;
     this.rng = Mulberry32(HashString("loop:" + (cfg.bed || "?")));
     this.nextAt = 0;
+    /**
+     * 这一层随战场强度涨落吗（AMBIENCE_PRESETS 的 `layers[].battle`）。
+     * 涨落写在**组增益**上，不写进播放头的包络 —— 播放头那条包络是等功率交叉，
+     * 外面改一次整条交叉就塌了（听感是每 11 秒陷一下，比循环还明显）。
+     */
+    this.battle = !!cfg.battle;
+    this.group = null;
+    this.levelScale = 1;
   }
 
   Start() {
-    if (!this.engine.ctx) return;
-    this.nextAt = this.engine.ctx.currentTime + 0.05;
+    const ctx = this.engine.ctx;
+    if (!ctx) return;
+    // 组增益：一层一个常驻节点，所有播放头都接它。SetLevel 只动这一个。
+    this.group = ctx.createGain();
+    this.group.gain.value = Math.max(FLOOR, this.levelScale);
+    this.group.connect(this.engine.Bus(this.busName));
+    this.engine.liveNodes += 1;
+    this.nextAt = ctx.currentTime + 0.05;
     this.Spawn(true);
+  }
+
+  /**
+   * 运行时改这一层的电平（战场强度）。**斜坡 ≥ 1 s**：床是一直在响的东西，
+   * 一枪一跳听感是「有人在推推子」，而不是「仗打得更凶了」。
+   */
+  SetLevel(scale, rampS = 1.0) {
+    this.levelScale = Math.max(0, scale);
+    const ctx = this.engine.ctx;
+    if (!this.group || !ctx) return;
+    const g = this.group.gain;
+    const t = ctx.currentTime;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(Math.max(FLOOR, g.value), t);
+    g.linearRampToValueAtTime(Math.max(FLOOR, this.levelScale), t + Math.max(0.05, rampS));
   }
 
   /** 起一条新播放头，并把下一条排进日程。 */
@@ -3131,7 +3289,8 @@ class LoopLayer {
     const outAt = at + this.seg;
     g.gain.setValueAtTime(level, outAt);
     g.gain.setTargetAtTime(FLOOR, outAt, this.xf * 0.32);
-    src.connect(g).connect(engine.Bus(this.busName));
+    // 接组增益而不是直接接总线：战场强度只动组增益那一个节点。
+    src.connect(g).connect(this.group || engine.Bus(this.busName));
     src.start(at, offset, this.seg + this.xf + 0.05);
     const head = { src, g };
     this.heads.add(head);
@@ -3170,6 +3329,15 @@ class LoopLayer {
         this.Kill(head);
       }
     }
+    // 组增益跟着走。淡出那一路要等播放头都回收完再拆，否则最后那 fade 秒没有出口。
+    const DropGroup = () => {
+      if (!this.group) return;
+      try { this.group.disconnect(); } catch (err) { /* ok */ }
+      this.group = null;
+      this.engine.liveNodes = Math.max(0, this.engine.liveNodes - 1);
+    };
+    if (fade > 0 && ctx) this.engine.Later(fade * 1000 + 200, DropGroup);
+    else DropGroup();
   }
 }
 
@@ -3231,7 +3399,26 @@ export class AudioEngine {
       occlusionQueries: 0, occlusionCached: 0, occlusionSkipped: 0,
       zoneQueries: 0, propagationDelays: 0,
       ducks: 0, deafens: 0, ambienceDucks: 0, priorityOverBudget: 0,
+      // 战场密度（2026-09-09）：接线层每帧写进来的 0..1，以及它驱动的两件事。
+      // 取证靠它 —— 「远处怎么不响」有三种原因（强度没涨、床没接上、事件被闸掉），
+      // 混在一起看不出是哪一件。
+      battleIntensity: 0, battleBedScale: BattleBedScale(0), battleEvents: 0,
     };
+    /**
+     * 战场强度 0..1。**引擎不自己算它**（算它要读 AI 状态，那是接线层的账）——
+     * 由 `Script_AudioWiring.Update` 每帧 `SetBattleIntensity()` 写进来。
+     * 没人写就恒 0，此时床与撒播都停在各自的 floor 上（「远处零星」，不是死寂）。
+     */
+    this.battleIntensity = 0;
+    this.battleBedApplied = -1;      // 上一次真的写进组增益的那个倍率（去抖用）
+    /**
+     * 每一枪的观察者（接线层装）。**包括被 GUN_CULL_M 剔掉的那些** ——
+     * 「打得有多凶」不该因为那一枪太远听不见就不算数，而被剔掉的那批正是
+     * 远枪扇区层的全部原料（见 AudioWiring.NoteGunshot）。
+     */
+    this.gunObserver = null;
+    /** 玩家上一枪的时刻（ctx 时钟）。「连着打没有」靠它判，见 FIRE_DUCK_SUSTAIN_S。 */
+    this.lastSelfShotAt = -99;
     /**
      * 宿主探针。两条都不注册时整条空间链退回 2026-08-20 的行为（见 SetProbes）。
      */
@@ -3448,6 +3635,49 @@ export class AudioEngine {
     this.listenerZone = null;
     this.listenerZoneAt = -1;
     return this.probes;
+  }
+
+  /**
+   * 战场强度（0..1）。接线层每帧写一次；引擎拿它驱动两件事：
+   * `battle: true` 的床的组增益，以及 `battle: true` 的撒播的频次与音量。
+   *
+   * **强度怎么算不在这一层**：那要数「最近六秒有多少枪、多少人在交火、
+   * 刚才炸了没有」，全是 AI 与玩法的账（`Script_AudioWiring.BattleIntensity`）。
+   * 引擎只认识一个数。
+   *
+   * 去抖：倍率变化不到 0.01 就不写自动化 —— 每帧写一条 1.4 s 的斜坡是几千条
+   * 自动化事件，而听感上一点差别都没有。
+   */
+  SetBattleIntensity(value) {
+    const x = Clamp01(Number.isFinite(value) ? value : 0);
+    this.battleIntensity = x;
+    this.stats.battleIntensity = x;
+    const scale = BattleBedScale(x);
+    this.stats.battleBedScale = scale;
+    if (Math.abs(scale - this.battleBedApplied) >= 0.01) {
+      this.battleBedApplied = scale;
+      for (const layer of this.ambLayers) {
+        if (layer.battle) layer.SetLevel(scale, BATTLE_BED_RAMP_S);
+      }
+    }
+    return x;
+  }
+
+  /**
+   * 装一个「每一枪都报一次」的观察者（接线层用它算强度、并把被剔掉的那些
+   * 按方位汇总成远处的交火层）。签名：
+   *
+   * ```js
+   * audio.SetGunObserver((cue, distance, position, culled) => {});
+   * ```
+   *
+   * 在 `PlayGunshot` 的**距离闸之前**调用 —— 被 `GUN_CULL_M` 剔掉的那一批
+   * 正是这一层最想要的原料。观察者抛异常就地注销（记进 lastError）：
+   * 一个取证钩子不许把枪声整条掐掉。
+   */
+  SetGunObserver(fn) {
+    this.gunObserver = typeof fn === "function" ? fn : null;
+    return this.gunObserver;
   }
 
   /** 首次用户手势后调用。有些浏览器只有在手势里 new AudioContext 才能出声。 */
@@ -4037,9 +4267,22 @@ export class AudioEngine {
     const dy = opts.position.y - this.listenerPos.y;
     const dz = opts.position.z - this.listenerPos.z;
     const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const culled = d > CullDistance(name);
+    // 战场密度的观察者：**闸之前**报，被剔掉的那一批照报（见 SetGunObserver）。
+    // 那一批原来只进 `drops.distance` 就没了 —— 一百六十米外的整条战线在
+    // 玩家耳朵里于是完全不存在，那正是「打起来整个战场安安静静的」的一半。
+    if (this.gunObserver) {
+      try { this.gunObserver(name, d, opts.position, culled); }
+      catch (err) {
+        // 取证钩子不许把枪声掐掉，但也不许静默地一直抛：就地注销 + 留痕。
+        this.gunObserver = null;
+        this.lastError = { name: "gunObserver", message: err && err.message, at: d };
+        this.errorCount += 1;
+      }
+    }
     // 太远的一枪不逐发播，交给环境床（见 GUN_CULL_M）。
     // 闸在这儿而不是在 AI 那边：AI 只知道"我开了一枪"，"听不听得见"是听者的事。
-    if (d > CullDistance(name)) {
+    if (culled) {
       this.playRequests.set(name, (this.playRequests.get(name) || 0) + 1);
       this.drops.distance += 1;
       return null;
@@ -4264,7 +4507,7 @@ export class AudioEngine {
   }
 
   Play(name, { position = null, volume = 1, pitch = 1, delay = 0, offset = 0, maxDuration = Infinity, pan = 0, burst = null, priority = false,
-    bus = "sfx", airCut = 0, soundField = false, firstPerson = false, occlusion = null } = {}) {
+    bus = "sfx", airCut = 0, soundField = false, firstPerson = false, occlusion = null, weaponClass = null } = {}) {
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
     // "rifleNra" 这一个去重 key，22 ms 窗口内谁先谁得。
@@ -4494,7 +4737,7 @@ export class AudioEngine {
     this.ReleaseVoice(v, v.life);
     // Duck / 耳鸣 / 环境闪避统一在这儿触发（配方里不再各自触发，见 DUCK_ON 的抬头）。
     // 放在最后：这三样都会去动别的总线，而这条 voice 得先建成功才算「这一声真响了」。
-    this.Reactions(name, distance, !!position, priority || firstPerson);
+    this.Reactions(name, distance, !!position, priority || firstPerson, weaponClass);
     return v;
   }
 
@@ -4507,7 +4750,7 @@ export class AudioEngine {
    * 而这件事没有任何机器发现得了（声音全在响、控制台干净、冒烟全绿）。
    * 触发条件属于「这一声是什么、离多远」，那是 Play 知道的事，不是配方知道的事。
    */
-  Reactions(name, distance, spatial, selfShot) {
+  Reactions(name, distance, spatial, selfShot, weaponClass = null) {
     const duck = DUCK_ON[name];
     if (duck) {
       // 按听者距离缩放：两百米外的一颗手榴弹不该把配乐压下去。
@@ -4520,7 +4763,18 @@ export class AudioEngine {
     // 耳鸣要过距离闸：几百米外的一记闷响不该震聋玩家（旧的 explosionFar 配方里正是这么写的）。
     if (deaf && (!spatial || distance < DEAFEN_M)) { this.Deafen(deaf); this.stats.deafens += 1; }
     // 玩家自己开的那一枪：环境床与远声组快压慢放（HDR-lite）。
-    if (selfShot && IsGunCue(name)) this.DuckAmbience();
+    //
+    // 【2026-09-09】远声组这一半**收敛了**：只有自动武器或真的在连着打时才压，
+    // 而且只压 −3 dB（FIRE_DUCK_FAR_AMOUNT）。栓动步枪单发不动远声组 ——
+    // 打一枪之后玩家要听的正是四十五米外的回应，压掉它就是「越打越静」。
+    if (selfShot && IsGunCue(name)) {
+      const now = this.ctx ? this.ctx.currentTime : 0;
+      const sustained = weaponClass === "mg"
+        || (this.lastSelfShotAt !== undefined && now - this.lastSelfShotAt < FIRE_DUCK_SUSTAIN_S);
+      this.lastSelfShotAt = now;
+      this.DuckAmbience(FIRE_DUCK_HOLD_S, FIRE_DUCK_AMOUNT,
+        sustained ? FIRE_DUCK_FAR_AMOUNT : 0);
+    }
   }
 
   /**
@@ -4711,15 +4965,28 @@ export class AudioEngine {
    * 写在独立的 ambienceDuck / farGain 上，不写 ambienceBus / ambienceUser：
    * 前者是系统配平、后者是玩家推子，一次开枪就把两者之一改掉了。
    *
+   * 【2026-09-09】两条总线**各自一个幅度**。原来共用一个 amount，于是玩家
+   * 每扣一次扳机就把「远处那一片仗」整组压 −6 dB、300 ms 才放回来 ——
+   * 连着打的时候它一直被摁在下面。用户原话「打起来整个战场安安静静的」
+   * 有一半是这条造成的（另一半是第一关那两档预设的 events 是空的）。
+   * `farAmount = 0` 就完全不动远声组（栓动步枪单发走这条）。
+   *
    * @param {number} seconds 压住不放的时长（起落各另算：40 ms 压、300 ms 放）
-   * @param {number} amount  压掉的比例；0.5 = 剩一半 = −6.02 dB
+   * @param {number} amount  环境床压掉的比例；0.5 = 剩一半 = −6.02 dB
+   * @param {number} farAmount 远声组压掉的比例；不给就沿用 amount（老调用点的行为）
    */
-  DuckAmbience(seconds = FIRE_DUCK_HOLD_S, amount = FIRE_DUCK_AMOUNT) {
+  DuckAmbience(seconds = FIRE_DUCK_HOLD_S, amount = FIRE_DUCK_AMOUNT, farAmount = null) {
     if (!this.ctx || !this.ambienceDuck || !this.farGain) return;
     const t = this.ctx.currentTime;
-    const level = Clamp01(1 - amount);
     const hold = Math.max(0, seconds);
-    for (const g of [this.ambienceDuck.gain, this.farGain.gain]) {
+    const far = farAmount === null ? amount : farAmount;
+    const targets = [[this.ambienceDuck.gain, amount]];
+    // farAmount 恰好 0 = 这一枪不许碰远声组。**不是「压 0 再放回来」** ——
+    // 那样也会 cancelScheduledValues 掉上一枪还没放完的斜坡，等于把它硬拽回 1，
+    // 连发时听感是远处那一层在抖。
+    if (far > 0) targets.push([this.farGain.gain, far]);
+    for (const [g, a] of targets) {
+      const level = Clamp01(1 - a);
       g.cancelScheduledValues(t);
       // 从**当前**值接上去，不是从 1 —— 连发时每一发都会重进这里，
       // 从 1 起跳的话每一发都先把音量弹回去再压下来，那是颤音不是闪避。
@@ -4807,10 +5074,15 @@ export class AudioEngine {
     this.space = cfg.space || "street";
     if (name === "silence") return;
 
+    // 换档时强度那一层要重新落到当前值上（新起的床不该从 1.0 起跳）。
+    this.battleBedApplied = BattleBedScale(this.battleIntensity);
     for (const layer of cfg.layers || []) {
       const buffer = this.ambBuffers.get(layer.bed);
       if (!buffer) continue;                       // 这一层没载到就少一层，其余照放
       const inst = new LoopLayer(this, buffer, layer);
+      // 强度要在 Start **之前**写进去：组增益的初值就是它，
+      // 否则新起的战斗床会先满音量响一下再被斜坡拉回去。
+      if (inst.battle) inst.levelScale = this.battleBedApplied;
       inst.Start();
       this.ambLayers.push(inst);
     }
@@ -4863,10 +5135,16 @@ export class AudioEngine {
     this.ambienceTimer = this.Later(AMB_TICK_MS, () => {
       const c = AMBIENCE_PRESETS[this.ambiencePreset];
       if (!c) return;
+      // 战斗类撒播随强度涨落。**两条曲线不同**：频次涨得比音量快
+      // （打起来是「更密」，不是「更响」——更响那件事由床与真实交火自己完成）。
+      const rateScale = BattleEventRate(this.battleIntensity);
+      const volScale = BattleEventVolume(this.battleIntensity);
       for (const ev of c.events || []) {
-        if (this.ambienceRng() >= (ev.perMin || 0) / AMB_TICKS_PER_MIN) continue;
+        const perMin = (ev.perMin || 0) * (ev.battle ? rateScale : 1);
+        if (this.ambienceRng() >= perMin / AMB_TICKS_PER_MIN) continue;
+        if (ev.battle) this.stats.battleEvents += 1;
         this.Play(ev.name, {
-          volume: ev.volume * (0.7 + this.ambienceRng() * 0.6),
+          volume: ev.volume * (ev.battle ? volScale : 1) * (0.7 + this.ambienceRng() * 0.6),
           // 远处的声音在立体声里撒开，别都堆在正中。
           pan: this.ambienceRng() * 2 - 1,
           pitch: (ev.pitch ?? 1) * (0.94 + this.ambienceRng() * 0.12),
