@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "updated": "2026-09-08",
-  "recordedUtc": "2026-09-08T04:25:35.113674+00:00",
-  "baseCommit": "4a97f17116e30cb8c1f1bd71d2b59dbf518137a7",
+  "recordedUtc": "2026-09-08T05:15:07.656001+00:00",
+  "baseCommit": "15225ff7ca721693c8885c2ed36b11dfd02fabc7",
   "missionContract": {
     "version": "first-level-20260907-r12",
     "stages": [
@@ -437,8 +437,8 @@
     }
   },
   "libraryRoot": "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼",
-  "catalogSha256": "90fc21e7e1d9a66fab57c17bd7b0f7cc64ec2dcec3a497378a3527766e1eda57",
-  "requirementsSha256": "e174dfa1ae05b266c78c4d7107ce25f89ec1aad95763232084294a636f8555e0",
+  "catalogSha256": "7aef343a9483c9156a5a3dcb574fba3db31f2ebbb14badb6f040f07a35db8c0e",
+  "requirementsSha256": "9b1e3b469a3ad37d367c62c95e4596c6f1a7eb8bc764c61414714a5a69acb179",
   "missionBaselineFiles": {
     "Data_FirstLevelMission.mjs": "933174877ea1595b60221e57fd3d0a46e0431ce60ab08460c3ee8267e09ab44b",
     "Data_FirstLevelMissionDialogue.mjs": "a62830fc97fedc1f5df3aacf0664c89edada411ae7689e1dbdaf3164550a5cda",
@@ -971,7 +971,7 @@
   },
   "gameIntegrationPending": null,
   "gameIntegrationCompatibility": {
-    "status": "current_original_rig_sampler_and_campaign_passed",
+    "status": "sampler_passed_campaign_failed_retry_cancelled_by_user",
     "changedFiles": [
       "Script_FirstLevelMissionView.mjs",
       "Script_FirstLevelMissionRuntime.mjs",
@@ -982,10 +982,10 @@
       "Script_FirstLevelMissionPeople.mjs",
       "index.html"
     ],
-    "fullCampaignCurrent": true,
+    "fullCampaignCurrent": false,
     "historicalIntegration": "Models/FirstLevelTrainGameV2/Data_GameIntegration.json",
-    "recordedUtc": "2026-09-08T04:20:31.953389+00:00",
-    "baseCommit": "2569928d3318c3d64de05a31a7e9873a06f7b11b",
+    "recordedUtc": "2026-09-08T05:15:03.079583+00:00",
+    "baseCommit": "15225ff7ca721693c8885c2ed36b11dfd02fabc7",
     "historicalIntegrationSha256": "6eec122e72d7213c7afce8b91566bbeb780f206458581d3a86e44b6e2ce17be8",
     "runtimeHashes": {
       "Script_FirstLevelTrainAnimation.mjs": "2a15df1c03f49c47186ddaf2efddabd074d0f407a1b8f781adeb67f697c8a34f",
@@ -994,7 +994,7 @@
       "Script_FirstLevelMissionView.mjs": "8a8a19465f3fbd4139c437910b763ea7a910e938deb9d9008d90f4c609fca83a",
       "Script_FirstLevelMissionRuntime.mjs": "8bd7ec7a94ef9d7650aeeda8af2bccf73c1a2a9cd157d37dd780262b5f5d4707",
       "Script_FirstLevelP012CastAppearance.mjs": "de0433e6c5f4e0a8752c121055ebc4bfd7692c968201bea381fb0b248b91724c",
-      "Script_Main.mjs": "c73e7c1c78793236443ca956e1894442031c91ef218590439c47a204b4debd62",
+      "Script_Main.mjs": "e67cc3d32d6ddcd973ba42c0b0bcd5d5e6eb77444d33a9b620f7247d28d42485",
       "Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json": "e6a8b7088774f86f97ce2c03462a377f90ae91e98fc39530f13f0d1e5a204595",
       "Data_FirstLevelMission.mjs": "933174877ea1595b60221e57fd3d0a46e0431ce60ab08460c3ee8267e09ab44b",
       "Data_FirstLevelMissionTrain.mjs": "adfd567c006889c6d1e48470ba002622d4c119d6741dfa6d9d4fe9ac118698d9",
@@ -1008,287 +1008,36 @@
       "Script_FirstLevelMissionColumn.mjs": "bbcee070b8d4faf20417973dfadcf87328877f926014b8186dc7a57bbd89ef24",
       "Script_FirstLevelMissionPeople.mjs": "0d1b3f7a34676f21252ad33e779a3c7e3271b6fb27f513f8ebcc04f4de5d674b",
       "Script_FirstLevelMissionVoice.mjs": "f875246b5de9b224acb27ea58c17e84863898257a6f72417b26f14b657ec2dc5",
-      "index.html": "784156f80a65cafeb1fa233030d8c8917486f1d8ed9bc066792c227a1948bc6d"
+      "index.html": "2f84cec205ffbefc37b459e1ff37523e8da9fb2fcae3881ea166c3676e01a7ba"
     },
     "evidence": [
       {
-        "path": "Models/FirstLevelTrainR13Cover/Data_SamplerValidation.json",
+        "path": "Models/FirstLevelTrainRenderV1/Data_SamplerValidation.json",
         "sha256": "4a59004475b19118be10f658690106f5588c35dc693f58d9a6566ca315fc0c65"
       },
       {
-        "path": "Models/FirstLevelTrainR13Cover/Data_CurrentSampler.log",
-        "sha256": "648cb4ba36096ced6500cfdca6ff5e30d9349db6f10b6b08c42485a4e9ebc2c1"
+        "path": "Models/FirstLevelTrainRenderCampaignV1/Data_CampaignValidation.json",
+        "sha256": "fa3bc883f851f550dbd9fca090e5af4accf824cbba5da98544b8a0ae72c41658"
       },
       {
-        "path": "Models/FirstLevelTrainR13Campaign/Data_CampaignValidation.json",
-        "sha256": "e7b1affb68376220903986f7aa2a12633f45ba41f5cb1c37bc9b07579de6067f"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_AirFirst.json",
-        "sha256": "6d9a6cccf6918d66f9822210b9348b7d488e408a379c9734ac9ef8c5377e05d1"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_BundleSupply.json",
-        "sha256": "7764a071b55201191b15ddba7beef7d046878f53b1108365c3ceac7c86950390"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_Carry.json",
-        "sha256": "f15e3155eda2d26c3eaff07ba7c0c4cd5e7c6c06a59430b677ead22405db2621"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_CarryToDitch.json",
-        "sha256": "7a697b889c812199d9560623070e419b1055a0f2f08acbac1e3667c889a52415"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_Complete.json",
-        "sha256": "64252860f6322c056c6ecdc04c41722f259569092320c138c8f89dd768b2037b"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_Courtyard.json",
-        "sha256": "e43ccdf3d20783910b8d97c8b2cca2c1fea742bb7eb11a32b12a70d91dbfea13"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_CourtyardColumn.json",
-        "sha256": "c921c6bd513185b2db9a934455d5bcd145c34771b7147c200fa56cd08dcfe921"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_CourtyardDressings.json",
-        "sha256": "77d4629035dddd85f94fc98a6fa7cf3550d6d79f02e8f86f898324982a01e5a9"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_CourtyardGate.json",
-        "sha256": "40dd6293f5973e4d4fff971f9d8e6a9083195018b269e3d82cb806b2a7967100"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_CourtyardOuterCover.json",
-        "sha256": "bbc6cc72cb384d8118b52259c3b74cce65f6f7d8f02c45fbfff93de6d578f494"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_CourtyardWatch.json",
-        "sha256": "eec505cb6da6c05bfbc9bb15cc5ad42319a4fa76c3ec88acde861ee21b342299"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_Defense.json",
-        "sha256": "3dd1f240afaad82d0b3f986e747bc7cb24fa763f79fcf90d430ea0a83ab62a1a"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_DeliverZhou.json",
-        "sha256": "ef74f27a19a206db96e901c3e1ee167fdfbede9ab0f1e236a17874ed76208773"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_EscortOrders.json",
-        "sha256": "e3fcfa202cc74e91118f0682885b6bcefe7840b0af814be28aad31904a434f08"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_Exit.json",
-        "sha256": "89eef5387d0fdd10f918dc18b9377f8b21785faeeb052d3492f6323b0a77f77e"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_FinalCarry.json",
-        "sha256": "232629f700fe5c941e2082db2ed7d6152e7b19b78f6cf791f1798607a6c9b261"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_FinalCarryPickup.json",
-        "sha256": "4bdb4303e679f7c7ba1197a8cc6832227611002190e40693a45631e321a85dc7"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_FinalDefense.json",
-        "sha256": "dd056f2447fed3a35c23cb30fbb228bc3a228b7b67ef319a9f8a05120974f686"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_FinalDefensePosition.json",
-        "sha256": "13ce6e9ed123a80dda1b8f2d46cc60ae150cf957ce32bb39117ca8920c126409"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_FirstCarryPickup.json",
-        "sha256": "3229aeb1d37756dcce9adad9ebd52ddcb07cfc6417114adf8f739ea7ff2e23ad"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_FirstRearguard.json",
-        "sha256": "430b00ae2a8f505f8191f109947c8d8bee7bb40378d40f4ef155b2488631305f"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_FrontResupply.json",
-        "sha256": "dfce6dd7b60f00254fe26df4a33678b6257dd3ece744d4279bbaae9008caf909"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_FrontVisual.json",
-        "sha256": "792509cba63dbc480119bc352b9745108662bcce19370d18be25ac573dfaf85e"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_Initial.json",
-        "sha256": "19b12a34063abb38692beeeddf0aea9dcc2d422a15cd3c195d6ea813cea83933"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_MachineGun.json",
-        "sha256": "5b3b9a4e33db8672fb0e672c6c6168b10ad0e4cfe135c99ae643308ec7a8bfdb"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_MedicalRescue.json",
-        "sha256": "078dce7133b948abb8bb642d8eadf88e58595b76646b40a0627751350235c38a"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_MeleeResult.json",
-        "sha256": "c4f11eced10006ee3c689cc1543f6a03ed73de169bb25adc93d519123a2649f6"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_Navigation.json",
-        "sha256": "9fffe5a1ca15834f0bff65c2eb2cd97284baeec61b7ae24f8b9074e868cc7e77"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_OpeningInteraction.json",
-        "sha256": "fae3afd66c1b3cfa55e147fca3871065b19658eedabe57c07e36fa65ad605bfb"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_Orders.json",
-        "sha256": "dcd9751634cdc573815d35328a3c71bbb07dc39eed1ad7a3c8539dfd01152999"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_PersonalExit.json",
-        "sha256": "64252860f6322c056c6ecdc04c41722f259569092320c138c8f89dd768b2037b"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_RearLaneRearguard.json",
-        "sha256": "dfeff155855e4d164fde66a4c6ac5200ffd870fa8865ed220a056755038f1cb2"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_Reception.json",
-        "sha256": "569aef07f7355312cbf0eea4e0b6f052686098e8f59f06901d8b04cf7a0d7698"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_ReceptionDefense.json",
-        "sha256": "3731ba610e89716b9213d7da8bea9e897e90327e32a9f161a8622bc218c2d154"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_Rescue.json",
-        "sha256": "d3161602fbe273a5d1176f5f6857bc3a9aee941578e6f5f9522731f52d36c22b"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_RetreatFirst.json",
-        "sha256": "8042bcb76c25be3c235c8922bbd32db373c3fad2401330db5d2b053c759de785"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_RetreatWall.json",
-        "sha256": "c8659b2947a17d33431dcc68a9095a212a0128213d6994bf7e8db1420df8e40b"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_RetreatYard.json",
-        "sha256": "c728e5102ba4b4850d1fde93ed3f6e22fcea62b8d0477e742547be4b1b2458ae"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_South.json",
-        "sha256": "69e6b37159f57ff7609a938492611d8ec02cde4c10221ddefc8eb87942cecd12"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_SouthRoad.json",
-        "sha256": "05e757c2aafea25c0dd93b712b75a23dc8c7c30673da8bb736ee494ced8f757f"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_TankFlank.json",
-        "sha256": "dbda5c104a843f8eedec27f559403850c74a7965f81f6b61d30a3fb0e540a7a6"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_TankShellCraters.json",
-        "sha256": "45e00c7c87729f3539630d56dd4823bc3b004103d837db1930cb44ef90211974"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_Train.json",
-        "sha256": "64bd5aeee4ffbe1abee848b158a352a1d7c8dd7ca562b9aeb44a5af141d496de"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_TrainAllDisembarked.json",
-        "sha256": "976e58d84ab87019c5a1a3cec67d9ef5e04520bba4ca2bab79680f48a925cbe9"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_TrainDisembark.json",
-        "sha256": "3400c1c1b97c8dad18cac969c30fe3e6a8afb21c8899c657196544f43a58e7e7"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_TrainExitApron.json",
-        "sha256": "4cbc9e7ecb68ef9f0544801a5ef4626b61b79b564a4d167a3543cbdd330977c1"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_TrainRide.json",
-        "sha256": "026ef4222a955701c5bc7993cf794c34b7ee75703a178d134ffd04fe1b70b19c"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_Transfer.json",
-        "sha256": "639bde08289db13067d2f756f88e9ae2d2770e33e265b76701ce1af0f433b96b"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_TransferApproach.json",
-        "sha256": "e41b489d10f5aff238069935561ec66f0e882403eaa3464356df5562ae363fa9"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_TransferDefense.json",
-        "sha256": "e078e5d4b03b6c6f653b54dd9de840e6f3783762755b66c5676421c498e3cb3c"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_TransferLoading.json",
-        "sha256": "132cf671eab28c74a535fee29797f7657886340ad1af3fafed71f9443bd0c4b2"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_TransferPosition.json",
-        "sha256": "f61d32ac2a6fa1b58c8b186eacecaf97feb7e20ea0dddd1c3094b0c27e982187"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_TransferSupply.json",
-        "sha256": "2976b71543ce743f481978edc9cfa5eba0845b9f5fd24453df42ba251cc421d2"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_TrenchCombatSound.json",
-        "sha256": "6d46fbd1054ef426fbca722831031364b48e7c375f5fb9daa168f5e8fd0514e6"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_Village.json",
-        "sha256": "c9d78e8f8c0e6b6968492c495c38d72189be2b00c3c877ec081e6bc4cde467c8"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_VillageKitchen.json",
-        "sha256": "9f3679d86a4b40d2cf0a3fb6d8809d7e180229073f9b447c165f682eb33ad858"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_WallRearguard.json",
-        "sha256": "eaae578dc36c55ad2c1bba47e20efd5b153301d5d043727d7f653fe9a2f051a8"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_YardRearguard.json",
-        "sha256": "421398a94e0280820442e02d0fedca44ed9ee495563852e27f7177e4eb1e4074"
-      },
-      {
-        "path": "Preview/FirstLevelTrainR13Campaign/Data_ZhouDeath.json",
-        "sha256": "cbeaffaf871670ab65827209dbec33762f762ccb14756ab8e9f28a79b81167fc"
-      },
-      {
-        "path": "Models/FirstLevelTrainR13Campaign/Pipeline/_check_FirstLevelExistingSourceCampaign.mjs",
-        "sha256": "43f03e8eb0ccbb8defeb3567369ce81fdb48042d5d53c1bf911e851ad4da135e"
-      },
-      {
-        "path": "Models/FirstLevelTrainR13Campaign/Pipeline/Script_ArchiveCampaignValidation.py",
-        "sha256": "e4e5a3eb89659f6e53e651bfc3bebb1ccd4db470cbc884ed9cab0a3b65c0aea3"
-      },
-      {
-        "path": "Models/FirstLevelTrainR13Campaign/Pipeline/Script_FirstLevelMissionBrowserTest.mjs",
-        "sha256": "33e1596ae2ee669e663cab0ed233fd4a7b97c8a2c32f6830b412185690fc798d"
-      },
-      {
-        "path": "Models/FirstLevelTrainR13Campaign/Pipeline/Script_FirstLevelMissionTest.mjs",
-        "sha256": "71aef84c3e951c18c2cfcd71761621a89edbf3328328b13fa50167542238afa6"
+        "path": "Models/FirstLevelTrainRenderCampaignV2/Data_CampaignValidation.json",
+        "sha256": "24ae20a95bebf0d355e1601cd399812d6e8fd255c84d4518b24fd9064c8d2cda"
       }
     ],
     "testScope": [
-      "Four original production models, nine height profiles, actual sampler versus independent AnimationMixer, skin, bind, restore and hitbox positions",
-      "Current first-level rule/audio test and full real-input browser campaign through Complete"
+      "Existing original-rig sampler: four production models by nine height profiles.",
+      "First-level rules/audio and module graph passed before user stopped further regression.",
+      "Full campaign V1 failed with player down at Melee; V2 cancelled at user request."
     ],
-    "note": "Regression of the current campaign with the already installed bench-support/rise subset. New body, carry and authored-ammo candidates remain outside runtime.",
-    "evidencePath": "Models/FirstLevelTrainR13Campaign/Data_CompatibilityValidation.json"
+    "note": "User requested upload without further regression or mandatory game integration. Current render campaign is not accepted; old successful campaign remains historical.",
+    "evidencePath": "Models/FirstLevelTrainRenderV1/Data_CompatibilityValidation.json"
   },
   "sourceSearch": {
     "directories": [
       "C:\\Users\\Bentl\\OneDrive\\Sync\\饮河\\FPS\\视频转骨骼\\Video\\Sources",
       "C:/Users/Bentl/Downloads/GVHMR"
     ],
-    "catalogActions": 94,
+    "catalogActions": 96,
     "newVideoGenerations": 60,
     "newInferenceRuns": 43
   },
@@ -20018,7 +19767,7 @@
       "blendFile": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra01TrainSupport.blend",
       "previewId": "TrainBenchRise",
       "revisionLabel": "原模型 bind/层级/骨长保持；实际身高五档曲线，经九身高 120 fps 验证。根、腿、腕、掌指为后期支撑修正，未接入任务。",
-      "status": "partially_integrated_other_actions_pending",
+      "status": "runtime_subset_enabled_upstream_campaign_validation_pending",
       "runtimeBinding": {
         "enabled": true,
         "stages": [
@@ -20027,8 +19776,8 @@
         "scope": "原骨架侧凳身体支撑；站姿扶稳和第二版表演待制",
         "evidence": "Models/FirstLevelTrainGameV2/Data_GameIntegration.json",
         "version": "FirstLevelTrainGameV2",
-        "fullCampaignCurrent": true,
-        "compatibilityStatus": "current_original_rig_sampler_and_campaign_passed"
+        "fullCampaignCurrent": false,
+        "compatibilityStatus": "sampler_passed_campaign_failed_retry_cancelled_by_user"
       },
       "reviewEvidence": [
         "Models/FirstLevelTrainV1/Data_SelectedExportFidelityValidation.json",
@@ -20046,6 +19795,7 @@
       "blockers": [
         "Other generated source targets require dense source review and recovery; first-pass retakes remain explicit.",
         "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted.",
+        "The frozen full campaign validates the previous runtime. Current upstream compatibility evidence has its own scope; it does not replace a current full campaign.",
         "Only the recorded carriage subset is enabled; dedicated life gestures, prop/finger contact and stair-down are still pending."
       ],
       "productionPolicy": "existing_sources_only",
@@ -22947,7 +22697,7 @@
       "blendFile": null,
       "previewId": null,
       "revisionLabel": null,
-      "status": "partially_integrated_other_actions_pending",
+      "status": "runtime_subset_enabled_upstream_campaign_validation_pending",
       "runtimeBinding": {
         "enabled": true,
         "stages": [
@@ -22956,8 +22706,8 @@
         "scope": "复用原骨架坐姿支撑；专用生活表演与手中道具待接",
         "evidence": "Models/FirstLevelTrainGameV2/Data_GameIntegration.json",
         "version": "FirstLevelTrainGameV2",
-        "fullCampaignCurrent": true,
-        "compatibilityStatus": "current_original_rig_sampler_and_campaign_passed"
+        "fullCampaignCurrent": false,
+        "compatibilityStatus": "sampler_passed_campaign_failed_retry_cancelled_by_user"
       },
       "reviewEvidence": [
         "Models/FirstLevelTrainGameV2/Data_GameIntegration.json"
@@ -22965,6 +22715,7 @@
       "blockers": [
         "Source targets/reused candidates do not prove this complete requirement is accepted or integrated.",
         "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted.",
+        "The frozen full campaign validates the previous runtime. Current upstream compatibility evidence has its own scope; it does not replace a current full campaign.",
         "Only the recorded carriage subset is enabled; dedicated life gestures, prop/finger contact and stair-down are still pending."
       ],
       "productionPolicy": "existing_sources_only",
@@ -25292,18 +25043,26 @@
       "exitPose": null,
       "interruptPolicy": "Animation must not write mission facts, population, inventory, camera or patient identity.",
       "blendFile": null,
-      "previewId": null,
+      "previewId": "TrainAisleSideStepAuthored",
       "revisionLabel": null,
-      "status": "existing_source_authored_correction_planned",
+      "status": "authored_candidate_requires_scene_clearance_review",
       "runtimeBinding": {
         "enabled": false,
         "stages": [
           "Unloading"
         ]
       },
-      "reviewEvidence": [],
+      "reviewEvidence": [
+        "Models/FirstLevelAisleAuthorV2/Data_AuthoredBake.json",
+        "Models/FirstLevelAisleAuthorV2/Data_ExportValidation.json",
+        "Models/FirstLevelAisleAuthorV2/Data_EditableProjectValidation.json",
+        "Models/FirstLevelAisleAuthorV2/Data_VisualAssessment.json"
+      ],
       "blockers": [
-        "Source targets/reused candidates do not prove this complete requirement is accepted or integrated."
+        "实际车厢过道、车门与其他乘客净空尚未装配验证，不能直接把 0.40 m 作者横移写入队列。",
+        "背包为几何试制；实际背包模型、移动后的碰撞体与安全落点待绑定。",
+        "侧步屈膝深度、上肢与重心过渡自然度仍待修；不以骨长和鞋面检查代替完整表演验收。",
+        "未绑定罗班长／何有田实例及事件，未接入游戏；任务、人数、对白与库存不变。"
       ],
       "productionPolicy": "existing_sources_only",
       "existingSourceResolutions": [
@@ -25467,7 +25226,455 @@
         "TrainBagKickAside"
       ],
       "newRecoveryCandidates": [],
-      "newVideoSubmissionRequired": false
+      "newVideoSubmissionRequired": false,
+      "newAuthoredCandidates": [
+        {
+          "variantId": "Nra-v2-LugouNra01-TrainAisleSideStepAuthored",
+          "path": "Models/FirstLevelAisleAuthorV2/Model_LugouNra01SideStep.glb",
+          "modelSha256": "c2e4021499f61306986775d2749efe4cfb8ba1379887de3d99d73da088b5730b",
+          "blend": "Blender/FirstLevelAisleAuthorV2/Scene_LugouNra01SideStep.blend",
+          "clip": "FirstLevelTrainSideStep",
+          "status": "作者候选 · 支撑已检 · 场景和自然度待验",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "固定展示原起身末态；侧身、脚步及踢包全部为作者后期制作，不是新增视频恢复。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": 0,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelAisleAuthorV2/Data_AuthoredBake.json",
+            "retargetNotes": "Verified stand endpoint reused. Side step, torso turn, foot targets and bag impulse authored; no new source or inference.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 7.966666666666667
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainAisleSideStepAuthored"
+        },
+        {
+          "variantId": "Nra-v2-LugouNra02-TrainAisleSideStepAuthored",
+          "path": "Models/FirstLevelAisleAuthorV2/Model_LugouNra02SideStep.glb",
+          "modelSha256": "287f7d56d85a8bdd8bc5840ece476ce61fec45604cb2094004b19eaa0a6b935e",
+          "blend": "Blender/FirstLevelAisleAuthorV2/Scene_LugouNra02SideStep.blend",
+          "clip": "FirstLevelTrainSideStep",
+          "status": "作者候选 · 支撑已检 · 场景和自然度待验",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "固定展示原起身末态；侧身、脚步及踢包全部为作者后期制作，不是新增视频恢复。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": 0,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelAisleAuthorV2/Data_AuthoredBake.json",
+            "retargetNotes": "Verified stand endpoint reused. Side step, torso turn, foot targets and bag impulse authored; no new source or inference.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 7.966666666666667
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainAisleSideStepAuthored"
+        },
+        {
+          "variantId": "Nra-v2-LugouNra03-TrainAisleSideStepAuthored",
+          "path": "Models/FirstLevelAisleAuthorV2/Model_LugouNra03SideStep.glb",
+          "modelSha256": "2ac24db512256ef7f829b901ae3eac40020ae8fdc6af594fe38f1e3832e4787b",
+          "blend": "Blender/FirstLevelAisleAuthorV2/Scene_LugouNra03SideStep.blend",
+          "clip": "FirstLevelTrainSideStep",
+          "status": "作者候选 · 支撑已检 · 场景和自然度待验",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "固定展示原起身末态；侧身、脚步及踢包全部为作者后期制作，不是新增视频恢复。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": 0,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelAisleAuthorV2/Data_AuthoredBake.json",
+            "retargetNotes": "Verified stand endpoint reused. Side step, torso turn, foot targets and bag impulse authored; no new source or inference.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 7.966666666666667
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainAisleSideStepAuthored"
+        },
+        {
+          "variantId": "Nra-v2-LugouNra04-TrainAisleSideStepAuthored",
+          "path": "Models/FirstLevelAisleAuthorV2/Model_LugouNra04SideStep.glb",
+          "modelSha256": "824395ae0e361d9ae718072c534ac7c7596283de716f6557194e72744e614899",
+          "blend": "Blender/FirstLevelAisleAuthorV2/Scene_LugouNra04SideStep.blend",
+          "clip": "FirstLevelTrainSideStep",
+          "status": "作者候选 · 支撑已检 · 场景和自然度待验",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "固定展示原起身末态；侧身、脚步及踢包全部为作者后期制作，不是新增视频恢复。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": 0,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelAisleAuthorV2/Data_AuthoredBake.json",
+            "retargetNotes": "Verified stand endpoint reused. Side step, torso turn, foot targets and bag impulse authored; no new source or inference.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 7.966666666666667
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainAisleSideStepAuthored"
+        },
+        {
+          "variantId": "Nra-v2-LugouNra01-TrainBagKickAsideAuthored",
+          "path": "Models/FirstLevelAisleAuthorV2/Model_LugouNra01BagKick.glb",
+          "modelSha256": "ec48e553c7c55548f8e3889076b6897709eb6b9a4a5a62a2f7b4b38ee44d9997",
+          "blend": "Blender/FirstLevelAisleAuthorV2/Scene_LugouNra01BagKick.blend",
+          "clip": "FirstLevelTrainBagKick",
+          "status": "作者候选 · 支撑已检 · 场景和自然度待验",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "固定展示原起身末态；侧身、脚步及踢包全部为作者后期制作，不是新增视频恢复。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": 0,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelAisleAuthorV2/Data_AuthoredBake.json",
+            "retargetNotes": "Verified stand endpoint reused. Side step, torso turn, foot targets and bag impulse authored; no new source or inference.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 7.966666666666667
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainBagKickAsideAuthored"
+        },
+        {
+          "variantId": "Nra-v2-LugouNra02-TrainBagKickAsideAuthored",
+          "path": "Models/FirstLevelAisleAuthorV2/Model_LugouNra02BagKick.glb",
+          "modelSha256": "e7e1a1b44eb5d024e4871b1e166d130c69eac7a7121596c4e2f2a585e723ec92",
+          "blend": "Blender/FirstLevelAisleAuthorV2/Scene_LugouNra02BagKick.blend",
+          "clip": "FirstLevelTrainBagKick",
+          "status": "作者候选 · 支撑已检 · 场景和自然度待验",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "固定展示原起身末态；侧身、脚步及踢包全部为作者后期制作，不是新增视频恢复。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": 0,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelAisleAuthorV2/Data_AuthoredBake.json",
+            "retargetNotes": "Verified stand endpoint reused. Side step, torso turn, foot targets and bag impulse authored; no new source or inference.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 7.966666666666667
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainBagKickAsideAuthored"
+        },
+        {
+          "variantId": "Nra-v2-LugouNra03-TrainBagKickAsideAuthored",
+          "path": "Models/FirstLevelAisleAuthorV2/Model_LugouNra03BagKick.glb",
+          "modelSha256": "96ce77c7d3338961b1ec13911a1d350d037cb8ae1d5cf8cae460ecc81d2cc0a6",
+          "blend": "Blender/FirstLevelAisleAuthorV2/Scene_LugouNra03BagKick.blend",
+          "clip": "FirstLevelTrainBagKick",
+          "status": "作者候选 · 支撑已检 · 场景和自然度待验",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "固定展示原起身末态；侧身、脚步及踢包全部为作者后期制作，不是新增视频恢复。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": 0,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelAisleAuthorV2/Data_AuthoredBake.json",
+            "retargetNotes": "Verified stand endpoint reused. Side step, torso turn, foot targets and bag impulse authored; no new source or inference.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 7.966666666666667
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainBagKickAsideAuthored"
+        },
+        {
+          "variantId": "Nra-v2-LugouNra04-TrainBagKickAsideAuthored",
+          "path": "Models/FirstLevelAisleAuthorV2/Model_LugouNra04BagKick.glb",
+          "modelSha256": "9ea29a9f74d93635093b9a8a52336884b20ba226aca1343544733c9d904231c0",
+          "blend": "Blender/FirstLevelAisleAuthorV2/Scene_LugouNra04BagKick.blend",
+          "clip": "FirstLevelTrainBagKick",
+          "status": "作者候选 · 支撑已检 · 场景和自然度待验",
+          "review": {
+            "sourceVideo": "Video/Sources/FirstLevelV1/TrainBenchRise/4a5ce187-3192-42bb-90e4-978a98af967e_video_1.mp4",
+            "sourceRangeSeconds": [
+              0,
+              7.966666666666667
+            ],
+            "recoveryTracks": [
+              {
+                "path": "Models/RecoveryPreview/Data_V1_TrainBenchRiseRawJoints.json",
+                "offset": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "recoveryLabel": "GVHMR 原始恢复 · 未重定向、未修脚",
+            "recoveryFps": 30.0,
+            "sourceAssessment": "固定展示原起身末态；侧身、脚步及踢包全部为作者后期制作，不是新增视频恢复。",
+            "sourceQuality": "authored_from_existing_pose",
+            "defaultCameraYawRadians": 0,
+            "cameraElevationRadians": 0.25,
+            "sideCameraYawRadians": -1.5707963267948966,
+            "retargetReport": "Models/FirstLevelAisleAuthorV2/Data_AuthoredBake.json",
+            "retargetNotes": "Verified stand endpoint reused. Side step, torso turn, foot targets and bag impulse authored; no new source or inference.",
+            "seamBlendSeconds": 0,
+            "sourcePoseSeconds": 7.966666666666667
+          },
+          "previewUrl": "http://127.0.0.1:8136/Preview/index.html?action=TrainBagKickAsideAuthored"
+        }
+      ],
+      "visualAssessment": {
+        "frozen": true,
+        "acceptedForGame": false,
+        "status": "candidate_requires_scene_clearance_and_naturalness_review",
+        "recordedUtc": "2026-09-08T04:48:55.324373+00:00",
+        "observed": "V2 正面采样消除了 V1 的交叉膝，四型号鞋面接触包体；侧面仍可见较深屈膝与较静态的上肢。原片和 raw 固定在站稳源帧，动作属于后期制作。",
+        "blockers": [
+          "实际车厢过道、车门与其他乘客净空尚未装配验证，不能直接把 0.40 m 作者横移写入队列。",
+          "背包为几何试制；实际背包模型、移动后的碰撞体与安全落点待绑定。",
+          "侧步屈膝深度、上肢与重心过渡自然度仍待修；不以骨长和鞋面检查代替完整表演验收。",
+          "未绑定罗班长／何有田实例及事件，未接入游戏；任务、人数、对白与库存不变。"
+        ],
+        "visualReadImages": [
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Texture_LugouNra01_TrainAisleSideStepAuthored_front_1600.png",
+            "sha256": "3d0a9cb689843ee5eb38cad1c94c0e8c3e612183f82f6a63524c1b4fb33635c3"
+          },
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Texture_LugouNra01_TrainAisleSideStepAuthored_side_2500.png",
+            "sha256": "733d2a03f17e0d52da9c912f2b51f06c3ab9954eb48c4dcb05d6e5aa2b65bd16"
+          },
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Texture_LugouNra01_TrainBagKickAsideAuthored_front_1600.png",
+            "sha256": "c52ca2a1f01e3dc5a5927084013150256bf0fb92a29a22680205275dad315d4b"
+          },
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Texture_LugouNra01_TrainBagKickAsideAuthored_side_1600.png",
+            "sha256": "e6e8277ddce64f05ac9864fcd6a1b06b584152e1b4af38dd36f073b90cf190d1"
+          },
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Texture_LugouNra02_TrainAisleSideStepAuthored_front_1600.png",
+            "sha256": "28b9ace17ca13b912c6423da9231b4fb9a9626c6220c12ee393c03a279e300ab"
+          },
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Texture_LugouNra02_TrainAisleSideStepAuthored_side_2500.png",
+            "sha256": "302ea1db950f1fed372d91b43fb18e56eeeb2a10b518da85666b7871455f12d9"
+          },
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Texture_LugouNra02_TrainBagKickAsideAuthored_front_1600.png",
+            "sha256": "2e62fff7b6d81a51c1acf009fca390de430e14053eada13005abdf6757ca6e8e"
+          },
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Texture_LugouNra02_TrainBagKickAsideAuthored_side_1600.png",
+            "sha256": "de0565edd00500d1a8cfa8d64b4aa728c09a1d35ed44753326ea4084b6d6288d"
+          },
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Texture_LugouNra03_TrainAisleSideStepAuthored_front_1600.png",
+            "sha256": "927abd0addb2e9666e4045c06adf35c7aefb9f5ffdc99a4ef2eb473b80dc478f"
+          },
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Texture_LugouNra03_TrainAisleSideStepAuthored_side_2500.png",
+            "sha256": "456c7e6113589ae3f6942278a011f519506021f580312cdd71de5d304163e3d9"
+          },
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Texture_LugouNra03_TrainBagKickAsideAuthored_front_1600.png",
+            "sha256": "575dfcdf37c698632da1fe7c848f9cacd61901960773764c28e6ecb47a39899b"
+          },
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Texture_LugouNra03_TrainBagKickAsideAuthored_side_1600.png",
+            "sha256": "4e101a5748fe84d92866fbaf39547055d5915848ab0469ce40ae38299f468782"
+          },
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Texture_LugouNra04_TrainAisleSideStepAuthored_front_1600.png",
+            "sha256": "c8db733c94c5ff996d8ae8c94acf99c217a5519d1ba9ddfe368d6477d4c0db0d"
+          },
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Texture_LugouNra04_TrainAisleSideStepAuthored_side_2500.png",
+            "sha256": "ef10dc4d8daee6c276a32af377fb0ca71556ec9e7470279e062b14f6b511a79f"
+          },
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Texture_LugouNra04_TrainBagKickAsideAuthored_front_1600.png",
+            "sha256": "8bbf56210bfc082572f203455e46749565603c19ee9c6509bc54d82aa2a18b8a"
+          },
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Texture_LugouNra04_TrainBagKickAsideAuthored_side_1600.png",
+            "sha256": "4714f0478d88a44fe46fd45c5da333bf6034442cfa27592423d38d0b7458239d"
+          }
+        ],
+        "screenshotCount": 80,
+        "visualReadCount": 16,
+        "validation": {
+          "poseSamples": 9608,
+          "sampleFps": 240,
+          "surfaceSamples": 1208,
+          "surfaceSampleFps": 30,
+          "minSoleY": 0.001999824278532295,
+          "maxBoneLengthError": 9.112011023493238e-08,
+          "minKneeSeparationX": 0.1938391808921377,
+          "maxBagContactError": 1.311449994156888e-07,
+          "maxProjection": 0.9221417815374062,
+          "editableMaxFootErrorM": 2.3663917807703258e-05
+        },
+        "evidence": [
+          {
+            "path": "Models/FirstLevelAisleAuthorV2/Data_AuthoredBake.json",
+            "sha256": "c1147ed3096d4a7b26e89423536c8a11b403d11f9a25d0b3cff1014f12c59614"
+          },
+          {
+            "path": "Models/FirstLevelAisleAuthorV2/Data_ExportValidation.json",
+            "sha256": "8c3b00a0c50f77eeea265b73fa1e15e4776e64d73b38b9ab9536593d8654119b"
+          },
+          {
+            "path": "Models/FirstLevelAisleAuthorV2/Data_EditableProjectValidation.json",
+            "sha256": "75c2ba1ad0b62f5a251a975d1b1c3d23fff135c6ff2792162d8e1b44ebf808f9"
+          },
+          {
+            "path": "Models/FirstLevelAisleAuthorV2/Data_Versions.json",
+            "sha256": "dcd4effa97bdb30fd7e6221333de528cbacf7c48845715996b0828fcf013873d"
+          },
+          {
+            "path": "Preview/FirstLevelAisleAuthorV2/Data_BrowserValidation.json",
+            "sha256": "aa7be796c718432dc0714fbddc00546fb4f364a36b577756e93d0b7fd36e7af5"
+          }
+        ],
+        "models": [
+          {
+            "path": "Models/FirstLevelAisleAuthorV2/Model_LugouNra01SideStep.glb",
+            "sha256": "c2e4021499f61306986775d2749efe4cfb8ba1379887de3d99d73da088b5730b"
+          },
+          {
+            "path": "Models/FirstLevelAisleAuthorV2/Model_LugouNra01BagKick.glb",
+            "sha256": "ec48e553c7c55548f8e3889076b6897709eb6b9a4a5a62a2f7b4b38ee44d9997"
+          },
+          {
+            "path": "Models/FirstLevelAisleAuthorV2/Model_LugouNra02SideStep.glb",
+            "sha256": "287f7d56d85a8bdd8bc5840ece476ce61fec45604cb2094004b19eaa0a6b935e"
+          },
+          {
+            "path": "Models/FirstLevelAisleAuthorV2/Model_LugouNra02BagKick.glb",
+            "sha256": "e7e1a1b44eb5d024e4871b1e166d130c69eac7a7121596c4e2f2a585e723ec92"
+          },
+          {
+            "path": "Models/FirstLevelAisleAuthorV2/Model_LugouNra03SideStep.glb",
+            "sha256": "2ac24db512256ef7f829b901ae3eac40020ae8fdc6af594fe38f1e3832e4787b"
+          },
+          {
+            "path": "Models/FirstLevelAisleAuthorV2/Model_LugouNra03BagKick.glb",
+            "sha256": "96ce77c7d3338961b1ec13911a1d350d037cb8ae1d5cf8cae460ecc81d2cc0a6"
+          },
+          {
+            "path": "Models/FirstLevelAisleAuthorV2/Model_LugouNra04SideStep.glb",
+            "sha256": "824395ae0e361d9ae718072c534ac7c7596283de716f6557194e72744e614899"
+          },
+          {
+            "path": "Models/FirstLevelAisleAuthorV2/Model_LugouNra04BagKick.glb",
+            "sha256": "9ea29a9f74d93635093b9a8a52336884b20ba226aca1343544733c9d904231c0"
+          }
+        ],
+        "history": "FirstLevelAisleAuthorV1 preserves crossed-knee output and 40 captures; its browser test stopped at a stale test phase read. V2 waits for render before reading controls."
+      }
     },
     {
       "requirementId": "FL21",
@@ -25504,7 +25711,7 @@
       "blendFile": "Blender/FirstLevelTrainSupportV2/Scene_LugouNra01TrainSupport.blend",
       "previewId": "TrainBenchRise",
       "revisionLabel": "原模型 bind/层级/骨长保持；实际身高五档曲线，经九身高 120 fps 验证。根、腿、腕、掌指为后期支撑修正，未接入任务。",
-      "status": "partially_integrated_other_actions_pending",
+      "status": "runtime_subset_enabled_upstream_campaign_validation_pending",
       "runtimeBinding": {
         "enabled": true,
         "stages": [
@@ -25513,8 +25720,8 @@
         "scope": "扶腿起身、直立等队列与行走衔接；逐阶下车待接",
         "evidence": "Models/FirstLevelTrainGameV2/Data_GameIntegration.json",
         "version": "FirstLevelTrainGameV2",
-        "fullCampaignCurrent": true,
-        "compatibilityStatus": "current_original_rig_sampler_and_campaign_passed"
+        "fullCampaignCurrent": false,
+        "compatibilityStatus": "sampler_passed_campaign_failed_retry_cancelled_by_user"
       },
       "reviewEvidence": [
         "Models/FirstLevelTrainV1/Data_SelectedExportFidelityValidation.json",
@@ -25527,11 +25734,14 @@
         "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra02.json",
         "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra03.json",
         "Video/Sources/FirstLevelV1/TrainBenchRise/Data_RetargetAssessment_V4_LugouNra04.json",
+        "Models/FirstLevelStairAuthorV1/Data_DeliveryStatus.json",
         "Models/FirstLevelTrainGameV2/Data_GameIntegration.json"
       ],
       "blockers": [
         "Other generated source targets require dense source review and recovery; first-pass retakes remain explicit.",
         "Source depth errors and authored contact corrections are tracked per version. Props, clip boundaries and mission event binding are not accepted.",
+        "Four-tread authored GLBs are delivered as unverified work in progress. Export check was stopped at user request; editable projects, three-pane registration and physical queue integration are not complete.",
+        "The frozen full campaign validates the previous runtime. Current upstream compatibility evidence has its own scope; it does not replace a current full campaign.",
         "Only the recorded carriage subset is enabled; dedicated life gestures, prop/finger contact and stair-down are still pending."
       ],
       "productionPolicy": "existing_sources_only",
@@ -26615,7 +26825,39 @@
           }
         }
       ],
-      "newVideoSubmissionRequired": false
+      "newVideoSubmissionRequired": false,
+      "authoredStairWorkInProgress": {
+        "status": "work_in_progress_uploaded_without_regression",
+        "frozen": true,
+        "acceptedForGame": false,
+        "recordedUtc": "2026-09-08T05:15:03.079583+00:00",
+        "models": [
+          {
+            "path": "Models/FirstLevelStairAuthorV1/Model_LugouNra01StairDescent.glb",
+            "sha256": "3d419739f97f194341500b26276d5b454ed7495fa53d03660bcda75a773d58a2"
+          },
+          {
+            "path": "Models/FirstLevelStairAuthorV1/Model_LugouNra02StairDescent.glb",
+            "sha256": "c8b797c653fd8aa6f0d9eac149f4d656f20007e462190cd38b1a763c1cb87b92"
+          },
+          {
+            "path": "Models/FirstLevelStairAuthorV1/Model_LugouNra03StairDescent.glb",
+            "sha256": "2b59f5e751eba8e83bbfa0530e9c28254ad36b88cc5156ccd65e00449fe1f24f"
+          },
+          {
+            "path": "Models/FirstLevelStairAuthorV1/Model_LugouNra04StairDescent.glb",
+            "sha256": "ff14d45adb8d73bcb8fad3197a5c8dd6057a935e982db280b75f6b9e1d55289f"
+          }
+        ],
+        "sourcePoseSeconds": 7.966666666666667,
+        "source": "FirstLevelTrainSupportV2: original standing endpoint; no new video or recovery.",
+        "authoredScope": "Frozen stand endpoint reused. Ten cautious step-to foot placements and pelvis descent are authored against four actual tread boxes; source/raw remain fixed.",
+        "exportVerification": "Interrupted at user request; no passing claim.",
+        "editableProject": null,
+        "threePanePreview": null,
+        "runtimeEnabled": false,
+        "note": "Four 12-second GLBs were authored. They remain unverified work in progress; no editable .blend or new three-pane registration has been made. Existing TrainStairDisembark preview is a separate earlier candidate."
+      }
     },
     {
       "requirementId": "FL22",

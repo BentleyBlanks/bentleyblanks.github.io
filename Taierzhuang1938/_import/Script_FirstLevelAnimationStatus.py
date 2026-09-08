@@ -276,6 +276,34 @@ def Main():
         row.update(status='authored_candidate_requires_contact_review',previewId=action['id'],newAuthoredCandidates=candidates,
             existingRuntimeBase='MissionTrainLifePose / CountAmmo',visualAssessment=assessment,blockers=assessment['blockers'])
         row['reviewEvidence'].extend(f'Models/{ammoGroup}/'+name for name in ['Data_AuthoredBake.json','Data_ExportValidation.json','Data_EditableProjectValidation.json','Data_VisualAssessment.json'])
+    aisleGroups=sorted((p for p in (root/'Models').glob('FirstLevelAisleAuthorV*') if (p/'Data_VisualAssessment.json').exists()),key=lambda p:int(p.name.split('V')[-1]))
+    if aisleGroups:
+        folder=aisleGroups[-1];assessment=Read(folder/'Data_VisualAssessment.json')
+        validation=Read(folder/'Data_ExportValidation.json');editable=Read(folder/'Data_EditableProjectValidation.json')
+        assert assessment['frozen'] and not assessment['acceptedForGame'] and not validation['errors']
+        candidates=[]
+        for actionId,mode in [('TrainAisleSideStepAuthored','SideStep'),('TrainBagKickAsideAuthored','BagKick')]:
+            action=next(a for a in catalog['actions'] if a['id']==actionId)
+            variants=[v for v in action['variants'] if v['path'].startswith(f'Models/{folder.name}/')]
+            assert len(variants)==4
+            for variant in variants:
+                checked=next(r for r in validation['results'] if r['id']==variant['modelId'] and r['mode']==mode)
+                projectRecord=next(r for r in editable['results'] if r['id']==variant['modelId'] and r['mode']==mode)
+                assert Hash(root/variant['path'])==checked['sha256']==projectRecord['modelSha256']
+                assert Hash(root/variant['blend'])==projectRecord['blendSha256']
+                candidates.append(dict(variantId=variant['id'],path=variant['path'],modelSha256=checked['sha256'],blend=variant['blend'],
+                    clip=variant['clip'],status=variant['status'],review=variant['review'],previewUrl='http://127.0.0.1:8136/Preview/index.html?action='+actionId))
+        row=next(r for r in rows if r['requirementId']=='FL20')
+        row.update(status='authored_candidate_requires_scene_clearance_review',previewId='TrainAisleSideStepAuthored',newAuthoredCandidates=candidates,
+            visualAssessment=assessment,blockers=assessment['blockers'])
+        row['reviewEvidence'].extend(f'Models/{folder.name}/'+name for name in ['Data_AuthoredBake.json','Data_ExportValidation.json','Data_EditableProjectValidation.json','Data_VisualAssessment.json'])
+    stairDelivery=root/'Models/FirstLevelStairAuthorV1/Data_DeliveryStatus.json'
+    if stairDelivery.exists():
+        stair=Read(stairDelivery)
+        row=next(r for r in rows if r['requirementId']=='FL21')
+        row['authoredStairWorkInProgress']=stair
+        row['reviewEvidence'].append(stairDelivery.relative_to(root).as_posix())
+        row['blockers'].append('Four-tread authored GLBs are delivered as unverified work in progress. Export check was stopped at user request; editable projects, three-pane registration and physical queue integration are not complete.')
     gameVersion=Read(project/'Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json')['version']
     assert re.fullmatch(r'FirstLevelTrainGameV[1-9]\d*',gameVersion)
     gameReport=root/'Models'/gameVersion/'Data_GameIntegration.json'

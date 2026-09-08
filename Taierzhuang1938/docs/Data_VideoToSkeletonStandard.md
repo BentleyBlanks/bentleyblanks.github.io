@@ -96,6 +96,8 @@ GVHMR 的 22 个身体关节不提供可靠的手指握法和枪械姿态。持�
 
 数弹作者动作复用已验坐姿时，用 `Script_FirstLevelAmmoAuthor.mjs`、`Script_FirstLevelAmmoProject.py` 和 `Script_FirstLevelAmmoVerify.mjs`，均指定 `--root <资产库> --revision 3`；已冻结版本改用新 revision。V3 的 `Script_FirstLevelAmmoContactVerify.mjs` 独立量测实际导出蒙皮的腿面支撑、袋体内手部顶点及五个道具位移，30 fps 表面检查与 120 fps 骨骼检查分别报告。手部顶点未进入袋体不代表三角形无交叉、弹药接触或自然度合格；真实人物实例、道具与 VoiceEvent 接入另验。原片和 raw 仍固定显示原坐姿，不能标成恢复出的数弹动作。
 
+车厢侧身／踢包作者动作使用 `Script_FirstLevelAisleAuthor.mjs`、`Script_FirstLevelAisleVerify.mjs`、Blender 的 `Script_FirstLevelAisleProject.py` 与三栏 `Script_FirstLevelAisleReview.mjs`，指定 `--root <资产库> --revision 2`。从已验起身末态取姿态，脚步、膝弯方向、肩部转向与背包位移为后期制作；原片／raw 固定源帧。120 fps 烘焙、240 fps 独立插值检查、30 fps 鞋面／包体顶点测量分开报告。近直腿的原膝弯平面可能不适合侧步；V1 的交叉膝失败保留，V2 另验前向弯曲和左右膝间距。真实车内净空、包体碰撞、演员与事件接入须另验，不把作者位移直接写入队列根节点。
+
 ### 全库重定向返修（ReviewV7）
 
 `Script_MotionFidelityPrepare.py --root <资产库>` 从目录中每个视频恢复/拆分实验的实际最新效果取得原片、选段和原始关节引用。首次运行保存 `Models/ReviewV7/Data_SourceInventory.json`；续跑从该快照复现，避免把正在生成的新版本当作来源。核验原始 NPZ 的 SHA-256 和 `worldJoints` 逐值相等后才准备运动。此流程不重新生成视频、不重新运行 GVHMR，也不重写原始骨骼。
