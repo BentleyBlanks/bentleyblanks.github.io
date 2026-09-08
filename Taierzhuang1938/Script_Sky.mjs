@@ -68,6 +68,9 @@ uniform float uTime;
 uniform float uArtGlow;
 // 太阳盘吃多少透过率（1 = 完全物理，黄昏自然变橙变暗；0 = 沿用美术色）。
 uniform float uSunDiskT;
+// 地平线以下：朝下的视线被战场霾罩住多少（0 = 不修正，退回原始 LUT）。
+// 为什么需要它，见 SkyRadiance 里那一段长注释。
+uniform float uAtmoBelowVeil;
 
 float Hash31(vec3 p) {
   p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
@@ -104,6 +107,29 @@ vec3 SkyRadiance(vec3 dir, float sunDiskGain) {
   if (uAtmoEnabled > 0.5) {
     // --- 物理：天空视图 LUT（瑞利 + Mie + 臭氧 + 多次散射）---
     sky = AtmoSkyView(dir, sunDir);
+    // --- 地平线以下：把 LUT 那一半按霾的不透明度混向地平线那一圈 -------------
+    //
+    // 事故（2026-09-08，俯瞰机位）：Hillaire 的天空视图 LUT 下半张算的是
+    // 「干净空气里看一片 albedo 0.2 的地面」—— 一条短程瑞利加一个朗伯地面。
+    // 而战场霾**按设计不进这张表**（它只进大气透视 LUT，见 17.7「已知的近似」），
+    // 于是朝下的方向拿到的是又暗又蓝的一片：实测 smokyDay、相机 86 m 时
+    // −1° 处物理 1.24 对旧解析天的 1.82（−32%），B/R 从 1.05 涨到 1.50。
+    // 地面机位看不见这一段（下半屏全是几何），**只有俯瞰机位会整片吃到** ——
+    // Air_Crossroad 的上半屏因此是一整块暗蓝灰，而基线是明亮白霾。
+    //
+    // 修法不是抬 LUT，是补上那层霾：一条朝下的视线要横穿整层战场霾好几公里，
+    // 出来的就是霾自己的辐射亮度，也就是**地平线那一圈**的值（真实世界里
+    // 「远处地面在霾里与天连成一片」正是这么来的）。所以按不透明度混向
+    // 同方位的 0° 方向。地平线两侧因此是连续的（up→0 时两个采样重合）。
+    if (up < 0.0 && uAtmoBelowVeil > 0.001) {
+      vec2 flatDir = vec2(dir.x, dir.z);
+      float flatLen = length(flatDir);
+      // 正下方没有方位可言；那里 uGround 早已完全接管，补不补一个样
+      if (flatLen > 1.0e-4) {
+        vec3 horizonDir = vec3(flatDir.x / flatLen, 0.0, flatDir.y / flatLen);
+        sky = mix(sky, AtmoSkyView(horizonDir, sunDir), clamp(uAtmoBelowVeil, 0.0, 1.0));
+      }
+    }
     sky += uSunColor * glow * uGlowStrength * uArtGlow;
   } else {
     // --- 旧解析天空（?skyLegacy=1）：天顶到地平线的梯度，pow 决定"天有多高" ---
@@ -311,8 +337,16 @@ export const SKY_PRESETS = {
     exposure: 0.62, godStrength: 0.45, bloom: 0.42, saturation: 0.98, contrast: 1.08,
     // 黄昏是臭氧唯一看得见的时候：太阳低到光线穿过 25 km 那层臭氧的路径最长，
     // 地平线上方那条带因此偏青而不是纯橙。ozone 倍率就是这条带的浓淡。
+    // **2026-09-08：skyFloor 中性化（同 smokyDay 定稿①、chuchuanDay 那一条配方）。**
+    // 全量清扫时 `Probe_StreetDusk` 是 45 张里色偏最大的一张：对大修前基线
+    // Δ(B−R) **+28.8**、ΔC **10.88**（第二名只有 4.9）—— 那条黄昏巷子从暖金色
+    // 变成了冷蓝灰。巷底几乎吃不到直射，墙的颜色全来自天光，而这一档的
+    // skyFloor 是个蓝得厉害的常数（B ≈ 2 × R）加在天顶也加在地平线上。
+    // 保亮度去蓝：Luma = 0.2126·0.127 + 0.7152·0.177 + 0.0722·0.249 = 0.1716。
+    // 亮度逐比特不变，只把这份常数拉成中性灰；黄昏的橙仍由物理 LUT 与
+    // 手调的 sunColor（#ffb072，定稿②明令不动）给。
     atmosphere: { mie: 2.4, mieG: 0.78, rayleigh: 2.0, ozone: 1.4, groundAlbedo: 0.55,
-      sunIrradiance: 47.17, skyTint: [0.904, 0.894, 1.238], skyFloor: [0.127, 0.177, 0.249],
+      sunIrradiance: 47.17, skyTint: [1.192, 0.852, 0.804], skyFloor: [0.172, 0.172, 0.172],
       aerialBlend: 0.5, aerialGain: 0.435, artGlow: 0.45 },
   },
   // 3 月 24 日午后：日军攻北门，硝烟遮日
@@ -374,9 +408,31 @@ export const SKY_PRESETS = {
     // 同族的 chuchuanDay [0.144,0.243,0.469] 与 overcast [0.228,0.305,0.457] 是同样的
     // 蓝偏，只是量级只有这一档的三分之一；它们没有采样点覆盖（chuchuanDay 只在出川
     // 过场的车厢里、overcast 正片没用），**没有基线可对照就没改** —— 修法同上，一行。
+    // **2026-09-08 俯瞰回归的两笔**（只有俯瞰机位吃得到，地面机位量出来在噪声里）：
+    //
+    // · `belowVeil` 0.40 —— 天空视图 LUT 的下半张是「干净空气里看一片 albedo 0.2
+    //   的地面」，战场霾按设计不进那张表。地面机位下半屏全是几何，看不见；
+    //   俯瞰机位（Air_* 那五个，相机 86—430 m）上半屏整片吃到，于是新版是一整块
+    //   暗蓝灰而基线是明亮白霾。实测（Air_Crossroad、自动曝光钉死 1.0、天空带
+    //   y∈[4,64]）：veil 0 → 150.6，旧解析天 → 190.9，veil 0.40 → **191.5**，
+    //   RGB 196.0/190.6/187.4 对旧解析的 195.6/190.2/184.2 —— 亮度与色相同时回位。
+    //   0.5/0.6/0.8/1.0 分别是 198/204/212/217，都比基线亮，所以取 0.40。
+    //
+    // · `aerialTint` —— 大气透视那张 LUT 里，战场霾的标高就是 fog.falloff（15 m），
+    //   而美术雾的高度衰减按**着色点**的高度算。两者对地面机位一致，对俯瞰机位
+    //   差得远：一条从 430 m 打下来的视线几乎不穿霾（只有贴地那 15 m），散射因此
+    //   由瑞利主导 = 蓝；而消光仍按美术雾给（「先别动雾」），于是「美术的雾量 +
+    //   物理的蓝色」。实测 Air_WholeCity 全幅 B−R 从基线的 +8.2 涨到 +30.1。
+    //   修法与 skyFloor 定稿同一条配方：**保亮度去蓝**（Luma(tint) = 1.000，
+    //   所以雾的明暗一步不动，只改色相）。扫值（同机位、AE 钉死）：
+    //   [1,1,1] +30.1 / A[1.162,0.969,0.833] +22.5 / **B[1.315,0.939,0.676] +14.2** /
+    //   C[1.458,0.911,0.529] +6.5。取 B：它把俯瞰那一张拉回与其余 84 张同一档
+    //   （Δ(B−R) +6…+10），而不是把物理散射的色相整个抹平（那就等于把 aerialBlend
+    //   退回 0，连「随距离变色 + 太阳侧前向散射」一起丢掉）。
     atmosphere: { mie: 5.4, mieG: 0.76, rayleigh: 2.0, groundAlbedo: 0.2, sunIrradiance: 61.17,
       skyTint: [1.110, 0.915, 0.985], skyFloor: [0.429, 0.429, 0.429],
-      aerialBlend: 0.5, aerialGain: 0.129, artGlow: 0.30 },
+      aerialBlend: 0.5, aerialGain: 0.129, aerialTint: [1.315, 0.939, 0.676],
+      belowVeil: 0.40, artGlow: 0.30 },
   },
   // 出川序章（CS_Chuchuan）专用。**只有这一场引用它**，正片七关一律不用 ——
   // 加这一档而不是改 smokyDay，就是因为 smokyDay 被七关共用，动不得。
@@ -432,8 +488,17 @@ export const SKY_PRESETS = {
     exposure: 0.56, godStrength: 0.18, bloom: 0.16, saturation: 0.98, contrast: 1.08,
     // 这一场唯一真正需要大气透视的地方是窗外那片两公里的田野 ——
     // aerialBlend 给到 0.7，让远处村舍的偏蓝是算出来的而不是刷上去的。
+    // **2026-09-08：skyFloor 按 smokyDay 定稿①的同一条配方中性化。**
+    // 那一轮写着「chuchuanDay 没有采样点覆盖、没有基线可对照就不改」——
+    // 这一轮翻 ShotTest 全套时找到了基线：`BaselineFull/Game_CH0_Chuchuan.png`。
+    // 标定出来的 [0.144, 0.243, 0.469] 蓝得厉害（B ≈ 3.3 × R），而它是个**常数**，
+    // 加在天顶也加在地平线；实测这一张对基线的 Δ(B−R) 是 +10.4、ΔC 3.88，
+    // 是 45 张里色偏最大的一档（其余中位 2.65）。修法同样是**保亮度去蓝**：
+    // F' = Luma(F)·[1,1,1]，Luma = 0.2126·0.144 + 0.7152·0.243 + 0.0722·0.469 = 0.238。
+    // 亮度逐比特不变（车厢内壁那三项 envIntensity / shProbeIntensity /
+    // ambientIntensity 一个没动），只把这份常数拉成中性灰。
     atmosphere: { mie: 3.6, rayleigh: 1.5, groundAlbedo: 0.55, sunIrradiance: 78.89,
-      skyTint: [1.636, 1.017, 0.601], skyFloor: [0.144, 0.243, 0.469],
+      skyTint: [1.636, 1.017, 0.601], skyFloor: [0.238, 0.238, 0.238],
       aerialBlend: 0.7, aerialGain: 0.096, artGlow: 0.35 },
   },
   // 阴天：鲁南三四月多西南风、浮尘大，天是一块均匀的亮。
@@ -702,6 +767,7 @@ export class SkyDome {
       uTime: { value: 0 },
       uArtGlow: { value: 0.35 },
       uSunDiskT: { value: 1 },
+      uAtmoBelowVeil: { value: 0 },
       // 大气 LUT 的采样端。**同一批对象**并进来：Script_Gi 的 BuildPasses
       // 把 sky.uniforms 整表拷进 trace 材质，于是探针的漏空射线自动问同一片天。
       ...this.atmosphere.sampleUniforms,
@@ -777,6 +843,7 @@ export class SkyDome {
     const atmo = MakeAtmospherePreset(preset.atmosphere);
     U.uArtGlow.value = atmo.artGlow ?? 0.35;
     U.uSunDiskT.value = atmo.sunDiskT ?? 1;
+    U.uAtmoBelowVeil.value = atmo.belowVeil ?? 0;
     // 画质面板的烟霾倍率乘在预设的 Mie 上；霾同时决定大气透视 LUT 里那一层。
     const tuned = { ...atmo, mie: atmo.mie * this.hazeScale };
     if (this.forceAerialMode != null) tuned.aerialMode = this.forceAerialMode;

@@ -86,6 +86,9 @@ float SunVisibility() {
 }
 
 void main() {
+  // 太阳露出来了没有：鬼影 / 光环 / 星芒**共用同一个判据**（见下面那段长注释）
+  float sunOpen = uGlare > 0.0001 ? uGlare * SunVisibility() : 0.0;
+
   // Chapman 的口径：以屏幕中心为对称点，先把 uv 翻过去
   vec2 flipped = 1.0 - vUv;
   vec2 toCenter = vec2(0.5) - flipped;
@@ -95,32 +98,52 @@ void main() {
   // 鬼影与光环单独一层：它们乘 ghostScale，太阳眩光不乘（见 Data_Tuning_Camera）。
   vec3 ghosts = vec3(0.0);
 
-  // --- 鬼影 ---------------------------------------------------------------
-  for (int i = 1; i <= ${F.ghostCount}; i++) {
-    vec2 uv = flipped + ghostStep * float(i);
-    // 画面外的鬼影不采（clamp 会把边缘那一列拉成一条亮带）
-    float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
-    float radial = length(vec2(0.5) - uv) / 0.70710678;
-    float weight = pow(clamp(1.0 - radial, 0.0, 1.0), 8.0) * inside;
-    vec3 texel = SourceDispersed(uv, direction, ${F.ghostDispersal.toFixed(5)} * float(i));
-    ghosts += texel * weight * LensTint(radial);
-  }
+  // 太阳没露出来时整条链一次纹理取样都不做：输出反正要被 sunOpen 乘成 0。
+  if (sunOpen > 0.0) {
+    // --- 鬼影 -------------------------------------------------------------
+    for (int i = 1; i <= ${F.ghostCount}; i++) {
+      vec2 uv = flipped + ghostStep * float(i);
+      // 画面外的鬼影不采（clamp 会把边缘那一列拉成一条亮带）
+      float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
+      float radial = length(vec2(0.5) - uv) / 0.70710678;
+      float weight = pow(clamp(1.0 - radial, 0.0, 1.0), 8.0) * inside;
+      vec3 texel = SourceDispersed(uv, direction, ${F.ghostDispersal.toFixed(5)} * float(i));
+      ghosts += texel * weight * LensTint(radial);
+    }
 
-  // --- 光环（镜筒内壁的一次反射）------------------------------------------
-  {
-    vec2 uv = flipped + direction * ${F.haloRadius.toFixed(4)};
-    float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
-    float radial = length(vec2(0.5) - uv) / 0.70710678;
-    float ring = pow(clamp(1.0 - abs(radial - 0.5) / ${F.haloWidth.toFixed(4)}, 0.0, 1.0), 3.0);
-    ghosts += SourceDispersed(uv, direction, ${F.haloChroma.toFixed(5)})
-      * ring * inside * LensTint(radial * 0.6 + 0.2);
+    // --- 光环（镜筒内壁的一次反射）----------------------------------------
+    vec2 haloUv = flipped + direction * ${F.haloRadius.toFixed(4)};
+    float haloInside = step(0.0, haloUv.x) * step(haloUv.x, 1.0)
+      * step(0.0, haloUv.y) * step(haloUv.y, 1.0);
+    float haloRadial = length(vec2(0.5) - haloUv) / 0.70710678;
+    float ring = pow(clamp(1.0 - abs(haloRadial - 0.5) / ${F.haloWidth.toFixed(4)}, 0.0, 1.0), 3.0);
+    ghosts += SourceDispersed(haloUv, direction, ${F.haloChroma.toFixed(5)})
+      * ring * haloInside * LensTint(haloRadial * 0.6 + 0.2);
   }
-  result += ghosts * ${F.ghostScale.toFixed(4)};
+  // --- 鬼影 / 光环也吃「太阳露出来了没有」---------------------------------
+  //
+  // 2026-09-08 第三版定稿。前两版只压强度与色散（0.55→0.95 门槛、
+  // ghostScale 0.30→0.12、ghostTint 0.38→0.16），局部峰值确实压到 ≤13/255，
+  // **但肉眼仍然看得见**：Gate_SouthOuter 城楼门洞上方那道绿紫相间的翅膀
+  // 就是它。病根前两版已经写清楚了 —— 够到门槛的不是一颗太阳盘而是上半屏
+  // 整片过曝的天，于是鬼影不是几个圆斑而是一层铺满的彩虹。压强度只能让它变淡，
+  // 压不掉「一大片连续的源被 LensTint 按半径染成彩虹扇」这件事本身。
+  //
+  // 真正的口径是**物理的**：Chapman 那一串鬼影模拟的是镜组之间对一颗
+  // **强点光源**的多次反射。太阳不在画面里（或者被城墙/屋檐挡住）时，镜筒里
+  // 根本没有那颗点源，就不该有鬼影 —— 天空自己在镜头里留下的是 veiling glare
+  // （那一层由泛光负责，本来就还在）。所以鬼影 / 光环与星芒共用同一个
+  // 屏幕空间遮挡判据 uGlare × SunVisibility()，太阳被挡上就平滑地退到 0，
+  // 而不是硬切（八个取样点绕太阳一圈，边缘处天然是个 0—1 的比例）。
+  //
+  // 代价：夜里的爆点与近处火光不再拖鬼影。那正是上一版在 Probe_StreetBurning
+  // 上手动压掉的东西（「巷子地面整片紫红」），所以这条是收益不是损失。
+  // 回归口：Script_ExposureTest 的 6b/6d（露出来 → 非零、被挡住 → 精确 0）。
+  result += ghosts * ${F.ghostScale.toFixed(4)} * sunOpen;
 
   // --- 太阳眩光（星芒 + 核心）---------------------------------------------
-  if (uGlare > 0.0001 && ${F.starPoints} > 0) {
-    float visibility = SunVisibility();
-    if (visibility > 0.0) {
+  if (${F.starPoints} > 0) {
+    if (sunOpen > 0.0) {
       vec2 d = (vUv - uSunUv) * vec2(uAspect, 1.0);
       float dist = length(d);
       float angle = atan(d.y, d.x);
@@ -133,7 +156,7 @@ void main() {
       vec3 sunColor = texture2D(uBright, clamp(uSunUv, vec2(0.001), vec2(0.999))).rgb;
       float br = max(max(sunColor.r, sunColor.g), max(sunColor.b, 1e-4));
       sunColor /= br;
-      result += sunColor * (spikes * falloff * 1.6 + core * 2.2) * uGlare * visibility;
+      result += sunColor * (spikes * falloff * 1.6 + core * 2.2) * sunOpen;
     }
   }
 

@@ -380,11 +380,23 @@ async function ProbeSection(page) {
       flare.Render(ctx);
       out.flareBlack = ReadFlare();
 
-      // 6b) 亮源存在 → 鬼影层非零
+      // 6b) 亮源存在**且太阳露着** → 鬼影层非零
+      //     2026-09-08 第三版定稿起鬼影 / 光环与星芒共用同一个屏幕空间遮挡判据
+      //     （太阳不在画面里就没有那颗点源，也就不该有鬼影），所以这一条要先
+      //     把太阳摆到天上；只喂一张白图是不够的。
       flare.bloom = { bright: { texture: white } };
       F.uThreshold.value = 0.20;
+      F.uGlare.value = 1;
+      F.uSunOnScreen.value = 1;
+      F.uAspect.value = post.width / post.height;
+      F.uSunUv.value.set(0.5, 0.97);            // 天空
       flare.Render(ctx);
       out.flareBright = ReadFlare();
+
+      // 6d) 同一张白图，太阳被地面挡住 → 整层（鬼影 + 光环 + 星芒）精确为 0
+      F.uSunUv.value.set(0.5, 0.06);            // 地面
+      flare.Render(ctx);
+      out.flareGhostOccluded = ReadFlare();
 
       // 6c) 太阳眩光的屏幕空间遮挡。阈值抬到 2.0 让鬼影/光环归零，
       //     只剩星芒那一项，于是读数就是遮挡判据本身。
@@ -523,11 +535,21 @@ async function ProbeSection(page) {
         return { min, max, mean: sum / count };
       };
       out.debugViews = {};
+      // 光晕那一张要**把相机转向太阳**才有内容：2026-09-08 第三版定稿起
+      // 鬼影 / 光环 / 星芒共用「太阳露出来了没有」的屏幕空间判据，
+      // 默认平视机位上这张靶合法地恒为 0（那不是「没出画」）。
+      const quatWas = P.camera.quaternion.clone();
       for (const id of ["exposure", "lensFlare", "lensDirt", "lutCheck"]) {
+        if (id === "lensFlare") {
+          P.camera.lookAt(P.camera.position.clone().addScaledVector(P.sky.sunDirection, 100));
+        } else {
+          P.camera.quaternion.copy(quatWas);
+        }
         post.SetDebugView(id);
         P.StepFrames(3, 1 / 60);
         out.debugViews[id] = ReadScreen();
       }
+      P.camera.quaternion.copy(quatWas);
       post.SetDebugView(viewWas);
       P.StepFrames(2, 1 / 60);
     }
@@ -853,8 +875,13 @@ if (!probe) {
     JSON.stringify(probe.lut));
   Check("光晕：黑场输入 → 恒 0",
     probe.flareBlack.max === 0, JSON.stringify(probe.flareBlack));
-  Check("光晕：有亮源时鬼影层非零",
+  Check("光晕：有亮源且太阳露着时鬼影层非零",
     probe.flareBright.max > 0.01, JSON.stringify(probe.flareBright));
+  // 2026-09-08 第三版定稿：鬼影是镜组对一颗**点光源**的多次反射，太阳被挡住
+  // （或不在画面里）时镜筒里根本没有那颗点源。上半屏一整片过曝的天不该拖出
+  // 彩虹扇 —— Gate_SouthOuter 城楼门洞上方那道绿紫翅膀就是这么来的。
+  Check("光晕：同一张白图、太阳被挡住 → 整层恒 0（鬼影不吃大面积天空）",
+    probe.flareGhostOccluded.max === 0, JSON.stringify(probe.flareGhostOccluded));
   Check("太阳眩光：被几何挡住 = 0，露天 > 0",
     probe.flareOccluded.max === 0 && probe.flareOpen.max > 0.01,
     JSON.stringify({ occluded: probe.flareOccluded, open: probe.flareOpen }));

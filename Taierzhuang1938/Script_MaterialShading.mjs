@@ -249,11 +249,9 @@ vec2 gMatDetailN = vec2(0.0);
 float gMatMicroShadow = 1.0;
 float gMatSkinCurvature = 0.0;
 
-mat3 MatTangentFrame(vec3 eyePos, vec3 surfNormal, vec2 uv) {
-  vec3 q0 = dFdx(eyePos.xyz);
-  vec3 q1 = dFdy(eyePos.xyz);
-  vec2 st0 = dFdx(uv.st);
-  vec2 st1 = dFdy(uv.st);
+// 导数由调用方传进来的那一版：**屏幕导数必须在一致控制流里求**（见 GLSL_POM
+// 里那段长注释），所以 POM 走这一版，把 dFdx/dFdy 全留在分支外面。
+mat3 MatTangentFrameFrom(vec3 q0, vec3 q1, vec2 st0, vec2 st1, vec3 surfNormal) {
   vec3 nrm = surfNormal;
   vec3 q1perp = cross(q1, nrm);
   vec3 q0perp = cross(nrm, q0);
@@ -286,22 +284,28 @@ vec2 gMatPomUv = vNormalMapUv;
   vec3 pomViewPos = -vViewPosition;
   float pomDistance = length(vViewPosition);
   float pomFade = 1.0 - smoothstep(uMatPomFade.x, uMatPomFade.y, pomDistance);
+  // --- 屏幕导数一律在**分支外**求 -----------------------------------------
+  // GLSL 里在非一致控制流里取 dFdx/dFdy 是未定义行为（2×2 像素块里没进分支的
+  // helper lane 不执行块内语句），而 pomFade 的淡出带正好会制造半进半不进的
+  // 像素块。2026-09-08 整理这一段时把 dFdx/dFdy 与切线标架一并提了出来 ——
+  // 它本身**不是**下面那条死黑窄缝的病因（已单独消融验证过），是顺手补的
+  // 规范问题：淡出带上的导数从此有定义。
   vec2 pomDx = dFdx(vNormalMapUv);
   vec2 pomDy = dFdy(vNormalMapUv);
+  vec3 pomPx = dFdx(pomViewPos);
+  vec3 pomPy = dFdy(pomViewPos);
+  vec3 pomNormal = normalize(vNormal);
+  #ifdef DOUBLE_SIDED
+    pomNormal *= gl_FrontFacing ? 1.0 : -1.0;
+  #endif
+  mat3 pomTbn = MatTangentFrameFrom(pomPx, pomPy, pomDx, pomDy, pomNormal);
   if (pomFade > 0.003) {
-    vec3 pomNormal = normalize(vNormal);
-    #ifdef DOUBLE_SIDED
-      pomNormal *= gl_FrontFacing ? 1.0 : -1.0;
-    #endif
-    mat3 pomTbn = MatTangentFrame(pomViewPos, pomNormal, vNormalMapUv);
     vec3 pomT = normalize(pomTbn[0]);
     vec3 pomB = normalize(pomTbn[1]);
     vec3 pomView = normalize(vViewPosition);
     vec3 pomTs = vec3(dot(pomView, pomT), dot(pomView, pomB), dot(pomView, pomNormal));
     // 「一米有多少 uv」：两个方向各算一次取大的 —— 掠射面上有一个方向的导数
     // 会趋近 0，只取一个方向会把深度放大到发散。
-    vec3 pomPx = dFdx(pomViewPos);
-    vec3 pomPy = dFdy(pomViewPos);
     float pomUvPerMeter = max(length(pomDx) / max(length(pomPx), 1e-5),
                               length(pomDy) / max(length(pomPy), 1e-5));
     float pomDepthUv = uMatSurface.x * uMatPomScale.x * pomUvPerMeter * pomFade;
@@ -314,6 +318,18 @@ vec2 gMatPomUv = vNormalMapUv;
     // 单步位移封顶：uv 导数在接缝 / 极端拉伸处会炸，不钳的话一个像素能跑穿整张图。
     float pomStepLen = length(pomStepUv);
     if (pomStepLen > uMatPomScale.y) pomStepUv *= uMatPomScale.y / pomStepLen;
+    // --- 退化行进的下闸（2026-09-08）--------------------------------------
+    // 淡出带的尾巴上 pomFade 只剩百分之几，整趟行进加起来走不满四分之一个屏幕
+    // 像素 —— 视差在画面上一点都看不出来，可循环仍然会跑满、把 pomDepth 累到
+    // 高度场上，出来的解与「干脆不做 POM」不是同一个（实测 Gate_SouthOuter
+    // 斜坡护栏那面斜退的墙，淡出边界那一列是一条 4 px 宽、50 px 高的死黑窄缝，
+    // 13/255 对周围 78/255）。把淡出带整个挪开（2—3 m 或 40—60 m）那条缝就消失，
+    // 只有默认的 9—15 m 有 —— 病在**淡出带本身**，不在深度也不在自阴影。
+    // 这一闸让「位移小于四分之一像素」直接退回无 POM，与 pomFade = 0 那一侧
+    // 逐比特一致，淡出因此是单调的：满视差 → 无视差，中间没有第三种解。
+    float pomTravel = length(pomStepUv) * pomSteps;
+    float pomPixelUv = (length(pomDx) + length(pomDy)) * 0.25;
+    if (pomTravel >= pomPixelUv) {
 
     vec2 pomUv = vNormalMapUv;
     vec2 pomPrevUv = pomUv;
@@ -366,6 +382,7 @@ vec2 gMatPomUv = vNormalMapUv;
       }
     }
     #endif
+    }   // 退化行进的下闸（pomTravel >= pomPixelUv）
   }
 }
 // 从这里往下，所有 chunk 采样的都是位移后的 uv（局部量遮蔽同名 varying）。
