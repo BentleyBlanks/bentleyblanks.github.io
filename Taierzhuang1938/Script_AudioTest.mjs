@@ -545,6 +545,273 @@ else {
     + `${durs.slice(0, 3).join(" / ")} ms，rate 恒为 1；同期滤掉别人的 ${cycle.others} 个一次性源）`);
 }
 
+// ---------------------------------------------------------------------------
+// 空间三件套 + 动态：遮挡、分区混响、传播延迟、duck/耳鸣、voice stealing、开枪压环境
+//
+// 这一整块（2026-09-08）测的东西**全都是静默的**：探针没注册上、遮挡只压了湿声、
+// 混响送错了档、延迟把去重窗顶掉、duck 随采样一起失效、预算满了丢的是玩家的枪 ——
+// 没有一条会报错、掉帧或者让别的断言翻红，只会「听着不对」。
+//
+// 探针在这里由测试自己注册（宿主侧接线是另一个包的事）：
+// occlusion / zone 都从 window 上读一个可写的假值，这样一条断言只动一个变量。
+// ---------------------------------------------------------------------------
+const spatial = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  a.Ambience("silence"); a.Music(null);
+  await sleep(400);
+  window.__occ = 0;
+  window.__zone = "street";
+  a.SetProbes({
+    occlusion: () => window.__occ,
+    zone: () => window.__zone,
+  });
+  const L = a.listenerPos;
+  const At = (m) => ({ x: L.x + m, y: L.y, z: L.z });
+  const Snap = (v) => v && ({
+    // 干声 = 源 gain × 遮挡衰减（occ 为 0 时不建那个节点）
+    dry: v.out.gain.value * (v.occGain ? v.occGain.gain.value : 1),
+    wet: v.wetGain.gain.value,
+    airHz: v.air ? v.air.frequency.value : null,
+    occ: v.occ, zone: v.reverbZone, propagation: v.propagation,
+    interiorConv: v.reverbNode === a.reverbs.interior,
+    streetConv: v.reverbNode === a.reverbs.street,
+  });
+
+  // 1) 遮挡：同一条 cue、同一个距离，只把遮挡度从 0 拨到 1。
+  //    30 m 是刻意选的：超过 OCCLUSION_MIN_M，又不至于让空气低通自己就压到 1 kHz 以下
+  //    （18000/(1+30×0.09) = 4865 Hz）。
+  a.lastPlayAt.delete("rifleNra");
+  window.__occ = 0;
+  const clear = Snap(a.Play("rifleNra", { position: At(30), priority: true, volume: 1 }));
+  await sleep(140);
+  // 缓存按空间格算，同一格里 0.25 s 内共用一次射线 —— 换个位置才问得到新值。
+  window.__occ = 1;
+  const blocked = Snap(a.Play("rifleNra", { position: { x: L.x + 30, y: L.y, z: L.z + 40 }, priority: true, volume: 1 }));
+  await sleep(140);
+
+  // 2) 分区混响：zone 探针说 interior，湿声就必须接到 interior 那只卷积上。
+  window.__occ = 0;
+  window.__zone = "interior";
+  const inside = Snap(a.Play("rifleIja", { position: { x: L.x + 12, y: L.y, z: L.z - 9 }, priority: true, volume: 1 }));
+  await sleep(140);
+  window.__zone = "street";
+  const outside = Snap(a.Play("rifleIja", { position: { x: L.x - 12, y: L.y, z: L.z + 9 }, priority: true, volume: 1 }));
+  await sleep(140);
+
+  // 3) 传播延迟：80 m 外的爆炸该晚 80/340 = 0.235 s；玩家自己那一枪（priority）不延迟。
+  //    这一条**不能用 priority 去保它出声**（priority 正是「不延迟」那一档），
+  //    所以改成把预算临时抬高 + 清掉去重记录：场上还在打仗，八十米外的低优先级
+  //    音随时会被预算闸或 22 ms 窗吃掉，那样这条断言就成了抛硬币。
+  const savedBudget = a.nodeBudget;
+  a.nodeBudget = 4000;
+  a.lastPlayAt.delete("explosionFar");
+  const boom = Snap(a.Play("explosionFar", { position: At(80), volume: 0.02 }));
+  a.nodeBudget = savedBudget;
+  await sleep(140);
+  const mine = Snap(a.Play("rifleNra", { position: At(1), priority: true, volume: 0.05 }));
+  await sleep(140);
+
+  const queries = a.stats.occlusionQueries;
+  a.SetProbes({ occlusion: null, zone: null });
+  return { clear, blocked, inside, outside, boom, mine, queries };
+});
+
+if (!spatial.clear || !spatial.blocked) {
+  Fail(`遮挡量不到（Play 返回 null）：${JSON.stringify(spatial)}`);
+} else {
+  const dropDb = 20 * Math.log10(spatial.blocked.dry / spatial.clear.dry);
+  const wetDb = 20 * Math.log10(spatial.blocked.wet / spatial.clear.wet);
+  if (spatial.blocked.occ !== 1) Fail(`遮挡探针没接上：occ ${spatial.blocked.occ}（应为 1）`);
+  else if (dropDb > -9) Fail(`挡死的那一枪干声只低了 ${(-dropDb).toFixed(1)} dB（至少要 9 dB）`);
+  else if (spatial.blocked.airHz > 1000) Fail(`挡死的那一枪低通还在 ${spatial.blocked.airHz.toFixed(0)} Hz（上限 1000）`);
+  else if (wetDb <= dropDb + 3) {
+    Fail(`遮挡把湿声也压了 ${(-wetDb).toFixed(1)} dB —— 隔着墙听见的主要就是混响，湿要掉得比干少得多`);
+  } else {
+    Ok(`遮挡成立：干 ${dropDb.toFixed(1)} dB / 湿 ${wetDb.toFixed(1)} dB / 低通 `
+      + `${spatial.clear.airHz.toFixed(0)} → ${spatial.blocked.airHz.toFixed(0)} Hz（射线 ${spatial.queries} 次）`);
+  }
+}
+if (!spatial.inside || !spatial.outside) Fail("分区混响量不到（Play 返回 null）");
+else if (spatial.inside.zone !== "interior" || !spatial.inside.interiorConv) {
+  Fail(`zone=interior 的声音没接到 interior 卷积上：${JSON.stringify(spatial.inside)}`);
+} else if (!spatial.outside.streetConv) {
+  Fail(`zone=street 的声音接错了卷积：${JSON.stringify(spatial.outside)}`);
+} else Ok("分区混响按声源所在区选 send（interior / street 各自接对）");
+
+if (!spatial.boom || !spatial.mine) Fail("传播延迟量不到（Play 返回 null）");
+else if (Math.abs(spatial.boom.propagation - 80 / 340) > 0.01) {
+  Fail(`八十米外的爆炸延迟 ${spatial.boom.propagation.toFixed(3)} s（应为 ${(80 / 340).toFixed(3)}）`);
+} else if (spatial.mine.propagation !== 0) {
+  Fail(`玩家自己那一枪被延迟了 ${spatial.mine.propagation.toFixed(3)} s —— priority 必须跟手`);
+} else Ok(`传播延迟：80 m 外 ${spatial.boom.propagation.toFixed(3)} s、玩家自己 0 s`);
+
+// 探针不注册时必须**逐条回到老行为**：不建遮挡节点、不延迟、混响仍走全局那一档。
+// 这一条是整块的安全带 —— 宿主还没接线的那几天，游戏不许因为这一轮变难听。
+const noProbe = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  a.SetProbes({ occlusion: null, zone: null });
+  await sleep(60);
+  const L = a.listenerPos;
+  const v = a.Play("rifleIja", { position: { x: L.x + 20, y: L.y, z: L.z + 5 }, priority: true, volume: 0.05 });
+  return v && { occ: v.occ, occGain: !!v.occGain, zone: v.reverbZone, space: a.space, propagation: v.propagation };
+});
+if (!noProbe) Fail("没注册探针时连声音都没了");
+else if (noProbe.occ !== 0 || noProbe.occGain) Fail(`没注册遮挡探针却建了遮挡节点：${JSON.stringify(noProbe)}`);
+else if (noProbe.zone !== noProbe.space) Fail(`没注册 zone 探针却没退回全局档：${JSON.stringify(noProbe)}`);
+else Ok(`探针不注册时逐条回到老行为（occ 0、无额外节点、混响走 ${noProbe.space}）`);
+
+// duck / 耳鸣：**采样路径下**也要触发。
+// 这条正是这一轮修的 bug —— 原来 A.Duck 写在合成配方体内，采样一盖上去就再也不执行，
+// 于是正常路径整局零 duck。用 sampleCues 断言当前确实走的是采样路径，不然测了个寂寞。
+const duck = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const sampled = a.sampleCues.has("explosionNear");
+  a.duckGain.gain.cancelScheduledValues(a.ctx.currentTime);
+  a.duckGain.gain.value = 1;
+  a.deafFilter.frequency.cancelScheduledValues(a.ctx.currentTime);
+  a.deafFilter.frequency.value = 20000;
+  const before = a.duckGain.gain.value;
+  const ducks = a.stats.ducks, deafens = a.stats.deafens;
+  // 脚边那一颗：不给 position = 满量
+  a.Play("explosionNear", { priority: true, volume: 0.02 });
+  await sleep(120);
+  const near = { gain: a.duckGain.gain.value, deaf: a.deafFilter.frequency.value };
+  await sleep(2600);
+  // 二百米外那一颗：按距离缩放之后应该几乎不压，也绝不许震聋玩家
+  a.duckGain.gain.cancelScheduledValues(a.ctx.currentTime);
+  a.duckGain.gain.value = 1;
+  a.deafFilter.frequency.cancelScheduledValues(a.ctx.currentTime);
+  a.deafFilter.frequency.value = 20000;
+  const L = a.listenerPos;
+  a.Play("explosionNear", { position: { x: L.x + 200, y: L.y, z: L.z }, priority: true, volume: 0.02 });
+  await sleep(120);
+  const far = { gain: a.duckGain.gain.value, deaf: a.deafFilter.frequency.value };
+  return { sampled, before, near, far, ducks: a.stats.ducks - ducks, deafens: a.stats.deafens - deafens };
+});
+if (!duck.sampled) Fail("explosionNear 还没被采样盖住 —— 这条断言测的正是采样路径，先修上面那条");
+else if (!(duck.near.gain < 0.6)) Fail(`采样路径下 explosionNear 没有 duck：duckGain ${duck.near.gain.toFixed(3)}（应 < 0.6）`);
+else if (!(duck.near.deaf < 2000)) Fail(`脚边那颗没有耳鸣：耳鸣低通 ${duck.near.deaf.toFixed(0)} Hz（应 < 2000）`);
+else if (!(duck.far.gain > 0.9)) Fail(`二百米外那颗把配乐压到了 ${duck.far.gain.toFixed(3)} —— duck 没按距离缩放`);
+else if (!(duck.far.deaf > 15000)) Fail(`二百米外那颗把玩家震聋了：耳鸣低通 ${duck.far.deaf.toFixed(0)} Hz`);
+else Ok(`采样路径下 duck 与耳鸣照常触发且按距离缩放（贴脸 ${duck.near.gain.toFixed(2)}/`
+  + `${duck.near.deaf.toFixed(0)} Hz，200 m ${duck.far.gain.toFixed(2)}/${duck.far.deaf.toFixed(0)} Hz）`);
+
+// 玩家开枪压环境（HDR-lite）：环境总线与远声组一起让路，40 ms 压、300 ms 放。
+//
+// **必须先给这两条总线喂一路输入**：Chrome 对「上游全静音」的子图会整段跳过处理，
+// 于是 AudioParam 的自动化压根不推进，`gain.value` 一直读到你写进去的那个静态值 ——
+// 表现就是「DuckAmbience 明明调了、总线纹丝不动」。踩过一次，写在这儿。
+// 用 ConstantSource 喂 1e-6（听不见，但不是静音），量完停掉。
+const hdr = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const keepAlive = [a.ambienceBus, a.farGain].map((dst) => {
+    const cs = a.ctx.createConstantSource();
+    cs.offset.value = 1e-6;
+    cs.connect(dst);
+    cs.start();
+    return cs;
+  });
+  const t = a.ctx.currentTime;
+  a.ambienceDuck.gain.cancelScheduledValues(t); a.ambienceDuck.gain.value = 1;
+  a.farGain.gain.cancelScheduledValues(t); a.farGain.gain.value = 1;
+  await sleep(120);
+  const before = { amb: a.ambienceDuck.gain.value, far: a.farGain.gain.value, n: a.stats.ambienceDucks };
+  const L = a.listenerPos;
+  a.Play("rifleNra", { position: { x: L.x, y: L.y, z: L.z - 0.4 }, priority: true, volume: 0.02, firstPerson: true });
+  await sleep(70);
+  const pressed = { amb: a.ambienceDuck.gain.value, far: a.farGain.gain.value };
+  await sleep(600);
+  const released = { amb: a.ambienceDuck.gain.value, far: a.farGain.gain.value };
+  for (const cs of keepAlive) { try { cs.stop(); cs.disconnect(); } catch (err) { /* 已停 */ } }
+  return { before, pressed, released, n: a.stats.ambienceDucks - before.n };
+});
+if (!hdr.n) Fail("玩家开枪没有触发 DuckAmbience（stats.ambienceDucks 没动）");
+else if (!(hdr.pressed.amb < 0.7)) Fail(`开枪后环境总线只压到 ${hdr.pressed.amb.toFixed(3)}（应 < 0.7，约 −6 dB）`);
+else if (!(hdr.pressed.far < 0.7)) Fail(`开枪后远声组只压到 ${hdr.pressed.far.toFixed(3)}（应 < 0.7）`);
+else if (!(hdr.released.amb > 0.95)) Fail(`开枪 0.67 s 之后环境还压着 ${hdr.released.amb.toFixed(3)} —— 放不回来`);
+else Ok(`玩家开枪压环境与远声组：${hdr.before.amb.toFixed(2)} → ${hdr.pressed.amb.toFixed(2)} → `
+  + `${hdr.released.amb.toFixed(2)}（远声组同步 ${hdr.pressed.far.toFixed(2)}）`);
+
+// Voice stealing：预算打满时玩家的 priority 枪必须 100% 出声，而且是**偷**出来的位置。
+//
+// 预算压到 8 才量得准：撑满 120 个节点要在浏览器里排几十条真声音，
+// 而这期间场上的 AI 随时会插一脚 —— 那种测法是抛硬币，不是断言。
+const steal = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const saved = a.nodeBudget;
+  a.Ambience("silence"); a.Music(null);
+  await sleep(400);
+  const L = a.listenerPos;
+  // 顺序很要紧：**先把填料放进去，再把预算压到它们已经撑破的位置**。
+  // 反过来（先压预算再放填料）测不到东西 —— 场上的 AI 一直在打，
+  // liveNodes 在你压预算的那一刻是多少全看运气，填料会被当场饿死，
+  // 于是一条可偷的都没有，断言变成抛硬币（第一版就是这么翻的红）。
+  //
+  // 填料：30—37 m 外、音量极低的长音。比玩家那一枪又轻又远，正是该让位的那一类。
+  // 距离压在 FAR_LOW_PRIORITY_M（45 m）以内 —— 再远它们自己就进不了门，
+  // 那样测到的是低优先级天花板，不是 voice stealing。
+  a.nodeBudget = 4000;
+  const filler = ["shellImpact", "explosionFar", "painMoan", "flareBurn", "telegraphHum", "mgOverheat"];
+  for (let i = 0; i < 8; i += 1) {
+    a.Play(filler[i % filler.length], { position: { x: L.x + 30 + i, y: L.y, z: L.z + i }, volume: 0.01 });
+    await sleep(40);
+  }
+  a.nodeBudget = Math.max(6, Math.floor(a.liveNodes * 0.8));
+  const shots = [];
+  const before = { stolen: a.drops.stolen, starved: a.drops.starved };
+  for (let i = 0; i < 12; i += 1) {
+    const v = a.Play("rifleNra", { position: { x: L.x, y: L.y, z: L.z - 0.4 }, priority: true, volume: 0.02, firstPerson: true });
+    shots.push(!!v);
+    await sleep(120);
+  }
+  const out = {
+    fired: shots.filter(Boolean).length, total: shots.length,
+    stolen: a.drops.stolen - before.stolen, starved: a.drops.starved - before.starved,
+    liveNodes: a.liveNodes, over: a.stats.priorityOverBudget,
+  };
+  a.nodeBudget = saved;
+  await sleep(400);
+  return out;
+});
+if (steal.fired !== steal.total) {
+  Fail(`预算打满时玩家开了 ${steal.total} 枪只响了 ${steal.fired} 枪 —— priority 必须 100% 出声`);
+} else if (steal.stolen < 1) {
+  Fail(`预算打满却一条都没偷（stolen ${steal.stolen}，starved ${steal.starved}）—— 这条断言没测到东西`);
+} else Ok(`预算打满：玩家 ${steal.fired}/${steal.total} 枪全响，偷了 ${steal.stolen} 条`
+  + `（超支放行 ${steal.over} 次，饿死 ${steal.starved} 条）`);
+
+// 两级动态：母线慢压 + 末端快限，参数不许被谁顺手改回单级。
+// 抽泵深度的实测（10.08 → 8.91 dB）在 Script_Audio 的 BUS_COMP 抬头与
+// docs/Data_AudioEngine.md 里，那是离线渲染量的，不在这条冒烟的成本里。
+const chain = await page.evaluate(() => {
+  const a = window.Taierzhuang.audio;
+  return {
+    bus: a.busComp ? { thr: a.busComp.threshold.value, ratio: a.busComp.ratio.value, rel: a.busComp.release.value } : null,
+    makeup: a.busMakeup ? a.busMakeup.gain.value : null,
+    peak: { thr: a.limiter.threshold.value, ratio: a.limiter.ratio.value, atk: a.limiter.attack.value },
+    reverbs: Object.keys(a.reverbs).sort(),
+    irSeconds: Object.fromEntries(Object.entries(a.reverbs).map(([k, c]) => [k, +c.buffer.duration.toFixed(2)])),
+  };
+});
+if (!chain.bus) Fail("母线慢压缩不见了 —— 两级动态被改回单级");
+else if (!(chain.bus.ratio <= 2 && chain.bus.rel >= 0.5)) {
+  Fail(`母线那只不「慢」了：ratio ${chain.bus.ratio} / release ${chain.bus.rel}（慢压缩要 ratio ≤ 2、release ≥ 0.5）`);
+} else if (!(chain.peak.ratio >= 12 && chain.peak.atk <= 0.006)) {
+  Fail(`末端那只不「快」了：ratio ${chain.peak.ratio} / attack ${chain.peak.atk}`);
+} else if (chain.reverbs.join(",") !== "courtyard,interior,open,street") {
+  Fail(`混响不是四档：${chain.reverbs.join(" ")}`);
+} else if (!(chain.irSeconds.interior < chain.irSeconds.courtyard
+    && chain.irSeconds.courtyard < chain.irSeconds.street
+    && chain.irSeconds.street < chain.irSeconds.open)) {
+  Fail(`四档 IR 的时长排序不对：${JSON.stringify(chain.irSeconds)}`);
+} else Ok(`两级动态在位（母线 ${chain.bus.thr}/${chain.bus.ratio}:1/${chain.bus.rel}s ×${chain.makeup}，`
+  + `末端 ${chain.peak.thr}/${chain.peak.ratio}:1）；四档 IR ${JSON.stringify(chain.irSeconds)}`);
+
 if (problems.length) { for (const p of problems.slice(0, 10)) Fail(p); }
 
 await browser.close();

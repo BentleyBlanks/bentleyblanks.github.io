@@ -11,18 +11,30 @@
 // 变调解掉（同一条思路：随机来自播放时，不是来自素材）。
 //
 // 信号链（顺序错一处味道就不对）：
-//   源(osc/noise) → 声部 gain → [距离低通] →┬→ PannerNode(HRTF) ┐
-//                                          └→ 混响 send → Convolver(现场生成 IR) → 回声总线 ┤
-//                                                   sfx/music/amb 三条总线 ┤
-//                             → duck gain → master gain → 耳鸣低通 → 限幅 → 输出
+//   源(osc/noise) → 声部 gain → [空气/遮挡低通] →┬→ [遮挡干声衰减] → PannerNode(HRTF) ┐
+//                                               │                    └→ [远声组 farGain] ┤
+//                                               └→ 混响 send → Convolver(按**声源所在区**选 IR) → 回声总线 ┤
+//                                                          sfx/music/amb 三条总线 ┤
+//        → duck gain → master gain → 母线慢压缩 → 耳鸣低通 → 末端快限幅 → 软削顶 → 输出
 //
-// 三条踩过的坑，写在前面：
+// 六条踩过的坑，写在前面（前三条是老的，后三条是 2026-09-08 这一轮的）：
 //   1) **混响必须在 Panner 之前分出去**。把 wet 也 HRTF 化的话，远处一枪的
 //      尾巴会跟着头一起转，听起来像枪在你耳朵边上绕圈 —— 真实的混响是弥散的。
 //   2) **exponentialRampToValueAtTime 不能收到 0**，WebAudio 会直接抛异常并
 //      把那一路静音。所有包络的地板统一 1e-4。
 //   3) **Panner 用 HRTF 很贵**。近处才值得，远处的零星枪声改用 StereoPanner，
 //      同屏 24 人时这一条决定了音频线程会不会爆。
+//   4) **遮挡不能把湿声一起压掉**。隔着一堵墙听见的那一枪，直达声几乎没了，
+//      听得见的**主要就是混响**。干声压 −12 dB、湿声只压 −4 dB，这个差额就是
+//      「墙那边有人在打」和「没有人在打」的全部区别。
+//   5) **传播延迟一开，22 ms 去重窗就得按「到耳朵的时刻」算**，不能再按调用时刻。
+//      旧代码是 `delay === 0` 才去重，于是延迟一上，同一帧的齐射全部原样叠进来。
+//   6) **预算不够时不许直接丢新的**。丢新的等于「越打越安静，而且丢的是刚发生的事」。
+//      正确做法是从活着的声部里偷一条更轻更远的（voice stealing），见 StealVoices。
+//
+// 分区混响 / 遮挡 / 传播延迟这三层要宿主注册探针才生效（见 SetProbes）；
+// 一条都不注册时行为与 2026-08-20 那一轮完全一致。契约与实测数字在
+// docs/Data_AudioEngine.md。
 //
 // 决定论：**不许 Math.random**。所有随机走 Mulberry32，种子 = 音效名哈希 ^ 播放序号，
 // 这样同一场回放里第 N 次开枪永远是同一条枪声，逐轮截图/录音比对才有意义。
@@ -47,7 +59,212 @@ const NODE_BUDGET = 120;
 // 同名音效在这个时间窗内重复触发就合并成一次。
 // 一排人同一帧齐射时，二十条一模一样的 rifleNra 叠在一起只会得到削顶的噪声，
 // 而且瞬间吃掉全部节点预算。
+//
+// **窗口比的是「到耳朵的时刻」，不是「调用的时刻」**（见文件头坑 5）。
 const DEDUPE_S = 0.022;
+
+// ===========================================================================
+// 空间三件套：遮挡 / 分区混响 / 传播延迟
+//
+// 这三层都要宿主注册探针（SetProbes）才生效。探针一条都不注册时每一处都退回
+// 老行为：occ 恒为 0（乘 1，不插节点）、混响 send 仍按 this.space 走全局那一档、
+// 延迟恒为 0。**回归为零是硬要求** —— 音频的失败是静默的，
+// 一层没接上去只会听着「怪」，不会报错。
+// ===========================================================================
+
+/**
+ * 近到这个距离以内不查遮挡。
+ * 贴身的声音要么在你手上（拉栓、脚步），要么和你在同一格里 ——
+ * 而射线在 4 m 内基本只会打到你自己的碰撞体，查出来的是噪声不是信息。
+ */
+const OCCLUSION_MIN_M = 4;
+/**
+ * 每帧最多几次射线。射线是**宿主的物理查询**，不是免费的：
+ * 一帧里二十个兵齐射就是二十次 battlefield.Raycast。
+ * 8 次是「场上同时在响的、真需要判遮挡的声源」的实际量级（其余走缓存）。
+ */
+const OCCLUSION_RAYS_PER_FRAME = 8;
+/** 引擎里没有 Frame() 钩子，「一帧」只能拿 ctx.currentTime 按 60 fps 分窗。 */
+const OCCLUSION_FRAME_S = 1 / 60;
+/**
+ * 遮挡结果的缓存寿命与空间格边长。
+ * 同一堵墙后面的一排兵落在同一格里，共用一次射线 —— 这是射线数能压到 8 次/帧
+ * 的真正原因，帧预算本身只是保险丝。
+ */
+const OCCLUSION_CACHE_S = 0.25;
+const OCCLUSION_CELL_M = 4;
+/** 缓存条目上限，超了整张丢。战场跑一分钟能摸到上千格，留着只是在漏内存。 */
+const OCCLUSION_CACHE_MAX = 512;
+/** 听者走出这么远就把缓存全丢：拐过一个墙角，旧结论条条都是错的。 */
+const OCCLUSION_LISTENER_MOVE_M = 2.5;
+/** 完全挡死时的低通截止（Hz）。砖墙对 2 kHz 以上几乎全吃，剩下的是闷声。 */
+const OCCLUSION_LP_HZ = 800;
+/** 完全挡死时干声掉多少 dB。 */
+const OCCLUSION_DRY_DB = -12;
+/** 湿声掉得少得多 —— 隔着墙听见的主要就是混响（见文件头坑 4）。 */
+const OCCLUSION_WET_DB = -4;
+/** 会飞的源多久重查一次遮挡（MoveVoice）。与缓存寿命同一档。 */
+const OCCLUSION_REFRESH_S = 0.25;
+/**
+ * 听者与声源分处室内/室外时额外叠的一档遮挡。
+ *
+ * 射线探针只回答「中间有没有实体挡着」，回答不了「你在屋里」这件事：
+ * 门开着的时候射线是通的，但屋里听外面的枪仍然是闷的（墙、屋顶、门框全在吸声）。
+ * 0.35 折算成 −4.2 dB 干声 + 低通压到 4.5 kHz，是「听得清但明显在屋外」的量。
+ */
+const ZONE_BOUNDARY_OCC = 0.35;
+
+/** 四档空间。名字同时是 zone 探针的返回值域与 this.reverbs 的键。 */
+const REVERB_SPACES = ["interior", "courtyard", "street", "open"];
+/**
+ * 各档混响的回声总线增益。
+ * 室内给得最高：小房间里混响占比本来就大（墙近、吸声面积小）。
+ * street / open 两条**保持 2026-08-20 的原值**，不借这一轮顺手改平衡。
+ */
+const REVERB_RETURN = { interior: 0.9, courtyard: 0.86, street: 0.85, open: 0.7 };
+/** 听者所在区的缓存寿命。zone 探针比射线便宜，但每条声音查一次仍然是白花。 */
+const ZONE_CACHE_S = 0.2;
+
+/**
+ * 传播延迟总开关：闪光先到、声音后到。
+ *
+ * 战地系列的做法，也是**唯一**能让玩家从听觉上估出距离的线索 ——
+ * 音量与音色只能告诉他「远」，延迟能告诉他「三百米」。
+ * 关掉它整条链退回原状（所有声音在调用那一帧就起播）。
+ */
+const PROPAGATION_DELAY = true;
+/** 这么近以内不延迟：30 m = 88 ms，比一帧多不了多少，听感上只是「不跟手」。 */
+const PROPAGATION_MIN_M = 30;
+/** 延迟上限。400 m（CULL_DEFAULT_M）折 1.18 s，留一点余量兜住 soundField 那档。 */
+const PROPAGATION_MAX_S = 1.4;
+/** 除了枪与炸，还有哪些 cue 走延迟。 */
+const PROPAGATION_CUES = new Set([
+  "shellImpact", "shellIncoming", "launcherPop", "amb.cannonFar",
+]);
+/** 枪类 cue 里 FAR_CUE / SAMPLE_BURST 覆盖不到的那几条。 */
+const GUN_EXTRA_CUES = new Set([
+  "rifleNra", "rifleIja", "zb26", "type11", "type92",
+  "strafeNear", "strafeFar", "strafeDirt",
+]);
+
+/**
+ * 触发 duck 的 cue 表 —— **从合成配方里搬出来的**。
+ *
+ * 原来 `A.Duck(...)` 写在 explosionNear / shellImpact 两条**合成配方**体内。
+ * 采样一盖上去（正常路径），那两条配方就再也不会被执行 ——
+ * 于是**整局一次 duck 都没有**：爆炸炸在脸上，音乐和环境床照样满音量顶着。
+ * 这类 bug 没有任何机器能发现：声音全在响，控制台干净。
+ *
+ * 现在改成按 cue 类别在 Play 里统一触发，而且**按听者距离缩放**：
+ * 两百米外的一颗手榴弹不该把配乐压下去。range 是「压到零」的距离。
+ * 表里留了 explosionMid 一行 —— 那条 cue 还没有（素材侧在补），
+ * 先备着比事后想起来强（多一个没人播的键不花钱，少一个就是又一次静默回归）。
+ */
+const DUCK_ON = {
+  explosionNear: { seconds: 1.1, amount: 0.55, range: 45 },
+  explosionMid: { seconds: 0.9, amount: 0.45, range: 80 },
+  explosionFar: { seconds: 0.8, amount: 0.30, range: 140 },
+  shellImpact: { seconds: 0.8, amount: 0.45, range: 55 },
+  launcherPop: { seconds: 0.5, amount: 0.25, range: 30 },
+  strafeNear: { seconds: 0.7, amount: 0.35, range: 40 },
+};
+/** 缩放之后低于这个量就不触发：压 3% 谁也听不出来，只是白改一次总线增益。 */
+const DUCK_MIN_AMOUNT = 0.06;
+
+/**
+ * 触发耳鸣的 cue 与时长。同样从配方里搬出来。
+ *
+ * 顺带修掉一个反过来的错：`explosionFar`（远炸）的合成配方里写着 `A.Deafen(0.3)` ——
+ * **几百米外的一记闷响把玩家的耳朵震了**。耳鸣是「炸在脸上」的独有反馈，
+ * 所以现在一律要过 DEAFEN_M 这道距离闸。
+ */
+const DEAFEN_ON = { explosionNear: 0.42, explosionMid: 0.3, shellImpact: 0.3 };
+/** 炸到这么近才耳鸣。12 m 是手榴弹的杀伤半径量级：再远只是很响，不是被震。 */
+const DEAFEN_M = 12;
+
+/**
+ * 玩家开枪压环境（HDR-lite）。
+ *
+ * 真枪在耳边响的那 0.2 秒里，人耳的镫骨肌反射会把外界整体压掉十几分贝 ——
+ * 游戏里对应的做法是把**环境床与远处那一组**快压慢放：压得快（枪响的瞬间），
+ * 放得慢（听感上是「耳朵缓过来」，而不是「音量旋钮弹回去」）。
+ *
+ * 只压环境与远声组，**不压近处的音效**：把身边的脚步和喊话一起压掉，
+ * 听感会变成「开一枪世界静音一下」，那是另一种穿帮。
+ */
+const FIRE_DUCK_AMOUNT = 0.5;      // 剩 0.50 = −6.02 dB
+const FIRE_DUCK_ATTACK_S = 0.04;   // 压：40 ms，跟得上枪口那一下
+const FIRE_DUCK_HOLD_S = 0.06;
+const FIRE_DUCK_RELEASE_S = 0.30;  // 放：300 ms，慢到听不出是个自动过程
+/** 超过这个距离的位置音统一走远声组（farGain），玩家开枪时整组一起让路。 */
+const FAR_GROUP_M = 45;
+
+/**
+ * Voice stealing：预算不够时腾位置而不是丢新的。
+ * 20 ms 淡出 —— 硬掐会「咔」一声，而 20 ms 已经短到听不出是被掐掉的。
+ */
+const STEAL_FADE_S = 0.02;
+/** 一次 Play 最多偷几条。偷到第四条还不够说明预算本身设错了，不该在这儿死磕。 */
+const STEAL_MAX_PER_PLAY = 3;
+
+/**
+ * 两级动态：母线慢压缩（+ 补偿增益）+ 末端峰值限幅。
+ *
+ * 原来只有一只 −8 dB / 12:1 / release 0.22 s 的压缩器兼做两件事，于是
+ * **密集爆炸会抽泵**（docs/Data_AudioAssets.md 手榴弹雨那一节）：
+ * 一记爆炸把整条母线摁下去，0.22 s 之内全场枪声跟着一起变小再浮回来。
+ * 拆成两级：慢的那只只做「整体响度的地板」（比值 1.6、起控 150 ms、放 1 s，
+ * 慢到听不出它在动），峰值交给末端那只（比值 20、起控 4 ms）。
+ *
+ * **数值是量出来的，不是照着直觉配的。** 在 OfflineAudioContext 里摆 20 记
+ * explosionNear（4.0 增益、0.15 s 间隔，干信号峰值 2.00 = +6.0 dBFS），
+ * 叠一条 6 kHz 的稳态探针，用 Goertzel 逐 20 ms 窗把探针幅度量出来 ——
+ * 压缩器施加的是宽带增益，所以探针幅度**就是**这一刻链上的增益，
+ * 它的 max−min 就是抽泵深度（量宽带 RMS 不行：WaveShaper 的 2x 过采样有群延迟，
+ * 逐窗相比会算出 ±5 dB 的假抖动）。
+ *
+ *   单级（旧）  抽泵深度 10.08 dB，平均压 −3.06 dB，输出峰值 0.932
+ *   两级（新）  抽泵深度  8.91 dB，平均压 −1.95 dB，输出峰值 0.941
+ *
+ * 两条要写下来的弯路：
+ *   · **一开始配的 −14 / 3:1 / 0.35 更糟**：深度 11.47 dB，比旧的还多 1.4 dB。
+ *     慢压缩的门槛压太低、比值太大，它自己就成了第二只在抽泵的压缩器。
+ *     慢压缩要「几乎不动」才叫慢压缩。
+ *   · **补偿增益必须显式给**。慢压缩把静态响度吃掉了 1.9 dB（Chrome 的
+ *     DynamicsCompressor 自带一份随参数变的隐式 makeup，参数一改它就跟着变），
+ *     不补的话表现是「整个游戏变小声了」。补齐之后静态增益与旧链持平
+ *     （+3.28 dB vs +3.23 dB），代价是抽泵优势从 2.98 dB 缩到 1.17 dB ——
+ *     这笔账认了：谁也不会为了少一点抽泵接受整局低 2 dB。
+ */
+const BUS_COMP = { threshold: -18, knee: 20, ratio: 1.6, attack: 0.15, release: 1.0 };
+const BUS_MAKEUP = 1.25;   // +1.94 dB，补回慢压缩吃掉的静态响度
+const PEAK_LIMITER = { threshold: -1, knee: 12, ratio: 20, attack: 0.004, release: 0.4 };
+
+/**
+ * 枪尾按区（第一人称分层）。近/远本体之外再追一条**尾巴**：
+ * 同一把枪在屋里、院里、街上、旷野上，区别几乎全在尾巴上
+ * （本体那 5 ms 的瞬态在哪儿都差不多）。
+ * courtyard 与 street 共用一条 —— 院墙与街墙是同一种反射面，
+ * 分四套素材只会让素材量翻倍而听不出差别。
+ */
+const GUN_TAIL_ZONE = { interior: "Interior", courtyard: "Street", street: "Street", open: "Open" };
+const GUN_TAIL_CLASS = { rifle: "Rifle", mg: "Mg" };
+/** 尾巴相对本体的电平。它是垫在本体后面的一层，站到本体前面就成了另一把枪。 */
+const GUN_TAIL_GAIN = 0.55;
+
+/** dB → 线性增益。 */
+function DbGain(db) { return Math.pow(10, db / 20); }
+
+/** 遮挡度 → 低通截止。occ = 0 时是 20 kHz（等于不存在），occ = 1 时是 OCCLUSION_LP_HZ。 */
+function OcclusionCut(occ) {
+  if (!(occ > 0)) return 20000;
+  return 20000 * Math.pow(OCCLUSION_LP_HZ / 20000, Clamp01(occ));
+}
+
+/** panner 的 inverse 曲线（refDistance 3.5 / rolloff 0.9）。偷声部时按它排有效电平。 */
+function DryFalloff(distance) {
+  return 3.5 / (3.5 + 0.9 * Math.max(0, distance - 3.5));
+}
 
 // ---------------------------------------------------------------------------
 // 噪声缓冲：白/粉/棕。按「种类 + 时长档」缓存，一次生成反复用。
@@ -87,41 +304,66 @@ function FillBrown(data, rng) {
 }
 
 // ---------------------------------------------------------------------------
-// 卷积混响的脉冲响应，现场算。
-// street（街巷）：早期反射密集且极短 —— 两侧墙相距几米，反射在 40ms 内就糊成一片。
-// open（开阔地/运河边）：早期反射稀疏但拖得长，能听出「一枪在旷野里散开」。
-// 这两条 IR 是「近枪声 vs 远枪声」之外，第二个让人分辨得出场景的线索。
+// 卷积混响的脉冲响应，现场算。**四档**，按声源所在的区选（见 AudioEngine.SourceZone）。
+//
+// interior（屋里）：0.5 s。反射极密（墙就在两三米外）、高频掉得极快 ——
+//   土墙、泥顶、席子、麦秸，鲁南的民房几乎没有硬反射面。
+//   「屋里那一枪」的辨识度全在**衰减快 + 闷**这两件事上，不在时长。
+// courtyard（院子）：0.7 s。四面墙但头顶开着，所以比屋里长、比街上干，
+//   而且没有街巷那种平行墙的颤动回声。
+// street（街巷）：0.95 s，早期反射密集且极短 —— 两侧墙相距几米，40 ms 内就糊成一片。
+// open（开阔地/运河边）：2.6 s，早期反射稀疏但拖得长，能听出「一枪在旷野里散开」。
+//
+// 这四条 IR 是「近枪声 vs 远枪声」之外，第二个让人分辨得出场景的线索。
+// street / open 两档的参数与采样值**与 2026-08-20 那一版逐样本相同**
+// （damp === 1 时那只一阶低通是恒等的，随机流的消耗顺序也没动）——
+// 加两档不许顺手改掉已经调好的两档。
 // ---------------------------------------------------------------------------
+const IMPULSE_KINDS = {
+  //                   秒    稀疏度  衰减   高频阻尼(1 = 不阻尼)  早期反射(秒)
+  interior: { seconds: 0.50, density: 1.0, decay: 11.0, damp: 0.30,
+    taps: [0.003, 0.006, 0.009, 0.013, 0.017, 0.022], tapLevel: 0.95, tapFall: 0.13 },
+  courtyard: { seconds: 0.70, density: 1.0, decay: 9.0, damp: 0.55,
+    taps: [0.008, 0.014, 0.021, 0.029, 0.038, 0.048], tapLevel: 0.9, tapFall: 0.12 },
+  street: { seconds: 0.95, density: 1.0, decay: 7.5, damp: 1,
+    taps: [0.006, 0.011, 0.017, 0.023, 0.031, 0.038], tapLevel: 0.85, tapFall: 0.11 },
+  open: { seconds: 2.60, density: 0.22, decay: 2.2, damp: 1, taps: null },
+};
+
 function BuildImpulse(ctx, kind, seed) {
-  const rng = Mulberry32(seed);
   const sr = ctx.sampleRate;
+  const cfg = IMPULSE_KINDS[kind] || IMPULSE_KINDS.street;
   const isOpen = kind === "open";
-  const seconds = isOpen ? 2.6 : 0.95;
-  const len = Math.floor(sr * seconds);
+  const len = Math.floor(sr * cfg.seconds);
   const buffer = ctx.createBuffer(2, len, sr);
-  // 稀疏度：开阔地只让一小部分样本非零，听感才是「一下一下的回声」而不是嘶声。
-  const density = isOpen ? 0.22 : 1.0;
-  const decay = isOpen ? 2.2 : 7.5;
+  const density = cfg.density;
+  const decay = cfg.decay;
+  // 一阶低通的系数。damp === 1 时 y = x，逐样本恒等 —— street / open 因此没动。
+  const damp = Clamp(cfg.damp, 0.02, 1);
 
   for (let ch = 0; ch < 2; ch += 1) {
     const data = buffer.getChannelData(ch);
     // 左右两声道用不同随机流，不然混响是「单声道贴在正中」，空间感全没了。
     const chRng = Mulberry32((seed ^ (ch * 0x9e3779b1)) >>> 0);
+    let lp = 0;
     for (let i = 0; i < len; i += 1) {
       const t = i / len;
       if (density < 1 && chRng() > density) { data[i] = 0; continue; }
       const env = Math.pow(1 - t, 1.6) * Math.exp(-decay * t);
-      data[i] = (chRng() * 2 - 1) * env;
+      // 高频阻尼在包络**之前**：吸声吃的是反射本身，不是整条尾巴的音量。
+      const raw = chRng() * 2 - 1;
+      lp = lp + damp * (raw - lp);
+      data[i] = (damp === 1 ? raw : lp) * env;
     }
-    // 街巷的早期反射：几个离散的强反射钉在 6—38ms 上。
+    // 早期反射：几个离散的强反射钉在几毫秒到几十毫秒上。
     // 没有这几下的话，卷积出来只是一团糊的 reverb，不像「墙就在旁边」。
-    if (!isOpen) {
-      const taps = [0.006, 0.011, 0.017, 0.023, 0.031, 0.038];
+    if (cfg.taps) {
+      const taps = cfg.taps;
       for (let k = 0; k < taps.length; k += 1) {
         const idx = Math.floor(taps[k] * sr) + Math.floor(chRng() * 40);
-        if (idx < len) data[idx] += (chRng() * 2 - 1) * (0.85 - k * 0.11);
+        if (idx < len) data[idx] += (chRng() * 2 - 1) * (cfg.tapLevel - k * cfg.tapFall);
       }
-    } else {
+    } else if (isOpen) {
       // 开阔地：一下很晚的「拍岸」回声（远处房子/河堤），给尾巴一个落点。
       const idx = Math.floor(0.34 * sr);
       if (idx < len) data[idx] += (chRng() * 2 - 1) * 0.5;
@@ -237,6 +479,22 @@ class Voice {
     this.out = null;          // 由 Play 建好后塞进来
     this.wetGain = null;      // 混响 send，配方可调
     this.wetScale = 1;        // 距离对混响占比的加成，Play 在配方跑完后乘上去
+    // --- 以下由 Play 填，voice stealing 与取证要读（见 StealVoices）---------
+    this.name = "";
+    this.priority = false;
+    this.startAt = startTime;   // 排定的**到耳朵的时刻**（含传播延迟）
+    this.propagation = 0;       // 其中有多少是传播延迟
+    this.distance = 0;          // 起播时到听者的距离
+    this.effectiveGain = 1;     // volume × 混音表 × 干声距离系数 —— 偷谁按它排
+    this.baseGain = undefined;  // 上面那份还没乘距离系数的，MoveVoice 用
+    this.airOcc = undefined;    // 遮挡给的低通上限（MoveVoice 重查后写）
+    this.wetOcc = undefined;    // 遮挡给的湿声系数
+    this.occ = 0;               // 起播时的遮挡度
+    this.occGain = null;        // 遮挡的干声衰减节点（occ > 0 时才建）
+    this.occAt = -1;            // 上一次重查遮挡的时刻（MoveVoice 用）
+    this.reverbZone = null;     // 送去了哪一档混响
+    this.reverbNode = null;
+    this.reclaimed = false;     // 被偷了：预算已经在偷的那一刻还回去了，FreeVoice 不许再还一次
   }
 
   /** 登记节点，纳入预算与回收。 */
@@ -375,7 +633,7 @@ function GunNear(A, v, p) {
   // --- 3) 环境尾 -----------------------------------------------------------
   // 拥挤时（同屏一排人在打）砍掉这一层：混响 send 还在，尾巴不会真的消失，
   // 只是少一条噪声垫。让第八条枪响不出来，比让它响得完整重要得多。
-  if (A.liveNodes > NODE_BUDGET * 0.55) {
+  if (A.liveNodes > A.nodeBudget * 0.55) {
     v.wetGain.gain.value = p.wet * 1.25;   // 少了噪声垫，用混响补回来一点
     v.Live(0.5);
     return;
@@ -754,8 +1012,11 @@ const RECIPES = {
 
     v.wetGain.gain.value = 0.7;
     v.Live(2.4);
-    A.Deafen(0.42);            // 耳鸣，见 Deafen 的注释
-    A.Duck(1.1, 0.55);
+    // 耳鸣与 duck **不在这里触发**（2026-09-08 搬走了）。
+    // 原来是 `A.Deafen(0.42); A.Duck(1.1, 0.55);` 写在这条配方体内 ——
+    // 采样一盖上去这条配方就再也不会被执行，于是正常路径下整局零 duck、零耳鸣。
+    // 现在由 Play 按 DUCK_ON / DEAFEN_ON 统一触发，而且按听者距离缩放
+    // （二百米外的一颗手榴弹不该把配乐压下去，也不该震聋玩家）。
   },
 
   // 远炸：只剩低频。高频在几百米上被空气吃干净了，听到的是闷的一记 + 很长的滚。
@@ -836,8 +1097,10 @@ const RECIPES = {
     v.Start(tail, t + 0.04, 1.4);
     v.wetGain.gain.value = 0.65;
     v.Live(1.9);
-    A.Deafen(0.3);
-    A.Duck(0.8, 0.45);
+    // 同上：搬去 Play 了。这一条原来还写着 `A.Deafen(0.3)` ——
+    // **几百米外的一记闷响把玩家的耳朵震了**，方向是反的。
+    // explosionFar 现在根本不在 DEAFEN_ON 表里：远炸只压一点音乐（DUCK_ON，
+    // 而且随距离缩到零），不碰耳朵。
   },
 
   // 掷弹筒发射：**闷响**，不是炮声。50 mm 短筒、装药少，出膛就是「咚」的一下，
@@ -1630,6 +1893,33 @@ function CullDistance(name) {
 }
 
 /**
+ * 这一声算不算「枪」。
+ * 写成函数而不是一张集合：FAR_CUE / SAMPLE_BURST 两张表随武器接线增长，
+ * 抄一份出来必然会漂（新加一把机枪，尾巴与环境闪避就悄悄不认它了）。
+ */
+function IsGunCue(name) {
+  if (FAR_CUE[name] || FAR_CUE_TARGET.has(name) || SAMPLE_BURST[name]) return true;
+  return GUN_EXTRA_CUES.has(name);
+}
+
+/**
+ * 这一声走不走传播延迟。
+ * 枪、炸、炮、扫射走；脚步、拉栓、喊话、环境床不走 ——
+ * 前者玩家看得见「发生的那一刻」（枪口焰、爆闪），延迟才有意义；
+ * 后者只会变成「音画不同步」。
+ * `gunTail*` 必须跟着走，不然尾巴会赶在本体之前到（那是彻底的穿帮）。
+ */
+function IsPropagated(name) {
+  if (IsGunCue(name) || PROPAGATION_CUES.has(name)) return true;
+  return name.startsWith("explosion") || name.startsWith("strafe") || name.startsWith("gunTail");
+}
+
+/** 按区与武器类挑尾巴 cue。素材没做的那几条由 Play 静默跳过（RECIPES 里查不到就返回 null）。 */
+function GunTailCue(zone, weaponClass) {
+  return `gunTail${GUN_TAIL_ZONE[zone] || "Street"}${GUN_TAIL_CLASS[weaponClass] || "Rifle"}`;
+}
+
+/**
  * 混响 send 的距离衰减。**这是「一打起来就糊成一片」的根子。**
  *
  * 混响 send 分在 Panner **之前**（那是对的，湿信号不该吃方位衰减），
@@ -2325,7 +2615,49 @@ export class AudioEngine {
      * 混在一个数里就查不出该去调哪一个 —— 2026-08-20 这一轮就是靠它分清
      * 「远处的枪是被距离闸掐掉的还是被 22 ms 去重窗吃掉的」。
      */
-    this.drops = { dedupe: 0, budget: 0, distance: 0 };
+    /**
+     * budget 那一格拆成了两个数（2026-09-08 上 voice stealing 之后）：
+     *   stolen  —— 腾出了位置（偷了一条更轻更远的），新声照播；
+     *   starved —— 实在偷不到，只好丢掉。
+     * 混在一个数里查不出该调什么：前者说明预算刚好卡在边上（正常），
+     * 后者说明场上全是不该丢的声音（要么预算太小，要么谁在滥用 priority）。
+     * `budget` 留成 starved 的别名，老取证脚本与编辑器面板还在读它。
+     */
+    this.drops = {
+      dedupe: 0, distance: 0, stolen: 0, starved: 0,
+      get budget() { return this.starved; },
+    };
+    /**
+     * 计数器（不是「失败」，是「做了多少次」）。取证与预算调参用。
+     * occlusionQueries 是宿主最关心的一条：它等于每秒真正打出去的射线数。
+     */
+    this.stats = {
+      occlusionQueries: 0, occlusionCached: 0, occlusionSkipped: 0,
+      zoneQueries: 0, propagationDelays: 0,
+      ducks: 0, deafens: 0, ambienceDucks: 0, priorityOverBudget: 0,
+    };
+    /**
+     * 宿主探针。两条都不注册时整条空间链退回 2026-08-20 的行为（见 SetProbes）。
+     */
+    this.probes = { occlusion: null, zone: null };
+    this.occCache = new Map();          // 空间格 → { at, value }
+    this.occCacheAt = { x: 0, y: 0, z: 0 };  // 建这张缓存时听者在哪儿
+    this.occFrameAt = -1;               // 当前射线预算窗口的起点
+    this.occFrameRays = 0;
+    this.listenerZone = null;           // 听者所在区（缓存）
+    this.listenerZoneAt = -1;
+    /**
+     * 还在响的 voice。**与 pendingVoices 是两件事**：pendingVoices 管回收，
+     * activeVoices 管「预算不够时能偷谁」—— 被偷的那条会立刻退出 activeVoices，
+     * 但它还要在 pendingVoices 里待够 20 ms 淡出时间。
+     */
+    this.activeVoices = new Set();
+    /**
+     * 节点预算。实例字段而不是直接用常量：编辑器要能现场调它看阈值，
+     * 测试要能把它压到个位数才量得出 voice stealing（把预算撑满 120 个节点
+     * 需要在浏览器里排几十条真声音，那种测法是抛硬币）。
+     */
+    this.nodeBudget = NODE_BUDGET;
     // --- 外部人声采样（战场口令）。加载失败不影响任何其他功能 ---
     this.voiceBank = new Map();      // key -> {key, text, kind, file, duration}
     this.voicesReady = false;
@@ -2406,12 +2738,14 @@ export class AudioEngine {
     this.softClip.oversample = "2x";
     this.softClip.connect(ctx.destination);
 
+    // 末端快限幅：只削瞬态那几毫秒（见 PEAK_LIMITER）。
+    // 它**不管整体响度** —— 那是母线慢压缩的事，两件事分开才不抽泵。
     this.limiter = ctx.createDynamicsCompressor();
-    this.limiter.threshold.value = -8;
-    this.limiter.knee.value = 6;
-    this.limiter.ratio.value = 12;
-    this.limiter.attack.value = 0.003;
-    this.limiter.release.value = 0.22;
+    this.limiter.threshold.value = PEAK_LIMITER.threshold;
+    this.limiter.knee.value = PEAK_LIMITER.knee;
+    this.limiter.ratio.value = PEAK_LIMITER.ratio;
+    this.limiter.attack.value = PEAK_LIMITER.attack;
+    this.limiter.release.value = PEAK_LIMITER.release;
     this.limiter.connect(this.softClip);
 
     // 耳鸣段落用的低通：平时开到 20 kHz 等于不存在，爆炸时压到几百 Hz。
@@ -2424,9 +2758,24 @@ export class AudioEngine {
     this.deafFilter.Q.value = 0.7;
     this.deafFilter.connect(this.outGain);
 
+    // 母线慢压缩：整体响度的地板。比值小、起控慢、释放慢 —— 听不出它在动，
+    // 但一记爆炸不会再把整条母线摁下去 0.22 s（那就是「抽泵」）。
+    // 它在耳鸣低通**之前**：耳鸣是听感效果，不该参与动态控制。
+    this.busComp = ctx.createDynamicsCompressor();
+    this.busComp.threshold.value = BUS_COMP.threshold;
+    this.busComp.knee.value = BUS_COMP.knee;
+    this.busComp.ratio.value = BUS_COMP.ratio;
+    this.busComp.attack.value = BUS_COMP.attack;
+    this.busComp.release.value = BUS_COMP.release;
+    // 补偿增益接在两级**之间**：这样静态响度补回来了，而天花板仍然由末端那只守着。
+    // 接在末端之后的话，补回来的 1.9 dB 会直接顶进软削顶，换成失真。
+    this.busMakeup = ctx.createGain();
+    this.busMakeup.gain.value = BUS_MAKEUP;
+    this.busComp.connect(this.busMakeup).connect(this.deafFilter);
+
     this.masterGain = ctx.createGain();
     this.masterGain.gain.value = this.masterVolume;
-    this.masterGain.connect(this.deafFilter);
+    this.masterGain.connect(this.busComp);
 
     // 三条声部总线。duck 只压音乐与环境，音效不压 —— 台词/爆炸时把枪声也压掉
     // 会让人以为战斗停了。
@@ -2439,6 +2788,11 @@ export class AudioEngine {
     this.sfxUser = ctx.createGain();
     this.sfxUser.gain.value = this.mix.sfx;
     this.sfxBus.connect(this.sfxUser).connect(this.masterGain);
+    // 远声组：超过 FAR_GROUP_M 的位置音统一从这儿进 sfx 总线。
+    // 有了这一组，玩家开枪时才能只压「远处那一片」而不动身边的脚步与喊话
+    // （见 DuckAmbience）。混响回声**不接这里** —— 尾巴让路会听出「空间在闪」。
+    this.farGain = ctx.createGain();
+    this.farGain.connect(this.sfxBus);
     this.duckGain = ctx.createGain();
     this.duckGain.connect(this.masterGain);
     this.musicBus = ctx.createGain();
@@ -2450,22 +2804,54 @@ export class AudioEngine {
     this.musicBus.connect(this.musicUser).connect(this.duckGain);
     this.ambienceBus = ctx.createGain();
     this.ambienceBus.gain.value = 0.8;
+    // 玩家开枪时压环境用的独立旋钮（见 DuckAmbience）。
+    // **不许写 ambienceBus 或 ambienceUser**：前者是系统配平、后者是玩家推子，
+    // 快压慢放写在它们身上，一次开枪就把两者之一改掉了（与 duckGain 同一条理由）。
+    this.ambienceDuck = ctx.createGain();
     this.ambienceUser = ctx.createGain();
     this.ambienceUser.gain.value = this.mix.ambience;
-    this.ambienceBus.connect(this.ambienceUser).connect(this.duckGain);
+    this.ambienceBus.connect(this.ambienceDuck).connect(this.ambienceUser).connect(this.duckGain);
 
-    // 两套空间的卷积混响，常驻。回声统一并到 sfx 总线。
+    // 四档空间的卷积混响，常驻。回声统一并到 sfx 总线。
+    // 常驻代价：四只 Convolver + 四个 gain。IR 是现场算的（约 12 ms/条，只在建图时一次）。
     this.reverbs = {};
     this.reverbReturns = [];
-    for (const kind of ["street", "open"]) {
+    for (const kind of REVERB_SPACES) {
       const conv = ctx.createConvolver();
       conv.buffer = BuildImpulse(ctx, kind, HashString(`ir:${kind}`));
       const ret = ctx.createGain();
-      ret.gain.value = kind === "open" ? 0.7 : 0.85;
+      ret.gain.value = REVERB_RETURN[kind] ?? 0.85;
       conv.connect(ret).connect(this.sfxBus);
       this.reverbs[kind] = conv;
       this.reverbReturns.push(ret);   // 留着引用，不然 Dispose 断不掉它
     }
+  }
+
+  /**
+   * 注册宿主探针。**这是引擎与宿主之间唯一的空间接口**，名字与语义都是契约的一部分
+   * （改名字等于把宿主那边的接线悄悄拆掉，而拆掉之后一切照跑、只是听着不对）。
+   *
+   * @param {object}   probes
+   * @param {function} probes.occlusion (from, to) → 0..1
+   *        0 = 通透、1 = 完全挡死。from / to 都是 {x,y,z} 世界坐标（米）。
+   *        **允许返回 undefined**，意思是「这一次不知道」（射线预算用光、物理世界
+   *        还没建好、查询抛了）—— 引擎会沿用上一次的缓存值，而不是当成通透。
+   *        实现侧要自己保证便宜：引擎每帧最多问 OCCLUSION_RAYS_PER_FRAME 次，
+   *        但同一格里的声源共用一次结果，所以真实频率还要低一档。
+   * @param {function} probes.zone (position) → "interior" | "courtyard" | "street" | "open"
+   *        返回值不在这四个里就按当前全局档（this.space）处理，不报错。
+   *        这条探针同时被用来判听者自己在哪儿（每 ZONE_CACHE_S 问一次）。
+   *
+   * 传 null / 不传 = 注销。两条都没注册时行为与 2026-08-20 那一版完全一致。
+   */
+  SetProbes({ occlusion = undefined, zone = undefined } = {}) {
+    if (occlusion !== undefined) this.probes.occlusion = typeof occlusion === "function" ? occlusion : null;
+    if (zone !== undefined) this.probes.zone = typeof zone === "function" ? zone : null;
+    // 换探针必须把缓存清了：留着的是上一套世界的结论。
+    this.occCache.clear();
+    this.listenerZone = null;
+    this.listenerZoneAt = -1;
+    return this.probes;
   }
 
   /** 首次用户手势后调用。有些浏览器只有在手势里 new AudioContext 才能出声。 */
@@ -2556,6 +2942,8 @@ export class AudioEngine {
     // 不拆的话它们一直挂在总线上，close() 之后引用还在，GC 收不掉整张图。
     for (const v of Array.from(this.pendingVoices)) this.FreeVoice(v);
     this.pendingVoices.clear();
+    this.activeVoices.clear();
+    this.occCache.clear();
     this.StopAmbience();
     this.StopMusic();
     if (!this.ctx) return;
@@ -2565,12 +2953,16 @@ export class AudioEngine {
       for (const ret of this.reverbReturns || []) ret.disconnect();
       this.sfxBus.disconnect();
       this.sfxUser.disconnect();
+      this.farGain.disconnect();
       this.musicBus.disconnect();
       this.musicUser.disconnect();
       this.ambienceBus.disconnect();
+      this.ambienceDuck.disconnect();
       this.ambienceUser.disconnect();
       this.duckGain.disconnect();
       this.masterGain.disconnect();
+      this.busComp.disconnect();
+      this.busMakeup.disconnect();
       this.deafFilter.disconnect();
       this.outGain.disconnect();
       this.limiter.disconnect();
@@ -3010,22 +3402,32 @@ export class AudioEngine {
    *        airCut   Hz          非空间化时的空气低通上限（环境一次性音用，见 AMB_AIR）
    *        volume   增益倍率
    *        pitch    频率倍率（同一把枪逐发做 ±3% 抖动，二十条枪才不像一条）
-   *        delay    延后多少秒开始
+   *        delay    延后多少秒开始（**传播延迟另算，会叠在这个数上**）
    *        burst    连发武器的点射发数
+   *        firstPerson  这是玩家自己耳朵边上的那一声：不走 HRTF、不加传播延迟
+   *        occlusion    0..1，显式指定遮挡度；不给就问探针
    */
   /**
-   * 开一枪：按距离在**两段不同录音**之间等功率交叉淡入（见 FAR_CUE 的注释）。
+   * 开一枪：按距离在**两段不同录音**之间等功率交叉淡入（见 FAR_CUE 的注释），
+   * 再按**声源所在的区**追一条尾巴。
    *
    * 为什么等功率（cos/sin）而不是线性（t / 1−t）：交叉带中点上线性淡入的两路
    * 各 0.5，功率和是 0.5²+0.5² = 0.5 —— 走到 87 m 会**塌下去 3 dB**，
    * 听感是「远处那一枪走到半路声音先小了一下再回来」。cos/sin 的平方和恒为 1。
    *
    * 没有远场素材的枪（zb26/type11/type92）原样落回 Play()，行为不变。
-   * 玩家自己那一枪 distance = 0，永远纯近场。
    *
-   * 注意这里**不加声速延迟**（300 m 该晚 0.87 s 到）。那是另一件事，
-   * 会动到所有「开枪→听见」的时序断言，这一轮不碰；rifleIjaFar 那条素材本身
-   * 就是来弹视角录的，弹头掠过在前、枪声后到，先靠素材把这层意思带出来。
+   * **尾巴这一层**（2026-09-08）：本体那 5 ms 的瞬态在哪儿都差不多，
+   * 同一把枪在屋里 / 院里 / 街上 / 旷野的区别几乎全在尾巴上。卷积混响给的是
+   * 「空间的一般响应」，尾巴给的是「这把枪在这个空间里的那一条录音」——
+   * 两者不重复：前者弥散、后者带瞬态包络。素材还没做的那几条由 Play 静默跳过。
+   *
+   * 声速延迟不在这里加，在 Play 里按 cue 类别统一加（见 PROPAGATION_DELAY）——
+   * 尾巴与本体因此**必然同时到**（同一个 distance 算出同一个延迟）。
+   *
+   * @param {object} opts 除 Play 的全部选项外：
+   *        firstPerson  玩家自己那一枪（不走 HRTF、不延迟）
+   *        weaponClass  "rifle" | "mg"，只影响挑哪条尾巴
    */
   PlayGunshot(name, opts = {}) {
     if (!opts.position) return this.Play(name, opts);
@@ -3040,19 +3442,33 @@ export class AudioEngine {
       this.drops.distance += 1;
       return null;
     }
-    const far = FAR_CUE[name];
-    if (!far) return this.Play(name, opts);
-    const t = Clamp((d - GUN_NEAR_M) / (GUN_FAR_M - GUN_NEAR_M), 0, 1);
+    const { weaponClass = "rifle", firstPerson = false } = opts;
     const base = opts.volume ?? 1;
-    const nearGain = Math.cos(t * Math.PI * 0.5);
-    const farGain = Math.sin(t * Math.PI * 0.5);
+    const far = FAR_CUE[name];
     let voice = null;
-    // 0.02 的门槛是省节点：低于这个增益的那一路在混音里听不见，
-    // 但仍然要占满一条链的预算（rifleNra 一条 16 个节点）。
-    if (nearGain > 0.02) voice = this.Play(name, { ...opts, volume: base * nearGain });
-    if (farGain > 0.02) {
-      const v = this.Play(far, { ...opts, volume: base * farGain });
-      voice = voice || v;
+    if (!far) {
+      voice = this.Play(name, opts);
+    } else {
+      const t = Clamp((d - GUN_NEAR_M) / (GUN_FAR_M - GUN_NEAR_M), 0, 1);
+      const nearGain = Math.cos(t * Math.PI * 0.5);
+      const farGain = Math.sin(t * Math.PI * 0.5);
+      // 0.02 的门槛是省节点：低于这个增益的那一路在混音里听不见，
+      // 但仍然要占满一条链的预算（rifleNra 一条 16 个节点）。
+      if (nearGain > 0.02) voice = this.Play(name, { ...opts, volume: base * nearGain });
+      if (farGain > 0.02) {
+        const v = this.Play(far, { ...opts, volume: base * farGain });
+        voice = voice || v;
+      }
+    }
+    // 尾巴：按声源所在区挑。cue 不存在就一声不响地跳过（素材侧在补）。
+    const tail = GunTailCue(this.SourceZone(opts.position), weaponClass);
+    if (RECIPES[tail]) {
+      this.Play(tail, {
+        ...opts, volume: base * GUN_TAIL_GAIN, weaponClass: undefined,
+        // 尾巴不是玩法反馈，不许拿 priority 去挤别人的位置 ——
+        // 唯一的例外是玩家自己那一枪：本体过了闸尾巴没过，听感是「哑火」。
+        priority: firstPerson ? true : false,
+      });
     }
     return voice;
   }
@@ -3060,8 +3476,157 @@ export class AudioEngine {
   /** 某个 cue 被请求过多少次。取证专用（见 this.playRequests 的抬头）。 */
   RequestedCount(name) { return this.playRequests.get(name) || 0; }
 
+  // --- 空间探针 -----------------------------------------------------------
+
+  /**
+   * 问一次遮挡：听者 → 声源之间挡了多少（0 通透、1 挡死）。
+   *
+   * 三层节流，缺一层都撑不住四十个兵同时开火：
+   *   1. **空间格缓存**（OCCLUSION_CELL_M / OCCLUSION_CACHE_S）——
+   *      同一堵墙后面的一排兵共用一次射线。这一层才是真正省下来的部分。
+   *   2. **每帧射线预算**（OCCLUSION_RAYS_PER_FRAME）—— 保险丝。用光了就沿用
+   *      过期的旧值；**一次都没查过的按通透**（宁可漏掉一次遮挡，
+   *      也不能把没查过的声音默认闷掉 —— 那会在探针刚注册的那一帧把全场压死）。
+   *   3. 听者走远了整张丢：拐过一个墙角，缓存里的结论条条都是错的。
+   *
+   * 探针返回 undefined = 「这一次不知道」，沿用旧值而不是当作通透。
+   */
+  Occlusion(position, distance) {
+    const probe = this.probes.occlusion;
+    if (!probe || !position || !this.ctx) return 0;
+    if (distance <= OCCLUSION_MIN_M) return 0;
+    const now = this.ctx.currentTime;
+    const L = this.listenerPos;
+    const moved = Math.hypot(L.x - this.occCacheAt.x, L.y - this.occCacheAt.y, L.z - this.occCacheAt.z);
+    if (moved > OCCLUSION_LISTENER_MOVE_M || this.occCache.size > OCCLUSION_CACHE_MAX) {
+      this.occCache.clear();
+      this.occCacheAt = { x: L.x, y: L.y, z: L.z };
+    }
+    const key = `${Math.round(position.x / OCCLUSION_CELL_M)},`
+      + `${Math.round(position.y / OCCLUSION_CELL_M)},`
+      + `${Math.round(position.z / OCCLUSION_CELL_M)}`;
+    const hit = this.occCache.get(key);
+    if (hit !== undefined && now - hit.at < OCCLUSION_CACHE_S) {
+      this.stats.occlusionCached += 1;
+      return hit.value;
+    }
+    if (now - this.occFrameAt >= OCCLUSION_FRAME_S) { this.occFrameAt = now; this.occFrameRays = 0; }
+    if (this.occFrameRays >= OCCLUSION_RAYS_PER_FRAME) {
+      this.stats.occlusionSkipped += 1;
+      return hit ? hit.value : 0;
+    }
+    this.occFrameRays += 1;
+    this.stats.occlusionQueries += 1;
+    let value = hit ? hit.value : 0;
+    try {
+      const raw = probe({ x: L.x, y: L.y, z: L.z }, position);
+      if (raw !== undefined && raw !== null && Number.isFinite(Number(raw))) value = Clamp01(Number(raw));
+    } catch (err) {
+      // 探针抛了不该让这一声静音（与配方异常同一条原则），但要留痕迹。
+      this.lastError = { name: "probe:occlusion", message: err && err.message, at: now };
+      this.errorCount += 1;
+    }
+    this.occCache.set(key, { at: now, value });
+    return value;
+  }
+
+  /**
+   * 声源在哪一档空间里。探针没注册 / 返回值不认识时退回全局那一档（this.space），
+   * 也就是 2026-08-20 那一版的行为。
+   */
+  SourceZone(position) {
+    const probe = this.probes.zone;
+    if (!probe || !position) return this.space;
+    try {
+      const z = probe(position);
+      this.stats.zoneQueries += 1;
+      if (REVERB_SPACES.includes(z)) return z;
+    } catch (err) {
+      this.lastError = { name: "probe:zone", message: err && err.message, at: this.ctx ? this.ctx.currentTime : 0 };
+      this.errorCount += 1;
+    }
+    return this.space;
+  }
+
+  /** 听者自己在哪一档。缓存 ZONE_CACHE_S —— 玩家一秒最多跑三米，问不着那么勤。 */
+  ListenerZone() {
+    const probe = this.probes.zone;
+    if (!probe || !this.ctx) return null;
+    const now = this.ctx.currentTime;
+    if (this.listenerZone !== null && now - this.listenerZoneAt < ZONE_CACHE_S) return this.listenerZone;
+    this.listenerZoneAt = now;
+    this.listenerZone = this.SourceZone(this.listenerPos);
+    return this.listenerZone;
+  }
+
+  /**
+   * 听者与声源是不是隔着一道「室内 / 室外」的界。
+   *
+   * 需求原文只说「听者在室内、声源在室外」，这里做成**对称**的：
+   * 站在街上听屋里那一枪，中间同样隔着一堵墙加一个门框，闷的程度是一样的。
+   * 只做单向的话，进屋和出屋会听出一次不该有的突变。
+   */
+  ZoneBoundary(sourceZone) {
+    const lz = this.ListenerZone();
+    if (!lz) return false;
+    return (lz === "interior") !== (sourceZone === "interior");
+  }
+
+  /**
+   * 声速延迟：这一声该晚多久到（秒）。
+   * 340 m/s —— 三百米外那一枪晚 0.88 s 到，八十米外晚 0.24 s。
+   * 玩家看得见枪口焰或爆闪的那些 cue 才走这条（见 IsPropagated）：
+   * 脚步、拉栓、喊话延后到达只会变成音画不同步。
+   */
+  PropagationDelay(name, distance) {
+    if (!PROPAGATION_DELAY) return 0;
+    if (!(distance > PROPAGATION_MIN_M)) return 0;
+    if (!IsPropagated(name)) return 0;
+    this.stats.propagationDelays += 1;
+    return Math.min(distance / SPEED_OF_SOUND, PROPAGATION_MAX_S);
+  }
+
+  /**
+   * 预算不够时腾位置：从活着的声部里挑「有效电平最低、且比新声远」的一条，
+   * 20 ms 淡出后释放，把它的节点算回预算。
+   *
+   * 三条硬规矩：
+   *   · **priority 的永远不被偷**（玩家自己的枪、命中回执）；
+   *   · 只偷**比新声远**的：偷了比新声还近的那一条，玩家听到的是眼前的声音消失，
+   *     那比缺一声远处的枪难受得多；
+   *   · 只偷**比新声轻**的：不然就成了「新来的一律插队」，
+   *     一记贴脸爆炸会被一记远处的脚步顶掉。
+   *
+   * 预算在偷的那一刻就还回去（reclaimed），不等 20 ms 淡完 ——
+   * 不这么做的话，新声在闸门那儿仍然是超的，等于白偷。代价是那 20 ms 里
+   * 实际节点数比账面多几个，可以接受（那正是淡出的时长）。
+   *
+   * @returns {boolean} 腾够了没有
+   */
+  StealVoices(need, effectiveGain, distance) {
+    if (!(need > 0)) return true;
+    let freed = 0;
+    for (let round = 0; round < STEAL_MAX_PER_PLAY && freed < need; round += 1) {
+      let victim = null;
+      for (const v of this.activeVoices) {
+        if (v.priority || v.stopping || v.reclaimed || !v.nodes || !v.nodes.length) continue;
+        if (!(v.effectiveGain < effectiveGain)) continue;
+        if (!(v.distance > distance)) continue;
+        if (!victim || v.effectiveGain < victim.effectiveGain) victim = v;
+      }
+      if (!victim) break;
+      freed += victim.nodes.length;
+      victim.reclaimed = true;
+      this.liveNodes = Math.max(0, this.liveNodes - victim.nodes.length);
+      this.activeVoices.delete(victim);
+      this.drops.stolen += 1;
+      this.StopVoice(victim, STEAL_FADE_S);
+    }
+    return freed >= need;
+  }
+
   Play(name, { position = null, volume = 1, pitch = 1, delay = 0, offset = 0, maxDuration = Infinity, pan = 0, burst = null, priority = false,
-    bus = "sfx", airCut = 0, soundField = false } = {}) {
+    bus = "sfx", airCut = 0, soundField = false, firstPerson = false, occlusion = null } = {}) {
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
     // "rifleNra" 这一个去重 key，22 ms 窗口内谁先谁得。
@@ -3074,21 +3639,8 @@ export class AudioEngine {
     const ctx = this.ctx;
     const now = ctx.currentTime;
 
-    // 同帧齐射去重（见文件头 DEDUPE_S 的注释）。
-    //
-    // 【2026-08-20】priority 这个参数**上面那段注释写了，函数体里一次都没读**：
-    // 去重与预算两道闸都对它视而不见，所以「玩家自己的枪永远要响」从来没有成立过，
-    // 那 8.3% 的丢枪声一直还在。补上是因为命中/击杀回执正好走同一条路 ——
-    // 回执要在几十条枪同时打的那一刻响，而那恰恰是两道闸最容易关上的时刻，
-    // 一条被丢掉四成的确认音等于没有确认音。
-    if (!priority) {
-      const last = this.lastPlayAt.get(name);
-      if (last !== undefined && now - last < DEDUPE_S && delay === 0) { this.drops.dedupe += 1; return null; }
-    }
-    this.lastPlayAt.set(name, now);
-
-    // 距离：决定 HRTF 开不开、空气低通压多狠、混响给多少、**预算紧张时先丢谁**。
-    // 必须算在预算闸**之前** —— 见下面 FAR_LOW_PRIORITY_M 那段。
+    // 距离：决定 HRTF 开不开、空气低通压多狠、混响给多少、**延迟多久到**、
+    // **预算紧张时先偷谁**。必须算在所有闸门之前 —— 见下面 FAR_LOW_PRIORITY_M 那段。
     let distance = 0;
     if (position) {
       const dx = position.x - this.listenerPos.x;
@@ -3102,43 +3654,108 @@ export class AudioEngine {
     // 这里管的是喊话、弹着、脚步，以及任何绕开 PlayGunshot 直接进来的枪声。
     if (position && distance > (soundField ? 1000 : CullDistance(name))) { this.drops.distance += 1; return null; }
 
-    // 预算闸门：按实测开销**发声前**判断。连发的开销随点射长度涨一点。
+    // 传播延迟：闪光先到、声音后到（见 PROPAGATION_DELAY）。
+    // priority 与第一人称不延迟 —— 玩家自己扣的扳机必须跟手，
+    // 而命中回执延后到达等于把「打中了」这条信息推后了半秒。
+    const propagation = (priority || firstPerson) ? 0 : this.PropagationDelay(name, distance);
+    const startDelay = Math.max(0, delay) + propagation;
+    const startAt = now + startDelay;
+
+    // 同帧齐射去重（见文件头 DEDUPE_S 的注释）。
+    //
+    // 【2026-08-20】priority 这个参数**上面那段注释写了，函数体里一次都没读**：
+    // 去重与预算两道闸都对它视而不见，所以「玩家自己的枪永远要响」从来没有成立过，
+    // 那 8.3% 的丢枪声一直还在。补上是因为命中/击杀回执正好走同一条路 ——
+    // 回执要在几十条枪同时打的那一刻响，而那恰恰是两道闸最容易关上的时刻，
+    // 一条被丢掉四成的确认音等于没有确认音。
+    //
+    // 【2026-09-08】窗口改成比**到耳朵的时刻**（见文件头坑 5）。旧写法是
+    // `now - last < DEDUPE_S && delay === 0`，也就是「只有不带延迟的才去重」——
+    // 传播延迟一上，一排人齐射全都带着延迟，去重当场整个失效，
+    // 二十条一模一样的 rifleNra 会原样叠在同一毫秒上（那正是它要防的事）。
+    if (!priority) {
+      const last = this.lastPlayAt.get(name);
+      if (last !== undefined && Math.abs(startAt - last) < DEDUPE_S) { this.drops.dedupe += 1; return null; }
+    }
+    this.lastPlayAt.set(name, startAt);
+
+    // 有效电平：这一声在玩家耳朵里到底有多响。voice stealing 按它排序。
+    const mix = MIX_GAIN[name] ?? 1;
+    const effectiveGain = volume * mix * (position ? DryFalloff(distance) : 1);
+
+    // 预算闸门：按实测开销**发声前**判断。
     // 连发的开销与点射长度无关（整条点射共用一套链，见 GunAuto），所以查表就够。
-    // priority 的那一档给 15% 超额：够放一条枪声或一条回执，又不至于让"优先"变成"无限"。
+    // priority 的那一档给 15% 超额：够放一条枪声或一条回执。
     //
     // 【2026-08-20】闸门原来只看名字，不看距离，于是**先到先得**：
     // 实测东关站在玩家耳朵里听二十秒，367 次枪声请求丢掉 172 次（47%），
     // 丢的是随机的那 47% —— 一百米外的和眼前的一样看运气。
-    // 可听感上这两者根本不是一回事：远处那一枪本来就只剩一层糊音，
-    // 眼前那一枪缺了就是穿帮。
     // 现在超过 FAR_LOW_PRIORITY_M 的位置音一律按低优先级算，先丢远的。
+    //
+    // 【2026-09-08】超了不再直接丢新的：先试着从活着的声部里**偷**一条更轻更远的
+    // （见 StealVoices）。「丢新的」这条策略在听感上是反的 —— 玩家注意的永远是
+    // 刚发生的那件事，而被丢掉的恰恰就是它。
     const cost = NODE_COST[name] ?? DEFAULT_COST;
     const far = position && distance > FAR_LOW_PRIORITY_M;
-    const ceiling = priority ? NODE_BUDGET * 1.15
-      : (far || LOW_PRIORITY.has(name)) ? NODE_BUDGET * LOW_PRIORITY_HEADROOM : NODE_BUDGET;
-    if (this.liveNodes + cost > ceiling) { this.drops.budget += 1; return null; }
+    const budget = this.nodeBudget;
+    const ceiling = priority ? budget * 1.15
+      : (far || LOW_PRIORITY.has(name)) ? budget * LOW_PRIORITY_HEADROOM : budget;
+    if (this.liveNodes + cost > ceiling) {
+      const need = this.liveNodes + cost - ceiling;
+      if (!this.StealVoices(need, effectiveGain, position ? distance : 0)) {
+        // 偷不到。priority 的照播 —— **玩家的枪 100% 出声是硬指标**：
+        // 它一秒最多几条，几个节点的超支只存在几百毫秒，而少响一枪是玩家会报的 bug。
+        if (!priority) { this.drops.starved += 1; return null; }
+        this.stats.priorityOverBudget += 1;
+      }
+    }
 
-    const t = now + Math.max(0, delay) + 0.005;   // 留 5 ms 调度余量，免得首音被吃
+    const t = startAt + 0.005;   // 留 5 ms 调度余量，免得首音被吃
     // 种子 = 名字哈希 ^ 播放序号：确定性，但同一个音效每次不一样。
     const rng = Mulberry32((HashString(name) ^ Math.imul(this.playCounter += 1, 2654435761)) >>> 0);
     const v = new Voice(this, t, pitch, rng, offset, maxDuration);
     v.burst = burst ?? BURST_DEFAULT[name] ?? null;
+    v.name = name;
+    v.priority = !!priority;
+    v.startAt = startAt;
+    v.propagation = propagation;
+    v.effectiveGain = effectiveGain;
+    v.baseGain = volume * mix;      // 距离系数还没乘进去的那一份，MoveVoice 按新距离重算
+    v.distance = distance;
 
     // 源 gain（干声起点）。混音表在这儿乘进去，配方里不必关心整体平衡。
-    const src = v.Gain(volume * (MIX_GAIN[name] ?? 1));
+    const src = v.Gain(volume * mix);
     v.out = src;
 
     // 混响 send 在 Panner **之前**分出去（文件头坑 1）。
     // 干湿比是两层：配方定「这个声音本身有多少尾巴」，距离定「离得远尾巴占比更高」。
     // 早先是让距离直接写 wet.gain，结果被配方后写的值覆盖掉了 —— 远处的枪和
     // 眼前的枪混响一样多，「远」就完全听不出来。改成事后乘一个 wetScale。
+    //
+    // 【2026-09-08】送去哪一档由**声源所在的区**决定，不再是全局一档。
+    // 为什么按声源不按听者：混响是声源那个空间的响应 —— 你站在街上听见屋里一枪，
+    // 听到的是那间屋子的短促闷响透过墙传出来，不是街巷的 0.95 s 尾巴。
+    // zone 探针没注册时退回 this.space，与旧行为逐条相同。
+    const zone = this.SourceZone(position);
+    const conv = this.reverbs[zone] || this.reverbs[this.space] || this.reverbs.street;
+    v.reverbZone = zone;
+    v.reverbNode = conv;
     const wet = v.Gain(0.25);
     v.wetGain = wet;
-    wet.connect(this.reverbs[this.space] || this.reverbs.street);
+    wet.connect(conv);
 
     if (position) {
+      // 遮挡：一次射线（有缓存与每帧预算，见 Occlusion）。
+      // 室内/室外的分界再叠一档 —— 射线回答不了「你在屋里」这件事（门开着射线就是通的）。
+      let occ = occlusion !== null ? Clamp01(occlusion) : this.Occlusion(position, distance);
+      if (this.ZoneBoundary(zone)) occ = Clamp01(occ + ZONE_BOUNDARY_OCC);
+      v.occ = occ;
+      v.occAt = now;
       // 空气吸收：距离越远高频掉得越快。20 m 上还有 8 kHz，200 m 上只剩 1 kHz 出头。
-      const airHz = Math.min(airCut || 20000, Clamp(18000 / (1 + distance * 0.09), 700, 20000));
+      // 遮挡的低通并到同一只滤波器上（取更狠的那个）：墙与空气吃的是同一段高频，
+      // 串两只滤波器只是多一个节点。
+      const airHz = Math.min(airCut || 20000,
+        Clamp(18000 / (1 + distance * 0.09), 700, 20000), OcclusionCut(occ));
       const air = v.Filter("lowpass", airHz, 0.7);
       src.connect(air);
       // 混响 send 接在空气低通**之后**（坑 1 说的是不能接在 Panner 之后，
@@ -3147,7 +3764,8 @@ export class AudioEngine {
       air.connect(wet);
       const panner = v.Own(ctx.createPanner());
       // HRTF 很贵，25 m 以外听不出方位差别，改用 equalpower（文件头坑 3）。
-      panner.panningModel = distance < 25 ? "HRTF" : "equalpower";
+      // 第一人称那一枪也不走 HRTF：枪就在你脸前面，HRTF 只会把它推到某一侧去。
+      panner.panningModel = (!firstPerson && distance < 25) ? "HRTF" : "equalpower";
       panner.distanceModel = "inverse";
       // A distant battle sector is an extended field, not a one-metre muzzle.
       panner.refDistance = soundField ? 64 : 3.5;
@@ -3160,14 +3778,24 @@ export class AudioEngine {
       } else if (panner.setPosition) {
         panner.setPosition(position.x, position.y, position.z);
       }
-      air.connect(panner).connect(this.Bus(bus));
-      // MoveVoice 要搬的就是这三样：方位、空气低通、混响占比。
+      // 遮挡的干声衰减单独一个节点 —— **不能折进 src**：src 同时喂着湿声那一路，
+      // 而湿声只掉 −4 dB（文件头坑 4）。occ 为 0 时不建这个节点，
+      // 探针没注册的场合因此一个节点都不多花（回归为零）。
+      if (occ > 0) {
+        const dry = v.Gain(DbGain(OCCLUSION_DRY_DB * occ));
+        v.occGain = dry;
+        air.connect(dry).connect(panner);
+      } else {
+        air.connect(panner);
+      }
+      // 远声组：远处那一片单独走一条总线，玩家开枪时整组让路（见 DuckAmbience）。
+      panner.connect(bus === "sfx" && distance > FAR_GROUP_M ? this.farGain : this.Bus(bus));
+      // MoveVoice 要搬的就是这几样：方位、空气低通、混响占比、遮挡。
       v.panner = panner;
       v.air = air;
-      v.distance = distance;
       // 混响也要跟着距离掉，只是掉得比直达声慢一半（dB 上正好一半）。
       // 见 WetFalloff —— 这一行原来是 `1 + distance*0.03`，**方向是反的**。
-      v.wetScale = WetFalloff(distance);
+      v.wetScale = WetFalloff(distance) * DbGain(OCCLUSION_WET_DB * occ);
     } else {
       // 非空间化：UI、第一人称、以及环境一次性音。
       // airCut 是给环境用的 —— 那些东西「在远处」这件事没有 position 可以表达，
@@ -3196,8 +3824,37 @@ export class AudioEngine {
     }
     v.wetBase = wet.gain.value;                    // 配方给的干湿比；MoveVoice 按新距离重乘
     wet.gain.value = Clamp01(wet.gain.value * v.wetScale);
+    this.activeVoices.add(v);
     this.ReleaseVoice(v, v.life);
+    // Duck / 耳鸣 / 环境闪避统一在这儿触发（配方里不再各自触发，见 DUCK_ON 的抬头）。
+    // 放在最后：这三样都会去动别的总线，而这条 voice 得先建成功才算「这一声真响了」。
+    this.Reactions(name, distance, !!position, priority || firstPerson);
     return v;
+  }
+
+  /**
+   * 一声响过之后，别的层要跟着做什么：压音乐环境（Duck）、耳鸣（Deafen）、
+   * 玩家开枪压环境与远声组（DuckAmbience）。
+   *
+   * **为什么不写在配方里**（原来就写在 explosionNear / shellImpact 两条合成配方体内）：
+   * 采样一盖上去那两条配方就再也不会被执行，于是整局一次 duck 都没有 ——
+   * 而这件事没有任何机器发现得了（声音全在响、控制台干净、冒烟全绿）。
+   * 触发条件属于「这一声是什么、离多远」，那是 Play 知道的事，不是配方知道的事。
+   */
+  Reactions(name, distance, spatial, selfShot) {
+    const duck = DUCK_ON[name];
+    if (duck) {
+      // 按听者距离缩放：两百米外的一颗手榴弹不该把配乐压下去。
+      // 非空间化的（玩家自己脚边那颗）按满量算。
+      const near = spatial ? Clamp01(1 - distance / duck.range) : 1;
+      const amount = duck.amount * near;
+      if (amount >= DUCK_MIN_AMOUNT) { this.Duck(duck.seconds, amount); this.stats.ducks += 1; }
+    }
+    const deaf = DEAFEN_ON[name];
+    // 耳鸣要过距离闸：几百米外的一记闷响不该震聋玩家（旧的 explosionFar 配方里正是这么写的）。
+    if (deaf && (!spatial || distance < DEAFEN_M)) { this.Deafen(deaf); this.stats.deafens += 1; }
+    // 玩家自己开的那一枪：环境床与远声组快压慢放（HDR-lite）。
+    if (selfShot && IsGunCue(name)) this.DuckAmbience();
   }
 
   /**
@@ -3221,11 +3878,33 @@ export class AudioEngine {
     } else if (p.setPosition) {
       p.setPosition(position.x, position.y, position.z);
     }
-    if (voice.air) voice.air.frequency.setTargetAtTime(Clamp(18000 / (1 + distance * 0.09), 700, 20000), t, tau);
+    // 遮挡每 OCCLUSION_REFRESH_S 重查一次。**不能每帧查**：会飞的源是持续声，
+    // 每帧一条射线 × 整条航线 = 上千次；而飞机从遮到不遮本来也就是零点几秒的事。
+    if (voice.occGain || this.probes.occlusion) {
+      if (t - (voice.occAt ?? -1) >= OCCLUSION_REFRESH_S) {
+        voice.occAt = t;
+        let occ = this.Occlusion(position, distance);
+        if (this.ZoneBoundary(voice.reverbZone || this.space)) occ = Clamp01(occ + ZONE_BOUNDARY_OCC);
+        voice.occ = occ;
+        // occGain 是起播那一刻按 occ > 0 才建的。起播时通透、飞到墙后面去的那种
+        // 只能靠低通与湿声表达 —— 中途插节点要断开重接一条正在响的链，
+        // 那一下会「咔」，比少 12 dB 难听得多。
+        if (voice.occGain) voice.occGain.gain.setTargetAtTime(DbGain(OCCLUSION_DRY_DB * occ), t, tau);
+        if (voice.air) voice.airOcc = OcclusionCut(occ);
+        voice.wetOcc = DbGain(OCCLUSION_WET_DB * occ);
+      }
+    }
+    if (voice.air) {
+      const airHz = Math.min(Clamp(18000 / (1 + distance * 0.09), 700, 20000), voice.airOcc ?? 20000);
+      voice.air.frequency.setTargetAtTime(airHz, t, tau);
+    }
     if (voice.wetGain && voice.wetBase !== undefined) {
-      voice.wetGain.gain.setTargetAtTime(Clamp01(voice.wetBase * WetFalloff(distance)), t, tau);
+      voice.wetGain.gain.setTargetAtTime(Clamp01(voice.wetBase * WetFalloff(distance) * (voice.wetOcc ?? 1)), t, tau);
     }
     voice.distance = distance;
+    // 有效电平跟着距离走 —— 不更新的话，一架飞远了的飞机在 stealing 那儿
+    // 永远还挂着起飞时的电平，成了偷不掉的常驻声部。
+    if (voice.baseGain !== undefined) voice.effectiveGain = voice.baseGain * DryFalloff(distance);
     if (velocity && typeof voice.SetDoppler === "function" && distance > 1e-3) {
       // 朝听者为正：f' = f * c / (c - v_radial)
       const radial = -(velocity.x * dx + velocity.y * dy + velocity.z * dz) / distance;
@@ -3270,10 +3949,14 @@ export class AudioEngine {
 
   FreeVoice(v) {
     this.pendingVoices.delete(v);
+    this.activeVoices.delete(v);
     for (let i = 0; i < v.nodes.length; i += 1) {
       try { v.nodes[i].disconnect(); } catch (err) { /* 已断开 */ }
     }
-    this.liveNodes = Math.max(0, this.liveNodes - v.nodes.length);
+    // 被偷过的那条，预算在偷的那一刻就还回去了（见 StealVoices）——
+    // 这儿再还一次就是凭空多出一堆预算，几分钟之后 liveNodes 会掉成 0
+    // 而节点还都在响（「预算怎么用不完」那一类症状）。
+    if (!v.reclaimed) this.liveNodes = Math.max(0, this.liveNodes - v.nodes.length);
     v.nodes.length = 0;
   }
 
@@ -3348,6 +4031,37 @@ export class AudioEngine {
     return this.paused;
   }
 
+  /**
+   * 玩家开枪时把**环境床与远声组**快压慢放（HDR-lite，见 FIRE_DUCK_* 那组常量）。
+   *
+   * 与 Duck 的分工：Duck 压的是音乐与环境（为台词和爆炸让路，一秒量级）；
+   * 这一条压的是环境与「远处那一片」（为玩家自己那一枪让路，几百毫秒量级），
+   * 而且**不动近处的音效** —— 把身边的脚步和喊话一起压掉，
+   * 听感会变成「开一枪世界静音一下」。
+   *
+   * 写在独立的 ambienceDuck / farGain 上，不写 ambienceBus / ambienceUser：
+   * 前者是系统配平、后者是玩家推子，一次开枪就把两者之一改掉了。
+   *
+   * @param {number} seconds 压住不放的时长（起落各另算：40 ms 压、300 ms 放）
+   * @param {number} amount  压掉的比例；0.5 = 剩一半 = −6.02 dB
+   */
+  DuckAmbience(seconds = FIRE_DUCK_HOLD_S, amount = FIRE_DUCK_AMOUNT) {
+    if (!this.ctx || !this.ambienceDuck || !this.farGain) return;
+    const t = this.ctx.currentTime;
+    const level = Clamp01(1 - amount);
+    const hold = Math.max(0, seconds);
+    for (const g of [this.ambienceDuck.gain, this.farGain.gain]) {
+      g.cancelScheduledValues(t);
+      // 从**当前**值接上去，不是从 1 —— 连发时每一发都会重进这里，
+      // 从 1 起跳的话每一发都先把音量弹回去再压下来，那是颤音不是闪避。
+      g.setValueAtTime(Clamp(g.value, FLOOR, 1), t);
+      g.linearRampToValueAtTime(Math.max(level, FLOOR), t + FIRE_DUCK_ATTACK_S);
+      g.setValueAtTime(Math.max(level, FLOOR), t + FIRE_DUCK_ATTACK_S + hold);
+      g.linearRampToValueAtTime(1, t + FIRE_DUCK_ATTACK_S + hold + FIRE_DUCK_RELEASE_S);
+    }
+    this.stats.ambienceDucks += 1;
+  }
+
   /** 台词/爆炸时压低音乐与环境。amount = 压掉的比例（0.6 就是只剩四成）。 */
   Duck(seconds = 1.0, amount = 0.6) {
     if (!this.ctx) return;
@@ -3366,6 +4080,10 @@ export class AudioEngine {
    * 两件事同时发生：主总线低通掉到几百 Hz（外界一下子变闷），
    * 同时脑子里留一条 4 kHz 的正弦慢慢衰减。缺任何一半都不像被震过。
    * 正弦接在耳鸣低通**之后**，不然它自己也会被压掉。
+   *
+   * 【2026-09-08】现在由 Play 按 DEAFEN_ON + DEAFEN_M 自动触发（爆炸类且炸得够近）。
+   * 这个方法**保留**成手动 API：编辑器要能单独试听，过场也可能要在没有爆炸的
+   * 地方来一下（比如被埋在土里那一拍）。
    */
   Deafen(seconds = 0.4) {
     if (!this.ctx) return;
@@ -3378,7 +4096,7 @@ export class AudioEngine {
     f.setValueAtTime(520, t + seconds);
     f.exponentialRampToValueAtTime(20000, t + seconds + 0.9);
 
-    if (this.liveNodes + 4 > NODE_BUDGET) return;   // 预算紧就只做闷响
+    if (this.liveNodes + 4 > this.nodeBudget) return;   // 预算紧就只做闷响
     const osc = ctx.createOscillator();
     osc.type = "sine";
     osc.frequency.value = 4000;
