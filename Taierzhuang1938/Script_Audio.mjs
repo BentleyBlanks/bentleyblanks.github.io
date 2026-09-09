@@ -2626,8 +2626,9 @@ export const MUSIC_BASE = "Audio/Music/";
 // 7 → 8：缺口批 A2 的十五个 cue 从 pendingCues 搬进 cues（2026-08-29）。
 // 清单本身换了内容，戳不动的话浏览器会拿着旧清单去要新文件（或者反过来）。
 // 9 → 10：九条爆炸/弹着成品换了素材并加了 38 Hz 高通（2026-09-09）。
+// 10 → 11：近中远爆炸与贴耳音爆/呼啸共 16 条换为 SeedAudio 1.0 成品。
 // **文件名一个没变**，所以不抬这个戳的话，玩家听到的永远是缓存里的旧爆炸。
-export const SFX_PACK_VERSION = "10";
+export const SFX_PACK_VERSION = "11";
 export const AMB_PACK_VERSION = "1";
 export const MUSIC_PACK_VERSION = "5";
 

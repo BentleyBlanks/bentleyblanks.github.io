@@ -754,6 +754,12 @@ const whiz = await page.evaluate(async () => {
     soldier.ammo = 99; soldier.coolUntil = -1; soldier.suppression = 0;
     soldier.order = "hold"; soldier.burstLeft = 0;
   };
+  // 连续远射的限幅窗口只测这支步枪、弹啸和随枪 foley。剧本仍在走，可能在
+  // 玩家 2–3 m 处触发炮击；那记近爆按设计会压限幅，不能算作远射过载。
+  // 同时清掉上一组玩家近射的余音，等末端压缩器释放，再开始计时。
+  allow = /^(rifleIja|rifleIjaFar|bulletCrack|bulletWhizz|gunTail|bolt|shellDrop)/;
+  for (const voice of [...a.activeVoices]) a.StopVoice(voice, 0.01);
+  await sleep(1500);
   const before = a.RequestedCount("bulletCrack");
   let redMin = 0;
   const t0 = performance.now();
@@ -767,6 +773,7 @@ const whiz = await page.evaluate(async () => {
   const far = { cracks: a.RequestedCount("bulletCrack") - before, secs: +secs.toFixed(1),
     perSec: +((a.RequestedCount("bulletCrack") - before) / secs).toFixed(2),
     redMinDb: +redMin.toFixed(2) };
+  allow = null;
 
   // ④ 30 m 外那一枪：弹啸先到、本体晚 d/340。34 m 是因为 PROPAGATION_MIN_M = 30
   //    （正好 30 m 上传播延迟按设计就是 0，量那个点等于量了个寂寞）。
