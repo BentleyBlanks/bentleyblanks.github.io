@@ -102,9 +102,9 @@ for(let i=0;i<120;i++)window.UpdateCrowdProbe(i/60);g.StepFrames(1,1/60,true);re
       walkers:column.walkers.map(w=>({x:w.x,z:w.z,area:w.staging?.area})),people:view.people.State(),updateMs,aftermath:view.aftermath.triangles};
   });
   assert.ok(crowd.aftermath.distant<crowd.aftermath.detail*.6,"distant bodies preserve silhouettes within a substantially smaller geometry budget");
-   assert.equal(crowd.litters.filter(l=>l.area==="courtyard").length,20);
+   assert.equal(crowd.litters.filter(l=>l.area==="courtyard").length,10);
   assert.ok(Math.max(...crowd.litters.map(l=>l.x))-Math.min(...crowd.litters.map(l=>l.x))>25);
-  assert.equal(crowd.walkers.filter(w=>w.area==="courtyard").length,58);
+  assert.equal(crowd.walkers.filter(w=>w.area==="courtyard").length,4);
   await page.screenshot({path:path.join(out,"Scene_CourtyardGroups.png")});
   await fs.writeFile(path.join(out,"Data_Crowd.json"),JSON.stringify(crowd,null,2));
  await page.goto(("http://127.0.0.1:"+server.address().port)+"/Taierzhuang1938/?phase=1&shot=1&manual=1&quality=low&scale=small");

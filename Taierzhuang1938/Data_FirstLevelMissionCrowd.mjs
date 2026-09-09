@@ -1,3 +1,5 @@
+import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
+
 // Covered work areas: arriving teams fan out before joining a narrow doorway or loading bay.
 export const MISSION_CROWD_AREAS = Object.freeze([
  {id:"courtyard",trigger:{x:58,z:18},entryZ:18,exitZ:32.2,merge:{x:53,z:32.2},
@@ -15,9 +17,10 @@ export const MISSION_CROWD_AREAS = Object.freeze([
 for(const area of MISSION_CROWD_AREAS){
   // Fill the farthest pockets first so later arrivals do not walk through resting teams.
   area.pockets.sort((a,b)=>b.z-a.z);
+  area.pockets=area.pockets.slice(0,R.litterCount);
   const bounds=area.id==="courtyard"?{x:39,z:19,w:30.7,d:12.1}:{x:57,z:91,w:32,d:17};
   const points=[];
-  for(let attempt=0;attempt<6000&&points.length<58;attempt++){
+  for(let attempt=0;attempt<6000&&points.length<R.walkingWoundedCount+R.medicCount+R.civilianCount;attempt++){
     const x=bounds.x+((attempt*.61803398875+.27)%1)*bounds.w;
     const z=bounds.z+((attempt*.41421356237+.19)%1)*bounds.d;
     if(area.pockets.some(p=>Math.hypot(x-p.x,z-p.z)<1.95))continue;

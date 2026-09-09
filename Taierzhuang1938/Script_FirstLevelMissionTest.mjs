@@ -221,6 +221,9 @@ const bad=[];for(const a of areas)for(const [kind,points] of [['litter',a.pocket
 assert.deepEqual(bad,[],"all staging routes clear real walls and furniture, including both bearers");
 assert.ok(areas.every(a=>a.walkerPockets.length===R.walkingWoundedCount+R.medicCount+R.civilianCount));
 const c = new FirstLevelMissionColumn();
+assert.equal(c.litters.length,10,"one squad escorts ten litters");
+assert.ok(c.litters.every(l=>l.bearers.length===2),"each litter has exactly two bearer slots");
+assert.deepEqual(c.walkers.map(w=>w.kind),["medic","medic","civilian","civilian"],"only essential unarmed support accompanies the litters");
 function CheckStagingClearance(column){
   const teams=column.litters.filter(l=>l.staging);
   for(let i=0;i<teams.length;i++)for(let j=i+1;j<teams.length;j++)
@@ -234,7 +237,7 @@ assert.ok(Math.max(...c.litters.map(l=>l.x))-Math.min(...c.litters.map(l=>l.x))>
 assert.ok(c.walkers.every(w=>w.staging?.mode==="resting"),"walkers reach separate waiting places");
 const waitingStart=c.walkers.map(w=>({x:w.x,z:w.z})),waitingTravel=c.walkers.map(()=>0);
 for(let frame=0;frame<240;frame++){c.Update(.1);c.walkers.forEach((w,i)=>waitingTravel[i]=Math.max(waitingTravel[i],Math.hypot(w.x-waitingStart[i].x,w.z-waitingStart[i].z)));}
-assert.ok(waitingTravel.filter(d=>d>.15).length>=5,"waiting wounded and medics make staggered short steps");
+assert.ok(waitingTravel.filter(d=>d>.15).length>=Math.ceil(c.walkers.length*.75),"waiting wounded and medics make staggered short steps");
 assert.ok(waitingTravel.every(d=>d<1.1),"waiting people remain near their assigned places");
 c.gateOpen = true;
 for (let i = 0; i < 6000; i++){c.Update(0.1);if(i%5===0)CheckStagingClearance(c);}
@@ -248,7 +251,7 @@ assert.equal(c.departed, 2);
 assert.equal(c.QueueAhead(), 0);
 assert.equal(c.zhou.loaded, false);
 assert.ok(c.vehicles.slice(0, 2).every((cart) => cart.z > 180));
-assert.equal(c.vehicles[2].load.length, 3);
+assert.equal(c.vehicles[2].load.length, R.zhouQueueIndex % R.cartCapacity);
 const zhouBefore = { x: c.zhou.x, z: c.zhou.z };
 assert.ok(c.BeginZhouBoarding());
 for (let i = 0; i < 50; i++) c.Update(0.1);
@@ -290,10 +293,10 @@ for (let i = 0; i < 4000; i++) c.Update(0.1);
 assert.ok(c.walkers.filter((w) => w.kind === "medic" && w.health > 0).every((w) => w.escaped));
 assert.deepEqual(c.bearerCasualties.slice(0,originalBearerBodies.length),originalBearerBodies,"fallen bearers stay at the original position after rescue and departure");
 console.log(
-  "ok 20 litters, closed gate, physical load queue, 2 departing carts, interrupted transfer, three passages, reception and actual rear exit",
+  "ok 10 litters, closed gate, physical load queue, 2 departing carts, interrupted transfer, three passages, reception and actual rear exit",
 );
 // Survivor counts change the number of useful loads; missing people cannot fill a cart.
-for (const lost of [1, 6, 7, 10, 11]) {
+for (const lost of Array.from({length:R.zhouQueueIndex+1},(_,i)=>i)) {
   const reduced = new FirstLevelMissionColumn();
   reduced.Activate(); reduced.gateOpen = true; reduced.loading = true;
   for (let i = 0; i < lost; i++) reduced.litters[i].health = 0;
