@@ -1,5 +1,5 @@
-// Approved SeedAudio takes, 2026-09-09. Labels are editor-only metadata.
-export const FIRST_LEVEL_MUSIC_VERSION = "20260909-seven-r1";
+// SeedAudio takes; carriage revised for homesickness and restrained foreboding. Labels are editor-only metadata.
+export const FIRST_LEVEL_MUSIC_VERSION = "20260909-carriage-r2";
 export const FIRST_LEVEL_MUSIC_CUES = Object.freeze(Object.fromEntries([
   ["LeavingHome", "离家的人", 0.72],
   ["TheFrontClosesIn", "前线压来", 0.50],
