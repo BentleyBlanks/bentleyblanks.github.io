@@ -8,6 +8,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
+import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage, FirstLevelStageForStep } from "./Data_FirstLevelMissionStages.mjs";
+import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
 import { FirstLevelMissionColumn, MissionCarryRoutePoint, MissionGuideSpeed, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
 import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
@@ -35,6 +37,25 @@ import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
   assert.ok(MISSION_TRAIN.cars.at(-1).z+R.trainTravelM+8<MISSION_LAYOUT.bounds.maxZ,"whole train begins inside the extended approach");
 }
 const flow = new FirstLevelMissionFlow();
+assert.equal(FIRST_LEVEL_STAGES.length,18);
+assert.deepEqual(FIRST_LEVEL_STAGES.flatMap(stage=>stage.steps),MISSION_STAGES.slice(0,-1).map(step=>step.id));
+for (const phase of FIRST_LEVEL_STAGES) {
+  const saved=BuildFirstLevelCheckpoint(phase.number), step=MISSION_STAGES[saved.index];
+  assert.equal(ResolveFirstLevelStage(phase.id),phase);
+  assert.equal(FirstLevelStageForStep(step.id),phase);
+  assert.ok(MISSION_STAGES.slice(0,saved.index).flatMap(s=>s.requirements).every(f=>saved.facts.includes(f)));
+  assert.ok(step.requirements.some(f=>!saved.facts.includes(f)),"destination must still require gameplay: "+phase.id);
+  const column=new FirstLevelMissionColumn(); column.Restore(saved.column);
+  const before=column.Snapshot();column.Update(.1);assert.ok(Number.isFinite(column.zhou.x));
+  assert.deepEqual(BuildFirstLevelCheckpoint(phase.id).column,before,"cached starts cannot be mutated by a run");
+  if(phase.number>=11)assert.ok(column.gateOpen&&column.litters.every(l=>l.passedGate));
+  if(phase.number>=13)assert.equal(column.loadEvents.length,R.zhouQueueIndex);
+  if(phase.number===14)assert.equal(column.zhou.state,"carried");
+  if(phase.number===17)assert.equal(column.zhou.state,"placed");
+  if(phase.number===18)assert.equal(column.zhou.health,0);
+}
+for(const value of [0,19,-1,1.5,"Complete","Carry",null])assert.throws(()=>ResolveFirstLevelStage(value));
+console.log("ok 18 Notion stages, complete prior facts, live destination gates and independent reconstructed columns");
 flow.Start();
 for (const stage of MISSION_STAGES.slice(0, -1)) {
   assert.equal(flow.stage.id, stage.id);

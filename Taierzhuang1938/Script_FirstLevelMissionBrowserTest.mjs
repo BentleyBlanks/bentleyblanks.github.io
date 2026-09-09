@@ -9,8 +9,26 @@ import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { SCENE_RENDER_LIMITS } from "./Data_AssetStandards.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url)),
   root = path.resolve(here, "..");
-const output = path.join(here, "_shots", "FirstLevelMission");
 const audioCheck = process.argv.includes("--audio");
+const stageJumps = process.argv.includes("--stage-jumps");
+const stageFrom = Number(process.argv.find(arg=>arg.startsWith("--stage-from="))?.split("=")[1] || 1);
+assert.ok(stageFrom===1 || (stageJumps && stageFrom===16),"supported continuation suites start at 1 or 16");
+const output = path.join(here, "_shots", stageFrom===16 ? "FirstLevelStageTail" : stageJumps ? "FirstLevelStageContinue" : "FirstLevelMission");
+const jumpReceipts = [];
+async function JumpStage(number) {
+  if (!stageJumps) return;
+  const receipt = await page.evaluate(async number => {
+    const g=window.Tengxian, before=g.Debug.FirstLevelMission();
+    const after=await g.Debug.FirstLevelJump(number);
+    // Test driver memory belongs to the old actors, just like the old runtime.
+    if(window.MissionInputDriver){window.MissionInputDriver.blocked.clear();window.MissionInputDriver.lastTarget=null;window.MissionInputDriver.observedShot=0;}
+    if(number===7)window.villageBodies=g.ai.soldiers.filter(a=>["VillageGunner","VillageCorner","KitchenGuard","RearWindow","SideYard","MeleeTutor"].includes(a.missionId)).map(a=>({id:a.id,missionId:a.missionId}));
+    return {number,before:before.stage,beforePhase:before.phaseNumber,after:after.stage,phase:after.phaseNumber,remaining:after.remaining};
+  },number);
+  assert.equal(receipt.phase,number);assert.ok(receipt.remaining.length);
+  if(number>stageFrom)assert.equal(receipt.beforePhase,number,"previous debug start reaches the next public phase before restarting it");
+  jumpReceipts.push(receipt);console.log("STAGE_JUMP",JSON.stringify(receipt));
+}
 const capturedActivities = new Set();
 await fs.mkdir(output, { recursive: true });
 const server = await ServeRoot(root, 0),
@@ -148,14 +166,14 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
       return {
         done:
           b.index === b.points.length ||
-          (g.Debug.FirstLevelMission().complete &&
+          (g.Debug.FirstLevelMissionRuntime().flow.completed &&
             Math.hypot(g.player.position.x - b.points.at(-1).x, g.player.position.z - b.points.at(-1).z) < 5),
         index: b.index,
         target: b.points[b.index],
         position: { ...g.player.position },
         alive: g.player.alive,
         health: g.player.health,
-        stage: g.Debug.FirstLevelMission().stage,
+        stage: g.Debug.FirstLevelMissionRuntime().flow.stage.id,
         stalled: b.stalled,
         shots: g.state.playerShots,
         ammo: g.state.ammo,
@@ -215,12 +233,14 @@ async function Interact() {
   });
 }
 async function WaitStage(expected, seconds = 240, { fight = false } = {}) {
+  // Read only the step id in the per-frame loop. Full State clones the entire
+  // casualty/transport ledger; keep that diagnostic snapshot at chunk boundaries.
   let state;
   for (let chunk = 0; chunk < Math.ceil(seconds / 5); chunk++) {
     state = await page.evaluate(
       ({ expected, fight }) => {
         const g = window.Tengxian;
-        for (let i = 0; i < 300 && g.player.alive && g.Debug.FirstLevelMission().stage !== expected; i++) {
+        for (let i = 0; i < 300 && g.player.alive && g.Debug.FirstLevelMissionRuntime().flow.stage.id !== expected; i++) {
           const foe = fight ? window.MissionInputDriver.Target() : null;
           if (foe) window.MissionInputDriver.Shoot(foe);
           else {
@@ -229,7 +249,7 @@ async function WaitStage(expected, seconds = 240, { fight = false } = {}) {
           }
           if (g.player.bleeding && g.player.health < 80) g.Debug.Key("KeyB");
           g.StepFrames(1, 1 / 60, false);
-          if(g.Debug.FirstLevelMission().stage==="Rescue"&&!window.rescueWitnessCaptured &&
+          if(g.Debug.FirstLevelMissionRuntime().flow.stage.id==="Rescue"&&!window.rescueWitnessCaptured &&
             ['yaowa','liuwencai'].every(id=>g.ai.soldiers.find(a=>a.castId===id)?.missionRescueReady))break;
         }
         g.Debug.Mouse(0, false);
@@ -288,6 +308,8 @@ try {
     { waitUntil: "domcontentloaded", timeout: 180000 },
   );
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 180000 });
+  if(stageFrom===1) {
+  await JumpStage(1);
   if (audioCheck) {
     await page.locator("#bootStart").click();
     await page.waitForFunction(()=>window.Tengxian.audio.ctx?.state==="running",null,{timeout:15000});
@@ -425,6 +447,8 @@ try {
     return { frozen, running: g.state.running, locked };
   });
   assert.ok(pause.frozen && pause.running && pause.locked, "Pause freezes the world and resume restores input");
+  if(stageJumps)await WaitStage("Unloading",120);
+  await JumpStage(2);
   const opening = await page.evaluate(() => {
     const g=window.Tengxian;
     const ammo=g.state.ammo,shots=g.state.playerShots,bundles=g.state.bundles,grenades=g.state.grenades;
@@ -440,7 +464,7 @@ try {
     g.Debug.Key("KeyD",true);g.StepFrames(18,1/60,true);g.Debug.Key("KeyD",false);
     const empty={visible:g.viewmodel.root.visible,unarmed:g.viewmodel.weaponId===null,handTravel,ammo:g.state.ammo===ammo,shots:g.state.playerShots===shots,
       grenades:g.state.grenades===grenades,bundles:g.state.bundles===bundles,ads:g.player.ads};
-    for(let i=0;i<120*60&&!g.Debug.FirstLevelMission().facts.includes("trainProneOrder");i++)g.StepFrames(1,1/60,false);
+    for(let i=0;i<120*60&&!g.Debug.FirstLevelMissionRuntime().Has("trainProneOrder");i++)g.StepFrames(1,1/60,false);
     const before=g.Debug.FirstLevelMission();
     const prompt=before.openingPrompt;
     const stanceBefore=g.player.stance;
@@ -449,7 +473,7 @@ try {
     const after=g.Debug.FirstLevelMission();
     const prone={prompt,stanceBefore,stanceAfter:g.player.stance,ack:after.facts.includes("trainPlayerProne"),
       promptCleared:!after.openingPrompt};
-    for(let i=0;i<120*60&&!g.Debug.FirstLevelMission().facts.includes("unloadOrdersHeard");i++)g.StepFrames(1,1/60,false);
+    for(let i=0;i<120*60&&!g.Debug.FirstLevelMissionRuntime().Has("unloadOrdersHeard");i++)g.StepFrames(1,1/60,false);
     return {empty,prone,released,walkAfter,after:g.Debug.FirstLevelMission()};
   });
   assert.ok(opening.empty.visible&&opening.empty.unarmed&&opening.empty.handTravel>.01&&opening.empty.ammo&&opening.empty.shots&&opening.empty.grenades&&opening.empty.bundles&&opening.empty.ads<.01,
@@ -493,7 +517,7 @@ try {
       frozen,
       alive: g.player.Alive,
       running: g.state.running,
-      stage: g.Debug.FirstLevelMission().stage,
+      stage: g.Debug.FirstLevelMissionRuntime().flow.stage.id,
       facts: g.Debug.FirstLevelMission().facts,
       beforeFacts: before.facts,
       ammo: g.state.ammo,
@@ -569,6 +593,7 @@ try {
   assert.ok(trainExit.entries.every(e=>e.life.weight===0),"every boarding pose releases before walking away");
   assert.ok(trainExit.entries.every(e=>e.arrived),"all train bodies arrive without respawning: "+JSON.stringify(trainExit.entries.filter(e=>!e.arrived)));
   console.log("ok all 40 recruits and Luo physically disembarked and reached individual muster points");
+  }
   if (process.argv.includes("--campaign")) {
     await page.evaluate(() => {
       const g = window.Tengxian;
@@ -620,6 +645,9 @@ try {
         },
       };
     });
+    if(stageFrom===1) {
+    if(stageJumps){await Route([{x:-71,z:74},{x:-66,z:66}],"UnloadCheckpointExit");await WaitStage("Support",30);}
+    await JumpStage(3);
     await page.evaluate(async () => {
       const { MISSION_ROUTES } = await import("./Data_FirstLevelMissionLayout.mjs");
       window.missionBot = {
@@ -669,7 +697,7 @@ try {
           index: b.index,
           target: b.route[b.index],
           position: { ...g.player.position },
-          stage: g.Debug.FirstLevelMission().stage,
+          stage: g.Debug.FirstLevelMissionRuntime().flow.stage.id,
           alive: g.player.alive,
           health: g.player.health,
           frames: b.frames,
@@ -730,6 +758,7 @@ try {
       assert.ok(samples.length>=2&&samples.some(a=>Math.hypot(a.x-samples[0].x,a.z-samples[0].z)>5),id+" makes physical progress along the personal route");
     }
     await fs.writeFile(path.join(output,"Data_TrenchCombatSound.json"),JSON.stringify(battlefieldSound,null,2));
+    await JumpStage(4);
     await page.evaluate(() => {
       const g = window.Tengxian;
       g.Debug.Key("KeyF", true);
@@ -807,12 +836,12 @@ try {
             b.lastGunShot=g.state.lastEmplacedShot.index;
             (b.gunShots??=[]).push({...g.state.lastEmplacedShot,target:target?{id:target.missionId||target.id,position:target.position.toArray(),stance:target.stance}:null,eye:g.player.EyePosition.toArray()});
           }
-          if (g.Debug.FirstLevelMission().stage !== "MachineGun" || !g.player.alive) break;
+          if (g.Debug.FirstLevelMissionRuntime().flow.stage.id !== "MachineGun" || !g.player.alive) break;
         }
         g.Debug.Mouse(0, false);
         g.Debug.Key("KeyR", false);
         return {
-          stage: g.Debug.FirstLevelMission().stage,
+          stage: g.Debug.FirstLevelMissionRuntime().flow.stage.id,
           health: g.player.health,
           alive: g.player.alive,
           gun: g.emplacement.View(),
@@ -849,6 +878,7 @@ try {
       g.Debug.Key("KeyF");
       g.Debug.Key("KeyB");
     });
+    await JumpStage(5);
     await Route([{x:0,z:-124},{x:-2.2,z:-122.5}],"FrontResupply",{stance:"crouch"});
     const reserveBefore=await page.evaluate(()=>window.Tengxian.emplacement.Emplacement("MissionGun").belts);
     await Interact();
@@ -940,6 +970,7 @@ try {
       if (thrown.mission.tank.immobilized) break;
     }
     await WaitStage("Orders", 20);
+    await JumpStage(6);
     await Route(
       [
         { x: 15, z: -111 },
@@ -954,6 +985,7 @@ try {
     assert.ok(ordersSupply.kind==="supply","covered orders position offers an actual supply interaction");
     await page.evaluate(()=>{const g=window.Tengxian;g.Debug.Key("KeyB");if(g.player.stance!=="crouch")g.Debug.Key("KeyC");g.StepFrames(1,1/60,false);});
     await WaitStage("South", 240);
+    await JumpStage(7);
     await Route(
       [
         { x: -8, z: -78 },
@@ -968,6 +1000,7 @@ try {
     );
     await WaitStage("Village", 120);
     assert.ok(await page.evaluate(()=>window.villageBodies.every(b=>window.Tengxian.ai.soldiers.some(a=>a.id===b.id&&a.missionId===b.missionId))),"the village reuses its pre-positioned soldiers");
+    await JumpStage(8);
     await Route(
       [
         { x: 58, z: -20 },
@@ -980,6 +1013,7 @@ try {
     const kitchenSquad=await page.evaluate(()=>{const g=window.Tengxian;return g.ai.soldiers.filter(a=>["luo","yaowa","heyoutian","liuwencai"].includes(a.castId)).map(a=>({id:a.castId,distance:a.position.distanceTo(g.player.position),alive:a.alive}));});
     console.log("kitchen squad",JSON.stringify(kitchenSquad));
     assert.ok(kitchenSquad.filter(a=>a.alive&&a.distance<25).length>=2,"at least two squadmates provide nearby kitchen support after the continuous march");
+    await JumpStage(9);
     const melee = await page.evaluate(() => {
       const g = window.Tengxian,
         enemy = g.ai.soldiers.find((a) => a.missionId === "MeleeTutor");
@@ -1049,6 +1083,15 @@ try {
     );
     await page.evaluate(() => window.Tengxian.Debug.Key("Digit1"));
     await WaitStage("Courtyard", 90, { fight: true });
+    await JumpStage(10);
+    if(stageJumps) {
+      // The normal approach already killed this gunner. A standalone court
+      // start deliberately keeps that current objective alive: use the same
+      // real kitchen approach to get a firing angle before opening the gate.
+      await Route([{x:58,z:4.6},{x:58,z:-9},{x:58,z:-20},{x:48,z:-20},
+        {x:58,z:-20},{x:58,z:-9},{x:58,z:4.6}],"CourtyardWindowGun",{fight:true});
+      assert.ok(await page.evaluate(()=>!window.Tengxian.Debug.FirstLevelMissionRuntime().enemies.get("VillageGunner").alive),"the current window gun is cleared with real fire");
+    }
     await Route(
       [
         { x: 58, z: 8 },
@@ -1075,6 +1118,7 @@ try {
     await page.evaluate(()=>{const g=window.Tengxian;g.Debug.Key("KeyB");g.StepFrames(1,1/60,false);});
     await Route([{x:53,z:32.2},{x:53,z:38},{x:57,z:38}],"CourtyardWatch",{fight:true});
     await WaitStage("TransferApproach", 360, { fight: true });
+    await JumpStage(11);
     await Route(
       [
         { x: 53, z: 37 },
@@ -1088,10 +1132,12 @@ try {
       { fight: true },
     );
     await WaitStage("Transfer", 120, { fight: true });
+    await JumpStage(12);
     await Route([{ x: 95, z: 110 }], "TransferSupply", { fight: true });
     await Interact();
     await Route([{ x: 95, z: 103 }], "TransferPosition", { fight: true });
     await WaitStage("AirFirst", 300, { fight: true });
+    await JumpStage(13);
     await WaitStage("Carry", 30, { fight: true });
     const pickup = await page.evaluate(() => {
       const z = window.Tengxian.Debug.FirstLevelMission().column.litters.find((l) => l.zhou);
@@ -1114,13 +1160,15 @@ try {
       ],
       "CarryToDitch",
     );
-    await WaitStage("Rescue", 12);
+    await JumpStage(14);
+    await WaitStage("Rescue", stageJumps ? 40 : 12);
     assert.equal(
       await page.evaluate(() => window.Tengxian.carry.Active),
       false,
       "Dive releases the original stretcher",
     );
     await WaitStage("RetreatFirst", 100, { fight: true });
+    await JumpStage(15);
     await Route(
       [
         { x: 39, z: 116 },
@@ -1151,6 +1199,8 @@ try {
       { fight: true },
     );
     await WaitStage("Reception", 180, { fight: true });
+    }
+    await JumpStage(16);
     await Route(
       [
         { x: -120, z: 40 },
@@ -1179,7 +1229,9 @@ try {
     );
     await Interact();
     assert.equal(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage), "Death");
+    await JumpStage(17);
     await WaitStage("FinalDefense", 45);
+    await JumpStage(18);
     assert.equal(
       await page.evaluate(
         () => window.Tengxian.Debug.FirstLevelMission().column.litters.find((l) => l.zhou).health,
@@ -1211,6 +1263,7 @@ try {
     await WaitStage("Complete", 60);
     assert.ok(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().voice.finished.includes("FinalExit")),"final handoff dialogue finishes before completion");
     assert.equal(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage), "Complete");
+    if (!stageJumps) {
     const pacing = await page.evaluate(() => {
       const stages = window.Tengxian.Debug.FirstLevelMission().log.filter((e) => e.kind === "stage");
       return Object.fromEntries(stages.slice(0, -1).map((e, i) => [e.id, stages[i + 1].time - e.time]));
@@ -1234,8 +1287,13 @@ try {
         return duration>=8&&duration<=12.1;}),
       "The limited-control death scene lasts 8–12 seconds",
     );
+    }
     assert.deepEqual(errors, []);
-    console.log("ok entire first level completed with real player input and physical mission events");
+    if (stageJumps) {
+      assert.deepEqual(jumpReceipts.map(receipt=>receipt.number),Array.from({length:19-stageFrom},(_,i)=>i+stageFrom));
+      await fs.writeFile(path.join(output,"Data_JumpContinuation.json"),JSON.stringify(jumpReceipts,null,2));
+      console.log(`ok debug starts ${stageFrom}–18 continued with real player input through their next stage, ending at Complete`);
+    } else console.log("ok entire first level completed with real player input and physical mission events");
   }
 } catch (error) {
   await page.screenshot({ path: path.join(output, "Scene_Failure.png") }).catch(() => {});

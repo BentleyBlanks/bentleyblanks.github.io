@@ -2,7 +2,7 @@ import { FRONT_REINFORCEMENTS, FRONT_APPROACH_ENEMIES } from "./Data_FirstLevelM
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-export const MISSION_VERSION = "first-level-20260907-r12";
+export const MISSION_VERSION = "first-level-20260909-stages18-r1";
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 const Stage = (id, objective, target, requirements, cue, extra = {}) =>

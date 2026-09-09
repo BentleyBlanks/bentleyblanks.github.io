@@ -69,6 +69,12 @@ try {
       await page.waitForFunction(()=>window.Tengxian.state.running&&document.getElementById('boot').classList.contains('gone'),null,{timeout:10000});
     } else {
       assert.equal(await page.evaluate(() => window.Tengxian.Debug.Menu().open), true);
+      await page.evaluate(()=>window.Tengxian.Debug.MenuAct("debug"));
+      assert.equal(await page.locator("#firstLevelStageSelect option").count(),18);
+      await page.selectOption("#firstLevelStageSelect","Transfer");
+      await page.locator('[data-action="firstLevelJump"]').click();
+      await page.waitForFunction(()=>window.Tengxian?.state?.running&&!window.Tengxian.state.advancing&&window.Tengxian.Debug.FirstLevelMission()?.phaseNumber===12,null,{timeout:180000});
+      assert.ok(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().facts.includes("courtyardPassed")));
     }
     assert.deepEqual(errors, []);
     assert.ok(![...modules].some(url => url.endsWith('/Script_Main.mjs')), 'source entry is not also loaded');

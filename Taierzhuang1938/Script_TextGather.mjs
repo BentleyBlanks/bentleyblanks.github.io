@@ -46,6 +46,7 @@ import { HISTORY_NOTES, BATTLE_TIMELINE, EPILOGUE_LINES } from "./Data_History.m
 import { VOICE_LINES } from "./Data_Voice.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { MISSION_STAGES,FIRST_LEVEL_MISSION_PHASE } from "./Data_FirstLevelMission.mjs";
+import { FIRST_LEVEL_STAGES } from "./Data_FirstLevelMissionStages.mjs";
 import { MISSION_DIALOGUE,MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
 import { FirstLevelStageTextId,FirstLevelVoiceTextId,FirstLevelCastTextId } from "./Script_TextIds.mjs";
 import {
@@ -106,6 +107,7 @@ function Add(row) {
 
 // --- 说话人名册 -------------------------------------------------------------
 for(const stage of MISSION_STAGES)Add({id:FirstLevelStageTextId(stage.id),text:stage.objective,source:'Data_FirstLevelMission'});
+for(const stage of FIRST_LEVEL_STAGES)Add({id:`firstLevel.phase.${stage.id}`,text:stage.title,source:'Data_FirstLevelMissionStages'});
 for(const cue of MISSION_DIALOGUE)cue.lines.forEach((line,index)=>Add({id:FirstLevelVoiceTextId(cue.id,index),text:line.text,who:line.who,voice:cue.file,source:'Data_FirstLevelMissionDialogue'}));
 for(const [id,person] of Object.entries(MISSION_VOICE_CAST))Add({id:FirstLevelCastTextId(id),text:person[0],who:id,source:'Data_FirstLevelMissionDialogue'});
 for(const field of ['label','date','place'])Add({id:LevelFieldId(FIRST_LEVEL_MISSION_PHASE.id,field),text:FIRST_LEVEL_MISSION_PHASE[field],source:'Data_FirstLevelMission'});

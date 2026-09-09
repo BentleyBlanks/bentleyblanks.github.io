@@ -662,10 +662,12 @@ await page.click(".edPanel.launcher .edX");
   await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("debug"));
   const debugPanel = await page.evaluate(() => ({
     mode: window.Taierzhuang.Debug.Menu().mode,
-    options: [...document.querySelectorAll("#menu .mnDebugRow")].map((e) => e.dataset.option),
+    options: [...document.querySelectorAll("#menu .mnDebugRow[data-option]")].map((e) => e.dataset.option),
+    stages: [...document.querySelectorAll("#firstLevelStageSelect option")].map(e=>e.value),
   }));
   Check("主菜单能打开五项调试选项", debugPanel.mode === "debug" && debugPanel.options.length === 5,
     JSON.stringify(debugPanel));
+  Check("主菜单调试面板列出第一关18个阶段",debugPanel.stages.length===18);
   await page.screenshot({ path: path.join(outDir, "Menu_Debug.png") });
   await page.click('#menu .mnDebugRow[data-option="noCollision"] input');
   const noCollision = await page.evaluate(() => window.Taierzhuang.Debug.DebugOptions());

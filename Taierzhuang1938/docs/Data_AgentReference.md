@@ -41,7 +41,8 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 - 先读：`docs/Data_TengxianIntegration.md`（模块契约与推定值索引）。
 
 ### 第一关《往南的路》
-- `Data_FirstLevelMission` / `Data_Tuning_FirstLevel`：24 个执行阶段对应 Notion 18 段剧情；事实门、有限敌人、节奏和装备。
+- `Data_FirstLevelMissionStages`：Notion 18 阶段目录；第 11–13 阶段采用原文最后的扩展修订。`Data_FirstLevelMission` / `Data_Tuning_FirstLevel` 保留 24 个执行步骤及通关状态的事实门、有限敌人、节奏和装备。
+- 调试选项可从主菜单、暂停菜单选择任一阶段并继续；agent 使用 `await window.Tengxian.Debug.FirstLevelJump(1)`（1–18 或目录 id），`Debug.FirstLevelStages()` 查询目录。状态中的 `phaseNumber/phaseId/phaseCount` 是剧情阶段，`stage` 是兼容原有工具的当前执行步骤。详见 [阶段跳转](Data_FirstLevelStageJump.md)。
 - `Data_FirstLevelMissionLayout` / `Terrain`：纯数据空间与共享高度场。室外地面不使用盒体；列车地板、台阶和桥面属于结构。
 - `Script_FirstLevelMissionRuntime` / `Flow` / `Column` / `View`：实际操作、阶段记录、20 副担架和装车/撤离。
 - `Data_FirstLevelMissionCrowd`：院落/转运区分散停靠点、错峰汇流和轻伤员等候区域。

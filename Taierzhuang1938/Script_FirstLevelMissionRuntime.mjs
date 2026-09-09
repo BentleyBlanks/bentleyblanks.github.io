@@ -18,6 +18,7 @@ import { MISSION_TRAIN, MissionTrainMotion } from "./Data_FirstLevelMissionTrain
 import { FirstLevelMissionTrain } from "./Script_FirstLevelMissionTrain.mjs";
 import { PrepareFirstLevelTrainAnimation } from "./Script_FirstLevelTrainAnimation.mjs";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
+import { ApplyFirstLevelStageJump } from "./Script_FirstLevelMissionStageJump.mjs";
 import {
   FirstLevelMissionColumn,
   MissionRoutePoint,
@@ -86,6 +87,7 @@ export class FirstLevelMissionRuntime {
     this.view.interact = this.interact;
     this.Register();
     this.flow.Start();
+    if (host.stageJump != null) ApplyFirstLevelStageJump(this, host.stageJump);
     this.voiceReady = this.voice.Load();
     this.SaveCheckpoint();
   }
@@ -1620,6 +1622,7 @@ export class FirstLevelMissionRuntime {
     return {
       ...this.flow.State(),
       missionVersion: MISSION_VERSION,
+      debugStart: this.debugStart || null,
       time: this.time,
       control: this.controls?.kind || null,
       emptyHands: this.EmptyHands,

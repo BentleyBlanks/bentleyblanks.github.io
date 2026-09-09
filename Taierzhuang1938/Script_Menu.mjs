@@ -591,6 +591,37 @@ export class MainMenu {
     intro.className = "mnDebugIntro";
     intro.textContent = T("menu.debug.intro");
     wrap.appendChild(intro);
+    const stages = this.host.FirstLevelStages?.();
+    if (stages?.length) {
+      const row = document.createElement("div");
+      row.className = "mnDebugRow mnDebugStages";
+      const copy = document.createElement("label");
+      copy.className = "mnDebugCopy"; copy.htmlFor = "firstLevelStageSelect";
+      const name = document.createElement("b");
+      name.textContent = T("menu.debug.firstLevelStages.label");
+      const note = document.createElement("small");
+      note.textContent = T("menu.debug.firstLevelStages.note");
+      copy.append(name,note);
+      const controls = document.createElement("div"); controls.className = "mnDebugStageControls";
+      const select = document.createElement("select"); select.id = "firstLevelStageSelect";
+      for (const stage of stages) {
+        const option = document.createElement("option"); option.value = stage.id;
+        option.textContent = T("menu.debug.firstLevelStages.option",{number:stage.number,title:Localize(`firstLevel.phase.${stage.id}`,stage.title)});
+        option.selected = stage.current; select.appendChild(option);
+      }
+      const button = document.createElement("button"); button.type = "button";
+      button.className = "mnDebugAdvance"; button.dataset.action = "firstLevelJump";
+      button.textContent = T("menu.debug.firstLevelStages.jump");
+      button.addEventListener("click",async () => {
+        button.disabled = true; select.disabled = true;
+        try { await this.host.FirstLevelJump(select.value); }
+        catch (error) {
+          note.textContent = T("menu.debug.p012Progress.failed",{message:error.message});
+          button.disabled = false; select.disabled = false;
+        }
+      });
+      controls.append(select,button); row.append(copy,controls); wrap.appendChild(row);
+    }
     const progress = this.host.P012Progress?.();
     if (progress) {
       const row = document.createElement("div");

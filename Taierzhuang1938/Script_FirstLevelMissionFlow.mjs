@@ -1,5 +1,6 @@
 // Pure mission facts. No kill quota, remote trigger circle or scheduled auto-win.
 import { MISSION_STAGES } from "./Data_FirstLevelMission.mjs";
+import { FIRST_LEVEL_STAGES, FirstLevelStageForStep } from "./Data_FirstLevelMissionStages.mjs";
 export class FirstLevelMissionFlow {
   constructor(host = {}) {
     this.host = host;
@@ -16,6 +17,7 @@ export class FirstLevelMissionFlow {
   get completed() {
     return this.stage.id === "Complete";
   }
+  get phase() { return FirstLevelStageForStep(this.stage.id); }
   Start() {
     if (this.started) return;
     this.started = true;
@@ -74,6 +76,10 @@ export class FirstLevelMissionFlow {
     return {
       ...this.Snapshot(),
       stage: this.stage.id,
+      phaseNumber: this.phase.number,
+      phaseId: this.phase.id,
+      phaseTitle: this.phase.title,
+      phaseCount: FIRST_LEVEL_STAGES.length,
       objective: this.stage.objective,
       complete: this.completed,
       remaining: this.stage.requirements.filter((id) => !this.Has(id)),

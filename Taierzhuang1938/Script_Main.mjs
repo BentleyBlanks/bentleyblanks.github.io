@@ -55,6 +55,7 @@ import {
 } from "./Data_FirstLevelP012Whitebox.mjs";
 import { FIRST_LEVEL_MISSION_PHASE as FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./Data_FirstLevelMission.mjs";
 import { FirstLevelMissionRuntime } from "./Script_FirstLevelMissionRuntime.mjs";
+import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage } from "./Data_FirstLevelMissionStages.mjs";
 import { LoadFirstLevelTrainAnimation } from "./Script_FirstLevelTrainAnimation.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { FirstLevelP012Debug } from "./Script_FirstLevelP012Debug.mjs";
@@ -226,6 +227,8 @@ const MELEE_TEST = params.get("melee") === "1";
 // Archived content is a developer regression fixture, absent from chapter selection.
 const ARCHIVED_P012_FIXTURE = params.get("whitebox") === "p012-archive";
 const FIRST_LEVEL_P012_WHITEBOX = params.get("whitebox") === "p012" || ARCHIVED_P012_FIXTURE;
+const FIRST_LEVEL_STAGE_START = FIRST_LEVEL_P012_WHITEBOX && !ARCHIVED_P012_FIXTURE
+  ? FIRST_LEVEL_STAGES.find(stage => stage.id === params.get("missionStage") || String(stage.number) === params.get("missionStage"))?.id || null : null;
 /**
  * 序 · 界河白盒（?jiehe=1）：与靶场同一条整表替换的路子。
  * 界河退出了正片流程，但 Script_JieheField / Script_JieheHeight /
@@ -1894,7 +1897,7 @@ async function Boot() {
 
   await NextFrame();
   setStep(T("boot.step.ready"), BOOT.progress.ready);
-  await EnterLevel(state.phaseIndex, { initial: true, cutscenes: false });
+  await EnterLevel(state.phaseIndex, { initial: true, cutscenes: false, stageJump:FIRST_LEVEL_STAGE_START });
   state.ready = true;
   bootStart.disabled = false;
   bootStart.textContent = BootStartLabel();
@@ -2359,6 +2362,8 @@ async function Boot() {
       BattleIntensity: () => audioWiring.BattleReport(),
       P012: () => missionRuntime?.State() || p012Flow?.State() || null,
       FirstLevelMission: () => missionRuntime?.State() || null,
+      FirstLevelStages: () => FIRST_LEVEL_STAGES.map(stage => ({...stage,current:missionRuntime?.flow.phase.id===stage.id})),
+      FirstLevelJump: value => JumpFirstLevelStage(value),
       // 性能取证与专项测试直接读运行时对象（敌人表、事实、列队）；不是玩法入口。
       FirstLevelMissionRuntime: () => missionRuntime || null,
       P012Progress: () => p012Debug.State(),
@@ -2769,6 +2774,8 @@ async function Boot() {
       P012Progress: () => p012Debug.State(),
       P012NextProgress: () => p012Debug.Next(),
       DebugOptions: () => debugOptions.Get(),
+      FirstLevelStages: () => FIRST_LEVEL_STAGES.map(stage => ({...stage,current:missionRuntime?.flow.phase.id===stage.id})),
+      FirstLevelJump: value => JumpFirstLevelStage(value),
       SetDebugOption: (id, enabled) => SetDebugOption(id, enabled),
       CheckpointStatus,
       ContinueCheckpoint,
@@ -2802,7 +2809,7 @@ async function Boot() {
     if (MENU_AT_BOOT) OpenMenu();
   }
 
-  if (SHOT) StartRun();
+  if (SHOT || FIRST_LEVEL_STAGE_START) StartRun();
   else if (PREVIEW_AUTOPLAY) StartPreview({ unlockAudio: false });
   if (EDITOR_PARAM === "fullScene" && !SHOT) {
     // 完整县城与车厢静态场景都直接进工具，不再让用户隔着已经打开的编辑器
@@ -2850,7 +2857,7 @@ function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField;
  * 夹成 0；从靶场退出时又会把玩家按到某一关的切片上）、`preview`（序章预览与
  * 靶场是互斥的两条旁路）、`menu=0`（进去就没有暂停菜单，也就没有退出靶场的路）。
  */
-function GoToSandbox(key) {
+function GoToSandbox(key, {stage = null} = {}) {
   const url = new URL(window.location.href);
   url.searchParams.delete("movement");
   url.searchParams.delete("range");
@@ -2858,6 +2865,7 @@ function GoToSandbox(key) {
   url.searchParams.delete("weapons");
   url.searchParams.delete("melee");
   url.searchParams.delete("whitebox");
+  url.searchParams.delete("missionStage");
   url.searchParams.delete("jiehe");
   if (key === "movement") url.searchParams.set("movement", "1");
   else if (key === "weapons") url.searchParams.set("weapons", "1");
@@ -2869,7 +2877,9 @@ function GoToSandbox(key) {
   url.searchParams.delete("phase");
   url.searchParams.delete("preview");
   url.searchParams.delete("menu");
+  if (key === "firstLevelP012Whitebox" && stage != null) url.searchParams.set("missionStage",stage);
   window.location.assign(url.toString());
+  return url.toString();
 }
 
 /**
@@ -3244,7 +3254,7 @@ function ClearRuntime() {
  *                      cutscenes 要不要播过场（出图与自检模式一律不播，保证镜头可复现；
  *                      过场的临时布景有近三百个网格，另在过场检查里验）
  */
-async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
+async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump = null } = {}) {
   state.advancing = true;
   state.phaseIndex = Clamp(index, 0, PHASE_TABLE.length - 1);
   const phase = PHASE_TABLE[state.phaseIndex];
@@ -3294,6 +3304,11 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // Extra unloading recruits and two children belong only to this test scene.
   ai.maxAlive=Math.max(phase.whitebox?.actorCapacity||0,SCALE.maxAlive+(phase.whitebox?.p012?(phase.whitebox.activities.trainColumn?.extraCount||0)+2:0));
   state.phaseTime = 0;
+  if (stageJump != null) {
+    // Support reads this counter as evidence of fire. A previous run's shots
+    // must not satisfy the new checkpoint's contact/defense requirements.
+    state.playerShots = 0; state.lastShot = null; state.lastEmplacedShot = null;
+  }
   state.objectiveIndex = 0;
   state.objectiveBlockedReason = null;
   state.objectiveCount = phase.zones.length;
@@ -3731,7 +3746,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   missionRuntime?.Dispose();
   if(phase.whitebox?.fullMission)await LoadFirstLevelTrainAnimation();
   missionRuntime = phase.whitebox?.fullMission ? new FirstLevelMissionRuntime({
-    scene,camera,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,
+    scene,camera,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,stageJump,
     FireVehicleBullet,
     Objective:text=>{state.storyObjective=text;},
     VoiceClock:()=>MANUAL_STEP?null:audio.ctx?.currentTime,
@@ -5670,7 +5685,7 @@ function FinishEditorSession() {
  * 相同时走 EnterLevel 的 initial 分支 —— 那一支只重置关卡状态（剧本、兵、出生点），
  * 不碰几何。
  */
-async function StartLevel(index, { cutscenes = false } = {}) {
+async function StartLevel(index, { cutscenes = false, stageJump = null } = {}) {
   if (!menu || state.advancing) return state.phaseIndex;
   const target = Clamp(index, 0, PHASE_TABLE.length - 1);
   CloseMenu();
@@ -5683,12 +5698,22 @@ async function StartLevel(index, { cutscenes = false } = {}) {
   hud.HideEpilogue();
   hud.HideDeathCard();
   const sameSlice = state.builtPhase === target;
-  await EnterLevel(target, { initial: sameSlice, cutscenes });
+  await EnterLevel(target, { initial: sameSlice && stageJump == null, cutscenes, stageJump });
   // 序章播完发现后面全是暂时废弃场景时，EnterLevel 已经把主菜单重新打开
   //（EndOfficialCampaign）——这时不许再 StartRun，否则菜单开着、玩法却在底下跑。
   if (state.menu) return target;
   StartRun();
   return target;
+}
+
+async function JumpFirstLevelStage(value) {
+  const stage = ResolveFirstLevelStage(value);
+  if (state.advancing) throw new Error("Level loading is already in progress");
+  const index = PHASE_TABLE.findIndex(phase => phase.whitebox?.fullMission);
+  if (index < 0) return {navigating:true,phaseNumber:stage.number,phaseId:stage.id,
+    url:GoToSandbox("firstLevelP012Whitebox",{stage:stage.id})};
+  await StartLevel(index, {cutscenes:false,stageJump:stage.id});
+  return missionRuntime.State();
 }
 
 /**
@@ -7144,7 +7169,7 @@ function AimEmplacementView(view) {
  * 「争夺中：路西村庄外围」）—— 顶栏那一行归剧本，不归战场状态。
  */
 function UpdateObjectives(dt) {
-  if(missionRuntime){state.objectiveIndex=missionRuntime.flow.index;state.storyObjective=missionRuntime.flow.stage.objective;return;}
+  if(missionRuntime){state.objectiveIndex=missionRuntime.flow.phase.number-1;state.objectiveCount=FIRST_LEVEL_STAGES.length;state.storyObjective=missionRuntime.flow.stage.objective;return;}
   if (p012Flow) {
     const goal = p012Flow.CurrentObjective();
     const index = battlefield.objectives.findIndex((item) => item.id === goal.zone);
