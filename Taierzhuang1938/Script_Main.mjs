@@ -4441,6 +4441,12 @@ async function WarmLevel(phase) {
         state.ready = wasReady;
       }
       if (smokeHandle != null) vfx.RemoveSmokeSource(smokeHandle);
+      // 摘掉发射器**不等于**画面干净：上面那一发爆炸、枪口焰、曳光、弹着、血雾
+      // 撒出去的粒子还在飞。它们活得比预热长，于是玩家点「进城」的第一帧
+      // 看见的是一团糊在脸上的火（实测交出控制权时 smoke 37 / debris 22 /
+      // ring 2 / streak 4 / decal 3，烧足两秒半）。预热要的是「真画过一遍」，
+      // 画完就该清干净 —— 常驻发射器不受影响（见 VfxSystem.ClearParticles）。
+      vfx?.ClearParticles?.();
       report.settleMs = Math.round(performance.now() - settleStart);
       Lap("settle");
     } finally {

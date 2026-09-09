@@ -2352,6 +2352,24 @@ export class VfxSystem {
     this.pools.smoke.Spawn(c, this.time);
   }
 
+  /**
+   * 把**还活着的一次性粒子**一把清空（烟、火、环、曳光、弹着、血雾、贴花、碎块）。
+   *
+   * 【2026-09-09 为什么需要它】着色器预热是**在镜头前三米真炸一发**
+   *（见 Script_Main.WarmLevel：dt=0 的帧里粒子不会活，只能真放一发让 ANGLE
+   * 把那批像素着色器变体编出来）。可它们活得比预热长 —— 玩家点「进城」的那一刻
+   * 火球还在烧：实测交出控制权的第一帧 smoke 37 / debris 22 / ring 2 / streak 4 /
+   * decal 3，整整两秒半，第一眼就是一团糊在脸上的火。用户报的「一开始就有爆炸
+   * 在我脸上」就是这个 —— 与音频无关，我上一轮全找错了地方。
+   *
+   * 只清粒子，**不动 smokeSources**：那些是常驻发射器（烧着的房子），清了下一帧
+   * 它们自己又会补上，白清一次。
+   */
+  ClearParticles() {
+    for (const pool of Object.values(this.pools || {})) pool.Clear?.();
+    this.debris?.Clear?.();
+  }
+
   Dispose() {
     if (this.scene.onBeforeRender === this.sceneHook) {
       this.scene.onBeforeRender = this.previousSceneHook;
