@@ -1,7 +1,7 @@
-// SeedAudio takes; carriage revised for homesickness and restrained foreboding. Labels are editor-only metadata.
-export const FIRST_LEVEL_MUSIC_VERSION = "20260909-carriage-r2";
+// SeedAudio takes; approved carriage banter with relaxed warmth and a trace of uncertainty. Labels are editor-only metadata.
+export const FIRST_LEVEL_MUSIC_VERSION = "20260909-carriage-banter";
 export const FIRST_LEVEL_MUSIC_CUES = Object.freeze(Object.fromEntries([
-  ["LeavingHome", "离家的人", 0.72],
+  ["LeavingHome", "车厢闲话", 0.72],
   ["TheFrontClosesIn", "前线压来", 0.50],
   ["TheRoadSouth", "往南的路", 0.66],
   ["OpenTheWay", "把路打开", 0.54],
