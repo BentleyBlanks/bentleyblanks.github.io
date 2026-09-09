@@ -1,0 +1,44 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import crypto from "node:crypto";
+import { MISSION_STAGES } from "./Data_FirstLevelMission.mjs";
+import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_STAGE_MUSIC, FirstLevelMusicState } from "./Data_FirstLevelMissionMusic.mjs";
+import { FirstLevelMissionMusic } from "./Script_FirstLevelMissionMusic.mjs";
+
+assert.deepEqual(Object.keys(FIRST_LEVEL_STAGE_MUSIC), MISSION_STAGES.map(stage => stage.id));
+const cues = Object.keys(FIRST_LEVEL_MUSIC_CUES);
+assert.equal(cues.length, 7);
+const manifest = JSON.parse(fs.readFileSync(new URL("./Audio/Music/FirstLevel/Data_FirstLevelMusicManifest.json", import.meta.url)));
+assert.deepEqual(Object.keys(manifest.cues), cues);
+for (const cue of cues) {
+  const spec = FIRST_LEVEL_MUSIC_CUES[cue], entry = manifest.cues[cue];
+  const bytes = fs.readFileSync(new URL(`./Audio/Music/${spec.file}`, import.meta.url));
+  assert.equal(crypto.createHash("sha256").update(bytes).digest("hex"), entry.sha256);
+  assert.ok(entry.seconds > 90 && entry.seconds < 130 && entry.bytes < 2_000_000);
+  assert.ok(Math.abs(entry.rmsDbfs + 27) <= 0.6 && entry.peakDbfs <= -3);
+}
+assert.equal(FirstLevelMusicState("Train").cue, "firstLevelLeavingHome");
+assert.equal(FirstLevelMusicState("Unloading").cue, "firstLevelLeavingHome");
+assert.equal(FirstLevelMusicState("Unloading", { shellImpact: true }).cue, null);
+assert.equal(FirstLevelMusicState("South").cue, "firstLevelTheRoadSouth");
+assert.equal(FirstLevelMusicState("TransferApproach").cue, "firstLevelTheRoadSouth");
+assert.equal(FirstLevelMusicState("Death").cue, null);
+assert.equal(FirstLevelMusicState("FinalDefense").cue, "firstLevelTheLivingStillNeedUs");
+assert.equal(FirstLevelMusicState("Complete").cue, null);
+assert.equal(FirstLevelMusicState("Train", { failed: true }).cue, null);
+const calls = [], levels = [];
+const audio = { Music: (...args) => calls.push(args), SetMusicLevel: (...args) => levels.push(args) };
+const director = new FirstLevelMissionMusic(audio);
+director.Update("Support"); director.Update("MachineGun"); director.Update("Tank");
+assert.equal(calls.length, 1, "continuous front battle must not restart its recording");
+director.Update("Orders", { speaking: true });
+assert.equal(calls.length, 1);
+assert.ok(levels.at(-1)[0] < 0.3, "dialogue and quieter orders combine on the music group only");
+director.Update("Orders", { speaking: false });
+assert.ok(levels.at(-1)[0] > levels[0][0]);
+director.Update("Death");
+assert.equal(calls.at(-1)[0], null); assert.ok(calls.at(-1)[1].fadeOut < 0.2);
+director.Update("FinalDefense"); director.Update("Exit");
+assert.equal(calls.at(-1)[0], "firstLevelTheLivingStillNeedUs");
+director.Dispose(); assert.equal(calls.at(-1)[0], null);
+console.log("PASS seven verified assets; every mission stage, shell/death silence, dialogue levels and uninterrupted battle cues");

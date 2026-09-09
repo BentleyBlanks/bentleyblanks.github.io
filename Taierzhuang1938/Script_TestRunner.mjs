@@ -194,6 +194,8 @@ export const testDefs = {
   TengxianZoneTest: { file: "Script_TengxianZoneTest.mjs", desc: "城内 zone/出生点不被街坊围死（纯 Node）" },
   SamplePointTest: { file: "Script_SamplePointTest.mjs", desc: "县城采样点覆盖率与位姿口径（纯 Node）" },
   HeightmapVerify: { file: "Script_HeightmapCli.mjs", args: ["verify"], desc: "SRTM 高度数据完整性（需先 download 过）" },
+  FirstLevelMissionMusicTest: { file: "Script_FirstLevelMissionMusicTest.mjs", desc: "Seven first-level score assets, story transitions and silence rules" },
+  FirstLevelMissionMusicBrowserTest: { file: "Script_FirstLevelMissionMusicBrowserTest.mjs", timeoutMs: 600000, desc: "First-level score playback, stage jumps, dialogue mix and lazy-load races" },
   AudioTest: { file: "Script_AudioTest.mjs", desc: "音频资产与烘焙管线" },
   AudioWiringTest: { file: "Script_AudioWiringTest.mjs",
     desc: "音频接线：弹啸/遮挡/空间档/AI foley/脚下材质/掷弹筒/爆炸三档" },
@@ -253,6 +255,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "FirstLevelMissionMusicBrowserTest",
   "FirstLevelMissionStageJumpTest",
   "FirstLevelMissionStageContinueTest",
   "FirstLevelMissionStageTailTest",
@@ -389,7 +392,7 @@ export const domains = {
     // 所以也挂在这个域下。
     tests: ["CarryTest", "EmplacementTest", "HudPromptTest", "HudPromptBrowserTest", "TelegraphTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
-  audio: { label: "音效/音乐/环境声", tests: ["AudioTest", "AudioWiringTest"] },
+  audio: { label: "音效/音乐/环境声", tests: ["FirstLevelMissionMusicTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest"] },
   voice: { label: "语音", tests: ["VoiceTest"] },
   menu: { label: "主菜单/开机陈设", tests: ["FirstLevelP012DebugTest", "MenuTest", "BootPropTest"] },
   editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "AiEditorTest", "TuningWriterTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },

@@ -31,7 +31,7 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 // 环境床的撒播表与弹啸的接线数：8.8 节最后那条「两套弹啸不许同时撒」在 node 侧判 ——
 // 那是一张**静态表**，跑进浏览器里再问一遍只会把一条确定的断言变成一次采样。
 import { AMBIENCE_PRESETS } from "./Script_Audio.mjs";
-import { NEAR_MISS } from "./Data_Tuning_Audio.mjs";
+import { NEAR_MISS, FIRE_SPOT } from "./Data_Tuning_Audio.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -431,7 +431,7 @@ Check("冲刺过三秒 → 开始喘", body.breath >= 1, `请求 ${body.breath} 
 // ---------------------------------------------------------------------------
 // 8.5) 火焰点声源：挂在 vfx 的火焰发射器上，同时最多四条（最近的优先）
 // ---------------------------------------------------------------------------
-const fire = await page.evaluate(async () => {
+const fire = await page.evaluate(async rescanS => {
   const T = window.Taierzhuang, w = T.audioWiring, a = T.audio;
   const L = a.listenerPos;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -442,8 +442,10 @@ const fire = await page.evaluate(async () => {
       { x: L.x + 4 + i * 3, y: L.y - 1, z: L.z + 4 }, "FireMedium", { scale: 1 }));
   }
   const before = a.RequestedCount("fireSpot");
-  // 一帧只起一条（同名 cue 的 22 ms 去重窗），所以要推够帧数。
-  for (let i = 0; i < 10; i += 1) { w.Update(1 / 60, T.state.frame + i); await sleep(16); }
+  // A newly added emitter may wait a full rescan period. Ten frames alone can
+  // finish before the 0.5 s scan, depending on the previous test's audio clock.
+  const frames = Math.ceil(rescanS * 60) + 10;
+  for (let i = 0; i < frames; i += 1) { w.Update(1 / 60, T.state.frame + i); await sleep(16); }
   const started = a.RequestedCount("fireSpot") - before;
   const voices = w.fireVoices.size;
   // 摘掉火头之后声音要跟着停
@@ -452,7 +454,7 @@ const fire = await page.evaluate(async () => {
   w.Update(1 / 60, T.state.frame + 99);
   const after = w.fireVoices.size;
   return { started, voices, after };
-});
+}, FIRE_SPOT.rescanS);
 Check("火场挂上循环点声源，同时最多四条", fire.voices === 4 && fire.started >= 1,
   `起了 ${fire.started} 条、在挂 ${fire.voices} 条`);
 Check("火头被摘掉之后声音跟着停", fire.after === 0, `还剩 ${fire.after} 条`);

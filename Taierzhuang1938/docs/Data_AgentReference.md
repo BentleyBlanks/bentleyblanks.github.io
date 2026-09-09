@@ -370,6 +370,8 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   运行时只读。先读：`docs/Data_Destruction.md`。
 
 ### 音频
+
+- 第一关七首剧情配乐：`Data_FirstLevelMissionMusic` / `Script_FirstLevelMissionMusic`；阶段切曲、对白让位、按需缓存、打包和验证见 [配乐接入](Data_FirstLevelMusic.md)。
 - `Script_Audio.mjs` —— 合成配方打底 + 实录采样逐条盖同名配方，盖不上就回落合成。
   引擎侧模型（遮挡 / 四档分区混响按声源选 IR / 传播延迟 / 采样路径 duck+耳鸣 / 玩家开枪压环境 /
   voice stealing / 两级限幅 / 枪尾按区）与宿主探针契约 `audio.SetProbes({occlusion, zone})`

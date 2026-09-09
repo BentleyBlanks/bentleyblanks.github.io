@@ -29,6 +29,7 @@ import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
 import { FirstLevelMissionView } from "./Script_FirstLevelMissionView.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
+import { FirstLevelMissionMusic } from "./Script_FirstLevelMissionMusic.mjs";
 import { EmplacementInteraction } from "./Script_Emplacement.mjs";
 import { Localize, T } from "./Script_Text.mjs";
 import { FirstLevelStageTextId } from "./Script_TextIds.mjs";
@@ -84,10 +85,14 @@ export class FirstLevelMissionRuntime {
       this.OnBlast(event);
     };
     this.battleSound = new FirstLevelMissionBattleSound(this.audio);
+    this.music = new FirstLevelMissionMusic(this.audio);
+    this.musicInitializing = true;
     this.view.interact = this.interact;
     this.Register();
     this.flow.Start();
     if (host.stageJump != null) ApplyFirstLevelStageJump(this, host.stageJump);
+    this.musicInitializing = false;
+    this.UpdateMusic();
     this.voiceReady = this.voice.Load();
     this.SaveCheckpoint();
   }
@@ -643,6 +648,7 @@ export class FirstLevelMissionRuntime {
     return T(`firstLevel.interaction.${key}`);
   }
   Enter(stage) {
+    this.UpdateMusic(stage.id);
     this.Objective(Localize(FirstLevelStageTextId(stage.id), stage.objective));
     if (stage.cue && !["Courtyard", "Train", "Unloading", "Death"].includes(stage.id))
       this.Say(stage.cue, { urgent: ["AirFirst", "Dive", "Death"].includes(stage.id) });
@@ -1288,6 +1294,7 @@ export class FirstLevelMissionRuntime {
     this.delta = dt;
     this.time += dt;
     this.voice.Update(dt);
+    this.UpdateMusic();
     this.battleSound.Update(dt,this.flow.stage.id,this.voice.current?.phase==="playing");
     this.train?.Update(dt, this.Has("trainStopped"), this.Has("trainFirstShellImpact"));
     if(this.Has("trainProneOrder") && this.player.stance==="prone")this.Record("trainPlayerProne");
@@ -1585,6 +1592,7 @@ export class FirstLevelMissionRuntime {
     this.emplacement.Vacate("playerDown");
     this.meleeCombat.Cancel("playerDown");
     this.voice.Pause();
+    this.UpdateMusic();
   }
   Retry() {
     const point = this.retryPoint || this.safePoint;
@@ -1611,12 +1619,18 @@ export class FirstLevelMissionRuntime {
       this.BeginControl("death", R.deathSeconds);
       this.voice.Replay("ZhouDeath");
     } else this.voice.Resume();
+    this.UpdateMusic();
     return true;
   }
   ContinueCheckpoint() {
     if (this.completed) return false;
     this.OnPlayerDown();
     return this.Retry();
+  }
+  UpdateMusic(stage = this.flow.stage.id) {
+    if (this.musicInitializing) return;
+    this.music.Update(stage, { shellImpact: this.Has("trainFirstShellImpact"),
+      speaking: this.voice.current?.phase === "playing", failed: this.failed });
   }
   State() {
     return {
@@ -1636,6 +1650,7 @@ export class FirstLevelMissionRuntime {
       train: this.train?.State(),
       relief: this.relief?.map(entry=>({id:entry.actor.id,alive:entry.actor.alive,arrived:entry.arrived,distance:entry.distance,index:entry.index,x:entry.actor.position.x,z:entry.actor.position.z})) || [],
       voice: this.voice.State(),
+      music: this.music.State(),
       battleSound: this.battleSound.State(),
       enemies: [...this.enemies].map(([id, actor]) => ({
         id,
@@ -1665,6 +1680,7 @@ export class FirstLevelMissionRuntime {
   Dispose() {
     if(this.tankDust!=null)this.vfx.RemoveSmokeSource(this.tankDust);
     this.voice.Dispose();
+    this.music.Dispose();
     this.battleSound.Dispose();
     this.view.Dispose();
     this.interact.Clear("FirstLevelMission");

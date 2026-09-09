@@ -207,11 +207,11 @@ const packs = await page.evaluate(async () => {
     manifestCues: a.ambManifest ? Object.keys(a.ambManifest.cues).length : 0,
     ambCues: [...a.sampleCues].filter((n) => n.startsWith("amb.")).sort(),
     ambErrors: a.ambErrors.slice(0, 6),
-    music: a.musicBuffers.size,
-    musicNames: [...a.musicBuffers.keys()].sort(),
+    music: [...a.musicBuffers.keys()].filter(cue => !mod.MUSIC_CUES[cue]?.onDemand).length,
+    musicNames: [...a.musicBuffers.keys()].filter(cue => !mod.MUSIC_CUES[cue]?.onDemand).sort(),
     musicErrors: a.musicErrors.slice(0, 6),
     presets: Object.keys(mod.AMBIENCE_PRESETS),
-    musicCues: Object.keys(mod.MUSIC_CUES),
+    musicCues: Object.keys(mod.MUSIC_CUES).filter(cue => !mod.MUSIC_CUES[cue].onDemand),
     // 每一档环境引用到的床，必须条条都在清单里 —— 写错一个名字，那一层就
     // 悄悄地少了，游戏照跑。
     missing: Object.entries(mod.AMBIENCE_PRESETS).flatMap(([name, cfg]) =>
@@ -293,6 +293,7 @@ const musicRun = await page.evaluate(async () => {
   const base = a.liveNodes;
   const rows = [];
   for (const cue of Object.keys(mod.MUSIC_CUES)) {
+    if (mod.MUSIC_CUES[cue].onDemand) await a.LoadMusicCue(cue);
     a.Music(cue);
     await sleep(300);
     rows.push({ cue, heads: a.musicLayer ? a.musicLayer.heads.size : 0 });

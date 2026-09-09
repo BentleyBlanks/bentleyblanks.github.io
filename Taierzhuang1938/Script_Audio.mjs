@@ -41,6 +41,7 @@
 
 import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { VOICE_BASE, VOICE_LINES } from "./Data_Voice.mjs";
+import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_MUSIC_MIX } from "./Data_FirstLevelMissionMusic.mjs";
 
 // 包络地板。低于这个值当作静音（见文件头坑 2）。
 const FLOOR = 1e-4;
@@ -3238,6 +3239,7 @@ export const AMBIENCE_PRESETS = {
 // 编辑器不本地化（docs/Data_TextAndTuning.md §2「什么不走文本表」），所以这九条
 // 逐行登记 @text-ok，而不是搬进 Data_Text_*。**玩家在任何界面上都看不到它们。**
 export const MUSIC_CUES = {
+  ...FIRST_LEVEL_MUSIC_CUES,
   // 进城之前：一间空屋子。
   menu: { level: 0.55, label: "菜单" },              // @text-ok 编辑器音频面板的试听标签
   // 白天守城时垫在枪炮底下的一层，几乎察觉不到 —— 察觉到了就说明太响。
@@ -3536,6 +3538,8 @@ export class AudioEngine {
     this.ambManifest = null;
     // --- 实录（生成）音乐。没有合成兜底：载不到就是没有音乐 ---
     this.musicBuffers = new Map();   // cue -> AudioBuffer
+    this.musicPending = new Map();
+    this.musicLevelScale = 1;
     this.musicLayer = null;          // 当前在放的那一段
     this.musicErrors = [];
     this.musicReady = false;
@@ -3764,8 +3768,8 @@ export class AudioEngine {
    * 开机时把音效包与环境包的字节先下下来（见 PREFETCHED_AUDIO 的抬头）。
    *
    * 只预取这两包：环境床决定「有没有底噪」，音效决定「第一脚、第一枪响不响」。
-   * 音乐 5.6 MB、剧情人声 5.3 MB **不在这里** —— 第一关的 music 是 null，
-   * 而人声那一支有自己的清单与惰性加载；把它们也塞进开机会真的把开机拖长。
+   * Music and story voices have their own demand loading; the first-level director
+   * requests its carriage cue after audio unlock, never all seven recordings here.
    *
    * 失败一律吞掉：Unlock 之后的 LoadPacks 会照常自己再拉一次（那时这张表是空的，
    * 走的就是原来的老路）。
@@ -3857,6 +3861,7 @@ export class AudioEngine {
     this.ambErrors = [];
     this.musicErrors = [];
     this.LoadPacks();
+    if (MUSIC_CUES[this.musicCue]?.onDemand) this.Music(this.musicCue);
   }
 
   get Ready() {
@@ -4158,6 +4163,38 @@ export class AudioEngine {
     }));
     this.musicReady = this.musicBuffers.size > 0;
     return ok;
+  }
+
+  /** Load one long-form cue, deduplicated. Completion never chooses what should play. */
+  async LoadMusicCue(cue) {
+    if (!this.ctx || this.disposed) return null;
+    if (this.musicBuffers.has(cue)) return this.musicBuffers.get(cue);
+    if (this.musicPending.has(cue)) return this.musicPending.get(cue);
+    const spec = MUSIC_CUES[cue];
+    if (!spec?.onDemand || !spec.file) return null;
+    const context = this.ctx;
+    const pending = (async () => {
+      try {
+        const bytes = await FetchAudioAsset(`${MUSIC_BASE}${spec.file}?v=${spec.version}`);
+        const buffer = await context.decodeAudioData(bytes);
+        if (this.disposed || this.ctx !== context) return null;
+        this.musicBuffers.set(cue, buffer);
+        // Old and next cues may overlap while fading. Retain only three long recordings.
+        const cached = [...this.musicBuffers.keys()].filter(key => MUSIC_CUES[key]?.onDemand);
+        while (cached.length > FIRST_LEVEL_MUSIC_MIX.cacheLimit) {
+          const index = cached.findIndex(key => key !== this.musicCue && key !== cue);
+          if (index < 0) break;
+          this.musicBuffers.delete(cached.splice(index, 1)[0]);
+        }
+        this.musicErrors = this.musicErrors.filter(error => error.file !== spec.file);
+        return buffer;
+      } catch (error) {
+        this.musicErrors.push({ file: spec.file, message: error.message });
+        return null;
+      } finally { this.musicPending.delete(cue); }
+    })();
+    this.musicPending.set(cue, pending);
+    return pending;
   }
 
   /**
@@ -5296,21 +5333,37 @@ export class AudioEngine {
    * cue 之间是**交叉**而不是硬切：旧的淡出 1.6 秒，新的立刻淡入。
    * 硬切在战斗里特别刺耳 —— 玩家会以为是自己把什么按坏了。
    */
-  Music(cue) {
+  Music(cue, { fadeOut = 1.6, levelScale } = {}) {
     const name = MUSIC_CUES[cue] ? cue : null;
     if (cue && !MUSIC_CUES[cue]) console.warn("没有这一段音乐：", cue);
+    const unchanged = this.musicCue === name;
+    levelScale ??= unchanged ? this.musicLevelScale : 1;
     this.musicCue = name;
+    this.musicLevelScale = levelScale;
+    if (this.paused && this.pausedState) this.pausedState.music = name;
     if (!this.ctx) return;
-    this.StopMusic(1.6);
-    if (!name) return;
+    if (unchanged && this.musicLayer) { this.SetMusicLevel(levelScale); return; }
+    this.StopMusic(fadeOut);
+    if (!name || this.paused || this.disposed) return;
     const buf = this.musicBuffers.get(name);
-    if (!buf) return;                       // 还没载到（或载失败）：这一段就是没有音乐
-    const fade = Math.min(3.2, buf.duration * 0.2);
+    if (!buf) {
+      if (MUSIC_CUES[name].onDemand) this.LoadMusicCue(name).then(buffer => {
+        if (buffer && !this.disposed && !this.paused && this.musicCue === name) this.Music(name);
+      });
+      return;
+    }
+    const fade = Math.min(MUSIC_CUES[name].loopFadeS ?? 3.2, buf.duration * 0.2);
     this.musicLayer = new LoopLayer(this, buf, {
       bed: "music:" + name, gain: MUSIC_CUES[name].level, bus: "music",
       random: false, seg: buf.duration - fade, fade,
     });
+    this.musicLayer.levelScale = this.musicLevelScale;
     this.musicLayer.Start();
+  }
+
+  SetMusicLevel(scale, rampS = 1) {
+    this.musicLevelScale = Math.max(0, scale);
+    this.musicLayer?.SetLevel(this.musicLevelScale, rampS);
   }
 
   /** 停音乐。fade > 0 时淡出，别硬掐。 */
