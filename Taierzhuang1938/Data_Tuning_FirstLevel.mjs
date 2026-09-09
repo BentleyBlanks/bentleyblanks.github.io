@@ -208,6 +208,12 @@ export const MISSION_TUNING = Object.freeze({
 });
 
 // Aftermath tiers (2026-09-08 frame probe: 87 full bodies inside 30 m cost 0.9 M triangles per pass): full mesh only to
-// aftermathDetailExitM, 5 cm clusters to aftermathMidExitM, 14 cm clusters beyond. Live corpses keep ACTOR_DETAIL.
+// aftermathTiers[0].exitM, 5 cm clusters to aftermathTiers[1].exitM, 14 cm clusters beyond. Live corpses keep ACTOR_DETAIL.
+// 2026-09-09: 试过在中间再插一档 2 cm，交替 A/B 量到 draw call +109 而帧时间不变 —— 一具尸体 7 个材质，
+// 每加一档就是 8 姿势 x 7 = 56 只网格。档数在这里是 draw call，不是三角形；账在 Script_FirstLevelMissionAftermath 抬头。
 // Tables are recompacted only after the focus moves aftermathRefreshM or the view turns (1-|q·q'| > aftermathRefreshDot).
-export const MISSION_PEOPLE_TUNING=Object.freeze({aftermathCellM:.05,aftermathFarCellM:.14,aftermathDetailEnterM:12,aftermathDetailExitM:15,aftermathMidEnterM:70,aftermathMidExitM:80,aftermathRefreshM:.35,aftermathRefreshDot:.00012,closeAnimationM:8,nearAnimationM:45,farAnimationM:90,nearAnimationS:1/20,idleAnimationS:1/10,midAnimationS:1/15,farAnimationS:1/8,walkThresholdMps:.08,gaitSpeedMps:3.6,carrySourceMps:1.4,loadSinkM:.08,loadLeanRad:.045,breathRate:1.7,watchYawRad:.18});
+export const MISSION_PEOPLE_TUNING=Object.freeze({aftermathTiers:Object.freeze([
+  Object.freeze({cellM:0,enterM:12,exitM:15}),
+  Object.freeze({cellM:.05,enterM:70,exitM:80}),
+  Object.freeze({cellM:.14}),
+]),aftermathRefreshM:.35,aftermathRefreshDot:.00012,closeAnimationM:8,nearAnimationM:45,farAnimationM:90,nearAnimationS:1/20,idleAnimationS:1/10,midAnimationS:1/15,farAnimationS:1/8,walkThresholdMps:.08,gaitSpeedMps:3.6,carrySourceMps:1.4,loadSinkM:.08,loadLeanRad:.045,breathRate:1.7,watchYawRad:.18});

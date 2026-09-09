@@ -57,3 +57,21 @@ AI 从动作状态与反应延迟判断，不直接读取按键。命中显著�
 - `Script_MeleeAnimationTest.mjs`：108 段全身、54 段第一人称，握点残差 ≤6 mm，腕关节 ≤65°，逐帧可见性。
 - `Script_BayonetTest.mjs`、`Script_SprintMeleeTest.mjs`、`Script_RangeTest.mjs`：正常枪械、装卸、冲刺和既有靶场的输入集成。
 - 相关 quick / prepush 和线上部署按项目入口执行。截图、视频与模型检查页面仅留 `_shots` 等本地目录。
+
+## 近邻网格（2026-09-09）
+
+`Script_MeleeCombat` 里两处全场规模的循环换成了 6 m 粗网格（`BuildIndex` / `Near`，
+`CELL_M` 必须 >= `engageM`，查询扫 3×3 格）：
+
+- 分离循环原来是所有人两两配对，第一关前沿 221 个人 = 每一步 24 000 对，而 `Update`
+  按 `maxStepS` 1/90 s 切子步 —— 帧越慢子步越多，25 fps 时一帧十万次。现在只从
+  **正在白刃的人**出发查邻居。
+- `Closest()` 原来每次新建全场数组再 filter + sort，现在按网格单趟扫，比当前最优远的
+  直接跳过，通视射线放在最后。
+
+实测第一关 Support 段（221 人）`Script_Main` 的「输入」桶 3.59 → 0.63 ms/帧。
+
+**`Step` 之外的调用必须先重建网格**（`stepping` 标志）：按 F 推架、拨挡、试验场
+「开始／重开」之后的第一次询问，位置刚被改过而网格还是上一步的。少了这一条，
+`MeleeQteTest` 的「DOM 按钮开局后按 F」拿到旧网格，`stats.pushes` 恒为 0。
+账在 docs/Data_EnemyAi.md §16.4。

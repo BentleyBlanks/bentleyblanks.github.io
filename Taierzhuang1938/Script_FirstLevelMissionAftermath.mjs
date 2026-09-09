@@ -20,7 +20,21 @@ import { MISSION_AFTERMATH } from "./Data_FirstLevelMissionFront.mjs";
 //   · only the detail tier casts shadows, and only when the camera is near enough;
 //   · materials are cloned from the live actor materials so the static instances never
 //     share a material object with skinned meshes (see CloneShadedMaterial).
-const TIERS = 3;
+// 距离档表（`MISSION_PEOPLE_TUNING.aftermathTiers`）：`cellM` 是合点格子（0 = 原模），
+// `enterM` / `exitM` 是这一档与下一档之间那条界的进入 / 退出距离（迟滞，免得边界上的
+// 尸体来回跳档）。最后一档不需要界。
+//
+// 【2026-09-09 加一档不划算，量过】原来 15 m 以内一律用原模（一具约 13 000 三角），
+// 前沿玩家站在尸堆里，这一档同时有 25 具 —— 每帧 100 万三角。试过在 6.5–15 m 之间
+// 插一档 2 cm 合点，交替 A/B 四轮：三角形 3.99 M → 3.68 M，**draw call 1010 → 1119**，
+// 帧时间在噪音里。原因是**一具尸体有 7 个材质**（7 张各自不同的贴图），8 种姿势 × 7
+// = 56 只网格：**每多开一档就多 56 只网格 ≈ 110 个 draw call**，而这一帧的瓶颈是提交
+// （20 ms / 1000 draw ≈ 每个 20 µs），不是三角形。所以档表保持三档。
+//
+// 真要把尸体的提交量压下来，得先把那 7 张贴图合成一张图集、7 个材质并成一个 ——
+// 那时候一档只要 8 只网格，加档才重新变得便宜。人群远景层（每档也是 7 个材质桶）
+// 是同一笔账，见 docs/Data_ActorCrowdLod.md §4.1。
+const TIERS = C.aftermathTiers.length;
 const _frustum = new THREE.Frustum();
 const _matrix = new THREE.Matrix4();
 const _sphere = new THREE.Sphere();
@@ -47,7 +61,7 @@ export class MissionAftermath {
         const parts=BakeMissionBody(actorFactory,spec,this.materials).map(part=>{
           const source=this.materials.get(part.key);
           const material=CloneShadedMaterial(source);this.clones.push(material);
-          const tiers=[part.geometry,CreateDistantBodyGeometry(part.geometry,C.aftermathCellM),CreateDistantBodyGeometry(part.geometry,C.aftermathFarCellM)];
+          const tiers=C.aftermathTiers.map(t=>t.cellM>0?CreateDistantBodyGeometry(part.geometry,t.cellM):part.geometry);
           return {material,tiers,triangles:tiers.map(Triangles)};
         });
         prototype={key,parts,members:[],meshes:[]};
@@ -75,6 +89,7 @@ export class MissionAftermath {
           const mesh=new THREE.InstancedMesh(geometry,part.material,Math.max(1,prototype.members.length));
           mesh.name=`MissionAftermath_${prototype.key}_${tier}`;
           mesh.frustumCulled=false;mesh.count=0;
+          // 只有最近那一档投阴影（`ACTOR_DETAIL.shadowM` 以外的尸体在阴影图里看不见）。
           mesh.castShadow=tier===0;mesh.receiveShadow=true;
           mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
           this.root.add(mesh);return mesh;
@@ -84,14 +99,13 @@ export class MissionAftermath {
     this.bloodMeshes=bloodSink.Flush(this.root,{Get:key=>this.materials.get(key)});
     for(const m of this.bloodMeshes){m.castShadow=false;m.receiveShadow=true;m.geometry.computeBoundingBox();}
     this.count=bodies.length;
-    // Budget report: what the whole field would cost at full detail versus the mid tier.
-    this.triangles={detail:0,distant:0,far:0};
-    for(const prototype of this.prototypes.values())for(const part of prototype.parts){
-      this.triangles.detail+=part.triangles[0]*prototype.members.length;
-      this.triangles.distant+=part.triangles[1]*prototype.members.length;
-      this.triangles.far+=part.triangles[2]*prototype.members.length;
-    }
-    this.visible={detail:0,distant:0,far:0};
+    // Budget report: what the whole field would cost at every tier.
+    // 名字保持 detail / distant / far（`FirstLevelMissionPresentationTest` 按它断言），
+    // 档表要是加到四档以上，多出来的按 tier<n> 记。
+    this.triangles={};this.visible={};
+    for(let tier=0;tier<TIERS;tier++){this.triangles[TierName(tier)]=0;this.visible[TierName(tier)]=0;}
+    for(const prototype of this.prototypes.values())for(const part of prototype.parts)
+      for(let tier=0;tier<TIERS;tier++) this.triangles[TierName(tier)]+=part.triangles[tier]*prototype.members.length;
   }
   /**
    * Compact the instance tables for this camera. Runs every frame but only rewrites the
@@ -114,19 +128,19 @@ export class MissionAftermath {
       _matrix.copy(camera.matrixWorld).invert().premultiply(camera.projectionMatrix);
       _frustum.setFromProjectionMatrix(_matrix);
     }
-    const detailEnter=C.aftermathDetailEnterM**2,detailExit=C.aftermathDetailExitM**2;
-    const midEnter=C.aftermathMidEnterM**2,midExit=C.aftermathMidExitM**2,shadow=ACTOR_DETAIL.shadowM**2;
-    const visible=this.visible;visible.detail=0;visible.distant=0;visible.far=0;
+    // 档界：bounds[t] 是第 t 档与第 t+1 档之间那一条（最后一档没有界）。
+    const bounds=this.bounds||(this.bounds=C.aftermathTiers.slice(0,-1)
+      .map(t=>({enter:t.enterM**2,exit:t.exitM**2})));
+    const shadow=ACTOR_DETAIL.shadowM**2;
+    const visible=this.visible;for(const key in visible)visible[key]=0;
     for(const prototype of this.prototypes.values()){
       for(const part of prototype.parts)for(const mesh of part.meshes)mesh.count=0;
       for(const instance of prototype.members){
         const dx=instance.x-focus.x,dz=instance.z-focus.z,d2=dx*dx+dz*dz;
         // Hysteresis per body so a corpse on the boundary does not flicker between tiers.
         let tier=instance.tier;
-        if(tier===0){if(d2>detailExit)tier=1;}
-        else if(d2<=detailEnter)tier=0;
-        if(tier===1){if(d2>midExit)tier=2;}
-        else if(tier===2&&d2<=midEnter)tier=1;
+        while(tier>0&&d2<=bounds[tier-1].enter)tier--;
+        while(tier<TIERS-1&&d2>bounds[tier].exit)tier++;
         instance.tier=tier;
         if(camera){
           _sphere.center.set(instance.x,instance.y,instance.z);_sphere.radius=instance.radius;
@@ -134,7 +148,7 @@ export class MissionAftermath {
           if(!_frustum.intersectsSphere(_sphere)&&!(tier===0&&d2<=shadow))continue;
         }
         for(const part of prototype.parts){const mesh=part.meshes[tier];mesh.setMatrixAt(mesh.count++,instance.matrix);}
-        if(tier===0)visible.detail++;else if(tier===1)visible.distant++;else visible.far++;
+        visible[TierName(tier)]++;
       }
       for(const part of prototype.parts)for(const mesh of part.meshes){mesh.instanceMatrix.needsUpdate=true;mesh.visible=mesh.count>0;}
     }
@@ -150,6 +164,8 @@ export class MissionAftermath {
 }
 
 function Triangles(geometry){return (geometry.index?.count||geometry.attributes.position.count)/3;}
+/** 档位名（预算报表与 `FirstLevelMissionPresentationTest` 用的就是这三个名字）。 */
+function TierName(tier){return ["detail","distant","far"][tier]??`tier${tier}`;}
 
 export function BakeMissionBody(factory,spec,materials){
     const actor=factory.Create(spec.side,{weapon:null,modelVariant:spec.pose,seed:1938+spec.pose});

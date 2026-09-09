@@ -433,10 +433,22 @@ export class FirstLevelMissionRuntime {
       if (MISSION_TACTICS[spec.id]) actor.missionTactic = { index: 0, elapsed: 0, hold: 0,
         movingSeconds: 0, distance: 0, last: { x: spec.x, z: spec.z }, shelter: {x:spec.x,z:spec.z}, mode: "cover" };
       // Men spawned after the battle already opened must not wait for a release that has passed.
+      // 玩家还没走到阵地（frontBattleStarted）之前，front / tank 这两批人是「待命」的：
+      // 他们不走跃进脚本，但**照常跑 AI**。
+      //
+      // 【2026-09-09 为什么改】原来待命等于 scriptedNoncombatant，而那个标记在
+      // Script_Ai.Think 里是整条链短路（清目标、放掩体、直接返回）。实拍：Support 段
+      // 活着的 154 个日军里有 143 个带这个标记，全部跪在 235—270 m 外，四秒内位移
+      // 一律 0.00 m —— 玩家看到的就是一片雕塑，而「同时 150 个敌人」这个指标正是
+      // 靠把这 143 个不动的人算进去达成的。用户 2026-09-09 定了口径：150 这个数保留，
+      // 待命的人要真的有 AI。超出交战距离（74 m）的人由 STATE.WATCH 接手：跪下、
+      // 面向枪声、隔几秒扫一次、有掩体就进掩体，一枪不开 —— 正是待命该有的样子。
+      //
+      // Flank 那几个是另一回事：他们是后面才登场的侧翼脚本，仍然冻着。
       const standby=["front","tank"].includes(id)&&!spec.id.startsWith("Flank")&&!this.Has("frontBattleStarted");
-      if(spec.id.startsWith("Flank")||standby)actor.scriptedNoncombatant=true;
+      if(spec.id.startsWith("Flank"))actor.scriptedNoncombatant=true;
       actor.missionFrontStandby=standby;
-      if(actor.missionFrontStandby)this.ai.SetStance(actor,1,4+actor.id%3,true);
+      if(standby)this.ai.SetStance(actor,1,4+actor.id%3,true);
       actor.scriptAccuracyScale = actor.missionAccuracyScale = ["front","approach"].includes(id)?R.frontAccuracyScale:.5;
       if(spec.reserve)actor.scriptAccuracyScale=actor.missionAccuracyScale=R.frontReserveAccuracyScale;
       actor.scriptFireIntervalScale = actor.missionFireIntervalScale = ["front","approach"].includes(id)?R.frontFireIntervalScale:1.45;
@@ -496,7 +508,8 @@ export class FirstLevelMissionRuntime {
     const active = ["Support", "MachineGun", "Tank"].includes(this.flow.stage.id);
     for (const actor of this.enemies.values()) {
       const s = actor.missionAssault;
-      if (!s || !actor.alive || actor.scriptedNoncombatant) continue;
+      // 待命的人（missionFrontStandby）不走跃进脚本 —— 他的 AI 照常跑，只是还没轮到他上。
+      if (!s || !actor.alive || actor.scriptedNoncombatant || actor.missionFrontStandby) continue;
       if(actor.missionReserve && this.time-(this.frontBattleAt??this.time)<actor.missionReleaseDelayS)continue;
       if (!active) {
         if (s.mode !== "settled") { this.Defend(actor, actor.position); s.mode = "settled"; }
@@ -619,6 +632,8 @@ export class FirstLevelMissionRuntime {
         (ids && !ids.includes(id)) ||
         !actor.alive ||
         actor.scriptedNoncombatant ||
+        // 待命的人在 WATCH 里一枪都不开，对通路不构成威胁（和改成真 AI 之前一个意思）
+        actor.missionFrontStandby ||
         actor.suppression >= R.threatSuppression ||
         actor.state === "suppressed"
       )

@@ -20,10 +20,17 @@ const PointSegment = (p, a, b) => {
   return Math.hypot(p.x-a.x-dx*t,p.z-a.z-dz*t);
 };
 const Tip = (e, yaw, reach) => ({x:e.position.x-Math.sin(yaw)*reach,y:(e.position.y||0)+1.1,z:e.position.z-Math.cos(yaw)*reach});
+// 近邻网格（见 BuildIndex）：格子边长要 >= engageM，查询才只用扫 3×3 格。
+const CELL_M = 6;
+const CellKeyAt = (cx, cz) => (cx + 4096) * 8192 + (cz + 4096);
+const CellKey = (x, z) => CellKeyAt(Math.floor(x / CELL_M), Math.floor(z / CELL_M));
 export class MeleeCombatDirector {
   constructor(host = {}, options = {}) {
     this.host = host; this.time = 0; this.fighters = new Map(); this.events = [];
     this.serial = 0; this.held = new Set(); this.enabled = true;
+    // 近邻网格与两个复用的查询数组（Near 返回的就是它们，别存下来）
+    this.indexCells = new Map(); this.indexRank = new Map(); this.indexAt = -1;
+    this.nearA = []; this.nearB = [];
     this.stats = { attacks: 0, hits: 0, misses: 0, parries: 0, pushes: 0, standing: 0, ground: 0, successes: 0, failures: 0 };
     this.qte = new MeleeQteDirector({ Resolve: (a) => this.ResolveQte(a), Finish: (a) => this.FinishQte(a) }, options);
   }
@@ -120,6 +127,51 @@ export class MeleeCombatDirector {
     return [this.Player(), ...this.Soldiers()].filter((target) => Alive(target) && !target.meleeDormant && target !== entity
       && (target === this.Player() ? "nra" : target.side) !== side);
   }
+
+  /**
+   * 每一步重建一次的粗网格。白刃全部发生在 engageM(5.5 m) 以内，
+   * 「谁在我旁边」不该靠把全场的人扫一遍来回答。
+   *
+   * 格子边长 CELL_M 6 m，查询扫 3×3 格，所以 6 m 以内的查询都是准的；
+   * 超过 6 m 的调用（现在没有）走 Closest 里的全场退路。
+   * 键用整数不用字符串：滕县爆炸那一轮量过，字符串键的格点每次要几十万次
+   * 字符串拼接与哈希，光这一项就是十几毫秒。
+   *
+   * indexRank 同时记下每个人在 all 里的次序，分离循环靠它给每一对定发起方。
+   */
+  BuildIndex(all) {
+    const cells = this.indexCells || (this.indexCells = new Map());
+    const rank = this.indexRank || (this.indexRank = new Map());
+    cells.clear(); rank.clear();
+    for (let i = 0; i < all.length; i += 1) {
+      const e = all[i];
+      rank.set(e, i);
+      if (!Alive(e) || !e.position) continue;
+      const key = CellKey(e.position.x, e.position.z);
+      let list = cells.get(key);
+      if (!list) cells.set(key, list = []);
+      list.push(e);
+    }
+    this.indexAt = this.time;
+  }
+
+  /** reach 米内的实体（含调用者自己，调用方自己排除）。返回复用数组，别存下来。 */
+  Near(position, reach, out = this.nearA || (this.nearA = [])) {
+    out.length = 0;
+    const cells = this.indexCells;
+    if (!cells) return out;
+    const cx = Math.floor(position.x / CELL_M), cz = Math.floor(position.z / CELL_M);
+    const r2 = reach * reach;
+    for (let dx = -1; dx <= 1; dx += 1) for (let dz = -1; dz <= 1; dz += 1) {
+      const list = cells.get(CellKeyAt(cx + dx, cz + dz));
+      if (!list) continue;
+      for (const e of list) {
+        const ex = e.position.x - position.x, ez = e.position.z - position.z;
+        if (ex * ex + ez * ez <= r2) out.push(e);
+      }
+    }
+    return out;
+  }
   Visible(a, b) { return Math.abs((a.position.y || 0) - (b.position.y || 0)) < 1.35 && this.host.LineClear?.(a, b) !== false; }
   BodyBlocker(a, b) {
     return [this.Player(),...this.Soldiers()].find(t => Alive(t) && t!==a && t!==b
@@ -145,9 +197,37 @@ export class MeleeCombatDirector {
     this.Stagger(target,e,'Deflected',R.beatStaggerS,0);
     this.Log('weaponBeat',e,target);
   }
+  /**
+   * reach 以内、朝向过 dot、看得见的最近的敌人。
+   *
+   * 这条是 Step 里每个人每一步都要问一次的（`managed` 那一行），所以走近邻网格、
+   * 不建数组、不排序：先按距离淘汰，再判朝向，最后才打通视射线（`Visible` 会
+   * 走 host.LineClear 打一条真射线，是这里最贵的一步）。比当前最优还远的直接跳过。
+   *
+   * 网格还没建（构造完还没跑过 Step）或者要的距离超过一格，退回全场扫描 ——
+   * 结果与旧写法逐字相同，只是慢。
+   */
   Closest(entity, reach = R.engageM, dot = -1) {
-    return this.Opponents(entity).filter((t) => Distance(entity, t) <= reach && Facing(entity, t) >= dot && this.Visible(entity, t))
-      .sort((a, b) => Distance(entity, a) - Distance(entity, b))[0] || null;
+    // Step 之外的调用（玩家按 F 推架、拨挡、试验场「重开」之后的第一次询问）位置可能
+    // 刚被改过，网格是上一步的。这些调用一帧最多几次，重建一次 O(N) 就好；
+    // 旧写法在这里本来也要新建一个全场数组，不比这个便宜。
+    if (!this.stepping) this.BuildIndex([this.Player(), ...this.Soldiers()].filter(Boolean));
+    if (this.indexAt < 0 || reach > CELL_M) {
+      return this.Opponents(entity).filter((t) => Distance(entity, t) <= reach && Facing(entity, t) >= dot && this.Visible(entity, t))
+        .sort((a, b) => Distance(entity, a) - Distance(entity, b))[0] || null;
+    }
+    const player = this.Player();
+    const side = entity === player ? "nra" : entity.side;
+    let best = null, bestDistance = Infinity;
+    for (const target of this.Near(entity.position, reach, this.nearA)) {
+      if (target === entity || !Alive(target) || target.meleeDormant) continue;
+      if ((target === player ? "nra" : target.side) === side) continue;
+      const distance = Distance(entity, target);
+      if (distance >= bestDistance) continue;
+      if (Facing(entity, target) < dot || !this.Visible(entity, target)) continue;
+      best = target; bestDistance = distance;
+    }
+    return best;
   }
   PushCandidate(entity = this.Player()) {
     const f = this.Fighter(entity);
@@ -541,7 +621,10 @@ export class MeleeCombatDirector {
     if (this.Active && (!Alive(player) || !Alive(this.qte.active.attacker))) this.Cancel("participantGone");
     if(this.Active) {const threat=this.ImmediateThreat(this.qte.active.attacker);if(threat)this.EscapeQte(threat);}
     const all = [player, ...this.Soldiers()].filter(Boolean);
-    for (const [entity] of this.fighters) if (!all.includes(entity)) this.fighters.delete(entity);
+    this.BuildIndex(all);
+    this.stepping = true;
+    const live = this.indexRank;
+    for (const [entity] of this.fighters) if (!live.has(entity)) this.fighters.delete(entity);
     for (const entity of all) {
       const f = this.Fighter(entity), weapon = this.Weapon(entity);
       if (weapon !== f.weapon) { this.SetState(f, "idle"); f.weapon = weapon; f.buffer=null;if (entity === player) this.held.clear(); }
@@ -555,16 +638,28 @@ export class MeleeCombatDirector {
       }
     }
     this.Coordinate();
-    for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
-      const a = all[i], b = all[j];
-      if (!Alive(a) || !Alive(b) || !(a.meleeCombat || b.meleeCombat) || !this.Visible(a, b)) continue;
-      const distance = Distance(a, b);
-      if (distance >= R.separationM) continue;
-      const dx = distance > 0.001 ? (b.position.x - a.position.x) / distance : 1;
-      const dz = distance > 0.001 ? (b.position.z - a.position.z) / distance : 0;
-      const amount = Math.min((R.separationM - distance) * 0.5, dt * 1.2);
-      if (a !== player) this.Move(a, -dx * amount, -dz * amount);
-      if (b !== player) this.Move(b, dx * amount, dz * amount);
+    // 互相分开：只有「正在白刃的那个人」和他 separationM(0.62 m) 以内的邻居要处理。
+    //
+    // 旧写法是全场所有人两两配对。第一关前沿有 221 个人，就是每一步 24 000 对；
+    // 而 Update 按 maxStepS(1/90 s) 切子步，帧越慢切得越多 —— 25 fps 时一帧跑四步，
+    // 将近十万次配对。实测这一条把 Script_Main 的「输入」这一桶顶到 7.3 ms/帧，
+    // 而且是正反馈：越卡越慢。现在从网格里取邻居，没在白刃的人一次都不进循环。
+    for (const a of all) {
+      if (!a.meleeCombat || !Alive(a)) continue;
+      const rankA = this.indexRank.get(a);
+      for (const b of this.Near(a.position, R.separationM, this.nearB)) {
+        if (b === a || !Alive(b)) continue;
+        // 每一对只算一次：两个人都在白刃时，由 all 里靠前的那个发起。
+        if (b.meleeCombat && this.indexRank.get(b) < rankA) continue;
+        if (!this.Visible(a, b)) continue;
+        const distance = Distance(a, b);
+        if (distance >= R.separationM) continue;
+        const dx = distance > 0.001 ? (b.position.x - a.position.x) / distance : 1;
+        const dz = distance > 0.001 ? (b.position.z - a.position.z) / distance : 0;
+        const amount = Math.min((R.separationM - distance) * 0.5, dt * 1.2);
+        if (a !== player) this.Move(a, -dx * amount, -dz * amount);
+        if (b !== player) this.Move(b, dx * amount, dz * amount);
+      }
     }
     this.qte.Update(dt);
     const struggle = this.qte.active;
@@ -573,6 +668,7 @@ export class MeleeCombatDirector {
       this.host.Event?.({kind:"struggle", progress:struggle.progress, qteKind:struggle.kind}, player, struggle.attacker);
     }
     for (const entity of all) if (entity !== player && entity.meleeCombat) entity.meleeCombat = this.Pose(this.Fighter(entity));
+    this.stepping = false;
   }
   Pose(f) {
     if (!f?.weapon) return null;

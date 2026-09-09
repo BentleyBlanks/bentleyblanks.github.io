@@ -1031,3 +1031,94 @@ draw call 多的那 55–77 次是远景层的姿势桶（每档 7 个材质桶�
 
 **整关通关**（`FirstLevelMissionBrowserTest --campaign`，最终树）：真实输入通关 22 分钟；三角形捕获最高 `South` **7.97 M**（限 8.1 M，master 同点 7.90 M），
 `CourtyardColumn` 6.96 M。`South` 那一帧只剩 0.13 M 余量：下一轮往前沿加东西之前先看这一行。
+
+## 16. 待命的日军也要跑 AI（2026-09-09）
+
+玩家看着截图问：「为什么这一幕掉帧？远处的敌方也没有动画？也不会躲掩体？完全是一副雕塑。」
+两个问题是同一件事。
+
+### 16.1 现场
+
+`?whitebox=p012&missionStage=3`（Support 段，3394×1348 high，真 rAF 跑 25 s）：
+
+| 距离 | 活着的日军 | 4 秒位移 < 0.2 m | 有掩体 | 状态 |
+| --- | --- | --- | --- | --- |
+| 74–120 m | 3 | 67% | 0 | fire / advance |
+| 120–200 m | 8 | 75% | 0 | fire / advance / watch |
+| **200 m+** | **143** | **100%** | 0 | advance 138 / watch 5 |
+
+那 143 个人全带 `scriptedNoncombatant`，位置在 235–270 m，`move4s` 一律 0.00。
+这个标记在 `Script_Ai.Think` 里是整条链短路：清目标、放掩体、落回 ADVANCE、直接返回。
+§15 给远景层加的姿势桶、WATCH、98 个掩体箱，对他们一条都不生效 —— 短路发生在那之前。
+
+来源是 `Script_FirstLevelMissionRuntime.SpawnEncounterActor`：玩家走到阵地
+（`frontEngageDistanceM` 85 m，`frontBattleStarted`）之前，front / tank 两批人一生成就被
+标成 `scriptedNoncombatant` 并摆成跪姿。于是 `frontSimultaneousEnemies:150` 这个指标，
+是靠把 143 个不动的人算进活人数达成的（任务日志里 `frontPopulationReached {alive:150}`
+在第 0 秒就打勾）。
+
+### 16.2 定的口径
+
+用户 2026-09-09 选了 A：**150 这个数保留，待命的人要真的有 AI**。
+
+- 待命只保留 `missionFrontStandby`，不再设 `scriptedNoncombatant`（Flank 那几个是后面
+  才登场的侧翼脚本，仍然冻着）。
+- `UpdateAssault` 与 `Threatens` 改成认 `missionFrontStandby`：他不走跃进脚本，
+  对友军通路也仍然不算威胁 —— 因为他在 WATCH 里一枪都不开。
+- 超出交战距离（74 m）的人由 §15 的 `STATE.WATCH` 接手：跪下、面向枪声、隔
+  `scanIntervalS` 扫一次扇面、有掩体就进掩体。这正是「待命」该有的样子，不用另写一套。
+
+改后同一机位：200 m+ 那一档 144 人里 watch 86 / cover_engage 20 / suppress 19 / fire 14 /
+reload 3，**21 个人在掩体里**，站 28 跪 116，四秒内动过的从 0 变成 20 个。
+
+### 16.3 这一刀的帧账（交替 A/B）
+
+同一页、同一现场，`scriptedNoncombatant` 轮流开关四轮，每轮 6 s 取中位数
+（这台机器上常有别的 agent 在跑浏览器，单向前后对比会把漂移算成开销 ——
+本轮八次采样里就有一次 113 ms 的外部尖峰）：
+
+| | 冻着 | 真跑 AI |
+| --- | --- | --- |
+| 帧间隔中位数 | 30.0 ms | 30.1 ms |
+| CPU 合计 | 32.25 | 33.13 |
+| `post`（渲染提交） | 20.19 | 20.38 |
+| `ai` | **5.12** | **6.62** |
+| draw call | 934 | 940 |
+| 三角形 | 3.78 M | 3.79 M |
+
+**代价是 `ai` 桶 +1.5 ms，别的都在噪音里。** 渲染不涨是因为这批人本来就在远景层里画着，
+冻不冻只改他们摆什么姿势，不改画不画。
+
+### 16.4 前提：白刃的两两配对
+
+不先修这一条，A 是跑不动的。`Script_MeleeCombat.Step` 原来有两处全场规模的循环：
+
+1. 分离循环 `for i for j>i`，221 个人 = 每一步 24 000 对；而 `Update` 按
+   `maxStepS` 1/90 s 切子步，**帧越慢子步越多**（25 fps 一帧跑四步 ≈ 十万次配对）。
+   这是正反馈：越卡越卡。实测把 `Script_Main` 的「输入」这一桶顶到 3.6–7.3 ms/帧。
+2. `Closest()` 走 `Opponents()`，每次新建一个全场数组再 filter + sort。Step 里每个
+   **eligible** 的人每一步都要问一次 —— 而 `eligible` 明确排除 `scriptedNoncombatant`，
+   所以冻着的时候只有十来个人在问；143 个人一解冻，这一条会直接翻十倍。
+
+改法：`BuildIndex` 每步建一次 6 m 粗网格（`CELL_M` >= `engageM` 5.5 m，查询扫 3×3 格，
+整数键 —— 字符串键的格点在爆炸那一轮量过是十几毫秒），`Closest` 与分离循环都从网格
+取邻居；分离循环只从**正在白刃的人**出发，没在白刃的人一次都不进循环。
+`Step` 之外的调用（按 F 推架、拨挡、试验场「重开」之后的第一次询问）位置可能刚被改过，
+用 `stepping` 标志判出来，重建一次再查 —— 少了这一条，`MeleeQteTest` 的「DOM 按钮开局
+之后按 F」会拿到上一步的网格，`pushes` 恒为 0。
+
+效果（同机、143 人都在跑 AI）：「输入」桶 **3.59 → 0.63 ms**。
+
+### 16.5 还没动的
+
+按这一轮量到的整帧 841 draw / 3.62 M 三角排，剩下的大头与本轮无关：
+
+| | draw/帧 | 三角/帧 |
+| --- | --- | --- |
+| 白盒地面（48 m 一块，没有距离 LOD） | 107 | 829 k |
+| 尸体 `MissionAftermath_*`（708 具三级 LOD） | ~200 | ~1.2 M |
+| 远景人群 `Crowd_ija_Kneel`（133 人 × 2730 三角） | 15 | 594 k |
+
+渲染提交贵不是因为单个 draw 贵，是同一批几何一帧要走阴影 + 深度法线预通道 + 主场景三遍
+（用户面板：2.17 + 4.09 + 7.83 + 零碎 2.21 ≈ 16 ms）。WebGL2 没有 GPU 侧剔除与 indirect
+draw，SRP Batcher 是 Unity 的东西，这两条这里都用不上；能省的是「别提交不该提交的」。
