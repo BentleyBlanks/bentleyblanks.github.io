@@ -42,17 +42,17 @@ const C = AUTO_QUALITY;
       on = value;
     }
   }
-  // 近级每帧烘是这条阶梯上唯一按 draw call 计价的一项，掉帧多半卡在提交上 ——
-  // 所以在几个效果开关里它排第一个（实测账见 AUTO_QUALITY.ladder 注释）。
+  // 阶梯**不许**摘近级每帧烘（2026-09-09 改，原来第 3 级就摘）：摘掉它，军列在动的
+  // 那一段单帧跳变像素 928 → 2499（玩家报的「车厢段 shadow 每帧闪」），而它只值
+  // −163 draw / −1.3–2.1 ms，且车厢降到最深级仍是 30 ms —— 阶梯在跑不动的场里
+  // 一路走到底，只要它在阶梯上，那一幕最终一定是闪的。实测账见 AUTO_QUALITY.ladder
+  // 与 Data_Tuning_Shadows 抬头；要改回去先重跑那张交替 A/B 表。
   const FirstOff = (key) => C.ladder.findIndex((rung) => rung[key] === false);
-  assert.ok(FirstOff("nearShadowBake") >= 0, "阶梯里必须有一级摘掉近级每帧烘");
-  assert.ok(FirstOff("nearShadowBake") <= FirstOff("ssr")
-    && FirstOff("nearShadowBake") <= FirstOff("contactShadows"),
-    "近级每帧烘不得比 SSR / 接触阴影更晚摘（它买的是 draw call，那两样买的是像素）");
-  // 但也不许摘得太早：第一关车厢在实机上稳定落在第 2 级（--live 实测帧间隔中位数
-  // 35 ms），第 2 级就摘 = 玩家最常待着的那一幕永远享受不到它，这件事就白做了。
-  assert.ok(FirstOff("nearShadowBake") >= 3,
-    "近级每帧烘不许在第 3 级之前摘：车厢实机就停在第 2 级");
+  assert.equal(FirstOff("nearShadowBake"), -1,
+    "阶梯不许摘近级每帧烘：它是车厢那一段不闪的唯一依靠，只值 5% 的帧时间");
+  // 但阶梯仍然要有效果开关可摘，否则 scale 一个人扛不住兜底
+  assert.ok(FirstOff("ssr") >= 0 && FirstOff("contactShadows") >= 0,
+    "阶梯里必须还有屏幕空间效果可摘");
   // 钳位：越界一律夹回阶梯里，不抛也不返回 undefined
   assert.equal(AutoQualityKnobs(-5).step, 0);
   assert.equal(AutoQualityKnobs(999).step, C.ladder.length - 1);

@@ -170,7 +170,10 @@ async function LiveAutoQuality(page, seconds) {
     const g = window.Tengxian, a = g.autoQuality;
     const spans = window.__frameSpans || [];
     const intervals = spans.slice(Math.floor(spans.length / 3)).filter((v) => v > 0 && v < 250).sort((x, y) => x - y);
-    return { autoQuality: a ? { enabled: a.enabled, step: a.step, scale: a.scale, ssr: a.ssr, contactShadows: a.contactShadows } : null,
+    const csm = g.lights?.csm;
+    return { autoQuality: a ? { enabled: a.enabled, step: a.step, steps: a.steps, scale: a.scale, ssr: a.ssr, contactShadows: a.contactShadows, nearShadowBake: a.nearShadowBake } : null,
+      // 阶梯摘没摘掉第二张阴影烘焙，最终落在 CsmRig 上就是这两位（见 §6.8）
+      shadowBake: csm ? { nearEveryFrame: csm.nearEveryFrame, allowed: csm.nearBakeAllowed, triangles: csm.bakeTriangles } : null,
       internal: [g.post.width, g.post.height], output: [g.post.outputWidth ?? g.post.width, g.post.outputHeight ?? g.post.height],
       renderScale: g.graphics.renderScale, ssrOn: g.post.preset ? g.post.ssrEnabled ?? null : null,
       hudFps: document.getElementById("fps")?.textContent ?? null,

@@ -308,12 +308,10 @@ export const VELOCITY = { clampUv: 0.25, skinnedPrev: true };
  *   · `scale`          内部分辨率**倍率**（乘在玩家/档位的 renderScale 上，
  *                      不覆盖它 —— 玩家拉过的滑杆仍然是他拉的那个数）
  *   · `nearShadowBake` 允不允许「近级每帧烘」那第二张阴影图
- *                      （`Data_Tuning_Shadows` 抬头那一节）。**效果开关里第一个摘的是它** ——
- *                      第一关车厢实测它值 +163 draw / +2.09 ms（3394×1348 / high，
- *                      `Script_FirstLevelFrameProbe --strict --ablate=oneShadowBakePerFrame`），
- *                      而 `scale` 那几档只买得到像素、买不到 draw，这一帧偏偏是提交受限的。
- *                      摘掉的代价是近处会动的人在地板上的影子退回 30 Hz（会看出来一点跳），
- *                      所以放在第 3 级而不是更早 —— 见 ladder 里那条注释。
+ *                      （`Data_Tuning_Shadows` 抬头那一节）。接线还在，但
+ *                      **阶梯每一级都给 true，不再摘它** —— 它值 +163 draw /
+ *                      +1.3–2.1 ms，摘掉却让军列在动的那一段单帧跳变像素
+ *                      928 → 2499（「车厢里 shadow 每帧闪」）。原委见 ladder 注释。
  *   · `ssr`            屏幕空间反射（`SetSsrEnabled`，运行时开关不重编译）
  *   · `contactShadows` 屏幕空间接触阴影（`preset.contactShadows`，同上）
  * 四者都是 `ApplyGraphics` 里一句话的事，没有一处会触发 `RecompileAllMaterials`。
@@ -345,18 +343,25 @@ export const AUTO_QUALITY = {
    * `scale` 是**乘在**当前 renderScale 上的倍率；`floor` 是绝对下限，
    * 低于它 TAAU 已经补不回来了（1440p 输出 × 0.5 = 720p 内部）。
    */
+  // **`nearShadowBake` 现在每一级都是 true —— 阶梯不再摘第二张阴影烘焙**
+  // （2026-09-09 改；原来第 3 级就摘，理由是「它唯一按 draw call 计价，
+  // 掉帧的机器多半卡在提交上」）。改的原因是两条实测：
+  //   1. 摘掉它，军列在动的那一段单帧跳变 > 32/255 的像素从 928 涨到 2499
+  //      （交替 A/B 十轮取中位，见 Data_Tuning_Shadows 抬头）—— 玩家报的
+  //      「车厢段的 shadow 每帧闪」就是它，而车厢是玩家一坐好几分钟的一幕；
+  //   2. 它只值 −163 draw / −1.3–2.1 ms（3394×1348 配对 A/B），而车厢在这台机器上
+  //      **降到阶梯最深一级仍然是 30 ms**（`--live --liveSeconds=200` 实测）：
+  //      这条阶梯在跑不动的场里是一路走到底的，所以「排在第几个摘」是假问题 ——
+  //      只要它在阶梯上，那一幕最终一定是闪的。5% 的帧时间换整段一直在闪，不值。
+  // 要把这 2 ms 拿回来的话，把它加回某一级即可（`ApplyGraphics` 那条线没动，
+  // `LightRig.SetNearShadowBakeAllowed` 照旧接着 `CsmRig.nearBakeAllowed`），
+  // 但请先重跑 Data_Tuning_Shadows 抬头那张交替 A/B 表。
   ladder: [
     { scale: 1.00, nearShadowBake: true, ssr: true, contactShadows: true },
     { scale: 0.92, nearShadowBake: true, ssr: true, contactShadows: true },
     { scale: 0.85, nearShadowBake: true, ssr: true, contactShadows: true },
-    // 第 3 级起摘掉第二张阴影烘焙。它是这条阶梯上**唯一按 draw call 计价**的一项，
-    // 到这一级还没救回来的机器多半卡在提交上，压像素买不回 draw —— 所以在几个
-    // 效果开关里它排第一个。
-    // **不放在第 2 级**：第一关车厢在这台机器上实机就稳定落在第 2 级
-    //（3394×1348、帧间隔中位数 35 ms，`Script_FirstLevelFrameProbe --live` 实测），
-    // 放第 2 级等于「玩家最常待着的那一幕永远享受不到近级每帧烘」，这件事就白做了。
-    { scale: 0.78, nearShadowBake: false, ssr: false, contactShadows: true },
-    { scale: 0.70, nearShadowBake: false, ssr: false, contactShadows: false },
+    { scale: 0.78, nearShadowBake: true, ssr: false, contactShadows: true },
+    { scale: 0.70, nearShadowBake: true, ssr: false, contactShadows: false },
   ],
   /** 内部分辨率倍率乘完之后的绝对下限（相对输出分辨率）。 */
   floor: 0.50,
