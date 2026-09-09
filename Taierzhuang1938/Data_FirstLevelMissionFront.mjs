@@ -90,6 +90,15 @@ export const FRONT_RIFLEMEN=Object.freeze([
 /** Every man the front stages put on this field. The cover rows never build on one of these
  *  firing positions - a bank standing on a man is a man standing in a bank. */
 export const FRONT_FIELD_MEN=Object.freeze([...FRONT_REINFORCEMENTS,...FRONT_RIFLEMEN]);
+// Five platoons spread behind the first line. Every man is spawned at Support entry;
+// release delays change movement, never the simultaneous population or damage rules.
+export const FRONT_RESERVES=Object.freeze(Array.from({length:FIRST_LEVEL_TUNING.frontReserveCount},(_,i)=>({
+  id:`FrontReserve${i}`,x:-39+(i%11)*7.6,z:-207-Math.floor(i/11)*4.2,
+  weapon:i%FIRST_LEVEL_TUNING.frontReservePlatoonSize===0?"Type11":"Type38",
+  reserve:true,releaseDelayS:Math.floor(i/FIRST_LEVEL_TUNING.frontReservePlatoonSize)*FIRST_LEVEL_TUNING.frontReserveReleaseGapS,
+})));
+// Supporting rows advance without crossing the first assault bank or collapsing their depth.
+export const FrontReserveLane=(x,z)=>[{x,z:z+FIRST_LEVEL_TUNING.frontReserveAdvanceM}];
 // Bounding assault geometry (2026-09-08). Lines are bound positions north of the traverse trench
 // (z=-124; withdrawal posts at -142..-148); each sits 1.6-2.5 m behind a cover row so kneeling
 // there never intersects it. blockedX are the cover columns a straight rush between lines would
@@ -169,7 +178,7 @@ export const FRONT_DEFENDERS=[
   [-38,-133,"HanYang"],[-31,-138,"Zb26"],[-23,-131,"HanYang"],[-17,-137,"HanYang"],
   [-9,-134,"HanYang"],[5,-138,"HanYang"],[19,-135,"Zb26"],[25,-140,"HanYang"],
 ].map(([x,z,weapon],i)=>({id:"FrontDefender"+i,x,z,weapon,stance:i%4===0?2:1}));
-export const FRONT_GUARD_POSTS=[[-29,-146],[-22,-142],[-12,-148],[-4,-144],[7,-147.6],[14,-146],[21,-143],[28,-147]]
+export const FRONT_GUARD_POSTS=[[-29,-145],[-22,-145],[-12,-145],[-4,-145],[7,-145],[14,-145],[21,-145],[28,-145]]
   .map(([x,z])=>({x,z}));
 export const FRONT_BREACHES=[{x:-43,z:25,radius:10,depth:.65},{x:-24,z:-39,radius:9,depth:.6},{x:-8,z:-94,radius:8,depth:.65}];
 export const FRONT_SHELLS=[

@@ -1,8 +1,8 @@
-import { FRONT_FIELD_MEN, FRONT_APPROACH_ENEMIES } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_APPROACH_ENEMIES } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-export const MISSION_VERSION = "first-level-20260909-stages18-r1";
+export const MISSION_VERSION = "first-level-20260909-pacing150-r1";
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 const Stage = (id, objective, target, requirements, cue, extra = {}) =>
@@ -27,7 +27,7 @@ export const MISSION_STAGES = Object.freeze([
     "MachineGun",
     "接手机枪，压住火力点，掩护前方守军撤回。",
     A.gun,
-    ["gunUsed", "guardsSafe"],
+    ["gunUsed", "guardWithdrawalResolved"],
     "TakeMachineGun",
   ),
   Stage(
@@ -71,9 +71,9 @@ export const MISSION_STAGES = Object.freeze([
   ),
   Stage(
     "Transfer",
-    "守住村东来路，等待伤员完成转运。",
+    "压住东侧火力，盯住南侧绕行，掩护车辆分批出发。",
     A.transfer,
-    ["transferArrived", "vehiclesDeparted", "zhouNext", "followVehicleHeard"],
+    ["transferArrived", "vehiclesDeparted", "transferAttacksResolved", "zhouNext", "followVehicleHeard"],
     "TransferDefense",
     { minimumSeconds: MISSION_TUNING.transferSeconds },
   ),
@@ -102,14 +102,14 @@ export const MISSION_STAGES = Object.freeze([
   ),
   Stage(
     "RetreatWall",
-    "退到院墙缺口，补弹并继续掩护担架。",
+    "退到院墙缺口，压住北侧横射火力，为担架打开缺口。",
     A.retreatB,
     ["retreatWallPassed"],
     "RetreatBleeding",
   ),
   Stage(
     "RetreatYard",
-    "从后院门窗阻击，掩护最后一副担架撤离。",
+    "随最后一副担架后撤，压住后院追兵，把伤员送到接收院。",
     A.retreatC,
     ["retreatYardPassed"],
     "RetreatCold",
@@ -125,7 +125,7 @@ export const MISSION_STAGES = Object.freeze([
   Stage("Death", "老周……", A.zhouDrop, ["deathSceneComplete"], "ZhouDeath"),
   Stage(
     "FinalDefense",
-    "掩护医护和伤员撤离接收院。",
+    "打开后门外的撤退窗口，随医护退出接收院。",
     A.finalCover,
     ["rearLaneClear", "medicsEscaped"],
     "ReceptionWithdrawal",
@@ -137,7 +137,7 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   approach: FRONT_APPROACH_ENEMIES,
   // The roster itself lives in Data_FirstLevelMissionFront: the assault lanes and the cover rows
   // are derived from it, and a list split across two files drifts.
-  front: FRONT_FIELD_MEN,
+  front: [...FRONT_FIELD_MEN,...FRONT_RESERVES],
   tank: [
     { id: "TankEscortA", x: 24, z: -145 },
     { id: "TankEscortB", x: 28, z: -152 },
@@ -163,6 +163,18 @@ export const MISSION_ENCOUNTERS = Object.freeze({
     { id: "TransferRifleB", x: 117, z: 97 },
     { id: "TransferRifleC", x: 119, z: 85 },
   ],
+  transferFlank: [
+    {id:"TransferFlankA",x:112,z:114},{id:"TransferFlankB",x:105,z:122},
+    {id:"TransferFlankC",x:104,z:141},{id:"TransferFlankD",x:103,z:140},
+  ],
+  transferLast: [
+    {id:"TransferLastGunner",x:113,z:80,weapon:"Type11",hold:true},
+    {id:"TransferLastA",x:118,z:89},{id:"TransferLastB",x:120,z:98},
+    {id:"TransferLastC",x:111,z:110},
+  ],
+  transferRear: [
+    {id:"TransferRearA",x:91,z:65},{id:"TransferRearB",x:96,z:70},{id:"TransferRearC",x:88,z:66},
+  ],
   air: [
     { id: "AirPursuerA", x: 113, z: 89 },
     { id: "AirPursuerB", x: 108, z: 94 },
@@ -172,8 +184,16 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   retreat: [
     { id: "RetreatPursuerA", x: 64, z: 114 },
     { id: "RetreatPursuerB", x: 61, z: 108 },
-    { id: "RetreatPursuerC", x: 70, z: 113 },
+    { id: "RetreatPursuerC", x: 63, z: 116 },
     { id: "RetreatPursuerD", x: 74, z: 109 },
+  ],
+  retreatWall: [
+    {id:"WallFlankerA",x:-29,z:65},{id:"WallFlankerB",x:-35,z:60},
+    {id:"WallGunner",x:-27,z:57,weapon:"Type11",hold:true},
+  ],
+  retreatYard: [
+    {id:"YardPursuerA",x:-80,z:51},{id:"YardPursuerB",x:-81,z:54},
+    {id:"YardPursuerC",x:-82,z:51},
   ],
   reception: [
     { id: "ReceptionGunner", x: -111, z: 32, weapon: "Type11", hold: true },
@@ -187,10 +207,19 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   ],
 });
 // Finite squads cross authored openings while the shared AI owns fire and damage.
+export const MISSION_TRANSFER_BEATS=Object.freeze([
+  {id:"transfer",earliestS:0,latestS:0,loaded:0,restS:0,hint:"transferEast"},
+  {id:"transferFlank",earliestS:35,latestS:60,loaded:4,restS:12,hint:"transferFlank"},
+  {id:"transferLast",earliestS:95,latestS:115,loaded:8,restS:12,hint:"transferLast"},
+  {id:"transferRear",earliestS:155,latestS:190,loaded:9,restS:12,hint:"transferRear"},
+]);
+export const MISSION_PURSUIT_ROUTE=Object.freeze([
+  {x:100,z:120.5},{x:74,z:120.5},{x:61,z:120.5},{x:60,z:114},...MISSION_ROUTES.evacuation,
+]);
 export const MISSION_GUIDANCE = Object.freeze({
   Unloading: {label:'unload'}, Support:{label:'support',route:'support'},
   MachineGun:{label:'gun'},Tank:{label:'bundle'},Orders:{label:'orders'},
-  South:{label:'south'},Village:{label:'village',route:'village'},
+  South:{label:'south',route:'south'},Village:{label:'village',route:'village'},
   Courtyard:{label:'gate'},TransferApproach:{label:'transfer',route:'village'},Transfer:{label:'transfer'},AirFirst:{label:'transfer'},
   Carry:{label:'carry'},Rescue:{label:'ditch'},
   RetreatFirst:{label:'retreat'},RetreatWall:{label:'retreat'},RetreatYard:{label:'retreat'},
@@ -202,8 +231,23 @@ export const MISSION_TACTICS = Object.freeze({
   CourtyardPursuerB: { delay: 12, points: [{x:89,z:39},{x:66,z:43},{x:59,z:40}] },
   CourtyardPursuerC: { delay: 25, points: [{x:91,z:41},{x:70,z:44},{x:64,z:40}] },
   TransferRifleA: { delay: 5, points: [{x:108,z:90},{x:102,z:91}] },
-  TransferRifleB: { delay: 38, points: [{x:112,z:106},{x:104,z:112}] },
-  TransferRifleC: { delay: 65, points: [{x:114,z:90},{x:107,z:94}] },
+  TransferRifleB: { delay: 9, points: [{x:112,z:106},{x:104,z:112}] },
+  TransferRifleC: { delay: 13, points: [{x:114,z:90},{x:107,z:94}] },
+  TransferFlankA: {delay:0,points:[{x:104,z:117},{x:100,z:117}]},
+  TransferFlankB: {delay:3,points:[{x:103,z:124},{x:96,z:125}]},
+  TransferFlankC: {delay:6,points:[{x:108,z:135},{x:96,z:137}]},
+  TransferFlankD: {delay:9,points:[{x:102,z:136},{x:94,z:134}]},
+  TransferLastA: {delay:0,points:[{x:110,z:90},{x:102,z:92}]},
+  TransferLastB: {delay:4,points:[{x:109,z:108},{x:102,z:114}]},
+  TransferLastC: {delay:8,points:[{x:104,z:115},{x:99,z:116}]},
+  TransferRearA: {delay:0,points:[{x:91,z:77},{x:90,z:91}]},
+  TransferRearB: {delay:3,points:[{x:96,z:81},{x:100,z:92}]},
+  TransferRearC: {delay:6,points:[{x:84,z:80},{x:86,z:95}]},
+  WallFlankerA: {delay:0,points:[{x:-37,z:66},{x:-41,z:79}]},
+  WallFlankerB: {delay:4,points:[{x:-40,z:63},{x:-42,z:70}]},
+  YardPursuerA: {delay:0,points:[{x:-80,z:51},{x:-81,z:43},{x:-94,z:43}]},
+  YardPursuerB: {delay:4,points:[{x:-81,z:53},{x:-81,z:41},{x:-99,z:42},{x:-103,z:41.62}]},
+  YardPursuerC: {delay:8,points:[{x:-81,z:51},{x:-81,z:41},{x:-99,z:42},{x:-110,z:40.95}]},
   AirPursuerA: { delay: 0, points: [{x:106,z:90},{x:102,z:92}] },
   AirPursuerB: { delay: 3, points: [{x:105,z:98},{x:104,z:111}] },
   AirPursuerC: { delay: 5, points: [{x:109,z:109},{x:100,z:114}] },
@@ -271,10 +315,10 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
     anchors: A,
     routes: MISSION_ROUTES,
     friendlyLimit: 4,
-    actorCapacity:144,
-    // Pre-built rigs for everything the mission spawns after boot (Support 46 IJA + waves 42;
-    // defenders / guards / relief NRA). Script_Main.WarmLevel builds them behind the loading screen.
-    actorPool: { ija: 64, nra: 32 },
+    actorCapacity:224,
+    crowdCellM:MISSION_TUNING.frontCrowdCellM,
+    // Real first-battle actors plus dormant village and NRA; casualties release capacity.
+    actorPool: { ija: 160, nra: 40 },
     actualEventsOnly: true,
     storyBeats: [],
     activities: { arrivalGuideStart: { x: -76, z: 71 }, trainColumn: { extraCount: MISSION_TRAIN.extraCount } },

@@ -26,7 +26,13 @@ export const FIRST_LEVEL_STAGES = Object.freeze([
 ]);
 export const FIRST_LEVEL_ENCOUNTER_STARTS = Object.freeze({
   front:3, approach:3, tank:3, village:3, melee:3, courtyard:10,
-  transfer:12, air:13, retreat:15, reception:16, final:17,
+  transfer:12, transferFlank:12, transferLast:12, transferRear:12, air:13, retreat:15,
+  retreatWall:15,retreatYard:15,reception:16, final:17,
+});
+// These belong to the current public phase but arrive after its entry encounter.
+export const FIRST_LEVEL_DEFERRED_ENCOUNTERS=Object.freeze({
+  12:Object.freeze(["transferFlank","transferLast","transferRear"]),
+  15:Object.freeze(["retreatWall","retreatYard"]),
 });
 // Reaching the inner court assumes its entrance has been cleared; the window
 // gun and side courtyard defenders still belong to the upcoming capture task.

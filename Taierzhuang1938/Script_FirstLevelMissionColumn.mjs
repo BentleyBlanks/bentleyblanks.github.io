@@ -170,6 +170,10 @@ export class FirstLevelMissionColumn {
       ];
       entry.exitProgress = 0;
       entry.exitLength = MissionRouteLength(entry.exitRoute);
+      const handoff=MISSION_ROUTES.exit[R.finalHandoffRouteIndex];
+      const handoffIndex=entry.exitRoute.findIndex(point=>point.x===handoff.x && point.z===handoff.z);
+      entry.exitSafeProgress=MissionRouteLength(entry.exitRoute.slice(0,handoffIndex+1));
+      entry.rearCleared=false;
     }
   }
   StartReception() {
@@ -367,6 +371,7 @@ export class FirstLevelMissionColumn {
             entry.exitProgress + (entry.bearers ? R.litterSpeedMps : R.finalEvacSpeedMps) * dt,
           );
         Object.assign(entry, MissionCarryRoutePoint(entry.exitRoute, entry.exitProgress));
+        entry.rearCleared=entry.exitProgress>=entry.exitSafeProgress;
         entry.state = routeSafe ? "moving" : "waiting";
         if (entry.exitProgress >= entry.exitLength) {
           entry.escaped = true;
@@ -485,6 +490,7 @@ export class FirstLevelMissionColumn {
         if(litter[key]!=null)helper[key]=litter[key];
       helper.health=Math.min(helper.health,litter.bearers[helper.assignedSlot]);
       helper.escaped=!!(litter.escaped||litter.evacuated);
+      helper.rearCleared=!!litter.rearCleared;
       helper.evacuated=helper.escaped;
       if(helper.escaped)helper.visible=false;
       if(litter.health<=0){

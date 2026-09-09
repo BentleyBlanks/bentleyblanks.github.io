@@ -4,7 +4,7 @@ import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {LaunchBrowser} from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import {ServeRoot} from "./Script_DevServer.mjs";
-import {FIRST_LEVEL_STAGES,FIRST_LEVEL_ENCOUNTER_STARTS} from "./Data_FirstLevelMissionStages.mjs";
+import {FIRST_LEVEL_STAGES,FIRST_LEVEL_ENCOUNTER_STARTS,FIRST_LEVEL_DEFERRED_ENCOUNTERS} from "./Data_FirstLevelMissionStages.mjs";
 import {MISSION_STAGES} from "./Data_FirstLevelMission.mjs";
 import {MISSION_TRAIN} from "./Data_FirstLevelMissionTrain.mjs";
 const here=path.dirname(fileURLToPath(import.meta.url));
@@ -24,6 +24,7 @@ async function Jump(number) {
   const spawned=await page.evaluate(()=>[...window.Tengxian.Debug.FirstLevelMissionRuntime().spawned]);
   for(const [id,first] of Object.entries(FIRST_LEVEL_ENCOUNTER_STARTS))
     if(first>number)assert.ok(!spawned.includes(id),"future encounter remains available: "+number+" / "+id);
+  for(const id of FIRST_LEVEL_DEFERRED_ENCOUNTERS[number]||[])assert.ok(!spawned.includes(id),"later attack in the current public phase remains available: "+id);
   await page.evaluate(()=>{const g=window.Tengxian;g.Debug.SetDebugOption("invincible",true);g.Debug.SetDebugOption("infiniteAmmo",true);});
   return state;
 }

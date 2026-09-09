@@ -1,11 +1,13 @@
 import * as THREE from "three";
-import { FRONT_DEFENDERS, FRONT_GUARD_POSTS, FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane, ClearLaneX } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_DEFENDERS, FRONT_GUARD_POSTS, FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane, FrontReserveLane, ClearLaneX } from "./Data_FirstLevelMissionFront.mjs";
 import {
   MISSION_STAGES,
   MISSION_TUNING as R,
   MISSION_ENCOUNTERS,
   MISSION_TACTICS,
   MISSION_GUIDANCE,
+  MISSION_TRANSFER_BEATS,
+  MISSION_PURSUIT_ROUTE,
   MISSION_VERSION,
 } from "./Data_FirstLevelMission.mjs";
 import {
@@ -18,6 +20,7 @@ import { MISSION_TRAIN, MissionTrainMotion } from "./Data_FirstLevelMissionTrain
 import { FirstLevelMissionTrain } from "./Script_FirstLevelMissionTrain.mjs";
 import { PrepareFirstLevelTrainAnimation } from "./Script_FirstLevelTrainAnimation.mjs";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
+import { TransferBeatReady, GuardCrossingPair, FrontReplacementSlots } from "./Script_FirstLevelMissionPacing.mjs";
 import { ApplyFirstLevelStageJump } from "./Script_FirstLevelMissionStageJump.mjs";
 import {
   FirstLevelMissionColumn,
@@ -384,8 +387,7 @@ export class FirstLevelMissionRuntime {
       if (actor.suppression > 0.65 && stage !== "Train") this.ai.SetStance(actor, 1, 1, true);
     }
   }
-  // Encounters are queued and drained a few rigs per frame (R.spawnPerFrame): the Support stage
-  // alone places 46 enemies, and creating them in one frame was a visible hitch.
+  // Warmed real actors are placed over several frames. Failed placement retains its slot.
   SpawnEncounter(id) {
     if (this.spawned.has(id)) return;
     this.spawned.add(id);
@@ -400,8 +402,11 @@ export class FirstLevelMissionRuntime {
         squadId: `Mission_${id}`,
         bayonetFixed: !!spec.bayonet,
       });
-      if (!actor) return null;
+      if (!actor) {this.spawnQueue.push(()=>this.SpawnEncounterActor(id,spec));return null;}
       actor.missionId = spec.id;InstallMissionSentry(actor);
+      actor.missionEncounter=id;
+      actor.missionReserve=!!spec.reserve;
+      actor.missionReleaseDelayS=spec.releaseDelayS||0;
       if(["village","melee"].includes(id)){actor.missionDormant=true;actor.scriptedNoncombatant=true;}
       if (MISSION_TACTICS[spec.id]) actor.missionTactic = { index: 0, elapsed: 0, hold: 0,
         movingSeconds: 0, distance: 0, last: { x: spec.x, z: spec.z }, shelter: {x:spec.x,z:spec.z}, mode: "cover" };
@@ -411,6 +416,7 @@ export class FirstLevelMissionRuntime {
       actor.missionFrontStandby=standby;
       if(actor.missionFrontStandby)this.ai.SetStance(actor,1,4+actor.id%3,true);
       actor.scriptAccuracyScale = actor.missionAccuracyScale = ["front","approach"].includes(id)?R.frontAccuracyScale:.5;
+      if(spec.reserve)actor.scriptAccuracyScale=actor.missionAccuracyScale=R.frontReserveAccuracyScale;
       actor.scriptFireIntervalScale = actor.missionFireIntervalScale = ["front","approach"].includes(id)?R.frontFireIntervalScale:1.45;
       actor.scriptArrivalRadius = 0.7;
       actor.manualGoalUntil = Infinity;
@@ -425,6 +431,9 @@ export class FirstLevelMissionRuntime {
       if (!spec.hold && !WEAPONS[spec.weapon || "Type38"]?.emplaced) actor.grenades = R.enemyGrenades;
       if (spec.hold) {actor.scriptDefensive=true;actor.scriptSuppressible=true;}
       if (id === "front" && !spec.hold) actor.missionAssault = this.MakeAssault(spec.x, spec.z);
+      // Supporting platoons keep their spacing and depth. They remain live combatants
+      // while the original line and casualty replacements make the close assault.
+      if(spec.reserve && actor.missionAssault)actor.missionAssault.points=FrontReserveLane(spec.x,spec.z);
       this.enemies.set(spec.id, actor);
       return actor;
   }
@@ -466,6 +475,7 @@ export class FirstLevelMissionRuntime {
     for (const actor of this.enemies.values()) {
       const s = actor.missionAssault;
       if (!s || !actor.alive || actor.scriptedNoncombatant) continue;
+      if(actor.missionReserve && this.time-(this.frontBattleAt??this.time)<actor.missionReleaseDelayS)continue;
       if (!active) {
         if (s.mode !== "settled") { this.Defend(actor, actor.position); s.mode = "settled"; }
         continue;
@@ -507,6 +517,7 @@ export class FirstLevelMissionRuntime {
         }
         s.hold += dt;
         const last = s.index === s.points.length - 1;
+        if(last && actor.missionReserve)continue;
         // The last line used to be a flat eleven second stand, three times over. Now it is the same
         // volley/hold rhythm as every other bound: fire assaultVolleyShots rounds or hold
         // assaultFinalHoldS seconds, then take a fresh firing position 3-6 m along the line
@@ -530,21 +541,23 @@ export class FirstLevelMissionRuntime {
   }
   UpdateWaves() {
     if (!["Support", "MachineGun", "Tank"].includes(this.flow.stage.id) || !this.Has("frontBattleStarted")) return;
-    const w = this.waves || (this.waves = { spawned: 0, squads: 0, nextAt: this.time + R.waveFirstDelayS });
+    const w = this.waves || (this.waves = { spawned: 0, queued:0, squads: 0, nextAt: this.time + R.waveFirstDelayS });
     if (w.spawned >= R.waveBudget || this.time < w.nextAt) return;
     let alive = 0;
-    for (const actor of this.enemies.values()) if (actor.alive && actor.missionAssault) alive++;
-    if (alive >= R.waveAliveCap) return;
+    for (const actor of this.enemies.values()) if (actor.alive && ["front","approach","tank"].includes(actor.missionEncounter)) alive++;
+    const size=FrontReplacementSlots({alive,queued:w.queued,spawned:w.spawned},R);
+    if (!size || this.spawnQueue.length) return;
     w.nextAt = this.time + R.waveIntervalS;
     const squad = w.squads++, cx = FRONT_ASSAULT.waveCentersX[squad % FRONT_ASSAULT.waveCentersX.length];
-    const size = Math.min(R.waveSquadSize, R.waveBudget - w.spawned);
     for (let i = 0; i < size; i++) {
-      w.spawned++;
+      w.queued++;
       const x = cx + ((i % 3) - 1) * 3.2 + (i >= 3 ? 1.6 : 0), z = FRONT_ASSAULT.spawnZ - (i >= 3 ? 2.5 : 0), id = `Wave${squad}_${i}`;
-      this.spawnQueue.push(() => {
+      const Spawn=() => {
         const actor = this.ai.Spawn("ija", x, z, { weapon: i === 0 && squad % 2 === 1 ? "Type11" : "Type38", squadId: `MissionWave${squad}` });
-        if (!actor) return;
+        if (!actor) {this.spawnQueue.push(Spawn);return;}
+        w.queued--;w.spawned++;
         actor.missionId = id; InstallMissionSentry(actor);
+        actor.missionEncounter="front";
         actor.scriptAccuracyScale = actor.missionAccuracyScale = R.frontAccuracyScale;
         actor.scriptFireIntervalScale = actor.missionFireIntervalScale = R.frontFireIntervalScale;
         actor.scriptArrivalRadius = 0.7;
@@ -555,10 +568,30 @@ export class FirstLevelMissionRuntime {
         if (actor.weapon?.kind === "boltRifle") actor.grenades = R.enemyGrenades;
         actor.missionAssault = this.MakeAssault(x, z);
         this.enemies.set(id, actor);
-      });
+      };
+      this.spawnQueue.push(Spawn);
     }
   }
-  Threatens(point, ids = null) {
+  UpdateTransferBeats() {
+    const beats=this.transferBeats ||= {index:0,previousClearedAt:0,started:[],cleared:[]};
+    const plan=MISSION_TRANSFER_BEATS[beats.index];
+    if(!plan)return;
+    const seconds=this.flow.stageTime;
+    if(!beats.started.includes(plan.id)) {
+      if(!TransferBeatReady(plan,{seconds,loaded:this.column.loadEvents.length,previousClearedAt:beats.previousClearedAt}))return;
+      this.SpawnEncounter(plan.id);beats.started.push(plan.id);
+      this.Record(`${plan.id}AttackStarted`,{loaded:this.column.loadEvents.length,departed:this.column.departed});
+      this.hud.Hint(T(`firstLevel.hint.${plan.hint}`),8);
+    }
+    const actors=MISSION_ENCOUNTERS[plan.id].map(spec=>this.enemies.get(spec.id));
+    if(actors.every(actor=>actor && !actor.alive)) {
+      beats.cleared.push(plan.id);beats.previousClearedAt=seconds;beats.index++;
+      this.Record(`${plan.id}AttackCleared`,{loaded:this.column.loadEvents.length,departed:this.column.departed});
+      this.hud.Hint(T("firstLevel.hint.transferWindow",{loaded:this.column.loadEvents.length,departed:this.column.departed}),8);
+      if(beats.index===MISSION_TRANSFER_BEATS.length)this.Record("transferAttacksResolved");
+    }
+  }
+  Threatens(point, ids = null, targetHeight = 1.1) {
     return [...this.enemies].some(([id, actor]) => {
       if (
         (ids && !ids.includes(id)) ||
@@ -571,7 +604,7 @@ export class FirstLevelMissionRuntime {
       if (Distance(actor.position, point) > R.passageRangeM) return false;
       const eye = actor.stance === 2 ? .35 : actor.stance === 1 ? .9 : 1.35;
       const from = actor.position.clone().add(new THREE.Vector3(0, eye, 0)),
-        to = this.Point(point, 1.1),
+        to = this.Point(point, targetHeight),
         delta = to.sub(from),
         length = delta.length();
       const hit = this.battlefield.Raycast(from, delta.normalize(), length, {terrain:true});
@@ -695,7 +728,9 @@ export class FirstLevelMissionRuntime {
   Enter(stage) {
     this.UpdateMusic(stage.id);
     this.Objective(Localize(FirstLevelStageTextId(stage.id), stage.objective));
-    if (stage.cue && !["Courtyard", "Train", "Unloading", "Death"].includes(stage.id))
+    const guardLoss=stage.id==="Tank" && this.guards.filter(guard=>guard.safe && guard.actor.alive).length<R.guardCount;
+    if(guardLoss)this.hud.Hint(T(this.guards.some(guard=>guard.safe && guard.actor.alive)?"firstLevel.hint.guardsLoss":"firstLevel.hint.guardsLost"),9);
+    if (stage.cue && !guardLoss && !["Courtyard", "Train", "Unloading", "Death"].includes(stage.id))
       this.Say(stage.cue, { urgent: ["AirFirst", "Dive", "Death"].includes(stage.id) });
     switch (stage.id) {
       case "Train":
@@ -756,7 +791,7 @@ export class FirstLevelMissionRuntime {
         this.Guide(MISSION_ROUTES.south);
         break;
       case "Village":
-        for (const actor of this.enemies.values()) if (actor.alive) actor.scriptedNoncombatant = false;
+        for (const actor of this.enemies.values()) if (actor.alive && actor.missionDormant) actor.scriptedNoncombatant = false;
         this.audio.Ambience("firstLevelFront");
         this.Guide(MISSION_ROUTES.village.slice(0, 3));
         this.SpawnEncounter("village");
@@ -812,10 +847,12 @@ export class FirstLevelMissionRuntime {
         this.Guide(MISSION_ROUTES.evacuation.slice(0, 4));
         break;
       case "RetreatWall":
+        this.SpawnEncounter("retreatWall");
         this.column.zhou.health = 12;
         this.Guide(MISSION_ROUTES.evacuation.slice(3, 7));
         break;
       case "RetreatYard":
+        this.SpawnEncounter("retreatYard");
         this.column.zhou.health = 6;
         this.Guide(MISSION_ROUTES.evacuation.slice(6));
         break;
@@ -869,9 +906,9 @@ export class FirstLevelMissionRuntime {
         squadId: "MissionWithdrawingGuard",
       });
       if (actor) {
-        InstallMissionSentry(actor);this.Defend(actor,actor.position);
+        InstallMissionSentry(actor);this.Defend(actor,actor.position,0,0);
         actor.scriptedNoncombatant=true;
-        this.ai.SetStance(actor,1,4+i*.35,true);
+        this.ai.SetStance(actor,2,Infinity,true);
         this.guards.push({
           actor,
           progress: 0,
@@ -882,21 +919,33 @@ export class FirstLevelMissionRuntime {
     }
   }
   UpdateGuards(dt) {
+    const pair=GuardCrossingPair(this.guards.map(guard=>({id:guard.actor.id,safe:guard.safe,alive:guard.actor.alive})),R.guardPairSize);
     for (const guard of this.guards) {
-      if (guard.safe || !guard.actor.alive) continue;
-      if (!this.Threatens(guard.actor.position)) {
-        guard.actor.scriptedNoncombatant=true;
+      if (!guard.actor.alive || guard.progress>=guard.route.length) continue;
+      if(!guard.safe && (!pair.includes(guard.actor.id) || !this.Has("gunUsed") || (!guard.crossing && this.time<(this.nextGuardCrossingAt||0)))) {
+        this.Defend(guard.actor,guard.actor.position,0,0);this.ai.SetStance(guard.actor,2,Infinity,true);continue;
+      }
+      // Test the waiting man's actual prone silhouette, then commit to the bound.
+      // Rechecking a standing silhouette every frame stranded men in their shelter.
+      if (guard.crossing || !this.Threatens(guard.actor.position,null,guard.actor.stance===2?.35:1.1)) {
+        guard.crossing=true;
+        guard.actor.scriptedNoncombatant=false;
         this.ai.SetStance(guard.actor,0,1.2);
         if (Distance(guard.actor.position, guard.route[guard.progress]) < 1.4) guard.progress++;
-        if (guard.progress >= guard.route.length) {
+        if(!guard.safe && guard.progress>R.guardSafeRouteIndex) {
           guard.safe = true;
+          this.Record(`guardWithdrawn${guard.actor.id}`,{survived:this.guards.filter(entry=>entry.safe).length});
+          this.hud.Hint(T("firstLevel.hint.guardCrossed"),5);
+          this.nextGuardCrossingAt=this.time+R.guardCrossingGapS;
+        }
+        if (guard.progress >= guard.route.length) {
           this.MoveActor(guard.actor,guard.actor.position,0);
           this.ai.SetStance(guard.actor,1,Infinity,true);
           continue;
         }
         const target=guard.route[guard.progress],p=guard.actor.position;
         const distance=Distance(p,target)||1,dx=(target.x-p.x)/distance,dz=(target.z-p.z)/distance;
-        const blocked=this.guards.some(other=>other!==guard&&!other.safe&&other.actor.alive&&
+        const blocked=this.guards.some(other=>other!==guard&&other.progress<other.route.length&&other.actor.alive&&
           (other.actor.position.x-p.x)*dx+(other.actor.position.z-p.z)*dz>0&&
           Math.abs((other.actor.position.x-p.x)*dz-(other.actor.position.z-p.z)*dx)<.65&&
           Distance(other.actor.position,p)<1.4);
@@ -907,7 +956,11 @@ export class FirstLevelMissionRuntime {
       }
     }
     if (this.guards.length && this.guards.every((guard) => guard.safe || !guard.actor.alive))
-      this.Record("guardsSafe", { survived: this.guards.filter((guard) => guard.safe).length });
+      {
+        const survived=this.guards.filter(guard=>guard.safe && guard.actor.alive).length;
+        this.Record("guardWithdrawalResolved", { survived,casualties:this.guards.length-survived,outcome:survived?"withdrawal":"lost" });
+        if(survived)this.Record("guardsSafe",{survived});
+      }
   }
   OnBlast({ position, radius, damage, byPlayer, explosiveId }) {
     if (byPlayer) {
@@ -1009,7 +1062,7 @@ export class FirstLevelMissionRuntime {
         const suppressed=actor.suppression>=R.tacticalSuppression;
         if(suppressed && Distance(actor.position,state.shelter)>R.tacticalArrivalM){
           this.MoveActor(actor,state.shelter,R.tacticalMoveMps);state.mode="fallback";
-        }else {this.Defend(actor, actor.position);state.mode=suppressed?"suppressed":"cover";}
+        }else {this.Defend(actor, state.shelter);state.mode=suppressed?"suppressed":"cover";}
         if (suppressed) this.ai.SetStance(actor, 1, 1, true);
         continue;
       }
@@ -1028,7 +1081,7 @@ export class FirstLevelMissionRuntime {
     }
   }
   UpdateFront() {
-    for(const actor of this.enemies.values())if(["South","Village"].includes(this.flow.stage.id) && actor.missionId!=="MeleeTutor" && actor.missionDormant && Distance(actor.position,this.player.position)<55){
+    for(const actor of this.enemies.values())if(this.flow.stage.id==="Village" && actor.missionId!=="MeleeTutor" && actor.missionDormant && Distance(actor.position,this.player.position)<55){
       actor.missionDormant=false;actor.scriptedNoncombatant=false;
     }
     if(!["Support","MachineGun","Tank","Orders"].includes(this.flow.stage.id))return;
@@ -1042,8 +1095,9 @@ export class FirstLevelMissionRuntime {
     }
     if(!this.Has("frontBattleStarted")&&this.Near(A.front,R.frontEngageDistanceM)){
       this.Record("frontBattleStarted");
+      this.frontBattleAt=this.time;
       for(const actor of this.enemies.values())if(actor.missionFrontStandby){actor.scriptedNoncombatant=false;actor.missionFrontStandby=false;}
-      for(const guard of this.guards)this.Defend(guard.actor,guard.actor.position);
+      for(const guard of this.guards){this.Defend(guard.actor,guard.actor.position,0,0);this.ai.SetStance(guard.actor,2,Infinity,true);}
     }
     if(!this.tank.active&&this.Near(A.front,R.tankRevealDistanceM)){this.tank.active=true;this.tank.lastShell=this.time;}
   }
@@ -1328,9 +1382,15 @@ export class FirstLevelMissionRuntime {
       else {const z=this.column.zhou;target={x:z.x+Math.sin(z.yaw)*1.6,z:z.z+Math.cos(z.yaw)*1.6};}
     }
     if(stage.id==="FinalDefense")target=MissionRouteLookahead(MISSION_ROUTES.exit.slice(0,5),this.player.position);
+    if(stage.id==="RetreatYard")target=this.column.litters.filter(litter=>litter.visible && !litter.loaded && !litter.evacuated && litter.health>0).at(-1)||A.retreatC;
     let status=null;
     if(stage.id==="MachineGun"&&this.emplacement.Mounted)status=T("firstLevel.hint.guards",{safe:this.guards.filter(g=>g.safe).length,remaining:this.guards.filter(g=>g.actor.alive&&!g.safe).length});
     if(["Courtyard","TransferApproach","Transfer"].includes(stage.id))status=T("firstLevel.hint.queue",{passed:this.column.litters.filter(l=>l.passedGate).length,total:this.column.litters.filter(l=>l.health>0||l.passedGate).length,loaded:this.column.loadEvents.length});
+    if(stage.id==="Transfer" && this.transferBeats?.cleared.length && this.transferBeats.started.length===this.transferBeats.cleared.length) {
+      target=this.column.QueueAhead()===0?this.column.zhou:this.column.vehicles.find(cart=>!cart.departed)||A.queue;
+      label="loading";
+      status=T("firstLevel.hint.transferWindow",{loaded:this.column.loadEvents.length,departed:this.column.departed});
+    }
     if(stage.id==="FinalDefense")status=T("firstLevel.hint.rearQueue",{remaining:this.column.litters.filter(l=>l.health>0&&!l.zhou&&!l.loaded&&!l.escaped).length});
     return {target,label:T(`firstLevel.guide.${label}`),status};
   }
@@ -1344,6 +1404,11 @@ export class FirstLevelMissionRuntime {
     this.train?.Update(dt, this.Has("trainStopped"), this.Has("trainFirstShellImpact"));
     if(this.Has("trainProneOrder") && this.player.stance==="prone")this.Record("trainPlayerProne");
     this.DrainSpawns();
+    if(["Support","MachineGun","Tank"].includes(this.flow.stage.id)) {
+      const alive=[...this.enemies.values()].filter(actor=>actor.alive && ["front","approach","tank"].includes(actor.missionEncounter)).length;
+      this.frontPeakAlive=Math.max(this.frontPeakAlive||0,alive);
+      if(alive>=R.frontSimultaneousEnemies)this.Record("frontPopulationReached",{alive});
+    }
     this.UpdateSquad();
     this.UpdateFront();
     this.UpdateTactics(dt);
@@ -1356,6 +1421,7 @@ export class FirstLevelMissionRuntime {
     this.UpdateCarry();
     const stage = this.flow.stage.id,
       t = this.flow.stageTime;
+    if(["MachineGun","Tank","Orders"].includes(stage))this.UpdateGuards(dt);
     if (stage === "Death") {
       if (this.deathMedic?.health<=0) {this.deathMedic.treating=false;this.deathMedic=null;this.deathCareRoute=null;}
       const medic=this.deathMedic, zhou=this.column.zhou;
@@ -1439,7 +1505,6 @@ export class FirstLevelMissionRuntime {
           safe:this.guards.filter(g=>g.safe).length, remaining:this.guards.filter(g=>g.actor.alive&&!g.safe).length}), 5);
       }
       if (this.emplacement.stats.shots > 0) this.Record("gunUsed");
-      this.UpdateGuards(dt);
       const gun = this.emplacement.Emplacement(this.gunId);
       if (gun?.belts === 3) this.Say("ThreeMagazines");
       if (gun?.belts === 2) this.Say("TwoMagazines");
@@ -1513,17 +1578,20 @@ export class FirstLevelMissionRuntime {
     }
     if (stage === "TransferApproach" && this.Near(A.transfer,14)) this.Record("transferApproachReached");
     if (stage === "Transfer") {
+      this.UpdateTransferBeats();
       if (this.Near(A.transfer, 14)) {
         this.Record("transferArrived");
         this.column.loading = true;
         this.guideRoute = null;
       }
-      safe = !this.Threatens(A.transfer, ["TransferRifleA", "TransferRifleB", "TransferRifleC"]);
+      const transferIds=MISSION_TRANSFER_BEATS.flatMap(beat=>MISSION_ENCOUNTERS[beat.id].map(spec=>spec.id));
+      safe = !this.Threatens(A.transfer,transferIds);
+      safeAt=point=>!this.Threatens(point,transferIds);
       if (this.column.TransferReady()) this.Record("vehiclesDeparted", { count: this.column.departed,
         survivingAhead: this.column.litters.slice(0, R.zhouQueueIndex).filter(litter => litter.health > 0).length });
       if (this.column.QueueAhead() === 3) this.Say("TransferQueue");
       if (this.column.QueueAhead() === 2) this.Say("TransferTwo");
-      if (this.column.QueueAhead() === 0 && t >= R.transferSeconds - R.followVehicleLeadS) {
+      if (this.column.QueueAhead() === 0 && this.Has("transferAttacksResolved") && t >= R.transferSeconds - R.followVehicleLeadS) {
         this.column.BeginZhouBoarding();
         this.Say("FollowVehicle");
         if (Distance(this.column.zhou, this.column.zhouBoardingStart) >= R.boardingWitnessM)
@@ -1568,9 +1636,17 @@ export class FirstLevelMissionRuntime {
     if (retreats[stage]) {
       const [position, fact] = retreats[stage];
       safe = !this.Threatens(position);
+      safeAt=point=>!this.Threatens(point);
       for (const [id, actor] of this.enemies)
-        if (actor.alive && (id.startsWith("Retreat") || id.startsWith("Air")))
-          this.MoveActor(actor, position, R.pursuerSpeedMps);
+        if (actor.alive && (id.startsWith("Retreat") || id.startsWith("Air"))) {
+          const end=MISSION_PURSUIT_ROUTE.findIndex(point=>point.x===position.x && point.z===position.z);
+          let index=Math.min(actor.missionPursuitIndex??MISSION_PURSUIT_ROUTE.findIndex(point=>point.x<=actor.position.x),end);
+          if(Distance(actor.position,MISSION_PURSUIT_ROUTE[index])<R.tacticalArrivalM && index<end)index++;
+          actor.missionPursuitIndex=index;
+          const target=MISSION_PURSUIT_ROUTE[index];
+          if(Distance(actor.position,target)<R.tacticalArrivalM)this.Defend(actor,target);
+          else this.MoveActor(actor,target,R.pursuerSpeedMps);
+        }
       const remaining = this.column.litters.filter(
         (litter) => litter.visible && !litter.evacuated && !litter.loaded && litter.health > 0,
       );
@@ -1579,7 +1655,7 @@ export class FirstLevelMissionRuntime {
       if (
         remaining.length &&
         remaining.every((litter) => litter.progress >= pass + 1) &&
-        this.Near(position, 20)
+        (stage==="RetreatYard" ? this.Near(remaining.at(-1),20) && this.player.position.x<=position.x+12 : this.Near(position,20))
       )
         this.Record(fact);
     }
@@ -1600,10 +1676,10 @@ export class FirstLevelMissionRuntime {
         (litter) => litter.health > 0 && !litter.zhou && !litter.loaded,
       );
       if (
-        medics.every((walker) => walker.escaped) &&
-        litters.every((litter) => litter.escaped)
+        safe && medics.every((walker) => walker.escaped || walker.rearCleared) &&
+        litters.every((litter) => litter.escaped || litter.rearCleared)
       )
-        this.Record("medicsEscaped", {survivingMedics:medics.length});
+        this.Record("medicsEscaped", {survivingMedics:medics.length,handoff:MISSION_ROUTES.exit[R.finalHandoffRouteIndex]});
     }
     if (stage === "Exit" && this.Near(A.end, 5)) this.Record("playerAtHandoff");
     this.column.Update(dt, { moving, routeSafe: safe, maxProgress, player: this.player.position, ...(safeAt ? {SafeAt:safeAt} : {}) });
@@ -1681,6 +1757,7 @@ export class FirstLevelMissionRuntime {
     return {
       ...this.flow.State(),
       missionVersion: MISSION_VERSION,
+      transferBeats:this.transferBeats || null,
       debugStart: this.debugStart || null,
       time: this.time,
       control: this.controls?.kind || null,
@@ -1700,6 +1777,7 @@ export class FirstLevelMissionRuntime {
       enemies: [...this.enemies].map(([id, actor]) => ({
         id,
         alive: actor.alive,
+        encounter:actor.missionEncounter,dormant:!!actor.missionDormant,noncombatant:!!actor.scriptedNoncombatant,
         x: actor.position.x,
         y: actor.position.y,
         z: actor.position.z,
@@ -1708,6 +1786,9 @@ export class FirstLevelMissionRuntime {
         assault: actor.missionAssault ? { mode: actor.missionAssault.mode, index: actor.missionAssault.index, cycles: actor.missionAssault.cycles } : null,
       })),
       assault: {
+        targetSimultaneous:R.frontSimultaneousEnemies,
+        peakFrontAlive:this.frontPeakAlive||0,
+        frontAlive:[...this.enemies.values()].filter(actor=>actor.alive && ["front","approach","tank"].includes(actor.missionEncounter)).length,
         squads: this.waves?.squads || 0, spawned: this.waves?.spawned || 0, queued: this.spawnQueue.length,
         alive: [...this.enemies.values()].filter((actor) => actor.alive && actor.missionAssault).length,
         rushing: [...this.enemies.values()].filter((actor) => actor.alive && actor.missionAssault?.mode === "rush").length,

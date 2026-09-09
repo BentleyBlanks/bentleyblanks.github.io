@@ -1,4 +1,4 @@
-import { FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_ASSAULT_STARTS, FrontAssaultLane } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_ASSAULT_STARTS, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
 import { COVER } from "./Data_Tuning_AiCover.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { CollectBulletNearMisses,ApplyBulletNearMisses } from "./Script_BallisticSuppression.mjs";
@@ -10,15 +10,30 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
+import { TransferBeatReady, GuardCrossingPair, FrontReplacementSlots } from "./Script_FirstLevelMissionPacing.mjs";
 import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage, FirstLevelStageForStep } from "./Data_FirstLevelMissionStages.mjs";
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
 import { FirstLevelMissionColumn, MissionCarryRoutePoint, MissionGuideSpeed, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
-import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
+import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS, MISSION_PURSUIT_ROUTE } from "./Data_FirstLevelMission.mjs";
 import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
 import { MISSION_DIALOGUE, MissionVoicePrompt } from "./Data_FirstLevelMissionDialogue.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
+{
+  const beat={earliestS:35,latestS:60,loaded:4,restS:12};
+  assert.equal(TransferBeatReady(beat,{seconds:35,loaded:4,previousClearedAt:30}),false,"vehicle event cannot erase the breathing window");
+  assert.equal(TransferBeatReady(beat,{seconds:44,loaded:4,previousClearedAt:30}),true);
+  assert.equal(TransferBeatReady(beat,{seconds:59,loaded:0,previousClearedAt:10}),false);
+  assert.equal(TransferBeatReady(beat,{seconds:60,loaded:0,previousClearedAt:10}),true,"casualties or delayed loading cannot starve the next finite attack");
+  assert.equal(TransferBeatReady(beat,{seconds:600,loaded:20,previousClearedAt:null}),false,"an uncleared previous attack never stacks another wave");
+  assert.deepEqual(GuardCrossingPair([{id:1,alive:false},{id:2,alive:true},{id:3,alive:true}],2),[2],"a fallen partner does not strand the surviving crossing man");
+  assert.deepEqual(GuardCrossingPair([{id:1,alive:true,safe:true},{id:2,alive:false},{id:3,alive:true}],2),[3]);
+  assert.equal(FrontReplacementSlots({alive:149,queued:1,spawned:0},R),0,"queued men reserve live capacity");
+  assert.equal(FrontReplacementSlots({alive:140,queued:0,spawned:R.waveBudget-1},R),1,"last finite replacement is not rounded up to a squad");
+  assert.equal(FrontReplacementSlots({alive:0,queued:0,spawned:R.waveBudget},R),0,"no infinite replacement loop");
+  for(const spec of MISSION_ENCOUNTERS.front)assert.ok(spec.x>MISSION_LAYOUT.bounds.minX && spec.x<MISSION_LAYOUT.bounds.maxX && spec.z>MISSION_LAYOUT.bounds.minZ && spec.z<MISSION_LAYOUT.bounds.maxZ,"every simultaneous soldier starts inside the playable heightfield");
+}
 {
   for (const time of [0,10,30,55]) {
     const a=MissionTrainMotion(time),b=MissionTrainMotion(time+.1);
@@ -88,16 +103,20 @@ assert.ok(SampleMissionTerrain(135,90)>2.8 && SampleMissionTerrain(-204,90)>3.8,
 console.log("ok shared terrain, excavated trenches, structural floors only");
 const tacticalRoutes = Object.fromEntries(Object.entries(MISSION_TACTICS).map(([id, plan]) => [id,
   [Object.values(MISSION_ENCOUNTERS).flat().find(spec => spec.id === id), ...plan.points]]));
+for(const spec of [...MISSION_ENCOUNTERS.retreat,...MISSION_ENCOUNTERS.air])
+  tacticalRoutes[spec.id+"Pursuit"]=[spec,...MISSION_PURSUIT_ROUTE.slice(MISSION_PURSUIT_ROUTE.findIndex(point=>point.x<=spec.x))];
 // Bounding-assault lanes: every front rifleman and every wave drop point must rush between lines without cutting a cover block.
 // FRONT_ASSAULT_STARTS is the single roster the cover rows are built around and the runtime spawns
 // from; walking it here is what keeps the three in step.
-assert.deepEqual(MISSION_ENCOUNTERS.front,FRONT_FIELD_MEN,"the front encounter roster is the authored front roster");
+assert.deepEqual(MISSION_ENCOUNTERS.front,[...FRONT_FIELD_MEN,...FRONT_RESERVES],"the front encounter roster includes every assault and supporting actor");
+const reserveLanes=Object.fromEntries(FRONT_RESERVES.map(spec=>[spec.id,[spec,...FrontReserveLane(spec.x,spec.z)]]));
+assert.equal(Object.keys(reserveLanes).length,R.frontReserveCount);
 const assaultLanes=Object.fromEntries(FRONT_ASSAULT_STARTS.map(start=>
   ["Assault"+start.id,[start,...FrontAssaultLane(start.x,start.z)]]));
 assert.ok(Object.values(assaultLanes).every(route=>route.length>=2&&route.at(-1).z===FRONT_ASSAULT.lines.at(-1)),"every assault lane ends on the last bound line");
 assert.ok(Object.keys(assaultLanes).length>=24,"most front riflemen and every wave drop point get a bounding lane: "+Object.keys(assaultLanes).length);
 const reliefRoutes=Object.fromEntries(P.reliefPositions.map((point,i)=>["Relief"+i,[MISSION_TRAIN.cars[2].muster[i],...P.reliefApproach,{x:point.x,z:-123},point]]));
-for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...tacticalRoutes, ...assaultLanes, ...reliefRoutes, ...Object.fromEntries(P.guardWithdrawalRoutes.map((route,i)=>["Guard"+i,route])) })) {
+for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...tacticalRoutes, ...assaultLanes, ...reserveLanes, ...reliefRoutes, ...Object.fromEntries(P.guardWithdrawalRoutes.map((route,i)=>["Guard"+i,route])) })) {
   for (let i = 1; i < route.length; i++) {
     const a = route[i - 1],
       b = route[i],
@@ -573,10 +592,12 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
 console.log("ok receiving-food release follows the source clock and survives pause/resume");
 
 {
-  assert.equal(MISSION_ENCOUNTERS.front.length,30,"first contact has three authored sections plus the original line");
+  assert.equal(MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.approach.length+MISSION_ENCOUNTERS.tank.length,150,
+    "150 actual initial enemy specifications, excluding later waves and dormant village");
+  assert.equal(new Set(Object.values(MISSION_ENCOUNTERS).flat().map(spec=>spec.id)).size,Object.values(MISSION_ENCOUNTERS).flat().length);
   assert.equal(MISSION_ENCOUNTERS.approach.length,6,"two approach positions provide actual enemy fire");
   assert.ok(MISSION_STAGES.find(s=>s.id==="Support").requirements.includes("frontRifleDefense"));
-  assert.ok(FIRST_LEVEL_MISSION_PHASE.whitebox.actorCapacity>=130,"small graphics scale cannot cut the mission manifest");
+  assert.ok(FIRST_LEVEL_MISSION_PHASE.whitebox.actorCapacity>=R.frontSimultaneousEnemies+40,"small graphics scale leaves capacity for real friendlies and dormant village");
   for(const point of FRONT_BREACHES){
     const h=SampleMissionTerrain(point.x,point.z);
     assert.ok(h>-.8 && h<-.35,"broken trench lips remain shallow walkable soil: "+h);

@@ -1,7 +1,7 @@
 import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
-import { FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_ENCOUNTER_STARTS, FIRST_LEVEL_STAGE_CLEARED_ENEMIES } from "./Data_FirstLevelMissionStages.mjs";
+import { FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_ENCOUNTER_STARTS, FIRST_LEVEL_STAGE_CLEARED_ENEMIES, FIRST_LEVEL_DEFERRED_ENCOUNTERS } from "./Data_FirstLevelMissionStages.mjs";
 import { MISSION_VOICE_TIMING } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MissionTrainMotion } from "./Data_FirstLevelMissionTrain.mjs";
 
@@ -66,7 +66,7 @@ export function ApplyFirstLevelStageJump(runtime, value) {
   // Spawn only live encounters at this checkpoint. Completed finite groups stay
   // in the ledger so later Enter callbacks cannot recreate defeated enemies.
   const live = FIRST_LEVEL_STAGE_ENCOUNTERS[n-1];
-  for (const id of Object.keys(MISSION_ENCOUNTERS)) if (!live.includes(id) && FIRST_LEVEL_ENCOUNTER_STARTS[id] <= n) r.spawned.add(id);
+  for (const id of Object.keys(MISSION_ENCOUNTERS)) if (!live.includes(id) && FIRST_LEVEL_ENCOUNTER_STARTS[id] <= n && !FIRST_LEVEL_DEFERRED_ENCOUNTERS[n]?.includes(id)) r.spawned.add(id);
   for (const id of live) r.SpawnEncounter(id);
   while (r.spawnQueue.length) r.DrainSpawns();
   for (const id of FIRST_LEVEL_STAGE_CLEARED_ENEMIES[n] || []) {

@@ -29,12 +29,21 @@ export const TEXT = Object.freeze({
   "firstLevel.guide.place": "卫生兵接收位置",
   "firstLevel.guide.exit": "城边联络巷",
   "firstLevel.guide.rearCover": "后门外侧：压住西侧追兵",
-  "firstLevel.hint.rearQueue": "伤员还在后面，守住撤退通道",
-  "firstLevel.hint.guards": "压住敌军火力，掩护前沿守军撤回",
+  "firstLevel.hint.rearQueue": "后门还有伤员，压住追兵后随队撤走",
+  "firstLevel.hint.guards": "压住火力，让眼前这组守军撤回，随后掩护下一组",
+  "firstLevel.hint.guardCrossed": "有守军进沟了！继续压住火力，掩护下一组",
+  "firstLevel.hint.guardsLoss": "活着的守军已经撤回，其余已伤亡。下机枪，去侧沟领取集束弹炸停战车",
+  "firstLevel.hint.guardsLost": "前沿守军没能撤回来。战车正逼近沟口，下机枪去侧沟领取集束弹",
   "firstLevel.hint.gunSupply": "机枪弹药不足：F 离位，身后弹药箱可补充弹匣",
   "firstLevel.hint.bundle": "按住 H 蓄力投向履带，松开后退回沟内；炮塔仍能开火",
   "firstLevel.hint.bundleEmpty": "集束弹已用完：回侧沟弹药箱补充后继续投掷",
-  "firstLevel.hint.queue": "掩护伤员转移，留意两侧和来路",
+  "firstLevel.hint.queue": "担架正在分批通过，留意两侧火力和来路",
+  "firstLevel.hint.transferEast": "东侧来敌！压住火力，让第一车伤员完成装载",
+  "firstLevel.hint.transferFlank": "敌人绕到南侧！转向棚外南角，护住车辆出路",
+  "firstLevel.hint.transferLast": "东侧又有一队逼近！守住最后一段装载时间",
+  "firstLevel.hint.transferRear": "北侧又有追兵！守住装载口，老周的担架就要到车边了",
+  "firstLevel.hint.transferWindow": "这股敌人已被打退，装载可以继续。留意车辆和老周的担架",
+  "firstLevel.guide.loading": "转运车辆与老周的担架",
 });
-export const DYNAMIC_PREFIXES = ["firstLevel.interaction.", "firstLevel.guide."];
+export const DYNAMIC_PREFIXES = ["firstLevel.interaction.", "firstLevel.guide.", "firstLevel.hint."];
 export const GATED_MODULES = ["Script_FirstLevelMissionRuntime.mjs", "Script_FirstLevelMissionVoice.mjs"];

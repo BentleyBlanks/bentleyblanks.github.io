@@ -29,7 +29,7 @@ export const MISSION_TUNING = Object.freeze({
   deathSeconds: 12,
   deathLookSeconds: .65,
   deathLookHeightM: .44,
-  frontEngageDistanceM:250,
+  frontEngageDistanceM:85,
   frontRifleDefenseSeconds:40,
   frontAccuracyScale:.28,
   frontFireIntervalScale:.95,
@@ -71,13 +71,25 @@ export const MISSION_TUNING = Object.freeze({
   // discharger round, so a squad's stock was pooled with the launcher man). Two per rifleman is the conservative
   // reading and it is also what the pacing wants: a man who has thrown twice is out, so grenades stay an event.
   enemyGrenades:2,
-  // Reinforcement waves drop at FRONT_ASSAULT.spawnZ while the front stages run and fewer than waveAliveCap assault men live.
+  // User 2026-09-09: approximately 150 LIVE enemies together, not 150 cumulative kills.
+  // 140 front + 6 approach + 4 tank escorts. Reserves are real actors at depth, bounding by platoon.
+  frontSimultaneousEnemies:150,
+  frontReserveCount:110,
+  frontReserveReleaseGapS:9,
+  frontReservePlatoonSize:22,
+  frontReserveAccuracyScale:.16,
+  frontReserveAdvanceM:14,
+  frontCrowdCellM:.045,
+  guardPairSize:2,
+  guardCrossingGapS:2,
+  guardSafeRouteIndex:3,
+  // Finite casualty replacements count successful spawns and include queued men in the live cap.
   waveFirstDelayS:18,
   waveIntervalS:26,
   waveSquadSize:6,
-  waveBudget:42,
-  waveAliveCap:30,
-  // Encounter spawns are drained a few per frame: 46 rigs in one frame was a 200 ms hitch at stage entry.
+  waveBudget:60,
+  waveAliveCap:150,
+  // Warm rigs behind the loading screen, then place a few per frame.
   spawnPerFrame:4,
   tankSpeedMps: 1.55,
   tankAdvanceSeconds: 11,
@@ -124,6 +136,7 @@ export const MISSION_TUNING = Object.freeze({
   guardCount: 8,
   guardSpeedMps: 2.7,
   finalEvacSpeedMps: 1.5,
+  finalHandoffRouteIndex:5,
   meleeWindowS: 2.7,
   meleeStrength: 0.6,
   meleeApproachMps: 2.3,

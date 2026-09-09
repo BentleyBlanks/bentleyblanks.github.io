@@ -6,14 +6,15 @@ import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
+import { MISSION_ENCOUNTERS, MISSION_TRANSFER_BEATS, MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { SCENE_RENDER_LIMITS } from "./Data_AssetStandards.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url)),
   root = path.resolve(here, "..");
 const audioCheck = process.argv.includes("--audio");
 const stageJumps = process.argv.includes("--stage-jumps");
 const stageFrom = Number(process.argv.find(arg=>arg.startsWith("--stage-from="))?.split("=")[1] || 1);
-assert.ok(stageFrom===1 || (stageJumps && stageFrom===16),"supported continuation suites start at 1 or 16");
-const output = path.join(here, "_shots", stageFrom===16 ? "FirstLevelStageTail" : stageJumps ? "FirstLevelStageContinue" : "FirstLevelMission");
+assert.ok(stageFrom===1 || (stageJumps && [12,16].includes(stageFrom)),"supported continuation suites start at 1, 12 or 16");
+const output = path.join(here, "_shots", stageFrom===12 ? "FirstLevelStageTransfer" : stageFrom===16 ? "FirstLevelStageTail" : stageJumps ? "FirstLevelStageContinue" : "FirstLevelMission");
 const jumpReceipts = [];
 async function JumpStage(number) {
   if (!stageJumps) return;
@@ -63,6 +64,25 @@ async function Capture(name) {
     return result;
   });
   console.log("BUDGET", name, JSON.stringify(render));
+  if(name==="MachineGun") {
+    const timing=await page.evaluate(async()=>{
+      const {Box3,Vector3}=await import("three");
+      const g=window.Tengxian,gl=g.renderer.getContext(),samples=[];
+      for(let i=0;i<24;i++){const start=performance.now();g.StepFrames(1,1/60,true);gl.finish();if(i>=4)samples.push(performance.now()-start);}
+      samples.sort((a,b)=>a-b);
+      const reducedBounds=Object.fromEntries([...g.ai.crowd.kinds].map(([key,entry])=>{
+        const bounds=new Box3();for(const mesh of entry.meshes){mesh.geometry.computeBoundingBox();bounds.union(mesh.geometry.boundingBox);}
+        return [key,bounds.getSize(new Vector3()).toArray()];
+      }));
+      return {method:"synchronous simulation and GPU completion, 4 warmup and 20 measured frames",p50Ms:samples[10],p95Ms:samples[19],reducedBounds,
+        actualLivingEnemies:g.ai.soldiers.filter(actor=>actor.alive && actor.side==="ija").length,
+        front:g.Debug.FirstLevelMission().assault,crowd:g.ai.crowd?.BakeReport(),cellM:g.ai.crowd?.cellM};
+    });
+    await fs.writeFile(path.join(output,"Data_FrontFrameTiming.json"),JSON.stringify(timing,null,2));
+    const standing=Object.entries(timing.crowd).filter(([key])=>key.endsWith(":standing"));
+    assert.ok(timing.cellM>0 && standing.length>=2 && standing.every(([,entry])=>entry.bodySpan>1.2),"the optimized standing crowd retains human-sized bodies");
+    for(const [key,entry] of Object.entries(timing.crowd))assert.ok(entry.size.every((size,axis)=>Math.abs(size-timing.reducedBounds[key][axis])<=2*Math.sqrt(3)*timing.cellM),"clustering preserves the original pose bounds: "+key);
+  }
   assert.ok(
     render.drawCalls <= SCENE_RENDER_LIMITS.drawCalls && render.triangles <= SCENE_RENDER_LIMITS.triangles,
     `${name} must fit the shared whole-frame rendering budget: ${JSON.stringify(render)}`,
@@ -750,7 +770,9 @@ try {
     const rifle=await page.evaluate(()=>({shots:window.Tengxian.state.playerShots,facts:window.Tengxian.Debug.FirstLevelMission().facts}));
     assert.ok(rifle.shots>0 && rifle.facts.includes("frontRifleDefense") && rifle.facts.includes("forwardNestDestroyed"),"rifle shooting and the real tank shell precede machine gun handover");
     const battlefieldSound=await page.evaluate(()=>window.missionBot.battleEvidence);
-    assert.ok(battlefieldSound.length>=3&&battlefieldSound.every(e=>e.front===30),"front encounter exists along the support approach");
+    assert.ok(battlefieldSound.length>=3&&battlefieldSound.every(e=>e.front===MISSION_ENCOUNTERS.front.length),"full front encounter exists along the support approach");
+    const population=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().assault);
+    assert.equal(population.peakFrontAlive,R.frontSimultaneousEnemies,"actual AI reaches 150 living front enemies together");
     assert.ok(battlefieldSound.some(e=>e.sound.recent.some(s=>s.cue==="amb.cannonFar"))&&battlefieldSound.some(e=>e.sound.recent.some(s=>s.cue==="type92")),"distant cannon and machine gun persist in the trench");
     assert.ok(battlefieldSound.some(e=>e.squad.filter(a=>a.speed>.1).length>=2 && Math.max(...e.squad.map(a=>a.speed))-Math.min(...e.squad.map(a=>a.speed))>.05),"actual squad march has independent pace");
     for(const id of ["luo","yaowa","heyoutian","liuwencai"]){
@@ -858,16 +880,26 @@ try {
           gun: defense.gun,
           stats: defense.gunStats,
           guards: defense.mission.guards,
-          enemies: defense.mission.enemies.filter((a) => a.alive).map((a) => a.id),
+          enemies: defense.mission.enemies.filter((a) => a.alive).length,
         }),
       );
       if (!defense.alive || defense.stage !== "MachineGun") break;
+      if(defense.gun.rounds===0 && defense.gun.belts===0) {
+        await page.evaluate(()=>{const g=window.Tengxian;g.Debug.Key("KeyF",true);g.StepFrames(1,1/60,false);g.Debug.Key("KeyF",false);});
+        await Route([{x:0,z:-124},{x:-2.2,z:-122.5}],"MachineGunResupply",{stance:"crouch"});
+        await Interact();
+        if(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().stage)==="MachineGun") {
+          await Route([{x:0,z:-124},{x:0,z:-127.4}],"ReturnToMachineGun",{stance:"crouch"});
+          if(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().stage)==="MachineGun")await Interact();
+        }
+      }
     }
     await page.evaluate(() => window.Tengxian.StepFrames(1, 1 / 60, true));
     await page.screenshot({ path: path.join(output, "Scene_MachineGun.png") });
     await fs.writeFile(path.join(output, "Data_Defense.json"), JSON.stringify(defense, null, 2));
     assert.ok(defense.alive, "Player survives covered emplacement");
     assert.equal(defense.stage, "Tank", "Actual guards pass under player machine gun support");
+    assert.ok(defense.mission.guards.some(guard=>guard.safe&&guard.alive),"a normal rescue must bring living guards back, not pass by losing all eight");
     const tankCraters=await page.evaluate(()=>({tank:window.Tengxian.Debug.FirstLevelMission().tank,terrain:window.Tengxian.battlefield.deformation.State()}));
     await fs.writeFile(path.join(output,"Data_TankShellCraters.json"),JSON.stringify(tankCraters,null,2));
     assert.ok(tankCraters.tank.impacts?.some(hit=>hit.crater),"actual tank fire reaches the shared deformable ground: "+JSON.stringify(tankCraters.tank));
@@ -880,6 +912,9 @@ try {
     });
     await JumpStage(5);
     await Route([{x:0,z:-124},{x:-2.2,z:-122.5}],"FrontResupply",{stance:"crouch"});
+    // The expanded battle may have used this box just before the handover.
+    // Wait its real cooldown in cover before testing another physical refill.
+    await page.evaluate(seconds=>window.Tengxian.StepFrames(Math.ceil(seconds*60),1/60,false),R.supplyCooldownS+1);
     const reserveBefore=await page.evaluate(()=>window.Tengxian.emplacement.Emplacement("MissionGun").belts);
     await Interact();
     const reserveAfter=await page.evaluate(()=>window.Tengxian.emplacement.Emplacement("MissionGun").belts);
@@ -1132,11 +1167,18 @@ try {
       { fight: true },
     );
     await WaitStage("Transfer", 120, { fight: true });
+    }
+    if(stageFrom<=12) {
     await JumpStage(12);
     await Route([{ x: 95, z: 110 }], "TransferSupply", { fight: true });
     await Interact();
     await Route([{ x: 95, z: 103 }], "TransferPosition", { fight: true });
     await WaitStage("AirFirst", 300, { fight: true });
+    const transferPacing=await page.evaluate(()=>{const m=window.Tengxian.Debug.FirstLevelMission();return {beats:m.transferBeats,events:m.log.filter(e=>/AttackStarted|AttackCleared|vehiclesDeparted|zhouNext/.test(e.id)),entered:m.log.find(e=>e.kind==="stage" && e.id==="Transfer")?.time,ended:m.time};});
+    assert.deepEqual(transferPacing.beats.started,MISSION_TRANSFER_BEATS.map(beat=>beat.id));
+    assert.deepEqual(transferPacing.beats.cleared,MISSION_TRANSFER_BEATS.map(beat=>beat.id),"all finite attacks actually resolve before the air raid");
+    await fs.writeFile(path.join(output,"Data_TransferPacing.json"),JSON.stringify(transferPacing,null,2));
+    console.log("transfer pacing",JSON.stringify(transferPacing));
     await JumpStage(13);
     await WaitStage("Carry", 30, { fight: true });
     const pickup = await page.evaluate(() => {
@@ -1199,6 +1241,8 @@ try {
       { fight: true },
     );
     await WaitStage("Reception", 180, { fight: true });
+    const retreatEncounters=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().enemies.map(actor=>actor.id));
+    for(const spec of [...MISSION_ENCOUNTERS.retreatWall,...MISSION_ENCOUNTERS.retreatYard])assert.ok(retreatEncounters.includes(spec.id),"the withdrawal has both authored flank encounters: "+spec.id);
     }
     await JumpStage(16);
     await Route(
@@ -1296,6 +1340,7 @@ try {
     } else console.log("ok entire first level completed with real player input and physical mission events");
   }
 } catch (error) {
+  await page.evaluate(()=>window.Tengxian?.Debug.FirstLevelMission()).then(state=>fs.writeFile(path.join(output,"Data_Failure.json"),JSON.stringify(state,null,2))).catch(()=>{});
   await page.screenshot({ path: path.join(output, "Scene_Failure.png") }).catch(() => {});
   console.error(
     await page

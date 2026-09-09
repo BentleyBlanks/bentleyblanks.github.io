@@ -48,7 +48,9 @@ const browserLockWriteGraceMs = 10 * 1000;
 
 export const testDefs = {
   FirstLevelMissionStageJumpTest: {file:"Script_FirstLevelMissionStageJumpTest.mjs",timeoutMs:900000,desc:"18 stage starts, backward jumps and resumed mission gates"},
-  FirstLevelMissionStageContinueTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-jumps"],timeoutMs:1200000,desc:"Play forward from each of the 18 debug starts through the next stage"},
+  // The 150-actor mission rebuilds 18 starts; a measured full continuation reached Complete
+  // at the old 1200 s limit. Match the full campaign allowance without changing any assertions.
+  FirstLevelMissionStageContinueTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-jumps"],timeoutMs:1800000,desc:"Play forward from each of the 18 debug starts through the next stage"},
   FirstLevelMissionStageTailTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-jumps","--stage-from=16"],timeoutMs:600000,desc:"Targeted 16–18 continuation, stretcher handoff and final exit"},
   FirstLevelMissionPresentationTest: {file:"Script_FirstLevelMissionPresentationTest.mjs",timeoutMs:240000,desc:"Real stretcher grip, idle feet, ADS fire and mounted recoil"},
   FirstLevelMissionTest: {file:'Script_FirstLevelMissionTest.mjs',args:['--audio'],desc:'新版第一关完整事实门、共享地形、实际担架队列和往返撤离'},

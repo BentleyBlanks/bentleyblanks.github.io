@@ -4137,7 +4137,7 @@ async function WarmActorShaders(phase, onStep = null) {
   const kinds = new Set(["nra", "ija"]);
   for (const soldier of ai.soldiers) if (soldier.actor?.kind) kinds.add(soldier.actor.kind);
   if (phase?.nightRaid) kinds.add("nraDare");
-  ai.PrepareCrowd([...kinds]);
+  ai.PrepareCrowd([...kinds],phase.whitebox?.crowdCellM||0);
 
   // 本阵营会发到人手里的枪：世界模型按枪各一套几何，材质桶也可能不同（机枪的弹匣/脚架）。
   const weaponsBySide = {

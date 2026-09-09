@@ -217,6 +217,11 @@ for(const x of [-28,-23,-18,-13,-8,-3,2,7])Wall(`WithdrawCover${x}`,x,-150,3.8,.
 // The three 0.62 m EnemyForwardCover slabs that used to sit alone on z=-173 are gone: they were
 // below the crouch-and-hide band and one 4.2 m slab only ever registered a single cover point.
 // The FRONT_COVER rows at the end of this file rebuild that row across the whole front.
+// Real shelter for the waiting pairs; south-facing withdrawal paths remain open.
+for(const [i,post] of FRONT_GUARD_POSTS.entries()) {
+  GroundedWall(`GuardWaitingCover${i}`,post.x,post.z-1.25,5.8,1,.65);
+  for(const side of [-1,1])GroundedWall(`GuardWaitingWing${i}_${side}`,post.x+side*2.7,post.z,.5,1,3.8);
+}
 for(const [i,x,z] of [[0,-16,-149.5],[1,-8,-151.5],[2,12,-151.5],[3,23,-151.5],[4,-32,-153.5],[5,-6,-158.5]])
   Wall("AssaultApproachCover"+i,x,z,2.6,.58,.6);
 // The village route passes through a kitchen, inner courtyard and connected rooms.
@@ -525,6 +530,7 @@ export const MISSION_PLACEMENT = Object.freeze({
   // First arrivals move furthest down the communication trench; the mouth stays open.
   guardWithdrawalRoutes: Array.from({length:8},(_,i)=>[
     FRONT_GUARD_POSTS[i],
+    {x:FRONT_GUARD_POSTS[i].x,z:-140},
     {x:-20+i*.45,z:-137+i*.35},
     {x:-20+i*.35,z:-124+i*.2},
     {x:-8,z:-112},
@@ -573,7 +579,7 @@ export const MISSION_LAYOUT = Object.freeze({
   terrain: "P012Heightfield",
   terrainSpec: MISSION_TERRAIN,
   SampleGroundColor: SampleMissionGroundColor,
-  bounds: { minX: -205, maxX: 137, minZ: -202, maxZ: MISSION_TRAIN.approachEndZ },
+  bounds: { minX: -205, maxX: 137, minZ: -258, maxZ: MISSION_TRAIN.approachEndZ },
   ground: { x: -34, z: (MISSION_TRAIN.approachEndZ-202)/2, w: 342, d: MISSION_TRAIN.approachEndZ+202, h: 1, y: -0.5, semantic: "ground" },
   semanticColors: {
     foliage: 0x68715f,

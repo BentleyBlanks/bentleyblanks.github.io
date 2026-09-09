@@ -1280,7 +1280,9 @@ export class AiDirector {
    * 进关时先把这些 kind 的远景层烘出来（见 ActorCrowd.Prepare）。
    * 装配层的人物着色器预热调它；纯逻辑环境（没有 scene / factory）是空操作。
    */
-  PrepareCrowd(kinds = []) {
+  PrepareCrowd(kinds = [], cellM = 0) {
+    if((this.crowd?.cellM||0)!==cellM){this.crowd?.Dispose();this.crowd=undefined;}
+    this.crowdCellM=cellM;
     const crowd = this._Crowd();
     if (crowd) crowd.Prepare(kinds);
     return crowd;
@@ -1290,7 +1292,7 @@ export class AiDirector {
   _Crowd() {
     if (this.crowd !== undefined) return this.crowd;
     const { scene, actorFactory } = this.ctx;
-    this.crowd = (scene && actorFactory) ? new ActorCrowd(scene, actorFactory) : null;
+    this.crowd = (scene && actorFactory) ? new ActorCrowd(scene, actorFactory,{cellM:this.crowdCellM||0}) : null;
     return this.crowd;
   }
 

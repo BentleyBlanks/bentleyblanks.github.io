@@ -39,6 +39,7 @@ import * as THREE from "three";
 import { MergeGeometries } from "./Script_Geo.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { ACTOR_DETAIL } from "./Data_Tuning_Ai.mjs";
+import { ClusterDistantGeometry } from "./Script_DistantGeometry.mjs";
 
 /**
  * 单一姿势桶的实例上限。尸体现在保留到本关结束，最大日军票池是 480；
@@ -152,10 +153,11 @@ export class ActorCrowd {
    * @param {THREE.Scene} scene
    * @param {import("./Script_Actor.mjs").ActorFactory} factory 已经 PreloadMeshes 过的工厂
    */
-  constructor(scene, factory, { capacity = CROWD_CAPACITY } = {}) {
+  constructor(scene, factory, { capacity = CROWD_CAPACITY, cellM = 0 } = {}) {
     this.scene = scene;
     this.factory = factory;
     this.capacity = Math.max(8, capacity | 0);
+    this.cellM=cellM;
     // `${kind}:${poseId}` -> { meshes, count, dead, pose, skinnedParts, bounds, bodyBounds, triangles }
     this.kinds = new Map();
     // 每个 kind 的材质克隆（全部姿势桶共用一份，见 _Harvest 的注释）；Dispose 从这里收。
@@ -301,7 +303,8 @@ export class ActorCrowd {
         materials.set(material, clone);
         this.materials.push(clone);
       }
-      const geometry = MergeGeometries(list);
+      let geometry = MergeGeometries(list);
+      if(this.cellM>0){const detailed=geometry;geometry=ClusterDistantGeometry(detailed,this.cellM);detailed.dispose();}
       const mesh = new THREE.InstancedMesh(geometry, clone, this.capacity);
       mesh.name = `Crowd_${kind}_${PoseMeshName(pose.id)}`;
       // 自己做视锥剔除（Script_Ai 那边逐人判），而且实例散布在全场，
