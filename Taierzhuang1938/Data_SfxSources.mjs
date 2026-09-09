@@ -93,33 +93,34 @@ export function ArchiveUrl(item, filePath) {
  */
 export const SFX_SOURCES = [
   // 2026-09-09：用户要求重新 SeedAudio 生成全部近中远爆炸及贴耳弹道音。
+  // 2026-09-10：爆炸改为用户认可的 Punch / Heavy 两条及中远距离派生版。
   // 全量 SfxBake 只登记这些成品，禁止旧素材配方重新覆盖。
   {
     id: "ExplosionNearSeedAudio",
     seedAudio: true,
-    bake: "Script_SeedAudioCombatBake.mjs",
-    credit: "Volcengine SeedAudio 1.0 · explosionNear · 2026-09-09",
+    bake: "Script_SeedAudioExplosionBake.mjs",
+    credit: "Volcengine SeedAudio 1.0 · approved Punch / Heavy · Near · 2026-09-10",
     license: "volcengine",
-    bitrate: BITRATE_TRANSIENT,
-    cuts: [{ cue: "explosionNear", files: ["AudioSfx_ExplosionNear_01.mp3","AudioSfx_ExplosionNear_02.mp3","AudioSfx_ExplosionNear_03.mp3"], durS: 2.6 }],
+    bitrate: "192k",
+    cuts: [{ cue: "explosionNear", files: ["AudioSfx_ExplosionNear_01.mp3","AudioSfx_ExplosionNear_02.mp3"], durS: 2.444 }],
   },
   {
     id: "ExplosionMidSeedAudio",
     seedAudio: true,
-    bake: "Script_SeedAudioCombatBake.mjs",
-    credit: "Volcengine SeedAudio 1.0 · explosionMid · 2026-09-09",
+    bake: "Script_SeedAudioExplosionBake.mjs",
+    credit: "Volcengine SeedAudio 1.0 · approved Punch / Heavy · Mid · 2026-09-10",
     license: "volcengine",
-    bitrate: BITRATE_TRANSIENT,
-    cuts: [{ cue: "explosionMid", files: ["AudioSfx_ExplosionMid_01.mp3","AudioSfx_ExplosionMid_02.mp3"], durS: 2.4 }],
+    bitrate: "192k",
+    cuts: [{ cue: "explosionMid", files: ["AudioSfx_ExplosionMid_01.mp3","AudioSfx_ExplosionMid_02.mp3"], durS: 2.444 }],
   },
   {
     id: "ExplosionFarSeedAudio",
     seedAudio: true,
-    bake: "Script_SeedAudioCombatBake.mjs",
-    credit: "Volcengine SeedAudio 1.0 · explosionFar · 2026-09-09",
+    bake: "Script_SeedAudioExplosionBake.mjs",
+    credit: "Volcengine SeedAudio 1.0 · approved Punch / Heavy · Far · 2026-09-10",
     license: "volcengine",
-    bitrate: BITRATE_TRANSIENT,
-    cuts: [{ cue: "explosionFar", files: ["AudioSfx_ExplosionFar_01.mp3","AudioSfx_ExplosionFar_02.mp3","AudioSfx_ExplosionFar_03.mp3"], durS: 2.8 }],
+    bitrate: "192k",
+    cuts: [{ cue: "explosionFar", files: ["AudioSfx_ExplosionFar_01.mp3","AudioSfx_ExplosionFar_02.mp3"], durS: 2.444 }],
   },
   {
     id: "BulletCrackSeedAudio",

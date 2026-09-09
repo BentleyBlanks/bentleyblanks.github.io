@@ -148,21 +148,19 @@
     "explosionNear": {
       "files": [
         "AudioSfx_ExplosionNear_01.mp3",
-        "AudioSfx_ExplosionNear_02.mp3",
-        "AudioSfx_ExplosionNear_03.mp3"
+        "AudioSfx_ExplosionNear_02.mp3"
       ],
-      "seconds": 2.6,
-      "credit": "Volcengine SeedAudio 1.0 · explosionNear · 2026-09-09",
+      "seconds": 2.444,
+      "credit": "Volcengine SeedAudio 1.0 · approved Punch / Heavy · Near · 2026-09-10",
       "license": "volcengine"
     },
     "explosionFar": {
       "files": [
         "AudioSfx_ExplosionFar_01.mp3",
-        "AudioSfx_ExplosionFar_02.mp3",
-        "AudioSfx_ExplosionFar_03.mp3"
+        "AudioSfx_ExplosionFar_02.mp3"
       ],
-      "seconds": 2.8,
-      "credit": "Volcengine SeedAudio 1.0 · explosionFar · 2026-09-09",
+      "seconds": 2.444,
+      "credit": "Volcengine SeedAudio 1.0 · approved Punch / Heavy · Far · 2026-09-10",
       "license": "volcengine"
     },
     "shellIncoming": {
@@ -731,8 +729,8 @@
         "AudioSfx_ExplosionMid_01.mp3",
         "AudioSfx_ExplosionMid_02.mp3"
       ],
-      "seconds": 2.4,
-      "credit": "Volcengine SeedAudio 1.0 · explosionMid · 2026-09-09",
+      "seconds": 2.444,
+      "credit": "Volcengine SeedAudio 1.0 · approved Punch / Heavy · Mid · 2026-09-10",
       "license": "volcengine"
     },
     "debrisFall": {

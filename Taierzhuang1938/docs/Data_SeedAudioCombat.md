@@ -1,5 +1,25 @@
 # 近中远爆炸与掠耳子弹音（2026-09-09 / 10）
 
+## 当前爆炸：用户选定的两条试听素材（2026-09-10）
+
+用户试听后认可 `ExplosionPunch`、`ExplosionHeavy`，两条均为本项目通过火山引擎 `seed-audio-1.0` 生成。近爆 `01` / `02` 直接使用认可的 MP3，字节不变；中爆和远爆分别从这两条加 5 kHz / 2.2 kHz 低通派生，不再使用上一批爆炸。三档各两个变体，时长为 1.536 / 2.444 s，全部为 44.1 kHz、单声道、192 kbps MP3。有声 RMS 为 −25.27 dBFS 左右，峰值 −10.94 至 −6.71 dBFS。
+
+游戏继续按距离选近、中、远 cue，并沿用距离衰减、遮挡、混响、空间定位与轮播。弹道音保持上次部署版本。本次音效包版本为 `12`。
+
+本次替换实测：整包 `AudioNormalize --report`、`ModuleGraphTest`、浏览器 `AudioTest` 和 `AudioWiringTest`（60/60）通过。LocalPreview 核对六条文件的 HTTP 响应与部署文件哈希一致；默认重建后六条文件哈希仍一致，其他 cue 的清单和弹道 MP3 未变。
+
+[爆炸复现脚本](../Script_SeedAudioExplosionBake.mjs) 默认读取仓库中的两条近爆，先校验已认可素材的 SHA-256，再原样复制近爆、重建中远档并同步 manifest；整个过程不请求 API。原始生成 take、提示词和试听文件归档于项目外 `音频提取/CombatAudioCandidates_20260910/`。两条认可素材的 SHA-256 固定在脚本中，避免后续重烘时误换素材。原 [战斗音效生成脚本](../Script_SeedAudioCombatBake.mjs) 现只管理弹道音。
+
+```powershell
+# FFMPEG 指向本机 ffmpeg；直接从仓库中的认可近爆复现。
+node Taierzhuang1938/Script_SeedAudioExplosionBake.mjs
+# 或用 --source-dir=<试听 Final 目录> 导入认可原件。
+node Taierzhuang1938/Script_AudioNormalize.mjs --report
+node Taierzhuang1938/Script_TestRunner.mjs --only=ModuleGraphTest,AudioTest,AudioWiringTest --fail-fast
+```
+
+## 上一批生成与验收记录（爆炸已由上述两条替换）
+
 本批按用户要求，经火山引擎 `seed-audio-1.0` 重新生成当前游戏的五组战斗音效。
 三档爆炸仍由 `Script_AudioWiring` 根据听者距离选取；子弹音爆、呼啸保留原有弹道触发、遮挡、左右定位和轮播机制。
 

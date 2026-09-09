@@ -1,4 +1,4 @@
-// SeedAudio combat replacements. Default: rebake cached takes without API calls.
+// SeedAudio bullet replacements. Approved explosions use Script_SeedAudioExplosionBake.mjs. Default: rebake cached takes without API calls.
 // --generate: generate missing takes; --force: regenerate selected takes.
 // --generate-only: keep raw takes for inspection; --only=<cue>: select one group.
 // --dry: print the exact generation plan without writing or calling the API.
@@ -18,15 +18,6 @@ const args = process.argv.slice(2);
 const only = args.find((arg) => arg.startsWith("--only="))?.slice(7);
 const common = "用于写实第一人称战争游戏的独立单次音效，单声道。只有一次事件，开头立即发生，结尾自然衰减至安静。不要重复、连发、音乐、人声、口令、背景战场或录音底噪。";
 const groups = [
-  { cue: "explosionNear", count: 3, duration: 2.6, hp: 38, lp: 12000,
-    prompt: "一发炮弹在近处户外泥土地面爆炸。起音是一记猛烈干脆的空气爆裂，紧跟结实的中低频冲击和短促土石碎屑落地尾声，具有真实爆炸的颗粒感与重量。不要科幻能量炮、雷声、炮弹飞行口哨或人为拉长的低音。",
-    variants: ["偏重厚实的低频冲击。", "偏重干脆的爆裂及碎土飞散。", "偏重紧凑的轰响与粗糙气浪。"] },
-  { cue: "explosionMid", count: 2, duration: 2.4, hp: 38, lp: 5000,
-    prompt: "一发炮弹在开阔野外约六十米处泥土地面爆炸。一记有清楚起音的轰响，厚实中低频，爆裂边缘已经被空气柔化，短暂自然户外尾声，听不到近在耳边的碎片。不含炮弹飞行啸声、发射声或雷声。",
-    variants: ["土坡旁较紧凑的一次爆炸。", "空旷田野较浑厚的一次爆炸。"] },
-  { cue: "explosionFar", count: 3, duration: 2.8, hp: 45, lp: 2200,
-    prompt: "一发炮弹在开阔田野约两百米外落地爆炸。独立的一记遥远沉闷轰隆，仍有清晰可辨的中低频闷冲击，尾声自然扩散消失。声音必须在普通耳机和小扬声器上听得见，不能只有次声或持续低音。没有近处碎片、尖锐爆裂、炮口声或连续炮击。",
-    variants: ["短促紧实的远处闷响。", "略带自然扩散尾声的浑厚远爆。", "柔和起音后迅速消散的远处炮弹落地声。"] },
   { cue: "bulletCrack", count: 4, duration: 0.32, hp: 250, lp: 14000,
     prompt: "一颗超音速步枪子弹从听者耳边极近处飞过产生的一记短促音爆，像空气被突然撕裂的尖脆啪嗒，约零点一秒后迅速结束，仅有极短擦风尾音。不是枪口发射声，不是爆炸，不是鞭子挥动，不要长啸、金属反弹、激光或命中声。",
     variants: ["非常干脆的一记空气脆裂。", "略厚实的一记短啪声。", "偏尖锐的一记空气撕裂。", "带极短砂质空气尾音的一记脆响。"] },
