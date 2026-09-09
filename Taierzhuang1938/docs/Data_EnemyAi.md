@@ -811,3 +811,223 @@ POST /__tuning/save  { file: "Taierzhuang1938/Data_Tuning_AiCover.mjs", changes:
   世界叠加画出视锥、通视线、掩体隐蔽/射击位与附近掩体点着色。截图在本地 `_shots/EnemyAi/editor_*.png`。
 - 已知边界：`SIGHT_BY_STANCE` 不在调参页（它不是 `Freeze` 包的裸数组，线上也可改，故不开放）；压制阈值 0.50/0.32、角色冲锋距离、cohesion 半径仍硬编码在 `Script_Ai`，
   行为图里对应边的 `keys` 为空——要调得先搬进表；叠加层几何走 `post.AddDebugOverlay` 而不是 `scene.add`（不进预通道 / SSAO / 线框换材质）。
+
+---
+
+## 15. 不在交战中怎么站、跪射之后怎么动（2026-09-09）
+
+> 玩家原话：「远处的敌人不会动、不找掩体、干站着。」
+> §12–§14 修的是**交火里**的行为（掩体、探头、射击、班组），这一轮修的是**交火之外的那几十秒**：
+> 不交战 ≠ 不做事。数全部落在 `Data_Tuning_Ai.WATCH` 与 `Data_Tuning_FirstLevel` 的 `assault*`，
+> 新状态 `watch` 与四条新边同步进了 `Data_AiBrainGraph`（`AiBrainGraphTest` 逐个对账）。
+
+### 15.1 取证：改前是什么样（`_shots/EnemyAi/Script_FarEnemyProbe.mjs`）
+
+前沿开战 20 s，玩家在 `MISSION_ANCHORS.gun`（0, −128）朝北，按到玩家的距离分档，再推 4 s 看谁挪了窝：
+
+| 档 | 人 | 站 / 蹲 / 卧 | 四秒没挪窝 | 有掩体 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| < 46 m | 10 | 5 / 5 / 0 | **9** | 5 | cover_engage 3、fire 3、charge 2、reload 2 |
+| 46–74 m | 31 | 11 / 20 / 0 | **23** | 2 | **fire 25**、cover_engage 2、advance 2、suppress 1、grenade 1 |
+| 74–120 m | 2 | 1 / 1 / 0 | 2 | 0 | fire 2（警戒 engaged） |
+| > 120 m | 6 | **6 / 0 / 0** | 6 | 0 | advance 5、idle 1，警戒**全是 unaware** |
+
+三条病根，一条一条对应到源码：
+
+1. **兜底分支一律站直。** `Think` 最后那一格是 `s.state = ADVANCE; SetStance(s, suppression > 0.55 ? 1 : 0)` ——
+   有目标但超出交战距离（`ENGAGE.defaultM` 74 m）、或者只听见动静没看见人的人，全都站得笔直。
+   守点单位的对应分支（`ApplyScriptDefense` 的 `!s.target`）是 `IDLE`，姿态根本没人管。
+2. **跪射之后没人换位。** 跃进到线的人由 `Defend()` 变成守点单位，`ApplyScriptDefense` 给他 `FIRE`，
+   然后他就在那块地上跪到下一次跃进（46–74 m 档 23/31 人四秒一步没挪）。
+3. **120 m 外那六个人为什么 `unaware`。** 他们不是前沿部队，是 **village / melee 遭遇编成**
+   （`VillageGunner` / `VillageCorner` / `KitchenGuard` / `RearWindow` / `SideYard` / `MeleeTutor`），
+   `SpawnEncounterActor` 给了 `missionDormant + scriptedNoncombatant`，等玩家走到 55 m 内才醒
+   （`UpdateFront`）。**听觉链路本身是好的**：诊断脚本从他们身边 40 m 手工上报一条 `gunshot`，
+   `Hear` 当场写进 8 个人的记忆、警戒立刻升到 suspicious/alert。
+   病根是 `Think` 的剧本旗短路里那句 **`this.perception.ForgetAll(s)`**：每 0.1 s 抹一次记忆，
+   听觉刚写进去的东西活不过一拍，于是「打了二十秒的战场上有人始终 unaware 且站得笔直」。
+   （他们离最近的国军 84–112 m，仍在步枪声 150 m 的可闻半径内 —— 原任务单里「离国军战线 50–60 m」
+   的估计偏近了一档，但结论不变。）
+
+### 15.2 规矩
+
+**① 戒备（`STATE.WATCH`，新增）** —— 进入条件（`WantWatch`）：已经**站定**（`order === "hold"`
+或走到了 goal），而且「有目标（在这条分支上意味着超出交战距离）」或「警戒 ≥ `WATCH.minAlertIndex`（suspicious）」。
+做的事：跪下（压制过 `proneSuppressionAt` 就卧倒，承诺 `stanceHoldS`）、面向目标 / 最后目击点、
+每 `scanIntervalS` 把面向往左右扳 `scanYawRad` 扫一次扇面、有掩体就缩在 hide 相位（`UpdateMoveOrder` 强制 `"hide"`），
+**一枪不开**（`Act` 的 WATCH 分支根本没有 `TryFire` 这条路径，所以「戒备的人开枪了」等于状态已经换了）。
+
+- **推进中的人不受影响**：`Arrived()` 要求 order=hold 或已到 goal；走剧本路线（`p012Guided + scriptMoveSpeedMps`）、
+  潜行、上刺刀的人一条都不进。已经在戒备的人用 2.5 倍到位半径做迟滞 —— 班组每秒重派一次槽位，
+  不留这条的话人会一秒蹲一次（`AiBehaviorTest` 的「姿态没有阈值抽动」当场翻红）。
+- **为什么加新状态而不是复用 `advance`/`idle`**：`advance` 的语义是「沿 goal 与队形走」，
+  编辑器的行为图、`Debug.Ai.State()` 的直方图与验收探针都按状态分桶 ——
+  把「跪着监视」塞进 `advance` 等于把这一轮的效果做成看不见的。`STATE` 只增不改的契约允许加
+  （§12.2），旧的十六个值一个字没动。
+- **守点单位同样适用**：`ApplyScriptDefense` 的 `!s.target` 分支从 `IDLE` 改成
+  `s.watchAlerted ? WATCH : IDLE`。级别在 `Think` 里判完写进布尔 —— 那一段每帧都跑，
+  而且被 `Script_FirstLevelP012ActorTest` 抽进**没有表也没有 ALERT_ORDER** 的纯 JS 沙箱重放。
+
+**② 换位（DISPLACE）** —— `fire` 状态且**身边没有掩体**（有掩体的人走 hide/peek 周期，那是另一套节奏）：
+站定超过 `displaceAfterS`（读 `s.stationaryS`）或自上次换位起打了 `displaceAfterShots` 发，
+且过了 `displaceMinDwellS`，就向侧向挪 `displaceMinM`–`displaceMaxM`（2–4 m，随机左右，左右各试两档）。
+压制过 `displaceProneAt`（0.35，在 SUPPRESSED 的 0.50 之下）改成**匍匐后退** `displaceBackM`。
+落点校验**一条射线都不打**：守区允许半径（`CoverReachM` = holdZone.radius + 掩体余量）、
+`nav.Walkable`、地面高差 ≤ 1.2 m、`Blocked()`（AABB 空间散列）。
+守区余量小于 `displaceMinReachM`（2.2 m）的人**一步都不挪** —— 机枪战位（0.4 + 0.9 = 1.3 m）是战位，挪了就不是那挺机枪了。
+找不到落点也记一次 `displaceAt`，不然「四面都走不通」的人每拍都要把候选点重扫一遍。
+
+**③ 听觉惊动** —— 剧本旗短路里的 `ForgetAll` 换成 `WatchScripted`：走一次**空候选**的 `Sense`
+（不打射线、不建新条目），只让听来的记忆按真实时间衰减，`alert` / `lkp` 照常出账；
+目标仍然当场清掉，所以这个人不选掩体、不接任务、不开枪。姿态只给**停在原地的武装单位**
+（有守区、order=hold、没有剧本速度）—— P012 的担架队、平民、开场发枪的队列走的是 `MoveActor`
+（清掉守区、order=advance），一个都不受影响。
+**听觉封顶 0.72 < ENGAGED 0.85 这条红线没动**：听见枪声最多到 alert，要交战仍然必须真的看见人。
+
+**④ 跃进节奏** —— `UpdateAssault` 两处：
+
+- **到位判据带迟滞**：进线仍是 `assaultArrivalM`（0.9 m），但**已经在线上的人**要走出
+  `defendHoldRadiusM + assaultCoverSearchM`（11 m）才算「离线」。旧口径把「走 5 m 去掩体」
+  和「侧向挪 3 m 换射击位」一律判成离线，下一拍 `MoveActor` 把他拽回原点（连 `scriptDefensive`
+  与 `holdZone` 一起清掉）—— 这一行就是 §12.7 第 1 条里「够得着掩体却走不完那五到八米」的机制来源。
+- **最后一线不再干守 11 秒**：`assaultFinalHoldS` 11 → 4.5，加上「打满 `assaultVolleyShots`（4）发也算」，
+  到点就沿同一条线横挪 `assaultLateralMinM`–`assaultLateralMaxM`（3–6 m）换个射击位，
+  换 `assaultLateralShifts`（2）次之后才退回 `assaultRegroupLine` 重来（`assaultRegroupCycles` 不变）。
+  横挪落点走**现成的 `ClearLaneX`**（为此把它从 `Data_FirstLevelMissionFront` 导出，列坐标一个没动），
+  而且**扫过的区间**也要避开 `blockedX` —— `ClearLaneX` 只保证终点不在列里，
+  x=−3 往右挪 6 m 落在 +3 是合法的，但路径正好横穿 Center 那一列。两侧都不通就退一线。
+
+### 15.3 取证：改后（同一条探针、同一个机位、同一段 20 s）
+
+| 档 | 人 | 站 / 蹲 / 卧 | 四秒没挪窝 | 有掩体 | 警戒 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| < 46 m | 18 | 5 / 13 / 0 | 7（39%，改前 9/10 = 90%） | 10 | — | cover_engage 9、fire 4、charge 2、reload 2、advance 1 |
+| 46–74 m | 25 | 8 / 17 / 0 | **9（36%，改前 23/31 = 74%）** | 12（改前 2/31） | — | cover_engage 12、fire 10、**watch 1**、advance 2 |
+| 74–120 m | 1 | 0 / 1 / 0 | 0 | 0 | engaged | fire 1 |
+| > 120 m | 8 | **0 / 8 / 0**（改前 6/0/0） | 7 | 0 | **suspicious**（改前全 unaware） | advance 5（戒备姿态）、fire 2、watch 1 |
+
+- 46–74 m 档「四秒没挪窝」**23/31 → 9/25**（74% → 36%，目标是 ≤ 一半）；蹲/卧比例 65% → 68%（没有下降）。
+  **这一格主要是跃进节奏的功劳，不是换位的**：把 `WATCH` 顶到永不触发再跑一趟整条验收，
+  全场换位 0 次，而同一档的「四秒没挪窝」仍是 10/24 —— 到位迟滞 + 最后一线的
+  volley/横移（`assault*`，也是本轮的改动）才是这一档动起来的原因。换位补的是
+  **身边没有掩体**的那批人（全场每 20 s 触发 74–75 次）。
+- 120 m 外那一档**站直 6/6 → 0/8**，警戒 **unaware → suspicious**，面向枪声来处（`watchYaw`）。
+- 「有掩体」2/31 → 12/25 是**两件事叠在一起**：本轮的到位迟滞让他们走得完那几米，
+  同一天前沿补掩体的那一包（`FRONT_COVER`）让那儿真的有东西可躲。这一格的功劳不全是大脑的。
+- 各档人数变了（31 → 25、10 → 18）是因为整场仗的推进节奏跟着变了，不是筛选口径变了。
+
+### 15.4 门禁
+
+| 门禁 | 结果 |
+| --- | --- |
+| `AiBehaviorTest` | 12/12：瞬转 4.77°、蹲卧 blend 0.0694、枪口 look 0.0800 / aim 0.0917、**姿态切换最多 4 次 / 12 s**（闸门 6）、换目标最多 4 次、支援位误冲 0 帧、过热 200 发、移动同向 95.4%、队向 88.7% |
+| `AiCombatBrowserTest` | 12/13：新增的 ⑨ 两条过，原 11 条里 **⑥ 会扔读到 0 枚**（见下面「⑥ 的取证」） |
+| `AiBrainGraphTest` | 833 条断言：节点 **17**（＝`STATE` 值数）、边 **56**、表键 140、任务 8 |
+| `AiPerceptionTest` / `AiCoverTest` / `AiTacticsTest` | 11 项 / 100 条 / 250 条，全绿 |
+| `FirstLevelP012ActorTest` / `FirstLevelP012RuntimeTest` | 全绿（剧本旗短路仍然落回 `advance`、清目标、清掩体；沙箱缺 `WatchScripted` 时自动退回 `ForgetAll`） |
+| `DamageTest` | 不受影响：换位写的是 `s.moveOrder`（走 `Think`/`UpdateMoveOrder`），而靶场直调 `ai.TryFire`，两条路不相交；WATCH 不开火所以也不进 TTK 账 |
+
+**⑥ 会扔读到 0 枚的取证。** 两套 A/B：整条验收（把 `WATCH.minAlertIndex` / `displaceAfter*`
+顶到永不触发，跑同一份 `AiCombatBrowserTest`）与只重放 B3 → B4 → B5 三段的
+`_shots/EnemyAi/Script_GrenadeSequenceAb.mjs`：
+
+| 配置 | 场景 | 投出 | 拿到投弹任务的采样帧 | 玩家挨伤害的帧 | 黑板里「对方钉了多久」上限 |
+| --- | --- | --- | --- | --- | --- |
+| §15 在 | 整条验收 ×3 | **0 / 0 / 0** | — | — | — |
+| §15 关 | 整条验收 ×1 | **1**（落点 0.4 m） | — | — | — |
+| §15 在 | B3–B5 重放 ×2 | 0 / 1 | 0 / 150 | 20 / 3 | 3.1 s / 40.7 s |
+| §15 关 | B3–B5 重放 ×2 | 1 / 1 | 170 / 150 | 4 / 6 | 42.1 s / 40.2 s |
+
+**这一条是本轮的账**（合起来 1/5 vs 3/3；单看重放那一对会误判成方差 —— 我第一次就是这么误判的）。
+机制已经量到：`ShouldGrenade` 的第②条「对方钉在一处 ≥ `GRENADE.holdS`(5 s)」读的是
+`playerStationaryS`，而那个计时器按**速度**算，挨一发的 knockback 就是 1.2 m/s（阈值 0.4 m/s）。
+§15 让这一班**打得更持续**（少起身冲锋、多在掩体里打），于是玩家几乎每两秒挨一下，
+计时器封顶在 3.1 s，投弹任务一次都派不出去 —— **正在挨打的玩家按定义永远不算「钉在一处」**。
+§13.1 记的「投出 1 枚」本来就贴在这条线上，是同一件事的另一面。
+
+修在哪：`GRENADE` 表与 `Script_AiTactics` **都不在本轮的文件归属里**，所以这一条交给投弹那一档的主人。
+两条候选，都不是放宽断言：
+
+- 把「钉在一处」改成**认位移不认速度**（`stationaryS` 按「离上一次移动了 ≥ x 米」算），
+  这样挨打的震动不会把它清零；
+- 或者反过来把「他在挨打」本身算成一种钉住（被压制的人正是最该吃手榴弹的人）。
+
+本轮只在探针那一侧把「钉住」这个动作做全（连刚体一起钉，见 B5 的注释），断言一个字没放宽。
+
+### 15.5 新增的验收条（`Script_AiCombatBrowserTest` ⑨，阈值读表）
+
+正片前沿开战 20 s 之后再推 4 s，按距离分两档（与取证探针同一条口径）：
+
+- **⑨ 跪射之后会换位（46–74 m）**：四秒窗口里挪过窝的人过半（`still ≤ n/2`），
+  且仍有 ≥ 35% 的人伏低（挡住「所有人都站起来走来走去」这一种退化）；同时打印全场 `stats.displaces`。
+  **不压「跪的比站的多」**：跃进节奏加快之后本来就有更多人在两条线之间跑，
+  同一份代码两趟读到 12:12 与 11:13 —— 压「多数」等于压一枚硬币。
+- **⑨ 远处听得见（120 m 外）**：警戒过半不再是 `unaware`、站直的不过半，
+  而且知道动静在哪的人里至少有一个是**朝着那边**的（±60°）。
+
+两条都验过「关掉 §15 会红」（这是新断言该有的样子）：把 `WATCH` 顶到永不触发再跑整条验收，
+远处那一条当场翻红 —— **站 6/7、面向 ±60° 的只有 3/7**（§15 在时是站 2/8、面向 7/8）。
+
+### 15.6 偏离与留给下一轮
+
+1. **`WATCH.minAlertIndex` 是级别下标不是阈值**：级别由感知层的 `AWARENESS.thresholds` 定，
+   戒备只问「到没到 suspicious」。写成下标（而不是字符串）是为了让调参页能拖它。
+2. **戒备不追击、不查看**：`INVESTIGATE` 是班组派的机动任务（`Script_AiTactics`），
+   守区与剧本旗的人本来就拿不到。戒备只改「怎么站、朝哪儿看」，一步都不走。
+   「听见动静就过去看看」仍然只发生在没有守区的自由单位身上。
+3. **村里那批人只是不站直了，仍然不参战**：`missionDormant` 是关卡编排的事
+   （`UpdateFront` 55 m 内才醒），大脑不越权把他们拉进战斗。
+4. **换位不选点位质量**：落点只验「走得到、撞不着、还在守区里」，不问「那儿是不是更安全」——
+   真要问就得射线，而 §7 的预算里这一层是 0 条。如果以后前沿掩体密度上来了，
+   更好的做法是让没有掩体的人**直接去查一次掩体**（`UpdateCover` 已经每 `reselectMinS` 查一次）。
+5. **`assaultFinalHoldS` 从 11 s 砍到 4.5 s 会让最后一线的火力更密**（同样的人打得更勤、也更早退回重来）。
+   这一条与内容侧的掩体密度是一对：掩体多了之后要重新看一次整条线的推进速度。
+6. **「正在挨打的人不算钉在一处」**（见 15.4 ⑥ 的取证）：投弹判据把「钉住」定义成
+   `playerStationaryS`（按速度算），而挨打的 knockback 就会把它清零。§15 让前沿打得更持续，
+   于是这条判据在验收场里再也不成立 —— **⑥ 会扔从 1 枚变成 0 枚是本轮的账**，
+   但修法在 `GRENADE` 表与 `Script_AiTactics`（都不在本包的归属里），已按两条候选写在 15.4。
+   在它修好之前，「玩家一直挨打时不会挨手榴弹」是**线上也成立**的行为，不只是测试口径问题。
+7. **一次 `AiCombatBrowserTest` 全程约 20 分钟，而 ⑥ 与 ⑨ 都在方差边上**：
+   ⑨ 的「伏低比例」原本压的是「跪的比站的多」，同一份代码两趟读到 12:12 与 11:13 —— 已改成 35% 的下限。
+   下一轮谁再动这两条，先按 15.4 的 A/B 配方跑两遍再判因果，别拿单趟读数下结论（这一轮我自己先踩了一次）。
+
+### 15.7 验收记录（2026-09-09，三路合并后独立验收）
+
+三路并行交付：远景层多姿势 + 跑步翻页（`docs/Data_ActorCrowdLod.md`）、不在交战中的戒备 / 换位 / 跃进节奏（本节 §15.2）、
+前沿掩体内容（`docs/Data_FrontCover.md`）。合并到同一棵树之后由验收批重跑。
+
+**按距离分档的探针**（`_shots/EnemyAi/Script_FarEnemyProbe.mjs`，机枪位朝北，开战 20 s）：
+
+| 档 | 改前 | 三路合并后 |
+| --- | --- | --- |
+| 46 m 内 | 10 人：站 5 / 蹲 5，4 秒没挪窝 9，有掩体 5 | 18 人：站 6 / 蹲 12，没挪窝 5，有掩体 15，掩体对射 13 |
+| 46–74 m（远景层） | 31 人：站 11 / 蹲 20，**没挪窝 23（74%）**，**有掩体 2** | 24 人：站 8 / 蹲 16，**没挪窝 7（29%）**，**有掩体 13（54%）**，掩体对射 13 |
+| 120 m 外 | 6 人**全站着**、unaware | 8 人**全跪着**、suspicious 以上、朝枪声方向（watch / fire / advance） |
+
+远景层现在真的画出跪姿（`Crowd_*_kneel` 桶），46 m 外的人不再是站姿雕像；跑步是 4 帧翻页。
+
+**验收批做的三处改动**：
+1. 投弹判据的「玩家钉在一处」改按**位移窗口**判（`BRAIN.stationaryDriftM`），不按速度：站在空地挨打的玩家每两秒被击退一下，
+   按速度永远不算钉住（§15.4 的账）。改后受控场 40 s 投出 2 枚、落点 0.1 m。
+2. **守区的人不自发冲锋**（`Think`：`!s.holdZone || order==="charge"`）：`Act` 本来就不让带 holdZone 的人离区，旧写法让他们
+   二十米内进 CHARGE 却一步迈不出去 —— 站直、上刺刀、原地干等，是「近处的敌人干站着」的一种；现在留在掩体 / 跪射里继续打。
+3. **投弹排在自发冲锋前面**：拿了投弹任务却去冲锋的人会把班组的投弹租约白占二十秒；玩家亲口的「上刺刀」仍压过投弹。
+4. 编辑器调参页把 `WATCH` 组收进来（`AiEditorTest` 的「行为图表键落在面板之外」那条）。
+
+**门禁**：纯 Node 全绿（`AiBrainGraphTest` 833 条 / 17 节点 56 边，`TuningWriterTest` 395，`FirstLevelMissionTest` 含前沿掩体覆盖率断言，quick 52/52）；
+浏览器 `AiCombatBrowserTest` **13/13**（⑤ 绕出正面锥最大 109°、⑥ 投出 2 枚）、`ActorCrowdTest` 20/20（像素级：跪姿包围盒真的变矮）、
+`VisibilityTest` 9/9、`ActorBatchTest`、`AiEditorTest` 32/32、`DamageTest` 24/24、`BootTest` 七章、`AiBehaviorTest`（见下）。
+
+**帧耗时 A/B**（`FrameProbe` 1536×864 high，对最新 master 两轮交替，机器空闲）：
+
+| 机位 | fps 基线 → 改后 | draw call | 三角形 | `ai` 桶 |
+| --- | --- | --- | --- | --- |
+| front | 63.4 / 65.2 → 63.6 / 61.3 | 558 → 635 | 2.63 M → 2.61 M | 4.13 / 4.08 → 4.31 / 4.49 |
+| frontEast | 74.8 / 75.7 → 72.3 / 70.1 | 497 → 551 | 1.68 M | 3.06 / 3.03 → 3.45 / 3.55 |
+| train | 41.3 / 42.9 → 43.9 / 42.1 | 1063 | 3.25 M | 6.6 → 6.5 / 6.8 |
+
+draw call 多的那 55–77 次是远景层的姿势桶（每档 7 个材质桶）与前沿更多人在跪 / 换位后的分布变化，三角形不涨；
+前沿机位 fps 约 −3…−7%，`ai` 桶 +0.2…+0.5 ms。都在 §7 / §13.3 的口径内，但前沿已经没有多少余量，下一轮别再往远景层加桶。
+
+**整关通关**（`FirstLevelMissionBrowserTest --campaign`，最终树）：真实输入通关 22 分钟；三角形捕获最高 `South` **7.97 M**（限 8.1 M，master 同点 7.90 M），
+`CourtyardColumn` 6.96 M。`South` 那一帧只剩 0.13 M 余量：下一轮往前沿加东西之前先看这一行。

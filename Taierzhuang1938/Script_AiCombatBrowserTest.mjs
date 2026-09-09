@@ -69,11 +69,13 @@ try {
     const coverTable = await import("./Data_Tuning_AiCover.mjs");
     const tacticsTable = await import("./Data_Tuning_AiTactics.mjs");
     const firstTable = await import("./Data_Tuning_FirstLevel.mjs");
+    const aiTable = await import("./Data_Tuning_Ai.mjs");
     const COVER_CYCLE = coverTable.COVER_CYCLE;
     const GRENADE = tacticsTable.GRENADE;
     const FLANK = tacticsTable.FLANK;
+    const WATCH = aiTable.WATCH;
     const R = firstTable.MISSION_TUNING;
-    const out = { thresholds: { COVER_CYCLE, GRENADE, FLANK } };
+    const out = { thresholds: { COVER_CYCLE, GRENADE, FLANK, WATCH } };
 
     T.state.menu = false;
     // 逼到 Support 段（前沿开战）：把流程要的事实记上，让它自己推进
@@ -149,6 +151,60 @@ try {
           pickAgo: +(T.ai.time - s.coverPickAt).toFixed(1),
         };
       });
+    }
+
+    // ======================================================================
+    // A2 远处不干站着（docs/Data_EnemyAi.md §15）
+    // ======================================================================
+    // 玩家的原话是「远处的敌人不会动、不找掩体、干站着」。前两条 A 已经量过了
+    // （掩体接得活不活），这一节量剩下那条**「干站着」**，按距离分两档，
+    // 与取证探针 `_shots/EnemyAi/Script_FarEnemyProbe.mjs` 同一条口径：
+    //   · 46–74 m（交战距离内的前沿）：跪射之后**会不会换位** —— 四秒里挪没挪窝；
+    //   · 120 m 外（听得见枪声、看不见玩家）：**听没听见** —— 警戒级别与姿态、朝向。
+    // 后一档在这张图上是 village / melee 遭遇编成那批剧本旗单位（`missionDormant`）。
+    // 他们本来就不该参战，但「战场上有人站得笔直、警戒 unaware」是画面事故不是设计：
+    // 病根是剧本旗分支每拍 `ForgetAll`，听觉刚写进去的记忆活不过一拍（§15）。
+    {
+      const Dist = (s) => Math.hypot(s.position.x - T.player.position.x,
+        s.position.z - T.player.position.z);
+      const Ija = () => T.ai.soldiers.filter((s) => s.alive && s.side === "ija");
+      const seen = new Map();
+      for (const s of Ija()) seen.set(s.id, { x: s.position.x, z: s.position.z });
+      Step(4 * 60);                        // 「四秒没挪窝」的窗口，与探针一致
+      const rows = Ija().map((s) => {
+        const b = seen.get(s.id);
+        // 朝向契约：yaw=0 面朝 −Z，前向量 =（−sin yaw, −cos yaw）。
+        const fx = -Math.sin(s.yaw), fz = -Math.cos(s.yaw);
+        const at = s.target ? s.target.position : ((s.lkpConfidence || 0) > 0 ? s.lkp : null);
+        let facingDeg = null;
+        if (at) {
+          const dx = at.x - s.position.x, dz = at.z - s.position.z;
+          const len = Math.hypot(dx, dz) || 1;
+          facingDeg = Math.acos(Math.max(-1, Math.min(1, (dx * fx + dz * fz) / len))) * 180 / Math.PI;
+        }
+        return {
+          d: Dist(s), stance: s.stance, state: s.state, alert: s.alert,
+          moved: b ? Math.hypot(s.position.x - b.x, s.position.z - b.z) : 0,
+          facingDeg, knows: !!at,
+        };
+      });
+      const Band = (lo, hi) => {
+        const r = rows.filter((x) => x.d >= lo && x.d < hi);
+        const n = (fn) => r.filter(fn).length;
+        return {
+          n: r.length,
+          still: n((x) => x.moved < 0.5),
+          standing: n((x) => x.stance === 0),
+          low: n((x) => x.stance > 0),
+          unaware: n((x) => x.alert === "unaware"),
+          alerted: n((x) => x.alert && x.alert !== "unaware"),
+          facingKnown: n((x) => x.facingDeg !== null),
+          facingAt: n((x) => x.facingDeg !== null && x.facingDeg <= 60),
+          states: r.reduce((h, x) => { h[x.state] = (h[x.state] || 0) + 1; return h; }, {}),
+        };
+      };
+      out.bands = { near: Band(46, 74), far: Band(120, 400) };
+      out.displaces = T.ai.stats.displaces;
     }
 
     // ======================================================================
@@ -367,7 +423,13 @@ try {
       for (let f = 0; f < 40 * 60; f += 1) {
         T.StepFrames(1, 1 / 60, false);
         // 玩家钉在同一处：投弹判据的第②条要的就是「对方钉在一处」。
+        // **刚体也一起钉**（2026-09-09）：这一条判据读的是 `playerStationaryS`，
+        // 而那个计时器按**速度**算，挨一发的 knockback 就是 1.2 m/s（阈值 0.4 m/s）。
+        // 只归零 `velocity` 而把刚体留在被推开的地方，等于给下一帧留了一段位移。
+        // 这不是本条失败的**已证明**病根（见 docs/Data_EnemyAi.md §15.4 的 A/B 取证：
+        // 同一份代码两趟一趟 0 枚一趟 1 枚，方差比效应大），只是把「钉住」这个动作做全。
         T.player.position.set(site.open.x, T.player.position.y, site.open.z);
+        T.player.body?.Teleport(T.player.position.x, T.player.position.y, T.player.position.z);
         T.player.velocity.set(0, 0, 0);
         T.player.health = 1e9;
         if (f % 90 === 0) { T.state.ammo = 5; T.Debug.Fire(); }
@@ -426,6 +488,7 @@ try {
     flankMinDeg: +(C.FLANK.flankMinAngleRad * 180 / Math.PI).toFixed(0),
   }));
   console.log("A 正片前沿:", JSON.stringify(sample.front));
+  console.log("A2 按距离分档（§15）:", JSON.stringify(sample.bands), "换位次数", sample.displaces);
   console.log("A 没选上掩体的现场诊断:", JSON.stringify(sample.frontWhy));
   console.log("B 受控场地:", JSON.stringify(sample.site), "班", sample.squad, "最近友军", sample.nearestFriendly);
   console.log("B 定量齐射:", JSON.stringify({ open: sample.open, wall: sample.wall }));
@@ -449,6 +512,27 @@ try {
       + `在跑周期=${f.cycling}、探过头=${f.peeked}；`
       + `守位上=${f.holding}（其中够得着掩体 ${f.holdingReachable}、选上 ${f.holdingWithCover}）；`
       + `另有 ${f.noCoverNearby}/${f.fighting} 人身边根本没有掩体点（开阔地，地形事实）`);
+
+  // ⑨ 远处不干站着（§15）。两档各压一条，阈值口径写在断言的说明里：
+  //   · 46–74 m：跪射之后会换位 —— 四秒窗口里**挪过窝的人过半**，而且还有三分之一
+  //     以上的人是伏低的（挡住「所有人都站起来走来走去」这一种退化）；
+  //   · 120 m 外：听得见 —— 警戒过半不再是 unaware、站直的不过半，
+  //     而且知道动静在哪的人里有人是**朝着那边**的（±60°）。
+  //
+  // 伏低那条**不要求「跪的比站的多」**：跃进节奏加快之后（assaultFinalHoldS 11 → 4.5 s
+  // 加上横向换位）本来就有更多人正在两条线之间跑，站着的那一批多半是跑动中的人
+  // —— 实测同一份代码两趟读到 12:12 与 11:13，压「多数」等于压一枚硬币。
+  const nb = sample.bands?.near || { n: 0 };
+  const fb = sample.bands?.far || { n: 0 };
+  Check("⑨ 跪射之后会换位（46–74 m）：四秒窗口里挪过窝的人过半，且仍有三分之一以上伏低",
+    nb.n === 0 || (nb.still <= Math.floor(nb.n / 2) && nb.low >= Math.ceil(nb.n * 0.35)),
+    `${nb.n} 人：四秒没挪窝 ${nb.still}、蹲/卧 ${nb.low}、站 ${nb.standing}、`
+      + `全场换位 ${sample.displaces} 次；${JSON.stringify(nb.states)}`);
+  Check("⑨ 远处听得见（120 m 外）：警戒过半不再是 unaware、站直的不过半、有人朝着枪声",
+    fb.n === 0 || (fb.alerted >= Math.ceil(fb.n / 2) && fb.standing <= Math.floor(fb.n / 2)
+      && (fb.facingKnown === 0 || fb.facingAt >= 1)),
+    `${fb.n} 人：警戒 ${fb.alerted}（unaware ${fb.unaware}）、站 ${fb.standing}、蹲/卧 ${fb.low}、`
+      + `知道动静在哪 ${fb.facingKnown}（其中面向 ±60° 的 ${fb.facingAt}）；${JSON.stringify(fb.states)}`);
 
   const rh = sample.rhythm || {};
   Check("① 会躲（受控）：整班在验证过的掩体里",

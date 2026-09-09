@@ -1,4 +1,4 @@
-import { FRONT_REINFORCEMENTS, FRONT_APPROACH_ENEMIES } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_FIELD_MEN, FRONT_APPROACH_ENEMIES } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
@@ -135,21 +135,9 @@ export const MISSION_STAGES = Object.freeze([
 ]);
 export const MISSION_ENCOUNTERS = Object.freeze({
   approach: FRONT_APPROACH_ENEMIES,
-  front: [
-    ...FRONT_REINFORCEMENTS,
-    { id: "FrontGunner", x: 25, z: -161, weapon: "Type11", hold: true },
-    { id: "FrontRifleA", x: -18, z: -159 },
-    { id: "FrontRifleB", x: -9, z: -164 },
-    { id: "FrontRifleC", x: 14, z: -154 },
-    { id: "FrontRifleD", x: 30, z: -151 },
-    { id: "FrontRifleE", x: -29, z: -171 },
-    { id: "FrontRifleF", x: -22, z: -178 },
-    { id: "FrontRifleG", x: -10, z: -180 },
-    { id: "FrontRifleH", x: 2, z: -177 },
-    { id: "FrontRifleI", x: 9, z: -170 },
-    { id: "FrontRifleJ", x: 20, z: -179 },
-    { id: "FrontSupportGunner", x: 33, z: -181, weapon:"Type11", hold:true },
-  ],
+  // The roster itself lives in Data_FirstLevelMissionFront: the assault lanes and the cover rows
+  // are derived from it, and a list split across two files drifts.
+  front: FRONT_FIELD_MEN,
   tank: [
     { id: "TankEscortA", x: 24, z: -145 },
     { id: "TankEscortB", x: 28, z: -152 },

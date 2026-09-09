@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { FRONT_DEFENDERS, FRONT_GUARD_POSTS, FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_DEFENDERS, FRONT_GUARD_POSTS, FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane, ClearLaneX } from "./Data_FirstLevelMissionFront.mjs";
 import {
   MISSION_STAGES,
   MISSION_TUNING as R,
@@ -433,7 +433,33 @@ export class FirstLevelMissionRuntime {
     if (!points.length) return null;
     // Hold times are scaled per man (0.6-1.4) so the field never moves in lockstep.
     const jitter = .6 + ((Math.abs(Math.round(x * 3 + z * 7)) % 17) / 16) * .8;
-    return { points, index: 0, hold: 0, pinned: 0, cycles: 0, mode: "rush", jitter };
+    // shifts/volley (2026-09-09, docs/Data_EnemyAi.md §15): the last line is no longer an eleven second
+    // stand. A man fires assaultVolleyShots rounds or holds assaultFinalHoldS seconds, then sidesteps to a
+    // fresh firing position on the same line (assaultLateralShifts times) before falling back a line and
+    // coming again. volley is the fireSequence snapshot taken when he settled on the position.
+    return { points, index: 0, hold: 0, pinned: 0, cycles: 0, shifts: 0, volley: 0, mode: "rush", jitter };
+  }
+  /**
+   * A fresh firing position on the same bound line: 3-6 m to one side, out of the cover columns.
+   *
+   * The sweep itself has to clear those columns too, not just the endpoint - `ClearLaneX` only pushes the
+   * endpoint out, and a man at x=-3 stepping +6 m lands at +3 (legal) after walking straight through the
+   * Center column between them. Both sides are tried; if neither is clear he keeps the position he has and
+   * the caller falls back a line instead.
+   */
+  FrontLateralBound(target, s) {
+    const span = Math.max(0, R.assaultLateralMaxM - R.assaultLateralMinM);
+    const step = R.assaultLateralMinM
+      + ((Math.abs(Math.round(target.x * 5 + target.z * 3)) + s.shifts * 7) % 16) / 15 * span;
+    const first = s.shifts % 2 === 0 ? 1 : -1;
+    for (const side of [first, -first]) {
+      const x = ClearLaneX(target.x + side * step, target.x);
+      if (Math.abs(x - target.x) < R.assaultLateralMinM * .5) continue;
+      const lo = Math.min(x, target.x), hi = Math.max(x, target.x);
+      if (FRONT_ASSAULT.blockedX.some(([a, b]) => hi > a && lo < b)) continue;
+      return { x, z: target.z };
+    }
+    return null;
   }
   UpdateAssault(dt) {
     const active = ["Support", "MachineGun", "Tank"].includes(this.flow.stage.id);
@@ -459,7 +485,14 @@ export class FirstLevelMissionRuntime {
       }
       s.pinned = 0;
       const target = s.points[s.index];
-      if (Distance(actor.position, target) > R.assaultArrivalM) {
+      // Arrival is hysteretic (2026-09-09, docs/Data_EnemyAi.md §15). Entering the line still needs
+      // assaultArrivalM, but a man who has **settled** on it may wander the whole anchor + cover slack
+      // without being dragged back: the AI walks him up to assaultCoverSearchM to reach a cover point and
+      // sidesteps him 2-4 m between volleys, and the old 0.9 m test called every one of those "off the
+      // line" and re-issued MoveActor - which clears scriptDefensive and holdZone and hauls him back to the
+      // bare spot. That single line is why the front knelt in the open with cover two steps away.
+      const settleM = R.defendHoldRadiusM + R.assaultCoverSearchM;
+      if (Distance(actor.position, target) > (s.mode === "hold" ? settleM : R.assaultArrivalM)) {
         s.mode = "rush";
         this.ai.SetStance(actor, 0, .4, true);
         this.MoveActor(actor, target, R.assaultRushMps);
@@ -470,13 +503,25 @@ export class FirstLevelMissionRuntime {
           // Kneeling stays the fallback for a line that has nothing to hide behind.
           this.Defend(actor, target, R.defendHoldRadiusM, R.assaultCoverSearchM);
           this.ai.SetStance(actor, 1, 1, true);
-          s.mode = "hold"; s.hold = 0;
+          s.mode = "hold"; s.hold = 0; s.volley = actor.fireSequence;
         }
         s.hold += dt;
         const last = s.index === s.points.length - 1;
-        if (s.hold >= (last ? R.assaultFinalHoldS : R.assaultHoldS) * s.jitter) {
+        // The last line used to be a flat eleven second stand, three times over. Now it is the same
+        // volley/hold rhythm as every other bound: fire assaultVolleyShots rounds or hold
+        // assaultFinalHoldS seconds, then take a fresh firing position 3-6 m along the line
+        // (assaultLateralShifts of them), and only then fall back to assaultRegroupLine and come again.
+        const spent = last && actor.fireSequence - s.volley >= R.assaultVolleyShots;
+        if (s.hold >= (last ? R.assaultFinalHoldS : R.assaultHoldS) * s.jitter || spent) {
           if (!last) s.index++;
-          else if (s.cycles < R.assaultRegroupCycles) { s.index = Math.max(0, Math.min(s.points.length - 1, R.assaultRegroupLine)); s.cycles++; }
+          else if (s.shifts < R.assaultLateralShifts) {
+            const point = this.FrontLateralBound(target, s);
+            // Nowhere to slide (both sides run into a cover column): fall back a line instead of
+            // standing here, and let the regroup budget below decide whether he comes again.
+            if (point) { s.points[s.index] = point; s.shifts++; }
+            else if (s.cycles < R.assaultRegroupCycles) { s.index = Math.max(0, Math.min(s.points.length - 1, R.assaultRegroupLine)); s.cycles++; s.shifts = 0; }
+            else continue;
+          } else if (s.cycles < R.assaultRegroupCycles) { s.index = Math.max(0, Math.min(s.points.length - 1, R.assaultRegroupLine)); s.cycles++; s.shifts = 0; }
           else continue;
           s.hold = 0; s.mode = "rush";
         }

@@ -59,12 +59,16 @@ export const BRAIN_GRAPH = Object.freeze({
       desc: "0.50–0.75 卧倒/蹲下并**往验证过的掩体里爬**（还能还击）；0.75 以上停火；0.90 以上且孤立超过 5 s 往后缩。",
     }),
     Object.freeze({
+      id: "watch", label: "戒备", group: "react", x: 0.30, y: 0.06,
+      desc: "不在交战中也不站直：跪下（压制过 WATCH.proneSuppressionAt 就卧倒）、面向威胁 / 枪声来处、每 scanIntervalS 扫一次扇面，有掩体就缩在 hide 相位，**一枪不开**。推进中的人（还没走到 goal）不进这一格。",
+    }),
+    Object.freeze({
       id: "reload", label: "换弹", group: "react", x: 0.30, y: 0.62,
       desc: "reloadTimer 走完补满弹仓。**先缩回 hide 相位再换**（有掩体），没掩体就地蹲下换。",
     }),
     Object.freeze({
       id: "fire", label: "就地对射", group: "combat", x: 0.54, y: 0.16,
-      desc: "有目标但身边没有可用掩体：FireStance 决定站还是蹲，原地 TryFire，同时每拍继续查掩体。",
+      desc: "有目标但身边没有可用掩体：FireStance 决定站还是蹲，原地 TryFire，同时每拍继续查掩体。**站定 WATCH.displaceAfterS 秒或打满 displaceAfterShots 发就侧向换位 2–4 m**（压制过 displaceProneAt 改成匍匐后退），换位不改状态，只写走位命令。",
     }),
     Object.freeze({
       id: "cover_engage", label: "掩体对射", group: "combat", x: 0.54, y: 0.36,
@@ -121,6 +125,17 @@ export const BRAIN_GRAPH = Object.freeze({
       from: "cover_engage", to: "idle", priority: 4,
       when: "守点单位没有目标了：站着监视扇面（不追、不绕、不跃进）",
       keys: Object.freeze(["LOCK.forgetS", "LOCK.keepBlindS", "MEMORY.memoryS"]),
+    }),
+    Object.freeze({
+      from: "idle", to: "watch", priority: 4,
+      when: "【§15】守点单位没有目标，但**听见 / 看见过动静**（警戒 ≥ WATCH.minAlertIndex）：跪下面向那边监视，不站直。判级别在 Think 里做，ApplyScriptDefense 只读 s.watchAlerted",
+      keys: Object.freeze(["WATCH.minAlertIndex", "WATCH.stanceHoldS", "WATCH.proneSuppressionAt",
+        "AWARENESS.thresholds.suspicious", "HEARING.awarenessCap"]),
+    }),
+    Object.freeze({
+      from: "watch", to: "idle", priority: 4,
+      when: "【§15】动静过去了：觉察按 AWARENESS.decayPerS 衰减回 release.suspicious 以下，守点单位落回站着待机",
+      keys: Object.freeze(["AWARENESS.decayPerS", "AWARENESS.release.suspicious", "MEMORY.memoryS"]),
     }),
     Object.freeze({
       from: "idle", to: "grenade", priority: 5,
@@ -303,6 +318,29 @@ export const BRAIN_GRAPH = Object.freeze({
       keys: Object.freeze(["ENGAGE.defaultM"]),
     }),
 
+    // --- 16 之后：兜底那一格分成「戒备」与「推进」两条（§15）---------------
+    Object.freeze({
+      from: "advance", to: "watch", priority: 17,
+      when: "【§15】没在交战、但**已经站定**（order=hold 或走到了 goal），而且有目标（说明超出交战距离 74/95 m）或警戒 ≥ WATCH.minAlertIndex：跪下面向威胁，不再站直发呆。走剧本路线 / 潜行 / 上刺刀的人一条都不进",
+      keys: Object.freeze(["ENGAGE.defaultM", "ENGAGE.supportM", "WATCH.minAlertIndex",
+        "WATCH.stanceHoldS", "WATCH.scanIntervalS", "WATCH.scanYawRad", "AWARENESS.thresholds.suspicious"]),
+    }),
+    Object.freeze({
+      from: "watch", to: "advance", priority: 17,
+      when: "【§15】又上路了：goal 挪到 2.5 倍到位半径之外（迟滞，免得班组每秒重派槽位时人一秒蹲一次），或者剧本层接管了位移",
+      keys: Object.freeze(["WATCH.faceHoldS", "SQUAD.lookaheadM"]),
+    }),
+    Object.freeze({
+      from: "watch", to: "fire", priority: 16,
+      when: "【§15】戒备中对方压进交战距离、身边又没有掩体：起手对射（`TryFire` 在 WATCH 里根本没有路径，所以「戒备的人开枪了」等于状态已经换了）",
+      keys: Object.freeze(["ENGAGE.defaultM", "ENGAGE.hysteresisM", "TACTICS.suppressConfidence"]),
+    }),
+    Object.freeze({
+      from: "watch", to: "cover_engage", priority: 13,
+      when: "【§15】戒备中对方压进交战距离，而戒备时缩着的那个掩体正好用得上：直接转 hide → peek 周期",
+      keys: Object.freeze(["COVER.defaultRadiusM", "COVER_CYCLE.reselectMinS", "TACTICS.suppressConfidence"]),
+    }),
+
     // --- 17 推进（最后的兜底）--------------------------------------------
     Object.freeze({
       from: "fire", to: "advance", priority: 17,
@@ -394,6 +432,8 @@ export const BRAIN_GRAPH = Object.freeze({
     bound: Object.freeze(["approach", "hide", "peek"]),
     reload: Object.freeze(["approach", "hide"]),
     suppressed: Object.freeze(["approach", "hide"]),
+    // 戒备也压在 hide 那一半：探头是为了开枪，而戒备的人不开枪（§15）。
+    watch: Object.freeze(["approach", "hide"]),
   }),
 
   // ---------------------------------------------------------------- 任务
@@ -421,6 +461,7 @@ export const BRAIN_GRAPH = Object.freeze({
     ACTOR_DETAIL: "Data_Tuning_Ai",
     HURT_FLINCH: "Data_Tuning_Ai",
     BRAIN: "Data_Tuning_Ai",
+    WATCH: "Data_Tuning_Ai",
 
     COVER_WEIGHTS: "Data_Tuning_AiCover",
     COVER: "Data_Tuning_AiCover",

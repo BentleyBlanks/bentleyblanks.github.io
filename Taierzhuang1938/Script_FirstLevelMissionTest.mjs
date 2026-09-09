@@ -1,4 +1,6 @@
-import { FRONT_BREACHES, FRONT_ASSAULT, FrontAssaultLane } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_ASSAULT_STARTS, FrontAssaultLane } from "./Data_FirstLevelMissionFront.mjs";
+import { COVER } from "./Data_Tuning_AiCover.mjs";
+import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { CollectBulletNearMisses,ApplyBulletNearMisses } from "./Script_BallisticSuppression.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
@@ -87,11 +89,11 @@ console.log("ok shared terrain, excavated trenches, structural floors only");
 const tacticalRoutes = Object.fromEntries(Object.entries(MISSION_TACTICS).map(([id, plan]) => [id,
   [Object.values(MISSION_ENCOUNTERS).flat().find(spec => spec.id === id), ...plan.points]]));
 // Bounding-assault lanes: every front rifleman and every wave drop point must rush between lines without cutting a cover block.
-const assaultLanes=Object.fromEntries([
-  ...MISSION_ENCOUNTERS.front.filter(spec=>!spec.hold&&FrontAssaultLane(spec.x,spec.z).length).map(spec=>["Assault"+spec.id,[spec,...FrontAssaultLane(spec.x,spec.z)]]),
-  ...FRONT_ASSAULT.waveCentersX.flatMap((cx,squad)=>[0,1,2,3,4,5].map(i=>{const x=cx+((i%3)-1)*3.2+(i>=3?1.6:0),z=FRONT_ASSAULT.spawnZ-(i>=3?2.5:0);
-    return ["AssaultWave"+squad+"_"+i,[{x,z},...FrontAssaultLane(x,z)]];})),
-]);
+// FRONT_ASSAULT_STARTS is the single roster the cover rows are built around and the runtime spawns
+// from; walking it here is what keeps the three in step.
+assert.deepEqual(MISSION_ENCOUNTERS.front,FRONT_FIELD_MEN,"the front encounter roster is the authored front roster");
+const assaultLanes=Object.fromEntries(FRONT_ASSAULT_STARTS.map(start=>
+  ["Assault"+start.id,[start,...FrontAssaultLane(start.x,start.z)]]));
 assert.ok(Object.values(assaultLanes).every(route=>route.length>=2&&route.at(-1).z===FRONT_ASSAULT.lines.at(-1)),"every assault lane ends on the last bound line");
 assert.ok(Object.keys(assaultLanes).length>=24,"most front riflemen and every wave drop point get a bounding lane: "+Object.keys(assaultLanes).length);
 const reliefRoutes=Object.fromEntries(P.reliefPositions.map((point,i)=>["Relief"+i,[MISSION_TRAIN.cars[2].muster[i],...P.reliefApproach,{x:point.x,z:-123},point]]));
@@ -122,11 +124,78 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...tacticalRoute
     }
   }
 }
-for(const id of ["FrontTraverseBlastScreen","BundleParapet","FlankParapet","MachineGunSideCover-1","MachineGunSideCover1"]){
-  const wall=MISSION_LAYOUT.blocks.find(b=>b.id===id);assert.ok(wall,"hand-built cover survives generic route cleanup: "+id);
-  for(const x of [-1,0,1])for(const z of [-1,0,1])assert.ok(wall.y-wall.h/2<=SampleMissionTerrain(wall.x+x*wall.w/2,wall.z+z*wall.d/2),"cover foundations follow the trench slope");
+const frontCover=MISSION_LAYOUT.blocks.filter(block=>block.id.startsWith("FrontCover"));
+for(const wall of [...["FrontTraverseBlastScreen","BundleParapet","FlankParapet","MachineGunSideCover-1","MachineGunSideCover1"]
+  .map(id=>{const found=MISSION_LAYOUT.blocks.find(b=>b.id===id);assert.ok(found,"hand-built cover survives generic route cleanup: "+id);return found;}),...frontCover]){
+  for(const x of [-1,0,1])for(const z of [-1,0,1])assert.ok(wall.y-wall.h/2<=SampleMissionTerrain(wall.x+x*wall.w/2,wall.z+z*wall.d/2),"cover foundations follow the slope: "+wall.id);
 }
 console.log("ok authored capsule routes clear walls, crates and gun supports");
+// ---------------------------------------------------------------------------
+// Front assault cover (docs/Data_FrontCover.md)
+// ---------------------------------------------------------------------------
+// The gate behind "far enemies take cover": a bound line the AI can reach with nothing to kneel
+// behind is the open-field pose the capture caught. These assertions hold the two halves together
+// - the cover has to be there, and the rush lane still has to get past it.
+{
+  const columns=FRONT_ASSAULT.blockedX.map(([a,b])=>[a,b]).sort((left,right)=>left[0]-right[0]);
+  assert.deepEqual(columns,FRONT_COVER.columns.map(column=>[...column.x]),"blockedX is exactly the cover columns, in order");
+  for(const [index,[a,b]] of columns.entries()){
+    // A bound moves at most 2 x lateralM in x and ClearLaneX only ever pushes a man 0.6 m clear,
+    // so a column this wide cannot be straddled: both ends of every rush stay on one side of it.
+    assert.ok(b-a>=FRONT_COVER.minColumnM,`cover column ${FRONT_COVER.columns[index].id} is at least minColumnM wide: ${(b-a).toFixed(1)}`);
+    assert.ok(b-a>2*FRONT_ASSAULT.lateralM,"a lane jitter cannot step over a cover column");
+    if(index)assert.ok(columns[index-1][1]<a,"cover columns never overlap");
+    const build=FRONT_COVER.columns[index].coverX||FRONT_COVER.columns[index].x;
+    assert.ok(build[0]>=a&&build[1]<=b,"a column only ever builds inside its own lane span");
+  }
+  for(const [name,route] of Object.entries(assaultLanes))for(const point of route.slice(1)){
+    assert.ok(point.x>=FRONT_ASSAULT.xRange[0]&&point.x<=FRONT_ASSAULT.xRange[1],name+" bounds inside the assault span");
+    for(const [a,b] of columns)assert.ok(!(point.x>a&&point.x<b),`${name} never bounds into a cover column at x=${point.x.toFixed(1)}`);
+  }
+  // Every bank is a crouch-and-hide cover: too tall to walk over, too low to hide a standing man.
+  const points=frontCover.map(block=>({x:block.x,z:block.z,h:block.h}));
+  assert.ok(points.length>=90,"the four rows are actually built: "+points.length);
+  for(const block of frontCover){
+    assert.ok(block.h>TRAVERSAL.stepMax&&block.h<COVER.tallM,`${block.id} stays in the crouch-and-hide band: ${block.h.toFixed(2)}`);
+    assert.ok(block.h>=COVER.minUsefulM,block.id+" registers as a usable cover point");
+    assert.ok(block.cover&&block.d/2<COVER.standoffM-.2,block.id+" is thin enough that its hide position clears the face");
+  }
+  for(const row of FRONT_COVER.rows){
+    assert.ok(row.z>row.line&&row.z-row.line<=2.5,`the ${row.id} row sits 0-2.5 m south of its line, between the man and the Chinese line`);
+    const xs=points.filter(point=>Math.abs(point.z-row.z)<.6).map(point=>point.x).sort((a,b)=>a-b);
+    for(let i=1;i<xs.length;i++)assert.ok(xs[i]-xs[i-1]>=COVER.minAllySpacingM,
+      `${row.id} cover points stay minAllySpacingM apart so a squad line can hold neighbours: ${(xs[i]-xs[i-1]).toFixed(2)}`);
+  }
+  // Coverage: how much of a bound line has a registered cover point inside assaultCoverSearchM.
+  // Before this pass the four lines read 30 / 68 / 48 / 57 %; the capture that started it found
+  // 2 of 31 live Japanese in the 46-74 m band holding a cover point at all.
+  const registered=MISSION_LAYOUT.blocks.filter(block=>block.cover&&block.h>=COVER.minUsefulM);
+  let covered=0,samples=0;
+  for(const line of FRONT_ASSAULT.lines){
+    const near=registered.filter(block=>Math.abs(block.z-line)<=R.assaultCoverSearchM);
+    let hit=0,count=0;
+    for(let x=FRONT_ASSAULT.xRange[0];x<=FRONT_ASSAULT.xRange[1];x+=1){
+      count++;
+      if(near.some(block=>Math.hypot(block.x-x,block.z-line)<=R.assaultCoverSearchM))hit++;
+    }
+    covered+=hit;samples+=count;
+    assert.ok(hit/count>=.7,`bound line ${line} has cover within assaultCoverSearchM over 70% of its span: ${(hit/count*100).toFixed(1)}%`);
+  }
+  assert.ok(covered/samples>=.7,"the whole assault front is covered: "+(covered/samples*100).toFixed(1)+"%");
+  // The tank advances by interpolation with no collision response, so its lane stays clear of the
+  // new banks whichever target it is tracking. Half hull width is 1.2 m: the collider in
+  // Script_FirstLevelMissionView is h=[1.075,1.28,2.15] and it drives along its own length.
+  // (FieldRuin1 already stands in the default advance; that predates this pass and is left alone.)
+  for(const destinationX of [R.tankPursuitBounds.minX,36,R.tankPursuitBounds.maxX]){
+    const from=P.tankStart,to={x:destinationX,z:R.tankFirstFireZ},length=Math.hypot(to.x-from.x,to.z-from.z);
+    for(let travelled=0;travelled<=length;travelled+=.25){
+      const t=travelled/length,x=from.x+(to.x-from.x)*t,z=from.z+(to.z-from.z)*t;
+      for(const block of frontCover)assert.ok(Math.abs(block.x-x)>=block.w/2+1.2||Math.abs(block.z-z)>=block.d/2+1.2,
+        `${block.id} stands in the tank advance to x=${destinationX}`);
+    }
+  }
+}
+console.log("ok four cover rows fill the assault front, the rush lanes still clear them and the tank lane stays open");
 // Each waiting team occupies an authored work area, with clear paths for both bearer ends.
 import {MISSION_CROWD_AREAS as areas} from './Data_FirstLevelMissionCrowd.mjs';import {MISSION_LAYOUT as crowdLayout} from './Data_FirstLevelMissionLayout.mjs';import {SampleMissionTerrain as crowdGround} from './Data_FirstLevelMissionTerrain.mjs';import {MissionCarryRoutePoint as crowdPoint,MissionRouteLength as crowdLength} from './Script_FirstLevelMissionColumn.mjs';
 const bad=[];for(const a of areas)for(const [kind,points] of [['litter',a.pockets],['walker',a.walkerPockets]])for(const [i,p] of points.entries()){const routes=[[a.trigger,{x:a.trigger.x,z:a.entryZ},{x:p.x,z:a.entryZ},p],[p,{x:p.x,z:a.exitZ},a.merge]];for(const route of routes)for(let d=0;d<crowdLength(route);d+=.3){const c=crowdPoint(route,d);for(const offset of kind==='litter'?[-1.28,0,1.28]:[0]){const x=c.x-Math.sin(c.yaw)*offset,z=c.z-Math.cos(c.yaw)*offset,y=crowdGround(x,z);for(const b of crowdLayout.blocks){if(b.solid===false||crowdLayout.walkableSurfaces.some(s=>s.id===b.id))continue;const dx=x-b.x,dz=z-b.z,co=Math.cos(b.ry||0),si=Math.sin(b.ry||0);if(Math.abs(dx*co-dz*si)<b.w/2+.32&&Math.abs(dx*si+dz*co)<b.d/2+.32&&b.y+b.h/2>y+.3&&b.y-b.h/2<y+1.7)bad.push({area:a.id,kind,i,box:b.id,x,z});}}}}

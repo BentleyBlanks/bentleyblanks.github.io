@@ -41,7 +41,17 @@ export const MISSION_TUNING = Object.freeze({
   // assaultRegroupLine and comes again (assaultRegroupCycles times) so the field is never static.
   assaultRushMps:3.4,
   assaultHoldS:3.5,
-  assaultFinalHoldS:11,
+  // 2026-09-09 (docs/Data_EnemyAi.md §15): the last line was an eleven second stand - live capture showed
+  // 21 of the 31 men in the 46-74 m band sitting in assault "hold" and 23 of them not moving at all over
+  // four seconds. It is now the same volley/hold rhythm as the other bounds: fire assaultVolleyShots
+  // rounds or hold assaultFinalHoldS seconds, then slide 3-6 m along the line to a fresh firing position
+  // (assaultLateralShifts of them, cover columns avoided by ClearLaneX), and only then fall back to
+  // assaultRegroupLine and come again. 4.5 s is one bolt-rifle volley plus the walk.
+  assaultFinalHoldS:4.5,
+  assaultVolleyShots:4,
+  assaultLateralShifts:2,
+  assaultLateralMinM:3,
+  assaultLateralMaxM:6,
   assaultRegroupLine:1,
   assaultRegroupCycles:3,
   assaultArrivalM:.9,

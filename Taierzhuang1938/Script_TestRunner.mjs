@@ -209,6 +209,8 @@ export const testDefs = {
   WorldInfoEditorTest: { file: "Script_WorldInfoEditorTest.mjs", desc: "WorldInfo：角色 Transform 实时浮窗与开关生命周期" },
   DestructionEditorTest: { file: "Script_DestructionEditorTest.mjs", desc: "可破坏预览编辑器：真实七关 + 承重白名单" },
   ActorBatchTest: { file: "Script_ActorBatchTest.mjs", desc: "人物合批：逐像素无损 + 真省 draw call" },
+  ActorCrowdTest: { file: "Script_ActorCrowdTest.mjs", timeoutMs: 10 * 60 * 1000,
+    desc: "远景人群姿势层：站/跪/卧/跑步翻页/尸体各归各桶 + 像素级剪影变矮 + 提交量增量" },
   PropInstancingTest: { file: "Script_PropInstancingTest.mjs", desc: "外部布设实例化：逐像素无损 + 真省 draw call + 流送自洽" },
   ProfilerTest: { file: "Script_ProfilerTest.mjs", desc: "运行时性能剖析器：开关接线、CPU 分桶、GPU 分段查询与钩子还原" },
   ActorPoseTest: { file: "Script_ActorPoseTest.mjs", desc: "车厢生活动作模块冒烟（Chromium 加载本地模块）" },
@@ -269,7 +271,7 @@ export const browserTests = new Set([
   'FirstLevelP012TerrainBrowserTest',
   "TrainLibraryTest",
   'BackRifleRunTest', 'MeleeAnimationTest', 'InfantryAnimationTest',
-  "ActorBatchTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
+  "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
   "AiCombatBrowserTest", "AiEditorTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
@@ -376,7 +378,7 @@ export const domains = {
     // 具名同伴（罗班长、幺娃…）是从 nra 名额里出的人，goal 直接写进 AiDirector，
     // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
     tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiShootingTest", "AiTacticsTest",
-      "VisibilityTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
+      "VisibilityTest", "ActorCrowdTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
       "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012AnimationTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest", "FirstLevelP012ArrivalTest", "FirstLevelP012VillageLifeTest", "FirstLevelP012CastTest"],
   },
   hud: {
@@ -408,7 +410,7 @@ export const domains = {
     //（UpdateFire / MoveSmokeSource），所以碰灯光或粒子的改动也要连着 FlareTest 跑。
     // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
-    tests: ["TestSceneLightingTest", "PostTest", "AutoQualityTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
+    tests: ["TestSceneLightingTest", "PostTest", "AutoQualityTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -883,6 +885,7 @@ const estimatedSeconds = {
   PerformanceTest: 600,
   DeathViewTest: 240,
   RespawnShaderWarmTest: 150,
+  ActorCrowdTest: 130,
   AtmosphereTest: 130,
   FrameProfileTest: 600,
   GodRaysPerformanceTest: 600,

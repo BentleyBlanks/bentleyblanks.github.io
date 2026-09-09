@@ -214,7 +214,9 @@ for (const [i, x, z, w] of [
 ])
   Wall(`FieldRuin${i}`, x, z, w, i<2?.75:1.3, 0.7);
 for(const x of [-28,-23,-18,-13,-8,-3,2,7])Wall(`WithdrawCover${x}`,x,-150,3.8,.88,.65);
-for(const x of [-20,0,20])Wall(`EnemyForwardCover${x}`,x,-173,4.2,.62,.7);
+// The three 0.62 m EnemyForwardCover slabs that used to sit alone on z=-173 are gone: they were
+// below the crouch-and-hide band and one 4.2 m slab only ever registered a single cover point.
+// The FRONT_COVER rows at the end of this file rebuild that row across the whole front.
 for(const [i,x,z] of [[0,-16,-149.5],[1,-8,-151.5],[2,12,-151.5],[3,23,-151.5],[4,-32,-153.5],[5,-6,-158.5]])
   Wall("AssaultApproachCover"+i,x,z,2.6,.58,.6);
 // The village route passes through a kitchen, inner courtyard and connected rooms.
@@ -373,6 +375,51 @@ for(const [id,x,z,length] of [['WestFieldFence',-58,-120,36],['VillageFieldFence
     Detail(id+'Rail'+i,x,z+i+1.35,.09,.12,2.7,'timber',{y:SampleMissionTerrain(x,z+i)+.72});
   }
 }
+// ---------------------------------------------------------------------------
+// Front assault cover rows (docs/Data_FrontCover.md)
+// ---------------------------------------------------------------------------
+// One row of broken field banks, grave mounds and wall stubs 1.6-2.5 m south of each
+// FRONT_ASSAULT bound line, so a man who reaches a line has something to kneel behind instead of
+// bare field. Segments only ever go inside a FRONT_COVER column, which is exactly the x span the
+// rush lanes are pushed out of, so no bank can ever stand across a bound. Anything that would
+// land inside an existing building, ruin or authored firing position is dropped - NorthFarm,
+// FieldRuin0 and FieldRuin1 are the cover on those stretches already.
+function FieldCover(id, x, z, w, h, d) {
+  const top = SampleMissionTerrain(x, z) + h;
+  let base = Infinity;
+  for (const a of [-1, 0, 1]) for (const b of [-1, 0, 1])
+    base = Math.min(base, SampleMissionTerrain(x + a * w / 2, z + b * d / 2));
+  base -= 0.06;
+  // The foot is dug to the lowest corner so no bank floats over a field swell; h is therefore the
+  // registered cover height (0.06 m taller than the authored clear height, still inside the band).
+  // faceZ points south, at the Chinese line: Script_AiCover reads a cover normal as an unsigned
+  // wall axis (its header), so the sign documents intent and only |dot| ever scores.
+  return Block(id, x, z, w, top - base, d, "cover", { y: (top + base) / 2, cover: { faceX: 0, faceZ: 1 } });
+}
+{
+  const existing = blocks.slice();
+  const Taken = (x, z, w, d) => existing.some((block) => block.solid !== false
+      && Math.abs(block.x - x) < (block.w + w) / 2 + 0.45
+      && Math.abs(block.z - z) < (block.d + d) / 2 + 0.45
+      && block.y + block.h / 2 > SampleMissionTerrain(x, z) + 0.3)
+    || FRONT_FIELD_MEN.some((man) => Math.abs(man.x - x) < w / 2 + 0.9 && Math.abs(man.z - z) < d / 2 + 0.9);
+  for (const row of FRONT_COVER.rows) for (const column of FRONT_COVER.columns) {
+    if (column.rows && !column.rows.includes(row.id)) continue;
+    const build = column.coverX || column.x;
+    const span = build[1] - build[0] - FRONT_COVER.insetM * 2;
+    const count = Math.max(1, Math.floor((span - row.w) / FRONT_COVER.pitchM) + 1);
+    const used = (count - 1) * FRONT_COVER.pitchM + row.w;
+    const first = build[0] + FRONT_COVER.insetM + (span - used) / 2 + row.w / 2;
+    for (let i = 0; i < count; i++) {
+      const x = first + i * FRONT_COVER.pitchM;
+      // A man authored inside the one-metre slack of a bound line skips that line and rushes
+      // straight through the row behind it. Columns cannot help there - the lane runs down the
+      // column - so the bank gives way instead of the route gate failing on it.
+      if (Taken(x, row.z, row.w, row.d) || FrontAssaultLaneCuts(x, row.z, row.w, row.d)) continue;
+      FieldCover(`FrontCover${row.id}${column.id}${i}`, x, row.z, row.w, row.h, row.d);
+    }
+  }
+}
 export const MISSION_ANCHORS = Object.freeze({
   train: MISSION_TRAIN.player,
   unload: { x: -66, z: 66 },
@@ -464,7 +511,7 @@ export const MISSION_ROUTES = Object.freeze({
     { x: -186, z: -8 },
   ],
 });
-import { FRONT_GUARD_POSTS } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_GUARD_POSTS, FRONT_COVER, FRONT_FIELD_MEN, FrontAssaultLaneCuts } from "./Data_FirstLevelMissionFront.mjs";
 export const MISSION_PLACEMENT = Object.freeze({
   stationCasualties: [
     { x: -65, z: 73, yaw: 0.3, health: 0 },

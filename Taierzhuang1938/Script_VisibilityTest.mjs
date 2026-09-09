@@ -89,14 +89,23 @@ try {
   // 所以闸门必须落在**烘出来的人体有多大**上，单位是米。
   const bake = await page.evaluate(() => window.Taierzhuang.ai.crowd?.BakeReport(["nra", "ija"]) || null);
   const bakeEntries = Object.entries(bake || {});
-  Check("远景层四套姿势都烘到了蒙皮人体",
+  Check("远景层每一档姿势都烘到了蒙皮人体",
     bakeEntries.length >= 4 && bakeEntries.every(([, entry]) => entry.skinnedParts > 0),
     bakeEntries.map(([key, entry]) => `${key}:${entry.skinnedParts}件`).join(" "));
-  // 站姿据枪约 1.49—1.53 m（不是立正的 1.66 m），倒地横躺约 1.59—1.62 m；
-  // 1.2 m 离两者都远，也离「塌成一粒」的 0.02 m 远得没有争议。
-  Check("远景人体不是只剩一支枪（最长边 ≥ 1.2 m）",
-    bakeEntries.length > 0 && bakeEntries.every(([, entry]) => entry.bodySpan >= 1.2),
-    bakeEntries.map(([key, entry]) => `${key}:${entry.bodySpan.toFixed(2)}m`).join(" "));
+  // 站姿据枪约 1.49—1.53 m（不是立正的 1.66 m），倒地横躺约 1.54—1.58 m。
+  //
+  // 【2026-09-09 拆成按姿势给下限】远景层从「站 + 倒地」两档扩到八档（加了跪、
+  // 真卧姿与跑步翻页 4 帧，见 docs/Data_ActorCrowdLod.md）。蹲跪与卧倒**本来就矮**：
+  // 实测跪 1.17—1.21 m、卧 0.78—0.91 m（卧姿是 `POSE_CLIPS.proneFire` 那条低姿匍匐，
+  // 近景完整 Actor 摆的是同一个姿势，这一层只是照抄）。一刀切 1.2 m 会把正确的
+  // 姿势判红，而这道门要抓的是**塌成 0.02 m 的一粒**（2026-09-02 那次），
+  // 所以按姿势给线：矮的那两档留 0.55—0.9 m，离「一粒」仍有三四十倍。
+  const SPAN_FLOOR = { kneel: 0.9, prone: 0.55 };
+  const SpanFloor = (entry) => SPAN_FLOOR[entry.pose] ?? 1.2;
+  Check("远景人体不是只剩一支枪（最长边过各姿势的下限）",
+    bakeEntries.length > 0 && bakeEntries.every(([, entry]) => entry.bodySpan >= SpanFloor(entry)),
+    bakeEntries.map(([key, entry]) =>
+      `${key}:${entry.bodySpan.toFixed(2)}≥${SpanFloor(entry)}m`).join(" "));
 
   const corpses = await page.evaluate(() => {
     const T = window.Taierzhuang;

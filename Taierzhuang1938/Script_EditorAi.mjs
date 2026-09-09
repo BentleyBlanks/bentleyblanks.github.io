@@ -92,7 +92,7 @@ const RGB = {
  * `file` 是保存端点认的仓库相对路径（docs/Data_EnemyAi.md §14.3）。
  */
 const TUNING_TABLES = [
-  { id: "brain", label: "大脑", file: "Taierzhuang1938/Data_Tuning_Ai.mjs", module: TuningAi, only: ["BRAIN", "ENGAGE", "SQUAD"] },
+  { id: "brain", label: "大脑", file: "Taierzhuang1938/Data_Tuning_Ai.mjs", module: TuningAi, only: ["BRAIN", "ENGAGE", "SQUAD", "WATCH"] },
   { id: "perception", label: "感知", file: "Taierzhuang1938/Data_Tuning_AiPerception.mjs", module: TuningPerception, only: null },
   { id: "cover", label: "掩体", file: "Taierzhuang1938/Data_Tuning_AiCover.mjs", module: TuningCover, only: null },
   { id: "shooting", label: "射击", file: "Taierzhuang1938/Data_Tuning_AiShooting.mjs", module: TuningShooting, only: null },
