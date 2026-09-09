@@ -120,12 +120,34 @@ export class FirstLevelMissionRuntime {
   Say(id, options) {
     this.voice.Enqueue(id, options);
   }
+  /**
+   * 一条对白从哪儿传来。
+   *
+   * 【2026-09-09】兜底那一支原来是**本阶段的目标点**，而目标点是地图上的一个死坐标。
+   * 用户报「车厢里大家的对话好像距离都很远，听不清」，实测就是它：`TrainShelling`
+   * 十句里第一句的说话人是泛用的 `soldier`（没有 companion handle），于是整条 cue
+   * 落在 Unloading 的目标点 (−66, 66) 上 —— 而军列这会儿还在 z=140 往南开，
+   * 那是**七十四米外**，引擎按距离给了 occ 0.45 与 2.3 kHz 低通。同一场里
+   * `TrainMeal`（说话人是幺娃，有 handle）实测 2 m / occ 0 / 15 kHz，清清楚楚 ——
+   * 两者的差别不在素材，在这一行。
+   *
+   * 现在兜底落到**玩家自己身上**（嘴高，非贴脸）：这一关里没有 handle 的说话人
+   * 一律是同一节车厢／同一条壕沟里的人，永远在身边。死坐标只留给真的定点事件。
+   *
+   * 已知限制：位置按**整条 cue 的第一句**取，多人对话的后几句沿用同一个点。
+   * 十句里换四个说话人时那是「一群人在这边说话」，不是四个方位 —— 要逐句定位
+   * 得把 `FirstLevelMissionVoice.PlaySegment` 的契约从 cue 改成 line。
+   */
   VoicePosition(cue) {
     if (cue.id.startsWith("Retreat") || cue.id === "ZhouDeath") return this.Point(this.column.zhou, 1);
     const who = cue.lines[0]?.who;
-    return who === "shunzi"
-      ? null
-      : this.companion.Handle(who)?.position || this.Point(this.flow.stage.target, 1);
+    if (who === "shunzi") return null;
+    const handled = this.companion.Handle(who)?.position;
+    if (handled) return handled;
+    // 不走 Point()：那一条按 GroundHeight 定高，而车厢地板比地面高两米 ——
+    // 在军列上会把说话的人塞到车底下去。
+    const at = this.player.position;
+    return new THREE.Vector3(at.x, at.y + 1.5, at.z);
   }
   get EmptyHands() {
     return this.controls?.kind === "death" || (["Train","Unloading"].includes(this.flow.stage.id) && !this.Has("unloaded"));

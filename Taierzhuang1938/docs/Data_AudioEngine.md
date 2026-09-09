@@ -313,6 +313,21 @@ cue、距离、遮挡值、低通、干声节点、总线路由。四条假设�
 - 外面那条前线交给 `MISSION_BATTLE_SOUND` 的新档，见
   `docs/Data_AudioWiring.md` 与 `Data_FirstLevelMissionBattleSound.mjs` 的注释。
 
+### 顺带修掉的：车厢里的对话「听着很远」
+
+`FirstLevelMissionRuntime.VoicePosition` 的兜底原来是**本阶段的目标点**——
+一个地图上的死坐标。`TrainShelling` 十句里第一句的说话人是泛用的 `soldier`
+（没有 companion handle），于是整条 cue 落在 Unloading 的目标点 (−66, 66) 上，
+而军列这会儿还在 z=140 往南开：**七十四米外**，引擎按距离给了 occ 0.45 与
+2.3 kHz 低通。同一场里 `TrainMeal`（说话人是幺娃，有 handle）实测
+2 m / occ 0 / 15 kHz —— 差别不在素材，在那一行兜底。
+
+兜底改成玩家自己的位置（嘴高，不走 `Point()`：那一条按 GroundHeight 定高，
+会把说话的人塞到车厢地板底下）。实测同一条 cue：74.5 m / occ 0.45 / 2.3 kHz →
+**0.1 m / occ 0 / 17.8 kHz**。
+
+已知限制：位置按整条 cue 的**第一句**取，多人对白的后几句沿用同一个点。
+
 ### 回归口
 
 `Script_AudioTest.mjs`（`trainInterior` 床与 preset）＋
