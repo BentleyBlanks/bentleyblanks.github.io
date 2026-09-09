@@ -447,6 +447,8 @@ const changedDomainRules = [
   { domain: "editor", pattern: /Script_EditorWorldInfo|Script_WorldInfoEditorTest/i },
   { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },
   { domain: 'animation', pattern: /BackRifleRun|Melee.*Animation|MeleeAnimation|Infantry/i },
+  // 站立待机叠加层与它的旋钮表：装在第一关每个兵身上，验收在 FirstLevelP012AnimationTest（ai 域）。
+  { domain: 'ai', pattern: /ActorStandIdle|Data_Tuning_ActorIdle/i },
   { domain: "hud", pattern: /FirstLevelP012Guidance/i },
   { domain: "cutscene", pattern: /FirstLevelP012ShellShot/i },
   { domain: "ai", pattern: /FirstLevelP012(ShellShot|BackRifle|TrainColumn|March|Family|Resting|Arrival|VillageLife|StageZero|Cast)/i },

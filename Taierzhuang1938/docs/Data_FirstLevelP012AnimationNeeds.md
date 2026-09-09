@@ -3,6 +3,10 @@
 2026-09-05 的旧 P012 动画需求记录；该版本现位于 `?whitebox=p012-archive`。当前完整人物接力见 [新版全部动作需求](Data_FirstLevelMissionAnimationRequirements.md)。当前正片 `?whitebox=p012` 已使用新版第一关，需求和验收见 [重构验收](Data_FirstLevelRebuildAcceptance.md)。当时的“用户制作、任务检查接入”分工仅用于追溯，不自动限制后续任务。
 本清单来自实际 GLB 片段检查、开场 40 人的运行时状态和渲染联系图；不表示这些动画已经完成。
 
+## 在等这批动作的这段时间里，站着的人怎么办（2026-09-09）
+
+`UnarmedIdleA/B` 还没有，所以运行时对「站住不动」的处理是：把现有站姿 clip **定格一帧**（`Script_FirstLevelP012CastAppearance` 里 `timeScale=0`；`AdvanceFire` 定在后段站定那一截，`AttackCommand` 定在 25%），再由 `Script_ActorStandIdle` 在这一帧上叠呼吸、重心倒换和扫视，两条腿用两骨 IK 钉在 clip 摆好的落脚点上。**这不是待机动画，是替代品**：它只有躯干和头，没有换脚、没有手上的小动作、也没有任何一版「疲惫站立」与「轻微换重心」的差别。下面第一条交付之后，定格与这一层一起撤。
+
 ## 先做的动作
 
 | 优先级 | 建议片段名 | 使用场景与验收重点 |

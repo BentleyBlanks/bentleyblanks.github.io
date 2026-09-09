@@ -7,6 +7,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import {ServeRoot} from './Script_DevServer.mjs';
+import {STAND_IDLE} from './Data_Tuning_ActorIdle.mjs';
 const root=path.resolve(import.meta.dirname,'..'),out=path.join(os.tmpdir(),'P012MotionReview_20260905');
 await fs.mkdir(out,{recursive:true});
 const server=await ServeRoot(root,0),browser=await LaunchBrowser();
@@ -77,15 +78,34 @@ try{
   const Make=(id)=>{const actor=t.actorFactory.Create('nra',{seed:id,weapon:null});
    const soldier={id,actor,p012AwaitingWeapon:true};InstallP012ActorMotion(soldier);scene.add(actor.root);return soldier;};
   const Frame=(s,mps,state={})=>{elapsed+=1/60;s.actor.root.position.z-=mps/60;s.actor.Update(1/60,{elapsed,moveSpeed:mps/3.6,...state});};
+  // 站着不动的人，各骨头在这几秒里的活动范围（米）。定格帧 + 待机叠加层的验收尺子：
+  // 头/胸必须动（不是雕像），脚必须不动（不许滑步）。
+  const Span=(soldier,seconds)=>{
+   const rig=soldier.actor.characterRig,names=['head','chest','pelvis','handR','footL','footR'];
+   const box=new Map(names.map(n=>[n,{min:[1e9,1e9,1e9],max:[-1e9,-1e9,-1e9]}]));
+   for(let f=0;f<seconds*60;f++){Frame(soldier,0);
+    if(f%3)continue;
+    for(const n of names){const bone=rig.bones[n];if(!bone)continue;bone.updateWorldMatrix(true,false);
+     const e=bone.matrixWorld.elements,b=box.get(n);
+     for(let i=0;i<3;i++){b.min[i]=Math.min(b.min[i],e[12+i]);b.max[i]=Math.max(b.max[i],e[12+i]);}}}
+   return Object.fromEntries([...box].map(([n,b])=>[n,+Math.hypot(...b.max.map((m,i)=>m-b.min[i])).toFixed(4)]));
+  };
   const s=Make(91),rig=s.actor.characterRig;
   const Sample=()=>({clip:rig.currentPlaybackId,rate:rig.currentAction.getEffectiveTimeScale(),time:rig.currentAction.time});
   for(let i=0;i<60;i++)Frame(s,0);const empty=Sample();
   for(let i=0;i<60;i++)Frame(s,1.35);const slow=Sample();
   for(let i=0;i<60;i++)Frame(s,2.7);const fast=Sample();
   for(let i=0;i<60;i++)Frame(s,0);const stop=Sample();
+  const emptySpan=Span(s,10);
   s.p012AwaitingWeapon=false;s.actor.SetWeapon('HanYang');
   for(let i=0;i<30;i++)Frame(s,0,{firing:true,aim:1});const fire=Sample();
   rig.ForceClip('RifleRun');for(let i=0;i<10;i++)Frame(s,0);const forced=Sample();rig.ForceClip(null);
+  for(let i=0;i<30;i++)Frame(s,0);
+  const armedSpan=Span(s,10);
+  // 定格帧必须落在 clip 后段站定的那一截：脚踝离根不到 0.25 m。前 1.2 s 的跨步里
+  // 踝骨抬到 0.42 m，定在那儿的人会单脚悬空站一整关。
+  const hold={time:rig.currentAction.time,duration:rig.currentAction.getClip().duration,clip:rig.currentId,
+   ankles:['footL','footR'].map(n=>+(rig.bones[n].getWorldPosition(new THREE.Vector3()).y-s.actor.root.position.y).toFixed(3))};
   const bearers=[];
   for(const role of ['front','rear']){
    const b=Make(role==='front'?93:94);b.p012AwaitingWeapon=false;
@@ -103,7 +123,7 @@ try{
   for(const e of document.body.children)if(e.tagName!=='CANVAS')e.style.setProperty('display','none','important');
   const camera=new THREE.PerspectiveCamera(32,1.6,.1,100);camera.position.set(0,2,-9);camera.lookAt(0,.9,0);
   window.review={scene,camera,shown,Frame,THREE,FirstLevelP012Resting};scene.updateMatrixWorld(true);t.renderer.render(scene,camera);
-  return {empty,slow,fast,stop,fire,forced,bearers};
+  return {empty,slow,fast,stop,fire,forced,bearers,emptySpan,armedSpan,hold};
  });
  console.log('Motion',JSON.stringify(result));
  assert.equal(result.empty.clip,'AttackCommand');assert.equal(result.empty.rate,0);
@@ -112,6 +132,15 @@ try{
  assert.equal(result.stop.clip,'AttackCommand');assert.equal(result.stop.rate,0);
  assert.equal(result.fire.rate,1);assert.equal(result.forced.rate,1);
  assert.ok(result.bearers.every(b=>b.from===b.to&&b.rate===0&&b.resumed));
+ // 站住的人：clip 定格（rate 0）但人不是雕像 —— 呼吸/重心/扫视由 Script_ActorStandIdle 叠上去，
+ // 脚由 IK 钉在 clip 摆好的位置上。空手与持枪两种站姿各量一遍。
+ for(const [label,span] of [['empty',result.emptySpan],['armed',result.armedSpan]]) {
+  assert.ok(span.head>.02&&span.chest>.01&&span.pelvis>.005,label+' 站立待机没有动：'+JSON.stringify(span));
+  assert.ok(span.footL<.005&&span.footR<.005,label+' 站立待机把脚挪了（滑步）：'+JSON.stringify(span));
+ }
+ assert.equal(result.hold.clip,'AdvanceFire');
+ assert.ok(Math.abs(result.hold.time/result.hold.duration-STAND_IDLE.advanceFireHold)<1e-6,'站住的据枪定格帧：'+JSON.stringify(result.hold));
+ assert.ok(result.hold.ankles.every(y=>y<.25),'定格帧不能落在跨步上（脚踝离地）：'+JSON.stringify(result.hold));
  await page.screenshot({path:path.join(out,'Train_EmptyHold.png')});
  await page.evaluate(()=>{const {scene,camera,shown,Frame}=window.review;
   for(const s of shown)for(let f=0;f<40;f++)Frame(s,1.35);

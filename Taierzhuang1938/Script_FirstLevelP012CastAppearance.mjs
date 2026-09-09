@@ -1,4 +1,6 @@
 import { MissionTrainLifePose } from "./Script_FirstLevelMissionTrainLife.mjs";
+import { StandIdleLayer, StandIdleAllowed } from "./Script_ActorStandIdle.mjs";
+import { STAND_IDLE } from "./Data_Tuning_ActorIdle.mjs";
 // P012-only temporary cast identification; these are not historical uniform colours.
 // Clone only the GLB uniform material (hands, heads, badges and mounted weapons
 // use separate materials). No source asset, shared material or geometry is edited.
@@ -60,16 +62,26 @@ export function InstallP012OpeningPose(soldier) {
 // P012 fallback while neutral walk/train idles are being authored. This adjusts
 // playback only: AI movement, collision, route timings and source GLBs stay owned
 // by their existing systems. In particular a slowed run is still not a walk.
+//
+// 【定格帧 + 待机叠加层】站住的人 rate 取 0（见下面两处 rate=0）：现有站姿素材是
+// 「上前射击」和「挥臂下令」，原地循环等于全场原地踏步。但光定格会让整关的人站住
+// 就变雕像 —— 定格之后由 Script_ActorStandIdle 在这一帧姿势上叠呼吸、重心倒换和
+// 扫视，脚用 IK 钉在 clip 摆好的位置上。真正的中性待机 clip 到位后，这一层随
+// rate=0 一起撤（需求见 docs/Data_FirstLevelP012AnimationNeeds.md）。
 export function InstallP012ActorMotion(soldier) {
   const actor=soldier?.actor,rig=actor?.characterRig;
   if(!rig?.mixer||typeof rig._ActionForState!=="function"||rig.p012ActorMotion)return false;
   InstallP012OpeningPose(soldier);
   const original=rig.Update;
+  const standIdle=new StandIdleLayer(soldier);
   let previous=null,lastElapsed=null,previousAction=null;
   const phase=((Number(soldier.id)||0)*.61803398875)%1;
   rig.p012ActorMotion=true;
   rig.p012BackRifleReady=import("./Script_FirstLevelP012BackRifle.mjs").then(module=>module.InstallP012BackRifle(soldier)).catch(error=>{rig.p012BackRifleError=String(error);console.warn("[P012BackRifle]",error);});
+  rig.p012StandIdle=standIdle;
   rig.Update=function UpdateP012ActorMotion(dt,state={}) {
+    // mixer 采样之前先撤掉上一帧的待机叠加，FK 不累积。
+    standIdle.Restore();
     const at=actor.root.position;
     const elapsed=Number.isFinite(state.elapsed)?state.elapsed:null;
     const step=elapsed!==null&&lastElapsed!==null?elapsed-lastElapsed:dt;
@@ -92,6 +104,7 @@ export function InstallP012ActorMotion(soldier) {
     const id=this._ActionForState(next);
     this.Play(id,dt===0?0:.12);
     const action=this.currentAction;
+    let rate=1;
     if(action){
       const changed=action!==previousAction;
       if(changed){
@@ -99,17 +112,23 @@ export function InstallP012ActorMotion(soldier) {
         if(!state.carryRole&&['RifleRun','AdvanceFire','WoundedLimp'].includes(id))
           action.time=action.getClip().duration*phase;
       }
-      let rate=1;
       if(emptyIdle){action.time=action.getClip().duration*.25;rate=0;}
       else if(id==='CarryStretcherFront'||id==='CarryStretcherRear')rate=speed<.08?0:Math.min(1.6,speed/1.35);
       else if(id==='WoundedLimp')rate=Math.min(1.5,speed/1.1);
       else if(id==='RifleRun')rate=Math.min(1.6,speed/3.6);
       else if(id==='BackRifleRun')rate=speed/(this.p012BackRifleReferenceMps*actor.root.scale.y*this.root.scale.y);
-      else if(id==='AdvanceFire'&&next.moveSpeed<.025&&!state.firing&&!(state.aim>.1))rate=0;
+      else if(id==='AdvanceFire'&&next.moveSpeed<.025&&!state.firing&&!(state.aim>.1)){
+        // 定格帧必须落在 clip 后段那一截静止的据枪上。前 1.2 s 是「上前」的跨步：
+        // 定在那里的人会单脚悬空站一整关（实测踝骨抬到 0.42 m，rate=0 之后再也放不下来）。
+        action.time=action.getClip().duration*STAND_IDLE.advanceFireHold;rate=0;
+      }
       action.setEffectiveTimeScale(rate);
       previousAction=action;
     }
-    return original.call(this,dt,next);
+    const result=original.call(this,dt,next);
+    // 定格帧上的待机。carry 的 rate 也是 0，但那两只手钉在担架杆上，不能挪骨盆。
+    if(action&&rate===0&&!state.carryRole&&StandIdleAllowed(soldier,next))standIdle.Apply(dt,next);
+    return result;
   };
   return true;
 }
