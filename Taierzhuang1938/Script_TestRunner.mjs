@@ -62,6 +62,7 @@ export const testDefs = {
   FirstLevelMissionStageTailTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-jumps","--stage-from=16"],timeoutMs:600000,desc:"Targeted 16–18 continuation, stretcher handoff and final exit"},
   FirstLevelMissionPresentationTest: {file:"Script_FirstLevelMissionPresentationTest.mjs",timeoutMs:240000,desc:"Real stretcher grip, idle feet, ADS fire and mounted recoil"},
   FirstLevelMissionFortificationsTest: {file:"Script_FirstLevelMissionFortificationsTest.mjs",timeoutMs:600000,desc:"Loaded field defenses, route clearance and merged scene screenshots"},
+  FirstLevelFrontPresenceTest: {file:"Script_FirstLevelFrontPresenceTest.mjs",timeoutMs:600000,desc:"Finite approach fire, delayed front commitment and no respawning after a slow approach"},
   FirstLevelMissionTest: {file:'Script_FirstLevelMissionTest.mjs',args:['--audio'],desc:'新版第一关完整事实门、共享地形、实际担架队列和往返撤离'},
   FirstLevelMissionBrowserTest: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign','--audio'],timeoutMs:1800000,desc:'新版第一关真实输入、移动军列、壕沟路线、作战与通关'},
   FirstLevelTrainAnimationTest: {file:'Script_FirstLevelTrainAnimationTest.mjs',timeoutMs:600000,desc:'四型号原骨架采样、真实凳板接触、起身暂停与物理队列衔接'},
@@ -273,6 +274,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "FirstLevelFrontPresenceTest",
   "FirstLevelMissionAftermathTest",
   "SquadMarchEditorTest",
   "FirstLevelSquadMarchTest",
@@ -360,7 +362,7 @@ export const tier2 = [
 export const domains = {
   squadMarch: {label:"通用小队行进",tests:["SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关接收院至结尾定向续接",tests:["FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelMissionTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelMissionTest','FirstLevelFrontPresenceTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['BackRifleRunTest','MeleeAnimationTest','InfantryAnimationTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -463,7 +465,7 @@ const changedDomainRules = [
   // 断肢：规则/数值/视觉三层与测试场都归 combat（它挂在 TakeHit/Kill 那条链上）。
   { domain: "combat", pattern: /Gore|Dismember/i },
   {domain:"combat",pattern:/BallisticSuppression/},
-  {domain:'firstLevel',pattern:/FirstLevelOpening|FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|CarriageSoundscape|FirstLevelVoiceAlign|SeedAudioFirstLevel|SeedAudioCarriage|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
+  {domain:'firstLevel',pattern:/FirstLevelOpening|FirstLevelFrontPresence|FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|CarriageSoundscape|FirstLevelVoiceAlign|SeedAudioFirstLevel|SeedAudioCarriage|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
   { domain: "menu", pattern: /FirstLevelP012Debug/i },
   { domain: "text", pattern: /(Script_Text|Data_Text_|Data_Locale_|Data_Tuning_|Data_Mission|Data_Cutscene|Data_History|Data_Voice|Data_Weapons|TengxianScript)/i },
   { domain: "ai", pattern: /Data_Setpieces_|Data_Companions|Data_Flares|Data_AircraftStrafe|Data_Telegraph|Data_Emplacements|Data_Carry/i },

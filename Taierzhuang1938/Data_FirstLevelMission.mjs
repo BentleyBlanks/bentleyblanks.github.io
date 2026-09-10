@@ -139,7 +139,7 @@ export const MISSION_STAGES = Object.freeze([
 export const MISSION_ENCOUNTERS = Object.freeze({
   surface: OPENING.surface,
   intrusion: OPENING.intruders,
-  approach: [],
+  approach: FRONT_APPROACH_ENEMIES,
   // The roster itself lives in Data_FirstLevelMissionFront: the assault lanes and the cover rows
   // are derived from it, and a list split across two files drifts.
   front: [...FRONT_FIELD_MEN,...FRONT_RESERVES],

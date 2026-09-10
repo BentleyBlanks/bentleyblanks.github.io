@@ -91,7 +91,9 @@ export const FRONT_RIFLEMEN=Object.freeze([
 ]);
 /** Every man the front stages put on this field. The cover rows never build on one of these
  *  firing positions - a bank standing on a man is a man standing in a bank. */
-export const FRONT_FIELD_MEN=Object.freeze([...FRONT_REINFORCEMENTS.filter((spec,i)=>i%6<2),...FRONT_RIFLEMEN]);
+// Six of the finite opening force cover the communication-trench approach;
+// the remaining twelve enter the front battle when the player reaches its last bend.
+export const FRONT_FIELD_MEN=Object.freeze([...FRONT_RIFLEMEN]);
 // Five platoons spread behind the first line. Every man is spawned at Support entry;
 // release delays change movement, never the simultaneous population or damage rules.
 export const FRONT_RESERVES=Object.freeze(Array.from({length:FIRST_LEVEL_TUNING.frontReserveCount},(_,i)=>({

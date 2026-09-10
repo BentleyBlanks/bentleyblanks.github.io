@@ -31,7 +31,9 @@ export const MISSION_TUNING = Object.freeze({
   deathSeconds: 12,
   deathLookSeconds: .65,
   deathLookHeightM: .44,
-  frontEngageDistanceM:85,
+  // Commit the finite front force at the last approach bend, not while the
+  // player is still crossing the long communication trench behind the line.
+  frontEngageDistanceM:26,
   frontRifleDefenseSeconds:40,
   frontAccuracyScale:.28,
   frontFireIntervalScale:.95,
@@ -74,7 +76,7 @@ export const MISSION_TUNING = Object.freeze({
   // reading and it is also what the pacing wants: a man who has thrown twice is out, so grenades stay an event.
   enemyGrenades:2,
   // 2026-09-10: finite squads, no population target and no casualty replacement.
-  // Six surface blockers + four intruders + eighteen front infantry + four escorts.
+  // Six surface blockers + four intruders + six approach infantry + twelve front infantry + four escorts.
   openingEnemyBudget:32,
   frontReserveCount:0,
   frontReserveReleaseGapS:9,

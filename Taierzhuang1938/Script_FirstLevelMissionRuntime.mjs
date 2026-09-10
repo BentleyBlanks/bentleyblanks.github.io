@@ -831,7 +831,8 @@ export class FirstLevelMissionRuntime {
           squadId: "MissionForwardNest",
         });
         if (this.forwardGunner) this.Defend(this.forwardGunner, A.forwardNest);
-        this.SpawnEncounter("front");
+        // The finite assault is committed by UpdateFront at the last approach
+        // bend. Spawning it here lets a slow approach spend the battle offscreen.
         this.SpawnEncounter("approach");
         this.SpawnEncounter("tank");
         this.SpawnEncounter("village");
@@ -1178,6 +1179,7 @@ export class FirstLevelMissionRuntime {
     if(!this.Has("frontBattleStarted")&&this.Near(A.front,R.frontEngageDistanceM)){
       this.Record("frontBattleStarted");
       this.frontBattleAt=this.time;
+      this.SpawnEncounter("front");
       for(const actor of this.enemies.values())if(actor.missionFrontStandby){actor.scriptedNoncombatant=false;actor.missionFrontStandby=false;}
       for(const guard of this.guards){this.Defend(guard.actor,guard.actor.position,0,0);this.ai.SetStance(guard.actor,2,Infinity,true);}
     }

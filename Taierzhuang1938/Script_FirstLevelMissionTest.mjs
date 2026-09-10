@@ -690,8 +690,11 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
 console.log("ok receiving-food release follows the source clock and survives pause/resume");
 
 {
-  assert.equal(MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.surface.length+MISSION_ENCOUNTERS.intrusion.length+MISSION_ENCOUNTERS.tank.length,32,
+  assert.equal(MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.approach.length+MISSION_ENCOUNTERS.surface.length+MISSION_ENCOUNTERS.intrusion.length+MISSION_ENCOUNTERS.tank.length,32,
     "32 finite opening/front enemies; no replacement waves");
+  assert.equal(MISSION_ENCOUNTERS.approach.length,6,"the communication-trench approach has a finite enemy screen");
+  assert.ok(MISSION_ENCOUNTERS.approach.some(actor=>actor.z>-40)&&MISSION_ENCOUNTERS.approach.some(actor=>actor.z<-60),"both halves of the approach retain actual fire teams");
+  assert.ok(R.frontEngageDistanceM>OPENING.frontReachRadiusM&&R.frontEngageDistanceM<35,"the finite main assault begins at the last trench bend, before the player reaches the firing post");
   assert.equal(new Set(Object.values(MISSION_ENCOUNTERS).flat().map(spec=>spec.id)).size,Object.values(MISSION_ENCOUNTERS).flat().length);
   assert.equal(MISSION_ENCOUNTERS.surface.length,6,"two surface sections provide actual enemy fire");
   assert.ok(MISSION_STAGES.find(s=>s.id==="Support").requirements.includes("frontRifleDefense"));
