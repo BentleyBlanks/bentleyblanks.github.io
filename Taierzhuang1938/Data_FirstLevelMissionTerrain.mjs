@@ -127,6 +127,46 @@ export const MISSION_TERRAIN = Object.freeze({
       bottom: 5.2,
       bank: 2.2,
     },
+    // Connected alternatives inside each mission area; the original four paths retain
+    // their indices because mission escorts consume those routes. These are authored
+    // reconstructions, not surveyed 1938 trench coordinates (see fortifications doc).
+    {
+      id: "WestCommunicationLoop", role: "communicationLoop",
+      points: [{x:-30,z:-124},{x:-42,z:-114},{x:-42,z:-101},{x:-51,z:-92},
+        {x:-48,z:-74},{x:-36,z:-66},{x:-24,z:-60}],
+      depth:1.5, bottom:4.2, bank:1.5,
+    },
+    {
+      id: "SupportTraverseLink", role: "lateralLink",
+      points: [{x:-42,z:-101},{x:-32,z:-99},{x:-26,z:-94},{x:-8,z:-94}],
+      depth:1.5, bottom:3.6, bank:1.5,
+    },
+    {
+      id: "WestListeningSap", role: "shelterSap",
+      points: [{x:-42,z:-114},{x:-54,z:-111},{x:-54,z:-120}],
+      depth:1.5, bottom:3.2, bank:1.5,
+    },
+    {
+      id: "ReserveShelterSap", role: "shelterSap",
+      points: [{x:-48,z:-74},{x:-60,z:-67},{x:-60,z:-57}],
+      depth:1.5, bottom:3.6, bank:1.5,
+    },
+    {
+      id: "MiddleCommunicationLoop", role: "communicationLoop",
+      points: [{x:-24,z:-18},{x:-38,z:-27},{x:-54,z:-18},{x:-56,z:3},
+        {x:-51,z:17},{x:-51,z:30},{x:-45,z:41}],
+      depth:1.5, bottom:4.2, bank:1.5,
+    },
+    {
+      id: "StationReserveLoop", role: "localLoop",
+      points: [{x:-54,z:-18},{x:-66,z:-10},{x:-65,z:6},{x:-56,z:3}],
+      depth:1.5, bottom:3.6, bank:1.5,
+    },
+    {
+      id: "RearEvacuationLoop", role: "localLoop",
+      points: [{x:-28,z:88},{x:-34,z:103},{x:-52,z:105},{x:-65,z:90},{x:-67,z:64}],
+      depth:1.1, bottom:5.2, bank:2.2,
+    },
   ],
   steps: [
     { x: 0, z: -127.5, radius: 3.6, depth: 0.88 },

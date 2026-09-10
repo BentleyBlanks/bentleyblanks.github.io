@@ -564,7 +564,7 @@ for (let i = blocks.length - 1; i >= 0; i--) {
   const block = blocks[i];
   if (!block.id.includes('Revetment')) continue;
   const c = Math.cos(block.ry||0), s = Math.sin(block.ry||0);
-  const crosses = [...Object.values(MISSION_ROUTES), ...MISSION_PLACEMENT.guardWithdrawalRoutes].some(route => route.slice(1).some((b,index) => {
+  const crosses = [...Object.values(MISSION_ROUTES), MISSION_PLACEMENT.reliefApproach, ...MISSION_PLACEMENT.guardWithdrawalRoutes, ...MISSION_TERRAIN.trenches.map(t=>t.points)].some(route => route.slice(1).some((b,index) => {
     const a=route[index], length=Math.hypot(b.x-a.x,b.z-a.z);
     for(let d=0;d<=length;d+=.5) {
       const x=a.x+(b.x-a.x)*d/length-block.x, z=a.z+(b.z-a.z)*d/length-block.z;

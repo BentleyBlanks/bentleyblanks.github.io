@@ -15,6 +15,7 @@ try {
   const report=await page.evaluate(async()=>{
     const g=window.Tengxian,field=g.battlefield;
     const {MISSION_ROUTES,MISSION_PLACEMENT}=await import("./Data_FirstLevelMissionLayout.mjs");
+    const {MISSION_TERRAIN}=await import("./Data_FirstLevelMissionTerrain.mjs");
     const {MISSION_TACTICS,MISSION_ENCOUNTERS,MISSION_PURSUIT_ROUTE}=await import("./Data_FirstLevelMission.mjs");
     const {MISSION_DEFENSE_OBJECTS,IsMissionSandbagBlock}=await import("./Data_FirstLevelMissionFortifications.mjs");
     const {Box3,Vector3,Matrix4,Quaternion}=await import("three");
@@ -48,7 +49,7 @@ try {
     const tactics=Object.fromEntries(Object.entries(MISSION_TACTICS).map(([id,plan])=>[id,[actors.find(s=>s.id===id),...plan.points]]));
     for(const s of [...MISSION_ENCOUNTERS.retreat,...MISSION_ENCOUNTERS.air])tactics[s.id+"Pursuit"]=[s,...MISSION_PURSUIT_ROUTE.slice(MISSION_PURSUIT_ROUTE.findIndex(p=>p.x<=s.x))];
     const spawns=Object.fromEntries(actors.map(s=>[s.id+"Spawn",[s,s]]));
-    for(const [name,route] of Object.entries({...MISSION_ROUTES,...tactics,...spawns,...Object.fromEntries(MISSION_PLACEMENT.guardWithdrawalRoutes.map((r,i)=>[`Guard${i}`,r]))}))
+    for(const [name,route] of Object.entries({...MISSION_ROUTES,...Object.fromEntries(MISSION_TERRAIN.trenches.filter(t=>t.role).map(t=>[t.id,t.points])),...tactics,...spawns,...Object.fromEntries(MISSION_PLACEMENT.guardWithdrawalRoutes.map((r,i)=>[`Guard${i}`,r]))}))
       for(let i=1;i<route.length;i++){
         const a=route[i-1],b=route[i],n=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.z-a.z)/.2));
         for(let step=0;step<=n;step++){
@@ -65,10 +66,39 @@ try {
   });
   await fs.writeFile(path.join(out,"Data_Verification.json"),JSON.stringify(report,null,2));
   console.log(JSON.stringify({count:report.count,blocks:report.blocks,obstacles:report.obstacles,meshCount:report.meshCount,triangles:report.triangles,missing:report.missing,envelopeErrors:report.envelopeErrors,cuts:report.cuts}));
+  // Physical capsule traversal is local geometry evidence, separate from the campaign input gate.
+  const trenchWalks=await page.evaluate(async()=>{
+    const g=window.Tengxian,{MISSION_TERRAIN}=await import("./Data_FirstLevelMissionTerrain.mjs"),results=[];
+    const body=g.physics.MakeCharacter();
+    try {
+      for(const trench of MISSION_TERRAIN.trenches.filter(t=>t.role))for(const reverse of [false,true]){
+        const points=reverse?[...trench.points].reverse():trench.points;
+        body.Teleport(points[0].x,g.physics.groundAt(points[0].x,points[0].z)+.03,points[0].z);
+        let reached=1;
+        for(let index=1;index<points.length;index++){
+          const target=points[index],start=body.position.clone();
+          const budget=Math.ceil(Math.hypot(start.x-target.x,start.z-target.z)/.05)+240;
+          for(let frame=0;frame<budget;frame++){
+            const dx=target.x-body.position.x,dz=target.z-body.position.z,d=Math.hypot(dx,dz);
+            if(d<.18){reached++;break;}
+            body.Move(dx/d*Math.min(.06,d),-.07,dz/d*Math.min(.06,d));
+          }
+          if(reached!==index+1)break;
+        }
+        results.push({id:trench.id,reverse,reached,expected:points.length,position:body.position.toArray()});
+      }
+    }finally{body.Remove();}
+    return results;
+  });
+  await fs.writeFile(path.join(out,"Data_TrenchWalks.json"),JSON.stringify(trenchWalks,null,2));
+  assert.ok(trenchWalks.every(r=>r.reached===r.expected),"every added trench walks in both directions: "+JSON.stringify(trenchWalks.filter(r=>r.reached!==r.expected)));
   for(const shot of [
     {id:"Front",x:-10,z:-121,yaw:0,pitch:-.03},
     {id:"FrontWest",x:-33,z:-133,yaw:.9,pitch:-.08},
     {id:"Communication",x:-24,z:-42,yaw:0,pitch:-.03},
+    {id:"WestJunction",x:-42,z:-103,yaw:1.6,pitch:-.04},
+    {id:"ReserveLoop",x:-55,z:-16,yaw:-.1,pitch:-.04},
+    {id:"RearLoop",x:-35,z:103,yaw:1.6,pitch:-.03},
     {id:"Transfer",x:87,z:105,yaw:-.8,pitch:-.04},
     {id:"Station",x:-59,z:54,yaw:.8,pitch:-.04},
   ]) {
