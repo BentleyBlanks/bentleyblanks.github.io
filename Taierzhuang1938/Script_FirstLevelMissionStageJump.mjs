@@ -59,7 +59,7 @@ export function ApplyFirstLevelStageJump(runtime, value) {
   r.player.pitch = 0;
   if (n > 3) for (const [i,actor] of r.squad.entries()) {
     // Spread the squad at the checkpoint; do not leave them aboard the old train.
-    const point = n <= 6 ? P.squadFrontPositions[i]
+    const point = n === 4 ? OPENING.frontPosts[i] : n <= 6 ? P.squadFrontPositions[i]
       : {x:spawn.x+(i%2?2.4:-2.4),z:spawn.z+3+Math.floor(i/2)*2.4};
     r.PlaceActor(actor,point); r.Defend(actor,point);
   }

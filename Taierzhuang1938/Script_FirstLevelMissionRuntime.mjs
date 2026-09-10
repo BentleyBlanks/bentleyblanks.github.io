@@ -319,7 +319,7 @@ export class FirstLevelMissionRuntime {
     actor.scriptCoverSlackM = coverSlackM;
     actor.goal.set(point.x, 0, point.z);
   }
-  Guide(route) {
+  Guide(route, { fromStart = false } = {}) {
     this.squadMarch?.Dispose();
     this.guideRoute = route;
     for (const actor of this.squad) {
@@ -331,7 +331,7 @@ export class FirstLevelMissionRuntime {
       const from = actor.position;
       let index = 0,
         best = Infinity;
-      for (let i = 0; i < personalRoute.length; i++) {
+      for (let i = 0; !fromStart && i < personalRoute.length; i++) {
         const distance = Distance(from, personalRoute[i]);
         if (distance < best) {
           best = distance;
@@ -431,10 +431,11 @@ export class FirstLevelMissionRuntime {
         this.MoveActor(actor,route[0],speed);
       } else if (["TrenchEntry","Shelter"].includes(stage)) {
         this.MoveActor(actor,actor.position,0);this.ai.SetStance(actor,1,.5,true);
-      } else if (["Support","MachineGun"].includes(stage)&&!this.Has("gunOccupied")) {
+      } else if (["Support","MachineGun"].includes(stage)) {
         // Stay inside the reached communication-trench post. A new generic
         // cover search here used to pull the squad onto the exposed parapet.
-        this.Defend(actor,actor.position,0,0);this.ai.SetStance(actor,1,.5,true);
+        const post=this.Has("gunOccupied")?OPENING.frontPosts[this.squad.indexOf(actor)]:actor.position;
+        this.Defend(actor,post,0,0);this.ai.SetStance(actor,1,.5,true);
       } else if (!["Rescue", "Death"].includes(stage)) {
         if(!this.WaitWatch(actor,stage))this.Defend(actor, actor.position);
         if(["Support","MachineGun","Tank"].includes(stage))this.ai.SetStance(actor,1,2);
@@ -858,7 +859,9 @@ export class FirstLevelMissionRuntime {
         for (const [i, actor] of this.squad.entries()) this.Defend(actor, OPENING.frontPosts[i],0,0);
         break;
       case "Tank":
-        this.Guide([...MISSION_ROUTES.bundle]);
+        // The blast screen separates the front posts from the far end of the
+        // bundle approach. Everyone exits through its central trench junction.
+        this.Guide(MISSION_ROUTES.bundle,{fromStart:true});
         break;
       case "Orders":
         this.Guide([...MISSION_ROUTES.bundle].reverse().concat([{x:-8,z:-112},A.orders]));

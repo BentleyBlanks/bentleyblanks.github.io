@@ -265,9 +265,10 @@ async function WaitStage(expected, seconds = 240, { fight = false } = {}) {
       ({ expected, fight }) => {
         const g = window.Tengxian;
         for (let i = 0; i < 300 && g.player.alive && g.Debug.FirstLevelMissionRuntime().flow.stage.id !== expected; i++) {
-          const foe = fight ? window.MissionInputDriver.Target() : null;
+          const evading=window.MissionInputDriver.EvadeGrenade();
+          const foe = fight&&!evading ? window.MissionInputDriver.Target() : null;
           if (foe) window.MissionInputDriver.Shoot(foe);
-          else {
+          else if(!evading) {
             g.Debug.Mouse(0, false);
             g.Debug.Mouse(2, false);
           }
@@ -402,11 +403,35 @@ try {
   assert.equal(initial.mission.train.entries.length, 41, "40 recruits plus Luo, player separate");
   if(!process.argv.includes("--campaign"))await PlayFirstLevelOpening(page,{out:output,audioClock:audioCheck,mount:false});
   }
-  campaign: if (process.argv.includes("--campaign")) {
+  campaignRun: if (process.argv.includes("--campaign")) {
     await page.evaluate(() => {
       const g = window.Tengxian;
       window.MissionInputDriver = {
         blocked: new Map(),
+        EvadeGrenade() {
+          const p=g.player,threat=g.combat.GrenadeThreats(p.position)[0];
+          if(!threat){
+            if(this.evading){g.Debug.Key("KeyW",false);g.Debug.Key("ShiftLeft",false);this.evading=false;}
+            return false;
+          }
+          // Read the same live warning used by the HUD, then turn and sprint
+          // through an open physical direction. Do not clear the projectile.
+          const away=Math.atan2(p.position.x-threat.position.x,p.position.z-threat.position.z);
+          let heading=null;
+          for(const offset of [0,.55,-.55,1.1,-1.1,1.65,-1.65]){
+            const angle=away+offset,x=p.position.x+Math.sin(angle)*1.2,z=p.position.z+Math.cos(angle)*1.2;
+            const y=g.battlefield.GroundHeight(x,z);
+            if(Math.abs(y-p.position.y)<.4&&!g.physics.Overlaps(x,y+.04,z,p.radius,1.78)){heading=angle;break;}
+          }
+          if(heading==null)return false;
+          if(p.stance!=="stand")g.Debug.Key(p.stance==="crouch"?"KeyC":"KeyZ");
+          const yaw=heading+Math.PI,gap=Math.atan2(Math.sin(yaw-p.yaw-p.aimYaw),Math.cos(yaw-p.yaw-p.aimYaw));
+          g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+          g.Debug.Look(Math.max(-30,Math.min(30,-gap/.0022)),0);
+          g.Debug.Key("KeyW",Math.abs(gap)<.3);g.Debug.Key("ShiftLeft",true);
+          this.evading=true;this.evadeFrames=(this.evadeFrames||0)+1;
+          return true;
+        },
         Target() {
           if(this.observedShot!==g.state.playerShots) {
             this.observedShot=g.state.playerShots;
@@ -724,6 +749,10 @@ try {
       { stance: "stand" },
     );
     await WaitStage("Village", 120);
+    const withdrawnSquad=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().squad.map(a=>({id:a.castId,alive:a.alive,x:a.position.x,z:a.position.z})));
+    console.log("withdrawn squad",JSON.stringify(withdrawnSquad));
+    assert.ok(withdrawnSquad.length===4&&withdrawnSquad.every(a=>a.alive&&a.z>-65),"all four companions leave the front trench and follow the southbound column");
+    if(process.argv.includes("--through-south")){await Capture("OpeningSquadWithdrawal");console.log("PASS normal opening, gun, tank and four-companion withdrawal");break campaignRun;}
     assert.ok(await page.evaluate(()=>window.villageBodies.every(b=>window.Tengxian.ai.soldiers.some(a=>a.id===b.id&&a.missionId===b.missionId))),"the village reuses its pre-positioned soldiers");
     await JumpStage(8);
     await Route(
