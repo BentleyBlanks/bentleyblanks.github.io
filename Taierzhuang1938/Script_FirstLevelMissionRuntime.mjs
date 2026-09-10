@@ -33,6 +33,7 @@ import { FirstLevelMissionView } from "./Script_FirstLevelMissionView.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
 import { FirstLevelMissionMusic } from "./Script_FirstLevelMissionMusic.mjs";
+import { FirstLevelCarriageSound } from "./Script_FirstLevelCarriageSound.mjs";
 import { EmplacementInteraction } from "./Script_Emplacement.mjs";
 import { Localize, T } from "./Script_Text.mjs";
 import { FirstLevelStageTextId } from "./Script_TextIds.mjs";
@@ -89,6 +90,7 @@ export class FirstLevelMissionRuntime {
     };
     this.battleSound = new FirstLevelMissionBattleSound(this.audio);
     this.music = new FirstLevelMissionMusic(this.audio);
+    this.carriageSound = new FirstLevelCarriageSound(this.audio,()=>this.train?.entries||[]);
     this.musicInitializing = true;
     this.view.interact = this.interact;
     this.Register();
@@ -167,6 +169,7 @@ export class FirstLevelMissionRuntime {
     return null;
   }
   VoiceEvent(id) {
+    if(this.carriageSound.Handle(id))return;
     if (id === "TrainFoodReceived") { this.Record("trainFoodReceived"); return; }
     if(id==="AircraftDiveOrder" && !this.Has("diveComplete")) {
       this.Record("diveOrderHeard");
@@ -187,6 +190,7 @@ export class FirstLevelMissionRuntime {
         flight:R.trainFirstShellFlightS,kind:"Shell75",radius:6,damage:0,
         OnImpact:()=>{
           this.Record("trainFirstShellImpact");
+          this.carriageSound.Impact();
           this.trainShellStartedAt=this.time;
           this.shellTrainOffset=this.battlefield.trainOffsetM;
         },
@@ -775,7 +779,7 @@ export class FirstLevelMissionRuntime {
         this.battlefield.SetTrainOffset(R.trainTravelM);
         this.PlaceSquad();
         this.PlacePlayerTrain();
-        this.audio.Ambience("trainInterior");
+        this.carriageSound.Start();
         break;
       case "Unloading":
         this.VoiceEvent("TrainFirstShell");
@@ -1519,9 +1523,11 @@ export class FirstLevelMissionRuntime {
       }
       if (motion.stopped && !this.Has("trainStopped")) {
         this.Record("trainStopped");
+        this.carriageSound.Stopped();
         this.trainStoppedAt = this.time;
         for (let i = 0; i < 3; i++) this.battlefield.OpenGate(`TrainDoor${i}`);
       }
+      this.carriageSound.Update(dt);
       if (this.Has("trainStopped") && this.Near(A.unload, 6) && !aboard) this.Record("unloaded");
     }
     if (stage === "Support" && this.Near(A.front, 18)) {
@@ -1843,6 +1849,7 @@ export class FirstLevelMissionRuntime {
   Dispose() {
     if(this.tankDust!=null)this.vfx.RemoveSmokeSource(this.tankDust);
     this.voice.Dispose();
+    this.carriageSound.Dispose();
     this.music.Dispose();
     this.battleSound.Dispose();
     this.view.Dispose();

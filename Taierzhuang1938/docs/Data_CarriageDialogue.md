@@ -32,9 +32,37 @@ node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --audio
 
 对齐脚本按音频及台词哈希判断缓存，超过 30 秒的录音必须提供分析窗口，防止继续使用旧版本 11 句的硬编码时间点。录音响度检查：均方平均 -23.0 dBFS、样本峰值 -3.1 dBFS。试听判断重点是其他乘客是否自然接话、七个声音能否区分、后半段疑虑是否克制。
 
-## 本次验收
+## 第一版验收
 
 - 47 项 quick 检查通过；`Script_FirstLevelMissionTest.mjs --audio` 核对全部 cue 的源稿、文件哈希、字幕区间，新增回归确认群戏只启动一次播放、30 句字幕完整出现、长对白之后列车仍实际移动。
 - 对齐脚本复算所得 30 个区间全部一致；字体补齐并通过 TextTest，335 模块的 Pages 预览包构建成功。
 - 浏览器车厢阶段实测：97.867 秒对白结束触发炮击阶段，99.283 秒首弹落地，101.433 秒卧倒命令，104.233 秒第二次命中导致伤员，116.717 秒停稳，123.783 秒下车对白结束。`TrainMeal` 与 `TrainShelling` 均在 finished 中，语音错误为空；本地截图与事件记录位于 `_shots/FirstLevelMission`。
 - `FirstLevelMissionBrowserTest --campaign --audio` 完整真实输入通关通过，耗时 759.6 秒，零历史基线、零失败，最终截图为 `Scene_Complete.png`。
+
+## 第二版：完整车厢声场
+
+根据试听反馈，增加持续的多人交谈底声及后排集体反应。主对白仍使用上面的完整录音，30 句字幕、递食物事件与列车时间不变。第一版导出的试听文件只有对白；第二版另行导出约 98 秒的完整混音，包含开场五秒、轮轨声、车内人群、主对白、两次后排起哄及结尾四秒。
+
+声音配置集中在 [Data_FirstLevelCarriageSound.mjs](../Data_FirstLevelCarriageSound.mjs)：
+
+- `AudioAmb_CarriageCrowd.mp3`：40.046 秒立体声、多人交谈和零散笑声，由运行时交叉淡化循环；不把人群声加入其他战场环境预设。
+- `AudioAmb_CarriageRearCheer.mp3`：7.027 秒单声道集体反应，接在“尝咸淡”和“数子弹”的笑点后；场景约 24.04、46.02 秒触发，声源跟随同车后排的实际乘客，而非固定在世界坐标。
+- 轮轨底声沿用已有 `AudioAmb_TrainInterior.mp3`，并提高车厢晃动、装备与衣料碰触的随机播放频率。
+- 场景约 55.52 秒听到异响时，人群层用 1.3 秒收至 38%；首弹命中后停止闲聊和起哄，保留行车声，实际停车时切到前线环境。暂停恢复和同预设重载保留人群收声状态。
+
+两个新增素材分别经 Volcengine `seed-audio-1.0` 一次连续生成，没有逐句生成拼接；模型、提示词哈希、成品哈希和声道处理版本记录在 `Audio/Amb/Data_AmbManifest.json` 的 `carriageSources`。主对白、轮轨声和人群底声分轨播放；整段主对白仍没有逐角色三维定位。后排两次反应复用同一完整素材，由不同座位发声。
+
+```powershell
+# 默认验证并复用已有成品；不要为重新混音加 --force。
+node Taierzhuang1938/Script_SeedAudioCarriageBake.mjs
+# 全环境烘焙也保留独立生成的车厢资产与来源；此命令仅处理车厢组。
+node Taierzhuang1938/Script_AmbBake.mjs CarriageCrowdSeedAudio
+# 本地试听文件不提交进游戏仓库。
+node Taierzhuang1938/Script_CarriageSoundscapeRender.mjs --output=C:/Users/Bentl/Downloads/CodexCarriageDialogue_20260910/AudioVoice_CarriageFullSoundscapeV2.mp3
+```
+
+完整试听通过 FFmpeg 混音，对两次后排反应加左右位置、低通与短反射；游戏中则经实时总线和真实乘客声源播放，转头、音量设置及环境随机声会影响听感。完整混音测得均方平均 -23.7 dBFS、样本峰值 -3.2 dBFS。技术检查验证文件、播放与时序，不代表人工听审通过。
+
+第二版验证：46 项 quick 检查、`Script_FirstLevelMissionTest.mjs --audio`、AudioTest 及模块登记检查通过；新增断言覆盖双层环境、反应跟随、异常收声、首弹清理、停车切换和重新开始。定向 AmbBake 复跑保留全部床、cue 和生成来源，未发起新生成请求。338 模块 Pages 预览包构建成功。
+
+`FirstLevelMissionBrowserTest --campaign --audio` 完整真实输入通关通过（1055.1 秒，零历史基线、零失败）。浏览器解码得到轮轨床 30 秒、RMS 0.03996；人群床 40.0457 秒、RMS 0.04255，两个实际循环均在播放。车厢段两次后排反应都触发，物理停稳后环境已切到 `firstLevelFront`。本地记录为 `_shots/FirstLevelMission/Data_CarriageAudio.json` 与 `Scene_Complete.png`。

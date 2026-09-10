@@ -20,6 +20,7 @@ export function ApplyFirstLevelStageJump(runtime, value) {
   r.flow.log = [{kind:"debugJump",id:saved.phase.id,number:n,time:0}];
   r.column.Restore(saved.column);
   if (n === 2) {
+    r.carriageSound?.Handle("CarriageUneasy");
     // The meal has finished while the train approaches the station. Preserve
     // that travelled distance so the real shell impact starts normal braking.
     const meal = MISSION_VOICE_TIMING.TrainMeal;

@@ -440,7 +440,7 @@ const changedDomainRules = [
   {domain:"combat",pattern:/FpsSkeleton|FpsSkeletal|FpsAnimation|Animation\/FirstPerson\/Data_Fps/},
   { domain: "combat", pattern: /CoverLean/i },
   {domain:"combat",pattern:/BallisticSuppression/},
-  {domain:'firstLevel',pattern:/FirstLevelMission|FirstLevelTrain|FirstLevelVoiceAlign|SeedAudioFirstLevel|Audio\/FirstLevel/},
+  {domain:'firstLevel',pattern:/FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|CarriageSoundscape|FirstLevelVoiceAlign|SeedAudioFirstLevel|SeedAudioCarriage|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
   { domain: "menu", pattern: /FirstLevelP012Debug/i },
   { domain: "text", pattern: /(Script_Text|Data_Text_|Data_Locale_|Data_Tuning_|Data_Mission|Data_Cutscene|Data_History|Data_Voice|Data_Weapons|TengxianScript)/i },
   { domain: "ai", pattern: /Data_Setpieces_|Data_Companions|Data_Flares|Data_AircraftStrafe|Data_Telegraph|Data_Emplacements|Data_Carry/i },

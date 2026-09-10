@@ -1,4 +1,5 @@
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
+import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 // Source seconds measured from the retained Seed Audio MP3s (Whisper word timings,
 // checked against the current script). Whole recordings remain unchanged.
 // Delays belong to playback, not to the generated performance.
@@ -6,7 +7,9 @@ export const MISSION_VOICE_TIMING = Object.freeze({
   TrainMeal: {
     segments: [
       {id:"CarriageExchange",start:0,end:88.842,wait:5,
-        events:[{at:MISSION_VOICE_ALIGNMENT.TrainMeal.lines[1][1],id:"TrainFoodReceived"}]},
+        events:[{at:MISSION_VOICE_ALIGNMENT.TrainMeal.lines[1][1],id:"TrainFoodReceived"},
+          ...CARRIAGE_SOUND.reactions.map(reaction=>({at:MISSION_VOICE_ALIGNMENT.TrainMeal.lines[reaction.line][1],id:reaction.id})),
+          {at:MISSION_VOICE_ALIGNMENT.TrainMeal.lines[CARRIAGE_SOUND.uneasyLine][0],id:"CarriageUneasy"}]},
     ],
     tail: 4,
   },

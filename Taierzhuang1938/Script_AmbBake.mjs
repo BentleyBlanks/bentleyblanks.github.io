@@ -348,6 +348,8 @@ async function Main() {
   fs.mkdirSync(RAW_DIR, { recursive: true });
 
   const manifest = { generated: "Script_AmbBake.mjs", sampleRate: SR, beds: {}, cues: {}, credits: {}, licenses: AMB_LICENSES };
+  const retainedManifest=fs.existsSync(MANIFEST)?JSON.parse(fs.readFileSync(MANIFEST,"utf8")):{};
+  if(retainedManifest.carriageSources)manifest.carriageSources=retainedManifest.carriageSources;
   const groups = AMB_SOURCES.filter((g) => !only.length || only.includes(g.id));
   let files = 0, bytes = 0;
   const failures = [];
@@ -365,10 +367,19 @@ async function Main() {
           continue;
         }
         if (!report) {
-          manifest.beds[bed.cue] = { file, seconds: bed.durS, channels: 2 };
+          manifest.beds[bed.cue] = retainedManifest.beds?.[bed.cue] || { file, seconds: bed.durS, channels: 2 };
           manifest.credits[bed.cue] = { credit: group.credit, license: group.license, source: "SeedAudio API generated" };
         }
         console.log(`  SeedAudio · 床 ${bed.cue} ${bed.durS}s`);
+      }
+      for(const cue of group.retainedCues||[]){
+        const entry=retainedManifest.cues?.[cue];
+        if(!entry?.files?.length||entry.files.some(file=>!fs.existsSync(path.join(OUT_DIR,file)))){
+          failures.push({id:group.id,stage:"seedAudio",message:`Missing retained cue ${cue}`});
+          continue;
+        }
+        manifest.cues[cue]=entry;
+        if(retainedManifest.credits?.[cue])manifest.credits[cue]=retainedManifest.credits[cue];
       }
       continue;
     }

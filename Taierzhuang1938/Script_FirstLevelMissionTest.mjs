@@ -5,6 +5,8 @@ import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { CollectBulletNearMisses,ApplyBulletNearMisses } from "./Script_BallisticSuppression.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
 import { MISSION_VOICE_TIMING } from "./Data_FirstLevelMissionVoiceTiming.mjs";
+import { CARRIAGE_SOUND, CARRIAGE_SOUND_ASSETS } from "./Data_FirstLevelCarriageSound.mjs";
+import { FirstLevelCarriageSound } from "./Script_FirstLevelCarriageSound.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
 import { MISSION_TRAIN, MissionTrainMotion } from "./Data_FirstLevelMissionTrain.mjs";
 import { FirstLevelMissionTrain } from "./Script_FirstLevelMissionTrain.mjs";
@@ -67,6 +69,32 @@ for(const point of [MISSION_TRAIN.guideMuster,...MISSION_TRAIN.cars.flatMap(car=
   assert.ok(MISSION_TRAIN.cars.at(-1).z+R.trainTravelM+8<MISSION_LAYOUT.bounds.maxZ,"whole train begins inside the extended approach");
 }
 const flow = new FirstLevelMissionFlow();
+{
+ const calls=[],moved=[],stopped=[],levels=[];
+ const actor={alive:true,position:{x:-78.65,y:1,z:92.8}};
+ const audio={Ambience:id=>calls.push(id),SetAmbienceLayerLevel:(...args)=>levels.push(args),
+  Play:(id,options)=>{calls.push({id,...options});return {duration:7};},
+  MoveVoice:(_voice,position)=>moved.push({...position}),StopVoice:voice=>stopped.push(voice)};
+ const sound=new FirstLevelCarriageSound(audio,()=>[{actor,carIndex:1,slot:CARRIAGE_SOUND.cheerSlots[0]}]);
+ sound.Start();sound.Handle(CARRIAGE_SOUND.reactions[0].id);
+ assert.equal(calls[0],CARRIAGE_SOUND.preset);
+ assert.equal(calls[1].id,CARRIAGE_SOUND.cheerCue);
+ assert.equal(calls[1].position.y,2.2,'rear reactions come from mouth height');
+ actor.position.z-=6;sound.Update(1);
+ assert.equal(moved[0].z,actor.position.z,'the source follows the moving train passenger');
+ sound.Handle('CarriageUneasy');assert.equal(levels.at(-1)[1],CARRIAGE_SOUND.uneasyScale);
+ sound.Impact();assert.equal(stopped.length,1);assert.equal(calls.at(-1),'trainInterior');
+ sound.Stopped();assert.equal(calls.at(-1),'firstLevelFront','rolling wheels stop with the actual train');
+ sound.Start();assert.equal(levels.at(-1)[1],1,'restart restores the lively crowd');
+ const manifest=JSON.parse(fs.readFileSync(new URL('./Audio/Amb/Data_AmbManifest.json',import.meta.url)));
+ for(const asset of CARRIAGE_SOUND_ASSETS){
+  const entry=manifest.carriageSources[asset.id];
+  const bytes=fs.readFileSync(new URL('./Audio/Amb/'+asset.file,import.meta.url));
+  assert.equal(entry.sha256,crypto.createHash('sha256').update(bytes).digest('hex'));
+  assert.equal(entry.promptHash,crypto.createHash('sha256').update(asset.prompt).digest('hex'));
+  assert.equal(entry.requests,1);assert.ok(entry.continuous&&entry.seconds>2);
+ }
+}
 assert.equal(FIRST_LEVEL_STAGES.length,18);
 assert.deepEqual(FIRST_LEVEL_STAGES.flatMap(stage=>stage.steps),MISSION_STAGES.slice(0,-1).map(step=>step.id));
 for (const phase of FIRST_LEVEL_STAGES) {

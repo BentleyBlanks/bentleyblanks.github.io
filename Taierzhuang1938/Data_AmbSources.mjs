@@ -70,6 +70,12 @@ export function ArchiveUrl(item, filePath) {
 }
 
 export const AMB_SOURCES = [
+  {
+    id:"CarriageCrowdSeedAudio",seedAudio:true,
+    credit:"Volcengine SeedAudio 1.0 · 满员军列持续闲谈",license:"volcengine",
+    beds:[{cue:"carriageCrowd",durS:40,rms:-27,lp:3800}],
+    retainedCues:["carriageRearCheer"],
+  },
   // 序章车厢床：由 Script_SeedAudioTrainBake.mjs 直连 SeedAudio 1.0 生成。
   // AmbBake 重烘其它床时只登记这一条，不得用旧的程序合成器覆写。
   {

@@ -355,6 +355,25 @@ try {
       "Every whole Seed Audio cue must decode and create a real playback source: " + JSON.stringify(voices),
     );
     console.log("ok every first-level voice asset decoded and played in the real audio engine");
+    // Start unlocks asynchronously loaded ambience separately from mission voices.
+    // Wait for the normal pack loader/restart path, without injecting test buffers.
+    await page.waitForFunction(()=>window.Tengxian.audio.ambReady&&!window.Tengxian.audio.ambLoading,
+      null,{timeout:60000});
+    const carriageAudio=await page.evaluate(()=>{
+      const a=window.Tengxian.audio;
+      const beds=['trainInterior','carriageCrowd'].map(id=>{
+        const buffer=a.ambBuffers.get(id),data=buffer?.getChannelData(0);
+        let sum=0;for(const value of data||[])sum+=value*value;
+        return {id,seconds:buffer?.duration||0,rms:data?Math.sqrt(sum/data.length):0,
+          playing:a.ambLayers.some(layer=>layer.bed===id&&layer.heads.size>0)};
+      });
+      return {preset:a.ambiencePreset,beds,reaction:a.sampleCues.has('amb.carriageRearCheer')};
+    });
+    assert.equal(carriageAudio.preset,'firstLevelCarriage');
+    assert.ok(carriageAudio.beds.every(bed=>bed.seconds>8&&bed.rms>.01&&bed.playing),
+      'audible rolling train AND multiple-passenger bed must really decode and play: '+JSON.stringify(carriageAudio));
+    assert.ok(carriageAudio.reaction,'the rear group response is loaded');
+    await fs.writeFile(path.join(output,'Data_CarriageAudio.json'),JSON.stringify(carriageAudio,null,2));
   }
   await page.evaluate(()=>{const g=window.Tengxian,original=g.player.TakeHit.bind(g.player);window.missionDamage=[];
     g.player.TakeHit=(damage,part,direction,info)=>{const before=g.player.health,result=original(damage,part,direction,info);
@@ -522,6 +541,12 @@ try {
   assert.equal(unloaded.mission.stage, "Unloading");
   assert.ok(unloaded.mission.facts.includes("trainStopped"));
   assert.ok(unloaded.mission.voice.finished.includes("TrainMeal"),"the opening exchange finishes before shelling interrupts it");
+  if(audioCheck){
+    const carriageEnd=await page.evaluate(()=>({cheers:window.Tengxian.audio.RequestedCount('amb.carriageRearCheer'),
+      preset:window.Tengxian.audio.ambiencePreset}));
+    assert.equal(carriageEnd.cheers,2,'both group responses follow the main conversation');
+    assert.equal(carriageEnd.preset,'firstLevelFront','no laughter or rolling loop remains after the physical stop');
+  }
   // Deliberate lethal-damage fixture tests the new runtime retry; it does not grant any mission facts.
   const retry = await page.evaluate(() => {
     const g = window.Tengxian,

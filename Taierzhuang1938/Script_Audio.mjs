@@ -42,6 +42,7 @@
 import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { VOICE_BASE, VOICE_LINES } from "./Data_Voice.mjs";
 import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_MUSIC_MIX } from "./Data_FirstLevelMissionMusic.mjs";
+import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 
 // 包络地板。低于这个值当作静音（见文件头坑 2）。
 const FLOOR = 1e-4;
@@ -2629,7 +2630,7 @@ export const MUSIC_BASE = "Audio/Music/";
 // 10 → 11：近中远爆炸与贴耳音爆/呼啸共 16 条换为 SeedAudio 1.0 成品。
 // **文件名一个没变**，所以不抬这个戳的话，玩家听到的永远是缓存里的旧爆炸。
 export const SFX_PACK_VERSION = "12";
-export const AMB_PACK_VERSION = "1";
+export const AMB_PACK_VERSION = "20260910carriagecrowd";
 export const MUSIC_PACK_VERSION = "5";
 
 // ---- 采样取数：并发闸 + 重试 ----------------------------------------------
@@ -3007,6 +3008,13 @@ const AMB_TICKS_PER_MIN = 60000 / AMB_TICK_MS;
  * 4 条就是 16 个常驻节点，占掉 NODE_BUDGET 的 13% —— 再多就要从枪声里抢了。
  */
 export const AMBIENCE_PRESETS = {
+  firstLevelCarriage: {
+    space:"interior",fallbackWind:.06,fallbackCut:180,
+    layers:[{bed:"trainInterior",gain:CARRIAGE_SOUND.trainGain,seg:12},
+      {bed:CARRIAGE_SOUND.crowdBed,gain:CARRIAGE_SOUND.crowdGain,seg:16}],
+    events:[{name:"carriageRattle",perMin:9,volume:.3},
+      {name:"gearRustle",perMin:5,volume:.24},{name:"clothMove",perMin:4,volume:.2}],
+  },
   silence: { space: "street", layers: [], events: [], fallbackWind: 0 },
 
   // 【2026-09-09】第一关两档补齐 —— **这是「打起来整个战场安安静静的」的头号原因**。
@@ -3280,6 +3288,7 @@ export const MUSIC_CUES = {
 class LoopLayer {
   constructor(engine, buffer, cfg) {
     this.engine = engine;
+    this.bed = cfg.bed;
     this.buffer = buffer;
     this.level = cfg.gain ?? 0.6;
     this.busName = cfg.bus || "ambience";
@@ -3534,6 +3543,7 @@ export class AudioEngine {
     // --- 实录环境床。载不到就退回一层合成的风，同样不影响任何其他功能 ---
     this.ambBuffers = new Map();     // 床名 -> AudioBuffer
     this.ambLayers = [];             // 当前这一档正在放的床
+    this.ambienceLayerLevels = new Map();
     this.ambErrors = [];
     this.ambReady = false;
     this.ambManifest = null;
@@ -5220,6 +5230,7 @@ export class AudioEngine {
     // 一关从头到尾没有环境音，冒烟测试照样全绿。
     if (preset && !AMBIENCE_PRESETS[preset]) console.warn("没有这一档环境：", preset);
     const name = AMBIENCE_PRESETS[preset] ? preset : "silence";
+    if(name!==this.ambiencePreset)this.ambienceLayerLevels.clear();
     this.ambiencePreset = name;
     if (!this.ctx) return;
     this.StopAmbience();
@@ -5236,6 +5247,7 @@ export class AudioEngine {
       // 强度要在 Start **之前**写进去：组增益的初值就是它，
       // 否则新起的战斗床会先满音量响一下再被斜坡拉回去。
       if (inst.battle) inst.levelScale = this.battleBedApplied;
+      if(this.ambienceLayerLevels.has(layer.bed))inst.levelScale=this.ambienceLayerLevels.get(layer.bed);
       inst.Start();
       this.ambLayers.push(inst);
     }
@@ -5309,6 +5321,12 @@ export class AudioEngine {
       }
       this.ScheduleAmbienceEvent();
     });
+  }
+
+  SetAmbienceLayerLevel(bed, scale, rampS=1) {
+    const level=Math.max(0,Number.isFinite(scale)?scale:1);
+    this.ambienceLayerLevels.set(bed,level);
+    for(const layer of this.ambLayers)if(layer.bed===bed)layer.SetLevel(level,rampS);
   }
 
   StopAmbience() {

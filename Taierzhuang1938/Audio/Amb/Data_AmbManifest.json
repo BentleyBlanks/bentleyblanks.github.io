@@ -51,6 +51,11 @@
       "file": "AudioAmb_TrainInterior.mp3",
       "seconds": 30,
       "channels": 2
+    },
+    "carriageCrowd": {
+      "file": "AudioAmb_CarriageCrowd.mp3",
+      "seconds": 40.046,
+      "channels": 2
     }
   },
   "cues": {
@@ -122,6 +127,14 @@
         "AudioAmb_AmbMoanFar_02.mp3"
       ],
       "seconds": 2.6
+    },
+    "carriageRearCheer": {
+      "files": [
+        "AudioAmb_CarriageRearCheer.mp3"
+      ],
+      "seconds": 7.027,
+      "credit": "Volcengine SeedAudio 1.0 · 车厢后排集体起哄",
+      "license": "volcengine"
     }
   },
   "credits": {
@@ -219,6 +232,16 @@
       "credit": "Volcengine SeedAudio 1.0 · 序章蒸汽列车车厢轮轨环境",
       "license": "volcengine",
       "source": "SeedAudio API generated"
+    },
+    "carriageCrowd": {
+      "credit": "Volcengine SeedAudio 1.0 · 车厢多人环境",
+      "license": "volcengine",
+      "source": "SeedAudio API generated"
+    },
+    "carriageRearCheer": {
+      "credit": "Volcengine SeedAudio 1.0 · 车厢多人环境",
+      "license": "volcengine",
+      "source": "SeedAudio API generated"
     }
   },
   "licenses": {
@@ -254,6 +277,32 @@
       "metric": "activeRmsDbfs",
       "targetDbfs": -25,
       "toleranceDb": 0.5
+    }
+  },
+  "carriageSources": {
+    "carriageCrowd": {
+      "file": "AudioAmb_CarriageCrowd.mp3",
+      "seconds": 40.046,
+      "channels": 2,
+      "model": "seed-audio-1.0",
+      "requests": 1,
+      "continuous": true,
+      "promptHash": "12f7144d4b0b5ee922b0ad3e72e250d72a58b4c63a679b157d0304b122a9bf44",
+      "mastering": "ChannelsBeforeLoudnessV2",
+      "sha256": "d91adca360eda73081967d0c47991fa6691f54e811007dd25e1c918915f1f6f6",
+      "bytes": 641611
+    },
+    "carriageRearCheer": {
+      "file": "AudioAmb_CarriageRearCheer.mp3",
+      "seconds": 7.027,
+      "channels": 1,
+      "model": "seed-audio-1.0",
+      "requests": 1,
+      "continuous": true,
+      "promptHash": "f51635ff6f81fa6997ebbf13d0ed645a005103e00dc881969a00850a8165d568",
+      "mastering": "ChannelsBeforeLoudnessV2",
+      "sha256": "783f2fadc55ccdc1b5582cb0ac93a70159c1d2cd71cca92f3254acafc124f5f4",
+      "bytes": 113311
     }
   }
 }
