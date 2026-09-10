@@ -63,11 +63,11 @@ for group in mesh.vertex_groups:
         child=next(iter(bone.children),None)
         start=rig.matrix_world@bone.head_local
         end=rig.matrix_world@child.head_local if child else start+(start-(rig.matrix_world@bone.parent.head_local))
-        segments[group.index]=(start,end,1.15 if 'finger0' in name else 1.12)
+        segments[group.index]=(start,end,(1.42 if 'finger0' in name else 1.48) if 'lfinger' in name else (1.15 if 'finger0' in name else 1.12))
     elif name.endswith('forearm') or name.endswith('upperarm'):
         bone=next(b for b in rig.data.bones if b.name==group.name)
         child=next(b for b in bone.children if Normalize(b.name).endswith('hand' if name.endswith('forearm') else 'forearm'))
-        segments[group.index]=(rig.matrix_world@bone.head_local,rig.matrix_world@child.head_local,1.35)
+        segments[group.index]=(rig.matrix_world@bone.head_local,rig.matrix_world@child.head_local,1.55 if 'lforearm' in name or 'lupperarm' in name else 1.35)
 inverse=mesh.matrix_world.inverted()
 clothVertices={i for polygon in mesh.data.polygons if polygon.material_index==1 for i in polygon.vertices}
 for vertex in mesh.data.vertices:
@@ -95,13 +95,16 @@ for vertex in mesh.data.vertices:
         elif name.endswith('hand'):
             side='r' if 'rhand' in name else 'l'
             hand,forward,normal=frames[side]
-            delta+=normal*(point-hand).dot(normal)*.30*assignment.weight
+            delta+=normal*(point-hand).dot(normal)*(.60 if side=='l' else .30)*assignment.weight
+            if side=='l':
+                across=normal.cross(forward).normalized()
+                delta+=across*(point-hand).dot(across)*.15*assignment.weight
     if vertex.index in clothVertices:
         side='r' if point.x<0 else 'l'
         hand,forward,normal=frames[side]
         distance=(point-hand).dot(forward)
         amount=max(0,min(1,(distance+.20)/.20))
-        delta-=forward*.012*amount*amount*(3-2*amount)
+        delta-=forward*(.060 if side=='l' else .012)*amount*amount*(3-2*amount)
         # Shallow, uneven cloth folds near the cuff; the sleeve stays loose
         # around the forearm instead of reading as a smooth tapered cylinder.
         if -.32<distance<0:

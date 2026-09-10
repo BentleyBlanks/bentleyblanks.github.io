@@ -129,7 +129,7 @@ CC0 不强制署名；表里的作者与链接是为了以后还能找回源文�
 | 国军步兵 `Model_NraSoldier.glb` | `Source/Model_BlueSoldierMale.fbx` | [Quaternius / Ultimate Animated Character Pack](https://opengameart.org/content/animated-characters-pack) | CC0 | 使用下载包里的 `BlueSoldier_Male`，保留灰蓝制服、布帽与装具；按源 FBX 的真实蒙皮权重烘成 13 关节显示层，继续使用本作枪械挂点与动作。 |
 | 百姓男/女 `Model_CivilianMale.glb`、`Model_CivilianFemale.glb` | `Source/Model_CasualMale.fbx`、`Source/Model_CasualFemale.fbx` | [Quaternius / Ultimate Animated Character Pack](https://opengameart.org/content/animated-characters-pack) | CC0 | 下载包里的 `Casual_Male` / `Casual_Female` 两种体型；按角色种子稳定选择，烘成同一 13 关节显示层，不携带武器。 |
 
-汉阳造手部的视觉参照为逝去的十月发布的 [汉阳造/汉造八八式步枪](https://steamcommunity.com/sharedfiles/filedetails/?id=3233303781)。页面允许标注来源的二次创作，并将动作模板署名为 zmg、Denny凯妈、Animal33。本地对照还读取了该包 `@awm_fire` 的单个静止握姿；没有导入或批量转换该包的动作库。用户最终要求裸手与土灰袖子；截图仅作为手型和持枪姿态参照，本项目双臂并非该包原始手部资产。参考包与验收截图留在本地，不随游戏分发。
+汉阳造手部的视觉参照为逝去的十月发布的 [汉阳造/汉造八八式步枪](https://steamcommunity.com/sharedfiles/filedetails/?id=3233303781)。页面允许标注来源的二次创作，并将动作模板署名为 zmg、Denny凯妈、Animal33。本地对照读取了 `@awm_fire` 的静止握姿，并用 `a_idle_1` 第 0 帧校正左手指节方向；没有导入或批量转换该包的动作库。用户最终要求裸手与土灰袖子；截图仅作为手型和持枪姿态参照，本项目双臂并非该包原始手部资产。参考包与验收截图留在本地，不随游戏分发。
 
 人物构建命令：
 

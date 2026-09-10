@@ -31,8 +31,12 @@ if(process.argv.includes('--browser')){
   page.on('pageerror',error=>errors.push(String(error)));
   const output=path.join(project,'_shots/FirstPersonSkeleton/Playback');await fs.mkdir(output,{recursive:true});
   try{
-    await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?weapons=1&manual=1&shot=1&quality=medium&scale=small`,{timeout:120000});
+    await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?weapons=1&editor=firstPerson&fpWeapon=HanYang&fpClip=Idle&manual=1&quality=medium&scale=small`,{timeout:120000});
     await page.waitForFunction(()=>window.Taierzhuang?.state?.ready,null,{timeout:240000});
+    const entry=await page.evaluate(()=>({active:window.Taierzhuang.editor.ActiveId,snapshot:window.Taierzhuang.editor.active?.Snapshot()}));
+    assert.equal(entry.active,'firstPerson','deep link opens the actual first-person editor');
+    assert.equal(entry.snapshot.weaponId,'HanYang','deep link selects HanYang');
+    assert.equal(entry.snapshot.animation.name,'Idle','deep link selects the single holding clip');
     const report=await page.evaluate(()=>{
       const game=window.Taierzhuang,vm=game.viewmodel;
       const first=game.Debug.FirstPersonAnimation({weapon:'HanYang',clip:'Idle',normalized:.55,playing:false,clean:true});

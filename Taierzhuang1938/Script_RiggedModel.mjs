@@ -17,7 +17,7 @@ import { FpsArmPose, FpsArmStateRotation, FPS_ARM_LIMITS, FPS_BAYONET_SUPPORT } 
 import { CaptureAnatomy, ApplyAnatomicalFingers, AimAnatomicalBone } from "./Script_FpsAnatomy.mjs";
 import { LoadFpsSkeletalAnimations } from "./Script_FpsSkeletalAnimation.mjs";
 
-const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsHanYang: "./Model/Model_FpsHanYangHands.glb?v=2", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
+const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsHanYang: "./Model/Model_FpsHanYangHands.glb?v=3", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
 const PROFILE_CLIPS = Object.freeze({
   rifle: "RifleIdle",
   lmg: "MachineGunFire",
@@ -381,7 +381,7 @@ export class FpsArmRig {
         this._q1.setFromEuler(this._e0);
         this.contactTargets[side].quaternion.copy(this._q0.slerp(this._q1, this.poseState.sprint));
         this.contactTargets[side].position.fromArray(this.poseSpec.contacts[key].position);
-        if (melee && side === "l" && this.poseSpec.actions.bayonet) {
+        if (melee && side === "l" && this.poseSpec.actions.bayonet && !this.poseSpec.contacts.left.fingerRotations) {
           this.contactTargets[side].position.y = FPS_BAYONET_SUPPORT.heightM;
           const r = FPS_BAYONET_SUPPORT.rotation;
           this._e0.set(r[0], r[1], r[2], "YXZ");

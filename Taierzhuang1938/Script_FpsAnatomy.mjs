@@ -90,6 +90,15 @@ export function ApplyAnatomicalFingers(rig) {
       const match = bone.name.match(/finger(\d)(\d)?$/i);
       if (!match) continue;
       const finger = Number(match[1]); const segment = Number(match[2] || 0);
+      const authored = contact?.fingerRotations?.[match[1]+(match[2]||'')];
+      const BlendAuthored = () => {
+        if (authored) bone.quaternion.copy(new THREE.Quaternion().fromArray(authored).normalize()
+          .slerp(bone.quaternion, workingBlend));
+      };
+      if (authored && workingBlend === 0) {
+        bone.quaternion.fromArray(authored).normalize();
+        continue;
+      }
       const baseCurl = contact?.fingers?.[finger] || (rig.unarmed ? [55, 76, 40].map((value,index)=>THREE.MathUtils.lerp([18,28,18][index],value,rig.poseState.sprint)) : firearm && side === "r" && finger === 1
         ? [14, 28, 20] : (contact?.curl || [56, 74, 46]));
       const curl = baseCurl.map((value,index) => THREE.MathUtils.lerp(
@@ -108,6 +117,7 @@ export function ApplyAnatomicalFingers(rig) {
         bone.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(direction,target).multiply(rest));
         const roll = THREE.MathUtils.lerp(contact?.thumbRoll || 0,working?.thumbRoll || 0,workingBlend);
         if (roll) bone.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(target, roll*Math.PI/180));
+        BlendAuthored();
         continue;
       }
       const degrees = finger === 0 && !contact?.fingers && !working ? (rig.unarmed ? (segment === 1 ? 32 : 22) : firearm ? (segment === 1 ? 12 : 8) : 28) : curl[segment];
@@ -118,6 +128,7 @@ export function ApplyAnatomicalFingers(rig) {
           + (finger === 1 ? (contact?.triggerSplay || 0) * fire : 0);
         if (spread) bone.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(spreadAxis, spread * Math.PI/180));
       }
+      BlendAuthored();
     }
   }
 }

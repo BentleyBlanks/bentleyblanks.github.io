@@ -54,6 +54,8 @@ MCP 使用独立实例与端口，不能在其他任务正在制作的场景中�
 手部工程位于 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\HanYangHands_20260910\Animation_HanYangHands.blend`。
 `_import/Script_HanYangHandsShape.py` 修改这一件手部网格；
 裸手沿用原始皮肤颜色与法线，修复腕部 UV 接缝；袖子为土灰色，无手套和白衬衫袖口。
+左掌加宽、加厚，手指与前臂增加横截面体积；手指局部旋转来自参考包的单个持枪姿势，
+再按本项目护木尺寸校正。`fingerRotations` 同时用于持枪骨骼片段和实时持枪状态，避免切换后回到旧手型。
 `_import/Script_ExportHanYangHands.py` 在设置 `FPS_PROJECT_ROOT` 后只导出该模型，不生成动作。
 
 动作表仅含 `Idle` 一个 4 秒持枪循环，60 fps，共 241 个采样点（不是 241 段动画）。
@@ -65,6 +67,8 @@ MCP 使用独立实例与端口，不能在其他任务正在制作的场景中�
 不得通过逐个调用导出入口绕过这项约束。
 
 第一人称编辑器提供片段选择、播放/暂停、循环、速度、进度拖动和逐帧定位。
+直接入口为 `?weapons=1&editor=firstPerson&fpWeapon=HanYang&fpClip=Idle`，
+打开后选中汉阳造、玩家相机和唯一的持枪片段；省略 `fpWeapon` / `fpClip` 时使用相同默认值。
 Agent 与界面共用以下入口；浏览器帧号从 0 开始：
 
 ```javascript

@@ -2845,6 +2845,16 @@ async function Boot() {
     ShowBoot(false);
     editor.Open("squadMarch");
   }
+  if (EDITOR_PARAM === "firstPerson") {
+    ShowBoot(false);
+    state.menu = false;
+    state.running = false;
+    window.Taierzhuang.Debug.FirstPersonAnimation({
+      weapon: params.get("fpWeapon") || "HanYang",
+      clip: params.get("fpClip") || "Idle",
+      view: "player", playing: false, normalized: 0,
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
