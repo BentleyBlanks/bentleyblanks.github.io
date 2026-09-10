@@ -703,8 +703,13 @@ export class FirstLevelMissionColumn {
 
 // Retain an unfinished physical approach until it joins the next authored route.
 // A stage change must not send a trailing actor directly across a trench bank.
-export function MissionGuideRoute(position,previous,route,personalRoute=route,fromStart=false) {
+export function MissionGuideRoute(position,previous,route,personalRoute=route,fromStart=false,resumeAfter=null) {
   const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
+  // Resuming beyond a cleared junction is different from joining a new route.
+  // Keep a late arrival's remaining approach, then continue forward. Choosing
+  // the nearest old waypoint would turn settled guards back into their queue.
+  const resumeIndex=resumeAfter?route.findIndex(p=>Distance(p,resumeAfter)<.1):-1;
+  if(resumeIndex>=0)return [...(previous||[]),...personalRoute.slice(resumeIndex+1)].map(p=>({...p}));
   const Nearest=point=>personalRoute.reduce((best,p,i)=>Distance(p,point)<Distance(personalRoute[best],point)?i:best,0);
   let index=fromStart?0:Nearest(position),prefix=[];
   if(!fromStart)for(let i=0;i<(previous?.length||0);i++){

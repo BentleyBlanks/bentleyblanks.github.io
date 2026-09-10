@@ -32,7 +32,9 @@ export const OPENING = Object.freeze({
   woundedRoute: [{x:-24,z:-56},{x:-24,z:-23},{x:-32,z:-23},{x:-32,z:-21}],
   runnerRoute: [{x:-24,z:-60},{x:-24,z:-23},{x:-31,z:-23},{x:-31,z:-24}],
   shelterPosts: [{x:-32,z:-24},{x:-32,z:-21},{x:-40,z:-20},{x:-37,z:-20}],
-  trenchCoverPosts: [{x:-45,z:36},{x:-45,z:38},{x:-45,z:40},{x:-45,z:42}],
+  // Clear the middle of the trench for the player and late-arriving companions.
+  trenchCoverPosts: [{x:-46.35,z:32},{x:-43.65,z:34},{x:-46.35,z:36},{x:-43.65,z:38}],
+  trenchContactRoute: [{x:-66,z:66},{x:-62,z:64},{x:-45,z:41},{x:-45,z:24},{x:-37,z:24},{x:-37,z:18}],
   frontPosts: [{x:-4,z:-124},{x:4,z:-122},{x:12,z:-124},{x:16,z:-124}],
   zhouGunSeat: {x:0,z:-127.4},
   zhouRest: {x:2.1,z:-124.6},

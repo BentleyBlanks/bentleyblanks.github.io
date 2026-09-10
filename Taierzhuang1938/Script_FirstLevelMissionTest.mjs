@@ -649,6 +649,15 @@ for(const preparedAnimation of [false,true]) {
  const village=MissionGuideRoute({x:-8,z:-78},south,MISSION_ROUTES.village);
  assert.deepEqual(village.slice(0,south.length),south,"village orders preserve the unfinished southbound path");
  assert.deepEqual(MissionGuideRoute({x:16,z:-124},pending,MISSION_ROUTES.bundle,MISSION_ROUTES.bundle,true),MISSION_ROUTES.bundle,"explicit entry starts at the cleared central junction");
+ for(const post of OPENING.trenchCoverPosts){
+   const forward=MissionGuideRoute(post,[],OPENING.approachRoute,OPENING.approachRoute,false,OPENING.trenchEntry);
+   assert.deepEqual(forward,OPENING.approachRoute.slice(3),"cleared trench resumes beyond the entrance without a queue reversal");
+   assert.ok(forward[0].z<post.z,"every settled guard continues north");
+   assert.ok(Math.abs(post.x-OPENING.trenchEntry.x)>1.2&&post.z<OPENING.trenchEntry.z,"rally guards leave the central walking lane clear");
+ }
+ const late=[{x:-62,z:64},OPENING.trenchEntry,OPENING.trenchCoverPosts[3]];
+ assert.deepEqual(MissionGuideRoute({x:-64,z:66},late,OPENING.approachRoute,OPENING.approachRoute,false,OPENING.trenchEntry),
+   [...late,...OPENING.approachRoute.slice(3)],"a delayed guard retains the physical entrance and post before continuing north");
 }
 
 {

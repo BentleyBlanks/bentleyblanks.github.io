@@ -197,7 +197,7 @@ export class FirstLevelOpening {
       if(r.Near(C.trenchEntry,5))r.Record("trenchEntered");
       const intruders=C.intruders.map(s=>r.enemies.get(s.id));
       if(intruders.every(a=>a&&!a.alive))r.Record("trenchCleared",{count:intruders.length});
-      if(r.Has("trenchCleared")&&!this.trenchReleased){this.trenchReleased=true;r.Guide(C.approachRoute);}
+      if(r.Has("trenchCleared")&&!this.trenchReleased){this.trenchReleased=true;r.Guide(C.approachRoute,{resumeAfter:C.trenchEntry});}
       if(r.Has("trenchCleared")&&r.Near(C.shelter,C.shelterRadiusM)&&this.ShelterProtected())r.Record("shelterReached",{health:r.player.health});
     }
     if(stage==="Shelter"){

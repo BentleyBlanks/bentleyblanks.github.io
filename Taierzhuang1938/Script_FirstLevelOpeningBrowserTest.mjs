@@ -9,7 +9,7 @@ import {LaunchBrowser} from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import {ServeRoot} from "./Script_DevServer.mjs";
 import {OPENING} from "./Data_FirstLevelOpening.mjs";
 const here=path.dirname(fileURLToPath(import.meta.url));
-export async function PlayFirstLevelOpening(page,{out=path.join(here,"_shots/FirstLevelOpening/InputRun"),realtime=false,audioClock=false,from="Train",through="Handover",mount=true}={}){
+export async function PlayFirstLevelOpening(page,{out=path.join(here,"_shots/FirstLevelOpening/InputRun"),realtime=false,audioClock=false,from="Train",through="Handover",mount=true,regroup=false}={}){
 await fs.mkdir(out,{recursive:true});
 const errors=[],trace=[],openingShots=new Set();let whisperCaptured=false;
 page.on("pageerror",error=>{errors.push(String(error));console.log("PAGEERROR",String(error));});
@@ -114,7 +114,12 @@ try{
       },
       Step(fight){
         const p=g.player;
-        const march=g.Debug.FirstLevelMissionRuntime().squadMarch;
+        const runtime=g.Debug.FirstLevelMissionRuntime(),march=runtime.squadMarch;
+        if(this.checkRally&&runtime.Has('trenchCleared')){
+          const leader=runtime.squad[0];
+          this.rallyRelease??={time:runtime.time,position:leader.position.toArray(),route:runtime.squadRoutes.get(leader.id).map(p=>({...p}))};
+          if(leader.position.z>24)this.rallyReturnMax=Math.max(this.rallyReturnMax||0,leader.position.z-this.rallyRelease.position[2]);
+        }
         if(march)for(const actor of march.soldiers){
           const command=actor.squadMarchCommand;
           if(command&&this.marchStates[actor.id]!==command.status){
@@ -186,7 +191,23 @@ try{
     return;
   }
   }
-  await Drive("TrenchContact",OPENING.approachRoute,{fight:true,until:"shelterReached",seconds:180});
+  if(regroup){
+    await Drive("RallyApproach",OPENING.approachRoute.slice(0,3),{seconds:70});
+    const until=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().time+16);
+    while(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().time)<until){
+      if(realtime)await page.waitForTimeout(250);
+      else await page.evaluate(()=>window.Tengxian.StepFrames(120,1/60,false));
+    }
+    await Capture("RallyWaiting");
+    const waiting=await page.evaluate(()=>{const r=window.Tengxian.Debug.FirstLevelMissionRuntime();return {
+      guide:r.CurrentGuide(),squad:r.squad.map(a=>({id:a.castId,p:a.position.toArray(),route:r.squadRoutes.get(a.id)}))};});
+    await fs.writeFile(path.join(out,'Data_RallyWaiting.json'),JSON.stringify(waiting,null,2));
+    assert.ok(waiting.guide.status&&waiting.guide.label,'waiting at the entrance explains the immediate trench fight');
+    assert.ok(waiting.squad.every(a=>Math.abs(a.p[0]-OPENING.trenchEntry.x)>.75),'waiting guards leave the central walking lane clear');
+    await page.evaluate(()=>{window.OpeningInput.checkRally=true;});
+    await Drive("PassWaitingSquad",[{x:-45,z:27}],{fight:true,seconds:50});
+  }
+  await Drive("TrenchContact",regroup?OPENING.approachRoute.slice(3):OPENING.approachRoute,{fight:true,until:"shelterReached",seconds:180});
   await Drive("ShelterWhisper",[],{until:"supportOrdersHeard",seconds:100});
   const rifleReady=["frontRifleDefense","rifleWithdrawalResolved","zhouGunWounded"];
   await Drive("FrontRifle",[...OPENING.supportRoute,{x:0,z:-124},{x:0,z:-126.5}],{fight:true,until:rifleReady,seconds:210});
@@ -207,6 +228,11 @@ try{
   const final=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission());
   if(mount)assert.ok(final.facts.includes("gunOccupied"),"normal F interaction completes the handover");
   assert.ok(final.facts.includes("rifleWithdrawalResolved")&&final.facts.includes("escapeWhisperHeard"));
+  if(regroup){
+    const release=await page.evaluate(()=>({release:window.OpeningInput.rallyRelease,backtrackM:window.OpeningInput.rallyReturnMax||0}));
+    await fs.writeFile(path.join(out,'Data_RallyRelease.json'),JSON.stringify(release,null,2));
+    assert.ok(release.release&&release.backtrackM<.6,'after clearing the trench the leader never turns back into his squad');
+  }
   if(from==="Train"){
     assert.ok(!final.log.some(e=>e.kind==="debugJump"));
     assert.equal(final.opening.playerCar,OPENING.derailCar,"the player carriage is the physical wreck");
@@ -255,7 +281,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
         window.OpeningVideo.recorder.start(1000);
       });
     }
-    await PlayFirstLevelOpening(page,{out,realtime,through:exposure?"Exposure":"Handover"});
+    await PlayFirstLevelOpening(page,{out,realtime,regroup:process.argv.includes('--regroup'),through:exposure?"Exposure":"Handover"});
   }finally{
     if(realtime){
       const encoded=await page.evaluate(async()=>{

@@ -488,7 +488,7 @@ try {
       await PlayFirstLevelOpening(page,{out:path.join(output,"Opening2"),from:"Unloading",through:"TrenchEntry"});
       await JumpStage(3);
       await PlayFirstLevelOpening(page,{out:path.join(output,"Opening3"),from:"TrenchEntry",mount:false});
-    }else await PlayFirstLevelOpening(page,{out:path.join(output,"Opening"),audioClock:audioCheck,mount:false});
+    }else await PlayFirstLevelOpening(page,{out:path.join(output,"Opening"),audioClock:audioCheck,mount:false,regroup:process.argv.includes('--regroup')});
     await page.evaluate(()=>{window.villageBodies=window.Tengxian.ai.soldiers.filter(a=>["VillageGunner","VillageCorner","KitchenGuard","RearWindow","SideYard","MeleeTutor"].includes(a.missionId)).map(a=>({id:a.id,missionId:a.missionId}));});
     const opening=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission());
     assert.ok(opening.facts.includes("frontRifleDefense")&&opening.facts.includes("rifleWithdrawalResolved")&&opening.facts.includes("zhouGunWounded"));

@@ -320,7 +320,7 @@ export class FirstLevelMissionRuntime {
     actor.scriptCoverSlackM = coverSlackM;
     actor.goal.set(point.x, 0, point.z);
   }
-  Guide(route, { fromStart = false } = {}) {
+  Guide(route, { fromStart = false, resumeAfter = null } = {}) {
     this.squadMarch?.Dispose();
     this.guideRoute = route;
     for (const actor of this.squad) {
@@ -328,7 +328,7 @@ export class FirstLevelMissionRuntime {
       const personalRoute = naturalMarch ? MissionSquadRoute(route,this.squad.indexOf(actor)) : route;
       actor.missionNaturalMarch = naturalMarch;
       actor.missionWatch=null;
-      const queued = MissionGuideRoute(actor.position,this.squadRoutes.get(actor.id),route,personalRoute,fromStart);
+      const queued = MissionGuideRoute(actor.position,this.squadRoutes.get(actor.id),route,personalRoute,fromStart,resumeAfter);
       if(route===MISSION_ROUTES.support){
         const post=OPENING.frontPosts[this.squad.indexOf(actor)];
         if(post)queued.push({x:post.x,z:-124},{...post});
@@ -1470,6 +1470,10 @@ export class FirstLevelMissionRuntime {
     if(stage.id==="FinalDefense")target=MissionRouteLookahead(MISSION_ROUTES.exit.slice(0,5),this.player.position);
     if(stage.id==="RetreatYard")target=this.column.litters.filter(litter=>litter.visible && !litter.loaded && !litter.evacuated && litter.health>0).at(-1)||A.retreatC;
     let status=null;
+    if(stage.id==='TrenchEntry'&&!this.Has('trenchCleared')) {
+      target=MissionRouteLookahead(OPENING.trenchContactRoute,this.player.position);
+      label='trenchContact';status=T('firstLevel.hint.trenchContact');
+    }
     if(stage.id==="MachineGun"&&this.emplacement.Mounted)status=T("firstLevel.hint.guards",{safe:this.guards.filter(g=>g.safe).length,remaining:this.guards.filter(g=>g.actor.alive&&!g.safe).length});
     if(["Courtyard","TransferApproach","Transfer"].includes(stage.id))status=T("firstLevel.hint.queue",{passed:this.column.litters.filter(l=>l.passedGate).length,total:this.column.litters.filter(l=>l.health>0||l.passedGate).length,loaded:this.column.loadEvents.length});
     if(stage.id==="Transfer" && this.transferBeats?.cleared.length && this.transferBeats.started.length===this.transferBeats.cleared.length) {

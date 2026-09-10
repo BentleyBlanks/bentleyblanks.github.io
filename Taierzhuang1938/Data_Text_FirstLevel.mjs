@@ -13,6 +13,8 @@ export const TEXT = Object.freeze({
   "firstLevel.guide.distance": "{label} · {distance} 米",
   "firstLevel.guide.unload": "借掩体进入交通壕",
   "firstLevel.guide.support": "沿交通壕进入阵地",
+  "firstLevel.guide.trenchContact": "清出侧沟日军",
+  "firstLevel.hint.trenchContact": "沿沟清出前方折角，班长在沟边掩护。",
   "firstLevel.guide.orders": "撤回交通壕接令",
   "firstLevel.guide.gun": "接管机枪",
   "firstLevel.guide.bundle": "集束手榴弹",
