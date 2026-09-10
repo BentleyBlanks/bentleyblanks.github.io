@@ -694,7 +694,7 @@ export class LugouCharacterRig {
   }
 
   BeginDeathPose() {
-    if (!this.kind.startsWith("ija") || this.deathPose) return;
+    if (this.deathPose) return;
     const nodes = [];
     this.root.traverse(node => {
       if (node.isBone) nodes.push({ node, startPosition: node.position.clone(),
@@ -707,9 +707,11 @@ export class LugouCharacterRig {
     this.root.updateWorldMatrix(true, true);
     const rootQ = this.root.getWorldQuaternion(new THREE.Quaternion());
     const rootInverse = rootQ.clone().invert();
-    const authored = new Map(Object.entries(DEATH_POSE.worldRotationDeltas).map(([name, q]) => [NormalizeName(name), q]));
+    // NRA imports use Bip002, IJA uses Bip001; the anatomical bone names are shared.
+    const DeathBoneKey = name => NormalizeName(name).replace(/^bip\d+/, "bip");
+    const authored = new Map(Object.entries(DEATH_POSE.worldRotationDeltas).map(([name, q]) => [DeathBoneKey(name), q]));
     const targets = new Map(nodes.map(({ node }) => {
-      const delta = new THREE.Quaternion().fromArray(authored.get(NormalizeName(node.name)) || [0, 0, 0, 1]);
+      const delta = new THREE.Quaternion().fromArray(authored.get(DeathBoneKey(node.name)) || [0, 0, 0, 1]);
       delta.premultiply(rootQ).multiply(rootInverse);
       return [node, node.getWorldQuaternion(new THREE.Quaternion()).premultiply(delta)];
     }));

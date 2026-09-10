@@ -454,12 +454,15 @@ try {
       && seatedArmed.gripL.distanceTo(leftGripCenter) > 0.025,
     "seated weapon palms no longer clear the gun centerline");
     const deathPositions = new Set();
-    for (let variant = 0; variant < 4; variant++) for (const direction of [-1, 1]) {
-      const dead = factory.Create("ija", { seed: 8100 + variant, modelVariant: variant, weapon: "Type38" });
+    const deathCases = ["ija", "nra"].flatMap(kind => Array.from({ length: 4 }, (_, variant) => ({ kind, variant })))
+      .concat([{ kind: "nraDare", variant: 0 }, { kind: "nraOfficer", variant: 4 }]);
+    for (const { kind, variant } of deathCases) for (const direction of [-1, 1]) {
+      const dead = factory.Create(kind, { seed: 8100 + variant, modelVariant: variant,
+        weapon: kind === "ija" ? "Type38" : "ZhongZheng" });
       dead.Update(.1, { aim: 1, crouch: variant === 2 ? 1 : 0, moveSpeed: variant === 3 ? 1 : 0 });
       const scale = dead.weaponGroup.getWorldScale(new THREE.Vector3()).length();
       dead.Ragdoll(new THREE.Vector3(.12, 0, direction));
-      check(dead.characterRig.deathPose?.length > 30, "death must animate the visible IJA skeleton");
+      check(dead.characterRig.deathPose?.length > 30, `${kind}/${variant}: death must animate the visible soldier skeleton`);
       for (let frame = 0; frame < 60; frame++) dead.Update(1 / 60, { dead: true });
       dead.root.updateMatrixWorld(true);
       check(dead.weaponGroup.parent === dead.root, "dead rifle still follows the hand socket");
@@ -472,7 +475,7 @@ try {
       for (const tag of ["L", "R"]) {
         const hand = rig.bones[`hand${tag}`].getWorldPosition(new THREE.Vector3());
         const hip = rig.bones.pelvis.getWorldPosition(new THREE.Vector3());
-        check(hand.distanceTo(hip) < .55, "relaxed hand remained in the raised firing pose");
+        check(hand.distanceTo(hip) < .55, `${kind}/${variant}: relaxed hand remained in the raised firing pose`);
       }
       let floor = Infinity;
       rig.root.traverse(mesh => {
