@@ -33,3 +33,5 @@ export const SQUAD_MARCH_AVOID = Object.freeze({
   retryS:.5, timeoutS:12, blockedS:3, startSpeedMps:.4, stoppedSpeedMps:.15,
   arrivalM:.12, brakingMarginM:.04, hostArrivalM:.06, narrowWidthM:2.5,
 });
+
+export const SQUAD_MARCH_GUARDS = Object.freeze({recentFireS:1.5,grenadeThreatS:2,suppression:.4,hurt:.4,groundDeltaM:.35});

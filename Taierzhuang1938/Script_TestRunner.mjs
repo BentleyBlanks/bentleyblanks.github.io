@@ -49,6 +49,9 @@ const browserLockWriteGraceMs = 10 * 1000;
 export const testDefs = {
   SquadMarchTest: {file:"Script_SquadMarchTest.mjs",desc:"Shared squad cadence, roles, safe interruption, replay and population variants"},
   SquadMarchEditorTest: {file:"Script_SquadMarchEditorTest.mjs",timeoutMs:300000,desc:"Squad editor real actors, editable routes, per-count styles and cleanup"},
+  SquadMarchAiTest: {file:"Script_SquadMarchAiTest.mjs",desc:"Real adapter memory/contact distinction, movement ownership and mission pose handoff"},
+  FirstLevelSquadMarchTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--march-only"],timeoutMs:600000,desc:"Shared march consumed by real first-level AI on the uninterrupted train/front approach"},
+  EditorLauncherTest: {file:"Script_EditorTest.mjs",args:["--launcher-only"],timeoutMs:240000,desc:"Editor launcher inventory including the squad march entry"},
   FirstLevelMissionStageJumpTest: {file:"Script_FirstLevelMissionStageJumpTest.mjs",timeoutMs:900000,desc:"18 stage starts, backward jumps and resumed mission gates"},
   // The 150-actor mission rebuilds 18 starts; a measured full continuation reached Complete
   // at the old 1200 s limit. Match the full campaign allowance without changing any assertions.
@@ -266,6 +269,8 @@ export const testDefs = {
 export const browserTests = new Set([
   "FirstLevelMissionAftermathTest",
   "SquadMarchEditorTest",
+  "FirstLevelSquadMarchTest",
+  "EditorLauncherTest",
   "FirstLevelMissionFortificationsTest",
   "FirstLevelMissionMusicBrowserTest",
   "FirstLevelMissionStageJumpTest",
@@ -345,7 +350,7 @@ export const tier2 = [
 ];
 
 export const domains = {
-  squadMarch: {label:"通用小队行进",tests:["SquadMarchTest","SquadMarchEditorTest"]},
+  squadMarch: {label:"通用小队行进",tests:["SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关接收院至结尾定向续接",tests:["FirstLevelMissionStageTailTest"]},
   firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelMissionTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },

@@ -140,6 +140,8 @@ export class SquadMarchEditor {
   Rebuild(){
     try{this.march=new SquadMarch(this.config);}catch(error){this.SetStatus(`配置无效：${error.message}`);return false;}
     this.DisposeScene();this.samples=[];this.sampleAt=0;this.selected=Math.min(this.selected,this.config.count-1);
+    const radius=Math.max(30,...[...this.march.members.values()].flatMap(m=>m.route.map(p=>Math.hypot(p.x,p.z))));
+    this.studio.pad.scale.setScalar((radius+6)/12);this.studio.grid.scale.copy(this.studio.pad.scale);
     let i=0;
     for(const member of this.march.members.values()){
       const actor=this.host.actorFactory.Create('nra',{seed:i*7+3,weapon:'HanYang',modelVariant:i%4});
@@ -186,7 +188,8 @@ export class SquadMarchEditor {
     if(!this.routeCanvas)return;const canvas=this.routeCanvas,ctx=canvas.getContext('2d'),span=this.RouteBounds();ctx.clearRect(0,0,canvas.width,canvas.height);
     const X=x=>(x/span+.5)*canvas.width,Z=z=>(z/span+.5)*canvas.height;
     ctx.strokeStyle='#424a50';ctx.lineWidth=1;
-    for(let v=-span/2;v<=span/2;v+=5){ctx.beginPath();ctx.moveTo(X(v),0);ctx.lineTo(X(v),canvas.height);ctx.stroke();ctx.beginPath();ctx.moveTo(0,Z(v));ctx.lineTo(canvas.width,Z(v));ctx.stroke();}
+    const gridStep=Math.max(5,Math.ceil(span/100)*5);
+    for(let v=-span/2;v<=span/2;v+=gridStep){ctx.beginPath();ctx.moveTo(X(v),0);ctx.lineTo(X(v),canvas.height);ctx.stroke();ctx.beginPath();ctx.moveTo(0,Z(v));ctx.lineTo(canvas.width,Z(v));ctx.stroke();}
     ctx.strokeStyle='#ccb77a';ctx.lineWidth=3;ctx.beginPath();this.config.route.forEach((p,i)=>i?ctx.lineTo(X(p.x),Z(p.z)):ctx.moveTo(X(p.x),Z(p.z)));ctx.stroke();
     this.config.route.forEach((p,i)=>{ctx.fillStyle=i===this.routeIndex?'#fff0bc':'#cbb16a';ctx.beginPath();ctx.arc(X(p.x),Z(p.z),7,0,Math.PI*2);ctx.fill();ctx.font='18px sans-serif';ctx.fillText(String(i+1),X(p.x)+10,Z(p.z)-8);});
     for(const s of this.soldiers){ctx.fillStyle=s.squadMarchCommand?.leader?'#ffffff':COLORS[s.squadMarchCommand?.status]||'#9bc9e8';ctx.beginPath();ctx.arc(X(s.position.x),Z(s.position.z),4,0,Math.PI*2);ctx.fill();}

@@ -39,9 +39,11 @@ try{
     const oldGoal=s.goal.clone(),oldZone=s.holdZone;const a=new SquadMarchAi(ai,[s],{route:[{x:0,z:0},{x:0,z:-20}]});a.Update(.1);
     const controlled=s.p012Guided&&s.squadMarchCommand.controlled;s.target={};a.Update(.1);
     const released=!s.squadMarchCommand&&!Object.hasOwn(s,'p012Guided')&&s.order==='hold'&&s.holdZone===oldZone&&s.manualGoalUntil===99&&s.goal.equals(oldGoal);
-    s.target=null;a.Update(.1);s.order='retreat';s.manualGoalUntil=101;s.goal.set(20,0,20);a.Dispose();
-    return {controlled,released,preserved:s.order==='retreat'&&s.manualGoalUntil===101&&s.goal.x===20};
-  });assert.deepEqual(adapter,{controlled:true,released:true,preserved:true});
+    s.targetVisible=false;s.lastFire=-99;a.Update(.1);const memory=!!s.squadMarchCommand;
+    s.lastFire=ai.time;a.Update(.1);const recentFire=!s.squadMarchCommand;
+    s.target=null;s.lastFire=-99;a.Update(.1);s.order='retreat';s.manualGoalUntil=101;s.goal.set(20,0,20);a.Dispose();
+    return {controlled,released,memory,recentFire,preserved:s.order==='retreat'&&s.manualGoalUntil===101&&s.goal.x===20};
+  });assert.deepEqual(adapter,{controlled:true,released:true,memory:true,recentFire:true,preserved:true});
   for(const count of [3,6,12,24]){
     const result=await page.evaluate(count=>{
       const T=window.Tengxian,e=T.editor.active;e.LoadConfig({...e.config,count,leaderIndex:count-1,seed:'173',route:[{x:0,z:12},{x:0,z:-250}]});e.playing=false;

@@ -642,7 +642,7 @@ try {
   assert.ok(trainExit.entries.every(e=>e.arrived),"all train bodies arrive without respawning: "+JSON.stringify(trainExit.entries.filter(e=>!e.arrived)));
   console.log("ok all 40 recruits and Luo physically disembarked and reached individual muster points");
   }
-  if (process.argv.includes("--campaign")) {
+  campaign: if (process.argv.includes("--campaign")) {
     await page.evaluate(() => {
       const g = window.Tengxian;
       window.MissionInputDriver = {
@@ -712,6 +712,7 @@ try {
         battleEvidence: [],
         marchEvidence: [],
         marchStates: {},
+        marchDiagnostics: [],
       };
     });
     let navigation;
@@ -747,6 +748,10 @@ try {
           }
           if(b.frames%300===0){const m=g.Debug.FirstLevelMission();if(m.stage==="Support")b.battleEvidence.push({position:{...p},sound:m.battleSound,front:m.enemies.filter(e=>e.id.startsWith("Front")).length,
             squad:g.ai.soldiers.filter(a=>a.missionNaturalMarch&&a.castId).map(a=>({id:a.castId,x:a.position.x,z:a.position.z,speed:a.missionMarchSpeed||0,yaw:a.yaw,goal:{x:a.goal.x,z:a.goal.z}}))});}
+          if(b.frames%300===0&&march)b.marchDiagnostics.push(march.soldiers.map(a=>({id:a.id,position:{...a.position},target:!!a.target,grounded:a.grounded,carry:a.carryRole,wounded:a.woundedWalk,
+            pause:march.CanPause(a),phase:march.march.members.get(String(a.id)).phase,runLeft:march.march.members.get(String(a.id)).runLeft,
+            speed:a.moveSpeed*3.6,command:a.squadMarchCommand?.status,suppression:a.suppression,hurt:a.hurtPose,grenade:a.grenadeThreatAt,aiTime:g.ai.time,
+            visible:a.targetVisible,state:a.state,lastFire:a.lastFire})));
           if (!g.player.alive) break;
         }
         g.Debug.Key("KeyW", false);
@@ -823,6 +828,7 @@ try {
       assert.ok(samples.length>=2&&samples.some(a=>Math.hypot(a.x-samples[0].x,a.z-samples[0].z)>5),id+" makes physical progress along the personal route");
     }
     await fs.writeFile(path.join(output,"Data_TrenchCombatSound.json"),JSON.stringify(battlefieldSound,null,2));
+    if(process.argv.includes('--march-only')){console.log('ok shared squad march: real first-level approach, physical stops and leader exemption');break campaign;}
     await JumpStage(4);
     await page.evaluate(() => {
       const g = window.Tengxian;

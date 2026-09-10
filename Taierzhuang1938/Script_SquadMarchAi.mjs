@@ -1,6 +1,7 @@
 // Adapter for existing AiDirector soldiers: keep Rapier/navigation and combat ownership.
 import { SquadMarch } from './Script_SquadMarch.mjs';
 import { InstallSquadMarchActor } from './Script_SquadMarchActor.mjs';
+import { SQUAD_MARCH_GUARDS as G } from './Data_Tuning_SquadMarch.mjs';
 
 export class SquadMarchAi {
   constructor(ai,soldiers,config,{Move=null}={}){
@@ -16,8 +17,10 @@ export class SquadMarchAi {
   Update(dt,{player=null,Observe=()=>({})}={}){
     const observations=this.soldiers.map(s=>({id:String(s.id),position:s.position,yaw:s.yaw,alive:s.alive,
       speedMps:(s.moveSpeed||0)*3.6,
-      busy:!!(s.target||s.carryRole||s.woundedWalk||s.meleeCombat||s.vault||s.ragdollState||s.grounded===false
-        ||s.state==='grenade'||s.state==='vault'||this.ai.time-s.grenadeThreatAt<2||s.suppression>.4||s.hurtPose>.4),
+      // AI retains unseen targets in memory. Awareness alone is not active combat.
+      busy:!!((s.target&&s.targetVisible!==false)||this.ai.time-s.lastFire<G.recentFireS
+        ||s.carryRole||s.woundedWalk||s.meleeCombat||s.vaultT>=0||s.ragdollState||s.grounded===false
+        ||s.state==='grenade'||s.state==='vault'||this.ai.time-s.grenadeThreatAt<G.grenadeThreatS||s.suppression>G.suppression||s.hurtPose>G.hurt),
       canPause:this.CanPause(s),CanMoveTo:point=>this.CanMoveTo(s,point),...Observe(s)}));
     const outputs=this.march.Update(dt,observations,{player});
     for(const s of this.soldiers){
@@ -48,7 +51,7 @@ export class SquadMarchAi {
     if(!nav.Walkable(p.x,p.z))return false;
     for(const [dx,dz] of [[r,0],[-r,0],[0,r],[0,-r]]){
       if(!nav.Walkable(p.x+dx,p.z+dz))return false;
-      if(ground&&Math.abs(ground.call(this.ai.ctx.battlefield,p.x+dx,p.z+dz)-p.y)>.35)return false;
+      if(ground&&Math.abs(ground.call(this.ai.ctx.battlefield,p.x+dx,p.z+dz)-p.y)>G.groundDeltaM)return false;
     }
     return true;
   }
@@ -57,7 +60,7 @@ export class SquadMarchAi {
     if(!nav)return false;
     for(let i=1;i<=5;i++){
       const x=s.position.x+(point.x-s.position.x)*i/5,z=s.position.z+(point.z-s.position.z)*i/5;
-      if(!nav.Walkable(x,z)||field?.GroundHeight&&Math.abs(field.GroundHeight(x,z)-s.position.y)>.35)return false;
+      if(!nav.Walkable(x,z)||field?.GroundHeight&&Math.abs(field.GroundHeight(x,z)-s.position.y)>G.groundDeltaM)return false;
     }
     return true;
   }

@@ -109,13 +109,14 @@ const afterGear = await page.evaluate(() => {
     capturing: T.Debug.Editor().capturing,
     panelOpen: T.Debug.Editor().panelOpen,
     entries: document.querySelectorAll(".edPanel.launcher [data-editor]").length,
+    squadMarch: !!document.querySelector('.edPanel.launcher [data-editor="squadMarch"]'),
   };
 });
 Check("打游戏当中按 ` 弹出入口面板", afterGear.panelOpen && afterGear.capturing,
   `进游戏时指针锁=${locked}`);
-// 三个设置 + 四个可叠加（渲染调试/性能剖析/WorldInfo/敌军 AI）+ 十五个编辑器（含第一人称持枪检查、资产规范、完整场景、样条 PCG 与道具 PCG）
+// 三个设置 + 四个可叠加（渲染调试/性能剖析/WorldInfo/敌军 AI）+ 十六个编辑器（含小队行进）
 // + 一个「全部关掉」（它的 data-editor 是空串，也被选择器数进来）
-Check("面板列出设置、调试与全部编辑器入口", afterGear.entries === 23, `按钮数=${afterGear.entries}`);
+Check("面板列出设置、调试与全部编辑器入口", afterGear.entries === 24 && afterGear.squadMarch, `按钮数=${afterGear.entries}，小队行进=${afterGear.squadMarch}`);
 
 // 玩法真的停了：推 60 帧，state.elapsed 只应该被编辑器那条分支加，AI 不许再动
 const paused = await page.evaluate(() => {
@@ -129,6 +130,13 @@ Check("面板开着时玩法暂停",
   paused.before.fire === paused.after.fire
   && paused.before.x === paused.after.x && paused.before.z === paused.after.z,
   `开火 ${paused.before.fire}→${paused.after.fire}`);
+
+if(process.argv.includes('--launcher-only')){
+  await browser.close();server.close();
+  const failed=results.filter(r=>!r.ok);
+  console.log(`Editor launcher: ${results.length-failed.length} passed, ${failed.length} failed, ${errors.length} errors`);
+  process.exit(failed.length||errors.length?1:0);
+}
 
 // 资产规范是构件库之外的独立只读分类。它不摆模型，但必须把原始/实际/限制/贴图
 // 与七类入口真实摆出来；只注册一个空按钮不算完成。
