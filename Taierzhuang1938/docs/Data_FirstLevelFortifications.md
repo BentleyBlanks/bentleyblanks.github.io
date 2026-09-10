@@ -30,7 +30,7 @@
 ## 验证入口
 
 - `node Taierzhuang1938/Script_FirstLevelMissionTest.mjs`：现有任务、胶囊行军路线、坦克路线、机枪支撑和伤员转运契约。
-- `node Taierzhuang1938/Script_FirstLevelMissionFortificationsTest.mjs`：真实模型载入、胸墙替换、独立障碍与行军/撤离/敌军推进路线及出场点的净空、沙袋实体范围、网孔/桩柱/网线射线、合批预算、换关重建及六处截图。截图和报告仅留 `_shots/FirstLevelFortifications/`。
+- `node Taierzhuang1938/Script_FirstLevelMissionFortificationsTest.mjs`：真实模型载入、胸墙替换、独立障碍与行军/撤离/敌军推进路线及出场点的净空、沙袋实体范围、网孔/桩柱/网线射线、合批预算、换关重建及重点区域截图。截图和报告仅留 `_shots/FirstLevelFortifications/`。
 - `node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign`：正式第一关实际输入通关。
 - `node Taierzhuang1938/Script_ModuleGraphTest.mjs`：浏览器缓存版本戳。
 
@@ -43,3 +43,13 @@
 前沿至中段有原交通壕和西侧交通壕两条主要线路，中段至车站侧有至多三条局部选择，后撤段有原线和绕行线。横向联络与尽端掩蔽支沟服务当前区域，不直接接到后续任务目标；既有任务事实门禁仍然决定阶段推进。沟网折线、支沟和纵深联系参考上述历史形制，具体走向仍为关卡推定。
 
 专项测试双向走完每条新增沟段，另查原主线、友军增援、警戒哨撤离与敌军行军净空。局部胶囊验证与完整战役真实输入验收分别记录。
+
+## 本次验收（2026-09-10）
+
+- 合入最新主分支后：相关 quick 套件 66 项通过，0 基线失败、0 新失败；七关 BootTest 与 BrowserBundleTest 通过。
+- 工事专项：56 段沙袋掩体、15 段桩网；随地形归一化后共 580 个模型实例，合成 25 个材质/空间分区网格，354,784 三角形。缺失资产、路线冲突和沙袋范围误差均为零。
+- 七条新增沟段约 384 米；14 次双向胶囊行走均到达终点。实际俯视截图确认分叉、汇合、支沟和沟底，玩家高度截图检查护壁及工事外观。
+- 桩网孔隙/桩柱/网线射线、阶段重建、共享材质保留均通过。模块图 334 个模块和 runner 注册自测 300 条通过。
+- 最终 `--campaign` 从列车开始，以真实玩家输入和物理任务事件抵达 `Complete`，退出码 0；未用阶段跳转或直接写任务事实替代通关。详细日志 `CampaignTrenches.log` 与截图只留本地，不随站点提交。
+
+上述为按影响范围执行的检查；未声称全仓或全部 prepush 项目均已执行。
