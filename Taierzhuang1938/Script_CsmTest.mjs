@@ -364,7 +364,42 @@ try {
       framesWithBake: shadowFrames,
     };
 
-    // --- 10) 稳态不再编译新程序 -------------------------------------------
+    // --- 10) 阴影总闸：翻它**不许**编译新程序 ------------------------------
+    // 由头：这一位原来是翻 `renderer.shadowMap.enabled` + 全场材质 needsUpdate，
+    // 也就是把上百个 program 全删了重编 —— 实测城里那一帧 25~30 秒（不是毫秒）。
+    // 现在改成逐级 `shadow.intensity = 0` + 停止点 needsUpdate，两件事都要守住：
+    //   · 一个新 program 都不许编（否则就是又走回 cache key 那条路）
+    //   · 烘焙真的停了（不然只是把影子擦掉，该花的还在花）
+    //   · 再打开要回得来（图与矩阵都停在原地，靠 ForceUpdate 追上）
+    P.StepFrames(10, 1 / 60);
+    const gateProgramsBefore = renderer.info.programs.length;
+    lights.SetShadowsEnabled(false);
+    P.StepFrames(6, 1 / 60);
+    const gateOff = {
+      programs: renderer.info.programs.length,
+      intensity: csm.lights.map((light) => light.shadow.intensity),
+      scheduled: lights.GetShadowState().scheduled.slice(),
+      pending: csm.ScheduleShadowUpdate(renderer),
+      shadowMapEnabled: renderer.shadowMap.enabled,
+    };
+    lights.SetShadowsEnabled(true);
+    P.StepFrames(csm.preset.bakeOrder.length + 2, 1 / 60);
+    const gateOn = {
+      programs: renderer.info.programs.length,
+      intensity: csm.lights.map((light) => light.shadow.intensity),
+      baked: csm.lights.map((light) => !!light.shadow.map),
+    };
+    out.gate = {
+      before: gateProgramsBefore, off: gateOff, on: gateOn,
+      noNewPrograms: gateOff.programs === gateProgramsBefore && gateOn.programs === gateProgramsBefore,
+      darkWhenOff: gateOff.intensity.every((v) => v === 0),
+      bakeStopped: gateOff.pending === 0 && gateOff.scheduled.every((v) => v === false),
+      // 总闸不许再去动那一位：它一变就是整场重编译
+      keepsRendererFlag: gateOff.shadowMapEnabled === true,
+      backOn: gateOn.intensity[0] > 0 && gateOn.baked.every(Boolean),
+    };
+
+    // --- 11) 稳态不再编译新程序 -------------------------------------------
     P.StepFrames(10, 1 / 60);
     const programsBefore = renderer.info.programs.length;
     P.StepFrames(60, 1 / 60);
@@ -492,6 +527,11 @@ if (!result) {
     JSON.stringify(result.contact));
   Check("接触阴影关掉后材质那边退回 1×1 纯白，再开又接回来",
     result.contact.whiteWhenOff && result.contact.restored, JSON.stringify(result.contact));
+  Check("阴影总闸：翻它一个新 program 都不编（不再走 shadowMap.enabled 那条重编译）",
+    result.gate.noNewPrograms && result.gate.keepsRendererFlag, JSON.stringify(result.gate));
+  Check("阴影总闸：关掉后逐级强度归零、烘焙整趟停掉，再打开图与影子都回得来",
+    result.gate.darkWhenOff && result.gate.bakeStopped && result.gate.backOn,
+    JSON.stringify(result.gate));
   Check("60 帧内不再编译新程序",
     result.programs.after === result.programs.before, JSON.stringify(result.programs));
   Check("无 GL 错误", result.glError === 0, `glError=${result.glError}`);

@@ -64,10 +64,15 @@ TAA 开放当前帧权重、抖动幅度和锐化；GI 开放采样偏移、反�
   （曝光、雾色、泛光阈值是美术意图），设置只决定画多重。两件事混在一张表里的
   下场是玩家把画质调低之后夜战关变成纯黑 —— 那一关的 `exposure` 是 3.6，被当成
   画质项一起压了。
-- **开关阴影要连着重编译一次全场材质**（`material.needsUpdate = true`）：
-  `renderer.shadowMap.enabled` 是编译期的 `#define USE_SHADOWMAP`，只改标志位的话
-  着色器还在采一张不再更新的图，画面会留着一层永不变化的假阴影。几百毫秒的卡顿，
-  但这是设置动作不是每帧的事。
+- **开关阴影不重编译**（2026-09-11 改）。原来它翻 `renderer.shadowMap.enabled` 并把
+  全场材质 `needsUpdate = true`：那一位是编译期的 `#define USE_SHADOWMAP`，在 cache key
+  上，翻一次等于把上百个 program 删掉重编 —— 城里实测**那一帧 25~30 秒**（不是毫秒），
+  正是玩家说的「点一下阴影卡好一会儿」。现在总闸走运行时：
+  `lights.SetShadowsEnabled()` → 逐级 `shadow.intensity = 0`（`CsmSunVisibility` 开头
+  按这一位早退，整套 blocker search + 盘抽样都不跑）+ 不再点 `shadow.needsUpdate`
+  （三方 `WebGLShadowMap.render` 整趟早退，烘焙的 draw call 一个不剩）。
+  省的东西一样，翻转的代价是零个新 program。看门狗在 `Script_CsmTest`「阴影总闸」两条。
+  同一条闸顺带管住接触阴影与英雄光阴影（后者仍是编译期的，但出厂就关）。
 - **第一人称自阴影**单独走 `Script_FirstPersonSelfShadow` 的小型 packed-depth 靶与
   3×3 PCF，只压手臂/武器自己的直射光。Viewmodel 仍保持 `castShadow=false`，因此
   压缩后的枪模不会把巨大的假影投到战场墙面；此项服从「阴影」总闸并随画质设置落盘。

@@ -2501,7 +2501,8 @@ low 保留微阴影与地平线遮蔽：它们各只有几条算术，却是「�
 把单张封在 1024²——ultra 不封顶的话是八个砖配方 × 三张 2048² = 四百多 MB 显存。
 
 画质面板「材质细节」一组：六个 Toggle（编译期，翻一次整场重编译几百毫秒，
-与阴影总闸、GI 采样层同一先例）+ 五根倍率滑杆（运行时，拖了立刻生效）。
+与 GI 采样层同一先例 —— 阴影总闸原来也在这一列，2026-09-11 改成运行时了，
+见 §15.6 后面那段）+ 五根倍率滑杆（运行时，拖了立刻生效）。
 出厂值从画质档拷进 `graphics`（与 `taa` 同款写法），「恢复出厂」按当前档重取。
 
 Debug Rendering 新增「材质细节」一组四张取证图（`?matView=1..5` 直连）：
@@ -4196,7 +4197,28 @@ for (k < cell & 255u) {
 出厂**关**，账很直白：一盏投影点光 = 整城几何再画六遍（六个面），而本项目
 CPU 提交本来就是瓶颈（1440p / phase=2 实测 15 ms）。开关会翻
 `NUM_POINT_LIGHTS` 0↔1 与 `NUM_POINT_LIGHT_SHADOWS` 0↔1，是**编译期**改动，
-`ApplyGraphics` 里跟着重编译一次整场材质（与阴影总闸、GI 采样层同一个先例）。
+`ApplyGraphics` 里跟着重编译一次整场材质（与 GI 采样层同一个先例）。它跟着
+「阴影」总闸走：总闸关了这一位也强制关（那张立方体图在停烘之后不会再更新）。
+
+#### 阴影总闸为什么不再重编译（2026-09-11）
+
+画质面板的「阴影」原来翻的是 `renderer.shadowMap.enabled` + 全场材质
+`needsUpdate = true`。那一位在 program 的 cache key 上（`#define USE_SHADOWMAP`），
+翻一次 = 上百个 program 删掉重编。城里 phase=5、high 档实测：**翻转那一帧
+25~30 秒**、新编 75 个 program。玩家看到的就是「点一下阴影，卡好一会儿」。
+
+现在走运行时（`LightRig.SetShadowsEnabled` → `CsmRig.SetUserEnabled`）：
+
+| | 关掉时做什么 | 省掉什么 |
+|---|---|---|
+| GPU 着色 | 逐级 `shadow.intensity = 0`；`CsmSunVisibility` 开头按它早退 | 整套 blocker search + 盘抽样 |
+| 烘焙 | 不再点 `shadow.needsUpdate`，`renderer.shadowMap.needsUpdate = false` | 整趟阴影 pass（城里 ~1.45 M 三角 / 100 draw call 每帧） |
+| 接触阴影 | `post.preset.contactShadows` 跟着关 | 那一趟屏幕空间 pass |
+
+`renderer.shadowMap.enabled` 与 `light.castShadow` **恒为 true，谁都不许再去翻**：
+省的东西一样，而代价从三十秒变成零个新 program。天光预设那道闸
+（夜里没有太阳影子，`csm.SetCastShadow`）走同一条路，两道取与。
+看门狗：`Script_CsmTest` 的「阴影总闸」两条。
 
 ### 15.7 给别的子系统的接口
 

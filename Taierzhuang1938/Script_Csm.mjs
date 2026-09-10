@@ -360,6 +360,14 @@ float CsmDispatch( int csmLevel, vec3 csmCoord, vec2 csmPlane ) {${Dispatch("csm
  * 最远一级之外没有阴影信息，返回 0 会让整个远景死黑。
  */
 float CsmSunVisibility() {
+  // 总闸（画质面板的「阴影」/ 夜里的预设）关掉时，JS 把逐级的 shadowIntensity
+  // 写成 0 并且**停止重烘**。早退必须在这里，不能等末尾那句
+  // mix( 1.0, visibility, shadowIntensity )：
+  //   · 省掉整套 blocker search + 盘抽样（关阴影要省的正是这一笔）；
+  //   · 停烘之后那几级可能一张图都没有，三方给采样器绑的是空纹理，
+  //     裸深度读回 0 = 整片死黑 —— 必须在采样之前就出去。
+  // 用 uniform 分支而不是 #define：翻它就不必重编译整场材质（那是几百毫秒的卡顿）。
+  if ( directionalLightShadows[ 0 ].shadowIntensity <= 0.0 ) return 1.0;
   int csmLevel = -1;
   vec3 csmCoordNear = vec3( 0.0 );
   vec3 csmCoordFar = vec3( 0.0 );
@@ -733,8 +741,25 @@ export class CsmRig {
     this.baseNormalBias = 0.035;
     this.baseRadius = 2.2;
     this.intensity = 1;
+    /**
+     * 两道总闸，取与才是「这一帧到底有没有太阳阴影」（见 `active`）。
+     *   · `enabled`   —— 天光预设那道（夜里 `lightIntensity` 太低就没有太阳影子）
+     *   · `userEnabled` —— 画质面板「阴影」那道（玩家自己的偏好）
+     * 两道分开是因为它们各自会变：合成一位的话换个时段就把玩家的选择抹掉了。
+     *
+     * **两道都不许去动 `light.castShadow` 或 `renderer.shadowMap.enabled`。**
+     * 那两位都在着色器的 cache key 上（`NUM_DIR_LIGHT_SHADOWS` / `USE_SHADOWMAP`），
+     * 翻一次要把全场几百份材质重编译一遍 —— 那正是「开关阴影卡一下」的病根。
+     * 关闭改成：逐级 `shadow.intensity = 0`（uniform，免费，着色器里早退）
+     * + 不再点 `needsUpdate`（三方的 `WebGLShadowMap.render` 整趟早退，
+     * 烘焙的 draw call 一个不剩）。省的东西一样，代价从几百毫秒变成零。
+     */
     this.enabled = true;
+    this.userEnabled = true;
   }
+
+  /** 这一帧到底有没有太阳阴影（两道总闸取与）。 */
+  get active() { return this.enabled && this.userEnabled; }
 
   /**
    * 这一帧烘哪几级。
@@ -813,6 +838,7 @@ export class CsmRig {
 
   SetIntensity(value) {
     this.intensity = Math.min(1, Math.max(0, Number(value) || 0));
+    this._ApplyActive();
   }
 
   SetBias(bias, normalBias, radius = null) {
@@ -846,11 +872,31 @@ export class CsmRig {
     this.ForceUpdate();
   }
 
+  /** 天光预设那道闸（夜里没有太阳影子）。语义见 `this.enabled` 的注释。 */
   SetCastShadow(on) {
     const want = !!on;
+    if (this.enabled === want) return;
     this.enabled = want;
-    for (const light of this.lights) light.castShadow = want;
-    if (want) this.ForceUpdate();
+    this._ApplyActive();
+  }
+
+  /** 画质面板「阴影」那道闸（玩家偏好）。语义见 `this.userEnabled` 的注释。 */
+  SetUserEnabled(on) {
+    const want = !!on;
+    if (this.userEnabled === want) return;
+    this.userEnabled = want;
+    this._ApplyActive();
+  }
+
+  /**
+   * 总闸变了：把逐级的 `shadow.intensity` 立刻推下去（`_ApplyBias` 只碰这一帧
+   * 重拟合的那一级，等它轮一圈的话关掉之后影子还要再留几帧）。
+   * 重新打开时清轮转相位 —— 关着的这段时间图与矩阵都停在原地，要重新追上。
+   */
+  _ApplyActive() {
+    const intensity = this.active ? this.intensity : 0;
+    for (const light of this.lights) light.shadow.intensity = intensity;
+    if (this.active) this.ForceUpdate();
   }
 
   /**
@@ -871,7 +917,7 @@ export class CsmRig {
     shadow.bias = biasMeters / depthRange;
     shadow.normalBias = this.baseNormalBias * texelRatio;
     shadow.radius = this.baseRadius;
-    shadow.intensity = this.intensity;
+    shadow.intensity = this.active ? this.intensity : 0;
   }
 
   /**
@@ -884,6 +930,10 @@ export class CsmRig {
    * @param {THREE.Vector3} fallbackForward 没有相机时的朝向
    */
   Update(camera, sunDirection, fallbackFocus = null, fallbackForward = null) {
+    // 总闸关着就一步都不走：这一帧不会烘，重拟合出来的矩阵配的还是旧图，
+    // 反而会在重新打开的第一帧凑成「矩阵新、图旧」。重新打开时 `_ApplyActive`
+    // 会清轮转相位（ForceUpdate），一轮之内全部级追上。
+    if (!this.active) return;
     this.frame += 1;
     let origin;
     let forward;
@@ -977,6 +1027,18 @@ export class CsmRig {
       this._UpdateBakeMode(meter.triangles);
       meter.triangles = 0;
     }
+    // 总闸关着：一张都不点。三方 `WebGLShadowMap.render` 的
+    // `autoUpdate === false && needsUpdate === false` 早退在最外层，
+    // 整趟烘焙（城里 ~1.45 M 三角、上百个 draw call）一次都不跑 ——
+    // 这就是「关阴影」真正省下来的那笔，不需要动 renderer.shadowMap.enabled。
+    if (!this.active) {
+      for (let level = 0; level < this.count; level += 1) {
+        this.lights[level].shadow.needsUpdate = false;
+        this.lastScheduled[level] = false;
+      }
+      if (renderer?.shadowMap) renderer.shadowMap.needsUpdate = false;
+      return 0;
+    }
     let pending = 0;
     for (let level = 0; level < this.count; level += 1) {
       // **不要在这里重算轮转判据**：Update 与本函数之间隔着半帧，两处各算一次
@@ -1022,8 +1084,10 @@ export class CsmRig {
       if (fallback) params[level].copy(params[Math.max(0, usable - 1)]);
     }
     uniforms.uSunShadowCount.value = usable;
-    uniforms.uSunShadowIntensity.value = this.intensity;
-    uniforms.uSunShadowEnabled.value = usable > 0 ? 1 : 0;
+    // 总闸关掉时这两位一起归零：全屏 pass（体积雾 / 接触阴影 / 调试视图）走的是
+    // `uSunShadowEnabled < 0.5` 那条早退，和材质里 shadowIntensity 的早退同一件事。
+    uniforms.uSunShadowIntensity.value = this.active ? this.intensity : 0;
+    uniforms.uSunShadowEnabled.value = (usable > 0 && this.active) ? 1 : 0;
   }
 
   /** 取证：逐级半径、纹素尺寸、分割距离、本帧烘了几张。 */
@@ -1050,6 +1114,9 @@ export class CsmRig {
       bakeTriangles: this.bakeTriangles,
       bakeTriangleBudget: SHADOW_COMMON.bakeTriangleBudget,
       intensity: this.intensity,
+      active: this.active,
+      presetEnabled: this.enabled,
+      userEnabled: this.userEnabled,
       bias: this.lights.map((light) => light.shadow.bias),
       normalBias: this.lights.map((light) => light.shadow.normalBias),
     };

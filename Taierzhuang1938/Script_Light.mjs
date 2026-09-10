@@ -196,6 +196,23 @@ export class LightRig {
   }
 
   /**
+   * 画质面板「阴影」那道总闸（玩家偏好；天光预设那道在 `csm.SetCastShadow`）。
+   *
+   * **它不动 `renderer.shadowMap.enabled`，也不动 `light.castShadow`。**
+   * 那两位都在着色器 cache key 上（`USE_SHADOWMAP` / `NUM_DIR_LIGHT_SHADOWS`），
+   * 翻一次要把全场几百份材质重编译 —— 玩家看到的就是「点一下阴影，卡好一会儿」。
+   * 关掉改成逐级 `shadow.intensity = 0` + 不再点 `needsUpdate`：着色器在
+   * `CsmSunVisibility` 开头早退、烘焙整趟不跑，省的东西一样而代价是零。
+   */
+  SetShadowsEnabled(on) {
+    this.csm.SetUserEnabled(on);
+    this.SyncShadowUniforms();
+  }
+
+  /** 这一帧到底有没有太阳阴影（面板那道闸 ∧ 天光预设那道闸）。 */
+  get shadowsActive() { return this.csm.active; }
+
+  /**
    * 允不允许「近级每帧烘」那第二张阴影图。自动降档第 2 级起关掉
    * （`AUTO_QUALITY.ladder` 的 `nearShadowBake`）—— 三角预算说得起不代表这台
    * 机器跑得动，那一张是按 draw call 计价的。口径见 `Data_Tuning_Shadows` 抬头。

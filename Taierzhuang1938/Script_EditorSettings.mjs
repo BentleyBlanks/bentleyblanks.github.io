@@ -578,7 +578,7 @@ export class GraphicsSettings {
     // 后者才是「阴影糊不糊」的那个数（重构前是一张 4096 铺 132 m = 3.2 cm）。
     const csm = this.host.lights?.GetShadowState?.();
     f.Set("阴影图", csm
-      ? `${csm.cascades} 级 × ${csm.mapSize}${this.host.renderer.shadowMap.enabled ? "" : "（已关）"}`
+      ? `${csm.cascades} 级 × ${csm.mapSize}${csm.active ? "" : (csm.userEnabled ? "（天光预设：无太阳影）" : "（已关）")}`
       : "—");
     if (csm) {
       f.Set("最近级纹素", `${(csm.texelWorld[0] * 100).toFixed(2)} cm`);

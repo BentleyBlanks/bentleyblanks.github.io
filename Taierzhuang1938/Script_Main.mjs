@@ -8465,10 +8465,12 @@ requestAnimationFrame(Loop);
 /**
  * 把画质旋钮落到渲染器上。**改完必须调它**，改字段本身什么也不会发生。
  *
- * 阴影那一条要连着重编译材质：`renderer.shadowMap.enabled` 是编译期的
- * `#define USE_SHADOWMAP`，只改标志位而不置 needsUpdate 的话，着色器还按老样子
- * 去采一张已经不再更新的图 —— 画面会留着一层永不变化的假阴影。
- * 重编译是一次性的（几百毫秒），而这是个设置动作，不是每帧的事。
+ * 「阴影」那道总闸**不在这里重编译**：`renderer.shadowMap.enabled` 是编译期的
+ * `#define USE_SHADOWMAP`，翻它要把全场几百份材质重编译一遍（玩家看到的就是
+ * 「点一下阴影，卡好一会儿」）。所以它恒为 true，开关走 `lights.SetShadowsEnabled`
+ * 的运行时那条路：逐级 `shadow.intensity = 0`（着色器在 `CsmSunVisibility`
+ * 开头早退）+ 不再点 `needsUpdate`（整趟烘焙不跑）。省的东西一样，卡顿没有了。
+ * 口径见 `Script_Csm.CsmRig` 的 `enabled` / `userEnabled` 注释。
  */
 /**
  * 把**全部**材质标脏。编译期开关（阴影总闸 / GI 采样层 / 材质着色升级那几位）
@@ -8558,8 +8560,10 @@ function ApplyGraphics() {
   lights.SetNearShadowBakeAllowed(!autoQuality.enabled || autoQuality.nearShadowBake);
   // 接触阴影：只是「这一趟 pass 跑不跑」。关掉时 ContactShadowsPass.Idle 会把
   // 材质那边还原成 1×1 纯白，不重编译。
+  // 总闸关掉时它也必须停：接触阴影补的是太阳影子贴地那一圈，太阳影子都没了
+  // 还留着一圈黑边，是「面板说关了、画面还有影子」的另一种说法。
   post.preset.contactShadows = CONTACT_SHADOWS_SUPPORTED
-    && graphics.contactShadows !== false && autoContact;
+    && graphics.contactShadows !== false && autoContact && graphics.shadows !== false;
   // --- 相机曝光轮：三位开关 + 四根旋钮（口径见 graphics 表里的注释）---------
   // 两位走管线的运行时状态（同 SetTaaEnabled 的先例），不写 preset ——
   // preset 是「这一档的出厂值」，面板的「恢复出厂」要从它读回去。
@@ -8581,23 +8585,18 @@ function ApplyGraphics() {
   firstPersonSelfShadow?.SetEnabled(!!graphics.shadows && graphics.firstPersonSelfShadow !== false);
   firstPersonSelfShadow?.SetSoft(graphics.firstPersonSelfShadowSoft === true);
 
-  const wantShadow = !!graphics.shadows;
-  if (renderer.shadowMap.enabled !== wantShadow) {
-    renderer.shadowMap.enabled = wantShadow;
-    scene.traverse((object) => {
-      const material = object.material;
-      if (!material) return;
-      if (Array.isArray(material)) material.forEach((m) => { m.needsUpdate = true; });
-      else material.needsUpdate = true;
-    });
-  }
+  // 阴影总闸。**故意不碰 `renderer.shadowMap.enabled`**（见 ApplyGraphics 抬头）：
+  // 那一位在 cache key 上，翻一次是几百毫秒的整场重编译。
+  lights.SetShadowsEnabled(!!graphics.shadows);
   // GI 开关是三件事（low 档没有 GI 配置，三件都不做）：
   //  1) 惰性构造 —— 出厂默认关，boot 不建 ProbeVolume；第一次打开才建，
   //     并补挂当前战场的碰撞盒表（boot 早期 battlefield 还没有时，
   //     EnterLevel 的 gi.SetWorld(battlefield) 会接上）。
   //  2) 材质重编译 —— 探针采样代码是**编译期**的（giUniforms.sampling 进了
-  //     cache key），只翻标志不重编译的话画面还跑着旧程序。与上面阴影开关
-  //     同一个先例，代价同样是一次性的几百毫秒。库缓存里暂不在场的材质也要标：
+  //     cache key），只翻标志不重编译的话画面还跑着旧程序。代价是一次性的几百
+  //     毫秒 —— 阴影总闸原来也走这条，2026-09 改成了运行时（见 ApplyGraphics
+  //     抬头）；GI 那段采样代码占着一堆采样器与寄存器，没有同样的退路。
+  //     库缓存里暂不在场的材质也要标：
   //     它们换关会被挂回来，而 three 不会为没 needsUpdate 的材质重查 cache key。
   //  3) 运行态开关 —— 关闭要立刻退回 Global SH 基线（blend 清零 + SetGiActive(0)）。
   if (GI_ON) {
@@ -8627,7 +8626,10 @@ function ApplyGraphics() {
   }
   // 簇状局部光：总闸是**运行时** uniform（不重编译），英雄光阴影才是编译期的。
   lights.SetClusteredEnabled(graphics.clusteredLights !== false);
-  const wantHero = !!graphics.clusterHeroShadow;
+  // 英雄光的立方体阴影是这一栏里唯一还留着编译期开关的（NUM_POINT_LIGHT_SHADOWS
+  // 在 cache key 上）。它出厂就关，跟着阴影总闸一起走：总闸关了还留着一盏投影的
+  // 局部光，一来自相矛盾，二来那张立方体图在停烘之后也不会再更新。
+  const wantHero = !!graphics.clusterHeroShadow && graphics.shadows !== false;
   if (lights.heroShadow !== wantHero) {
     lights.SetHeroShadow(wantHero);
     // NUM_POINT_LIGHTS / NUM_POINT_LIGHT_SHADOWS 翻了，整场材质要重编译一次
