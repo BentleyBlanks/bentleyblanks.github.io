@@ -186,6 +186,7 @@ export const testDefs = {
   FpsArmTest: { file: "Script_FpsArmTest.mjs", desc: "第一人称国军 01 双手：手扣在枪上、腕袖不糊屏" },
   FpsHandContactTest: { file: "Script_FpsHandContactTest.mjs", desc: "实际指腹与扳机、枪栓、桥夹、弹匣及套筒的接触与动作可达性" },
   FpsGripEditorTest: { file: "Script_FpsGripEditorTest.mjs", desc: "第一人称持枪检查编辑器：装备/双视角/真实挂点/骨骼残差与退出还原" },
+  FpsAnimationTest: {file:"Script_FpsAnimationTest.mjs",desc:"Blender第一人称骨骼片段完整性、旋转和循环接缝"},
   SprintMeleeTest: { file: "Script_SprintMeleeTest.mjs", desc: "冲刺白刃：左键挥得出、刀在画面里" },
   HudPromptBrowserTest: { file: "Script_HudPromptBrowserTest.mjs", desc: "HUD 提示真浏览器交互" },
   TargetInfoTest: { file: "Script_TargetInfoTest.mjs", desc: "准心目标识别：番号/姓名/距离、穿墙与雾外不认" },
@@ -295,6 +296,7 @@ export const browserTests = new Set([
 ]);
 
 export const tier0Fast = [
+  "FpsAnimationTest",
   "TextTest",
   "AiPerceptionTest",
   "AiCoverTest",
@@ -352,7 +354,7 @@ export const domains = {
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "MeleeQteTest", "MeleeCombatTest", "MeleeAnimationTest",
+      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "MeleeQteTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest", "ModelFacingTest",
       // 玩家自己的命中几何（AI 打玩家的部位由它判）与通用震屏（爆炸/近失/中弹/落地/扫射/扑沟）：
       // 两条都是纯 Node 毫秒级，碰伤害口径或相机的改动连着跑。
@@ -431,6 +433,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"combat",pattern:/FpsSkeleton|FpsSkeletal|FpsAnimation|Animation\/FirstPerson\/Data_Fps/},
   { domain: "combat", pattern: /CoverLean/i },
   {domain:"combat",pattern:/BallisticSuppression/},
   {domain:'firstLevel',pattern:/FirstLevelMission|FirstLevelTrain|FirstLevelVoiceAlign|SeedAudioFirstLevel|Audio\/FirstLevel/},

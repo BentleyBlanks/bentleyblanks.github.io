@@ -16,6 +16,7 @@ import {
 } from "./Script_EditorUi.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { WEAPON_MESH_BY_ID, WEAPON_MESH_VARIANTS } from "./Data_Meshes.mjs";
+import { FPS_ANIMATION_LABELS } from "./Data_FpsSkeletalAnimation.mjs";
 
 const MOUNT_NAMES = Object.freeze(["muzzle", "gripR", "gripL", "sight", "magazine"]);
 const MOUNT_STYLE = Object.freeze({
@@ -241,6 +242,28 @@ export class FirstPersonEditor {
       throw: Button(actions, "投掷", () => this.Trigger("throw")),
     };
 
+    const timeline = Section(body, "骨骼动画时间轴");
+    this.animationSelect = document.createElement("select");
+    this.animationSelect.setAttribute("aria-label", "动画片段");
+    this.animationSelect.addEventListener("change",()=>this.SetAnimation(this.animationSelect.value));
+    timeline.appendChild(this.animationSelect);
+    this.animationPosition = Slider(timeline, {label:"播放位置",min:0,max:1,step:.001,value:0,
+      format:value=>`${Math.round(value*100)}%`,onInput:value=>this.SeekAnimation({normalized:value})});
+    ButtonRow(timeline,[
+      {label:"播放",onClick:()=>this.PlayAnimation(true)},
+      {label:"暂停",onClick:()=>this.PlayAnimation(false)},
+      {label:"前一帧",onClick:()=>this.StepAnimation(-1)},
+      {label:"后一帧",onClick:()=>this.StepAnimation(1)},
+      {label:"实时输入",onClick:()=>this.ClearAnimation()},
+    ]);
+    this.animationLoop = Toggle(timeline,"循环",true,on=>{
+      const preview=this.host.viewmodel.skeletalAnimation?.preview;if(preview)preview.loop=on;
+    });
+    this.animationSpeed = Slider(timeline,{label:"播放速度",min:.1,max:2,step:.1,value:1,format:value=>`${value.toFixed(1)}×`,onInput:value=>{
+      const preview=this.host.viewmodel.skeletalAnimation?.preview;if(preview)preview.speed=value;
+    }});
+    this.animationTime = Note(timeline,"");
+
     const overlay = Section(body, "挂点与骨骼");
     const toggles = document.createElement("div");
     toggles.className = "edBtns";
@@ -376,11 +399,19 @@ export class FirstPersonEditor {
     this.weaponId = id;
     const variants = WEAPON_MESH_VARIANTS[id] || [];
     this.weaponVariant = variants.length && variant > 0 && variant < variants.length ? variant | 0 : 0;
+    const previousRig=this.host.viewmodel.riggedArms;
     this.host.viewmodel.Equip(id, this.weaponVariant);
+    if(this.markerLayer&&previousRig!==this.host.viewmodel.riggedArms){
+      this.DisposeDiagnostics();
+      this.labelLayer.replaceChildren();
+      this.BuildDiagnostics();
+      this.ApplyDiagnosticVisibility();
+    }
     this.list?.Select(id);
     this.time = 0;
     this.RebuildMountSources();
     this.RefreshActions();
+    this.RefreshAnimationList();
     this.RefreshFacts(true);
     return true;
   }
@@ -434,6 +465,7 @@ export class FirstPersonEditor {
   }
 
   SetPose(value) {
+    this.ClearAnimation();
     if (value !== "hip" && value !== "ads" && value !== "sprint") return false;
     this.pose = value;
     this.ads = value === "ads" ? 1 : 0;
@@ -446,7 +478,8 @@ export class FirstPersonEditor {
 
   PlayerFov() {
     const scale = WEAPONS[this.weaponId]?.adsFovScale ?? 0.75;
-    return 55 * (1 - this.ads * (1 - scale));
+    const ads=this.host.viewmodel.skeletalAnimation?.State()?.[0]??this.ads;
+    return 55 * (1 - ads * (1 - scale));
   }
 
   SetStudioFov(value) {
@@ -457,6 +490,7 @@ export class FirstPersonEditor {
   }
 
   Trigger(action) {
+    this.ClearAnimation();
     const viewmodel = this.host.viewmodel;
     const weapon = WEAPONS[this.weaponId];
     if (!viewmodel || !CanAction(weapon, action)) return false;
@@ -473,6 +507,79 @@ export class FirstPersonEditor {
     for (const [action, button] of Object.entries(this.actionButtons || {})) {
       button.hidden = !CanAction(weapon, action);
     }
+  }
+
+  RefreshAnimationList() {
+    if(!this.animationSelect)return;
+    this.animationSelect.replaceChildren();
+    const names=this.host.viewmodel.skeletalAnimation?.Clips()||[];
+    for(const name of names){
+      const option=document.createElement('option');option.value=name;option.textContent=FPS_ANIMATION_LABELS[name]||name;
+      this.animationSelect.appendChild(option);
+    }
+    this.animationSelect.disabled=!names.length;
+    this.RefreshAnimationTimeline();
+  }
+
+  SetAnimation(name,options={}) {
+    const vm=this.host.viewmodel;
+    if(!vm.skeletalAnimation?.Clip(name))return false;
+    vm.action=null;vm.pendingBoltAt=-1;vm._ResetAnimatedParts();
+    vm.adsSpring.Set(0);vm.sprintSpring.Set(0);
+    this.ads=0;this.sprint=0;
+    this.animationSelect.value=name;
+    const result=vm.skeletalAnimation.SetPreview(name,options);
+    this.SetStudioFov(this.PlayerFov());
+    this.RefreshAnimationTimeline();this.UpdateDiagnostics();return result;
+  }
+
+  SeekAnimation({seconds,normalized,frame}={}) {
+    const player=this.host.viewmodel.skeletalAnimation;
+    if(!player?.preview&&!this.SetAnimation(this.animationSelect?.value||'Idle'))return false;
+    const clip=player.Clip(player.preview.name);
+    const time=seconds??(normalized!=null?normalized*clip.duration:frame!=null?frame*clip.duration/(clip.count-1):NaN);
+    const result=player.Seek(time);
+    this.SetStudioFov(this.PlayerFov());
+    this.RefreshAnimationTimeline();this.UpdateDiagnostics();return result;
+  }
+
+  PlayAnimation(playing=true) {
+    return this.SetAnimationPlayback({playing});
+  }
+
+  SetAnimationPlayback(options={}) {
+    const player=this.host.viewmodel.skeletalAnimation;
+    if(!player?.preview&&!this.SetAnimation(this.animationSelect?.value||'Idle'))return false;
+    if(options.speed!=null&&!Number.isFinite(options.speed))return false;
+    if(options.playing!=null)player.preview.playing=!!options.playing;
+    if(options.loop!=null)player.preview.loop=!!options.loop;
+    if(options.speed!=null)player.preview.speed=Math.max(.1,Math.min(2,options.speed));
+    this.RefreshAnimationTimeline();return player.Snapshot();
+  }
+
+  StepAnimation(delta=1) {
+    const player=this.host.viewmodel.skeletalAnimation;
+    if(!player?.preview&&!this.SetAnimation(this.animationSelect?.value||'Idle'))return false;
+    const clip=player.Clip(player.preview.name);
+    const frame=Math.round(player.preview.time/clip.duration*(clip.count-1))+Math.trunc(delta);
+    return this.SeekAnimation({frame});
+  }
+
+  ClearAnimation() {
+    const vm=this.host.viewmodel;
+    if(vm?.skeletalAnimation)vm.skeletalAnimation.preview=null;
+    vm?.armAnchor.position.set(0,0,0);vm?.armAnchor.quaternion.identity();vm?.armAnchor.scale.set(1,1,1);
+    this.RefreshAnimationTimeline();return true;
+  }
+
+  RefreshAnimationTimeline() {
+    const snapshot=this.host.viewmodel.skeletalAnimation?.Snapshot();
+    if(this.animationLoop)this.animationLoop.Set(snapshot?.loop??true);
+    if(this.animationSpeed)this.animationSpeed.Set(snapshot?.speed??1);
+    if(this.animationPosition)this.animationPosition.Set(snapshot?.duration?snapshot.time/snapshot.duration:0);
+    if(this.animationTime)this.animationTime.textContent=snapshot?.duration
+      ? `${snapshot.time.toFixed(3)} / ${snapshot.duration.toFixed(3)} s · ${snapshot.frame} / ${snapshot.frames-1} 帧 · ${snapshot.playing?'播放':'暂停'}`
+      : '选择片段后可拖动、逐帧定位';
   }
 
   RebuildMountSources() {
@@ -634,6 +741,7 @@ export class FirstPersonEditor {
       view: this.view,
       inspectPreset: this.inspectPreset || null,
       pose: this.pose,
+      animation: viewmodel.skeletalAnimation?.Snapshot()||null,
       ads: +this.ads.toFixed(3),
       sprint: +this.sprint.toFixed(3),
       rigSource: viewmodel.rigSource,
@@ -710,6 +818,13 @@ export class FirstPersonEditor {
     this.cleanTimer = window.setTimeout(() => this.ClearCleanMode(), 3000);
   }
 
+  SetAnimationClean(clean) {
+    this.ClearCleanMode();
+    document.body.classList.toggle('edFpsClean',!!clean);
+    this.showMounts=!clean;this.showSkeleton=!clean;this.showGripLines=!clean;
+    this.ApplyDiagnosticVisibility();
+  }
+
   ClearCleanMode() {
     if (this.cleanTimer != null) window.clearTimeout(this.cleanTimer);
     this.cleanTimer = null;
@@ -733,6 +848,7 @@ export class FirstPersonEditor {
       ads: this.ads, lookDeltaYaw: 0, lookDeltaPitch: 0,
       crouch: 0, elapsed: this.time, lowAmmo: false,
     });
+    this.RefreshAnimationTimeline();
     this.UpdateDiagnostics();
     this.RefreshFacts();
     if (this.view === "player") this.SetStudioFov(this.PlayerFov());

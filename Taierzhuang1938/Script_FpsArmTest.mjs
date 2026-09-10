@@ -29,7 +29,7 @@ const report = await page.evaluate(async (onlyIds) => {
   T.player.spawnGrace = 999;
   for (const soldier of T.ai.soldiers) if (soldier.side === "ija") soldier.position.x += 500;
   const vm = T.viewmodel;
-  const arms = vm.riggedArms;
+  let arms = vm.riggedArms;
   const src = document.getElementById("view");
   const canvas = document.createElement("canvas");
   canvas.width = src.width;
@@ -44,7 +44,7 @@ const report = await page.evaluate(async (onlyIds) => {
   const Step = (frames, state = {}) => {
     for (let frame = 0; frame < frames; frame += 1) vm.Update(1 / 60, Input(state));
   };
-  const Equip = (weapon) => { vm.SetBayonetFixed(false); vm.Equip(weapon); };
+  const Equip = (weapon) => { vm.SetBayonetFixed(false); vm.Equip(weapon); arms=vm.riggedArms; };
   const PaintedFraction = () => {
     const swapped = [];
     arms.root.traverse((node) => { if (node.isMesh) swapped.push([node, node.material]); });

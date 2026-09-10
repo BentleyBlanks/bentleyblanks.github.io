@@ -304,6 +304,7 @@
 .edFpsLegend span::before { content: "● "; }
 .edFpsLegend::after { content: attr(data-view); color: var(--ui-muted); }
 body.edFpsClean #edRoot .edPanel,
+body.edFpsClean #weaponRangePanel,
 body.edFpsClean #edRoot .edGear,
 body.edFpsClean #edRoot .edHint { display: none !important; }
 

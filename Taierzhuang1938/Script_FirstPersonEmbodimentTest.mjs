@@ -24,10 +24,11 @@ try {
     const THREE=await import("./vendor/three/build/three.module.js");
     const {WEAPONS}=await import("./Data_Weapons.mjs");
     T.player.health=100;T.player.spawnGrace=999;
-    const vm=T.viewmodel; const arms=vm.riggedArms;
+    const vm=T.viewmodel; let arms=vm.riggedArms;
     const cases=[],transitions=[];
     for(const weapon of Object.values(WEAPONS).filter(w=>w.ammo&&w.magazine)) {
       vm.Equip(weapon.id);
+      arms=vm.riggedArms;
       const transition={weapon:weapon.id,frames:0,wristMax:0,elbowStepMax:0,gripMax:0};
       const previous={};
       for(const state of ["hip","ads","sprint","return"]){
@@ -58,6 +59,7 @@ try {
       transitions.push(transition);
     }
     vm.Equip(null);
+    arms=vm.riggedArms;
     T.player.pitch=0; T.player.yaw=0;
     T.Debug.Key("KeyW",true);T.Debug.Key("ShiftLeft",true);
     const samples=[];

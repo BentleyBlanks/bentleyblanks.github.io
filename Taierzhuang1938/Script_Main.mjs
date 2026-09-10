@@ -2704,6 +2704,25 @@ async function Boot() {
   window.Taierzhuang.editor = editor;
   // 编辑器的取证口：冒烟测试不点按钮，直接从这里开关与读状态
   window.Taierzhuang.Debug.OpenEditor = (id) => !!editor.Open(id);
+  // Deterministic first-person animation inspection, shared with the UI.
+  window.Taierzhuang.Debug.FirstPersonAnimation = (options = {}) => {
+    if(editor.ActiveId!=="firstPerson")editor.Open("firstPerson");
+    const tool=editor.active;
+    if(options.weapon&&!tool.SetWeapon(options.weapon,options.variant))throw new Error(`Unknown FPS weapon: ${options.weapon}`);
+    if(options.view)tool.SetView(options.view);
+    if(options.preset)tool.SetInspectPreset(options.preset);
+    if(options.clip&&!tool.SetAnimation(options.clip,options))throw new Error(`Unknown FPS animation: ${options.clip}`);
+    if((options.seconds!=null||options.normalized!=null||options.frame!=null)&&!tool.SeekAnimation(options))throw new Error('Invalid FPS animation position');
+    if(options.step!=null&&!tool.StepAnimation(options.step))throw new Error('Invalid FPS animation step');
+    if(options.playing!=null||options.loop!=null||options.speed!=null){
+      if(!tool.SetAnimationPlayback(options))throw new Error('Invalid FPS playback settings');
+    }
+    if(options.realtime)tool.ClearAnimation();
+    if(options.clean!=null){
+      tool.SetAnimationClean(options.clean);
+    }
+    return tool.Snapshot();
+  };
   window.Taierzhuang.Debug.CloseEditor = () => { editor.TogglePanel(false); };
   window.Taierzhuang.Debug.Editor = () => ({
     panelOpen: editor.panelOpen,

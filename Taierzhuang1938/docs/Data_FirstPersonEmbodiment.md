@@ -47,6 +47,47 @@ MCP 使用独立实例与端口，不能在其他任务正在制作的场景中�
 
 ## 验证
 
+### 汉阳造手部与动作定位
+
+汉阳造使用独立的 `Model/Model_FpsHanYangHands.glb`，其余武器继续使用原双臂。
+该资产保持 bind pose 的前臂与手部骨段长度，不再将关节静止位移乘以 1.60。
+手部工程位于 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\HanYangHands_20260910\Animation_HanYangHands.blend`。
+`_import/Script_HanYangHandsShape.py` 修改这一件手部网格；
+裸手沿用原始皮肤颜色与法线，修复腕部 UV 接缝；袖子为土灰色，无手套和白衬衫袖口。
+`_import/Script_ExportHanYangHands.py` 在设置 `FPS_PROJECT_ROOT` 后只导出该模型，不生成动作。
+
+动作表仅含 `Idle` 一个 4 秒持枪循环，60 fps，共 241 个采样点（不是 241 段动画）。
+独立 Blender 工程只有一个 Action，以 9 个关键姿势驱动骨骼和枪械挂点；旧工程已独立备份。
+`runtimeEnabled` 为 `true`，站立腰射持枪时播放；开镜、移动、开火、拉栓和换弹沿用原有逻辑。
+`_import/Script_HanYangHoldingAnimation.py` 只重建这一段持枪动作，输入为已校准的单个握姿。
+播放定位测试通过不代表手型、接触或动作已经验收。
+大量动画及同类批量生成默认拒绝，必须先说明具体范围与数量并获得用户明确同意；
+不得通过逐个调用导出入口绕过这项约束。
+
+第一人称编辑器提供片段选择、播放/暂停、循环、速度、进度拖动和逐帧定位。
+Agent 与界面共用以下入口；浏览器帧号从 0 开始：
+
+```javascript
+const debug = window.Taierzhuang.Debug;
+debug.FirstPersonAnimation({weapon:'HanYang',clip:'Idle',normalized:.55,playing:false,clean:true});
+debug.FirstPersonAnimation({frame:126});
+debug.FirstPersonAnimation({step:1});
+debug.FirstPersonAnimation({playing:true,loop:true,speed:.5});
+debug.FirstPersonAnimation({playing:false});
+debug.FirstPersonAnimation({realtime:true,clean:false});
+```
+
+`seconds`、`normalized`、`frame` 三种定位参数择一使用；定位自动暂停。
+返回快照包含当前片段、秒数、帧数、播放状态和诊断信息，便于随后截图。
+BlenderMCP 在上述独立工程执行 `_import/Script_FpsAnimationStudio.py` 后，可调用
+`SelectFpsAnimation('HanYang','Idle',normalized=.55)`；Blender 帧号从 1 开始。
+`ExportFpsAnimation(projectRoot,'Idle')` 只更新一个已存在的片段，拒绝其他武器或新增条目；
+它本身不授予动画制作或批量导出的许可。
+
+`node Taierzhuang1938/Script_FpsAnimationTest.mjs --browser` 检查限定条目、骨骼数据、
+暂停稳定性、重复定位与逐帧行为。截图位于忽略目录 `_shots/FirstPersonSkeleton/Playback/`，
+需人工与参考图对照掌形、指节、腕部、肘部和枪械接触。
+
 `Script_FirstPersonEmbodimentTest` 从实际游戏输入检查空手双手运动与蒙皮像素，
 从最终骨骼矩阵检查所有枪械的掌心位置、腕部弯曲与肘部奇异姿态，并输出低头截图。
 低头验收测量实际蒙皮顶点到眼位的净空与裁切领口的可见性，覆盖站、蹲、卧及四个朝向的

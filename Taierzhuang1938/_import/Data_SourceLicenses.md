@@ -3,7 +3,7 @@
 > 2026-09-06：按用户要求移除 C96（Mauser96）的运行时资产、携行、展示与重建入口。下文相关内容仅为历史记录或来源存档，不代表现行装备，也不构成滕县使用该型号的实证。
 
 游戏运行时加载 `Model/*.tzm.json`，并为人物换模额外加载
-`Model_FpsArmsNraSkeletal01.glb` 与 `Model/Character/` 下的十名日军/国军 GLB。
+`Model_FpsArmsNraSkeletal01.glb`、汉阳造专用 `Model_FpsHanYangHands.glb` 与 `Model/Character/` 下的十名日军/国军 GLB。
 `_import/Source/` 下的是可追溯、可重建的原始素材，页面不会直接加载。
 
 武器 TZM 保留几何与 steel/wood 材质分区。源包自带的 2K/4K 贴图不直接进入 Pages；
@@ -123,10 +123,13 @@ CC0 不强制署名；表里的作者与链接是为了以后还能找回源文�
 | 游戏内资产 | 源文件 | 作者 | 许可 | 处理方式 |
 |---|---|---|---|---|
 | 第一人称国军骨骼双臂 `Model_FpsArmsNraSkeletal01.glb` | `Model/Character/Model_LugouNra01.glb`（用户提供的“国军模型 01”派生） | 用户提供 | 沿用卢沟桥角色成品的项目内使用范围 | `_import/Script_BakeNraFpsArms.py` 保留原军装袖、双臂、完整十指、53 骨权重与源动作，只剔除不受上肢骨影响的身体顶点；运行时按步枪/机枪/手枪/近战/投掷物提取手指姿态，并用肩—肘—腕解析 IK 锁到每把武器的左右握持坐标系。 |
+| 汉阳造专用双臂 `Model_FpsHanYangHands.glb` | 上述用户提供的国军双臂派生；独立工程 `HanYangHands_20260910/Animation_HanYangHands.blend` | 用户提供的基础模型；本项目修形与材质 | 沿用基础模型的项目内使用范围 | 通过 BlenderMCP 修复腕部开缝、手掌与手指体积及腕部权重，保留裸手皮肤，修复腕部 UV 并将袖子改为土灰色；保留 53 骨，GLB 不内嵌动作。只供汉阳造使用。 |
 | 第一人称双臂 `Model_FpsArms.glb` | `Source/Model_WradArms.glb` | [wwwriks / WRAD Arms](https://github.com/wwwriks/wrad-arms) | CC0 | 保留 50 根手指/手臂骨骼与 512×512 皮肤贴图；离线细分平滑并增加 `GripIdle`，运行时用双臂 IK 跟随原有握点。原始许可副本为 `Source/License_WradArms.txt`。 |
 | 日军步兵 `Model_IjaSoldier.glb` | `Source/Model_LowpolyWw2Soldier.fbx` + `Source/Texture_LowpolyWw2Soldier.png` | [nisu / Rigged Lowpoly WW2 Soldier](https://opengameart.org/content/rigged-lowpoly-ww2-soldier) | CC0 | 保留原始 49 骨骨架、蒙皮和贴图，并内置 Idle / Walk / AimRifle / Death 四段动画；制服重着色为土黄、另建九〇式钢盔。为无损复用本作既有动作，另离线生成与 13 关节旧骨架同轴的纹理分段作为运行时显示层。 |
 | 国军步兵 `Model_NraSoldier.glb` | `Source/Model_BlueSoldierMale.fbx` | [Quaternius / Ultimate Animated Character Pack](https://opengameart.org/content/animated-characters-pack) | CC0 | 使用下载包里的 `BlueSoldier_Male`，保留灰蓝制服、布帽与装具；按源 FBX 的真实蒙皮权重烘成 13 关节显示层，继续使用本作枪械挂点与动作。 |
 | 百姓男/女 `Model_CivilianMale.glb`、`Model_CivilianFemale.glb` | `Source/Model_CasualMale.fbx`、`Source/Model_CasualFemale.fbx` | [Quaternius / Ultimate Animated Character Pack](https://opengameart.org/content/animated-characters-pack) | CC0 | 下载包里的 `Casual_Male` / `Casual_Female` 两种体型；按角色种子稳定选择，烘成同一 13 关节显示层，不携带武器。 |
+
+汉阳造手部的视觉参照为逝去的十月发布的 [汉阳造/汉造八八式步枪](https://steamcommunity.com/sharedfiles/filedetails/?id=3233303781)。页面允许标注来源的二次创作，并将动作模板署名为 zmg、Denny凯妈、Animal33。本地对照还读取了该包 `@awm_fire` 的单个静止握姿；没有导入或批量转换该包的动作库。用户最终要求裸手与土灰袖子；截图仅作为手型和持枪姿态参照，本项目双臂并非该包原始手部资产。参考包与验收截图留在本地，不随游戏分发。
 
 人物构建命令：
 

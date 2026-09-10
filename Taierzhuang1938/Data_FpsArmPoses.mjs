@@ -81,6 +81,7 @@ const BladeBody = (leftZ = -0.500, rightZ = -0.145) => Body(
 );
 
 const RifleSprint = FixedPose(V(0.145, -0.200, -0.285), V(0.32, 0.44, 0.30));
+const HanYangBody = () => Body(V(.19,-.40,.08),V(-.24,-.50,-.55),V(.30,-.80,.12),V(-.40,-.75,.12));
 const PistolSprint = FixedPose(V(0.105, -0.140, -0.260), V(0.26, 0.38, 0.16));
 const ThrowableSprint = FixedPose(V(0.155, -0.135, -0.385), V(-0.48, 0.34, 0.24));
 
@@ -94,9 +95,9 @@ export const FPS_ARM_POSES = Freeze({
   }),
   HanYang: WeaponPose({
     family: "boltRifle", hip: FixedPose(V(0.105, -0.145, -0.335), V(0.050, -0.055, 0.025)), ads: Sight(0.550), sprint: RifleSprint,
-    right: Contact(V(0.01577,-0.03173,-0.02896), V(0.2,3.392992654,1.957596327), CLOSED, TRIGGER, {"fingers":[[0,29.01,17.52],[0,0,50.96],[37.16,77.8,1.5],[82.19,27.6,29.04],[88,48.3,0]],"fingerSplay":[0,-21.53,-6.16,10.71,-22.43],"thumbDirection":[-0.21,-1,0.596],"thumbRoll":4.8,"triggerFingers":[0,2,51.96],"triggerSplay":0}),
+    right: Contact(V(0.01577,-0.03173,-0.02896), V(0.2,3.392992654,1.957596327), CLOSED, TRIGGER, {"fingers":[[0,29.01,17.52],[0,0,50.96],[50,78,35],[55,75,32],[60,70,28]],"fingerSplay":[0,-21.53,0,-4,-8],"thumbDirection":[-0.21,-1,0.596],"thumbRoll":4.8,"triggerFingers":[0,2,51.96],"triggerSplay":0}),
     left: Contact(V(0.00739,-0.0051,-0.41441), V(-0.1092,1.455796327,-3.112792654), CLOSED, TRIGGER, {"fingers":[[0,62.21,46.8],[19.06,100,9.68],[20.97,67.6,60.52],[9.99,72,39.11],[10.91,36.5,45.32]],"fingerSplay":[0,35,13.37,-15.43,-34.93],"thumbDirection":[-0.179,-0.843,-0.099],"thumbRoll":81.12,"triggerFingers":[12,28,18],"triggerSplay":0}),
-    bodyHip: RifleBody(-0.545), bodyAds: RifleAdsBody(-0.525), bodySprint: RifleSprintBody(-0.480),
+    bodyHip: HanYangBody(), bodyAds: HanYangBody(), bodySprint: HanYangBody(),
     actions: { bolt: { family: "turnBolt", timing: V(0.24, 0.55, 0.84) }, reload: { family: "stripper", timing: V(0.52, 0.66, 0.79) }, bayonet: "hanYang" },
   }),
   Type38: WeaponPose({

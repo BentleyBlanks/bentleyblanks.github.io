@@ -19,22 +19,26 @@ try {
   await page.waitForFunction(()=>window.Taierzhuang?.state?.ready,null,{timeout:240000});
   const report=await page.evaluate(async({only})=>{
     const THREE=await import("./vendor/three/build/three.module.js");
-    const T=window.Taierzhuang,vm=T.viewmodel,arms=vm.riggedArms;
+    const T=window.Taierzhuang,vm=T.viewmodel;let arms=vm.riggedArms;
     T.Debug.OpenEditor("firstPerson");const editor=T.editor.active;
     const probes={ZhongZheng:[.002,-.023,-.0558],HanYang:[.002,-.019,-.0838],Type38:[.003,-.021,-.1288],
       Zb26:[.002,-.045,-.1229],Type11:[.002,-.040,-.124],ServicePistol:[.002,-.007,-.0531]};
     const result={poses:[],actions:[],samples:0};
     const pads={};
-    const Refresh=()=>{vm.root.updateMatrixWorld(true);arms.mesh.skeleton.update();};
+    const Refresh=()=>{vm.root.updateMatrixWorld(true);arms.root.traverse(mesh=>{if(mesh.isSkinnedMesh)mesh.skeleton.update();});};
     const Pad=(side,digit)=>{
-      const key=side+digit;let entry=pads[key];
+      const key=vm.weaponId+side+digit;let entry=pads[key];
       if(!entry){
-        const mesh=arms.mesh,g=mesh.geometry,bone=arms.anatomy[side].curls.find(c=>c.bone.name.toLowerCase().endsWith("finger"+digit+"2")).bone;
-        const index=mesh.skeleton.bones.indexOf(bone),points=[];
-        for(let i=0;i<g.attributes.position.count;i++){
-          let weight=0;for(let j=0;j<4;j++)if(g.attributes.skinIndex.getComponent(i,j)===index)weight+=g.attributes.skinWeight.getComponent(i,j);
-          if(weight>.95)points.push(bone.worldToLocal(mesh.getVertexPosition(i,new THREE.Vector3()).applyMatrix4(mesh.matrixWorld)));
-        }
+        const bone=arms.anatomy[side].curls.find(c=>c.bone.name.toLowerCase().endsWith("finger"+digit+"2")).bone,points=[];
+        arms.root.traverse(mesh=>{
+          if(!mesh.isSkinnedMesh)return;
+          const g=mesh.geometry,index=mesh.skeleton.bones.indexOf(bone);
+          for(let i=0;i<g.attributes.position.count;i++){
+            let weight=0;for(let j=0;j<4;j++)if(g.attributes.skinIndex.getComponent(i,j)===index)weight+=g.attributes.skinWeight.getComponent(i,j);
+            if(weight>.95)points.push(bone.worldToLocal(mesh.getVertexPosition(i,new THREE.Vector3()).applyMatrix4(mesh.matrixWorld)));
+          }
+        });
+        if(!points.length)throw new Error('No skinned fingertip vertices: '+key);
         const box=new THREE.Box3().setFromPoints(points);
         entry=pads[key]={bone,point:new THREE.Vector3(box.max.x*.78,box.max.y*(digit?.9:.75),(box.min.z+box.max.z)*.5)};
       }
@@ -58,12 +62,12 @@ try {
       return hit;
     };
     for(const id of Object.keys(probes).filter(id=>!only||only.includes(id))){
-      editor.SetWeapon(id);editor.SetPose("hip");editor.SetView("player");for(let i=0;i<90;i++)editor.Update(1/60);Refresh();
+      editor.SetWeapon(id);arms=vm.riggedArms;editor.SetPose("hip");editor.SetView("player");for(let i=0;i<90;i++)editor.Update(1/60);Refresh();
       const target=TriggerPoint(id),hip=Pad("r",1),originalPositions=arms.fingerBones.r.concat(arms.fingerBones.l).map(b=>b.position.clone());
       for(const pose of ["hip","ads","fire"]){
         editor.SetPose(pose==="ads"?"ads":"hip");for(let i=0;i<90;i++)editor.Update(1/60);
         if(pose==="fire"){vm.TriggerFire();editor.Update(1/120);}
-        Refresh();const point=Pad("r",1),bone=pads.r1.bone;
+        Refresh();const point=Pad("r",1),bone=pads[id+'r1'].bone;
         const normal=new THREE.Vector3(0,1,0).transformDirection(vm.rig.group.matrixWorld.clone().invert().multiply(bone.matrixWorld));
         const gunSurface=id!=="ServicePistol"?Triangles(vm.rig.group,o=>o.name.startsWith(id+"_")):null;
         const support=gunSurface?[0,1,2,3,4].map(digit=>Nearest(Pad("l",digit),gunSurface)):[];

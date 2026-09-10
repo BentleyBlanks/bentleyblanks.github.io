@@ -15,8 +15,9 @@ import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
 import { FpsArmPose, FpsArmStateRotation, FPS_ARM_LIMITS, FPS_BAYONET_SUPPORT } from "./Data_FpsArmPoses.mjs";
 import { CaptureAnatomy, ApplyAnatomicalFingers, AimAnatomicalBone } from "./Script_FpsAnatomy.mjs";
+import { LoadFpsSkeletalAnimations } from "./Script_FpsSkeletalAnimation.mjs";
 
-const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
+const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsHanYang: "./Model/Model_FpsHanYangHands.glb?v=2", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
 const PROFILE_CLIPS = Object.freeze({
   rifle: "RifleIdle",
   lmg: "MachineGunFire",
@@ -104,8 +105,10 @@ function Inspect(gltf) {
 export async function LoadRiggedAssets() {
   if (loadPromise) return loadPromise;
   loadPromise = (async () => {
-    const [fpsArms, fpsBody] = await Promise.all([LoadOne("fpsArms"), LoadOne("fpsBody")]);
-    return { fpsArms, fpsBody, report: { fpsArms: Inspect(fpsArms), fpsBody: Inspect(fpsBody) } };
+    const [fpsArms, fpsBody, fpsHanYang, fpsAnimations] = await Promise.all([LoadOne("fpsArms"), LoadOne("fpsBody"), LoadOne("fpsHanYang"),
+      LoadFpsSkeletalAnimations().catch(error=>{console.warn(`[RiggedModel] FPS clips unavailable: ${error.message}`);return null;})]);
+    if(fpsHanYang&&fpsArms)fpsHanYang.animations=fpsArms.animations;
+    return { fpsArms, fpsBody, fpsHanYang, fpsAnimations, report: { fpsArms: Inspect(fpsArms), fpsBody: Inspect(fpsBody) } };
   })();
   return loadPromise;
 }
@@ -122,6 +125,8 @@ export class FpsArmRig {
     this.gltf = gltf;
     this.materialLibrary = materialLibrary;
     this.root = CloneSkeleton(gltf.scene);
+    this.fixedRestLengths=false;
+    this.root.traverse(object=>{if(object.userData.fpsFixedRestLengths)this.fixedRestLengths=true;});
     this.root.name = "RiggedFpsArmsNra01";
     this.mesh = FirstSkinnedMesh(this.root);
     this.mixer = new THREE.AnimationMixer(this.root);
@@ -314,11 +319,13 @@ export class FpsArmRig {
 
   _ApplyBase(profile = this.profile) {
     this._Restore(this.basePose);
-    // Fixed viewmodel proportions, not reach-dependent stretching. Keep palm
-    // size readable while shoulders remain below the near-camera silhouette.
-    for (const side of ["r", "l"]) {
-      this.bones[side].forearm.position.multiplyScalar(1.60);
-      this.bones[side].hand.position.multiplyScalar(1.60);
+    // Bone length belongs to the Blender bind mesh. Moving the elbow/wrist
+    // 60% beyond the bind pose stretched skin across the sleeve and palm.
+    for (const entry of this.bindPose) {
+      if (/Forearm|Hand/i.test(entry.object.name)) {
+        if(this.fixedRestLengths)entry.object.position.copy(entry.position);
+        else entry.object.position.multiplyScalar(1.60);
+      }
     }
     const poses = this.fingerPoseByProfile.get(profile) || this.fingerPoseByProfile.get("rifle");
     if (poses) for (const side of ["r", "l"]) this._Restore(poses[side] || []);
@@ -463,7 +470,7 @@ export class FpsArmRig {
       return {shoulders:{right:[0.19,-0.40,-0.15],left:[-0.19,-0.40,-0.10]},
         elbowPoles:{right:[0.30,-0.80,0.12],left:[-0.30,-0.80,0.12]}};
     }
-    if (["boltRifle", "lmg", "pistol"].includes(this.poseSpec.family)) {
+    if (this.weaponId !== 'HanYang' && ["boltRifle", "lmg", "pistol"].includes(this.poseSpec.family)) {
       const pistol = this.poseSpec.family === "pistol";
       const adsShoulder = this.poseSpec.ads.weapon.eyeDistance > 0.45 ? -0.41 : -0.26;
       const leftZ = THREE.MathUtils.lerp(-0.41, adsShoulder, this.poseState.ads);
@@ -761,6 +768,35 @@ export class FpsArmRig {
     this.root.updateWorldMatrix(true, true);
     this._UpdateGripError("r");
     this._UpdateGripError("l");
+  }
+
+  /** Measure the final authored pose without modifying its bone transforms. */
+  MeasureSkeletalPose() {
+    this.root.updateWorldMatrix(true,true);
+    this.wristBend ||= {r:0,l:0};
+    for(const side of ["r","l"]){
+      this._ComputeHandGoal(side);
+      this._UpdateGripError(side);
+      const chain=this.bones[side];
+      const shoulder=this._InAnchor(chain.upperArm,new THREE.Vector3());
+      const elbow=this._InAnchor(chain.forearm,new THREE.Vector3());
+      const wrist=this._InAnchor(chain.hand,new THREE.Vector3());
+      const direction=new THREE.Vector3(0,0,1).applyQuaternion(this._InAnchorBasisQuaternion(this.gripNodes[side],new THREE.Quaternion()));
+      const axis=wrist.clone().sub(elbow).normalize();
+      this.wristBend[side]=THREE.MathUtils.radToDeg(direction.angleTo(axis));
+      const forearmBasis=this._InAnchorBasisQuaternion(chain.forearm,new THREE.Quaternion()).multiply(this.anatomy[side].bones.forearm.clone().invert());
+      const forearmNormal=new THREE.Vector3(0,1,0).applyQuaternion(forearmBasis);
+      const handNormal=new THREE.Vector3(0,1,0).applyQuaternion(this._InAnchorBasisQuaternion(this.gripNodes[side],new THREE.Quaternion()));
+      handNormal.addScaledVector(axis,-handNormal.dot(axis)).normalize();
+      const twist=Math.atan2(axis.dot(new THREE.Vector3().crossVectors(forearmNormal,handNormal)),forearmNormal.dot(handNormal));
+      this.jointTwist[side]={clavicle:0,upperArm:0,forearm:0,hand:THREE.MathUtils.radToDeg(twist)};
+      this.reachRatio[side]=shoulder.distanceTo(wrist)/(this.armLength[side].upper+this.armLength[side].lower);
+      this.reachable[side]=this.reachRatio[side]<=FPS_ARM_LIMITS.maxReachRatio+.001;
+      this.stretch[side]=1;
+      const rest=this.bindPose.find(entry=>entry.object===chain.hand);
+      const restWorld=chain.hand.parent.localToWorld(rest.position.clone());
+      this.handTranslation[side]=this.anchor.worldToLocal(restWorld).distanceTo(wrist);
+    }
   }
 
   Dispose() {

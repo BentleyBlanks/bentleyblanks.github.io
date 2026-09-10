@@ -42,6 +42,7 @@ import { FpsArmRig } from "./Script_RiggedModel.mjs";
 import { FpsArmPose, FPS_HAND_SHAPES } from "./Data_FpsArmPoses.mjs";
 import { FirstPersonBody } from "./Script_FirstPersonBody.mjs";
 import { FrameQuaternion } from "./Script_FpsAnatomy.mjs";
+import { FpsSkeletalAnimation } from "./Script_FpsSkeletalAnimation.mjs";
 
 const DEG = Math.PI / 180;
 
@@ -1551,6 +1552,7 @@ export class Viewmodel {
     this.handRight = MakeHand(this.materials, 1, "hr");
     this.handLeft = MakeHand(this.materials, -1, "hl");
     this.riggedArms = null;
+    this.armRigs = {};
     this.body = riggedAssets?.fpsBody ? new FirstPersonBody(riggedAssets.fpsBody, library) : null;
     if (riggedAssets && riggedAssets.fpsArms) {
       try {
@@ -1558,10 +1560,14 @@ export class Viewmodel {
         // ConfigureExternalPbr 才能接进 SSAO/GI 注入链与 Debug Rendering 的假彩色
         //（以前这里传 this.materials，签名根本不收，等于什么都没接）。
         this.riggedArms = new FpsArmRig(riggedAssets.fpsArms, library);
+        this.armRigs.default=this.riggedArms;
+        if(riggedAssets.fpsHanYang)this.armRigs.HanYang=new FpsArmRig(riggedAssets.fpsHanYang,library);
       } catch (error) {
         console.warn(`[Viewmodel] FPS 手臂实例化失败，退回旧手模：${String(error).slice(0, 180)}`);
       }
     }
+    this.skeletalAnimation = this.riggedArms && riggedAssets?.fpsAnimations
+      ? new FpsSkeletalAnimation(this,riggedAssets.fpsAnimations) : null;
     this.handBase = { right: new THREE.Vector3(), left: new THREE.Vector3() };
     this.handBaseRot = { right: new THREE.Euler(), left: new THREE.Euler() };
     this.gripContactRight = new THREE.Object3D();
@@ -1700,7 +1706,14 @@ export class Viewmodel {
 
   /** @param {string|null} weaponId Data_Weapons.WEAPONS 的 id；null = 空手 */
   Equip(weaponId, variant = 0) {
+    if(this.skeletalAnimation){this.skeletalAnimation.preview=null;this.skeletalAnimation.current=null;}
+    this.armAnchor.position.set(0,0,0);this.armAnchor.quaternion.identity();this.armAnchor.scale.set(1,1,1);
     this._ClearRig();
+    this.riggedArms=this.armRigs[weaponId]||this.armRigs.default||null;
+    if(this.skeletalAnimation){
+      this.skeletalAnimation.boneMap.clear();
+      this.riggedArms?.root.traverse(object=>{if(object.isBone)this.skeletalAnimation.boneMap.set(object.name.toLowerCase().replace(/[^a-z0-9]/g,''),object);});
+    }
     this.ironSightOffsetOverride = null;
     this.weaponId = weaponId || null;
     this.weaponVariant = Number.isInteger(variant) && variant > 0 ? variant : 0;
@@ -2440,7 +2453,7 @@ export class Viewmodel {
         reload: this.action?.kind === "reload", reloadBlend: this.reloadBlend, melee: !!input.meleeCombat,
         fire: 1-Ease.InOut(Ease.Seg(this.flashTime,0.055,0.18)) });
       if (this.meleeVideoFrame) this._ApplyMeleeVideo();
-      this.riggedArms.Update(step);
+      if (!this.skeletalAnimation?.Update(step,input)) this.riggedArms.Update(step);
     }
     if (!this.weapon && !this.riggedArms) this._UpdateUnarmedHands(gait, sprint, grounded ? 1 : 0);
     this.body?.Update(step, input.carryBodyVisible ? { ...input, playerYaw: input.carryBodyYaw ?? input.playerYaw,
@@ -2760,7 +2773,7 @@ export class Viewmodel {
       const to = this._tmpVec2.set(seat.x, seat.y + 0.010, seat.z);
       this.clipProp.position.lerpVectors(from, to, bring);
       // The clip stays in its guide while cartridges are pushed down.
-      this.clipProp.position.y += pull * 0.16;        // 抽夹：往上抽走
+      this.clipProp.position.y += pull * 0.16;
       this.clipProp.position.x += pull * 0.05;
       this.clipProp.rotation.set(Mix(0.5, 0.0, bring), 0, Mix(0.7, 0.0, bring), "YXZ");
       // 5 发压进弹仓：弹头逐颗沉下去
@@ -3241,7 +3254,7 @@ export class Viewmodel {
 
   Dispose() {
     this._ClearRig();
-    if (this.riggedArms) this.riggedArms.Dispose();
+    for(const rig of Object.values(this.armRigs))rig.Dispose();
     this.body?.Dispose();
     const seen = new Set();
     this.root.traverse((node) => {
