@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<!-- Three.js 0.185.1 is used under the MIT License: https://github.com/mrdoob/three.js/blob/dev/LICENSE -->
+<title>采耳物语 · EarSpa3D</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#FFF8F2">
+<meta name="description" content="一款 3D 采耳 ASMR 解压游戏：用真实的专业采耳工具，把耳道清理得干干净净。">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="stylesheet" href="Style_EarSpa.css?v=ear003">
+<style>
+  /* 首屏骨架：样式表可能还没到，先给出与基调一致的底色，避免白闪 */
+  html { background: #FFF8F2; }
+
+  /* 画布尺寸必须在这里兜一层。
+     three 的 setSize(w, h, false) **不改画布样式**，只改绘制缓冲；画布的 CSS 尺寸
+     得由样式表给。而样式表是异步的——在它生效之前 canvas 是浏览器默认的 300×150，
+     于是 ResizeObserver 量到 300×150，就把渲染器也设成 300×150，整局游戏只画在
+     左上角一个邮戳大的方块里，画布外全是 body 背景。这个坑花了一整轮排查，
+     所以关键尺寸不再依赖异步样式表，直接与 .ear-scene 写一致。 */
+  #ear-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+
+  #ear-boot { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+              flex-direction: column; gap: 18px; z-index: 900;
+              font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+              color: #8A7C6E; letter-spacing: .08em;
+              background: radial-gradient(120% 90% at 50% 20%, #FFF8F2 0%, #DFF3EC 60%, #DCEBF7 100%); }
+  #ear-boot .ring { width: 46px; height: 46px; border-radius: 50%; border: 3px solid #DFF3EC; border-top-color: #6FD6B6;
+                    animation: earSpin 900ms linear infinite; }
+  @keyframes earSpin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<!-- DOM 结构是 Script_Ui.js 的约定：它自己会建 #ear-root（带渐变底 + HUD 覆盖层），
+     画布必须成为 #ear-root 的**子节点**——如果画布和 #ear-root 是兄弟关系，
+     #ear-root 的渐变底会把画布整块盖住（实测过一次，画面全白、什么都看不见）。
+     所以这里先给一个中性的舞台容器，Script_Main 在 UI 建好后把画布插进 #ear-root 里。 -->
+<div id="ear-stage">
+  <canvas id="ear-canvas" class="ear-scene"></canvas>
+</div>
+
+<div id="ear-boot"><div class="ring"></div><div>正在铺好耳道…</div></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/build/three.module.js?v=ear003",
+    "./vendor/three/build/three.module.js": "./vendor/three/build/three.module.js?v=ear003"
+  }
+}
+</script>
+
+<script type="module">
+  // 引导壳：只负责把 Script_Main 拉起来并把致命错误显示成人话。
+  // 真正的游戏逻辑一行都不在这里——这里出错是最难查的那种，保持它足够小。
+  const boot = document.getElementById("ear-boot");
+  try {
+    const mod = await import("./Script_Main.js?v=ear003");
+    await mod.Start();
+  } catch (error) {
+    console.error(error);
+    if (boot) {
+      boot.innerHTML = "";
+      const box = document.createElement("div");
+      box.style.cssText = "max-width:32rem;padding:24px;text-align:center;line-height:1.7";
+      const title = document.createElement("div");
+      title.style.cssText = "font-size:18px;color:#4A4038;margin-bottom:8px";
+      title.textContent = "没能启动";
+      const detail = document.createElement("div");
+      detail.style.cssText = "font-size:13px;color:#8A7C6E;word-break:break-all";
+      detail.textContent = String(error && error.message ? error.message : error);
+      box.append(title, detail);
+      boot.append(box);
+    }
+  }
+</script>
+</body>
+</html>

@@ -67,3 +67,7 @@ Taierzhuang1938/_import/__pycache__/
 
 # Generated Pages module bundle; rebuilt from source on every deployment.
 Taierzhuang1938/Script_BrowserBundle.mjs
+
+# EarSpa3D 的本地验收产物：各模块自测页、无头截图、CDP 探针脚本、验收录屏。
+# 按根 AGENTS.md「模型验收网页、验收截图和演示视频只留本地」，一律不进仓库。
+EarSpa3D/_dev/
