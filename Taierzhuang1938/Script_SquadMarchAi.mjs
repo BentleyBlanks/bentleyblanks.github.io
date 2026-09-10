@@ -16,7 +16,7 @@ export class SquadMarchAi {
   SetLeader(soldier){this.march.SetLeader(soldier.id);}
   Update(dt,{player=null,Observe=()=>({})}={}){
     const observations=this.soldiers.map(s=>({id:String(s.id),position:s.position,yaw:s.yaw,alive:s.alive,
-      speedMps:(s.moveSpeed||0)*3.6,
+      speedMps:(s.moveSpeed||0)*3.6,turnLimited:false,
       // AI retains unseen targets in memory. Awareness alone is not active combat.
       busy:!!((s.target&&s.targetVisible!==false)||this.ai.time-s.lastFire<G.recentFireS
         ||s.carryRole||s.woundedWalk||s.meleeCombat||s.vaultT>=0||s.ragdollState||s.grounded===false

@@ -178,11 +178,12 @@ export class SquadMarch {
     const lead=byId.get(leader?.id);
     const progress=new Map(observations.map(o=>[String(o.id),SquadMarchProgress(this.config.route,o.position)]));
     const leadProgress=progress.get(leader?.id)??0;
+    const playerProgress=player?SquadMarchProgress(this.config.route,player):-Infinity;
     const lag=Math.max(0,...[...this.members.values()].filter(m=>byId.get(m.id)?.alive!==false&&byId.get(m.id)?.active!==false&&!byId.get(m.id)?.busy)
       .map(m=>leadProgress-(progress.get(m.id)??leadProgress)-m.followDistance));
     if(player&&lead){
       const dest=leader.route[Math.min(leader.index,leader.route.length-1)],p=lead.position;
-      const ahead=dest&&(player.x-p.x)*(dest.x-p.x)+(player.z-p.z)*(dest.z-p.z)>0;
+      const ahead=playerProgress>leadProgress+t.arrivalM||dest&&(player.x-p.x)*(dest.x-p.x)+(player.z-p.z)*(dest.z-p.z)>0;
       if(ahead)this.waiting=false;
       else if(Distance(player,p)>t.waitDistanceM)this.waiting=true;
       else if(Distance(player,p)<t.resumeDistanceM)this.waiting=false;
@@ -238,7 +239,7 @@ export class SquadMarch {
       }
       const behind=lead&&lead!==o?Math.max(0,leadProgress-(progress.get(m.id)??leadProgress)-m.followDistance):0;
       const tooFarAhead=!m.leader&&lead&&(progress.get(m.id)??0)>leadProgress+t.spacingM*2;
-      const catchup=behind>t.catchupM;
+      const catchup=behind>t.catchupM||playerProgress-(progress.get(m.id)??playerProgress)>t.catchupM;
       const wait=this.waiting;
       const noPause=o.noPause||m.avoiding||target.width<A.narrowWidthM||catchup||wait||o.maxSpeed===0||t.pauses===false||this.config.preset==='walk';
       if(noPause||m.leader){if(m.phase!=='run')this.Resume(m,'priority');}
@@ -264,9 +265,10 @@ export class SquadMarch {
       }
       const bearing=Math.atan2(-dx,-dz),turn=Math.abs(Angle(bearing-(o.yaw??bearing)));
       let wanted=Math.min(t.speedMps*m.stride*(catchup?t.catchupScale:1),o.maxSpeed??Infinity);
-      if(m.leader&&this.members.size>1&&this.config.preset==='guided')wanted*=t.leaderSpeedScale*Clamp(1-(lag-t.catchupM*.3)/t.catchupM*.5,.55,1);
+      if(m.leader&&!catchup&&this.members.size>1&&this.config.preset==='guided')wanted*=t.leaderSpeedScale*Clamp(1-(lag-t.catchupM*.3)/t.catchupM*.5,.55,1);
       if(tooFarAhead)wanted=Math.min(wanted,t.speedMps*t.leaderSpeedScale*.65);
-      wanted*=Math.max(.25,Math.cos(Math.min(Math.PI/2,turn)));
+      // AI hosts may aim/strafe independently of travel; body yaw must not throttle them twice.
+      if(o.turnLimited!==false)wanted*=Math.max(.25,Math.cos(Math.min(Math.PI/2,turn)));
       wanted=Math.min(wanted,Math.sqrt(Math.max(0,2*t.decelerationMps2*(distance-(m.avoiding?A.brakingMarginM:t.arrivalM*.5)))));
       if(m.phase!=='run'||wait)wanted=0;
       if(gap<t.separationM*2)wanted=Math.min(wanted,Math.max(0,(gap-t.separationM)*2));

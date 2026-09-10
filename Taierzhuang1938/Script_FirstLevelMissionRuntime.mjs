@@ -344,7 +344,7 @@ export class FirstLevelMissionRuntime {
     // Role is supplied by the mission roster; the shared controller knows no cast names.
     this.squadMarch=new SquadMarchAi(this.ai,this.squad,{
       route,leaderIndex:0,seed:`FirstLevel:${this.flow.stage.id}`,
-      tuning:{speedMps:R.squadSpeedMps,arrivalM:.45},
+      tuning:{speedMps:R.squadSpeedMps,catchupScale:R.squadCatchupMps/R.squadSpeedMps,arrivalM:.45},
       members:this.squad.map(actor=>({route:this.squadRoutes.get(actor.id)})),
     },{Move:(actor,point,speed)=>this.MoveActor(actor,point,speed)});
   }
@@ -370,6 +370,7 @@ export class FirstLevelMissionRuntime {
   }
   UpdateSquad() {
     const stage = this.flow.stage.id;
+    const marchSpeeds = new Map();
     if (["Train", "Unloading"].includes(stage) && !this.Has("trainStopped")) return;
     for (const actor of [...this.squad, this.trainWounded].filter(Boolean)) {
       InstallMissionSentry(actor);
@@ -401,6 +402,9 @@ export class FirstLevelMissionRuntime {
             0;
         const yielding = ahead && Distance(previous.position, actor.position) < R.squadSpacingM;
         let speed=MissionGuideSpeed(actor.position,this.player.position,route[0],actor.missionNaturalMarch?false:yielding,route);
+        // Shared cadence owns its own acceleration and spacing. Keep the unfiltered
+        // host limit; the legacy pace below remains available when combat takes over.
+        marchSpeeds.set(actor.id,speed);
         if(actor.missionNaturalMarch){
           const p=actor.position,dx=route[0].x-p.x,dz=route[0].z-p.z,d=Math.hypot(dx,dz)||1;
           let gap=Infinity;
@@ -426,7 +430,7 @@ export class FirstLevelMissionRuntime {
         route:this.squadRoutes.get(actor.id)||[],
         active:!!actor.missionTrainReady&&!!this.squadRoutes.get(actor.id)?.length
           &&!(actor===this.bedGuide?.actor&&["FinalCarry","Death"].includes(stage)),
-        maxSpeed:actor.scriptMoveSpeedMps,
+        maxSpeed:marchSpeeds.get(actor.id)??0,
       }),
     });
   }

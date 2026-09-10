@@ -51,6 +51,19 @@ const narrow=Simulation(6);for(const o of narrow.observations)o.canPause=false;n
 const urgent=Simulation(6,17,{preset:'urgent'});urgent.Run(20);assert.equal(urgent.march.events.filter(e=>e.type==='stop').length,0,'urgent transfer has no optional rests');
 const wait=Simulation(3);wait.Run(2);const lead=wait.observations[0];wait.Tick(1/60,{player:{x:lead.position.x,z:lead.position.z+40}});assert.equal(wait.march.outputs.get(lead.id).status,'waiting');
 wait.Tick(1/60,{player:{x:lead.position.x,z:lead.position.z+3}});assert.notEqual(wait.march.outputs.get(lead.id).status,'waiting');
+// A player who runs ahead must not leave the whole squad throttled by leader pace
+// and backward-looking combat yaw. The real AI independently owns body facing.
+const pursuing=Simulation(4,17,{tuning:{speedMps:3.05,catchupScale:4.5/3.05}});
+for(const o of pursuing.observations){o.turnLimited=false;o.maxSpeed=4.5;}
+for(let i=0;i<30*60;i++){
+  for(const o of pursuing.observations)o.yaw=Math.PI;
+  pursuing.Tick(1/60,{player:{x:0,z:-180}});
+}
+assert.ok(pursuing.observations.every(o=>o.position.z<-100),'every squadmate catches up with an advanced player while watching behind');
+assert.ok(!pursuing.march.events.some(e=>e.type==='stop'),'catching up takes priority over optional recovery');
+const bend=Simulation(3,17,{route:[{x:0,z:0},{x:0,z:-30},{x:40,z:-30},{x:40,z:20}]});
+bend.Tick(1/60,{player:{x:40,z:10}});
+assert.equal(bend.march.waiting,false,'a player farther around a bend is ahead even behind the immediate heading');
 const config={count:6,route:[{x:0,z:0},{x:0,z:10}]};
 for(const invalid of [{...config,count:0},{...config,count:25},{...config,leaderIndex:6},{...config,route:[{x:0,z:0}]},{...config,tuning:{runMinS:8,runMaxS:2}},
   {...config,tuning:{catchupM:0}},{...config,goal:{x:1e7,z:0}},{...config,members:[{}, {}, {}, {}, {}, {}]},
