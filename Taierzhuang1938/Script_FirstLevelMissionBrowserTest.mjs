@@ -309,6 +309,7 @@ async function WaitStage(expected, seconds = 240, { fight = false } = {}) {
       await page.evaluate(()=>{window.rescueWitnessCaptured=true;});
       capturedActivities.add("MedicalRescue");await CaptureFocus("MedicalRescue",state.mission.column.litters.find(l=>l.zhou));
     }
+    if(chunk%12===11)console.log("WAIT_PROGRESS",JSON.stringify({expected,stage:state.mission.stage,time:state.mission.time,health:state.health,remaining:state.mission.remaining}));
     if (state.mission.stage === expected || !state.alive) break;
   }
   console.log(
@@ -870,6 +871,9 @@ try {
     await fs.writeFile(path.join(output,"Data_TransferPacing.json"),JSON.stringify(transferPacing,null,2));
     console.log("transfer pacing",JSON.stringify(transferPacing));
     await JumpStage(13);
+    // The aircraft warning arrives while live infantry can still lob grenades
+    // at the last firing position. Walk behind the existing supply cover.
+    await Route([{x:95,z:107},{x:90,z:107}],"AirWarningCover",{stance:"crouch"});
     await WaitStage("Carry", 30, { fight: true });
     const pickup = await page.evaluate(() => {
       const z = window.Tengxian.Debug.FirstLevelMission().column.litters.find((l) => l.zhou);
