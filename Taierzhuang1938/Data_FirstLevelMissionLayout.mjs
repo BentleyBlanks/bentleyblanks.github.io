@@ -1,4 +1,5 @@
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
+import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
 import { P012_STATION_BLOCKS } from "./Data_FirstLevelP012Station.mjs";
 import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance, SampleMissionGroundColor } from "./Data_FirstLevelMissionTerrain.mjs";
 const blocks = [],
@@ -278,6 +279,7 @@ Wall("ReceptionWest", -166, 35, 0.7, 2.8, 34);
 Block("ReceptionMedicine", -156, 36, 1, 0.7, 1, "missionRoute");
 Wall("RearExitCover", -169.5, 29, 6, 1.05, 0.7);
 Wall("FinalAlleyCover", -185, 10, 0.7, 1.2, 12);
+for(const post of MISSION_DEFENSE_POSTS)GroundedWall(post.id,post.x,post.z,post.w,post.h,post.d);
 // Human-scale work areas, connected landmarks and trench construction remain pure geometry.
 // Small surface details have no separate collision; functional furniture and walls do.
 function Detail(id, x, z, w, h, d, semantic = "timber", extra = {}) {
@@ -574,6 +576,7 @@ for (let i = blocks.length - 1; i >= 0; i--) {
 }
 export const MISSION_LAYOUT = Object.freeze({
   id: "FirstLevelMissionSeptember07",
+  fortifications: true,
   terrain: "P012Heightfield",
   terrainSpec: MISSION_TERRAIN,
   SampleGroundColor: SampleMissionGroundColor,

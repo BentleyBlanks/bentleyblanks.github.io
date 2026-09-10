@@ -1,7 +1,8 @@
 // 第一关策划白盒场景：受光语义体块；P012 使用连续可变形土壤地形。
 //
 // 它与 TengxianField / JieheField / RangeField 实现同一套战场查询接口，但不调用
-// 城、城外、道路、植被、贴图或外部资产生成器。所有静态体块先进入 BuildSink 合批；
+// 城、城外、道路或植被生成器。正式第一关额外预载并合批自己的工事模型；
+// 归档白盒仍只画体块。所有静态体块先进入 BuildSink 合批；
 // 两扇剧情门保留为独立 Mesh，收到正式第一章信号后升起并同步移除 Rapier 碰撞体。
 //
 // GroundHeight 取布局地形（旧布局默认0）；显式 walkableSurfaces 仅引用同一布局实体的顶面。
@@ -14,6 +15,7 @@ import { BuildSink } from "./Script_World.mjs";
 import { MarkDynamicPrepass } from "./Script_Post.mjs";
 import { T } from "./Script_Text.mjs";
 import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
+import { LoadMissionFortifications, AddMissionFortifications } from "./Script_FirstLevelMissionFortifications.mjs";
 import {
   FIRST_LEVEL_WHITEBOX_LAYOUT,
 } from "./Data_FirstLevelWhitebox.mjs";
@@ -85,6 +87,10 @@ function ColliderRecord(spec) {
 export class FirstLevelWhiteboxField {
   constructor(scene, _library, { bounds = null, zones = [], levelId = null, whiteboxLayout = null } = {}) {
     this.scene = scene;
+    this.library = _library;
+    this.fortificationModels = null;
+    this.fortificationPlacements = [];
+    this.sharedFortificationMaterials = new Set();
     this.levelId = levelId;
     this.layout = whiteboxLayout || FIRST_LEVEL_WHITEBOX_LAYOUT;
     this.SampleGroundColor = this.layout.SampleGroundColor;
@@ -132,6 +138,10 @@ export class FirstLevelWhiteboxField {
 
   GroundHeight(x, z) { return SampleWhiteboxSurface(this.walkableSurfaces,x,z,this.terrain?.SampleHeight(x,z) ?? 0); }
 
+  async PrepareAssets() {
+    if(this.layout.fortifications)this.fortificationModels=await LoadMissionFortifications(this.library);
+  }
+
   BuildWhiteBoxes() {
     const sink = new BuildSink();
     sink.SetSector("FirstLevelWhitebox");
@@ -171,12 +181,18 @@ export class FirstLevelWhiteboxField {
     }
     sink.SetSector("FirstLevelWhitebox");
 
+    const defenses=this.fortificationModels
+      ? AddMissionFortifications(sink,this.layout,this.fortificationModels,(x,z)=>this.GroundHeight(x,z),this.materials)
+      : {replaced:new Set(),placements:[]};
+    this.fortificationPlacements=defenses.placements;
+    for(const [key,material] of this.materials)if(key.startsWith("MissionDefenseMaterial_"))this.sharedFortificationMaterials.add(material);
     const trainSink = new BuildSink();
     for (const block of this.layout.blocks) {
       if(block.dynamic)continue;
       const targetSink = this.layout.terrain === "P012Heightfield" && IsP012TrainBlock(block.id) ? trainSink : sink;
       if (this.layout.scenario?.replaceBlockIds.includes(block.id)) continue;
-      targetSink.Add(block.semantic || "Whitebox", PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), {
+      const seamOwner=block.id.includes("BagSeam")?block.id.split("BagSeam")[0]:null;
+      if(!defenses.replaced.has(block.id) && !defenses.replaced.has(seamOwner))targetSink.Add(block.semantic || "Whitebox", PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), {
         x: block.x,
         y: block.y,
         z: block.z,
@@ -194,7 +210,7 @@ export class FirstLevelWhiteboxField {
     }
 
     for (const mesh of sink.Flush(this.scene, { Get: (key) => this.materials.get(key) || this.whiteMaterial })) {
-      mesh.name = "FirstLevelWhitebox_StaticWhiteBoxes";
+      if(!mesh.name.includes("MissionDefense_"))mesh.name = "FirstLevelWhitebox_StaticWhiteBoxes";
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       this.meshes.push(mesh);
@@ -585,7 +601,7 @@ export class FirstLevelWhiteboxField {
         open: gate.open,
         colliding: this.colliders.includes(gate.collider),
       })),
-      externalAssets: 0,
+      externalAssets: this.fortificationPlacements.length,
     };
   }
 
@@ -598,13 +614,14 @@ export class FirstLevelWhiteboxField {
       mesh.geometry?.dispose();
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       for (const material of materials) {
-        if (material && !disposedMaterials.has(material)) {
+        if (material && !disposedMaterials.has(material) && !this.sharedFortificationMaterials.has(material)) {
           material.dispose();
           disposedMaterials.add(material);
         }
       }
     }
     this.meshes.length = 0;
+    this.fortificationModels=null;this.fortificationPlacements=[];this.sharedFortificationMaterials.clear();
     this.colliders = [];
     this.covers = [];
     this.grid.clear();

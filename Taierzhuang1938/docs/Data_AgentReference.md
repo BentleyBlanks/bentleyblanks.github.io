@@ -44,6 +44,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 - `Data_FirstLevelMissionStages`：Notion 18 阶段目录；第 11–13 阶段采用原文最后的扩展修订。`Data_FirstLevelMission` / `Data_Tuning_FirstLevel` 保留 24 个执行步骤及通关状态的事实门、有限敌人、节奏和装备。
 - 调试选项可从主菜单、暂停菜单选择任一阶段并继续；agent 使用 `await window.Tengxian.Debug.FirstLevelJump(1)`（1–18 或目录 id），`Debug.FirstLevelStages()` 查询目录。状态中的 `phaseNumber/phaseId/phaseCount` 是剧情阶段，`stage` 是兼容原有工具的当前执行步骤。详见 [阶段跳转](Data_FirstLevelStageJump.md)。
 - `Data_FirstLevelMissionLayout` / `Terrain`：纯数据空间与共享高度场。室外地面不使用盒体；列车地板、台阶和桥面属于结构。
+- `Data_FirstLevelMissionFortifications` / `Script_FirstLevelMissionFortifications`：第一关专用地面工事，复用沙袋、桩网与木障碍，经 `BuildSink` 分区合批。史料、推定范围、布设与验证见 [工事布设](Data_FirstLevelFortifications.md)。
 - `Script_FirstLevelMissionRuntime` / `Flow` / `Column` / `View`：实际操作、阶段记录、20 副担架和装车/撤离。
 - `Data_FirstLevelMissionCrowd`：院落/转运区分散停靠点、错峰汇流和轻伤员等候区域。
 - `Data_FirstLevelMissionFront`：前沿增援、沿途火力、友军据点和战场遗体布局；`FRONT_ASSAULT` / `FrontAssaultLane` 是跃进冲击的跳线与落点几何（禁行列、增援落点）。`Script_FirstLevelMissionAftermath`：八种烘焙姿势按实例化三级距离层绘制（全模 / 5 cm / 14 cm 聚类），每帧自做视锥与距离压表，材质克隆自人物材质（`Script_Materials.CloneShadedMaterial`，别再与蒙皮网格共用同一材质对象，three 会每次切换 skinning/instancing 重算着色器参数；克隆体按 `Script_MaterialPatches.PatchesOf` 取同一份补丁列表重新 `ApplyPatches`，不是抄钩子——抄过来的 defines / SyncDefines 仍指向源材质，会出孪生程序）。距离与聚类粒度在 `Data_Tuning_FirstLevel.MISSION_PEOPLE_TUNING`。

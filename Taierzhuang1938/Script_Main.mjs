@@ -2945,6 +2945,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
     detailRadius: (phase.detailRadius ?? 100) * (QUALITY === "low" ? 0.72 : 1),
     midRadius: (phase.midRadius ?? 210) * (QUALITY === "low" ? 0.72 : 1),
   });
+  await battlefield.PrepareAssets?.();
   for (const step of battlefield.BuildSteps()) {
     setStep(step.label, base + span * step.progress);
     await yieldFrame();
