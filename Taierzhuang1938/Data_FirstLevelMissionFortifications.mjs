@@ -39,3 +39,10 @@ export const MISSION_DEFENSE_OBJECTS = Object.freeze([
 export const MISSION_DEFENSE_PACKING = Object.freeze({
   spanM:1.85, layerM:.4, sectorM:32, overlapM:.22, groundEmbedM:.04,
 });
+
+// Matches _blender/Script_BuildBarbedWireSet.py: BuildStakeFence, in source GLB metres.
+// Wire has open sight/fire gaps; a single full-height collider would make it a bulletproof wall.
+export const MISSION_STAKE_FENCE = Object.freeze({
+  posts:[[-1.55,-.05],[0,.035],[1.55,-.025]],height:1.28,postRadius:.035,
+  wireHeights:[.38,.72,1.06],wireHalfLength:1.6,wireRadius:.014,sag:.055,sagStep:.012,
+});

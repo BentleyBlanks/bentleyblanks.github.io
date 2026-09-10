@@ -23,14 +23,14 @@
 | 车站 | 卸载区北侧临时沙袋与侧后方军需箱，离开列车下车口、集合点和支援行军线 |
 | 村口、转运区及后卫 | 村口路障、转运区边缘、后方撤离掩体使用实际沙袋；转运区东缘另设分段桩网，装车通道保持开放 |
 
-`Data_FirstLevelMissionFortifications` 是本次布设数据源。原掩体体积按横向分段、纵向分层填充沙袋，并继续使用同一个实体碰撞盒及 AI 掩体点；模型不会把门口或射击位包成实心大盒。新增独立障碍按实测网格包围盒登记旋转碰撞，底面从共享高度采样器读取。
+`Data_FirstLevelMissionFortifications` 是本次布设数据源。原掩体体积按横向分段、纵向分层填充沙袋，并继续使用同一个实体碰撞盒及 AI 掩体点；模型不会把门口或射击位包成实心大盒。木障碍和箱体按实测网格包围盒登记旋转碰撞；桩网按源工程的三根桩、三道网线分别登记碰撞，保留射击孔隙，不能用整片包围盒挡子弹。底面从共享高度采样器读取。
 
 静态工事经 `BuildSink` 按 32 米分区、材质合批；换关释放本场几何，保留共享模型与材质。加载失败会明确报缺失资产，不把“成功进入白盒”当成工事已显示。
 
 ## 验证入口
 
 - `node Taierzhuang1938/Script_FirstLevelMissionTest.mjs`：现有任务、胶囊行军路线、坦克路线、机枪支撑和伤员转运契约。
-- `node Taierzhuang1938/Script_FirstLevelMissionFortificationsTest.mjs`：真实模型载入、胸墙替换、独立障碍与行军/撤离通道净空、合批预算及五处截图。截图和报告仅留 `_shots/FirstLevelFortifications/`。
+- `node Taierzhuang1938/Script_FirstLevelMissionFortificationsTest.mjs`：真实模型载入、胸墙替换、独立障碍与行军/撤离/敌军推进路线及出场点的净空、沙袋实体范围、网孔/桩柱/网线射线、合批预算、换关重建及六处截图。截图和报告仅留 `_shots/FirstLevelFortifications/`。
 - `node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign`：正式第一关实际输入通关。
 - `node Taierzhuang1938/Script_ModuleGraphTest.mjs`：浏览器缓存版本戳。
 

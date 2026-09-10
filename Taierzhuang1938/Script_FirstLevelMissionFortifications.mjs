@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { IsMissionSandbagBlock, MISSION_DEFENSE_ASSETS, MISSION_DEFENSE_OBJECTS,
-  MISSION_DEFENSE_PACKING as PACKING } from "./Data_FirstLevelMissionFortifications.mjs";
+  MISSION_DEFENSE_PACKING as PACKING, MISSION_STAKE_FENCE as FENCE } from "./Data_FirstLevelMissionFortifications.mjs";
 
 // Templates have already been grounded, centred and rebound to the project's PBR library.
 export async function LoadMissionFortifications(library) {
@@ -59,8 +59,21 @@ export function AddMissionFortifications(sink,layout,models,groundAt,materials) 
       groundAt(spec.x+cos*a*hx+sin*b*hz,spec.z-sin*a*hx+cos*b*hz));
     const y=Math.min(...heights)-PACKING.groundEmbedM;
     Place(spec.id,spec.asset,spec.x,y,spec.z,spec.ry,new THREE.Vector3(scale,scale,scale));
-    if(spec.solid)sink.Solid(spec.x,y+model.size.y*scale/2,spec.z,hx,model.size.y*scale/2,hz,
-      spec.asset.includes("Wire")?"fence":"barricade",spec.ry);
+    if(spec.solid && spec.asset==="battlefieldBarbedWire02"){
+      // Retain the asset loader's measured source-to-grounded offset (the diagonal feet shift X).
+      const offset=model.root.children[0].position;
+      const Solid=(x,cy,hw,hh,hd)=>{
+        const lx=(x+offset.x)*scale,lz=offset.z*scale;
+        sink.Solid(spec.x+cos*lx+sin*lz,y+(cy+offset.y)*scale,spec.z-sin*lx+cos*lz,
+          hw*scale,hh*scale,hd*scale,"fence",spec.ry);
+      };
+      for(const [x,lean] of FENCE.posts)Solid(x+lean/2,FENCE.height/2,
+        FENCE.postRadius+Math.abs(lean)/2,FENCE.height/2,FENCE.postRadius);
+      for(const [i,height] of FENCE.wireHeights.entries()){
+        const sag=FENCE.sag+i*FENCE.sagStep;
+        Solid(0,height-sag/2,FENCE.wireHalfLength,sag/2+FENCE.wireRadius,FENCE.wireRadius);
+      }
+    }else if(spec.solid)sink.Solid(spec.x,y+model.size.y*scale/2,spec.z,hx,model.size.y*scale/2,hz,"barricade",spec.ry);
   }
   sink.SetSector("FirstLevelWhitebox");
   return {replaced,placements};

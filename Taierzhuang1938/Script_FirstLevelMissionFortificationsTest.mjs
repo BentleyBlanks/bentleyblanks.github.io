@@ -33,6 +33,16 @@ try {
     }
     const meshes=field.meshes.filter(m=>m.name.includes("MissionDefense_"));
     const obstacles=field.colliders.filter(c=>["fence","barricade"].includes(c.tag));
+    const wireGaps=[];
+    for(const p of field.fortificationPlacements.filter(p=>p.asset==="battlefieldBarbedWire02")){
+      const offset=field.fortificationModels.get(p.asset).root.children[0].position;
+      const cos=Math.cos(p.ry),sin=Math.sin(p.ry),scale=p.scale[0];
+      const Probe=(localX,height)=>{
+        const x=p.x+cos*(localX+offset.x)*scale,z=p.z-sin*(localX+offset.x)*scale;
+        return g.physics.Raycast({x:x+sin*1.2,y:p.y+height*scale,z:z+cos*1.2},{x:-sin,y:0,z:-cos},2.4,{terrain:false})?.box?.tag||null;
+      };
+      wireGaps.push({id:p.id,gap:Probe(-.7,.9),post:Probe(.035*.9/1.28,.9),strand:Probe(-.7,.69)});
+    }
     const cuts=[];
     const actors=Object.values(MISSION_ENCOUNTERS).flat();
     const tactics=Object.fromEntries(Object.entries(MISSION_TACTICS).map(([id,plan])=>[id,[actors.find(s=>s.id===id),...plan.points]]));
@@ -49,7 +59,7 @@ try {
       }
     const assets=Object.fromEntries([...field.fortificationModels].map(([id,m])=>[id,{size:m.size.toArray(),triangles:(()=>{let n=0;m.root.traverse(o=>{if(o.isMesh)n+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3;});return n;})()}]));
     const bounds=meshes.map(m=>({name:m.name,size:new Box3().setFromObject(m).getSize(new Vector3()).toArray()}));
-    return {count:field.fortificationPlacements.length,blocks:blocks.length,missing,envelopeErrors,cuts:cuts.slice(0,10),assets,
+    return {count:field.fortificationPlacements.length,blocks:blocks.length,missing,envelopeErrors,wireGaps,cuts:cuts.slice(0,10),assets,
       objectCount:MISSION_DEFENSE_OBJECTS.length,obstacles:obstacles.length,meshCount:meshes.length,
       triangles:meshes.reduce((n,m)=>n+(m.geometry.index?.count||m.geometry.attributes.position.count)/3,0),bounds};
   });
@@ -72,6 +82,7 @@ try {
   }
   assert.ok(report.count>100);assert.equal(report.missing.length,0);assert.deepEqual(report.envelopeErrors,[],"visual stacks retain the collision envelopes");assert.equal(report.cuts.length,0,"obstacles must leave mission and withdrawal lanes clear");
   assert.ok(report.meshCount>0&&report.meshCount<70);assert.ok(report.triangles<600000);
+  assert.ok(report.wireGaps.every(p=>p.gap!=="fence"&&p.post==="fence"&&p.strand==="fence"),"stake and strand collision must leave open firing gaps: "+JSON.stringify(report.wireGaps));
   const rebuild=await page.evaluate(async()=>{
     const g=window.Tengxian,old=g.battlefield,oldMeshes=old.meshes.slice();
     let disposedShared=0;
