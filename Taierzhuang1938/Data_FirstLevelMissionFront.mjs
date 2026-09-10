@@ -1,4 +1,5 @@
 import { MISSION_TUNING as FIRST_LEVEL_TUNING } from "./Data_Tuning_FirstLevel.mjs";
+import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 // Authored squads and persistent aftermath. Historical dead do not affect live combat counts.
 // 2026-09-09: the Center squad's fifth man moved 12,-188 -> 12,-190. At -188 he was inside the
 // one-metre slack of the first bound line, so he skipped it and rushed straight through the Bank
@@ -205,6 +206,10 @@ const clusters=[
   [96,96,15,.4,5],[108,110,12,.6,4],[60,112,12,.4,4],[24,110,12,.35,4],[-20,92,12,.35,4],[-60,78,12,.35,4],[-100,44,12,.4,4],[-128,36,9,.4,3.5],
 ];
 let seed=19380907; const Random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+// Leave room for a full prone body around each living recruit's muster point.
+// Filter after generation so every retained battlefield body keeps its original placement.
+const musterBodyClearanceM=1.8;
+const musterPoints=[MISSION_TRAIN.guideMuster,...MISSION_TRAIN.cars.flatMap(car=>car.muster)];
 export const MISSION_AFTERMATH=clusters.flatMap(([x,z,count,ijaShare,spread],group)=>Array.from({length:count},(_,i)=>{
   const angle=Random()*Math.PI*2,r=Math.sqrt(Random())*spread;
   const ija=Random()<ijaShare;
@@ -213,4 +218,4 @@ export const MISSION_AFTERMATH=clusters.flatMap(([x,z,count,ijaShare,spread],gro
   return {id:"Aftermath"+group+"_"+i,x:x+Math.cos(angle)*r,z:z+Math.sin(angle)*r,
     yaw:Random()*Math.PI*2,side:ija?"ija":"nra",pose:i%4,
     pile,scale:.94+Random()*.12,blood:.6+Random()*.75};
-}));
+})).filter(body=>musterPoints.every(point=>Math.hypot(body.x-point.x,body.z-point.z)>=musterBodyClearanceM));

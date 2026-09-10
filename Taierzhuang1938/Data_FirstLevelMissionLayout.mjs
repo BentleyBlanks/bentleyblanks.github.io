@@ -519,9 +519,7 @@ export const MISSION_ROUTES = Object.freeze({
 import { FRONT_GUARD_POSTS, FRONT_COVER, FRONT_FIELD_MEN, FrontAssaultLaneCuts } from "./Data_FirstLevelMissionFront.mjs";
 export const MISSION_PLACEMENT = Object.freeze({
   stationCasualties: [
-    { x: -65, z: 73, yaw: 0.3, health: 0 },
     { x: -62, z: 69, yaw: -0.4, health: 35 },
-    { x: -69, z: 70, yaw: 1.2, health: 0 },
     { x: -64, z: 77, yaw: 2.1, health: 28 },
   ],
   squadFrontPositions:[{x:-1.7,z:-129},{x:1.7,z:-128.7},{x:14,z:-129},{x:16,z:-127.5}],

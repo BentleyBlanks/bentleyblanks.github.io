@@ -1,4 +1,4 @@
-import { FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_ASSAULT_STARTS, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
+import { MISSION_AFTERMATH, FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_ASSAULT_STARTS, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
 import { COVER } from "./Data_Tuning_AiCover.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { CollectBulletNearMisses,ApplyBulletNearMisses } from "./Script_BallisticSuppression.mjs";
@@ -20,6 +20,9 @@ import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
 import { MISSION_DIALOGUE, MissionVoicePrompt } from "./Data_FirstLevelMissionDialogue.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
+assert.ok(P.stationCasualties.every(person=>person.health>0),"station shelling does not manufacture dead recruits at muster");
+for(const point of [MISSION_TRAIN.guideMuster,...MISSION_TRAIN.cars.flatMap(car=>car.muster)])
+  assert.ok(MISSION_AFTERMATH.every(body=>Math.hypot(body.x-point.x,body.z-point.z)>=1.8),"living recruits never muster on historical bodies");
 {
   const beat={earliestS:35,latestS:60,loaded:4,restS:12};
   assert.equal(TransferBeatReady(beat,{seconds:35,loaded:4,previousClearedAt:30}),false,"vehicle event cannot erase the breathing window");
