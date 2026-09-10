@@ -214,6 +214,10 @@ export const MISSION_TUNING = Object.freeze({
 // 2026-09-09: 试过在中间再插一档 2 cm，交替 A/B 量到 draw call +109 而帧时间不变 —— 一具尸体 7 个材质，
 // 每加一档就是 8 姿势 x 7 = 56 只网格。档数在这里是 draw call，不是三角形；账在 Script_FirstLevelMissionAftermath 抬头。
 // Tables are recompacted only after the focus moves aftermathRefreshM or the view turns (1-|q·q'| > aftermathRefreshDot).
+// Static casualty contact at scene construction: 8 cm lower envelope / 6 cm
+// occupied support cells, then a full-mesh clearance pass. No per-frame solver.
+export const MISSION_BODY_SUPPORT=Object.freeze({sampleCellM:.08,stackCellM:.06,
+  clearanceM:.006,maxTiltRad:.55,angleStepsRad:Object.freeze([.24,.12,.06,.03,.015])});
 export const MISSION_PEOPLE_TUNING=Object.freeze({aftermathTiers:Object.freeze([
   Object.freeze({cellM:0,enterM:12,exitM:15}),
   Object.freeze({cellM:.05,enterM:70,exitM:80}),

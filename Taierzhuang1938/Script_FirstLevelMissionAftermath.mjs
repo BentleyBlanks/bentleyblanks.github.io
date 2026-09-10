@@ -1,12 +1,13 @@
 import { ClusterDistantGeometry } from "./Script_DistantGeometry.mjs";
 import * as THREE from "three";
 import { ACTOR_DETAIL } from "./Data_Tuning_Ai.mjs";
-import { MISSION_PEOPLE_TUNING as C } from "./Data_Tuning_FirstLevel.mjs";
+import { MISSION_PEOPLE_TUNING as C, MISSION_BODY_SUPPORT } from "./Data_Tuning_FirstLevel.mjs";
 import { MissionTrainLifePose } from "./Script_FirstLevelMissionTrainLife.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { MISSION_AFTERMATH } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_CIVILIAN_AFTERMATH } from "./Data_FirstLevelMissionCivilianAftermath.mjs";
+import { CreateBodyContactShape, MissionBodySupport } from "./Script_FirstLevelMissionBodySupport.mjs";
 
 // Historical casualties: military poses plus four adult civilian bakes, drawn with three
 // distance tiers. No AI, tickets, collision walls or animation mixers are added for them.
@@ -39,10 +40,6 @@ const TIERS = C.aftermathTiers.length;
 const _frustum = new THREE.Frustum();
 const _matrix = new THREE.Matrix4();
 const _sphere = new THREE.Sphere();
-const _position = new THREE.Vector3();
-const _rotation = new THREE.Quaternion();
-const _scale = new THREE.Vector3();
-const _euler = new THREE.Euler();
 const _quaternion = new THREE.Quaternion();
 
 export class MissionAftermath {
@@ -55,7 +52,11 @@ export class MissionAftermath {
     this.instances=[];
     this.lastFocus=new THREE.Vector3(NaN,NaN,NaN);this.lastQuaternion=new THREE.Quaternion(0,0,0,0);this.frames=0;
     const bloodSink=new BuildSink();
-    for(const spec of bodies){
+    const groundAt=(x,z)=>(battlefield.StaticGroundHeight||battlefield.GroundHeight).call(battlefield,x,z);
+    const support=new MissionBodySupport(groundAt);
+    const contactShapes=new Map(),settleStart=performance.now();
+    // Ground layer first, then authored upper bodies; stable order makes restarts identical.
+    for(const spec of [...bodies].sort((a,b)=>(a.pile||0)-(b.pile||0))){
       const key=spec.side+(spec.variant||"")+spec.pose;
       let prototype=this.prototypes.get(key);
       if(!prototype){
@@ -67,22 +68,27 @@ export class MissionAftermath {
         });
         prototype={key,parts,members:[],meshes:[]};
         this.prototypes.set(key,prototype);
+        contactShapes.set(key,CreateBodyContactShape(parts));
       }
-      const ground=battlefield.GroundHeight(spec.x,spec.z);
-      _rotation.setFromEuler(_euler.set(0,spec.yaw,0));_scale.setScalar(spec.scale);
-      const matrix=new THREE.Matrix4().compose(_position.set(spec.x,ground+spec.pile+.025,spec.z),_rotation,_scale);
-      const instance={id:spec.id,side:spec.side,houseId:spec.houseId,x:spec.x,y:ground+spec.pile+.5,z:spec.z,radius:1.25*spec.scale,matrix,tier:TIERS-1,prototype};
+      const ground=groundAt(spec.x,spec.z);
+      const shape=contactShapes.get(key),settled=support.Settle(shape,spec),matrix=settled.matrix;
+      // Authored upper bodies rest on the ground layer; never grow accidental
+      // towers by feeding one upper body's height into the next upper body.
+      if(!spec.pile)support.Add(shape,matrix);
+      const instance={id:spec.id,side:spec.side,houseId:spec.houseId,x:spec.x,y:settled.center.y,z:spec.z,
+        center:settled.center,radius:settled.radius,matrix,tier:TIERS-1,prototype};
       this.instances.push(instance);prototype.members.push(instance);
       // Irregular, terrain-conforming pools and smears; each body has its own outline.
       const vertices=[],count=13,angle=spec.yaw;
       const Point=(i)=>{const a=i/count*Math.PI*2,r=spec.blood*(.78+.22*Math.sin(i*2.37+spec.x));
         const x=spec.x+Math.cos(a+angle)*r,z=spec.z+Math.sin(a+angle)*r*.68;
-        return [x,battlefield.GroundHeight(x,z)+.013,z];};
+        return [x,groundAt(x,z)+.013,z];};
       const center=[spec.x,ground+.013,spec.z];
       for(let i=0;i<count;i++)vertices.push(...center,...Point(i),...Point((i+1)%count));
       const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.Float32BufferAttribute(vertices,3));g.computeVertexNormals();
       bloodSink.Add("Blood",g);
     }
+    this.settleMs=performance.now()-settleStart;
     // One instance table per part and tier, sized to the pose's member count.
     for(const prototype of this.prototypes.values()){
       for(const part of prototype.parts){
@@ -144,7 +150,7 @@ export class MissionAftermath {
         while(tier<TIERS-1&&d2>bounds[tier].exit)tier++;
         instance.tier=tier;
         if(camera){
-          _sphere.center.set(instance.x,instance.y,instance.z);_sphere.radius=instance.radius;
+          _sphere.center.copy(instance.center);_sphere.radius=instance.radius;
           // Bodies just outside the view still throw shadows into it; keep the near ones.
           if(!_frustum.intersectsSphere(_sphere)&&!(tier===0&&d2<=shadow))continue;
         }
@@ -174,6 +180,18 @@ export function BakeMissionBody(factory,spec,materials){
     if(spec.patient)actor.root.rotation.set(Math.PI/2,0,0);
     else {actor.Ragdoll(new THREE.Vector3(spec.pose%2?.7:-.6,0,spec.pose<2?-1:1));
       actor.Update(1,{dead:true,dying:1,elapsed:2});}
+    if(actor.characterRig && !spec.patient){
+      // The falling root retains impact yaw/roll. Baking that as rest leaves the
+      // helmet as the only floor contact and props up the entire torso and legs.
+      actor.body.rotation.set(-actor.ragdollState.forward*Math.PI/2,0,0);
+      const skeletons=new Set();
+      actor.characterRig.root.traverse(mesh=>{if(mesh.skeleton)skeletons.add(mesh.skeleton);});
+      const bones=[...new Set([...skeletons].flatMap(s=>s.bones))].map(b=>({b,p:b.position.clone(),s:b.scale.clone(),q:b.quaternion.clone()}));
+      for(const skeleton of skeletons)skeleton.pose();
+      // GLB bind matrices include the source centimetre root. Keep the production
+      // root and animated translations/scales, taking only joint rest rotations.
+      for(const {b,p,s,q} of bones){b.position.copy(p);b.scale.copy(s);if(!b.parent?.isBone)b.quaternion.copy(q);}
+    }
     if(spec.side==="civilian" && !actor.characterRig && !spec.patient){
       // These segmented civilian models use the procedural bones. Settle them
       // in the ground plane instead of freezing the generic falling knee/arm curl.
@@ -236,6 +254,12 @@ export function BakeMissionBody(factory,spec,materials){
     });
     const center=bounds.getCenter(new THREE.Vector3());
     for(const part of parts)part.geometry.translate(-center.x,-bounds.min.y,-center.z);
+    if(!spec.patient){
+      const settled=new MissionBodySupport(()=>0).Settle(CreateBodyContactShape(parts),{x:0,z:0,yaw:0,scale:1});
+      // Share the settled rest pose across every terrain placement and all LODs.
+      settled.matrix.elements[13]-=MISSION_BODY_SUPPORT.clearanceM;
+      for(const part of parts)part.geometry.applyMatrix4(settled.matrix);
+    }
     actor.Dispose();return parts;
   }
 

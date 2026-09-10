@@ -1,6 +1,6 @@
 // Explicit visual block tops are the only analytic whitebox walking surfaces.
 import assert from "node:assert/strict";
-import {CompileWhiteboxWalkableSurfaces,SampleWhiteboxSurface} from "./Script_FirstLevelWhiteboxField.mjs";
+import {CompileWhiteboxWalkableSurfaces,SampleWhiteboxSurface,FirstLevelWhiteboxField} from "./Script_FirstLevelWhiteboxField.mjs";
 const floor={id:"Floor",x:0,y:1.125,z:0,w:2,h:.25,d:2,ry:0,solid:false};
 const stairs=Array.from({length:4},(_,i)=>({id:`Step${i}`,x:1.275+i*.55,y:(1-i*.25)/2,z:0,w:.55,h:1-i*.25,d:2,ry:0,solid:false}));
 const roof={id:"Roof",x:0,y:4,z:0,w:3,h:.3,d:3,ry:0};
@@ -15,4 +15,11 @@ assert.throws(()=>CompileWhiteboxWalkableSurfaces({...layout,walkableSurfaces:[{
 const rotated={...floor,ry:Math.PI/2,w:4,d:1};
 assert.equal(SampleWhiteboxSurface([rotated],0,1.5),1.25);
 assert.equal(SampleWhiteboxSurface([rotated],1.5,0),0);
+const train={...floor,id:"StationCar0Floor",y:2};
+const field=new FirstLevelWhiteboxField(null,null,{whiteboxLayout:{blocks:[floor,train],walkableSurfaces:[floor,train],bounds:{}}});
+assert.equal(field.GroundHeight(0,0),2.125,"live actors still stand on train floors");
+assert.equal(field.StaticGroundHeight(0,0),1.25,"static casualties use the fixed floor below the train");
+field.SetTrainOffset(20);
+assert.equal(field.StaticGroundHeight(0,0),1.25,"train departure cannot move the baked support surface");
+assert.equal(field.GroundHeight(0,20),2.125,"live train floor moves normally");
 console.log("PASS explicit whitebox floor, four 0.25m stairs, OBB rotation, roof exclusion and legacy flat ground");

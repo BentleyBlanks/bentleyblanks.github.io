@@ -95,6 +95,7 @@ export class FirstLevelWhiteboxField {
     this.layout = whiteboxLayout || FIRST_LEVEL_WHITEBOX_LAYOUT;
     this.SampleGroundColor = this.layout.SampleGroundColor;
     this.walkableSurfaces = CompileWhiteboxWalkableSurfaces(this.layout);
+    this.staticWalkableSurfaces = this.walkableSurfaces.filter(surface=>!IsP012TrainBlock(surface.id));
     this.terrain = this.layout.terrain === "P012Heightfield" ? CreateP012Terrain(this.layout) : null;
     this.bounds = bounds
       ? { minX: bounds.minX, maxX: bounds.maxX, minZ: bounds.minZ, maxZ: bounds.maxZ }
@@ -137,6 +138,9 @@ export class FirstLevelWhiteboxField {
   }
 
   GroundHeight(x, z) { return SampleWhiteboxSurface(this.walkableSurfaces,x,z,this.terrain?.SampleHeight(x,z) ?? 0); }
+  // Load-time environment placement cannot rest on the train that moves away
+  // after construction. Terrain and fixed floors still use the shared sampler.
+  StaticGroundHeight(x,z){return SampleWhiteboxSurface(this.staticWalkableSurfaces,x,z,this.terrain?.SampleHeight(x,z)??0);}
 
   async PrepareAssets() {
     if(this.layout.fortifications)this.fortificationModels=await LoadMissionFortifications(this.library);

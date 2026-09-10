@@ -222,7 +222,8 @@ function OpeningRouteClear(body){
 export const MISSION_AFTERMATH=clusters.flatMap(([x,z,count,ijaShare,spread],group)=>Array.from({length:count},(_,i)=>{
   const angle=Random()*Math.PI*2,r=Math.sqrt(Random())*spread;
   const ija=Random()<ijaShare;
-  // Every fourth body of a dense cluster lies across another: piles read as 尸山, not a carpet.
+  // Upper-layer ordering hint only. The load-time solver requires actual body
+  // support underneath; this value must never become an unconditional Y offset.
   const pile=count>=15&&i%4===3?.18+Random()*.2:0;
   return {id:"Aftermath"+group+"_"+i,x:x+Math.cos(angle)*r,z:z+Math.sin(angle)*r,
     yaw:Random()*Math.PI*2,side:ija?"ija":"nra",pose:i%4,
