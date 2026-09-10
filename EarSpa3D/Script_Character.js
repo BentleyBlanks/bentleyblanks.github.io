@@ -152,11 +152,24 @@ export function BuildCharacter(_THREE, { materials, quality = "mid", seed = 2026
   const armUnder = capsule(34, 150, -34, -120, HEAD.cz - 78, 0.28, skinM, q.blob);
   const armFront = capsule(30, 130, 46, -250, HEAD.cz + 62, -0.55, clothM, q.blob);
 
-  // 枕头：软软的一大块，头就枕在上面
-  const pillow = bodyBlob(150, 62, 130, -12, -78, HEAD.cz - 40, new THREE.MeshStandardMaterial({
-    color: new THREE.Color(PALETTE.cream), roughness: 0.98, metalness: 0,
-    sheen: 0.4, sheenColor: new THREE.Color(PALETTE.white),
-  }), q.body);
+  // 枕头：软软的一大块，头就枕在上面。
+  //
+  // 用 MeshPhysicalMaterial 而不是 Standard：`sheen / sheenColor`（布料绒毛的
+  // 边缘反光）只有物理材质认，Standard 只在**构造参数对象**里认这些键，挂在
+  // Standard 上会被 three 静默忽略并每次打一条 `THREE.Material:` 警告——
+  // 画面看不出问题，但 console 被刷屏，验收时真假告警混在一起就分不清了。
+  // 低画质档退回 Standard（省一遍物理材质的光照计算），绒感靠极淡的暖色自发光近似。
+  const pillowIsLow = quality === "low";
+  const pillowMat = pillowIsLow
+    ? new THREE.MeshStandardMaterial({
+      color: new THREE.Color(PALETTE.cream), roughness: 0.98, metalness: 0,
+      emissive: new THREE.Color(PALETTE.cream), emissiveIntensity: 0.06,
+    })
+    : new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(PALETTE.cream), roughness: 0.98, metalness: 0,
+      sheen: 0.4, sheenColor: new THREE.Color(PALETTE.white),
+    });
+  const pillow = bodyBlob(150, 62, 130, -12, -78, HEAD.cz - 40, pillowMat, q.body);
   ownedMaterials.push(pillow.material);
 
   // 头发：一团软软的短发 + 一撮呆毛

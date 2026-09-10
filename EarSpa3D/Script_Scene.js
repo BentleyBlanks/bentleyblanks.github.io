@@ -19,17 +19,45 @@ import { MakeDustPoints } from "./Script_Materials.js";
 // ════════════════════════════════════════════════════════════════════════
 
 const ROOM = {
-  halfW: 1500, // x ∈ [-1500, 1500]
-  halfD: 1500, // z ∈ [-1500, 1500]
+  halfW: 1500, // 局部 x ∈ [-1500, 1500]
+  halfD: 1500, // 局部 z ∈ [-1500, 1500]
   height: 2750,
   wall: 60, // 墙体厚度（做个样子，让窗洞有纵深）
 };
 
-const BED = { x: 0, z: 120, w: 900, d: 1700, top: 420, frame: 90 };
-const TABLE = { x: -1060, z: -430, h: 470, w: 460, d: 460 };
-const LAMP = { x: 1350, z: -1250 }; // 角落落地纸灯
-const HANG = { x: 0, y: 1900, z: 60 }; // 床头垂下的纸灯
-const DESK = { x: -1240, y: 620, z: 900 }; // 床头小台灯（睡衣 mood 只留它）
+// ── 与耳道的落位约定（这是"房间不许穿进耳朵"的结构性约束）───────────
+//
+// 世界原点是**耳道口**（契约 §2：耳道空间原点 = 耳甲腔处的耳道口），
+// 而角色与耳部都是绕原点建的。所以房间必须围绕原点"让开"：
+//
+//   · 地面在原点下方 FLOOR_Y，矮榻的躺面在原点下方 LIE_BELOW（150mm）——
+//     人侧躺在枕上，耳道口本来就在接触面上方约 15~20cm；躺面比 350mm
+//     规则更贴近解剖，所以单独给一条"躺面必须低于 LIE_BELOW"的约束。
+//   · 原点周围 KEEP_CLEAR_R 的水平半径内，**除躺面之外**不许有任何房间几何
+//     高出 SETBACK_Y。地毯、家具、窗帘、灯、墙上的画、绿植全都要让开——
+//     这些是"贴上来的东西"，一旦进了这个半径，将来任何配件都会穿进耳道。
+//
+// 历史事故：房间原先以原点为中心，地面就在 y=0，地毯铺在耳道口下方 3.8mm 处，
+// 耳道内窥射线第一个命中的就是地毯与家具。
+const FLOOR_Y = -390; // 地面标高（世界坐标）
+const LIE_BELOW = 150; // 躺面（床垫上表面）至少低于原点这么多
+const KEEP_CLEAR_R = 350; // 原点保持空的水平半径
+const SETBACK_Y = -350; // 这个半径内的几何必须低于此高度（躺面也要守这一条）
+
+// 房间组的世界落位：原点落在"床头靠窗、身体朝 +z 平躺"的位置，
+// 且四面墙都在 KEEP_CLEAR_R 之外（原点距每面墙 ≥ 470mm）。
+const ROOM_OFFSET = { x: 500, y: FLOOR_Y, z: 1500 };
+
+// BED.top 是"床垫上表面离地高度"。
+// 目标：躺面世界标高 = FLOOR_Y + BED.top = -LIE_BELOW
+//   → BED.top = -LIE_BELOW - FLOOR_Y = -150 + 390 = 240（一张 240mm 高的矮榻）
+// 这个等式必须由代码推出来而不是手写常数：手写时踩过两次——写成 540 的那次
+// 把躺面抬到原点上方 150mm，整张床穿进了耳道。
+const BED = { x: 1000, z: 80, w: 900, d: 1900, top: -LIE_BELOW - FLOOR_Y, frame: 110 }; // 局部；躺面世界标高 = -150
+const TABLE = { x: 240, z: -1040, h: 470, w: 460, d: 460 }; // 小几放到床的左侧前方
+const LAMP = { x: 1150, z: 1050 }; // 角落落地纸灯（原点左后方）
+const HANG = { x: 1000, y: 1510, z: 80 }; // 床头垂下的纸灯（离地 1900）
+const DESK = { x: 2200, y: FLOOR_Y + 890, z: -1180 }; // 床头小台灯（sleepy mood 只留它）
 
 // ════════════════════════════════════════════════════════════════════════
 //  1. 氛围预设（只放"数据"，应用逻辑在 applyMood 里）
@@ -101,8 +129,8 @@ function makeMoods() {
       key: { color: "#C9A98C", intensity: 0.1, pos: [-620, 900, -1150] },
       fill: { color: "#8C7A8E", intensity: 0.12, pos: [1500, 900, 800] },
       rim: { color: PALETTE.honeyDeep, intensity: 0.26, pos: [900, 620, 1500] },
-      hemi: { sky: "#6E6478", ground: "#5B4B42", intensity: 0.26 },
-      ambient: { color: "#D9C3B0", intensity: 0.09 },
+      hemi: { sky: "#6E6478", ground: "#3E352F", intensity: 0.16 },
+      ambient: { color: "#D9C3B0", intensity: 0.06 },
       spot: { color: PALETTE.honeyDeep, intensity: 3.5, distance: 2000, decay: 1.7 },
       desk: { color: PALETTE.honey, intensity: 11 },
       sky: { day: 0, night: 1, tint: "#6B6E86" },
@@ -495,6 +523,9 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
 
   const group = new THREE.Group();
   group.name = "EarSpaRoom";
+  // 房间的落位：世界原点是耳道口，人躺的位置与四面墙都要围绕它排开。
+  // 这里只设一次 group.position，房间内部所有坐标仍写"局部"的（好读）。
+  group.position.set(ROOM_OFFSET.x, ROOM_OFFSET.y, ROOM_OFFSET.z);
 
   // 材质兜底：契约要求"材质没传就退回 MeshStandardMaterial 默认色"，绝不抛异常。
   const mat = (key, fallbackColor) => {
@@ -522,25 +553,34 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
   };
 
   // 房间自己的派生材质（都不是从 materials 里直接拿的通用件）。
-  // 用到 sheen 的必须走 Physical——Standard 上没有这个属性，会被静默忽略。
-  const MINT = new THREE.MeshPhysicalMaterial({
-    color: new THREE.Color(PALETTE.mintDeep),
-    roughness: 0.85,
-    metalness: 0,
-    sheen: 0.45,
-    sheenColor: new THREE.Color(PALETTE.mint),
-    envMapIntensity: 0.5,
-  });
-  MINT.name = "AccentMint";
-  const PEACH = new THREE.MeshPhysicalMaterial({
-    color: new THREE.Color(PALETTE.peachDeep),
-    roughness: 0.88,
-    metalness: 0,
-    sheen: 0.45,
-    sheenColor: new THREE.Color(PALETTE.peach),
-    envMapIntensity: 0.5,
-  });
-  PEACH.name = "AccentPeach";
+  // sheen / clearcoat 属于 MeshPhysicalMaterial：Standard 不认这些键，three 会忽略并
+  // 打 setValues 告警——所以必须走构造参数，且低档整条退回 Standard（用 emissive 找补）。
+  const accent = (name, color, sheenColor) =>
+    low
+      ? Object.assign(
+          new THREE.MeshStandardMaterial({
+            color: new THREE.Color(color),
+            roughness: 0.82,
+            metalness: 0,
+            emissive: new THREE.Color(sheenColor),
+            emissiveIntensity: 0.08,
+            envMapIntensity: 0.5,
+          }),
+          { name }
+        )
+      : Object.assign(
+          new THREE.MeshPhysicalMaterial({
+            color: new THREE.Color(color),
+            roughness: 0.85,
+            metalness: 0,
+            sheen: 0.45,
+            sheenColor: new THREE.Color(sheenColor),
+            envMapIntensity: 0.5,
+          }),
+          { name }
+        );
+  const MINT = accent("AccentMint", PALETTE.mintDeep, PALETTE.mint);
+  const PEACH = accent("AccentPeach", PALETTE.peachDeep, PALETTE.peach);
   const SHAFT = new THREE.MeshStandardMaterial({
     color: new THREE.Color(PALETTE.cream),
     emissive: new THREE.Color(PALETTE.honey),
@@ -580,6 +620,15 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
     return geo;
   };
 
+  // 零件清单里的 y 都写成"离地高度"（好读、好改），这里统一抬到世界标高。
+  // 为什么要统一抬：世界原点是耳道口，地面必须在原点下方（见 FLOOR_Y 的说明），
+  // 而零件表里只愿意写"踢脚线高 110"这种离地数。抬升集中在这一处，
+  // 以后调整标高不用再翻遍整个文件。
+  const lift = (parts) => {
+    for (const p of parts) if (typeof p.y === "number") p.y += FLOOR_Y;
+    return parts;
+  };
+
   // ── 5.1 房间外壳：地板 / 墙 / 天花 ────────────────────────────────
   // 拆成三块几何：地板（顺纹长条）、墙体（细密纹）、深木件。
   // 目的不是好看，是 UV 尺度——木纹贴图里只有 3 圈年轮，3000mm 的大面
@@ -589,7 +638,7 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
   floorParts.push({ type: "box", w: ROOM.halfW * 2, h: 40, d: ROOM.halfD * 2, y: -20 });
   // 天花（浅一点，用同一张贴图但 UV 密一些）
   floorParts.push({ type: "box", w: ROOM.halfW * 2, h: 40, d: ROOM.halfD * 2, y: ROOM.height + 20 });
-  const floorGeo = buildMerged(THREE, floorParts);
+  const floorGeo = buildMerged(THREE, lift(floorParts));
   scaleUV(THREE, floorGeo, 4, 4); // 一张贴图铺 750mm，年轮约 250mm 一道
   ownGeos.push(floorGeo);
   const floorMesh = new THREE.Mesh(floorGeo, M.bone);
@@ -627,7 +676,7 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
   // 窗棂（一根竖 + 一根横）——日式格子窗的味
   shell.push({ type: "box", w: 54, h: winT - winB, d: 60, x: 0, y: (winB + winT) / 2, z: -ROOM.halfD - 40 });
   shell.push({ type: "box", w: winR - winL, h: 54, d: 60, x: 0, y: (winB + winT) / 2 + 180, z: -ROOM.halfD - 40 });
-  const shellGeo = buildMerged(THREE, shell);
+  const shellGeo = buildMerged(THREE, lift(shell));
   scaleUV(THREE, shellGeo, 2.2, 2.2); // 墙面：一张贴图约 1360mm
   ownGeos.push(shellGeo);
   const shellMesh = new THREE.Mesh(shellGeo, M.bone);
@@ -638,10 +687,32 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
 
   // 深木件：窗框的线条感 + 后面的家具，共用一个 draw call 的组
   const darkParts = [];
-  // 榻的床架
-  darkParts.push({ type: "box", w: BED.w, h: BED.frame, d: BED.d, x: BED.x, y: BED.frame / 2, z: BED.z });
-  darkParts.push({ type: "box", w: BED.w + 70, h: 60, d: BED.d + 70, x: BED.x, y: BED.frame + 30, z: BED.z });
-  // 床头小几（两条细腿 + 台面）
+  // 榻的床架：**只有矮腿 + 一圈边条**，不做一个从地面到床面的实心盒子。
+  // 原因见 FLOOR_Y 的说明：实心床架的顶面会正好顶到原点附近，耳道就被"包"进去了。
+  // 矮腿 + 边条既保住了榻的体量感，又把床面附近让了出来。
+  for (const [dx, dz] of [
+    [-1, -1],
+    [1, -1],
+    [-1, 1],
+    [1, 1],
+  ]) {
+    darkParts.push({
+      type: "box",
+      w: 70,
+      h: BED.frame,
+      d: 70,
+      x: BED.x + dx * (BED.w / 2 - 50),
+      y: BED.frame / 2,
+      z: BED.z + dz * (BED.d / 2 - 50),
+    });
+  }
+  // 床边条（四面围一圈，托住床垫）
+  const railY = BED.frame - 15;
+  darkParts.push({ type: "box", w: BED.w + 60, h: 30, d: 60, x: BED.x, y: railY, z: BED.z - BED.d / 2 });
+  darkParts.push({ type: "box", w: BED.w + 60, h: 30, d: 60, x: BED.x, y: railY, z: BED.z + BED.d / 2 });
+  darkParts.push({ type: "box", w: 60, h: 30, d: BED.d, x: BED.x - BED.w / 2, y: railY, z: BED.z });
+  darkParts.push({ type: "box", w: 60, h: 30, d: BED.d, x: BED.x + BED.w / 2, y: railY, z: BED.z });
+  // 床头小几（四条细腿 + 台面）
   darkParts.push({ type: "box", w: TABLE.w, h: 48, d: TABLE.d, x: TABLE.x, y: TABLE.h, z: TABLE.z });
   for (const [dx, dz] of [
     [-1, -1],
@@ -660,23 +731,23 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
       z: TABLE.z + dz * (TABLE.d / 2 - 40),
     });
   }
-  // 墙上两幅小画的框
+  // 墙上两幅小画的框（挂在 -x 侧墙）
   darkParts.push({ type: "box", w: 380, h: 500, d: 34, x: -1180, y: 1800, z: -1420, rot: [0, Math.PI / 2, 0] });
   darkParts.push({ type: "box", w: 300, h: 300, d: 34, x: -1180, y: 1180, z: -960, rot: [0, Math.PI / 2, 0] });
-  // 矮凳（右侧，不挡视线）
-  darkParts.push({ type: "box", w: 420, h: 60, d: 420, x: 1060, y: 430, z: 700 });
+  // 矮凳（挪到床的右后侧，原先的位置会和床头小几叠在一起）
+  darkParts.push({ type: "box", w: 420, h: 60, d: 420, x: 300, y: 430, z: 1180 });
   for (const [dx, dz] of [
     [-1, -1],
     [1, -1],
     [-1, 1],
     [1, 1],
   ]) {
-    darkParts.push({ type: "box", w: 46, h: 400, d: 46, x: 1060 + dx * 165, y: 200, z: 700 + dz * 165 });
+    darkParts.push({ type: "box", w: 46, h: 400, d: 46, x: 300 + dx * 165, y: 200, z: 1180 + dz * 165 });
   }
   // 落纸灯的底座与灯杆
   darkParts.push({ type: "cylinder", rTop: 150, rBottom: 180, height: 60, seg: 20, x: LAMP.x, y: 30, z: LAMP.z });
   darkParts.push({ type: "cylinder", rTop: 16, rBottom: 16, height: 1500, seg: 10, x: LAMP.x, y: 810, z: LAMP.z });
-  const darkGeo = buildMerged(THREE, darkParts);
+  const darkGeo = buildMerged(THREE, lift(darkParts));
   ownGeos.push(darkGeo);
   const darkMesh = new THREE.Mesh(darkGeo, M.woodDark);
   darkMesh.name = "RoomFurnitureDark";
@@ -685,7 +756,9 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
   group.add(darkMesh);
 
   // 竹编地毯（细条 InstancedMesh：一张毯子只花 1 个 draw call）
-  const RUG = { w: 1900, d: 1250, z: 420 };
+  // 位置：铺在床的**远侧**（局部 x 偏大 = 世界 x 偏左），离开原点 KEEP_CLEAR_R 之外。
+  // 原先它铺在床尾正下方，正好压在耳道口下方 3.8mm 处，是这次穿模的主犯。
+  const RUG = { w: 1400, d: 1250, x: 260, z: 420 };
   const rugStrips = low ? 26 : 40;
   const rugGeo = new THREE.BoxGeometry(RUG.w, 16, RUG.d / rugStrips - 8);
   const rugMesh = new THREE.InstancedMesh(rugGeo, M.bamboo, rugStrips);
@@ -697,7 +770,7 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
       const z = -RUG.d / 2 + (i + 0.5) * (RUG.d / rugStrips);
       // 竹条轻微错位，看起来是手工编的
       const jitter = ((i * 37) % 7) / 7 - 0.5;
-      m4.makeTranslation(jitter * 6, 8 + (i % 2) * 2, RUG.z + z);
+      m4.makeTranslation(RUG.x + jitter * 6, FLOOR_Y + 8 + (i % 2) * 2, RUG.z + z);
       rugMesh.setMatrixAt(i, m4);
     }
     rugMesh.instanceMatrix.needsUpdate = true;
@@ -707,19 +780,34 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
   group.add(rugMesh);
 
   // ── 5.2 矮榻：床垫 / 软枕 / 被子 ──────────────────────────────────
+  // 躺面（床垫上表面）由 BED.top 反算，定在原点下方 LIE_BELOW=150mm——这是
+  // 侧躺时耳道口离接触面的真实量级。枕头放在**头的后方**（-z 侧），不压在耳道口上：
+  // 真实采耳也是侧躺、耳朵悬在枕沿外，任何压在耳朵上的东西都会挡住耳道。
   const soft = [];
-  const mattressTop = BED.frame + 60 + 130;
-  soft.push({ type: "box", w: BED.w - 40, h: 130, d: BED.d - 40, x: BED.x, y: BED.frame + 60 + 65, z: BED.z });
+  const bedTop = FLOOR_Y + BED.top; // 床垫上表面（世界标高）= -150
+  const matH = 130;
+  soft.push({
+    type: "box",
+    w: BED.w - 40,
+    h: matH,
+    d: BED.d - 40,
+    x: BED.x,
+    y: bedTop - matH / 2 - FLOOR_Y,
+    z: BED.z,
+  });
   // 被子（盖在下半身那一段，带一点压痕的厚度）
-  soft.push({ type: "box", w: BED.w - 20, h: 90, d: 700, x: BED.x, y: mattressTop + 30, z: BED.z + 380 });
-  // 软枕（两个，床头）
-  soft.push({ type: "box", w: BED.w - 260, h: 150, d: 320, x: BED.x - 20, y: mattressTop + 70, z: BED.z - 610 });
-  soft.push({ type: "box", w: BED.w - 320, h: 120, d: 260, x: BED.x + 40, y: mattressTop + 62, z: BED.z - 380 });
-  // 床头靠垫（靠着后墙，暖暖的一块）
-  soft.push({ type: "box", w: BED.w - 120, h: 420, d: 140, x: BED.x, y: mattressTop + 210, z: BED.z - 760 });
+  soft.push({ type: "box", w: BED.w - 20, h: 90, d: 820, x: BED.x, y: bedTop + 45 - FLOOR_Y, z: BED.z + 440 });
+  // 软枕两个，都放在头的后方（-z 侧），近侧那一面在 z ≈ -120mm 之外
+  soft.push({ type: "box", w: BED.w - 120, h: 170, d: 320, x: BED.x, y: bedTop + 85 - FLOOR_Y, z: BED.z - 680 });
+  soft.push({ type: "box", w: BED.w - 220, h: 130, d: 260, x: BED.x, y: bedTop + 65 - FLOOR_Y, z: BED.z - 900 });
+  // 床头板：刻意做矮。它离原点很近，做高了就会顶进 KEEP_CLEAR 半径里
+  // （450mm 高的板曾经让躺面最高点跑到原点上方 310mm，正是穿模的来源之一）。
+  soft.push({ type: "box", w: BED.w - 60, h: 120, d: 110, x: BED.x, y: bedTop + 60 - FLOOR_Y, z: BED.z - 1090 });
   const softGeo = buildMerged(THREE, soft);
-  // 布的 UV 拉大一点：织纹在世界里才有真实尺度
-  scaleUV(THREE, softGeo, 3.2, 3.2);
+  // 布的 UV 拉大：织纹在世界里才有真实尺度。
+  // 但也不能过头——同一张贴图同时当 map 与 normalMap，repeat 太高会起摩尔纹，
+  // 5 是在 900mm 宽的床垫上"看得出布纹又不起噪点"的折中值。
+  scaleUV(THREE, softGeo, 5, 5);
   ownGeos.push(softGeo);
   const softMesh = new THREE.Mesh(softGeo, M.cloth);
   softMesh.name = "Bedding";
@@ -743,9 +831,9 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
   }
   ownGeos.push(cushionGeo);
   const cushions = [
-    { m: MINT, x: -430, z: BED.z - 700, y: mattressTop + 100, s: [280, 300, 180], ry: 0.2 },
-    { m: PEACH, x: 470, z: BED.z - 640, y: mattressTop + 90, s: [250, 260, 170], ry: -0.35 },
-    { m: M.cloth, x: 300, z: BED.z + 620, y: mattressTop + 80, s: [340, 200, 260], ry: 0.5 },
+    { m: MINT, x: -430, z: BED.z - 700, y: bedTop + 100, s: [280, 300, 180], ry: 0.2 },
+    { m: PEACH, x: 470, z: BED.z - 640, y: bedTop + 90, s: [250, 260, 170], ry: -0.35 },
+    { m: M.cloth, x: 300, z: BED.z + 620, y: bedTop + 80, s: [340, 200, 260], ry: 0.5 },
   ];
   for (let i = 0; i < cushions.length; i++) {
     const c = cushions[i];
@@ -763,7 +851,7 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
   // ── 5.3 小几上的茶具（陶瓷：一个托盘 + 壶 + 两只杯）───────────────
   // 每件单独一个 mesh 会白吃 draw call，这里按材质合并：壶的四件并成一个，
   // 两只杯并成一个，两杯茶汤并成一个。合并后的整体摆位用外层 Group 承担。
-  const teaY = TABLE.h + 24;
+  const teaY = FLOOR_Y + TABLE.h + 24;
   const tray = new THREE.Mesh(new THREE.BoxGeometry(320, 16, 220), M.woodDark);
   ownGeos.push(tray.geometry);
   tray.position.set(TABLE.x, teaY + 8, TABLE.z);
@@ -895,7 +983,7 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
     const bulb = new THREE.Mesh(bulbGeo, BULB);
     floorLamp.add(shade, bulb);
   }
-  floorLamp.position.set(LAMP.x, 1680, LAMP.z);
+  floorLamp.position.set(LAMP.x, FLOOR_Y + 1680, LAMP.z);
   floorLamp.name = "FloorLamp";
   group.add(floorLamp);
   lamps.push({ obj: floorLamp, base: 0, amp: 0.018, speed: 0.42, axis: "x" });
@@ -946,7 +1034,7 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
   ownGeos.push(glowGeo);
   const glowSpots = [
     { at: new THREE.Vector3(HANG.x, HANG.y + 90, HANG.z), size: 1500 },
-    { at: new THREE.Vector3(LAMP.x, 1680, LAMP.z), size: 1250 },
+    { at: new THREE.Vector3(LAMP.x, FLOOR_Y + 1680, LAMP.z), size: 1250 },
     { at: new THREE.Vector3(DESK.x, DESK.y + 380, DESK.z), size: 900 },
   ];
   const glowMesh = new THREE.InstancedMesh(glowGeo, glowMat, glowSpots.length * 3);
@@ -976,7 +1064,7 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
   const winW = winR - winL;
   const winH = winT - winB;
   const winCy = (winB + winT) / 2;
-  const winZ = -ROOM.halfD - 30;
+  const winZ = -ROOM.halfD - 60; // 玻璃/雨膜再往里让 30mm，确保离开原点 350mm 之外
 
   // 玻璃：很淡的一层，给窗外景一点"隔着玻璃"的分隔
   const winGlass = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH), M.glass);
@@ -1111,8 +1199,11 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
   for (const [x, zOff, material, name] of [
     [-1400, -20, drapeMat, "DrapeLeft"],
     [1400, -20, drapeMat, "DrapeRight"],
-    [-620, 40, tulleMat, "TulleLeft"],
-    [620, 40, tulleMat, "TulleRight"],
+    // 纱帘：这是唯一一块"正对原点"的大面积几何，必须留在 KEEP_CLEAR_R 之外。
+    // zOff 是相对 winZ 的偏移，winZ 已经在墙外；410 让纱帘落在世界 z=350（原点前方）。
+    // 历史事故：zOff 给 40 时纱帘贴到耳道口 10mm 处，内窥射线第一个命中的就是它。
+    [-620, 410, tulleMat, "TulleLeft"],
+    [620, 410, tulleMat, "TulleRight"],
   ]) {
     const c = new THREE.Mesh(curtainGeoMat, material);
     c.position.set(x, curtainPivot - (winH + 420) / 2, winZ + zOff);
@@ -1151,7 +1242,7 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
 
   // 挂植物：一根藤 + 花盆（合并成一个 mesh）+ 一簇 InstancedMesh 叶子（会轻轻摆）
   const plantGroup = new THREE.Group();
-  plantGroup.position.set(980, ROOM.height - 40, -880);
+  plantGroup.position.set(1600, FLOOR_Y + ROOM.height - 40, -700);
   plantGroup.name = "HangingPlant";
   {
     const vineGeo = place(new THREE.CylinderGeometry(7, 5, 520, 6), 0, -260, 0);
@@ -1205,7 +1296,7 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
   // ── 5.7 小道具：棉球罐、鹅毛掸子、药水瓶（都是采耳店的物件）───────
   // 这些小东西每一个都单独成 mesh 的话要白吃十几个 draw call，
   // 这里按材质归堆合并：玻璃一个、水一个、木一个、羽毛两个。
-  const propY = TABLE.h + 24 + 16;
+  const propY = FLOOR_Y + TABLE.h + 24 + 16;
   const propGeos = { glass: [], water: [], cotton: [], wood: [], featherW: [], featherB: [] };
   // 小罐子（玻璃）+ 里面的棉球
   const jarAt = [TABLE.x + 120, propY + 90, TABLE.z - 150];
@@ -1454,12 +1545,14 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
     dust.setOpacity(cur.dustOp);
     // 纸灯的发光体跟着灯强走，否则暗的时候灯罩还在发白。
     // 这里只算"基准亮度"，每帧的呼吸在 Update 里乘上去（不能让乘法自己叠上去）。
-    const k = Math.max(0.25, Math.min(1.6, cur.lampI / 14 + cur.deskI / 26));
-    shaftBase = 0.55 + k * 1.1;
-    bulbBase = 1.4 + k * 2.2;
+    // sleepy 这类暗场氛围要把灯罩压下去：不压的话灯罩自己把整个房间照亮，
+    // "昏暗柔光"就变成了"亮堂的白天"。
+    const k = Math.max(0.08, Math.min(1.15, cur.lampI / 14 + cur.deskI / 26));
+    shaftBase = 0.3 + k * 1.05;
+    bulbBase = 0.9 + k * 2.1;
     SHAFT.emissiveIntensity = shaftBase;
     BULB.emissiveIntensity = bulbBase;
-    glowMat.opacity = 0.22 + k * 0.42;
+    glowMat.opacity = 0.1 + k * 0.34;
     mistMat.opacity = cur.rain * 0.5;
     rainMat.opacity = 0.18 + cur.rain * 0.3;
     skyMatNight.opacity = cur.sky;
@@ -1598,6 +1691,125 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
 
   setMood("teaRoom");
 
+  // ── 落位约定：交给调用方的 landmarks ─────────────────────────────
+  // 世界原点 = 耳道口。下面这几个数就是"房间是怎么围绕耳道排开的"，写出来是为了让
+  // 上游（Script_Main / Script_Camera）不必再自己猜"躺面在哪个高度"。
+  const lyingSurfaceY = FLOOR_Y + BED.top; // 床垫上表面（世界标高）
+  const landmarks = {
+    floorY: FLOOR_Y,
+    lyingSurface: {
+      x: ROOM_OFFSET.x + BED.x,
+      y: lyingSurfaceY,
+      z: ROOM_OFFSET.z + BED.z,
+    },
+    /** 原点周围必须保持空的水平半径（mm）：耳朵、镜头、任何贴上去的配件都靠它 */
+    originKeepClearRadius: KEEP_CLEAR_R,
+    /** 躺面相对原点的高度（mm，负值 = 在原点下方） */
+    lyingSurfaceBelowOrigin: -lyingSurfaceY,
+    /** 房间在世界里的范围，方便机位判断"人在不在屋里" */
+    bounds: {
+      min: { x: ROOM_OFFSET.x - ROOM.halfW - ROOM.wall, y: FLOOR_Y, z: ROOM_OFFSET.z - ROOM.halfD - ROOM.wall },
+      max: { x: ROOM_OFFSET.x + ROOM.halfW + ROOM.wall, y: FLOOR_Y + ROOM.height, z: ROOM_OFFSET.z + ROOM.halfD + ROOM.wall },
+    },
+    ceilingY: FLOOR_Y + ROOM.height,
+    /**
+     * 自查：原点 KEEP_CLEAR_R 内不许有"贴上来的东西"。
+     *
+     * 为什么要逐顶点算而不是比包围盒：BuildRoom 大部分零件是合并过的，
+     * 一块 RoomFurnitureDark 的包围盒跨越整间房、必然"包含原点"，用包围盒
+     * 会报一堆假阳性，真正贴到耳朵上的那一块反而看不出来。
+     * 这里取每个网格的世界坐标顶点样本，逐点算到原点的距离——
+     * 墙、地板这种"把房间围起来"的东西自然就落在半径之外了。
+     *
+     * 躺面（床垫/被子/靠垫）是唯一的例外，而且**只允许在原点下方**：
+     * 现实里耳朵就贴在垫子上，不能要求垫子离耳朵 350mm；但垫子必须整个低于
+     * SETBACK_Y（原点下方 350mm）——躺着时垫子本来就在耳道口下方 150mm 上下，
+     * 守得住；守不住说明整张床被放高了（这个坑踩过）。
+     *
+     * 枕头是**唯一**允许高过 SETBACK_Y 的：头枕在上面，枕面本来就在耳道口上下
+     * 20~40mm 的真实高度上。把它也算违规的话，规则就自相矛盾了——
+     * 真实采耳里耳朵就是贴着枕沿的，不存在"让耳朵离枕头 350mm"的躺法。
+     *
+     * 返回 { ok, offending, bedSurfaceAbove }，两个数组正常情况下都是空的。
+     */
+    auditKeepClear({ radius = KEEP_CLEAR_R, report = false } = {}) {
+      // 躺面：允许近，但必须低于 SETBACK_Y。枕头单独一类（见上面的说明）。
+      const BED_SURFACE = [/^Bedding$/, /^Cushion\d/];
+      // 枕头在合并几何里的高度带：床面往上 20~230mm 那一段算枕头（头枕在上面）。
+      // 被子会稍微高过床面（100mm 左右），它也在这个带里——被子在脚那一头，
+      // 离原点 1.5m 以上，进不了 KEEP_CLEAR 半径，单独用 belowMesaLimit 报出来核对。
+      const PILLOW_BAND = { lo: lyingSurfaceY + 20, hi: lyingSurfaceY + 230 };
+      const MESA_LIMIT = lyingSurfaceY + 150; // 非枕头部分的躺面最高允许到这个高度
+      group.updateMatrixWorld(true);
+      const v = new THREE.Vector3();
+      const offending = [];
+      const bedSurfaceAbove = [];
+      group.traverse((o) => {
+        if (!o.isMesh && !o.isPoints && !o.isLine) return;
+        const isBed = BED_SURFACE.some((re) => re.test(o.name || ""));
+        const pos = o.geometry && o.geometry.getAttribute ? o.geometry.getAttribute("position") : null;
+        if (!pos) return;
+        const count = pos.count;
+        const step = Math.max(1, Math.floor(count / 800)); // 每个网格最多采 800 个点
+        let minDist = Infinity;
+        let closest = null;
+        let bedPeak = -Infinity;
+        for (let i = 0; i < count; i += step) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+          if (v.y > SETBACK_Y) {
+            const d = v.length();
+            if (d < minDist) {
+              minDist = d;
+              closest = [Math.round(v.x * 10) / 10, Math.round(v.y * 10) / 10, Math.round(v.z * 10) / 10];
+            }
+          }
+          if (isBed && (v.y < PILLOW_BAND.lo || v.y > PILLOW_BAND.hi) && v.y > bedPeak) bedPeak = v.y;
+        }
+        if (isBed) {
+          if (Number.isFinite(bedPeak) && bedPeak > MESA_LIMIT) {
+            const box = new THREE.Box3().setFromObject(o);
+            bedSurfaceAbove.push({
+              name: o.name || o.type,
+              highestY: Math.round(bedPeak * 10) / 10,
+              limit: MESA_LIMIT,
+              min: box.min.toArray().map((n) => Math.round(n * 10) / 10),
+              max: box.max.toArray().map((n) => Math.round(n * 10) / 10),
+            });
+          }
+        } else if (Number.isFinite(minDist) && minDist < radius) {
+          const box = new THREE.Box3().setFromObject(o);
+          offending.push({
+            name: o.name || o.type,
+            minDist: Math.round(minDist * 100) / 100,
+            at: closest,
+            min: box.min.toArray().map((n) => Math.round(n * 10) / 10),
+            max: box.max.toArray().map((n) => Math.round(n * 10) / 10),
+          });
+        }
+      });
+      offending.sort((a, b) => a.minDist - b.minDist);
+      bedSurfaceAbove.sort((a, b) => b.highestY - a.highestY);
+      const out = {
+        radius,
+        setbackY: SETBACK_Y,
+        lyingSurfaceY,
+        pillowBand: PILLOW_BAND,
+        mesaLimit: MESA_LIMIT,
+        offending, // 应为空：这个半径内不许有除躺面/枕头以外的房间几何
+        bedSurfaceAbove, // 应为空：非枕头部分的躺面不得高过 mesaLimit
+        ok: offending.length === 0 && bedSurfaceAbove.length === 0,
+      };
+      if (report && !out.ok) {
+        console.warn("[EarSpaRoom] 原点保持空自查未通过：", JSON.stringify(out));
+      }
+      return out;
+    },
+  };
+
+  // 建完就自查一遍：把"耳道被房间包住"这类问题在开发期就打出来，
+  // 不要去等验收射线发现（那时已经很难倒推是哪一块几何）。
+  landmarks.auditKeepClear({ report: true });
+
   return {
     group,
     lights,
@@ -1605,6 +1817,7 @@ export function BuildRoom(THREE_unused, { materials = null, quality = "mid", dus
     setMood,
     Update,
     dispose,
+    landmarks,
     /** 额外给验收/调试用（不在契约里，但只增不改） */
     mood: () => moodId,
     moods: MOOD_IDS,

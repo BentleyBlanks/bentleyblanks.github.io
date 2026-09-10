@@ -147,7 +147,8 @@ export function CreateCameraRig({ core, canal } = {}) {
       if (frame?.tangent) tangent.copy(frame.tangent);
       if (frame?.up) centerUp.copy(frame.up);
       desired.copy(ShopPosition(tip, tmpB));
-      target.copy(tip);
+      // 看向客人斜前方的房间中部，而不是盯着工具尖——盯着尖看会变成耳部特写
+      target.copy(tip).add(shopLookAt);
     }
 
     // 手抖：低频漂移 + 一点点高频
@@ -193,9 +194,26 @@ export function CreateCameraRig({ core, canal } = {}) {
     return camera;
   }
 
-  const shopOffset = new THREE.Vector3(-118, 46, 62);
+  /**
+   * 店里机位：退到客人的斜后方看整间房。
+   *
+   * 原来的偏移是 (-118, 46, 62) —— 离耳道口只有 143mm，画面里几乎只有耳廓、
+   * 脸颊和床沿，「看整个房间和客人的表情」这条完全没做到（实测截图确认）。
+   * 本作单位是毫米、房间是几米见方，所以这个偏移必须是**千毫米级**的。
+   * 具体值在 Main 里按 `room.landmarks.bounds` 算，这里只给一个兜底。
+   */
+  const shopOffset = new THREE.Vector3(-1500, 820, 1200);
+  const shopLookAt = new THREE.Vector3(420, 380, 780);
+
+  /** Main 按房间实际包围盒覆盖这两个向量，房间改了不用回来改相机 */
+  function SetShopFraming(offset, lookAt) {
+    if (offset) shopOffset.copy(offset);
+    if (lookAt) shopLookAt.copy(lookAt);
+  }
+
   function ShopPosition(tip, out) {
-    return out.copy(tip).add(shopOffset);
+    // pullOut 是留给「客人躺下 / 坐起」这类未来状态的拉远系数，一直被声明却没人读
+    return out.copy(tip).addScaledVector(shopOffset, 1 + state.pullOut);
   }
 
   /**
@@ -221,7 +239,7 @@ export function CreateCameraRig({ core, canal } = {}) {
   }
 
   return {
-    state, SetMode, Update, Zoom, SetShake, FocusDepth,
+    state, SetMode, Update, Zoom, SetShake, FocusDepth, SetShopFraming,
     get mode() { return state.mode; },
     get backDistance() { return state.backDistance; },
   };

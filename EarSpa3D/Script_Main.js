@@ -131,6 +131,34 @@ export async function Start() {
   if (room?.ambient) core.scene.add(room.ambient);
   t0 = mark("房间与灯光", t0);
 
+  // 店里机位要按房间实际包围盒定：房间改了不用回来改相机。
+  // 偏移必须是千毫米级的——本作 1 单位 = 1mm，房间是几米见方，
+  // 用几十毫米的偏移会拍成一张耳部特写（实测踩过：143mm，画面里只有耳廓和床沿）。
+  // rig 在下面才建，所以先算好存起来，建完再喂给它。
+  let shopFraming = null;
+  if (room?.landmarks?.bounds) {
+    const b = room.landmarks.bounds;
+    const cx = (b.min.x + b.max.x) / 2;
+    const cy = (b.min.y + b.max.y) / 2;
+    const cz = (b.min.z + b.max.z) / 2;
+    // 看：客人身上再往房间中心偏一点，画框里同时有客人和房间
+    const look = new THREE.Vector3(cx * 0.35, cy * 0.32, cz * 0.35);
+    // 站：从客人出发、朝房间中心的反方向退开 1.3 米，抬高 0.7 米。
+    // **必须是「朝房间内侧退」**，不能拿房间尺寸当偏移直接加——那样相机会退到
+    // 墙外面去，画面里只有一面墙的背面（实测就是一片暗褐）。
+    const inward = new THREE.Vector3(cx - 0, 0, cz - 0);
+    if (inward.lengthSq() < 1e-6) inward.set(0, 0, 1);
+    inward.normalize();
+    const back = 1300;
+    const margin = 260;
+    const offset = new THREE.Vector3(
+      Clamp(-inward.x * back, b.min.x + margin, b.max.x - margin),
+      700,
+      Clamp(-inward.z * back, b.min.z + margin, b.max.z - margin),
+    );
+    shopFraming = { offset, lookAt: look };
+  }
+
   // 微尘：通透空气的关键，UI 里没有开关，跟着画质档走
   if (M.ok && M.mod.MakeDustPoints && (quality !== "low" || true)) {
     const dust = M.mod.MakeDustPoints(THREE, {
@@ -292,11 +320,12 @@ export async function Start() {
     },
   });
   const rig = CreateCameraRig({ core, canal });
+  if (shopFraming) rig.SetShopFraming(shopFraming.offset, shopFraming.lookAt);
   const hand = CreateHand({ canal, core });
   const session = CreateSession({ seed: settings.seed, wax, canal });
 
   const state = {
-    phase: "intro",           // intro | playing | paused | finished
+    phase: "intro",           // intro | counter | playing | paused | finished
     mode: "canal",
     currentToolId: toolSpecs[0]?.id || null,
     unlocked: new Set(toolSpecs.slice(0, 5).map((t) => t.id)),
@@ -306,6 +335,8 @@ export async function Start() {
     expressionUntil: 0,
     elapsed: 0,
   };
+  /** 当前打开的小铺面板（同一时刻只允许一个） */
+  let shopPanel = null;
 
   // ── UI ──
   const ui = U.ok ? U.mod.CreateUi({
@@ -589,117 +620,150 @@ export async function Start() {
   /**
    * 兜底小铺面板。
    *
-   * 存在的理由：经营环是**玩法**，不能因为 UI 模块没加载成功就整条断掉。
-   * 它刻意做得朴素（只有数字、客人、升级三块），真正的观感由 Script_Ui.js
-   * 的 `showShop` 负责；这里保证「无论如何都能开店、能升级、能打烊」。
+   * 优先用 `Script_Ui.js` 的 `showShop`（它更懂自己那套样式）；UI 没提供时用这里
+   * 这一层。**但它不自己写样式**——`.ear-panel / .ear-btn / .ear-opt / .ear-chip`
+   * 这些类都在 Style_EarSpa.css 里，直接复用，观感才和 HUD 是同一套东西。
+   * 自己塞一套 inline 样式的面板会立刻看起来像另一个游戏。
+   *
+   * 经营环是**玩法**，不能因为 UI 模块没加载成功就整条断掉——这层存在的意义
+   * 就是「无论如何都能开店、能升级、能打烊」。
    */
   function ShowFallbackShop() {
     const snapshot = BuildShopSnapshot();
-    const wrap = document.createElement("div");
-    wrap.style.cssText = [
-      "position:absolute", "inset:0", "z-index:600", "display:flex", "align-items:center",
-      "justify-content:center", "padding:24px", "overflow:auto",
-      "background:rgba(74,64,56,.22)", "backdrop-filter:blur(6px)",
-      `font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif`,
-    ].join(";");
-    const card = document.createElement("div");
-    card.style.cssText = [
-      "width:min(680px,100%)", "max-height:86%", "overflow:auto",
-      `background:${PALETTE.cream}`, `border-radius:${SHAPE.radiusLg}`,
-      `box-shadow:${SHAPE.shadowLift}`, "padding:22px 24px",
-      `color:${PALETTE.ink}`, "line-height:1.7",
-    ].join(";");
+    const handlers = ShopHandlers();
+    if (shopPanel) { shopPanel.remove(); shopPanel = null; }
+
+    const scrim = document.createElement("div");
+    scrim.className = "ear-panel-scrim is-open";
+    const panel = document.createElement("div");
+    panel.className = "ear-panel";
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-label", "采耳小铺");
 
     const head = document.createElement("div");
-    head.innerHTML = `<b style="font-size:20px;letter-spacing:.1em">采耳小铺</b>`
-      + `<span style="margin-left:14px;color:${PALETTE.inkSoft};font-size:13px">`
-      + `第 ${snapshot.day} 天 · ${snapshot.shopName} · 声望 ${snapshot.reputation}（${snapshot.rarity}）</span>`
-      + `<div style="margin-top:6px;font-size:22px;color:${PALETTE.honeyDeep}">${snapshot.coins} 文</div>`;
-    card.appendChild(head);
+    head.className = "ear-panel__head";
+    const title = document.createElement("div");
+    title.className = "ear-panel__title";
+    title.textContent = "采耳小铺";
+    const sub = document.createElement("div");
+    sub.className = "ear-panel__sub";
+    sub.textContent = `第 ${snapshot.day} 天 · ${snapshot.shopName} · 声望 ${snapshot.reputation}`;
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "ear-btn ear-btn--icon";
+    close.setAttribute("aria-label", "关上小铺");
+    close.textContent = "×";
+    close.addEventListener("click", () => { scrim.remove(); shopPanel = null; });
+    head.append(title, sub, close);
 
-    const section = (title) => {
-      const t = document.createElement("div");
-      t.textContent = title;
-      t.style.cssText = `margin:18px 0 8px;font-size:13px;letter-spacing:.14em;color:${PALETTE.inkSoft}`;
-      card.appendChild(t);
+    const body = document.createElement("div");
+    body.className = "ear-panel__body";
+
+    const purse = document.createElement("div");
+    purse.className = "ear-chip";
+    purse.style.marginBottom = "10px";
+    purse.textContent = `铜钱 ${snapshot.coins} 文　·　客人档次 ${snapshot.rarity}　·　单价 ×${snapshot.priceMul.toFixed(2)}`;
+    body.appendChild(purse);
+
+    const field = (label) => {
+      const f = document.createElement("div");
+      f.className = "ear-field";
+      const l = document.createElement("div");
+      l.className = "ear-field__label";
+      l.textContent = label;
+      f.appendChild(l);
+      body.appendChild(f);
+      return f;
     };
-
-    section("今日客人");
-    for (const c of snapshot.todayCustomers) {
-      const row = document.createElement("button");
-      row.type = "button";
-      row.style.cssText = [
-        "display:block", "width:100%", "text-align:left", "margin-bottom:8px", "padding:12px 16px",
-        "border:none", `border-radius:${SHAPE.radiusMd}`,
-        `background:${c.done ? PALETTE.mint : PALETTE.white}`,
-        `box-shadow:${SHAPE.shadowSoft}`, "cursor:pointer", "font:inherit", `color:${PALETTE.ink}`,
-      ].join(";");
-      row.textContent = c.done
-        ? `${c.name} · ${c.tierName} —— 已接待，收了 ${c.paid} 文`
-        : `接待 ${c.name}（${c.tierName}）—— ${c.blurb}`;
-      if (!c.done) row.addEventListener("click", () => { wrap.remove(); StartCustomer(c.id); });
-      card.appendChild(row);
-    }
-    if (!snapshot.todayCustomers.length) {
-      const p = document.createElement("div");
-      p.textContent = "今天还没开门。";
-      p.style.cssText = `color:${PALETTE.inkSoft};font-size:13px`;
-      card.appendChild(p);
-    }
-
-    section("升级工具");
-    for (const tool of snapshot.tools) {
-      const offer = snapshot.toolOffers[tool.id];
-      const row = document.createElement("button");
-      row.type = "button";
-      row.style.cssText = [
-        "display:flex", "justify-content:space-between", "align-items:center", "gap:12px",
-        "width:100%", "text-align:left", "margin-bottom:6px", "padding:10px 16px",
-        "border:none", `border-radius:${SHAPE.radiusMd}`,
-        `background:${offer.maxed ? PALETTE.mint : PALETTE.white}`,
-        `box-shadow:${SHAPE.shadowSoft}`, "cursor:pointer", "font:inherit", `color:${PALETTE.ink}`,
-      ].join(";");
-      row.innerHTML = `<span>${tool.cnName}<span style="color:${PALETTE.inkSoft};font-size:12px"> Lv.${offer.level}/5</span></span>`
-        + `<span style="color:${offer.maxed ? PALETTE.mintAccent : offer.affordable ? PALETTE.honeyDeep : PALETTE.inkFaint}">`
-        + `${offer.maxed ? "已满级" : offer.cost + " 文"}</span>`;
-      if (!offer.maxed) row.addEventListener("click", () => { shop.UpgradeTool(tool.id); leveledTools.clear(); wrap.remove(); ShowFallbackShop(); });
-      card.appendChild(row);
-    }
-
-    section("升级铺面");
-    const shopOffer = snapshot.shopOffer;
-    const up = document.createElement("button");
-    up.type = "button";
-    up.style.cssText = [
-      "display:block", "width:100%", "text-align:left", "padding:12px 16px", "border:none",
-      `border-radius:${SHAPE.radiusMd}`, `background:${PALETTE.white}`, `box-shadow:${SHAPE.shadowSoft}`,
-      "cursor:pointer", "font:inherit", `color:${PALETTE.ink}`,
-    ].join(";");
-    up.textContent = shopOffer.maxed
-      ? "已是老字号，没有更大的铺面了"
-      : `${shopOffer.name}（${shopOffer.cost} 文）—— 单价 ×${(SHOP_LEVELS[shopOffer.next - 1].priceMul).toFixed(2)}，多一位客人`;
-    if (!shopOffer.maxed) up.addEventListener("click", () => { shop.UpgradeShop(); wrap.remove(); ShowFallbackShop(); });
-    card.appendChild(up);
-
-    const foot = document.createElement("div");
-    foot.style.cssText = "display:flex;gap:10px;margin-top:20px;flex-wrap:wrap";
-    const mkBtn = (label, bg, fn) => {
+    const opt = (parent, label, onClick, primary = false) => {
       const b = document.createElement("button");
       b.type = "button";
+      b.className = primary ? "ear-opt ear-btn--primary" : "ear-opt";
       b.textContent = label;
-      b.style.cssText = `padding:12px 26px;border:none;border-radius:${SHAPE.radiusPill};`
-        + `background:${bg};color:#fff;font:inherit;cursor:pointer;letter-spacing:.12em`;
-      b.addEventListener("click", fn);
+      if (onClick) b.addEventListener("click", onClick);
+      parent.appendChild(b);
       return b;
     };
-    foot.append(
-      mkBtn("收工，明天再来", PALETTE.mintAccent, () => { wrap.remove(); CloseDay(); }),
-      mkBtn("关掉", PALETTE.inkFaint, () => wrap.remove()),
-    );
-    card.appendChild(foot);
-    wrap.appendChild(card);
-    stage.appendChild(wrap);
-    wrap.addEventListener("click", (e) => { if (e.target === wrap) wrap.remove(); });
+
+    const doneCount = snapshot.todayCustomers.filter((c) => c.done).length;
+    const cf = field(`今日客人（${doneCount}/${snapshot.todayCustomers.length} 位已接待）`);
+    const cRow = document.createElement("div");
+    cRow.className = "ear-field__options";
+    cf.appendChild(cRow);
+    for (const c of snapshot.todayCustomers) {
+      if (c.done) {
+        const done = document.createElement("div");
+        done.className = "ear-chip";
+        done.textContent = `${c.name} · 已接待 ${c.paid} 文`;
+        cRow.appendChild(done);
+      } else {
+        opt(cRow, `接待 ${c.name}（${c.tierName}）`, () => { scrim.remove(); shopPanel = null; StartCustomer(c.id); }, true);
+      }
+    }
+    if (!snapshot.todayCustomers.length) {
+      const empty = document.createElement("div");
+      empty.className = "ear-chip";
+      empty.textContent = "今天还没开门";
+      cRow.appendChild(empty);
+    }
+
+    const tf = field("升级工具（等级越高越省力、越不容易崩碎）");
+    const tRow = document.createElement("div");
+    tRow.className = "ear-field__options";
+    tf.appendChild(tRow);
+    for (const tool of snapshot.tools) {
+      const offer = snapshot.toolOffers[tool.id];
+      const label = offer.maxed
+        ? `${tool.cnName} Lv.5 已满级`
+        : `${tool.cnName} Lv.${offer.level} → ${offer.cost} 文`;
+      const b = opt(tRow, label, () => {
+        const r = shop.UpgradeTool(tool.id);
+        if (r.ok) { leveledTools.clear(); RefreshShop(); audio?.playSfx?.("uiConfirm", { gain: 0.6 }); }
+        else ui?.tip?.("再接待两位客人就够了", { tone: "info", ms: 2200 });
+      });
+      if (offer.maxed) b.disabled = true;
+      else if (!offer.affordable) b.style.opacity = "0.55";
+    }
+
+    const sf = field("升级铺面");
+    const sRow = document.createElement("div");
+    sRow.className = "ear-field__options";
+    sf.appendChild(sRow);
+    const so = snapshot.shopOffer;
+    opt(sRow, so.maxed ? "已是老字号" : `${so.name} · ${so.cost} 文（单价更高、客人更多）`, () => {
+      const r = shop.UpgradeShop();
+      if (r.ok) { room?.setMood?.(shop.state.mood); RefreshShop(); }
+      else ui?.tip?.("攒够钱再来升级铺面", { tone: "info", ms: 2200 });
+    }, !so.maxed);
+
+    const mf = field("今天的氛围");
+    const mRow = document.createElement("div");
+    mRow.className = "ear-field__options";
+    mf.appendChild(mRow);
+    const MOOD_CN = { teaRoom: "午后茶室", rainNight: "雨夜", morning: "清晨", sleepy: "睡前" };
+    for (const mood of ["teaRoom", "morning", "rainNight", "sleepy"]) {
+      const unlocked = snapshot.moods.includes(mood);
+      const b = opt(mRow, MOOD_CN[mood] || mood, () => {
+        if (!unlocked) { ui?.tip?.("升级铺面才能解锁这个氛围", { tone: "info", ms: 2200 }); return; }
+        handlers.onSetMood(mood);
+      });
+      b.setAttribute("aria-pressed", shop.state.mood === mood ? "true" : "false");
+      if (!unlocked) { b.disabled = true; b.style.opacity = "0.5"; }
+    }
+
+    const foot = field("");
+    const fRow = document.createElement("div");
+    fRow.className = "ear-field__options";
+    foot.appendChild(fRow);
+    opt(fRow, "收工，明天再来", () => { scrim.remove(); shopPanel = null; CloseDay(); }, true);
+    opt(fRow, "继续采耳", () => { scrim.remove(); shopPanel = null; });
+
+    panel.append(head, body);
+    scrim.appendChild(panel);
+    stage.appendChild(scrim);
+    scrim.addEventListener("click", (e) => { if (e.target === scrim) { scrim.remove(); shopPanel = null; } });
+    shopPanel = scrim;
+    audio?.playSfx?.("uiTap", { gain: 0.5 });
   }
 
   function Restart() {
@@ -972,7 +1036,25 @@ export async function Start() {
       action01: handFrame.action01,
       toolId: hand.spec?.id,
     });
-    room?.Update?.(dt, { mood01: session.state.relax01 });
+    // 房间的氛围：Update 会吐回曝光 / 雾 / 背景色，**必须接住**。
+    // 不接的话四个 mood 在游戏里只剩灯的明暗差，雨夜和清晨看起来几乎一样
+    // （这是场景模块交付时点出来的一条）。
+    const moodState = room?.Update?.(dt, { mood01: session.state.relax01 });
+    if (moodState) {
+      if (state.mode === "shop") {
+        if (moodState.background !== undefined) core.scene.background = new THREE.Color(moodState.background);
+        if (moodState.fog) {
+          if (!core.scene.fog) core.scene.fog = new THREE.Fog(moodState.fog.color, moodState.fog.near, moodState.fog.far);
+          core.scene.fog.color.set(moodState.fog.color);
+          core.scene.fog.near = moodState.fog.near;
+          core.scene.fog.far = moodState.fog.far;
+        }
+        if (moodState.exposure !== undefined) core.setExposure(moodState.exposure);
+      } else {
+        // 耳道里没有房间的雾（雾是按米标定的，耳道只有几十毫米，留着只会白白算一遍）
+        core.scene.fog = null;
+      }
+    }
     wax?.Update?.(dt, {
       moisture: 0.4,
       vibration01: hand.state.vibration01,

@@ -775,28 +775,29 @@ function paintCloth(ctx, size) {
   const uneven = makeField(1103, 1 / 8, 3);
   const nap = makeFbm(1104, 4);
 
-  const base = [246, 232, 219];
-  const deep = [214, 196, 180];
-  const warm = [255, 245, 236];
+  // 基准色刻意压到中亮：奶油白在暖光下最容易过曝成一片死白，布纹就全丢了。
+  const base = [219, 201, 183];
+  const deep = [176, 156, 138];
+  const warm = [238, 224, 208];
 
   for (let y = 0; y < size; y++) {
     const v = y / size;
     for (let x = 0; x < size; x++) {
       const u = x / size;
       // 经纬线：横竖两个方向的方波，交叉处最亮（织物凸起）
-      const warp = Math.abs(((u * 32) % 1) - 0.5) * 2;
-      const weft = Math.abs(((v * 32) % 1) - 0.5) * 2;
+      const warp = Math.abs(((u * 24) % 1) - 0.5) * 2;
+      const weft = Math.abs(((v * 24) % 1) - 0.5) * 2;
       const thread = (warp + weft) * 0.5;
-      let t = thread * 0.6 + (uneven(u, v) - 0.5) * 0.5 + (nap(u * 18, v * 18) - 0.5) * 0.3;
-      t = fit01(t + 0.35);
+      let t = thread * 0.72 + (uneven(u, v) - 0.5) * 0.5 + (nap(u * 18, v * 18) - 0.5) * 0.34;
+      t = fit01(t + 0.3);
       let r = lerp(deep[0], base[0], t);
       let g = lerp(deep[1], base[1], t);
       let b = lerp(deep[2], base[2], t);
-      r = lerp(r, warm[0], 0.22);
-      g = lerp(g, warm[1], 0.22);
-      b = lerp(b, warm[2], 0.22);
+      r = lerp(r, warm[0], 0.18);
+      g = lerp(g, warm[1], 0.18);
+      b = lerp(b, warm[2], 0.18);
       // 表面绒毛的极淡提亮
-      const fz = fit01((nap(u * 40, v * 40) - 0.6) / 0.3) * 0.22;
+      const fz = fit01((nap(u * 40, v * 40) - 0.6) / 0.3) * 0.16;
       r = lerp(r, 255, fz);
       g = lerp(g, 255, fz);
       b = lerp(b, 255, fz);
@@ -976,27 +977,54 @@ export function CreateMaterials(THREE_unused, { quality = "mid" } = {}) {
     return mat;
   };
 
-  // 皮肤：MeshPhysicalMaterial + sheen（绒感）+ 极淡 clearcoat（湿润高光）。
+  // ── 低档的物理材质退化路径 ────────────────────────────────────────
+  // MeshPhysicalMaterial 比 Standard 贵（多了 sheen + clearcoat 两段 BRDF）。
+  // 低档整条链路退回 MeshStandardMaterial：
+  //   · sheen（绒感）→ 用 emissive 的极淡暖色近似，皮肤/布/羽毛不至于死板
+  //   · clearcoat（湿润高光）→ 直接不要，改用略低的 roughness 顶一点高光
+  // 所有参数一律走构造参数对象（three 只在构造时认这些键；事后赋值会被 setValues
+  // 拒绝并打警告——sheen/clearcoat 属于 Physical，Standard 上一个都不能带）。
+  const lowQ = q === "low";
+  // physOpts 是"完整物理参数"，stdOpts 是低档的等价近似；两边都只在构造时传，不事后改。
+  const makePhysical = (physOpts, stdOpts) => {
+    if (!lowQ) return new THREE.MeshPhysicalMaterial(physOpts);
+    return new THREE.MeshStandardMaterial(stdOpts || physOpts);
+  };
+
+  // 皮肤：Physical + sheen（绒感）+ 极淡 clearcoat（湿润高光）。
   // 次表面感用 emissive 的淡暖色近似——真开 transmission 在手机上会掉一半帧。
   const makeSkin = (inner) => {
-    const m = new THREE.MeshPhysicalMaterial({
+    const base = {
       color: col(inner ? PALETTE.canalWall : PALETTE.skin),
       map: canTex ? (inner ? texSet.skinInnerMap : texSet.skinMap) : null,
       normalMap: wantNormal && canTex ? (inner ? texSet.skinInnerNormal : texSet.skinNormal) : null,
       roughness: inner ? 0.50 : 0.55,
       metalness: 0.0,
-      sheen: 1.0,
-      sheenRoughness: inner ? 0.72 : 0.62,
-      sheenColor: col(PALETTE.skinSheen),
-      clearcoat: inner ? 0.22 : 0.14,
-      clearcoatRoughness: 0.55,
-      emissive: col(PALETTE.skinShadow),
-      emissiveIntensity: inner ? 0.075 : 0.05,
       envMapIntensity: 0.55,
       side: THREE.FrontSide,
-    });
+    };
+    const m = makePhysical(
+      {
+        ...base,
+        sheen: 1.0,
+        sheenRoughness: inner ? 0.72 : 0.62,
+        sheenColor: col(PALETTE.skinSheen),
+        clearcoat: inner ? 0.22 : 0.14,
+        clearcoatRoughness: 0.55,
+        emissive: col(PALETTE.skinShadow),
+        emissiveIntensity: inner ? 0.075 : 0.05,
+      },
+      {
+        ...base,
+        // 低档：没有 sheen/clearcoat，把次表面的暖色提到看得出来的程度，
+        // 并把 roughness 压一点补回湿润感
+        roughness: inner ? 0.46 : 0.5,
+        emissive: col(PALETTE.skinShadow),
+        emissiveIntensity: inner ? 0.19 : 0.14,
+      }
+    );
     if (m.normalMap) m.normalScale.set(inner ? 0.85 : 0.6, inner ? 0.85 : 0.6);
-    m.name = inner ? "EarSkinInner" : "EarSkin";
+    m.name = (inner ? "EarSkinInner" : "EarSkin") + (lowQ ? "Low" : "");
     return keep(m);
   };
   materials.skin = makeSkin(false);
@@ -1005,55 +1033,84 @@ export function CreateMaterials(THREE_unused, { quality = "mid" } = {}) {
   // 鼓膜：珍珠灰粉、半透、有一点点蜡感高光。禁触但要好看到让人舍不得碰。
   // 颜色比调色板稍微往蜜桃偏一点，免得在暖光下发灰、像块塑料。
   materials.drum = keep(
-    new THREE.MeshPhysicalMaterial({
-      color: col(PALETTE.drumMembrane).lerp(col(PALETTE.peach), 0.45),
-      map: canTex ? texSet.skinMap : null,
-      roughness: 0.30,
-      metalness: 0.0,
-      transparent: true,
-      opacity: 0.94,
-      sheen: 0.7,
-      sheenColor: col(PALETTE.drumCone),
-      clearcoat: 0.55,
-      clearcoatRoughness: 0.22,
-      emissive: col(PALETTE.drumCone),
-      emissiveIntensity: 0.22,
-      envMapIntensity: 0.7,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    })
+    makePhysical(
+      {
+        color: col(PALETTE.drumMembrane).lerp(col(PALETTE.peach), 0.45),
+        map: canTex ? texSet.skinMap : null,
+        roughness: 0.30,
+        metalness: 0.0,
+        transparent: true,
+        opacity: 0.94,
+        sheen: 0.7,
+        sheenColor: col(PALETTE.drumCone),
+        clearcoat: 0.55,
+        clearcoatRoughness: 0.22,
+        emissive: col(PALETTE.drumCone),
+        emissiveIntensity: 0.22,
+        envMapIntensity: 0.7,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      },
+      {
+        color: col(PALETTE.drumMembrane).lerp(col(PALETTE.peach), 0.45),
+        map: canTex ? texSet.skinMap : null,
+        roughness: 0.26,
+        metalness: 0.0,
+        transparent: true,
+        opacity: 0.94,
+        emissive: col(PALETTE.drumCone),
+        emissiveIntensity: 0.34,
+        envMapIntensity: 0.7,
+        depthWrite: true,
+        side: THREE.DoubleSide,
+      }
+    )
   );
-  materials.drum.name = "EarDrum";
+  materials.drum.name = "EarDrum" + (lowQ ? "Low" : "");
 
   // 耵聍三兄弟：同一张琥珀贴图，靠 tint / 粗糙度 / 透明度 / emissive 区分。
   // 硬结最透最亮——逆光时要能"透亮"，那是采耳最爽的一眼。
   const makeWax = (name, { tint, map, rough, opacity, emissive, glow, density }) => {
-    const m = new THREE.MeshPhysicalMaterial({
+    const base = {
       color: col(tint),
       map: canTex ? map : null,
       normalMap: wantNormal && canTex ? texSet.waxNormal : null,
-      roughness: rough,
       metalness: 0.0,
       transparent: true,
       opacity,
-      sheen: 0.5,
-      sheenColor: col(PALETTE.waxGlow),
-      sheenRoughness: 0.3,
-      clearcoat: 0.6,
-      clearcoatRoughness: 0.22,
-      emissive: col(emissive),
-      emissiveIntensity: glow,
       envMapIntensity: 1.1,
-      ior: 1.45,
       depthWrite: opacity > 0.9,
-    });
+    };
+    const m = makePhysical(
+      {
+        ...base,
+        roughness: rough, // 湿 0.35 / 干 0.62 / 硬结 0.30
+        sheen: 0.5,
+        sheenColor: col(PALETTE.waxGlow),
+        sheenRoughness: 0.3,
+        clearcoat: 0.6,
+        clearcoatRoughness: 0.22,
+        emissive: col(emissive),
+        emissiveIntensity: glow,
+        ior: 1.45,
+      },
+      {
+        ...base,
+        // 低档：靠 roughness 高低区分干湿，琥珀的"透亮"全部交给 emissive
+        roughness: Math.max(0.2, rough - 0.08),
+        emissive: col(emissive),
+        emissiveIntensity: glow * 1.7,
+      }
+    );
     if (m.normalMap) m.normalScale.set(0.5, 0.5);
-    m.name = name;
-    // 供 Script_Wax 调节"软化后更透更亮"，不用重建材质
+    m.name = name + (lowQ ? "Low" : "");
+    // 供 Script_Wax 调节"软化后更透更亮"，不用重建材质。
+    // 注意：opacity / emissiveIntensity 在 Physical 与 Standard 上都是合法属性，
+    // 这里事后赋值不会触发 setValues 的告警。
     m.userData.soften = (soft01) => {
       const s = fit01(soft01);
       m.opacity = opacity + (0.97 - opacity) * s * 0.6;
-      m.emissiveIntensity = glow * (1 + s * 0.35);
+      m.emissiveIntensity = (lowQ ? glow * 1.7 : glow) * (1 + s * 0.35);
     };
     m.userData.density = density;
     return keep(m);
@@ -1122,24 +1179,37 @@ export function CreateMaterials(THREE_unused, { quality = "mid" } = {}) {
   materials.steelDark = makeSteel("SteelDark", PALETTE.steelDeep, texSet.steelRoughDark, 0.42);
 
   // 竹：细长纤维 + 竹节，稍微有一点蜡质反光（真竹子是抛光过的）。
-  // 注意：sheen 属于 MeshPhysicalMaterial 的扩展，MeshStandardMaterial 会忽略并告警，
-  // 所以凡是要「绒感」的材质都走 Physical（低档时再把 clearcoat 关掉控成本）。
+  // 注意：sheen / clearcoat 是 MeshPhysicalMaterial 的扩展，MeshStandardMaterial
+  // 不认这两个键（会忽略并打 setValues 告警）。所以这里的参数全部只在构造时传，
+  // 低档则由 makePhysical 整条换成 Standard（见 makePhysical 的说明）。
   materials.bamboo = keep(
-    new THREE.MeshPhysicalMaterial({
-      color: col(PALETTE.bamboo),
-      map: canTex ? texSet.bambooMap : null,
-      normalMap: wantNormal && canTex ? texSet.bambooNormal : null,
-      roughness: 0.45,
-      metalness: 0.0,
-      sheen: 0.3,
-      sheenRoughness: 0.6,
-      sheenColor: col(PALETTE.honey),
-      clearcoat: 0.18,
-      clearcoatRoughness: 0.5,
-      envMapIntensity: 0.9,
-    })
+    makePhysical(
+      {
+        color: col(PALETTE.bamboo),
+        map: canTex ? texSet.bambooMap : null,
+        normalMap: wantNormal && canTex ? texSet.bambooNormal : null,
+        roughness: 0.45,
+        metalness: 0.0,
+        sheen: 0.3,
+        sheenRoughness: 0.6,
+        sheenColor: col(PALETTE.honey),
+        clearcoat: 0.18,
+        clearcoatRoughness: 0.5,
+        envMapIntensity: 0.9,
+      },
+      {
+        color: col(PALETTE.bamboo),
+        map: canTex ? texSet.bambooMap : null,
+        normalMap: wantNormal && canTex ? texSet.bambooNormal : null,
+        roughness: 0.38,
+        metalness: 0.0,
+        emissive: col(PALETTE.honey),
+        emissiveIntensity: 0.05,
+        envMapIntensity: 0.9,
+      }
+    )
   );
-  materials.bamboo.name = "Bamboo";
+  materials.bamboo.name = "Bamboo" + (lowQ ? "Low" : "");
 
   // 木：暖木色年轮，房间与木器的底子。
   const makeWood = (name, tint, map, normal, rough) => {
@@ -1160,24 +1230,36 @@ export function CreateMaterials(THREE_unused, { quality = "mid" } = {}) {
   // 羽毛 / 棉花：alphaMap + DoubleSide + 轻微 emissive 提亮，避免透光处发黑。
   // 用 Physical 是为了 sheen——羽毛和棉花的"绒"全靠它，Standard 上没有这个属性。
   const makeFluffy = (name, tint, map, { rough, emissive, glow, sheen, sheenColor, alphaTest }) => {
-    const m = new THREE.MeshPhysicalMaterial({
+    const base = {
       color: col(tint),
       map: canTex ? map : null,
       alphaMap: canTex ? map : null,
       transparent: true,
       alphaTest: alphaTest || 0,
-      roughness: rough,
       metalness: 0.0,
-      emissive: col(emissive),
-      emissiveIntensity: glow,
-      sheen: sheen == null ? 0.8 : sheen,
-      sheenRoughness: 0.85,
-      sheenColor: col(sheenColor || PALETTE.cream),
       side: THREE.DoubleSide,
       depthWrite: true,
       envMapIntensity: 0.85,
-    });
-    m.name = name;
+    };
+    const m = makePhysical(
+      {
+        ...base,
+        roughness: rough,
+        emissive: col(emissive),
+        emissiveIntensity: glow,
+        sheen: sheen == null ? 0.8 : sheen,
+        sheenRoughness: 0.85,
+        sheenColor: col(sheenColor || PALETTE.cream),
+      },
+      {
+        ...base,
+        // 低档：绒感没了，靠 emissive 提亮 + 略降 roughness 找补
+        roughness: Math.max(0.5, rough - 0.1),
+        emissive: col(emissive),
+        emissiveIntensity: glow * 2.2,
+      }
+    );
+    m.name = name + (lowQ ? "Low" : "");
     return keep(m);
   };
   materials.featherWhite = makeFluffy("FeatherWhite", PALETTE.featherWhite, texSet.featherMap, {
@@ -1207,114 +1289,190 @@ export function CreateMaterials(THREE_unused, { quality = "mid" } = {}) {
 
   // 马尾 / 耳毛：细密毛束，用毛发贴图 + 弱高光。
   materials.horsehair = keep(
-    new THREE.MeshPhysicalMaterial({
-      color: col(PALETTE.horsehair),
-      map: canTex ? texSet.hairMap : null,
-      normalMap: wantNormal && canTex ? texSet.hairNormal : null,
-      roughness: 0.42,
-      metalness: 0.0,
-      sheen: 0.6,
-      sheenRoughness: 0.4,
-      sheenColor: col(PALETTE.wood),
-      emissive: col(PALETTE.horsehair),
-      emissiveIntensity: 0.05,
-      side: THREE.DoubleSide,
-      envMapIntensity: 0.8,
-    })
+    makePhysical(
+      {
+        color: col(PALETTE.horsehair),
+        map: canTex ? texSet.hairMap : null,
+        normalMap: wantNormal && canTex ? texSet.hairNormal : null,
+        roughness: 0.42,
+        metalness: 0.0,
+        sheen: 0.6,
+        sheenRoughness: 0.4,
+        sheenColor: col(PALETTE.wood),
+        emissive: col(PALETTE.horsehair),
+        emissiveIntensity: 0.05,
+        side: THREE.DoubleSide,
+        envMapIntensity: 0.8,
+      },
+      {
+        color: col(PALETTE.horsehair),
+        map: canTex ? texSet.hairMap : null,
+        normalMap: wantNormal && canTex ? texSet.hairNormal : null,
+        roughness: 0.36,
+        metalness: 0.0,
+        emissive: col(PALETTE.horsehair),
+        emissiveIntensity: 0.12,
+        side: THREE.DoubleSide,
+        envMapIntensity: 0.8,
+      }
+    )
   );
-  materials.horsehair.name = "Horsehair";
+  materials.horsehair.name = "Horsehair" + (lowQ ? "Low" : "");
 
   // 头发 / 角色发丝：比马尾浅，带一点亮泽。
   materials.hair = keep(
-    new THREE.MeshPhysicalMaterial({
-      color: col(PALETTE.inkSoft),
-      map: canTex ? texSet.hairMap : null,
-      normalMap: wantNormal && canTex ? texSet.hairNormal : null,
-      roughness: 0.36,
-      metalness: 0.0,
-      sheen: 0.5,
-      sheenRoughness: 0.35,
-      sheenColor: col(PALETTE.peach),
-      emissive: col(PALETTE.inkSoft),
-      emissiveIntensity: 0.04,
-      side: THREE.DoubleSide,
-      envMapIntensity: 0.9,
-    })
+    makePhysical(
+      {
+        color: col(PALETTE.inkSoft),
+        map: canTex ? texSet.hairMap : null,
+        normalMap: wantNormal && canTex ? texSet.hairNormal : null,
+        roughness: 0.36,
+        metalness: 0.0,
+        sheen: 0.5,
+        sheenRoughness: 0.35,
+        sheenColor: col(PALETTE.peach),
+        emissive: col(PALETTE.inkSoft),
+        emissiveIntensity: 0.04,
+        side: THREE.DoubleSide,
+        envMapIntensity: 0.9,
+      },
+      {
+        color: col(PALETTE.inkSoft),
+        map: canTex ? texSet.hairMap : null,
+        normalMap: wantNormal && canTex ? texSet.hairNormal : null,
+        roughness: 0.30,
+        metalness: 0.0,
+        emissive: col(PALETTE.inkSoft),
+        emissiveIntensity: 0.1,
+        side: THREE.DoubleSide,
+        envMapIntensity: 0.9,
+      }
+    )
   );
-  materials.hair.name = "Hair";
+  materials.hair.name = "Hair" + (lowQ ? "Low" : "");
 
   // 玻璃（药水瓶 / 水杯）：低粗糙 + 高透明；不用 transmission 以免移动端丢帧。
   materials.glass = keep(
-    new THREE.MeshPhysicalMaterial({
-      color: col(PALETTE.glass),
-      roughness: 0.08,
-      metalness: 0.0,
-      transparent: true,
-      opacity: 0.30,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.05,
-      ior: 1.5,
-      reflectivity: 0.6,
-      envMapIntensity: 1.5,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    })
+    makePhysical(
+      {
+        color: col(PALETTE.glass),
+        roughness: 0.08,
+        metalness: 0.0,
+        transparent: true,
+        opacity: 0.30,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.05,
+        ior: 1.5,
+        reflectivity: 0.6,
+        envMapIntensity: 1.5,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      },
+      {
+        color: col(PALETTE.glass),
+        roughness: 0.1,
+        metalness: 0.0,
+        transparent: true,
+        opacity: 0.3,
+        envMapIntensity: 1.5,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }
+    )
   );
-  materials.glass.name = "Glass";
+  materials.glass.name = "Glass" + (lowQ ? "Low" : "");
 
   // 水 / 液体：低粗糙、高透明、法线扰动（滴耳液、茶杯里的茶汤）。
   materials.water = keep(
-    new THREE.MeshPhysicalMaterial({
-      color: col(PALETTE.water),
-      normalMap: canTex ? texSet.waterNormal : null,
-      roughness: 0.06,
-      metalness: 0.0,
-      transparent: true,
-      opacity: 0.55,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.04,
-      ior: 1.33,
-      envMapIntensity: 1.6,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    })
+    makePhysical(
+      {
+        color: col(PALETTE.water),
+        normalMap: canTex ? texSet.waterNormal : null,
+        roughness: 0.06,
+        metalness: 0.0,
+        transparent: true,
+        opacity: 0.55,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.04,
+        ior: 1.33,
+        envMapIntensity: 1.6,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      },
+      {
+        color: col(PALETTE.water),
+        normalMap: canTex ? texSet.waterNormal : null,
+        roughness: 0.08,
+        metalness: 0.0,
+        transparent: true,
+        opacity: 0.55,
+        envMapIntensity: 1.6,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }
+    )
   );
   if (materials.water.normalMap) materials.water.normalScale.set(0.35, 0.35);
-  materials.water.name = "Water";
+  materials.water.name = "Water" + (lowQ ? "Low" : "");
 
   // 陶瓷（茶具、花瓶）：奶油釉面，很轻的次表面。
   materials.ceramic = keep(
-    new THREE.MeshPhysicalMaterial({
-      color: col(PALETTE.ceramic),
-      roughness: 0.22,
-      metalness: 0.0,
-      clearcoat: 0.9,
-      clearcoatRoughness: 0.12,
-      sheen: 0.3,
-      sheenColor: col(PALETTE.cream),
-      emissive: col(PALETTE.cream),
-      emissiveIntensity: 0.04,
-      envMapIntensity: 1.0,
-    })
+    makePhysical(
+      {
+        color: col(PALETTE.ceramic),
+        roughness: 0.22,
+        metalness: 0.0,
+        clearcoat: 0.9,
+        clearcoatRoughness: 0.12,
+        sheen: 0.3,
+        sheenColor: col(PALETTE.cream),
+        emissive: col(PALETTE.cream),
+        emissiveIntensity: 0.04,
+        envMapIntensity: 1.0,
+      },
+      {
+        color: col(PALETTE.ceramic),
+        roughness: 0.18,
+        metalness: 0.0,
+        emissive: col(PALETTE.cream),
+        emissiveIntensity: 0.1,
+        envMapIntensity: 1.0,
+      }
+    )
   );
-  materials.ceramic.name = "Ceramic";
+  materials.ceramic.name = "Ceramic" + (lowQ ? "Low" : "");
 
   // 布（床品 / 窗帘 / 地毯）：经纬织纹 + 绒毛（sheen 让布有棉绒的柔光）。
   materials.cloth = keep(
-    new THREE.MeshPhysicalMaterial({
-      color: col(PALETTE.creamDeep),
-      map: canTex ? texSet.clothMap : null,
-      normalMap: wantNormal && canTex ? texSet.clothNormal : null,
-      roughness: 0.92,
-      metalness: 0.0,
-      sheen: 0.7,
-      sheenColor: col(PALETTE.cream),
-      sheenRoughness: 0.85,
-      envMapIntensity: 0.55,
-      side: THREE.DoubleSide,
-    })
+    makePhysical(
+      {
+        color: col(PALETTE.cream),
+        map: canTex ? texSet.clothMap : null,
+        normalMap: wantNormal && canTex ? texSet.clothNormal : null,
+        roughness: 0.92,
+        metalness: 0.0,
+        sheen: 0.7,
+        sheenColor: col(PALETTE.cream),
+        sheenRoughness: 0.85,
+        envMapIntensity: 0.55,
+        side: THREE.DoubleSide,
+      },
+      {
+        color: col(PALETTE.cream),
+        map: canTex ? texSet.clothMap : null,
+        normalMap: wantNormal && canTex ? texSet.clothNormal : null,
+        roughness: 0.9,
+        metalness: 0.0,
+        emissive: col(PALETTE.cream),
+        emissiveIntensity: 0.08,
+        envMapIntensity: 0.55,
+        side: THREE.DoubleSide,
+      }
+    )
   );
-  materials.cloth.name = "Cloth";
+  materials.cloth.name = "Cloth" + (lowQ ? "Low" : "");
+  // 布的法线只给一点点：同一张贴图既当 map 又当 normalMap，推太猛会出摩尔纹
+  if (materials.cloth.normalMap) materials.cloth.normalScale.set(0.55, 0.55);
 
   // 微尘（Points 用的 sprite 材质；MakeDustPoints 会自己克隆一份）
   materials.dust = keep(
@@ -1332,14 +1490,9 @@ export function CreateMaterials(THREE_unused, { quality = "mid" } = {}) {
   );
   materials.dust.name = "Dust";
 
-  // 低档再收一层：去掉 clearcoat（每盏灯一次额外高光计算，省在片元上）
-  if (q === "low") {
-    for (const key of ["skin", "skinInner", "waxWet", "waxDry", "waxImpacted", "glass", "water", "ceramic", "bamboo"]) {
-      const m = materials[key];
-      if (m && "clearcoat" in m) m.clearcoat = 0;
-    }
-    materials.drum.depthWrite = true;
-  }
+  // 低档的收尾：已经全部由 makePhysical 在建材质时就分好了 Physical / Standard 两套，
+  // 这里只补一处——低档没有 clearcoat 撑湿润高光，把鼓膜的不透明处理回来更稳。
+  if (lowQ) materials.drum.depthWrite = true;
 
   // 贴图集清单：交给消费方设 repeat / offset，也方便验收页统计
   const textureSet = Object.assign(texSet, {
