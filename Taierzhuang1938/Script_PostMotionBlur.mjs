@@ -91,6 +91,7 @@ uniform float uMinBlurPx;
 uniform float uFrame;
 uniform float uForegroundDepth;
 uniform float uForegroundEps;
+uniform vec2 uNormalDepthResolution;
 varying vec2 vUv;
 ${GLSL_COMMON}
 
@@ -114,7 +115,10 @@ void main() {
   vec4 nd = texture2D(uNormalDepth, vUv);
   vec3 centerColor = texture2D(uColor, vUv).rgb;
   // 硬闸：第一人称手与枪一个像素都不许糊。
-  if (uForegroundDepth > 0.0 && abs(nd.w - uForegroundDepth) < uForegroundEps) {
+  // 标签必须读纹素中心，不能把枪边缘与背景深度线性插值后再比较。
+  ivec2 maskPixel = ivec2(floor(vUv * uNormalDepthResolution + 1e-4));
+  float foregroundDepth = texelFetch(uNormalDepth, maskPixel, 0).w;
+  if (uForegroundDepth > 0.0 && abs(foregroundDepth - uForegroundDepth) < uForegroundEps) {
     gl_FragColor = vec4(centerColor, 1.0);
     return;
   }
@@ -166,12 +170,23 @@ const FRAG_MB_RESOLVE = /* glsl */`
 uniform sampler2D uSharp;
 uniform sampler2D uBlur;
 uniform sampler2D uNeighborMax;
+uniform sampler2D uNormalDepth;
+uniform float uForegroundDepth;
+uniform float uForegroundEps;
+uniform vec2 uNormalDepthResolution;
 uniform vec2 uPixelResolution;
 uniform float uBlurScale;
 uniform float uMinBlurPx;
 uniform float uBlendPx;
 varying vec2 vUv;
 void main() {
+  // 重建靶降采样后已丢失枪械细节；最终输出也必须直接取原分辨率前景。
+  ivec2 maskPixel = ivec2(floor(vUv * uNormalDepthResolution + 1e-4));
+  float depth = texelFetch(uNormalDepth, maskPixel, 0).w;
+  if (uForegroundDepth > 0.0 && abs(depth - uForegroundDepth) < uForegroundEps) {
+    gl_FragColor = vec4(texture2D(uSharp, vUv).rgb, 1.0);
+    return;
+  }
   float lenN = length(texture2D(uNeighborMax, vUv).xy * uBlurScale * uPixelResolution);
   float amount = smoothstep(uMinBlurPx, uBlendPx, lenN);
   gl_FragColor = vec4(mix(texture2D(uSharp, vUv).rgb, texture2D(uBlur, vUv).rgb, amount), 1.0);
@@ -209,11 +224,16 @@ export class MotionBlurPass {
       uMinBlurPx: { value: MOTION_BLUR.minBlurPx },
       uFrame: { value: 0 },
       uForegroundDepth: { value: 0 }, uForegroundEps: { value: 0.002 },
+      uNormalDepthResolution: { value: new THREE.Vector2(2, 2) },
     };
     this.material = MakeFullscreenMaterial(MakeReconstructFrag(this.taps), this.uniforms);
 
     this.uniformsResolve = {
       uSharp: { value: null }, uBlur: { value: null }, uNeighborMax: { value: null },
+      uNormalDepth: this.uniforms.uNormalDepth,
+      uForegroundDepth: this.uniforms.uForegroundDepth,
+      uForegroundEps: this.uniforms.uForegroundEps,
+      uNormalDepthResolution: this.uniforms.uNormalDepthResolution,
       uPixelResolution: { value: new THREE.Vector2(2, 2) },
       uBlurScale: { value: MOTION_BLUR.shutterFraction * 0.5 },
       uMinBlurPx: { value: MOTION_BLUR.minBlurPx },
@@ -309,6 +329,7 @@ export class MotionBlurPass {
     U.uColor.value = ctx.sceneColor.texture;
     U.uVelocity.value = ctx.velocityTexture;
     U.uNormalDepth.value = ctx.normalDepthTexture;
+    U.uNormalDepthResolution.value.set(P.width, P.height);
     U.uNeighborMax.value = this.neighbor.texture;
     U.uPixelResolution.value.set(P.width, P.height);
     // 最大半位移 = 半个 tile：McGuire 的前提是「没有像素跑得比一个 tile 还远」，

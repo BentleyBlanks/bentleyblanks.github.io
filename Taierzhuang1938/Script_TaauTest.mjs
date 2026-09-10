@@ -26,6 +26,7 @@
 // 退出码即成败。
 
 import path from "node:path";
+import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
@@ -444,6 +445,44 @@ try {
     out.foregroundRatio = foregroundPixels / (nd.width * nd.height);
     out.medianDepth = medianDepth;
 
+    // 比较运动模糊前后的同帧 HDR 前景，覆盖中档的半分辨率 resolve。
+    const mb = P.motionBlurPass;
+    const savedMbScale = mb.scale;
+    out.weaponBlur = [];
+    for (const scale of [0.5, 1]) {
+      mb.scale = scale;
+      mb.Resize(P.targets.ldr.width, P.targets.ldr.height);
+      SpinRun(0.035, 3);
+      const sharp = mb.uniforms.uColor.value;
+      const source = Object.values(P.targets).find(rt => rt?.texture === sharp);
+      if (!source) throw new Error("Motion blur source target missing");
+      const before = new Uint16Array(source.width * source.height * 4);
+      const after = new Uint16Array(mb.target.width * mb.target.height * 4);
+      T.renderer.readRenderTargetPixels(source, 0, 0, source.width, source.height, before);
+      T.renderer.readRenderTargetPixels(mb.target, 0, 0, mb.target.width, mb.target.height, after);
+      T.renderer.readRenderTargetPixels(nd, 0, 0, nd.width, nd.height, rawNd);
+      let samples = 0, maxError = 0, worldChanged = 0, changed = 0, maxAt = null;
+      for (let y = 0; y < mb.target.height; y += 1) {
+        for (let x = 0; x < mb.target.width; x += 1) {
+          const depth = NdDepth(Math.floor((x + 0.5) * nd.width / mb.target.width),
+            Math.floor((y + 0.5) * nd.height / mb.target.height));
+          const i = (y * mb.target.width + x) * 4;
+          const delta = Math.max(...[0, 1, 2].map(c =>
+            Math.abs(HalfToFloat(before[i + c]) - HalfToFloat(after[i + c]))));
+          if (Math.abs(depth - P.foregroundViewDepth) < 0.002) {
+            samples += 1;
+            if (delta > 0.002) changed += 1;
+            if (delta > maxError) maxAt = { x, y, before: Array.from(before.slice(i, i + 3)).map(HalfToFloat), after: Array.from(after.slice(i, i + 3)).map(HalfToFloat) };
+            maxError = Math.max(maxError, delta);
+          } else if (delta > 0.001) worldChanged += 1;
+        }
+      }
+      out.weaponBlur.push({ scale, samples, maxError, worldChanged, active: mb.active, changed, maxAt,
+        source: [source.width, source.height], target: [mb.target.width, mb.target.height], normalDepth: [nd.width, nd.height] });
+    }
+    mb.scale = savedMbScale;
+    mb.Resize(P.targets.ldr.width, P.targets.ldr.height);
+
     // draw call 计数：三方在 render() 里会自动 reset，先关掉它
     T.renderer.info.autoReset = false;
     const CountCalls = (options) => {
@@ -613,6 +652,25 @@ try {
     out.programs = T.renderer.info.programs.length;
     return out;
   });
+  if (process.env.TAAU_SHOTS === "1") {
+    await page.evaluate(() => {
+      const T = window.Taierzhuang;
+      T.post.SetDebugView("final");
+      T.player.Spawn(-405, 0, -Math.PI / 2);
+      T.player.health = 100;
+      T.player.pitch = 0.02;
+      T.graphics.renderScale = 1;
+      T.graphics.motionBlur = 1;
+      T.ApplyGraphics();
+      T.post.motionBlurPass.scale = 0.5;
+      T.post.motionBlurPass.Resize(T.post.targets.ldr.width, T.post.targets.ldr.height);
+      Object.assign(T.input, { forward: 1, sprint: true });
+      T.StepFrames(20);
+    });
+    const shotDir = path.join(projectDir, "_shots", "SprintWeaponBlur");
+    await fs.mkdir(shotDir, { recursive: true });
+    await page.screenshot({ path: path.join(shotDir, "Scene_Sprinting.png") });
+  }
 } catch (error) {
   problems.push(`THROW ${String(error).slice(0, 400)}`);
 }
@@ -669,6 +727,11 @@ Check("蒙皮人物：世界照跑、相机不动时没有 tile 顶到速度钳�
   + ` ｜ 最大 ${R.skinnedVelocity.live.max} uv（钳位 ${R.skinnedVelocity.clampUv}）`);
 
 const mt = R.motionTilePx;
+for (const result of R.weaponBlur) {
+  Check(`运动模糊 ${result.scale} 分辨率保留枪械原色且背景仍模糊`,
+    result.active && result.samples > 100 && result.maxError < 0.002 && result.worldChanged > 100,
+    JSON.stringify(result));
+}
 Check("运动模糊：tile 最大速度与角速度成正比（两档 2×）",
   mt.ratio > 1.7 && mt.ratio < 2.35,
   `慢 ${mt.slow.toFixed(2)} px · 快 ${mt.fast.toFixed(2)} px · 比 ${mt.ratio.toFixed(3)}`);
