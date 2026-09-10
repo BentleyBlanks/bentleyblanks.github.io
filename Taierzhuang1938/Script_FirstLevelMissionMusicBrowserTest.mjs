@@ -21,10 +21,20 @@ try {
   await page.waitForFunction(() => window.Tengxian.audio.musicLayer && window.Tengxian.audio.ctx?.state === "running", null, { timeout: 60000 });
   assert.ok(requests.every(url => url.includes("LeavingHome")), "boot must request only the current first-level recording");
   await page.screenshot({ path: path.join(output, "Scene_CarriageMusic.png") });
-  const starts = [[1,"LeavingHome"],[3,"TheFrontClosesIn"],[7,"TheRoadSouth"],[8,"OpenTheWay"],
-    [11,"TheRoadSouth"],[12,"TheFrontClosesIn"],[13,"TheSouthRoadBreaks"],[15,"KeepYourEyesOpen"],[17,null],[18,"TheLivingStillNeedUs"]];
-  for (const [number, id] of starts) {
+  const starts = [[1,"LeavingHome"],[3,"IronSiege"],[4,"IronSiege"],[5,"IronSiege"],
+    [6,"TheFrontClosesIn"],[7,"TheRoadSouth"],[8,"CloseQuartersPressure"],[9,"CloseQuartersPressure"],[10,"CloseQuartersPressure"],
+    [11,"TheRoadSouth"],[12,"IronSiege"],[13,"IronSiege"],[14,"TheSouthRoadBreaks"],
+    [15,"CloseQuartersPressure"],[16,"CloseQuartersPressure"],[16,"KeepYourEyesOpen","FinalCarry"],
+    [17,null],[18,"IronSiege"],[18,"TheLivingStillNeedUs","Exit"]];
+  for (const [number, id, step] of starts) {
     if (number !== 1) await page.evaluate(number => window.Tengxian.Debug.FirstLevelJump(number), number);
+    // Internal story boundaries share public starts; this remains a wiring diagnostic.
+    if (step) await page.evaluate(async step => {
+      const r = window.Tengxian.Debug.FirstLevelMissionRuntime();
+      const { MISSION_STAGES } = await import("./Data_FirstLevelMission.mjs");
+      r.flow.index = MISSION_STAGES.findIndex(stage => stage.id === step);
+      r.UpdateMusic();
+    }, step);
     const cue = id ? `firstLevel${id}` : null;
     await page.waitForFunction(cue => {
       const g = window.Tengxian;
@@ -64,7 +74,8 @@ try {
     assert.ok(row.held); assert.equal(row.errors.length,0);
     assert.ok(row.cached.length<=3);
     if(cue) {
-      assert.ok(row.heads>0 && row.bufferSeconds>90 && row.signalPeak>0.00001, JSON.stringify(row));
+      const isBattleCue = ["CloseQuartersPressure", "IronSiege"].includes(id);
+      assert.ok(row.heads>0 && (isBattleCue ? Math.abs(row.bufferSeconds-90)<0.1 : row.bufferSeconds>90) && row.signalPeak>0.00001, JSON.stringify(row));
       assert.ok(row.dialogueScale<row.normalScale && row.paused && row.resumed);
     }
     rows.push(row); console.log("MUSIC_STAGE",JSON.stringify(row));
@@ -87,8 +98,8 @@ try {
     a.Dispose(); return {staleIgnored,pauseHeld,resumesLatest,silenceHeld};
   });
   assert.ok(Object.values(races).every(Boolean),JSON.stringify(races));
-  assert.equal(new Set(requests.map(url=>url.split("?")[0])).size,7);
+  assert.equal(new Set(requests.map(url=>url.split("?")[0])).size,8);
   assert.deepEqual(errors,[]);
   await fs.writeFile(path.join(output,"Data_MusicVerification.json"),JSON.stringify({rows,races,requests,errors},null,2));
-  console.log("PASS seven audible cues, real stage wiring, dialogue, pause/resume, bounded cache and late-load races");
+  console.log("PASS eight active audible cues, both battle recordings, story transitions, dialogue, pause/resume, cache and late-load races");
 } finally { await browser.close(); await new Promise(resolve=>server.close(resolve)); }

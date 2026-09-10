@@ -1,5 +1,5 @@
 // SeedAudio takes; approved carriage banter with relaxed warmth and a trace of uncertainty. Labels are editor-only metadata.
-export const FIRST_LEVEL_MUSIC_VERSION = "20260909-carriage-banter";
+export const FIRST_LEVEL_MUSIC_VERSION = "20260910-combat-duo";
 export const FIRST_LEVEL_MUSIC_CUES = Object.freeze(Object.fromEntries([
   ["LeavingHome", "车厢闲话", 0.72],
   ["TheFrontClosesIn", "前线压来", 0.50],
@@ -8,6 +8,8 @@ export const FIRST_LEVEL_MUSIC_CUES = Object.freeze(Object.fromEntries([
   ["TheSouthRoadBreaks", "南路断了", 0.56],
   ["KeepYourEyesOpen", "别闭眼", 0.58],
   ["TheLivingStillNeedUs", "后头还有活人", 0.60],
+  ["CloseQuartersPressure", "交火前沿", 0.54],
+  ["IronSiege", "钢铁围攻", 0.54],
 ].map(([id, label, level]) => [`firstLevel${id}`, Object.freeze({
   label, level, file: `FirstLevel/AudioBgm_${id}.mp3`,
   version: FIRST_LEVEL_MUSIC_VERSION, onDemand: true, loopFadeS: 6,
@@ -16,18 +18,18 @@ export const FIRST_LEVEL_MUSIC_CUES = Object.freeze(Object.fromEntries([
 export const FIRST_LEVEL_MUSIC_MIX = Object.freeze({
   transitionS: 1.6, silenceS: 0.12, dialogueScale: 0.42,
   dialogueAttackS: 0.15, dialogueReleaseS: 1.2, cacheLimit: 3,
-  // Quieter preparation and defensive waiting reuse the same take without restarting it.
-  unloadingScale: 0.45, ordersScale: 0.55, transferScale: 0.55, finalCarryScale: 0.55,
+  // Preparation stays restrained; transfer defense uses the normal battle level.
+  unloadingScale: 0.45, ordersScale: 0.55, transferScale: 1, finalCarryScale: 0.55,
 });
 export const FIRST_LEVEL_STAGE_MUSIC = Object.freeze({
   Train: "LeavingHome", Unloading: "LeavingHome",
-  Support: "TheFrontClosesIn", MachineGun: "TheFrontClosesIn", Tank: "TheFrontClosesIn", Orders: "TheFrontClosesIn",
-  South: "TheRoadSouth", Village: "OpenTheWay", Melee: "OpenTheWay", Courtyard: "OpenTheWay",
-  TransferApproach: "TheRoadSouth", Transfer: "TheFrontClosesIn",
-  AirFirst: "TheSouthRoadBreaks", Carry: "TheSouthRoadBreaks", Dive: "TheSouthRoadBreaks",
-  Rescue: "KeepYourEyesOpen", RetreatFirst: "KeepYourEyesOpen", RetreatWall: "KeepYourEyesOpen",
-  RetreatYard: "KeepYourEyesOpen", Reception: "KeepYourEyesOpen", FinalCarry: "KeepYourEyesOpen",
-  Death: null, FinalDefense: "TheLivingStillNeedUs", Exit: "TheLivingStillNeedUs", Complete: null,
+  Support: "IronSiege", MachineGun: "IronSiege", Tank: "IronSiege", Orders: "TheFrontClosesIn",
+  South: "TheRoadSouth", Village: "CloseQuartersPressure", Melee: "CloseQuartersPressure", Courtyard: "CloseQuartersPressure",
+  TransferApproach: "TheRoadSouth", Transfer: "IronSiege",
+  AirFirst: "IronSiege", Carry: "TheSouthRoadBreaks", Dive: "TheSouthRoadBreaks",
+  Rescue: "CloseQuartersPressure", RetreatFirst: "CloseQuartersPressure", RetreatWall: "CloseQuartersPressure",
+  RetreatYard: "CloseQuartersPressure", Reception: "CloseQuartersPressure", FinalCarry: "KeepYourEyesOpen",
+  Death: null, FinalDefense: "IronSiege", Exit: "TheLivingStillNeedUs", Complete: null,
 });
 
 export function FirstLevelMusicState(stage, { shellImpact = false, speaking = false, failed = false } = {}) {

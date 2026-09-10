@@ -1,5 +1,6 @@
-// Package the seven user-approved takes; never regenerates or edits the source recordings.
+// Package user-approved takes; never regenerates or edits the source recordings.
 // node Taierzhuang1938/Script_FirstLevelMusicBake.mjs --source-dir=<LevelOne_SevenCues>
+// Add approved takes without re-encoding existing cues: --only=CloseQuartersPressure,IronSiege
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -7,7 +8,9 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_MUSIC_VERSION } from "./Data_FirstLevelMissionMusic.mjs";
 const sourceDir = process.argv.find(arg => arg.startsWith("--source-dir="))?.slice(13);
-if (!sourceDir) throw new Error("Pass --source-dir with the approved seven-cue folder");
+if (!sourceDir) throw new Error("Pass --source-dir with the approved recordings and Data_Tracklist.json");
+const only = process.argv.find(arg => arg.startsWith("--only="))?.slice(7).split(",");
+if (only?.some(id => !FIRST_LEVEL_MUSIC_CUES[`firstLevel${id}`])) throw new Error("Unknown cue in --only");
 const here = path.dirname(fileURLToPath(import.meta.url));
 const outputDir = path.join(here, "Audio/Music/FirstLevel");
 const sources = JSON.parse(fs.readFileSync(path.join(sourceDir, "Data_Tracklist.json"), "utf8"));
@@ -22,11 +25,14 @@ function Measure(file) {
   return { rmsDbfs: Number(output.match(/mean_volume: ([-\d.]+)/)?.[1]), peakDbfs: Number(output.match(/max_volume: ([-\d.]+)/)?.[1]) };
 }
 fs.mkdirSync(outputDir, { recursive: true });
-const manifest = { version: FIRST_LEVEL_MUSIC_VERSION, model: "seed-audio-1.0",
+const manifestFile = path.join(outputDir, "Data_FirstLevelMusicManifest.json");
+const manifest = only ? JSON.parse(fs.readFileSync(manifestFile, "utf8")) : { model: "seed-audio-1.0",
   provider: "Volcengine", storySource: "https://app.notion.com/p/3d360335331c81ea86f6f637ab92327c",
   terms: "Generated recordings are subject to Volcengine service terms", sampleRate: 44100,
   normalization: { metric: "rmsDbfs", targetDbfs: -27, peakCeilingDbfs: -3 }, cues: {} };
+manifest.version = FIRST_LEVEL_MUSIC_VERSION;
 for (const [cue, spec] of Object.entries(FIRST_LEVEL_MUSIC_CUES)) {
+  if (only && !only.includes(cue.slice("firstLevel".length))) continue;
   const id = cue.slice("firstLevel".length), source = sources.tracks.find(track => track.id === id);
   if (!source) throw new Error(`Missing approved take ${id}`);
   const sourceFile = path.join(sourceDir, path.basename(source.destination));
@@ -43,4 +49,4 @@ for (const [cue, spec] of Object.entries(FIRST_LEVEL_MUSIC_CUES)) {
     sourceGeneratedAt: source.generatedAt, prompt: source.prompt, gainDb, ...result };
   console.log(`${cue}: ${duration.toFixed(2)}s RMS ${result.rmsDbfs} peak ${result.peakDbfs}`);
 }
-fs.writeFileSync(path.join(outputDir, "Data_FirstLevelMusicManifest.json"), JSON.stringify(manifest, null, 2) + "\n");
+fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + "\n");
