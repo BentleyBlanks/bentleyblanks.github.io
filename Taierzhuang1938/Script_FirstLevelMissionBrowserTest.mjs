@@ -14,8 +14,8 @@ const here = path.dirname(fileURLToPath(import.meta.url)),
 const audioCheck = process.argv.includes("--audio");
 const stageJumps = process.argv.includes("--stage-jumps");
 const stageFrom = Number(process.argv.find(arg=>arg.startsWith("--stage-from="))?.split("=")[1] || 1);
-assert.ok(stageFrom===1 || (stageJumps && [12,16].includes(stageFrom)),"supported continuation suites start at 1, 12 or 16");
-const output = path.join(here, "_shots", stageFrom===12 ? "FirstLevelStageTransfer" : stageFrom===16 ? "FirstLevelStageTail" : stageJumps ? "FirstLevelStageContinue" : "FirstLevelMission");
+assert.ok(stageFrom===1 || (stageJumps && [8,12,16].includes(stageFrom)),"supported continuation suites start at 1, 8, 12 or 16");
+const output = path.join(here, "_shots", stageFrom===8 ? "FirstLevelStageVillage" : stageFrom===12 ? "FirstLevelStageTransfer" : stageFrom===16 ? "FirstLevelStageTail" : stageJumps ? "FirstLevelStageContinue" : "FirstLevelMission");
 const jumpReceipts = [];
 async function JumpStage(number) {
   if (!stageJumps) return;
@@ -230,6 +230,9 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
             : g.player.stance === "crouch" ? "KeyC" : "KeyZ");
         g.Debug.Key("ShiftLeft", sprint);
         const b = window.routeBot;
+        // The checkpoint can be on the other side of a wall from the current
+        // waypoint. Rewalk the authored entry instead of cutting across it.
+        b.index = 0;
         b.stalled = 0; b.last = { ...g.player.position };
       }, { stance, sprint });
     }
@@ -761,6 +764,8 @@ try {
     assert.ok(withdrawnSquad.length===4&&withdrawnSquad.every(a=>a.alive&&a.z>-65),"all four companions leave the front trench and follow the southbound column");
     if(process.argv.includes("--through-south")){await Capture("OpeningSquadWithdrawal");console.log("PASS normal opening, gun, tank and four-companion withdrawal");break campaignRun;}
     assert.ok(await page.evaluate(()=>window.villageBodies.every(b=>window.Tengxian.ai.soldiers.some(a=>a.id===b.id&&a.missionId===b.missionId))),"the village reuses its pre-positioned soldiers");
+    }
+    if(stageFrom<=8) {
     await JumpStage(8);
     await Route(
       [
