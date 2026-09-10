@@ -91,7 +91,15 @@ try{
   assert.equal(lifecycle.zeroY,0,"Horizontal blood source must preserve zero Y direction");
   assert(lifecycle.roof.length>0&&lifecycle.roof.every(y=>y>.8),"Platform catches droplets above the ground floor");
   assert(lifecycle.stopped);assert.equal(lifecycle.kept,1);assert.equal(lifecycle.dynamic,0);assert.equal(lifecycle.drops,0);
+  const budget=await page.evaluate(()=>{
+    const {THREE,vfx,scene,Step,Clear}=B,node=new THREE.Group();scene.add(node);node.position.y=1;
+    for(let i=0;i<100;i++){vfx.BloodBurst(node.position,new THREE.Vector3(0,1,0),2);vfx.BloodSpurt(node,null,{x:0,y:1,z:0});}
+    Step(1);const b=vfx.bloodEffects,result={drops:b.activeDrops.length,dropLimit:b.limits.drops,
+      sources:b.sources.size,sourceLimit:b.limits.sources,mistInstances:b.mist.geometry.instanceCount,mistLimit:b.limits.mist};
+    Clear();node.removeFromParent();return result;
+  });
+  assert(budget.drops<=budget.dropLimit&&budget.sources<=budget.sourceLimit&&budget.mistInstances<=budget.mistLimit,"Burst overload stays within all fixed pools");
   assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(shots,"Data_BloodEffectsResults.json"),JSON.stringify({impacts,projection,lifecycle,errors},null,2));
+  fs.writeFileSync(path.join(shots,"Data_BloodEffectsResults.json"),JSON.stringify({impacts,projection,lifecycle,budget,errors},null,2));
   console.log("PASS BloodEffects: rendered projection, mist, physical impacts, platform, zero-axis source, separate pools, detach and clear",JSON.stringify({impacts,projection}));
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
