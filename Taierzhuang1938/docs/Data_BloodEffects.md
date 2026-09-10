@@ -53,7 +53,9 @@ CPU 只追踪有上限的可碰撞液滴，GPU 与 CPU 使用相同的解析解�
 
 `node Taierzhuang1938/Script_BloodEffectsTest.mjs` 使用真实 GPU 与项目后处理验证：
 血雾／飞溅出画、实际碰撞后沉积、台面接住液滴、水平源零 Y 分量不变、独立容量、
-源节点移除与清理、静态层保留。截图和结果落 `_shots/BloodEffects`；本地台架 HTML 被忽略。
+源节点移除与清理、静态层保留、整层一次绘制、采样器上限和过载容量。台面用例使用
+低速水平滴漏并断言落点精确等于台面高度；高速侧喷允许飞出台面，不能假定全被接住。
+截图和结果落 `_shots/BloodEffects`；本地台架 HTML 被忽略。
 
 实际枪击、爆炸、大刀与断肢生命周期由 `Script_GoreRangeTest` 覆盖；第一关预布遗体
 由 `Script_FirstLevelMissionAftermathTest` 检查真实模型、接地、距离层与重建，并保存实际游戏截图。

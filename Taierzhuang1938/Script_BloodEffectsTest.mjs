@@ -79,7 +79,9 @@ try{
   const lifecycle=await page.evaluate(()=>{
     const {THREE,vfx,scene,Clear,Step}=B;Clear();
     const node=new THREE.Group();node.position.set(2,1.1,0);scene.add(node);
-    const handle=vfx.BloodSpurt(node,null,{x:1,y:0,z:0},{seconds:.4,rate:30,decals:8});
+    // A slow horizontal leak must land inside the 1.2 m tabletop; a default high-pressure
+    // spurt can legitimately fly beyond its edge before gravity brings it down.
+    const handle=vfx.BloodSpurt(node,null,{x:1,y:0,z:0},{seconds:.4,rate:30,decals:8,speed:[.15,.15],spread:0});
     const zeroY=vfx.bloodEffects.sources.get(handle).direction.y;Step(120);
     const roof=vfx.bloodEffects.decals.records.filter(Boolean).map(r=>r.position.y);
     const persistent=vfx.CreateBloodDecalLayer(scene,4);persistent.Add(new THREE.Vector3(),new THREE.Vector3(0,1,0),.5,{age:90,pool:true});
@@ -89,7 +91,7 @@ try{
     persistent.Dispose();return {zeroY,roof,stopped,kept,dynamic,drops};
   });
   assert.equal(lifecycle.zeroY,0,"Horizontal blood source must preserve zero Y direction");
-  assert(lifecycle.roof.length>0&&lifecycle.roof.every(y=>y>.8),"Platform catches droplets above the ground floor");
+  assert(lifecycle.roof.length>0&&lifecycle.roof.every(y=>Math.abs(y-.875)<1e-5),"Platform catches droplets exactly on its top surface");
   assert(lifecycle.stopped);assert.equal(lifecycle.kept,1);assert.equal(lifecycle.dynamic,0);assert.equal(lifecycle.drops,0);
   const budget=await page.evaluate(()=>{
     const {THREE,vfx,scene,Step,Clear}=B,node=new THREE.Group();scene.add(node);node.position.y=1;
