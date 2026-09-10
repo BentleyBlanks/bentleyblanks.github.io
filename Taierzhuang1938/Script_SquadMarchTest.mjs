@@ -59,8 +59,8 @@ for(const invalid of [{...config,count:0},{...config,count:25},{...config,leader
 for(const [name,route] of Object.entries({
   corners:[{x:-12,z:10},{x:-12,z:-12},{x:12,z:-12},{x:12,z:10}],
   narrow:[{x:0,z:16},{x:0,z:4,width:2},{x:0,z:-4,width:2},{x:4,z:-20}],
-}))for(const count of [3,6,12,24]){
-  const sim=Simulation(count,17,{route});sim.Run(180);
+}))for(const count of Array.from({length:24},(_,i)=>i+1)){
+  const sim=Simulation(count,count*91,{route});sim.Run(180);
   const states=[...sim.march.outputs.values()];
   assert.ok(states.every(o=>o.status==='arrived'),`${name} ${count}: all members complete route; ${JSON.stringify(states.filter(o=>o.status!=='arrived'))}`);
   console.log(`ok ${name} ${count}: every member reaches its formation destination`);

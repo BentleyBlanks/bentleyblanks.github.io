@@ -710,6 +710,8 @@ try {
         frames: 0,
         trace: [],
         battleEvidence: [],
+        marchEvidence: [],
+        marchStates: {},
       };
     });
     let navigation;
@@ -734,6 +736,15 @@ try {
           if(g.player.bleeding && g.player.health<85)g.Debug.Key("KeyB");
           g.StepFrames(1, 1 / 60, false);
           b.frames++;
+          const march=g.Debug.FirstLevelMissionRuntime().squadMarch;
+          if(march)for(const actor of march.soldiers){
+            const command=actor.squadMarchCommand;
+            if(command&&b.marchStates[actor.id]!==command.status){
+              b.marchStates[actor.id]=command.status;
+              b.marchEvidence.push({id:actor.id,role:command.leader?'leader':'member',status:command.status,
+                time:march.march.time,speed:actor.moveSpeed*3.6,position:{x:actor.position.x,z:actor.position.z}});
+            }
+          }
           if(b.frames%300===0){const m=g.Debug.FirstLevelMission();if(m.stage==="Support")b.battleEvidence.push({position:{...p},sound:m.battleSound,front:m.enemies.filter(e=>e.id.startsWith("Front")).length,
             squad:g.ai.soldiers.filter(a=>a.missionNaturalMarch&&a.castId).map(a=>({id:a.castId,x:a.position.x,z:a.position.z,speed:a.missionMarchSpeed||0,yaw:a.yaw,goal:{x:a.goal.x,z:a.goal.z}}))});}
           if (!g.player.alive) break;
@@ -798,6 +809,10 @@ try {
     const rifle=await page.evaluate(()=>({shots:window.Tengxian.state.playerShots,facts:window.Tengxian.Debug.FirstLevelMission().facts}));
     assert.ok(rifle.shots>0 && rifle.facts.includes("frontRifleDefense") && rifle.facts.includes("forwardNestDestroyed"),"rifle shooting and the real tank shell precede machine gun handover");
     const battlefieldSound=await page.evaluate(()=>window.missionBot.battleEvidence);
+    const marchEvidence=await page.evaluate(()=>window.missionBot.marchEvidence);
+    assert.ok(marchEvidence.some(e=>e.status==='resting'&&e.role==='member'),'shared controller produces an actual rest during the first-level approach');
+    assert.ok(marchEvidence.filter(e=>e.status==='resting').every(e=>e.role!=='leader'&&e.speed<.12),'leader exemption and physical stops reach real AI soldiers');
+    await fs.writeFile(path.join(output,'Data_SquadMarchIntegration.json'),JSON.stringify(marchEvidence,null,2));
     assert.ok(battlefieldSound.length>=3&&battlefieldSound.every(e=>e.front===MISSION_ENCOUNTERS.front.length),"full front encounter exists along the support approach");
     const population=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().assault);
     assert.equal(population.peakFrontAlive,R.frontSimultaneousEnemies,"actual AI reaches 150 living front enemies together");

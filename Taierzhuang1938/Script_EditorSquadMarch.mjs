@@ -119,6 +119,7 @@ export class SquadMarchEditor {
     for(const key of ['x','z'])this.routeInputs[key].value=String(p[key]);
   }
   RouteBounds(){
+    if(this.dragSpan!=null)return this.dragSpan;
     const points=this.config.route,span=Math.max(40,...points.map(p=>Math.abs(p.x)*2.5),...points.map(p=>Math.abs(p.z)*2.5));return span;
   }
   BindRouteInput(){

@@ -76,7 +76,7 @@ export function ValidateSquadMarchConfig(raw) {
   if(!Number.isInteger(config.leaderIndex)||config.leaderIndex<0||config.leaderIndex>=config.count)throw new Error('Invalid leader index');
   config.seed=String(config.seed??17);
   config.preset=config.preset??'guided';
-  if(!SQUAD_MARCH_PRESETS[config.preset])throw new Error('Unknown march preset');
+  if(!Object.hasOwn(SQUAD_MARCH_PRESETS,config.preset))throw new Error('Unknown march preset');
   if(!Array.isArray(config.route)||config.route.length<2||config.route.length>C.maxRoutePoints)throw new Error('Route needs 2–128 points');
   config.route=config.route.map(ValidatePoint);
   if(config.route.slice(1).every((p,i)=>Distance(p,config.route[i])<.01))throw new Error('Route has no length');
@@ -87,7 +87,7 @@ export function ValidateSquadMarchConfig(raw) {
   }
   config.tuning=config.tuning??{};
   for(const [key,value] of Object.entries(config.tuning)){
-    if(!(key in C)||['maxCount','maxRoutePoints'].includes(key)||!Number.isFinite(value)||value<0||value>100)throw new Error(`Invalid march tuning: ${key}`);
+    if(!Object.hasOwn(C,key)||['maxCount','maxRoutePoints'].includes(key)||!Number.isFinite(value)||value<0||value>100)throw new Error(`Invalid march tuning: ${key}`);
   }
   const t={...C,...SQUAD_MARCH_PRESETS[config.preset],...config.tuning};
   if(t.runMinS<.5||t.runMaxS<t.runMinS||t.restMinS<.2||t.restMaxS<t.restMinS||t.speedMps<.1||t.speedMps>8

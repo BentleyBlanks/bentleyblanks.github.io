@@ -54,15 +54,26 @@ try{
     assert.ok(result.actors.every(a=>a.meshSource.startsWith('glb:')));
     console.log(`ok ${count}: real actors, selected leader, seeded stops, saved profile`);
   }
+  const cycles=await page.evaluate(()=>{
+    const e=window.Tengxian.editor.active;e.LoadConfig({...e.config,count:6,leaderIndex:0,seed:'17',route:[{x:0,z:12},{x:0,z:-500}]});e.playing=false;
+    for(let i=0;i<5400;i++)e.Step(1/60);
+    return [...e.march.members.values()].map(m=>({id:m.id,leader:m.leader,cycles:m.cycles}));
+  });assert.ok(cycles.every(m=>m.leader?m.cycles===0:m.cycles>=3),'each real model completes at least three independent run/rest cycles');
   await page.evaluate(()=>{const e=window.Tengxian.editor.active;e.LoadConfig({...e.config,count:6,leaderIndex:0,route:[{x:-12,z:10},{x:-12,z:-12},{x:12,z:-12},{x:12,z:10}]});e.playing=false;for(let i=0;i<420;i++)e.Step(1/60);e.Frame();});
   await page.screenshot({path:path.join(out,'Scene_SquadMarchSix.png')});
   const rest=await page.evaluate(()=>{const e=window.Tengxian.editor.active;for(let i=0;i<600;i++){e.Step(1/60);const at=e.soldiers.findIndex(s=>s.squadMarchCommand?.status==='resting'&&Math.abs(s.squadMarchCommand.lookYaw)>.15);if(at>=0){e.selected=at;e.follow=true;e.Frame();return {id:e.soldiers[at].memberId,speed:e.soldiers[at].moveSpeed,look:e.soldiers[at].squadMarchCommand.lookYaw};}}return null;});
   assert.ok(rest&&rest.speed===0&&Math.abs(rest.look)>.15,'resting actor is stopped and actually scanning');
   await page.screenshot({path:path.join(out,'Scene_SquadMarchRest.png')});
+  const pose=await page.evaluate(()=>{
+    const e=window.Tengxian.editor.active,s=e.soldiers[e.selected],bones=s.actor.characterRig.bones;
+    s.actor.root.updateWorldMatrix(true,true);const head=bones.head.quaternion.clone(),footL=bones.footL.getWorldPosition(s.position.clone()),footR=bones.footR.getWorldPosition(s.position.clone()),position=s.position.clone();
+    for(let i=0;i<6;i++)e.Step(1/60);s.actor.root.updateWorldMatrix(true,true);
+    return {status:s.squadMarchCommand.status,head:head.angleTo(bones.head.quaternion),movement:position.distanceTo(s.position),feet:Math.max(footL.distanceTo(bones.footL.getWorldPosition(s.position.clone())),footR.distanceTo(bones.footR.getWorldPosition(s.position.clone())))};
+  });assert.equal(pose.status,'resting');assert.equal(pose.movement,0);assert.ok(pose.head>.001,'actual head bones scan during rest');assert.ok(pose.feet<.025,'stationary feet remain anchored during breathing');
   const edited=await page.evaluate(()=>{const e=window.Tengxian.editor.active;const route=e.config.route.map(p=>({...p}));route[1].x-=3;e.SetRoute(route);const saved=e.Export();const good=e.LoadConfig(saved);const before=e.config.count;const bad=e.LoadConfig({...saved,count:0});return {good,bad,before,count:e.config.count,x:e.config.route[1].x};});
   assert.ok(edited.good&&!edited.bad);assert.equal(edited.count,edited.before);assert.equal(edited.x,-15);
   const closed=await page.evaluate(()=>{const T=window.Tengxian,e=T.editor.active;const config=e.config;e.SaveProfile();T.editor.Close();const count=T.editor.studio.stand.children.length;T.editor.Open('squadMarch');const again=T.editor.active.config;T.editor.Close();return {count,saved:again.count===config.count&&again.seed===config.seed,elapsed:T.ai.time,active:T.editor.ActiveId,pad:T.editor.studio.pad.scale.x};});
   assert.equal(closed.count,0);assert.ok(closed.saved);assert.equal(closed.active,null);assert.equal(closed.pad,1);assert.equal(closed.elapsed,initial.elapsed,'editor does not advance the live mission');
-  assert.deepEqual(errors,[]);await fs.writeFile(path.join(out,'Data_SquadMarchEditorReport.json'),JSON.stringify({initial,edited,closed,rest,adapter,errors},null,2));
+  assert.deepEqual(errors,[]);await fs.writeFile(path.join(out,'Data_SquadMarchEditorReport.json'),JSON.stringify({initial,edited,closed,rest,pose,cycles,adapter,errors},null,2));
   console.log(`ok config roundtrip, invalid import rejection, persistent styles, clean exit; screenshot ${out}`);
 }finally{await browser.close();if(server)await new Promise(resolve=>server.close(resolve));}
