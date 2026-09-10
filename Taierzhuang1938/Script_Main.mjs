@@ -1232,6 +1232,7 @@ async function Boot() {
   vfx = new VfxSystem(scene, library, {
     quality: QUALITY, maxParticles: SCALE.vfxBudget, lights,
   });
+  vfx.SetBloodSurface((from,direction,distance)=>battlefield?.Raycast(from,direction,distance,{terrain:true}));
   // 浮尘：体积光要有介质才散射得出来，不然 godStrength 给再大也只是天上一片糊。
   // AmbientDust 会重建整个 DustField（丢旧的、建新的），所以只在这里调一次，
   // 换关时由 EnterLevel 重新按新切片调一次，别每帧调。

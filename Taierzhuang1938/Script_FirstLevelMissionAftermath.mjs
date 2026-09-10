@@ -1,10 +1,11 @@
 import { ClusterDistantGeometry } from "./Script_DistantGeometry.mjs";
 import * as THREE from "three";
 import { ACTOR_DETAIL } from "./Data_Tuning_Ai.mjs";
+import { BLOOD_DRESSING as BLOOD } from "./Data_Tuning_Blood.mjs";
 import { MISSION_PEOPLE_TUNING as C, MISSION_BODY_SUPPORT } from "./Data_Tuning_FirstLevel.mjs";
 import { MissionTrainLifePose } from "./Script_FirstLevelMissionTrainLife.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
-import { BuildSink } from "./Script_World.mjs";
+
 import { MISSION_AFTERMATH } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_CIVILIAN_AFTERMATH } from "./Data_FirstLevelMissionCivilianAftermath.mjs";
 import { CreateBodyContactShape, MissionBodySupport } from "./Script_FirstLevelMissionBodySupport.mjs";
@@ -43,15 +44,13 @@ const _sphere = new THREE.Sphere();
 const _quaternion = new THREE.Quaternion();
 
 export class MissionAftermath {
-  constructor({root,battlefield,actorFactory,bodies=[...MISSION_AFTERMATH,...MISSION_CIVILIAN_AFTERMATH]}) {
+  constructor({root,battlefield,actorFactory,vfx,bodies=[...MISSION_AFTERMATH,...MISSION_CIVILIAN_AFTERMATH]}) {
     this.root=new THREE.Group();this.root.name="MissionBattlefieldAftermath";root.add(this.root);
     this.materials=new Map();this.clones=[];
-    this.blood=new THREE.MeshStandardMaterial({color:0x4b1110,roughness:.72,metalness:0,side:THREE.DoubleSide});
-    this.materials.set("Blood",this.blood);
+    this.bloodLayer=vfx?.CreateBloodDecalLayer(this.root,bodies.length);
     this.prototypes=new Map();
     this.instances=[];
     this.lastFocus=new THREE.Vector3(NaN,NaN,NaN);this.lastQuaternion=new THREE.Quaternion(0,0,0,0);this.frames=0;
-    const bloodSink=new BuildSink();
     const groundAt=(x,z)=>(battlefield.StaticGroundHeight||battlefield.GroundHeight).call(battlefield,x,z);
     const support=new MissionBodySupport(groundAt);
     const contactShapes=new Map(),settleStart=performance.now();
@@ -70,7 +69,6 @@ export class MissionAftermath {
         this.prototypes.set(key,prototype);
         contactShapes.set(key,CreateBodyContactShape(parts));
       }
-      const ground=groundAt(spec.x,spec.z);
       const shape=contactShapes.get(key),settled=support.Settle(shape,spec),matrix=settled.matrix;
       // Authored upper bodies rest on the ground layer; never grow accidental
       // towers by feeding one upper body's height into the next upper body.
@@ -78,15 +76,14 @@ export class MissionAftermath {
       const instance={id:spec.id,side:spec.side,houseId:spec.houseId,x:spec.x,y:settled.center.y,z:spec.z,
         center:settled.center,radius:settled.radius,matrix,tier:TIERS-1,prototype};
       this.instances.push(instance);prototype.members.push(instance);
-      // Irregular, terrain-conforming pools and smears; each body has its own outline.
-      const vertices=[],count=13,angle=spec.yaw;
-      const Point=(i)=>{const a=i/count*Math.PI*2,r=spec.blood*(.78+.22*Math.sin(i*2.37+spec.x));
-        const x=spec.x+Math.cos(a+angle)*r,z=spec.z+Math.sin(a+angle)*r*.68;
-        return [x,groundAt(x,z)+.013,z];};
-      const center=[spec.x,ground+.013,spec.z];
-      for(let i=0;i<count;i++)vertices.push(...center,...Point(i),...Point((i+1)%count));
-      const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.Float32BufferAttribute(vertices,3));g.computeVertexNormals();
-      bloodSink.Add("Blood",g);
+      // Reuse the same projected material as fresh combat blood, aged and restrained.
+      const stain=new THREE.Vector3(...BLOOD.offset).applyMatrix4(matrix);
+      stain.y=groundAt(stain.x,stain.z);
+      const e=BLOOD.normalSampleM,n=new THREE.Vector3(groundAt(stain.x-e,stain.z)-groundAt(stain.x+e,stain.z),2*e,
+        groundAt(stain.x,stain.z-e)-groundAt(stain.x,stain.z+e)).normalize();
+      this.bloodLayer?.Add(stain,n,Math.max(BLOOD.minRadius,spec.blood*BLOOD.radiusScale),
+        {now:vfx.time,age:BLOOD.age+spec.pose*BLOOD.ageStep,pool:true,aspect:BLOOD.aspect,opacity:BLOOD.opacity,
+          seed:((spec.x*7.31+spec.z*3.19)%1+1)%1});
     }
     this.settleMs=performance.now()-settleStart;
     // One instance table per part and tier, sized to the pose's member count.
@@ -103,8 +100,7 @@ export class MissionAftermath {
         });
       }
     }
-    this.bloodMeshes=bloodSink.Flush(this.root,{Get:key=>this.materials.get(key)});
-    for(const m of this.bloodMeshes){m.castShadow=false;m.receiveShadow=true;m.geometry.computeBoundingBox();}
+    this.bloodMeshes=this.bloodLayer?[this.bloodLayer.mesh]:[];
     this.count=bodies.length;
     // Budget report: what the whole field would cost at every tier.
     // 名字保持 detail / distant / far（`FirstLevelMissionPresentationTest` 按它断言），
@@ -164,9 +160,8 @@ export class MissionAftermath {
   Dispose(){
     this.root.removeFromParent();
     for(const prototype of this.prototypes.values())for(const part of prototype.parts){for(const g of part.tiers)g.dispose();for(const m of part.meshes)m.dispose?.();}
-    for(const mesh of this.bloodMeshes)mesh.geometry.dispose();
+    this.bloodLayer?.Dispose();
     for(const material of this.clones)material.dispose();
-    this.blood.dispose();
   }
 }
 

@@ -234,3 +234,11 @@ CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保�
 | `OfficerSwordSet`、`Type11`、`Mauser96`、`MediumMortar`（另有 `WaltherP38`、`Karabiner98k`、`UnidentifiedBoltActionRifle`、`UnidentifiedAntiaircraftGun`、`LightMortar` 五件于 2026-09-05 按史实考据移除，`RingPommelDagger`、`UnidentifiedMunition`、`BrowningTripodAssembly` 三件于 2026-09-06 作为无制式道具移除，见 `_import/Reference/LugouqiaoWeapons/Data_LugouqiaoWeaponIdentification.md`） | 用户提供的 `武器.max` 与同目录 `texture/` | 用户提供；本仓库未取得也不推断第三方公开许可 | 按 12 个根节点拆成独立 Blend（现存 7 件），16 张 DDS/TGA/JPEG 原图逐文件保存在 `_import/Source/Model_LugouqiaoWeapons/Texture_Source/`。运行时 TZM 保留 UV/材质槽，浏览器贴图由 `Script_SplitLugouqiaoWeapons.py` 转换；型号不明的八件附识别截图，不冒认史实制式。 |
 
 这批资源不是公开素材库下载项，不应被重新标成 CC0 / CC-BY。若站点公开分发权限后续无法确认，应移除这批源 Blend、原始贴图和运行时派生物，再恢复项目原有武器模型。
+
+## 血液特效纹理（2026-09-11）
+
+- 游戏文件：`Texture/Texture_BloodSplatterCc0.png`，1600×1200 RGBA，2,625,982 bytes。
+- 作者：ExileGL；[Blood Splatter](https://opengameart.org/content/blood-splatter)，页面标记 CC0。
+- 原始下载：<https://opengameart.org/sites/default/files/blood_0.png>；原样保存，没有重绘或图像生成。
+- SHA-256：`2f625d3ce46c723c54f3a78a94cd54aef808ef2480b470dd70bf7b6fdbb42c14`。
+- `Script_SurfaceDecals` 取 alpha 作为液滴／毛细渗透细节，血色与湿干状态由共享材质定义。

@@ -85,7 +85,7 @@ export class FirstLevelMissionRuntime {
       battlefield: this.battlefield,
       physics: this.physics,
       column: this.column,
-      actorFactory:this.actorFactory,library:this.library,hud:this.hud,
+      actorFactory:this.actorFactory,library:this.library,hud:this.hud,vfx:this.vfx,
     });
     this.oldBlast = this.combat.host.onBlast;
     this.combat.host.onBlast = (event) => {

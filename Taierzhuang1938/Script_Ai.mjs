@@ -464,6 +464,7 @@ export class Soldier {
     // 阵亡事件从这里出，是**唯一**的一条路。
     // 以前扣票分散在三处（Combat.Blast 的 onKill、Main.TryFire、Main.DoMelee），
     // 结果是：日军炮弹炸死中国兵扣日方的票，玩家亲手打死人扣两票。
+    this.director?.ctx?.vfx?.CorpseBlood?.(this.actor);
     if (this.director) this.director.NotifyDeath(this);
     // 倒下的那一声是**旁边的人**喊的（「班长！班长！」），所以位置取阵亡处、
     // 但语气归活人。这一条比"死人自己惨叫"更接近战场，也更不容易滥。

@@ -47,6 +47,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  BloodEffectsTest: {file:"Script_BloodEffectsTest.mjs",timeoutMs:180000,desc:"Shared blood GPU projection, ballistic collision, platform and source lifecycle"},
   SquadMarchTest: {file:"Script_SquadMarchTest.mjs",desc:"Shared squad cadence, roles, safe interruption, replay and population variants"},
   SquadMarchEditorTest: {file:"Script_SquadMarchEditorTest.mjs",timeoutMs:300000,desc:"Squad editor real actors, editable routes, per-count styles and cleanup"},
   SquadMarchAiTest: {file:"Script_SquadMarchAiTest.mjs",desc:"Real adapter memory/contact distinction, movement ownership and mission pose handoff"},
@@ -302,7 +303,7 @@ export const browserTests = new Set([
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
-  "SamplerBudgetTest",
+  "SamplerBudgetTest", "BloodEffectsTest",
   "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "GoreRangeTest", "MenuTest",
   "ClusteredLightsTest", "MaterialUpgradeTest",
   "PerformanceTest", "PhysicsTest", "PostTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
@@ -439,7 +440,7 @@ export const domains = {
     //（UpdateFire / MoveSmokeSource），所以碰灯光或粒子的改动也要连着 FlareTest 跑。
     // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
-    tests: ["TestSceneLightingTest", "PostTest", "AutoQualityTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
+    tests: ["BloodEffectsTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -463,7 +464,7 @@ const changedDomainRules = [
   {domain:"combat",pattern:/FpsSkeleton|FpsSkeletal|FpsAnimation|Animation\/FirstPerson\/Data_Fps/},
   { domain: "combat", pattern: /CoverLean/i },
   // 断肢：规则/数值/视觉三层与测试场都归 combat（它挂在 TakeHit/Kill 那条链上）。
-  { domain: "combat", pattern: /Gore|Dismember/i },
+  { domain: "combat", pattern: /Gore|Dismember|Blood|SurfaceDecals/i },
   {domain:"combat",pattern:/BallisticSuppression/},
   {domain:'firstLevel',pattern:/FirstLevelOpening|FirstLevelFrontPresence|FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|CarriageSoundscape|FirstLevelVoiceAlign|SeedAudioFirstLevel|SeedAudioCarriage|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
   { domain: "menu", pattern: /FirstLevelP012Debug/i },
@@ -499,7 +500,7 @@ const changedDomainRules = [
   { domain: "menu", pattern: /(Menu|Style_Interface|BootProp|index\.html|Font_Title|\/Font\/)/i },
   { domain: "editor", pattern: /(Editor|Style_Interface|AssetStandards|Pcg|Data_Levels|SamplePoint|Data_Dressing|Data_ExternalAssets|WestSuburbBlocks|_import)/i },
   { domain: "cutscene", pattern: /(Cutscene|Story|Data_Script|TengxianScript|Mission|ActorPose|Train|Data_MissionCh|Companion|Checkpoint)/i },
-  { domain: "render", pattern: /(Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|FirstLevelP012CarryView|Vfx|Post|Light|Gi|GlobalShProbe|FirstPersonSelfShadow|Atmosphere|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Pcg|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|Mocap|EscortLitter|TexBake|Pbr|PropBatch|PropStreaming|Profiler|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },
+  { domain: "render", pattern: /(Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|FirstLevelP012CarryView|Vfx|Blood|SurfaceDecals|Post|Light|Gi|GlobalShProbe|FirstPersonSelfShadow|Atmosphere|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Pcg|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|Mocap|EscortLitter|TexBake|Pbr|PropBatch|PropStreaming|Profiler|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },
   // Data_Tuning_Graphics 是渲染帧图的档位表（不是玩法数值）：它同时命中 text 的
   // Data_Tuning_ 那条，这里再补一条把 render 域也拉进来。
   { domain: "render", pattern: /Data_Tuning_Graphics/i },

@@ -594,3 +594,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 - 新增离线布设时用 `Script_HeightmapCli.mjs match --input=... --output=...` 批量贴地；
   改高度图或序章地形后必须跑 `Script_HeightmapCli.mjs verify`、
   `Script_JieheTerrainTest.mjs` 与 `Script_BootTest.mjs`。
+
+### 通用血液与表面贴花
+
+`Script_BloodEffects` / `Script_SurfaceDecals` / `Data_Tuning_Blood`：枪击、断肢与普通尸体共用的血雾、物理液滴、湿干血迹。`MissionAftermath` 使用同一投影材质的持久层。接口、免费资产、限制与验收见 [通用血液特效](Data_BloodEffects.md)，定向门禁 `Script_BloodEffectsTest.mjs`。

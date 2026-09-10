@@ -9,7 +9,7 @@ import { BuildSink } from "./Script_World.mjs";
 import { PlaceGeometry } from "./Script_Geo.mjs";
 import { MISSION_PLACEMENT, MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
 export class FirstLevelMissionView {
-  constructor({ scene, battlefield, physics, column, actorFactory, library, hud }) {
+  constructor({ scene, battlefield, physics, column, actorFactory, library, hud, vfx }) {
     Object.assign(this, { scene, battlefield, physics, column, actorFactory, library });
     this.root = new THREE.Group();
     this.root.name = "FirstLevelMissionWhitebox";
@@ -75,7 +75,7 @@ export class FirstLevelMissionView {
     this.zhouRoot.add(zhouHead);zhouHead.visible=false;
     this.zhouRoot.visible = false;
     this.people=new MissionPeople({root:this.root,actorFactory,battlefield});
-    this.aftermath=new MissionAftermath({root:this.root,actorFactory,battlefield});
+    this.aftermath=new MissionAftermath({root:this.root,actorFactory,battlefield,vfx});
     this.BuildTank();
     this.BuildSupplies();
     this.navigation=document.createElement("div");

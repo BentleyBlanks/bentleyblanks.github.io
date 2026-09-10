@@ -46,7 +46,7 @@ try {
         if (Math.abs(dx*cos-dz*sin) < c.h[0] && Math.abs(dx*sin+dz*cos) < c.h[2]) { clearance.push(spec.id); break; }
       }
     }
-    return { count: bodies.length, actual: aftermath.instances.filter(p => p.side === "civilian").length,
+    return { blood:{count:aftermath.bloodLayer?.count,expected:aftermath.count,shared:aftermath.bloodLayer?.material.uniforms.uBloodTexture===g.vfx.shared.uBloodTexture}, count: bodies.length, actual: aftermath.instances.filter(p => p.side === "civilian").length,
       geometry, clearance: [...new Set(clearance)], grounding: grounding.slice(0, 12),
       civilianActors: g.ai.soldiers.filter(s => s.missionId?.startsWith("CivilianAftermath")).length };
   });
@@ -67,6 +67,8 @@ try {
     }, shot);
     await page.screenshot({ path: path.join(out, "Scene_" + shot.id + ".png") });
   }
+  assert.equal(report.blood.count,report.blood.expected,"all historical casualties use the shared decal layer");
+  assert(report.blood.shared,"historical and live blood share texture and render uniforms");
   assert.equal(report.actual, report.count);
   assert.equal(report.geometry.length, 4, "both adult models keep separate pose prototypes");
   assert.ok(report.geometry.every(p => p.size[2] > 1.3 && p.size[1] < .36 && p.minY >= -.001), "real adult models settle flat without frozen falling limbs");

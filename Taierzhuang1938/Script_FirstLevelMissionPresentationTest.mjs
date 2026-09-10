@@ -88,7 +88,7 @@ for(let i=0;i<120;i++)window.UpdateCrowdProbe(i/60);g.StepFrames(1,1/60,true);re
     const original=g.scene.children.find(c=>c.name==="FirstLevelMissionWhitebox");original.visible=false;
     const column=new FirstLevelMissionColumn();column.Activate();
     for(let i=0;i<3500;i++)column.Update(.2);
-    const view=new FirstLevelMissionView({scene:g.scene,battlefield:g.battlefield,column,actorFactory:g.actorFactory,library:g.library,
+    const view=new FirstLevelMissionView({vfx:g.vfx,scene:g.scene,battlefield:g.battlefield,column,actorFactory:g.actorFactory,library:g.library,
       physics:{AddSolid(){},MoveSolid(){},RemoveSolid(){}}});
     // Visual fixture only. The continuous campaign does not set player coordinates.
     g.player.position.set(69,7,35);g.player.yaw=Math.atan2(15,10);g.player.pitch=-.40;g.player.SyncCamera(0);

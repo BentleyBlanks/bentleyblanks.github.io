@@ -35,6 +35,7 @@
 import * as THREE from "three";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
+import { BloodEffects } from "./Script_BloodEffects.mjs";
 
 // ---------------------------------------------------------------------------
 // 色板：全部来自 docs/Data_HistoryMaterial.md 的考据表。
@@ -301,7 +302,12 @@ void main() {
 #elif defined(ORIENT_STRETCH)
   // 沿飞行方向拉长：曳光弹与火星。头在 corner.x = +1 处。
   vec3 toCam = cameraPosition - world;
+#ifdef SHAPE_BLOODDROP
+  vec3 instant=iVelocity*exp(-k*age)+iAccel*((1.0-exp(-k*age))/k);
+  vec3 dir=normalize(instant+vec3(0.0,1e-5,0.0));
+#else
   vec3 dir = normalize(iVelocity + vec3(0.0, 1e-5, 0.0));
+#endif
   vec3 side = normalize(cross(dir, normalize(toCam + vec3(1e-5))));
   offset = dir * ((corner.x - 1.0) * 0.5 * iExtra.x) + side * (corner.y * size);
 #else
@@ -422,7 +428,20 @@ void main() {
   float mask = 0.0;
   vec3 color = vColor;
 
-#if defined(SHAPE_PUFF)
+#if defined(SHAPE_BLOODMIST)
+  vec2 flow=vec2(vSeed*37.0,vSeed*19.0);
+  vec2 q=p+vec2(Vnoise(p*3.1+flow),Vnoise(p*3.9+flow.yx))*.32-.16;
+  float n=Vnoise(q*5.5+flow+vAge01*.7);
+  float fine=Vnoise(q*17.0+flow.yx);
+  float edge=1.0-smoothstep(.3,.97,length(q*vec2(1.0,1.2)));
+  float erosion=smoothstep(.19+vAge01*.15,.65,n+fine*.3);
+  mask=edge*erosion*(.38+.62*fine);
+#elif defined(SHAPE_BLOODDROP)
+  float head=1.0-smoothstep(.14,.95,length(vec2((p.x-.48)*1.3,p.y)));
+  float tail=(1.0-smoothstep(.08,.38,abs(p.y)))*smoothstep(-1.0,.55,p.x);
+  mask=max(head,tail*.6)*(1.0-smoothstep(.8,1.0,abs(p.x)));
+  color*=uSkyColor+uSunColor*.5;
+#elif defined(SHAPE_PUFF)
   // 烟/尘：两层不同尺度的噪声让每一片都是一团卷起来的絮，而不是一张
   // 单调的柔边圆盘。只啃外轮廓仍会读成“半透明云”；要让中心密度也有起伏，
   // 多片叠起来才会出现烟羽的深浅团块。
@@ -749,12 +768,6 @@ const SPAWN = {
   seed: 0, nx: 0, ny: 1, nz: 0,
 };
 
-// 持续血源（BloodSpurt）每帧的临时量。与 TMP_A/B/C 分开：血源的循环里要调
-// _ConeVelocity（它写 TMP_B）与 _SpawnDecal，共用一份会被自己覆盖掉。
-const SPURT_POSITION = new THREE.Vector3();
-const SPURT_DIRECTION = new THREE.Vector3();
-const SPURT_NORMAL = new THREE.Vector3();
-const SPURT_QUATERNION = new THREE.Quaternion();
 
 // 碎块的生成描述符，同样只有一份（爆炸一次要塞 20 个，别在这儿制造垃圾）
 const DEBRIS_SPAWN = {
@@ -1277,9 +1290,6 @@ export class VfxSystem {
     this.wind = new THREE.Vector3(0.35, 0, -0.15);     // 鲁南春季多西南风，考据里写死的
     this.groundLevel = 0;                              // 碎块/弹壳落到哪一层，见 SetGroundLevel
     this.smokeSources = new Map();
-    // 断口的持续血源（BloodSpurt）。与 smokeSources 共用一条 id 序列，
-    // 免得两套句柄在调试口里长得一样却不是一回事。
-    this.bloodSpurts = new Map();
     this.nextSourceId = 1;
     // 运行时取证：冒烟测试确认调用方传了真实枪种、快烟与余烟两层都生成。
     this.lastMuzzleProfile = null;
@@ -1421,6 +1431,12 @@ export class VfxSystem {
         preserveTargetAlpha: true,
       }, this.shared),
     };
+    this.bloodEffects = new BloodEffects({root:this.root,shared:this.shared,lights,quality:this.quality,
+      CreatePool:(capacity,config)=>new ParticlePool(capacity,config,this.shared),
+      random:this.random,GroundLevel:()=>this.groundLevel});
+    this.pools.bloodMist=this.bloodEffects.mist;
+    this.pools.bloodDrop=this.bloodEffects.drops;
+    this.bloodSpurts=this.bloodEffects.sources;
     this.debris = new DebrisPool(cap(POOL_SHARE.debris, 48), this.shared);
 
     for (const pool of Object.values(this.pools)) this.root.add(pool.mesh);
@@ -1598,7 +1614,7 @@ export class VfxSystem {
     if (camera) this.eye.copy(camera.position);
 
     this._UpdateSmokeSources(step);
-    this._UpdateBloodSpurts(step);
+    this.bloodEffects.Update(step,this.time,camera);
 
     if (this.dust && camera) {
       // 浮尘盒跟着相机走，但被 AmbientDust 给的战斗区域夹住 —— 越出战场就没有尘
@@ -2194,260 +2210,15 @@ export class VfxSystem {
     return count;
   }
 
-  /**
-   * 血。一发步枪弹在七十米上打进人体，画面上要**看得见发生了什么**：
-   * 背面炸开的一团雾、顺着弹道甩出去的溅射、落下来的血滴、地上那摊渍。
-   *
-   * 过去这里是"克制版"：四片 0.17 m 的暗红雾、0.5 不透明度、半秒没。
-   * 结果四十米外命中在画面上等于没发生 —— 反馈全压在音频那一路上，
-   * 而 impactFlesh 到八十米只剩 4.8%，两条链一起哑。现在按四层出：
-   *
-   * 1. **雾芯**：两三片高亮鲜红，快、短命，是"打穿了"的那一瞬；
-   * 2. **雾体**：十来片暗红，沿弹道锥形张开并被 drag 拉住，膨到 0.5 m；
-   * 3. **溅射**：拉长的血线，速度比雾快三倍，负责把方向写出来；
-   * 4. **血滴 + 地渍**：会落地会弹的小滴，落点铺一摊贴花 —— 打完之后
-   *    地上留下的痕迹，才是让人相信"这里死过人"的东西。
-   *
-   * 距离补偿仍然保留（粒子是世界尺寸的广告牌，一百米外张角只有零点一度），
-   * 但不再是唯一的手段：18 m 以内不补，往外按 eyeDist/18 抬到封顶 4 倍 ——
-   * 七十米上折合一团 2 m 的雾，在雾里仍然只是个淡红点，这已经是**雾**给的上限
-   * （`taierzhuang-fog-vs-visibility`：雾不许动，那就只能在尺寸上找）。
-   */
-  Blood(position, direction, amount = 1) {
-    const dir = TMP_A.copy(direction).normalize();
-    const eyeDist = Math.hypot(position.x - this.eye.x, position.y - this.eye.y,
-      position.z - this.eye.z);
-    const far = Math.min(4.0, Math.max(1, eyeDist / 18));
-    const groundY = this.groundLevel;
-
-    // --- 1. 雾芯：出膛那一下最亮的两三片 -----------------------------------
-    const coreCount = Math.max(1, Math.round(3 * amount * this.spawnScale));
-    for (let i = 0; i < coreCount; i += 1) {
-      const s = ResetSpawn();
-      this._ConeVelocity(dir, 0.35, this._Range(2.6, 5.4) * amount);
-      s.x = position.x + dir.x * 0.06;
-      s.y = position.y + dir.y * 0.06;
-      s.z = position.z + dir.z * 0.06;
-      s.vx = TMP_B.x; s.vy = TMP_B.y + 0.5; s.vz = TMP_B.z;
-      s.ay = -2.4; s.drag = 6.5;
-      s.life = this._Range(0.18, 0.32);
-      s.sizeStart = 0.06 * amount * far; s.sizeEnd = 0.30 * amount * far;
-      s.opacity = 0.9; s.fadeIn = 0.01;
-      s.angle = this._Range(0, 6.283); s.spin = this._Signed(3.5);
-      s.colorA = VFX_PALETTE.bloodFresh; s.colorB = VFX_PALETTE.blood;
-      s.seed = this.random();
-      this.pools.smoke.Spawn(s, this.time);
-    }
-
-    // --- 2. 雾体：撑开、留一会儿 -------------------------------------------
-    const mistCount = Math.max(2, Math.round(11 * amount * this.spawnScale));
-    for (let i = 0; i < mistCount; i += 1) {
-      const s = ResetSpawn();
-      this._ConeVelocity(dir, 0.9, this._Range(1.4, 4.2) * amount);
-      s.x = position.x + this._Signed(0.04);
-      s.y = position.y + this._Signed(0.04);
-      s.z = position.z + this._Signed(0.04);
-      s.vx = TMP_B.x; s.vy = TMP_B.y + 0.3; s.vz = TMP_B.z;
-      s.ay = -3.2; s.drag = 4.2;
-      s.life = this._Range(0.45, 0.95);
-      s.sizeStart = 0.07 * amount * far;
-      s.sizeEnd = 0.5 * amount * far * this._Range(0.6, 1.3);
-      // 单片 0.8 的话十几片叠起来是一颗实心红球，不是雾。0.55 才留得住层次。
-      s.opacity = 0.55; s.fadeIn = 0.04;
-      s.angle = this._Range(0, 6.283); s.spin = this._Signed(2);
-      s.colorA = VFX_PALETTE.blood; s.colorB = VFX_PALETTE.bloodDark;
-      s.seed = this.random();
-      this.pools.smoke.Spawn(s, this.time);
-    }
-
-    // --- 3. 溅射：沿弹道甩出去的血线（细长片，把方向写出来）---------------
-    const sprayCount = Math.max(2, Math.round(7 * amount * this.spawnScale));
-    for (let i = 0; i < sprayCount; i += 1) {
-      const s = ResetSpawn();
-      this._ConeVelocity(dir, 0.5, this._Range(5, 11) * amount);
-      s.x = position.x + dir.x * 0.05;
-      s.y = position.y + dir.y * 0.05;
-      s.z = position.z + dir.z * 0.05;
-      s.vx = TMP_B.x; s.vy = TMP_B.y + 0.8; s.vz = TMP_B.z;
-      s.ay = -8.5; s.drag = 1.5;
-      s.life = this._Range(0.16, 0.34);
-      s.sizeStart = 0.035 * amount * far; s.sizeEnd = 0.09 * amount * far;
-      s.opacity = 0.85; s.fadeIn = 0.01;
-      s.angle = this._Range(0, 6.283); s.spin = this._Signed(4);
-      s.colorA = VFX_PALETTE.blood; s.colorB = VFX_PALETTE.bloodDrop;
-      s.seed = this.random();
-      this.pools.smoke.Spawn(s, this.time);
-    }
-
-    // --- 4. 血滴：会落地、会弹一下的实体小块 -------------------------------
-    const dropCount = Math.round(6 * amount * this.spawnScale);
-    for (let i = 0; i < dropCount; i += 1) {
-      this._ConeVelocity(dir, 0.95, this._Range(2.5, 7) * amount);
-      const size = this._Range(0.008, 0.022);
-      this._SpawnDebris(
-        position.x, position.y, position.z,
-        TMP_B.x, TMP_B.y + 1.6, TMP_B.z,
-        size, size * this._Range(0.7, 1.1), size * this._Range(1.0, 2.2),
-        VFX_PALETTE.bloodDrop, this._Range(0.9, 1.6), groundY, 0.18, 1.4);
-    }
-
-    // --- 5. 地渍：命中点正下方铺一摊，致命伤再在溅射方向上补一小块 ---------
-    // 悬在半空的击中（打在屋顶上的人）离地太远就不留渍，否则血会凭空出现在楼下。
-    const height = position.y - groundY;
-    if (height >= -0.2 && height <= 3.2 && amount >= 0.5) {
-      TMP_C.set(0, 1, 0);
-      const near = Math.max(0.55, Math.min(1.6, amount));
-      // 贴花的形状本体是弹孔（暗芯 + 亮环 + 放射线）。血渍要的是一摊没有暗芯的红，
-      // 所以 rim/hole 两个色都给红，rays 给 0 —— 留着的话地上会出现一颗卡通星号。
-      this._SpawnDecal(
-        { x: position.x + this._Signed(0.12), y: groundY + 0.012, z: position.z + this._Signed(0.12) },
-        TMP_C, this._Range(0.45, 0.75) * near,
-        VFX_PALETTE.blood, VFX_PALETTE.bloodDrop, 0.62, 0);
-      // 贴花池是环形缓冲（高画质 198 格），血渍和弹孔抢同一批格子 ——
-      // 「战损靠弹孔密度」是这作的考据底盘，血不许把墙上的弹孔冲掉。
-      // 所以一次命中最多两格：一摊主渍，外加致命伤才有的一小块溅渍。
-      const splats = amount >= 0.9 ? 1 : 0;
-      for (let i = 0; i < splats; i += 1) {
-        const reach = this._Range(0.4, 1.5) * near;
-        this._SpawnDecal(
-          {
-            x: position.x + dir.x * reach + this._Signed(0.25),
-            y: groundY + 0.012,
-            z: position.z + dir.z * reach + this._Signed(0.25),
-          },
-          TMP_C, this._Range(0.16, 0.34) * near,
-          VFX_PALETTE.blood, VFX_PALETTE.bloodDrop, 0.5, 0);
-      }
-    }
-  }
-
-  /**
-   * 断肢那一瞬间的血雾（一次性）。
-   *
-   * 与 `Blood` 的差别是**方向感**：中弹是沿弹道往身后炸开一道锥，断肢是断口
-   * 朝四面泼出去一圈再被断口轴带走一半。所以先照常走一遍 Blood（雾芯/雾体/
-   * 溅射/血滴/地渍那四层都要），再补一圈几乎无方向的暗红雾把「炸开」写出来。
-   */
-  BloodBurst(position, direction, amount = 1.6) {
-    this.Blood(position, direction, amount);
-    const dir = TMP_A.copy(direction).normalize();
-    const eyeDist = Math.hypot(position.x - this.eye.x, position.y - this.eye.y,
-      position.z - this.eye.z);
-    const far = Math.min(4.0, Math.max(1, eyeDist / 18));
-    const ringCount = Math.max(3, Math.round(9 * amount * this.spawnScale));
-    for (let i = 0; i < ringCount; i += 1) {
-      const s = ResetSpawn();
-      // 张角接近半球：断口是**一个面**在泼，不是一条弹道在钻。
-      this._ConeVelocity(dir, 1.5, this._Range(1.2, 3.4) * amount);
-      s.x = position.x + this._Signed(0.05);
-      s.y = position.y + this._Signed(0.05);
-      s.z = position.z + this._Signed(0.05);
-      s.vx = TMP_B.x; s.vy = TMP_B.y + 0.25; s.vz = TMP_B.z;
-      s.ay = -3.0; s.drag = 3.6;
-      s.life = this._Range(0.55, 1.15);
-      s.sizeStart = 0.09 * amount * far;
-      s.sizeEnd = 0.62 * amount * far * this._Range(0.7, 1.25);
-      s.opacity = 0.5; s.fadeIn = 0.03;
-      s.angle = this._Range(0, 6.283); s.spin = this._Signed(1.6);
-      s.colorA = VFX_PALETTE.blood; s.colorB = VFX_PALETTE.bloodDark;
-      s.seed = this.random();
-      this.pools.smoke.Spawn(s, this.time);
-    }
-  }
-
-  /**
-   * 跟着骨头走的**持续**血源（动脉喷血）。
-   *
-   * 写法照 `smokeSources`：登记一条源，每帧从 node 的世界矩阵取当前位置与朝向再
-   * 生成粒子。不能用一次性 Blood 顶替 —— 断口是挂在还在动的骨头上的，人倒下去
-   * 的两秒里那道血要跟着一起甩过去，而一次性粒子从生成起就与骨头无关了。
-   *
-   * @param {THREE.Object3D} node 断面盖（或肢块）节点，血从它身上出
-   * @param {{x:number,y:number,z:number}|null} localOffset 相对 node 的偏移（局部系）
-   * @param {{x:number,y:number,z:number}} direction 喷射方向（**node 的局部系**，跟着骨头转）
-   * @param {{seconds?:number, rate?:number, decals?:number, speed?:number[], spread?:number}} [options]
-   * @returns {number} handle，交给 RemoveBloodSpurt
-   */
-  BloodSpurt(node, localOffset, direction, options = {}) {
-    if (!node) return 0;
-    const id = this.nextSourceId;
-    this.nextSourceId += 1;
-    this.bloodSpurts.set(id, {
-      node,
-      offset: new THREE.Vector3(localOffset?.x || 0, localOffset?.y || 0, localOffset?.z || 0),
-      direction: new THREE.Vector3(direction?.x || 0, direction?.y || 1, direction?.z || 0).normalize(),
-      seconds: Math.max(0.05, options.seconds ?? 2.4),
-      rate: Math.max(0, options.rate ?? 26),
-      spread: options.spread ?? 0.45,
-      speedMin: options.speed?.[0] ?? 2.2,
-      speedMax: options.speed?.[1] ?? 5.2,
-      decals: Math.max(0, options.decals ?? 0),
-      accumulator: 0,
-      decalTimer: 0,
-      age: 0,
-    });
-    // 登记这一帧就把父链算一次：断面盖刚挂上去时它的 matrixWorld 还是单位阵，
-    // 不先算一次的话第一帧的血会从世界原点冒出来。
-    node.updateWorldMatrix(true, false);
-    return id;
-  }
-
-  RemoveBloodSpurt(handle) { this.bloodSpurts.delete(handle); }
-
-  /** 还活着的持续血源数（取证/面板读数用）。 */
-  get bloodSpurtCount() { return this.bloodSpurts.size; }
-
-  _UpdateBloodSpurts(dt) {
-    if (dt <= 0 || this.bloodSpurts.size === 0) return;
-    for (const [handle, spurt] of this.bloodSpurts) {
-      spurt.age += dt;
-      // 节点被摘掉（肢块回收 / 士兵撤场）就自己收摊：调用方漏了 Remove 也不会漏源。
-      if (spurt.age >= spurt.seconds || !spurt.node || !spurt.node.parent) {
-        this.bloodSpurts.delete(handle);
-        continue;
-      }
-      const node = spurt.node;
-      SPURT_POSITION.copy(spurt.offset).applyMatrix4(node.matrixWorld);
-      node.getWorldQuaternion(SPURT_QUATERNION);
-      SPURT_DIRECTION.copy(spurt.direction).applyQuaternion(SPURT_QUATERNION).normalize();
-      // 动脉压随失血下降：后半程只剩三分之一的量，不是一直突突到最后一帧。
-      const fade = 1 - spurt.age / spurt.seconds;
-      spurt.accumulator += spurt.rate * dt * this.spawnScale * (0.35 + 0.65 * fade);
-      const emit = Math.floor(spurt.accumulator);
-      spurt.accumulator -= emit;
-      for (let i = 0; i < emit; i += 1) {
-        const s = ResetSpawn();
-        this._ConeVelocity(SPURT_DIRECTION, spurt.spread,
-          this._Range(spurt.speedMin, spurt.speedMax) * (0.45 + 0.55 * fade));
-        s.x = SPURT_POSITION.x; s.y = SPURT_POSITION.y; s.z = SPURT_POSITION.z;
-        s.vx = TMP_B.x; s.vy = TMP_B.y + 0.4; s.vz = TMP_B.z;
-        s.ay = -7.5; s.drag = 1.2;
-        s.life = this._Range(0.24, 0.5);
-        s.sizeStart = this._Range(0.018, 0.032);
-        s.sizeEnd = this._Range(0.05, 0.11);
-        s.opacity = 0.9; s.fadeIn = 0.01;
-        s.angle = this._Range(0, 6.283); s.spin = this._Signed(3);
-        s.colorA = VFX_PALETTE.bloodFresh; s.colorB = VFX_PALETTE.blood;
-        s.seed = this.random();
-        this.pools.smoke.Spawn(s, this.time);
-      }
-      // 脚下那摊。半秒补一片、总数封顶：贴花池是环形缓冲，血渍与弹孔抢同一批格子。
-      spurt.decalTimer += dt;
-      if (spurt.decals > 0 && spurt.decalTimer >= 0.5) {
-        spurt.decalTimer = 0;
-        spurt.decals -= 1;
-        const height = SPURT_POSITION.y - this.groundLevel;
-        if (height >= -0.2 && height <= 3.2) {
-          SPURT_NORMAL.set(0, 1, 0);
-          this._SpawnDecal(
-            { x: SPURT_POSITION.x + this._Signed(0.18), y: this.groundLevel + 0.012,
-              z: SPURT_POSITION.z + this._Signed(0.18) },
-            SPURT_NORMAL, this._Range(0.35, 0.62),
-            VFX_PALETTE.blood, VFX_PALETTE.bloodDrop, 0.6, 0);
-        }
-      }
-    }
-  }
+  /** Shared blood pipeline: mist, ballistic droplets, surface projection and corpse seepage. */
+  Blood(position,direction,amount=1){this.bloodEffects.Emit(position,direction,amount);}
+  BloodBurst(position,direction,amount=1.6){this.bloodEffects.Emit(position,direction,amount,true);}
+  BloodSpurt(node,offset,direction,options={}){return this.bloodEffects.Spurt(node,offset,direction,options);}
+  RemoveBloodSpurt(handle){this.bloodEffects.sources.delete(handle);}
+  get bloodSpurtCount(){return this.bloodEffects.sources.size;}
+  CorpseBlood(actor){return this.bloodEffects.Corpse(actor);}
+  CreateBloodDecalLayer(parent,capacity){return this.bloodEffects.CreateLayer(parent,capacity);}
+  SetBloodSurface(raycast){this.bloodEffects.raycast=raycast;}
 
   /**
    * 炮弹 / 掷弹筒落点预警。掷弹筒 1.6 s、炮兵 2.6 s 提前量：玩家要能"听到啸声、
@@ -2509,13 +2280,14 @@ export class VfxSystem {
     this.debris?.Clear?.();
     // 血源与 smokeSources 不同：它挂在一根**已经不在场上**的骨头上，清粒子那一刻
     // 那个断口八成也随着换关拆掉了，留着只会在下一关的原点冒血。
-    this.bloodSpurts.clear();
+    this.bloodEffects.Clear();
   }
 
   Dispose() {
     if (this.scene.onBeforeRender === this.sceneHook) {
       this.scene.onBeforeRender = this.previousSceneHook;
     }
+    this.bloodEffects.Dispose();
     this.scene.remove(this.root);
     for (const pool of Object.values(this.pools)) pool.Dispose();
     this.debris.Dispose();
