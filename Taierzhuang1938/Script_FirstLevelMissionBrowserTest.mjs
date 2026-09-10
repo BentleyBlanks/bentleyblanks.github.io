@@ -384,7 +384,8 @@ try {
     for(const key of ["Space","KeyC","KeyZ"])g.Debug.Key(key);
     g.Debug.Look(70,-12);g.StepFrames(1,1/60,true);
     const canLook=Math.abs(g.player.yaw-playerStart.yaw)>.02;
-    g.Debug.Look(-70,12);g.StepFrames(119,1/60,true);
+    // Leave the eight-second ride probe before the newly recorded handoff ends.
+    g.Debug.Look(-70,12);g.StepFrames(59,1/60,true);
     const actors = g.ai.soldiers.filter(a => a.missionTrainPassenger);
     const BoneLocal = (a, role) => a.actor.root.worldToLocal(a.actor.characterRig.bones[role].getWorldPosition(a.position.clone()));
     const start = actors.map(a => ({x:a.position.x, z:a.position.z-g.battlefield.trainOffsetM,
@@ -476,6 +477,8 @@ try {
     for(const key of ["KeyR","KeyV","KeyG","KeyH","Digit2"])g.Debug.Key(key);
     g.StepFrames(30,1/60,true);
     g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+    // The receiving reply is timed from the current take, not a fixed 10.4 s mark.
+    for(let i=0;i<120&&g.Debug.FirstLevelMission().receivingFood;i++)g.StepFrames(1,1/60,true);
     const released=!g.Debug.FirstLevelMission().receivingFood, xBefore=g.player.position.x;
     const handBefore=g.viewmodel.handRight.group.position.clone();
     g.Debug.Key("KeyA",true);g.StepFrames(18,1/60,true);g.Debug.Key("KeyA",false);

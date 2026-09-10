@@ -4,6 +4,7 @@ import { COVER } from "./Data_Tuning_AiCover.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { CollectBulletNearMisses,ApplyBulletNearMisses } from "./Script_BallisticSuppression.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
+import { MISSION_VOICE_TIMING } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
 import { MISSION_TRAIN, MissionTrainMotion } from "./Data_FirstLevelMissionTrain.mjs";
 import { FirstLevelMissionTrain } from "./Script_FirstLevelMissionTrain.mjs";
@@ -598,13 +599,34 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
  const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){},PlayStoryVoice(){return {voice:{t:clock}};}},hud:{Say(){}},Clock:()=>clock,Event:id=>events.push(id)});
  voice.Enqueue("TrainMeal");voice.Update(5);voice.Update(90);
  assert.equal(events.length,0,"simulation time cannot finish the receiving gesture ahead of audio");
- clock=5.3;voice.Update(.1);voice.Pause();clock=90;voice.Update(60);
+ clock=MISSION_VOICE_ALIGNMENT.TrainMeal.lines[1][1]-.1;voice.Update(.1);voice.Pause();clock=90;voice.Update(60);
  assert.equal(events.length,0,"pause cannot release the handoff");
  voice.Resume();clock=90.11;voice.Update(.01);
  assert.deepEqual(events,["TrainFoodReceived"],"Shunzi's completed reply releases the handoff at its source timestamp");
  clock=91;voice.Update(1);assert.equal(events.length,1);
 }
 console.log("ok receiving-food release follows the source clock and survives pause/resume");
+
+{
+ const cue=MISSION_DIALOGUE.find(c=>c.id==='TrainMeal');
+ const entry=JSON.parse(fs.readFileSync(new URL('./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json',import.meta.url))).cues.TrainMeal;
+ const sources=[],subtitles=[],done=[];
+ const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){},PlayStoryVoice:(_key,options)=>{sources.push(options);return {}; }},
+   hud:{Say:(_who,text)=>subtitles.push(text)},Done:id=>done.push(id)});
+ voice.manifest={cues:{TrainMeal:entry}};
+ voice.Enqueue('TrainMeal');
+ for(let t=0;t<entry.seconds+12;t+=1/60)voice.Update(1/60);
+ assert.equal(sources.length,1,'the carriage ensemble has no artificial playback breaks');
+ assert.equal(sources[0].offset,0);
+ assert.equal(sources[0].maxDuration,entry.seconds,'the complete recording plays through its final reply');
+ assert.deepEqual(subtitles,cue.lines.map(line=>line.text),'every passenger reply appears once, in order');
+ assert.deepEqual(done,['TrainMeal']);
+ const plan=MISSION_VOICE_TIMING.TrainMeal;
+ const impactAt=plan.segments.reduce((t,s)=>t+s.end-s.start+(s.wait||0),plan.tail)+R.trainFirstShellFlightS;
+ const before=MissionTrainMotion(impactAt),after=MissionTrainMotion(impactAt+.1);
+ assert.ok(before.offsetM>0 && Math.abs(before.offsetM-after.offsetM-R.trainCruiseSpeedMps*.1)<1e-6,
+   'the train still moves when the first shell arrives after the longer exchange');
+}
 
 {
   assert.equal(MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.approach.length+MISSION_ENCOUNTERS.tank.length,150,

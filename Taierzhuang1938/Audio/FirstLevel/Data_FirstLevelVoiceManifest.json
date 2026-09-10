@@ -4,11 +4,11 @@
   "cues": {
     "TrainMeal": {
       "file": "AudioVoice_FirstLevelTrainMeal.mp3",
-      "seconds": 38.818,
-      "bytes": 466486,
-      "promptHash": "a65481bbd2ed98ed7ff5fcc1eb9f479033306621a5fbe0ec82c6728900229ba8",
-      "sha256": "97f61b2024176b71a7098fc342942ca3eedc4236cda72f94ae31ee957015840e",
-      "lineCount": 11,
+      "seconds": 88.842,
+      "bytes": 1066781,
+      "promptHash": "3aee50023aff4e7ca33bd6a702962a3bbe9d8f7eb64b9591ee33f1243586ee6f",
+      "sha256": "4f6bc3015cca6417c864d423c2c44fff86291300e2d5828b7df7dd1d6e811d4c",
+      "lineCount": 30,
       "requests": 1,
       "continuous": true,
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
@@ -454,5 +454,5 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-09-07T08:46:18.732Z"
+  "updatedAt": "2026-09-10T04:49:49.048Z"
 }

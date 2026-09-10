@@ -5,10 +5,8 @@ import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.
 export const MISSION_VOICE_TIMING = Object.freeze({
   TrainMeal: {
     segments: [
-      {id:"ShareFood",start:0,end:15.55,wait:5,
+      {id:"CarriageExchange",start:0,end:88.842,wait:5,
         events:[{at:MISSION_VOICE_ALIGNMENT.TrainMeal.lines[1][1],id:"TrainFoodReceived"}]},
-      {id:"CountAmmo",start:15.55,end:27.54,wait:4.5},
-      {id:"LeaveSome",start:27.54,end:38.818,wait:3.5},
     ],
     tail: 4,
   },

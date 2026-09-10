@@ -96,7 +96,7 @@
 - 机枪掩护段调整护卫兵位置，使阻挡撤退路线的火力在机枪射界内；侧翼兵在履带被炸断后才行动，未行动的敌人不被错误计作正在封锁道路。
 - 后送等老周上担架对白完成后开始；第一轮空袭命令说完再进入接抬阶段。二次空袭在“下沟”原音时点触发两秒扑沟；接收院先等卫生兵走到老周身边，再进入死亡短镜头。医护停步后不再原地踏步。
 
-源码：Data_FirstLevelMissionVoiceAlignment / VoiceTiming、Script_FirstLevelMissionVoice、Data_FirstLevelMissionBattleSound / Script_FirstLevelMissionBattleSound。对齐复现：安装 faster-whisper 1.2.1，在本地缓存 medium 模型后执行 python Taierzhuang1938/Script_FirstLevelVoiceAlign.py --model <本地模型目录> --output <忽略的验收目录>，检查生成的逐词证据再更新数据；此过程不生成或剪裁录音。
+源码：Data_FirstLevelMissionVoiceAlignment / VoiceTiming、Script_FirstLevelMissionVoice、Data_FirstLevelMissionBattleSound / Script_FirstLevelMissionBattleSound。对齐使用 faster-whisper 1.2.1 与本地 medium 模型，检查逐词证据再更新数据；此过程不生成或剪裁录音。2026-09-10 车厢对白已替换为七人、30 句的 88.842 秒完整群戏，取消上述三段间的人为停顿；新的对齐命令与窗口、行驶距离配套变更见 [车厢群体对白](Data_CarriageDialogue.md)。旧版通关时长仅是历史基线。
 
 [全部人物动作与跨电脑接力](Data_FirstLevelMissionAnimationRequirements.md) 已单独提交。新的精细骨骼动作、口型、表情仍由该接力任务完成。
 
