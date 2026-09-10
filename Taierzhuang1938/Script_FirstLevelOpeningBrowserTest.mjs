@@ -217,7 +217,7 @@ try{
     // before continuing, so the shared safe-running cadence can actually occur.
     // Combat, catch-up and narrow-passage priorities remain untouched.
     const until=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().time+12);
-    while(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().time)<until){
+    while(await page.evaluate(until=>{const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();return r.time<until&&g.player.alive&&!r.failed;},until)){
       if(realtime)await page.waitForTimeout(250);
       else await page.evaluate(()=>{for(let i=0;i<120;i++){window.OpeningInput.Step(false);window.Tengxian.StepFrames(1,1/60,false);}});
     }
