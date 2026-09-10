@@ -371,6 +371,38 @@ export const SFX_SOURCES = [
     ],
   },
 
+  // === 断肢（2026-09-11）===================================================
+  // 断肢系统上线时这两条是空的（docs/Data_Dismemberment.md §11.4「断肢没有音频」）：
+  // Sonniss 那九个包里没有对得上的素材 —— 「肢体被卸掉」不是弹着也不是倒地，
+  // 借一条钝器命中顶上去，听感就是"又中了一枪"，而画面上一条胳膊正飞出去。
+  // 所以走 SeedAudio 生成，与白刃三音同一条路（拟音替身写法：劈猪腿 / 摔生肉，
+  // 提示词里绝不提人体部位 —— 一提模型就往惨叫和血浆上塌）。
+  //
+  // 成品由 Script_SeedAudioGoreBake.mjs 单独烘（12 条候选逐条量过再挑的两对，
+  // 挑法与量出来的数记在那个脚本的头注里）。这里登记同样只为了别让全量 SfxBake
+  // 把这两个 cue 从 manifest 漏掉。
+  {
+    id: "GoreSeedAudio",
+    seedAudio: true,
+    bake: "Script_SeedAudioGoreBake.mjs",
+    credit: "Volcengine SeedAudio 1.0 · 断肢两音",
+    license: "volcengine",
+    cuts: [
+      // 两条都给两个变体：近炸一次卸两三段，一个样本反复响就露馅（轮播见
+      // Script_Audio 的 SAMPLE_CYCLE）。
+      {
+        cue: "goreSever", durS: 0.54,
+        files: ["AudioSfx_GoreSever_01.mp3", "AudioSfx_GoreSever_02.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 断肢（两变体：重 / 撕裂）",
+      },
+      {
+        cue: "goreLimbLand", durS: 0.35,
+        files: ["AudioSfx_GoreLimbLand_01.mp3", "AudioSfx_GoreLimbLand_02.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 肢块落地（两变体：湿闷 / 带骨磕）",
+      },
+    ],
+  },
+
   // === 命中 ===============================================================
   {
     id: "ImpactBrick",

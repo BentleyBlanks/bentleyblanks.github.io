@@ -427,6 +427,19 @@ export class GraphicsSettings {
       onInput: (v) => { gfx.fov = v; this.Save(); },
     });
 
+    // --- 内容 ---------------------------------------------------------------
+    // **不是画质项**：断肢既不省时间也不改画风，它决定的是玩家愿不愿意看到这个。
+    // 所以单开一节，不塞进上面任何一栏（口径见 docs/Data_Dismemberment.md §1 最后一行）。
+    // 存的是 gfx.gore 那一位，落地由 Script_Main 的 ApplyGraphics 转给 GoreSystem；
+    // 关掉时场上已经飞出去的肢块会立刻收回（GoreSystem.SetEnabled → ReleaseAll）。
+    const content = Section(body, "内容");
+    const contentRow = document.createElement("div");
+    contentRow.className = "edBtns";
+    content.appendChild(contentRow);
+    Toggle(contentRow, "断肢表现", gfx.gore !== false, (on) => { gfx.gore = on; this.Apply(); });
+    Note(content, "关掉之后子弹与爆炸不再卸掉肢体，断肢音效也一并不响；血迹与倒地不受影响。"
+      + "带 ?gore=0 打开时这一位被强制关掉（出图与回归要确定的画面）。");
+
     const level = Section(body, "画质档位（切换将刷新）");
     ButtonRow(level, [
       { label: "low", onClick: () => this.Reload("low") },
@@ -497,6 +510,9 @@ export class GraphicsSettings {
     gfx.dither = 0;
     gfx.autoExposure = this.host.post ? this.host.post.preset.autoExposure !== false : true;
     gfx.lut = this.host.post ? this.host.post.preset.lut !== false : true;
+    // 内容项：断肢出厂开（Data_Tuning_Gore.ENABLED）。`?gore=0` 那条硬覆盖在
+    // ApplyGraphics 里，这里照常写 true —— 恢复出厂不是绕过参数的后门。
+    gfx.gore = true;
     NormalizeGraphicsDetails(gfx, this.host.post, true);
     // TAA 的出厂值跟画质档走（medium 及以上开），不是固定的 true/false ——
     // 在 low 档上按「恢复出厂」应该回到关，而不是给它按上一份历史靶。

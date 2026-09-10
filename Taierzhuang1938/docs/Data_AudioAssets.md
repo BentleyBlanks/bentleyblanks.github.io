@@ -402,6 +402,8 @@ Sonniss 的许可不要求署名，但 `Data_SfxSources.mjs` 仍然逐条记着�
 | `dadaoSwing` | 3 | 0.55 s | 11.1 KB | Volcengine SeedAudio 1.0 · 大刀挥空（木质厚实 / 长嘶 / 刃嘶明亮）|
 | `dadaoHit` | 1 | 0.67 s | 5.8 KB | Volcengine SeedAudio 1.0 · 大刀砍入人体 |
 | `bayonetHit` | 1 | 1.37 s | 11.3 KB | Volcengine SeedAudio 1.0 · 刺刀刺入拔出 |
+| `goreSever` | 2 | 0.43—0.54 s | 8.7 KB | Volcengine SeedAudio 1.0 · 断肢（重 / 撕裂）|
+| `goreLimbLand` | 2 | 0.34—0.35 s | 6.6 KB | Volcengine SeedAudio 1.0 · 肢块落地（湿闷 / 带骨磕）|
 | `impactBrick` | 3 | 0.33 s | 12.2 KB | Gamemaster Audio · 弹着砖石 · GDC 2017 ／ PMSFX · 青砖碎裂 · GDC 2020 |
 | `impactDirt` | 1 | 0.42 s | 3.9 KB | PMSFX · 弹着夯土 · Sonniss GDC 2020 |
 | `impactWood` | 2 | 0.45 s | 8.7 KB | Double Trouble Audio · 木料受击（软/硬两条）· Sonniss GDC 2017 |

@@ -89,7 +89,7 @@ import { VfxSystem } from "./Script_Vfx.mjs";
 // 断肢：视觉/物理层与预热代理在 Script_CharacterGore，运行时总闸在规则层
 //（`SetGoreEnabled` 同时被 `?gore=0` 与 `Debug.Gore.SetEnabled` 使用）。
 import { GoreSystem, AddGoreWarmProxies } from "./Script_CharacterGore.mjs";
-import { SetGoreEnabled, LIMB_IDS as GORE_LIMB_IDS, PickMeleeShape } from "./Script_Dismemberment.mjs";
+import { SetGoreEnabled, IsGoreEnabled, LIMB_IDS as GORE_LIMB_IDS, PickMeleeShape } from "./Script_Dismemberment.mjs";
 import { AudioEngine } from "./Script_Audio.mjs";
 import { AudioWiring, WeaponClassOf } from "./Script_AudioWiring.mjs";
 import { Hud, ContextualActionPrompts, CrosshairGeometry } from "./Script_Hud.mjs";
@@ -240,7 +240,10 @@ const MELEE_TEST = params.get("melee") === "1";
 const GORE_TEST = params.get("gore") === "1";
 // 内容总闸的运行时覆盖。`?gore=0` 一段肢体都不掉（`Data_Tuning_Gore.ENABLED` 与
 // `Debug.Gore.SetEnabled` 是另外两个入口，三者任一关闭即关闭）。
-if (params.get("gore") === "0") SetGoreEnabled(false);
+// **`?gore=0` 压过设置面板那一位**（见 ApplyGraphics 里 graphics.gore 那一段）：
+// 出图与回归都靠这个参数拿到确定的画面，不能被上一次玩到一半存下的偏好推翻。
+const GORE_FORCED_OFF = params.get("gore") === "0";
+if (GORE_FORCED_OFF) SetGoreEnabled(false);
 // Archived content is a developer regression fixture, absent from chapter selection.
 const ARCHIVED_P012_FIXTURE = params.get("whitebox") === "p012-archive";
 const FIRST_LEVEL_P012_WHITEBOX = params.get("whitebox") === "p012" || ARCHIVED_P012_FIXTURE;
@@ -556,6 +559,12 @@ const graphics = {
   pomDepth: 1, detailNormalStrength: 1, microShadowStrength: 1,
   horizonStrength: 1, skinStrength: 1, pomSelfShadowStrength: 1,
   fov: CAMERA.baseFovDeg,
+  // 断肢表现（docs/Data_Dismemberment.md §1）。**这不是画质项，是内容项** ——
+  // 它不省时间也不改画风，它决定的是玩家愿不愿意看到这个。放在 graphics 上
+  // 只是为了搭 `ApplySavedSettings` 的顺风车（那边只回灌已经存在于 graphics
+  // 上的键），面板里单开一节「内容」，不与阴影/后处理混在一起。
+  // 出厂值读规则层的当前状态：`?gore=0` 已经在上面把它关掉了。
+  gore: IsGoreEnabled(),
 };
 NormalizeGraphicsDetails(graphics, post);
 // 本档位到底编没编接触阴影那段材质 GLSL（编译期，见 Script_Csm.SetCsmContactCompiled）。
@@ -1369,6 +1378,9 @@ async function Boot() {
     Physics: () => physics,
     Vfx: () => vfx,
     Quality: () => QUALITY,
+    // 断的那一声与肢块落地那一记（goreSever / goreLimbLand）。出图模式下
+    // AudioEngine 是 enabled:false，取值器照样交出去 —— Play 自己会不响。
+    Audio: () => audio,
   });
   ai.ctx.gore = gore;
 
@@ -2613,7 +2625,12 @@ async function Boot() {
       else gore.Sever(soldier, plan.limbs, { direction, kind: plan.kind });
       return gore.State();
     },
-    SetEnabled: (value) => gore?.SetEnabled(value !== false),
+    // 顺手写回 graphics.gore：不写的话下一次 ApplyGraphics（改个窗口大小就够）
+    // 会拿设置面板那一位把这里刚关掉的又打开。
+    SetEnabled: (value) => {
+      graphics.gore = value !== false;
+      return gore?.SetEnabled(value !== false);
+    },
     SetForce: (kind) => gore?.SetForce(kind || null) ?? null,
     Reset: () => { gore?.ReleaseAll(); return gore?.State() || null; },
   };
@@ -8471,6 +8488,14 @@ function RecompileAllMaterials() {
 
 function ApplyGraphics() {
   NormalizeGraphicsDetails(graphics, post);
+  // 断肢内容开关。`?gore=0` 压过面板与存档那一位 —— 出图与回归靠这个参数
+  // 拿确定的画面，不能被上一次存下的偏好推翻（见 GORE_FORCED_OFF）。
+  // 关掉时 `GoreSystem.SetEnabled` 会顺手 ReleaseAll：场上已经飞出去的肢块
+  // 立刻收回、身体几何还原，不留半具切开的人在那儿。
+  if (GORE_FORCED_OFF) graphics.gore = false;
+  // 系统建起来之前（boot 早期 resize 也会走到这儿）直接写规则层那一位。
+  if (gore) gore.SetEnabled(graphics.gore !== false);
+  else SetGoreEnabled(graphics.gore !== false);
   // 面板/存档改的是 graphics.autoQuality 那一位，这里同步到规则层。
   // 必须排在下面读 autoQuality.scale 之前 —— 反过来的话「关掉自动降档」
   // 要等下一次 ApplyGraphics 才还原分辨率。

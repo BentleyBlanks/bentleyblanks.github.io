@@ -754,6 +754,24 @@
       "seconds": 0.45,
       "credit": "Olivier Girardot · 子弹打在石头上 · Sonniss GDC 2020 ／ PMSFX · 单块石头受击 · Sonniss GDC 2020 ／ PMSFX · 单块石头受击（更闷）· Sonniss GDC 2020",
       "license": "sonniss"
+    },
+    "goreSever": {
+      "files": [
+        "AudioSfx_GoreSever_01.mp3",
+        "AudioSfx_GoreSever_02.mp3"
+      ],
+      "seconds": 0.54,
+      "credit": "Volcengine SeedAudio 1.0 · 断肢（两变体：重 / 撕裂）",
+      "license": "volcengine"
+    },
+    "goreLimbLand": {
+      "files": [
+        "AudioSfx_GoreLimbLand_01.mp3",
+        "AudioSfx_GoreLimbLand_02.mp3"
+      ],
+      "seconds": 0.35,
+      "credit": "Volcengine SeedAudio 1.0 · 肢块落地（两变体：湿闷 / 带骨磕）",
+      "license": "volcengine"
     }
   },
   "bakedAt": "2026-09-10",

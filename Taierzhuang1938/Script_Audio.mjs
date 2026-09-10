@@ -1252,6 +1252,46 @@ const RECIPES = {
     v.Live(0.6);
   },
 
+  // --- 断肢 ---------------------------------------------------------------
+  // 卸掉一段肢体的那一瞬间。**与 impactFlesh 的差别是「多一层骨」**：
+  // 入肉是一记湿闷，断肢是「撕开 + 断骨」两件事叠在 0.2 秒里。听不出这两层的话，
+  // 画面上一条胳膊飞出去、耳朵里却只有一发普通子弹 —— 两件事对不上。
+  goreSever(A, v) {
+    const t = v.t;
+    Thud(v, t, 170, 62, 0.16, 0.62, 240);
+    // 湿裂：宽带噪声过带通，频心边响边塌 —— 撕开的那一下是高频先走。
+    const rip = v.Noise("white", 0.22);
+    const band = v.Filter("bandpass", v.F(900), 0.8);
+    Glide(band.frequency, t, v.F(1500), v.F(420), 0.2);
+    const rg = v.Gain(FLOOR);
+    Swell(rg.gain, t, 0.42, 0.006, 0.05, 0.16);
+    rip.connect(band).connect(rg).connect(v.out);
+    v.Start(rip, t, 0.22);
+    // 骨断：一记很短的脆响，频心压在 2 kHz 上下、Q 给低 ——
+    // 骨头不是钢，用 bayonetHit 那种高 Q 共振会立刻听成"砍在铁上"。
+    MetalClick(v, t + 0.045, v.R(1700, 2300), 0.3, 0.035, 6);
+    Grains(v, t + 0.09, 3, 0.12, 600, 1600, 0.1);
+    v.wetGain.gain.value = 0.1;    // 与 impactFlesh 同一条：打在人身上是「不响」的
+    v.Live(0.45);
+  },
+
+  // 那一段落地。比 bodyFall 短得多也轻得多 —— 落的是一条胳膊，不是一个人：
+  // 一记湿闷、不弹跳，尾巴上一点点滑蹭。它是「肢块落在哪」的唯一线索
+  //（与 grenadeBounce 同一条理由：飞出去的东西要听得见落点）。
+  goreLimbLand(A, v) {
+    const t = v.t;
+    Thud(v, t, 120, 52, 0.13, 0.5, 200);
+    const wet = v.Noise("pink", 0.14);
+    const lp = v.Filter("lowpass", v.F(700), 1.1);
+    const g = v.Gain(FLOOR);
+    Hit(g.gain, t, 0.3, 0.002, 0.1);
+    wet.connect(lp).connect(g).connect(v.out);
+    v.Start(wet, t, 0.14);
+    Grains(v, t + 0.06, 2, 0.1, 400, 1100, 0.07);
+    v.wetGain.gain.value = 0.14;
+    v.Live(0.34);
+  },
+
   // --- 弹着 ---------------------------------------------------------------
   // 砖：脆裂 + 砖粉。台儿庄的墙大多是青砖，打上去会掉一小片。
   impactBrick(A, v) {
@@ -2518,6 +2558,9 @@ const NODE_COST = {
   rifleNraFar: 14, rifleIjaFar: 14, impactMetal: 14,
   grenadePin: 13, impactBrick: 13, impactWood: 13, footstepRubble: 13, hurt: 13,
   dadaoHit: 12, shellIncoming: 11, whistle: 11,
+  // 断肢两条：照各自建了几个节点数出来再留一格（sever = 闷响 3 + 湿裂 3 + 骨断 3
+  // + 碎屑 3；land 少一层骨）。
+  goreSever: 14, goreLimbLand: 11,
   shellDrop: 22,
   grenadeThrow: 10, launcherPop: 10, impactDirt: 10, impactFlesh: 10,
   footstepDirt: 10, heartbeat: 10,
@@ -2631,7 +2674,11 @@ export const MUSIC_BASE = "Audio/Music/";
 // 9 → 10：九条爆炸/弹着成品换了素材并加了 38 Hz 高通（2026-09-09）。
 // 10 → 11：近中远爆炸与贴耳音爆/呼啸共 16 条换为 SeedAudio 1.0 成品。
 // **文件名一个没变**，所以不抬这个戳的话，玩家听到的永远是缓存里的旧爆炸。
-export const SFX_PACK_VERSION = "20260911gunfire";
+// 12 → 13：断肢两音（goreSever / goreLimbLand，各两变体）进清单（2026-09-11）。
+// 这一次是**加条目**：戳不动的话浏览器拿着缓存里的旧清单，新素材永远载不上，
+// 而 LoadSfxPack 盖不上去是静默的 —— 表现只是「断肢还是合成音」。
+// （同一天 Codex 那边把戳改成了日期式，合并后取带两件事的同一个新戳。）
+export const SFX_PACK_VERSION = "20260911gunfiregore";
 export const AMB_PACK_VERSION = "20260910carriagecrowd";
 export const MUSIC_PACK_VERSION = "5";
 
@@ -2756,6 +2803,10 @@ const SAMPLE_MIX = {
   explosionFar: 0.5, rifleNraFar: 0.42, rifleIjaFar: 0.46, shellIncoming: 0.62,
   bolt: 0.95, stripperLoad: 1.0, magIn: 1.0, grenadePin: 0.7, grenadeThrow: 0.5,
   dadaoSwing: 0.5, dadaoHit: 0.78, bayonetHit: 0.8,
+  // 断肢两条：sever 与 dadaoHit 同一档（同样是「一段身体被切下来」这件事，
+  // 而且十有八九与那一发枪声同时响，站低了就被枪盖掉）；落地那一记按 bodyFall
+  // 再压一点 —— 掉的是一条胳膊不是一个人。
+  goreSever: 0.78, goreLimbLand: 0.45,
   impactBrick: 0.55, impactDirt: 0.45, impactWood: 0.5, impactMetal: 0.55, impactFlesh: 0.72,
   footstepDirt: 0.26, footstepRubble: 0.28, bodyFall: 0.55, hurt: 0.8, heartbeat: 0.75,
   // 弹壳与脚步同一档：每开一枪响一次的东西，与枪声同量级的话整场只剩叮叮当当。
@@ -2909,7 +2960,11 @@ const AMB_AIR = {   // → Play 的 airCut
  * 一梭子下来必然连出两次同一条 —— 那恰恰是切四条想避开的事。轮播两样都不占。
  */
 const SAMPLE_CYCLE = new Set(["dadaoSwing", "dadaoHit", "bayonetHit", "telegraphKey",
-  "bulletCrack", "bulletWhizz"]);
+  "bulletCrack", "bulletWhizz",
+  // 断肢两条与白刃同理由：变体是一条条量过挑出来的（`Script_SeedAudioGoreBake`
+  // 的头注记了每条的取舍），要的就是它们本来的样子；而近炸一次卸两三段时
+  // 随机挑两条里的一条必然连出两次同一条。
+  "goreSever", "goreLimbLand"]);
 
 /**
  * 把一组 AudioBuffer 包成配方。

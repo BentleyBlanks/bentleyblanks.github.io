@@ -1106,6 +1106,79 @@ Check(`接线批 ${cues.total} 条 cue 全部发得出声`, cues.silent.length =
 Check("这一批配方零异常", !cues.errorCount, JSON.stringify(cues.lastError));
 
 // ---------------------------------------------------------------------------
+// 10) 断肢的两声：断的那一下、肢块落地那一记
+//
+// 这一节测的是**接线**，不是几何：断肢系统本身有 Script_DismembermentTest 守着。
+// 四条断言（再加一条「零异常」），前三条是：
+//   · 卸一段 → `goreSever` 请求了一次（走 Debug.Gore.Sever，也就是正片那条
+//     Kill → Ragdoll → Sever 的死亡链，不是绕过规则层的后门）；
+//   · 一次卸多段**只发一条** —— 四条同时响是一团糊，而 Play 的同帧去重窗
+//     也只会留下一条，与其让引擎随机丢不如在 GoreSystem 里就只发一条；
+//   · 内容开关关掉之后**这两声也不响** —— 「关掉断肢却还听见断肢」是设置项
+//     自相矛盾（与画质面板「阴影关了枪上还有影子」同一条账）。
+// 落地那一记单独一条：肢块是真刚体，要给它时间落地，判据取 State() 里那一段
+// 自己的 landCount（RequestedCount 只数总数，说不清落在哪一段上）。
+// ---------------------------------------------------------------------------
+const gore = await page.evaluate(async () => {
+  const T = window.Taierzhuang, a = T.audio;
+  const Alive = () => T.ai.soldiers.find((s) => s.side === "ija" && s.alive && s.actor?.characterRig?.root);
+  const first = Alive();
+  if (!first) return { error: "这一关没有带蒙皮 rig 的活人可以卸" };
+  T.Debug.Gore.SetEnabled(true);
+  T.Debug.Gore.Reset();
+  a.Ambience("silence");
+  a.Music(null);
+
+  // 1) 卸一段
+  const before = a.RequestedCount("goreSever");
+  T.Debug.Gore.Sever(first.id, "upperArmR");
+  const oneLimb = a.RequestedCount("goreSever") - before;
+
+  // 2) 一次卸多段只发一条（直接调 GoreSystem，Debug.Gore.Sever 一次只吃一段）
+  const many = Alive();
+  let multiLimb = -1, multiSevered = 0;
+  if (many) {
+    const at = a.RequestedCount("goreSever");
+    many.Kill(null, null);
+    multiSevered = (T.ai.ctx.gore.Sever(many, ["upperArmL", "thighL", "thighR"], { kind: "blast" }) || []).length;
+    multiLimb = a.RequestedCount("goreSever") - at;
+  }
+
+  // 3) 肢块落地：推两秒帧，看那几段自己的 landCount
+  const landBefore = a.RequestedCount("goreLimbLand");
+  T.StepFrames(120, 1 / 60, false);
+  const state = T.Debug.Gore.State();
+  const landed = (state?.parts || []).reduce((sum, p) => sum + (p.landCount || 0), 0);
+  const landRequests = a.RequestedCount("goreLimbLand") - landBefore;
+
+  // 4) 关掉内容开关：一段不掉、一声不响
+  T.Debug.Gore.Reset();
+  T.Debug.Gore.SetEnabled(false);
+  const off = Alive();
+  let offSever = -1, offLimbs = -1;
+  if (off) {
+    const at = a.RequestedCount("goreSever");
+    off.Kill(null, null);
+    offLimbs = (T.ai.ctx.gore.Sever(off, ["upperArmR"], { kind: "debug" }) || []).length;
+    offSever = a.RequestedCount("goreSever") - at;
+  }
+  T.Debug.Gore.SetEnabled(true);
+  return { oneLimb, multiLimb, multiSevered, landed, landRequests, offSever, offLimbs,
+    errorCount: a.errorCount, lastError: a.lastError };
+});
+if (gore.error) Check(`断肢接线：${gore.error}`, false);
+else {
+  Check("卸一段肢体请求了一条断肢声", gore.oneLimb === 1, `goreSever ×${gore.oneLimb}`);
+  Check("一次卸多段只发一条断肢声", gore.multiSevered >= 2 && gore.multiLimb === 1,
+    `卸掉 ${gore.multiSevered} 段 → goreSever ×${gore.multiLimb}`);
+  Check("肢块落地响了落地声", gore.landed >= 1 && gore.landRequests >= 1,
+    `landCount 合计 ${gore.landed}，goreLimbLand ×${gore.landRequests}`);
+  Check("断肢开关关掉之后一段不掉、一声不响", gore.offLimbs === 0 && gore.offSever === 0,
+    `卸掉 ${gore.offLimbs} 段，goreSever ×${gore.offSever}`);
+  Check("断肢这两条配方零异常", !gore.errorCount, JSON.stringify(gore.lastError));
+}
+
+// ---------------------------------------------------------------------------
 if (errors.length) for (const e of errors.slice(0, 8)) Check(e, false);
 
 await browser.close();

@@ -243,3 +243,34 @@ export const BLOOD = Object.freeze({
 
 /** 断肢时把死亡推力乘一下（被炸飞的人多退半步，见 §8.1）。 */
 export const DEATH_PUSH_SCALE = 1.6;
+
+/**
+ * 断肢的**声音**（接线在 Script_CharacterGore，配方与混音在 Script_Audio）。
+ *
+ * 两条 cue，理由分别是：
+ *   · `goreSever` —— 断的那一瞬间。没有它的时候，一条胳膊在画面上飞出去是**无声**的，
+ *     而同一发子弹的入肉声（impactFlesh）照旧在响 —— 玩家听到的是「普通一枪」，
+ *     看到的是「断了一条胳膊」，两件事对不上。播在断口（options.point，没有就取关节）。
+ *   · `goreLimbLand` —— 那一段落地的一记。肢块是真刚体、会飞两三米，落点常常在
+ *     玩家视野边缘；一记湿闷响是「它落在哪」的唯一线索（与 grenadeBounce 同一条理由）。
+ *
+ * 一次卸多段（近炸）**只播一条 sever**：四条同时响就是一团糊，而且 Play 的同帧
+ * 去重窗（22 ms）本来也会把后面几条丢掉 —— 与其让引擎随机丢，不如在这里只发一条，
+ * 音量按段数抬一点点（多卸一段抬 volumePerLimb，封顶 volumeMax）。
+ *
+ *   landSpeedMinMs —— 落地那一帧的**竖直速度**下限（m/s）。低于它不发声：
+ *                     贴着地滑出去的那种「落地」在现实里没有声音，
+ *                     而 ClampToGround 每一帧都可能返回 true（肢块沿坡滑行时）。
+ *   landCooldownS  —— 同一段肢块两次落地声之间的最短间隔（秒）。刚体在坡上会连着
+ *                     几帧被顶回地面，不设这道闸就是一串连响。
+ *   landMaxCount   —— 同一段肢块最多响几次（第一次是落地，之后是弹跳）。
+ */
+export const GORE_AUDIO = Object.freeze({
+  severVolume: 0.95,
+  volumePerLimb: 0.12,
+  volumeMax: 1.3,
+  landVolume: 0.6,
+  landSpeedMinMs: 2.2,
+  landCooldownS: 0.35,
+  landMaxCount: 2,
+});

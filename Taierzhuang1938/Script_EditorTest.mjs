@@ -1407,7 +1407,10 @@ const undescribed = await page.evaluate(async () => {
   const editor = window.Taierzhuang.editor.active;
   // 用编辑器自己的过滤器逐类点一遍，凑齐的名字应该等于 SOUND_NAMES
   const seen = new Set();
-  for (const cat of ["环境", "枪械", "爆炸", "命中", "白刃", "身体", "信号"]) {
+  // 分类签从编辑器模块读，**不在这里拄一份** —— 拄一份的话，
+  // 那边新开一类（断肢就是）这条断言会红在一个与它无关的地方。
+  const editorAudio = await import("./Script_EditorAudio.mjs");
+  for (const cat of editorAudio.CATEGORIES.filter((c) => c !== "全部")) {
     editor.category = cat;
     for (const name of editor.Names()) seen.add(name);
   }

@@ -81,7 +81,8 @@ const load = await page.evaluate(() => {
 // 2026-08-24 序章车厢新增 SeedAudio 蒸汽机车汽笛 → 41
 // 2026-08-29 集成批 INT3a：缺口批 A2 的十五个 cue 接完线，从 pendingCues 搬进 cues → 56
 //   （惨叫 / 痛呼 / 闷哼、照明弹四条、发报两条、日机三条、扫地一条、重机两条）
-const RECIPE_COUNT = 81;
+// 2026-09-11 断肢两音（goreSever / goreLimbLand）→ 83
+const RECIPE_COUNT = 83;
 
 if (!load.enabled) Fail("AudioEngine 被禁用了（正常模式不该走到出图那条路）");
 if (load.manifestCues !== RECIPE_COUNT) {

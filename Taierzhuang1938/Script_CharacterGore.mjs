@@ -1,4 +1,4 @@
-// 断肢的**视觉 / 物理层**：切身体、盖断面、烘肢块、挂刚体、喷血、回收。
+// 断肢的**视觉 / 物理 / 声音层**：切身体、盖断面、烘肢块、挂刚体、喷血、发声、回收。
 //
 // 规则（判定 / 顶点分类 / index 过滤 / 预算环）在 `Script_Dismemberment.mjs`（纯 Node），
 // 数字全在 `Data_Tuning_Gore.mjs`。口径文档：docs/Data_Dismemberment.md §5–§7。
@@ -20,7 +20,7 @@ import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import {
   LIMBS, BUDGET, DEFAULT_QUALITY, LAUNCH, LIMB_BODY, CAP, BLOOD, DEATH_PUSH_SCALE,
-  PART_RETIRE,
+  PART_RETIRE, GORE_AUDIO,
 } from "./Data_Tuning_Gore.mjs";
 import {
   ClassifyVertices, FilterIndex, ResolveSever, LimbSubtree, GoreBudget,
@@ -223,6 +223,9 @@ export class GoreSystem {
   get scene() { return this.host.Scene?.() || null; }
   get physics() { return this.host.Physics?.() || null; }
   get vfx() { return this.host.Vfx?.() || null; }
+  // 音频与 vfx 同一条约定（取值器，不是普通属性）：AudioEngine 在出图模式下
+  // 根本不建，换关也可能是另一份。拿不到就是没声音，本层绝不因此抛。
+  get audio() { return this.host.Audio?.() || null; }
   get quality() {
     const name = this.host.Quality?.() || DEFAULT_QUALITY;
     return BUDGET[name] ? name : DEFAULT_QUALITY;
@@ -325,6 +328,7 @@ export class GoreSystem {
 
     soldier.gore = record;
     this._Splash(record, fresh, options);
+    this._PlaySever(record, fresh, options);
     return fresh;
   }
 
@@ -540,6 +544,9 @@ export class GoreSystem {
       age: 0,
       restTime: 0,
       resting: !body,
+      // 落地声用的两个账（见 Update 里那一段 / GORE_AUDIO）：响过几次、上一次在什么时候。
+      landCount: 0,
+      landAge: -Infinity,
       spurt: 0,
       disposed: false,
       // 这一段有没有扛着人物的手持武器（见 _HandOffWeapon）。
@@ -652,6 +659,72 @@ export class GoreSystem {
     vfx.BloodBurst(at, direction, BLOOD.burstAmount * Math.min(1.4, 0.85 + limbIds.length * 0.15));
   }
 
+  /**
+   * 断的那一声（`goreSever`）。
+   *
+   * **一次卸多段只发一条**：四条同时响是一团糊，而且 Play 的同帧去重窗（22 ms）
+   * 本来也会把后面几条丢掉 —— 与其让引擎随机丢，不如在这里就只发一条，
+   * 音量按段数抬一点点（GORE_AUDIO.volumePerLimb，封顶 volumeMax）。
+   *
+   * 位置与 `_Splash` 取同一个点（命中点，没有就取第一段的关节）——
+   * 血雾在哪儿冒，声音就得在哪儿响。
+   */
+  _PlaySever(record, limbIds, options) {
+    const audio = this.audio;
+    if (!audio?.Play || !limbIds.length) return null;
+    const at = new THREE.Vector3();
+    if (options.point) at.copy(options.point);
+    else {
+      const joint = record.rig.bones[LIMBS[limbIds[0]].joint];
+      if (!joint) return null;
+      joint.getWorldPosition(at);
+    }
+    const volume = Math.min(GORE_AUDIO.volumeMax,
+      GORE_AUDIO.severVolume + (limbIds.length - 1) * GORE_AUDIO.volumePerLimb);
+    // 发声包一层：`Sever` 跑在 `Soldier.Kill` 的 try/catch 里面，从这儿抛出去
+    // 会被记成「这一下没断」（severed 归 0、死亡推力少乘一档）—— 明明已经断了。
+    // 声音是旁支的旁支，出什么事都不许改动死亡链的账。
+    try {
+      return audio.Play("goreSever", { position: at, volume });
+    } catch (error) {
+      console.warn("[Gore] 断肢声没播出来：", error);
+      return null;
+    }
+  }
+
+  /**
+   * 肢块砸在地上那一记（`goreLimbLand`）。
+   *
+   * 三道闸，缺一条就是一串连响：
+   *   · 速度 —— `ClampToGround` 在肢块**沿坡滑行**时每一帧都返回 true，
+   *     而贴着地滑出去在现实里没有声音。低于 landSpeedMinMs 一律不发。
+   *   · 冷却 —— 刚体落在斜面上会连着几帧被顶回地面（每次都带一点下落速度）。
+   *   · 次数 —— 第一次是落地，第二次是弹一下；再往后是物理解算的抖动，不是事件。
+   *
+   * @param {object} part
+   * @param {number} fallSpeed 撞地**之前**那一帧的下落速度（m/s，向下为正）
+   */
+  _PlayLand(part, fallSpeed) {
+    if (!(fallSpeed >= GORE_AUDIO.landSpeedMinMs)) return null;
+    if (part.landCount >= GORE_AUDIO.landMaxCount) return null;
+    if (part.age - part.landAge < GORE_AUDIO.landCooldownS) return null;
+    const audio = this.audio;
+    part.landAge = part.age;
+    part.landCount += 1;
+    if (!audio?.Play) return null;
+    // 弹起来那一记比落地轻：按速度折一下，但不低于一半（听得见才叫线索）。
+    const scale = Math.min(1, fallSpeed / (GORE_AUDIO.landSpeedMinMs * 2.5));
+    try {
+      return audio.Play("goreLimbLand", {
+        position: part.root.position.clone(),
+        volume: GORE_AUDIO.landVolume * Math.max(0.5, scale),
+      });
+    } catch (error) {
+      console.warn("[Gore] 肢块落地声没播出来：", error);
+      return null;
+    }
+  }
+
   // --- 每帧 -----------------------------------------------------------------
 
   Update(dt, camera) {
@@ -690,7 +763,11 @@ export class GoreSystem {
       const axis = TMP_A.copy(UP).applyQuaternion(TMP_Q);
       const axisUpY = Math.abs(axis.y);
       const lift = part.radius + axisUpY * Math.max(0, part.halfLength - part.radius);
+      // 落地声要的是**撞地之前**那一刻的下落速度：ClampToGround 就地把法向速度
+      // 反弹/抹掉了，clamp 之后再读只剩切向那一点点，怎么摔都是「轻轻放下」。
+      const fallSpeed = -part.body.linvel().y;
       if (physics?.ClampToGround?.(part.body, step, { lift })) {
+        this._PlayLand(part, fallSpeed);
         const spin = part.body.angvel();
         const decay = Math.max(0, 1 - LIMB_BODY.groundSpinDrag * step);
         let wx = spin.x * decay, wy = spin.y * decay, wz = spin.z * decay;
@@ -839,6 +916,10 @@ export class GoreSystem {
       resting: !!part.resting,
       ageS: Math.round(part.age * 100) / 100,
       holdsWeapon: !!part.holdsWeapon,
+      // 落地声响过几次（`_PlayLand` 的三道闸之后）。摆在这儿是给验收用的：
+      // 「有没有响」在浏览器里只能靠 RequestedCount 数总数，落到**哪一段**上
+      // 只有这一位说得清。
+      landCount: part.landCount | 0,
     }));
     const severed = [];
     let caps = 0;

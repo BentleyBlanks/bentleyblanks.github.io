@@ -360,6 +360,17 @@ FireMedium / GroundFire / BurningWreck / BurningHouse 都带 fire）。
   同名 cue 在 22 ms 去重窗里只活得下来一条，四条一起起等于白起三条，
   而且那三条会被记成 `drops.dedupe`，查起来像在丢音。
 
+### 12. 断肢两声（`goreSever` / `goreLimbLand`，2026-09-11）
+
+**不在这一层接线**：发声就在 `Script_CharacterGore` 自己里面（`Sever` 末尾一条、
+`Update` 里肢块落地那一帧一条）—— 那两个时刻只有断肢系统自己知道，
+拿到这一层来要么重做一遍判定、要么多一条回调。口径与数字在
+docs/Data_Dismemberment.md §13，数值在 `Data_Tuning_Gore.GORE_AUDIO`。
+
+这一层要知道的只有两件：一次卸多段（近炸）**只发一条 sever**
+（四条同时响是一团糊，而 22 ms 去重窗本来也只会留下一条）；
+断肢内容开关关掉时这两声也一并不响。断言在 `Script_AudioWiringTest` §10。
+
 ---
 
 ## 二之二、战场密度（2026-09-09）
