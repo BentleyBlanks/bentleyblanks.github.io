@@ -31,6 +31,7 @@ export const FIRST_LEVEL_ENCOUNTER_STARTS = Object.freeze({
 });
 // These belong to the current public phase but arrive after its entry encounter.
 export const FIRST_LEVEL_DEFERRED_ENCOUNTERS=Object.freeze({
+  3:Object.freeze(["front","approach","tank","village","melee"]),
   12:Object.freeze(["transferFlank","transferLast","transferRear"]),
   15:Object.freeze(["retreatWall","retreatYard"]),
 });

@@ -43,6 +43,7 @@ export const OPENING = Object.freeze({
     {id:"TrenchIntruderC",x:-27,z:8,weapon:"Type38",bayonet:true},
     {id:"TrenchIntruderD",x:-22,z:8,weapon:"Type38",bayonet:true},
   ],
+  intruderGrenades:0,
   intruderRoutes: {
     TrenchIntruderA:[{x:-37,z:18}],
     TrenchIntruderB:[{x:-37,z:8},{x:-37,z:13}],

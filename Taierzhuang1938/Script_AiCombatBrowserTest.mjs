@@ -223,7 +223,7 @@ try {
     // 每个位子身边还得有掩体点可进（探头节奏要在有掩体的地方量）。
     /** 投弹那一段把人挪到离玩家多远（落在 GRENADE 的 [minM, maxM] 中段）。 */
     const GRENADE_RANGE_M = 16;
-    const site = probe.PickSite(T, anchors.village.x, anchors.village.z);
+    let site = probe.PickSite(T, anchors.village.x, anchors.village.z);
     out.site = site ? {
       cover: { x: +site.cover.x.toFixed(1), z: +site.cover.z.toFixed(1), h: +site.cover.height.toFixed(2) },
       hide: { x: +site.hide.x.toFixed(1), z: +site.hide.z.toFixed(1) },
@@ -379,6 +379,15 @@ try {
 
     // B4 会绕：把钉子拔了（侧翼与跃进属于机动任务，守区的人一条都不许拿）
     {
+      // The protected opening recess intentionally has no flank exit. Use a
+      // village wall for the maneuver fixture; keep the same six live actors.
+      site=probe.PickSite(T,anchors.village.x,anchors.village.z,{nearest:true});
+      if(!site)throw new Error("Missing village flank fixture");
+      Teleport(site.open.x,site.open.z,"stand",site.yaw);
+      for(const [i,s] of squad.entries()){
+        const p=T.physics.FindFreeSpot(site.shoot.x-7+i*2.8,site.shoot.z);
+        s.position.set(p.x,p.y,p.z);s.body?.Teleport(p.x,p.y,p.z);s.goal.copy(s.position);s.cover=null;
+      }
       for (const s of squad) { s.holdZone = null; s.order = "advance"; s.scriptCoverSlackM = undefined; }
       const flank = { assigned: 0, wide: 0, bestAngleDeg: 0 };
       for (let f = 0; f < 40 * 60; f += 1) {

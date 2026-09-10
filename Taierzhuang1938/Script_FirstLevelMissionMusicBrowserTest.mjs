@@ -21,7 +21,8 @@ try {
   await page.waitForFunction(() => window.Tengxian.audio.musicLayer && window.Tengxian.audio.ctx?.state === "running", null, { timeout: 60000 });
   assert.ok(requests.every(url => url.includes("LeavingHome")), "boot must request only the current first-level recording");
   await page.screenshot({ path: path.join(output, "Scene_CarriageMusic.png") });
-  const starts = [[1,"LeavingHome"],[3,"IronSiege"],[4,"IronSiege"],[5,"IronSiege"],
+  const starts = [[1,"LeavingHome"],[3,"CloseQuartersPressure"],[3,null,"Shelter"],
+    [3,"IronSiege","Support"],[4,"IronSiege"],[5,"IronSiege"],
     [6,"TheFrontClosesIn"],[7,"TheRoadSouth"],[8,"CloseQuartersPressure"],[9,"CloseQuartersPressure"],[10,"CloseQuartersPressure"],
     [11,"TheRoadSouth"],[12,"IronSiege"],[13,"IronSiege"],[14,"TheSouthRoadBreaks"],
     [15,"CloseQuartersPressure"],[16,"CloseQuartersPressure"],[16,"KeepYourEyesOpen","FinalCarry"],

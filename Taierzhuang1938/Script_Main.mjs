@@ -7044,6 +7044,8 @@ function FireVehicleBullet(from,direction,{weaponId="Type11",damageScale=1,sourc
 }
 function FireEmplacedShot(shot) {
   if (!player || !battlefield) return;
+  player.lastShotAt=ai.time;
+  ai.NoteStimulus("machinegun",player.position,{side:shot.side,isPlayer:true,ref:player});
   const view=emplacementViews.get(shot.id);
   const gun=emplacement.Emplacement(shot.id);
   const modelMuzzle=view?.nodes?.get("muzzle");

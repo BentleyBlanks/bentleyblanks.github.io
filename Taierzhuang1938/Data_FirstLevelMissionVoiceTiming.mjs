@@ -13,7 +13,11 @@ export function MissionVoiceTimeline(cue, total) {
   // Each rebuilt exchange is aligned to its retained whole recording.
   if (["TrainMeal","TrainShelling","EscapeWhisper"].includes(cue.id)) {
     const lines=MISSION_VOICE_ALIGNMENT[cue.id].lines;
-    if(cue.id==="TrainMeal")return {lines,segments:[{id:"ShareFood",start:0,end:total,wait:4,events:[{at:lines[1][1],id:"TrainFoodReceived"}]}],tail:2};
+    if(cue.id==="TrainMeal")return {lines,segments:[{id:"ShareFood",start:0,end:total,wait:4,events:[
+      {at:lines[1][1],id:"TrainFoodReceived"},
+      ...CARRIAGE_SOUND.reactions.map(reaction=>({at:lines[reaction.line][1],id:reaction.id})),
+      {at:lines[CARRIAGE_SOUND.uneasyLine][0],id:"CarriageUneasy"},
+    ]}],tail:2};
     if(cue.id==="EscapeWhisper")return {lines,segments:[{id:"PrivateExchange",start:0,end:total,wait:2}],tail:2};
     return {lines,segments:[
       {id:"FirstShellWarning",start:0,end:lines[0][1],wait:0,gate:"trainFirstShellImpact",endEvent:"TrainNearShell"},

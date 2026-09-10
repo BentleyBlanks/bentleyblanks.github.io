@@ -498,6 +498,7 @@ export class FirstLevelMissionRuntime {
       // when one is worth throwing (target pinned in one place, 8-26 m, squad and personal cooldowns);
       // gunners on an emplacement never throw, they are married to the gun.
       if (!spec.hold && !WEAPONS[spec.weapon || "Type38"]?.emplaced) actor.grenades = R.enemyGrenades;
+      if(id==="intrusion")actor.grenades=OPENING.intruderGrenades;
       if (spec.hold) {actor.scriptDefensive=true;actor.scriptSuppressible=true;}
       if (id === "front" && !spec.hold) actor.missionAssault = this.MakeAssault(spec.x, spec.z);
       // Supporting platoons keep their spacing and depth. They remain live combatants

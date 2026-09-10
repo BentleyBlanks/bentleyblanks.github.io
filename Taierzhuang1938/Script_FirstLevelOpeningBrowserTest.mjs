@@ -51,14 +51,18 @@ async function Drive(label,points,{fight=false,until=null,seconds=120}={}){
     trace.push({label,...result});
     if(!whisperCaptured&&result.voiceCue==="EscapeWhisper"){
       whisperCaptured=true;
-      for(let i=0;i<60;i++){
+      for(let i=0;i<120;i++){
         await page.evaluate(realtime=>{
           const g=window.Tengxian,a=g.Debug.FirstLevelMissionRuntime().companion.Handle("yaowa");
-          if(a)window.OpeningInput.Look(a.position,1.1);
+          if(a){
+            const aligned=window.OpeningInput.Look(a.position,1.3);
+            g.Debug.Key("KeyS",aligned&&a.position.distanceTo(g.player.position)<2.2);
+          }
           if(!realtime)g.StepFrames(1,1/60,true);
         },realtime);
         if(realtime)await page.waitForTimeout(17);
       }
+      await page.evaluate(()=>window.Tengxian.Debug.Key("KeyS",false));
       await Capture("EscapeWhisperPlaying");
     }
     if(secondsDone%10===0||result.ready||!result.alive)console.log(label,JSON.stringify(result));
@@ -161,7 +165,7 @@ try{
   }
   await Drive("TrenchContact",OPENING.approachRoute,{fight:true,until:"shelterReached",seconds:180});
   await Drive("ShelterWhisper",[],{until:"supportOrdersHeard",seconds:100});
-  await Drive("FrontRifle",[...OPENING.supportRoute,{x:0,z:-124},{x:0,z:-126.5}],{fight:true,seconds:160});
+  await Drive("FrontRifle",[...OPENING.supportRoute,{x:0,z:-124},{x:0,z:-126.5}],{fight:true,until:"zhouGunWounded",seconds:210});
   await Drive("RifleWithdrawal",[],{fight:true,until:"zhouGunWounded",seconds:150});
   await Drive("MachineGunApproach",[{x:0,z:-124},{x:0,z:-127.4}],{seconds:40});
   if(mount){
@@ -179,7 +183,15 @@ try{
   const final=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission());
   if(mount)assert.ok(final.facts.includes("gunOccupied"),"normal F interaction completes the handover");
   assert.ok(final.facts.includes("rifleWithdrawalResolved")&&final.facts.includes("escapeWhisperHeard"));
-  if(from==="Train")assert.ok(!final.log.some(e=>e.kind==="debugJump"));
+  if(from==="Train"){
+    assert.ok(!final.log.some(e=>e.kind==="debugJump"));
+    assert.ok(final.train.entries.filter(e=>e.alive).every(e=>e.exited&&e.arrived),
+      "all surviving original passengers leave the wreck and clear their exit lanes");
+    if(realtime||audioClock){
+      const cheers=await page.evaluate(()=>window.Tengxian.audio.RequestedCount("amb.carriageRearCheer"));
+      assert.equal(cheers,2,"both retained rear-group reactions follow the shortened conversation");
+    }
+  }
   assert.deepEqual(errors,[]);
   console.log("PASS normal opening input, clear trench, private exchange, rifle retreat and machine gun handover");
   return {final,trace};

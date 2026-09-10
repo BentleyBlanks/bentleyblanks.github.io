@@ -502,7 +502,7 @@ try {
     for (let chunk = 0; chunk < 30; chunk++) {
       defense = await page.evaluate(() => {
         const g = window.Tengxian,
-          b = window.missionBot;
+          b = (window.missionGunProbe ||= {frames:0});
         for (let i = 0; i < 600; i++) {
           const p = g.player.position,
             gun = g.emplacement.Emplacement("MissionGun");

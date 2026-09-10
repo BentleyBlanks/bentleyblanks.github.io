@@ -9,10 +9,10 @@ export const CARRIAGE_SOUND = Object.freeze({
   cheerVolume: 1.5,
   cheerSlots: [22, 23],
   reactions: [
-    {id:"CarriageLaughAtTasting",line:7},
-    {id:"CarriageLaughAtCounting",line:13},
+    {id:"CarriageLaughAtTasting",line:2},
+    {id:"CarriageLaughAtCounting",line:4},
   ],
-  uneasyLine: 17,
+  uneasyLine: 5,
 });
 
 export const CARRIAGE_SOUND_ASSETS = Object.freeze([
