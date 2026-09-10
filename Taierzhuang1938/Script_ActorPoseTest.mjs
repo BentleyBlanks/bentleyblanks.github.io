@@ -453,6 +453,55 @@ try {
     check(seatedArmed.gripR.distanceTo(rightGripCenter) > 0.025
       && seatedArmed.gripL.distanceTo(leftGripCenter) > 0.025,
     "seated weapon palms no longer clear the gun centerline");
+    const deathPositions = new Set();
+    for (let variant = 0; variant < 4; variant++) for (const direction of [-1, 1]) {
+      const dead = factory.Create("ija", { seed: 8100 + variant, modelVariant: variant, weapon: "Type38" });
+      dead.Update(.1, { aim: 1, crouch: variant === 2 ? 1 : 0, moveSpeed: variant === 3 ? 1 : 0 });
+      const scale = dead.weaponGroup.getWorldScale(new THREE.Vector3()).length();
+      dead.Ragdoll(new THREE.Vector3(.12, 0, direction));
+      check(dead.characterRig.deathPose?.length > 30, "death must animate the visible IJA skeleton");
+      for (let frame = 0; frame < 60; frame++) dead.Update(1 / 60, { dead: true });
+      dead.root.updateMatrixWorld(true);
+      check(dead.weaponGroup.parent === dead.root, "dead rifle still follows the hand socket");
+      check(Math.abs(dead.weaponGroup.getWorldScale(new THREE.Vector3()).length() - scale) < 1e-5,
+        "detached rifle changed physical size");
+      const gunBox = new THREE.Box3().setFromObject(dead.weaponGroup);
+      check(gunBox.min.y >= .006 && gunBox.max.y < .13, "dead rifle is airborne or buried");
+      check(gunBox.min.x > .30 || gunBox.max.x < -.30, "dead rifle overlaps the torso");
+      const rig = dead.characterRig;
+      for (const tag of ["L", "R"]) {
+        const hand = rig.bones[`hand${tag}`].getWorldPosition(new THREE.Vector3());
+        const hip = rig.bones.pelvis.getWorldPosition(new THREE.Vector3());
+        check(hand.distanceTo(hip) < .55, "relaxed hand remained in the raised firing pose");
+      }
+      let floor = Infinity;
+      rig.root.traverse(mesh => {
+        if (!mesh.isSkinnedMesh) return;
+        mesh.skeleton.update();
+        const point = new THREE.Vector3();
+        for (let index = 0; index < mesh.geometry.attributes.position.count; index++) {
+          mesh.getVertexPosition(index, point).applyMatrix4(mesh.matrixWorld);
+          floor = Math.min(floor, point.y);
+        }
+      });
+      check(Math.abs(floor - .008) < .003, "settled visible skin does not meet the ground");
+      const position = dead.weaponGroup.position.clone(), quaternion = dead.weaponGroup.quaternion.clone();
+      dead.Update(.5, { dead: true, aim: 1, firing: true });
+      check(dead.weaponGroup.position.distanceTo(position) < 1e-8
+        && dead.weaponGroup.quaternion.angleTo(quaternion) < 1e-7, "settled rifle jitters or remounts");
+      deathPositions.add(position.toArray().join(","));
+      dead.Dispose();
+    }
+    check(deathPositions.size >= 4, "corpse rifles have no per-soldier variation");
+    const severed = factory.Create("ija", { seed: 8199, weapon: "Type38" });
+    severed.Update(.1, { aim: 1 }); severed.Ragdoll(null);
+    const limb = new THREE.Group();
+    check(severed.DetachWeaponForGore(limb), "gore handoff failed before death step");
+    for (let frame = 0; frame < 60; frame++) severed.Update(1 / 60, { dead: true });
+    check(severed.weaponGroup.parent === limb && !severed.ragdollState.weaponStart,
+      "death drop stole the rifle from a severed arm");
+    severed.RestoreWeaponFromGore(); severed.Dispose();
+
     for (const item of [actor, armed, ija, baselineA, baselineB, seatTest, seatedArmed]) item.Dispose();
     return "10 套军人蒙皮 GLB, 16 动作, 11 骨骼命中体, 主角国军 01, 程序化动作兼容, 百姓男女分身, seated legs, weapon-palm clearance; bayonet vertices " + bayonetMeshes.join(", ");
   });

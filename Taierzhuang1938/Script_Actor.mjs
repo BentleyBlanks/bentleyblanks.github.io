@@ -1915,7 +1915,13 @@ export class Actor {
       this.tmpQuat.setFromRotationMatrix(this.root.matrixWorld).invert();
       local.applyQuaternion(this.tmpQuat).normalize();
     }
+    this.characterRig?.BeginDeathPose();
+    const random = Mulberry32(HashString(`${this.seed}|death-weapon`));
     this.ragdollState = {
+      weaponSide: random() < .5 ? -1 : 1,
+      weaponOffset: .34 + random() * .14,
+      weaponForward: (random() - .5) * .55,
+      weaponYaw: (random() - .5) * 1.3 + (random() < .5 ? 0 : Math.PI),
       t: 0,
       // 子弹朝人物正面（-Z）飞 = 打在背上 = 往前扑
       forward: local.z < 0 ? 1 : -1,
@@ -1975,6 +1981,14 @@ export class Actor {
     const elapsed = s.elapsed ?? (this.time + dt);
     this.time += dt;
 
+    if (s.dead && !this.ragdollState) this.Ragdoll(null);
+    if (this.ragdollState) {
+      this.ragdollState.t = Math.min(1, this.ragdollState.t + dt / 0.8);
+      this.PoseRagdoll(this.ragdollState, dying);
+      return;
+    }
+
+
     // --- 开火 / 拉栓的边沿检测 --------------------------------------------
     const firing = !!s.firing;
     if (this.characterRig) {
@@ -2027,12 +2041,6 @@ export class Actor {
       else if (this.boltTimer > 0) boltPhase = this.boltTimer / boltTime;
     }
 
-    if (s.dead && !this.ragdollState) this.Ragdoll(null);
-    if (this.ragdollState) {
-      this.ragdollState.t = Math.min(1, this.ragdollState.t + dt / 0.8);
-      this.PoseRagdoll(this.ragdollState, dying);
-      return;
-    }
 
     // --- 步态相位 ----------------------------------------------------------
     // 设 moveSpeed=1 对应 4.2 m/s（冲刺）。步频不是随手给的：1.6→4.5 步/秒是人的
@@ -3215,6 +3223,29 @@ export class Actor {
   PoseRagdoll(rag, dying) {
     const d = this.dims;
     const t = rag.t;
+    // Detach before rotating the body; gore owns its own weapon hand-off.
+    if (this.weaponGroup && !this.goreWeaponHold && !rag.weaponStart) {
+      this.root.attach(this.weaponGroup);
+      const group = this.weaponGroup;
+      rag.weaponStart = group.position.clone();
+      rag.weaponStartQ = group.quaternion.clone();
+      rag.weaponEndQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rag.weaponYaw, Math.PI / 2, "YXZ"));
+      // Measure the whole weapon, including fixed bayonet, in its final orientation.
+      group.position.set(0, 0, 0); group.quaternion.copy(rag.weaponEndQ);
+      group.updateMatrix();
+      const box = new THREE.Box3(), partBox = new THREE.Box3();
+      group.traverse(mesh => {
+        if (!mesh.isMesh) return;
+        mesh.geometry.computeBoundingBox();
+        mesh.updateWorldMatrix(true, false);
+        const matrix = new THREE.Matrix4().copy(this.root.matrixWorld).invert().multiply(mesh.matrixWorld);
+        partBox.copy(mesh.geometry.boundingBox).applyMatrix4(matrix); box.union(partBox);
+      });
+      const center = box.getCenter(new THREE.Vector3());
+      rag.weaponEnd = new THREE.Vector3(rag.weaponSide * (rag.weaponOffset + (box.max.x - box.min.x) / 2) - center.x,
+        .008 - box.min.y, rag.weaponForward - center.z);
+      group.position.copy(rag.weaponStart); group.quaternion.copy(rag.weaponStartQ);
+    }
     const knee = SmoothStep(0, 0.30, t);
     const fall = SmoothStep(0.12, 0.78, t);
     const settle = SmoothStep(0.62, 1, t);
@@ -3245,23 +3276,11 @@ export class Actor {
       BlendEuler(arm.shoulder, dir * (0.9 * fall + 0.55 * droopArms) - 0.2, 0, leg.side * (0.35 + 0.55 * fall), 1);
       BlendEuler(arm.elbow, -0.5 - 0.4 * fall, 0, 0, 1);
     }
-    // 死了枪就脱手：**平躺在身侧的地上**。
-    //
-    // 朝向不能直接写一组欧拉角：上身这时已经翻到脸朝下（body.x ≈ -1.5），挂点是
-    // chest 的子节点，写死的角度会跟着一起翻过去 —— 枪连刺刀扎进土里，从任何角度
-    // 都只看得见一截枪托（旧版倒地截图里那把「不见了」的枪就是埋在身子底下）。
-    // 和据枪走同一条路：先在世界空间摆平，再整体除掉上身累积的旋转。
-    if (this.weaponGroup) {
-      POSE_E.set(0, 1.15 + rag.side * 0.5, 0, "YXZ");     // 世界空间：枪身水平，枪口偏向一侧
-      AIM_Q.setFromEuler(POSE_E);
-      PARENT_Q.copy(this.body.quaternion).multiply(this.hips.quaternion)
-        .multiply(this.chest.quaternion).invert();
-      AIM_Q.premultiply(PARENT_Q);
-      this.weaponMount.quaternion.slerp(AIM_Q, 1);
-      // 位置：chest 的 -Z 此刻正朝着地面，所以 -0.075H 就是「落到地上」；
-      // x 把枪挪到身体右侧外面，别插在人身上
-      this.weaponMount.position.set(
-        (0.20 + 0.06 * fall) * d.height, -0.05 * d.height, -0.075 * d.height);
+    this.characterRig?.PoseDeath(t);
+    if (rag.weaponStart && this.weaponGroup && !this.goreWeaponHold) {
+      const drop = SmoothStep(.05, .85, t);
+      this.weaponGroup.position.lerpVectors(rag.weaponStart, rag.weaponEnd, drop);
+      this.weaponGroup.quaternion.slerpQuaternions(rag.weaponStartQ, rag.weaponEndQ, drop);
     }
     if (dying > 0) this.body.rotation.x += dying * 0.02;
   }

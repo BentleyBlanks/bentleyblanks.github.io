@@ -4,6 +4,7 @@
 // 这里实例化。每名士兵稳定抽取本阵营五个模型之一；第一人称过场主角固定 Nra01。
 
 import * as THREE from "three";
+import { DEATH_POSE } from "./Data_DeathPose.mjs";
 import { InfantryAnimationController, INFANTRY_ANIMATION_IDS, INFANTRY_ANIMATION_LABELS, INFANTRY_ONCE_IDS } from "./Script_InfantryAnimation.mjs";
 import { MeleeAnimationPlayer } from "./Script_MeleeAnimation.mjs";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
@@ -690,6 +691,82 @@ export class LugouCharacterRig {
     this.root.position.set(0, -actor.body.position.y, 0);
     actor.root.updateWorldMatrix(true, true);
     return this;
+  }
+
+  BeginDeathPose() {
+    if (!this.kind.startsWith("ija") || this.deathPose) return;
+    const nodes = [];
+    this.root.traverse(node => {
+      if (node.isBone) nodes.push({ node, startPosition: node.position.clone(),
+        startQuaternion: node.quaternion.clone(), startScale: node.scale.clone() });
+    });
+    this.mixer.stopAllAction();
+    const reference = this.mixer.clipAction(this.clipById.get(DEATH_POSE.referenceClip));
+    reference.reset().play(); reference.time = DEATH_POSE.referenceTime;
+    this.mixer.update(0);
+    this.root.updateWorldMatrix(true, true);
+    const rootQ = this.root.getWorldQuaternion(new THREE.Quaternion());
+    const rootInverse = rootQ.clone().invert();
+    const authored = new Map(Object.entries(DEATH_POSE.worldRotationDeltas).map(([name, q]) => [NormalizeName(name), q]));
+    const targets = new Map(nodes.map(({ node }) => {
+      const delta = new THREE.Quaternion().fromArray(authored.get(NormalizeName(node.name)) || [0, 0, 0, 1]);
+      delta.premultiply(rootQ).multiply(rootInverse);
+      return [node, node.getWorldQuaternion(new THREE.Quaternion()).premultiply(delta)];
+    }));
+    for (const item of nodes) {
+      const { node } = item;
+      item.position = node.position.clone(); item.scale = node.scale.clone();
+      const parentQ = targets.get(node.parent) || node.parent.getWorldQuaternion(new THREE.Quaternion());
+      item.quaternion = parentQ.clone().invert().multiply(targets.get(node));
+    }
+    this.mixer.stopAllAction();
+    for (const item of nodes) {
+      item.node.position.copy(item.startPosition); item.node.quaternion.copy(item.startQuaternion);
+      item.node.scale.copy(item.startScale);
+    }
+    this.deathPose = nodes;
+    this.deathGroundProbes = [];
+    this.root.traverse(mesh => {
+      if (!mesh.isSkinnedMesh) return;
+      // Fixed vertex sample keeps the short transition bounded; final frame checks every vertex.
+      this.deathGroundProbes.push(mesh);
+    });
+  }
+
+  PoseDeath(t) {
+    if (!this.deathPose) return;
+    const blend = THREE.MathUtils.smoothstep(t, 0, .85);
+    for (const item of this.deathPose) {
+      item.node.position.lerpVectors(item.startPosition, item.position, blend);
+      item.node.quaternion.slerpQuaternions(item.startQuaternion, item.quaternion, blend);
+      item.node.scale.lerpVectors(item.startScale, item.scale, blend);
+    }
+    if (t === 1 && this.deathFloorLift !== undefined) {
+      this.actor.body.position.y += this.deathFloorLift; return;
+    }
+    // Ground against visible skin, in Actor.root's fitted terrain plane, not ankle pivots.
+    this.root.updateWorldMatrix(true, false); this.root.updateMatrixWorld(true);
+    const inverse = this.actor.root.matrixWorld.clone().invert();
+    const point = new THREE.Vector3(), transform = new THREE.Matrix4();
+    let floor = Infinity;
+    for (const mesh of this.deathGroundProbes) {
+      mesh.skeleton.update(); transform.multiplyMatrices(inverse, mesh.matrixWorld);
+      // Gore removes triangles from the index while retaining the shared vertex buffer.
+      // Only drawn vertices can support the body; a removed boot must not lift the torso.
+      const indices = mesh.geometry.index;
+      const count = indices?.count ?? mesh.geometry.attributes.position.count;
+      const stride = t === 1 ? 1 : Math.max(1, Math.floor(count / 256));
+      for (let offset = 0; offset < count; offset += stride) {
+        const index = indices ? indices.getX(offset) : offset;
+        mesh.getVertexPosition(index, point).applyMatrix4(transform);
+        floor = Math.min(floor, point.y);
+      }
+    }
+    if (Number.isFinite(floor)) {
+      const lift = (.008 - floor) * THREE.MathUtils.smoothstep(t, 0, .2);
+      this.actor.body.position.y += lift;
+      if (t === 1) this.deathFloorLift = lift;
+    }
   }
 
   Play(id, fadeSeconds = 0.12) {

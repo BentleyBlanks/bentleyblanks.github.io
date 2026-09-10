@@ -456,6 +456,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  { domain: "render", pattern: /DeathPose/ },
   {domain:"squadMarch",pattern:/SquadMarch/},
   {domain:"combat",pattern:/FpsSkeleton|FpsSkeletal|FpsAnimation|Animation\/FirstPerson\/Data_Fps/},
   { domain: "combat", pattern: /CoverLean/i },
