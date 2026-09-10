@@ -392,13 +392,13 @@ const dist = await page.evaluate(async () => {
   const L = a.listenerPos;
   const At = (m) => ({ x: L.x + m, y: L.y, z: L.z });
   // panner 的 inverse 曲线，与 Script_Audio 里那组参数一致
-  const Dry = (m) => 3.5 / (3.5 + 0.9 * Math.max(0, m - 3.5));
+  const Dry = (m, ref) => ref / (ref + 0.9 * Math.max(0, m - ref));
   const ret = a.space === "open" ? 0.7 : 0.85;
   const Measure = (m) => {
     const v = a.Play("rifleNra", { position: At(m), priority: true, volume: 1 });
     if (!v) return null;
     const g = v.out.gain.value;
-    return { dry: g * Dry(m), wet: g * v.wetGain.gain.value * ret };
+    return { dry: g * Dry(m, v.panner.refDistance), wet: g * v.wetGain.gain.value * ret };
   };
   const near = Measure(2);
   await sleep(120);
@@ -431,6 +431,36 @@ if (!dist.culled || dist.culledCount < 1) {
 }
 else if (!dist.kept) Fail("一百米外那一枪被掐掉了 —— 闸门开得太狠");
 else Ok("三百米外不逐发播、一百米外照播");
+
+// Guard audibility and voice-stealing against the actual spatial node curve.
+const gunAudibility = await page.evaluate(() => {
+  const a = window.Taierzhuang.audio, L = a.listenerPos;
+  const At = (d) => ({ x: L.x + d, y: L.y, z: L.z });
+  const rows = [];
+  for (const cue of ["rifleNra", "rifleIja", "rifleNraFar", "rifleIjaFar", "type11", "type92"]) {
+    for (const distance of [2, 100, 150]) {
+      const v = a.Play(cue, { position: At(distance), priority: true });
+      if (!v) { rows.push({ cue, distance, ok: false }); continue; }
+      const ref = v.panner.refDistance;
+      const fall = ref / (ref + 0.9 * Math.max(0, distance - ref));
+      rows.push({ cue, distance, level: v.effectiveGain, ok: ref === 14
+        && Math.abs(v.effectiveGain - v.baseGain * fall) < 1e-6
+        && Math.abs(a.LevelAt(cue, distance) - v.effectiveGain) < 1e-6
+        && (distance < 100 || v.effectiveGain >= 0.04) });
+      a.StopVoice(v, 0.001);
+    }
+  }
+  const field = a.Play("rifleIjaFar", { position: At(220), soundField: true, priority: true });
+  for (const distance of [220, 300]) {
+    if (distance === 300) a.MoveVoice(field, At(distance));
+    const expected = field.baseGain * 64 / (64 + 0.9 * (distance - 64));
+    rows.push({ cue: "soundField", distance, ok: Math.abs(field.effectiveGain - expected) < 1e-6 });
+  }
+  a.StopVoice(field, 0.001);
+  return rows;
+});
+if (gunAudibility.some((row) => !row.ok)) Fail(`gun audibility/spatial priority: ${JSON.stringify(gunAudibility)}`);
+else Ok("both armies audible at 100/150 m; far-field stealing matches Panner before/after movement");
 
 // 抛壳落地：这条 cue 以前根本不存在，代码里拿「野外迫击炮爆炸」当弹壳用，
 // 每开一枪跟一记 2.8 秒的迫击炮。所以既要断言 cue 在，也要断言**开枪不再去要它**。

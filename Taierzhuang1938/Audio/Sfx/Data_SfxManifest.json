@@ -54,25 +54,19 @@
     },
     "rifleIja": {
       "files": [
-        "AudioSfx_RifleIja_01.mp3",
-        "AudioSfx_RifleIja_02.mp3",
-        "AudioSfx_RifleIja_03.mp3",
-        "AudioSfx_RifleIja_04.mp3",
-        "AudioSfx_RifleIja_05.mp3"
+        "AudioSfx_SeedAudioRifleIja_01.mp3"
       ],
-      "seconds": 1.045,
-      "credit": "Watson Wu · M1 Garand .30-06 近射 · Sonniss Game Audio Monthly #3 ／ Pole Position Production · 斯普林菲尔德 M1903A3 .30-06 连续实录 · Sonniss GDC 2020 ／ 三八式步枪（三八大盖，有盖版）实弹射击 · 参考视频实录",
-      "license": "refvideo"
+      "seconds": 1.4,
+      "credit": "Volcengine SeedAudio 1.0 · rifleIja · 2026-09-11",
+      "license": "volcengine"
     },
     "rifleIjaFar": {
       "files": [
-        "AudioSfx_RifleIjaFar_01.mp3",
-        "AudioSfx_RifleIjaFar_02.mp3",
-        "AudioSfx_RifleIjaFar_03.mp3"
+        "AudioSfx_SeedAudioRifleIjaFar_01.mp3"
       ],
-      "seconds": 1.389,
-      "credit": "Pole Position Production · BAR .30cal 300 m 正面 · Sonniss GDC 2016 ／ Pole Position Production · 50 m 外、经建筑反射的步枪射击 · Sonniss GDC 2018",
-      "license": "sonniss"
+      "seconds": 1.8,
+      "credit": "Volcengine SeedAudio 1.0 · rifleIjaFar · 2026-09-11",
+      "license": "volcengine"
     },
     "zb26": {
       "files": [
@@ -85,12 +79,11 @@
     },
     "type11": {
       "files": [
-        "AudioSfx_Type11_01.mp3",
-        "AudioSfx_Type11_02.mp3"
+        "AudioSfx_SeedAudioType11_01.mp3"
       ],
-      "seconds": 0.696,
-      "credit": "Pole Position Production · BAR .30cal 近场 · Sonniss GDC 2016 ／ Pole Position Production · BAR .30cal 近场（同一次双发的第二发）· Sonniss GDC 2016",
-      "license": "sonniss"
+      "seconds": 0.65,
+      "credit": "Volcengine SeedAudio 1.0 · type11 · 2026-09-11",
+      "license": "volcengine"
     },
     "type92": {
       "files": [

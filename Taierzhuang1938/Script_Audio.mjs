@@ -42,6 +42,7 @@
 import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { VOICE_BASE, VOICE_LINES } from "./Data_Voice.mjs";
 import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_MUSIC_MIX } from "./Data_FirstLevelMissionMusic.mjs";
+import { GUN_AUDIBILITY } from "./Data_Tuning_Audio.mjs";
 import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 import { AUDIO_MIX_DEFAULTS } from "./Data_Tuning_Audio.mjs";
 
@@ -326,9 +327,9 @@ function OcclusionCut(occ) {
   return 20000 * Math.pow(OCCLUSION_LP_HZ / 20000, Clamp01(occ));
 }
 
-/** panner 的 inverse 曲线（refDistance 3.5 / rolloff 0.9）。偷声部时按它排有效电平。 */
-function DryFalloff(distance) {
-  return 3.5 / (3.5 + 0.9 * Math.max(0, distance - 3.5));
+/** Panner inverse curve; use the actual source reference distance for voice stealing. */
+function DryFalloff(distance, refDistance = 3.5) {
+  return refDistance / (refDistance + 0.9 * Math.max(0, distance - refDistance));
 }
 
 /**
@@ -2630,7 +2631,7 @@ export const MUSIC_BASE = "Audio/Music/";
 // 9 → 10：九条爆炸/弹着成品换了素材并加了 38 Hz 高通（2026-09-09）。
 // 10 → 11：近中远爆炸与贴耳音爆/呼啸共 16 条换为 SeedAudio 1.0 成品。
 // **文件名一个没变**，所以不抬这个戳的话，玩家听到的永远是缓存里的旧爆炸。
-export const SFX_PACK_VERSION = "20260911traintrio";
+export const SFX_PACK_VERSION = "20260911gunfire";
 export const AMB_PACK_VERSION = "20260910carriagecrowd";
 export const MUSIC_PACK_VERSION = "5";
 
@@ -4489,7 +4490,7 @@ export class AudioEngine {
    * `MIX_GAIN`，不能读 `SAMPLE_MIX`（那张表只是采样路径的来源）。
    */
   LevelAt(name, distance = 0) {
-    return (MIX_GAIN[name] ?? 1) * DryFalloff(Math.max(0, distance));
+    return (MIX_GAIN[name] ?? 1) * DryFalloff(Math.max(0, distance), IsGunCue(name) ? GUN_AUDIBILITY.refDistanceM : 3.5);
   }
 
   /**
@@ -4503,7 +4504,7 @@ export class AudioEngine {
   GunReportLevelAt(name, distance = 0) {
     const d = Math.max(0, distance);
     const far = FAR_CUE[name];
-    const fall = DryFalloff(d);
+    const fall = DryFalloff(d, IsGunCue(name) ? GUN_AUDIBILITY.refDistanceM : 3.5);
     if (!far) return (MIX_GAIN[name] ?? 1) * fall;
     const t = Clamp((d - GUN_NEAR_M) / (GUN_FAR_M - GUN_NEAR_M), 0, 1);
     const nearGain = Math.cos(t * Math.PI * 0.5) * (MIX_GAIN[name] ?? 1);
@@ -4730,7 +4731,9 @@ export class AudioEngine {
 
     // 有效电平：这一声在玩家耳朵里到底有多响。voice stealing 按它排序。
     const mix = MIX_GAIN[name] ?? 1;
-    const effectiveGain = volume * mix * (position ? DryFalloff(distance) : 1);
+    const refDistance = soundField ? 64 : Math.max(3.5, sourceSizeM || 0,
+      IsGunCue(name) ? GUN_AUDIBILITY.refDistanceM : 0);
+    const effectiveGain = volume * mix * (position && !firstPerson ? DryFalloff(distance, refDistance) : 1);
 
     // 预算闸门：按实测开销**发声前**判断。
     // 连发的开销与点射长度无关（整条点射共用一套链，见 GunAuto），所以查表就够。
@@ -4826,7 +4829,7 @@ export class AudioEngine {
       // A distant battle sector is an extended field, not a one-metre muzzle.
       // 爆炸同理，只是尺度小两档：火球本身就有好几米，近场不是一个枪口
       //（sourceSizeM 由调用侧给，接线层交的就是爆炸半径，见 IsBlastCue 的抬头）。
-      panner.refDistance = soundField ? 64 : Math.max(3.5, sourceSizeM || 0);
+      panner.refDistance = refDistance;
       panner.maxDistance = soundField ? 1000 : 600;
       panner.rolloffFactor = 0.9;
       // 【2026-09-09】**极近场钳位**（PANNER_MIN_M）：贴到听者身上的声源沿自己的
@@ -4991,7 +4994,7 @@ export class AudioEngine {
     voice.distance = distance;
     // 有效电平跟着距离走 —— 不更新的话，一架飞远了的飞机在 stealing 那儿
     // 永远还挂着起飞时的电平，成了偷不掉的常驻声部。
-    if (voice.baseGain !== undefined) voice.effectiveGain = voice.baseGain * DryFalloff(distance);
+    if (voice.baseGain !== undefined) voice.effectiveGain = voice.baseGain * DryFalloff(distance, voice.panner?.refDistance ?? 3.5);
     if (velocity && typeof voice.SetDoppler === "function" && distance > 1e-3) {
       // 朝听者为正：f' = f * c / (c - v_radial)
       const radial = -(velocity.x * dx + velocity.y * dy + velocity.z * dz) / distance;

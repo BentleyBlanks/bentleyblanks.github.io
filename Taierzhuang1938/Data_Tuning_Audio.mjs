@@ -389,7 +389,7 @@ export const BATTLE_DENSITY = Object.freeze({
    * 「一百六十米外逐发播」原样搬回来，只是换了个位置。
    */
   sectorBudgetPerS: 3,
-  sectorVolume: 0.3,        // 扇区那一条的基础音量（再乘强度曲线）
+  sectorVolume: 0.65,        // 扇区那一条的基础音量（再乘强度曲线）
   sectorBurst: 4,           // 机枪远场那条的点射发数
 });
 
@@ -437,3 +437,6 @@ export const FIRE_SPOT = Object.freeze({
   minFire: 0.2,             // vfx 烟源的 fire 强度低于此当作只冒烟不着火
   rescanS: 0.5,             // 重新挑「最近四个」的间隔；每帧挑是白花的
 });
+
+// 2026-09-11: keep NPC reports audible across the combat field; near gun mix stays unchanged.
+export const GUN_AUDIBILITY = Object.freeze({ refDistanceM: 14 });
