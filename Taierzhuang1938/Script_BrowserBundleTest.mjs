@@ -61,7 +61,7 @@ try {
       const partial=await page.evaluate(()=>{const g=window.Tengxian;const actors=g.ai.soldiers.filter(a=>a.missionTrainPassenger);
         return {count:actors.length,models:actors.map(a=>a.actor.characterRig?.modelId||null),train:g.Debug.FirstLevelMission().train};});
       assert.equal(partial.count,41,'interrupted models preserve every physical passenger');
-      assert.deepEqual(partial.train.counts,[8,24,8]);
+      assert.deepEqual(partial.train.counts,[12,16,12]);
       assert.ok(partial.models.includes(null),'missing selected models use the explicit whitebox fallback');
       assert.ok(partial.models.includes('LugouNra03'),'the surviving soldier keeps its original model ID');
       assert.ok(partial.models.every(id=>id===null||id==='LugouNra03'),'failed downloads never shift soldier slots into another model or officer');

@@ -14,6 +14,8 @@ debug.FirstLevelMission(); // phaseNumber / phaseId / phaseTitle / phaseCount
 
 必须等待 Promise 完成后再输入；加载中的第二次请求会被拒绝。无效编号在修改现场之前报错。`stage`、`index` 指内部执行步骤；当前共 27 步。Flow v2 快照以稳定 `stageId` 恢复，v1 优先读取日志中的阶段名，无日志时按原 25 步映射。正常流程的所有事实门和最短节奏保留。
 
+2026-09-10 开局 r2：炮击阶段使用玩家所在第二节车厢，恢复后沿当前车体残骸与救援条件继续；第三阶段及后续起点使用已完成翻覆／脱险的场景。眼睑、眩晕与听觉模糊是任务实例拥有的暂态表现，离开该任务时复位，不能残留到跳关或重开。阶段跳转依然只是恢复专项，不能代替开局正常输入验收。
+
 从主菜单或其他测试场跳转时，沿既有选关流程导航到第一关页面，API 返回 `navigating/url/phaseNumber` 回执；agent 应等待新页面的 `state.ready && state.running` 与目标 `phaseNumber`。也可直接打开 `?whitebox=p012&missionStage=14`（支持编号或 id），加载完成即从指定阶段开始；刷新重进同一阶段，退出第一关或普通选关会清除此参数。
 
 | 阶段 | id | 执行步骤 |

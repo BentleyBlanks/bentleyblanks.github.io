@@ -37,6 +37,8 @@ ambienceBus → ambienceDuck → ambienceUser ┴→ duckGain ┘
 
 2026-09-10 另加一个常驻 `storyDuck`，只串在环境／音乐的 `duckGain` 后，音效与对白仍直接经 `sfxUser` 到 `masterGain`。`PlayStoryVoice` 的 `environmentGain` 默认 1；第一关短腊肉对白传入 0.28。停止、自然结束和暂停恢复分别释放／重建压低，避免爆炸的短 duck 把整段对白的环境压低提前取消。声源跟随由任务播放器每帧调用 `MoveVoice`，不改变其他位置音的探针契约。
 
+玩家车厢受击另经 `SetConcussion(amount, lowHz)` 控制独立低通，置于 `busMakeup` 与原 `deafFilter` 之间；它不改写普通爆炸耳鸣的自动化。恢复包络由开局数据按任务时钟驱动，低通从 650 Hz 逐步回到 20 kHz，暂停保持、任务销毁复位。已有 `breathHeavy` 录音复用为非空间化近身急喘，未新增素材。
+
 ---
 
 ## 1. 宿主探针契约
