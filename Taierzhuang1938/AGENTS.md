@@ -7,7 +7,7 @@
 ## 当前入口与任务范围
 
 - 正片第一关是《往南的路》新版完整任务，入口 `?whitebox=p012`，序章已并入。任务、对白和数值分别由 `Data_FirstLevelMission`、`Data_FirstLevelMissionDialogue`、`Data_Tuning_FirstLevel` 管理；来源、范围决定与未完成项见 [重构验收](docs/Data_FirstLevelRebuildAcceptance.md)。
-- 第一关跨电脑动画接力见 [全部人物动作需求](docs/Data_FirstLevelMissionAnimationRequirements.md)，包含当前规模与视频重定向交付。当前任务按 Notion 分为 18 个公开阶段，保留 25 个内部执行步骤（含完成）；调试菜单与 agent 跳转接口见 [阶段跳转](docs/Data_FirstLevelStageJump.md)。
+- 第一关跨电脑动画接力见 [全部人物动作需求](docs/Data_FirstLevelMissionAnimationRequirements.md)，包含当前规模与视频重定向交付。当前任务按 Notion 分为 18 个公开阶段，保留 27 个内部执行步骤（含完成）；调试菜单与 agent 跳转接口见 [阶段跳转](docs/Data_FirstLevelStageJump.md)。
 - 正式菜单以 `Data_Menu.CAMPAIGN_ENTRIES` 为准：第一关可玩，第二关到终章为标注“未完成”的占位，点击提示“敬请期待”。旧序章及旧章节不恢复进菜单；`?phase=N` / `Debug.StartLevel` 只建原切片，不装旧剧本、摆点或换关。每次只建当前切片，换章拆除重建。
 - `?whitebox=p012-archive` 是旧 P0–P2 的开发回归夹具，旧资产与组件契约继续保留。旧任务表、旧 Notion 摘录和旧通关结果不能替代新版需求与验收；任务涉及哪条入口，就核对对应运行时及测试。新需求在当前任务授权范围内同步数据、消费方和文档，不按旧提案自行恢复已废弃内容。
 

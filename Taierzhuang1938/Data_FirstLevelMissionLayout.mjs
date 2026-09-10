@@ -195,6 +195,8 @@ GroundedWall("ApronEastBank",-63,80,.8,1.65,9);
 GroundedWall("TrenchMouthBank",-58.5,65,.9,1.5,7);
 GroundedWall("FlankLockBank",-37,56,.65,1.1,5);
 GroundedWall("RailLockBank",-90.5,48,.65,1.1,5);
+// Rally behind the eastern earth traverse while the player clears the breach.
+GroundedWall("TrenchRallyEast",-42.3,33,.65,2,15);
 // Roofed dressing recess and two solid traverses shelter the private exchange.
 Block("OpeningShelterRoof",-32,-20,7,.25,11,"timber",{y:1.05});
 GroundedWall("OpeningShelterSouth",-32,-15.5,7,2.4,.8);
@@ -220,6 +222,10 @@ for (const side of [-1, 1]) GroundedWall(`MachineGunSideCover${side}`, side * 2.
 const gunRestTop=SampleMissionTerrain(0,-128)+1.45+.08-.12294;
 const gunRestHeight=gunRestTop-SampleMissionTerrain(0,-128.55);
 Block("MachineGunRest",0,-128.55,1.18,gunRestHeight,1.0,"cover");
+// A timber firing step carries the shooter's feet even after nearby shelling
+// deforms the soil. The gun and the shooter share a stable physical foundation.
+Block("MachineGunFiringStep",0,-127.5,2.2,.18,1.9,"timber",
+  {y:SampleMissionTerrain(0,-127.4)-.09});
 for (const [i, x, z, w] of [
   [0, -26, -164, 10],
   [1, 28, -158, 9],
@@ -547,6 +553,7 @@ export const MISSION_PLACEMENT = Object.freeze({
     {x:FRONT_GUARD_POSTS[i].x,z:-140},
     {x:-20+i*.45,z:-137+i*.35},
     {x:-20+i*.35,z:-124+i*.2},
+    {x:6,z:-124},
     {x:-8,z:-112},
     {x:-8+(i%2?1:-1),z:-92-Math.floor(i/2)*2.8},
   ]),

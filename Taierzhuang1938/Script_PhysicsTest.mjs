@@ -298,11 +298,13 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(60));
     const before = T.ai.soldiers.filter((s) => s.alive).map((s) => ({ id: s.id, x: s.position.x, z: s.position.z }));
     for (let i = 0; i < 20 * 60; i += 1) T.StepFrames(1);
     const alive = T.ai.soldiers.filter((s) => s.alive);
-    let inside = 0, bodies = 0;
+    let inside = 0, bodies = 0;const overlaps=[];
     for (const s of alive) {
       if (s.body) bodies += 1;
-      const cap = s.stance === 2 ? [0.42, 0.58] : s.stance === 1 ? [0.34, 1.21] : [0.34, 1.78];
-      if (T.physics.Overlaps(s.position.x, s.position.y, s.position.z, cap[0], cap[1])) inside += 1;
+      const cap=s.body?[s.body.radius,s.body.height]:s.stance === 2 ? [0.42, 0.58] : s.stance === 1 ? [0.34, 1.21] : [0.34, 1.78];
+      if (T.physics.Overlaps(s.position.x, s.position.y, s.position.z, cap[0], cap[1])) {
+        inside += 1;overlaps.push({id:s.id,stance:s.stance,cap,position:s.position.toArray(),body:s.body?.body.translation()});
+      }
     }
     const byId = new Map(before.map((b) => [b.id, b]));
     const moves = alive.filter((s) => byId.has(s.id))
@@ -310,11 +312,11 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(60));
       .sort((a, b) => a - b);
     const median = moves.length ? moves[Math.floor(moves.length / 2)] : 0;
     const movedAtAll = moves.filter((m) => m > 1.0).length;
-    return { alive: alive.length, bodies, inside, median, movedAtAll, total: moves.length };
+    return { alive: alive.length, bodies, inside, overlaps, median, movedAtAll, total: moves.length };
   });
   Check("AI 都挂上了胶囊", r.bodies === r.alive, `${r.bodies}/${r.alive}`);
   Check("AI 不站在墙里", r.inside <= Math.max(1, r.alive * 0.05),
-    `${r.inside}/${r.alive} 人与实体重叠`);
+    `${r.inside}/${r.alive} 人与实体重叠 ${JSON.stringify(r.overlaps)}`);
   Check("AI 没被墙卡死（20 s 后还在推进）", r.movedAtAll >= r.total * 0.5,
     `走过 1 m 以上的 ${r.movedAtAll}/${r.total} 人，位移中位数 ${r.median.toFixed(1)} m`);
 }

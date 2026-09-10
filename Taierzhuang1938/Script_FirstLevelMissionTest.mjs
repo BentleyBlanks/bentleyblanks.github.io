@@ -1,5 +1,7 @@
+import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_CIVILIAN_AFTERMATH } from "./Data_FirstLevelMissionCivilianAftermath.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
+import { FirstLevelOpening } from "./Script_FirstLevelOpening.mjs";
 import { MISSION_AFTERMATH, FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_ASSAULT_STARTS, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
 import { COVER } from "./Data_Tuning_AiCover.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
@@ -128,6 +130,22 @@ for (const stage of MISSION_STAGES.slice(0, -1)) {
 }
 assert.equal(flow.completed, true);
 console.log("ok all mission gates require recorded gameplay facts and restore exactly");
+{
+  const facts=new Map(),calls=[];
+  const r={column:{zhou:{id:"Zhou",health:100,visible:false}},Has:id=>facts.has(id),Record:(id,detail)=>facts.set(id,detail),
+    Point:p=>p,MoveActor:()=>calls.push("move"),OnPlayerDown:()=>calls.push("fail"),MissionFailure:id=>calls.push(id),
+    emplacement:{NpcVacate:()=>calls.push("vacate")},ai:{SetStance(){},Remove:()=>calls.push("remove")}};
+  const opening=new FirstLevelOpening(r);
+  opening.zhou={id:54,alive:true,health:80,lastFire:5,position:{...OPENING.zhouGunSeat},yaw:0};
+  opening.UpdateZhou();
+  assert.ok(calls.includes("move")&&!facts.has("zhouGunWounded"),"an early actual wound makes Zhou leave the gun, not wait under fire for later gates");
+  opening.zhou.position={...OPENING.zhouRest};opening.UpdateZhou();
+  assert.equal(r.column.zhou.health,80,"representation transfer preserves actual injury");
+  assert.ok(facts.get("zhouGunWounded").alive&&calls.includes("remove"));
+  facts.clear();calls.length=0;opening.zhou.alive=false;opening.zhou.health=0;
+  opening.UpdateZhou();
+  assert.ok(facts.has("zhouGunKilled")&&!facts.has("zhouGunWounded")&&calls.includes("fail"),"actual death fails the mission instead of becoming a living litter");
+}
 for(const [index,step] of MISSION_STAGES.filter(s=>!["TrenchEntry","Shelter"].includes(s.id)).entries()){
   const legacy={version:1,index,time:42,stageTime:2,facts:[],log:[]};
   const restored=new FirstLevelMissionFlow();restored.Restore(legacy);
@@ -687,7 +705,7 @@ console.log("ok receiving-food release follows the source clock and survives pau
  assert.equal(sources[0].maxDuration,entry.seconds,'the complete recording plays through its final reply');
  assert.deepEqual(subtitles,cue.lines.map(line=>line.text),'every passenger reply appears once, in order');
  assert.deepEqual(done,['TrainMeal']);
- const plan=MISSION_VOICE_TIMING.TrainMeal;
+ const plan=MissionVoiceTimeline(cue,entry.seconds);
  const impactAt=plan.segments.reduce((t,s)=>t+s.end-s.start+(s.wait||0),plan.tail)+R.trainFirstShellFlightS;
  const before=MissionTrainMotion(impactAt),after=MissionTrainMotion(impactAt+.1);
  assert.ok(before.offsetM>0 && Math.abs(before.offsetM-after.offsetM-R.trainCruiseSpeedMps*.1)<1e-6,

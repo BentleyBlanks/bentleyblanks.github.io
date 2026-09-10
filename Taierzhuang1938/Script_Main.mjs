@@ -1577,10 +1577,11 @@ async function Boot() {
     // 「视角接到枪上」：把人挪到射手位并换成射手姿态。**只在玩家自己按下那一下
     // 之后发生**，不是脚本把人拽过去 —— 挪的距离本来就只有一步（交互点的够得着
     // 半径不到两米）。姿态记下来，离位时还回去。
-    Seat: ({ seat, stance }) => {
+    Seat: ({ id, seat, stance }) => {
       if (!player?.Alive) return;
       seatStanceBefore = player.stance;
-      const y = battlefield ? battlefield.GroundHeight(seat.x, seat.z) : player.position.y;
+      const ground = battlefield ? battlefield.GroundHeight(seat.x, seat.z) : player.position.y;
+      const y = emplacement.Emplacement(id)?.payload?.supportedSeat ? Math.max(ground,seat.y) : ground;
       player.position.set(seat.x, y, seat.z);
       player.body?.Teleport(seat.x, y, seat.z);
       if (stance) player.stance = stance;

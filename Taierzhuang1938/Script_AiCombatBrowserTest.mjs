@@ -78,10 +78,10 @@ try {
     const out = { thresholds: { COVER_CYCLE, GRENADE, FLANK, WATCH } };
 
     T.state.menu = false;
-    // 逼到 Support 段（前沿开战）：把流程要的事实记上，让它自己推进
-    //（配方与 Script_FirstLevelFrameProbe 同源）。
+    // Isolated AI fixture: use the supported public stage installer. Normal
+    // campaign acceptance runs separately without jumps or fabricated facts.
+    await T.Debug.FirstLevelJump(4);
     const rt = T.Debug.FirstLevelMissionRuntime();
-    for (const fact of ["trainShelling", "trainStopped", "unloadOrdersHeard", "unloaded"]) rt.Record(fact);
     T.StepFrames(2, 1 / 60, false);
 
     const Step = (n) => { for (let i = 0; i < n; i += 1) T.StepFrames(1, 1 / 60, false); };
@@ -170,7 +170,12 @@ try {
       const Ija = () => T.ai.soldiers.filter((s) => s.alive && s.side === "ija");
       const seen = new Map();
       for (const s of Ija()) seen.set(s.id, { x: s.position.x, z: s.position.z });
+      // A real player MG burst supplies the opposing audible stimulus. The
+      // reduced roster has no 110-man rear reserve generating constant noise.
+      T.Debug.Key("KeyF",true);Step(2);T.Debug.Key("KeyF",false);
+      T.Debug.Mouse(0,true);
       Step(4 * 60);                        // 「四秒没挪窝」的窗口，与探针一致
+      T.Debug.Mouse(0,false);
       const rows = Ija().map((s) => {
         const b = seen.get(s.id);
         // 朝向契约：yaw=0 面朝 −Z，前向量 =（−sin yaw, −cos yaw）。
@@ -183,13 +188,13 @@ try {
           facingDeg = Math.acos(Math.max(-1, Math.min(1, (dx * fx + dz * fz) / len))) * 180 / Math.PI;
         }
         return {
-          d: Dist(s), stance: s.stance, state: s.state, alert: s.alert,
+          d: Dist(s), mobile:!!s.missionAssault, stance: s.stance, state: s.state, alert: s.alert,
           moved: b ? Math.hypot(s.position.x - b.x, s.position.z - b.z) : 0,
           facingDeg, knows: !!at,
         };
       });
       const Band = (lo, hi) => {
-        const r = rows.filter((x) => x.d >= lo && x.d < hi);
+        const r = rows.filter((x) => x.d >= lo && x.d < hi && (lo>=120 || x.mobile));
         const n = (fn) => r.filter(fn).length;
         return {
           n: r.length,
@@ -205,6 +210,7 @@ try {
       };
       out.bands = { near: Band(46, 74), far: Band(120, 400) };
       out.displaces = T.ai.stats.displaces;
+      T.Debug.Key("KeyF",true);Step(2);T.Debug.Key("KeyF",false);
     }
 
     // ======================================================================

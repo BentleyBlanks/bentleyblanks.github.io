@@ -111,7 +111,7 @@ export class FirstLevelMissionTrain {
       counts: C.cars.map(car => this.entries.filter(e => e.recruit && e.carIndex === car.carIndex).length),
       exited: this.entries.filter(e => e.recruit && e.exited).length,
       entries: this.entries.map(e => ({ id: e.actor.id, carIndex: e.carIndex, slot: e.slot, recruit: e.recruit,
-        life: { ...e.actor.missionTrainLife }, alive: e.actor.alive, exited: e.exited, arrived: e.arrived, index: e.index, target: e.steps[e.index],
+        life: { ...e.actor.missionTrainLife }, alive: e.actor.alive, health:e.actor.health, essential:!!e.actor.scriptEssential, exited: e.exited, arrived: e.arrived, index: e.index, target: e.steps[e.index],
         position: { x: e.actor.position.x, y: e.actor.position.y, z: e.actor.position.z } })) };
   }
 }

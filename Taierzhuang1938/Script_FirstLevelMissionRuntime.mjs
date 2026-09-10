@@ -99,11 +99,12 @@ export class FirstLevelMissionRuntime {
     this.view.interact = this.interact;
     this.Register();
     this.flow.Start();
-    if (host.stageJump != null) ApplyFirstLevelStageJump(this, host.stageJump);
-    this.musicInitializing = false;
-    this.UpdateMusic();
-    this.voiceReady = this.voice.Load();
-    this.SaveCheckpoint();
+    this.voiceReady = this.voice.Load().then(()=>{
+      if (host.stageJump != null) ApplyFirstLevelStageJump(this, host.stageJump);
+      this.musicInitializing = false;
+      this.UpdateMusic();
+      this.SaveCheckpoint();
+    });
   }
   Point(point, rise = 0) {
     return new THREE.Vector3(point.x, this.battlefield.GroundHeight(point.x, point.z) + rise, point.z);
@@ -246,7 +247,7 @@ export class FirstLevelMissionRuntime {
   }
   PlaceSquad() {
     this.squad = ["luo", "yaowa", "heyoutian", "liuwencai"].map(id => this.companion.Handle(id)).filter(Boolean);
-    for (const actor of this.squad) actor.scriptEssential = true;
+    for (const actor of this.squad) actor.scriptEssential = false;
     const originals = this.squad.filter(actor => actor.castId !== "luo");
     while (originals.length < 6) originals.push(this.ai.Spawn("nra", MISSION_TRAIN.centerX, A.train.z + R.trainTravelM, {
       weapon: "HanYang", scriptedNoncombatant: true, squadId: "MissionTrainOriginals",
@@ -340,7 +341,7 @@ export class FirstLevelMissionRuntime {
       for (const point of personalRoute.slice(index))
         if (!queued.length || Distance(queued.at(-1), point) > 0.1) queued.push({ ...point });
       if(route===MISSION_ROUTES.support){
-        const post=P.squadFrontPositions[this.squad.indexOf(actor)];
+        const post=OPENING.frontPosts[this.squad.indexOf(actor)];
         if(post)queued.push({x:post.x,z:-124},{...post});
       }
       if(!naturalMarch && route!==OPENING.approachRoute && personalRoute.length>1){
@@ -430,6 +431,10 @@ export class FirstLevelMissionRuntime {
         this.MoveActor(actor,route[0],speed);
       } else if (["TrenchEntry","Shelter"].includes(stage)) {
         this.MoveActor(actor,actor.position,0);this.ai.SetStance(actor,1,.5,true);
+      } else if (["Support","MachineGun"].includes(stage)&&!this.Has("gunOccupied")) {
+        // Stay inside the reached communication-trench post. A new generic
+        // cover search here used to pull the squad onto the exposed parapet.
+        this.Defend(actor,actor.position,0,0);this.ai.SetStance(actor,1,.5,true);
       } else if (!["Rescue", "Death"].includes(stage)) {
         if(!this.WaitWatch(actor,stage))this.Defend(actor, actor.position);
         if(["Support","MachineGun","Tank"].includes(stage))this.ai.SetStance(actor,1,2);
@@ -473,19 +478,8 @@ export class FirstLevelMissionRuntime {
       if(["village","melee"].includes(id)){actor.missionDormant=true;actor.scriptedNoncombatant=true;}
       if (MISSION_TACTICS[spec.id]) actor.missionTactic = { index: 0, elapsed: 0, hold: 0,
         movingSeconds: 0, distance: 0, last: { x: spec.x, z: spec.z }, shelter: {x:spec.x,z:spec.z}, mode: "cover" };
-      // Men spawned after the battle already opened must not wait for a release that has passed.
-      // 玩家还没走到阵地（frontBattleStarted）之前，front / tank 这两批人是「待命」的：
-      // 他们不走跃进脚本，但**照常跑 AI**。
-      //
-      // 【2026-09-09 为什么改】原来待命等于 scriptedNoncombatant，而那个标记在
-      // Script_Ai.Think 里是整条链短路（清目标、放掩体、直接返回）。实拍：Support 段
-      // 活着的 154 个日军里有 143 个带这个标记，全部跪在 235—270 m 外，四秒内位移
-      // 一律 0.00 m —— 玩家看到的就是一片雕塑，而「同时 150 个敌人」这个指标正是
-      // 靠把这 143 个不动的人算进去达成的。用户 2026-09-09 定了口径：150 这个数保留，
-      // 待命的人要真的有 AI。超出交战距离（74 m）的人由 STATE.WATCH 接手：跪下、
-      // 面向枪声、隔几秒扫一次、有掩体就进掩体，一枪不开 —— 正是待命该有的样子。
-      //
-      // Flank 那几个是另一回事：他们是后面才登场的侧翼脚本，仍然冻着。
+      // Finite front teams remain ordinary alert AI before the assault starts.
+      // Only the later tank-flank group waits for its authored release.
       const standby=["front","tank"].includes(id)&&!spec.id.startsWith("Flank")&&!this.Has("frontBattleStarted");
       if(id==="tank"&&spec.id.startsWith("Flank"))actor.scriptedNoncombatant=true;
       actor.missionFrontStandby=standby;
@@ -783,8 +777,13 @@ export class FirstLevelMissionRuntime {
       baseYaw: 0,
       arcYawDeg: 62,
       belts: 4,
-      payload:{followSight:true},
-      OnOccupy: () => this.Record("gunOccupied"),
+      payload:{followSight:true,supportedSeat:true},
+      OnOccupy: () => {
+        this.Record("gunOccupied");
+        for(const [i,actor] of this.squad.entries()){
+          actor.scriptEssential=true;this.Defend(actor,P.squadFrontPositions[i]);
+        }
+      },
     });
     const gun = this.emplacement.Emplacement(this.gunId);
     gun.kind = { ...gun.kind, stance: "stand" };
@@ -805,6 +804,10 @@ export class FirstLevelMissionRuntime {
     return T(`firstLevel.interaction.${key}`);
   }
   Enter(stage) {
+    // Preserve the later escort story's existing contract; the rebuilt opening
+    // earns survival through geometry, movement and ordinary combat damage.
+    if(!["Train","Unloading","TrenchEntry","Shelter","Support","MachineGun"].includes(stage.id))
+      for(const actor of this.squad||[])actor.scriptEssential=true;
     this.opening.Enter(stage.id);
     this.UpdateMusic(stage.id);
     this.Objective(Localize(FirstLevelStageTextId(stage.id), stage.objective));
@@ -851,7 +854,7 @@ export class FirstLevelMissionRuntime {
         this.tank.active = true;
         this.SpawnEncounter("tank");
         this.SpawnGuards();
-        for (const [i, actor] of this.squad.entries()) this.Defend(actor, P.squadFrontPositions[i]);
+        for (const [i, actor] of this.squad.entries()) this.Defend(actor, OPENING.frontPosts[i],0,0);
         break;
       case "Tank":
         this.Guide([...MISSION_ROUTES.bundle]);
@@ -1009,7 +1012,7 @@ export class FirstLevelMissionRuntime {
       if (guard.crossing || !this.Threatens(guard.actor.position,null,guard.actor.stance===2?.35:1.1)) {
         guard.crossing=true;
         guard.actor.scriptedNoncombatant=false;
-        this.ai.SetStance(guard.actor,0,1.2);
+        this.ai.SetStance(guard.actor,guard.safe?1:0,1.2);
         if (Distance(guard.actor.position, guard.route[guard.progress]) < 1.4) guard.progress++;
         if(!guard.safe && guard.progress>R.guardSafeRouteIndex) {
           guard.safe = true;
@@ -1484,6 +1487,7 @@ export class FirstLevelMissionRuntime {
     this.battleSound.Update(dt,this.flow.stage.id,this.voice.current?.phase==="playing");
     this.train?.Update(dt, this.Has("trainStopped") && this.Has("luoRescueComplete"), this.Has("trainFirstShellImpact"));
     this.opening.Update(dt);
+    if(this.failed)return;
     if(this.Has("trainProneOrder") && this.player.stance==="prone")this.Record("trainPlayerProne");
     this.DrainSpawns();
     if(["Support","MachineGun","Tank"].includes(this.flow.stage.id)) {

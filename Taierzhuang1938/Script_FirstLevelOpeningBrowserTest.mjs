@@ -11,7 +11,7 @@ import {OPENING} from "./Data_FirstLevelOpening.mjs";
 const here=path.dirname(fileURLToPath(import.meta.url));
 export async function PlayFirstLevelOpening(page,{out=path.join(here,"_shots/FirstLevelOpening/InputRun"),realtime=false,audioClock=false,from="Train",through="Handover",mount=true}={}){
 await fs.mkdir(out,{recursive:true});
-const errors=[],trace=[];
+const errors=[],trace=[];let whisperCaptured=false;
 page.on("pageerror",error=>{errors.push(String(error));console.log("PAGEERROR",String(error));});
 async function Capture(name){
   if(!realtime)await page.evaluate(()=>window.Tengxian.StepFrames(1,1/60,true));
@@ -37,18 +37,30 @@ async function Drive(label,points,{fight=false,until=null,seconds=120}={}){
     if(realtime){await page.evaluate(fight=>{window.OpeningInput.fight=fight},fight);await page.waitForTimeout(250);}
     result=await page.evaluate(({fight,until,realtime})=>{
       const g=window.Tengxian,b=window.OpeningInput;
-      for(let i=0;!realtime&&i<120&&g.player.alive;i++){
+      for(let i=0;!realtime&&i<120&&g.player.alive&&!g.Debug.FirstLevelMissionRuntime().failed;i++){
         b.Step(fight);
         g.StepFrames(1,1/60,false);
         if(until&&g.Debug.FirstLevelMissionRuntime().Has(until))break;
       }
       if(!realtime)g.StepFrames(1,1/60,true);
       const r=g.Debug.FirstLevelMissionRuntime();
-      return {t:r.time,stage:r.flow.stage.id,index:b.index,points:b.points.length,position:g.player.position.toArray(),health:g.player.health,alive:g.player.alive,
+      return {t:r.time,stage:r.flow.stage.id,index:b.index,points:b.points.length,position:g.player.position.toArray(),health:g.player.health,alive:g.player.alive&&!r.failed,
         ready:until?r.Has(until):b.index===b.points.length,shots:g.state.playerShots,ammo:g.state.ammo,remaining:r.flow.State().remaining,foe:b.foe,
-        npc:r.squad.map(a=>({id:a.castId,p:a.position.toArray(),goal:a.goal.toArray()})),voicePlaying:!!r.voice.current,opening:r.opening.State()};
+        npc:r.squad.map(a=>({id:a.castId,health:a.health,essential:!!a.scriptEssential,p:a.position.toArray(),goal:a.goal.toArray()})),voicePlaying:!!r.voice.current,voiceCue:r.voice.current?.cue?.id,opening:r.opening.State()};
     },{fight,until,realtime});
     trace.push({label,...result});
+    if(!whisperCaptured&&result.voiceCue==="EscapeWhisper"){
+      whisperCaptured=true;
+      for(let i=0;i<60;i++){
+        await page.evaluate(realtime=>{
+          const g=window.Tengxian,a=g.Debug.FirstLevelMissionRuntime().companion.Handle("yaowa");
+          if(a)window.OpeningInput.Look(a.position,1.1);
+          if(!realtime)g.StepFrames(1,1/60,true);
+        },realtime);
+        if(realtime)await page.waitForTimeout(17);
+      }
+      await Capture("EscapeWhisperPlaying");
+    }
     if(secondsDone%10===0||result.ready||!result.alive)console.log(label,JSON.stringify(result));
     if(result.ready||!result.alive)break;
     if(audioClock&&result.voicePlaying)await page.waitForTimeout(2000);
@@ -113,6 +125,16 @@ try{
   if(through==="Unloading")return;
   await Drive("LuoRescue",[],{until:"luoRescueComplete",seconds:30});
   await Drive("TrainExit",[{x:-74,z:88},{x:-71,z:88},{x:-69,z:78},{x:-68,z:70},{x:-66,z:66}],{seconds:80});
+  if(through==="Handover"){
+    await page.evaluate(async realtime=>{
+      for(let i=0;i<60;i++){
+        window.OpeningInput.Look({x:-76,z:74},2.5);
+        if(realtime)await new Promise(resolve=>requestAnimationFrame(resolve));
+        else window.Tengxian.StepFrames(1,1/60,i===59);
+      }
+    },realtime);
+    await Capture("CarriageWreck");
+  }
   if(through==="Exposure"){
     await Drive("ExposedApron",[{x:-55,z:72}],{seconds:35});
     const before=await page.evaluate(()=>window.Tengxian.player.health);
@@ -139,13 +161,19 @@ try{
   }
   await Drive("TrenchContact",OPENING.approachRoute,{fight:true,until:"shelterReached",seconds:180});
   await Drive("ShelterWhisper",[],{until:"supportOrdersHeard",seconds:100});
-  await Drive("FrontRifle",OPENING.supportRoute,{fight:true,until:"frontReached",seconds:160});
+  await Drive("FrontRifle",[...OPENING.supportRoute,{x:0,z:-124},{x:0,z:-126.5}],{fight:true,seconds:160});
   await Drive("RifleWithdrawal",[],{fight:true,until:"zhouGunWounded",seconds:150});
   await Drive("MachineGunApproach",[{x:0,z:-124},{x:0,z:-127.4}],{seconds:40});
   if(mount){
-  await page.keyboard.down("f");
-  if(realtime)await page.waitForTimeout(1500);else await page.evaluate(()=>window.Tengxian.StepFrames(90,1/60,true));
-  await page.keyboard.up("f");
+  // A live nearby grenade can legitimately take F priority for a moment.
+  // Release and press again after the current interaction resolves.
+  for(let attempt=0;attempt<4;attempt++){
+    await page.keyboard.down("f");
+    if(realtime)await page.waitForTimeout(750);else await page.evaluate(()=>window.Tengxian.StepFrames(45,1/60,true));
+    await page.keyboard.up("f");
+    if(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().Has("gunOccupied")))break;
+    if(realtime)await page.waitForTimeout(300);else await page.evaluate(()=>window.Tengxian.StepFrames(18,1/60,true));
+  }
   }
   await Capture("MachineGunHandover");
   const final=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission());
@@ -172,8 +200,11 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
     if(realtime){
       await page.locator("#bootStart").click();
       await page.evaluate(()=>{
-        const stream=window.Tengxian.renderer.domElement.captureStream(30);
-        window.OpeningVideo={chunks:[],recorder:new MediaRecorder(stream,{mimeType:"video/webm;codecs=vp9",videoBitsPerSecond:2500000})};
+        const g=window.Tengxian,stream=g.renderer.domElement.captureStream(30);
+        const audioTap=g.audio.ctx.createMediaStreamDestination();
+        g.audio.softClip.connect(audioTap);
+        for(const track of audioTap.stream.getAudioTracks())stream.addTrack(track);
+        window.OpeningVideo={chunks:[],audioTap,recorder:new MediaRecorder(stream,{mimeType:"video/webm;codecs=vp9,opus",videoBitsPerSecond:2500000})};
         window.OpeningVideo.recorder.ondataavailable=e=>window.OpeningVideo.chunks.push(e.data);
         window.OpeningVideo.recorder.start(1000);
       });
@@ -184,6 +215,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
       const encoded=await page.evaluate(async()=>{
         const v=window.OpeningVideo;if(!v)return null;
         await new Promise(resolve=>{v.recorder.onstop=resolve;v.recorder.stop()});
+        window.Tengxian.audio.softClip.disconnect(v.audioTap);
         return await new Promise(resolve=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(",")[1]);r.readAsDataURL(new Blob(v.chunks,{type:"video/webm"}))});
       });
       if(encoded){await fs.mkdir(out,{recursive:true});await fs.writeFile(path.join(out,"Video_NormalOpening.webm"),Buffer.from(encoded,"base64"));}

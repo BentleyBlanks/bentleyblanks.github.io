@@ -18,7 +18,13 @@ export class FirstLevelOpening {
   }
   Enter(stage){
     const r=this.r;
-    if(stage==="TrenchEntry")r.Guide(C.approachRoute);
+    if(stage==="TrenchEntry"){
+      r.Guide(C.approachRoute);
+      for(const [i,a] of r.squad.entries()){
+        const route=r.squadRoutes.get(a.id)||[],entry=route.findIndex(p=>Distance(p,C.trenchEntry)<.1);
+        r.squadRoutes.set(a.id,[...route.slice(0,entry+1),C.trenchCoverPosts[i]]);
+      }
+    }
     if(stage==="Shelter"){
       for(const [i,a] of r.squad.entries()){
         const route=r.squadRoutes.get(a.id)||[];
@@ -30,14 +36,18 @@ export class FirstLevelOpening {
     }
     if(stage==="Support"){
       r.rifleStartShots=r.Inventory().shots;
-      this.zhou=r.ai.Spawn("nra",C.zhouGunSeat.x,C.zhouGunSeat.z,{weapon:"Zb26",squadId:"MissionZhouGun"});
-      if(this.zhou){
-        this.zhou.missionId=r.column.zhou.id;this.zhou.castId="zhou";
-        r.PlaceActor(this.zhou,C.zhouGunSeat);
-        r.Defend(this.zhou,C.zhouGunSeat,0,0);r.ai.SetStance(this.zhou,0,Infinity,true);
-        r.emplacement.NpcOccupy(r.gunId,this.zhou);
-      }
+      this.SpawnZhou();
     }
+  }
+  SpawnZhou(){
+    const r=this.r;
+    if(this.zhou)return;
+    this.zhou=r.ai.Spawn("nra",C.zhouGunSeat.x,C.zhouGunSeat.z,{weapon:"Zb26",squadId:"MissionZhouGun"});
+    if(!this.zhou)return; // A temporarily unavailable physical spawn retries next frame.
+    this.zhou.missionId=r.column.zhou.id;this.zhou.castId="zhou";
+    r.PlaceActor(this.zhou,C.zhouGunSeat);
+    r.Defend(this.zhou,C.zhouGunSeat,0,0);r.ai.SetStance(this.zhou,0,Infinity,true);
+    r.emplacement.NpcOccupy(r.gunId,this.zhou);
   }
   SpawnMessenger(id,route,weapon){
     const r=this.r,actor=r.ai.Spawn("nra",route[0].x,route[0].z,{weapon,scriptedNoncombatant:true,squadId:id});
@@ -53,6 +63,11 @@ export class FirstLevelOpening {
   }
   Update(dt){
     const r=this.r,stage=r.flow.stage.id;
+    if(["Train","Unloading","TrenchEntry","Shelter","Support","MachineGun"].includes(stage)&&!r.Has("gunOccupied")){
+      const lost=r.squad.find(a=>!a.alive);
+      if(lost){r.Record("openingSquadLost",{castId:lost.castId});r.OnPlayerDown();r.MissionFailure?.(lost.castId);return;}
+    }
+    if(stage==="Support")this.SpawnZhou();
     if(this.derailAt!=null&&!r.Has("trainDerailed")){
       const elapsed=r.time-this.derailAt,t=Smooth(elapsed/C.derailSeconds);
       r.battlefield.SetCarDerailment(C.derailCar,C.derailRollRad*t,C.derailPivot);
@@ -68,9 +83,11 @@ export class FirstLevelOpening {
         a.position.set(x,y,z);a.body?.Teleport(x,y,z);a.actor?.root.position.copy(a.position);
         r.ai.SetStance(a,2,.2,true);
         if(t===1){
-          e.exited=true;e.arrived=true;e.index=e.steps.length;e.animation=null;e.rise=2;
-          a.missionUnloaded=true;a.missionTrainReady=true;
-          r.MoveActor(a,a.position,0);r.ai.SetStance(a,2,Infinity,true);
+          const retreat=C.spillRetreat,z=retreat.postZ+e.slot*retreat.rowM;
+          e.steps=[{x:retreat.laneX,z:from.z},{x:retreat.laneX,z},
+            {x:retreat.postX,z}];
+          e.exited=true;e.index=0;e.animation=null;e.rise=2;a.missionUnloaded=true;
+          r.MoveActor(a,a.position,0);
         }
       }
       if(t===1)r.Record("trainDerailed",{car:C.derailCar,roll:C.derailRollRad});
@@ -100,6 +117,7 @@ export class FirstLevelOpening {
       if(r.Near(C.trenchEntry,5))r.Record("trenchEntered");
       const intruders=C.intruders.map(s=>r.enemies.get(s.id));
       if(intruders.every(a=>a&&!a.alive))r.Record("trenchCleared",{count:intruders.length});
+      if(r.Has("trenchCleared")&&!this.trenchReleased){this.trenchReleased=true;r.Guide(C.approachRoute);}
       if(r.Has("trenchCleared")&&r.Near(C.shelter,C.shelterRadiusM)&&this.ShelterProtected())r.Record("shelterReached",{health:r.player.health});
     }
     if(stage==="Shelter"){
@@ -124,17 +142,17 @@ export class FirstLevelOpening {
       r.Record("zhouGunKilled",{actorId:a.id});r.OnPlayerDown();r.MissionFailure?.("zhou");return;
     }
     if(a.lastFire>0)r.Record("zhouCoverFired");
-    if(a.health>=95&&(!r.Has("frontRifleDefense")||!r.Has("rifleWithdrawalResolved")))return;
-    if(!this.zhouShellSent&&a.health>=95){
+    if(a.health>=C.zhouWoundThreshold&&(!r.Has("frontRifleDefense")||!r.Has("rifleWithdrawalResolved")))return;
+    if(!this.zhouShellSent&&a.health>=C.zhouWoundThreshold){
       this.zhouShellSent=true;
       const spec=C.zhouShell,target=r.Point({x:a.position.x+spec.offsetX,z:a.position.z},.65);
       r.combat.FireShell(r.Point(spec.from,spec.height),target,{...spec,kind:"Shell75",
         OnImpact:()=>r.Record("zhouGunBlast",{x:target.x,z:target.z})});
     }
-    if(a.health>=95)return;
+    if(a.health>=C.zhouWoundThreshold)return;
     r.emplacement.NpcVacate(r.gunId,"wounded");
     a.scriptedNoncombatant=true;r.ai.SetStance(a,1,.3,true);
-    if(a.alive&&Distance(a.position,C.zhouRest)>.65){r.MoveActor(a,C.zhouRest,R.walkSpeedMps);return;}
+    if(Distance(a.position,C.zhouRest)>C.zhouExitRadiusM){r.MoveActor(a,C.zhouRest,R.walkSpeedMps);return;}
     // The same narrative casualty continues on the existing litter. Switch
     // representation only at his observed position after the real hit and move.
     Object.assign(r.column.zhou,{x:a.position.x,z:a.position.z,health:Math.max(0,a.health),visible:true,state:"waiting",yaw:a.yaw});

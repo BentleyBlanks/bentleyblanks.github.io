@@ -12,7 +12,7 @@ await debug.FirstLevelJump("Reception"); // 等同于第 16 阶段
 debug.FirstLevelMission(); // phaseNumber / phaseId / phaseTitle / phaseCount
 ```
 
-必须等待 Promise 完成后再输入；加载中的第二次请求会被拒绝。无效编号在修改现场之前报错。`stage`、`index` 与旧快照仍指内部执行步骤，保持已有回归脚本兼容。正常流程的所有事实门和最短节奏保留。
+必须等待 Promise 完成后再输入；加载中的第二次请求会被拒绝。无效编号在修改现场之前报错。`stage`、`index` 指内部执行步骤；当前共 27 步。Flow v2 快照以稳定 `stageId` 恢复，v1 优先读取日志中的阶段名，无日志时按原 25 步映射。正常流程的所有事实门和最短节奏保留。
 
 从主菜单或其他测试场跳转时，沿既有选关流程导航到第一关页面，API 返回 `navigating/url/phaseNumber` 回执；agent 应等待新页面的 `state.ready && state.running` 与目标 `phaseNumber`。也可直接打开 `?whitebox=p012&missionStage=14`（支持编号或 id），加载完成即从指定阶段开始；刷新重进同一阶段，退出第一关或普通选关会清除此参数。
 
@@ -20,7 +20,7 @@ debug.FirstLevelMission(); // phaseNumber / phaseId / phaseTitle / phaseCount
 |---|---|---|
 | 1 军列上的人味 | Train | Train |
 | 2 接近卸载点，遭遇炮击 | Unloading | Unloading |
-| 3 支援外围阵地 | Support | Support |
+| 3 进沟、喘息与前线步枪掩护 | Support | TrenchEntry → Shelter → Support |
 | 4 接手机枪 | MachineGun | MachineGun |
 | 5 集束手榴弹炸停战车 | Tank | Tank |
 | 6 后送命令 | Orders | Orders |
@@ -39,7 +39,7 @@ debug.FirstLevelMission(); // phaseNumber / phaseId / phaseTitle / phaseCount
 
 跳转是可重复的阶段起点：重建本轮关卡和此前完成事实，保留当前阶段的任务条件。原先本轮的弹药、伤亡、破坏与未来事实不沿用；这避免后退时门已打开、敌人消失、QTE 或担架状态残留。调试开关沿用菜单设置。普通“从当前检查点继续”仍恢复原现场，两者含义不同。
 
-`Script_FirstLevelMissionCheckpoint` 用原后送系统离线推进队列、装载、车辆离开、空袭损坏和接收院进度，缓存独立副本。`Script_FirstLevelMissionStageJump` 装配实际演员、机枪、车门、战车、未完成遭遇、对白回执与持担架状态。第二阶段按车厢对白及停顿时长还原军列已行驶距离，再由真实炮击触发刹车；重试点保存在车厢局部坐标。当前阶段之后继续使用正常 Runtime.Update 和真实交互。
+`Script_FirstLevelMissionCheckpoint` 用原后送系统离线推进队列、装载、车辆离开、空袭损坏和接收院进度，缓存独立副本。`Script_FirstLevelMissionStageJump` 装配实际演员、机枪、车门、战车、未完成遭遇、对白回执与持担架状态。第二阶段读取当前配音清单，按对白及停顿时长还原已行驶距离，再由真实炮击触发翻车与刹车；第三阶段从车外进沟口起步，仍须清理四名突入者、进入遮蔽点听完私语与命令、步枪掩护友军。第四阶段起不重新生成已清理的沟内敌人；重试点保存在车厢局部坐标。当前阶段之后继续使用正常 Runtime.Update 和真实交互。
 
 验收入口：`Script_FirstLevelMissionTest.mjs` 检查目录、事实边界、列队状态及副本隔离；`Script_FirstLevelMissionStageJumpTest.mjs` 检查 18 个真实浏览器起点、菜单操作、反向/重复跳转及空袭/临终续接；`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-jumps` 从每个阶段起点分别用真实输入推进到下一阶段，最后通关；不带 `--stage-jumps` 单独验证正常通关。调试跳转验收不能当作正常通关证据。截图和日志保存在本地 `_shots/FirstLevelStageJump`、`_shots/FirstLevelStageContinue` 和 `_shots/FirstLevelMission`。
 

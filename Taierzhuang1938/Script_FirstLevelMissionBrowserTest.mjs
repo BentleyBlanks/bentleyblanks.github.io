@@ -463,7 +463,9 @@ try {
     await page.evaluate(()=>{window.villageBodies=window.Tengxian.ai.soldiers.filter(a=>["VillageGunner","VillageCorner","KitchenGuard","RearWindow","SideYard","MeleeTutor"].includes(a.missionId)).map(a=>({id:a.id,missionId:a.missionId}));});
     const opening=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission());
     assert.ok(opening.facts.includes("frontRifleDefense")&&opening.facts.includes("rifleWithdrawalResolved")&&opening.facts.includes("zhouGunWounded"));
-    assert.equal(opening.guards.filter(g=>g.safe).length,2,"rifle cover resolves only the first pair before the MG");
+    assert.ok(opening.guards.slice(0,2).every(g=>g.safe||!g.alive)&&opening.guards.slice(2).every(g=>!g.safe),
+      "rifle cover resolves only the first pair before the MG, with real casualties retained");
+    assert.ok(opening.guards.slice(0,2).some(g=>g.safe&&g.alive),"rifle cover must actually save a living guard");
     assert.ok(opening.opening.peakPlayerShooters<=3&&opening.opening.playerShots>0,"finite enemy fire slots issue actual shots at the player");
     await JumpStage(4);
     await page.evaluate(() => {
@@ -482,7 +484,9 @@ try {
     const frontVisual=await page.evaluate(()=>{
       const g=window.Tengxian,root=g.scene.getObjectByName("Emplacement_MissionGun"),tank=g.scene.getObjectByName("MissionTankTrackDamage");
       const sights=[];
-      for(const yaw of [0,.5,-.5]){g.player.yaw=yaw;g.player.pitch=0;g.StepFrames(6,1/60,false);
+      for(const yaw of [0,.5,-.5]){g.player.yaw=yaw;g.player.pitch=0;g.StepFrames(30,1/60,false);
+        // Measure alignment between impacts; keep the real trauma simulation.
+        for(let n=0;n<180&&(Math.abs(g.player.shake.pitch)>.01||Math.abs(g.player.shake.rise)>.005);n++)g.StepFrames(1,1/60,false);
         const p=root.getObjectByName("sight").getWorldPosition(g.player.position.clone()).project(g.camera);sights.push({yaw,x:p.x,y:p.y});}
       return {sights,tankModel:!!tank?.getObjectByName("Type89Tank_root_type89Armor"),
         fired:g.ai.soldiers.filter(a=>a.lastFire>0).map(a=>({id:a.missionId||a.id,side:a.side})),

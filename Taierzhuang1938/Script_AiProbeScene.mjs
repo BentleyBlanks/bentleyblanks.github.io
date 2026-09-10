@@ -58,7 +58,8 @@ function Unseen(T, from, to) { return Blocked(T, from, to) || T.ai.aiHost.Blocks
  *   「玩家该站哪儿、什么姿势、朝哪边」是**场地**的属性，不该让每个调用方各猜一份。
  */
 export function PickSite(T, cx, cz) {
-  const list = T.ai.covers.Nearby(cx, cz, 110).filter((c) => c.height >= 1.5);
+  const list = T.ai.covers.Nearby(cx, cz, 110).filter((c) => c.height >= 1.5)
+    .sort((a,b)=>Math.hypot(a.x-cx,a.z-cz)-Math.hypot(b.x-cx,b.z-cz));
   for (const c of list) {
     for (const sign of [1, -1]) {
       // 距离要拉到**自动冲锋距离以外**（突击位 24 m 是最远的一档，见 Script_Ai 的
