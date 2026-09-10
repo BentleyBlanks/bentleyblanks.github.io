@@ -6,8 +6,9 @@ import { MissionTrainLifePose } from "./Script_FirstLevelMissionTrainLife.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { MISSION_AFTERMATH } from "./Data_FirstLevelMissionFront.mjs";
+import { MISSION_CIVILIAN_AFTERMATH } from "./Data_FirstLevelMissionCivilianAftermath.mjs";
 
-// Historical casualties: eight baked poses (side × pose) drawn as InstancedMesh with three
+// Historical casualties: military poses plus four adult civilian bakes, drawn with three
 // distance tiers. No AI, tickets, collision walls or animation mixers are added for them.
 //
 // 2026-09-08 rewrite. The previous version cloned every body's full geometry into
@@ -45,7 +46,7 @@ const _euler = new THREE.Euler();
 const _quaternion = new THREE.Quaternion();
 
 export class MissionAftermath {
-  constructor({root,battlefield,actorFactory,bodies=MISSION_AFTERMATH}) {
+  constructor({root,battlefield,actorFactory,bodies=[...MISSION_AFTERMATH,...MISSION_CIVILIAN_AFTERMATH]}) {
     this.root=new THREE.Group();this.root.name="MissionBattlefieldAftermath";root.add(this.root);
     this.materials=new Map();this.clones=[];
     this.blood=new THREE.MeshStandardMaterial({color:0x4b1110,roughness:.72,metalness:0,side:THREE.DoubleSide});
@@ -55,7 +56,7 @@ export class MissionAftermath {
     this.lastFocus=new THREE.Vector3(NaN,NaN,NaN);this.lastQuaternion=new THREE.Quaternion(0,0,0,0);this.frames=0;
     const bloodSink=new BuildSink();
     for(const spec of bodies){
-      const key=spec.side+spec.pose;
+      const key=spec.side+(spec.variant||"")+spec.pose;
       let prototype=this.prototypes.get(key);
       if(!prototype){
         const parts=BakeMissionBody(actorFactory,spec,this.materials).map(part=>{
@@ -70,7 +71,7 @@ export class MissionAftermath {
       const ground=battlefield.GroundHeight(spec.x,spec.z);
       _rotation.setFromEuler(_euler.set(0,spec.yaw,0));_scale.setScalar(spec.scale);
       const matrix=new THREE.Matrix4().compose(_position.set(spec.x,ground+spec.pile+.025,spec.z),_rotation,_scale);
-      const instance={x:spec.x,y:ground+spec.pile+.5,z:spec.z,radius:1.25*spec.scale,matrix,tier:TIERS-1,prototype};
+      const instance={id:spec.id,side:spec.side,houseId:spec.houseId,x:spec.x,y:ground+spec.pile+.5,z:spec.z,radius:1.25*spec.scale,matrix,tier:TIERS-1,prototype};
       this.instances.push(instance);prototype.members.push(instance);
       // Irregular, terrain-conforming pools and smears; each body has its own outline.
       const vertices=[],count=13,angle=spec.yaw;
@@ -168,11 +169,26 @@ function Triangles(geometry){return (geometry.index?.count||geometry.attributes.
 function TierName(tier){return ["detail","distant","far"][tier]??`tier${tier}`;}
 
 export function BakeMissionBody(factory,spec,materials){
-    const actor=factory.Create(spec.side,{weapon:null,modelVariant:spec.pose,seed:1938+spec.pose});
+    const actor=factory.Create(spec.side,{weapon:null,variant:spec.variant,modelVariant:spec.pose,seed:1938+spec.pose});
     actor.Update(.5,{elapsed:spec.pose*.47});
     if(spec.patient)actor.root.rotation.set(Math.PI/2,0,0);
     else {actor.Ragdoll(new THREE.Vector3(spec.pose%2?.7:-.6,0,spec.pose<2?-1:1));
       actor.Update(1,{dead:true,dying:1,elapsed:2});}
+    if(spec.side==="civilian" && !actor.characterRig && !spec.patient){
+      // These segmented civilian models use the procedural bones. Settle them
+      // in the ground plane instead of freezing the generic falling knee/arm curl.
+      actor.body.rotation.set(spec.pose%2?Math.PI/2:-Math.PI/2,0,0);
+      actor.hips.rotation.set(0,0,0);actor.chest.rotation.set(0,0,0);
+      actor.neck.rotation.set(0,spec.pose%2?.35:-.28,0);
+      for(const tag of ["L","R"]){
+        const side=tag==="L"?-1:1,leg=actor.legs[tag],arm=actor.arms[tag];
+        leg.thigh.rotation.set(0,0,side*(tag==="L"?.16:.27));
+        leg.knee.rotation.set(0,0,side*(spec.pose%2?.12:.04));
+        leg.ankle.rotation.set(0,0,0);
+        arm.shoulder.rotation.set(0,0,side*(tag==="L"?.65:.32));
+        arm.elbow.rotation.set(0,0,side*(spec.pose%2?.35:.15));
+      }
+    }
     // Settle the imported skeleton itself. The generic death root alone leaves
     // hands frozen in the source rifle pose and bent knees pointing into the air.
     if(actor.characterRig){
