@@ -334,17 +334,17 @@
       "files": [
         "AudioSfx_TrainBrake_01.mp3"
       ],
-      "seconds": 1.8,
-      "credit": "Taierzhuang1938 procedural synthesis · 序章车厢专用音",
-      "license": "generated"
+      "seconds": 3.882,
+      "credit": "Volcengine SeedAudio 1.0 · trainBrake · 2026-09-11 approved take",
+      "license": "volcengine"
     },
     "carriageRattle": {
       "files": [
         "AudioSfx_CarriageRattle_01.mp3"
       ],
-      "seconds": 0.8,
-      "credit": "Taierzhuang1938 procedural synthesis · 序章车厢专用音",
-      "license": "generated"
+      "seconds": 1.437,
+      "credit": "Volcengine SeedAudio 1.0 · carriageRattle · 2026-09-11 approved take",
+      "license": "volcengine"
     },
     "stretcherWood": {
       "files": [
@@ -390,8 +390,8 @@
       "files": [
         "AudioSfx_TrainWhistle_01.mp3"
       ],
-      "seconds": 4.055,
-      "credit": "Volcengine SeedAudio 1.0 · 序章蒸汽机车入站汽笛",
+      "seconds": 3.923,
+      "credit": "Volcengine SeedAudio 1.0 · trainWhistle · 2026-09-11 approved take",
       "license": "volcengine"
     },
     "execScream": {
@@ -763,7 +763,7 @@
       "license": "sonniss"
     }
   },
-  "bakedAt": "2026-09-09",
+  "bakedAt": "2026-09-10",
   "normalization": {
     "normalizedAt": "2026-09-08",
     "tool": "Script_AudioNormalize.mjs",
@@ -772,5 +772,40 @@
     "targetDbfs": -25,
     "toleranceDb": 0.5
   },
-  "pendingNote": "素材已烘好，但 Script_Audio.RECIPES 里还没有同名配方，运行时不会加载（LoadSfxPack 只遍历 cues）。配方补齐后把 Data_SfxSources 对应组的 pending 去掉重烘。"
+  "pendingNote": "素材已烘好，但 Script_Audio.RECIPES 里还没有同名配方，运行时不会加载（LoadSfxPack 只遍历 cues）。配方补齐后把 Data_SfxSources 对应组的 pending 去掉重烘。",
+  "trainSources": {
+    "trainBrake": {
+      "prompt": "生成一条独立的真实电影拟音音效：1938年老式蒸汽军列减速制动，听点在木质车厢内。约五秒，一次完整的刹车过程：先是沉重车轮低频滚动逐渐放慢，闸瓦与钢轮摩擦发出粗粝、略带尖锐的金属吱鸣，音高自然下滑，最后车体轻轻顿一下，短促泄压嘶声随即消散。起音直接，过程连续，尾音完整自然停止。克制写实、有机械重量，不要恐怖片音效。只要这一件制动音，不要汽笛，不要现代电车提示音、汽车刹车、撞车、说话、旁白、音乐或长段静音。",
+      "generatedAt": "2026-09-10T17:09:17.615Z",
+      "seconds": 3.88161,
+      "activeRmsDbfs": -25.440948989618654,
+      "peakDbfs": -9.020695231849224,
+      "sha256": "6aabd82dde6b9eaeb2a1982a2fe4af8df2820266a3fec84d8dc70258cb7f12f7",
+      "file": "AudioSfx_TrainBrake_01.mp3",
+      "model": "seed-audio-1.0",
+      "approvedOn": "2026-09-11"
+    },
+    "trainWhistle": {
+      "prompt": "生成一条独立的真实蒸汽机车汽笛音效。1930年代中国北方的蒸汽火车，距离听者约三十米，一声低沉厚实、略带沙哑气流质感的双音蒸汽汽笛，持续约三秒，起音有短促蒸汽涌出，持续音自然微颤，末尾蒸汽压力下降后完整收住，整条约四秒。一次长鸣，不要重复。户外小站只有很短的自然空间尾音。不要现代电子电笛、船笛、警笛、口哨、汽车喇叭、铁轨节奏、人声、广播、音乐和夸张回声。",
+      "generatedAt": "2026-09-10T17:09:53.679Z",
+      "seconds": 3.923197,
+      "activeRmsDbfs": -25.445500707538876,
+      "peakDbfs": -12.748822797352116,
+      "sha256": "3813a521c88e42a10f338f820725d39446e0515de97f814b91d82384edc8e17a",
+      "file": "AudioSfx_TrainWhistle_01.mp3",
+      "model": "seed-audio-1.0",
+      "approvedOn": "2026-09-11"
+    },
+    "carriageRattle": {
+      "prompt": "生成一条独立短促的老式木质火车车厢结构震响音效，约一秒半。听者坐在1938年军列木车厢内部，车轮刚越过一处钢轨接缝：两下相连的沉闷咯噔，厚木板与木凳短促吱嘎共振，松动铁扣随之细碎哐啷两三下，然后自然衰减停止。有重量但不是猛烈撞击，近处真实录音质感。这是一次经过接缝引起的短震响，不是连续火车环境底，不要循环，不要长段轮轨轰鸣。不要汽笛、刹车、人声、喘息、脚步、枪炮、音乐或旁白。",
+      "generatedAt": "2026-09-10T17:10:06.841Z",
+      "seconds": 1.436508,
+      "activeRmsDbfs": -25.447198327178025,
+      "peakDbfs": -10.323937017462697,
+      "sha256": "fb138f85f849b1e46cbbf5520476636ab65bee2f049b71f5a93adbb6531acd6c",
+      "file": "AudioSfx_CarriageRattle_01.mp3",
+      "model": "seed-audio-1.0",
+      "approvedOn": "2026-09-11"
+    }
+  }
 }

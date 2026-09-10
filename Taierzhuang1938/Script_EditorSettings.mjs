@@ -23,6 +23,7 @@
 
 import { Panel, Section, Slider, Chips, Toggle, ButtonRow, Facts, Note } from "./Script_EditorUi.mjs";
 import { CONTROL_GUIDE } from "./Script_Input.mjs";
+import { AUDIO_MIX_DEFAULTS } from "./Data_Tuning_Audio.mjs";
 
 
 // 可热调参数的范围、标签和默认值共用；旧存档缺项时沿用默认值。
@@ -698,7 +699,7 @@ export class AudioSettings {
     const audio = this.audio;
     if (!audio) return;
     audio.SetMasterVolume(1);
-    for (const kind of ["sfx", "music", "ambience"]) audio.SetBusVolume(kind, 1);
+    for (const [kind, value] of Object.entries(AUDIO_MIX_DEFAULTS)) audio.SetBusVolume(kind, value);
     audio.voiceMute = false;
     audio.pauseSilence = true;
     this.Rebuild();

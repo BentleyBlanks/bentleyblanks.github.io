@@ -147,8 +147,6 @@ export const SFX_SOURCES = [
     credit: "Taierzhuang1938 procedural synthesis · 序章车厢专用音",
     license: "generated",
     cuts: [
-      { cue: "trainBrake", durS: 1.8 },
-      { cue: "carriageRattle", durS: 0.8 },
       { cue: "stretcherWood", durS: 0.9 },
       { cue: "coughLow", durS: 0.8 },
       { cue: "gearRustle", durS: 0.7 },
@@ -156,15 +154,18 @@ export const SFX_SOURCES = [
       { cue: "stepBallast", durS: 0.65 },
     ],
   },
-  // 非语音 SeedAudio take 不许混进本地合成器；由 Script_SeedAudioTrainBake.mjs 单独生成。
-  // SfxBake 重烘其它素材时仍登记这一条，避免把已经验收的汽笛从 manifest 漏掉。
+  // 三条已试听确认的 SeedAudio take；通用重烘只登记，不用程序合成覆盖。
   {
     id: "PrologueTrainSeedAudio",
     seedAudio: true,
-    bake: "Script_SeedAudioTrainBake.mjs",
-    credit: "Volcengine SeedAudio 1.0 · 序章蒸汽机车入站汽笛",
+    bake: "Script_SeedAudioTrainSfxBake.mjs --install-reviewed",
+    credit: "Volcengine SeedAudio 1.0 · 列车三音 · 2026-09-11 approved take",
     license: "volcengine",
-    cuts: [{ cue: "trainWhistle", file: "AudioSfx_TrainWhistle_01.mp3", durS: 4.055 }],
+    cuts: [
+      { cue: "trainBrake", file: "AudioSfx_TrainBrake_01.mp3", durS: 3.882 },
+      { cue: "trainWhistle", file: "AudioSfx_TrainWhistle_01.mp3", durS: 3.923 },
+      { cue: "carriageRattle", file: "AudioSfx_CarriageRattle_01.mp3", durS: 1.437 },
+    ],
   },
   // === 步枪 ===============================================================
   {

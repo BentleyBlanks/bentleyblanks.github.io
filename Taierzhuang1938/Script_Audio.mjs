@@ -43,6 +43,7 @@ import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { VOICE_BASE, VOICE_LINES } from "./Data_Voice.mjs";
 import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_MUSIC_MIX } from "./Data_FirstLevelMissionMusic.mjs";
 import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
+import { AUDIO_MIX_DEFAULTS } from "./Data_Tuning_Audio.mjs";
 
 // 包络地板。低于这个值当作静音（见文件头坑 2）。
 const FLOOR = 1e-4;
@@ -2629,7 +2630,7 @@ export const MUSIC_BASE = "Audio/Music/";
 // 9 → 10：九条爆炸/弹着成品换了素材并加了 38 Hz 高通（2026-09-09）。
 // 10 → 11：近中远爆炸与贴耳音爆/呼啸共 16 条换为 SeedAudio 1.0 成品。
 // **文件名一个没变**，所以不抬这个戳的话，玩家听到的永远是缓存里的旧爆炸。
-export const SFX_PACK_VERSION = "12";
+export const SFX_PACK_VERSION = "20260911traintrio";
 export const AMB_PACK_VERSION = "20260910carriagecrowd";
 export const MUSIC_PACK_VERSION = "5";
 
@@ -3428,7 +3429,7 @@ export class AudioEngine {
     this.space = "street";
     this.masterVolume = 1;
     // 玩家的音量设置。ctx 还没建的时候也能设，BuildGraph 会照着这份摆节点。
-    this.mix = { sfx: 1, music: 1, ambience: 1 };
+    this.mix = { ...AUDIO_MIX_DEFAULTS };
     this.voiceMute = false;
     // 「暂停时静音背景」。默认开 —— 暂停了背景还在打枪是个 bug，不是特性。
     this.pauseSilence = true;

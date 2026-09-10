@@ -1,5 +1,20 @@
 # 音频资产：音效 / 环境床 / 音乐
 
+## 环境床默认音量（2026-09-11）
+
+当前及后续所有环境预设共用 `Data_Tuning_Audio.AUDIO_MIX_DEFAULTS.ambience = 0.1`，
+即环境音量推子默认 10%；新建音频引擎及音效设置「恢复默认」都读取该值。
+各环境床内部层次配比保持原值，用户主动保存的音量设置仍可覆盖默认值。
+
+列车制动、列车汽笛、车厢震响的本轮 SeedAudio 试听入口为
+`node Taierzhuang1938/Script_SeedAudioTrainSfxBake.mjs`。严格限定三个单条 take，
+输出在仓库忽略的 `tmp/TrainSfxPreview/`，附提示词、SHA-256、时长、有效 RMS 与峰值报告；
+已存在原始 take 会复用。2026-09-11 用户试听后确认接入，使用 `--install-reviewed`
+按试听报告 SHA-256 原样安装三个 MP3，不重新生成或转码。制动 3.882 秒、汽笛 3.923 秒、
+车厢震响 1.437 秒；有效 RMS 均约 −25.45 dBFS。正式 manifest 的 `trainSources`
+保留模型、提示词、响度与哈希。`Data_SfxSources` 将三条登记为 SeedAudio 素材，
+通用合成重烘不会覆盖；旧列车 baker 也跳过已经批准的汽笛。
+
 近中远爆炸与贴耳子弹音的最新生成来源、格式和复现入口见 [SeedAudio 战斗音效](Data_SeedAudioCombat.md)。
 
 ## 部署素材本体响度（2026-08-25）

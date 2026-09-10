@@ -1,4 +1,7 @@
-// Data_Tuning_Audio.mjs — 音频**接线层**的距离、限频与配平数。
+// Data_Tuning_Audio.mjs — 音频默认分路音量与接线层的距离、限频、配平数。
+
+// 2026-09-11 用户要求：当前及后续环境床默认 10%；恢复默认使用同一份数值。
+export const AUDIO_MIX_DEFAULTS = Object.freeze({ sfx: 1, music: 1, ambience: 0.1 });
 //
 // **纯数据**：不 import three、不 import 规则代码、不含函数。规则在 `Script_AudioWiring.mjs`。
 //

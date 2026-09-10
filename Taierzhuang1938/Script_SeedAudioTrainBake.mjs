@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { SFX_LICENSES } from "./Data_SfxSources.mjs";
+import { SFX_LICENSES, SFX_SOURCES } from "./Data_SfxSources.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const apiUrl = "https://openspeech.bytedance.com/api/v3/tts/create";
@@ -94,21 +94,28 @@ function writeManifests(results) {
   amb.beds.trainInterior = { file: "AudioAmb_TrainInterior.mp3", seconds: results.trainInterior.seconds, channels: 2 };
   amb.credits.trainInterior = { credit: "Volcengine SeedAudio 1.0 · 序章蒸汽列车车厢轮轨环境", license: "volcengine", source: "SeedAudio API generated" };
   sfx.licenses.volcengine = SFX_LICENSES.volcengine;
-  sfx.cues.trainWhistle = { files: ["AudioSfx_TrainWhistle_01.mp3"], seconds: results.trainWhistle.seconds, credit: "Volcengine SeedAudio 1.0 · 序章蒸汽机车入站汽笛", license: "volcengine" };
+  if (results.trainWhistle) sfx.cues.trainWhistle = { files: ["AudioSfx_TrainWhistle_01.mp3"], seconds: results.trainWhistle.seconds, credit: "Volcengine SeedAudio 1.0 · 序章蒸汽机车入站汽笛", license: "volcengine" };
   sfx.bakedAt = new Date().toISOString().slice(0, 10);
   fs.writeFileSync(ambManifest, JSON.stringify(amb, null, 2) + "\n");
   fs.writeFileSync(sfxManifest, JSON.stringify(sfx, null, 2) + "\n");
 }
 
 async function main() {
-  if (dry) { for (const asset of assets) console.log(`${asset.id}: ${asset.output}`); return; }
   const results = {};
+  // Source registration survives a full SfxBake manifest rebuild.
+  const approvedWhistle = SFX_SOURCES.some(group => group.bake?.startsWith("Script_SeedAudioTrainSfxBake.mjs")
+    && group.cuts.some(cut => cut.cue === "trainWhistle"));
   for (const asset of assets) {
+    if (asset.id === "trainWhistle" && approvedWhistle) {
+      console.log("trainWhistle: preserving approved take; review changes with Script_SeedAudioTrainSfxBake.mjs");
+      continue;
+    }
+    if (dry) { console.log(`${asset.id}: ${asset.output}`); continue; }
     if (force || !fs.existsSync(asset.raw)) await generate(asset);
     results[asset.id] = encode(asset);
     console.log(`${asset.id}: ${results[asset.id].seconds}s ${(results[asset.id].bytes / 1024).toFixed(1)} KB`);
   }
-  writeManifests(results);
+  if (!dry) writeManifests(results);
 }
 
 main().catch((error) => { console.error(error.message); process.exitCode = 1; });
