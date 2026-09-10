@@ -209,7 +209,21 @@ try{
     await page.evaluate(()=>{window.OpeningInput.checkRally=true;});
     await Drive("PassWaitingSquad",[{x:-45,z:27}],{fight:true,seconds:50});
   }
-  await Drive("TrenchContact",regroup?OPENING.approachRoute.slice(3):OPENING.approachRoute,{fight:true,until:"shelterReached",seconds:180});
+  let remainingApproach=regroup?OPENING.approachRoute.slice(3):OPENING.approachRoute;
+  if(regroup){
+    const cleared=await Drive("TrenchClear",remainingApproach,{fight:true,until:"trenchCleared",seconds:150});
+    remainingApproach=remainingApproach.slice(cleared.index);
+    // The player has cleared this traverse. Let the squad physically catch up
+    // before continuing, so the shared safe-running cadence can actually occur.
+    // Combat, catch-up and narrow-passage priorities remain untouched.
+    const until=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().time+12);
+    while(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().time)<until){
+      if(realtime)await page.waitForTimeout(250);
+      else await page.evaluate(()=>{for(let i=0;i<120;i++){window.OpeningInput.Step(false);window.Tengxian.StepFrames(1,1/60,false);}});
+    }
+    await Capture("ClearedTrenchRegroup");
+  }
+  await Drive("TrenchContact",remainingApproach,{fight:true,until:"shelterReached",seconds:180});
   await Drive("ShelterWhisper",[],{until:"supportOrdersHeard",seconds:100});
   const rifleReady=["frontRifleDefense","rifleWithdrawalResolved","zhouGunWounded"];
   await Drive("FrontRifle",[...OPENING.supportRoute,{x:0,z:-124},{x:0,z:-126.5}],{fight:true,until:rifleReady,seconds:210});
