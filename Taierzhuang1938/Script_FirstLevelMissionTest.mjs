@@ -19,7 +19,7 @@ import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
 import { TransferBeatReady, GuardCrossingPair, FrontReplacementSlots } from "./Script_FirstLevelMissionPacing.mjs";
 import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage, FirstLevelStageForStep } from "./Data_FirstLevelMissionStages.mjs";
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
-import { FirstLevelMissionColumn, MissionCarryRoutePoint, MissionGuideSpeed, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
+import { FirstLevelMissionColumn, MissionCarryRoutePoint, MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS, MISSION_PURSUIT_ROUTE } from "./Data_FirstLevelMission.mjs";
 import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance } from "./Data_FirstLevelMissionTerrain.mjs";
@@ -628,6 +628,12 @@ for(const preparedAnimation of [false,true]) {
  assert.equal(MissionGuideSpeed(actor,{x:0,z:5},target),R.squadSpeedMps,"nearby guide keeps walking pace");
  assert.equal(MissionGuideSpeed(actor,{x:0,z:-40},target,true),0,"spacing still takes priority");
  assert.equal(MissionGuideSpeed({x:0,z:-124},{x:48,z:-20},{x:-1,z:-123},false,[{x:-8,z:-112},{x:-24,z:-60},{x:-24,z:-18},{x:0,z:0},{x:48,z:-20}]),R.squadCatchupMps,"a squad behind a route bend catches up instead of waiting forever");
+ const pending=[{x:25,z:-110},{x:15,z:-111},{x:6,z:-124},{x:-8,z:-112},A.orders];
+ const south=MissionGuideRoute({x:27,z:-113},pending,MISSION_ROUTES.south);
+ assert.deepEqual(south.slice(0,4),pending.slice(0,4),"a delayed companion returns through the bundle trench before heading south");
+ const village=MissionGuideRoute({x:-8,z:-78},south,MISSION_ROUTES.village);
+ assert.deepEqual(village.slice(0,south.length),south,"village orders preserve the unfinished southbound path");
+ assert.deepEqual(MissionGuideRoute({x:16,z:-124},pending,MISSION_ROUTES.bundle,MISSION_ROUTES.bundle,true),MISSION_ROUTES.bundle,"explicit entry starts at the cleared central junction");
 }
 
 {

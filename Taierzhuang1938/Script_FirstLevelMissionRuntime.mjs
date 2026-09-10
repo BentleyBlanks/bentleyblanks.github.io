@@ -28,7 +28,7 @@ import {
   FirstLevelMissionColumn,
   MissionRoutePoint,
   MissionRouteLength,
-  MissionGuideSpeed, MissionSquadRoute, MissionSquadPace, MissionRouteLookahead,
+  MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace, MissionRouteLookahead,
 } from "./Script_FirstLevelMissionColumn.mjs";
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
 import { SquadMarchAi } from "./Script_SquadMarchAi.mjs";
@@ -327,19 +327,7 @@ export class FirstLevelMissionRuntime {
       const personalRoute = naturalMarch ? MissionSquadRoute(route,this.squad.indexOf(actor)) : route;
       actor.missionNaturalMarch = naturalMarch;
       actor.missionWatch=null;
-      const queued = [];
-      const from = actor.position;
-      let index = 0,
-        best = Infinity;
-      for (let i = 0; !fromStart && i < personalRoute.length; i++) {
-        const distance = Distance(from, personalRoute[i]);
-        if (distance < best) {
-          best = distance;
-          index = i;
-        }
-      }
-      for (const point of personalRoute.slice(index))
-        if (!queued.length || Distance(queued.at(-1), point) > 0.1) queued.push({ ...point });
+      const queued = MissionGuideRoute(actor.position,this.squadRoutes.get(actor.id),route,personalRoute,fromStart);
       if(route===MISSION_ROUTES.support){
         const post=OPENING.frontPosts[this.squad.indexOf(actor)];
         if(post)queued.push({x:post.x,z:-124},{...post});
@@ -436,6 +424,10 @@ export class FirstLevelMissionRuntime {
         // cover search here used to pull the squad onto the exposed parapet.
         const post=this.Has("gunOccupied")?OPENING.frontPosts[this.squad.indexOf(actor)]:actor.position;
         this.Defend(actor,post,0,0);this.ai.SetStance(actor,1,.5,true);
+      } else if (stage === "Tank") {
+        // The throwing-pocket route has already provided cover. Searching for
+        // another point can drag an arrived actor across the blast traverse.
+        this.Defend(actor,actor.position,0,0);this.ai.SetStance(actor,1,.5,true);
       } else if (!["Rescue", "Death"].includes(stage)) {
         if(!this.WaitWatch(actor,stage))this.Defend(actor, actor.position);
         if(["Support","MachineGun","Tank"].includes(stage))this.ai.SetStance(actor,1,2);

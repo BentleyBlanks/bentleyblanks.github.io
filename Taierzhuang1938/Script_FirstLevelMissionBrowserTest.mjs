@@ -493,6 +493,13 @@ try {
       "rifle cover resolves only the first pair before the MG, with real casualties retained");
     assert.ok(opening.guards.slice(0,2).some(g=>g.safe&&g.alive),"rifle cover must actually save a living guard");
     assert.ok(opening.opening.peakPlayerShooters<=3&&opening.opening.playerShots>0,"finite enemy fire slots issue actual shots at the player");
+    const marchEvidence=await page.evaluate(()=>window.OpeningInput.marchEvidence);
+    await fs.writeFile(path.join(output,"Data_SquadMarchIntegration.json"),JSON.stringify(marchEvidence,null,2));
+    if(!stageJumps){
+      assert.ok(marchEvidence.some(e=>e.status==="resting"&&e.role==="member"),"shared controller produces an actual rest during the opening approach");
+      assert.ok(marchEvidence.filter(e=>e.status==="resting").every(e=>e.role!=="leader"&&e.speed<.12),"leader exemption and physical stops reach the real actors");
+    }
+    if(process.argv.includes("--march-only")){console.log("PASS shared squad march on the normal rebuilt opening");break campaignRun;}
     await JumpStage(4);
     await page.evaluate(() => {
       const g = window.Tengxian;

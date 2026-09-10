@@ -7,7 +7,7 @@ export const OPENING = Object.freeze({
   derailSeconds: 2.4,
   rescueSeconds: 2.1,
   rescueReachM: 1.6,
-  spillRetreat: {laneX:-69,postX:-65.5,postZ:118,rowM:2},
+  spillRetreat: {laneX:-69,postX:-65.5,rearClearanceM:8,rowM:2},
   shelter: {x:-32,z:-20},
   trenchEntry: {x:-45,z:41},
   breach: {x:-22,z:8},

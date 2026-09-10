@@ -40,12 +40,12 @@ async function Drive(label,points,{fight=false,until=null,seconds=120}={}){
       for(let i=0;!realtime&&i<120&&g.player.alive&&!g.Debug.FirstLevelMissionRuntime().failed;i++){
         b.Step(fight);
         g.StepFrames(1,1/60,false);
-        if(until&&g.Debug.FirstLevelMissionRuntime().Has(until))break;
+        if(until&&[until].flat().every(id=>g.Debug.FirstLevelMissionRuntime().Has(id)))break;
       }
       if(!realtime)g.StepFrames(1,1/60,true);
       const r=g.Debug.FirstLevelMissionRuntime();
       return {t:r.time,stage:r.flow.stage.id,index:b.index,points:b.points.length,position:g.player.position.toArray(),health:g.player.health,alive:g.player.alive&&!r.failed,
-        ready:until?r.Has(until):b.index===b.points.length,shots:g.state.playerShots,ammo:g.state.ammo,remaining:r.flow.State().remaining,foe:b.foe,
+        ready:until?[until].flat().every(id=>r.Has(id)):b.index===b.points.length,shots:g.state.playerShots,ammo:g.state.ammo,remaining:r.flow.State().remaining,foe:b.foe,
         npc:r.squad.map(a=>({id:a.castId,health:a.health,essential:!!a.scriptEssential,p:a.position.toArray(),goal:a.goal.toArray()})),voicePlaying:!!r.voice.current,voiceCue:r.voice.current?.cue?.id,opening:r.opening.State()};
     },{fight,until,realtime});
     trace.push({label,...result});
@@ -78,7 +78,7 @@ async function Drive(label,points,{fight=false,until=null,seconds=120}={}){
 try{
   await page.evaluate(()=>{
     const g=window.Tengxian,Wrap=a=>Math.atan2(Math.sin(a),Math.cos(a)),Clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
-    window.OpeningInput={points:[],index:0,foe:null,
+    window.OpeningInput={points:[],index:0,foe:null,marchEvidence:[],marchStates:{},
       Look(point,height=0){
         const p=g.player,e=p.EyePosition,y=height?g.battlefield.GroundHeight(point.x,point.z)+height:e.y;
         const yaw=Math.atan2(p.position.x-point.x,p.position.z-point.z),pitch=Math.atan2(y-e.y,Math.hypot(point.x-e.x,point.z-e.z));
@@ -100,6 +100,15 @@ try{
       },
       Step(fight){
         const p=g.player;
+        const march=g.Debug.FirstLevelMissionRuntime().squadMarch;
+        if(march)for(const actor of march.soldiers){
+          const command=actor.squadMarchCommand;
+          if(command&&this.marchStates[actor.id]!==command.status){
+            this.marchStates[actor.id]=command.status;
+            this.marchEvidence.push({id:actor.id,role:command.leader?"leader":"member",status:command.status,
+              time:march.march.time,speed:actor.moveSpeed*3.6,position:{x:actor.position.x,z:actor.position.z}});
+          }
+        }
         while(this.index<this.points.length&&Math.hypot(p.position.x-this.points[this.index].x,p.position.z-this.points[this.index].z)<.85)this.index++;
         const foe=fight?this.Target():null;this.foe=foe?.missionId||null;
         g.Debug.Mouse(0,false);
@@ -165,8 +174,9 @@ try{
   }
   await Drive("TrenchContact",OPENING.approachRoute,{fight:true,until:"shelterReached",seconds:180});
   await Drive("ShelterWhisper",[],{until:"supportOrdersHeard",seconds:100});
-  await Drive("FrontRifle",[...OPENING.supportRoute,{x:0,z:-124},{x:0,z:-126.5}],{fight:true,until:"zhouGunWounded",seconds:210});
-  await Drive("RifleWithdrawal",[],{fight:true,until:"zhouGunWounded",seconds:150});
+  const rifleReady=["frontRifleDefense","rifleWithdrawalResolved","zhouGunWounded"];
+  await Drive("FrontRifle",[...OPENING.supportRoute,{x:0,z:-124},{x:0,z:-126.5}],{fight:true,until:rifleReady,seconds:210});
+  await Drive("RifleWithdrawal",[],{fight:true,until:rifleReady,seconds:150});
   await Drive("MachineGunApproach",[{x:0,z:-124},{x:0,z:-127.4}],{seconds:40});
   if(mount){
   // A live nearby grenade can legitimately take F priority for a moment.

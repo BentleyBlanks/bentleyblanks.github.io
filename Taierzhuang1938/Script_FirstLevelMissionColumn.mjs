@@ -701,6 +701,22 @@ export class FirstLevelMissionColumn {
   }
 }
 
+// Retain an unfinished physical approach until it joins the next authored route.
+// A stage change must not send a trailing actor directly across a trench bank.
+export function MissionGuideRoute(position,previous,route,personalRoute=route,fromStart=false) {
+  const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
+  const Nearest=point=>personalRoute.reduce((best,p,i)=>Distance(p,point)<Distance(personalRoute[best],point)?i:best,0);
+  let index=fromStart?0:Nearest(position),prefix=[];
+  if(!fromStart)for(let i=0;i<(previous?.length||0);i++){
+    const join=route.find(p=>Distance(p,previous[i])<.1);
+    if(join){prefix=previous.slice(0,i+1);index=Nearest(join);break;}
+  }
+  const queued=[];
+  for(const point of [...prefix,...personalRoute.slice(index)])
+    if(!queued.length||Distance(queued.at(-1),point)>.1)queued.push({...point});
+  return queued;
+}
+
 export function MissionGuideSpeed(actor,player,target,yielding=false,route=null) {
   if(yielding)return 0;
   const dx=player.x-actor.x,dz=player.z-actor.z,distance=Math.hypot(dx,dz);

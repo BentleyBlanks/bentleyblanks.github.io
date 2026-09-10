@@ -13,6 +13,9 @@ export class FirstLevelOpening {
     if(this.derailAt!=null)return;
     this.derailAt=r.time;
     this.passengers=r.train.entries.filter(e=>e.carIndex===C.derailCar).map(e=>({e,from:{...e.actor.position}}));
+    // The impact occurs while the train is braking. Keep every evacuation turn
+    // beyond the actual rearmost fallen passenger, independent of impact timing.
+    this.spillRearZ=Math.max(...this.passengers.map(p=>p.from.z))+C.spillRetreat.rearClearanceM;
     r.Record("trainNearShellImpact");
     r.player.stance="prone";
   }
@@ -83,7 +86,7 @@ export class FirstLevelOpening {
         a.position.set(x,y,z);a.body?.Teleport(x,y,z);a.actor?.root.position.copy(a.position);
         r.ai.SetStance(a,2,.2,true);
         if(t===1){
-          const retreat=C.spillRetreat,z=retreat.postZ+e.slot*retreat.rowM;
+          const retreat=C.spillRetreat,z=this.spillRearZ+e.slot*retreat.rowM;
           e.steps=[{x:retreat.laneX,z:from.z},{x:retreat.laneX,z},
             {x:retreat.postX,z}];
           e.exited=true;e.index=0;e.animation=null;e.rise=2;a.missionUnloaded=true;
