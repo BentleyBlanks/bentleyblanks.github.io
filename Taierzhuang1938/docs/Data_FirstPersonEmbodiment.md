@@ -52,6 +52,9 @@ MCP 使用独立实例与端口，不能在其他任务正在制作的场景中�
 汉阳造使用独立的 `Model/Model_FpsHanYangHands.glb`，其余武器继续使用原双臂。
 该资产保持 bind pose 的前臂与手部骨段长度，不再将关节静止位移乘以 1.60。
 手部工程位于 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\HanYangHands_20260910\Animation_HanYangHands.blend`。
+本次接触微调的独立工程位于 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\HanYangHandContact_20260911\Animation_HanYangHands.blend`，
+同目录 `Data_HanYangHoldingPose.json` 保留校准握姿。左掌向外 1.5 mm、向下 0.5 mm，右拇指改为沿枪托前伸，
+近、远指节屈曲分别为 18°、12°；运行时握姿与原有 Idle 循环同步，未增加动作。
 `_import/Script_HanYangHandsShape.py` 修改这一件手部网格；
 裸手沿用原始皮肤颜色与法线，修复腕部 UV 接缝；袖子为土灰色，无手套和白衬衫袖口。
 左掌加宽、加厚，手指与前臂增加横截面体积；手指局部旋转来自参考包的单个持枪姿势，
