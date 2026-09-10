@@ -3,7 +3,7 @@ import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_APPROACH_ENEMIES } from "./Data_
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-export const MISSION_VERSION = "first-level-20260910-opening-r1";
+export const MISSION_VERSION = "first-level-20260910-opening-r2";
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 const Stage = (id, objective, target, requirements, cue, extra = {}) =>
@@ -12,7 +12,7 @@ export const MISSION_STAGES = Object.freeze([
   Stage("Train", "随军列前行，和同伴待在车厢内。", A.train, ["trainShelling"], "TrainMeal"),
   Stage(
     "Unloading",
-    "前车翻了！伏低，跟罗班长离开车厢，借残骸和土埂进入交通壕。",
+    "伏低，听罗班长指挥！脱离车厢后借掩体进入交通壕。",
     A.unload,
     ["trainStopped", "trainDerailed", "luoRescueComplete", "unloadOrdersHeard", "unloaded"],
     "TrainShelling",

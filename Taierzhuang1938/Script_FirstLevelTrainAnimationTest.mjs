@@ -33,10 +33,19 @@ try{
   for(let i=0;i<180*60&&!g.Debug.FirstLevelMission().train.open;i++){
    if(g.Debug.FirstLevelMission().openingPrompt?.keys==='Z')g.Debug.Key('KeyZ');g.StepFrames(1,1/60,false);
   }
+  // The player now finishes rescue facing east. Observe the intact north wagon
+  // via the same mouse-delta adapter, so its actual rise is in the full-detail view.
+  const yaw=Math.atan2(g.player.position.x+77,g.player.position.z-74);
+  g.Debug.Look(-Math.atan2(Math.sin(yaw-g.player.yaw),Math.cos(yaw-g.player.yaw))/.0022,g.player.pitch/.0022);
+  g.StepFrames(1,1/60,true);
   const start=g.Debug.FirstLevelMission();
   const rows=passengers.map(a=>({id:a.id,kind:a.missionTrainLife.kind,model:a.actor.characterRig.modelId,seated:a.missionTrainLife.seated,samples:[]}));
   for(const a of passengers){
    const rig=a.actor.characterRig,sampler=rig?.firstLevelTrainAnimation;if(!sampler)continue;
+   const update=rig.mixer.update;rig.mixer.update=function(...args){
+    const result=update.apply(this,args),b=rig.bones.pelvis;
+    rig.trainNativeMixerSample={worldY:b.getWorldPosition(new T.Vector3()).y,p:b.position.toArray(),q:b.quaternion.toArray(),s:b.scale.toArray()};return result;
+   };
    const sample=sampler.Sample;sampler.Sample=function(...args){
     a.actor.root.updateMatrixWorld(true);const b=rig.bones.pelvis;
     rig.trainNativeSample={worldY:b.getWorldPosition(new T.Vector3()).y,p:b.position.toArray(),q:b.quaternion.toArray(),s:b.scale.toArray()};
@@ -46,7 +55,7 @@ try{
   window.TrainTransitionProbe={passengers,rows,Snapshot,ProbeFirstLevelTrainContact,start,T,clone,native:new Map()};
   return {count:passengers.length,open:start.train.open,counts:start.train.counts,log:start.log};
  });
- assert.equal(initial.count,41);assert.deepEqual(initial.counts,[8,24,8]);assert.ok(initial.open);
+ assert.equal(initial.count,41);assert.deepEqual(initial.counts,[12,16,12]);assert.ok(initial.open);
  for(let chunk=0;chunk<8;chunk++){
   await page.evaluate(chunk=>{
    const g=window.Tengxian,p=TrainTransitionProbe;
@@ -77,7 +86,10 @@ try{
        action.clampWhenFinished=true;action.setEffectiveWeight(source.getEffectiveWeight());action.play();action.time=source.time;action.paused=true;
       }
       native.mixer.update(0);
-      const bone=rig.bones.pelvis,base=rig.missionTrainLifeActive?rig.trainNativeSample:null;
+      // Compare mixer to mixer, before legitimate stand-idle FK is layered on
+      // the first fully released frame. Comparing the final pelvis to raw clips
+      // would mistake that new shared overlay for a contaminated sampler.
+      const bone=rig.bones.pelvis,base=rig.trainNativeMixerSample;
       const source=base?{name:bone.name,position:new p.T.Vector3(...base.p),quaternion:new p.T.Quaternion(...base.q),scale:new p.T.Vector3(...base.s)}:bone;
       const expected=native.root.getObjectByName(source.name);
       row.nativeWorldY=base?base.worldY:bone.getWorldPosition(new p.T.Vector3()).y;
@@ -132,5 +144,36 @@ try{
  console.log('TRAIN_TRANSITION',JSON.stringify({summary,failures:failures.slice(0,6),failureCount:failures.length}));
  assert.ok(summary.filter(r=>r.samples>200).length>=4,'Several real seated actors must be observed throughout their rise');
  assert.ok(summary.some(r=>r.waiting>30),'An actual passenger waits upright for the door queue');
+ const lowPoses=await page.evaluate(async()=>{
+  const g=window.Tengxian,T=await import('three'),{InstallP012OpeningPose}=await import('./Script_FirstLevelP012CastAppearance.mjs');
+  const results=[];
+  for(let variant=0;variant<4;variant++){
+   const actor=g.actorFactory.Create('nra',{weapon:'HanYang',modelVariant:variant,seed:901+variant});
+   const soldier={actor,alive:true};InstallP012OpeningPose(soldier);
+   const rig=actor.characterRig,at=role=>{actor.root.updateMatrixWorld(true);return rig.bones[role].getWorldPosition(new T.Vector3());};
+   const lengths=()=>['L','R'].map(side=>at('thigh'+side).distanceTo(at('calf'+side))+at('calf'+side).distanceTo(at('foot'+side)));
+   for(let i=0;i<120;i++)actor.Update(1/60,{});
+   const standingLengths=lengths();
+   for(let i=0;i<60;i++)actor.Update(1/60,{crouch:1});
+   const crouch={head:at('head').y,pelvis:at('pelvis').y,lengths:lengths()};
+   for(let i=0;i<60;i++)actor.Update(1/60,{prone:1});
+   const prone={head:at('head').y,lengths:lengths(),span:Math.abs(at('head').z-(at('footL').z+at('footR').z)/2),supported:rig.p012ProneSupported};
+   for(let i=0;i<120;i++)actor.Update(1/60,{});
+   const recovered={head:at('head').y,lengths:lengths()};
+   results.push({variant,standingLengths,crouch,prone,recovered});actor.Dispose();
+  }
+  return results;
+ });
+ await fs.writeFile(path.join(out,'Data_LowPoseRecovery.json'),JSON.stringify(lowPoses,null,2));
+ for(const row of lowPoses){
+  assert.ok(row.crouch.head>.75&&row.crouch.head<1.35&&row.crouch.pelvis>.15,'crouch remains a complete kneeling body');
+  assert.ok(row.prone.supported&&row.prone.span>1.05&&row.prone.head<.8,'prone extends legs behind torso instead of folding into a ball');
+  assert.ok(row.recovered.head>1.3,'standing recovers full height after low pose');
+  // The imported crouch clip itself has different translation tracks. The
+  // prone correction samples RifleIdle; verify its original standing lengths
+  // and recovery, rather than equating two distinct authored clips.
+  for(const phase of [row.prone,row.recovered])for(let i=0;i<2;i++)assert.ok(Math.abs(phase.lengths[i]-row.standingLengths[i])<.005,'prone and recovery preserve the original RifleIdle bone lengths');
+ }
+ console.log('LOW_POSE_RECOVERY',JSON.stringify(lowPoses));
  assert.deepEqual(errors,[]);assert.deepEqual(failures,[]);
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve))}

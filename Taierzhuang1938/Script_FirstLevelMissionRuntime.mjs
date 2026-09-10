@@ -151,7 +151,7 @@ export class FirstLevelMissionRuntime {
     const who = cue.lines[0]?.who;
     if (who === "shunzi") return null;
     const handled = this.companion.Handle(who)?.position;
-    if (handled) return handled;
+    if (handled) return new THREE.Vector3(handled.x,handled.y+1.35,handled.z);
     // 不走 Point()：那一条按 GroundHeight 定高，而车厢地板比地面高两米 ——
     // 在军列上会把说话的人塞到车底下去。
     const at = this.player.position;
@@ -164,7 +164,7 @@ export class FirstLevelMissionRuntime {
     return this.flow.stage.id === "Train" && !this.Has("trainFoodReceived");
   }
   OpeningPrompt() {
-    if (!this.EmptyHands || !["Train","Unloading"].includes(this.flow.stage.id)) return null;
+    if (this.controls || !this.EmptyHands || !["Train","Unloading"].includes(this.flow.stage.id)) return null;
     if (this.ReceivingFood) return {keys:T("input.guide.move.look.keys"),
       label:T("firstLevel.hint.receiveFood"),kind:"look",text:true};
     if (this.Has("trainStopped")) return this.player.stance==="prone"
@@ -259,6 +259,7 @@ export class FirstLevelMissionRuntime {
         weapon: "HanYang", scriptedNoncombatant: true, squadId: "MissionTrain" + car.carIndex,
       }),
       Offset: () => this.battlefield.trainOffsetM,
+      Stopped: () => this.Has("trainStopped"),
       PrepareAnimation: actor=>PrepareFirstLevelTrainAnimation(actor,(x,z)=>this.battlefield.GroundHeight(x,z)),
       Place: (actor, point) => { this.PlaceActor(actor, point); actor.yaw = Math.PI / 2; },
       Hold: (actor) => { actor.scriptedNoncombatant = true; this.MoveActor(actor, actor.position, 0); },
@@ -1110,7 +1111,9 @@ export class FirstLevelMissionRuntime {
   UpdateRelief(dt) {
     if(!this.Has("unloaded") || !this.train.entries.every(entry=>entry.arrived||!entry.actor.alive))return;
     if(!this.relief) {
-      this.relief=this.train.entries.filter(entry=>entry.carIndex===2&&entry.actor.alive).map((entry,i)=>({
+      // The existing eight-man relief detail keeps its authored front posts;
+      // extra rear-car survivors stay at the unloading casualty station.
+      this.relief=this.train.entries.filter(entry=>entry.carIndex===2&&entry.actor.alive).slice(0,P.reliefPositions.length).map((entry,i)=>({
         actor:entry.actor, route:[...P.reliefApproach,{x:P.reliefPositions[i].x,z:-123},P.reliefPositions[i]], index:0, delay:i*R.reliefDelaySeconds,
         arrived:false, distance:0, last:{x:entry.actor.position.x,z:entry.actor.position.z}
       }));
@@ -1320,7 +1323,7 @@ export class FirstLevelMissionRuntime {
     }
     // A restricted short take (dive / death) locks the player's hands and view: nobody may
     // target or wound him meanwhile. Reuses spawn grace so AI and TakeHit read one flag.
-    if(kind!=="rescue")this.player.spawnGrace = Math.max(this.player.spawnGrace || 0, seconds + .5);
+    if(kind==="death"||kind==="dive")this.player.spawnGrace = Math.max(this.player.spawnGrace || 0, seconds + .5);
     this.Control?.(true, kind);
   }
   BeforePlayer(dt, input) {
@@ -1332,6 +1335,7 @@ export class FirstLevelMissionRuntime {
     }
     const control = this.controls;
     if (!control) return;
+    if(control.kind==="derail"||control.kind==="rescue")this.opening.PlacePlayer();
     input.forward = 0;
     input.strafe = 0;
     input.sprint = false;
@@ -1479,9 +1483,12 @@ export class FirstLevelMissionRuntime {
     this.delta = dt;
     this.time += dt;
     this.voice.Update(dt);
+    const meal=this.voice.current;
+    if(meal?.cue.id==="TrainMeal"&&meal.phase==="playing")
+      this.trainClockLead=Math.max(this.trainClockLead||0,(meal.plan.segments[0].wait||0)+meal.sourceTime-this.time);
     this.UpdateMusic();
     this.battleSound.Update(dt,this.flow.stage.id,this.voice.current?.phase==="playing");
-    this.train?.Update(dt, this.Has("trainStopped") && this.Has("luoRescueComplete"), this.Has("trainFirstShellImpact"));
+    this.train?.Update(dt, this.Has("trainStopped") && this.Has("luoRescueComplete"), this.Has("trainFirstShellImpact"),this.time+(this.trainClockLead||0),this.Has("trainNearShellImpact"));
     this.opening.Update(dt);
     if(this.failed)return;
     if(this.Has("trainProneOrder") && this.player.stance==="prone")this.Record("trainPlayerProne");
@@ -1542,6 +1549,7 @@ export class FirstLevelMissionRuntime {
           this.player.stance="stand";this.Record("luoRescueComplete");
         }
         else if (kind === "dive") this.Record("diveComplete");
+        else if (kind === "derail") { /* Rescue cue owns release. */ }
         else {
           this.column.zhou.health = 0;
           if(this.deathMedic){this.deathMedic.treating=false;this.deathMedic.crouch=false;}
@@ -1551,7 +1559,11 @@ export class FirstLevelMissionRuntime {
       }
     }
     if (["Train", "Unloading"].includes(stage)) {
-      const motion = MissionTrainMotion(this.time, this.trainShellStartedAt, this.shellTrainOffset);
+      // Audio keeps a real source clock even when a slow frame caps simulation dt.
+      // The moving train follows that same meal clock; otherwise it remains tens
+      // of metres short and a rendered impact strands the player waiting to stop.
+      const rideTime=this.trainShellStartedAt==null?this.time+(this.trainClockLead||0):this.time;
+      const motion = MissionTrainMotion(rideTime, this.trainShellStartedAt, this.shellTrainOffset);
       const offset = motion.offsetM;
       const before = this.battlefield.trainOffsetM,
         delta = offset - before;
@@ -1894,6 +1906,7 @@ export class FirstLevelMissionRuntime {
     };
   }
   Dispose() {
+    this.opening.Dispose();
     this.squadMarch?.Dispose();
     if(this.tankDust!=null)this.vfx.RemoveSmokeSource(this.tankDust);
     this.voice.Dispose();

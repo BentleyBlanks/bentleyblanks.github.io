@@ -2462,6 +2462,17 @@ export class Viewmodel {
     this._UpdateSleeves();
   }
 
+  ReachWorld(target,weight=1) {
+    if(this.weapon||!target)return;
+    this.root.updateMatrixWorld(true);
+    const hand=this.handRight.group;
+    hand.position.lerp(hand.parent.worldToLocal(target.clone()),Clamp01(weight));
+    this.gripContactRight.position.copy(hand.position);
+    this.gripContactRight.quaternion.copy(hand.quaternion);
+    this.riggedArms?.Update(0);
+    this._UpdateSleeves();
+  }
+
   _UpdateUnarmedHands(gait, sprint, grounded) {
     const amplitude = gait * grounded;
     if (this.riggedArms) {

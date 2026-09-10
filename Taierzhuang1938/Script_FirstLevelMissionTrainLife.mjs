@@ -1,6 +1,7 @@
 // Opt-in procedural carriage activities over a stable sampled pose. No world-root motion.
 // Restore every edited transform before the next mixer sample; no accumulated FK drift.
 import * as THREE from "three";
+import { PRONE_SUPPORT } from "./Data_Tuning_ActorIdle.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 const C = MISSION_TRAIN.life;
 const Clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -70,6 +71,31 @@ export class MissionTrainLifePose {
     const lift=Math.max(0,ground+animation.config.floorClearanceM-animation.FootFloor());
     if(lift>0){this.Save(this.rig.root);this.rig.root.position.y+=lift/soldier.actor.root.scale.y;this.rig.root.updateWorldMatrix(true,true)}
     if(this.releasePelvisY!=null)this.SettleReleaseFloor(dt);
+  }
+  ApplyProne(state){
+    const rig=this.rig,b=rig.bones,c=PRONE_SUPPORT;
+    if(!(state.prone>.45)||state.dead||state.meleeCombat||rig.forcedClip||!rig.kind.startsWith("nra"))return false;
+    this.basis=this.soldier.actor.root;
+    this.proneTracks ||= rig.clipById.get(c.sourceClip).tracks.map(track=>{
+      const dot=track.name.lastIndexOf("."),node=rig.root.getObjectByName(track.name.slice(0,dot));
+      return {node,property:track.name.slice(dot+1),sample:track.createInterpolant()};
+    }).filter(track=>track.node);
+    for(const {node,property,sample} of this.proneTracks){this.Save(node);node[property].fromArray(sample.evaluate(c.sourceTime));}
+    this.basis.updateWorldMatrix(true,true);
+    const handRotations=['L','R'].map(side=>b['hand'+side].getWorldQuaternion(new THREE.Quaternion()));
+    this.Tilt(b.pelvis,c.torsoRollRad,0,0);
+    const pelvis=this.basis.worldToLocal(this.World(b.pelvis)),shift=this.Local(0,c.pelvisM-pelvis.y,c.pelvisZ-pelvis.z).sub(this.Local(0,0,0));
+    this.Save(rig.root);rig.root.position.copy(rig.root.parent.worldToLocal(this.World(rig.root).add(shift)));
+    rig.root.updateWorldMatrix(true,true);
+    for(const [i,side] of ['L','R'].entries()){
+      const sign=side==='L'?-1:1;
+      this.Chain(b['thigh'+side],b['calf'+side],b['foot'+side],this.Local(sign*c.footX,c.footY,c.footZ),this.Local(sign*.38,.04,.5));
+      this.Chain(b['upperArm'+side],b['forearm'+side],b['hand'+side],this.Local(sign*c.handX,c.handY,c.handZ),this.Local(sign*.55,.12,-.35));
+      this.Save(b['hand'+side]);b['hand'+side].quaternion.copy(b['hand'+side].parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(handRotations[i]));
+    }
+    this.Tilt(b.head,c.headLiftRad,0,0);
+    rig.root.updateWorldMatrix(true,true);rig.p012ProneSupported=true;
+    return true;
   }
   Apply(dt,state) {
     const life=this.soldier.missionTrainLife, rig=this.rig, b=rig.bones;
@@ -141,6 +167,7 @@ export class MissionTrainLifePose {
     const headY=this.basis.worldToLocal(this.World(b.head)).y;
     const activity=life.kind;
     for (const s of ['L','R']) {
+      if(this.animation&&brace<.01&&(activity==='Rest'||activity==='Lookout'||activity==='Talk'&&s==='L'))continue;
       const shoulder=this.basis.worldToLocal(this.World(b['upperArm'+s]));
       const side=Math.sign(shoulder.x), right=s==='R';
       let x=side*.28,y=chestY-.40,z=-.22;

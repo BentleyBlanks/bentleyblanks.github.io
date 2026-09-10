@@ -1,4 +1,4 @@
-// Population mirrors the accepted P012 train: 40 recruits (8 / 24 / 8), plus Luo and the player.
+// Population mirrors the accepted P012 train: 40 recruits (12 / 16 / 12), plus Luo and the player.
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { trainColumn } from "./Data_FirstLevelP012TrainColumn.mjs";
 const Point = (x, z) => ({ x, z });
@@ -6,7 +6,23 @@ export const MISSION_TRAIN = Object.freeze({
   total: trainColumn.total,
   extraCount: trainColumn.extraCount,
   mainCar: 1,
-  life: { seatTopM: 0.48, pelvisAboveSeatM: 0.12, standSeconds: 1.25, sideSeatM: 1.65, gesturePeriodS: 7.5 },
+  life: { seatTopM: 0.48, pelvisAboveSeatM: 0.12, standSeconds: 1.25, sideSeatM: 1.65, gesturePeriodS: 7.5,
+    braceDelayS:.14,braceSpreadS:.6,braceRate:5 },
+  // Two deliberate aisle movements, with seated passengers leaving a clear lane.
+  activities: {
+    yaowa: [
+      {at:.5,x:-77,z:87,speed:.65,face:{x:-77,z:88}},
+      {at:10,x:-77,z:84.8,speed:.65,face:{x:-78.65,z:85.2}},
+      {at:19,x:-77,z:86.6,speed:.65,face:{x:-77,z:88}},
+    ],
+    luo: [
+      {at:12,x:-76.5,z:88.95,speed:.7},
+      {at:14,x:-77,z:88.95,speed:.7},
+      {at:16,x:-77,z:90.7,speed:.7,face:{x:-78.65,z:90}},
+      {at:21,x:-76.5,z:90.7,speed:.7},
+      {at:23,x:-76.15,z:88.4,speed:.7,face:{x:-77,z:88}},
+    ],
+  },
   centerX: -77,
   approachEndZ: R.trainTravelM + 140,
   doorClearX: -73.1,
@@ -21,10 +37,13 @@ export const MISSION_TRAIN = Object.freeze({
   guide: Point(-75.95, 88),
   cars: trainColumn.cars.map((source, carIndex) => {
     const z = 74 + carIndex * 14;
-    const seats = source.seats.map((_, i) => carIndex === 1
-      ? Point(-77 + [0, -1.65, 1.65][i % 3], z + [-1.2, 1.2, -2.4, 2.4, -3.6, 3.6, -4.8, 4.8][Math.floor(i / 3)])
-      : Point(-77 + (i % 2 ? 1.65 : -1.65), z + [-4.8, -1.6, 1.6, 4.8][Math.floor(i / 2)]));
-    seats.sort((a, b) => Math.abs(a.z-z)-Math.abs(b.z-z) || Math.abs(a.x+77)-Math.abs(b.x+77) || a.z-b.z);
+    const seats = carIndex===1
+      ? [Point(-77,86.6),...[-4,-2.8,-1.6,-.4,.8,2,3.2,4.4].map(d=>Point(-78.65,z+d)),
+          ...[-4,-2.8,-1.6,1.6,2.8,4].map(d=>Point(-75.35,z+d)),Point(-78.65,83)]
+      : Array.from({length:12},(_,i)=>Point(-77+(i%2?1.65:-1.65),z+[-4.9,-3.7,-2.5,2.5,3.7,4.9][Math.floor(i/2)]));
+    const giver=carIndex===1?seats.shift():null;
+    seats.sort((a,b)=>Math.abs(a.z-z)-Math.abs(b.z-z)||Math.abs(a.x+77)-Math.abs(b.x+77)||a.z-b.z);
+    if(giver)seats.unshift(giver);
     return { carIndex, z, seats,
       exit: [Point(-77,z), Point(-74.2,z), Point(-72,z), Point(-70.4,z)],
       // Separate lanes keep background bodies out of the player's supply point and northbound route.

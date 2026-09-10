@@ -24,12 +24,14 @@ export function InstallP012OpeningPose(soldier) {
   if(arms.some(chain=>chain.some(bone=>!bone)))return false;
   const original=rig.Update,saved=new Map(),lifePose=new MissionTrainLifePose(soldier);let time=0;
   rig.p012OpeningPose=true;
+  rig.RestoreP012OpeningPose=()=>{lifePose.Restore();for(const [bone,rotation] of saved)bone.quaternion.copy(rotation);saved.clear();};
   rig.Update=function UpdateP012OpeningPose(dt,state={}) {
     lifePose.Restore();
     for(const [bone,rotation] of saved)bone.quaternion.copy(rotation);
     saved.clear();
     const result=original.call(this,dt,state);
-    if(lifePose.Apply(dt,state))return result;
+    this.p012ProneSupported=false;
+    if(lifePose.ApplyProne(state)||lifePose.Apply(dt,state))return result;
     lifePose.GroundReleasedPose(state,dt);
     const trainRest = soldier.missionTrainPassenger && !soldier.missionTrainReady && (state.moveSpeed ?? 0) < .025
       && !state.firing && !state.carryRole && !state.meleeCombat && !(state.prone > .35 || state.crouch > .35);
@@ -82,13 +84,14 @@ export function InstallP012ActorMotion(soldier) {
   rig.Update=function UpdateP012ActorMotion(dt,state={}) {
     // mixer 采样之前先撤掉上一帧的待机叠加，FK 不累积。
     standIdle.Restore();
+    this.RestoreP012OpeningPose?.();
     const at=actor.root.position;
     const elapsed=Number.isFinite(state.elapsed)?state.elapsed:null;
     const step=elapsed!==null&&lastElapsed!==null?elapsed-lastElapsed:dt;
     const distance=previous?Math.hypot(at.x-previous.x,at.z-previous.z):0;
     const measuredSpeed=previous&&step>0&&distance<Math.max(2,step*8)
       ? Math.min(6,distance/step):0;
-    const speed=soldier.p012OnMovingTrain?0:measuredSpeed;
+    const speed=soldier.p012OnMovingTrain?(soldier.missionTrainWalkSpeed||0):measuredSpeed;
     this.p012ActualSpeedMps=speed;
     // Zero-dt pose reads (including stretcher sockets) must not consume motion.
     if(dt>0){previous={x:at.x,z:at.z};lastElapsed=elapsed;}

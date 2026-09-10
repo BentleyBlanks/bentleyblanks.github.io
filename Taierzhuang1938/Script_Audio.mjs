@@ -3632,7 +3632,9 @@ export class AudioEngine {
     // 接在末端之后的话，补回来的 1.9 dB 会直接顶进软削顶，换成失真。
     this.busMakeup = ctx.createGain();
     this.busMakeup.gain.value = BUS_MAKEUP;
-    this.busComp.connect(this.busMakeup).connect(this.deafFilter);
+    this.concussionFilter=ctx.createBiquadFilter();
+    this.concussionFilter.type="lowpass";this.concussionFilter.frequency.value=20000;this.concussionFilter.Q.value=.7;
+    this.busComp.connect(this.busMakeup).connect(this.concussionFilter).connect(this.deafFilter);
 
     this.masterGain = ctx.createGain();
     this.masterGain.gain.value = this.masterVolume;
@@ -3655,7 +3657,8 @@ export class AudioEngine {
     this.farGain = ctx.createGain();
     this.farGain.connect(this.sfxBus);
     this.duckGain = ctx.createGain();
-    this.duckGain.connect(this.masterGain);
+    this.storyDuck = ctx.createGain();
+    this.duckGain.connect(this.storyDuck).connect(this.masterGain);
     this.musicBus = ctx.createGain();
     // 常数。每段曲子的配平在 MUSIC_CUES[cue].level 上，由 LoopLayer 施加 ——
     // 上一版是 Music() 去 ramp 这条总线，于是「切 cue」和「调音量」用的是同一个旋钮。
@@ -3905,10 +3908,12 @@ export class AudioEngine {
       this.ambienceDuck.disconnect();
       this.ambienceUser.disconnect();
       this.duckGain.disconnect();
+      this.storyDuck.disconnect();
       this.masterGain.disconnect();
       this.busComp.disconnect();
       this.busMakeup.disconnect();
       this.deafFilter.disconnect();
+      this.concussionFilter.disconnect();
       this.outGain.disconnect();
       this.limiter.disconnect();
       this.softClip.disconnect();
@@ -4302,7 +4307,7 @@ export class AudioEngine {
    * @returns {{key:string,duration:number,voice:object}|null} null = 没有这条音频，
    *   由调用方降级成纯字幕（这是常态，不是错误：台词先写、音频后烘）。
    */
-  PlayStoryVoice(key, { position = null, volume = 1, offset = 0, maxDuration = Infinity } = {}) {
+  PlayStoryVoice(key, { position = null, volume = 1, offset = 0, maxDuration = Infinity, environmentGain = 1 } = {}) {
     if (!this.ctx || this.disposed || this.voiceMute) return null;
     const entry = key ? this.voiceBank.get(key) : null;
     if (!entry) return null;
@@ -4316,6 +4321,7 @@ export class AudioEngine {
     this.StopStoryVoice();
     const voice = this.Play("voice." + key, { position: at, volume, offset, maxDuration, pitch: 1, priority: true });
     if (!voice) return null;
+    this.storyDuck.gain.setTargetAtTime(Clamp01(environmentGain),this.ctx.currentTime,.06);
     this.storyVoice = voice;
     this.storyVoiceKey = key;
     return { key, duration: entry.duration || entry.dur || 0, voice };
@@ -4323,6 +4329,7 @@ export class AudioEngine {
 
   /** 掐掉正在响的剧情台词（换关、切过场、被下一条顶掉时）。 */
   StopStoryVoice() {
+    if(this.ctx)this.storyDuck?.gain.setTargetAtTime(1,this.ctx.currentTime,.25);
     if (!this.storyVoice) return false;
     const stopped = this.StopVoice(this.storyVoice);
     this.storyVoice = null;
@@ -5028,6 +5035,7 @@ export class AudioEngine {
 
   FreeVoice(v) {
     this.pendingVoices.delete(v);
+    if(v===this.storyVoice){this.storyVoice=null;this.storyVoiceKey=null;this.storyDuck?.gain.setTargetAtTime(1,this.ctx.currentTime,.25);}
     this.activeVoices.delete(v);
     for (let i = 0; i < v.nodes.length; i += 1) {
       try { v.nodes[i].disconnect(); } catch (err) { /* 已断开 */ }
@@ -5177,6 +5185,11 @@ export class AudioEngine {
    * 这个方法**保留**成手动 API：编辑器要能单独试听，过场也可能要在没有爆炸的
    * 地方来一下（比如被埋在土里那一拍）。
    */
+  SetConcussion(amount,lowHz=650){
+    if(!this.ctx||this.disposed)return;
+    this.concussionFilter.frequency.setValueAtTime(20000*Math.pow(Math.max(200,lowHz)/20000,Clamp01(amount)),this.ctx.currentTime);
+  }
+
   Deafen(seconds = 0.4, holdS = DEAFEN_ATTACK_HOLD_S) {
     if (!this.ctx) return;
     const ctx = this.ctx;

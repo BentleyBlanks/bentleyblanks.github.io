@@ -598,6 +598,7 @@ for (let i = blocks.length - 1; i >= 0; i--) {
 export const MISSION_LAYOUT = Object.freeze({
   id: "FirstLevelMissionSeptember07",
   fortifications: true,
+  derailCar: OPENING.derailCar,
   terrain: "P012Heightfield",
   terrainSpec: MISSION_TERRAIN,
   SampleGroundColor: SampleMissionGroundColor,

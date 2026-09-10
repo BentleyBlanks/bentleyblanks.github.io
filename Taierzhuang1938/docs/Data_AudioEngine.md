@@ -29,11 +29,13 @@
 sfxBus ─────────────────────────────────┐
 musicBus  → musicUser ─┐                │
 ambienceBus → ambienceDuck → ambienceUser ┴→ duckGain ┘
-  → masterGain → 母线慢压缩 → 补偿增益 → 耳鸣低通 → outGain → 末端限幅 → 软削顶 → 输出
+  → storyDuck → masterGain → 母线慢压缩 → 补偿增益 → 耳鸣低通 → outGain → 末端限幅 → 软削顶 → 输出
 ```
 
 新增的常驻节点：两只卷积（interior / courtyard）+ 两个回声 gain、`farGain`、
 `ambienceDuck`、`busComp`、`busMakeup` —— 共 8 个，一次性开销，不进 `NODE_BUDGET`。
+
+2026-09-10 另加一个常驻 `storyDuck`，只串在环境／音乐的 `duckGain` 后，音效与对白仍直接经 `sfxUser` 到 `masterGain`。`PlayStoryVoice` 的 `environmentGain` 默认 1；第一关短腊肉对白传入 0.28。停止、自然结束和暂停恢复分别释放／重建压低，避免爆炸的短 duck 把整段对白的环境压低提前取消。声源跟随由任务播放器每帧调用 `MoveVoice`，不改变其他位置音的探针契约。
 
 ---
 

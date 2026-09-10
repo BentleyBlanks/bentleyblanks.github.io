@@ -189,7 +189,7 @@ export class FirstLevelWhiteboxField {
     const trainSink = new BuildSink(),derailSink=new BuildSink();
     for (const block of this.layout.blocks) {
       if(block.dynamic)continue;
-      const targetSink = this.layout.terrain === "P012Heightfield" && IsP012TrainBlock(block.id) ? (this.layout.fortifications && /^StationCar0/.test(block.id) ? derailSink : trainSink) : sink;
+      const targetSink = this.layout.terrain === "P012Heightfield" && IsP012TrainBlock(block.id) ? (this.layout.fortifications && block.id.startsWith(`StationCar${this.layout.derailCar}`) ? derailSink : trainSink) : sink;
       if (this.layout.scenario?.replaceBlockIds.includes(block.id)) continue;
       const seamOwner=block.id.includes("BagSeam")?block.id.split("BagSeam")[0]:null;
       if(!defenses.replaced.has(block.id) && !defenses.replaced.has(seamOwner))targetSink.Add(block.semantic || "Whitebox", PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), {

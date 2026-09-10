@@ -11,7 +11,7 @@ import {OPENING} from "./Data_FirstLevelOpening.mjs";
 const here=path.dirname(fileURLToPath(import.meta.url));
 export async function PlayFirstLevelOpening(page,{out=path.join(here,"_shots/FirstLevelOpening/InputRun"),realtime=false,audioClock=false,from="Train",through="Handover",mount=true}={}){
 await fs.mkdir(out,{recursive:true});
-const errors=[],trace=[];let whisperCaptured=false;
+const errors=[],trace=[],openingShots=new Set();let whisperCaptured=false;
 page.on("pageerror",error=>{errors.push(String(error));console.log("PAGEERROR",String(error));});
 async function Capture(name){
   if(!realtime)await page.evaluate(()=>window.Tengxian.StepFrames(1,1/60,true));
@@ -46,9 +46,23 @@ async function Drive(label,points,{fight=false,until=null,seconds=120}={}){
       const r=g.Debug.FirstLevelMissionRuntime();
       return {t:r.time,stage:r.flow.stage.id,index:b.index,points:b.points.length,position:g.player.position.toArray(),health:g.player.health,alive:g.player.alive&&!r.failed,
         ready:until?[until].flat().every(id=>r.Has(id)):b.index===b.points.length,shots:g.state.playerShots,ammo:g.state.ammo,remaining:r.flow.State().remaining,foe:b.foe,
+        camera:{position:g.camera.position.toArray(),rotation:g.camera.rotation.toArray()},control:r.controls?.kind,
+        audio:{sourceTime:r.voice.current?.sourceTime,phase:r.voice.current?.phase,distance:g.audio.storyVoice?.distance,storyDuck:g.audio.storyDuck?.gain.value,
+          cutoff:g.audio.concussionFilter?.frequency.value,breaths:g.audio.RequestedCount('breathHeavy')},
+        nearImpact:r.Has('trainNearShellImpact'),firstImpact:r.Has('trainFirstShellImpact'),braces:r.train.entries.map(e=>e.actor.missionTrainLife.brace),
+        trainOffset:r.battlefield.trainOffsetM,
         npc:r.squad.map(a=>({id:a.castId,health:a.health,essential:!!a.scriptEssential,p:a.position.toArray(),goal:a.goal.toArray()})),voicePlaying:!!r.voice.current,voiceCue:r.voice.current?.cue?.id,opening:r.opening.State()};
     },{fight,until,realtime});
     trace.push({label,...result});
+    const age=result.t-(result.opening.derailAt??Infinity),rescueAge=result.t-(result.opening.rescueAt??Infinity);
+    const shots=[['Meal',result.voiceCue==='TrainMeal'&&result.audio.sourceTime>2],
+      ['MealLater',result.voiceCue==='TrainMeal'&&result.audio.sourceTime>13],
+      ['PlayerCarRoll',age>.7&&age<1.6],['ImpactBlackout',result.opening.blackout>.99],
+      ['BeforeNearImpact',result.firstImpact&&!result.nearImpact],
+      ['EyelidPartial',age>2.65&&age<4.3&&result.opening.eyeClosure>.1&&result.opening.eyeClosure<.8],
+      ['FallenPlayer',age>3.8&&rescueAge<0],['RescueReach',rescueAge>1&&rescueAge<2.5]];
+    for(const [name,ready] of shots)if(ready&&!openingShots.has(name)){openingShots.add(name);await Capture(name);}
+
     if(!whisperCaptured&&result.voiceCue==="EscapeWhisper"){
       whisperCaptured=true;
       for(let i=0;i<120;i++){
@@ -137,7 +151,7 @@ try{
   await Drive("Derail",[],{until:"trainDerailed",seconds:55});
   if(through==="Unloading")return;
   await Drive("LuoRescue",[],{until:"luoRescueComplete",seconds:30});
-  await Drive("TrainExit",[{x:-74,z:88},{x:-71,z:88},{x:-69,z:78},{x:-68,z:70},{x:-66,z:66}],{seconds:80});
+  await Drive("TrainExit",[{x:-69,z:88},{x:-69,z:78},{x:-68,z:70},{x:-66,z:66}],{seconds:80});
   if(through==="Handover"){
     await page.evaluate(async realtime=>{
       for(let i=0;i<60;i++){
@@ -195,6 +209,16 @@ try{
   assert.ok(final.facts.includes("rifleWithdrawalResolved")&&final.facts.includes("escapeWhisperHeard"));
   if(from==="Train"){
     assert.ok(!final.log.some(e=>e.kind==="debugJump"));
+    assert.equal(final.opening.playerCar,OPENING.derailCar,"the player carriage is the physical wreck");
+    assert.ok(final.opening.rescueAt-final.opening.derailAt<9,'a stopped wreck permits prompt rescue without a long braking wait');
+    if(realtime){
+      assert.ok(openingShots.has('PlayerCarRoll')&&openingShots.has('ImpactBlackout')&&openingShots.has('RescueReach'),'normal flow records physical roll, blackout and visible rescue');
+      const speech=trace.filter(row=>row.voiceCue==='TrainMeal'&&row.audio.phase==='playing'&&row.audio.sourceTime>1);
+      assert.ok(speech.length>10&&speech.every(row=>row.audio.distance<6&&row.audio.storyDuck<.4),'the moving meal voice stays nearby and above the ducked environment');
+      assert.ok(trace.filter(row=>!row.nearImpact).every(row=>row.braces.every(value=>value===0)),'no passenger anticipates the carriage impact with a protective pose');
+      assert.ok(openingShots.has('EyelidPartial')&&trace.some(row=>row.audio.cutoff<900&&row.audio.breaths>0),'partial eyelids, muffled hearing and heavy breaths occur after impact');
+      assert.ok(trace.at(-1).audio.cutoff>19000&&final.opening.eyeClosure===0,'hearing and sight recover before combat');
+    }
     assert.ok(final.train.entries.filter(e=>e.alive).every(e=>e.exited&&e.arrived),
       "all surviving original passengers leave the wreck and clear their exit lanes");
     if(realtime||audioClock){
@@ -214,7 +238,7 @@ finally{
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const realtime=process.argv.includes("--realtime"),server=await ServeRoot(path.resolve(here,".."),0),browser=await LaunchBrowser();
   const exposure=process.argv.includes("--exposure");
-  const out=path.join(here,"_shots/FirstLevelOpening",exposure?"ExposureRun":realtime?"RealtimeRun":"InputRun");
+  const out=process.argv.find(a=>a.startsWith("--out="))?.slice(6)||path.join(here,"_shots/FirstLevelOpening",exposure?"ExposureRun":realtime?"RealtimeRun":"InputRun");
   const page=await browser.newPage({viewport:{width:1440,height:900}});
   try{
     await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&${realtime?"menu=0":"shot=1&manual=1"}&quality=low&scale=small`,{timeout:180000});

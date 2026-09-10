@@ -3781,7 +3781,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   missionRuntime?.Dispose();
   if(phase.whitebox?.fullMission)await LoadFirstLevelTrainAnimation();
   missionRuntime = phase.whitebox?.fullMission ? new FirstLevelMissionRuntime({
-    scene,camera,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,stageJump,
+    scene,camera,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,stageJump,viewmodel,
     FireVehicleBullet,
     Objective:text=>{state.storyObjective=text;},
     VoiceClock:()=>MANUAL_STEP?null:audio.ctx?.currentTime,
@@ -7757,6 +7757,7 @@ function Frame(dt, render = true) {
 
   profiler.B("story");
   missionRuntime?.Update(dt);
+  missionRuntime?.opening.ApplyCamera();
   if(missionRuntime?.completed){profiler.E('story');return;}
   if (p012Flow) {
     p012StageZero?.Update(dt);
@@ -8166,6 +8167,7 @@ function RenderScene(dt) {
     saturation: preset.saturation * (1 - suppression * 0.35),
     contrast: preset.contrast,
     grain: (skyName === "night" ? 0.020 : 0.014) * graphics.grain,
+    eyeClosure: missionRuntime?.opening.eyeClosure || 0,
     vignette: (0.42 + suppression * 0.22) * graphics.vignette,
     damage: Clamp01(1 - health / 62) * 0.55,
     // DOF 要把近景钉清楚；死亡时再叠运动模糊会把前景也抹掉，焦点层级就没了。

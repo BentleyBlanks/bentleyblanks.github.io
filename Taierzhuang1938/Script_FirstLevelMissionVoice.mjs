@@ -1,3 +1,4 @@
+import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_DIALOGUE, MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
 import { Localize } from "./Script_Text.mjs";
@@ -80,6 +81,7 @@ export class FirstLevelMissionVoice {
     const current = this.current, segment = current.plan.segments[current.segmentIndex];
     const played = this.audio.PlayStoryVoice(`Mission${current.cue.id}`, {
       position: this.Position?.(current.cue),
+      environmentGain:current.cue.id==="TrainMeal"?CARRIAGE_SOUND.speechBedGain:1,
       offset: current.sourceTime,
       maxDuration: segment.end-current.sourceTime,
     });
@@ -123,6 +125,8 @@ export class FirstLevelMissionVoice {
       // The audio starts now; do not consume the waiting frame twice.
       return;
     }
+    const position=this.Position?.(current.cue);
+    if(position&&this.audio.storyVoice)this.audio.MoveVoice?.(this.audio.storyVoice,position);
     const clock=this.Clock?.();
     current.sourceTime=Math.min(segment.end, current.clock!=null && Number.isFinite(clock)
       ? current.clockSource+Math.max(0,clock-current.clock)

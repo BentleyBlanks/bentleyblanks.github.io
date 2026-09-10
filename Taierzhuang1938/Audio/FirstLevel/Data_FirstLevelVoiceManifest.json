@@ -15,10 +15,10 @@
     },
     "TrainShelling": {
       "file": "AudioVoice_FirstLevelTrainShelling.mp3",
-      "seconds": 22.413,
-      "bytes": 269628,
-      "promptHash": "8e15696c422a9bc1a5687013d62f20b9457cd61eb608533506b07d3258d8a885",
-      "sha256": "68c3968b695aa315d20972998d658e2805ab00d2fb3f3e285a4ee995812ab30b",
+      "seconds": 18.651,
+      "bytes": 224489,
+      "promptHash": "edde0529a1547e5566bd850c13eefb77891e758d3d6df7160dc29061f3d9ad76",
+      "sha256": "24b25c0823f0d85bcf2bcf8492b38d6b55ba25aa36d1d025aac38721a39d245f",
       "lineCount": 8,
       "requests": 1,
       "continuous": true,
@@ -454,5 +454,5 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-09-10T04:44:40.213Z"
+  "updatedAt": "2026-09-10T13:27:08.334Z"
 }

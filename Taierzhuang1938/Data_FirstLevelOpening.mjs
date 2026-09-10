@@ -1,13 +1,23 @@
 // 2026-09-10 opening rebuild. Gameplay reconstruction of a local flank breach;
 // these coordinates are not claims about surveyed 1938 positions.
 export const OPENING = Object.freeze({
-  derailCar: 0,
+  derailCar: 1,
   derailPivot: {x:-74.6,y:.75},
   derailRollRad: -Math.PI/2,
   derailSeconds: 2.4,
-  rescueSeconds: 2.1,
-  rescueReachM: 1.6,
-  spillRetreat: {laneX:-69,postX:-65.5,rearClearanceM:8,rowM:2},
+  rescueSeconds: 3.2,
+  playerFall: {x:-73.25,z:88,eyeM:.38},
+  rescueEnd: {x:-70.5,z:88},
+  rescueGuide: {x:-72.15,z:88},
+  blackout: {start:1.65,close:.35,hold:.65,open:1.1},
+  // Closed lids, two failed attempts to focus, then one light blink during rescue.
+  blinks: [[0,0],[1.55,0],[1.95,1],[2.6,1],[3.05,.38],[3.3,.96],[3.58,.28],[3.85,.78],[4.25,0],[5.45,0],[5.58,.7],[5.82,0]],
+  hearing: [[0,0],[.15,0],[.3,1],[2.8,1],[4.1,.72],[6.5,.42],[10.5,0]],
+  hearingLowHz:650,
+  breath: {start:2.6,end:11,interval:2.4,volume:.95},
+  dizzySeconds: 4,
+  rescueReachM: 2.1,
+  spillRetreat: {postX:-65.5,columnM:1.5},
   shelter: {x:-32,z:-20},
   trenchEntry: {x:-45,z:41},
   breach: {x:-22,z:8},

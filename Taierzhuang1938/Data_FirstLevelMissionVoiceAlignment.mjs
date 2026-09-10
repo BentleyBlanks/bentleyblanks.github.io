@@ -1,4 +1,5 @@
 // Source-script forced alignment, faster-whisper medium CPU int8.
+// TrainShelling revised 2026-09-10 with the locally available small CPU int8 model.
 // Hashes bind source intervals to retained whole Seed Audio recordings.
 export const MISSION_VOICE_ALIGNMENT = Object.freeze({
   "TrainMeal": {
@@ -31,39 +32,39 @@ export const MISSION_VOICE_ALIGNMENT = Object.freeze({
     ]
   },
   "TrainShelling": {
-    "sha256": "68c3968b695aa315d20972998d658e2805ab00d2fb3f3e285a4ee995812ab30b",
+    "sha256": "24b25c0823f0d85bcf2bcf8492b38d6b55ba25aa36d1d025aac38721a39d245f",
     "lines": [
       [
-        0,
-        0.78
+        0.0,
+        0.54
       ],
       [
-        1.16,
-        5.14
+        0.78,
+        2.12
       ],
       [
-        5.14,
-        7.12
+        2.24,
+        3.8
       ],
       [
-        7.22,
-        8.92
+        3.94,
+        5.56
       ],
       [
-        9.42,
-        12.38
+        5.72,
+        8.32
       ],
       [
-        12.54,
-        16.72
+        8.48,
+        12.26
       ],
       [
-        17.02,
-        19.5
+        12.46,
+        14.76
       ],
       [
-        19.62,
-        22.1
+        15.0,
+        18.28
       ]
     ]
   },

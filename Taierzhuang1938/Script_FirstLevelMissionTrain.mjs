@@ -31,7 +31,7 @@ export class FirstLevelMissionTrain {
     actor.missionUnloaded = false;
     actor.missionTrainPassenger = true;
     actor.p012OnMovingTrain = true;
-    const kinds = ['Talk', 'Rest', 'Gear', 'Eat', 'Lookout'];
+    const kinds = ['Rest', 'Rest', 'Gear', 'Rest', 'Lookout', 'Eat', 'Rest', 'Talk'];
     const kind = {yaowa:'ShareFood', liuwencai:'CountAmmo', heyoutian:'Talk', luo:'Lookout'}[actor.castId]
       || kinds[(slot + car.carIndex * 3 + kinds.length) % kinds.length];
     actor.missionTrainLife = { kind, seated, phase: ((slot + 2 + car.carIndex * 13) * .61803398875) % 1,
@@ -47,7 +47,7 @@ export class FirstLevelMissionTrain {
   }
   Translate(delta) {
     if (Math.abs(delta) < 1e-9) return;
-    for (const e of this.entries) if (!e.exited) {
+    for (const e of this.entries) if (!e.exited || e.actor.missionTrainImpact && !this.open) {
       const a = e.actor;
       a.position.z += delta;
       a.goal.z += delta;
@@ -55,16 +55,39 @@ export class FirstLevelMissionTrain {
       a.actor?.root.position.copy(a.position);
     }
   }
-  Update(dt, open, shelling = false) {
+  Update(dt, open, shelling = false, lifeSeconds = null, closeImpact = shelling) {
     this.open = open;
+    this.lifeSeconds=lifeSeconds??((this.lifeSeconds||0)+Math.max(0,dt));
+    if(closeImpact)this.impactSeconds=(this.impactSeconds||0)+Math.max(0,dt);
     if(open)this.openSeconds=(this.openSeconds||0)+Math.max(0,dt);
     for (const e of this.entries) {
       const a = e.actor;
       if(a.missionRescueTarget)continue;
-      a.p012OnMovingTrain = !open;
-      a.missionTrainLife.brace += ((shelling ? 1 : 0) - a.missionTrainLife.brace) * Math.min(1, dt * 3);
+      const canExit=open||(a.missionTrainImpact&&e.exited&&this.host.Stopped?.()&&a.castId!=="luo");
+      if(a.missionTrainImpact&&!canExit){this.host.Hold(a);continue;}
+      if(a.missionTrainImpact&&e.exited&&!a.missionUnloaded){a.missionUnloaded=true;this.host.Exited(a);}
+      a.p012OnMovingTrain = !canExit;
+      const reacts=closeImpact&&this.impactSeconds>C.life.braceDelayS+a.missionTrainLife.phase*C.life.braceSpreadS;
+      a.missionTrainLife.brace += ((reacts ? 1 : 0) - a.missionTrainLife.brace) * Math.min(1, dt * C.life.braceRate);
       if (!a.alive || e.arrived) continue;
-      if (!open) { this.host.Hold(a); continue; }
+      if (!canExit) {
+        a.missionTrainWalkSpeed=0;
+        const activity=!shelling&&C.activities[a.castId]?.findLast(step=>step.at<=this.lifeSeconds);
+        if(activity){
+          const target={x:activity.x,z:activity.z+this.host.Offset()},distance=Distance(a.position,target);
+          const clear=this.entries.every(other=>other===e||!other.actor.alive||Distance(other.actor.position,target)>C.bodySpacingM);
+          if(distance>C.arrivalRadiusM&&clear){
+            a.missionTrainWalkSpeed=Math.min(activity.speed,distance/Math.max(.001,dt));
+            this.host.Move(a,target,a.missionTrainWalkSpeed);
+          }else{
+            this.host.Hold(a);
+            const face=activity.face;
+            if(face){a.missionTrainLife.yaw=Math.atan2(a.position.x-face.x,a.position.z-face.z-this.host.Offset());a.yaw=a.missionTrainLife.yaw;}
+          }
+        }else this.host.Hold(a);
+        continue;
+      }
+      a.missionTrainWalkSpeed=0;
       // Stand at the same fixed physical anchor, staggered across seats. The
       // existing door queue below still exclusively grants permission to walk.
       if(e.animation){

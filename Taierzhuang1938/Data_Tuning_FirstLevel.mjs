@@ -1,7 +1,7 @@
 // First-level whitebox pacing and handling. Notion 2026-09-07: calm walk 1–2 min, transfer 2–4 min, dive 2 s, death 8–12 s.
 export const MISSION_TUNING = Object.freeze({
   // Cruise at 21.6 km/h; the remaining physical approach determines smooth braking after impact.
-  trainTravelM: 210,
+  trainTravelM: 174,
   trainCruiseSpeedMps: 6,
   trainShellLeadM: 18,
   trainFirstShellFlightS: 1.4,

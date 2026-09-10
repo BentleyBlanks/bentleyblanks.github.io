@@ -151,6 +151,7 @@ uniform float uVignette;
 uniform float uGrain;
 uniform float uDamage;      // 受伤：边缘泛红 + 去色
 uniform float uFade;        // 黑场
+uniform float uEyeClosure;  // Scripted eyelids, zero leaves ordinary rendering unchanged.
 
 // --- SEGMENT encode ---------------------------------------------------------
 uniform float uDither;      // 输出抖动（1/255 的倍数）；0 = 关（出厂）
@@ -456,7 +457,13 @@ vec3 LensEffects(vec3 color, vec2 uv, float r2, float gradedLuma) {
   float grain = (Hash12(gl_FragCoord.xy + uFrame * 13.71) - 0.5);
   color += grain * uGrain * (0.35 + 0.65 * (1.0 - abs(Luma(color) * 2.0 - 1.0)));
 
-  return max(color, vec3(0.0)) * (1.0 - uFade);
+  float aperture=1.0;
+  if(uEyeClosure>0.0){
+    float lid=abs(vUv.y-.5)+.14*pow(vUv.x*2.0-1.0,2.0)*uEyeClosure;
+    float gap=mix(.65,-.025,clamp(uEyeClosure,0.0,1.0));
+    aperture=1.0-smoothstep(gap-.018,gap+.018,lid);
+  }
+  return max(color, vec3(0.0)) * (1.0 - uFade) * aperture;
 }
 
 // ===========================================================================
@@ -530,7 +537,7 @@ export class CompositePass {
       uMotionScale: { value: 0.6 }, uInvProjection: { value: new THREE.Matrix4() },
       uPrevViewProjection: { value: new THREE.Matrix4() }, uInvView: { value: new THREE.Matrix4() },
       uProjScale: { value: new THREE.Vector2(1, 1) },
-      uDamage: { value: 0 }, uFade: { value: 0 },
+      uDamage: { value: 0 }, uFade: { value: 0 }, uEyeClosure:{value:0},
       uDofStrength: { value: 0 }, uDofFocus: { value: 1.5 },
       uDofRange: { value: 2.8 }, uDofMaxPx: { value: 11.0 },
       uNearDofStrength: { value: 0 }, uNearDofFocus: { value: 1.6 },
@@ -670,6 +677,7 @@ export class CompositePass {
     if (options.sunColor) U.uSunColorFog.value.fromArray(options.sunColor);
     U.uDamage.value = options.damage ?? 0;
     U.uFade.value = options.fade ?? 0;
+    U.uEyeClosure.value = options.eyeClosure ?? 0;
     U.uDofStrength.value = options.dofStrength ?? 0;
     U.uDofFocus.value = options.dofFocus ?? 1.5;
     U.uDofRange.value = options.dofRange ?? 2.8;

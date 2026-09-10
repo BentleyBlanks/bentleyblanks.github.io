@@ -399,7 +399,7 @@ try {
     "ok initial mission",
     JSON.stringify({ stage: initial.mission.stage, position: initial.position, slots: initial.slots }),
   );
-  assert.deepEqual(initial.mission.train.counts, [8, 24, 8]);
+  assert.deepEqual(initial.mission.train.counts, [12, 16, 12]);
   assert.equal(initial.mission.train.entries.length, 41, "40 recruits plus Luo, player separate");
   if(!process.argv.includes("--campaign"))await PlayFirstLevelOpening(page,{out:output,audioClock:audioCheck,mount:false});
   }

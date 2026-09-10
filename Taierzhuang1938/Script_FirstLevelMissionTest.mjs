@@ -52,7 +52,7 @@ for(const point of [MISSION_TRAIN.guideMuster,...MISSION_TRAIN.cars.flatMap(car=
   for(const spec of MISSION_ENCOUNTERS.front)assert.ok(spec.x>MISSION_LAYOUT.bounds.minX && spec.x<MISSION_LAYOUT.bounds.maxX && spec.z>MISSION_LAYOUT.bounds.minZ && spec.z<MISSION_LAYOUT.bounds.maxZ,"every simultaneous soldier starts inside the playable heightfield");
 }
 {
-  for (const time of [0,10,20,30]) {
+  for (const time of [0,10,20,R.trainTravelM/R.trainCruiseSpeedMps-1]) {
     const a=MissionTrainMotion(time),b=MissionTrainMotion(time+.1);
     assert.ok(Math.abs((a.offsetM-b.offsetM)/.1-6)<1e-6,"train keeps real cruise speed before shell impact");
   }
@@ -560,8 +560,8 @@ for(const preparedAnimation of [false,true]) {
       State:t=>({weight:t<5?1:0,gestureWeight:0})}):undefined,
   });
   train.Initialize(); train.Initialize();
-  assert.equal(actors.length,41);assert.deepEqual(train.State().counts,[8,24,8]);
-  assert.equal(actors.filter(a=>a.missionTrainLife.seated).length,32);
+  assert.equal(actors.length,41);assert.deepEqual(train.State().counts,[12,16,12]);
+  assert.equal(actors.filter(a=>a.missionTrainLife.seated).length,39);
   const local=actors.map(a=>({x:a.position.x,z:a.position.z-offset}));
   for(let i=0;i<120;i++){offset-=R.trainTravelM/120;train.Translate(-R.trainTravelM/120);train.Update(dt,false);}
   for(const [i,a] of actors.entries()) {assert.ok(Math.abs(a.position.z-offset-local[i].z)<1e-8);assert.equal(a.position.x,local[i].x);assert.ok(a.p012OnMovingTrain);}
@@ -575,7 +575,7 @@ for(const preparedAnimation of [false,true]) {
   assert.equal(train.State().exited,40,JSON.stringify(train.State()));
   assert.ok(train.entries.every(e=>e.arrived),'all passengers physically reach their own muster point: '+JSON.stringify(train.State().entries.filter(e=>!e.arrived)));
   assert.ok(actors.every(a=>!a.p012OnMovingTrain&&a.missionUnloaded));
-  console.log('ok train 8/24/8, Luo separate, '+(preparedAnimation?'prepared standing anchors':'fallback seats')+', unchanged local positions while moving, all physical exits in '+(ticks*dt).toFixed(1)+'s');
+  console.log('ok train 12/16/12, Luo separate, '+(preparedAnimation?'prepared standing anchors':'fallback seats')+', unchanged local positions while moving, all physical exits in '+(ticks*dt).toFixed(1)+'s');
 }
 
 {

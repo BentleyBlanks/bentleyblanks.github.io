@@ -8,6 +8,13 @@
 //     （单频 + 每人相位错开，站成一排时仍然看得出是同一条曲线）。
 // 位移都是厘米级：脚由 IK 钉在 clip 摆好的位置上，骨盆挪得多了膝盖会明显打弯。
 
+// The old imported prone clip folds both legs under the torso. Retain full
+// original bone lengths and the valid same-rig kneeling grip, then extend into cover.
+export const PRONE_SUPPORT = Object.freeze({
+  sourceClip:"RifleIdle",sourceTime:.8,pelvisM:.25,pelvisZ:.12,torsoRollRad:-1.08,
+  headLiftRad:.75,footX:.19,footY:.10,footZ:.94,handX:.20,handY:.30,handZ:-.59,
+});
+
 export const STAND_IDLE = Object.freeze({
   // 呼吸
   breathRateHz: 0.21,        // 约 4.8 s 一个呼吸周期

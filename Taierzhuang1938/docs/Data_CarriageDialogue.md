@@ -1,5 +1,17 @@
 # 车厢群体对白 · 2026-09-10
 
+## 当前开局修正
+
+下文为此前长对白与声场的历史记录。当前版本按用户要求采用短暂分食后遭炮击的开局，`TrainMeal` 使用保留的短录音；播放期间声源每帧跟随幺娃的实际位置并抬至口部。轮轨与人群分别按 `Data_FirstLevelCarriageSound` 配平，`TrainMeal` 播放时环境和音乐经独立 `storyDuck` 降至 28%，对白结束、暂停或切场时恢复。其他对白默认不改变该总线；爆炸自己的短时 duck 不会提前解除对白压低。
+
+40 名新兵按 12 / 16 / 12 分布，另有班长与玩家。玩家车厢留中央过道，幺娃沿过道递食、转向邻座分食再回来，班长短距巡看。大部分坐着的士兵保留既有扶膝姿态；所有日常走动仍通过现有 AI 与实体碰撞。
+
+本轮只重录 `TrainShelling` 一个连续 Seed Audio cue（18.65 秒），将错误的“前头车厢”改为“车厢翻了！抓牢！”。玩家所在第二节车厢真正侧翻，同步车体碰撞、短黑幕与眩晕，班长近身拖出。该 cue 使用本地 faster-whisper small CPU int8 对齐；其他已保留 cue 的对齐来源未变。完整录音仍为一个文件，未拼接逐句生成结果。
+
+最新实玩、截图与回归结论见 [第一关重构验收](Data_FirstLevelRebuildAcceptance.md)。没有制作新角色、动画库或逐角色口型；救援手部、低姿和生活动作仍属复用骨架的白盒编排。
+
+## 历史：长对白第一版
+
 本次只替换第一关 `TrainMeal`：Volcengine `seed-audio-1.0` 一次请求生成一条完整录音，88.842 秒、30 句、七个角色。台词与表演要求的唯一来源是 [Data_FirstLevelMissionDialogue.mjs](../Data_FirstLevelMissionDialogue.mjs)，成品为 [AudioVoice_FirstLevelTrainMeal.mp3](../Audio/FirstLevel/AudioVoice_FirstLevelTrainMeal.mp3)。炮击后的 `TrainShelling` 沿用现有录音。
 
 后排与靠窗士兵先自己讨水、留水，听到前排分肉才插话；前排把肉传过去后，靠窗的人接着帮忙找滚落的子弹。远处闷响引出猜测和追问，班长并不知道敌情，只让大家坐好。短暂停顿后继续递水、收脚和吃东西，保留人在不确定中维持日常的反应。两名新增说话身份来自现有乘客，不新增人物模型或动画资产。
