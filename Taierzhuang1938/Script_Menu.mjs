@@ -58,7 +58,7 @@ function PhaseText(entry, field) {
  * 这几个 id 与 Script_Main 的 `?range=1 / ?melee=1 / ?jiehe=1` 一一对应，
  * 文案在 Data_Text_Menu 的 `menu.sandbox.<id>.where / .exit`。
  */
-const SANDBOX_MODES = ["movement", "explosions", "weapons", "range", "melee",
+const SANDBOX_MODES = ["movement", "explosions", "weapons", "range", "melee", "gore",
   "firstLevelP012Whitebox", "jiehe"];
 const DEFAULT_SANDBOX_MODE = "range";
 

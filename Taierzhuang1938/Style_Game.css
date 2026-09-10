@@ -869,3 +869,9 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudEmplacement .empPrompt:empty {display:none}
 .hudEmplacement .empExit {margin-left:auto;opacity:.75}
 #hud.emplaced .combatWeapon,#hud.emplaced .combatAmmo {visibility:hidden}
+
+/* 断肢测试场（?gore=1）的左上角面板。版式照 .meleeLab 抄一份，只换类名与配色。 */
+.goreLab{--glMaxHeight:calc(100dvh - 36px);position:fixed;left:18px;top:18px;z-index:38;box-sizing:border-box;width:308px;max-width:calc(50vw - 36px);max-height:var(--glMaxHeight);overflow:auto;background:rgba(19,25,27,.93);color:#e9e6d9;border:1px solid #788280;border-top:3px solid #b4645c;padding:16px;font:13px/1.55 system-ui,sans-serif;box-shadow:0 10px 38px #0007;pointer-events:auto}
+.goreLab[hidden]{display:none}.glHeading{display:flex;flex-wrap:wrap;gap:4px 10px;justify-content:space-between;align-items:baseline;margin-bottom:12px}.glHeading b{font-size:18px}.glHeading span{font-size:11px;color:#b2b9b2}.glButtons{display:flex;gap:7px;margin-bottom:7px}.goreLab button{background:#c7b276;color:#172020;border:0;padding:8px 10px;cursor:pointer;flex:1}.goreLab button:focus-visible{outline:2px solid #fff}.glLimbLabel{color:#adb6ae;font-size:11px;margin:10px 0 5px}.glLimbs{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}.goreLab .glLimb{background:#3c4a4c;color:#e9e6d9;font-size:11px;padding:6px 2px}.glStatus{display:block;color:#cdd9ad;margin:12px 0 8px}.glMeters,.glPosts{white-space:pre-line;font-variant-numeric:tabular-nums}.glMeters{padding:9px;background:#ffffff09}.glPosts{font-size:11px;margin:9px 0;color:#b8c7cb}.glControls{font-size:12px;color:#b9c2c0;border-top:1px solid #54615a;padding-top:10px;margin-bottom:0}
+.goreLabActive .hudMarkers,.goreLabActive .hudForceStatus,.goreLabActive .hudTop{display:none}
+@media(max-width:760px){.goreLab{--glMaxHeight:52dvh;top:10px;left:8px;width:228px;max-width:calc(50vw - 20px);padding:10px;font-size:11px}.glHeading b{font-size:14px}.glLimbs{grid-template-columns:repeat(3,1fr)}}

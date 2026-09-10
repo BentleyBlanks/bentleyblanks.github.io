@@ -31,6 +31,9 @@ import { TacticsDirector, TASK, IsManeuverTask } from "./Script_AiTactics.mjs";
 // 只读 TACTICS：压制射击的情报门槛与守区掩体余量。侧翼 / 投弹 / 查看的那几张表
 // 由 `TacticsDirector` 自己消费 —— 大脑只按 `task.kind` 选状态，不重复读它们的数。
 import { TACTICS } from "./Data_Tuning_AiTactics.mjs";
+// 断肢只借一个数：被卸掉肢体的那一下死亡推力乘多少（docs/Data_Dismemberment.md §8.1）。
+// 判定与执行都在 ctx.gore 那一层，这里不认识 three 以外的任何断肢概念。
+import { DEATH_PUSH_SCALE as GORE_DEATH_PUSH_SCALE } from "./Data_Tuning_Gore.mjs";
 
 // 发现距离、班组队形、交火距离与人物 LOD 预算全在 `Data_Tuning_Ai.mjs`
 //（每一组的账跟着数搬过去了）。这里按原名 re-export —— 那两个名字是跨系统契约：
@@ -315,6 +318,9 @@ export class Soldier {
     // 尸体上的家当。ER2 的拾取靠它，L4_LastFiveMinutes 那句"子弹得从倒下的人身上取"
     // 以前是一条死注释 —— 死人身上什么都没有。
     this.drop = null;
+    // 断肢记录（GoreSystem 建、GoreSystem 清）。**非空 = 这具身上少了东西**：
+    // 远景层不许接管他（那一层是整人烘的，会把肢体长回来），撤场时要先还原几何。
+    this.gore = null;
     // 过热。十一年式不能换枪管，约 200 发必须冷却 —— 这是日军机枪火力
     // 有节奏间隙的史实来源，也是玩家冲过街口的战术窗口。
     this.heat = 0;
@@ -404,7 +410,13 @@ export class Soldier {
 
   get alive() { return this.state !== STATE.DEAD; }
 
-  Kill(direction) {
+  /**
+   * @param {THREE.Vector3|null} direction 中弹方向
+   * @param {{limbs:string[], kind?:string, point?:THREE.Vector3}|null} sever
+   *   TakeHit 里 `gore.Resolve` 的结论。非空表示这一下要卸肢：`actor.Ragdoll`
+   *   之后交给 GoreSystem 执行（口径 docs/Data_Dismemberment.md §8.1）。
+   */
+  Kill(direction, sever = null) {
     if (this.state === STATE.DEAD) return false;
     this.state = STATE.DEAD;
     this.health = 0;
@@ -422,13 +434,31 @@ export class Soldier {
       taken: false,
     };
     if (this.actor) this.actor.Ragdoll(direction || new THREE.Vector3(0, 0, 1));
+    // 断肢排在 Ragdoll **之后**：倒地姿态由 Actor.PoseRagdoll 管，被卸掉的骨头照常动，
+    // 只是身上没有那一段三角形了（逐关节 ragdoll 不做，见 §1）。
+    // **断肢层是死亡链上的旁支，不是主干。** 一个几何 bug 绝不能让敌人打不死、
+    // 或者让扣票丢失：抛出来就当「这一下没断」，deathPush / NotifyDeath / Bark 照常走完。
+    let severed = 0;
+    if (sever?.limbs?.length) {
+      try {
+        const gore = this.director?.ctx?.gore;
+        severed = gore?.Sever?.(this, sever.limbs, {
+          direction, kind: sever.kind, point: sever.point,
+        })?.length || 0;
+      } catch (error) {
+        console.warn("[Gore] Sever 抛错，这一下按不断处理：", error);
+        severed = 0;
+      }
+    }
     // 中弹的方向 × 一点力度，交给尸体刚体当初速度（见 AiDirector.StepCorpse）。
     // 不给的话人是"原地融化"；给太大就成了被炮弹掀飞，1.6 m/s 大约是踉跄一步。
+    // 真的被卸掉肢体的那一下再乘一档：那是近炸/重机枪，人要多退半步。
     if (direction) {
+      const push = 1.6 * (severed ? GORE_DEATH_PUSH_SCALE : 1);
       this.deathPush = {
-        x: direction.x * 1.6,
+        x: direction.x * push,
         y: 0.6,
-        z: direction.z * 1.6,
+        z: direction.z * push,
       };
     }
     // 阵亡事件从这里出，是**唯一**的一条路。
@@ -444,7 +474,16 @@ export class Soldier {
     return true;
   }
 
-  TakeHit(damage, part, direction) {
+  /**
+   * @param {number} damage
+   * @param {"head"|"torso"|string} part
+   * @param {THREE.Vector3|null} direction
+   * @param {{kind?:string, shapeId?:string, weaponId?:string, mode?:string,
+   *          falloff?:number, point?:THREE.Vector3}} [info]
+   *   这一下**是什么打的**。断肢判定要它（docs/Data_Dismemberment.md §8.2）；
+   *   不给就退回 bullet，行为与接线之前一致。
+   */
+  TakeHit(damage, part, direction, info = {}) {
     if (!this.alive) return false;
     const mult = part === "head" ? 3.2 : part === "torso" ? 1.0 : 0.6;
     this.health -= damage * mult;
@@ -453,7 +492,25 @@ export class Soldier {
     this.suppression = Clamp01(this.suppression + 0.45);
     // 中弹踉跄：擦一下也晃，一发三八式基本满幅。以前这条从没接过线 —— 打中活人只有一团血。
     this.hurtPose = Math.min(1, Math.max(this.hurtPose, HURT_FLINCH.base + (damage * mult) / HURT_FLINCH.damageDiv));
-    if (this.health <= 0) return this.Kill(direction);
+    // 断肢判定排在「死没死」**之前**：近炸这一类未致死也可能卸肢，而卸掉一段
+    // 肢体本身就把这一发抬成致死（规则层的 forceKill）。判定只发生一次，
+    // 结论交给 Kill 去执行 —— 视觉层不在这条链上做第二次骰子。
+    // 叙事保护的角色整条链都不进（forceKill 会绕过上面那道钳 1 的闸）。
+    // 与 Kill 里那一层同一条理由：判定抛错就按「不断」处理，伤害链照常走完。
+    const gore = this.scriptEssential ? null : this.director?.ctx?.gore;
+    let sever = null;
+    try {
+      sever = gore?.Resolve?.(this, {
+        part, shapeId: info.shapeId, kind: info.kind || "bullet", weaponId: info.weaponId,
+        mode: info.mode, falloff: info.falloff, point: info.point,
+        damage: damage * mult, wouldDie: this.health <= 0,
+      }) || null;
+    } catch (error) {
+      console.warn("[Gore] Resolve 抛错，这一下按不断处理：", error);
+      sever = null;
+    }
+    if (sever?.forceKill) this.health = 0;
+    if (this.health <= 0) return this.Kill(direction, sever);
     // 中弹没死会喊。中日两侧各喊各的语言（side 由 Bark 侧过滤声库）。
     // 节流在引擎侧（全局 0.55 s / 同阵营同类 4.5 s）。
     const A = this.director && this.director.ctx && this.director.ctx.audio;
@@ -773,6 +830,9 @@ export class AiDirector {
       soldier.corpse = null;
     }
     if (soldier.heatSmoke) { this.ctx.vfx?.RemoveSmokeSource(soldier.heatSmoke); soldier.heatSmoke = 0; }
+    // 断肢**必须在 actor.Dispose 之前**收回：身体几何是「共享属性 + 私有 index」，
+    // 不还原的话这具 rig 回到对象池后，下一个从池子里出生的兵天生缺一条胳膊。
+    if (soldier.gore) this.ctx.gore?.ReleaseSoldier?.(soldier);
     const i = this.soldiers.indexOf(soldier);
     if (i >= 0) this.soldiers.splice(i, 1);
     if (soldier.actor) {
@@ -1236,7 +1296,10 @@ export class AiDirector {
         ? (s.renderLod === "detail" ? ACTOR_DETAIL.corpseExitM : ACTOR_DETAIL.corpseEnterM)
         : (s.renderLod === "detail" ? ACTOR_DETAIL.exitM : ACTOR_DETAIL.enterM);
       // 纯逻辑测试没有 scene/factory，没有远景层可以接手时必须回退完整 Actor。
-      const detailed = !crowd || distanceSq <= detailLimit * detailLimit;
+      // **断过肢的人不进远景层**：远景层是按姿势桶烘的整人（见 ActorCrowd 的头注），
+      // 换过去等于把卸掉的胳膊长回来 —— 四十米外的尸体会突然肢体齐全。
+      // 距离更远时仍按 corpseCrowdMaxM 整个剔除，那一条不受影响。
+      const detailed = !crowd || !!s.gore || distanceSq <= detailLimit * detailLimit;
       this._SetDetailedAttached(s.actor, detailed);
       s.renderLod = detailed ? "detail" : "crowd";
       if (!detailed) {
@@ -3682,7 +3745,9 @@ export class AiDirector {
       } else if (s.target.ref) {
         // AI 打 AI 仍按概率抽部位：那边的胶囊是给玩家的子弹用的，这条链一帧几十发不做几何。
         const part = s.rnd() < 0.08 ? "head" : s.rnd() < 0.6 ? "torso" : (s.rnd() < 0.5 ? "arm" : "leg");
-        const died = s.target.ref.TakeHit(s.weapon.damage, part, dir);
+        // shapeId 留空：这条链不做几何（一帧几十发），断肢规则层按部位与权重自己挑段。
+        const died = s.target.ref.TakeHit(s.weapon.damage, part, dir,
+          { kind: s.weapon.rpm ? "hmg" : "bullet", weaponId: s.weaponId, point: aimV.clone() });
         if (vfx) vfx.Blood(aimV, dir, died ? 1 : 0.5);
       }
     } else {

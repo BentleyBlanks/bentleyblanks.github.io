@@ -23,6 +23,8 @@ import { FindReturnableGrenade } from "./Script_GrenadeReturn.mjs";
 import { GRENADE_RETURN, ExplosiveIdFor } from "./Data_Explosives.mjs";
 import { ShellVisuals } from "./Script_ShellVisual.mjs";
 import { T } from "./Script_Text.mjs";
+// 白刃劈中了哪一段：纯几何（离挥砍视线最近的那条胳膊），断肢规则层要它当 shapeId。
+import { PickMeleeShape } from "./Script_Dismemberment.mjs";
 import {
   THROW, GRENADE_BODY, MELEE, BLAST, SHELL, INDIRECT, THREAT,
 } from "./Data_Tuning_Combat.mjs";
@@ -341,8 +343,17 @@ export class CombatSystem {
         { volume: mode === "thrust" ? 0.75 : 0.6, pitch: mode === "thrust" ? 0.85 : 1.1 });
     }
     if (hit) {
-      const died = hit.TakeHit(damage, "torso", direction);
       const at = hit.position.clone(); at.y += MELEE.hitHeightM;
+      // 断肢按**动作**分：大刀劈砍与刺刀挥砍才卸肢，捅刺与枪托砸不卸
+      //（docs/Data_Dismemberment.md §3 的 SEVER_RULES.blade.modes）。
+      // 扇形判定没有命中体，劈中哪一段由「离挥砍视线最近的那条胳膊」定 ——
+      // 不交 shapeId 的话规则层只能随机挑，大刀劈脖子会掉小腿（2026-09-10 测试场实测）。
+      const slashing = isBlade || mode === "cut";
+      const swingEye = this.host.player?.EyePosition || fromPosition;
+      const shapeId = slashing
+        ? PickMeleeShape(swingEye, direction, hit.actor?.characterRig?.GetHitboxes?.() || null) : null;
+      const died = hit.TakeHit(damage, "torso", direction,
+        { kind: isBlade ? "blade" : mode, weaponId, mode, shapeId, point: at.clone() });
       if (this.host.vfx) {
         this.host.vfx.Blood(at, direction,
           died ? MELEE.bloodStrengthKill : MELEE.bloodStrengthHit);
@@ -636,11 +647,14 @@ export class CombatSystem {
         if (d > radius * BLAST.friendlyRadiusScale) continue;
       }
       const at = s.position.clone(); at.y += BLAST.soldierHitRiseM;
-      affect(at, (dmg, dir) => {
+      affect(at, (dmg, dir, falloff) => {
         // 不在这里扣票。这条回调以前是 onKill(s) —— 不带 side，装配层写死扣日方池，
         // 于是**日军炮弹炸死中国兵扣的是日军的票**（实跑 ijaPool 700→696 / nraPool 600→600）。
         // 扣票统一由 Soldier.Kill() 发的阵亡事件负责，这里只管伤害与压制。
-        const died = s.TakeHit(dmg, "torso", dir);
+        // falloff 交下去是给断肢用的：近炸（falloff ≥ minFalloff）才卸肢，
+        // 三米开外的那一圈只是被震倒（docs/Data_Dismemberment.md §3）。shapeId 留空。
+        const died = s.TakeHit(dmg, "torso", dir,
+          { kind: "blast", falloff, weaponId: explosiveId, point: at.clone() });
         onHit?.(s, dmg, position);
         s.suppression = Clamp01(s.suppression + BLAST.soldierSuppression);
         // 只数日军。玩家的手榴弹也炸得到自己人，而给误伤发一记"击杀确认"

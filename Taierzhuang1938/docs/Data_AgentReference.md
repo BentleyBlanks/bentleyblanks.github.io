@@ -241,7 +241,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 - 先读：`docs/Data_TechPhysics.md`（角色 IK 部分）。
 
 ### 测试场共享光照
-- 六个测试场共用 `Script_Sky.TEST_SCENE_DAY`；参数、角色比较条件与灰卡/全角色回归见 [测试场光照基准](Data_TestSceneLighting.md)。
+- 七个测试场共用 `Script_Sky.TEST_SCENE_DAY`；参数、角色比较条件与灰卡/全角色回归见 [测试场光照基准](Data_TestSceneLighting.md)。
 
 ### 靠墙自动探身
 - `Script_CoverLean` / `Data_Tuning_Player.COVER_LEAN`：通用右键墙角探身，沿用 Q/E 手动控制；镜头、射击和受击共用偏移。
@@ -280,6 +280,11 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 - `Script_MeleeLab.mjs` 与 `Debug.MeleeCombat` 只配置场景、预览动作和取证；专用章与正片共用 Soldier、Actor、伤害与死亡链。
 - 新源工程按根约定存于 OneDrive 的 `Blender/Taierzhuang1938/MeleeCombat_20260905/Scene_MeleeCombat.blend`，含敌友军和第一人称动作；`_blender/Script_Melee*` 设置 `MELEE_PROJECT_ROOT` 后烘焙到 `Animation/Melee/Data_Melee{Nra,Ija}Animations.json`（纯 json，2026-09-07 起不再是 ES 模块：两份 15 MB 曾占 Pages 入口 bundle 的 6.5 MB，线上开机因此前 25 秒空白；表头在 `Data_MeleeAnimationSets.mjs`，`Script_MeleeAnimationData.mjs` 在主菜单出现后异步拉），经 `Script_MeleeAnimation.mjs`、CharacterModel 与 Viewmodel 播放，详见 `docs/Data_MeleeQte.md`。
 - 回归口：`Script_MeleeCombatTest.mjs`、`Script_MeleeAnimationTest.mjs`、`Script_MeleeQteTest.mjs`，并保留 Bayonet / Range / SprintMelee 的正片输入回归。先读 `docs/Data_MeleeQte.md` 与 `docs/Data_MeleeRebuildAcceptance.md`。
+
+### 断肢测试场（?gore=1，第六片测试沙盒）
+- `Data_GoreRange.mjs` 定四工位坐标（枪线 10 m / 25 m 各五个木桩、炸坑一圈六个标 1/2/3 m 环、刀桩三个站 0.30 m 台、观察台加白板背景，x 3300–3380 / z 3300–3370，与另外五个测试场不重叠）；`Script_GoreRangeField.mjs` 按同一套战场接口铺地、合批、Canvas 路牌。
+- `Script_GoreRange.mjs` 撒木桩兵（`dummy:true`）、重置、按手榴弹原数引爆炸坑、慢动作与读数，取证口 `Debug.GoreRange`（State / Reset / Detonate / Target / SeverLimb / SeverRandom / SetForce / SetSlowMotion / LimbPoint / Posts）；`Script_GoreLab.mjs` 是左上角面板（必断开关、每肢体一颗按钮、live parts / 断面 / 血源 / draw call 增量 / 上一帧 ms）。断肢本身一行都不在这三个模块里，它们只调 `Debug.Gore`。
+- 回归口 `Script_GoreRangeTest.mjs`（combat 域）：`--field` 只验场地（不依赖断肢核心），不带参数连断肢链一起验。先读 `docs/Data_Dismemberment.md`（§9 场地、§10.2 验收）。
 
 ### 已移除的旧策划白盒
 
@@ -358,6 +363,13 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   `Script_Combat.mjs`（投掷物/白刃/日军间接火力/胜负判定）、
   `Script_Identify.mjs`（准心指着谁，纯几何不 import three）。
 - `Data_Weapons.mjs` —— 武器数据；中方装备必须参差（杂牌军一个班至少三种枪）。
+- **断肢** —— 判定与顶点/index 规则在 `Script_Dismemberment.mjs`（纯 Node，零 three），
+  数值全在 `Data_Tuning_Gore.mjs`，切身体/盖断面/烘肢块/挂刚体/喷血在 `Script_CharacterGore.mjs`；
+  肢体 id 与 `Data_CharacterHitbox.CHARACTER_HITBOX_PROFILE` 的 shape id 同名（子弹交出来的就是它）。
+  接线：`Soldier.TakeHit(damage, part, dir, info)` → `Kill(dir, sever)`，`Script_Physics.MakeLimbBody`、
+  `Script_Vfx.BloodSpurt/BloodBurst`。**断肢 ⇒ 必死**；玩家本人与无 `characterRig` 的角色不进本系统。
+  开关：`?gore=0` / `Debug.Gore.SetEnabled(false)` / `Data_Tuning_Gore.ENABLED`。取证口 `Debug.Gore`，
+  测试场 `?gore=1`。回归口 `Script_DismembermentTest.mjs`（纯 Node）；口径 `docs/Data_Dismemberment.md`。
 - 先读：`docs/Data_GunFeelReview.md`（常设审查表，自由瞄准口径在末节）、`Data_Bayonet.md`、
   `Data_PlayerDamage.md`（挨打链，**别动 aiAccuracyBase**）、`Data_BattlefieldNumbers.md`。
 

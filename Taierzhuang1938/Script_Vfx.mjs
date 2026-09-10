@@ -749,6 +749,13 @@ const SPAWN = {
   seed: 0, nx: 0, ny: 1, nz: 0,
 };
 
+// 持续血源（BloodSpurt）每帧的临时量。与 TMP_A/B/C 分开：血源的循环里要调
+// _ConeVelocity（它写 TMP_B）与 _SpawnDecal，共用一份会被自己覆盖掉。
+const SPURT_POSITION = new THREE.Vector3();
+const SPURT_DIRECTION = new THREE.Vector3();
+const SPURT_NORMAL = new THREE.Vector3();
+const SPURT_QUATERNION = new THREE.Quaternion();
+
 // 碎块的生成描述符，同样只有一份（爆炸一次要塞 20 个，别在这儿制造垃圾）
 const DEBRIS_SPAWN = {
   x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0,
@@ -1270,6 +1277,9 @@ export class VfxSystem {
     this.wind = new THREE.Vector3(0.35, 0, -0.15);     // 鲁南春季多西南风，考据里写死的
     this.groundLevel = 0;                              // 碎块/弹壳落到哪一层，见 SetGroundLevel
     this.smokeSources = new Map();
+    // 断口的持续血源（BloodSpurt）。与 smokeSources 共用一条 id 序列，
+    // 免得两套句柄在调试口里长得一样却不是一回事。
+    this.bloodSpurts = new Map();
     this.nextSourceId = 1;
     // 运行时取证：冒烟测试确认调用方传了真实枪种、快烟与余烟两层都生成。
     this.lastMuzzleProfile = null;
@@ -1588,6 +1598,7 @@ export class VfxSystem {
     if (camera) this.eye.copy(camera.position);
 
     this._UpdateSmokeSources(step);
+    this._UpdateBloodSpurts(step);
 
     if (this.dust && camera) {
       // 浮尘盒跟着相机走，但被 AmbientDust 给的战斗区域夹住 —— 越出战场就没有尘
@@ -2311,6 +2322,134 @@ export class VfxSystem {
   }
 
   /**
+   * 断肢那一瞬间的血雾（一次性）。
+   *
+   * 与 `Blood` 的差别是**方向感**：中弹是沿弹道往身后炸开一道锥，断肢是断口
+   * 朝四面泼出去一圈再被断口轴带走一半。所以先照常走一遍 Blood（雾芯/雾体/
+   * 溅射/血滴/地渍那四层都要），再补一圈几乎无方向的暗红雾把「炸开」写出来。
+   */
+  BloodBurst(position, direction, amount = 1.6) {
+    this.Blood(position, direction, amount);
+    const dir = TMP_A.copy(direction).normalize();
+    const eyeDist = Math.hypot(position.x - this.eye.x, position.y - this.eye.y,
+      position.z - this.eye.z);
+    const far = Math.min(4.0, Math.max(1, eyeDist / 18));
+    const ringCount = Math.max(3, Math.round(9 * amount * this.spawnScale));
+    for (let i = 0; i < ringCount; i += 1) {
+      const s = ResetSpawn();
+      // 张角接近半球：断口是**一个面**在泼，不是一条弹道在钻。
+      this._ConeVelocity(dir, 1.5, this._Range(1.2, 3.4) * amount);
+      s.x = position.x + this._Signed(0.05);
+      s.y = position.y + this._Signed(0.05);
+      s.z = position.z + this._Signed(0.05);
+      s.vx = TMP_B.x; s.vy = TMP_B.y + 0.25; s.vz = TMP_B.z;
+      s.ay = -3.0; s.drag = 3.6;
+      s.life = this._Range(0.55, 1.15);
+      s.sizeStart = 0.09 * amount * far;
+      s.sizeEnd = 0.62 * amount * far * this._Range(0.7, 1.25);
+      s.opacity = 0.5; s.fadeIn = 0.03;
+      s.angle = this._Range(0, 6.283); s.spin = this._Signed(1.6);
+      s.colorA = VFX_PALETTE.blood; s.colorB = VFX_PALETTE.bloodDark;
+      s.seed = this.random();
+      this.pools.smoke.Spawn(s, this.time);
+    }
+  }
+
+  /**
+   * 跟着骨头走的**持续**血源（动脉喷血）。
+   *
+   * 写法照 `smokeSources`：登记一条源，每帧从 node 的世界矩阵取当前位置与朝向再
+   * 生成粒子。不能用一次性 Blood 顶替 —— 断口是挂在还在动的骨头上的，人倒下去
+   * 的两秒里那道血要跟着一起甩过去，而一次性粒子从生成起就与骨头无关了。
+   *
+   * @param {THREE.Object3D} node 断面盖（或肢块）节点，血从它身上出
+   * @param {{x:number,y:number,z:number}|null} localOffset 相对 node 的偏移（局部系）
+   * @param {{x:number,y:number,z:number}} direction 喷射方向（**node 的局部系**，跟着骨头转）
+   * @param {{seconds?:number, rate?:number, decals?:number, speed?:number[], spread?:number}} [options]
+   * @returns {number} handle，交给 RemoveBloodSpurt
+   */
+  BloodSpurt(node, localOffset, direction, options = {}) {
+    if (!node) return 0;
+    const id = this.nextSourceId;
+    this.nextSourceId += 1;
+    this.bloodSpurts.set(id, {
+      node,
+      offset: new THREE.Vector3(localOffset?.x || 0, localOffset?.y || 0, localOffset?.z || 0),
+      direction: new THREE.Vector3(direction?.x || 0, direction?.y || 1, direction?.z || 0).normalize(),
+      seconds: Math.max(0.05, options.seconds ?? 2.4),
+      rate: Math.max(0, options.rate ?? 26),
+      spread: options.spread ?? 0.45,
+      speedMin: options.speed?.[0] ?? 2.2,
+      speedMax: options.speed?.[1] ?? 5.2,
+      decals: Math.max(0, options.decals ?? 0),
+      accumulator: 0,
+      decalTimer: 0,
+      age: 0,
+    });
+    // 登记这一帧就把父链算一次：断面盖刚挂上去时它的 matrixWorld 还是单位阵，
+    // 不先算一次的话第一帧的血会从世界原点冒出来。
+    node.updateWorldMatrix(true, false);
+    return id;
+  }
+
+  RemoveBloodSpurt(handle) { this.bloodSpurts.delete(handle); }
+
+  /** 还活着的持续血源数（取证/面板读数用）。 */
+  get bloodSpurtCount() { return this.bloodSpurts.size; }
+
+  _UpdateBloodSpurts(dt) {
+    if (dt <= 0 || this.bloodSpurts.size === 0) return;
+    for (const [handle, spurt] of this.bloodSpurts) {
+      spurt.age += dt;
+      // 节点被摘掉（肢块回收 / 士兵撤场）就自己收摊：调用方漏了 Remove 也不会漏源。
+      if (spurt.age >= spurt.seconds || !spurt.node || !spurt.node.parent) {
+        this.bloodSpurts.delete(handle);
+        continue;
+      }
+      const node = spurt.node;
+      SPURT_POSITION.copy(spurt.offset).applyMatrix4(node.matrixWorld);
+      node.getWorldQuaternion(SPURT_QUATERNION);
+      SPURT_DIRECTION.copy(spurt.direction).applyQuaternion(SPURT_QUATERNION).normalize();
+      // 动脉压随失血下降：后半程只剩三分之一的量，不是一直突突到最后一帧。
+      const fade = 1 - spurt.age / spurt.seconds;
+      spurt.accumulator += spurt.rate * dt * this.spawnScale * (0.35 + 0.65 * fade);
+      const emit = Math.floor(spurt.accumulator);
+      spurt.accumulator -= emit;
+      for (let i = 0; i < emit; i += 1) {
+        const s = ResetSpawn();
+        this._ConeVelocity(SPURT_DIRECTION, spurt.spread,
+          this._Range(spurt.speedMin, spurt.speedMax) * (0.45 + 0.55 * fade));
+        s.x = SPURT_POSITION.x; s.y = SPURT_POSITION.y; s.z = SPURT_POSITION.z;
+        s.vx = TMP_B.x; s.vy = TMP_B.y + 0.4; s.vz = TMP_B.z;
+        s.ay = -7.5; s.drag = 1.2;
+        s.life = this._Range(0.24, 0.5);
+        s.sizeStart = this._Range(0.018, 0.032);
+        s.sizeEnd = this._Range(0.05, 0.11);
+        s.opacity = 0.9; s.fadeIn = 0.01;
+        s.angle = this._Range(0, 6.283); s.spin = this._Signed(3);
+        s.colorA = VFX_PALETTE.bloodFresh; s.colorB = VFX_PALETTE.blood;
+        s.seed = this.random();
+        this.pools.smoke.Spawn(s, this.time);
+      }
+      // 脚下那摊。半秒补一片、总数封顶：贴花池是环形缓冲，血渍与弹孔抢同一批格子。
+      spurt.decalTimer += dt;
+      if (spurt.decals > 0 && spurt.decalTimer >= 0.5) {
+        spurt.decalTimer = 0;
+        spurt.decals -= 1;
+        const height = SPURT_POSITION.y - this.groundLevel;
+        if (height >= -0.2 && height <= 3.2) {
+          SPURT_NORMAL.set(0, 1, 0);
+          this._SpawnDecal(
+            { x: SPURT_POSITION.x + this._Signed(0.18), y: this.groundLevel + 0.012,
+              z: SPURT_POSITION.z + this._Signed(0.18) },
+            SPURT_NORMAL, this._Range(0.35, 0.62),
+            VFX_PALETTE.blood, VFX_PALETTE.bloodDrop, 0.6, 0);
+        }
+      }
+    }
+  }
+
+  /**
    * 炮弹 / 掷弹筒落点预警。掷弹筒 1.6 s、炮兵 2.6 s 提前量：玩家要能"听到啸声、
    * 看见地上一枚收拢的准星"然后跑开。准星（贴图线稿 + 程序化收缩环 + 中心亮核）由
    * marker 池的一张 quad 全程演完；外圈半径按杀伤半径给，看得出这一发大概波及多大。
@@ -2368,6 +2507,9 @@ export class VfxSystem {
   ClearParticles() {
     for (const pool of Object.values(this.pools || {})) pool.Clear?.();
     this.debris?.Clear?.();
+    // 血源与 smokeSources 不同：它挂在一根**已经不在场上**的骨头上，清粒子那一刻
+    // 那个断口八成也随着换关拆掉了，留着只会在下一关的原点冒血。
+    this.bloodSpurts.clear();
   }
 
   Dispose() {
@@ -2394,6 +2536,7 @@ export class VfxSystem {
       this.DetachSourceLight(source);
     }
     this.smokeSources.clear();
+    this.bloodSpurts.clear();
     this.dust = null;
   }
 

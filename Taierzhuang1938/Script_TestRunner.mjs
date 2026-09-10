@@ -73,6 +73,7 @@ export const testDefs = {
   TrainLibraryTest: { file: "Script_TrainLibraryTest.mjs", desc: "火车构件库：点击懒载、原 PBR、完整轮组绑定、缓存隔离与实际显示" },
   BackRifleRunTest: { file: 'Script_BackRifleRunTest.mjs', desc: '独立背枪跑步 GLB：原骨架、循环接缝、真实蒙皮接地、速度与挂点浏览器验收' },
   ExplosionRulesTest: { file: "Script_ExplosionRulesTest.mjs", desc: "爆炸配置、稀疏地形叠加/坡度/上限、返掷窗口与完整资产目录（纯 Node）" },
+  DismembermentTest: { file: "Script_DismembermentTest.mjs", desc: "断肢规则层：肢体表与命中体互核、顶点分类、index 三角守恒、六类来源判定与预算 FIFO（纯 Node，毫秒级）" },
   ModelFacingTest: { file: "Script_ModelFacingTest.mjs", desc: "外部模型朝向闸：飞机 GLB 机首按 noseDir 落到 -Z、战车 tzm 炮口/车头在 -Z，全部用顶点云复量（纯 Node，秒级）" },
   CraterSurfaceTest: { file: "Script_CraterSurfaceTest.mjs", desc: "真实连续爆炸后无水平焦痕环带，HDR 像素对照及普通弹孔保留" },
   ExplosionRangeTest: { file: "Script_ExplosionRangeTest.mjs", timeoutMs: 8 * 60 * 1000, desc: "爆炸白盒：真实F拾取/返掷/战车/炮击、地形网格/Rapier/人物穿坑与复位" },
@@ -184,6 +185,8 @@ export const testDefs = {
   MeleeAnimationTest: { file: "Script_MeleeAnimationTest.mjs", timeoutMs: 15 * 60 * 1000, desc: "Blender 全骨骼与第一人称 54 动作、握持可见性及源工程样本" },
   MeleeCombatTest: { file: "Script_MeleeCombatTest.mjs", desc: "通用白刃规则、拨挡窗口、F 推架、两类僵持、伤害和多人隔离（纯 Node）" },
   MeleeQteTest: { file: "Script_MeleeQteTest.mjs", desc: "白刃 QTE（?melee=1）：独立战斗、站立/倒地成功失败、真实输入、接触、骨骼与画面" },
+  GoreRangeTest: { file: "Script_GoreRangeTest.mjs", timeoutMs: 15 * 60 * 1000,
+    desc: "断肢测试场（?gore=1）：四工位木桩、面板、真枪/爆炸/大刀断肢、预算、释放与像素证据" },
   TownDressingTest: { file: "Script_TownDressingTest.mjs", desc: "城内每户布设的硬规则（纯 Node，秒级）" },
   PropPcgTest: { file: "Script_PropPcgTest.mjs", desc: "生活用具/工事 PCG：确定性、跨切片、碰撞/坡度/间距裁决（纯 Node）" },
   PropPcgEditorTest: { file: "Script_PropPcgEditorTest.mjs", desc: "PCG 编辑器：真实模型预览、GPU 桶取证、JSON 往返与退出还原" },
@@ -298,7 +301,7 @@ export const browserTests = new Set([
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
   "SamplerBudgetTest",
-  "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MenuTest",
+  "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "GoreRangeTest", "MenuTest",
   "ClusteredLightsTest", "MaterialUpgradeTest",
   "PerformanceTest", "PhysicsTest", "PostTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
@@ -372,7 +375,7 @@ export const domains = {
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "MeleeQteTest", "MeleeCombatTest", "MeleeAnimationTest",
+      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "MeleeQteTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest", "ModelFacingTest",
       // 玩家自己的命中几何（AI 打玩家的部位由它判）与通用震屏（爆炸/近失/中弹/落地/扫射/扑沟）：
       // 两条都是纯 Node 毫秒级，碰伤害口径或相机的改动连着跑。
@@ -388,7 +391,9 @@ export const domains = {
       "EmplacementTest", "FirstLevelMissionTest",
       // 日机扫射自己算一条伤害链（打倒 NPC、打倒玩家），不走 MarchBullet 也不走 Blast，
       // 所以碰伤害口径的改动要连着它一起跑（毫秒级，白搭一条不亏）。
-      "AircraftStrafeTest"],
+      "AircraftStrafeTest",
+      // 断肢挂在 TakeHit/Kill 上（还会把未致死的近炸抬成致死），碰伤害口径就要跑它。
+      "DismembermentTest"],
   },
   // 机枪位与 Script_Ai 共用「一个战位只填一个人」那道闸（soldier.emplacementId），
   // 所以碰 AI 的改动要连着 EmplacementTest 一起跑（毫秒级，白搭一条不亏）。
@@ -454,6 +459,8 @@ const changedDomainRules = [
   {domain:"squadMarch",pattern:/SquadMarch/},
   {domain:"combat",pattern:/FpsSkeleton|FpsSkeletal|FpsAnimation|Animation\/FirstPerson\/Data_Fps/},
   { domain: "combat", pattern: /CoverLean/i },
+  // 断肢：规则/数值/视觉三层与测试场都归 combat（它挂在 TakeHit/Kill 那条链上）。
+  { domain: "combat", pattern: /Gore|Dismember/i },
   {domain:"combat",pattern:/BallisticSuppression/},
   {domain:'firstLevel',pattern:/FirstLevelOpening|FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|CarriageSoundscape|FirstLevelVoiceAlign|SeedAudioFirstLevel|SeedAudioCarriage|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
   { domain: "menu", pattern: /FirstLevelP012Debug/i },

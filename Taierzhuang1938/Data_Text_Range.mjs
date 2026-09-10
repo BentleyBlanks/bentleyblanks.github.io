@@ -21,6 +21,8 @@ export const TEXT = Object.freeze({
   "range.build.weaponCollision": "枪械白盒：碰撞与标识",
   "range.build.movementFixtures": "操作白盒：五区工位与标尺",
   "range.build.movementReady": "操作白盒：物理与测量就绪",
+  "range.build.goreStations": "断肢白盒：四工位与木桩",
+  "range.build.goreReady": "断肢白盒：就绪",
   "range.field.melee": "白刃测试场",
   "range.field.rifle": "靶场",
 
@@ -211,6 +213,55 @@ export const TEXT = Object.freeze({
   "range.melee.state.down": "倒地",
   "range.melee.state.rise": "起身",
   "range.melee.state.qte": "抵抗",
+
+  // ── 断肢测试场（?gore=1）：路牌 ────────────────────────────────────────
+  "range.gore.signWelcome": "断肢测试场",
+  "range.gore.signWelcomeSub": "枪线 · 炸坑 · 刀桩 · 观察台",
+  "range.gore.signLineSub": "两排木桩 · 十米与二十五米",
+  "range.gore.signCraterSub": "六个木桩 · 一二三米环",
+  "range.gore.signBladeSub": "三个木桩 · 台上齐胸",
+  "range.gore.signDeckSub": "退后看全场 · 白板背景",
+  "range.gore.signDistance": "{value} 米",
+  "range.gore.signRing": "{value} 米环",
+  "range.gore.signBladePost": "台上木桩",
+  "range.gore.signCentre": "爆心",
+
+  // ── 断肢测试场：左上角面板 ────────────────────────────────────────────
+  "range.gore.title": "断肢测试场",
+  "range.gore.subtitle": "四工位 · 木桩兵",
+  "range.gore.aria": "断肢测试面板",
+  "range.gore.btnForceOn": "下一发必断：开",
+  "range.gore.btnForceOff": "下一发必断：关",
+  "range.gore.btnReset": "重置木桩",
+  "range.gore.btnDetonate": "引爆炸坑",
+  "range.gore.btnSlowOn": "恢复速度",
+  "range.gore.btnSlowOff": "慢动作 {scale}×",
+  "range.gore.btnRandom": "随机卸一段",
+  "range.gore.limbsLabel": "对准星目标卸一段",
+  "range.gore.controls": "按住 Alt 用鼠标点面板",
+
+  // ── 断肢测试场：实时读数 ──────────────────────────────────────────────
+  "range.gore.readWaiting": "断肢系统未就绪",
+  "range.gore.readQuality": "画质 {quality} · 断肢 {enabled}",
+  "range.gore.readParts": "肢块 {live} / {max} · 断面 {caps} · 血源 {spurts}",
+  "range.gore.readCalls": "断肢批次 +{delta} · 上一帧 {ms} 毫秒",
+  "range.gore.readTarget": "准星目标：{target}",
+  "range.gore.readNone": "无",
+  "range.gore.readSevered": "{id} 已卸：{list}",
+  "range.gore.readIntact": "{count} 个木桩完好",
+  "range.gore.on": "开",
+  "range.gore.off": "关",
+
+  // ── 断肢测试场：肢体名（键的后半段是 CHARACTER_HITBOX_PROFILE 的 shape id）──
+  "range.gore.limb.upperArmL": "左上臂",
+  "range.gore.limb.forearmL": "左前臂",
+  "range.gore.limb.upperArmR": "右上臂",
+  "range.gore.limb.forearmR": "右前臂",
+  "range.gore.limb.thighL": "左大腿",
+  "range.gore.limb.calfL": "左小腿",
+  "range.gore.limb.thighR": "右大腿",
+  "range.gore.limb.calfR": "右小腿",
+  "range.gore.limb.head": "头",
 });
 
 /** 这张表覆盖的代码文件：闸门从此不许它们再出现玩家可见的中文字面量。 */
@@ -223,6 +274,9 @@ export const GATED_MODULES = Object.freeze([
   "Script_ExplosionRange.mjs",
   "Script_ExplosionRangeField.mjs",
   "Script_MeleeLab.mjs",
+  "Script_GoreRangeField.mjs",
+  "Script_GoreRange.mjs",
+  "Script_GoreLab.mjs",
 ]);
 
 /**
@@ -241,4 +295,7 @@ export const DYNAMIC_PREFIXES = Object.freeze([
   "range.melee.state.",
   "range.melee.role.",
   "range.movement.kind.",
+  // `range.gore.limb.<id>` —— id 是 CHARACTER_HITBOX_PROFILE 的 shape id
+  //（upperArmL / forearmL / thighL / calfL / head 与右侧同名），查不到时退回原 id。
+  "range.gore.limb.",
 ]);

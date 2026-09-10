@@ -17,6 +17,7 @@ const HURT_RIGHT = new THREE.Vector3();
 const HURT_FWD = new THREE.Vector3();
 const HURT_LOCAL_AXIS = new THREE.Vector3();
 import { RaycastCapsule, RaycastEllipsoid, RaycastSphere } from "./Script_CharacterHitboxMath.mjs";
+import { CHARACTER_HITBOX_PROFILE } from "./Data_CharacterHitbox.mjs";
 
 export const LUGOU_ANIMATION_IDS = Object.freeze([
   "LeanWallSitPeek", "RifleIdle", "RifleIdleAlt", "RifleRun",
@@ -360,20 +361,11 @@ export async function LoadLugouCharacterAssets() {
 // 骨尾沿脸部前下方伸出，不在头盔中心。旧版 neck→Socket_HeadGear 胶囊因此压在
 // 颈部与下颌，颅顶约十几厘米完全没有命中体。BuildHeadHitCenter 用同一根骨的
 // 长度当尺，在 Head 的局部“向上 / 向前”轴上重建真正的颅腔中心。
-export const CHARACTER_HITBOX_PROFILE = Object.freeze([
-  { id: "head", type: "sphere", role: "headCenter", radius: 0.15, nraWidthScale: 0.8,
-    part: "head", priority: 3 },
-  { id: "upperTorso", type: "capsule", a: "chest", b: "neck", radius: 0.135, part: "torso", priority: 1 },
-  { id: "lowerTorso", type: "capsule", a: "pelvis", b: "chest", radius: 0.19, part: "torso", priority: 1 },
-  { id: "upperArmL", type: "capsule", a: "upperArmL", b: "forearmL", radius: 0.075, part: "limb", priority: 0 },
-  { id: "forearmL", type: "capsule", a: "forearmL", b: "handL", radius: 0.060, part: "limb", priority: 0 },
-  { id: "upperArmR", type: "capsule", a: "upperArmR", b: "forearmR", radius: 0.075, part: "limb", priority: 0 },
-  { id: "forearmR", type: "capsule", a: "forearmR", b: "handR", radius: 0.060, part: "limb", priority: 0 },
-  { id: "thighL", type: "capsule", a: "thighL", b: "calfL", radius: 0.10, part: "limb", priority: 0 },
-  { id: "calfL", type: "capsule", a: "calfL", b: "footL", radius: 0.075, part: "limb", priority: 0 },
-  { id: "thighR", type: "capsule", a: "thighR", b: "calfR", radius: 0.10, part: "limb", priority: 0 },
-  { id: "calfR", type: "capsule", a: "calfR", b: "footR", radius: 0.075, part: "limb", priority: 0 },
-]);
+//
+// 【2026-09-10】表本身搬去 `Data_CharacterHitbox.mjs`（纯数据、零 three）：断肢
+// 规则层与它的纯 Node 测试要按 shape id 与 `Data_Tuning_Gore.LIMBS` 互核，不能
+// 为此把 three 拖进规则层（契约 2）。这里原样 re-export，运行时是同一个冻结数组。
+export { CHARACTER_HITBOX_PROFILE };
 
 const WORLD_SCALE = new THREE.Vector3();
 const WORLD_QUATERNION = new THREE.Quaternion();

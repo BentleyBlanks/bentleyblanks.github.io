@@ -1358,6 +1358,9 @@ export class Actor {
     this.weaponMount = new THREE.Group();
     this.chest.add(this.weaponMount);
     this.weaponGroup = null;
+    // 断肢层借走手持武器时的还原凭据（见 DetachWeaponForGore）。非空 = 这把枪
+    // 现在挂在一段飞出去的胳膊上，**每帧那几处写 weaponGroup 的地方都要让开**。
+    this.goreWeaponHold = null;
     this.weaponData = null;
     this.weaponMuzzle = new THREE.Vector3();
     this.weaponGripFront = new THREE.Vector3();
@@ -1478,6 +1481,9 @@ export class Actor {
   }
 
   _AdoptRiggedCharacter() {
+    // 重新挂 rig 会另建一只 SocketAttachment_WeaponR，断肢层那份还原凭据指着的
+    // 是上一只，留着就是往一个已经摘掉的挂点上还枪。
+    this.goreWeaponHold = null;
     // 先藏旧人体，再挂新人体；顺序反过来会把刚挂上的 SkinnedMesh 一起藏掉。
     this.body.traverse((object) => { if (object.isMesh) object.visible = false; });
     this.characterRig.Attach(this);
@@ -1549,6 +1555,9 @@ export class Actor {
    * same transform.
    */
   _UpdateRiggedWeaponMount() {
+    // 枪已经交给一段断掉的胳膊了：这一整套是往挂点局部系里写 position/quaternion，
+    // 而枪现在的父节点是肢块，照写一遍就是把它瞬移回那只看不见的手上。
+    if (this.goreWeaponHold) return;
     if (!this.riggedWeaponMount || !this.weaponGroup || !this.characterRig) return;
     const rightSocket = this.characterRig.Grip("weaponR");
     if (!rightSocket) return;
@@ -1643,11 +1652,14 @@ export class Actor {
   _UpdateInfantryProps() {
     const rig = this.characterRig;
     if (!rig) return;
-    if (rig.infantryPropWeight > 0 && this.weaponGroup) {
-      this._ApplyInfantryProp(this.weaponGroup, rig.infantryProps.rifle, rig.infantryPropWeight);
+    // goreWeaponHold 非空 = 枪挂在一段飞出去的肢块上；_ApplyInfantryProp 会按
+    // group.parent 重算局部位姿，那时的 parent 是肢块，等于把枪拽回人手里。
+    const propWeapon = this.goreWeaponHold ? null : this.weaponGroup;
+    if (rig.infantryPropWeight > 0 && propWeapon) {
+      this._ApplyInfantryProp(propWeapon, rig.infantryProps.rifle, rig.infantryPropWeight);
     }
-    if (rig.meleeAnimation?.propWeight > 0 && this.weaponGroup) {
-      this._ApplyInfantryProp(this.weaponGroup, rig.meleeAnimation.prop, rig.meleeAnimation.propWeight);
+    if (rig.meleeAnimation?.propWeight > 0 && propWeapon) {
+      this._ApplyInfantryProp(propWeapon, rig.meleeAnimation.prop, rig.meleeAnimation.propWeight);
     }
     const throwing = rig.currentId === "GrenadeThrow";
     if (throwing) {
@@ -1732,6 +1744,9 @@ export class Actor {
   /** 换手持模型。几何在工厂里按 id 缓存，这里只换 Group。 */
   SetWeapon(weaponId) {
     if(this.isChild)weaponId=null;
+    // 换枪等于把旧那把整个丢掉，断肢层那份还原凭据也就作废了（它指着的挂点还在，
+    // 但那把枪已经不存在）。留着的话下一次 RestoreWeaponFromGore 会去摆一件死对象。
+    this.goreWeaponHold = null;
     if (this.weaponGroup) {
       if (this.weaponGroup.parent) this.weaponGroup.parent.remove(this.weaponGroup);
       this.weaponGroup = null;
@@ -1759,6 +1774,59 @@ export class Actor {
     this.weaponBolt.copy(built.bolt);
     this.weaponTwoHanded = built.twoHanded;
     return this;
+  }
+
+  /**
+   * 断肢层专用：把手持武器交给一段飞出去的肢块（手攥着枪一起走，这是 3A 的做法）。
+   *
+   * 不做这一步的症状：卸掉右前臂之后手骨的三角形没了，但**骨头还在动**，步枪就
+   * 悬在半空跟着一只看不见的手走。
+   *
+   * `attach` 保留世界变换，所以调用方要先把 target 的 matrixWorld 摆到位。
+   * 挂走之后这一帧起 `_UpdateRiggedWeaponMount` / `_UpdateInfantryProps` / `Update`
+   * 里那三处每帧写 weaponGroup 的地方都靠 `goreWeaponHold` 让开 —— 少一处枪就被拽回去。
+   *
+   * @param {THREE.Object3D} target 肢块根节点
+   * @returns {boolean} 真的交出去了没有
+   */
+  DetachWeaponForGore(target) {
+    const group = this.weaponGroup;
+    if (!group || !target || this.goreWeaponHold) return false;
+    const mount = group.parent;
+    if (!mount || mount === target) return false;
+    this.goreWeaponHold = {
+      mount,
+      position: group.position.clone(),
+      quaternion: group.quaternion.clone(),
+      scale: group.scale.clone(),
+    };
+    target.attach(group);
+    return true;
+  }
+
+  /**
+   * 把武器挂回原挂点、还原原局部变换。
+   *
+   * @param {boolean} visible 还原之后显不显示。肢块到寿命被回收时给 false
+   *   （人已经死了，枪随胳膊一起消失，不能又浮回空手里）；`ReleaseSoldier`
+   *   （撤场 / 对象池复用）时给 true —— 池子里复用的 rig 不许带着「枪不见了」出生。
+   * @returns {boolean}
+   */
+  RestoreWeaponFromGore(visible = true) {
+    const hold = this.goreWeaponHold;
+    this.goreWeaponHold = null;
+    const group = this.weaponGroup;
+    if (group) {
+      if (hold?.mount) {
+        hold.mount.add(group);                 // three 的 add 会先从旧父节点摘掉
+        group.position.copy(hold.position);
+        group.quaternion.copy(hold.quaternion);
+        group.scale.copy(hold.scale);
+        group.updateMatrix();
+      }
+      group.visible = visible !== false;
+    }
+    return !!hold;
   }
 
   /**
@@ -1924,7 +1992,9 @@ export class Actor {
       this._UpdateInfantryProps();
       // 抬担架/跛行时两只手都不在枪上：枪藏起来（视作背在身后），
       // 否则握姿常量会把整支步枪钉在担架杆的位置上。旗一清就还原。
-      if (this.weaponGroup) {
+      // 枪交给断肢层的那一段时间里这一条要让开：显隐归 GoreSystem 管
+      // （肢块回收时枪跟着消失，ReleaseSoldier 时才还原成 true）。
+      if (this.weaponGroup && !this.goreWeaponHold) {
         this.weaponGroup.visible = !(s.carryRole || (s.woundedWalk || 0) > 0.5);
       }
     }
@@ -3225,6 +3295,7 @@ export class Actor {
     if (this.root.parent) this.root.parent.remove(this.root);
     this.root.clear();
     this.weaponGroup = null;
+    this.goreWeaponHold = null;
     this.disposed = true;
   }
 }

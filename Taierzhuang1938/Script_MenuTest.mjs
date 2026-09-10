@@ -758,8 +758,8 @@ async function CheckMissionList() {
   });
   Check("全屏任务选择采用六行纵向章节清单", panel.fullScreen && panel.title === "任务选择"
     && panel.rects.length === 6 && panel.rects.every((r,i)=>r.x===panel.rects[0].x && (!i||r.y>=panel.rects[i-1].y+panel.rects[i-1].h)),JSON.stringify(panel.rects));
-  Check("只剩正式章节与五项测试入口两组，没有「暂时废弃场景」组", panel.levels===11 && !panel.shelved
-    && panel.groups.join(",")==="正式章节,测试场景", panel.groups.join(","));
+  Check("只剩正式章节与六项测试入口两组，没有「暂时废弃场景」组", panel.levels===12 && !panel.shelved
+    && panel.groups.join(",")==="正式章节,测试场景", `${panel.groups.join(",")} / levels=${panel.levels}`);
   Check("旧序章、旧第一关到终章与旧白盒的入口一条都不列", !panel.retired, JSON.stringify(panel.names));
   // 关卡名字保持原来的（用户口径）：左栏关号 + 章节原名，第一关沿用第一章的「往南的路」。
   Check("第一条是「第一关 · 往南的路」（P0/P1/P2 白盒改名），后面五条照原名列、标「未完成」",
@@ -1323,15 +1323,16 @@ async function CheckMissionList() {
   Check("靶场条目排在六条章节之后，标「沙盒」",
     brief.selected === 8 && brief.mark === "沙盒" && brief.no === "靶",   // 枪械专项后保留原玩法靶场
     `selected=${brief.selected} mark=${brief.mark} no=${brief.no}`);
-  Check("选章列出操作、枪械、玩法、爆炸、白刃五项测试入口（第一关已归入正式章节）",
-    brief.sandboxes.length === 5
-      && brief.sandboxes.map((entry) => entry.no).join(",") === "跃,枪,靶,爆,刃"
+  Check("选章列出操作、枪械、玩法、爆炸、白刃、断肢六项测试入口（第一关已归入正式章节）",
+    brief.sandboxes.length === 6
+      && brief.sandboxes.map((entry) => entry.no).join(",") === "跃,枪,靶,爆,刃,肢"
       && brief.sandboxes.every((entry) => entry.mark === "沙盒")
       && brief.sandboxes[0].name.includes("操作交互测试场")
       && brief.sandboxes[1].name.includes("枪械白盒靶场")
       && brief.sandboxes[2].name.includes("玩法测试靶场")
       && brief.sandboxes[3].name.includes("爆炸测试场")
       && brief.sandboxes[4].name.includes("白刃战 · 大刀与刺刀")
+      && brief.sandboxes[5].name.includes("断肢测试场")
       && !brief.sandboxes.some((entry) => /第一关|P0\/P1\/P2/.test(entry.name))
       && brief.sandboxes.every((entry) => !entry.name.includes("界河")),
     JSON.stringify(brief.sandboxes));

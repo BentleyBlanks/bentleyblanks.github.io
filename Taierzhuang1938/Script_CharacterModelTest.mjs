@@ -242,6 +242,11 @@ for (const [id, reference] of Object.entries(shoulderReference)) {
 }
 
 const runtime = fs.readFileSync(path.join(here, "Script_CharacterModel.mjs"), "utf8");
+// 2026-09-10：命中体表本体搬去 Data_CharacterHitbox.mjs（纯数据、零 three），
+// 断肢规则层与它的纯 Node 测试要按 shape id 与 Data_Tuning_Gore.LIMBS 互核。
+// Script_CharacterModel 仍 import + re-export 同一个冻结数组，运行时口径不变；
+// 扫源码的那几条断言跟着搬到这份表上。
+const hitboxProfile = fs.readFileSync(path.join(here, "Data_CharacterHitbox.mjs"), "utf8");
 const actor = fs.readFileSync(path.join(here, "Script_Actor.mjs"), "utf8");
 const cutscene = fs.readFileSync(path.join(here, "Script_Cutscene.mjs"), "utf8");
 const main = fs.readFileSync(path.join(here, "Script_Main.mjs"), "utf8");
@@ -252,7 +257,11 @@ assert.match(runtime, /options\.protagonist\s*&&\s*faction\s*===\s*"nra"[\s\S]*?
 assert.match(runtime, /HashString\(`\$\{faction\}:\$\{options\.seed/, "stable faction variant selection");
 assert.match(runtime, /Raycast\(origin, direction, maxDistance\)/, "bone hitbox raycast exists");
 assert.match(runtime, /CHARACTER_HITBOX_PROFILE/, "model-calibrated character hitbox profile exists");
-assert.match(runtime, /id: "head", type: "sphere", role: "headCenter"[\s\S]*?nraWidthScale: 0\.8[\s\S]*?part: "head"/,
+assert.match(hitboxProfile, /export const CHARACTER_HITBOX_PROFILE = Object\.freeze\(\[/,
+  "hitbox profile lives in the three-free data module");
+assert.doesNotMatch(hitboxProfile, /\bimport\b[\s\S]*?["']three["']/,
+  "hitbox profile data module stays free of three");
+assert.match(hitboxProfile, /id: "head", type: "sphere", role: "headCenter"[\s\S]*?nraWidthScale: 0\.8[\s\S]*?part: "head"/,
   "head profile carries the NRA 20%-narrower cranial width");
 assert.match(runtime, /isNraHead[\s\S]*?type: isNraHead \? "ellipsoid"[\s\S]*?definition\.nraWidthScale/,
   "NRA head instantiates an ellipsoid while IJA retains the shared sphere");

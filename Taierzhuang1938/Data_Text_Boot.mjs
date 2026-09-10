@@ -30,6 +30,7 @@ export const TEXT = Object.freeze({
   "boot.start.movementRange": "进入操作测试场",
   "boot.start.weaponRange": "进入枪械靶场",
   "boot.start.explosionRange": "进入爆炸测试场",
+  "boot.start.goreRange": "进入断肢测试场",
   "boot.start.preview": "播放序章",
 
   // --- 序章预览（?preview=CS_Chuchuan）的收尾终端 ---------------------------

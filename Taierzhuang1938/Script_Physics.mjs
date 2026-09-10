@@ -590,6 +590,42 @@ export class PhysicsWorld {
     return body;
   }
 
+  /**
+   * 一段被卸掉的**肢体**。
+   *
+   * 与尸体正相反：这一段**不锁旋转** —— 它就该翻着飞、落地滚两下。胶囊沿局部 Y，
+   * 调用方给的 quaternion 负责把 Y 对到肢体轴上（见 Script_CharacterGore 的 Sever）。
+   *
+   * 组是 DEBRIS，只与 WORLD | DEBRIS | RAGDOLL 相互作用 —— **不推活人**：
+   * 一条飞过来的胳膊把班长顶进墙里，这条 bug 比断肢本身难看。
+   * CCD 打开：初速最高到 12 m/s（近炸），一帧 0.2 m，薄墙与栏杆不能穿过去。
+   *
+   * 调用方负责 RemoveBody（肢块静止一段时间后就会拆掉刚体只留网格，见 §5.2）。
+   */
+  MakeLimbBody({ position, quaternion = null, velocity = null, angularVelocity = null,
+    halfLength = 0.2, radius = 0.07, mass = 3,
+    friction = 0.9, restitution = 0.15, linearDamping = 0.25, angularDamping = 0.6 } = {}) {
+    const halfHeight = Math.max(0.01, halfLength - radius);
+    const desc = R.RigidBodyDesc.dynamic()
+      .setTranslation(position.x, position.y, position.z)
+      .setLinearDamping(linearDamping)
+      .setAngularDamping(angularDamping)
+      .setCcdEnabled(true);
+    if (quaternion) desc.setRotation({ x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w });
+    if (velocity) desc.setLinvel(velocity.x, velocity.y, velocity.z);
+    if (angularVelocity) desc.setAngvel(angularVelocity);
+    const body = this.world.createRigidBody(desc);
+    this.world.createCollider(
+      R.ColliderDesc.capsule(halfHeight, radius)
+        .setMass(Math.max(0.2, mass))
+        .setRestitution(restitution)
+        .setFriction(friction)
+        .setCollisionGroups(InteractionGroups(GROUP.DEBRIS, GROUP.WORLD | GROUP.DEBRIS | GROUP.RAGDOLL)),
+      body);
+    this.dynamics.add(body);
+    return body;
+  }
+
   RemoveBody(body) {
     if (!body || this.disposed) return;
     this.dynamics.delete(body);

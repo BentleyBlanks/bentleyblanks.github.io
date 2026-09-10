@@ -43,6 +43,9 @@ import { WeaponRangeRuntime } from "./Script_WeaponRangeRuntime.mjs";
 import { MOVEMENT_RANGE_PHASE, MOVEMENT_RANGE_ID } from "./Data_MovementRange.mjs";
 import { MovementRangeField } from "./Script_MovementRangeField.mjs";
 import { MovementRange } from "./Script_MovementRange.mjs";
+import { GORE_RANGE_PHASE, GORE_RANGE_ID } from "./Data_GoreRange.mjs";
+import { GoreRangeField } from "./Script_GoreRangeField.mjs";
+import { GoreRange } from "./Script_GoreRange.mjs";
 import {
   RANGE_PHASE, RANGE_LEVEL_ID, RANGE_TARGETS, RANGE_STATIONS, RANGE_RESPAWN_S,
 } from "./Data_Range.mjs";
@@ -83,6 +86,10 @@ import { ActorBatcher } from "./Script_ActorBatch.mjs";
 import { Viewmodel } from "./Script_Viewmodel.mjs";
 import { FirstPersonSelfShadow } from "./Script_FirstPersonSelfShadow.mjs";
 import { VfxSystem } from "./Script_Vfx.mjs";
+// 断肢：视觉/物理层与预热代理在 Script_CharacterGore，运行时总闸在规则层
+//（`SetGoreEnabled` 同时被 `?gore=0` 与 `Debug.Gore.SetEnabled` 使用）。
+import { GoreSystem, AddGoreWarmProxies } from "./Script_CharacterGore.mjs";
+import { SetGoreEnabled, LIMB_IDS as GORE_LIMB_IDS, PickMeleeShape } from "./Script_Dismemberment.mjs";
 import { AudioEngine } from "./Script_Audio.mjs";
 import { AudioWiring, WeaponClassOf } from "./Script_AudioWiring.mjs";
 import { Hud, ContextualActionPrompts, CrosshairGeometry } from "./Script_Hud.mjs";
@@ -149,6 +156,7 @@ function BootStartLabel() {
   if (MOVEMENT_RANGE) return T("boot.start.movementRange");
   if (WEAPON_RANGE) return T("boot.start.weaponRange");
   if (EXPLOSION_TEST) return T("boot.start.explosionRange");
+  if (GORE_TEST) return T("boot.start.goreRange");
   if (PREVIEW) return T("boot.start.preview");
   return T("boot.start.play");
 }
@@ -224,6 +232,15 @@ const EXPLOSION_TEST = params.get("explosions") === "1";
 const WEAPON_RANGE = params.get("weapons") === "1";
 const MOVEMENT_RANGE = params.get("movement") === "1";
 const MELEE_TEST = params.get("melee") === "1";
+/**
+ * 断肢测试场（?gore=1）：与靶场同一条整表替换的路子，口径见 docs/Data_Dismemberment.md §9。
+ * **注意与内容开关分家**：`?gore=0` 是断肢系统本身的总闸（Data_Tuning_Gore.ENABLED 的
+ * 运行时覆盖），`?gore=1` 是这片场地的入口 —— 两者不冲突，测试场里断肢默认开着。
+ */
+const GORE_TEST = params.get("gore") === "1";
+// 内容总闸的运行时覆盖。`?gore=0` 一段肢体都不掉（`Data_Tuning_Gore.ENABLED` 与
+// `Debug.Gore.SetEnabled` 是另外两个入口，三者任一关闭即关闭）。
+if (params.get("gore") === "0") SetGoreEnabled(false);
 // Archived content is a developer regression fixture, absent from chapter selection.
 const ARCHIVED_P012_FIXTURE = params.get("whitebox") === "p012-archive";
 const FIRST_LEVEL_P012_WHITEBOX = params.get("whitebox") === "p012" || ARCHIVED_P012_FIXTURE;
@@ -257,8 +274,9 @@ const FULL_SCENE = PHASE_PARAM === "fullscene" || LEGACY_FULL_SCENE_CARRIAGE;
 const FULL_SCENE_VIEW = FULL_SCENE
   && (LEGACY_FULL_SCENE_CARRIAGE || params.get("fullSceneView") === "carriage")
   ? "carriage" : "county";
-const SANDBOX = MOVEMENT_RANGE || EXPLOSION_TEST || WEAPON_RANGE || RANGE || MELEE_TEST || FIRST_LEVEL_P012_WHITEBOX || JIEHE;
+const SANDBOX = MOVEMENT_RANGE || EXPLOSION_TEST || WEAPON_RANGE || RANGE || MELEE_TEST || GORE_TEST || FIRST_LEVEL_P012_WHITEBOX || JIEHE;
 const PHASE_TABLE = MOVEMENT_RANGE ? [MOVEMENT_RANGE_PHASE] : EXPLOSION_TEST ? [EXPLOSION_RANGE_PHASE] : WEAPON_RANGE ? [WEAPON_RANGE_PHASE] : RANGE ? [RANGE_PHASE]
+  : GORE_TEST ? [GORE_RANGE_PHASE]
   : MELEE_TEST ? [MELEE_QTE_PHASE]
     : FIRST_LEVEL_P012_WHITEBOX ? [ARCHIVED_P012_FIXTURE ? ARCHIVED_P012_PHASE : FIRST_LEVEL_P012_WHITEBOX_PHASE]
       : JIEHE ? [JIEHE_SANDBOX_PHASE]
@@ -745,6 +763,8 @@ let meleePreview = null;
 let meleePreviewFrame = null;
 let meleeStance = false;
 let vfx = null;
+/** 断肢系统（所有关卡都有；`?gore=0` 只是让它不做事，不是不建）。 */
+let gore = null;
 let viewmodel = null;
 let firstPersonSelfShadow = null;
 let actorFactory = null;
@@ -815,6 +835,8 @@ let editorReturnMenuMode = null;
 let currentWeapon = "HanYang";
 let weaponRange = null;
 let movementRange = null;
+/** 断肢测试场的运行时（?gore=1）；其余入口下永远是 null。 */
+let goreRange = null;
 // 下令轮盘。HUD 那条静态横排（1跟我来 2向前…）已经撤掉：
 // ER2 的指挥手感是"按住 Tab 推一下鼠标松手"，眼睛不用离开战场。
 const wheel = new RadialWheel(hudRoot);
@@ -857,6 +879,9 @@ function ApplyDebugOptions() {
   // 爆炸测试场里玩家一律无敌：这一场的用途是站在坑边看炮坑与弹道，被自己
   // 召来的炮击炸死再换人，只会把着色器重编那三秒和一张阵亡卡塞进测试里。
   if (EXPLOSION_TEST) options.invincible = true;
+  // 断肢测试场同理：「引爆炸坑」这颗按钮就架在爆心旁边，被自己按的那一下炸死，
+  // 只会把换人的着色器预热和一张阵亡卡塞进取证里。
+  if (GORE_TEST) options.invincible = true;
   player?.SetDebugOptions(options);
   EnsureDebugInventory();
   return options;
@@ -1299,8 +1324,27 @@ async function Boot() {
       const delta = new THREE.Vector3().subVectors(target.position, attacker.position); delta.y = 0; delta.normalize();
       if (target === player) player.TakeHit(kind === "qte" ? amount : amount * COMBAT.player.meleeScale, "torso", delta, { from: attacker.position.clone(), melee: true });
       else {
-        const died = target.TakeHit(amount, "torso", delta);
-        vfx?.Blood(target.position.clone().add(new THREE.Vector3(0, 1, 0)), delta, died ? 1 : 0.5);
+        // 断肢按**攻击方手里那把**分：大刀（含敌方大刀）算劈砍，刺刀算捅刺 ——
+        // 捅刺一段都不卸（docs/Data_Dismemberment.md §3 的 thrust 行）。
+        const attackerWeapon = attacker === player ? WEAPONS[currentWeapon] : attacker?.weapon;
+        const at = target.position.clone().add(new THREE.Vector3(0, 1, 0));
+        // mode 写成 slash 而不是 MeleeCombat 自己的事件名（light/heavy/qte）：
+        // SEVER_RULES.blade 只认 slash / cut，事件名会被那道闸一律挡掉。
+        const bladed = attackerWeapon?.kind === "melee";
+        // 劈中了哪一段：白刃状态机没有射线，按「离挥砍视线最近的那条胳膊」定
+        //（Script_Dismemberment.PickMeleeShape，纯几何）。视线起点取攻击者眼位：
+        // 玩家有 EyePosition，AI 用头骨的世界位置，都没有就退回脚底往上一米五。
+        let shapeId = null;
+        if (bladed) {
+          const eye = attacker === player ? player.EyePosition
+            : (attacker?.actor?.characterRig?.bones?.head?.getWorldPosition(new THREE.Vector3())
+              || attacker.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
+          shapeId = PickMeleeShape(eye, at.clone().sub(eye), target.actor?.characterRig?.GetHitboxes?.() || null);
+        }
+        const died = target.TakeHit(amount, "torso", delta,
+          { kind: bladed ? "blade" : "thrust", mode: bladed ? "slash" : "thrust",
+            weaponId: attackerWeapon?.id || null, shapeId, point: at.clone() });
+        vfx?.Blood(at, delta, died ? 1 : 0.5);
         if (attacker === player) ConfirmHit(died);
       }
     },
@@ -1315,6 +1359,18 @@ async function Boot() {
     },
   }, { assist: params.get("qteAssist") || "tap" });
   ai.ctx.meleeCombat = meleeCombat;
+
+  // 断肢系统。**取值器交出 scene / physics / vfx**：物理世界与切片每换一关都是
+  // 新的一份，写成普通属性的话这一层会一直指着上一关那具已经 Dispose 的物理世界
+  // （与 Debug.battlefield 那几条取值器同一笔账）。所有关卡都建，`?gore=0` 只是
+  // 让规则层一律返回空，不是不建 —— Debug.Gore 的契约要求它在每一关都在。
+  gore = new GoreSystem({
+    Scene: () => scene,
+    Physics: () => physics,
+    Vfx: () => vfx,
+    Quality: () => QUALITY,
+  });
+  ai.ctx.gore = gore;
 
   // 叙事层：把 Data_TengxianScript 那本考据过的剧本按关派发。
   // 线性关卡不需要翻译层，剧本的 at 语义就是运行时语义（见 Script_Story 的头注）。
@@ -2517,6 +2573,9 @@ async function Boot() {
   window.Tengxian = window.Taierzhuang;
   if (movementRange) window.Taierzhuang.Debug.MovementRange = movementRange.api;
   if (weaponRange) window.Taierzhuang.Debug.WeaponRange = weaponRange.api;
+  // 开机那趟 EnterLevel 排在 window.Taierzhuang 建起来之前，所以断肢测试场的取证口
+  // 与上面两位同样要在这儿再挂一次（换关时那一支在 EnterLevel 里）。
+  if (goreRange) window.Taierzhuang.Debug.GoreRange = goreRange.api;
 
   // --- 靶场取证口（只在 ?range=1 下存在；口径在 docs/Data_TestRange.md） ----
   // 人机共用：agent 用 State/Targets 断言、GoTo/AimAt 摆位，真人在旁边看同一片场。
@@ -2532,6 +2591,31 @@ async function Boot() {
     State: () => explosionRange?.State() || null,
     GoTo: (id) => explosionRange?.GoTo(id),
     Reset: () => explosionRange?.Reset(),
+  };
+  // 断肢取证口。**所有关卡都挂**（不只测试场）：正片里也要能一句话验「打死人不报错」。
+  // 契约在 docs/Data_Dismemberment.md §8.3，别改签名。
+  window.Taierzhuang.Debug.Gore = {
+    State: () => gore?.State() || null,
+    Limbs: () => [...GORE_LIMB_IDS],
+    /**
+     * 直接对一名士兵卸一段肢体。走的是**正片那条死亡链**（Kill → Ragdoll → Sever），
+     * 不是绕过规则层的后门；已经倒下的人则直接 Sever（Kill 对死人返回 false）。
+     * @param {number} soldierId 士兵 id
+     * @param {string} limbId 肢体名（Limbs() 里的一个）
+     * @param {[number,number,number]|null} dir 卸出去的方向，默认沿断口轴
+     */
+    Sever: (soldierId, limbId, dir = null) => {
+      const soldier = ai?.soldiers.find((s) => s.id === soldierId) || null;
+      if (!soldier || !gore) return null;
+      const direction = dir ? new THREE.Vector3(dir[0], dir[1], dir[2]) : null;
+      const plan = { limbs: [limbId], kind: "debug", point: null };
+      if (soldier.alive) soldier.Kill(direction, plan);
+      else gore.Sever(soldier, plan.limbs, { direction, kind: plan.kind });
+      return gore.State();
+    },
+    SetEnabled: (value) => gore?.SetEnabled(value !== false),
+    SetForce: (kind) => gore?.SetForce(kind || null) ?? null,
+    Reset: () => { gore?.ReleaseAll(); return gore?.State() || null; },
   };
   if (RANGE) {
     const RangeTargetSnapshot = (entry) => {
@@ -2769,8 +2853,9 @@ async function Boot() {
       // 玩家可见的测试场景集中保留核心玩法入口。界河与过场仍可通过
       // ?jiehe=1 / ?preview=... 直达，供自动化与内部验收使用，不再混入选章。
       // P0/P1/P2 白盒不在这一组：它已是正式章节组里的「第一关」（CAMPAIGN_ENTRIES[0]）。
-      sandboxes: [MOVEMENT_RANGE_PHASE, WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE],
+      sandboxes: [MOVEMENT_RANGE_PHASE, WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE, GORE_RANGE_PHASE],
       sandboxMode: MOVEMENT_RANGE ? "movement" : WEAPON_RANGE ? "weapons" : EXPLOSION_TEST ? "explosions" : RANGE ? "range" : MELEE_TEST ? "melee"
+        : GORE_TEST ? "gore"
         : FIRST_LEVEL_P012_WHITEBOX ? "firstLevelP012Whitebox" : JIEHE ? "jiehe" : false,
       PlaySandbox: (key) => GoToSandbox(key),
       // 机位表按**建好的那一片**取，不按「第几章」取：`?phase=overview` 与
@@ -2879,6 +2964,7 @@ const WORLD_CLASSES = {
   [EXPLOSION_RANGE_ID]: ExplosionRangeField,
   [WEAPON_RANGE_LEVEL_ID]: WeaponRangeField,
   [MOVEMENT_RANGE_ID]: MovementRangeField,
+  [GORE_RANGE_ID]: GoreRangeField,
   [MELEE_QTE_LEVEL_ID]: RangeField,
   [FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID]: FirstLevelWhiteboxField,
 };
@@ -2898,6 +2984,7 @@ function GoToSandbox(key, {stage = null} = {}) {
   url.searchParams.delete("explosions");
   url.searchParams.delete("weapons");
   url.searchParams.delete("melee");
+  url.searchParams.delete("gore");
   url.searchParams.delete("whitebox");
   url.searchParams.delete("missionStage");
   url.searchParams.delete("jiehe");
@@ -2906,6 +2993,7 @@ function GoToSandbox(key, {stage = null} = {}) {
   else if (key === "range") url.searchParams.set("range", "1");
   else if (key === "explosions") url.searchParams.set("explosions", "1");
   else if (key === "melee") url.searchParams.set("melee", "1");
+  else if (key === "gore") url.searchParams.set("gore", "1");
   else if (key === "firstLevelP012Whitebox") url.searchParams.set("whitebox", "p012");
   else if (key === "jiehe") url.searchParams.set("jiehe", "1");
   url.searchParams.delete("phase");
@@ -2931,6 +3019,10 @@ function FieldIdFor(phase) { return phase.fieldFrom || phase.id; }
 /** 建一片关卡切片。**换关一定要先把上一片拆掉**，不然七关跑下来会攒七座城。 */
 async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   movementRange?.Dispose(); movementRange = null;
+  // 断肢先收：肢块挂在**上一关**那具 PhysicsWorld 上，而这一关会 Dispose 它；
+  // 身体几何也要还原回共享原件，否则对象池里的 rig 带着缺口进下一关。
+  gore?.ReleaseAll();
+  goreRange?.Dispose(); goreRange = null;
   weaponRange?.Dispose();
   weaponRange = null;
   aircraft?.SetPhase(phase);
@@ -2970,7 +3062,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   // 上一轮 PCG 自己的碰撞盒挡自己，所有候选都被判成重叠。
   battlefield.propPcgBlockers = battlefield.colliders.slice();
   // TownDressing is bounds-based, not phase-based: independent IDs alone do not isolate it.
-  const external = phase.whitebox?.p012 || phase.id === EXPLOSION_RANGE_ID || phase.id === MOVEMENT_RANGE_ID ? {count:0,generatedCount:0,pcgCount:0,pcgStats:null,pcgErrors:[],failed:[],colliders:[],streamer:null} : await AddExternalProps({
+  const external = phase.whitebox?.p012 || phase.id === EXPLOSION_RANGE_ID || phase.id === MOVEMENT_RANGE_ID || phase.id === GORE_RANGE_ID ? {count:0,generatedCount:0,pcgCount:0,pcgStats:null,pcgErrors:[],failed:[],colliders:[],streamer:null} : await AddExternalProps({
     scene, library, phaseId: FieldIdFor(phase), bounds: phase.bounds,
     groundAt: (x, z) => battlefield.GroundHeight(x, z),
     blockers: battlefield.propPcgBlockers,
@@ -2998,7 +3090,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   }
   // tzm 饰件层（信号机/站灯/窗花/门五金…）：与外部 GLB 布景同一个异步槽位，
   // 但物理契约不同（多数无碰撞、可悬空安装），所以是平行的一层，见 Script_TrimProps 文件头。
-  const trim = phase.whitebox?.p012 || phase.id === EXPLOSION_RANGE_ID || phase.id === MOVEMENT_RANGE_ID ? {count:0,failed:[],colliders:[]} : await AddTrimProps({ scene, library, phaseId: FieldIdFor(phase) });
+  const trim = phase.whitebox?.p012 || phase.id === EXPLOSION_RANGE_ID || phase.id === MOVEMENT_RANGE_ID || phase.id === GORE_RANGE_ID ? {count:0,failed:[],colliders:[]} : await AddTrimProps({ scene, library, phaseId: FieldIdFor(phase) });
   battlefield.trimProps = trim;
   if (trim.colliders?.length) {
     battlefield.colliders.push(...trim.colliders);
@@ -3399,7 +3491,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   // CountSide("nra") 都会把他们数进去，于是撒兵自动少撒同样多 ——
   // 场上活人总数一个没多，开机红线（drawCalls / triangles）不受影响。
   // 名册默认从本章 beats 的 who 推导（该章说过话的战斗员自动在场），INT2 按章精修。
-  if (!MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && !deprecated && companion) {
+  if (!MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !GORE_TEST && !PREVIEW && !cutsceneOnly && !deprecated && companion) {
     companion.BeginLevel(contentId, {
       // 名册**优先走章节数据点名**（INT2 起七章都写了 roster）；没写才由 beats 推。
       // 推导只收「该章说过话的战斗员」—— 军医、参谋、师长这些 combatant:false 的人
@@ -3424,7 +3516,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   // 章节摆点：**排在具名同伴之后**（罗班长要先站出来，摆点层才拿得到他的句柄），
   // 也排在 SeedSoldiers 之前（后送队要从 nra 名额里出人，撒兵才会自动少撒同样多）。
   // 靶场／白刃训练场／预览／过场承载章都不摆；第一关白盒有正式第一章内容。
-  if (!phase.whitebox?.fullMission && !MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && !deprecated && setpieces) {
+  if (!phase.whitebox?.fullMission && !MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !GORE_TEST && !PREVIEW && !cutsceneOnly && !deprecated && setpieces) {
     setpieces.BeginLevel(contentId, phase);
   }
   interact.Clear("P012");
@@ -3834,6 +3926,18 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
     if (window.Taierzhuang?.Debug) window.Taierzhuang.Debug.WeaponRange = weaponRange.api;
   }
   else if (RANGE) { state.pinned = true; SeedRangeTargets(); }
+  else if (GORE_TEST) {
+    state.pinned = true;
+    goreRange = new GoreRange({
+      ai, player, camera, scene, combat, battlefield, renderer,
+      // 核心断肢系统的调试口（docs/Data_Dismemberment.md §8.3）。惰性取：它挂在
+      // Debug 上，建关时可能还没挂好，取值器让面板从「未就绪」自己转成有数。
+      Gore: () => window.Taierzhuang?.Debug?.Gore || null,
+      CanUse: () => state.ready && state.running && !state.menu && !state.cutscene && !editor?.Capturing,
+      Focus: RequestPointerLock,
+    });
+    if (window.Taierzhuang?.Debug) window.Taierzhuang.Debug.GoreRange = goreRange.api;
+  }
   else if (MELEE_TEST) { state.pinned = true; SeedMeleeTargets(); }
   else if (FIRST_LEVEL_P012_WHITEBOX) { state.pinned = true; SeedSoldiers(phase); }
   else if (!PREVIEW && !cutsceneOnly) SeedSoldiers(phase);
@@ -4209,6 +4313,12 @@ async function WarmActorShaders(phase, onStep = null) {
       proxies.push(actor);
     }
   }
+  // 断肢块用的是**同一批人物材质的非蒙皮克隆**，那是一份新 program（skinning
+  // define 不同）。第一次断肢不能在战斗里现编 —— 与换人卡顿同一笔账，所以在这一趟
+  // 里摆一批代理网格（每份人物材质一个 + 一只断面）一起编。见 docs/Data_Dismemberment.md §7。
+  let goreProxies = 0;
+  try { goreProxies = AddGoreWarmProxies(group, proxies); }
+  catch (error) { console.warn("[Main] 断肢材质预热代理建失败", error); }
   group.position.set(player.position.x, player.position.y, player.position.z);
   scene.add(group);
   group.updateMatrixWorld(true);
@@ -4238,10 +4348,16 @@ async function WarmActorShaders(phase, onStep = null) {
     state.warming = wasWarming;
     scene.remove(group);
     for (const actor of proxies) actor.Dispose();
+    // 断肢代理的**几何**是这一趟临时造的，得回收；材质与断面几何是全场共享的
+    // 缓存件（下一次断肢就用它们），一件都不能 dispose。
+    for (const child of group.children) {
+      if (child.isMesh && child.name.startsWith("GoreWarm_Part_")) child.geometry.dispose();
+    }
+    group.clear();
   }
   if (stageLabel) stages[stageLabel] = Math.round((stages[stageLabel] || 0) + performance.now() - stageStart);
   state.actorShaderWarm = {
-    kinds: [...kinds], proxies: proxies.length, picks, stages,
+    kinds: [...kinds], proxies: proxies.length, goreProxies, picks, stages,
     ms: Math.round(performance.now() - started),
     programsBefore, programs: renderer.info.programs.length,
   };
@@ -4621,7 +4737,7 @@ const PIN_RELEASE_GRACE_S = PACING.pinReleaseGraceS;
 /** 换下一关。关末过场 -> 下一关关前过场 -> 建切片。 */
 async function AdvanceLevel(opts = {}) {
   // The gun laboratory has no campaign completion, including explicit debug calls.
-  if (MOVEMENT_RANGE || WEAPON_RANGE || EXPLOSION_TEST) return state.phaseIndex;
+  if (MOVEMENT_RANGE || WEAPON_RANGE || EXPLOSION_TEST || GORE_TEST) return state.phaseIndex;
   if (state.advancing) return state.phaseIndex;
   // 走到这里就算这一关过了：菜单的「继续」与选章里的「已通过」都读这条
   Progress.MarkCleared(PHASE_TABLE[state.phaseIndex].id, state.phaseIndex);
@@ -6704,13 +6820,16 @@ function MarchBullet(from, dir, weapon, targets, sourceCollider=null) {
 
     // 军人使用蒙皮骨架上的分部位球/胶囊；蹲、卧、跑、倒地时每一段都跟着对应
     // 骨头走。只有模型资源缺席的角色才回落到固定球，确保加载故障不让敌人无敌。
-    let bestSoldier = null, bestPart = "torso", bestT = Infinity;
+    // bestShape 是**命中的那一只代理**（`Data_CharacterHitbox` 的 shape）。
+    // part 只有 head/torso/limb 三档，断肢要知道是哪一段肢体，靠的是 shape.id。
+    let bestSoldier = null, bestPart = "torso", bestT = Infinity, bestShape = null;
     for (const s of targets) {
       const boneHit = s.actor?.RaycastHitboxes?.(_bulletPos, _segDir, segLen) || null;
       if (boneHit) {
         if (boneHit.t < bestT) {
           bestT = boneHit.t;
           bestPart = boneHit.part;
+          bestShape = boneHit.shape || null;
           bestSoldier = s;
         }
         continue;
@@ -6725,6 +6844,7 @@ function MarchBullet(from, dir, weapon, targets, sourceCollider=null) {
       if (perp < HITBOX.radius && fallbackT < bestT) {
         bestT = fallbackT;
         bestPart = "torso";
+        bestShape = null;              // 回退球没有部位语义，断肢按躯干处理（= 不卸）
         bestSoldier = s;
       }
     }
@@ -6736,7 +6856,7 @@ function MarchBullet(from, dir, weapon, targets, sourceCollider=null) {
     if (bestSoldier && (!wallHit || bestT < wallHit.t)) {
       ResolveNearMisses(nearMisses,bestSoldier);
       _hitPoint.copy(_bulletPos).addScaledVector(_segDir, bestT);
-      return { soldier: bestSoldier, part: bestPart, dist: travelled + bestT, dir: _segDir };
+      return { soldier: bestSoldier, part: bestPart, shape: bestShape, dist: travelled + bestT, dir: _segDir };
     }
     if (wallHit) {
       ResolveNearMisses(nearMisses);
@@ -6986,7 +7106,12 @@ function TryFire(dt, returningGrenade = false) {
     const part = shot.part || "torso";
     // 这里**不扣票**：扣票走 Soldier.Kill() 发的阵亡事件。
     // 两条路径同时扣的话，玩家亲手打死的人会扣两票。
-    const died = shot.soldier.TakeHit(weapon.damage, part, dir);
+    // 断肢要的三样：什么枪打的（rpm 有值就是机枪，走 hmg 那一档更容易卸肢）、
+    // 打中的是哪一只代理（shape.id 就是肢体名）、弹着点（血雾从那儿出）。
+    const died = shot.soldier.TakeHit(weapon.damage, part, dir, {
+      kind: weapon.rpm ? "hmg" : "bullet", shapeId: shot.shape?.id || null,
+      weaponId: currentWeapon, point: _hitPoint.clone(),
+    });
     vfx.Blood(_hitPoint, dir, died ? 1 : 0.5);
     audio.Play("impactFlesh", { position: _hitPoint.clone(), volume: 0.7 });
     ConfirmHit(died);
@@ -7048,7 +7173,9 @@ function FireVehicleBullet(from,direction,{weaponId="Type11",damageScale=1,sourc
   vfx.MuzzleFlash(from,direction,{scale:1.1,kind:"hmg"});
   vfx.Tracer(from,end,{kind:"ija"});audio.PlayGunshot("type92",{position:from,volume:.85});
   if(result.soldier===playerTarget)player.TakeHit(weapon.damage*damageScale*(COMBAT.player?.bulletScale??.4),result.part,direction,{from,bullet:true});
-  else if(result.soldier){result.soldier.TakeHit(weapon.damage*damageScale,result.part,direction);vfx.Blood(end,direction,.5);}
+  // 车载重机枪走 hmg 那一档（断肢概率比步枪高一个量级，见 SEVER_RULES）。
+  else if(result.soldier){result.soldier.TakeHit(weapon.damage*damageScale,result.part,direction,
+    {kind:"hmg",shapeId:result.shape?.id||null,weaponId,point:end.clone()});vfx.Blood(end,direction,.5);}
   else if(result.wall){const normal=new THREE.Vector3(...result.wall.normal);vfx.Impact(end,normal,SURFACE_BY_TAG[result.wall.box?.tag]||"dirt");}
   return {hit:result.soldier===playerTarget?"player":result.soldier?.missionId||null,wall:result.wall?.box?.tag||null,end:end.toArray()};
 }
@@ -7089,7 +7216,11 @@ function FireEmplacedShot(shot) {
     hit:result.soldier?.missionId || result.soldier?.id || null, part:result.part || null,
     wall:result.wall?.box?.tag || null, wallId:result.wall?.box?.id || null, dist:result.dist };
   if (result.soldier) {
-    const died = result.soldier.TakeHit(shot.damage, result.part || "torso", _empDir);
+    // 架起来的九二式同样是重机枪那一档。
+    const died = result.soldier.TakeHit(shot.damage, result.part || "torso", _empDir, {
+      kind: "hmg", shapeId: result.shape?.id || null,
+      weaponId: shot.weaponId, point: _hitPoint.clone(),
+    });
     vfx.Blood(_hitPoint, _empDir, died ? 1 : 0.5);
     audio.Play("impactFlesh", { position: _hitPoint.clone(), volume: 0.7 });
     ConfirmHit(died);
@@ -7371,6 +7502,8 @@ function Frame(dt, render = true) {
   // 这句必须在 state.elapsed 之前：否则慢的只有 AI，玩家/故事仍按正常速度飞过去。
   // Combat is stepped after pause/menu/editor gates, before movement and AI.
   dt *= meleeCombat?.TimeScale ?? 1;
+  // 断肢测试场的慢动作按钮（?gore=1 才有；其余入口 goreRange 恒为 null）。
+  if (goreRange) dt *= goreRange.timeScale;
   state.frame += 1;
   state.elapsed += dt;
   // 叠加层（Debug Rendering）不接管相机也不暂停玩法，所以它的每帧要排在
@@ -7494,6 +7627,7 @@ function Frame(dt, render = true) {
       || ["reload", "melee", "meleeWind", "fixBayonet", "throw"].includes(viewmodel.action?.kind),
   });
   movementRange?.Update(dt);
+  goreRange?.Update(dt);
   profiler.E("player");
   // 架设机枪同样排在 player.Update **之后**：射界限位要夹的是这一帧的视线，
   // 夹晚一帧画面就会先越界再被拉回来。
@@ -7686,6 +7820,10 @@ function Frame(dt, render = true) {
   // 表现为「手雷从刚跑过去的人身上穿过去」。
   profiler.B("physics");
   if (physics) physics.Step(dt);
+  // 断肢块排在**物理步进之后、Vfx 之前**：它把刚体位姿同步到网格上，
+  // 而挂在断面上的持续血源是 Vfx 每帧读节点世界矩阵取位置的 —— 顺序反了
+  // 血会跟着上一帧的肢块走（一段在半空的血迹）。
+  gore?.Update(dt, camera);
   profiler.E("physics");
   profiler.B("vfx");
   vfx.Update(dt, camera, state.elapsed);
@@ -7868,6 +8006,8 @@ function Frame(dt, render = true) {
     else if (WEAPON_RANGE) { /* WeaponRangeRuntime maintains every fixture each frame. */ }
     else if (RANGE) MaintainRangeTargets();
     else if (MELEE_TEST) MaintainMeleeTargets();
+    // 断肢场的木桩兵**不自动复位**：断了的肢体要留在场上看，复位走面板的「重置木桩」。
+    else if (GORE_TEST) { /* GoreRange reseeds only on demand. */ }
     else if (!EXPLOSION_TEST) SeedSoldiers(phase);
     profiler.E("spawn");
   }
