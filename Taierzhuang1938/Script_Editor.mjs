@@ -43,6 +43,7 @@ import { DebugRenderingEditor } from "./Script_EditorDebugRendering.mjs";
 import { WorldInfoEditor } from "./Script_EditorWorldInfo.mjs";
 import { ProfilerEditor } from "./Script_EditorProfiler.mjs";
 import { AiEditor } from "./Script_EditorAi.mjs";
+import { SquadMarchEditor } from "./Script_EditorSquadMarch.mjs";
 import {
   GraphicsSettings, AudioSettings, ControlsSettings, ApplySavedSettings,
 } from "./Script_EditorSettings.mjs";
@@ -56,7 +57,7 @@ import {
  */
 const SETTINGS = [ControlsSettings, GraphicsSettings, AudioSettings];
 const EDITORS = [
-  ActorEditor, WeaponEditor, FirstPersonEditor, VfxEditor, AudioEditor, TimelineEditor,
+  ActorEditor, SquadMarchEditor, WeaponEditor, FirstPersonEditor, VfxEditor, AudioEditor, TimelineEditor,
   SceneEditor, PropLibraryEditor, AssetStandardsEditor, PropPcgEditor, TerrainEditor, SplineEditor, DestructionEditor,
   FullSceneEditor, SamplePointEditor,
 ];

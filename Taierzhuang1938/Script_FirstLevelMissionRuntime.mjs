@@ -29,6 +29,7 @@ import {
   MissionGuideSpeed, MissionSquadRoute, MissionSquadPace, MissionRouteLookahead,
 } from "./Script_FirstLevelMissionColumn.mjs";
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
+import { SquadMarchAi } from "./Script_SquadMarchAi.mjs";
 import { FirstLevelMissionView } from "./Script_FirstLevelMissionView.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
@@ -308,6 +309,7 @@ export class FirstLevelMissionRuntime {
     actor.goal.set(point.x, 0, point.z);
   }
   Guide(route) {
+    this.squadMarch?.Dispose();
     this.guideRoute = route;
     for (const actor of this.squad) {
       const naturalMarch=[MISSION_ROUTES.support,MISSION_ROUTES.south].includes(route);
@@ -339,6 +341,12 @@ export class FirstLevelMissionRuntime {
       }
       this.squadRoutes.set(actor.id, queued);
     }
+    // Role is supplied by the mission roster; the shared controller knows no cast names.
+    this.squadMarch=new SquadMarchAi(this.ai,this.squad,{
+      route,leaderIndex:0,seed:`FirstLevel:${this.flow.stage.id}`,
+      tuning:{speedMps:R.squadSpeedMps,arrivalM:.45},
+      members:this.squad.map(actor=>({route:this.squadRoutes.get(actor.id)})),
+    },{Move:(actor,point,speed)=>this.MoveActor(actor,point,speed)});
   }
   WaitWatch(actor, stage) {
     const slot=this.squad.indexOf(actor);
@@ -412,6 +420,15 @@ export class FirstLevelMissionRuntime {
       }
       if (actor.suppression > 0.65 && stage !== "Train") this.ai.SetStance(actor, 1, 1, true);
     }
+    this.squadMarch?.Update(this.delta,{
+      player:this.player.position,
+      Observe:actor=>({
+        route:this.squadRoutes.get(actor.id)||[],
+        active:!!actor.missionTrainReady&&!!this.squadRoutes.get(actor.id)?.length
+          &&!(actor===this.bedGuide?.actor&&["FinalCarry","Death"].includes(stage)),
+        maxSpeed:actor.scriptMoveSpeedMps,
+      }),
+    });
   }
   // Warmed real actors are placed over several frames. Failed placement retains its slot.
   SpawnEncounter(id) {
@@ -1847,6 +1864,7 @@ export class FirstLevelMissionRuntime {
     };
   }
   Dispose() {
+    this.squadMarch?.Dispose();
     if(this.tankDust!=null)this.vfx.RemoveSmokeSource(this.tankDust);
     this.voice.Dispose();
     this.carriageSound.Dispose();

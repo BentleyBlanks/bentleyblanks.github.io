@@ -625,3 +625,10 @@ node Taierzhuang1938/Script_AiEditorTest.mjs
 
 改了编辑器以外的东西照旧跑 `Script_BootTest.mjs`（画面健康 + draw call 红线）与
 `Script_PlayTest.mjs`（玩法与剧本）。
+
+
+### 小队行进 `Script_EditorSquadMarch.mjs`
+
+入口 `?editor=squadMarch&phase=1` 或「编辑器 → 小队行进」。复用摄影棚、正式人物模型与 `Script_SquadMarch` 共享行为；正式场景通过 `SquadMarchAi` 使用同一调度。支持 1–24 人、班长选择、可复现随机种子、跑停与间距参数、拖动路线、成员跟随、时间带、暂停/单帧和速度控制。按人数保留浏览器样式，JSON 可导出及验证后导入。
+
+编辑器暂停并隐藏正式玩法；只创建预览人物，退出清理演员并还原相机、舞台大小与可见性。平地样式预览与关卡碰撞/威胁验收分别记录，详见 [小队行进设计](Data_NpcGuideCadence.md) 第 8–9 节。回归入口：`Script_SquadMarchTest.mjs` / `Script_SquadMarchEditorTest.mjs`。

@@ -47,6 +47,8 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  SquadMarchTest: {file:"Script_SquadMarchTest.mjs",desc:"Shared squad cadence, roles, safe interruption, replay and population variants"},
+  SquadMarchEditorTest: {file:"Script_SquadMarchEditorTest.mjs",timeoutMs:300000,desc:"Squad editor real actors, editable routes, per-count styles and cleanup"},
   FirstLevelMissionStageJumpTest: {file:"Script_FirstLevelMissionStageJumpTest.mjs",timeoutMs:900000,desc:"18 stage starts, backward jumps and resumed mission gates"},
   // The 150-actor mission rebuilds 18 starts; a measured full continuation reached Complete
   // at the old 1200 s limit. Match the full campaign allowance without changing any assertions.
@@ -263,6 +265,7 @@ export const testDefs = {
 
 export const browserTests = new Set([
   "FirstLevelMissionAftermathTest",
+  "SquadMarchEditorTest",
   "FirstLevelMissionFortificationsTest",
   "FirstLevelMissionMusicBrowserTest",
   "FirstLevelMissionStageJumpTest",
@@ -342,6 +345,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  squadMarch: {label:"通用小队行进",tests:["SquadMarchTest","SquadMarchEditorTest"]},
   firstLevelTail: {label:"第一关接收院至结尾定向续接",tests:["FirstLevelMissionStageTailTest"]},
   firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelMissionTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
@@ -437,6 +441,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"squadMarch",pattern:/SquadMarch/},
   {domain:"combat",pattern:/FpsSkeleton|FpsSkeletal|FpsAnimation|Animation\/FirstPerson\/Data_Fps/},
   { domain: "combat", pattern: /CoverLean/i },
   {domain:"combat",pattern:/BallisticSuppression/},

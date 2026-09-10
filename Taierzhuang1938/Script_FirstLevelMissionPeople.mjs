@@ -130,7 +130,7 @@ export function InstallMissionSentry(soldier){
   let time=0;
   rig.Update=function UpdateMissionSentry(dt,state={}){
     pose.Restore();const result=original.call(this,dt,state);time+=Math.max(0,dt);
-    if(!soldier.alive || state.dead || state.firing || state.moveSpeed>.08 || state.carryRole || state.meleeCombat ||
+    if(!soldier.alive || soldier.squadMarchCommand?.breath || state.dead || state.firing || state.moveSpeed>.08 || state.carryRole || state.meleeCombat ||
       soldier.target || soldier.missionTrainLife?.weight>.01)return result;
     pose.basis=actor.root;
     const b=rig.bones,scan=Math.sin(time*.23+phase);

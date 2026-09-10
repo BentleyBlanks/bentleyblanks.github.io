@@ -18,6 +18,7 @@
 import * as THREE from "three";
 import { MissionTrainLifePose } from "./Script_FirstLevelMissionTrainLife.mjs";
 import { STAND_IDLE as C } from "./Data_Tuning_ActorIdle.mjs";
+import { SQUAD_MARCH } from "./Data_Tuning_SquadMarch.mjs";
 
 const TAU = Math.PI * 2;
 const REQUIRED_BONES = ["pelvis", "chest", "head", "thighL", "calfL", "footL", "thighR", "calfR", "footR"];
@@ -51,7 +52,10 @@ export class StandIdleLayer {
     this.time += Math.max(0, dt);
     actor.root.updateWorldMatrix(true, false);
     const t = this.time + this.phase;
-    const breath = Math.sin(t * TAU * C.breathRateHz);
+    const march = this.soldier.squadMarchCommand;
+    const recovering = march?.breath > 0;
+    const breath = Math.sin(t * TAU * (recovering ? SQUAD_MARCH.breathRateHz : C.breathRateHz))
+      * (recovering ? SQUAD_MARCH.breathScale : 1);
     const shift = Math.sin(t * TAU * C.shiftRateHz) * 0.75 + Math.sin(t * TAU * C.shiftJitterHz) * 0.25;
     const scan = Math.sin(t * TAU * C.scanRateHz) * 0.7 + Math.sin(t * TAU * C.scanJitterHz + 1.7) * 0.3;
     // clip 摆好的落脚点就是这一帧的接地事实：先记住，骨盆动完再解回来。
@@ -79,8 +83,9 @@ export class StandIdleLayer {
     }
     pose.Tilt(bones.chest, -breath * C.breathChestRad, scan * C.chestYawRad, -shift * C.shiftLeanRad);
     // 头让给哨兵层（它装在任务演员身上，摆幅更大）；没有它的人由这里张望。
-    if (!rig.missionSentryPose) {
-      pose.Tilt(bones.head, Math.sin(t * TAU * C.headPitchRateHz) * C.headPitchRad, scan * C.headYawRad, 0);
+    if (!rig.missionSentryPose || recovering) {
+      pose.Tilt(bones.head, Math.sin(t * TAU * C.headPitchRateHz) * C.headPitchRad,
+        recovering ? march.lookYaw : scan * C.headYawRad, 0);
     }
     // 这里**不做**整棵子树的 updateWorldMatrix：那是一趟约 137 个节点的递归，几十个站着的人
     // 同时走就是整帧最大的单项（账在 Script_CharacterModel._GroundInfantryBlend 的头注里）。

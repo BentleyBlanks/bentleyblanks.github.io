@@ -2840,6 +2840,10 @@ async function Boot() {
     }
     editor.Open("fullScene");
   }
+  if (EDITOR_PARAM === "squadMarch" && !SHOT) {
+    ShowBoot(false);
+    editor.Open("squadMarch");
+  }
 }
 
 // ---------------------------------------------------------------------------
