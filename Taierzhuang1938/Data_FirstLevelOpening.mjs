@@ -1,0 +1,56 @@
+// 2026-09-10 opening rebuild. Gameplay reconstruction of a local flank breach;
+// these coordinates are not claims about surveyed 1938 positions.
+export const OPENING = Object.freeze({
+  derailCar: 0,
+  derailPivot: {x:-74.6,y:.75},
+  derailRollRad: -Math.PI/2,
+  derailSeconds: 2.4,
+  rescueSeconds: 2.1,
+  rescueReachM: 1.6,
+  shelter: {x:-32,z:-20},
+  trenchEntry: {x:-45,z:41},
+  breach: {x:-22,z:8},
+  shelterRadiusM: 2.2,
+  shelterWitnessM: 14,
+  // A clear local trench, two successive traverses and friendly posts protect
+  // the exchange. No scripted damage immunity or global ceasefire in this area.
+  approachRoute: [{x:-66,z:66},{x:-62,z:64},{x:-45,z:41},{x:-45,z:24},
+    {x:-37,z:24},{x:-37,z:6},{x:-45,z:6},{x:-45,z:-20},{x:-32,z:-20}],
+  supportRoute: [{x:-32,z:-20},{x:-32,z:-23},{x:-24,z:-23},{x:-24,z:-60},
+    {x:-8,z:-78},{x:-8,z:-112},{x:6,z:-124}],
+  woundedRoute: [{x:-24,z:-56},{x:-24,z:-23},{x:-32,z:-23},{x:-32,z:-21}],
+  runnerRoute: [{x:-24,z:-60},{x:-24,z:-23},{x:-31,z:-23},{x:-31,z:-24}],
+  shelterPosts: [{x:-32,z:-24},{x:-32,z:-21},{x:-40,z:-20},{x:-37,z:-20}],
+  zhouGunSeat: {x:0,z:-127.4},
+  zhouRest: {x:2.1,z:-124.6},
+  zhouShell: {from:{x:18,z:-210},height:30,flight:1.8,radius:3,damage:55,offsetX:1.1},
+  surface: [
+    {id:"FlankLockGunner",x:-35,z:58,weapon:"Type11",hold:true},
+    {id:"FlankLockA",x:-33,z:49,hold:true},
+    {id:"FlankLockB",x:-26,z:57,hold:true},
+    {id:"RailLockGunner",x:-93,z:43,weapon:"Type11",hold:true},
+    {id:"RailLockA",x:-96,z:34,hold:true},
+    {id:"RailLockB",x:-89,z:30,hold:true},
+  ],
+  intruders: [
+    {id:"TrenchIntruderA",x:-38,z:15,weapon:"Type38",bayonet:true},
+    {id:"TrenchIntruderB",x:-34,z:8,weapon:"Type38",bayonet:true},
+    {id:"TrenchIntruderC",x:-27,z:8,weapon:"Type38",bayonet:true},
+    {id:"TrenchIntruderD",x:-22,z:8,weapon:"Type38",bayonet:true},
+  ],
+  intruderRoutes: {
+    TrenchIntruderA:[{x:-37,z:18}],
+    TrenchIntruderB:[{x:-37,z:8},{x:-37,z:13}],
+    TrenchIntruderC:[{x:-32,z:8},{x:-37,z:8}],
+    TrenchIntruderD:[{x:-27,z:8},{x:-32,z:8}],
+  },
+  surfaceBurstSeconds: 2.4,
+  // These teams seal the unloading apron. They do not all turn north to chase
+  // closer friendlies already deep in the communication trench.
+  surfaceSector: {minX:-85,maxX:-52,minZ:60,maxZ:112,selfDefenseM:12},
+  surfaceRestSeconds: 3.8,
+  playerFireLimit: 3,
+  fireSlotSeconds: 3.5,
+  rifleGuardCount: 2,
+  frontReachRadiusM: 9,
+});

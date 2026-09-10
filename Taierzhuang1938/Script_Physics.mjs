@@ -241,8 +241,10 @@ export class PhysicsWorld {
   MoveSolid(box) {
     const collider = this.world.getCollider(box._physicsHandle);
     if (!collider) return false;
-    collider.setTranslation({ x: box.c[0], y: box.c[1], z: box.c[2] });
-    collider.setRotation(YawQuat(box.ry || 0));
+    // Solids belong to the identity fixed body. Update their parent-relative
+    // pose too, or propagating the body's transform restores the creation pose.
+    collider.setTranslationWrtParent({ x: box.c[0], y: box.c[1], z: box.c[2] });
+    collider.setRotationWrtParent(YawQuat(box.ry || 0));
     return true;
   }
 

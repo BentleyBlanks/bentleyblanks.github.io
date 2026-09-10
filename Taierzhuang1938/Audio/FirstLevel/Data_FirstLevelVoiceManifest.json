@@ -4,32 +4,32 @@
   "cues": {
     "TrainMeal": {
       "file": "AudioVoice_FirstLevelTrainMeal.mp3",
-      "seconds": 88.842,
-      "bytes": 1066781,
-      "promptHash": "3aee50023aff4e7ca33bd6a702962a3bbe9d8f7eb64b9591ee33f1243586ee6f",
-      "sha256": "4f6bc3015cca6417c864d423c2c44fff86291300e2d5828b7df7dd1d6e811d4c",
-      "lineCount": 30,
+      "seconds": 19.331,
+      "bytes": 232639,
+      "promptHash": "8792bbbd8288ebf8ec41657bba68a57b252d02bbddaffea4cf27041c75391700",
+      "sha256": "4b5b1a47f8f739da91f99667059fafa8b132ff3b3a83a4ec1c092971c4bdbbd7",
+      "lineCount": 6,
       "requests": 1,
       "continuous": true,
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     },
     "TrainShelling": {
       "file": "AudioVoice_FirstLevelTrainShelling.mp3",
-      "seconds": 20.036,
-      "bytes": 241102,
-      "promptHash": "3178208a80313c4fad6051d151804ca1a3906c1be5db350f138ba7e63758cf52",
-      "sha256": "29c8b4061324ffcb9b57dd58130c51461ec1356e48fafd29e83a109c262462be",
-      "lineCount": 10,
+      "seconds": 22.413,
+      "bytes": 269628,
+      "promptHash": "8e15696c422a9bc1a5687013d62f20b9457cd61eb608533506b07d3258d8a885",
+      "sha256": "68c3968b695aa315d20972998d658e2805ab00d2fb3f3e285a4ee995812ab30b",
+      "lineCount": 8,
       "requests": 1,
       "continuous": true,
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     },
     "EscapeWhisper": {
       "file": "AudioVoice_FirstLevelEscapeWhisper.mp3",
-      "seconds": 9.143,
-      "bytes": 110385,
-      "promptHash": "7c2f05e28f7a028ed3ba184a483a34a7245f4e100387c89d1a7a1229cb96ecc7",
-      "sha256": "30b1f280a3ded7fa335d8189da921578b6133ad758290f102b06e0920cbdc279",
+      "seconds": 17.241,
+      "bytes": 207561,
+      "promptHash": "6a94c34bc4c962efe2b77a113364cd14bb7f77b6de5b8c490e894d2ffae63f23",
+      "sha256": "83f55fcf3d0ef855f4110a4142320bbe463fb43a9839c378629a88837b1bb752",
       "lineCount": 4,
       "requests": 1,
       "continuous": true,
@@ -454,5 +454,5 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-09-10T04:49:49.048Z"
+  "updatedAt": "2026-09-10T04:44:40.213Z"
 }

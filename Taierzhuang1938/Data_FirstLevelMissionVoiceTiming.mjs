@@ -4,35 +4,24 @@ import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 // checked against the current script). Whole recordings remain unchanged.
 // Delays belong to playback, not to the generated performance.
 export const MISSION_VOICE_TIMING = Object.freeze({
-  TrainMeal: {
-    segments: [
-      {id:"CarriageExchange",start:0,end:88.842,wait:5,
-        events:[{at:MISSION_VOICE_ALIGNMENT.TrainMeal.lines[1][1],id:"TrainFoodReceived"},
-          ...CARRIAGE_SOUND.reactions.map(reaction=>({at:MISSION_VOICE_ALIGNMENT.TrainMeal.lines[reaction.line][1],id:reaction.id})),
-          {at:MISSION_VOICE_ALIGNMENT.TrainMeal.lines[CARRIAGE_SOUND.uneasyLine][0],id:"CarriageUneasy"}]},
-    ],
-    tail: 4,
-  },
-  TrainShelling: {
-    segments: [
-      {id:"FirstShellWarning",start:0,end:2.12,wait:.3,gate:"trainFirstShellImpact",endEvent:"TrainNearShell"},
-      {id:"BrakeAndCover",start:2.12,end:4.76,wait:0,startEvent:"TrainProneOrder"},
-      {id:"WoundedSoldier",start:4.76,end:6.44,wait:0,gate:"trainSoldierWounded"},
-      {id:"TakeCover",start:6.44,end:9.32,wait:.2},
-      {id:"CheckWound",start:9.32,end:17,wait:2.5},
-      {id:"EmergencyUnload",start:17,end:20.036,wait:.5,gate:"trainStopped"},
-    ],
-    tail: 1,
-  },
   AircraftReturn: {
     segments:[{id:"ReturnAndDive",start:0,end:5.721,wait:0,events:[{at:4.58,id:"AircraftDiveOrder"}]}],tail:0,
   },
-  EscapeWhisper: {
-    segments: [{id:"PrivateExchange",start:0,end:9.143,wait:3}],
-    tail: 1,
-  },
+
 });
 export function MissionVoiceTimeline(cue, total) {
+  // Each rebuilt exchange is aligned to its retained whole recording.
+  if (["TrainMeal","TrainShelling","EscapeWhisper"].includes(cue.id)) {
+    const lines=MISSION_VOICE_ALIGNMENT[cue.id].lines;
+    if(cue.id==="TrainMeal")return {lines,segments:[{id:"ShareFood",start:0,end:total,wait:4,events:[{at:lines[1][1],id:"TrainFoodReceived"}]}],tail:2};
+    if(cue.id==="EscapeWhisper")return {lines,segments:[{id:"PrivateExchange",start:0,end:total,wait:2}],tail:2};
+    return {lines,segments:[
+      {id:"FirstShellWarning",start:0,end:lines[0][1],wait:0,gate:"trainFirstShellImpact",endEvent:"TrainNearShell"},
+      {id:"DerailImpact",start:lines[1][0],end:lines[3][1],wait:0,gate:"trainNearShellImpact",startEvent:"TrainProneOrder"},
+      {id:"LuoRescue",start:lines[4][0],end:lines[4][1],wait:0,gate:"trainStopped",startEvent:"TrainRescue"},
+      {id:"GroundFire",start:lines[5][0],end:total,wait:0,gate:"luoRescueComplete"},
+    ],tail:.5};
+  }
   const authored = MISSION_VOICE_TIMING[cue.id];
   const aligned = MISSION_VOICE_ALIGNMENT[cue.id];
   if (aligned) return {lines:aligned.lines,segments:authored?.segments||[{id:"WholeExchange",start:0,end:total,wait:0}],tail:authored?.tail||0};

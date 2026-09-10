@@ -3779,6 +3779,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
     RestoreRifle:()=>{if(state.activeSlot!=='primary')SwitchSlot('primary');SyncMissionHands();viewmodel.root.visible=!carry?.Blocking;},
     Control:active=>{state.missionControl=active;state.cooking=null;state.cook=0;input.fire=false;input.ads=false;},
     Complete:()=>{Progress.MarkCleared(FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,0);ShowPauseMenu();menu.OpenSandboxComplete();},
+    MissionFailure:castId=>{ShowPauseMenu();menu.OpenSandboxFailure(false,{castId,restartOnly:true});},
   }) : null;
   await missionRuntime?.voiceReady;
   SyncMissionHands();

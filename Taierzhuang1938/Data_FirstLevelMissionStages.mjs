@@ -7,7 +7,7 @@ const Phase = (number, id, title, steps, spawn) => Object.freeze({
 export const FIRST_LEVEL_STAGES = Object.freeze([
   Phase(1, "Train", "军列上的人味", ["Train"], A.train),
   Phase(2, "Unloading", "接近卸载点，遭遇炮击", ["Unloading"], A.train),
-  Phase(3, "Support", "支援外围阵地", ["Support"], A.unload),
+  Phase(3, "Support", "清沟、喘息与支援外围阵地", ["TrenchEntry","Shelter","Support"], A.unload),
   Phase(4, "MachineGun", "接手机枪", ["MachineGun"], {x:0,z:-127.4}),
   Phase(5, "Tank", "集束手榴弹炸停战车", ["Tank"], Routes.bundle[0]),
   Phase(6, "Orders", "后送命令", ["Orders"], A.orders),
@@ -25,7 +25,7 @@ export const FIRST_LEVEL_STAGES = Object.freeze([
   Phase(18, "FinalDefense", "接收院被逼退，战斗收尾", ["FinalDefense","Exit"], {x:-151,z:43.6}),
 ]);
 export const FIRST_LEVEL_ENCOUNTER_STARTS = Object.freeze({
-  front:3, approach:3, tank:3, village:3, melee:3, courtyard:10,
+  surface:2, intrusion:2, front:3, approach:3, tank:3, village:3, melee:3, courtyard:10,
   transfer:12, transferFlank:12, transferLast:12, transferRear:12, air:13, retreat:15,
   retreatWall:15,retreatYard:15,reception:16, final:17,
 });
@@ -42,7 +42,7 @@ export const FIRST_LEVEL_STAGE_CLEARED_ENEMIES = Object.freeze({
 });
 export const FIRST_LEVEL_STAGE_ENCOUNTERS = Object.freeze([
   [], [],
-  ["front","approach","tank","village","melee"],
+  ["surface","intrusion"],
   ["front","approach","tank","village","melee"],
   ["front","approach","tank","village","melee"],
   ["village","melee"], ["village","melee"], ["village","melee"], ["village","melee"],

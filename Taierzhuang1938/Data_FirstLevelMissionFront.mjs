@@ -1,5 +1,6 @@
 import { MISSION_TUNING as FIRST_LEVEL_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
+import { OPENING } from "./Data_FirstLevelOpening.mjs";
 // Authored squads and persistent aftermath. Historical dead do not affect live combat counts.
 // 2026-09-09: the Center squad's fifth man moved 12,-188 -> 12,-190. At -188 he was inside the
 // one-metre slack of the first bound line, so he skipped it and rushed straight through the Bank
@@ -90,7 +91,7 @@ export const FRONT_RIFLEMEN=Object.freeze([
 ]);
 /** Every man the front stages put on this field. The cover rows never build on one of these
  *  firing positions - a bank standing on a man is a man standing in a bank. */
-export const FRONT_FIELD_MEN=Object.freeze([...FRONT_REINFORCEMENTS,...FRONT_RIFLEMEN]);
+export const FRONT_FIELD_MEN=Object.freeze([...FRONT_REINFORCEMENTS.filter((spec,i)=>i%6<2),...FRONT_RIFLEMEN]);
 // Five platoons spread behind the first line. Every man is spawned at Support entry;
 // release delays change movement, never the simultaneous population or damage rules.
 export const FRONT_RESERVES=Object.freeze(Array.from({length:FIRST_LEVEL_TUNING.frontReserveCount},(_,i)=>({
@@ -181,7 +182,7 @@ export const FRONT_DEFENDERS=[
 ].map(([x,z,weapon],i)=>({id:"FrontDefender"+i,x,z,weapon,stance:i%4===0?2:1}));
 export const FRONT_GUARD_POSTS=[[-29,-145],[-22,-145],[-12,-145],[-4,-145],[7,-145],[14,-145],[21,-145],[28,-145]]
   .map(([x,z])=>({x,z}));
-export const FRONT_BREACHES=[{x:-43,z:25,radius:10,depth:.65},{x:-24,z:-39,radius:9,depth:.6},{x:-8,z:-94,radius:8,depth:.65}];
+export const FRONT_BREACHES=[{x:-22,z:8,radius:4,depth:1.05}];
 export const FRONT_SHELLS=[
   {trigger:{x:-46,z:37},impact:{x:-37,z:22}},
   {trigger:{x:-24,z:-28},impact:{x:-31,z:-45}},
@@ -210,6 +211,14 @@ let seed=19380907; const Random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>
 // Filter after generation so every retained battlefield body keeps its original placement.
 const musterBodyClearanceM=1.8;
 const musterPoints=[MISSION_TRAIN.guideMuster,...MISSION_TRAIN.cars.flatMap(car=>car.muster)];
+function OpeningRouteClear(body){
+  for(const route of [OPENING.approachRoute,OPENING.supportRoute])for(let i=1;i<route.length;i++){
+    const a=route[i-1],b=route[i],dx=b.x-a.x,dz=b.z-a.z;
+    const t=Math.max(0,Math.min(1,((body.x-a.x)*dx+(body.z-a.z)*dz)/(dx*dx+dz*dz)));
+    if(Math.hypot(body.x-a.x-dx*t,body.z-a.z-dz*t)<3.5)return false;
+  }
+  return true;
+}
 export const MISSION_AFTERMATH=clusters.flatMap(([x,z,count,ijaShare,spread],group)=>Array.from({length:count},(_,i)=>{
   const angle=Random()*Math.PI*2,r=Math.sqrt(Random())*spread;
   const ija=Random()<ijaShare;
@@ -217,5 +226,6 @@ export const MISSION_AFTERMATH=clusters.flatMap(([x,z,count,ijaShare,spread],gro
   const pile=count>=15&&i%4===3?.18+Random()*.2:0;
   return {id:"Aftermath"+group+"_"+i,x:x+Math.cos(angle)*r,z:z+Math.sin(angle)*r,
     yaw:Random()*Math.PI*2,side:ija?"ija":"nra",pose:i%4,
-    pile,scale:.94+Random()*.12,blood:.6+Random()*.75};
-})).filter(body=>musterPoints.every(point=>Math.hypot(body.x-point.x,body.z-point.z)>=musterBodyClearanceM));
+    pile,scale:.94+Random()*.12,blood:.6+Random()*.75,opening:group<13};
+})).filter(body=>(!body.opening||(+body.id.split("_")[1]<2&&OpeningRouteClear(body)))&&
+  musterPoints.every(point=>Math.hypot(body.x-point.x,body.z-point.z)>=musterBodyClearanceM));

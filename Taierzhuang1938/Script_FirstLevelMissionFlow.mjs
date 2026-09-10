@@ -49,7 +49,8 @@ export class FirstLevelMissionFlow {
   }
   Snapshot() {
     return {
-      version: 1,
+      version: 2,
+      stageId: this.stage.id,
       index: this.index,
       time: this.time,
       stageTime: this.stageTime,
@@ -59,13 +60,16 @@ export class FirstLevelMissionFlow {
   }
   Restore(saved) {
     if (
-      saved?.version !== 1 ||
+      ![1,2].includes(saved?.version) ||
       !Number.isInteger(saved.index) ||
       saved.index < 0 ||
       saved.index >= MISSION_STAGES.length
     )
       throw new Error("Invalid first-level checkpoint");
-    this.index = saved.index;
+    const legacySteps=MISSION_STAGES.filter(step=>!["TrenchEntry","Shelter"].includes(step.id));
+    const stageId=saved.stageId||saved.log?.findLast(entry=>entry.kind==="stage")?.id||legacySteps[saved.index]?.id;
+    this.index=MISSION_STAGES.findIndex(step=>step.id===stageId);
+    if(this.index<0)throw new Error("Unknown first-level checkpoint stage");
     this.time = saved.time;
     this.stageTime = saved.stageTime;
     this.facts = new Set(saved.facts);

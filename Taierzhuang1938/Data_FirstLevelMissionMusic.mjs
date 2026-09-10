@@ -23,6 +23,7 @@ export const FIRST_LEVEL_MUSIC_MIX = Object.freeze({
 });
 export const FIRST_LEVEL_STAGE_MUSIC = Object.freeze({
   Train: "LeavingHome", Unloading: "LeavingHome",
+  TrenchEntry: "CloseQuartersPressure", Shelter: null,
   Support: "IronSiege", MachineGun: "IronSiege", Tank: "IronSiege", Orders: "TheFrontClosesIn",
   South: "TheRoadSouth", Village: "CloseQuartersPressure", Melee: "CloseQuartersPressure", Courtyard: "CloseQuartersPressure",
   TransferApproach: "TheRoadSouth", Transfer: "IronSiege",

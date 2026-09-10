@@ -1,3 +1,4 @@
+import { OPENING } from "./Data_FirstLevelOpening.mjs";
 // Authored soil, metres: natural ground, roads, rail berm and excavated trenches.
 // This function is baked once into the shared rendered/physical heightfield.
 import { FRONT_BREACHES } from "./Data_FirstLevelMissionFront.mjs";
@@ -71,16 +72,7 @@ export const MISSION_TERRAIN = Object.freeze({
   trenches: [
     {
       id: "FrontCommunication",
-      points: [
-        { x: -62, z: 64 },
-        { x: -45, z: 41 },
-        { x: -40, z: 4 },
-        { x: -24, z: -18 },
-        { x: -24, z: -60 },
-        { x: -8, z: -78 },
-        { x: -8, z: -112 },
-        { x: 6, z: -124 },
-      ],
+      points: [...OPENING.approachRoute.slice(1),...OPENING.supportRoute.slice(1)],
       depth: 1.5,
       bottom: 4.2,
       bank: 1.5,
@@ -127,41 +119,11 @@ export const MISSION_TERRAIN = Object.freeze({
       bottom: 5.2,
       bank: 2.2,
     },
-    // Connected alternatives inside each mission area; the original four paths retain
-    // their indices because mission escorts consume those routes. These are authored
-    // reconstructions, not surveyed 1938 trench coordinates (see fortifications doc).
-    {
-      id: "WestCommunicationLoop", role: "communicationLoop",
-      points: [{x:-30,z:-124},{x:-42,z:-114},{x:-42,z:-101},{x:-51,z:-92},
-        {x:-48,z:-74},{x:-36,z:-66},{x:-24,z:-60}],
-      depth:1.5, bottom:4.2, bank:1.5,
-    },
-    {
-      id: "SupportTraverseLink", role: "lateralLink",
-      points: [{x:-42,z:-101},{x:-32,z:-99},{x:-26,z:-94},{x:-8,z:-94}],
-      depth:1.5, bottom:3.6, bank:1.5,
-    },
-    {
-      id: "WestListeningSap", role: "shelterSap",
-      points: [{x:-42,z:-114},{x:-54,z:-111},{x:-54,z:-120}],
-      depth:1.5, bottom:3.2, bank:1.5,
-    },
-    {
-      id: "ReserveShelterSap", role: "shelterSap",
-      points: [{x:-48,z:-74},{x:-60,z:-67},{x:-60,z:-57}],
-      depth:1.5, bottom:3.6, bank:1.5,
-    },
-    {
-      id: "MiddleCommunicationLoop", role: "communicationLoop",
-      points: [{x:-24,z:-18},{x:-38,z:-27},{x:-54,z:-18},{x:-56,z:3},
-        {x:-51,z:17},{x:-51,z:30},{x:-45,z:41}],
-      depth:1.5, bottom:4.2, bank:1.5,
-    },
-    {
-      id: "StationReserveLoop", role: "localLoop",
-      points: [{x:-54,z:-18},{x:-66,z:-10},{x:-65,z:6},{x:-56,z:3}],
-      depth:1.5, bottom:3.6, bank:1.5,
-    },
+    // Two short choices return to the same northbound main trench.
+    {id:"EntryCoverLoop",role:"localLoop",points:[{x:-45,z:41},{x:-52,z:35},{x:-52,z:27},{x:-45,z:24}],depth:1.5,bottom:3.6,bank:1.5},
+    {id:"NorthCoverLoop",role:"localLoop",points:[{x:-24,z:-44},{x:-31,z:-48},{x:-31,z:-56},{x:-24,z:-60}],depth:1.5,bottom:3.6,bank:1.5},
+    // A short breached enemy sap explains intruders; it never rejoins behind the player.
+    {id:"FlankBreachSap",role:"enemyEntry",points:[{x:-22,z:8},{x:-28,z:8},{x:-37,z:8}],depth:1.5,bottom:3.2,bank:1.5},
     {
       id: "RearEvacuationLoop", role: "localLoop",
       points: [{x:-28,z:88},{x:-34,z:103},{x:-52,z:105},{x:-65,z:90},{x:-67,z:64}],

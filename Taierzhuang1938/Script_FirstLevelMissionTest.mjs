@@ -1,10 +1,10 @@
-import { MISSION_AFTERMATH, FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_ASSAULT_STARTS, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_CIVILIAN_AFTERMATH } from "./Data_FirstLevelMissionCivilianAftermath.mjs";
+import { OPENING } from "./Data_FirstLevelOpening.mjs";
+import { MISSION_AFTERMATH, FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_ASSAULT_STARTS, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
 import { COVER } from "./Data_Tuning_AiCover.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { CollectBulletNearMisses,ApplyBulletNearMisses } from "./Script_BallisticSuppression.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
-import { MISSION_VOICE_TIMING } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { CARRIAGE_SOUND, CARRIAGE_SOUND_ASSETS } from "./Data_FirstLevelCarriageSound.mjs";
 import { FirstLevelCarriageSound } from "./Script_FirstLevelCarriageSound.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
@@ -45,16 +45,16 @@ for(const point of [MISSION_TRAIN.guideMuster,...MISSION_TRAIN.cars.flatMap(car=
   assert.deepEqual(GuardCrossingPair([{id:1,alive:false},{id:2,alive:true},{id:3,alive:true}],2),[2],"a fallen partner does not strand the surviving crossing man");
   assert.deepEqual(GuardCrossingPair([{id:1,alive:true,safe:true},{id:2,alive:false},{id:3,alive:true}],2),[3]);
   assert.equal(FrontReplacementSlots({alive:149,queued:1,spawned:0},R),0,"queued men reserve live capacity");
-  assert.equal(FrontReplacementSlots({alive:140,queued:0,spawned:R.waveBudget-1},R),1,"last finite replacement is not rounded up to a squad");
+  assert.equal(FrontReplacementSlots({alive:24,queued:0,spawned:5},{...R,waveBudget:6}),1,"last finite replacement is not rounded up to a squad");
   assert.equal(FrontReplacementSlots({alive:0,queued:0,spawned:R.waveBudget},R),0,"no infinite replacement loop");
   for(const spec of MISSION_ENCOUNTERS.front)assert.ok(spec.x>MISSION_LAYOUT.bounds.minX && spec.x<MISSION_LAYOUT.bounds.maxX && spec.z>MISSION_LAYOUT.bounds.minZ && spec.z<MISSION_LAYOUT.bounds.maxZ,"every simultaneous soldier starts inside the playable heightfield");
 }
 {
-  for (const time of [0,10,30,55]) {
+  for (const time of [0,10,20,30]) {
     const a=MissionTrainMotion(time),b=MissionTrainMotion(time+.1);
     assert.ok(Math.abs((a.offsetM-b.offsetM)/.1-6)<1e-6,"train keeps real cruise speed before shell impact");
   }
-  for (const impactAt of [56,57.5,60]) {
+  for (const impactAt of [24,26,28]) {
     const start=MissionTrainMotion(impactAt),stop=MissionTrainMotion(impactAt,impactAt,start.offsetM);
     let previous=start;
     for(let t=.01;t<=stop.brakeSeconds+.02;t+=.01) {
@@ -128,6 +128,15 @@ for (const stage of MISSION_STAGES.slice(0, -1)) {
 }
 assert.equal(flow.completed, true);
 console.log("ok all mission gates require recorded gameplay facts and restore exactly");
+for(const [index,step] of MISSION_STAGES.filter(s=>!["TrenchEntry","Shelter"].includes(s.id)).entries()){
+  const legacy={version:1,index,time:42,stageTime:2,facts:[],log:[]};
+  const restored=new FirstLevelMissionFlow();restored.Restore(legacy);
+  assert.equal(restored.stage.id,step.id,"v1 index migrates through the old stage order");
+  restored.Restore({...legacy,log:[{kind:"stage",id:step.id,time:40}]});
+  assert.equal(restored.stage.id,step.id,"v1 log preserves the named stage");
+}
+const stable=new FirstLevelMissionFlow();stable.Restore({version:2,stageId:"Shelter",index:0,time:1,stageTime:0,facts:["trenchCleared"],log:[]});
+assert.equal(stable.stage.id,"Shelter","v2 stable stage id overrides positional index");
 const terrain = CreateP012Terrain(MISSION_LAYOUT);
 for (const [x, z] of [
   [-24, -53],
@@ -474,21 +483,26 @@ console.log(process.argv.includes("--audio")
   assert.equal(sources.length,0,"no arrival speech precedes the actual surprise impact");
   facts.add("trainFirstShellImpact");
   for(let i=0;i<360;i++)voice.Update(1/60);
-  assert.deepEqual(events,["TrainNearShell","TrainProneOrder"]);
-  assert.equal(voice.State().segment,"WoundedSoldier");
+  assert.deepEqual(events,["TrainNearShell"]);
+  assert.equal(voice.State().segment,"DerailImpact");
   assert.ok(!subtitles.some(text=>text.includes("手遭打中了")),"injury speech waits for actual impact");
-  facts.add("trainSoldierWounded");
+  facts.add("trainNearShellImpact");
   for(let i=0;i<360;i++)voice.Update(1/60);
   assert.ok(events.includes("TrainProneOrder"));
   voice.Pause();const paused=voice.State();
   voice.Update(40);assert.deepEqual(voice.State(),paused);
   voice.Resume();
   for(let i=0;i<1800;i++)voice.Update(1/60);
-  assert.equal(voice.State().segment,"EmergencyUnload");
+  assert.equal(voice.State().segment,"LuoRescue");
   assert.equal(voice.State().playbackPhase,"waiting");
-  assert.ok(!subtitles.some(text=>text.includes("停稳了")),"unload command waits for physical emergency braking");
+  assert.ok(!subtitles.some(text=>text.includes("抓到我")),"unload command waits for physical emergency braking");
   facts.add("trainStopped");
-  for(let i=0;i<360;i++)voice.Update(1/60);
+  for(let i=0;i<1200;i++)voice.Update(1/60);
+  assert.ok(events.includes("TrainRescue"));
+  assert.equal(voice.State().segment,"GroundFire");
+  assert.ok(!done.length,"orders cannot rush ahead of Luo releasing the player");
+  facts.add("luoRescueComplete");
+  for(let i=0;i<1800;i++)voice.Update(1/60);
   assert.deepEqual(done,["TrainShelling"]);
   assert.ok(sources.every(source=>source.maxDuration>0&&source.offset>=0));
   assert.equal(events.filter(id=>id==="TrainNearShell").length,1,"resume never re-fires a shell");
@@ -627,13 +641,37 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
  const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){},PlayStoryVoice(){return {voice:{t:clock}};}},hud:{Say(){}},Clock:()=>clock,Event:id=>events.push(id)});
  voice.Enqueue("TrainMeal");voice.Update(5);voice.Update(90);
  assert.equal(events.length,0,"simulation time cannot finish the receiving gesture ahead of audio");
- clock=MISSION_VOICE_ALIGNMENT.TrainMeal.lines[1][1]-.1;voice.Update(.1);voice.Pause();clock=90;voice.Update(60);
+ const handoffAt=MISSION_VOICE_ALIGNMENT.TrainMeal.lines[1][1];
+ clock=handoffAt-.05;voice.Update(.1);voice.Pause();clock=90;voice.Update(60);
  assert.equal(events.length,0,"pause cannot release the handoff");
  voice.Resume();clock=90.11;voice.Update(.01);
  assert.deepEqual(events,["TrainFoodReceived"],"Shunzi's completed reply releases the handoff at its source timestamp");
  clock=91;voice.Update(1);assert.equal(events.length,1);
 }
 console.log("ok receiving-food release follows the source clock and survives pause/resume");
+
+{
+  assert.equal(MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.surface.length+MISSION_ENCOUNTERS.intrusion.length+MISSION_ENCOUNTERS.tank.length,32,
+    "32 finite opening/front enemies; no replacement waves");
+  assert.equal(new Set(Object.values(MISSION_ENCOUNTERS).flat().map(spec=>spec.id)).size,Object.values(MISSION_ENCOUNTERS).flat().length);
+  assert.equal(MISSION_ENCOUNTERS.surface.length,6,"two surface sections provide actual enemy fire");
+  assert.ok(MISSION_STAGES.find(s=>s.id==="Support").requirements.includes("frontRifleDefense"));
+  assert.ok(FIRST_LEVEL_MISSION_PHASE.whitebox.actorCapacity>=R.openingEnemyBudget+40,"small graphics scale leaves capacity for real friendlies and dormant village");
+  for(const point of FRONT_BREACHES){
+    const h=SampleMissionTerrain(point.x,point.z);
+    assert.ok(h> -2 && h<-.8,"the breached sap remains a walkable excavated passage below surface fire: "+h);
+  }
+  const corner=[{x:0,z:0},{x:0,z:5},{x:5,z:5}],step=1.4/60;
+  let before=MissionCarryRoutePoint(corner,3);
+  for(let d=3+step;d<7;d+=step){
+    const at=MissionCarryRoutePoint(corner,d);
+    assert.ok(Math.hypot(at.x-before.x,at.z-before.z)<=step+.00001,"corner never teleports the litter");
+    const turn=Math.atan2(Math.sin(at.yaw-before.yaw),Math.cos(at.yaw-before.yaw));
+    assert.ok(Math.abs(turn)<.09,"litter heading turns gradually");
+    before=at;
+  }
+  assert.deepEqual(MissionCarryRoutePoint(corner,10),{x:5,z:5,yaw:-Math.PI/2},"arrival position and hidden passage distance stay stable");
+}
 
 {
  const cue=MISSION_DIALOGUE.find(c=>c.id==='TrainMeal');
@@ -654,27 +692,4 @@ console.log("ok receiving-food release follows the source clock and survives pau
  const before=MissionTrainMotion(impactAt),after=MissionTrainMotion(impactAt+.1);
  assert.ok(before.offsetM>0 && Math.abs(before.offsetM-after.offsetM-R.trainCruiseSpeedMps*.1)<1e-6,
    'the train still moves when the first shell arrives after the longer exchange');
-}
-
-{
-  assert.equal(MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.approach.length+MISSION_ENCOUNTERS.tank.length,150,
-    "150 actual initial enemy specifications, excluding later waves and dormant village");
-  assert.equal(new Set(Object.values(MISSION_ENCOUNTERS).flat().map(spec=>spec.id)).size,Object.values(MISSION_ENCOUNTERS).flat().length);
-  assert.equal(MISSION_ENCOUNTERS.approach.length,6,"two approach positions provide actual enemy fire");
-  assert.ok(MISSION_STAGES.find(s=>s.id==="Support").requirements.includes("frontRifleDefense"));
-  assert.ok(FIRST_LEVEL_MISSION_PHASE.whitebox.actorCapacity>=R.frontSimultaneousEnemies+40,"small graphics scale leaves capacity for real friendlies and dormant village");
-  for(const point of FRONT_BREACHES){
-    const h=SampleMissionTerrain(point.x,point.z);
-    assert.ok(h>-.8 && h<-.35,"broken trench lips remain shallow walkable soil: "+h);
-  }
-  const corner=[{x:0,z:0},{x:0,z:5},{x:5,z:5}],step=1.4/60;
-  let before=MissionCarryRoutePoint(corner,3);
-  for(let d=3+step;d<7;d+=step){
-    const at=MissionCarryRoutePoint(corner,d);
-    assert.ok(Math.hypot(at.x-before.x,at.z-before.z)<=step+.00001,"corner never teleports the litter");
-    const turn=Math.atan2(Math.sin(at.yaw-before.yaw),Math.cos(at.yaw-before.yaw));
-    assert.ok(Math.abs(turn)<.09,"litter heading turns gradually");
-    before=at;
-  }
-  assert.deepEqual(MissionCarryRoutePoint(corner,10),{x:5,z:5,yaw:-Math.PI/2},"arrival position and hidden passage distance stay stable");
 }

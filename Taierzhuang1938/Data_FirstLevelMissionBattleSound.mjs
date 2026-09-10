@@ -12,6 +12,7 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
     Train: {gain:.62,interval:1.9,startAfterS:24,rampFromGain:.3,rampS:30,airCut:340},
     // 第一发落在车边之后：门开了，人往外跑，外面不再是闷的。
     Unloading:{gain:1,interval:.85,airCut:1400},
+    TrenchEntry:{gain:.85,interval:1}, Shelter:{gain:.55,interval:1.2,airCut:1100},
     Support: {gain:1,interval:1}, MachineGun:{gain:.55,interval:1.2}, Tank:{gain:.55,interval:1.2},
     Orders:{gain:.7,interval:1.15}, South:{gain:.46,interval:1.7},
     Village:{gain:.7,interval:1.25}, Melee:{gain:.6,interval:1.3}, Courtyard:{gain:.75,interval:1.2},

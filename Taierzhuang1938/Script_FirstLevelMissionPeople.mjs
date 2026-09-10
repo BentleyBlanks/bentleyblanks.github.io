@@ -130,6 +130,11 @@ export function InstallMissionSentry(soldier){
   let time=0;
   rig.Update=function UpdateMissionSentry(dt,state={}){
     pose.Restore();const result=original.call(this,dt,state);time+=Math.max(0,dt);
+    if(soldier.missionRescueTarget && soldier.alive){
+      pose.basis=actor.root;const b=rig.bones;actor.root.updateWorldMatrix(true,false);
+      pose.Chain(b.upperArmL,b.forearmL,b.handL,soldier.missionRescueTarget,pose.Local(-.5,1,.5));
+      pose.Tilt(b.chest,.24,0,0);rig.root.updateWorldMatrix(true,true);return result;
+    }
     if(!soldier.alive || soldier.squadMarchCommand?.breath || state.dead || state.firing || state.moveSpeed>.08 || state.carryRole || state.meleeCombat ||
       soldier.target || soldier.missionTrainLife?.weight>.01)return result;
     pose.basis=actor.root;

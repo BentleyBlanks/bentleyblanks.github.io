@@ -1,8 +1,9 @@
+import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_APPROACH_ENEMIES } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-export const MISSION_VERSION = "first-level-20260909-pacing150-r1";
+export const MISSION_VERSION = "first-level-20260910-opening-r1";
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 const Stage = (id, objective, target, requirements, cue, extra = {}) =>
@@ -11,17 +12,19 @@ export const MISSION_STAGES = Object.freeze([
   Stage("Train", "随军列前行，和同伴待在车厢内。", A.train, ["trainShelling"], "TrainMeal"),
   Stage(
     "Unloading",
-    "军列遭袭！车内伏低，紧急停车后跟罗班长撤进交通壕。",
+    "前车翻了！伏低，跟罗班长离开车厢，借残骸和土埂进入交通壕。",
     A.unload,
-    ["trainStopped", "unloadOrdersHeard", "unloaded"],
+    ["trainStopped", "trainDerailed", "luoRescueComplete", "unloadOrdersHeard", "unloaded"],
     "TrainShelling",
   ),
+  Stage("TrenchEntry", "侧沟有日军！清出折角，跟班长进掩蔽处。", OPENING.shelter, ["trenchEntered", "trenchCleared", "shelterReached"], null),
+  Stage("Shelter", "守住折角，照看从前方撤下来的伤兵。", OPENING.shelter, ["escapeWhisperHeard", "woundedSeen", "supportOrdersHeard"], "EscapeWhisper"),
   Stage(
     "Support",
     "沿交通壕支援前沿守军，掩护他们撤回。",
     A.front,
-    ["frontReached", "frontContact", "frontRifleDefense", "forwardNestDestroyed"],
-    "SupportOrder",
+    ["frontReached", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "zhouGunWounded"],
+    null,
   ),
   Stage(
     "MachineGun",
@@ -134,7 +137,9 @@ export const MISSION_STAGES = Object.freeze([
   Stage("Complete", "第一关完成 · 往南的路", A.end, [], null),
 ]);
 export const MISSION_ENCOUNTERS = Object.freeze({
-  approach: FRONT_APPROACH_ENEMIES,
+  surface: OPENING.surface,
+  intrusion: OPENING.intruders,
+  approach: [],
   // The roster itself lives in Data_FirstLevelMissionFront: the assault lanes and the cover rows
   // are derived from it, and a list split across two files drifts.
   front: [...FRONT_FIELD_MEN,...FRONT_RESERVES],
@@ -217,7 +222,7 @@ export const MISSION_PURSUIT_ROUTE=Object.freeze([
   {x:100,z:120.5},{x:74,z:120.5},{x:61,z:120.5},{x:60,z:114},...MISSION_ROUTES.evacuation,
 ]);
 export const MISSION_GUIDANCE = Object.freeze({
-  Unloading: {label:'unload'}, Support:{label:'support',route:'support'},
+  Unloading: {label:'unload'}, TrenchEntry:{label:'support',route:'opening'}, Shelter:{label:'support'}, Support:{label:'support',route:'support'},
   MachineGun:{label:'gun'},Tank:{label:'bundle'},Orders:{label:'orders'},
   South:{label:'south',route:'south'},Village:{label:'village',route:'village'},
   Courtyard:{label:'gate'},TransferApproach:{label:'transfer',route:'village'},Transfer:{label:'transfer'},AirFirst:{label:'transfer'},
@@ -227,6 +232,7 @@ export const MISSION_GUIDANCE = Object.freeze({
 });
 // Front riflemen no longer use point tactics: they bound between FRONT_ASSAULT lines (runtime UpdateAssault).
 export const MISSION_TACTICS = Object.freeze({
+  ...Object.fromEntries(Object.entries(OPENING.intruderRoutes).map(([id,points],i)=>[id,{delay:i*2,points}])),
   CourtyardPursuerA: { delay: 1, points: [{x:86,z:37},{x:62,z:40},{x:53,z:38}] },
   CourtyardPursuerB: { delay: 12, points: [{x:89,z:39},{x:66,z:43},{x:59,z:40}] },
   CourtyardPursuerC: { delay: 25, points: [{x:91,z:41},{x:70,z:44},{x:64,z:40}] },
@@ -315,10 +321,10 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
     anchors: A,
     routes: MISSION_ROUTES,
     friendlyLimit: 4,
-    actorCapacity:224,
+    actorCapacity:112,
     crowdCellM:MISSION_TUNING.frontCrowdCellM,
     // Real first-battle actors plus dormant village and NRA; casualties release capacity.
-    actorPool: { ija: 160, nra: 40 },
+    actorPool: { ija: 48, nra: 40 },
     actualEventsOnly: true,
     storyBeats: [],
     activities: { arrivalGuideStart: { x: -76, z: 71 }, trainColumn: { extraCount: MISSION_TRAIN.extraCount } },

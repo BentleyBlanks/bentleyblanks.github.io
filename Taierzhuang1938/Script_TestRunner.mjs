@@ -53,6 +53,8 @@ export const testDefs = {
   SquadMarchNavigationTest: {file:"Script_SquadMarchNavigationTest.mjs",timeoutMs:300000,desc:"Displaced squad member rejoins through real navigation and terrain"},
   FirstLevelSquadMarchTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--march-only"],timeoutMs:600000,desc:"Shared march consumed by real first-level AI on the uninterrupted train/front approach"},
   EditorLauncherTest: {file:"Script_EditorTest.mjs",args:["--launcher-only"],timeoutMs:240000,desc:"Editor launcher inventory including the squad march entry"},
+  FirstLevelMissionAftermathTest: {file:"Script_FirstLevelMissionAftermathTest.mjs",timeoutMs:600000,desc:"Civilian body placement, actual model clearance, grounding, LOD and screenshots"},
+  FirstLevelOpeningBrowserTest:{file:"Script_FirstLevelOpeningBrowserTest.mjs",timeoutMs:900000,desc:"Normal inputs from train impact through finite trench contact to gun handover"},
   FirstLevelMissionStageJumpTest: {file:"Script_FirstLevelMissionStageJumpTest.mjs",timeoutMs:900000,desc:"18 stage starts, backward jumps and resumed mission gates"},
   // The 150-actor mission rebuilds 18 starts; a measured full continuation reached Complete
   // at the old 1200 s limit. Match the full campaign allowance without changing any assertions.
@@ -60,7 +62,6 @@ export const testDefs = {
   FirstLevelMissionStageTailTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-jumps","--stage-from=16"],timeoutMs:600000,desc:"Targeted 16–18 continuation, stretcher handoff and final exit"},
   FirstLevelMissionPresentationTest: {file:"Script_FirstLevelMissionPresentationTest.mjs",timeoutMs:240000,desc:"Real stretcher grip, idle feet, ADS fire and mounted recoil"},
   FirstLevelMissionFortificationsTest: {file:"Script_FirstLevelMissionFortificationsTest.mjs",timeoutMs:600000,desc:"Loaded field defenses, route clearance and merged scene screenshots"},
-  FirstLevelMissionAftermathTest: {file:"Script_FirstLevelMissionAftermathTest.mjs",timeoutMs:600000,desc:"Civilian body placement, actual model clearance, grounding, LOD and screenshots"},
   FirstLevelMissionTest: {file:'Script_FirstLevelMissionTest.mjs',args:['--audio'],desc:'新版第一关完整事实门、共享地形、实际担架队列和往返撤离'},
   FirstLevelMissionBrowserTest: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign','--audio'],timeoutMs:1800000,desc:'新版第一关真实输入、移动军列、壕沟路线、作战与通关'},
   FirstLevelTrainAnimationTest: {file:'Script_FirstLevelTrainAnimationTest.mjs',timeoutMs:600000,desc:'四型号原骨架采样、真实凳板接触、起身暂停与物理队列衔接'},
@@ -280,6 +281,7 @@ export const browserTests = new Set([
   "FirstLevelMissionStageTailTest",
   "FirstLevelMissionPresentationTest",
   "FirstLevelMissionBrowserTest",
+  "FirstLevelOpeningBrowserTest",
   "FirstLevelTrainAnimationTest",
   "BrowserBundleTest",
 
@@ -354,7 +356,7 @@ export const tier2 = [
 export const domains = {
   squadMarch: {label:"通用小队行进",tests:["SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关接收院至结尾定向续接",tests:["FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelMissionTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelMissionTest','FirstLevelOpeningBrowserTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['BackRifleRunTest','MeleeAnimationTest','InfantryAnimationTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -452,7 +454,7 @@ const changedDomainRules = [
   {domain:"combat",pattern:/FpsSkeleton|FpsSkeletal|FpsAnimation|Animation\/FirstPerson\/Data_Fps/},
   { domain: "combat", pattern: /CoverLean/i },
   {domain:"combat",pattern:/BallisticSuppression/},
-  {domain:'firstLevel',pattern:/FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|CarriageSoundscape|FirstLevelVoiceAlign|SeedAudioFirstLevel|SeedAudioCarriage|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
+  {domain:'firstLevel',pattern:/FirstLevelOpening|FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|CarriageSoundscape|FirstLevelVoiceAlign|SeedAudioFirstLevel|SeedAudioCarriage|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
   { domain: "menu", pattern: /FirstLevelP012Debug/i },
   { domain: "text", pattern: /(Script_Text|Data_Text_|Data_Locale_|Data_Tuning_|Data_Mission|Data_Cutscene|Data_History|Data_Voice|Data_Weapons|TengxianScript)/i },
   { domain: "ai", pattern: /Data_Setpieces_|Data_Companions|Data_Flares|Data_AircraftStrafe|Data_Telegraph|Data_Emplacements|Data_Carry/i },

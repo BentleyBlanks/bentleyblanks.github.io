@@ -479,13 +479,13 @@ export class MainMenu {
     this.sandboxCompleteStyle = style;
     this.root.classList.add("p012Complete");
   }
-  OpenSandboxFailure(atLoad = false) {
+  OpenSandboxFailure(atLoad = false, {castId="shunzi",restartOnly=false} = {}) {
     this.OpenPause();
-    const who = CastName("shunzi");
+    const who = CastName(castId);
     this.el.titleSub.textContent = T("menu.p012.failTitle", { name: who });
     this.SetItems([
-      { id: "retrySandbox", label: atLoad ? T("menu.item.retryAtLoad") : T("menu.item.retryCheckpoint"),
-        hint: T("menu.hint.retrySandbox", { name: who }) },
+      ...(!restartOnly?[{ id: "retrySandbox", label: atLoad ? T("menu.item.retryAtLoad") : T("menu.item.retryCheckpoint"),
+        hint: T("menu.hint.retrySandbox", { name: who }) }]:[]),
       { id: "restartSandbox", label: T("menu.item.restartSandbox"), hint: T("menu.hint.restartSandbox") },
       { id: "exitSandbox", label: T("menu.item.exitToTitle"), hint: T("menu.hint.exitSandboxFail") },
     ]);

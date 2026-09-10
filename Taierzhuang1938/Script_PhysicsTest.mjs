@@ -788,6 +788,23 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
       && Math.abs(r.groundDistance - 2) < .02, JSON.stringify(r));
 }
 
+{
+  const moved=await page.evaluate(async()=>{
+    const {PhysicsWorld}=await import("./Script_Physics.mjs"),pw=new PhysicsWorld();
+    try{
+      const box={c:[0,2,94],h:[.12,2.4,6.4],ry:0,tag:"movingWreck"};
+      pw.AddSolid(box);pw.RefreshStaticQueries();
+      box.c[2]=74;pw.MoveSolid(box);pw.RefreshStaticQueries();
+      const first=pw.world.getCollider(box._physicsHandle).translation().z;
+      pw.RemoveSolid(box._physicsHandle);box.c[2]=85;pw.AddSolid(box);pw.RefreshStaticQueries();
+      box.c[2]=70;pw.MoveSolid(box);pw.RefreshStaticQueries();pw.Step(1/60);
+      return {first,rebuilt:pw.world.getCollider(box._physicsHandle).translation().z,
+        oldExitBlocked:!!pw.Raycast({x:-2,y:2,z:88},{x:1,y:0,z:0},4),
+        newWreckBlocked:!!pw.Raycast({x:-2,y:2,z:70},{x:1,y:0,z:0},4)};
+    }finally{pw.Dispose();}
+  });
+  Check("移动与重建的车体碰撞随固定刚体刷新保持新位置",moved.first===74&&moved.rebuilt===70&&!moved.oldExitBlocked&&moved.newWreckBlocked,JSON.stringify(moved));
+}
 await browser.close();
 server.close();
 

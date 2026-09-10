@@ -46,4 +46,4 @@ export const TEXT = Object.freeze({
   "firstLevel.guide.loading": "转运车辆与老周的担架",
 });
 export const DYNAMIC_PREFIXES = ["firstLevel.interaction.", "firstLevel.guide.", "firstLevel.hint."];
-export const GATED_MODULES = ["Script_FirstLevelMissionRuntime.mjs", "Script_FirstLevelMissionVoice.mjs"];
+export const GATED_MODULES = ["Script_FirstLevelMissionRuntime.mjs", "Script_FirstLevelMissionVoice.mjs", "Script_FirstLevelOpening.mjs"];

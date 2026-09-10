@@ -60,6 +60,7 @@ export class FirstLevelMissionTrain {
     if(open)this.openSeconds=(this.openSeconds||0)+Math.max(0,dt);
     for (const e of this.entries) {
       const a = e.actor;
+      if(a.missionRescueTarget)continue;
       a.p012OnMovingTrain = !open;
       a.missionTrainLife.brace += ((shelling ? 1 : 0) - a.missionTrainLife.brace) * Math.min(1, dt * 3);
       if (!a.alive || e.arrived) continue;
@@ -90,6 +91,7 @@ export class FirstLevelMissionTrain {
       while (e.index < e.steps.length && Distance(p, e.steps[e.index]) < C.routeArrivalRadiusM) e.index++;
       // Crossing the stair foot is a real body event, independent of the player's stage.
       if (!e.exited && p.x > C.stairFootX) { e.exited = true; a.missionUnloaded = true; this.host.Exited(a); }
+      if(e.exited&&a.castId){e.arrived=true;a.missionTrainReady=true;continue;}
       if (e.index === e.steps.length) {
         e.arrived = true; a.missionTrainReady = true; this.host.Hold(a); continue;
       }

@@ -186,10 +186,10 @@ export class FirstLevelWhiteboxField {
       : {replaced:new Set(),placements:[]};
     this.fortificationPlacements=defenses.placements;
     for(const [key,material] of this.materials)if(key.startsWith("MissionDefenseMaterial_"))this.sharedFortificationMaterials.add(material);
-    const trainSink = new BuildSink();
+    const trainSink = new BuildSink(),derailSink=new BuildSink();
     for (const block of this.layout.blocks) {
       if(block.dynamic)continue;
-      const targetSink = this.layout.terrain === "P012Heightfield" && IsP012TrainBlock(block.id) ? trainSink : sink;
+      const targetSink = this.layout.terrain === "P012Heightfield" && IsP012TrainBlock(block.id) ? (this.layout.fortifications && /^StationCar0/.test(block.id) ? derailSink : trainSink) : sink;
       if (this.layout.scenario?.replaceBlockIds.includes(block.id)) continue;
       const seamOwner=block.id.includes("BagSeam")?block.id.split("BagSeam")[0]:null;
       if(!defenses.replaced.has(block.id) && !defenses.replaced.has(seamOwner))targetSink.Add(block.semantic || "Whitebox", PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), {
@@ -215,7 +215,10 @@ export class FirstLevelWhiteboxField {
       mesh.receiveShadow = true;
       this.meshes.push(mesh);
     }
+    this.derailMeshes=derailSink.Flush(this.scene,{Get:key=>this.materials.get(key)||this.whiteMaterial});
+    this.derailColliders=derailSink.colliders;
     this.trainMeshes = trainSink.Flush(this.scene, { Get: key => this.materials.get(key) || this.whiteMaterial });
+    this.trainMeshes.push(...this.derailMeshes);
     // MarkDynamicPrepass：车厢每帧沿 z 平移（SetTrainOffset），玩家又坐在车上跟着一起走。
     // 不标它，预通道就按「静止几何」写速度（prevWorld = curWorld），于是速度靶里
     // 整个车厢都是相机速度 —— 而它在屏幕上其实一动不动。见 SetTrainOffset 的注释。
@@ -224,13 +227,38 @@ export class FirstLevelWhiteboxField {
       MarkDynamicPrepass(mesh);
       this.meshes.push(mesh);
     }
-    this.trainColliders = trainSink.colliders;
+    this.trainColliders = [...trainSink.colliders,...this.derailColliders];
     this.colliders = [...sink.colliders, ...this.trainColliders];
     this.covers = sink.covers.slice();
   }
 
+  // Authored kinematic roll of a single carriage. The transient collider is a
+  // conservative envelope; at the 90-degree resting pose it exactly matches
+  // each transformed plank. Rebuilding is limited to this short impact.
+  SetCarDerailment(car,angle,pivot) {
+    if(!this.derailMeshes?.length || Math.abs((this.derailRoll||0)-angle)<1e-7)return;
+    this.derailRoll=angle;this.derailCar=car;
+    const c=Math.cos(angle),s=Math.sin(angle);
+    for(const mesh of this.derailMeshes){
+      mesh.rotation.z=angle;mesh.position.x=pivot.x-c*pivot.x+s*pivot.y;
+      mesh.position.y=pivot.y-s*pivot.x-c*pivot.y;
+    }
+    this.walkableSurfaces=this.walkableSurfaces.filter(surface=>!surface.id.startsWith(`StationCar${car}`));
+    for(const box of this.derailColliders){
+      box.derailSource ||= {c:[...box.c],h:[...box.h],offset:this.trainOffsetM};
+      const base=box.derailSource,dx=base.c[0]-pivot.x,dy=base.c[1]-pivot.y;
+      this._GridRemove(box);this.physics?.RemoveSolid(box._physicsHandle);
+      box.c=[pivot.x+c*dx-s*dy,pivot.y+s*dx+c*dy,base.c[2]+this.trainOffsetM-base.offset];
+      box.h=[Math.abs(c)*base.h[0]+Math.abs(s)*base.h[1],Math.abs(s)*base.h[0]+Math.abs(c)*base.h[1],base.h[2]];
+      box.min=box.c.map((v,i)=>v-box.h[i]);box.max=box.c.map((v,i)=>v+box.h[i]);
+      this.physics?.AddSolid(box);this._GridInsert(box);
+    }
+    this.physics?.RefreshStaticQueries();
+  }
+
   TrainContains(position, offset = this.trainOffsetM) {
     return this.layout.walkableSurfaces?.some(surface => /^StationCar\dFloor$/.test(surface.id)
+      && !(this.derailRoll && surface.id===`StationCar${this.derailCar}Floor`)
       && Math.abs(position.x-surface.x)<surface.w/2 && Math.abs(position.z-surface.z-offset)<surface.d/2
       && position.y>=surface.y+surface.h/2-.25 && position.y<surface.y+surface.h/2+3);
   }

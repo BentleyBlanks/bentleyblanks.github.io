@@ -1,3 +1,4 @@
+import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
 import { P012_STATION_BLOCKS } from "./Data_FirstLevelP012Station.mjs";
@@ -190,6 +191,18 @@ for (const x of [-77.75, -76.25])
 Block("SupplyTable", -68.5, 66, 2, 0.85, 1, "missionRoute");
 Room("UnloadingShed", -58, 85, 9, 9);
 Wall("BrokenStationWall", -68, 55, 9, 1.1, 0.65);
+GroundedWall("ApronEastBank",-63,80,.8,1.65,9);
+GroundedWall("TrenchMouthBank",-58.5,65,.9,1.5,7);
+GroundedWall("FlankLockBank",-37,56,.65,1.1,5);
+GroundedWall("RailLockBank",-90.5,48,.65,1.1,5);
+// Roofed dressing recess and two solid traverses shelter the private exchange.
+Block("OpeningShelterRoof",-32,-20,7,.25,11,"timber",{y:1.05});
+GroundedWall("OpeningShelterSouth",-32,-15.5,7,2.4,.8);
+GroundedWall("OpeningShelterNorth",-32,-26,7,2.4,.8);
+GroundedWall("OpeningShelterEast",-28,-18,.8,2.4,5);
+GroundedWall("OpeningShelterEastNorth",-28,-25.5,.8,2.4,2);
+GroundedWall("OpeningShelterWest",-36,-17,.8,2.4,4);
+GroundedWall("OpeningShelterWestNorth",-36,-24,.8,2.4,4);
 // Defensive parapets are small sandbag stacks above genuine excavated soil.
 for (const x of [-25, 0, 15]) {
   Wall(`FrontParapet${x}`, x, -131, 6, 0.55, 0.9);
@@ -462,7 +475,8 @@ export const MISSION_ROUTES = Object.freeze({
     { x: 89, z: -45 },
     { x: 91, z: -10 },
   ],
-  support: MISSION_TERRAIN.trenches[0].points,
+  opening: OPENING.approachRoute,
+  support: OPENING.supportRoute,
   bundle: MISSION_TERRAIN.trenches[2].points,
   south: [
     { x: -36, z: -124 },
@@ -525,7 +539,7 @@ export const MISSION_PLACEMENT = Object.freeze({
     { x: -64, z: 77, yaw: 2.1, health: 28 },
   ],
   squadFrontPositions:[{x:-1.7,z:-129},{x:1.7,z:-128.7},{x:14,z:-129},{x:16,z:-127.5}],
-  reliefApproach: [{x:-69,z:106},{x:-71,z:74},{x:-66,z:66},...MISSION_ROUTES.support,{x:6,z:-123}],
+  reliefApproach: [{x:-69,z:106},{x:-71,z:74},{x:-66,z:66},...MISSION_ROUTES.opening,...MISSION_ROUTES.support,{x:6,z:-123}],
   reliefPositions: [{x:-30,z:-123.4},{x:-26,z:-124.9},{x:-21,z:-122.8},{x:-17,z:-125},{x:-10,z:-124.3},{x:4,z:-123.2},{x:11,z:-125},{x:20,z:-124.6}],
   // First arrivals move furthest down the communication trench; the mouth stays open.
   guardWithdrawalRoutes: Array.from({length:8},(_,i)=>[

@@ -1107,7 +1107,7 @@ export class AiDirector {
     for (const s2 of this.soldiers) {
       // 只数**真的看见他**的人：靠记忆压制射击的不占名额，否则听见一声枪响的三个人
       // 会把射手上限占满，真正看得见的人反而选不上他（那正是旧版集体抽搐的一条源头）。
-      if (s2.alive && s2.target && s2.target.isPlayer && !s2.targetFromMemory) this.playerTargetedBy += 1;
+      if (s2.alive && s2.target?.isPlayer && s2.targetVisible && !s2.targetFromMemory && !s2.missionFireHold) this.playerTargetedBy += 1;
     }
     // 玩家在原地钉了多久。投弹判据（TacticsDirector.ShouldGrenade 的第②条
     //「对方钉在一处」）读它 —— 玩家没有 `soldier.cover` 可查，只能看他挪没挪窝。
@@ -1438,6 +1438,11 @@ export class AiDirector {
   }
 
   // ---------------------------------------------------------------- 决策
+  InFireSector(s, point) {
+    const sector=s.scriptFireSector;
+    return !sector || Math.hypot(point.x-s.position.x,point.z-s.position.z)<sector.selfDefenseM ||
+      (point.x>=sector.minX&&point.x<=sector.maxX&&point.z>=sector.minZ&&point.z<=sector.maxZ);
+  }
   Think(s, dt, player) {
     s.suppression = Math.max(0, s.suppression - COMBAT.suppressDecayPerS * dt);
     // 翻墙翻到一半不做决策：状态机会立刻把 VAULT 打回 advance，人卡在墙头上
@@ -1477,19 +1482,20 @@ export class AiDirector {
     // 最后一条比调命中率管用得多：实测出生点 27 m 上九个人同时开火，
     // 每秒挨四发，三秒必死，而玩家完全不知道自己做错了什么。
     // ER2 的 AI 会分散目标，不会九个人焊死一个人。
-    const playerOpen = player && player.Alive && !player.Protected
+    const playerOpen = player && player.Alive && !player.Protected && !s.missionFireHold
       // 已经锁住玩家的人不占「新锁」名额。旧写法达到上限后会把现有三个人也一起
       // 排除，下一次 Think 全部转头找 NPC，再下一次又转回来，正是集体抽搐的一条源头。
       && (s.target?.isPlayer || this.playerTargetedBy < (COMBAT.maxShootersOnPlayer ?? 3));
     if (enemySide === "nra" && playerOpen) {
       const d = s.position.distanceTo(player.position);
       const st = player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0;
-      if (d < this.SightRange(st)) {
+      if (d < this.SightRange(st) && this.InFireSector(s,player.position)) {
         this._PushNear(d, player, true, PLAYER_TRACK_ID, st, player.position);
       }
     }
     for (const other of this.soldiers) {
       if (other.side !== enemySide || !other.alive) continue;
+      if (!this.InFireSector(s,other.position)) continue;
       const d = s.position.distanceTo(other.position);
       if (d < this.SightRange(other.stance)) {
         this._PushNear(d, other, false, other.id, other.stance, other.position);
@@ -1556,7 +1562,7 @@ export class AiDirector {
         }
         s.target.stance = sense.track.stance | 0;
         s.targetVisible = false;
-        s.targetFromMemory = false;
+        s.targetFromMemory = true;
       } else {
         this.DropTarget(s);
         bestDist = 1e9;
@@ -3443,6 +3449,9 @@ export class AiDirector {
     }
     if (s.fireTimer > 0 || !s.target || s.ammo <= 0) return;
     s.aimTime += dt;
+    // Authored fire windows hold the trigger, while cooling and acquiring aim
+    // continue normally between bursts.
+    if (s.missionSurfaceRest || (s.missionFireHold && s.target.isPlayer)) return;
     const aimNeeded = s.weapon.aiAimTimeS ?? 0.8;
     if (s.aimTime < aimNeeded * (1 + s.suppression)) return;
     // 枪口还没转过去就不能凭概率从侧后方命中。方向闸门也让「转身—瞄准—开火」

@@ -30,6 +30,7 @@ export class FirstLevelMissionView {
     for (const [key, geometry, color, count] of [
       ["ration", new THREE.BoxGeometry(.10,.045,.13), 0xa47752, 20],
       ["pouch", new THREE.BoxGeometry(.14,.07,.12), 0x857a56, 20],
+      ["fieldPack",new THREE.BoxGeometry(.32,.43,.21),0x857a56,4],
       ["cartridge", new THREE.BoxGeometry(.018,.018,.07), 0xc2a45d, 32],
       ["body", new THREE.BoxGeometry(0.42, 0.65, 0.25), 0x87958d, 160],
       ["head", new THREE.SphereGeometry(0.13, 7, 5), 0xc9bda7, 160],
@@ -207,6 +208,11 @@ export class FirstLevelMissionView {
   TrainHandProps() {
     for(const entry of this.train?.entries || []) {
       const actor=entry.actor, rig=actor.actor?.characterRig, life=actor.missionTrainLife;
+      if(actor.castId&&actor.alive&&rig?.bones.chest){
+        rig.bones.chest.getWorldPosition(this.position);
+        this.Instance("fieldPack",this.position.x+Math.sin(actor.yaw)*.25,this.position.y-.18,
+          this.position.z+Math.cos(actor.yaw)*.25,actor.yaw);
+      }
       if(!rig?.missionTrainLifeActive || life.brace>.25 || life.weight<.7 || life.gestureWeight<.7)continue;
       const kind=life.kind;
       if(!['Eat','ShareFood','CountAmmo','Gear'].includes(kind))continue;

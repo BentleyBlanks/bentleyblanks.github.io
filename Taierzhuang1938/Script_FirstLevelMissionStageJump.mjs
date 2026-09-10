@@ -2,7 +2,9 @@ import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TUNING as R } from "./Data_
 import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
 import { FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_ENCOUNTER_STARTS, FIRST_LEVEL_STAGE_CLEARED_ENEMIES, FIRST_LEVEL_DEFERRED_ENCOUNTERS } from "./Data_FirstLevelMissionStages.mjs";
-import { MISSION_VOICE_TIMING } from "./Data_FirstLevelMissionVoiceTiming.mjs";
+import { OPENING } from "./Data_FirstLevelOpening.mjs";
+import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
+import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MissionTrainMotion } from "./Data_FirstLevelMissionTrain.mjs";
 
 // Called once on a fresh runtime, after the shared level restart has cleared all
@@ -23,7 +25,9 @@ export function ApplyFirstLevelStageJump(runtime, value) {
     r.carriageSound?.Handle("CarriageUneasy");
     // The meal has finished while the train approaches the station. Preserve
     // that travelled distance so the real shell impact starts normal braking.
-    const meal = MISSION_VOICE_TIMING.TrainMeal;
+    const seconds=r.voice.manifest.cues.TrainMeal?.seconds;
+    if(!Number.isFinite(seconds))throw new Error("Train checkpoint requires the loaded voice manifest");
+    const meal = MissionVoiceTimeline(MISSION_DIALOGUE.find(c=>c.id==="TrainMeal"),seconds);
     r.time = r.flow.time = meal.segments.reduce((sum, part) => sum + part.end - part.start + (part.wait || 0), meal.tail || 0);
     const offset = MissionTrainMotion(r.time).offsetM;
     r.train.Translate(offset - r.battlefield.trainOffsetM);
@@ -31,6 +35,7 @@ export function ApplyFirstLevelStageJump(runtime, value) {
   }
   if (n > 2) {
     r.battlefield.SetTrainOffset(0);
+    r.battlefield.SetCarDerailment(OPENING.derailCar,OPENING.derailRollRad,OPENING.derailPivot);
     r.trainShellStartedAt = -60; r.shellTrainOffset = R.trainTravelM; r.trainStoppedAt = 0;
     for (let i = 0; i < 3; i++) r.battlefield.OpenGate(`TrainDoor${i}`);
     for (const entry of r.train.entries) {

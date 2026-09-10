@@ -1,8 +1,7 @@
 // First-level whitebox pacing and handling. Notion 2026-09-07: calm walk 1–2 min, transfer 2–4 min, dive 2 s, death 8–12 s.
 export const MISSION_TUNING = Object.freeze({
   // Cruise at 21.6 km/h; the remaining physical approach determines smooth braking after impact.
-  // 89 s ensemble exchange + opening/tail + first-shell flight, then ~53 m to brake.
-  trainTravelM: 648,
+  trainTravelM: 210,
   trainCruiseSpeedMps: 6,
   trainShellLeadM: 18,
   trainFirstShellFlightS: 1.4,
@@ -74,10 +73,10 @@ export const MISSION_TUNING = Object.freeze({
   // discharger round, so a squad's stock was pooled with the launcher man). Two per rifleman is the conservative
   // reading and it is also what the pacing wants: a man who has thrown twice is out, so grenades stay an event.
   enemyGrenades:2,
-  // User 2026-09-09: approximately 150 LIVE enemies together, not 150 cumulative kills.
-  // 140 front + 6 approach + 4 tank escorts. Reserves are real actors at depth, bounding by platoon.
-  frontSimultaneousEnemies:150,
-  frontReserveCount:110,
+  // 2026-09-10: finite squads, no population target and no casualty replacement.
+  // Six surface blockers + four intruders + eighteen front infantry + four escorts.
+  openingEnemyBudget:32,
+  frontReserveCount:0,
   frontReserveReleaseGapS:9,
   frontReservePlatoonSize:22,
   frontReserveAccuracyScale:.16,
@@ -90,8 +89,8 @@ export const MISSION_TUNING = Object.freeze({
   waveFirstDelayS:18,
   waveIntervalS:26,
   waveSquadSize:6,
-  waveBudget:60,
-  waveAliveCap:150,
+  waveBudget:0,
+  waveAliveCap:32,
   // Warm rigs behind the loading screen, then place a few per frame.
   spawnPerFrame:4,
   tankSpeedMps: 1.55,
