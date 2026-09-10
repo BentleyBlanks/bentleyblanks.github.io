@@ -32,12 +32,13 @@ assert.equal(FirstLevelMusicState("South").cue, "firstLevelTheRoadSouth");
 assert.equal(FirstLevelMusicState("TransferApproach").cue, "firstLevelTheRoadSouth");
 assert.equal(FirstLevelMusicState("Death").cue, null);
 for (const stage of ["Support", "MachineGun", "Tank", "Transfer", "AirFirst", "FinalDefense"]) {
-  assert.equal(FirstLevelMusicState(stage).cue, "firstLevelIronSiege", stage);
+  assert.equal(FirstLevelMusicState(stage).cue, "firstLevelCloseQuartersPressure", stage);
   assert.equal(FirstLevelMusicState(stage, { failed: true }).cue, null, stage);
 }
-for (const stage of ["Village", "Melee", "Courtyard", "Rescue", "RetreatFirst", "RetreatWall", "RetreatYard", "Reception"]) {
-  assert.equal(FirstLevelMusicState(stage).cue, "firstLevelCloseQuartersPressure", stage);
+for (const stage of ["TrenchEntry", "Village", "Melee", "Courtyard", "Rescue", "RetreatFirst", "RetreatWall", "RetreatYard", "Reception"]) {
+  assert.equal(FirstLevelMusicState(stage).cue, "firstLevelIronSiege", stage);
 }
+assert.equal(FirstLevelMusicState("Shelter").cue, null);
 assert.equal(FirstLevelMusicState("Orders").cue, "firstLevelTheFrontClosesIn");
 assert.equal(FirstLevelMusicState("FinalCarry").cue, "firstLevelKeepYourEyesOpen");
 assert.equal(FirstLevelMusicState("Exit").cue, "firstLevelTheLivingStillNeedUs");
@@ -65,11 +66,11 @@ assert.equal(calls.at(-1)[0], "firstLevelTheLivingStillNeedUs");
 const beforeVillage = calls.length;
 director.Update("Village"); director.Update("Melee"); director.Update("Courtyard");
 assert.equal(calls.length, beforeVillage + 1, "continuous close combat holds its recording");
-assert.equal(calls.at(-1)[0], "firstLevelCloseQuartersPressure");
+assert.equal(calls.at(-1)[0], "firstLevelIronSiege");
 director.Update("TransferApproach");
 assert.equal(calls.at(-1)[0], "firstLevelTheRoadSouth", "travel leaves battle music");
 director.Update("Rescue"); director.Update("RetreatFirst"); director.Update("RetreatWall"); director.Update("RetreatYard"); director.Update("Reception");
-assert.equal(calls.at(-1)[0], "firstLevelCloseQuartersPressure");
+assert.equal(calls.at(-1)[0], "firstLevelIronSiege");
 director.Update("FinalCarry");
 assert.equal(calls.at(-1)[0], "firstLevelKeepYourEyesOpen", "carrying returns to the story cue");
 director.Dispose(); assert.equal(calls.at(-1)[0], null);

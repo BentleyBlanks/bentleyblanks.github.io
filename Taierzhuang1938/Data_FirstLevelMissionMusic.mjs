@@ -23,14 +23,14 @@ export const FIRST_LEVEL_MUSIC_MIX = Object.freeze({
 });
 export const FIRST_LEVEL_STAGE_MUSIC = Object.freeze({
   Train: "LeavingHome", Unloading: "LeavingHome",
-  TrenchEntry: "CloseQuartersPressure", Shelter: null,
-  Support: "IronSiege", MachineGun: "IronSiege", Tank: "IronSiege", Orders: "TheFrontClosesIn",
-  South: "TheRoadSouth", Village: "CloseQuartersPressure", Melee: "CloseQuartersPressure", Courtyard: "CloseQuartersPressure",
-  TransferApproach: "TheRoadSouth", Transfer: "IronSiege",
-  AirFirst: "IronSiege", Carry: "TheSouthRoadBreaks", Dive: "TheSouthRoadBreaks",
-  Rescue: "CloseQuartersPressure", RetreatFirst: "CloseQuartersPressure", RetreatWall: "CloseQuartersPressure",
-  RetreatYard: "CloseQuartersPressure", Reception: "CloseQuartersPressure", FinalCarry: "KeepYourEyesOpen",
-  Death: null, FinalDefense: "IronSiege", Exit: "TheLivingStillNeedUs", Complete: null,
+  TrenchEntry: "IronSiege", Shelter: null,
+  Support: "CloseQuartersPressure", MachineGun: "CloseQuartersPressure", Tank: "CloseQuartersPressure", Orders: "TheFrontClosesIn",
+  South: "TheRoadSouth", Village: "IronSiege", Melee: "IronSiege", Courtyard: "IronSiege",
+  TransferApproach: "TheRoadSouth", Transfer: "CloseQuartersPressure",
+  AirFirst: "CloseQuartersPressure", Carry: "TheSouthRoadBreaks", Dive: "TheSouthRoadBreaks",
+  Rescue: "IronSiege", RetreatFirst: "IronSiege", RetreatWall: "IronSiege",
+  RetreatYard: "IronSiege", Reception: "IronSiege", FinalCarry: "KeepYourEyesOpen",
+  Death: null, FinalDefense: "CloseQuartersPressure", Exit: "TheLivingStillNeedUs", Complete: null,
 });
 
 export function FirstLevelMusicState(stage, { shellImpact = false, speaking = false, failed = false } = {}) {

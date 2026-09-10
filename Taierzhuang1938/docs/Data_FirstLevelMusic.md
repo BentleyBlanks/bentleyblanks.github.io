@@ -2,15 +2,15 @@
 
 2026-09-09：用户批准的七首 SeedAudio 1.0 完整录音已接入《往南的路》。剧情依据为 [Notion 当前第一关及覆盖修订](https://app.notion.com/p/3d360335331c81ea86f6f637ab92327c)。这批音乐为新增的第一关专用 cue，旧关卡音乐仍沿用原清单。
 
-2026-09-10：按用户试听批准，新增《交火前沿》《钢铁围攻》两首约 90 秒的 SeedAudio 1.0 战斗音乐，直接使用本次获批音频，不重新生成。当前版本为 `20260910-combat-duo`。曲库共九首，其中八首用于当前流程；《把路打开》保留为已有资产，村落战斗改用《交火前沿》。行军和剧情段仍用对应剧情曲，切入战斗时按下表选曲。
+2026-09-10：按用户试听批准，新增《交火前沿》《钢铁围攻》两首约 90 秒的 SeedAudio 1.0 战斗音乐，直接使用本次获批音频，不重新生成。音频版本为 `20260910-combat-duo`。随后按用户要求对调两首的阶段安排：前沿及阵地防守用《交火前沿》，清沟、村落近战及撤退掩护用《钢铁围攻》。曲库共九首，其中八首用于当前流程；《把路打开》保留为已有资产。行军和剧情段仍用对应剧情曲，切入战斗时按下表选曲。
 
 车厢曲采用用户试听确认的《车厢闲话》：年轻战友打趣的松弛、亲近和懵懂乐观为主，轻巧拨弦与单簧管短句呼应，未知感仅作很淡的底色。版本为 `20260909-carriage-banter`。保留完整约 120 秒的获批演奏，仅按现有标准统一电平和编码；来源及成品哈希、提示词均记录在音乐清单。运行时沿用 `LeavingHome` cue 与文件名，其他六首、阶段映射、对白避让和六秒循环淡化保持原有契约。提示词记录创作目标，技术验证不代替用户试听。
 
 | 曲目 | 运行阶段 |
 | --- | --- |
 | 车厢闲话 | Train；Unloading 先降低，第一发炮弹实际落地后撤掉 |
-| 钢铁围攻 | Support、MachineGun、Tank、Transfer、AirFirst、FinalDefense |
-| 交火前沿 | Village、Melee、Courtyard、Rescue、RetreatFirst、RetreatWall、RetreatYard、Reception |
+| 交火前沿 | Support、MachineGun、Tank、Transfer、AirFirst、FinalDefense |
+| 钢铁围攻 | TrenchEntry、Village、Melee、Courtyard、Rescue、RetreatFirst、RetreatWall、RetreatYard、Reception |
 | 前线压来 | Orders，使用较低强度 |
 | 往南的路 | South、TransferApproach，两次希望保持温暖 |
 | 把路打开 | 保留曲库资产，当前阶段不自动选用 |

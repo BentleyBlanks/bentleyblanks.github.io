@@ -21,12 +21,12 @@ try {
   await page.waitForFunction(() => window.Tengxian.audio.musicLayer && window.Tengxian.audio.ctx?.state === "running", null, { timeout: 60000 });
   assert.ok(requests.every(url => url.includes("LeavingHome")), "boot must request only the current first-level recording");
   await page.screenshot({ path: path.join(output, "Scene_CarriageMusic.png") });
-  const starts = [[1,"LeavingHome"],[3,"CloseQuartersPressure"],[3,null,"Shelter"],
-    [3,"IronSiege","Support"],[4,"IronSiege"],[5,"IronSiege"],
-    [6,"TheFrontClosesIn"],[7,"TheRoadSouth"],[8,"CloseQuartersPressure"],[9,"CloseQuartersPressure"],[10,"CloseQuartersPressure"],
-    [11,"TheRoadSouth"],[12,"IronSiege"],[13,"IronSiege"],[14,"TheSouthRoadBreaks"],
-    [15,"CloseQuartersPressure"],[16,"CloseQuartersPressure"],[16,"KeepYourEyesOpen","FinalCarry"],
-    [17,null],[18,"IronSiege"],[18,"TheLivingStillNeedUs","Exit"]];
+  const starts = [[1,"LeavingHome"],[3,"IronSiege"],[3,null,"Shelter"],
+    [3,"CloseQuartersPressure","Support"],[4,"CloseQuartersPressure"],[5,"CloseQuartersPressure"],
+    [6,"TheFrontClosesIn"],[7,"TheRoadSouth"],[8,"IronSiege"],[9,"IronSiege"],[10,"IronSiege"],
+    [11,"TheRoadSouth"],[12,"CloseQuartersPressure"],[13,"CloseQuartersPressure"],[14,"TheSouthRoadBreaks"],
+    [15,"IronSiege"],[16,"IronSiege"],[16,"KeepYourEyesOpen","FinalCarry"],
+    [17,null],[18,"CloseQuartersPressure"],[18,"TheLivingStillNeedUs","Exit"]];
   for (const [number, id, step] of starts) {
     if (number !== 1) await page.evaluate(number => window.Tengxian.Debug.FirstLevelJump(number), number);
     // Internal story boundaries share public starts; this remains a wiring diagnostic.

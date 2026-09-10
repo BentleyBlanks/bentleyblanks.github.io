@@ -113,7 +113,7 @@
     "firstLevelCloseQuartersPressure": {
       "file": "AudioBgm_CloseQuartersPressure.mp3",
       "title": "交火前沿",
-      "scene": "村落近战、营救断后与撤退掩护",
+      "scene": "前沿支援、机枪与战车、转运区防御及最后掩护",
       "seconds": 90.024014,
       "bytes": 1261393,
       "sha256": "5489bdd5115a0c16c08deeb005d879691b2d8f76522b1448085ea123a5548b1c",
@@ -127,7 +127,7 @@
     "firstLevelIronSiege": {
       "file": "AudioBgm_IronSiege.mp3",
       "title": "钢铁围攻",
-      "scene": "前沿支援、机枪与战车、转运区防御及最后掩护",
+      "scene": "清沟、村落近战、营救断后与撤退掩护",
       "seconds": 90.024014,
       "bytes": 1261393,
       "sha256": "aed7e2e4d8a458bb3b5cd5f4a8ce46361c9b53217693f78ca8fdf75f068ff507",
