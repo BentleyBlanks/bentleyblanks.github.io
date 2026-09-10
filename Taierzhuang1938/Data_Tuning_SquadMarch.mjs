@@ -34,4 +34,11 @@ export const SQUAD_MARCH_AVOID = Object.freeze({
   arrivalM:.12, brakingMarginM:.04, hostArrivalM:.06, narrowWidthM:2.5,
 });
 
-export const SQUAD_MARCH_GUARDS = Object.freeze({recentFireS:1.5,grenadeThreatS:2,suppression:.4,hurt:.4,groundDeltaM:.35});
+export const SQUAD_MARCH_GUARDS = Object.freeze({
+  recentFireS:1.5,grenadeThreatS:2,suppression:.4,hurt:.4,groundDeltaM:.35,
+  // AiDirector uses its navigation field for goals beyond 14 metres.
+  navigationStallS:.8,navigationMinDistanceM:14,navigationMovingMps:.15,navigationCommandMps:.5,
+  localRecoveryStallS:1.6,localRecoveryProbeM:.65,localRecoveryGoalM:1.2,
+  localRecoveryTimeoutS:1.5,localRecoveryMinFraction:.65,localRecoveryAngles:16,localRecoveryRetryS:1,
+  localRecoveryPersistence:1.2,localRecoveryMaxGrade:.9,
+});

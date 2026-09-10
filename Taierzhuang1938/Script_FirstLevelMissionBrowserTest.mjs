@@ -1100,6 +1100,7 @@ try {
     const kitchenSquad=await page.evaluate(()=>{const g=window.Tengxian;return g.ai.soldiers.filter(a=>["luo","yaowa","heyoutian","liuwencai"].includes(a.castId)).map(a=>({id:a.castId,distance:a.position.distanceTo(g.player.position),alive:a.alive}));});
     console.log("kitchen squad",JSON.stringify(kitchenSquad));
     assert.ok(kitchenSquad.filter(a=>a.alive&&a.distance<25).length>=2,"at least two squadmates provide nearby kitchen support after the continuous march");
+    assert.ok(kitchenSquad.filter(a=>a.alive).every(a=>a.distance<45),"no living squadmate remains abandoned at the front during village support");
     await JumpStage(9);
     const melee = await page.evaluate(() => {
       const g = window.Tengxian,

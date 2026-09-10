@@ -17,6 +17,7 @@ export class SquadMarchAi {
   Update(dt,{player=null,Observe=()=>({})}={}){
     const observations=this.soldiers.map(s=>({id:String(s.id),position:s.position,yaw:s.yaw,alive:s.alive,
       speedMps:(s.moveSpeed||0)*3.6,turnLimited:false,
+      noPause:!!(this.owned.get(s)?.navigationGoal||this.owned.get(s)?.recoveryGoal),
       // AI retains unseen targets in memory. Awareness alone is not active combat.
       busy:!!((s.target&&s.targetVisible!==false)||this.ai.time-s.lastFire<G.recentFireS
         ||s.carryRole||s.woundedWalk||s.meleeCombat||s.vaultT>=0||s.ragdollState||s.grounded===false
@@ -30,7 +31,41 @@ export class SquadMarchAi {
       const owner=this.owned.get(s);
       s.squadMarchCommand=command;
       owner.command=command;
-      if(this.Move){this.Move(s,command.goal,command.speedMps);if(command.arrivalM)s.scriptArrivalRadius=Math.min(s.scriptArrivalRadius??Infinity,command.arrivalM);}
+      if(this.Move){
+        this.Move(s,command.goal,command.speedMps);
+        if(command.arrivalM)s.scriptArrivalRadius=Math.min(s.scriptArrivalRadius??Infinity,command.arrivalM);
+        // Some authored hosts clamp goals to a short corridor step. After an actual
+        // stall, expose the original distant waypoint so AiDirector can navigate
+        // around static obstacles instead of repeatedly walking into the same face.
+        const distance=Math.hypot(command.goal.x-s.position.x,command.goal.z-s.position.z);
+        owner.stalledS=command.speedMps>G.navigationCommandMps&&(s.moveSpeed||0)*3.6<G.navigationMovingMps?(owner.stalledS||0)+dt:0;
+        if(owner.navigationGoal&&Math.hypot(owner.navigationGoal.x-command.goal.x,owner.navigationGoal.z-command.goal.z)>this.march.tuning.arrivalM)owner.navigationGoal=null;
+        if(owner.stalledS>=G.navigationStallS&&distance>G.navigationMinDistanceM&&this.ai.ctx?.nav?.Steer)owner.navigationGoal={...command.goal};
+        if(distance<=G.navigationMinDistanceM)owner.navigationGoal=null;
+        if(owner.navigationGoal)s.goal.set(command.goal.x,0,command.goal.z);
+        if(owner.recoveryGoal&&(Math.hypot(owner.recoveryGoal.x-s.position.x,owner.recoveryGoal.z-s.position.z)<this.march.tuning.arrivalM||this.march.time>owner.recoveryUntil
+          ||Math.hypot(owner.recoverySource.x-command.goal.x,owner.recoverySource.z-command.goal.z)>this.march.tuning.arrivalM)){
+          const dx=command.goal.x-s.position.x,dz=command.goal.z-s.position.z,d=Math.hypot(dx,dz)||1;
+          const direct=this.ProbeDirection(s,dx/d,dz/d);
+          const sourceChanged=Math.hypot(owner.recoverySource.x-command.goal.x,owner.recoverySource.z-command.goal.z)>this.march.tuning.arrivalM;
+          if(sourceChanged||direct&&(direct.x*dx+direct.z*dz)/d>G.localRecoveryMinFraction){
+            owner.recoveryGoal=null;owner.recoveryHeading=null;owner.navigationGoal=null;owner.stalledS=0;
+          }else{
+            owner.recoveryGoal=this.RecoveryGoal(s,command.goal,owner.recoveryHeading);
+            owner.recoveryUntil=this.march.time+G.localRecoveryTimeoutS;
+          }
+        }
+        if(!owner.recoveryGoal&&owner.stalledS>=G.localRecoveryStallS&&this.march.time>=(owner.recoveryRetryAt??0)&&s.body?.ProbeMove){
+          owner.recoveryRetryAt=this.march.time+G.localRecoveryRetryS;
+          owner.recoveryGoal=this.RecoveryGoal(s,command.goal,owner.recoveryHeading);
+          owner.recoverySource={...command.goal};
+          owner.recoveryUntil=this.march.time+G.localRecoveryTimeoutS;
+        }
+        if(owner.recoveryGoal&&command.speedMps>0){
+          const dx=owner.recoveryGoal.x-s.position.x,dz=owner.recoveryGoal.z-s.position.z,d=Math.hypot(dx,dz)||1;
+          owner.recoveryHeading={x:dx/d,z:dz/d};s.goal.set(owner.recoveryGoal.x,0,owner.recoveryGoal.z);
+        }
+      }
       else{
         // p012Guided is the existing shared route-following switch despite its legacy name.
         const values={p012Guided:true,scriptDefensive:false,scriptMoveSpeedMps:command.speedMps,
@@ -54,6 +89,28 @@ export class SquadMarchAi {
       if(ground&&Math.abs(ground.call(this.ai.ctx.battlefield,p.x+dx,p.z+dz)-p.y)>G.groundDeltaM)return false;
     }
     return true;
+  }
+  ProbeDirection(s,nx,nz){
+    const ground=this.ai.ctx?.battlefield?.GroundHeight,field=this.ai.ctx?.battlefield;
+    if(!ground)return null;
+    const swept=s.body.ProbeMove(nx*G.localRecoveryProbeM,-.01,nz*G.localRecoveryProbeM);
+    const travel=Math.hypot(swept.x,swept.z);
+    if(travel<G.localRecoveryProbeM*G.localRecoveryMinFraction)return null;
+    const x=s.position.x+swept.x,z=s.position.z+swept.z;
+    if(Math.abs(ground.call(field,x,z)-s.position.y)>Math.max(G.groundDeltaM,travel*G.localRecoveryMaxGrade))return null;
+    return {x:swept.x/travel,z:swept.z/travel};
+  }
+  RecoveryGoal(s,target,heading){
+    const dx=target.x-s.position.x,dz=target.z-s.position.z,distance=Math.hypot(dx,dz)||1;
+    let best=null,score=-Infinity;
+    for(let i=0;i<G.localRecoveryAngles;i++){
+      const angle=i*Math.PI*2/G.localRecoveryAngles;
+      const direction=this.ProbeDirection(s,Math.cos(angle),Math.sin(angle));if(!direction)continue;
+      const nx=direction.x,nz=direction.z;
+      const candidate=(nx*dx+nz*dz)/distance+(heading?(nx*heading.x+nz*heading.z)*G.localRecoveryPersistence:0);
+      if(candidate>score){score=candidate;best={x:s.position.x+nx*G.localRecoveryGoalM,z:s.position.z+nz*G.localRecoveryGoalM};}
+    }
+    return best;
   }
   CanMoveTo(s,point){
     const nav=this.ai.ctx?.nav,field=this.ai.ctx?.battlefield;

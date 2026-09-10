@@ -51,6 +51,10 @@ const narrow=Simulation(6);for(const o of narrow.observations)o.canPause=false;n
 const urgent=Simulation(6,17,{preset:'urgent'});urgent.Run(20);assert.equal(urgent.march.events.filter(e=>e.type==='stop').length,0,'urgent transfer has no optional rests');
 const wait=Simulation(3);wait.Run(2);const lead=wait.observations[0];wait.Tick(1/60,{player:{x:lead.position.x,z:lead.position.z+40}});assert.equal(wait.march.outputs.get(lead.id).status,'waiting');
 wait.Tick(1/60,{player:{x:lead.position.x,z:lead.position.z+3}});assert.notEqual(wait.march.outputs.get(lead.id).status,'waiting');
+const straggler=wait.observations[2];straggler.position.z=lead.position.z+55;
+wait.Tick(1/60,{player:{x:lead.position.x,z:lead.position.z+30}});
+assert.equal(wait.march.outputs.get(lead.id).status,'waiting');
+assert.equal(wait.march.outputs.get(straggler.id).status,'catchup','a distant member keeps rejoining while the leader waits for the player');
 // A player who runs ahead must not leave the whole squad throttled by leader pace
 // and backward-looking combat yaw. The real AI independently owns body facing.
 const pursuing=Simulation(4,17,{tuning:{speedMps:3.05,catchupScale:4.5/3.05}});
@@ -64,6 +68,11 @@ assert.ok(!pursuing.march.events.some(e=>e.type==='stop'),'catching up takes pri
 const bend=Simulation(3,17,{route:[{x:0,z:0},{x:0,z:-30},{x:40,z:-30},{x:40,z:20}]});
 bend.Tick(1/60,{player:{x:40,z:10}});
 assert.equal(bend.march.waiting,false,'a player farther around a bend is ahead even behind the immediate heading');
+const playerInPath=Simulation(3),playerPoint={x:0,z:-4};
+for(let i=0;i<12*60;i++){
+  playerInPath.Tick(1/60,{player:playerPoint});
+  assert.ok(playerInPath.observations.every(o=>Math.hypot(o.position.x-playerPoint.x,o.position.z-playerPoint.z)>=.79),'members keep physical clearance from a stationary player');
+}
 const config={count:6,route:[{x:0,z:0},{x:0,z:10}]};
 for(const invalid of [{...config,count:0},{...config,count:25},{...config,leaderIndex:6},{...config,route:[{x:0,z:0}]},{...config,tuning:{runMinS:8,runMaxS:2}},
   {...config,tuning:{catchupM:0}},{...config,goal:{x:1e7,z:0}},{...config,members:[{}, {}, {}, {}, {}, {}]},

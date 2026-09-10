@@ -751,6 +751,15 @@ export class CharacterBody {
    *
    * @returns {{x:number,y:number,z:number,grounded:boolean,blocked:boolean}}
    */
+  /** Read-only capsule sweep for local steering; neither body nor world is moved. */
+  ProbeMove(dx, dy, dz) {
+    if(this.detached)return {x:0,y:0,z:0};
+    const cc=this.pw.controller;
+    cc.computeColliderMovement(this.collider,{x:dx,y:dy,z:dz},R.QueryFilterFlags.EXCLUDE_SENSORS,IG_CHARACTER);
+    const movement=cc.computedMovement();
+    return {x:movement.x,y:movement.y,z:movement.z};
+  }
+
   Move(dx, dy, dz) {
     if (this.detached) return { x: this.position.x, y: this.position.y, z: this.position.z, grounded: this.grounded, blocked: false };
     const pw = this.pw;

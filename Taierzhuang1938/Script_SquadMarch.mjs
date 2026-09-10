@@ -212,6 +212,7 @@ export class SquadMarch {
       m.arrived=false;
       let distance=Distance(o.position,target),dx=(target.x-o.position.x)/(distance||1),dz=(target.z-o.position.z)/(distance||1);
       const obstacles=observations.filter(other=>String(other.id)!==m.id&&other.alive!==false&&other.active!==false);
+      if(player)obstacles.push({position:player,alive:true});
       // Short local avoidance, checked against neighbours and host navigation. Keeping
       // a chosen side until clear prevents a symmetric crowd from oscillating in place.
       const wasAvoiding=m.avoiding;m.avoiding=false;
@@ -240,7 +241,7 @@ export class SquadMarch {
       const behind=lead&&lead!==o?Math.max(0,leadProgress-(progress.get(m.id)??leadProgress)-m.followDistance):0;
       const tooFarAhead=!m.leader&&lead&&(progress.get(m.id)??0)>leadProgress+t.spacingM*2;
       const catchup=behind>t.catchupM||playerProgress-(progress.get(m.id)??playerProgress)>t.catchupM;
-      const wait=this.waiting;
+      const wait=this.waiting&&(m.leader||!catchup);
       const noPause=o.noPause||m.avoiding||target.width<A.narrowWidthM||catchup||wait||o.maxSpeed===0||t.pauses===false||this.config.preset==='walk';
       if(noPause||m.leader){if(m.phase!=='run')this.Resume(m,'priority');}
       if(!noPause&&!m.leader&&m.phase==='run'&&gap>t.separationM){

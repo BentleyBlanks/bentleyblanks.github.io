@@ -20,6 +20,14 @@ for(const patch of [{targetVisible:true},{lastFire:ai.time},{vaultT:0},{suppress
   Object.assign(s,{targetVisible:false,lastFire:-99,vaultT:-1,suppression:0,hurtPose:0,carryRole:null,woundedWalk:0,grounded:true});
 }
 adapter.Dispose();assert.ok(soldiers.every(s=>!s.squadMarchCommand&&!Object.hasOwn(s,'p012Guided')),'dispose restores only owned movement');
+const blocked={id:'Blocked',alive:true,position:new Vector3(),goal:new Vector3(),moveSpeed:0,grounded:true,yaw:0};
+const navAi={...ai,ctx:{...ai.ctx,nav:{Walkable:()=>true,Steer:()=>true}}};
+const recovery=new SquadMarchAi(navAi,[blocked],{route:[{x:0,z:0},{x:0,z:-100}]},{Move(s,point,speed){
+  s.goal.copy(s.position).addScaledVector(new Vector3(point.x,0,point.z).sub(s.position).normalize(),8);s.scriptMoveSpeedMps=speed;
+}});
+for(let i=0;i<120;i++)recovery.Update(1/60);
+assert.ok(blocked.goal.distanceTo(blocked.position)>14,'a real stall restores the far goal required by host navigation');
+recovery.Dispose();
 let poseState;
 const actor={characterRig:{p012ActorMotion:true,Update(_dt,state){poseState=state;}}},soldier={actor,squadMarchCommand:{breath:1}};
 InstallSquadMarchActor(soldier);actor.characterRig.Update(.1,{aim:1,lookYaw:.8,firing:false});assert.equal(poseState.aim,0,'memory aim yields to actual recovery pose');
