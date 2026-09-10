@@ -223,6 +223,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 - 五种视频步兵动作已接入两军 01–04 模型；运行时、重建与验收见 [步兵动作说明](Data_InfantryAnimations.md)。
 
 ### 人物 / AI / 合批
+- **带路跑通用设计**：普通随队士兵采用独立错峰的「跑几步 → 短停喘息与左右观察 → 再跑」，班长按引导职责行动。跨关卡复用、行为优先级、动画衔接与动态验收见 [NPC 带路跑通用设计](Data_NpcGuideCadence.md)。当前为待接入规范；已有站立待机层不等于跑停行为已实现。
 - 国军眼球材质与肩线资产修复、独立 Blender 工程和重建入口见 [国军眼睛与肩线修复](Data_NraEyesShoulders.md)。
 - `Script_Actor.mjs` —— 程序化人物（不用 SkinnedMesh：预通道 overrideMaterial 不带 skinning，
   蒙皮会在 SSAO 里塌成原点，见头注）；`Script_ActorBatch.mjs` 收成 InstancedMesh，
