@@ -21,8 +21,8 @@ import { Mulberry32 } from "./Script_Noise.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { STANCE } from "./Data_Tuning_Player.mjs";
 import { PLAYER_HITBOX } from "./Script_PlayerHitbox.mjs";
-import { AIM, SHOOTING, BURST, SAMPLES } from "./Data_Tuning_AiShooting.mjs";
-import { ShootingModel, ExposureCurve, AimErrorCurve, SAMPLE_PART } from "./Script_AiShooting.mjs";
+import { AIM, SHOOTING, BURST, SAMPLES, CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
+import { ShootingModel, ExposureCurve, AimErrorCurve, CloseRangeWeight, SAMPLE_PART } from "./Script_AiShooting.mjs";
 
 // --------------------------------------------------------------------------
 // 假宿主：一堵解析矮墙 + 可数的射线计数器 + 可拨的时钟
@@ -896,3 +896,20 @@ console.log("AiShootingTest OK — 枪口三级优先与姿态兜底 / 抬枪角
 console.log("AiShootingTest OK — 确定性重跑一致 / 返回对象复用 / 只写 soldier.shooting");
 
 console.log("AiShootingTest OK — 全部通过");
+
+{
+  assert.equal(CloseRangeWeight(2), 1);
+  assert.equal(CloseRangeWeight(25), 0);
+  assert.equal(CloseRangeWeight(Infinity), 0);
+  let previous=1;
+  for(let distance=0;distance<=60;distance+=.25){
+    const w=CloseRangeWeight(distance);
+    assert.ok(w<=previous && w>=0);previous=w;
+  }
+  const err=AIM.initialErrorRad.boltRifle, floor=AIM.floorRad.boltRifle;
+  const near=AimErrorCurve(err,floor,Math.atan(CLOSE_RANGE.targetRadiusM/2));
+  const far=AimErrorCurve(err,floor,Math.atan(CLOSE_RANGE.targetRadiusM/25));
+  assert.ok(near>.8 && near>far, "near body tolerates acquisition error");
+  assert.equal(far,AimErrorCurve(err,floor), "25 m acquisition balance unchanged");
+}
+console.log("AiShootingTest OK — close range blend and angular tolerance");

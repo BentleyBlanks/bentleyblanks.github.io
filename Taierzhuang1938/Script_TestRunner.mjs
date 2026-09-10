@@ -159,6 +159,7 @@ export const testDefs = {
   AiPerceptionTest: { file: "Script_AiPerceptionTest.mjs", desc: "感知：视锥/觉察迟滞/听觉 LKP/目标锁" },
   AiCoverTest: { file: "Script_AiCoverTest.mjs", desc: "掩体注册表：归一/散列/验证射线/侧翼/占用/探头" },
   AiShootingTest: { file: "Script_AiShootingTest.mjs", desc: "射击模型：误差收敛/暴露采样/走廊/点射/压制点" },
+  AiCloseRangeTest: { file: "Script_AiCloseRangeTest.mjs", desc: "近距离实弹：命中/伤害/遮挡/攻击名额" },
   AiTacticsTest: { file: "Script_AiTacticsTest.mjs", desc: "班组战术：令牌/侧翼点/跃进配对/投弹/撤退" },
   AiBrainGraphTest: { file: "Script_AiBrainGraphTest.mjs", desc: "敌军 AI 行为图：节点=STATE、边两端存在、表键可解析、任务=TASK（纯 Node，毫秒级）" },
   TuningWriterTest: { file: "Script_TuningWriterTest.mjs", desc: "调参表改写器：按花括号层级只改那一个数字、注释格式不动（纯 Node，毫秒级）" },
@@ -291,7 +292,7 @@ export const browserTests = new Set([
   "TrainLibraryTest",
   'BackRifleRunTest', 'MeleeAnimationTest', 'InfantryAnimationTest',
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
-  "AiCombatBrowserTest", "AiEditorTest",
+  "AiCombatBrowserTest", "AiCloseRangeTest", "AiEditorTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
@@ -378,7 +379,7 @@ export const domains = {
       "PlayerHitboxTest", "CameraShakeTest",
       // 射击模型叠在 COMBAT.aiAccuracyBase 那条链上（暴露曲线 × 误差曲线），
       // 碰伤害口径的改动要连着它一起跑（纯 Node 毫秒级）。
-      "AiShootingTest",
+      "AiShootingTest", "AiCloseRangeTest",
       // 负重会封掉开火/开镜/冲刺三条（Player 的 carrySpeedScale + TryFire 的闸），
       // 碰这三样的改动要连着枪感串一起跑，所以它同时挂在 combat 与 interact 两个域。
       "CarryTest",
@@ -398,7 +399,7 @@ export const domains = {
     label: "AI 与战场内容预算",
     // 具名同伴（罗班长、幺娃…）是从 nra 名额里出的人，goal 直接写进 AiDirector，
     // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
-    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiShootingTest", "AiTacticsTest",
+    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AiPerceptionTest", "AiCoverTest", "AiShootingTest", "AiTacticsTest",
       "VisibilityTest", "ActorCrowdTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
       "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012AnimationTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest", "FirstLevelP012ArrivalTest", "FirstLevelP012VillageLifeTest", "FirstLevelP012CastTest"],
   },

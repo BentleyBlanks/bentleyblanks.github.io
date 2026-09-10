@@ -25,7 +25,8 @@ import { PlayerHitboxes, PlayerAimPoint, RaycastPlayerHitboxes, GaussianPair } f
 import { PerceptionModel, PLAYER_TRACK_ID, ALERT_ORDER } from "./Script_AiPerception.mjs";
 import { CoverRegistry } from "./Script_AiCover.mjs";
 import { COVER, COVER_CYCLE } from "./Data_Tuning_AiCover.mjs";
-import { ShootingModel } from "./Script_AiShooting.mjs";
+import { ShootingModel, CloseRangeWeight } from "./Script_AiShooting.mjs";
+import { CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
 import { TacticsDirector, TASK, IsManeuverTask } from "./Script_AiTactics.mjs";
 // 只读 TACTICS：压制射击的情报门槛与守区掩体余量。侧翼 / 投弹 / 查看的那几张表
 // 由 `TacticsDirector` 自己消费 —— 大脑只按 `task.kind` 选状态，不重复读它们的数。
@@ -1485,7 +1486,8 @@ export class AiDirector {
     const playerOpen = player && player.Alive && !player.Protected && !s.missionFireHold
       // 已经锁住玩家的人不占「新锁」名额。旧写法达到上限后会把现有三个人也一起
       // 排除，下一次 Think 全部转头找 NPC，再下一次又转回来，正是集体抽搐的一条源头。
-      && (s.target?.isPlayer || this.playerTargetedBy < (COMBAT.maxShootersOnPlayer ?? 3));
+      && (s.target?.isPlayer || this.playerTargetedBy < (COMBAT.maxShootersOnPlayer ?? 3)
+        || s.position.distanceTo(player.position) <= CLOSE_RANGE.priorityM);
     if (enemySide === "nra" && playerOpen) {
       const d = s.position.distanceTo(player.position);
       const st = player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0;
@@ -3425,6 +3427,25 @@ export class AiDirector {
     return Number.isFinite(h) && h > 0 ? h / CAPSULE[0].height : 1;
   }
 
+  /** Visible close threats can take a distant shooter's slot, never add one. */
+  AcquireFireToken(s, targetId, player) {
+    if (this.tactics.AcquireToken(targetId, s.id, s.target.isPlayer)) return true;
+    if (!s.target.isPlayer || !player
+      || s.position.distanceTo(player.position) > CLOSE_RANGE.priorityM) return false;
+    let farthest = null;
+    const nearDistance = s.position.distanceTo(player.position);
+    let distance = Math.max(nearDistance * CLOSE_RANGE.priorityDistanceRatio,
+      nearDistance + CLOSE_RANGE.priorityDistanceGapM);
+    for (const other of this.soldiers) {
+      if (other === s || !this.tactics.HasToken(other.id, targetId)) continue;
+      const d = other.position.distanceTo(player.position);
+      if (d > distance) { distance = d; farthest = other; }
+    }
+    if (!farthest) return false;
+    this.tactics.ReleaseToken(farthest.id);
+    return this.tactics.AcquireToken(targetId, s.id, true);
+  }
+
   TryFire(s, dt, player) {
     if (s.unarmed) return;
     s.fireTimer -= dt;
@@ -3470,15 +3491,16 @@ export class AiDirector {
     const targetId = s.target.isPlayer ? PLAYER_TRACK_ID : s.target.id;
     let exposure = 0;
     let aimed = null;
-    if (s.targetVisible !== false
-      && this.tactics.AcquireToken(targetId, s.id, s.target.isPlayer)) {
+    if (s.targetVisible !== false) {
       const samples = toPlayer
         ? this.shooting.PlayerSamples(player)
         : this.shooting.SoldierSamples(s.target.position, s.target.stance, undefined,
           AiDirector.HeightScale(s.target.ref));
       const seen = this.shooting.Exposure(s, from, samples, { targetId, now: this.time });
-      exposure = seen.fraction;
-      aimed = seen.aimPoint;
+      if (seen.fraction > 0 && this.AcquireFireToken(s, targetId, player)) {
+        exposure = seen.fraction;
+        aimed = seen.aimPoint;
+      }
     }
 
     const aimV = this.tmpB;
@@ -3550,27 +3572,37 @@ export class AiDirector {
     // 于是原来的式子在 27 m 上算出来还是满命中（1.25 − 0.09 → 钳到 1）。
     // 实际上机械瞄具打一个会动的人：25 m 内基本能打中，100 m 打一半，200 m 靠运气。
     acc *= Clamp(1.0 - Math.max(0, dist - 25) / 175, 0.10, 1);
-    acc *= s.suppression > 0.3 ? COMBAT.aiAccuracySuppressed / COMBAT.aiAccuracyBase : 1;
+    const closeWeight = toPlayer ? CloseRangeWeight(dist) : 0;
     if (s.target.isPlayer && player) {
       acc *= COMBAT.player?.accuracyScale ?? 1;
-      acc *= player.stance === "prone" ? 0.45 : player.stance === "crouch" ? 0.72 : 1;
+      // Explicit zero accuracy still disables damage (script/debug contract).
+      // Nearby visible bodies should not inherit the campaign's 0.28 multiplier.
+      if (acc > 0) {
+        const closeAccuracy = Math.min(CLOSE_RANGE.maxAccuracy,
+          CLOSE_RANGE.accuracy * (DIFFICULTY.aiAccuracy ?? 1));
+        acc += (Math.max(acc, closeAccuracy) - acc) * closeWeight;
+      }
+      const stanceScale = player.stance === "prone" ? 0.45 : player.stance === "crouch" ? 0.72 : 1;
+      acc *= stanceScale + (1 - stanceScale) * closeWeight;
     }
+    acc *= s.suppression > 0.3 ? COMBAT.aiAccuracySuppressed / COMBAT.aiAccuracyBase : 1;
 
-    // 刚锁上玩家的那一发必偏。理由与代价都写在 COMBAT.player 那段注释里：
-    // 它买的是**一次预警**——子弹先从耳边过、暗角先亮一下，玩家才有得反应。
+    // Distant crossfire keeps the warning-miss window. At close contact the
+    // shorter window allows a properly acquired first shot to inflict damage.
+    const farGrace = COMBAT.player?.firstShotGraceS ?? 0;
+    const grace = farGrace + (Math.min(farGrace, CLOSE_RANGE.firstShotGraceS) - farGrace) * closeWeight;
     const firstShot = s.target.isPlayer
-      && this.time - (s.playerLockAt ?? -99) < (COMBAT.player?.firstShotGraceS ?? 0);
+      && this.time - (s.playerLockAt ?? -99) < grace;
     if (firstShot) acc = 0;
 
-    // **只有这一行换成了 Resolve**：整条命中率链（难度 / 剧本 / 距离衰减 / 压制 /
-    // COMBAT.player 各项 / firstShotGrace）原样留在上面，Resolve 只在它上面叠
-    // 暴露曲线与瞄准误差曲线两条 —— 满暴露、误差收敛到底时两条都精确等于 1，
-    // 也就是说这一套只会让 AI 变得没那么准，绝不会缩短 TTK（docs/Data_PlayerDamage.md 的账）。
+    // Resolve adds exposure and acquisition error after the distance-aware
+    // player balance. The existing 25 m+ damage/TTK baseline is unchanged.
     // 压制射击传 baseAccuracy = 0 且 exposure = 0：永不命中，但近失弹压制照旧。
     const shot = this.shooting.Resolve(s, from, aimV, {
       baseAccuracy: aimed ? acc : 0,
       exposure: aimed ? exposure : 0,
       distance: dist,
+      targetRadiusM: toPlayer ? CLOSE_RANGE.targetRadiusM : 0,
       rnd: s.rnd,
     });
     const hit = shot.hit;

@@ -72,6 +72,21 @@
 // TAIERZHUANG_TUNING_EDITABLE，敌军 AI 编辑器才能就地改数；线上与纯 Node 测试里照旧冻结。
 const Freeze = (typeof globalThis === "object" && globalThis.TAIERZHUANG_TUNING_EDITABLE) ? (value) => value : Object.freeze;
 
+// Player close-contact tuning (2026-09-10): campaign accuracy discounts describe
+// distant crossfire, not a visible body filling the sights. Blend back to the
+// existing battle balance at 25 m; cover, suppression and damage still apply.
+export const CLOSE_RANGE = Freeze({
+  fullAccuracyM: 5,
+  fadeOutM: 25,
+  accuracy: 0.88,
+  maxAccuracy: 0.96,
+  firstShotGraceS: 0.20,
+  targetRadiusM: 0.24,
+  priorityM: 8,
+  priorityDistanceRatio: 2,
+  priorityDistanceGapM: 3,
+});
+
 export const AIM = Freeze({
   initialErrorRad: Freeze({
     boltRifle: 0.055, lmg: 0.070, hmg: 0.050, pistol: 0.095, default: 0.060,

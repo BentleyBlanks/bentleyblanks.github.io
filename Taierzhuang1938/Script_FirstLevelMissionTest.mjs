@@ -131,6 +131,21 @@ for (const stage of MISSION_STAGES.slice(0, -1)) {
 assert.equal(flow.completed, true);
 console.log("ok all mission gates require recorded gameplay facts and restore exactly");
 {
+  const Position=(x,z)=>({x,y:0,z,clone:()=>({x,y:0,z,project(){this.x=0;this.y=0;this.z=0;}})});
+  const enemies=[...Array(8)].map((_,i)=>({id:i+1,missionId:`Enemy${i}`,alive:true,
+    position:Position(0,i===7?3:40+i),stance:0,missionEncounter:"front"}));
+  const r={time:0,flow:{stage:{id:"Support"}},enemies:new Map(enemies.map(a=>[a.id,a])),
+    player:{position:Position(0,0),EyePosition:Position(0,0),camera:{}},Point:p=>p,BlocksSight:()=>false};
+  const opening=new FirstLevelOpening(r);
+  for(let slot=0;slot<8;slot++){
+    r.time=slot*OPENING.fireSlotSeconds;opening.FireWindows();
+    assert.equal(enemies[7].missionFireHold,false,"close enemy keeps a firing window across distant rotations");
+    assert.ok(enemies.filter(a=>!a.missionFireHold).length<=OPENING.playerFireLimit);
+  }
+  r.BlocksSight=(from)=>from===enemies[7].position;opening.FireWindows();
+  assert.equal(enemies[7].missionFireHold,true,"wall-blocked close enemy cannot displace visible shooters");
+}
+{
   const facts=new Map(),calls=[];
   const r={column:{zhou:{id:"Zhou",health:100,visible:false}},Has:id=>facts.has(id),Record:(id,detail)=>facts.set(id,detail),
     Point:p=>p,MoveActor:()=>calls.push("move"),OnPlayerDown:()=>calls.push("fail"),MissionFailure:id=>calls.push(id),

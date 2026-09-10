@@ -477,6 +477,7 @@ export const BRAIN_GRAPH = Object.freeze({
     PERCEPTION: "Data_Tuning_AiPerception",
 
     AIM: "Data_Tuning_AiShooting",
+    CLOSE_RANGE: "Data_Tuning_AiShooting",
     SHOOTING: "Data_Tuning_AiShooting",
     BURST: "Data_Tuning_AiShooting",
     SAMPLES: "Data_Tuning_AiShooting",

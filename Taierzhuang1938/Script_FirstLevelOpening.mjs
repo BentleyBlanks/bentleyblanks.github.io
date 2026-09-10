@@ -1,5 +1,6 @@
 import { OPENING as C } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
+import { CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const Smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t)};
 
@@ -197,6 +198,12 @@ export class FirstLevelOpening {
     const shift=Math.floor(r.time/C.fireSlotSeconds);
     candidates.sort((a,b)=>a.id-b.id);
     if(candidates.length)candidates.push(...candidates.splice(0,shift%candidates.length));
+    // Keep the rotating distant fire windows, but give immediate threats first
+    // refusal. Rest/reload windows and the authored shooter cap still apply.
+    candidates.sort((a,b)=>{
+      const da=Distance(a.position,r.player.position),db=Distance(b.position,r.player.position);
+      return (da<=CLOSE_RANGE.priorityM?da:Infinity)-(db<=CLOSE_RANGE.priorityM?db:Infinity)||0;
+    });
     for(const a of candidates.slice(0,C.playerFireLimit))a.missionFireHold=false;
     this.playerShooters=candidates.slice(0,C.playerFireLimit).map(a=>a.missionId);
     this.peakPlayerShooters=Math.max(this.peakPlayerShooters,this.playerShooters.length);

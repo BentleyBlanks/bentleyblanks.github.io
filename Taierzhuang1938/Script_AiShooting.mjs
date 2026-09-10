@@ -23,7 +23,7 @@
 // · **不 import three、不 import Script_Ai**。只吃普通对象 `{x,y,z}` 与注入的 `host`，
 //   所以纯 Node 毫秒级可测（项目契约 2：规则层无 three 依赖）。
 //   `Script_Ai` 仍是唯一持有 `THREE.Vector3` 的适配层。
-// · **命中率的账不许动**（docs/Data_PlayerDamage.md 那本 TTK 账）。
+// · 玩家距离平衡由 Script_Ai 计算（近距调整见 docs/Data_PlayerDamage.md）。
 //   `COMBAT.aiAccuracyBase × 难度 × 剧本 × 距离衰减 × 压制 × COMBAT.player.accuracyScale
 //   × 玩家姿态折让 × firstShotGrace` 那整条链**仍然在 `Script_Ai` 里算**，
 //   整条链的乘积作为 `baseAccuracy` 传进来。`Resolve` 只在它上面叠两条曲线：
@@ -31,7 +31,7 @@
 //       命中率 = baseAccuracy × ExposureCurve(fraction) × AimErrorCurve(err)
 //
 //   两条曲线的上限都是 1，且**满暴露（fraction=1）、误差收敛到底（err == floor）时
-//   都精确等于 1** —— 也就是说这一套只会让 AI 变得没那么准，绝不会把 TTK 缩短。
+//   都精确等于 1**；近距玩家按目标张角减轻误差折扣，25 m 以上保留原曲线。
 //   反过来 `fraction = 0` 时**永远不命中**：看不见的目标只能压制射击。
 // · `soldier.shooting` 由 `BeginAim`（或任何入口）幂等挂载；`Detach` 卸掉。
 //   模块不读 `soldier` 上除 `position` / `stance` / `suppression` / `weapon` /
@@ -79,7 +79,7 @@
 // 这四条对应本模块的四件事，一一对上。
 
 import { PLAYER_HITBOX, PlayerHitboxes, GaussianPair } from "./Script_PlayerHitbox.mjs";
-import { AIM, SHOOTING, BURST, SAMPLES } from "./Data_Tuning_AiShooting.mjs";
+import { AIM, SHOOTING, BURST, SAMPLES, CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
 
 const STANCE_NAMES = ["stand", "crouch", "prone"];
 
@@ -124,19 +124,28 @@ export function ExposureCurve(fraction) {
  *   · 在 σ=0 处精确为 1（指数形式也行，但它在 0 附近太平，读起来像"误差不影响命中"）；
  *   · 处处单调、可导，不会在阈值上跳变（分段线性会让玩家看到"瞄到某一刻突然变准"）；
  *   · 只有一次乘法一次除法，1/6 分帧下 110 人跑得起。
- * 真式子里 θ₀ 与距离相关（远处的人张角小），但**距离已经在 `Script_Ai` 的
- * `baseAccuracy` 里按绝对米数衰减过了**，这里再乘一次就是重复计价。
+ * 默认使用 AIM.halfRad。玩家近距可传身体张角 targetAngleRad，避免把贴脸目标
+ * 当成远处的小靶；张角小于 halfRad 时沿用旧曲线，不追加远距离惩罚。
  *
  * @param {number} errorRad 当前瞄准误差（弧度）
  * @param {number} [floorRad=0] 这支枪 / 这个姿态瞄到底的误差；低于它一律算 1
+ * @param {number} [targetAngleRad=0] 可选的目标半张角
  */
-export function AimErrorCurve(errorRad, floorRad = 0) {
+export function AimErrorCurve(errorRad, floorRad = 0, targetAngleRad = 0) {
   const err = Finite(errorRad) ? errorRad : 0;
   const floor = Finite(floorRad) ? floorRad : 0;
   const excess = err - floor;
   if (!(excess > 0)) return 1;
-  const k = excess / AIM.halfRad;
+  const k = excess / Math.max(AIM.halfRad, targetAngleRad);
   return 1 / (1 + k * k);
+}
+
+/** Smoothly remove distant-crossfire assistance at close contact. */
+export function CloseRangeWeight(distance) {
+  if (!Finite(distance)) return 0;
+  const t = Clamp01((CLOSE_RANGE.fadeOutM - distance)
+    / (CLOSE_RANGE.fadeOutM - CLOSE_RANGE.fullAccuracyM));
+  return t * t * (3 - 2 * t);
 }
 
 /**
@@ -582,7 +591,7 @@ export class ShootingModel {
    * @param {{x,y,z}} from 枪口
    * @param {{x,y,z}} aimPoint 瞄点（`Exposure` 给的，或压制点）
    * @param {{baseAccuracy:number, exposure?:number|object, distance?:number,
-   *          rnd?:function, aimError?:number}} opts
+   *          rnd?:function, aimError?:number, targetRadiusM?:number}} opts
    * @returns {{hit:boolean, dir:{x,y,z}, aimPoint:{x,y,z}, missPoint:{x,y,z}, missDir:{x,y,z}}}
    *          复用对象；要跨帧留着就自己 copy。
    */
@@ -594,7 +603,11 @@ export class ShootingModel {
     const fraction = ExposureFraction(o.exposure);
     const err = Finite(o.aimError) ? o.aimError : st.errorRad;
     const exposureCurve = ExposureCurve(fraction);
-    const errorCurve = AimErrorCurve(err, st.floorRad);
+    // A 24 cm target at 2 m tolerates more angular error than the same body at
+    // 25 m. Optional: non-player and distant shooting retain their old curve.
+    const targetAngle = o.targetRadiusM > 0 && o.distance > 0
+      ? Math.atan(o.targetRadiusM / o.distance) : 0;
+    const errorCurve = AimErrorCurve(err, st.floorRad, targetAngle);
     const acc = base * exposureCurve * errorCurve;
 
     const rnd = typeof o.rnd === "function" ? o.rnd

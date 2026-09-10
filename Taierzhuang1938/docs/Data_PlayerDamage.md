@@ -4,6 +4,28 @@
 > 这份文档把那句话拆成三件独立的事，各自记清楚改了什么、为什么、怎么复测。
 > 回归口：`node Taierzhuang1938/Script_DamageTest.mjs`（退出码即成败）。
 
+## 2026-09-10：近距离射击修正
+
+此前第一关前沿的剧本折扣与玩家折扣在贴脸时照常叠乘。真实 `TryFire` 定种子靶场中，
+2 m 站姿 600 发仅中 25 发（4.17%），正常节拍十秒五发没有一次伤害。
+本次将近距参数集中到 `Data_Tuning_AiShooting.CLOSE_RANGE`：近距逐步取消远程交火的命中与姿态折扣，
+缩短必偏预警窗口，并按身体张角计算瞄准容差；达到 `fadeOutM` 后恢复原来的命中链。
+`COMBAT.player` 的枪伤、部位倍率、单发上限、流血、出生保护均继续使用原表。
+
+同一靶场修正后：2 m 站姿 522/600（87%），5 m 站姿 509/600（84.83%）；
+2 m 正常节拍首发在 0.85 s 造成伤害。25 m、60 m 的配对结果与修正前一致。
+墙体完全遮挡、朝向背离目标和剧本命中倍率为零时仍不造成伤害。
+这些是隔离射击链的统计，不是整关死亡时间或正常通关记录。
+
+新增回归：`node Taierzhuang1938/Script_AiCloseRangeTest.mjs`。
+旧文档下述 TTK 账的适用范围为原 25 m 靶场，不能再解读为贴脸也应打十几秒。
+
+本次交付验证：`--changed=origin/master --profile=quick` 53 项通过；
+`--profile=prepush --domain=ai` 44 项通过；另跑 `DamageTest`、
+`FirstLevelMissionBrowserTest --campaign --audio`、`BootTest`，三项全部通过。
+正常输入通关耗时 693 s（运行测试的实际时间），结算为 Complete、failed=false，玩家剩余 46.71 HP。
+已查看本地壕沟接敌、前沿交火与通关截图；截图及靶场原始数据仅留本地。
+
 ---
 
 ## 一、修之前是什么样（实测账，不是估算）
