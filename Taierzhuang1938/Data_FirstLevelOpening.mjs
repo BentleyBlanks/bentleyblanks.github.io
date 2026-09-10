@@ -15,6 +15,25 @@ export const OPENING = Object.freeze({
   hearing: [[0,0],[.15,0],[.3,1],[2.8,1],[4.1,.72],[6.5,.42],[10.5,0]],
   hearingLowHz:650,
   breath: {start:2.6,end:11,interval:2.4,volume:.95},
+  escapeBreath: {interval:4.2,volume:.55},
+  // Finite ranging salvo along the railway/apron. Fixed impacts stay outside
+  // the covered walking lane; entering the open impact areas is still dangerous.
+  escapePressure: {
+    intervalS:4.5, flightS:1.6, radiusM:5.5, damage:70,
+    origin:{x:35,z:20}, originHeightM:38,
+    shells:[
+      {id:"WreckRear",after:3.2,impact:{x:-84,z:89}},
+      {id:"WreckAhead",after:8.8,impact:{x:-82,z:73}},
+      {id:"OpenApron",after:14.6,impact:{x:-53,z:83}},
+      {id:"ApronAdvance",after:20.4,impact:{x:-54,z:67}},
+      {id:"TrenchLip",after:10,near:{x:-65,z:67},nearM:12,impact:{x:-48,z:64}},
+      {id:"TrenchApproach",after:10,near:{x:-51,z:49},nearM:10,impact:{x:-34,z:35}},
+    ],
+    smoke:[
+      {point:{x:-78,z:87},height:1.3,kind:"black",rate:6,radius:.6,rise:1.8,sizeStart:.65,sizeEnd:3.4,life:5,opacity:.42},
+      {point:{x:-77,z:76},height:1.1,kind:"dust",rate:4,radius:.8,rise:.65,sizeStart:.7,sizeEnd:2.6,life:4,opacity:.28},
+    ],
+  },
   dizzySeconds: 4,
   rescueReachM: 2.1,
   spillRetreat: {postX:-65.5,columnM:1.5},
@@ -45,9 +64,9 @@ export const OPENING = Object.freeze({
     {id:"FlankLockGunner",x:-35,z:58,weapon:"Type11",hold:true},
     {id:"FlankLockA",x:-33,z:49,hold:true},
     {id:"FlankLockB",x:-26,z:57,hold:true},
-    {id:"RailLockGunner",x:-93,z:43,weapon:"Type11",hold:true},
-    {id:"RailLockA",x:-96,z:34,hold:true},
-    {id:"RailLockB",x:-89,z:30,hold:true},
+    {id:"RailLockGunner",x:-93,z:43,weapon:"Type11",hold:true,firePhaseS:3.1},
+    {id:"RailLockA",x:-96,z:34,hold:true,firePhaseS:3.1},
+    {id:"RailLockB",x:-89,z:30,hold:true,firePhaseS:3.1},
   ],
   intruders: [
     {id:"TrenchIntruderA",x:-38,z:15,weapon:"Type38",bayonet:true},

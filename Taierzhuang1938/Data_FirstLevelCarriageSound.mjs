@@ -6,6 +6,7 @@ export const CARRIAGE_SOUND = Object.freeze({
   trainGain: 0.72,
   crowdGain: 0.38,
   speechBedGain: 0.28,
+  escapeSpeechBedGain: 0.68,
   uneasyScale: 0.38,
   cheerVolume: 0.48,
   cheerSlots: [14, 15],

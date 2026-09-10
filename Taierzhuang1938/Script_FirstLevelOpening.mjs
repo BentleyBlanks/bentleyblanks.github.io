@@ -14,7 +14,8 @@ const Curve=(rows,t)=>{
 // aiming, suppression, ammunition and damage throughout the opening.
 export class FirstLevelOpening {
   constructor(runtime){this.r=runtime;this.peakPlayerShooters=0;this.fireSeen=new Map();this.fireEvents=[];this.shotCount=0;this.playerShotCount=0;this.peakVisible=0;
-    this.pack={id:"ShunziPack",contents:["CivilianClothes"],carried:true};}
+    this.pack={id:"ShunziPack",contents:["CivilianClothes"],carried:true};
+    this.pressureShells=new Set();this.pressureImpacts=[];this.wreckSmoke=[];}
   Derail(){
     const r=this.r;
     if(this.derailAt!=null)return;
@@ -133,6 +134,7 @@ export class FirstLevelOpening {
   }
   Update(dt){
     const r=this.r,stage=r.flow.stage.id;
+    this.UpdateEscapePressure();
     if(this.derailAt!=null){
       const age=r.time-this.derailAt;
       const hearing=Curve(C.hearing,age);
@@ -142,6 +144,10 @@ export class FirstLevelOpening {
       if(age>=b.start&&age<b.end&&(this.nextBreathAt==null||age>=this.nextBreathAt)){
         this.breathVoice=r.audio.Play("breathHeavy",{volume:b.volume*(1-.45*Smooth((age-b.start)/(b.end-b.start))),priority:true});
         this.nextBreathAt=age+b.interval;
+      }
+      if(age>=b.end&&!r.Has("trenchEntered")&&["Unloading","TrenchEntry"].includes(stage)&&age>=this.nextBreathAt){
+        this.breathVoice=r.audio.Play("breathHeavy",{volume:C.escapeBreath.volume,priority:true});
+        this.nextBreathAt=age+C.escapeBreath.interval;
       }
     }
     if(["Train","Unloading","TrenchEntry","Shelter","Support","MachineGun"].includes(stage)&&!r.Has("gunOccupied")){
@@ -215,6 +221,31 @@ export class FirstLevelOpening {
     this.FireWindows();
     this.UpdateZhou();
   }
+  UpdateEscapePressure(){
+    const r=this.r,config=C.escapePressure;
+    if(this.derailAt==null)return;
+    const age=r.time-this.derailAt;
+    // The same wreck remains a visible source while the player leaves it.
+    // Smoke uses the existing pools and is removed at the sheltered exchange.
+    if(!this.wreckSmokeStarted){
+      this.wreckSmokeStarted=true;
+      for(const spec of config.smoke)this.wreckSmoke.push(r.vfx.SmokeSource(r.Point(spec.point,spec.height),spec));
+    }
+    if(r.Has("shelterReached"))this.ClearWreckSmoke();
+    if(r.Has("trenchEntered")||!["Unloading","TrenchEntry"].includes(r.flow.stage.id)||r.time<(this.nextPressureAt||0))return;
+    const shell=config.shells.find(s=>!this.pressureShells.has(s.id)&&age>=s.after&&(!s.near||r.Near(s.near,s.nearM)));
+    if(!shell)return;
+    this.pressureShells.add(shell.id);
+    this.nextPressureAt=r.time+config.intervalS;
+    r.combat.FireShell(r.Point(config.origin,config.originHeightM),r.Point(shell.impact),{
+      kind:"Shell75",flight:config.flightS,radius:config.radiusM,damage:config.damage,
+      OnImpact:point=>this.pressureImpacts.push({id:shell.id,time:r.time,point:{x:point.x,y:point.y,z:point.z}}),
+    });
+  }
+  ClearWreckSmoke(){
+    for(const handle of this.wreckSmoke)this.r.vfx.RemoveSmokeSource(handle);
+    this.wreckSmoke=[];
+  }
   UpdateZhou(){
     const r=this.r,a=this.zhou;
     if(!a||r.Has("zhouGunWounded"))return;
@@ -247,6 +278,7 @@ export class FirstLevelOpening {
     });
   }
   Dispose(){
+    this.ClearWreckSmoke();
     this.r.audio.SetConcussion?.(0);
     if(this.breathVoice)this.r.audio.StopVoice?.(this.breathVoice,.15);
   }
@@ -267,7 +299,8 @@ export class FirstLevelOpening {
       // Visible MG bursts alternate with real reload/reacquisition windows.
       // The field still shoots at friendly combatants during player fire slots.
       const surface=a.missionEncounter==="surface";
-      const rest=surface&&(r.time%(C.surfaceBurstSeconds+C.surfaceRestSeconds)>=C.surfaceBurstSeconds);
+      const phase=C.surface.find(spec=>spec.id===a.missionId)?.firePhaseS||0;
+      const rest=surface&&((r.time+phase)%(C.surfaceBurstSeconds+C.surfaceRestSeconds)>=C.surfaceBurstSeconds);
       a.missionFireHold=true;
       a.missionSurfaceRest=rest;
       const projected=a.position.clone();projected.y+=1;projected.project(r.player.camera);
@@ -292,6 +325,7 @@ export class FirstLevelOpening {
   State(){return {derailAt:this.derailAt,roll:this.r.battlefield.derailRoll||0,
     blackout:this.eyeClosure>=.99?1:0,eyeClosure:this.eyeClosure||0,hearingAmount:this.hearingAmount||0,rescueAt:this.rescueAt,playerCar:MISSION_TRAIN.mainCar,
     pack:this.pack,
+    escapePressure:{launched:[...this.pressureShells],impacts:this.pressureImpacts,smokeSources:this.wreckSmoke.length},
     playerShooters:this.playerShooters||[],peakPlayerShooters:this.peakPlayerShooters,
     visible:this.visible||0,peakVisible:this.peakVisible,shots:this.shotCount,playerShots:this.playerShotCount,
     shelterProtected:this.ShelterProtected(),

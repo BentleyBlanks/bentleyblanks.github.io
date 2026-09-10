@@ -81,7 +81,8 @@ export class FirstLevelMissionVoice {
     const current = this.current, segment = current.plan.segments[current.segmentIndex];
     const played = this.audio.PlayStoryVoice(`Mission${current.cue.id}`, {
       position: this.Position?.(current.cue),
-      environmentGain:current.cue.id==="TrainMeal"?CARRIAGE_SOUND.speechBedGain:1,
+      environmentGain:current.cue.id==="TrainMeal"?CARRIAGE_SOUND.speechBedGain:
+        current.cue.id==="TrainShelling"?CARRIAGE_SOUND.escapeSpeechBedGain:1,
       offset: current.sourceTime,
       maxDuration: segment.end-current.sourceTime,
     });

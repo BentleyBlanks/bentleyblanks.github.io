@@ -60,7 +60,9 @@ async function Drive(label,points,{fight=false,until=null,seconds=120}={}){
       ['PlayerCarRoll',age>.7&&age<1.6],['ImpactBlackout',result.opening.blackout>.99],
       ['BeforeNearImpact',result.firstImpact&&!result.nearImpact],
       ['EyelidPartial',age>2.65&&age<4.3&&result.opening.eyeClosure>.1&&result.opening.eyeClosure<.8],
-      ['FallenPlayer',age>3.8&&rescueAge<0],['RescueReach',rescueAge>1&&rescueAge<2.5]];
+      ['FallenPlayer',age>3.8&&rescueAge<0],['RescueReach',rescueAge>1&&rescueAge<2.5],
+      ['WreckPressure',age>10&&result.opening.escapePressure?.smokeSources===2],
+      ['ApronPressure',result.opening.escapePressure?.impacts.length>=4&&result.position[2]>45]];
     for(const [name,ready] of shots)if(ready&&!openingShots.has(name)){openingShots.add(name);await Capture(name);}
 
     if(!whisperCaptured&&result.voiceCue==="EscapeWhisper"){
@@ -236,6 +238,10 @@ try{
   if(from==="Train"){
     assert.ok(!final.log.some(e=>e.kind==="debugJump"));
     assert.equal(final.opening.playerCar,OPENING.derailCar,"the player carriage is the physical wreck");
+    const pressure=final.opening.escapePressure;
+    assert.ok(pressure.impacts.length>=4&&pressure.launched.length<=OPENING.escapePressure.shells.length,
+      "finite follow-up shells actually hit during the normal escape");
+    assert.equal(pressure.smokeSources,0,"the sheltered exchange releases the wreck smoke sources");
     assert.ok(final.opening.rescueAt-final.opening.derailAt<9,'a stopped wreck permits prompt rescue without a long braking wait');
     if(realtime){
       assert.ok(openingShots.has('PlayerCarRoll')&&openingShots.has('ImpactBlackout')&&openingShots.has('RescueReach'),'normal flow records physical roll, blackout and visible rescue');

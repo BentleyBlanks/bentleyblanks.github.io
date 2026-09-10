@@ -685,6 +685,30 @@ for(const preparedAnimation of [false,true]) {
 console.log("ok individual trench lanes, rounded corners, safe spacing and variable march pace");
 
 {
+  const shells=[],smoke=[],removed=[],facts=new Set();
+  const runtime={time:0,flow:{stage:{id:"Unloading"}},Has:id=>facts.has(id),Near:()=>true,
+    Point:(p,y=0)=>({...p,y}),combat:{FireShell:(from,to,options)=>shells.push({from,to,options})},
+    vfx:{SmokeSource:(p,options)=>{smoke.push({p,options});return smoke.length;},RemoveSmokeSource:id=>removed.push(id)}};
+  const opening=new FirstLevelOpening(runtime);
+  opening.UpdateEscapePressure();
+  assert.equal(shells.length+smoke.length,0,"no anticipatory barrage or smoke before impact");
+  opening.derailAt=0;
+  for(runtime.time=0;runtime.time<90;runtime.time+=.1)opening.UpdateEscapePressure();
+  assert.equal(shells.length,OPENING.escapePressure.shells.length,"the salvo is finite even if the player stops");
+  assert.ok(shells.every(s=>s.options.damage>0&&s.options.radius>0),"escape shells use real combat damage");
+  assert.equal(smoke.length,2,"reuse two pooled wreck emitters without per-frame creation");
+  for(const [i,shell] of shells.entries())shell.options.OnImpact({...shell.to});
+  assert.equal(opening.pressureImpacts.length,shells.length,"record actual impacts independently of launch");
+  facts.add("shelterReached");opening.UpdateEscapePressure();opening.ClearWreckSmoke();
+  assert.deepEqual(removed,[1,2],"the sheltered exchange clears every wreck emitter exactly once");
+  const cycle=OPENING.surfaceBurstSeconds+OPENING.surfaceRestSeconds;
+  const second=OPENING.surface.find(s=>s.id==="RailLockGunner").firePhaseS;
+  assert.ok(second>=OPENING.surfaceBurstSeconds&&second<cycle,
+    "the second surface section keeps firing during the first section's reload");
+  console.log("ok finite real escape barrage, impact causality and bounded smoke lifecycle");
+}
+
+{
  let clock=0;const events=[];
  const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){},PlayStoryVoice(){return {voice:{t:clock}};}},hud:{Say(){}},Clock:()=>clock,Event:id=>events.push(id)});
  voice.Enqueue("TrainMeal");voice.Update(5);voice.Update(90);
