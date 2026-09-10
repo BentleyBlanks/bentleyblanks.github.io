@@ -169,12 +169,21 @@ try {
         s.position.z - T.player.position.z);
       const Ija = () => T.ai.soldiers.filter((s) => s.alive && s.side === "ija");
       const seen = new Map();
-      for (const s of Ija()) seen.set(s.id, { x: s.position.x, z: s.position.z });
+      for (const s of Ija()) seen.set(s.id, { x: s.position.x, z: s.position.z, maxMoved: 0 });
       // A real player MG burst supplies the opposing audible stimulus. The
       // reduced roster has no 110-man rear reserve generating constant noise.
       T.Debug.Key("KeyF",true);Step(2);T.Debug.Key("KeyF",false);
       T.Debug.Mouse(0,true);
-      Step(4 * 60);                        // 「四秒没挪窝」的窗口，与探针一致
+      // Measure movement throughout the window. A soldier who peeks out and
+      // returns to cover has moved; comparing only the endpoints erases it.
+      for (let frame = 0; frame < 4 * 60; frame++) {
+        Step(1);
+        for (const s of Ija()) {
+          const before = seen.get(s.id);
+          if (before) before.maxMoved = Math.max(before.maxMoved,
+            Math.hypot(s.position.x - before.x, s.position.z - before.z));
+        }
+      }
       T.Debug.Mouse(0,false);
       const rows = Ija().map((s) => {
         const b = seen.get(s.id);
@@ -189,7 +198,7 @@ try {
         }
         return {
           d: Dist(s), mobile:!!s.missionAssault, stance: s.stance, state: s.state, alert: s.alert,
-          moved: b ? Math.hypot(s.position.x - b.x, s.position.z - b.z) : 0,
+          moved: b?.maxMoved || 0,
           facingDeg, knows: !!at,
         };
       });
@@ -384,9 +393,14 @@ try {
       site=probe.PickSite(T,anchors.village.x,anchors.village.z,{nearest:true});
       if(!site)throw new Error("Missing village flank fixture");
       Teleport(site.open.x,site.open.z,"stand",site.yaw);
+      // This invulnerable fixture measures rifle maneuvering. A flanker who
+      // passes the player otherwise enters an endless melee (neither can die),
+      // freezing Think before the flank angle can be measured. Melee has its own gates.
+      const meleeDormancy = squad.map(s => s.meleeDormant);
       for(const [i,s] of squad.entries()){
         const p=T.physics.FindFreeSpot(site.shoot.x-7+i*2.8,site.shoot.z);
         s.position.set(p.x,p.y,p.z);s.body?.Teleport(p.x,p.y,p.z);s.goal.copy(s.position);s.cover=null;
+        s.meleeDormant = true;
       }
       for (const s of squad) { s.holdZone = null; s.order = "advance"; s.scriptCoverSlackM = undefined; }
       const flank = { assigned: 0, wide: 0, bestAngleDeg: 0 };
@@ -410,6 +424,7 @@ try {
         }
       }
       out.flank = flank;
+      squad.forEach((s, i) => { s.meleeDormant = meleeDormancy[i]; });
     }
 
     // B5 会扔：把人钉回射击线。**距离必须留住** —— 上一段他们会一路压到玩家脸上，

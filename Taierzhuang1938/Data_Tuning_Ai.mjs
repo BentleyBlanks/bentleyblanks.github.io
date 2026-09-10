@@ -280,4 +280,7 @@ export const BRAIN = Freeze({
    * 0.35 m 比一帧的位移大得多，比「人被瞬移到靶场」小得多。
    */
   muzzleSyncM: 0.35,
+  // Visible soldiers must finish raising and pointing their actual barrel before firing.
+  fireAimBlendMin: 0.95,
+  fireBarrelAngleRad: 0.12,
 });

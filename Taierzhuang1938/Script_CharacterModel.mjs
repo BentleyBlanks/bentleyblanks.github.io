@@ -175,7 +175,7 @@ export function DefaultLugouAnimationId(kind) {
  * 下面这些数是实机量的骨骼世界坐标（演员脚下平面记作 0；探针是 nra / seed 41938，
  * 抽到 Nra01、整体缩放 0.898。2026-08-29 补回骨盆位移轨道之后重量了一遍）：
  *
- *   StandFireCrouch   头 0.37–0.51  胯 0.16–0.28  手 0.27–0.48  → **趴着据枪**（真匍匐）
+ *   StandFireCrouch   头 0.37–0.51  胯 0.16–0.28  手 0.27–0.48  → 旧低姿（比例异常，见下）
  *   ProneFire         头 1.36       胯 0.82–0.83  手 1.48–1.50  → 站着把手臂甩过肩
  *   RifleIdle / Alt   头 0.86       胯 0.31                     → 单膝跪地据枪
  *   AdvanceFire       头 1.18–1.38  胯 0.69–0.80                → **站姿据枪**（真站着）
@@ -185,6 +185,8 @@ export function DefaultLugouAnimationId(kind) {
  *   LeanWallSitPeek   头 0.66–0.67  胯 0.13–0.14                → 坐在地上
  *   RifleRun          头 1.20–1.26  胯 0.63–0.69                → 持枪跑步
  *
+ * 2026-09-10：StandFireCrouch 的低高度来自缩短的骨骼平移，不能证明卧姿正确。
+ * FullSizeProneClip 在运行时用正常比例参考姿态替换它；ActorPoseTest 另验骨长与前后展开。
  * 回归口在 Script_CutscenePoseTest.mjs：它按这张表逐条量高度，
  * 换一批动作资产（或重烘）把姿态换了位置，那条测试会先红。
  *
@@ -427,6 +429,102 @@ function BuildHandGrip(hand, side, fallback) {
   return grip;
 }
 
+// The legacy StandFireCrouch track carries a different Biped's translations:
+// its thigh is 16.4 cm versus AdvanceFire's 39.5 cm. Low head height was the
+// result of shrinking the skeleton, not lying down. Build one corrected clip
+// per loaded model from its full-size reference, preserving every limb length.
+const PRONE_CLIP_CACHE = new WeakMap();
+function FullSizeProneClip(asset, reference) {
+  if (PRONE_CLIP_CACHE.has(asset)) return PRONE_CLIP_CACHE.get(asset);
+  const root = CloneSkeleton(asset.gltf.scene);
+  const pelvis = FindNode(root, asset.record.boneRoles.pelvis);
+  const mixer = new THREE.AnimationMixer(root);
+  const action = mixer.clipAction(reference).play();
+  const times = [], positions = [], rotations = [];
+  const legs = ["L", "R"].flatMap((side, index) => {
+    const thigh = FindNode(root, asset.record.boneRoles[`thigh${side}`]);
+    const calf = FindNode(root, asset.record.boneRoles[`calf${side}`]);
+    const foot = FindNode(root, asset.record.boneRoles[`foot${side}`]);
+    const toe = foot.children.find(node => /Toe0$/.test(node.name));
+    const sign = index === 0 ? 1 : -1;
+    return [
+      { bone: thigh, child: calf, direction: new THREE.Vector3(sign * .15, -.18, -1).normalize(), values: [] },
+      { bone: calf, child: foot, direction: new THREE.Vector3(sign * .10, -.08, -1).normalize(), values: [] },
+      { bone: foot, child: toe, direction: new THREE.Vector3(sign * .03, -.7, -.65).normalize(), values: [] },
+    ].filter(leg => leg.child);
+  });
+  for (const leg of legs) leg.base = new THREE.Quaternion();
+  const pelvisBasePosition = new THREE.Vector3(), pelvisBaseQuaternion = new THREE.Quaternion();
+  const direction = new THREE.Vector3(), start = new THREE.Vector3(), delta = new THREE.Quaternion();
+  const worldPosition = new THREE.Vector3(), point = new THREE.Vector3();
+  const parentQ = new THREE.Quaternion(), localQ = new THREE.Quaternion();
+  // Source faces +Z; lean forward while retaining a small shoulder/head lift.
+  const lean = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 1.15);
+  const meshes = [];
+  root.traverse(node => { if (node.isSkinnedMesh) meshes.push(node); });
+  const frames = Math.ceil(reference.duration * 30);
+  let bestLift = Infinity, bestTime = 0;
+  for (let frame = 0; frame <= frames; frame++) {
+    const time = reference.duration * frame / frames;
+    mixer.setTime(Math.min(time, reference.duration - 1e-6));
+    pelvisBasePosition.copy(pelvis.position); pelvisBaseQuaternion.copy(pelvis.quaternion);
+    for (const leg of legs) leg.base.copy(leg.bone.quaternion);
+    pelvis.parent.getWorldQuaternion(parentQ);
+    localQ.copy(parentQ).invert().multiply(lean).multiply(parentQ);
+    pelvis.quaternion.premultiply(localQ);
+    pelvis.getWorldPosition(worldPosition); worldPosition.y = .22;
+    pelvis.position.copy(pelvis.parent.worldToLocal(worldPosition));
+    for (const leg of legs) {
+      leg.bone.getWorldPosition(start); leg.child.getWorldPosition(direction);
+      direction.sub(start).normalize();
+      delta.setFromUnitVectors(direction, leg.direction);
+      leg.bone.parent.getWorldQuaternion(parentQ);
+      localQ.copy(parentQ).invert().multiply(delta).multiply(parentQ);
+      leg.bone.quaternion.premultiply(localQ);
+      leg.values.push(...leg.bone.quaternion.toArray());
+    }
+    root.updateMatrixWorld(true);
+    let floor = Infinity;
+    for (const mesh of meshes) {
+      mesh.skeleton.update();
+      for (let vertex = 0; vertex < mesh.geometry.attributes.position.count; vertex++) {
+        mesh.getVertexPosition(vertex, point).applyMatrix4(mesh.matrixWorld);
+        floor = Math.min(floor, point.y);
+      }
+    }
+    const lift = Math.max(0, .003 - floor);
+    if (lift < bestLift) { bestLift = lift; bestTime = time; }
+    if (floor < .003) {
+      pelvis.getWorldPosition(worldPosition); worldPosition.y += .003 - floor;
+      pelvis.position.copy(pelvis.parent.worldToLocal(worldPosition));
+    }
+    times.push(time); positions.push(...pelvis.position.toArray()); rotations.push(...pelvis.quaternion.toArray());
+    // Mixer skips writes when adjacent keys are identical. Restore the sampled
+    // pose so our correction cannot accumulate on those constant tracks.
+    pelvis.position.copy(pelvisBasePosition); pelvis.quaternion.copy(pelvisBaseQuaternion);
+    for (const leg of legs) leg.bone.quaternion.copy(leg.base);
+  }
+  const prefix = pelvis.name;
+  const replaced = new Set([`${prefix}.position`, `${prefix}.quaternion`,
+    ...legs.map(leg => `${leg.bone.name}.quaternion`)]);
+  const tracks = reference.tracks.filter(track => !replaced.has(track.name)).map(track => track.clone());
+  tracks.push(new THREE.VectorKeyframeTrack(`${prefix}.position`, times, positions),
+    new THREE.QuaternionKeyframeTrack(`${prefix}.quaternion`, times, rotations));
+  for (const leg of legs) tracks.push(new THREE.QuaternionKeyframeTrack(`${leg.bone.name}.quaternion`, times, leg.values));
+  // This is a prone holding pose, not the reference's standing footwork loop.
+  // Keep the full-size frame with the smallest contact correction so a raised
+  // foot or a sweeping arm cannot lift the entire prone soldier on later frames.
+  for (const track of tracks) {
+    const value = Array.from(track.createInterpolant().evaluate(bestTime));
+    track.times = new Float32Array([0, reference.duration]);
+    track.values = new Float32Array([...value, ...value]);
+  }
+  const clip = new THREE.AnimationClip("StandFireCrouch", reference.duration, tracks);
+  action.stop(); mixer.uncacheRoot(root);
+  PRONE_CLIP_CACHE.set(asset, clip);
+  return clip;
+}
+
 /** One independently animated, skeleton-cloned soldier. */
 export class LugouCharacterRig {
   constructor(asset, { kind, targetHeight, seed, variantIndex, materialLibrary = null }) {
@@ -471,6 +569,9 @@ export class LugouCharacterRig {
           .sort((a, b) => b.length - a.length)
           .find((candidate) => normalized.includes(NormalizeName(candidate)));
       if (id && !this.clipById.has(id)) this.clipById.set(id, clip);
+    }
+    if (this.clipById.has("StandFireCrouch") && this.clipById.has("AdvanceFire")) {
+      this.clipById.set("StandFireCrouch", FullSizeProneClip(asset, this.clipById.get("AdvanceFire")));
     }
     this.mixer = new THREE.AnimationMixer(this.root);
     this.infantryPropTracks = new Map((asset.infantry?.animations || []).map(clip => [clip.name,

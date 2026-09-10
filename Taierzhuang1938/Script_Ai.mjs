@@ -360,7 +360,7 @@ export class Soldier {
     this.targetExposedS = 0;     // 目标连续暴露了几秒（瞄准收敛加速）
     this.muzzleWorld = null;     // 这一发的枪口（UpdateMuzzle 写，对不上账时为 null）
     this.muzzleStore = null;
-    this.lookPitch = 0;          // TryFire 算出来的抬枪角（向上为正）
+    this.lookPitch = 0;          // 持续跟踪瞄点的抬枪角（向上为正）
     this.lookPitchBlend = 0;     // 限速之后真正喂给 Actor 的那个
     this.burstLeft = 0;          // 这一梭子还剩几发（BurstPlan 排的）
     this.burstIntervalS = 0;
@@ -2422,6 +2422,7 @@ export class AiDirector {
       return;
     }
     const animationStartX = s.position.x, animationStartZ = s.position.z;
+    let wantsFire = false;
     let desired = null;
     let speed = 0;
     let wantedYaw = s.yaw;
@@ -2495,7 +2496,7 @@ export class AiDirector {
             const d = Math.hypot(s.cover.x - s.position.x, s.cover.z - s.position.z);
             if (d > 1.1) { desired = this.tmpD.set(s.cover.x, 0, s.cover.z); speed = 1.8; }
           }
-          this.TryFire(s, dt, player);
+          wantsFire = true;
         }
         break;
       }
@@ -2520,7 +2521,7 @@ export class AiDirector {
           const d = Math.hypot(cx - s.position.x, cz - s.position.z);
           if (d > 1.1) { desired = this.tmpD.set(cx, 0, cz); speed = 2.4; }
         }
-        this.TryFire(s, dt, player);
+        wantsFire = true;
         break;
       }
       case STATE.WATCH: {
@@ -2535,14 +2536,14 @@ export class AiDirector {
         // 缩着头还打枪的话，「躲」就退化成一个不影响任何事的动画。
         const m = s.moveOrder;
         if (m) { desired = this.tmpD.set(m.x, 0, m.z); speed = m.speed; }
-        if (s.coverPhase === "peek") this.TryFire(s, dt, player);
+        if (s.coverPhase === "peek") wantsFire = true;
         break;
       }
       case STATE.SUPPRESS: {
         // 压制射击：向最后目击位置 / 掩体沿打。命中恒 false，近失弹压制照旧。
         const m = s.moveOrder;
         if (m) { desired = this.tmpD.set(m.x, 0, m.z); speed = m.speed; }
-        this.TryFire(s, dt, player);
+        wantsFire = true;
         break;
       }
       case STATE.BOUND: {
@@ -2558,7 +2559,7 @@ export class AiDirector {
         // 「一边横着跑一边往侧后方开枪」，所以不必在这儿再判一次。
         const m = s.moveOrder;
         if (m) { desired = this.tmpD.set(m.x, 0, m.z); speed = m.speed; }
-        this.TryFire(s, dt, player);
+        wantsFire = true;
         break;
       }
       case STATE.GRENADE:
@@ -2572,7 +2573,7 @@ export class AiDirector {
           desired = this.tmpD.copy(dest);
           speed = ordered ? 3.6 * 1.4 : 3.6;      // 下了命令的冲锋跑得更快
         }
-        this.TryFire(s, dt, player);
+        wantsFire = true;
         this.TryBayonet(s, dt, player);
         break;
       }
@@ -2697,6 +2698,21 @@ export class AiDirector {
 
     let targetYaw = null;
     if (s.target) {
+      // Track height before the first shot and during the cooldown, not after firing.
+      this.UpdateMuzzle(s);
+      const from = this.shooting.MuzzleOrigin(s);
+      const samples = s.target.isPlayer && player ? this.shooting.PlayerSamples(player)
+        : this.shooting.SoldierSamples(s.target.position, s.target.stance, undefined,
+          AiDirector.HeightScale(s.target.ref));
+      const targetId = s.target.isPlayer ? PLAYER_TRACK_ID : s.target.id;
+      const point = this._aimPoint;
+      const sample = samples.find(p => p.part === s.visualAimPart && s.visualAimTargetId === targetId)
+        || samples[1] || samples[0];
+      if (sample) {
+        point.x = sample.x; point.y = sample.y; point.z = sample.z;
+        s.lookPitch = this.shooting.LookPitch(from, point);
+        s.muzzleAimYaw = Math.atan2(-(point.x - from.x), -(point.z - from.z));
+      }
       const dx = s.target.position.x - s.position.x, dz = s.target.position.z - s.position.z;
       targetYaw = Math.atan2(-dx, -dz);
       // 停火瞄准与冲锋面向敌人；跑向掩体时身体面向移动方向，只让上身有限度地看敌。
@@ -2717,19 +2733,19 @@ export class AiDirector {
     // 导航场在相邻格之间切方向时 wantedYaw 会左右跳，身体因为有转速限制尚且平滑，
     // 枪却每帧直接吃跳变后的 lookYaw，于是原地疯狂改枪口方向。
     const wantedLookYaw = targetYaw === null
-      ? 0 : Clamp(AngleDelta(s.yaw, targetYaw), -0.75, 0.75);
+      ? 0 : Clamp(AngleDelta(s.yaw, s.target ? (s.muzzleAimYaw ?? targetYaw) : targetYaw), -0.75, 0.75);
     s.lookYaw += Clamp(wantedLookYaw - s.lookYaw, -4.8 * dt, 4.8 * dt);
 
     // FIRE/ADVANCE 是离散战术状态，枪托不是电门。短暂离开 FIRE 仍保留 0.35 s
     // 的据枪承诺，再用连续 blend 上肩/放下，距离阈值两侧不会横着甩枪。
-    const mayAim = s.state === STATE.FIRE || s.state === STATE.COVER_ENGAGE
+    const mayAim = wantsFire || s.state === STATE.FIRE || s.state === STATE.COVER_ENGAGE
       || s.state === STATE.SUPPRESS
       || (s.state === STATE.SUPPRESSED && s.target && s.suppression <= 0.75);
     if (mayAim && s.target) s.aimUntil = this.time + 0.35;
     const wantedAim = s.target && this.time < s.aimUntil ? 1 : 0;
     const aimRate = wantedAim ? 5.5 : 4.0;
     s.aimBlend += Clamp(wantedAim - s.aimBlend, -aimRate * dt, aimRate * dt);
-    // 抬枪 / 压枪。`s.lookPitch` 由 TryFire 按「枪口 → 瞄点」算出来（向上为正），
+    // 抬枪 / 压枪。`s.lookPitch` 持续按「枪口 → 瞄点」跟踪（向上为正），
     // 这里跟 lookYaw 同一套做法：不据枪时回零，且**限速** ——
     // 一发打完立刻把枪甩平，画面上就是每开一枪抖一下头。
     const wantedPitch = s.target && this.time < s.aimUntil ? (s.lookPitch || 0) : 0;
@@ -2767,7 +2783,7 @@ export class AiDirector {
       s.actor.root.position.copy(s.position);
       s.actor.root.rotation.y = s.yaw;
       const cadence = ActorAnimationCadence(s);
-      if (s.actor.root.visible && (this.tickIndex + s.id) % cadence === 0) s.actor.Update(dt * cadence, {
+      if (s.actor.root.visible && (wantsFire || (this.tickIndex + s.id) % cadence === 0)) s.actor.Update(dt * (wantsFire ? 1 : cadence), {
         moveSpeed: s.moveSpeed,
         moveSpeedMps: Math.hypot(s.position.x - animationStartX, s.position.z - animationStartZ) / Math.max(dt, .0001),
         bayonetFixed: s.bayonetFixed,
@@ -2787,6 +2803,8 @@ export class AiDirector {
         woundedWalk: s.woundedWalk || 0,
       });
     }
+    // Fire only after movement, turning and this frame's visible skeleton are synchronized.
+    if (wantsFire && !s.meleeCombat) this.TryFire(s, dt, player);
   }
 
   /** A named living casualty is attached to the carrier, with the same model and body. */
@@ -3524,6 +3542,22 @@ export class AiDirector {
     const dist = dir.length();
     dir.divideScalar(dist || 1);
 
+    // Remember the exposed body part for pre-shot tracking on following frames.
+    s.lookPitch = this.shooting.LookPitch(from, aimV);
+    if (aimed) {
+      const samples = toPlayer ? this.shooting.PlayerSamples(player)
+        : this.shooting.SoldierSamples(s.target.position, s.target.stance, undefined,
+          AiDirector.HeightScale(s.target.ref));
+      const sample = samples.find(p => Math.hypot(p.x - aimV.x, p.y - aimV.y, p.z - aimV.z) < 0.01);
+      s.visualAimPart = sample?.part;
+      s.visualAimTargetId = targetId;
+    }
+    // Body yaw alone cannot validate a skinned weapon (kneeling/turning/raising).
+    // Hidden LOD actors retain the rule-layer origin and facing fallback.
+    if (s.muzzleWorld && typeof s.actor?.MuzzleDirection === "function"
+        && (s.aimBlend < BRAIN.fireAimBlendMin
+          || s.actor.MuzzleDirection(this.tmpMuzzle).dot(dir) < Math.cos(BRAIN.fireBarrelAngleRad))) return;
+
     // 射击线上有自己人就不扣扳机（后排隔着前排的后脑勺开枪）。
     if (!this.shooting.LineOfFireClear(from, aimV, this.FriendlyTorsos(s))) return;
 
@@ -3544,8 +3578,6 @@ export class AiDirector {
     s.aimTime = 0;
     this.fireCount += 1;              // 通关冒烟要的是"仗真的打起来了"的运行时证据
     if (aimed) this.stats.aimedShots += 1; else this.stats.suppressShots += 1;
-    // 人物抬枪 / 压枪：Actor 的 lookPitch 向上为正（Script_AiShooting.LookPitch 头注）。
-    s.lookPitch = this.shooting.LookPitch(from, aimV);
     // AI 的枪声也是刺激：一条街上的人听得见谁在开火（docs/Data_EnemyAi.md §4.1）。
     this.NoteStimulus(s.weapon.rpm ? "machinegun" : "gunshot", s.position,
       { side: s.side, sourceId: s.id, ref: s });

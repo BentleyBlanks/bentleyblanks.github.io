@@ -1186,6 +1186,53 @@ const SOCKET_FRAME_SOURCE = new THREE.Matrix4();
 const SOCKET_FRAME_TARGET = new THREE.Matrix4();
 const SOCKET_MOUNT_INVERSE = new THREE.Matrix4();
 const SOCKET_AIM_Q = new THREE.Quaternion();
+const RIG_AIM_DIRECTION = new THREE.Vector3();
+const RIG_AIM_FORWARD = new THREE.Vector3();
+const RIG_AIM_ROOT_Q = new THREE.Quaternion();
+const RIG_AIM_PARENT_Q = new THREE.Quaternion();
+const RIG_AIM_DELTA_Q = new THREE.Quaternion();
+const RIG_AIM_LOCAL_Q = new THREE.Quaternion();
+const RIG_AIM_PIVOT = new THREE.Vector3();
+const RIG_IK_AXIS = new THREE.Vector3();
+const RIG_IK_POLE = new THREE.Vector3();
+const RIG_IK_ELBOW = new THREE.Vector3();
+const RIG_IK_FROM = new THREE.Vector3();
+const RIG_IK_TO = new THREE.Vector3();
+const RIG_IK_SHIFT = new THREE.Vector3();
+
+function RotateRigBoneWorld(bone, delta) {
+  bone.parent.getWorldQuaternion(RIG_AIM_PARENT_Q);
+  RIG_AIM_LOCAL_Q.copy(RIG_AIM_PARENT_Q).invert().multiply(delta).multiply(RIG_AIM_PARENT_Q);
+  bone.quaternion.premultiply(RIG_AIM_LOCAL_Q);
+}
+
+function SolveRigAimArm(arm) {
+  RIG_IK_AXIS.subVectors(arm.target, arm.shoulder);
+  const distance = Math.max(1e-6, RIG_IK_AXIS.length());
+  RIG_IK_AXIS.divideScalar(distance);
+  const along = (arm.upperLength ** 2 - arm.lowerLength ** 2 + distance ** 2) / (2 * distance);
+  const height = Math.sqrt(Math.max(0, arm.upperLength ** 2 - along ** 2));
+  RIG_IK_POLE.subVectors(arm.pole, arm.shoulder);
+  RIG_IK_POLE.addScaledVector(RIG_IK_AXIS, -RIG_IK_POLE.dot(RIG_IK_AXIS));
+  if (RIG_IK_POLE.lengthSq() < 1e-8) {
+    RIG_IK_POLE.set(0, 1, 0).addScaledVector(RIG_IK_AXIS, -RIG_IK_AXIS.y);
+    if (RIG_IK_POLE.lengthSq() < 1e-8) RIG_IK_POLE.set(1, 0, 0);
+  }
+  RIG_IK_ELBOW.copy(arm.shoulder).addScaledVector(RIG_IK_AXIS, along)
+    .addScaledVector(RIG_IK_POLE.normalize(), height);
+  RIG_IK_FROM.subVectors(arm.elbow, arm.shoulder).normalize();
+  RIG_IK_TO.subVectors(RIG_IK_ELBOW, arm.shoulder).normalize();
+  RIG_AIM_DELTA_Q.setFromUnitVectors(RIG_IK_FROM, RIG_IK_TO);
+  RotateRigBoneWorld(arm.upper, RIG_AIM_DELTA_Q);
+  arm.lower.getWorldPosition(RIG_IK_ELBOW);
+  arm.hand.getWorldPosition(RIG_IK_FROM);
+  RIG_IK_FROM.sub(RIG_IK_ELBOW).normalize();
+  RIG_IK_TO.subVectors(arm.target, RIG_IK_ELBOW).normalize();
+  RIG_AIM_DELTA_Q.setFromUnitVectors(RIG_IK_FROM, RIG_IK_TO);
+  RotateRigBoneWorld(arm.lower, RIG_AIM_DELTA_Q);
+  arm.hand.parent.getWorldQuaternion(RIG_AIM_PARENT_Q);
+  arm.hand.quaternion.copy(RIG_AIM_PARENT_Q).invert().multiply(arm.handWorld);
+}
 
 export class Actor {
   /** @param {ActorFactory} factory */
@@ -1764,6 +1811,13 @@ export class Actor {
     return out.copy(this.weaponMuzzle).applyMatrix4(this.weaponGroup.matrixWorld);
   }
 
+  /** Actual barrel axis, using the same live transform as MuzzleWorld. */
+  MuzzleDirection(target = new THREE.Vector3()) {
+    const group = this.weaponGroup || this.neck;
+    group.updateWorldMatrix(true, false);
+    return target.set(0, 0, -1).transformDirection(group.matrixWorld);
+  }
+
   /**
    * 通用人体挂点。返回稳定复用的 Object3D（不是每次 new 的 Vector3），所以调用方可以
    * 直接把线、弹药袋、背包或镜头目标挂在上面。名称大小写不敏感，未知名称返回 null。
@@ -1856,6 +1910,15 @@ export class Actor {
     // --- 开火 / 拉栓的边沿检测 --------------------------------------------
     const firing = !!s.firing;
     if (this.characterRig) {
+      // Undo our post-animation correction before the mixer (including unkeyed bones).
+      if (this.rigAimApplied) {
+        for (const arm of this.rigAimArms) {
+          arm.upper.quaternion.copy(arm.upperBase);
+          arm.lower.quaternion.copy(arm.lowerBase);
+          arm.hand.quaternion.copy(arm.handBase);
+        }
+        this.rigAimApplied = false;
+      }
       this.characterRig.Update(dt, s);
       this._UpdateRiggedWeaponMount();
       this._UpdateInfantryProps();
@@ -2309,7 +2372,64 @@ export class Actor {
     if (this.characterRig) {
       this.body.position.set(0, d.hipY, 0);
       this.body.rotation.set(0, 0, 0);
+      this._ApplyRiggedAim(s);
     }
+  }
+
+  /** Aim the arms and rifle without folding the animated torso into the knees. */
+  _ApplyRiggedAim(state) {
+    const rig = this.characterRig;
+    const weight = Clamp01(state.aim || 0);
+    if (!rig || !this.weaponGroup || weight < 0.001
+        || rig.forcedClip || state.dead || this.ragdollState || state.meleeCombat
+        || state.throwing > 0 || rig.infantry.IsThrowing() || state.melee > 0
+        || state.carryRole || state.woundedWalk > 0.5
+        || this.weaponData?.kind === "melee" || this.weaponData?.kind === "throwable") return;
+    if (!this.rigAimArms) {
+      this.rigAimArms = ["L", "R"].map(side => ({
+        upper: rig.bones[`upperArm${side}`], lower: rig.bones[`forearm${side}`], hand: rig.bones[`hand${side}`],
+        upperBase: new THREE.Quaternion(), lowerBase: new THREE.Quaternion(), handBase: new THREE.Quaternion(),
+        handWorld: new THREE.Quaternion(), shoulder: new THREE.Vector3(), elbow: new THREE.Vector3(),
+        wrist: new THREE.Vector3(), target: new THREE.Vector3(), pole: new THREE.Vector3(),
+      }));
+    }
+    if (this.rigAimArms.some(arm => !arm.upper || !arm.lower || !arm.hand)) return;
+    POSE_E.set(Clamp(state.lookPitch || 0, -1.0, 0.9),
+      Clamp(state.lookYaw || 0, -1.4, 1.4), 0, "YXZ");
+    RIG_AIM_ROOT_Q.setFromEuler(POSE_E);
+    RIG_AIM_DIRECTION.set(0, 0, -1).applyQuaternion(RIG_AIM_ROOT_Q);
+    this.root.getWorldQuaternion(RIG_AIM_ROOT_Q);
+    RIG_AIM_DIRECTION.applyQuaternion(RIG_AIM_ROOT_Q);
+    this.MuzzleDirection(RIG_AIM_FORWARD);
+    RIG_AIM_ROOT_Q.setFromUnitVectors(RIG_AIM_FORWARD, RIG_AIM_DIRECTION);
+    RIG_AIM_DELTA_Q.identity().slerp(RIG_AIM_ROOT_Q, weight);
+    RIG_AIM_PIVOT.set(0, 0, 0);
+    for (const arm of this.rigAimArms) {
+      arm.upperBase.copy(arm.upper.quaternion); arm.lowerBase.copy(arm.lower.quaternion);
+      arm.handBase.copy(arm.hand.quaternion);
+      arm.upper.getWorldPosition(arm.shoulder); arm.lower.getWorldPosition(arm.elbow);
+      arm.hand.getWorldPosition(arm.wrist); arm.hand.getWorldQuaternion(arm.handWorld);
+      arm.upperLength = arm.shoulder.distanceTo(arm.elbow);
+      arm.lowerLength = arm.elbow.distanceTo(arm.wrist);
+      RIG_AIM_PIVOT.addScaledVector(arm.shoulder, .5);
+    }
+    for (const arm of this.rigAimArms) {
+      arm.target.copy(arm.wrist).sub(RIG_AIM_PIVOT).applyQuaternion(RIG_AIM_DELTA_Q).add(RIG_AIM_PIVOT);
+      arm.pole.copy(arm.elbow).sub(RIG_AIM_PIVOT).applyQuaternion(RIG_AIM_DELTA_Q).add(RIG_AIM_PIVOT);
+      arm.handWorld.premultiply(RIG_AIM_DELTA_Q);
+    }
+    // Translate the complete grip pair into both arms' reach; never shorten a
+    // bone or move the torso/legs to force a wrist onto an unreachable target.
+    for (let pass = 0; pass < 8; pass++) for (const arm of this.rigAimArms) {
+      RIG_IK_SHIFT.subVectors(arm.shoulder, arm.target);
+      const distance = RIG_IK_SHIFT.length();
+      const reach = arm.upperLength + arm.lowerLength - .0001;
+      if (distance <= reach) continue;
+      RIG_IK_SHIFT.multiplyScalar(1 - reach / distance);
+      for (const other of this.rigAimArms) { other.target.add(RIG_IK_SHIFT); other.pole.add(RIG_IK_SHIFT); }
+    }
+    for (const arm of this.rigAimArms) SolveRigAimArm(arm);
+    this.rigAimApplied = true;
   }
 
   /** 把 root 空间的落脚点换算进 hips 的父子链（body 与 hips 都可能有旋转/位移）。 */

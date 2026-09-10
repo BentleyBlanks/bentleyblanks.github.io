@@ -110,6 +110,54 @@ try {
     ai.HasLineOfSight=()=>true;
     for(let i=0;i<20&&!rifle.target?.isPlayer;i++){ai.time+=.1;ai.Think(rifle,.1,player);}
     out.nearAcquired=!!rifle.target?.isPlayer;
+    // Exercise the visible skinned soldier through Act, including first acquisition,
+    // a raised target, target turning and posture changes. Capture the real VFX calls.
+    const THREE = await import("three");
+    const { BRAIN } = await import("./Data_Tuning_Ai.mjs");
+    ai.soldiers = [rifle];
+    ai.StepBody = () => {}; // Static, empty firing range; preserve normal pose/fire scheduling.
+    const fireRows = [];
+    let shotRows = [];
+    ai.ctx.vfx = {
+      MuzzleFlash(from, direction) {
+        const muzzle = rifle.actor.MuzzleWorld(new THREE.Vector3());
+        const axis = rifle.actor.MuzzleDirection(new THREE.Vector3());
+        const target = ai.shooting.PlayerSamples(player)[1];
+        const aim = new THREE.Vector3(target.x, target.y, target.z).sub(muzzle).normalize();
+        shotRows.push({ originError: muzzle.distanceTo(from), aimDot: axis.dot(aim),
+          flightDot: axis.dot(direction), blend: rifle.aimBlend, from: from.toArray(), direction: direction.toArray() });
+      },
+      Tracer(from, end) {
+        const row = shotRows.at(-1);
+        row.tracerOriginError = from.distanceTo(new THREE.Vector3(...row.from));
+        row.tracerDot = end.clone().sub(from).normalize().dot(new THREE.Vector3(...row.direction));
+      }, Impact() {}, SmokeSource() { return null; }, Blood() {},
+    };
+    ai.ctx.battlefield.Raycast = () => null;
+    for (const stance of [0, 1, 2]) {
+      Prepare(5);
+      player.position.y = stance === 1 ? 1.8 : 0;
+      rifle.actor.root.position.copy(rifle.position);
+      rifle.actor.root.visible = true;
+      rifle.scriptDefensive = false;
+      rifle.actor.hurtPose = 0; rifle.hurtPose = 0;
+      rifle.state = "fire"; rifle.stance = stance;
+      rifle.crouchBlend = +(stance === 1); rifle.proneBlend = +(stance === 2);
+      rifle.aimBlend = 0; rifle.lookYaw = 0; rifle.lookPitchBlend = 0;
+      rifle.yaw = 1.1; rifle.moveOrder = null; rifle.cover = null;
+      rifle.grounded = true; rifle.holdZone = null;
+      rifle.actor.Update(0, { aim: 0, crouch: rifle.crouchBlend, prone: rifle.proneBlend });
+      shotRows = [];
+      for (let frame = 0; frame < 420; frame++) {
+        player.health = 100; player.wounds = [];
+        player.position.x = frame > 180 ? 1.5 : 0;
+        ai.time += 1 / 60; ai.tickIndex++;
+        ai.Act(rifle, 1 / 60, player);
+      }
+      fireRows.push({ stance, shots: shotRows.length, samples: shotRows });
+    }
+    out.visibleFire = fireRows;
+    out.barrelGate = Math.cos(BRAIN.fireBarrelAngleRad);
     return out;
   });
   const dir = path.join(root,"Taierzhuang1938/_shots/EnemyCloseRange");
@@ -127,6 +175,15 @@ try {
     assert.ok(result.firstHitS!==null&&result.firstHitS<3,"close rifle must inflict damage promptly");
     assert.equal(result.nearToken,true);assert.equal(result.tokenCount,result.cap);
     assert.equal(result.nearAcquired,true);
+    for (const row of result.visibleFire) {
+      assert.ok(row.shots > 0, `visible stance ${row.stance} stopped firing`);
+      for (const shot of row.samples) {
+        assert.ok(shot.originError < 1e-5 && shot.tracerOriginError < 1e-5, "shot uses stale muzzle");
+        assert.ok(shot.aimDot >= result.barrelGate - 1e-5, "visible barrel is not aimed at target");
+        assert.ok(shot.tracerDot > .99999, "flash/tracer directions disagree");
+        assert.ok(shot.blend >= .95, "shot fired before raising rifle");
+      }
+    }
   }
   console.log("AiCloseRangeTest OK");
 } finally {

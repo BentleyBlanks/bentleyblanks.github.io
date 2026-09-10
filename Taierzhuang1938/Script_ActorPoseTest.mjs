@@ -341,6 +341,59 @@ try {
       check(civilian.usingModel && civilian.height > 1.4 && civilian.height < 1.75,
         `civilian ${variant} height out of range: ${civilian.height}`);
     }
+    // Imported pose axes must drive the actual barrel in world space, at every stance.
+    for (let modelVariant = 0; modelVariant < 4; modelVariant += 1) {
+      const gunner = factory.Create("ija", { seed: 410 + modelVariant, modelVariant, weapon: "Type38" });
+      gunner.root.rotation.y = 1.1;
+      const expected = new THREE.Vector3(), actual = new THREE.Vector3();
+      gunner.Update(1 / 60, { aim: 0 });
+      const ThighLength = () => gunner.characterRig.bones.thighL.getWorldPosition(new THREE.Vector3())
+        .distanceTo(gunner.characterRig.bones.calfL.getWorldPosition(new THREE.Vector3()));
+      const standingThigh = ThighLength();
+      let frames = 0;
+      const applyAim = gunner._ApplyRiggedAim;
+      gunner._ApplyRiggedAim = function(state) {
+        const left = this.characterRig.Grip("weaponL");
+        const gripBefore = this.weaponGroup.worldToLocal(left.getWorldPosition(new THREE.Vector3())).clone();
+        const foot = this.characterRig.bones.footL;
+        const footBefore = foot.getWorldPosition(new THREE.Vector3());
+        const head = this.characterRig.bones.head;
+        const headBefore = head.getWorldPosition(new THREE.Vector3());
+        applyAim.call(this, state);
+        const gripAfter = this.weaponGroup.worldToLocal(left.getWorldPosition(new THREE.Vector3()));
+        check(gripBefore.distanceTo(gripAfter) < 1e-4, "aim correction detached left hand from rifle");
+        check(footBefore.distanceTo(foot.getWorldPosition(new THREE.Vector3())) < 1e-5,
+          "aim correction moved planted foot");
+        check(headBefore.distanceTo(head.getWorldPosition(new THREE.Vector3())) < 1e-5,
+          "aim correction folded the head/torso into the crouched legs");
+        frames++;
+      };
+      for (const stance of [0, 1, 2]) for (const lookYaw of [-.55, .4]) for (const lookPitch of [-.35, .4]) {
+        const state = { aim: 1, lookYaw, lookPitch, crouch: +(stance === 1), prone: +(stance === 2) };
+        for (let frame = 0; frame < 12; frame++) {
+          gunner.Update(1 / 60, { ...state, elapsed: frames / 60, firing: frame % 3 === 0 });
+          expected.set(0, 0, -1).applyEuler(new THREE.Euler(lookPitch, lookYaw, 0, "YXZ"))
+            .applyQuaternion(gunner.root.quaternion);
+          gunner.MuzzleDirection(actual);
+          check(ThighLength() / standingThigh > .9 && ThighLength() / standingThigh < 1.1,
+            "low stance shrank the skeleton instead of bending full-size limbs");
+          if (stance === 2 && frame > 8) {
+            const pelvis = gunner.characterRig.bones.pelvis.getWorldPosition(new THREE.Vector3());
+            const head = gunner.characterRig.bones.head.getWorldPosition(new THREE.Vector3()).sub(pelvis)
+              .applyQuaternion(gunner.root.quaternion.clone().invert());
+            const foot = gunner.characterRig.bones.footL.getWorldPosition(new THREE.Vector3()).sub(pelvis)
+              .applyQuaternion(gunner.root.quaternion.clone().invert());
+            check(head.z < -.4 && foot.z > .5, "prone body must extend ahead and behind the pelvis");
+          }
+          check(expected.dot(actual) > .99999,
+            `Ija${modelVariant}/${stance}: live barrel ignores yaw/pitch during animation blend`);
+        }
+      }
+      gunner.Update(0, { aim: 0 });
+      check(!gunner.rigAimApplied, "aim correction leaked into idle");
+      gunner.Dispose();
+    }
+
     // 两个分身必须真的取到两个不同的 tzm 文档。只比身高是不够的：
     // 个体差 ±4% 会让男女的身高区间叠上，同一个模型也可能"看着不一样高"。
     check(factory.KindGeometry("civilian", "male").meshId === "CivilianMale"

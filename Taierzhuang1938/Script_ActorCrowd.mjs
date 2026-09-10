@@ -67,8 +67,8 @@ const CROWD_CAPACITY = 512;
  *   `StandToKneel`（实测 1.7 s 左右）才切 `KneelHold`。实测 2.0 s 起稳定在
  *   1.18 m（站姿 1.52 m），2.5 s 留半秒余量。
  * prone 1.5 s：`POSE_CLIPS.proneFire`（clip 名 `StandFireCrouch`，名实不符，
- *   见 Script_CharacterModel 的注释）没有过渡 clip，但它自己是一条 96 帧的
- *   匍匐循环，头几帧还在往下伏。
+ *   见 Script_CharacterModel 的注释）由完整比例的参考骨架构建静态卧姿；
+ *   保留 1.5 s 收敛窗口，让上一个姿势的混合和程序化权重归稳。
  * dead 1.0 s：倒地 0.8 s + 淡入 0.12 s，推满一秒是完全定格帧。
  *
  * 【要等两秒半的那两档改用大步长】烘焙不出画，中间帧一帧都不要，只要终点。
@@ -87,15 +87,15 @@ const POSE_BAKE = {
 /**
  * 各档姿势喂给 `Actor.Update` 的状态。
  *
- * aim 给 0.35 而不是 0：完全不端枪的话胳膊垂在身侧，远景剪影是一根竖棍，
- * 看不出是个持枪的兵。0.35 大致是"枪斜端在胸前"。
- * 跪射把 aim 抬到 0.5 —— 蹲下来的人多半正在瞄，肩线端起来剪影才是"跪射"而不是"蹲着"。
+ * Static armed poses use full aim so the baked barrel points along local -Z,
+ * the same axis used by distant AI ballistics. Partial aim kept the source
+ * animation's sideways barrel even after the close-up rig was corrected.
  * 跑动把 aim 压到 0.25：`PoseWeapon` 在 moveSpeed>0.55 时自己走"端着枪跑"的一路，
  * 再叠满 aim 会把肩线拧成据枪，腿在跑上身在瞄。
  */
-const STANDING_STATE = { aim: 0.35, moveSpeed: 0, crouch: 0, prone: 0 };
-const KNEEL_STATE = { aim: 0.50, moveSpeed: 0, crouch: 1, prone: 0 };
-const PRONE_STATE = { aim: 0.35, moveSpeed: 0, crouch: 0, prone: 1 };
+const STANDING_STATE = { aim: 1, moveSpeed: 0, crouch: 0, prone: 0 };
+const KNEEL_STATE = { aim: 1, moveSpeed: 0, crouch: 1, prone: 0 };
+const PRONE_STATE = { aim: 1, moveSpeed: 0, crouch: 0, prone: 1 };
 const RUN_STATE = { aim: 0.25, moveSpeed: 1, crouch: 0, prone: 0 };
 const DEAD_BAKE_STATE = { dead: true, dying: 1 };
 

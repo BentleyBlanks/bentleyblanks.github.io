@@ -27,9 +27,9 @@ AI 是对的，`renderLod` 是对的，实例数是对的，`Script_VisibilityTe
 
 | 桶 id | 喂给 `Actor.Update` | 收敛时长 | 落到的 clip | 人体最长边 nra / ija | 三角形 |
 | --- | --- | --- | --- | --- | --- |
-| `standing` | `aim .35` | 0.4 s | `AdvanceFire` | 1.54 / 1.51 m | 15 571 / 23 573 |
-| `kneel` | `aim .50 crouch 1` | 2.5 s | `KneelHold` | 1.21 / 1.17 m | 同上 |
-| `prone` | `aim .35 prone 1` | 1.5 s | `StandFireCrouch` | 0.91 / 0.78 m | 同上 |
+| `standing` | `aim 1` | 0.4 s | `AdvanceFire` | 以当前 ActorCrowdTest 输出为准 | 15 571 / 23 573 |
+| `kneel` | `aim 1 crouch 1` | 2.5 s | `KneelHold` | 同上 | 同上 |
+| `prone` | `aim 1 prone 1` | 1.5 s | `StandFireCrouch`（运行时修正） | 同上 | 同上 |
 | `run0`—`run3` | `aim .25 moveSpeed 1` | 0.4 s + 循环等分 | `RifleRun` | 1.43—1.50 m | 同上 |
 | `dead` | `dead: true, dying: 1` | 1.0 s | 程序化 `PoseRagdoll` | 1.58 / 1.54 m | 同上 |
 
@@ -43,12 +43,13 @@ AI 是对的，`renderLod` 是对的，实例数是对的，`Script_VisibilityTe
   才切 `KneelHold`。第一版给 6 帧（0.1 s），烘出来的**跪姿 1.61 m 比站姿 1.53 m 还高** ——
   那是「刚开始蹲」的第一帧。蹲/卧两档用 1/20 s 的大步长走完同样的秒数，省掉一百多次
   `Actor.Update`（烘焙不出画，中间帧一帧都不要）。
-- **clip 名与内容不符**：`StandFireCrouch` 才是低姿匍匐，`ProneFire` 反而是站姿甩臂。
+- **clip 名与内容不符**：卧姿入口是 `StandFireCrouch`，`ProneFire` 反而是站姿甩臂。
   一律走 `Script_CharacterModel.POSE_CLIPS` 语义表，别按名字反推。
-- **卧姿是「低姿蜷伏」不是「全身摊平」**：`POSE_CLIPS.proneFire` 的骨盆高 0.12—0.27 m，
-  人体包围盒约 0.43 × 0.65 × 0.49 m。这是**近景完整 Actor 的同一个姿势**（`?phase=2` 把一个人
-  的 `prone` 拉满出图核对过），这一层只是照抄。旧的「站姿倒 80°」看着更像躺平，
-  但它与走近之后看到的不是一个东西 —— LOD 的第一要求是两层一致。
+- **卧姿必须保持正常骨长**（2026-09-10 修正）：旧 `StandFireCrouch` 的大腿骨平移只有
+  16.4 cm，正常 `AdvanceFire` 为 39.5 cm；旧高度和包围盒检查误把缩小当成伏低。
+  `FullSizeProneClip` 现在从完整比例的参考骨架构建卧姿，头向前、双腿向后展开并贴地，
+  近景和远景共用。`ActorPoseTest` 同时检查骨长、身体前后展开和枪口方向。
+- **静态持枪桶使用完整瞄准权重**，使烘焙后的枪管沿局部 −Z，与远景 AI 的射击轴一致。
 - **烘焙不做贴地 IK**（`actor.allowFootIk = false`）。探针量的是「烘这一刻 root 恰好落在
   世界哪一点」的地面高度，与将来这批实例站的地方毫无关系，却会被整批人一起继承。
 - **倒地必须排最后**：`Actor.Ragdoll` 一进去 `ragdollState` 就回不来了，而一个 kind 的
@@ -166,9 +167,7 @@ three 的 `primcount === 0` 早退在 `renderInstances` 里，而 `renderBufferD
 
 ## 6. 已知取舍 / 未解
 
-- **卧姿看着像蜷着而不是躺平**。这是 `POSE_CLIPS.proneFire` 那条 clip 本身的样子，
-  近景完整 Actor 一模一样，不是这一层引入的。要改得去改资产（或换一条卧姿 clip），
-  改完这一层跟着变，不用动代码。
+- **卧姿目前是静态据枪姿态**。已修复源动作缩小骨架的问题，尚未新增匍匐爬行动画。
 - **翻页只有 N 档、且一律按满速翻**。远景层不按各人的真实速度调频（那要按人存相位）；
   46 m 外读得出「在跑」，读不出「跑多快」。
 - **姿势档只覆盖战斗姿态**。担架员、伤员跛行、投弹、白刃这些在远景层仍是站姿；

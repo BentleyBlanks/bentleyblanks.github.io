@@ -240,14 +240,16 @@ try {
     pixels.kneel.count > 300 && pixels.kneel.height <= pixels.stand.height * 0.85,
     `跪 ${pixels.kneel.height} px × ${pixels.kneel.count} px² / `
       + `站 ${pixels.stand.height} px × ${pixels.stand.count} px²`);
-  // 【为什么不拿卧姿去跟跪姿比高度】取景是 21° 俯角：横着的身子会把长度投影成
-  // 高度，卧与跪在屏幕上的高度因此咬得很近（实测 42 vs 39 px）。有分量的判据是
-  // **占了多少像素** —— 趴着的人比跪着的人小一圈，这一条对俯角不敏感。
-  Check("卧姿实例的剪影明显低于站姿、也比跪姿小一圈",
-    pixels.prone.count > 150 && pixels.prone.height <= pixels.stand.height * 0.90
-      && pixels.prone.count <= pixels.kneel.count * 0.9,
-    `卧 ${pixels.prone.height} px × ${pixels.prone.count} px² / `
-      + `跪 ${pixels.kneel.height} px × ${pixels.kneel.count} px²`);
+  // Side view: a full-size prone body is lower but extends along the ground.
+  // The old area upper bound certified a shrunken skeleton as a correct pose.
+  // Require standing-scale length and visible body area as well as low height.
+  Check("卧姿实例伏低且保持完整体型，身体沿地面展开",
+    pixels.prone.height <= pixels.stand.height * 0.75
+      && pixels.prone.width >= pixels.stand.height * 0.9
+      && pixels.prone.count >= pixels.stand.count * 0.7
+      && pixels.prone.count <= pixels.stand.count * 2,
+    `卧 ${pixels.prone.width}×${pixels.prone.height} px、${pixels.prone.count} px² / `
+      + `站高 ${pixels.stand.height} px、${pixels.stand.count} px²`);
 
   // ── ④ 预算 ──────────────────────────────────────────────────────────────
   // 最坏情况：同一批人全挤在两档（旧口径） vs 摊到全部八档（新口径）。
