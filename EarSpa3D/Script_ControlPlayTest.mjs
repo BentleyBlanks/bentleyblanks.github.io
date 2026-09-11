@@ -29,8 +29,22 @@ try{for(const [width,height,touch] of [[1000,900,false],[320,568,true]]){
    const t=(await Probe()).targets[0];await Input('down',t);await Step(3);await page.mouse.down({button:'right'});await Step(5);Check((await Probe()).turning&&!(await Probe()).active,'right press switches force to safe rotation');await page.mouse.up();await Step(3);Check((await Probe()).turning,'left release does not stop a held right button');await page.mouse.up({button:'right'});Check(!(await Probe()).turning&&!(await Probe()).active,'mixed mouse buttons release without stuck input');
    await Input('down',t,'right');await Step(3);await page.evaluate(()=>window.dispatchEvent(new Event('blur')));const angle=(await Probe()).rendering.heading;await Step(12);Check(!(await Probe()).turning&&(await Probe()).rendering.heading===angle,'focus loss stops rotation');await Input('up',t,'right');
   }
+  // 真实指针跨越不同法线的耳垢与深浅镜头，不能偷偷改变握持朝向。
+  await Rotate(0,'scoop',s=>s.facing<-.8);
+  const fixed=(await Probe()).rendering;let translated=false,corrected=false;
+  for(const index of [0,1,2,3,4,5,0]){
+   const t=(await Probe()).targets[index];
+   if(touch){await Input('down',t);await Step(1);await Input('up');}else{await page.mouse.move(t.screen.x,t.screen.y);await Step(2);}
+   const p=await Probe();Check(p.rendering.toolRotation.every((v,i)=>Math.abs(v-fixed.toolRotation[i])<1e-8),'moving to target '+index+' preserves actual spoon rotation');
+   translated ||= p.rendering.toolPosition.some((v,i)=>Math.abs(v-fixed.toolPosition[i])>.1);corrected ||= (await page.evaluate(()=>__EarSpaDebug.view.CollisionProbe())).correction>.01;
+  }
+  Check(translated&&corrected,'surface contact still adjusts tool position');
+  for(let i=0;i<2;i++){await page.locator('#depth-toggle').click();await Step(120);const t=(await Probe()).targets[0];if(touch){await Input('down',t);await Input('up');}else await page.mouse.move(t.screen.x,t.screen.y);await Step(2);Check((await Probe()).rendering.toolRotation.every((v,j)=>Math.abs(v-fixed.toolRotation[j])<1e-8),'camera depth change preserves spoon rotation');}
+  await page.screenshot({path:path.join(here,'_dev/Shot_ControlFixedRotation_'+width+'.png')});
+  await Start();
   await Rotate(0,'scoop',s=>s.facing<-.8);let c=await Hold(0);Check(!c.aligned&&c.physics.anchors===9&&!c.physics.detached,'back of the spoon cannot loosen wax');await page.screenshot({path:path.join(here,'_dev/Shot_ControlWrong_'+width+'.png')});await Input('up');await Step(60);
-  await Rotate(0,'scoop',s=>s.facing>.8);c=await Hold(0);Check(c.aligned&&c.physics.detached,'open spoon face lifts the same wax');await Input('up');await Step(230);Check((await Probe()).harvest.some(c=>c.id===0),'proper spoon force collects after landing');
+  await Rotate(0,'scoop',s=>s.facing>.8);const heldRotation=(await Probe()).rendering.toolRotation;c=await Hold(0);Check((await Probe()).rendering.toolRotation.every((v,i)=>Math.abs(v-heldRotation[i])<1e-8),'force and wax detachment preserve spoon rotation');Check(c.aligned&&c.physics.detached,'open spoon face lifts the same wax');await Input('up');await Step(230);Check((await Probe()).harvest.some(c=>c.id===0),'proper spoon force collects after landing');
+  const next=(await Probe()).targets[1];if(touch){await Input('down',next);await Step(1);await Input('up');}else{await page.mouse.move(next.screen.x,next.screen.y);await Step(2);}Check((await Probe()).rendering.toolRotation.every((v,i)=>Math.abs(v-heldRotation[i])<1e-8),'return from automatic delivery restores player spoon rotation');
   await Start();await page.locator('[data-tool="tweezers"]').click();await Rotate(3,'tweezers',s=>s.jawTilt>.85);c=await Hold(3);Check(!c.aligned&&c.physics.anchors===9,'misoriented forceps cannot grip or fracture');await Input('up');await Step(60);
   await Rotate(3,'tweezers',s=>s.jawTilt<.12);c=await Hold(3,125);Check((await Probe()).fractures===1,'properly aligned jaws contact both sides and load brittle wax');await Input('up');
   await Start();await page.locator('[data-tool="feather"]').click();c=await Hold(0,100);Check(c.physics.anchors===9&&c.state==='attached'&&(await Probe()).cleanliness===0,'feather cannot carry a full deposit');await Input('up');

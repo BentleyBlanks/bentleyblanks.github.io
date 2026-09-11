@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CreateCore } from './Script_Core.js?v=ear011-20260911';
-import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear012-controls-20260912';
+import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear013-fixed-rotation-20260912';
 import { CreateAudio } from './Script_Audio.js?v=ear012-size-audio-20260912';
 import { LandingSound } from './Script_LandingSound.mjs?v=ear012-size-audio-20260912';
 import { CreateShop } from './Script_Shop.js?v=ear011-20260911';
@@ -9,7 +9,7 @@ import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear011-20260911';
 
 import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear011-20260911';
 
-const VERSION = 'ear012-size-audio-20260912';
+const VERSION = 'ear013-fixed-rotation-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const TOOL_IDS = { scoop: 'earPickBamboo', tweezers: 'earForceps', drops: 'earDrops',brush:'softBrush',suction:'microSuction',feather:'gooseFeather' };
 const TYPE_NAMES = { dry: '干性薄层', wet: '黏性耳垢', impacted: '紧实硬结' };

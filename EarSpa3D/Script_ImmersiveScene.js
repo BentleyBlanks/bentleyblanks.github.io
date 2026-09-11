@@ -19,7 +19,7 @@ export async function CreateImmersiveScene({ core }) {
   const materials=await CreateTactileMaterials(core.renderer);
   const profile=await (await fetch(new URL('./Data_CanalProfile.json?v=ear012-outer-20260911',import.meta.url))).json();
   const contact=CreateToolContact(profile);
-  let lampOn=false,aim=new THREE.Vector2(),aimed=false,toolLevels={},toolSkins={},lastToolId=null,previewTriangles=0,inspectionDepth=0,inspectionTarget=0,reachBlocked=false,heading=0,turnPoint=null,turnChunk=null,hairTime=0;
+  let lampOn=false,aim=new THREE.Vector2(),aimed=false,toolLevels={},toolSkins={},lastToolId=null,previewTriangles=0,inspectionDepth=0,inspectionTarget=0,reachBlocked=false,heading=0,scoopRotation=null,turnPoint=null,turnChunk=null,hairTime=0;
   const TOOL_REACH={scoop:8.8,tweezers:17.5,drops:17.5,brush:9.5,suction:18,feather:18};
   const Reach=id=>(TOOL_REACH[id]||8.8)+Math.max(0,(toolLevels[id]||1)-1)*.3;
   function PhysicalCopy(source){
@@ -202,7 +202,7 @@ export async function CreateImmersiveScene({ core }) {
   }
   function Reset(seed) {
     for (const c of chunks) { root.remove(c.mesh, c.mark); c.mesh.geometry.dispose(); c.mesh.material.dispose(); c.mark.geometry.dispose(); c.mark.material.dispose(); }
-    transfer=null;showcase=false;inspectionDepth=inspectionTarget=0;contact.Reset();
+    transfer=null;showcase=false;inspectionDepth=inspectionTarget=0;scoopRotation=null;heading=0;turnPoint=turnChunk=null;contact.Reset();
     const rng = MakeRng(seed);
     chunks = Array.from({ length: 9 }, (_, i) => {
       const front = i < 6; const angle = front ? .22 + i * Math.PI / 3 : .70 + (i-6)*Math.PI*2/3;
@@ -450,12 +450,17 @@ export async function CreateImmersiveScene({ core }) {
     reachBlocked=false;
     if(inside&&!transfer){const projected=canal.Project(point);if(projected.depth>Reach(id)){point=Surface(Reach(id),projected.angle,.3);reachBlocked=true;}}
     tool.visible=true;tool.position.copy(point);
-    const shaftAxis=camera.position.clone().addScaledVector(right,1.15).addScaledVector(up,-1.7).sub(point).normalize();
-    const faceNormal=c ? new THREE.Vector3(0,0,1).applyQuaternion(c.body?.detached?c.mesh.quaternion:c.rotation) : toward;
-    const xAxis=shaftAxis.clone().cross(faceNormal).normalize();
-    if(xAxis.lengthSq()<.1)xAxis.copy(right);
-    const zAxis=xAxis.clone().cross(shaftAxis).normalize();
-    tool.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis,shaftAxis,zAxis));tool.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),heading));
+    // 耳勺保存玩家的握持朝向，贴壁、换目标和镜头移动只修正位置。
+    if(id==='scoop'&&scoopRotation)tool.quaternion.copy(scoopRotation);
+    else{
+      const shaftAxis=camera.position.clone().addScaledVector(right,1.15).addScaledVector(up,-1.7).sub(point).normalize();
+      const faceNormal=c ? new THREE.Vector3(0,0,1).applyQuaternion(c.body?.detached?c.mesh.quaternion:c.rotation) : toward;
+      const xAxis=shaftAxis.clone().cross(faceNormal).normalize();
+      if(xAxis.lengthSq()<.1)xAxis.copy(right);
+      const zAxis=xAxis.clone().cross(shaftAxis).normalize();
+      tool.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis,shaftAxis,zAxis));tool.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),heading));
+      if(id==='scoop')scoopRotation=tool.quaternion.clone();
+    }
 
     const jawAxis=new THREE.Vector3(1,0,0).applyQuaternion(tool.quaternion);
     if(id==='tweezers'&&c?.body?.grip){
@@ -479,6 +484,7 @@ export async function CreateImmersiveScene({ core }) {
     const samples=contact.Samples(toolParts[id]);
     if(['feather','brush'].includes(id))for(let y=0;y<3;y+=.15)samples.push(new THREE.Vector3(0,y,0));
     const pose=contact.Solve(point,tool.quaternion,samples,{sweep:!transfer,lockPivot:!!turnPoint});tool.position.copy(pose.position);tool.quaternion.copy(pose.rotation);
+    if(id==='scoop'&&!transfer)scoopRotation.copy(pose.rotation);
     if(['feather','brush'].includes(id)){
       tool.updateMatrixWorld(true);
       for(const part of toolParts[id].children){if(!part.userData.softFiber)continue;
@@ -646,7 +652,7 @@ export async function CreateImmersiveScene({ core }) {
       const envelope=[];for(const [band,radius] of bins)for(const y of [band*.2,(band+1)*.2])for(let i=0;i<16;i++){const a=i*Math.PI/8,r=(radius+.025)/Math.cos(Math.PI/16);envelope.push(new THREE.Vector3(Math.cos(a)*r,y,Math.sin(a)*r));}
       const pose=contact.Solve(tool.position,tool.quaternion,envelope,{sweep:false});tool.position.copy(pose.position);tool.quaternion.copy(pose.rotation);turnPoint=tool.position.clone();return true;
     },
-    TurnBy(delta,id){if(!turnPoint)return;const previous=heading;heading+=delta;const pose=ToolAt(turnPoint,id,turnChunk);if(pose.blocked)heading=previous+delta*(pose.rotationFraction||0);return heading;},
+    TurnBy(delta,id){if(!turnPoint)return;const previous=heading;heading+=delta;if(id==='scoop')scoopRotation.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),delta));const pose=ToolAt(turnPoint,id,turnChunk);if(pose.blocked)heading=previous+delta*(pose.rotationFraction||0);return heading;},
     TurnEnd(){turnPoint=null;turnChunk=null;},Heading(){return heading;},
     Reach,CanReach(c,id){return c.depth<=Reach(id);},SetDeep(value){inspectionTarget=value?1:0;contact.Reset();HideTool();},
     AuditTool,CollisionProbe(){return contact.Probe();},
