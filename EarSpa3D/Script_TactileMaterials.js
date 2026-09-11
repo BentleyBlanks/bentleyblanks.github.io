@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {CreateContactOcclusion} from './Script_ContactOcclusion.js?v=ear011-20260911';
+import {CreateContactOcclusion} from './Script_ContactOcclusion.js?v=ear020-contact-loading-20260912';
 // imagegen 的图集按通道拆成 GPU 纹理；法线/粗糙度/AO 保持线性，颜色才走 sRGB。
 export async function CreateTactileMaterials(renderer) {
   const loader=new THREE.TextureLoader(),contact=CreateContactOcclusion();
@@ -112,5 +112,5 @@ export async function CreateTactileMaterials(renderer) {
     const originals=chunks.filter(c=>!c.fragment).slice(0,9);
     originals.forEach((c,i)=>{marks[i].set(c.origin.x,c.origin.y,c.origin.z,c.irritation||0);wet[i].set(c.origin.x,c.origin.y,c.origin.z,c.surfaceWet||c.softened||0);});
   }
-  return{Skin,Wax,WetWax,GripMaterial,Update,SetOutside(value){state.outside.value=value;},SetContact:contact.SetEnabled,Probe(){return{...contact.Probe(),pbr:['albedo','normal','roughness','ao'],sss:'thin-layer single-scattering approximation',sssStrength:state.sss.value,outerPbr:'Texture_OuterSkinPbrAtlas.png',outerSss:'separate thin-pinna transmission approximation',outerSssStrength:state.outerSss.value};}};
+  return{Skin,Wax,WetWax,GripMaterial,Update,PrepareContact:contact.Prepare,SetOutside(value){state.outside.value=value;},SetContact:contact.SetEnabled,Probe(){return{...contact.Probe(),pbr:['albedo','normal','roughness','ao'],sss:'thin-layer single-scattering approximation',sssStrength:state.sss.value,outerPbr:'Texture_OuterSkinPbrAtlas.png',outerSss:'separate thin-pinna transmission approximation',outerSssStrength:state.outerSss.value};}};
 }

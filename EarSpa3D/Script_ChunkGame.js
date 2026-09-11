@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { ToolIcon } from './Script_ToolIcons.mjs?v=ear014-ui-20260912';
 import { CreateCore } from './Script_Core.js?v=ear011-20260911';
-import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear019-hair-complexion-20260912';
+import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear020-contact-loading-20260912';
 import { CreateAudio } from './Script_Audio.js?v=ear012-size-audio-20260912';
 import { LandingSound } from './Script_LandingSound.mjs?v=ear012-size-audio-20260912';
 import { CreateShop } from './Script_Shop.js?v=ear011-20260911';
@@ -10,7 +10,7 @@ import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear011-20260911';
 
 import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear014-ui-20260912';
 
-const VERSION = 'ear019-hair-complexion-20260912';
+const VERSION = 'ear020-contact-loading-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const TOOL_IDS = { scoop: 'earPickBamboo', tweezers: 'earForceps', drops: 'earDrops',brush:'softBrush',suction:'microSuction',feather:'gooseFeather' };
 const TYPE_NAMES = { dry: '干性薄层', wet: '黏性耳垢', impacted: '紧实硬结' };
@@ -61,9 +61,9 @@ export async function Start() {
   const $ = id => document.getElementById(id);
   app.insertAdjacentHTML('beforeend','<button id="depth-toggle" class="depth-toggle" aria-pressed="false" aria-label="放大观察深处" title="放大观察"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5M7 10h6"/><path class="zoom-plus" d="M10 7v6"/></svg></button>');
   const core = CreateCore({ canvas, viewCamera: new THREE.PerspectiveCamera(65, 1, .05, 400) });
-  const view = await CreateImmersiveScene({ core });
   const audio = CreateAudio();
   const shop = CreateShop();
+  const view = await CreateImmersiveScene({ core });
   let settings = { master: .8, sfx: .85, bgm: .16, muted: false, haptics: true };
   try { settings = { ...settings, ...JSON.parse(localStorage.getItem('earspa3d.calm.settings') || '{}') }; } catch { /* 隐私模式也能玩 */ }
   let phase = 'ready', toolId = 'scoop', active = null, harvested = [], elapsed = 0, time = 0, settle = 0;
@@ -116,11 +116,11 @@ export async function Start() {
     $('satisfaction').textContent=(satisfaction>75?'☺':satisfaction>50?'◔':'☹')+' '+Math.round(satisfaction);
     $('satisfaction').dataset.mood=satisfaction>75?'happy':satisfaction>50?'neutral':'hurt';
   }
-  function StartCustomer() {
+  function StartCustomer(reuseScene=false) {
     if (!shop.CurrentCustomer()) shop.StartDay(rng);
     const customer = shop.CurrentCustomer();
     feedback.length=0;
-    view.Reset(customer.waxSeed);timeLimit=210;timedOut=false;
+    if(!reuseScene)view.Reset(customer.waxSeed);timeLimit=210;timedOut=false;
     view.Enter();
     $('view-toggle').textContent='看耳廓 ↗';
     harvested=[];active=pointer=null;elapsed=settle=0;phase='playing';app.dataset.phase='playing';satisfaction=85;$('depth-toggle').setAttribute('aria-pressed','false');$('depth-toggle').setAttribute('aria-label','放大观察深处');$('depth-toggle').title='放大观察';combo=bestCombo=painCount=fractures=0;painCooldown=0;$('receipt').hidden=true;UpdateInventory();
@@ -133,7 +133,7 @@ export async function Start() {
   // 首屏先摆好同一局，不播放、不计时，点击后直接开始操作。
   shop.StartDay(rng); view.Reset(shop.CurrentCustomer().waxSeed);
   $('customer-name').textContent = `第 ${shop.day} 天 · ${shop.CurrentCustomer().name}`;
-  $('ear-start').onclick = () => { audio.unlock(); $('welcome').remove(); StartCustomer(); canvas.focus({preventScroll:true}); Sound('uiTap', .3); };
+  $('ear-start').onclick = () => { audio.unlock(); $('welcome').remove(); StartCustomer(true); canvas.focus({preventScroll:true}); Sound('uiTap', .3); };
   function SetTool(id) {
     if(!shop.Snapshot().inventory.tools.includes(id))return;Cancel();toolId=id;UpdateInventory();
     for (const button of app.querySelectorAll('[data-tool]')) button.setAttribute('aria-pressed', String(button.dataset.tool === id));
@@ -233,11 +233,16 @@ export async function Start() {
     $('receipt-title').textContent=(expired?'服务结束':satisfaction>=85?'非常满意':satisfaction>=60?'还不错':'下次请轻一点')+' · +'+(payout?.payout||0)+' 枚';
     $('receipt-detail').textContent=`清洁 ${Math.round(CleanMass()/9*100)}% · 满意度 ${Math.round(satisfaction)}｜工时费 ${payout?.labor||0} + 小费 ${payout?.tip||0} + 手艺奖励 ${(payout?.comboBonus||0)+(payout?.perfectBonus||0)}`;
     $('next-customer').hidden=true;  Sound('sparkle', .3);
+    const next=shop.state.todayCustomers.find(c=>!c.done);
+    if(next)view.PrepareCustomer(next.waxSeed).catch(error=>console.error('下一位客人准备失败',error));
   }
-  $('next-customer').onclick = () => {
+  $('next-customer').onclick = async () => {
     if (phase !== 'complete') return;
     audio.unlock(); shop.AdvanceCustomer(); if (!shop.HasNextCustomer()) { shop.NextDay(); shop.StartDay(rng); }
-    StartCustomer();
+    const customer=shop.CurrentCustomer(),button=$('receipt-next');phase='preparing';app.dataset.phase=phase;button.disabled=true;button.textContent='正在准备下一位…';
+    try{if(await view.PrepareCustomer(customer.waxSeed,{urgent:true}))StartCustomer();}
+    catch(error){console.error('客人准备失败',error);phase='complete';app.dataset.phase=phase;}
+    finally{button.disabled=false;button.textContent=phase==='complete'?'重试接待 →':'接待下一位 →';}
   };
   $('receipt-next').onclick=()=>$('next-customer').click();
   $('receipt-shop').onclick=()=>OpenShop();
@@ -309,7 +314,7 @@ export async function Start() {
   }
   function Probe() {
     return { version: VERSION,phase,timeLimit,timeRemaining:Math.max(0,timeLimit-elapsed),timedOut,inputMode:touchMode,turning:!!turnPointer,tool: toolId, elapsed: +elapsed.toFixed(2), cleanliness: CleanMass()/9,satisfaction,painCount,fractures, harvest: harvested.map(x => ({ ...x })), active: active?.id ?? null,
-      targets: view.Targets(), transfer:view.transfer, model:view.modelInfo, viewReady:view.ready, rendering:view.RenderingProbe(), collision:view.CollisionProbe(),feedback:feedback.map(f=>({...f})), events: events.map(x => ({ ...x })), audio: audio.debug(), settings: { ...settings }, shop: shop.Snapshot(), stats: { ...core.stats },
+      targets: view.Targets(), transfer:view.transfer, model:view.modelInfo, viewReady:view.ready, rendering:view.RenderingProbe(), collision:view.CollisionProbe(),preparation:view.PreparationProbe(),feedback:feedback.map(f=>({...f})), events: events.map(x => ({ ...x })), audio: audio.debug(), settings: { ...settings }, shop: shop.Snapshot(), stats: { ...core.stats },
       viewport: { width: innerWidth, height: innerHeight }, stage: (() => { const r = canvas.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })() };
   }
   UpdateInventory();UpdateProgress();core.Resize();view.Resize();Frame(0);await view.WarmTools();Frame(0);

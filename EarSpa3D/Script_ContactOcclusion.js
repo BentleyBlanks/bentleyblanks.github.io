@@ -63,5 +63,5 @@ export function CreateContactOcclusion(){
   if(dirty)texture.needsUpdate=true;uniforms.contactCount.value=i;covered=i;
   for(const c of chunks){const m=c.mesh.material;m.userData.contactSelf=slots.get(c)??-1;if(m.userData.contactShader)m.userData.contactShader.uniforms.contactSelf.value=m.userData.contactSelf;}
  }
- return{Bind,Update,SetEnabled(value){uniforms.contactEnabled.value=value?1:0;},Probe(){return{contactOcclusion:'actual triangle silhouette edge AO and short contact rays',contactOccluders:covered,contactEnabled:!!uniforms.contactEnabled.value,contactRimMm:.135}}};
+ return{Bind,Update,Prepare:Outline,SetEnabled(value){uniforms.contactEnabled.value=value?1:0;},Probe(){return{contactOcclusion:'actual triangle silhouette edge AO and short contact rays',contactOccluders:covered,contactEnabled:!!uniforms.contactEnabled.value,contactRimMm:.135}}};
 }

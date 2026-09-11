@@ -5,7 +5,7 @@ import {execFileSync} from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import {IsFeatherDebris,InstrumentContact} from './Script_InstrumentInteraction.mjs';
+import {InstrumentContact,IsFeatherDebris} from './Script_InstrumentInteraction.mjs';
 import {fileURLToPath} from 'node:url';
 const here=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(here);
 const common=path.resolve(root,execFileSync('git',['rev-parse','--git-common-dir'],{cwd:root,encoding:'utf8'}).trim());
@@ -16,6 +16,8 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
  const reports=[];await fs.mkdir(path.join(here,'_dev'),{recursive:true});
  try{for(const [width,height,touch] of profiles){
   const page=await browser.newPage({viewport:{width,height},hasTouch:touch,isMobile:touch,deviceScaleFactor:touch?2:1,userAgent:touch?'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36':undefined});
+  // 手工推进物理时不再混入机器快慢决定的 rAF 步数；保留浏览器和 Playwright 自己的 rAF。
+  await page.addInitScript(()=>{const native=requestAnimationFrame.bind(window);window.requestAnimationFrame=callback=>callback.name==='Animate'?0:native(callback);});
   if(touch)await page.addInitScript(()=>{Object.defineProperty(navigator,'deviceMemory',{get:()=>4});Object.defineProperty(navigator,'hardwareConcurrency',{get:()=>4});});
   const heardTiers=new Set();
   const cdp=await page.context().newCDPSession(page),report={width,height,touch,checks:[],errors:[]};reports.push(report);
@@ -25,18 +27,19 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
   let down=false;
   async function Input(type,x=0,y=0){if(type==='up'&&!down)return;if(type==='down')down=true;if(type==='up')down=false;if(touch)await cdp.send('Input.dispatchTouchEvent',{type:{down:'touchStart',move:'touchMove',up:'touchEnd'}[type],touchPoints:type==='up'?[]:[{x,y}]});else{if(type==='down'){await page.mouse.move(x,y);await page.mouse.down();}if(type==='move')await page.mouse.move(x,y,{steps:8});if(type==='up')await page.mouse.up();}await page.waitForTimeout(20);}
   async function Select(id){await Input('up');await page.locator('[data-tool="'+id+'"]').click();}
-  // 耳勺跨块保留玩家朝向；整局验收也须像玩家一样主动把勺面转向当前内壁。
-  async function AlignScoop(id){
-    let t=(await Probe()).targets.find(c=>c.id===id);
-    if((await page.locator('#depth-toggle').getAttribute('aria-pressed')==='true')!==(t.depth>10)){await page.locator('#depth-toggle').click();await Step(70);t=(await Probe()).targets.find(c=>c.id===id);}
-    if(touch){await page.locator('#mode-turn').click();await Input('down',t.screen.x,t.screen.y);}else{await page.mouse.move(t.screen.x,t.screen.y);await page.mouse.down({button:'right'});}
-    const normal=await page.evaluate(id=>__EarSpaDebug.view.chunks.find(c=>c.id===id).normal.toArray(),id);
-    for(let i=0;i<80;i++){const p=await Probe();if(InstrumentContact('scoop',p.rendering.toolRotation,normal).facing>.8)break;await Step(3);if(i===79)throw Error('spoon cannot face deposit '+id);}
-    if(touch){await Input('up');await page.locator('#mode-force').click();}else await page.mouse.up({button:'right'});
-  }
-  async function Start(){await page.goto(url+'?debug=1');await page.waitForFunction(()=>window.__EarSpaDebug);await page.evaluate(()=>{window.requestAnimationFrame=()=>0;});await page.locator('#ear-start').click();await page.locator('#lamp-toggle').click();await Step(150);}
+  async function Start(){await page.goto(url+'?debug=1');await page.waitForFunction(()=>window.__EarSpaDebug);await page.locator('#ear-start').click();await page.locator('#lamp-toggle').click();await Step(150);}
   async function Press(id,frames=110){let t=(await Probe()).targets.find(c=>c.id===id);const deep=t.depth>10;if((await page.locator('#depth-toggle').getAttribute('aria-pressed')==='true')!==deep){await page.locator('#depth-toggle').click();await Step(70);t=(await Probe()).targets.find(c=>c.id===id);} await Input('down',t.screen.x,t.screen.y);await Step(frames);return (await Probe()).targets.find(c=>c.id===id);}
-  async function Collect(id,tool){await Select(tool);if(tool==='scoop')await AlignScoop(id);const before=(await Probe()).harvest.length;const c=await Press(id);Check(c.state==='held','hold current tool direction detaches '+id);Check((await Probe()).harvest.length===before,'holding does not award cleaning '+id);await Input('up');await Step(80);if(id===0){Check((await Probe()).rendering.headRealtime&&(await Probe()).rendering.outerVisible,'same live head stays visible during extraction');await page.screenshot({path:path.join(here,'_dev','Shot_LiveExtraction_'+width+'.png')});}await Step(150);Check((await Probe()).harvest.filter(c=>c.id===id).length===1,'exactly one landing award '+id);const landed=(await Probe()).events.find(e=>e.type==='landingSound'&&e.id===id);Check(landed?.cue===LandingSound(c).cue,'size selects approved landing '+id);heardTiers.add(landed.tier);}
+  async function Align(id,tool){
+   if(!['scoop','tweezers'].includes(tool))return;
+   let t=(await Probe()).targets.find(c=>c.id===id);if((await page.locator('#depth-toggle').getAttribute('aria-pressed')==='true')!==(t.depth>10)){await page.locator('#depth-toggle').click();await Step(70);t=(await Probe()).targets.find(c=>c.id===id);}
+   // 握持方向跨目标保留，整局测试也必须像玩家一样转到有效工作面，不能假定自动对齐。
+   const normal=await page.evaluate(id=>__EarSpaDebug.view.chunks.find(c=>c.id===id).normal.toArray(),id);
+   if(touch){await page.locator('#mode-turn').click();await Input('down',t.screen.x,t.screen.y);}else{await page.mouse.move(t.screen.x,t.screen.y);await page.mouse.down({button:'right'});}
+   let aligned=false;for(let i=0;i<100;i++){await Step(3);const p=await Probe(),contact=InstrumentContact(tool,p.rendering.toolRotation,normal);aligned=contact.aligned;if(aligned)break;}
+   if(touch){await Input('up');await page.locator('#mode-force').click();}else await page.mouse.up({button:'right'});
+   Check(aligned,'real rotation aligns '+tool+' for target '+id);
+  }
+  async function Collect(id,tool){await Select(tool);await Align(id,tool);const before=(await Probe()).harvest.length;const c=await Press(id);Check(c.state==='held','hold current tool direction detaches '+id);Check((await Probe()).harvest.length===before,'holding does not award cleaning '+id);await Input('up');await Step(80);if(id===0){Check((await Probe()).rendering.headRealtime&&(await Probe()).rendering.outerVisible,'same live head stays visible during extraction');await page.screenshot({path:path.join(here,'_dev','Shot_LiveExtraction_'+width+'.png')});}await Step(150);Check((await Probe()).harvest.filter(c=>c.id===id).length===1,'exactly one landing award '+id);const landed=(await Probe()).events.find(e=>e.type==='landingSound'&&e.id===id);Check(landed?.cue===LandingSound(c).cue,'size selects approved landing '+id);heardTiers.add(landed.tier);}
   try{
    await Start();let p=await Probe();
    Check(p.targets.length===21&&p.targets.filter(c=>c.fine).reduce((s,c)=>s+c.grainCount,0)===108,'initial ear contains large deposits and 108 separate tiny grains');
@@ -80,8 +83,10 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
    Check(['small','medium','large'].every(t=>heardTiers.has(t)),'all three approved sizes occur during real play');Check(!p.audio.sfxLoaded.some(c=>/customer|relaxSigh/.test(c)),'female voices are not loaded');Check(!p.events.some(e=>e.type==='sound'&&/customer|relaxSigh/.test(e.cue)),'no female voice events');
    await page.screenshot({path:path.join(here,'_dev','Shot_DirectionalComplete_'+width+'.png')});
    const coins=p.shop.coins;await Step(300);Check((await Probe()).shop.coins===coins,'receipt cannot pay repeatedly');
-   await page.locator('#receipt-next').click();await Step(150);await page.locator('#shop-open').click();const beforePause=(await Probe()).timeRemaining;await Step(180);Check((await Probe()).timeRemaining===beforePause,'shopping pauses service clock');await page.locator('[data-select-tool="feather"]').click();Check((await Probe()).rendering.previewTriangles>500,'feather has a real rotatable shop model');await page.screenshot({path:path.join(here,'_dev','Shot_FeatherShop_'+width+'.png')});await page.locator('#shop-close').click();
-   for(let i=0;i<4;i++)await Step(3600);p=await Probe();Check(p.phase==='complete'&&p.timedOut&&p.cleanliness<1&&p.timeRemaining===0,'deadline ends incomplete service without claiming full cleaning');
+   await page.locator('#receipt-next').click();await page.waitForFunction(()=>window.__EarSpaProbe().phase==='playing');await Step(150);await page.locator('#shop-open').click();const beforePause=(await Probe()).timeRemaining;await Step(180);Check((await Probe()).timeRemaining===beforePause,'shopping pauses service clock');await page.locator('[data-select-tool="feather"]').click();Check((await Probe()).rendering.previewTriangles>500,'feather has a real rotatable shop model');await page.screenshot({path:path.join(here,'_dev','Shot_FeatherShop_'+width+'.png')});await page.locator('#shop-close').click();
+   // 截止时间检查推进全部游戏/物理步骤；只省去无人操作期间重复绘制的 14,400 帧。
+   await page.evaluate(()=>{const{core}=__EarSpaDebug,render=core.Render;core.Render=()=>{};try{for(let i=0;i<4;i++)__EarSpaDebug.StepFrames(3600);}finally{core.Render=render;core.Render();}});
+   p=await Probe();Check(p.phase==='complete'&&p.timedOut&&p.cleanliness<1&&p.timeRemaining===0,'deadline ends incomplete service without claiming full cleaning');
    Check(report.errors.length===0,'no page, shader or resource errors');report.final=p;console.log('PASS '+width+'×'+height+' '+(touch?'touch':'mouse')+' '+report.checks.length+' checks');
   }catch(error){report.failure=error.message;report.probe=await Probe().catch(()=>null);await page.screenshot({path:path.join(here,'_dev','Shot_DirectionalFailure_'+width+'.png')});throw error;}
   finally{await fs.writeFile(path.join(here,'_dev','Data_DirectionalPlayReport.json'),JSON.stringify(reports,null,2));await page.close();}

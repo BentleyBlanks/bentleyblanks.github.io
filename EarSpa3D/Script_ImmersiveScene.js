@@ -4,20 +4,22 @@ import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
 import { PALETTE as P } from './Data_Palette.mjs?v=ear012-outer-20260911';
 
 import {InstrumentContact,IsFeatherDebris} from './Script_InstrumentInteraction.mjs?v=ear016-normal-scrape-20260912';
-import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody, BindPeelSurface, WritePeelSurface, MovePeelBody } from './Script_PeelPhysics.mjs?v=ear018-body-bending-20260912';
+import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody, BindPeelSurface, BindPeelSurfaceSteps, WritePeelSurface, MovePeelBody } from './Script_PeelPhysics.mjs?v=ear020-contact-loading-20260912';
 import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
 import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear012-outer-20260911';
 import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear012-outer-20260911';
-import { CreateToolContact } from './Script_ToolContact.js?v=ear015-day-two-perf-20260912';
-import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear019-hair-complexion-20260912';
+import { CreateToolContact } from './Script_ToolContact.js?v=ear020-contact-loading-20260912';
+import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear020-contact-loading-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 
 // 封闭耳道、真实接触点与实体收集盘共用毫米世界；镜头在取出时连续后退。
 export async function CreateImmersiveScene({ core }) {
-  const asset = await new GLTFLoader().loadAsync(new URL('./Models/Model_ImmersiveEar.glb?v=ear019-hair-complexion-20260912', import.meta.url).href);
+  const [asset,materials,profile]=await Promise.all([
+    new GLTFLoader().loadAsync(new URL('./Models/Model_ImmersiveEar.glb?v=ear019-hair-complexion-20260912', import.meta.url).href),
+    CreateTactileMaterials(core.renderer),
+    fetch(new URL('./Data_CanalProfile.json?v=ear012-outer-20260911',import.meta.url)).then(response=>response.json()),
+  ]);
   asset.scene.updateMatrixWorld(true);
-  const materials=await CreateTactileMaterials(core.renderer);
-  const profile=await (await fetch(new URL('./Data_CanalProfile.json?v=ear012-outer-20260911',import.meta.url))).json();
   const contact=CreateToolContact(profile);
   let lampOn=false,aim=new THREE.Vector2(),aimed=false,toolLevels={},toolSkins={},lastToolId=null,previewTriangles=0,inspectionDepth=0,inspectionTarget=0,reachBlocked=false,heading=0,scoopRotation=null,turnPoint=null,turnChunk=null,hairTime=0;
   const TOOL_REACH={scoop:8.8,tweezers:17.5,drops:17.5,brush:9.5,suction:18,feather:18};
@@ -177,11 +179,19 @@ export async function CreateImmersiveScene({ core }) {
     for(const c of chunks)if(c.state==='collected'&&c.toolId!=='suction')c.mesh.position.copy(TrayPosition(c));
   }
 
+  const waxPrototypes=new Map();
+  function WaxGeometry(type){
+    if(!waxPrototypes.has(type)){
+      const prototype=Baked(type==='dry'?'Model_WaxDry':type==='wet'?'Model_WaxWet':'Model_WaxFirm');
+      for(const material of(Array.isArray(prototype.material)?prototype.material:[prototype.material]))material.dispose();
+      waxPrototypes.set(type,prototype.geometry);
+    }
+    return waxPrototypes.get(type).clone();
+  }
   function BuildChunk(rng, id, depth, angle, type, form='chunk') {
     const size = .75 + rng() * .12;
     const tone=type==='dry'&&(form==='ribbon'||id===0||rng()<.48)?'paleYellow':'brown';
-    const prototype = Baked(type === 'dry' ? 'Model_WaxDry' : type === 'wet' ? 'Model_WaxWet' : 'Model_WaxFirm');
-    const geo = prototype.geometry; const p = geo.attributes.position; const seed=rng()*6;
+    const geo=WaxGeometry(type); const p = geo.attributes.position; const seed=rng()*6;
     const stretch=form==='film'?[1.48,1.7,.24]:form==='ribbon'?[.66,2.22,.32]:form==='flake'?[1.25,1.4,.40]:[1,1,1];
     geo.scale(size*stretch[0],size*stretch[1],size*stretch[2]);
     // Blender 原型尖端平面为 XY，背面沿局部 +Z 进入内壁，正面朝向内法线。
@@ -192,8 +202,7 @@ export async function CreateImmersiveScene({ core }) {
       p.setXYZ(i,x*variation,y*(1+.08*Math.sin(seed)),z+(.22*stretch[2])+curl);
     }
     geo.computeVertexNormals();
-    prototype.material=materials.Wax(type,tone);
-    const mesh = new THREE.Mesh(geo, prototype.material);mesh.castShadow=true;mesh.receiveShadow=true;
+    const mesh = new THREE.Mesh(geo, materials.Wax(type,tone));mesh.castShadow=true;mesh.receiveShadow=true;
     const normal = canal.NormalAt(depth, angle).clone().normalize();
     const tangent = canal.TangentAt(depth).clone().normalize();
     const xAxis = tangent.clone().cross(normal).normalize();
@@ -202,37 +211,74 @@ export async function CreateImmersiveScene({ core }) {
     const surfaceRay=new THREE.Raycaster(canal.CenterAt(depth).clone(),normal.clone().negate(),0,10);
     const surfaceHit=surfaceRay.intersectObject(wall)[0];
     mesh.position.copy(surfaceHit?surfaceHit.point.clone().addScaledVector(normal,.01):Surface(depth,angle,.018));
-    root.add(mesh);
     const mark = new THREE.Mesh(new THREE.CircleGeometry(size * .99, 40), new THREE.MeshBasicMaterial({ color: P.skinSheen, transparent: true, opacity: 0, depthWrite: false }));
     mark.visible=false;
-    mark.position.copy(Surface(depth, angle, .03)); mark.quaternion.copy(mesh.quaternion); root.add(mark);
+    mark.position.copy(Surface(depth, angle, .03)); mark.quaternion.copy(mesh.quaternion);
     const chunk = { id, type, depth, angle, size, state: 'attached', progress: 0, softened: 0, mesh, mark,
       mass:.90,form,tone,generation:0,fine:false,fragment:false,wetting:0,stress:0,irritation:0,tear:0,origin: mesh.position.clone(), rotation: mesh.quaternion.clone(), original: p.array.slice(), normal, seed, footprint:[size*stretch[0],size*stretch[1]], slot: -1, fly: 0, held: 0 };
     chunk.body=CreatePeelBody({position:chunk.origin.toArray(),rotation:chunk.rotation.toArray(),normal:normal.toArray(),size,type,footprint:chunk.footprint,anchorCount:type==='wet'?13:9});
     mesh.userData.chunk = chunk;
     return chunk;
   }
-  function Reset(seed) {
-    for (const c of chunks) { root.remove(c.mesh, c.mark); c.mesh.geometry.dispose(); c.mesh.material.dispose(); c.mark.geometry.dispose(); c.mark.material.dispose(); }
-    transfer=null;showcase=false;inspectionDepth=inspectionTarget=0;scoopRotation=null;heading=0;turnPoint=turnChunk=null;contact.Reset();
+  function* BuildCustomer(seed,result) {
     const rng = MakeRng(seed);
-    chunks = Array.from({ length: 9 }, (_, i) => {
+    for(let i=0;i<9;i++){
       const front = i < 6; const angle = front ? .22 + i * Math.PI / 3 : .70 + (i-6)*Math.PI*2/3;
       const wetEar=seed%5>=3;const type=i===4||i===8?'impacted':i===2||i===7?'wet':wetEar?(i%3===0?'dry':'wet'):(i===5?'wet':'dry');
-      return BuildChunk(rng,i,(i===8?14.6:i===7?11.8:front?4.4:8.0)+(rng()-.5)*.15,angle,type,type==='wet'?'film':i%2?'ribbon':'flake');
-    });
+      result.push(BuildChunk(rng,i,(i===8?14.6:i===7?11.8:front?4.4:8.0)+(rng()-.5)*.15,angle,type,type==='wet'?'film':i%2?'ribbon':'flake'));yield;
+    }
     for(let i=0;i<12;i++){
       const c=BuildChunk(rng,'dust'+i,4.8+(i%3)*.72,.46+i*Math.PI*2/12,'dry','flake');
       const gs=[];for(let j=0;j<9;j++){const g=new THREE.IcosahedronGeometry(.025+rng()*.06,1);g.scale(1,1,.2);g.translate((rng()-.5)*.62,(rng()-.5)*.75,.035);gs.push(g);}
       c.mesh.geometry.dispose();c.mesh.geometry=mergeGeometries(gs);gs.forEach(g=>g.dispose());c.mesh.geometry.setIndex(Array.from({length:c.mesh.geometry.attributes.position.count},(_,i)=>i));
-      c.mass=.075;c.form='microdust';c.fine=true;c.size=.38;c.footprint=[.38,.42];c.grainCount=9;c.original=c.mesh.geometry.attributes.position.array.slice();c.body=CreatePeelBody({position:c.origin.toArray(),rotation:c.rotation.toArray(),normal:c.normal.toArray(),size:c.size,type:'dry'});chunks.push(c);
+      c.mass=.075;c.form='microdust';c.fine=true;c.size=.38;c.footprint=[.38,.42];c.grainCount=9;c.original=c.mesh.geometry.attributes.position.array.slice();c.body=CreatePeelBody({position:c.origin.toArray(),rotation:c.rotation.toArray(),normal:c.normal.toArray(),size:c.size,type:'dry'});result.push(c);yield;
     }
     // Film and long flakes follow the wall curvature across their whole back surface.
-    for(const c of chunks){const p=c.mesh.geometry.attributes.position;
+    for(const c of result){const p=c.mesh.geometry.attributes.position;
       for(let i=0;i<p.count;i++){const v=new THREE.Vector3(p.getX(i),p.getY(i),0).applyQuaternion(c.rotation).add(c.origin),surface=contact.Surface(v);p.setZ(i,p.getZ(i)-surface.clearance+.018);}
-      p.needsUpdate=true;SmoothWaxNormals(c.mesh.geometry);c.original=p.array.slice();
-      if(!c.fine)BindPeelSurface(c.body,p.array,c.mesh.geometry.index.array);
+      p.needsUpdate=true;SmoothWaxNormals(c.mesh.geometry);c.original=p.array.slice();yield;
+      if(!c.fine){yield* BindPeelSurfaceSteps(c.body,p.array,c.mesh.geometry.index.array);yield;materials.PrepareContact(c.mesh.geometry);yield;}
     }
+  }
+  let preparation=null,disposed=false;
+  const preparationStats={builds:0,preparedResets:0,lastResetMs:0,lastBuildMs:0,maxSliceMs:0};
+  function DisposeChunks(list){for(const c of list){c.mesh.removeFromParent();c.mark.removeFromParent();c.mesh.geometry.dispose();c.mesh.material.dispose();c.mark.geometry.dispose();c.mark.material.dispose();}}
+  function CancelPreparation(){
+    if(!preparation)return;const job=preparation;preparation=null;
+    if(job.id!=null){if(job.idle)cancelIdleCallback(job.id);else clearTimeout(job.id);}
+    job.iterator.return();DisposeChunks(job.chunks);job.resolve(false);
+  }
+  function PrepareCustomer(seed,{urgent=false}={}){
+    if(disposed)return Promise.resolve(false);
+    if(preparation?.seed===seed){const job=preparation;if(urgent&&!job.ready&&!job.urgent){job.urgent=true;if(job.idle&&job.id!=null)cancelIdleCallback(job.id);else if(job.id!=null)clearTimeout(job.id);job.schedule();}return job.promise;}
+    CancelPreparation();const job={seed,chunks:[],ready:false,id:null,urgent,idle:false,cpuMs:0};
+    job.iterator=BuildCustomer(seed,job.chunks);job.promise=new Promise((resolve,reject)=>{job.resolve=resolve;job.reject=reject;});preparation=job;
+    function Schedule(){job.idle=!job.urgent&&typeof requestIdleCallback==='function';job.id=job.idle?requestIdleCallback(Work,{timeout:100}):setTimeout(Work,0);}
+    job.schedule=Schedule;
+    function Work(){
+      if(preparation!==job)return;job.id=null;const start=performance.now();
+      try{
+        do{if(job.iterator.next().done){job.ready=true;break;}}while(performance.now()-start<3);
+        const elapsed=performance.now()-start;job.cpuMs+=elapsed;preparationStats.maxSliceMs=Math.max(preparationStats.maxSliceMs,elapsed);
+        if(job.ready){preparationStats.builds++;preparationStats.lastBuildMs=job.cpuMs;job.resolve(true);}else Schedule();
+      }catch(error){preparation=null;DisposeChunks(job.chunks);job.reject(error);}
+    }
+    Schedule();return job.promise;
+  }
+  function Reset(seed) {
+    const start=performance.now();let next;
+    if(preparation?.seed===seed&&preparation.ready){next=preparation.chunks;preparation=null;preparationStats.preparedResets++;}
+    else{CancelPreparation();next=[];for(const _ of BuildCustomer(seed,next)){/* synchronous diagnostic/fallback entry */}preparationStats.builds++;}
+    // 同类材质保留已编译的 program；每块仍使用独立的湿度和接触 uniform。
+    const available=new Map();
+    for(const c of chunks){if(c.fragment)continue;const key=c.type+':'+c.tone;if(!available.has(key))available.set(key,[]);available.get(key).push(c);}
+    for(const c of next){const previous=available.get(c.type+':'+c.tone)?.pop();if(!previous)continue;
+      const fresh=c.mesh.material;c.mesh.material=previous.mesh.material;previous.mesh.material=fresh;
+      c.mesh.material.clippingPlanes=null;materials.WetWax(c.mesh.material,0,0,c.type);
+    }
+    DisposeChunks(chunks);chunks=next;for(const c of chunks)root.add(c.mesh,c.mark);
+    transfer=null;showcase=false;inspectionDepth=inspectionTarget=0;scoopRotation=null;heading=0;turnPoint=turnChunk=null;contact.Reset();
+    preparationStats.lastResetMs=performance.now()-start;
     HideTool(); droplet.visible = false; dropTarget = null; return chunks;
   }
   function VisualCenter(c) { return new THREE.Vector3(0,0,0.09).applyQuaternion(c.mesh.quaternion).add(c.mesh.position); }
@@ -430,6 +476,7 @@ export async function CreateImmersiveScene({ core }) {
     return{SetView(mode){const y=mode==='tip'?.65:mode==='grip'?(id==='drops'?6.2:16.7):id==='drops'?4.5:10;const z=mode==='full'?(id==='drops'?21:38):7;models.forEach((m,i)=>m.position.x=(i?1:-1)*(mode==='full'?4:1.25));cam.position.set(1,y+(mode==='tip'?1:0),z);cam.lookAt(0,y,0);render();},Dispose(){previewTriangles=0;previewEnvironment.dispose();renderer.dispose();renderer.forceContextLoss();models.forEach(g=>g.traverse(p=>{p.geometry?.dispose();if(p.material)for(const m of (Array.isArray(p.material)?p.material:[p.material]))m.dispose();}));}};
   }
   function Ungrip(c) { UngripPeelBody(c.body);c.gripRotation=null;c.grasped=false; }
+  const fiberTipSamples=[];for(let y=0;y<3;y+=.15)fiberTipSamples.push(new THREE.Vector3(0,y,0));
   function ToolAt(point,id,c=null,opening=0) {
     reachBlocked=false;
     if(inside&&!transfer){const projected=canal.Project(point);if(projected.depth>Reach(id)){point=Surface(Reach(id),projected.angle,.3);reachBlocked=true;}}
@@ -465,8 +512,7 @@ export async function CreateImmersiveScene({ core }) {
       jaw.position.set(Math.sin(angle)*17,17-Math.cos(angle)*17,0);
     });
     if(lastToolId!==id){contact.Reset();lastToolId=id;}
-    const samples=contact.Samples(toolParts[id]);
-    if(['feather','brush'].includes(id))for(let y=0;y<3;y+=.15)samples.push(new THREE.Vector3(0,y,0));
+    const samples=contact.Samples(toolParts[id],['feather','brush'].includes(id)?fiberTipSamples:null);
     const pose=contact.Solve(point,tool.quaternion,samples,{sweep:!transfer,lockPivot:!!turnPoint});tool.position.copy(pose.position);tool.quaternion.copy(pose.rotation);
     if(id==='scoop'&&!transfer)scoopRotation.copy(pose.rotation);
     if(['feather','brush'].includes(id)){
@@ -627,7 +673,7 @@ export async function CreateImmersiveScene({ core }) {
     return VisualCenter(c);
   }
   function Targets() { return chunks.map(c=>({id:c.id,type:c.type,depth:c.depth,mass:c.mass,form:c.form,tone:c.tone,generation:c.generation,fine:c.fine,grainCount:c.grainCount||1,cutDirection:c.cutDirection,forceDirection:c.forceDirection?.toArray(),fragment:c.fragment,wetting:c.wetting,surfaceWet:c.surfaceWet||0,aligned:c.aligned,jawContact:c.jawContact,footprint:c.footprint,state:c.state,progress:c.progress,softened:c.softened,vertices:c.mesh.geometry.attributes.position.count,triangles:c.mesh.geometry.index.count/3,position:c.mesh.position.toArray(),rotation:c.mesh.quaternion.toArray(),scale:c.mesh.scale.toArray(),screen:Project(InteractionPoint(c)),sweepScreen:Project(VisualCenter(c).add(new THREE.Vector3(1.8,0,0).applyQuaternion(c.rotation))),pullScreen:Project(VisualCenter(c).addScaledVector(c.normal,1.8)),physics:{solver:c.body.surface?'xpbd-shell':'rigid-grain',nodes:c.body.surface?.points.length||0,bend:c.body.bend||0,peakBend:c.body.surface?.peakBend||0,maxStretch:c.body.surface?.maxStretch||0,motion:c.body.motion||0,anchors:c.body.anchors.filter(a=>a.alive).length,detached:c.body.detached,strain:c.body.strain,force:c.body.force,contact:c.body.contact,grip:c.body.grip?.slice()||null}})); }
-  return {WarmTools,canal,Reset,EndService,Pick,Grip,Drag,Fracture,SetSkins,CreateToolPreview,Ungrip,ShowTool,HideTool,Release,Update,Targets,Project,Resize,
+  return {WarmTools,canal,Reset,PrepareCustomer,CancelPreparation,PreparationProbe(){return{...preparationStats,pendingSeed:preparation?.seed??null,ready:!!preparation?.ready,stagedChunks:preparation?.chunks.length||0};},EndService,Pick,Grip,Drag,Fracture,SetSkins,CreateToolPreview,Ungrip,ShowTool,HideTool,Release,Update,Targets,Project,Resize,
     TurnStart(x,y,id){
       turnChunk=Pick(x,y,id);if(turnChunk)ShowTool(turnChunk,id,0,{x,y});else Hover(x,y,id);
       if(!tool.visible)return false;
@@ -652,5 +698,5 @@ export async function CreateImmersiveScene({ core }) {
     Drop(c){c.surfaceWet=Math.max(c.surfaceWet||0,.18);ShowTool(c,'drops');dropTarget=c.mesh.position.clone().addScaledVector(c.normal,.18);dropAge=0;droplet.visible=true;droplet.userData.start=lastToolPoint.clone();},
     get chunks(){return chunks;},
     modelInfo:{source:'BlenderMCP',file:'Models/Model_ImmersiveEar.glb',edition:'DirectionalAnatomy',nodes:asset.scene.children.map(n=>n.name)},
-    Dispose(){anatomy.dispose();root.traverse(n=>{n.geometry?.dispose();});}};
+    Dispose(){disposed=true;CancelPreparation();waxPrototypes.forEach(g=>g.dispose());anatomy.dispose();root.traverse(n=>{n.geometry?.dispose();});}};
 }

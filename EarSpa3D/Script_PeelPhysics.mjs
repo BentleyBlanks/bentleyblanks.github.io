@@ -1,6 +1,6 @@
 // 可见块体使用薄壳，细微颗粒保留低成本刚体；两者共用工具和附着接口。
-import {BindWaxSurface,GripWaxSurface,UngripWaxSurface,StepWaxSurface,WriteWaxSurface} from './Script_SoftWaxPhysics.mjs?v=ear018-body-bending-20260912';
-export {BindWaxSurface as BindPeelSurface,WriteWaxSurface as WritePeelSurface};
+import {BindWaxSurface,BindWaxSurfaceSteps,GripWaxSurface,UngripWaxSurface,StepWaxSurface,WriteWaxSurface} from './Script_SoftWaxPhysics.mjs?v=ear020-contact-loading-20260912';
+export {BindWaxSurface as BindPeelSurface,BindWaxSurfaceSteps as BindPeelSurfaceSteps,WriteWaxSurface as WritePeelSurface};
 const Add=(a,b)=>a.map((x,i)=>x+b[i]);
 const Sub=(a,b)=>a.map((x,i)=>x-b[i]);
 const Mul=(a,s)=>a.map(x=>x*s);

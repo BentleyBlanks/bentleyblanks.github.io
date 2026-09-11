@@ -37,6 +37,12 @@ function BindPoint(surface,p){
 function BoundPoint(surface,binding){const p=Weighted(surface.points,binding.ids,binding.weights),frame=Frame(surface.points,binding.ids);for(let j=0;j<3;j++)for(let k=0;k<3;k++)p[k]+=frame[j][k]*binding.offset[j];return p;}
 
 export function BindWaxSurface(body,positions,indices){
+  for(const _ of BindWaxSurfaceSteps(body,positions,indices)){/* synchronous fracture and diagnostic entry */}
+  return body;
+}
+
+// 暂存客人可在确定性的绑定步骤之间让出主线程，求解网格与权重不变。
+export function* BindWaxSurfaceSteps(body,positions,indices){
   const vertices=Array.from({length:positions.length/3},(_,i)=>Array.from(positions.slice(i*3,i*3+3)));
   const faces=Array.from({length:indices.length/3},(_,i)=>[indices[i*3],indices[i*3+1],indices[i*3+2]]);
   const min=[0,1].map(k=>Math.min(...vertices.map(p=>p[k]))),max=[0,1].map(k=>Math.max(...vertices.map(p=>p[k]))),center=min.map((v,k)=>(v+max[k])/2);
@@ -47,8 +53,8 @@ export function BindWaxSurface(body,positions,indices){
     if(!Number.isFinite(bottom)){const nearest=vertices.reduce((a,b)=>(b[0]-x)**2+(b[1]-y)**2<(a[0]-x)**2+(a[1]-y)**2?b:a);bottom=top=nearest[2];}
     rest.push([x,y,(bottom+top)/2]);thickness.push(Math.max(.006,(top-bottom)/2));
   }
-  Sample(...center);
-  const radii=Array.from({length:segments},(_,j)=>{
+  Sample(...center);yield;
+  const radii=[];for(let j=0;j<segments;j++){
     const direction=[Math.cos(j*Math.PI*2/segments),Math.sin(j*Math.PI*2/segments)];let radius=0;
     for(const ids of faces)for(let e=0;e<3;e++){
       const a=vertices[ids[e]],b=vertices[ids[(e+1)%3]],dx=b[0]-a[0],dy=b[1]-a[1],den=direction[0]*dy-direction[1]*dx;
@@ -56,9 +62,9 @@ export function BindWaxSurface(body,positions,indices){
       const ax=a[0]-center[0],ay=a[1]-center[1],r=(ax*dy-ay*dx)/den,t=(ax*direction[1]-ay*direction[0])/den;
       if(t>=-1e-7&&t<=1+1e-7)radius=Math.max(radius,r);
     }
-    return Math.max(.01,radius*.998);
-  });
-  for(let r=1;r<=rings;r++)for(let j=0;j<segments;j++){const a=j*Math.PI*2/segments;Sample(center[0]+Math.cos(a)*radii[j]*r/rings,center[1]+Math.sin(a)*radii[j]*r/rings);}
+    radii.push(Math.max(.01,radius*.998));yield;
+  }
+  for(let r=1;r<=rings;r++)for(let j=0;j<segments;j++){const a=j*Math.PI*2/segments;Sample(center[0]+Math.cos(a)*radii[j]*r/rings,center[1]+Math.sin(a)*radii[j]*r/rings);yield;}
   const Index=(r,j)=>1+(r-1)*segments+(j+segments)%segments;
   for(let j=0;j<segments;j++)triangles.push([0,Index(1,j),Index(1,j+1)]);
   for(let r=1;r<rings;r++)for(let j=0;j<segments;j++){const a=Index(r,j),b=Index(r+1,j),c=Index(r+1,j+1),d=Index(r,j+1);triangles.push([a,b,c],[a,c,d]);}
@@ -69,7 +75,8 @@ export function BindWaxSurface(body,positions,indices){
     else edges.set(key,{a,b,opposite,rest:Length(Sub(rest[a],rest[b])),lambda:0});
   }
   const surface={rest,points:rest.map(p=>World(body,p)),velocities:rest.map(()=>[0,0,0]),triangles,edges:[...edges.values()],bends,thickness,grip:null,motion:0,peakBend:0,maxStretch:0,releaseClock:0};
-  surface.bindings=vertices.map(p=>BindPoint(surface,p));
+  surface.bindings=[];
+  for(let i=0;i<vertices.length;i++){surface.bindings.push(BindPoint(surface,vertices[i]));if(i%32===31)yield;}
   const used=new Set();
   for(const anchor of body.anchors){
     let node=-1,distance=Infinity;for(let i=1;i<rest.length;i++){const d=(rest[i][0]-anchor.local[0])**2+(rest[i][1]-anchor.local[1])**2;if(!used.has(i)&&d<distance){node=i;distance=d;}}

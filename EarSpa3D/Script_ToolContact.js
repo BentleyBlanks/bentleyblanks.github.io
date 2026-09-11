@@ -17,7 +17,7 @@ export function CreateToolContact(profile) {
     candidates=[];for(let i=0;i<distances.length;i++)if(distances[i]<=bound)candidates.push(i);
     if(cellCache.size>=cellLimit)cellCache.delete(cellCache.keys().next().value);cellCache.set(key,candidates);return candidates;
   }
-  function Surface(point,out=null){
+  function Surface(point,out=null,normalThreshold=Infinity){
     let distance=Infinity,index=0,blend=0;
       for(const i of Candidates(point)){
         const a=rows[i].center,s=segments[i],x=point.x-a.x,y=point.y-a.y,z=point.z-a.z,t=Math.max(0,Math.min(1,(x*s.ax+y*s.ay+z*s.az)/s.lengthSq));
@@ -32,16 +32,18 @@ export function CreateToolContact(profile) {
     const un=Math.hypot(ux,uy,uz),rn=Math.hypot(rx,ry,rz);ux/=un;uy/=un;uz/=un;rx/=rn;ry/=rn;rz/=rn;
     const angle=(Math.atan2(dx*rx+dy*ry+dz*rz,dx*ux+dy*uy+dz*uz)+Math.PI*2)%(Math.PI*2),k=angle/(Math.PI*2)*64,lo=Math.floor(k),f=k-lo,next=(lo+1)%64;
     const ra=a.radii[lo]*(1-f)+a.radii[next]*f,rb=b.radii[lo]*(1-f)+b.radii[next]*f,radius=ra*(1-t)+rb*t+.012*Math.sin(angle*11+(index+t)*.18)*Math.sin((index+t)*.41+angle*3);
-    result.normal.set(-dx+ax*axial,-dy+ay*axial,-dz+az*axial).normalize();const slope=(rb-ra)/s.length;result.normal.x+=ax*slope;result.normal.y+=ay*slope;result.normal.z+=az*slope;result.normal.normalize();
-    result.clearance=radius-Math.sqrt(Math.max(0,distance-axial*axial));result.depth=index+t;return result;
+    result.clearance=radius-Math.sqrt(Math.max(0,distance-axial*axial));result.depth=index+t;
+    // Clearance 只使用最小间隙点的法线；其他点仍精确计算距离，省去两次归一化。
+    if(result.clearance<normalThreshold){result.normal.set(-dx+ax*axial,-dy+ay*axial,-dz+az*axial).normalize();const slope=(rb-ra)/s.length;result.normal.x+=ax*slope;result.normal.y+=ay*slope;result.normal.z+=az*slope;result.normal.normalize();}
+    return result;
   }
-  const sampleCache=new WeakMap();
-  function Samples(group){
-    group.updateMatrixWorld(true);const samples=[];
+  const sampleCache=new WeakMap(),groupSamples=new WeakMap(),managedSamples=new WeakSet();
+  function Samples(group,extra=null){
+    group.updateMatrixWorld(true);const sources=[];
     for(const part of group.children){
       if(part.userData.softFiber)continue;
       const p=part.geometry?.attributes.position;if(!p)continue;
-      const cached=sampleCache.get(part);if(cached&&cached.geometry===part.geometry&&cached.version===p.version&&cached.matrix.equals(part.matrix)){samples.push(...cached.points);continue;}
+      const cached=sampleCache.get(part);if(cached&&cached.geometry===part.geometry&&cached.version===p.version&&cached.matrix.equals(part.matrix)){sources.push(cached.points);continue;}
       // 各轴向薄片分二十四个周向扇区保留最外顶点。头部与爪端使用更密采样。
       const bins=new Map();
       for(let i=0;i<p.count;i++){
@@ -49,12 +51,26 @@ export function CreateToolContact(profile) {
         const band=Math.floor(point.y/(point.y<3?.06:.20)),sector=Math.floor((Math.atan2(point.z,point.x)+Math.PI)*12/Math.PI),key=band+':'+sector;
         const old=bins.get(key);if(!old||point.x*point.x+point.z*point.z>old.x*old.x+old.z*old.z)bins.set(key,point);
       }
-      const points=[...bins.values()];sampleCache.set(part,{geometry:part.geometry,version:p.version,matrix:part.matrix.clone(),points});samples.push(...points);
-    }return samples;
+      const points=[...bins.values()];sampleCache.set(part,{geometry:part.geometry,version:p.version,matrix:part.matrix.clone(),points});sources.push(points);
+    }
+    if(extra)sources.push(extra);
+    const cached=groupSamples.get(group);
+    if(cached&&cached.sources.length===sources.length&&sources.every((s,i)=>s===cached.sources[i]))return cached.samples;
+    const samples=sources.flat();managedSamples.add(samples);groupSamples.set(group,{sources,samples});return samples;
   }
   const surfaceResult={normal:new THREE.Vector3()};
-  const transformed=new THREE.Vector3();let last=null,report={contact:false,clearance:1,correction:0,samples:0,blocked:false};
-  function Clearance(position,rotation,samples){let minimum=Infinity,hitNormal=null;for(const local of samples){transformed.copy(local).applyQuaternion(rotation).add(position);const hit=Surface(transformed,surfaceResult);if(hit.clearance<minimum){minimum=hit.clearance;hitNormal=hit.normal.clone();}}return{minimum,normal:hitNormal};}
+  const transformed=new THREE.Vector3(),minimumNormal=new THREE.Vector3();let last=null,report={contact:false,clearance:1,correction:0,samples:0,blocked:false};
+  const poseCache=new WeakMap();let clearanceChecks=0,reusedClearances=0;
+  function Clearance(position,rotation,samples){
+    const managed=managedSamples.has(samples),cached=managed&&poseCache.get(samples);
+    if(cached&&cached.position.equals(position)&&cached.rotation.equals(rotation)){reusedClearances++;return{minimum:cached.minimum,normal:cached.normal?.clone()||null};}
+    clearanceChecks++;let minimum=Infinity,hasNormal=false;
+    for(const local of samples){transformed.copy(local).applyQuaternion(rotation).add(position);const hit=Surface(transformed,surfaceResult,minimum);if(hit.clearance<minimum){minimum=hit.clearance;minimumNormal.copy(hit.normal);hasNormal=true;}}
+    const normal=hasNormal?minimumNormal.clone():null;
+    // Samples 的身份随几何、顶点版本、夹爪局部矩阵或附加采样改变；只复用完全相等的位姿。
+    if(managed)poseCache.set(samples,{position:position.clone(),rotation:rotation.clone(),minimum,normal});
+    return{minimum,normal:normal?.clone()||null};
+  }
   function Project(position,rotation,samples){
     const out=position.clone();let contact=false,hit=Clearance(out,rotation,samples);
     for(let i=0;i<14&&hit.minimum<.045;i++){out.addScaledVector(hit.normal,Math.min(.45,.048-hit.minimum));contact=true;hit=Clearance(out,rotation,samples);}
@@ -78,5 +94,5 @@ export function CreateToolContact(profile) {
     if(hit.minimum>=-.01)last={position:pose.position.clone(),rotation:rotation.clone()};
     return{position:pose.position,rotation, ...report};
   }
-  return {Surface,Samples,Solve,Clearance,Reset(){last=null;},Probe(){return{...report,cachedCells:cellCache.size,cellLimit};}};
+  return {Surface,Samples,Solve,Clearance,Reset(){last=null;},Probe(){return{...report,cachedCells:cellCache.size,cellLimit,clearanceChecks,reusedClearances};}};
 }
