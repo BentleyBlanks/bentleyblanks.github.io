@@ -1,6 +1,7 @@
 // Owner-only jacket, legs and feet, authored in Animation_FirstPerson.blend.
 // World-space body follows feet/yaw, never camera pitch or weapon FOV compression.
 import * as THREE from "three";
+import { ApplyNraUniform } from "./Script_UniformColors.mjs";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
 
 export class FirstPersonBody {
@@ -25,6 +26,7 @@ export class FirstPersonBody {
       node.material = Array.isArray(node.material) ? node.material.map((m) => m.clone()) : node.material.clone();
       library?.ConfigureExternalPbr?.(node.material, {metalness: 0, minRoughness: 0.78, mesh: node});
     });
+    ApplyNraUniform(this.root);
   }
 
   Update(dt, input, camera, visible) {

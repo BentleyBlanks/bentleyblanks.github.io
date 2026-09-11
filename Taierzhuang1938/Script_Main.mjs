@@ -70,7 +70,7 @@ import { FirstLevelP012CarryView, CreateP012StretcherGeometry } from "./Script_F
 import { AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload, RestoreP012ManualReload } from "./Script_FirstLevelP012Opening.mjs";
 import { FirstLevelP012Binoculars, P012BinocularLensContains } from "./Script_FirstLevelP012Binoculars.mjs";
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
-import { ApplyP012CastAppearance, InstallP012OpeningPose, InstallP012ActorMotion } from "./Script_FirstLevelP012CastAppearance.mjs";
+import { InstallP012OpeningPose, InstallP012ActorMotion } from "./Script_FirstLevelP012CastAppearance.mjs";
 import { SelectP012CompanionCast, SelectP012RecruitCast } from "./Data_FirstLevelP012Cast.mjs";
 import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 import { FirstLevelP012StageZero } from "./Script_FirstLevelP012StageZero.mjs";
@@ -1405,7 +1405,7 @@ async function Boot() {
       const identity = { ...MakeSoldierIdentity(seed), name: label || castId };
       const casting = PHASE_TABLE[state.phaseIndex]?.whitebox?.p012 ? SelectP012CompanionCast(castId, identity) : null;
       const soldier = ai.Spawn("nra", x, z, {
-        identity, weapon: weapon || identity.weapon, squadId, ...casting,
+        identity, castId, weapon: weapon || identity.weapon, squadId, ...casting,
       });
       if (soldier) soldier.castId = castId;
       return soldier;
@@ -3527,7 +3527,6 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
     if (phase.whitebox?.p012) {
       for (const actor of ai.soldiers) if (actor.alive && actor.castId) {
         actor.scriptEssential = true;
-        ApplyP012CastAppearance(actor, library);
       }
       const guide = companion.Handle("luo");
       if (guide) {

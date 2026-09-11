@@ -747,6 +747,7 @@ export class AiDirector {
       weapon: soldier.unarmed ? null : soldier.weaponId,
       variant: options.actorVariant,
       modelVariant: options.modelVariant,
+      castId: options.castId || soldier.identity?.castId,
     });
     this.ctx.onActorSpawn?.(soldier);
     if (kind === "civilian" && ["childBoy", "childGirl"].includes(options.actorVariant)

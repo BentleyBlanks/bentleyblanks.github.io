@@ -475,6 +475,7 @@ export const domains = {
 
 const changedDomainRules = [
   {domain:'motionVector',pattern:/MotionVector|PostPrepass|Script_Post\.mjs|Actor|Skinn|Skeleton|Viewmodel|FpsArm|BackRifle|Binoculars|Data_Tuning_Graphics/},
+  { domain: "render", pattern: /UniformColors/ },
   {domain:'propVelocity',pattern:/CarriagePropVelocity|PostPrepass|FirstLevelMissionView|FirstLevelMeal/},
   { domain: "render", pattern: /DeathPose|Data_Tuning_ActorDeath/ },
   {domain:"hud",pattern:/IncomingFire/},

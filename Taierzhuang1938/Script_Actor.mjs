@@ -21,6 +21,7 @@
 //   · 中方子弹带必须大面积瘪着、只有靠身几格鼓 —— 这是一眼读出「缺弹」的美术语言。
 
 import * as THREE from "three";
+import { ApplyNraUniform, NraUniformPalette } from "./Script_UniformColors.mjs";
 import { INFANTRY_RELEASE_SECONDS } from "./Script_InfantryAnimation.mjs";
 import { Mulberry32, HashString, Clamp, Clamp01, SmoothStep } from "./Script_Noise.mjs";
 import { MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
@@ -3483,6 +3484,7 @@ export class ActorFactory {
   Create(kind, options = {}) {
     const resolved = KIND_SPEC[kind] ? kind : "nra";
     const actor = this._FromPool(resolved, options) || new Actor(this, resolved, options);
+    ApplyNraUniform(actor.characterRig?.root, NraUniformPalette(resolved, actor.modelVariant, options.castId));
     // 合批层（Script_ActorBatch）在这里挂钩：造出来就登记，Dispose 时摘掉。
     // 挂在工厂上而不是各个调用点上 —— 人物有五个建造口（AI／过场／人群／
     // 编辑器两处），漏掉一个的后果是那批人在画面上整个消失，而不是掉帧。

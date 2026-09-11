@@ -4,6 +4,7 @@
 // 这里实例化。每名士兵稳定抽取本阵营五个模型之一；第一人称过场主角固定 Nra01。
 
 import * as THREE from "three";
+import { ApplyNraUniform, NraUniformPalette } from "./Script_UniformColors.mjs";
 import { DEATH_POSE } from "./Data_DeathPose.mjs";
 import { DEATH_CONTACT } from "./Data_Tuning_ActorDeath.mjs";
 import { InfantryAnimationController, INFANTRY_ANIMATION_IDS, INFANTRY_ANIMATION_LABELS, INFANTRY_ONCE_IDS } from "./Script_InfantryAnimation.mjs";
@@ -660,6 +661,7 @@ export class LugouCharacterRig {
         skinnedParts.push({ object, triangles });
       }
     });
+    ApplyNraUniform(this.root, NraUniformPalette(kind, variantIndex));
     const silhouettePart = skinnedParts.reduce((best, part) =>
       (!best || part.triangles > best.triangles ? part : best), null);
     for (const part of skinnedParts) {

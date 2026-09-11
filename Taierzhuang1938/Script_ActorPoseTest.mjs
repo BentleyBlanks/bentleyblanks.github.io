@@ -72,6 +72,26 @@ try {
     check(Object.values(invalid).every((value) => value === 0), "invalid value handling failed");
     check(NormalizeLifePose({ lifePose: { sit: 0.4 } }).sit === 0.4, "nested lifePose failed");
 
+    const { PatchKeysOf } = await import("./Script_MaterialPatches.mjs");
+    const Cloth = actor => {
+      let cloth = null;
+      actor.characterRig.root.traverse(mesh => {
+        if (mesh.userData.characterPbrSurface && mesh.material?.userData.nraUniformPalette) cloth = mesh.material;
+      });
+      return cloth;
+    };
+    factory.Prewarm("nra", 1, {modelVariant: 0});
+    const leader = factory.Create("nra", {modelVariant: 0, castId: "luo", weapon: null});
+    const regular = factory.Create("nra", {modelVariant: 0, weapon: null});
+    const green = factory.Create("nra", {modelVariant: 3, weapon: null});
+    check(leader.pooled && Cloth(leader)?.userData.nraUniformPalette === "leader", "pooled leader receives his uniform");
+    check(Cloth(regular)?.userData.nraUniformPalette === "grayBlue" && Cloth(green)?.userData.nraUniformPalette === "grayGreen", "soldier palettes remain independent");
+    check(Cloth(leader) !== Cloth(regular) && Cloth(leader).map === Cloth(regular).map, "leader dye preserves the shared atlas without changing other soldiers");
+    for (const candidate of [leader, regular, green]) {
+      check(PatchKeysOf(Cloth(candidate)).some(key => key.startsWith("nraUniformCloth1")), "cloth patch survives lighting setup");
+      candidate.Dispose();
+    }
+
     const actor = factory.Create("nra", { seed: 90210, weapon: null });
     const armed = factory.Create("nra", { seed: 90211, weapon: "ZhongZheng" });
     // Inspect actual merged vertices, not source spelling or a logic-only flag.

@@ -1409,26 +1409,27 @@ async function VerifyFrontlineRecoveryFixtures() {
 // Inspection fixture, not campaign movement or a natural gameplay camera claim.
 async function VerifyCastClothing() {
   const cast = await page.evaluate(async () => {
-    const { P012_CAST_CLOTH_COLORS: colors } = await import("./Script_FirstLevelP012CastAppearance.mjs");
+    const { NraUniformPalette } = await import("./Script_UniformColors.mjs");
+    const { PatchKeysOf } = await import("./Script_MaterialPatches.mjs");
     const game = window.Tengxian;
     return game.ai.soldiers.filter(soldier => soldier.castId).map(soldier => {
       const clothes = [], other = [];
       soldier.actor.characterRig.root.traverse(object => {
         if (!object.isMesh) return;
         for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
-          const entry = { name: material.name, color: material.color?.getHex(), map: !!material.map };
-          (material.name.startsWith("P012Cloth_") ? clothes : other).push(entry);
+          const entry = { name: material.name, palette: material.userData.nraUniformPalette, patches: PatchKeysOf(material), map: !!material.map };
+          (material.userData.nraUniformPalette ? clothes : other).push(entry);
         }
       });
-      return { castId: soldier.castId, expected: colors[soldier.castId],
-        applied: soldier.actor.p012ClothColor, clothes, other };
+      return { castId: soldier.castId, expected: NraUniformPalette("nra", soldier.actor.modelVariant, soldier.castId), clothes, other };
     });
   });
-  Check(cast.length === 5 && new Set(cast.map(entry => entry.applied)).size === 5
-    && cast.every(entry => entry.applied === entry.expected && entry.clothes.length > 0
-      && entry.clothes.every(material => material.color === entry.expected && !material.map)
+  Check(cast.length === 5 && new Set(cast.map(entry => entry.expected)).size === 3
+    && cast.every(entry => entry.clothes.length > 0
+      && entry.clothes.every(material => material.palette === entry.expected && material.map
+        && material.patches.some(key => key.startsWith("nraUniformCloth1")))
       && entry.other.some(material => material.map)),
-  "五名具名NPC使用各自纯色衣服，仍保留原皮肤/装备贴图");
+  "具名NPC使用灰蓝/灰绿军装，班长深橄榄灰绿，衣服与装备贴图完整");
   for (const entry of cast) {
     const placement = await page.evaluate(castId => {
       const game = window.Tengxian, soldier = game.ai.soldiers.find(actor => actor.castId === castId);

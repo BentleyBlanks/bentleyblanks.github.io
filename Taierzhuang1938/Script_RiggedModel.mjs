@@ -11,6 +11,7 @@
 // Script_Viewmodel 的程序化手，不能静默显示一支浮空的枪。
 
 import * as THREE from "three";
+import { ApplyNraUniform } from "./Script_UniformColors.mjs";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
 import { FpsArmPose, FpsArmStateRotation, FPS_ARM_LIMITS, FPS_BAYONET_SUPPORT } from "./Data_FpsArmPoses.mjs";
@@ -244,6 +245,7 @@ export class FpsArmRig {
         material.needsUpdate = true;
       }
     });
+    ApplyNraUniform(this.root);
   }
 
   _CollectBones() {

@@ -25,6 +25,19 @@
 //   · 布料绒光 —— three r185 `MeshPhysicalMaterial` 的 Charlie sheen；
 //     粗棉布/土布的 sheenRoughness 取 0.6–0.8（越糙绒光越散）。
 
+// User reference, 2026-09-11: worn gray-blue / gray-green cotton for Sichuan
+// soldiers; slightly better deep olive-gray cloth for the squad leader.
+// sRGB albedo targets, not final lit screenshot colors. 02/04 keep both colors
+// present in the young first-level squad; the player shares 01's gray-blue.
+export const NRA_UNIFORM_COLORS = Object.freeze({
+  materialName: "Material #1721585337",
+  sourceBlue: 0x315669,
+  grayBlue: 0x747c80,
+  grayGreen: 0x7b8070,
+  leader: 0x535644,
+  variants: Object.freeze(["grayBlue", "grayBlue", "grayGreen", "grayGreen", "leader"]),
+});
+
 /**
  * 逐配方的表面参数。`Script_Materials` 按配方名查这张表决定编哪几个 define。
  *
