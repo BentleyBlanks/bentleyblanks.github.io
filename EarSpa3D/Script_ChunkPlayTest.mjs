@@ -82,6 +82,7 @@ async function Run(width, height, touch) {
     await page.waitForFunction(() => window.__EarSpaDebug);
     await page.screenshot({ path: path.join(out, `Shot_${width}x${height}_Welcome.png`) });
     await page.locator('#ear-start').click(); await Step(150);
+    Check(!(await Probe()).rendering.lampOn,'耳道检查灯默认关闭');await page.locator('#lamp-toggle').click();
     const initial = await Probe();
     Check(initial.phase === 'playing' && initial.targets.length === 9, '开始进入完整九块回合');
     Check(initial.viewReady && initial.model?.source==='BlenderMCP', 'Blender 模型已加载且镜头已进入耳道');
@@ -129,11 +130,12 @@ async function Run(width, height, touch) {
     Check(final.audio.activeContacts.length === 0, '停止操作后无残留摩擦噪声');
     await page.screenshot({ path: path.join(out, `Shot_${width}x${height}_Complete.png`) });
     await Step(600); Check((await Probe()).phase === 'complete' && (await Probe()).shop.coins === final.shop.coins, '结算停留供欣赏且不重复收款');
-    await page.locator('#settings-open').click();
+    await page.locator('#shop-open').click();
+    Check(await page.locator('#shop-dialog').evaluate(e=>e.open)&&!await page.locator('#settings-dialog').evaluate(e=>e.open),'器具小铺与声音设置独立');
     await page.screenshot({ path: path.join(out, `Shot_${width}x${height}_Settings.png`) });
     await page.locator('[data-upgrade="earPickBamboo"]').click();
     Check((await Probe()).shop.toolLevels.earPickBamboo === 2, '升级沿用旧存档工具 ID');
-    await page.locator('#settings-close').click();
+    await page.locator('#shop-close').click();
     await page.locator('#receipt-next').click(); await Step(90);
     Check((await Probe()).phase === 'playing' && (await Probe()).cleanliness === 0 && (await Probe()).harvest.length === 0, '下一位完整重置');
     await page.locator('#sound-toggle').click();

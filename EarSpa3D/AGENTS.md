@@ -6,13 +6,14 @@
 ## 当前入口：拟物采耳与经营（2026-09-11）
 
 `index.html` → `Script_ChunkGame.js` + `Script_ImmersiveScene.js` + `Script_PeelPhysics.mjs` + `Style_Chunk.css`。
-以契约 §0 的拟物采耳与经营重设计为当前玩法。原 `Script_Main/Ui/Hand/Wax` 保留为旧玩法参考，
+以契约 §0 的拟物采耳与经营重设计为当前玩法。写实器具、工具接触、独立小铺与渲染资产见 [Data_TactileAssets.md](./Data_TactileAssets.md)。原 `Script_Main/Ui/Hand/Wax` 保留为旧玩法参考，
 当前入口不再使用它们。核心目标固定为真实接触、材质差异、完整取出或碎片清理、落盘/吸入、满意度经营，手机一指完成。
 
 实际交互回归：
 ```powershell
 node EarSpa3D/Script_PeelPhysicsTest.mjs
 node EarSpa3D/Script_EconomyTest.mjs
+node EarSpa3D/Script_TactileDetailTest.mjs
 node EarSpa3D/Script_TactilePlayTest.mjs
 node EarSpa3D/Script_TactilePlayTest.mjs --touch
 node EarSpa3D/Script_ChunkPlayTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
@@ -28,7 +29,7 @@ node EarSpa3D/Script_ChunkPlayTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
 （探、刮、挑、夹、扫、振、冲、吸、滴、照）做成可精细操作的交互，
 配上自然写实的材质和 ASMR 音景，外加一个最小的经营环。
 
-当前美术基调：自然写实、暖光与舒适。用户要求取代旧有“可爱琥珀糖”方向。
+当前美术基调：全套写实拟物，金属、玻璃与磨砂器具工作台 UI。用户最后明确取消治愈插画方向；真实材质、结构、接触与可玩性优先。
 耳廓参考、建模与纹理说明见 Data_ImmersiveAssets.md，玩法与画质边界见契约 §0。
 
 ## 三条硬约定（最容易踩的）

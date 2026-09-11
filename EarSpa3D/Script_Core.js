@@ -3,7 +3,7 @@
 // 高像素密度与抗锯齿保持接触细节；持续慢帧先关闭阴影，再小幅降分辨率。
 
 import * as THREE from "three";
-import { Clamp, Damp } from "./Script_Util.js?v=ear008-20260911";
+import { Clamp, Damp } from "./Script_Util.js?v=ear009-20260911";
 
 export const QUALITY_TIERS = {
   low: {

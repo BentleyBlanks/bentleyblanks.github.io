@@ -88,7 +88,7 @@ def SurfaceMaterial(name,base,isSkin=False,rough=.5):
     sep=nodes.new('ShaderNodeSeparateColor');links.new(texr.outputs['Color'],sep.inputs['Color']);links.new(sep.outputs['Green'],bsdf.inputs['Roughness'])
     return mat
 
-def Canal():
+def Canal(hairCount=58,hairColor=(.08,.047,.025),hairRadius=.009):
     Remove(['Model_Canal','Model_Eardrum','Model_CanalHair'])
     mat=SurfaceMaterial('NaturalCanal',(.66,.435,.345),True,.48)
     profile=json.loads((ROOT/'Data_CanalProfile.json').read_text())
@@ -128,7 +128,7 @@ def Canal():
     drum=Mesh('Model_Eardrum',verts,faces,Mat('Material_NaturalMembrane',(.27,.235,.21),.3,coat=.25))
     # 耳毛只在外侧软骨段，稀疏、很细并向耳口倾斜；合并一个 mesh。
     rng=random.Random(905);hv=[];hf=[]
-    for hair in range(58):
+    for hair in range(hairCount):
         depth=rng.randint(2,23);f=profile[depth];angle=rng.random()*math.tau
         outward=np.array(f['up'])*math.cos(angle)+np.array(f['right'])*math.sin(angle)
         radius=smoothed[depth,int(angle/math.tau*64)%64]
@@ -136,14 +136,14 @@ def Canal():
         toward=np.array(profile[max(0,depth-1)]['center'])-np.array(f['center']);toward/=np.linalg.norm(toward)
         length=rng.uniform(.24,.72);side=np.cross(outward,toward);start=len(hv)
         for k in range(6):
-            t=k/5;p=base-outward*(math.sin(t*1.3)*length*.65)+toward*(t*length*.65)
-            r=.009*(1-t)+.0015
+            t=k/5;p=base-outward*(math.sin(t*1.3)*length*.65)+toward*(t*length*.65)+side*(math.sin(t*2.4)*length*.12)
+            r=hairRadius*(1-t)+.0007
             for j in range(4):
                 a=j/4*math.tau;hv.append((p+r*(side*math.cos(a)+outward*math.sin(a))).tolist())
                 if k<5:
                     n=start+k*4+j;m=start+k*4+(j+1)%4;hf.append((n,m,m+4,n+4))
-    Mesh('Model_CanalHair',hv,hf,Mat('Material_FineHair',(.08,.047,.025),.82))
-    print('NATURAL_CANAL',len(verts),'drum vertices; hairs',58)
+    Mesh('Model_CanalHair',hv,hf,Mat('Material_FineHair',hairColor,.82))
+    print('NATURAL_CANAL',len(verts),'drum vertices; hairs',hairCount)
 
 def Wax():
     Remove(['Model_WaxDry','Model_WaxWet','Model_WaxFirm'])

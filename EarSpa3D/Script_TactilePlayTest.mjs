@@ -60,18 +60,19 @@ try{
  await page.evaluate(()=>localStorage.setItem('earspa3d.shop.v1',JSON.stringify({version:1,coins:500,day:3,toolLevels:{earPickBamboo:2}})));
  await page.reload();await page.waitForFunction(()=>window.__EarSpaDebug);
  Check((await Probe()).shop.day===3&&(await Probe()).shop.inventory.tools.length===3,'旧存档保留余额和等级并补齐库存');
- await page.locator('#ear-start').click();await Step(150);
+ await page.locator('#ear-start').click();await page.locator('#lamp-toggle').click();await Step(150);
  await page.locator('#shop-open').click();
- await page.locator('[data-purchase="brush"]').click();await page.locator('[data-purchase="suction"]').click();
+ await page.locator('[data-select-tool="brush"]').click();await page.locator('[data-purchase="brush"]').click();await page.locator('[data-select-tool="suction"]').click();await page.locator('[data-purchase="suction"]').click();
+ await page.locator('[data-shop-tab="skins"]').click();await page.locator('[data-select-tool="scoop"]').click();
  await page.locator('[data-skin="walnut"]').click();
  const saved=(await Probe()).shop;
  Check(saved.coins===339&&saved.inventory.equipped.scoop==='walnut'&&saved.inventory.tools.length===5,'购买两件工具及耳勺皮肤扣款正确');
  await page.locator('[data-skin="walnut"]').click();Check((await Probe()).shop.coins===339,'重复装备皮肤不扣款');
  await page.screenshot({path:path.join(here,'_dev','Shot_Shop_'+width+'.png')});
- await page.locator('#settings-close').click();
+ await page.locator('#shop-close').click();
  await page.reload();await page.waitForFunction(()=>window.__EarSpaDebug);
  Check((await Probe()).shop.inventory.equipped.scoop==='walnut'&&(await Probe()).shop.inventory.tools.includes('suction'),'新工具与单工具皮肤刷新后保留');
- await page.locator('#ear-start').click();await Step(150);
+ await page.locator('#ear-start').click();await page.locator('#lamp-toggle').click();await Step(150);
  await page.evaluate(()=>__EarSpaDebug.audio.setBgmVolume(0));await page.waitForTimeout(2200);
  const idle=await Sample(.4);
  // 收音开始于真实接触，涵盖摩擦与粘附断裂，未直接调用播放函数。
@@ -111,6 +112,8 @@ try{
  const hard=(await Probe()).targets.find(t=>t.type==='impacted'&&!t.fragment);
  await Select('tweezers');await Pull(hard.id);await Input('up');await Step(100);
  Check((await Probe()).painCount>=1&&(await Probe()).satisfaction<90,'强拉硬结让客人疼痛并降低满意度');
+ Check((await Probe()).rendering.irritation.some(v=>v>.1),'未软化强拉留下局部红肿状态');
+ await page.screenshot({path:path.join(here,'_dev','Shot_Irritation_'+width+'.png')});
  Check((await Probe()).audio.recentPlayback.some(t=>t.cue==='customerPain'&&!t.truncated&&t.seconds===t.naturalSeconds),'客人抱怨整句播放不截断');
  pieces=(await Probe()).targets.filter(t=>t.fragment&&t.state==='attached');
  for(const t of pieces)await Land(t.id);

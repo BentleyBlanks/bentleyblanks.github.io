@@ -5,15 +5,15 @@
 <!-- Three.js 0.185.1 is used under the MIT License: https://github.com/mrdoob/three.js/blob/dev/LICENSE -->
 <title>采耳物语 · EarSpa3D</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#FFF8F2">
-<meta name="description" content="按住、撬起、整块拉出。用竹耳勺和小镊子收集琥珀耳垢，享受轻柔 ASMR，手机一指就能放松。">
+<meta name="theme-color" content="#171f23">
+<meta name="description" content="写实采耳模拟：照明、软化、托起与夹取，观察客人反馈，升级器具并经营工作间。">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="Style_Chunk.css?v=ear008-20260911">
+<link rel="stylesheet" href="Style_Chunk.css?v=ear009-20260911">
 <style>
   /* 首屏骨架：样式表可能还没到，先给出与基调一致的底色，避免白闪 */
-  html { background: #FFF8F2; }
+  html { background: #171f23; }
 
   /* 画布尺寸必须在这里兜一层。
      three 的 setSize(w, h, false) **不改画布样式**，只改绘制缓冲；画布的 CSS 尺寸
@@ -26,9 +26,9 @@
   #ear-boot { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
               flex-direction: column; gap: 18px; z-index: 900;
               font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
-              color: #8A7C6E; letter-spacing: .08em;
-              background: radial-gradient(120% 90% at 50% 20%, #FFF8F2 0%, #DFF3EC 60%, #DCEBF7 100%); }
-  #ear-boot .ring { width: 46px; height: 46px; border-radius: 50%; border: 3px solid #DFF3EC; border-top-color: #6FD6B6;
+              color: #b9cbd0; letter-spacing: .08em;
+              background: radial-gradient(120% 90% at 50% 20%, #171f23 0%, #29383f 60%, #10181c 100%); }
+  #ear-boot .ring { width: 46px; height: 46px; border-radius: 50%; border: 3px solid #3d515b; border-top-color: #bfdadd;
                     animation: earSpin 900ms linear infinite; }
   @keyframes earSpin { to { transform: rotate(360deg); } }
 </style>
@@ -40,13 +40,13 @@
   <canvas id="ear-canvas" class="ear-scene"></canvas>
 </div>
 
-<div id="ear-boot"><div class="ring"></div><div>正在铺好耳道…</div></div>
+<div id="ear-boot"><div class="ring"></div><div>正在准备工作间…</div></div>
 
 <script type="importmap">
 {
   "imports": {
-    "three": "./vendor/three/build/three.module.js?v=ear008-20260911",
-    "./vendor/three/build/three.module.js": "./vendor/three/build/three.module.js?v=ear008-20260911"
+    "three": "./vendor/three/build/three.module.js?v=ear009-20260911",
+    "./vendor/three/build/three.module.js": "./vendor/three/build/three.module.js?v=ear009-20260911"
   }
 }
 </script>
@@ -56,7 +56,7 @@
   // 真正的游戏逻辑一行都不在这里——这里出错是最难查的那种，保持它足够小。
   const boot = document.getElementById("ear-boot");
   try {
-    const mod = await import("./Script_ChunkGame.js?v=ear008-20260911");
+    const mod = await import("./Script_ChunkGame.js?v=ear009-20260911");
     await mod.Start();
   } catch (error) {
     console.error(error);

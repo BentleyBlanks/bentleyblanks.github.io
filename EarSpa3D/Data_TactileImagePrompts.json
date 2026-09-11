@@ -1,0 +1,62 @@
+{
+  "date": "2026-09-11",
+  "direction": "Photorealistic materials, physically constrained interaction, instrument workbench UI",
+  "assets": [
+    {
+      "id": "CanalPbr",
+      "provider": "Built-in imagegen",
+      "tier": 1,
+      "output": "Textures/Texture_CanalPbrAtlas.png",
+      "prompt": "Use case: photorealistic-natural. Asset type: production physically based rendering texture atlas for a realistic ear canal game, NOT an illustration of an ear. Generate a square 2048x2048 2-by-2 PBR atlas containing FOUR EXACTLY ALIGNED material maps of the SAME tiny patch of healthy human ear canal skin. No dividers, margins, labels, text, shadows from objects, hair or objects. TOP LEFT: diffuse base color only, neutral soft peach pink with very fine epidermal pores, subtle irregular branching creases and barely visible capillaries, dry healthy skin, no baked specular highlights or directional lighting. TOP RIGHT: matching OpenGL tangent-space normal map, predominantly flat RGB(128,128,255), fine shallow pore relief, restrained strength; map pattern MUST match top left pixel for pixel. BOTTOM LEFT: corresponding grayscale roughness map, predominantly 70%-85% gray, slightly varied around pores, dry material. BOTTOM RIGHT: matching grayscale ambient occlusion, almost white with very subtle gray pore crevices. All quadrants full bleed, same exact crop and scale, seamless edges within each quadrant. Skin feels soft, not leather or stone; no freckles, no black dots, no deep wrinkles, no blood, no border. Output one atlas. Save the generated image to C:/Users/Bentl/Documents/Program/bentleyblanks_Codex_EarSpaTactileDetail_20260911/EarSpa3D/Textures/Texture_CanalPbrAtlas.png."
+    },
+    {
+      "id": "WaxPbr",
+      "provider": "Built-in imagegen",
+      "tier": 1,
+      "output": "Textures/Texture_WaxPbrAtlas.png",
+      "prompt": "Create a production physically based rendering material texture atlas for realistic dry human cerumen, ONE square 2048x2048 image divided into four exactly equal quadrants, no border or labels. All four maps registered to the identical flat seamless material patch. UPPER LEFT base color: very realistic ochre brown dry wax with pale tan flaky lamellae, scattered tiny irregular fissures, faint amber oily specks, extremely fine surface structure, no large objects, no spheres, no skin, no hairs, neutral flat illumination without baked highlights or shadows. UPPER RIGHT tangent-space OpenGL normal map purple blue of same fine flaking and fissures. LOWER LEFT grayscale roughness map, predominantly light gray for dry rough surface 70-90 percent, darker tiny oily regions. LOWER RIGHT grayscale ambient occlusion predominantly white, darker only in small crevices. No perspective, no shading on color map. Material scale 4 millimeters across per patch, restrained realistic irregular wax structure, not candy. Save as C:/Users/Bentl/Documents/Program/bentleyblanks_Codex_EarSpaTactileDetail_20260911/EarSpa3D/Textures/Texture_WaxPbrAtlas.png"
+    },
+    {
+      "id": "GripPbr",
+      "provider": "Built-in imagegen",
+      "tier": 1,
+      "output": "Textures/Texture_GripPbrAtlas.png",
+      "prompt": "Generate a texture atlas for physically based rendering of three small tool grip materials. ONE square 2048x2048 bitmap. Four equal quadrants: upper-left ALBEDO, upper-right tangent OpenGL NORMAL purple blue, lower-left linear grayscale ROUGHNESS, lower-right grayscale AMBIENT OCCLUSION. Each quadrant has exactly the same THREE EQUAL VERTICAL STRIPS, perfectly aligned across all maps: left third lightly used satin stainless steel with fine lengthwise hairline brushing and sparse tiny scratches; middle third dark natural walnut endgrain-free longitudinal wood grain subtle matte oiled brown; right third pale gray green nephrite jade with very subtle cloudy stone inclusions, no cracks. All seamless material patches, no objects no labels no borders no writing. Orthographic flat color lighting without baked shadows or specular reflections in the albedo quadrant. Mostly white AO, slight pore definition only for walnut. Satin roughness around .5 for steel, .55 walnut, .2 jade. Normal surface relief extremely subtle fine material microstructure appropriate for 2mm instrument handles, no raised pattern no giant cracks. Production-ready registered maps. Save as C:/Users/Bentl/Documents/Program/bentleyblanks_Codex_EarSpaTactileDetail_20260911/EarSpa3D/Textures/Texture_GripPbrAtlas.png"
+    },
+    {
+      "id": "Workbench",
+      "provider": "Built-in imagegen",
+      "tier": 1,
+      "output": "Textures/Texture_InstrumentWorkbench.png",
+      "prompt": "Photorealistic product photograph for a premium ear-care simulator instrument store UI header. Landscape 1536x1024. Close low angled overhead view of a real brushed stainless steel instrument tray inset in a dark charcoal textured work surface. On the RIGHT half only: three precise steel micro ear forceps, an oval curette spoon, a hollow glass graduated pipette with dark silicone bulb, and soft ivory fine brush, each secured separately in fitted charcoal foam. A folded white clinical linen corner. LEFT half almost empty dark graphite metal surface for UI type. Light from a large neutral white rectangular task light, realistic soft reflections and micro surface scratches, tactile machined metal bevels, restrained high-end industrial design, extremely sharp believable physical materials. No cartoon, no healing aesthetic, no flowers no tea no golden sunlight no decorative organic shapes. No lettering, no logos, no text. This is an actual workbench photo, not a UI mockup. Save as C:/Users/Bentl/Documents/Program/bentleyblanks_Codex_EarSpaTactileDetail_20260911/EarSpa3D/Textures/Texture_InstrumentWorkbench.png"
+    },
+    {
+      "id": "CustomerSideProfile",
+      "provider": "Built-in imagegen",
+      "tier": 1,
+      "output": "Textures/Texture_CustomerSideProfile.png",
+      "prompt": "Photorealistic close up side profile photograph for an ear-care simulator, a fictional adult East Asian male customer resting sideways on a charcoal padded treatment chair, clean natural skin texture with pores and fine hair, short black hair, eye gently closed, right ear clearly visible on left half of frame and cheek nose profile toward right. Camera level with ear and face, relaxed neutral expression not smiling, precise anatomical outer ear shape. Soft neutral white task light, dim real ear-care studio background, gray linen pillow, shallow realistic photographic depth of field but ear and face sharply resolved. No instruments in ear, no person treating him, no text, no graphic overlays, no cartoon, no warm healing illustration. Landscape1536x1024. Used as a small customer live-view context card during extraction, not as medical reference. Save as C:/Users/Bentl/Documents/Program/bentleyblanks_Codex_EarSpaTactileDetail_20260911/EarSpa3D/Textures/Texture_CustomerSideProfile.png"
+    },
+    {
+      "id": "ToolsBasicThreeView",
+      "provider": "Built-in imagegen",
+      "tier": 1,
+      "output": "OneDrive/AI/Models/Blender/EarSpa3D/TactilePbr/References/Reference_ToolsBasicThreeView.png",
+      "prompt": "One technical modeling reference sheet for an ear-care game, BASIC VINTAGE TOOL SET, restrained realistic product photography on neutral light gray. Exactly three equal horizontal bands: front orthographic, side orthographic, top orthographic. Each band repeats exactly the same FIVE recognizable slender tools in identical left to right order, individual separated columns: 1 gently used bamboo ear scoop with tiny shallow oval cup and rounded lip; 2 slender straight spring ear forceps with two elongated tapered jaws, blunt tiny inward curved tips and ridged grip; 3 clear glass dropper pipette with visible hollow tube and beige silicone bulb; 4 slim wood handled soft cream bristle ear brush; 5 slim bent stainless microsuction cannula with rounded open nozzle and finger vent grip. All tool long axes vertical, tool tips downward. Same dimensions and profiles across views, no perspective, every object fully visible no overlap. Fine subtle scratches, slightly darkened bamboo grip, matte brushed steel, aged clean surfaces, no rust dirt blood. Accurate joints materials open jaws cup concavity and tube bore; no fanciful extra parts, no text, no labels, no shadows obscuring shape. 1536x1024. Save as C:/Users/Bentl/OneDrive/AI/Models/Blender/EarSpa3D/TactilePbr/References/Reference_ToolsBasicThreeView.png"
+    },
+    {
+      "id": "ToolsRefinedThreeView",
+      "provider": "Built-in imagegen",
+      "tier": 1,
+      "output": "OneDrive/AI/Models/Blender/EarSpa3D/TactilePbr/References/Reference_ToolsRefinedThreeView.png",
+      "prompt": "Production Blender modeling reference board, REFINED professional ear cleaning instrument set. Three equal horizontal bands on neutral gray with orthographic FRONT, SIDE, and END-ON TOP views. Five fixed columns in every band, same exact instruments and scale. Column1 thin stainless shallow oval ear curette spoon with smoothly rolled rim and satin steel ergonomic cylindrical grip. Column2 elongated spring micro ear forceps, flat spring arms tapered to rounded inward tips with micro serrations, finely knurled rear grip. Column3 precision hollow glass pipette, fine graduated etched markings without lettering, clean gray silicone bulb. Column4 dense pale fine bristle micro ear brush with ferrule and satin steel grip. Column5 hollow angled polished steel microsuction cannula, blunt open round tip, knurled finger vent grip. Front row tips down full length, side row EXACTLY 90 degree rotation full length, bottom row show true short foreshortened end-on circles/cup cross sections, do NOT repeat a lengthwise view in the bottom row. Cool neutral silver materials, new well maintained precision instruments, still feasible real manufacturing, no decorative fantasy shapes. Completely separate tools no overlap, crisp contours, no text, no logos, no perspective shadows. 1536x1024. Save as C:/Users/Bentl/OneDrive/AI/Models/Blender/EarSpa3D/TactilePbr/References/Reference_ToolsRefinedThreeView.png"
+    },
+    {
+      "id": "ToolsMasterThreeView",
+      "provider": "Built-in imagegen",
+      "tier": 1,
+      "output": "OneDrive/AI/Models/Blender/EarSpa3D/TactilePbr/References/Reference_ToolsMasterThreeView.png",
+      "prompt": "A rigorous manufacturing-style THREE VIEW reference board of a premium ear-care tool set for Blender, front orthographic row, side orthographic row, true END-ON cross section top-view row at bottom. Five columns repeat the same 5 tools, tip down: shallow oval micro ear spoon with rolled polished steel rim and tapered titanium grip; slender spring micro-forceps with thin flat polished arms blunt inward tips and precision serrations; hollow borosilicate pipette with clear etched graduations and charcoal silicone bulb inside a machined steel collar; soft densely packed ivory micro brush with precise crimped ferrule and titanium grip; angled hollow stainless microsuction cannula with rounded open tip and machined oval finger vent. Premium clinical-grade steel and subtly pale champagne titanium handles, precise knurled sections separated by smooth rings, delicate chamfers, immaculate clean surfaces, no gemstones no decorative colors. Distinct from basic and refined sets through precision engineering, clearer slender tips, polished bevel highlights, smoother ergonomic grip profiles. Front and side are exact 90 degree rotations no perspective. Bottom row true foreshortened end views NOT another lengthwise tool. Neutral gray seamless background, each tool fully visible with empty gutters, crisp real metal photorealism. No text labels logos, 1536x1024. Save as C:/Users/Bentl/OneDrive/AI/Models/Blender/EarSpa3D/TactilePbr/References/Reference_ToolsMasterThreeView.png"
+    }
+  ]
+}
