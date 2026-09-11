@@ -295,7 +295,7 @@ sRGB 编码，最后一趟必须自己手写（Composite 的 `EncodeOutput`）�
 | 静态几何 | 相机速度（精确） | prevWorld = curWorld |
 | **蒙皮人物（SkinnedMesh）** | **逐骨骼（精确）** | `skeleton.boneTexture` 换成**高度翻倍**的图：上半是本帧骨矩阵（three 每帧自己写），下半是上一帧的副本（`PrepassPass._SnapshotSkeletons` 在 Render 末尾 `copyWithin`）。取样端 `GetPrevBoneMatrix(i)` = three 的 `getBoneMatrix(i)` 把纹素下标 +`size*size`。**零逐 draw 成本** —— `boneTexture` 本来就是 three 逐 draw 塞的 |
 | InstancedMesh / BatchedMesh | **只有相机速度（近似）** | 实例矩阵当不变。`Script_ActorBatch` 的远景人群、流送的布设件每帧改写 `instanceMatrix`，所以它们在 RT1 里是「静止物体」。要修得给每只实例网格再挂一份上一帧 `instanceMatrix`（显存翻倍 + 每帧多一次上传） |
-| 非蒙皮刚体运动件（大车、列车、载具、碎块） | **标了就精确，没标只有相机速度** | `uPrevModelMatrix` + `MarkDynamicPrepass(object)`。**已有两个消费方**（2026-09-09）：第一关移动车厢的体块与车门（`Script_FirstLevelWhiteboxField` 的 `trainMeshes` / 车门 gate，6 只）、P012 背枪座下的枪与背带（`Script_FirstLevelP012BackRifle`，车厢内满编 66 只）。它逐 draw 置 `material.uniformsNeedUpdate = true`，会把整份 uniform（含 24 组破口数组）重传一遍，几十只以内不值一提（这 72 只实测墙钟 35.53 → 35.19 ms/帧，在噪声里），成百上千会撞「CPU 提交是瓶颈」那条红线 |
+| 非蒙皮刚体运动件（普通 Mesh，含父节点/骨骼带动的附件） | **默认逐物体，不需打标** | 2026-09-11 起 `PrepassPass._BindRigidVelocity` 通过覆盖材质回调读取私有 WeakMap 的上一帧世界矩阵；只有矩阵变化的 draw 与恢复默认值时上传 uniform。所有材质组绘制完统一更新历史，消失后重现丢弃旧物体矩阵。`MarkDynamicPrepass` 只保留兼容标记，不占用对象钩子。近景背包/弹药使用身份稳定的普通 Mesh；实例路径限制见上行和[复发调查](Data_CarriagePropVelocity.md) |
 
 主 pass 读到的骨骼纹理**逐纹素不变**（宽度没动，`getBoneMatrix(i)` 对
 `i < size²/4` 落点完全一样），所以换成翻倍纹理对画面零影响。显存与上传：一具 50 骨的
@@ -346,6 +346,8 @@ sRGB 编码，最后一趟必须自己手写（Composite 的 `EncodeOutput`）�
 > 行车段）：车厢体块必须全部标了逐物体速度，且真跑一段之后画面上速度 > 4 px/帧的
 > 像素少于 6%（修前 19%）。**剩下的已知缺口**：帽子这类挂在头骨上的刚体件仍是相机
 > 速度（车厢内占画面 0.08%，肉眼看不出），InstancedMesh 那条见上表。
+
+> **当前修复（2026-09-11）：腊肉/背包复发。** 上述逐件打标没有覆盖新增道具，旧开场速度门禁又在流程重写中消失。普通 Mesh 现已由预通道默认记录历史；近景背包和弹药移出无逐实例历史的实例批次。独立 `CarriagePropVelocityTest` 用 high 画质与每种道具的 GPU 速度读回保护，不依赖任务流程或整屏占比。历史、数值和剩余实例化限制见[调查记录](Data_CarriagePropVelocity.md)。上方 9 月 9 日的打标范围及性能数字是历史取证，不是当前接入要求。
 
 **TAA 与运动模糊现在都吃速度靶**（这一段原来写的是「仍走深度反投影」，TAAU 那一轮
 落地后没跟着改，2026-09-09 更正）：`TaaPass` 的 `uUseVelocityBuffer` 在
@@ -3241,8 +3243,9 @@ scale=medium、玩家在西关大街）：
   没了；剩下的仍是成本那一条：逐 draw 置 `uniformsNeedUpdate` 会把整份 uniform
   （含 24 组破口数组、288 个 float）重传，419 只 × 进出各一次 = 每帧 838 次全量
   重传，正好撞在「CPU 提交是瓶颈」那条红线上（`FrameProfileTest` 的 baseline 是
-  submit ≈ 15 ms）。所以**照旧只给真的在世界里动的那几只标**（第一关车厢体块 6 只
-  + 背枪 66 只，实测在噪声里），不给整城静态几何标 —— 它们本来就该只有相机速度。
+  submit ≈ 15 ms）。**2026-09-11 已改为覆盖材质自动记录普通 Mesh 历史**；只在矩阵
+  实际变化与恢复默认值时上传 uniform，静态几何保持相机速度。这里的逐件打标成本
+  是旧实现取证，不再要求调用者给每个道具手动接线，现状见 §1 的速度表。
 * **实例化**：显存不是问题（0.15 MB）。问题是预通道的覆盖材质**全场只有一份**，
   自定义属性的 `#define` 是材质级不是对象级 —— 要么 161 只 InstancedMesh
   （以及布设流送、`Script_ActorBatch` 之后新建的每一只）**都**带上第二份

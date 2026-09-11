@@ -26,6 +26,11 @@ export class FirstLevelMissionView {
     this.rotation = new THREE.Quaternion();
     this.scale = new THREE.Vector3();
     this.parts = {};
+    // Near-camera moving props need persistent object identity and real motion
+    // history. The crowd's instance slots have no previous-instance transforms.
+    this.rigidParts = {fieldPack: [], cartridge: []};
+    this.rigidTemplates = {};
+    this.rigidProps = new Map();
     this.personColor = new THREE.Color();
     for (const [key, geometry, color, count] of [
       ["fieldPack",new THREE.BoxGeometry(.32,.43,.21),0x857a56,4],
@@ -46,6 +51,10 @@ export class FirstLevelMissionView {
     ]) {
       const material = new THREE.MeshStandardMaterial({ color, roughness: 0.92 });
       this.materials.push(material);
+      if (this.rigidParts[key]) {
+        this.rigidTemplates[key] = {geometry, material, capacity: count};
+        continue;
+      }
       const mesh = new THREE.InstancedMesh(geometry, material, count);
       mesh.count = 0;
       mesh.castShadow = true;
@@ -206,7 +215,7 @@ export class FirstLevelMissionView {
       const actor=entry.actor, rig=actor.actor?.characterRig, life=actor.missionTrainLife;
       if(actor.castId&&actor.alive&&rig?.bones.chest){
         rig.bones.chest.getWorldPosition(this.position);
-        this.Instance("fieldPack",this.position.x+Math.sin(actor.yaw)*.25,this.position.y-.18,
+        this.RigidProp("fieldPack",actor.id,this.position.x+Math.sin(actor.yaw)*.25,this.position.y-.18,
           this.position.z+Math.cos(actor.yaw)*.25,actor.yaw);
       }
       if(!rig?.missionTrainLifeActive || life.brace>.25 || life.weight<.7 || life.gestureWeight<.7)continue;
@@ -216,9 +225,9 @@ export class FirstLevelMissionView {
         const bone=rig.bones['hand'+side];
         bone.getWorldPosition(this.position);
         const {x,y,z}=this.position, yaw=actor.yaw;
-        if(kind==='CountAmmo'&&side==='R')this.Instance('cartridge',x,y,z,yaw);
+        if(kind==='CountAmmo'&&side==='R')this.RigidProp('cartridge',actor.id+'R',x,y,z,yaw);
         else if(kind==='CountAmmo'){
-          for(const offset of [-.016,0,.016])this.Instance('cartridge',x+offset,y+.018,z,yaw);
+          for(const offset of [-.016,0,.016])this.RigidProp('cartridge',actor.id+'L'+offset,x+offset,y+.018,z,yaw);
         }
         else if(kind==='ShareFood'&&side==='L'&&!life.mealPerforming){
           let prop=this.mealProps.get(actor.id);
@@ -233,10 +242,23 @@ export class FirstLevelMissionView {
       }
     }
   }
+  RigidProp(key, id, x, y, z, yaw) {
+    const identity=key+':'+id;
+    let mesh=this.rigidProps.get(identity);
+    if(!mesh){
+      const template=this.rigidTemplates[key];
+      if(this.rigidParts[key].length>=template.capacity)return;
+      mesh=new THREE.Mesh(template.geometry,template.material);
+      mesh.name='Mission_'+identity;mesh.castShadow=true;mesh.receiveShadow=true;
+      this.rigidProps.set(identity,mesh);this.rigidParts[key].push(mesh);this.root.add(mesh);
+    }
+    mesh.position.set(x,y,z);mesh.rotation.set(0,yaw,0);mesh.visible=true;
+  }
   Update(time, { tank,player,camera=null } = {}) {
     this.people.Begin(time,player?.position);
     this.aftermath.Update(player?.position,camera);
     for (const mesh of Object.values(this.parts)) mesh.count = 0;
+    for (const mesh of this.rigidProps.values()) mesh.visible=false;
     this.TrainHandProps();
     this.UpdateSupplies(time);
     if (this.column.stationBombed)
@@ -366,9 +388,9 @@ export class FirstLevelMissionView {
       const index=this.battlefield.colliders.indexOf(collider);
       if(index>=0)this.battlefield.colliders.splice(index,1);
     }
-    this.root.traverse((object) => {
-      if (object.isMesh) object.geometry.dispose();
-    });
+    const geometries=new Set(Object.values(this.rigidTemplates).map(template=>template.geometry));
+    this.root.traverse(object=>{if(object.isMesh)geometries.add(object.geometry)});
+    for(const geometry of geometries)geometry.dispose();
     for (const material of this.materials) material.dispose();
     this.scene.remove(this.root);
   }

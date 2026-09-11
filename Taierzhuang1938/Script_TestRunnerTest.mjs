@@ -137,6 +137,11 @@ const missionPrepush = ResolveSelection(ParseArgs(["--changed=origin/master", "-
 Check(missionPrepush.includes("MissionSetpiecesTest") && !missionPrepush.includes("PlayTest"), "任务摆点推送前跑领域专项，不再追加已删除的整局门禁");
 
 const textureChange = InferDomains(["Taierzhuang1938/Texture/Texture_BrickWallBase.webp"]);
+for(const file of ['Script_PostPrepass.mjs','Script_FirstLevelMeal.mjs','Script_FirstLevelMissionView.mjs']){
+  const change=InferDomains(['Taierzhuang1938/'+file]);
+  const selection=ResolveSelection(ParseArgs(['--changed=origin/master','--profile=prepush']),change.domains,change);
+  Check(selection.includes('CarriagePropVelocityTest'),file+' keeps the per-prop GPU velocity gate when the opening route changes');
+}
 Check(textureChange.domains.includes("render"), "贴图改动映射 render");
 const texturePrepush = ResolveSelection(ParseArgs(["--changed=origin/master", "--profile=prepush"]), textureChange.domains, textureChange);
 Check(texturePrepush.includes("BootTest") && texturePrepush.includes("BootStallTest"), "贴图推送前追加开机与挂死门禁");

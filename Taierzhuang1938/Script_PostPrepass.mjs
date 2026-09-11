@@ -36,10 +36,11 @@
 //     `Script_ActorBatch` 与布设流送每帧改写 `instanceMatrix`，所以**远景人群与
 //     会动的布设件在 RT1 里是「静止物体」**。要修得给每只 InstancedMesh 再挂一份
 //     上一帧 `instanceMatrix` 属性（显存翻倍 + 每帧多一次上传），本阶段不做。
-//   · **非蒙皮的刚体运动件**（大车、列车、载具、飞出去的碎块）同上：只有相机速度。
-//     接线点留在 `uPrevModelMatrix` + `MarkDynamicPrepass(object)`：它给对象挂
-//     onBeforeRender/onAfterRender，逐 draw 写上一帧矩阵并置 `uniformsNeedUpdate`。
-//     **当前没有任何消费方**（成本按上面那条账，得先确认值得）。
+//   · **普通刚体 Mesh 默认记录上一帧世界矩阵**，包括骨骼附件、异步新建道具。
+//     由覆盖材质的 onBeforeRender 统一绑定，不要求调用方逐件打标、不占对象钩子。
+//     只有矩阵实际变化时上传上一帧矩阵；静态物体仍走相机速度的快速路径。
+//     InstancedMesh / BatchedMesh 的逐实例形变仍不在此契约内，近景移动交互件用
+//     身份稳定的普通 Mesh（如车厢背包、弹药）；不能把组矩阵当成逐实例历史。
 //
 // ## HZB
 // 预通道之后按 max-reduce 建一条线性视深金字塔（RGBA16F，四个通道同值）：
@@ -359,6 +360,12 @@ export class PrepassPass {
     this._skeletons = new Set();       // 本帧在场的骨骼（下面拷上一帧矩阵用）
     this._upgraded = new WeakSet();    // 已经换成「高度翻倍」boneTexture 的骨骼
     this._failedUpgrade = new WeakSet();
+    this._rigidHistory = new WeakMap();
+    this._rigidDrawn = [];
+    this._velocityFrame = 0;
+    if (this.velocityEnabled) this.material.onBeforeRender = (renderer, scene, camera, geometry, object) => {
+      this._BindRigidVelocity(object);
+    };
 
     this.uniformsHzb = {
       uSource: { value: null }, uTexel: { value: new THREE.Vector2() },
@@ -541,11 +548,48 @@ export class PrepassPass {
     }
   }
 
+  // Called after the object's existing hooks, before three uploads uniforms.
+  // Keep history per pass, outside userData (cloning must not clone live history).
+  _BindRigidVelocity(object) {
+    const U = this.material.uniforms;
+    let valid = 0;
+    if (object.isMesh && !object.isSkinnedMesh && !object.isInstancedMesh && !object.isBatchedMesh
+        && !object.userData.foregroundPrepass) {
+      let history = this._rigidHistory.get(object);
+      if (!history) {
+        history = { object, matrix: object.matrixWorld.clone(), frame: -1, queued: -1 };
+        this._rigidHistory.set(object, history);
+      }
+      if (history.frame === this._velocityFrame - 1 && !history.matrix.equals(object.matrixWorld)) {
+        U.uPrevModelMatrix.value.copy(history.matrix);
+        valid = 1;
+      }
+      if (history.queued !== this._velocityFrame) {
+        history.queued = this._velocityFrame;
+        this._rigidDrawn.push(history);
+      }
+    }
+    // Restore the default before static/skinned/instanced draws too. Upload only
+    // for moving draws and the transition back, not for every static wall.
+    if (valid || U.uPrevModelValid.value !== valid) this.material.uniformsNeedUpdate = true;
+    U.uPrevModelValid.value = valid;
+  }
+
+  _SnapshotRigids() {
+    for (const history of this._rigidDrawn) {
+      history.matrix.copy(history.object.matrixWorld);
+      history.frame = this._velocityFrame;
+    }
+    this._rigidDrawn.length = 0;
+  }
+
   Render(ctx) {
     const renderer = ctx.renderer;
     const scene = ctx.scene;
     const camera = ctx.camera;
     const material = this.material;
+    this._velocityFrame += 1;
+    this._rigidDrawn.length = 0;
 
     // 事故（这一条是好几个"远景不对劲"的共同根因）：allowOverride = false 只保证
     // **不被换材质**，它照样会被画进这一趟。天空穹正是这样用自己那套着色器
@@ -579,6 +623,8 @@ export class PrepassPass {
     renderer.setClearColor(0x000000, 0);
     renderer.clear(true, true, false);
     renderer.render(scene, camera);
+    // Advance once after every material group has drawn, never between groups.
+    this._SnapshotRigids();
     scene.overrideMaterial = prevOverride;
     scene.background = prevBackground;
     for (const object of skipped) object.visible = true;
@@ -620,49 +666,13 @@ export class PrepassPass {
 }
 
 /**
- * 让一只**非蒙皮的刚体运动件**在速度缓冲里拿到真的逐物体速度。
- *
- * 成本口径（读完再决定要不要用）：three 只在「程序变了」或「材质 id 变了」时
- * 才重传 ShaderMaterial 的 uniform 包，所以逐 draw 改 uniform 必须置
- * `material.uniformsNeedUpdate = true` —— 那会把**整份** uniform（含 24 组破口
- * 数组，288 个 float）在这一 draw 重传一遍。标了这个函数的对象每帧多两次
- * 这样的重传（进/出各一次）。几十只以内不值一提，成百上千就会撞上
- * 「整帧卡在 CPU 提交」那条红线。
- *
- * 与 `MarkForegroundPrepass` 互斥：那条路是**直接赋值**同一对钩子。
- *
- * 反过来，本函数是**链式**的：`BuildSink.Flush` 出来的静态网格早就占着这一对钩子
- * （破口裁切的逐 draw 开关），直接赋值等于把它静默摘掉 —— 墙上打了洞照样投一块
- * 完整的墙影，而且没有任何报错。所以这里先存下原钩子再包一层，并且**幂等**：
- * 同一只标两次不会把自己套两层。
+ * Compatibility/diagnostic marker for existing callers. Ordinary rigid meshes
+ * are tracked automatically by PrepassPass, including unmarked new props.
+ * Never replace object hooks: destruction and foreground rendering own them.
  */
 export function MarkDynamicPrepass(object) {
   if (!object || !object.isMesh || object.userData.prepassDynamic) return object;
   object.userData.prepassDynamic = true;
-  const chainedBefore = object.onBeforeRender;   // 缺省是 Object3D 原型上的空函数
-  const chainedAfter = object.onAfterRender;
-  object.onBeforeRender = function DynamicPrepassOn(renderer, scene, camera, geometry, material, group) {
-    chainedBefore.call(this, renderer, scene, camera, geometry, material, group);
-    const uniforms = material?.uniforms;
-    if (!uniforms || !uniforms.uPrevModelMatrix) return;
-    const prev = object.userData.prepassPrevMatrix;
-    uniforms.uPrevModelMatrix.value.copy(prev || object.matrixWorld);
-    uniforms.uPrevModelValid.value = 1;
-    material.uniformsNeedUpdate = true;
-  };
-  object.onAfterRender = function DynamicPrepassOff(renderer, scene, camera, geometry, material, group) {
-    chainedAfter.call(this, renderer, scene, camera, geometry, material, group);
-    const uniforms = material?.uniforms;
-    if (!uniforms || !uniforms.uPrevModelValid) return;
-    uniforms.uPrevModelValid.value = 0;
-    // 下一 draw 必须拿到干净默认值，所以这里也要请一次重传。
-    material.uniformsNeedUpdate = true;
-    if (!object.userData.prepassPrevMatrix) {
-      object.userData.prepassPrevMatrix = object.matrixWorld.clone();
-    } else {
-      object.userData.prepassPrevMatrix.copy(object.matrixWorld);
-    }
-  };
   return object;
 }
 

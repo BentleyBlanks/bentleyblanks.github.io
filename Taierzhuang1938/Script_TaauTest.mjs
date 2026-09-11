@@ -262,7 +262,17 @@ try {
     // =====================================================================
     // 4) TAAU 画质
     // =====================================================================
-    const ScaleShot = (scale) => { SetScale(scale); Settle(28); return ReadLdr(); };
+    // Compare the same world pose and the same Halton phase at every scale.
+    // Advancing 28 live frames moved breathing/idle poses between samples and
+    // shifted the eight-frame jitter cycle by four; that measured time changes
+    // together with reconstruction quality (0.67 could spuriously beat 0.75).
+    const ScaleShot = (scale) => {
+      SetScale(scale);
+      P.frame = 0;
+      P.NotifyCameraCut();
+      T.StepFrames(32, 0, true);
+      return ReadLdr();
+    };
     const ref = ScaleShot(1.0);
     out.taauPsnr = {};
     for (const scale of [0.85, 0.8, 0.75, 0.67]) out.taauPsnr[scale] = Psnr(ref, ScaleShot(scale));
