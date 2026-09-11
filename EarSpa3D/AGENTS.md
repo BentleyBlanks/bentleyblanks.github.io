@@ -32,7 +32,7 @@ node EarSpa3D/Script_ChunkPlayTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
 配上自然写实的材质和 ASMR 音景，外加一个最小的经营环。
 
 当前美术基调：全套写实拟物，金属、玻璃与磨砂器具工作台 UI。用户最后明确取消治愈插画方向；真实材质、结构、接触与可玩性优先。
-耳廓参考、建模与纹理说明见 Data_ImmersiveAssets.md，玩法与画质边界见契约 §0。
+最新外耳入口和头发修订见 [Data_OuterAnatomyAssets.md](./Data_OuterAnatomyAssets.md)。耳廓参考、建模与纹理说明见 Data_ImmersiveAssets.md，玩法与画质边界见契约 §0。
 
 ## 三条硬约定（最容易踩的）
 

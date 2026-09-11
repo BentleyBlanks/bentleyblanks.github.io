@@ -9,6 +9,8 @@
 
 ear010 补充：取出镜头与开场共用实时头部和耳廓；移除侧脸图片。耳垢按客人种子生成黏附层、长薄片、硬结及天然细屑。左键按住沿工具当前方向施力，右键拖动在固定接触点旋转；移动端显式转向/施力模式。锚点按实际形态配置、240 Hz 子步；切割方向由抓点和局部拉力决定，可递归三代（比旧版多两级），以切割体积比例分配质量，总清洁质量保持 9。白灰色密集耳毛根部固定、末梢轻微运动。
 
+ear012 外耳修正：耳甲腔与深部耳道分别对齐；入口为略倾斜的椭圆凹陷，16 段过渡接到现有零深度环。外侧过渡采用外耳 PBR，与邻近皮肤共用 20 mm 投影 UV；Blender 原始 V 保留入口深度权重，GLTF 读取时反转后用于外景遮光渐变。头部头发为同一个梳理发型的细发丝与轮廓碎发，不增加独立发型资产。模型源工程和重建说明见 [Data_OuterAnatomyAssets.md](./Data_OuterAnatomyAssets.md)。
+
 ear011 补充：外耳与耳道分别使用独立 PBR 图集及 SSS 参数；最外镜头仅保留耳部与邻近皮肤/头发。动态轮廓边缘 AO 与短光线接触阴影不采用宽泛黑晕；凹裂面按独立环封口。深处两块约 11.8 / 14.6 mm，短耳勺 8.8 mm、长镊/滴管 17.5 mm，探查按钮是实际输入入口。悬浮盘约 55 × 33 mm，盘沿淡印“强迫症的SOPHIA”。工具首次材质预热，静态壁面 BVH 与有界毛簇加速，完整网格与独立壁面审计仍要求通过。具体边界和源工程见 Data_DirectionalAssets.md。
 
 ear009 历史补充：用户最后明确选择全套写实拟物，取代此前治愈 UI。新增 Script_ToolContact.js、Script_TactileMaterials.js 与 Script_InstrumentShop.js。旧版资产见 [Data_TactileAssets.md](./Data_TactileAssets.md)，当前实现与边界见 [Data_DirectionalAssets.md](./Data_DirectionalAssets.md)。

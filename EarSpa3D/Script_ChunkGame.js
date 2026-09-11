@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CreateCore } from './Script_Core.js?v=ear011-20260911';
-import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear011-20260911';
+import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear012-outer-20260911';
 import { CreateAudio } from './Script_Audio.js?v=ear011-20260911';
 import { CreateShop } from './Script_Shop.js?v=ear011-20260911';
 import { MakeRng } from './Script_Util.js?v=ear011-20260911';

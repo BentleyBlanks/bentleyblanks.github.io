@@ -22,19 +22,20 @@ export async function CreateTactileMaterials(renderer) {
   }
   const marks=Array.from({length:9},()=>new THREE.Vector4(0,0,0,0)),wet=Array.from({length:9},()=>new THREE.Vector4(0,0,0,0));
   const state={outerSss:{value:.10},outside:{value:0},sss:{value:.18},light:{value:new THREE.Vector3()},power:{value:0},marks:{value:marks},wet:{value:wet}};
-  function Skin({outer=false}={}){
+  function Skin({outer=false,vestibule=false}={}){
     const maps=Object.fromEntries(Object.entries(outer?outerSkin:skin).map(([k,t])=>{const c=t.clone();c.repeat.set(outer?1:4,outer?1:5);if(outer)c.wrapS=c.wrapT=THREE.MirroredRepeatWrapping;return[k,c];}));
     const material=new THREE.MeshPhysicalMaterial({...maps,color:new THREE.Color().setRGB(.99,1.20,1.23),roughness:1,metalness:0,normalScale:new THREE.Vector2(outer?.18:.12,outer?.18:.12),aoMapIntensity:outer?.18:.65,clearcoat:1,clearcoatRoughness:.12,side:THREE.DoubleSide});
     material.userData.kind='skin';
     material.onBeforeCompile=shader=>{
       shader.uniforms.earOutside=state.outside;shader.uniforms.earSss=outer?state.outerSss:state.sss;shader.uniforms.earLamp=state.light;shader.uniforms.earPower=state.power;shader.uniforms.earMarks=state.marks;shader.uniforms.earWet=state.wet;
-      shader.vertexShader='varying vec3 earWorld;\n'+shader.vertexShader;
-      shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nearWorld=(modelMatrix*vec4(position,1.0)).xyz;\n'+(outer?'':`for(int i=0;i<9;i++){float d=distance(earWorld,earMarks[i].xyz);float bump=exp(-d*d/0.65)*earMarks[i].w;transformed+=normal*bump*0.035;}`));
+      shader.vertexShader=(vestibule?'attribute float vestibuleDepth;varying float mouthDepth;\n':'')+'varying vec3 earWorld;\n'+shader.vertexShader;
+      shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nearWorld=(modelMatrix*vec4(position,1.0)).xyz;\n'+(vestibule?'mouthDepth=vestibuleDepth;\n':'')+(outer?'':`for(int i=0;i<9;i++){float d=distance(earWorld,earMarks[i].xyz);float bump=exp(-d*d/0.65)*earMarks[i].w;transformed+=normal*bump*0.035;}`));
       if(!outer)shader.vertexShader='uniform vec4 earMarks[9];\n'+shader.vertexShader;
-      shader.fragmentShader='uniform float earOutside;varying vec3 earWorld;uniform float earSss;uniform vec3 earLamp;uniform float earPower;uniform vec4 earMarks[9];uniform vec4 earWet[9];\n'+shader.fragmentShader;
+      shader.fragmentShader=(vestibule?'varying float mouthDepth;\n':'')+'uniform float earOutside;varying vec3 earWorld;uniform float earSss;uniform vec3 earLamp;uniform float earPower;uniform vec4 earMarks[9];uniform vec4 earWet[9];\n'+shader.fragmentShader;
       shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
         float localIrritation=0.0;float localWet=0.0;
         ${outer?'':'diffuseColor.rgb*=mix(1.0,.18,earOutside);'}
+        ${vestibule?'diffuseColor.rgb*=mix(1.0,.18,smoothstep(0.0,.85,mouthDepth)*earOutside);':''}
         ${outer?`float faceDetail=clamp(dot(diffuseColor.rgb,vec3(.299,.587,.114)),0.0,1.0);diffuseColor.rgb*=vec3(1.02,1.02,1.02);
         float lip=exp(-pow((earWorld.y+51.0)/5.0,4.0)-pow((earWorld.z-63.2)/19.0,4.0))*smoothstep(67.0,75.0,-earWorld.x);
         diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.38,.095,.080),lip*.8);`:''}
@@ -57,7 +58,7 @@ export async function CreateTactileMaterials(renderer) {
         reflectedLight.directDiffuse+=diffuseColor.rgb*vec3(1.0,.32,.18)*wrap*earSss*min(earPower/(earDistance*earDistance),2.0);`);
     };
     const skinCompile=material.onBeforeCompile;material.onBeforeCompile=shader=>{skinCompile(shader);if(!outer)contact.Bind(shader);};
-    material.customProgramCacheKey=()=>outer?'EarSkinOuterSss2':'EarSkinCanalContact2';return material;
+    material.customProgramCacheKey=()=>outer?(vestibule?'EarSkinRecessedVestibule3':'EarSkinOuterSss2'):'EarSkinCanalContact2';return material;
   }
   function Wax(type,tone='brown'){
     const pale=tone==='paleYellow';

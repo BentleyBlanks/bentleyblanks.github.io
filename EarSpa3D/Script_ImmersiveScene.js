@@ -1,22 +1,22 @@
 import * as THREE from 'three';
-import { BuildEar, MakeRng } from './Script_EarAnatomy.js?v=ear011-20260911';
+import { BuildEar, MakeRng } from './Script_EarAnatomy.js?v=ear012-outer-20260911';
 import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
-import { PALETTE as P } from './Data_Palette.mjs?v=ear011-20260911';
+import { PALETTE as P } from './Data_Palette.mjs?v=ear012-outer-20260911';
 
-import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody } from './Script_PeelPhysics.mjs?v=ear011-20260911';
+import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody } from './Script_PeelPhysics.mjs?v=ear012-outer-20260911';
 import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
-import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear011-20260911';
-import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear011-20260911';
-import { CreateToolContact } from './Script_ToolContact.js?v=ear011-20260911';
-import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear011-20260911';
+import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear012-outer-20260911';
+import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear012-outer-20260911';
+import { CreateToolContact } from './Script_ToolContact.js?v=ear012-outer-20260911';
+import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear012-outer-20260911';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 
 // 封闭耳道、真实接触点与实体收集盘共用毫米世界；镜头在取出时连续后退。
 export async function CreateImmersiveScene({ core }) {
-  const asset = await new GLTFLoader().loadAsync(new URL('./Models/Model_ImmersiveEar.glb?v=ear011-20260911', import.meta.url).href);
+  const asset = await new GLTFLoader().loadAsync(new URL('./Models/Model_ImmersiveEar.glb?v=ear012-outer-20260911', import.meta.url).href);
   asset.scene.updateMatrixWorld(true);
   const materials=await CreateTactileMaterials(core.renderer);
-  const profile=await (await fetch(new URL('./Data_CanalProfile.json?v=ear011-20260911',import.meta.url))).json();
+  const profile=await (await fetch(new URL('./Data_CanalProfile.json?v=ear012-outer-20260911',import.meta.url))).json();
   const contact=CreateToolContact(profile);
   let lampOn=false,aim=new THREE.Vector2(),aimed=false,toolLevels={},toolSkins={},lastToolId=null,previewTriangles=0,inspectionDepth=0,inspectionTarget=0,reachBlocked=false,heading=0,turnPoint=null,turnChunk=null,hairTime=0;
   const TOOL_REACH={scoop:8.8,tweezers:17.5,drops:17.5,brush:9.5,suction:18,feather:18};
@@ -56,11 +56,23 @@ export async function CreateImmersiveScene({ core }) {
   scene.environment=BakeEnvironment(core.renderer).texture;scene.environmentIntensity=.18;
 
   const outer = new THREE.Group(), canalGroup = new THREE.Group(); root.add(outer, canalGroup);
-  for (const name of ['Model_OuterEar','Model_Temple','Model_Pillow']){const mesh=Baked(name);if(name!=='Model_Pillow'){mesh.material=materials.Skin({outer:name!=='Model_OuterEar'});if(name==='Model_Temple'){const uv=mesh.geometry.attributes.uv,p=mesh.geometry.attributes.position;for(let i=0;i<p.count;i++)uv.setXY(i,p.getX(i)/20,p.getY(i)/20);uv.needsUpdate=true;}}if(name==='Model_Pillow')mesh.visible=false;outer.add(mesh);}
+  for (const name of ['Model_OuterEar','Model_Temple','Model_Pillow']) {
+    const mesh=Baked(name);
+    if(name==='Model_Pillow') mesh.visible=false;
+    else {
+      const vestibule=name==='Model_OuterEar',uv=mesh.geometry.attributes.uv,p=mesh.geometry.attributes.position;
+      mesh.material=materials.Skin({outer:true,vestibule});
+      // GLTF flips Blender V. Keep authored recess depth before projecting shared skin UVs.
+      if(vestibule) mesh.geometry.setAttribute('vestibuleDepth',new THREE.Float32BufferAttribute(Array.from({length:uv.count},(_,i)=>1-uv.getY(i)),1));
+      for(let i=0;i<p.count;i++) uv.setXY(i,p.getX(i)/20,p.getY(i)/20);
+      uv.needsUpdate=true;
+    }
+    outer.add(mesh);
+  }
   for(const name of ['Model_ProfileEyes','Model_ProfileIris','Model_ProfileLashes','Model_ProfileHair','Model_ProfileHairStrands']){const mesh=Baked(name);
-    if(name.includes('Hair')){mesh.material.roughness=.58;mesh.material.clearcoat=.06;mesh.material.anisotropy=.32;mesh.material.anisotropyRotation=Math.PI/2;mesh.material.side=THREE.DoubleSide;mesh.material.onBeforeCompile=shader=>{shader.vertexShader='varying vec2 hairFlow;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nhairFlow=uv;');shader.fragmentShader='varying vec2 hairFlow;\n'+shader.fragmentShader;shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
-      float strand=.5+.5*sin(hairFlow.x*3800.0+sin(hairFlow.y*18.0)*2.0);float lock=.5+.5*sin(hairFlow.x*470.0+hairFlow.y*3.0);
-      diffuseColor.rgb*=.76+strand*.15+lock*.09;`);};mesh.material.customProgramCacheKey=()=> 'ProfileFineHairFlow';}
+    if(name.includes('Hair')){mesh.material.roughness=.62;mesh.material.clearcoat=.035;mesh.material.sheen=.08;mesh.material.sheenColor.set(0x655046);mesh.material.sheenRoughness=.65;mesh.material.anisotropy=0;mesh.material.anisotropyRotation=Math.PI/2;mesh.material.side=THREE.DoubleSide;mesh.material.onBeforeCompile=shader=>{shader.vertexShader='varying vec2 hairFlow;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nhairFlow=uv;');shader.fragmentShader='varying vec2 hairFlow;\n'+shader.fragmentShader;shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+      float phase=hairFlow.x*13500.0+sin(hairFlow.y*13.0)*1.4;float strand=.5+.5*sin(phase)*(1.0-smoothstep(.6,3.0,fwidth(phase)));
+      diffuseColor.rgb*=.82+strand*.18;`);};mesh.material.customProgramCacheKey=()=> 'ProfileGroomedFiberFlow3';}
     outer.add(mesh);}
   const wall = Baked('Model_Canal'); wall.material.side = THREE.DoubleSide; wall.receiveShadow=true; const drum=Baked('Model_Eardrum');drum.material.side=THREE.DoubleSide;const hair=Baked('Model_CanalHair');hair.material=new THREE.MeshPhysicalMaterial({color:0xd0d2ce,roughness:.8,sheen:1,sheenColor:0xe7e9e4,sheenRoughness:.7});canalGroup.add(wall,drum,hair);
   wall.material=materials.Skin();wall.receiveShadow=true;AccelerateStaticRaycast(wall);
