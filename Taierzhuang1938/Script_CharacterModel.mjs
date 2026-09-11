@@ -18,6 +18,11 @@ const HURT_R = new THREE.Quaternion();
 const HURT_RIGHT = new THREE.Vector3();
 const HURT_FWD = new THREE.Vector3();
 const HURT_LOCAL_AXIS = new THREE.Vector3();
+const MELEE_FACE_FORWARD = new THREE.Vector3();
+const MELEE_FACE_TARGET = new THREE.Vector3();
+const MELEE_FACE_UP = new THREE.Vector3(0, 1, 0);
+const MELEE_FACE_Q = new THREE.Quaternion();
+const IsBayonetThrust = pose => /^Bayonet(Light|LightAlt|Heavy|Compact|CompactAlt)$/.test(pose?.clip || "");
 import { RaycastCapsule, RaycastEllipsoid, RaycastSphere } from "./Script_CharacterHitboxMath.mjs";
 import { CHARACTER_HITBOX_PROFILE } from "./Data_CharacterHitbox.mjs";
 
@@ -1018,6 +1023,7 @@ export class LugouCharacterRig {
     this._SampleInfantryProps();
     this.infantry.AfterUpdate(previousId, previousTime);
     this.meleeAnimation?.Apply(state.meleeCombat);
+    this._AlignBayonetFacing(state.meleeCombat);
     this._GroundInfantryBlend(state);
     // 中弹踉跄：程序化 body 那套「胸后仰 / 头后甩」在有蒙皮骨架时不可见（body 被复位），
     // 所以在 mixer 之后给胸/颈叠一记世界轴旋转；下一帧开头 _RestoreHurtTilt 先还原，
@@ -1029,6 +1035,33 @@ export class LugouCharacterRig {
     // the head bone after mixer evaluation instead.  Doing it before mixer.update
     // would be overwritten by the clip's sampled scale track on the same frame.
     if (!this.headVisible && this.bones.head) this.bones.head.scale.setScalar(0.001);
+  }
+
+  /** The captured side-on thrust looks across the rifle; face the committed attack instead. */
+  _AlignBayonetFacing(pose) {
+    const current = IsBayonetThrust(pose), previous = IsBayonetThrust(pose?.transition?.from);
+    const mix = pose?.transition?.mix ?? 1;
+    const weight = current ? (previous ? 1 : mix) : (previous ? 1 - mix : 0);
+    const head = this.bones.head;
+    if (!weight || !this.meleeAnimation?.applied || !head) return;
+    const bind = this.meleeAnimation?.bones.find(record => record.part === "Head");
+    if (!bind) return;
+    // Measure face direction from the original +Z bind, independently of the
+    // source clip's hip heading. Rotate only Head (the Biped clavicles are
+    // children of Neck): hands, rifle and feet
+    // retain their recovered transforms and the shared melee hit sweep stays intact.
+    MELEE_FACE_Q.copy(bind.rotation).invert();
+    MELEE_FACE_FORWARD.set(0, 0, 1).applyQuaternion(MELEE_FACE_Q);
+    head.getWorldQuaternion(MELEE_FACE_Q);
+    MELEE_FACE_FORWARD.applyQuaternion(MELEE_FACE_Q);
+    this.root.getWorldQuaternion(MELEE_FACE_Q);
+    const yaw = pose.weaponYawOffset || 0;
+    MELEE_FACE_TARGET.set(Math.sin(yaw), 0, Math.cos(yaw)).applyQuaternion(MELEE_FACE_Q);
+    const angle = Math.atan2(
+      MELEE_FACE_FORWARD.z * MELEE_FACE_TARGET.x - MELEE_FACE_FORWARD.x * MELEE_FACE_TARGET.z,
+      MELEE_FACE_FORWARD.x * MELEE_FACE_TARGET.x + MELEE_FACE_FORWARD.z * MELEE_FACE_TARGET.z);
+    this._TiltBone(head, MELEE_FACE_UP, angle * weight);
+    head.updateWorldMatrix(false, true);
   }
 
   _ApplyHurtTilt(hurt, elapsed) {

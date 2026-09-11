@@ -525,6 +525,37 @@ try {
       "death drop stole the rifle from a severed arm");
     severed.RestoreWeaponFromGore(); severed.Dispose();
 
+    await (await import("./Script_MeleeAnimationData.mjs")).LoadMeleeAnimations();
+    for (const kind of ["ija", "nra"]) for (let variant = 0; variant < 5; variant++) {
+      const fighter = factory.Create(kind, { modelVariant: variant, seed: 9200 + variant,
+        weapon: kind === "ija" ? "Type38" : "ZhongZheng", bayonetFixed: true });
+      const rig = fighter.characterRig, at = bone => bone.getWorldPosition(new THREE.Vector3());
+      for (const yaw of [0, 1.1, -2.4]) for (const clip of ["BayonetLight", "BayonetHeavy", "BayonetCompact"])
+        for (const normalized of [0, .2, .4, .6, 1]) {
+          fighter.root.rotation.y = yaw;
+          const pose = { weapon: "Bayonet", clip, normalized, state: "attack", weaponYawOffset: .12 };
+          fighter.Update(0, { elapsed: 1, meleeCombat: pose });
+          const hands = [at(rig.bones.handL), at(rig.bones.handR)];
+          const feet = [at(rig.bones.footL), at(rig.bones.footR)];
+          const prop = at(rig.meleeAnimation.prop);
+          // Head-local +Y is anatomical forward, measured from the shipped mesh.
+          const face = new THREE.Vector3(0, 1, 0).applyQuaternion(rig.bones.head.getWorldQuaternion(new THREE.Quaternion()));
+          face.y = 0; face.normalize();
+          const target = new THREE.Vector3(-Math.sin(yaw + .12), 0, -Math.cos(yaw + .12));
+          check(face.dot(target) > Math.cos(5 * Math.PI / 180), `${kind}${variant}/${clip}/${normalized}: face misses committed thrust`);
+          rig._RestoreHurtTilt(); rig.meleeAnimation.Restore(); rig.meleeAnimation.Apply(pose);
+          const limbs = [rig.bones.handL, rig.bones.handR, rig.bones.footL, rig.bones.footR];
+          limbs.forEach((bone, i) => check(at(bone).distanceTo([...hands, ...feet][i]) < .00001,
+            `${kind}${variant}/${clip}: facing correction moved a hand or foot`));
+          check(at(rig.meleeAnimation.prop).distanceTo(prop) < .00001, "facing correction moved recovered rifle");
+        }
+      // Repeated updates and leaving melee must not accumulate the head correction.
+      fighter.Update(0, { elapsed: 1, meleeCombat: { weapon: "Bayonet", clip: "BayonetLight", normalized: .4 } });
+      fighter.Update(1 / 60, { elapsed: 1 });
+      check(rig.hurtTilt.length === 0, "bayonet facing remained active after leaving melee");
+      fighter.Dispose();
+    }
+
     for (const item of [actor, armed, ija, baselineA, baselineB, seatTest, seatedArmed]) item.Dispose();
     return "10 套军人蒙皮 GLB, 16 动作, 11 骨骼命中体, 主角国军 01, 程序化动作兼容, 百姓男女分身, seated legs, weapon-palm clearance; bayonet vertices " + bayonetMeshes.join(", ");
   });
