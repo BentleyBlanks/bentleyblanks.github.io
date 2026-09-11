@@ -3133,14 +3133,8 @@ export class Viewmodel {
     const weight = frame.weight;
     const length = rig.armLength.r.upper + rig.armLength.r.lower;
     const scale = length / frame.sourceArmLength;
-    const rotation = new THREE.Quaternion().slerp(new THREE.Quaternion().fromArray(values,3),weight*.65);
-    const displacement = new THREE.Vector3().fromArray(values).multiplyScalar(scale*weight*.45);
-    if (frame.source === "StaffThrustsV1") {
-      // The source starts at the waist; the FPS rifle is already at chest
-      // height. Preserve its thrust timing/path without repeating that lift.
-      displacement.y *= .12/.45;
-      displacement.z *= .30/.45;
-    }
+    const rotation = new THREE.Quaternion().slerp(new THREE.Quaternion().fromArray(values,3),weight);
+    const displacement = new THREE.Vector3().fromArray(values).multiplyScalar(scale*weight);
     // Rotate the prop about the calibrated dominant grip. The camera carrier
     // stays fixed, so it cannot drag shoulders along with the weapon.
     this.root.updateWorldMatrix(true,true);
@@ -3151,7 +3145,7 @@ export class Viewmodel {
     rig.videoBody = {shoulders:{},elbowPoles:{}};
     for (const [key,offset,pole] of [["right",7,13],["left",10,16]]) {
       rig.videoBody.shoulders[key] = new THREE.Vector3().fromArray(body.shoulders[key])
-        .add(new THREE.Vector3().fromArray(values,offset).multiplyScalar(scale*weight*.5)).toArray();
+        .add(new THREE.Vector3().fromArray(values,offset).multiplyScalar(scale*weight)).toArray();
       rig.videoBody.elbowPoles[key] = new THREE.Vector3().fromArray(body.elbowPoles[key]).normalize()
         .lerp(new THREE.Vector3().fromArray(values,pole).normalize(),weight*.65).normalize().toArray();
     }

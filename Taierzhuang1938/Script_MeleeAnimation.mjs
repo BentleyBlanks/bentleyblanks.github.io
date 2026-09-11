@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import { MELEE_NRA_ANIMATIONS, MELEE_IJA_ANIMATIONS } from './Data_MeleeAnimationSets.mjs';
 import { LoadMeleeAnimations } from './Script_MeleeAnimationData.mjs';
 import { MELEE_VIDEO_ANIMATIONS } from './Data_MeleeVideoAnimations.mjs';
+import { FPS_DADAO_SWING } from './Data_FpsDadaoSwing.mjs';
+import { MELEE_WEAPONS, MELEE_RULES } from './Data_MeleeCombat.mjs';
 const q0=new THREE.Quaternion(),q1=new THREE.Quaternion(),qr=new THREE.Quaternion(),qp=new THREE.Quaternion(),qd=new THREE.Quaternion();
 const v=new THREE.Vector3(),vp=new THREE.Vector3(),vs=new THREE.Vector3(),inv=new THREE.Matrix4();
 function Samples(data,pose) {
@@ -33,14 +35,37 @@ export function SampleMeleeFirstPerson(pose) {
 /** Actual recovered wrist/shoulder/elbow tracks, sampled at gameplay phase time. */
 export function SampleMeleeVideo(pose, transition = true) {
   if (!pose) return null;
-  const clip = MELEE_VIDEO_ANIMATIONS.clips[pose.clip];
+  const authored = /^Dadao(Light|LightAlt|Heavy|Compact|CompactAlt|Charge)$/.test(pose.clip);
+  const clip = authored ? FPS_DADAO_SWING : MELEE_VIDEO_ANIMATIONS.clips[pose.clip];
   let result = null;
   if (clip) {
-    const frame = THREE.MathUtils.clamp(pose.animationNormalized ?? pose.normalized ?? 0,0,1)*30;
-    const i = Math.floor(frame), mix = frame-i, a = clip.frames[i], b = clip.frames[Math.min(30,i+1)];
+    let time = THREE.MathUtils.clamp(pose.animationNormalized ?? pose.normalized ?? 0,0,1);
+    if (authored) {
+      const attack = MELEE_WEAPONS.Dadao[pose.action === 'Heavy' ? 'heavy' : 'light'];
+      const duration = attack.windup+attack.active+attack.recovery;
+      const start=attack.windup/duration,end=(attack.windup+attack.active)/duration;
+      time=pose.action==='Charge' ? Math.min(1,(pose.t||0)/MELEE_RULES.chargeMinS)*clip.cutStart
+        : time<start ? time/start*clip.cutStart : time<end
+          ? clip.cutStart+(time-start)/(end-start)*(clip.cutEnd-clip.cutStart)
+          : clip.cutEnd+(time-end)/(1-end)*(1-clip.cutEnd);
+    }
+    const last=clip.frames.length-1,frame=time*last;
+    const i = Math.floor(frame), mix = frame-i, a = clip.frames[i], b = clip.frames[Math.min(last,i+1)];
     const values = a.map((value,index)=>THREE.MathUtils.lerp(value,b[index],mix));
     const rotation = new THREE.Quaternion().fromArray(a,3).slerp(new THREE.Quaternion().fromArray(b,3),mix).normalize();
     rotation.toArray(values,3);
+    if(authored && /Compact/.test(pose.action)) {
+      for(let j=0;j<3;j++)values[j]*=.8;
+      new THREE.Quaternion().slerp(rotation,.85).toArray(values,3);
+    }
+    // Blend evaluated motion in one space. Applying the destination clip's
+    // amplitude after a transition would also rescale its outgoing pose.
+    if(!authored) {
+      for(let j=0;j<3;j++)values[j]*=.45;
+      new THREE.Quaternion().slerp(rotation,.65).toArray(values,3);
+      for(let j=7;j<13;j++)values[j]*=.5;
+      if(clip.source==='StaffThrustsV1') {values[1]*=.12/.45;values[2]*=.30/.45;}
+    }
     result = {values, sourceArmLength:clip.sourceArmLength, weight:1, source:clip.source};
   }
   if (transition && pose.transition?.mix < 1) {
@@ -50,6 +75,7 @@ export function SampleMeleeVideo(pose, transition = true) {
         .slerp(new THREE.Quaternion().fromArray(result.values,3),mix);
       result.values = result.values.map((value,i)=>THREE.MathUtils.lerp(previous.values[i],value,mix));
       rotation.toArray(result.values,3);
+      result.sourceArmLength=THREE.MathUtils.lerp(previous.sourceArmLength,result.sourceArmLength,mix);
     } else if (result) result.weight = mix;
     else if (previous) result = {...previous,weight:1-mix};
   }

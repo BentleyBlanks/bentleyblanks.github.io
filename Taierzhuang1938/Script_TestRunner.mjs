@@ -193,6 +193,7 @@ export const testDefs = {
   WeaponRangeTest: { file: "Script_WeaponRangeTest.mjs", timeoutMs: 20 * 60 * 1000,
     desc: "全枪械白盒：桌面 F 拾取、无限弹药/换弹、10–200米静动靶与真实命中" },
   MeleeAnimationTest: { file: "Script_MeleeAnimationTest.mjs", timeoutMs: 15 * 60 * 1000, desc: "Blender 全骨骼与第一人称 54 动作、握持可见性及源工程样本" },
+  DadaoSwingTest: { file: "Script_DadaoSwingTest.mjs", timeoutMs: 10 * 60 * 1000, desc: "Dadao cutting-edge travel, speed, recovery, grip and wrist limits" },
   MeleeCombatTest: { file: "Script_MeleeCombatTest.mjs", desc: "通用白刃规则、拨挡窗口、F 推架、两类僵持、伤害和多人隔离（纯 Node）" },
   MeleeQteTest: { file: "Script_MeleeQteTest.mjs", desc: "白刃 QTE（?melee=1）：独立战斗、站立/倒地成功失败、真实输入、接触、骨骼与画面" },
   GoreRangeTest: { file: "Script_GoreRangeTest.mjs", timeoutMs: 15 * 60 * 1000,
@@ -310,7 +311,7 @@ export const browserTests = new Set([
   'FirstLevelP012AnimationTest',
   'FirstLevelP012TerrainBrowserTest',
   "TrainLibraryTest",
-  'BackRifleRunTest', 'MeleeAnimationTest', 'InfantryAnimationTest',
+  'BackRifleRunTest', 'MeleeAnimationTest', 'DadaoSwingTest', 'InfantryAnimationTest',
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
   "AiCombatBrowserTest", "AiCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
@@ -381,7 +382,7 @@ export const domains = {
   firstLevelTail: {label:"第一关接收院至结尾定向续接",tests:["FirstLevelMissionStageTailTest"]},
   firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelMealTest','FirstLevelMissionTest','FirstLevelFrontPresenceTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelOpeningContactTest','FirstLevelGuideQueueTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
-  animation: { label: '独立动画资产验收', tests: ['BackRifleRunTest','MeleeAnimationTest','InfantryAnimationTest'] },
+  animation: { label: '独立动画资产验收', tests: ['BackRifleRunTest','MeleeAnimationTest','DadaoSwingTest','InfantryAnimationTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
@@ -475,6 +476,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:'animation',pattern:/DadaoSwing|DadaoPowerSwing/},
   {domain:"combat",pattern:/HitDisorientation/},
   {domain:'motionVector',pattern:/MotionVector|PostPrepass|Script_Post\.mjs|Actor|Skinn|Skeleton|Viewmodel|FpsArm|BackRifle|Binoculars|Data_Tuning_Graphics/},
   { domain: "render", pattern: /UniformColors/ },

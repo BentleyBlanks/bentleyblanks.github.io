@@ -27,7 +27,7 @@ await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//,
 
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&manual=1&melee=1&quality=medium&scale=small`,
   { waitUntil: "load", timeout: 120000 });
-await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
+await page.waitForFunction(() => window.Taierzhuang?.state?.ready && window.Taierzhuang.meleeAnimationsLoaded, null, { timeout: 180000 });
 
 await page.evaluate(() => {
   const T = window.Taierzhuang;
@@ -36,7 +36,7 @@ await page.evaluate(() => {
   // 日军推远：这条测的是自己手里的刀，不是被人打断的刀
   for (const soldier of [...T.ai.soldiers]) T.ai.Remove(soldier);
   T.Debug.Key("Digit3");           // 走键位表切到大刀槽，不直接调 SwitchSlot
-  T.StepFrames(10);
+  T.StepFrames(10,1/60,false);
   // 取刀身中点而不是刀尖：刀尖离握把 0.74 m，抡起来必然扫出画面，站着也一样。
   // 「这一刀读不读得到」看的是刀身在不在框里。
   window.__bladeNdc = () => {
@@ -63,16 +63,16 @@ async function Swing(sprinting) {
     for (const soldier of [...T.ai.soldiers]) T.ai.Remove(soldier);
     T.Debug.Key("ShiftLeft", !!on);
     T.Debug.Key("KeyW", !!on);
-    T.StepFrames(90);              // 冲刺弹簧与体力都到稳态
+    T.StepFrames(90,1/60,false);    // 冲刺弹簧与体力都到稳态
     // 挥刀**之前**的速度是这条测试的前置条件，不是结论：sprint 是按键弹簧，
     // 人顶在墙上它照样充到 1。不单独记一笔的话，"出生点前方被院墙堵死"会
     // 伪装成"挥刀打断了跑动"红出来 —— 2026-08-27 就白查了一轮。
     const beforeSpeed = T.player.velocity.length();
-    T.Debug.Mouse(0,true);T.StepFrames(3);T.Debug.Mouse(0,false);                // 左键全链：input.fire -> TryFire -> DoMelee
+    T.Debug.Mouse(0,true);T.StepFrames(3,1/60,false);T.Debug.Mouse(0,false);       // 左键全链：input.fire -> TryFire -> DoMelee
     const fired = { action: T.meleeCombat.State().player?.state, sprint: T.player.sprint, beforeSpeed };
     const track = [];
     for (let i = 0; i < 34; i += 1) {
-      T.StepFrames(1);
+      T.StepFrames(1,1/60,false);
       track.push({
         t: T.meleeCombat.State().player?.state === "attack" ? T.meleeCombat.State().player.t : -1,
         speed: T.player.velocity.length(),
@@ -81,7 +81,7 @@ async function Swing(sprinting) {
     }
     T.Debug.Key("ShiftLeft", false);
     T.Debug.Key("KeyW", false);
-    T.StepFrames(120);             // 收招 + 冲刺姿态回位，两次挥刀互不污染
+    T.StepFrames(120,1/60,false);   // 收招 + 冲刺姿态回位，两次挥刀互不污染
     return { fired, track };
   }, sprinting);
 }
@@ -89,8 +89,11 @@ async function Swing(sprinting) {
 const stand = await Swing(false);
 const run = await Swing(true);
 
+// The trace samples real transforms and inputs. Render once after simulation
+// instead of queuing hundreds of GPU frames before the diagnostic screenshot.
+await page.evaluate(() => window.Taierzhuang.StepFrames(1,1/60,true));
 const screenshotPath = path.join(os.tmpdir(), "TaierzhuangSprintMelee.png");
-await page.screenshot({ path: screenshotPath });
+await page.screenshot({ path: screenshotPath, timeout: 90000 });
 
 // 取「在挥刀里的采样中有多大比例刀身在框内」而不是绝对帧数：rAF 与 StepFrames 并行，
 // 每次跑落在 0.5 s 挥刀窗口里的采样数本来就有一两帧的浮动，绝对数会随机红。
@@ -124,8 +127,8 @@ const checks = [
 ];
 
 console.log(JSON.stringify({
-  stand: { fired: stand.fired, inFrame: standIn, swept: +Swept(stand).toFixed(2) },
-  run: { fired: run.fired, inFrame: runIn, swept: +Swept(run).toFixed(2), minSpeed: +runSpeed.toFixed(2) },
+  stand: { fired: stand.fired, inFrame: standIn, swept: +Swept(stand).toFixed(2), track: process.argv.includes('--trace') ? stand.track : undefined },
+  run: { fired: run.fired, inFrame: runIn, swept: +Swept(run).toFixed(2), minSpeed: +runSpeed.toFixed(2), track: process.argv.includes('--trace') ? run.track : undefined },
   muteBack, screenshotPath, errors: errors.slice(0, 5),
 }, null, 2));
 
