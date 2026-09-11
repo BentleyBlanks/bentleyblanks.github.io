@@ -815,3 +815,5 @@ details p {
 .play-stage:has(.pull-feedback:not([hidden])) .tray-label {
   visibility:hidden
 }
+
+button.view-label { pointer-events: auto; min-height: 34px; padding: 4px 9px; border: 0; background: #fff8f299; color: #8a7c6e; border-radius: 11px; top: 9px; }

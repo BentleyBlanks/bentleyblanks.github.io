@@ -48,29 +48,42 @@ async function Run(width, height, touch) {
     Check((await Probe()).active === id, `目标 ${id} 可直接点中`);
     return { x, y, original: target };
   }
-  async function Extract(id, capture = false) {
-    const { x, y, original } = await Grab(id);
-    await Input('move', x + 2, y + 40); await Step(15);
-    const partial = (await Probe()).targets.find(t => t.id === id);
-    Check(partial.progress > 0 && partial.progress < 1 && partial.triangles === original.triangles, `目标 ${id} 半程保持完整拓扑`);
-    if (capture) await page.screenshot({ path: path.join(out, `Shot_${width}x${height}_Peel.png`) });
-    await Input('move', x + 4, y + 178); await Step(32);
-    const airborne = (await Probe()).targets.find(t => t.id === id);
-    Check(airborne.state === 'flying', `目标 ${id} 完整飞行`);
-    Check(airborne.triangles === original.triangles, `目标 ${id} 飞行无削减几何`);
-    if (capture) await page.screenshot({ path: path.join(out, `Shot_${width}x${height}_Flight.png`) });
-    await Input('up'); await Step(90);
-    const landed = await Probe();
-    Check(landed.targets.find(t => t.id === id).state === 'collected', `目标 ${id} 已落盘`);
-    Check(landed.harvest.filter(t => t.id === id).length === 1, `目标 ${id} 只收集一次`);
+  async function Extract(id,capture=false) {
+    const {x,y,original}=await Grab(id);
+    const initial=await Probe();
+    const dx=original.pullScreen.x-original.screen.x,dy=original.pullScreen.y-original.screen.y;
+    await Input('move',x+dx*.08,y+dy*.08);await Step(12);
+    const partial=(await Probe()).targets.find(t=>t.id===id);
+    Check(partial.physics.anchors>0&&partial.triangles===original.triangles,`目标 ${id} 受力时保持完整拓扑与粘附`);
+    if(capture)await page.screenshot({path:path.join(out,`Shot_${width}x${height}_Peel.png`)});
+    await Input('move',x+dx,y+dy);await Step(100);
+    const held=(await Probe()).targets.find(t=>t.id===id);
+    Check(held.state==='held'&&held.physics.detached&&held.physics.grip,`目标 ${id} 松脱后仍由工具持住`);
+    Check(held.scale.every(v=>v===1)&&held.triangles===original.triangles,`目标 ${id} 尺寸和几何不变`);
+    Check((await Probe()).harvest.length===initial.harvest.length,`目标 ${id} 持握时不提前收集`);
+    await Step(90);
+    Check((await Probe()).targets.find(t=>t.id===id).state==='held',`目标 ${id} 不会自动飞走`);
+    if(capture)await page.screenshot({path:path.join(out,`Shot_${width}x${height}_Held.png`)});
+    await Input('up');await Step(60);
+    const carrying=await Probe();
+    Check(carrying.transfer?.toolVisible&&carrying.targets.find(t=>t.id===id).state==='carrying',`目标 ${id} 由可见工具带出`);
+    Check(carrying.targets.find(t=>t.id===id).scale.every(v=>v===1),`目标 ${id} 带出时保持毫米尺寸`);
+    Check(carrying.stats.triangles<=180000&&carrying.stats.drawCalls<=120,'带出时渲染预算');
+    if(capture)await page.screenshot({path:path.join(out,`Shot_${width}x${height}_Carry.png`)});
+    await Step(140);
+    const landed=await Probe();
+    Check(landed.targets.find(t=>t.id===id).state==='collected',`目标 ${id} 已落盘`);
+    Check(landed.harvest.filter(t=>t.id===id).length===1,`目标 ${id} 只收集一次`);
+    await Step(15);
   }
   try {
     await page.goto(baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'debug=1');
     await page.waitForFunction(() => window.__EarSpaDebug);
     await page.screenshot({ path: path.join(out, `Shot_${width}x${height}_Welcome.png`) });
-    await page.locator('#ear-start').click(); await Step(90);
+    await page.locator('#ear-start').click(); await Step(150);
     const initial = await Probe();
     Check(initial.phase === 'playing' && initial.targets.length === 9, '开始进入完整九块回合');
+    Check(initial.viewReady && initial.model?.source==='BlenderMCP', 'Blender 模型已加载且镜头已进入耳道');
     Check(initial.stats.triangles <= 180000 && initial.stats.drawCalls <= 120, '渲染预算');
     const layout = await page.evaluate(() => {
       const ids = ['.spa-header', '.session-bar', '.instruction', '.play-stage', '.tool-dock', '.quiet-footer'];
@@ -84,7 +97,14 @@ async function Run(width, height, touch) {
     }
     await page.screenshot({ path: path.join(out, `Shot_${width}x${height}_Start.png`) });
     await Step(300); Check((await Probe()).cleanliness === 0, '待机不自动消除');
-    const held = await Grab(0); await Input('move', held.x, held.y + 22); await Step(12); await Input('cancel'); await Step(60);
+    const held = await Grab(0);
+    await Step(240);Check((await Probe()).targets[0].physics.anchors===5,'抓住但静止不自动松脱');
+    for(let i=0;i<10;i++){await Input('move',held.x+(i%2?1:-1),held.y);await Step(6);}
+    Check((await Probe()).targets[0].physics.anchors===5,'重复微动不累积消除进度');
+    const pull=held.original.pullScreen,screen=held.original.screen;
+    await Input('move',held.x-(pull.x-screen.x)*.28,held.y-(pull.y-screen.y)*.28);await Step(90);
+    Check(!(await Probe()).targets[0].physics.detached,'推向内壁不能清除');
+    await Input('cancel'); await Step(180);
     Check((await Probe()).targets[0].state === 'attached' && (await Probe()).harvest.length === 0, '中途松手/取消会完整放回且无收益');
     await page.locator('[data-tool="drops"]').click();
     const hard = (await Probe()).targets.find(t => t.type === 'impacted');

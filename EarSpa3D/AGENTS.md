@@ -5,12 +5,13 @@
 
 ## 当前入口：整块采耳（2026-09-11）
 
-`index.html` → `Script_ChunkGame.js` + `Script_ChunkScene.js` + `Style_Chunk.css`。
+`index.html` → `Script_ChunkGame.js` + `Script_ImmersiveScene.js` + `Script_PeelPhysics.mjs` + `Style_Chunk.css`。
 以契约 §0 的整块取出重设计为当前玩法。原 `Script_Main/Ui/Hand/Wax` 保留为旧玩法参考，
 当前入口不再使用它们。核心目标固定为撬起、完整取出、落盘收藏，手机一指完成。
 
 实际交互回归：
 ```powershell
+node EarSpa3D/Script_PeelPhysicsTest.mjs
 node EarSpa3D/Script_ChunkPlayTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
 ```
 使用已安装的 `playwright-core` 与 Edge（可用 `EARSPA_BROWSER` 指定其他 Chromium 路径），
