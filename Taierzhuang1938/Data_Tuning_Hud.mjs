@@ -60,8 +60,12 @@ export const HITMARK = Object.freeze({
 
 /** 来弹指示器（外圈那一段弧）的淡出。 */
 export const HITDIR = Object.freeze({
-  hitPath: "M-26,-71.4 A76,76 0 0 1 -6,-75.8 L0,-84 L6,-75.8 A76,76 0 0 1 26,-71.4 L20.5,-56.4 A60,60 0 0 0 -20.5,-56.4 Z",
-  nearPath: "M-24,-66 A70,70 0 0 1 -7,-69.6 M7,-69.6 A70,70 0 0 1 24,-66 M-5,-75 L0,-81 L5,-75",
+  /** Built-in Imagegen: distressed crescent; local alpha PNG shared by every bearing. */
+  texture: "./Texture/Hud/Texture_HudDamageArc.png?v=20260911a",
+  /** Registration in the -100..100 HUD viewBox; keep the sight center clear. */
+  textureBox: Object.freeze({ x: -70, y: -85, size: 140 }),
+  /** Near fire has a split thin crest as well as its lighter, desaturated texture. */
+  nearPath: "M-43,-55 Q-27,-70 -9,-73 M9,-73 Q27,-70 43,-55",
   nearOpacity: 0.86,
   /** 剩余寿命乘这个数再夹到 1：前四分之一寿命满亮，之后才开始淡。 */
   fullBrightGain: 1.35,

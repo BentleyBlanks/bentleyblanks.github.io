@@ -20,6 +20,33 @@ try {
   await page.goto(`${base}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=low`,
     {waitUntil:"domcontentloaded",timeout:240000});
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, {timeout:300000});
+  // Decode the actual production images: a CSS URL alone does not prove pixels render.
+  const textures = await page.evaluate(async () => {
+    const arc = document.querySelector(".hudHitTexture").getAttribute("href");
+    const blood = getComputedStyle(document.querySelector(".hudDamage"), "::before")
+      .backgroundImage.match(/url\(["']?([^"')]+)/)[1];
+    return await Promise.all([arc, blood].map(async src => {
+      const image = new Image(); image.src = src; await image.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = image.width; canvas.height = image.height;
+      const ctx = canvas.getContext("2d"); ctx.drawImage(image, 0, 0);
+      const data = ctx.getImageData(0,0,image.width,image.height).data;
+      let opaque = 0, clear = 0, centerMax = 0;
+      for (let y = 0; y < image.height; y++) for (let x = 0; x < image.width; x++) {
+        const alpha = data[(y * image.width + x) * 4 + 3];
+        if (alpha > 128) opaque++;
+        if (alpha < 3) clear++;
+        if (x > image.width*.25 && x < image.width*.75 && y > image.height*.43 && y < image.height*.65)
+          centerMax = Math.max(centerMax, alpha);
+      }
+      return {src,width:image.width,height:image.height,opaque,clear,centerMax};
+    }));
+  });
+  for (const texture of textures) {
+    assert.ok(texture.width >= 1000 && texture.opaque > 2000, "Real texture decoded");
+    assert.ok(texture.clear > texture.width * texture.height * .5, "Clear sight area");
+    assert.ok(texture.centerMax <= 2, "Alpha center does not cover aiming");
+  }
   await page.evaluate(async () => {
     const T = window.Tengxian;
     await T.Debug.FirstLevelJump(4);
@@ -41,12 +68,15 @@ try {
   });
   const near = await page.evaluate(() => {
     const T = window.Tengxian, el = document.querySelector(".hudHitDir.near");
+    const texture = el?.querySelector(".hudHitTexture"), crest = el?.querySelector(".hudNearCrest");
     return {hp:T.player.health,flash:T.player.hitFlash,kind:T.player.hitMarks[0]?.kind,
       angle:el?.getAttribute("transform"),opacity:el && +getComputedStyle(el).opacity,
-      fill:el && getComputedStyle(el).fill,stroke:el && getComputedStyle(el).stroke};
+      textureOpacity:texture && +getComputedStyle(texture).opacity,
+      crestDisplay:crest && getComputedStyle(crest).display,fill:crest && getComputedStyle(crest).fill};
   });
   assert.equal(near.hp,100); assert.equal(near.flash,0); assert.equal(near.kind,"near");
   assert.equal(near.angle,"rotate(90.0)"); assert.ok(near.opacity>.7); assert.equal(near.fill,"none");
+  assert.equal(near.crestDisplay,"block"); assert.ok(near.textureOpacity < .5);
   await page.screenshot({path:path.join(output,"NearRight.png")});
   const hit = await page.evaluate(() => {
     const T = window.Tengxian, p = T.player;
@@ -56,10 +86,13 @@ try {
     T.hud.SetHurt({health:p.health,flash:p.hitFlash,marks:p.hitMarks,yaw:p.yaw});
     const el = document.querySelector(".hudHitDir.hit");
     return {hp:p.health,flash:p.hitFlash,marks:p.hitMarks.map(m=>({...m})),
-      opacity:+getComputedStyle(el).opacity,fill:getComputedStyle(el).fill};
+      opacity:+getComputedStyle(el).opacity,
+      textureOpacity:+getComputedStyle(el.querySelector(".hudHitTexture")).opacity,
+      crestDisplay:getComputedStyle(el.querySelector(".hudNearCrest")).display};
   });
   assert.ok(hit.hp<100 && hit.flash>.5); assert.equal(hit.marks.length,1);
-  assert.equal(hit.marks[0].kind,"hit"); assert.ok(hit.opacity>.8); assert.notEqual(hit.fill,near.fill);
+  assert.equal(hit.marks[0].kind,"hit"); assert.ok(hit.opacity>.8);
+  assert.equal(hit.textureOpacity,1); assert.equal(hit.crestDisplay,"none");
   await page.waitForTimeout(150); // Let the existing damage-vignette CSS transition settle.
   await page.screenshot({path:path.join(output,"HitRight.png")});
   const rotation = await page.evaluate(() => {
@@ -106,6 +139,28 @@ try {
     return {count,hits,expired,visible,invalid,respawn:p.hitMarks.length};
   });
   assert.deepEqual(lifecycle,{count:5,hits:5,expired:0,visible:0,invalid:0,respawn:0});
+  // Injury grading, heartbeat and recovery use the same production SetHurt path.
+  const healthStates = [];
+  for (const health of [100,60,22]) {
+    await page.evaluate(health => window.Tengxian.hud.SetHurt({health}), health);
+    await page.waitForTimeout(160);
+    healthStates.push(await page.evaluate(() => {
+      const el = document.querySelector(".hudDamage");
+      return {opacity:+getComputedStyle(el).opacity,low:el.classList.contains("low"),
+        pulse:getComputedStyle(el,"::before").animationName};
+    }));
+    await page.screenshot({path:path.join(output,`Health${health}.png`)});
+  }
+  assert.equal(healthStates[0].opacity,0);
+  assert.ok(healthStates[1].opacity > 0 && healthStates[1].opacity < healthStates[2].opacity);
+  assert.equal(healthStates[1].low,false); assert.equal(healthStates[2].pulse,"hudPulse");
+  await page.emulateMedia({reducedMotion:"reduce"});
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector(".hudDamage"),"::before").animationName),"none");
+  await page.emulateMedia({reducedMotion:"no-preference"});
+  await page.evaluate(() => window.Tengxian.hud.SetHurt({health:100}));
+  await page.waitForTimeout(160);
+  assert.equal(await page.evaluate(() => +getComputedStyle(document.querySelector(".hudDamage")).opacity),0);
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector(".hudDamage"),"::before").animationName),"none");
   // Narrow viewport uses the same center and readable vmin geometry.
   await page.setViewportSize({width:745,height:377});
   await page.evaluate(() => {
@@ -116,8 +171,11 @@ try {
   });
   await page.waitForTimeout(150);
   await page.screenshot({path:path.join(output,"CompactHit.png")});
+  await page.evaluate(() => window.Tengxian.hud.SetHurt({health:22}));
+  await page.waitForTimeout(160);
+  await page.screenshot({path:path.join(output,"CompactCritical.png")});
   assert.deepEqual(errors,[]);
-  const report={near,hit,rotation,sectors,lifecycle};
+  const report={textures,near,hit,rotation,sectors,lifecycle,healthStates};
   await fs.writeFile(path.join(output,"Report.json"),JSON.stringify(report,null,2));
   console.log("IncomingFireBrowserTest OK",JSON.stringify(report));
 } finally {

@@ -815,22 +815,31 @@ export class Hud {
    * 为什么非要有：这一版之前玩家挨枪只有两件事会发生 —— 血掉了、暗角亮一点点
    *（而暗角是 health<70 才开始的，70 到 0 只隔两发）。也就是说在"还有得救"的
    * 那段血量里，屏幕上**什么都没发生**，玩家既不知道自己在挨打，更不知道朝哪边躲。
-   * 弧是画在 SVG 里的，五个共用一份几何，转的时候只改 transform。
+   * 五个方位共用一张透明血色纹理；SVG 只负责旋转，不重新绘制素材。
    */
   BuildHitDirs() {
     const svg = document.createElementNS(NS, "svg");
     svg.setAttribute("class", "hudHitDirs");
     svg.setAttribute("viewBox", "-100 -100 200 200");
     svg.setAttribute("aria-hidden", "true");
-    this.hitDirPaths = [];
+    this.hitDirNodes = [];
     for (let i = 0; i < HIT_FEEDBACK.markMax; i += 1) {
-      const path = document.createElementNS(NS, "path");
-      // 朝正上（= 视线正前）的一段环形扇区，半径 60—76、张角 ±20°。
-      path.setAttribute("d", HITDIR.hitPath);
-      path.setAttribute("class", "hudHitDir");
-      path.style.opacity = "0";
-      svg.appendChild(path);
-      this.hitDirPaths.push(path);
+      const node = document.createElementNS(NS, "g");
+      node.setAttribute("class", "hudHitDir");
+      node.style.opacity = "0";
+      const texture = document.createElementNS(NS, "image");
+      texture.setAttribute("class", "hudHitTexture");
+      texture.setAttribute("href", HITDIR.texture);
+      texture.setAttribute("x", HITDIR.textureBox.x);
+      texture.setAttribute("y", HITDIR.textureBox.y);
+      texture.setAttribute("width", HITDIR.textureBox.size);
+      texture.setAttribute("height", HITDIR.textureBox.size);
+      const crest = document.createElementNS(NS, "path");
+      crest.setAttribute("class", "hudNearCrest");
+      crest.setAttribute("d", HITDIR.nearPath);
+      node.append(texture, crest);
+      svg.appendChild(node);
+      this.hitDirNodes.push(node);
     }
     this.root.appendChild(svg);
     this.el.hitDirs = svg;
@@ -893,7 +902,7 @@ export class Hud {
    * 受伤的全部画面反馈，一次调用。三层叠在同一张暗角上：
    *   · 底噪 —— 剩余血量；
    *   · 事件 —— 这一发的红闪（player.hitFlash，独立衰减，与剩余血量无关）；
-   *   · 濒死 —— 血量到某一档以下整块暗角开始搏动（CSS 动画，零 JS 成本）。
+   *   · 濒死 —— 血量到某一档以下血污子层开始搏动，不覆盖总透明度。
    * 三个档位的数与「为什么是这个数」都在 Data_Tuning_Hud.VIGNETTE。
    */
   SetHurt({ health = 100, flash = 0, marks = null, yaw = 0 } = {}) {
@@ -903,12 +912,12 @@ export class Hud {
     SetStyle(this.el.damage, "opacity", v.toFixed(3));
     SetClass(this.el.damage, "low", health < VIGNETTE.pulseBelowHealth && health > 0);
 
-    const paths = this.hitDirPaths;
-    if (!paths) return;
+    const nodes = this.hitDirNodes;
+    if (!nodes) return;
     const list = marks || [];
-    for (let i = 0; i < paths.length; i += 1) {
+    for (let i = 0; i < nodes.length; i += 1) {
       const m = list[i];
-      if (!m) { SetStyle(paths[i], "opacity", "0"); continue; }
+      if (!m) { SetStyle(nodes[i], "opacity", "0"); continue; }
       // 世界方向 → 屏幕角。存的是世界向量，所以转身之后指示器跟着转 ——
       // 存屏幕角的话你一回头它就指错地方了。
       const sin = Math.sin(yaw), cos = Math.cos(yaw);
@@ -917,11 +926,10 @@ export class Hud {
       const deg = Math.atan2(right, fwd) * 180 / Math.PI;
       const life = m.max ? m.life / m.max : 0;
       const near = m.kind === "near";
-      SetAttr(paths[i], "class", near ? "hudHitDir near" : "hudHitDir hit");
-      SetAttr(paths[i], "d", near ? HITDIR.nearPath : HITDIR.hitPath);
-      SetAttr(paths[i], "transform", `rotate(${deg.toFixed(1)})`);
+      SetAttr(nodes[i], "class", near ? "hudHitDir near" : "hudHitDir hit");
+      SetAttr(nodes[i], "transform", `rotate(${deg.toFixed(1)})`);
       // 前四分之一寿命满亮，之后淡出：一眼看得见，但不会在屏幕上挂两秒。
-      SetStyle(paths[i], "opacity",
+      SetStyle(nodes[i], "opacity",
         (Math.min(1, life * HITDIR.fullBrightGain) * (near ? HITDIR.nearOpacity : HITDIR.maxOpacity)).toFixed(3));
     }
   }
