@@ -58,12 +58,15 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudHitDirs {
   position: absolute; left: 50%; top: 50%;
   width: 46vmin; height: 46vmin; margin: -23vmin 0 0 -23vmin;
-  pointer-events: none; overflow: visible;
+  pointer-events: none; overflow: visible; z-index: 6;
 }
 .hudHitDir {
-  fill: rgba(228,64,44,0.92);
-  stroke: rgba(20,4,3,0.55); stroke-width: 1.2;
-  transition: opacity 0.08s linear;
+  fill: #f3503d;
+  stroke: rgba(24,4,3,0.88); stroke-width: 1.1;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8));
+}
+.hudHitDir.near {
+  fill: none; stroke: #ffe0a0; stroke-width: 2.3; stroke-linecap: round;
 }
 
 /* 帧率是调试读数，让开 COD 目标通知占用的左上角。 */

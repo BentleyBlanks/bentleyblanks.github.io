@@ -164,6 +164,7 @@ export class ShootingModel {
     this._center = { x: 0, y: 0, z: 0 };     // 躯干中心（选瞄点用）
     this._muzzle = { x: 0, y: 0, z: 0 };
     this._suppress = { x: 0, y: 0, z: 0 };
+    this._passPoint = { x: 0, y: 0, z: 0 };
     this._burst = { shots: 1, intervalS: 1, pauseS: 0 };
     this._result = {
       hit: false,
@@ -522,6 +523,25 @@ export class ShootingModel {
 
   /** Fresh trigger check, including suppression points; never reuse exposure caches. */
   ShotPathClear(from, to) { return !this._Blocked(from, to); }
+
+  /** Nearest real passage by the exposed player's head/chest; walls stop the segment. */
+  PlayerNearMiss(from, dir, player, maxDistance, radius) {
+    if (!FinitePoint(from) || !FinitePoint(dir) || !(maxDistance > 0) || !(radius > 0)) return Infinity;
+    const samples = this.PlayerSamples(player);
+    let nearest = Infinity;
+    for (let i = 0; i < Math.min(2, samples.length); i++) {
+      const p = samples[i];
+      const along = (p.x - from.x) * dir.x + (p.y - from.y) * dir.y + (p.z - from.z) * dir.z;
+      if (along <= 0 || along > maxDistance) continue;
+      const point = this._passPoint;
+      point.x = from.x + dir.x * along;
+      point.y = from.y + dir.y * along;
+      point.z = from.z + dir.z * along;
+      const miss = Math.hypot(p.x - point.x, p.y - point.y, p.z - point.z);
+      if (miss < radius && miss < nearest && !this._Blocked(from, point)) nearest = miss;
+    }
+    return nearest;
+  }
 
   /** 一条采样线被挡住了没有。缺 `host.Raycast` 时一律算通（纯逻辑环境）。 */
   _Blocked(from, to) {

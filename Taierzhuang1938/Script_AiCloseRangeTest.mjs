@@ -76,6 +76,7 @@ try {
     function Prepare(distance, stance = "stand", scale = MISSION_TUNING.frontAccuracyScale) {
       player.alive = true; player.health = 100; player.spawnGrace = 0; player.debug.invincible = false;
       player.wounds.length = 0; player.bleeding = 0;
+      player.hitMarks.length = 0; player.hitFlash = 0; player.suppression = 0;
       player.stance = stance;
       rifle.position.set(0,0,distance); rifle.yaw = 0;
       rifle.stance = 0; rifle.moveSpeed = 0; rifle.suppression = 0;
@@ -88,7 +89,7 @@ try {
       rifle.targetExposedS = 4; rifle.playerLockAt = ai.time;
       ai.tactics.Reset(); ai.shooting.Detach(rifle); ai.shooting.BeginAim(rifle,-1);
     }
-    for (const distance of [2,5,12,25,60]) {
+    for (const distance of [2,5,12,18,25,60]) {
       for (const stance of ["stand","crouch","prone"]) {
         Prepare(distance, stance);
         ai.time += 5;
@@ -110,6 +111,7 @@ try {
     const before=player.health, blockedSequence=rifle.fireSequence, blockedAmmo=rifle.ammo;
     for(let i=0;i<120;i++){rifle.fireTimer=0;rifle.aimTime=10;ai.time+=.02;ai.TryFire(rifle,1/60,player);}
     out.blockedDamage=before-player.health;
+    out.blockedMarks=player.hitMarks.length;
     out.blockedShots=rifle.fireSequence-blockedSequence;out.blockedAmmo=blockedAmmo-rifle.ammo;
     blocked=false;
     // Cache a clear exposure, then insert a blocker within its 0.25 s lifetime.
@@ -130,6 +132,8 @@ try {
     Prepare(2,"stand",0);ai.time+=5;
     for(let i=0;i<120;i++){rifle.fireTimer=0;rifle.aimTime=10;ai.time+=.02;ai.TryFire(rifle,1/60,player);}
     out.disabledDamage=100-player.health;
+    out.warningMarks=player.hitMarks.map(m=>m.kind);
+    out.warningFlash=player.hitFlash;
     Prepare(2); const start=ai.time, sequence=rifle.fireSequence;
     for(let i=0;i<600&&player.health===100;i++){ai.time+=1/60;ai.TryFire(rifle,1/60,player);}
     out.firstHitS=player.health<100?ai.time-start:null;
@@ -139,10 +143,10 @@ try {
     out.behindDamage=100-player.health;
     // Fill every token with distant shooters; a visible close threat must be
     // able to take over without increasing simultaneous damaging attackers.
-    Prepare(2);ai.time+=5;
+    Prepare(12);ai.time+=5;
     const far=[];
     for(let i=0;i<COMBAT.maxShootersOnPlayer;i++){
-      const s={id:9000+i,alive:true,side:"ija",position:rifle.position.clone().set(0,0,12+i*5),target:rifle.target};
+      const s={id:9000+i,alive:true,side:"ija",position:rifle.position.clone().set(0,0,40+i*5),target:rifle.target};
       far.push(s);ai.tactics.AcquireToken(-1,s.id,true);
     }
     ai.soldiers=[rifle,...far];rifle.aimTime=10;
@@ -151,7 +155,7 @@ try {
     out.tokenCount=ai.tactics.TokenCount(-1);out.cap=COMBAT.maxShootersOnPlayer;
     // Saturating the target admission cap must not hide a nearby candidate
     // from perception. Empty-range LOS only; real Sense/Think chooses the target.
-    ai.soldiers=[rifle];Prepare(2);
+    ai.soldiers=[rifle];Prepare(12);
     ai.DropTarget(rifle);ai.perception.ForgetAll(rifle);
     rifle.scriptedNoncombatant=false;rifle.state="idle";
     ai.playerTargetedBy=COMBAT.maxShootersOnPlayer;
@@ -227,10 +231,11 @@ try {
   console.log(JSON.stringify(result,null,2));
   assert.deepEqual(errors,[]);
   if (!process.env.AI_CLOSE_BASELINE) {
-    for(const row of result.rows.filter(r=>r.distance<=5)) {
+    for(const row of result.rows.filter(r=>r.distance<=12)) {
       assert.equal(row.shots,600);
       assert.ok(row.rate>=.65 && row.rate<.98, `close ${row.distance}m ${row.stance}: ${row.rate}`);
     }
+    for(const row of result.rows.filter(r=>r.distance===18)) assert.ok(row.rate>.40, `18 m threat must be credible: ${row.rate}`);
     for(const row of result.rows.filter(r=>r.distance>=25)) assert.ok(row.rate<.1,`distant campaign balance: ${row.rate}`);
     assert.equal(result.blockedDamage,0);assert.equal(result.disabledDamage,0);assert.equal(result.behindDamage,0);
     assert.equal(result.blockedShots,0,"blocked exposure must not become wall suppression");
@@ -243,6 +248,10 @@ try {
       assert.equal(row.shots,0,"NRA soldier must not fire into intervening campaign wall");
       assert.equal(row.ammoSpent,0);assert.equal(row.suppression,0,"wall stops remote suppression");
     }
+
+    assert.equal(result.blockedMarks,0,"solid cover must block incoming cues");
+    assert.ok(result.warningMarks.length>0 && result.warningMarks.every(kind=>kind==="near"));
+    assert.equal(result.warningFlash,0,"warning fire must not imply an injury");
     assert.ok(result.firstHitS!==null&&result.firstHitS<3,"close rifle must inflict damage promptly");
     assert.equal(result.nearToken,true);assert.equal(result.tokenCount,result.cap);
     assert.equal(result.nearAcquired,true);

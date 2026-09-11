@@ -11,6 +11,7 @@
 
 import { T, Localize } from "./Script_Text.mjs";
 import { LevelBriefId, LevelFieldId } from "./Script_TextIds.mjs";
+import { HIT_FEEDBACK } from "./Data_Tuning_Player.mjs";
 import {
   TITLE_CARD, TIMING, GRENADE_WARNING, HITMARK, HITDIR, VIGNETTE, SUPPRESSION,
   PROMPTS, MINIMAP, FPS, IDLE_FADE,
@@ -820,12 +821,12 @@ export class Hud {
     const svg = document.createElementNS(NS, "svg");
     svg.setAttribute("class", "hudHitDirs");
     svg.setAttribute("viewBox", "-100 -100 200 200");
+    svg.setAttribute("aria-hidden", "true");
     this.hitDirPaths = [];
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < HIT_FEEDBACK.markMax; i += 1) {
       const path = document.createElementNS(NS, "path");
       // 朝正上（= 视线正前）的一段环形扇区，半径 60—76、张角 ±20°。
-      path.setAttribute("d",
-        "M-26.0,-71.4 A76,76 0 0 1 26.0,-71.4 L20.5,-56.4 A60,60 0 0 0 -20.5,-56.4 Z");
+      path.setAttribute("d", HITDIR.hitPath);
       path.setAttribute("class", "hudHitDir");
       path.style.opacity = "0";
       svg.appendChild(path);
@@ -915,10 +916,13 @@ export class Hud {
       const right = m.x * cos + m.z * -sin;
       const deg = Math.atan2(right, fwd) * 180 / Math.PI;
       const life = m.max ? m.life / m.max : 0;
+      const near = m.kind === "near";
+      SetAttr(paths[i], "class", near ? "hudHitDir near" : "hudHitDir hit");
+      SetAttr(paths[i], "d", near ? HITDIR.nearPath : HITDIR.hitPath);
       SetAttr(paths[i], "transform", `rotate(${deg.toFixed(1)})`);
       // 前四分之一寿命满亮，之后淡出：一眼看得见，但不会在屏幕上挂两秒。
       SetStyle(paths[i], "opacity",
-        (Math.min(1, life * HITDIR.fullBrightGain) * HITDIR.maxOpacity).toFixed(3));
+        (Math.min(1, life * HITDIR.fullBrightGain) * (near ? HITDIR.nearOpacity : HITDIR.maxOpacity)).toFixed(3));
     }
   }
 

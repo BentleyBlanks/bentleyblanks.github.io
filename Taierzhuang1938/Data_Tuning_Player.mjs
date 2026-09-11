@@ -205,6 +205,9 @@ export const HIT_FEEDBACK = Object.freeze({
   severityDiv: 55,
   markLifeS: 2.2,
   markMax: 5,
+  // Near fire is a warning, not an injury: no blood flash, shorter hollow arc.
+  nearMarkLifeS: 1.3,
+  markMergeDot: 0.94,
   eventQueueMax: 8,           // 过场/编辑器不取事件时队列的封顶
   heartbeatBelowHp: 45,
   heartbeatMinS: 0.42,

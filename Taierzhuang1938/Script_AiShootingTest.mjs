@@ -932,3 +932,19 @@ console.log("AiShootingTest OK — 全部通过");
   assert.equal(far,AimErrorCurve(err,floor), "25 m acquisition balance unchanged");
 }
 console.log("AiShootingTest OK — close range blend and angular tolerance");
+
+// Incoming cues follow real finite segments and solid cover, without audio.
+{
+  let blocked = false;
+  const model = new ShootingModel({ Raycast: () => blocked ? { t: 2 } : null });
+  const player = {position:{x:0,y:0,z:0},yaw:0,stance:"stand"};
+  const from = {x:1,y:1.3,z:12}, toward = {x:0,y:0,z:-1};
+  assert.ok(model.PlayerNearMiss(from,toward,player,20,2.6) < 1.5);
+  blocked = true;
+  assert.equal(model.PlayerNearMiss(from,toward,player,20,2.6),Infinity);
+  blocked = false;
+  assert.equal(model.PlayerNearMiss(from,{x:0,y:0,z:1},player,20,2.6),Infinity);
+  assert.equal(model.PlayerNearMiss(from,toward,player,5,2.6),Infinity);
+  assert.equal(model.PlayerNearMiss({...from,x:4},toward,player,20,2.6),Infinity);
+}
+console.log("AiShootingTest OK — real near misses / blocked / receding / finite segment / distant misses");

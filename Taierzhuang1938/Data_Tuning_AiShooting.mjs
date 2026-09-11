@@ -76,13 +76,14 @@ const Freeze = (typeof globalThis === "object" && globalThis.TAIERZHUANG_TUNING_
 // distant crossfire, not a visible body filling the sights. Blend back to the
 // existing battle balance at 25 m; cover, suppression and damage still apply.
 export const CLOSE_RANGE = Freeze({
-  fullAccuracyM: 5,
+  // Short-range fights include the opposite side of a trench, not only melee reach.
+  fullAccuracyM: 15,
   fadeOutM: 25,
   accuracy: 0.88,
   maxAccuracy: 0.96,
   firstShotGraceS: 0.20,
   targetRadiusM: 0.24,
-  priorityM: 8,
+  priorityM: 25,
   priorityDistanceRatio: 2,
   priorityDistanceGapM: 3,
 });

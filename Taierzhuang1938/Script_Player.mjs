@@ -1033,11 +1033,13 @@ export class PlayerController {
    */
   TakeHit(damage, part = "torso", direction = null, info = null) {
     if (!this.alive) return;
+    if (!Number.isFinite(damage) || damage <= 0) return;
     if (this.debug.invincible) return;
     // 出生保护期内只吃压制不吃伤 —— 让接替者有几秒找到掩体，
     // 而不是睁眼就躺回去。子弹照样从耳边过，压制照样上。
     if (this.spawnGrace > 0) {
       this.suppression = Clamp01(this.suppression + SUPPRESSION.onGraceHit);
+      if (info?.bullet) this.RecordIncomingFire(info.from, "near");
       return;
     }
     const P = COMBAT.player || {};
@@ -1064,17 +1066,7 @@ export class PlayerController {
     this.hitFlash = Clamp01(Math.max(this.hitFlash,
       HIT_FEEDBACK.flashBase + applied / HIT_FEEDBACK.flashDamageDiv));
     const from = info && info.from ? info.from : null;
-    if (from) {
-      // 来弹方位存世界方向（从玩家指向枪口），HUD 每帧按当前 yaw 转成屏幕角。
-      // 存屏幕角的话转身之后指示器就指错了。
-      const dx = from.x - this.position.x, dz = from.z - this.position.z;
-      const len = Math.hypot(dx, dz) || 1;
-      this.hitMarks.push({
-        x: dx / len, z: dz / len,
-        life: HIT_FEEDBACK.markLifeS, max: HIT_FEEDBACK.markLifeS,
-      });
-      if (this.hitMarks.length > HIT_FEEDBACK.markMax) this.hitMarks.shift();
-    }
+    this.RecordIncomingFire(from, "hit");
     this.PushHitEvent({
       kind: "hurt", part, damage: applied,
       severity: Clamp01(applied / HIT_FEEDBACK.severityDiv), blast: !!info?.blast,
@@ -1146,10 +1138,40 @@ export class PlayerController {
    * source = "bullet"（默认）时顺手震一下画面 —— 那一声破空本来就该在头上炸开；
    * 爆炸传 "blast"：它的震屏在 Combat.Blast 里按距离与遮挡单独算，不在这儿叠第二遍。
    */
-  Suppress(amount, source = "bullet") {
+  Suppress(amount, source = "bullet", from = null) {
     const scaled = amount * (DIFFICULTY.suppressionScale ?? 1);
     this.suppression = Clamp01(this.suppression + scaled);
     if (source === "bullet") this.shake.NearMiss(scaled);
+    if (source === "bullet" && scaled > 0) this.RecordIncomingFire(from, "near");
+  }
+
+  /** Remember a firing bearing, not a tracked enemy. Merge automatic fire by sector. */
+  RecordIncomingFire(from, kind = "near") {
+    if (!this.alive || !Number.isFinite(from?.x) || !Number.isFinite(from?.z)) return;
+    const dx = from.x - this.position.x, dz = from.z - this.position.z;
+    const len = Math.hypot(dx, dz);
+    if (len < 1e-5) return;
+    const x = dx / len, z = dz / len;
+    const life = kind === "hit" ? HIT_FEEDBACK.markLifeS : HIT_FEEDBACK.nearMarkLifeS;
+    let mark = this.hitMarks.find(m => m.x * x + m.z * z >= HIT_FEEDBACK.markMergeDot);
+    // A subsequent miss must not downgrade or keep an old injury glowing forever.
+    if (mark?.kind === "hit" && kind === "near") return;
+    if (!mark) {
+      if (this.hitMarks.length >= HIT_FEEDBACK.markMax) {
+        let replace = -1;
+        for (let i = 0; i < this.hitMarks.length; i++) {
+          const m = this.hitMarks[i];
+          if (kind === "near" && m.kind === "hit") continue;
+          if (replace < 0 || (m.kind === "near" && this.hitMarks[replace].kind !== "near")
+            || (m.kind === this.hitMarks[replace].kind && m.life < this.hitMarks[replace].life)) replace = i;
+        }
+        if (replace < 0) return;
+        this.hitMarks.splice(replace, 1);
+      }
+      mark = {};
+      this.hitMarks.push(mark);
+    }
+    Object.assign(mark, { x, z, kind, life, max: life });
   }
 
   /** 包扎：止血，不回满血。伤口留着，跑不快。 */

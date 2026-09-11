@@ -47,6 +47,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  IncomingFireBrowserTest: {file:"Script_IncomingFireBrowserTest.mjs",timeoutMs:300000,desc:"Real near-fire/hit HUD, camera bearings, sector merging, expiry and compact screenshots"},
   BloodEffectsTest: {file:"Script_BloodEffectsTest.mjs",timeoutMs:180000,desc:"Shared blood GPU projection, ballistic collision, platform and source lifecycle"},
   SquadMarchTest: {file:"Script_SquadMarchTest.mjs",desc:"Shared squad cadence, roles, safe interruption, replay and population variants"},
   SquadMarchEditorTest: {file:"Script_SquadMarchEditorTest.mjs",timeoutMs:300000,desc:"Squad editor real actors, editable routes, per-count styles and cleanup"},
@@ -308,7 +309,7 @@ export const browserTests = new Set([
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
   "SamplerBudgetTest", "BloodEffectsTest",
-  "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "GoreRangeTest", "MenuTest",
+  "IncomingFireBrowserTest", "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "GoreRangeTest", "MenuTest",
   "ClusteredLightsTest", "MaterialUpgradeTest",
   "PerformanceTest", "PhysicsTest", "PostTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
@@ -389,7 +390,7 @@ export const domains = {
       "PlayerHitboxTest", "CameraShakeTest",
       // 射击模型叠在 COMBAT.aiAccuracyBase 那条链上（暴露曲线 × 误差曲线），
       // 碰伤害口径的改动要连着它一起跑（纯 Node 毫秒级）。
-      "AiShootingTest", "AiCloseRangeTest",
+      "AiShootingTest", "AiCloseRangeTest", "IncomingFireBrowserTest",
       // 负重会封掉开火/开镜/冲刺三条（Player 的 carrySpeedScale + TryFire 的闸），
       // 碰这三样的改动要连着枪感串一起跑，所以它同时挂在 combat 与 interact 两个域。
       "CarryTest",
@@ -418,7 +419,7 @@ export const domains = {
   hud: {
     label: "HUD/交互提示/目标识别",
     // 报码纸是 HUD 面板，改 Script_Hud 要连着它一起跑（TelegraphTest 有一段扫 HUD 源码）。
-    tests: ["HudPromptTest", "HudPromptBrowserTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012BinocularsTest", "TargetInfoTest", "TelegraphTest"],
+    tests: ["IncomingFireBrowserTest", "HudPromptTest", "HudPromptBrowserTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012BinocularsTest", "TargetInfoTest", "TelegraphTest"],
   },
   interact: {
     label: "交互框架/负重/架设机枪/发报（担架·搬运·救护交互点·机枪位·电键）",
@@ -464,6 +465,7 @@ export const domains = {
 
 const changedDomainRules = [
   { domain: "render", pattern: /DeathPose|Data_Tuning_ActorDeath/ },
+  {domain:"hud",pattern:/IncomingFire/},
   {domain:"squadMarch",pattern:/SquadMarch/},
   {domain:"combat",pattern:/FpsSkeleton|FpsSkeletal|FpsAnimation|Animation\/FirstPerson\/Data_Fps/},
   { domain: "combat", pattern: /CoverLean/i },

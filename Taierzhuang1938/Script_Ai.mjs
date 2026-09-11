@@ -3742,6 +3742,15 @@ export class AiDirector {
     // 只有栓动才有：捷克式、歪把子、九二式自己上膛。
     this.ctx.audioWiring?.AiBolt(s, s.weapon.kind === "boltRifle");
 
+    // Threat feedback is tied to this bullet's unobstructed segment, independent
+    // of audio being enabled and of whom the enemy intended to shoot.
+    if (player?.Alive && s.side === "ija" && !(hit && toPlayer)) {
+      const pass = this.shooting.PlayerNearMiss(from, dir, player, hit ? dist : dist + 6, COMBAT.suppressRadius);
+      if (Number.isFinite(pass)) {
+        player.Suppress(COMBAT.suppressPerNearMiss * (1 - pass / COMBAT.suppressRadius) * 3, "bullet", from);
+      }
+    }
+
     if (hit) {
       if (toPlayer) {
         // 打玩家的部位不抽概率：照 aimScatterM 在瞄点周围散一个点，射线去碰玩家自己的
@@ -3763,7 +3772,8 @@ export class AiDirector {
       // 压制射击走的也是这一支 —— 「藏起来也有子弹擦着掩体过」就是它。
       if (s.target.isPlayer && player) {
         const miss = 0.4 + s.rnd() * 1.4;
-        if (miss < COMBAT.suppressRadius) player.Suppress(COMBAT.suppressPerNearMiss * (1 - miss / COMBAT.suppressRadius) * 3);
+        // Retain the legacy random draw so the damage sequence does not drift;
+        // suppression and its bearing now use the actual passage measured above.
         // **打偏的这一发要听得见。**
         //
         // `dir` 这时已经是 `shot.missDir` —— 这一发**真正飞出去的方向**
