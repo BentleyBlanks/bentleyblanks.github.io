@@ -1,4 +1,5 @@
-// Rebuild distance variants from the two user-approved SeedAudio takes (2026-09-10).
+// Rebuild MID/FAR variants from the two user-approved SeedAudio takes (2026-09-10).
+// Near now uses the separate 2026-09-11 replacement; never reinstall the retired near cues.
 // Default inputs are the deployed near files, preserved byte-for-byte. No API calls.
 // --source-dir=<directory> imports the approved audition filenames instead.
 import fs from "node:fs";
@@ -16,7 +17,7 @@ const takes = [
   { name: "Punch", sha256: "eab820624f286d3c06a0918691c3c5c1b6dddaa531eb403f352d6ce0452e2d1f" },
   { name: "Heavy", sha256: "aef8b5d89aa24173f75d0e3d11a5e9b59eaac6507440709ecc9586941edc03a4" },
 ];
-const bands = [{ name: "Near", lp: 0 }, { name: "Mid", lp: 5000 }, { name: "Far", lp: 2200 }];
+const bands = [{ name: "Mid", lp: 5000 }, { name: "Far", lp: 2200 }];
 function Decode(file, filter) {
   return execFileSync(ffmpeg, ["-v", "error", "-i", file, ...(filter ? ["-af", filter] : []),
     "-ac", "1", "-ar", "44100", "-f", "f32le", "-"], { maxBuffer: 32 * 1024 * 1024 });

@@ -140,11 +140,10 @@
     },
     "explosionNear": {
       "files": [
-        "AudioSfx_ExplosionNear_01.mp3",
-        "AudioSfx_ExplosionNear_02.mp3"
+        "AudioSfx_ExplosionNearReplacement.mp3"
       ],
-      "seconds": 2.444,
-      "credit": "Volcengine SeedAudio 1.0 · approved Punch / Heavy · Near · 2026-09-10",
+      "seconds": 4.049,
+      "credit": "Volcengine SeedAudio 1.0 · 近距爆炸 · 冲击与碎土 · 2026-09-11",
       "license": "volcengine"
     },
     "explosionFar": {
@@ -772,6 +771,14 @@
       "seconds": 0.35,
       "credit": "Volcengine SeedAudio 1.0 · 肢块落地（两变体：湿闷 / 带骨磕）",
       "license": "volcengine"
+    },
+    "planeDrone": {
+      "files": [
+        "AudioSfx_PlaneEngine.mp3"
+      ],
+      "seconds": 11.692,
+      "credit": "Volcengine SeedAudio 1.0 · 日机活塞引擎 · 新录音 · 2026-09-11",
+      "license": "volcengine"
     }
   },
   "bakedAt": "2026-09-10",
@@ -817,6 +824,34 @@
       "file": "AudioSfx_CarriageRattle_01.mp3",
       "model": "seed-audio-1.0",
       "approvedOn": "2026-09-11"
+    }
+  },
+  "carriageReviewSources": {
+    "planeDrone": {
+      "title": "日机活塞引擎 · 新录音",
+      "file": "AudioSfx_PlaneEngine.mp3",
+      "seconds": 11.692449,
+      "rmsDbfs": -25.447688631199572,
+      "activeRmsDbfs": -25.445659339556062,
+      "peakDbfs": -12.573333370020109,
+      "sha256": "43b1e230497e96188e3e24e202c381a973df971f830a4833460aec9684042216",
+      "prompt": "生成一条约十二秒的写实电影拟音：二战1930年代双发螺旋桨飞机在稳定巡航功率下的活塞发动机声音。固定相对距离三十米录音，沉厚但不刺耳的径向发动机轰隆，桨叶轻微扑扑脉动，两个真实机械发动机之间缓慢自然的拍频，少量柔和空气气流。整段转速和响度稳定，适合游戏作为移动飞机持续声源的循环素材；不要预先做飞过或多普勒，不要加速、启动和熄火。开始和结束均有平稳可衔接的纹理。只要真实机械声，不要电子振荡器、电锯、蜂鸣、合成锯齿波感、喷气机、直升机、汽笛、音乐、说话、枪炮和长段静音。",
+      "rawSha256": "a5110b91adc085acd86316d7d5e9a8cc019102a6c0a5bea201969883d2b7f5e6",
+      "generatedAt": "2026-09-11T14:10:51.941Z",
+      "model": "seed-audio-1.0"
+    },
+    "explosionNear": {
+      "title": "近距爆炸 · 冲击与碎土",
+      "file": "AudioSfx_ExplosionNearReplacement.mp3",
+      "seconds": 4.04898,
+      "rmsDbfs": -30.338420534759358,
+      "activeRmsDbfs": -25.447150388528822,
+      "peakDbfs": -9.473827841880505,
+      "sha256": "ec9356d8a63580ec78f8bb00ab80b5bc5d838face37053732c6cbaa62edd853f",
+      "prompt": "生成一条独立的真实战争电影近距离爆炸音效，整条约四秒，仅一次爆炸。户外土路上七八米外一枚迫击炮弹炸开：第一瞬间干脆短促的高压爆裂，紧跟一记结实有空气推动感的低中频闷冲，极短的宽频炸响；随后少量泥土与碎石落地哗啦噼啪，空间尾声自然迅速衰减并完整停止。沉重、有实体冲击但不做夸张低音轰炸，起音利落不拖沓。不要引信飞啸，不要重复爆炸、连续炮战、耳鸣、尖锐长鸣、激光、科幻音效、音乐、人声、旁白和长段静音。",
+      "rawSha256": "083c6a1caa8d4a207963c6bb89e4484ce8694dee5c7b6d56000efd4bebc68c1f",
+      "generatedAt": "2026-09-11T14:03:22.745Z",
+      "model": "seed-audio-1.0"
     }
   }
 }

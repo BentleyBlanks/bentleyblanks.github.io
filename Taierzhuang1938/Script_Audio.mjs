@@ -2678,7 +2678,7 @@ export const MUSIC_BASE = "Audio/Music/";
 // 这一次是**加条目**：戳不动的话浏览器拿着缓存里的旧清单，新素材永远载不上，
 // 而 LoadSfxPack 盖不上去是静默的 —— 表现只是「断肢还是合成音」。
 // （同一天 Codex 那边把戳改成了日期式，合并后取带两件事的同一个新戳。）
-export const SFX_PACK_VERSION = "20260911gunfiregore";
+export const SFX_PACK_VERSION = "20260911planeexplosion";
 export const AMB_PACK_VERSION = "20260910carriagecrowd";
 export const MUSIC_PACK_VERSION = "5";
 
@@ -2994,7 +2994,17 @@ function SampleRecipe(buffers, name) {
       const rate = cycle ? v.pitch : v.pitch * (0.97 + v.rng() * 0.06);
       src.playbackRate.value = rate;
       src.connect(v.out);
-      v.Start(src, v.t + i * interval, buf.duration / Math.max(0.1, rate));
+      if (name === "planeDrone") {
+        // A moving engine must keep sounding beyond the recording and retain Doppler.
+        // The director owns StopVoice; the editor separately limits its audition.
+        src.loop = true;
+        src.start(v.t);
+        v.loop = true;
+        v.Live(3600);
+        v.SetDoppler = doppler => src.playbackRate.setTargetAtTime(rate * doppler, A.ctx.currentTime, 0.12);
+      } else {
+        v.Start(src, v.t + i * interval, buf.duration / Math.max(0.1, rate));
+      }
     }
     if (wet !== undefined && v.wetGain) v.wetGain.gain.value = wet;
   };

@@ -4,7 +4,7 @@
 // 底层是 WebAudio 节点图现算的 33 个配方（Script_Audio 的 RECIPES），
 // 上面盖着一层实录素材（Audio/Sfx/，来源见 Data_SfxSources.mjs）。
 // 采样是异步 fetch 的，**盖不上去就自动退回合成** —— 所以列表里每条都标了
-// 「实录 / 合成」：当前到底在响哪一层，只有摆出来才答得清。
+// 「采样 / 合成」：当前到底在响哪一层，只有摆出来才答得清。
 // 名字（rifleNra / impactFlesh / shellIncoming）光看字面认不出是什么声音，
 // 这就是「指认」那一栏存在的理由：一句中文说明 + 它在游戏里什么时候响。
 //
@@ -43,7 +43,7 @@ const SOUND_INFO = {
   shellDrop: ["枪械", "抛壳落地", "空壳落在砖石地上。压得极低 —— 它是玩法反馈的边料，不是事件"],
   grenadePin: ["爆炸", "拧弹盖 / 拉弦", "木柄手榴弹的引信。攥弹倒计时从这一声起"],
   grenadeThrow: ["爆炸", "投掷", "抡臂出手的风声"],
-  explosionNear: ["爆炸", "近距爆炸", "手榴弹/炮弹在身边炸。冲击 + 碎砖 + 耳鸣"],
+  explosionNear: ["爆炸", "近距爆炸", "近处炮弹的短促冲击与碎土；耳鸣由游戏混音另行触发"],
   explosionFar: ["爆炸", "远处爆炸", "城外落弹的闷响，环境床用"],
   shellIncoming: ["爆炸", "炮弹啸声", "落点前的预警。听到它到炸有 1.5 秒 —— 这是玩家唯一的躲避窗口"],
   shellImpact: ["爆炸", "炮弹落地", "野炮/山炮命中，比手榴弹低一个八度"],
@@ -88,10 +88,10 @@ const SOUND_INFO = {
   telegraphKey: ["信号", "电键单点", "终章发报：按一下发一组码。三个变体**顺序轮播不随机**，随机会连出两次同一条"],
   telegraphHum: ["信号", "发报机底噪", "终章电台桌旁的电流低鸣，循环播。断线那一拍它也跟着停"],
   planeDive: ["环境", "日机俯冲", "一关日机通场：由远及近的发动机声，扫射线之前先到"],
-  // 与 planeDive 是两件事：这条是**挂在机身上逐帧搬位置**的合成引擎（带多普勒），
+  // 与 planeDive 是两件事：这条是**挂在机身上逐帧搬位置**的循环引擎（带多普勒），
   // 从进入段第一帧起一直响；planeDive 是录好多普勒的实录通场，压到头顶前才放一次。
   // 见 Data_AircraftStrafe.STRAFE_SFX 的 drone / engine 两档。
-  planeDrone: ["环境", "日机引擎（持续）", "飞在天上时一直挂着的双发拍频引擎声，循环播且跟着机身走；远处只剩低八度那一层"],
+  planeDrone: ["环境", "日机引擎（持续）", "双发活塞引擎采样，跟随机身循环与变调；试听 10 秒自动停止，也可点击停止音效"],
   strafeNear: ["枪械", "空对地扫射（近）", "航空机枪约 900 发/分，身份就是「一梭子」——只给一发这条 cue 就不成立"],
   strafeFar: ["枪械", "空对地扫射（远）", "同一挺枪、同一次射击，三百米外的另一支麦。远近两条要能拼出距离感"],
   strafeDirt: ["命中", "弹着扫过土路", "一串近弹扫过地面的连击。它决定玩家知不知道这一趟航线压到了自己头上"],
@@ -168,6 +168,8 @@ export class AudioEditor {
     this.savedMusic = null;
     this.ambButtons = new Map();
     this.musicButtons = new Map();
+    this.previewVoices = new Set();
+    this.previewTimers = new Set();
   }
 
   get audio() { return this.host.audio; }
@@ -191,6 +193,7 @@ export class AudioEditor {
   }
 
   Exit() {
+    this.StopSoundPreview();
     const audio = this.audio;
     if (audio) {
       // 环境床与音乐是常驻的：不还原的话退出编辑器之后战场上会一直挂着菜单音乐
@@ -244,6 +247,7 @@ export class AudioEditor {
     ButtonRow(play, [
       { label: "▶ 播放", onClick: () => this.PlayCurrent() },
       { label: "连播 ×5", onClick: () => this.PlayCurrent(5) },
+      { label: "■ 停止音效", onClick: () => this.StopSoundPreview() },
       { label: "耳鸣", onClick: () => this.audio && this.audio.Deafen(0.6) },
       { label: "压音乐", onClick: () => this.audio && this.audio.Duck(1.2, 0.6) },
     ]);
@@ -293,7 +297,8 @@ export class AudioEditor {
     voice.appendChild(barkBox);
     for (const kind of Object.keys(VOICE_KIND)) {
       Button(barkBox, `喊 ${VOICE_KIND[kind]}`, () => {
-        if (this.audio) this.audio.Bark(kind, { priority: true, seed: Math.floor(Math.random() * 1000) });
+        this.StopSoundPreview();
+        if (this.audio) this.TrackPreviewVoice(this.audio.Bark(kind, { priority: true, seed: Math.floor(Math.random() * 1000) }));
       });
     }
     this.voiceNote = Note(voice, "", true);
@@ -327,9 +332,9 @@ export class AudioEditor {
     const sampled = this.audio ? this.audio.sampleCues : new Set();
     this.soundList.Fill(names.map((name) => {
       const info = SOUND_INFO[name] || ["", name, ""];
-      // 尾标直接写「实录 / 合成」：采样包是异步载入的，「怎么听着还是合成的」
+      // 尾标直接写「采样 / 合成」：采样包是异步载入的，「怎么听着还是合成的」
       // 这个问题只有把当前实际生效的那一层摆在列表里才答得出来。
-      const tag = sampled.has(name) ? "实录" : "合成";
+      const tag = sampled.has(name) ? "采样" : "合成";
       return { id: name, name: info[1], tail: `${tag} · ${name}`, title: info[2] };
     }));
     if (!names.includes(this.soundName) && names.length) this.soundName = names[0];
@@ -339,14 +344,43 @@ export class AudioEditor {
 
   /** 这一条现在到底在响哪一层：实录素材的出处，还是合成配方。 */
   Describe() {
-    this.soundNote.textContent = this.audio?.sampleCues.has(this.soundName) ? "实录采样" : "合成音效";
+    const description = SOUND_INFO[this.soundName]?.[2] || "";
+    const source = this.audio?.sampleCues.has(this.soundName) ? "音频采样" : "合成音效";
+    this.soundNote.textContent = `${source} · ${description}`;
   }
 
   PlayCurrent(times = 1) {
     const audio = this.audio;
     if (!audio) return;
+    this.StopSoundPreview();
     audio.Unlock();
-    for (let i = 0; i < times; i += 1) this.PlayName(this.soundName, i * 0.42);
+    for (let i = 0; i < times; i += 1) {
+      const voice = this.PlayName(this.soundName, i * 0.42);
+      // A continuous source is one performance, never five overlapping engines.
+      if (voice?.loop) break;
+    }
+  }
+
+  StopSoundPreview() {
+    for (const timer of this.previewTimers) clearTimeout(timer);
+    this.previewTimers.clear();
+    for (const voice of this.previewVoices) this.audio?.StopVoice(voice);
+    this.previewVoices.clear();
+  }
+
+  TrackPreviewVoice(voice) {
+    if (!voice) return voice;
+    this.previewVoices.add(voice);
+    // Gameplay owns the continuous source lifetime. Auditions end after 10 seconds.
+    if (voice.loop) {
+      const timer = setTimeout(() => {
+        this.previewTimers.delete(timer);
+        this.previewVoices.delete(voice);
+        this.audio?.StopVoice(voice);
+      }, 10000);
+      this.previewTimers.add(timer);
+    }
+    return voice;
   }
 
   /** 音频编辑器打开时玩法暂停，但背景试听必须单独放行。 */
@@ -396,15 +430,16 @@ export class AudioEditor {
         z: camera.position.z + forward.z * this.distance,
       };
     }
-    return audio.Play(name, options);
+    return this.TrackPreviewVoice(audio.Play(name, options));
   }
 
   PlayVoice(key) {
     const audio = this.audio;
     if (!audio) return;
+    this.StopSoundPreview();
     audio.Unlock();
     const line = VOICE_LINES.find((v) => v.key === key);
-    const played = audio.Play(`voice.${key}`, { volume: this.volume, priority: true });
+    const played = this.TrackPreviewVoice(audio.Play(`voice.${key}`, { volume: this.volume, priority: true }));
     if (this.voiceNote && line) {
       this.voiceNote.textContent = played
         ? `${line.role}（pitch ${line.pitch}）：「${line.text}」`
@@ -439,6 +474,7 @@ export class AudioEditor {
 
   ReplayBlind() {
     if (!this.blind) return;
+    this.StopSoundPreview();
     this.PlayName(this.blind.answer);
   }
 

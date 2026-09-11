@@ -82,7 +82,8 @@ const load = await page.evaluate(() => {
 // 2026-08-29 集成批 INT3a：缺口批 A2 的十五个 cue 接完线，从 pendingCues 搬进 cues → 56
 //   （惨叫 / 痛呼 / 闷哼、照明弹四条、发报两条、日机三条、扫地一条、重机两条）
 // 2026-09-11 断肢两音（goreSever / goreLimbLand）→ 83
-const RECIPE_COUNT = 83;
+// 2026-09-11: sampled continuous piston engine.
+const RECIPE_COUNT = 84;
 
 if (!load.enabled) Fail("AudioEngine 被禁用了（正常模式不该走到出图那条路）");
 if (load.manifestCues !== RECIPE_COUNT) {
@@ -868,6 +869,38 @@ else if (!(chain.bus.ratio <= 2 && chain.bus.rel >= 0.5)) {
   Fail(`四档 IR 的时长排序不对：${JSON.stringify(chain.irSeconds)}`);
 } else Ok(`两级动态在位（母线 ${chain.bus.thr}/${chain.bus.ratio}:1/${chain.bus.rel}s ×${chain.makeup}，`
   + `末端 ${chain.peak.thr}/${chain.peak.ratio}:1）；四档 IR ${JSON.stringify(chain.irSeconds)}`);
+
+// Continuous audition regression: real AudioBufferSource nodes must stop, including
+// scheduled repeats and editor exit, without stopping an unrelated gameplay engine.
+const preview = await page.evaluate(async () => {
+  const {AudioEditor} = await import("./Script_EditorAudio.mjs");
+  const a = window.Taierzhuang.audio;
+  const root = document.createElement("div"); document.body.appendChild(root);
+  const editor = new AudioEditor({audio:a, Close:()=>editor.Exit()});
+  const world = a.Play("planeDrone", {priority:true, volume:.01,
+    position:{x:a.listenerPos.x+50,y:a.listenerPos.y+15,z:a.listenerPos.z}});
+  const source = world?.nodes.find(node => node instanceof AudioBufferSourceNode);
+  a.MoveVoice(world,{x:a.listenerPos.x+40,y:a.listenerPos.y+15,z:a.listenerPos.z},{velocity:{x:-40,y:0,z:0}});
+  const sampledLoop = !!source?.loop && world.loop && typeof world.SetDoppler === "function" && world.doppler > 1;
+  editor.Enter(root); editor.soundName="planeDrone"; editor.PlayCurrent(5);
+  const first=[...editor.previewVoices], singleLoop=first.length===1 && first[0].loop;
+  [...root.querySelectorAll("button")].find(b=>b.textContent==="■ 停止音效").click();
+  const buttonStopped=first.every(v=>v.nodes.length===0&&!a.activeVoices.has(v));
+  editor.PlayCurrent(); const previous=[...editor.previewVoices];
+  editor.soundName="rifleNra";editor.PlayCurrent(5); const burst=[...editor.previewVoices];
+  const switchStopped=previous.every(v=>v.nodes.length===0);
+  editor.StopSoundPreview();const scheduledStopped=burst.length===5&&burst.every(v=>v.nodes.length===0);
+  editor.soundName="planeDrone";editor.PlayCurrent();const timed=[...editor.previewVoices];
+  await new Promise(resolve=>setTimeout(resolve,10300));
+  const timeoutStopped=timed.every(v=>v.nodes.length===0)&&editor.previewVoices.size===0;
+  editor.PlayCurrent();const exiting=[...editor.previewVoices];editor.Exit();
+  const exitStopped=exiting.every(v=>v.nodes.length===0)&&editor.previewTimers.size===0;
+  const worldRetained=a.activeVoices.has(world)&&world.nodes.length>0;
+  a.StopVoice(world);root.remove();
+  return {sampledLoop,singleLoop,buttonStopped,switchStopped,scheduledStopped,timeoutStopped,exitStopped,worldRetained};
+});
+if(Object.values(preview).some(value=>!value))Fail(`continuous audio preview lifecycle ${JSON.stringify(preview)}`);
+else Ok("sampled aircraft Doppler; preview stop/switch/delayed burst/10-second timeout/exit; gameplay voice retained");
 
 if (problems.length) { for (const p of problems.slice(0, 10)) Fail(p); }
 

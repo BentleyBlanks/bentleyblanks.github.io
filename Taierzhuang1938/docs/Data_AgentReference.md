@@ -403,6 +403,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   （宿主探针 / 逐弹弹啸 / 跳弹 / AI foley / 脚下材质 / 身体 foley / 手榴弹 / 爆炸三档 /
   火场点声源）。取证 `Debug.AudioZone()`，闸门 `Script_AudioWiringTest.mjs`。
 - 先读：`docs/Data_AudioAssets.md`（素材与烘焙）、`docs/Data_AudioEngine.md`（引擎模型与探针契约）、`docs/Data_AudioWiring.md`（触发条件与限频）。
+- 2026-09-11 引擎/近距爆炸替换、持续试听停止及四首车厢配乐候选见 [车厢音频修订](Data_CarriageAudioReview.md)。
 
 ### 过场 / 剧情
 - `Script_Cutscene.mjs` —— 实机演出；只有用户点名的几场夺控制权，战斗内演出不夺。
@@ -446,7 +447,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   HUD 是 `.hudEmplacement`，武器 UI 禁用态挂在 `#hud.emplaced`。
 
 ### 日机扫射（第一关的核心演出）
-- **引擎声挂在机身上**（2026-09-07）：`STRAFE_SFX.drone`（合成 `planeDrone`）从进入段第一帧起播，
+- **引擎声挂在机身上**（2026-09-07；2026-09-11 换 SeedAudio 采样）：`STRAFE_SFX.drone`（`planeDrone`）从进入段第一帧起播，
   `AircraftStrafeDirector.TrackEngine` 每帧把机位与差分速度交给 `host.MoveVoice` → `Script_Audio.MoveVoice`
   搬方位 / 空气低通 / 混响占比并按径向速度做多普勒（夹在 `DOPPLER_RATE_MIN..MAX`）；`engine`（实录 `planeDive`）
   在开火前 `PASS_LEAD_S` 秒起播、只搬位置不变调；离场 `StopVoice(voice, 0.9)` 淡出。

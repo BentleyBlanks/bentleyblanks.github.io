@@ -98,11 +98,20 @@ export const SFX_SOURCES = [
   {
     id: "ExplosionNearSeedAudio",
     seedAudio: true,
-    bake: "Script_SeedAudioExplosionBake.mjs",
-    credit: "Volcengine SeedAudio 1.0 · approved Punch / Heavy · Near · 2026-09-10",
+    bake: "Script_SeedAudioCarriageReviewBake.mjs --install-sfx",
+    credit: "Volcengine SeedAudio 1.0 · close impact and debris replacement · 2026-09-11",
     license: "volcengine",
     bitrate: "192k",
-    cuts: [{ cue: "explosionNear", files: ["AudioSfx_ExplosionNear_01.mp3","AudioSfx_ExplosionNear_02.mp3"], durS: 2.444 }],
+    cuts: [{ cue: "explosionNear", files: ["AudioSfx_ExplosionNearReplacement.mp3"], durS: 4.05 }],
+  },
+  {
+    id: "PlaneEngineSeedAudio",
+    seedAudio: true,
+    bake: "Script_SeedAudioCarriageReviewBake.mjs --install-sfx",
+    credit: "Volcengine SeedAudio 1.0 · twin piston engine · 2026-09-11",
+    license: "volcengine",
+    bitrate: "160k",
+    cuts: [{ cue: "planeDrone", files: ["AudioSfx_PlaneEngine.mp3"], durS: 11.7 }],
   },
   {
     id: "ExplosionMidSeedAudio",
