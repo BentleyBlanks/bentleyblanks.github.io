@@ -61,12 +61,12 @@ export const OPENING = Object.freeze({
   zhouExitRadiusM:.65,
   zhouShell: {from:{x:18,z:-210},height:30,flight:1.8,radius:3,damage:55,offsetX:1.1},
   surface: [
-    {id:"FlankLockGunner",x:-35,z:58,weapon:"Type11",hold:true},
-    {id:"FlankLockA",x:-33,z:49,hold:true},
-    {id:"FlankLockB",x:-26,z:57,hold:true},
-    {id:"RailLockGunner",x:-93,z:43,weapon:"Type11",hold:true,firePhaseS:3.1},
-    {id:"RailLockA",x:-96,z:34,hold:true,firePhaseS:3.1},
-    {id:"RailLockB",x:-89,z:30,hold:true,firePhaseS:3.1},
+    {id:"FlankLockGunner",x:-35,z:58,weapon:"Type11",hold:true,team:"Flank"},
+    {id:"FlankLockA",x:-33,z:49,team:"Flank",firePhaseS:1.1},
+    {id:"FlankLockB",x:-26,z:57,team:"Flank",firePhaseS:2.2},
+    {id:"RailLockGunner",x:-93,z:43,weapon:"Type11",hold:true,team:"Rail",firePhaseS:3.8},
+    {id:"RailLockA",x:-96,z:34,team:"Rail",firePhaseS:4.9},
+    {id:"RailLockB",x:-89,z:30,team:"Rail",firePhaseS:6},
   ],
   intruders: [
     {id:"TrenchIntruderA",x:-38,z:15,weapon:"Type38",bayonet:true},
@@ -81,11 +81,11 @@ export const OPENING = Object.freeze({
     TrenchIntruderC:[{x:-32,z:8},{x:-37,z:8}],
     TrenchIntruderD:[{x:-27,z:8},{x:-32,z:8}],
   },
-  surfaceBurstSeconds: 2.4,
+  surfaceBurstSeconds: 3.6,
   // These teams seal the unloading apron. They do not all turn north to chase
   // closer friendlies already deep in the communication trench.
   surfaceSector: {minX:-85,maxX:-52,minZ:60,maxZ:112,selfDefenseM:12},
-  surfaceRestSeconds: 3.8,
+  surfaceRestSeconds: 2.2,
   playerFireLimit: 3,
   fireSlotSeconds: 3.5,
   rifleGuardCount: 2,

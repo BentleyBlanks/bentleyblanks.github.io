@@ -9,6 +9,8 @@ const Curve=(rows,t)=>{
   if(next<0)return rows.at(-1)[1];if(next===0)return rows[0][1];
   const [a,x]=rows[next-1],[b,y]=rows[next];return x+(y-x)*Smooth((t-a)/(b-a));
 };
+// Keep the impact onset at its authored time; stretch only recovery after the peak.
+export const OpeningRecoveryTime=(elapsed,onset)=>elapsed<=onset?elapsed:onset+(elapsed-onset)/R.openingRecoveryScale;
 
 // Coordinates, roster and timing live in data. Existing AI owns movement,
 // aiming, suppression, ammunition and damage throughout the opening.
@@ -46,7 +48,7 @@ export class FirstLevelOpening {
     this.blackout=0;
     if(this.derailAt==null)return;
     const elapsed=r.time-this.derailAt;
-    this.eyeClosure=Curve(C.blinks,elapsed);
+    this.eyeClosure=Curve(C.blinks,OpeningRecoveryTime(elapsed,C.blinks.find(([,value])=>value===1)[0]));
     const active=!r.Has("luoRescueComplete"),rescue=this.rescueAt==null?0:Smooth((r.time-this.rescueAt)/C.rescueSeconds);
     if(active){
       this.PlacePlayer();
@@ -75,7 +77,7 @@ export class FirstLevelOpening {
       cam.rotation.x+=Math.sin(elapsed*8)*.035*t*(1-rescue);
       cam.rotation.z+=Math.sin(elapsed*5)*.05*t*(1-rescue);
     }else if(this.rescueAt!=null){
-      const after=r.time-this.rescueAt-C.rescueSeconds,k=Math.max(0,1-after/C.dizzySeconds);
+      const after=r.time-this.rescueAt-C.rescueSeconds,k=Math.max(0,1-after/(C.dizzySeconds*R.openingRecoveryScale));
       cam.rotation.z+=Math.sin(after*3.5)*.035*k;
       cam.rotation.x+=Math.sin(after*4.5)*.018*k;
     }
@@ -137,15 +139,16 @@ export class FirstLevelOpening {
     this.UpdateEscapePressure();
     if(this.derailAt!=null){
       const age=r.time-this.derailAt;
-      const hearing=Curve(C.hearing,age);
+      const recoveryAge=OpeningRecoveryTime(age,C.hearing.find(([,value])=>value===1)[0]);
+      const hearing=Curve(C.hearing,recoveryAge);
       if(hearing!==this.hearingAmount)r.audio.SetConcussion?.(hearing,C.hearingLowHz);
       this.hearingAmount=hearing;
       const b=C.breath;
-      if(age>=b.start&&age<b.end&&(this.nextBreathAt==null||age>=this.nextBreathAt)){
-        this.breathVoice=r.audio.Play("breathHeavy",{volume:b.volume*(1-.45*Smooth((age-b.start)/(b.end-b.start))),priority:true});
+      if(age>=b.start&&recoveryAge<b.end&&(this.nextBreathAt==null||age>=this.nextBreathAt)){
+        this.breathVoice=r.audio.Play("breathHeavy",{volume:b.volume*(1-.45*Smooth((recoveryAge-b.start)/(b.end-b.start))),priority:true});
         this.nextBreathAt=age+b.interval;
       }
-      if(age>=b.end&&!r.Has("trenchEntered")&&["Unloading","TrenchEntry"].includes(stage)&&age>=this.nextBreathAt){
+      if(recoveryAge>=b.end&&!r.Has("trenchEntered")&&["Unloading","TrenchEntry"].includes(stage)&&age>=this.nextBreathAt){
         this.breathVoice=r.audio.Play("breathHeavy",{volume:C.escapeBreath.volume,priority:true});
         this.nextBreathAt=age+C.escapeBreath.interval;
       }
@@ -317,8 +320,19 @@ export class FirstLevelOpening {
       const da=Distance(a.position,r.player.position),db=Distance(b.position,r.player.position);
       return (da<=CLOSE_RANGE.priorityM?da:Infinity)-(db<=CLOSE_RANGE.priorityM?db:Infinity)||0;
     });
-    for(const a of candidates.slice(0,C.playerFireLimit))a.missionFireHold=false;
-    this.playerShooters=candidates.slice(0,C.playerFireLimit).map(a=>a.missionId);
+    const chosen=candidates.filter(a=>Distance(a.position,r.player.position)<=CLOSE_RANGE.priorityM).slice(0,C.playerFireLimit);
+    const groups=new Set(chosen.map(a=>a.missionFireGroup).filter(Boolean));
+    // When both flanking teams can see the player, each gets a firing lane.
+    // Immediate close threats keep priority; this never exceeds the same cap.
+    for(const a of candidates){
+      if(chosen.length>=C.playerFireLimit)break;
+      if(a.missionFireGroup&&!groups.has(a.missionFireGroup)&&!chosen.includes(a)){
+        chosen.push(a);groups.add(a.missionFireGroup);
+      }
+    }
+    for(const a of candidates)if(chosen.length<C.playerFireLimit&&!chosen.includes(a))chosen.push(a);
+    for(const a of chosen)a.missionFireHold=false;
+    this.playerShooters=chosen.map(a=>a.missionId);
     this.peakPlayerShooters=Math.max(this.peakPlayerShooters,this.playerShooters.length);
     this.visible=visible;this.peakVisible=Math.max(this.peakVisible,visible);
   }

@@ -1,5 +1,21 @@
 // First-level whitebox pacing and handling. Notion 2026-09-07: calm walk 1–2 min, transfer 2–4 min, dive 2 s, death 8–12 s.
 export const MISSION_TUNING = Object.freeze({
+  // User 2026-09-11: double post-impact sensory recovery, without slowing the roll or rescue.
+  openingRecoveryScale:2,
+  // Two covering teams: ordinary weapon cadence and a usable rifle cover radius.
+  openingSurfaceAccuracyScale:.95,
+  openingSurfaceFireIntervalScale:1,
+  openingSurfaceRifleRadiusM:3,
+  openingSurfaceRifleCoverSlackM:4,
+  openingSurfaceGrenades:0,
+  // Route followers stop to fight a visible local threat, then resume the saved route.
+  contactRangeM:28,
+  contactHoldS:2.5,
+  contactMaxHoldS:3.5,
+  contactResumeS:4.5,
+  contactRadiusM:.5,
+  contactCoverSlackM:.9,
+  openingContactStages:["Unloading","TrenchEntry","Shelter","Support"],
   // Cruise at 21.6 km/h; the remaining physical approach determines smooth braking after impact.
   trainTravelM: 174,
   trainCruiseSpeedMps: 6,

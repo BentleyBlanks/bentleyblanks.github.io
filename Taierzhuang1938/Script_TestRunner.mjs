@@ -56,6 +56,7 @@ export const testDefs = {
   EditorLauncherTest: {file:"Script_EditorTest.mjs",args:["--launcher-only"],timeoutMs:240000,desc:"Editor launcher inventory including the squad march entry"},
   FirstLevelMissionAftermathTest: {file:"Script_FirstLevelMissionAftermathTest.mjs",timeoutMs:600000,desc:"Civilian body placement, actual model clearance, grounding, LOD and screenshots"},
   FirstLevelOpeningBrowserTest:{file:"Script_FirstLevelOpeningBrowserTest.mjs",timeoutMs:900000,desc:"Normal inputs from train impact through finite trench contact to gun handover"},
+  FirstLevelOpeningContactTest:{file:"Script_FirstLevelOpeningBrowserTest.mjs",args:["--contact"],timeoutMs:600000,desc:"Normal disembarkation, reciprocal NPC fire and contact interrupting march"},
   FirstLevelGuideQueueTest:{file:"Script_FirstLevelOpeningBrowserTest.mjs",args:["--regroup"],timeoutMs:900000,desc:"Normal start, wait for the squad at the trench entrance, pass its clear lane and continue to the gun without guide reversal"},
   FirstLevelMissionStageJumpTest: {file:"Script_FirstLevelMissionStageJumpTest.mjs",timeoutMs:900000,desc:"18 stage starts, backward jumps and resumed mission gates"},
   // The 150-actor mission rebuilds 18 starts; a measured full continuation reached Complete
@@ -290,6 +291,7 @@ export const browserTests = new Set([
   "FirstLevelMissionPresentationTest",
   "FirstLevelMissionBrowserTest",
   "FirstLevelOpeningBrowserTest",
+  "FirstLevelOpeningContactTest",
   "FirstLevelGuideQueueTest",
   "FirstLevelTrainAnimationTest",
   "BrowserBundleTest",
@@ -365,7 +367,7 @@ export const tier2 = [
 export const domains = {
   squadMarch: {label:"通用小队行进",tests:["SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关接收院至结尾定向续接",tests:["FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelMissionTest','FirstLevelFrontPresenceTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelGuideQueueTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelMissionTest','FirstLevelFrontPresenceTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelOpeningContactTest','FirstLevelGuideQueueTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['BackRifleRunTest','MeleeAnimationTest','InfantryAnimationTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },

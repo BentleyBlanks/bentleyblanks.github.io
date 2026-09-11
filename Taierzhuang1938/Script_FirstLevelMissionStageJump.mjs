@@ -44,6 +44,7 @@ export function ApplyFirstLevelStageJump(runtime, value) {
       actor.missionUnloaded = true; actor.missionTrainReady = true; actor.p012OnMovingTrain = false;
       actor.missionTrainLife.weight = 0; actor.missionTrainLife.gestureWeight = 0;
       r.PlaceActor(actor,entry.steps.at(-1));
+      if(actor!==r.trainWounded)r.Defend(actor,actor.position);
     }
     r.train.open = true;
     r.audio.Ambience(n === 7 ? "firstLevelSouth" : "firstLevelFront");

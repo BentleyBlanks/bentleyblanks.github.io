@@ -11,7 +11,7 @@ import {OPENING} from "./Data_FirstLevelOpening.mjs";
 const here=path.dirname(fileURLToPath(import.meta.url));
 export async function PlayFirstLevelOpening(page,{out=path.join(here,"_shots/FirstLevelOpening/InputRun"),realtime=false,audioClock=false,from="Train",through="Handover",mount=true,regroup=false}={}){
 await fs.mkdir(out,{recursive:true});
-const errors=[],trace=[],openingShots=new Set();let whisperCaptured=false;
+const errors=[],trace=[],combatTrace=[],openingShots=new Set();let whisperCaptured=false;
 page.on("pageerror",error=>{errors.push(String(error));console.log("PAGEERROR",String(error));});
 async function Capture(name){
   if(!realtime)await page.evaluate(()=>window.Tengxian.StepFrames(1,1/60,true));
@@ -54,6 +54,15 @@ async function Drive(label,points,{fight=false,until=null,seconds=120}={}){
         npc:r.squad.map(a=>({id:a.castId,health:a.health,essential:!!a.scriptEssential,p:a.position.toArray(),goal:a.goal.toArray()})),voicePlaying:!!r.voice.current,voiceCue:r.voice.current?.cue?.id,opening:r.opening.State()};
     },{fight,until,realtime});
     trace.push({label,...result});
+    combatTrace.push(await page.evaluate(()=>{
+      const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
+      return {time:r.time,actors:g.ai.soldiers.filter(a=>a.alive&&(a.side==='nra'||['surface','intrusion'].includes(a.missionEncounter)))
+        .map(a=>({id:a.id,missionId:a.missionId,side:a.side,encounter:a.missionEncounter,
+          p:a.position.toArray(),state:a.state,health:a.health,stance:a.stance,ready:a.missionTrainReady,
+          unarmed:a.unarmed,noncombatant:!!a.scriptedNoncombatant,contact:!!a.missionContactPost,
+          cover:a.cover?.id,target:a.target?.id,targetSide:a.target?.ref?.side,visible:a.targetVisible,
+          shots:a.fireSequence,lastFire:a.lastFire,aimError:a.shooting?.errorRad}))};
+    }));
     const age=result.t-(result.opening.derailAt??Infinity),rescueAge=result.t-(result.opening.rescueAt??Infinity);
     const shots=[['Meal',result.voiceCue==='TrainMeal'&&result.audio.sourceTime>2],
       ['MealLater',result.voiceCue==='TrainMeal'&&result.audio.sourceTime>13],
@@ -159,6 +168,36 @@ try{
   if(through==="Unloading")return;
   await Drive("LuoRescue",[],{until:"luoRescueComplete",seconds:30});
   await Drive("TrainExit",[{x:-69,z:88},{x:-69,z:78},{x:-68,z:70},{x:-66,z:66}],{seconds:80});
+  if(through==="Contact"){
+    await Drive("TrenchContactApproach",OPENING.approachRoute.slice(0,3),{seconds:80});
+    // Observe real NPC combat while the player stays in the protected entrance.
+    // Empty route completes each two-second observation without firing a player shot.
+    for(let i=0;i<6;i++)await Drive("TrenchContactWatch",[],{seconds:2});
+    const rows=combatTrace.flatMap(t=>t.actors.map(a=>({...a,time:t.time})));
+    const friendly=rows.filter(a=>a.side==='nra'&&a.targetSide==='ija'&&a.shots>0&&a.time-a.lastFire<2.5);
+    const enemy=rows.filter(a=>a.side==='ija'&&a.targetSide==='nra'&&a.shots>0&&a.time-a.lastFire<2.5);
+    assert.ok(friendly.length&&enemy.length,'both armies actually fire at each other during the uninterrupted opening');
+    assert.ok(rows.some(a=>a.contact),'near contact interrupts a living friendly route follower');
+    const parked=rows.filter(a=>a.side==='nra'&&a.ready&&!a.unarmed&&a.missionId!=='TrainWounded');
+    // The original wounded man is deliberately unfit for combat, identified from runtime.
+    const woundedId=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().trainWounded.id);
+    assert.ok(parked.filter(a=>a.id!==woundedId).every(a=>!a.noncombatant),'disembarked armed soldiers are combatants');
+    const summary={friendlyShooters:[...new Set(friendly.map(a=>a.id))],enemyShooters:[...new Set(enemy.map(a=>a.id))],
+      contacts:[...new Set(rows.filter(a=>a.contact).map(a=>a.id))]};
+    summary.rifleMoves=OPENING.surface.filter(spec=>!spec.hold).map(spec=>{
+      const samples=rows.filter(a=>a.missionId===spec.id),start=samples[0]?.p;
+      return {id:spec.id,meters:start?Math.max(...samples.map(a=>Math.hypot(a.p[0]-start[0],a.p[2]-start[2]))):0};
+    });
+    assert.ok(summary.rifleMoves.filter(a=>a.meters>1).length>=3,'surface riflemen relocate during real contact');
+    assert.ok(rows.some(a=>a.side==='nra'&&a.health<100)&&rows.some(a=>a.side==='ija'&&a.health<100),
+      'reciprocal combat produces real casualties or injuries');
+    await Drive("ContactCorner",OPENING.approachRoute.slice(3,4),{seconds:35});
+    await page.evaluate(()=>{for(let i=0;i<90;i++){window.OpeningInput.Look({x:-37,z:15},1.1);window.Tengxian.StepFrames(1,1/60,i===89);}});
+    await Capture("ReciprocalTrenchFire");
+    await fs.writeFile(path.join(out,'Data_ContactSummary.json'),JSON.stringify(summary,null,2));
+    assert.deepEqual(errors,[]);console.log('PASS reciprocal opening contact',JSON.stringify(summary));
+    return summary;
+  }
   if(through==="Handover"){
     await page.evaluate(async realtime=>{
       for(let i=0;i<60;i++){
@@ -279,6 +318,7 @@ try{
 finally{
   await page.evaluate(()=>{if(window.OpeningInput)window.OpeningInput.auto=false;});
   await fs.writeFile(path.join(out,"Data_Trace.json"),JSON.stringify({trace,errors,realtime},null,2));
+  await fs.writeFile(path.join(out,"Data_CombatTrace.json"),JSON.stringify(combatTrace,null,2));
 }
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
@@ -301,7 +341,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
         window.OpeningVideo.recorder.start(1000);
       });
     }
-    await PlayFirstLevelOpening(page,{out,realtime,regroup:process.argv.includes('--regroup'),through:exposure?"Exposure":"Handover"});
+    await PlayFirstLevelOpening(page,{out,realtime,regroup:process.argv.includes('--regroup'),through:process.argv.includes('--contact')?"Contact":exposure?"Exposure":"Handover"});
   }finally{
     if(realtime){
       const encoded=await page.evaluate(async()=>{

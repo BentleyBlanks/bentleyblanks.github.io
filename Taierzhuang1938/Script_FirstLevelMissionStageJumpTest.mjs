@@ -19,6 +19,13 @@ async function Jump(number) {
   assert.equal(await page.evaluate(()=>window.Tengxian.state.playerShots),0,"old fire cannot satisfy this start's task gates");
   assert.equal(state.phaseNumber,number);assert.equal(state.stage,FIRST_LEVEL_STAGES[number-1].entry);
   assert.equal(state.phaseCount,18);assert.ok(state.remaining.length);
+  if(number>2&&number<7){
+    const frozen=await page.evaluate(()=>{
+      const r=window.Tengxian.Debug.FirstLevelMissionRuntime();
+      return r.train.entries.filter(e=>e.actor!==r.trainWounded&&e.actor.alive&&e.actor.scriptedNoncombatant).map(e=>e.actor.id);
+    });
+    assert.deepEqual(frozen,[],"checkpoint disembarkation restores armed passengers as combatants");
+  }
   const index=MISSION_STAGES.findIndex(step=>step.id===state.stage);
   assert.ok(MISSION_STAGES.slice(0,index).flatMap(s=>s.requirements).every(f=>state.facts.includes(f)));
   const spawned=await page.evaluate(()=>[...window.Tengxian.Debug.FirstLevelMissionRuntime().spawned]);

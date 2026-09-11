@@ -158,6 +158,17 @@ try {
     ai.HasLineOfSight=()=>true;
     for(let i=0;i<20&&!rifle.target?.isPlayer;i++){ai.time+=.1;ai.Think(rifle,.1,player);}
     out.nearAcquired=!!rifle.target?.isPlayer;
+    Prepare(35);ai.DropTarget(rifle);ai.perception.ForgetAll(rifle);
+    rifle.scriptTrackPlayer=true;rifle.missionFireHold=true;
+    for(let i=0;i<30;i++){ai.time+=.1;ai.Think(rifle,.1,player);}
+    out.heldWindowAcquired=!!rifle.target?.isPlayer&&rifle.targetVisible;
+    const heldSequence=rifle.fireSequence;
+    for(let i=0;i<120;i++){ai.time+=1/60;ai.TryFire(rifle,1/60,player);}
+    out.heldWindowShots=rifle.fireSequence-heldSequence;
+    const aimBeforeRelease=rifle.shooting.errorRad;
+    rifle.missionFireHold=false;ai.time+=.1;ai.Think(rifle,.1,player);
+    out.releaseKeepsAim=rifle.target?.isPlayer&&rifle.shooting.errorRad<=aimBeforeRelease;
+    rifle.scriptTrackPlayer=false;
     // Exercise the visible skinned soldier through Act, including first acquisition,
     // a raised target, target turning and posture changes. Capture the real VFX calls.
     const THREE = await import("three");
@@ -211,6 +222,8 @@ try {
   const dir = path.join(root,"Taierzhuang1938/_shots/EnemyCloseRange");
   await fs.mkdir(dir,{recursive:true});
   await fs.writeFile(path.join(dir,process.env.AI_CLOSE_BASELINE ? "Before.json" : "After.json"),JSON.stringify(result,null,2));
+  assert.ok(result.heldWindowAcquired&&result.releaseKeepsAim,'surface observation and acquired aim survive a held firing window');
+  assert.equal(result.heldWindowShots,0,'tracking never bypasses the authored trigger hold');
   console.log(JSON.stringify(result,null,2));
   assert.deepEqual(errors,[]);
   if (!process.env.AI_CLOSE_BASELINE) {

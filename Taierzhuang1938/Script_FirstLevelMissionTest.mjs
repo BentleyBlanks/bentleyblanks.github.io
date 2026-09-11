@@ -1,7 +1,7 @@
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_CIVILIAN_AFTERMATH } from "./Data_FirstLevelMissionCivilianAftermath.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
-import { FirstLevelOpening } from "./Script_FirstLevelOpening.mjs";
+import { FirstLevelOpening, OpeningRecoveryTime } from "./Script_FirstLevelOpening.mjs";
 import { MISSION_AFTERMATH, FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_ASSAULT_STARTS, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
 import { COVER } from "./Data_Tuning_AiCover.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
@@ -27,6 +27,17 @@ import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
 import { MISSION_DIALOGUE, MissionVoicePrompt } from "./Data_FirstLevelMissionDialogue.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
 assert.ok(P.stationCasualties.every(person=>person.health>0),"station shelling does not manufacture dead recruits at muster");
+{
+  for(const curve of [OPENING.blinks,OPENING.hearing]){
+    const onset=curve.find(([,value])=>value===1)[0];
+    assert.equal(OpeningRecoveryTime(onset,onset),onset,"impact onset remains synchronized with the physical wreck");
+    for(const [at] of curve.filter(([at])=>at>onset)){
+      assert.ok(Math.abs(OpeningRecoveryTime(onset+(at-onset)*2,onset)-at)<1e-9,
+        "every post-impact eyelid/hearing beat lasts twice as long");
+    }
+  }
+  assert.equal(OPENING.dizzySeconds*R.openingRecoveryScale,8,"standing recovery lasts eight seconds");
+}
 for(const person of MISSION_CIVILIAN_AFTERMATH) {
   assert.ok(["male","female"].includes(person.variant) && person.side==="civilian");
   assert.ok(Object.values(MISSION_ROUTES).every(route=>MissionPathDistance(person,route)>=2.4),"civilian bodies leave stretcher and player routes clear: "+person.id);
@@ -144,6 +155,13 @@ console.log("ok all mission gates require recorded gameplay facts and restore ex
   }
   r.BlocksSight=(from)=>from===enemies[7].position;opening.FireWindows();
   assert.equal(enemies[7].missionFireHold,true,"wall-blocked close enemy cannot displace visible shooters");
+  for(const [i,a] of enemies.entries())a.missionFireGroup=i===6?'Rail':'Flank';
+  for(let slot=0;slot<8;slot++){
+    r.time=slot*OPENING.fireSlotSeconds;opening.FireWindows();
+    assert.ok(enemies.filter(a=>!a.missionFireHold).some(a=>a.missionFireGroup==='Rail'),
+      "the second visible direction cannot be starved by a larger first team");
+    assert.ok(enemies.filter(a=>!a.missionFireHold).length<=OPENING.playerFireLimit);
+  }
 }
 {
   const facts=new Map(),calls=[];

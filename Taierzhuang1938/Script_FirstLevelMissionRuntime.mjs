@@ -262,7 +262,10 @@ export class FirstLevelMissionRuntime {
       Stopped: () => this.Has("trainStopped"),
       PrepareAnimation: actor=>PrepareFirstLevelTrainAnimation(actor,(x,z)=>this.battlefield.GroundHeight(x,z)),
       Place: (actor, point) => { this.PlaceActor(actor, point); actor.yaw = Math.PI / 2; },
-      Hold: (actor) => { actor.scriptedNoncombatant = true; this.MoveActor(actor, actor.position, 0); },
+      Hold: (actor) => {
+        if(actor.missionTrainReady && actor!==this.trainWounded)this.Defend(actor,actor.position);
+        else {actor.scriptedNoncombatant=true;this.MoveActor(actor,actor.position,0);}
+      },
       Move: (actor, point, speed) => {
         this.ai.SetStance(actor, 0, 0.5, true);
         this.MoveActor(actor, point, speed);
@@ -291,6 +294,31 @@ export class FirstLevelMissionRuntime {
       0,
       actor.position.z + (point.z - actor.position.z) * fraction,
     );
+  }
+  RespondToContact(actor) {
+    if(!actor?.alive || actor.unarmed || actor.scriptedNoncombatant || actor.carryRole || actor.meleeCombat)return false;
+    // A moving escort answers the threat in short bounds. Continuous visibility
+    // must not pin the leader forever to the first enemy beside the route.
+    if(actor.missionContactPost && (this.time>=actor.missionContactUntil || this.time-actor.missionContactAt>=R.contactMaxHoldS)){
+      actor.missionContactPost=null;actor.missionContactResumeAt=this.time+R.contactResumeS;
+      return false;
+    }
+    if(this.time<(actor.missionContactResumeAt||0))return false;
+    const target=actor.target;
+    const contact=target && actor.targetVisible && !actor.targetFromMemory && target.ref?.alive!==false
+      && Distance(actor.position,target.position)<=R.contactRangeM;
+    if(contact){
+      if(!actor.missionContactPost)actor.missionContactAt=this.time;
+      actor.missionContactUntil=this.time+R.contactHoldS;
+      actor.missionContactPost??={x:actor.position.x,z:actor.position.z};
+    }
+    if(actor.missionContactPost && this.time<actor.missionContactUntil){
+      this.squadMarch?.Release(actor);
+      this.Defend(actor,actor.missionContactPost,R.contactRadiusM,R.contactCoverSlackM);
+      return true;
+    }
+    actor.missionContactPost=null;
+    return false;
   }
   /**
    * Hold this spot and fight from it.
@@ -390,6 +418,8 @@ export class FirstLevelMissionRuntime {
         continue;
       }
       actor.scriptedNoncombatant = stage === "South";
+      if(R.openingContactStages.includes(stage)&&this.RespondToContact(actor))continue;
+      if(!R.openingContactStages.includes(stage))actor.missionContactPost=null;
       const route = this.squadRoutes.get(actor.id);
       while (route?.length && Distance(actor.position, route[0]) < 1.1) route.shift();
       if (route?.length) {
@@ -419,7 +449,7 @@ export class FirstLevelMissionRuntime {
         }
         this.MoveActor(actor,route[0],speed);
       } else if (["TrenchEntry","Shelter"].includes(stage)) {
-        this.MoveActor(actor,actor.position,0);this.ai.SetStance(actor,1,.5,true);
+        this.Defend(actor,actor.position,R.contactRadiusM,R.contactCoverSlackM);this.ai.SetStance(actor,1,.5,true);
       } else if (["Support","MachineGun"].includes(stage)) {
         // Stay inside the reached communication-trench post. A new generic
         // cover search here used to pull the squad onto the exposed parapet.
@@ -440,6 +470,7 @@ export class FirstLevelMissionRuntime {
       Observe:actor=>({
         route:this.squadRoutes.get(actor.id)||[],
         active:!!actor.missionTrainReady&&!!this.squadRoutes.get(actor.id)?.length
+          &&!actor.missionContactPost
           &&!(actor===this.bedGuide?.actor&&["FinalCarry","Death"].includes(stage)),
         maxSpeed:marchSpeeds.get(actor.id)??0,
       }),
@@ -457,7 +488,7 @@ export class FirstLevelMissionRuntime {
   SpawnEncounterActor(id, spec) {
       const actor = this.ai.Spawn("ija", spec.x, spec.z, {
         weapon: spec.weapon || "Type38",
-        squadId: `Mission_${id}`,
+        squadId: `Mission_${id}${spec.team?"_"+spec.team:""}`,
         bayonetFixed: !!spec.bayonet,
       });
       if (!actor) {this.spawnQueue.push(()=>this.SpawnEncounterActor(id,spec));return null;}
@@ -465,6 +496,8 @@ export class FirstLevelMissionRuntime {
       actor.missionEncounter=id;
       if(id==="surface"){
         actor.scriptFireSector=OPENING.surfaceSector;
+        actor.scriptTrackPlayer=true;
+        actor.missionFireGroup=spec.team;
         actor.yaw=Math.atan2(spec.x+62,spec.z-75);
       }
       actor.missionReserve=!!spec.reserve;
@@ -488,11 +521,17 @@ export class FirstLevelMissionRuntime {
       // Emplaced gunners keep their firing position: the hide/peek side step is all they may do.
       // Everyone else may take cover inside their zone plus the ordinary slack.
       actor.scriptCoverSlackM = spec.hold ? R.defendHoldFixedSlackM : R.defendCoverSlackM;
+      if(id==="surface"){
+        actor.scriptAccuracyScale=actor.missionAccuracyScale=R.openingSurfaceAccuracyScale;
+        actor.scriptFireIntervalScale=actor.missionFireIntervalScale=R.openingSurfaceFireIntervalScale;
+        if(!spec.hold){actor.holdZone.radius=R.openingSurfaceRifleRadiusM;actor.scriptCoverSlackM=R.openingSurfaceRifleCoverSlackM;}
+      }
       // Two Type 91/97 grenades apiece (Data_Tuning_FirstLevel.enemyGrenades). The tactics layer decides
       // when one is worth throwing (target pinned in one place, 8-26 m, squad and personal cooldowns);
       // gunners on an emplacement never throw, they are married to the gun.
       if (!spec.hold && !WEAPONS[spec.weapon || "Type38"]?.emplaced) actor.grenades = R.enemyGrenades;
       if(id==="intrusion")actor.grenades=OPENING.intruderGrenades;
+      if(id==="surface")actor.grenades=R.openingSurfaceGrenades;
       if (spec.hold) {actor.scriptDefensive=true;actor.scriptSuppressible=true;}
       if (id === "front" && !spec.hold) actor.missionAssault = this.MakeAssault(spec.x, spec.z);
       // Supporting platoons keep their spacing and depth. They remain live combatants
@@ -1126,7 +1165,8 @@ export class FirstLevelMissionRuntime {
       if(entry.delay>0){entry.delay-=dt;continue;}
       while(entry.index<entry.route.length&&Distance(actor.position,entry.route[entry.index])<1)entry.index++;
       if(entry.index>=entry.route.length){entry.arrived=true;this.Defend(actor,actor.position);this.ai.SetStance(actor,1,2);continue;}
-      actor.scriptedNoncombatant=Distance(actor.position,A.front)>30;
+      actor.scriptedNoncombatant=false;
+      if(this.RespondToContact(actor))continue;
       this.ai.SetStance(actor,0,.4,true);
       this.MoveActor(actor,entry.route[entry.index],R.reliefSpeedMps);
     }

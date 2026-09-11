@@ -1547,10 +1547,12 @@ export class AiDirector {
     // 最后一条比调命中率管用得多：实测出生点 27 m 上九个人同时开火，
     // 每秒挨四发，三秒必死，而玩家完全不知道自己做错了什么。
     // ER2 的 AI 会分散目标，不会九个人焊死一个人。
-    const playerOpen = player && player.Alive && !player.Protected && !s.missionFireHold
+    // Authored covering teams may keep observing while their trigger is held.
+    // Visibility, sector checks and the real firing-token cap still apply.
+    const playerOpen = player && player.Alive && !player.Protected && (s.scriptTrackPlayer || !s.missionFireHold)
       // 已经锁住玩家的人不占「新锁」名额。旧写法达到上限后会把现有三个人也一起
       // 排除，下一次 Think 全部转头找 NPC，再下一次又转回来，正是集体抽搐的一条源头。
-      && (s.target?.isPlayer || this.playerTargetedBy < (COMBAT.maxShootersOnPlayer ?? 3)
+      && (s.scriptTrackPlayer || s.target?.isPlayer || this.playerTargetedBy < (COMBAT.maxShootersOnPlayer ?? 3)
         || s.position.distanceTo(player.position) <= CLOSE_RANGE.priorityM);
     if (enemySide === "nra" && playerOpen) {
       const d = s.position.distanceTo(player.position);
