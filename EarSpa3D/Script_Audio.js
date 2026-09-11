@@ -65,9 +65,10 @@ export function CreateAudio() {
   // 为什么运行时也写一份：清单可能拿不到，而 404 不该让整个音频层瘫掉。
   // 注意路径统一写「相对项目根」，交给 AssetUrl() 解析。
   const SFX_FILES = {
-    customerPain:['Audio/Sfx/AudioSfx_CustomerPain.mp3'],
+    waxLandSmall:['Audio/Sfx/AudioSfx_WaxLandSmall.wav'],
+    waxLandMedium:['Audio/Sfx/AudioSfx_WaxLandMedium.wav'],
+    waxLandLarge:['Audio/Sfx/AudioSfx_WaxLandLarge.wav'],
     peelDry:['Audio/Sfx/AudioSfx_PeelDry.mp3'],peelSticky:['Audio/Sfx/AudioSfx_PeelSticky.mp3'],
-    chunkLand: ["Audio/Sfx/AudioSfx_ChunkLand.mp3"],
     scrapeSoft: ["Audio/Sfx/AudioSfx_ScrapeSoft.mp3"],
     scrapeGritty: ["Audio/Sfx/AudioSfx_ScrapeGritty.mp3"],
     scoopLift: ["Audio/Sfx/AudioSfx_ScoopLift.mp3"],
@@ -82,7 +83,6 @@ export function CreateAudio() {
     vacuumSuck: ["Audio/Sfx/AudioSfx_VacuumSuck.mp3"],
     metalTick: ["Audio/Sfx/AudioSfx_MetalTick.mp3"],
     blink: ["Audio/Sfx/AudioSfx_Blink.mp3"],
-    relaxSigh: ["Audio/Sfx/AudioSfx_RelaxSigh.mp3"],
     shiver: ["Audio/Sfx/AudioSfx_Shiver.mp3"],
     sparkle: ["Audio/Sfx/AudioSfx_Sparkle.mp3"],
     uiTap: ["Audio/Sfx/AudioSfx_UiTap.mp3"],
@@ -101,14 +101,13 @@ export function CreateAudio() {
   // 生成回来的 take 普遍比目标时长长（SeedAudio 的尾巴），运行时按 cue 裁一下：
   // 不裁的话「挑起来的一记啵」会拖着两秒尾巴，跟下一个动作叠在一起。
   const SFX_MAX_SECONDS = {
-    customerPain:6,
     peelDry:1.15,peelSticky:1.4,
-    chunkLand: 0.7,
     scrapeSoft: 1.3, scrapeGritty: 1.4, scoopLift: 0.9, stretchWax: 1.6, snapWax: 0.6,
     crumbFall: 2.2, tickleFeather: 2.0, tickleHair: 1.8, vibrateHum: 3.4, waterPour: 3.0,
-    dropLiquid: 0.9, vacuumSuck: 2.6, metalTick: 0.6, blink: 0.8, relaxSigh: 2.0,
+    dropLiquid: 0.9, vacuumSuck: 2.6, metalTick: 0.6, blink: 0.8,
     shiver: 1.8, sparkle: 2.2, uiTap: 0.35, uiConfirm: 1.6,
   };
+  const LANDING_CUES = new Set(['waxLandSmall','waxLandMedium','waxLandLarge']);
   const SFX_FADE_OUT = 0.12;        // 秒：裁剪处的淡出，避免咔一声
 
   // contact 的 kind 别名：游戏里的工具 id 直说自己的材质，运行时不猜。
@@ -139,6 +138,8 @@ export function CreateAudio() {
   const gainCache = new WeakMap();  // AudioBuffer → 归一化增益（避免每次播放都扫一遍样点）
   const windowCache = new WeakMap();
   const recentPlayback = [];
+  // 旧入口或旧清单仍可能请求客人语音；一律静默，不加载、不合成。
+  const DISABLED_VOICE_CUES = new Set(['customerPain','customerStop','customerComfort','customerClear','relaxSigh']);
 
   let currentBgmId = null;
   const bgmVoices = new Map();
@@ -574,7 +575,7 @@ export function CreateAudio() {
     src.buffer = buffer;
     src.playbackRate.value = rate;
     const g = ctx.createGain();
-    g.gain.value = gain * NormalizeGain(buffer);
+    g.gain.value = gain * (LANDING_CUES.has(cue) ? 1 : NormalizeGain(buffer));
     let tail = g;
     if (pan && typeof ctx.createStereoPanner === "function") {
       const panner = ctx.createStereoPanner();
@@ -624,7 +625,6 @@ export function CreateAudio() {
     vacuumSuck: { parts: [{ type: "noise", filter: "bandpass", from: 400, to: 1100, q: 3, gain: 0.4, attack: 0.25, hold: 1.2, release: 0.6, peak: 620 }, { type: "noise", filter: "highpass", from: 3500, to: 3500, q: 0.7, gain: 0.08, attack: 0.2, hold: 1.1, release: 0.5 }] },
     metalTick: { parts: [{ type: "tone", wave: "sine", from: 1850, to: 1800, gain: 0.4, attack: 0.001, hold: 0.008, release: 0.12 }, { type: "tone", wave: "sine", from: 3250, to: 3200, gain: 0.24, attack: 0.001, hold: 0.006, release: 0.08 }, { type: "noise", filter: "highpass", from: 4000, to: 4000, q: 0.8, gain: 0.12, attack: 0.001, hold: 0.004, release: 0.03 }] },
     blink: { parts: [{ type: "noise", filter: "lowpass", from: 300, to: 700, q: 1.6, gain: 0.3, attack: 0.05, hold: 0.12, release: 0.3 }] },
-    relaxSigh: { parts: [{ type: "noise", filter: "bandpass", from: 700, to: 420, q: 3.4, gain: 0.32, attack: 0.18, hold: 0.45, release: 0.9, peak: 780 }, { type: "noise", filter: "bandpass", from: 1400, to: 900, q: 4, gain: 0.12, attack: 0.2, hold: 0.4, release: 0.8 }] },
     shiver: { parts: [{ type: "tone", wave: "sine", from: 660, to: 630, gain: 0.18, attack: 0.05, hold: 0.3, release: 1.0, vibrato: 11 }, { type: "tone", wave: "sine", from: 990, to: 950, gain: 0.1, attack: 0.06, hold: 0.25, release: 0.9, vibrato: 13 }, { type: "tone", wave: "triangle", from: 1320, to: 1240, gain: 0.06, attack: 0.08, hold: 0.2, release: 0.8, vibrato: 9 }] },
     sparkle: { parts: [{ type: "tone", wave: "sine", from: 1180, to: 1180, gain: 0.26, attack: 0.005, hold: 0.05, release: 0.6 }, { type: "tone", wave: "sine", from: 1560, to: 1560, gain: 0.22, attack: 0.005, at: 0.13, hold: 0.05, release: 0.6 }, { type: "tone", wave: "sine", from: 1980, to: 1980, gain: 0.18, attack: 0.005, at: 0.26, hold: 0.05, release: 0.8 }] },
     uiTap: { parts: [{ type: "tone", wave: "sine", from: 620, to: 420, gain: 0.3, attack: 0.002, hold: 0.012, release: 0.09 }, { type: "noise", filter: "lowpass", from: 1800, to: 900, q: 1, gain: 0.12, attack: 0.001, hold: 0.006, release: 0.04 }] },
@@ -1109,6 +1109,7 @@ export function CreateAudio() {
       }));
     }
     for (const [cue, files] of Object.entries(sfxFiles)) {
+      if(DISABLED_VOICE_CUES.has(cue))continue;
       buffers.sfx[cue] = buffers.sfx[cue] || [];
       for (const file of (Array.isArray(files) ? files : [files])) {
         jobs.push(LoadBuffer(file).then((buffer) => {
@@ -1224,17 +1225,21 @@ export function CreateAudio() {
     },
 
     playSfx(cue, { gain = 1, rate = 1, pan = 0, delay = 0 } = {}) {
+      if(cue==='chunkLand')cue='waxLandMedium'; // 旧入口兼容，不再使用金属感旧素材。
       if (!ctx || !unlocked || ctx.state === "closed") return 0;
+      if(DISABLED_VOICE_CUES.has(cue))return 0;
       const now = typeof performance !== "undefined" ? performance.now() : Date.now();
       if (now - (lastPlay.get(cue) || 0) < RETRIGGER_MS) return 0;   // 连点保护
       lastPlay.set(cue, now);
-      const jitterRate = cue==='customerPain'?1:rate * (1 + (Math.random() - 0.5) * 0.08);
-      const jitterGain = gain * (1 + (Math.random() - 0.5) * 0.35);
+      const jitterRate = LANDING_CUES.has(cue) ? 1 : rate * (1 + (Math.random() - 0.5) * 0.08);
+      const jitterGain = LANDING_CUES.has(cue) ? gain : gain * (1 + (Math.random() - 0.5) * 0.35);
       const takes = buffers.sfx[cue];
       if (takes && takes.length) {
         const buffer = takes[Math.floor(Math.random() * takes.length)];
-        return PlayBuffer(buffer, { cue, gain: jitterGain, rate: jitterRate, pan, delay });
+        const played=PlayBuffer(buffer, { cue, gain: jitterGain, rate: jitterRate, pan, delay });
+        return played;
       }
+      if(LANDING_CUES.has(cue))return 0;
       // 兜底：合成版本（失败就真的静默，绝不抛）
       SynthSfx(cue==='peelDry'?'snapWax':cue==='peelSticky'?'stretchWax':cue, { gain: jitterGain, pan, delay, rate: jitterRate });
       return 0;

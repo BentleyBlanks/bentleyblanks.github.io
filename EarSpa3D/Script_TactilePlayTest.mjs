@@ -1,3 +1,4 @@
+import { LandingSound } from './Script_LandingSound.mjs';
 // 真实输入验收碎裂、工具差异、声音输出和经营持久化；存档夹具只用于模拟已有玩家。
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
@@ -41,6 +42,7 @@ async function Land(id,tool='scoop',kind='pullScreen'){
  Check(t.state==='held','工具托住 '+id);
  await Input('up');await Step(230);
  Check((await Probe()).harvest.filter(t=>t.id===id).length===1,'只收一次 '+id);
+ Check((await Probe()).events.some(e=>e.type==='landingSound'&&e.id===id&&e.cue===LandingSound(t).cue),'落盘按当前尺寸选声音 '+id);
 }
 async function Soften(id){
  await Select('drops');let t=(await Probe()).targets.find(t=>t.id===id);if((await page.locator('#depth-toggle').getAttribute('aria-pressed')==='true')!==(t.depth>10)){await page.locator('#depth-toggle').click();await Step(70);t=(await Probe()).targets.find(t=>t.id===id);}
@@ -97,6 +99,7 @@ try{
  Check(pieces.every(t=>t.triangles>10&&t.state==='attached'),'碎片具有独立可拾取几何');
  await page.screenshot({path:path.join(here,'_dev','Shot_Fragment_'+width+'.png')});
  await Land(pieces[0].id);
+ Check(!(await Probe()).events.some(e=>e.type==='sound'&&e.cue==='sparkle'),'服务中落盆不叠加奖励铃音');
  await Land(pieces[1].id,'brush','sweepScreen');
  await Select('suction');
  await Pull(pieces[2].id);await Input('up');await Step(160);
@@ -115,7 +118,7 @@ try{
  Check((await Probe()).painCount>=1&&(await Probe()).satisfaction<90,'强拉硬结让客人疼痛并降低满意度');
  Check((await Probe()).rendering.irritation.some(v=>v>.1),'未软化强拉留下局部红肿状态');
  await page.screenshot({path:path.join(here,'_dev','Shot_Irritation_'+width+'.png')});
- Check((await Probe()).audio.recentPlayback.some(t=>t.cue==='customerPain'&&!t.truncated&&t.seconds===t.naturalSeconds),'客人抱怨整句播放不截断');
+ Check(!(await Probe()).audio.recentPlayback.some(t=>t.cue?.startsWith('customer')||t.cue==='relaxSigh'),'疼痛和碎裂不播放客人女声');
  pieces=(await Probe()).targets.filter(t=>t.fragment&&t.state==='attached');
  for(const t of pieces)await Land(t.id);
  for(const target of (await Probe()).targets.filter(t=>t.state==='attached')){if((await Probe()).targets.find(t=>t.id===target.id).state==='collected')continue;if(target.type==='impacted'&&!target.fragment)await Soften(target.id);await Land(target.id,target.fine?'feather':target.type==='dry'?'scoop':'tweezers');}

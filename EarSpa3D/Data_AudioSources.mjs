@@ -125,19 +125,16 @@ export const BGM_SOURCES = [
 // 清单与运行时都跟着走，不用改别的地方。
 
 export const SFX_SOURCES = [
- {id:'customerPain',cue:'customerPain',name:'客人请求轻一点',seconds:2.5,category:'voice',material:'voice',contactKind:null,variants:['哎哟，轻一点，先软化一下吧。'],prompt:'生成一段游戏客人对白，成年女性自然轻声说中文：“哎哟，轻一点，先软化一下吧。”语气是突然有点不适后友善地提醒，克制、生活化，不尖叫、不夸张呻吟。整句连贯说完。近距离干净人声，单声道，无音乐、无背景声、无混响。'},
 
   {id:'peelDry',cue:'peelDry',name:'干性薄层缓慢剥离',seconds:1.15,category:'contact',material:'dry',contactKind:'scrape',variants:['薄而干燥的蜡层从柔软表面慢慢掀起，细微脆裂。'],
    prompt:COMMON_SFX+'竹质耳勺贴着一小片干燥耳垢的边缘，缓慢托起完整薄层：开头有清楚贴耳的细砂摩擦，中间连续三四次不规则、细密的纸屑般脆裂，最后一声很短的干脆脱离。声音清晰可辨但柔和，不是极低音量。不要夸张爆破、气泡啵声、食物咀嚼、刺耳高频。总时长约一秒。'},
   {id:'peelSticky',cue:'peelSticky',name:'黏性耵聍牵拉脱离',seconds:1.4,category:'contact',material:'wet',contactKind:'wipe',variants:['黏性蜡块被小镊子夹住缓慢牵拉，黏连逐渐松开。'],
    prompt:COMMON_SFX+'小镊子夹住一块柔韧的黏性耳垢缓慢拉起：先是近距离细腻的蜡质摩擦，随后黏连短短拉伸，最后轻而明确地脱离，带少量细微黏性撕裂声。细节清晰、厚实而柔和。不要夸张口水、咀嚼、鼻涕、电子滑音、气球爆裂。总时长约一点四秒。'},
 
-  {
-    id: "chunkLand", cue: "chunkLand", name: "完整琥珀块落入小瓷盘",
-    seconds: 0.7, category: "reward", material: "dry", contactKind: "scrape",
-    variants: ["一整块轻软的琥珀糖落入小瓷盘，温润轻巧的一声嗒。"],
-    prompt: `${COMMON_SFX}一小块轻软的琥珀糖从很低的高度落入手心大小的小瓷盘，只有一次轻巧温润的嗒声，带一点柔软的触感，立即收住。声音近、细腻、舒服，短而有满足感。不要尖锐玻璃声、不要金属撞击、不要碎裂、不要连续散落颗粒声。总长度约零点七秒。`,
-  },
+  // 固定为已试听选定的三条 WAV，baker 不调用 API 覆盖。
+  {"id": "waxLandSmall", "cue": "waxLandSmall", "name": "耳垢落盘 · 稍低沉", "seconds": 0.32447916666666665, "category": "reward", "material": "wax", "contactKind": null, "variants": ["稍低沉"], "file": "AudioSfx_WaxLandSmall.wav", "bakedOnly": true, "prompt": "已试听选定的 SeedAudio F 衍生音效；约0.1秒轻小非金属物件短促接触。固定成品，不重新生音。"},
+  {"id": "waxLandMedium", "cue": "waxLandMedium", "name": "耳垢落盘 · 轻度沉闷", "seconds": 0.32447916666666665, "category": "reward", "material": "wax", "contactKind": null, "variants": ["轻度沉闷"], "file": "AudioSfx_WaxLandMedium.wav", "bakedOnly": true, "prompt": "已试听选定的 SeedAudio F 衍生音效；约0.1秒轻小非金属物件短促接触。固定成品，不重新生音。"},
+  {"id": "waxLandLarge", "cue": "waxLandLarge", "name": "耳垢落盘 · 明显沉闷", "seconds": 0.32447916666666665, "category": "reward", "material": "wax", "contactKind": null, "variants": ["明显沉闷"], "file": "AudioSfx_WaxLandLarge.wav", "bakedOnly": true, "prompt": "已试听选定的 SeedAudio F 衍生音效；约0.1秒轻小非金属物件短促接触。固定成品，不重新生音。"},
   // ── 刮擦类 ──
   {
     id: "scrapeSoft",
@@ -343,24 +340,6 @@ export const SFX_SOURCES = [
       + "音量很小。不要呼吸声、不要喷气、不要风声、不要吹气、不要人声与混响。",
   },
   {
-    id: "relaxSigh",
-    cue: "relaxSigh",
-    name: "客人舒服的叹气",
-    seconds: 1.8,
-    category: "calm",
-    material: "voice",
-    contactKind: null,
-    variants: [
-      "客人舒服极了的、软软的一声叹气，气息为主，音量很小。",
-    ],
-    // 这一条第一次以「像 XX 的一声」的拟声写法提交时被服务端以 HTTP 400 拒了，
-    // 改成纯描述「只是呼出的一口气、不含任何语言内容」之后就过了。记在这里：
-    // 带引号的口语拟声容易被判成人声台词。
-    prompt: `${COMMON_SFX}一声很轻、很软、以气流为主的满足的呼气声，听上去是一个人被伺候得很放松、`
-      + "把胸腔里那口气慢慢吐出来的声音，音量很小，持续约一秒半后自然收住；"
-      + "全程只是呼出的一口气，不含任何语言内容，也听不出任何词句。不要说话、不要唱歌、不要笑出声、不要夸张的呻吟。",
-  },
-  {
     id: "shiver",
     cue: "shiver",
     name: "一阵酥麻的轻颤",
@@ -439,7 +418,7 @@ export const CONTACT_KINDS = [
 export const SFX_TAKES = SFX_SOURCES.map((source) => ({
   cue: source.cue,
   files: Array.from({ length: source.variants.length }, (_, index) =>
-    source.variants.length === 1
+    source.file ? source.file : source.variants.length === 1
       ? `AudioSfx_${source.cue[0].toUpperCase()}${source.cue.slice(1)}.mp3`
       : `AudioSfx_${source.cue[0].toUpperCase()}${source.cue.slice(1)}_${String(index + 1).padStart(2, "0")}.mp3`),
   seconds: source.seconds,

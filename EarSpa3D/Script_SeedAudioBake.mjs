@@ -63,7 +63,7 @@ const assets = [
     kind: "bgm", cue: source.cue, name: source.name, seconds: source.seconds,
     dir: bgmDir, file: source.file, prompt: source.prompt, variant: 0,
   })),
-  ...SFX_SOURCES.flatMap((source) => source.variants.map((variantText, index) => ({
+  ...SFX_SOURCES.filter((source) => !source.bakedOnly).flatMap((source) => source.variants.map((variantText, index) => ({
     kind: "sfx", cue: source.cue, name: source.name, seconds: source.seconds,
     dir: sfxDir, file: SfxFileName(source.cue, index, source.variants.length),
     // 变体做法沿用 Combat baker：公共规范段 + 事件描述 + 这一条的差异句。

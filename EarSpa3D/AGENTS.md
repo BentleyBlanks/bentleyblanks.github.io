@@ -13,6 +13,7 @@
 ```powershell
 node EarSpa3D/Script_PeelPhysicsTest.mjs
 node EarSpa3D/Script_EconomyTest.mjs
+node EarSpa3D/Script_LandingSoundTest.mjs
 node EarSpa3D/Script_InstrumentInteractionTest.mjs
 node EarSpa3D/Script_ControlPlayTest.mjs
 node EarSpa3D/Script_DirectionalPhysicsTest.mjs
@@ -26,6 +27,7 @@ node EarSpa3D/Script_ChunkPlayTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
 依次检查桌面、390×844、320×568、844×390 的真实鼠标/CDP 触屏整局。
 验收图与报告写入忽略的 `_dev/`；必须另外查看截图，不能只看 PASS。
 音频的信号分析及浏览器输出电平可以证明起音、静音和素材完整性，不能替代人的主观试听。
+落盘三档已试听定稿及女声停用契约见 [Data_LandingAudio.md](./Data_LandingAudio.md)，后续不再生成或接入女声。
 
 ## 这是什么
 

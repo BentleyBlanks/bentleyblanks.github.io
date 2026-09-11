@@ -1,3 +1,4 @@
+import { LandingSound } from './Script_LandingSound.mjs';
 // Real mouse / CDP touch. Debug stepping advances time, never assigns cleaning or fracture state.
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
@@ -16,6 +17,7 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
  try{for(const [width,height,touch] of profiles){
   const page=await browser.newPage({viewport:{width,height},hasTouch:touch,isMobile:touch,deviceScaleFactor:touch?2:1,userAgent:touch?'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36':undefined});
   if(touch)await page.addInitScript(()=>{Object.defineProperty(navigator,'deviceMemory',{get:()=>4});Object.defineProperty(navigator,'hardwareConcurrency',{get:()=>4});});
+  const heardTiers=new Set();
   const cdp=await page.context().newCDPSession(page),report={width,height,touch,checks:[],errors:[]};reports.push(report);
   page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});page.on('response',r=>{if(r.status()>=400)report.errors.push(r.status()+' '+r.url());});
   const Check=(ok,label)=>{assert.ok(ok,width+'×'+height+': '+label);report.checks.push(label);};
@@ -25,7 +27,7 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
   async function Select(id){await Input('up');await page.locator('[data-tool="'+id+'"]').click();}
   async function Start(){await page.goto(url+'?debug=1');await page.waitForFunction(()=>window.__EarSpaDebug);await page.locator('#ear-start').click();await page.locator('#lamp-toggle').click();await Step(150);}
   async function Press(id,frames=110){let t=(await Probe()).targets.find(c=>c.id===id);const deep=t.depth>10;if((await page.locator('#depth-toggle').getAttribute('aria-pressed')==='true')!==deep){await page.locator('#depth-toggle').click();await Step(70);t=(await Probe()).targets.find(c=>c.id===id);} await Input('down',t.screen.x,t.screen.y);await Step(frames);return (await Probe()).targets.find(c=>c.id===id);}
-  async function Collect(id,tool){await Select(tool);const before=(await Probe()).harvest.length;const c=await Press(id);Check(c.state==='held','hold current tool direction detaches '+id);Check((await Probe()).harvest.length===before,'holding does not award cleaning '+id);await Input('up');await Step(80);if(id===0){Check((await Probe()).rendering.headRealtime&&(await Probe()).rendering.outerVisible,'same live head stays visible during extraction');await page.screenshot({path:path.join(here,'_dev','Shot_LiveExtraction_'+width+'.png')});}await Step(150);Check((await Probe()).harvest.filter(c=>c.id===id).length===1,'exactly one landing award '+id);}
+  async function Collect(id,tool){await Select(tool);const before=(await Probe()).harvest.length;const c=await Press(id);Check(c.state==='held','hold current tool direction detaches '+id);Check((await Probe()).harvest.length===before,'holding does not award cleaning '+id);await Input('up');await Step(80);if(id===0){Check((await Probe()).rendering.headRealtime&&(await Probe()).rendering.outerVisible,'same live head stays visible during extraction');await page.screenshot({path:path.join(here,'_dev','Shot_LiveExtraction_'+width+'.png')});}await Step(150);Check((await Probe()).harvest.filter(c=>c.id===id).length===1,'exactly one landing award '+id);const landed=(await Probe()).events.find(e=>e.type==='landingSound'&&e.id===id);Check(landed?.cue===LandingSound(c).cue,'size selects approved landing '+id);heardTiers.add(landed.tier);}
   try{
    await Start();let p=await Probe();
    Check(p.targets.length===21&&p.targets.filter(c=>c.fine).reduce((s,c)=>s+c.grainCount,0)===108,'initial ear contains large deposits and 108 separate tiny grains');
@@ -66,6 +68,7 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
    }
    for(let guard=0;guard<16;guard++){const next=(await Probe()).targets.find(c=>c.fine&&c.state==='attached');if(!next)break;await Collect(next.id,'feather');}
    await Step(60);p=await Probe();Check(p.phase==='complete'&&!p.timedOut&&Math.abs(p.cleanliness-1)<1e-8,'all deposits and dust finish within service limit');Check(p.shop.totalCustomers===1,'service pays exactly once');Check(p.audio.contextState==='running'&&p.audio.sfxMissing.length===0,'real input unlocks sound with no missing cues');
+   Check(['small','medium','large'].every(t=>heardTiers.has(t)),'all three approved sizes occur during real play');Check(!p.audio.sfxLoaded.some(c=>/customer|relaxSigh/.test(c)),'female voices are not loaded');Check(!p.events.some(e=>e.type==='sound'&&/customer|relaxSigh/.test(e.cue)),'no female voice events');
    await page.screenshot({path:path.join(here,'_dev','Shot_DirectionalComplete_'+width+'.png')});
    const coins=p.shop.coins;await Step(300);Check((await Probe()).shop.coins===coins,'receipt cannot pay repeatedly');
    await page.locator('#receipt-next').click();await Step(150);await page.locator('#shop-open').click();const beforePause=(await Probe()).timeRemaining;await Step(180);Check((await Probe()).timeRemaining===beforePause,'shopping pauses service clock');await page.locator('[data-select-tool="feather"]').click();Check((await Probe()).rendering.previewTriangles>500,'feather has a real rotatable shop model');await page.screenshot({path:path.join(here,'_dev','Shot_FeatherShop_'+width+'.png')});await page.locator('#shop-close').click();

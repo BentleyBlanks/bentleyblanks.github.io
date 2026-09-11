@@ -33,7 +33,7 @@ try{
  }
  await page.locator('[data-tool="drops"]').click();await page.mouse.click(target.screen.x,target.screen.y);await Step(210);let p=await Probe();Check(p.targets[0].softened>.9,'滴管真实点击后逐步渗透');Check(p.rendering.roughness[0]<.3&&p.rendering.clearcoat[0]>.8,'软化后的粗糙度与湿膜同时变化');
  await page.mouse.move(target.screen.x,target.screen.y);await Step(2);await page.screenshot({path:path.join(here,'_dev/Shot_Detail_Wet.png')});
- await page.locator('#customer-feedback summary').click();Check(await page.locator('#feedback-list li').count()>=2,'客人反馈可展开并保留历史');await page.screenshot({path:path.join(here,'_dev/Shot_Detail_Feedback.png')});await page.locator('#customer-feedback summary').click();
+ Check(await page.locator('#customer-feedback').count()===0&&await page.locator('#customer-bubble').count()===0,'客人文字反馈保持隐藏，女声已停用');await page.screenshot({path:path.join(here,'_dev/Shot_Detail_Feedback.png')});
  await page.locator('#shop-open').click();
  for(const id of Object.keys(ids)){await page.locator('[data-select-tool="'+id+'"]').click();Check((await Probe()).rendering.previewTriangles>500,id+' 预览显示真实模型');for(let i=0;i<4;i++)await page.locator('[data-upgrade="'+ids[id]+'"]').click();Check((await Probe()).rendering.previewTriangles>500,id+' 升级后预览仍可见');}
  p=await Probe();Check(Object.keys(ids).every(id=>p.rendering.toolLevels[id]===5),'六种工具购买升级后同步真实模型等级');

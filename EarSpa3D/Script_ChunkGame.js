@@ -1,14 +1,15 @@
 import * as THREE from 'three';
 import { CreateCore } from './Script_Core.js?v=ear011-20260911';
 import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear012-controls-20260912';
-import { CreateAudio } from './Script_Audio.js?v=ear011-20260911';
+import { CreateAudio } from './Script_Audio.js?v=ear012-size-audio-20260912';
+import { LandingSound } from './Script_LandingSound.mjs?v=ear012-size-audio-20260912';
 import { CreateShop } from './Script_Shop.js?v=ear011-20260911';
 import { MakeRng } from './Script_Util.js?v=ear011-20260911';
 import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear011-20260911';
 
 import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear011-20260911';
 
-const VERSION = 'ear012-controls-20260912';
+const VERSION = 'ear012-size-audio-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const TOOL_IDS = { scoop: 'earPickBamboo', tweezers: 'earForceps', drops: 'earDrops',brush:'softBrush',suction:'microSuction',feather:'gooseFeather' };
 const TYPE_NAMES = { dry: '干性薄层', wet: '黏性耳垢', impacted: '紧实硬结' };
@@ -58,7 +59,7 @@ export async function Start() {
   app.querySelector('.session-status').append(app.querySelector('.clean-meter'));
   app.querySelector('.header-actions').insertAdjacentHTML('afterbegin','<button id="shop-open">小铺</button>');
   app.querySelector('.session-status').insertAdjacentHTML('beforeend','<span id="satisfaction" title="客人满意度">☺ 85</span>');
-  app.querySelector('.play-stage').insertAdjacentHTML('beforeend','<div id="customer-bubble" hidden role="status"></div><div id="reward-toast" hidden role="status"></div><section id="receipt" hidden><span>本次采耳</span><h2 id="receipt-title"></h2><p id="receipt-detail"></p><div><button id="receipt-shop">逛逛小铺</button><button id="receipt-next">接待下一位 →</button></div></section>');
+  app.querySelector('.play-stage').insertAdjacentHTML('beforeend','<div id="reward-toast" hidden role="status"></div><section id="receipt" hidden><span>本次采耳</span><h2 id="receipt-title"></h2><p id="receipt-detail"></p><div><button id="receipt-shop">逛逛小铺</button><button id="receipt-next">接待下一位 →</button></div></section>');
   for(const [id,label,detail] of [['brush','柔毛刷','刷松干屑'],['suction','吸引管','清理软化碎屑'],['feather','鹅绒掸','成片带走微屑']])app.querySelector('.tool-dock').insertAdjacentHTML('beforeend',`<button data-tool="${id}" aria-pressed="false" hidden>${Icon(id)}<span><strong>${label}</strong><small>${detail}</small></span></button>`);
   app.querySelector('.dialog-heading').insertAdjacentHTML('afterend','<button id="audio-test">试听挖取音效</button>');
   document.getElementById('play-stage').prepend(canvas);
@@ -76,9 +77,9 @@ export async function Start() {
   app.dataset.phase='ready';
   let turnPointer=null,touchMode='force',timeLimit=210,timedOut=false;
   let pointer = null, keyboardIndex = 0, contactOn = false;
-  let hintUntil=0,satisfaction=85,painCooldown=0,bubbleUntil=0,rewardUntil=0,combo=0,bestCombo=0,painCount=0,fractures=0;
+  let hintUntil=0,satisfaction=85,painCooldown=0,rewardUntil=0,combo=0,bestCombo=0,painCount=0,fractures=0;
   const events = [],feedback=[];
-  app.querySelector('.play-stage').insertAdjacentHTML('beforeend','<button id="lamp-toggle" class="lamp-toggle" aria-pressed="false">☼ 检查灯 · 关</button><details id="customer-feedback"><summary><span class="feedback-heart">●</span> 客人反馈 <b id="feedback-count">0</b><span class="feedback-chevron">⌄</span></summary><div class="feedback-heading"><span id="feedback-name"></span><span id="feedback-mood"></span></div><ol id="feedback-list" aria-live="polite"></ol></details>');
+  app.querySelector('.play-stage').insertAdjacentHTML('beforeend','<button id="lamp-toggle" class="lamp-toggle" aria-pressed="false">☼ 检查灯 · 关</button>');
   app.querySelector('.play-stage').insertAdjacentHTML('beforeend','<div id="precision-controls"><div class="touch-modes"><button id="mode-force" aria-pressed="true">施力</button><button id="mode-turn" aria-pressed="false">转向</button></div></div><div id="service-clock" role="timer" aria-label="服务剩余时间"><span>剩余服务</span><b id="service-time">03:30</b></div>');
   function SetTouchMode(mode){Cancel();touchMode=mode;$('mode-force').setAttribute('aria-pressed',String(mode==='force'));$('mode-turn').setAttribute('aria-pressed',String(mode==='turn'));}
   $('mode-force').onclick=()=>SetTouchMode('force');$('mode-turn').onclick=()=>SetTouchMode('turn');
@@ -88,12 +89,11 @@ export async function Start() {
   const rng = MakeRng(20260911 + shop.day * 307 + shop.state.totalCustomers * 997);
   function Record(type, data = {}) { events.push({ type, at: +time.toFixed(3), ...data }); if (events.length > 160) events.shift(); }
 
-  function Bubble(message,kind='calm'){
-    const previous=feedback.at(-1);if(!previous||previous.message!==message||time-previous.time>7||Math.round(satisfaction)!==previous.satisfaction){
-      const entry={message,kind,time,satisfaction:Math.round(satisfaction),delta:Math.round(satisfaction)-(previous?.satisfaction??85)};feedback.push(entry);if(feedback.length>40)feedback.shift();
-      const li=document.createElement('li');li.dataset.kind=kind;const quote=document.createElement('p');quote.textContent=message;const meta=document.createElement('small');meta.textContent=Math.floor(elapsed/60)+':'+String(Math.floor(elapsed%60)).padStart(2,'0')+' · 满意 '+entry.satisfaction+(entry.delta?' ('+(entry.delta>0?'+':'')+entry.delta+')':'');li.append(quote,meta);$('feedback-list').prepend(li);while($('feedback-list').children.length>40)$('feedback-list').lastChild.remove();$('feedback-count').textContent=feedback.length;$('feedback-name').textContent=shop.CurrentCustomer()?.name||'今日客人';$('feedback-mood').textContent=kind==='pain'?'需要轻一点':'渐渐放松';
-    }
- $('customer-bubble').textContent=message;$('customer-bubble').dataset.kind=kind;$('customer-bubble').hidden=false;bubbleUntil=time+4; }
+  function Feedback(message,kind='calm'){
+    const previous=feedback.at(-1);
+    feedback.push({message,kind,time,satisfaction:Math.round(satisfaction),delta:Math.round(satisfaction)-(previous?.satisfaction??85)});
+    if(feedback.length>40)feedback.shift();
+  }
   function Reward(message,kind='good'){const box=$('reward-toast');box.textContent=message;box.dataset.kind=kind;box.hidden=false;box.getAnimations().forEach(a=>a.cancel());box.animate([{opacity:0,transform:'translate(-50%,12px) scale(.9)'},{opacity:1,transform:'translate(-50%,0) scale(1.04)',offset:.2},{opacity:1,transform:'translate(-50%,-7px) scale(1)',offset:.8},{opacity:0,transform:'translate(-50%,-18px) scale(1)'}],{duration:2200,fill:'forwards'});rewardUntil=time+2.3;}
   function CleanMass(){return Math.min(9,harvested.reduce((sum,c)=>sum+c.mass,0));}
   function UpdateInventory(){const inv=shop.Snapshot().inventory;for(const button of app.querySelectorAll('[data-tool]'))button.hidden=!inv.tools.includes(button.dataset.tool);view.SetSkins(inv.equipped,Object.fromEntries(Object.entries(TOOL_IDS).map(([id,key])=>[id,shop.ToolLevel(key)])));}
@@ -124,7 +124,7 @@ export async function Start() {
   function StartCustomer() {
     if (!shop.CurrentCustomer()) shop.StartDay(rng);
     const customer = shop.CurrentCustomer();
-    feedback.length=0;$('feedback-list').replaceChildren();$('feedback-count').textContent='0';
+    feedback.length=0;
     view.Reset(customer.waxSeed);timeLimit=210;timedOut=false;
     view.Enter();
     $('view-toggle').textContent='看耳廓 ↗';
@@ -132,7 +132,7 @@ export async function Start() {
     UpdateProgress(); $('next-customer').hidden = true;
     $('customer-name').textContent = `第 ${shop.day} 天 · ${customer.name}`;
 
-    Record('customerStart',{seed:customer.waxSeed});Bubble(customer.name+'：慢慢来，我有点怕疼。');
+    Record('customerStart',{seed:customer.waxSeed});
     audio.setBgm(shop.state.mood);
   }
   // 首屏先摆好同一局，不播放、不计时，点击后直接开始操作。
@@ -163,7 +163,7 @@ export async function Start() {
     if(toolId==='drops'){
       c.wetting=Math.min(1,c.wetting+.92+(shop.ToolLevel('earDrops')-1)*.03);
       view.Drop(c);Sound('dropLiquid',.75,c);Record('soften',{id:c.id,target:c.wetting});
-      Bubble('嗯，凉凉的。');return;
+      Feedback('软化液已滴入');return;
     }
     active=c;app.dataset.gripping='true';c.state='peeling';c.held=0;c.stretchPlayed=false;c.painLoad=0;
     pointer={id,x,y,currentX:x,currentY:y};
@@ -228,7 +228,7 @@ export async function Start() {
   });
   function Complete(expired=false) {
     if (phase !== 'playing') return;
-    timedOut=expired;Cancel();if(expired)view.EndService();phase='complete';app.dataset.phase='complete';view.Showcase();UpdateProgress();$('customer-bubble').hidden=true;
+    timedOut=expired;Cancel();if(expired)view.EndService();phase='complete';app.dataset.phase='complete';view.Showcase();UpdateProgress();
     const payout = shop.FinishCustomer({ cleanliness01: CleanMass()/9, comfort01:satisfaction/100,relax01:satisfaction/100,bestCombo, harvest: harvested });
     Record('complete', { payout:payout?.payout,count:harvested.length,timedOut:expired,cleanliness:CleanMass()/9 });
 
@@ -260,13 +260,13 @@ export async function Start() {
     c.painLoad=state.pain>0?c.painLoad+dt:Math.max(0,c.painLoad-dt);
     if(c.painLoad>.18&&!painCooldown){
       satisfaction=Math.max(5,satisfaction-9);painCount++;combo=0;painCooldown=4;
-      Bubble(c.type==='impacted'&&c.softened<.6?'哎哟！这块太硬了，先软化一下吧。':'有点疼……轻一点，别顶着内壁。','pain');
-      Sound('customerPain',.8,c);Record('pain',{id:c.id,satisfaction});UpdateProgress();
+      Feedback('操作引起不适','pain');
+      Record('pain',{id:c.id,satisfaction});UpdateProgress();
     }
     if(state.fracture){
       const pieces=view.Fracture(c);if(!pieces.length)return;Record('fracture',{id:c.id,pieces:pieces.map(p=>p.id)});fractures++;combo=0;satisfaction=Math.max(5,satisfaction-3);
       active=null;Cancel();Sound('snapWax',.9,c);Reward('裂成了 '+pieces.length+' 片 · 碎屑仍需清理','warn');
-      Bubble(c.type==='dry'?'薄层很脆，用耳勺托边，别用镊子硬夹。':'硬结被撬裂了，先软化，再清理碎屑。','pain');UpdateProgress();return;
+      Feedback('硬拉导致碎裂','pain');UpdateProgress();return;
     }
     $('pull-meter').value=state.strain;
     $('pull-label').textContent=state.wrongDirection?(toolId==='scoop'?'勺面方向不对 · 旋转后再撬':'夹爪未对准 · 旋转后再夹'):state.wrongTool?(toolId==='suction'?'只吸软化后的碎屑':'毛刷只能刷松碎屑'):state.needsForceps?'边缘松了 · 换镊子夹出':c.type==='impacted'&&c.softened<.6?'硬结牢固 · 先滴软化液':state.detached?'松手带出':state.contact?'内壁有阻力 · 轻一点':'边缘正在松开';
@@ -284,7 +284,6 @@ export async function Start() {
   }
   function Frame(dt) {
     time+=dt;painCooldown=Math.max(0,painCooldown-dt);
-    if(time>bubbleUntil)$('customer-bubble').hidden=true;
     if(time>rewardUntil)$('reward-toast').hidden=true;
     if (phase === 'playing' && !DialogOpen() && !document.hidden) {
       dt=Math.min(dt,Math.max(0,timeLimit-elapsed));elapsed+=dt;
@@ -294,10 +293,11 @@ export async function Start() {
       for (const c of view.Update(dt)) {
         harvested.push({id:c.id,type:c.type,size:c.size,mass:c.mass,fragment:c.fragment});Record('land',{id:c.id,mass:c.mass});
         satisfaction=Math.min(100,satisfaction+c.mass*2);combo++;bestCombo=Math.max(bestCombo,combo);
-        Sound(c.toolId==='suction'?'vacuumSuck':'chunkLand',c.toolId==='suction'?.3:.9,c);Sound('sparkle',.24);UpdateProgress();
+        const landing=LandingSound(c);
+        Sound(landing.cue,landing.gain,c);Record('landingSound',{id:c.id,...landing});UpdateProgress();
         Reward(`+${(c.mass/9*100).toFixed(c.mass<.09?1:0)}%`);
         if(settings.haptics&&navigator.vibrate)navigator.vibrate([12,40,8]);
-        Bubble(satisfaction>80?'嗯……舒服，通透多了。':'这一下轻多了。');
+        Feedback('清理完成，满意度提升');
 
       }
       if(elapsed>=timeLimit){Complete(true);}
