@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { SelectP012RecruitCast } from "./Data_FirstLevelP012Cast.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FirstLevelOpening } from "./Script_FirstLevelOpening.mjs";
 import { FRONT_DEFENDERS, FRONT_GUARD_POSTS, FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane, FrontReserveLane, ClearLaneX } from "./Data_FirstLevelMissionFront.mjs";
@@ -252,13 +253,13 @@ export class FirstLevelMissionRuntime {
     for (const actor of this.squad) actor.scriptEssential = false;
     const originals = this.squad.filter(actor => actor.castId !== "luo");
     while (originals.length < 6) originals.push(this.ai.Spawn("nra", MISSION_TRAIN.centerX, A.train.z + R.trainTravelM, {
-      weapon: "HanYang", scriptedNoncombatant: true, squadId: "MissionTrainOriginals",
+      ...SelectP012RecruitCast(originals.length), weapon: "HanYang", scriptedNoncombatant: true, squadId: "MissionTrainOriginals",
     }));
     this.trainWounded = originals[3];
     this.train = new FirstLevelMissionTrain({
       Originals: () => originals, Guide: () => this.companion.Handle("luo"),
-      Spawn: (car) => this.ai.Spawn("nra", MISSION_TRAIN.centerX, car.z + this.battlefield.trainOffsetM, {
-        weapon: "HanYang", scriptedNoncombatant: true, squadId: "MissionTrain" + car.carIndex,
+      Spawn: (car, slot) => this.ai.Spawn("nra", MISSION_TRAIN.centerX, car.z + this.battlefield.trainOffsetM, {
+        ...SelectP012RecruitCast(slot), weapon: "HanYang", scriptedNoncombatant: true, squadId: "MissionTrain" + car.carIndex,
       }),
       Offset: () => this.battlefield.trainOffsetM,
       Stopped: () => this.Has("trainStopped"),

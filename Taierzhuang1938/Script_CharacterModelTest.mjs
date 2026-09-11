@@ -23,6 +23,7 @@
 // ===========================================================================
 
 import assert from "node:assert/strict";
+import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -252,8 +253,8 @@ const cutscene = fs.readFileSync(path.join(here, "Script_Cutscene.mjs"), "utf8")
 const main = fs.readFileSync(path.join(here, "Script_Main.mjs"), "utf8");
 const editor = fs.readFileSync(path.join(here, "Script_EditorActor.mjs"), "utf8");
 const bakePowerShell = fs.readFileSync(path.join(here, "_import", "Script_BakeLugouCharacters.ps1"), "utf8");
-assert.match(runtime, /options\.protagonist\s*&&\s*faction\s*===\s*"nra"[\s\S]*?\?\s*0/,
-  "protagonist selects Nra01");
+assert.match(runtime, /options\.protagonist\s*&&\s*faction\s*===\s*"nra"[\s\S]*?\?\s*CHARACTER_PROTAGONIST_VARIANT/,
+  "protagonist selects the approved default");
 assert.match(runtime, /HashString\(`\$\{faction\}:\$\{options\.seed/, "stable faction variant selection");
 assert.match(runtime, /Raycast\(origin, direction, maxDistance\)/, "bone hitbox raycast exists");
 assert.match(runtime, /CHARACTER_HITBOX_PROFILE/, "model-calibrated character hitbox profile exists");
@@ -283,8 +284,8 @@ assert.match(actor, /this\.proceduralHitboxes\s*=\s*\[/,
   "procedural civilian and fallback models have segmented hitboxes");
 assert.match(actor, /capsule\("head", this\.neck, this\.eyes/,
   "procedural head uses neck-to-eye proxy instead of fallback torso sphere");
-assert.match(cutscene, /protagonist:\s*spec\.firstPerson\s*===\s*true[\s\S]*?modelVariant:\s*spec\.firstPerson\s*===\s*true\s*\?\s*0/,
-  "first-person protagonist requests Nra01");
+assert.match(cutscene, /protagonist:\s*spec\.firstPerson\s*===\s*true[\s\S]*?modelVariant:\s*spec\.firstPerson\s*===\s*true\s*\?\s*1/,
+  "first-person protagonist requests Nra02");
 assert.match(cutscene, /characterRig\?\.SetHeadVisible\(false\)/,
   "first-person protagonist hides only its skinned head bone");
 assert.doesNotMatch(main, /shot\.dist\s*<\s*40[\s\S]{0,100}head/, "head hit is not rolled after impact");
@@ -309,15 +310,18 @@ assert.match(editor, /GetLugouAnimationEntries/, "editor reads role-filtered imp
 assert.match(editor, /IsLugouAnimationAllowed\(actor\.kind, this\.clipId\)/,
   "editor rechecks every lineup actor before playing an imported clip");
 assert.match(editor, /动作适用对象/, "editor reports the action's intended character type");
-assert.match(runtime, /LUGOU_MODEL_VARIANTS_BY_KIND/, "runtime records the four-soldier plus one-officer model contract");
-assert.match(runtime, /nraOfficer:\s*OFFICER_MODEL_VARIANTS/, "NRA officer selects only the officer source model");
-assert.match(runtime, /ijaOfficer:\s*OFFICER_MODEL_VARIANTS/, "IJA officer selects only the officer source model");
+assert.match(runtime, /LUGOU_MODEL_VARIANTS_BY_KIND/, "runtime records the approved appearance contract");
+assert.deepEqual(CHARACTER_MODEL_VARIANTS_BY_KIND, {nra:[1,4],nraDare:[1,4],nraOfficer:[4],ija:[0,1,2],ijaOfficer:[0]});
+assert.equal(CHARACTER_PROTAGONIST_VARIANT, 1);
+for (const [kind, variants] of Object.entries(CHARACTER_RANDOM_VARIANTS_BY_KIND)) {
+  assert.deepEqual([...new Set(variants)].sort(), [...CHARACTER_MODEL_VARIANTS_BY_KIND[kind]].sort(), "anonymous weighting retains exactly the approved models");
+}
 assert.match(editor, /GetLugouCharacterVariantEntries/, "editor exposes selectable source models");
 assert.match(editor, /function ImportedClipStance\(clipId, action = null\)[\s\S]*?"CrouchIdle"[\s\S]*?return 1/,
   "imported CrouchIdle preview uses the crouched movement capsule");
 assert.match(editor, /姿态校正[\s\S]*?去除 59° 异常前倾/,
   "editor discloses the corrective playback curve in its evidence panel");
-assert.match(editor, /4兵\+1官对比/, "editor offers a full faction lineup instead of a hidden random variant");
+assert.match(editor, /获准模型对比/, "editor offers a full faction lineup instead of a hidden random variant");
 assert.doesNotMatch(runtime, /floorY[\s\S]{0,300}foot/i,
   "runtime does not align ankle-height foot bones to the floor");
 assert.match(runtime, /this\.root\.position\.set\(0,\s*-actor\.body\.position\.y,\s*0\)/,

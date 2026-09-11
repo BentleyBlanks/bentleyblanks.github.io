@@ -140,7 +140,7 @@ try {
     const weapons = { nra: ["HanYang", "ZhongZheng", "Zb26"], ija: ["Type38", "Type11"] };
     const plan = [];
     for (const side of ["nra", "ija"]) {
-      for (let variant = 0; variant < 4; variant += 1) for (const weapon of weapons[side]) plan.push({ side, variant, weapon });
+      for (const variant of side === "nra" ? [1,4] : [0,1,2]) for (const weapon of weapons[side]) plan.push({ side, variant, weapon });
     }
     T.ai.maxAlive += plan.length;
     const yaw = T.player.yaw;
@@ -214,9 +214,9 @@ try {
   if (result.rounds.length < DEATHS) Report(false, "换人轮数", `只跑了 ${result.rounds.length}/${DEATHS} 轮`);
 
   const sweep = result.sweep;
-  // 两个阵营四个模型号都要真的挂进场景（被画过）；个别人被院墙挡在视锥外可以容忍，模型号不能缺。
+  // 两个阵营获准的模型号都要真的挂进场景（被画过）；个别人被院墙挡在视锥外可以容忍，模型号不能缺。
   const attachedModels = new Set(sweep.attachedModels);
-  const modelsWanted = ["LugouNra01", "LugouNra02", "LugouNra03", "LugouNra04", "LugouIja01", "LugouIja02", "LugouIja03", "LugouIja04"];
+  const modelsWanted = ["LugouNra02", "LugouNra05", "LugouIja01", "LugouIja02", "LugouIja03"];
   const missingModels = modelsWanted.filter((id) => !attachedModels.has(id));
   Report(sweep.spawned === sweep.planned && !missingModels.length,
     "全模型号摆到镜头前",

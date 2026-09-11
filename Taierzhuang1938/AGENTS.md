@@ -29,6 +29,8 @@
     **所有现有及新增 renderer 统一遵守 [MotionVector 接入规范](docs/Data_MotionVectorContract.md)**：世界 Mesh / SkinnedMesh（SkinnedMeshRenderer）和骨骼挂件自动写真实运动；前景根的后续子孙继承明确零速度；透明 / 天空按约定排除。不能以逐件手动标记决定是否接入，不得覆盖对象原有 draw 钩子。未实现历史的移动实例、morph / 自定义形变不得直接用于新增近景角色与挂件。`Script_MotionVectorContractTest.mjs` 是独立 GPU 门禁，Script / Data / GLB 变更在 prepush 自动选中；改预通道或开场道具还须通过 `Script_CarriagePropVelocityTest.mjs` 的 high 画质真实资产检查。不得以 low 画质、整屏占比或关闭后期代替，也不得随关卡重构删除门禁。历史原因见 [车厢复发调查](docs/Data_CarriagePropVelocity.md)。
 13. **带路跑采用跨关卡共用的 NPC 跑停节奏。** 普通随队士兵跑出几步后自然减速，短停喘息、左右观察，再继续跑；每人的首次停步、停留时长与再次起跑独立错峰，不能只错开动画相位却让全队同时停走。班长不参加普通队员的随机喘息停步，按带路、回看、等候和战术职责行动。战斗、避险、通行及协作搬运优先；不得用喘息阻塞窄口、拖断队伍或锁住玩家。规则由共享行为与数据驱动，关卡只配置路线、角色职责和情境覆盖，不按关卡号或角色姓名复制特例。完整要求与后续验收见 [NPC 带路跑通用设计](docs/Data_NpcGuideCadence.md)；共享入口为 `SquadMarchAi`，可视化工具为「小队行进」；接入方式与分项验收状态见该文档第 8–9 节。
 
+人物外观必须遵循[用户确认的选模清单](docs/Data_CharacterSelection.md)，运行时与编辑器共用 `Data_CharacterSelection.mjs`；保留的源模型或动作参考不等于允许重新启用其人物外观。
+
 ## 调查与工具
 
 以下视频与动作要求仅用于动画素材、重定向或动作验收任务；普通玩法与文档修改按涉及系统查阅。

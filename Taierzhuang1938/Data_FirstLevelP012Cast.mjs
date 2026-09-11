@@ -1,15 +1,15 @@
 // P012 fictional whitebox casting, not historical-person age claims.
 // Named companions keep a stable face independent of spawn order/random identity.
-// NRA 02/04 are younger-looking source candidates; 01 retains the leader's beard.
+// Approved cast: NRA02 recruits and NRA05 squad leader.
 // These are whole existing GLB variants, not age morphs or altered source assets.
 // Only the P012 host should apply this selection; other chapters stay unchanged.
 
 export const P012_COMPANION_CAST = Object.freeze({
-  luo: Object.freeze({ name: "罗班长", fullName: "罗茂才", age: 32, modelVariant: 0 }),
+  luo: Object.freeze({ name: "罗班长", fullName: "罗茂才", age: 32, modelVariant: 4 }),
   yaowa: Object.freeze({ name: "幺娃", fullName: "幺娃", age: 18, modelVariant: 1 }),
-  heyoutian: Object.freeze({ name: "何有田", fullName: "何有田", age: 21, modelVariant: 3 }),
+  heyoutian: Object.freeze({ name: "何有田", fullName: "何有田", age: 21, modelVariant: 1 }),
   liuwencai: Object.freeze({ name: "刘文财", fullName: "刘文财", age: 20, modelVariant: 1 }),
-  zhaodegui: Object.freeze({ name: "赵德贵", fullName: "赵德贵", age: 23, modelVariant: 3 }),
+  zhaodegui: Object.freeze({ name: "赵德贵", fullName: "赵德贵", age: 23, modelVariant: 1 }),
   xiaoqin: Object.freeze({ name: "小秦", fullName: "小秦", age: 19, modelVariant: 1 }),
 });
 
@@ -27,5 +27,5 @@ export function SelectP012CompanionCast(castId, baseIdentity = {}) {
 /** Unnamed recruits in the same marching squad also use the younger cast pool. */
 export function SelectP012RecruitCast(slot, baseIdentity = {}) {
   const index=Math.abs(Math.trunc(slot)||0);
-  return {actorKind:"nra",modelVariant:index%2?3:1,identity:{...baseIdentity,age:18+index%6}};
+  return {actorKind:"nra",modelVariant:1,identity:{...baseIdentity,age:18+index%6}};
 }

@@ -523,6 +523,7 @@ const changedDomainRules = [
   // Data_Tuning_Graphics 是渲染帧图的档位表（不是玩法数值）：它同时命中 text 的
   // Data_Tuning_ 那条，这里再补一条把 render 域也拉进来。
   { domain: "render", pattern: /Data_Tuning_Graphics/i },
+  { domain: "render", pattern: /Data_CharacterSelection/i },
   // 自动降档是渲染档位的规则层：它读 Data_Tuning_Graphics.AUTO_QUALITY，
   // 由 Script_Main 的 rAF 循环驱动、由 ApplyGraphics 落地。
   { domain: "render", pattern: /AutoQuality/i },

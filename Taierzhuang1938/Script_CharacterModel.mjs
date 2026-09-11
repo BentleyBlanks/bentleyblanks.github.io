@@ -1,9 +1,10 @@
 // 卢沟桥来源的十名第三人称士兵：GLB 资产、动画播放器、骨骼挂点与分部位命中体。
 //
 // 旧的程序化 Actor 仍负责移动/死亡状态机与编辑器的驱动量，但军人可见部分只从
-// 这里实例化。每名士兵稳定抽取本阵营五个模型之一；第一人称过场主角固定 Nra01。
+// 这里实例化。每名士兵只抽取获准外观；第一人称过场主角固定 Nra02。
 
 import * as THREE from "three";
+import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_INFANTRY_SOURCE_BY_MODEL, CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
 import { ApplyNraUniform, NraUniformPalette } from "./Script_UniformColors.mjs";
 import { DEATH_POSE } from "./Data_DeathPose.mjs";
 import { DEATH_CONTACT } from "./Data_Tuning_ActorDeath.mjs";
@@ -110,18 +111,8 @@ export const LUGOU_ANIMATION_PROFILE_BY_KIND = Object.freeze({
   ijaOfficer: Object.freeze({ faction: "ija", role: "officer", label: "日军军官", clipIds: OFFICER_ACTION_IDS }),
 });
 
-// 每方的五套来源模型不是五个等价的步兵皮肤：01—04 是普通士兵，05 是军官。
-// 这张表既限制战场随机抽取，也给人物动作编辑器提供可逐个点选的真实名单；否则
-// 「步兵」会不小心抽到军官，而编辑器只能靠 seed 碰运气，根本验不了四兵一官。
-const SOLDIER_MODEL_VARIANTS = Object.freeze([0, 1, 2, 3]);
-const OFFICER_MODEL_VARIANTS = Object.freeze([4]);
-export const LUGOU_MODEL_VARIANTS_BY_KIND = Object.freeze({
-  nra: SOLDIER_MODEL_VARIANTS,
-  nraDare: SOLDIER_MODEL_VARIANTS,
-  nraOfficer: OFFICER_MODEL_VARIANTS,
-  ija: SOLDIER_MODEL_VARIANTS,
-  ijaOfficer: OFFICER_MODEL_VARIANTS,
-});
+// Appearance eligibility is shared by gameplay and the actor editor.
+export const LUGOU_MODEL_VARIANTS_BY_KIND = CHARACTER_MODEL_VARIANTS_BY_KIND;
 
 /** 当前身份可用的源模型序号（0-based；对应 Lugou{Faction}01—05）。 */
 export function GetLugouCharacterVariantEntries(kind) {
@@ -313,9 +304,35 @@ async function LoadAsset(record) {
   try {
     const gltf = await LOADER.loadAsync(VersionedUrl(record.url));
     let infantry = null;
-    if (!record.id.endsWith("05")) {
+    const infantrySource = CHARACTER_INFANTRY_SOURCE_BY_MODEL[record.id] || record.id;
+    if (!infantrySource.endsWith("05")) {
       try {
-        infantry = await LOADER.loadAsync(`./Model/Character/Animation_${record.id}Infantry.glb?v=202609060201`);
+        infantry = await LOADER.loadAsync(`./Model/Character/Animation_${infantrySource}Infantry.glb?v=202609060201`);
+        if (infantrySource !== record.id) {
+          // NRA05 shares NRA02's limb axes. Transfer local rest offsets and omit
+          // source-only unweighted helpers; the visible model remains NRA05.
+          infantry = { ...infantry, animations: infantry.animations.map(sourceClip => {
+            const clip = sourceClip.clone();
+            clip.tracks = clip.tracks.filter(track => {
+              const split = track.name.lastIndexOf("."), name = track.name.slice(0, split);
+              if (name.startsWith("Infantry")) return true;
+              const source = infantry.scene.getObjectByName(name), target = gltf.scene.getObjectByName(name);
+              if (!source || !target) return false;
+              const property = track.name.slice(split + 1);
+              if (property === "position") {
+                const delta = target.position.clone().sub(source.position);
+                for (let i = 0; i < track.values.length; i += 3) {
+                  track.values[i] += delta.x; track.values[i + 1] += delta.y; track.values[i + 2] += delta.z;
+                }
+              } else if (property === "quaternion") {
+                const delta = target.quaternion.clone().multiply(source.quaternion.clone().invert()), q = new THREE.Quaternion();
+                for (let i = 0; i < track.values.length; i += 4) q.fromArray(track.values, i).premultiply(delta).toArray(track.values, i);
+              }
+              return true;
+            });
+            return clip;
+          }) };
+        }
       } catch (error) { console.warn("[InfantryAnimation] optional library unavailable", record.id, String(error)); }
     }
     return { record, gltf, infantry, error: null };
@@ -1186,14 +1203,15 @@ export function CreateLugouCharacterRig(
   if (!faction) return null;
   const variants = library?.byFaction?.[faction] || [];
   if (!variants.length) return null;
-  const allowed = LUGOU_MODEL_VARIANTS_BY_KIND[kind] || SOLDIER_MODEL_VARIANTS;
+  const allowed = LUGOU_MODEL_VARIANTS_BY_KIND[kind] || LUGOU_MODEL_VARIANTS_BY_KIND[faction];
+  const randomVariants = CHARACTER_RANDOM_VARIANTS_BY_KIND[kind] || allowed;
   const explicit = Number.isInteger(options.modelVariant) && allowed.includes(options.modelVariant)
     ? options.modelVariant : null;
   const index = options.protagonist && faction === "nra"
-    ? 0
+    ? CHARACTER_PROTAGONIST_VARIANT
     : explicit !== null
       ? explicit
-      : allowed[HashString(`${faction}:${options.seed ?? 0}:model`) % allowed.length];
+      : randomVariants[HashString(`${faction}:${options.seed ?? 0}:model`) % randomVariants.length];
   // Loaded arrays omit failed downloads; numeric slots must never change model identity.
   const modelId = `Lugou${faction === "nra" ? "Nra" : "Ija"}${String(index + 1).padStart(2, "0")}`;
   const asset = variants.find(candidate => candidate.record?.id === modelId);

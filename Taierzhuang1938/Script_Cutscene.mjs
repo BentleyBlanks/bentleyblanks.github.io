@@ -1002,7 +1002,7 @@ export class CutsceneDirector {
             // 第一人称演员就是玩家在过场里可低头看见的主人公身体，固定国军 01；
             // 其余国军/日军照 ActorFactory 的稳定种子随机五种外观。
             protagonist: spec.firstPerson === true,
-            modelVariant: spec.firstPerson === true ? 0 : undefined,
+            modelVariant: spec.firstPerson === true ? 1 : undefined,
             uniformHex: spec.uniformHex,
             trouserHex: spec.trouserHex,
             accessoryHex: spec.accessoryHex,

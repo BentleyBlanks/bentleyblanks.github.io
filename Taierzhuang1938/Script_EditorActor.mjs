@@ -477,7 +477,7 @@ export class ActorEditor {
     opts.className = "edBtns";
     who.appendChild(opts);
     Toggle(opts, "白毛巾", false, (on) => { this.towel = on; this.ApplyTowel(); });
-    Toggle(opts, "本阵营 4兵+1官对比", false, (on) => { this.lineup = on; this.Rebuild(); });
+    Toggle(opts, "本阵营获准模型对比", false, (on) => { this.lineup = on; this.Rebuild(); });
     Toggle(opts, "米格", true, (on) => this.studio.SetGridVisible(on));
 
     // --- 判定盒 ---

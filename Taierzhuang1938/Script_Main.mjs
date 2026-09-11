@@ -3256,7 +3256,7 @@ function MakeSetpieceProp(spec = {}) {
   let mesh = null;
   let woundedActor=null;
   if(whiteboxColors&&kind==="shroudedBody"){
-    woundedActor=actorFactory.Create("nra",{weapon:null,modelVariant:0,seed:1938});
+    woundedActor=actorFactory.Create("nra",{weapon:null,modelVariant:1,seed:1938});
     mesh=new THREE.Group();mesh.add(woundedActor.root);
     // The parent remains the same movable casualty/litter centre.
     woundedActor.root.rotation.x=Math.PI/2;woundedActor.root.position.set(0,.02,-.85);
@@ -3640,7 +3640,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
     IsEscortMember: (actor) => (setpieces?.mem?.column?.members || []).some((member) => member.handle === actor),
     BodyRadius: (actor) => actor?.body?.radius,
     SpawnRecruit: (spec) => {
-      const actor=ai.Spawn("nra",spec.x,spec.z,{identity:{...MakeSoldierIdentity(HashString(`P012Train:${spec.carIndex}:${spec.slot}`)),name:T("hud.actor.trainRecruit")},
+      const actor=ai.Spawn("nra",spec.x,spec.z,{...SelectP012RecruitCast(spec.slot,{...MakeSoldierIdentity(HashString(`P012Train:${spec.carIndex}:${spec.slot}`)),name:T("hud.actor.trainRecruit")}),
         weapon:"HanYang",unarmed:true,scriptedNoncombatant:true,escortRole:"trainRecruit",squadId:`P012Train${spec.carIndex}`});
       if(actor)actor.p012TrainExtra=true;
       return actor;

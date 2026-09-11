@@ -80,12 +80,12 @@ try {
       });
       return cloth;
     };
-    factory.Prewarm("nra", 1, {modelVariant: 0});
-    const leader = factory.Create("nra", {modelVariant: 0, castId: "luo", weapon: null});
-    const regular = factory.Create("nra", {modelVariant: 0, weapon: null});
-    const green = factory.Create("nra", {modelVariant: 3, weapon: null});
+    factory.Prewarm("nra", 1, {modelVariant: 1});
+    const leader = factory.Create("nra", {modelVariant: 1, castId: "luo", weapon: null});
+    const regular = factory.Create("nra", {modelVariant: 1, weapon: null});
+    const green = factory.Create("nra", {modelVariant: 4, weapon: null});
     check(leader.pooled && Cloth(leader)?.userData.nraUniformPalette === "leader", "pooled leader receives his uniform");
-    check(Cloth(regular)?.userData.nraUniformPalette === "grayBlue" && Cloth(green)?.userData.nraUniformPalette === "grayGreen", "soldier palettes remain independent");
+    check(Cloth(regular)?.userData.nraUniformPalette === "grayBlue" && Cloth(green)?.userData.nraUniformPalette === "leader", "soldier palettes remain independent");
     check(Cloth(leader) !== Cloth(regular) && Cloth(leader).map === Cloth(regular).map, "leader dye preserves the shared atlas without changing other soldiers");
     for (const candidate of [leader, regular, green]) {
       check(PatchKeysOf(Cloth(candidate)).some(key => key.startsWith("nraUniformCloth1")), "cloth patch survives lighting setup");
@@ -274,13 +274,30 @@ try {
         }
       }
     };
+    // Explicit rejected numbers and deterministic/random seeds cannot restore a banned face.
+    for (const kind of ["nra", "nraDare", "ija"]) for (let number = 0; number < 8; number++) {
+      const candidate = factory.Create(kind, {seed:number,modelVariant:number % 5,weapon:null});
+      const allowed = kind.startsWith("nra") ? ["LugouNra02","LugouNra05"] : ["LugouIja01","LugouIja02","LugouIja03"];
+      check(allowed.includes(candidate.modelId), `banned appearance ${candidate.modelId}`);
+      if (candidate.modelId === "LugouNra05") {
+        for (const id of ["RifleCrouchAdvance","StandToKneel","KneelHold","KneelToStand","GrenadeThrow"]) {
+          const clip = candidate.characterRig.clipById.get(id);
+          check(clip?.tracks.length > 100, `NRA05 missing adapted infantry clip ${id}`);
+          for (const track of clip.tracks) {
+            const name=track.name.slice(0,track.name.lastIndexOf("."));
+            check(!!candidate.characterRig.root.getObjectByName(name), `NRA05 unbound track ${track.name}`);
+          }
+        }
+      }
+      candidate.Dispose();
+    }
     const protagonist = factory.Create("nra", { seed: "player", protagonist: true, weapon: null });
-    check(protagonist.modelId === "LugouNra01",
-      `protagonist should use LugouNra01, got ${protagonist.modelId}`);
+    check(protagonist.modelId === "LugouNra02",
+      `protagonist should use LugouNra02, got ${protagonist.modelId}`);
     protagonist.Dispose();
     for (const [kind, prefix] of [["nra", "LugouNra"], ["ija", "LugouIja"]]) {
       const variants = [];
-      for (let modelVariant = 0; modelVariant < 4; modelVariant += 1) {
+      for (const modelVariant of kind === "nra" ? [1,4] : [0,1,2]) {
         const candidate = factory.Create(kind, { seed: `${kind}:${modelVariant}`, modelVariant, weapon: null });
         variants.push(candidate.modelId);
         checkHeadHitbox(candidate);
@@ -290,10 +307,10 @@ try {
         CheckIjaBackpackHelmet(candidate);
         candidate.Dispose();
       }
-      check(variants.join(",") === [1, 2, 3, 4].map((n) => `${prefix}0${n}`).join(","),
-        `${kind} four-soldier lineup mismatch: ${variants.join(",")}`);
+      check(variants.join(",") === (kind === "nra" ? [2,5] : [1,2,3]).map((n) => `${prefix}0${n}`).join(","),
+        `${kind} approved lineup mismatch: ${variants.join(",")}`);
       const officer = factory.Create(`${kind}Officer`, { seed: `${kind}:officer`, modelVariant: 4, weapon: null });
-      check(officer.modelId === `${prefix}05`, `${kind} officer model mismatch: ${officer.modelId}`);
+      check(officer.modelId === `${prefix}0${kind === "nra" ? 5 : 1}`, `${kind} officer model mismatch: ${officer.modelId}`);
       checkHeadHitbox(officer);
       checkFacing(officer, officer.modelId);
       officer.SetWeapon("ZhongZheng");
@@ -362,7 +379,7 @@ try {
         `civilian ${variant} height out of range: ${civilian.height}`);
     }
     // Imported pose axes must drive the actual barrel in world space, at every stance.
-    for (let modelVariant = 0; modelVariant < 4; modelVariant += 1) {
+    for (const modelVariant of [0,1,2]) {
       const gunner = factory.Create("ija", { seed: 410 + modelVariant, modelVariant, weapon: "Type38" });
       gunner.root.rotation.y = 1.1;
       const expected = new THREE.Vector3(), actual = new THREE.Vector3();
@@ -577,7 +594,7 @@ try {
     }
 
     for (const item of [actor, armed, ija, baselineA, baselineB, seatTest, seatedArmed]) item.Dispose();
-    return "10 套军人蒙皮 GLB, 16 动作, 11 骨骼命中体, 主角国军 01, 程序化动作兼容, 百姓男女分身, seated legs, weapon-palm clearance; bayonet vertices " + bayonetMeshes.join(", ");
+    return "5 套获准军人外观, 16 动作, 11 骨骼命中体, 主角国军 02, 程序化动作兼容, 百姓男女分身, seated legs, weapon-palm clearance; bayonet vertices " + bayonetMeshes.join(", ");
   });
   console.log(`ActorPoseTest: PASS (${result})`);
 } finally {
