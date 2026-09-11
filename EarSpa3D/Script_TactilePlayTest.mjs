@@ -124,7 +124,7 @@ try{
  Check(final.phase==='complete'&&Math.abs(final.cleanliness-1)<1e-8&&final.fractures>=2&&final.harvest.length>21,'发生两次碎裂仍能清完全部质量并结算');
  Check(final.shop.totalCustomers===1&&final.shop.log[0].comfort<1,'经营结算读取实际满意度');
  await page.screenshot({path:path.join(here,'_dev','Shot_TactileComplete_'+width+'.png')});
- await page.locator('#sound-toggle').click();await page.waitForTimeout(400);
+ await page.locator('#settings-open').click();await page.locator('#sound-toggle').click();await page.waitForTimeout(400);
  const muted=await Sample(.4);report.audio.muted=muted;Check(muted.peak<.00001,'总静音输出归零');
  Check(report.errors.length===0,'无异常与资产请求失败');
  report.clean=true;console.log('PASS tactile '+width+': '+report.checks.length+' checks');

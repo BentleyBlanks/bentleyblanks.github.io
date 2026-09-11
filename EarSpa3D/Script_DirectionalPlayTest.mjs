@@ -4,6 +4,7 @@ import {execFileSync} from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import {IsFeatherDebris} from './Script_InstrumentInteraction.mjs';
 import {fileURLToPath} from 'node:url';
 const here=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(here);
 const common=path.resolve(root,execFileSync('git',['rev-parse','--git-common-dir'],{cwd:root,encoding:'utf8'}).trim());
@@ -38,8 +39,8 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
    if(touch)Check(p.stats.pixelRatio>=1.8,'mobile retains clear 2x drawing buffer');
    await page.screenshot({path:path.join(here,'_dev','Shot_DirectionalStart_'+width+'.png')});
    const t=p.targets[0];let pivotStart;await Select('scoop');
-   if(touch){await page.locator('#mode-turn').click();await Input('down',t.screen.x,t.screen.y);pivotStart=(await Probe()).rendering.toolPosition;await Input('move',t.screen.x+45,t.screen.y);await Input('up');await page.locator('#mode-force').click();}
-   else{await page.mouse.move(t.screen.x,t.screen.y);await page.mouse.down({button:'right'});pivotStart=(await Probe()).rendering.toolPosition;await page.mouse.move(t.screen.x+45,t.screen.y,{steps:15});await page.mouse.up({button:'right'});}
+   if(touch){await page.locator('#mode-turn').click();await Input('down',t.screen.x,t.screen.y);pivotStart=(await Probe()).rendering.toolPosition;await Step(15);await Input('up');await page.locator('#mode-force').click();}
+   else{await page.mouse.move(t.screen.x,t.screen.y);await page.mouse.down({button:'right'});pivotStart=(await Probe()).rendering.toolPosition;await Step(15);await page.mouse.up({button:'right'});}
    p=await Probe();Check(p.rendering.toolPosition.every((v,i)=>Math.abs(v-pivotStart[i])<1e-7),'rotation preserves the physical contact pivot');Check(Math.abs(p.rendering.heading)>.01&&!p.turning,'real rotate gesture persists angle and ends cleanly');Check(p.cleanliness===0&&p.targets[0].state==='attached','rotating never applies extraction force');
    if(!touch){
     await Start();let parent=(await Probe()).targets.find(c=>c.type==='dry'&&!c.fine&&c.form==='ribbon')||(await Probe()).targets.find(c=>c.type==='dry'&&!c.fine);
@@ -52,7 +53,7 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
       parent=await page.evaluate(ids=>__EarSpaProbe().targets.filter(c=>ids.includes(c.id)).sort((a,b)=>b.mass-a.mass).find(c=>__EarSpaDebug.view.Pick(c.screen.x,c.screen.y,'tweezers')?.id===c.id),children.map(c=>c.id));
       Check(!!parent,'generation '+generation+' keeps a visible contact point');
     }
-    Check(parent.fine,'third generation becomes feather-only dust');await Select('tweezers');await Press(parent.id,12);await Input('up');Check((await Probe()).targets.find(c=>c.id===parent.id).state==='attached','forceps cannot pick final fine dust');await Collect(parent.id,'feather');
+    Check(parent.fine===IsFeatherDebris(parent),'third generation uses actual fragment size and mass');await Select(parent.fine?'tweezers':'feather');await Press(parent.id,60);await Input('up');Check((await Probe()).targets.find(c=>c.id===parent.id).state==='attached','incompatible tool cannot collect third-generation residue');await Collect(parent.id,parent.fine?'feather':'scoop');
    }
    await Start();await Select('scoop');await Press(8,60);await Input('up');p=await Probe();
    Check(p.targets.find(c=>c.id===8).state==='attached'&&p.rendering.reachBlocked,'short spoon cannot grip or advance deep wax');

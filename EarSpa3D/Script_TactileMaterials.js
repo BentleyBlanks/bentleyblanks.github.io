@@ -80,13 +80,28 @@ export async function CreateTactileMaterials(renderer) {
       };
       material.customProgramCacheKey=()=> 'PaleYellowKeratinThinSheet';
     }
-    const waxCompile=material.onBeforeCompile;material.onBeforeCompile=shader=>{waxCompile(shader);contact.Bind(shader,{self:material.userData.contactSelf,wall:material.userData.contactWall});material.userData.contactShader=shader;};material.customProgramCacheKey=()=>pale?'PaleKeratinContact2':'BrownWaxContact2';
+    material.userData.waxWet={value:0};material.userData.waxSoft={value:0};
+    const waxCompile=material.onBeforeCompile;material.onBeforeCompile=shader=>{waxCompile(shader);
+      shader.uniforms.waxWet=material.userData.waxWet;shader.uniforms.waxSoft=material.userData.waxSoft;
+      shader.fragmentShader='uniform float waxWet;uniform float waxSoft;\n'+shader.fragmentShader;
+      shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>',`
+        diffuseColor.rgb*=mix(vec3(1.0),vec3(.61,.48,.32),waxWet*.55+waxSoft*.45);
+        #include <roughnessmap_fragment>
+        roughnessFactor=mix(roughnessFactor,.075,waxWet*.85);`);
+      contact.Bind(shader,{self:material.userData.contactSelf,wall:material.userData.contactWall});material.userData.contactShader=shader;};material.customProgramCacheKey=()=>pale?'PaleKeratinWet3':'BrownWaxWet3';
     return material;
+  }
+  function WetWax(material,softness,wetness,type){
+    material.userData.waxWet.value=wetness;material.userData.waxSoft.value=softness;
+    material.roughness=(type==='wet'?.27:1)*(1-wetness*.81);
+    material.clearcoat=Math.max(type==='wet'?.8:0,wetness*.98);material.clearcoatRoughness=.055;
+    const normal=material.userData.dryNormalScale||(material.userData.dryNormalScale=material.normalScale.clone());
+    material.normalScale.copy(normal).multiplyScalar(1-softness*.72);
   }
   function Update(chunks,lamp){
     contact.Update(chunks,lamp);state.light.value.copy(lamp.position);state.power.value=lamp.intensity;
     const originals=chunks.filter(c=>!c.fragment).slice(0,9);
-    originals.forEach((c,i)=>{marks[i].set(c.origin.x,c.origin.y,c.origin.z,c.irritation||0);wet[i].set(c.origin.x,c.origin.y,c.origin.z,c.softened||0);});
+    originals.forEach((c,i)=>{marks[i].set(c.origin.x,c.origin.y,c.origin.z,c.irritation||0);wet[i].set(c.origin.x,c.origin.y,c.origin.z,c.surfaceWet||c.softened||0);});
   }
-  return{Skin,Wax,GripMaterial,Update,SetOutside(value){state.outside.value=value;},SetContact:contact.SetEnabled,Probe(){return{...contact.Probe(),pbr:['albedo','normal','roughness','ao'],sss:'thin-layer single-scattering approximation',sssStrength:state.sss.value,outerPbr:'Texture_OuterSkinPbrAtlas.png',outerSss:'separate thin-pinna transmission approximation',outerSssStrength:state.outerSss.value};}};
+  return{Skin,Wax,WetWax,GripMaterial,Update,SetOutside(value){state.outside.value=value;},SetContact:contact.SetEnabled,Probe(){return{...contact.Probe(),pbr:['albedo','normal','roughness','ao'],sss:'thin-layer single-scattering approximation',sssStrength:state.sss.value,outerPbr:'Texture_OuterSkinPbrAtlas.png',outerSss:'separate thin-pinna transmission approximation',outerSssStrength:state.outerSss.value};}};
 }

@@ -13,6 +13,8 @@
 ```powershell
 node EarSpa3D/Script_PeelPhysicsTest.mjs
 node EarSpa3D/Script_EconomyTest.mjs
+node EarSpa3D/Script_InstrumentInteractionTest.mjs
+node EarSpa3D/Script_ControlPlayTest.mjs
 node EarSpa3D/Script_DirectionalPhysicsTest.mjs
 node EarSpa3D/Script_RenderingRegressionTest.mjs
 node EarSpa3D/Script_TactileDetailTest.mjs
