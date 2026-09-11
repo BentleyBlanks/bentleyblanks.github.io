@@ -1,6 +1,9 @@
 // 可见块体使用薄壳，细微颗粒保留低成本刚体；两者共用工具和附着接口。
 import {BindWaxSurface,BindWaxSurfaceSteps,GripWaxSurface,UngripWaxSurface,StepWaxSurface,WriteWaxSurface} from './Script_SoftWaxPhysics.mjs?v=ear024-cohesive-scraping-20260912';
-export {BindWaxSurface as BindPeelSurface,BindWaxSurfaceSteps as BindPeelSurfaceSteps,WriteWaxSurface as WritePeelSurface};
+import {BindSlimeVolume,GripSlimeVolume,UngripSlimeVolume,StepSlimeVolume,WriteSlimeSurface,PoseSlimeVolume} from './Script_SlimePhysics.mjs?v=ear025-oily-20260912';
+export function BindPeelSurface(body,positions,indices){return body.type==='oily'?BindSlimeVolume(body,positions,indices):BindWaxSurface(body,positions,indices);}
+export function WritePeelSurface(body,positions){return body.gel?WriteSlimeSurface(body,positions):WriteWaxSurface(body,positions);}
+export {BindWaxSurfaceSteps as BindPeelSurfaceSteps};
 export {WaxAnchorPoint as PeelAnchorPoint} from './Script_SoftWaxPhysics.mjs?v=ear024-cohesive-scraping-20260912';
 const Add=(a,b)=>a.map((x,i)=>x+b[i]);
 const Sub=(a,b)=>a.map((x,i)=>x-b[i]);
@@ -28,18 +31,21 @@ export function CreatePeelBody({position,rotation,normal,size,type='dry',footpri
 }
 
 export function GripPeelBody(body,point){
+  if(body.gel){GripSlimeVolume(body,point);return;}
   if(body.surface){GripWaxSurface(body,point);return;}
   body.grip=Rotate([-body.rotation[0],-body.rotation[1],-body.rotation[2],body.rotation[3]],Sub(point,body.position));
 }
-export function UngripPeelBody(body){body.grip=null;if(body.surface)UngripWaxSurface(body);}
+export function UngripPeelBody(body){body.grip=null;if(body.gel)UngripSlimeVolume(body);else if(body.surface)UngripWaxSurface(body);}
 export function GetGripPoint(body){return World(body,body.grip||[0,0,0]);}
 export function MovePeelBody(body,position){
+  if(body.gel){PoseSlimeVolume(body,position,body.rotation);return;}
   const delta=Sub(position,body.position);
   if(body.surface)for(const point of body.surface.points)for(let k=0;k<3;k++)point[k]+=delta[k];
   body.position=position.slice();body.velocity=[0,0,0];
 }
 
 export function StepPeelBody(body,{target=null,softness=0,efficiency=1,supportRotation=null,adhesion=1,minAnchors=0,fracture=false}={},dt=1/60){
+  if(body.gel)return StepSlimeVolume(body,{target,softness,efficiency,adhesion,minAnchors},dt);
   if(body.surface)return StepWaxSurface(body,{target,softness,efficiency,supportRotation,adhesion,minAnchors,fracture},dt);
   const count=Math.max(1,Math.ceil(Math.min(.05,dt)*240)),h=Math.min(.05,dt)/count;
   const profile=PROFILES[body.type]||PROFILES.dry;

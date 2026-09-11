@@ -148,6 +148,7 @@ export function CreateShop({ seed = 20260910, storage = null } = {}) {
       tierId: tier.id,
       tierName: tier.name,
       name,
+      earType: (state.day + index) % 4 === 3 ? 'oily' : 'mixed',
       blurb: tier.blurb,
       waxSeed: (state.day * 7919 + index * 104729 + seed) >>> 0,
       waxCount: rng.int(lo, hi),

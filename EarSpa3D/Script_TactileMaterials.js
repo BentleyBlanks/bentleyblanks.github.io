@@ -90,6 +90,26 @@ export async function CreateTactileMaterials(renderer) {
     material.customProgramCacheKey=()=>outer?(vestibule?'EarSkinRecessedVestibule4':'EarSkinOuterComplexion3'):'EarSkinCanalContact2';return material;
   }
   function Wax(type,tone='brown'){
+    if(type==='oily'){
+      const material=new THREE.MeshPhysicalMaterial({color:0xecc477,map:wax.map,roughness:.24,normalMap:wax.normalMap,normalScale:new THREE.Vector2(.018,.018),metalness:0,ior:1.46,transmission:.5,thickness:.70,attenuationColor:0xc78925,attenuationDistance:1.8,clearcoat:.65,clearcoatRoughness:.10,specularIntensity:.65,envMapIntensity:.85});
+      material.userData.waxWet={value:1};material.userData.waxSoft={value:0};material.userData.oily=true;
+      material.onBeforeCompile=shader=>{
+        shader.vertexShader='attribute vec3 gelRest;attribute float gelThickness;varying vec3 gelLocal;varying float gelPath;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ngelLocal=gelRest;gelPath=gelThickness;');
+        shader.fragmentShader='varying vec3 gelLocal;varying float gelPath;\n'+shader.fragmentShader;
+        shader.fragmentShader=shader.fragmentShader.replace('#include <transmission_fragment>',THREE.ShaderChunk.transmission_fragment.replace('material.thickness = thickness;', 'material.thickness = thickness * gelPath;').replace('material.transmission = transmission;', 'material.transmission = mix(.28,.83,exp(-gelPath*1.8));'));
+        shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+          float cloud=.5+.5*sin(gelLocal.x*4.1+sin(gelLocal.y*3.7))*sin(gelLocal.y*5.3+gelLocal.z*3.0);
+          float lipidDetail=dot(texture2D(map,vMapUv).rgb,vec3(.299,.587,.114));
+          diffuseColor.rgb=diffuse*mix(vec3(.88,.84,.73),vec3(1.03,1.00,.94),smoothstep(.025,.42,lipidDetail));
+          diffuseColor.rgb*=.88+cloud*.16;
+        `);
+        shader.fragmentShader=shader.fragmentShader.replace('#include <lights_fragment_end>',`#include <lights_fragment_end>
+          float rim=pow(1.0-abs(dot(normal,geometryViewDir)),2.5);
+          reflectedLight.directDiffuse+=diffuseColor.rgb*reflectedLight.directDiffuse*(.20+rim*.8);
+        `);
+        contact.Bind(shader,{self:material.userData.contactSelf});material.userData.contactShader=shader;
+      };material.customProgramCacheKey=()=> 'OilyViscoelasticVolume1';return material;
+    }
     const pale=tone==='paleYellow';
     const material=new THREE.MeshPhysicalMaterial({...wax,color:type==='impacted'?0xcbb588:type==='wet'?0xd1bfa1:0xfff3d5,roughness:type==='wet'?.27:1,normalScale:new THREE.Vector2(pale?.11:.22,pale?.11:.22),aoMapIntensity:pale?.35:.58,clearcoat:type==='wet'?.8:0,clearcoatRoughness:.13,metalness:0});
     if(pale){
@@ -121,6 +141,7 @@ export async function CreateTactileMaterials(renderer) {
     return material;
   }
   function WetWax(material,softness,wetness,type){
+    if(type==='oily'){material.roughness=.24-softness*.055;material.clearcoatRoughness=.10;return;}
     material.userData.waxWet.value=wetness;material.userData.waxSoft.value=softness;
     material.roughness=(type==='wet'?.27:1)*(1-wetness*.81);
     material.clearcoat=Math.max(type==='wet'?.8:0,wetness*.98);material.clearcoatRoughness=.055;

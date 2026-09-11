@@ -70,6 +70,7 @@ dialog{padding:23px;max-height:calc(100dvh - 24px)}.dialog-heading h2{font-size:
 .shop-hero{min-height:142px;padding:20px 28px}.shop-hero h2{font-size:26px;margin:6px 0}.shop-hero p{font-size:10px}.shop-purse{bottom:18px}.shop-nav button{padding:12px 0}#tool-preview{height:250px}
 }
 @media(prefers-reduced-motion:reduce){button,.instruction{transition:none}}
+.practice-settings{padding-bottom:20px;border-bottom:1px solid var(--ui-edge);margin-bottom:14px}.practice-settings h3{font-size:15px;font-weight:400;color:var(--ui-cream);margin:0 0 10px}.practice-settings p{font-size:11px;color:var(--ui-muted);line-height:1.8}.practice-settings label{display:block;font-size:11px;margin:16px 0 8px}.practice-settings select{display:block;width:100%;min-width:0;max-width:100%;padding:12px 8px;background:#201b16;color:var(--ui-text);border:1px solid var(--ui-edge);border-radius:5px;font:inherit;font-size:11px}.practice-settings>div{display:flex;gap:8px;margin-top:12px}.practice-settings button{flex:1;min-height:44px;padding:10px 8px;font-size:11px;border:1px solid #d6b98566;border-radius:5px;background:#a7834521;color:var(--ui-cream)}#ear-app[data-practice=true] :is(#shop-open,#receipt-shop){display:none}.welcome[hidden]{display:none}
 /* Keep the current compact status group and simplified controls. */
 .spa-brand{padding:10px 13px;border:1px solid var(--ui-edge);border-radius:8px;background:var(--ui-glass)}
 .session-status{display:flex;align-items:center;gap:12px;margin-top:9px}

@@ -10,6 +10,9 @@
 当前入口不再使用它们。ear010 的方向碎裂、羽毛微屑、限时服务及源工程见 [Data_DirectionalAssets.md](./Data_DirectionalAssets.md)。核心目标固定为真实接触、材质差异、完整取出或碎片清理、落盘/吸入、满意度经营，手机通过转向／施力模式用一指完成。
 
 实际交互回归：
+
+油耳凝胶、五种练习耳道与营业隔离见 [Data_OilyWax.md](./Data_OilyWax.md)。对应检查：`Script_SlimePhysicsTest.mjs`、`Script_OilyWaxPlayTest.mjs`、`Script_OilyRenderingTest.mjs`；后两者通过 `--url=` 指向本任务预览。
+
 ```powershell
 node EarSpa3D/Script_CohesivePhysicsTest.mjs
 node EarSpa3D/Script_CohesiveScrapingPlayTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
