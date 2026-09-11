@@ -73,6 +73,25 @@ function MakeSoldier(over = {}) {
 
 const Near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
 
+// Suppression can pass over low cover, but never through an intervening wall.
+// Trigger queries are fresh even while the exposure cache still reports clear.
+{
+  const host = MakeHost({wall:{z:10,top:.6}}), model = new ShootingModel(host);
+  const from = {x:0,y:1.35,z:0}, target = {x:0,y:0,z:20};
+  const point = model.SuppressPoint(target,{x:0,y:0,z:10,height:.6,nz:-1});
+  assert.equal(model.ShotPathClear(from,point),true,"reachable low-cover edge can be suppressed");
+  const soldier = MakeSoldier();
+  const exposure = model.Exposure(soldier,from,model.SoldierSamples(target,0),{targetId:2});
+  assert.ok(exposure.fraction>0);
+  host.state.wall.top=3;
+  assert.equal(model.ShotPathClear(from,exposure.aimPoint),false,"fresh wall overrides cached visible body");
+  assert.equal(model.ShotPathClear(from,model.SuppressPoint(target)),false,"last sighting behind a wall is unreachable");
+  host.state.wall=null;
+  assert.equal(model.ShotPathClear(from,exposure.aimPoint),true,"removed wall reopens firing immediately");
+  host.BlocksSight=()=>true;
+  assert.equal(model.ShotPathClear(from,exposure.aimPoint),false,"mission terrain/vehicle blockers also hold the trigger");
+}
+
 // --------------------------------------------------------------------------
 // 1. 两条曲线的端点与单调性 —— 这是整套契约的地基
 // --------------------------------------------------------------------------

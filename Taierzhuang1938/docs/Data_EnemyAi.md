@@ -499,6 +499,10 @@ P012 冒烟认 fire/charge/bayonet/melee）。新增七个：
    「`SIGHT_BY_STANCE` 只许被下标读一次、`this.SightRange(` 至少三处」，接入后仍然满足）。
 3. `BlocksSight` 转给 `ctx.BlocksSight`（第一关运行时，**含地形**）。这一条决定了
    「AI 看不看得见」，验收探针挑实验场地时必须用同一条判据，否则量的是地形不是 AI。
+4. `TryFire` 扣弹前通过 `ShootingModel.ShotPathClear` 重新检查枪口到实际瞄点，
+   瞄准与压制射击都适用，不复用暴露缓存。被挡住不能直接退成朝墙压制；
+   可达的掩体沿、最后目击点仍可射击。`AiCloseRangeTest` 覆盖四名国军对真实关卡墙体、
+   缓存未过期时新增遮挡、无遮挡但令牌已满的压制射击，断言开火数、耗弹与压制量。
 
 ### 12.4 第一关接入的实际做法
 

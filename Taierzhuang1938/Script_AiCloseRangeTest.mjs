@@ -29,6 +29,37 @@ try {
     const ai = T.ai, player = T.player;
     const rifle = ai.soldiers.find(s => s.alive && s.side === "ija" && s.weapon.kind === "boltRifle");
     if (!rifle) throw new Error("Campaign fixture has no enemy rifleman");
+    // Four NRA soldiers behind an actual campaign blast wall. Keep the production
+    // battlefield/terrain probes and TryFire; only pin actors and force ready aim.
+    const wall = T.battlefield.layout.blocks.find(b => b.id === "FrontTraverseBlastScreen");
+    const allies = ai.soldiers.filter(s => s.alive && s.side === "nra" && !s.unarmed).slice(0, 4);
+    if (!wall || allies.length !== 4) throw new Error("Missing four-soldier wall fixture");
+    const wallRows = [];
+    const ground = (x,z) => T.battlefield.GroundHeight(x,z);
+    rifle.position.set(wall.x-3, ground(wall.x-3,wall.z), wall.z);
+    ai.soldiers = [...allies,rifle];
+    for (const [index,s] of allies.entries()) {
+      ai.soldiers = [s,rifle]; // Isolate each trigger from friendly corridor blocking.
+      s.position.set(wall.x+3, ground(wall.x+3,wall.z), wall.z);
+      s.yaw = Math.PI/2; s.stance = 0; s.moveSpeed = 0; s.suppression = 0;
+      s.actor.root.visible = false; s.coolUntil = 0; s.covertUntil = 0;
+      s.missionSurfaceRest = false; s.missionFireHold = false;
+      s.weapon = WEAPONS.Type38; s.weaponId = "Type38"; s.ammo = 100;
+      s.target = {position:rifle.position,ref:rifle,id:rifle.id,isPlayer:false,stance:0};
+      s.targetVisible = index < 2; s.lkp = rifle.position.clone(); s.lkpConfidence = 1;
+      s.targetExposedS = 4; s.burstLeft = 0;
+      ai.shooting.Detach(s); ai.shooting.BeginAim(s,rifle.id);
+      ai.UpdateMuzzle(s);
+      const from = ai.shooting.MuzzleOrigin(s);
+      const samples = ai.shooting.SoldierSamples(rifle.position,0);
+      const exposure = ai.shooting.Exposure(s,from,samples,{targetId:rifle.id}).fraction;
+      const sequence=s.fireSequence, ammo=s.ammo, targetSuppression=rifle.suppression;
+      for(let frame=0;frame<120;frame++) {
+        s.fireTimer=0; s.aimTime=10; ai.time+=.1; ai.TryFire(s,.1,player);
+      }
+      wallRows.push({id:s.id,visible:s.targetVisible,exposure,shots:s.fireSequence-sequence,
+        ammoSpent:ammo-s.ammo,suppression:rifle.suppression-targetSuppression});
+    }
     // Isolate only the firing range. Real shot resolution, token director, player
     // hitboxes and TakeHit run unchanged; empty range removes map placement noise.
     ai.soldiers = [rifle];
@@ -41,7 +72,7 @@ try {
     rifle.weapon = WEAPONS.Type38; rifle.weaponId = "Type38";
     rifle.actor.root.visible = false;
     rifle.scriptDefensive = true; rifle.scriptFireIntervalScale = 1;
-    const out = { rows: [] };
+    const out = { rows: [], wallRows };
     function Prepare(distance, stance = "stand", scale = MISSION_TUNING.frontAccuracyScale) {
       player.alive = true; player.health = 100; player.spawnGrace = 0; player.debug.invincible = false;
       player.wounds.length = 0; player.bleeding = 0;
@@ -76,9 +107,26 @@ try {
       }
     }
     Prepare(2); blocked=true; ai.time+=5;
-    const before=player.health;
+    const before=player.health, blockedSequence=rifle.fireSequence, blockedAmmo=rifle.ammo;
     for(let i=0;i<120;i++){rifle.fireTimer=0;rifle.aimTime=10;ai.time+=.02;ai.TryFire(rifle,1/60,player);}
-    out.blockedDamage=before-player.health; blocked=false;
+    out.blockedDamage=before-player.health;
+    out.blockedShots=rifle.fireSequence-blockedSequence;out.blockedAmmo=blockedAmmo-rifle.ammo;
+    blocked=false;
+    // Cache a clear exposure, then insert a blocker within its 0.25 s lifetime.
+    // A cached aimed shot must obey the same fresh trigger check as suppression.
+    Prepare(5);ai.time+=5;ai.UpdateMuzzle(rifle);
+    ai.shooting.Exposure(rifle,ai.shooting.MuzzleOrigin(rifle),ai.shooting.PlayerSamples(player),{targetId:-1,now:ai.time});
+    blocked=true;const cachedSequence=rifle.fireSequence;
+    rifle.aimTime=10;ai.time+=.01;ai.TryFire(rifle,1/60,player);
+    out.cachedBlockedShots=rifle.fireSequence-cachedSequence;blocked=false;
+    // Token saturation may still produce suppression when its point is reachable.
+    Prepare(5);ai.time+=5;const acquireToken=ai.AcquireFireToken;
+    ai.AcquireFireToken=()=>false;rifle.aimTime=10;
+    const suppressSequence=rifle.fireSequence, suppressBefore=ai.stats.suppressShots;
+    ai.TryFire(rifle,1/60,player);
+    out.clearSuppressionShots=rifle.fireSequence-suppressSequence;
+    out.clearSuppressionCount=ai.stats.suppressShots-suppressBefore;
+    ai.AcquireFireToken=acquireToken;
     Prepare(2,"stand",0);ai.time+=5;
     for(let i=0;i<120;i++){rifle.fireTimer=0;rifle.aimTime=10;ai.time+=.02;ai.TryFire(rifle,1/60,player);}
     out.disabledDamage=100-player.health;
@@ -172,6 +220,16 @@ try {
     }
     for(const row of result.rows.filter(r=>r.distance>=25)) assert.ok(row.rate<.1,`distant campaign balance: ${row.rate}`);
     assert.equal(result.blockedDamage,0);assert.equal(result.disabledDamage,0);assert.equal(result.behindDamage,0);
+    assert.equal(result.blockedShots,0,"blocked exposure must not become wall suppression");
+    assert.equal(result.blockedAmmo,0,"blocked trigger consumes no ammo");
+    assert.equal(result.cachedBlockedShots,0,"fresh obstacle overrides cached clear exposure");
+    assert.equal(result.clearSuppressionShots,1,"reachable suppression survives token saturation");
+    assert.equal(result.clearSuppressionCount,1);
+    for(const row of result.wallRows) {
+      assert.equal(row.exposure,0,"real campaign wall fully hides the enemy");
+      assert.equal(row.shots,0,"NRA soldier must not fire into intervening campaign wall");
+      assert.equal(row.ammoSpent,0);assert.equal(row.suppression,0,"wall stops remote suppression");
+    }
     assert.ok(result.firstHitS!==null&&result.firstHitS<3,"close rifle must inflict damage promptly");
     assert.equal(result.nearToken,true);assert.equal(result.tokenCount,result.cap);
     assert.equal(result.nearAcquired,true);

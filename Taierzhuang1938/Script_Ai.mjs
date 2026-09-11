@@ -3565,7 +3565,7 @@ export class AiDirector {
     if (Math.abs(AngleDelta(s.yaw, targetYaw)) > 0.34) return;
 
     // --- 这一发是瞄准射击还是压制射击 -------------------------------------
-    // 三道闸，任何一道不过就转压制：看不见 / 没抢到攻击令牌 / 暴露采样全被挡。
+    // 三道闸，任何一道不过就尝试压制：看不见 / 没抢到攻击令牌 / 暴露采样全被挡。
     // 压制射击**不占令牌**（否则「没令牌→去压制→压制又要令牌」是死循环）。
     this.UpdateMuzzle(s);
     const from = this.shooting.MuzzleOrigin(s);
@@ -3624,6 +3624,11 @@ export class AiDirector {
 
     // 射击线上有自己人就不扣扳机（后排隔着前排的后脑勺开枪）。
     if (!this.shooting.LineOfFireClear(from, aimV, this.FriendlyTorsos(s))) return;
+
+    // Suppression still needs a reachable point above cover or at the last sighting.
+    // A hidden target must not turn a solid intervening wall into an endless firing
+    // order. Recheck aimed shots too: exposure/visibility may predate a moving blocker.
+    if (!this.shooting.ShotPathClear(from, aimV)) return;
 
     s.ammo -= 1;
     const scriptFactors = this.ScriptFireFactors(s);

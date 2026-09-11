@@ -191,12 +191,17 @@ try {
       const roster = T.ai.soldiers.slice();
       T.ai.soldiers.length = 0;
       T.ai.soldiers.push(gunner);
+      // The fictional eastward heat-test target also needs an empty firing lane.
+      // Wall rejection is exercised with real geometry in AiCloseRangeTest.
+      const host = T.ai.aiHost, raycast = host.Raycast, blocksSight = host.BlocksSight;
+      host.Raycast = () => null; host.BlocksSight = () => false;
       for (let i = 0; i < 500 && gunner.coolUntil <= T.ai.time; i += 1) {
         const before = T.ai.fireCount;
         gunner.ammo = 30; gunner.fireTimer = 0; gunner.aimTime = 9; gunner.suppression = 0;
         T.ai.TryFire(gunner, 0.05, T.player);
         overheatShots += T.ai.fireCount - before;
       }
+      host.Raycast = raycast; host.BlocksSight = blocksSight;
       T.ai.soldiers.length = 0;
       for (const soldier of roster) T.ai.soldiers.push(soldier);
     }

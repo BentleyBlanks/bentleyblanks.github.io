@@ -325,7 +325,7 @@ try {
       return result;
     };
 
-    // B1 墙后：照打不误（压制射击），但一点血都掉不了。
+    // B1 墙后：实际射击路径被挡时停火，不能退成朝实墙压制。
     out.wall = Volley(squad[0], site.hide, "crouch", 60);
     // B2 空地对照：同一支枪、同一段距离，看得见就打得到。
     out.open = Volley(squad[0], site.open, "stand", 60);
@@ -576,8 +576,8 @@ try {
     rh.reloads === 0 || rh.reloadsHidden / rh.reloads >= 0.8,
     `${rh.reloadsHidden}/${rh.reloads}`);
 
-  Check("③ 不隔墙打人：墙后连打 60 发，发发出膛、一点血不掉",
-    sample.wall.fired >= 40 && sample.wall.damage === 0 && sample.wall.maxExposure === 0
+  Check("③ 实墙遮挡时停火：60 次开火尝试，零出膛、零伤害",
+    sample.wall.fired === 0 && sample.wall.damage === 0 && sample.wall.maxExposure === 0
       && sample.wall.aimed === 0,
     `出膛 ${sample.wall.fired} 发（瞄准 ${sample.wall.aimed} / 压制 ${sample.wall.suppress}）、`
       + `掉血 ${sample.wall.damage}、最大暴露 ${sample.wall.maxExposure}、枪口 ${sample.wall.muzzleY} m`);

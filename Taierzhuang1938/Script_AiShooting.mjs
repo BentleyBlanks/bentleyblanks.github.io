@@ -520,6 +520,9 @@ export class ShootingModel {
     return view;
   }
 
+  /** Fresh trigger check, including suppression points; never reuse exposure caches. */
+  ShotPathClear(from, to) { return !this._Blocked(from, to); }
+
   /** 一条采样线被挡住了没有。缺 `host.Raycast` 时一律算通（纯逻辑环境）。 */
   _Blocked(from, to) {
     const host = this.host;
