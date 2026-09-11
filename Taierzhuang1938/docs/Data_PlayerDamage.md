@@ -56,6 +56,17 @@ FirstLevelMissionBrowserTest（正常输入 `--campaign --audio`）全部通过�
 本次完整关卡检查运行 751.7 s，结束状态 Complete、failed=false；这不是靶场 TTK。
 已查看 1280×720 与 745×377 的本地 HUD 截图。过程截图与原始统计只留本地。
 
+合并掩体射击门禁后，近距、伤害、HUD 与 AI 行为四项再测通过。整关首轮在厨房支援
+检查失败：队友仍以约 3.5 m/s 正常追赶，但更快的清敌过程让玩家比队友先到。
+通关驱动改为在村口先自然会合（最多 20 s 等至少两名队友进入玩家 15 m 内），再攻入厨房；
+原有厨房至少两人在 25 m 内、所有存活队员在 45 m 内的断言保留，没有改位置、血量或任务事实。
+复测厨房四人距离约 12.5–17.2 m，完整 `--campaign --audio` 在 711.5 s 后到达 Complete。
+
+最终吸收 `7fa6a44b6` 的开局交火/护送修复后，重新通过 AiCloseRangeTest、
+IncomingFireBrowserTest、FirstLevelOpeningContactTest；`--profile=prepush --domain=infra`
+26 项全过，包含 Pages 合并包的实际启动。该补测针对新合入的开局与射击链，
+整关记录仍是上一段的 711.5 s，不冒充又跑了一次整关。
+
 ## 2026-09-10：近距离射击修正
 
 此前第一关前沿的剧本折扣与玩家折扣在贴脸时照常叠乘。真实 `TryFire` 定种子靶场中，

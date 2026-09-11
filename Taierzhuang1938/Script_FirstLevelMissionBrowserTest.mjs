@@ -784,6 +784,20 @@ try {
     }
     if(stageFrom<=8) {
     await JumpStage(8);
+    // Regroup at the cleared village entrance before assaulting the kitchen.
+    // Faster firefights can leave the human-paced followers a few seconds behind;
+    // do not make support depend on how long the bot happened to shoot earlier.
+    // Only elapsed live simulation: no teleport, mission facts or health overrides.
+    const kitchenRegroup=await page.evaluate(()=>{
+      const g=window.Tengxian;
+      const Members=()=>g.ai.soldiers.filter(a=>["luo","yaowa","heyoutian","liuwencai"].includes(a.castId)&&a.alive);
+      const Near=()=>Members().filter(a=>a.position.distanceTo(g.player.position)<15).length;
+      const before=Near();let frames=0;
+      for(;frames<20*60&&Near()<2&&g.player.Alive;frames++)g.StepFrames(1,1/60,false);
+      return {before,near:Near(),seconds:frames/60,alive:g.player.Alive};
+    });
+    console.log("kitchen regroup",JSON.stringify(kitchenRegroup));
+    assert.ok(kitchenRegroup.alive&&kitchenRegroup.near>=2,"two squadmates regroup within fifteen metres at the entrance within twenty seconds");
     await Route(
       [
         { x: 58, z: -20 },
