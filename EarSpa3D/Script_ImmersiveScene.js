@@ -482,7 +482,10 @@ export async function CreateImmersiveScene({ core }) {
     if(inside&&!transfer){const projected=canal.Project(point);if(projected.depth>Reach(id)){point=Surface(Reach(id),projected.angle,.3);reachBlocked=true;}}
     tool.visible=true;tool.position.copy(point);
     // 耳勺保存玩家的握持朝向，贴壁、换目标和镜头移动只修正位置。
-    if(id==='scoop'&&scoopRotation)tool.quaternion.copy(scoopRotation);
+    if(id==='tweezers'&&transfer?.toolRotation){
+      // 尖端离开耳道后再转腕；固定外景握持角，避免镊身始终指向镜头而透视缩成小点。
+      tool.quaternion.copy(transfer.toolRotation).slerp(transfer.outsideToolRotation,Smooth((-point.z-3)/10));
+    }else if(id==='scoop'&&scoopRotation)tool.quaternion.copy(scoopRotation);
     else{
       const shaftAxis=camera.position.clone().addScaledVector(right,1.15).addScaledVector(up,-1.7).sub(point).normalize();
       const faceNormal=c ? new THREE.Vector3(0,0,1).applyQuaternion(c.body?.detached?c.mesh.quaternion:c.rotation) : toward;
@@ -582,6 +585,15 @@ export async function CreateImmersiveScene({ core }) {
     c.path=new THREE.CatmullRomCurve3([start,center,new THREE.Vector3(0,0,-2),new THREE.Vector3(0,-1,-7),destination],false,'centripetal');
     c.carryRotation=c.mesh.quaternion.clone();c.dropVelocity=0;c.bounces=0;
     transfer={chunk:c,age:0};
+    if(c.toolId==='tweezers'){
+      const outward=trayCamera.clone().sub(trayFocus).normalize();
+      const lateral=new THREE.Vector3(0,1,0).cross(outward).normalize();
+      const vertical=outward.clone().cross(lateral).normalize();
+      const shaft=lateral.multiplyScalar(.75).addScaledVector(vertical,.55).addScaledVector(outward,.35).normalize();
+      const jawAxis=shaft.clone().cross(outward).normalize();
+      transfer.toolRotation=tool.quaternion.clone();
+      transfer.outsideToolRotation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(jawAxis,shaft,jawAxis.clone().cross(shaft).normalize()));
+    }
   }
   function EndService(){if(transfer){const c=transfer.chunk;c.state='attached';c.mesh.position.copy(c.origin);c.mesh.quaternion.copy(c.rotation);for(const child of c.batch||[]){child.state='attached';child.mesh.position.copy(child.origin);child.mesh.quaternion.copy(child.rotation);}transfer=null;}for(const c of chunks)if(c.state==='held'||c.state==='peeling'){Ungrip(c);c.state='attached';}HideTool();}
   function Update(dt) {
