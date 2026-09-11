@@ -60,6 +60,7 @@ import { FIRST_LEVEL_MISSION_PHASE as FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./
 import { FirstLevelMissionRuntime } from "./Script_FirstLevelMissionRuntime.mjs";
 import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage } from "./Data_FirstLevelMissionStages.mjs";
 import { LoadFirstLevelTrainAnimation } from "./Script_FirstLevelTrainAnimation.mjs";
+import { LoadFirstLevelMeal } from "./Script_FirstLevelMeal.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { FirstLevelP012Debug } from "./Script_FirstLevelP012Debug.mjs";
 import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
@@ -3893,7 +3894,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   }, phase.whitebox) : null;
   if (p012Flow) state.storyObjective = p012Flow.CurrentObjective().text;
   missionRuntime?.Dispose();
-  if(phase.whitebox?.fullMission)await LoadFirstLevelTrainAnimation();
+  if(phase.whitebox?.fullMission)await Promise.all([LoadFirstLevelTrainAnimation(),LoadFirstLevelMeal()]);
   missionRuntime = phase.whitebox?.fullMission ? new FirstLevelMissionRuntime({
     scene,camera,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,stageJump,viewmodel,
     FireVehicleBullet,

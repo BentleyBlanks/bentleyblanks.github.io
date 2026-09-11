@@ -39,12 +39,12 @@ function NodeMatrix(node) {
     t[0], t[1], t[2], 1,
   ]);
 }
-function GlbPoints(file) {
+function GlbPoints(file, meshName = null) {
   const glb = LoadGlb(file), g = glb.json, points = [];
   const identity = Float64Array.from([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   const Walk = (index, parent) => {
     const node = g.nodes[index], m = Mat4Mul(parent, NodeMatrix(node));
-    if (node.mesh !== undefined) {
+    if (node.mesh !== undefined && (!meshName || node.name === meshName)) {
       for (const prim of g.meshes[node.mesh].primitives) {
         const acc = ReadAccessor(glb, prim.attributes.POSITION);
         for (let k = 0; k < acc.count; k++) {
@@ -193,6 +193,15 @@ for (const [name, points] of grenadeClouds) {
 }
 Check(grenadeDoc.triangles === MESHES.Grenade.triangles && grenadeDoc.meshes.length === 1,
   "木柄弹展示清单与实物面数一致，单材质合批");
+
+// Locally authored food has no nose. Measure its long X axis, vertical tissue
+// layers and thin Z cross-section from the shipped GLB, after axis conversion.
+for (const [name,width,depth] of [["Model_CuredPorkWhole",.28,.038],["Model_CuredPorkSlice",.105,.005]]) {
+  const points=GlbPoints(path.join(projectDir,"Model/BaconHandoff/Model_CuredPork.glb"),name);
+  const span=[0,1,2].map(axis=>Math.max(...points.map(p=>p[axis]))-Math.min(...points.map(p=>p[axis])));
+  Check(points.length>1000 && Math.abs(span[0]-width)<.00001 && span[1]>span[2]*1.8
+    && span[2]>=depth*.95 && span[2]<depth*1.35,`${name} X 长边、Y 肥瘦分层、Z 厚度`,span.map(v=>v.toFixed(4)).join(" / "));
+}
 
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
 console.log("PASS ModelFacingTest: 飞机机首与战车车头全部按几何复量落在 -Z");

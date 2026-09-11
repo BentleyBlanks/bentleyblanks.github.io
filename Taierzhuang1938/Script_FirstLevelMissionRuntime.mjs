@@ -33,6 +33,7 @@ import {
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
 import { SquadMarchAi } from "./Script_SquadMarchAi.mjs";
 import { FirstLevelMissionView } from "./Script_FirstLevelMissionView.mjs";
+import { FirstLevelMeal } from "./Script_FirstLevelMeal.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
 import { FirstLevelMissionMusic } from "./Script_FirstLevelMissionMusic.mjs";
@@ -97,6 +98,7 @@ export class FirstLevelMissionRuntime {
     this.carriageSound = new FirstLevelCarriageSound(this.audio,()=>this.train?.entries||[]);
     this.musicInitializing = true;
     this.view.interact = this.interact;
+    this.meal = new FirstLevelMeal(this);
     this.Register();
     this.flow.Start();
     this.voiceReady = this.voice.Load().then(()=>{
@@ -870,6 +872,7 @@ export class FirstLevelMissionRuntime {
         this.battlefield.SetTrainOffset(R.trainTravelM);
         this.PlaceSquad();
         this.PlacePlayerTrain();
+        this.player.pitch=MISSION_TRAIN.life.mealLookPitchRad;
         this.carriageSound.Start();
         break;
       case "Unloading":
@@ -1382,6 +1385,7 @@ export class FirstLevelMissionRuntime {
     this.Control?.(true, kind);
   }
   BeforePlayer(dt, input) {
+    this.meal.Restore();
     if (this.ReceivingFood) {
       // Hold the exchange in carriage space; normal train translation and free look remain active.
       input.forward = 0; input.strafe = 0; input.sprint = false; input.lean = 0;
@@ -1821,6 +1825,7 @@ export class FirstLevelMissionRuntime {
     }
     if (stage === "Exit" && this.Near(A.end, 5)) this.Record("playerAtHandoff");
     this.column.Update(dt, { moving, routeSafe: safe, maxProgress, player: this.player.position, ...(safeAt ? {SafeAt:safeAt} : {}) });
+    this.meal.Update();
     this.view.Update(this.time, { tank: this.tank,player:this.player,camera:this.camera||null });
     this.flow.Update(dt);
   }
@@ -1903,6 +1908,7 @@ export class FirstLevelMissionRuntime {
       control: this.controls?.kind || null,
       emptyHands: this.EmptyHands,
       receivingFood: this.ReceivingFood,
+      meal: this.meal.State(),
       openingPrompt: this.OpeningPrompt(),
       failed: this.failed,
       tank: { ...this.tank },
@@ -1945,6 +1951,7 @@ export class FirstLevelMissionRuntime {
     };
   }
   Dispose() {
+    this.meal.Dispose();
     this.opening.Dispose();
     this.squadMarch?.Dispose();
     if(this.tankDust!=null)this.vfx.RemoveSmokeSource(this.tankDust);

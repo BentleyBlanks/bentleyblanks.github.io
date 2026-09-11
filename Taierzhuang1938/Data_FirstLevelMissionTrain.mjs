@@ -6,12 +6,12 @@ export const MISSION_TRAIN = Object.freeze({
   total: trainColumn.total,
   extraCount: trainColumn.extraCount,
   mainCar: 1,
-  life: { seatTopM: 0.48, pelvisAboveSeatM: 0.12, standSeconds: 1.25, sideSeatM: 1.65, gesturePeriodS: 7.5,
+  life: { seatTopM: 0.48, pelvisAboveSeatM: 0.12, standSeconds: 1.25, sideSeatM: 1.65, gesturePeriodS: 7.5, mealLookPitchRad:-.18,
     braceDelayS:.14,braceSpreadS:.6,braceRate:5 },
   // Two deliberate aisle movements, with seated passengers leaving a clear lane.
   activities: {
     yaowa: [
-      {at:.5,x:-77,z:87,speed:.65,face:{x:-77,z:88}},
+      {at:0,x:-77,z:87.08,speed:.65,face:{x:-77,z:88}},
       {at:10,x:-77,z:84.8,speed:.65,face:{x:-78.65,z:85.2}},
       {at:19,x:-77,z:86.6,speed:.65,face:{x:-77,z:88}},
     ],

@@ -2473,6 +2473,28 @@ export class Viewmodel {
     this._UpdateSleeves();
   }
 
+  MealHands({right,left,closure,worldRotation}) {
+    if(this.weapon)return;
+    this.root.updateMatrixWorld(true);
+    // During the contact window the shoulders remain aligned with the giver;
+    // looking away must not drag the receiving hand out of their palm.
+    this.armAnchor.quaternion.copy(this.armAnchor.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(worldRotation));
+    this.armAnchor.updateWorldMatrix(true,true);
+    for(const [side,target,hand,contact] of [['r',right,this.handRight.group,this.gripContactRight],['l',left,this.handLeft.group,this.gripContactLeft]]){
+      hand.position.copy(hand.parent.worldToLocal(target.clone()));
+      const sign=side==='r'?1:-1;
+      const orientation=FrameQuaternion(new THREE.Vector3(-sign*.10,.60,-.80),new THREE.Vector3(sign,0,0)).premultiply(worldRotation);
+      hand.quaternion.copy(hand.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(orientation));
+      contact.position.copy(hand.position);contact.quaternion.copy(hand.quaternion);
+      if(this.riggedArms){
+        this.riggedArms.SetContactWeight(side,0);
+        this.riggedArms.operationPose[side]={shape:'open',nextShape:side==='r'?'clip':'open',shapeMix:closure};
+      }
+    }
+    this.riggedArms?.Update(0);
+    this._UpdateSleeves();
+  }
+
   _UpdateUnarmedHands(gait, sprint, grounded) {
     const amplitude = gait * grounded;
     if (this.riggedArms) {
