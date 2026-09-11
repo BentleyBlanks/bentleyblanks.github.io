@@ -364,6 +364,9 @@ export class Hud {
     };
     this.el.suppress = mk("hudSuppress");        // 压制暗角：纯 CSS 径向渐变，零成本
     this.el.damage = mk("hudDamage");
+    this.el.healthWarning = mk("hudHealthWarning");
+    this.el.healthWarning.setAttribute("role", "status");
+    this.el.healthWarning.setAttribute("aria-live", "polite");
     this.BuildHitDirs();
     // 左上角一个小帧率读数：只看性能，字号压到最小、不抢战场信息。
     this.el.fps = mk("hudFps");
@@ -906,11 +909,23 @@ export class Hud {
    * 三个档位的数与「为什么是这个数」都在 Data_Tuning_Hud.VIGNETTE。
    */
   SetHurt({ health = 100, flash = 0, marks = null, yaw = 0 } = {}) {
-    const base = Math.pow(Math.max(0, 1 - health / VIGNETTE.bleedFromHealth),
-      VIGNETTE.curvePower) * VIGNETTE.baseMax;
+    const injury = Math.pow(Math.min(1, Math.max(0, 1 - health / VIGNETTE.bleedFromHealth)),
+      VIGNETTE.curvePower);
+    const base = injury * VIGNETTE.baseMax;
     const v = Math.min(VIGNETTE.totalMax, Math.max(base, flash * VIGNETTE.flashGain));
     SetStyle(this.el.damage, "opacity", v.toFixed(3));
+    // Health controls coverage; a passing hit flash must not shrink persistent blood.
+    SetVar(this.el.damage, "--blood-clear", (VIGNETTE.clearHealthyPct
+      + (VIGNETTE.clearCriticalPct - VIGNETTE.clearHealthyPct) * injury).toFixed(1) + "%");
+    SetVar(this.el.damage, "--blood-size", (VIGNETTE.textureHealthyPct
+      + (VIGNETTE.textureCriticalPct - VIGNETTE.textureHealthyPct) * injury).toFixed(1) + "%");
+    const critical = Math.min(1, Math.max(0, 1 - health / VIGNETTE.pulseBelowHealth));
+    SetVar(this.el.damage, "--blood-pulse", (VIGNETTE.pulseSlowS
+      + (VIGNETTE.pulseFastS - VIGNETTE.pulseSlowS) * critical).toFixed(2) + "s");
     SetClass(this.el.damage, "low", health < VIGNETTE.pulseBelowHealth && health > 0);
+    const warning = health > 0 && health <= VIGNETTE.warningBelowHealth;
+    SetText(this.el.healthWarning, warning ? T("hud.state.critical") : "");
+    SetClass(this.el.healthWarning, "on", warning);
 
     const nodes = this.hitDirNodes;
     if (!nodes) return;

@@ -4844,7 +4844,8 @@ function StartMeleeScenario(id) {
   meleeTargets.length = 0;
   player.Spawn(1400, spec.kind === "observe" ? 1470 : 1467, 0);
   if(spec.kind==='field')player.Spawn(1400,1476,0);
-  player.spawnGrace = 0; player.debug.invincible = false; player.debug.noCollision = false;
+  player.spawnGrace = 0;
+  ApplyDebugOptions();
   state.slots.primary = "HanYang"; state.slots.melee = "Dadao";
   viewmodel.action = null; state.meleeCharge = null;
   state.activeSlot = spec.weapon === "Dadao" ? "melee" : "primary";

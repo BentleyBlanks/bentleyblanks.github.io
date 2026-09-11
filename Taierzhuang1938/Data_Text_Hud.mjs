@@ -26,6 +26,7 @@ export const TEXT = Object.freeze({
   "hud.equipment.bundle": "集束手榴弹",
   "hud.equipment.mortar": "迫击炮支援",
   "hud.state.bleeding": "流血",
+  "hud.state.critical": "生命危急 · 立即寻找掩护",
   "hud.state.wounded": "带伤",
   "hud.state.bandages": "绷带 {n}",
   "hud.state.breath": "屏息",

@@ -16,9 +16,29 @@ page.on('pageerror',e=>errors.push(String(e)));
 page.on('console',m=>{if(m.type()==='error' && !/fonts|ERR_BLOCKED_BY_CLIENT/.test(m.text()))errors.push(m.text());});
 try {
   await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//,route=>route.abort('blockedbyclient'));
+  await page.addInitScript(()=>{
+    if(sessionStorage.getItem("InvincibilityFixture")==="done")return;
+    localStorage.setItem("tengxian1938_debug_options_v1",JSON.stringify({invincible:true}));
+  });
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?shot=1&manual=1&melee=1&quality=medium&scale=small`,{waitUntil:'load',timeout:120000});
   await page.waitForFunction(()=>window.Taierzhuang?.state?.ready&&window.Taierzhuang?.state?.running&&window.Taierzhuang?.Debug?.MeleeCombat,null,{timeout:120000});
   console.log('PASS whitebox boot');
+  const protection=await page.evaluate(()=>{
+    const T=Taierzhuang;
+    T.Debug.MeleeCombat.Reset();
+    T.player.TakeHit(10000,"head",null,{melee:true});
+    T.player.Kill();
+    const result={option:JSON.parse(localStorage.getItem("tengxian1938_debug_options_v1")).invincible,runtime:T.player.debug.invincible,
+      alive:T.player.Alive,health:T.player.health};
+    localStorage.removeItem("tengxian1938_debug_options_v1");
+    sessionStorage.setItem("InvincibilityFixture","done");
+    return result;
+  });
+  assert.deepEqual(protection,{option:true,runtime:true,alive:true,health:100},
+    "restarting the melee arena preserves the menu's invincibility option");
+  await page.reload({waitUntil:'load',timeout:120000});
+  await page.waitForFunction(()=>window.Taierzhuang?.state?.ready&&window.Taierzhuang?.state?.running&&window.Taierzhuang?.Debug?.MeleeCombat,null,{timeout:120000});
+  assert.equal(await page.evaluate(()=>Taierzhuang.player.debug.invincible),false);
   if(!posesOnly){
   assert(await page.evaluate(()=>Taierzhuang.ai.soldiers.length===12&&Taierzhuang.ai.soldiers.every(s=>s.meleeDormant)),'field contains six dormant encounter groups');
   const field=await page.evaluate(()=>{

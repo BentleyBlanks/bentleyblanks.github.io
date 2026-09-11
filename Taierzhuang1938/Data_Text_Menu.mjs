@@ -61,6 +61,7 @@ export const TEXT = Object.freeze({
   "menu.p012.completeTitle": "第一关完成",
   "menu.p012.failTitle": "{name} · 阵亡",
   "menu.death.title": "你已阵亡",
+  "menu.death.missionFailed": "任务失败",
   "menu.death.checkpoint": "从检查点开始",
   "menu.death.checkpointHint": "返回最近的检查点，继续当前任务",
   "menu.death.restart": "重新开始本关",

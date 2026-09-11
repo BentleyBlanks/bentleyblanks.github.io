@@ -286,6 +286,10 @@ export class PlayerController {
       this.health = 100;
       this.bleeding = 0;
       this.wounds.length = 0;
+      this.hitFlash = 0;
+      this.hitMarks.length = 0;
+      this.hitEvents.length = 0;
+      this.heartbeatTimer = 0;
     }
   }
   get EyePosition() {
@@ -1185,7 +1189,8 @@ export class PlayerController {
   }
 
   Kill() {
-    if (!this.alive) return;
+    // Direct lethal callers must obey the same debug protection as TakeHit/bleeding.
+    if (!this.alive || this.debug.invincible) return;
     this.deathCameraStart.copy(this.camera.position);
     this.deathStartYaw = this.camera.rotation.y;
     this.deathStartPitch = this.camera.rotation.x;

@@ -64,7 +64,7 @@ export const HITDIR = Object.freeze({
   texture: "./Texture/Hud/Texture_HudDamageArc.png?v=20260911a",
   /** Registration in the -100..100 HUD viewBox; keep the sight center clear. */
   textureBox: Object.freeze({ x: -70, y: -85, size: 140 }),
-  /** Near fire has a split thin crest as well as its lighter, desaturated texture. */
+  /** Near fire keeps a split thin red crest; injury uses the solid blood arc. */
   nearPath: "M-43,-55 Q-27,-70 -9,-73 M9,-73 Q27,-70 43,-55",
   nearOpacity: 0.86,
   /** 剩余寿命乘这个数再夹到 1：前四分之一寿命满亮，之后才开始淡。 */
@@ -79,19 +79,27 @@ export const HITDIR = Object.freeze({
  */
 export const VIGNETTE = Object.freeze({
   /**
-   * 底噪从这一档血量开始渗。**90 而不是 70**：让「我该包扎了」提前到还有得救的时候。
+   * 失血即开始提示；2026-09-11 玩家反馈要求范围与深度同时随剩余生命变化。
    */
-  bleedFromHealth: 90,
+  bleedFromHealth: 100,
   /** 曲线幂次。越低涨得越快。 */
-  curvePower: 1.6,
+  curvePower: 0.85,
   /** 底噪的最大不透明度。 */
-  baseMax: 0.78,
+  baseMax: 0.94,
   /** 这一发的红闪（player.hitFlash）折算成不透明度的系数。 */
   flashGain: 0.85,
   /** 三层叠完之后的总上限：留一条缝，任何时候都还看得见路。 */
   totalMax: 0.92,
   /** 血量低于这一档整块暗角开始搏动（CSS 动画）。 */
   pulseBelowHealth: 40,
+  warningBelowHealth: 30,
+  /** Clear central ellipse shrinks as blood spreads inward; aiming stays unobscured. */
+  clearHealthyPct: 82,
+  clearCriticalPct: 32,
+  textureHealthyPct: 148,
+  textureCriticalPct: 100,
+  pulseSlowS: 1.10,
+  pulseFastS: 0.60,
 });
 
 /** 压制暗角。压制值指数衰减永远到不了 0，所以另有千分位截断（在代码里）。 */

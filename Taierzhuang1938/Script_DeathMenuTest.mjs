@@ -111,8 +111,27 @@ try {
   });
   assert.ok(unavailable.disabled && unavailable.stillDead, JSON.stringify(unavailable));
   assert.equal(unavailable.title, "你已阵亡");
+  const companionFailure = await page.evaluate(async () => {
+    const g=window.Tengxian;
+    await g.Debug.FirstLevelJump(1);
+    const r=g.Debug.FirstLevelMissionRuntime();
+    g.Debug.SetDebugOption("invincible",true);
+    g.StepFrames(2,1/60,true);
+    r.squad.find(actor=>actor.castId==="luo").Kill();
+    r.opening.Update(1/60);
+    g.StepFrames(1,1/60,true);
+    return {alive:g.player.Alive,health:g.player.health,failed:r.failed,
+      title:g.menu.el.titleMain.textContent,subtitle:g.menu.el.titleSub.textContent,
+      items:g.menu.items.map(item=>item.id)};
+  });
+  assert.ok(companionFailure.alive && companionFailure.health===100 && companionFailure.failed);
+  assert.equal(companionFailure.title,"任务失败","a living invincible player is never reported as killed by a squadmate's death");
+  assert.ok(companionFailure.subtitle.includes("罗"));
+  assert.deepEqual(companionFailure.items,["restartSandbox","exitSandbox"]);
+  await page.waitForFunction(() => document.getAnimations().every(animation => animation.playState !== "running"));
+  await page.screenshot({path:path.join(out,"Scene_CompanionFailure.png")});
   assert.deepEqual(errors, []);
-  await fs.writeFile(path.join(out, "Data_DeathMenu.json"), JSON.stringify({ setup, frozen, restored, unavailable, errors }, null, 2));
+  await fs.writeFile(path.join(out, "Data_DeathMenu.json"), JSON.stringify({ setup, frozen, restored, unavailable, companionFailure, errors }, null, 2));
   console.log("DeathMenuTest PASS: independent death state, frozen world, falling camera, mouse/Enter checkpoint recovery, pause regression and missing checkpoint");
 } finally {
   await browser.close();

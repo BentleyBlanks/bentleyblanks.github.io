@@ -499,7 +499,8 @@ export class MainMenu {
     this.root.classList.add("failure");
     const who = CastName(castId);
     const checkpoint = this.host.CheckpointStatus?.();
-    this.el.titleMain.textContent = T("menu.death.title");
+    this.el.titleMain.textContent = restartOnly || castId !== "shunzi"
+      ? T("menu.death.missionFailed") : T("menu.death.title");
     this.el.titleSub.textContent = T("menu.p012.failTitle", { name: who });
     this.el.foot.textContent = T("menu.death.keys");
     this.SetItems([

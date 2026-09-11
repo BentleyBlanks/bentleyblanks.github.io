@@ -35,18 +35,28 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 /* Imagegen 血污只覆盖周边，中央保持清楚。父层接伤害/血量，子层独立搏动。 */
 .hudDamage {
   position: absolute; inset: 0; opacity: 0;
-  pointer-events: none;
+  pointer-events: none; overflow: hidden;
+  --blood-clear: 82%; --blood-size: 148%; --blood-pulse: 1.1s;
   transition: opacity 0.09s linear;
   background: radial-gradient(ellipse closest-side at center,
-    transparent 66%, rgba(51,4,7,0.08) 83%, rgba(25,2,5,0.46) 112%);
+    transparent var(--blood-clear),
+    rgba(142,6,14,0.46) calc(var(--blood-clear) + 22%),
+    rgba(78,0,7,0.9) 112%);
 }
 .hudDamage::before {
   content: ""; position: absolute; inset: 0;
-  background: url("./Texture/Hud/Texture_HudCriticalBlood.png?v=20260911a") center / 100% 100% no-repeat;
+  background: url("./Texture/Hud/Texture_HudCriticalBlood.png?v=20260911a") center / var(--blood-size) var(--blood-size) no-repeat;
   opacity: 0.88;
 }
 /* 只动画化子层 opacity，不对全屏纹理逐帧做 brightness/filter。 */
-.hudDamage.low::before { animation: hudPulse 0.86s ease-in-out infinite; }
+.hudDamage.low::before { animation: hudPulse var(--blood-pulse) ease-in-out infinite; }
+.hudHealthWarning {
+  position: absolute; right: 22px; bottom: 122px; z-index: 7;
+  max-width: calc(100vw - 32px); opacity: 0;
+  color: #ff655c; font: 700 clamp(12px, 1.15vw, 16px)/1.5 var(--ui-font);
+  text-shadow: 0 1px 3px #180000, 0 0 6px #000;
+}
+.hudHealthWarning.on { opacity: 1; }
 @keyframes hudPulse {
   0%, 100% { opacity: 0.62; }
   18%      { opacity: 1; }
@@ -66,10 +76,10 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudNearCrest { display: none; }
 .hudHitDir.near .hudHitTexture {
   opacity: 0.36;
-  filter: grayscale(1) sepia(0.8) saturate(1.4) brightness(2.7);
+  filter: drop-shadow(0 1px 1px rgba(19,2,3,0.7));
 }
 .hudHitDir.near .hudNearCrest {
-  display: block; fill: none; stroke: #ecd6a5;
+  display: block; fill: none; stroke: #ed5048;
   stroke-width: 1.15; stroke-linecap: round;
   filter: drop-shadow(0 1px 1px rgba(18,12,5,0.65));
 }
@@ -840,11 +850,11 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 
 /* 命中记号 —— 屏幕正中四道短撇。
    它叠在准心上仍必须小、暗、短命，不能盖住跑动和腰射的方向反馈。
-   四道撇按 45° 斜角排，靠 --spread 往外弹一下；命中是骨白，击杀是干血红且更长。 */
+   四道撇按 45° 斜角排，靠 --spread 往外弹一下；命中是红色，击杀是干血红且更长。 */
 .hudHitmark {
   position: absolute; left: 50%; top: 50%; width: 34px; height: 34px;
   margin: -17px 0 0 -17px; z-index: 4; isolation: isolate;
-  opacity: 0; --spread: 5px; --len: 9px; --mk: rgba(246, 240, 222, 1);
+  opacity: 0; --spread: 5px; --len: 9px; --mk: rgba(239, 83, 70, 1);
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.9));
 }
 .hudHitmark .t {

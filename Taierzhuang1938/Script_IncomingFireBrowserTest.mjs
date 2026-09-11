@@ -72,11 +72,14 @@ try {
     return {hp:T.player.health,flash:T.player.hitFlash,kind:T.player.hitMarks[0]?.kind,
       angle:el?.getAttribute("transform"),opacity:el && +getComputedStyle(el).opacity,
       textureOpacity:texture && +getComputedStyle(texture).opacity,
-      crestDisplay:crest && getComputedStyle(crest).display,fill:crest && getComputedStyle(crest).fill};
+      crestDisplay:crest && getComputedStyle(crest).display,fill:crest && getComputedStyle(crest).fill,
+      stroke:crest && getComputedStyle(crest).stroke,filter:texture && getComputedStyle(texture).filter};
   });
   assert.equal(near.hp,100); assert.equal(near.flash,0); assert.equal(near.kind,"near");
   assert.equal(near.angle,"rotate(90.0)"); assert.ok(near.opacity>.7); assert.equal(near.fill,"none");
   assert.equal(near.crestDisplay,"block"); assert.ok(near.textureOpacity < .5);
+  assert.equal(near.stroke,"rgb(237, 80, 72)");
+  assert.ok(!near.filter.includes("grayscale"),"incoming attacks keep their red warning color");
   await page.screenshot({path:path.join(output,"NearRight.png")});
   const hit = await page.evaluate(() => {
     const T = window.Tengxian, p = T.player;
@@ -141,25 +144,36 @@ try {
   assert.deepEqual(lifecycle,{count:5,hits:5,expired:0,visible:0,invalid:0,respawn:0});
   // Injury grading, heartbeat and recovery use the same production SetHurt path.
   const healthStates = [];
-  for (const health of [100,60,22]) {
+  for (const health of [100,80,60,40,22,8]) {
     await page.evaluate(health => window.Tengxian.hud.SetHurt({health}), health);
     await page.waitForTimeout(160);
     healthStates.push(await page.evaluate(() => {
       const el = document.querySelector(".hudDamage");
       return {opacity:+getComputedStyle(el).opacity,low:el.classList.contains("low"),
-        pulse:getComputedStyle(el,"::before").animationName};
+        pulse:getComputedStyle(el,"::before").animationName,
+        clear:parseFloat(el.style.getPropertyValue("--blood-clear")),
+        size:parseFloat(getComputedStyle(el,"::before").backgroundSize),
+        duration:parseFloat(getComputedStyle(el,"::before").animationDuration),
+        warning:document.querySelector(".hudHealthWarning").textContent};
     }));
     await page.screenshot({path:path.join(output,`Health${health}.png`)});
   }
   assert.equal(healthStates[0].opacity,0);
-  assert.ok(healthStates[1].opacity > 0 && healthStates[1].opacity < healthStates[2].opacity);
-  assert.equal(healthStates[1].low,false); assert.equal(healthStates[2].pulse,"hudPulse");
+  for(let i=1;i<healthStates.length;i++){
+    assert.ok(healthStates[i].opacity>healthStates[i-1].opacity,"blood deepens with lost HP");
+    assert.ok(healthStates[i].clear<healthStates[i-1].clear,"blood covers more of the screen as HP falls");
+    assert.ok(healthStates[i].size<healthStates[i-1].size,"texture moves inward along with the gradient");
+  }
+  assert.equal(healthStates[1].low,false); assert.equal(healthStates[4].pulse,"hudPulse");
+  assert.ok(healthStates[4].warning.includes("生命危急"));
+  assert.ok(healthStates[5].duration<healthStates[4].duration,"critical pulse accelerates");
   await page.emulateMedia({reducedMotion:"reduce"});
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector(".hudDamage"),"::before").animationName),"none");
   await page.emulateMedia({reducedMotion:"no-preference"});
   await page.evaluate(() => window.Tengxian.hud.SetHurt({health:100}));
   await page.waitForTimeout(160);
   assert.equal(await page.evaluate(() => +getComputedStyle(document.querySelector(".hudDamage")).opacity),0);
+  assert.equal(await page.locator(".hudHealthWarning").textContent(),"");
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector(".hudDamage"),"::before").animationName),"none");
   // Narrow viewport uses the same center and readable vmin geometry.
   await page.setViewportSize({width:745,height:377});
@@ -174,8 +188,49 @@ try {
   await page.evaluate(() => window.Tengxian.hud.SetHurt({health:22}));
   await page.waitForTimeout(160);
   await page.screenshot({path:path.join(output,"CompactCritical.png")});
+  // The real menu checkbox, stage rebuild and checkpoint recovery share one option.
+  await page.evaluate(() => {
+    const T=window.Tengxian;
+    T.menu.OpenPause();
+    T.Debug.MenuAct("debug");
+  });
+  await page.locator('#menu .mnDebugRow[data-option="invincible"] input').check();
+  const protection = await page.evaluate(async () => {
+    const T=window.Tengxian;
+    await T.Debug.FirstLevelJump(4);
+    const p=T.player, enabled=T.Debug.DebugOptions().invincible;
+    p.spawnGrace=0;
+    for(const info of [{bullet:true},{blast:true},{melee:true},null]) p.TakeHit(10000,"head",null,info);
+    p.Kill();
+    const protectedAlive=p.Alive;
+    p.bleeding=10000;
+    p.Update(1/60,{lookX:0,lookY:0},{});
+    const result={enabled,runtime:p.debug.invincible,protectedAlive,health:p.health,bleeding:p.bleeding};
+    T.Debug.SetDebugOption("invincible",false);
+    p.spawnGrace=0;p.TakeHit(10000,"torso");T.StepFrames(1,1/60,false);
+    result.disabledLethal=!p.Alive;
+    result.deathMenu=T.menu.mode;
+    T.Debug.MenuAct("continueCheckpoint");
+    result.checkpointAlive=p.Alive;
+    // Turning on protection clears injury feedback immediately, without a damage frame.
+    p.spawnGrace=0;p.TakeHit(60,"torso");
+    T.Debug.SetDebugOption("invincible",true);
+    T.hud.SetHurt({health:p.health,flash:p.hitFlash,marks:p.hitMarks});
+    result.recovery={health:p.health,bleeding:p.bleeding,flash:p.hitFlash,marks:p.hitMarks.length,
+      warning:T.hud.el.healthWarning.textContent};
+    T.Debug.SetDebugOption("invincible",false);
+    return result;
+  });
+  assert.deepEqual(protection,{enabled:true,runtime:true,protectedAlive:true,health:100,bleeding:0,
+    disabledLethal:true,deathMenu:"failure",checkpointAlive:true,
+    recovery:{health:100,bleeding:0,flash:0,marks:0,warning:""}});
+  const hitmarkColor=await page.evaluate(()=>{
+    const T=window.Tengxian;T.hud.Hitmark("hit");
+    return getComputedStyle(T.hud.el.hitmark.querySelector(".t")).backgroundColor;
+  });
+  assert.equal(hitmarkColor,"rgb(239, 83, 70)");
   assert.deepEqual(errors,[]);
-  const report={textures,near,hit,rotation,sectors,lifecycle,healthStates};
+  const report={textures,near,hit,rotation,sectors,lifecycle,healthStates,protection,hitmarkColor};
   await fs.writeFile(path.join(output,"Report.json"),JSON.stringify(report,null,2));
   console.log("IncomingFireBrowserTest OK",JSON.stringify(report));
 } finally {
