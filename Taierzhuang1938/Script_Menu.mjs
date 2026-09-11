@@ -159,6 +159,7 @@ export class MainMenu {
    *   P012Progress() / P012NextProgress() 白盒逐段调试推进
    *   DebugOptions() / SetDebugOption(id, on) 调试选项的读取与写入
    *   CheckpointStatus() / ContinueCheckpoint() 暂停调试中的检查点状态与恢复动作
+   *   CurrentObjective() 当前正在执行的任务目标
    *   SliceIndex() 当前建好的是哪一关的切片
    *   Unlock()     第一次用户手势时解锁音频（可选）
    *   GroundHeight(x, z) 可选：把机位抬到地面之上，免得穿地
@@ -242,6 +243,14 @@ export class MainMenu {
     MENU.lines.forEach((line, index) => {
       mk("mnTitleLine", this.el.titleLines).textContent = Localize(MenuLineId(index), line);
     });
+
+    this.el.pauseObjective = mk("mnPauseObjective", this.root, "section");
+    this.el.pauseObjective.hidden = true;
+    this.el.pauseObjective.setAttribute("aria-labelledby", "PauseObjectiveTitle");
+    const objectiveTitle = mk("mnPauseObjectiveTitle", this.el.pauseObjective, "h2");
+    objectiveTitle.id = "PauseObjectiveTitle";
+    objectiveTitle.textContent = T("menu.pause.objective");
+    this.el.pauseObjectiveText = mk("mnPauseObjectiveText", this.el.pauseObjective, "p");
 
     // --- 主列表 -----------------------------------------------------------
     this.el.list = mk("mnList", this.root, "nav");
@@ -526,6 +535,9 @@ export class MainMenu {
       this.el.titleSub.textContent = mode === "pause"
         ? title : Localize(MenuTextId("subtitle"), MENU.subtitle);
     }
+    const objective = mode === "pause" ? String(this.host.CurrentObjective?.() || "").trim() : "";
+    this.el.pauseObjectiveText.textContent = objective;
+    this.el.pauseObjective.hidden = !objective;
     const panel = mode === "levels" || mode === "codex" || mode === "credits" || mode === "debug";
     if (panel) this.panelReturnMode = wasMode === "pause" ? "pause" : "title";
     this.root.classList.toggle("panelOn", panel);

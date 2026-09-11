@@ -12,6 +12,7 @@ export const TEXT = Object.freeze({
   "menu.foot.escBack": "Esc 返回",
   "menu.foot.campaign": "↑↓ 选择  /  Enter 进入  /  Esc 返回",
   "menu.title.paused": "游戏暂停",
+  "menu.pause.objective": "当前任务目标",
   "menu.panel.levels": "任务选择",
   "menu.toggle.on": "开",
   "menu.toggle.off": "关",

@@ -703,13 +703,11 @@ export class FirstLevelMissionRuntime {
       if(!TransferBeatReady(plan,{seconds,loaded:this.column.loadEvents.length,previousClearedAt:beats.previousClearedAt}))return;
       this.SpawnEncounter(plan.id);beats.started.push(plan.id);
       this.Record(`${plan.id}AttackStarted`,{loaded:this.column.loadEvents.length,departed:this.column.departed});
-      this.hud.Hint(T(`firstLevel.hint.${plan.hint}`),8);
     }
     const actors=MISSION_ENCOUNTERS[plan.id].map(spec=>this.enemies.get(spec.id));
     if(actors.every(actor=>actor && !actor.alive)) {
       beats.cleared.push(plan.id);beats.previousClearedAt=seconds;beats.index++;
       this.Record(`${plan.id}AttackCleared`,{loaded:this.column.loadEvents.length,departed:this.column.departed});
-      this.hud.Hint(T("firstLevel.hint.transferWindow",{loaded:this.column.loadEvents.length,departed:this.column.departed}),8);
       if(beats.index===MISSION_TRANSFER_BEATS.length)this.Record("transferAttacksResolved");
     }
   }
@@ -864,7 +862,6 @@ export class FirstLevelMissionRuntime {
     this.UpdateMusic(stage.id);
     this.Objective(Localize(FirstLevelStageTextId(stage.id), stage.objective));
     const guardLoss=stage.id==="Tank" && this.guards.filter(guard=>guard.safe && guard.actor.alive).length<R.guardCount;
-    if(guardLoss)this.hud.Hint(T(this.guards.some(guard=>guard.safe && guard.actor.alive)?"firstLevel.hint.guardsLoss":"firstLevel.hint.guardsLost"),9);
     if (stage.cue && !guardLoss && !["Courtyard", "Train", "Unloading", "Shelter", "Death"].includes(stage.id))
       this.Say(stage.cue, { urgent: ["AirFirst", "Dive", "Death"].includes(stage.id) });
     switch (stage.id) {
@@ -947,7 +944,6 @@ export class FirstLevelMissionRuntime {
           // The noncombatant AI stows its bayonet while waiting behind cover.
           this.tutor.bayonetFixed = true;
         }
-        this.hud.Hint(T("firstLevel.hint.melee"), 8);
         break;
       case "Courtyard":
         this.Guide(MISSION_ROUTES.village.slice(2, 6));
@@ -1072,7 +1068,6 @@ export class FirstLevelMissionRuntime {
         if(!guard.safe && guard.progress>R.guardSafeRouteIndex) {
           guard.safe = true;
           this.Record(`guardWithdrawn${guard.actor.id}`,{survived:this.guards.filter(entry=>entry.safe).length});
-          this.hud.Hint(T("firstLevel.hint.guardCrossed"),5);
           this.nextGuardCrossingAt=this.time+R.guardCrossingGapS;
         }
         if (guard.progress >= guard.route.length) {
@@ -1662,20 +1657,10 @@ export class FirstLevelMissionRuntime {
         this.Record("frontContact");
     }
     if (stage === "MachineGun") {
-      if (Math.floor(t / 8) !== this.lastGuardHint) {
-        this.lastGuardHint = Math.floor(t / 8);
-        const gun=this.emplacement.Emplacement(this.gunId);
-        this.hud.Hint(gun?.rounds===0 && gun?.belts===0 ? T("firstLevel.hint.gunSupply") : T("firstLevel.hint.guards", {
-          safe:this.guards.filter(g=>g.safe).length, remaining:this.guards.filter(g=>g.actor.alive&&!g.safe).length}), 5);
-      }
       if (this.emplacement.stats.shots > 0) this.Record("gunUsed");
       const gun = this.emplacement.Emplacement(this.gunId);
       if (gun?.belts === 3) this.Say("ThreeMagazines");
       if (gun?.belts === 2) this.Say("TwoMagazines");
-    }
-    if (stage === "Tank" && Math.floor(t / 10) !== this.lastTankHint) {
-      this.lastTankHint=Math.floor(t / 10);
-      this.hud.Hint(this.Inventory().bundles>0?T("firstLevel.hint.bundle"):T("firstLevel.hint.bundleEmpty"),5);
     }
     if(stage==="Orders" && this.Near(A.orders,8))this.Record("ordersReached");
     if (stage === "South") {
@@ -1715,17 +1700,6 @@ export class FirstLevelMissionRuntime {
       maxProgress = Infinity;
     let safeAt = null;
     if (stage === "Courtyard") {
-      if (Math.floor(t / 10) !== this.lastQueueHint) {
-        this.lastQueueHint = Math.floor(t / 10);
-        this.hud.Hint(
-          T("firstLevel.hint.queue", {
-            passed: this.column.State().gatePassed,
-            total: this.column.litters.filter(litter=>litter.health>0||litter.passedGate).length,
-            loaded: this.column.loadEvents.length,
-          }),
-          4,
-        );
-      }
       const gun = this.enemies.get("VillageGunner");
       if (gun && !gun.alive) this.Record("villageGunSilent");
       safeAt = point => Distance(point,A.gate) > R.passageRangeM || (this.Has("villageGunSilent") && !this.Threatens(point));
@@ -1848,7 +1822,6 @@ export class FirstLevelMissionRuntime {
     if (stage === "Exit" && this.Near(A.end, 5)) this.Record("playerAtHandoff");
     this.column.Update(dt, { moving, routeSafe: safe, maxProgress, player: this.player.position, ...(safeAt ? {SafeAt:safeAt} : {}) });
     this.view.Update(this.time, { tank: this.tank,player:this.player,camera:this.camera||null });
-    this.view.UpdateNavigation(this.CurrentGuide(),this.player);
     this.flow.Update(dt);
   }
   SaveCheckpoint() {

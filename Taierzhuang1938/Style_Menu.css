@@ -32,6 +32,17 @@
   display: flex; flex-direction: column; align-items: stretch; gap: 2px; overflow-y: auto;
 }
 #menu.pause .mnList { top: 30%; }
+.mnPauseObjective {
+  position: absolute; top: 30%; right: 8%; width: min(560px, 40vw);
+  max-height: 54%; overflow-y: auto; pointer-events: auto;
+}
+.mnPauseObjective[hidden] { display: none; }
+.mnPauseObjectiveTitle { margin: 0 0 14px; color: var(--ui-muted); font-size: 13px; font-weight: 400; letter-spacing: 0.08em; }
+.mnPauseObjectiveText { margin: 0; color: var(--ui-bright); font-size: clamp(18px, 1.5vw, 24px); line-height: 1.7; white-space: pre-line; }
+@media (max-width: 760px) {
+  .mnPauseObjective { top: 17%; left: 5%; right: 5%; width: auto; max-height: 24%; }
+  #menu.pause:has(.mnPauseObjective:not([hidden])) .mnList { top: 44%; width: 90%; }
+}
 .mnItem {
   pointer-events: auto; cursor: pointer; flex: 0 0 auto; min-height: 44px;
   display: flex; align-items: center; border: 1px solid transparent;

@@ -2,7 +2,6 @@
 import * as THREE from "three";
 import { MissionAftermath } from "./Script_FirstLevelMissionAftermath.mjs";
 import { MissionPeople } from "./Script_FirstLevelMissionPeople.mjs";
-import { T } from "./Script_Text.mjs";
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { CreateP012StretcherGeometry } from "./Script_FirstLevelP012CarryView.mjs";
 import { BuildSink } from "./Script_World.mjs";
@@ -78,11 +77,7 @@ export class FirstLevelMissionView {
     this.aftermath=new MissionAftermath({root:this.root,actorFactory,battlefield,vfx});
     this.BuildTank();
     this.BuildSupplies();
-    this.navigation=document.createElement("div");
-    this.navigation.dataset.missionNavigation="true";
-    this.navigation.style.cssText="position:absolute;top:84px;left:22px;padding:6px 10px;color:#eee5d0;background:#202720bb;border-left:2px solid #d6be84;font:14px/1.5 sans-serif;max-width:430px;white-space:pre-line;pointer-events:none";
-    this.navigation.hidden=true;
-    hud?.root?.append(this.navigation);
+
   }
   Box(root, w, h, d, x, y, z, color) {
     const material = new THREE.MeshStandardMaterial({ color, roughness: 0.9 });
@@ -352,19 +347,7 @@ export class FirstLevelMissionView {
       }
     }
   }
-  UpdateNavigation(guide,player) {
-    const distance=guide?Math.hypot(guide.target.x-player.position.x,guide.target.z-player.position.z):0;
-    this.navigation.hidden=!guide || !player.Alive || (distance<MISSION_TUNING.guideHideDistanceM&&!guide.status);
-    if(this.navigation.hidden)return;
-    const angle=Math.atan2(player.position.x-guide.target.x,player.position.z-guide.target.z)-player.yaw;
-    const delta=Math.atan2(Math.sin(angle),Math.cos(angle));
-    const arrow=Math.abs(delta)<.45?'↑':Math.abs(delta)>2.6?'↓':delta>0?'←':'→';
-    const direction=distance>=MISSION_TUNING.guideHideDistanceM?arrow+' '+T('firstLevel.guide.distance',{label:guide.label,distance:Math.round(distance)}):'';
-    const text=[direction,guide.status].filter(Boolean).join('\n');
-    if(this.navigation.textContent!==text)this.navigation.textContent=text;
-  }
   Dispose() {
-    this.navigation?.remove();
     this.people.Dispose();this.aftermath.Dispose();
     for (const collider of this.colliders) {
       if (collider._physicsHandle != null) this.physics.RemoveSolid(collider._physicsHandle);

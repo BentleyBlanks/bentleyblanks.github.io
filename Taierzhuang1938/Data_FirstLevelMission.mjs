@@ -56,7 +56,7 @@ export const MISSION_STAGES = Object.freeze([
     { minimumSeconds: MISSION_TUNING.quietSouthSeconds },
   ),
   Stage("Village", "从右侧灶屋绕进内院，夺取伤员通道。", A.melee, ["innerCourtReached"], "VillageAmbush"),
-  Stage("Melee", "近距离接敌：V 切大刀，F 拨推枪身，左键挥刀。", A.melee, ["meleeResolved"], null),
+  Stage("Melee", "清除近身日军，夺取伤员通道。", A.melee, ["meleeResolved"], null),
   Stage(
     "Courtyard",
     "清理窗口机枪，打开院门，掩护担架分批通过。",

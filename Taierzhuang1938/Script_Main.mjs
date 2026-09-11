@@ -141,7 +141,7 @@ import { Clamp, Clamp01, HashString, Mulberry32 } from "./Script_Noise.mjs";
 import { T, Localize } from "./Script_Text.mjs";
 /** 武器名是 Data_Weapons 里的内容原稿：显示前按 id 找译文。没有这把枪返回空串（调用点自己兜底）。 */
 const WeaponName = (weaponId) => (WEAPONS[weaponId]?.name ? Localize(WeaponNameId(weaponId), WEAPONS[weaponId].name) : "");
-import { CastNameId, LevelObjectiveStepId, WeaponNameId } from "./Script_TextIds.mjs";
+import { CastNameId, FirstLevelStageTextId, LevelObjectiveStepId, WeaponNameId } from "./Script_TextIds.mjs";
 import { BOOT, CAMERA, PACING, SQUAD } from "./Data_Tuning_Main.mjs";
 
 /** 加载条一段之内的进度：`from + span * t`。别在调用点手拼这两个数。 */
@@ -2861,6 +2861,10 @@ async function Boot() {
       // 后面几章只占位（Data_Menu.CAMPAIGN_ENTRIES）。
       root: menuRoot, camera, campaign: CAMPAIGN_ENTRIES,
       SliceIndex: () => state.builtPhase,
+      CurrentObjective: () => {
+        const stage = missionRuntime?.flow.stage;
+        return stage ? Localize(FirstLevelStageTextId(stage.id), stage.objective) : p012Flow?.CurrentObjective().text || state.storyObjective || "";
+      },
       GroundHeight: (x, z) => (battlefield ? battlefield.GroundHeight(x, z) : null),
       Unlock: () => audio.Unlock(),
       Play: (index, opts) => StartLevel(index, opts),
@@ -8032,7 +8036,8 @@ function Frame(dt, render = true) {
 
   // --- HUD ---
   profiler.B("hud");
-  hud.SetObjective(state.storyObjective || phase.label, phase.whitebox?.fullMission?null:state.nraPool, null);
+  // The campaign objective is read on the pause screen, without HUD notifications.
+  hud.SetObjective(phase.whitebox?.fullMission ? "" : state.storyObjective || phase.label, phase.whitebox?.fullMission?null:state.nraPool, null);
   hud.SetState({
     wounded: player.wounds.length > 0,
     bleeding: player.bleeding,
