@@ -127,11 +127,16 @@ try {
     return { head, tail, position: shell.position.toArray(), trace,
       length: Math.hypot(...head.map((v,i) => v - tail[i])),
       skipDepth: shell.visual.core.userData.skipNormalDepth && shell.visual.trail.userData.skipNormalDepth,
-      initialAligned: Math.abs(initial.w) < 1 && shell.visual.core.scale.x < 0.1 };
+      initialAligned: Math.abs(initial.w) < 1 && shell.visual.core.scale.x < 0.1,
+      emissive: shell.visual.core.material.emissive.getHex(),
+      trailBlending: shell.visual.trail.material.blending };
   });
   assert.ok(result.shellVisual.trace.every((error) => error < 0.0005), "ribbon follows actual past ballistic positions");
-  // 0.35 s at ~36 m/s: the ribbon must show the whole flight so far, not a 5 m stub.
-  assert.ok(result.shellVisual.length > 10 && result.shellVisual.length < 14 && result.shellVisual.skipDepth, "trail length " + result.shellVisual.length);
+  // At ~36 m/s, only the latest motion smear remains; no long meteor tail.
+  assert.ok(result.shellVisual.length > 0.5 && result.shellVisual.length < 1.6 && result.shellVisual.skipDepth, "trail length " + result.shellVisual.length);
+  assert.ok(result.shellVisual.initialAligned, "small body follows its velocity");
+  assert.equal(result.shellVisual.emissive, 0, "ordinary shell does not glow");
+  assert.equal(result.shellVisual.trailBlending, 1, "motion smear uses normal alpha blending");
   await page.screenshot({ path: path.join(out, "Scene_ShellTrail.png") });
   result.wallImpact = await page.evaluate(() => {
     const t = window.Taierzhuang; t.Debug.Explosions.Reset();

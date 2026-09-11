@@ -132,7 +132,7 @@ export const TEXT = Object.freeze({
   "range.explosion.vehicleLabel": "{name} · 向前开一炮",
   "range.explosion.barrageBusy": "炮击进行中",
   "range.explosion.barrageCall": "呼叫炮击 · 落点在玩家周围16m",
-  "range.explosion.barrageHint": "炮弹来袭！抬头观察亮光轨迹，移动避开落点",
+  "range.explosion.barrageHint": "炮弹来袭！留意来弹声与落点，及时移动避让",
   "range.explosion.returnLabel": "投来一枚活手雷 · 靠近按F掷回",
   "range.explosion.returnHint": "活手雷落到附近后，按 F 拾起并掷回。原引信继续计时",
   "range.explosion.airstrikeBusy": "飞机投弹中，等待飞离",

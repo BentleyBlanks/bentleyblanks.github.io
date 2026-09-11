@@ -1,17 +1,15 @@
-// Shell / bomb visuals: a bright core plus a ribbon that samples the projectile's
+// Shell / bomb visuals: a metal body plus a short smear of the projectile's
 // actual ballistic history. Nothing here predicts a path through a wall, and
 // nothing writes solid depth for SSAO.
 //
-// 2026-09-05：上一版把尾迹缩到 0.12 s / 5.5 m、宽 3.5–10 cm、核心 5.5 cm，
-// 结果 36 m 高空的炸弹和 145 m 外的炮弹在屏幕上都只剩一个像素。可见性的口径：
-// 站在爆炸测试场里能用肉眼看见炮击和空投的整条来路。做法是历史窗放长到
-// 1 s / 45 m、加色相加混合、并给带宽和核心一个按视距的像素下限——
-// 远处的弹道也至少几个像素宽。测试按 shell.visual.span 回读采样窗核对轨迹。
+// Distant rounds naturally become small. No emissive fireball, expanding smoke
+// plume or distance-based enlargement; incoming audio / impact carry the warning.
 import * as THREE from "three";
+import { SHELL_VISUAL } from "./Data_Tuning_ShellVisual.mjs";
 
-const SEGMENTS = 24, GRAVITY = 19.6, FADE_S = 0.18;
+const SEGMENTS = 8, GRAVITY = 19.6, FADE_S = SHELL_VISUAL.fadeS;
 /** History window: at most this many seconds / metres of past trajectory. */
-export const TRAIL_SPAN_S = 1.0, TRAIL_SPAN_M = 45;
+export const TRAIL_SPAN_S = SHELL_VISUAL.trailSpanS, TRAIL_SPAN_M = SHELL_VISUAL.trailSpanM;
 const FORWARD = new THREE.Vector3(0, 0, -1);
 
 export function TrailSpan(shell) {
@@ -21,33 +19,27 @@ export function TrailSpan(shell) {
 export class ShellVisuals {
   constructor(scene) {
     this.scene = scene; this.fading = [];
-    this.coreGeometry = new THREE.SphereGeometry(1, 16, 10);
-    this.coreMaterial = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, toneMapped: false,
-      vertexShader: `
-        varying vec3 vNormal;
-        varying vec3 vView;
-        void main() {
-          // Keep a minimum apparent size: far shells must stay a visible bright dot.
-          vec4 centre = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-          float grow = max(1.0, -centre.z * 0.0024 / 0.16);
-          vec4 p = modelViewMatrix * vec4(position * grow, 1.0);
-          vNormal = normalMatrix * normal; vView = -p.xyz;
-          gl_Position = projectionMatrix * p;
-        }`,
-      fragmentShader: `
-        varying vec3 vNormal;
-        varying vec3 vView;
-        void main() {
-          float facing = max(0.0, dot(normalize(vNormal), normalize(vView)));
-          vec3 heat = mix(vec3(3.2, 1.1, 0.18), vec3(9.0, 5.4, 1.6), pow(facing, 1.4));
-          gl_FragColor = vec4(heat, smoothstep(0.0, 0.5, facing));
-        }`,
+    // Closed base, cylindrical body and ogive nose; the nose faces local -Z.
+    this.coreGeometry = new THREE.LatheGeometry([
+      [0, -1], [0.86, -1], [1, -0.86], [1, 0.18],
+      [0.86, 0.5], [0.55, 0.78], [0.2, 0.96], [0, 1],
+    ].map(([radius, y]) => new THREE.Vector2(radius, y)), 12);
+    this.coreGeometry.rotateX(-Math.PI / 2);
+    // Remain in the transparent VFX path: the tiny moving round must not leave
+    // an opaque prepass silhouette. Standard lighting gives it real highlights.
+    this.coreMaterial = new THREE.MeshStandardMaterial({ transparent: true, depthWrite: false,
+      color: SHELL_VISUAL.bodyColor, metalness: SHELL_VISUAL.bodyMetalness, roughness: SHELL_VISUAL.bodyRoughness,
     });
     this.trailMaterial = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
-      blending: THREE.AdditiveBlending,
-      uniforms: { uOpacity: { value: 1 } },
+      transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: true,
+      blending: THREE.NormalBlending,
+      uniforms: { ...THREE.UniformsLib.fog, uOpacity: { value: 1 },
+        uWidth: { value: new THREE.Vector2(SHELL_VISUAL.trailHeadHalfWidthM, SHELL_VISUAL.trailTailHalfWidthM) },
+        uColor: { value: new THREE.Color(SHELL_VISUAL.trailColor) },
+        uAlpha: { value: SHELL_VISUAL.trailOpacity } },
       vertexShader: `
+        #include <fog_pars_vertex>
+        uniform vec2 uWidth;
         attribute vec3 tangent;
         varying vec2 vUv;
         void main() {
@@ -56,26 +48,34 @@ export class ShellVisuals {
           vec3 direction = normalize(mat3(modelViewMatrix) * tangent);
           vec3 side = cross(direction, normalize(-p.xyz));
           side = length(side) < 0.001 ? vec3(1.0, 0.0, 0.0) : normalize(side);
-          // Head 12 cm, tail 45 cm, never thinner than a few pixels at any distance.
-          float width = max(mix(0.12, 0.45, uv.y), -p.z * 0.0032);
+          float width = mix(uWidth.x, uWidth.y, uv.y);
           p.xyz += side * (uv.x * 2.0 - 1.0) * width;
           gl_Position = projectionMatrix * p;
+          vec4 mvPosition = p;
+          #include <fog_vertex>
         }`,
       fragmentShader: `
+        #include <fog_pars_fragment>
         uniform float uOpacity;
+        uniform vec3 uColor;
+        uniform float uAlpha;
         varying vec2 vUv;
         void main() {
           float edge = pow(max(0.0, 1.0 - abs(vUv.x * 2.0 - 1.0)), 1.6);
-          float heat = exp(-vUv.y * 3.5);
-          float alpha = edge * pow(1.0 - vUv.y, 1.1) * mix(0.30, 1.0, heat) * uOpacity;
-          gl_FragColor = vec4(mix(vec3(1.1, 0.55, 0.22), vec3(4.5, 2.4, 0.8), heat), alpha);
+          float alpha = edge * pow(1.0 - vUv.y, 2.0) * uAlpha * uOpacity;
+          gl_FragColor = vec4(uColor, alpha);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+          #include <fog_fragment>
         }`,
     });
   }
   Create(shell) {
     const root = new THREE.Group(); root.name = `ShellVisual_${shell.id}`;
     const core = new THREE.Mesh(this.coreGeometry, this.coreMaterial);
-    core.name = "ShellCore"; core.scale.set(0.16, 0.16, 0.42); core.userData.skipNormalDepth = true;
+    core.name = "ShellCore";
+    core.scale.set(SHELL_VISUAL.bodyRadiusM, SHELL_VISUAL.bodyRadiusM, SHELL_VISUAL.bodyHalfLengthM);
+    core.userData.skipNormalDepth = true;
     const geometry = new THREE.BufferGeometry(), uv = [], indices = [];
     geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array((SEGMENTS + 1) * 6), 3).setUsage(THREE.DynamicDrawUsage));
     geometry.setAttribute("tangent", new THREE.BufferAttribute(new Float32Array((SEGMENTS + 1) * 6), 3).setUsage(THREE.DynamicDrawUsage));
