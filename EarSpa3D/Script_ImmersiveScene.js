@@ -8,7 +8,7 @@ import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBod
 import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
 import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear012-outer-20260911';
 import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear012-outer-20260911';
-import { CreateToolContact } from './Script_ToolContact.js?v=ear012-outer-20260911';
+import { CreateToolContact } from './Script_ToolContact.js?v=ear015-day-two-perf-20260912';
 import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear012-controls-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 

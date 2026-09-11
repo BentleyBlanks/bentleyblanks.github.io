@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { ToolIcon } from './Script_ToolIcons.mjs?v=ear014-ui-20260912';
 import { CreateCore } from './Script_Core.js?v=ear011-20260911';
-import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear015-grip-20260912';
+import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear015-day-two-perf-20260912';
 import { CreateAudio } from './Script_Audio.js?v=ear012-size-audio-20260912';
 import { LandingSound } from './Script_LandingSound.mjs?v=ear012-size-audio-20260912';
 import { CreateShop } from './Script_Shop.js?v=ear011-20260911';
@@ -10,7 +10,7 @@ import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear011-20260911';
 
 import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear014-ui-20260912';
 
-const VERSION = 'ear015-grip-20260912';
+const VERSION = 'ear015-day-two-perf-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const TOOL_IDS = { scoop: 'earPickBamboo', tweezers: 'earForceps', drops: 'earDrops',brush:'softBrush',suction:'microSuction',feather:'gooseFeather' };
 const TYPE_NAMES = { dry: '干性薄层', wet: '黏性耳垢', impacted: '紧实硬结' };
@@ -69,7 +69,7 @@ export async function Start() {
   let phase = 'ready', toolId = 'scoop', active = null, harvested = [], elapsed = 0, time = 0, settle = 0;
   app.dataset.phase='ready';
   let turnPointer=null,touchMode='force',timeLimit=210,timedOut=false;
-  let pointer = null, keyboardIndex = 0, contactOn = false;
+  let pointer = null, keyboardIndex = 0, contactOn = false, pendingHover = null;
   let hintUntil=0,satisfaction=85,painCooldown=0,rewardUntil=0,combo=0,bestCombo=0,painCount=0,fractures=0;
   const events = [],feedback=[];
   app.querySelector('.play-stage').insertAdjacentHTML('beforeend','<button id="lamp-toggle" class="lamp-toggle" aria-pressed="false">☼ 检查灯 · 关</button>');
@@ -140,6 +140,7 @@ export async function Start() {
   }
   app.querySelectorAll('[data-tool]').forEach(button => { button.onclick = () => { audio.unlock(); SetTool(button.dataset.tool); Sound('uiTap', .22); }; });
   function Cancel() {
+    pendingHover=null;
     if(turnPointer){const id=turnPointer.id;turnPointer=null;view.TurnEnd();if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);}
     if(active) {
       if(active.body.detached) Release();
@@ -177,7 +178,7 @@ export async function Start() {
   function Position(event) { const r = canvas.getBoundingClientRect(); return { x: event.clientX - r.left, y: event.clientY - r.top }; }
   function PointerDown(e){
     if(e.isPrimary===false||![0,2].includes(e.button)||phase!=='playing'||DialogOpen()||view.busy)return;
-    if(pointer||turnPointer)Cancel();
+    pendingHover=null;if(pointer||turnPointer)Cancel();
     const p=Position(e);view.AimLamp(p.x,p.y);e.preventDefault();audio.unlock();
     if(e.pointerType==='touch'){app.dataset.touch='true';}
     if(e.button===2||(e.pointerType==='touch'&&touchMode==='turn')){
@@ -192,7 +193,8 @@ export async function Start() {
   canvas.addEventListener('pointermove',e=>{
     const p=Position(e);view.AimLamp(p.x,p.y);if(e.pointerType==='mouse')mousePointerId=e.pointerId;
     if(turnPointer){if(e.pointerId!==turnPointer.id)return;e.preventDefault();turnPointer.x=p.x;turnPointer.y=p.y;return;}
-    if(!pointer){if(phase==='playing'&&!DialogOpen())view.Hover(p.x,p.y,toolId);return;}
+    // 高频鼠标事件只保留最新位置，每个可见帧做一次完整碰撞扫掠。
+    if(!pointer){if(phase==='playing'&&!DialogOpen())pendingHover=p;return;}
     if(e.pointerId!==pointer.id)return;pointer.currentX=p.x;pointer.currentY=p.y;
   });
   function PointerUp(e){
@@ -284,6 +286,7 @@ export async function Start() {
     if(time>rewardUntil)$('reward-toast').hidden=true;
     if (phase === 'playing' && !DialogOpen() && !document.hidden) {
       dt=Math.min(dt,Math.max(0,timeLimit-elapsed));elapsed+=dt;
+      if(pendingHover){const p=pendingHover;pendingHover=null;if(!pointer&&!turnPointer)view.Hover(p.x,p.y,toolId);}
       if(turnPointer)view.TurnBy(dt*Math.PI*.65,toolId);
       if(active&&pointer) Interact(dt);
       else if(!turnPointer&&time>hintUntil)$('pull-feedback').hidden=true;
