@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { ToolIcon } from './Script_ToolIcons.mjs?v=ear014-ui-20260912';
 import { CreateCore } from './Script_Core.js?v=ear011-20260911';
-import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear022-metal-finish-20260912';
+import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear023-tray-cleanup-20260912';
 import { CreateAudio } from './Script_Audio.js?v=ear012-size-audio-20260912';
 import { LandingSound } from './Script_LandingSound.mjs?v=ear012-size-audio-20260912';
 import { CreateShop } from './Script_Shop.js?v=ear011-20260911';
@@ -10,7 +10,7 @@ import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear011-20260911';
 
 import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear014-ui-20260912';
 
-const VERSION = 'ear022-metal-finish-20260912';
+const VERSION = 'ear023-tray-cleanup-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const TOOL_IDS = { scoop: 'earPickBamboo', tweezers: 'earForceps', drops: 'earDrops',brush:'softBrush',suction:'microSuction',feather:'gooseFeather' };
 const TYPE_NAMES = { dry: '干性薄层', wet: '黏性耳垢', impacted: '紧实硬结' };
@@ -59,6 +59,7 @@ export async function Start() {
   document.getElementById('ear-stage')?.remove();
   canvas.tabIndex = 0; canvas.setAttribute('aria-label', '耳道操作区，工具接触耳垢后，自由拨动或夹取');
   const $ = id => document.getElementById(id);
+  $('play-stage').insertAdjacentHTML('beforeend','<section id="tray-cleanup" hidden aria-label="整理收藏盘"><div><span class="eyebrow">收藏盘</span><strong id="tray-count" role="status"></strong></div><p id="tray-help">按住拖动耳勺，将耳垢拨过盘沿。未清理的会留到下一位。</p><button id="tray-tilt" aria-pressed="false">按住倾倒盘子</button></section>');
   app.insertAdjacentHTML('beforeend','<button id="depth-toggle" class="depth-toggle" aria-pressed="false" aria-label="放大观察深处" title="放大观察"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5M7 10h6"/><path class="zoom-plus" d="M10 7v6"/></svg></button>');
   const core = CreateCore({ canvas, viewCamera: new THREE.PerspectiveCamera(65, 1, .05, 400) });
   const audio = CreateAudio();
@@ -68,6 +69,7 @@ export async function Start() {
   try { settings = { ...settings, ...JSON.parse(localStorage.getItem('earspa3d.calm.settings') || '{}') }; } catch { /* 隐私模式也能玩 */ }
   let phase = 'ready', toolId = 'scoop', active = null, harvested = [], elapsed = 0, time = 0, settle = 0;
   app.dataset.phase='ready';
+  let trayPointer=null,tiltPointer=null;
   let turnPointer=null,touchMode='force',timeLimit=210,timedOut=false;
   let pointer = null, keyboardIndex = 0, contactOn = false, pendingHover = null;
   let hintUntil=0,satisfaction=85,painCooldown=0,rewardUntil=0,combo=0,bestCombo=0,painCount=0,fractures=0;
@@ -120,6 +122,7 @@ export async function Start() {
     if (!shop.CurrentCustomer()) shop.StartDay(rng);
     const customer = shop.CurrentCustomer();
     feedback.length=0;
+    Cancel();$('tray-cleanup').hidden=true;
     if(!reuseScene)view.Reset(customer.waxSeed);timeLimit=210;timedOut=false;
     view.Enter();
     $('view-toggle').textContent='看耳廓 ↗';
@@ -141,6 +144,7 @@ export async function Start() {
   app.querySelectorAll('[data-tool]').forEach(button => { button.onclick = () => { audio.unlock(); SetTool(button.dataset.tool); Sound('uiTap', .22); }; });
   function Cancel() {
     pendingHover=null;
+    StopTrayInput();
     if(turnPointer){const id=turnPointer.id;turnPointer=null;view.TurnEnd();if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);}
     if(active) {
       if(active.body.detached) Release();
@@ -177,6 +181,11 @@ export async function Start() {
   }
   function Position(event) { const r = canvas.getBoundingClientRect(); return { x: event.clientX - r.left, y: event.clientY - r.top }; }
   function PointerDown(e){
+    if(phase==='complete'){
+      if(e.isPrimary===false||e.button!==0||DialogOpen()||trayPointer!=null)return;
+      const p=Position(e);e.preventDefault();audio.unlock();
+      if(view.TrayBegin(p.x,p.y)){trayPointer=e.pointerId;canvas.setPointerCapture(e.pointerId);}return;
+    }
     if(e.isPrimary===false||![0,2].includes(e.button)||phase!=='playing'||DialogOpen()||view.busy)return;
     pendingHover=null;if(pointer||turnPointer)Cancel();
     const p=Position(e);view.AimLamp(p.x,p.y);e.preventDefault();audio.unlock();
@@ -192,24 +201,27 @@ export async function Start() {
   let mousePointerId=1;
   canvas.addEventListener('pointermove',e=>{
     const p=Position(e);view.AimLamp(p.x,p.y);if(e.pointerType==='mouse')mousePointerId=e.pointerId;
+    if(phase==='complete'){if(trayPointer===e.pointerId&&!DialogOpen()){e.preventDefault();view.TrayMove(p.x,p.y);}return;}
     if(turnPointer){if(e.pointerId!==turnPointer.id)return;e.preventDefault();turnPointer.x=p.x;turnPointer.y=p.y;return;}
     // 高频鼠标事件只保留最新位置，每个可见帧做一次完整碰撞扫掠。
     if(!pointer){if(phase==='playing'&&!DialogOpen())pendingHover=p;return;}
     if(e.pointerId!==pointer.id)return;pointer.currentX=p.x;pointer.currentY=p.y;
   });
   function PointerUp(e){
+    if(trayPointer===e.pointerId){StopTrayInput();return;}
     if(turnPointer?.id===e.pointerId&&(e.pointerType!=='mouse'||e.button===2)){turnPointer=null;view.TurnEnd();if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);Record('turnEnd',{angle:view.Heading()});return;}
     if(pointer&&e.pointerId===pointer.id&&(e.pointerType!=='mouse'||e.button===0))Cancel();
   }
   canvas.addEventListener('pointerup',e=>{if(e.pointerType!=='mouse')PointerUp(e);});
   canvas.addEventListener('mouseup',e=>PointerUp({pointerId:mousePointerId,pointerType:'mouse',button:e.button}));
   canvas.addEventListener('pointercancel', Cancel);
-  canvas.addEventListener('lostpointercapture', () => { if (active||turnPointer) Cancel(); });
+  canvas.addEventListener('lostpointercapture', () => { if (active||turnPointer||trayPointer!=null) Cancel(); });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   window.addEventListener('blur', Cancel);
   window.addEventListener('resize', Cancel);
   document.addEventListener('visibilitychange', () => { if (document.hidden) Cancel(); });
   window.addEventListener('keydown', e => {
+    if(phase==='complete'){if(e.key==='Escape')Cancel();return;}
     if (DialogOpen() || /INPUT|BUTTON|SUMMARY/.test(document.activeElement?.tagName)) return;
     if (['1', '2', '3'].includes(e.key)) { SetTool(['scoop', 'tweezers', 'drops'][Number(e.key) - 1]); return; }
     if (document.activeElement !== canvas) return;
@@ -229,7 +241,7 @@ export async function Start() {
     const payout = shop.FinishCustomer({ cleanliness01: CleanMass()/9, comfort01:satisfaction/100,relax01:satisfaction/100,bestCombo, harvest: harvested });
     Record('complete', { payout:payout?.payout,count:harvested.length,timedOut:expired,cleanliness:CleanMass()/9 });
 
-    $('receipt').hidden=false;
+    $('receipt').hidden=false;$('tray-cleanup').hidden=false;
     $('receipt-title').textContent=(expired?'服务结束':satisfaction>=85?'非常满意':satisfaction>=60?'还不错':'下次请轻一点')+' · +'+(payout?.payout||0)+' 枚';
     $('receipt-detail').textContent=`清洁 ${Math.round(CleanMass()/9*100)}% · 满意度 ${Math.round(satisfaction)}｜工时费 ${payout?.labor||0} + 小费 ${payout?.tip||0} + 手艺奖励 ${(payout?.comboBonus||0)+(payout?.perfectBonus||0)}`;
     $('next-customer').hidden=true;  Sound('sparkle', .3);
@@ -238,7 +250,7 @@ export async function Start() {
   }
   $('next-customer').onclick = async () => {
     if (phase !== 'complete') return;
-    audio.unlock(); shop.AdvanceCustomer(); if (!shop.HasNextCustomer()) { shop.NextDay(); shop.StartDay(rng); }
+    Cancel();audio.unlock(); shop.AdvanceCustomer(); if (!shop.HasNextCustomer()) { shop.NextDay(); shop.StartDay(rng); }
     const customer=shop.CurrentCustomer(),button=$('receipt-next');phase='preparing';app.dataset.phase=phase;button.disabled=true;button.textContent='正在准备下一位…';
     try{if(await view.PrepareCustomer(customer.waxSeed,{urgent:true}))StartCustomer();}
     catch(error){console.error('客人准备失败',error);phase='complete';app.dataset.phase=phase;}
@@ -246,6 +258,19 @@ export async function Start() {
   };
   $('receipt-next').onclick=()=>$('next-customer').click();
   $('receipt-shop').onclick=()=>OpenShop();
+  function StopTrayInput(){
+    const id=trayPointer;trayPointer=null;view.TrayEnd();view.TrayTilt(false);
+    if(id!=null&&canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);
+    const tiltId=tiltPointer;tiltPointer=null;
+    if(tiltId!=null&&$('tray-tilt').hasPointerCapture(tiltId))$('tray-tilt').releasePointerCapture(tiltId);
+    $('tray-tilt').setAttribute('aria-pressed','false');
+  }
+  function TiltTray(){if(phase!=='complete'||DialogOpen())return;view.TrayTilt(true);$('tray-tilt').setAttribute('aria-pressed','true');}
+  $('tray-tilt').addEventListener('pointerdown',e=>{if(e.button!==0||e.isPrimary===false)return;e.preventDefault();Cancel();audio.unlock();tiltPointer=e.pointerId;$('tray-tilt').setPointerCapture(e.pointerId);TiltTray();});
+  for(const name of ['pointerup','pointercancel','lostpointercapture','blur'])$('tray-tilt').addEventListener(name,StopTrayInput);
+  $('tray-tilt').addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='Enter'){e.preventDefault();TiltTray();}});
+  $('tray-tilt').addEventListener('keyup',e=>{if(e.code==='Space'||e.code==='Enter'){e.preventDefault();StopTrayInput();}});
+
   function OpenShop(){instrumentShop.Open();}
   function OpenSettings(showGuide=false){Cancel();$('operation-guide').open=showGuide;$('settings-dialog').showModal();if(showGuide)$('operation-guide').scrollIntoView({block:'nearest'});}
   $('settings-open').onclick=()=>OpenSettings();$('shop-open').onclick=OpenShop;
@@ -307,14 +332,15 @@ export async function Start() {
       }
       if(elapsed>=timeLimit){Complete(true);}
       if(CleanMass()>8.999&&!view.busy){settle+=dt;if(settle>.7)Complete();}
-    } else { view.Update(0); }
+    } else { view.Update(phase==='complete'&&!DialogOpen()&&!document.hidden?dt:0); }
+    if(phase==='complete'){const tray=view.TrayProbe();$('tray-count').textContent=tray.count?tray.count+' 件留在盘中':'盘子清空了';}
     const remaining=Math.max(0,timeLimit-elapsed);$('service-time').textContent=Math.floor(remaining/60).toString().padStart(2,'0')+':'+Math.floor(remaining%60).toString().padStart(2,'0');$('service-clock').dataset.urgent=String(remaining<30);
     const transferring=String(!!view.transfer);if(app.dataset.transferring!==transferring)app.dataset.transferring=transferring;
     audio.Update(dt); core.Render();
   }
   function Probe() {
     return { version: VERSION,phase,timeLimit,timeRemaining:Math.max(0,timeLimit-elapsed),timedOut,inputMode:touchMode,turning:!!turnPointer,tool: toolId, elapsed: +elapsed.toFixed(2), cleanliness: CleanMass()/9,satisfaction,painCount,fractures, harvest: harvested.map(x => ({ ...x })), active: active?.id ?? null,
-      targets: view.Targets(), transfer:view.transfer, model:view.modelInfo, viewReady:view.ready, rendering:view.RenderingProbe(), collision:view.CollisionProbe(),preparation:view.PreparationProbe(),feedback:feedback.map(f=>({...f})), events: events.map(x => ({ ...x })), audio: audio.debug(), settings: { ...settings }, shop: shop.Snapshot(), stats: { ...core.stats },
+      tray:view.TrayProbe(),targets: view.Targets(), transfer:view.transfer, model:view.modelInfo, viewReady:view.ready, rendering:view.RenderingProbe(), collision:view.CollisionProbe(),preparation:view.PreparationProbe(),feedback:feedback.map(f=>({...f})), events: events.map(x => ({ ...x })), audio: audio.debug(), settings: { ...settings }, shop: shop.Snapshot(), stats: { ...core.stats },
       viewport: { width: innerWidth, height: innerHeight }, stage: (() => { const r = canvas.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })() };
   }
   UpdateInventory();UpdateProgress();core.Resize();view.Resize();Frame(0);await view.WarmTools();Frame(0);

@@ -83,10 +83,28 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
    Check(['small','medium','large'].every(t=>heardTiers.has(t)),'all three approved sizes occur during real play');Check(!p.audio.sfxLoaded.some(c=>/customer|relaxSigh/.test(c)),'female voices are not loaded');Check(!p.events.some(e=>e.type==='sound'&&/customer|relaxSigh/.test(e.cue)),'no female voice events');
    await page.screenshot({path:path.join(here,'_dev','Shot_DirectionalComplete_'+width+'.png')});
    const coins=p.shop.coins;await Step(300);Check((await Probe()).shop.coins===coins,'receipt cannot pay repeatedly');
-   await page.locator('#receipt-next').click();await page.waitForFunction(()=>window.__EarSpaProbe().phase==='playing');await Step(150);await page.locator('#shop-open').click();const beforePause=(await Probe()).timeRemaining;await Step(180);Check((await Probe()).timeRemaining===beforePause,'shopping pauses service clock');await page.locator('[data-select-tool="feather"]').click();Check((await Probe()).rendering.previewTriangles>500,'feather has a real rotatable shop model');await page.screenshot({path:path.join(here,'_dev','Shot_FeatherShop_'+width+'.png')});await page.locator('#shop-close').click();
-   // 截止时间检查推进全部游戏/物理步骤；只省去无人操作期间重复绘制的 14,400 帧。
-   await page.evaluate(()=>{const{core}=__EarSpaDebug,render=core.Render;core.Render=()=>{};try{for(let i=0;i<4;i++)__EarSpaDebug.StepFrames(3600);}finally{core.Render=render;core.Render();}});
-   p=await Probe();Check(p.phase==='complete'&&p.timedOut&&p.cleanliness<1&&p.timeRemaining===0,'deadline ends incomplete service without claiming full cleaning');
+   p=await Probe();Check(p.tray.count>0&&Math.abs(p.tray.mass-9)<1e-7,'all landed wax is stored separately on the tray');
+   Check(p.rendering.trayCloseup>.99&&!p.rendering.outerVisible,'settlement camera reaches the plate close-up');
+   const trayBefore=p.tray.count,first=p.tray.pieces[0];
+   await Input('down',first.screen.x,first.screen.y);await Step(1);
+   Check((await Probe()).tray.toolVisible,'real pointer holds the free cleanup scoop');
+   const destination=await page.evaluate(async position=>{const T=await import('three'),{view,core}=__EarSpaDebug;return view.Project(new T.Vector3(position[0],.1,-19).add(core.scene.getObjectByName('Model_Tray').position));},first.position);
+   for(let i=1;i<=18;i++){await Input('move',first.screen.x+(destination.x-first.screen.x)*i/18,first.screen.y+(destination.y-first.screen.y)*i/18);await Step(2);}
+   await Input('up');await Step(90);p=await Probe();
+   Check(p.tray.count<trayBefore&&p.tray.count>0,'scoop sweeps only contacted wax past the rim, leaving the rest');
+   Check(p.shop.coins===coins&&Math.abs(p.cleanliness-1)<1e-8,'manual tray cleanup never changes the awarded income or cleanliness');
+   const remainingTray={count:p.tray.count,mass:p.tray.mass};
+   await page.screenshot({path:path.join(here,'_dev','Shot_TrayCleanup_'+width+'.png')});
+   await page.locator('#receipt-next').click();await page.waitForFunction(()=>window.__EarSpaProbe().phase==='playing');await Step(150);p=await Probe();Check(p.tray.count===remainingTray.count&&Math.abs(p.tray.mass-remainingTray.mass)<1e-8&&p.cleanliness===0,'next customer preserves the tray while resetting only their own score');await page.locator('#shop-open').click();const beforePause=(await Probe()).timeRemaining;await Step(180);Check((await Probe()).timeRemaining===beforePause,'shopping pauses service clock');await page.locator('[data-select-tool="feather"]').click();Check((await Probe()).rendering.previewTriangles>500,'feather has a real rotatable shop model');await page.screenshot({path:path.join(here,'_dev','Shot_FeatherShop_'+width+'.png')});await page.locator('#shop-close').click();
+   await page.evaluate(()=>{const{core}=__EarSpaDebug,render=core.Render;core.Render=()=>{};try{for(let i=0;i<4;i++)__EarSpaDebug.StepFrames(3600);}finally{core.Render=render;core.Render();}});p=await Probe();Check(p.phase==='complete'&&p.timedOut&&p.cleanliness<1&&p.timeRemaining===0,'deadline ends incomplete service without claiming full cleaning');
+   const secondCoins=p.shop.coins,tiltButton=await page.locator('#tray-tilt').boundingBox();
+   await Input('down',tiltButton.x+tiltButton.width/2,tiltButton.y+tiltButton.height/2);await Step(15);p=await Probe();
+   Check(p.tray.tilting&&p.tray.tilt>.3&&p.tray.count===remainingTray.count,'holding tilt starts a visible physical pour without instant deletion');
+   await Input('up');await Step(90);Check(!(await Probe()).tray.tilting&&(await Probe()).tray.tilt<.001,'release returns the tray to level');
+   await Input('down',tiltButton.x+tiltButton.width/2,tiltButton.y+tiltButton.height/2);await Step(330);await Input('up');await Step(120);p=await Probe();
+   Check(p.tray.count===0&&p.tray.batches===0,'holding tilt spills every remaining piece and releases render batches');
+   Check(p.shop.coins===secondCoins&&p.cleanliness===0,'pouring old wax cannot award or erase the next service score');
+   await page.screenshot({path:path.join(here,'_dev','Shot_TrayEmpty_'+width+'.png')});
    Check(report.errors.length===0,'no page, shader or resource errors');report.final=p;console.log('PASS '+width+'×'+height+' '+(touch?'touch':'mouse')+' '+report.checks.length+' checks');
   }catch(error){report.failure=error.message;report.probe=await Probe().catch(()=>null);await page.screenshot({path:path.join(here,'_dev','Shot_DirectionalFailure_'+width+'.png')});throw error;}
   finally{await fs.writeFile(path.join(here,'_dev','Data_DirectionalPlayReport.json'),JSON.stringify(reports,null,2));await page.close();}

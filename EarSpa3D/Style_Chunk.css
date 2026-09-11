@@ -82,3 +82,37 @@ dialog{padding:23px;max-height:calc(100dvh - 24px)}.dialog-heading h2{font-size:
 .spa-brand{padding:8px 10px}.spa-brand p{margin-top:4px}.session-status{margin-top:7px;gap:9px}.session-status .clean-meter{gap:7px}.session-status .clean-meter strong{font-size:14px}.session-status .clean-meter progress{width:48px}
 .view-label,.lamp-toggle,.depth-toggle{top:calc(var(--ui-top) + 88px)}.care-objective{top:calc(var(--ui-top) + 132px)}
 }
+/* 结算留下可操作的盘面；小屏把结算单与清盘操作分置上下。 */
+#tray-cleanup{position:absolute;z-index:8;left:var(--ui-left);bottom:var(--ui-bottom);width:280px;padding:17px 19px;background:var(--ui-panel);border:1px solid var(--ui-edge);border-radius:8px;pointer-events:auto}
+#tray-cleanup>div{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#tray-count{font-size:12px;font-weight:400;color:var(--ui-cream)}
+#tray-cleanup p{font-size:11px;line-height:1.8;color:var(--ui-muted);margin:10px 0 13px}
+#tray-tilt{width:100%;min-height:43px;border:1px solid #d6b98580;border-radius:5px;background:#a783451c;color:var(--ui-cream);font-size:12px;touch-action:none}
+#tray-tilt[aria-pressed=true]{background:#a7834560}
+#ear-app[data-phase=complete] #receipt{top:calc(var(--ui-top) + 108px);left:var(--ui-left);right:auto;width:280px;padding:19px}
+#ear-app[data-phase=complete] #receipt h2{font-size:22px;margin:9px 0}
+#ear-app[data-phase=complete] #receipt p{font-size:11px;padding-bottom:12px;margin:9px 0}
+#ear-app[data-phase=complete] #receipt>div{margin-top:13px}
+@media(max-width:600px){
+  #ear-app[data-phase=complete] #receipt{left:12px;right:12px;top:calc(var(--ui-top) + 78px);width:auto;padding:14px 17px}
+  #ear-app[data-phase=complete] #receipt h2{font-size:20px;margin:6px 0}
+  #ear-app[data-phase=complete] #receipt p{line-height:1.6;margin:5px 0;padding-bottom:8px}
+  #ear-app[data-phase=complete] #receipt>div{margin-top:9px}
+  #ear-app[data-phase=complete] #receipt button{padding:10px 8px}
+  #tray-cleanup{left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));width:auto;padding:11px 14px}
+  #tray-cleanup p{margin:6px 0;font-size:10px}
+  #tray-tilt{min-height:40px}
+}
+@media(max-height:480px) and (min-width:600px){
+  #ear-app[data-phase=complete] #receipt{top:103px;width:250px;padding:12px 15px}
+  #ear-app[data-phase=complete] #receipt>span{display:none}
+  #ear-app[data-phase=complete] #receipt h2{font-size:18px;margin:0 0 5px}
+  #ear-app[data-phase=complete] #receipt p{margin:4px 0;padding-bottom:6px;font-size:10px;line-height:1.5}
+  #ear-app[data-phase=complete] #receipt>div{margin-top:8px}
+  #ear-app[data-phase=complete] #receipt button{padding:8px 5px}
+  #tray-cleanup{width:250px;padding:10px 14px}
+  #tray-cleanup p{font-size:10px;line-height:1.5;margin:5px 0 8px}
+  #tray-tilt{min-height:37px}
+}
+
+#ear-app[data-phase=preparing] :is(.tool-dock,.instruction,.view-label,.lamp-toggle,.depth-toggle,#precision-controls,.care-objective){display:none}

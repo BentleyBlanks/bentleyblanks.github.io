@@ -1,3 +1,4 @@
+import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear023-tray-cleanup-20260912';
 import * as THREE from 'three';
 import { BuildEar, MakeRng } from './Script_EarAnatomy.js?v=ear012-outer-20260911';
 import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
@@ -112,7 +113,7 @@ export async function CreateImmersiveScene({ core }) {
   const workingPlane = new THREE.Plane();
   const ray = new THREE.Raycaster();
   let width = 1, height = 1, chunks = [], inside = false, entrance = 0;
-  let lastToolPoint = null, transfer = null, showcase = false;
+  let lastToolPoint = null, transfer = null, showcase = false, showcaseBlend = 0, traySlot = 0;
   const outsidePosition = new THREE.Vector3(-31, 12, -115);
   const insidePosition = new THREE.Vector3(-.25, .2, -1.8);
   camera.position.copy(outsidePosition); camera.up.set(0, 1, 0); camera.lookAt(-2, 8, -1); camera.updateMatrixWorld(true);
@@ -138,6 +139,7 @@ export async function CreateImmersiveScene({ core }) {
     }
     tool.add(toolParts[id]);
   }
+  const collectionTray=CreateCollectionTray({scene,tray,camera,Project,size:()=>({width,height}),scoop:toolParts.scoop});
   const ring = new THREE.Mesh(new THREE.TorusGeometry(.95, .026, 8, 64), new THREE.MeshBasicMaterial({ color: P.white, transparent: true, opacity: .75 }));
   scene.add(ring); ring.quaternion.copy(camera.quaternion); ring.visible = false;
   const droplet = new THREE.Mesh(new THREE.SphereGeometry(.16, 16, 12), new THREE.MeshPhysicalMaterial({ color: P.water, roughness: .12, clearcoat: 1 }));
@@ -157,27 +159,42 @@ export async function CreateImmersiveScene({ core }) {
     camera.position.lerp(trayCamera,transferBlend); look.lerp(trayFocus,transferBlend);
     // 横屏把耳部留在画幅右侧，避免宽画幅重新露出整张侧脸。
     const outerPan=width/height>1.65?30*Math.max(1-t,transferBlend):0;camera.position.x+=outerPan;look.x+=outerPan;
-    camera.lookAt(look);
     const narrow=width/height<.85;
     camera.fov = ((narrow?65:width/height>1.65?34:45)*(1-t)+(narrow?THREE.MathUtils.radToDeg(2*Math.atan(Math.tan(.55)/camera.aspect)):66)*t)*(1-transferBlend)+ (narrow?74:width/height>1.65?36:48)*transferBlend;
+    showcaseBlend+=( (showcase?1:0)-showcaseBlend)*(1-Math.exp(-dt*4));
+    if(showcaseBlend>.0001){
+      // 盘子占据结算卡以外的区域，竖屏留在下半部，横屏留在右侧。
+      const portrait=width<=600,wide=width/height>1.65;
+      const distance=portrait?88:wide?82:105;
+      const closePosition=tray.position.clone().add(new THREE.Vector3(0,distance*.82,-distance*.57));
+      const closeLook=tray.position.clone();
+      const forward=closeLook.clone().sub(closePosition).normalize();
+      const closeRight=forward.clone().cross(new THREE.Vector3(0,1,0)).normalize();
+      const closeUp=closeRight.clone().cross(forward).normalize();
+      const pan=portrait?closeUp.multiplyScalar(height<650?13:15):closeRight.multiplyScalar(wide?-18:-10);
+      closePosition.add(pan);closeLook.add(pan);
+      camera.position.lerp(closePosition,showcaseBlend);look.lerp(closeLook,showcaseBlend);
+      camera.fov=THREE.MathUtils.lerp(camera.fov,portrait?THREE.MathUtils.radToDeg(2*Math.atan(36/(distance*camera.aspect))):wide?36:48,showcaseBlend);
+    }
+    camera.lookAt(look);
     camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
     right.setFromMatrixColumn(camera.matrixWorld,0);up.setFromMatrixColumn(camera.matrixWorld,1);toward.setFromMatrixColumn(camera.matrixWorld,2);
     toolClip.setFromNormalAndCoplanarPoint(toward.clone().negate(),camera.position.clone().addScaledVector(toward,-2.5));
     workingPlane.setFromNormalAndCoplanarPoint(toward, focus);
-    outer.visible=entrance<.94||transferBlend>.15;canalGroup.visible=true;
+    outer.visible=(entrance<.94||transferBlend>.15)&&showcaseBlend<.92;canalGroup.visible=showcaseBlend<.92;
     scene.background.set('#191d20');
     scene.backgroundIntensity=.8;scene.backgroundBlurriness=0;
     scene.environmentIntensity=transferBlend>.4?.65:lampOn?.28:.018;
     metalIntensity=THREE.MathUtils.lerp(THREE.MathUtils.lerp(.7,lampOn?.75:.045,t),.85,transferBlend);
     for(const material of metalMaterials)material.envMapIntensity=metalIntensity;
-    for(const c of chunks)c.mesh.visible=(transferBlend<.66||['carrying','dropping','collected'].includes(c.state))&&c.state!=='fractured'&&!(c.toolId==='suction'&&c.state==='collected');
+    for(const c of chunks)c.mesh.visible=(transferBlend<.66||['carrying','dropping','collected'].includes(c.state))&&c.state!=='fractured'&&!(c.toolId==='suction'&&c.state==='collected')&&!c.trayStored&&showcaseBlend<.92;
     lamp.position.copy(camera.position).addScaledVector(right,.6).addScaledVector(up,.4);
     lamp.target.position.copy(look);
     if(t>.9&&transferBlend<.05&&aimed){ray.setFromCamera(aim,camera);const hit=ray.intersectObject(wall)[0];lamp.target.position.copy(hit?.point||ray.ray.at(14,new THREE.Vector3()));}
     lamp.angle=.48+(1-t+transferBlend)*.6;lamp.penumbra=.55;
     lamp.intensity=(lampOn?115:0)*t*(1-transferBlend)+transferBlend*190;
     ambient.intensity=.7*(1-t)+(lampOn?.24:.045)*t+transferBlend*.4;key.intensity=1.8*(1-t)+transferBlend*1.4;
-    tray.visible=transferBlend>.2||showcase;
+    tray.visible=transferBlend>.2||showcase;collectionTray.Update(dt);
     materials.SetOutside(Math.max(1-t,transferBlend));drum.material.color.setScalar(1-Math.max(1-t,transferBlend)*.92);
     ring.quaternion.copy(camera.quaternion);
   }
@@ -284,7 +301,7 @@ export async function CreateImmersiveScene({ core }) {
       c.mesh.material.clippingPlanes=null;materials.WetWax(c.mesh.material,0,0,c.type);
     }
     DisposeChunks(chunks);chunks=next;for(const c of chunks)root.add(c.mesh,c.mark);
-    transfer=null;showcase=false;inspectionDepth=inspectionTarget=0;scoopRotation=null;heading=0;turnPoint=turnChunk=null;contact.Reset();
+    transfer=null;showcase=false;showcaseBlend=0;collectionTray.SetActive(false);inspectionDepth=inspectionTarget=0;scoopRotation=null;heading=0;turnPoint=turnChunk=null;contact.Reset();
     preparationStats.lastResetMs=performance.now()-start;
     HideTool(); droplet.visible = false; dropTarget = null; return chunks;
   }
@@ -573,7 +590,8 @@ export async function CreateImmersiveScene({ core }) {
   function HideTool() { tool.visible = ring.visible = false; }
   function TrayBounds(){const b=new THREE.Box3().setFromObject(tray),points=[];for(const x of [b.min.x,b.max.x])for(const y of [b.min.y,b.max.y])for(const z of [b.min.z,b.max.z])points.push(Project(new THREE.Vector3(x,y,z)));return{x:Math.min(...points.map(p=>p.x)),y:Math.min(...points.map(p=>p.y)),right:Math.max(...points.map(p=>p.x)),bottom:Math.max(...points.map(p=>p.y)),visible:tray.visible};}
   function TrayPosition(c) {
-    return tray.position.clone().add(new THREE.Vector3((c.slot%5-2)*1.75,.045+(c.bottomOffset||0)+Math.floor(c.slot/15)*.28,Math.floor(c.slot/5)%3*1.55-1.55));
+    const slot=c.slot<0?0:c.slot,angle=slot*2.39996323,radius=1.1+Math.sqrt(slot%90)*.8;
+    return tray.position.clone().add(new THREE.Vector3(Math.cos(angle)*radius,.10+(c.bottomOffset||0)+Math.floor(slot/90)*.18,Math.sin(angle)*radius*.7));
   }
   function Release(c,slot) {
     if(c.toolId==='feather'){
@@ -581,7 +599,7 @@ export async function CreateImmersiveScene({ core }) {
       c.batch=chunks.filter(other=>other!==c&&IsFeatherDebris(other)&&other.state==='attached'&&other.origin.distanceTo(c.origin)<1.7);
       c.batch.forEach(other=>{other.state='carrying';other.toolId='feather';other.batchOffset=other.mesh.position.clone().sub(c.mesh.position).applyQuaternion(c.mesh.quaternion.clone().invert()).multiplyScalar(.45);});
     }
-    c.state='carrying';c.slot=slot;c.mesh.geometry.computeBoundingBox();c.bottomOffset=-c.mesh.geometry.boundingBox.min.z;
+    c.state='carrying';c.slot=traySlot++;for(const child of c.batch||[]){child.slot=traySlot++;child.mesh.geometry.computeBoundingBox();child.bottomOffset=-child.mesh.geometry.boundingBox.min.z;}c.mesh.geometry.computeBoundingBox();c.bottomOffset=-c.mesh.geometry.boundingBox.min.z;
     if(c.toolId==='suction'){
       c.suctionStart=c.mesh.position.clone();c.suctionRotation=tool.quaternion.clone();
       c.nozzle=lastToolPoint.clone().addScaledVector(c.normal,.6);
@@ -606,7 +624,7 @@ export async function CreateImmersiveScene({ core }) {
       transfer.outsideToolRotation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(jawAxis,shaft,jawAxis.clone().cross(shaft).normalize()));
     }
   }
-  function EndService(){if(transfer){const c=transfer.chunk;c.state='attached';c.mesh.position.copy(c.origin);c.mesh.quaternion.copy(c.rotation);for(const child of c.batch||[]){child.state='attached';child.mesh.position.copy(child.origin);child.mesh.quaternion.copy(child.rotation);}transfer=null;}for(const c of chunks)if(c.state==='held'||c.state==='peeling'){Ungrip(c);c.state='attached';}HideTool();}
+  function EndService(){if(transfer){const c=transfer.chunk;c.state=c.trayStored?'collected':'attached';c.mesh.position.copy(c.origin);c.mesh.quaternion.copy(c.rotation);for(const child of c.batch||[]){child.state=child.trayStored?'collected':'attached';child.mesh.position.copy(child.origin);child.mesh.quaternion.copy(child.rotation);}transfer=null;}for(const c of chunks)if(c.state==='held'||c.state==='peeling'){Ungrip(c);c.state='attached';}HideTool();}
   function Update(dt) {
     Resize();hairTime+=dt;hairUniforms.time.value=hairTime;hairUniforms.tool.value.copy(tool.visible?tool.position:new THREE.Vector3(999,999,999));
     if(transfer)transfer.age+=dt;
@@ -670,8 +688,9 @@ export async function CreateImmersiveScene({ core }) {
       }
       if(age>=3.4) { c.state='collected';c.mesh.position.copy(TrayPosition(c));transfer=null;HideTool(); }
     }
-    if(transfer?.chunk.batch){const parent=transfer.chunk;for(const child of parent.batch){child.mesh.visible=true;child.mesh.position.copy(parent.mesh.position).add(child.batchOffset.clone().applyQuaternion(parent.mesh.quaternion));child.mesh.quaternion.copy(parent.mesh.quaternion);if(parent.state==='collected')child.state='collected';}}
+    if(transfer?.chunk.batch){const parent=transfer.chunk;for(const child of parent.batch){child.mesh.visible=!child.trayStored;child.mesh.position.copy(parent.mesh.position).add(child.batchOffset.clone().applyQuaternion(parent.mesh.quaternion));child.mesh.quaternion.copy(parent.mesh.quaternion);if(parent.state==='collected')child.state='collected';}}
     for(const parent of [...landed])if(parent.batch)for(const child of parent.batch){child.state='collected';landed.push(child);}
+    for(const c of landed){collectionTray.Add(c,TrayPosition(c).sub(tray.position));if(c.trayStored)c.mesh.visible=false;}
     return landed;
   }
   function AuditTool(){
@@ -697,6 +716,7 @@ export async function CreateImmersiveScene({ core }) {
   }
   function Targets() { return chunks.map(c=>({id:c.id,type:c.type,depth:c.depth,mass:c.mass,form:c.form,tone:c.tone,generation:c.generation,fine:c.fine,grainCount:c.grainCount||1,cutDirection:c.cutDirection,forceDirection:c.forceDirection?.toArray(),fragment:c.fragment,wetting:c.wetting,surfaceWet:c.surfaceWet||0,aligned:c.aligned,jawContact:c.jawContact,footprint:c.footprint,state:c.state,progress:c.progress,softened:c.softened,vertices:c.mesh.geometry.attributes.position.count,triangles:c.mesh.geometry.index.count/3,position:c.mesh.position.toArray(),rotation:c.mesh.quaternion.toArray(),scale:c.mesh.scale.toArray(),screen:Project(InteractionPoint(c)),sweepScreen:Project(VisualCenter(c).add(new THREE.Vector3(1.8,0,0).applyQuaternion(c.rotation))),pullScreen:Project(VisualCenter(c).addScaledVector(c.normal,1.8)),physics:{solver:c.body.surface?'xpbd-shell':'rigid-grain',nodes:c.body.surface?.points.length||0,bend:c.body.bend||0,peakBend:c.body.surface?.peakBend||0,maxStretch:c.body.surface?.maxStretch||0,motion:c.body.motion||0,anchors:c.body.anchors.filter(a=>a.alive).length,detached:c.body.detached,strain:c.body.strain,force:c.body.force,contact:c.body.contact,grip:c.body.grip?.slice()||null}})); }
   return {WarmTools,canal,Reset,PrepareCustomer,CancelPreparation,PreparationProbe(){return{...preparationStats,pendingSeed:preparation?.seed??null,ready:!!preparation?.ready,stagedChunks:preparation?.chunks.length||0};},EndService,Pick,Grip,Drag,Fracture,SetSkins,CreateToolPreview,Ungrip,ShowTool,HideTool,Release,Update,Targets,Project,Resize,
+    TrayBegin:collectionTray.Begin,TrayMove:collectionTray.Move,TrayEnd:collectionTray.End,TrayTilt:collectionTray.SetTilt,TrayProbe:collectionTray.Probe,
     TurnStart(x,y,id){
       turnChunk=Pick(x,y,id);if(turnChunk)ShowTool(turnChunk,id,0,{x,y});else Hover(x,y,id);
       if(!tool.visible)return false;
@@ -710,16 +730,16 @@ export async function CreateImmersiveScene({ core }) {
     Reach,CanReach(c,id){return c.depth<=Reach(id);},SetDeep(value){inspectionTarget=value?1:0;contact.Reset();HideTool();},
     AuditTool,CollisionProbe(){return contact.Probe();},
     SetContact:materials.SetContact,
-    RenderingProbe(){return {shadersWarmed,staticRaycast:true,fiberClusters:Object.fromEntries(['feather','brush'].map(id=>[id,toolParts[id].children.reduce((sum,p)=>sum+(p.userData.fiberGroups?.length||0),0)])),...materials.Probe(),heading,inspectionDepth,inspectionTarget,reachBlocked,toolReach:Reach(lastToolId),traySize:new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).toArray(),trayStandalone:true,trayBounds:TrayBounds(),trayInscription:"强迫症的SOPHIA",toolPosition:tool.position.toArray(),toolRotation:tool.quaternion.toArray(),featherShading:'dual-lobe anisotropic fiber approximation',hairCount:360,hairRootFixed:true,profileHairLayers:3,profileHairTexture:'Texture_LayeredDarkHair.png',profileHairWisps:90,hairTime,headRealtime:true,lampOn,lampAim:lamp.target.position.toArray(),lampIntensity:lamp.intensity,shadows:core.renderer.shadowMap.enabled,canalVisible:canalGroup.visible,externalContext:outer.visible&&!!(transfer||showcase),outerVisible:outer.visible,irritation:chunks.filter(c=>!c.fragment).map(c=>c.irritation),roughness:chunks.map(c=>c.mesh.material.roughness),clearcoat:chunks.map(c=>c.mesh.material.clearcoat),toolLevels:{...toolLevels},previewTriangles};},
+    RenderingProbe(){return {shadersWarmed,staticRaycast:true,fiberClusters:Object.fromEntries(['feather','brush'].map(id=>[id,toolParts[id].children.reduce((sum,p)=>sum+(p.userData.fiberGroups?.length||0),0)])),...materials.Probe(),heading,inspectionDepth,inspectionTarget,reachBlocked,toolReach:Reach(lastToolId),traySize:new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).toArray(),trayStandalone:true,trayCloseup:showcaseBlend,trayCollection:collectionTray.Probe(),trayBounds:TrayBounds(),trayInscription:"强迫症的SOPHIA",toolPosition:tool.position.toArray(),toolRotation:tool.quaternion.toArray(),featherShading:'dual-lobe anisotropic fiber approximation',hairCount:360,hairRootFixed:true,profileHairLayers:3,profileHairTexture:'Texture_LayeredDarkHair.png',profileHairWisps:90,hairTime,headRealtime:true,lampOn,lampAim:lamp.target.position.toArray(),lampIntensity:lamp.intensity,shadows:core.renderer.shadowMap.enabled,canalVisible:canalGroup.visible,externalContext:outer.visible&&!!(transfer||showcase),outerVisible:outer.visible,irritation:chunks.filter(c=>!c.fragment).map(c=>c.irritation),roughness:chunks.map(c=>c.mesh.material.roughness),clearcoat:chunks.map(c=>c.mesh.material.clearcoat),toolLevels:{...toolLevels},previewTriangles};},
     ToggleLamp(){lampOn=!lampOn;return lampOn;},AimLamp(x,y){aim.set(x/width*2-1,1-y/height*2);aimed=true;},
     Enter(){inside=true;entrance=0;showcase=false;},Hover,
     ToggleView(){if(transfer)return 'canal';showcase=false;inside=!inside;HideTool();return inside?'canal':'ear';},
-    Showcase(){showcase=true;HideTool();},
+    Showcase(){showcase=true;collectionTray.SetActive(true);HideTool();},
     get ready(){return entrance>=1&&!transfer&&!showcase;},
     get busy(){return !!transfer;},
     get transfer(){return transfer?{id:transfer.chunk.id,age:transfer.age,mode:transfer.mode||'carry',toolVisible:tool.visible}:null;},
     Drop(c){c.surfaceWet=Math.max(c.surfaceWet||0,.18);ShowTool(c,'drops');dropTarget=c.mesh.position.clone().addScaledVector(c.normal,.18);dropAge=0;droplet.visible=true;droplet.userData.start=lastToolPoint.clone();},
     get chunks(){return chunks;},
     modelInfo:{source:'BlenderMCP',file:'Models/Model_ImmersiveEar.glb',edition:'DirectionalAnatomy',nodes:asset.scene.children.map(n=>n.name)},
-    Dispose(){disposed=true;CancelPreparation();waxPrototypes.forEach(g=>g.dispose());environment.dispose();metalEnvironment.dispose();metalMaterials.clear();anatomy.dispose();root.traverse(n=>{n.geometry?.dispose();});}};
+    Dispose(){collectionTray.Dispose();disposed=true;CancelPreparation();waxPrototypes.forEach(g=>g.dispose());environment.dispose();metalEnvironment.dispose();metalMaterials.clear();anatomy.dispose();root.traverse(n=>{n.geometry?.dispose();});}};
 }
