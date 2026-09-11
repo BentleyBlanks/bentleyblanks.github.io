@@ -11,7 +11,7 @@ const Inverse=q=>[-q[0],-q[1],-q[2],q[3]];
 const World=(body,p)=>Add(body.position,Rotate(body.rotation,p));
 const Local=(body,p)=>Rotate(Inverse(body.rotation),Sub(p,body.position));
 function Product(a,b){const xyz=Add(Add(Mul(b,a[3]),Mul(a,b[3])),Cross(a,b));return[...xyz,a[3]*b[3]-Dot(a,b)];}
-const PROFILES={dry:{stretch:2e-7,bend:.12,strength:32},wet:{stretch:1.2e-5,bend:.45,strength:32},impacted:{stretch:4e-8,bend:.00001,strength:45}};
+const PROFILES={dry:{stretch:2e-7,bend:.12,strength:32,cohesion:70000},wet:{stretch:1.2e-5,bend:.45,strength:32,cohesion:7500},impacted:{stretch:4e-8,bend:.00001,strength:45,cohesion:3800}};
 
 function Barycentric(p,a,b,c){
   const den=(b[1]-c[1])*(a[0]-c[0])+(c[0]-b[0])*(a[1]-c[1]);
@@ -79,10 +79,17 @@ export function* BindWaxSurfaceSteps(body,positions,indices){
   for(let i=0;i<vertices.length;i++){surface.bindings.push(BindPoint(surface,vertices[i]));if(i%32===31)yield;}
   const used=new Set();
   for(const anchor of body.anchors){
+    if(anchor.inherited){anchor.binding=BindPoint(surface,anchor.local);anchor.lambda=[0,0,0];continue;}
     let node=-1,distance=Infinity;for(let i=1;i<rest.length;i++){const d=(rest[i][0]-anchor.local[0])**2+(rest[i][1]-anchor.local[1])**2;if(!used.has(i)&&d<distance){node=i;distance=d;}}
     used.add(node);anchor.node=node;anchor.local=rest[node].slice();anchor.rest=surface.points[node].slice();anchor.lambda=[0,0,0];
   }
   surface.restFit=FitRotation({points:rest});surface.support=surface.points.map(p=>p.slice());body.surface=surface;body.bend=0;body.motion=0;
+  surface.sections=bends.map(edge=>{
+    const [a,b]=edge.ids,mid=Mul(Add(rest[a],rest[b]),.5),axis=Unit(Sub(rest[b],rest[a])),normal=Unit(Cross(axis,Frame(rest,edge.ids.slice(0,3))[2]));
+    const distances=rest.map(p=>Dot(Sub(p,mid),normal)),span=rest.map(p=>Dot(Sub(p,mid),axis));
+    return{edge,mid,normal,positive:distances.filter(d=>d>.005).length,width:Math.max(.08,Math.max(...span)-Math.min(...span)),sides:body.anchors.map(a=>Dot(Sub(a.local,mid),normal))};
+  });
+  surface.sectionThickness=Math.max(.035,thickness.reduce((sum,t)=>sum+t*2,0)/thickness.length);
   return body;
 }
 
@@ -100,6 +107,7 @@ export function GripWaxSurface(body,point){
   body.grip=Local(body,point);
 }
 export function UngripWaxSurface(body){body.surface.grip=null;}
+export function WaxAnchorPoint(body,anchor){return anchor.binding?BoundPoint(body.surface,anchor.binding):body.surface.points[anchor.node];}
 
 // 壳的拉伸/剪切使用三角边，弯曲单独约束两三角形之间的有符号二面角。
 // 柔度除以子步时间平方，迭代次数不再直接决定材料软硬。
@@ -139,11 +147,41 @@ function FitRotation(s){
   return q.map(v=>v/(Math.hypot(...q)||1));
 }
 
-export function StepWaxSurface(body,{target=null,softness=0,efficiency=1,adhesion=1,minAnchors=0,supportRotation=null}={},dt=1/60){
+// 对穿过网格边的截面积分真实锚点反力和弯矩。裂纹位置由载荷路径决定，
+// 不从块中心随机切，也不累计按住时间。单位为 mm 与求解器的归一化力单位。
+function CohesiveSection(body,h,profile,soft){
+  const s=body.surface,binding=s.grip,grip=Weighted(s.rest,binding.ids,binding.weights),frame=Frame(s.rest,binding.ids);
+  for(let j=0;j<3;j++)for(let k=0;k<3;k++)grip[k]+=frame[j][k]*binding.offset[j];
+  if(!body.anchors.some(a=>a.alive))return;
+  const anchorPoints=body.anchors.map(a=>WaxAnchorPoint(body,a)),reactions=body.anchors.map(a=>Mul(a.lambda,-1/(h*h)));
+  let critical=null;
+  for(const section of s.sections){
+    const {edge,width}=section,sign=Dot(Sub(grip,section.mid),section.normal)<0?-1:1;
+    const gripDistance=Math.abs(Dot(Sub(grip,section.mid),section.normal));
+    if(gripDistance<Math.max(.045,body.size*.12))continue;
+    if(section.positive<s.points.length*.12||section.positive>s.points.length*.85)continue;
+    const [ia,ib]=edge.ids,mid=Mul(Add(s.points[ia],s.points[ib]),.5),axis=Unit(Sub(s.points[ib],s.points[ia]));
+    const face=Frame(s.points,edge.ids.slice(0,3))[2],normal=Mul(Unit(Cross(axis,face)),sign);
+    let force=[0,0,0],moment=[0,0,0],fixed=0;
+    for(let j=0;j<body.anchors.length;j++)if(body.anchors[j].alive&&section.sides[j]*sign<-.008){fixed++;force=Add(force,reactions[j]);moment=Add(moment,Cross(Sub(anchorPoints[j],mid),reactions[j]));}
+    if(!fixed)continue;
+    const thickness=s.sectionThickness;
+    const tensile=Math.max(0,Dot(force,normal)),shear=Math.abs(Dot(force,face));
+    const stress=(tensile+shear*.25)/(width*thickness)+6*Math.abs(Dot(moment,axis))/(width*thickness*thickness);
+    const ratio=stress/(profile.cohesion*(1+soft*5));
+    edge.peakLoad=Math.max(edge.peakLoad||0,ratio);
+    edge.damage=Clamp((edge.peakLoad-.65)/.7);
+    if(!critical||ratio>critical.ratio)critical={ratio,damage:edge.damage,point:mid,normal,stress,width,thickness};
+  }
+  s.cohesion=critical;
+  if(critical?.damage>=1&&!s.fracture)s.fracture=critical;
+}
+
+export function StepWaxSurface(body,{target=null,softness=0,efficiency=1,adhesion=1,minAnchors=0,supportRotation=null,fracture=false}={},dt=1/60){
   const s=body.surface,profile=PROFILES[body.type]||PROFILES.dry,soft=Clamp(softness),duration=Clamp(dt,0,.05),count=Math.max(1,Math.ceil(duration*240)),h=duration/count;
   if(h===0)return{detached:body.detached,remaining:body.anchors.filter(a=>a.alive).length,strain:Clamp(body.strain),force:body.force,contact:body.contact};
   const mass=s.points.length,stretch=profile.stretch*(1+soft*10)/(h*h),bend=(profile.bend+soft*.20)/(h*h);
-  body.softness=soft;body.contact=false;body.strain=0;
+  body.softness=soft;body.contact=false;body.strain=0;let simulatedTime=0;
   for(let step=0;step<count;step++){
     const before=s.points.map(p=>p.slice()),damping=Math.exp(-h*12);
     for(let i=0;i<s.points.length;i++)for(let k=0;k<3;k++)s.points[i][k]+=s.velocities[i][k]*h*damping;
@@ -152,17 +190,22 @@ export function StepWaxSurface(body,{target=null,softness=0,efficiency=1,adhesio
     for(let iteration=0;iteration<8;iteration++){
       for(const c of s.edges)DistanceConstraint(s,c,stretch,mass);
       for(const c of s.bends)BendConstraint(s,c,bend,mass);
-      for(const a of body.anchors)if(a.alive)Pin(s,[a.node,a.node,a.node],[1,0,0],a.rest,a.lambda,.000004/Math.max(.03,adhesion)/(h*h),mass);
+      for(const a of body.anchors)if(a.alive){
+        const binding=a.binding,offset=binding?Sub(BoundPoint(s,binding),Weighted(s.points,binding.ids,binding.weights)):null;
+        Pin(s,binding?.ids||[a.node,a.node,a.node],binding?.weights||[1,0,0],a.rest,a.lambda,.000004*(1+(a.damage||0)*3)/Math.max(.03,adhesion)/(h*h),mass,offset);
+      }
       if(s.grip&&target){const frame=Frame(s.points,s.grip.ids),offset=[0,0,0];for(let j=0;j<3;j++)for(let k=0;k<3;k++)offset[k]+=frame[j][k]*s.grip.offset[j];Pin(s,s.grip.ids,s.grip.weights,target,s.grip.lambda,1/(220*Math.max(.03,efficiency)*h*h),mass,offset,135*h*h);}
       // 每个材料点有独立背面支撑，向耳壁内推不会换来剥离进度。
-      for(let i=0;i<s.points.length;i++){const opening=Dot(Sub(s.points[i],s.support[i]),body.normal);if(opening<0){for(let k=0;k<3;k++)s.points[i][k]-=body.normal[k]*opening;body.contact||=opening<-.0001;}}
+      if(!body.detached)for(let i=0;i<s.points.length;i++){const opening=Dot(Sub(s.points[i],s.support[i]),body.normal);if(opening<0){for(let k=0;k<3;k++)s.points[i][k]-=body.normal[k]*opening;body.contact||=opening<-.0001;}}
     }
     let candidate=null,maxStrain=0;
     for(const a of body.anchors)if(a.alive){
       const reaction=Mul(a.lambda,-1/(h*h)),normal=Dot(reaction,body.normal),slide=Length(Sub(reaction,Mul(body.normal,normal)));
       a.strain=(Math.max(0,normal)+slide*.22)/(profile.strength*(1-soft*(body.type==='impacted'?.85:.55))*Math.sqrt(Math.max(.001,adhesion)));
+      a.peakLoad=Math.max(a.peakLoad||0,a.strain);a.damage=Clamp((a.peakLoad-.7)/.3);
       if(a.strain>maxStrain){maxStrain=a.strain;candidate=a;}
     }
+    if(fracture&&target&&s.grip&&!s.fracture)CohesiveSection(body,h,profile,soft);
     s.releaseClock=Math.max(0,s.releaseClock-h);
     if(target&&s.grip&&candidate&&maxStrain>1&&s.releaseClock===0&&body.anchors.filter(a=>a.alive).length>minAnchors){candidate.alive=false;s.releaseClock=.018;}
     body.strain=Math.max(body.strain,maxStrain);body.force=s.grip&&target?Math.min(135,Length(s.grip.lambda)/(h*h)):0;
@@ -175,14 +218,16 @@ export function StepWaxSurface(body,{target=null,softness=0,efficiency=1,adhesio
     s.motion=0;
     for(let i=0;i<s.points.length;i++){s.velocities[i]=Mul(Sub(s.points[i],before[i]),1/h);const speed=Length(s.velocities[i]);if(speed>24)s.velocities[i]=Mul(s.velocities[i],24/speed);s.motion=Math.max(s.motion,speed);}
     body.steps++;
+    simulatedTime+=h;
+    if(s.fracture)break;
   }
   const previous=body.position,rotation=Product(FitRotation(s),Inverse(s.restFit)),rotationDelta=Product(rotation,Inverse(body.rotation)),restCenter=s.rest.reduce((p,v)=>Add(p,Mul(v,1/s.rest.length)),[0,0,0]),center=s.points.reduce((p,v)=>Add(p,Mul(v,1/s.points.length)),[0,0,0]);
-  body.rotation=rotation;body.position=Sub(center,Rotate(rotation,restCenter));body.velocity=Mul(Sub(body.position,previous),1/duration);body.spin=Mul(rotationDelta,(rotationDelta[3]<0?-2:2)/duration);body.motion=s.motion;
+  body.rotation=rotation;body.position=Sub(center,Rotate(rotation,restCenter));body.velocity=Mul(Sub(body.position,previous),1/simulatedTime);body.spin=Mul(rotationDelta,(rotationDelta[3]<0?-2:2)/simulatedTime);body.motion=s.motion;
   if(s.grip)body.grip=Local(body,BoundPoint(s,s.grip));
   s.maxStretch=Math.max(...s.edges.map(c=>Math.abs(Length(Sub(s.points[c.a],s.points[c.b]))/c.rest-1)));
   const restFrames=s.triangles.map(ids=>Frame(s.rest,ids)[2]),frames=s.triangles.map(ids=>Frame(s.points,ids)[2]);
   body.bend=Math.max(...frames.map((n,i)=>Math.acos(Clamp(Dot(n,Rotate(rotation,restFrames[i])),-1,1))));s.peakBend=Math.max(s.peakBend,body.bend);
-  return{detached:body.detached,remaining:body.anchors.filter(a=>a.alive).length,strain:Clamp(body.strain),force:body.force,contact:body.contact};
+  return{detached:body.detached,remaining:body.anchors.filter(a=>a.alive).length,strain:Clamp(body.strain),force:body.force,contact:body.contact,fracture:s.fracture||null};
 }
 
 export function WriteWaxSurface(body,positions){

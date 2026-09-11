@@ -48,19 +48,13 @@ export function SmoothWaxNormals(g){
 }
 // Volume is measured from the actual sealed faces, so daughter mass follows the cut.
 export function GeometryVolume(g){const p=g.attributes.position,idx=g.index;let sum=0;const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();for(let i=0;i<(idx?idx.count:p.count);i+=3){a.fromBufferAttribute(p,idx?idx.getX(i):i);b.fromBufferAttribute(p,idx?idx.getX(i+1):i+1);c.fromBufferAttribute(p,idx?idx.getX(i+2):i+2);sum+=a.dot(b.cross(c))/6;}return Math.abs(sum);}
-export function FractureGeometry(source,{direction=[1,0,0],grip=[0,0,0],seed=1,generation=0,load=1}={}){
- const pull=new THREE.Vector3().fromArray(direction);pull.z*=.18;if(pull.length()<.001)pull.set(1,0,0);pull.normalize();
- const count=2+Math.floor((Math.sin(seed*31.7)+1)*.999)+(generation===0&&load>.85?1:0);
- let pieces=[source.clone()];
- for(let cut=0;cut<count-1;cut++){
-   const weights=pieces.map(GeometryVolume),index=weights.indexOf(Math.max(...weights)),part=pieces[index];part.computeBoundingBox();
-   const center=part.boundingBox.getCenter(new THREE.Vector3()),extent=part.boundingBox.getSize(new THREE.Vector3());
-   const n=pull.clone().applyAxisAngle(new THREE.Vector3(0,0,1),Math.sin(seed+cut*2.6)*.21);
-   const width=Math.abs(n.x)*extent.x+Math.abs(n.y)*extent.y+Math.abs(n.z)*extent.z;
-   const offset=THREE.MathUtils.clamp(new THREE.Vector3().fromArray(grip).sub(center).dot(n)*.17,-width*.12,width*.12)+Math.sin(seed*1.7+cut)*width*.10;
-   const plane=center.dot(n)+offset,a=CutGeometry(part,n,plane,false),b=CutGeometry(part,n,plane,true);
-   if(a.attributes.position.count<15||b.attributes.position.count<15||GeometryVolume(a)<weights[index]*.04||GeometryVolume(b)<weights[index]*.04){a.dispose();b.dispose();continue;}
-   a.userData.cutNormal=n.toArray();b.userData.cutNormal=n.toArray();part.dispose();pieces.splice(index,1,a,b);
- }
+// 只接受物理解算得到的截面。两侧共用同一平面并封口，不能用随机种子决定碎片。
+export function FractureGeometry(source,{normal,point}={}){
+ if(!normal||!point)return [];
+ const axis=new THREE.Vector3().fromArray(normal).normalize(),constant=axis.dot(new THREE.Vector3().fromArray(point));
+ if(axis.lengthSq()<.99)return [];
+ const pieces=[CutGeometry(source,axis,constant,false),CutGeometry(source,axis,constant,true)],volumes=pieces.map(GeometryVolume),total=volumes[0]+volumes[1];
+ if(total<=1e-12||volumes.some(v=>v<total*.025)||pieces.some(g=>g.attributes.position.count<12)){pieces.forEach(g=>g.dispose());return [];}
+ for(const piece of pieces){piece.userData.cutNormal=axis.toArray();piece.userData.cutPoint=point.slice();}
  return pieces;
 }

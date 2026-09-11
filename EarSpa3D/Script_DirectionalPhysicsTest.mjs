@@ -7,14 +7,15 @@ const source=(await fs.readFile(new URL('./Script_FractureGeometry.js',import.me
 const {FractureGeometry,GeometryVolume,CutGeometry}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 let checks=0;const Check=(ok,label)=>{assert.ok(ok,label);checks++;};
 const sheet=new THREE.BoxGeometry(1.4,2.7,.08,6,12,1);
-const x=FractureGeometry(sheet,{direction:[1,0,.2],seed:12}),y=FractureGeometry(sheet,{direction:[0,1,.2],seed:12});
+const x=FractureGeometry(sheet,{normal:[1,0,.2],point:[.13,0,0]}),y=FractureGeometry(sheet,{normal:[0,1,.2],point:[0,-.21,0]});
 Check(x.length>=2&&y.length>=2,'actual mesh faces split into separate fragments');
-Check(x[0].userData.cutNormal[0]>.8&&y[0].userData.cutNormal[1]>.8,'cut normal follows the orthogonal applied directions');
+Check(x[0].userData.cutNormal[0]>.8&&y[0].userData.cutNormal[1]>.8,'cut normal preserves the physical stress section');
+Check(FractureGeometry(sheet).length===0,'no fragments are invented without a physical section');
 for(const pieces of [x,y])Check(Math.abs(pieces.reduce((s,g)=>s+GeometryVolume(g),0)-GeometryVolume(sheet))<1e-5,'sealed split conserves volume');
 let generations=[sheet],initial=GeometryVolume(sheet),smallest=initial;
 for(let generation=0;generation<3;generation++){
  const next=[];
- for(const [i,g] of generations.entries()){const parts=FractureGeometry(g,{direction:generation%2?[1,0,.1]:[0,1,.1],seed:8+i,generation});next.push(...parts);}
+ for(const [i,g] of generations.entries()){g.computeBoundingBox();const parts=FractureGeometry(g,{normal:generation%2?[1,0,.1]:[0,1,.1],point:g.boundingBox.getCenter(new THREE.Vector3()).toArray()});next.push(...parts);}
  Check(next.length>generations.length,'each additional fracture generation creates smaller real geometries');
  Check(Math.abs(next.reduce((s,g)=>s+GeometryVolume(g),0)-initial)<1e-5,'recursive cuts conserve total volume');
  const maximum=Math.max(...next.map(GeometryVolume));Check(maximum<smallest,'maximum child volume decreases in each generation');smallest=maximum;generations=next;

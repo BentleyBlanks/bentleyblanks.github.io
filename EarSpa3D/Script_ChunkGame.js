@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { ToolIcon } from './Script_ToolIcons.mjs?v=ear014-ui-20260912';
 import { CreateCore } from './Script_Core.js?v=ear011-20260911';
-import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear023-tray-cleanup-20260912';
+import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear024-cohesive-scraping-20260912';
 import { CreateAudio } from './Script_Audio.js?v=ear012-size-audio-20260912';
 import { LandingSound } from './Script_LandingSound.mjs?v=ear012-size-audio-20260912';
 import { CreateShop } from './Script_Shop.js?v=ear011-20260911';
@@ -10,7 +10,7 @@ import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear011-20260911';
 
 import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear014-ui-20260912';
 
-const VERSION = 'ear023-tray-cleanup-20260912';
+const VERSION = 'ear024-cohesive-scraping-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const TOOL_IDS = { scoop: 'earPickBamboo', tweezers: 'earForceps', drops: 'earDrops',brush:'softBrush',suction:'microSuction',feather:'gooseFeather' };
 const TYPE_NAMES = { dry: '干性薄层', wet: '黏性耳垢', impacted: '紧实硬结' };
@@ -45,7 +45,7 @@ export async function Start() {
       <label class="slider-row">背景音乐<input id="volume-bgm" type="range" min="0" max="1" step="0.01" value="0.16"></label>
       <label class="slider-row">轻微震动<input id="haptics" type="checkbox" checked></label>
 
-      <details id="operation-guide"><summary>操作指南</summary><p>鼠标右键按住连续旋转，松开停止，工具留在接触点；左键持续按住，耳勺沿接近垂直于耳道壁的方向把耳垢刮离，镊子沿夹持方向夹起。手机切换转向／施力，分别单指按住。工具遇到内壁会受阻。点放大镜切换深浅视野，短耳勺工作长度有限；深处用长镊，硬结先滴液软化。松脱后仍在工具上，松手由工具托送到耳外，再轻放入盘。硬结先滴液等待约 3 秒。干薄片用耳勺托边，黏块先松边再用镊子夹；硬拉会痛或碎裂。碎屑可用耳勺清理，也可买毛刷轻扫或用吸引管吸走湿碎屑。中途松手会放回。</p><p>键盘：1/2/3 切换工具；画面获得焦点后，左右方向键选块，空格抓住，Q/E 旋转方向，空格松手，Esc 取消。</p></details>
+      <details id="operation-guide"><summary>操作指南</summary><p>鼠标右键按住连续旋转，松开停止，工具留在接触点；左键按住并移动鼠标，耳勺跟随指针刮动；凹口朝向耳垢才能托刮，勺背和空划不能剥离。镊子按住夹起。手机在施力模式下按住并拖动耳勺，转向模式下按住旋转。工具遇到内壁会受阻。点放大镜切换深浅视野，短耳勺工作长度有限；深处用长镊，硬结先滴液软化。松脱后仍在工具上，松手由工具托送到耳外，再轻放入盘。硬结先滴液等待约 3 秒。干薄片用耳勺托边，黏块先松边再用镊子夹；硬拉会痛或碎裂。碎屑可用耳勺清理，也可买毛刷轻扫或用吸引管吸走湿碎屑。尚未松脱时松手，材料会弹性回落；黏附牢固时受力断面会碎裂，残片仍需清理。</p><p>键盘：1/2/3 切换工具；画面获得焦点后，左右方向键选块，空格抓住，Q/E 旋转方向，空格松手，Esc 取消。</p></details>
     </dialog>`;
   document.body.append(app);
   app.querySelector('.spa-brand').insertAdjacentHTML('beforeend','<div class="session-status"></div>');
@@ -145,6 +145,7 @@ export async function Start() {
   function Cancel() {
     pendingHover=null;
     StopTrayInput();
+    view.EndScoopStroke();
     if(turnPointer){const id=turnPointer.id;turnPointer=null;view.TurnEnd();if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);}
     if(active) {
       if(active.body.detached) Release();
@@ -165,9 +166,9 @@ export async function Start() {
       view.Drop(c);Sound('dropLiquid',.75,c);Record('soften',{id:c.id,target:c.wetting});
       Feedback('软化液已滴入');return;
     }
+    if(view.Grip(c,x,y,toolId)===false)return;
     active=c;app.dataset.gripping='true';c.state='peeling';c.held=0;c.stretchPlayed=false;c.painLoad=0;
     pointer={id,x,y,currentX:x,currentY:y};
-    view.Grip(c,x,y,toolId);
     $('pull-feedback').hidden=false;$('pull-label').textContent=TYPE_NAMES[c.type];
 
     Sound(toolId==='suction'?'vacuumSuck':toolId==='brush'?'tickleFeather':toolId==='tweezers'?'metalTick':'scrapeSoft', .65, c); Record('grab', { id: c.id, tool: toolId });
@@ -194,7 +195,10 @@ export async function Start() {
       if(view.ready&&view.TurnStart(p.x,p.y,toolId)){turnPointer={id:e.pointerId,x:p.x,y:p.y};canvas.setPointerCapture(e.pointerId);Record('turnStart');}return;
     }
     if(e.button!==0)return;
-    Begin(view.Pick(p.x,p.y,toolId),p.x,p.y,e.pointerId);if(active)canvas.setPointerCapture(e.pointerId);
+    if(toolId==='scoop')view.StartScoopStroke(p.x,p.y);
+    Begin(view.Pick(p.x,p.y,toolId),p.x,p.y,e.pointerId);
+    if(toolId==='scoop'&&!pointer)pointer={id:e.pointerId,x:p.x,y:p.y,currentX:p.x,currentY:p.y};
+    if(pointer)canvas.setPointerCapture(e.pointerId);
   }
   canvas.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse')PointerDown(e);else mousePointerId=e.pointerId;});
   canvas.addEventListener('mousedown',e=>PointerDown({clientX:e.clientX,clientY:e.clientY,button:e.button,pointerId:mousePointerId,pointerType:'mouse',preventDefault:()=>e.preventDefault()}));
@@ -205,7 +209,7 @@ export async function Start() {
     if(turnPointer){if(e.pointerId!==turnPointer.id)return;e.preventDefault();turnPointer.x=p.x;turnPointer.y=p.y;return;}
     // 高频鼠标事件只保留最新位置，每个可见帧做一次完整碰撞扫掠。
     if(!pointer){if(phase==='playing'&&!DialogOpen())pendingHover=p;return;}
-    if(e.pointerId!==pointer.id)return;pointer.currentX=p.x;pointer.currentY=p.y;
+    if(e.pointerId!==pointer.id)return;pointer.moved||=pointer.currentX!==p.x||pointer.currentY!==p.y;pointer.currentX=p.x;pointer.currentY=p.y;
   });
   function PointerUp(e){
     if(trayPointer===e.pointerId){StopTrayInput();return;}
@@ -215,7 +219,7 @@ export async function Start() {
   canvas.addEventListener('pointerup',e=>{if(e.pointerType!=='mouse')PointerUp(e);});
   canvas.addEventListener('mouseup',e=>PointerUp({pointerId:mousePointerId,pointerType:'mouse',button:e.button}));
   canvas.addEventListener('pointercancel', Cancel);
-  canvas.addEventListener('lostpointercapture', () => { if (active||turnPointer||trayPointer!=null) Cancel(); });
+  canvas.addEventListener('lostpointercapture', () => { if (pointer||active||turnPointer||trayPointer!=null) Cancel(); });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   window.addEventListener('blur', Cancel);
   window.addEventListener('resize', Cancel);
@@ -286,6 +290,7 @@ export async function Start() {
     const c=active;c.held+=dt;
     const before=c.body.anchors.filter(a=>a.alive).length;
     const state=view.Drag(c,pointer.currentX,pointer.currentY,dt,1+(shop.ToolLevel(TOOL_IDS[toolId])-1)*.08);
+    if(state.slipped){view.Slip(c);active=null;pointer.moved=false;app.dataset.gripping='false';StopContact();Record('slip',{id:c.id});return;}
     c.painLoad=state.pain>0?c.painLoad+dt:Math.max(0,c.painLoad-dt);
     if(c.painLoad>.18&&!painCooldown){
       satisfaction=Math.max(5,satisfaction-9);painCount++;combo=0;painCooldown=4;
@@ -294,7 +299,7 @@ export async function Start() {
     }
     if(state.fracture){
       const pieces=view.Fracture(c);if(!pieces.length)return;Record('fracture',{id:c.id,pieces:pieces.map(p=>p.id)});fractures++;combo=0;satisfaction=Math.max(5,satisfaction-3);
-      active=null;Cancel();Sound('snapWax',.9,c);Reward('裂成了 '+pieces.length+' 片 · 碎屑仍需清理','warn');
+      active=null;if(toolId!=='scoop')Cancel();else{pointer.moved=false;app.dataset.gripping='false';StopContact();}Sound('snapWax',.9,c);Reward('裂成了 '+pieces.length+' 片 · 碎屑仍需清理','warn');
       Feedback('硬拉导致碎裂','pain');UpdateProgress();return;
     }
     $('pull-meter').value=state.strain;
@@ -318,6 +323,7 @@ export async function Start() {
       dt=Math.min(dt,Math.max(0,timeLimit-elapsed));elapsed+=dt;
       if(pendingHover){const p=pendingHover;pendingHover=null;if(!pointer&&!turnPointer)view.Hover(p.x,p.y,toolId);}
       if(turnPointer)view.TurnBy(dt*Math.PI*.65,toolId);
+      if(pointer&&!active&&toolId==='scoop'&&!view.busy){const p=pointer;view.MoveScoopStroke(p.currentX,p.currentY);if(p.moved)Begin(view.Pick(p.currentX,p.currentY,toolId),p.currentX,p.currentY,p.id);p.moved=false;}
       if(active&&pointer) Interact(dt);
       else if(!turnPointer&&time>hintUntil)$('pull-feedback').hidden=true;
       for (const c of view.Update(dt)) {

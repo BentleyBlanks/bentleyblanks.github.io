@@ -1,6 +1,7 @@
 // 可见块体使用薄壳，细微颗粒保留低成本刚体；两者共用工具和附着接口。
-import {BindWaxSurface,BindWaxSurfaceSteps,GripWaxSurface,UngripWaxSurface,StepWaxSurface,WriteWaxSurface} from './Script_SoftWaxPhysics.mjs?v=ear020-contact-loading-20260912';
+import {BindWaxSurface,BindWaxSurfaceSteps,GripWaxSurface,UngripWaxSurface,StepWaxSurface,WriteWaxSurface} from './Script_SoftWaxPhysics.mjs?v=ear024-cohesive-scraping-20260912';
 export {BindWaxSurface as BindPeelSurface,BindWaxSurfaceSteps as BindPeelSurfaceSteps,WriteWaxSurface as WritePeelSurface};
+export {WaxAnchorPoint as PeelAnchorPoint} from './Script_SoftWaxPhysics.mjs?v=ear024-cohesive-scraping-20260912';
 const Add=(a,b)=>a.map((x,i)=>x+b[i]);
 const Sub=(a,b)=>a.map((x,i)=>x-b[i]);
 const Mul=(a,s)=>a.map(x=>x*s);
@@ -38,8 +39,8 @@ export function MovePeelBody(body,position){
   body.position=position.slice();body.velocity=[0,0,0];
 }
 
-export function StepPeelBody(body,{target=null,softness=0,efficiency=1,supportRotation=null,adhesion=1,minAnchors=0}={},dt=1/60){
-  if(body.surface)return StepWaxSurface(body,{target,softness,efficiency,supportRotation,adhesion,minAnchors},dt);
+export function StepPeelBody(body,{target=null,softness=0,efficiency=1,supportRotation=null,adhesion=1,minAnchors=0,fracture=false}={},dt=1/60){
+  if(body.surface)return StepWaxSurface(body,{target,softness,efficiency,supportRotation,adhesion,minAnchors,fracture},dt);
   const count=Math.max(1,Math.ceil(Math.min(.05,dt)*240)),h=Math.min(.05,dt)/count;
   const profile=PROFILES[body.type]||PROFILES.dry;
   const soft=Clamp(softness);

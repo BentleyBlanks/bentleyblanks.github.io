@@ -24,10 +24,12 @@ try{for(const [width,height,touch] of [[1000,900,false],[390,844,true]]){
     Check(probe.targets.filter(c=>!c.fine).every(c=>c.physics.solver==='xpbd-shell'&&c.physics.nodes===65),'all visible deposits use the physical shell');
     Check(probe.targets.filter(c=>c.fine).every(c=>c.physics.solver==='rigid-grain'),'microdebris keeps its small-particle solver');
     await page.screenshot({path:path.join(here,'_dev/Shot_SoftWaxRest_'+width+'.png')});
+    await page.locator('[data-tool="drops"]').click();await Input(true,original);await Input(false);await Step(195);await page.locator('[data-tool="scoop"]').click();
     await Input(true,original);
-    for(const frames of [6,6,6,6,10,36]){await Step(frames);const s=await Surface();const{geometry,...sample}=s;report.samples.push(sample);if(s.remaining>2&&s.remaining<13&&s.bend>.2){await page.screenshot({path:path.join(here,'_dev/Shot_SoftWaxPeeling_'+width+'.png')});}}
-    Check(report.samples.some(s=>s.remaining>2&&s.remaining<13&&s.renderDelta>.07&&s.bend>.2&&s.attachedError<.05),'actual pointer force bends the rendered body while its remaining attachment points stay seated');
-    let s=await Surface();Check(s.remaining===2&&s.state==='peeling','spoon loosens the wet layer while preserving its two final attachments');
+    let stroke=0;for(const frames of [6,6,6,6,10,36]){stroke+=1;const x=original.screen.x+(original.pullScreen.x-original.screen.x)*Math.min(stroke,2)/9,y=original.screen.y+(original.pullScreen.y-original.screen.y)*Math.min(stroke,2)/9;
+      if(touch)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y}]});else await page.mouse.move(x,y);await Step(frames);const s=await Surface();const{geometry,...sample}=s;report.samples.push(sample);if(s.remaining>2&&s.remaining<=13&&s.bend>.2){await page.screenshot({path:path.join(here,'_dev/Shot_SoftWaxPeeling_'+width+'.png')});}}
+    Check(report.samples.some(s=>s.remaining>2&&s.remaining<=13&&s.renderDelta>.07&&s.bend>.2&&s.attachedError<.05),'actual pointer force bends the rendered body while its remaining attachment points stay seated');
+    let s=await Surface();Check(s.remaining===13&&s.state==='peeling','strongly adhered wet film bends locally while all wall bonds remain seated');
     Check(s.vertices===original.vertices&&s.stretch<.15,'deformation retains surface detail with bounded extension');
     await page.screenshot({path:path.join(here,'_dev/Shot_SoftWaxFold_'+width+'.png')});
     const bent=s.bend;await Input(false);await Step(200);s=await Surface();
@@ -35,7 +37,7 @@ try{for(const [width,height,touch] of [[1000,900,false],[390,844,true]]){
     await page.screenshot({path:path.join(here,'_dev/Shot_SoftWaxReturn_'+width+'.png')});
     await page.locator('[data-tool="tweezers"]').click();const before=await Surface();await Input(true,(await Probe()).targets.find(c=>c.id===2));const after=await Surface();
     Check((await Probe()).active===2&&after.geometry.every((v,i)=>Math.abs(v-before.geometry[i])<1e-5),'tweezers can regrip during recovery without resetting or snapping the surface');
-    await Step(110);probe=await Probe();Check(probe.targets.find(c=>c.id===2).state==='held'&&probe.cleanliness===0,'forceps detach the same body without awarding collection early');
+    const forcepsCounts=new Set();for(let i=0;i<42;i++){await Step(3);forcepsCounts.add((await Surface()).remaining);}Check(forcepsCounts.size>=3,'forceps peel the softened film through multiple distinct attachment states');probe=await Probe();Check(probe.targets.find(c=>c.id===2).state==='held'&&probe.cleanliness===0,'forceps detach the same body without awarding collection early');
     await Input(false);await Step(230);probe=await Probe();Check(probe.harvest.filter(c=>c.id===2).length===1&&probe.cleanliness>0,'the deformed body can be carried out and counted once on landing');
     Check(probe.stats.triangles<=180000&&probe.stats.drawCalls<=120,'shell skinning stays inside the existing rendering budget');
     Check(report.errors.length===0,'no browser, shader or asset errors');console.log('PASS soft wax '+width+' '+report.checks.length+' real '+(touch?'touch':'mouse')+' checks');

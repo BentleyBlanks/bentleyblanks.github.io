@@ -29,6 +29,8 @@ try{
    await page.evaluate(()=>{window.requestAnimationFrame=()=>0;});
    await page.locator('#ear-start').click();await page.locator('#lamp-toggle').click();await Step(150);
    // 覆盖现有三档几何；夹持、松手与计分仍全部走真实鼠标 / CDP 触屏。
+   const wetTarget=(await Probe()).targets.find(c=>c.id===2);
+   await page.locator('[data-tool="drops"]').click();await Input(true,wetTarget);await Input(false,wetTarget);await Step(195);
    await page.locator('[data-tool="tweezers"]').click();
    await page.evaluate(level=>__EarSpaDebug.view.SetSkins({tweezers:'classic'},{tweezers:level}),level);
    Check((await Probe()).rendering.toolLevels.tweezers===level,'requested forceps edition is loaded');

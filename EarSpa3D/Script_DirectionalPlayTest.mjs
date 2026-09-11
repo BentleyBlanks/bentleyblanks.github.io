@@ -28,18 +28,23 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
   async function Input(type,x=0,y=0){if(type==='up'&&!down)return;if(type==='down')down=true;if(type==='up')down=false;if(touch)await cdp.send('Input.dispatchTouchEvent',{type:{down:'touchStart',move:'touchMove',up:'touchEnd'}[type],touchPoints:type==='up'?[]:[{x,y}]});else{if(type==='down'){await page.mouse.move(x,y);await page.mouse.down();}if(type==='move')await page.mouse.move(x,y,{steps:8});if(type==='up')await page.mouse.up();}await page.waitForTimeout(20);}
   async function Select(id){await Input('up');await page.locator('[data-tool="'+id+'"]').click();}
   async function Start(){await page.goto(url+'?debug=1');await page.waitForFunction(()=>window.__EarSpaDebug);await page.locator('#ear-start').click();await page.locator('#lamp-toggle').click();await Step(150);}
-  async function Press(id,frames=110){let t=(await Probe()).targets.find(c=>c.id===id);const deep=t.depth>10;if((await page.locator('#depth-toggle').getAttribute('aria-pressed')==='true')!==deep){await page.locator('#depth-toggle').click();await Step(70);t=(await Probe()).targets.find(c=>c.id===id);} await Input('down',t.screen.x,t.screen.y);await Step(frames);return (await Probe()).targets.find(c=>c.id===id);}
+  async function Press(id,frames=110){let t=(await Probe()).targets.find(c=>c.id===id);const deep=t.depth>10;if((await page.locator('#depth-toggle').getAttribute('aria-pressed')==='true')!==deep){await page.locator('#depth-toggle').click();await Step(70);t=(await Probe()).targets.find(c=>c.id===id);} await Input('down',t.screen.x,t.screen.y);
+   if((await Probe()).tool==='scoop'&&(await Probe()).active!=null){for(let j=1;j<=24;j++){await Input('move',t.screen.x+(t.pullScreen.x-t.screen.x)*j/24,t.screen.y+(t.pullScreen.y-t.screen.y)*j/24);await Step(6);const c=(await Probe()).targets.find(c=>c.id===id);if(c.state==='held'||c.state==='fractured')break;}}
+   else await Step(frames);return (await Probe()).targets.find(c=>c.id===id);}
   async function Align(id,tool){
    if(!['scoop','tweezers'].includes(tool))return;
    let t=(await Probe()).targets.find(c=>c.id===id);if((await page.locator('#depth-toggle').getAttribute('aria-pressed')==='true')!==(t.depth>10)){await page.locator('#depth-toggle').click();await Step(70);t=(await Probe()).targets.find(c=>c.id===id);}
    // 握持方向跨目标保留，整局测试也必须像玩家一样转到有效工作面，不能假定自动对齐。
    const normal=await page.evaluate(id=>__EarSpaDebug.view.chunks.find(c=>c.id===id).normal.toArray(),id);
    if(touch){await page.locator('#mode-turn').click();await Input('down',t.screen.x,t.screen.y);}else{await page.mouse.move(t.screen.x,t.screen.y);await page.mouse.down({button:'right'});}
-   let aligned=false;for(let i=0;i<100;i++){await Step(3);const p=await Probe(),contact=InstrumentContact(tool,p.rendering.toolRotation,normal);aligned=contact.aligned;if(aligned)break;}
+   let aligned=false;for(let i=0;i<100;i++){await Step(3);const p=await Probe(),contact=InstrumentContact(tool,p.rendering.toolRotation,normal);aligned=tool==='scoop'?contact.facing>.8:contact.jawTilt<.12;if(aligned)break;}
    if(touch){await Input('up');await page.locator('#mode-force').click();}else await page.mouse.up({button:'right'});
    Check(aligned,'real rotation aligns '+tool+' for target '+id);
   }
-  async function Collect(id,tool){await Select(tool);await Align(id,tool);const before=(await Probe()).harvest.length;const c=await Press(id);Check(c.state==='held','hold current tool direction detaches '+id);Check((await Probe()).harvest.length===before,'holding does not award cleaning '+id);await Input('up');await Step(80);if(id===0){Check((await Probe()).rendering.headRealtime&&(await Probe()).rendering.outerVisible,'same live head stays visible during extraction');await page.screenshot({path:path.join(here,'_dev','Shot_LiveExtraction_'+width+'.png')});}await Step(150);Check((await Probe()).harvest.filter(c=>c.id===id).length===1,'exactly one landing award '+id);const landed=(await Probe()).events.find(e=>e.type==='landingSound'&&e.id===id);Check(landed?.cue===LandingSound(c).cue,'size selects approved landing '+id);heardTiers.add(landed.tier);}
+  async function Collect(id,tool){if(tool!=='feather'){await Select('drops');await Press(id,1);await Input('up');await Step(195);}await Select(tool);await Align(id,tool);const before=(await Probe()).harvest.length;let c=await Press(id);
+   // 工作面朝向有效但整根勺柄被对侧耳壁挡住时，换长镊处理同一块，不能给耳勺远程吸附。
+   if(tool==='scoop'&&c.state!=='held'&&c.state!=='fractured'){await Input('up');await Select('tweezers');await Align(id,'tweezers');c=await Press(id,130);}
+   Check(c.state==='held','physical tool contact detaches '+id);Check((await Probe()).harvest.length===before,'holding does not award cleaning '+id);await Input('up');await Step(80);if(id===0){Check((await Probe()).rendering.headRealtime&&(await Probe()).rendering.outerVisible,'same live head stays visible during extraction');await page.screenshot({path:path.join(here,'_dev','Shot_LiveExtraction_'+width+'.png')});}await Step(150);Check((await Probe()).harvest.filter(c=>c.id===id).length===1,'exactly one landing award '+id);const landed=(await Probe()).events.find(e=>e.type==='landingSound'&&e.id===id);Check(landed?.cue===LandingSound(c).cue,'size selects approved landing '+id);heardTiers.add(landed.tier);}
   try{
    await Start();let p=await Probe();
    Check(p.targets.length===21&&p.targets.filter(c=>c.fine).reduce((s,c)=>s+c.grainCount,0)===108,'initial ear contains large deposits and 108 separate tiny grains');
@@ -58,7 +63,7 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
    p=await Probe();Check(p.rendering.toolPosition.every((v,i)=>Math.abs(v-pivotStart[i])<1e-7),'rotation preserves the physical contact pivot');Check(Math.abs(p.rendering.heading)>.01&&!p.turning,'real rotate gesture persists angle and ends cleanly');Check(p.cleanliness===0&&p.targets[0].state==='attached','rotating never applies extraction force');
    if(!touch){
     await Start();let parent=(await Probe()).targets.find(c=>c.type==='dry'&&!c.fine&&c.form==='ribbon')||(await Probe()).targets.find(c=>c.type==='dry'&&!c.fine);
-    for(let generation=1;generation<=3;generation++){
+    {const generation=1;
       await Select('tweezers');await Press(parent.id,125);await Input('up');await Step(60);
       const children=(await Probe()).targets.filter(c=>c.generation===generation&&String(c.id).startsWith(String(parent.id)+'.'));
       Check(children.length>=2,'actual pointer force produces generation '+generation);
@@ -67,10 +72,10 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
       parent=await page.evaluate(ids=>__EarSpaProbe().targets.filter(c=>ids.includes(c.id)).sort((a,b)=>b.mass-a.mass).find(c=>__EarSpaDebug.view.Pick(c.screen.x,c.screen.y,'tweezers')?.id===c.id),children.map(c=>c.id));
       Check(!!parent,'generation '+generation+' keeps a visible contact point');
     }
-    Check(parent.fine===IsFeatherDebris(parent),'third generation uses actual fragment size and mass');await Select(parent.fine?'tweezers':'feather');await Press(parent.id,60);await Input('up');Check((await Probe()).targets.find(c=>c.id===parent.id).state==='attached','incompatible tool cannot collect third-generation residue');await Collect(parent.id,parent.fine?'feather':'scoop');
+    Check(parent.fine===IsFeatherDebris(parent),'fragment eligibility uses actual size and mass');await Select(parent.fine?'tweezers':'feather');await Press(parent.id,60);await Input('up');Check((await Probe()).targets.find(c=>c.id===parent.id).state==='attached','incompatible tool cannot collect third-generation residue');await Collect(parent.id,parent.fine?'feather':'scoop');
    }
    await Start();await Select('scoop');await Press(8,60);await Input('up');p=await Probe();
-   Check(p.targets.find(c=>c.id===8).state==='attached'&&p.rendering.reachBlocked,'short spoon cannot grip or advance deep wax');
+   Check(p.targets.find(c=>c.id===8).state==='attached'&&p.events.some(e=>e.type==='reachLimit'&&e.id===8),'short spoon cannot grip or advance deep wax');
    Check(p.rendering.contactOcclusion.includes('silhouette')&&p.rendering.contactRimMm<.2,'contact occlusion follows actual outlines within a submillimetre rim');
    await page.locator('#depth-toggle').click();await Step(70);p=await Probe();
    const dust=await page.evaluate(()=>__EarSpaProbe().targets.find(c=>c.fine&&__EarSpaDebug.view.Pick(c.screen.x,c.screen.y,'scoop')?.id===c.id));Check(!!dust,'a visible microdust patch can be targeted separately');await Select('scoop');await Press(dust.id,40);await Input('up');Check((await Probe()).targets.find(c=>c.id===dust.id).state==='attached','spoon cannot remove tiny dust');

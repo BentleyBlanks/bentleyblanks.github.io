@@ -9,7 +9,7 @@ export function InstrumentContact(id,rotation,normal,{jawContact=true}={}){
   const face=Axis(rotation,[0,0,1]),jaws=Axis(rotation,[1,0,0]);
   const facing=Dot(face,normal),jawTilt=Math.abs(Dot(jaws,normal));
   const aligned=id==='scoop'?facing>.28:id==='tweezers'?jawTilt<.48&&jawContact:true;
-  // 勺面决定能否托住，刮除力沿壁面法线向管腔加载，不能随握持旋转变成斜拉。
+  // 勺面决定能否托住；direction 是参考法线，耳勺的实际加载位移由鼠标与碰撞后的位姿计算。
   const direction=id==='scoop'?normal.map(v=>v/(Math.hypot(...normal)||1)):id==='tweezers'?face.map(v=>v*(facing<0?-1:1)):face;
   return {aligned,direction,facing,jawTilt};
 }
