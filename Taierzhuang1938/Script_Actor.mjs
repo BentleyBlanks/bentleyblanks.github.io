@@ -3282,7 +3282,8 @@ export class Actor {
       this.weaponGroup.position.lerpVectors(rag.weaponStart, rag.weaponEnd, drop);
       this.weaponGroup.quaternion.slerpQuaternions(rag.weaponStartQ, rag.weaponEndQ, drop);
     }
-    if (dying > 0) this.body.rotation.x += dying * 0.02;
+    // Rigged corpses already measured their final skin contact in PoseDeath.
+    if (dying > 0 && !this.characterRig) this.body.rotation.x += dying * 0.02;
   }
 
   /**

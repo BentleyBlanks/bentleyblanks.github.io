@@ -5,6 +5,7 @@
 
 import * as THREE from "three";
 import { DEATH_POSE } from "./Data_DeathPose.mjs";
+import { DEATH_CONTACT } from "./Data_Tuning_ActorDeath.mjs";
 import { InfantryAnimationController, INFANTRY_ANIMATION_IDS, INFANTRY_ANIMATION_LABELS, INFANTRY_ONCE_IDS } from "./Script_InfantryAnimation.mjs";
 import { MeleeAnimationPlayer } from "./Script_MeleeAnimation.mjs";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
@@ -729,7 +730,7 @@ export class LugouCharacterRig {
     this.deathPose = nodes;
     this.deathGroundProbes = [];
     this.root.traverse(mesh => {
-      if (!mesh.isSkinnedMesh) return;
+      if (!mesh.isMesh || !mesh.userData.characterPbrSurface) return;
       // Fixed vertex sample keeps the short transition bounded; final frame checks every vertex.
       this.deathGroundProbes.push(mesh);
     });
@@ -743,29 +744,89 @@ export class LugouCharacterRig {
       item.node.quaternion.slerpQuaternions(item.startQuaternion, item.quaternion, blend);
       item.node.scale.lerpVectors(item.startScale, item.scale, blend);
     }
+    // Let the feet roll onto their sides as muscle tension releases. Preserve limb
+    // lengths and the authored pose; only swing the ankle, in the fitted ground plane.
+    const rootQ = this.actor.root.getWorldQuaternion(new THREE.Quaternion());
+    const point = new THREE.Vector3(), start = new THREE.Vector3();
+    const parentQ = new THREE.Quaternion(), swing = new THREE.Quaternion();
+    const ankleBlend = THREE.MathUtils.smoothstep(t, DEATH_CONTACT.ankleStart, DEATH_CONTACT.poseEnd);
+    for (const [side, sign] of [["L", -1], ["R", 1]]) {
+      const foot = this.bones[`foot${side}`];
+      const toe = foot?.children.find(node => /Toe0$/.test(node.name));
+      if (!toe) continue;
+      foot.getWorldPosition(start); toe.getWorldPosition(point).sub(start).normalize();
+      const target = new THREE.Vector3(sign * DEATH_CONTACT.footOutward, 0,
+        this.actor.ragdollState.forward * DEATH_CONTACT.footAlongBody).normalize().applyQuaternion(rootQ);
+      swing.setFromUnitVectors(point, target);
+      foot.parent.getWorldQuaternion(parentQ);
+      swing.premultiply(parentQ.clone().invert()).multiply(parentQ);
+      swing.slerpQuaternions(new THREE.Quaternion(), swing.clone(), ankleBlend);
+      foot.quaternion.premultiply(swing);
+    }
+    const settle = THREE.MathUtils.smoothstep(t, DEATH_CONTACT.poseEnd, 1);
     if (t === 1 && this.deathFloorLift !== undefined) {
+      this.actor.body.quaternion.premultiply(this.deathContactRotation);
       this.actor.body.position.y += this.deathFloorLift; return;
     }
     // Ground against visible skin, in Actor.root's fitted terrain plane, not ankle pivots.
     this.root.updateWorldMatrix(true, false); this.root.updateMatrixWorld(true);
     const inverse = this.actor.root.matrixWorld.clone().invert();
-    const point = new THREE.Vector3(), transform = new THREE.Matrix4();
+    const transform = new THREE.Matrix4(), points = [];
     let floor = Infinity;
     for (const mesh of this.deathGroundProbes) {
-      mesh.skeleton.update(); transform.multiplyMatrices(inverse, mesh.matrixWorld);
+      if (!mesh.visible) continue;
+      mesh.skeleton?.update(); transform.multiplyMatrices(inverse, mesh.matrixWorld);
       // Gore removes triangles from the index while retaining the shared vertex buffer.
       // Only drawn vertices can support the body; a removed boot must not lift the torso.
       const indices = mesh.geometry.index;
       const count = indices?.count ?? mesh.geometry.attributes.position.count;
-      const stride = t === 1 ? 1 : Math.max(1, Math.floor(count / 256));
+      const stride = t >= DEATH_CONTACT.poseEnd ? 1 : Math.max(1, Math.floor(count / 256));
       for (let offset = 0; offset < count; offset += stride) {
         const index = indices ? indices.getX(offset) : offset;
         mesh.getVertexPosition(index, point).applyMatrix4(transform);
         floor = Math.min(floor, point.y);
+        if (t >= DEATH_CONTACT.poseEnd) points.push(point.clone().sub(this.actor.body.position));
       }
     }
+    if (points.length) {
+      if (!this.deathContactRotation) {
+        // One bounded support search per corpse. Minimise the mass centre height,
+        // not just the lowest vertex: toes or a backpack alone cannot balance a body.
+        const cells = new Map();
+        for (const p of points) {
+          const key = `${Math.floor(p.x / DEATH_CONTACT.sampleCellM)},${Math.floor(p.z / DEATH_CONTACT.sampleCellM)}`;
+          if (!cells.has(key) || cells.get(key).y > p.y) cells.set(key, p);
+        }
+        const center = this.bones.pelvis.getWorldPosition(new THREE.Vector3())
+          .lerp(this.bones.chest.getWorldPosition(new THREE.Vector3()), .4)
+          .applyMatrix4(inverse).sub(this.actor.body.position);
+        const rotation = new THREE.Quaternion(), euler = new THREE.Euler();
+        const Potential = (pitch, roll) => {
+          rotation.setFromEuler(euler.set(pitch, 0, roll, "YXZ"));
+          let low = Infinity;
+          for (const p of cells.values()) low = Math.min(low, point.copy(p).applyQuaternion(rotation).y);
+          return point.copy(center).applyQuaternion(rotation).y - low;
+        };
+        let pitch = 0, roll = 0, energy = Potential(0, 0);
+        for (const step of DEATH_CONTACT.angleStepsRad) {
+          const startPitch = pitch, startRoll = roll;
+          for (const dx of [-step, 0, step]) for (const dz of [-step, 0, step]) {
+            const px = startPitch + dx, rz = startRoll + dz;
+            if (Math.abs(px) > DEATH_CONTACT.maxTiltRad || Math.abs(rz) > DEATH_CONTACT.maxTiltRad) continue;
+            const next = Potential(px, rz);
+            if (next < energy - 1e-6) { pitch = px; roll = rz; energy = next; }
+          }
+        }
+        this.deathContactRotation = new THREE.Quaternion().setFromEuler(euler.set(pitch, 0, roll, "YXZ"));
+      }
+      swing.slerpQuaternions(new THREE.Quaternion(), this.deathContactRotation, settle);
+      this.actor.body.quaternion.premultiply(swing);
+      floor = Infinity;
+      for (const p of points) floor = Math.min(floor,
+        point.copy(p).applyQuaternion(swing).y + this.actor.body.position.y);
+    }
     if (Number.isFinite(floor)) {
-      const lift = (.008 - floor) * THREE.MathUtils.smoothstep(t, 0, .2);
+      const lift = (DEATH_CONTACT.clearanceM - floor) * THREE.MathUtils.smoothstep(t, 0, .2);
       this.actor.body.position.y += lift;
       if (t === 1) this.deathFloorLift = lift;
     }

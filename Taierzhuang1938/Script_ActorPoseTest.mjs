@@ -463,7 +463,7 @@ try {
       const scale = dead.weaponGroup.getWorldScale(new THREE.Vector3()).length();
       dead.Ragdoll(new THREE.Vector3(.12, 0, direction));
       check(dead.characterRig.deathPose?.length > 30, `${kind}/${variant}: death must animate the visible soldier skeleton`);
-      for (let frame = 0; frame < 60; frame++) dead.Update(1 / 60, { dead: true });
+      for (let frame = 0; frame < 60; frame++) dead.Update(1 / 60, { dead: true, dying: Math.min(1, (frame + 1) / 54) });
       dead.root.updateMatrixWorld(true);
       check(dead.weaponGroup.parent === dead.root, "dead rifle still follows the hand socket");
       check(Math.abs(dead.weaponGroup.getWorldScale(new THREE.Vector3()).length() - scale) < 1e-5,
@@ -477,19 +477,39 @@ try {
         const hip = rig.bones.pelvis.getWorldPosition(new THREE.Vector3());
         check(hand.distanceTo(hip) < .55, `${kind}/${variant}: relaxed hand remained in the raised firing pose`);
       }
-      let floor = Infinity;
+      let floor = Infinity, legFloor = Infinity, torsoFloor = Infinity;
       rig.root.traverse(mesh => {
-        if (!mesh.isSkinnedMesh) return;
-        mesh.skeleton.update();
+        if (!mesh.isMesh || !mesh.visible || !mesh.userData.characterPbrSurface) return;
+        mesh.skeleton?.update();
         const point = new THREE.Vector3();
-        for (let index = 0; index < mesh.geometry.attributes.position.count; index++) {
+        const indices = mesh.geometry.index;
+        for (let offset = 0; offset < (indices?.count ?? mesh.geometry.attributes.position.count); offset++) {
+          const index = indices ? indices.getX(offset) : offset;
           mesh.getVertexPosition(index, point).applyMatrix4(mesh.matrixWorld);
           floor = Math.min(floor, point.y);
+          if (!mesh.isSkinnedMesh) continue;
+          const bones = mesh.geometry.attributes.skinIndex, weights = mesh.geometry.attributes.skinWeight;
+          let dominant = 0;
+          for (let k = 1; k < 4; k++) if (weights.getComponent(index, k) > weights.getComponent(index, dominant)) dominant = k;
+          const name = mesh.skeleton.bones[bones.getComponent(index, dominant)].name;
+          if (/Calf|Thigh/.test(name)) legFloor = Math.min(legFloor, point.y);
+          if (/Pelvis|Spine/.test(name)) torsoFloor = Math.min(torsoFloor, point.y);
         }
       });
       check(Math.abs(floor - .008) < .003, "settled visible skin does not meet the ground");
+      check(legFloor < .08 && torsoFloor < .08,
+        `${kind}/${variant}/${direction}: body balanced on toes or equipment: legs=${legFloor}, torso=${torsoFloor}`);
       const position = dead.weaponGroup.position.clone(), quaternion = dead.weaponGroup.quaternion.clone();
-      dead.Update(.5, { dead: true, aim: 1, firing: true });
+      const bodyPosition = dead.body.position.clone(), bodyQuaternion = dead.body.quaternion.clone();
+      // Gameplay changes the corpse terrain plane independently of its settled
+      // skeleton: world elevation/yaw/slope must not accumulate the cached lift.
+      for (const [pitch, roll] of [[.24, -.12], [-.18, .2], [0, 0]]) {
+        dead.root.position.set(12, 3, -5); dead.root.rotation.set(pitch, .9, roll, "YXZ");
+        dead.Update(.5, { dead: true, dying: 1, aim: 1, firing: true });
+        check(dead.body.position.distanceTo(bodyPosition) < 1e-7
+          && dead.body.quaternion.angleTo(bodyQuaternion) < 1e-6,
+          `${kind}/${variant}: settled contact changes with terrain/yaw or cached updates`);
+      }
       check(dead.weaponGroup.position.distanceTo(position) < 1e-8
         && dead.weaponGroup.quaternion.angleTo(quaternion) < 1e-7, "settled rifle jitters or remounts");
       deathPositions.add(position.toArray().join(","));
