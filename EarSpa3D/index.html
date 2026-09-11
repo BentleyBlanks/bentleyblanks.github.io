@@ -5,15 +5,15 @@
 <!-- Three.js 0.185.1 is used under the MIT License: https://github.com/mrdoob/three.js/blob/dev/LICENSE -->
 <title>采耳物语 · EarSpa3D</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#171f23">
+<meta name="theme-color" content="#141210">
 <meta name="description" content="写实采耳模拟：照明、软化、托起与夹取，观察客人反馈，升级器具并经营工作间。">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="Style_Chunk.css?v=ear013-fixed-rotation-20260912">
+<link rel="stylesheet" href="Style_Chunk.css?v=ear014-ui-20260912">
 <style>
   /* 首屏骨架：样式表可能还没到，先给出与基调一致的底色，避免白闪 */
-  html { background: #171f23; }
+  html { background: #141210; }
 
   /* 画布尺寸必须在这里兜一层。
      three 的 setSize(w, h, false) **不改画布样式**，只改绘制缓冲；画布的 CSS 尺寸
@@ -26,21 +26,23 @@
   #ear-boot { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
               flex-direction: column; gap: 18px; z-index: 900;
               font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
-              color: #b9cbd0; letter-spacing: .08em;
-              background: radial-gradient(120% 90% at 50% 20%, #171f23 0%, #29383f 60%, #10181c 100%); }
-  #ear-boot .ring { width: 46px; height: 46px; border-radius: 50%; border: 3px solid #3d515b; border-top-color: #bfdadd;
-                    animation: earSpin 900ms linear infinite; }
+              color: #d8c2a8; letter-spacing: .18em;
+              background: radial-gradient(120% 90% at 50% 20%, #2c241b 0%, #171411 60%, #100f0d 100%); }
+  #ear-boot .ring { width: 38px; height: 38px; border-radius: 50%; border: 1px solid #d6b98526; border-top-color: #d6b985;
+                    animation: earSpin 1400ms linear infinite; }
+  #ear-boot .boot-title { font-family: "Palatino Linotype", "Times New Roman", serif; font-size: 27px; letter-spacing: .2em; }
+  #ear-boot .boot-note { font-size: 11px; color: #b3a596; }
+  @media (prefers-reduced-motion: reduce) { #ear-boot .ring { animation: none; } }
   @keyframes earSpin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
-<!-- 引导期间先保留画布；ChunkGame 建好分区布局后，将它移入 #play-stage。
-     工具栏、提示和设置都有自己的布局区域，不再覆盖整张游戏画布。 -->
+<!-- 引导期间保留全屏画布，启动后移入 #play-stage；轻量 HUD 沿视口边缘排列。 -->
 <div id="ear-stage">
   <canvas id="ear-canvas" class="ear-scene"></canvas>
 </div>
 
-<div id="ear-boot"><div class="ring"></div><div>正在准备工作间…</div></div>
+<div id="ear-boot" role="status"><div class="boot-title">EAR CARE</div><div class="ring"></div><div class="boot-note">正在准备工作间…</div></div>
 
 <script type="importmap">
 {
@@ -56,7 +58,7 @@
   // 真正的游戏逻辑一行都不在这里——这里出错是最难查的那种，保持它足够小。
   const boot = document.getElementById("ear-boot");
   try {
-    const mod = await import("./Script_ChunkGame.js?v=ear013-fixed-rotation-20260912");
+    const mod = await import("./Script_ChunkGame.js?v=ear014-ui-20260912");
     await mod.Start();
   } catch (error) {
     console.error(error);
@@ -65,10 +67,10 @@
       const box = document.createElement("div");
       box.style.cssText = "max-width:32rem;padding:24px;text-align:center;line-height:1.7";
       const title = document.createElement("div");
-      title.style.cssText = "font-size:18px;color:#4A4038;margin-bottom:8px";
+      title.style.cssText = "font-size:18px;color:#e0cbb4;margin-bottom:8px";
       title.textContent = "没能启动";
       const detail = document.createElement("div");
-      detail.style.cssText = "font-size:13px;color:#8A7C6E;word-break:break-all";
+      detail.style.cssText = "font-size:13px;color:#b3a596;word-break:break-all";
       detail.textContent = String(error && error.message ? error.message : error);
       box.append(title, detail);
       boot.append(box);

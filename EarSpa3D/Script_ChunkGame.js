@@ -1,58 +1,51 @@
 import * as THREE from 'three';
+import { ToolIcon } from './Script_ToolIcons.mjs?v=ear014-ui-20260912';
 import { CreateCore } from './Script_Core.js?v=ear011-20260911';
-import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear013-fixed-rotation-20260912';
+import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear014-ui-20260912';
 import { CreateAudio } from './Script_Audio.js?v=ear012-size-audio-20260912';
 import { LandingSound } from './Script_LandingSound.mjs?v=ear012-size-audio-20260912';
 import { CreateShop } from './Script_Shop.js?v=ear011-20260911';
 import { MakeRng } from './Script_Util.js?v=ear011-20260911';
 import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear011-20260911';
 
-import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear011-20260911';
+import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear014-ui-20260912';
 
-const VERSION = 'ear013-fixed-rotation-20260912';
+const VERSION = 'ear014-ui-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const TOOL_IDS = { scoop: 'earPickBamboo', tweezers: 'earForceps', drops: 'earDrops',brush:'softBrush',suction:'microSuction',feather:'gooseFeather' };
 const TYPE_NAMES = { dry: '干性薄层', wet: '黏性耳垢', impacted: '紧实硬结' };
-const ICONS = {
-  feather:'<path d="M17 30V4m0 6-8 7m8-3 9 7m-9-3-9 7m9-3 8 7m-8-4-4 6"/>',
-  brush:'<path d="M17 29V13M11 14l1-10m4 10V3m4 11 1-10m3 11 2-9M10 16h15"/>',
-  suction:'<path d="M20 29V13q0-7-5-7H9m0-3v7M17 29h6"/>',
-  ear: '<path d="M13 26c-1-5-7-3-7-12a10 10 0 0 1 20 0c0 7-7 7-8 12-1 5-6 5-7 1M12 17v-4a4 4 0 0 1 8 0c0 4-5 3-5 7"/>',
-  scoop: '<path d="M10 27 20 10"/><ellipse cx="22" cy="7" rx="3" ry="5" transform="rotate(30 22 7)"/>',
-  tweezers: '<path d="m7 27 11-22q1-2 3-1l3 2q2 1 0 3L12 29M19 8l-8 16M22 10 14 25"/>',
-  drops: '<path d="m19 4 8 8-5 5-8-8zM16 11l-8 8 5 5 8-8M8 23s-4 3-4 5a3 3 0 0 0 6 0c0-2-2-5-2-5Z"/>',
-};
-const Icon = name => `<svg viewBox="0 0 34 34" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ICONS.ear}</svg>`;
+
 
 export async function Start() {
   for (const [key, value] of Object.entries(CSS_VARS)) document.documentElement.style.setProperty(key, value);
   const canvas = document.getElementById('ear-canvas');
   const app = document.createElement('main'); app.id = 'ear-app';
   app.innerHTML = `
-    <header class="spa-header"><div class="spa-brand">${Icon('ear')}<div><h1>采耳物语</h1><span>PRECISION EAR CARE</span></div></div>
+    <svg class="tool-icon-filters" width="0" height="0" aria-hidden="true"><defs><filter id="tool-icon-cutout" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  5 5 5 0 -0.15"/></filter></defs></svg>
+    <header class="spa-header"><div class="spa-brand"><span class="eyebrow">EAR CARE</span><p id="customer-name">今日采耳</p></div>
       <div class="header-actions"><button id="settings-open" aria-label="打开声音设置">设置</button></div></header>
     <section class="spa-game" aria-label="整块采耳游戏">
-      <div class="session-bar"><div><span class="eyebrow">慢慢来 · 一块一块取干净</span><p id="customer-name">今日采耳</p></div>
-        <div class="clean-meter"><div><span>清洁度</span><strong id="clean-value">0%</strong></div><progress id="clean-progress" max="9" value="0" aria-label="清洁度"></progress></div></div>
+      <div class="clean-meter"><div><span>已清理</span><strong id="clean-value">0%</strong></div><progress id="clean-progress" max="9" value="0" aria-label="清洁度"></progress></div>
       <button id="next-customer" hidden>下一位</button>
       <div class="play-stage" id="play-stage"><button class="view-label" id="view-toggle" aria-label="切换耳廓与耳道视角">看耳廓 ↗</button><span class="tray-label">收藏盘 <b id="harvest-count">0 / 9</b></span>
         <div id="pull-feedback" class="pull-feedback" hidden><span id="pull-label">慢慢拉</span><progress id="pull-meter" max="1" value="0" aria-label="当前接触阻力"></progress></div>
-        <div id="welcome" class="welcome"><div class="welcome-card"><span class="eyebrow">EAR SPA / REALTIME 3D</span><h2>看清每一处，<br>感受每次接触。</h2><p>探入 · 撬松 · 完整取出<br>打开检查灯，选择合适的工具。</p><button id="ear-start" class="primary">开始接待 ${Icon('ear')}</button><small>戴上耳机，听见每一次轻轻脱离</small></div></div>
+        <div id="welcome" class="welcome"><div class="welcome-card"><h2>EAR CARE</h2><p class="welcome-subtitle">耳 道 护 理 模 拟 器</p><nav class="welcome-menu" aria-label="主菜单"><button id="ear-start" class="welcome-start">开始游戏</button><button id="welcome-shop">器具商店</button><button id="welcome-settings">设置</button><button id="welcome-help">操作指南</button></nav><p class="welcome-quote">小小的舒适，<br><span>也是一种治愈。</span></p></div><span class="welcome-signature">CLEAN · RELAX · HEAL</span></div>
+        <aside class="care-objective" aria-label="服务目标"><span class="eyebrow">目标</span><strong>清理耳垢与微屑</strong></aside>
       </div>
       <nav class="tool-dock" aria-label="采耳工具">
-        <button data-tool="scoop" aria-pressed="true">${Icon('scoop')}<span><strong>竹耳勺</strong><small>撬起薄片</small></span><kbd>1</kbd></button>
-        <button data-tool="tweezers" aria-pressed="false">${Icon('tweezers')}<span><strong>小镊子</strong><small>夹起软块</small></span><kbd>2</kbd></button>
-        <button data-tool="drops" aria-pressed="false">${Icon('drops')}<span><strong>软化液</strong><small>点一下软化</small></span><kbd>3</kbd></button>
+        <button data-tool="scoop" aria-pressed="true">${ToolIcon('scoop')}<span><strong>耳勺</strong><small>撬起薄片</small></span><kbd>1</kbd></button>
+        <button data-tool="tweezers" aria-pressed="false">${ToolIcon('tweezers')}<span><strong>小镊子</strong><small>夹起软块</small></span><kbd>2</kbd></button>
+        <button data-tool="drops" aria-pressed="false">${ToolIcon('drops')}<span><strong>软化液</strong><small>点一下软化</small></span><kbd>3</kbd></button>
       </nav>
     </section>
-    <dialog id="settings-dialog"><div class="dialog-heading"><div><span class="eyebrow">音频 / 操作反馈</span><h2>声音与轻触</h2></div><button id="settings-close" aria-label="关闭设置">✕</button></div>
+    <dialog id="settings-dialog" aria-labelledby="settings-title"><div class="dialog-heading"><div><span class="eyebrow">EAR CARE / SETTINGS</span><h2 id="settings-title">声音与轻触</h2></div><button id="settings-close" aria-label="关闭设置">✕</button></div>
       <div class="slider-row"><span>声音</span><button id="sound-toggle" aria-label="静音" aria-pressed="false">声音开</button></div>
       <label class="slider-row">总音量<input id="volume-master" type="range" min="0" max="1" step="0.01" value="0.8"></label>
       <label class="slider-row">动作音效<input id="volume-sfx" type="range" min="0" max="1" step="0.01" value="0.85"></label>
       <label class="slider-row">背景音乐<input id="volume-bgm" type="range" min="0" max="1" step="0.01" value="0.16"></label>
       <label class="slider-row">轻微震动<input id="haptics" type="checkbox" checked></label>
 
-      <details><summary>操作说明</summary><p>鼠标右键按住连续旋转，松开停止，工具留在接触点；左键按住沿当前方向撬起或夹起。手机切换转向／施力，分别单指按住。工具遇到内壁会受阻。点放大镜切换深浅视野，短耳勺工作长度有限；深处用长镊，硬结先滴液软化。松脱后仍在工具上，松手由工具托送到耳外，再轻放入盘。硬结先滴液等待约 3 秒。干薄片用耳勺托边，黏块先松边再用镊子夹；硬拉会痛或碎裂。碎屑可用耳勺清理，也可买毛刷轻扫或用吸引管吸走湿碎屑。中途松手会放回。</p><p>键盘：1/2/3 切换工具；画面获得焦点后，左右方向键选块，空格抓住，Q/E 旋转方向，空格松手，Esc 取消。</p></details>
+      <details id="operation-guide"><summary>操作指南</summary><p>鼠标右键按住连续旋转，松开停止，工具留在接触点；左键按住沿当前方向撬起或夹起。手机切换转向／施力，分别单指按住。工具遇到内壁会受阻。点放大镜切换深浅视野，短耳勺工作长度有限；深处用长镊，硬结先滴液软化。松脱后仍在工具上，松手由工具托送到耳外，再轻放入盘。硬结先滴液等待约 3 秒。干薄片用耳勺托边，黏块先松边再用镊子夹；硬拉会痛或碎裂。碎屑可用耳勺清理，也可买毛刷轻扫或用吸引管吸走湿碎屑。中途松手会放回。</p><p>键盘：1/2/3 切换工具；画面获得焦点后，左右方向键选块，空格抓住，Q/E 旋转方向，空格松手，Esc 取消。</p></details>
     </dialog>`;
   document.body.append(app);
   app.querySelector('.spa-brand').insertAdjacentHTML('beforeend','<div class="session-status"></div>');
@@ -60,7 +53,7 @@ export async function Start() {
   app.querySelector('.header-actions').insertAdjacentHTML('afterbegin','<button id="shop-open">小铺</button>');
   app.querySelector('.session-status').insertAdjacentHTML('beforeend','<span id="satisfaction" title="客人满意度">☺ 85</span>');
   app.querySelector('.play-stage').insertAdjacentHTML('beforeend','<div id="reward-toast" hidden role="status"></div><section id="receipt" hidden><span>本次采耳</span><h2 id="receipt-title"></h2><p id="receipt-detail"></p><div><button id="receipt-shop">逛逛小铺</button><button id="receipt-next">接待下一位 →</button></div></section>');
-  for(const [id,label,detail] of [['brush','柔毛刷','刷松干屑'],['suction','吸引管','清理软化碎屑'],['feather','鹅绒掸','成片带走微屑']])app.querySelector('.tool-dock').insertAdjacentHTML('beforeend',`<button data-tool="${id}" aria-pressed="false" hidden>${Icon(id)}<span><strong>${label}</strong><small>${detail}</small></span></button>`);
+  for(const [id,label,detail] of [['brush','柔毛刷','刷松干屑'],['suction','吸引管','清理软化碎屑'],['feather','鹅绒掸','成片带走微屑']])app.querySelector('.tool-dock').insertAdjacentHTML('beforeend',`<button data-tool="${id}" aria-pressed="false" hidden>${ToolIcon(id)}<span><strong>${label}</strong><small>${detail}</small></span></button>`);
   app.querySelector('.dialog-heading').insertAdjacentHTML('afterend','<button id="audio-test">试听挖取音效</button>');
   document.getElementById('play-stage').prepend(canvas);
   document.getElementById('ear-stage')?.remove();
@@ -81,6 +74,8 @@ export async function Start() {
   const events = [],feedback=[];
   app.querySelector('.play-stage').insertAdjacentHTML('beforeend','<button id="lamp-toggle" class="lamp-toggle" aria-pressed="false">☼ 检查灯 · 关</button>');
   app.querySelector('.play-stage').insertAdjacentHTML('beforeend','<div id="precision-controls"><div class="touch-modes"><button id="mode-force" aria-pressed="true">施力</button><button id="mode-turn" aria-pressed="false">转向</button></div></div><div id="service-clock" role="timer" aria-label="服务剩余时间"><span>剩余服务</span><b id="service-time">03:30</b></div>');
+  app.querySelector('.care-objective').append($('service-clock'));
+  for (const button of app.querySelectorAll('[data-tool]')) button.title = button.textContent.trim();
   function SetTouchMode(mode){Cancel();touchMode=mode;$('mode-force').setAttribute('aria-pressed',String(mode==='force'));$('mode-turn').setAttribute('aria-pressed',String(mode==='turn'));}
   $('mode-force').onclick=()=>SetTouchMode('force');$('mode-turn').onclick=()=>SetTouchMode('turn');
   const instrumentShop=CreateInstrumentShop({app,shop,view,Cancel,Sound,UpdateInventory});
@@ -138,7 +133,7 @@ export async function Start() {
   // 首屏先摆好同一局，不播放、不计时，点击后直接开始操作。
   shop.StartDay(rng); view.Reset(shop.CurrentCustomer().waxSeed);
   $('customer-name').textContent = `第 ${shop.day} 天 · ${shop.CurrentCustomer().name}`;
-  $('ear-start').onclick = () => { audio.unlock(); $('welcome').remove(); StartCustomer(); Sound('uiTap', .3); };
+  $('ear-start').onclick = () => { audio.unlock(); $('welcome').remove(); StartCustomer(); canvas.focus({preventScroll:true}); Sound('uiTap', .3); };
   function SetTool(id) {
     if(!shop.Snapshot().inventory.tools.includes(id))return;Cancel();toolId=id;UpdateInventory();
     for (const button of app.querySelectorAll('[data-tool]')) button.setAttribute('aria-pressed', String(button.dataset.tool === id));
@@ -245,7 +240,9 @@ export async function Start() {
   $('receipt-next').onclick=()=>$('next-customer').click();
   $('receipt-shop').onclick=()=>OpenShop();
   function OpenShop(){instrumentShop.Open();}
-  $('settings-open').onclick=()=>{Cancel();$('settings-dialog').showModal();};$('shop-open').onclick=OpenShop;
+  function OpenSettings(showGuide=false){Cancel();$('operation-guide').open=showGuide;$('settings-dialog').showModal();if(showGuide)$('operation-guide').scrollIntoView({block:'nearest'});}
+  $('settings-open').onclick=()=>OpenSettings();$('shop-open').onclick=OpenShop;
+  $('welcome-shop').onclick=OpenShop;$('welcome-settings').onclick=()=>OpenSettings();$('welcome-help').onclick=()=>OpenSettings(true);
   $('depth-toggle').onclick=()=>{if(phase!=='playing'||view.busy)return;Cancel();const deep=$('depth-toggle').getAttribute('aria-pressed')!=='true';view.SetDeep(deep);$('depth-toggle').setAttribute('aria-pressed',String(deep));$('depth-toggle').setAttribute('aria-label',deep?'缩小观察入口':'放大观察深处');$('depth-toggle').title=deep?'缩小观察':'放大观察';};
   $('view-toggle').onclick = () => { if(phase==='ready')return;Cancel();$('view-toggle').textContent=view.ToggleView()==='ear'?'进入耳道 ↗':'看耳廓 ↗'; };
   $('settings-close').onclick = () => $('settings-dialog').close();

@@ -1,0 +1,23 @@
+{
+  "generatedOn": "2026-09-12",
+  "provider": "Built-in image_gen__imagegen",
+  "tier": 1,
+  "source": "exec-cfbcc5e0-abda-48fc-a32c-a392c8f110f2.png",
+  "sourceSize": [
+    1254,
+    1254
+  ],
+  "purpose": "Photographic tool icons shared by the game tool dock and instrument shop. These are UI identifiers, not replacements for the live 3D models.",
+  "background": "Opaque black source, removed at display time with a shared SVG alpha filter (sRGB alpha = clamp(5R + 5G + 5B - 0.15)). This keeps the dark metal and wood surfaces more solid than a direct luminance mask. The first transparent-background request returned RGB checkerboard pixels and was corrected with a second built-in imagegen edit.",
+  "processing": "Extract the 3 × 2 grid cells, crop empty black padding, preserve aspect ratio and center inside 128 × 192 pixels. Export WebP quality 94.",
+  "files": [
+    "Textures/Ui/Icon_EarScoop.webp",
+    "Textures/Ui/Icon_EarTweezers.webp",
+    "Textures/Ui/Icon_EarDrops.webp",
+    "Textures/Ui/Icon_SoftBrush.webp",
+    "Textures/Ui/Icon_MicroSuction.webp",
+    "Textures/Ui/Icon_FeatherDuster.webp"
+  ],
+  "generationPrompt": "Create one production PNG spritesheet of SIX photorealistic ear-care instrument UI icons, with a genuinely transparent alpha background. Use the attached screenshot ONLY as a style reference for its tiny realistic tool icons: photographic objects on dark UI, fine bright metallic highlights, subtle warm neutral light. Do NOT reproduce any ear, skin, game scene, UI cards, outlines, text or labels. This is one square image, precisely 3 equal columns by 2 equal rows, six isolated instruments in separate cells, with ample empty transparent padding and no contact between cells. Top row left to right: 1 a slender stainless steel ear scoop, a clearly visible small shallow oval spoon bowl at the upper end and delicate knurled grip toward the bottom; 2 a fine stainless steel tweezer with two distinguishable slightly separated tapered prongs and brushed steel handles; 3 a clear glass ear-drop pipette with a charcoal rubber squeeze bulb. Bottom row left to right: 4 a soft compact brush with warm ivory fine bristles, a silver ferrule and slim walnut handle; 5 a slender curved stainless steel microsuction cannula with rounded hollow end and short neutral gray handle; 6 an airy ivory goose-feather ear duster with delicate fine feather branches and slim warm wood stem. Each tool should be large enough to fill about 76 percent of its cell height and 45 percent cell width, with the long axis tilted 22 degrees from vertical, lower-left to upper-right, centered. Use natural three-dimensional product photography, realistic material texture and volume, clean contours, brighter edges readable when shown at 40 pixels high on a dark brown background, no exaggerated glow, no line-art, no vector style, no cartoon, no floating shadows, no colored rim lights, no checkered background. Deliver actual transparent PNG alpha; no baked checkerboard. Intended raw asset destination after generation: C:/Users/Bentl/Documents/Program/bentleyblanks_Codex_EarSpaUiStyle_20260912/EarSpa3D/_dev/UiStyle/Icon_RealisticToolsSource.png. Six individual final icon files will be derived by simple cell extraction without repainting.",
+  "finalEditPrompt": "Edit target: the supplied six-instrument icon sheet. SINGLE CHANGE: replace EVERY gray and white checkerboard background pixel with a perfectly uniform pure black #000000 background. Make the sheet a black-background product photography icon atlas. Black background must be truly black in the corners, all gutters and around each silhouette. Also remove the checkerboard seen THROUGH the clear glass pipette: it should show the black background with the same realistic white reflections and glass wall details. No checkerboard, grid, checker reflection, paper texture, gradient, ground plane, shadow or text anywhere. Preserve exactly all SIX existing objects, their placement in the same 3-column by 2-row layout, their shapes, bright metal reflections, colors, relative sizes and directions. Keep feather filaments crisply separated against black. Keep the rubber bulb and dark handles readable with natural soft edge highlights. No new objects, no drawn outlines. Do NOT attempt transparent output; provide opaque RGB PNG on pure black. These icons will be composited with screen blending on dark game buttons. Target asset source path after generation C:/Users/Bentl/Documents/Program/bentleyblanks_Codex_EarSpaUiStyle_20260912/EarSpa3D/_dev/UiStyle/Icon_RealisticToolsSource.png."
+}
