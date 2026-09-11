@@ -262,8 +262,8 @@ export class MeleeCombatDirector {
     f.poise = 0; f.pressureBy = attacker; f.lastHit = this.time;
     this.SetState(f,"fall",R.knockdownS,"Fall");this.Log("knockdown",entity,attacker,{reason});return true;
   }
-  Damage(target, attacker, amount, kind) {
-    if (this.host.Damage) this.host.Damage(target, attacker, amount, kind);
+  Damage(target, attacker, amount, kind, contact = null) {
+    if (this.host.Damage) this.host.Damage(target, attacker, amount, kind, contact || {});
     else { target.health = Math.max(0, target.health - amount); if (target.health <= 0) target.alive = false; }
     this.Log("hit", attacker, target, { amount, attack: kind }); this.stats.hits++;
   }
@@ -602,7 +602,7 @@ export class MeleeCombatDirector {
     }
     if (distance < weapon.minReach) { this.Log("tooClose", e, target); a.connected = true; this.SetState(f,'stagger',.3,'WeaponClash'); return; }
     a.connected = true;
-    this.Damage(target, e, a.damage, a.heavy ? "heavy" : "light");
+    this.Damage(target, e, a.damage, a.heavy ? "heavy" : "light", { yaw: a.yaw, reach: a.reach, start, end, previous });
     if (Alive(target)) {
       const protectedRecovery=this.time<tf.interruptUntil;
       this.Stagger(target,e,'Hit',a.heavy?R.staggerS:protectedRecovery?.12:.32,a.poise);

@@ -9,6 +9,7 @@ import { CHARACTER_HITBOX_IDS } from "./Data_CharacterHitbox.mjs";
 import {
   LIMB_IDS, LimbSubtree, LimbForBone, ClassifyVertices, FilterIndex, ResolveSever,
   GoreBudget, CodeForLimb, LimbForCode, SetGoreEnabled, IsGoreEnabled, PickMeleeShape,
+  AccumulateLimbDamage, BlastLimbWeights,
 } from "./Script_Dismemberment.mjs";
 
 let checks = 0;
@@ -237,7 +238,41 @@ for (let seed = 1; seed <= 40; seed += 1) {
 }
 
 // 步枪弹伤害不够（擦伤致死也不卸）
-Eq(ResolveSever(Hit({ damage: 20 })).reason, "lowDamage", "伤害低于 minDamage 不断");
+Eq(ResolveSever(Hit({ damage: 10 })).reason, "lowDamage", "伤害低于 minDamage 不断");
+
+// Three ordinary Type38 leg hits (66 × 0.6) must work without force or a lucky RNG.
+{
+  const history = new Map();
+  for (let shot = 1; shot <= 3; shot++) {
+    const hit = Hit({ shapeId: "calfR", damage: 66 * 0.6, wouldDie: shot === 3, rng: () => 0.999 });
+    hit.accumulatedDamage = AccumulateLimbDamage(history, hit);
+    const result = ResolveSever(hit);
+    Eq(result.limbs.join(), shot === 3 ? "calfR" : "", `same calf shot ${shot}`);
+  }
+  Eq(AccumulateLimbDamage(history, Hit({ shapeId: "calfL", damage: 39.6 })), 39.6, "opposite calf starts fresh");
+  Eq(AccumulateLimbDamage(history, Hit({ shapeId: "thighR", damage: 39.6 })), 39.6, "another segment starts fresh");
+  Eq(AccumulateLimbDamage(history, Hit({ shapeId: null, part: "leg", damage: 39.6 })), 0, "coarse rolls do not invent a hitbox");
+  Eq(ResolveSever(Hit({ shapeId: null, part: "torso", rng: () => 0 })).limbs.length, 0, "torso hit cannot pick a random limb");
+  Eq(ResolveSever(Hit({ shapeId: "calfR", accumulatedDamage: 200, severed: ["thighR"] })).limbs.length, 0, "missing calf cannot detach twice");
+}
+
+{
+  const shapes = [
+    { id: "calfL", type: "capsule", center: { x: 0, y: 0, z: 0 }, start: { x: -0.3, y: 0.2, z: 0 }, end: { x: -0.3, y: 0.6, z: 0 } },
+    { id: "calfR", type: "capsule", center: { x: 0, y: 0, z: 0 }, start: { x: 0.3, y: 0.2, z: 0 }, end: { x: 0.3, y: 0.6, z: 0 } },
+    { id: "forearmL", type: "capsule", center: { x: 0, y: 0, z: 0 }, start: { x: -0.3, y: 1, z: 0 }, end: { x: -0.3, y: 1.4, z: 0 } },
+  ];
+  const left = BlastLimbWeights({ x: -1, y: 0, z: 0 }, shapes);
+  const right = BlastLimbWeights({ x: 1, y: 0, z: 0 }, shapes);
+  Ok(left.calfL > left.calfR && right.calfR > right.calfL, "blast direction swaps near-side weighting");
+  Ok(left.calfL > left.forearmL, "ground blast favours nearby lower limb");
+  const blast = Hit({ kind: "blast", shapeId: null, part: "torso", wouldDie: true,
+    falloff: 0.9, rng: () => 0.999 });
+  const result = ResolveSever(blast);
+  Ok(result.limbs.length >= 2 && !result.forceKill, "point-blank lethal blast guarantees multiple limbs even with worst rolls");
+  Eq(ResolveSever({ ...blast, wouldDie: false }).limbs.length, 0, "nonlethal hits keep protection");
+  Eq(ResolveSever({ ...blast, wouldDie: false, falloff: 0.75 }).limbs.length, 0, "distant nonlethal grenade cannot force a kill");
+}
 
 // 步枪弹概率极低：四百次里断的次数在合理区间（chance 0.06）
 {
@@ -350,7 +385,7 @@ for (let seed = 1; seed <= 30; seed += 1) {
     Eq(result.limbs.length, 1, "大刀一刀只卸一段");
     Ok(LIMB_POOLS.blade.includes(result.limbs[0]), `大刀卸的是胳膊，不是 ${result.limbs[0]}`);
   }
-  Ok(severed > 40, `大刀无命中体时照样按 0.80 断（80 次里 ${severed} 次）`);
+  Eq(severed, 0, "大刀无真实肢体命中时不随机卸胳膊");
   // 命中体报了头，才按 head 那一档骰头。
   let heads = 0;
   for (let seed = 1; seed <= 80; seed += 1) {
@@ -385,11 +420,18 @@ for (const [part, pool] of [["arm", LIMB_POOLS.arm], ["leg", LIMB_POOLS.leg]]) {
     { id: "upperTorso", type: "capsule", start: { x: 0, y: 1.2, z: -2 }, end: { x: 0, y: 1.45, z: -2 } },
   ];
   const eye = { x: 0, y: 1.6, z: 0 };
+  // Match actual rig objects: capsules have an unused centre; spheres have unused endpoints.
+  for (const shape of shapes) {
+    if (shape.type === "capsule") shape.center = { x: 0, y: 0, z: 0 };
+    else { shape.start = { x: 0, y: 0, z: 0 }; shape.end = { x: 0, y: 0, z: 0 }; }
+  }
   Eq(PickMeleeShape(eye, { x: 0.3, y: -0.35, z: -2 }, shapes), "upperArmL", "朝左肩挥过去劈中左上臂");
   Eq(PickMeleeShape(eye, { x: -0.3, y: -0.35, z: -2 }, shapes), "upperArmR", "朝右肩挥过去劈中右上臂");
   Eq(PickMeleeShape(eye, { x: 0.35, y: -0.65, z: -2 }, shapes), "forearmL", "低一点劈中左前臂");
   Eq(PickMeleeShape(eye, { x: 0, y: 0, z: -2 }, shapes, ["head", "upperArmL"]), "head", "池子里有头且视线正对头才选头");
-  Eq(PickMeleeShape(eye, { x: 0.1, y: -1.0, z: -2 }, shapes), "forearmL", "默认池子里没有腿：朝腿劈也只报最近的胳膊段");
+  Eq(PickMeleeShape(eye, { x: 0.1, y: -1.0, z: -2 }, shapes), "thighL", "朝腿劈就命中腿，不能改成胳膊");
+  Eq(PickMeleeShape(eye, { x: 0, y: 3, z: -2 }, shapes), null, "朝头顶上方挥空不选最近的胳膊");
+  Eq(PickMeleeShape(eye, { x: 0.3, y: -0.35, z: -2 }, shapes, null, 1), null, "超出有限攻击范围不卸肢");
   Eq(PickMeleeShape(eye, { x: 0, y: 0, z: 2 }, shapes), null, "身后的段不算");
   Eq(PickMeleeShape(eye, { x: 0, y: 0, z: -2 }, []), null, "没有命中体返回 null");
 }

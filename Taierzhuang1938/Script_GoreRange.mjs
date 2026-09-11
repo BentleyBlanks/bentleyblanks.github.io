@@ -194,7 +194,7 @@ export class GoreRange {
     const shapes = soldier?.actor?.GetBoneHitboxes?.() || [];
     const shape = shapes.find((candidate) => candidate.id === limbId);
     if (!shape) return null;
-    if (shape.start && shape.end) {
+    if (shape.type === "capsule" && shape.start && shape.end) {
       return [(shape.start.x + shape.end.x) / 2, (shape.start.y + shape.end.y) / 2,
         (shape.start.z + shape.end.z) / 2];
     }

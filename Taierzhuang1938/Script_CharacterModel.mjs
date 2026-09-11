@@ -1143,6 +1143,7 @@ export class LugouCharacterRig {
     const scale = this.root.getWorldScale(WORLD_SCALE).y || 1;
     const active = [];
     for (const shape of this.hitboxes) {
+      if (this.severedHitboxes?.has(shape.id)) continue;
       shape.worldRadius = shape.radius * scale;
       if (shape.type === "sphere" || shape.type === "ellipsoid") {
         const node = this.hitboxNodes[shape.role];

@@ -1,7 +1,7 @@
 // 断肢**规则层**：判定、顶点分类、index 过滤、预算环。
 //
 // 纯 Node、零 three、零 Math.random（契约 2 与项目纪律）：随机一律由调用方交进来
-// （正片是 `Soldier.rnd()`，那是每个兵自带的 Mulberry32），所以同一个种子重放
+// （正片是按士兵 id 派生的独立 GoreRng，不消耗 AI 随机流），所以同一个种子重放
 // 出同一次断肢。数字全部在 `Data_Tuning_Gore.mjs`，这里一个常数都不写。
 //
 // 口径文档：docs/Data_Dismemberment.md §4。直测入口：`Script_DismembermentTest.mjs`。
@@ -11,7 +11,8 @@
 // 用 mask 藏肢体的话，人身上没有胳膊了，地上的影子里还有。CPU 只删三角形，
 // 三条 pass 读的是同一份 index，天然一致，而且零新 program。
 
-import { ENABLED, LIMBS, SEVER_RULES, KIND_ALIASES, LIMB_POOLS } from "./Data_Tuning_Gore.mjs";
+import { ENABLED, LIMBS, SEVER_RULES, KIND_ALIASES, LIMB_POOLS, HIT_GEOMETRY } from "./Data_Tuning_Gore.mjs";
+import { RaycastCapsule, RaycastSphere, RaycastEllipsoid } from "./Script_CharacterHitboxMath.mjs";
 
 /** 冻结的肢体 id 数组（顺序即编码顺序，见 CodeForLimb）。 */
 export const LIMB_IDS = Object.freeze(Object.keys(LIMBS));
@@ -175,18 +176,46 @@ export function FilterIndex(index, vertexLimb, severedLimbIds) {
 }
 
 /** 爆炸没给 shapeId 时的挑选权重：贴地炸先卸腿（爆心通常在脚边）。 */
-const BLAST_WEIGHT = Object.freeze({ thighL: 2, thighR: 2, calfL: 2, calfR: 2 });
+const BLAST_WEIGHT = Object.freeze(Object.fromEntries(LIMB_POOLS.leg.map(id => [id, HIT_GEOMETRY.blastLegWeight])));
 
-function WeightedPick(pool, roll) {
+function WeightedPick(pool, roll, weights = BLAST_WEIGHT) {
   if (!pool.length) return null;
   let total = 0;
-  for (const id of pool) total += BLAST_WEIGHT[id] || 1;
+  for (const id of pool) total += weights[id] ?? 1;
+  if (!(total > 0)) return null;
   let r = Math.min(0.999999, Math.max(0, roll)) * total;
   for (const id of pool) {
-    r -= BLAST_WEIGHT[id] || 1;
+    r -= weights[id] ?? 1;
     if (r < 0) return id;
   }
   return pool[pool.length - 1];
+}
+
+/** Each exact hitbox owns its own damage; coarse AI body rolls never build a fake limb history. */
+export function AccumulateLimbDamage(history, hit) {
+  const kind = KIND_ALIASES[hit.kind] || hit.kind || "bullet";
+  if (!IsGoreEnabled() || !SEVER_RULES[kind]?.accumulatedDamage || !LIMBS[hit.shapeId]
+      || hit.shapeId === "head" || !(hit.damage > 0)) return 0;
+  const value = (history.get(hit.shapeId) || 0) + hit.damage;
+  history.set(hit.shapeId, value);
+  return value;
+}
+
+/** Blast-facing limbs are closer to the origin and receive more of the weighted draw. */
+export function BlastLimbWeights(origin, shapes) {
+  const weights = {};
+  if (!origin || !shapes?.length) return weights;
+  for (const shape of shapes) {
+    if (!LIMBS[shape.id] || shape.id === "head") continue;
+    const capsule = shape.type === "capsule" || !shape.type && shape.start && shape.end;
+    const a = capsule ? shape.start : shape.center, b = capsule ? shape.end : shape.center;
+    if (!a || !b) continue;
+    const distance = Math.hypot((a.x + b.x) / 2 - origin.x,
+      (a.y + b.y) / 2 - origin.y, (a.z + b.z) / 2 - origin.z);
+    weights[shape.id] = (BLAST_WEIGHT[shape.id] || 1)
+      / Math.max(HIT_GEOMETRY.blastDistanceFloorM, distance) ** 2;
+  }
+  return weights;
 }
 
 /** shapeId / part 交出来的东西未必是肢体（躯干也会被打中）。 */
@@ -224,40 +253,57 @@ function TierFor(rule, falloff) {
  *
  * 白刃判定是扇形（Script_Combat.Melee / Script_MeleeCombat），本来不做射线，
  * 所以没有 shapeId；但劈砍的走向是确定的 —— 从攻击者眼位朝目标挥过去，
- * 离这条线最近的那条胳膊就是挨刀的。纯几何，不 import three，命中体从
+ * 对整条骨段与有限视线求最近点，并按半径、容差筛掉挥空；包含腿、头与躯干遮挡。命中体从
  * `characterRig.GetHitboxes()` 拿（sphere/ellipsoid 有 center，capsule 有 start/end）。
  *
  * @param {{x:number,y:number,z:number}} origin 攻击者眼位（世界）
  * @param {{x:number,y:number,z:number}} direction 挥砍方向（世界，不必归一）
  * @param {Array<{id:string,type:string,center?:object,start?:object,end?:object}>} shapes
- * @param {Iterable<string>} poolIds 只在这几段里挑（默认 LIMB_POOLS.blade）
+ * @param {Iterable<string>|null} poolIds 显式限制候选；null 检查所有身体命中体
  * @returns {string|null}
  */
-export function PickMeleeShape(origin, direction, shapes, poolIds = LIMB_POOLS.blade) {
+export function PickMeleeShape(origin, direction, shapes, poolIds = null, reach = HIT_GEOMETRY.meleeReachM) {
   if (!origin || !direction || !shapes?.length) return null;
-  const pool = new Set(poolIds || []);
+  const pool = poolIds ? new Set(poolIds) : null;
   const dx = direction.x || 0, dy = direction.y || 0, dz = direction.z || 0;
   const len = Math.hypot(dx, dy, dz);
   if (!(len > 1e-9)) return null;
   const ux = dx / len, uy = dy / len, uz = dz / len;
-  let best = null, bestDistance = Infinity;
+  let best = null, bestDistance = Infinity, bestAlong = Infinity;
+  let first = null, firstT = Infinity;
+  const unit = { x: ux, y: uy, z: uz };
   for (const shape of shapes) {
-    if (!shape || !pool.has(shape.id)) continue;
-    let cx, cy, cz;
-    if (shape.center) { cx = shape.center.x; cy = shape.center.y; cz = shape.center.z; }
-    else if (shape.start && shape.end) {
-      cx = (shape.start.x + shape.end.x) * 0.5;
-      cy = (shape.start.y + shape.end.y) * 0.5;
-      cz = (shape.start.z + shape.end.z) * 0.5;
-    } else continue;
-    const rx = cx - origin.x, ry = cy - origin.y, rz = cz - origin.z;
-    const along = rx * ux + ry * uy + rz * uz;
-    if (along < 0) continue;                   // 在攻击者身后的段不算
-    const px = rx - ux * along, py = ry - uy * along, pz = rz - uz * along;
-    const distance = Math.hypot(px, py, pz);
-    if (distance < bestDistance) { bestDistance = distance; best = shape.id; }
+    if (!shape || pool && !pool.has(shape.id)) continue;
+    // Runtime capsules also own a zero-valued centre field. Type selects the
+    // populated coordinates; truthiness would send every limb to world origin.
+    const capsule = shape.type === "capsule" || !shape.type && shape.start && shape.end;
+    const a = capsule ? shape.start : shape.center, b = capsule ? shape.end : shape.center;
+    if (!a || !b) continue;
+    const radius = shape.worldRadius ?? shape.radius ?? 0;
+    const direct = capsule ? RaycastCapsule(origin, unit, a, b, radius)
+      : shape.type === "ellipsoid" && shape.worldRadii && shape.worldAxes
+        ? RaycastEllipsoid(origin, unit, a, shape.worldRadii, shape.worldAxes)
+        : RaycastSphere(origin, unit, a, radius);
+    if (direct !== null && direct <= reach && direct < firstT) { firstT = direct; first = shape.id; }
+    // Closest points between the finite attack ray and the entire bone segment.
+    const vx = b.x-a.x, vy = b.y-a.y, vz = b.z-a.z;
+    const wx = origin.x-a.x, wy = origin.y-a.y, wz = origin.z-a.z;
+    const vv = vx*vx+vy*vy+vz*vz, uv = ux*vx+uy*vy+uz*vz;
+    const uw = ux*wx+uy*wy+uz*wz, vw = vx*wx+vy*wy+vz*wz;
+    const Clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    let t = vv > 1e-9 ? Clamp((vw-uv*uw)/(vv-uv*uv || 1e-9), 0, 1) : 0;
+    let along = Clamp(uv*t-uw, 0, reach);
+    t = vv > 1e-9 ? Clamp((vw+uv*along)/vv, 0, 1) : 0;
+    along = Clamp(uv*t-uw, 0, reach);
+    const distance = Math.max(0, Math.hypot(wx+ux*along-vx*t, wy+uy*along-vy*t,
+      wz+uz*along-vz*t) - radius);
+    if (along <= 0 || distance > HIT_GEOMETRY.meleeToleranceM) continue;
+    if (distance < bestDistance - 1e-6 || Math.abs(distance-bestDistance) <= 1e-6 && along < bestAlong) {
+      bestDistance = distance; bestAlong = along; best = shape.id;
+    }
   }
-  return best;
+  const chosen = first || best;
+  return LIMBS[chosen] ? chosen : null;
 }
 
 /** 不断的那一路统一从这里出：形状与真断了那一路完全一致，调用方不用分两种写法。 */
@@ -275,6 +321,8 @@ function Empty(reason, kind = null) { return { limbs: [], forceKill: false, reas
  *   damage    —— 这一发**乘过部位倍率之后**落到身上的伤害
  *   wouldDie  —— 这一发本来就打死了人
  *   falloff   —— 爆炸的距离衰减（1 = 爆心）
+ *   accumulatedDamage —— 同一肢段的累计弹伤
+ *   limbWeights / severed —— 爆心到各段的权重 / 已卸肢段集合
  *   force     —— 无视骰子（Debug.Gore.SetForce / Debug.Gore.Sever 用）
  *   rng       —— 确定性随机源，一次调用最多消耗 8 次
  * @returns {{ limbs: string[], forceKill: boolean, reason: string, kind: string|null }}
@@ -287,37 +335,43 @@ export function ResolveSever(hit = {}) {
   const force = !!hit.force;
   const rule = SEVER_RULES[kind] || (force ? SEVER_RULES.bullet : null);
   if (!rule) return Empty("noRule", kind);
+  const hitLimb = LimbFromHit(hit.shapeId, hit.part);
+  if (kind === "blade" && !hitLimb) return Empty("noLimb", kind);
+  const accumulated = hitLimb && hitLimb !== "head" && rule.accumulatedDamage
+    && hit.accumulatedDamage >= rule.accumulatedDamage;
   if (!force) {
     if (rule.requiresKill && !hit.wouldDie) return Empty("notLethal", kind);
-    if (rule.minDamage != null && !(Number(hit.damage) >= rule.minDamage)) return Empty("lowDamage", kind);
+    if (!accumulated && rule.minDamage != null && !(Number(hit.damage) >= rule.minDamage)) return Empty("lowDamage", kind);
     if (rule.minFalloff != null && !(Number(hit.falloff) >= rule.minFalloff)) return Empty("falloff", kind);
     if (rule.modes && hit.mode && !rule.modes.includes(hit.mode)) return Empty("mode", kind);
+    if (kind !== "blast" && !hitLimb && !LIMB_POOLS[hit.part]) return Empty("noLimb", kind);
   }
 
   // 固定 8 次抽取：r0 主段骰子 / r1 主段挑选 / (r2,r3)(r4,r5)(r6,r7) 三次追加段。
-  // 固定次数是为了可回放 —— 同一个 Soldier.rnd 序列在同一场战斗里要能重现。
+  // 固定次数是为了可回放 —— 同一个独立 GoreRng 序列在同一场战斗里要能重现。
   const r = [rng(), rng(), rng(), rng(), rng(), rng(), rng(), rng()];
 
-  const hitLimb = LimbFromHit(hit.shapeId, hit.part);
   const isHead = hitLimb === "head";
-  const chance = isHead ? (rule.chance?.head ?? 0) : (rule.chance?.limb ?? 0);
-  if (!force && !(r[0] < chance)) return Empty("chance", kind);
+  const tier = TierFor(rule, hit.falloff);
+  const chance = isHead ? (rule.chance?.head ?? 0) : (tier.chance ?? rule.chance?.limb ?? 0);
+  if (!force && !accumulated && !(r[0] < chance)) return Empty("chance", kind);
 
-  const pool = RandomPool(rule, hit.part);
-  const primary = hitLimb || WeightedPick(pool, r[1]);
+  const available = id => ![...(hit.severed || [])].some(cut => Conflicts(cut, id));
+  const pool = RandomPool(rule, hit.part).filter(available);
+  const weights = kind === "blast" ? (hit.limbWeights || BLAST_WEIGHT) : {};
+  const primary = hitLimb ? (available(hitLimb) ? hitLimb : null) : WeightedPick(pool, r[1], weights);
   if (!primary) return Empty("noLimb", kind);
   const limbs = [primary];
 
   // 追加段只在爆炸那一档出现，段数与概率按 falloff 分档（近炸四段、三米外一段）。
   // 追加段从八段全池里挑（不限 pool：爆心在脚边也炸得到胳膊），头永远不在里面。
-  const tier = TierFor(rule, hit.falloff);
   const maxLimbs = Math.max(1, tier.maxLimbs || 1);
   if (maxLimbs > 1) {
     const extraPool = LIMB_IDS.filter((id) => id !== "head");
     for (let i = 0; i < 3 && limbs.length < maxLimbs; i += 1) {
-      if (!(r[2 + i * 2] < (tier.extraLimbChance ?? 0))) continue;
-      const free = extraPool.filter((id) => !limbs.some((chosen) => Conflicts(chosen, id)));
-      const extra = WeightedPick(free, r[3 + i * 2]);
+      if (limbs.length >= (tier.minLimbs || 1) && !(r[2 + i * 2] < (tier.extraLimbChance ?? 0))) continue;
+      const free = extraPool.filter((id) => available(id) && !limbs.some((chosen) => Conflicts(chosen, id)));
+      const extra = WeightedPick(free, r[3 + i * 2], weights);
       if (extra) limbs.push(extra);
     }
   }

@@ -23,7 +23,7 @@ import { FindReturnableGrenade } from "./Script_GrenadeReturn.mjs";
 import { GRENADE_RETURN, ExplosiveIdFor } from "./Data_Explosives.mjs";
 import { ShellVisuals } from "./Script_ShellVisual.mjs";
 import { T } from "./Script_Text.mjs";
-// 白刃劈中了哪一段：纯几何（离挥砍视线最近的那条胳膊），断肢规则层要它当 shapeId。
+// 白刃劈中了哪一段：纯几何（实际高度与方向命中的肢段），断肢规则层要它当 shapeId。
 import { PickMeleeShape } from "./Script_Dismemberment.mjs";
 import {
   THROW, GRENADE_BODY, MELEE, BLAST, SHELL, INDIRECT, THREAT,
@@ -346,7 +346,7 @@ export class CombatSystem {
       const at = hit.position.clone(); at.y += MELEE.hitHeightM;
       // 断肢按**动作**分：大刀劈砍与刺刀挥砍才卸肢，捅刺与枪托砸不卸
       //（docs/Data_Dismemberment.md §3 的 SEVER_RULES.blade.modes）。
-      // 扇形判定没有命中体，劈中哪一段由「离挥砍视线最近的那条胳膊」定 ——
+      // 扇形判定没有命中体，劈中哪一段由「实际高度与方向命中的肢段」定 ——
       // 不交 shapeId 的话规则层只能随机挑，大刀劈脖子会掉小腿（2026-09-10 测试场实测）。
       const slashing = isBlade || mode === "cut";
       const swingEye = this.host.player?.EyePosition || fromPosition;
@@ -653,9 +653,12 @@ export class CombatSystem {
         // 扣票统一由 Soldier.Kill() 发的阵亡事件负责，这里只管伤害与压制。
         // falloff 交下去是给断肢用的：近炸（falloff ≥ minFalloff）才卸肢，
         // 三米开外的那一圈只是被震倒（docs/Data_Dismemberment.md §3）。shapeId 留空。
-        const died = s.TakeHit(dmg, "torso", dir,
-          { kind: "blast", falloff, weaponId: explosiveId, point: at.clone() });
-        onHit?.(s, dmg, position);
+        const injury = kind === "grenade" && s.side === "ija" && falloff >= BLAST.grenadeCloseMinFalloff
+          ? Math.max(dmg, Math.min(damage, BLAST.grenadeCloseDamage)) : dmg;
+        const died = s.TakeHit(injury, "torso", dir,
+          { kind: "blast", falloff, weaponId: explosiveId, point: at.clone(),
+            blastOrigin: position.clone() });
+        onHit?.(s, injury, position);
         s.suppression = Clamp01(s.suppression + BLAST.soldierSuppression);
         // 只数日军。玩家的手榴弹也炸得到自己人，而给误伤发一记"击杀确认"
         // 是这套反馈能犯的最难看的错。

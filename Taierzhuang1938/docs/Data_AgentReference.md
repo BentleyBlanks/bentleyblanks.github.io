@@ -369,6 +369,9 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   肢体 id 与 `Data_CharacterHitbox.CHARACTER_HITBOX_PROFILE` 的 shape id 同名（子弹交出来的就是它）。
   接线：`Soldier.TakeHit(damage, part, dir, info)` → `Kill(dir, sever)`，`Script_Physics.MakeLimbBody`、
   `Script_Vfx.BloodSpurt/BloodBurst`。**断肢 ⇒ 必死**；玩家本人与无 `characterRig` 的角色不进本系统。
+  弹伤按具体肢段累计，玩家可继续命中尸体而不重复计击杀；大刀按真实骨段及攻击俯仰选段，
+  爆炸按距离与迎爆侧加权。手榴弹对近距离敌军的创伤伤害单列于 `Data_Tuning_Combat.BLAST`，
+  不依赖内容开关，友军、炮击与剧情角色保留原伤害保护。详见断肢文档的当前行为节。
   开关：`?gore=0` / `Debug.Gore.SetEnabled(false)` / `Data_Tuning_Gore.ENABLED`。取证口 `Debug.Gore`，
   测试场 `?gore=1`。回归口 `Script_DismembermentTest.mjs`（纯 Node）；口径 `docs/Data_Dismemberment.md`。
 - 先读：`docs/Data_GunFeelReview.md`（常设审查表，自由瞄准口径在末节）、`Data_Bayonet.md`、

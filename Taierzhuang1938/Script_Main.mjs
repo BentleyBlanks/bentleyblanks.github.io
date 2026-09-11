@@ -1331,7 +1331,7 @@ async function Boot() {
         if (body) { body.ReconcileTo(player.position.x, player.position.y, player.position.z); const r = body.Move(dx, -0.006, dz); player.position.set(r.x, r.y, r.z); }
       } else ai.StepBody(entity, dx, dz, 0.001);
     },
-    Damage: (target, attacker, amount, kind) => {
+    Damage: (target, attacker, amount, kind, contact = {}) => {
       const delta = new THREE.Vector3().subVectors(target.position, attacker.position); delta.y = 0; delta.normalize();
       if (target === player) player.TakeHit(kind === "qte" ? amount : amount * COMBAT.player.meleeScale, "torso", delta, { from: attacker.position.clone(), melee: true });
       else {
@@ -1342,7 +1342,7 @@ async function Boot() {
         // mode 写成 slash 而不是 MeleeCombat 自己的事件名（light/heavy/qte）：
         // SEVER_RULES.blade 只认 slash / cut，事件名会被那道闸一律挡掉。
         const bladed = attackerWeapon?.kind === "melee";
-        // 劈中了哪一段：白刃状态机没有射线，按「离挥砍视线最近的那条胳膊」定
+        // 劈中了哪一段：白刃状态机没有射线，按实际攻击朝向、俯仰与有限骨段距离定
         //（Script_Dismemberment.PickMeleeShape，纯几何）。视线起点取攻击者眼位：
         // 玩家有 EyePosition，AI 用头骨的世界位置，都没有就退回脚底往上一米五。
         let shapeId = null;
@@ -1350,7 +1350,16 @@ async function Boot() {
           const eye = attacker === player ? player.EyePosition
             : (attacker?.actor?.characterRig?.bones?.head?.getWorldPosition(new THREE.Vector3())
               || attacker.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
-          shapeId = PickMeleeShape(eye, at.clone().sub(eye), target.actor?.characterRig?.GetHitboxes?.() || null);
+          // Preserve the attack's yaw and the player's actual vertical aim. Never aim
+          // back at the target's centre: that used to choose the same arm every swing.
+          const yaw = contact.yaw ?? attacker.yaw ?? 0;
+          const pitch = attacker === player ? player.pitch : Math.atan2(at.y-eye.y, Math.hypot(at.x-eye.x, at.z-eye.z));
+          const direction = new THREE.Vector3(-Math.sin(yaw)*Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw)*Math.cos(pitch));
+          shapeId = PickMeleeShape(eye, direction, target.actor?.characterRig?.GetHitboxes?.() || null,
+            null, contact.reach ? Math.hypot(contact.reach, eye.y-attacker.position.y) : undefined);
+          const shape = target.actor?.characterRig?.GetHitboxes?.().find(entry => entry.id === shapeId);
+          if (shape?.type === "capsule") at.copy(shape.start).add(shape.end).multiplyScalar(0.5);
+          else if (shape?.center) at.copy(shape.center);
         }
         const died = target.TakeHit(amount, "torso", delta,
           { kind: bladed ? "blade" : "thrust", mode: bladed ? "slash" : "thrust",
@@ -7117,7 +7126,7 @@ function TryFire(dt, returningGrenade = false) {
   _marchTargets.length = 0;
   const range = weapon.effectiveRangeM || 400;
   for (const s of ai.soldiers) {
-    if (!s.alive || s.side === "nra") continue;
+    if (s.side === "nra" || !s.alive && (!gore?.enabled || !s.actor?.characterRig)) continue;
     if (s.position.distanceTo(from) > range + 4) continue;
     _marchTargets.push(s);
   }
@@ -7135,6 +7144,7 @@ function TryFire(dt, returningGrenade = false) {
     dropM: (from.y + dir.y * horizDist / horiz) - _hitPoint.y,
     muzzleOffsetM: muzzleOffset,
     hitKind: shot.soldier ? "soldier" : shot.wall ? "wall" : "none",
+    hitShape: shot.shape?.id || null,
     fromY: from.y, endY: _hitPoint.y,
     from: from.toArray(), end: _hitPoint.toArray(), muzzleBlocked: !!obstruction,
     // Read-only trigger/ballistic evidence. Keep spread and recoil separate:

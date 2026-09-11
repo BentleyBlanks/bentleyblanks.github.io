@@ -49,7 +49,7 @@ export const LIMBS = Object.freeze({
  *
  *   chance        —— 「这一发已经致死」前提下卸掉一段的概率（limb / head 两档）。
  *   requiresKill  —— true 表示只在这一发本来就打死了人时才可能断。
- *   minDamage     —— 单发落到身上的伤害下限（步枪弹 80、九二式 95，见 Data_Weapons）。
+ *   minDamage     —— 乘过部位倍率后的单发伤害下限；累计阈值另见 accumulatedDamage。
  *   modes         —— 只有这些白刃动作算数（劈砍才卸肢，捅刺不卸）。
  *   （没有 killOnSever：**断肢永远不改变生死** —— 六类来源全部 requiresKill，只有
  *     Debug.Gore 的 force 通道会把一发抬成致死，那是测试场的按钮不是玩法。）
@@ -58,8 +58,10 @@ export const LIMBS = Object.freeze({
  * 近炸几乎必卸），实测微调记在 docs/Data_Dismemberment.md §11。
  */
 export const SEVER_RULES = Object.freeze({
-  bullet: Object.freeze({ chance: Object.freeze({ limb: 0.06, head: 0.0 }), requiresKill: true, minDamage: 60 }),
-  hmg: Object.freeze({ chance: Object.freeze({ limb: 0.30, head: 0.12 }), requiresKill: true, minDamage: 60 }),
+  // 2026-09-12 玩家反馈：部位倍率后的步枪伤害仅 40–47，旧 60 门槛永远到不了。
+  // 同一命中段累计达到阈值时必断；不把左右肢或其它身体部位的伤害混在一起。
+  bullet: Object.freeze({ chance: Object.freeze({ limb: 0.06, head: 0.0 }), requiresKill: true, minDamage: 20, accumulatedDamage: 100 }),
+  hmg: Object.freeze({ chance: Object.freeze({ limb: 0.30, head: 0.12 }), requiresKill: true, minDamage: 20, accumulatedDamage: 90 }),
   // 爆炸按 falloff 分档（falloff = 1 − 距离 / (半径 × BLAST.radiusScale)；木柄手榴弹
   // 6.5 m × 1.9 = 12.35 m 有效半径，1 m ≈ 0.91、2 m ≈ 0.83、3 m ≈ 0.75、3.7 m ≈ 0.70）。
   // 没有这张分档表时 3 m 外的人与爆心旁的人一样能连卸四段（2026-09-10 测试场实测
@@ -72,16 +74,21 @@ export const SEVER_RULES = Object.freeze({
     chance: Object.freeze({ limb: 0.95, head: 0.35 }), requiresKill: true,
     minFalloff: 0.70,
     tiers: Object.freeze([
-      Object.freeze({ minFalloff: 0.88, maxLimbs: 4, extraLimbChance: 0.85 }),
-      Object.freeze({ minFalloff: 0.80, maxLimbs: 2, extraLimbChance: 0.60 }),
+      Object.freeze({ minFalloff: 0.88, minLimbs: 2, maxLimbs: 4, extraLimbChance: 0.85, chance: 1 }),
+      Object.freeze({ minFalloff: 0.80, minLimbs: 1, maxLimbs: 2, extraLimbChance: 0.60, chance: 1 }),
       Object.freeze({ minFalloff: 0.70, maxLimbs: 1, extraLimbChance: 0 }),
     ]),
   }),
-  // 大刀劈砍：断的是**上半身**（挥砍高度在肩胸一线，砍不到腿）。没给 shapeId 时
-  // 从 LIMB_POOLS.blade 里挑；头只在命中体真的报 head 时才按 head 那一档骰。
+  // 大刀按实际瞄准方向与骨骼命中体选段；不再用两条胳膊的随机池兜底。
   blade: Object.freeze({ chance: Object.freeze({ limb: 0.80, head: 0.30 }), requiresKill: true, modes: Object.freeze(["slash", "cut"]), pool: "blade" }),
   thrust: Object.freeze({ chance: Object.freeze({ limb: 0, head: 0 }), requiresKill: true }),
   bash: Object.freeze({ chance: Object.freeze({ limb: 0, head: 0 }), requiresKill: true }),
+});
+
+// 简单几何判定的手感参数；距离按实际世界命中体计算，头不进爆炸随机池。
+export const HIT_GEOMETRY = Object.freeze({
+  blastLegWeight: 2, blastDistanceFloorM: 0.25,
+  meleeToleranceM: 0.12, meleeReachM: 2.8,
 });
 
 /**
@@ -103,7 +110,7 @@ export const KIND_ALIASES = Object.freeze({
  * 没有命中体 id 时的候选段。
  *   arm / leg —— AI 打 AI 那条链只抽到 "arm" / "leg" 这种粗部位（Script_Ai 3611 行那一掷），
  *                按部位限在对应的四段里，不再「打中胳膊掉大腿」；
- *   blade     —— 大刀劈砍的挥砍高度在肩胸一线：只砍得到两条胳膊。
+ *   blade     —— 保留的显式候选池；正常大刀链必须给真实 shapeId，不走随机兜底。
  *                头单独走 head 那一档骰（要命中体报 head）。
  *   blast     —— 贴地炸先卸腿（爆心通常在脚边），权重在 Script_Dismemberment.BLAST_WEIGHT。
  * 每一项都必须是 LIMBS 的键；Script_DismembermentTest 互核。

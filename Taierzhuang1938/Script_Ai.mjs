@@ -486,18 +486,27 @@ export class Soldier {
    *   不给就退回 bullet，行为与接线之前一致。
    */
   TakeHit(damage, part, direction, info = {}) {
-    if (!this.alive) return false;
     const mult = part === "head" ? 3.2 : part === "torso" ? 1.0 : 0.6;
+    // Corpses keep their hitbox damage history; further hits never emit another death event.
+    if (!this.alive) {
+      if (!this.scriptEssential && damage > 0) {
+        try {
+          const gore = this.director?.ctx?.gore;
+          const sever = gore?.Resolve?.(this, { ...info, part, kind: info.kind || "bullet",
+            damage: damage * mult, wouldDie: true });
+          if (sever?.limbs?.length) gore.Sever(this, sever.limbs, { ...sever, direction });
+        } catch (error) { console.warn("[Gore] Corpse hit failed", error); }
+      }
+      return false;
+    }
     this.health -= damage * mult;
     // Opt-in narrative cast protection; explicit scripted Kill remains authoritative.
     if (this.scriptEssential) this.health = Math.max(1, this.health);
     this.suppression = Clamp01(this.suppression + 0.45);
     // 中弹踉跄：擦一下也晃，一发三八式基本满幅。以前这条从没接过线 —— 打中活人只有一团血。
     this.hurtPose = Math.min(1, Math.max(this.hurtPose, HURT_FLINCH.base + (damage * mult) / HURT_FLINCH.damageDiv));
-    // 断肢判定排在「死没死」**之前**：近炸这一类未致死也可能卸肢，而卸掉一段
-    // 肢体本身就把这一发抬成致死（规则层的 forceKill）。判定只发生一次，
-    // 结论交给 Kill 去执行 —— 视觉层不在这条链上做第二次骰子。
-    // 叙事保护的角色整条链都不进（forceKill 会绕过上面那道钳 1 的闸）。
+    // 先累计肢段弹伤，再根据本次是否致死选择断肢；只有调试 force 可额外致死。
+    // 叙事保护的角色整条链都不进，剧情角色不会因内容表现失去保护。
     // 与 Kill 里那一层同一条理由：判定抛错就按「不断」处理，伤害链照常走完。
     const gore = this.scriptEssential ? null : this.director?.ctx?.gore;
     let sever = null;
@@ -505,6 +514,7 @@ export class Soldier {
       sever = gore?.Resolve?.(this, {
         part, shapeId: info.shapeId, kind: info.kind || "bullet", weaponId: info.weaponId,
         mode: info.mode, falloff: info.falloff, point: info.point,
+        blastOrigin: info.blastOrigin,
         damage: damage * mult, wouldDie: this.health <= 0,
       }) || null;
     } catch (error) {

@@ -24,7 +24,7 @@ import {
 } from "./Data_Tuning_Gore.mjs";
 import {
   ClassifyVertices, FilterIndex, ResolveSever, LimbSubtree, GoreBudget,
-  IsGoreEnabled, SetGoreEnabled,
+  IsGoreEnabled, SetGoreEnabled, AccumulateLimbDamage, BlastLimbWeights,
 } from "./Script_Dismemberment.mjs";
 
 export { DEATH_PUSH_SCALE };
@@ -214,6 +214,7 @@ export class GoreSystem {
   constructor(host = {}) {
     this.host = host;
     this.records = new Map();       // soldier → GoreRecord
+    this.hitHistory = new WeakMap();
     this.parts = [];                // 场上所有肢块
     this.classifyCache = new Map(); // 源几何 uuid → Uint8Array（十套 GLB 各算一次）
     this.force = null;              // SetForce：下一发必断，并决定用哪条 LAUNCH
@@ -261,8 +262,14 @@ export class GoreSystem {
     const rig = soldier?.actor?.characterRig;
     if (!rig || !rig.root) return null;
     const force = this.force;
+    let history = this.hitHistory.get(soldier);
+    if (!history) { history = new Map(); this.hitHistory.set(soldier, history); }
+    const accumulatedDamage = AccumulateLimbDamage(history, hit);
     const result = ResolveSever({
       ...hit,
+      accumulatedDamage,
+      severed: soldier.gore?.limbs,
+      limbWeights: hit.blastOrigin ? BlastLimbWeights(hit.blastOrigin, rig.GetHitboxes()) : undefined,
       kind: force || hit.kind,
       force: !!force,
       rng: GoreRng(soldier),
@@ -318,6 +325,7 @@ export class GoreSystem {
     // 两边用**同一次过滤**的结果，`身体减少的三角数 = 肢块三角数 + 丢弃数`
     // 这条守恒才成立（浏览器验收要读它）。属性数组不动，先切后烘没有区别。
     for (const id of fresh) record.limbs.add(id);
+    rig.severedHitboxes = new Set([...record.limbs].flatMap(LimbSubtree));
     this._RebuildBody(record);
     for (const id of fresh) {
       const part = this._SpawnPart(record, id, options);
@@ -861,6 +869,7 @@ export class GoreSystem {
    * 不还原的话他天生缺一条胳膊。
    */
   ReleaseSoldier(soldier) {
+    this.hitHistory.delete(soldier);
     const record = this.records.get(soldier);
     if (!record) return false;
     for (const part of [...record.parts]) this._DisposePart(part);
@@ -886,12 +895,14 @@ export class GoreSystem {
       entry.privateGeometry = null;
     }
     record.limbs.clear();
+    record.rig.severedHitboxes = null;
     this.records.delete(soldier);
     if (soldier) soldier.gore = null;
     return true;
   }
 
   ReleaseAll() {
+    this.hitHistory = new WeakMap();
     for (const soldier of [...this.records.keys()]) this.ReleaseSoldier(soldier);
     for (const part of [...this.parts]) this._DisposePart(part);
     this.parts.length = 0;

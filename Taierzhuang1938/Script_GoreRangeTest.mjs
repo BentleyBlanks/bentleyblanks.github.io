@@ -271,6 +271,43 @@ try {
     assert(!hit.force, "Force 打完一发要自动清空");
     console.log("PASS 9 真枪链：必断开关 + 真开火 + 死亡链，命中的那一段被卸掉");
 
+    const repeatedShots = await page.evaluate(() => {
+      const T = Taierzhuang, G = T.Debug.GoreRange, Gore = T.Debug.Gore;
+      G.Reset(); window.__gore.Step(20);
+      T.player.Spawn(3332, 3352, 0); window.__gore.Step(10);
+      T.Debug.Key("KeyR"); window.__gore.Step(240);
+      T.Debug.Mouse(2, true); window.__gore.Step(45);
+      const soldier = window.__gore.Soldier("L10_1"), shots = [];
+      for (let i = 0; i < 7 && !soldier.gore?.limbs?.has("calfR"); i++) {
+        window.__gore.AimAt("L10_1", "calfR"); window.__gore.Step(8);
+        T.Debug.Mouse(0, true); window.__gore.Step(2); T.Debug.Mouse(0, false);
+        window.__gore.Step(120);
+        shots.push({ health: soldier.health, cut: [...(soldier.gore?.limbs || [])],
+          hit: T.state.lastShot?.hitKind, shape: T.state.lastShot?.hitShape });
+        if (i === 3) { T.Debug.Key("KeyR"); window.__gore.Step(240); }
+      }
+      T.Debug.Mouse(2, false);
+      window.__gore.Step(2, true);
+      return { shots, cut: [...(soldier.gore?.limbs || [])], force: Gore.State().force };
+    });
+    console.log("REPEATED_SHOTS", JSON.stringify(repeatedShots));
+    assert(repeatedShots.cut.includes("calfR"), "正常子弹重复命中右小腿必须断肢，不能依赖 Force");
+    assert(!repeatedShots.force);
+    await page.screenshot({ path: path.join(shots, "Scene_RepeatedLegShots.png") });
+
+    const corpseHits = await page.evaluate(() => {
+      const T = Taierzhuang, G = T.Debug.GoreRange;
+      G.Reset(); window.__gore.Step(20);
+      const s = window.__gore.Soldier("L10_1"), direction = s.position.clone().set(0, 0, -1);
+      s.TakeHit(150, "torso", direction);
+      const deaths = { ...T.ai.deaths };
+      for (let i = 0; i < 3; i++) s.TakeHit(66, "limb", direction, { kind: "bullet", shapeId: "calfL" });
+      const shapes = s.actor.characterRig.GetHitboxes().map(shape => shape.id);
+      return { deaths, afterDeaths: T.ai.deaths, cut: [...s.gore.limbs], shapes };
+    });
+    assert.deepEqual(corpseHits.deaths, corpseHits.afterDeaths, "补射尸体不能重复计阵亡");
+    assert(corpseHits.cut.includes("calfL") && !corpseHits.shapes.includes("calfL"), "补射可断肢且缺肢不再挡弹");
+
     // 4. 爆炸链：一米环 ≥ 2 段，三米环 ≤ 1 段
     const blastSever = await page.evaluate(() => {
       const G = Taierzhuang.Debug.GoreRange, Gore = Taierzhuang.Debug.Gore;
@@ -279,16 +316,24 @@ try {
       const state = G.State();
       const Count = (id) => state.posts.find((post) => post.id === id)?.severed.length ?? -1;
       return {
-        ring1: ["C1_E", "C1_W"].map(Count), ring3: ["C3_SE", "C3_NW"].map(Count),
+        ring1: ["C1_E", "C1_W"].map(Count), ring2: ["C2_S", "C2_N"].map(Count), ring3: ["C3_SE", "C3_NW"].map(Count),
         budget: Gore.State().budget,
       };
     });
     console.log("BLAST_SEVER", JSON.stringify(blastSever));
     assert(Math.max(...blastSever.ring1) >= 2, "一米环上至少有一个木桩被卸掉两段以上");
+    assert(blastSever.ring1.every(count => count >= 2), "一米圈每个敌军保证至少两段");
+    assert(blastSever.ring2.every(count => count >= 1 && count <= 2), "两米圈每个敌军断一至两段");
     assert(Math.max(...blastSever.ring3) <= 1,
       "三米环上最多卸一段（爆炸的断肢段数要随 falloff 收：见 Data_Dismemberment §10.2-4）："
       + JSON.stringify(blastSever.ring3));
     console.log("PASS 10 爆炸链：一米环多段、三米环最多一段");
+    await page.evaluate(() => {
+      Taierzhuang.player.Spawn(3364, 3345, 0);
+      Taierzhuang.player.pitch = Math.atan2(0.4 - Taierzhuang.player.eyeHeight, 9);
+      window.__gore.Step(4, true);
+    });
+    await page.screenshot({ path: path.join(shots, "Scene_GrenadeDistance.png") });
 
     // 5. 大刀链
     const blade = await page.evaluate(() => {
@@ -315,6 +360,68 @@ try {
     assert(blade.cut.some((limb) => /^(upperArm|forearm|head)/.test(limb)),
       "大刀劈砍应卸掉上臂/前臂/头之一（白刃那一支要把命中部位交给规则层）：" + JSON.stringify(blade));
     console.log("PASS 11 大刀链：劈中的那一段被卸掉");
+
+    const directedCuts = await page.evaluate(() => {
+      const T = Taierzhuang, G = T.Debug.GoreRange, Gore = T.Debug.Gore, results = [];
+      const originalDamage = T.meleeCombat.host.Damage;
+      let actualHit = null;
+      T.meleeCombat.host.Damage = (target, attacker, amount, kind, contact) => {
+        const yaw = contact.yaw, pitch = attacker.pitch, eye = attacker.EyePosition;
+        const direction = eye.clone().set(-Math.sin(yaw)*Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw)*Math.cos(pitch));
+        actualHit = target.actor.RaycastHitboxes(eye, direction, Math.hypot(contact.reach, eye.y-attacker.position.y))?.shape?.id || null;
+        originalDamage(target, attacker, amount, kind, contact);
+      };
+      for (const [limb, behind] of [["upperArmL", false], ["upperArmR", false], ["calfL", false], ["calfR", false], ["head", false], ["upperArmR", true]]) {
+        G.Reset(); T.meleeCombat.Reset(); window.__gore.Step(20);
+        const post = G.Posts().find(spec => spec.id === "L10_3");
+        T.player.Spawn(post.x, post.z + (behind ? -1.1 : 1.1), behind ? Math.PI : 0);
+        window.__gore.Step(10);
+        Gore.SetForce("blade"); actualHit = null;
+        window.__gore.AimAt(post.id, limb);
+        T.Debug.Mouse(0, true); T.Debug.Mouse(0, false);
+        // Track the moving limb during windup, just as a player following a target.
+        for (let frame = 0; frame < 45; frame++) {
+          if (!window.__gore.Soldier(post.id).gore) window.__gore.AimAt(post.id, limb);
+          window.__gore.Step(1);
+        }
+        const s = window.__gore.Soldier(post.id);
+        results.push({ limb, behind, actualHit, cut: [...(s.gore?.limbs || [])], events: T.meleeCombat.State().events });
+      }
+      T.meleeCombat.host.Damage = originalDamage;
+      T.player.Spawn(3340, 3351, 0);
+      T.player.pitch = Math.atan2(0.45 - T.player.eyeHeight, 3);
+      window.__gore.Step(2, true);
+      return results;
+    });
+    console.log("DIRECTED_CUTS", JSON.stringify(directedCuts));
+    for (const entry of directedCuts) {
+      // Moving arms/legs can overlap: the rig's independent exact raycast determines
+      // the exposed segment at contact, rather than the earlier aiming snapshot.
+      assert(entry.actualHit, `瞄准部位必须发生真实骨骼接触 ${JSON.stringify(entry)}`);
+      assert.deepEqual(entry.cut, [entry.actualHit], `断肢必须匹配真实接触 ${JSON.stringify(entry)}`);
+      const family = entry.limb === "head" ? /^head$/ : entry.limb.startsWith("calf")
+        ? new RegExp(`^(thigh|calf)${entry.limb.at(-1)}$`) : new RegExp(`^(upperArm|forearm)${entry.limb.at(-1)}$`);
+      assert(family.test(entry.actualHit), `不许换高度或左右肢 ${JSON.stringify(entry)}`);
+    }
+    await page.screenshot({ path: path.join(shots, "Scene_DirectedBlade.png") });
+
+    const protectedBlast = await page.evaluate(() => {
+      const T = Taierzhuang, G = T.Debug.GoreRange, Gore = T.Debug.Gore;
+      const Run = enabled => {
+        G.Reset(); window.__gore.Step(20); Gore.SetEnabled(enabled);
+        const friend = window.__gore.Soldier("C2_N"); friend.side = "nra";
+        const essential = window.__gore.Soldier("C1_W"); essential.scriptEssential = true;
+        G.Detonate();
+        return { friend: friend.health, essential: essential.health,
+          friendCut: [...(friend.gore?.limbs || [])], essentialCut: [...(essential.gore?.limbs || [])],
+          enemy: window.__gore.Soldier("C2_S").health };
+      };
+      const on = Run(true), off = Run(false); Gore.SetEnabled(true);
+      return { on, off };
+    });
+    assert.deepEqual(protectedBlast.on, protectedBlast.off, "内容开关不改变近炸伤害或角色保护");
+    assert(protectedBlast.on.friend > 0 && protectedBlast.on.essential > 0 && protectedBlast.on.enemy === 0,
+      "两米敌军有毁伤，友军与剧情角色保留保护");
 
     // 6. 预算：连续卸超过上限，同屏肢块钉在 maxParts
     const budget = await page.evaluate(() => {

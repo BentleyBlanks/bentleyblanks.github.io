@@ -64,6 +64,9 @@ export const MELEE = Object.freeze({
  */
 export const BLAST = Object.freeze({
   radiusScale: 1.9,
+  // 2026-09-12 玩家要求近身手榴弹产生明显毁伤。约两米内的敌军承受致死级创伤；
+  // 这是伤害规则，关闭断肢表现不改变战斗结果；友军和炮击仍用原衰减。
+  grenadeCloseMinFalloff: 0.80, grenadeCloseDamage: 100,
   originRiseM: 0.35,          // 爆心抬高一点再射线，免得贴地那一发被地面自遮
   wallMarginM: 0.5,           // 射线打到东西且比目标近这么多以上 = 有墙挡着
   friendlyRadiusScale: 0.75,  // 自己的弹也能伤自己人，但只在很近的时候
