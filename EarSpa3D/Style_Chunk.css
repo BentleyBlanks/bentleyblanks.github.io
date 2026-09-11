@@ -1,4 +1,6 @@
 /* EAR CARE UI: warm glass, fine serif titles and restrained gold accents. */
+/* Safari long presses must stay game gestures, including over HUD text and tool images. */
+html,body,body *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 :root{color-scheme:dark;--ui-black:#141210;--ui-panel:#181512ef;--ui-glass:#171411b8;--ui-edge:#e6d5bf29;--ui-text:#eee6dc;--ui-muted:#b3a596;--ui-gold:#d6b985;--ui-cream:#e0cbb4;--ui-warning:#e4ab95;--ui-serif:"Baskerville","Palatino Linotype","Book Antiqua","Times New Roman","Songti SC","SimSun",serif;--ui-left:max(20px,env(safe-area-inset-left));--ui-right:max(20px,env(safe-area-inset-right));--ui-top:max(22px,env(safe-area-inset-top));--ui-bottom:max(24px,env(safe-area-inset-bottom))}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--ui-black);color:var(--ui-text);font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
 button,input{font:inherit}button{cursor:pointer;touch-action:manipulation;color:inherit;transition:background .18s,border-color .18s,color .18s}button:focus-visible,summary:focus-visible,input:focus-visible{outline:2px solid var(--ui-gold);outline-offset:4px}button:disabled{cursor:default;opacity:.42}button[hidden],[hidden]{display:none!important}button:active:not(:disabled){filter:brightness(1.18)}
