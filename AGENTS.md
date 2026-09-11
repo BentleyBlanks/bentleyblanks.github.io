@@ -39,7 +39,8 @@
 
 - 站点由 [.github/workflows/pages.yml](.github/workflows/pages.yml) 从 **master** 部署。通常直接快进推送；需要评审或分支保护要求时走 PR，无需同时做两套发布流程。
 - 小型文案、平衡、功能修复在验证后自行交付 master；不要把已要求上线的结果留在未合并草稿。用户明确要求仅审查、保留本地或先评审时按该范围交付。
-- **页面变化先本地验收，再推送。** 在本任务 worktree 运行 `node scripts/Script_LocalPreview.mjs`，默认 8080，实际端口以输出为准；`/__preview/` 顶部可核对服务根目录。无需 npm 安装即可启动预览。
+- **页面变化先本地验收，再推送。** 在本任务 worktree 运行 `node scripts/Script_LocalPreview.mjs --no-open`，默认 8080，指定端口用裸数字（如 `node scripts/Script_LocalPreview.mjs 8098 --no-open`），实际端口以输出为准；`/__preview/ping` 可核对服务根目录。无需 npm 安装即可启动预览。
+- **预览服务默认静默启动，不自动弹出系统浏览器或页面索引。** Agent 不调用桌面快捷方式启动器；只有用户明确要求打开系统浏览器时才使用 `--open`。页面验收优先使用可用的内置浏览器，或项目已有的自动化浏览器检查；需要 Edge 时通过其控制接口操作目标页面。启动服务、弹出页面或 HTTP 200 均不等于验收通过，须实际检查渲染或交互并报告证据；控制接口失败时如实说明，不能用弹窗代替验收。
 - 直接调用脚本能明确选中检出；若使用 npm，先确认解析到本任务的 package.json。服务支持 `--help`、指定端口、worktree 挂载与 `--shortcut`；保持路径、缓存和 COOP/COEP 行为与 Pages 兼容。
 - 运行与改动相关的现有检查；跨模块、共享基础设施和高风险变化扩大验证。纯指令或文档整理检查链接、命令和 diff，不因此启动所有游戏或浏览器回归；嵌入代码或运行时配置的变化按实际影响选测。
 - 全仓选测入口：`node scripts/Script_TestChangedProjects.mjs --changed=origin/master --dry-run` 查看计划，再按影响范围执行。该脚本按路径选项目，文档路径也可能命中；没有命中不代表无需验证。

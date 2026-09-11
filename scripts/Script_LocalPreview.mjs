@@ -5,7 +5,8 @@
 //   node scripts/Script_LocalPreview.mjs             # 服务本脚本所在的那棵树
 //   node scripts/Script_LocalPreview.mjs 8090        # 换端口
 //   node scripts/Script_LocalPreview.mjs --lan       # 同时监听局域网（手机上验收）
-//   node scripts/Script_LocalPreview.mjs --no-open   # 不自动开浏览器
+//   node scripts/Script_LocalPreview.mjs --open      # 明确要求打开浏览器（默认不打开）
+//   node scripts/Script_LocalPreview.mjs --no-open   # 强制不打开，兼容旧调用
 //
 // 为什么不是 `python -m http.server`：
 //   1. Windows 注册表把 .js 映射成 text/plain，ES module 一加载就炸；这里带
@@ -535,7 +536,7 @@ function CreateShortcut(rootDir) {
 
   if (process.platform === "darwin") {
     const file = path.join(desktop, `${label}.command`);
-    fs.writeFileSync(file, `#!/bin/sh\ncd "${rootDir}"\nexec node scripts/Script_LocalPreview.mjs "$@"\n`);
+    fs.writeFileSync(file, `#!/bin/sh\ncd "${rootDir}"\nexec node scripts/Script_LocalPreview.mjs --open "$@"\n`);
     fs.chmodSync(file, 0o755);
     console.log(`快捷方式已创建：${file}`);
     return;
@@ -544,7 +545,7 @@ function CreateShortcut(rootDir) {
   const file = path.join(desktop, "BlanksLocalPreview.desktop");
   fs.writeFileSync(file, [
     "[Desktop Entry]", "Type=Application", `Name=${label}`,
-    `Exec=node ${path.join(rootDir, "scripts", "Script_LocalPreview.mjs")}`,
+    `Exec=node ${path.join(rootDir, "scripts", "Script_LocalPreview.mjs")} --open`,
     `Path=${rootDir}`, `Icon=${path.join(rootDir, "favicon.ico")}`, "Terminal=true", "",
   ].join("\n"));
   fs.chmodSync(file, 0o755);
@@ -553,11 +554,12 @@ function CreateShortcut(rootDir) {
 
 const HELP = `本地预览服 —— 按线上同款路径把整棵树跑在 127.0.0.1 上。零 npm 依赖，只要有 node。
 
-  node scripts/Script_LocalPreview.mjs              服务本脚本所在的那棵树，默认 8080
+  node scripts/Script_LocalPreview.mjs              服务本脚本所在的那棵树，默认 8080，不打开浏览器
   node scripts/Script_LocalPreview.mjs 8090         换端口（占用了就自动往上让）
   node scripts/Script_LocalPreview.mjs --shortcut   在桌面放一个双击就起服的快捷方式，然后退出
   node scripts/Script_LocalPreview.mjs --lan        同时监听局域网（手机上验收）
-  node scripts/Script_LocalPreview.mjs --no-open    不自动开浏览器（跑测试/给 agent 用）
+  node scripts/Script_LocalPreview.mjs --open       明确要求打开默认浏览器
+  node scripts/Script_LocalPreview.mjs --no-open    强制不打开浏览器，优先于 --open（兼容旧调用）
   node scripts/Script_LocalPreview.mjs --root=<dir> 指定要服务的目录
 
 索引页在 http://127.0.0.1:<port>/__preview/ ：列出所有页面，并能把任意 worktree 挂到相邻端口。
@@ -569,7 +571,7 @@ async function Main() {
   const args = process.argv.slice(2);
   if (args.includes("--help") || args.includes("-h")) { console.log(HELP); return; }
   const lan = args.includes("--lan");
-  const noOpen = args.includes("--no-open");
+  const shouldOpen = args.includes("--open") && !args.includes("--no-open");
   const rootArg = args.find((a) => a.startsWith("--root="));
   const rootDir = path.resolve(rootArg ? rootArg.slice("--root=".length) : DEFAULT_ROOT);
   const portArg = args.find((a) => /^\d+$/.test(a));
@@ -588,7 +590,7 @@ async function Main() {
   const existing = await ProbeExisting(basePort);
   if (existing && path.resolve(existing.root) === rootDir) {
     console.log(`已经在跑了：http://127.0.0.1:${basePort}/__preview/   （根：${existing.root}）`);
-    if (!noOpen) OpenBrowser(`http://127.0.0.1:${basePort}/__preview/`);
+    if (shouldOpen) OpenBrowser(`http://127.0.0.1:${basePort}/__preview/`);
     return;
   }
   if (existing) {
@@ -614,7 +616,7 @@ async function Main() {
   console.log(`  停服          :  关掉这个窗口，或按 Ctrl+C`);
   console.log(`  放桌面快捷方式:  node scripts/Script_LocalPreview.mjs --shortcut`);
   console.log("");
-  if (!noOpen) OpenBrowser(`http://127.0.0.1:${port}/__preview/`);
+  if (shouldOpen) OpenBrowser(`http://127.0.0.1:${port}/__preview/`);
 }
 
 Main().catch((error) => {

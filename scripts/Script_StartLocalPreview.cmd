@@ -21,5 +21,5 @@ if errorlevel 1 (
   exit /b 1
 )
 
-node scripts\Script_LocalPreview.mjs %*
+node scripts\Script_LocalPreview.mjs --open %*
 if errorlevel 1 pause
