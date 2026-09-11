@@ -2679,7 +2679,7 @@ export const MUSIC_BASE = "Audio/Music/";
 // 而 LoadSfxPack 盖不上去是静默的 —— 表现只是「断肢还是合成音」。
 // （同一天 Codex 那边把戳改成了日期式，合并后取带两件事的同一个新戳。）
 export const SFX_PACK_VERSION = "20260911planeexplosion";
-export const AMB_PACK_VERSION = "20260910carriagecrowd";
+export const AMB_PACK_VERSION = "20260912trainonly";
 export const MUSIC_PACK_VERSION = "5";
 
 // ---- 采样取数：并发闸 + 重试 ----------------------------------------------
@@ -3077,7 +3077,7 @@ const AMB_TICKS_PER_MIN = 60000 / AMB_TICK_MS;
 export const AMBIENCE_PRESETS = {
   firstLevelCarriage: {
     space:"interior",fallbackWind:.06,fallbackCut:180,
-    layers:[{bed:"trainInterior",gain:CARRIAGE_SOUND.trainGain,seg:12},
+    layers:[{bed:CARRIAGE_SOUND.trainBed,gain:CARRIAGE_SOUND.trainGain,seg:12},
       {bed:CARRIAGE_SOUND.crowdBed,gain:CARRIAGE_SOUND.crowdGain,seg:16}],
     events:[{name:"carriageRattle",perMin:9,volume:.3},
       {name:"gearRustle",perMin:5,volume:.24},{name:"clothMove",perMin:4,volume:.2}],

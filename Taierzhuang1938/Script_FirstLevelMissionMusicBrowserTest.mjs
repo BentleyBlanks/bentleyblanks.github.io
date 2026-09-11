@@ -18,10 +18,10 @@ try {
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&menu=0&manual=1&quality=low&scale=small`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 180000 });
   await page.locator("#bootStart").click();
-  await page.waitForFunction(() => window.Tengxian.audio.musicLayer && window.Tengxian.audio.ctx?.state === "running", null, { timeout: 60000 });
-  assert.ok(requests.every(url => url.includes("LeavingHome")), "boot must request only the current first-level recording");
+  await page.waitForFunction(() => window.Tengxian.audio.ctx?.state === "running" && !window.Tengxian.audio.musicLayer, null, { timeout: 60000 });
+  assert.equal(requests.length, 0, "the carriage must not load any first-level score");
   await page.screenshot({ path: path.join(output, "Scene_CarriageMusic.png") });
-  const starts = [[1,"LeavingHome"],[3,"IronSiege"],[3,null,"Shelter"],
+  const starts = [[1,null],[3,"IronSiege"],[3,null,"Shelter"],
     [3,"CloseQuartersPressure","Support"],[4,"CloseQuartersPressure"],[5,"CloseQuartersPressure"],
     [6,"TheFrontClosesIn"],[7,"TheRoadSouth"],[8,"IronSiege"],[9,"IronSiege"],[10,"IronSiege"],
     [11,"TheRoadSouth"],[12,"CloseQuartersPressure"],[13,"CloseQuartersPressure"],[14,"TheSouthRoadBreaks"],
@@ -99,8 +99,8 @@ try {
     a.Dispose(); return {staleIgnored,pauseHeld,resumesLatest,silenceHeld};
   });
   assert.ok(Object.values(races).every(Boolean),JSON.stringify(races));
-  assert.equal(new Set(requests.map(url=>url.split("?")[0])).size,8);
+  assert.equal(new Set(requests.map(url=>url.split("?")[0])).size,7);
   assert.deepEqual(errors,[]);
   await fs.writeFile(path.join(output,"Data_MusicVerification.json"),JSON.stringify({rows,races,requests,errors},null,2));
-  console.log("PASS eight active audible cues, both battle recordings, story transitions, dialogue, pause/resume, cache and late-load races");
+  console.log("PASS silent carriage and seven active audible cues, both battle recordings, story transitions, dialogue, pause/resume, cache and late-load races");
 } finally { await browser.close(); await new Promise(resolve=>server.close(resolve)); }

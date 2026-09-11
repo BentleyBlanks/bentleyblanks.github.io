@@ -3,6 +3,7 @@ export const CARRIAGE_SOUND = Object.freeze({
   preset: "firstLevelCarriage",
   crowdBed: "carriageCrowd",
   cheerCue: "amb.carriageRearCheer",
+  trainBed: "trainCarriageOnly",
   trainGain: 0.72,
   crowdGain: 0.38,
   speechBedGain: 0.28,

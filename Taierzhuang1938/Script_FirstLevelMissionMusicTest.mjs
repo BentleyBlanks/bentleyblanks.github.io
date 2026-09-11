@@ -3,6 +3,7 @@ import fs from "node:fs";
 import crypto from "node:crypto";
 import { MISSION_STAGES } from "./Data_FirstLevelMission.mjs";
 import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_STAGE_MUSIC, FirstLevelMusicState } from "./Data_FirstLevelMissionMusic.mjs";
+import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 import { FirstLevelMissionMusic } from "./Script_FirstLevelMissionMusic.mjs";
 
 assert.deepEqual(Object.keys(FIRST_LEVEL_STAGE_MUSIC), MISSION_STAGES.map(stage => stage.id));
@@ -25,8 +26,8 @@ for (const cue of cues) {
   assert.ok(entry.seconds > 90 && entry.seconds < 130 && entry.bytes < 2_000_000);
   assert.ok(Math.abs(entry.rmsDbfs + 27) <= 0.6 && entry.peakDbfs <= -3);
 }
-assert.equal(FirstLevelMusicState("Train").cue, "firstLevelLeavingHome");
-assert.equal(FirstLevelMusicState("Unloading").cue, "firstLevelLeavingHome");
+assert.equal(FirstLevelMusicState("Train").cue, null);
+assert.equal(FirstLevelMusicState("Unloading").cue, null);
 assert.equal(FirstLevelMusicState("Unloading", { shellImpact: true }).cue, null);
 assert.equal(FirstLevelMusicState("South").cue, "firstLevelTheRoadSouth");
 assert.equal(FirstLevelMusicState("TransferApproach").cue, "firstLevelTheRoadSouth");
@@ -45,6 +46,13 @@ assert.equal(FirstLevelMusicState("Exit").cue, "firstLevelTheLivingStillNeedUs")
 assert.equal(FirstLevelMusicState("Transfer").scale, 1);
 assert.equal(FirstLevelMusicState("Complete").cue, null);
 assert.equal(FirstLevelMusicState("Train", { failed: true }).cue, null);
+const ambience = JSON.parse(fs.readFileSync(new URL("./Audio/Amb/Data_AmbManifest.json", import.meta.url)));
+const trainBed = ambience.beds[CARRIAGE_SOUND.trainBed];
+const trainSource = ambience.carriageSources[CARRIAGE_SOUND.trainBed];
+const trainBytes = fs.readFileSync(new URL(`./Audio/Amb/${trainBed.file}`, import.meta.url));
+assert.equal(crypto.createHash("sha256").update(trainBytes).digest("hex"), trainSource.sha256, "play the verified train-only take");
+assert.ok(trainBed.seconds > 20 && trainBed.channels === 2);
+assert.ok(Math.abs(trainSource.rmsDbfs + 27) < .6 && trainSource.peakDbfs < -1);
 const calls = [], levels = [];
 const audio = { Music: (...args) => calls.push(args), SetMusicLevel: (...args) => levels.push(args) };
 const director = new FirstLevelMissionMusic(audio);

@@ -398,7 +398,7 @@ try {
       null,{timeout:60000});
     const carriageAudio=await page.evaluate(()=>{
       const a=window.Tengxian.audio;
-      const beds=['trainInterior','carriageCrowd'].map(id=>{
+      const beds=['trainCarriageOnly','carriageCrowd'].map(id=>{
         const buffer=a.ambBuffers.get(id),data=buffer?.getChannelData(0);
         let sum=0;for(const value of data||[])sum+=value*value;
         return {id,seconds:buffer?.duration||0,rms:data?Math.sqrt(sum/data.length):0,

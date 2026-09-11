@@ -1,4 +1,4 @@
-// SeedAudio takes; approved carriage banter with relaxed warmth and a trace of uncertainty. Labels are editor-only metadata.
+// Train and unloading use diegetic sound only. Retained score labels are editor metadata.
 export const FIRST_LEVEL_MUSIC_VERSION = "20260910-combat-duo";
 export const FIRST_LEVEL_MUSIC_CUES = Object.freeze(Object.fromEntries([
   ["LeavingHome", "车厢闲话", 0.72],
@@ -22,7 +22,7 @@ export const FIRST_LEVEL_MUSIC_MIX = Object.freeze({
   unloadingScale: 0.45, ordersScale: 0.55, transferScale: 1, finalCarryScale: 0.55,
 });
 export const FIRST_LEVEL_STAGE_MUSIC = Object.freeze({
-  Train: "LeavingHome", Unloading: "LeavingHome",
+  Train: null, Unloading: null,
   TrenchEntry: "IronSiege", Shelter: null,
   Support: "CloseQuartersPressure", MachineGun: "CloseQuartersPressure", Tank: "CloseQuartersPressure", Orders: "TheFrontClosesIn",
   South: "TheRoadSouth", Village: "IronSiege", Melee: "IronSiege", Courtyard: "IronSiege",

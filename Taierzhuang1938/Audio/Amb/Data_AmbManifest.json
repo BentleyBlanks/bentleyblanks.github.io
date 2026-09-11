@@ -56,6 +56,11 @@
       "file": "AudioAmb_CarriageCrowd.mp3",
       "seconds": 40.046,
       "channels": 2
+    },
+    "trainCarriageOnly": {
+      "file": "AudioAmb_TrainCarriageOnly.mp3",
+      "seconds": 39.63201814058957,
+      "channels": 2
     }
   },
   "cues": {
@@ -242,6 +247,11 @@
       "credit": "Volcengine SeedAudio 1.0 · 车厢多人环境",
       "license": "volcengine",
       "source": "SeedAudio API generated"
+    },
+    "trainCarriageOnly": {
+      "credit": "Volcengine SeedAudio 1.0 · train and carriage mechanics only",
+      "license": "volcengine",
+      "source": "Script_SeedAudioCarriageAmbienceBake.mjs"
     }
   },
   "licenses": {
@@ -303,6 +313,19 @@
       "mastering": "ChannelsBeforeLoudnessV2",
       "sha256": "783f2fadc55ccdc1b5582cb0ac93a70159c1d2cd71cca92f3254acafc124f5f4",
       "bytes": 113311
+    },
+    "trainCarriageOnly": {
+      "file": "AudioAmb_TrainCarriageOnly.mp3",
+      "seconds": 39.63201814058957,
+      "channels": 2,
+      "model": "seed-audio-1.0",
+      "prompt": "生成一条约四十秒的连续写实火车车厢环境录音，纯机械自然噪声，不是音乐。1938年老式蒸汽军列在钢轨接缝的铁路上中低速匀速前行，听者坐在中间的木质敞口兵员车厢，机车在很前方。主要声音是脚下沉厚柔和的车轮与轨道滚动轰隆，以及轮对经过轨缝时自然不完全整齐的咯噔、咔哒咔哒。近处厚木地板与木板凳偶尔轻微吱嘎，车厢连接铁扣和松动螺栓细碎颤响，车帮外有少量柔和风声。声音具有真实机械重量，接缝轻震，空间贴近坐在车厢里的耳朵；全程速度、距离和整体响度稳定，低频充实但不轰耳，高频柔和不过分尖锐，没有明显节拍配乐感，不能把火车节奏变成打击乐。开头与结尾均保持同样的持续行进纹理，不进站、不停车、不减速，适合作为可循环环境床。绝对没有音乐、旋律、和弦、乐器、鼓点、电子持续音、人声、闲聊、笑声、脚步、广播、汽笛、刹车、枪声、炮声、爆炸和动物。只要行驶列车本身、木车厢和少量穿堂风的真实噪声。",
+      "sourceSha256": "98b5da98b3888bea6e1c06223d4887a44ee3353ff2e9db451abf2978c706bd79",
+      "sha256": "cabaf6a3c72d7d847712c8383842c02ec7cab1cbf11e434eae87ca9b366b2b78",
+      "bytes": 635341,
+      "rmsDbfs": -27.44477222299964,
+      "peakDbfs": -6.83334366626973,
+      "loopOverlapS": 0.4
     }
   }
 }
