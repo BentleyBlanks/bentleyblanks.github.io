@@ -1,4 +1,6 @@
-// 毫米空间里的工具约束、粘附弹簧与刚体转动。输入是工具的世界坐标目标，不是手势里程。
+// 可见块体使用薄壳，细微颗粒保留低成本刚体；两者共用工具和附着接口。
+import {BindWaxSurface,GripWaxSurface,UngripWaxSurface,StepWaxSurface,WriteWaxSurface} from './Script_SoftWaxPhysics.mjs?v=ear018-body-bending-20260912';
+export {BindWaxSurface as BindPeelSurface,WriteWaxSurface as WritePeelSurface};
 const Add=(a,b)=>a.map((x,i)=>x+b[i]);
 const Sub=(a,b)=>a.map((x,i)=>x-b[i]);
 const Mul=(a,s)=>a.map(x=>x*s);
@@ -25,12 +27,19 @@ export function CreatePeelBody({position,rotation,normal,size,type='dry',footpri
 }
 
 export function GripPeelBody(body,point){
+  if(body.surface){GripWaxSurface(body,point);return;}
   body.grip=Rotate([-body.rotation[0],-body.rotation[1],-body.rotation[2],body.rotation[3]],Sub(point,body.position));
 }
-export function UngripPeelBody(body){body.grip=null;}
+export function UngripPeelBody(body){body.grip=null;if(body.surface)UngripWaxSurface(body);}
 export function GetGripPoint(body){return World(body,body.grip||[0,0,0]);}
+export function MovePeelBody(body,position){
+  const delta=Sub(position,body.position);
+  if(body.surface)for(const point of body.surface.points)for(let k=0;k<3;k++)point[k]+=delta[k];
+  body.position=position.slice();body.velocity=[0,0,0];
+}
 
 export function StepPeelBody(body,{target=null,softness=0,efficiency=1,supportRotation=null,adhesion=1,minAnchors=0}={},dt=1/60){
+  if(body.surface)return StepWaxSurface(body,{target,softness,efficiency,supportRotation,adhesion,minAnchors},dt);
   const count=Math.max(1,Math.ceil(Math.min(.05,dt)*240)),h=Math.min(.05,dt)/count;
   const profile=PROFILES[body.type]||PROFILES.dry;
   const soft=Clamp(softness);

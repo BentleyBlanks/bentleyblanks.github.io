@@ -4,7 +4,7 @@ import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
 import { PALETTE as P } from './Data_Palette.mjs?v=ear012-outer-20260911';
 
 import {InstrumentContact,IsFeatherDebris} from './Script_InstrumentInteraction.mjs?v=ear016-normal-scrape-20260912';
-import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody } from './Script_PeelPhysics.mjs?v=ear012-outer-20260911';
+import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody, BindPeelSurface, WritePeelSurface, MovePeelBody } from './Script_PeelPhysics.mjs?v=ear018-body-bending-20260912';
 import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
 import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear012-outer-20260911';
 import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear012-outer-20260911';
@@ -105,7 +105,7 @@ export async function CreateImmersiveScene({ core }) {
   const workingPlane = new THREE.Plane();
   const ray = new THREE.Raycaster();
   let width = 1, height = 1, chunks = [], inside = false, entrance = 0;
-  let lastToolPoint = null, transfer = null, showcase = false,tearTransfer=null;
+  let lastToolPoint = null, transfer = null, showcase = false;
   const outsidePosition = new THREE.Vector3(-31, 12, -115);
   const insidePosition = new THREE.Vector3(-.25, .2, -1.8);
   camera.position.copy(outsidePosition); camera.up.set(0, 1, 0); camera.lookAt(-2, 8, -1); camera.updateMatrixWorld(true);
@@ -133,14 +133,10 @@ export async function CreateImmersiveScene({ core }) {
   }
   const ring = new THREE.Mesh(new THREE.TorusGeometry(.95, .026, 8, 64), new THREE.MeshBasicMaterial({ color: P.white, transparent: true, opacity: .75 }));
   scene.add(ring); ring.quaternion.copy(camera.quaternion); ring.visible = false;
-  const threadGroup = new THREE.Group(); scene.add(threadGroup);
   const droplet = new THREE.Mesh(new THREE.SphereGeometry(.16, 16, 12), new THREE.MeshPhysicalMaterial({ color: P.water, roughness: .12, clearcoat: 1 }));
   scene.add(droplet); droplet.visible = false;
   let dropAge = 1, dropTarget = null;
-  const threads = Array.from({ length: 3 }, () => {
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(.035, .07, 1, 7), new THREE.MeshStandardMaterial({ color: P.waxGlow, roughness: .2 }));
-    threadGroup.add(m); m.visible = false; return m;
-  });
+
 
   function CameraFrame(dt) {
     entrance = Clamp(entrance + (inside ? dt : -dt) / 1.7);
@@ -235,6 +231,7 @@ export async function CreateImmersiveScene({ core }) {
     for(const c of chunks){const p=c.mesh.geometry.attributes.position;
       for(let i=0;i<p.count;i++){const v=new THREE.Vector3(p.getX(i),p.getY(i),0).applyQuaternion(c.rotation).add(c.origin),surface=contact.Surface(v);p.setZ(i,p.getZ(i)-surface.clearance+.018);}
       p.needsUpdate=true;SmoothWaxNormals(c.mesh.geometry);c.original=p.array.slice();
+      if(!c.fine)BindPeelSurface(c.body,p.array,c.mesh.geometry.index.array);
     }
     HideTool(); droplet.visible = false; dropTarget = null; return chunks;
   }
@@ -246,12 +243,12 @@ export async function CreateImmersiveScene({ core }) {
   function Pick(x, y,toolId=null) {
     scene.updateMatrixWorld(true);
     ray.setFromCamera(new THREE.Vector2(x / width * 2 - 1, 1 - y / height * 2), camera);
-    const hit = ray.intersectObjects(chunks.filter(c=>c.state==='attached').map(c=>c.mesh))[0];
+    const hit = ray.intersectObjects(chunks.filter(c=>c.state==='attached'||c.state==='returning').map(c=>c.mesh))[0];
     const obstruction = ray.intersectObject(wall)[0];
     if (hit && (!obstruction || hit.distance < obstruction.distance + .035)) return hit.object.userData.chunk;
     // 小屏边缘容差只扩到最近的一块，不能把空白长按解释成远处接触。
     let nearest = null, distance = Math.min(30, width * .075);
-    for (const c of chunks.filter(c=>c.state==='attached')) {
+    for (const c of chunks.filter(c=>c.state==='attached'||c.state==='returning')) {
       const p = Project(VisualCenter(c));
       const d = Math.hypot(x - p.x, y - p.y);
       if (d < distance) {
@@ -332,36 +329,20 @@ export async function CreateImmersiveScene({ core }) {
       const center=canal.CenterAt(projected.depth).clone();
       const radial=pos.clone().sub(center), limit=canal.RadiusAt(projected.depth,projected.angle)-c.size*.7;
       if(radial.length()>limit && c.body.detached) {
-        c.body.position=center.add(radial.setLength(limit)).toArray();
-        c.body.velocity=[0,0,0];result.contact=true;
+        MovePeelBody(c.body,center.add(radial.setLength(limit)).toArray());result.contact=true;
       }
     }
     SyncBody(c);Deform(c);
     ShowTool(c,c.toolId);
-    Threads(c);
     return result;
   }
   function Deform(c) {
-    if(c.fine)return;
-    const p=c.mesh.geometry.attributes.position,rotation=c.mesh.quaternion.clone().invert();
-    const grip=c.body.grip?new THREE.Vector3().fromArray(c.body.grip):null;
-    const anchors=c.body.anchors.filter(a=>a.alive);
-    for(let i=0;i<p.count;i++){
-      const v=new THREE.Vector3(c.original[i*3],c.original[i*3+1],c.original[i*3+2]),delta=new THREE.Vector3();let weight=0;
-      for(const a of anchors){
-        const local=new THREE.Vector3().fromArray(a.local),w=Math.exp(-((v.x-local.x)**2+(v.y-local.y)**2)/(c.size*c.size*.24));
-        const current=local.clone().applyQuaternion(c.mesh.quaternion).add(c.mesh.position);
-        delta.addScaledVector(new THREE.Vector3().fromArray(a.rest).sub(current).applyQuaternion(rotation),w);weight+=w;
-      }
-      if(weight>0){
-        const away=grip?Clamp(v.distanceTo(grip)/(c.size*.65)):1;
-        delta.divideScalar(weight).clampLength(0,c.type==='wet'?.38:.18).multiplyScalar(away*.72);
-        v.add(delta);
-      }
-      if(c.tear>.15){const d=c.pullLocal||new THREE.Vector3(1,0,0),band=v.x*d.x+v.y*d.y,sign=Math.sign(band);const strain=c.tear*c.tear;v.addScaledVector(d,sign*strain*.10*Math.min(1,Math.abs(band)*3));v.z+=Math.sin(v.y*4+c.seed)*strain*.07;}
-      p.setXYZ(i,v.x,v.y,v.z);
-    }
-    p.needsUpdate=true;c.mesh.geometry.computeVertexNormals();
+    if(!c.body.surface)return;
+    const geometry=c.mesh.geometry;
+    WritePeelSurface(c.body,geometry.attributes.position.array);
+    geometry.attributes.position.needsUpdate=true;
+    SmoothWaxNormals(geometry);
+    geometry.computeBoundingBox();geometry.computeBoundingSphere();
   }
   function Fracture(c){
     const direction=c.pullLocal?.toArray()||[Math.sin(heading),Math.cos(heading),0];
@@ -385,10 +366,9 @@ export async function CreateImmersiveScene({ core }) {
       mesh.castShadow=mesh.receiveShadow=true;root.add(mesh);
       const fragment={...c,id:String(c.id)+'.'+i,state:'settling',settleFrom:start,settleAge:0,settleVelocity:c.normal.clone().multiplyScalar(.5).add(spread.clone().multiplyScalar(1.6)),tear:0,mesh,mark:c.mark.clone(),size:Math.max(.045,Math.sqrt(geometry.boundingBox.getSize(new THREE.Vector3()).x*geometry.boundingBox.getSize(new THREE.Vector3()).y)*.52),origin:mesh.position.clone(),rotation:mesh.quaternion.clone(),original:geometry.attributes.position.array.slice(),body:null,normal,depth:projected.depth,angle:projected.angle,footprint:[geometry.boundingBox.getSize(new THREE.Vector3()).x*.5,geometry.boundingBox.getSize(new THREE.Vector3()).y*.5],fragment:true,generation:c.generation+1,fine:false,form:'fragment',grainCount:1,cutDirection:direction,mass:c.mass*volumes[i]/totalVolume,stress:0,progress:0,slot:-1};
       fragment.fine=IsFeatherDebris(fragment);
-      fragment.body=CreatePeelBody({position:fragment.origin.toArray(),rotation:fragment.rotation.toArray(),normal:normal.toArray(),size:fragment.size,type:c.type});mesh.userData.chunk=fragment;chunks.push(fragment);return fragment;
+      fragment.body=CreatePeelBody({position:fragment.origin.toArray(),rotation:fragment.rotation.toArray(),normal:normal.toArray(),size:fragment.size,type:c.type});if(!fragment.fine)BindPeelSurface(fragment.body,geometry.attributes.position.array,geometry.index.array);mesh.userData.chunk=fragment;chunks.push(fragment);return fragment;
     });
     result.forEach((fragment,i)=>{fragment.mesh.position.copy(fragment.settleFrom);fragment.tearRotation=c.mesh.quaternion.clone();fragment.settleRotation=fragment.rotation.clone();});
-    c.tearPieces=result;c.tearAge=0;tearTransfer={pieces:result,age:0,color:c.mesh.material.color.clone()};
     HideTool();return result;
   }
   function FiberMaterial(){
@@ -449,20 +429,7 @@ export async function CreateImmersiveScene({ core }) {
     canvas.onpointerdown=e=>{px=e.clientX;canvas.setPointerCapture(e.pointerId);};canvas.onpointermove=e=>{if(px==null)return;models.forEach(m=>m.rotation.y+=(e.clientX-px)*.015);px=e.clientX;render();};canvas.onpointerup=canvas.onpointercancel=()=>px=null;
     return{SetView(mode){const y=mode==='tip'?.65:mode==='grip'?(id==='drops'?6.2:16.7):id==='drops'?4.5:10;const z=mode==='full'?(id==='drops'?21:38):7;models.forEach((m,i)=>m.position.x=(i?1:-1)*(mode==='full'?4:1.25));cam.position.set(1,y+(mode==='tip'?1:0),z);cam.lookAt(0,y,0);render();},Dispose(){previewTriangles=0;previewEnvironment.dispose();renderer.dispose();renderer.forceContextLoss();models.forEach(g=>g.traverse(p=>{p.geometry?.dispose();if(p.material)for(const m of (Array.isArray(p.material)?p.material:[p.material]))m.dispose();}));}};
   }
-  function Threads(c) {
-    const alive=c.body.anchors.filter(a=>a.alive);
-    threads.forEach((thread,i)=>{
-      const anchor=alive[i];thread.visible=!!anchor&&(c.type==='wet'&&c.body.strain>.12||c.tear>.35);thread.material.color.copy(c.mesh.material.color);
-      if(!thread.visible)return;
-      const start=new THREE.Vector3().fromArray(anchor.rest);
-      const end=new THREE.Vector3().fromArray(anchor.local).applyQuaternion(c.mesh.quaternion).add(c.mesh.position);
-      const delta=end.clone().sub(start);
-      thread.position.copy(start).add(end).multiplyScalar(.5);
-      thread.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.clone().normalize());
-      const thickness=c.type==='wet'?.5:Math.max(.05,(1-c.tear)*.25);thread.scale.set(thickness,delta.length(),thickness);
-    });
-  }
-  function Ungrip(c) { UngripPeelBody(c.body);c.gripRotation=null;c.grasped=false;threads.forEach(t=>t.visible=false); }
+  function Ungrip(c) { UngripPeelBody(c.body);c.gripRotation=null;c.grasped=false; }
   function ToolAt(point,id,c=null,opening=0) {
     reachBlocked=false;
     if(inside&&!transfer){const projected=canal.Project(point);if(projected.depth>Reach(id)){point=Surface(Reach(id),projected.angle,.3);reachBlocked=true;}}
@@ -543,7 +510,7 @@ export async function CreateImmersiveScene({ core }) {
       else HideTool();
     }
   }
-  function HideTool() { tool.visible = ring.visible = false; threads.forEach(t => { t.visible = false; }); }
+  function HideTool() { tool.visible = ring.visible = false; }
   function TrayBounds(){const b=new THREE.Box3().setFromObject(tray),points=[];for(const x of [b.min.x,b.max.x])for(const y of [b.min.y,b.max.y])for(const z of [b.min.z,b.max.z])points.push(Project(new THREE.Vector3(x,y,z)));return{x:Math.min(...points.map(p=>p.x)),y:Math.min(...points.map(p=>p.y)),right:Math.max(...points.map(p=>p.x)),bottom:Math.max(...points.map(p=>p.y)),visible:tray.visible};}
   function TrayPosition(c) {
     return tray.position.clone().add(new THREE.Vector3((c.slot%5-2)*1.75,.045+(c.bottomOffset||0)+Math.floor(c.slot/15)*.28,Math.floor(c.slot/5)%3*1.55-1.55));
@@ -568,7 +535,7 @@ export async function CreateImmersiveScene({ core }) {
     const destination=TrayPosition(c).add(new THREE.Vector3(0,2.3,0));
     c.path=new THREE.CatmullRomCurve3([start,center,new THREE.Vector3(0,0,-2),new THREE.Vector3(0,-1,-7),destination],false,'centripetal');
     c.carryRotation=c.mesh.quaternion.clone();c.dropVelocity=0;c.bounces=0;
-    transfer={chunk:c,age:0};threads.forEach(t=>t.visible=false);
+    transfer={chunk:c,age:0};
   }
   function EndService(){if(transfer){const c=transfer.chunk;c.state='attached';c.mesh.position.copy(c.origin);c.mesh.quaternion.copy(c.rotation);for(const child of c.batch||[]){child.state='attached';child.mesh.position.copy(child.origin);child.mesh.quaternion.copy(child.rotation);}transfer=null;}for(const c of chunks)if(c.state==='held'||c.state==='peeling'){Ungrip(c);c.state='attached';}HideTool();}
   function Update(dt) {
@@ -596,15 +563,10 @@ export async function CreateImmersiveScene({ core }) {
       }
       if(c.state==='returning') {
         StepPeelBody(c.body,{softness:c.softened},dt);SyncBody(c);Deform(c);
-        if(Math.hypot(...c.body.velocity)<.02&&Math.hypot(...c.body.spin)<.04) c.state='attached';
+        if(Math.hypot(...c.body.velocity)<.02&&Math.hypot(...c.body.spin)<.04&&(c.body.motion||0)<.035) c.state='attached';
       }
     }
     materials.Update(chunks,lamp);
-    if(tearTransfer){
-      tearTransfer.age+=dt;const t=tearTransfer.age;
-      threads.forEach((thread,i)=>{const a=tearTransfer.pieces[i%tearTransfer.pieces.length],b=tearTransfer.pieces[(i+1)%tearTransfer.pieces.length];const start=a.mesh.position.clone(),end=b.mesh.position.clone();const delta=end.clone().sub(start);thread.visible=t<.3+i*.055;thread.material.color.copy(tearTransfer.color);thread.position.copy(start).add(end).multiplyScalar(.5);thread.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.clone().normalize());thread.scale.set(Math.max(.015,.27*(1-t/.47)),delta.length(),Math.max(.015,.27*(1-t/.47)));});
-      if(t>.47){threads.forEach(t=>t.visible=false);tearTransfer=null;}
-    }
     if(transfer) {
       const c=transfer.chunk,age=transfer.age;
       if(transfer.mode==='suction'){
@@ -652,14 +614,19 @@ export async function CreateImmersiveScene({ core }) {
     return {visible:true,id:lastToolId,vertices:closest.length,fieldMinimum,meshMinimum};
   }
   function InteractionPoint(c){
-    if(!c.fragment||c.state!=='attached')return VisualCenter(c);
+    if(!c.fragment||!['attached','returning'].includes(c.state))return VisualCenter(c);
     scene.updateMatrixWorld(true);const p=c.mesh.geometry.attributes.position,idx=c.mesh.geometry.index,candidates=[VisualCenter(c)];
     const stride=Math.max(3,Math.floor((idx?.count||p.count)/60/3)*3);
     for(let i=0;i<(idx?.count||p.count)-2;i+=stride){const v=new THREE.Vector3();for(let j=0;j<3;j++)v.add(new THREE.Vector3().fromBufferAttribute(p,idx?idx.getX(i+j):i+j));candidates.push(v.multiplyScalar(1/3).applyMatrix4(c.mesh.matrixWorld));}
-    for(const point of candidates){const screen=Project(point);ray.setFromCamera(new THREE.Vector2(screen.x/width*2-1,1-screen.y/height*2),camera);const hit=ray.intersectObjects(chunks.filter(c=>c.state==='attached').map(c=>c.mesh))[0],skin=ray.intersectObject(wall)[0];if(hit?.object===c.mesh&&(!skin||hit.distance<skin.distance+.035))return point;}
+    // 鼠标事件会把 clientX/Y 截成整数；极薄碎片的诊断触点也必须在该像素仍然可见。
+    const pickable=chunks.filter(c=>c.state==='attached'||c.state==='returning').map(c=>c.mesh);
+    for(const point of candidates){const screen=Project(point);let visible=true;
+      for(const [x,y] of [[screen.x,screen.y],[Math.floor(screen.x),Math.floor(screen.y)]]){ray.setFromCamera(new THREE.Vector2(x/width*2-1,1-y/height*2),camera);const hit=ray.intersectObjects(pickable)[0],skin=ray.intersectObject(wall)[0];if(hit?.object!==c.mesh||(skin&&hit.distance>=skin.distance+.035)){visible=false;break;}}
+      if(visible)return point;
+    }
     return VisualCenter(c);
   }
-  function Targets() { return chunks.map(c=>({id:c.id,type:c.type,depth:c.depth,mass:c.mass,form:c.form,tone:c.tone,generation:c.generation,fine:c.fine,grainCount:c.grainCount||1,cutDirection:c.cutDirection,forceDirection:c.forceDirection?.toArray(),fragment:c.fragment,wetting:c.wetting,surfaceWet:c.surfaceWet||0,aligned:c.aligned,jawContact:c.jawContact,footprint:c.footprint,state:c.state,progress:c.progress,softened:c.softened,vertices:c.mesh.geometry.attributes.position.count,triangles:c.mesh.geometry.index.count/3,position:c.mesh.position.toArray(),rotation:c.mesh.quaternion.toArray(),scale:c.mesh.scale.toArray(),screen:Project(InteractionPoint(c)),sweepScreen:Project(VisualCenter(c).add(new THREE.Vector3(1.8,0,0).applyQuaternion(c.rotation))),pullScreen:Project(VisualCenter(c).addScaledVector(c.normal,1.8)),physics:{anchors:c.body.anchors.filter(a=>a.alive).length,detached:c.body.detached,strain:c.body.strain,force:c.body.force,contact:c.body.contact,grip:c.body.grip?.slice()||null}})); }
+  function Targets() { return chunks.map(c=>({id:c.id,type:c.type,depth:c.depth,mass:c.mass,form:c.form,tone:c.tone,generation:c.generation,fine:c.fine,grainCount:c.grainCount||1,cutDirection:c.cutDirection,forceDirection:c.forceDirection?.toArray(),fragment:c.fragment,wetting:c.wetting,surfaceWet:c.surfaceWet||0,aligned:c.aligned,jawContact:c.jawContact,footprint:c.footprint,state:c.state,progress:c.progress,softened:c.softened,vertices:c.mesh.geometry.attributes.position.count,triangles:c.mesh.geometry.index.count/3,position:c.mesh.position.toArray(),rotation:c.mesh.quaternion.toArray(),scale:c.mesh.scale.toArray(),screen:Project(InteractionPoint(c)),sweepScreen:Project(VisualCenter(c).add(new THREE.Vector3(1.8,0,0).applyQuaternion(c.rotation))),pullScreen:Project(VisualCenter(c).addScaledVector(c.normal,1.8)),physics:{solver:c.body.surface?'xpbd-shell':'rigid-grain',nodes:c.body.surface?.points.length||0,bend:c.body.bend||0,peakBend:c.body.surface?.peakBend||0,maxStretch:c.body.surface?.maxStretch||0,motion:c.body.motion||0,anchors:c.body.anchors.filter(a=>a.alive).length,detached:c.body.detached,strain:c.body.strain,force:c.body.force,contact:c.body.contact,grip:c.body.grip?.slice()||null}})); }
   return {WarmTools,canal,Reset,EndService,Pick,Grip,Drag,Fracture,SetSkins,CreateToolPreview,Ungrip,ShowTool,HideTool,Release,Update,Targets,Project,Resize,
     TurnStart(x,y,id){
       turnChunk=Pick(x,y,id);if(turnChunk)ShowTool(turnChunk,id,0,{x,y});else Hover(x,y,id);

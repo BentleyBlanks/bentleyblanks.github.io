@@ -1,4 +1,5 @@
 import { LandingSound } from './Script_LandingSound.mjs';
+import { InstrumentContact } from './Script_InstrumentInteraction.mjs';
 // 真实输入验收碎裂、工具差异、声音输出和经营持久化；存档夹具只用于模拟已有玩家。
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
@@ -30,6 +31,14 @@ async function Input(type,x=0,y=0){
 async function Select(id){await Input('up');await page.locator('[data-tool="'+id+'"]').click();}
 async function Grab(id){
  let t=(await Probe()).targets.find(t=>t.id===id);if((await page.locator('#depth-toggle').getAttribute('aria-pressed')==='true')!==(t.depth>10)){await page.locator('#depth-toggle').click();await Step(70);t=(await Probe()).targets.find(t=>t.id===id);}
+ // 换块后通过真实转向输入对准勺面或夹爪，不假设上一接触面的角度仍然适用。
+ const tool=(await Probe()).tool;
+ if(['scoop','tweezers'].includes(tool)){
+  if(touch){await page.locator('#mode-turn').click();await Input('down',t.screen.x,t.screen.y);}else{await page.mouse.move(t.screen.x,t.screen.y);await page.mouse.down({button:'right'});}
+  const normal=await page.evaluate(id=>__EarSpaDebug.view.chunks.find(c=>c.id===id).normal.toArray(),id);
+  for(let i=0;i<80;i++){const pose=InstrumentContact(tool,(await Probe()).rendering.toolRotation,normal);if(tool==='scoop'?pose.facing>.8:pose.jawTilt<.15)break;await Step(3);if(i===79)throw Error(tool+' cannot face '+id);}
+  if(touch){await Input('up');await page.locator('#mode-force').click();}else await page.mouse.up({button:'right'});
+ }
  await Input('down',t.screen.x,t.screen.y);await Step(5);
  Check((await Probe()).active===id||(await Probe()).transfer?.id===id,'接触可拾取 '+id);return t;
 }

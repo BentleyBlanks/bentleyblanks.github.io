@@ -12,6 +12,8 @@
 实际交互回归：
 ```powershell
 node EarSpa3D/Script_PeelPhysicsTest.mjs
+node EarSpa3D/Script_SoftWaxPhysicsTest.mjs
+node EarSpa3D/Script_SoftWaxPlayTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
 node EarSpa3D/Script_EconomyTest.mjs
 node EarSpa3D/Script_LandingSoundTest.mjs
 node EarSpa3D/Script_InstrumentInteractionTest.mjs
