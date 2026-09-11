@@ -25,7 +25,7 @@ async function Advance(seconds){
 async function Receipt(label){
   const state=await page.evaluate(()=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
-    return {time:r.time,failed:r.failed,stage:r.flow.stage.id,started:r.Has("frontBattleStarted"),
+    return {time:r.time,failed:r.failed,playerHealth:g.player.health,squad:r.squad.map(a=>({id:a.castId,health:a.health,position:a.position.toArray()})),stage:r.flow.stage.id,started:r.Has("frontBattleStarted"),
       enemies:[...r.enemies.values()].map(a=>({id:a.missionId,encounter:a.missionEncounter,alive:a.alive,health:a.health,shots:a.fireSequence,position:a.position.toArray()}))};
   });
   receipts.push({label,...state});console.log(label,JSON.stringify(state));return state;
@@ -48,6 +48,26 @@ try{
   const initial=await Receipt("SupportEntry");
   assert.equal(initial.enemies.filter(a=>a.encounter==="approach"&&a.alive).length,MISSION_ENCOUNTERS.approach.length);
   assert.ok(initial.enemies.some(a=>a.encounter==="approach"),"approach cannot silently become an empty encounter");
+  // Before making contact, a sheltered delay keeps the squad in the recess too. Sending them
+  // ahead alone would test an unassisted assault against the new mobile sections.
+  await page.evaluate(async()=>{
+    const r=window.Tengxian.Debug.FirstLevelMissionRuntime(),{OPENING}=await import("./Data_FirstLevelOpening.mjs");
+    r.squadMarch?.Dispose();r.squadMarch=null;
+    for(const [i,a] of r.squad.entries()){
+      // shelterPosts also contains two exterior sentry positions. This fixture
+      // is waiting under the roof, not leaving sentries exposed for three minutes.
+      const post={x:OPENING.shelter.x+(i%2?1:-1),z:OPENING.shelter.z+(i<2?-3:2)};
+      r.PlaceActor(a,post);r.squadRoutes.set(a.id,[]);a.missionContactPost=null;
+      r.Defend(a,post,0,0);
+    }
+  });
+  await Place(-32,-20);await Advance(180);
+  await Place(-24,-60);await Advance(1);
+  const delayed=await Receipt("DelayedApproach");
+  assert.equal(delayed.failed,false,"the sheltered delay remains playable");
+  assert.equal(delayed.started,false,"a slow approach cannot spend the finite main assault");
+  assert.equal(delayed.enemies.filter(a=>a.encounter==="front").length,0);
+  assert.ok(delayed.enemies.some(a=>a.encounter==="approach"&&a.shots>0),"approach troops participate in real combat");
   await Place(-24,-40);await Advance(2);
   const contact=await page.evaluate(()=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),eye=g.player.EyePosition;
@@ -62,13 +82,6 @@ try{
   assert.ok(contact.length,"the approach has visible live enemies from the actual trench route");
   await page.screenshot({path:path.join(out,"Scene_ApproachContact.png")});
   receipts.push({label:"VisibleApproach",enemies:contact});
-  await Place(-32,-20);await Advance(180);
-  await Place(-24,-60);await Advance(1);
-  const delayed=await Receipt("DelayedApproach");
-  assert.equal(delayed.failed,false,"the sheltered delay remains playable");
-  assert.equal(delayed.started,false,"a slow approach cannot spend the finite main assault");
-  assert.equal(delayed.enemies.filter(a=>a.encounter==="front").length,0);
-  assert.ok(delayed.enemies.some(a=>a.encounter==="approach"&&a.shots>0),"approach troops participate in real combat");
   await Place(-8,-112);await Advance(1);
   const arrived=await Receipt("LastTrenchBend");
   const front=arrived.enemies.filter(a=>a.encounter==="front");

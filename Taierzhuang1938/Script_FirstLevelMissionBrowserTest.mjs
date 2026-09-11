@@ -203,12 +203,15 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
         shots: g.state.playerShots,
         ammo: g.state.ammo,
         clips: g.state.clips,
+        activeSlot:g.state.activeSlot,primaryMagazine:{...g.state.mags.primary},
         lastShot: g.state.lastShot,
         foe: window.MissionInputDriver?.Target()?.missionId,
       };
     }, fight);
     if (chunk % 4 === 0 || result.done || !result.alive) console.log(label, JSON.stringify(result));
-    if (result.done || result.stalled >= 3) break;
+    // A death can also leave the body stationary. Let the existing checkpoint
+    // retry below handle it before applying the live-navigation stall limit.
+    if (result.done || (result.alive && result.stalled >= 3)) break;
     if (!result.alive) {
       // Losing a firefight is an outcome of live combat, not a regression: this
       // bot fights standing in the open with no cover, and the runs that died
@@ -222,7 +225,7 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
       console.log(label, `player died at waypoint ${result.index}; checkpoint retry ${retries}/${ROUTE_RETRY_BUDGET}`);
       await page.evaluate(({ stance, sprint }) => {
         const g = window.Tengxian;
-        g.Debug.MenuAct("retrySandbox");
+        g.Debug.MenuAct("continueCheckpoint");
         g.StepFrames(1, 1 / 60, false);
         // Re-establish the stance and sprint the leg asked for, and re-seed the
         // stall detector: the retry teleports the body to the checkpoint.
@@ -455,6 +458,9 @@ try {
           return true;
         },
         Target() {
+          // A real bind has priority over an unobstructed distant rifle target.
+          const opponent=g.meleeCombat.qte.active?.attacker;
+          if(g.meleeCombat.Active && opponent?.alive)return opponent;
           if(this.observedShot!==g.state.playerShots) {
             this.observedShot=g.state.playerShots;
             if(this.lastTarget && g.state.lastShot?.hitKind==="wall")this.blocked.set(this.lastTarget,g.ai.time+4);
@@ -481,6 +487,10 @@ try {
             });
         },
         Shoot(foe) {
+          if(g.meleeCombat.Active){
+            g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+            g.Debug.Key("KeyF",true);g.Debug.Key("KeyF",false);return;
+          }
           this.lastTarget=foe.id;
           g.Debug.Mouse(0, false);
           const eye = g.player.EyePosition,
@@ -677,8 +687,10 @@ try {
     // The expanded battle may have used this box just before the handover.
     // Wait its real cooldown in cover before testing another physical refill.
     await page.evaluate(seconds=>window.Tengxian.StepFrames(Math.ceil(seconds*60),1/60,false),R.supplyCooldownS+1);
+    const clipsBefore=await page.evaluate(()=>window.Tengxian.state.clips);
     const reserveBefore=await page.evaluate(()=>window.Tengxian.emplacement.Emplacement("MissionGun").belts);
     await Interact();
+    assert.equal(await page.evaluate(()=>window.Tengxian.state.clips),clipsBefore+R.frontSupplyClips,"physical front supply covers the expanded approach ammunition cost");
     const reserveAfter=await page.evaluate(()=>window.Tengxian.emplacement.Emplacement("MissionGun").belts);
     assert.ok(reserveAfter>reserveBefore,"front box physically replenishes machine-gun reserve");
     await Route(

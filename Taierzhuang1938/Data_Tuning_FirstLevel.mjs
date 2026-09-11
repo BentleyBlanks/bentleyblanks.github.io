@@ -7,7 +7,7 @@ export const MISSION_TUNING = Object.freeze({
   openingSurfaceFireIntervalScale:1,
   openingSurfaceRifleRadiusM:3,
   openingSurfaceRifleCoverSlackM:4,
-  openingSurfaceGrenades:0,
+  openingSurfaceGrenades:2,
   // Mobile rifles may search and counterattack inside their assigned area.
   surfaceTacticalRadiusM:12,
   intrusionTacticalRadiusM:10,
@@ -99,9 +99,17 @@ export const MISSION_TUNING = Object.freeze({
   // discharger round, so a squad's stock was pooled with the launcher man). Two per rifleman is the conservative
   // reading and it is also what the pacing wants: a man who has thrown twice is out, so grenades stay an event.
   enemyGrenades:2,
-  // 2026-09-10: finite squads, no population target and no casualty replacement.
-  // Six surface blockers + four intruders + six approach infantry + twelve front infantry + four escorts.
-  openingEnemyBudget:32,
+  // User 2026-09-11: sustained multi-direction contact during the approach.
+  // Twelve surface + four intruders + eighteen approach + twelve front + four escorts; finite, no respawn.
+  openingEnemyBudget:50,
+  // Route attackers cover the approach; the separate front force owns the gun line.
+  approachFireSector:{minX:-80,maxX:35,minZ:-118,maxZ:-18,selfDefenseM:3},
+  approachAccuracyScale:.35,
+  approachTacticalRadiusM:24,
+  approachContactM:18,
+  approachContactRadiusM:6,
+  approachAdvanceMps:2.8,
+  approachBoundHoldS:2.8,
   frontReserveCount:0,
   frontReserveReleaseGapS:9,
   frontReservePlatoonSize:22,
@@ -220,6 +228,8 @@ export const MISSION_TUNING = Object.freeze({
   southHopeAtS: 43,
   followVehicleLeadS: 12,
   interactionSeconds: 0.55,
+  // Extra opening contacts consume roughly forty more rifle rounds before the rear ward.
+  frontSupplyClips:12,
   supplyCooldownS: 15,
   limitedLookRadians: 0.28,
   diveTravelM: 3.8,

@@ -501,11 +501,12 @@ export class FirstLevelMissionRuntime {
       actor.missionId = spec.id;InstallMissionSentry(actor);
       actor.missionEncounter=id;
       if(id==="surface"){
-        actor.scriptFireSector=OPENING.surfaceSector;
+        if(!spec.advance)actor.scriptFireSector=OPENING.surfaceSector;
         actor.scriptTrackPlayer=true;
         actor.missionFireGroup=spec.team;
         actor.yaw=Math.atan2(spec.x+62,spec.z-75);
       }
+      if(id==="approach")actor.scriptFireSector=R.approachFireSector;
       actor.missionReserve=!!spec.reserve;
       actor.missionReleaseDelayS=spec.releaseDelayS||0;
       if(["village","melee"].includes(id)){actor.missionDormant=true;actor.scriptedNoncombatant=true;}
@@ -526,13 +527,13 @@ export class FirstLevelMissionRuntime {
       actor.holdZone = { id: `Mission_${spec.id}`, x: spec.x, z: spec.z, radius: spec.hold ? 0.4 : 2 };
       if(!spec.hold && !WEAPONS[spec.weapon || "Type38"]?.emplaced){
         actor.tacticalRadiusM = id === "surface" ? R.surfaceTacticalRadiusM
-          : id === "intrusion" ? R.intrusionTacticalRadiusM : R.infantryTacticalRadiusM;
+          : id === "intrusion" ? R.intrusionTacticalRadiusM : id === "approach" ? R.approachTacticalRadiusM : R.infantryTacticalRadiusM;
       }
       // Emplaced gunners keep their firing position: the hide/peek side step is all they may do.
       // Everyone else may take cover inside their zone plus the ordinary slack.
       actor.scriptCoverSlackM = spec.hold ? R.defendHoldFixedSlackM : R.defendCoverSlackM;
       if(id==="surface"){
-        actor.scriptAccuracyScale=actor.missionAccuracyScale=R.openingSurfaceAccuracyScale;
+        actor.scriptAccuracyScale=actor.missionAccuracyScale=spec.advance?R.approachAccuracyScale:R.openingSurfaceAccuracyScale;
         actor.scriptFireIntervalScale=actor.missionFireIntervalScale=R.openingSurfaceFireIntervalScale;
         if(!spec.hold){actor.holdZone.radius=R.openingSurfaceRifleRadiusM;actor.scriptCoverSlackM=R.openingSurfaceRifleCoverSlackM;}
       }
@@ -541,12 +542,17 @@ export class FirstLevelMissionRuntime {
       // gunners on an emplacement never throw, they are married to the gun.
       if (!spec.hold && !WEAPONS[spec.weapon || "Type38"]?.emplaced) actor.grenades = R.enemyGrenades;
       if(id==="intrusion")actor.grenades=OPENING.intruderGrenades;
-      if(id==="surface")actor.grenades=R.openingSurfaceGrenades;
+      if(id==="surface"&&!spec.hold)actor.grenades=R.openingSurfaceGrenades;
       if (spec.hold) {actor.scriptDefensive=true;actor.scriptSuppressible=true;}
       if (id === "front" && !spec.hold) actor.missionAssault = this.MakeAssault(spec.x, spec.z);
       // Supporting platoons keep their spacing and depth. They remain live combatants
       // while the original line and casualty replacements make the close assault.
       if(spec.reserve && actor.missionAssault)actor.missionAssault.points=FrontReserveLane(spec.x,spec.z);
+      if(MISSION_TACTICS[spec.id]?.near){
+        actor.missionTacticalRadiusM=actor.tacticalRadiusM;
+        actor.tacticalRadiusM=0;
+        actor.scriptDefensive=true;actor.scriptSuppressible=true;
+      }
       this.enemies.set(spec.id, actor);
       return actor;
   }
@@ -812,7 +818,7 @@ export class FirstLevelMissionRuntime {
         `MissionSupply${spec.id}`, spec, () => this.Text("supply"),
         () => !this.carry.Active && !this.EmptyHands,
         () => {
-        this.GiveSupply({clips:4,grenades:2,bandages:1});
+        this.GiveSupply({clips:spec.id==="Front"?R.frontSupplyClips:4,grenades:2,bandages:1});
         if(spec.id==="Front")this.emplacement.Resupply(this.gunId,3);
         return true;
       },
@@ -1195,7 +1201,20 @@ export class FirstLevelMissionRuntime {
         ((id.startsWith("Air") || id.startsWith("Retreat")) && stage.startsWith("Retreat"))) continue;
       state.distance += Distance(actor.position, state.last);
       state.last = { x: actor.position.x, z: actor.position.z };
+      // Local attacks start as the marching player reaches each sector, not offscreen at stage entry.
+      if(plan.near && !state.released){
+        if(!this.Near(plan.near,plan.nearM))continue;
+        state.released=true;
+        actor.tacticalRadiusM=actor.missionTacticalRadiusM;actor.scriptDefensive=false;
+      }
       state.elapsed += dt;
+      // Let shared AI finish throws, fight/charge visible close threats and search after the final bound.
+      if(plan.near && (actor.actor?.pendingGrenadeThrow || actor.actor?.characterRig?.infantry?.IsThrowing() || actor.state==="grenade" ||
+        (actor.targetVisible && actor.target && Distance(actor.position,actor.target.position)<R.approachContactM) ||
+        state.index>=plan.points.length)){
+        if(state.mode!=="contact"){actor.tacticalRadiusM=R.approachContactRadiusM;this.Defend(actor,actor.position);state.mode="contact";}
+        continue;
+      }
       const target = plan.points[state.index];
       if (!target || state.elapsed < plan.delay || actor.suppression >= R.tacticalSuppression) {
         const suppressed=actor.suppression>=R.tacticalSuppression;
@@ -1210,11 +1229,11 @@ export class FirstLevelMissionRuntime {
         state.shelter={...target};
         state.mode = "cover";
         state.hold += dt;
-        if (state.hold >= R.tacticalHoldSeconds) { state.index++; state.hold = 0; }
+        if (state.hold >= (plan.near?R.approachBoundHoldS:R.tacticalHoldSeconds)) { state.index++; state.hold = 0; }
       } else {
         state.mode = "advance";
         this.ai.SetStance(actor, 0, .4, true);
-        this.MoveActor(actor, target, R.tacticalMoveMps);
+        this.MoveActor(actor, target, plan.near?R.approachAdvanceMps:R.tacticalMoveMps);
         state.movingSeconds += dt;
       }
     }

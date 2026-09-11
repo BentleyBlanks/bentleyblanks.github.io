@@ -1,5 +1,5 @@
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
-import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_APPROACH_ENEMIES } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_APPROACH_ENEMIES, APPROACH_TACTICS } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
@@ -232,6 +232,7 @@ export const MISSION_GUIDANCE = Object.freeze({
 });
 // Front riflemen no longer use point tactics: they bound between FRONT_ASSAULT lines (runtime UpdateAssault).
 export const MISSION_TACTICS = Object.freeze({
+  ...APPROACH_TACTICS,
   ...Object.fromEntries(Object.entries(OPENING.intruderRoutes).map(([id,points],i)=>[id,{delay:i*2,points}])),
   CourtyardPursuerA: { delay: 1, points: [{x:86,z:37},{x:62,z:40},{x:53,z:38}] },
   CourtyardPursuerB: { delay: 12, points: [{x:89,z:39},{x:66,z:43},{x:59,z:40}] },

@@ -60,6 +60,7 @@ export const OPENING = Object.freeze({
   zhouWoundThreshold:95,
   zhouExitRadiusM:.65,
   zhouShell: {from:{x:18,z:-210},height:30,flight:1.8,radius:3,damage:55,offsetX:1.1},
+  // Finite attacking sections on both sides of the march, staggered by local contact.
   surface: [
     {id:"FlankLockGunner",x:-35,z:58,weapon:"Type11",hold:true,team:"Flank"},
     {id:"FlankLockA",x:-33,z:49,team:"Flank",firePhaseS:1.1},
@@ -67,6 +68,12 @@ export const OPENING = Object.freeze({
     {id:"RailLockGunner",x:-93,z:43,weapon:"Type11",hold:true,team:"Rail",firePhaseS:3.8},
     {id:"RailLockA",x:-96,z:34,team:"Rail",firePhaseS:4.9},
     {id:"RailLockB",x:-89,z:30,team:"Rail",firePhaseS:6},
+    {id:"FlankAdvanceA",advance:true,x:-24,z:43,team:"Flank",bayonet:true},
+    {id:"FlankAdvanceB",advance:true,x:-21,z:37,team:"Flank",bayonet:true},
+    {id:"FlankAdvanceC",advance:true,x:-17,z:47,team:"Flank",bayonet:true},
+    {id:"RailAdvanceA",advance:true,x:-70,z:46,team:"Rail",bayonet:true},
+    {id:"RailAdvanceB",advance:true,x:-70,z:39,team:"Rail",bayonet:true},
+    {id:"RailAdvanceC",advance:true,x:-69,z:34,team:"Rail",bayonet:true},
   ],
   intruders: [
     {id:"TrenchIntruderA",x:-38,z:15,weapon:"Type38",bayonet:true},
@@ -74,7 +81,7 @@ export const OPENING = Object.freeze({
     {id:"TrenchIntruderC",x:-27,z:8,weapon:"Type38",bayonet:true},
     {id:"TrenchIntruderD",x:-22,z:8,weapon:"Type38",bayonet:true},
   ],
-  intruderGrenades:0,
+  intruderGrenades:1,
   intruderRoutes: {
     TrenchIntruderA:[{x:-37,z:18}],
     TrenchIntruderB:[{x:-37,z:8},{x:-37,z:13}],

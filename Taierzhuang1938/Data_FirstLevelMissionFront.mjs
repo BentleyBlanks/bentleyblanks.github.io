@@ -91,7 +91,7 @@ export const FRONT_RIFLEMEN=Object.freeze([
 ]);
 /** Every man the front stages put on this field. The cover rows never build on one of these
  *  firing positions - a bank standing on a man is a man standing in a bank. */
-// Six of the finite opening force cover the communication-trench approach;
+// The approach sections cover the communication trench;
 // the remaining twelve enter the front battle when the player reaches its last bend.
 export const FRONT_FIELD_MEN=Object.freeze([...FRONT_RIFLEMEN]);
 // Five platoons spread behind the first line. Every man is spawned at Support entry;
@@ -170,12 +170,30 @@ export function FrontAssaultLaneCuts(x,z,w,d,slackM=.4){
   }
   return false;
 }
+// Three successive crossfires: west, east and the forward bend. All are finite actors.
 export const FRONT_APPROACH_ENEMIES=[
-  {id:"ApproachWestGunner",x:-68,z:-17,weapon:"Type11",hold:true},
-  {id:"ApproachWestA",x:-61,z:-27},{id:"ApproachWestB",x:-74,z:-35},
-  {id:"ApproachEastGunner",x:19,z:-75,weapon:"Type11",hold:true},
-  {id:"ApproachEastA",x:22,z:-88},{id:"ApproachEastB",x:31,z:-98},
+  {id:"ApproachWestGunner",x:-68,z:-17,weapon:"Type11",hold:true,team:"West"},
+  ...[[-61,-27],[-74,-35],[-64,-36],[-70,-42],[-58,-40]].map(([x,z],i)=>
+    ({id:"ApproachWest"+"ABCDE"[i],x,z,team:"West",bayonet:true})),
+  {id:"ApproachEastGunner",x:2,z:-39,weapon:"Type11",hold:true,team:"East"},
+  ...[[5,-48],[0,-56],[8,-59],[5,-67],[9,-68]].map(([x,z],i)=>
+    ({id:"ApproachEast"+"ABCDE"[i],x,z,team:"East",bayonet:true})),
+  {id:"ApproachBendGunner",x:19,z:-88,weapon:"Type11",hold:true,team:"Bend"},
+  ...[[22,-95],[27,-103],[20,-110],[29,-105],[17,-108]].map(([x,z],i)=>
+    ({id:"ApproachBend"+i,x,z,team:"Bend",bayonet:true})),
 ];
+// Bounded approach routes end at the trench lip; shared tactical AI closes on observed targets.
+export const APPROACH_TACTICS=Object.fromEntries([
+  ...OPENING.surface.filter(s=>s.advance).map((s,i)=>[s.id,{
+    near:{x:-52,z:50},nearM:18,delay:(i%3)*2,
+    points:[{x:s.x+(s.team==="Rail"?8:-6),z:s.z},{x:s.x+(s.team==="Rail"?14:-12),z:s.z}],
+  }]),
+  ...FRONT_APPROACH_ENEMIES.filter(s=>!s.hold).map((s,i)=>[s.id,{
+    near:s.team==="West"?{x:-24,z:-38}:s.team==="East"?{x:-24,z:-63}:{x:-8,z:-100},
+    nearM:18,delay:(i%5)*1.5,
+    points:[{x:s.x+(s.team==="West"?9:-9),z:s.z},{x:s.x+(s.team==="West"?17:-18),z:s.z}],
+  }]),
+]);
 export const FRONT_DEFENDERS=[
   [-54,15,"HanYang"],[-49,6,"Zb26"],[-52,-3,"HanYang"],[-43,-19,"HanYang"],
   [-21,-54,"HanYang"],[-13,-63,"Zb26"],[-19,-70,"HanYang"],

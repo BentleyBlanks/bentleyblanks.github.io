@@ -741,13 +741,19 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
 console.log("ok receiving-food release follows the source clock and survives pause/resume");
 
 {
-  assert.equal(MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.approach.length+MISSION_ENCOUNTERS.surface.length+MISSION_ENCOUNTERS.intrusion.length+MISSION_ENCOUNTERS.tank.length,32,
-    "32 finite opening/front enemies; no replacement waves");
-  assert.equal(MISSION_ENCOUNTERS.approach.length,6,"the communication-trench approach has a finite enemy screen");
+  assert.equal(MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.approach.length+MISSION_ENCOUNTERS.surface.length+MISSION_ENCOUNTERS.intrusion.length+MISSION_ENCOUNTERS.tank.length,R.openingEnemyBudget,
+    "finite opening/front roster agrees with budget; no replacement waves");
+  assert.equal(MISSION_ENCOUNTERS.approach.length,18,"the communication-trench approach has a finite enemy screen");
+  const attackers=[...MISSION_ENCOUNTERS.surface.filter(s=>s.advance),...MISSION_ENCOUNTERS.approach.filter(s=>!s.hold)];
+  assert.equal(new Set(attackers.map(s=>s.id)).size,21,"each advancing actor has a persistent unique identity");
+  assert.equal(new Set(MISSION_ENCOUNTERS.approach.map(s=>s.team)).size,3,"three independent attack sectors keep grenade cooldowns per squad");
+  assert.ok(attackers.every(s=>MISSION_TACTICS[s.id]?.near && MISSION_TACTICS[s.id].points.length>=2),"mobile attackers have local activation and physical approach bounds");
+  assert.ok(R.openingSurfaceGrenades>0 && R.enemyGrenades>0 && OPENING.intruderGrenades>0,"entry and approach riflemen carry finite grenades");
+  assert.ok(R.approachContactM<26 && R.approachTacticalRadiusM>=R.approachContactM,"close contact hands movement back to shared combat and grenade AI");
   assert.ok(MISSION_ENCOUNTERS.approach.some(actor=>actor.z>-40)&&MISSION_ENCOUNTERS.approach.some(actor=>actor.z<-60),"both halves of the approach retain actual fire teams");
   assert.ok(R.frontEngageDistanceM>OPENING.frontReachRadiusM&&R.frontEngageDistanceM<35,"the finite main assault begins at the last trench bend, before the player reaches the firing post");
   assert.equal(new Set(Object.values(MISSION_ENCOUNTERS).flat().map(spec=>spec.id)).size,Object.values(MISSION_ENCOUNTERS).flat().length);
-  assert.equal(MISSION_ENCOUNTERS.surface.length,6,"two surface sections provide actual enemy fire");
+  assert.equal(MISSION_ENCOUNTERS.surface.length,12,"two surface sections provide actual enemy fire");
   assert.ok(MISSION_STAGES.find(s=>s.id==="Support").requirements.includes("frontRifleDefense"));
   assert.ok(FIRST_LEVEL_MISSION_PHASE.whitebox.actorCapacity>=R.openingEnemyBudget+40,"small graphics scale leaves capacity for real friendlies and dormant village");
   for(const point of FRONT_BREACHES){

@@ -56,9 +56,10 @@ async function Drive(label,points,{fight=false,until=null,seconds=120}={}){
     trace.push({label,...result});
     combatTrace.push(await page.evaluate(()=>{
       const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
-      return {time:r.time,actors:g.ai.soldiers.filter(a=>a.alive&&(a.side==='nra'||['surface','intrusion'].includes(a.missionEncounter)))
+      return {time:r.time,combat:{...g.ai.stats},actors:g.ai.soldiers.filter(a=>a.alive&&(a.side==='nra'||['surface','intrusion','approach'].includes(a.missionEncounter)))
         .map(a=>({id:a.id,missionId:a.missionId,side:a.side,encounter:a.missionEncounter,
           p:a.position.toArray(),state:a.state,health:a.health,stance:a.stance,ready:a.missionTrainReady,
+          grenades:a.grenades,tactic:a.missionTactic?{...a.missionTactic}:null,
           unarmed:a.unarmed,noncombatant:!!a.scriptedNoncombatant,contact:!!a.missionContactPost,
           cover:a.cover?.id,target:a.target?.id,targetSide:a.target?.ref?.side,visible:a.targetVisible,
           shots:a.fireSequence,lastFire:a.lastFire,aimError:a.shooting?.errorRad}))};
@@ -115,8 +116,8 @@ try{
         const eye=g.player.EyePosition;
         const stage=g.Debug.FirstLevelMissionRuntime().flow.stage.id;
         const limit=stage==="TrenchEntry"?28:stage==="Support"&&!g.Debug.FirstLevelMissionRuntime().Has("frontReached")?35:85;
-        return g.ai.soldiers.filter(a=>a.side==="ija"&&a.alive&&!a.scriptedNoncombatant&&a.position.distanceTo(eye)<limit&&
-          (stage!=="TrenchEntry"||a.missionEncounter==="intrusion"))
+        return g.ai.soldiers.filter(a=>a.side==="ija"&&a.alive&&!a.scriptedNoncombatant&&a.position.distanceTo(eye)<limit &&
+          (stage!=="TrenchEntry" || a.missionEncounter==="intrusion" || (!a.scriptDefensive && a.position.distanceTo(eye)<20)))
           .sort((a,b)=>a.position.distanceToSquared(eye)-b.position.distanceToSquared(eye)).find(a=>{
             const to=a.position.clone();to.y+=a.stance===2?.3:a.stance===1?.85:1.2;
             const direction=to.sub(eye),length=direction.length(),hit=g.battlefield.Raycast(eye,direction.normalize(),length,{terrain:true});
@@ -294,6 +295,13 @@ try{
     assert.ok(release.release&&release.backtrackM<.6,'after clearing the trench the leader never turns back into his squad');
   }
   if(from==="Train"){
+    const mobile=OPENING.surface.filter(s=>s.advance);
+    for(const team of new Set(mobile.map(s=>s.team))) {
+      const ids=new Set(mobile.filter(s=>s.team===team).map(s=>s.id));
+      const movers=new Set(combatTrace.flatMap(row=>row.actors.filter(a=>ids.has(a.missionId)&&a.tactic?.distance>3).map(a=>a.missionId)));
+      assert.ok(movers.size>=2,`${team}: multiple attackers physically advance during the normal march`);
+    }
+    assert.ok(combatTrace.some(row=>row.combat.grenades>0),"enemy grenades are physically thrown during normal opening combat");
     assert.ok(!final.log.some(e=>e.kind==="debugJump"));
     assert.equal(final.opening.playerCar,OPENING.derailCar,"the player carriage is the physical wreck");
     const pressure=final.opening.escapePressure;
