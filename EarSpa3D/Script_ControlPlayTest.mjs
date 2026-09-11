@@ -43,7 +43,12 @@ try{for(const [width,height,touch] of [[1000,900,false],[320,568,true]]){
   await page.screenshot({path:path.join(here,'_dev/Shot_ControlFixedRotation_'+width+'.png')});
   await Start();
   await Rotate(0,'scoop',s=>s.facing<-.8);let c=await Hold(0);Check(!c.aligned&&c.physics.anchors===9&&!c.physics.detached,'back of the spoon cannot loosen wax');await page.screenshot({path:path.join(here,'_dev/Shot_ControlWrong_'+width+'.png')});await Input('up');await Step(60);
-  await Rotate(0,'scoop',s=>s.facing>.8);const heldRotation=(await Probe()).rendering.toolRotation;c=await Hold(0);Check((await Probe()).rendering.toolRotation.every((v,i)=>Math.abs(v-heldRotation[i])<1e-8),'force and wax detachment preserve spoon rotation');Check(c.aligned&&c.physics.detached,'open spoon face lifts the same wax');await Input('up');await Step(230);Check((await Probe()).harvest.some(c=>c.id===0),'proper spoon force collects after landing');
+  await Rotate(0,'scoop',s=>s.facing>.4&&s.facing<.6);const heldRotation=(await Probe()).rendering.toolRotation;c=await Hold(0,18);
+  const wallNormal=await page.evaluate(()=>__EarSpaDebug.view.chunks[0].normal.toArray());
+  Check(c.aligned&&c.forceDirection.reduce((sum,v,i)=>sum+v*wallNormal[i],0)>.999999,'holding an oblique spoon applies wall-normal force without a drag');
+  report.spoonScrape={normal:wallNormal,direction:c.forceDirection,rotation:heldRotation};
+  await page.screenshot({path:path.join(here,'_dev/Shot_ControlNormalScrape_'+width+'.png')});
+  await Step(92);c=(await Probe()).targets[0];Check((await Probe()).rendering.toolRotation.every((v,i)=>Math.abs(v-heldRotation[i])<1e-8),'force and wax detachment preserve spoon rotation');Check(c.aligned&&c.physics.detached,'wall-normal spoon force lifts the same wax');await Input('up');await Step(230);Check((await Probe()).harvest.some(c=>c.id===0),'proper spoon force collects after landing');
   const next=(await Probe()).targets[1];if(touch){await Input('down',next);await Step(1);await Input('up');}else{await page.mouse.move(next.screen.x,next.screen.y);await Step(2);}Check((await Probe()).rendering.toolRotation.every((v,i)=>Math.abs(v-heldRotation[i])<1e-8),'return from automatic delivery restores player spoon rotation');
   await Start();await page.locator('[data-tool="tweezers"]').click();await Rotate(3,'tweezers',s=>s.jawTilt>.85);c=await Hold(3);Check(!c.aligned&&c.physics.anchors===9,'misoriented forceps cannot grip or fracture');await Input('up');await Step(60);
   await Rotate(3,'tweezers',s=>s.jawTilt<.12);c=await Hold(3,125);Check((await Probe()).fractures===1,'properly aligned jaws contact both sides and load brittle wax');await Input('up');

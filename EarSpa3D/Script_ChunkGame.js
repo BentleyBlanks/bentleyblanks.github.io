@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { ToolIcon } from './Script_ToolIcons.mjs?v=ear014-ui-20260912';
 import { CreateCore } from './Script_Core.js?v=ear011-20260911';
-import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear015-day-two-perf-20260912';
+import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear016-normal-scrape-20260912';
 import { CreateAudio } from './Script_Audio.js?v=ear012-size-audio-20260912';
 import { LandingSound } from './Script_LandingSound.mjs?v=ear012-size-audio-20260912';
 import { CreateShop } from './Script_Shop.js?v=ear011-20260911';
@@ -10,7 +10,7 @@ import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear011-20260911';
 
 import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear014-ui-20260912';
 
-const VERSION = 'ear015-day-two-perf-20260912';
+const VERSION = 'ear016-normal-scrape-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const TOOL_IDS = { scoop: 'earPickBamboo', tweezers: 'earForceps', drops: 'earDrops',brush:'softBrush',suction:'microSuction',feather:'gooseFeather' };
 const TYPE_NAMES = { dry: '干性薄层', wet: '黏性耳垢', impacted: '紧实硬结' };
@@ -45,7 +45,7 @@ export async function Start() {
       <label class="slider-row">背景音乐<input id="volume-bgm" type="range" min="0" max="1" step="0.01" value="0.16"></label>
       <label class="slider-row">轻微震动<input id="haptics" type="checkbox" checked></label>
 
-      <details id="operation-guide"><summary>操作指南</summary><p>鼠标右键按住连续旋转，松开停止，工具留在接触点；左键按住沿当前方向撬起或夹起。手机切换转向／施力，分别单指按住。工具遇到内壁会受阻。点放大镜切换深浅视野，短耳勺工作长度有限；深处用长镊，硬结先滴液软化。松脱后仍在工具上，松手由工具托送到耳外，再轻放入盘。硬结先滴液等待约 3 秒。干薄片用耳勺托边，黏块先松边再用镊子夹；硬拉会痛或碎裂。碎屑可用耳勺清理，也可买毛刷轻扫或用吸引管吸走湿碎屑。中途松手会放回。</p><p>键盘：1/2/3 切换工具；画面获得焦点后，左右方向键选块，空格抓住，Q/E 旋转方向，空格松手，Esc 取消。</p></details>
+      <details id="operation-guide"><summary>操作指南</summary><p>鼠标右键按住连续旋转，松开停止，工具留在接触点；左键持续按住，耳勺沿接近垂直于耳道壁的方向把耳垢刮离，镊子沿夹持方向夹起。手机切换转向／施力，分别单指按住。工具遇到内壁会受阻。点放大镜切换深浅视野，短耳勺工作长度有限；深处用长镊，硬结先滴液软化。松脱后仍在工具上，松手由工具托送到耳外，再轻放入盘。硬结先滴液等待约 3 秒。干薄片用耳勺托边，黏块先松边再用镊子夹；硬拉会痛或碎裂。碎屑可用耳勺清理，也可买毛刷轻扫或用吸引管吸走湿碎屑。中途松手会放回。</p><p>键盘：1/2/3 切换工具；画面获得焦点后，左右方向键选块，空格抓住，Q/E 旋转方向，空格松手，Esc 取消。</p></details>
     </dialog>`;
   document.body.append(app);
   app.querySelector('.spa-brand').insertAdjacentHTML('beforeend','<div class="session-status"></div>');

@@ -3,7 +3,7 @@ import { BuildEar, MakeRng } from './Script_EarAnatomy.js?v=ear012-outer-2026091
 import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
 import { PALETTE as P } from './Data_Palette.mjs?v=ear012-outer-20260911';
 
-import {InstrumentContact,IsFeatherDebris} from './Script_InstrumentInteraction.mjs?v=ear012-controls-20260912';
+import {InstrumentContact,IsFeatherDebris} from './Script_InstrumentInteraction.mjs?v=ear016-normal-scrape-20260912';
 import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody } from './Script_PeelPhysics.mjs?v=ear012-outer-20260911';
 import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
 import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear012-outer-20260911';
