@@ -14,7 +14,7 @@ const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 
 // 封闭耳道、真实接触点与实体收集盘共用毫米世界；镜头在取出时连续后退。
 export async function CreateImmersiveScene({ core }) {
-  const asset = await new GLTFLoader().loadAsync(new URL('./Models/Model_ImmersiveEar.glb?v=ear012-outer-20260911', import.meta.url).href);
+  const asset = await new GLTFLoader().loadAsync(new URL('./Models/Model_ImmersiveEar.glb?v=ear015-grip-20260912', import.meta.url).href);
   asset.scene.updateMatrixWorld(true);
   const materials=await CreateTactileMaterials(core.renderer);
   const profile=await (await fetch(new URL('./Data_CanalProfile.json?v=ear012-outer-20260911',import.meta.url))).json();

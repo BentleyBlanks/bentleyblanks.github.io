@@ -1,5 +1,15 @@
 # EarSpa3D · ear009 写实器具与材质（历史记录）
 
+## ear015 耳勺握柄修复（2026-09-12）
+
+耳勺原握柄由半径 .24 mm 的杆身和带环槽的套筒重叠组成，槽底穿入杆身；两层使用不同的纵向 UV，造成木纹横向断带、金属反射边缘交错。耳勺现有基础、精修、典藏款及基础别名统一改成一层连续网格；圆周接缝复制 U=0/1 顶点，纵向 UV 按实际毫米距离展开。木柄抛光，金属槽深由 .025 mm 减至 .003/.004 mm。保留 20 mm 总长、工作杆段、最大外径及原 PBR 图集。
+
+- 共用几何定义：`Script_ScoopGripGeometry.py`；原 `Script_BuildTactileTools.py` 已接入，重新建模不会恢复重叠套筒。
+- `python EarSpa3D/Script_RepairScoopGrip.py` 只替换 GLB 内四个耳勺杆身 primitive，保留其余节点、材质和二进制数据；重复执行不追加数据。
+- 在独立后台 Blender 中执行同一脚本可另存源工程：`C:/Users/Bentl/OneDrive/AI/Models/Blender/EarSpa3D/ScoopGripRepair/Model_ScoopGripRepair.blend`。该工程从修复后的运行时 GLB 导入，不回导覆盖其他模型。
+- `node EarSpa3D/Script_ScoopGripTest.mjs --url=http://127.0.0.1:8098/EarSpa3D/` 检查 1148 条横截射线均仅穿过一层表面的前后两面、UV 连续性、三种已有等级及木/玉皮肤的旋转特写、页面错误与渲染预算。截图与报告留在 `_dev/`。
+- 本修复修改既有几何和 UV，没有生成新图片。
+
 当前 ear010 已替换静态侧脸、扩展为六工具与 48 组接触审计，见 [Data_DirectionalAssets.md](./Data_DirectionalAssets.md)。下文记录 ear009 来源，不代表当前行为。
 
 用户最后明确选择全套写实拟物方向，覆盖此前温馨治愈 UI 方向。固定迭代顺序仍是接触受力、材质与手法、松脱/碎裂、收集反馈、满意度经营。

@@ -57,8 +57,15 @@ def Tools(tier,edition):
     for j in range(cols):
         k=(rows-1)*cols+j;n=(rows-1)*cols+(j+1)%cols;faces.append((k,k+rows*cols,n+rows*cols,n))
     Mesh('Model_ScoopHead'+suffix,verts,faces,handle if tier==0 else steel)
-    shaft=Lathe('Model_ScoopShaft'+suffix,[(.4,.08),(.7,.10),(3,.085),(8,.13),(10,.24),(19.8,.24),(20,.19),(20,0)],handle)
-    shaft2=Grip('Model_ScoopGripTemp',10,19.8,.24,handle,tier);Join(shaft,[shaft2])
+    import sys
+    if str(ROOT) not in sys.path:sys.path.insert(0,str(ROOT))
+    from Script_ScoopGripGeometry import ScoopGripGeometry
+    positions,normals,uvs,faces=ScoopGripGeometry(tier)
+    shaft=Mesh('Model_ScoopShaft'+suffix,positions,faces,handle)
+    uv=shaft.data.uv_layers.new(name='UVMap')
+    for loop in shaft.data.loops:
+        u,v=uvs[loop.vertex_index];uv.data[loop.index].uv=(u,1-v)
+    shaft.data.normals_split_custom_set_from_vertices([V(n) for n in normals])
     for side,label in [(-1,'Left'),(1,'Right')]:
         # 镊臂由扁弹片收束到圆钝夹尖，前端细齿是几何，不是贴一张黑条。
         prof=[(0,.048),(.08,.057),(.25,.060),(.7,.058),(1.6,.055),(3,.077),(6,.12),(11,.18),(16.8,.13),(17,.04)]
