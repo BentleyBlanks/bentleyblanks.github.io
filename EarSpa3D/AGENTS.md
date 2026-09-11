@@ -7,12 +7,13 @@
 
 `index.html` → `Script_ChunkGame.js` + `Script_ImmersiveScene.js` + `Script_PeelPhysics.mjs` + `Style_Chunk.css`。
 以契约 §0 的拟物采耳与经营重设计为当前玩法。写实器具、工具接触、独立小铺与渲染资产见 [Data_TactileAssets.md](./Data_TactileAssets.md)。原 `Script_Main/Ui/Hand/Wax` 保留为旧玩法参考，
-当前入口不再使用它们。核心目标固定为真实接触、材质差异、完整取出或碎片清理、落盘/吸入、满意度经营，手机一指完成。
+当前入口不再使用它们。ear010 的方向碎裂、羽毛微屑、限时服务及源工程见 [Data_DirectionalAssets.md](./Data_DirectionalAssets.md)。核心目标固定为真实接触、材质差异、完整取出或碎片清理、落盘/吸入、满意度经营，手机通过转向／施力模式用一指完成。
 
 实际交互回归：
 ```powershell
 node EarSpa3D/Script_PeelPhysicsTest.mjs
 node EarSpa3D/Script_EconomyTest.mjs
+node EarSpa3D/Script_DirectionalPhysicsTest.mjs
 node EarSpa3D/Script_TactileDetailTest.mjs
 node EarSpa3D/Script_TactilePlayTest.mjs
 node EarSpa3D/Script_TactilePlayTest.mjs --touch

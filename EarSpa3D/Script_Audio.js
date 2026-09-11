@@ -46,7 +46,7 @@ export function CreateAudio() {
   const PROJECT_ROOT = new URL("./", import.meta.url);
   const AssetUrl = (relativePath) => {
     const url = new URL(relativePath, PROJECT_ROOT);
-    url.searchParams.set('v', new URL(import.meta.url).searchParams.get('v') || 'ear009-20260911');
+    url.searchParams.set('v', new URL(import.meta.url).searchParams.get('v') || 'ear010-20260911');
     return url.href;
   };
   const MANIFEST_URL = AssetUrl("Audio/Data_AudioManifest.json");

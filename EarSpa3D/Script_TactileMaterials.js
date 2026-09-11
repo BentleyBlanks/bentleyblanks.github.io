@@ -3,7 +3,7 @@ import * as THREE from 'three';
 export async function CreateTactileMaterials(renderer) {
   const loader=new THREE.TextureLoader();
   async function Atlas(file){
-    const atlas=await loader.loadAsync(new URL('./Textures/'+file+'?v=ear009-20260911',import.meta.url).href),image=atlas.image;
+    const atlas=await loader.loadAsync(new URL('./Textures/'+file+'?v=ear010-20260911',import.meta.url).href),image=atlas.image;
     const maps={};
     for(const [name,x,y] of [['map',0,0],['normalMap',1,0],['roughnessMap',0,1],['aoMap',1,1]]){
       const canvas=document.createElement('canvas');canvas.width=Math.floor(image.width/2);canvas.height=Math.floor(image.height/2);
@@ -16,14 +16,14 @@ export async function CreateTactileMaterials(renderer) {
   function GripMaterial(material,skin='classic',level=1){
     const handle=/ToolHandle/.test(material.name),steel=/ToolSteel/.test(material.name);if(!handle&&!steel)return;
     const id=handle&&skin==='jade'?2:handle&&(skin==='walnut'||level===1)?1:0;
-    Object.assign(material,grips[id]);material.normalScale.set(.12,.12);material.aoMapIntensity=.5;material.color.setRGB(id===1&&skin==='classic'?1.6:1,id===1&&skin==='classic'?1.5:1,id===1&&skin==='classic'?1.3:1);
-    material.roughness=id===2?.85:id===1?1:Math.max(.24,.95-(level-1)*.16);material.metalness=id===0?.92:0;if(material.isMeshPhysicalMaterial){material.clearcoat=id===2?.7:id===1?.1:.2;material.clearcoatRoughness=.12;}material.needsUpdate=true;
+    Object.assign(material,grips[id]);material.normalScale.set(id===0?.055:.12,id===0?.24:.12);material.aoMapIntensity=.5;material.color.setRGB(id===1&&skin==='classic'?1.6:1,id===1&&skin==='classic'?1.5:1,id===1&&skin==='classic'?1.3:1);
+    material.roughness=id===2?.85:id===1?1:Math.max(.20,.68-(level-1)*.10);material.metalness=id===0?1:0;if(material.isMeshPhysicalMaterial){material.clearcoat=id===2?.7:id===1?.1:.2;material.clearcoatRoughness=.12;material.anisotropy=id===0?.58:0;material.anisotropyRotation=Math.PI/2;}if(id===0){const floor=Math.max(.19,.36-(level-1)*.032);material.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=max(roughnessFactor,'+floor.toFixed(3)+');');};material.customProgramCacheKey=()=>'InstrumentBrushedSteel'+level;}material.needsUpdate=true;
   }
   const marks=Array.from({length:9},()=>new THREE.Vector4(0,0,0,0)),wet=Array.from({length:9},()=>new THREE.Vector4(0,0,0,0));
   const state={sss:{value:.18},light:{value:new THREE.Vector3()},power:{value:0},marks:{value:marks},wet:{value:wet}};
   function Skin({outer=false}={}){
     const maps=Object.fromEntries(Object.entries(skin).map(([k,t])=>{const c=t.clone();c.repeat.set(outer?7:4,outer?9:5);return[k,c];}));
-    const material=new THREE.MeshPhysicalMaterial({...maps,color:new THREE.Color().setRGB(1.04,1.15,1.19),roughness:1,metalness:0,normalScale:new THREE.Vector2(.27,.27),aoMapIntensity:.65,clearcoat:1,clearcoatRoughness:.12,side:THREE.DoubleSide});
+    const material=new THREE.MeshPhysicalMaterial({...maps,color:new THREE.Color().setRGB(.99,1.20,1.23),roughness:1,metalness:0,normalScale:new THREE.Vector2(.12,.12),aoMapIntensity:.65,clearcoat:1,clearcoatRoughness:.12,side:THREE.DoubleSide});
     material.userData.kind='skin';
     material.onBeforeCompile=shader=>{
       shader.uniforms.earSss=state.sss;shader.uniforms.earLamp=state.light;shader.uniforms.earPower=state.power;shader.uniforms.earMarks=state.marks;shader.uniforms.earWet=state.wet;
@@ -47,7 +47,7 @@ export async function CreateTactileMaterials(renderer) {
     };
     material.customProgramCacheKey=()=>outer?'EarSkinOuterSss1':'EarSkinCanalSss1';return material;
   }
-  function Wax(type){return new THREE.MeshPhysicalMaterial({...wax,color:type==='impacted'?0xa18053:type==='wet'?0x9e7445:0xe6c899,roughness:type==='wet'?.65:1,normalScale:new THREE.Vector2(.38,.38),aoMapIntensity:.58,clearcoat:type==='wet'?.2:0,clearcoatRoughness:.13,metalness:0});}
+  function Wax(type){return new THREE.MeshPhysicalMaterial({...wax,color:type==='impacted'?0xcbb588:type==='wet'?0xd1bfa1:0xfff3d5,roughness:type==='wet'?.27:1,normalScale:new THREE.Vector2(.22,.22),aoMapIntensity:.58,clearcoat:type==='wet'?.8:0,clearcoatRoughness:.13,metalness:0});}
   function Update(chunks,lamp){
     state.light.value.copy(lamp.position);state.power.value=lamp.intensity;
     const originals=chunks.filter(c=>!c.fragment).slice(0,9);

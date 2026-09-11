@@ -10,7 +10,7 @@ let checks=0;const Check=(ok,message)=>{assert.ok(ok,message);checks++;};
 const storage=Storage({version:1,day:8,coins:220,reputation:12,toolLevels:{earForceps:3}});
 const shop=CreateShop({storage});
 Check(shop.day===8&&shop.coins===220&&shop.ToolLevel('earForceps')===3,'迁移旧存档保留进度');
-Check(shop.Snapshot().inventory.tools.join(',')==='scoop,tweezers,drops','迁移补齐初始工具');
+Check(shop.Snapshot().inventory.tools.join(',')==='scoop,tweezers,drops,feather','迁移补齐初始工具');
 Check(shop.BuyTool('brush').ok&&shop.coins===172,'购买工具扣款');
 Check(!shop.BuyTool('brush').ok&&shop.coins===172,'重复工具不收费');
 Check(shop.BuySkin('scoop','walnut').ok&&shop.coins===144,'购买指定工具皮肤');

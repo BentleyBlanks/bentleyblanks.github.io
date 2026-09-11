@@ -1,4 +1,6 @@
-# EarSpa3D · ear009 写实器具与材质
+# EarSpa3D · ear009 写实器具与材质（历史记录）
+
+当前 ear010 已替换静态侧脸、扩展为六工具与 48 组接触审计，见 [Data_DirectionalAssets.md](./Data_DirectionalAssets.md)。下文记录 ear009 来源，不代表当前行为。
 
 用户最后明确选择全套写实拟物方向，覆盖此前温馨治愈 UI 方向。固定迭代顺序仍是接触受力、材质与手法、松脱/碎裂、收集反馈、满意度经营。
 
@@ -35,7 +37,7 @@
 | `Textures/Texture_WaxPbrAtlas.png` | 1254 × 1254 | 不规则干蜡层的四通道 PBR |
 | `Textures/Texture_GripPbrAtlas.png` | 1254 × 1254 | 钢、胡桃木、玉质的四通道 PBR |
 | `Textures/Texture_InstrumentWorkbench.png` | 1536 × 1024 | 独立器具工作台页的写实陈列背景 |
-| `Textures/Texture_CustomerSideProfile.png` | 1536 × 1024 | 耳外镜头的虚构客人侧脸背景 |
+| 已移除的 Texture_CustomerSideProfile.png | 1536 × 1024 | ear009 曾使用；ear010 已删除运行时资产，改用实时头部 |
 
 图集四象限依次为左上颜色、右上法线、左下粗糙度、右下 AO。运行时通过 Canvas 解包，不生成二次派生文件；仅颜色通道走 sRGB，其余线性。握柄图集每象限再分钢、木、玉三条。程序材质和运行时参数的最终绑定在 `Script_TactileMaterials.js`；GLB 的基础材质供缺省加载，实际游戏材质由该模块控制。
 

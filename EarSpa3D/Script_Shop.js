@@ -15,7 +15,7 @@
 // 升级的效果必须**真的改变手感**，不能只是数字好看：工具等级会改写
 // comfortGain / crackRisk / idealSpeedRange，这些字段是耵聍判定真正读的。
 
-import { Clamp } from "./Script_Util.js?v=ear009-20260911";
+import { Clamp } from "./Script_Util.js?v=ear010-20260911";
 
 const STORAGE_KEY = "earspa3d.shop.v1";
 const MAX_TOOL_LEVEL = 5;
@@ -74,7 +74,7 @@ export function CreateShop({ seed = 20260910, storage = null } = {}) {
     totalEarned: 0,
     totalCustomers: 0,
     bestPayout: 0,
-    inventory:{tools:['scoop','tweezers','drops'],skins:{},equipped:{}},
+    inventory:{tools:['scoop','tweezers','drops','feather'],skins:{},equipped:{}},
     unlockedTools: null,     // Set，由外部灌入（EAR_TOOLS 的 id 列表）
     todayCustomers: [],      // [{ tierId, name, waxSeed, mood, done, paid }]
     todayIndex: 0,
@@ -108,7 +108,8 @@ export function CreateShop({ seed = 20260910, storage = null } = {}) {
       state.totalCustomers = data.totalCustomers ?? 0;
       state.bestPayout = data.bestPayout ?? 0;
       state.mood = data.mood || 'teaRoom';
-      state.inventory={tools:['scoop','tweezers','drops'],skins:{},equipped:{},...data.inventory};
+      state.inventory={tools:['scoop','tweezers','drops','feather'],skins:{},equipped:{},...data.inventory};
+      state.inventory.tools=[...new Set([...state.inventory.tools,'feather'])];
       return true;
     } catch { return false; }
   }
@@ -118,7 +119,7 @@ export function CreateShop({ seed = 20260910, storage = null } = {}) {
     state.coins = 60;
     state.reputation = 0;
     state.shopLevel = 1;
-    state.toolLevels = {};state.inventory={tools:['scoop','tweezers','drops'],skins:{},equipped:{}};
+    state.toolLevels = {};state.inventory={tools:['scoop','tweezers','drops','feather'],skins:{},equipped:{}};
     state.totalEarned = 0;
     state.totalCustomers = 0;
     state.bestPayout = 0;

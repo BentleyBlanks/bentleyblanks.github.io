@@ -13,12 +13,12 @@ function Rotate(q,v){const r=Product(Product(q,[...v,0]),[-q[0],-q[1],-q[2],q[3]
 function World(body,local){return Add(body.position,Rotate(body.rotation,local));}
 const PROFILES={dry:{stiffness:55,strength:.22,damping:2.8},wet:{stiffness:20,strength:.65,damping:2.0},impacted:{stiffness:105,strength:.37,damping:3.5}};
 
-export function CreatePeelBody({position,rotation,normal,size,type='dry'}){
+export function CreatePeelBody({position,rotation,normal,size,type='dry',footprint=null,anchorCount=5}){
   const body={position:[...position],rotation:[...rotation],origin:[...position],restRotation:[...rotation],normal:Unit(normal),size,type,
     velocity:[0,0,0],spin:[0,0,0],grip:null,detached:false,strain:0,force:0,contact:false,softness:0,steps:0};
-  body.anchors=Array.from({length:5},(_,i)=>{
-    const a=(i/5)*Math.PI*2;
-    const local=[Math.cos(a)*size*.63,Math.sin(a)*size*.7,0];
+  body.anchors=Array.from({length:anchorCount},(_,i)=>{
+    const a=(i/anchorCount)*Math.PI*2;
+    const local=[Math.cos(a)*(footprint?.[0]||size)*.63,Math.sin(a)*(footprint?.[1]||size)*.7,0];
     return{local,rest:World(body,local),alive:true,strain:0};
   });
   return body;
@@ -31,7 +31,7 @@ export function UngripPeelBody(body){body.grip=null;}
 export function GetGripPoint(body){return World(body,body.grip||[0,0,0]);}
 
 export function StepPeelBody(body,{target=null,softness=0,efficiency=1,supportRotation=null,adhesion=1,minAnchors=0}={},dt=1/60){
-  const count=Math.max(1,Math.ceil(Math.min(.05,dt)*120)),h=Math.min(.05,dt)/count;
+  const count=Math.max(1,Math.ceil(Math.min(.05,dt)*240)),h=Math.min(.05,dt)/count;
   const profile=PROFILES[body.type]||PROFILES.dry;
   const soft=Clamp(softness);
   body.softness=soft;
@@ -55,7 +55,7 @@ export function StepPeelBody(body,{target=null,softness=0,efficiency=1,supportRo
       // 裂开由局部受力决定：反复小幅空划、停在原处都不会积累“完成进度”。
       if(anchor.strain>1&&body.anchors.filter(a=>a.alive).length>minAnchors){anchor.alive=false;continue;}
       const speed=Add(body.velocity,Cross(body.spin,Sub(point,body.position)));
-      Apply(point,Sub(Mul(displacement,-profile.stiffness*(1-soft*.48)*adhesion),Mul(speed,profile.damping)));
+      Apply(point,Sub(Mul(displacement,-profile.stiffness*(1-soft*.48)*adhesion*5/body.anchors.length),Mul(speed,profile.damping*5/body.anchors.length)));
     }
     body.detached=body.anchors.every(a=>!a.alive);
     if(body.detached&&body.grip&&supportRotation){

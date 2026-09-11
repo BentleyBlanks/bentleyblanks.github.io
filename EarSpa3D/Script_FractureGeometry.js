@@ -25,9 +25,21 @@ export function CutGeometry(source,normal,constant,positive=true){
  geometry.dispose();
  const result=new THREE.BufferGeometry();result.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));result.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));result.setIndex(Array.from({length:positions.length/3},(_,i)=>i));result.computeVertexNormals();result.computeBoundingBox();return result;
 }
-export function FractureGeometry(source){
- const normal=new THREE.Vector3(1,.28,.03).normalize();source.computeBoundingBox();const s=source.boundingBox.getSize(new THREE.Vector3()).x;
- const a=CutGeometry(source,normal,-s*.12,false),rest=CutGeometry(source,normal,-s*.12,true);
- const b=CutGeometry(rest,normal,s*.2,false),c=CutGeometry(rest,normal,s*.2,true);rest.dispose();
- return[a,b,c].filter(g=>g.attributes.position.count>12);
+// Volume is measured from the actual sealed faces, so daughter mass follows the cut.
+export function GeometryVolume(g){const p=g.attributes.position,idx=g.index;let sum=0;const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();for(let i=0;i<(idx?idx.count:p.count);i+=3){a.fromBufferAttribute(p,idx?idx.getX(i):i);b.fromBufferAttribute(p,idx?idx.getX(i+1):i+1);c.fromBufferAttribute(p,idx?idx.getX(i+2):i+2);sum+=a.dot(b.cross(c))/6;}return Math.abs(sum);}
+export function FractureGeometry(source,{direction=[1,0,0],grip=[0,0,0],seed=1,generation=0,load=1}={}){
+ const pull=new THREE.Vector3().fromArray(direction);pull.z*=.18;if(pull.length()<.001)pull.set(1,0,0);pull.normalize();
+ const count=2+Math.floor((Math.sin(seed*31.7)+1)*.999)+(generation===0&&load>.85?1:0);
+ let pieces=[source.clone()];
+ for(let cut=0;cut<count-1;cut++){
+   const weights=pieces.map(GeometryVolume),index=weights.indexOf(Math.max(...weights)),part=pieces[index];part.computeBoundingBox();
+   const center=part.boundingBox.getCenter(new THREE.Vector3()),extent=part.boundingBox.getSize(new THREE.Vector3());
+   const n=pull.clone().applyAxisAngle(new THREE.Vector3(0,0,1),Math.sin(seed+cut*2.6)*.21);
+   const width=Math.abs(n.x)*extent.x+Math.abs(n.y)*extent.y+Math.abs(n.z)*extent.z;
+   const offset=THREE.MathUtils.clamp(new THREE.Vector3().fromArray(grip).sub(center).dot(n)*.17,-width*.12,width*.12)+Math.sin(seed*1.7+cut)*width*.10;
+   const plane=center.dot(n)+offset,a=CutGeometry(part,n,plane,false),b=CutGeometry(part,n,plane,true);
+   if(a.attributes.position.count<15||b.attributes.position.count<15||GeometryVolume(a)<weights[index]*.04||GeometryVolume(b)<weights[index]*.04){a.dispose();b.dispose();continue;}
+   a.userData.cutNormal=n.toArray();b.userData.cutNormal=n.toArray();part.dispose();pieces.splice(index,1,a,b);
+ }
+ return pieces;
 }

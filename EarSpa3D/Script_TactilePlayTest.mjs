@@ -59,14 +59,14 @@ try{
  await page.goto(url+'?debug=1');await page.waitForFunction(()=>window.__EarSpaDebug);
  await page.evaluate(()=>localStorage.setItem('earspa3d.shop.v1',JSON.stringify({version:1,coins:500,day:3,toolLevels:{earPickBamboo:2}})));
  await page.reload();await page.waitForFunction(()=>window.__EarSpaDebug);
- Check((await Probe()).shop.day===3&&(await Probe()).shop.inventory.tools.length===3,'旧存档保留余额和等级并补齐库存');
+ Check((await Probe()).shop.day===3&&(await Probe()).shop.inventory.tools.length===4,'旧存档保留余额和等级并补齐库存');
  await page.locator('#ear-start').click();await page.locator('#lamp-toggle').click();await Step(150);
  await page.locator('#shop-open').click();
  await page.locator('[data-select-tool="brush"]').click();await page.locator('[data-purchase="brush"]').click();await page.locator('[data-select-tool="suction"]').click();await page.locator('[data-purchase="suction"]').click();
  await page.locator('[data-shop-tab="skins"]').click();await page.locator('[data-select-tool="scoop"]').click();
  await page.locator('[data-skin="walnut"]').click();
  const saved=(await Probe()).shop;
- Check(saved.coins===339&&saved.inventory.equipped.scoop==='walnut'&&saved.inventory.tools.length===5,'购买两件工具及耳勺皮肤扣款正确');
+ Check(saved.coins===339&&saved.inventory.equipped.scoop==='walnut'&&saved.inventory.tools.length===6,'购买两件工具及耳勺皮肤扣款正确');
  await page.locator('[data-skin="walnut"]').click();Check((await Probe()).shop.coins===339,'重复装备皮肤不扣款');
  await page.screenshot({path:path.join(here,'_dev','Shot_Shop_'+width+'.png')});
  await page.locator('#shop-close').click();
@@ -88,11 +88,11 @@ try{
  Check(w.physics.anchors===2&&!w.physics.detached,'耳勺松边保留两处粘附，不能代替镊子');
  await Input('up');await Step(200);await Land(wet.id,'tweezers');
  // 干薄片硬夹会裂，清洁度不凭裂片增加。
- const dry=(await Probe()).targets.find(t=>t.type==='dry'&&t.state==='attached');
+ const dry=(await Probe()).targets.find(t=>t.type==='dry'&&!t.fine&&t.state==='attached');
  const cleanBefore=(await Probe()).cleanliness;
  await Select('tweezers');await Pull(dry.id);await Input('up');await Step(90);
  let pieces=(await Probe()).targets.filter(t=>t.fragment);
- Check(pieces.length===3&&Math.abs(pieces.reduce((s,t)=>s+t.mass,0)-1)<1e-8,'三片实体碎片且质量守恒');
+ Check(pieces.length>=3&&pieces.length<=5&&Math.abs(pieces.reduce((s,t)=>s+t.mass,0)-dry.mass)<1e-8,'方向切割得到真实碎片且质量守恒');
  Check((await Probe()).cleanliness===cleanBefore,'碎裂没有清洁收益');
  Check(pieces.every(t=>t.triangles>10&&t.state==='attached'),'碎片具有独立可拾取几何');
  await page.screenshot({path:path.join(here,'_dev','Shot_Fragment_'+width+'.png')});
@@ -102,7 +102,8 @@ try{
  await Pull(pieces[2].id);await Input('up');await Step(160);
  Check(!(await Probe()).harvest.some(t=>t.id===pieces[2].id),'吸引管不吸干燥碎片');
  await Soften(pieces[2].id);await Select('suction');
- await Grab(pieces[2].id);await Step(15);
+ await Grab(pieces[2].id);
+ for(let i=0;i<35&&!(await Probe()).transfer;i++)await Step(3);
  const sucking=await Probe();
  Check(sucking.transfer?.mode==='suction','吸引接触直接进入吸入过程');
  await page.screenshot({path:path.join(here,'_dev','Shot_Suction_'+width+'.png')});
@@ -117,10 +118,10 @@ try{
  Check((await Probe()).audio.recentPlayback.some(t=>t.cue==='customerPain'&&!t.truncated&&t.seconds===t.naturalSeconds),'客人抱怨整句播放不截断');
  pieces=(await Probe()).targets.filter(t=>t.fragment&&t.state==='attached');
  for(const t of pieces)await Land(t.id);
- for(const target of (await Probe()).targets.filter(t=>t.state==='attached'))await Land(target.id,target.type==='dry'?'scoop':'tweezers');
+ for(const target of (await Probe()).targets.filter(t=>t.state==='attached')){if((await Probe()).targets.find(t=>t.id===target.id).state==='collected')continue;await Land(target.id,target.fine?'feather':target.type==='dry'?'scoop':'tweezers');}
  await Step(180);
  const final=await Probe();report.final=final;
- Check(final.phase==='complete'&&Math.abs(final.cleanliness-1)<1e-8&&final.harvest.length===13,'发生两次碎裂仍能清完全部质量并结算');
+ Check(final.phase==='complete'&&Math.abs(final.cleanliness-1)<1e-8&&final.fractures>=2&&final.harvest.length>21,'发生两次碎裂仍能清完全部质量并结算');
  Check(final.shop.totalCustomers===1&&final.shop.log[0].comfort<1,'经营结算读取实际满意度');
  await page.screenshot({path:path.join(here,'_dev','Shot_TactileComplete_'+width+'.png')});
  await page.locator('#sound-toggle').click();await page.waitForTimeout(400);
