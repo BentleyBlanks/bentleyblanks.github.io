@@ -19,6 +19,8 @@ node EarSpa3D/Script_ControlPlayTest.mjs
 node EarSpa3D/Script_DirectionalPhysicsTest.mjs
 node EarSpa3D/Script_RenderingRegressionTest.mjs
 node EarSpa3D/Script_DayTwoPerformanceTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
+
+node EarSpa3D/Script_OuterAnatomyTest.mjs
 node EarSpa3D/Script_TactileDetailTest.mjs
 node EarSpa3D/Script_TactilePlayTest.mjs
 node EarSpa3D/Script_TactilePlayTest.mjs --touch

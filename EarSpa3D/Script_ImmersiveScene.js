@@ -14,7 +14,7 @@ const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 
 // 封闭耳道、真实接触点与实体收集盘共用毫米世界；镜头在取出时连续后退。
 export async function CreateImmersiveScene({ core }) {
-  const asset = await new GLTFLoader().loadAsync(new URL('./Models/Model_ImmersiveEar.glb?v=ear015-grip-20260912', import.meta.url).href);
+  const asset = await new GLTFLoader().loadAsync(new URL('./Models/Model_ImmersiveEar.glb?v=ear017-layered-20260912', import.meta.url).href);
   asset.scene.updateMatrixWorld(true);
   const materials=await CreateTactileMaterials(core.renderer);
   const profile=await (await fetch(new URL('./Data_CanalProfile.json?v=ear012-outer-20260911',import.meta.url))).json();
@@ -30,7 +30,7 @@ export async function CreateImmersiveScene({ core }) {
     const source = asset.scene.getObjectByName(name);
     if(!source)throw new Error('模型缺少节点：'+name);
     const meshes=[];source.traverse(n=>{if(n.isMesh)meshes.push(n);});
-    const geometries=meshes.map(n=>{const g=n.geometry.clone().applyMatrix4(n.matrixWorld);for(const key of Object.keys(g.attributes))if(!['position','normal','uv'].includes(key))g.deleteAttribute(key);if(!g.attributes.uv)g.setAttribute('uv',new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count*2),2));return g;});
+    const geometries=meshes.map(n=>{const g=n.geometry.clone().applyMatrix4(n.matrixWorld);for(const key of Object.keys(g.attributes))if(!['position','normal','uv','color'].includes(key))g.deleteAttribute(key);if(!g.attributes.uv)g.setAttribute('uv',new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count*2),2));return g;});
     const mesh=new THREE.Mesh(geometries.length===1?geometries[0]:mergeGeometries(geometries,true),meshes.length===1?PhysicalCopy(meshes[0].material):meshes.map(m=>PhysicalCopy(m.material)));
     mesh.name = name; return mesh;
   }
@@ -63,6 +63,8 @@ export async function CreateImmersiveScene({ core }) {
     else {
       const vestibule=name==='Model_OuterEar',uv=mesh.geometry.attributes.uv,p=mesh.geometry.attributes.position;
       mesh.material=materials.Skin({outer:true,vestibule});
+      // Blender bakes local pinna occlusion from the sculpted cartilage geometry.
+      mesh.material.vertexColors=!!mesh.geometry.attributes.color;
       // GLTF flips Blender V. Keep authored recess depth before projecting shared skin UVs.
       if(vestibule) mesh.geometry.setAttribute('vestibuleDepth',new THREE.Float32BufferAttribute(Array.from({length:uv.count},(_,i)=>1-uv.getY(i)),1));
       for(let i=0;i<p.count;i++) uv.setXY(i,p.getX(i)/20,p.getY(i)/20);
@@ -70,11 +72,25 @@ export async function CreateImmersiveScene({ core }) {
     }
     outer.add(mesh);
   }
-  for(const name of ['Model_ProfileEyes','Model_ProfileIris','Model_ProfileLashes','Model_ProfileHair','Model_ProfileHairStrands']){const mesh=Baked(name);
-    if(name.includes('Hair')){mesh.material.roughness=.62;mesh.material.clearcoat=.035;mesh.material.sheen=.08;mesh.material.sheenColor.set(0x655046);mesh.material.sheenRoughness=.65;mesh.material.anisotropy=0;mesh.material.anisotropyRotation=Math.PI/2;mesh.material.side=THREE.DoubleSide;mesh.material.onBeforeCompile=shader=>{shader.vertexShader='varying vec2 hairFlow;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nhairFlow=uv;');shader.fragmentShader='varying vec2 hairFlow;\n'+shader.fragmentShader;shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
-      float phase=hairFlow.x*13500.0+sin(hairFlow.y*13.0)*1.4;float strand=.5+.5*sin(phase)*(1.0-smoothstep(.6,3.0,fwidth(phase)));
-      diffuseColor.rgb*=.82+strand*.18;`);};mesh.material.customProgramCacheKey=()=> 'ProfileGroomedFiberFlow3';}
-    outer.add(mesh);}
+  const hairMap=await new THREE.TextureLoader().loadAsync(new URL('./Textures/Texture_LayeredDarkHair.png?v=ear017-layered-20260912',import.meta.url).href);
+  hairMap.colorSpace=THREE.SRGBColorSpace;hairMap.anisotropy=Math.min(8,core.renderer.capabilities.getMaxAnisotropy());
+  for(const name of ['Model_ProfileEyes','Model_ProfileIris','Model_ProfileLashes','Model_ProfileHair','Model_ProfileHairStrands','Model_ProfileHairWisps']){
+    const mesh=Baked(name);
+    if(name.includes('Hair')){
+      const scalp=name==='Model_ProfileHair',wisps=name==='Model_ProfileHairWisps';
+      mesh.material=new THREE.MeshPhysicalMaterial({map:scalp?null:hairMap,bumpMap:scalp?null:hairMap,bumpScale:.035,color:scalp?0x17100c:0xffffff,roughness:scalp?.75:.62,metalness:0,specularIntensity:.24,anisotropy:scalp?0:.28,anisotropyRotation:Math.PI/2,sheen:.10,sheenColor:0x9b8067,sheenRoughness:.72,clearcoat:0,alphaTest:scalp?0:.10,side:THREE.DoubleSide,depthWrite:true});
+      mesh.material.alphaToCoverage=!wisps;
+      if(wisps){mesh.material.map=null;mesh.material.bumpMap=null;mesh.material.alphaTest=0;mesh.material.color.set(0x655046);mesh.material.specularIntensity=.1;mesh.material.transparent=true;mesh.material.opacity=.64;mesh.material.depthWrite=false;}
+      if(!scalp&&!wisps){
+        // Sample a strand-scale slice for color, retaining the full authored edge alpha.
+        mesh.material.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',THREE.ShaderChunk.map_fragment.replace('texture2D( map, vMapUv )','texture2D( map, vec2(.34+vMapUv.x*.18,vMapUv.y) )').replace('diffuseColor *= sampledDiffuseColor;','sampledDiffuseColor.a=texture2D(map,vMapUv).a; diffuseColor *= sampledDiffuseColor;'));};
+        mesh.material.customProgramCacheKey=()=> 'LayeredHairStrandScale1';
+        mesh.material.roughness=.54;mesh.material.specularIntensity=.38;
+      }
+      mesh.userData.hairLayer=scalp?'opaqueScalp':wisps?'silhouetteStrands':'threeTexturedCardLayers';
+    }
+    outer.add(mesh);
+  }
   const wall = Baked('Model_Canal'); wall.material.side = THREE.DoubleSide; wall.receiveShadow=true; const drum=Baked('Model_Eardrum');drum.material.side=THREE.DoubleSide;const hair=Baked('Model_CanalHair');hair.material=new THREE.MeshPhysicalMaterial({color:0xd0d2ce,roughness:.8,sheen:1,sheenColor:0xe7e9e4,sheenRoughness:.7});canalGroup.add(wall,drum,hair);
   wall.material=materials.Skin();wall.receiveShadow=true;AccelerateStaticRaycast(wall);
   const hairUniforms={time:{value:0},tool:{value:new THREE.Vector3(999,999,999)}};
@@ -658,7 +674,7 @@ export async function CreateImmersiveScene({ core }) {
     Reach,CanReach(c,id){return c.depth<=Reach(id);},SetDeep(value){inspectionTarget=value?1:0;contact.Reset();HideTool();},
     AuditTool,CollisionProbe(){return contact.Probe();},
     SetContact:materials.SetContact,
-    RenderingProbe(){return {shadersWarmed,staticRaycast:true,fiberClusters:Object.fromEntries(['feather','brush'].map(id=>[id,toolParts[id].children.reduce((sum,p)=>sum+(p.userData.fiberGroups?.length||0),0)])),...materials.Probe(),heading,inspectionDepth,inspectionTarget,reachBlocked,toolReach:Reach(lastToolId),traySize:new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).toArray(),trayStandalone:true,trayBounds:TrayBounds(),trayInscription:"强迫症的SOPHIA",toolPosition:tool.position.toArray(),toolRotation:tool.quaternion.toArray(),featherShading:'dual-lobe anisotropic fiber approximation',hairCount:360,hairRootFixed:true,hairTime,headRealtime:true,lampOn,lampAim:lamp.target.position.toArray(),lampIntensity:lamp.intensity,shadows:core.renderer.shadowMap.enabled,canalVisible:canalGroup.visible,externalContext:outer.visible&&!!(transfer||showcase),outerVisible:outer.visible,irritation:chunks.filter(c=>!c.fragment).map(c=>c.irritation),roughness:chunks.map(c=>c.mesh.material.roughness),clearcoat:chunks.map(c=>c.mesh.material.clearcoat),toolLevels:{...toolLevels},previewTriangles};},
+    RenderingProbe(){return {shadersWarmed,staticRaycast:true,fiberClusters:Object.fromEntries(['feather','brush'].map(id=>[id,toolParts[id].children.reduce((sum,p)=>sum+(p.userData.fiberGroups?.length||0),0)])),...materials.Probe(),heading,inspectionDepth,inspectionTarget,reachBlocked,toolReach:Reach(lastToolId),traySize:new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).toArray(),trayStandalone:true,trayBounds:TrayBounds(),trayInscription:"强迫症的SOPHIA",toolPosition:tool.position.toArray(),toolRotation:tool.quaternion.toArray(),featherShading:'dual-lobe anisotropic fiber approximation',hairCount:360,hairRootFixed:true,profileHairLayers:3,profileHairTexture:'Texture_LayeredDarkHair.png',profileHairWisps:90,hairTime,headRealtime:true,lampOn,lampAim:lamp.target.position.toArray(),lampIntensity:lamp.intensity,shadows:core.renderer.shadowMap.enabled,canalVisible:canalGroup.visible,externalContext:outer.visible&&!!(transfer||showcase),outerVisible:outer.visible,irritation:chunks.filter(c=>!c.fragment).map(c=>c.irritation),roughness:chunks.map(c=>c.mesh.material.roughness),clearcoat:chunks.map(c=>c.mesh.material.clearcoat),toolLevels:{...toolLevels},previewTriangles};},
     ToggleLamp(){lampOn=!lampOn;return lampOn;},AimLamp(x,y){aim.set(x/width*2-1,1-y/height*2);aimed=true;},
     Enter(){inside=true;entrance=0;showcase=false;},Hover,
     ToggleView(){if(transfer)return 'canal';showcase=false;inside=!inside;HideTool();return inside?'canal':'ear';},
