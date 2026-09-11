@@ -14,6 +14,7 @@
 node EarSpa3D/Script_PeelPhysicsTest.mjs
 node EarSpa3D/Script_EconomyTest.mjs
 node EarSpa3D/Script_DirectionalPhysicsTest.mjs
+node EarSpa3D/Script_RenderingRegressionTest.mjs
 node EarSpa3D/Script_TactileDetailTest.mjs
 node EarSpa3D/Script_TactilePlayTest.mjs
 node EarSpa3D/Script_TactilePlayTest.mjs --touch

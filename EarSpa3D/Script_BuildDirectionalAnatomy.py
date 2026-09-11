@@ -32,10 +32,15 @@ def Head():
     vertices=[]
     for i in used:
         x,y,z=points[i]
-        vertices.append(((z-.22)*100,(y-7.13)*100,(x+.79)*100+9))
+        vertices.append(((z-.22)*100-28,(y-7.13)*100+4,(x+.79)*100+14))
     Remove('Model_Temple')
     obj=Mesh('Model_Temple',vertices,[[lookup[i] for i in f] for f in faces],Mat('Material_AnatomicalHead',(.60,.40,.31),.58))
-    sub=obj.modifiers.new('FacialSubdivision','SUBSURF');sub.levels=2;Apply(obj,sub)
+    # 平滑处理侧底模耳廓，保留连续头皮，实际耳廓由独立解剖模型提供。
+    bm=bmesh.new();bm.from_mesh(obj.data)
+    native=[v for v in bm.verts if -31<v.co.x<25 and -42<v.co.z<39 and -v.co.y<48]
+    for _ in range(100):bmesh.ops.smooth_vert(bm,verts=native,factor=.62,use_axis_x=True,use_axis_y=True,use_axis_z=True)
+    bm.to_mesh(obj.data);bm.free()
+    sub=obj.modifiers.new('FacialSubdivision','SUBSURF');sub.levels=1;Apply(obj,sub)
     # The treated-side base ear is recessed behind our continuous pinna, not doubled.
     for v in obj.data.vertices:
         p=(v.co.x,v.co.z,-v.co.y)
@@ -180,9 +185,11 @@ def RefineTools():
 def Build():
     assert Path(bpy.data.filepath).resolve()==(SOURCE/'Model_DirectionalAnatomy.blend').resolve()
     import sys
-    if '--feather-only' not in sys.argv and '--tools-only' not in sys.argv:Head();Ear()
-    if '--tools-only' not in sys.argv:Feather()
-    RefineTools()
+    if '--head-only' in sys.argv:Head()
+    else:
+        if '--feather-only' not in sys.argv and '--tools-only' not in sys.argv:Head();Ear()
+        if '--tools-only' not in sys.argv:Feather()
+        RefineTools()
     for obj in bpy.data.objects:
         if obj.type=='MESH' and obj.name!='Model_Canal':
             bm=bmesh.new();bm.from_mesh(obj.data);bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));bm.to_mesh(obj.data);bm.free()

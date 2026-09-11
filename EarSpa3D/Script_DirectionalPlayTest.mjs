@@ -23,11 +23,13 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
   async function Input(type,x=0,y=0){if(type==='up'&&!down)return;if(type==='down')down=true;if(type==='up')down=false;if(touch)await cdp.send('Input.dispatchTouchEvent',{type:{down:'touchStart',move:'touchMove',up:'touchEnd'}[type],touchPoints:type==='up'?[]:[{x,y}]});else{if(type==='down'){await page.mouse.move(x,y);await page.mouse.down();}if(type==='move')await page.mouse.move(x,y,{steps:8});if(type==='up')await page.mouse.up();}await page.waitForTimeout(20);}
   async function Select(id){await Input('up');await page.locator('[data-tool="'+id+'"]').click();}
   async function Start(){await page.goto(url+'?debug=1');await page.waitForFunction(()=>window.__EarSpaDebug);await page.locator('#ear-start').click();await page.locator('#lamp-toggle').click();await Step(150);}
-  async function Press(id,frames=110){const t=(await Probe()).targets.find(c=>c.id===id);await Input('down',t.screen.x,t.screen.y);await Step(frames);return (await Probe()).targets.find(c=>c.id===id);}
+  async function Press(id,frames=110){let t=(await Probe()).targets.find(c=>c.id===id);const deep=t.depth>10;if((await page.locator('#depth-toggle').getAttribute('aria-pressed')==='true')!==deep){await page.locator('#depth-toggle').click();await Step(70);t=(await Probe()).targets.find(c=>c.id===id);} await Input('down',t.screen.x,t.screen.y);await Step(frames);return (await Probe()).targets.find(c=>c.id===id);}
   async function Collect(id,tool){await Select(tool);const before=(await Probe()).harvest.length;const c=await Press(id);Check(c.state==='held','hold current tool direction detaches '+id);Check((await Probe()).harvest.length===before,'holding does not award cleaning '+id);await Input('up');await Step(80);if(id===0){Check((await Probe()).rendering.headRealtime&&(await Probe()).rendering.outerVisible,'same live head stays visible during extraction');await page.screenshot({path:path.join(here,'_dev','Shot_LiveExtraction_'+width+'.png')});}await Step(150);Check((await Probe()).harvest.filter(c=>c.id===id).length===1,'exactly one landing award '+id);}
   try{
    await Start();let p=await Probe();
    Check(p.targets.length===21&&p.targets.filter(c=>c.fine).reduce((s,c)=>s+c.grainCount,0)===108,'initial ear contains large deposits and 108 separate tiny grains');
+   Check(p.targets.some(c=>c.tone==='paleYellow'&&!c.fine)&&p.targets.some(c=>c.tone==='brown'&&!c.fine),'pale yellow thin keratin coexists with dark wax');
+   Check(p.targets.some(c=>c.fine&&c.tone==='paleYellow'),'tiny residue also contains pale yellow grains');
    Check(p.targets.some(c=>c.form==='film')&&p.targets.some(c=>c.form==='ribbon'),'adherent wet films and long thin dry sheets coexist');
    Check(Math.abs(p.targets.reduce((s,c)=>s+c.mass,0)-9)<1e-8,'initial mass remains nine accounting units');
    Check(p.rendering.hairCount===360&&p.rendering.hairRootFixed,'dense pale hairs have fixed roots');
@@ -52,7 +54,10 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
     }
     Check(parent.fine,'third generation becomes feather-only dust');await Select('tweezers');await Press(parent.id,12);await Input('up');Check((await Probe()).targets.find(c=>c.id===parent.id).state==='attached','forceps cannot pick final fine dust');await Collect(parent.id,'feather');
    }
-   await Start();p=await Probe();
+   await Start();await Select('scoop');await Press(8,60);await Input('up');p=await Probe();
+   Check(p.targets.find(c=>c.id===8).state==='attached'&&p.rendering.reachBlocked,'short spoon cannot grip or advance deep wax');
+   Check(p.rendering.contactOcclusion.includes('silhouette')&&p.rendering.contactRimMm<.2,'contact occlusion follows actual outlines within a submillimetre rim');
+   await page.locator('#depth-toggle').click();await Step(70);p=await Probe();
    const dust=await page.evaluate(()=>__EarSpaProbe().targets.find(c=>c.fine&&__EarSpaDebug.view.Pick(c.screen.x,c.screen.y,'scoop')?.id===c.id));Check(!!dust,'a visible microdust patch can be targeted separately');await Select('scoop');await Press(dust.id,40);await Input('up');Check((await Probe()).targets.find(c=>c.id===dust.id).state==='attached','spoon cannot remove tiny dust');
    for(const original of p.targets.filter(c=>!c.fine)){
     if(original.type==='impacted'){await Select('drops');await Press(original.id,3);await Input('up');Check((await Probe()).targets.find(c=>c.id===original.id).softened<.5,'softener needs real diffusion time');await Step(195);}

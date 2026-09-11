@@ -1,0 +1,16 @@
+{
+  "asset": "Textures/Texture_OuterSkinPbrAtlas.png",
+  "provider": "built-in image_gen__imagegen",
+  "tier": 1,
+  "date": "2026-09-11",
+  "purpose": "Independent external pinna and temporal facial skin; runtime UV coverage 20 mm per tile",
+  "channels": {
+    "topLeft": "albedo sRGB",
+    "topRight": "OpenGL tangent-space normal linear",
+    "bottomLeft": "roughness linear",
+    "bottomRight": "micro AO linear"
+  },
+  "source": "C:/Users/Bentl/.codex/generated_images/01a08e04-9be4-74a3-a909-875e7f3017f8/exec-85985e3a-80a9-4548-a164-de01b82f6393.png",
+  "prompt": "Create ONE square production PBR texture atlas for healthy ADULT EXTERNAL EAR AND TEMPORAL FACE SKIN for a realistic realtime ear-cleaning game. A seamless 2x2 grid of exactly equal square quadrants, zero gutters, no labels, no text, no borders. All four quadrants describe the SAME subtle fine-pored surface with corresponding details. TOP LEFT: cross-polarized diffuse ALBEDO, very smooth healthy peach-beige skin, gentle rosy color variations, almost imperceptible fine pores, a few extremely subtle freckles, no hairs, absolutely NO baked light, shadow, gloss or visible creases. TOP RIGHT: tangent-space OpenGL NORMAL map, overwhelmingly flat lavender RGB 128,128,255, extremely shallow tiny fine pores, normal deviations very weak, no large bumps. BOTTOM LEFT: linear ROUGHNESS grayscale, fairly uniform medium gray around 155/255, subtle small pore variation, silky skin slightly oily but never wet slime. BOTTOM RIGHT: micro AMBIENT OCCLUSION, almost pure white around 244/255 with extremely subtle fine pore depressions, no broad shaded regions. Intended physical coverage of each tile is 20 millimeters square. External ear skin resembles a delicate natural adult beauty-photo surface, NOT the red coarse textured canal lining, not leather, not orange peel, not cracked clay, not aged wrinkled skin. Technical flat orthographic texture atlas filling the image edge to edge. Make fine pores sufficiently sparse and restrained that skin reads smooth at normal viewing distance.",
+  "limitations": "Generated PBR channel approximation, not a calibrated skin scan or measured scattering profile."
+}

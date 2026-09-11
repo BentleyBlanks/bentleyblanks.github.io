@@ -8,28 +8,28 @@ export function CreateToolContact(profile) {
   function BuildBounds(start,end){const box=new THREE.Box3();for(let i=start;i<=end;i++)box.expandByPoint(rows[i].center);const node={start,end,box};if(end-start>4){const mid=Math.floor((start+end)/2);node.left=BuildBounds(start,mid);node.right=BuildBounds(mid,end);}return node;}
   const bounds=BuildBounds(0,rows.length-1);
   function BoundDistance(node,p){const b=node.box,dx=Math.max(b.min.x-p.x,0,p.x-b.max.x),dy=Math.max(b.min.y-p.y,0,p.y-b.max.y),dz=Math.max(b.min.z-p.z,0,p.z-b.max.z);return dx*dx+dy*dy+dz*dz;}
-  function Surface(point){
+  const segments=rows.slice(0,-1).map((f,i)=>{const b=rows[i+1].center,ax=b.x-f.center.x,ay=b.y-f.center.y,az=b.z-f.center.z;return{ax,ay,az,length:Math.hypot(ax,ay,az),lengthSq:ax*ax+ay*ay+az*az};});
+  function Surface(point,out=null){
     let distance=Infinity,index=0,blend=0;
     function Visit(node){
       if(BoundDistance(node,point)>distance)return;
       if(node.left){const leftFirst=BoundDistance(node.left,point)<=BoundDistance(node.right,point);Visit(leftFirst?node.left:node.right);Visit(leftFirst?node.right:node.left);return;}
       for(let i=node.start;i<node.end;i++){
-        axis.subVectors(rows[i+1].center,rows[i].center);const t=THREE.MathUtils.clamp(v.subVectors(point,rows[i].center).dot(axis)/axis.lengthSq(),0,1);
-        nearest.copy(rows[i].center).addScaledVector(axis,t);const d=nearest.distanceToSquared(point);
+        const a=rows[i].center,s=segments[i],x=point.x-a.x,y=point.y-a.y,z=point.z-a.z,t=Math.max(0,Math.min(1,(x*s.ax+y*s.ay+z*s.az)/s.lengthSq));
+        const dx=x-s.ax*t,dy=y-s.ay*t,dz=z-s.az*t,d=dx*dx+dy*dy+dz*dz;
         if(d<distance||(d===distance&&i<index)){distance=d;index=i;blend=t;}
       }
     }Visit(bounds);
-    const a=rows[index],b=rows[index+1],t=blend;
-    axis.subVectors(b.center,a.center).normalize();nearest.copy(a.center).lerp(b.center,t);
-    const axial=v.subVectors(point,nearest).dot(axis);
-    if((index===0&&t===0&&axial<-.03)||(index===rows.length-2&&t===1&&axial>.05))return {clearance:Infinity,normal:new THREE.Vector3(),depth:-1};
-    const u=a.up.clone().lerp(b.up,t).normalize(),r=a.right.clone().lerp(b.right,t).normalize();
-    const radial=v.subVectors(point,nearest),angle=(Math.atan2(radial.dot(r),radial.dot(u))+Math.PI*2)%(Math.PI*2),k=angle/(Math.PI*2)*64,lo=Math.floor(k),f=k-lo;
-    const radiusAt=row=>row.radii[lo]*(1-f)+row.radii[(lo+1)%64]*f;
-    const radius=radiusAt(a)*(1-t)+radiusAt(b)*t+.012*Math.sin(angle*11+(index+t)*.18)*Math.sin((index+t)*.41+angle*3);
-    normal.copy(radial).addScaledVector(axis,-axial).negate().normalize();
-    const slope=(radiusAt(b)-radiusAt(a))/b.center.distanceTo(a.center);normal.addScaledVector(axis,slope).normalize();
-    return {clearance:radius-Math.sqrt(Math.max(0,distance-axial*axial)),normal:normal.clone(),depth:index+t};
+    const a=rows[index],b=rows[index+1],t=blend,s=segments[index],ax=s.ax/s.length,ay=s.ay/s.length,az=s.az/s.length;
+    const dx=point.x-a.center.x-s.ax*t,dy=point.y-a.center.y-s.ay*t,dz=point.z-a.center.z-s.az*t,axial=dx*ax+dy*ay+dz*az;
+    const result=out||{normal:new THREE.Vector3()};
+    if((index===0&&t===0&&axial<-.03)||(index===rows.length-2&&t===1&&axial>.05)){result.clearance=Infinity;result.normal.set(0,0,0);result.depth=-1;return result;}
+    let ux=a.up.x+(b.up.x-a.up.x)*t,uy=a.up.y+(b.up.y-a.up.y)*t,uz=a.up.z+(b.up.z-a.up.z)*t,rx=a.right.x+(b.right.x-a.right.x)*t,ry=a.right.y+(b.right.y-a.right.y)*t,rz=a.right.z+(b.right.z-a.right.z)*t;
+    const un=Math.hypot(ux,uy,uz),rn=Math.hypot(rx,ry,rz);ux/=un;uy/=un;uz/=un;rx/=rn;ry/=rn;rz/=rn;
+    const angle=(Math.atan2(dx*rx+dy*ry+dz*rz,dx*ux+dy*uy+dz*uz)+Math.PI*2)%(Math.PI*2),k=angle/(Math.PI*2)*64,lo=Math.floor(k),f=k-lo,next=(lo+1)%64;
+    const ra=a.radii[lo]*(1-f)+a.radii[next]*f,rb=b.radii[lo]*(1-f)+b.radii[next]*f,radius=ra*(1-t)+rb*t+.012*Math.sin(angle*11+(index+t)*.18)*Math.sin((index+t)*.41+angle*3);
+    result.normal.set(-dx+ax*axial,-dy+ay*axial,-dz+az*axial).normalize();const slope=(rb-ra)/s.length;result.normal.x+=ax*slope;result.normal.y+=ay*slope;result.normal.z+=az*slope;result.normal.normalize();
+    result.clearance=radius-Math.sqrt(Math.max(0,distance-axial*axial));result.depth=index+t;return result;
   }
   const sampleCache=new WeakMap();
   function Samples(group){
@@ -48,8 +48,9 @@ export function CreateToolContact(profile) {
       const points=[...bins.values()];sampleCache.set(part,{geometry:part.geometry,version:p.version,matrix:part.matrix.clone(),points});samples.push(...points);
     }return samples;
   }
+  const surfaceResult={normal:new THREE.Vector3()};
   const transformed=new THREE.Vector3();let last=null,report={contact:false,clearance:1,correction:0,samples:0,blocked:false};
-  function Clearance(position,rotation,samples){let minimum=Infinity,hitNormal=null;for(const local of samples){transformed.copy(local).applyQuaternion(rotation).add(position);const hit=Surface(transformed);if(hit.clearance<minimum){minimum=hit.clearance;hitNormal=hit.normal;}}return{minimum,normal:hitNormal};}
+  function Clearance(position,rotation,samples){let minimum=Infinity,hitNormal=null;for(const local of samples){transformed.copy(local).applyQuaternion(rotation).add(position);const hit=Surface(transformed,surfaceResult);if(hit.clearance<minimum){minimum=hit.clearance;hitNormal=hit.normal.clone();}}return{minimum,normal:hitNormal};}
   function Project(position,rotation,samples){
     const out=position.clone();let contact=false;
     for(let i=0;i<14;i++){const hit=Clearance(out,rotation,samples);if(hit.minimum>=.045)break;out.addScaledVector(hit.normal,Math.min(.45,.048-hit.minimum));contact=true;}

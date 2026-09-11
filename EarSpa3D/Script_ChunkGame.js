@@ -1,14 +1,14 @@
 import * as THREE from 'three';
-import { CreateCore } from './Script_Core.js?v=ear010-20260911';
-import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear010-20260911';
-import { CreateAudio } from './Script_Audio.js?v=ear010-20260911';
-import { CreateShop } from './Script_Shop.js?v=ear010-20260911';
-import { MakeRng } from './Script_Util.js?v=ear010-20260911';
-import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear010-20260911';
+import { CreateCore } from './Script_Core.js?v=ear011-20260911';
+import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear011-20260911';
+import { CreateAudio } from './Script_Audio.js?v=ear011-20260911';
+import { CreateShop } from './Script_Shop.js?v=ear011-20260911';
+import { MakeRng } from './Script_Util.js?v=ear011-20260911';
+import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear011-20260911';
 
-import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear010-20260911';
+import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear011-20260911';
 
-const VERSION = 'ear010-20260911';
+const VERSION = 'ear011-20260911';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const TOOL_IDS = { scoop: 'earPickBamboo', tweezers: 'earForceps', drops: 'earDrops',brush:'softBrush',suction:'microSuction',feather:'gooseFeather' };
 const TYPE_NAMES = { dry: '干性薄层', wet: '黏性耳垢', impacted: '紧实硬结' };
@@ -51,7 +51,7 @@ export async function Start() {
       <label class="slider-row">背景音乐<input id="volume-bgm" type="range" min="0" max="1" step="0.01" value="0.16"></label>
       <label class="slider-row">轻微震动<input id="haptics" type="checkbox" checked></label>
 
-      <details><summary>操作说明</summary><p>鼠标右键按住拖动，工具留在接触点旋转；左键按住沿当前方向撬起或夹起。手机切换转向／施力，分别单指拖动或按住。工具遇到内壁会受阻。松脱后仍在工具上，松手由工具托送到耳外，再轻放入盘。硬结先滴液等待约 3 秒。干薄片用耳勺托边，黏块先松边再用镊子夹；硬拉会痛或碎裂。碎屑可用耳勺清理，也可买毛刷轻扫或用吸引管吸走湿碎屑。中途松手会放回。</p><p>键盘：1/2/3 切换工具；画面获得焦点后，左右方向键选块，空格抓住，方向键旋转施力方向，空格松手，Esc 取消。</p></details>
+      <details><summary>操作说明</summary><p>鼠标右键按住拖动，工具留在接触点旋转；左键按住沿当前方向撬起或夹起。手机切换转向／施力，分别单指拖动或按住。工具遇到内壁会受阻。点“探查深处”检查更深的耳道，短耳勺工作长度有限；深处用长镊，硬结先滴液软化。松脱后仍在工具上，松手由工具托送到耳外，再轻放入盘。硬结先滴液等待约 3 秒。干薄片用耳勺托边，黏块先松边再用镊子夹；硬拉会痛或碎裂。碎屑可用耳勺清理，也可买毛刷轻扫或用吸引管吸走湿碎屑。中途松手会放回。</p><p>键盘：1/2/3 切换工具；画面获得焦点后，左右方向键选块，空格抓住，方向键旋转施力方向，空格松手，Esc 取消。</p></details>
     </dialog>`;
   document.body.append(app);
   app.querySelector('.spa-header').insertBefore(app.querySelector('.clean-meter'),app.querySelector('.header-actions'));
@@ -64,6 +64,7 @@ export async function Start() {
   document.getElementById('ear-stage')?.remove();
   canvas.tabIndex = 0; canvas.setAttribute('aria-label', '耳道操作区，工具接触耳垢后，自由拨动或夹取');
   const $ = id => document.getElementById(id);
+  app.insertAdjacentHTML('beforeend','<button id="depth-toggle" class="depth-toggle" aria-pressed="false">探查深处</button>');
   const core = CreateCore({ canvas, viewCamera: new THREE.PerspectiveCamera(65, 1, .05, 400) });
   const view = await CreateImmersiveScene({ core });
   const audio = CreateAudio();
@@ -71,6 +72,7 @@ export async function Start() {
   let settings = { master: .8, sfx: .85, bgm: .16, muted: false, haptics: true };
   try { settings = { ...settings, ...JSON.parse(localStorage.getItem('earspa3d.calm.settings') || '{}') }; } catch { /* 隐私模式也能玩 */ }
   let phase = 'ready', toolId = 'scoop', active = null, harvested = [], elapsed = 0, time = 0, settle = 0;
+  app.dataset.phase='ready';
   let turnPointer=null,touchMode='force',timeLimit=210,timedOut=false;
   let pointer = null, lastMove = 0, keyboardIndex = 0, contactOn = false;
   let satisfaction=85,painCooldown=0,bubbleUntil=0,rewardUntil=0,combo=0,bestCombo=0,painCount=0,fractures=0;
@@ -125,7 +127,7 @@ export async function Start() {
     view.Reset(customer.waxSeed);timeLimit=210;timedOut=false;
     view.Enter();
     $('view-toggle').textContent='看耳廓 ↗';
-    harvested=[];active=pointer=null;elapsed=settle=0;phase='playing';app.dataset.phase='playing';satisfaction=85;combo=bestCombo=painCount=fractures=0;painCooldown=0;$('receipt').hidden=true;UpdateInventory();
+    harvested=[];active=pointer=null;elapsed=settle=0;phase='playing';app.dataset.phase='playing';satisfaction=85;$('depth-toggle').setAttribute('aria-pressed','false');$('depth-toggle').textContent='探查深处';combo=bestCombo=painCount=fractures=0;painCooldown=0;$('receipt').hidden=true;UpdateInventory();
     UpdateProgress(); $('next-customer').hidden = true;
     $('customer-name').textContent = `第 ${shop.day} 天 · ${customer.name}`;
     Instructions('先转向，再沿器具方向施力','右键拖动转向，左键按住撬起；微屑用鹅绒掸');
@@ -157,6 +159,7 @@ export async function Start() {
   }
   function Begin(c, x, y, id = null) {
     if (!c || !view.ready || phase !== 'playing' || DialogOpen() || active || view.busy) return;
+    if(!view.CanReach(c,toolId)){view.ShowTool(c,toolId,0,{x,y});Instructions('这把工具够不到 · 换长镊','短工具不能越过有效工作长度');Record('reachLimit',{id:c.id,depth:c.depth,reach:view.Reach(toolId),tool:toolId});return;}
     if(c.fine&&toolId!=='feather'){Instructions('细屑要用鹅绒掸','绒羽能轻贴内壁，一次带走多粒');return;}
     if(!c.fine&&toolId==='feather'){Instructions('鹅绒掸只清理微屑','大片先用耳勺或镊子处理');return;}
     if(toolId==='drops'){
@@ -240,6 +243,7 @@ export async function Start() {
   $('receipt-shop').onclick=()=>OpenShop();
   function OpenShop(){instrumentShop.Open();}
   $('settings-open').onclick=()=>{Cancel();$('settings-dialog').showModal();};$('shop-open').onclick=OpenShop;
+  $('depth-toggle').onclick=()=>{if(phase!=='playing'||view.busy)return;Cancel();const deep=$('depth-toggle').getAttribute('aria-pressed')!=='true';view.SetDeep(deep);$('depth-toggle').setAttribute('aria-pressed',String(deep));$('depth-toggle').textContent=deep?'查看入口':'探查深处';};
   $('view-toggle').onclick = () => { if(phase==='ready')return;Cancel();$('view-toggle').textContent=view.ToggleView()==='ear'?'进入耳道 ↗':'看耳廓 ↗'; };
   $('settings-close').onclick = () => $('settings-dialog').close();
   $('sound-toggle').onclick = () => { audio.unlock(); settings.muted = !settings.muted; ApplySettings(); };
@@ -295,6 +299,7 @@ export async function Start() {
       if(CleanMass()>8.999&&!view.busy){settle+=dt;if(settle>.7)Complete();}
     } else { view.Update(0); }
     const remaining=Math.max(0,timeLimit-elapsed);$('service-time').textContent=Math.floor(remaining/60).toString().padStart(2,'0')+':'+Math.floor(remaining%60).toString().padStart(2,'0');$('service-clock').dataset.urgent=String(remaining<30);$('heading-needle').style.transform='rotate('+view.Heading()+'rad)';$('heading-angle').textContent=((Math.round(view.Heading()*180/Math.PI)%360+360)%360)+'°';
+    const transferring=String(!!view.transfer);if(app.dataset.transferring!==transferring)app.dataset.transferring=transferring;
     audio.Update(dt); core.Render();
   }
   function Probe() {
@@ -302,11 +307,11 @@ export async function Start() {
       targets: view.Targets(), transfer:view.transfer, model:view.modelInfo, viewReady:view.ready, rendering:view.RenderingProbe(), collision:view.CollisionProbe(),feedback:feedback.map(f=>({...f})), events: events.map(x => ({ ...x })), audio: audio.debug(), settings: { ...settings }, shop: shop.Snapshot(), stats: { ...core.stats },
       viewport: { width: innerWidth, height: innerHeight }, stage: (() => { const r = canvas.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })() };
   }
+  UpdateInventory();UpdateProgress();core.Resize();view.Resize();Frame(0);await view.WarmTools();Frame(0);
   Object.defineProperty(window, '__EarSpaProbe', { value: Probe, configurable: true });
   if (new URLSearchParams(location.search).get('debug') === '1') {
     window.__EarSpaDebug = { StepFrames(n = 1) { for (let i = 0; i < Math.min(n, 3600); i++) Frame(1 / 60); return Probe(); }, Probe, audio, view, shop, core };
   }
-  UpdateInventory();UpdateProgress();core.Resize(); view.Resize(); Frame(0);
   document.getElementById('ear-boot')?.remove();
   function Animate(now) { Frame(core.Tick(now)); requestAnimationFrame(Animate); }
   requestAnimationFrame(Animate);

@@ -28,7 +28,7 @@ async function Input(type,x=0,y=0){
 }
 async function Select(id){await Input('up');await page.locator('[data-tool="'+id+'"]').click();}
 async function Grab(id){
- const t=(await Probe()).targets.find(t=>t.id===id);
+ let t=(await Probe()).targets.find(t=>t.id===id);if((await page.locator('#depth-toggle').getAttribute('aria-pressed')==='true')!==(t.depth>10)){await page.locator('#depth-toggle').click();await Step(70);t=(await Probe()).targets.find(t=>t.id===id);}
  await Input('down',t.screen.x,t.screen.y);await Step(5);
  Check((await Probe()).active===id||(await Probe()).transfer?.id===id,'接触可拾取 '+id);return t;
 }
@@ -43,7 +43,7 @@ async function Land(id,tool='scoop',kind='pullScreen'){
  Check((await Probe()).harvest.filter(t=>t.id===id).length===1,'只收一次 '+id);
 }
 async function Soften(id){
- await Select('drops');const t=(await Probe()).targets.find(t=>t.id===id);
+ await Select('drops');let t=(await Probe()).targets.find(t=>t.id===id);if((await page.locator('#depth-toggle').getAttribute('aria-pressed')==='true')!==(t.depth>10)){await page.locator('#depth-toggle').click();await Step(70);t=(await Probe()).targets.find(t=>t.id===id);}
  await Input('down',t.screen.x,t.screen.y);await Input('up');await Step(195);
  Check((await Probe()).targets.find(t=>t.id===id).softened>.85,'渗透到位 '+id);
 }
@@ -118,7 +118,7 @@ try{
  Check((await Probe()).audio.recentPlayback.some(t=>t.cue==='customerPain'&&!t.truncated&&t.seconds===t.naturalSeconds),'客人抱怨整句播放不截断');
  pieces=(await Probe()).targets.filter(t=>t.fragment&&t.state==='attached');
  for(const t of pieces)await Land(t.id);
- for(const target of (await Probe()).targets.filter(t=>t.state==='attached')){if((await Probe()).targets.find(t=>t.id===target.id).state==='collected')continue;await Land(target.id,target.fine?'feather':target.type==='dry'?'scoop':'tweezers');}
+ for(const target of (await Probe()).targets.filter(t=>t.state==='attached')){if((await Probe()).targets.find(t=>t.id===target.id).state==='collected')continue;if(target.type==='impacted'&&!target.fragment)await Soften(target.id);await Land(target.id,target.fine?'feather':target.type==='dry'?'scoop':'tweezers');}
  await Step(180);
  const final=await Probe();report.final=final;
  Check(final.phase==='complete'&&Math.abs(final.cleanliness-1)<1e-8&&final.fractures>=2&&final.harvest.length>21,'发生两次碎裂仍能清完全部质量并结算');
