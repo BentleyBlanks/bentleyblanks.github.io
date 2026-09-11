@@ -10,7 +10,7 @@
 //
 // 顶层零副作用：事件监听在 CreateInput 里挂，Dispose 里摘干净。
 
-import { Clamp, AngleDelta } from "./Script_Util.js";
+import { Clamp, AngleDelta } from "./Script_Util.js?v=ear005-20260911";
 
 const FINE_DIVISOR = 3;
 
@@ -76,12 +76,12 @@ export function CreateInput({ dom, on = {} } = {}) {
     if (pinchPrevDist > 0) {
       state.pinch += Math.log(dist / pinchPrevDist);
       state.twist += AngleDelta(twistPrevAngle, angle);
-      const mx = (list[0].mx + list[1].mx) / 2;
-      const my = (list[0].my + list[1].my) / 2;
+      const mx = (list[0].x + list[1].x) / 2;
+      const my = (list[0].y + list[1].y) / 2;
       state.panX += (mx - (list[0].pmx + list[1].pmx) / 2) / ShortSide();
       state.panY += (my - (list[0].pmy + list[1].pmy) / 2) / ShortSide();
-      for (const p of list) { p.pmx = p.mx; p.pmy = p.my; }
     }
+    for (const p of list) { p.pmx = p.x; p.pmy = p.y; }
     pinchPrevDist = dist;
     twistPrevAngle = angle;
   }
@@ -91,7 +91,7 @@ export function CreateInput({ dom, on = {} } = {}) {
     dom.setPointerCapture?.(event.pointerId);
     const n = Normalize(event.clientX, event.clientY);
     pointers.set(event.pointerId, {
-      x: event.clientX, y: event.clientY, mx: n.x, my: n.y, pmx: n.x, pmy: n.y,
+      x: event.clientX, y: event.clientY, mx: n.x, my: n.y, pmx: event.clientX, pmy: event.clientY,
     });
     state.pressedCount = pointers.size;
     state.pointerActive = true;
@@ -118,8 +118,8 @@ export function CreateInput({ dom, on = {} } = {}) {
     if (!prev) return;
     const n = Normalize(event.clientX, event.clientY);
     const rect = dom.getBoundingClientRect();
-    const ndx = (event.clientX - prev.x) / rect.width;
-    const ndy = (event.clientY - prev.y) / rect.height;
+    const ndx = (event.clientX - prev.x) / ShortSide();
+    const ndy = (event.clientY - prev.y) / ShortSide();
     prev.x = event.clientX;
     prev.y = event.clientY;
     prev.mx = n.x;
@@ -201,8 +201,10 @@ export function CreateInput({ dom, on = {} } = {}) {
   }
 
   function OnBlur() {
+    ClearLongPress();
     keys.clear();
     pointers.clear();
+    state.dragX = state.dragY = state.pinch = state.twist = state.panX = state.panY = state.wheel = 0;
     state.pressedCount = 0;
     state.pointerActive = false;
     if (state.actionHeld) { state.actionHeld = false; on.actionEnd?.(); }

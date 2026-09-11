@@ -14,8 +14,8 @@
 // 三角面预算：单件 ≤ 6k，二十件合计 ≤ 40k（quality 三档真实影响分段数与实例数）。
 
 import * as THREE from "three";
-import { PALETTE } from "./Data_Palette.mjs";
-import { EAR_TOOLS, EAR_TOOL_BY_ID } from "./Data_EarTools.mjs";
+import { PALETTE } from "./Data_Palette.mjs?v=ear005-20260911";
+import { EAR_TOOLS, EAR_TOOL_BY_ID } from "./Data_EarTools.mjs?v=ear005-20260911";
 
 // ── quality 三档：直接决定分段数、实例数与可选部件，不是「摆设参数」──
 const QUALITY_LEVELS = {
@@ -549,13 +549,13 @@ function MakeJawHingeDeformer(geo, hingeY, hingeZ, sign, maxAngle) {
 // 竹耳勺：竹节纹理的杆（轻微弯曲）+ 手工削出来的勺头（有薄刃和弧度）+ 握持端收细
 function BuildEarPickBamboo(THREE_ref, kit, q, seed) {
   const parts = [];
-  const shaftLen = 116, scoopLen = 18, scoopW = 5.2, scoopD = 1.5;
+  const shaftLen = 116, scoopLen = 7, scoopW = 3.0, scoopD = 0.8;
   // 杆：竹子，带节、带弯
   const rod = MakeNodeRod(THREE_ref, {
     length: shaftLen, r0: 2.5, r1: 1.15, seg: q.seg,
     nodes: [0.24, 0.5, 0.76], nodeBump: 0.16, curveAmp: 0.55,
   });
-  rod.translate(0, 0, -14);
+  rod.translate(0, 0, -shaftLen / 2 - 2);
   parts.push({ geo: rod, mat: kit.bamboo() });
 
   // 勺颈：从杆前端收细过渡到勺头
@@ -1572,12 +1572,12 @@ export function BuildTool(THREE_unused, { id, materials, quality } = {}) {
   // 缩放到契约长度（保留真实比例，不拉伸）
   const scale = size.z > 1e-4 ? spec.lengthMm / size.z : 1;
   if (Math.abs(scale - 1) > 1e-3) group.scale.setScalar(scale);
-  const halfZ = (size.z * scale) / 2;
 
   // ⑤ tip：接触判定的最前端。挂在一个 pivot 上，位置 = (0,0,+halfZ)
   const tip = new THREE_ref.Object3D();
   tip.name = `Tip_${id}`;
-  tip.position.set(0, 0, halfZ);
+  // builder 标出的工作端仍在局部空间，不能先乘 scale 再让父节点重复缩放。
+  tip.position.set(0, 0, (built.tipZ ?? box.max.z) - center.z);
   group.add(tip);
 
   // ⑥ 摆动/动画用的形变器
@@ -1660,18 +1660,14 @@ export function BuildTool(THREE_unused, { id, materials, quality } = {}) {
         m.position.x = basePositions[i].x + w * (0.4 + i * 0.25);
         m.position.y = basePositions[i].y;
       }
-      group.rotation.z = w * 0.28;
-      group.rotation.x = Math.sin(state.phase * hz * 1.13) * amp * 0.22;
-    } else {
-      group.rotation.z *= 0.86;
-      group.rotation.x *= 0.86;
+
     }
 
     // ── 耳镊 / 耳毛剪：捏合动画 ──
     if (built.forceps || built.scissors) {
       const target = 1 - squeeze01;                 // squeeze=1 → 合上
       state.bladeOpen += (target - state.bladeOpen) * Math.min(1, d * 14);
-      group.scale.y = 1;                            // 保持整体缩放，靠顶点不改
+
       const tilt = (0.5 - state.bladeOpen) * 0.030;
       // 直接微调各部件 y 方向：镊臂看起来在开合
       for (let i = 0; i < meshes.length; i++) {
@@ -1745,7 +1741,7 @@ export function BuildTool(THREE_unused, { id, materials, quality } = {}) {
 
     // ── 通用：握持时的轻微手持抖动，让静止的工具不像贴图 ──
     const bob = Math.sin(state.phase * 1.7) * 0.012 * (0.3 + active01);
-    group.position.y = (group.userData.baseY || 0) + bob;
+    // 世界位姿完全由 Hand 管理，不能在局部动画里清零位置或欧拉角。
   }
 
   function dispose() {

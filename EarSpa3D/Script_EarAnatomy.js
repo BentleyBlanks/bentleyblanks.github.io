@@ -17,7 +17,7 @@
 // 也就是「从 +tangent 看过去」up→right 是顺时针，与契约文字一致。
 
 import * as THREE from "three";
-import { PALETTE } from "./Data_Palette.mjs";
+import { PALETTE } from "./Data_Palette.mjs?v=ear005-20260911";
 
 // ─────────────────────────── 契约常量 ───────────────────────────
 
@@ -785,8 +785,8 @@ export function BuildEar(_THREE, { materials, quality = "mid", seed = 20260910 }
           kind: "canal",
           depth: clamp(cd + (rng() - 0.5) * 1.8, 0.8, 9.0),
           angle: ca + (rng() - 0.5) * 0.55,
-          len: lerp(1.4, 3.2, rng()),
-          rad: lerp(0.045, 0.075, rng()),
+          len: lerp(0.5, 1.1, rng()),
+          rad: lerp(0.02, 0.035, rng()),
           wander: (rng() - 0.5) * 0.7,
           phase: rng() * Math.PI * 2,
         });

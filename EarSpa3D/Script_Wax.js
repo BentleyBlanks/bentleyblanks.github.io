@@ -15,7 +15,7 @@
 // 了却判定没碰到」。
 
 import * as THREE from "three";
-import { PALETTE } from "./Data_Palette.mjs";
+import { PALETTE } from "./Data_Palette.mjs?v=ear005-20260911";
 
 // ─────────────────────────── 契约常量 ───────────────────────────
 
@@ -180,7 +180,16 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
   for (const t of WAX_TYPES) {
     const prof = WAX_PROFILE[t];
     const given = materials && materials[CRUMB_MAT_KEY[t]];
-    if (given && given.isMaterial) { waxMats[t] = given; continue; }
+    if (given && given.isMaterial) {
+      const mat = given.clone();
+      mat.transparent = false; mat.opacity = 1; mat.depthWrite = true;
+      if ("transmission" in mat) mat.transmission = 0;
+      mat.vertexColors = true;
+      mat.color.set(0xffffff);
+      mat.map = null;
+      if (mat.normalScale) mat.normalScale.setScalar(0.12);
+      waxMats[t] = mat; ownedMaterials.push(mat); continue;
+    }
     const m = new THREE.MeshStandardMaterial({
       color: new THREE.Color(prof.color),
       roughness: t === "wet" ? 0.20 : t === "impacted" ? 0.34 : 0.50,
@@ -247,12 +256,17 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
     return d;
   }
 
+  function DepositUv(i, j, nu, nv) {
+    const x = i / nu * 2 - 1, y = j / nv * 2 - 1;
+    return [x * Math.sqrt(1 - y * y / 2), y * Math.sqrt(1 - x * x / 2)];
+  }
+
   /** heightfield：边缘自然收薄贴住管壁，厚度带噪声起伏，中间最厚。 */
   function depHeight(d, u, v) {
     const r = Math.min(1, Math.hypot(u, v));
     const rim = Math.pow(smooth01((1 - r) / 0.28), 0.85);
     const lumps = 0.55 + 0.75 * fbm2(u * 1.7 + 3.1, v * 1.7 + 7.7, d.noiseSeed, 3);
-    return 0.06 + d.thickness * rim * lumps;
+    return Math.min(canal.RadiusAt(d.depth, d.angle) * 0.62, 0.06 + d.thickness * rim * lumps);
   }
 
   /**
@@ -276,17 +290,16 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
 
     let k = 0;
     for (let i = 0; i <= nu; i++) {
-      const u = (i / nu) * 2 - 1;
-      const depth = clamp(d.depth + u * d.size * 0.5, 0, canal.length);
-      const rLocal = Math.max(1.0, canal.RadiusAt(depth, d.angle));
       for (let j = 0; j <= nv; j++) {
-        const v = (j / nv) * 2 - 1;
+        const [u, v] = DepositUv(i, j, nu, nv);
+        const depth = clamp(d.depth + u * d.size * 0.5, 0, canal.length);
+        const rLocal = Math.max(1.0, canal.RadiusAt(depth, d.angle));
         const angle = d.angle + (v * d.size * d.spread * 0.5) / rLocal;
         const h = depHeight(d, u, v);
-        const p = canal.PointAt(depth, angle, h);
+        const p = canal.PointAt(depth, angle, -h).clone();
         const n = canal.NormalAt(depth, angle); // 由管壁指向管腔中心
         pos[k * 3] = p.x; pos[k * 3 + 1] = p.y; pos[k * 3 + 2] = p.z;
-        nrm[k * 3] = -n.x; nrm[k * 3 + 1] = -n.y; nrm[k * 3 + 2] = -n.z; // 朝管腔
+        nrm[k * 3] = n.x; nrm[k * 3 + 1] = n.y; nrm[k * 3 + 2] = n.z; // 朝管腔
         dirs[k * 3] = n.x; dirs[k * 3 + 1] = n.y; dirs[k * 3 + 2] = n.z;
         // 顶点色：贴壁处深、顶部亮；湿性的顶部再叠一点「透亮」
         const hNorm = clamp(h / Math.max(0.001, d.thickness + 0.06), 0, 1);
@@ -303,7 +316,8 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
     for (let i = 0; i < nu; i++) {
       for (let j = 0; j < nv; j++) {
         const a = i * (nv + 1) + j, b = a + nv + 1;
-        idx.push(a, b, a + 1, a + 1, b, b + 1);
+        if (weights[a] && weights[b] && weights[a + 1]) idx.push(a, b, a + 1);
+        if (weights[a + 1] && weights[b] && weights[b + 1]) idx.push(a + 1, b, b + 1);
       }
     }
     const g = new THREE.BufferGeometry();
@@ -312,6 +326,7 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
     g.setAttribute("color", new THREE.BufferAttribute(col, 3));
     g.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
     g.setIndex(idx);
+    g.computeVertexNormals();
     g.computeBoundingSphere();
 
     let mesh = d.mesh;
@@ -339,7 +354,11 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
     d._by = new Float32Array(vCount);
     d._bz = new Float32Array(vCount);
     for (let i = 0; i < vCount; i++) {
-      d._bx[i] = pos[i * 3]; d._by[i] = pos[i * 3 + 1]; d._bz[i] = pos[i * 3 + 2];
+      const [u, v] = DepositUv(Math.floor(i / (nv + 1)), i % (nv + 1), nu, nv);
+      const h = depHeight(d, u, v);
+      d._bx[i] = pos[i * 3] - dirs[i * 3] * h;
+      d._by[i] = pos[i * 3 + 1] - dirs[i * 3 + 1] * h;
+      d._bz[i] = pos[i * 3 + 2] - dirs[i * 3 + 2] * h;
     }
     if (ownedGeometries.indexOf(g) < 0) ownedGeometries.push(g);
     return g;
@@ -393,6 +412,13 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
         spreadCount++;
       }
     }
+    // 排布规则改了厚度/展开幅度后，几何也要同步，不能只改判定数据。
+    for (const d of deposits) {
+      d.size = Math.min(d.size, d.type === "impacted" ? 4.5 : 3.2);
+      d.spread = Math.min(d.spread, canal.RadiusAt(d.depth, d.angle) * 0.9 / d.size);
+      d.thickness = Math.min(d.thickness, d.type === "impacted" ? 1.3 : 0.85);
+      buildDepositGeometry(d, d._resU, d._resV);
+    }
     initialMass.total = Math.max(1e-6, totalMass());
   }
 
@@ -417,6 +443,7 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
   function applyRemoval(d) {
     const W = d._w;
     if (!W) return;
+    if (d.removed01 >= 0.999) d.removed01 = 1;
     const rem = d.removed01;
     if (Math.abs(rem - d._lastRemoved) < 0.004 && rem < 0.999) return;
     const nu = d._resU, nv = d._resV;
@@ -424,14 +451,13 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
     const cx = Math.cos(d.biteCenter), cy = Math.sin(d.biteCenter);
     let live = 0, k = 0;
     for (let i = 0; i <= nu; i++) {
-      const u = (i / nu) * 2 - 1;
       for (let j = 0; j <= nv; j++) {
-        const v = (j / nv) * 2 - 1;
+        const [u, v] = DepositUv(i, j, nu, nv);
         const hFull = depHeight(d, u, v);
         // 「已挖到多远」：从 biteCenter 方向往里啃，边缘用噪声抖出动口
         const along = u * cx + v * cy;
         const jag = (fbm2(u * 2.6 + d.biteSeed, v * 2.6 - d.biteSeed, d.noiseSeed + 5, 2) - 0.5) * 0.55;
-        const kill = smooth01((rem * 2.05 + jag - along + 1) / 0.5);
+        const kill = smooth01((rem * 3.6 + jag - along - 1.8) / 0.25);
         const w = clamp(1 - kill, 0, 1);
         W[k] = w;
         if (w > 0.02) live++;
@@ -458,12 +484,12 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
     for (let i = 0; i < nu; i++) {
       for (let j = 0; j < nv; j++) {
         const a = i * (nv + 1) + j, b = a + nv + 1;
-        if (W[a] > 0.02 || W[b] > 0.02 || W[a + 1] > 0.02 || W[b + 1] > 0.02) {
-          out.push(a, b, a + 1, a + 1, b, b + 1);
-        }
+        if (W[a] > 0.02 && W[b] > 0.02 && W[a + 1] > 0.02) out.push(a, b, a + 1);
+        if (W[a + 1] > 0.02 && W[b] > 0.02 && W[b + 1] > 0.02) out.push(a + 1, b, b + 1);
       }
     }
     d.geom.setIndex(out);
+    d.geom.computeVertexNormals();
     d.geom.computeBoundingSphere();
     d._indexDirty = false;
   }
@@ -531,7 +557,7 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
         const pr = canal.Project(_v1.set(c.px, c.py, c.pz));
         const limit = Math.max(0.15, pr.wallRadius - c.size * 0.5);
         if (pr.radialDist >= limit) {
-          const p = canal.PointAt(pr.depth, pr.angle, limit);
+          const p = canal.PointAt(pr.depth, pr.angle, limit - pr.wallRadius);
           c.px = p.x; c.py = p.y; c.pz = p.z;
           c.vx *= 0.25; c.vz *= 0.25;
           if (Math.abs(c.vy) < 26) { c.vy = 0; c.settled = true; }
@@ -660,7 +686,7 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
   const harvest = [];
   function recordHarvest(d, amount) {
     const size = d.size * amount;
-    if (size < 0.05) return;
+    if (size <= 0) return;
     // 同一处、短时间内的多次刮取合并成一条，免得结算界面刷屏
     const last = harvest[harvest.length - 1];
     if (last && last._id === d.id && now - last._t < 3) {
@@ -719,8 +745,8 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
     out.events.length = 0;
     if (!tip) return out;
 
-    const spec = tool || {};
-    const tipRadius = spec.tipRadius ?? spec.tipRadiusMm ?? 0.6;
+    const spec = tool?.spec || tool || {};
+    const tipRadius = tool?.tipRadius ?? spec.tipRadiusMm ?? 0.6;
     const idealAngle = (spec.idealAngleDeg ?? 35) * Math.PI / 180;
     const speedRange = spec.idealSpeedRange || [4, 40];
     const stepDt = (typeof dt === "number" && dt > 1e-6 && dt < 0.25) ? dt : 1 / 60;
@@ -766,8 +792,8 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
     if (best) {
       // 径向还要够靠近管壁才算「碰到耵聍」：耵聍是贴在壁上的
       const localH = best.thickness * (1 - best.removed01) + 0.10;
-      const gap = pNow.wallRadius + localH + tipRadius - pNow.radialDist;
-      if (gap < -0.55 || bestScore > 2.6) best = null;
+      const wallGap = pNow.wallRadius - pNow.radialDist;
+      if (wallGap > localH + tipRadius + 0.35 || wallGap < -tipRadius || bestScore > 2.6) best = null;
     }
     if (!best) {
       if (stretch.active) endStretch(true);
@@ -777,6 +803,7 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
     const d = best;
     out.hit = true;
     out.depositId = d.id;
+    out.type = d.type;
     const hNow = hardnessNow(d);
     out.hardnessNow = hNow;
 
@@ -789,7 +816,7 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
     strike.normalize();
     const surfN = canal.NormalAt(pNow.depth, pNow.angle); // 由管壁指向管腔中心
     // 与「管壁切面」的夹角：运动方向平行于壁 → 0；垂直于壁（往里压）→ ±90°
-    const nAngle = Math.acos(clamp(Math.abs(strike.dot(surfN)), -1, 1)) - Math.PI / 2;
+    const nAngle = Math.asin(clamp(Math.abs(strike.dot(surfN)), 0, 1));
     const err = Math.abs(nAngle - idealAngle);
     out.angleErrorDeg = err * 180 / Math.PI;
     const angleScore = Math.pow(clamp(1 - err / (Math.PI / 3), 0, 1), 1.4);
@@ -815,7 +842,15 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
       (spec.mechanic === "pinch" ? 0.85 : 1.0);
     let removeNow = stepDt * (0.85 + 2.4 * speedScore) * angleFactor *
       (0.45 + 0.55 * hardScore) * effStrength / (1 + d.size * 0.35);
-    removeNow = clamp(removeNow, 0, 0.35);
+    const working = motion?.actionHeld === true;
+    removeNow *= working ? (spec.efficiencyMul ?? 1) : 0;
+    // 观察、滴液、共振等工具走各自的机制，不能自动当作耳勺。
+    if (["light", "spray", "vibrate", "irrigate", "vacuum"].includes(spec.mechanic)) removeNow = 0;
+    if (working && spec.mechanic === "spray") d.softnessLocal = clamp(d.softnessLocal + stepDt * 0.8, 0, 1);
+    if (working && spec.mechanic === "vibrate") d.softnessLocal = clamp(d.softnessLocal + stepDt * 0.3, 0, 1);
+    if (working && spec.mechanic === "irrigate") removeNow = stepDt * (1 - hNow) * 0.6;
+    if (working && spec.mechanic === "vacuum") removeNow = stepDt * (1 - hNow) * 0.8;
+    removeNow = clamp(removeNow, 0, Math.min(0.35, 1 - d.removed01));
 
     // 太快 → 干性/硬结崩成碎屑，整块反而拿得少（真实的取舍，也是玩家要学的技巧）
     const crackRisk = clamp((spec.crackRisk ?? 0.4) * 0.6 + prof.crumbMul * 0.25, 0, 1);
@@ -828,7 +863,7 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
 
     // 硬结没软化：挖不动 + 累积不适（真实会痛，这里只做「一点点委屈」的反馈）
     let discomfort = 0;
-    if (softDeficit > 0.02) {
+    if (softDeficit > 0.02 && motion?.actionHeld && !["spray", "vibrate", "light"].includes(spec.mechanic)) {
       removeNow *= clamp(1 - softDeficit * 3, 0, 1);
       discomfort = stepDt * softDeficit * 0.9;
       state.discomfort += discomfort;
@@ -836,7 +871,7 @@ export function MakeWaxField(_THREE, { canal, rng: rngIn, materials, quality = "
       pushEvent("tooHard", { depositId: d.id, softness: softNow, depth: d.depth });
     }
 
-    if (removeNow > 0.0005) {
+    if (removeNow > 0) {
       d.removed01 = clamp(d.removed01 + removeNow, 0, 1);
       applyRemoval(d);
       recordHarvest(d, removeNow);

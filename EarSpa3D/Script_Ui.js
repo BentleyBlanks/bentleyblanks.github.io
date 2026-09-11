@@ -11,7 +11,7 @@
 //      进深尺只在数值真的动了才重绘。
 //   4. dispose() 要真的解绑、真的移除。
 
-import { CSS_VARS, SHAPE } from "./Data_Palette.mjs";
+import { CSS_VARS, SHAPE } from "./Data_Palette.mjs?v=ear005-20260911";
 
 const STYLE_ID = "ear-spa-ui-style";
 
@@ -235,8 +235,9 @@ const WAX_META = {
 
 // 工具动作按钮：契约的 on.action(name) 只认名字，这里按 mechanic 给可用动作
 const TOOL_ACTIONS = {
-  speak: { icon: "sound", label: "轻声提示" },
-  breath: { icon: "feather", label: "吹一吹" },
+  toggleFine: { icon: "feather", label: "精修" },
+  shop: { icon: "scoop", label: "小铺" },
+  finish: { icon: "check", label: "收工" },
 };
 
 const BGM_OPTIONS = [
@@ -540,8 +541,42 @@ export function CreateUi({ palette, tools, on, mount, showLoading = true } = {})
     btn.dataset.action = name;
     btn.setAttribute("aria-label", meta.label);
     btn.title = meta.label;
+    btn.appendChild(El(doc, "span", null, meta.label));
     actions.appendChild(btn);
   }
+
+  const workBtn = El(doc, "button", "ear-btn ear-work ear-glass", "按住清理");
+  workBtn.type = "button";
+  workBtn.setAttribute("aria-label", "按住清理");
+  actions.prepend(workBtn);
+  const WorkStart = ev => {
+    ev.preventDefault();
+    workBtn.setPointerCapture?.(ev.pointerId);
+    workBtn.classList.add("is-held");
+    emit("action", "workStart");
+  };
+  const WorkEnd = () => {
+    workBtn.classList.remove("is-held");
+    emit("action", "workEnd");
+  };
+  workBtn.addEventListener("pointerdown", WorkStart);
+  for (const name of ["pointerup", "pointercancel", "lostpointercapture"]) workBtn.addEventListener(name, WorkEnd);
+  const cameras = El(doc, "nav", "ear-cameras ear-glass");
+  cameras.setAttribute("aria-label", "视角");
+  for (const [id, label] of [["canal", "内窥"], ["macro", "微距"], ["shop", "店内"]]) {
+    const btn = El(doc, "button", "ear-btn", label);
+    btn.type = "button";
+    btn.dataset.camera = id;
+    btn.setAttribute("aria-pressed", String(id === "canal"));
+    btn.addEventListener("click", () => emit("camera", id));
+    cameras.appendChild(btn);
+  }
+  root.appendChild(cameras);
+  const contactMarker = El(doc, "div", "ear-contact");
+  const contactLabel = El(doc, "span", "ear-contact__label");
+  contactMarker.appendChild(contactLabel);
+  contactMarker.hidden = true;
+  root.appendChild(contactMarker);
 
   // ── 提示浮层 ──
   const toastHost = El(doc, "div", "ear-toast-host");
@@ -602,9 +637,6 @@ export function CreateUi({ palette, tools, on, mount, showLoading = true } = {})
     if (tool?.realWorldNote) card.title = tool.realWorldNote;
 
     card.addEventListener("click", () => {
-      if (locked) {
-        cmd.tip(`这把${ToolLabel(tool)}还没解锁，再采几轮就有了`, { tone: "info" });
-      }
       emit("toolSelect", tool?.id);
     });
     return { el: card, iconEl: icon, nameEl: name, catEl: cat, tool, locked };
@@ -1120,6 +1152,35 @@ export function CreateUi({ palette, tools, on, mount, showLoading = true } = {})
         SetText(toolNameEl, "toolName", "选一件工具");
         SetText(hintEl, "toolHint", "轻一点，慢慢来");
       }
+    },
+
+    hasOpenPanel() { return openStack.length > 0; },
+    setToolLocked(id, locked) {
+      const entry = toolCards.get(id);
+      if (!entry) return;
+      entry.tool.locked = locked;
+      entry.el.classList.toggle("is-locked", locked);
+      entry.el.setAttribute("aria-disabled", String(locked));
+      entry.el.setAttribute("aria-label", `${ToolLabel(entry.tool)}${locked ? "，未解锁" : ""}`);
+      if (!locked) entry.el.querySelector(".ear-toolcard__lock")?.remove();
+    },
+    setContactPoint({ x, y, visible, hit, working, blocked }) {
+      contactMarker.hidden = !visible;
+      contactMarker.style.left = `${x * 100}%`;
+      contactMarker.style.top = `${y * 100}%`;
+      contactMarker.classList.toggle("is-hit", !!hit);
+      contactMarker.classList.toggle("is-working", !!working);
+      contactLabel.textContent = blocked ? "先用滴耳液软化" : hit ? (working ? "正在处理" : "已对准") : "工作端";
+    },
+    setActionHint(label, note) {
+      workBtn.textContent = `按住${label}`;
+      workBtn.title = note;
+    },
+    setCameraMode(mode) {
+      for (const btn of cameras.children) btn.setAttribute("aria-pressed", String(btn.dataset.camera === mode));
+    },
+    setFineMode(fine) {
+      actions.querySelector('[data-action="toggleFine"]').setAttribute("aria-pressed", String(fine));
     },
 
     /** 温和提示：tone = "info" | "good" | "warn" */

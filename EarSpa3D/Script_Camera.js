@@ -11,7 +11,7 @@
 // 但抖动的频率要压得很低（<1.5Hz 的漂移 + 极小幅高频噪声），否则晕。
 
 import * as THREE from "three";
-import { Clamp, Damp, Lerp, Smooth } from "./Script_Util.js";
+import { Clamp, Damp, Lerp, Smooth } from "./Script_Util.js?v=ear005-20260911";
 
 export const CAMERA_MODES = ["canal", "macro", "shop"];
 
@@ -48,6 +48,7 @@ export function CreateCameraRig({ core, canal } = {}) {
   };
 
   const shakeSeed = 1.7;
+  let snapNext = true;
 
   /** 极简值噪声：够做手抖了，省一个依赖 */
   function Noise(t, seed) {
@@ -63,12 +64,13 @@ export function CreateCameraRig({ core, canal } = {}) {
     state.prevMode = state.mode;
     state.mode = mode;
     state.blend = 0;
+    snapNext = true;
     return state.mode;
   }
 
   /** 捏合 / 滚轮都在改这个：内窥视角的可视距离 3.5–22mm */
   function Zoom(delta) {
-    state.backTarget = Clamp(state.backTarget * Math.exp(-delta * 1.1), 3.5, 22);
+    state.backTarget = Clamp(state.backTarget * Math.exp(-delta * 1.1), 5.5, 10);
   }
 
   function Update(dt, ctx = {}) {
@@ -87,7 +89,7 @@ export function CreateCameraRig({ core, canal } = {}) {
 
     // 停手 1.2 秒后自动轻微推近：像内窥镜在对焦，也给出「看得更细了」的暗示
     const focusPush = state.stillTime > 1.2 ? Math.min(1, (state.stillTime - 1.2) / 2.2) : 0;
-    const zoomWanted = state.backTarget - focusPush * 2.6;
+    const zoomWanted = state.backTarget;
     state.backDistance = Damp(state.backDistance, zoomWanted, 0.45, dt);
 
     const frame = canal?.FrameAt ? canal.FrameAt(Clamp(depth, 0, canal.length || 28)) : null;
@@ -105,7 +107,7 @@ export function CreateCameraRig({ core, canal } = {}) {
       //    沿切线外推。
       //  · 在管腔里时侧偏要小：管腔半径只有 2.5–3.4mm，偏 1.2mm 以上镜头就贴到
       //    壁上了，画面会被一整片皮肤糊满（实测过）。管外则回到中轴线上。
-      const back = macro ? state.backDistance * 0.6 : state.backDistance;
+      const back = macro ? Math.max(4.5, state.backDistance * 0.8) : state.backDistance;
       const rawDepth = depth - back;
       const insideCanal = rawDepth >= 0.9;
       const camDepth = insideCanal ? Clamp(rawDepth, 0.9, Math.max(1.2, (canal?.length || 28) - 1.5)) : 0;
@@ -135,12 +137,9 @@ export function CreateCameraRig({ core, canal } = {}) {
       const lookFrame = canal?.FrameAt ? canal.FrameAt(lookDepth) : null;
       if (lookFrame?.center) target.copy(lookFrame.center);
       else target.copy(tip).addScaledVector(tangent, lookAhead);
-      // shop 过渡时从当前位往店里插值
-      if (state.blend < 1 && state.prevMode === "shop") {
-        const k = 1 - state.blend;
-        desired.lerp(ShopPosition(tip, tmpB), k);
-        target.lerp(tip, k * 0.6);
-      }
+      // 微距把关注点偏向真实工具尖，保持工作区域在画框内。
+      target.lerp(tip, macro ? 0.65 : 0.25);
+
     } else {
       // 店里视角：从工具尖往侧后方退开，看客人和整个房间
       const frame = canal?.FrameAt ? canal.FrameAt(Clamp(depth, 0, canal?.length || 28)) : null;
@@ -163,6 +162,7 @@ export function CreateCameraRig({ core, canal } = {}) {
 
     // 跟随弹簧：位置慢一点、朝向快一点，看起来像「手在带镜头」
     const posHalf = state.mode === "shop" ? 0.55 : state.blend < 1 ? 0.4 : 0.13;
+    if (snapNext) camera.position.copy(desired);
     camera.position.x = Damp(camera.position.x, desired.x, posHalf, dt);
     camera.position.y = Damp(camera.position.y, desired.y, posHalf, dt);
     camera.position.z = Damp(camera.position.z, desired.z, posHalf, dt);
@@ -173,6 +173,7 @@ export function CreateCameraRig({ core, canal } = {}) {
     wantDir.copy(look).sub(camera.position);
     if (wantDir.lengthSq() < 1e-9) wantDir.copy(tangent);
     wantDir.normalize();
+    if (snapNext) currentDir.copy(wantDir);
     currentDir.lerp(wantDir, 1 - Math.exp(-dt / lookHalf)).normalize();
     camera.lookAt(tmp.copy(camera.position).add(currentDir));
 
@@ -182,12 +183,17 @@ export function CreateCameraRig({ core, canal } = {}) {
     camera.rotateZ(state.roll + Noise(state.tremor * 0.41, 3.3) * 0.006);
 
     // 视野：内窥视角要广一点才看得全管壁，且随缩放收窄
-    const wantFov = state.mode === "shop"
+    let wantFov = state.mode === "shop"
       ? 42
       : state.mode === "macro"
-        ? 34
+        ? 62
         : Clamp(56 + (11 - state.backDistance) * 1.4, 40, 68);
-    camera.fov = Damp(camera.fov, wantFov, 0.35, dt);
+    // 竖屏守住横向视野，否则左右管壁与工具都会被裁出屏幕。
+    if (state.mode !== "shop" && camera.aspect < 1) {
+      wantFov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(wantFov / 2)) / camera.aspect));
+    }
+    camera.fov = snapNext ? wantFov : Damp(camera.fov, wantFov, 0.35, dt);
+    snapNext = false;
     camera.updateProjectionMatrix();
 
     if (insetCamera) UpdateInset(dt, ctx);

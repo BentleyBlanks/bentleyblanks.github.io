@@ -258,6 +258,19 @@ export function CreateUi({ palette, tools, on }) -> {
 
 ## 6. 交叉验收（lead 负责，但你要自己先跑通）
 
+### 可玩性与视图约定（2026-09-11）
+
+- 工具 `tip` 是模型局部坐标，Hand 放置时必须计入 group.scale；显示尖端与接触点一致。
+- `Hand.SetViewClip(camera, mode)` 在相机更新后按实际视平面裁掉近镜头的器械；店内关闭裁切。
+- 店内与耳道切换直接落到安全机位，不穿过角色或墙体；耳道缩放不越过管口或鼓膜。
+- Wax 的高度沿内法线长向管腔，保存原始管壁基点后再变形；读取缓存空间向量立即复制。
+- `Wax.Probe` 接收 BuildTool 返回值并读取 `tool.spec`，`motion.actionHeld` 驱动清理；`removeNow` 是本帧真实取出量。
+- UI 的 `action` 路由包括 `workStart/workEnd`、`toggleFine`、`shop`、`finish`；机位按钮走 `camera(mode)`。
+- 店内角色按床位单独摆放，隐藏耳道、耵聍和工具；回内窥时恢复耳道坐标系。
+- 滴耳液开局可用，避免硬结所需工具被锁导致无法通关。清理到 99.9% 后自动收工。
+- 无独立日程面板时直接接待当前客人；小铺可切换未完成客人，结算后能继续下一位。
+- 仪表只占边缘，中央画布接收拖动；角色小窗每帧完整合成且单独清色、清深度。
+
 1. `node scripts/Script_LocalPreview.mjs --no-open` 起本地服，打开
    `http://127.0.0.1:<port>/EarSpa3D/index.html`，页面必须无 console 报错。
 2. 手机验收用 `--lan`，扫输出的局域网地址。

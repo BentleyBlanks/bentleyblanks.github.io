@@ -10,14 +10,14 @@
 //    容忍可选依赖，但集成层不能假设「它一定实现了」——不然一个笔误会整局卡死。
 
 import * as THREE from "three";
-import { PALETTE, CSS_VARS, SEMANTIC, SHAPE } from "./Data_Palette.mjs";
-import { CreateCore, GuessQuality } from "./Script_Core.js";
-import { CreateInput } from "./Script_Input.js";
-import { CreateCameraRig } from "./Script_Camera.js";
-import { CreateSession } from "./Script_Session.js";
-import { CreateHand } from "./Script_Hand.js";
-import { CreateShop, SHOP_LEVELS } from "./Script_Shop.js";
-import { Clamp, Damp, MakeRng } from "./Script_Util.js";
+import { PALETTE, CSS_VARS, SEMANTIC, SHAPE } from "./Data_Palette.mjs?v=ear005-20260911";
+import { CreateCore, GuessQuality } from "./Script_Core.js?v=ear005-20260911";
+import { CreateInput } from "./Script_Input.js?v=ear005-20260911";
+import { CreateCameraRig } from "./Script_Camera.js?v=ear005-20260911";
+import { CreateSession } from "./Script_Session.js?v=ear005-20260911";
+import { CreateHand } from "./Script_Hand.js?v=ear005-20260911";
+import { CreateShop, SHOP_LEVELS } from "./Script_Shop.js?v=ear005-20260911";
+import { Clamp, Damp, MakeRng } from "./Script_Util.js?v=ear005-20260911";
 
 /** 动态 import：拿不到就记一笔，页面继续跑。 */
 async function TryLoad(path, name) {
@@ -34,7 +34,7 @@ const SETTINGS_KEY = "earspa3d.settings.v1";
 function LoadSettings() {
   const fallback = {
     quality: "auto", bgm: "teaRoom", master: 0.85, bgmVolume: 0.5, sfxVolume: 0.9,
-    gyro: false, inset: true, handedness: "right", seed: 20260910,
+    gyro: false, inset: false, handedness: "right", seed: 20260910,
   };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
@@ -96,16 +96,16 @@ export async function Start() {
 
   // ── 并行拉模块，谁慢等谁 ──
   const [M, A, T, L, S, U, AU] = await Promise.all([
-    TryLoad("./Script_Materials.js", "Materials"),
-    TryLoad("./Script_EarAnatomy.js", "EarAnatomy"),
-    TryLoad("./Script_Tools.js", "Tools"),
-    TryLoad("./Script_Character.js", "Character"),
-    TryLoad("./Script_Scene.js", "Scene"),
-    TryLoad("./Script_Ui.js", "Ui"),
-    TryLoad("./Script_Audio.js", "Audio"),
+    TryLoad("./Script_Materials.js?v=ear005-20260911", "Materials"),
+    TryLoad("./Script_EarAnatomy.js?v=ear005-20260911", "EarAnatomy"),
+    TryLoad("./Script_Tools.js?v=ear005-20260911", "Tools"),
+    TryLoad("./Script_Character.js?v=ear005-20260911", "Character"),
+    TryLoad("./Script_Scene.js?v=ear005-20260911", "Scene"),
+    TryLoad("./Script_Ui.js?v=ear005-20260911", "Ui"),
+    TryLoad("./Script_Audio.js?v=ear005-20260911", "Audio"),
   ]);
-  const W = await TryLoad("./Script_Wax.js", "Wax");
-  const D = await TryLoad("./Data_EarTools.mjs", "EarTools");
+  const W = await TryLoad("./Script_Wax.js?v=ear005-20260911", "Wax");
+  const D = await TryLoad("./Data_EarTools.mjs?v=ear005-20260911", "EarTools");
   missing = [M, A, T, L, S, U, AU, W, D].filter((r) => !r.ok).map((r) => r.name || r.error?.message);
   intro.setMissing(missing);
   t0 = mark("加载模块", t0);
@@ -136,27 +136,12 @@ export async function Start() {
   // 用几十毫米的偏移会拍成一张耳部特写（实测踩过：143mm，画面里只有耳廓和床沿）。
   // rig 在下面才建，所以先算好存起来，建完再喂给它。
   let shopFraming = null;
-  if (room?.landmarks?.bounds) {
-    const b = room.landmarks.bounds;
-    const cx = (b.min.x + b.max.x) / 2;
-    const cy = (b.min.y + b.max.y) / 2;
-    const cz = (b.min.z + b.max.z) / 2;
-    // 看：客人身上再往房间中心偏一点，画框里同时有客人和房间
-    const look = new THREE.Vector3(cx * 0.35, cy * 0.32, cz * 0.35);
-    // 站：从客人出发、朝房间中心的反方向退开 1.3 米，抬高 0.7 米。
-    // **必须是「朝房间内侧退」**，不能拿房间尺寸当偏移直接加——那样相机会退到
-    // 墙外面去，画面里只有一面墙的背面（实测就是一片暗褐）。
-    const inward = new THREE.Vector3(cx - 0, 0, cz - 0);
-    if (inward.lengthSq() < 1e-6) inward.set(0, 0, 1);
-    inward.normalize();
-    const back = 1300;
-    const margin = 260;
-    const offset = new THREE.Vector3(
-      Clamp(-inward.x * back, b.min.x + margin, b.max.x - margin),
-      700,
-      Clamp(-inward.z * back, b.min.z + margin, b.max.z - margin),
-    );
-    shopFraming = { offset, lookAt: look };
+  if (room?.landmarks?.lyingSurface) {
+    const bed = room.landmarks.lyingSurface;
+    shopFraming = {
+      offset: new THREE.Vector3(bed.x - 950, bed.y + 1150, bed.z + 1000),
+      lookAt: new THREE.Vector3(bed.x - 80, bed.y + 150, bed.z - 150),
+    };
   }
 
   // 微尘：通透空气的关键，UI 里没有开关，跟着画质档走
@@ -173,6 +158,14 @@ export async function Start() {
   // 用一层**稳定的门面**包住耵聍场：经营环里换一位客人就换一只耳朵，需要整场
   // 重建耵聍，但 Session / 主循环持有的是引用，重新赋值它们会指到旧的场上。
   // 门面身份不变、内部可换，换客人时不必重建任何上游对象。
+  const detailClip = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+  const clipPoint = new THREE.Vector3();
+  const screenTip = new THREE.Vector3();
+  const hairs = ear?.group?.getObjectByName("CanalHairs");
+  if (hairs?.material) {
+    hairs.material = hairs.material.clone();
+    hairs.material.clippingPlanes = [detailClip];
+  }
   let harvestSeen = 0;
   let waxField = null;
   const wax = {
@@ -198,7 +191,12 @@ export async function Start() {
       }
       if (!W.ok || !canal) return false;
       waxField = W.mod.MakeWaxField(THREE, { canal, rng: customerRng, materials, quality });
-      if (waxField?.group) core.scene.add(waxField.group);
+      if (waxField?.group) {
+        core.scene.add(waxField.group);
+        waxField.group.traverse(node => {
+          if (node.material) node.material.clippingPlanes = [detailClip];
+        });
+      }
       harvestSeen = 0;
       return !!waxField;
     },
@@ -276,7 +274,7 @@ export async function Start() {
   // 角色的几何在耳道视角里既看不见又会穿镜头，所以让它单独待在一个场景里：
   // 主场景画耳道（内窥灯），画中画场景画角色的脸（固定三点光）。
   // 两个场景共享世界坐标——scene 本身没有变换，所以 earAnchor 的对位照旧成立。
-  core.insetScene.background = null;
+  core.insetScene.background = new THREE.Color(PALETTE.mint);
   const insetKey = new THREE.DirectionalLight(0xffe9d5, 1.5);
   insetKey.position.set(70, 110, 130);
   const insetFill = new THREE.DirectionalLight(0xdcebf7, 0.75);
@@ -285,7 +283,7 @@ export async function Start() {
   insetRim.position.set(20, -60, -120);
   core.insetScene.add(insetKey, insetFill, insetRim, new THREE.AmbientLight(0xfff3e8, 0.85));
 
-  let charScene = "inset";
+  let charScene = "main";
   function ApplyLightingForMode(mode) {
     const insideEar = mode !== "shop";
     for (const entry of roomLights) {
@@ -298,7 +296,18 @@ export async function Start() {
     endoAmbient.intensity = insideEar ? 0.55 : 0;
     core.setExposure(insideEar ? 1.12 : 1.05);
     if (room?.group) room.group.visible = !insideEar;
+    const pinna = ear?.group?.getObjectByName("Pinna");
+    if (pinna) pinna.visible = !insideEar;
     if (room?.ambient) room.ambient.visible = !insideEar;
+
+    if (ear?.group) ear.group.visible = insideEar;
+    if (wax?.group) wax.group.visible = insideEar;
+    if (character?.group) {
+      const bed = room?.landmarks?.lyingSurface;
+      character.group.rotation.set(insideEar ? 0 : -Math.PI / 2, 0, 0);
+      if (insideEar || !bed) character.group.position.set(0, 0, 0);
+      else character.group.position.set(bed.x, bed.y + 325, bed.z - 600);
+    }
 
     // 角色按模式换场景：耳道里进画中画，店里回主场景
     const want = insideEar ? "inset" : "main";
@@ -328,12 +337,13 @@ export async function Start() {
     phase: "intro",           // intro | counter | playing | paused | finished
     mode: "canal",
     currentToolId: toolSpecs[0]?.id || null,
-    unlocked: new Set(toolSpecs.slice(0, 5).map((t) => t.id)),
+    unlocked: new Set([...toolSpecs.slice(0, 5).map((t) => t.id), "earDrops"]),
     lastHarvestCount: 0,
     comfortSmooth: 0.2,
     expression: "relaxed",
     expressionUntil: 0,
     elapsed: 0,
+    showInset: settings.inset,
   };
   /** 当前打开的小铺面板（同一时刻只允许一个） */
   let shopPanel = null;
@@ -347,7 +357,7 @@ export async function Start() {
       toolSelect: (id) => SelectTool(id),
       action: (name) => HandleUiAction(name),
       mode: (id) => SetMode(id),
-      camera: (id) => SetCamera(id),
+      camera: (id) => SetMode(id),
       settings: (patch) => ApplySettings(patch),
     },
   }) : null;
@@ -361,6 +371,9 @@ export async function Start() {
   }
 
   function ApplySettings(patch) {
+    if (patch.volume) patch = { ...patch, master: patch.volume.master ?? settings.master,
+      sfxVolume: patch.volume.sfx ?? settings.sfxVolume, bgmVolume: patch.volume.bgm ?? settings.bgmVolume };
+    Object.assign(settings, patch);
     if (patch.quality) {
       const applied = core.SetQuality(patch.quality === "auto" ? GuessQuality() : patch.quality);
       SaveSettings({ ...patch, quality: applied });
@@ -387,9 +400,9 @@ export async function Start() {
     if (!built) return;
     state.currentToolId = id;
     hand.SetTool(built);
-    hand.Reset();
     ui?.setToolActive?.(id);
     const hint = hand.ActionHint();
+    ui?.setActionHint?.(hint.label, hint.note);
     ui?.tip?.(`${built.spec?.cnName || id}：${hint.note}`, { tone: "info", ms: 3200 });
     audio?.playSfx?.("uiTap", { gain: 0.6 });
     // 工具拿到手就自动进入耳道视角：省一次点击，也避免玩家对着房间发愣
@@ -403,8 +416,10 @@ export async function Start() {
   }
 
   function SetMode(mode) {
+    if (!["canal", "macro", "shop"].includes(mode)) return;
     if (mode === state.mode) return;
     state.mode = mode;
+    ui?.setCameraMode?.(mode);
     rig.SetMode(mode === "shop" ? "shop" : mode === "macro" ? "macro" : "canal");
     if (mode === "shop") hand.Retract(); else hand.Engage();
     ApplyLightingForMode(mode);
@@ -412,14 +427,17 @@ export async function Start() {
   }
 
   function HandleUiAction(name) {
+    if (name.startsWith("bgm:")) { ApplySettings({ bgm: name.slice(4) }); return; }
     switch (name) {
+      case "workStart": input.state.actionHeld = true; hand.OnActionStart(); break;
+      case "workEnd": input.state.actionHeld = false; break;
       case "finish": FinishSession(); break;
       case "restart": Restart(); break;
       case "shop": OpenShopPanel(); break;
       case "openDay": OpenDay(); break;
       case "nextCustomer": AfterCustomer(); break;
       case "closeDay": CloseDay(); break;
-      case "toggleFine": input.SetFine(!input.fine); break;
+      case "toggleFine": input.SetFine(!input.fine); ui?.setFineMode?.(input.fine); break;
       case "toggleInset": state.showInset = !state.showInset; break;
       case "toggleGyro": ApplySettings({ gyro: !settings.gyro }); break;
       default: break;
@@ -457,7 +475,9 @@ export async function Start() {
         case "discomfort":
           SetExpression("ticklish", 0.5);
           break;
-        case "finish":
+        case "workStart": input.state.actionHeld = true; hand.OnActionStart(); break;
+      case "workEnd": input.state.actionHeld = false; break;
+      case "finish":
           ui?.showHarvest?.(event.harvest || []);
           break;
         case "harvest":
@@ -484,6 +504,7 @@ export async function Start() {
     else if (state.currentToolId) SelectTool(state.currentToolId);
     rig.SetMode("canal");
     state.mode = "canal";
+    ui?.setCameraMode?.("canal");
     ApplyLightingForMode("canal");
     audio?.setBgm?.(shop.state.mood || settings.bgm || "teaRoom");
     PlayBootChime();
@@ -495,7 +516,7 @@ export async function Start() {
 
   /** 一局结束：结算给经营环，出收款单，再决定「下一位」还是「打烊」 */
   function FinishSession() {
-    if (state.phase === "finished") return null;
+    if (state.phase !== "playing") return null;
     state.phase = "finished";
     const summary = session.Finish();
     hand.Retract();
@@ -544,14 +565,20 @@ export async function Start() {
     ApplyLightingForMode("shop");
     audio?.setBgm?.(shop.state.mood);
     room?.setMood?.(shop.state.mood);
-    ui?.showDayStart?.(BuildShopSnapshot(), ShopHandlers());
+    if (ui?.showDayStart) ui.showDayStart(BuildShopSnapshot(), ShopHandlers());
+    else StartCustomer();
     return brief;
   }
 
   /** 接待：换耳朵（按客人的种子重建耵聍）、换氛围、进耳道视角 */
   function StartCustomer(customerId) {
+    if (customerId) {
+      const index = shop.state.todayCustomers.findIndex(c => c.id === customerId && !c.done);
+      if (index < 0) return false;
+      shop.state.todayIndex = index;
+    }
     const customer = shop.CurrentCustomer();
-    if (!customer) return false;
+    if (!customer || customer.done) return false;
     wax.Rebuild(MakeRng(customer.waxSeed));
     session.Start();
     state.phase = "playing";
@@ -559,10 +586,12 @@ export async function Start() {
     hand.Reset();
     rig.SetMode("canal");
     state.mode = "canal";
+    ui?.setCameraMode?.("canal");
     ApplyLightingForMode("canal");
     room?.setMood?.(shop.state.mood);
     state._dangerLatched = false;
     ui?.hideShop?.();
+    ui?.closePanel?.("harvest");
     ui?.tip?.(`客人：${customer.name} · ${customer.tierName}`, { tone: "info", ms: 2600 });
     SelectTool(state.currentToolId || toolSpecs[0]?.id);
     return true;
@@ -570,7 +599,7 @@ export async function Start() {
 
   function AfterCustomer() {
     shop.AdvanceCustomer();
-    if (shop.HasNextCustomer()) OpenDay();
+    if (shop.HasNextCustomer()) StartCustomer();
     else CloseDay();
   }
 
@@ -605,7 +634,8 @@ export async function Start() {
   }
 
   function RefreshShop() {
-    ui?.showShop?.(BuildShopSnapshot(), ShopHandlers());
+    if (ui?.showShop) ui.showShop(BuildShopSnapshot(), ShopHandlers());
+    else ShowFallbackShop();
   }
 
   function OpenShopPanel() {
@@ -629,6 +659,7 @@ export async function Start() {
    * 就是「无论如何都能开店、能升级、能打烊」。
    */
   function ShowFallbackShop() {
+    input.state.actionHeld = false;
     const snapshot = BuildShopSnapshot();
     const handlers = ShopHandlers();
     if (shopPanel) { shopPanel.remove(); shopPanel = null; }
@@ -773,6 +804,7 @@ export async function Start() {
     hand.Reset();
     rig.SetMode("canal");
     state.mode = "canal";
+    ui?.setCameraMode?.("canal");
     ApplyLightingForMode("canal");
   }
 
@@ -834,7 +866,7 @@ export async function Start() {
     });
 
     const enter = () => {
-      button.removeEventListener("pointerup", enter);
+
       // 音频解锁必须在手势里同步发起，这条不能等
       try { audio?.unlock?.(); } catch (error) { console.warn(error); }
 
@@ -862,7 +894,7 @@ export async function Start() {
         go();
       }
     };
-    button.addEventListener("pointerup", enter);
+    button.addEventListener("click", enter, { once: true });
     return wrap;
   }
 
@@ -955,15 +987,15 @@ export async function Start() {
     if (inputFrame.pinch) rig.Zoom(inputFrame.pinch);
     if (inputFrame.wheel) rig.Zoom(inputFrame.wheel);
 
-    const playing = state.phase === "playing";
+    const playing = state.phase === "playing" && !shopPanel && !ui?.hasOpenPanel?.();
+    if (hand.tool?.group) hand.tool.group.visible = state.mode !== "shop";
     const handFrame = hand.Update(dt, playing ? inputFrame : { ...inputFrame, actionHeld: false }, { locked: !playing || state.mode === "shop" });
 
     // 工具尖位移：碎屑掉落与「刮了多长」都靠它
     const tipMoved = handFrame.tipWorld.distanceTo(lastTipWorld);
-    lastTipWorld.copy(handFrame.tipWorld);
 
     let probe = null;
-    if (wax?.Probe && playing && state.mode !== "shop") {
+    if (wax?.Probe && playing && state.mode !== "shop" && handFrame.lift < 0.4) {
       probe = wax.Probe({
         tip: handFrame.tipWorld,
         tipPrev: lastTipWorld,
@@ -983,6 +1015,8 @@ export async function Start() {
       });
     }
 
+    lastTipWorld.copy(handFrame.tipWorld);
+
     const zone = canal?.ZoneAt?.(handFrame.depth) || "cartilage";
     if (playing) {
       const motion = {
@@ -991,7 +1025,7 @@ export async function Start() {
         spinRate: handFrame.spinRate,
         angleError01: handFrame.angleError01,
         speedError01: handFrame.speedError01,
-        removedTotal: wax?.RemovedTotal?.() ?? 0,
+        removedTotal: wax.Cleanliness(),
       };
       session.Update(dt, {
         dt, tool: hand.tool, motion, probe, zone, depth: handFrame.depth,
@@ -1012,7 +1046,7 @@ export async function Start() {
 
       // 掏干净了就自动收工：经营环需要「一局有终点」，但强迫症玩家会一直挖到
       // 一颗渣都不剩。给 2.5 秒的确认窗口，让他能亲眼看着清洁度停在 100%。
-      if (session.state.cleanliness01 > 0.985) {
+      if (session.state.cleanliness01 > 0.999) {
         state._cleanStreak = (state._cleanStreak || 0) + dt;
         if (state._cleanStreak > 2.5) {
           state._cleanStreak = 0;
@@ -1060,13 +1094,6 @@ export async function Start() {
       vibration01: hand.state.vibration01,
       heat01: session.state.comfort01,
     });
-    hand.tool?.Update?.(dt, {
-      active01: handFrame.lift < 0.5 ? 1 : 0,
-      vibration01: hand.state.vibration01,
-      squeeze01: handFrame.action01,
-      speed01: Clamp(handFrame.speed / 20, 0, 1),
-      pressure01: handFrame.pressure01,
-    });
 
     // 音频：连续接触声现场合成，参数直接来自手感读数
     if (audio?.contact && probe) {
@@ -1097,10 +1124,19 @@ export async function Start() {
 
     // 工具裁切距离跟着相机走：内窥视角只画相机前面那一段，否则 150mm 的器械
     // 会从相机旁边穿过去糊满屏幕；店里视角则要看到整把工具。
-    hand.SetClipKeep(state.mode === "shop"
-      ? 400
-      : Math.max(4, (state.mode === "macro" ? rig.state.backDistance * 0.6 : rig.state.backDistance) - (state.mode === "macro" ? 1.2 : 2.2)));
+    hand.SetViewClip(core.camera, state.mode);
+    core.camera.getWorldDirection(detailClip.normal);
+    detailClip.constant = state.mode === "shop" ? 100000 : -detailClip.normal.dot(
+      clipPoint.copy(core.camera.position).addScaledVector(detailClip.normal, 3));
     AimEndoLight(core.camera);
+
+    core.camera.updateMatrixWorld();
+    screenTip.copy(handFrame.tipWorld).project(core.camera);
+    ui?.setContactPoint?.({
+      x: (screenTip.x + 1) / 2, y: (1 - screenTip.y) / 2,
+      visible: playing && state.mode !== "shop" && Math.abs(screenTip.x) < 0.96 && Math.abs(screenTip.y) < 0.9 && screenTip.z < 1,
+      hit: probe?.hit, blocked: probe?.blocked, working: handFrame.actionHeld && probe?.hit,
+    });
 
     // UI
     ui?.setDepth?.(handFrame.depth, zone);
@@ -1117,7 +1153,7 @@ export async function Start() {
     // StepFrames 批量推进时只画最后一帧——软件渲染下一帧要一秒，画六十帧
     // 会让验收慢到没法用，而中间帧根本没人看。
     if (!skipRender) {
-      const wantInset = state.showInset !== false && state.mode !== "shop" && character;
+      const wantInset = state.showInset === true && state.mode !== "shop" && character;
       core.Render(wantInset ? { insetRect: InsetRect(), insetEvery: quality === "low" ? 4 : 3 } : {});
     }
 
@@ -1186,7 +1222,7 @@ export async function Start() {
       deposits,
       comfort: Number(session.state.comfort01.toFixed(3)),
       relax: Number(session.state.relax01.toFixed(3)),
-      score: session.state.score,
+      score: Math.round(session.state.score),
       harvest: session.state.harvest.length,
       achievements: Array.from(session.state.achievements),
       fps: Math.round(core.stats.fps),

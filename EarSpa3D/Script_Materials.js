@@ -9,7 +9,7 @@
 // 单位提醒：1 世界单位 = 1mm。贴图在世界里的物理尺寸由各模块的 UV 决定，
 // 本文件只负责「看起来对」的密度（重复次数交给消费方设 repeat）。
 
-import { PALETTE } from "./Data_Palette.mjs";
+import { PALETTE } from "./Data_Palette.mjs?v=ear005-20260911";
 
 // ════════════════════════════════════════════════════════════════════════
 //  0. 小工具：确定性随机、值噪声、fBm、网格插值
@@ -996,7 +996,7 @@ export function CreateMaterials(THREE_unused, { quality = "mid" } = {}) {
   const makeSkin = (inner) => {
     const base = {
       color: col(inner ? PALETTE.canalWall : PALETTE.skin),
-      map: canTex ? (inner ? texSet.skinInnerMap : texSet.skinMap) : null,
+      map: canTex && !inner ? texSet.skinMap : null,
       normalMap: wantNormal && canTex ? (inner ? texSet.skinInnerNormal : texSet.skinNormal) : null,
       roughness: inner ? 0.50 : 0.55,
       metalness: 0.0,
@@ -1023,7 +1023,7 @@ export function CreateMaterials(THREE_unused, { quality = "mid" } = {}) {
         emissiveIntensity: inner ? 0.19 : 0.14,
       }
     );
-    if (m.normalMap) m.normalScale.set(inner ? 0.85 : 0.6, inner ? 0.85 : 0.6);
+    if (m.normalMap) m.normalScale.set(inner ? 0.12 : 0.6, inner ? 0.12 : 0.6);
     m.name = (inner ? "EarSkinInner" : "EarSkin") + (lowQ ? "Low" : "");
     return keep(m);
   };

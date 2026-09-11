@@ -8,7 +8,7 @@
 //    富余就慢慢升回来。这比一次性按机型猜档位可靠得多。
 
 import * as THREE from "three";
-import { Clamp, Damp } from "./Script_Util.js";
+import { Clamp, Damp } from "./Script_Util.js?v=ear005-20260911";
 
 export const QUALITY_TIERS = {
   low: {
@@ -87,7 +87,7 @@ export function CreateCore({ canvas, quality = "auto", onError } = {}) {
 
   function ApplyPixelRatio() {
     const pr = Math.min(tier.pixelRatio, (typeof devicePixelRatio !== "undefined" ? devicePixelRatio : 1));
-    renderer.setPixelRatio(pr);
+    renderer.setPixelRatio(pr * renderScale);
     renderer.setSize(width, height, false);
     stats.renderScale = renderScale;
     stats.width = width;
@@ -159,7 +159,7 @@ export function CreateCore({ canvas, quality = "auto", onError } = {}) {
     renderer.setViewport(0, 0, width, height);
     renderer.setScissorTest(false);
     renderer.render(scene, camera);
-    if (insetRect && frameCount % insetEvery === 0) {
+    if (insetRect) {
       const x = Math.round(insetRect.x * width);
       const y = Math.round(insetRect.y * height);
       const w = Math.max(2, Math.round(insetRect.w * width));
@@ -167,10 +167,11 @@ export function CreateCore({ canvas, quality = "auto", onError } = {}) {
       const prevAutoClear = renderer.autoClear;
       renderer.autoClear = false;
       // 画中画要清掉自己的深度，否则会被主场景的深度挡住
-      renderer.clearDepth();
       renderer.setScissorTest(true);
       renderer.setScissor(x, y, w, h);
       renderer.setViewport(x, y, w, h);
+      // 主画面每帧覆盖整张画布，小窗也必须每帧清色重画，否则会闪烁、透出耳道。
+      renderer.clear(true, true, false);
       const a = insetCamera.aspect;
       insetCamera.aspect = w / h;
       if (a !== insetCamera.aspect) insetCamera.updateProjectionMatrix();

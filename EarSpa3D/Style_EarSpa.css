@@ -1053,185 +1053,88 @@ body {
   100% { opacity: 0.05; transform: translateX(30%); }
 }
 
-/* ───────────────────────────── 11. 断点 ─────────────────────────────── */
-
-/* 11.1 平板 / 桌面：面板浮起来，仪表铺开 */
-@media (min-width: 720px) {
-  :root { --ear-pad: 18px; --ear-gap: 14px; }
-  .ear-ruler { width: 152px; }
-  .ear-ruler__value { font-size: 30px; }
-  .ear-ring { width: 104px; height: 104px; }
-  /* 桌面一行放下全部 11 件工具，不用滑 */
-  .ear-toolcard {
-    --ear-card-w: clamp(86px, calc((min(100vw, 1440px) - 40px - 10 * var(--ear-gap)) / 11), 124px);
-    min-height: 100px;
-  }
-  .ear-toolcard__icon { width: 52px; height: 52px; }
-  .ear-toolcard__icon svg { width: 34px; height: 34px; }
-  .ear-toolcard__name { font-size: 13.5px; }
-  .ear-hud__hint { max-width: 340px; font-size: 13px; }
-  .ear-toast-host { bottom: calc(206px + var(--ear-safe-b)); }
-  .ear-actions { bottom: calc(214px + var(--ear-safe-b)); }
-  .ear-actions__btn { width: 54px; height: 54px; }
-
-  /* 宽屏别把仪表拉成一片：居中一条更好看 */
-  .ear-meters {
-    width: 100%;
-    max-width: 1120px;
-    max-height: 520px; /* 尺子再长就假了：耳道才 28mm */
-    align-self: center;
-    margin: 0 auto;
-  }
-  .ear-toolrack__strip { max-width: 1440px; margin: 0 auto; width: 100%; }
-  .ear-toolrack__head { max-width: 1440px; margin: 0 auto; width: 100%; }
-}
-
-@media (min-width: 1280px) {
-  .ear-meters,
-  .ear-toolrack__strip,
-  .ear-toolrack__head { max-width: 1440px; }
-  .ear-meters { max-width: 1120px; }
-}
-
-/* 大屏别用手机字号：面板一大片，字却只有 11px 会显得发飘 */
-@media (min-width: 1100px) {
-  .ear-ruler { width: 168px; }
-  .ear-ruler__value { font-size: 34px; }
-  .ear-ruler__zone { font-size: 13px; }
-  .ear-ruler__num { font-size: 12.5px; }
-  .ear-ring { width: 132px; height: 132px; }
-  .ear-ring__heart { width: 44px; height: 44px; }
-  .ear-ring__value { font-size: 12.5px; bottom: 10px; }
-  .ear-meter { padding: 14px 18px; gap: 8px; }
-  .ear-meter__label { font-size: 13.5px; }
-  .ear-meter__value { font-size: 24px; }
-  .ear-meter__value small { font-size: 13px; }
-  .ear-capsule { height: 18px; }
-  .ear-capsule--thin { height: 12px; }
-  .ear-gauge__label { font-size: 12.5px; }
-  .ear-gauge__value { font-size: 14.5px; }
-  .ear-gauges { gap: 14px; }
-  .ear-gauge { min-width: 128px; }
-  .ear-toolcard__name { font-size: 14px; }
-  .ear-toolrack__head { font-size: 13px; }
-  .ear-hud__tool-name { font-size: 19px; }
-  .ear-hud__hint { font-size: 13.5px; }
-}
-
-@media (min-width: 1024px) {
-  .ear-hud { padding-top: calc(20px + var(--ear-safe-t)); }
-  .ear-toolrack__scrollhint { display: none; } /* 桌面不用滑 */
-}
-
-/* 11.2 手机横屏 / 矮屏：把仪表压缩成一条，工具架也变矮 */
-@media (orientation: landscape) and (max-height: 520px) {
+/* 仪表沿边缘排列，中间始终留给观察和拖动。 */
+.ear-overlay > * { pointer-events: none; }
+.ear-hud button, .ear-toolrack { pointer-events: auto; }
+.ear-meters { position: absolute; inset: 0; padding: 0; margin: 0; max-width: none; }
+.ear-ruler { position: absolute; left: 16px; bottom: 156px; width: 112px; height: min(300px, 44vh); min-height: 0; padding: 10px; }
+.ear-ruler__body { min-height: 0; }
+.ear-ruler__zone { display: none; }
+.ear-ruler__value { font-size: 24px; min-width: 2.5em; }
+.ear-meter-column { position: absolute; right: 16px; top: 86px; width: 204px; flex: none; gap: 8px; }
+.ear-meter { padding: 10px 12px; }
+.ear-meter__value { font-size: 19px; }
+.ear-ring { width: 52px; height: 52px; flex: 0 0 52px; }
+.ear-ring__heart { width: 23px; height: 23px; }
+.ear-ring__value { display: none; }
+.ear-gauges { padding: 0; gap: 6px; }
+.ear-gauge { min-width: 0; }
+.ear-gauge__label { font-size: 11px; }
+.ear-gauge__value { font-size: 12px; }
+.ear-capsule { height: 9px; }
+.ear-capsule--thin { height: 5px; }
+.ear-toolrack { margin-top: auto; padding: 6px 12px calc(8px + var(--ear-safe-b)); }
+.ear-toolcard { --ear-card-w: 96px; min-height: 84px; padding: 6px; }
+.ear-toolcard__icon { width: 36px; height: 36px; }
+.ear-toolcard__icon svg { width: 26px; height: 26px; }
+.ear-toolcard__name { font-size: 12px; }
+.ear-toolcard__cat { font-size: 10px; }
+.ear-toolrack__scrollhint { display: flex; }
+.ear-cameras { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); display: flex; border-radius: 30px; padding: 3px; z-index: var(--ear-z-hud); }
+.ear-cameras .ear-btn { padding: 6px 14px; min-height: 36px; background: transparent; font-size: 13px; }
+.ear-cameras [aria-pressed="true"], .ear-actions [aria-pressed="true"] { background: var(--ear-mint); }
+.ear-actions { right: 16px; bottom: calc(152px + var(--ear-safe-b)); flex-direction: row; align-items: end; gap: 7px; }
+.ear-actions__btn { width: 48px; height: 54px; flex-direction: column; gap: 2px; font-size: 11px; border-radius: 18px; }
+.ear-actions__btn svg { width: 19px; height: 19px; }
+.ear-work { min-height: 54px; padding: 10px 20px; background: var(--ear-mint); font-weight: 700; touch-action: none; }
+.ear-work.is-held { background: var(--ear-mint-accent); transform: scale(.96); }
+.ear-contact { position: absolute; width: 22px; height: 22px; border: 2px solid var(--ear-cream); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: var(--ear-z-hud); box-shadow: 0 0 0 2px rgba(90, 65, 40, .35); }
+.ear-contact[hidden] { display: none; }
+.ear-contact.is-hit { border-color: var(--ear-mint-accent); }
+.ear-contact.is-working { background: var(--ear-mint-accent); }
+.ear-contact__label { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); white-space: nowrap; background: var(--ear-cream); border-radius: 14px; padding: 4px 9px; font-size: 11px; color: var(--ear-ink); }
+.ear-toast-host { bottom: 218px; max-width: min(480px, 72vw); }
+.ear-chip--fps { display: none !important; }
+.ear-expression { top: 82px; }
+@media (max-width: 719px) {
   :root { --ear-pad: 10px; --ear-gap: 8px; }
-  .ear-hud { align-items: center; }
-  .ear-hud__tool-icon { width: 28px; height: 28px; }
-  .ear-hud__tool-icon svg { width: 20px; height: 20px; }
-  .ear-hud__tool-name { font-size: 14.5px; }
-  .ear-hud__hint { font-size: 11.5px; max-width: 30vw; }
-  /* 矮屏放不下表情胶囊，收起来（它只是锦上添花的提示） */
+  .ear-hud__title { max-width: calc(100% - 52px); }
+  .ear-hud__tool-name { font-size: 15px; }
+  .ear-hud__hint { font-size: 11px; max-width: 60vw; }
   .ear-expression { display: none; }
-
-  .ear-meters { align-items: stretch; padding-top: 0; }
-  .ear-ruler {
-    width: 104px;
-    padding: 6px 8px;
-    min-height: 0;
-    gap: 4px;
-  }
-  /* 矮屏把「mm」挪到读数旁边一行放下，别把数字挤掉 */
-  .ear-ruler__head {
-    display: flex;
-    align-items: baseline;
-    justify-content: center;
-    gap: 2px;
-  }
-  .ear-ruler__label { display: none; } /* 矮屏省一行字，mm 读数还在 */
-  .ear-ruler__readout { gap: 1px; }
-  .ear-ruler__value { font-size: 19px; min-width: 2.5em; }
-  .ear-ruler__unit { font-size: 10px; }
-  .ear-ruler__body { min-height: 92px; }
-  /* 矮屏上分区名绝不能折行：折成两行会跟隔壁分区名叠在一起 */
-  .ear-ruler__zone { font-size: 10.5px; white-space: nowrap; }
-
-  .ear-meter { padding: 7px 11px; }
-  .ear-meter__label { font-size: 11px; }
-  .ear-meter__value { font-size: 16px; }
-  .ear-capsule { height: 11px; }
-  .ear-ring { width: 70px; height: 70px; }
-  .ear-ring__heart { width: 24px; height: 24px; }
-  .ear-ring__value { display: none; }
-  .ear-gauges { flex-direction: row; gap: 16px; padding: 6px 11px; }
-  .ear-gauge { min-width: 84px; }
-
-  .ear-toolrack { padding-top: 2px; padding-bottom: calc(4px + var(--ear-safe-b)); }
-  .ear-toolrack__head { font-size: 10.5px; }
-  .ear-toolcard { min-height: 74px; --ear-card-w: 86px; padding: 5px 4px; }
-  .ear-toolcard__icon { width: 38px; height: 38px; }
-  .ear-toolcard__icon svg { width: 25px; height: 25px; }
-  .ear-toolcard__name { font-size: 11.5px; }
-  .ear-toolcard__cat { display: none; }
-
-  .ear-actions { bottom: calc(104px + var(--ear-safe-b)); flex-direction: row; }
-  .ear-actions__btn { width: 46px; height: 46px; }
-  .ear-toast-host { bottom: calc(100px + var(--ear-safe-b)); }
-  .ear-panel-scrim { align-items: flex-end; }
-  .ear-panel { width: min(96vw, 620px); max-height: 92%; }
-  .ear-harvest__list { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
-}
-
-/* 窄手机上的收藏册一行只放一张：三列卡片会把「2.6mm · 18.6mm深」切掉 */
-@media (max-width: 430px) {
+  .ear-cameras { top: 74px; }
+  .ear-meter-column { width: 154px; top: 126px; right: 10px; }
+  .ear-meter { padding: 8px 10px; }
+  .ear-meter__body { gap: 5px !important; }
+  .ear-ring { display: none; }
+  .ear-gauges { width: 100%; }
+  .ear-ruler { left: 10px; bottom: 194px; width: 96px; height: 190px; }
+  .ear-ruler__value { font-size: 21px; }
+  .ear-ruler__zone, .ear-ruler__num { font-size: 10px; }
+  .ear-toolcard { --ear-card-w: 82px; min-height: 80px; }
+  .ear-actions { right: 10px; bottom: calc(130px + var(--ear-safe-b)); gap: 6px; }
+  .ear-work { padding: 10px 16px; }
+  .ear-toast-host { bottom: 195px; max-width: 66vw; left: auto; right: 10px; transform: none; }
+  .ear-toast { font-size: 11px; padding: 8px; }
+  .ear-panel { width: 100%; max-height: 90%; }
   .ear-harvest__list { grid-template-columns: minmax(0, 1fr); }
-  .ear-harvest-card { padding: 10px 12px; }
-  .ear-harvest-card__type { font-size: 14px; }
-  .ear-harvest-card__spec { font-size: 12px; }
 }
-
-/* 11.3 矮竖屏（小折叠机 / 横屏平板分屏） */
-@media (orientation: portrait) and (max-height: 680px) {
-  .ear-ruler__body { min-height: 0; }
-  .ear-ring { width: 76px; height: 76px; }
-  .ear-toolcard { min-height: 84px; }
-}
-
-/* 手机竖屏：面板做成底部抽屉，更好按 */
-@media (orientation: portrait) and (max-width: 719px) {
-  .ear-panel-scrim { align-items: flex-end; padding-bottom: 0; }
-  .ear-panel {
-    width: 100%;
-    max-width: 100%; /* 别被 content-box 顶出屏幕：抽屉必须正好一屏宽 */
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
-    max-height: 88%;
-    transform: translateY(100%);
-    padding-bottom: var(--ear-safe-b);
-  }
-  .ear-panel-scrim.is-open .ear-panel { transform: translateY(0); }
-  /* 提示浮层抬到工具架与右侧动作按钮之上，别压住它们 */
-  .ear-toast-host { bottom: calc(186px + var(--ear-safe-b)); }
-}
-
-/* 窄机（iPhone SE / 小屏安卓）：把仪表再压一压，别顶出屏幕 */
-@media (max-width: 430px) {
-  :root { --ear-pad: 10px; --ear-gap: 8px; }
-  .ear-ruler { width: 104px; }
-  .ear-ruler__head { padding-bottom: 8px; }
-  .ear-ruler__value { font-size: 24px; min-width: 3em; }
-  .ear-meter { padding: 8px 11px; }
-  .ear-meter__label { font-size: 11.5px; }
-  .ear-meter__value { font-size: 17px; }
-  .ear-ring { width: 78px; height: 78px; }
-  .ear-ring__heart { width: 28px; height: 28px; }
-  .ear-ring__value { bottom: 4px; font-size: 10.5px; }
-  .ear-gauges { padding: 8px 11px; gap: 8px; }
-  .ear-gauge { min-width: 96px; }
-  .ear-gauge__label { font-size: 11px; }
-  .ear-gauge__value { font-size: 12.5px; }
-  .ear-toolcard { --ear-card-w: clamp(80px, calc((100vw - 20px - 3 * var(--ear-gap)) / 3.5), 104px); }
-  .ear-hud__hint { max-width: 56vw; }
+@media (orientation: landscape) and (max-height: 520px) {
+  .ear-hud { padding: 8px 10px; }
+  .ear-hud__hint, .ear-expression { display: none; }
+  .ear-cameras { top: 8px; }
+  .ear-meter-column { top: 62px; width: 162px; }
+  .ear-ring { display: none; }
+  .ear-gauges { width: 100%; }
+  .ear-ruler { bottom: 108px; height: 174px; width: 100px; padding: 6px; }
+  .ear-ruler__value { font-size: 19px; }
+  .ear-toolcard { min-height: 58px; --ear-card-w: 84px; }
+  .ear-toolcard__icon { width: 25px; height: 25px; }
+  .ear-toolcard__cat { display: none; }
+  .ear-actions { bottom: 105px; }
+  .ear-actions__btn { height: 44px; }
+  .ear-work { min-height: 44px; }
+  .ear-toast-host { bottom: 158px; }
 }
 
 /* ───────────────────────────── 12. 无障碍 ──────────────────────────── */

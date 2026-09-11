@@ -23,7 +23,7 @@
 // 「专业手法」在游戏里最直接的体现，也是玩家最先学会的一课。
 
 import * as THREE from "three";
-import { AngleDelta, Clamp, Damp, Smooth, TAU } from "./Script_Util.js";
+import { AngleDelta, Clamp, Damp, Smooth, TAU } from "./Script_Util.js?v=ear005-20260911";
 
 /** 一次整屏拖拽对应的进深跨度（mm）。耳道全长 28，所以一屏多一点能走完全程。 */
 const DEPTH_PER_SCREEN = 26;
@@ -60,7 +60,7 @@ export function CreateHand({ canal, core } = {}) {
     // 开局停在 9mm 而不是 2mm：镜头在工具尖后方约 7mm 处，工具尖要够深才留得出
     // 「相机在管腔里」的空间，否则相机只能退到耳道口外，画面就成了一片耳廓特写。
     depth: 9,
-    angle: Math.PI * 0.5,          // 从下方（耳道下壁）开局，那里最安全也最好刮
+    angle: Math.PI,               // 下壁，工具从画面下方进入
     spin: 0,
     pressure01: 0,
     action01: 0,                    // 动作键的按下程度（0→1 有起落，不是布尔）
@@ -144,20 +144,21 @@ export function CreateHand({ canal, core } = {}) {
     // ── 深度 ──
     // 屏幕向上（dragY < 0）等于往耳道深处。这是「直接操纵」：手指往上，
     // 画面里的东西就往里走，不需要玩家在脑子里做一次坐标变换。
-    const depthDelta = -input.dragY * DEPTH_PER_SCREEN;
+    const depthDelta = locked ? 0 : -((input.dragY || 0) + (input.panY || 0)) * DEPTH_PER_SCREEN;
     let wantDepth = state.depth + depthDelta;
     // 工具自身的长度决定它最深能到哪（真实里就是「杆不够长了」）
-    const maxDepth = Math.min(length - 1.2, (s.idealDepthRange?.[1] ?? 24) + 6);
+    const maxDepth = Math.min(length - 1.2, s.lengthMm ?? length);
     wantDepth = Clamp(wantDepth, 0, maxDepth);
     // 拨到危险区时给一点阻尼，让「进去」变难——手感上的警告比文字有效
     if (wantDepth > 21) {
       const overshoot = wantDepth - 21;
       wantDepth = 21 + overshoot * (input.fine ? 0.45 : 0.7);
     }
-    state.depth = Damp(state.depth, wantDepth, input.fine ? 0.05 : 0.05, dt);
+    // drag 是本帧累计位移，不能阻尼后丢弃余量，否则高帧率下几乎拖不动。
+    state.depth = wantDepth;
 
     // ── 绕圈 ──
-    state.angle += input.dragX * ANGLE_PER_SCREEN;
+    state.angle += locked ? 0 : ((input.dragX || 0) + (input.panX || 0)) * ANGLE_PER_SCREEN;
     state.angle = ((state.angle % TAU) + TAU) % TAU;
 
     // ── 陀螺仪微调：只在开启时叠加，比例压得很小，做「最后 0.1mm」的活 ──
@@ -168,7 +169,7 @@ export function CreateHand({ canal, core } = {}) {
     }
 
     // ── 自转（工作面朝向）──
-    const spinDelta = (input.twist || 0) * 2.4;
+    const spinDelta = locked ? 0 : (input.twist || 0) * 2.4;
     state.spin += spinDelta;
     state.spin = ((state.spin % TAU) + TAU) % TAU;
 
@@ -237,6 +238,7 @@ export function CreateHand({ canal, core } = {}) {
       pressure01: state.pressure01,
       action01: state.action01,
       actionHeld: held,
+      lift: state.lift,
       speed: state.speed,
       spinRate: state.spinRate,
       angleError01: state.angleError01,
@@ -274,7 +276,8 @@ export function CreateHand({ canal, core } = {}) {
     const normal = tmpNormal;
 
     // 抬离：换工具时抽出来，避免新工具凭空出现在壁里
-    const gap = tipR + state.lift * Math.max(3.5, R(state.depth, state.angle) * 0.9);
+    const wallRadius = R(state.depth, state.angle);
+    const gap = Math.min(wallRadius, tipR + state.lift * Math.max(0, wallRadius - tipR));
     const tipPos = state.tipWorld.copy(wallPoint).addScaledVector(normal, gap);
 
     // 最小痕迹：Place 每一步的中间量。存成裸数字（不是向量引用），所以即使
@@ -291,6 +294,8 @@ export function CreateHand({ canal, core } = {}) {
     const frame = canal?.FrameAt ? canal.FrameAt(state.depth) : null;
     if (frame?.tangent) tmpTangent.copy(frame.tangent); else tmpTangent.set(0, 0, 1);
     if (frame?.up) tmpUp.copy(frame.up); else tmpUp.set(0, 1, 0);
+    // 工作端轻斜向管腔，勺面能被镜头看见，长杆自然退向下方。
+    tmpTangent.addScaledVector(normal, 0.35).normalize();
     const tangent = tmpTangent;
     const frameUp = tmpUp;
 
@@ -312,7 +317,7 @@ export function CreateHand({ canal, core } = {}) {
     if (tool.tip) {
       tool.tip.updateMatrix();
       const localTip = new THREE.Vector3().setFromMatrixPosition(tool.tip.matrix);
-      tool.group.position.copy(tipPos).sub(localTip.clone().applyQuaternion(tmpQ));
+      tool.group.position.copy(tipPos).sub(localTip.multiply(tool.group.scale).applyQuaternion(tmpQ));
     } else {
       tool.group.position.copy(tipPos);
     }
@@ -338,13 +343,24 @@ export function CreateHand({ canal, core } = {}) {
     state.clipKeep = Clamp(mm, 3, 400);
   }
 
+  function SetViewClip(camera, mode) {
+    if (!toolClipPlane || !camera) return;
+    if (mode === "shop") {
+      toolClipPlane.constant = 100000;
+      return;
+    }
+    camera.getWorldDirection(tmpV2);
+    toolClipPlane.setFromNormalAndCoplanarPoint(tmpV2,
+      tmpV.copy(camera.position).addScaledVector(tmpV2, 1.2));
+  }
+
   /** 结算/开场用：把工具完全抽出来并停用 */
   function Retract() { state.lift = 1; }
   function Engage() { state.lift = 0; }
 
   function Reset() {
     state.depth = 9;
-    state.angle = Math.PI * 0.5;
+    state.angle = Math.PI;
     state.spin = 0;
     state.speed = 0;
     state._prevDepth = state.depth;
@@ -362,7 +378,7 @@ export function CreateHand({ canal, core } = {}) {
   }
 
   return {
-    state, SetTool, Update, Reset, Retract, Engage, ActionHint, OnActionStart, SetClipKeep,
+    state, SetTool, Update, Reset, Retract, Engage, ActionHint, OnActionStart, SetClipKeep, SetViewClip,
     get tool() { return tool; },
     get spec() { return spec(); },
     get tip() { return state.tipWorld; },

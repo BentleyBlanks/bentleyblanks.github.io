@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="Style_EarSpa.css?v=ear004">
+<link rel="stylesheet" href="Style_EarSpa.css?v=ear005-20260911">
 <style>
   /* 首屏骨架：样式表可能还没到，先给出与基调一致的底色，避免白闪 */
   html { background: #FFF8F2; }
@@ -47,8 +47,8 @@
 <script type="importmap">
 {
   "imports": {
-    "three": "./vendor/three/build/three.module.js?v=ear004",
-    "./vendor/three/build/three.module.js": "./vendor/three/build/three.module.js?v=ear004"
+    "three": "./vendor/three/build/three.module.js?v=ear005-20260911",
+    "./vendor/three/build/three.module.js": "./vendor/three/build/three.module.js?v=ear005-20260911"
   }
 }
 </script>
@@ -58,7 +58,7 @@
   // 真正的游戏逻辑一行都不在这里——这里出错是最难查的那种，保持它足够小。
   const boot = document.getElementById("ear-boot");
   try {
-    const mod = await import("./Script_Main.js?v=ear004");
+    const mod = await import("./Script_Main.js?v=ear005-20260911");
     await mod.Start();
   } catch (error) {
     console.error(error);

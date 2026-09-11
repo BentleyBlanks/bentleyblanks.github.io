@@ -9,7 +9,7 @@
 //    玩家要学的是「慢」，这本身就解压。
 // ③ **大块完整取出**要慢镜 + 奖励：这是本作的高光时刻，必须被放大。
 
-import { Clamp, Damp, Smooth } from "./Script_Util.js";
+import { Clamp, Damp, Smooth } from "./Script_Util.js?v=ear005-20260911";
 
 export const ZONE_RULES = {
   cartilage: { comfortScale: 0.55, riskScale: 0.15, label: "软骨部" },
@@ -87,6 +87,10 @@ export function CreateSession({ seed = 1, wax = null, canal = null } = {}) {
     state.phase = "playing";
     state.elapsed = 0;
     state.score = 0;
+    state.cleanliness01 = 0;
+    state._prevRemovedTotal = 0;
+    state._scoopStrength = 0;
+    state.timeScale = 1;
     state.combo = 0;
     state.bestCombo = 0;
     state.mistakes = 0;
@@ -174,7 +178,7 @@ export function CreateSession({ seed = 1, wax = null, canal = null } = {}) {
       state.removals += 1;
       const big = removedNow > 0.28;
       const multiplier = 1 + Math.min(12, state.combo) * 0.1;
-      state.score += Math.round(removedNow * 260 * multiplier * (big ? 2.2 : 1));
+      state.score += removedNow * 260 * multiplier * (big ? 2.2 : 1);
       if (big) {
         // 高光时刻：慢镜 + 脉冲 + 奖励音
         state.timeScale = 0.42;

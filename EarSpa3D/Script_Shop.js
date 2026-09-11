@@ -15,7 +15,7 @@
 // 升级的效果必须**真的改变手感**，不能只是数字好看：工具等级会改写
 // comfortGain / crackRisk / idealSpeedRange，这些字段是耵聍判定真正读的。
 
-import { Clamp } from "./Script_Util.js";
+import { Clamp } from "./Script_Util.js?v=ear005-20260911";
 
 const STORAGE_KEY = "earspa3d.shop.v1";
 const MAX_TOOL_LEVEL = 5;
