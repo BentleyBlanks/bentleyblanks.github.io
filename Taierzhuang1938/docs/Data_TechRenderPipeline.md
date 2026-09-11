@@ -288,14 +288,16 @@ sRGB 编码，最后一趟必须自己手写（Composite 的 `EncodeOutput`）�
 * 第一帧、前景件（`uForegroundDepth > 0`，即第一人称手与枪）一律写 0；天空整只
   `skipNormalDepth` 藏出预通道，那里留的是 clear 值 0。
 
-**逐物体速度做到哪一步（已知近似，别当 bug 修）**
+**逐物体速度与接入规范**
+
+新增 renderer、SkinnedMesh、骨骼挂件和异步子节点统一遵守 [MotionVector 接入规范](Data_MotionVectorContract.md)。其中定义真实运动、前景零速度、排除三种语义与 GPU 门禁；下表记录实现。
 
 | 对象 | 速度 | 怎么做的 |
 |---|---|---|
 | 静态几何 | 相机速度（精确） | prevWorld = curWorld |
-| **蒙皮人物（SkinnedMesh）** | **逐骨骼（精确）** | `skeleton.boneTexture` 换成**高度翻倍**的图：上半是本帧骨矩阵（three 每帧自己写），下半是上一帧的副本（`PrepassPass._SnapshotSkeletons` 在 Render 末尾 `copyWithin`）。取样端 `GetPrevBoneMatrix(i)` = three 的 `getBoneMatrix(i)` 把纹素下标 +`size*size`。**零逐 draw 成本** —— `boneTexture` 本来就是 three 逐 draw 塞的 |
+| **蒙皮人物（SkinnedMesh）** | **逐骨骼 + 蒙皮到世界变换** | 双高度骨纹理记录前帧骨骼，私有逐对象历史记录前帧 `modelMatrix * bindMatrixInverse`。Attached / Detached 均保留骨骼形变；新对象、重现或绑定变化不读陈旧骨骼。骨纹理仍由 three 逐 draw 绑定，附加 uniform 仅在变换或有效性变化时上传 |
 | InstancedMesh / BatchedMesh | **只有相机速度（近似）** | 实例矩阵当不变。`Script_ActorBatch` 的远景人群、流送的布设件每帧改写 `instanceMatrix`，所以它们在 RT1 里是「静止物体」。要修得给每只实例网格再挂一份上一帧 `instanceMatrix`（显存翻倍 + 每帧多一次上传） |
-| 非蒙皮刚体运动件（普通 Mesh，含父节点/骨骼带动的附件） | **默认逐物体，不需打标** | 2026-09-11 起 `PrepassPass._BindRigidVelocity` 通过覆盖材质回调读取私有 WeakMap 的上一帧世界矩阵；只有矩阵变化的 draw 与恢复默认值时上传 uniform。所有材质组绘制完统一更新历史，消失后重现丢弃旧物体矩阵。`MarkDynamicPrepass` 只保留兼容标记，不占用对象钩子。近景背包/弹药使用身份稳定的普通 Mesh；实例路径限制见上行和[复发调查](Data_CarriagePropVelocity.md) |
+| 非蒙皮刚体运动件（普通 Mesh，含父节点/骨骼带动的附件） | **默认逐物体，不需打标** | 2026-09-11 起 `PrepassPass._BindObjectVelocity` 通过覆盖材质回调读取私有 WeakMap 的上一帧世界矩阵；只有矩阵变化的 draw 与恢复默认值时上传 uniform。所有材质组绘制完统一更新历史，消失后重现丢弃旧物体矩阵。`MarkDynamicPrepass` 只保留兼容标记，不占用对象钩子。近景背包/弹药使用身份稳定的普通 Mesh；实例路径限制见上行和[复发调查](Data_CarriagePropVelocity.md) |
 
 主 pass 读到的骨骼纹理**逐纹素不变**（宽度没动，`getBoneMatrix(i)` 对
 `i < size²/4` 落点完全一样），所以换成翻倍纹理对画面零影响。显存与上传：一具 50 骨的
@@ -1311,15 +1313,16 @@ particleMaterial.allowOverride = false;   // r165+ 的正规做法
 视模的几何带一层非等比深度压缩，它的视深不是世界视深（枪口在眼前 0.2 m、枪托在眼睛后面）。
 `Script_Post.MarkForegroundPrepass` 定的口径是：
 
+对稳定根节点标记一次，当前和后续异步子孙都由 Prepass 每帧继承策略；覆盖材质绑定逐 draw 状态，不覆盖对象已有回调。完整准入规则见 [MotionVector 接入规范](Data_MotionVectorContract.md)。
+
 - **不透明件照常吃覆盖材质**，写**真法线**；深度写常数 `FOREGROUND_VIEW_DEPTH = 1 m`
   （覆盖材质的 `uForegroundDepth` uniform 按 draw 开关，与破口裁切同一个手法）。
   真按它自己的视深写，开镜近景 DOF（focus 1.60 m）会把正在瞄的枪整支糊掉、相机运动模糊
   按 0.2 m 的视差把枪拖成一片、SSAO 在枪身边缘挖黑边。
 - **半透明/加性件（枪口焰）** 没有可用的法线，整只 `skipNormalDepth` 藏出预通道。
 
-**别用 `MarkNoPrepass` 代替它。** 那个函数只保证"不被换材质"，物体照样被画进
-`rtNormalDepth`，写进去的 xyz 是它自己的光照颜色 —— 当法线用是纯垃圾，SSAO 直接读错，
-Debug Rendering 的 GBuffer 组也就成了一团噪声。蒙皮双臂同理不许再标 `skipNormalDepth`：
+**别用 `MarkNoPrepass` 代替它。** 它使 MRT 路径整只排除对象，不等于前景零速度；
+旧单靶路径甚至可能把自身颜色误写进法线。蒙皮双臂同理不许再标 `skipNormalDepth`：
 覆盖材质带 skinning chunk，蒙皮不会塌到原点（`Script_ActorDepthTest` 守着同一条）。
 
 ---

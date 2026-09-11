@@ -16,11 +16,11 @@
 //     正在瞄的那支枪拖成一片。
 //   · 天空穹整只 `skipNormalDepth` 藏出这一趟，所以 RT1 在天空位置留的是 clear 值 0。
 //
-// ## 逐物体速度做到哪一步（**已知近似，别当 bug**）
+// ## 逐物体速度（接入与例外规范：docs/Data_MotionVectorContract.md）
 //   · **蒙皮人物：真的逐骨骼**。做法见下面 `_UpgradeSkeleton`：把 three 的
 //     `skeleton.boneTexture` 换成一张**高度翻倍**的图，上半是本帧骨矩阵（three 自己
 //     每帧写），下半是上一帧的副本（本模块在 Render 末尾 copyWithin 一次）。
-//     好处是**零逐 draw 成本** —— `boneTexture` 是 three 在 `setProgram` 里
+//     骨纹理无需新增逐 draw 绑定 —— `boneTexture` 是 three 在 `setProgram` 里
 //     逐 draw 用 `p_uniforms.setValue` 塞的，本来就每次都传；换成自定义 uniform 就得
 //     `material.uniformsNeedUpdate = true`，那会把整份材质 uniform（含 24 组破口
 //     数组）在每个蒙皮 draw 上重传一遍，正好撞在「CPU 提交是瓶颈」那条红线上。
@@ -39,6 +39,7 @@
 //   · **普通刚体 Mesh 默认记录上一帧世界矩阵**，包括骨骼附件、异步新建道具。
 //     由覆盖材质的 onBeforeRender 统一绑定，不要求调用方逐件打标、不占对象钩子。
 //     只有矩阵实际变化时上传上一帧矩阵；静态物体仍走相机速度的快速路径。
+//     蒙皮同时记录 modelMatrix * bindMatrixInverse；有效性按实际绘制历史判断。
 //     InstancedMesh / BatchedMesh 的逐实例形变仍不在此契约内，近景移动交互件用
 //     身份稳定的普通 Mesh（如车厢背包、弹药）；不能把组矩阵当成逐实例历史。
 //
@@ -98,17 +99,6 @@ export function MarkNoPrepass(material) {
   return material;
 }
 
-// 覆盖材质是全场共用的一份，uniform 按 draw 上传（three 在 renderObject 里先调
-// onBeforeRender 再 setProgram）—— 与破口裁切那一套是同一个手法。
-function ForegroundPrepassOn(renderer, scene, camera, geometry, material) {
-  const uniform = material?.userData?.foregroundDepth;
-  if (uniform) uniform.value = FOREGROUND_VIEW_DEPTH;
-}
-function ForegroundPrepassOff(renderer, scene, camera, geometry, material) {
-  const uniform = material?.userData?.foregroundDepth;
-  if (uniform) uniform.value = 0;
-}
-
 /**
  * 把一棵前景子树（`viewmodel.root`）接进深度法线预通道。
  *
@@ -123,10 +113,12 @@ function ForegroundPrepassOff(renderer, scene, camera, geometry, material) {
  *   · 半透明/加性件（枪口焰）—— 仍旧整只藏出预通道（skipNormalDepth），
  *     它没有可用的法线，混进去只会污染 SSAO。
  *
- * 每次 Equip 之后都要再调一次：枪械树是 Equip 里现建的。
+ * 标记保存在根节点；以后异步添加的 Mesh / SkinnedMesh 自动继承。
+ * 重复调用幂等，不占用对象的 onBeforeRender / onAfterRender。
  */
 export function MarkForegroundPrepass(root) {
   if (!root) return root;
+  root.userData.foregroundPrepassRoot = true;
   root.traverse((object) => {
     if (!object.isMesh || !object.material) return;
     const materials = Array.isArray(object.material) ? object.material : [object.material];
@@ -141,10 +133,6 @@ export function MarkForegroundPrepass(root) {
     for (const material of materials) if (material) material.allowOverride = true;
     object.userData.skipNormalDepth = false;
     object.userData.foregroundPrepass = true;
-    // 视图模型的网格没有别的 onBeforeRender 用户（破口裁切只挂在世界静态件上），
-    // 直接赋值即可，重复调用是幂等的。
-    object.onBeforeRender = ForegroundPrepassOn;
-    object.onAfterRender = ForegroundPrepassOff;
   });
   return root;
 }
@@ -171,6 +159,7 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) 
     uniforms.uPrevViewProjection = { value: new THREE.Matrix4() };
     uniforms.uPrevModelMatrix = { value: new THREE.Matrix4() };
     uniforms.uPrevModelValid = { value: 0 };
+    uniforms.uPrevSkinValid = { value: 0 };
     uniforms.uVelocityValid = { value: 0 };
     uniforms.uVelocityClamp = { value: VELOCITY.clampUv };
   }
@@ -189,6 +178,7 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) 
           vec4 worldNow = modelMatrix * worldLocal;
           vec4 worldPrev = worldNow;
           #ifdef USE_SKINNING
+          if (uPrevSkinValid > 0.5) {
             // 上一帧骨矩阵在同一张 boneTexture 的下半张（见文件头「逐物体速度」）。
             // **喂给它的必须是蒙皮前的顶点**（vPreSkinPosition，在 skinning_vertex
             // 之前存下）。这里若用 transformed，那已经是本帧蒙皮完的位置，
@@ -202,8 +192,13 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) 
             prevSkinned += GetPrevBoneMatrix(skinIndex.z) * prevSkinVertex * skinWeight.z;
             prevSkinned += GetPrevBoneMatrix(skinIndex.w) * prevSkinVertex * skinWeight.w;
             worldPrev = modelMatrix * vec4((bindMatrixInverse * prevSkinned).xyz, 1.0);
+            // Attached and detached binding both need the previous skin-to-world
+            // transform. Never overwrite previous deformation with worldLocal.
+            if (uPrevModelValid > 0.5) worldPrev = uPrevModelMatrix * prevSkinned;
+          }
+          #else
+            if (uPrevModelValid > 0.5) worldPrev = uPrevModelMatrix * worldLocal;
           #endif
-          if (uPrevModelValid > 0.5) worldPrev = uPrevModelMatrix * worldLocal;
           vCurClip = uViewProjection * worldNow;
           vPrevClip = uPrevViewProjection * worldPrev;
         }` : "";
@@ -221,6 +216,7 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) 
       uniform mat4 uPrevViewProjection;
       uniform mat4 uPrevModelMatrix;
       uniform float uPrevModelValid;
+      uniform float uPrevSkinValid;
       varying vec4 vCurClip;
       varying vec4 vPrevClip;
       #ifdef USE_SKINNING
@@ -360,11 +356,17 @@ export class PrepassPass {
     this._skeletons = new Set();       // 本帧在场的骨骼（下面拷上一帧矩阵用）
     this._upgraded = new WeakSet();    // 已经换成「高度翻倍」boneTexture 的骨骼
     this._failedUpgrade = new WeakSet();
-    this._rigidHistory = new WeakMap();
-    this._rigidDrawn = [];
+    this._objectHistory = new WeakMap();
+    this._objectsDrawn = [];
+    this._foregroundObjects = new WeakSet();
+    this._skinWorldMatrix = new THREE.Matrix4();
     this._velocityFrame = 0;
-    if (this.velocityEnabled) this.material.onBeforeRender = (renderer, scene, camera, geometry, object) => {
-      this._BindRigidVelocity(object);
+    this.material.onBeforeRender = (renderer, scene, camera, geometry, object) => {
+      const uniform = this.material.uniforms.uForegroundDepth;
+      const depth = this._foregroundObjects.has(object) ? FOREGROUND_VIEW_DEPTH : 0;
+      if (uniform.value !== depth) this.material.uniformsNeedUpdate = true;
+      uniform.value = depth;
+      if (this.velocityEnabled) this._BindObjectVelocity(object);
     };
 
     this.uniformsHzb = {
@@ -456,7 +458,19 @@ export class PrepassPass {
     const mrt = this.velocityEnabled;
     if (wantSkeletons) this._skeletons.clear();
     scene.traverse((object) => {
+      const foreground = !!object.userData?.foregroundPrepassRoot || this._foregroundObjects.has(object.parent);
+      if (foreground) this._foregroundObjects.add(object);
+      else this._foregroundObjects.delete(object);
       if (!object.visible || !object.userData) return;
+      if (object.isMesh) {
+        // Diagnostic only: the root policy, not a copied leaf flag, owns routing.
+        object.userData.foregroundPrepass = foreground;
+        if (foreground && [object.material].flat().some(material => material
+            && (material.transparent || material.alphaTest > 0 || material.depthWrite === false))) {
+          list.push(object);
+          return;
+        }
+      }
       if (wantSkeletons && object.isSkinnedMesh && object.skeleton) {
         this._skeletons.add(object.skeleton);
       }
@@ -510,12 +524,20 @@ export class PrepassPass {
    * 只是纹理下面多了一片它永远不会取到的行。
    */
   _UpgradeSkeleton(skeleton) {
-    if (this._upgraded.has(skeleton) || this._failedUpgrade.has(skeleton)) return;
+    const current = skeleton.boneTexture;
+    // A rebuilt post pipeline can reuse the skeleton's already packed texture.
+    if (current?.name === "boneTextureWithPrev" && current.image.height === current.image.width * 2
+        && skeleton.userData?.prevBoneOffset === current.image.width ** 2 * 4) {
+      this._upgraded.add(skeleton);
+      return;
+    }
+    this._upgraded.delete(skeleton);
+    if (this._failedUpgrade.has(skeleton)) return;
     try {
       if (skeleton.boneTexture === null) skeleton.computeBoneTexture();
       const old = skeleton.boneTexture;
       const size = old.image.width;
-      if (old.image.height !== size) { this._failedUpgrade.add(skeleton); return; }
+      if (old.image.height !== size) throw new Error("Unsupported bone texture layout");
       const half = size * size * 4;
       const big = new Float32Array(half * 2);
       big.set(skeleton.boneMatrices.subarray(0, Math.min(half, skeleton.boneMatrices.length)));
@@ -550,37 +572,51 @@ export class PrepassPass {
 
   // Called after the object's existing hooks, before three uploads uniforms.
   // Keep history per pass, outside userData (cloning must not clone live history).
-  _BindRigidVelocity(object) {
+  _BindObjectVelocity(object) {
     const U = this.material.uniforms;
-    let valid = 0;
-    if (object.isMesh && !object.isSkinnedMesh && !object.isInstancedMesh && !object.isBatchedMesh
-        && !object.userData.foregroundPrepass) {
-      let history = this._rigidHistory.get(object);
+    let valid = 0, skinValid = 0;
+    if (object.isMesh && !object.isInstancedMesh && !object.isBatchedMesh
+        && !this._foregroundObjects.has(object)) {
+      const skinned = !!object.isSkinnedMesh;
+      const matrix = skinned
+        ? this._skinWorldMatrix.multiplyMatrices(object.matrixWorld, object.bindMatrixInverse)
+        : object.matrixWorld;
+      let history = this._objectHistory.get(object);
       if (!history) {
-        history = { object, matrix: object.matrixWorld.clone(), frame: -1, queued: -1 };
-        this._rigidHistory.set(object, history);
+        history = { object, matrix: matrix.clone(), frame: -1, queued: -1,
+          skeleton: object.skeleton, bind: skinned ? object.bindMatrix.clone() : null };
+        this._objectHistory.set(object, history);
       }
-      if (history.frame === this._velocityFrame - 1 && !history.matrix.equals(object.matrixWorld)) {
+      const consecutive = history.frame === this._velocityFrame - 1;
+      skinValid = skinned && consecutive && VELOCITY.skinnedPrev && this._upgraded.has(object.skeleton)
+        && history.skeleton === object.skeleton && history.bind.equals(object.bindMatrix) ? 1 : 0;
+      if (consecutive && (!skinned || skinValid) && !history.matrix.equals(matrix)) {
         U.uPrevModelMatrix.value.copy(history.matrix);
         valid = 1;
       }
       if (history.queued !== this._velocityFrame) {
         history.queued = this._velocityFrame;
-        this._rigidDrawn.push(history);
+        this._objectsDrawn.push(history);
       }
     }
-    // Restore the default before static/skinned/instanced draws too. Upload only
-    // for moving draws and the transition back, not for every static wall.
-    if (valid || U.uPrevModelValid.value !== valid) this.material.uniformsNeedUpdate = true;
+    // Restore defaults before other draws too. Upload only changed transforms
+    // and validity transitions, not the full uniforms for every static wall.
+    if (valid || U.uPrevModelValid.value !== valid || U.uPrevSkinValid.value !== skinValid) this.material.uniformsNeedUpdate = true;
     U.uPrevModelValid.value = valid;
+    U.uPrevSkinValid.value = skinValid;
   }
 
-  _SnapshotRigids() {
-    for (const history of this._rigidDrawn) {
-      history.matrix.copy(history.object.matrixWorld);
+  _SnapshotObjects() {
+    for (const history of this._objectsDrawn) {
+      const object = history.object;
+      if (object.isSkinnedMesh) {
+        history.matrix.multiplyMatrices(object.matrixWorld, object.bindMatrixInverse);
+        history.bind.copy(object.bindMatrix);
+        history.skeleton = object.skeleton;
+      } else history.matrix.copy(object.matrixWorld);
       history.frame = this._velocityFrame;
     }
-    this._rigidDrawn.length = 0;
+    this._objectsDrawn.length = 0;
   }
 
   Render(ctx) {
@@ -589,7 +625,7 @@ export class PrepassPass {
     const camera = ctx.camera;
     const material = this.material;
     this._velocityFrame += 1;
-    this._rigidDrawn.length = 0;
+    this._objectsDrawn.length = 0;
 
     // 事故（这一条是好几个"远景不对劲"的共同根因）：allowOverride = false 只保证
     // **不被换材质**，它照样会被画进这一趟。天空穹正是这样用自己那套着色器
@@ -606,8 +642,7 @@ export class PrepassPass {
     const prevOverride = scene.overrideMaterial;
     scene.background = null;
     scene.overrideMaterial = material;
-    // 前景标签逐 draw 由 MarkForegroundPrepass 的钩子开关；这一趟开头先归零，
-    // 上一帧要是在某个 draw 中途出错（onAfterRender 没跑），整个世界会被写成 1 m。
+    // 每个 draw 由覆盖材质按继承的根策略设置前景深度，不占对象钩子。
     material.userData.foregroundDepth.value = 0;
     if (this.velocityEnabled) {
       for (const skeleton of this._skeletons) this._UpgradeSkeleton(skeleton);
@@ -616,6 +651,7 @@ export class PrepassPass {
       U.uPrevViewProjection.value.copy(ctx.prevViewProjection);
       U.uVelocityValid.value = ctx.hasPrev && this.hasPrevVelocity ? 1 : 0;
       U.uPrevModelValid.value = 0;
+      U.uPrevSkinValid.value = 0;
       U.uFar.value = camera.far;
       material.uniformsNeedUpdate = true;   // 每帧一次，不是每 draw 一次
     }
@@ -624,7 +660,7 @@ export class PrepassPass {
     renderer.clear(true, true, false);
     renderer.render(scene, camera);
     // Advance once after every material group has drawn, never between groups.
-    this._SnapshotRigids();
+    this._SnapshotObjects();
     scene.overrideMaterial = prevOverride;
     scene.background = prevBackground;
     for (const object of skipped) object.visible = true;

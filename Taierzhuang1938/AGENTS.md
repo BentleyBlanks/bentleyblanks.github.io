@@ -26,7 +26,7 @@
 11. **往 `MeshStandardMaterial` 插 GLSL 只走 `Script_MaterialPatches` 注册表**（three 一个材质只有一个 `onBeforeCompile`，谁后写谁静默覆盖前一个）。克隆已装补丁的材质用 `Script_Materials.CloneShadedMaterial`，它按 `PatchesOf(source)` 重挂补丁，不抄钩子。每个材质变体的 sampler uniform ≤ `MAX_TEXTURE_IMAGE_UNITS`（ANGLE-D3D11 上是 16；超了程序不链接、只有一行日志，那只材质整个不画）。验收：`Script_SamplerBudgetTest.mjs`；预算表与打包手段见 [渲染管线](docs/Data_TechRenderPipeline.md) §1.8。
 12. **画质旋钮与分档只在 `Data_Tuning_Graphics.mjs` 与各 `Data_Tuning_*`**（纯数据、零 three），`Script_Post` / `Script_Main` / `Script_EditorSettings` 只读不写。新增帧图 pass 按 [渲染管线](docs/Data_TechRenderPipeline.md) §1.3 的 pass 契约接入、调试视图按 §1.11 的三条登记路登记，不往 `Render()` 里插代码。验收：`Script_PostFrameGraphTest.mjs`、`Script_EditorTest.mjs`。
 
-    近景移动道具必须有正确的逐物体速度。普通 Mesh 由 `PrepassPass` 默认记录；没有逐实例历史的 InstancedMesh/BatchedMesh 不用于近景手持、背包或骨骼附件。改预通道或开场道具须通过 `Script_CarriagePropVelocityTest.mjs` 的 high 画质 GPU 像素门禁，不以 low 画质动作测试、整屏占比或关闭后期代替。原因与限制见 [车厢道具复发调查](docs/Data_CarriagePropVelocity.md)。
+    **所有现有及新增 renderer 统一遵守 [MotionVector 接入规范](docs/Data_MotionVectorContract.md)**：世界 Mesh / SkinnedMesh（SkinnedMeshRenderer）和骨骼挂件自动写真实运动；前景根的后续子孙继承明确零速度；透明 / 天空按约定排除。不能以逐件手动标记决定是否接入，不得覆盖对象原有 draw 钩子。未实现历史的移动实例、morph / 自定义形变不得直接用于新增近景角色与挂件。`Script_MotionVectorContractTest.mjs` 是独立 GPU 门禁，Script / Data / GLB 变更在 prepush 自动选中；改预通道或开场道具还须通过 `Script_CarriagePropVelocityTest.mjs` 的 high 画质真实资产检查。不得以 low 画质、整屏占比或关闭后期代替，也不得随关卡重构删除门禁。历史原因见 [车厢复发调查](docs/Data_CarriagePropVelocity.md)。
 13. **带路跑采用跨关卡共用的 NPC 跑停节奏。** 普通随队士兵跑出几步后自然减速，短停喘息、左右观察，再继续跑；每人的首次停步、停留时长与再次起跑独立错峰，不能只错开动画相位却让全队同时停走。班长不参加普通队员的随机喘息停步，按带路、回看、等候和战术职责行动。战斗、避险、通行及协作搬运优先；不得用喘息阻塞窄口、拖断队伍或锁住玩家。规则由共享行为与数据驱动，关卡只配置路线、角色职责和情境覆盖，不按关卡号或角色姓名复制特例。完整要求与后续验收见 [NPC 带路跑通用设计](docs/Data_NpcGuideCadence.md)；共享入口为 `SquadMarchAi`，可视化工具为「小队行进」；接入方式与分项验收状态见该文档第 8–9 节。
 
 ## 调查与工具

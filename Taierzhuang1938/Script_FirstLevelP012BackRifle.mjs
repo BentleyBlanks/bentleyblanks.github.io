@@ -4,14 +4,9 @@ import { MarkDynamicPrepass } from "./Script_Post.mjs";
 let libraryPromise;
 
 /**
- * 背枪与背带是挂在胸骨上的**刚体**网格 —— 不是蒙皮网格，预通道因此按「静止几何」
- * 给它们写速度（prevWorld = curWorld），也就是整份相机速度。坐在开动的军列里，
- * 人和枪跟着车厢一起走、相机也一起走，枪在屏幕上其实一动不动，可速度靶上每支枪
- * 都写着十几到三十几像素/帧：运动模糊照着把细枪管糊成一道宽黑带，TAA 再去十几
- * 像素外取历史。标上逐物体速度就都对了。
- *
- * 成本：逐 draw 多两次 uniform 重传（见 MarkDynamicPrepass 的成本口径）。车厢内
- * 满编 66 只网格，1600×900/high 实测墙钟 35.53 → 35.19 ms/帧（在噪声里）。
+ * 背枪与背带是胸骨下的普通 Mesh，Prepass 默认记录世界矩阵历史。
+ * 这里保留旧诊断标记；它不再决定速度写入，也不安装对象 draw 钩子。
+ * 新增附件遵守 docs/Data_MotionVectorContract.md，不复制资产专用接线。
  */
 function MarkMountVelocity(root) {
   root?.traverse(object => {

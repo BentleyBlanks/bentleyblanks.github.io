@@ -223,9 +223,8 @@ export class FirstLevelWhiteboxField {
     this.derailColliders=derailSink.colliders;
     this.trainMeshes = trainSink.Flush(this.scene, { Get: key => this.materials.get(key) || this.whiteMaterial });
     this.trainMeshes.push(...this.derailMeshes);
-    // MarkDynamicPrepass：车厢每帧沿 z 平移（SetTrainOffset），玩家又坐在车上跟着一起走。
-    // 不标它，预通道就按「静止几何」写速度（prevWorld = curWorld），于是速度靶里
-    // 整个车厢都是相机速度 —— 而它在屏幕上其实一动不动。见 SetTrainOffset 的注释。
+    // 车厢与相机同行时，Prepass 的默认世界矩阵历史抵消相机速度。
+    // MarkDynamicPrepass 仅保留旧诊断标记；新网格不需要这个调用。
     for (const mesh of this.trainMeshes) {
       mesh.name="P012MovingTrain"; mesh.castShadow=true; mesh.receiveShadow=true;
       MarkDynamicPrepass(mesh);
@@ -269,11 +268,9 @@ export class FirstLevelWhiteboxField {
 
   /**
    * 车厢沿 z 平移。玩家坐在车上，所以相机跟着一起走 —— **车厢在屏幕上是不动的**，
-   * 速度靶里就必须是 0。做到这件事全靠 BuildWhiteBoxes / BuildGates 里那两句
-   * `MarkDynamicPrepass`：没有它，预通道按静止几何写速度（prevWorld = curWorld），
-   * 车厢每个像素都会拿到整份相机速度（1.6 K 输出实测中位数 12 px/帧、边上顶到
-   * 32 px 的钳位），运动模糊照着糊、TAA 照着去十几像素外取历史，
-   * 结果就是「整个车厢一路都是糊的」。
+   * 速度靶里就必须是 0。普通 Mesh 由 Prepass 默认跟踪上一帧世界矩阵，
+   * 不依赖 BuildWhiteBoxes / BuildGates 的兼容标记。统一规范见
+   * docs/Data_MotionVectorContract.md，真实道具门禁见 CarriagePropVelocityTest。
    */
   SetTrainOffset(offset) {
     const delta=offset-this.trainOffsetM;if(Math.abs(delta)<1e-9)return;

@@ -636,7 +636,7 @@ export function CreateGame(canvas, hudRoot, options?): Game;
   Reset(): void;
 }
   ```
-- **Script_Crowd.mjs** — 远景人群渲染：90—200 m 的士兵用共享 InstancedMesh 表示（躯干+头 / 两腿 / 步枪，压成 2—3 个 InstancedMesh，共 90 个实例只吃 2 个 draw call）。姿态只有站/蹲/卧/倒四态，用 instanceMatrix 的缩放与平移表达；阵营用 instanceColor 区分；每 3 帧更新一次矩阵。必须遵守全项目的硬约束：不用 SkinnedMesh，并给 mesh.userData.skipNormalDepth 让它不污染深度法线预通道。
+- **Script_Crowd.mjs** — 远景人群渲染：90—200 m 的士兵用共享 InstancedMesh 表示（躯干+头 / 两腿 / 步枪，压成 2—3 个 InstancedMesh，共 90 个实例只吃 2 个 draw call）。姿态只有站/蹲/卧/倒四态，用 instanceMatrix 的缩放与平移表达；阵营用 instanceColor 区分；每 3 帧更新一次矩阵。本段是早期实例人群提案；其中旧版“不用 SkinnedMesh / 整体跳过预通道”的限制已失效。现有与新增 renderer、骨骼挂件遵循 [MotionVector 接入规范](Data_MotionVectorContract.md)。
   ```
   export class CrowdRenderer {
   constructor(scene, library, { capacity = 120 } = {});

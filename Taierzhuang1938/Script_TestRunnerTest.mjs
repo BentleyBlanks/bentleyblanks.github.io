@@ -143,6 +143,13 @@ for(const file of ['Script_PostPrepass.mjs','Script_FirstLevelMeal.mjs','Script_
   Check(selection.includes('CarriagePropVelocityTest'),file+' keeps the per-prop GPU velocity gate when the opening route changes');
 }
 Check(textureChange.domains.includes("render"), "贴图改动映射 render");
+for(const file of ['Script_PostPrepass.mjs','Script_Actor.mjs','Script_Viewmodel.mjs',
+  'Script_FutureAttachmentFactory.mjs','Data_FutureRenderer.mjs','Model_FutureSkinned.glb']){
+  const change=InferDomains(['Taierzhuang1938/'+file]);
+  const selection=ResolveSelection(ParseArgs(['--changed=origin/master','--profile=prepush']),change.domains,change);
+  Check(selection.includes('MotionVectorContractTest'),file+' always selects the renderer admission GPU gate');
+  Check(change.prepushGates.includes('MotionVectorContractTest'),file+' is gated directly, independently of known domain/factory names');
+}
 const texturePrepush = ResolveSelection(ParseArgs(["--changed=origin/master", "--profile=prepush"]), textureChange.domains, textureChange);
 Check(texturePrepush.includes("BootTest") && texturePrepush.includes("BootStallTest"), "贴图推送前追加开机与挂死门禁");
 

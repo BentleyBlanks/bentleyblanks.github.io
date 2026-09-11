@@ -2,8 +2,8 @@
 //
 // 国军/日军的可见人体已由 Script_CharacterModel 的蒙皮 GLB 与 AnimationClip 接管。
 // 这里的 Object3D 程序化骨架只保留状态机、死亡根运动、百姓与资源故障回退；军人旧网格
-// 会被隐藏。SkinnedMesh 整棵标 skipNormalDepth，避免 overrideMaterial 预通道缺 skinning
-// define 时塌到原点；主场景和阴影仍正常蒙皮渲染。
+// 会被隐藏。可见 SkinnedMesh 与骨骼挂件由 Prepass 自动记录运动历史，不能整棵
+// 标 skipNormalDepth；统一接入与例外见 docs/Data_MotionVectorContract.md。
 //
 // 三条贯穿本文件的规矩：
 //   1) **零 Math.random**。个体差异（身高、军装深浅、待机相位、鞋子）全部来自

@@ -48,6 +48,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 
 export const testDefs = {
   CarriagePropVelocityTest: {file:'Script_CarriagePropVelocityTest.mjs',timeoutMs:300000,desc:'Real pork/pack GPU velocities with moving camera, stop and reappearance; high-quality opening'},
+  MotionVectorContractTest: {file:'Script_MotionVectorContractTest.mjs',timeoutMs:120000,desc:'GPU admission contract for new rigid/skinned renderers, bone attachments, foreground inheritance and history lifecycle'},
   IncomingFireBrowserTest: {file:"Script_IncomingFireBrowserTest.mjs",timeoutMs:300000,desc:"Real near-fire/hit HUD, camera bearings, sector merging, expiry and compact screenshots"},
   BloodEffectsTest: {file:"Script_BloodEffectsTest.mjs",timeoutMs:180000,desc:"Shared blood GPU projection, ballistic collision, platform and source lifecycle"},
   SquadMarchTest: {file:"Script_SquadMarchTest.mjs",desc:"Shared squad cadence, roles, safe interruption, replay and population variants"},
@@ -301,6 +302,7 @@ export const browserTests = new Set([
   "FirstLevelGuideQueueTest",
   "FirstLevelTrainAnimationTest",
   "CarriagePropVelocityTest",
+  "MotionVectorContractTest",
   "BrowserBundleTest",
 
   "CoverLeanBrowserTest", "MovementRangeTest",
@@ -372,6 +374,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  motionVector: {label:'统一运动矢量接入契约',tests:['MotionVectorContractTest']},
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关接收院至结尾定向续接",tests:["FirstLevelMissionStageTailTest"]},
@@ -471,6 +474,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:'motionVector',pattern:/MotionVector|PostPrepass|Script_Post\.mjs|Actor|Skinn|Skeleton|Viewmodel|FpsArm|BackRifle|Binoculars|Data_Tuning_Graphics/},
   {domain:'propVelocity',pattern:/CarriagePropVelocity|PostPrepass|FirstLevelMissionView|FirstLevelMeal/},
   { domain: "render", pattern: /DeathPose|Data_Tuning_ActorDeath/ },
   {domain:"hud",pattern:/IncomingFire/},
@@ -548,6 +552,9 @@ const ignoredChangeRules = [
 ];
 
 const prepushGateRules = [
+  // Every production module can introduce an asynchronously attached renderer.
+  // This small fixture must not depend on recognizing an old asset/factory name.
+  {pattern:/\/(?:Script_|Data_).*\.mjs$|\.(?:glb|gltf)$/i,tests:['MotionVectorContractTest']},
   {
     tests: ["BootTest"],
     pattern: /(Script_Main|index\.html|Data_Battle|Data_Levels|Render|Shader|Material|Texture|Model|Scene|Outfield|Battlefield|Tengxian|Jiehe|Dressing|ExternalAssets|ExternalProps|FarLand|Sky|Water)/i,
@@ -926,6 +933,7 @@ function PreflightSelection(selection) {
 }
 
 const estimatedSeconds = {
+  MotionVectorContractTest: 3,
   CsmTest: 70,
   BootTest: 100,
   ClusteredLightsTest: 150,

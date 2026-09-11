@@ -226,8 +226,9 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 ### 人物 / AI / 合批
 - **带路跑通用设计**：普通随队士兵采用独立错峰的「跑几步 → 短停喘息与左右观察 → 再跑」，班长按引导职责行动。跨关卡复用、行为优先级、动画衔接与动态验收见 [NPC 带路跑通用设计](Data_NpcGuideCadence.md)。共享 `Script_SquadMarch` / `Script_SquadMarchAi` 已接第一关 Guide，`Script_EditorSquadMarch` 提供 1–24 人、路线、种子与参数预览/保存；分项验收状态见设计文档第 9 节。
 - 国军眼球材质与肩线资产修复、独立 Blender 工程和重建入口见 [国军眼睛与肩线修复](Data_NraEyesShoulders.md)。
-- `Script_Actor.mjs` —— 程序化人物（不用 SkinnedMesh：预通道 overrideMaterial 不带 skinning，
-  蒙皮会在 SSAO 里塌成原点，见头注）；`Script_ActorBatch.mjs` 收成 InstancedMesh，
+- `Script_Actor.mjs` —— 近景蒙皮 GLB 人物与程序化回退；预通道支持骨骼形变和运动历史。
+  新 renderer、模型替换和骨骼挂件统一走 [MotionVector 接入规范](Data_MotionVectorContract.md)，
+  不沿用旧版“不支持 SkinnedMesh”的限制。`Script_ActorBatch.mjs` 收成 InstancedMesh，
   `Script_ActorCrowd.mjs` 管远景人群 —— 46 m 外的人按**姿态**分桶（站 / 跪 / 真卧 /
   跑步翻页 / 倒地），桶表、选桶规则、翻页与预算账见 [远景人群的姿势层](Data_ActorCrowdLod.md)；
   验收口 `Script_ActorCrowdTest.mjs`（含像素级剪影）与 `Script_VisibilityTest.mjs`。
