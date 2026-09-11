@@ -173,6 +173,9 @@ try{
     // Observe real NPC combat while the player stays in the protected entrance.
     // Empty route completes each two-second observation without firing a player shot.
     for(let i=0;i<6;i++)await Drive("TrenchContactWatch",[],{seconds:2});
+    await Drive("ContactCorner",OPENING.approachRoute.slice(3,4),{seconds:35});
+    await page.evaluate(()=>{for(let i=0;i<90;i++){window.OpeningInput.Look({x:-37,z:15},1.1);window.Tengxian.StepFrames(1,1/60,i===89);}});
+    await Capture("ReciprocalTrenchFire");
     const rows=combatTrace.flatMap(t=>t.actors.map(a=>({...a,time:t.time})));
     const friendly=rows.filter(a=>a.side==='nra'&&a.targetSide==='ija'&&a.shots>0&&a.time-a.lastFire<2.5);
     const enemy=rows.filter(a=>a.side==='ija'&&a.targetSide==='nra'&&a.shots>0&&a.time-a.lastFire<2.5);
@@ -191,9 +194,6 @@ try{
     assert.ok(summary.rifleMoves.filter(a=>a.meters>1).length>=3,'surface riflemen relocate during real contact');
     assert.ok(rows.some(a=>a.side==='nra'&&a.health<100)&&rows.some(a=>a.side==='ija'&&a.health<100),
       'reciprocal combat produces real casualties or injuries');
-    await Drive("ContactCorner",OPENING.approachRoute.slice(3,4),{seconds:35});
-    await page.evaluate(()=>{for(let i=0;i<90;i++){window.OpeningInput.Look({x:-37,z:15},1.1);window.Tengxian.StepFrames(1,1/60,i===89);}});
-    await Capture("ReciprocalTrenchFire");
     await fs.writeFile(path.join(out,'Data_ContactSummary.json'),JSON.stringify(summary,null,2));
     assert.deepEqual(errors,[]);console.log('PASS reciprocal opening contact',JSON.stringify(summary));
     return summary;

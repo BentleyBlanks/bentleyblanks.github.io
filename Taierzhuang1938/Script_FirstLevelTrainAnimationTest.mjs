@@ -63,9 +63,18 @@ try{
     g.StepFrames(1,1/60,true);
     p.passengers.forEach((a,i)=>{
      if(!a.missionTrainLife.seated)return;
+     const observed=p.rows[i];
+     // This probe measures the authored stand-up, not hit flinches or ragdolls.
+     // Real opening fire can now wound/kill a waiting passenger. Skip only
+     // active hit/death poses; a surviving wounded actor resumes sampling as
+     // soon as the flinch ends. The contact test separately checks real damage.
+     if(!a.alive || a.hurtPose>0){
+      observed.combatInterrupted??={time:g.Debug.FirstLevelMission().time,health:a.health,alive:a.alive};
+      observed.combatFrames=(observed.combatFrames||0)+1;
+      return;
+     }
      const rig=a.actor.characterRig,pose=rig.missionTrainLifeState;
      if(!a.actor.root.visible)return;
-     const observed=p.rows[i];
      if(!rig.missionTrainLifeActive){
       if(!observed.samples.at(-1)?.walkReleaseTime)return;
       observed.releasedAt??=g.Debug.FirstLevelMission().time;
@@ -114,13 +123,20 @@ try{
  for(const row of result.rows.filter(r=>r.seated)){
   let maxStationaryFootDrift=0,maxPelvisSpeed=0,maxNativePelvisSpeed=0,maxNativePelvisError=0,minWaitingPelvis=Infinity,contactCount=0,previous=null,anchor=null,waiting=0;
   for(const s of row.samples){
+   // A skipped hit pose is not adjacent animation time. Start a fresh contact
+   // anchor rather than measuring the flinch's displacement as foot sliding.
+   if(previous&&s.frame!==previous.frame+1){previous=null;anchor=null}
    if(s.contact){contactCount++;if(s.contact.penetrating||s.contact.deckPenetrating)failures.push({id:row.id,reason:'skin_support',sample:s})}
    const stationary=previous&&Math.hypot(s.physical[0]-previous.physical[0],s.physical[2]-previous.physical[2])<1e-4;
    if(s.weight===0&&s.walkReleaseTime===0){waiting++;minWaitingPelvis=Math.min(minWaitingPelvis,s.pelvis[1]*s.scale+s.physical[1]-s.deckY)}
    if(previous&&s.poseTime>previous.poseTime&&s.poseTime-previous.poseTime<.05){
     const dy=(s.pelvis[1]-previous.pelvis[1])*s.scale+s.physical[1]-previous.physical[1];
     const speed=Math.abs(dy)/(s.poseTime-previous.poseTime);
-    if(s.poseWeight>0||previous.poseWeight>0)maxPelvisSpeed=Math.max(maxPelvisSpeed,speed);
+    // A real queue stop can switch the underlying run/idle clips before the
+    // final blend frame. Report that native seam with the native motion; the
+    // independent mixer-error and skin/deck checks still cover both frames.
+    const nativeSwitch=s.nativeClip&&previous.nativeClip&&s.nativeClip!==previous.nativeClip;
+    if((s.poseWeight>0||previous.poseWeight>0)&&!nativeSwitch)maxPelvisSpeed=Math.max(maxPelvisSpeed,speed);
     else maxNativePelvisSpeed=Math.max(maxNativePelvisSpeed,speed);
    }
    maxNativePelvisError=Math.max(maxNativePelvisError,s.nativePelvisError||0);

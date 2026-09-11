@@ -9,7 +9,9 @@ export const MISSION_TUNING = Object.freeze({
   openingSurfaceRifleCoverSlackM:4,
   openingSurfaceGrenades:0,
   // Route followers stop to fight a visible local threat, then resume the saved route.
-  contactRangeM:28,
+  // Only immediate contact interrupts the escape. Distant covering fire must
+  // not make the escort halt on the exposed apron instead of reaching the trench.
+  contactRangeM:12,
   contactHoldS:2.5,
   contactMaxHoldS:3.5,
   contactResumeS:4.5,

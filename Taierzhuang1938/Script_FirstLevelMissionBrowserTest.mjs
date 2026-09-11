@@ -151,6 +151,7 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
     },
     { points, stance, sprint },
   );
+  const carriedKind=await page.evaluate(()=>window.Tengxian.carry.KindId);
   let result, retries = 0;
   for (let chunk = 0; chunk < 90; chunk++) {
     result = await page.evaluate((fight) => {
@@ -235,6 +236,22 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
         b.index = 0;
         b.stalled = 0; b.last = { ...g.player.position };
       }, { stance, sprint });
+      if(carriedKind==='stretcher' && await page.evaluate(()=>window.Tengxian.carry.KindId!=='stretcher')){
+        // Death really drops the patient. Retry restores the player, so walk
+        // back and use F before continuing; an empty-handed arrival is not a carry.
+        const pickup=await page.evaluate(()=>{
+          const z=window.Tengxian.Debug.FirstLevelMission().column.litters.find(l=>l.zhou);
+          return {x:z.x+Math.sin(z.yaw)*1.6,z:z.z+Math.cos(z.yaw)*1.6};
+        });
+        await Route([pickup],label+'Repick',{fight:true,stance});
+        await Interact();
+        assert.equal(await page.evaluate(()=>window.Tengxian.carry.KindId),'stretcher','checkpoint retry reacquires the real patient through F');
+        await page.evaluate(({points,sprint})=>{
+          const g=window.Tengxian;
+          window.routeBot={points,index:0,frames:0,stalled:0,last:{...g.player.position}};
+          g.Debug.Key('ShiftLeft',sprint);
+        },{points,sprint});
+      }
     }
   }
   await page.evaluate(() => window.Tengxian.Debug.Key("ShiftLeft", false));
