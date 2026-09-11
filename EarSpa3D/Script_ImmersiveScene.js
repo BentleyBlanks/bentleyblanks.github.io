@@ -9,7 +9,7 @@ import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryU
 import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear012-outer-20260911';
 import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear012-outer-20260911';
 import { CreateToolContact } from './Script_ToolContact.js?v=ear020-contact-loading-20260912';
-import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear020-contact-loading-20260912';
+import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear022-metal-finish-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 
 // 封闭耳道、真实接触点与实体收集盘共用毫米世界；镜头在取出时连续后退。
@@ -51,12 +51,17 @@ export async function CreateImmersiveScene({ core }) {
   lamp.shadow.camera.near=.2;lamp.shadow.camera.far=45;lamp.shadow.bias=-.00005;lamp.shadow.normalBias=.018;
   lamp.shadow.intensity=.78;lamp.shadow.normalBias=.028;
   core.setExposure(1.1);lamp.color.set(0xfffbf5);
-  function BakeEnvironment(renderer){
+  function BakeEnvironment(renderer,metal=false){
   const environmentScene=new THREE.Scene();environmentScene.background=new THREE.Color(0x626c74);
-  for(const [x,y,z,w,h] of [[-5,5,4,4,9],[4,1,-3,3,8],[0,8,0,8,2]]){const card=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:0xe9edef,side:THREE.DoubleSide}));card.position.set(x,y,z);card.lookAt(0,0,0);environmentScene.add(card);}
-  const pmrem=new THREE.PMREMGenerator(renderer),target=pmrem.fromScene(environmentScene,.08);pmrem.dispose();environmentScene.traverse(n=>{n.geometry?.dispose();n.material?.dispose();});return target;
+  // 金属需要可分辨的亮条、暗面和冷暖反射；仅作用于器具，避免照亮封闭耳道。
+  if(metal)environmentScene.background.setRGB(.025,.032,.042);
+  const cards=metal?[[-5,3,4,2.1,9,3.4,3.6,3.8],[5,1,-3,1.2,8,1.7,1.95,2.3],[0,8,0,7,3,1.8,1.7,1.5],[-1,-4,-5,5,2,.42,.34,.27]]:[[-5,5,4,4,9],[4,1,-3,3,8],[0,8,0,8,2]];
+  for(const [x,y,z,w,h,r,g,b] of cards){const color=metal?new THREE.Color().setRGB(r,g,b):new THREE.Color(0xe9edef),card=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color,side:THREE.DoubleSide}));card.position.set(x,y,z);card.lookAt(0,0,0);environmentScene.add(card);}
+  const pmrem=new THREE.PMREMGenerator(renderer),target=pmrem.fromScene(environmentScene,metal?.015:.08);pmrem.dispose();environmentScene.traverse(n=>{n.geometry?.dispose();n.material?.dispose();});return target;
   }
-  scene.environment=BakeEnvironment(core.renderer).texture;scene.environmentIntensity=.18;
+  const environment=BakeEnvironment(core.renderer),metalEnvironment=BakeEnvironment(core.renderer,true),metalMaterials=new Set();
+  let metalIntensity=.7;
+  scene.environment=environment.texture;scene.environmentIntensity=.18;
 
   const outer = new THREE.Group(), canalGroup = new THREE.Group(); root.add(outer, canalGroup);
   for (const name of ['Model_OuterEar','Model_Temple','Model_Pillow']) {
@@ -163,6 +168,8 @@ export async function CreateImmersiveScene({ core }) {
     scene.background.set('#191d20');
     scene.backgroundIntensity=.8;scene.backgroundBlurriness=0;
     scene.environmentIntensity=transferBlend>.4?.65:lampOn?.28:.018;
+    metalIntensity=THREE.MathUtils.lerp(THREE.MathUtils.lerp(.7,lampOn?.75:.045,t),.85,transferBlend);
+    for(const material of metalMaterials)material.envMapIntensity=metalIntensity;
     for(const c of chunks)c.mesh.visible=(transferBlend<.66||['carrying','dropping','collected'].includes(c.state))&&c.state!=='fractured'&&!(c.toolId==='suction'&&c.state==='collected');
     lamp.position.copy(camera.position).addScaledVector(right,.6).addScaledVector(up,.4);
     lamp.target.position.copy(look);
@@ -436,7 +443,7 @@ export async function CreateImmersiveScene({ core }) {
       `);
     };m.customProgramCacheKey=()=> 'FeatherDualLobeFiber';return m;
   }
-  function StyleTool(group,id,level,skin){
+  function StyleTool(group,id,level,skin,reflection=metalEnvironment.texture){
     const edition=level<2?'Basic':level<4?'Refined':'Master';
     for(const part of group.children){
       part.userData.originalName??=part.name;
@@ -448,7 +455,11 @@ export async function CreateImmersiveScene({ core }) {
         for(const bin of groups.values()){bin.center.divideScalar(bin.indices.length);for(const i of bin.indices)bin.radius=Math.max(bin.radius,bin.center.distanceTo(new THREE.Vector3(rest[i*3],rest[i*3+1],rest[i*3+2])));}
         part.userData.fiberGroups=[...groups.values()];part.userData.fiberPose=null;}
       for(const m of (Array.isArray(part.material)?part.material:[part.material])){
-        materials.GripMaterial(m,skin,level);if(/ToolLiquid/.test(m.name)){m.transparent=false;m.opacity=1;m.transmission=.72;m.thickness=.12;m.depthWrite=true;m.roughness=.075;m.ior=1.33;m.attenuationColor.set(0xc9dbc1);m.attenuationDistance=1.8;}if(/ToolGlass/.test(m.name)){m.transparent=false;m.opacity=1;m.transmission=.96;m.thickness=.065;m.depthWrite=true;m.roughness=.055;m.clearcoat=.2;m.ior=1.47;m.color.set(0xf3fafb);}m.clippingPlanes=[toolClip];if(!/ToolGlass|ToolLiquid/.test(m.name))m.roughness=Math.max(.12,m.roughness-(level%2===1&&level>1?.08:0));
+        materials.GripMaterial(m,skin,level);if(/ToolLiquid/.test(m.name)){m.transparent=false;m.opacity=1;m.transmission=.72;m.thickness=.12;m.depthWrite=true;m.roughness=.075;m.ior=1.33;m.attenuationColor.set(0xc9dbc1);m.attenuationDistance=1.8;}if(/ToolGlass/.test(m.name)){m.transparent=false;m.opacity=1;m.transmission=.96;m.thickness=.065;m.depthWrite=true;m.roughness=.055;m.clearcoat=.2;m.ior=1.47;m.color.set(0xf3fafb);}m.clippingPlanes=[toolClip];if(!m.userData.instrumentMetal&&!/ToolGlass|ToolLiquid/.test(m.name))m.roughness=Math.max(.12,m.roughness-(level%2===1&&level>1?.08:0));
+        if(m.userData.instrumentMetal){
+          m.envMap=reflection;m.envMapIntensity=reflection===metalEnvironment.texture?metalIntensity:.8;
+          if(reflection===metalEnvironment.texture){metalMaterials.add(m);m.addEventListener('dispose',()=>metalMaterials.delete(m));}
+        }
         if(/ToolHandle/.test(m.name)&&['walnut','jade'].includes(skin)){m.color.set(skin==='walnut'?0x66452c:0xd1ded3);m.metalness=0;m.roughness=skin==='jade'?.22:.47;}
       }
     }
@@ -467,13 +478,13 @@ export async function CreateImmersiveScene({ core }) {
   function CreateToolPreview(canvas,id,level,next,skin){
     const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});renderer.setPixelRatio(Math.min(2,devicePixelRatio));renderer.setSize(canvas.clientWidth||500,canvas.clientHeight||300,false);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;
     const stage=new THREE.Scene(),cam=new THREE.PerspectiveCamera(34,(canvas.clientWidth||500)/(canvas.clientHeight||300),.1,150);cam.position.set(1,10,38);cam.lookAt(0,10,0);
-    // 商店预览透明底，沿用 UI 的底板；器具环境光与材质保持原值。
-    const previewEnvironment=BakeEnvironment(renderer);stage.environment=previewEnvironment.texture;stage.environmentIntensity=.9;stage.background=null;stage.add(new THREE.HemisphereLight(0xffffff,0x504a40,2.2));
-    for(const [x,z,intensity] of [[-8,12,4],[10,-5,3]]){const light=new THREE.DirectionalLight(0xffffff,intensity);light.position.set(x,18,z);stage.add(light);}
-    const models=[level,next].map((n,i)=>{const group=toolParts[id].clone(true);group.visible=true;group.children.forEach(p=>{p.geometry=p.geometry.clone();p.material=Array.isArray(p.material)?p.material.map(m=>m.clone()):p.material.clone();p.rotation.set(0,0,0);});StyleTool(group,id,n,skin);group.children.forEach(p=>{for(const m of (Array.isArray(p.material)?p.material:[p.material]))m.clippingPlanes=[];p.position.set(0,0,0);});group.position.x=i?4:-4;group.rotation.x=.12;group.rotation.y=-.35;stage.add(group);return group;});
+    // 渲染目标不能跨 WebGL 上下文复用；预览在自己的 renderer 烘焙相同的金属反射。
+    const previewEnvironment=BakeEnvironment(renderer),previewMetalEnvironment=BakeEnvironment(renderer,true);stage.environment=previewEnvironment.texture;stage.environmentIntensity=.9;stage.background=null;stage.add(new THREE.HemisphereLight(0xffffff,0x504a40,2.2));
+    for(const [x,z,intensity] of [[-8,12,1.8],[10,-5,1.2]]){const light=new THREE.DirectionalLight(0xffffff,intensity);light.position.set(x,18,z);stage.add(light);}
+    const models=[level,next].map((n,i)=>{const group=toolParts[id].clone(true);group.visible=true;group.children.forEach(p=>{p.geometry=p.geometry.clone();p.material=Array.isArray(p.material)?p.material.map(m=>m.clone()):p.material.clone();p.rotation.set(0,0,0);});StyleTool(group,id,n,skin,previewMetalEnvironment.texture);group.children.forEach(p=>{for(const m of (Array.isArray(p.material)?p.material:[p.material]))m.clippingPlanes=[];p.position.set(0,0,0);});group.position.x=i?4:-4;group.rotation.x=.12;group.rotation.y=-.35;stage.add(group);return group;});
     const render=()=>{renderer.render(stage,cam);previewTriangles=renderer.info.render.triangles;};render();let px=null;
     canvas.onpointerdown=e=>{px=e.clientX;canvas.setPointerCapture(e.pointerId);};canvas.onpointermove=e=>{if(px==null)return;models.forEach(m=>m.rotation.y+=(e.clientX-px)*.015);px=e.clientX;render();};canvas.onpointerup=canvas.onpointercancel=()=>px=null;
-    return{SetView(mode){const y=mode==='tip'?.65:mode==='grip'?(id==='drops'?6.2:16.7):id==='drops'?4.5:10;const z=mode==='full'?(id==='drops'?21:38):7;models.forEach((m,i)=>m.position.x=(i?1:-1)*(mode==='full'?4:1.25));cam.position.set(1,y+(mode==='tip'?1:0),z);cam.lookAt(0,y,0);render();},Dispose(){previewTriangles=0;previewEnvironment.dispose();renderer.dispose();renderer.forceContextLoss();models.forEach(g=>g.traverse(p=>{p.geometry?.dispose();if(p.material)for(const m of (Array.isArray(p.material)?p.material:[p.material]))m.dispose();}));}};
+    return{SetView(mode){const y=mode==='tip'?.65:mode==='grip'?(id==='drops'?6.2:16.7):id==='drops'?4.5:10;const z=mode==='full'?(id==='drops'?21:38):7;models.forEach((m,i)=>m.position.x=(i?1:-1)*(mode==='full'?4:1.25));cam.position.set(1,y+(mode==='tip'?1:0),z);cam.lookAt(0,y,0);render();},Dispose(){previewTriangles=0;previewEnvironment.dispose();previewMetalEnvironment.dispose();renderer.dispose();renderer.forceContextLoss();models.forEach(g=>g.traverse(p=>{p.geometry?.dispose();if(p.material)for(const m of (Array.isArray(p.material)?p.material:[p.material]))m.dispose();}));}};
   }
   function Ungrip(c) { UngripPeelBody(c.body);c.gripRotation=null;c.grasped=false; }
   const fiberTipSamples=[];for(let y=0;y<3;y+=.15)fiberTipSamples.push(new THREE.Vector3(0,y,0));
@@ -710,5 +721,5 @@ export async function CreateImmersiveScene({ core }) {
     Drop(c){c.surfaceWet=Math.max(c.surfaceWet||0,.18);ShowTool(c,'drops');dropTarget=c.mesh.position.clone().addScaledVector(c.normal,.18);dropAge=0;droplet.visible=true;droplet.userData.start=lastToolPoint.clone();},
     get chunks(){return chunks;},
     modelInfo:{source:'BlenderMCP',file:'Models/Model_ImmersiveEar.glb',edition:'DirectionalAnatomy',nodes:asset.scene.children.map(n=>n.name)},
-    Dispose(){disposed=true;CancelPreparation();waxPrototypes.forEach(g=>g.dispose());anatomy.dispose();root.traverse(n=>{n.geometry?.dispose();});}};
+    Dispose(){disposed=true;CancelPreparation();waxPrototypes.forEach(g=>g.dispose());environment.dispose();metalEnvironment.dispose();metalMaterials.clear();anatomy.dispose();root.traverse(n=>{n.geometry?.dispose();});}};
 }

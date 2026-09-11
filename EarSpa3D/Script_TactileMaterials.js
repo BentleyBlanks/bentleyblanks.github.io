@@ -18,7 +18,27 @@ export async function CreateTactileMaterials(renderer) {
     const handle=/ToolHandle/.test(material.name),steel=/ToolSteel/.test(material.name);if(!handle&&!steel)return;
     const id=handle&&skin==='jade'?2:handle&&(skin==='walnut'||level===1)?1:0;
     Object.assign(material,grips[id]);material.normalScale.set(id===0?.055:.12,id===0?.24:.12);material.aoMapIntensity=.5;material.color.setRGB(id===1&&skin==='classic'?1.6:1,id===1&&skin==='classic'?1.5:1,id===1&&skin==='classic'?1.3:1);
-    material.roughness=id===2?.85:id===1?1:Math.max(.20,.68-(level-1)*.10);material.metalness=id===0?1:0;if(material.isMeshPhysicalMaterial){material.clearcoat=id===2?.7:id===1?.1:.2;material.clearcoatRoughness=.12;material.anisotropy=id===0?.58:0;material.anisotropyRotation=Math.PI/2;}if(id===0){const floor=Math.max(.19,.36-(level-1)*.032);material.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=max(roughnessFactor,'+floor.toFixed(3)+');');};material.customProgramCacheKey=()=>'InstrumentBrushedSteel'+level;}material.needsUpdate=true;
+    material.roughness=id===2?.85:1;material.metalness=id===0?1:0;
+    if(material.isMeshPhysicalMaterial){material.clearcoat=id===2?.7:id===1?.1:0;material.clearcoatRoughness=.12;material.anisotropy=0;}
+    if(id===0){
+      // 钢的颜色是导体反射率；图集里的灰色明暗不能再次作为烘焙光照压暗反射。
+      const brushed=handle,roughness=(brushed?.28:.21)-(level-1)*.022;
+      material.map=null;material.color.setRGB(.72,.75,.78);material.aoMapIntensity=.22;
+      material.normalScale.set(brushed?.025:.010,brushed?.055:.018);
+      material.roughness=1;
+      if(material.isMeshPhysicalMaterial){material.anisotropy=brushed?.42:.12;material.anisotropyRotation=Math.PI/2;}
+      // 保留图集中的微细加工纹，限制起伏幅度，避免粗糙度被全局下限抹平。
+      material.onBeforeCompile=shader=>{
+        shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor='+roughness.toFixed(3)+'+(roughnessFactor-.5)*.07;');
+        // 毫米近距点光会出现针状极值；柔和压缩直射峰值，保留环境反射的亮暗条带。
+        shader.fragmentShader=shader.fragmentShader.replace('#include <lights_fragment_end>',`#include <lights_fragment_end>
+          float metalPeak=max(max(reflectedLight.directSpecular.r,reflectedLight.directSpecular.g),reflectedLight.directSpecular.b);
+          reflectedLight.directSpecular/=1.0+metalPeak/.8;`);
+      };
+      material.customProgramCacheKey=()=> 'InstrumentSteelFinish'+(brushed?'Brushed':'Polished')+level;
+      material.userData.instrumentMetal=brushed?'brushed':'polished';
+    }
+    material.needsUpdate=true;
   }
   const marks=Array.from({length:9},()=>new THREE.Vector4(0,0,0,0)),wet=Array.from({length:9},()=>new THREE.Vector4(0,0,0,0));
   const state={outerSss:{value:.10},outside:{value:0},sss:{value:.18},light:{value:new THREE.Vector3()},power:{value:0},marks:{value:marks},wet:{value:wet}};
