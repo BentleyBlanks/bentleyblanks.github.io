@@ -167,6 +167,7 @@ export const testDefs = {
   AiShootingTest: { file: "Script_AiShootingTest.mjs", desc: "射击模型：误差收敛/暴露采样/走廊/点射/压制点" },
   AiCloseRangeTest: { file: "Script_AiCloseRangeTest.mjs", desc: "近距离实弹：命中/伤害/遮挡/攻击名额" },
   AiTacticsTest: { file: "Script_AiTacticsTest.mjs", desc: "班组战术：令牌/侧翼点/跃进配对/投弹/撤退" },
+  AiInitiativeBrowserTest: {file:"Script_AiInitiativeBrowserTest.mjs",timeoutMs:300000,desc:"战术执行：受压移动/跃进/失败掩体/刺刀接触/失去目标"},
   AiBrainGraphTest: { file: "Script_AiBrainGraphTest.mjs", desc: "敌军 AI 行为图：节点=STATE、边两端存在、表键可解析、任务=TASK（纯 Node，毫秒级）" },
   TuningWriterTest: { file: "Script_TuningWriterTest.mjs", desc: "调参表改写器：按花括号层级只改那一个数字、注释格式不动（纯 Node，毫秒级）" },
   AiEditorTest: { file: "Script_AiEditorTest.mjs", timeoutMs: 300000, desc: "敌军 AI 编辑器：六个分节、世界叠加进出还干净、滑杆热改、重置/复制/保存退化、行为图节点数" },
@@ -303,7 +304,7 @@ export const browserTests = new Set([
   "TrainLibraryTest",
   'BackRifleRunTest', 'MeleeAnimationTest', 'InfantryAnimationTest',
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
-  "AiCombatBrowserTest", "AiCloseRangeTest", "AiEditorTest",
+  "AiCombatBrowserTest", "AiCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
@@ -412,7 +413,7 @@ export const domains = {
     label: "AI 与战场内容预算",
     // 具名同伴（罗班长、幺娃…）是从 nra 名额里出的人，goal 直接写进 AiDirector，
     // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
-    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AiPerceptionTest", "AiCoverTest", "AiShootingTest", "AiTacticsTest",
+    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AiInitiativeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiShootingTest", "AiTacticsTest",
       "VisibilityTest", "ActorCrowdTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
       "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012AnimationTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest", "FirstLevelP012ArrivalTest", "FirstLevelP012VillageLifeTest", "FirstLevelP012CastTest"],
   },

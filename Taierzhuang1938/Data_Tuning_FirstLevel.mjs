@@ -8,6 +8,12 @@ export const MISSION_TUNING = Object.freeze({
   openingSurfaceRifleRadiusM:3,
   openingSurfaceRifleCoverSlackM:4,
   openingSurfaceGrenades:0,
+  // Mobile rifles may search and counterattack inside their assigned area.
+  surfaceTacticalRadiusM:12,
+  intrusionTacticalRadiusM:10,
+  infantryTacticalRadiusM:14,
+  friendlyTacticalRadiusM:5,
+  assaultContactRangeM:14,
   // Route followers stop to fight a visible local threat, then resume the saved route.
   // Only immediate contact interrupts the escape. Distant covering fire must
   // not make the escort halt on the exposed apron instead of reaching the trench.

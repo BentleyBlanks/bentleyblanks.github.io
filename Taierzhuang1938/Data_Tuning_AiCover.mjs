@@ -170,7 +170,15 @@ export const COVER = Freeze({
  * 分到两个文件里改一半忘一半。
  */
 export const COVER_CYCLE = Freeze({
-  /** 两次重选掩体的最小间隔（秒）。被判侧翼 / 压制爆表 / 掩体被炸是例外，可以立刻重选。 */
+  // 2026-09-11: stalled shelters must release ownership and allow normal obstacle recovery.
+  selectedValidationBudget: 2,
+  microMoveM: 2,
+  traversalTurnRadPerS: 5,
+  urgentReselectS: 0.4,
+  stalledApproachS: 2.5,
+  failedRetryS: 7,
+  progressM: 0.35,
+  /** 两次重选掩体的最小间隔（秒）。紧急失效改用 urgentReselectS，避免每次思考都重查。 */
   reselectMinS: 2.5,
 
   /** 到位判定：离 hidePos 小于它就算「进掩体了」。与验收标准 §9 第 1 条的 1.2 m 同一个数。 */

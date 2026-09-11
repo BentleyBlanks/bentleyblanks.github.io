@@ -27,10 +27,10 @@ import { CoverRegistry } from "./Script_AiCover.mjs";
 import { COVER, COVER_CYCLE } from "./Data_Tuning_AiCover.mjs";
 import { ShootingModel, CloseRangeWeight } from "./Script_AiShooting.mjs";
 import { CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
-import { TacticsDirector, TASK, IsManeuverTask } from "./Script_AiTactics.mjs";
+import { TacticsDirector, TASK, IsManeuverTask, CanManeuver, ManeuverAllowed, ChargeOpportunity } from "./Script_AiTactics.mjs";
 // 只读 TACTICS：压制射击的情报门槛与守区掩体余量。侧翼 / 投弹 / 查看的那几张表
 // 由 `TacticsDirector` 自己消费 —— 大脑只按 `task.kind` 选状态，不重复读它们的数。
-import { TACTICS } from "./Data_Tuning_AiTactics.mjs";
+import { TACTICS, INVESTIGATE } from "./Data_Tuning_AiTactics.mjs";
 // 断肢只借一个数：被卸掉肢体的那一下死亡推力乘多少（docs/Data_Dismemberment.md §8.1）。
 // 判定与执行都在 ctx.gore 那一层，这里不认识 three 以外的任何断肢概念。
 import { DEATH_PUSH_SCALE as GORE_DEATH_PUSH_SCALE } from "./Data_Tuning_Gore.mjs";
@@ -1678,6 +1678,7 @@ export class AiDirector {
     this.ShareTrack(s, sense);
     // 任务过期就当没派活：Tactics 每秒写一次，中间掉帧不该让人抱着一分钟前的活不放。
     const task = s.task && s.task.kind && this.time < s.task.until ? s.task : null;
+    const charge = this.UpdateChargeIntent(s);
 
     // 掩体：先选点，状态机才知道有没有「躲得住的地方」可选。
     this.UpdateCover(s);
@@ -1692,7 +1693,7 @@ export class AiDirector {
       // 被压制打断的冲锋是失败的冲锋：这一轮不再自动重起。冷却带抖动，
       // 免得全班同一秒重新站起来吃同一轮齐射。玩家下的刺刀令不受此限。
       if (s.state === STATE.CHARGE && s.order !== "charge") {
-        s.chargeCooldownUntil = this.time + 8 + s.rnd() * 4;
+        s.chargeCooldownUntil = this.time + TACTICS.chargeCooldownS + s.rnd() * TACTICS.chargeCooldownJitterS;
       }
       if (s.state !== STATE.SUPPRESSED) s.suppressedAt = this.time;
       s.state = STATE.SUPPRESSED;
@@ -1726,11 +1727,14 @@ export class AiDirector {
         // 于是「他在换弹」这条战术信息一直只有字幕没有声音。
         this.ctx?.audioWiring?.AiReload(s, s.weapon.kind);
       }
-    } else if (task && IsManeuverTask(task.kind) && task.point) {
+    } else if (charge && task?.kind !== TASK.RETREAT && task?.kind !== TASK.GRENADE) {
+      s.state = STATE.CHARGE;
+      this.SetStance(s, 0, 1.0, true);
+    } else if (task && IsManeuverTask(task.kind) && (task.point || task.kind === TASK.BOUND)) {
       // **班组的机动任务优先于「就地对射」**（方案 §5 的状态表就是这么排的）。
       // 排在对射后面的话，交战距离（74 m）之内永远轮不到它 —— 侧翼手拿了任务
       // 却站在原地开枪，「会绕」这条机制等于没有。
-      // 谁能拿到机动任务由 Tactics 决定：剧本旗与守区的人一条都拿不到，
+      // 谁能拿到机动任务由 Tactics 决定：剧本仍优先，显式开放的守区只在范围内机动，
       // 每班最多 `FLANK.flankers` 个人去绕，正面仍然有人咬着。
       s.state = task.kind === TASK.FLANK ? STATE.FLANK
         : task.kind === TASK.BOUND ? STATE.BOUND
@@ -1739,38 +1743,12 @@ export class AiDirector {
     } else if (s.target && bestDist < engageRange + (wasEngaged ? ENGAGE.hysteresisM : 0)) {
       // 六人组内不再人人同一种打法：突击位先压、侧翼位次之，步枪位只在贴脸时冲，
       // 支援位永不自行冲锋，留在后方持续射击。
-      const chargeRange = s.tacticalRole === "assault" ? 24
-        : s.tacticalRole === "flank" ? 18
-          : s.tacticalRole === "leader" ? 13
-            : s.tacticalRole === "rifleman" ? 10 : 0;
-      const wasAutoCharge = s.state === STATE.CHARGE && s.order !== "charge";
-      // 冲锋的**发起**也看压制值：压制没清完（≥0.25）、还押着姿态承诺（多半是
-      // 卧倒没到期）、或上一次冲锋刚被压制打断的人，都不许新起冲锋。旧版在
-      // SUPPRESSED 一跌破 0.32 时就转 CHARGE 强制站立，正是姿态抽动环的另一半。
-      // 已在冲锋中的不看这些 —— 一发近失弹不该打散端着刺刀的人。
-      const chargeReady = this.time >= s.chargeCooldownUntil && s.suppression < 0.25
-        && (s.stance === 0 || this.time >= s.stanceUntil);
-      // 记忆目标（只听见、没看见）不许发起白刃冲锋：端着刺刀冲向一个影子既不好看
-      // 也不合理；已经在冲的那一支不受影响（wasAutoCharge 那一档）。
-      // 守区的人不自发冲锋（玩家亲口的「上刺刀」除外）：Act 本来就不让带 holdZone 的人离区，
-      // 旧写法让他们在二十米内进 CHARGE 却一步迈不出去 —— 站直、上刺刀、原地干等，
-      // 正是「近处的敌人干站着」的一种；改成留在掩体 / 跪射里继续打（2026-09-09 验收）。
-      const charge = chargeRange > 0 && !s.targetFromMemory
-        && (!s.holdZone || s.order === "charge")
-        && (wasAutoCharge ? bestDist < chargeRange + 7 : chargeReady && bestDist < chargeRange)
-        && s.cohesion > 0.5 && s.squadMateCount > 0;
-      if (charge && !wasAutoCharge) s.combatModeUntil = this.time + 1.4;
-      const committedCharge = charge || (wasAutoCharge && this.time < s.combatModeUntil
-        && bestDist < chargeRange + 10);
       // 投弹排在自发冲锋前面：班组把弹派给他，就该先扔再说 —— 十几米上一枚手榴弹比端着刺刀
       // 冲进火力里划算；拿了投弹任务却去冲锋的人会把班组的投弹租约白白占满二十秒。
       // 玩家下的「上刺刀」命令（order==="charge"）仍然压过投弹。
       if (task && task.kind === TASK.GRENADE && s.order !== "charge" && this.CanThrowGrenade(s)) {
         s.state = STATE.GRENADE;
         this.SetStance(s, 0, 0.8, true);
-      } else if (committedCharge) {
-        s.state = STATE.CHARGE;
-        this.SetStance(s, 0, 1.0, true);
       } else if (s.cover) {
         // **有掩体就进掩体打**：hide → peek → 点射 → hide（§5 的 COVER_ENGAGE）。
         // 姿态由掩体决定（矮掩体蹲藏跪射 / 高掩体贴墙侧步），所以这里不调 FireStance ——
@@ -1848,11 +1826,36 @@ export class AiDirector {
     this.UpdateMoveOrder(s, task);
   }
 
-  /**
-   * 把当前状态翻译成这一帧的走位命令（`s.moveOrder` / `s.moveArriveM`）。
-   * `Act` 的 switch 只读这两个字段 —— 那一段被 `Script_FirstLevelP012RuntimeTest`
-   * 抽出源码放进沙箱重放，所以它里面**不许出现新的方法调用与模块常量**。
-   */
+  /** Commit a visible local charge, and cancel it when contact or support is lost. */
+  UpdateChargeIntent(s) {
+    if (s.order === "charge") return false;
+    if (s.state === STATE.CHARGE) {
+      const point = this.ThreatPoint(s);
+      if (CanManeuver(s,this.time) && point && ManeuverAllowed(s,point)
+        && s.target?.id === s.autoChargeTarget && this.time < s.autoChargeUntil
+        && s.targetLostTime < TACTICS.chargeLostS && s.suppression < TACTICS.chargeAbortSuppression) return true;
+      s.chargeCooldownUntil = this.time + TACTICS.chargeCooldownS;
+      s.autoChargeUntil = 0;
+    }
+    if (s.ammo <= 0 || s.task?.kind === TASK.RETREAT || s.task?.kind === TASK.GRENADE) return false;
+    let attackers = 0;
+    for (const other of this.soldiers) {
+      if (other !== s && other.alive && other.side === s.side && other.state === STATE.CHARGE
+        && other.target?.id === s.target?.id) attackers++;
+    }
+    if (!ChargeOpportunity(s,this.time,attackers)) return false;
+    s.autoChargeTarget = s.target.id;
+    s.autoChargeUntil = this.time + TACTICS.chargeMaxS;
+    this.ReleaseCover(s);
+    return true;
+  }
+
+  ChargePoint(s, ordered) {
+    const point = this.ThreatPoint(s) || (ordered ? s.goal : null);
+    return point && (ordered || ManeuverAllowed(s,point)) ? point : null;
+  }
+
+  /** Translate the selected state into this frame's movement order. */
   UpdateMoveOrder(s, task) {
     s.moveOrder = null;
     s.moveArriveM = NaN;
@@ -1862,8 +1865,9 @@ export class AiDirector {
         this.UpdateCoverCycle(s, s.suppression > COVER.suppressionProneAt ? "hide" : null);
         break;
       case STATE.SUPPRESS:
-        // 压制射击要看得见掩体沿：进掩体的人保持射击位，没掩体的原地打。
+        // Suppression fire shares the cover rhythm and open-ground relocation.
         if (s.cover) this.UpdateCoverCycle(s, null);
+        else if (this.UpdateDisplace(s)) this.MoveTo(s,s.displaceX,s.displaceZ,WATCH.displaceSpeedMps,WATCH.displaceArriveM);
         break;
       case STATE.FIRE:
         // 【§15】跪射之后换位：站定超过 displaceAfterS 秒、或连着打了
@@ -1885,11 +1889,19 @@ export class AiDirector {
         break;
       case STATE.SUPPRESSED:
         // 被压住的人**优先爬向验证过的掩体**：这是「往掩体里缩」而不是「站着不动」。
-        if (s.cover && s.cover.validated) this.UpdateCoverCycle(s, "hide");
+        if (s.cover && s.cover.blockedCrouched) this.UpdateCoverCycle(s, "hide");
+        else if (this.UpdateDisplace(s)) this.MoveTo(s,s.displaceX,s.displaceZ,WATCH.displaceSpeedMps,WATCH.displaceArriveM);
         break;
       case STATE.BOUND:
         // 跃进：下一个掩体已经由 UpdateCover 带 toward 查过了，跑过去就是。
-        if (s.cover) this.UpdateCoverCycle(s, null);
+        if (s.cover) {
+          this.UpdateCoverCycle(s, null);
+          if (s.coverPhase !== "approach") s.state = STATE.COVER_ENGAGE;
+        } else {
+          // A missing next cover is a failed bound, not an order to stand idle.
+          s.state = s.target ? STATE.FIRE : STATE.WATCH;
+          if (this.UpdateDisplace(s)) this.MoveTo(s,s.displaceX,s.displaceZ,WATCH.displaceSpeedMps,WATCH.displaceArriveM);
+        }
         break;
       case STATE.FLANK:
       case STATE.INVESTIGATE:
@@ -2040,7 +2052,7 @@ export class AiDirector {
    *（听来的那条也算 —— 「朝枪声那边看」正是这一条要的东西）。
    */
   WatchPoint(s) {
-    if (s.target && s.target.position) return s.target.position;
+    if (s.targetVisible && s.target?.position) return s.target.position;
     if (s.lkp && (s.lkpConfidence || 0) > 0) return s.lkp;
     return null;
   }
@@ -2206,7 +2218,7 @@ export class AiDirector {
     if (!zone && !s.scriptDefensive) return NaN;
     const base = zone && Number.isFinite(zone.radius) ? zone.radius : 0;
     const slack = Number.isFinite(s.scriptCoverSlackM) ? s.scriptCoverSlackM : TACTICS.holdCoverSlackM;
-    return base + slack;
+    return Math.max(base + slack, s.tacticalRadiusM || 0);
   }
 
   /** 这个候选掩体的隐蔽位与射击位是不是都还在守区允许的范围里。 */
@@ -2245,7 +2257,7 @@ export class AiDirector {
    *
    * 什么时候查：首次接敌、被判抄侧翼、压制越阈值、敌方手榴弹落在身边、
    * 掩体被炸没了、跃进要带推进方向。其余一律按 `COVER_CYCLE.reselectMinS` 限流 ——
-   * 每次 Query 最多三条验证射线，不限流的话 110 个人每拍就是三百条。
+   * Query 的候选验证和最终候补的补查均有限额，重选节流避免全员逐帧打射线。
    *
    * @returns {boolean} 这一拍有没有换点
    */
@@ -2262,9 +2274,18 @@ export class AiDirector {
     const now = this.time;
     const task = s.task;
     const bounding = !!task && task.kind === TASK.BOUND;
-    const cover = s.cover;
+    let cover = s.cover;
+    if (cover && s.coverPhase === "approach") {
+      const left = Math.hypot(cover.hidePos.x-s.position.x,cover.hidePos.z-s.position.z);
+      if (!Number.isFinite(s.coverProgressM) || left < s.coverProgressM-COVER_CYCLE.progressM) {
+        s.coverProgressM = left; s.coverProgressAt = now;
+      } else if (now-s.coverProgressAt > COVER_CYCLE.stalledApproachS) {
+        s.failedCoverId = cover.id; s.failedCoverUntil = now+COVER_CYCLE.failedRetryS;
+        this.ReleaseCover(s); cover = null; s.coverPickAt = -99;
+      }
+    } else { s.coverProgressM = Infinity; s.coverProgressAt = now; }
 
-    // ① 紧急重选：这几条不吃限流，因为它们说的都是「现在这个点已经不管用了」。
+    // ① 紧急重选：使用更短的重查间隔，因为当前藏身点已经失效。
     // **「身上没有掩体」不在这一档里**：那正是「附近根本没有掩体」的常态
     //（第一关前沿的日军身边 11 m 内实测 0 个点），当成紧急的话每次 Think 都要重查一遍，
     //  52 个人就是每秒五百次 Query、上千条验证射线 —— 直接把 §7 的预算烧穿。
@@ -2282,7 +2303,7 @@ export class AiDirector {
       want = true;
     }
     if (!want) return false;
-    if (!urgent && now - s.coverPickAt < COVER_CYCLE.reselectMinS) return false;
+    if (now - s.coverPickAt < (urgent ? COVER_CYCLE.urgentReselectS : COVER_CYCLE.reselectMinS)) return false;
 
     const opts = this._coverOpts;
     let radiusM = task && Number.isFinite(task.coverRadiusM) ? task.coverRadiusM : COVER.defaultRadiusM;
@@ -2318,9 +2339,24 @@ export class AiDirector {
     s.coverThreatZ = threat.z;
     // 守区的人得挑一个**隐蔽位与射击位都还在区里**的点：查询半径是以人为圆心的，
     // 而守区是以锚点为圆心的，两个圆不重合时前几名有可能落在区外。
-    let best = null;
+    let best = null, extraValidations = 0;
     for (let i = 0; i < found.length; i += 1) {
-      if (this.CoverAllowed(s, found[i])) { best = found[i]; break; }
+      const cand = found[i];
+      if (cand.cover.id === s.failedCoverId && now < s.failedCoverUntil) continue;
+      if (!this.CoverAllowed(s, cand)) continue;
+      // Query only ray-tests its first few scores. Never accept an untested
+      // runner-up just because the tested candidates failed their protection check.
+      if (!cand.validated && typeof this.covers.host.Raycast === "function") {
+        if (extraValidations >= COVER_CYCLE.selectedValidationBudget) continue;
+        extraValidations++;
+        const validation = this.covers.Validate(cand.cover,threat,{hidePos:cand.hidePos,suppression:s.suppression});
+        cand.validated = true;
+        cand.blockedCrouched = validation.blockedCrouched;
+        cand.blockedStanding = validation.blockedStanding;
+      }
+      if (cand.validated && !cand.blockedCrouched && !cand.blockedStanding) continue;
+      if (cand.validated && !cand.blockedStanding) cand.hideStance = Math.max(1,cand.hideStance);
+      best = cand; break;
     }
     if (!best) { this.ReleaseCover(s); return false; }
     if (cover && best.cover.id === cover.id) {
@@ -2332,6 +2368,7 @@ export class AiDirector {
     this.covers.Release(s.id);
     this.covers.Claim(best.cover.id, s.id);
     this.WriteCover(s, best, now);
+    s.coverProgressM = Infinity; s.coverProgressAt = now;
     s.coverPhase = "approach";
     s.coverPhaseUntil = -99;
     this.stats.coverPicks += 1;
@@ -2528,7 +2565,7 @@ export class AiDirector {
       // 不放宽的话，非剧本的守区单位刚侧向挪出两米就被这一段判成「出区了」、
       // 把目标点拽回守位 —— 人在两点之间来回蹭，换位一次都完不成。
       const reach = s.cover || this.time < s.displaceUntil ? this.CoverReachM(s) : NaN;
-      const limit = Number.isFinite(reach) ? Math.max(s.holdZone.radius, reach) : s.holdZone.radius;
+      const limit = Math.max(s.tacticalRadiusM || 0, Number.isFinite(reach) ? Math.max(s.holdZone.radius, reach) : s.holdZone.radius);
       if (d > limit) {
         strayed = true;
         if (this.time - s.regoalTime > 1.5) {
@@ -2547,9 +2584,12 @@ export class AiDirector {
     switch (s.state) {
       case STATE.SUPPRESSED: {
         // 三档：0.50–0.75 卧倒并往掩体里爬（还能还击）；
-        //       0.75 以上停火、保持姿态；
+        //       0.75 以上停火，仍能向掩体爬行；
         //       0.90 以上且 20 m 内五秒没有友军 —— 往后缩。这不是投降，是被打散。
-        if (s.suppression > 0.90 && s.lonelyTime > 5 && s.target) {
+        if (s.moveOrder) {
+          desired = this.tmpD.set(s.moveOrder.x,0,s.moveOrder.z); speed = s.moveOrder.speed;
+          wantsFire = s.suppression <= .75;
+        } else if (s.suppression > 0.90 && s.lonelyTime > 5 && s.target) {
           desired = this.tmpD.set(
             s.position.x * 2 - s.target.position.x, 0, s.position.z * 2 - s.target.position.z);
           speed = 2.0;
@@ -2619,7 +2659,6 @@ export class AiDirector {
         break;
       }
       case STATE.FLANK:
-      case STATE.INVESTIGATE:
       case STATE.RETREAT: {
         // 走到班组给的点。途中仍走 TryFire —— 它自己的枪口方向闸会挡住
         // 「一边横着跑一边往侧后方开枪」，所以不必在这儿再判一次。
@@ -2628,14 +2667,19 @@ export class AiDirector {
         wantsFire = true;
         break;
       }
+      case STATE.INVESTIGATE: {
+        const m = s.moveOrder;
+        if (m) { desired = this.tmpD.set(m.x,0,m.z); speed = m.speed; }
+        break;
+      }
       case STATE.GRENADE:
         this.TryGrenade(s, player);
         break;
       case STATE.CHARGE: {
-        // 守点的人平时不冲锋（冲出去就是把点让出来），但玩家下的"上刺刀"是例外。
+        // 自主冲锋受局部战区约束；玩家明确下达的刺刀令可越出守区。
         const ordered = s.order === "charge" && this.time < s.chargeUntil;
-        const dest = s.target ? s.target.position : (ordered ? s.goal : null);
-        if (dest && (!s.holdZone || ordered)) {
+        const dest = this.ChargePoint ? this.ChargePoint(s,ordered) : (s.target ? s.target.position : (ordered ? s.goal : null));
+        if (dest && (!s.holdZone || ordered || s.tacticalRadiusM > 0)) {
           desired = this.tmpD.copy(dest);
           speed = ordered ? 3.6 * 1.4 : 3.6;      // 下了命令的冲锋跑得更快
         }
@@ -2682,10 +2726,11 @@ export class AiDirector {
     // P012 route followers use an explicit metres/second pace, not a cap on the
     // ordinary 2.6m/s advance state. Scouts still perceive and fire normally.
     const scriptedPathFollower = s.p012Guided === true && Number.isFinite(s.scriptMoveSpeedMps);
-    // P012 has already swept its corridor and owns queue waits. A stale random
-    // detour must not turn a resumed walker out of that corridor or vault a desk.
+    // Exact escort corridors own their queue waits. Locally mobile infantry
+    // retain obstacle recovery even during authored bounds.
+    const lockedCorridor = scriptedPathFollower && !(s.tacticalRadiusM > 0);
     if (scriptedPathFollower) {
-      s.detourTime = 0; s.stuckTime = 0;
+      if (lockedCorridor) { s.detourTime = 0; s.stuckTime = 0; }
       // Combat still owns aiming, firing, reloading and damage above. The
       // checked corridor owns movement: FIRE's cached cover must not pull the
       // leader away from the escort, and RELOAD must not cancel his next step.
@@ -2713,7 +2758,7 @@ export class AiDirector {
           navigated = this.ctx.nav.Steer(s.position.x, s.position.z, desired.x, desired.z, this.navOut);
           if (navigated) { nx = this.navOut.x; nz = this.navOut.z; s.detourTime = 0; s.stuckTime = 0; }
         }
-        if (!scriptedPathFollower && !navigated && s.detourTime > 0) {
+        if (!lockedCorridor && !navigated && s.detourTime > 0) {
           s.detourTime -= dt;
           const c = Math.cos(s.detourYaw), sn = Math.sin(s.detourYaw);
           const rx = nx * c - nz * sn, rz = nx * sn + nz * c;
@@ -2732,16 +2777,16 @@ export class AiDirector {
         // 掩体微走位（半米的侧步）不参与「卡住就翻墙 / 卡住就绕路」那一套：
         // 一帧只挪两三厘米，胶囊求解的余量本来就吃得下，判成"卡住"的话
         // 探头探到一半会去翻墙。
-        const microStep = Number.isFinite(s.moveArriveM);
+        const microStep = Number.isFinite(s.moveArriveM) && d < COVER_CYCLE.microMoveM;
         if (moved < step * 0.4 && !microStep) {
           s.stuckTime += dt;
           // 挡在前面的要是一堵翻得过去的墙，就翻过去 —— 别沿着院墙兜半圈找门洞。
           // 门槛比"卡住就绕"的 0.8 s 早一点：能翻就不该先绕。
-          if (!scriptedPathFollower && s.stuckTime > 0.3 && this.TryVault(s, nx, nz)) return;
+          if (!lockedCorridor && s.stuckTime > 0.3 && this.TryVault(s, nx, nz)) return;
           // 绕着还是不动就**翻到另一面**再绕。这一条不能写成"只有不在绕行时才重掷"：
           // 那样一旦直奔方向与拐 99° 的方向同时被挡就是死锁，实跑量到位置整整
           // 两百四十秒一帧都不动。翻面 + 每次重掷都带一点抖动才出得来。
-          if (!scriptedPathFollower && s.stuckTime > 0.8) {
+          if (!lockedCorridor && s.stuckTime > 0.8) {
             s.stuckTime = 0;
             if (s.detourTime > 0) s.detourSign = -s.detourSign;
             s.detourTime = 2.0 + s.rnd() * 1.2;
@@ -2763,7 +2808,7 @@ export class AiDirector {
     }
 
     let targetYaw = null;
-    if (s.target) {
+    if (s.target && s.targetVisible) {
       // Track height before the first shot and during the cooldown, not after firing.
       this.UpdateMuzzle(s);
       const from = this.shooting.MuzzleOrigin(s);
@@ -2784,6 +2829,13 @@ export class AiDirector {
       // 停火瞄准与冲锋面向敌人；跑向掩体时身体面向移动方向，只让上身有限度地看敌。
       // 旧代码无条件用 targetYaw 覆盖移动朝向，移动与目标分列两侧时会逐帧互相抢方向。
       if (s.moveSpeed < 0.08 || s.state === STATE.CHARGE) wantedYaw = targetYaw;
+    } else if (s.lkp && (s.lkpConfidence || 0) > 0) {
+      targetYaw = Math.atan2(s.position.x-s.lkp.x,s.position.z-s.lkp.z);
+      if(s.state===STATE.INVESTIGATE && s.moveSpeed<.08){
+        targetYaw += Math.sin(this.time*2*Math.PI/INVESTIGATE.scanS)*WATCH.scanYawRad;
+      }
+      s.muzzleAimYaw=targetYaw;
+      if(s.moveSpeed<.08)wantedYaw=targetYaw;
     } else if (this.time < s.watchUntil && Number.isFinite(s.watchYaw)) {
       // 【§15】戒备：没有目标，但听见过动静 —— 面向那边（`ApplyWatchPose` 每
       // scanIntervalS 把这个角度往左右扳一次，看起来就是在扫扇面）。转速仍由下面
@@ -2995,7 +3047,7 @@ export class AiDirector {
     // 与玩家同一条曲线：起点 →（爬）→ 顶点 →（掉）→ 落点
     s.position.y = from.y + (s.vaultApexY - from.y) * c.up - (s.vaultApexY - to.y) * c.down;
     s.moveSpeed = 1;
-    s.yaw = Math.atan2(-(to.x - from.x), -(to.z - from.z));
+    s.yaw = ApproachAngle(s.yaw, Math.atan2(-(to.x - from.x), -(to.z - from.z)), COVER_CYCLE.traversalTurnRadPerS * dt);
     if (k >= 1) {
       s.vaultT = -1;
       s.state = STATE.ADVANCE;

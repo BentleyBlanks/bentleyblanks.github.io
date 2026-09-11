@@ -83,6 +83,7 @@ try {
         if (!prev || !soldier.alive) continue;
         const yawStep = Math.abs(Math.atan2(Math.sin(soldier.yaw - prev.yaw),
           Math.cos(soldier.yaw - prev.yaw)));
+        if(yawStep>prev.maxYawStep)prev.yawWorst={frame,state:soldier.state,vault:soldier.vaultT,melee:!!soldier.meleeCombat};
         prev.maxYawStep = Math.max(prev.maxYawStep, yawStep);
         const blendStep = Math.max(Math.abs(soldier.crouchBlend - prev.crouch),
           Math.abs(soldier.proneBlend - prev.prone));
@@ -252,6 +253,7 @@ try {
     return {
       count: soldiers.length, roles, squads,
       maxYawStep: Math.max(...soldiers.map((soldier) => soldier.maxYawStep)),
+      yawWorst: soldiers.reduce((a,b)=>a.maxYawStep>b.maxYawStep?a:b).yawWorst,
       maxBlendStep: Math.max(...soldiers.map((soldier) => soldier.maxBlendStep)),
       maxLookYawStep: Math.max(...soldiers.map((soldier) => soldier.maxLookYawStep)),
       maxAimStep: Math.max(...soldiers.map((soldier) => soldier.maxAimStep)),
@@ -273,7 +275,7 @@ try {
     && ["leader", "assault", "support", "flank"].every((role) => sample.roles.includes(role)),
   `兵=${sample.count} 组=${sample.squads.length} 角色=${sample.roles.join("/")}`);
   Check("身体没有逐帧瞬转", sample.maxYawStep <= 0.086,
-    `单帧最大 ${(sample.maxYawStep * 180 / Math.PI).toFixed(2)}°`);
+    `单帧最大 ${(sample.maxYawStep * 180 / Math.PI).toFixed(2)}° ${JSON.stringify(sample.yawWorst)}`);
   Check("蹲卧动画连续", sample.maxBlendStep <= 0.071,
     `单帧最大 blend=${sample.maxBlendStep.toFixed(4)}`);
   Check("枪口转向与据枪连续", sample.maxLookYawStep <= 0.081 && sample.maxAimStep <= 0.093,

@@ -88,7 +88,7 @@ try {
     const Ground = (x, z) => T.battlefield.GroundHeight(x, z);
     const Teleport = (x, z, stance = "stand", yaw = 0) => probe.PlacePlayer(T, { x, z }, stance, yaw);
     const Immortal = () => probe.Immortal(T);
-    const InCover = (s) => !!s.cover && s.cover.validated
+    const InCover = (s) => !!s.cover && s.cover.validated && (s.cover.blockedCrouched || s.cover.blockedStanding)
       && Math.hypot(s.cover.hidePos.x - s.position.x, s.cover.hidePos.z - s.position.z)
         < COVER_CYCLE.arriveRadiusM;
     /** 这个人够得着的范围里到底有没有掩体点可用（没有的话「会躲」无从谈起）。 */
@@ -128,7 +128,7 @@ try {
         holdingInCover: holdingWithCover.filter(InCover).length,
         holdingReachable: holding.filter(HasCoverInReach).length,
         peeked: fighting.filter((s) => s.peekCount > 0).length,
-        cycling: fighting.filter((s) => s.state === "cover_engage").length,
+        cycling: fighting.filter((s) => s.cover && ["approach","hide","peek"].includes(s.coverPhase)).length,
       };
       // 「够得着却没选上」的人现场重跑一次 Query，把被哪一条筛掉记下来。
       out.frontWhy = holding.filter((s) => !s.cover && HasCoverInReach(s)).slice(0, 4).map((s) => {
@@ -197,6 +197,7 @@ try {
           facingDeg = Math.acos(Math.max(-1, Math.min(1, (dx * fx + dz * fz) / len))) * 180 / Math.PI;
         }
         return {
+          id:s.missionId||s.id, guided:s.p012Guided, mode:s.missionAssault?.mode, suppression:s.suppression,
           d: Dist(s), mobile:!!s.missionAssault, stance: s.stance, state: s.state, alert: s.alert,
           moved: b?.maxMoved || 0,
           facingDeg, knows: !!at,
@@ -218,6 +219,7 @@ try {
         };
       };
       out.bands = { near: Band(46, 74), far: Band(120, 400) };
+      out.nearRows=rows.filter(r=>r.mobile&&r.d>=46&&r.d<74);
       out.displaces = T.ai.stats.displaces;
       T.Debug.Key("KeyF",true);Step(2);T.Debug.Key("KeyF",false);
     }
@@ -330,8 +332,19 @@ try {
     // B2 空地对照：同一支枪、同一段距离，看得见就打得到。
     out.open = Volley(squad[0], site.open, "stand", 60);
 
-    // B3 探头节奏（这支班身边有真掩体，前沿那片开阔地量不到）
+    // B3: Nearby marker counts cannot prove cover protects against this firing
+    // direction. Add six temporary physical slabs for this isolated rhythm test.
+    // All hiding, movement and ray validation still use production AI/Rapier.
     {
+      const field=T.battlefield,originalCovers=[...field.covers],slabs=[];
+      for(const soldier of squad){
+        const x=soldier.position.x,z=soldier.position.z+Math.sign(site.open.z-soldier.position.z)*.8;
+        const y=field.GroundHeight(x,z),box={min:[x-.35,y,z-.18],max:[x+.35,y+1.85,z+.18],tag:'AiRhythmFixture'};
+        field.colliders.push(box);T.physics.AddSolid(box);slabs.push(box);
+        field.covers.push({x,z,height:1.85,nx:0,nz:1});
+        T.ai.ReleaseCover(soldier);soldier.coverPickAt=-99;
+      }
+      field.BuildCollisionGrid();T.physics.RefreshStaticQueries();T.ai.covers.Rebuild(field.covers);
       const watch = new Map();
       for (const s of squad) {
         if (!s.alive) continue;
@@ -384,6 +397,8 @@ try {
         states: squad.map((s) => `${s.state}/${s.coverPhase}/${s.stance}`
           + `/${s.cover ? Math.hypot(s.cover.hidePos.x - s.position.x, s.cover.hidePos.z - s.position.z).toFixed(1) : "-"}`),
       };
+      for(const slab of slabs){T.physics.RemoveSolid(slab._physicsHandle);field.colliders.splice(field.colliders.indexOf(slab),1);}
+      field.covers.splice(0,field.covers.length,...originalCovers);field.BuildCollisionGrid();T.physics.RefreshStaticQueries();T.ai.covers.Rebuild(field.covers);
     }
 
     // B4 会绕：把钉子拔了（侧翼与跃进属于机动任务，守区的人一条都不许拿）
@@ -518,6 +533,7 @@ try {
     flankMinDeg: +(C.FLANK.flankMinAngleRad * 180 / Math.PI).toFixed(0),
   }));
   console.log("A 正片前沿:", JSON.stringify(sample.front));
+  console.log("Near rows:",JSON.stringify(sample.nearRows));
   console.log("A2 按距离分档（§15）:", JSON.stringify(sample.bands), "换位次数", sample.displaces);
   console.log("A 没选上掩体的现场诊断:", JSON.stringify(sample.frontWhy));
   console.log("B 受控场地:", JSON.stringify(sample.site), "班", sample.squad, "最近友军", sample.nearestFriendly);

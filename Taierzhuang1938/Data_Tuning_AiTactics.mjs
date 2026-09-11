@@ -59,6 +59,19 @@ export const TACTICS = Freeze({
   taskLeaseS: 1.6,
   fillFlankMinEngagers: 1,
   steerPathProbe: false,
+  // User 2026-09-11: local initiative inside authored combat areas.
+  maxChargersPerTarget: 2,
+  chargeContactM: 7,
+  chargeAssaultM: 18,
+  chargeFlankM: 13,
+  chargeRifleM: 10,
+  chargeMaxS: 6,
+  chargeCooldownS: 8,
+  chargeLostS: 0.8,
+  chargeSuppressionMax: 0.3,
+  chargeAbortSuppression: 0.5,
+  chargeCooldownJitterS: 4,
+  chargeHealthMin: 28,
 });
 
 /**
@@ -221,6 +234,12 @@ export const RETREAT = Freeze({
  * arriveM                到点判定半径。
  */
 export const INVESTIGATE = Freeze({
+  lostDelayS: 1.5,
+  maxSearchers: 2,
+  scanS: 2.5,
+  searchStepM: 3.5,
+  maxSearchSteps: 3,
+  recycleS: 8,
   investigateConfidence: 0.35,
   investigateMaxM: 45,
   minM: 3.0,

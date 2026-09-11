@@ -291,6 +291,8 @@ async function WaitStage(expected, seconds = 240, { fight = false } = {}) {
           else if(!evading) {
             g.Debug.Mouse(0, false);
             g.Debug.Mouse(2, false);
+            if(g.state.activeSlot==="melee")g.Debug.Key("Digit1");
+            if(g.state.ammo===0)g.Debug.Key("KeyR");
           }
           if (g.player.bleeding && g.player.health < 80) g.Debug.Key("KeyB");
           g.StepFrames(1, 1 / 60, false);
@@ -481,7 +483,6 @@ try {
         Shoot(foe) {
           this.lastTarget=foe.id;
           g.Debug.Mouse(0, false);
-          if (g.state.activeSlot !== "primary") g.Debug.Key("Digit1");
           const eye = g.player.EyePosition,
             to = foe.position.clone();
           to.y += foe.stance === 2 ? 0.3 : foe.stance === 1 ? 0.85 : 1.2;
@@ -492,6 +493,25 @@ try {
           g.player.yaw += Math.max(-0.06, Math.min(0.06, gap));
           g.player.pitch = Math.atan2(to.y - eye.y, Math.hypot(dx, dz)) - g.player.aimPitch;
           g.player.yaw -= g.player.aimYaw;
+          const distance=foe.position.distanceTo(g.player.position),fighter=g.meleeCombat.Fighter(g.player);
+          // Mobile enemies now reach real bayonet contact. The campaign maps V
+          // to the equipped melee slot (Dadao), so keep that weapon out through
+          // contact instead of switching back to the rifle on every frame.
+          if(distance<3 && Math.abs(gap)<.2){
+            g.Debug.Mouse(2,false);
+            if(g.state.activeSlot!=="melee"){g.Debug.Key("KeyV");return;}
+            if(!fighter.weapon)return;
+            this.meleeResponses=(this.meleeResponses||0)+1;
+            if(g.meleeCombat.Active){g.Debug.Key("KeyF",true);g.Debug.Key("KeyF",false);}
+            else if(fighter.state==="idle"){
+              const attacker=g.meleeCombat.Fighter(foe);
+              if(attacker.attack && attacker.t>attacker.attack.windup-.13 && attacker.t<attacker.attack.windup
+                && distance<attacker.attack.reach){g.Debug.Mouse(2,true);g.Debug.Mouse(2,false);}
+              else if(distance<2.3){g.Debug.Mouse(0,true);g.Debug.Mouse(0,false);}
+            }
+            return;
+          }
+          if(g.state.activeSlot!=="primary"){g.Debug.Key("Digit1");return;}
           g.Debug.Mouse(2, true);
           if (g.state.ammo === 0) g.Debug.Key("KeyR");
           else if (Math.abs(gap) < 0.06) g.Debug.Mouse(0, true);

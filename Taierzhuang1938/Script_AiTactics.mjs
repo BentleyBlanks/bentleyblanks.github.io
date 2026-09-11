@@ -158,12 +158,38 @@ export function IsScripted(soldier, now = null) {
   return false;
 }
 
-/** 能不能给机动任务：剧本旗之外，守区（holdZone）同样一步都不许出。 */
+/** 剧本保留位移所有权；显式 tacticalRadiusM 允许守军在局部战区内机动。 */
 export function CanManeuver(soldier, now = null) {
   if (!soldier || soldier.alive === false) return false;
   if (IsScripted(soldier, now)) return false;
-  if (soldier.holdZone) return false;
+  if (soldier.holdZone && !(soldier.tacticalRadiusM > 0)) return false;
   return true;
+}
+
+/** Explicit combat areas permit local initiative without abandoning the post. */
+export function ManeuverAllowed(soldier, point) {
+  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) return false;
+  if (!soldier.holdZone) return true;
+  const zone = soldier.holdZone, radius = soldier.tacticalRadiusM;
+  return radius > 0 && Math.hypot(point.x-zone.x, point.z-zone.z) <= radius;
+}
+
+/** Only observed contact can start a charge; no hidden health or input reads. */
+export function ChargeOpportunity(soldier, now, attackers = 0) {
+  if (!CanManeuver(soldier, now) || soldier.unarmed || soldier.tacticalRole === "support") return false;
+  if (!soldier.weapon?.bayonet || !soldier.targetVisible || soldier.targetFromMemory || !soldier.target) return false;
+  if (soldier.target.ref?.alive === false || !ManeuverAllowed(soldier, soldier.target.position)) return false;
+  if ((soldier.health ?? 100) < TACTICS.chargeHealthMin || soldier.suppression >= TACTICS.chargeSuppressionMax) return false;
+  if (now < (soldier.chargeCooldownUntil || 0) || attackers >= TACTICS.maxChargersPerTarget) return false;
+  if (soldier.stance !== 0 && now < soldier.stanceUntil) return false;
+  const distance = Math.hypot(PosX(soldier)-soldier.target.position.x, PosZ(soldier)-soldier.target.position.z);
+  if (distance <= TACTICS.chargeContactM) return true;
+  const range = soldier.tacticalRole === "assault" ? TACTICS.chargeAssaultM
+    : soldier.tacticalRole === "flank" ? TACTICS.chargeFlankM : TACTICS.chargeRifleM;
+  // Read the visible opponent's animation state, never player buttons or ammo.
+  const target = soldier.target.ref;
+  const opening = target?.state === "reload" || target?.reloading > 0 || target?.stance === 2 || target?.stance === "prone";
+  return distance <= range && (soldier.squadMateCount > 0 || opening);
 }
 
 /** 不参与战术分配的人（伙夫、担架队、赤手空拳的）。 */
@@ -778,11 +804,18 @@ export class TacticsDirector {
       }
     }
 
+    // Search a remembered area before spending the entire memory window firing
+    // at its wall. The remaining squad keeps covering the last sighting.
+    if (enemy?.entry) this._AssignSearches(slots, n, enemy, now);
     // --- ③ 侧翼（先给专职侧翼手） -----------------------------------------
     if (enemy) this._AssignFlanks(group, slots, n, squad, enemy, now, true);
+    // Commit the bound pair before renewing firing leases, otherwise the same
+    // permanent token holders always stay put and partners never swap roles.
+    if (enemy) this._AssignBounds(group, slots, n, squad, enemy, now);
 
     // --- ④ 攻击令牌 → ENGAGE（按角色优先级抢） ----------------------------
     let engagers = 0;
+    for(let i=0;i<n;i++)if(slots[i].kind===TASK.ENGAGE)engagers++;
     if (enemy && this._EngageWorthy(enemy, now)) {
       // 先给已经持有令牌的人续租：稳定压倒公平，否则每秒重新排队 = 集体换目标。
       for (let i = 0; i < n; i += 1) {
@@ -818,11 +851,7 @@ export class TacticsDirector {
       this._AssignFlanks(group, slots, n, squad, enemy, now, false);
     }
 
-    // --- ⑥ 跃进配对（一动一掩护） -----------------------------------------
-    if (enemy) this._AssignBounds(group, slots, n, squad, enemy, now);
-
     // --- ⑦ 压制 / 查看 / 守 -----------------------------------------------
-    const track = enemy ? enemy.entry : null;
     for (let i = 0; i < n; i += 1) {
       const slot = slots[i];
       if (slot.kind || slot.excluded) continue;
@@ -832,16 +861,6 @@ export class TacticsDirector {
         slot.hasPoint = true;
         slot.pointX = enemy.lkp.x;
         slot.pointZ = enemy.lkp.z;
-        continue;
-      }
-      if (!slot.restricted && track && this.ShouldInvestigate(slot.soldier, track, now)) {
-        slot.kind = TASK.INVESTIGATE;
-        slot.targetId = track.id;
-        slot.hasPoint = true;
-        slot.pointX = track.lkp.x;
-        slot.pointZ = track.lkp.z;
-        slot.leaseS = INVESTIGATE.holdS;
-        this.stats.investigates += 1;
         continue;
       }
       if (slot.restricted) {
@@ -859,6 +878,10 @@ export class TacticsDirector {
       const slot = slots[i];
       const soldier = slot.soldier;
       const task = EnsureTask(soldier);
+      if (IsManeuverTask(slot.kind) && slot.hasPoint
+        && !ManeuverAllowed(soldier, {x:slot.pointX,z:slot.pointZ})) {
+        slot.kind = TASK.HOLD; slot.hasPoint = false;
+      }
       task.kind = slot.kind;
       task.targetId = slot.targetId;
       task.partnerId = slot.partnerId;
@@ -924,6 +947,41 @@ export class TacticsDirector {
     slot.pointZ = enemy.lkp.z;
   }
 
+  _AssignSearches(slots, n, enemy, now) {
+    if (enemy.ageS < INVESTIGATE.lostDelayS || enemy.ageS > INVESTIGATE.maxAgeS) return;
+    let count = 0;
+    for (let i = 0; i < n && count < INVESTIGATE.maxSearchers; i++) {
+      const slot = slots[i], s = slot.soldier;
+      if (slot.kind || slot.restricted || slot.excluded || slot.preference === "suppress" || s.targetVisible) continue;
+      const task = EnsureTask(s);
+      if (now < (task.searchDoneAt ?? -1e9) + INVESTIGATE.recycleS) continue;
+      const continuing = task.searchTargetId === enemy.id && task.searchSeenAt === enemy.lkp.time;
+      if (!continuing) {
+        if (!this.ShouldInvestigate(s, enemy.entry, now) || !ManeuverAllowed(s, enemy.lkp)) continue;
+        task.searchTargetId = enemy.id; task.searchSeenAt = enemy.lkp.time;
+        task.searchX = enemy.lkp.x; task.searchZ = enemy.lkp.z;
+        task.searchStep = 0; task.searchScanUntil = 0; task.searchUntil = now + INVESTIGATE.holdS;
+      }
+      if (now >= task.searchUntil) { task.searchDoneAt = now; continue; }
+      if (Math.hypot(PosX(s)-task.searchX, PosZ(s)-task.searchZ) <= INVESTIGATE.arriveM) {
+        if (!task.searchScanUntil) task.searchScanUntil = now + INVESTIGATE.scanS;
+        if (now >= task.searchScanUntil) {
+          if (++task.searchStep > INVESTIGATE.maxSearchSteps) { task.searchDoneAt = now; continue; }
+          // Fan out around the sighting, with deterministic sides and no access
+          // to the hidden target's current transform.
+          const angle = ((s.id % 2) * 2 - 1) * task.searchStep * Math.PI / 2;
+          const x = enemy.lkp.x + Math.cos(angle) * INVESTIGATE.searchStepM;
+          const z = enemy.lkp.z + Math.sin(angle) * INVESTIGATE.searchStepM;
+          if (!ManeuverAllowed(s,{x,z}) || !this.Walkable(x,z)) { task.searchDoneAt = now; continue; }
+          task.searchX = x; task.searchZ = z; task.searchScanUntil = 0;
+        }
+      }
+      slot.kind = TASK.INVESTIGATE; slot.targetId = enemy.id; slot.hasPoint = true;
+      slot.pointX = task.searchX; slot.pointZ = task.searchZ;
+      count++; this.stats.investigates++;
+    }
+  }
+
   _SetRetreatPoint(slot, group, enemy) {
     let dx = 0;
     let dz = 0;
@@ -946,6 +1004,7 @@ export class TacticsDirector {
    * 已经在路上的人不重选点（FLANK.holdS 内认账），否则每秒一个新点 = 原地打转。
    */
   _AssignFlanks(group, slots, n, squad, enemy, now, primaryPass) {
+    if (enemy.ageS > INVESTIGATE.lostDelayS) return;
     if (squad.flankCount >= FLANK.flankers) return;
     for (let i = 0; i < n; i += 1) {
       const slot = slots[i];
@@ -971,7 +1030,7 @@ export class TacticsDirector {
           slot.arrivedFlank = true;
           continue;
         }
-        if (this.Walkable(task.point.x, task.point.z)) {
+        if (ManeuverAllowed(soldier, task.point) && this.Walkable(task.point.x, task.point.z)) {
           slot.kind = TASK.FLANK;
           slot.targetId = enemy.id;
           slot.hasPoint = true;
@@ -1000,6 +1059,7 @@ export class TacticsDirector {
    * 配对本身由 `BoundPairs` 做；这里只决定「谁是这一轮的 mover」。
    */
   _AssignBounds(group, slots, n, squad, enemy, now) {
+    if (enemy.ageS > INVESTIGATE.lostDelayS) return;
     const repair = now >= squad.boundPhaseUntil;
     if (!repair) {
       // 相位没到：保持上一轮的分工（mover 继续往前，coverer 继续掩护）。
@@ -1025,9 +1085,11 @@ export class TacticsDirector {
       }
       if (!moverSlot || moverSlot.kind) continue;
       if (moverSlot.preference === "suppress") continue;   // 机枪手不当跃进的那一头
+      if (!covererSlot || covererSlot.kind && ![TASK.ENGAGE,TASK.SUPPRESS].includes(covererSlot.kind)) continue;
       this._AssignBoundMover(moverSlot, group, enemy, coverer ? coverer.id : null);
       if (covererSlot && !covererSlot.kind) {
-        covererSlot.kind = TASK.SUPPRESS;
+        covererSlot.kind = this._EngageWorthy(enemy,now)
+          && this.AcquireToken(enemy.id,coverer.id,enemy.isPlayer) ? TASK.ENGAGE : TASK.SUPPRESS;
         covererSlot.targetId = enemy.id;
         covererSlot.partnerId = mover.id;
         covererSlot.hasPoint = true;
@@ -1191,6 +1253,7 @@ export class TacticsDirector {
       if (angle < minAngle) continue;                       // 还在正面锥里，绕了等于没绕
       const px = ex + dx * radiusM;
       const pz = ez + dz * radiusM;
+      if (soldier && !ManeuverAllowed(soldier, {x:px,z:pz})) continue;
       if (!this.Walkable(px, pz)) continue;
       if (this.coverRegistry && typeof this.coverRegistry.Nearby === "function") {
         const near = this.coverRegistry.Nearby(px, pz, coverNearbyM);

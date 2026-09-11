@@ -28,7 +28,7 @@
 import assert from "node:assert/strict";
 import {
   TacticsDirector, SquadBlackboard, TASK, MANEUVER_TASKS, HOLD_SAFE_TASKS,
-  PLAYER_TARGET_ID, IsScripted, CanManeuver, IsManeuverTask,
+  PLAYER_TARGET_ID, IsScripted, CanManeuver, IsManeuverTask, ManeuverAllowed, ChargeOpportunity,
 } from "./Script_AiTactics.mjs";
 import {
   TACTICS, FLANK, BOUND, GRENADE, RETREAT, INVESTIGATE, BLACKBOARD, ROLE_PREFERENCE,
@@ -747,4 +747,39 @@ console.log("ok  黑板：最新/同刻高置信合并、seenBy、过期清理�
 }
 console.log("ok  死亡与换关：令牌回收、任务清空、Reset 清台");
 
+{
+  const s=MakeSoldier({x:0,z:0,holdZone:{x:0,z:0,radius:2}});
+  s.tacticalRadiusM=14;
+  Check(CanManeuver(s,1),'explicit mobile combat area permits initiative');
+  Check(ManeuverAllowed(s,{x:13,z:0})&&!ManeuverAllowed(s,{x:15,z:0}),'combat area has a hard destination boundary');
+  for(const flag of ['scriptDefensive','p012Guided','scriptedNoncombatant','dummy']){
+    s[flag]=true;Check(!CanManeuver(s,1),'local initiative cannot override '+flag);s[flag]=false;
+  }
+  s.weapon=WEAPONS.Type38;s.stance=0;s.health=100;s.targetVisible=true;s.squadMateCount=1;
+  s.target={id:99,position:{x:6,z:0},ref:{state:'fire'}};
+  Check(ChargeOpportunity(s,1),'armed mobile defender can charge immediate visible contact');
+  Check(!ChargeOpportunity(s,1,TACTICS.maxChargersPerTarget),'charge concurrency remains capped');
+  s.targetVisible=false;Check(!ChargeOpportunity(s,1),'invisible target does not start charge');s.targetVisible=true;
+  s.targetFromMemory=true;Check(!ChargeOpportunity(s,1),'memory alone does not start charge');s.targetFromMemory=false;
+  s.suppression=.8;Check(!ChargeOpportunity(s,1),'pinned soldier does not stand up to charge');s.suppression=0;
+  s.tacticalRole='support';Check(!ChargeOpportunity(s,1),'support gunner stays on fire support');s.tacticalRole='rifleman';
+  s.target.position.x=15;Check(!ChargeOpportunity(s,1),'visible opponent outside defended area cannot lure a charge');
+
+  const host=MakeHost(),director=new TacticsDirector(host,MakeCoverRegistry());
+  const members=MakeSixManSquad({squadId:'local_search'});
+  const group=MakeGroup(members,{id:'local_search'}),board=director.Blackboard(group.id,'ija');
+  for(const m of members){m.holdZone={x:m.position.x,z:m.position.z,radius:2};m.tacticalRadiusM=45;
+    board.Share(m,MakeTrack({id:99,x:0,z:0,time:0,yaw:Math.PI}));}
+  host.now=INVESTIGATE.lostDelayS+.1;director.UpdateSquad(group,{yaw:Math.PI});
+  const searchers=members.filter(m=>m.task.kind===TASK.INVESTIGATE);
+  Check(searchers.length>0&&searchers.length<=INVESTIGATE.maxSearchers,'only a bounded subset searches while others cover');
+  const scout=searchers[0],first={...scout.task.point};
+  scout.position.x=first.x;scout.position.z=first.z;
+  host.now+=.1;director.UpdateSquad(group,{yaw:0});
+  Check(scout.task.kind===TASK.INVESTIGATE,'searcher pauses and observes at the last sighting');
+  host.now+=INVESTIGATE.scanS+.1;director.UpdateSquad(group,{yaw:0});
+  Check(Math.hypot(scout.task.point.x-first.x,scout.task.point.z-first.z)>1,'search continues around the remembered area');
+  host.now=INVESTIGATE.maxAgeS+BLACKBOARD.blackboardMemoryS;director.UpdateSquad(group);
+  Check(members.every(m=>m.task.kind!==TASK.INVESTIGATE),'stale search ends rather than following a ghost forever');
+}
 console.log(`\nAiTacticsTest 通过：${checks} 条断言`);

@@ -584,9 +584,11 @@ const ai = readFileSync(new URL("./Script_Ai.mjs", import.meta.url), "utf8");
  const start=ai.indexOf('    switch (s.state) {',ai.indexOf('  Act(s, dt, player) {'));
  const end=ai.indexOf('    if (desired && speed > 0) {',start);
  assert.ok(start>=0&&end>start);
- const Resolve=vm.runInNewContext(`(function(s,dt){let desired=null,speed=0;const strayed=false,player={};
+ const fire=ai.match(/    if \(wantsFire && !s\.meleeCombat\) this\.TryFire\(s, dt, player\);/)[0];
+ assert.ok(ai.indexOf(fire)>ai.indexOf('const wantedLookYaw',end),'shooting follows body and muzzle aiming');
+ const Resolve=vm.runInNewContext(`(function(s,dt){let desired=null,speed=0,wantsFire=false;const strayed=false,player={};
   const STATE={SUPPRESSED:'suppressed',RELOAD:'reload',FIRE:'fire',CHARGE:'charge',ADVANCE:'advance',IDLE:'idle'};
-  ${ai.slice(start,end)};return {desired:desired?{x:desired.x,z:desired.z}:null,speed};})`);
+  ${ai.slice(start,end)};${fire};return {desired:desired?{x:desired.x,z:desired.z}:null,speed};})`);
  const context={time:0,shots:0,tmpD:{set(x,y,z){Object.assign(this,{x,y,z});return this;},copy(p){return this.set(p.x,p.y||0,p.z);}},
   TryFire(){this.shots++;},TryBayonet(){}};
  const actor={position:{x:90,z:10},goal:{x:92,z:12},cover:{x:91.78160882438247,z:19.055415581231244},

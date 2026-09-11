@@ -263,7 +263,9 @@ export class FirstLevelMissionRuntime {
       PrepareAnimation: actor=>PrepareFirstLevelTrainAnimation(actor,(x,z)=>this.battlefield.GroundHeight(x,z)),
       Place: (actor, point) => { this.PlaceActor(actor, point); actor.yaw = Math.PI / 2; },
       Hold: (actor) => {
-        if(actor.missionTrainReady && actor!==this.trainWounded)this.Defend(actor,actor.position);
+        if(actor.missionTrainReady && actor!==this.trainWounded){
+          this.Defend(actor,actor.position);
+        }
         else {actor.scriptedNoncombatant=true;this.MoveActor(actor,actor.position,0);}
       },
       Move: (actor, point, speed) => {
@@ -324,8 +326,8 @@ export class FirstLevelMissionRuntime {
    * Hold this spot and fight from it.
    *
    * 2026-09-08 (docs/Data_EnemyAi.md §6): this is an **anchor plus a radius**, not a pin.
-   * `scriptDefensive` still forbids every manoeuvre task (no chasing, no flanking, no bounding
-   * out of the zone) and still owns the firing cadence, but the man may now take a cover point
+   * Cast and fixed posts retain scriptDefensive; authored tacticalRadiusM grants
+   * ordinary riflemen local manoeuvres while retaining the firing cadence and a cover point
    * whose hide position lies inside `radius + coverSlackM` and run the hide/peek cycle there.
    * Before this change `AiDirector.ApplyScriptDefense` opened with `s.cover = null`, so every
    * front-line Japanese soldier in this level was **forbidden by design** from taking cover.
@@ -337,7 +339,9 @@ export class FirstLevelMissionRuntime {
     if (!actor?.alive) return;
     actor.scriptedNoncombatant = false;
     actor.p012Guided = false;
-    actor.scriptDefensive = true;
+    if(actor.side==="nra" && actor.missionTrainReady && !actor.castId && actor!==this.trainWounded)
+      actor.tacticalRadiusM=R.friendlyTacticalRadiusM;
+    actor.scriptDefensive = !(actor.tacticalRadiusM > 0);
     actor.scriptSuppressible=true;
     delete actor.scriptMoveSpeedMps;
     actor.manualGoalUntil=Infinity;
@@ -518,6 +522,10 @@ export class FirstLevelMissionRuntime {
       actor.manualGoalUntil = Infinity;
       actor.order = "hold";
       actor.holdZone = { id: `Mission_${spec.id}`, x: spec.x, z: spec.z, radius: spec.hold ? 0.4 : 2 };
+      if(!spec.hold && !WEAPONS[spec.weapon || "Type38"]?.emplaced){
+        actor.tacticalRadiusM = id === "surface" ? R.surfaceTacticalRadiusM
+          : id === "intrusion" ? R.intrusionTacticalRadiusM : R.infantryTacticalRadiusM;
+      }
       // Emplaced gunners keep their firing position: the hide/peek side step is all they may do.
       // Everyone else may take cover inside their zone plus the ordinary slack.
       actor.scriptCoverSlackM = spec.hold ? R.defendHoldFixedSlackM : R.defendCoverSlackM;
@@ -579,10 +587,20 @@ export class FirstLevelMissionRuntime {
       const s = actor.missionAssault;
       // 待命的人（missionFrontStandby）不走跃进脚本 —— 他的 AI 照常跑，只是还没轮到他上。
       if (!s || !actor.alive || actor.scriptedNoncombatant || actor.missionFrontStandby) continue;
+      if(actor.meleeCombat)continue;
       if(actor.missionReserve && this.time-(this.frontBattleAt??this.time)<actor.missionReleaseDelayS)continue;
       if (!active) {
         if (s.mode !== "settled") { this.Defend(actor, actor.position); s.mode = "settled"; }
         continue;
+      }
+      // A nearby visible opponent overrides the scheduled bound. The shared
+      // combat brain owns cover, search and the physical melee handoff.
+      const contact=actor.tacticalRadiusM>0 && !actor.missionReserve && actor.targetVisible
+        && !actor.targetFromMemory && actor.target?.ref?.alive!==false
+        && actor.target && Distance(actor.position,actor.target.position)<R.assaultContactRangeM;
+      if(contact){
+        if(s.mode!=="contact")this.Defend(actor,actor.position,R.defendHoldRadiusM,R.assaultCoverSearchM);
+        s.mode="contact";continue;
       }
       if (actor.suppression >= R.tacticalSuppression) {
         // Pinned: the anchor is where he already is, but the cover search radius stays open so he
@@ -1175,7 +1193,7 @@ export class FirstLevelMissionRuntime {
     const stage = this.flow.stage.id;
     for (const [id, actor] of this.enemies) {
       const plan = MISSION_TACTICS[id], state = actor.missionTactic;
-      if (!actor.alive || !state || actor.scriptedNoncombatant ||
+      if (!actor.alive || !state || actor.scriptedNoncombatant || actor.meleeCombat ||
         ((id.startsWith("Air") || id.startsWith("Retreat")) && stage.startsWith("Retreat"))) continue;
       state.distance += Distance(actor.position, state.last);
       state.last = { x: actor.position.x, z: actor.position.z };
