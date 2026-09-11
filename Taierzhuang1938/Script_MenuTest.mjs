@@ -348,10 +348,10 @@ if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-v
    const frozenBefore=JSON.stringify({elapsed:g.state.elapsed,hp:g.player.health,aiTime:g.ai.time,positions:g.ai.soldiers.map(a=>a.position.toArray()),flow:g.Debug.P012()});
    g.StepFrames(600,1/60,false);
    const frozen=frozenBefore===JSON.stringify({elapsed:g.state.elapsed,hp:g.player.health,aiTime:g.ai.time,positions:g.ai.soldiers.map(a=>a.position.toArray()),flow:g.Debug.P012()});
-   g.Debug.MenuAct("retrySandbox");
+   g.Debug.MenuAct("continueCheckpoint");
    return {before,menu,failed,frozen,alive:g.player.Alive,hp:g.player.health,ammo:g.state.ammo,clips:g.state.clips,pool:g.state.nraPool,actors:g.ai.soldiers.map(a=>a.id),flow:JSON.stringify(g.Debug.P012()),identity:g.state.identity,running:g.state.running};
   });
-  Check("真实致死进入专属失败菜单",result.failed&&result.menu.items.includes("retrySandbox"));
+  Check("真实致死进入专属失败菜单",result.failed&&result.menu.items.includes("continueCheckpoint")&&result.menu.mode==="failure");
   Check("失败菜单600帧不推进时间/伤害/NPC/任务",result.frozen);
   Check("恢复同一顺子而非随机新兵",result.identity.name==="顺子"&&!("origin" in result.identity)&&result.alive&&result.running&&result.hp===100);
   Check("任务资源与NPC世界保留",["flow","ammo","clips","pool"].every(k=>result[k]===result.before[k])&&JSON.stringify(result.actors)===JSON.stringify(result.before.actors));

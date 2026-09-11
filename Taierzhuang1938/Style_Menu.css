@@ -43,6 +43,58 @@
   .mnPauseObjective { top: 17%; left: 5%; right: 5%; width: auto; max-height: 24%; }
   #menu.pause:has(.mnPauseObjective:not([hidden])) .mnList { top: 44%; width: 90%; }
 }
+/* Campaign death is a centered terminal screen over the fallen viewpoint. */
+#menu.failure { pointer-events: auto; }
+#menu.failure .mnVignette {
+  backdrop-filter: grayscale(1) blur(3px) brightness(.48);
+  background: radial-gradient(ellipse at 50% 40%, #080a0c14 12%, #100607b3 65%, #050405f2 100%),
+    linear-gradient(0deg, #030405eb, #06070838 60%, #09050677);
+  animation: mnDeathShade .9s ease-out both;
+}
+#menu.failure .mnVignette::before, #menu.failure .mnVignette::after,
+#menu.failure .mnTitleLines, #menu.failure .mnShotNote, #menu.failure .mnFade { display: none; }
+#menu.failure .mnTitle {
+  left: 8%; right: 8%; top: 25%; max-width: none; text-align: center;
+  animation: mnDeathCopy .75s ease-out both;
+}
+#menu.failure .mnTitleMain {
+  font-family: var(--ui-font);
+  color: #c7bdb4; font-size: clamp(34px, 4.2vw, 66px); font-weight: 500;
+  letter-spacing: .2em; padding-left: .2em; text-shadow: 0 2px 20px #000;
+}
+#menu.failure .mnTitleMain::after {
+  content: ""; display: block; width: 66px; height: 2px; margin: 24px auto 20px;
+  background: #9b4b40; box-shadow: 0 0 16px #711b1b55;
+}
+#menu.failure .mnTitleSub { color: #96928b; font-size: 13px; letter-spacing: .16em; }
+#menu.failure .mnList {
+  left: 50%; top: 55%; bottom: 10%; width: min(410px, 84vw); transform: translateX(-50%);
+  gap: 8px; text-align: center; animation: mnDeathCopy .9s ease-out both;
+}
+#menu.failure .mnItem {
+  justify-content: center; min-height: 44px; font-size: clamp(15px, 1.25vw, 19px);
+  font-weight: 400; letter-spacing: .1em; color: #979992; border-image: none;
+}
+#menu.failure .mnItem.on {
+  color: #efede5; background: linear-gradient(90deg, #c2b8a300, #c2b8a32e 40%, #c2b8a32e 60%, #c2b8a300);
+  border: 1px solid #c2b8a32e; border-left-color: transparent; border-right-color: transparent;
+}
+#menu.failure .mnItem:focus-visible { outline: 1px solid #c7bdb488; outline-offset: -3px; }
+#menu.failure .mnItem:disabled { color: #686963; cursor: default; }
+#menu.failure .mnItemHint { order: -1; margin: 0 0 17px; min-height: 2em; color: #9b9b94; }
+#menu.failure .mnFoot { left: 8%; right: 8%; bottom: 4%; text-align: center; color: #858982; }
+@keyframes mnDeathShade { from { opacity: .3; } to { opacity: 1; } }
+@keyframes mnDeathCopy { from { opacity: 0; } to { opacity: 1; } }
+@media (max-height: 560px) {
+  #menu.failure .mnTitle { top: 12%; }
+  #menu.failure .mnTitleMain { font-size: 32px; }
+  #menu.failure .mnTitleMain::after { margin: 12px auto; }
+  #menu.failure .mnList { top: 43%; bottom: 10%; gap: 2px; }
+  #menu.failure .mnItemHint { margin-bottom: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #menu.failure .mnVignette, #menu.failure .mnTitle, #menu.failure .mnList { animation: none; }
+}
 .mnItem {
   pointer-events: auto; cursor: pointer; flex: 0 0 auto; min-height: 44px;
   display: flex; align-items: center; border: 1px solid transparent;

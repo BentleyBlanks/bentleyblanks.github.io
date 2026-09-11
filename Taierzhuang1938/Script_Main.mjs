@@ -5498,8 +5498,8 @@ function PlayHurtCues() {
 
 function OnPlayerDown() {
   if(missionRuntime){
-      missionRuntime.OnPlayerDown();state.pendingRespawn=false;state.deathTimer=0;
-    p012CarryView?.Update(0,{alive:false});audio.Play('bodyFall',{volume:.9});ShowPauseMenu();menu.OpenSandboxFailure(false);return;
+    missionRuntime.OnPlayerDown();
+    ShowDeathMenu();return;
   }
   if (MELEE_TEST) {
     state.pendingRespawn = false; state.deathTimer = 0;
@@ -5512,8 +5512,8 @@ function OnPlayerDown() {
     p012CarryView?.Update(0, { alive: false });
     if (viewmodel?.body) viewmodel.body.root.visible = false;
     p012Runtime.retryAtLoad=carry?.Active?{x:player.position.x,z:player.position.z,yaw:player.yaw,stance:player.stance}:null;
-    // An active load stays at the death location; only an empty-handed retry returns to a checkpoint.
-    audio.Play("bodyFall",{volume:.9});ShowPauseMenu();menu.OpenSandboxFailure(!!p012Runtime.retryAtLoad);return;
+    // Archive-only local recovery stays with its load; checkpoint recovery is a separate action.
+    ShowDeathMenu(!!p012Runtime.retryAtLoad);return;
   }
   const identity = state.identity;
   state.fallen.push(identity);
@@ -6093,7 +6093,7 @@ const p012Debug = new FirstLevelP012Debug({
  * 的收口），于是回到战斗时手里是空的 —— 拿大刀时最刺眼：整只手连刀一起没了，
  * 而且不换关不重生就再也回不来（换槽的 SwitchSlot 不碰 root.visible）。
  */
-function ShowPauseMenu() {
+function SuspendGameplay() {
   meleeCombat?.HandleInput("Blur", false);
   missionRuntime?.voice.Pause();
   state.running = false;
@@ -6107,7 +6107,24 @@ function ShowPauseMenu() {
   // HUD 收起来：暂停屏是给人读菜单的，顶着阶段条、简报、小地图和阵亡卡片读不清。
   // ER2 的暂停也是「冻住的画面 + 一层压暗 + 一列字」，HUD 不留。
   hudRoot.style.display = "none";
+}
+
+function ShowPauseMenu() {
+  SuspendGameplay();
   menu.OpenPause();
+}
+
+/** Terminal failure owns the fallen camera and checkpoint actions, never Pause. */
+function ShowDeathMenu(atLoad = false) {
+  state.pendingRespawn = false;
+  state.deathTimer = 0;
+  p012CarryView?.Update(0, { alive: false });
+  viewmodel.root.visible = false;
+  if (viewmodel.body) viewmodel.body.root.visible = false;
+  audio.Play("bodyFall", { volume: .9 });
+  SuspendGameplay();
+  document.getElementById("edRoot")?.classList.add("off");
+  menu.OpenSandboxFailure(atLoad);
 }
 
 /** 游戏中按 Esc：挂暂停。世界冻在原地（Frame 不跑），相机不动。 */
@@ -6117,10 +6134,11 @@ function PauseGame() {
   return true;
 }
 
-/** 调试动作只使用当前关卡已经建立的检查点。 */
+/** Both death and debug recovery use the current level's saved checkpoint. */
 function CheckpointStatus() {
   const available = !!player && !state.menu && !state.cutscene && !state.advancing
-    && !missionRuntime?.completed && !p012Runtime?.completed && !!(missionRuntime?.safePoint || (p012Runtime ? p012Runtime.safePoint : checkpoint?.saved));
+    && !missionRuntime?.completed && !p012Runtime?.completed
+    && !!(missionRuntime ? missionRuntime.safePoint : p012Runtime ? p012Runtime.safePoint : checkpoint?.saved);
   return { available, note: available
     ? (missionRuntime || p012Runtime ? T("menu.checkpoint.noteP012") : T("menu.checkpoint.noteLevel"))
     : T("menu.checkpoint.none") };
@@ -6161,6 +6179,7 @@ function ResumeFromPause() {
   state.menu = false;
   state.running = true;
   hudRoot.style.display = "";
+  if (!SHOT) document.getElementById("edRoot")?.classList.remove("off");
   audio.SetPaused(false);
   missionRuntime?.voice.Resume();
   RequestPointerLock();
@@ -7514,6 +7533,12 @@ function UpdateAiDebugOverlay() {
  *   而不是把断言的时长缩水去迁就它。
  */
 function Frame(dt, render = true) {
+  if (menu?.open && menu.mode === "failure") {
+    // Only the fallen viewpoint advances; AI, damage and mission clocks stay frozen.
+    if (!player.Alive) player.Update(dt);
+    if (render) RenderScene(0);
+    return;
+  }
   // StepFrames also enters here directly: terminal P012 screens freeze the entire world clock.
   if (missionRuntime?.completed || missionRuntime?.failed || (missionRuntime && !state.running && !editor?.Capturing) || p012Runtime?.completed || p012Runtime?.failed) {
     if (render) RenderScene(0);
@@ -8448,6 +8473,7 @@ function LoopStep(dt) {
   // 预热着色器的那几帧不出画（见 WarmupShaders）：屏幕上盖着加载画面，
   // 而这时候渲染一帧就等于把要摊开的那笔编译账一口气同步付掉。
   if (state.warming) return;
+  if (menu?.open && menu.mode === "failure") { Frame(dt); return; }
   // 菜单态：只推运镜与画面（玩法停摆）。暂停态两个都是 false —— 世界冻住，
   // 最后那一帧留在屏幕上，菜单盖在它上面，这正是暂停该有的样子。
   // 编辑器与菜单都要独占相机；编辑器优先，以便能从菜单里的设置入口直接编辑切片。

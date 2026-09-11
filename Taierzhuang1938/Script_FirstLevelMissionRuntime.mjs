@@ -1881,8 +1881,10 @@ export class FirstLevelMissionRuntime {
     return true;
   }
   ContinueCheckpoint() {
-    if (this.completed) return false;
+    if (this.completed || !this.safePoint) return false;
     this.OnPlayerDown();
+    // Explicit checkpoint recovery never selects a carry/control death position.
+    this.retryPoint = this.safePoint;
     return this.Retry();
   }
   UpdateMusic(stage = this.flow.stage.id) {

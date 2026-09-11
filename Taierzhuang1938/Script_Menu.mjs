@@ -158,7 +158,7 @@ export class MainMenu {
    *   Settings()   暂停态的「设置」
    *   P012Progress() / P012NextProgress() 白盒逐段调试推进
    *   DebugOptions() / SetDebugOption(id, on) 调试选项的读取与写入
-   *   CheckpointStatus() / ContinueCheckpoint() 暂停调试中的检查点状态与恢复动作
+   *   CheckpointStatus() / ContinueCheckpoint() 阵亡页及暂停调试的检查点状态与恢复动作
    *   CurrentObjective() 当前正在执行的任务目标
    *   SliceIndex() 当前建好的是哪一关的切片
    *   Unlock()     第一次用户手势时解锁音频（可选）
@@ -199,7 +199,7 @@ export class MainMenu {
     this.open = false;
     /** live = 开机菜单（接管相机、跑运镜）；暂停态是 false（世界冻在原地）。 */
     this.live = false;
-    this.mode = "title";           // title | levels | codex | credits | debug | pause
+    this.mode = "title";           // title | levels | codex | credits | debug | pause | failure
     this.busy = false;
     this.time = 0;
     this.shotTime = 0;
@@ -333,6 +333,8 @@ export class MainMenu {
     this.itemEls = items.map((item, i) => {
       const b = document.createElement("button");
       b.className = "mnItem";
+      b.type = "button";
+      b.disabled = !!item.disabled;
       b.dataset.act = item.id;
       const bar = document.createElement("span");
       bar.className = "mnItemBar";
@@ -489,21 +491,34 @@ export class MainMenu {
     this.root.classList.add("p012Complete");
   }
   OpenSandboxFailure(atLoad = false, {castId="shunzi",restartOnly=false} = {}) {
-    this.OpenPause();
+    this.ClearSandboxComplete();
+    this.open = true;
+    this.live = false;
+    this.Show("failure");
+    this.root.classList.remove("off", "pause");
+    this.root.classList.add("failure");
     const who = CastName(castId);
+    const checkpoint = this.host.CheckpointStatus?.();
+    this.el.titleMain.textContent = T("menu.death.title");
     this.el.titleSub.textContent = T("menu.p012.failTitle", { name: who });
+    this.el.foot.textContent = T("menu.death.keys");
     this.SetItems([
-      ...(!restartOnly?[{ id: "retrySandbox", label: atLoad ? T("menu.item.retryAtLoad") : T("menu.item.retryCheckpoint"),
-        hint: T("menu.hint.retrySandbox", { name: who }) }]:[]),
-      { id: "restartSandbox", label: T("menu.item.restartSandbox"), hint: T("menu.hint.restartSandbox") },
+      ...(!restartOnly?[{ id: "continueCheckpoint", label: T("menu.death.checkpoint"),
+        disabled: !checkpoint?.available, hint: checkpoint?.available ? T("menu.death.checkpointHint") : T("menu.checkpoint.none") }]:[]),
+      ...(atLoad && !restartOnly ? [{ id: "retrySandbox", label: T("menu.item.retryAtLoad"),
+        hint: T("menu.hint.retrySandbox", { name: who }) }] : []),
+      { id: "restartSandbox", label: T("menu.death.restart"), hint: T("menu.hint.restartSandbox") },
       { id: "exitSandbox", label: T("menu.item.exitToTitle"), hint: T("menu.hint.exitSandboxFail") },
     ]);
+    this.itemEls.find(el => !el.disabled)?.focus({ preventScroll: true });
   }
 
   ClearSandboxComplete() {
     this.sandboxCompleteStyle?.remove();
     this.sandboxCompleteStyle = null;
     this.root.classList.remove("p012Complete");
+    this.root.classList.remove("failure");
+    this.el.foot.textContent = T("menu.foot.main");
   }
 
   Close() {
@@ -814,6 +829,8 @@ export class MainMenu {
   // 动作
   // -------------------------------------------------------------------------
   Activate(id) {
+    // Terminal screens accept only their own visible, enabled actions.
+    if (this.mode === "failure" && !this.items.some(item => item.id === id && !item.disabled)) return;
     switch (id) {
       case "start": {
         const progress = Progress.Read();
@@ -833,6 +850,9 @@ export class MainMenu {
       case "exitSandbox": this.host.ExitSandbox?.(); return;
       case "restartSandbox": this.host.RestartSandbox?.(); return;
       case "retrySandbox": this.host.RetrySandbox?.(); return;
+      case "continueCheckpoint":
+        if (this.host.ContinueCheckpoint?.() === false) this.el.itemHint.textContent = T("menu.death.retryFailed");
+        return;
       case "title": this.ToTitle(); return;
       default: break;
     }
@@ -876,6 +896,9 @@ export class MainMenu {
     this.onKey = (event) => {
       // 设置窗口接管键盘时，不让 Enter / 方向键穿透到背后的菜单。
       if (!this.open || document.querySelector("body.edToolsOpen #edRoot:not(.off)")) return;
+      if (this.mode === "failure" && (event.repeat || event.key === "Escape")) {
+        event.preventDefault(); return;
+      }
       const panel = this.root.classList.contains("panelOn");
       switch (event.key) {
         case "Escape":

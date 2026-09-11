@@ -223,6 +223,7 @@ export const testDefs = {
     desc: "音频接线：弹啸/遮挡/空间档/AI foley/脚下材质/掷弹筒/爆炸三档" },
   VoiceTest: { file: "Script_VoiceTest.mjs", desc: "语音资产与降级链" },
   MenuTest: { file: "Script_MenuTest.mjs", desc: "主菜单接线 29 条" },
+  DeathMenuTest: { file: "Script_DeathMenuTest.mjs", desc: "阵亡独立状态与检查点恢复" },
   BootPropTest: { file: "Script_BootPropTest.mjs", desc: "开机陈设道具计数" },
   // 现有套件已扩到 160 项，含音频试听、完整县城/车厢切换与三套 PBR 截图；
   // 实机约 12—14 分钟，继续吃 10 分钟默认值会在末段稳定误报 timeout。
@@ -310,7 +311,7 @@ export const browserTests = new Set([
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
   "SamplerBudgetTest", "BloodEffectsTest",
-  "IncomingFireBrowserTest", "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "GoreRangeTest", "MenuTest",
+  "IncomingFireBrowserTest", "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
   "ClusteredLightsTest", "MaterialUpgradeTest",
   "PerformanceTest", "PhysicsTest", "PostTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
@@ -432,7 +433,7 @@ export const domains = {
   },
   audio: { label: "音效/音乐/环境声", tests: ["FirstLevelMissionMusicTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest"] },
   voice: { label: "语音", tests: ["VoiceTest"] },
-  menu: { label: "主菜单/开机陈设", tests: ["FirstLevelP012DebugTest", "MenuTest", "BootPropTest"] },
+  menu: { label: "主菜单/开机陈设", tests: ["FirstLevelP012DebugTest", "MenuTest", "DeathMenuTest", "BootPropTest"] },
   editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "AiEditorTest", "TuningWriterTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",

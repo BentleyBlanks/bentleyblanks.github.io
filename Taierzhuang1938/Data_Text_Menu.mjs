@@ -59,14 +59,20 @@ export const TEXT = Object.freeze({
 
   // --- 第一关（P0/P1/P2 白盒）的收场与失败面板 -------------------------------
   "menu.p012.completeTitle": "第一关完成",
-  "menu.p012.failTitle": "{name} · 测试失败",
+  "menu.p012.failTitle": "{name} · 阵亡",
+  "menu.death.title": "你已阵亡",
+  "menu.death.checkpoint": "从检查点开始",
+  "menu.death.checkpointHint": "返回最近的检查点，继续当前任务",
+  "menu.death.restart": "重新开始本关",
+  "menu.death.keys": "↑ ↓ 选择　 /　Enter 确认",
+  "menu.death.retryFailed": "检查点恢复失败，请重试或重新开始本关",
   "menu.item.restartSandbox": "重新测试",
   "menu.item.exitToTitle": "返回主菜单",
   "menu.item.retryAtLoad": "在载物处继续",
   "menu.item.retryCheckpoint": "从检查点继续",
   "menu.hint.restartSandbox": "从车厢重新开始第一关",
   "menu.hint.exitSandboxComplete": "回到主菜单（第二关尚未完成）",
-  "menu.hint.exitSandboxFail": "退出独立测试",
+  "menu.hint.exitSandboxFail": "结束本次任务，返回主菜单",
   "menu.hint.retrySandbox": "保留现场进度与剩余补给；仅恢复{name}本人，不移动载物",
 
   // --- 选章 -----------------------------------------------------------------
