@@ -36,7 +36,16 @@ export async function CreateTactileMaterials(renderer) {
         float localIrritation=0.0;float localWet=0.0;
         ${outer?'':'diffuseColor.rgb*=mix(1.0,.18,earOutside);'}
         ${vestibule?'diffuseColor.rgb*=mix(1.0,.18,smoothstep(0.0,.85,mouthDepth)*earOutside);':''}
-        ${outer?`float faceDetail=clamp(dot(diffuseColor.rgb,vec3(.299,.587,.114)),0.0,1.0);diffuseColor.rgb*=vec3(1.02,1.02,1.02);
+        ${outer?`// Keep pore/albedo variation; broad anatomical masks add subtle perfusion.
+        diffuseColor.rgb*=vec3(1.065,.995,1.025);
+        vec2 cheekOffset=(earWorld.xy+vec2(45.0,13.0))/27.0;
+        vec2 noseOffset=(earWorld.xy+vec2(87.0,16.0))/vec2(13.0,18.0);
+        vec2 earOffset=earWorld.xy/vec2(23.0,35.0);
+        float cheek=exp(-dot(cheekOffset,cheekOffset));
+        float nose=exp(-dot(noseOffset,noseOffset));
+        float earWarm=exp(-dot(earOffset,earOffset))*(1.0-smoothstep(10.0,26.0,earWorld.z));
+        float perfusion=clamp(cheek*.23+nose*.13+earWarm*.15,0.0,.28);
+        diffuseColor.rgb*=mix(vec3(1.0),vec3(1.17,.79,.83),perfusion);
         float lip=exp(-pow((earWorld.y+51.0)/5.0,4.0)-pow((earWorld.z-63.2)/19.0,4.0))*smoothstep(67.0,75.0,-earWorld.x);
         diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.38,.095,.080),lip*.8);`:''}
         ${outer?'':`for(int i=0;i<9;i++){float d=distance(earWorld,earMarks[i].xyz);localIrritation=max(localIrritation,exp(-d*d/0.6)*earMarks[i].w);float w=distance(earWorld,earWet[i].xyz);localWet=max(localWet,exp(-w*w/1.1)*earWet[i].w);}`}
@@ -58,7 +67,7 @@ export async function CreateTactileMaterials(renderer) {
         reflectedLight.directDiffuse+=diffuseColor.rgb*vec3(1.0,.32,.18)*wrap*earSss*min(earPower/(earDistance*earDistance),2.0);`);
     };
     const skinCompile=material.onBeforeCompile;material.onBeforeCompile=shader=>{skinCompile(shader);if(!outer)contact.Bind(shader);};
-    material.customProgramCacheKey=()=>outer?(vestibule?'EarSkinRecessedVestibule3':'EarSkinOuterSss2'):'EarSkinCanalContact2';return material;
+    material.customProgramCacheKey=()=>outer?(vestibule?'EarSkinRecessedVestibule4':'EarSkinOuterComplexion3'):'EarSkinCanalContact2';return material;
   }
   function Wax(type,tone='brown'){
     const pale=tone==='paleYellow';

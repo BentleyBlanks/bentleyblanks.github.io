@@ -9,12 +9,12 @@ import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryU
 import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear012-outer-20260911';
 import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear012-outer-20260911';
 import { CreateToolContact } from './Script_ToolContact.js?v=ear015-day-two-perf-20260912';
-import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear012-controls-20260912';
+import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear019-hair-complexion-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 
 // 封闭耳道、真实接触点与实体收集盘共用毫米世界；镜头在取出时连续后退。
 export async function CreateImmersiveScene({ core }) {
-  const asset = await new GLTFLoader().loadAsync(new URL('./Models/Model_ImmersiveEar.glb?v=ear017-layered-20260912', import.meta.url).href);
+  const asset = await new GLTFLoader().loadAsync(new URL('./Models/Model_ImmersiveEar.glb?v=ear019-hair-complexion-20260912', import.meta.url).href);
   asset.scene.updateMatrixWorld(true);
   const materials=await CreateTactileMaterials(core.renderer);
   const profile=await (await fetch(new URL('./Data_CanalProfile.json?v=ear012-outer-20260911',import.meta.url))).json();
@@ -78,13 +78,13 @@ export async function CreateImmersiveScene({ core }) {
     const mesh=Baked(name);
     if(name.includes('Hair')){
       const scalp=name==='Model_ProfileHair',wisps=name==='Model_ProfileHairWisps';
-      mesh.material=new THREE.MeshPhysicalMaterial({map:scalp?null:hairMap,bumpMap:scalp?null:hairMap,bumpScale:.035,color:scalp?0x17100c:0xffffff,roughness:scalp?.75:.62,metalness:0,specularIntensity:.24,anisotropy:scalp?0:.28,anisotropyRotation:Math.PI/2,sheen:.10,sheenColor:0x9b8067,sheenRoughness:.72,clearcoat:0,alphaTest:scalp?0:.10,side:THREE.DoubleSide,depthWrite:true});
+      mesh.material=new THREE.MeshPhysicalMaterial({map:hairMap,bumpMap:hairMap,bumpScale:.035,color:scalp?0x99918b:0xffffff,roughness:scalp?.75:.62,metalness:0,specularIntensity:.24,anisotropy:0,anisotropyRotation:Math.PI/2,sheen:.10,sheenColor:0x9b8067,sheenRoughness:.72,clearcoat:0,alphaTest:scalp?0:.10,side:THREE.DoubleSide,depthWrite:true});
       mesh.material.alphaToCoverage=!wisps;
       if(wisps){mesh.material.map=null;mesh.material.bumpMap=null;mesh.material.alphaTest=0;mesh.material.color.set(0x655046);mesh.material.specularIntensity=.1;mesh.material.transparent=true;mesh.material.opacity=.64;mesh.material.depthWrite=false;}
-      if(!scalp&&!wisps){
+      if(!wisps){
         // Sample a strand-scale slice for color, retaining the full authored edge alpha.
-        mesh.material.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',THREE.ShaderChunk.map_fragment.replace('texture2D( map, vMapUv )','texture2D( map, vec2(.34+vMapUv.x*.18,vMapUv.y) )').replace('diffuseColor *= sampledDiffuseColor;','sampledDiffuseColor.a=texture2D(map,vMapUv).a; diffuseColor *= sampledDiffuseColor;'));};
-        mesh.material.customProgramCacheKey=()=> 'LayeredHairStrandScale1';
+        mesh.material.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',THREE.ShaderChunk.map_fragment.replace('texture2D( map, vMapUv )','texture2D( map, vec2(.34+vMapUv.x*.18,vMapUv.y) )').replace('diffuseColor *= sampledDiffuseColor;','sampledDiffuseColor.a='+(scalp?'1.0':'texture2D(map,vMapUv).a')+'; diffuseColor *= sampledDiffuseColor;'));};
+        mesh.material.customProgramCacheKey=()=> scalp?'HairOpaqueCoverage2':'LayeredHairStrandScale2';
         mesh.material.roughness=.54;mesh.material.specularIntensity=.38;
       }
       mesh.userData.hairLayer=scalp?'opaqueScalp':wisps?'silhouetteStrands':'threeTexturedCardLayers';
