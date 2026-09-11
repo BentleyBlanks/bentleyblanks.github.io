@@ -4,6 +4,34 @@
 > 这份文档把那句话拆成三件独立的事，各自记清楚改了什么、为什么、怎么复测。
 > 回归口：`node Taierzhuang1938/Script_DamageTest.mjs`（退出码即成败）。
 
+## 2026-09-12：通用子弹受击眩晕
+
+真实子弹伤害经 `PlayerController.TakeHit(..., {bullet:true})` 触发独立的
+`HitDisorientation` 包络，所有关卡共用。航空扫射用 `{projectile:true}` 只触发反馈，
+不套用小口径子弹伤害上限；数值集中在 `Data_Tuning_Player.HIT_DISORIENTATION`。
+短暂保持后平滑衰减，连续命中刷新时长但不无限叠加强度或排队。
+擦身弹、出生保护、无敌、流血和非子弹伤害不触发这个包络；已有红闪、方位、
+伤害、压制、爆炸反馈仍走原链。
+
+画面在现有 composite 的 HDR 取样段混入少量横向双重影，偏移轻微摆动后恢复。
+不增加 pass、纹理或 TAA 历史，不改变真实瞄准方向；HUD 与字幕保持清晰。
+系统减少动态效果设置下关闭此重影，保留音频与原红色伤害提示。
+声音使用独立低通和增益节点短暂变闷、压低，再恢复；与第一关脚本震荡、
+爆炸耳鸣分别串联，不修改玩家音量滑杆，也不新增音频资产。
+
+暂停菜单、过场、编辑器接管与死亡时不输出受击眩晕；重生、阶段重建和开启无敌清空。
+回归 `Script_HitDisorientationTest.mjs` 检查真实第一关装配、GPU 编译、音频节点、
+离线 PCM 高低频响应、消退、连续命中上限、菜单与重建及减少动态效果设置。
+截图和原始报告在忽略目录 `_shots/HitDisorientation/`，不作为正常整关通关证据。
+
+本次验证：69 项 quick、30 项音频/infra prepush 全部通过；专项与既有 Damage、
+IncomingFire、PostFrameGraph、Post、MotionVectorContract、Boot 七项通过。
+补齐航空反馈后，FirstLevelMission、AircraftStrafe、ModuleGraph、Text 四项及 high
+受击专项再次通过。已查看 low/high 的中弹与恢复截图；满强度离线 PCM 测试中，
+150 Hz 保留约 61%，5 kHz 保留约 1.6%，清除后恢复至原频响；用户音量设置不变。
+这是组件、启动与截图验收，没有重新宣称完整任务通关。
+发布前合入最新列车环境音调整后，音乐配置、模块图和 high 受击专项三项再次通过。
+
 ## 2026-09-11：无敌一致性与失血范围反馈
 
 第一关关键队友阵亡会触发任务失败，但失败面板此前无条件使用“你已阵亡”标题；

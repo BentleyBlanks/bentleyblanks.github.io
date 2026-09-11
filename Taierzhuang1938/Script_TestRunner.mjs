@@ -49,6 +49,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 export const testDefs = {
   CarriagePropVelocityTest: {file:'Script_CarriagePropVelocityTest.mjs',timeoutMs:300000,desc:'Real pork/pack GPU velocities with moving camera, stop and reappearance; high-quality opening'},
   MotionVectorContractTest: {file:'Script_MotionVectorContractTest.mjs',timeoutMs:120000,desc:'GPU admission contract for new rigid/skinned renderers, bone attachments, foreground inheritance and history lifecycle'},
+  HitDisorientationTest: {file:"Script_HitDisorientationTest.mjs",timeoutMs:420000,desc:"Shared bullet disorientation: real GPU/audio, decay and lifecycle"},
   IncomingFireBrowserTest: {file:"Script_IncomingFireBrowserTest.mjs",timeoutMs:300000,desc:"Real near-fire/hit HUD, camera bearings, sector merging, expiry and compact screenshots"},
   BloodEffectsTest: {file:"Script_BloodEffectsTest.mjs",timeoutMs:180000,desc:"Shared blood GPU projection, ballistic collision, platform and source lifecycle"},
   SquadMarchTest: {file:"Script_SquadMarchTest.mjs",desc:"Shared squad cadence, roles, safe interruption, replay and population variants"},
@@ -317,7 +318,7 @@ export const browserTests = new Set([
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
   "SamplerBudgetTest", "BloodEffectsTest",
-  "IncomingFireBrowserTest", "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
+  "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
   "ClusteredLightsTest", "MaterialUpgradeTest",
   "PerformanceTest", "PhysicsTest", "PostTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
@@ -392,7 +393,7 @@ export const domains = {
   },
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
-    tests: ["CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
+    tests: ["HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
       "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "MeleeQteTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest", "ModelFacingTest",
       // 玩家自己的命中几何（AI 打玩家的部位由它判）与通用震屏（爆炸/近失/中弹/落地/扫射/扑沟）：
@@ -474,6 +475,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"combat",pattern:/HitDisorientation/},
   {domain:'motionVector',pattern:/MotionVector|PostPrepass|Script_Post\.mjs|Actor|Skinn|Skeleton|Viewmodel|FpsArm|BackRifle|Binoculars|Data_Tuning_Graphics/},
   { domain: "render", pattern: /UniformColors/ },
   {domain:'propVelocity',pattern:/CarriagePropVelocity|PostPrepass|FirstLevelMissionView|FirstLevelMeal/},

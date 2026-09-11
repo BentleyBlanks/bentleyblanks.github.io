@@ -1587,7 +1587,7 @@ export class FirstLevelMissionRuntime {
       if (air.shots % 5 === 0)
         this.combat.FireShell(from, to, { flight: 0.18, kind: "AircraftStrafe", radius: 2, damage: 45 });
       if (Distance(this.player.position, target) < 3 && this.player.stance !== "prone")
-        this.player.TakeHit(8, "torso", null, { from });
+        this.player.TakeHit(8, "torso", null, { from, projectile: true });
     }
     if (pass === 1 && air.time > R.bridgeBombAtS && !this.bridgeBombLaunched) {
       this.bridgeBombLaunched = true;

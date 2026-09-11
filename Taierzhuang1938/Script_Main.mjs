@@ -8316,6 +8316,9 @@ function RenderScene(dt) {
   profiler.B("actorBatch");
   if (actorBatch) actorBatch.Update(camera);
   profiler.E("actorBatch");
+  const hitDisorientation = state.running && !state.menu && !state.cutscene && !editor?.Capturing
+    ? player?.HitDisorientation || 0 : 0;
+  audio.SetHitDisorientation(hitDisorientation);
   const suppression = player ? player.suppression : 0;
   const health = player ? player.health : 100;
   // 阵亡画面先在 3D 合成链里做「前景清楚、背景重度散焦」，HUD 的半透明
@@ -8359,6 +8362,7 @@ function RenderScene(dt) {
     eyeClosure: missionRuntime?.opening.eyeClosure || 0,
     vignette: (0.42 + suppression * 0.22) * graphics.vignette,
     damage: Clamp01(1 - health / 62) * 0.55,
+    hitDisorientation,
     // DOF 要把近景钉清楚；死亡时再叠运动模糊会把前景也抹掉，焦点层级就没了。
     // 2026-09 起这是 **0–1 的总闸**，不再是「模糊长度倍率」——
     // 长度由物理快门（Data_Tuning_TemporalDof.MOTION_BLUR.shutterFraction，180°）定。

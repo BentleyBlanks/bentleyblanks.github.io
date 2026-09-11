@@ -42,6 +42,7 @@
 import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { VOICE_BASE, VOICE_LINES } from "./Data_Voice.mjs";
 import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_MUSIC_MIX } from "./Data_FirstLevelMissionMusic.mjs";
+import { HIT_DISORIENTATION } from "./Data_Tuning_Player.mjs";
 import { GUN_AUDIBILITY } from "./Data_Tuning_Audio.mjs";
 import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 import { AUDIO_MIX_DEFAULTS } from "./Data_Tuning_Audio.mjs";
@@ -3701,7 +3702,16 @@ export class AudioEngine {
     this.busMakeup.gain.value = BUS_MAKEUP;
     this.concussionFilter=ctx.createBiquadFilter();
     this.concussionFilter.type="lowpass";this.concussionFilter.frequency.value=20000;this.concussionFilter.Q.value=.7;
-    this.busComp.connect(this.busMakeup).connect(this.concussionFilter).connect(this.deafFilter);
+    // Dedicated injury nodes compose with scripted concussion and explosion deafening.
+    // User volume sliders remain independent; no per-hit nodes or timers accumulate.
+    this.hitFilter = ctx.createBiquadFilter();
+    this.hitFilter.type = "lowpass";
+    this.hitFilter.frequency.value = 20000;
+    this.hitFilter.Q.value = 0.7;
+    this.hitGain = ctx.createGain();
+    this.hitDisorientation = 0;
+    this.busComp.connect(this.busMakeup).connect(this.concussionFilter)
+      .connect(this.hitFilter).connect(this.hitGain).connect(this.deafFilter);
 
     this.masterGain = ctx.createGain();
     this.masterGain.gain.value = this.masterVolume;
@@ -3980,6 +3990,8 @@ export class AudioEngine {
       this.busComp.disconnect();
       this.busMakeup.disconnect();
       this.deafFilter.disconnect();
+      this.hitFilter.disconnect();
+      this.hitGain.disconnect();
       this.concussionFilter.disconnect();
       this.outGain.disconnect();
       this.limiter.disconnect();
@@ -5242,6 +5254,21 @@ export class AudioEngine {
     g.linearRampToValueAtTime(Math.max(level, FLOOR), t + 0.06);   // 快压
     g.setValueAtTime(Math.max(level, FLOOR), t + Math.max(0.1, seconds));
     g.linearRampToValueAtTime(1, t + Math.max(0.1, seconds) + 0.55); // 慢放（快放会「呼」一下）
+  }
+
+  /** Shared injury filter/gain; independent of scripted concussion and explosion schedules. */
+  SetHitDisorientation(amount = 0) {
+    if (!this.ctx || this.disposed) return;
+    const strength = Clamp01(Number.isFinite(amount) ? amount : 0);
+    if (strength === this.hitDisorientation) return;
+    this.hitDisorientation = strength;
+    const t = this.ctx.currentTime;
+    const cutoff = 20000 * Math.pow(HIT_DISORIENTATION.lowpassHz / 20000, strength);
+    const gain = 1 - (1 - HIT_DISORIENTATION.minGain) * strength;
+    for (const [param, target] of [[this.hitFilter.frequency, cutoff], [this.hitGain.gain, gain]]) {
+      param.cancelScheduledValues(t);
+      param.setTargetAtTime(target, t, HIT_DISORIENTATION.audioSmoothS);
+    }
   }
 
   /**

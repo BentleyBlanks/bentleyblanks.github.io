@@ -259,7 +259,7 @@ export function MakeAircraftStrafeHost(deps = {}) {
       const amount = deadly ? Math.max(damage, (player.health ?? 100) + 40) : damage;
       const src = info?.from;
       player.TakeHit(amount, info?.part || "torso", dir, {
-        from: src ? new THREE.Vector3(src.x, src.y, src.z) : null, bullet: false, blast: false,
+        from: src ? new THREE.Vector3(src.x, src.y, src.z) : null, bullet: false, projectile: true, blast: false,
       });
     },
     PlayerPos: () => {

@@ -316,3 +316,21 @@ export const CAMERA_SHAKE = Object.freeze({
   hit: Object.freeze({ traumaScale: 0.45, rollKickRad: 0.09 }),
   dive: Object.freeze({ pitchKickRad: -0.42, rollKickRad: 0.24, riseKickM: -0.12, trauma: 0.55 }),
 });
+
+/** Shared bullet-hit disorientation: brief sensory feedback, independent of HP and suppression.
+ * 2026-09-12: user requested temporary visual/audio dizziness on enemy bullet hits.
+ * Refresh duration on a new injury; never stack beyond one bounded envelope.
+ */
+export const HIT_DISORIENTATION = Object.freeze({
+  durationS: 1.15,
+  holdS: 0.10,
+  minStrength: 0.55,
+  damageDiv: 62,
+  ghostOffsetUv: 0.010,
+  ghostMix: 0.30,
+  swayUv: 0.0025,
+  swayHz: 2.0,
+  lowpassHz: 850,
+  minGain: 0.60,
+  audioSmoothS: 0.018,
+});

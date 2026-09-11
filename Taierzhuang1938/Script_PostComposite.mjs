@@ -39,6 +39,7 @@
 //   · **取样接口** —— `VOLUMETRIC_SAMPLE_GLSL` 的 `VolumetricFarTransmittance(uv)`：
 //     froxel 只铺到 `uVolumetricFar`，远段归大气，这个函数给的是两段的分界透过率。
 
+import { HIT_DISORIENTATION } from "./Data_Tuning_Player.mjs";
 import * as THREE from "three";
 import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_PostCommon.mjs";
 // 物理大气（子系统 B4）：ApplyFog 段里的大气透视那几行用它。
@@ -149,6 +150,9 @@ uniform float uSplitHighlight;
 // --- SEGMENT lens -----------------------------------------------------------
 uniform float uVignette;
 uniform float uGrain;
+uniform float uHitDisorientation;
+uniform vec2 uHitOffset;
+uniform float uHitGhostMix;
 uniform float uDamage;      // 受伤：边缘泛红 + 去色
 uniform float uFade;        // 黑场
 uniform float uEyeClosure;  // Scripted eyelids, zero leaves ordinary rendering unchanged.
@@ -496,6 +500,14 @@ void main() {
   vec4 nd = texture2D(uNormalDepth, uv);
 
   vec3 color = MotionBlur(uv, centered, r2, nd);
+  // A brief double image on the final scene texture, outside temporal history.
+  // Zero strength skips both samples; HUD and subtitles stay sharp.
+  if (uHitDisorientation > 0.001) {
+    vec2 offset = uHitOffset * uHitDisorientation;
+    vec3 ghost = (texture2D(uHdr, clamp(uv + offset, 0.0, 1.0)).rgb
+      + texture2D(uHdr, clamp(uv - offset * 0.6, 0.0, 1.0)).rgb) * 0.5;
+    color = mix(color, ghost, uHitGhostMix * uHitDisorientation);
+  }
   color = DepthOfField(color, uv, nd);
   color += texture2D(uBloom, uv).rgb * uBloomStrength;
   color += texture2D(uGod, uv).rgb * uGodStrength;
@@ -523,6 +535,8 @@ function MakeWhitePixel() {
 export class CompositePass {
   constructor(pipeline) {
     this.name = "composite";
+    this.hitTime = 0;
+    this.reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)");
     this.pipeline = pipeline;
     this.whitePixel = MakeWhitePixel();
     this.uniforms = {
@@ -537,6 +551,9 @@ export class CompositePass {
       uMotionScale: { value: 0.6 }, uInvProjection: { value: new THREE.Matrix4() },
       uPrevViewProjection: { value: new THREE.Matrix4() }, uInvView: { value: new THREE.Matrix4() },
       uProjScale: { value: new THREE.Vector2(1, 1) },
+      uHitDisorientation: { value: 0 },
+      uHitOffset: { value: new THREE.Vector2() },
+      uHitGhostMix: { value: HIT_DISORIENTATION.ghostMix },
       uDamage: { value: 0 }, uFade: { value: 0 }, uEyeClosure:{value:0},
       uDofStrength: { value: 0 }, uDofFocus: { value: 1.5 },
       uDofRange: { value: 2.8 }, uDofMaxPx: { value: 11.0 },
@@ -676,6 +693,12 @@ export class CompositePass {
     if (options.sunDirection) U.uSunDir.value.copy(options.sunDirection);
     if (options.sunColor) U.uSunColorFog.value.fromArray(options.sunColor);
     U.uDamage.value = options.damage ?? 0;
+    U.uHitDisorientation.value = this.reducedMotion?.matches ? 0 : Math.max(0, Math.min(1, options.hitDisorientation || 0));
+    this.hitTime += Math.max(0, options.dt || 0);
+    const hitPhase = this.hitTime * Math.PI * 2 * HIT_DISORIENTATION.swayHz;
+    U.uHitOffset.value.set(HIT_DISORIENTATION.ghostOffsetUv
+      + Math.sin(hitPhase) * HIT_DISORIENTATION.swayUv,
+      Math.cos(hitPhase) * HIT_DISORIENTATION.swayUv);
     U.uFade.value = options.fade ?? 0;
     U.uEyeClosure.value = options.eyeClosure ?? 0;
     U.uDofStrength.value = options.dofStrength ?? 0;

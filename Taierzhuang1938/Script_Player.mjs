@@ -22,7 +22,7 @@ import { TRAVERSAL, TraversalPlan, TraversalCurve, TraversalLanding } from "./Da
 import { T } from "./Script_Text.mjs";
 import {
   STANCE as STANCE_TUNING, JUMP, MOVE, STAMINA, FREE_AIM, RECOIL,
-  SUPPRESSION, WOUNDS, SPAWN, HIT_FEEDBACK, SWAY, SPREAD, CAMERA, COVER_LEAN,
+  SUPPRESSION, WOUNDS, SPAWN, HIT_FEEDBACK, HIT_DISORIENTATION, SWAY, SPREAD, CAMERA, COVER_LEAN,
 } from "./Data_Tuning_Player.mjs";
 import { CoverLean, LeanClearance } from "./Script_CoverLean.mjs";
 import { CameraShake } from "./Script_CameraShake.mjs";
@@ -172,6 +172,8 @@ export class PlayerController {
     //   hitMarks   来弹方位（屏幕边缘的指向楔形；世界方向，HUD 自己转成屏幕角）
     //   hitEvents  这一帧新挨的伤（装配层取走后播闷哼）
     this.hitFlash = 0;
+    this.hitDisorientationTime = 0;
+    this.hitDisorientationStrength = 0;
     this.hitMarks = [];
     this.hitEvents = [];
     this.heartbeatTimer = 0;
@@ -243,6 +245,8 @@ export class PlayerController {
     this.suppressedUpright = false;
     this.stamina = 1;
     this.hitFlash = 0;
+    this.hitDisorientationTime = 0;
+    this.hitDisorientationStrength = 0;
     this.hitMarks.length = 0;
     this.hitEvents.length = 0;
     this.heartbeatTimer = 0;
@@ -287,6 +291,8 @@ export class PlayerController {
       this.bleeding = 0;
       this.wounds.length = 0;
       this.hitFlash = 0;
+      this.hitDisorientationTime = 0;
+      this.hitDisorientationStrength = 0;
       this.hitMarks.length = 0;
       this.hitEvents.length = 0;
       this.heartbeatTimer = 0;
@@ -777,6 +783,8 @@ export class PlayerController {
       if (this.health <= 0) this.Kill();
     }
 
+    this.hitDisorientationTime = Math.max(0, this.hitDisorientationTime - dt);
+
     // --- 受击反馈的寿命 ------------------------------------------------------
     // 红闪衰减比暗角快：它要读起来像"挨了一下"，不是"我现在很虚"。
     if (this.hitFlash > 0) this.hitFlash = Math.max(0, this.hitFlash - dt * HIT_FEEDBACK.flashDecayPerS);
@@ -1025,6 +1033,14 @@ export class PlayerController {
       + (side * 1.22 - this.deathStartRoll) * fall;
   }
 
+  /** Bounded injury envelope shared by rendering and audio; never derived from low HP. */
+  get HitDisorientation() {
+    if (!this.alive || this.debug.invincible) return 0;
+    const remaining = Clamp01(this.hitDisorientationTime
+      / (HIT_DISORIENTATION.durationS - HIT_DISORIENTATION.holdS));
+    return this.hitDisorientationStrength * remaining * remaining * (3 - 2 * remaining);
+  }
+
   /**
    * 被弹片/子弹擦过或命中。part: head/torso/arm/leg
    *
@@ -1033,7 +1049,7 @@ export class PlayerController {
    * 满血一枪毙，而爆头有 8% 概率，也就是每次交火都可能在第一发结束。
    * 现在爆头仍然是最重的一发（还会当场把视线打飞），但打不死一个满血的人。
    *
-   * @param {object} [info] { from: THREE.Vector3 来弹位置, bullet, melee, blast }
+   * @param {object} [info] { from: THREE.Vector3 来弹位置, bullet, projectile (feedback only; no bullet damage cap), melee, blast }
    */
   TakeHit(damage, part = "torso", direction = null, info = null) {
     if (!this.alive) return;
@@ -1057,6 +1073,12 @@ export class PlayerController {
     // 单发硬上限只管小口径。炮弹与集束照样能一下要命 —— 那是它们应得的，
     // 而且它们有啸声、有落点标记、有一秒半的预警，玩家是"没躲开"，不是"没看见"。
     if (info && info.bullet) applied = Math.min(applied, P.maxBulletDamage ?? 62);
+    if (info?.bullet || info?.projectile) {
+      this.hitDisorientationStrength = Math.max(this.HitDisorientation,
+        Clamp(HIT_DISORIENTATION.minStrength + applied / HIT_DISORIENTATION.damageDiv,
+          0, 1));
+      this.hitDisorientationTime = HIT_DISORIENTATION.durationS;
+    }
     this.health -= applied;
     const bleed = (part === "head" ? WOUNDS.bleedHead
       : part === "torso" ? WOUNDS.bleedTorso : WOUNDS.bleedLimb) * (P.bleedScale ?? 0.6);
