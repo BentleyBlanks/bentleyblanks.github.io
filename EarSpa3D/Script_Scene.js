@@ -11,8 +11,8 @@
 //  - 四档氛围（teaRoom / rainNight / morning / sleepy）改的是**真光**：
 //    三盏灯的强度与色温、outside 天空、雾、微尘、窗帘摆速、台灯明灭。
 
-import { PALETTE, LIGHTING } from "./Data_Palette.mjs?v=ear005-20260911";
-import { MakeDustPoints } from "./Script_Materials.js?v=ear005-20260911";
+import { PALETTE, LIGHTING } from "./Data_Palette.mjs?v=ear006-20260911";
+import { MakeDustPoints } from "./Script_Materials.js?v=ear006-20260911";
 
 // ════════════════════════════════════════════════════════════════════════
 //  0. 房间尺寸常量（单位 mm）

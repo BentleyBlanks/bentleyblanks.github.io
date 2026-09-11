@@ -143,8 +143,7 @@ export function AnalyzeMpeg(buffer) {
     seconds: rate ? totalSamples / rate : 0,
     sampleRate: rate,
     meanBitrateKbps: frames.length ? Math.round(frames.reduce((sum, frame) => sum + frame.bitrate, 0) / frames.length / 1000) : 0,
-    // 帧长序列就是「编码器眼里的响度曲线」：静音段会被压到很短或恒定，
-    // 这里给出最小/最大帧长的比值，比值接近 1 说明整段动态极平（可能是空音）。
+    // 帧长分布只能描述码率。CBR 有声素材也会恒定，静音必须解码 PCM 后判断。
     lengthSpread: frames.length > 2
       ? Number((Math.max(...frames.map((f) => f.length)) / Math.min(...frames.map((f) => f.length))).toFixed(2))
       : 0,
@@ -283,7 +282,6 @@ async function Main() {
       const warnings = [];
       if (asset.kind === "sfx" && info.seconds > AUDIO_CONFIG.sfxSecondsCap) warnings.push(`时长 ${info.seconds.toFixed(2)}s 超出上限 ${AUDIO_CONFIG.sfxSecondsCap}s`);
       if (asset.kind === "bgm" && info.seconds < AUDIO_CONFIG.bgmSeconds[0] * 0.6) warnings.push(`BGM 偏短（${info.seconds.toFixed(1)}s）`);
-      if (info.lengthSpread && info.lengthSpread < 1.05 && asset.kind === "sfx") warnings.push("帧长几乎不变，疑似整段接近静音");
       ok.push({ asset, info, warnings });
       manifest.cues[`${asset.cue}#${asset.variant + 1}`] = {
         cue: asset.cue,

@@ -125,6 +125,12 @@ export const BGM_SOURCES = [
 // 清单与运行时都跟着走，不用改别的地方。
 
 export const SFX_SOURCES = [
+  {
+    id: "chunkLand", cue: "chunkLand", name: "完整琥珀块落入小瓷盘",
+    seconds: 0.7, category: "reward", material: "dry", contactKind: "scrape",
+    variants: ["一整块轻软的琥珀糖落入小瓷盘，温润轻巧的一声嗒。"],
+    prompt: `${COMMON_SFX}一小块轻软的琥珀糖从很低的高度落入手心大小的小瓷盘，只有一次轻巧温润的嗒声，带一点柔软的触感，立即收住。声音近、细腻、舒服，短而有满足感。不要尖锐玻璃声、不要金属撞击、不要碎裂、不要连续散落颗粒声。总长度约零点七秒。`,
+  },
   // ── 刮擦类 ──
   {
     id: "scrapeSoft",

@@ -44,7 +44,11 @@ export function CreateAudio() {
   // 拼出 `Audio/Audio/Bgm/x.mp3`，24 条音频全部 404，而日志里只看到「资产缺失」。
   // 一个入口就只可能有一种拼法，分叉才会重复加前缀。
   const PROJECT_ROOT = new URL("./", import.meta.url);
-  const AssetUrl = (relativePath) => new URL(relativePath, PROJECT_ROOT).href;
+  const AssetUrl = (relativePath) => {
+    const url = new URL(relativePath, PROJECT_ROOT);
+    url.searchParams.set('v', new URL(import.meta.url).searchParams.get('v') || 'ear006-20260911');
+    return url.href;
+  };
   const MANIFEST_URL = AssetUrl("Audio/Data_AudioManifest.json");
   const BGM_LOOP_CROSSFADE = 2.5;   // 秒：循环接缝交叉淡化长度
   const BGM_SWITCH_FADE = 3.0;      // 秒：换曲交叉淡化长度
@@ -61,6 +65,7 @@ export function CreateAudio() {
   // 为什么运行时也写一份：清单可能拿不到，而 404 不该让整个音频层瘫掉。
   // 注意路径统一写「相对项目根」，交给 AssetUrl() 解析。
   const SFX_FILES = {
+    chunkLand: ["Audio/Sfx/AudioSfx_ChunkLand.mp3"],
     scrapeSoft: ["Audio/Sfx/AudioSfx_ScrapeSoft.mp3"],
     scrapeGritty: ["Audio/Sfx/AudioSfx_ScrapeGritty.mp3"],
     scoopLift: ["Audio/Sfx/AudioSfx_ScoopLift.mp3"],
@@ -94,6 +99,7 @@ export function CreateAudio() {
   // 生成回来的 take 普遍比目标时长长（SeedAudio 的尾巴），运行时按 cue 裁一下：
   // 不裁的话「挑起来的一记啵」会拖着两秒尾巴，跟下一个动作叠在一起。
   const SFX_MAX_SECONDS = {
+    chunkLand: 0.7,
     scrapeSoft: 1.3, scrapeGritty: 1.4, scoopLift: 0.9, stretchWax: 1.6, snapWax: 0.6,
     crumbFall: 2.2, tickleFeather: 2.0, tickleHair: 1.8, vibrateHum: 3.4, waterPour: 3.0,
     dropLiquid: 0.9, vacuumSuck: 2.6, metalTick: 0.6, blink: 0.8, relaxSigh: 2.0,
@@ -127,6 +133,8 @@ export function CreateAudio() {
   const missing = { bgm: {}, sfx: {} };
   const noiseBuffers = {};
   const gainCache = new WeakMap();  // AudioBuffer → 归一化增益（避免每次播放都扫一遍样点）
+  const windowCache = new WeakMap();
+  const recentPlayback = [];
 
   let currentBgmId = null;
   const bgmVoices = new Map();
@@ -541,6 +549,21 @@ export function CreateAudio() {
     return gain;
   }
 
+  function SoundWindow(buffer) {
+    if (windowCache.has(buffer)) return windowCache.get(buffer);
+    const data = buffer.getChannelData(0);
+    let peak = 0;
+    for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]));
+    const threshold = Math.max(.0001, peak * .025);
+    let first = 0, last = data.length - 1;
+    while (first < last && Math.abs(data[first]) < threshold) first++;
+    while (last > first && Math.abs(data[last]) < threshold) last--;
+    // SeedAudio 单次拟音有约 0.25 秒前置静音。按信号起点播放，保留 8ms 起音保护。
+    const result = { offset: Math.max(0, first / buffer.sampleRate - .008), end: Math.min(buffer.duration, last / buffer.sampleRate + .07) };
+    if (peak < .0001) { result.offset = 0; result.end = buffer.duration; }
+    windowCache.set(buffer, result); return result;
+  }
+
   function PlayBuffer(buffer, { cue = null, gain = 1, rate = 1, pan = 0, delay = 0, dest = null } = {}) {
     const at = ctx.currentTime + Math.max(0, delay);
     const src = ctx.createBufferSource();
@@ -558,17 +581,20 @@ export function CreateAudio() {
     src.connect(g);
     tail.connect(dest || bus.sfx);
     live.sfxStarted += 1;
-    const natural = buffer.duration / rate;
+    const window = cue ? SoundWindow(buffer) : { offset: 0, end: buffer.duration };
+    const natural = (window.end - window.offset) / rate;
     const cap = cue ? (SFX_MAX_SECONDS[cue] || natural) : natural;
     const played = Math.min(natural, cap);
+    recentPlayback.push({ cue, offset: +window.offset.toFixed(4), seconds: +played.toFixed(4), gain: +g.gain.value.toFixed(3) });
+    if (recentPlayback.length > 24) recentPlayback.shift();
     if (played < natural - 0.01) {
       const stopAt = at + Math.max(0.02, played - SFX_FADE_OUT);
       g.gain.setValueAtTime(g.gain.value, stopAt);
       g.gain.linearRampToValueAtTime(0.0001, stopAt + SFX_FADE_OUT);
-      src.start(at);
+      src.start(at, window.offset);
       src.stop(at + played);
     } else {
-      src.start(at);
+      src.start(at, window.offset);
       src.stop(at + natural + 0.02);
     }
     return played;
@@ -1282,6 +1308,7 @@ export function CreateAudio() {
         activeContacts: [...contact.keys()],
         live: { ...live, busCounts: bus ? { master: 1, sfx: 1, bgm: 1, amb: 1 } : null },
         loadLog: [...loadLog],
+        recentPlayback: recentPlayback.map(item => ({ ...item })),
       };
     },
 

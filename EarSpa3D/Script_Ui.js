@@ -11,7 +11,7 @@
 //      进深尺只在数值真的动了才重绘。
 //   4. dispose() 要真的解绑、真的移除。
 
-import { CSS_VARS, SHAPE } from "./Data_Palette.mjs?v=ear005-20260911";
+import { CSS_VARS, SHAPE } from "./Data_Palette.mjs?v=ear006-20260911";
 
 const STYLE_ID = "ear-spa-ui-style";
 

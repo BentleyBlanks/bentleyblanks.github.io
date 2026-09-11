@@ -15,7 +15,7 @@
 // 了却判定没碰到」。
 
 import * as THREE from "three";
-import { PALETTE } from "./Data_Palette.mjs?v=ear005-20260911";
+import { PALETTE } from "./Data_Palette.mjs?v=ear006-20260911";
 
 // ─────────────────────────── 契约常量 ───────────────────────────
 

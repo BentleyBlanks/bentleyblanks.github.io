@@ -10,14 +10,14 @@
 //    容忍可选依赖，但集成层不能假设「它一定实现了」——不然一个笔误会整局卡死。
 
 import * as THREE from "three";
-import { PALETTE, CSS_VARS, SEMANTIC, SHAPE } from "./Data_Palette.mjs?v=ear005-20260911";
-import { CreateCore, GuessQuality } from "./Script_Core.js?v=ear005-20260911";
-import { CreateInput } from "./Script_Input.js?v=ear005-20260911";
-import { CreateCameraRig } from "./Script_Camera.js?v=ear005-20260911";
-import { CreateSession } from "./Script_Session.js?v=ear005-20260911";
-import { CreateHand } from "./Script_Hand.js?v=ear005-20260911";
-import { CreateShop, SHOP_LEVELS } from "./Script_Shop.js?v=ear005-20260911";
-import { Clamp, Damp, MakeRng } from "./Script_Util.js?v=ear005-20260911";
+import { PALETTE, CSS_VARS, SEMANTIC, SHAPE } from "./Data_Palette.mjs?v=ear006-20260911";
+import { CreateCore, GuessQuality } from "./Script_Core.js?v=ear006-20260911";
+import { CreateInput } from "./Script_Input.js?v=ear006-20260911";
+import { CreateCameraRig } from "./Script_Camera.js?v=ear006-20260911";
+import { CreateSession } from "./Script_Session.js?v=ear006-20260911";
+import { CreateHand } from "./Script_Hand.js?v=ear006-20260911";
+import { CreateShop, SHOP_LEVELS } from "./Script_Shop.js?v=ear006-20260911";
+import { Clamp, Damp, MakeRng } from "./Script_Util.js?v=ear006-20260911";
 
 /** 动态 import：拿不到就记一笔，页面继续跑。 */
 async function TryLoad(path, name) {
@@ -96,16 +96,16 @@ export async function Start() {
 
   // ── 并行拉模块，谁慢等谁 ──
   const [M, A, T, L, S, U, AU] = await Promise.all([
-    TryLoad("./Script_Materials.js?v=ear005-20260911", "Materials"),
-    TryLoad("./Script_EarAnatomy.js?v=ear005-20260911", "EarAnatomy"),
-    TryLoad("./Script_Tools.js?v=ear005-20260911", "Tools"),
-    TryLoad("./Script_Character.js?v=ear005-20260911", "Character"),
-    TryLoad("./Script_Scene.js?v=ear005-20260911", "Scene"),
-    TryLoad("./Script_Ui.js?v=ear005-20260911", "Ui"),
-    TryLoad("./Script_Audio.js?v=ear005-20260911", "Audio"),
+    TryLoad("./Script_Materials.js?v=ear006-20260911", "Materials"),
+    TryLoad("./Script_EarAnatomy.js?v=ear006-20260911", "EarAnatomy"),
+    TryLoad("./Script_Tools.js?v=ear006-20260911", "Tools"),
+    TryLoad("./Script_Character.js?v=ear006-20260911", "Character"),
+    TryLoad("./Script_Scene.js?v=ear006-20260911", "Scene"),
+    TryLoad("./Script_Ui.js?v=ear006-20260911", "Ui"),
+    TryLoad("./Script_Audio.js?v=ear006-20260911", "Audio"),
   ]);
-  const W = await TryLoad("./Script_Wax.js?v=ear005-20260911", "Wax");
-  const D = await TryLoad("./Data_EarTools.mjs?v=ear005-20260911", "EarTools");
+  const W = await TryLoad("./Script_Wax.js?v=ear006-20260911", "Wax");
+  const D = await TryLoad("./Data_EarTools.mjs?v=ear006-20260911", "EarTools");
   missing = [M, A, T, L, S, U, AU, W, D].filter((r) => !r.ok).map((r) => r.name || r.error?.message);
   intro.setMissing(missing);
   t0 = mark("加载模块", t0);

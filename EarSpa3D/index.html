@@ -6,11 +6,11 @@
 <title>采耳物语 · EarSpa3D</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#FFF8F2">
-<meta name="description" content="一款 3D 采耳 ASMR 解压游戏：用真实的专业采耳工具，把耳道清理得干干净净。">
+<meta name="description" content="按住、撬起、整块拉出。用竹耳勺和小镊子收集琥珀耳垢，享受轻柔 ASMR，手机一指就能放松。">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="Style_EarSpa.css?v=ear005-20260911">
+<link rel="stylesheet" href="Style_Chunk.css?v=ear006-20260911">
 <style>
   /* 首屏骨架：样式表可能还没到，先给出与基调一致的底色，避免白闪 */
   html { background: #FFF8F2; }
@@ -34,10 +34,8 @@
 </style>
 </head>
 <body>
-<!-- DOM 结构是 Script_Ui.js 的约定：它自己会建 #ear-root（带渐变底 + HUD 覆盖层），
-     画布必须成为 #ear-root 的**子节点**——如果画布和 #ear-root 是兄弟关系，
-     #ear-root 的渐变底会把画布整块盖住（实测过一次，画面全白、什么都看不见）。
-     所以这里先给一个中性的舞台容器，Script_Main 在 UI 建好后把画布插进 #ear-root 里。 -->
+<!-- 引导期间先保留画布；ChunkGame 建好分区布局后，将它移入 #play-stage。
+     工具栏、提示和设置都有自己的布局区域，不再覆盖整张游戏画布。 -->
 <div id="ear-stage">
   <canvas id="ear-canvas" class="ear-scene"></canvas>
 </div>
@@ -47,18 +45,18 @@
 <script type="importmap">
 {
   "imports": {
-    "three": "./vendor/three/build/three.module.js?v=ear005-20260911",
-    "./vendor/three/build/three.module.js": "./vendor/three/build/three.module.js?v=ear005-20260911"
+    "three": "./vendor/three/build/three.module.js?v=ear006-20260911",
+    "./vendor/three/build/three.module.js": "./vendor/three/build/three.module.js?v=ear006-20260911"
   }
 }
 </script>
 
 <script type="module">
-  // 引导壳：只负责把 Script_Main 拉起来并把致命错误显示成人话。
+  // 引导壳：只负责启动整块采耳入口，并显示可读的启动错误。
   // 真正的游戏逻辑一行都不在这里——这里出错是最难查的那种，保持它足够小。
   const boot = document.getElementById("ear-boot");
   try {
-    const mod = await import("./Script_Main.js?v=ear005-20260911");
+    const mod = await import("./Script_ChunkGame.js?v=ear006-20260911");
     await mod.Start();
   } catch (error) {
     console.error(error);

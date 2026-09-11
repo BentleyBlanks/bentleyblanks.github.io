@@ -3,6 +3,21 @@
 **3D 采耳 ASMR 解压游戏**。入口页：`EarSpa3D/index.html`。
 接口契约与协作边界在 [`Data_Contract.md`](./Data_Contract.md)，**改任何跨模块的东西之前先读它**。
 
+## 当前入口：整块采耳（2026-09-11）
+
+`index.html` → `Script_ChunkGame.js` + `Script_ChunkScene.js` + `Style_Chunk.css`。
+以契约 §0 的整块取出重设计为当前玩法。原 `Script_Main/Ui/Hand/Wax` 保留为旧玩法参考，
+当前入口不再使用它们。核心目标固定为撬起、完整取出、落盘收藏，手机一指完成。
+
+实际交互回归：
+```powershell
+node EarSpa3D/Script_ChunkPlayTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
+```
+使用已安装的 `playwright-core` 与 Edge（可用 `EARSPA_BROWSER` 指定其他 Chromium 路径），
+依次检查桌面、390×844、320×568、844×390 的真实鼠标/CDP 触屏整局。
+验收图与报告写入忽略的 `_dev/`；必须另外查看截图，不能只看 PASS。
+音频的信号分析及浏览器输出电平可以证明起音、静音和素材完整性，不能替代人的主观试听。
+
 ## 这是什么
 
 一款给「强迫症 + 采耳爱好者」做的解压游戏：把真实采耳店的全套专业手法

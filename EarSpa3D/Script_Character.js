@@ -8,7 +8,7 @@
 // 绝不动 anchor 本身 —— 否则 lead 那边的工具判定就会跟视觉错位。
 
 import * as THREE from "three";
-import { PALETTE } from "./Data_Palette.mjs?v=ear005-20260911";
+import { PALETTE } from "./Data_Palette.mjs?v=ear006-20260911";
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const lerp = (a, b, t) => a + (b - a) * t;

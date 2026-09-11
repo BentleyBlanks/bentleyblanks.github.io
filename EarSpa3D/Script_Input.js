@@ -10,7 +10,7 @@
 //
 // 顶层零副作用：事件监听在 CreateInput 里挂，Dispose 里摘干净。
 
-import { Clamp, AngleDelta } from "./Script_Util.js?v=ear005-20260911";
+import { Clamp, AngleDelta } from "./Script_Util.js?v=ear006-20260911";
 
 const FINE_DIVISOR = 3;
 

@@ -437,13 +437,32 @@
    "generatedAt": "2026-09-10",
    "license": "volcengine",
    "credit": "Volcengine SeedAudio 1.0 · relaxSigh · 2026-09-10"
+  },
+  "chunkLand#1": {
+   "cue": "chunkLand",
+   "kind": "sfx",
+   "variant": 1,
+   "name": "完整琥珀块落入小瓷盘",
+   "file": "Audio/Sfx/AudioSfx_ChunkLand.mp3",
+   "seconds": 0.768,
+   "bytes": 12333,
+   "sampleRate": 48000,
+   "meanBitrateKbps": 128,
+   "frames": 32,
+   "targetSeconds": 0.7,
+   "promptSummary": "用于一款采耳 ASMR 解压游戏的独立单次音效，单声道。只有一次事件，开头立即发生，结尾自然衰减至绝对安静。极近距离的拟音录音，干声，不带任何房间混响与回声尾巴。不要重复、不要循环、不要音乐、不要人声或言语、不要背景底噪与环境声。一小块轻软的琥珀糖从很低的高度落入手心大小的小瓷盘，只有一次轻巧温润的嗒声，带一点柔软的触",
+   "promptChars": 223,
+   "model": "seed-audio-1.0",
+   "generatedAt": "2026-09-11",
+   "license": "volcengine",
+   "credit": "Volcengine SeedAudio 1.0 · chunkLand · 2026-09-11"
   }
  },
  "model": "seed-audio-1.0",
  "sampleRate": 48000,
  "channels": 1,
  "nominalBitrate": "192k",
- "generatedAt": "2026-09-10",
+ "generatedAt": "2026-09-11",
  "bakedBy": "Script_SeedAudioBake.mjs",
  "notes": [
   "时长由纯 JS 解析 MPEG 帧头累加得到（本机无 ffmpeg，不做转码）。",

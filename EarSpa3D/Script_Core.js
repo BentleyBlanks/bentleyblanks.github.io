@@ -8,7 +8,7 @@
 //    富余就慢慢升回来。这比一次性按机型猜档位可靠得多。
 
 import * as THREE from "three";
-import { Clamp, Damp } from "./Script_Util.js?v=ear005-20260911";
+import { Clamp, Damp } from "./Script_Util.js?v=ear006-20260911";
 
 export const QUALITY_TIERS = {
   low: {
@@ -37,7 +37,7 @@ export function GuessQuality() {
   return "low";
 }
 
-export function CreateCore({ canvas, quality = "auto", onError } = {}) {
+export function CreateCore({ canvas, quality = "auto", onError, viewCamera = null } = {}) {
   let tier = QUALITY_TIERS[quality] || QUALITY_TIERS[GuessQuality()];
 
   const renderer = new THREE.WebGLRenderer({
@@ -65,7 +65,7 @@ export function CreateCore({ canvas, quality = "auto", onError } = {}) {
   const scene = new THREE.Scene();
 
   // 内窥视角：近平面要小到能贴住耳道壁，远平面要能看见房间
-  const camera = new THREE.PerspectiveCamera(52, 1, 0.05, 6000);
+  const camera = viewCamera || new THREE.PerspectiveCamera(52, 1, 0.05, 6000);
   const insetCamera = new THREE.PerspectiveCamera(38, 1, 1, 6000);
   const insetScene = new THREE.Scene();
 

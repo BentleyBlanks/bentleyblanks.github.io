@@ -23,7 +23,7 @@
 // 「专业手法」在游戏里最直接的体现，也是玩家最先学会的一课。
 
 import * as THREE from "three";
-import { AngleDelta, Clamp, Damp, Smooth, TAU } from "./Script_Util.js?v=ear005-20260911";
+import { AngleDelta, Clamp, Damp, Smooth, TAU } from "./Script_Util.js?v=ear006-20260911";
 
 /** 一次整屏拖拽对应的进深跨度（mm）。耳道全长 28，所以一屏多一点能走完全程。 */
 const DEPTH_PER_SCREEN = 26;

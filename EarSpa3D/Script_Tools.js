@@ -14,8 +14,8 @@
 // 三角面预算：单件 ≤ 6k，二十件合计 ≤ 40k（quality 三档真实影响分段数与实例数）。
 
 import * as THREE from "three";
-import { PALETTE } from "./Data_Palette.mjs?v=ear005-20260911";
-import { EAR_TOOLS, EAR_TOOL_BY_ID } from "./Data_EarTools.mjs?v=ear005-20260911";
+import { PALETTE } from "./Data_Palette.mjs?v=ear006-20260911";
+import { EAR_TOOLS, EAR_TOOL_BY_ID } from "./Data_EarTools.mjs?v=ear006-20260911";
 
 // ── quality 三档：直接决定分段数、实例数与可选部件，不是「摆设参数」──
 const QUALITY_LEVELS = {

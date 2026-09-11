@@ -11,7 +11,7 @@
 // 但抖动的频率要压得很低（<1.5Hz 的漂移 + 极小幅高频噪声），否则晕。
 
 import * as THREE from "three";
-import { Clamp, Damp, Lerp, Smooth } from "./Script_Util.js?v=ear005-20260911";
+import { Clamp, Damp, Lerp, Smooth } from "./Script_Util.js?v=ear006-20260911";
 
 export const CAMERA_MODES = ["canal", "macro", "shop"];
 

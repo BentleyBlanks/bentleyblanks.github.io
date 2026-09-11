@@ -9,7 +9,7 @@
 //    玩家要学的是「慢」，这本身就解压。
 // ③ **大块完整取出**要慢镜 + 奖励：这是本作的高光时刻，必须被放大。
 
-import { Clamp, Damp, Smooth } from "./Script_Util.js?v=ear005-20260911";
+import { Clamp, Damp, Smooth } from "./Script_Util.js?v=ear006-20260911";
 
 export const ZONE_RULES = {
   cartilage: { comfortScale: 0.55, riskScale: 0.15, label: "软骨部" },
