@@ -8,6 +8,7 @@
 // 退出码即成败。
 
 import path from "node:path";
+import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
@@ -112,9 +113,37 @@ try {
     P.renderer.readRenderTargetPixels(ldrDark,
       Math.floor(ldrDark.width / 2), Math.floor(ldrDark.height / 2), 1, 1, rgba);
     const glError = P.renderer.getContext().getError();
+    // An alternating target catches a blur branch that compiles but never
+    // changes pixels; also guard complete lid closure and the exact neutral path.
+    const pixels=new Uint8Array(64*64*4);
+    for(let y=0;y<64;y++)for(let x=0;x<64;x++){
+      const at=(y*64+x)*4,value=x%2?220:16;
+      pixels.set([value,value,value,255],at);
+    }
+    const stripes=new THREE.DataTexture(pixels,64,64,THREE.RGBAFormat);
+    stripes.colorSpace=THREE.NoColorSpace;stripes.needsUpdate=true;
+    U.uHdr.value=stripes;U.uGrain.value=0;U.uDither.value=0;
+    const Read=()=>{post._Blit(post.matComposite,post.targets.ldr);
+      const bytes=new Uint8Array(ldrDark.width*ldrDark.height*4);
+      P.renderer.readRenderTargetPixels(ldrDark,0,0,ldrDark.width,ldrDark.height,bytes);return bytes;};
+    U.uConcussion.value.set(0,0,0,0);U.uEyeClosure.value=0;
+    const clear=Read();
+    U.uConcussion.value.set(1,1,4,3);
+    const blurred=Read();
+    U.uEyeClosure.value=1;
+    const closed=Read();
+    U.uConcussion.value.set(0,0,0,0);U.uEyeClosure.value=0;
+    const reset=Read();
+    let difference=0,resetDifference=0,closedMaximum=0;
+    for(let i=0;i<clear.length;i++)if(i%4!==3){
+      difference+=Math.abs(clear[i]-blurred[i]);
+      resetDifference+=Math.abs(clear[i]-reset[i]);
+      closedMaximum=Math.max(closedMaximum,closed[i]);
+    }
+    stripes.dispose();
     dark.dispose();
     black.dispose();
-    return { rgba: Array.from(rgba), glError };
+    return { rgba: Array.from(rgba), glError,concussion:{difference,resetDifference,closedMaximum} };
   });
 } catch (error) {
   problems.push(`THROW ${String(error).slice(0, 240)}`);
@@ -133,3 +162,7 @@ const taaOk = taa && taa.presetOn && taa.historyRolling && taa.projClean
 console.log(`${taaOk ? "ok  " : "FAIL"} TAA 历史滚动 + 抖动还原 + 出画非黑`, taa || "无结果");
 for (const problem of problems) console.log(`FAIL ${problem}`);
 if (!ok || !taaOk) process.exit(1);
+assert.ok(result.concussion.difference>1000,"concussion actually filters the GPU output");
+assert.equal(result.concussion.resetDifference,0,"neutral concussion is pixel-identical");
+assert.equal(result.concussion.closedMaximum,0,"closed lids leave no visible seam");
+console.log("ok concussion GPU filtering, complete blackout and exact neutral recovery");

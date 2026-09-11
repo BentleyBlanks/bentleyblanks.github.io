@@ -3848,6 +3848,8 @@ result += ghosts * ghostScale * sunOpen;      // 太阳被挡上就平滑退到 
 
 ## 14. Composite：雾段组合 / tonemap / LUT / 镜头效果
 
+2026-09-12：开场炮震在既有 HDR 采样段增加受任务包络控制的柔化与轻微偏像，在 lens 段完成去色和柔边眼睑；没有新增 pass、靶或 sampler，零强度回到原路径。参数、来源和验收见 [黑视与炮震恢复](Data_OpeningShellshock.md)。
+
 > 分段结构与「只替换自己那一段」的规矩在 §1.9；这一节是每一段里算什么。
 > 模块 `Script_PostComposite.mjs`、`Script_PostGrade.mjs`。
 

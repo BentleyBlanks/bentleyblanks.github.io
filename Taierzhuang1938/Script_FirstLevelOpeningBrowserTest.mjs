@@ -72,7 +72,7 @@ async function Drive(label,points,{fight=false,until=null,seconds=120}={}){
       ['MealLater',result.voiceCue==='TrainMeal'&&result.audio.sourceTime>13],
       ['PlayerCarRoll',age>.7&&age<1.6],['ImpactBlackout',result.opening.blackout>.99],
       ['BeforeNearImpact',result.firstImpact&&!result.nearImpact],
-      ['EyelidPartial',age>2.65&&age<4.3&&result.opening.eyeClosure>.1&&result.opening.eyeClosure<.8],
+      ['EyelidPartial',age>3.3&&age<6.6&&result.opening.eyeClosure>.1&&result.opening.eyeClosure<.8],
       ['FallenPlayer',age>3.8&&rescueAge<0],['RescueReach',rescueAge>1&&rescueAge<2.5],
       ['WreckPressure',age>10&&result.opening.escapePressure?.smokeSources===2],
       ['ApronPressure',result.opening.escapePressure?.impacts.length>=4&&result.position[2]>45]];

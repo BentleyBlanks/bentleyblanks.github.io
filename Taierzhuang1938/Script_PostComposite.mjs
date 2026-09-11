@@ -40,6 +40,7 @@
 //     froxel 只铺到 `uVolumetricFar`，远段归大气，这个函数给的是两段的分界透过率。
 
 import { HIT_DISORIENTATION } from "./Data_Tuning_Player.mjs";
+import { OPENING_PERCEPTION } from "./Data_Tuning_FirstLevel.mjs";
 import * as THREE from "three";
 import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_PostCommon.mjs";
 // 物理大气（子系统 B4）：ApplyFog 段里的大气透视那几行用它。
@@ -156,6 +157,9 @@ uniform float uHitGhostMix;
 uniform float uDamage;      // 受伤：边缘泛红 + 去色
 uniform float uFade;        // 黑场
 uniform float uEyeClosure;  // Scripted eyelids, zero leaves ordinary rendering unchanged.
+uniform vec4 uConcussion;   // intensity, focus loss, blur pixels, secondary image pixels
+uniform vec3 uConcussionGrade; // secondary image mix, desaturation, peripheral dimming
+uniform vec4 uLidShape;      // feather, curvature, tilt, upper lid share
 
 // --- SEGMENT encode ---------------------------------------------------------
 uniform float uDither;      // 输出抖动（1/255 的倍数）；0 = 关（出厂）
@@ -203,12 +207,30 @@ vec3 ViewPos(vec2 uv, float depth) {
 // ===========================================================================
 vec3 MotionBlur(vec2 uv, vec2 centered, float r2, vec4 nd) {
   float ca = uAberration * r2;
-  if (ca > 0.0001) {
-    return vec3(texture2D(uHdr, uv + centered * ca).r,
-                texture2D(uHdr, uv).g,
-                texture2D(uHdr, uv - centered * ca).b);
+  vec3 clear=texture2D(uHdr,uv).rgb;
+  if(ca>0.0001)clear=vec3(texture2D(uHdr,uv+centered*ca).r,clear.g,
+    texture2D(uHdr,uv-centered*ca).b);
+  // Concussion is an optical response, independent of velocity/TAA history.
+  // A compact Gaussian footprint keeps silhouettes continuous; the centre
+  // resolves earlier than the periphery. No extra pass, target or sampler.
+  if(uConcussion.y>0.001){
+    float peripheral=smoothstep(.015,.32,r2);
+    vec2 radius=vec2(uConcussion.z*uConcussion.y*(.35+.65*peripheral))/uResolution;
+    vec3 soft=texture2D(uHdr,uv).rgb*.25;
+    soft+=(texture2D(uHdr,clamp(uv+vec2(radius.x,0.0),0.0,1.0)).rgb
+          +texture2D(uHdr,clamp(uv-vec2(radius.x,0.0),0.0,1.0)).rgb
+          +texture2D(uHdr,clamp(uv+vec2(0.0,radius.y),0.0,1.0)).rgb
+          +texture2D(uHdr,clamp(uv-vec2(0.0,radius.y),0.0,1.0)).rgb)*.125;
+    soft+=(texture2D(uHdr,clamp(uv+radius,0.0,1.0)).rgb
+          +texture2D(uHdr,clamp(uv-radius,0.0,1.0)).rgb
+          +texture2D(uHdr,clamp(uv+vec2(radius.x,-radius.y),0.0,1.0)).rgb
+          +texture2D(uHdr,clamp(uv+vec2(-radius.x,radius.y),0.0,1.0)).rgb)*.0625;
+    vec2 offset=vec2(uConcussion.w,-uConcussion.w*.22)*uConcussion.y/uResolution;
+    vec3 secondary=texture2D(uHdr,clamp(uv+offset,0.0,1.0)).rgb;
+    vec3 blurred=mix(soft,secondary,uConcussionGrade.x*uConcussion.y*(.25+.75*peripheral));
+    return mix(clear,blurred,smoothstep(0.0,.08,uConcussion.y));
   }
-  return texture2D(uHdr, uv).rgb;
+  return clear;
 }
 
 // ===========================================================================
@@ -438,6 +460,10 @@ vec3 ColorGrade(vec3 color, out float gradedLuma) {
 // 镜头光晕、镜头脏污接在这里：都属于「镜头上发生的事」，在调色之后、编码之前。
 // ===========================================================================
 vec3 LensEffects(vec3 color, vec2 uv, float r2, float gradedLuma) {
+  if(uConcussion.x>0.0){
+    color=mix(color,vec3(Luma(color)),uConcussionGrade.y*uConcussion.x);
+    color*=1.0-uConcussionGrade.z*uConcussion.x*smoothstep(.04,.5,r2);
+  }
   // 受伤反馈：边缘吃血、中心去色。
   //
   // 原来 edge = smoothstep(0.06, 0.28, r2)：r2 的角点最大值只有 0.5，0.28 意味着
@@ -463,9 +489,14 @@ vec3 LensEffects(vec3 color, vec2 uv, float r2, float gradedLuma) {
 
   float aperture=1.0;
   if(uEyeClosure>0.0){
-    float lid=abs(vUv.y-.5)+.14*pow(vUv.x*2.0-1.0,2.0)*uEyeClosure;
-    float gap=mix(.65,-.025,clamp(uEyeClosure,0.0,1.0));
-    aperture=1.0-smoothstep(gap-.018,gap+.018,lid);
+    float closure=clamp(uEyeClosure,0.0,1.0);
+    float x=uv.x*2.0-1.0;
+    float arc=uLidShape.y*x*x*closure,tilt=uLidShape.z*x*closure;
+    float upper=1.0+uLidShape.x-closure*(uLidShape.w+uLidShape.x)-arc+tilt;
+    float lower=-uLidShape.x+closure*(1.0-uLidShape.w+uLidShape.x)+arc+tilt;
+    aperture=smoothstep(lower-uLidShape.x,lower+uLidShape.x,uv.y)
+      *(1.0-smoothstep(upper-uLidShape.x,upper+uLidShape.x,uv.y));
+    aperture*=1.0-smoothstep(.90,1.0,closure);
   }
   return max(color, vec3(0.0)) * (1.0 - uFade) * aperture;
 }
@@ -555,6 +586,9 @@ export class CompositePass {
       uHitOffset: { value: new THREE.Vector2() },
       uHitGhostMix: { value: HIT_DISORIENTATION.ghostMix },
       uDamage: { value: 0 }, uFade: { value: 0 }, uEyeClosure:{value:0},
+      uConcussion:{value:new THREE.Vector4()},
+      uConcussionGrade:{value:new THREE.Vector3(OPENING_PERCEPTION.ghostMix,OPENING_PERCEPTION.desaturation,OPENING_PERCEPTION.vignette)},
+      uLidShape:{value:new THREE.Vector4(OPENING_PERCEPTION.lidFeather,OPENING_PERCEPTION.lidCurve,OPENING_PERCEPTION.lidTilt,OPENING_PERCEPTION.lidUpperShare)},
       uDofStrength: { value: 0 }, uDofFocus: { value: 1.5 },
       uDofRange: { value: 2.8 }, uDofMaxPx: { value: 11.0 },
       uNearDofStrength: { value: 0 }, uNearDofFocus: { value: 1.6 },
@@ -655,9 +689,8 @@ export class CompositePass {
     U.uBloom.value = this.pipeline.BloomTarget.texture;
     U.uGod.value = this.pipeline.targets.god.texture;
     U.uNormalDepth.value = ctx.normalDepthTexture;
-    // **内部分辨率**，不是这一趟的靶尺寸：合成的 GLSL 自己已经不用它了
-    // （景深搬走之后），留着是给 `Script_PostDebug` 的 Motion Vector 视图
-    // 换算像素速度用 —— 那张图读的是内部分辨率的预通道靶。
+    // Internal resolution also serves the Motion Vector debug view. Concussion
+    // radii scale with this same height so changing render scale preserves FOV.
     U.uResolution.value.set(ctx.width, ctx.height);
     U.uExposure.value = options.exposure ?? 1.0;
     U.uBloomStrength.value = options.bloom ?? 0.5;
@@ -701,6 +734,11 @@ export class CompositePass {
       Math.cos(hitPhase) * HIT_DISORIENTATION.swayUv);
     U.uFade.value = options.fade ?? 0;
     U.uEyeClosure.value = options.eyeClosure ?? 0;
+    const concussion=options.concussion,perception=OPENING_PERCEPTION;
+    const pixelScale=ctx.height/perception.referenceHeight;
+    U.uConcussion.value.set(Math.max(0,Math.min(1,concussion?.amount||0)),
+      Math.max(0,Math.min(1,concussion?.focus||0)),perception.blurPx*pixelScale,
+      this.reducedMotion?.matches?0:perception.ghostPx*pixelScale);
     U.uDofStrength.value = options.dofStrength ?? 0;
     U.uDofFocus.value = options.dofFocus ?? 1.5;
     U.uDofRange.value = options.dofRange ?? 2.8;

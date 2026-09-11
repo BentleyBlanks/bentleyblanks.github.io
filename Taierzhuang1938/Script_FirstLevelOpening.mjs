@@ -1,6 +1,6 @@
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { OPENING as C } from "./Data_FirstLevelOpening.mjs";
-import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
+import { MISSION_TUNING as R, OPENING_PERCEPTION as P } from "./Data_Tuning_FirstLevel.mjs";
 import { CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const Smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t)};
@@ -12,12 +12,24 @@ const Curve=(rows,t)=>{
 // Keep the impact onset at its authored time; stretch only recovery after the peak.
 export const OpeningRecoveryTime=(elapsed,onset)=>elapsed<=onset?elapsed:onset+(elapsed-onset)/R.openingRecoveryScale;
 
+// A pure mission-clock sample: pause, re-render and different frame rates all
+// produce the same recovery. No accumulated post-process animation time.
+export function SampleOpeningPerception(elapsed){
+  const age=OpeningRecoveryTime(elapsed,P.onsetS);
+  return {
+    eyeClosure:Curve(C.blinks,OpeningRecoveryTime(elapsed,C.blinks.find(([,value])=>value===1)[0])),
+    amount:Curve(P.intensity,age),focus:Curve(P.focus,age),
+    pitch:Curve(P.pitch,age),roll:Curve(P.roll,age),
+  };
+}
+
 // Coordinates, roster and timing live in data. Existing AI owns movement,
 // aiming, suppression, ammunition and damage throughout the opening.
 export class FirstLevelOpening {
   constructor(runtime){this.r=runtime;this.peakPlayerShooters=0;this.fireSeen=new Map();this.fireEvents=[];this.shotCount=0;this.playerShotCount=0;this.peakVisible=0;
     this.pack={id:"ShunziPack",contents:["CivilianClothes"],carried:true};
-    this.pressureShells=new Set();this.pressureImpacts=[];this.wreckSmoke=[];}
+    this.pressureShells=new Set();this.pressureImpacts=[];this.wreckSmoke=[];
+    this.reducedMotion=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');}
   Derail(){
     const r=this.r;
     if(this.derailAt!=null)return;
@@ -45,10 +57,12 @@ export class FirstLevelOpening {
   }
   ApplyCamera(){
     const r=this.r,cam=r.player.camera;
-    this.blackout=0;
+    this.blackout=0;this.eyeClosure=0;this.concussion=null;
     if(this.derailAt==null)return;
     const elapsed=r.time-this.derailAt;
-    this.eyeClosure=Curve(C.blinks,OpeningRecoveryTime(elapsed,C.blinks.find(([,value])=>value===1)[0]));
+    const perception=SampleOpeningPerception(elapsed);
+    this.eyeClosure=perception.eyeClosure;
+    this.concussion=perception;
     const active=!r.Has("luoRescueComplete"),rescue=this.rescueAt==null?0:Smooth((r.time-this.rescueAt)/C.rescueSeconds);
     if(active){
       this.PlacePlayer();
@@ -74,12 +88,12 @@ export class FirstLevelOpening {
       }
       const b=C.blackout,close=Smooth((elapsed-b.start)/b.close),open=Smooth((elapsed-b.start-b.close-b.hold)/b.open);
       this.blackout=close*(1-open);
-      cam.rotation.x+=Math.sin(elapsed*8)*.035*t*(1-rescue);
-      cam.rotation.z+=Math.sin(elapsed*5)*.05*t*(1-rescue);
-    }else if(this.rescueAt!=null){
-      const after=r.time-this.rescueAt-C.rescueSeconds,k=Math.max(0,1-after/(C.dizzySeconds*R.openingRecoveryScale));
-      cam.rotation.z+=Math.sin(after*3.5)*.035*k;
-      cam.rotation.x+=Math.sin(after*4.5)*.018*k;
+    }
+    const standingAge=this.rescueAt==null?0:Math.max(0,r.time-this.rescueAt-C.rescueSeconds);
+    const settle=active?1:1-Smooth(standingAge/(C.dizzySeconds*R.openingRecoveryScale));
+    if(!this.reducedMotion?.matches){
+      cam.rotation.x+=perception.pitch*settle;
+      cam.rotation.z+=perception.roll*settle;
     }
     cam.updateMatrixWorld(true);
     if(active&&this.rescueAt!=null){
@@ -289,6 +303,7 @@ export class FirstLevelOpening {
   }
   Dispose(){
     this.ClearWreckSmoke();
+    this.eyeClosure=0;this.blackout=0;this.concussion=null;
     this.r.audio.SetConcussion?.(0);
     if(this.breathVoice)this.r.audio.StopVoice?.(this.breathVoice,.15);
   }
@@ -344,7 +359,7 @@ export class FirstLevelOpening {
     this.visible=visible;this.peakVisible=Math.max(this.peakVisible,visible);
   }
   State(){return {derailAt:this.derailAt,roll:this.r.battlefield.derailRoll||0,
-    blackout:this.eyeClosure>=.99?1:0,eyeClosure:this.eyeClosure||0,hearingAmount:this.hearingAmount||0,rescueAt:this.rescueAt,playerCar:MISSION_TRAIN.mainCar,
+    blackout:this.eyeClosure>=.99?1:0,eyeClosure:this.eyeClosure||0,concussion:this.concussion,hearingAmount:this.hearingAmount||0,rescueAt:this.rescueAt,playerCar:MISSION_TRAIN.mainCar,
     pack:this.pack,
     escapePressure:{launched:[...this.pressureShells],impacts:this.pressureImpacts,smokeSources:this.wreckSmoke.length},
     playerShooters:this.playerShooters||[],peakPlayerShooters:this.peakPlayerShooters,

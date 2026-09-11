@@ -8360,6 +8360,7 @@ function RenderScene(dt) {
     contrast: preset.contrast,
     grain: (skyName === "night" ? 0.020 : 0.014) * graphics.grain,
     eyeClosure: missionRuntime?.opening.eyeClosure || 0,
+    concussion: missionRuntime?.opening.concussion,
     vignette: (0.42 + suppression * 0.22) * graphics.vignette,
     damage: Clamp01(1 - health / 62) * 0.55,
     hitDisorientation,

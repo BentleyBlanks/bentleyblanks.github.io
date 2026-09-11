@@ -10,8 +10,9 @@ export const OPENING = Object.freeze({
   rescueEnd: {x:-70.5,z:88},
   rescueGuide: {x:-72.15,z:88},
   blackout: {start:1.65,close:.35,hold:.65,open:1.1},
-  // Closed lids, two failed attempts to focus, then one light blink during rescue.
-  blinks: [[0,0],[1.55,0],[1.95,1],[2.6,1],[3.05,.38],[3.3,.96],[3.58,.28],[3.85,.78],[4.25,0],[5.45,0],[5.58,.7],[5.82,0]],
+  // One impact closure, held blackout, then a continuous reopening. Focus and
+  // hearing recover separately; repeated shutter beats made the wreck theatrical.
+  blinks: [[0,0],[1.72,0],[1.95,1],[2.6,1],[3.15,.52],[3.65,.18],[4.25,0]],
   hearing: [[0,0],[.15,0],[.3,1],[2.8,1],[4.1,.72],[6.5,.42],[10.5,0]],
   hearingLowHz:650,
   breath: {start:2.6,end:11,interval:2.4,volume:.95},

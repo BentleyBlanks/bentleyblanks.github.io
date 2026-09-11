@@ -1,3 +1,18 @@
+// Opening sensory reconstruction, 2026-09-12. COD's published concussion/flash
+// and tinnitus separation informs the layered response; these are our authored
+// values, not claimed COD engine parameters. See docs/Data_OpeningShellshock.md.
+export const OPENING_PERCEPTION = Object.freeze({
+  onsetS:.3,
+  intensity:[[0,0],[.15,0],[.3,1],[2.8,1],[4.1,.72],[6.5,.42],[10.5,0]],
+  focus:[[0,0],[.15,0],[.3,1],[2.8,1],[3.4,.58],[3.85,.72],[4.8,.36],[6.5,.14],[8.5,0]],
+  // Finite, irregular settling poses (radians), with no periodic horizon roll.
+  pitch:[[0,0],[.3,.014],[1.1,-.008],[2.8,.011],[4.2,-.005],[6.1,.002],[8.5,0]],
+  roll:[[0,0],[.3,-.018],[1.4,.008],[3.1,-.01],[4.9,.004],[6.8,-.001],[8.5,0]],
+  blurPx:5.5, ghostPx:5, ghostMix:.13, desaturation:.32, vignette:.24,
+  referenceHeight:900,
+  lidFeather:.065, lidCurve:.18, lidTilt:.012, lidUpperShare:.64,
+});
+
 // First-level whitebox pacing and handling. Notion 2026-09-07: calm walk 1–2 min, transfer 2–4 min, dive 2 s, death 8–12 s.
 export const MISSION_TUNING = Object.freeze({
   // User 2026-09-11: double post-impact sensory recovery, without slowing the roll or rescue.

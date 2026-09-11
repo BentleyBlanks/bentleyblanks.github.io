@@ -1,7 +1,7 @@
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_CIVILIAN_AFTERMATH } from "./Data_FirstLevelMissionCivilianAftermath.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
-import { FirstLevelOpening, OpeningRecoveryTime } from "./Script_FirstLevelOpening.mjs";
+import { FirstLevelOpening, OpeningRecoveryTime, SampleOpeningPerception } from "./Script_FirstLevelOpening.mjs";
 import { MISSION_AFTERMATH, FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_ASSAULT_STARTS, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
 import { COVER } from "./Data_Tuning_AiCover.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
@@ -46,6 +46,18 @@ assert.ok(P.stationCasualties.every(person=>person.health>0),"station shelling d
     }
   }
   assert.equal(OPENING.dizzySeconds*R.openingRecoveryScale,8,"standing recovery lasts eight seconds");
+  let previous=1;
+  for(let time=1.95;time<=24;time+=1/60){
+    const sample=SampleOpeningPerception(time);
+    assert.ok(sample.eyeClosure<=previous+1e-9,"after impact the lids reopen without repeated shutter beats");
+    assert.ok(Object.values(sample).every(Number.isFinite),"all sensory channels remain finite");
+    assert.ok(Math.abs(sample.pitch)<.02&&Math.abs(sample.roll)<.02,"settling stays below a 1.15 degree horizon offset");
+    previous=sample.eyeClosure;
+  }
+  assert.equal(SampleOpeningPerception(2.5).eyeClosure,1,"the impact still fully blacks out");
+  assert.equal(SampleOpeningPerception(7).eyeClosure,0,"the rescue view remains open");
+  assert.ok(SampleOpeningPerception(10).focus>0&&SampleOpeningPerception(14).amount>0,"sustained recovery is carried by vision, not repeated blackouts");
+  assert.deepEqual(SampleOpeningPerception(30),{eyeClosure:0,amount:0,focus:0,pitch:0,roll:0},"every sensory channel has a neutral endpoint");
 }
 for(const person of MISSION_CIVILIAN_AFTERMATH) {
   assert.ok(["male","female"].includes(person.variant) && person.side==="civilian");
