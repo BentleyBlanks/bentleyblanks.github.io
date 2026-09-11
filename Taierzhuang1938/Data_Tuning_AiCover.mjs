@@ -170,6 +170,8 @@ export const COVER = Freeze({
  * 分到两个文件里改一半忘一半。
  */
 export const COVER_CYCLE = Freeze({
+  incomingMemoryS:4,
+  grenadeStanceHoldS:.5,
   // 2026-09-11: stalled shelters must release ownership and allow normal obstacle recovery.
   selectedValidationBudget: 2,
   microMoveM: 2,

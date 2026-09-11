@@ -476,6 +476,8 @@ console.log("ok  无朝向掩体：选得上、不吃朝向分、隐蔽位正背
   ], host);
   const out = reg.Query({ x: 0, z: 0 }, [{ x: 30, y: 0, z: 0, stance: 0 }], { radiusM: 30 });
   Check(out.length === 1 && out[0].cover.x === 5, "背对威胁那一侧的点被硬条件筛掉");
+  const retreat = reg.Query({ x: 0, z: 0 }, [{ x: 30, y: 0, z: 0, stance: 0 }], { radiusM: 30, allowRetreat: true });
+  Check(retreat.some(c=>c.cover.x===-12), "避险允许后退到掩体，保护仍由射线验证");
 
   // 返回值复用：下一次 Query 会覆盖上一次的结果（头注写明的契约）
   const first = reg.Query({ x: 0, z: 0 }, [{ x: 30, y: 0, z: 0, stance: 0 }], { radiusM: 30 });

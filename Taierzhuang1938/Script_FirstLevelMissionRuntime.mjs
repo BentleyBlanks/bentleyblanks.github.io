@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { SelectP012RecruitCast } from "./Data_FirstLevelP012Cast.mjs";
+import { AiDirector } from "./Script_Ai.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FirstLevelOpening } from "./Script_FirstLevelOpening.mjs";
 import { FRONT_DEFENDERS, FRONT_GUARD_POSTS, FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane, FrontReserveLane, ClearLaneX } from "./Data_FirstLevelMissionFront.mjs";
@@ -300,8 +301,111 @@ export class FirstLevelMissionRuntime {
       actor.position.z + (point.z - actor.position.z) * fraction,
     );
   }
+  RespondToGrenade(actor) {
+    const grenade=actor.grenadeThreat;
+    const radius=this.ai.GrenadeDangerRadius(grenade);
+    if(!actor.alive || actor.unarmed || actor.carryRole || actor.meleeCombat
+      || !grenade?.alive || grenade.fuse<=0 || Distance(actor.position,grenade.position)>=radius
+      || this.ai.GrenadeShielded(actor,grenade)){
+      actor.missionGrenadeEvade=false;actor.missionGrenadeGoal=null;return false;
+    }
+    this.squadMarch?.Release(actor);
+    actor.missionContactPost=null;
+    let goal=actor.missionGrenadeGoal;
+    if(!goal || Distance(actor.position,goal)<R.contactRadiusM || this.time>=(actor.missionGrenadeReplanAt||0)){
+      if(this.time<(actor.missionGrenadeReplanAt||0))return !!actor.missionGrenadeEvade;
+      actor.missionGrenadeReplanAt=this.time+R.companionGrenadeReplanS;
+      goal=null;
+      const at=actor.position,away=Math.atan2(at.z-grenade.position.z,at.x-grenade.position.x);
+      const ceiling=this.battlefield.GroundHeight(at.x,at.z)+R.companionCoverMaxRiseM;
+      const threats=(this.ai.ctx.combat?.projectiles||[grenade]).filter(p=>p.alive&&p.fuse>0
+        &&p.owner!==actor.side&&!(p.owner==="player"&&actor.side==="nra")
+        &&Distance(at,p.position)<this.ai.GrenadeDangerRadius(p)+radius+R.companionGrenadeMarginM);
+      const Safety=point=>Math.min(...threats.map(p=>Distance(point,p.position)-this.ai.GrenadeDangerRadius(p)));
+      let best=Safety(at);
+      for(const scale of R.companionGrenadeFractions)for(let i=0;i<R.companionGrenadeDirections;i++){
+        const angle=away+i*Math.PI*2/R.companionGrenadeDirections;
+        const reach=(radius+R.companionGrenadeMarginM)*scale;
+        const point={x:at.x+Math.cos(angle)*reach,z:at.z+Math.sin(angle)*reach};
+        const distance=Safety(point);
+        if(distance<=best)continue;
+        // A far endpoint across the explosive is not an escape route. A tight
+        // corridor may require a shorter step away before turning the corner.
+        if(threats.some(p=>Distance(at,p.position)<this.ai.GrenadeDangerRadius(p)
+          &&(point.x-at.x)*(at.x-p.position.x)+(point.z-at.z)*(at.z-p.position.z)<-1e-6))continue;
+        let clear=true;
+        for(let step=1;step<=R.companionGrenadeDirections;step++){
+          const t=step/R.companionGrenadeDirections;
+          if(this.battlefield.GroundHeight(at.x+(point.x-at.x)*t,at.z+(point.z-at.z)*t)>ceiling){clear=false;break;}
+        }
+        if(!clear || this.BlocksSight(this.Point(at,.5),this.Point(point,.5)))continue;
+        goal=point;best=distance;
+      }
+      actor.missionGrenadeGoal=goal;
+    }
+    if(!goal){
+      // Keep emergency ownership while blocked; the marching order must not
+      // pull the actor back across a live grenade during the next replan delay.
+      actor.missionGrenadeEvade=true;
+      this.MoveActor(actor,actor.position,0);
+      this.ai.SetStance(actor,2,R.companionGrenadeReplanS,true);
+      return true;
+    }
+    actor.missionGrenadeEvade=true;
+    this.MoveActor(actor,goal,R.companionGrenadeSpeedMps);
+    this.ai.SetStance(actor,0,R.companionGrenadeReplanS,true);
+    return true;
+  }
   RespondToContact(actor) {
     if(!actor?.alive || actor.unarmed || actor.scriptedNoncombatant || actor.carryRole || actor.meleeCombat)return false;
+    actor.scriptEscapeStance=null;
+    const hit=Number.isFinite(actor.missionLastHealth)&&actor.health<actor.missionLastHealth;
+    actor.missionLastHealth=actor.health;
+    const incoming=actor.incomingFire;
+    const newIncoming=incoming && incoming.at>(actor.missionIncomingAt??-Infinity);
+    if(incoming)actor.missionIncomingAt=incoming.at;
+    const wounded=actor.health<=R.companionWoundedHealth;
+    const exposedWounded=wounded && (actor.targetVisible || this.ai.time-(incoming?.at??-Infinity)<R.companionDangerHoldS);
+    if(hit || newIncoming || exposedWounded || actor.suppression>=R.companionDangerSuppression)
+      actor.missionDangerUntil=this.time+R.companionDangerHoldS;
+    const danger=this.time<(actor.missionDangerUntil||0);
+    if(danger){
+      if(hit || wounded || actor.suppression>=R.companionHideSuppression)
+        actor.scriptShelterUntil=this.ai.time+actor.missionDangerUntil-this.time;
+      // Never let a march timer pull a man out of shelter while bullets are
+      // still passing him. Without a reachable shelter, keep escaping low.
+      actor.missionContactPost??={x:actor.position.x,z:actor.position.z};
+      this.Defend(actor,actor.missionContactPost,R.contactRadiusM,R.companionCoverSlackM);
+      actor.scriptCoverMaxRiseM=R.companionCoverMaxRiseM;
+      this.ai.UpdateCover(actor);
+      if(hit || wounded || actor.suppression>=R.companionProneSuppression
+        || (!actor.cover && !this.squadRoutes?.get(actor.id)?.length))
+        actor.scriptProneUntil=this.ai.time+R.companionDangerHoldS;
+      if(wounded || !actor.cover || actor.coverPhase==="approach" || this.ai.time<(actor.scriptShelterUntil||0))
+        this.ai.SetStance(actor,this.ai.time<(actor.scriptProneUntil||0)?2:1,R.companionDangerHoldS,true);
+      if(actor.cover){
+        actor.missionContactUntil=actor.missionDangerUntil;
+        actor.missionContactAt=this.time;
+        this.squadMarch?.Release(actor);
+        return true;
+      }
+      actor.missionContactPost=null;
+      if(this.squadRoutes?.get(actor.id)?.length){
+        // A prone man is still exposed when the incoming ray clears the ground.
+        // Cross that opening at full pace; only slow down where the terrain
+        // actually shields a lower posture.
+        const threat=this.ai.ThreatPoint(actor);
+        let stance=0;
+        if(threat){
+          const from=new THREE.Vector3(threat.x,threat.y+AiDirector.StanceEye(threat.stance,actor),threat.z);
+          for(const lower of [1,2])if(this.BlocksSight(from,actor.position.clone().add(new THREE.Vector3(0,AiDirector.StanceEye(lower,actor),0)))){stance=lower;break;}
+        }
+        actor.scriptEscapeStance=stance;
+        actor.scriptProneUntil=stance===2?this.ai.time+R.companionDangerHoldS:0;
+        this.ai.SetStance(actor,stance,R.companionDangerHoldS,true);
+      }
+      return false;
+    }
     // A moving escort answers the threat in short bounds. Continuous visibility
     // must not pin the leader forever to the first enemy beside the route.
     if(actor.missionContactPost && (this.time>=actor.missionContactUntil || this.time-actor.missionContactAt>=R.contactMaxHoldS)){
@@ -353,6 +457,7 @@ export class FirstLevelMissionRuntime {
     actor.order = "hold";
     actor.holdZone = { id: "MissionDefense", ...point, radius };
     actor.scriptCoverSlackM = coverSlackM;
+    if(actor.castId)actor.scriptCoverMaxRiseM=R.companionCoverMaxRiseM;
     actor.goal.set(point.x, 0, point.z);
   }
   Guide(route, { fromStart = false, resumeAfter = null } = {}) {
@@ -425,12 +530,17 @@ export class FirstLevelMissionRuntime {
         continue;
       }
       actor.scriptedNoncombatant = stage === "South";
+      actor.scriptEscapeStance=null;
+      if(this.RespondToGrenade(actor))continue;
       if(R.openingContactStages.includes(stage)&&this.RespondToContact(actor))continue;
       if(!R.openingContactStages.includes(stage))actor.missionContactPost=null;
       const route = this.squadRoutes.get(actor.id);
-      while (route?.length && Distance(actor.position, route[0]) < 1.1) route.shift();
+      // Intermediate bends allow a smooth pass. The final defensive post must
+      // use the mover's actual arrival radius or men stop in the walking lane.
+      while (route?.length && Distance(actor.position, route[0]) <=
+        (route.length===1 && Number.isFinite(actor.scriptArrivalRadius)?actor.scriptArrivalRadius:1.1)) route.shift();
       if (route?.length) {
-        if (stage === "South" || actor.suppression < 0.4) this.ai.SetStance(actor, 0, 0.5, true);
+        if (stage === "South" || (actor.suppression < 0.4 && this.time>=(actor.missionDangerUntil||0))) this.ai.SetStance(actor, 0, 0.5, true);
         const previous = this.squad[this.squad.indexOf(actor) - 1];
         const ahead =
           previous &&
@@ -456,21 +566,21 @@ export class FirstLevelMissionRuntime {
         }
         this.MoveActor(actor,route[0],speed);
       } else if (["TrenchEntry","Shelter"].includes(stage)) {
-        this.Defend(actor,actor.position,R.contactRadiusM,R.contactCoverSlackM);this.ai.SetStance(actor,1,.5,true);
+        this.Defend(actor,actor.holdZone||actor.position,R.contactRadiusM,R.companionCoverSlackM);
+        if(!actor.cover && this.time>=(actor.missionDangerUntil||0))this.ai.SetStance(actor,1,.5);
       } else if (["Support","MachineGun"].includes(stage)) {
-        // Stay inside the reached communication-trench post. A new generic
-        // cover search here used to pull the squad onto the exposed parapet.
-        const post=this.Has("gunOccupied")?OPENING.frontPosts[this.squad.indexOf(actor)]:actor.position;
-        this.Defend(actor,post,0,0);this.ai.SetStance(actor,1,.5,true);
+        // Keep the authored anchor; the cover corridor check prevents climbing
+        // the parapet while allowing a reachable shelter along the trench.
+        const post=this.Has("gunOccupied")?OPENING.frontPosts[this.squad.indexOf(actor)]:(actor.holdZone||actor.position);
+        this.Defend(actor,post,R.contactRadiusM,R.companionCoverSlackM);
       } else if (stage === "Tank") {
-        // The throwing-pocket route has already provided cover. Searching for
-        // another point can drag an arrived actor across the blast traverse.
-        this.Defend(actor,actor.position,0,0);this.ai.SetStance(actor,1,.5,true);
+        // Nearby shelter remains on this side of the blast traverse.
+        this.Defend(actor,actor.holdZone||actor.position,R.contactRadiusM,R.companionCoverSlackM);
       } else if (!["Rescue", "Death"].includes(stage)) {
-        if(!this.WaitWatch(actor,stage))this.Defend(actor, actor.position);
+        if(!this.WaitWatch(actor,stage))this.Defend(actor, actor.holdZone||actor.position);
         if(["Support","MachineGun","Tank"].includes(stage))this.ai.SetStance(actor,1,2);
       }
-      if (actor.suppression > 0.65 && stage !== "Train") this.ai.SetStance(actor, 1, 1, true);
+      if (!Number.isFinite(actor.scriptEscapeStance) && actor.suppression > R.companionProneSuppression && stage !== "Train") this.ai.SetStance(actor, 2, R.companionDangerHoldS, true);
     }
     this.squadMarch?.Update(this.delta,{
       player:this.player.position,
@@ -478,6 +588,7 @@ export class FirstLevelMissionRuntime {
         route:this.squadRoutes.get(actor.id)||[],
         active:!!actor.missionTrainReady&&!!this.squadRoutes.get(actor.id)?.length
           &&!actor.missionContactPost
+          &&!actor.missionGrenadeEvade
           &&!(actor===this.bedGuide?.actor&&["FinalCarry","Death"].includes(stage)),
         maxSpeed:marchSpeeds.get(actor.id)??0,
       }),
@@ -914,7 +1025,7 @@ export class FirstLevelMissionRuntime {
         this.tank.active = true;
         this.SpawnEncounter("tank");
         this.SpawnGuards();
-        for (const [i, actor] of this.squad.entries()) this.Defend(actor, OPENING.frontPosts[i],0,0);
+        for (const [i, actor] of this.squad.entries()) this.Defend(actor, OPENING.frontPosts[i],R.contactRadiusM,R.companionCoverSlackM);
         break;
       case "Tank":
         // The blast screen separates the front posts from the far end of the

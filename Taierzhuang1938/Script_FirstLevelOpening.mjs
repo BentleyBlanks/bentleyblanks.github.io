@@ -119,7 +119,7 @@ export class FirstLevelOpening {
     if(!this.zhou)return; // A temporarily unavailable physical spawn retries next frame.
     this.zhou.missionId=r.column.zhou.id;this.zhou.castId="zhou";
     r.PlaceActor(this.zhou,C.zhouGunSeat);
-    r.Defend(this.zhou,C.zhouGunSeat,0,0);r.ai.SetStance(this.zhou,0,Infinity,true);
+    r.Defend(this.zhou,C.zhouGunSeat,0,R.companionCoverSlackM);r.ai.SetStance(this.zhou,1,.5,true);
     r.emplacement.NpcOccupy(r.gunId,this.zhou);
   }
   SpawnMessenger(id,route,weapon){
@@ -256,6 +256,13 @@ export class FirstLevelOpening {
       r.Record("zhouGunKilled",{actorId:a.id});r.OnPlayerDown();r.MissionFailure?.("zhou");return;
     }
     if(a.lastFire>0)r.Record("zhouCoverFired");
+    // The gunner owns a separate opening script, outside UpdateSquad. Give
+    // him the same real cover/escape response while the gun is still his;
+    // actual injury continues into the existing wounded handover below.
+    if(a.health>=C.zhouWoundThreshold){
+      const shelter=r.RespondToGrenade(a)||r.RespondToContact(a);
+      if(!shelter)r.Defend(a,C.zhouGunSeat,0,R.companionCoverSlackM);
+    }
     if(a.health>=C.zhouWoundThreshold&&(!r.Has("frontRifleDefense")||!r.Has("rifleWithdrawalResolved")))return;
     if(!this.zhouShellSent&&a.health>=C.zhouWoundThreshold){
       this.zhouShellSent=true;

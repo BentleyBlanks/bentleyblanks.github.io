@@ -14,6 +14,7 @@ import * as THREE from "three";
 import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { COMBAT, NAME_POOL, DIFFICULTY } from "./Data_Battle.mjs";
+import { BLAST } from "./Data_Tuning_Combat.mjs";
 import { TRAVERSAL, TraversalPlan, TraversalCurve, TraversalLanding } from "./Data_Traversal.mjs";
 import { ActorCrowd } from "./Script_ActorCrowd.mjs";
 import {
@@ -1236,13 +1237,29 @@ export class AiDirector {
    * 真有弹的时候才付 O(弹 × 人) 的账。标记只写一个时刻戳，
    * 由 `UpdateCover` 当成「紧急重选」的触发条件（不吃 reselectMinS 限流）。
    */
+  GrenadeDangerRadius(grenade) {
+    return Number.isFinite(grenade?.weapon?.radiusM) ? grenade.weapon.radiusM*BLAST.radiusScale : BRAIN.grenadeDodgeM;
+  }
+  GrenadeShielded(s,grenade,point=s.position) {
+    const field=this.ctx.battlefield;
+    const from=this._grenadeFrom||(this._grenadeFrom=new THREE.Vector3());
+    const direction=this._grenadeDirection||(this._grenadeDirection=new THREE.Vector3());
+    from.copy(grenade.position);from.y+=BLAST.originRiseM;
+    const y=Number.isFinite(point.y)?point.y:field.GroundHeight(point.x,point.z);
+    direction.set(point.x,y+BLAST.soldierHitRiseM,point.z).sub(from);
+    const distance=direction.length();
+    if(distance<=BLAST.wallMarginM)return false;
+    const hit=field.Raycast(from,direction.multiplyScalar(1/distance),distance,{terrain:true});
+    return !!hit&&hit.t<distance-BLAST.wallMarginM;
+  }
   UpdateGrenadeThreats() {
+    for(const s of this.soldiers)s.grenadeThreat=null;
     const list = this.ctx.combat && this.ctx.combat.projectiles;
     if (!list || !list.length) return;
-    const r2 = BRAIN.grenadeDodgeM * BRAIN.grenadeDodgeM;
     for (let i = 0; i < list.length; i += 1) {
       const p = list[i];
       if (!p.alive || p.fuse <= 0) continue;
+      const radius=this.GrenadeDangerRadius(p),r2=radius*radius;
       for (let j = 0; j < this.soldiers.length; j += 1) {
         const s = this.soldiers[j];
         if (!s.alive) continue;
@@ -1251,9 +1268,11 @@ export class AiDirector {
         const at = s.cover ? s.cover.hidePos : s.position;
         const dx = p.position.x - at.x;
         const dz = p.position.z - at.z;
-        if (dx * dx + dz * dz > r2) continue;
+        if (Math.min(dx*dx+dz*dz,(p.position.x-s.position.x)**2+(p.position.z-s.position.z)**2)>r2) continue;
+        if(Number.isFinite(s.scriptCoverMaxRiseM)&&this.GrenadeShielded(s,p))continue;
         if (this.time - s.grenadeThreatAt > 1) this.Bark(s, "grenade");
         s.grenadeThreatAt = this.time;
+        if(!s.grenadeThreat || p.fuse<s.grenadeThreat.fuse)s.grenadeThreat=p;
       }
     }
   }
@@ -1989,6 +2008,12 @@ export class AiDirector {
    */
   ThreatPoint(s) {
     const t = this._coverThreat;
+    if(Number.isFinite(s.scriptCoverMaxRiseM) && s.incomingFire
+      && this.time-s.incomingFire.at<COVER_CYCLE.incomingMemoryS){
+      const from=s.incomingFire;
+      t.x=from.x;t.y=from.y;t.z=from.z;t.stance=2;t.id=null;
+      return t;
+    }
     if (s.target && s.targetVisible) {
       t.x = s.target.position.x; t.y = s.target.position.y; t.z = s.target.position.z;
       t.stance = s.target.stance | 0;
@@ -2224,13 +2249,35 @@ export class AiDirector {
 
   /** 这个候选掩体的隐蔽位与射击位是不是都还在守区允许的范围里。 */
   CoverAllowed(s, cand) {
+    const grenade=s.grenadeThreat;
+    if(grenade?.alive && grenade.fuse>0 && Number.isFinite(s.scriptCoverMaxRiseM)
+      && Math.hypot(cand.hidePos.x-grenade.position.x,cand.hidePos.z-grenade.position.z)<this.GrenadeDangerRadius(grenade)
+      && !this.GrenadeShielded(s,grenade,cand.hidePos))return false;
     const reach = this.CoverReachM(s);
     if (!Number.isFinite(reach)) return true;
     const anchor = s.holdZone || s.position;
     const hx = cand.hidePos.x - anchor.x, hz = cand.hidePos.z - anchor.z;
     if (hx * hx + hz * hz > reach * reach) return false;
     const fx = cand.firePos.x - anchor.x, fz = cand.firePos.z - anchor.z;
-    return fx * fx + fz * fz <= reach * reach;
+    if (fx * fx + fz * fz > reach * reach) return false;
+    // Opt-in escorts must reach shelter along their current floor, never vault
+    // out of a trench or cross a blast traverse to a superficially nearby point.
+    if (Number.isFinite(s.scriptCoverMaxRiseM)) {
+      const host=this.covers.host, from=s.position;
+      const ceiling=host.GroundHeight(anchor.x,anchor.z)+s.scriptCoverMaxRiseM;
+      for(const to of [cand.hidePos,cand.firePos]){
+        // The navigation grid rounds a narrow trench edge into the adjacent
+        // wall cell. Use its physical corridor below for these short moves.
+        for(let i=1;i<=COVER.pathSamples+1;i++){
+          const t=i/(COVER.pathSamples+1);
+          if(host.GroundHeight(from.x+(to.x-from.x)*t,from.z+(to.z-from.z)*t)>ceiling)return false;
+        }
+        const dx=to.x-from.x,dz=to.z-from.z,d=Math.hypot(dx,dz);
+        if(d>0 && host.Raycast?.({x:from.x,y:from.y+AiDirector.StanceEye(2,s),z:from.z},
+          {x:dx/d,y:0,z:dz/d},d))return false;
+      }
+    }
+    return true;
   }
 
   /** 掩体打分要避开的友军（间距惩罚）。返回复用数组。 */
@@ -2326,6 +2373,7 @@ export class AiDirector {
     opts.radiusM = radiusM;
     opts.soldierId = s.id;
     opts.suppression = s.suppression;
+    opts.allowRetreat = Number.isFinite(s.scriptCoverMaxRiseM);
     opts.allies = this.CoverAllies(s);
     if (bounding && (task.towardX || task.towardZ)) {
       // Tactics 只给方向（跃进往哪儿压），`Query` 要的是一个点：往前推一个 towardCapM。
@@ -2412,6 +2460,7 @@ export class AiDirector {
    * @param {string} force "hide" 时强制缩头（换弹、压制爆表）
    */
   UpdateCoverCycle(s, force) {
+    if(this.time<(s.scriptShelterUntil||0))force="hide";
     s.moveOrder = null;
     s.moveArriveM = NaN;
     const c = s.cover;
@@ -2738,6 +2787,9 @@ export class AiDirector {
       if (!s.scriptDefensive) desired = this.tmpD.copy(s.goal);
     }
     if (s.p012ScoutDirected || s.p012RouteRejoining) { desired = this.tmpD.copy(s.goal); speed = 2.6; }
+    if(s.missionGrenadeEvade){wantsFire=false;this.SetStance(s,s.scriptMoveSpeedMps>0?0:2,COVER_CYCLE.grenadeStanceHoldS,true);}
+    else if(Number.isFinite(s.scriptEscapeStance))this.SetStance(s,s.scriptEscapeStance,COVER_CYCLE.grenadeStanceHoldS,true);
+    else if(this.time<(s.scriptProneUntil||0))this.SetStance(s,2,s.scriptProneUntil-this.time,true);
     if (Number.isFinite(s.scriptMoveSpeedMps)) speed = s.p012Guided && desired
       ? Math.max(0, s.scriptMoveSpeedMps) : Math.min(speed, Math.max(0, s.scriptMoveSpeedMps));
     if (desired && speed > 0) {
@@ -3371,7 +3423,7 @@ export class AiDirector {
       // 彻底安静的才是 IDLE。级别在 Think 里判完写进 `s.watchAlerted` —— 这一段
       // 每帧都跑，而且被 `Script_FirstLevelP012ActorTest` 抽进没有表也没有
       // ALERT_ORDER 的纯 JS 沙箱重放，所以这儿只许读那个布尔。
-      s.state = s.watchAlerted ? STATE.WATCH : STATE.IDLE;
+      s.state = s.watchAlerted || (s.cover && this.time<(s.scriptShelterUntil||0)) ? STATE.WATCH : STATE.IDLE;
     } else if (s.task && s.task.kind === TASK.GRENADE && this.time < s.task.until
       && this.CanThrowGrenade(s)) {
       // 投弹是**原地能做的事**，所以剧本守点单位也许可（Script_AiTactics 的
@@ -3585,6 +3637,7 @@ export class AiDirector {
 
   TryFire(s, dt, player) {
     if (s.unarmed) return;
+    if(s.missionGrenadeEvade || this.time<(s.scriptShelterUntil||0))return;
     s.fireTimer -= dt;
     // 潜行的班不许开枪 —— 这是那道命令的全部代价，也是它区别于"跟我来"的地方
     if (s.order === "covert" && this.time < s.covertUntil) return;
@@ -3816,6 +3869,7 @@ export class AiDirector {
         // AI 打 AI 仍按概率抽部位：那边的胶囊是给玩家的子弹用的，这条链一帧几十发不做几何。
         const part = s.rnd() < 0.08 ? "head" : s.rnd() < 0.6 ? "torso" : (s.rnd() < 0.5 ? "arm" : "leg");
         // shapeId 留空：这条链不做几何（一帧几十发），断肢规则层按部位与权重自己挑段。
+        this.RememberIncomingFire(s.target.ref,fromV);
         const died = s.target.ref.TakeHit(s.weapon.damage, part, dir,
           { kind: s.weapon.rpm ? "hmg" : "bullet", weaponId: s.weaponId, point: aimV.clone() });
         if (vfx) vfx.Blood(aimV, dir, died ? 1 : 0.5);
@@ -3839,6 +3893,7 @@ export class AiDirector {
         this.ctx.audioWiring?.AiNearMissAtPlayer(s, from, dir, aimV, miss, gunCue);
       } else if (s.target.ref) {
         s.target.ref.suppression = Clamp01(s.target.ref.suppression + COMBAT.suppressPerNearMiss);
+        this.RememberIncomingFire(s.target.ref,fromV);
       }
       if (vfx) {
         // 弹着点由 Resolve 给：散布是按**瞄准误差 × 距离**算的高斯，
@@ -3861,6 +3916,11 @@ export class AiDirector {
         }
       }
     }
+  }
+
+  RememberIncomingFire(s,from) {
+    const memory=s.incomingFire||(s.incomingFire={x:0,y:0,z:0,at:0});
+    memory.x=from.x;memory.y=from.y-AiDirector.StanceEye(2,s);memory.z=from.z;memory.at=this.time;
   }
 
   /**

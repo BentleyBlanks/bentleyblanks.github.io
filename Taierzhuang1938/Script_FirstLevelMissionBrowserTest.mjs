@@ -279,16 +279,22 @@ async function Interact() {
     return query;
   });
 }
-async function WaitStage(expected, seconds = 240, { fight = false } = {}) {
+async function WaitStage(expected, seconds = 240, { fight = false, cover = false } = {}) {
   // Read only the step id in the per-frame loop. Full State clones the entire
   // casualty/transport ledger; keep that diagnostic snapshot at chunk boundaries.
   let state;
   for (let chunk = 0; chunk < Math.ceil(seconds / 5); chunk++) {
     state = await page.evaluate(
-      ({ expected, fight }) => {
+      ({ expected, fight, cover }) => {
         const g = window.Tengxian;
         for (let i = 0; i < 300 && g.player.alive && g.Debug.FirstLevelMissionRuntime().flow.stage.id !== expected; i++) {
           const evading=window.MissionInputDriver.EvadeGrenade();
+          // At a waist-high defensive wall, use normal crouch/peek inputs.
+          // Grenade evasion can leave the player standing outside its protection.
+          if(cover&&!evading){
+            const hide=g.state.ammo===0 || g.ai.time%5<3;
+            if((g.player.stance==="crouch")!==hide)g.Debug.Key("KeyC");
+          }
           const foe = fight&&!evading ? window.MissionInputDriver.Target() : null;
           if (foe) window.MissionInputDriver.Shoot(foe);
           else if(!evading) {
@@ -306,7 +312,7 @@ async function WaitStage(expected, seconds = 240, { fight = false } = {}) {
         g.Debug.Mouse(2, false);
         return { mission: g.Debug.FirstLevelMission(), health: g.player.health, alive: g.player.alive };
       },
-      { expected, fight },
+      { expected, fight, cover },
     );
     if(state.mission.stage==="Transfer" && state.mission.column.loaded>0 && !capturedActivities.has("TransferLoading")) {
       capturedActivities.add("TransferLoading");
@@ -429,12 +435,18 @@ try {
   if(!process.argv.includes("--campaign"))await PlayFirstLevelOpening(page,{out:output,audioClock:audioCheck,mount:false});
   }
   campaignRun: if (process.argv.includes("--campaign")) {
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
+      const {BLAST}=await import("./Data_Tuning_Combat.mjs");
       const g = window.Tengxian;
       window.MissionInputDriver = {
         blocked: new Map(),
         EvadeGrenade() {
-          const p=g.player,threat=g.combat.GrenadeThreats(p.position)[0];
+          const p=g.player,threat=g.combat.GrenadeThreats(p.position).find(t=>{
+            const from=t.position.clone();from.y+=BLAST.originRiseM;
+            const ray=p.position.clone();ray.y+=BLAST.playerHitRiseM;ray.sub(from);
+            const d=ray.length(),hit=d>BLAST.wallMarginM?g.battlefield.Raycast(from,ray.normalize(),d,{terrain:true}):null;
+            return !hit||hit.t>=d-BLAST.wallMarginM;
+          });
           if(!threat){
             if(this.evading){g.Debug.Key("KeyW",false);g.Debug.Key("ShiftLeft",false);this.evading=false;}
             return false;
@@ -589,6 +601,13 @@ try {
         for (let i = 0; i < 600; i++) {
           const p = g.player.position,
             gun = g.emplacement.Emplacement("MissionGun");
+          if(g.combat.GrenadeThreats(p).length && g.emplacement.Mounted){
+            g.Debug.Mouse(0,false);g.Debug.Key("KeyF",true);g.Debug.Key("KeyF",false);
+          }
+          if(!g.emplacement.Mounted){
+            if(window.MissionInputDriver.EvadeGrenade()){g.StepFrames(1,1/60,false);continue;}
+            break;
+          }
           const target = g.ai.soldiers
             .filter(
               (a) =>
@@ -602,7 +621,7 @@ try {
             .find((a) => {
               const from = g.player.EyePosition.clone(),
                 to = a.position.clone();
-              to.y += a.stance === 2 ? 0.3 : a.stance === 1 ? 0.85 : 1.2;
+              to.y += a.stance === 2 ? 0.45 : a.stance === 1 ? 1 : 1.55;
               const d = to.sub(from),
                 len = d.length();
               const hit = g.battlefield.Raycast(from, d.normalize(), len, {terrain:true});
@@ -615,7 +634,7 @@ try {
             g.player.yaw = Math.atan2(-dx, -dz);
             g.player.pitch = Math.atan2(
               target.position.y +
-                (target.stance === 2 ? 0.3 : target.stance === 1 ? 0.85 : 1.2) -
+                (target.stance === 2 ? 0.45 : target.stance === 1 ? 1 : 1.55) -
                 eye.y,
               Math.hypot(dx, dz),
             );
@@ -638,6 +657,7 @@ try {
           stage: g.Debug.FirstLevelMissionRuntime().flow.stage.id,
           health: g.player.health,
           alive: g.player.alive,
+          damage:window.missionDamage?.slice(-12),
           gun: g.emplacement.View(),
           gunStats: { ...g.emplacement.stats },
           shots:b.gunShots,
@@ -656,6 +676,11 @@ try {
         }),
       );
       if (!defense.alive || defense.stage !== "MachineGun") break;
+      if(!defense.gun){
+        await Route([{x:0,z:-124},{x:0,z:-127.4}],"GrenadeReturnToMachineGun",{stance:"crouch"});
+        if(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().stage)==="MachineGun")await Interact();
+        continue;
+      }
       if(defense.gun.rounds===0 && defense.gun.belts===0) {
         await page.evaluate(()=>{const g=window.Tengxian;g.Debug.Key("KeyF",true);g.StepFrames(1,1/60,false);g.Debug.Key("KeyF",false);});
         await Route([{x:0,z:-124},{x:-2.2,z:-122.5}],"MachineGunResupply",{stance:"crouch"});
@@ -968,7 +993,7 @@ try {
     await Route([{ x: 95, z: 110 }], "TransferSupply", { fight: true });
     await Interact();
     await Route([{ x: 95, z: 103 }], "TransferPosition", { fight: true });
-    await WaitStage("AirFirst", 300, { fight: true });
+    await WaitStage("AirFirst", 300, { fight: true, cover: true });
     const transferPacing=await page.evaluate(()=>{const m=window.Tengxian.Debug.FirstLevelMission();return {beats:m.transferBeats,events:m.log.filter(e=>/AttackStarted|AttackCleared|vehiclesDeparted|zhouNext/.test(e.id)),entered:m.log.find(e=>e.kind==="stage" && e.id==="Transfer")?.time,ended:m.time};});
     assert.deepEqual(transferPacing.beats.started,MISSION_TRANSFER_BEATS.map(beat=>beat.id));
     assert.deepEqual(transferPacing.beats.cleared,MISSION_TRANSFER_BEATS.map(beat=>beat.id),"all finite attacks actually resolve before the air raid");

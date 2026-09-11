@@ -28,6 +28,15 @@ import { MISSION_DIALOGUE, MissionVoicePrompt } from "./Data_FirstLevelMissionDi
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
 assert.ok(P.stationCasualties.every(person=>person.health>0),"station shelling does not manufacture dead recruits at muster");
 {
+  const wall=MISSION_LAYOUT.blocks.find(block=>block.id==="TrenchRallyEast");
+  assert.equal(wall.cover.faceZ,0,"rally cover normal is perpendicular to its long wall");
+  assert.ok(wall.cover.points.length>=OPENING.trenchCoverPosts.length,"the squad has distinct shelter slots along the existing wall");
+  for(const point of wall.cover.points){
+    assert.equal(point.x,wall.x);
+    assert.ok(Math.abs(point.z-wall.z)<wall.d/2,"every cover slot lies on actual wall geometry");
+  }
+}
+{
   for(const curve of [OPENING.blinks,OPENING.hearing]){
     const onset=curve.find(([,value])=>value===1)[0];
     assert.equal(OpeningRecoveryTime(onset,onset),onset,"impact onset remains synchronized with the physical wreck");

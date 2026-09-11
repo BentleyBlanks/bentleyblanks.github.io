@@ -196,7 +196,9 @@ GroundedWall("TrenchMouthBank",-58.5,65,.9,1.5,7);
 GroundedWall("FlankLockBank",-37,56,.65,1.1,5);
 GroundedWall("RailLockBank",-90.5,48,.65,1.1,5);
 // Rally behind the eastern earth traverse while the player clears the breach.
-GroundedWall("TrenchRallyEast",-42.3,33,.65,2,15);
+const trenchRallyWall=GroundedWall("TrenchRallyEast",-42.3,33,.65,2,15);
+trenchRallyWall.cover={faceX:1,faceZ:0,
+  points:[27,29,31,33,35,37,39].map(z=>({x:trenchRallyWall.x,z}))};
 // Roofed dressing recess and two solid traverses shelter the private exchange.
 Block("OpeningShelterRoof",-32,-20,7,.25,11,"timber",{y:1.05});
 GroundedWall("OpeningShelterSouth",-32,-15.5,7,2.4,.8);

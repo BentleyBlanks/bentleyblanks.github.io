@@ -705,7 +705,7 @@ export class CoverRegistry {
    * @param {Array}  threats `[{x,y,z,stance,id}]`（一般 1 个：当前目标或 LKP）
    *                 多于一个时**只按第一个**算姿势与验证，其余暂不参与打分（已知取舍）。
    * @param {object} [opts] `{ radiusM, maxCandidates, maxValidate, towardX, towardZ,
-   *                           minAllySpacingM, allies:[{x,z}], soldierId, suppression, useSteer }`
+   *                           minAllySpacingM, allies:[{x,z}], soldierId, suppression, useSteer, allowRetreat }`
    * @return {Array<{cover, score, base, distance, validated, blockedStanding, blockedCrouched,
    *                 side, hidePos:{x,z}, firePos:{x,z}, fireStance, hideStance}>} 按 score 降序
    */
@@ -732,7 +732,7 @@ export class CoverRegistry {
     let k = 0;
     for (let i = 0; i < nearCount; i += 1) {
       const c = list[i];
-      if (hasThreat && !this._Between(c, sx, sz, tx, tz)) continue;
+      if (hasThreat && !opts?.allowRetreat && !this._Between(c, sx, sz, tx, tz)) continue;
       const base = this._Cheap(c, sx, sz, tx, tz, hasThreat);
       let pos;
       if (k < maxCand) { pos = k; k += 1; }

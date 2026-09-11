@@ -207,7 +207,8 @@ export class FirstLevelWhiteboxField {
           block.d * 0.5, block.tag, block.ry || 0);
       }
       if (block.cover) {
-        targetSink.Cover(block.x, block.z, block.h, block.cover.faceX, block.cover.faceZ);
+        for(const point of block.cover.points||[block])
+          targetSink.Cover(point.x, point.z, block.h, block.cover.faceX, block.cover.faceZ);
       }
       this.stats.whiteBoxes += 1;
       this.stats.structures += 1;

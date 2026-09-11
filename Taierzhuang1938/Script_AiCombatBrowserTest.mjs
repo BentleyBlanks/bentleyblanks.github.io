@@ -174,9 +174,11 @@ try {
       // reduced roster has no 110-man rear reserve generating constant noise.
       T.Debug.Key("KeyF",true);Step(2);T.Debug.Key("KeyF",false);
       T.Debug.Mouse(0,true);
+      const hearingShotsBefore=T.emplacement.stats.shots;
       // Measure movement throughout the window. A soldier who peeks out and
       // returns to cover has moved; comparing only the endpoints erases it.
       for (let frame = 0; frame < 4 * 60; frame++) {
+        if(T.emplacement.View()?.rounds===0)T.Debug.Key("KeyR");
         Step(1);
         for (const s of Ija()) {
           const before = seen.get(s.id);
@@ -184,7 +186,18 @@ try {
             Math.hypot(s.position.x - before.x, s.position.z - before.z));
         }
       }
+      // Movement keeps the fixed four-second window above. Hearing must be
+      // sampled after an audible shot, not after the magazine runs dry and
+      // awareness has legitimately decayed during its reload interval.
+      const lastWindowShot=T.emplacement.stats.shots;
+      for(let frame=0;frame<10*60&&T.emplacement.stats.shots===lastWindowShot;frame++){
+        if(T.emplacement.View()?.rounds===0)T.Debug.Key("KeyR");
+        Step(1);
+      }
+      Step(6); // every listener gets its ordinary staggered perception tick
       T.Debug.Mouse(0,false);
+      out.hearingStimulus={mounted:T.emplacement.Mounted,shots:T.emplacement.stats.shots-hearingShotsBefore,
+        freshShot:T.emplacement.stats.shots>lastWindowShot};
       const rows = Ija().map((s) => {
         const b = seen.get(s.id);
         // 朝向契约：yaw=0 面朝 −Z，前向量 =（−sin yaw, −cos yaw）。
@@ -534,7 +547,7 @@ try {
   }));
   console.log("A 正片前沿:", JSON.stringify(sample.front));
   console.log("Near rows:",JSON.stringify(sample.nearRows));
-  console.log("A2 按距离分档（§15）:", JSON.stringify(sample.bands), "换位次数", sample.displaces);
+  console.log("A2 按距离分档（§15）:", JSON.stringify({bands:sample.bands,stimulus:sample.hearingStimulus}), "换位次数", sample.displaces);
   console.log("A 没选上掩体的现场诊断:", JSON.stringify(sample.frontWhy));
   console.log("B 受控场地:", JSON.stringify(sample.site), "班", sample.squad, "最近友军", sample.nearestFriendly);
   console.log("B 定量齐射:", JSON.stringify({ open: sample.open, wall: sample.wall }));
@@ -570,6 +583,9 @@ try {
   // —— 实测同一份代码两趟读到 12:12 与 11:13，压「多数」等于压一枚硬币。
   const nb = sample.bands?.near || { n: 0 };
   const fb = sample.bands?.far || { n: 0 };
+  Check("听觉刺激成立：玩家通过 F 操作机枪，换弹后实弹枪声到达采样窗口",
+    sample.hearingStimulus?.mounted&&sample.hearingStimulus.shots>0&&sample.hearingStimulus.freshShot,
+    JSON.stringify(sample.hearingStimulus));
   Check("⑨ 跪射之后会换位（46–74 m）：四秒窗口里挪过窝的人过半，且仍有三分之一以上伏低",
     nb.n === 0 || (nb.still <= Math.floor(nb.n / 2) && nb.low >= Math.ceil(nb.n * 0.35)),
     `${nb.n} 人：四秒没挪窝 ${nb.still}、蹲/卧 ${nb.low}、站 ${nb.standing}、`

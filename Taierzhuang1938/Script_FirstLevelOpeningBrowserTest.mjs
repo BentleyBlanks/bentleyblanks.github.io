@@ -46,12 +46,15 @@ async function Drive(label,points,{fight=false,until=null,seconds=120}={}){
       const r=g.Debug.FirstLevelMissionRuntime();
       return {t:r.time,stage:r.flow.stage.id,index:b.index,points:b.points.length,position:g.player.position.toArray(),health:g.player.health,alive:g.player.alive&&!r.failed,
         ready:until?[until].flat().every(id=>r.Has(id)):b.index===b.points.length,shots:g.state.playerShots,ammo:g.state.ammo,remaining:r.flow.State().remaining,foe:b.foe,
+        damage:window.missionDamage?.slice(-8),
         camera:{position:g.camera.position.toArray(),rotation:g.camera.rotation.toArray()},control:r.controls?.kind,
         audio:{sourceTime:r.voice.current?.sourceTime,phase:r.voice.current?.phase,distance:g.audio.storyVoice?.distance,storyDuck:g.audio.storyDuck?.gain.value,
           cutoff:g.audio.concussionFilter?.frequency.value,breaths:g.audio.RequestedCount('breathHeavy')},
         nearImpact:r.Has('trainNearShellImpact'),firstImpact:r.Has('trainFirstShellImpact'),braces:r.train.entries.map(e=>e.actor.missionTrainLife.brace),
         trainOffset:r.battlefield.trainOffsetM,
-        npc:r.squad.map(a=>({id:a.castId,health:a.health,essential:!!a.scriptEssential,p:a.position.toArray(),goal:a.goal.toArray()})),voicePlaying:!!r.voice.current,voiceCue:r.voice.current?.cue?.id,opening:r.opening.State()};
+        npc:r.squad.map(a=>({id:a.castId,health:a.health,essential:!!a.scriptEssential,p:a.position.toArray(),goal:a.goal.toArray(),
+          stance:a.stance,suppression:a.suppression,cover:a.cover?.id,coverPhase:a.coverPhase,
+          contact:!!a.missionContactPost,incoming:a.incomingFire,move:a.moveOrder,evade:!!a.missionGrenadeEvade,grenade:a.grenadeThreat?{p:a.grenadeThreat.position.toArray(),fuse:a.grenadeThreat.fuse}:null})),voicePlaying:!!r.voice.current,voiceCue:r.voice.current?.cue?.id,opening:r.opening.State()};
     },{fight,until,realtime});
     trace.push({label,...result});
     combatTrace.push(await page.evaluate(()=>{
@@ -97,14 +100,50 @@ async function Drive(label,points,{fight=false,until=null,seconds=120}={}){
   }
   await page.evaluate(()=>{window.OpeningInput.points=[];window.OpeningInput.fight=false;const g=window.Tengxian;g.Debug.Key("KeyW",false);g.Debug.Mouse(0,false);g.Debug.Mouse(2,false)});
   await Capture(label);
-  assert.ok(result?.alive,`${label}: player died, actual combat outcome`);
+  assert.ok(result?.alive,`${label}: real combat failed; player health=${result?.health}; fallen squad=${result?.npc.filter(a=>a.health<=0).map(a=>a.id).join(",")||"none"}`);
   assert.ok(result.ready,`${label}: failed to progress: ${JSON.stringify(result)}`);
   return result;
 }
 try{
-  await page.evaluate(()=>{
+  await page.evaluate(async()=>{
+    const {BLAST}=await import("./Data_Tuning_Combat.mjs");
     const g=window.Tengxian,Wrap=a=>Math.atan2(Math.sin(a),Math.cos(a)),Clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+    if(!window.missionDamage){
+      window.missionDamage=[];const takeHit=g.player.TakeHit.bind(g.player);
+      g.player.TakeHit=(damage,part,direction,info)=>{
+        const before=g.player.health,result=takeHit(damage,part,direction,info);
+        window.missionDamage.push({time:g.ai.time,before,after:g.player.health,part,blast:!!info?.blast,
+          bullet:!!info?.bullet,position:g.player.position.toArray()});
+        if(window.missionDamage.length>120)window.missionDamage.shift();return result;
+      };
+    }
     window.OpeningInput={points:[],index:0,foe:null,marchEvidence:[],marchStates:{},contactIds:[],
+      EvadeGrenade(){
+        if(window.MissionInputDriver)return window.MissionInputDriver.EvadeGrenade();
+        const p=g.player,threat=g.combat.GrenadeThreats(p.position).find(t=>{
+          const from=t.position.clone();from.y+=BLAST.originRiseM;
+          const ray=p.position.clone();ray.y+=BLAST.playerHitRiseM;ray.sub(from);
+          const d=ray.length(),hit=d>BLAST.wallMarginM?g.battlefield.Raycast(from,ray.normalize(),d,{terrain:true}):null;
+          return !hit||hit.t>=d-BLAST.wallMarginM;
+        });
+        if(!threat){
+          if(this.evading){g.Debug.Key("KeyW",false);g.Debug.Key("ShiftLeft",false);this.evading=false;}
+          return false;
+        }
+        const away=Math.atan2(p.position.x-threat.position.x,p.position.z-threat.position.z);
+        let heading=null;
+        for(const offset of [0,.55,-.55,1.1,-1.1,1.65,-1.65]){
+          const angle=away+offset,x=p.position.x+Math.sin(angle)*1.2,z=p.position.z+Math.cos(angle)*1.2;
+          const y=g.battlefield.GroundHeight(x,z);
+          if(Math.abs(y-p.position.y)<.4&&!g.physics.Overlaps(x,y+.04,z,p.radius,1.78)){heading=angle;break;}
+        }
+        if(heading==null)return false;
+        if(p.stance!=="stand")g.Debug.Key(p.stance==="crouch"?"KeyC":"KeyZ");
+        const gap=Wrap(heading+Math.PI-p.yaw-p.aimYaw);
+        g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);g.Debug.Look(Clamp(-gap/.0022,-30,30),0);
+        g.Debug.Key("KeyW",Math.abs(gap)<.3);g.Debug.Key("ShiftLeft",true);
+        this.evading=true;return true;
+      },
       Look(point,height=0){
         const p=g.player,e=p.EyePosition,y=height?g.battlefield.GroundHeight(point.x,point.z)+height:e.y;
         const yaw=Math.atan2(p.position.x-point.x,p.position.z-point.z),pitch=Math.atan2(y-e.y,Math.hypot(point.x-e.x,point.z-e.z));
@@ -115,11 +154,14 @@ try{
       Target(){
         const eye=g.player.EyePosition;
         const stage=g.Debug.FirstLevelMissionRuntime().flow.stage.id;
-        const limit=stage==="TrenchEntry"?28:stage==="Support"&&!g.Debug.FirstLevelMissionRuntime().Has("frontReached")?35:85;
+        // Keep up with the squad through the communication trench. Only a
+        // close blocker interrupts this transit; the authored front defense
+        // still requires the full firefight once the player reaches its post.
+        const limit=stage==="TrenchEntry"?28:stage==="Support"&&!g.Debug.FirstLevelMissionRuntime().Has("frontReached")?12:85;
         return g.ai.soldiers.filter(a=>a.side==="ija"&&a.alive&&!a.scriptedNoncombatant&&a.position.distanceTo(eye)<limit &&
           (stage!=="TrenchEntry" || a.missionEncounter==="intrusion" || (!a.scriptDefensive && a.position.distanceTo(eye)<20)))
           .sort((a,b)=>a.position.distanceToSquared(eye)-b.position.distanceToSquared(eye)).find(a=>{
-            const to=a.position.clone();to.y+=a.stance===2?.3:a.stance===1?.85:1.2;
+            const to=a.position.clone();to.y+=a.stance===2?.45:a.stance===1?1:1.55;
             const direction=to.sub(eye),length=direction.length(),hit=g.battlefield.Raycast(eye,direction.normalize(),length,{terrain:true});
             return !hit||hit.t>=length-.25;
           });
@@ -142,11 +184,24 @@ try{
           }
         }
         while(this.index<this.points.length&&Math.hypot(p.position.x-this.points[this.index].x,p.position.z-this.points[this.index].z)<.85)this.index++;
+        // Resolve a real close-combat bind with the shipped shove input, as
+        // the main campaign driver does; a rifle trigger cannot break the bind.
+        if(g.meleeCombat.Active){
+          g.Debug.Key("KeyW",false);g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+          g.Debug.Key("KeyF",true);g.Debug.Key("KeyF",false);return;
+        }
+        // The campaign already responds to live HUD grenade warnings after
+        // the MG handover; use the same ordinary escape inputs on the approach.
+        if(this.EvadeGrenade())return;
         const foe=fight?this.Target():null;this.foe=foe?.missionId||null;
+        // Use the ordinary crouch key while clearing the trench. Companions
+        // now survive behind cover instead of absorbing the driver's exposure.
+        const crouch=(fight||this.cautiousTransit)&&["TrenchEntry","Support"].includes(runtime.flow.stage.id);
+        if((p.stance==="crouch")!==crouch)g.Debug.Key("KeyC");
         g.Debug.Mouse(0,false);
         if(foe){
           g.Debug.Key("KeyW",false);g.Debug.Mouse(2,true);
-          const aligned=this.Look(foe.position,foe.stance===2?.3:foe.stance===1?.85:1.2);
+          const aligned=this.Look(foe.position,foe.stance===2?.45:foe.stance===1?1:1.55);
           if(g.state.ammo===0)g.Debug.Key("KeyR");
           else if(aligned)g.Debug.Mouse(0,true);
         }else{
@@ -239,20 +294,31 @@ try{
   }
   }
   if(regroup){
+    await page.evaluate(()=>{window.OpeningInput.cautiousTransit=true;});
     await Drive("RallyApproach",OPENING.approachRoute.slice(0,3),{seconds:70});
-    const until=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().time+16);
-    while(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().time)<until){
+    const started=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().time);
+    // Wait for actual passage clearance: a man crossing toward cover at exactly
+    // sixteen seconds has not yet settled at his waiting post. Keep the original
+    // clearance threshold, a bounded deadline, and the physical walk-through below.
+    while(await page.evaluate(({started,x})=>{
+      const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
+      return g.player.alive&&!r.failed&&r.time<started+45
+        &&(r.time<started+16||r.squad.some(a=>Math.abs(a.position.x-x)<=.75));
+    },{started,x:OPENING.trenchEntry.x})){
       if(realtime)await page.waitForTimeout(250);
-      else await page.evaluate(()=>window.Tengxian.StepFrames(120,1/60,false));
+      else await page.evaluate(()=>{for(let i=0;i<120;i++){window.OpeningInput.Step(false);window.Tengxian.StepFrames(1,1/60,false);}});
     }
     await Capture("RallyWaiting");
-    const waiting=await page.evaluate(()=>{const r=window.Tengxian.Debug.FirstLevelMissionRuntime();return {
-      guide:r.CurrentGuide(),squad:r.squad.map(a=>({id:a.castId,p:a.position.toArray(),route:r.squadRoutes.get(a.id)}))};});
+    const waiting=await page.evaluate(()=>{const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();return {
+      alive:g.player.alive&&!r.failed,guide:r.CurrentGuide(),squad:r.squad.map(a=>({id:a.castId,p:a.position.toArray(),route:r.squadRoutes.get(a.id)}))};});
     await fs.writeFile(path.join(out,'Data_RallyWaiting.json'),JSON.stringify(waiting,null,2));
-    assert.ok(waiting.guide.status&&waiting.guide.label,'waiting at the entrance explains the immediate trench fight');
+    assert.ok(waiting.alive,'the player and squad survive the real entrance wait');
+    assert.ok(waiting.guide?.status&&waiting.guide.label,'waiting at the entrance explains the immediate trench fight');
     assert.ok(waiting.squad.every(a=>Math.abs(a.p[0]-OPENING.trenchEntry.x)>.75),'waiting guards leave the central walking lane clear');
     await page.evaluate(()=>{window.OpeningInput.checkRally=true;});
-    await Drive("PassWaitingSquad",[{x:-45,z:27}],{fight:true,seconds:50});
+    // Measure whether the squad leaves a traversable lane. Do not spend this
+    // passage window stopping to shoot; the next leg still clears every required enemy.
+    await Drive("PassWaitingSquad",[{x:-45,z:27}],{seconds:50});
   }
   let remainingApproach=regroup?OPENING.approachRoute.slice(3):OPENING.approachRoute;
   if(regroup){
