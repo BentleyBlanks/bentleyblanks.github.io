@@ -46,7 +46,7 @@ export function CreateAudio() {
   const PROJECT_ROOT = new URL("./", import.meta.url);
   const AssetUrl = (relativePath) => {
     const url = new URL(relativePath, PROJECT_ROOT);
-    url.searchParams.set('v', new URL(import.meta.url).searchParams.get('v') || 'ear006-20260911');
+    url.searchParams.set('v', new URL(import.meta.url).searchParams.get('v') || 'ear008-20260911');
     return url.href;
   };
   const MANIFEST_URL = AssetUrl("Audio/Data_AudioManifest.json");
@@ -65,6 +65,8 @@ export function CreateAudio() {
   // 为什么运行时也写一份：清单可能拿不到，而 404 不该让整个音频层瘫掉。
   // 注意路径统一写「相对项目根」，交给 AssetUrl() 解析。
   const SFX_FILES = {
+    customerPain:['Audio/Sfx/AudioSfx_CustomerPain.mp3'],
+    peelDry:['Audio/Sfx/AudioSfx_PeelDry.mp3'],peelSticky:['Audio/Sfx/AudioSfx_PeelSticky.mp3'],
     chunkLand: ["Audio/Sfx/AudioSfx_ChunkLand.mp3"],
     scrapeSoft: ["Audio/Sfx/AudioSfx_ScrapeSoft.mp3"],
     scrapeGritty: ["Audio/Sfx/AudioSfx_ScrapeGritty.mp3"],
@@ -99,6 +101,8 @@ export function CreateAudio() {
   // 生成回来的 take 普遍比目标时长长（SeedAudio 的尾巴），运行时按 cue 裁一下：
   // 不裁的话「挑起来的一记啵」会拖着两秒尾巴，跟下一个动作叠在一起。
   const SFX_MAX_SECONDS = {
+    customerPain:6,
+    peelDry:1.15,peelSticky:1.4,
     chunkLand: 0.7,
     scrapeSoft: 1.3, scrapeGritty: 1.4, scoopLift: 0.9, stretchWax: 1.6, snapWax: 0.6,
     crumbFall: 2.2, tickleFeather: 2.0, tickleHair: 1.8, vibrateHum: 3.4, waterPour: 3.0,
@@ -182,7 +186,7 @@ export function CreateAudio() {
     const sfx = ctx.createGain();
     const amb = ctx.createGain();
     bgm.gain.value = volumes.bgm;
-    sfx.gain.value = volumes.sfx;
+    sfx.gain.value = volumes.sfx * 2.4;
     amb.gain.value = volumes.amb;
     bgm.connect(master); sfx.connect(master); amb.connect(master);
     master.connect(limiter);
@@ -585,7 +589,7 @@ export function CreateAudio() {
     const natural = (window.end - window.offset) / rate;
     const cap = cue ? (SFX_MAX_SECONDS[cue] || natural) : natural;
     const played = Math.min(natural, cap);
-    recentPlayback.push({ cue, offset: +window.offset.toFixed(4), seconds: +played.toFixed(4), gain: +g.gain.value.toFixed(3) });
+    recentPlayback.push({ cue, offset: +window.offset.toFixed(4), seconds: +played.toFixed(4), naturalSeconds:+natural.toFixed(4), truncated:played<natural-.01, gain: +g.gain.value.toFixed(3) });
     if (recentPlayback.length > 24) recentPlayback.shift();
     if (played < natural - 0.01) {
       const stopAt = at + Math.max(0.02, played - SFX_FADE_OUT);
@@ -1101,7 +1105,7 @@ export function CreateAudio() {
     const jobs = [];
     for (const [cue, file] of Object.entries(bgmFiles)) {
       jobs.push(LoadBuffer(file).then((buffer) => {
-        if (buffer) buffers.bgm[cue] = buffer; else missing.bgm[cue] = file;
+        if (buffer) { buffers.bgm[cue] = buffer; delete missing.bgm[cue]; } else missing.bgm[cue] = file;
       }));
     }
     for (const [cue, files] of Object.entries(sfxFiles)) {
@@ -1224,7 +1228,7 @@ export function CreateAudio() {
       const now = typeof performance !== "undefined" ? performance.now() : Date.now();
       if (now - (lastPlay.get(cue) || 0) < RETRIGGER_MS) return 0;   // 连点保护
       lastPlay.set(cue, now);
-      const jitterRate = rate * (1 + (Math.random() - 0.5) * 0.08);
+      const jitterRate = cue==='customerPain'?1:rate * (1 + (Math.random() - 0.5) * 0.08);
       const jitterGain = gain * (1 + (Math.random() - 0.5) * 0.35);
       const takes = buffers.sfx[cue];
       if (takes && takes.length) {
@@ -1232,7 +1236,7 @@ export function CreateAudio() {
         return PlayBuffer(buffer, { cue, gain: jitterGain, rate: jitterRate, pan, delay });
       }
       // 兜底：合成版本（失败就真的静默，绝不抛）
-      SynthSfx(cue, { gain: jitterGain, pan, delay, rate: jitterRate });
+      SynthSfx(cue==='peelDry'?'snapWax':cue==='peelSticky'?'stretchWax':cue, { gain: jitterGain, pan, delay, rate: jitterRate });
       return 0;
     },
 
@@ -1268,8 +1272,13 @@ export function CreateAudio() {
       active() { return [...contact.keys()]; },
     },
 
-    setMaster(v) { volumes.master = Clamp01(v); if (bus) Smooth(bus.master.gain, volumes.master * ACTIVATION_GAIN, 0.05); },
-    setSfxVolume(v) { volumes.sfx = Clamp01(v); if (bus) Smooth(bus.sfx.gain, volumes.sfx, 0.05); },
+    setMaster(v) {
+      volumes.master=Clamp01(v);if(!bus)return;
+      const gain=bus.master.gain,now=ctx.currentTime;
+      gain.cancelScheduledValues(now);gain.setValueAtTime(gain.value,now);
+      gain.linearRampToValueAtTime(volumes.master*ACTIVATION_GAIN,now+.04);
+    },
+    setSfxVolume(v) { volumes.sfx = Clamp01(v); if (bus) Smooth(bus.sfx.gain, volumes.sfx * 2.4, 0.05); },
     setBgmVolume(v) { volumes.bgm = Clamp01(v); if (bus) Smooth(bus.bgm.gain, volumes.bgm, 0.05); },
     setAmbienceVolume(v) { volumes.amb = Clamp01(v); if (bus) Smooth(bus.amb.gain, volumes.amb, 0.05); },
     volumes() { return { ...volumes }; },

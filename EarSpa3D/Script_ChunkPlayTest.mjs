@@ -20,9 +20,10 @@ const browser = await chromium.launch({ executablePath, headless: true, args: ['
 const report = { url: baseUrl, at: new Date().toISOString(), profiles: [] };
 
 async function Run(width, height, touch) {
-  const page = await browser.newPage({ viewport: { width, height }, isMobile: touch, hasTouch: touch, deviceScaleFactor: 1 });
+  const page = await browser.newPage({ viewport: { width, height }, isMobile: touch, hasTouch: touch, deviceScaleFactor: touch?2:1, userAgent:touch?"Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36":undefined });
+  if(touch)await page.addInitScript(()=>{Object.defineProperty(navigator,'deviceMemory',{get:()=>4});Object.defineProperty(navigator,'hardwareConcurrency',{get:()=>4});});
   const cdp = await page.context().newCDPSession(page);
-  if (touch) await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
+  if (touch) await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 2, mobile: true });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -85,16 +86,15 @@ async function Run(width, height, touch) {
     Check(initial.phase === 'playing' && initial.targets.length === 9, '开始进入完整九块回合');
     Check(initial.viewReady && initial.model?.source==='BlenderMCP', 'Blender 模型已加载且镜头已进入耳道');
     Check(initial.stats.triangles <= 180000 && initial.stats.drawCalls <= 120, '渲染预算');
-    const layout = await page.evaluate(() => {
-      const ids = ['.spa-header', '.session-bar', '.instruction', '.play-stage', '.tool-dock', '.quiet-footer'];
-      return { overflow: document.documentElement.scrollWidth > innerWidth || document.documentElement.scrollHeight > innerHeight, rects: ids.map(id => { const r = document.querySelector(id).getBoundingClientRect(); return { id, x: r.x, y: r.y, w: r.width, h: r.height }; }) };
+    const layout=await page.evaluate(()=>{
+      const stage=document.querySelector('.play-stage').getBoundingClientRect();
+      const rects=['.spa-header','.tool-dock'].map(id=>{const r=document.querySelector(id).getBoundingClientRect();return {id,x:r.x,y:r.y,w:r.width,h:r.height};});
+      return {overflow:document.documentElement.scrollWidth>innerWidth,stage:{w:stage.width,h:stage.height},rects};
     });
-    Check(!layout.overflow, '页面无溢出');
-    Check(layout.rects.every(r => r.x >= 0 && r.y >= 0 && r.x + r.w <= width + 1 && r.y + r.h <= height + 1), '全部界面区域在屏内');
-    for (let i = 0; i < layout.rects.length; i++) for (let j = i + 1; j < layout.rects.length; j++) {
-      const a = layout.rects[i], b = layout.rects[j];
-      Check(Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x) < 1 || Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y) < 1, `${a.id} 与 ${b.id} 无遮挡`);
-    }
+    Check(!layout.overflow&&layout.stage.w===width&&layout.stage.h===height,'全屏画面无溢出');
+    Check(layout.rects.every(r=>r.x>=0&&r.y>=0&&r.x+r.w<=width+1&&r.y+r.h<=height+1),'浮动 UI 位于屏内');
+    Check(layout.rects.reduce((s,r)=>s+r.w*r.h,0)/(width*height)<.18,'常驻顶部与工具 UI 占屏小于 18%');
+    if(touch)Check(initial.stats.pixelRatio>=1.8&&initial.stats.tier==='low','真实移动 UA 使用清晰抗锯齿 2 倍缓冲');
     await page.screenshot({ path: path.join(out, `Shot_${width}x${height}_Start.png`) });
     await Step(300); Check((await Probe()).cleanliness === 0, '待机不自动消除');
     const held = await Grab(0);
@@ -106,18 +106,19 @@ async function Run(width, height, touch) {
     Check(!(await Probe()).targets[0].physics.detached,'推向内壁不能清除');
     await Input('cancel'); await Step(180);
     Check((await Probe()).targets[0].state === 'attached' && (await Probe()).harvest.length === 0, '中途松手/取消会完整放回且无收益');
-    await page.locator('[data-tool="drops"]').click();
-    const hard = (await Probe()).targets.find(t => t.type === 'impacted');
-    const pos = (await Probe()).stage;
-    await Input('down', pos.x + hard.screen.x, pos.y + hard.screen.y); await Input('up');
-    Check((await Probe()).targets.find(t => t.id === hard.id).softened > .7, '软化液实际降低块体阻力');
-    Check((await Probe()).harvest.length === 0, '软化不会代替完整取出');
-    await page.locator('[data-tool="scoop"]').click();
-    await Extract(0, true);
-    await page.locator('[data-tool="tweezers"]').click();
-    await Extract(2);
-    await page.locator('[data-tool="scoop"]').click();
-    for (const id of [1, 3, 4, 5, 6, 7, 8]) await Extract(id);
+    // 每种材质使用符合直觉的工具；滴液后等待实际渗透。
+    for(const id of [0,1,2,3,4,5,6,7,8]){
+      let target=(await Probe()).targets.find(t=>t.id===id);
+      if(target.type==='impacted'){
+        await page.locator('[data-tool="drops"]').click();
+        await Input('down',target.screen.x,target.screen.y);await Input('up');
+        Check((await Probe()).targets.find(t=>t.id===id).softened<.5,'软化不是瞬时完成');
+        await Step(190);
+        Check((await Probe()).targets.find(t=>t.id===id).softened>.85,'软化液逐渐渗透');
+      }
+      await page.locator('[data-tool="'+(target.type==='dry'?'scoop':'tweezers')+'"]').click();
+      await Extract(id,id===0);
+    }
     await Step(120);
     const final = await Probe();
     Check(final.phase === 'complete' && final.cleanliness === 1 && final.harvest.length === 9, '真实操作完成清洁与结算');
@@ -133,7 +134,7 @@ async function Run(width, height, touch) {
     await page.locator('[data-upgrade="earPickBamboo"]').click();
     Check((await Probe()).shop.toolLevels.earPickBamboo === 2, '升级沿用旧存档工具 ID');
     await page.locator('#settings-close').click();
-    await page.locator('#next-customer').click(); await Step(90);
+    await page.locator('#receipt-next').click(); await Step(90);
     Check((await Probe()).phase === 'playing' && (await Probe()).cleanliness === 0 && (await Probe()).harvest.length === 0, '下一位完整重置');
     await page.locator('#sound-toggle').click();
     Check((await Probe()).settings.muted, '静音生效');
@@ -149,5 +150,5 @@ async function Run(width, height, touch) {
   } finally { report.profiles.push(profile); await fs.writeFile(path.join(out, 'Data_RedesignAudit.json'), JSON.stringify(report, null, 2)); await page.close(); }
 }
 try {
-  for (const profile of [[1000,900,false],[390,844,true],[320,568,true],[844,390,true]]) await Run(...profile);
+  for (const profile of (process.argv.includes('--desktop')?[[1000,900,false]]:[[1000,900,false],[390,844,true],[320,568,true],[844,390,true]])) await Run(...profile);
 } finally { await browser.close(); }

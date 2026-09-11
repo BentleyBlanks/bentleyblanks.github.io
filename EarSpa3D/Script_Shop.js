@@ -15,7 +15,7 @@
 // 升级的效果必须**真的改变手感**，不能只是数字好看：工具等级会改写
 // comfortGain / crackRisk / idealSpeedRange，这些字段是耵聍判定真正读的。
 
-import { Clamp } from "./Script_Util.js?v=ear006-20260911";
+import { Clamp } from "./Script_Util.js?v=ear008-20260911";
 
 const STORAGE_KEY = "earspa3d.shop.v1";
 const MAX_TOOL_LEVEL = 5;
@@ -74,6 +74,7 @@ export function CreateShop({ seed = 20260910, storage = null } = {}) {
     totalEarned: 0,
     totalCustomers: 0,
     bestPayout: 0,
+    inventory:{tools:['scoop','tweezers','drops'],skins:{},equipped:{}},
     unlockedTools: null,     // Set，由外部灌入（EAR_TOOLS 的 id 列表）
     todayCustomers: [],      // [{ tierId, name, waxSeed, mood, done, paid }]
     todayIndex: 0,
@@ -88,7 +89,7 @@ export function CreateShop({ seed = 20260910, storage = null } = {}) {
         day: state.day, coins: state.coins, reputation: state.reputation,
         shopLevel: state.shopLevel, toolLevels: state.toolLevels,
         totalEarned: state.totalEarned, totalCustomers: state.totalCustomers,
-        bestPayout: state.bestPayout, mood: state.mood, version: 1,
+        bestPayout: state.bestPayout, mood: state.mood, inventory:state.inventory,version: 2,
       }));
     } catch { /* 隐私模式写不了，静默 */ }
   }
@@ -106,7 +107,8 @@ export function CreateShop({ seed = 20260910, storage = null } = {}) {
       state.totalEarned = data.totalEarned ?? 0;
       state.totalCustomers = data.totalCustomers ?? 0;
       state.bestPayout = data.bestPayout ?? 0;
-      state.mood = data.mood || "teaRoom";
+      state.mood = data.mood || 'teaRoom';
+      state.inventory={tools:['scoop','tweezers','drops'],skins:{},equipped:{},...data.inventory};
       return true;
     } catch { return false; }
   }
@@ -116,7 +118,7 @@ export function CreateShop({ seed = 20260910, storage = null } = {}) {
     state.coins = 60;
     state.reputation = 0;
     state.shopLevel = 1;
-    state.toolLevels = {};
+    state.toolLevels = {};state.inventory={tools:['scoop','tweezers','drops'],skins:{},equipped:{}};
     state.totalEarned = 0;
     state.totalCustomers = 0;
     state.bestPayout = 0;
@@ -209,7 +211,7 @@ export function CreateShop({ seed = 20260910, storage = null } = {}) {
     state.totalCustomers += 1;
     state.bestPayout = Math.max(state.bestPayout, payout);
     // 声望只看「活儿干得怎么样」，不看赚了多少
-    state.reputation += Math.round(clean * 3 + comfort * 2);
+    state.reputation = Math.max(0,state.reputation+Math.round(clean*3+comfort*3-(1-comfort)*5));
     customer.done = true;
     customer.paid = payout;
 
@@ -297,9 +299,17 @@ export function CreateShop({ seed = 20260910, storage = null } = {}) {
     };
   }
 
+  const toolCatalog={brush:{name:'柔毛刷',cost:48,detail:'刷松干燥碎屑；不撬硬块'},suction:{name:'微型吸引管',cost:85,detail:'吸走已软化的碎屑，收进滤芯'}};
+  const skinCatalog={walnut:{name:'胡桃木',cost:28,color:'#704126'},jade:{name:'白玉',cost:45,color:'#dbe7cf'}};
+  function ToolOffer(id){const item=toolCatalog[id];if(!item)return null;const owned=state.inventory.tools.includes(id);return{id,...item,owned,affordable:!owned&&state.coins>=item.cost};}
+  function BuyTool(id){const item=ToolOffer(id);if(!item||!item.affordable)return{ok:false};state.coins-=item.cost;state.inventory.tools.push(id);Save();return{ok:true};}
+  function SkinOffer(tool,id){const skin=skinCatalog[id];if(!skin)return null;const owned=(state.inventory.skins[tool]||[]).includes(id);return{...skin,id,tool,owned,equipped:state.inventory.equipped[tool]===id,affordable:owned||state.coins>=skin.cost};}
+  function BuySkin(tool,id){const offer=SkinOffer(tool,id);if(!state.inventory.tools.includes(tool)||!offer?.affordable)return{ok:false};if(!offer.owned){state.coins-=offer.cost;(state.inventory.skins[tool]??=[]).push(id);}state.inventory.equipped[tool]=id;Save();return{ok:true};}
+  function EquipSkin(tool,id){if(id!=='classic'&&!(state.inventory.skins[tool]||[]).includes(id))return false;state.inventory.equipped[tool]=id;Save();return true;}
   function Snapshot() {
     return {
       day: state.day,
+      inventory:JSON.parse(JSON.stringify(state.inventory)),
       coins: state.coins,
       reputation: state.reputation,
       shopLevel: state.shopLevel,
@@ -326,7 +336,7 @@ export function CreateShop({ seed = 20260910, storage = null } = {}) {
     state, Snapshot, Save, Load, Reset,
     StartDay, NextDay, CurrentCustomer, HasNextCustomer, AdvanceCustomer, FinishCustomer,
     ToolLevel, ToolUpgradeOffer, UpgradeTool, ShopOffer, UpgradeShop, LeveledSpec,
-    TierForReputation,
+    TierForReputation,ToolOffer,BuyTool,SkinOffer,BuySkin,EquipSkin,
     get coins() { return state.coins; },
     get day() { return state.day; },
   };

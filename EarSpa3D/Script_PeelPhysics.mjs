@@ -30,7 +30,7 @@ export function GripPeelBody(body,point){
 export function UngripPeelBody(body){body.grip=null;}
 export function GetGripPoint(body){return World(body,body.grip||[0,0,0]);}
 
-export function StepPeelBody(body,{target=null,softness=0,efficiency=1,supportRotation=null}={},dt=1/60){
+export function StepPeelBody(body,{target=null,softness=0,efficiency=1,supportRotation=null,adhesion=1,minAnchors=0}={},dt=1/60){
   const count=Math.max(1,Math.ceil(Math.min(.05,dt)*120)),h=Math.min(.05,dt)/count;
   const profile=PROFILES[body.type]||PROFILES.dry;
   const soft=Clamp(softness);
@@ -49,13 +49,13 @@ export function StepPeelBody(body,{target=null,softness=0,efficiency=1,supportRo
       const point=World(body,anchor.local),displacement=Sub(point,anchor.rest);
       const opening=Math.max(0,Dot(displacement,body.normal));
       const slide=Length(Sub(displacement,Mul(body.normal,Dot(displacement,body.normal))));
-      const strength=profile.strength*(1-soft*.48);
+      const strength=profile.strength*(1-soft*.48)*Math.sqrt(adhesion);
       anchor.strain=(opening+slide*.26)/strength;
       body.strain=Math.max(body.strain,anchor.strain);
       // 裂开由局部受力决定：反复小幅空划、停在原处都不会积累“完成进度”。
-      if(anchor.strain>1){anchor.alive=false;continue;}
+      if(anchor.strain>1&&body.anchors.filter(a=>a.alive).length>minAnchors){anchor.alive=false;continue;}
       const speed=Add(body.velocity,Cross(body.spin,Sub(point,body.position)));
-      Apply(point,Sub(Mul(displacement,-profile.stiffness*(1-soft*.48)),Mul(speed,profile.damping)));
+      Apply(point,Sub(Mul(displacement,-profile.stiffness*(1-soft*.48)*adhesion),Mul(speed,profile.damping)));
     }
     body.detached=body.anchors.every(a=>!a.alive);
     if(body.detached&&body.grip&&supportRotation){

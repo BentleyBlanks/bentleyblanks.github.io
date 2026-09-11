@@ -125,6 +125,13 @@ export const BGM_SOURCES = [
 // 清单与运行时都跟着走，不用改别的地方。
 
 export const SFX_SOURCES = [
+ {id:'customerPain',cue:'customerPain',name:'客人请求轻一点',seconds:2.5,category:'voice',material:'voice',contactKind:null,variants:['哎哟，轻一点，先软化一下吧。'],prompt:'生成一段游戏客人对白，成年女性自然轻声说中文：“哎哟，轻一点，先软化一下吧。”语气是突然有点不适后友善地提醒，克制、生活化，不尖叫、不夸张呻吟。整句连贯说完。近距离干净人声，单声道，无音乐、无背景声、无混响。'},
+
+  {id:'peelDry',cue:'peelDry',name:'干性薄层缓慢剥离',seconds:1.15,category:'contact',material:'dry',contactKind:'scrape',variants:['薄而干燥的蜡层从柔软表面慢慢掀起，细微脆裂。'],
+   prompt:COMMON_SFX+'竹质耳勺贴着一小片干燥耳垢的边缘，缓慢托起完整薄层：开头有清楚贴耳的细砂摩擦，中间连续三四次不规则、细密的纸屑般脆裂，最后一声很短的干脆脱离。声音清晰可辨但柔和，不是极低音量。不要夸张爆破、气泡啵声、食物咀嚼、刺耳高频。总时长约一秒。'},
+  {id:'peelSticky',cue:'peelSticky',name:'黏性耵聍牵拉脱离',seconds:1.4,category:'contact',material:'wet',contactKind:'wipe',variants:['黏性蜡块被小镊子夹住缓慢牵拉，黏连逐渐松开。'],
+   prompt:COMMON_SFX+'小镊子夹住一块柔韧的黏性耳垢缓慢拉起：先是近距离细腻的蜡质摩擦，随后黏连短短拉伸，最后轻而明确地脱离，带少量细微黏性撕裂声。细节清晰、厚实而柔和。不要夸张口水、咀嚼、鼻涕、电子滑音、气球爆裂。总时长约一点四秒。'},
+
   {
     id: "chunkLand", cue: "chunkLand", name: "完整琥珀块落入小瓷盘",
     seconds: 0.7, category: "reward", material: "dry", contactKind: "scrape",

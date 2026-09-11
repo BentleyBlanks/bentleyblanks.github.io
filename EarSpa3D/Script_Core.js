@@ -1,26 +1,21 @@
 // 渲染核心：renderer / scene / 分级画质 / 自适应分辨率 / 主循环计时。
 //
-// 两条设计底线：
-// ① **本仓 vendor 的 three 只有 build/three.module.js，没有 examples/jsm**，
-//    所以这里不能用 EffectComposer / OrbitControls / GLTFLoader 之类的 addon。
-//    需要后期感（柔光、暗角）一律用「材质自发光 + billboard + CSS 叠加」近似。
-// ② 移动端要能稳住 60fps，所以分辨率是**动态**的：帧时间超标就降 renderScale，
-//    富余就慢慢升回来。这比一次性按机型猜档位可靠得多。
+// 高像素密度与抗锯齿保持接触细节；持续慢帧先关闭阴影，再小幅降分辨率。
 
 import * as THREE from "three";
-import { Clamp, Damp } from "./Script_Util.js?v=ear006-20260911";
+import { Clamp, Damp } from "./Script_Util.js?v=ear008-20260911";
 
 export const QUALITY_TIERS = {
   low: {
-    id: "low", pixelRatio: 1.0, minScale: 0.55, shadow: false,
-    shadowSize: 0, anisotropy: 1, dustCount: 220, antialias: false,
+    id: "low", pixelRatio: 2.0, minScale: 0.9, shadow: false,
+    shadowSize: 0, anisotropy: 1, dustCount: 220, antialias: true,
   },
   mid: {
-    id: "mid", pixelRatio: 1.5, minScale: 0.7, shadow: true,
+    id: "mid", pixelRatio: 2.0, minScale: 0.95, shadow: true,
     shadowSize: 1024, anisotropy: 2, dustCount: 520, antialias: true,
   },
   high: {
-    id: "high", pixelRatio: 2.0, minScale: 0.85, shadow: true,
+    id: "high", pixelRatio: 2.5, minScale: 0.95, shadow: true,
     shadowSize: 2048, anisotropy: 4, dustCount: 900, antialias: true,
   },
 };
@@ -89,6 +84,7 @@ export function CreateCore({ canvas, quality = "auto", onError, viewCamera = nul
     const pr = Math.min(tier.pixelRatio, (typeof devicePixelRatio !== "undefined" ? devicePixelRatio : 1));
     renderer.setPixelRatio(pr * renderScale);
     renderer.setSize(width, height, false);
+    stats.pixelRatio=pr*renderScale;stats.bufferWidth=canvas.width;stats.bufferHeight=canvas.height;
     stats.renderScale = renderScale;
     stats.width = width;
     stats.height = height;
@@ -141,7 +137,9 @@ export function CreateCore({ canvas, quality = "auto", onError, viewCamera = nul
       fastStreak = 0;
     }
     if (slowStreak >= 30) {
-      scaleTarget = Math.max(tier.minScale, scaleTarget - 0.08);
+      // 先削减阴影成本，保持像素密度；不能把整张手机画面糊成低分辨率。
+      renderer.shadowMap.enabled=false;
+      scaleTarget = Math.max(tier.minScale, scaleTarget - 0.03);
       slowStreak = 0;
     } else if (fastStreak >= 180) {
       scaleTarget = Math.min(1, scaleTarget + 0.05);

@@ -3,15 +3,18 @@
 **3D 采耳 ASMR 解压游戏**。入口页：`EarSpa3D/index.html`。
 接口契约与协作边界在 [`Data_Contract.md`](./Data_Contract.md)，**改任何跨模块的东西之前先读它**。
 
-## 当前入口：整块采耳（2026-09-11）
+## 当前入口：拟物采耳与经营（2026-09-11）
 
 `index.html` → `Script_ChunkGame.js` + `Script_ImmersiveScene.js` + `Script_PeelPhysics.mjs` + `Style_Chunk.css`。
-以契约 §0 的整块取出重设计为当前玩法。原 `Script_Main/Ui/Hand/Wax` 保留为旧玩法参考，
-当前入口不再使用它们。核心目标固定为撬起、完整取出、落盘收藏，手机一指完成。
+以契约 §0 的拟物采耳与经营重设计为当前玩法。原 `Script_Main/Ui/Hand/Wax` 保留为旧玩法参考，
+当前入口不再使用它们。核心目标固定为真实接触、材质差异、完整取出或碎片清理、落盘/吸入、满意度经营，手机一指完成。
 
 实际交互回归：
 ```powershell
 node EarSpa3D/Script_PeelPhysicsTest.mjs
+node EarSpa3D/Script_EconomyTest.mjs
+node EarSpa3D/Script_TactilePlayTest.mjs
+node EarSpa3D/Script_TactilePlayTest.mjs --touch
 node EarSpa3D/Script_ChunkPlayTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
 ```
 使用已安装的 `playwright-core` 与 Edge（可用 `EARSPA_BROWSER` 指定其他 Chromium 路径），
@@ -23,11 +26,10 @@ node EarSpa3D/Script_ChunkPlayTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
 
 一款给「强迫症 + 采耳爱好者」做的解压游戏：把真实采耳店的全套专业手法
 （探、刮、挑、夹、扫、振、冲、吸、滴、照）做成可精细操作的交互，
-配上干净通透的可爱画风和 ASMR 音景，外加一个最小的经营环。
+配上自然写实的材质和 ASMR 音景，外加一个最小的经营环。
 
-美术基调是硬约束：**清新 · 可爱 · 舒适 · 解压**。配色唯一真相在
-[`Data_Palette.mjs`](./Data_Palette.mjs)。不允许脏、暗、医用冷白、恐怖谷；
-耵聍要做成可爱的琥珀糖，不是恶心的东西。理由与边界见契约 §1。
+当前美术基调：自然写实、暖光与舒适。用户要求取代旧有“可爱琥珀糖”方向。
+耳廓参考、建模与纹理说明见 Data_ImmersiveAssets.md，玩法与画质边界见契约 §0。
 
 ## 三条硬约定（最容易踩的）
 

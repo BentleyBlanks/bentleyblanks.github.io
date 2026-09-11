@@ -1,0 +1,27 @@
+import fs from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const util=await fs.readFile(new URL('./Script_Util.js',import.meta.url),'utf8');
+const url='data:text/javascript;base64,'+Buffer.from(util).toString('base64');
+const source=(await fs.readFile(new URL('./Script_Shop.js',import.meta.url),'utf8')).replace(/"\.\/Script_Util.js[^"]*"/,JSON.stringify(url));
+const {MakeRng}=await import(url);
+const {CreateShop}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+function Storage(data){let raw=data?JSON.stringify(data):null;return{getItem:()=>raw,setItem:(k,v)=>raw=v,removeItem:()=>raw=null};}
+let checks=0;const Check=(ok,message)=>{assert.ok(ok,message);checks++;};
+const storage=Storage({version:1,day:8,coins:220,reputation:12,toolLevels:{earForceps:3}});
+const shop=CreateShop({storage});
+Check(shop.day===8&&shop.coins===220&&shop.ToolLevel('earForceps')===3,'迁移旧存档保留进度');
+Check(shop.Snapshot().inventory.tools.join(',')==='scoop,tweezers,drops','迁移补齐初始工具');
+Check(shop.BuyTool('brush').ok&&shop.coins===172,'购买工具扣款');
+Check(!shop.BuyTool('brush').ok&&shop.coins===172,'重复工具不收费');
+Check(shop.BuySkin('scoop','walnut').ok&&shop.coins===144,'购买指定工具皮肤');
+Check(shop.BuySkin('scoop','walnut').ok&&shop.coins===144,'装备已购皮肤免费');
+Check(!shop.Snapshot().inventory.equipped.tweezers,'皮肤不串到另一件工具');
+Check(!shop.EquipSkin('scoop','jade'),'未购买皮肤不能装备');
+const restored=CreateShop({storage});
+Check(restored.Snapshot().inventory.equipped.scoop==='walnut'&&restored.Snapshot().inventory.tools.includes('brush'),'保存加载库存与装备');
+const poor=CreateShop({storage:Storage({coins:0})});
+Check(!poor.BuyTool('brush').ok&&!poor.BuySkin('scoop','jade').ok&&poor.coins===0,'余额不足不购买不负债');
+const payout=comfort=>{const s=CreateShop({storage:Storage()});s.StartDay(MakeRng(14));const r=s.FinishCustomer({cleanliness01:1,comfort01:comfort,relax01:comfort,bestCombo:2,harvest:[]});const coins=s.coins;Check(s.FinishCustomer({cleanliness01:1,comfort01:1})===null&&s.coins===coins,'每位客人只结算一次');return{...r,rep:s.Snapshot().reputation};};
+const happy=payout(.98),hurt=payout(.3);
+Check(happy.tip>hurt.tip&&happy.payout>hurt.payout&&happy.rep>hurt.rep,'满意度决定小费、总收入和声望');
+console.log('PASS '+checks+' economy checks');
