@@ -32,7 +32,7 @@ def Control(name):
             bpy.data.actions.remove(action)
     return obj
 
-def Rotation(pitch):
+def Rotation(pitch, yaw=0, roll=0):
     theta = math.radians(pitch)
     # -Z is the blade, -Y its cutting edge. The edge stays in the swing plane.
     down = Vector((.30, .953939, 0)).normalized()
@@ -40,7 +40,7 @@ def Rotation(pitch):
     y = down * math.cos(theta) + Vector((0, 0, math.sin(theta)))
     z = -blade
     x = y.cross(z).normalized()
-    return Matrix((x, y, z)).transposed().to_quaternion()
+    return Quaternion((0,1,0),math.radians(yaw)) @ Matrix((x, y, z)).transposed().to_quaternion() @ Quaternion((0,0,1),math.radians(roll))
 
 # Exact production YXZ resting basis, measured before FOV/depth compensation.
 baseRotation = Quaternion((0,1,0),-.62) @ Quaternion((1,0,0),.72) @ Quaternion((0,0,1),1.54)
@@ -49,31 +49,43 @@ grip = Control('Animation_DadaoGrip')
 blade = Control('Animation_DadaoBlade')
 right = Control('Animation_DadaoRightShoulder')
 left = Control('Animation_DadaoLeftShoulder')
+rightPole = Control('Animation_DadaoRightElbowPole')
+leftPole = Control('Animation_DadaoLeftElbowPole')
 grip.rotation_mode = blade.rotation_mode = 'QUATERNION'
 
 # Grip first accelerates out of the shoulder; blade rotation catches up later.
-# The cut continues below the target, brakes, then returns along a folded arc.
+# The cut continues below the target. The wrists turn during unloading so
+# the support forearm stays below/outside the grip instead of folding over it.
 keys = [
     (0.00, tuple(baseGrip), None, (0,0,0), (0,0,0)),
     (0.14, (.220,-.110,-.450), 58, (.015,.040,.015), (.035,.040,.010)),
     (0.26, (.200,.005,-.415), 112, (.020,.070,.015), (.050,.075,.005)),
     (0.30, (.220,-.015,-.425), 76, (.005,.050,-.030), (.055,.060,-.025)),
     (0.36, (.105,-.185,-.545), 12, (-.015,.010,-.065), (.040,.020,-.060)),
-    (0.43, (-.130,-.195,-.630), -45, (-.035,.015,-.055), (.015,.065,-.100)),
-    (0.55, (-.200,-.150,-.590), -45, (-.060,.040,-.070), (0,.140,-.130)),
-    (0.72, (-.040,-.200,-.485), -15, (-.010,-.010,0), (0,0,-.020)),
+    (0.43, (-.130,-.235,-.630), (-35,-15,-15), (-.035,.010,-.045), (.015,.025,-.040)),
+    (0.52, (-.170,-.240,-.620), (-25,-35,-60), (-.030,.010,-.035), (.010,.030,-.030)),
+    (0.65, (-.100,-.220,-.590), (15,-45,-60), (-.025,.010,-.030), (.010,.030,-.030)),
+    (0.80, (.040,-.210,-.525), (35,-35,-25), (-.010,0,-.010), (.010,.010,-.010)),
     (1.00, tuple(baseGrip), None, (0,0,0), (0,0,0)),
 ]
+previousRotation = baseRotation.copy()
 for t,position,pitch,r,l in ([] if exportOnly else keys):
     frame = 1+t*120
     grip.location = position
     grip.keyframe_insert('location', frame=frame)
-    blade.rotation_quaternion = baseRotation if pitch is None else Rotation(pitch)
+    rotation = baseRotation.copy() if pitch is None else Rotation(*(pitch if isinstance(pitch,tuple) else (pitch,)))
+    rotation.make_compatible(previousRotation)
+    blade.rotation_quaternion = rotation
+    previousRotation = rotation.copy()
     blade.keyframe_insert('rotation_quaternion', frame=frame)
     for obj,value in [(right,r),(left,l)]:
         obj.location = value
         obj.keyframe_insert('location',frame=frame)
-for obj in ([] if exportOnly else [grip,blade,right,left]):
+for row in ([] if exportOnly else json.loads((root/'_blender/Data_DadaoElbowPoles.json').read_text())['rows']):
+    for obj,offset in [(rightPole,1),(leftPole,4)]:
+        obj.location = row[offset:offset+3]
+        obj.keyframe_insert('location',frame=1+row[0]*120)
+for obj in ([] if exportOnly else [grip,blade,right,left,rightPole,leftPole]):
     action = obj.animation_data.action
     action.name = obj.name+'PowerSwing'
     for layer in action.layers:
@@ -89,7 +101,7 @@ for frame in range(1,122):
     scene.frame_set(frame)
     q=blade.rotation_quaternion.normalized() @ baseRotation.inverted()
     d=grip.location-baseGrip
-    frames.append([round(x,7) for x in [*d,q.x,q.y,q.z,q.w,*right.location,*left.location,.3,-.8,.12,-.3,-.8,.12]])
+    frames.append([round(x,7) for x in [*d,q.x,q.y,q.z,q.w,*right.location,*left.location,*rightPole.location,*leftPole.location]])
 data={'schema':1,'source':'BlenderDadaoPowerSwing','sourceArmLength':.57233826,
       'frameCount':121,'cutStart':.26,'cutEnd':.46,'frames':frames}
 (root/'Data_FpsDadaoSwing.mjs').write_text('// One Blender-authored Dadao stroke; see _blender/Script_DadaoPowerSwing.py.\nexport const FPS_DADAO_SWING = '+json.dumps(data,separators=(',',':'))+';\n',encoding='utf-8')

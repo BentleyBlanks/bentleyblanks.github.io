@@ -38,10 +38,21 @@ try{
     const edge=new THREE.Vector3(0,-1,0).transformDirection(matrix);
     frames.push({t:i/120,tip:tip.toArray(),edge:edge.toArray(),grip:Math.max(r.gripError.r,r.gripError.l),
      wrist:Math.max(r.wristBend.r,r.wristBend.l),wristPair:{...r.wristBend},right:P(r.bones.r.hand),left:P(r.bones.l.hand),
-     upper:P(r.bones.r.upperArm),elbow:P(r.bones.r.forearm),weapon:matrix.toArray()});
+     upper:P(r.bones.r.upperArm),elbow:P(r.bones.r.forearm),leftElbow:P(r.bones.l.forearm),weapon:matrix.toArray()});
     if(exportSource&&action==='Light')result.sourceFrames.push({bones:bones.map(b=>Matrix(b,T.camera)),weapon:Matrix(v.rig.group,T.camera)});
    }
    result.clips.push({action,duration,windup:spec.windup,active:spec.active,frames});
+  }
+  // Seeking into recovery must agree with uninterrupted playback. The old
+  // elbow limiter preserved a different bend plane and wrapped over the hilt.
+  result.recoverySeekError=0;
+  for(const index of [96,66,78,60,84]){
+   L.Preview('Light',index/120);T.StepFrames(1,1/60,false);v.root.updateWorldMatrix(true,true);
+   const expected=result.clips[0].frames[index];
+   for(const [side,key] of [['r','elbow'],['l','leftElbow']]){
+    const actual=v.armAnchor.worldToLocal(r.bones[side].forearm.getWorldPosition(new THREE.Vector3()));
+    result.recoverySeekError=Math.max(result.recoverySeekError,actual.distanceTo(new THREE.Vector3().fromArray(expected[key])));
+   }
   }
   // Interruption must start from the evaluated outgoing pose, without changing
   // its amplitude at mix=0 (the previous implementation shrank the downstroke).
@@ -51,6 +62,7 @@ try{
   result.interruptionError=Math.max(...previous.values.map((n,i)=>Math.abs(n-transition.values[i])));
   return result;
  },process.argv.includes('--export-source'));
+ if(process.argv.includes('--trace'))fs.writeFileSync(path.join(out,'Data_DadaoSwingTrace.json'),JSON.stringify(data));
  const Dist=(a,b)=>Math.hypot(...a.map((n,i)=>n-b[i]));
  const metrics=[];
  for(const clip of data.clips){
@@ -61,7 +73,13 @@ try{
   const upper=clip.frames.map(f=>Dist(f.upper,f.elbow)),lower=clip.frames.map(f=>Dist(f.elbow,f.right));
   assert(Math.max(...upper)-Math.min(...upper)<.001,'Upper arm must not stretch');
   assert(Math.max(...lower)-Math.min(...lower)<.001,'Forearm must not stretch');
+  for(let i=1;i<clip.frames.length;i++)for(const key of ['elbow','leftElbow'])
+   assert(Dist(clip.frames[i-1][key],clip.frames[i][key])<.085,`${clip.action} ${clip.frames[i].t}: elbow flips between frames`);
   if(clip.action==='Charge')continue;
+  for(const f of clip.frames.filter(f=>f.t>=.55&&f.t<=.85)){
+   assert(f.elbow[1]<f.right[1]-.035,`${clip.action} ${f.t}: dominant elbow folds over the grip`);
+   assert(f.leftElbow[1]<f.left[1]-.035,`${clip.action} ${f.t}: support elbow folds over the grip`);
+  }
   const start=Math.ceil(clip.windup/clip.duration*120),end=Math.floor((clip.windup+clip.active)/clip.duration*120);
   let travel=0,alignment=0,peak=0;
   for(let i=start;i<end;i++){
@@ -78,6 +96,7 @@ try{
   metrics.push({action:clip.action,travel,vertical,alignment,peak,wrist:Math.max(...clip.frames.map(f=>f.wrist))});
  }
  assert(data.interruptionError<1e-6,'Interrupted cut changes amplitude');assert.deepEqual(errors,[]);
+ assert(data.recoverySeekError<.001,`Recovery elbow changes with playback history: ${data.recoverySeekError} m`);
  const visibility=[];
  for(const viewport of [{width:1280,height:720},{width:1440,height:900}]){
   await page.setViewportSize(viewport);
@@ -95,7 +114,7 @@ try{
   visibility.push({viewport,checks});
  }
  await page.setViewportSize({width:1280,height:720});
- fs.writeFileSync(path.join(out,'Data_DadaoSwingAcceptance.json'),JSON.stringify({metrics,visibility,interruptionError:data.interruptionError},null,2));
+ fs.writeFileSync(path.join(out,'Data_DadaoSwingAcceptance.json'),JSON.stringify({metrics,visibility,interruptionError:data.interruptionError,recoverySeekError:data.recoverySeekError},null,2));
  if(data.sourceFrames.length)fs.writeFileSync(path.join(out,'Data_DadaoSourceBake.json'),JSON.stringify({boneNames:data.boneNames,frames:data.sourceFrames}));
  for(const phase of [.24,.34,.4,.55,.85]){
   await page.evaluate(phase=>{Taierzhuang.Debug.MeleeCombat.Preview('Light',phase);Taierzhuang.StepFrames(1,1/60,true);},phase);

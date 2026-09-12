@@ -638,13 +638,17 @@ export class FpsArmRig {
       preferred.normalize();
       const baseCos = axial*(solvedDistance-upper*Math.cos(angle))/lower;
       const minimumBend = THREE.MathUtils.radToDeg(Math.acos(THREE.MathUtils.clamp(baseCos+amplitude,-1,1)));
-      const desiredBend = Math.min(FPS_ARM_LIMITS.wristBendDeg-1,
-        Math.max(FPS_ARM_LIMITS.wristRelaxedDeg,minimumBend+FPS_ARM_LIMITS.wristPoseSlackDeg));
+      const desiredBend = this.videoBody?.authoredElbows ? FPS_ARM_LIMITS.wristBendDeg-1
+        : Math.min(FPS_ARM_LIMITS.wristBendDeg-1,
+          Math.max(FPS_ARM_LIMITS.wristRelaxedDeg,minimumBend+FPS_ARM_LIMITS.wristPoseSlackDeg));
       const threshold = Math.cos(desiredBend*DEG);
       const allowed = Math.acos(THREE.MathUtils.clamp((threshold-baseCos)/amplitude,-1,1));
       const offset = SignedAngle(preferred,chosen);
       if (Math.abs(offset)>allowed) chosen.copy(preferred).applyAxisAngle(direction,Math.sign(offset)*allowed);
-      if (previous && computeGoal) {
+      // An authored pole is already a sampled trajectory. History-dependent
+      // steering can take the other side of the wrist-feasible arc and wrap
+      // the support elbow over the hilt; it also makes seeking differ from play.
+      if (previous && computeGoal && !this.videoBody?.authoredElbows) {
         const delta = SignedAngle(previousPlane,chosen);
         const maximum = FPS_ARM_LIMITS.elbowSpeedRadPerS*this.solveDt;
         chosen.copy(previousPlane).applyAxisAngle(direction,THREE.MathUtils.clamp(delta,-maximum,maximum));

@@ -3142,12 +3142,12 @@ export class Viewmodel {
     this.weaponMount.position.sub(grip).applyQuaternion(rotation).add(grip).add(displacement);
     this.weaponMount.quaternion.premultiply(rotation);
     const body = rig._CurrentBody();
-    rig.videoBody = {shoulders:{},elbowPoles:{}};
+    rig.videoBody = {shoulders:{},elbowPoles:{},authoredElbows:frame.source === 'BlenderDadaoPowerSwing'};
     for (const [key,offset,pole] of [["right",7,13],["left",10,16]]) {
       rig.videoBody.shoulders[key] = new THREE.Vector3().fromArray(body.shoulders[key])
         .add(new THREE.Vector3().fromArray(values,offset).multiplyScalar(scale*weight)).toArray();
       rig.videoBody.elbowPoles[key] = new THREE.Vector3().fromArray(body.elbowPoles[key]).normalize()
-        .lerp(new THREE.Vector3().fromArray(values,pole).normalize(),weight*.65).normalize().toArray();
+        .lerp(new THREE.Vector3().fromArray(values,pole).normalize(),weight*(rig.videoBody.authoredElbows ? 1 : .65)).normalize().toArray();
     }
   }
 
