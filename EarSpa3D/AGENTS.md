@@ -28,6 +28,7 @@ node EarSpa3D/Script_WaxEdgeContactTest.mjs
 node EarSpa3D/Script_WaxEdgePlayTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
 node EarSpa3D/Script_ControlPlayTest.mjs
 node EarSpa3D/Script_DirectionalPhysicsTest.mjs
+node EarSpa3D/Script_FeatherSweepPlayTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
 node EarSpa3D/Script_RenderingRegressionTest.mjs
 node EarSpa3D/Script_TweezersExtractionTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
 node EarSpa3D/Script_MetalRenderingTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/

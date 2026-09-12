@@ -3,16 +3,16 @@ import {CreatePhysicsSettings} from './Script_PhysicsSettings.mjs?v=ear028-physi
 import {CUSTOMER_EARS,CustomerEarType} from './Data_CustomerTypes.mjs?v=ear025-oily-20260912';
 import { ToolIcon } from './Script_ToolIcons.mjs?v=ear014-ui-20260912';
 import { CreateCore } from './Script_Core.js?v=ear011-20260911';
-import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear028-physics-settings-20260912';
+import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear029-feather-20260912';
 import { CreateAudio } from './Script_Audio.js?v=ear012-size-audio-20260912';
 import { LandingSound } from './Script_LandingSound.mjs?v=ear012-size-audio-20260912';
 import { CreateShop } from './Script_Shop.js?v=ear025-oily-20260912';
 import { MakeRng } from './Script_Util.js?v=ear011-20260911';
 import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear011-20260911';
 
-import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear014-ui-20260912';
+import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear029-feather-20260912';
 
-const VERSION = 'ear028-physics-settings-20260912';
+const VERSION = 'ear029-feather-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const TOOL_IDS = { scoop: 'earPickBamboo', tweezers: 'earForceps', drops: 'earDrops',brush:'softBrush',suction:'microSuction',feather:'gooseFeather' };
 const TYPE_NAMES = { dry: '干性薄层', wet: '黏性耳垢', impacted: '紧实硬结', oily:'油性凝胶' };
@@ -49,7 +49,7 @@ export async function Start() {
       <label class="slider-row">轻微震动<input id="haptics" type="checkbox" checked></label>
       <section id="physics-debug" class="debug-settings" aria-labelledby="debug-title"></section>
 
-      <details id="operation-guide"><summary>操作指南</summary><p>鼠标右键按住连续旋转，松开停止，工具留在接触点；左键按住并移动鼠标，耳勺跟随指针刮动；凹口朝向耳垢才能托刮，勺背和空划不能剥离。镊子按住夹起。手机在施力模式下按住并拖动耳勺，转向模式下按住旋转。工具遇到内壁会受阻。点放大镜切换深浅视野，短耳勺工作长度有限；深处用长镊，硬结先滴液软化。松脱后仍在工具上，松手由工具托送到耳外，再轻放入盘。硬结先滴液等待约 3 秒。干薄片用耳勺托边，黏块先松边再用镊子夹；硬拉会痛或碎裂。碎屑可用耳勺清理，也可买毛刷轻扫或用吸引管吸走湿碎屑。尚未松脱时松手，材料会弹性回落；黏附牢固时受力断面会碎裂，残片仍需清理。</p><p>键盘：1/2/3 切换工具；画面获得焦点后，左右方向键选块，空格抓住，Q/E 旋转方向，空格松手，Esc 取消。</p></details>
+      <details id="operation-guide"><summary>操作指南</summary><p>鼠标右键按住连续旋转，松开停止，工具留在接触点；左键按住并移动鼠标，耳勺跟随指针刮动；凹口朝向耳垢才能托刮，勺背和空划不能剥离。镊子按住夹起。手机在施力模式下按住并拖动耳勺，转向模式下按住旋转。工具遇到内壁会受阻。点放大镜切换深浅视野，短耳勺工作长度有限；深处用长镊，硬结先滴液软化。松脱后仍在工具上，松手由工具托送到耳外，再轻放入盘。硬结先滴液等待约 3 秒。干薄片用耳勺托边，黏块先松边再用镊子夹；硬拉会痛或碎裂。细微屑用鹅绒掸贴住后旋转，松手带出；初始每次 1 组，升级后最多 5 组，只带走绒羽扫到的微屑。较大碎片可用耳勺清理，也可买毛刷轻扫或用吸引管吸走湿碎屑。尚未松脱时松手，材料会弹性回落；黏附牢固时受力断面会碎裂，残片仍需清理。</p><p>键盘：1/2/3 切换工具；画面获得焦点后，左右方向键选块，空格抓住，Q/E 旋转方向，空格松手，Esc 取消。</p></details>
     </dialog>`;
   document.body.append(app);
   app.querySelector('.spa-brand').insertAdjacentHTML('beforeend','<div class="session-status"></div>');
@@ -194,7 +194,7 @@ export async function Start() {
       if(view.TrayBegin(p.x,p.y)){trayPointer=e.pointerId;canvas.setPointerCapture(e.pointerId);}return;
     }
     if(e.isPrimary===false||![0,2].includes(e.button)||phase!=='playing'||DialogOpen()||view.busy)return;
-    pendingHover=null;if(pointer||turnPointer)Cancel();
+    pendingHover=null;if(pointer||turnPointer)Cancel();if(view.busy)return;
     const p=Position(e);view.AimLamp(p.x,p.y);e.preventDefault();audio.unlock();
     if(e.pointerType==='touch'){app.dataset.touch='true';}
     if(e.button===2||(e.pointerType==='touch'&&touchMode==='turn')){
@@ -348,7 +348,15 @@ export async function Start() {
     if (phase === 'playing' && !DialogOpen() && !document.hidden) {
       if(!practice){dt=Math.min(dt,Math.max(0,timeLimit-elapsed));elapsed+=dt;}
       if(pendingHover){const p=pendingHover;pendingHover=null;if(!pointer&&!turnPointer)view.Hover(p.x,p.y,toolId);}
-      if(turnPointer)view.TurnBy(dt*Math.PI*.65,toolId);
+      if(turnPointer){
+        const before=toolId==='feather'?view.FeatherSweepProbe().held:0;
+        view.TurnBy(dt*Math.PI*.65,toolId);
+        if(toolId==='feather'){
+          const sweep=view.FeatherSweepProbe();
+          if(sweep.held>before){Sound('tickleFeather',.4);Record('featherSweep',{count:sweep.held,capacity:sweep.capacity});}
+          $('pull-feedback').hidden=false;$('pull-label').textContent=`已带起 ${sweep.held} / ${sweep.capacity} 组 · 松手带出`;$('pull-meter').value=sweep.held/sweep.capacity;
+        }
+      }
       if(pointer&&!active&&toolId==='scoop'&&!view.busy){const p=pointer;view.MoveScoopStroke(p.currentX,p.currentY);if(p.moved)Begin(view.Pick(p.currentX,p.currentY,toolId),p.currentX,p.currentY,p.id);p.moved=false;}
       if(active&&pointer) Interact(dt);
       else if(!turnPointer&&time>hintUntil)$('pull-feedback').hidden=true;
