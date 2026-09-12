@@ -73,3 +73,18 @@ Codex 官方默认 `project_doc_max_bytes` 为合计 32 KiB。以上三份原子
 - 保留台儿庄坐标、共享高度场、战斗、存档、数据驱动、缓存、Windows 假指针锁、浏览器释放及测试并发保护；保留视频转骨骼的专用源工程路径。未修改游戏代码、测试断言、资产或模型配置。仓库未有自有 SKILL.md；本轮不新增技能，也不修改插件缓存。MountainEmber 的 Blender 输出路径需联动导出脚本，留待单独处理。
 
 验证：核对修改文档的本地链接、可执行命令和参数；检查迁移章节完整性与关键契约保留；运行全仓与台儿庄选测 dry-run，核对纯 Markdown 差异；`git diff --check`。本轮没有页面行为变化，不运行游戏或浏览器回归。
+
+
+## 2026-09-12 按官方文章继续整理
+
+依据 [Rethinking skills and prompts for GPT-6 Astra](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)，从 `0e863e2c2` 检查 22 份 AGENTS.md／CLAUDE.md；用户确认后实施六项调整。仓库内没有 SKILL.md，此次未修改个人技能或插件缓存。
+
+- 根批量生成边界改为明确范围／数量授权，已授权批次可继续、扩量再确认；同步第一人称资产说明里的同一条规则。独占 worktree、禁止强推、资产供应商、密钥与视觉验收要求保留。
+- EarSpa3D 移除不存在的本地探针作为必经入口，38 个原有检查完整迁入按影响选用的 Data_Verification.md。当前装配地图替换旧模块地图；Data_Contract.md 保留共同契约并路由到 Data_SystemContracts.md；原 42 KB 契约完整保存为 Data_ContractHistory.md，明确原指令和人员归属的历史性质。新旧拖动、自动加载及羽毛容量说明按现行版本归一。打包工作流移至 Data_Packaging.md。未移动采耳原始工程；用户另行规整其源目录，确认结构后再更新具体源路径。
+- SOPHIA 统一为构建、验证实际构建页面、再按根流程发布；移除依赖私有会话 memory 的流程依据。按影响选测，必要的跨层实现可在同一任务完成。
+- MountainEmber 源工程保全备份并迁入 OneDrive；配置、builder 与验证说明同步更新，停止跟踪仓库中的 blend。原 >1 MB 源工程完整性断言迁到独立 Blender 验证器，增加实际重开、三环境、集合、内嵌图片和外部库检查；原 GLB 地形和锚点断言保留。源码、GLB 和贴图未重新生成。迁移记录见 [源工程说明](../MountainEmber1941/Data_BlenderSource.md)。
+- TunnelLight 的专项规则逐条迁入对应分册，入口保留共同契约和路由；验证命令迁入 docs/Data_Verification.md。Notion 同步按本次已有授权范围执行，有实际目标、内容核对和回读验证；不再依赖不存在的 scratchpad 工具。修正 Script 分册的两处父目录引用。
+
+按 UTF-8 内容计算（不计 Windows 换行转换）：EarSpa3D/AGENTS.md 12,050 → 2,435 字节；TunnelLight1943/CLAUDE.md 19,695 → 3,061 字节。现行契约与历史保全分开，减少普通任务的必读内容；未做模型任务 A/B 实验，不能据此声称速度或成功率提升。
+
+验证包括修改文档的本地链接／锚点、命令文件存在性、全部原采耳测试名与 TunnelLight 专项条目的迁移保全、Python／JSON 语法、git diff 空白检查；Blender 5.1.2 实际读取迁移前后工程，对比 63 个对象的名称／类型／网格顶点数量，4 张贴图内嵌，原备份 SHA-256 一致；Script_VerifyBlenderSource.py 与 Script_ArtTerrainContractTest.mjs 通过。选测 dry-run 命中的台儿庄与 TunnelLight 仅为说明变化，未启动游戏回归。没有玩家页面或运行时资产变化，无需更新页面缓存戳。

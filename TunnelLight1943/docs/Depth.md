@@ -5,6 +5,19 @@
 > 往这里加条目：**【规矩】一句 / 【为什么】一句 / 【守着它的】测试名或 shot 判据**；
 > 事故过程、日期、用户原话、实测数字写进 [`../Data_DesignHistory.md`](../Data_DesignHistory.md)，数值只写常量名。
 
+## 契约速查
+
+以下由原项目入口迁入，仅在涉及本系统时适用；具体接口、判据与说明见后续章节。
+
+- 带的数值只在 `Data_DepthSpec.mjs`，哪类物体用哪带只在 `Data_PropArt.json`（或 `Data_Scenes.json` 逐件 `band`）；**放置代码里不许写裸 z / renderOrder**。
+- 摆位走 `PlaceZ(band)`，排序走 `SetPlayOrder/DepthOrder(band)`；行走线上的一切位置压回 walk 那条线；`world.DepthViolations()` 必须为空；`Script_DepthAudit.mjs` 逐章扫。
+- 两个人绝不共用一个绘制序号——用 `SetPlayOrder` 第四参 nudge，不许改 z；`FixOrder` 不遍历，别拿它钉骨架。
+- 落地贴图底边＝地平线，不许为观感手抬 y；例外走 `yOffset`。道具落点走 `DropSpot()`，不进掩体足迹。
+- 地面是三张：`AddGroundPlane`（田，画不了细节，且是**一把刀**——地平线附近的东西先问在它上头还是下头）、`AddRoadPlane`（街面，只有调子）、`AddGroundBand`（几乎不管事）。**地面上不许有碎点**；路上要摆东西摆成道具。
+- 一条街不许排在一根尺子上：纯布景件散到 `obstacle/clutter`，会做活的留 `walk`；挪完跑 `npm run scene:tunnelLight1943` + `Script_DepthAudit.mjs`。
+- **场景有多长由「镜头最远到哪儿」定**（village 已从 190→120，行走 `[4,116]`）：东界是进村那支队伍顶出来的，入场坐标只有 `RAID_LEAD_X` 一处真相（c2 不再另挪）；剪场景要连收藏品/看点一起搬，别删。
+- 主相机看不到地平线以下；要演井底用小窗（pip）那台相机（`PIP_LAYER`）。
+
 ## 场景数据在哪（改东西之前先看这里）
 
 **场景物体不写在代码里**。要挪一个东西、换一张贴图、改一档深度，改 JSON 就够了：

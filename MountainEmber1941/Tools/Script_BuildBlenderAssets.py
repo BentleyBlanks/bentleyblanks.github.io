@@ -6,6 +6,7 @@ import os
 import random
 import subprocess
 import zlib
+from pathlib import Path
 from mathutils import Vector
 
 
@@ -14,6 +15,12 @@ ScriptDirectory = os.path.dirname(os.path.abspath(__file__))
 ProjectRoot = os.path.dirname(ScriptDirectory)
 ModelDirectory = os.path.join(ProjectRoot, "Models")
 TextureDirectory = os.path.join(ProjectRoot, "Textures")
+with open(os.path.join(ProjectRoot, "Data_SourceProject.json"), encoding="utf-8") as sourceProjectFile:
+    SourceProject = json.load(sourceProjectFile)
+SourceDirectory = os.path.join(
+    os.environ.get(SourceProject["rootEnvironment"], SourceProject["defaultRoot"]),
+    SourceProject["directory"],
+)
 TerrainHelperPath = os.path.join(ProjectRoot, "Script_CanonicalTerrain.mjs")
 TerrainHelperProcess = None
 ActiveTerrainOperationId = None
@@ -951,8 +958,18 @@ def ExportCollection(targetCollection, fileName):
 
 
 def WriteSourceBlend(rootCollection):
-    sourcePath = os.path.join(ModelDirectory, "Model_SourceMountainEmberArtPass.blend")
-    temporaryPath = os.path.join(ModelDirectory, "Model_SourceMountainEmberArtPass_Temporary.blend")
+    sourceDirectory = os.path.realpath(SourceDirectory)
+    if not os.path.isabs(SourceDirectory):
+        raise ValueError("Blender source root must be an absolute directory outside the repository")
+    if Path(sourceDirectory).is_relative_to(Path(ProjectRoot).resolve().parent):
+        raise ValueError("Blender source must not be written into the repository project")
+    os.makedirs(sourceDirectory, exist_ok=True)
+    sourcePath = os.path.join(sourceDirectory, SourceProject["fileName"])
+    temporaryPath = os.path.join(sourceDirectory, "Model_SourceMountainEmberArtPass_Temporary.blend")
+    # Keep the editable source independent of a temporary checkout's texture paths.
+    for sourceImage in bpy.data.images:
+        if sourceImage.source == "FILE" and sourceImage.filepath and not sourceImage.packed_file:
+            sourceImage.pack()
     sourceScene = bpy.data.scenes.new("Scene_MountainEmberArtPass")
     sourceScene.collection.children.link(rootCollection)
     try:

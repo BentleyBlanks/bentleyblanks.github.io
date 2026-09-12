@@ -43,7 +43,7 @@ Canonical path: `/MountainEmber1941/`
 
 ## Art asset contract
 
-- Blender source is `Models/Model_SourceMountainEmberArtPass.blend`; regenerate owned assets with `Tools/Script_BuildBlenderAssets.py` through Blender rather than hand-editing exported GLB files.
+- Editable Blender source lives outside Git at `C:/Users/Bentl/OneDrive/AI/Models/Blender/MountainEmber1941/ArtPass/Model_SourceMountainEmberArtPass.blend`. Path configuration, safe migration evidence and authoring checks are in [Data_BlenderSource.md](Data_BlenderSource.md). Regenerate authorized assets with `Tools/Script_BuildBlenderAssets.py`; runtime GLBs and textures remain in the repository.
 - The operation environment mapping is fixed: `infiltrateSignalStation` → `Model_EnvironmentCounty.glb`, `nightRendezvous` → `Model_EnvironmentNorthVillage.glb`, and `quarryInterdiction` → `Model_EnvironmentQuarrySlope.glb`. Runtime must request only the active operation's environment GLB.
 - Every environment GLB must remain one mesh with material slots. The north-village asset owns the five obstacle-aligned buildings, walls, rain cart, creek, millrace, and irrigation sluice. The quarry asset owns its obstacle-aligned office/sheds/blockhouse, retaining walls, five authored elevation benches, worker sheds, ore-cart track and carts, rockfall timbers, and telephone poles.
 - Each operation keeps its own procedural fallback visible until that operation's GLB has loaded successfully. A failed or mismatched request must never hide blockers, waterworks, quarry track, or objective landmarks.

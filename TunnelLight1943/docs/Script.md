@@ -5,11 +5,34 @@
 > 往这里加条目：**【规矩】一句 / 【为什么】一句 / 【守着它的】测试名或 shot 判据**；
 > 事故过程、日期、用户原话、实测数字写进 [`../Data_DesignHistory.md`](../Data_DesignHistory.md)，数值只写常量名。
 
+## 契约速查
+
+以下由原项目入口迁入，仅在涉及本系统时适用；具体接口、判据与说明见后续章节。
+
+- 第九稿下线但保留数据的接绳活卡、辘轳墩桶／拽到井沿（`simple:true`），按休眠内容维护，不顺手删除或恢复。
+
+- 剧本按章在 `Data_ScriptC1..C8.mjs`；帮手函数在 `Script_Core.mjs`；新章文件要登 index.html import map（`TestModuleGraphIsCacheBusted`）。
+- **描述不是旁白**：`say+who`＝对白、`stage`＝真旁白、`act`＝演出说明（不上屏不配音）；字卡走 `state.titleCard`。c1 已分好，c2 起逐章翻新（`TestChapterOneShowsOnlyRealNarration`）。
+- 旗标落在 `effect`，`on()` 只做画面；一整段戏只在微过场里的拍必须写 `settle`，且与 `on()` 调同一个函数。
+- cinematic 不跑 `onStart`——过场拍的布景写在第一行的 `on()`。
+- 新加活卡三处同步：每帧清、DebugJump 重置、Main 的 SetLiveCard；判定与作画共用同一份版面。
+- 光柱：`CustomBlending` 真加法、绘制序过 `FixOrder` 排在压暗罩之后、直射必配间接光、人挡光走 `BlockedSeg` 解析不走步进。判据：`shot "c2_hush@hold=e,dur=1.2"` 光柱无等距横杠。
+- 序章「院外动静」走 `SetDin/StopDin` 调度器，改完用 `state <id> --cues` 验，别靠听。
+- 声音默认关（`SOUND_KEY`），别改回去；旁白/音效不许 `Math.random`，无头要能复现。
+- 视频序章已删、`Video/`／`proN` 卡／旧旁白是无引用遗产，**别顺手删**（始末见 History）。
+
+- 每个玩法元素过「1942-43 华北敌后穷苦农村会有这个吗」。
+- 画面里的汉字按 1942 年写法：繁体、竖排或横排自右向左、「徵」不作「征」；告示是纸、标语是石灰水。
+- 派差事必须有前因后果；新地点/新人物先在画面里出现过再让玩家去找。
+- 旁白不实况复述；惊变时刻旁白闭嘴走同期声；日军讲日语无字幕。
+- 被护送者永不成为失败原因；首败无文字；重试 ≤15 秒；潜行重置点不落在敌人视线里。
+- 全作是冀中平原，不许画山；只有一个景别档，不许俯瞰全村。
+
 ## 剧本口径（2026-08-11 起；c1 2026-08-13 按 Notion **第八稿**整章重排）
 
-**c1 逐拍剧情梗概不在这儿**：读 [`Data_StoryC1.md`](./Data_StoryC1.md)（或
+**c1 逐拍剧情梗概不在这儿**：读 [`Data_StoryC1.md`](../Data_StoryC1.md)（或
 `node Script_Cli.mjs beats c1` / `beat <id>`——从代码现挖，永远最新）；被砍掉的旧
-设计在 [`Data_DesignHistory.md`](./Data_DesignHistory.md)。本节只留**口径规矩**。
+设计在 [`Data_DesignHistory.md`](../Data_DesignHistory.md)。本节只留**口径规矩**。
 **剧本代码按章在 `Data_ScriptC1..C8.mjs`**（一章一个文件，工厂＋Core 末尾的
 SCRIPT_KIT 组装），帮手函数（Cue/FindActor/Spawn* 一族）在 `Script_Core.mjs`；
 新增章文件要登进 index.html 的 import map（`TestModuleGraphIsCacheBusted` 盯着）。

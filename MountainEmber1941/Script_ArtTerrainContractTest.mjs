@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { GetOperationLayout } from "./Data_Operations.mjs";
@@ -139,9 +139,7 @@ assert.match(
   "compact tactical readout text must retain a 10px minimum",
 );
 
-assert.ok(
-  statSync(join(modelRoot, "Model_SourceMountainEmberArtPass.blend")).size > 1_000_000,
-  "full source blend must be regenerated and nontrivial",
-);
+// Editable source lives outside Git. Its size, reopen and dependency checks run
+// through Tools/Script_VerifyBlenderSource.py on the asset-authoring machine.
 
 console.log("MountainEmber1941 canonical terrain art contract passed.");

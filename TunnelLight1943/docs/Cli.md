@@ -65,3 +65,10 @@ node TunnelLight1943/Script_Cli.mjs
 - 【规矩】`?fast=1` 只在静音时生效（开着声音旁白仍正常语速，每句被切在半截，像「台词没说完就切镜头」）；调完把预览页导回不带参数的 URL。
 - 【规矩】面板隐藏时 rAF 停走、canvas 被压成 0×0——没有 playwright 也看不到画面时，`world.Resize` → BuildEnvironment/UpdateActors/UpdateProps → ApplyCamera → Render → `gl.readPixels` 同一个任务里跑，就能做像素级断言；DOM HUD 无法用 canvas.toDataURL 验证（只抓 WebGL 缓冲），只能验根因（fonts loaded、transform none）。
 - 【规矩】只调 `StepGame` 验证镜头或 HUD 等于什么都没验——它们只在 `RunFrame` 里更新；`ReadInput()` 钩子走真实输入路径。
+
+
+## 调查范围与组合调用
+
+已有明确源码位置时可直接阅读；诊断允许跨模块追因。查询状态优先复用 `state`，入口不足时可补定向探针；一次性取证留在忽略目录，可复用的能力才扩充 CLI 并更新说明。
+
+`shot "<id>@line=N,at=T,zoom=<对象>,<旗标>=1"` 可复用 F3 时间轴“复制定位”；拨开关用 `--flag` 或 `@key=v`，查询画面网格用 `--eval`。同一命令可拍多拍。`doctor` 在需要核查分支、缓存、端口或检出时使用。

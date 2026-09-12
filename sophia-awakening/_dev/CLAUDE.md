@@ -1,6 +1,6 @@
 # CLAUDE.md — 强迫症 SOPHIA 项目地图
 
-> 给 Claude 的导航图。**先读这页再动手**，别从零探索整库。改动前按"工作流"先定位"这次改哪一层"。
+> 项目代码导航。按任务定位相关层与内容表；协作、共享工作区和发布遵循 [根 AGENTS.md](../../AGENTS.md)。
 > 策划真源是 Notion《觉醒的SOPHIA》（§ 编号在代码注释里到处引用）。这页是代码侧的对照。
 
 ## 这是什么 / 怎么跑
@@ -11,17 +11,14 @@
 - `npm run dev` — 本地开发（vite，127.0.0.1）。
 - `npm run build` — `tsc --noEmit && vite build`（~400ms）。
 - **`npm run sim`** — ⭐ 4 秒跑通整局核心层（无浏览器）：断言不抛错 / 升满级 / 里程碑全可买 / 结局触发。**改了经济/请求/进阶/技能后先跑这个**，别为验证就开浏览器截图。
-- 部署：见根 `.gitignore` 约定——`_dev/dist` 构建产物拷到 `sophia-awakening/`（已记在 user memory `deploy-vite-demos`）。**默认本地验证后再 push**（memory `workflow-local-test-first`）。
+- 交付：在本任务 worktree 的 `sophia-awakening/_dev/` 执行 `npm run build`，将 `dist/` 产物复制到同树 `sophia-awakening/`（保留 `_dev/` 和现有非构建资产）。从 worktree 根运行 `node scripts/Script_LocalPreview.mjs --no-open`，用输出端口检查 `/sophia-awakening/` 的实际构建页面；核对 `/__preview/ping` 根目录。页面变化完成相关交互与画面验收后，按根流程快进交付 master 并核对部署及线上内容。
 
 ## 工作流（这能砍掉大部分探索时间）
 
 1. **先判断改哪一层**：纯玩法/数值/平衡 → `src/core/`（不碰 Pixi）。画面/交互/动效 → `src/presentation/`。**文案/对话/数值表 → 不在 .ts，在 `src/core/content/locales/zh-CN/<域>.json`**（16 个按域拆的文件，见下「内容地图」）。
 2. **文案与可调数值都在 JSON / TUNING，不要硬编码进 .ts**：`locales/zh-CN/*.json`（按域拆分的语言包：requests/skills/faceCards/…，见「内容地图」）＋ `src/core/tuning.ts`（`TUNING` 平衡常量）。`content/*.ts` 只留**类型 + 逻辑函数**，数据从 `content()` 取。游戏内还有 Debug「内容编辑器 / 数值编辑器」可就地改并**按域导出**。
-3. **提交前必跑验证（执行规范·强制）**：
-   - **较大规模改动**（玩法/经济/进阶/请求/重生/循环等核心层，或跨多文件）→ **必须**跑「循环跑测」再提交：`npm run sim`（跨三循环通关回归）**＋** `npm run loopcheck`（§09 三循环行为对照，`scripts/loop-check.cjs`），两者都 PASS 才提交；再 `npm run build`（tsc + vite）。
-   - **小型改动**（单点文案/数值/局部 UI）→ 至少 `npm run sim` 或一个针对性的简单单测/核对即可。
-   - 默认 `npm run build` 通过后直接部署 + 提交推送（用户已改为不走本地预览，见 memory `workflow-local-test-first`）。
-4. 范围要窄：一次只改一个层/一个体验点（别把"技能面板 UI"和"阶段结构重做"绑一起）。
+3. 按改动影响验证：核心玩法／经济／请求变化运行 `npm run sim`；涉及循环、进阶或重生追加 `npm run loopcheck`。运行时与构建配置变化执行 `npm run build`，页面变化验证实际构建页面。单点文案做相应内容核对及可见布局检查；纯说明整理只查内容、引用、命令和 diff。
+4. 范围以本次目标为准；需要跨 core、presentation 或内容表时同步相关实现、存档与消费方，不因“一次一层”中断必要接线。完成实现、相关验证与授权交付后再报告结果。
 
 ## 架构（core 纯净，presentation 吃 Pixi）
 
@@ -112,7 +109,7 @@ Codex 之类的外部分析常把这些误判为废弃——它们都是当前�
 
 ## 易踩的坑
 
-- **改了 save 结构**（GameState 加字段等）→ 必须同时升 `initialState.ts` 的 `SAVE_VERSION` **和** `App.ts` 的 `PERSISTENCE_REVISION`，否则旧档灌进新代码会崩（memory `sophia-awakening-design` 有详情）。重置/重启走 `hardResetAndReload`。
+- **改了 save 结构**（GameState 加字段等）→ 必须同时升 `initialState.ts` 的 `SAVE_VERSION` **和** `App.ts` 的 `PERSISTENCE_REVISION`，否则旧档灌进新代码会崩。重置/重启走 `hardResetAndReload`。
 - **HUD 买按钮别 `disabled = !affordable`**：算力在价格线附近抖动会吃点击。保持可点、由 core 拒绝。列表用签名缓存，别每 tick `replaceChildren`。
-- **本地用 `python -m http.server` 会白屏**（.js 当 text/plain）；要用带正确 MIME 的静态服务器。无头截图 Pixi 画布会卡——细节在 memory `deploy-vite-demos`。
+- 本地构建页面使用根预览服务，保留正确 MIME 与资源路径。浏览器检查确认 Pixi 画布已完成渲染；等待或截图本身不证明布局／输入正确，发现节流时定向诊断。
 - 工作区常有未提交改动 + dist 产物——动手前先 `git status` / 读 diff，别覆盖用户在改的文件。
