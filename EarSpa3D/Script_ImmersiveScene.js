@@ -5,7 +5,8 @@ import { BuildEar, MakeRng } from './Script_EarAnatomy.js?v=ear012-outer-2026091
 import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
 import { PALETTE as P } from './Data_Palette.mjs?v=ear012-outer-20260911';
 
-import {InstrumentContact,IsFeatherDebris} from './Script_InstrumentInteraction.mjs?v=ear024-cohesive-scraping-20260912';
+import {InstrumentContact,IsFeatherDebris} from './Script_InstrumentInteraction.mjs?v=ear028-edge-contact-20260912';
+import {WaxEdgeContact} from './Script_WaxEdgeContact.mjs?v=ear028-edge-contact-20260912';
 import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody, BindPeelSurface, BindPeelSurfaceSteps, WritePeelSurface, MovePeelBody, PeelAnchorPoint } from './Script_PeelPhysics.mjs?v=ear025-oily-20260912';
 import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
 import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear024-cohesive-scraping-20260912';
@@ -322,6 +323,15 @@ export async function CreateImmersiveScene({ core }) {
     const hit = ray.intersectObjects(chunks.filter(c=>c.state==='attached'||c.state==='returning').map(c=>c.mesh))[0];
     const obstruction = ray.intersectObject(wall)[0];
     if (hit && (!obstruction || hit.distance < obstruction.distance + .035)) return hit.object.userData.chunk;
+    if(toolId==='scoop'&&scoopStroke){
+      let nearest=null,distance=Infinity;
+      for(const c of chunks){
+        if(!['attached','returning'].includes(c.state)||c.fine||!CanScoopReach(c))continue;
+        const contactHit=ScoopSurfaceHit(c);
+        if(contactHit&&contactHit.point.distanceToSquared(tool.position)<distance){nearest=c;distance=contactHit.point.distanceToSquared(tool.position);}
+      }
+      if(nearest)return nearest;
+    }
     // 小屏边缘容差只扩到最近的一块，不能把空白长按解释成远处接触。
     let nearest = null, distance = Math.min(30, width * .075);
     for (const c of chunks.filter(c=>c.state==='attached'||c.state==='returning')) {
@@ -343,12 +353,32 @@ export async function CreateImmersiveScene({ core }) {
     const local=point.clone().sub(tool.position).applyQuaternion(tool.quaternion.clone().invert());
     return Math.abs(local.x)<.64&&Math.abs(local.y)<.84&&local.z>-.55&&local.z<.6;
   }
+  function CanScoopReach(c){return c.depth<=Reach('scoop');}
+  function ScoopSurfaceHit(c){
+    if(!c.mesh.geometry.boundingSphere)c.mesh.geometry.computeBoundingSphere();
+    const bounds=c.mesh.geometry.boundingSphere.clone().applyMatrix4(c.mesh.matrixWorld);
+    if(bounds.center.distanceTo(tool.position)>bounds.radius+.95)return null;
+    const axis=new THREE.Vector3(0,0,1).applyQuaternion(tool.quaternion),probe=new THREE.Raycaster(),samples=[[0,0]];
+    for(let i=0;i<12;i++){const angle=i*Math.PI/6;samples.push([Math.cos(angle)*.36,Math.sin(angle)*.51]);}
+    let nearest=null,distance=Infinity;
+    // 沿真实勺碗开口检查有限工作区，鼠标中心在轮廓外时勺沿也能接触。
+    for(const [x,y] of samples){
+      const start=new THREE.Vector3(x,y,.6).applyQuaternion(tool.quaternion).add(tool.position);
+      probe.set(start,axis.clone().negate());probe.far=1.15;
+      const hit=probe.intersectObject(c.mesh)[0];if(!hit||!ScoopTouches(hit.point))continue;
+      const d=hit.point.distanceToSquared(tool.position);if(d>=distance)continue;
+      const skin=probe.intersectObject(wall)[0];if(skin&&skin.distance+.035<hit.distance)continue;
+      nearest=hit;distance=d;
+    }
+    return nearest;
+  }
   function Grip(c,x,y,id) {
     scene.updateMatrixWorld(true);
     ray.setFromCamera(new THREE.Vector2(x/width*2-1,1-y/height*2),camera);
-    const hit=ray.intersectObject(c.mesh)[0];
+    let hit=ray.intersectObject(c.mesh)[0];
+    if(id==='scoop'&&scoopStroke&&(!hit||!ScoopTouches(hit.point)||hit.point.distanceTo(tool.position)>.95))hit=ScoopSurfaceHit(c);
     let point=hit?.point.clone()||c.mesh.position.clone().addScaledVector(c.normal,.35);
-    if(id==='scoop'&&scoopStroke&&(!ScoopTouches(point)||point.distanceTo(tool.position)>.95))return false;
+    if(id==='scoop'&&scoopStroke&&(!hit||!ScoopTouches(point)||point.distanceTo(tool.position)>.95))return false;
     if(id==='tweezers'){
       const side=c.mesh.material.side;c.mesh.material.side=THREE.DoubleSide;
       const thicknessRay=new THREE.Raycaster(point.clone().addScaledVector(c.normal,c.size*2+.2),c.normal.clone().negate(),0,c.size*4+1);
@@ -365,7 +395,7 @@ export async function CreateImmersiveScene({ core }) {
       c.cursorOffset=scoopStroke?.offset||tool.position.clone().sub(cursor||tool.position);
       c.scoopOffset=point.clone().sub(tool.position);c.lastScoopTarget=tool.position.clone();
     }
-    const contactState=InstrumentContact(id,c.gripRotation.toArray(),c.normal.toArray(),{jawContact:c.jawContact});
+    const contactState=InstrumentContact(id,c.gripRotation.toArray(),c.normal.toArray(),{jawContact:c.jawContact,edgeContact:id==='scoop'?WaxEdgeContact(c.body,point.toArray()):null});
     c.aligned=contactState.aligned;c.grasped=id==='tweezers'&&contactState.aligned;c.forceDirection=new THREE.Vector3().fromArray(contactState.direction);
     c.pullLocal=c.forceDirection.clone().applyQuaternion(c.rotation.clone().invert());
 
@@ -374,7 +404,7 @@ export async function CreateImmersiveScene({ core }) {
   }
   function Drag(c,x,y,dt,efficiency) {
     ray.setFromCamera(new THREE.Vector2(x/width*2-1,1-y/height*2),camera);
-    if(!c.body.detached){
+    if(!c.body.detached&&c.toolId!=='scoop'){
       // 已形成双侧夹持后由抓点保持，变形中的表面射线不应把镊子误判为松夹。
       const contactState=InstrumentContact(c.toolId,tool.quaternion.toArray(),c.normal.toArray(),{jawContact:c.grasped});
       c.aligned=contactState.aligned;c.forceDirection.fromArray(contactState.direction);
@@ -392,8 +422,10 @@ export async function CreateImmersiveScene({ core }) {
       const motion=target.clone().sub(c.lastScoopTarget);c.lastScoopTarget.copy(target);
       if(motion.lengthSq()>1e-10)c.forceDirection.copy(motion).normalize();
       // 勺碗仅在有限工作区接触材料；越过勺沿或朝向错误会滑脱，不能成为无限长的抓取弹簧。
-      c.scoopContact=ScoopTouches(new THREE.Vector3().fromArray(GetGripPoint(c.body)))&&c.scoopOffset.length()<.95;
-      c.aligned=InstrumentContact('scoop',tool.quaternion.toArray(),c.normal.toArray()).aligned;
+      const grip=GetGripPoint(c.body),edgeContact=WaxEdgeContact(c.body,grip);
+      const contactState=InstrumentContact('scoop',tool.quaternion.toArray(),c.normal.toArray(),{edgeContact,motion:motion.toArray()});
+      c.scoopContact=ScoopTouches(new THREE.Vector3().fromArray(grip))&&c.scoopOffset.length()<.95&&contactState.loading;
+      c.aligned=contactState.aligned;c.scoopEdgeContact=edgeContact;
       target.add(c.scoopOffset);
     }
     if(c.body.detached&&!c.holdRotation)c.holdRotation=['scoop','brush'].includes(c.toolId)?FlatRotation.toArray():c.body.rotation.slice();
