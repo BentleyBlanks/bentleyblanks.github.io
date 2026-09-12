@@ -182,6 +182,13 @@ export function CreateShop({ seed = 20260910, storage = null } = {}) {
     return state.todayCustomers.some((c) => !c.done);
   }
 
+  function SkipCustomer() {
+    const customer = CurrentCustomer();
+    if (!customer || customer.done) return false;
+    customer.done = true;customer.paid = 0;customer.skipped = true;
+    Save();return true;
+  }
+
   function AdvanceCustomer() {
     const idx = state.todayCustomers.findIndex((c) => !c.done);
     state.todayIndex = idx < 0 ? state.todayCustomers.length : idx;
@@ -336,7 +343,7 @@ export function CreateShop({ seed = 20260910, storage = null } = {}) {
 
   return {
     state, Snapshot, Save, Load, Reset,
-    StartDay, NextDay, CurrentCustomer, HasNextCustomer, AdvanceCustomer, FinishCustomer,
+    StartDay, NextDay, CurrentCustomer, HasNextCustomer, AdvanceCustomer, SkipCustomer, FinishCustomer,
     ToolLevel, ToolUpgradeOffer, UpgradeTool, ShopOffer, UpgradeShop, LeveledSpec,
     TierForReputation,ToolOffer,BuyTool,SkinOffer,BuySkin,EquipSkin,
     get coins() { return state.coins; },

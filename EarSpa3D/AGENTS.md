@@ -13,6 +13,8 @@
 
 六种工具统一按住拖动、实际工作端接触判定，旧的跟随鼠标设置自动迁移。滚轮／触屏进退模式控制深度，松手原地停留。对应检查：`node EarSpa3D/Script_ToolDragPlayTest.mjs --url=http://127.0.0.1:8136/EarSpa3D/`，覆盖四种视口、实际输入、接触与鼠标偏移、松手停留及设置持久化。
 
+设置 → 通用 → 画质支持总开关、预设与八类分项调节；Debug → GamePlay 可跳转下一个顾客（未完成服务不结算，练习禁用）。对应检查：`node EarSpa3D/Script_RenderQualityPlayTest.mjs --url=http://127.0.0.1:8147/EarSpa3D/`，覆盖实际渲染、存储异常、四种视口、跨日、重试与盘内保留。
+
 设置 → Debug → 物理模拟可按四种材质调整物理参数并恢复默认，参数单独保存在本机，关闭设置后用于当前及后续耳垢。对应检查：`node EarSpa3D/Script_PhysicsSettingsTest.mjs`、`node EarSpa3D/Script_PhysicsSettingsPlayTest.mjs --url=http://127.0.0.1:8128/EarSpa3D/`；覆盖回弹能量、求解器参数、存储异常与四种视口。
 
 油耳凝胶、五种练习耳道与营业隔离见 [Data_OilyWax.md](./Data_OilyWax.md)。对应检查：`Script_OilyCoatingTest.mjs`、`Script_SlimePhysicsTest.mjs`、`Script_OilyWaxPlayTest.mjs`、`Script_OilyFilmPlayTest.mjs`、`Script_OilyRenderingTest.mjs`、`Script_OilyDetailTest.mjs`、`Script_OilyVisibilityTest.mjs`；浏览器检查通过 `--url=` 指向本任务预览。表面细节回归另检查到 24 mm 的显示曲面间隙和绘制顺序。覆盖层物理测试检查反复局部撕取、闭合断口、体积／质量守恒与离壁收拢；交互必须验证每次只能挖一小团，持续握持不重复取母体，耳勺静止不加载。油耳营业时长为 900 秒，练习不限时。

@@ -33,6 +33,7 @@ export function GuessQuality() {
 }
 
 export function CreateCore({ canvas, quality = "auto", onError, viewCamera = null } = {}) {
+  let renderQuality = null;
   let tier = QUALITY_TIERS[quality] || QUALITY_TIERS[GuessQuality()];
 
   const renderer = new THREE.WebGLRenderer({
@@ -81,7 +82,8 @@ export function CreateCore({ canvas, quality = "auto", onError, viewCamera = nul
   let disposed = false;
 
   function ApplyPixelRatio() {
-    const pr = Math.min(tier.pixelRatio, (typeof devicePixelRatio !== "undefined" ? devicePixelRatio : 1));
+    const dpr = typeof devicePixelRatio !== "undefined" ? devicePixelRatio : 1;
+    const pr = renderQuality && renderQuality.resolution !== "auto" ? ({low:.75,mid:1,high:Math.min(2.5,dpr)}[renderQuality.resolution]) : Math.min(tier.pixelRatio,dpr);
     renderer.setPixelRatio(pr * renderScale);
     renderer.setSize(width, height, false);
     stats.pixelRatio=pr*renderScale;stats.bufferWidth=canvas.width;stats.bufferHeight=canvas.height;
@@ -119,6 +121,21 @@ export function CreateCore({ canvas, quality = "auto", onError, viewCamera = nul
     return tier.id;
   }
 
+  function SetRenderQuality(next) {
+    renderQuality = {...next};
+    renderScale = scaleTarget = 1;slowStreak = fastStreak = 0;
+    renderer.shadowMap.enabled = next.shadows === 'auto' ? tier.shadow : next.shadows !== 'off';
+    const size = {off:0,auto:1024,low:512,mid:1024,high:2048}[next.shadows];
+    scene.traverse(light => {
+      if (!light.shadow || !size || light.shadow.mapSize.x === size) return;
+      light.shadow.map?.dispose();light.shadow.map = null;
+      light.shadow.mapPass?.dispose();light.shadow.mapPass = null;
+      light.shadow.mapSize.set(size,size);light.shadow.needsUpdate = true;
+    });
+    stats.renderQuality = {...next};
+    ApplyPixelRatio();
+  }
+
   /**
    * 自适应分辨率。判定用**中位数量级**的帧时间而不是瞬时值：
    * 一次 GC 卡一下不该把画质打下去，而持续 40ms 就必须降。
@@ -138,8 +155,8 @@ export function CreateCore({ canvas, quality = "auto", onError, viewCamera = nul
     }
     if (slowStreak >= 30) {
       // 先削减阴影成本，保持像素密度；不能把整张手机画面糊成低分辨率。
-      renderer.shadowMap.enabled=false;
-      scaleTarget = Math.max(tier.minScale, scaleTarget - 0.03);
+      if (!renderQuality || renderQuality.shadows === "auto") renderer.shadowMap.enabled=false;
+      if (!renderQuality || renderQuality.resolution === "auto") scaleTarget = Math.max(tier.minScale, scaleTarget - 0.03);
       slowStreak = 0;
     } else if (fastStreak >= 180) {
       scaleTarget = Math.min(1, scaleTarget + 0.05);
@@ -220,7 +237,7 @@ export function CreateCore({ canvas, quality = "auto", onError, viewCamera = nul
     THREE, renderer, scene, camera, insetCamera, insetScene, stats,
     get tier() { return tier; },
     get size() { return { width, height }; },
-    Resize, SetQuality, Tick, Render, Dispose,
+    Resize, SetQuality, SetRenderQuality, Tick, Render, Dispose,
     setExposure(v) { renderer.toneMappingExposure = v; },
   };
 }

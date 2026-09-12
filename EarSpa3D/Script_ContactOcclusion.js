@@ -3,7 +3,7 @@ import * as THREE from 'three';
 export function CreateContactOcclusion(){
  const limit=24,tile=64,grid=5,side=tile*grid,range=.40,data=new Uint8Array(side*side*4),cache=new WeakMap();
  const texture=new THREE.DataTexture(data,side,side,THREE.RGBAFormat);texture.minFilter=texture.magFilter=THREE.LinearFilter;texture.needsUpdate=true;
- const matrices=Array.from({length:limit},()=>new THREE.Matrix4()),sizes=Array.from({length:limit},()=>new THREE.Vector3(1,1,1)),uniforms={contactInverse:{value:matrices},contactSize:{value:sizes},contactCount:{value:0},contactEnabled:{value:1},contactLamp:{value:new THREE.Vector3()},contactOutline:{value:texture}};
+ const matrices=Array.from({length:limit},()=>new THREE.Matrix4()),sizes=Array.from({length:limit},()=>new THREE.Vector3(1,1,1)),uniforms={contactInverse:{value:matrices},contactSize:{value:sizes},contactCount:{value:0},contactEnabled:{value:1},contactSamples:{value:4},contactLamp:{value:new THREE.Vector3()},contactOutline:{value:texture}};
  const slotGeometry=Array(limit).fill(null);let covered=0;
  function Outline(g){
   if(cache.has(g))return cache.get(g);g.computeBoundingBox();const center=g.boundingBox.getCenter(new THREE.Vector3()),size=g.boundingBox.getSize(new THREE.Vector3()).multiplyScalar(.5).add(new THREE.Vector3(range,range,.025));
@@ -27,13 +27,13 @@ export function CreateContactOcclusion(){
  function Bind(shader,{self=-1,wall=null}={}){
   Object.assign(shader.uniforms,uniforms);shader.uniforms.contactSelf={value:self};
   shader.vertexShader='varying vec3 contactWorld;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <project_vertex>','contactWorld=(modelMatrix*vec4(transformed,1.0)).xyz;\n#include <project_vertex>');
-  shader.fragmentShader=`varying vec3 contactWorld;uniform mat4 contactInverse[24];uniform vec3 contactSize[24];uniform int contactCount;uniform int contactSelf;uniform float contactEnabled;uniform vec3 contactLamp;uniform sampler2D contactOutline;
+  shader.fragmentShader=`varying vec3 contactWorld;uniform mat4 contactInverse[24];uniform vec3 contactSize[24];uniform int contactCount;uniform int contactSelf;uniform float contactEnabled;uniform int contactSamples;uniform vec3 contactLamp;uniform sampler2D contactOutline;
    vec3 ReadContact(vec3 q,vec3 r,int index){vec2 uv=clamp(q.xy/r.xy*.5+.5,vec2(0.0),vec2(1.0));vec2 cell=vec2(float(index%5),floor(float(index)/5.0));vec3 sampleValue=texture2D(contactOutline,(cell+(uv*63.0+.5)/64.0)/5.0).rgb;return vec3((sampleValue.r-.5)*.8,(sampleValue.gb-.5)*2.0*r.z);}
   `+shader.fragmentShader;
   shader.fragmentShader=shader.fragmentShader.replace('#include <aomap_fragment>',`#include <aomap_fragment>
    float contactAo=1.0;float contactShadow=1.0;vec3 contactRay=normalize(contactLamp-contactWorld);
    for(int ci=0;ci<24;ci++){
-    if(ci>=contactCount)break;if(ci==contactSelf)continue;
+    if(contactEnabled<.001||ci>=contactCount)break;if(ci==contactSelf)continue;
     vec3 q=(contactInverse[ci]*vec4(contactWorld,1.0)).xyz,r=contactSize[ci];
     if(any(greaterThan(abs(q),r+vec3(.32))))continue;
     vec3 surface=ReadContact(q,r,ci);float gap=abs(q.z-surface.y);
@@ -42,7 +42,7 @@ export function CreateContactOcclusion(){
     contactAo=min(contactAo,1.0-.76*rim);
     vec3 rd=(contactInverse[ci]*vec4(contactRay,0.0)).xyz;
     for(int si=0;si<4;si++){
-     float travel=.045+float(si)*.085;vec3 probe=q+rd*travel;
+     if(si>=contactSamples)break;float travel=.045+float(si)*(.34/float(max(contactSamples,1)));vec3 probe=q+rd*travel;
      if(any(greaterThan(abs(probe.xy),r.xy)))continue;
      vec3 hit=ReadContact(probe,r,ci);float silhouette=1.0-smoothstep(-.018,.026,hit.x);
      float volume=smoothstep(hit.y-.012,hit.y+.024,probe.z)*(1.0-smoothstep(hit.z-.012,hit.z+.024,probe.z));
@@ -55,6 +55,7 @@ export function CreateContactOcclusion(){
   `);
  }
  function Update(chunks,lamp){
+  if(!uniforms.contactEnabled.value){uniforms.contactCount.value=0;covered=0;return;}
   uniforms.contactLamp.value.copy(lamp.position);const slots=new Map();let i=0,dirty=false;
   for(const c of chunks){if(i===limit)break;if(c.coating||c.fine||!c.mesh.visible||['fractured','collected'].includes(c.state))continue;
    const outline=Outline(c.mesh.geometry);c.mesh.updateMatrixWorld(true);matrices[i].copy(c.mesh.matrixWorld).multiply(new THREE.Matrix4().makeTranslation(...outline.center.toArray())).invert();sizes[i].copy(outline.size);slots.set(c,i);
@@ -63,5 +64,5 @@ export function CreateContactOcclusion(){
   if(dirty)texture.needsUpdate=true;uniforms.contactCount.value=i;covered=i;
   for(const c of chunks){const m=c.mesh.material;m.userData.contactSelf=slots.get(c)??-1;if(m.userData.contactShader)m.userData.contactShader.uniforms.contactSelf.value=m.userData.contactSelf;}
  }
- return{Bind,Update,Prepare:Outline,SetEnabled(value){uniforms.contactEnabled.value=value?1:0;},Probe(){return{contactOcclusion:'actual triangle silhouette edge AO and short contact rays',contactOccluders:covered,contactEnabled:!!uniforms.contactEnabled.value,contactRimMm:.135}}};
+ return{Bind,Update,Prepare:Outline,SetQuality(strength,samples){uniforms.contactEnabled.value=strength;uniforms.contactSamples.value=samples;},SetEnabled(value){uniforms.contactEnabled.value=value?1:0;},Probe(){return{contactOcclusion:'actual triangle silhouette edge AO and short contact rays',contactOccluders:covered,contactEnabled:!!uniforms.contactEnabled.value,contactRimMm:.135,contactSamples:uniforms.contactSamples.value}}};
 }

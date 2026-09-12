@@ -3,7 +3,7 @@ import {CloneSlimeVolume,PoseSlimeVolume,StepSlimeVolume,WriteSlimeSurface} from
 import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // 盘内藏品只保存外观与独立运动状态，不再持有耳壁物理体或参与客人评分。
-export function CreateCollectionTray({scene, tray, camera, Project, size, scoop}) {
+export function CreateCollectionTray({scene, tray, camera, Project, size, scoop, ConfigureMaterial=material=>material}) {
   const group=new THREE.Group();scene.add(group);
   const pieces=[],batches=new Map(),ray=new THREE.Raycaster(),plane=new THREE.Plane();
   const flat=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),new THREE.Vector3(0,1,0));
@@ -53,7 +53,7 @@ export function CreateCollectionTray({scene, tray, camera, Project, size, scoop}
     }
     for(const batch of batches.values()){
       const mesh=new THREE.Mesh(mergeGeometries(batch.geometries),batch.material.clone());
-      if(batch.material.userData.oily){mesh.material.onBeforeCompile=batch.material.onBeforeCompile;mesh.material.customProgramCacheKey=batch.material.customProgramCacheKey;}
+      if(batch.material.userData.oily){mesh.material.onBeforeCompile=batch.material.onBeforeCompile;mesh.material.customProgramCacheKey=batch.material.customProgramCacheKey;}ConfigureMaterial(mesh.material);
       mesh.castShadow=mesh.receiveShadow=true;mesh.frustumCulled=false;group.add(mesh);batch.mesh=mesh;
     }
     Write();
@@ -77,7 +77,7 @@ export function CreateCollectionTray({scene, tray, camera, Project, size, scoop}
     if(!geometry.attributes.uv)geometry.setAttribute('uv',new THREE.Float32BufferAttribute(new Float32Array(geometry.attributes.position.count*2),2));
     const material=c.mesh.material.clone();material.clippingPlanes=[];
     if(c.body.gel){material.onBeforeCompile=c.mesh.material.onBeforeCompile;material.customProgramCacheKey=c.mesh.material.customProgramCacheKey;}
-    pieces.push({id:++serial,key:c.type+':'+c.tone,gelBody:c.body.gel?CloneSlimeVolume(c.body,position.toArray()):null,geometry,material,position:position.clone(),velocity:new THREE.Vector3(),floor:position.y,mass:c.mass,grains:c.grainCount||1,radius:Math.max(.35,Math.min(1.7,Math.max(...c.footprint)/2)),fall:0});
+    ConfigureMaterial(material);pieces.push({id:++serial,key:c.type+':'+c.tone,gelBody:c.body.gel?CloneSlimeVolume(c.body,position.toArray()):null,geometry,material,position:position.clone(),velocity:new THREE.Vector3(),floor:position.y,mass:c.mass,grains:c.grainCount||1,radius:Math.max(.35,Math.min(1.7,Math.max(...c.footprint)/2)),fall:0});
     Rebuild();
   }
   function Point(x,y){

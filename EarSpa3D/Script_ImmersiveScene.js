@@ -1,6 +1,7 @@
+import {ResolveRenderQuality} from './Data_RenderQuality.mjs?v=ear040-render-settings-20260912';
 import {FeatherCapacity} from './Script_FeatherSweep.mjs?v=ear039-brush-gather-20260912';
 import {AddFeatherFur,ClearFeatherFur,PrepareFeatherStrands,FEATHER_FUR_LENGTH,FEATHER_FUR_PASSES} from './Script_FeatherFur.js?v=ear031-feather-groom-20260912';
-import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear038-oily-performance-20260912';
+import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear040-render-settings-20260912';
 import * as THREE from 'three';
 import {SlimeCage,PoseSlimeVolume,StepSlimeVolume,SplitSlimeBite} from './Script_SlimePhysics.mjs?v=ear038-oily-performance-20260912';
 import {BuildOilyCoating,OILY_REGIONS} from './Script_OilyCoating.mjs?v=ear036-oily-bites-20260912';
@@ -15,7 +16,7 @@ import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryU
 import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear024-cohesive-scraping-20260912';
 import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear012-outer-20260911';
 import { CreateToolContact } from './Script_ToolContact.js?v=ear020-contact-loading-20260912';
-import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear032-oily-detail-20260912';
+import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear040-render-settings-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 
 // 封闭耳道、真实接触点与实体收集盘共用毫米世界；镜头在取出时连续后退。
@@ -66,7 +67,7 @@ export async function CreateImmersiveScene({ core }) {
   const pmrem=new THREE.PMREMGenerator(renderer),target=pmrem.fromScene(environmentScene,metal?.015:.08);pmrem.dispose();environmentScene.traverse(n=>{n.geometry?.dispose();n.material?.dispose();});return target;
   }
   const environment=BakeEnvironment(core.renderer),metalEnvironment=BakeEnvironment(core.renderer,true),metalMaterials=new Set();
-  let metalIntensity=.7;
+  let metalIntensity=.7,renderQuality=ResolveRenderQuality();
   scene.environment=environment.texture;scene.environmentIntensity=.18;
 
   const outer = new THREE.Group(), canalGroup = new THREE.Group(); root.add(outer, canalGroup);
@@ -158,7 +159,7 @@ export async function CreateImmersiveScene({ core }) {
     }
     tool.add(toolParts[id]);
   }
-  const collectionTray=CreateCollectionTray({scene,tray,camera,Project,size:()=>({width,height}),scoop:toolParts.scoop});
+  const collectionTray=CreateCollectionTray({scene,tray,camera,Project,size:()=>({width,height}),scoop:toolParts.scoop,ConfigureMaterial:materials.ConfigureMaterial});
   const ring = new THREE.Mesh(new THREE.TorusGeometry(.95, .026, 8, 64), new THREE.MeshBasicMaterial({ color: P.white, transparent: true, opacity: .75 }));
   scene.add(ring); ring.quaternion.copy(camera.quaternion); ring.visible = false;
   const droplet = new THREE.Mesh(new THREE.SphereGeometry(.16, 16, 12), new THREE.MeshPhysicalMaterial({ color: P.water, roughness: .12, clearcoat: 1 }));
@@ -748,9 +749,18 @@ export async function CreateImmersiveScene({ core }) {
       }
     }
   }
+  function ApplyGroupQuality(group){
+    group.traverse(node=>{
+      if(node.userData.featherShell)node.visible=Number(node.name.split('_').at(-1))<=renderQuality.furLayers;
+      for(const material of node.material?(Array.isArray(node.material)?node.material:[node.material]):[])materials.ConfigureMaterial(material);
+    });
+  }
+  function SetRenderQuality(next){
+    renderQuality={...next};materials.SetQuality(next);ApplyGroupQuality(scene);CameraFrame(0);materials.Update(chunks,lamp);
+  }
   function SetSkins(equipped,levels={}){
     for(const [id,group] of Object.entries(toolParts))if(toolSkins[id]!==equipped[id]||toolLevels[id]!==levels[id])StyleTool(group,id,levels[id]||1,equipped[id]||'classic');
-    toolSkins={...equipped};toolLevels={...levels};contact.Reset();
+    toolSkins={...equipped};toolLevels={...levels};ApplyGroupQuality(tool);contact.Reset();
   }
   let shadersWarmed=false;
   async function WarmTools(){
@@ -1141,8 +1151,8 @@ export async function CreateImmersiveScene({ core }) {
     CycleDepth(){inspectionTarget=chunks[0]?.type==='oily'?(inspectionTarget===0?1:inspectionTarget>0?-.4:0):(inspectionTarget?0:1);contact.Reset();HideTool();return inspectionTarget;},
     Reach,CanReach(c,id){return c.coating||c.depth<=Reach(id);},SetDeep(value){inspectionTarget=value?1:0;contact.Reset();HideTool();},
     AuditTool,CollisionProbe(){return contact.Probe();},
-    SetContact:materials.SetContact,
-    RenderingProbe(){return {shadersWarmed,staticRaycast:true,fiberClusters:Object.fromEntries(['feather','brush'].map(id=>[id,toolParts[id].children.reduce((sum,p)=>sum+(p.userData.fiberGroups?.length||0),0)])),...materials.Probe(),heading,inspectionDepth,inspectionTarget,reachBlocked,toolReach:Reach(lastToolId),traySize:new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).toArray(),trayStandalone:true,trayCloseup:showcaseBlend,trayCollection:collectionTray.Probe(),trayBounds:TrayBounds(),trayInscription:"强迫症的SOPHIA",toolVisible:tool.visible,toolDragMode,draggingTool:!!toolDrag,toolPosition:tool.position.toArray(),toolScreen:Project(tool.position),toolDepth:canal.Project(tool.position).depth,toolRotation:tool.quaternion.toArray(),featherShading:'six-pass combed continuous fibers',featherFur:{passes:FEATHER_FUR_PASSES,length:FEATHER_FUR_LENGTH},featherSweep:{capacity:FeatherCapacity(toolLevels.feather),held:featherSweep?.items.length||0,angle:featherSweep?.angle||0},hairCount:360,hairRootFixed:true,profileHairLayers:3,profileHairTexture:'Texture_LayeredDarkHair.png',profileHairWisps:90,hairTime,headRealtime:true,lampOn,lampAim:lamp.target.position.toArray(),lampIntensity:lamp.intensity,shadows:core.renderer.shadowMap.enabled,canalVisible:canalGroup.visible,externalContext:outer.visible&&!!(transfer||showcase),outerVisible:outer.visible,irritation:chunks.filter(c=>!c.fragment).map(c=>c.irritation),roughness:chunks.map(c=>c.mesh.material.roughness),clearcoat:chunks.map(c=>c.mesh.material.clearcoat),toolLevels:{...toolLevels},previewTriangles};},
+    SetContact:materials.SetContact,SetRenderQuality,
+    RenderingProbe(){return {renderQuality:{...renderQuality},shadowSize:lamp.shadow.mapSize.x,reflectionStrength:renderQuality.reflections,furLayers:renderQuality.furLayers,shadersWarmed,staticRaycast:true,fiberClusters:Object.fromEntries(['feather','brush'].map(id=>[id,toolParts[id].children.reduce((sum,p)=>sum+(p.userData.fiberGroups?.length||0),0)])),...materials.Probe(),heading,inspectionDepth,inspectionTarget,reachBlocked,toolReach:Reach(lastToolId),traySize:new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).toArray(),trayStandalone:true,trayCloseup:showcaseBlend,trayCollection:collectionTray.Probe(),trayBounds:TrayBounds(),trayInscription:"强迫症的SOPHIA",toolVisible:tool.visible,toolDragMode,draggingTool:!!toolDrag,toolPosition:tool.position.toArray(),toolScreen:Project(tool.position),toolDepth:canal.Project(tool.position).depth,toolRotation:tool.quaternion.toArray(),featherShading:'six-pass combed continuous fibers',featherFur:{passes:FEATHER_FUR_PASSES,length:FEATHER_FUR_LENGTH},featherSweep:{capacity:FeatherCapacity(toolLevels.feather),held:featherSweep?.items.length||0,angle:featherSweep?.angle||0},hairCount:360,hairRootFixed:true,profileHairLayers:3,profileHairTexture:'Texture_LayeredDarkHair.png',profileHairWisps:90,hairTime,headRealtime:true,lampOn,lampAim:lamp.target.position.toArray(),lampIntensity:lamp.intensity,shadows:core.renderer.shadowMap.enabled,canalVisible:canalGroup.visible,externalContext:outer.visible&&!!(transfer||showcase),outerVisible:outer.visible,irritation:chunks.filter(c=>!c.fragment).map(c=>c.irritation),roughness:chunks.map(c=>c.mesh.material.roughness),clearcoat:chunks.map(c=>c.mesh.material.clearcoat),toolLevels:{...toolLevels},previewTriangles};},
     ToggleLamp(){lampOn=!lampOn;return lampOn;},AimLamp(x,y){aim.set(x/width*2-1,1-y/height*2);aimed=true;},
     Enter(){inside=true;entrance=0;showcase=false;},Hover,
     ToggleView(){if(transfer)return 'canal';showcase=false;inside=!inside;HideTool();return inside?'canal':'ear';},

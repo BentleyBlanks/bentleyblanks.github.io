@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="Style_Chunk.css?v=ear039-brush-gather-20260912">
+<link rel="stylesheet" href="Style_Chunk.css?v=ear040-render-settings-20260912">
 <style>
   /* 首屏骨架：样式表可能还没到，先给出与基调一致的底色，避免白闪 */
   html { background: #141210; }
@@ -58,7 +58,7 @@
   // 真正的游戏逻辑一行都不在这里——这里出错是最难查的那种，保持它足够小。
   const boot = document.getElementById("ear-boot");
   try {
-    const mod = await import("./Script_ChunkGame.js?v=ear039-brush-gather-20260912");
+    const mod = await import("./Script_ChunkGame.js?v=ear040-render-settings-20260912");
     await mod.Start();
   } catch (error) {
     console.error(error);
