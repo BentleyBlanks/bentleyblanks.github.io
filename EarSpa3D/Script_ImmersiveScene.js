@@ -1,20 +1,21 @@
 import {FeatherCapacity} from './Script_FeatherSweep.mjs?v=ear029-feather-20260912';
 import {AddFeatherFur,ClearFeatherFur,FEATHER_FUR_LENGTH,FEATHER_FUR_PASSES} from './Script_FeatherFur.js?v=ear029-feather-20260912';
-import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear028-physics-settings-20260912';
+import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear029-oily-coating-20260912';
 import * as THREE from 'three';
-import {SlimeCage,PoseSlimeVolume,StepSlimeVolume} from './Script_SlimePhysics.mjs?v=ear028-physics-settings-20260912';
+import {SlimeCage,PoseSlimeVolume,StepSlimeVolume} from './Script_SlimePhysics.mjs?v=ear029-oily-coating-20260912';
+import {BuildOilyCoating,OILY_REGIONS} from './Script_OilyCoating.mjs?v=ear029-oily-coating-20260912';
 import { BuildEar, MakeRng } from './Script_EarAnatomy.js?v=ear012-outer-20260911';
 import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
 import { PALETTE as P } from './Data_Palette.mjs?v=ear012-outer-20260911';
 
 import {InstrumentContact,IsFeatherDebris} from './Script_InstrumentInteraction.mjs?v=ear028-edge-contact-20260912';
 import {WaxEdgeContact} from './Script_WaxEdgeContact.mjs?v=ear028-edge-contact-20260912';
-import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody, BindPeelSurface, BindPeelSurfaceSteps, WritePeelSurface, MovePeelBody, PeelAnchorPoint } from './Script_PeelPhysics.mjs?v=ear028-physics-settings-20260912';
+import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody, BindPeelSurface, BindPeelSurfaceSteps, WritePeelSurface, MovePeelBody, PeelAnchorPoint } from './Script_PeelPhysics.mjs?v=ear029-oily-coating-20260912';
 import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
 import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear024-cohesive-scraping-20260912';
 import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear012-outer-20260911';
 import { CreateToolContact } from './Script_ToolContact.js?v=ear020-contact-loading-20260912';
-import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear026-skin-sss-20260912';
+import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear029-oily-coating-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 
 // 封闭耳道、真实接触点与实体收集盘共用毫米世界；镜头在取出时连续后退。
@@ -190,6 +191,7 @@ export async function CreateImmersiveScene({ core }) {
     scene.backgroundIntensity=.8;scene.backgroundBlurriness=0;
     scene.environmentIntensity=transferBlend>.4?.65:lampOn?.28:.018;
     metalIntensity=THREE.MathUtils.lerp(THREE.MathUtils.lerp(.7,lampOn?.75:.045,t),.85,transferBlend);
+    for(const c of chunks)if(c.coating)c.mesh.material.envMapIntensity=metalIntensity*.72;
     for(const material of metalMaterials)material.envMapIntensity=metalIntensity;
     for(const c of chunks)c.mesh.visible=(transferBlend<.66||['carrying','dropping','collected'].includes(c.state))&&c.state!=='fractured'&&!(c.toolId==='suction'&&c.state==='collected')&&!c.trayStored&&showcaseBlend<.92;
     lamp.position.copy(camera.position).addScaledVector(right,.6).addScaledVector(up,.4);
@@ -233,6 +235,7 @@ export async function CreateImmersiveScene({ core }) {
     geo.computeVertexNormals();
     // 凝胶透光，局部遮蔽使用实际轮廓；不把它烘成不透光的黑影。
     const mesh = new THREE.Mesh(geo, materials.Wax(type,tone));mesh.castShadow=type!=='oily';mesh.receiveShadow=true;
+    if(type==='oily')mesh.material.envMap=metalEnvironment.texture;
     const normal = canal.NormalAt(depth, angle).clone().normalize();
     const tangent = canal.TangentAt(depth).clone().normalize();
     const xAxis = tangent.clone().cross(normal).normalize();
@@ -250,9 +253,23 @@ export async function CreateImmersiveScene({ core }) {
     mesh.userData.chunk = chunk;
     return chunk;
   }
+  function BuildOilRegion(rng,id,seed){
+    const lattice=BuildOilyCoating(id,seed,(depth,angle)=>{
+      const normal=canal.NormalAt(depth,angle).clone().normalize(),center=canal.CenterAt(depth).clone();
+      const hit=new THREE.Raycaster(center,normal.clone().negate(),0,10).intersectObject(wall)[0];
+      const point=hit?.point||Surface(depth,angle);return{point:point.toArray(),normal:contact.Surface(point).normal.toArray()};
+    });
+    const sample=lattice.parameters[lattice.gripNode%lattice.layer],chunk=BuildChunk(rng,id,sample[2],sample[3],'oily','coating');
+    const inverse=chunk.rotation.clone().invert(),position=new THREE.Vector3();
+    for(let i=0;i<lattice.positions.length;i+=3){position.fromArray(lattice.positions,i).sub(chunk.origin).applyQuaternion(inverse);position.toArray(lattice.positions,i);}
+    chunk.mesh.geometry.dispose();chunk.mesh.geometry=new THREE.BufferGeometry();chunk.mesh.geometry.setAttribute('position',new THREE.BufferAttribute(lattice.positions,3));chunk.mesh.geometry.setIndex(new THREE.BufferAttribute(lattice.indices,1));chunk.mesh.geometry.computeVertexNormals();
+    chunk.mass=9/OILY_REGIONS.length;chunk.coating=true;chunk.gripNode=lattice.gripNode;chunk.coverage={start:lattice.region.start,end:lattice.region.end,width:lattice.region.width};
+    chunk.body.volumeMesh=lattice;chunk.original=lattice.positions.slice();return chunk;
+  }
   function* BuildCustomer(seed,result,earType='mixed') {
     const rng = MakeRng(seed);
-    for(let i=0;i<9;i++){
+    if(earType==='oily')for(let i=0;i<OILY_REGIONS.length;i++){result.push(BuildOilRegion(rng,i,seed));yield;}
+    for(let i=0;earType!=='oily'&&i<9;i++){
       const front = i < 6; const angle = front ? .22 + i * Math.PI / 3 : .70 + (i-6)*Math.PI*2/3;
       const wetEar=seed%5>=3;const type=earType!=='mixed'?earType:i===4||i===8?'impacted':i===2||i===7?'wet':wetEar?(i%3===0?'dry':'wet'):(i===5?'wet':'dry');
       result.push(BuildChunk(rng,i,(i===8?14.6:i===7?11.8:front?4.4:8.0)+(rng()-.5)*.15,angle,type,type==='oily'?'gel':type==='wet'?'film':i%2?'ribbon':'flake'));yield;
@@ -265,7 +282,7 @@ export async function CreateImmersiveScene({ core }) {
     }
     // Film and long flakes follow the wall curvature across their whole back surface.
     for(const c of result){const p=c.mesh.geometry.attributes.position;
-      for(let i=0;i<p.count;i++){const v=new THREE.Vector3(p.getX(i),p.getY(i),0).applyQuaternion(c.rotation).add(c.origin),surface=contact.Surface(v);p.setZ(i,p.getZ(i)-surface.clearance+.018);}
+      for(let i=0;!c.coating&&i<p.count;i++){const v=new THREE.Vector3(p.getX(i),p.getY(i),0).applyQuaternion(c.rotation).add(c.origin),surface=contact.Surface(v);p.setZ(i,p.getZ(i)-surface.clearance+.018);}
       p.needsUpdate=true;SmoothWaxNormals(c.mesh.geometry);c.original=p.array.slice();yield;
       if(!c.fine){let render;if(c.type==='oily')render=BindPeelSurface(c.body,p.array,c.mesh.geometry.index.array);else yield* BindPeelSurfaceSteps(c.body,p.array,c.mesh.geometry.index.array);
         if(c.body.gel){const sample={normal:new THREE.Vector3()},point=new THREE.Vector3();c.body.gel.collider=p=>{contact.Surface(point.fromArray(p),sample);return{normal:sample.normal.toArray(),clearance:sample.clearance};};c.mesh.geometry.dispose();c.mesh.geometry=new THREE.BufferGeometry();c.mesh.geometry.setAttribute('position',new THREE.BufferAttribute(render.positions,3));c.mesh.geometry.setIndex(new THREE.BufferAttribute(render.indices,1));c.mesh.geometry.setAttribute('gelRest',new THREE.BufferAttribute(render.rest,3));const uv=new Float32Array(render.rest.length/3*2);for(let i=0;i<uv.length/2;i++){uv[i*2]=render.rest[i*3]/3+.5;uv[i*2+1]=render.rest[i*3+1]/3+.5;}c.mesh.geometry.setAttribute('uv',new THREE.BufferAttribute(uv,2));c.mesh.geometry.setAttribute('gelThickness',new THREE.BufferAttribute(render.thickness,1));c.mesh.geometry.computeVertexNormals();c.original=render.positions.slice();}
@@ -314,7 +331,7 @@ export async function CreateImmersiveScene({ core }) {
     preparationStats.lastResetMs=performance.now()-start;
     HideTool(); droplet.visible = false; dropTarget = null; return chunks;
   }
-  function VisualCenter(c) { return new THREE.Vector3(0,0,0.09).applyQuaternion(c.mesh.quaternion).add(c.mesh.position); }
+  function VisualCenter(c) { if(c.coating&&c.body.gel)return new THREE.Vector3().fromArray(c.body.gel.points[c.gripNode]);return new THREE.Vector3(0,0,0.09).applyQuaternion(c.mesh.quaternion).add(c.mesh.position); }
   function Project(position) {
     const v = position.clone().project(camera);
     return { x: (v.x + 1) * .5 * width, y: (1 - v.y) * .5 * height, z: v.z };
@@ -380,6 +397,7 @@ export async function CreateImmersiveScene({ core }) {
     let hit=ray.intersectObject(c.mesh)[0];
     if(id==='scoop'&&scoopStroke&&(!hit||!ScoopTouches(hit.point)||hit.point.distanceTo(tool.position)>.95))hit=ScoopSurfaceHit(c);
     let point=hit?.point.clone()||c.mesh.position.clone().addScaledVector(c.normal,.35);
+    if(c.coating){const projected=canal.Project(point);if(projected.depth>Reach(id))return false;c.depth=projected.depth;c.normal.copy(contact.Surface(point).normal);}
     if(id==='scoop'&&scoopStroke&&(!hit||!ScoopTouches(point)||point.distanceTo(tool.position)>.95))return false;
     if(id==='tweezers'){
       const side=c.mesh.material.side;c.mesh.material.side=THREE.DoubleSide;
@@ -415,7 +433,7 @@ export async function CreateImmersiveScene({ core }) {
     }
     c.appliedAge+=dt;
     const pressure=Smooth(Clamp((c.appliedAge-.08)/(c.body.gel?1.6:.72)));
-    const travel=(c.body.gel?3.4:c.toolId==='feather'?.7:Math.max(2.15,1.4+Math.max(...(c.footprint||[c.size]))))*pressure;
+    const travel=(c.coating?4.8:c.body.gel?3.4:c.toolId==='feather'?.7:Math.max(2.15,1.4+Math.max(...(c.footprint||[c.size]))))*pressure;
     const cursor=c.toolId==='scoop'?ray.ray.intersectPlane(c.dragPlane,new THREE.Vector3()):null;
     const target=c.toolId==='scoop'?(cursor?cursor.add(c.cursorOffset):c.lastScoopTarget.clone()):c.gripStart.clone().addScaledVector(c.forceDirection,c.aligned?travel:0);
     if(c.toolId==='suction'&&c.fragment&&c.softened>.45)target.addScaledVector(c.normal,.85);
@@ -601,7 +619,7 @@ export async function CreateImmersiveScene({ core }) {
     }else if(id==='scoop'&&scoopRotation)tool.quaternion.copy(scoopRotation);
     else{
       const shaftAxis=camera.position.clone().addScaledVector(right,1.15).addScaledVector(up,-1.7).sub(point).normalize();
-      const faceNormal=c ? new THREE.Vector3(0,0,1).applyQuaternion(c.body?.detached?c.mesh.quaternion:c.rotation) : toward;
+      const faceNormal=c?.coating&&!c.body.detached?c.normal:c ? new THREE.Vector3(0,0,1).applyQuaternion(c.body?.detached?c.mesh.quaternion:c.rotation) : toward;
       const xAxis=shaftAxis.clone().cross(faceNormal).normalize();
       if(xAxis.lengthSq()<.1)xAxis.copy(right);
       const zAxis=xAxis.clone().cross(shaftAxis).normalize();

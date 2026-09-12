@@ -13,8 +13,10 @@ await page.addInitScript(()=>{window.nativeFrame=requestAnimationFrame.bind(wind
 try{
  await page.goto(url+'?debug=1');await page.waitForFunction(()=>window.__EarSpaDebug);await page.evaluate(()=>requestAnimationFrame=()=>0);await page.locator('#ear-start').click();await page.locator('#lamp-toggle').click();await page.evaluate(()=>__EarSpaDebug.StepFrames(150));
  let p=await page.evaluate(()=>__EarSpaProbe());Check(p.earType==='oily'&&p.practice===null&&p.targets.every(c=>c.type==='oily'),'ordinary business customers can naturally be oily');
- const maps=await page.evaluate(()=>__EarSpaDebug.view.chunks.map(c=>({transmission:c.mesh.material.transmission,ior:c.mesh.material.ior,thickness:!!c.mesh.geometry.attributes.gelThickness,rest:!!c.mesh.geometry.attributes.gelRest,clearcoat:c.mesh.material.clearcoat})));
+ const maps=await page.evaluate(()=>__EarSpaDebug.view.chunks.map(c=>({transmission:c.mesh.material.transmission,ior:c.mesh.material.ior,metalness:c.mesh.material.metalness,roughness:c.mesh.material.roughness,thickness:!!c.mesh.geometry.attributes.gelThickness,rest:!!c.mesh.geometry.attributes.gelRest,clearcoat:c.mesh.material.clearcoat})));
  Check(maps.every(m=>m.transmission>0&&m.ior>1&&m.thickness&&m.rest&&m.clearcoat>0),'wet dielectric shading has material-space pigment and physical thickness inputs');
+ Check(maps.every(m=>m.metalness===0&&m.roughness>=.1&&m.roughness<=.25),'oil uses nonmetallic, moderately smooth dielectric reflection');
+ await page.screenshot({path:path.join(here,'_dev/Shot_OilyCoatingLit.png')});
  await page.locator('[data-tool="tweezers"]').click();p=await page.evaluate(()=>__EarSpaProbe());const target=p.targets.find(c=>c.id===2);await page.mouse.move(target.screen.x,target.screen.y);await page.mouse.down();
  report.timing=await page.evaluate(async()=>{
   const samples=[],cpu=[],gl=__EarSpaDebug.core.renderer.getContext();
@@ -27,7 +29,7 @@ try{
   return{count,minimum,volumeRatio:c.body.gel.volumeRatio,minJacobian:c.body.gel.minJacobian,peakStretch:c.body.gel.peakStretch};
  });
  Check(report.surface.count>100&&report.surface.minimum>-.08,'independent rendered-mesh rays find no material canal penetration');
- Check(report.surface.peakStretch>1.8&&report.surface.minJacobian>0,'ordinary oily customer stretches without inverted volume cells');
+ Check(report.surface.peakStretch>1.4&&report.surface.minJacobian>0,'ordinary oily customer stretches its continuous layer without inverted volume cells');
  Check(report.timing.frameWithGpuMs.p95<80,'measured GPU-complete frames avoid sustained long stalls on this machine');
  await page.screenshot({path:path.join(here,'_dev/Shot_OilyBusinessHeld.png')});await page.mouse.up();await page.evaluate(()=>__EarSpaDebug.StepFrames(230));
  const saved=await page.evaluate(()=>__EarSpaProbe()),saveText=await page.evaluate(()=>localStorage.getItem('earspa3d.shop.v1'));

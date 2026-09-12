@@ -23,8 +23,8 @@ try{for(const [width,height,touch] of (process.argv.includes('--diagnose')?[[100
     await page.locator(business.phase==='ready'?'#welcome-settings':'#settings-open').click();await Shot('Settings');await page.locator('#practice-start').click();await Step(130);const base=await Probe();
     await Shot('Rest');
     if(process.argv.includes('--look')){for(const [name,color,transmission,roughness,clearcoat] of [['Honey',0xf2ce83,.82,.23,.55],['Cloudy',0xf1c97c,.52,.3,.7],['Cream',0xecc477,.35,.26,.5]]){await page.evaluate(({color,transmission,roughness,clearcoat})=>{for(const c of __EarSpaDebug.view.chunks){c.mesh.material.color.set(color);c.mesh.material.transmission=transmission;c.mesh.material.roughness=roughness;c.mesh.material.clearcoat=clearcoat;}__EarSpaDebug.core.Render();},{color,transmission,roughness,clearcoat});await Shot(name);}continue;}
-    Check(base.practice==='oily'&&base.targets.length===9&&base.targets.every(c=>c.type==='oily'&&!c.fine),'oil ear has only nine cohesive gel deposits');
-    Check(base.targets.every(c=>c.physics.solver==='xpbd-viscoelastic-volume'&&c.physics.tetrahedra===320),'every deposit has a tetrahedral volume solver');
+    Check(base.practice==='oily'&&base.targets.length===3&&base.targets.every(c=>c.type==='oily'&&c.form==='coating'&&!c.fine),'oil ear has three continuous films with raised deposits');
+    Check(base.targets.every(c=>c.physics.solver==='xpbd-viscoelastic-volume'&&c.physics.tetrahedra>c.physics.nodes),'every coating uses a volumetric lattice');
     await page.locator('[data-tool="tweezers"]').click();let target=(await Probe()).targets.find(c=>c.id===2);await Input(true,target);
     for(const n of [3,6,9,12,20,35,60]){await Step(n);const probe=await Probe(),c=probe.targets.find(c=>c.id===2);report.samples.push({state:c.state,...c.physics,position:c.position,active:probe.active});await Shot('Pull'+report.samples.length);}
     report.stats=(await Probe()).stats;
@@ -35,14 +35,14 @@ try{for(const [width,height,touch] of (process.argv.includes('--diagnose')?[[100
       Check(report.samples.every(s=>Math.abs(s.volumeRatio-1)<.06&&s.minJacobian>0),'loaded gel preserves volume and positive tetrahedra');
       Check(report.final.harvest.some(c=>c.id===2),'gel lands and receives collection credit once');
       Check(report.final.harvest.filter(c=>c.id===2).length===1,'one deposit never receives duplicate landing credit');
-      Check(report.samples.some(s=>s.gelStretch>1.8&&s.anchors>0),'visible necking occurs before adhesive release');
+      Check(report.samples.some(s=>s.gelStretch>1.4&&s.anchors>0),'the continuous film stretches while its far wall attachments remain');
       await page.locator('#settings-open').click();await page.locator('#practice-start').click();await Step(130);
       const reset=await Probe();Check(reset.targets.every((c,i)=>JSON.stringify(c.position)===JSON.stringify(base.targets[i].position)),'restarting reproduces the same seeded oil ear');
       await page.locator('[data-tool="tweezers"]').click();await Input(true,reset.targets.find(c=>c.id===2));await Step(35);const extended=(await Probe()).targets.find(c=>c.id===2);await Shot('RecoilBefore');await Input(false);await Step(160);const relaxed=(await Probe()).targets.find(c=>c.id===2);await Shot('RecoilAfter');
       Check(extended.physics.anchors>0&&relaxed.physics.gelStretch<extended.physics.gelStretch*.85,'letting go partway visibly relaxes the same gel body');
       Check((await Probe()).cleanliness===0,'uncollected recoil cannot increase cleanliness');
       await page.locator('#settings-open').click();await page.locator('#practice-start').click();await Step(130);
-      for(const id of [2,0,1,3,4,5,6,7,8]){
+      for(const id of [2,0,1]){
         let probe=await Probe();if(id===7){await page.locator('#depth-toggle').click();await Step(70);probe=await Probe();}
         target=probe.targets.find(c=>c.id===id);await Input(true,target);await Step(3);probe=await Probe();if(probe.active===id&&!probe.targets.find(c=>c.id===id).aligned){await Input(false);await Align(id);await Input(true,(await Probe()).targets.find(c=>c.id===id));}
         for(let attempt=0;attempt<9;attempt++){await Step(45);probe=await Probe();if(probe.targets.find(c=>c.id===id).state==='held')break;}
@@ -50,8 +50,8 @@ try{for(const [width,height,touch] of (process.argv.includes('--diagnose')?[[100
         const gel=probe.targets.find(c=>c.id===id).physics;Check(Math.abs(gel.volumeRatio-1)<.06&&gel.minJacobian>0,'deposit '+id+' retains positive volume');
         await Input(false);await Step(210);if(id===2)await Shot('Tray');
       }
-      await Step(200);const complete=await Probe();await Shot('Complete');Check(complete.phase==='complete'&&complete.cleanliness===1&&complete.harvest.length===9,'all nine deposits complete the practice ear with conserved mass');
-      Check(complete.tray.count===9&&Math.abs(complete.tray.mass-9)<1e-6&&complete.rendering.trayCloseup>.99,'all gel deposits persist in the practice tray close-up');
+      await Step(200);const complete=await Probe();await Shot('Complete');Check(complete.phase==='complete'&&complete.cleanliness===1&&complete.harvest.length===3,'all continuous coatings complete the practice ear with conserved mass');
+      Check(complete.tray.count===3&&Math.abs(complete.tray.mass-9)<1e-6&&complete.rendering.trayCloseup>.99,'all gel coatings persist in the practice tray close-up');
       Check(report.stats.triangles<=180000&&report.stats.drawCalls<=120,'transmissive oil wax remains inside the scene rendering budget');
       Check(await page.evaluate(()=>localStorage.getItem('earspa3d.shop.v1'))===savedShop,'practice completion never alters the business save');
       await page.locator('#settings-open').click();await page.locator('#practice-return').click();let restored=await Probe();

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {CreateContactOcclusion} from './Script_ContactOcclusion.js?v=ear020-contact-loading-20260912';
+import {CreateContactOcclusion} from './Script_ContactOcclusion.js?v=ear029-oily-coating-20260912';
 // imagegen 的图集按通道拆成 GPU 纹理；法线/粗糙度/AO 保持线性，颜色才走 sRGB。
 export async function CreateTactileMaterials(renderer) {
   const loader=new THREE.TextureLoader(),contact=CreateContactOcclusion();
@@ -104,24 +104,27 @@ export async function CreateTactileMaterials(renderer) {
   }
   function Wax(type,tone='brown'){
     if(type==='oily'){
-      const material=new THREE.MeshPhysicalMaterial({color:0xecc477,map:wax.map,roughness:.24,normalMap:wax.normalMap,normalScale:new THREE.Vector2(.018,.018),metalness:0,ior:1.46,transmission:.5,thickness:.70,attenuationColor:0xc78925,attenuationDistance:1.8,clearcoat:.65,clearcoatRoughness:.10,specularIntensity:.65,envMapIntensity:.85});
+      const material=new THREE.MeshPhysicalMaterial({color:0xeaba65,map:wax.map,roughness:.16,normalMap:wax.normalMap,normalScale:new THREE.Vector2(.009,.009),metalness:0,ior:1.46,transmission:.84,thickness:1,attenuationColor:0xd3993d,attenuationDistance:1.2,clearcoat:1,clearcoatRoughness:.095,specularIntensity:1,envMapIntensity:.54});
       material.userData.waxWet={value:1};material.userData.waxSoft={value:0};material.userData.oily=true;
+      material.transparent=true;material.depthWrite=false;
       material.onBeforeCompile=shader=>{
         shader.vertexShader='attribute vec3 gelRest;attribute float gelThickness;varying vec3 gelLocal;varying float gelPath;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ngelLocal=gelRest;gelPath=gelThickness;');
         shader.fragmentShader='varying vec3 gelLocal;varying float gelPath;\n'+shader.fragmentShader;
-        shader.fragmentShader=shader.fragmentShader.replace('#include <transmission_fragment>',THREE.ShaderChunk.transmission_fragment.replace('material.thickness = thickness;', 'material.thickness = thickness * gelPath;').replace('material.transmission = transmission;', 'material.transmission = mix(.28,.83,exp(-gelPath*1.8));'));
+        shader.fragmentShader=shader.fragmentShader.replace('#include <transmission_fragment>',THREE.ShaderChunk.transmission_fragment.replace('material.thickness = thickness;', 'material.thickness = max(.01,gelPath);').replace('material.transmission = transmission;', 'material.transmission = mix(.36,.97,exp(-gelPath*3.2));').replace('material.diffuseContribution, material.specularColorBlended','mix(vec3(1.0),material.diffuseContribution,smoothstep(.06,.65,gelPath)), material.specularColorBlended'));
+        shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(.10,.21,smoothstep(.02,.65,gelPath));');
+        shader.fragmentShader=shader.fragmentShader.replace('#include <opaque_fragment>','diffuseColor.a*=smoothstep(.008,.075,gelPath);\n#include <opaque_fragment>');
         shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
           float cloud=.5+.5*sin(gelLocal.x*4.1+sin(gelLocal.y*3.7))*sin(gelLocal.y*5.3+gelLocal.z*3.0);
           float lipidDetail=dot(texture2D(map,vMapUv).rgb,vec3(.299,.587,.114));
           diffuseColor.rgb=diffuse*mix(vec3(.88,.84,.73),vec3(1.03,1.00,.94),smoothstep(.025,.42,lipidDetail));
-          diffuseColor.rgb*=.88+cloud*.16;
+          diffuseColor.rgb*=.96+cloud*.08;
         `);
         shader.fragmentShader=shader.fragmentShader.replace('#include <lights_fragment_end>',`#include <lights_fragment_end>
           float rim=pow(1.0-abs(dot(normal,geometryViewDir)),2.5);
           reflectedLight.directDiffuse+=diffuseColor.rgb*reflectedLight.directDiffuse*(.20+rim*.8);
         `);
         contact.Bind(shader,{self:material.userData.contactSelf});material.userData.contactShader=shader;
-      };material.customProgramCacheKey=()=> 'OilyViscoelasticVolume1';return material;
+      };material.customProgramCacheKey=()=> 'OilyContinuousCoating2';return material;
     }
     const pale=tone==='paleYellow';
     const material=new THREE.MeshPhysicalMaterial({...wax,color:type==='impacted'?0xcbb588:type==='wet'?0xd1bfa1:0xfff3d5,roughness:type==='wet'?.27:1,normalScale:new THREE.Vector2(pale?.11:.22,pale?.11:.22),aoMapIntensity:pale?.35:.58,clearcoat:type==='wet'?.8:0,clearcoatRoughness:.13,metalness:0});
@@ -154,7 +157,7 @@ export async function CreateTactileMaterials(renderer) {
     return material;
   }
   function WetWax(material,softness,wetness,type){
-    if(type==='oily'){material.roughness=.24-softness*.055;material.clearcoatRoughness=.10;return;}
+    if(type==='oily'){material.roughness=.16-softness*.035;material.clearcoatRoughness=.095;return;}
     material.userData.waxWet.value=wetness;material.userData.waxSoft.value=softness;
     material.roughness=(type==='wet'?.27:1)*(1-wetness*.81);
     material.clearcoat=Math.max(type==='wet'?.8:0,wetness*.98);material.clearcoatRoughness=.055;
@@ -164,6 +167,7 @@ export async function CreateTactileMaterials(renderer) {
   function Update(chunks,lamp){
     contact.Update(chunks,lamp);state.light.value.copy(lamp.position);state.power.value=lamp.intensity;
     const originals=chunks.filter(c=>!c.fragment).slice(0,9);
+    for(let i=originals.length;i<9;i++){marks[i].set(0,0,0,0);wet[i].set(0,0,0,0);}
     originals.forEach((c,i)=>{marks[i].set(c.origin.x,c.origin.y,c.origin.z,c.irritation||0);wet[i].set(c.origin.x,c.origin.y,c.origin.z,c.surfaceWet||c.softened||0);});
   }
   return{Skin,Wax,WetWax,GripMaterial,Update,PrepareContact:contact.Prepare,SetOutside(value){state.outside.value=value;},SetContact:contact.SetEnabled,Probe(){return{...contact.Probe(),pbr:['albedo','normal','roughness','ao'],sss:'thin-layer single-scattering approximation',sssStrength:state.sss.value,outerPbr:'Texture_OuterSkinPbrAtlas.png',outerSss:'per-light RGB diffusion and thin-pinna backlighting approximation',outerSssStrength:state.outerSss.value};}};

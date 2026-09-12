@@ -56,7 +56,7 @@ export function CreateContactOcclusion(){
  }
  function Update(chunks,lamp){
   uniforms.contactLamp.value.copy(lamp.position);const slots=new Map();let i=0,dirty=false;
-  for(const c of chunks){if(i===limit)break;if(c.fine||!c.mesh.visible||['fractured','collected'].includes(c.state))continue;
+  for(const c of chunks){if(i===limit)break;if(c.coating||c.fine||!c.mesh.visible||['fractured','collected'].includes(c.state))continue;
    const outline=Outline(c.mesh.geometry);c.mesh.updateMatrixWorld(true);matrices[i].copy(c.mesh.matrixWorld).multiply(new THREE.Matrix4().makeTranslation(...outline.center.toArray())).invert();sizes[i].copy(outline.size);slots.set(c,i);
    if(slotGeometry[i]!==c.mesh.geometry){for(let y=0;y<tile;y++){const start=((Math.floor(i/grid)*tile+y)*side+(i%grid)*tile)*4;data.set(outline.pixels.subarray(y*tile*4,(y+1)*tile*4),start);}slotGeometry[i]=c.mesh.geometry;dirty=true;}i++;
   }
