@@ -4,16 +4,16 @@ import {CreatePhysicsSettings} from './Script_PhysicsSettings.mjs?v=ear028-physi
 import {CUSTOMER_EARS,CustomerEarType} from './Data_CustomerTypes.mjs?v=ear029-oily-coating-20260912';
 import { ToolIcon } from './Script_ToolIcons.mjs?v=ear014-ui-20260912';
 import { CreateCore } from './Script_Core.js?v=ear011-20260911';
-import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear038-oily-performance-20260912';
+import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear039-brush-gather-20260912';
 import { CreateAudio } from './Script_Audio.js?v=ear035-sticky-scrape-audio-20260912';
 import { LandingSound } from './Script_LandingSound.mjs?v=ear012-size-audio-20260912';
 import { CreateShop } from './Script_Shop.js?v=ear025-oily-20260912';
 import { MakeRng } from './Script_Util.js?v=ear011-20260911';
 import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear011-20260911';
 
-import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear029-feather-20260912';
+import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear039-brush-gather-20260912';
 
-const VERSION = 'ear038-oily-performance-20260912';
+const VERSION = 'ear039-brush-gather-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const TOOL_IDS = { scoop: 'earPickBamboo', tweezers: 'earForceps', drops: 'earDrops',brush:'softBrush',suction:'microSuction',feather:'gooseFeather' };
 const TYPE_NAMES = { dry: '干性薄层', wet: '黏性耳垢', impacted: '紧实硬结', oily:'油性凝胶' };
@@ -51,7 +51,7 @@ export async function Start() {
       <label class="slider-row">轻微震动<input id="haptics" type="checkbox" checked></label>
       <section id="physics-debug" class="debug-settings" aria-labelledby="debug-title"></section>
 
-      <details id="operation-guide"><summary>操作指南</summary><p>鼠标右键按住连续旋转，松开停止，工具留在接触点；左键按住拖动器具，松开原地停留；勺头实际接触耳垢才能刮动，点击远处不选块；滚轮向上推进、向下退出；凹口朝向耳垢才能托刮，勺背和空划不能剥离。镊尖接触后按住拖动夹取。手机在施力模式下按住拖动，转向模式下按住旋转，进退模式向上拖推进、向下拖退出。工具遇到内壁会受阻。点放大镜切换深浅视野，短耳勺工作长度有限；深处用长镊，硬结先滴液软化。松脱后仍在工具上，松手由工具托送到耳外，再轻放入盘。硬结先滴液等待约 3 秒。干薄片用耳勺托边，黏块先松边再用镊子夹；硬拉会痛或碎裂。细微屑用鹅绒掸贴住后旋转，松手带出；初始每次 1 组，升级后最多 5 组，只带走绒羽扫到的微屑。较大碎片可用耳勺清理，也可买毛刷轻扫或用吸引管吸走湿碎屑。尚未松脱时松手，材料会弹性回落；黏附牢固时受力断面会碎裂，残片仍需清理。</p><p>键盘：1/2/3 切换工具；画面获得焦点后，方向键移动器具，W/S 推进或退出，按住空格接触并施力，Q/E 转向，松开空格停手，Esc 取消。</p></details>
+      <details id="operation-guide"><summary>操作指南</summary><p>鼠标右键按住连续旋转，松开停止，工具留在接触点；左键按住拖动器具，松开原地停留；勺头实际接触耳垢才能刮动，点击远处不选块；滚轮向上推进、向下退出；凹口朝向耳垢才能托刮，勺背和空划不能剥离。镊尖接触后按住拖动夹取。手机在施力模式下按住拖动，转向模式下按住旋转，进退模式向上拖推进、向下拖退出。工具遇到内壁会受阻。点放大镜切换深浅视野，短耳勺工作长度有限；深处用长镊，硬结先滴液软化。松脱后仍在工具上，松手由工具托送到耳外，再轻放入盘。硬结先滴液等待约 3 秒。干薄片用耳勺托边，黏块先松边再用镊子夹；硬拉会痛或碎裂。细碎屑可先用柔毛刷按住拖动扫到一起，松手留在原处；再用鹅绒掸贴住后旋转，松手带出。掸子五级容量为 1／3／6／9／12 组，只带走绒羽实际扫到的微屑。较大碎片可用耳勺清理，也可买毛刷轻扫或用吸引管吸走湿碎屑。尚未松脱时松手，材料会弹性回落；黏附牢固时受力断面会碎裂，残片仍需清理。</p><p>键盘：1/2/3 切换工具；画面获得焦点后，方向键移动器具，W/S 推进或退出，按住空格接触并施力，Q/E 转向，松开空格停手，Esc 取消。</p></details>
     </dialog>`;
   document.body.append(app);
   app.querySelector('.spa-brand').insertAdjacentHTML('beforeend','<div class="session-status"></div>');
@@ -59,7 +59,7 @@ export async function Start() {
   app.querySelector('.header-actions').insertAdjacentHTML('afterbegin','<button id="shop-open">小铺</button>');
   app.querySelector('.session-status').insertAdjacentHTML('beforeend','<span id="satisfaction" title="客人满意度">☺ 85</span>');
   app.querySelector('.play-stage').insertAdjacentHTML('beforeend','<div id="reward-toast" hidden role="status"></div><section id="receipt" hidden><span>本次采耳</span><h2 id="receipt-title"></h2><p id="receipt-detail"></p><div><button id="receipt-shop">逛逛小铺</button><button id="receipt-next">接待下一位 →</button></div></section>');
-  for(const [id,label,detail] of [['brush','柔毛刷','刷松干屑'],['suction','吸引管','清理软化碎屑'],['feather','鹅绒掸','成片带走微屑']])app.querySelector('.tool-dock').insertAdjacentHTML('beforeend',`<button data-tool="${id}" aria-pressed="false" hidden>${ToolIcon(id)}<span><strong>${label}</strong><small>${detail}</small></span></button>`);
+  for(const [id,label,detail] of [['brush','柔毛刷','扫拢细碎屑'],['suction','吸引管','清理软化碎屑'],['feather','鹅绒掸','成片带走微屑']])app.querySelector('.tool-dock').insertAdjacentHTML('beforeend',`<button data-tool="${id}" aria-pressed="false" hidden>${ToolIcon(id)}<span><strong>${label}</strong><small>${detail}</small></span></button>`);
   app.querySelector('.dialog-heading').insertAdjacentHTML('afterend','<button id="audio-test">试听挖取音效</button>');
   document.getElementById('play-stage').prepend(canvas);
   document.getElementById('ear-stage')?.remove();
@@ -168,7 +168,9 @@ export async function Start() {
   function Begin(c, x, y, id = null) {
     if (!c || !view.ready || phase !== 'playing' || DialogOpen() || active || view.busy) return;
     if(!view.CanReach(c,toolId)){Hint('工具够不到 · 换长镊');Record('reachLimit',{id:c.id,depth:c.depth,reach:view.Reach(toolId),tool:toolId});return;}
-    if(c.fine&&toolId!=='feather'){Hint('细屑用鹅绒掸');return;}
+    if(c.fine&&toolId==='brush')return;
+    if(toolId==='brush'&&!c.fragment){Hint('毛刷只能扫拢细屑或刷松碎片');return;}
+    if(c.fine&&toolId!=='feather'){Hint('细屑先用刷子扫拢，再用鹅绒掸带走');return;}
     if(!c.fine&&toolId==='feather'){Hint('鹅绒掸带不动大块');return;}
     if(toolId==='drops'){
       if(pointer){if(pointer.dropped.has(c.id))return;pointer.dropped.add(c.id);}
@@ -371,7 +373,19 @@ export async function Start() {
     if (phase === 'playing' && !DialogOpen() && !document.hidden) {
       if(!practice){dt=Math.min(dt,Math.max(0,timeLimit-elapsed));elapsed+=dt;}
       if(!turnPointer)view.EnsureTool(toolId);
-      if(pointer&&!active&&!view.busy){const p=pointer;view.MoveToolDrag(p.currentX,p.currentY,toolId);if(p.moved)Begin(view.PickTool(toolId),p.currentX,p.currentY,p.id);p.moved=false;}
+      if(pointer&&!active&&!view.busy){
+        const p=pointer;view.MoveToolDrag(p.currentX,p.currentY,toolId,null,true);
+        const sweep=toolId==='brush'?view.BrushSweepProbe():null;
+        if(sweep?.moved){
+          Hint('碎屑已扫拢 · 换鹅绒掸带走');
+          if(contactOn!=='sweep'){StopContact();audio.contact.begin('sweep');contactOn='sweep';}
+          audio.contact.update('sweep',{speed01:Clamp(sweep.distance/Math.max(dt,1e-6)/8),pressure01:.25,roughness01:.35,dt});
+        }else{
+          if(toolId==='brush')StopContact();
+          if(p.moved)Begin(view.PickTool(toolId),p.currentX,p.currentY,p.id);
+        }
+        p.moved=false;
+      }
       if(turnPointer){
         const before=toolId==='feather'?view.FeatherSweepProbe().held:0;
         view.TurnBy(dt*Math.PI*.65,toolId);

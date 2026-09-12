@@ -1,4 +1,4 @@
-import {FeatherCapacity} from './Script_FeatherSweep.mjs?v=ear029-feather-20260912';
+import {FeatherCapacity} from './Script_FeatherSweep.mjs?v=ear039-brush-gather-20260912';
 import {AddFeatherFur,ClearFeatherFur,PrepareFeatherStrands,FEATHER_FUR_LENGTH,FEATHER_FUR_PASSES} from './Script_FeatherFur.js?v=ear031-feather-groom-20260912';
 import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear038-oily-performance-20260912';
 import * as THREE from 'three';
@@ -486,7 +486,7 @@ export async function CreateImmersiveScene({ core }) {
     if(!cursor)return false;
     toolDrag={plane,offset:tool.position.clone().sub(cursor),cursor:cursor.clone(),y,axis,depth:0};return true;
   }
-  function MoveToolDrag(x,y,id,c=null){
+  function MoveToolDrag(x,y,id,c=null,gather=false){
     if(!toolDrag)return null;
     ray.setFromCamera(new THREE.Vector2(x/width*2-1,1-y/height*2),camera);
     const cursor=ray.ray.intersectPlane(toolDrag.plane,new THREE.Vector3());
@@ -496,7 +496,17 @@ export async function CreateImmersiveScene({ core }) {
     target.addScaledVector(forward,toolDrag.depth);
     // Consume the input even when blocked: reversing must move immediately, without paying back overshoot.
     toolDrag.depth=0;toolDrag.y=y;if(cursor)toolDrag.cursor.copy(cursor);
-    const pose=ToolAt(target,id,c);
+    let pose;
+    if(id==='brush'&&!c&&gather){
+      brushSweep={moved:0,distance:0};
+      const start=tool.position.clone(),steps=Math.max(1,Math.ceil(start.distanceTo(target)/.12)),moved=new Set();
+      for(let i=1;i<=steps;i++){
+        const previous=tool.position.clone();
+        pose=ToolAt(start.clone().lerp(target,i/steps),id);
+        for(const item of SweepBrush(previous))moved.add(item);
+      }
+      brushSweep.moved=moved.size;
+    }else pose=ToolAt(target,id,c);
     // Rebase at the visible depth, so screen displacement stays direct after advancing or wall contact.
     toolDrag.plane.setFromNormalAndCoplanarPoint(forward,pose.position);
     const rebased=ray.ray.intersectPlane(toolDrag.plane,new THREE.Vector3());
@@ -865,6 +875,71 @@ export async function CreateImmersiveScene({ core }) {
     const cursor=ray.ray.intersectPlane(scoopStroke.plane,new THREE.Vector3());
     if(cursor)ToolAt(cursor.add(scoopStroke.offset),'scoop');
   }
+  let brushSweep={moved:0,distance:0};
+  function BrushTouchesDebris(c){
+    const part=toolParts.brush.children.find(p=>p.userData.softFiber);
+    const local=c.mesh.position.clone().applyMatrix4(part.matrixWorld.clone().invert());
+    const radius=Math.min(.30,Math.max(...c.footprint)*.6),fiber=new THREE.Vector3();
+    // Microdust uses the same finite grain envelope as feather pickup, avoiding
+    // a ray slipping through the spaces between the nine grains of one patch.
+    return part.userData.fiberGroups.some(bin=>{
+      fiber.fromBufferAttribute(part.geometry.attributes.position,bin.indices[0]);
+      return fiber.distanceToSquared(local)<(radius+bin.radius+.035)**2;
+    });
+  }
+  function SweepBrush(previousPosition) {
+    const motion=tool.position.clone().sub(previousPosition),moved=[];
+    if(!toolDrag||transfer||motion.lengthSq()<1e-10)return moved;
+    scene.updateMatrixWorld(true);
+    const candidates=chunks.filter(c=>IsFeatherDebris(c)&&['attached','returning'].includes(c.state)&&c.depth<=Reach('brush')&&BrushTouchesDebris(c));
+    if(!candidates.length)return moved;
+    // Use the contacted patch of bristles, which can bend far from the nominal tip.
+    const focus=new THREE.Vector3();
+    for(const c of candidates)focus.add(c.mesh.position);
+    focus.divideScalar(candidates.length).add(motion);
+    for(const c of candidates){
+      const surface=contact.Surface(c.mesh.position),normal=surface.normal.clone();
+      if(!Number.isFinite(surface.clearance))continue;
+      const tangent=motion.clone().addScaledVector(normal,-motion.dot(normal)),travel=tangent.length();
+      if(travel<1e-5)continue;
+      const direction=tangent.clone().divideScalar(travel);
+      const toward=focus.clone().sub(c.mesh.position).addScaledVector(normal,-focus.clone().sub(c.mesh.position).dot(normal));
+      // Bristles push a short front and funnel contacted grains toward its centre.
+      // Every displacement is bounded by actual tool travel; holding still cannot gather.
+      const forward=Clamp(toward.dot(direction)+.24,0,travel*1.1);
+      const sideways=toward.addScaledVector(direction,-toward.dot(direction));
+      if(sideways.length()>travel*.7)sideways.setLength(travel*.7);
+      const desired=c.mesh.position.clone().addScaledVector(direction,forward).add(sideways);
+      const next=contact.Surface(desired),clearance=Clamp(surface.clearance,.06,.18);
+      if(!Number.isFinite(next.clearance))continue;
+      desired.addScaledVector(next.normal,clearance-next.clearance);
+      if(canal.Project(desired).depth>Reach('brush'))continue;
+      const rotationDelta=new THREE.Quaternion().setFromUnitVectors(c.normal,next.normal);
+      const rotation=rotationDelta.clone().multiply(c.mesh.quaternion);
+      // Check the visible grains, including their thickness, against the actual canal.
+      const positions=c.mesh.geometry.attributes.position,vertex=new THREE.Vector3();
+      for(let pass=0;pass<3;pass++){
+        let penetration=0,correction=null;
+        for(let i=0;i<positions.count;i++){
+          vertex.fromBufferAttribute(positions,i).applyQuaternion(rotation).add(desired);
+          const hit=contact.Surface(vertex);
+          if(.018-hit.clearance>penetration){penetration=.018-hit.clearance;correction=hit.normal.clone();}
+        }
+        if(!correction)break;
+        desired.addScaledVector(correction,penetration);
+      }
+      if(desired.distanceToSquared(c.mesh.position)<1e-10)continue;
+      const old=c.mesh.position.clone();
+      UngripPeelBody(c.body);MovePeelBody(c.body,desired.toArray());
+      for(const anchor of c.body.anchors)anchor.rest=new THREE.Vector3().fromArray(anchor.rest).sub(old).applyQuaternion(rotationDelta).add(desired).toArray();
+      c.mesh.position.copy(desired);c.origin.copy(desired);c.mesh.quaternion.copy(rotation);c.rotation.copy(rotation);
+      c.normal.copy(next.normal);c.depth=canal.Project(desired).depth;c.state='attached';
+      c.body.origin=desired.toArray();c.body.rotation=rotation.toArray();c.body.restRotation=rotation.toArray();c.body.normal=c.normal.toArray();c.body.spin=[0,0,0];
+      brushSweep.distance+=old.distanceTo(desired);moved.push(c.id);
+      c.mesh.updateMatrixWorld(true);
+    }
+    return moved;
+  }
   function SweepFeather(previousRotation) {
     if(!featherSweep||transfer)return;
     const angle=previousRotation.angleTo(tool.quaternion);
@@ -1062,6 +1137,7 @@ export async function CreateImmersiveScene({ core }) {
     TurnBy(delta,id){if(!turnPoint)return;const previous=heading,previousRotation=tool.quaternion.clone();heading+=delta;if(toolDragMode&&manualRotation)manualRotation.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),delta));else if(id==='scoop')scoopRotation.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),delta));const pose=ToolAt(turnPoint,id,turnChunk);if(pose.blocked)heading=previous+delta*(pose.rotationFraction||0);if(id==='feather')SweepFeather(previousRotation);return heading;},
     TurnEnd(){turnPoint=null;turnChunk=null;EndFeatherSweep();},Heading(){return heading;},
     FeatherSweepProbe(){return{capacity:FeatherCapacity(toolLevels.feather),held:featherSweep?.items.length||0};},
+    BrushSweepProbe(){return{...brushSweep};},
     CycleDepth(){inspectionTarget=chunks[0]?.type==='oily'?(inspectionTarget===0?1:inspectionTarget>0?-.4:0):(inspectionTarget?0:1);contact.Reset();HideTool();return inspectionTarget;},
     Reach,CanReach(c,id){return c.coating||c.depth<=Reach(id);},SetDeep(value){inspectionTarget=value?1:0;contact.Reset();HideTool();},
     AuditTool,CollisionProbe(){return contact.Probe();},

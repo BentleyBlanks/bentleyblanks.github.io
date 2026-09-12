@@ -12,7 +12,7 @@ const browser=await chromium.launch({executablePath:process.env.EARSPA_BROWSER||
 const Check=(ok,label)=>{assert.ok(ok,label);report.checks.push(label);};
 await fs.mkdir(path.join(here,'_dev'),{recursive:true});
 try {
- Check([1,2,3,4,5].every(level=>FeatherCapacity(level)===level),'five upgrade capacities');
+ Check([1,2,3,4,5].every(level=>FeatherCapacity(level)===[1,3,6,9,12][level-1]),'five upgrade capacities');
  for(const [width,height,touch] of [[1000,900,false],[390,844,true],[320,568,true],[844,390,true]]){
   const page=await browser.newPage({viewport:{width,height},hasTouch:touch,isMobile:touch,deviceScaleFactor:touch?2:1}),cdp=await page.context().newCDPSession(page);
   page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});page.on('response',r=>{if(r.status()>=400)report.errors.push(r.status()+' '+r.url());});
@@ -26,21 +26,22 @@ try {
     const {view,shop}=__EarSpaDebug;view.Reset(20260911,'mixed');view.Enter();shop.state.toolLevels.gooseFeather=level;
     view.SetSkins(shop.Snapshot().inventory.equipped,{scoop:1,tweezers:1,drops:1,brush:1,suction:1,feather:level});
     if(dense){const source=view.chunks.find(c=>c.id==='dust1');
-     // Six separate patches at one known wall contact exercise the cap, not acquisition via debug APIs.
-     for(const [i,c] of view.chunks.filter(c=>c.fine&&c!==source).slice(0,5).entries()){
-      const offset=source.normal.clone().cross({x:0,y:1,z:0}).multiplyScalar((i-2)*.025);
+     // Twelve separate patches at one known wall contact exercise the cap, not acquisition via debug APIs.
+     for(const [i,c] of view.chunks.filter(c=>c.fine&&c!==source).slice(0,11).entries()){
+      const offset=source.normal.clone().cross({x:0,y:1,z:0}).multiplyScalar((i-5)*.012);
       c.origin.copy(source.origin).add(offset);c.mesh.position.copy(c.origin);c.rotation.copy(source.rotation);c.mesh.quaternion.copy(c.rotation);c.normal.copy(source.normal);c.depth=source.depth;
       c.body.position=c.origin.toArray();c.body.origin=c.origin.toArray();c.body.rotation=c.rotation.toArray();c.body.restRotation=c.rotation.toArray();c.body.anchors.forEach(a=>{a.rest=c.origin.toArray();});
      }
     }
    },{level,dense});await Step(150);
+   await page.evaluate(()=>{const v=__EarSpaDebug.view,c=v.chunks.find(c=>c.id==='dust1');v.SetToolDrag(false);v.ShowTool(c,'feather',0,v.Project(c.mesh.position));v.SetToolDrag(true);v.ShowTool(c,'feather',0,v.Project(c.mesh.position));});
    return(await Probe()).targets.find(c=>c.id==='dust1');
   }
   // Natural layout: the real broadened feather must reach multiple independent neighbours.
   let t=await Fixture(5);const cleanBefore=(await Probe()).cleanliness;
   await Down(t);Check((await Probe()).rendering.featherSweep.held===0,width+': pressing alone does not collect');
   await Step(65);let p=await Probe();const held=p.targets.filter(c=>c.state==='held');
-  Check(held.length>=2&&held.length<=5,width+': one real rotation picks up multiple natural patches');
+  Check(held.length>=2&&held.length<=FeatherCapacity(5),width+': one real rotation picks up multiple natural patches');
   Check(held.every(c=>c.fine)&&p.targets.filter(c=>!c.fine).every(c=>c.state==='attached'),width+': large wax is never swept');
   Check(p.cleanliness===cleanBefore,width+': holding a batch awards no cleaning');
   if(width===1000){const shapeError=await page.evaluate(()=>{const part=__EarSpaDebug.core.scene.getObjectByName('Model_FeatherTuft'),p=part.geometry.attributes.position,rest=part.userData.fiberRest;let error=0;for(const ring of part.geometry.userData.featherRings){const a=ring[0];for(const b of ring.slice(1)){const before=Math.hypot(rest[a*3]-rest[b*3],rest[a*3+1]-rest[b*3+1],rest[a*3+2]-rest[b*3+2]),after=Math.hypot(p.getX(a)-p.getX(b),p.getY(a)-p.getY(b),p.getZ(a)-p.getZ(b));error=Math.max(error,Math.abs(before-after));}}return{error,ringSize:Math.min(...part.geometry.userData.featherRings.map(r=>r.length))};});Check(shapeError.error<1e-5&&shapeError.ringSize===4,'wall bending keeps feather cross sections round instead of crushing them into strips');report.crossSectionError=shapeError;}
@@ -56,16 +57,16 @@ try {
   // Reset only the fixture and stop before transfer to avoid reusing harvested ids in the game state.
   for(const level of width===1000?[1,2,3,4,5]:[1]){
    t=await Fixture(level,true);await Down(t);await Step(100);p=await Probe();
-   Check(p.rendering.featherSweep.held===level,width+': level '+level+' caps dense real contact at '+level);
+   Check(p.rendering.featherSweep.held===FeatherCapacity(level),width+': level '+level+' caps dense real contact at '+FeatherCapacity(level));
    const count=p.rendering.featherSweep.held;await Step(100);Check((await Probe()).rendering.featherSweep.held===count,width+': holding rotation cannot exceed level '+level+' capacity');
    Check(p.targets.filter(c=>c.state==='held').every(c=>c.fine),width+': capacity excludes large deposits');
    await Up();await page.evaluate(()=>__EarSpaDebug.view.EndService());await Step(1);
   }
   if(width===1000){
    await Fixture(1);await page.locator('#shop-open').click();await page.locator('[data-select-tool="feather"]').click();
-   Check((await page.locator('.upgrade-benefit').innerText()).includes('1 → 2 组微屑'),'shop shows concrete upgrade capacity');
+   Check((await page.locator('.upgrade-benefit').innerText()).includes('1 → 3 组微屑'),'shop shows concrete upgrade capacity');
    await page.evaluate(()=>{__EarSpaDebug.shop.state.coins=1000;});await page.locator('[data-select-tool="feather"]').click();await page.locator('[data-upgrade="gooseFeather"]').click();
-   Check((await Probe()).shop.toolLevels.gooseFeather===2&&(await Probe()).rendering.featherSweep.capacity===2,'real purchase applies feather capacity');
+   Check((await Probe()).shop.toolLevels.gooseFeather===2&&(await Probe()).rendering.featherSweep.capacity===3,'real purchase applies feather capacity');
    const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('earspa3d.shop.v1')).toolLevels.gooseFeather);Check(saved===2,'upgrade persists in the existing save');
    await page.locator('[data-preview-view="tip"]').click();await page.screenshot({path:path.join(here,'_dev','Shot_FeatherFur.png')});
    await page.locator('#shop-close').click();await Fixture(5);await page.locator('#shop-open').click();await page.locator('[data-select-tool="feather"]').click();await page.locator('[data-preview-view="tip"]').click();await page.screenshot({path:path.join(here,'_dev','Shot_FeatherFurMaster.png')});await page.locator('#tool-preview').screenshot({path:path.join(here,'_dev','Shot_FeatherFurDetail.png')});await page.locator('#shop-close').click();
