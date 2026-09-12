@@ -1,5 +1,5 @@
 import {FeatherCapacity} from './Script_FeatherSweep.mjs?v=ear029-feather-20260912';
-import {AddFeatherFur,ClearFeatherFur,FEATHER_FUR_LENGTH,FEATHER_FUR_PASSES} from './Script_FeatherFur.js?v=ear029-feather-20260912';
+import {AddFeatherFur,ClearFeatherFur,PrepareFeatherStrands,FEATHER_FUR_LENGTH,FEATHER_FUR_PASSES} from './Script_FeatherFur.js?v=ear031-feather-groom-20260912';
 import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear029-oily-coating-20260912';
 import * as THREE from 'three';
 import {SlimeCage,PoseSlimeVolume,StepSlimeVolume} from './Script_SlimePhysics.mjs?v=ear029-oily-coating-20260912';
@@ -617,8 +617,8 @@ export async function CreateImmersiveScene({ core }) {
     });
   }
   function FiberMaterial(feather=false){
-    const m=new THREE.MeshPhysicalMaterial({color:feather?0xcac7b9:0xe5e3d8,roughness:feather?.82:.65,metalness:0,sheen:feather?.65:1,sheenColor:feather?0xe1dacc:0xf4f2e6,sheenRoughness:.58,side:THREE.DoubleSide});
-    m.onBeforeCompile=shader=>{shader.uniforms.fiberTime=hairUniforms.time;shader.uniforms.fiberLamp={value:lamp.position};shader.uniforms.fiberTouch={get value(){return tool.visible&&lastToolPoint?lastToolPoint:new THREE.Vector3(999,999,999)}};shader.vertexShader='varying vec3 fiberAxis;varying vec3 fiberWorld;uniform float fiberTime;uniform vec3 fiberTouch;\n'+shader.vertexShader;
+    const m=new THREE.MeshPhysicalMaterial({color:feather?0xc2bba9:0xe5e3d8,roughness:feather?.86:.65,metalness:0,sheen:feather?.3:1,sheenColor:feather?0xe1dacc:0xf4f2e6,sheenRoughness:.58,side:THREE.DoubleSide});
+    m.onBeforeCompile=shader=>{if(feather)shader.vertexShader='attribute vec3 featherTangent;\n'+shader.vertexShader;shader.uniforms.fiberTime=hairUniforms.time;shader.uniforms.fiberLamp={value:lamp.position};shader.uniforms.fiberTouch={get value(){return tool.visible&&lastToolPoint?lastToolPoint:new THREE.Vector3(999,999,999)}};shader.vertexShader='varying vec3 fiberAxis;varying vec3 fiberWorld;uniform float fiberTime;uniform vec3 fiberTouch;\n'+shader.vertexShader;
       shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
         float freeTip=1.0-smoothstep(0.0,3.0,position.y);
         transformed.x+=sin(fiberTime*2.4+position.y*2.0)*.018*freeTip;
@@ -633,7 +633,11 @@ export async function CreateImmersiveScene({ core }) {
         reflectedLight.indirectSpecular+=irradiance*(lobe*.15+secondary*.08)*vec3(1.0,.94,.83);
         reflectedLight.indirectDiffuse+=irradiance*diffuseColor.rgb*.10;
       `);
-    };m.customProgramCacheKey=()=> 'FeatherDualLobeFiber';return m;
+      if(feather){
+        shader.vertexShader=shader.vertexShader.replace('vec3(position.x*.22,1.0,position.z*.22)','featherTangent');
+        shader.fragmentShader=shader.fragmentShader.replace('lobe*.15+secondary*.08','lobe*.035+secondary*.035').replace('diffuseColor.rgb*.10','diffuseColor.rgb*.025');
+      }
+    };m.customProgramCacheKey=()=> feather?'FeatherCombedFiberV2':'FeatherDualLobeFiber';return m;
   }
   function StyleTool(group,id,level,skin,reflection=metalEnvironment.texture){
     const edition=level<2?'Basic':level<4?'Refined':'Master';
@@ -642,10 +646,12 @@ export async function CreateImmersiveScene({ core }) {
       part.userData.originalName??=part.name;
       const source=asset.scene.getObjectByName(part.userData.originalName+'_'+edition);
       if(source){const variant=Baked(source.name);part.geometry.dispose();for(const m of (Array.isArray(part.material)?part.material:[part.material]))m.dispose();part.geometry=variant.geometry;part.material=variant.material;}
-      if(id==='feather'&&part.userData.originalName==='Model_FeatherTuft'){const spread=1+(level-1)*.32;part.geometry.scale(spread,1,spread);}
+      if(id==='feather'&&part.userData.originalName==='Model_FeatherTuft'){const spread=1+(level-1)*.32;part.geometry.scale(spread,1,spread);PrepareFeatherStrands(part.geometry);}
       if(['Model_FeatherTuft','Model_Brush'].includes(part.userData.originalName)){for(const m of (Array.isArray(part.material)?part.material:[part.material]))m.dispose();part.material=FiberMaterial(id==='feather');part.userData.softFiber=true;part.userData.fiberRest=part.geometry.attributes.position.array.slice();
         const groups=new Map(),rest=part.userData.fiberRest;
-        for(let i=0;i<rest.length/3;i++){const v=new THREE.Vector3(rest[i*3],rest[i*3+1],rest[i*3+2]),key=[v.x,v.y,v.z].map(x=>Math.floor(x/.028)).join(',');if(!groups.has(key))groups.set(key,{center:new THREE.Vector3(),indices:[],radius:0});const bin=groups.get(key);bin.center.add(v);bin.indices.push(i);}
+        if(id==='feather'){
+          for(const indices of part.geometry.userData.featherRings){const bin={center:new THREE.Vector3(),indices,radius:0};for(const i of indices)bin.center.add(new THREE.Vector3(rest[i*3],rest[i*3+1],rest[i*3+2]));groups.set(groups.size,bin);}
+        }else for(let i=0;i<rest.length/3;i++){const v=new THREE.Vector3(rest[i*3],rest[i*3+1],rest[i*3+2]),key=[v.x,v.y,v.z].map(x=>Math.floor(x/.028)).join(',');if(!groups.has(key))groups.set(key,{center:new THREE.Vector3(),indices:[],radius:0});const bin=groups.get(key);bin.center.add(v);bin.indices.push(i);}
         for(const bin of groups.values()){bin.center.divideScalar(bin.indices.length);for(const i of bin.indices)bin.radius=Math.max(bin.radius,bin.center.distanceTo(new THREE.Vector3(rest[i*3],rest[i*3+1],rest[i*3+2])));}
         part.userData.fiberGroups=[...groups.values()];part.userData.fiberPose=null;
         if(id==='feather')AddFeatherFur(part,()=>FiberMaterial(true),[toolClip]);}
@@ -985,7 +991,7 @@ export async function CreateImmersiveScene({ core }) {
     Reach,CanReach(c,id){return c.depth<=Reach(id);},SetDeep(value){inspectionTarget=value?1:0;contact.Reset();HideTool();},
     AuditTool,CollisionProbe(){return contact.Probe();},
     SetContact:materials.SetContact,
-    RenderingProbe(){return {shadersWarmed,staticRaycast:true,fiberClusters:Object.fromEntries(['feather','brush'].map(id=>[id,toolParts[id].children.reduce((sum,p)=>sum+(p.userData.fiberGroups?.length||0),0)])),...materials.Probe(),heading,inspectionDepth,inspectionTarget,reachBlocked,toolReach:Reach(lastToolId),traySize:new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).toArray(),trayStandalone:true,trayCloseup:showcaseBlend,trayCollection:collectionTray.Probe(),trayBounds:TrayBounds(),trayInscription:"强迫症的SOPHIA",toolVisible:tool.visible,toolDragMode,draggingTool:!!toolDrag,toolPosition:tool.position.toArray(),toolRotation:tool.quaternion.toArray(),featherShading:'six-pass shell fur with dual-lobe fibers',featherFur:{passes:FEATHER_FUR_PASSES,length:FEATHER_FUR_LENGTH},featherSweep:{capacity:FeatherCapacity(toolLevels.feather),held:featherSweep?.items.length||0,angle:featherSweep?.angle||0},hairCount:360,hairRootFixed:true,profileHairLayers:3,profileHairTexture:'Texture_LayeredDarkHair.png',profileHairWisps:90,hairTime,headRealtime:true,lampOn,lampAim:lamp.target.position.toArray(),lampIntensity:lamp.intensity,shadows:core.renderer.shadowMap.enabled,canalVisible:canalGroup.visible,externalContext:outer.visible&&!!(transfer||showcase),outerVisible:outer.visible,irritation:chunks.filter(c=>!c.fragment).map(c=>c.irritation),roughness:chunks.map(c=>c.mesh.material.roughness),clearcoat:chunks.map(c=>c.mesh.material.clearcoat),toolLevels:{...toolLevels},previewTriangles};},
+    RenderingProbe(){return {shadersWarmed,staticRaycast:true,fiberClusters:Object.fromEntries(['feather','brush'].map(id=>[id,toolParts[id].children.reduce((sum,p)=>sum+(p.userData.fiberGroups?.length||0),0)])),...materials.Probe(),heading,inspectionDepth,inspectionTarget,reachBlocked,toolReach:Reach(lastToolId),traySize:new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).toArray(),trayStandalone:true,trayCloseup:showcaseBlend,trayCollection:collectionTray.Probe(),trayBounds:TrayBounds(),trayInscription:"强迫症的SOPHIA",toolVisible:tool.visible,toolDragMode,draggingTool:!!toolDrag,toolPosition:tool.position.toArray(),toolRotation:tool.quaternion.toArray(),featherShading:'six-pass combed continuous fibers',featherFur:{passes:FEATHER_FUR_PASSES,length:FEATHER_FUR_LENGTH},featherSweep:{capacity:FeatherCapacity(toolLevels.feather),held:featherSweep?.items.length||0,angle:featherSweep?.angle||0},hairCount:360,hairRootFixed:true,profileHairLayers:3,profileHairTexture:'Texture_LayeredDarkHair.png',profileHairWisps:90,hairTime,headRealtime:true,lampOn,lampAim:lamp.target.position.toArray(),lampIntensity:lamp.intensity,shadows:core.renderer.shadowMap.enabled,canalVisible:canalGroup.visible,externalContext:outer.visible&&!!(transfer||showcase),outerVisible:outer.visible,irritation:chunks.filter(c=>!c.fragment).map(c=>c.irritation),roughness:chunks.map(c=>c.mesh.material.roughness),clearcoat:chunks.map(c=>c.mesh.material.clearcoat),toolLevels:{...toolLevels},previewTriangles};},
     ToggleLamp(){lampOn=!lampOn;return lampOn;},AimLamp(x,y){aim.set(x/width*2-1,1-y/height*2);aimed=true;},
     Enter(){inside=true;entrance=0;showcase=false;},Hover,
     ToggleView(){if(transfer)return 'canal';showcase=false;inside=!inside;HideTool();return inside?'canal':'ear';},

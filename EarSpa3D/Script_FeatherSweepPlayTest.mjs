@@ -43,6 +43,7 @@ try {
   Check(held.length>=2&&held.length<=5,width+': one real rotation picks up multiple natural patches');
   Check(held.every(c=>c.fine)&&p.targets.filter(c=>!c.fine).every(c=>c.state==='attached'),width+': large wax is never swept');
   Check(p.cleanliness===cleanBefore,width+': holding a batch awards no cleaning');
+  if(width===1000){const shapeError=await page.evaluate(()=>{const part=__EarSpaDebug.core.scene.getObjectByName('Model_FeatherTuft'),p=part.geometry.attributes.position,rest=part.userData.fiberRest;let error=0;for(const ring of part.geometry.userData.featherRings){const a=ring[0];for(const b of ring.slice(1)){const before=Math.hypot(rest[a*3]-rest[b*3],rest[a*3+1]-rest[b*3+1],rest[a*3+2]-rest[b*3+2]),after=Math.hypot(p.getX(a)-p.getX(b),p.getY(a)-p.getY(b),p.getZ(a)-p.getZ(b));error=Math.max(error,Math.abs(before-after));}}return{error,ringSize:Math.min(...part.geometry.userData.featherRings.map(r=>r.length))};});Check(shapeError.error<1e-5&&shapeError.ringSize===4,'wall bending keeps feather cross sections round instead of crushing them into strips');report.crossSectionError=shapeError;}
   const audit=await page.evaluate(()=>__EarSpaDebug.view.AuditTool());Check(audit.fieldMinimum>=-.03&&audit.meshMinimum>=-.04,width+': upgraded fibers stay inside wall');
   if(width===1000)await page.screenshot({path:path.join(here,'_dev','Shot_FeatherSweep.png')});
   if(width===390)await page.screenshot({path:path.join(here,'_dev','Shot_FeatherSweepMobile.png')});
@@ -70,12 +71,12 @@ try {
    await page.locator('#shop-close').click();await Fixture(5);await page.locator('#shop-open').click();await page.locator('[data-select-tool="feather"]').click();await page.locator('[data-preview-view="tip"]').click();await page.screenshot({path:path.join(here,'_dev','Shot_FeatherFurMaster.png')});await page.locator('#tool-preview').screenshot({path:path.join(here,'_dev','Shot_FeatherFurDetail.png')});await page.locator('#shop-close').click();
    // Shared deformation and six extra passes, with visible pixel contribution and stable strand coordinates after previews.
    t=(await Probe()).targets.find(c=>c.id==='dust1');await page.mouse.move(t.screen.x,t.screen.y);await Step(1);
-   const fur=await page.evaluate(()=>{const {core}=__EarSpaDebug,part=core.scene.getObjectByName('Model_FeatherTuft');
+   const fur=await page.evaluate(()=>{const {core,view}=__EarSpaDebug,part=core.scene.getObjectByName('Model_FeatherTuft'),beforeUv=part.geometry.attributes.featherUv.array.slice(),beforePose=part.geometry.attributes.position.array.slice();view.ShowTool(view.chunks.find(c=>c.id==='dust11'),'feather');
     const shells=part.children.filter(c=>c.userData.featherShell),gl=core.renderer.getContext();
     function Pixels(){core.Render();const pixels=new Uint8Array(gl.drawingBufferWidth*gl.drawingBufferHeight*4);gl.readPixels(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.RGBA,gl.UNSIGNED_BYTE,pixels);return pixels;}
     const on=Pixels(),calls=core.renderer.info.render.calls;shells.forEach(c=>c.visible=false);const off=Pixels(),without=core.renderer.info.render.calls;shells.forEach(c=>c.visible=true);let changed=0;for(let i=0;i<on.length;i+=4)if(Math.abs(on[i]-off[i])+Math.abs(on[i+1]-off[i+1])+Math.abs(on[i+2]-off[i+2])>9)changed++;
-    return{count:shells.length,shared:shells.every(c=>c.geometry===part.geometry),stable:part.geometry.attributes.furRestPosition.array.every((v,i)=>v===part.userData.fiberRest[i]),drawCalls:calls-without,changed};});
-   Check(fur.count===6&&fur.shared&&fur.drawCalls===6,'fur shares collision-deformed geometry across six passes');Check(fur.changed>100,'shell fur changes visible pixels');Check(fur.stable,'fur follicles stay attached to rest coordinates while fibers bend');report.fur=fur;
+    return{count:shells.length,shared:shells.every(c=>c.geometry===part.geometry),stable:part.geometry.attributes.featherUv.array.every((v,i)=>v===beforeUv[i]),deformed:part.geometry.attributes.position.array.some((v,i)=>Math.abs(v-beforePose[i])>1e-6),drawCalls:calls-without,changed};});
+   Check(fur.count===6&&fur.shared&&fur.drawCalls===6,'fur shares collision-deformed geometry across six passes');Check(fur.changed>100,'shell fur changes visible pixels');Check(fur.stable&&fur.deformed,'continuous fiber coordinates stay attached while the contact mesh bends');report.fur=fur;
   }
   await page.close();console.log('PASS feather sweep viewport '+width);
  }
