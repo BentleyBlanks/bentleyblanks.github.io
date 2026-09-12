@@ -10,6 +10,17 @@ export function CreateCollectionTray({scene, tray, camera, Project, size, scoop}
   const cleaner=scoop.clone(true);cleaner.name='Model_TrayCleaner';scene.add(cleaner);cleaner.visible=false;
   // 免费清盘耳勺是独立竹制器具，不参与采耳工具的等级和皮肤切换。
   cleaner.traverse(node=>{if(node.isMesh){node.name=node.name.replace('Model_','Model_TrayCleaner');node.geometry=node.geometry.clone();node.material=(Array.isArray(node.material)?node.material:[node.material]).map(m=>{const copy=m.clone();copy.name='Material_TrayCleanerBamboo';copy.clippingPlanes=[];return copy;});if(node.material.length===1)node.material=node.material[0];}});
+  // 清盘器具按盘宽标定；柄沿盘面斜向伸出，避免朝向特写镜头而缩成短棍。
+  const cleanerLength=new THREE.Box3().setFromObject(cleaner).getSize(new THREE.Vector3()).y;
+  const trayWidth=new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).x;
+  cleaner.scale.setScalar(trayWidth*.68/cleanerLength);
+  const cleanerHandle=new THREE.Vector3(-.70,.22,-.68).normalize();
+  const cleanerSide=cleanerHandle.clone().cross(new THREE.Vector3(0,1,0)).normalize();
+  const cleanerNormal=cleanerSide.clone().cross(cleanerHandle).normalize();
+  const cleanerPose=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(cleanerSide,cleanerHandle,cleanerNormal));
+  cleaner.quaternion.copy(cleanerPose);
+  // 以真实勺面最低点贴盘；缩放与旋转不改变鼠标／触点对应的工作端原点。
+  const cleanerHeight=.16-new THREE.Box3().setFromObject(cleaner,true).min.y;
   let serial=0,tilt=0,tilting=false,active=false,drag=null,removed=0;
   const unitScale=new THREE.Vector3(1,1,1),matrix=new THREE.Matrix4();
   function Sync(){group.position.copy(tray.position);group.quaternion.copy(tray.quaternion);group.updateMatrixWorld(true);}
@@ -57,8 +68,8 @@ export function CreateCollectionTray({scene, tray, camera, Project, size, scoop}
   }
   function ShowCleaner(p){
     cleaner.visible=active&&!tilting;
-    cleaner.position.copy(group.localToWorld(p.clone().setY(.8)));
-    cleaner.quaternion.copy(group.quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-.7,0,-.45)));
+    cleaner.position.copy(group.localToWorld(p.clone().setY(cleanerHeight)));
+    cleaner.quaternion.copy(group.quaternion).multiply(cleanerPose);
   }
   function Begin(x,y){
     if(!active||tilting)return false;const p=Point(x,y);

@@ -1,4 +1,4 @@
-import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear025-oily-20260912';
+import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear027-tray-proportions-20260912';
 import * as THREE from 'three';
 import {SlimeCage,PoseSlimeVolume,StepSlimeVolume} from './Script_SlimePhysics.mjs?v=ear025-oily-20260912';
 import { BuildEar, MakeRng } from './Script_EarAnatomy.js?v=ear012-outer-20260911';
