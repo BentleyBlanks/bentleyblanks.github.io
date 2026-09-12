@@ -1,4 +1,4 @@
-// Instanced box projection onto the CURRENT opaque depth/normal buffer.
+// Planar / volume projection onto the CURRENT opaque depth/normal buffer.
 // No floating quads, copied terrain formula, extra frame-graph pass or Three addon.
 // Each layer is one draw; persistent dressing and transient impacts own separate slots.
 import * as THREE from "three";
@@ -13,15 +13,17 @@ attribute vec3 iBitangent;
 attribute vec3 iNormal;
 attribute vec4 iShape; // radius x/y, projection depth, seeded texture offset
 attribute vec4 iState; // birth, pre-age, kind (pool=1, splash=0), opacity
+attribute vec3 iProjection; // planar flag, normal rejection / full-opacity cosines
 varying vec3 vCenter;
 varying vec3 vTangent;
 varying vec3 vBitangent;
 varying vec3 vNormal;
 varying vec4 vShape;
 varying vec4 vState;
+varying vec3 vProjection;
 void main() {
   vCenter=iCenter;vTangent=iTangent;vBitangent=iBitangent;vNormal=iNormal;
-  vShape=iShape;vState=iState;
+  vShape=iShape;vState=iState;vProjection=iProjection;
   vec3 world=iCenter+iTangent*position.x*iShape.x
     +iBitangent*position.y*iShape.y+iNormal*position.z*iShape.z;
   gl_Position=projectionMatrix*viewMatrix*vec4(world,1.0);
@@ -48,6 +50,7 @@ varying vec3 vBitangent;
 varying vec3 vNormal;
 varying vec4 vShape;
 varying vec4 vState;
+varying vec3 vProjection;
 ${SUN_SHADOW_GLSL}
 float Hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float Noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
@@ -61,13 +64,18 @@ void main(){
   vec4 ray=uBloodInverseProjection*vec4(screenUv*2.0-1.0,1.0,1.0);
   vec3 view=ray.xyz*(nd.w/max(-ray.z,1e-6));
   vec3 world=(uBloodCameraWorld*vec4(view,1.0)).xyz;
+  // Evaluate derivatives before per-fragment clipping. Smoothed vertex normals alone
+  // can accept a steep edge and stretch the projection vertically across it.
+  vec3 geometricCross=cross(dFdx(world),dFdy(world));
+  vec3 geometricNormal=geometricCross/max(length(geometricCross),1e-8);
   vec3 delta=world-vCenter;
   vec3 local=vec3(dot(delta,vTangent)/vShape.x,dot(delta,vBitangent)/vShape.y,
     dot(delta,vNormal)/vShape.z);
   if(any(greaterThan(abs(local),vec3(1.0))))discard;
   vec3 normal=normalize(mat3(uBloodCameraWorld)*nd.xyz);
   float facing=dot(normal,vNormal);
-  if(facing<${C.normalReject})discard;
+  if(vProjection.x>.5)facing=min(facing,abs(dot(geometricNormal,vNormal)));
+  if(facing<vProjection.y)discard;
   float age=max(0.0,uTime-vState.x),dry=clamp((age+vState.y)/${C.drySeconds.toFixed(1)},0.0,1.0);
   float pool=vState.z;
   float grow=vState.y>0.0?1.0:mix(.32,1.0,1.0-exp(-age/${C.growSeconds}));
@@ -84,7 +92,9 @@ void main(){
   float footprint=1.0-smoothstep(.67,.99,length(p));
   float splash=max(detail*footprint*mix(.42,1.0,noise),core*.48*(.35+.65*detail));
   float alpha=mix(splash,max(core,fringe),pool)*vState.w;
-  alpha*=smoothstep(${C.normalReject},.85,facing);
+  alpha*=smoothstep(vProjection.y,vProjection.z,facing);
+  // Fade before the volume cap; never reveal its hard rectangular upper/lower edge.
+  alpha*=1.0-smoothstep(${C.depthFadeStart},1.0,abs(local.z));
   alpha*=uGlobalFade*(uPersistent>.5?1.0:1.0-smoothstep(${C.lifeSeconds-20}.0,${C.lifeSeconds}.0,age));
   if(alpha<.008)discard;
   vec3 albedo=mix(uBloodFresh,uBloodDry,dry)*mix(.72,1.13,detail);
@@ -111,7 +121,7 @@ export class SurfaceDecalLayer {
     const box=new THREE.BoxGeometry(2,2,2),g=new THREE.InstancedBufferGeometry();
     g.index=box.index.clone();g.setAttribute("position",box.attributes.position.clone());box.dispose();
     this.attributes={};
-    for(const [key,size] of [["iCenter",3],["iTangent",3],["iBitangent",3],["iNormal",3],["iShape",4],["iState",4]]){
+    for(const [key,size] of [["iCenter",3],["iTangent",3],["iBitangent",3],["iNormal",3],["iShape",4],["iState",4],["iProjection",3]]){
       const attr=new THREE.InstancedBufferAttribute(new Float32Array(this.capacity*size),size);
       attr.setUsage(THREE.DynamicDrawUsage);g.setAttribute(key,attr);this.attributes[key]=attr;
     }
@@ -131,12 +141,22 @@ export class SurfaceDecalLayer {
       shared.uBloodCameraWorld.value.copy(camera.matrixWorld);
     };
   }
-  Add(position,surfaceNormal,radius,{now=0,age=0,pool=false,opacity=.86,seed=.5,aspect=1,merge=false}={}){
+  Add(position,surfaceNormal,radius,{now=0,age=0,pool=false,opacity=.86,seed=.5,aspect=1,merge=false,
+    projection=C.projection,depth=null,normalReject=null,normalFade=null}={}){
     if(this.disposed||!Number.isFinite(position.x+position.y+position.z)||!(radius>0))return null;
+    if(projection!=="planar"&&projection!=="volume")throw new RangeError(`Unknown decal projection: ${projection}`);
+    const planar=projection==="planar";
+    depth??=planar?C.planarDepth:C.depth;
+    normalReject??=planar?C.planarNormalReject:C.normalReject;
+    normalFade??=planar?C.planarNormalFade:C.volumeNormalFade;
+    if(![radius,aspect,depth,normalReject,normalFade,seed,now,age,opacity,surfaceNormal.x,surfaceNormal.y,surfaceNormal.z].every(Number.isFinite)
+      ||aspect<=0||depth<=0||normalReject<0||normalFade>1||normalReject>=normalFade)return null;
     normal.copy(surfaceNormal);if(normal.lengthSq()<1e-8)normal.set(0,1,0);normal.normalize();
-    if(merge){
+    if(merge&&pool){
       for(const rec of this.records){
-        if(rec&&rec.pool&&now-rec.now<C.drySeconds&&rec.position.distanceToSquared(position)<C.mergeDistance**2&&rec.normal.dot(normal)>.9){
+        const planeDistance=rec?Math.abs((position.x-rec.position.x)*rec.normal.x+(position.y-rec.position.y)*rec.normal.y+(position.z-rec.position.z)*rec.normal.z):Infinity;
+        if(rec&&rec.pool&&rec.projection===projection&&rec.depth===depth&&rec.normalReject===normalReject&&rec.normalFade===normalFade
+          &&planeDistance<depth*.5&&now-rec.now<C.drySeconds&&rec.position.distanceToSquared(position)<C.mergeDistance**2&&rec.normal.dot(normal)>.9){
           rec.radius=Math.min(C.mergeMaxRadius,Math.sqrt(rec.radius**2+radius**2*C.mergeAreaScale));
           this.attributes.iShape.setXY(rec.index,rec.radius,rec.radius*rec.aspect);
           this.attributes.iShape.needsUpdate=true;return rec;
@@ -153,11 +173,13 @@ export class SurfaceDecalLayer {
     a.iNormal.setXYZ(i,normal.x,normal.y,normal.z);
     a.iTangent.setXYZ(i,tangent.x,tangent.y,tangent.z);
     a.iBitangent.setXYZ(i,bitangent.x,bitangent.y,bitangent.z);
-    a.iShape.setXYZW(i,radius,radius*aspect,C.depth,seed);
+    a.iShape.setXYZW(i,radius,radius*aspect,depth,seed);
     a.iState.setXYZW(i,now,age,pool?1:0,opacity);
+    a.iProjection.setXYZ(i,planar?1:0,normalReject,normalFade);
     for(const attr of Object.values(a))attr.needsUpdate=true;
     this.geometry.instanceCount=this.count;
-    return this.records[i]={index:i,position:new THREE.Vector3().copy(position),normal:normal.clone(),radius,aspect,pool,now};
+    return this.records[i]={index:i,position:new THREE.Vector3().copy(position),normal:normal.clone(),radius,aspect,pool,now,
+      projection,depth,normalReject,normalFade};
   }
   Clear(){this.cursor=0;this.count=0;this.records.length=0;this.geometry.instanceCount=0;}
   Dispose(){if(this.disposed)return;this.disposed=true;this.mesh.removeFromParent();this.geometry.dispose();

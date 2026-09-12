@@ -14,6 +14,9 @@ export const BLOOD_MOTION = Object.freeze({ gravity: 9.81, drag: .65, dropLife: 
   corpseSeconds: 9, corpseRate: 3.5, corpseSpeed: [.12, .4], corpseDropRadius: .22,
 });
 export const BLOOD_SURFACE = Object.freeze({
+  // Planar limits reception around the hit tangent plane; cosine .8 caps stretch at 1.25x.
+  projection: "planar", planarDepth: .035, planarNormalReject: .8, planarNormalFade: .95,
+  depthFadeStart: .65, volumeNormalFade: .85,
   depth: .12, normalReject: .55, drySeconds: 85, lifeSeconds: 240,
   growSeconds: 1.8, minRadius: .035, maxRadius: .9, mergeDistance: .14,
   mergeMaxRadius: .62, mergeAreaScale: .35,
