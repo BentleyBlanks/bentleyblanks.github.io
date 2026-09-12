@@ -2679,7 +2679,7 @@ export const MUSIC_BASE = "Audio/Music/";
 // 这一次是**加条目**：戳不动的话浏览器拿着缓存里的旧清单，新素材永远载不上，
 // 而 LoadSfxPack 盖不上去是静默的 —— 表现只是「断肢还是合成音」。
 // （同一天 Codex 那边把戳改成了日期式，合并后取带两件事的同一个新戳。）
-export const SFX_PACK_VERSION = "20260911planeexplosion";
+export const SFX_PACK_VERSION = "20260912heavyearth";
 export const AMB_PACK_VERSION = "20260912trainonly";
 export const MUSIC_PACK_VERSION = "5";
 

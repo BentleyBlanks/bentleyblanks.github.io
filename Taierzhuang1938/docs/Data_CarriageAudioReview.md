@@ -1,5 +1,8 @@
 # 车厢配乐与音效修订（2026-09-11）
 
+2026-09-12 更新：近爆已被用户认可的[厚重掀土](Data_HeavyEarthExplosion.md)替换。
+下文近爆记录为历史状态；`--install-sfx` 现在仅重装飞机引擎，保留新的近爆成品。
+
 本批范围为用户指定的 7 条音频，供应商统一为 Volcengine `seed-audio-1.0`。
 生成入口为 `Script_SeedAudioCarriageReviewBake.mjs`，密钥仅在请求时读取环境变量
 `VOLCENGINE_API_KEY`。每条一次连续生成，原始 take 按提示词哈希缓存；失败重试不扩展变体数量。

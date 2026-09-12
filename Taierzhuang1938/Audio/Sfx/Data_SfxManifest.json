@@ -140,10 +140,10 @@
     },
     "explosionNear": {
       "files": [
-        "AudioSfx_ExplosionNearReplacement.mp3"
+        "AudioSfx_ExplosionNearHeavyEarth.mp3"
       ],
-      "seconds": 4.049,
-      "credit": "Volcengine SeedAudio 1.0 · 近距爆炸 · 冲击与碎土 · 2026-09-11",
+      "seconds": 3.407,
+      "credit": "Volcengine SeedAudio 1.0 · approved Heavy Earth +6 dB · 2026-09-12",
       "license": "volcengine"
     },
     "explosionFar": {
@@ -781,7 +781,7 @@
       "license": "volcengine"
     }
   },
-  "bakedAt": "2026-09-10",
+  "bakedAt": "2026-09-12",
   "normalization": {
     "normalizedAt": "2026-09-08",
     "tool": "Script_AudioNormalize.mjs",
@@ -852,6 +852,27 @@
       "rawSha256": "083c6a1caa8d4a207963c6bb89e4484ce8694dee5c7b6d56000efd4bebc68c1f",
       "generatedAt": "2026-09-11T14:03:22.745Z",
       "model": "seed-audio-1.0"
+    }
+  },
+  "approvedExplosionSources": {
+    "explosionNear": {
+      "id": "ExplosionNear03",
+      "cue": "explosionNear",
+      "title": "近距爆炸 03 · 厚重掀土",
+      "duration": 3.8,
+      "prompt": "生成用于写实二战第一人称战争游戏的一条独立音效，单声道，无音乐，无人声，无旁白，无其他战场背景声，无耳鸣，无电子合成或科幻质感。仅一次事件，不重复。起音及时，尾音完整自然停止。约三秒半。户外十二米外一枚重型迫击炮弹在结实泥土地面爆炸，仅一次。开头厚实短促的爆裂带胸腔可感的低中频空气推力，随后泥土大块翻起，砂石碎屑密集但很快衰减，最后几下较重土块落地。比干脆版本更低沉厚重，保持清晰的起音与真实质感。不要飞行啸声、枪声、鞭炮、重复爆炸、超长轰鸣、音效叠成多次爆炸。",
+      "file": "AudioSfx_ExplosionNearHeavyEarth.mp3",
+      "model": "seed-audio-1.0",
+      "generatedAt": "2026-09-12T15:19:30.314Z",
+      "sha256": "02a9ac36438e9e54fe2601799a3c912dc362396d7dc191a97e95f96d00199f21",
+      "rawSha256": "4c4136f70f337e48ce1c074ea7758baa5a2d150bfedd77a6ef798832980c04eb",
+      "seconds": 3.406530612244898,
+      "activeRmsDbfs": -19.53,
+      "peakDbfs": -4.1,
+      "onset": 0,
+      "normalizedSourceSha256": "e0a6c8318d9aeed91c336275d1e5ee0bec836895383706b4406c434bc751c8aa",
+      "auditionGainDb": 6,
+      "approvedOn": "2026-09-12"
     }
   }
 }

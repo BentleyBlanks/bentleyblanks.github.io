@@ -98,11 +98,11 @@ export const SFX_SOURCES = [
   {
     id: "ExplosionNearSeedAudio",
     seedAudio: true,
-    bake: "Script_SeedAudioCarriageReviewBake.mjs --install-sfx",
-    credit: "Volcengine SeedAudio 1.0 · close impact and debris replacement · 2026-09-11",
+    // Approved louder Heavy Earth take; preserve the checked-in MP3, do not regenerate.
+    credit: "Volcengine SeedAudio 1.0 · approved Heavy Earth +6 dB · 2026-09-12",
     license: "volcengine",
     bitrate: "192k",
-    cuts: [{ cue: "explosionNear", files: ["AudioSfx_ExplosionNearReplacement.mp3"], durS: 4.05 }],
+    cuts: [{ cue: "explosionNear", files: ["AudioSfx_ExplosionNearHeavyEarth.mp3"], durS: 3.407 }],
   },
   {
     id: "PlaneEngineSeedAudio",

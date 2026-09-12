@@ -56,7 +56,9 @@ async function Main() {
     const report = JSON.parse(fs.readFileSync(path.join(outputDir, "Data_AudioReview.json"), "utf8"));
     const manifestPath = path.join(here, "Audio/Sfx/Data_SfxManifest.json");
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-    const selected = [["PlaneEngine", "planeDrone"], ["ExplosionNearReplacement", "explosionNear"]].map(([id, cue]) => {
+    // Near explosion now uses the user-approved Heavy Earth take (2026-09-12).
+    // Reinstalling this historical review must not restore the retired near cue.
+    const selected = [["PlaneEngine", "planeDrone"]].map(([id, cue]) => {
       const take = report.assets[id], bytes = fs.readFileSync(path.join(outputDir, take.file));
       if (Hash(bytes) !== take.sha256) throw new Error(`${id}: SHA-256 mismatch`);
       return {take, bytes, cue};
