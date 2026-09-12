@@ -137,7 +137,9 @@ export class FirstLevelWhiteboxField {
     };
   }
 
-  GroundHeight(x, z) { return SampleWhiteboxSurface(this.walkableSurfaces,x,z,this.terrain?.SampleHeight(x,z) ?? 0); }
+  TerrainHeight(x, z) { return this.terrain?.SampleHeight(x,z) ?? 0; }
+  WalkableHeight(x, z, terrainHeight) { return SampleWhiteboxSurface(this.walkableSurfaces,x,z,terrainHeight); }
+  GroundHeight(x, z) { return this.WalkableHeight(x,z,this.TerrainHeight(x,z)); }
   // Load-time environment placement cannot rest on the train that moves away
   // after construction. Terrain and fixed floors still use the shared sampler.
   StaticGroundHeight(x,z){return SampleWhiteboxSurface(this.staticWalkableSurfaces,x,z,this.terrain?.SampleHeight(x,z)??0);}

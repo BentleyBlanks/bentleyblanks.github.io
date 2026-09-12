@@ -274,6 +274,9 @@ export class TerrainDeformationView {
   constructor(field, scene, library) {
     this.field = field; this.scene = scene; this.physics = null;
     this.originalHeight = field.GroundHeight.bind(field);
+    // Rebuild soil from soil only. Sampling walkable decks here drapes crater
+    // tiles over train floors/stairs, creating coplanar surfaces after a blast.
+    this.terrainHeight = field.TerrainHeight?.bind(field) || this.originalHeight;
     this.groundColor = new THREE.Color();
     this.originalGeometry = new Map(); this.tileMeshes = new Map();
     this.overlayTiles = new Map(); this.overlayMaterials = new Map();
@@ -291,10 +294,13 @@ export class TerrainDeformationView {
     // Overlay materials are cloned up front, not at the first crater on a road:
     // Warm() has to compile every crater program the level can ever need.
     for (const source of this.overlaySources) this.OverlayMaterial(source);
-    this.model = new TerrainDeformation({ GroundHeight: this.originalHeight, bounds: field.bounds,
+    this.model = new TerrainDeformation({ GroundHeight: this.terrainHeight, bounds: field.bounds,
       CanDeform: (x, z) => this.CanDeform(x, z) });
     field.BaseGroundHeight = this.originalHeight;
-    field.GroundHeight = (x, z) => this.model.GroundHeight(x, z);
+    field.GroundHeight = (x, z) => {
+      const soil = this.model.GroundHeight(x, z);
+      return field.WalkableHeight ? field.WalkableHeight(x, z, soil) : soil;
+    };
     field.deformation = this;
     this.maskColliders = field.colliders?.length ?? 0;
     this.warmProxies = []; this.warmState = null; this.warmRetired = null;
@@ -470,7 +476,7 @@ export class TerrainDeformationView {
     for (const source of this.overlaySources) {
       const polygonsByTile = keys.map(() => []);
       this.CutSource(source, rects, {
-        AllowTriangle: (tri, p) => tri.every((v) => Math.abs(v[p + 1] - this.originalHeight(v[p], v[p + 2])) < 1),
+        AllowTriangle: (tri, p) => tri.every((v) => Math.abs(v[p + 1] - this.terrainHeight(v[p], v[p + 2])) < 1),
         OnCut: (polygon, attrs, p, up, tile) => { if (up > 1e-9) polygonsByTile[tile].push({ polygon, attrs, p }); },
       });
       for (let tile = 0; tile < keys.length; tile++) {
