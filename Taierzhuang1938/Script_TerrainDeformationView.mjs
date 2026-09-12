@@ -15,6 +15,27 @@ import { ValueNoise2 } from "./Script_Noise.mjs";
 // (all of them are dirty on the first gameplay frame) the wait is a few frames.
 const WARM_MAX_RENDERS = 240;
 
+// How many tiles' surface fragments a frame may bake. One grenade dirties three
+// or four tiles, so its pebbles finish arriving within about two frames.
+const DEBRIS_TILES_PER_FRAME = 2;
+
+// Every crater tile has the same lattice, so the index list is built once and
+// each tile wraps that one array in its own attribute (its own small GPU buffer,
+// so disposing one tile cannot pull the index out from under the others).
+let tileIndexArray = null, tileIndexCells = 0;
+function TileIndexArray(cells) {
+  if (tileIndexArray && tileIndexCells === cells) return tileIndexArray;
+  const width = cells + 1, indices = new Uint16Array(cells * cells * 6);
+  let at = 0;
+  for (let z = 0; z < cells; z++) for (let x = 0; x < cells; x++) {
+    const v = z * width + x;
+    indices[at++] = v; indices[at++] = v + width; indices[at++] = v + 1;
+    indices[at++] = v + 1; indices[at++] = v + width; indices[at++] = v + width + 1;
+  }
+  tileIndexCells = cells;
+  return tileIndexArray = indices;
+}
+
 function ClipByDistance(polygon, Distance) {
   const inside = [], outside = [];
   for (let i = 0; i < polygon.length; i++) {
@@ -54,11 +75,16 @@ export function CutTerrainRectangles(mesh, rects, { AllowTriangle = null, OnCut 
   }
   if (worldBox.max.x <= union.minX || worldBox.min.x >= union.maxX || worldBox.max.z <= union.minZ || worldBox.min.z >= union.maxZ) return false;
   const attrs = Object.entries(geometry.attributes).filter(([, a]) => a.itemSize <= 4);
-  const index = geometry.index, count = index?.count || pos.count;
+  const index = geometry.index, indexArray = index?.array, count = index?.count || pos.count;
   const offsets = []; let stride = 0;
   for (const [name, a] of attrs) { offsets.push({ name, size: a.itemSize, offset: stride }); stride += a.itemSize; }
   const pOffset = offsets.find((a) => a.name === "position").offset;
-  const data = [], kept = [], temp = new THREE.Vector3(); let removed = false;
+  const data = [], temp = new THREE.Vector3(); let removed = false;
+  // Surviving triangles go straight into a typed array. Growing a plain array to
+  // 24k entries and handing that to setIndex (which rescans it for the index type
+  // and copies it again) was several milliseconds of the chunk being cut.
+  const kept = new Uint32Array(count); let keptCount = 0;
+  const Keep = (a, b, c) => { kept[keptCount++] = a; kept[keptCount++] = b; kept[keptCount++] = c; };
   // Reject with positions first. Recopying every UV/normal of the entire city
   // for each small hole used to dominate the blast frame.
   const matrix = mesh.matrixWorld.elements, identity = matrix.every((v, i) => v === (i % 5 === 0 ? 1 : 0));
@@ -82,20 +108,20 @@ export function CutTerrainRectangles(mesh, rects, { AllowTriangle = null, OnCut 
     if (inside.length >= 3) { cutAny = true; OnCut?.(inside, offsets, pOffset, up, overlapping[r]); }
   };
   for (let i = 0; i < count; i += 3) {
-    const ai = index ? index.getX(i) : i, bi = index ? index.getX(i + 1) : i + 1, ci = index ? index.getX(i + 2) : i + 2;
+    const ai = indexArray ? indexArray[i] : i, bi = indexArray ? indexArray[i + 1] : i + 1, ci = indexArray ? indexArray[i + 2] : i + 2;
     const ax = worldPositions[ai * 3], az = worldPositions[ai * 3 + 2];
     const bx = worldPositions[bi * 3], bz = worldPositions[bi * 3 + 2];
     const cx = worldPositions[ci * 3], cz = worldPositions[ci * 3 + 2];
     const minX = Math.min(ax, bx, cx), maxX = Math.max(ax, bx, cx), minZ = Math.min(az, bz, cz), maxZ = Math.max(az, bz, cz);
-    if (maxX <= union.minX || minX >= union.maxX || maxZ <= union.minZ || minZ >= union.maxZ) { kept.push(ai, bi, ci); continue; }
+    if (maxX <= union.minX || minX >= union.maxX || maxZ <= union.minZ || minZ >= union.maxZ) { Keep(ai, bi, ci); continue; }
     overlapping.length = 0;
     for (let r = 0; r < rects.length; r++) {
       const rect = rects[r];
       if (!(maxX <= rect.minX || minX >= rect.maxX || maxZ <= rect.minZ || minZ >= rect.maxZ)) overlapping.push(r);
     }
-    if (!overlapping.length) { kept.push(ai, bi, ci); continue; }
+    if (!overlapping.length) { Keep(ai, bi, ci); continue; }
     up = (bz - az) * (cx - ax) - (bx - ax) * (cz - az);
-    if (!AllowTriangle && up <= 1e-9) { kept.push(ai, bi, ci); continue; }
+    if (!AllowTriangle && up <= 1e-9) { Keep(ai, bi, ci); continue; }
     const tri = [];
     for (const at of [ai, bi, ci]) {
       const values = [];
@@ -103,12 +129,12 @@ export function CutTerrainRectangles(mesh, rects, { AllowTriangle = null, OnCut 
       values[pOffset] = worldPositions[at * 3]; values[pOffset + 1] = worldPositions[at * 3 + 1]; values[pOffset + 2] = worldPositions[at * 3 + 2];
       tri.push(values);
     }
-    if (AllowTriangle && !AllowTriangle(tri, pOffset, up)) { kept.push(ai, bi, ci); continue; }
+    if (AllowTriangle && !AllowTriangle(tri, pOffset, up)) { Keep(ai, bi, ci); continue; }
     const start = data.length;
     cutAny = false;
     Cut(tri, 0);
     if (cutAny) removed = true;
-    else { data.length = start; kept.push(ai, bi, ci); }
+    else { data.length = start; Keep(ai, bi, ci); }
   }
   if (!removed) return false;
   const result = new THREE.BufferGeometry(), inverse = mesh.matrixWorld.clone().invert();
@@ -125,8 +151,11 @@ export function CutTerrainRectangles(mesh, rects, { AllowTriangle = null, OnCut 
     }
     result.setAttribute(attr.name, new THREE.BufferAttribute(values, attr.size, original.normalized));
   }
-  for (let i = 0; i < data.length / stride; i++) kept.push(pos.count + i);
-  result.setIndex(kept);
+  const added = data.length / stride, indices = pos.count + added > 65535
+    ? new Uint32Array(keptCount + added) : new Uint16Array(keptCount + added);
+  indices.set(kept.subarray(0, keptCount));
+  for (let i = 0; i < added; i++) indices[keptCount + i] = pos.count + i;
+  result.setIndex(new THREE.BufferAttribute(indices, 1));
   // A cut only shrinks the source; the old conservative bounds stay valid.
   result.boundingBox = geometry.boundingBox.clone();
   result.boundingSphere = geometry.boundingSphere?.clone() || null;
@@ -278,7 +307,10 @@ export class TerrainDeformationView {
     // tiles over train floors/stairs, creating coplanar surfaces after a blast.
     this.terrainHeight = field.TerrainHeight?.bind(field) || this.originalHeight;
     this.groundColor = new THREE.Color();
-    this.originalGeometry = new Map(); this.tileMeshes = new Map();
+    // Scratch target for field colour samplers that accept one (SampleMissionGroundColor
+    // does); samplers that ignore it still return their own array.
+    this.colorOut = [0, 0, 0];
+    this.originalGeometry = new Map(); this.tileMeshes = new Map(); this.sourceBounds = new Map();
     this.overlayTiles = new Map(); this.overlayMaterials = new Map();
     this.blastPages = new Map();
     const groundMaterial = library.Get("Ground");
@@ -305,9 +337,15 @@ export class TerrainDeformationView {
     this.maskColliders = field.colliders?.length ?? 0;
     this.warmProxies = []; this.warmState = null; this.warmRetired = null;
     const w = this.model.config.tileCells + 3;
-    this._heights = new Float64Array(w * w); this._deltas = new Float32Array(w * w); this._wear = new Float32Array(w * w);
+    // Heights and deltas are scratch (one tile at a time); soil wear lives on
+    // each tile mesh, because the debris and overlay passes read the whole tile
+    // even when the rebuild only touched a sub-rect of it.
+    this._heights = new Float64Array(w * w); this._deltas = new Float32Array(w * w);
     this.lastUpdateMs = null; this.lastStepSerial = -1;
     this.debris = new CraterDebris(this, library);
+    // Tiles waiting for their surface fragments, and whether a host is ticking
+    // Update() at all (see Update()).
+    this.debrisQueue = new Map(); this.hosted = false;
   }
   CanDeform(x, z) {
     if (!this.sources.length) return false;
@@ -448,8 +486,9 @@ export class TerrainDeformationView {
             const lx = ix - tx * n, lz = iz - tz * n, at = (lz * n + lx) * 2;
             page[at] = Math.max(page[at], heat); page[at + 1] = Math.max(page[at + 1], powder);
             // Border vertices belong to both neighbours, exactly as SetNode().
+            // Scorch is per vertex, so the dirty sub-rect needs no halo.
             for (let z = lz === 0 ? tz - 1 : tz; z <= tz; z++) {
-              for (let x = lx === 0 ? tx - 1 : tx; x <= tx; x++) this.model.MarkTile(x, z);
+              for (let x = lx === 0 ? tx - 1 : tx; x <= tx; x++) this.model.MarkTile(x, z, ix - x * n, iz - z * n, 0);
             }
           }
         }
@@ -462,8 +501,32 @@ export class TerrainDeformationView {
     const page = this.blastPages.get(tx * 4096 + tz), at = ((iz - tz * n) * n + ix - tx * n) * 2;
     target[offset] = page?.[at] || 0; target[offset + 1] = page?.[at + 1] || 0;
   }
+  /**
+   * World-space xz bounds of a static source, kept because the level splits its
+   * ground into ~100 chunks and a blast used to ask every one of them to update
+   * its matrix and clone a box before rejecting it. Cutting only removes
+   * triangles, so the first (largest) bounds stay a valid conservative filter.
+   */
+  SourceBounds(source) {
+    let bounds = this.sourceBounds.get(source);
+    if (!bounds) {
+      if (!source.geometry.boundingBox) source.geometry.computeBoundingBox();
+      source.updateMatrixWorld(true);
+      const box = source.geometry.boundingBox.clone().applyMatrix4(source.matrixWorld);
+      bounds = { minX: box.min.x, maxX: box.max.x, minZ: box.min.z, maxZ: box.max.z };
+      this.sourceBounds.set(source, bounds);
+    }
+    return bounds;
+  }
   /** Cut every rect of this Flush out of one source in a single triangle pass. */
   CutSource(source, rects, options) {
+    const bounds = this.SourceBounds(source);
+    let reachable = false;
+    for (const r of rects) {
+      if (bounds.maxX <= r.minX || bounds.minX >= r.maxX || bounds.maxZ <= r.minZ || bounds.minZ >= r.maxZ) continue;
+      reachable = true; break;
+    }
+    if (!reachable) return false;
     const before = source.geometry;
     if (!CutTerrainRectangles(source, rects, options)) return false;
     if (!this.originalGeometry.has(source)) this.originalGeometry.set(source, before);
@@ -504,7 +567,7 @@ export class TerrainDeformationView {
    * vertices were clipped to the tile so they round onto it, and the 9-node
    * lookup per vertex that SoilWear() does is then a single array read.
    */
-  UpdateOverlays(key, tx = null, tz = null, wear = null, w = 0) {
+  UpdateOverlays(key, tx = null, tz = null, wear = null, w = 0, box = null) {
     const s = this.model.config.cellM, n = this.model.config.tileCells;
     for (const mesh of this.overlayTiles.get(key) || []) {
       const geo = mesh.geometry, pos = geo.attributes.position.array, color = geo.attributes.color.array, delta = geo.attributes.terrainDelta.array;
@@ -512,6 +575,11 @@ export class TerrainDeformationView {
       const count = geo.attributes.position.count;
       for (let i = 0; i < count; i++) {
         const x = original[i * 3], z = original[i * 3 + 2], baseline = baseHeights[i];
+        const nx = tx === null ? 0 : Math.round(x / s) - tx * n, nz = tz === null ? 0 : Math.round(z / s) - tz * n;
+        // A partial tile pass only moved one sub-rect; overlay vertices outside
+        // it (plus a cell of margin, they interpolate across the boundary) keep
+        // the height, wear and scorch they already have.
+        if (box && (nx < box.x0 - 1 || nx > box.x1 + 1 || nz < box.z0 - 1 || nz > box.z1 + 1)) continue;
         const ground = this.model.GroundHeight(x, z), d = baseline - ground, depth = Math.abs(d);
         // Intact surface retains its old crown. Exposed deep soil converges on
         // the shared collision surface with only a subpixel rendering offset.
@@ -520,7 +588,7 @@ export class TerrainDeformationView {
         color[i * 3] = baseColor[i * 3]; color[i * 3 + 1] = baseColor[i * 3 + 1]; color[i * 3 + 2] = baseColor[i * 3 + 2];
         let soil;
         if (wear) {
-          const lx = Math.round(x / s) - tx * n + 1, lz = Math.round(z / s) - tz * n + 1;
+          const lx = nx + 1, lz = nz + 1;
           soil = lx >= 1 && lx <= n + 1 && lz >= 1 && lz <= n + 1 ? wear[lz * w + lx] : this.SoilWear(x, z);
         } else soil = this.SoilWear(x, z);
         delta[i * 2] = d; delta[i * 2 + 1] = soil;
@@ -530,6 +598,25 @@ export class TerrainDeformationView {
       geo.attributes.terrainDelta.needsUpdate = true;
       geo.attributes.terrainBlast.needsUpdate = true;
       geo.computeVertexNormals(); geo.computeBoundingBox(); geo.computeBoundingSphere();
+    }
+  }
+  /**
+   * Host frame tick (Script_Main). Bakes the surface dressing of the tiles the
+   * blasts of the last frames dirtied, a couple of tiles per frame: each tile is
+   * ~12k vertices of clods and stones, which is the most expensive thing left in
+   * a blast and the only one that can wait. Without a host (editor probes,
+   * headless rules tests) Flush() keeps baking inline.
+   */
+  Update() {
+    this.hosted = true;
+    if (!this.debrisQueue.size) return;
+    const w = this.model.config.tileCells + 3;
+    let budget = DEBRIS_TILES_PER_FRAME;
+    for (const [key, { tx, tz }] of this.debrisQueue) {
+      this.debrisQueue.delete(key);
+      const mesh = this.tileMeshes.get(key);
+      if (mesh) this.debris.Update(key, tx, tz, mesh.userData.wear, w);
+      if (--budget <= 0) break;
     }
   }
   ApplyBlast(position, kind) {
@@ -544,7 +631,7 @@ export class TerrainDeformationView {
   }
   Flush() {
     const { cellM: s, tileCells: n } = this.model.config, width = n + 1, w = n + 3, sizeM = n * s;
-    const dirty = this.model.TakeDirty(), heights = this._heights, deltas = this._deltas, wear = this._wear;
+    const dirty = this.model.TakeDirty(), heights = this._heights, deltas = this._deltas;
     // Fresh tiles first: cut all of their rects out of every source in one pass.
     const tiles = dirty.map((key) => { const [tx, tz] = key.split(",").map(Number); return { key, tx, tz, x0: tx * sizeM, z0: tz * sizeM }; });
     const fresh = tiles.filter((tile) => !this.tileMeshes.has(tile.key));
@@ -559,12 +646,12 @@ export class TerrainDeformationView {
         geometry.setAttribute("color", new THREE.BufferAttribute(new Float32Array(width * width * 3), 3).setUsage(THREE.DynamicDrawUsage));
         geometry.setAttribute("terrainDelta", new THREE.BufferAttribute(new Float32Array(width * width * 2), 2).setUsage(THREE.DynamicDrawUsage));
         geometry.setAttribute("terrainBlast", new THREE.BufferAttribute(new Float32Array(width * width * 2), 2).setUsage(THREE.DynamicDrawUsage));
-        const uv = new Float32Array(width * width * 2), indices = [];
+        const uv = new Float32Array(width * width * 2);
         for (let z = 0; z <= n; z++) for (let x = 0; x <= n; x++) {
           const at = z * width + x; uv[at * 2] = (x0 + x * s) / 3.4; uv[at * 2 + 1] = -(z0 + z * s) / 3.4;
-          if (x < n && z < n) indices.push(at, at + width, at + 1, at + 1, at + width, at + width + 1);
         }
-        geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2)); geometry.setIndex(indices);
+        geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+        geometry.setIndex(new THREE.BufferAttribute(TileIndexArray(n), 1));
         const mesh = new THREE.Mesh(geometry, this.material); mesh.name = `TerrainCrater_${tx}_${tz}`;
         mesh.receiveShadow = true; mesh.castShadow = true; mesh.userData.terrainTile = key; mesh.userData.fresh = true;
         this.scene.add(mesh); this.tileMeshes.set(key, mesh);
@@ -574,48 +661,91 @@ export class TerrainDeformationView {
     for (const { key, tx, tz, x0, z0 } of tiles) {
       const mesh = this.tileMeshes.get(key), isFresh = mesh.userData.fresh === true;
       mesh.userData.fresh = false;
+      // Only the lattice the blast actually moved. A grenade dimple is about six
+      // cells wide, so a full 33x33 rebuild of every tile it touched (four of
+      // them when it lands on a corner) spent most of its time rewriting
+      // vertices that hold the same numbers as before.
+      const box = isFresh ? null : this.model.DirtyBox(tx, tz);
+      const bx0 = box ? box.x0 : 0, bx1 = box ? box.x1 : n;
+      const bz0 = box ? box.z0 : 0, bz1 = box ? box.z1 : n;
       // One pass over the lattice with a one-cell halo: heights, normals and
       // soil wear all come from the same two flat arrays instead of a string-
       // keyed lookup per neighbour (that lookup used to be the blast frame).
-      this.model.FillTile(tx, tz, 1, heights, deltas);
+      this.model.FillTile(tx, tz, 1, heights, deltas, box);
       const geo = mesh.geometry, attributes = geo.attributes;
       const pos = attributes.position.array, nrm = attributes.normal.array, col = attributes.color.array, del = attributes.terrainDelta.array;
-      const field = new Float32Array(width * width);
-      let moved = isFresh;
-      for (let z = 0; z <= n; z++) {
-        for (let x = 0; x <= n; x++) {
+      // The heightfield and the soil-wear lattice keep their own copy per tile:
+      // Rapier and the debris pass read the whole tile, but a partial rebuild
+      // only rewrites the part that moved.
+      let field = mesh.userData.heightfield;
+      if (!field) field = mesh.userData.heightfield = new Float32Array(width * width);
+      let wear = mesh.userData.wear;
+      if (!wear) wear = mesh.userData.wear = new Float32Array(w * w);
+      let moved = isFresh, wearChanged = isFresh, minY = Infinity, maxY = -Infinity;
+      // The field's base albedo is a function of (x, z) only, so a tile's vertex
+      // colours are the same on every rebuild. Sampling them per blast was the
+      // whole blast frame in the mission level (SampleMissionGroundColor walks
+      // every authored road / trench polyline per vertex: ~14 of 15 ms per
+      // grenade, three or four tiles' worth of lattice). Paint once per tile.
+      const paint = isFresh;
+      for (let z = bz0; z <= bz1; z++) {
+        for (let x = bx0; x <= bx1; x++) {
           const at = z * width + x, local = (z + 1) * w + x + 1, y = heights[local];
           if (pos[at * 3 + 1] !== y) moved = true;
           pos[at * 3] = (tx * n + x) * s; pos[at * 3 + 1] = y; pos[at * 3 + 2] = (tz * n + z) * s;
           const nx = heights[local - 1] - heights[local + 1], nz = heights[local - w] - heights[local + w];
           const norm = Math.hypot(nx, 2 * s, nz);
           nrm[at * 3] = nx / norm; nrm[at * 3 + 1] = 2 * s / norm; nrm[at * 3 + 2] = nz / norm;
-          // Rebuilt soil inherits the field's base albedo before blast wear is applied.
-          const rgb = this.field.SampleGroundColor?.(pos[at * 3], pos[at * 3 + 2]);
-          if (rgb) this.groundColor.setRGB(...rgb, THREE.SRGBColorSpace).toArray(col, at * 3);
-          else { col[at * 3] = 1; col[at * 3 + 1] = 1; col[at * 3 + 2] = 1; }
+          if (paint) {
+            // Rebuilt soil inherits the field's base albedo before blast wear is applied.
+            const rgb = this.field.SampleGroundColor?.(pos[at * 3], pos[at * 3 + 2], this.colorOut);
+            if (rgb) this.groundColor.setRGB(rgb[0], rgb[1], rgb[2], THREE.SRGBColorSpace).toArray(col, at * 3);
+            else { col[at * 3] = 1; col[at * 3 + 1] = 1; col[at * 3 + 2] = 1; }
+          }
           let soil = Math.abs(deltas[local]);
           for (let dz = -w; dz <= w; dz += w) for (let dx = -1; dx <= 1; dx++) {
             const v = Math.abs(deltas[local + dz + dx]) * 0.85;
             if (v > soil) soil = v;
           }
+          if (del[at * 2 + 1] !== soil) wearChanged = true;
           del[at * 2] = deltas[local]; del[at * 2 + 1] = soil; wear[local] = soil;
           this.ReadBlast((tx * n + x) * s, (tz * n + z) * s, attributes.terrainBlast.array, at * 2);
           // Rapier heightfield layout: column-major, rows along z.
           field[z + x * width] = y;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
         }
       }
       attributes.position.needsUpdate = true; attributes.normal.needsUpdate = true;
-      attributes.color.needsUpdate = true; attributes.terrainDelta.needsUpdate = true;
+      if (paint) attributes.color.needsUpdate = true;
+      attributes.terrainDelta.needsUpdate = true;
       attributes.terrainBlast.needsUpdate = true;
-      geo.computeBoundingBox(); geo.computeBoundingSphere();
+      // The tile's footprint is fixed and only y moves, so the bounds come from
+      // the heights just written, unioned with what the tile already had. A
+      // partial pass keeps the old extreme even if that vertex has since moved
+      // in: too large is a wasted culling test, too small drops the tile.
+      const bounds = mesh.userData.bounds;
+      if (bounds && !isFresh) { minY = Math.min(minY, bounds[0]); maxY = Math.max(maxY, bounds[1]); }
+      mesh.userData.bounds = [minY, maxY];
+      geo.boundingBox = geo.boundingBox || new THREE.Box3();
+      geo.boundingBox.min.set(x0, minY, z0); geo.boundingBox.max.set(x0 + sizeM, maxY, z0 + sizeM);
+      geo.boundingSphere = geo.boundingSphere || new THREE.Sphere();
+      geo.boundingBox.getBoundingSphere(geo.boundingSphere);
       // A halo tile only re-lights its seam; its surface did not move, so the
       // collider it already has is still exact.
       if (this.physics && (moved || !this.physics.terrainTiles.has(key))) {
         this.physics.SetTerrainTile(key, { x0, z0, sizeM, cells: n, heights: field }); rebuilt++;
       }
-      this.UpdateOverlays(key, tx, tz, wear, w);
-      this.debris.Update(key, tx, tz, wear, w);
+      this.UpdateOverlays(key, tx, tz, wear, w, box);
+      // Debris is placed from the soil-wear lattice alone. A tile dirtied only by
+      // scorch stamping would bake the exact same fragments again, so keep the
+      // ones it has. Under a host that ticks Update() the bake is queued: it is
+      // the one part of a blast nobody can see arriving a frame late, and a tile
+      // that several blasts touch then bakes once instead of once per blast.
+      if (moved || wearChanged) {
+        if (this.hosted) this.debrisQueue.set(key, { tx, tz });
+        else this.debris.Update(key, tx, tz, wear, w);
+      }
     }
     if (rebuilt && this.physics) {
       // Gameplay steps the world every frame and the next Step publishes the new
@@ -628,6 +758,7 @@ export class TerrainDeformationView {
   }
   Reset() {
     this.debris.Reset();
+    this.debrisQueue.clear();
     this.blastPages.clear();
     for (const [source, original] of this.originalGeometry) { source.geometry.dispose(); source.geometry = original; }
     this.originalGeometry.clear();

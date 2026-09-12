@@ -195,24 +195,80 @@ export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {
 }
 
 // Greybox surface identity uses the same authored road and trench corridors.
-export function SampleMissionGroundColor(x, z) {
-  const mix=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
+//
+// This is sampled per lattice vertex whenever a crater tile is built, so it is a
+// blast-frame cost, not a load-time one: the array-allocating version below
+// (one `mix` array per corridor per vertex, every polyline walked in full) was
+// ~14 of the 15 ms a grenade cost in the mission level. Same output, but scalar
+// channels and corridor culling — a vertex only pays for the polylines that can
+// actually tint it. `out` lets a caller reuse one array across a whole tile.
+const routeBounds = new WeakMap();
+function RouteBounds(route) {
+  let bounds = routeBounds.get(route);
+  if (!bounds) {
+    bounds = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+    for (const p of route) {
+      if (p.x < bounds.minX) bounds.minX = p.x;
+      if (p.x > bounds.maxX) bounds.maxX = p.x;
+      if (p.z < bounds.minZ) bounds.minZ = p.z;
+      if (p.z > bounds.maxZ) bounds.maxZ = p.z;
+    }
+    routeBounds.set(route, bounds);
+  }
+  return bounds;
+}
+/**
+ * Distance from (x, z) to a polyline, or Infinity once it is farther than
+ * `reach` — the blends below are exactly zero beyond their own reach, so the
+ * early-out never changes a colour. Segment rejection is a box test; the one
+ * square root is taken at the end.
+ */
+function RouteDistanceWithin(x, z, route, reach) {
+  const bounds = RouteBounds(route);
+  if (x < bounds.minX - reach || x > bounds.maxX + reach
+    || z < bounds.minZ - reach || z > bounds.maxZ + reach) return Infinity;
+  let best = reach * reach;
+  for (let i = 1; i < route.length; i++) {
+    const a = route[i - 1], b = route[i];
+    const loX = a.x < b.x ? a.x : b.x, hiX = a.x < b.x ? b.x : a.x;
+    if (x < loX - reach || x > hiX + reach) continue;
+    const loZ = a.z < b.z ? a.z : b.z, hiZ = a.z < b.z ? b.z : a.z;
+    if (z < loZ - reach || z > hiZ + reach) continue;
+    const dx = b.x - a.x, dz = b.z - a.z;
+    let t = ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz || 1);
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const ex = x - a.x - dx * t, ez = z - a.z - dz * t, d2 = ex * ex + ez * ez;
+    if (d2 < best) best = d2;
+  }
+  return best < reach * reach ? Math.sqrt(best) : Infinity;
+}
+export function SampleMissionGroundColor(x, z, out = [0, 0, 0]) {
   const variation=.94+.06*Math.sin(x*.37)*Math.sin(z*.29);
-  const field=[.48,.50,.43], dust=[.64,.60,.51], soil=[.40,.36,.29];
-  let color=field.map(v=>v*variation);
+  // field [.48,.50,.43], dust [.64,.60,.51], soil [.40,.36,.29]
+  let r=.48*variation, g=.50*variation, b=.43*variation;
   for(const road of MISSION_TERRAIN.roads) {
-    const d=MissionPathDistance({x,z},road.points);
-    color=mix(color,dust,1-Smooth((d-road.width/2)/1.8));
+    const d=RouteDistanceWithin(x,z,road.points,road.width/2+1.8);
+    if(d===Infinity)continue;
+    const t=1-Smooth((d-road.width/2)/1.8);
+    r+=(.64-r)*t; g+=(.60-g)*t; b+=(.51-b)*t;
   }
   for(const pad of MISSION_TERRAIN.pads) {
-    const d=Math.hypot(Math.max(0,Math.abs(x-pad.x)-pad.w/2),Math.max(0,Math.abs(z-pad.z)-pad.d/2));
-    color=mix(color,dust,.75*(1-Smooth(d/3)));
+    const ex=Math.abs(x-pad.x)-pad.w/2, ez=Math.abs(z-pad.z)-pad.d/2;
+    if(ex>=3||ez>=3)continue;
+    const dx=ex>0?ex:0, dz=ez>0?ez:0, d=Math.sqrt(dx*dx+dz*dz);
+    const t=.75*(1-Smooth(d/3));
+    if(t<=0)continue;
+    r+=(.64-r)*t; g+=(.60-g)*t; b+=(.51-b)*t;
   }
   for(const trench of MISSION_TERRAIN.trenches) {
-    const d=MissionPathDistance({x,z},trench.points);
-    color=mix(color,soil,1-Smooth((d-trench.bottom/2)/trench.bank));
+    const d=RouteDistanceWithin(x,z,trench.points,trench.bottom/2+trench.bank);
+    if(d===Infinity)continue;
+    const t=1-Smooth((d-trench.bottom/2)/trench.bank);
+    r+=(.40-r)*t; g+=(.36-g)*t; b+=(.29-b)*t;
   }
   const rail=Math.abs(x+77);
-  color=mix(color,[.43,.44,.41],1-Smooth((rail-2.4)/1.5));
-  return color;
+  const railT=1-Smooth((rail-2.4)/1.5);
+  if(railT>0){ r+=(.43-r)*railT; g+=(.44-g)*railT; b+=(.41-b)*railT; }
+  out[0]=r; out[1]=g; out[2]=b;
+  return out;
 }

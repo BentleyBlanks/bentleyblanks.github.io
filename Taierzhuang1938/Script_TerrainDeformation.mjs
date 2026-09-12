@@ -33,6 +33,11 @@ export class TerrainDeformation {
     this.tiles = new Set();          // "tx,tz" render contract
     this.dirtyKeys = new Set();      // numeric mirror of `dirty`
     this.tileKeys = new Set();       // numeric mirror of `tiles`
+    // Which vertices of each dirty tile actually moved. A grenade is about six
+    // cells across a 32-cell tile, so rebuilding the whole 33x33 lattice (plus
+    // its bounding volumes) was most of the blast frame. page key -> box.
+    this.dirtyBoxes = new Map();
+    this.takenBoxes = new Map();
     // Numeric rows keep the hot GroundHeight path allocation-free.
     this.tileRows = new Map();
     // Static deform mask memo. CanDeform walks the collider grid; a single crater
@@ -71,14 +76,44 @@ export class TerrainDeformation {
   }
   /** Colliders changed (destruction, editor): the protected-soil memo is stale. */
   InvalidateAllowed() { this.allowedCache.clear(); }
-  MarkTile(tx, tz) {
+  /**
+   * `lx`/`lz` are the marked node in this tile's own vertex indices (0..tileCells,
+   * one off either end for a seam neighbour) and `halo` how many cells around it
+   * the rebuild has to touch as well (1 where normals read their neighbours).
+   * Omit them and the whole tile is marked, which is what the editor and any
+   * caller that changed the page wholesale wants.
+   */
+  MarkTile(tx, tz, lx = null, lz = null, halo = 0, haloOnly = false) {
     const key = PageKey(tx, tz);
+    // `haloOnly` means this node is outside the tile's own vertex lattice and
+    // only feeds its normals / soil wear. Such a tile has no seam to close, so
+    // it is refreshed if it already exists and never allocated for this alone.
+    if (haloOnly && !this.tileKeys.has(key)) return;
     if (!this.dirtyKeys.has(key)) { this.dirtyKeys.add(key); this.dirty.add(this.Key(tx, tz)); }
+    this.GrowDirtyBox(key, lx, lz, halo);
     if (this.tileKeys.has(key)) return;
     this.tileKeys.add(key); this.tiles.add(this.Key(tx, tz));
     let row = this.tileRows.get(tz);
     if (!row) { row = new Set(); this.tileRows.set(tz, row); }
     row.add(tx);
+  }
+  GrowDirtyBox(key, lx, lz, halo) {
+    const n = this.config.tileCells;
+    let box = this.dirtyBoxes.get(key);
+    if (!box) { box = { x0: n, z0: n, x1: 0, z1: 0, full: false }; this.dirtyBoxes.set(key, box); }
+    if (box.full) return;
+    if (lx === null || lz === null) { box.full = true; box.x0 = 0; box.z0 = 0; box.x1 = n; box.z1 = n; return; }
+    const x0 = lx - halo < 0 ? 0 : lx - halo, x1 = lx + halo > n ? n : lx + halo;
+    const z0 = lz - halo < 0 ? 0 : lz - halo, z1 = lz + halo > n ? n : lz + halo;
+    if (x0 < box.x0) box.x0 = x0;
+    if (z0 < box.z0) box.z0 = z0;
+    if (x1 > box.x1) box.x1 = x1;
+    if (z1 > box.z1) box.z1 = z1;
+  }
+  /** Sub-rect (inclusive vertex indices) of a tile the last TakeDirty() handed out. */
+  DirtyBox(tx, tz) {
+    const box = this.takenBoxes.get(PageKey(tx, tz));
+    return box && !box.full && box.x1 >= box.x0 && box.z1 >= box.z0 ? box : null;
   }
   SetNode(ix, iz, depth) {
     const n = this.config.tileCells;
@@ -87,10 +122,23 @@ export class TerrainDeformation {
     if (!page) { page = new Float32Array(n * n); this.pages.set(PageKey(tx, tz), page); this._page = page; }
     const lx = ix - tx * n, lz = iz - tz * n;
     page[lz * n + lx] = depth;
-    // Nodes on a tile seam belong to both meshes; normals need a one-cell halo.
-    const x0 = lx === 0 ? tx - 1 : tx, x1 = lx === n - 1 ? tx + 1 : tx;
-    const z0 = lz === 0 ? tz - 1 : tz, z1 = lz === n - 1 ? tz + 1 : tz;
-    for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) this.MarkTile(x, z);
+    // Nodes on a tile seam belong to both meshes, and normals plus soil wear read
+    // one cell past the mesh's own lattice. A tile's vertices span nodes
+    // [X*n, X*n+n], so node ix feeds every tile X with X*n-1 <= ix <= X*n+n+1:
+    // that is the tile before it for lx of 0 (its seam vertex) **and 1** (the
+    // halo behind that vertex), and the tile after it for lx of n-1. The lx of 1
+    // case used to be missed, which left a one-vertex-wide seam row carrying the
+    // wear and normal of the blast before — invisible while every dirty tile was
+    // rebuilt whole, permanent once only the moved sub-rect is.
+    const x0 = lx <= 1 ? tx - 1 : tx, x1 = lx === n - 1 ? tx + 1 : tx;
+    const z0 = lz <= 1 ? tz - 1 : tz, z1 = lz === n - 1 ? tz + 1 : tz;
+    // halo 1: this node also feeds the normals of the vertices beside it. A tile
+    // that only reads it through that halo keeps its own vertices, so it is not
+    // worth opening a crater tile (with its terrain cut and collider) there.
+    for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
+      const vx = ix - x * n, vz = iz - z * n;
+      this.MarkTile(x, z, vx, vz, 1, vx < 0 || vx > n || vz < 0 || vz > n);
+    }
   }
   BasePage(tx, tz) {
     const key = PageKey(tx, tz);
@@ -141,16 +189,21 @@ export class TerrainDeformation {
    * Copy one tile plus `halo` cells of surroundings into flat arrays
    * (width = tileCells + 1 + 2 * halo, row-major by z). `heights` receives the
    * deformed surface, `deltas` the signed displacement. Pages are visited once
-   * each instead of once per vertex.
+   * each instead of once per vertex. `box` narrows the filled lattice to one
+   * tile sub-rect (plus `halo`); indices into `heights` / `deltas` are unchanged,
+   * so a caller that walks the same sub-rect reads the same slots as a full fill.
    */
-  FillTile(tx, tz, halo, heights, deltas) {
+  FillTile(tx, tz, halo, heights, deltas, box = null) {
     const n = this.config.tileCells, s = this.config.cellM, w = n + 1 + 2 * halo;
-    const ix0 = tx * n - halo, iz0 = tz * n - halo, ix1 = ix0 + w - 1, iz1 = iz0 + w - 1;
-    for (let ptz = Math.floor(iz0 / n); ptz * n <= iz1; ptz++) {
-      for (let ptx = Math.floor(ix0 / n); ptx * n <= ix1; ptx++) {
+    const ix0 = tx * n - halo, iz0 = tz * n - halo;
+    const ix1 = box ? tx * n + box.x1 + halo : ix0 + w - 1;
+    const iz1 = box ? tz * n + box.z1 + halo : iz0 + w - 1;
+    const ixa = box ? tx * n + box.x0 - halo : ix0, iza = box ? tz * n + box.z0 - halo : iz0;
+    for (let ptz = Math.floor(iza / n); ptz * n <= iz1; ptz++) {
+      for (let ptx = Math.floor(ixa / n); ptx * n <= ix1; ptx++) {
         const page = this.pages.get(PageKey(ptx, ptz)), base = this.BasePage(ptx, ptz);
-        const xa = Math.max(ix0, ptx * n), xb = Math.min(ix1, ptx * n + n - 1);
-        const za = Math.max(iz0, ptz * n), zb = Math.min(iz1, ptz * n + n - 1);
+        const xa = Math.max(ixa, ptx * n), xb = Math.min(ix1, ptx * n + n - 1);
+        const za = Math.max(iza, ptz * n), zb = Math.min(iz1, ptz * n + n - 1);
         for (let iz = za; iz <= zb; iz++) {
           for (let ix = xa; ix <= xb; ix++) {
             const at = (iz - ptz * n) * n + ix - ptx * n, out = (iz - iz0) * w + ix - ix0;
@@ -293,12 +346,18 @@ export class TerrainDeformation {
     }
     return count;
   }
-  TakeDirty() { const keys = [...this.dirty]; this.dirty.clear(); this.dirtyKeys.clear(); return keys; }
+  TakeDirty() {
+    const keys = [...this.dirty];
+    this.dirty.clear(); this.dirtyKeys.clear();
+    this.takenBoxes = this.dirtyBoxes; this.dirtyBoxes = new Map();
+    return keys;
+  }
   State() { return { revision: this.revision, impacts: this.impacts, tiles: this.tiles.size, pages: this.pages.size,
     bytes: this.pages.size * this.config.tileCells ** 2 * 4, maxDepthM: this.config.maxDepthM, lastImpact: this.lastImpact }; }
   Clear() {
     this.pages.clear(); this.basePages.clear(); this.dirty.clear(); this.tiles.clear();
     this.dirtyKeys.clear(); this.tileKeys.clear(); this.tileRows.clear(); this.allowedCache.clear();
+    this.dirtyBoxes.clear(); this.takenBoxes.clear();
     this._pageKey = NaN; this._page = null;
     this.revision++; this.impacts = 0; this.lastImpact = null;
   }
