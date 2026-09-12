@@ -120,3 +120,7 @@ dialog{padding:23px;max-height:calc(100dvh - 24px)}#settings-dialog>.dialog-head
 }
 
 #ear-app[data-phase=preparing] :is(.tool-dock,.instruction,.view-label,.lamp-toggle,.depth-toggle,#precision-controls,.care-objective){display:none}
+
+/* The pointer is a grip control, never a wax targeting crosshair. */
+#ear-app[data-phase=playing] #ear-canvas{cursor:grab}
+#ear-app[data-dragging=true] #ear-canvas{cursor:grabbing}

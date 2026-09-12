@@ -478,24 +478,40 @@ export async function CreateImmersiveScene({ core }) {
     }
     return tool.visible;
   }
-  function StartToolDrag(x,y,id){
+  function StartToolDrag(x,y,id,axis='plane'){
     if(!EnsureTool(id))return false;
     const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()),tool.position);
     ray.setFromCamera(new THREE.Vector2(x/width*2-1,1-y/height*2),camera);
     const cursor=ray.ray.intersectPlane(plane,new THREE.Vector3());
     if(!cursor)return false;
-    toolDrag={plane,offset:tool.position.clone().sub(cursor)};return true;
+    toolDrag={plane,offset:tool.position.clone().sub(cursor),cursor:cursor.clone(),y,axis,depth:0};return true;
   }
   function MoveToolDrag(x,y,id,c=null){
     if(!toolDrag)return null;
     ray.setFromCamera(new THREE.Vector2(x/width*2-1,1-y/height*2),camera);
     const cursor=ray.ray.intersectPlane(toolDrag.plane,new THREE.Vector3());
-    return ToolAt(cursor?cursor.add(toolDrag.offset):tool.position.clone(),id,c);
+    const target=tool.position.clone(),forward=camera.getWorldDirection(new THREE.Vector3());
+    if(toolDrag.axis==='depth')target.addScaledVector(forward,(toolDrag.y-y)*8/height);
+    else if(cursor)target.add(cursor.clone().sub(toolDrag.cursor));
+    target.addScaledVector(forward,toolDrag.depth);
+    // Consume the input even when blocked: reversing must move immediately, without paying back overshoot.
+    toolDrag.depth=0;toolDrag.y=y;if(cursor)toolDrag.cursor.copy(cursor);
+    const pose=ToolAt(target,id,c);
+    // Rebase at the visible depth, so screen displacement stays direct after advancing or wall contact.
+    toolDrag.plane.setFromNormalAndCoplanarPoint(forward,pose.position);
+    const rebased=ray.ray.intersectPlane(toolDrag.plane,new THREE.Vector3());
+    if(rebased){toolDrag.cursor.copy(rebased);toolDrag.offset.copy(pose.position).sub(rebased);}
+    return pose;
+  }
+  function AdvanceTool(amount,id){
+    if(!EnsureTool(id))return null;
+    return ToolAt(tool.position.clone().addScaledVector(camera.getWorldDirection(new THREE.Vector3()),Clamp(amount,-.6,.6)),id);
   }
   function Grip(c,x,y,id) {
     scene.updateMatrixWorld(true);
     ray.setFromCamera(new THREE.Vector2(x/width*2-1,1-y/height*2),camera);
-    const manual=toolDragMode&&!!toolDrag;
+    const manual=toolDragMode;
+    if(manual&&!toolDrag)return false;
     let hit=manual?ToolSurfaceHit(c,id):ray.intersectObject(c.mesh)[0];
     if(manual&&!hit)return false;
     if(id==='scoop'&&scoopStroke&&(!hit||!ScoopTouches(hit.point)||hit.point.distanceTo(tool.position)>.95))hit=ScoopSurfaceHit(c);
@@ -751,7 +767,7 @@ export async function CreateImmersiveScene({ core }) {
   }
   function ToolAt(point,id,c=null,opening=0) {
     reachBlocked=false;
-    if(inside&&!transfer){const projected=canal.Project(point);if(projected.depth>Reach(id)){point=Surface(Reach(id),projected.angle,.3);reachBlocked=true;}}
+    if(inside&&!transfer){const projected=canal.Project(point);if(projected.depth>Reach(id)){const originalCenter=canal.CenterAt(projected.depth).clone();point=point.clone().sub(originalCenter).add(canal.CenterAt(Reach(id)).clone());reachBlocked=true;}}
     tool.visible=true;tool.position.copy(point);
     // 耳勺保存玩家的握持朝向，贴壁、换目标和镜头移动只修正位置。
     if(id==='tweezers'&&transfer?.toolRotation){
@@ -1027,7 +1043,7 @@ export async function CreateImmersiveScene({ core }) {
     ClearTray(){collectionTray.Clear();traySlot=0;},
     Suspend(){CancelPreparation();const saved={tray:collectionTray.Suspend(),traySlot,showcaseBlend,chunks,transfer,showcase,inspectionDepth,inspectionTarget,inside,entrance,heading,scoopRotation,parkedTool,manualRotation,lampOn,aimed,aim:aim.clone()};for(const c of chunks)root.remove(c.mesh,c.mark);chunks=[];transfer=null;HideTool();return saved;},
     Restore(saved){CancelPreparation();collectionTray.Restore(saved.tray);traySlot=saved.traySlot;showcaseBlend=saved.showcaseBlend;for(const c of chunks){root.remove(c.mesh,c.mark);c.mesh.geometry.dispose();c.mesh.material.dispose();c.mark.geometry.dispose();c.mark.material.dispose();}({chunks,transfer,showcase,inspectionDepth,inspectionTarget,inside,entrance,heading,scoopRotation,parkedTool,manualRotation,lampOn,aimed}=saved);aim.copy(saved.aim);for(const c of chunks)root.add(c.mesh,c.mark);contact.Reset();HideTool();},
-    SetToolDrag(enabled){toolDragMode=enabled;parkedTool=toolDrag=manualRotation=null;HideTool();},EnsureTool,StartToolDrag,MoveToolDrag,PickTool,EndToolDrag(){toolDrag=null;},
+    SetToolDrag(enabled){toolDragMode=enabled;parkedTool=toolDrag=manualRotation=null;HideTool();},EnsureTool,StartToolDrag,MoveToolDrag,PickTool,AdvanceTool,QueueToolDepth(amount){if(toolDrag)toolDrag.depth=Clamp(toolDrag.depth+amount,-.6,.6);},EndToolDrag(){toolDrag=null;},
     TurnStart(x,y,id){
       if(transfer||showcase)return false;
       if(toolDragMode){if(!EnsureTool(id))return false;turnChunk=PickTool(id);}
@@ -1047,7 +1063,7 @@ export async function CreateImmersiveScene({ core }) {
     Reach,CanReach(c,id){return c.coating||c.depth<=Reach(id);},SetDeep(value){inspectionTarget=value?1:0;contact.Reset();HideTool();},
     AuditTool,CollisionProbe(){return contact.Probe();},
     SetContact:materials.SetContact,
-    RenderingProbe(){return {shadersWarmed,staticRaycast:true,fiberClusters:Object.fromEntries(['feather','brush'].map(id=>[id,toolParts[id].children.reduce((sum,p)=>sum+(p.userData.fiberGroups?.length||0),0)])),...materials.Probe(),heading,inspectionDepth,inspectionTarget,reachBlocked,toolReach:Reach(lastToolId),traySize:new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).toArray(),trayStandalone:true,trayCloseup:showcaseBlend,trayCollection:collectionTray.Probe(),trayBounds:TrayBounds(),trayInscription:"强迫症的SOPHIA",toolVisible:tool.visible,toolDragMode,draggingTool:!!toolDrag,toolPosition:tool.position.toArray(),toolRotation:tool.quaternion.toArray(),featherShading:'six-pass combed continuous fibers',featherFur:{passes:FEATHER_FUR_PASSES,length:FEATHER_FUR_LENGTH},featherSweep:{capacity:FeatherCapacity(toolLevels.feather),held:featherSweep?.items.length||0,angle:featherSweep?.angle||0},hairCount:360,hairRootFixed:true,profileHairLayers:3,profileHairTexture:'Texture_LayeredDarkHair.png',profileHairWisps:90,hairTime,headRealtime:true,lampOn,lampAim:lamp.target.position.toArray(),lampIntensity:lamp.intensity,shadows:core.renderer.shadowMap.enabled,canalVisible:canalGroup.visible,externalContext:outer.visible&&!!(transfer||showcase),outerVisible:outer.visible,irritation:chunks.filter(c=>!c.fragment).map(c=>c.irritation),roughness:chunks.map(c=>c.mesh.material.roughness),clearcoat:chunks.map(c=>c.mesh.material.clearcoat),toolLevels:{...toolLevels},previewTriangles};},
+    RenderingProbe(){return {shadersWarmed,staticRaycast:true,fiberClusters:Object.fromEntries(['feather','brush'].map(id=>[id,toolParts[id].children.reduce((sum,p)=>sum+(p.userData.fiberGroups?.length||0),0)])),...materials.Probe(),heading,inspectionDepth,inspectionTarget,reachBlocked,toolReach:Reach(lastToolId),traySize:new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).toArray(),trayStandalone:true,trayCloseup:showcaseBlend,trayCollection:collectionTray.Probe(),trayBounds:TrayBounds(),trayInscription:"强迫症的SOPHIA",toolVisible:tool.visible,toolDragMode,draggingTool:!!toolDrag,toolPosition:tool.position.toArray(),toolScreen:Project(tool.position),toolDepth:canal.Project(tool.position).depth,toolRotation:tool.quaternion.toArray(),featherShading:'six-pass combed continuous fibers',featherFur:{passes:FEATHER_FUR_PASSES,length:FEATHER_FUR_LENGTH},featherSweep:{capacity:FeatherCapacity(toolLevels.feather),held:featherSweep?.items.length||0,angle:featherSweep?.angle||0},hairCount:360,hairRootFixed:true,profileHairLayers:3,profileHairTexture:'Texture_LayeredDarkHair.png',profileHairWisps:90,hairTime,headRealtime:true,lampOn,lampAim:lamp.target.position.toArray(),lampIntensity:lamp.intensity,shadows:core.renderer.shadowMap.enabled,canalVisible:canalGroup.visible,externalContext:outer.visible&&!!(transfer||showcase),outerVisible:outer.visible,irritation:chunks.filter(c=>!c.fragment).map(c=>c.irritation),roughness:chunks.map(c=>c.mesh.material.roughness),clearcoat:chunks.map(c=>c.mesh.material.clearcoat),toolLevels:{...toolLevels},previewTriangles};},
     ToggleLamp(){lampOn=!lampOn;return lampOn;},AimLamp(x,y){aim.set(x/width*2-1,1-y/height*2);aimed=true;},
     Enter(){inside=true;entrance=0;showcase=false;},Hover,
     ToggleView(){if(transfer)return 'canal';showcase=false;inside=!inside;HideTool();return inside?'canal':'ear';},
