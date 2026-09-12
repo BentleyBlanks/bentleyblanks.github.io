@@ -12,24 +12,26 @@ const Check=(ok,label)=>{assert.ok(ok,label);report.checks.push(label);};
 await page.addInitScript(()=>{window.nativeFrame=requestAnimationFrame.bind(window);window.localStorage.setItem('earspa3d.shop.v1',JSON.stringify({version:2,coins:500,day:3,toolLevels:{}}));});
 try{
  await page.goto(url+'?debug=1');await page.waitForFunction(()=>window.__EarSpaDebug);await page.evaluate(()=>requestAnimationFrame=()=>0);await page.locator('#ear-start').click();await page.locator('#lamp-toggle').click();await page.evaluate(()=>__EarSpaDebug.StepFrames(150));
- let p=await page.evaluate(()=>__EarSpaProbe());Check(p.earType==='oily'&&p.practice===null&&p.targets.every(c=>c.type==='oily'),'ordinary business customers can naturally be oily');
+ let p=await page.evaluate(()=>__EarSpaProbe());Check(p.earType==='oily'&&p.timeLimit===900&&p.practice===null&&p.targets.every(c=>c.type==='oily'),'ordinary business customers can naturally be oily');
  const maps=await page.evaluate(()=>__EarSpaDebug.view.chunks.map(c=>({transmission:c.mesh.material.transmission,ior:c.mesh.material.ior,metalness:c.mesh.material.metalness,roughness:c.mesh.material.roughness,thickness:!!c.mesh.geometry.attributes.gelThickness,rest:!!c.mesh.geometry.attributes.gelRest,clearcoat:c.mesh.material.clearcoat})));
  Check(maps.every(m=>m.transmission>0&&m.ior>1&&m.thickness&&m.rest&&m.clearcoat>0),'wet dielectric shading has material-space pigment and physical thickness inputs');
  Check(maps.every(m=>m.metalness===0&&m.roughness>=.1&&m.roughness<=.25),'oil uses nonmetallic, moderately smooth dielectric reflection');
  await page.screenshot({path:path.join(here,'_dev/Shot_OilyCoatingLit.png')});
  await page.locator('[data-tool="tweezers"]').click();p=await page.evaluate(()=>__EarSpaProbe());const target=p.targets.find(c=>c.id===2);await page.mouse.move(target.screen.x,target.screen.y);await page.mouse.down();
  report.timing=await page.evaluate(async()=>{
-  const samples=[],cpu=[],gl=__EarSpaDebug.core.renderer.getContext();
-  for(let i=0;i<135;i++){await new Promise(nativeFrame);const start=performance.now();__EarSpaDebug.StepFrames(1);cpu.push(performance.now()-start);gl.finish();samples.push(performance.now()-start);}
-  const Summary=a=>{const s=a.slice(15).sort((a,b)=>a-b);return{median:s[Math.floor(s.length*.5)],p95:s[Math.floor(s.length*.95)],max:s.at(-1)};};return{frameWithGpuMs:Summary(samples),frameSubmissionMs:Summary(cpu),renderer:gl.getParameter(gl.RENDERER)};
+  let attachedPeak=1;const samples=[],cpu=[],gl=__EarSpaDebug.core.renderer.getContext();
+  for(let i=0;i<135;i++){await new Promise(nativeFrame);const start=performance.now();__EarSpaDebug.StepFrames(1);attachedPeak=Math.max(attachedPeak,__EarSpaDebug.view.chunks.find(c=>c.id===2).body.gel.maxStretch);cpu.push(performance.now()-start);gl.finish();samples.push(performance.now()-start);}
+  const Summary=a=>{const s=a.slice(15).sort((a,b)=>a-b);return{median:s[Math.floor(s.length*.5)],p95:s[Math.floor(s.length*.95)],max:s.at(-1)};};return{attachedPeak,frameWithGpuMs:Summary(samples),frameSubmissionMs:Summary(cpu),renderer:gl.getParameter(gl.RENDERER)};
  });
  report.surface=await page.evaluate(async()=>{
-  const T=await import('three'),{view,core}=__EarSpaDebug,c=view.chunks.find(c=>c.id===2),mesh=c.mesh,wall=core.scene.getObjectByName('Model_Canal');core.scene.updateMatrixWorld(true);const positions=mesh.geometry.attributes.position;let minimum=Infinity,count=0;
-  for(let i=0;i<positions.count;i+=3){const world=new T.Vector3().fromBufferAttribute(positions,i).applyMatrix4(mesh.matrixWorld),projected=view.canal.Project(world);if(projected.depth<0||projected.depth>20)continue;const center=view.canal.CenterAt(projected.depth).clone(),delta=world.clone().sub(center),distance=delta.length(),hit=new T.Raycaster(center,delta.normalize(),0,10).intersectObject(wall)[0];if(hit){minimum=Math.min(minimum,hit.distance-distance);count++;}}
-  return{count,minimum,volumeRatio:c.body.gel.volumeRatio,minJacobian:c.body.gel.minJacobian,peakStretch:c.body.gel.peakStretch};
+  const T=await import('three'),{view,core}=__EarSpaDebug,wall=core.scene.getObjectByName('Model_Canal');core.scene.updateMatrixWorld(true);
+  const components=view.chunks.filter(c=>c.mesh.visible&&c.body.gel).map(c=>{const mesh=c.mesh,positions=mesh.geometry.attributes.position;let minimum=Infinity,count=0;
+   for(let i=0;i<positions.count;i+=3){const world=new T.Vector3().fromBufferAttribute(positions,i).applyMatrix4(mesh.matrixWorld),projected=view.canal.Project(world);if(projected.depth<0||projected.depth>24)continue;const center=view.canal.CenterAt(projected.depth).clone(),delta=world.clone().sub(center),distance=delta.length(),hit=new T.Raycaster(center,delta.normalize(),0,10).intersectObject(wall)[0];if(hit){minimum=Math.min(minimum,hit.distance-distance);count++;}}
+   return{id:c.id,count,minimum,volumeRatio:c.body.gel.volumeRatio,minJacobian:c.body.gel.minJacobian};
+  });return{components,count:components.reduce((n,c)=>n+c.count,0),minimum:Math.min(...components.map(c=>c.minimum)),minJacobian:Math.min(...components.map(c=>c.minJacobian))};
  });
- Check(report.surface.count>100&&report.surface.minimum>-.08,'independent rendered-mesh rays find no material canal penetration');
- Check(report.surface.peakStretch>1.4&&report.surface.minJacobian>0,'ordinary oily customer stretches its continuous layer without inverted volume cells');
+ Check(report.surface.count>100&&report.surface.minimum>-.08&&report.surface.components.every(c=>Math.abs(c.volumeRatio-1)<.06),'independent rendered-mesh rays find no material canal penetration');
+ Check(report.timing.attachedPeak>1.25&&report.surface.minJacobian>0,'local rupture follows visible 25 percent strain while the mother film retains positive volume');
  Check(report.timing.frameWithGpuMs.p95<80,'measured GPU-complete frames avoid sustained long stalls on this machine');
  await page.screenshot({path:path.join(here,'_dev/Shot_OilyBusinessHeld.png')});await page.mouse.up();await page.evaluate(()=>__EarSpaDebug.StepFrames(230));
  const saved=await page.evaluate(()=>__EarSpaProbe()),saveText=await page.evaluate(()=>localStorage.getItem('earspa3d.shop.v1'));

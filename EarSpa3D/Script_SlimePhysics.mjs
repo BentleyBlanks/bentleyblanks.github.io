@@ -1,5 +1,6 @@
 // 毫米制黏弹凝胶：四面体近似不可压缩，剪切可松弛，附着受局部反力剥离。
 import {WaxPhysicsMaterial} from './Data_WaxPhysicsSettings.mjs?v=ear028-physics-settings-20260912';
+import {PlanSlimeBite,UpdateSlimeBite,PartitionSlimeBite} from './Script_SlimeBite.mjs?v=ear036-oily-bites-20260912';
 const Add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],Sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],Mul=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
 const Dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],Cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
 const Length=a=>Math.hypot(...a),Clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
@@ -39,14 +40,15 @@ export function BindSlimeVolume(body,positions,indices){
   const used=new Set();
   if(lattice)body.anchors=lattice.anchors.map(a=>({...a,alive:true,strain:0}));
   for(const anchor of body.anchors){let node=anchor.node??0,best=Infinity;if(!lattice)for(let i=0;i<centerId;i++){const p=rest[i],d=(p[0]-anchor.local[0])**2+(p[1]-anchor.local[1])**2+p[2]**2*2;if(!used.has(i)&&d<best){node=i;best=d;}}used.add(node);anchor.node=node;anchor.local=rest[node].slice();anchor.rest=points[node].slice();anchor.lambda=[0,0,0];anchor.damage=0;}
-  body.gel={points,rest,coating:!!lattice,nodeThickness:lattice?.thickness||null,surfaceCount:centerId,velocities:points.map(()=>[0,0,0]),tetrahedra,edges:[...edges.values()],render,faces,grip:null,volume:tetrahedra.reduce((s,t)=>s+t.rest,0),volumeRatio:1,minJacobian:1,maxStretch:0,peakStretch:0,motion:0,releaseClock:0,awake:0};
+  body.gel={points,rest,coating:!!lattice,cells:lattice?.cells||null,nodeThickness:lattice?.thickness||null,surfaceCount:centerId,velocities:points.map(()=>[0,0,0]),tetrahedra,edges:[...edges.values()],render,faces,grip:null,volume:tetrahedra.reduce((s,t)=>s+t.rest,0),volumeRatio:1,minJacobian:1,maxStretch:0,peakStretch:0,motion:0,releaseClock:0,awake:0};
   WriteSlimeSurface(body,render.positions);render.rest=render.positions.slice();return render;
 }
 export function GripSlimeVolume(body,point){
   const s=body.gel,nearest=s.points.slice(0,s.surfaceCount).map((p,i)=>({i,d:Length(Sub(p,point))})).sort((a,b)=>a.d-b.d).slice(0,4),raw=nearest.map(({d})=>1/(.025+d*d)),sum=raw.reduce((a,b)=>a+b,0),weights=raw.map(w=>w/sum),ids=nearest.map(n=>n.i),p=ids.reduce((p,id,i)=>Add(p,Mul(s.points[id],weights[i])),[0,0,0]);
   s.grip={ids,weights,offset:Sub(point,p),lambda:[0,0,0]};body.grip=Rotate(Inverse(body.rotation),Sub(point,body.position));s.awake=2;
+  if(s.cells)PlanSlimeBite(body);
 }
-export function UngripSlimeVolume(body){body.gel.grip=null;body.grip=null;body.gel.awake=3;}
+export function UngripSlimeVolume(body){body.gel.grip=null;body.gel.bite=null;body.grip=null;body.gel.awake=3;}
 
 function Edge(s,c,alpha,mass){const a=s.points[c.i],b=s.points[c.j],x=a[0]-b[0],y=a[1]-b[1],z=a[2]-b[2],length=Math.hypot(x,y,z);if(length<1e-9)return;const dl=(-(length-c.memory)-alpha*c.lambda)/(2*mass+alpha);c.lambda+=dl;const k=dl*mass/length;a[0]+=x*k;a[1]+=y*k;a[2]+=z*k;b[0]-=x*k;b[1]-=y*k;b[2]-=z*k;}
 function Tetrahedron(s,t,alpha,mass,barrier=false){
@@ -58,22 +60,33 @@ function Tetrahedron(s,t,alpha,mass,barrier=false){
   a[0]+=gax*correction;a[1]+=gay*correction;a[2]+=gaz*correction;b[0]+=gbx*correction;b[1]+=gby*correction;b[2]+=gbz*correction;c[0]+=gcx*correction;c[1]+=gcy*correction;c[2]+=gcz*correction;d[0]+=gdx*correction;d[1]+=gdy*correction;d[2]+=gdz*correction;
 }
 function Pin(s,ids,weights,target,lambda,alpha,mass,cap=Infinity){
+  if(ids.length===1&&weights[0]===1){const p=s.points[ids[0]];for(let k=0;k<3;k++){const dl=(-(p[k]-target[k])-alpha*lambda[k])/(mass+alpha);lambda[k]+=dl;p[k]+=dl*mass;}return;}
   const p=[0,0,0];let w=0;for(let j=0;j<ids.length;j++){w+=weights[j]**2*mass;for(let k=0;k<3;k++)p[k]+=s.points[ids[j]][k]*weights[j];}
   const next=lambda.map((v,k)=>v+(-(p[k]-target[k])-alpha*v)/(w+alpha)),length=Length(next);if(length>cap)for(let k=0;k<3;k++)next[k]*=cap/length;
   for(let k=0;k<3;k++){const dl=next[k]-lambda[k];lambda[k]=next[k];for(let j=0;j<ids.length;j++)s.points[ids[j]][k]+=dl*weights[j]*mass;}
 }
+// 闭合断口的表面张力来自实际三角面积梯度；三角内的合力为零。
+// 仅离壁小团启用，凝胶慢慢收拢，不能把贴壁薄膜也拉成珠子。
+function SurfaceTension(s,scale){
+ for(const [ia,ib,ic] of s.faces){
+  const a=s.points[ia],b=s.points[ib],c=s.points[ic],ab=Sub(b,a),ac=Sub(c,a),cross=Cross(ab,ac),length=Length(cross);if(length<1e-10)continue;
+  const normal=Mul(cross,1/length),ga=Mul(Cross(Sub(b,c),normal),.5),gb=Mul(Cross(Sub(c,a),normal),.5),gc=Mul(Cross(Sub(a,b),normal),.5);
+  for(let k=0;k<3;k++){a[k]-=ga[k]*scale;b[k]-=gb[k]*scale;c[k]-=gc[k]*scale;}
+ }
+}
 export function StepSlimeVolume(body,{target=null,efficiency=1,adhesion=1,minAnchors=0,softness=0,gravity=[0,-1.5,0],floor=null}={},dt=1/60){
   const s=body.gel,physics=WaxPhysicsMaterial('oily'),duration=Clamp(dt,0,.05),count=Math.max(1,Math.ceil(duration*240)),h=duration/count;
   if(!h)return{detached:body.detached,remaining:body.anchors.filter(a=>a.alive).length,strain:Clamp(body.strain),force:body.force,contact:body.contact};
-  const mass=s.points.length,h2=h*h,edgeAlpha=(s.coating?.006:.06)*(1+softness*.6)/(physics.stretch*h2),volumeAlpha=(s.coating?1e-12:2e-10)/h2;
+  const mass=s.points.length,h2=h*h,edgeAlpha=(s.coating?(s.cells?.006:.035):.06)*(1+softness*.6)/(physics.stretch*h2),volumeAlpha=(s.coating?1e-12:2e-10)/h2;
   body.contact=false;body.strain=0;body.softness=softness;
   for(let step=0;step<count;step++){
     const before=s.points.map(p=>p.slice()),damping=Math.exp(-h*physics.damping);
     const planes=s.collider?s.points.map(p=>({point:p.slice(),...s.collider(p)})):null;
     for(let i=0;i<s.points.length;i++)for(let k=0;k<3;k++)s.points[i][k]+=s.velocities[i][k]*h*damping+gravity[k]*h2;
+    if(s.coating&&!s.cells)SurfaceTension(s,8*mass*h2);
     for(const c of s.edges)c.lambda=0;for(const t of s.tetrahedra)t.lambda=0;for(const a of body.anchors)a.lambda.fill(0);if(s.grip)s.grip.lambda.fill(0);
     for(let iteration=0;iteration<(s.coating?16:8);iteration++){
-      for(const c of s.edges)Edge(s,c,edgeAlpha,mass);
+      for(const c of s.edges)Edge(s,c,edgeAlpha*(s.bite&&(s.bite.mask[c.i]||s.bite.mask[c.j])?8:1),mass);
       for(const t of s.tetrahedra)Tetrahedron(s,t,volumeAlpha,mass);
       for(const a of body.anchors)if(a.alive)Pin(s,[a.node],[1],a.rest,a.lambda,2e-6/Math.max(.05,adhesion)/h2,mass);
       if(s.grip&&target)Pin(s,s.grip.ids,s.grip.weights,Sub(target,s.grip.offset),s.grip.lambda,.0015/Math.max(.03,efficiency)/h2,mass,90*h2);
@@ -97,9 +110,9 @@ export function StepSlimeVolume(body,{target=null,efficiency=1,adhesion=1,minAnc
       s.backtracks=(s.backtracks||0)+1;
     }
     let candidate=null,largest=0,remaining=0;
-    for(const a of body.anchors)if(a.alive){remaining++;const f=Mul(a.lambda,-1/h2),n=a.normal||body.normal,normal=Dot(f,n),slide=Length(Sub(f,Mul(n,normal)));a.strain=(Math.max(0,normal)+slide*.3)/((a.strength||18)*physics.adhesion*Math.sqrt(adhesion)*(1-softness*.3));a.damage=Math.max(0,a.damage+h*Math.max(-.3,a.strain-.75));if(a.strain>largest){largest=a.strain;candidate=a;}}
+    for(const a of body.anchors)if(a.alive){remaining++;const f=Mul(a.lambda,-1/h2),n=a.normal||body.normal,normal=Dot(f,n),slide=Length(Sub(f,Mul(n,normal)));a.strain=(Math.max(0,normal)+slide*.3)/((a.strength||18)*physics.adhesion*Math.sqrt(adhesion)*(1-softness*.3));a.damage=Math.max(0,a.damage+h*Math.max(-.3,a.strain-.75));largest=Math.max(largest,a.strain);if((!s.cells||s.bite?.releaseMask[a.node])&&(!candidate||a.strain>candidate.strain))candidate=a;}
     s.releaseClock=Math.max(0,s.releaseClock-h);
-    if(s.grip&&target&&candidate&&remaining>minAnchors&&s.releaseClock===0&&(candidate.strain>2||candidate.damage>.065)){candidate.alive=false;s.releaseClock=.045;}
+    if(s.grip&&target&&candidate&&remaining>Math.max(minAnchors,s.cells?1:0)&&s.releaseClock===0&&(candidate.strain>2||candidate.damage>.065)){candidate.alive=false;s.releaseClock=.045;}
     body.strain=Math.max(body.strain,largest);body.force=s.grip&&target?Math.min(90,Length(s.grip.lambda)/h2):0;body.detached=body.anchors.every(a=>!a.alive);
     s.motion=0;
     for(let i=0;i<s.points.length;i++){s.velocities[i]=Mul(Sub(s.points[i],before[i]),1/h);const speed=Length(s.velocities[i]);if(speed>24)s.velocities[i]=Mul(s.velocities[i],24/speed);s.motion=Math.max(s.motion,speed);}
@@ -111,7 +124,8 @@ export function StepSlimeVolume(body,{target=null,efficiency=1,adhesion=1,minAnc
   const previous=body.position,center=s.points.reduce((p,v)=>Add(p,Mul(v,1/s.points.length)),[0,0,0]),restCenter=s.rest.reduce((p,v)=>Add(p,Mul(v,1/s.rest.length)),[0,0,0]);body.position=Sub(center,Rotate(body.rotation,restCenter));body.velocity=Mul(Sub(body.position,previous),1/duration);body.motion=s.motion;body.spin=[0,0,0];
   if(s.grip){const p=s.grip.ids.reduce((p,id,i)=>Add(p,Mul(s.points[id],s.grip.weights[i])),s.grip.offset.slice());body.grip=Rotate(Inverse(body.rotation),Sub(p,body.position));}
   s.volumeRatio=s.tetrahedra.reduce((sum,t)=>sum+Volume(s.points,t.ids),0)/s.volume;s.minJacobian=Math.min(...s.tetrahedra.map(t=>Volume(s.points,t.ids)/t.rest));s.maxStretch=Math.max(...s.edges.map(c=>Length(Sub(s.points[c.i],s.points[c.j]))/c.rest));s.peakStretch=Math.max(s.peakStretch,s.maxStretch);s.awake=Math.max(0,s.awake-duration);
-  return {detached:body.detached,remaining:body.anchors.filter(a=>a.alive).length,strain:Clamp(body.strain),force:body.force,contact:body.contact};
+  if(s.cells&&target&&minAnchors<body.anchors.length)UpdateSlimeBite(body,target);
+  return {detached:body.detached,remaining:body.anchors.filter(a=>a.alive).length,strain:Clamp(body.strain),force:body.force,contact:body.contact,biteReady:!!s.bite?.ready};
 }
 export function WriteSlimeSurface(body,positions){
   const s=body.gel,inverse=Inverse(body.rotation),stretch=new Float32Array(s.points.length).fill(1);
@@ -120,3 +134,25 @@ export function WriteSlimeSurface(body,positions){
 }
 export function PoseSlimeVolume(body,position,rotation){const s=body.gel,inverse=Inverse(body.rotation);for(let i=0;i<s.points.length;i++){s.points[i]=Add(position,Rotate(rotation,Rotate(inverse,Sub(s.points[i],body.position))));s.velocities[i]=Rotate(rotation,Rotate(inverse,s.velocities[i]));}if(s.grip)s.grip.offset=Rotate(rotation,Rotate(inverse,s.grip.offset));body.position=position.slice();body.rotation=rotation.slice();}
 export function CloneSlimeVolume(body,position){const copy=structuredClone({...body,gel:{...body.gel,collider:null}});UngripSlimeVolume(copy);PoseSlimeVolume(copy,position,body.rotation);copy.gel.awake=1.5;return copy;}
+export function SplitSlimeBite(body){
+  const parts=PartitionSlimeBite(body);if(!parts)return null;
+  const source=body.gel,grip=source.grip.ids.reduce((p,id,j)=>Add(p,Mul(source.points[id],source.grip.weights[j])),source.grip.offset.slice());
+  const edgeMemory=new Map(source.edges.map(e=>[[e.i,e.j].sort((a,b)=>a-b).join(':'),e.memory]));
+  function Build(part){
+    if(!part)return null;
+    const center=part.oldNodes.reduce((p,id)=>Add(p,Mul(source.rest[id],1/part.oldNodes.length)),[0,0,0]),position=part.oldNodes.reduce((p,id)=>Add(p,Mul(source.points[id],1/part.oldNodes.length)),[0,0,0]);
+    for(let i=0;i<part.positions.length;i++)part.positions[i]-=center[i%3];
+    const anchors=part.anchors.map(a=>({...a,rest:a.rest.slice()}));
+    const copy={...body,position,origin:position.slice(),rotation:body.rotation.slice(),restRotation:body.restRotation.slice(),velocity:body.velocity.slice(),spin:[0,0,0],anchors:[],grip:null,detached:part.held,cleanMass:(body.cleanMass||3)*part.volume/source.volume,volumeMesh:part};
+    const render=BindSlimeVolume(copy,part.positions,part.indices),s=copy.gel;
+    s.points=part.oldNodes.map(id=>source.points[id].slice());s.velocities=part.oldNodes.map(id=>source.velocities[id].slice());
+    s.materialRest=part.oldNodes.map(id=>(source.materialRest||source.rest)[id].slice());s.collider=source.collider;s.awake=1.2;
+    s.tetrahedra.forEach((t,i)=>t.rest=source.tetrahedra[part.oldTets[i]].rest);s.volume=part.volume;
+    s.edges.forEach(e=>{e.memory=edgeMemory.get([part.oldNodes[e.i],part.oldNodes[e.j]].sort((a,b)=>a-b).join(':'))??e.rest;});
+    copy.anchors.forEach((a,i)=>Object.assign(a,{...anchors[i],local:s.rest[a.node].slice(),lambda:[0,0,0]}));copy.detached=part.held;
+    WriteSlimeSurface(copy,render.positions);
+    render.rest=Float32Array.from(render.bindings.flatMap(b=>b.ids.reduce((p,id,j)=>Add(p,Mul(s.materialRest[id],b.weights[j])),[0,0,0])));
+    if(part.held)GripSlimeVolume(copy,grip);return copy;
+  }
+  return{bite:Build(parts.bite),remainder:Build(parts.remainder)};
+}

@@ -15,7 +15,7 @@
 
 设置 → Debug → 物理模拟可按四种材质调整物理参数并恢复默认，参数单独保存在本机，关闭设置后用于当前及后续耳垢。对应检查：`node EarSpa3D/Script_PhysicsSettingsTest.mjs`、`node EarSpa3D/Script_PhysicsSettingsPlayTest.mjs --url=http://127.0.0.1:8128/EarSpa3D/`；覆盖回弹能量、求解器参数、存储异常与四种视口。
 
-油耳凝胶、五种练习耳道与营业隔离见 [Data_OilyWax.md](./Data_OilyWax.md)。对应检查：`Script_OilyCoatingTest.mjs`、`Script_SlimePhysicsTest.mjs`、`Script_OilyWaxPlayTest.mjs`、`Script_OilyFilmPlayTest.mjs`、`Script_OilyRenderingTest.mjs`、`Script_OilyDetailTest.mjs`；浏览器检查通过 `--url=` 指向本任务预览。表面细节回归另检查整片显示曲面间隙和绘制顺序，避免只检查物理节点漏掉视觉问题。
+油耳凝胶、五种练习耳道与营业隔离见 [Data_OilyWax.md](./Data_OilyWax.md)。对应检查：`Script_OilyCoatingTest.mjs`、`Script_SlimePhysicsTest.mjs`、`Script_OilyWaxPlayTest.mjs`、`Script_OilyFilmPlayTest.mjs`、`Script_OilyRenderingTest.mjs`、`Script_OilyDetailTest.mjs`、`Script_OilyVisibilityTest.mjs`；浏览器检查通过 `--url=` 指向本任务预览。表面细节回归另检查到 24 mm 的显示曲面间隙和绘制顺序。覆盖层物理测试检查反复局部撕取、闭合断口、体积／质量守恒与离壁收拢；交互必须验证每次只能挖一小团，持续握持不重复取母体，耳勺静止不加载。油耳营业时长为 900 秒，练习不限时。
 
 ```powershell
 node EarSpa3D/Script_CohesivePhysicsTest.mjs

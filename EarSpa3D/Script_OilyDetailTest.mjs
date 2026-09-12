@@ -22,7 +22,7 @@ try{
    return view.chunks.map(c=>{
     const mesh=c.mesh,p=mesh.geometry.attributes.position,indices=mesh.geometry.index,points=Array.from({length:p.count},(_,i)=>new T.Vector3().fromBufferAttribute(p,i).applyMatrix4(mesh.matrixWorld));
     let minimum=Infinity,count=0,penetrations=0;const worst=[];
-    function Sample(world){const projected=view.canal.Project(world);if(projected.depth<0||projected.depth>20)return;const center=view.canal.CenterAt(projected.depth).clone(),delta=world.clone().sub(center),distance=delta.length(),hit=new T.Raycaster(center,delta.normalize(),0,10).intersectObject(wall)[0];if(hit){const gap=hit.distance-distance;count++;if(gap<-.005)penetrations++;if(gap<minimum){minimum=gap;worst.splice(0,worst.length,...world.toArray());}}}
+    function Sample(world){const projected=view.canal.Project(world);if(projected.depth<0||projected.depth>24)return;const center=view.canal.CenterAt(projected.depth).clone(),delta=world.clone().sub(center),distance=delta.length(),hit=new T.Raycaster(center,delta.normalize(),0,10).intersectObject(wall)[0];if(hit){const gap=hit.distance-distance;count++;if(gap<-.005)penetrations++;if(gap<minimum){minimum=gap;worst.splice(0,worst.length,...world.toArray());}}}
     points.forEach(Sample);const edges=new Set();
     for(let i=0;i<indices.count;i+=3){const ids=[0,1,2].map(k=>indices.getX(i+k));Sample(points[ids[0]].clone().add(points[ids[1]]).add(points[ids[2]]).multiplyScalar(1/3));for(let j=0;j<3;j++){const a=ids[j],b=ids[(j+1)%3],key=Math.min(a,b)+':'+Math.max(a,b);if(!edges.has(key)){edges.add(key);Sample(points[a].clone().add(points[b]).multiplyScalar(.5));}}}
     const heights=Array.from(c.body.gel.nodeThickness),material=mesh.material;
@@ -35,7 +35,7 @@ try{
  await page.evaluate(()=>{__EarSpaDebug.view.Reset(20260912,'oily');__EarSpaDebug.StepFrames(3);});
  for(const mode of ['Wide','Deep','Mobile']){
   if(mode==='Deep'){await page.locator('#depth-toggle').click();await page.evaluate(()=>__EarSpaDebug.StepFrames(90));}
-  if(mode==='Mobile'){await page.locator('#depth-toggle').click();await page.setViewportSize({width:390,height:844});await page.waitForFunction(()=>__EarSpaDebug.core.size.width===390,null,{polling:50});await page.evaluate(()=>__EarSpaDebug.StepFrames(90));}
+  if(mode==='Mobile'){await page.locator('#depth-toggle').click();await page.locator('#depth-toggle').click();await page.setViewportSize({width:390,height:844});await page.waitForFunction(()=>__EarSpaDebug.core.size.width===390,null,{polling:50});await page.evaluate(()=>__EarSpaDebug.StepFrames(90));}
   const pixels=await page.evaluate(()=>{
    const {core,view}=__EarSpaDebug;
    function Pixels(){core.Render();const gl=core.renderer.getContext(),out=new Uint8Array(gl.drawingBufferWidth*gl.drawingBufferHeight*4);gl.readPixels(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.RGBA,gl.UNSIGNED_BYTE,out);return out;}

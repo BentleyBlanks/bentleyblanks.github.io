@@ -1,6 +1,6 @@
 // 可见块体使用薄壳，细微颗粒保留低成本刚体；两者共用工具和附着接口。
 import {BindWaxSurface,BindWaxSurfaceSteps,GripWaxSurface,UngripWaxSurface,StepWaxSurface,WriteWaxSurface} from './Script_SoftWaxPhysics.mjs?v=ear028-physics-settings-20260912';
-import {BindSlimeVolume,GripSlimeVolume,UngripSlimeVolume,StepSlimeVolume,WriteSlimeSurface,PoseSlimeVolume} from './Script_SlimePhysics.mjs?v=ear029-oily-coating-20260912';
+import {BindSlimeVolume,GripSlimeVolume,UngripSlimeVolume,StepSlimeVolume,WriteSlimeSurface,PoseSlimeVolume} from './Script_SlimePhysics.mjs?v=ear036-oily-bites-20260912';
 export function BindPeelSurface(body,positions,indices){return body.type==='oily'?BindSlimeVolume(body,positions,indices):BindWaxSurface(body,positions,indices);}
 export function WritePeelSurface(body,positions){return body.gel?WriteSlimeSurface(body,positions):WriteWaxSurface(body,positions);}
 export {BindWaxSurfaceSteps as BindPeelSurfaceSteps};

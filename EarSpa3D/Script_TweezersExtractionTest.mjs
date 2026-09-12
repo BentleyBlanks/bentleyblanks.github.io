@@ -65,7 +65,7 @@ try{
     report.samples.push(...samples);
     if(frame===60||frame===90)await page.screenshot({path:path.join(here,'_dev/Shot_TweezersExtraction_'+width+'_'+(frame===60?'Carry':'Drop')+'.png')});
    }
-   Check(report.samples.every(s=>Math.abs(s.worldLength-20)<.02&&s.toolScale.every(v=>v===1)&&s.waxScale.every(v=>v===1)),'tool stays 20 mm long and carried wax retains its scale');
+   Check(report.samples.every(s=>Math.abs(s.worldLength-26.3)<.02&&s.toolScale.every(v=>v===1)&&s.waxScale.every(v=>v===1)),'tool stays 26.3 mm long and carried wax retains its scale');
    Check(report.samples.every(s=>s.rotationStep<.4&&s.clearance>=-.03),'rotation stays continuous and keeps wall clearance');
    Check(report.samples.filter(s=>s.state==='carrying').every(s=>s.gripError<.06),'visible jaws remain on the physical grip until release');
    const outside=report.samples.filter(s=>s.age>=1.2);
