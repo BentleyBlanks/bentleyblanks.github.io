@@ -1,7 +1,9 @@
 // 局部黏聚撕取：只分开工具附近的体积单元，材料和运动场由两侧继承。
 const Sub=(a,b)=>a.map((x,k)=>x-b[k]),Distance=(a,b)=>Math.hypot(...Sub(a,b));
 const Faces=([a,b,c,d])=>[[a,c,b],[a,b,d],[b,c,d],[c,a,d]];
-const Key=face=>face.slice().sort((a,b)=>a-b).join(':');
+// Mesh indices are Uint16; three sorted indices fit exactly in a JS integer.
+// Numeric face keys avoid thousands of sorting arrays/strings at the cut.
+const Key=([a,b,c])=>{if(a>b)[a,b]=[b,a];if(b>c)[b,c]=[c,b];if(a>b)[a,b]=[b,a];return(a*65536+b)*65536+c;};
 export const OILY_BITE_MASS=.32;
 export function PlanSlimeBite(body){
  const s=body.gel,g=s.grip;if(!g||!s.cells?.length)return;
@@ -28,6 +30,7 @@ export function UpdateSlimeBite(body,target){
 export function PartitionSlimeBite(body){
  const s=body.gel,b=s.bite;if(!b?.ready)return null;
  const selected=new Set(b.cells),bite=s.cells.filter((_,i)=>selected.has(i)),left=s.cells.filter((_,i)=>!selected.has(i));
+ const anchorsByNode=new Map(body.anchors.map(a=>[a.node,a]));
  function Part(cells,held){
   if(!cells.length)return null;
   const oldTets=cells.flatMap(c=>c.tetrahedra),tetIds=new Map(oldTets.map((id,i)=>[id,i])),original=oldTets.map(id=>s.tetrahedra[id].ids),parent=Array.from({length:oldTets.length*4},(_,i)=>i),shared=new Map();
@@ -38,7 +41,7 @@ export function PartitionSlimeBite(body){
   const tetrahedra=original.map((tet,i)=>tet.map((_,j)=>occurrence[i*4+j])),faces=new Map();
   for(const tet of tetrahedra)for(const face of Faces(tet)){const key=Key(face);if(faces.has(key))faces.delete(key);else faces.set(key,face);}
   return{held,oldNodes,oldTets,volume:oldTets.reduce((v,id)=>v+s.tetrahedra[id].rest,0),positions:Float32Array.from(oldNodes.flatMap(id=>s.rest[id])),indices:Uint16Array.from([...faces.values()].flat()),tetrahedra,
-   cells:held?null:cells.map(c=>({...c,ids:c.ids.map(id=>{const ti=tetIds.get(c.tetrahedra.find(ti=>s.tetrahedra[ti].ids.includes(id)));return occurrence[ti*4+original[ti].indexOf(id)];}),tetrahedra:c.tetrahedra.map(id=>tetIds.get(id))})),thickness:Float32Array.from(oldNodes.map(id=>s.nodeThickness[id])),anchors:held?[]:oldNodes.flatMap((id,node)=>{const a=body.anchors.find(a=>a.node===id);return a?[{...a,node}]:[]})};
+   cells:held?null:cells.map(c=>({...c,ids:c.ids.map(id=>{const ti=tetIds.get(c.tetrahedra.find(ti=>s.tetrahedra[ti].ids.includes(id)));return occurrence[ti*4+original[ti].indexOf(id)];}),tetrahedra:c.tetrahedra.map(id=>tetIds.get(id))})),thickness:Float32Array.from(oldNodes.map(id=>s.nodeThickness[id])),anchors:held?[]:oldNodes.flatMap((id,node)=>{const a=anchorsByNode.get(id);return a?[{...a,node}]:[]})};
  }
  return{bite:Part(bite,true),remainder:Part(left,false)};
 }

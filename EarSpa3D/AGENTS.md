@@ -37,6 +37,8 @@ node EarSpa3D/Script_RenderingRegressionTest.mjs
 node EarSpa3D/Script_TweezersExtractionTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
 node EarSpa3D/Script_MetalRenderingTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
 node EarSpa3D/Script_DayTwoPerformanceTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
+node EarSpa3D/Script_OilyFracturePerformanceTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/
+node EarSpa3D/Script_OilyFracturePerformanceTest.mjs --url=http://127.0.0.1:8081/EarSpa3D/ --touch --label=Touch
 
 node EarSpa3D/Script_OuterAnatomyTest.mjs
 node EarSpa3D/Script_SkinScatteringTest.mjs --url=http://127.0.0.1:8097/EarSpa3D/

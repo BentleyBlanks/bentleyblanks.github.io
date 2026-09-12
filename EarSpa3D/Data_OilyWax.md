@@ -28,9 +28,15 @@
 
 ## 验证
 
+ear038 性能修订保留全部节点、四面体、求解轮数与细分曲面。约束计算使用每个物体独立的连续 Float64 暂存区，减少嵌套数组访问和临时分配；断口与材料边改用数值键，母体在断裂帧不重复推进。新性能检查先把真实夹尖放到确定性接触点，随后使用偏离目标的鼠标／触屏拖动加载，逐帧完整绘制并等待 GPU。`--baseline=<本地报告路径>` 可断言相同环境下断裂平均耗时和握持帧中位耗时至少降低 25%；这些本机数据不代表实体手机帧率。
+
+2026-09-12 本机 Edge、1000×900、同一接触轨迹三轮对比：断裂帧平均约 108→42 ms，断裂后握持帧中位约 44→23 ms、P95 约 52→27 ms。390×844 的真实 CDP 触屏施力、长按、松手落盘也通过。三个区域共 360 帧与修改前求解器逐节点比较，最大位置差约 1.5×10⁻¹⁴ mm；九组物理回归仍保持闭合断口、质量／体积守恒与正体积，完整清理仍为 52／47／51 次。宽屏、深部与窄屏的独立曲面间隙及细节检查通过；截图与性能报告保留本地。
+
 ```powershell
 node EarSpa3D/Script_OilyCoatingTest.mjs
 node EarSpa3D/Script_SlimePhysicsTest.mjs
+node EarSpa3D/Script_OilyFracturePerformanceTest.mjs --url=http://127.0.0.1:8143/EarSpa3D/
+node EarSpa3D/Script_OilyFracturePerformanceTest.mjs --url=http://127.0.0.1:8143/EarSpa3D/ --touch --label=Touch
 node EarSpa3D/Script_OilyWaxPlayTest.mjs --url=http://127.0.0.1:8143/EarSpa3D/
 node EarSpa3D/Script_OilyFilmPlayTest.mjs --url=http://127.0.0.1:8143/EarSpa3D/
 node EarSpa3D/Script_OilyRenderingTest.mjs --url=http://127.0.0.1:8143/EarSpa3D/

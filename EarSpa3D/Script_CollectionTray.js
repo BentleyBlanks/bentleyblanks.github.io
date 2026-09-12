@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {CloneSlimeVolume,PoseSlimeVolume,StepSlimeVolume,WriteSlimeSurface} from './Script_SlimePhysics.mjs?v=ear036-oily-bites-20260912';
+import {CloneSlimeVolume,PoseSlimeVolume,StepSlimeVolume,WriteSlimeSurface} from './Script_SlimePhysics.mjs?v=ear038-oily-performance-20260912';
 import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // 盘内藏品只保存外观与独立运动状态，不再持有耳壁物理体或参与客人评分。

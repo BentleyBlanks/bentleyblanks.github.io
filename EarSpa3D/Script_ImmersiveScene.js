@@ -1,8 +1,8 @@
 import {FeatherCapacity} from './Script_FeatherSweep.mjs?v=ear029-feather-20260912';
 import {AddFeatherFur,ClearFeatherFur,PrepareFeatherStrands,FEATHER_FUR_LENGTH,FEATHER_FUR_PASSES} from './Script_FeatherFur.js?v=ear031-feather-groom-20260912';
-import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear036-oily-bites-20260912';
+import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear038-oily-performance-20260912';
 import * as THREE from 'three';
-import {SlimeCage,PoseSlimeVolume,StepSlimeVolume,SplitSlimeBite} from './Script_SlimePhysics.mjs?v=ear036-oily-bites-20260912';
+import {SlimeCage,PoseSlimeVolume,StepSlimeVolume,SplitSlimeBite} from './Script_SlimePhysics.mjs?v=ear038-oily-performance-20260912';
 import {BuildOilyCoating,OILY_REGIONS} from './Script_OilyCoating.mjs?v=ear036-oily-bites-20260912';
 import { BuildEar, MakeRng } from './Script_EarAnatomy.js?v=ear012-outer-20260911';
 import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
@@ -10,7 +10,7 @@ import { PALETTE as P } from './Data_Palette.mjs?v=ear012-outer-20260911';
 
 import {InstrumentContact,IsFeatherDebris} from './Script_InstrumentInteraction.mjs?v=ear033-scoop-contact-audio-20260912';
 import {WaxEdgeContact,WaxGripNormal} from './Script_WaxEdgeContact.mjs?v=ear033-scoop-contact-audio-20260912';
-import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody, BindPeelSurface, BindPeelSurfaceSteps, WritePeelSurface, MovePeelBody, PeelAnchorPoint } from './Script_PeelPhysics.mjs?v=ear036-oily-bites-20260912';
+import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody, BindPeelSurface, BindPeelSurfaceSteps, WritePeelSurface, MovePeelBody, PeelAnchorPoint } from './Script_PeelPhysics.mjs?v=ear038-oily-performance-20260912';
 import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
 import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear024-cohesive-scraping-20260912';
 import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear012-outer-20260911';
@@ -621,7 +621,9 @@ export async function CreateImmersiveScene({ core }) {
     const mesh=new THREE.Mesh(new THREE.BufferGeometry(),material);mesh.receiveShadow=true;
     const bite={...c,id:String(c.id)+'.bite'+(c.biteSerial=(c.biteSerial||0)+1),body:parts.bite,mesh,mark:c.mark.clone(),mass:parts.bite.cleanMass,form:'oilyBite',fragment:true,generation:0,state:'held',grasped:c.grasped,gripNode:0,normal:c.normal.clone(),origin:new THREE.Vector3().fromArray(parts.bite.origin),rotation:new THREE.Quaternion().fromArray(parts.bite.rotation),trayStored:false,slot:-1,progress:1};
     bite.mark.geometry=c.mark.geometry.clone();bite.mark.material=c.mark.material.clone();SetOilGeometry(bite);const extent=mesh.geometry.boundingBox.getSize(new THREE.Vector3());bite.size=Math.max(.10,Math.cbrt(parts.bite.gel.volume)*.5);bite.footprint=[Math.max(.2,extent.x*.5),Math.max(.2,extent.y*.5)];mesh.userData.chunk=bite;root.add(mesh);chunks.push(bite);
-    if(parts.remainder){c.body=parts.remainder;c.mass=parts.remainder.cleanMass;c.state='returning';SetOilGeometry(c);}
+    // Drag has already integrated both sides for this frame before the split.
+    // Update resumes the remainder on the next frame, not a second 1/60 now.
+    if(parts.remainder){c.body=parts.remainder;c.mass=parts.remainder.cleanMass;c.state='returning';c.oilSplitAdvanced=true;SetOilGeometry(c);}
     else{Ungrip(c);c.mass=0;c.state='exhausted';c.mesh.visible=false;}
     return bite;
   }
@@ -968,7 +970,8 @@ export async function CreateImmersiveScene({ core }) {
         MovePeelBody(c.body,desired.toArray());c.mesh.position.copy(desired);c.origin.copy(desired);
         if((hitWall&&c.settleAge>.25&&c.settleVelocity.length()<.25)||c.settleAge>3){c.state='attached';c.settleVelocity.set(0,0,0);}
       }
-      if(c.state==='returning'||c.body.gel&&c.state==='attached'&&(c.body.gel.awake>0||c.body.motion>.035)) {
+      if(c.oilSplitAdvanced)c.oilSplitAdvanced=false;
+      else if(c.state==='returning'||c.body.gel&&c.state==='attached'&&(c.body.gel.awake>0||c.body.motion>.035)) {
         StepPeelBody(c.body,{softness:c.softened,adhesion:c.adhesion||c.inheritedAdhesion||1},dt);SyncBody(c);Deform(c);
         if(Math.hypot(...c.body.velocity)<.02&&Math.hypot(...c.body.spin)<.04&&(c.body.motion||0)<.035) c.state='attached';
       }
