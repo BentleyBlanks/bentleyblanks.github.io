@@ -11,7 +11,7 @@ import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryU
 import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear024-cohesive-scraping-20260912';
 import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear012-outer-20260911';
 import { CreateToolContact } from './Script_ToolContact.js?v=ear020-contact-loading-20260912';
-import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear025-oily-20260912';
+import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear026-skin-sss-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 
 // 封闭耳道、真实接触点与实体收集盘共用毫米世界；镜头在取出时连续后退。
