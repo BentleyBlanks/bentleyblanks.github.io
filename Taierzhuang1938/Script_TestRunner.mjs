@@ -72,6 +72,7 @@ export const testDefs = {
   FirstLevelMissionPresentationTest: {file:"Script_FirstLevelMissionPresentationTest.mjs",timeoutMs:240000,desc:"Real stretcher grip, idle feet, ADS fire and mounted recoil"},
   FirstLevelMissionFortificationsTest: {file:"Script_FirstLevelMissionFortificationsTest.mjs",timeoutMs:600000,desc:"Loaded field defenses, route clearance and merged scene screenshots"},
   FirstLevelFrontPresenceTest: {file:"Script_FirstLevelFrontPresenceTest.mjs",timeoutMs:600000,desc:"Finite approach fire, delayed front commitment and no respawning after a slow approach"},
+  FirstLevelCasualtyBrowserTest:{file:"Script_FirstLevelCasualtyBrowserTest.mjs",timeoutMs:360000,desc:"Ordinary squad death uses real damage, retains the mission and reports local casualties"},
   FirstLevelMissionTest: {file:'Script_FirstLevelMissionTest.mjs',args:['--audio'],desc:'新版第一关完整事实门、共享地形、实际担架队列和往返撤离'},
   FirstLevelMissionBrowserTest: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign','--audio'],timeoutMs:1800000,desc:'新版第一关真实输入、移动军列、壕沟路线、作战与通关'},
   FirstLevelMealTest: {file:"Script_FirstLevelMealTest.mjs",timeoutMs:300000,desc:"Blender bacon, paired hand contact, source-clock pause and prop ownership"},
@@ -287,6 +288,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "FirstLevelCasualtyBrowserTest",
   "FirstLevelMealTest",
   "FirstLevelFrontPresenceTest",
   "FirstLevelMissionAftermathTest",
@@ -384,7 +386,7 @@ export const domains = {
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关接收院至结尾定向续接",tests:["FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelOpeningSequenceBrowserTest','FirstLevelCarriageAnimationTest','FirstLevelMealTest','FirstLevelMissionTest','FirstLevelFrontPresenceTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelOpeningContactTest','FirstLevelGuideQueueTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelCasualtyBrowserTest','FirstLevelOpeningSequenceBrowserTest','FirstLevelCarriageAnimationTest','FirstLevelMealTest','FirstLevelMissionTest','FirstLevelFrontPresenceTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelOpeningContactTest','FirstLevelGuideQueueTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['BackRifleRunTest','MeleeAnimationTest','DadaoSwingTest','InfantryAnimationTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },

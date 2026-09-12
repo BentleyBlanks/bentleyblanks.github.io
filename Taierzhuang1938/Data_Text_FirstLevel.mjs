@@ -1,5 +1,7 @@
 // Interaction strings for the September first-level replacement.
 export const TEXT = Object.freeze({
+  "firstLevel.casualty.speaker": "战友",
+  "firstLevel.casualty.reaction": "有弟兄倒下了！守住掩体，继续掩护！",
   "firstLevel.interaction.bundle": "领取集束手榴弹 · 按住 H 蓄力，松开投掷",
   "firstLevel.interaction.gate": "打开院门，让担架通过",
   "firstLevel.interaction.carry": "接过老周担架后端",

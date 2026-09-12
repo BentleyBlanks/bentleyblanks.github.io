@@ -15,6 +15,10 @@ export const OPENING_PERCEPTION = Object.freeze({
 
 // First-level whitebox pacing and handling. Notion 2026-09-07: calm walk 1–2 min, transfer 2–4 min, dive 2 s, death 8–12 s.
 export const MISSION_TUNING = Object.freeze({
+  // Local casualty reactions must not interrupt mission dialogue or pile up.
+  casualtyWitnessM:18,
+  casualtyReactionGapS:12,
+  casualtyReactionS:3,
   // User 2026-09-11: double post-impact sensory recovery, without slowing the roll or rescue.
   openingRecoveryScale:2,
   // Two covering teams: ordinary weapon cadence and a usable rifle cover radius.

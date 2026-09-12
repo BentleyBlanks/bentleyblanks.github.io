@@ -185,7 +185,7 @@ export class FirstLevelOpening {
       }
     }
     if(["Train","Unloading","TrenchEntry","Shelter","Support","MachineGun"].includes(stage)&&!r.Has("gunOccupied")){
-      const lost=r.squad.find(a=>!a.alive);
+      const lost=r.squad.find(a=>!a.alive&&C.requiredSquadCast.includes(a.castId));
       if(lost){r.Record("openingSquadLost",{castId:lost.castId});r.OnPlayerDown();r.MissionFailure?.(lost.castId);return;}
     }
     if(stage==="Support")this.SpawnZhou();

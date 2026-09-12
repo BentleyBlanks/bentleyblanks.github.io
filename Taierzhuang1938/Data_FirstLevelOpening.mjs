@@ -1,6 +1,9 @@
 // 2026-09-10 opening rebuild. Gameplay reconstruction of a local flank breach;
 // these coordinates are not claims about surveyed 1938 positions.
 export const OPENING = Object.freeze({
+  // Only these authored companions are required by later dialogue and rescue.
+  // Membership of a squad alone never makes an ordinary soldier a failure target.
+  requiredSquadCast: Object.freeze(["luo","yaowa","heyoutian","liuwencai"]),
   derailCar: 1,
   derailPivot: {x:-74.6,y:.75},
   derailRollRad: -Math.PI/2,

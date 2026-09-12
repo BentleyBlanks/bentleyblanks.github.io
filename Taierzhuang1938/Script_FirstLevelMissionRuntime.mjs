@@ -91,6 +91,12 @@ export class FirstLevelMissionRuntime {
       actorFactory:this.actorFactory,library:this.library,hud:this.hud,vfx:this.vfx,
     });
     this.oldBlast = this.combat.host.onBlast;
+    this.oldSoldierDeath = this.ai.ctx.onSoldierDeath;
+    this.soldierDeath = (side, actor) => {
+      this.oldSoldierDeath?.call(this.ai.ctx, side, actor);
+      this.OnOrdinaryCasualty(actor);
+    };
+    this.ai.ctx.onSoldierDeath = this.soldierDeath;
     this.combat.host.onBlast = (event) => {
       this.oldBlast?.(event);
       this.OnBlast(event);
@@ -130,6 +136,26 @@ export class FirstLevelMissionRuntime {
   }
   Say(id, options) {
     this.voice.Enqueue(id, options);
+  }
+  OnOrdinaryCasualty(actor) {
+    if(this.failed || this.completed || !actor || actor.alive || actor.side!=="nra"
+      || OPENING.requiredSquadCast.includes(actor.castId)
+      || actor===this.opening.zhou || actor===this.opening.runner?.actor || actor===this.opening.wounded?.actor)return;
+    if(!this.Record(`ordinaryCasualty${actor.id}`,{actorId:actor.id,squadId:actor.squadId,
+      stage:this.flow.stage.id}))return;
+    // The death pipeline already removes this soldier's fire, cover and tokens.
+    // A living squadmate may react locally; never stop or refill the mission.
+    if(this.voice.current || this.time<(this.nextCasualtyReactionAt||0)
+      || Distance(actor.position,this.player.position)>R.casualtyWitnessM)return;
+    const witness=this.ai.soldiers.find(other=>other!==actor&&other.alive&&other.side==="nra"
+      && actor.squadId && other.squadId===actor.squadId
+      && Distance(other.position,actor.position)<=R.casualtyWitnessM
+      && Distance(other.position,this.player.position)<=R.casualtyWitnessM
+      && !this.BlocksSight(this.Point(other.position,1.3),this.Point(actor.position,.4)));
+    if(!witness)return;
+    this.hud.Say(witness.castId?T(`gameplay.cast.${witness.castId}`):T("firstLevel.casualty.speaker"),
+      T("firstLevel.casualty.reaction"),R.casualtyReactionS);
+    this.nextCasualtyReactionAt=this.time+R.casualtyReactionGapS;
   }
   // Intact dialogue recordings follow the current speaker; overlapping Luo
   // briefing keeps its own source. Unknown nearby voices stay in carriage space.
@@ -956,7 +982,7 @@ export class FirstLevelMissionRuntime {
       OnOccupy: () => {
         this.Record("gunOccupied");
         for(const [i,actor] of this.squad.entries()){
-          actor.scriptEssential=true;this.Defend(actor,P.squadFrontPositions[i]);
+          actor.scriptEssential=OPENING.requiredSquadCast.includes(actor.castId);this.Defend(actor,P.squadFrontPositions[i]);
         }
       },
     });
@@ -982,7 +1008,7 @@ export class FirstLevelMissionRuntime {
     // Preserve the later escort story's existing contract; the rebuilt opening
     // earns survival through geometry, movement and ordinary combat damage.
     if(!["Train","Unloading","TrenchEntry","Shelter","Support","MachineGun"].includes(stage.id))
-      for(const actor of this.squad||[])actor.scriptEssential=true;
+      for(const actor of this.squad||[])actor.scriptEssential=OPENING.requiredSquadCast.includes(actor.castId);
     this.opening.Enter(stage.id);
     this.UpdateMusic(stage.id);
     this.Objective(Localize(FirstLevelStageTextId(stage.id), stage.objective));
@@ -1213,7 +1239,7 @@ export class FirstLevelMissionRuntime {
         this.ai.SetStance(guard.actor,1,1.5);
       }
     }
-    if(this.flow.stage.id==="Support" && this.guards.slice(0,OPENING.rifleGuardCount).length===OPENING.rifleGuardCount && this.guards.slice(0,OPENING.rifleGuardCount).every(g=>g.safe||!g.actor.alive))this.Record("rifleWithdrawalResolved",{survived:this.guards.slice(0,OPENING.rifleGuardCount).filter(g=>g.safe).length});
+    if(this.flow.stage.id==="Support" && this.guards.slice(0,OPENING.rifleGuardCount).length===OPENING.rifleGuardCount && this.guards.slice(0,OPENING.rifleGuardCount).every(g=>g.safe||!g.actor.alive))this.Record("rifleWithdrawalResolved",{survived:this.guards.slice(0,OPENING.rifleGuardCount).filter(g=>g.safe&&g.actor.alive).length});
     if (this.guards.length && this.guards.every((guard) => guard.safe || !guard.actor.alive))
       {
         const survived=this.guards.filter(guard=>guard.safe && guard.actor.alive).length;
@@ -2062,6 +2088,7 @@ export class FirstLevelMissionRuntime {
       meal: this.meal.State(),
       openingPrompt: this.OpeningPrompt(),
       failed: this.failed,
+      ordinaryCasualties:this.flow.log.filter(event=>event.id?.startsWith("ordinaryCasualty")).map(event=>event.detail),
       tank: { ...this.tank },
       playerExplosions: this.playerExplosions || [],
       column: this.column.State(),
@@ -2102,6 +2129,7 @@ export class FirstLevelMissionRuntime {
     };
   }
   Dispose() {
+    if(this.ai.ctx.onSoldierDeath===this.soldierDeath)this.ai.ctx.onSoldierDeath=this.oldSoldierDeath;
     this.meal.Dispose();
     this.opening.Dispose();
     this.squadMarch?.Dispose();

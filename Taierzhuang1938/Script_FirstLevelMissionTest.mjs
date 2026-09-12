@@ -112,6 +112,56 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     ({FirstLevelMissionRuntime}=await import("./Script_FirstLevelMissionRuntime.mjs"));
     ({Vector3}=await import("three"));
   } finally {hooks.deregister();}
+  {
+    const flow=new FirstLevelMissionFlow(),said=[];
+    const ordinary={id:901,side:"nra",alive:false,squadId:"TestSquad",position:new Vector3()};
+    const witness={id:902,side:"nra",alive:true,squadId:"TestSquad",position:new Vector3(2,0,0)};
+    const r={flow,time:1,failed:false,completed:false,opening:{},voice:{current:null},
+      ai:{soldiers:[ordinary,witness]},player:{position:new Vector3()},hud:{Say:(...args)=>said.push(args)},
+      Point:p=>p,BlocksSight:()=>false,Record:(id,detail)=>flow.Record(id,detail)};
+    const Notify=actor=>FirstLevelMissionRuntime.prototype.OnOrdinaryCasualty.call(r,actor);
+    Notify(ordinary);Notify(ordinary);
+    assert.equal(flow.log.filter(e=>e.id==="ordinaryCasualty901").length,1,"one real casualty receipt per actor");
+    assert.equal(said.length,1,"a nearby living squadmate reacts once");
+    assert.equal(r.failed,false);
+    Notify({...ordinary,id:903});assert.equal(said.length,1,"reactions are throttled");
+    r.time+=R.casualtyReactionGapS;r.voice.current={};
+    Notify({...ordinary,id:904});assert.equal(said.length,1,"mission dialogue is never overwritten");
+    r.voice.current=null;r.BlocksSight=()=>true;
+    Notify({...ordinary,id:905});assert.equal(said.length,1,"a wall prevents a false witness reaction");
+    r.BlocksSight=()=>false;witness.alive=false;
+    Notify({...ordinary,id:906});assert.equal(said.length,1,"dead squadmates do not speak");
+    witness.alive=true;
+    Notify({...ordinary,id:908,position:new Vector3(100,0,0)});
+    assert.equal(said.length,1,"distant casualties stay outside the local subtitle channel");
+    Notify({...ordinary,id:909,squadId:"OtherSquad"});
+    assert.equal(said.length,1,"another group does not pretend to be a squad witness");
+    for(const castId of OPENING.requiredSquadCast)Notify({...ordinary,id:castId,castId});
+    Notify({...ordinary,id:907,side:"ija"});Notify({...witness,alive:true});
+    assert.equal(flow.log.filter(e=>e.id?.startsWith("ordinaryCasualty")).length,7,
+      "ordinary casualty receipts exclude living actors, enemies and required companions");
+  }
+  {
+    const flow=new FirstLevelMissionFlow();flow.Start();
+    const r={flow,squad:[{id:1,alive:false,castId:null}],Has:id=>flow.Has(id),Record:(id,d)=>flow.Record(id,d),
+      OnPlayerDown:()=>{r.failed=true;},MissionFailure:()=>{},failed:false};
+    const opening=new FirstLevelOpening(r);
+    opening.barrage.Update=()=>{};opening.FireWindows=()=>{};opening.UpdateZhou=()=>{};
+    opening.Update(1/60);
+    assert.equal(r.failed,false,"an ordinary member in the player's squad does not fail the opening");
+    r.squad.push({id:2,castId:OPENING.requiredSquadCast[0],alive:false});
+    opening.Update(1/60);assert.equal(r.failed,true,"the existing required-companion contract is preserved");
+  }
+  for(const survivors of [0,1,3]){
+    const flow=new FirstLevelMissionFlow();flow.index=MISSION_STAGES.findIndex(s=>s.id==="MachineGun");flow.started=true;
+    const guards=Array.from({length:4},(_,i)=>({actor:{id:i,alive:i<survivors},safe:true,progress:1,route:[{}]}));
+    const r={flow,guards,time:0,Has:id=>flow.Has(id),Record:(id,d)=>flow.Record(id,d)};
+    flow.Record("gunUsed");
+    FirstLevelMissionRuntime.prototype.UpdateGuards.call(r,1/60);
+    assert.equal(flow.log.find(e=>e.id==="guardWithdrawalResolved").detail.survived,survivors,
+      "withdrawal counts only living survivors, including casualties after reaching cover");
+    flow.Update(1/60);assert.equal(flow.stage.id,"Tank","partial or total ordinary losses never strand withdrawal");
+  }
   const StanceRequest=(stage,facts)=>{
     const input={stanceRequested:"stand",crouchPressed:true,pronePressed:true};
     FirstLevelMissionRuntime.prototype.BeforePlayer.call({flow:{stage:{id:stage}},
