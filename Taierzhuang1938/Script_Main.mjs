@@ -1355,8 +1355,11 @@ async function Boot() {
           const yaw = contact.yaw ?? attacker.yaw ?? 0;
           const pitch = attacker === player ? player.pitch : Math.atan2(at.y-eye.y, Math.hypot(at.x-eye.x, at.z-eye.z));
           const direction = new THREE.Vector3(-Math.sin(yaw)*Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw)*Math.cos(pitch));
+          // 第六个参数是刀刃真正扫过的角度：中线扎在躯干上时按扫刀取样，
+          // 不然齐胸一刀（最常见的那一刀）挑不出任何肢段，一段都卸不掉。
           shapeId = PickMeleeShape(eye, direction, target.actor?.characterRig?.GetHitboxes?.() || null,
-            null, contact.reach ? Math.hypot(contact.reach, eye.y-attacker.position.y) : undefined);
+            null, contact.reach ? Math.hypot(contact.reach, eye.y-attacker.position.y) : undefined,
+            contact.sweep || 0);
           const shape = target.actor?.characterRig?.GetHitboxes?.().find(entry => entry.id === shapeId);
           if (shape?.type === "capsule") at.copy(shape.start).add(shape.end).multiplyScalar(0.5);
           else if (shape?.center) at.copy(shape.center);

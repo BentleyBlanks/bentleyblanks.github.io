@@ -13,6 +13,9 @@ export const MELEE_RULES = Object.freeze({
   npcTellS: 0.48, npcReactionS: 0.2, npcAimCommitLeadS: 0.16, attackCorrectionRad: 0.12,
   bodyRadiusM: 0.29, bladeRadiusM: 0.09, hitInterruptCooldownS: 0.85,
   pushImmunityS: 1.3, maxHeavyHoldS: 1.6,
+  // 大刀接触窗口里刀刃扫过的 yaw 半幅（起手 +bladeSweepRad 扫到收势 −bladeSweepRad，
+  // Alt 分镜左右镜像）。Script_MeleeCombat.ResolveContact 与断肢选段共用这一个数。
+  bladeSweepRad: 0.64,
 });
 export const MELEE_WEAPONS = Object.freeze({
   Dadao: Object.freeze({ label: "大刀", pushReach: 0.95, minReach: 0.38, pushDistance: 0.16, beatReach: 1.72,

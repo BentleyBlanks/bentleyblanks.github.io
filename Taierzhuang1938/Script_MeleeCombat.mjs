@@ -564,7 +564,9 @@ export class MeleeCombatDirector {
   ResolveContact(f) {
     const e = f.entity, a = f.attack, weapon = W[f.weapon];
     const u=Clamp((f.t-a.windup)/a.active,0,1), blade=f.weapon==='Dadao';
-    const yaw=a.yaw+(blade?(f.clip.endsWith('Alt')?-1:1)*(.64-1.28*u):0);
+    // 刀刃这一刀扫过的半幅（带符号，Alt 分镜左右镜像）：接触点与断肢选段共用同一个数。
+    const sweep=blade?(f.clip.endsWith('Alt')?-1:1)*R.bladeSweepRad:0;
+    const yaw=a.yaw+sweep*(1-2*u);
     const end=Tip(e,yaw,blade?a.reach:.66+(a.reach-.66)*Math.sin(u*Math.PI/2));
     const start=Tip(e,yaw,blade?.42:Math.max(.6,(a.previousReach??.66)));
     const previous=a.previousTip || end;
@@ -602,7 +604,7 @@ export class MeleeCombatDirector {
     }
     if (distance < weapon.minReach) { this.Log("tooClose", e, target); a.connected = true; this.SetState(f,'stagger',.3,'WeaponClash'); return; }
     a.connected = true;
-    this.Damage(target, e, a.damage, a.heavy ? "heavy" : "light", { yaw: a.yaw, reach: a.reach, start, end, previous });
+    this.Damage(target, e, a.damage, a.heavy ? "heavy" : "light", { yaw: a.yaw, sweep, reach: a.reach, start, end, previous });
     if (Alive(target)) {
       const protectedRecovery=this.time<tf.interruptUntil;
       this.Stagger(target,e,'Hit',a.heavy?R.staggerS:protectedRecovery?.12:.32,a.poise);

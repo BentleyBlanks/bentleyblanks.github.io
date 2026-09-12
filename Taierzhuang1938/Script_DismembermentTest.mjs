@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import { LIMBS, SEVER_RULES, BUDGET, LAUNCH, ENABLED, LIMB_POOLS } from "./Data_Tuning_Gore.mjs";
 import { CHARACTER_HITBOX_IDS } from "./Data_CharacterHitbox.mjs";
+import { MELEE_RULES } from "./Data_MeleeCombat.mjs";
 import {
   LIMB_IDS, LimbSubtree, LimbForBone, ClassifyVertices, FilterIndex, ResolveSever,
   GoreBudget, CodeForLimb, LimbForCode, SetGoreEnabled, IsGoreEnabled, PickMeleeShape,
@@ -434,6 +435,41 @@ for (const [part, pool] of [["arm", LIMB_POOLS.arm], ["leg", LIMB_POOLS.leg]]) {
   Eq(PickMeleeShape(eye, { x: 0.3, y: -0.35, z: -2 }, shapes, null, 1), null, "超出有限攻击范围不卸肢");
   Eq(PickMeleeShape(eye, { x: 0, y: 0, z: 2 }, shapes), null, "身后的段不算");
   Eq(PickMeleeShape(eye, { x: 0, y: 0, z: -2 }, []), null, "没有命中体返回 null");
+}
+
+// 齐胸一刀：中线扎在躯干上，刀刃扫过去照样卸掉胳膊（2026-09-13 玩家反馈的病根）
+{
+  const Z = -1.2;
+  const S = (id, type, extra) => ({ id, type,
+    center: { x: 0, y: 0, z: 0 }, start: { x: 0, y: 0, z: 0 }, end: { x: 0, y: 0, z: 0 }, ...extra });
+  // 带真实半径的站立命中体：躯干粗、胳膊挂在两侧，尺寸照 CHARACTER_HITBOX_PROFILE。
+  const shapes = [
+    S("head", "sphere", { center: { x: 0, y: 1.63, z: Z }, worldRadius: 0.15 }),
+    S("upperTorso", "capsule", { start: { x: 0, y: 1.32, z: Z }, end: { x: 0, y: 1.50, z: Z }, worldRadius: 0.135 }),
+    S("lowerTorso", "capsule", { start: { x: 0, y: 1.02, z: Z }, end: { x: 0, y: 1.32, z: Z }, worldRadius: 0.19 }),
+    S("upperArmL", "capsule", { start: { x: 0.19, y: 1.42, z: Z }, end: { x: 0.22, y: 1.14, z: Z }, worldRadius: 0.075 }),
+    S("forearmL", "capsule", { start: { x: 0.22, y: 1.14, z: Z }, end: { x: 0.24, y: 0.90, z: Z }, worldRadius: 0.06 }),
+    S("upperArmR", "capsule", { start: { x: -0.19, y: 1.42, z: Z }, end: { x: -0.22, y: 1.14, z: Z }, worldRadius: 0.075 }),
+    S("forearmR", "capsule", { start: { x: -0.22, y: 1.14, z: Z }, end: { x: -0.24, y: 0.90, z: Z }, worldRadius: 0.06 }),
+    S("thighL", "capsule", { start: { x: 0.1, y: 0.92, z: Z }, end: { x: 0.1, y: 0.5, z: Z }, worldRadius: 0.10 }),
+    S("thighR", "capsule", { start: { x: -0.1, y: 0.92, z: Z }, end: { x: -0.1, y: 0.5, z: Z }, worldRadius: 0.10 }),
+  ];
+  const eye = { x: 0, y: 1.6, z: 0 };
+  const Aim = (deg) => ({ x: 0, y: Math.sin(deg * Math.PI / 180), z: -Math.cos(deg * Math.PI / 180) });
+  const sweep = MELEE_RULES.bladeSweepRad;
+  for (const deg of [-5, -10, -15, -20]) {
+    Eq(PickMeleeShape(eye, Aim(deg), shapes, null, 2.6), null, `${deg}° 中线扎在躯干上，单线判定不卸肢`);
+    const cut = PickMeleeShape(eye, Aim(deg), shapes, null, 2.6, sweep);
+    Ok(LIMB_IDS.includes(cut), `${deg}° 齐胸一刀按扫刀取样仍挑得出肢段（挑到 ${cut}）`);
+    Ok(/^(upperArm|forearm)/.test(cut), `${deg}° 齐胸那一刀砍的是胳膊不是腿（挑到 ${cut}）`);
+  }
+  // 起手那一侧先挨刀：同一刀正反手扫，卸的是对称的两条胳膊
+  Eq(PickMeleeShape(eye, Aim(-12), shapes, null, 2.6, sweep), "upperArmR", "正手扫过去先碰到的那条胳膊");
+  Eq(PickMeleeShape(eye, Aim(-12), shapes, null, 2.6, -sweep), "upperArmL", "反手扫过去先碰到另一条");
+  // 瞄着哪一段砍还是卸哪一段：中线直接命中时不走扫刀那一路
+  Eq(PickMeleeShape(eye, { x: 0.1, y: -1.05, z: -1.2 }, shapes, null, 2.6, sweep), "thighL", "瞄腿砍就卸腿");
+  Eq(PickMeleeShape(eye, Aim(2), shapes, null, 2.6, sweep), "head", "平着砍脖子那一刀仍是头");
+  Eq(PickMeleeShape(eye, Aim(90), shapes, null, 2.6, sweep), null, "朝天挥空照样一段都不卸");
 }
 
 // 命中体给了哪一段就卸哪一段

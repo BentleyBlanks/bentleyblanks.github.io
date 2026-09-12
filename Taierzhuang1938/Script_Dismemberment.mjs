@@ -249,29 +249,16 @@ function TierFor(rule, falloff) {
 }
 
 /**
- * 白刃接触时挑「劈中了哪一段」：命中体里离攻击者视线最近的那一段。
+ * 一条攻击线劈中了哪一段：直接命中的那一段优先，其次是贴着这条线走过去的骨段。
  *
- * 白刃判定是扇形（Script_Combat.Melee / Script_MeleeCombat），本来不做射线，
- * 所以没有 shapeId；但劈砍的走向是确定的 —— 从攻击者眼位朝目标挥过去，
- * 对整条骨段与有限视线求最近点，并按半径、容差筛掉挥空；包含腿、头与躯干遮挡。命中体从
- * `characterRig.GetHitboxes()` 拿（sphere/ellipsoid 有 center，capsule 有 start/end）。
- *
- * @param {{x:number,y:number,z:number}} origin 攻击者眼位（世界）
- * @param {{x:number,y:number,z:number}} direction 挥砍方向（世界，不必归一）
- * @param {Array<{id:string,type:string,center?:object,start?:object,end?:object}>} shapes
- * @param {Iterable<string>|null} poolIds 显式限制候选；null 检查所有身体命中体
- * @returns {string|null}
+ * 躯干（upperTorso / lowerTorso）留在射线里**只为了挡住它后面的肢体** —— 刀砍进胸口
+ * 不该把背面那条胳膊卸了；但它自己不是可卸的段，所以中线扎在躯干上时这条线不出结果，
+ * 交回调用方去走扫刀那一路。贴线那一路只在肢体之间比，躯干不参与「最近」的竞争。
  */
-export function PickMeleeShape(origin, direction, shapes, poolIds = null, reach = HIT_GEOMETRY.meleeReachM) {
-  if (!origin || !direction || !shapes?.length) return null;
-  const pool = poolIds ? new Set(poolIds) : null;
-  const dx = direction.x || 0, dy = direction.y || 0, dz = direction.z || 0;
-  const len = Math.hypot(dx, dy, dz);
-  if (!(len > 1e-9)) return null;
-  const ux = dx / len, uy = dy / len, uz = dz / len;
+function ScanMeleeLine(origin, unit, shapes, pool, reach) {
   let best = null, bestDistance = Infinity, bestAlong = Infinity;
   let first = null, firstT = Infinity;
-  const unit = { x: ux, y: uy, z: uz };
+  const ux = unit.x, uy = unit.y, uz = unit.z;
   for (const shape of shapes) {
     if (!shape || pool && !pool.has(shape.id)) continue;
     // Runtime capsules also own a zero-valued centre field. Type selects the
@@ -285,6 +272,7 @@ export function PickMeleeShape(origin, direction, shapes, poolIds = null, reach 
         ? RaycastEllipsoid(origin, unit, a, shape.worldRadii, shape.worldAxes)
         : RaycastSphere(origin, unit, a, radius);
     if (direct !== null && direct <= reach && direct < firstT) { firstT = direct; first = shape.id; }
+    if (!LIMBS[shape.id]) continue;              // 躯干只挡视线，不参与贴线竞争
     // Closest points between the finite attack ray and the entire bone segment.
     const vx = b.x-a.x, vy = b.y-a.y, vz = b.z-a.z;
     const wx = origin.x-a.x, wy = origin.y-a.y, wz = origin.z-a.z;
@@ -302,8 +290,53 @@ export function PickMeleeShape(origin, direction, shapes, poolIds = null, reach 
       bestDistance = distance; bestAlong = along; best = shape.id;
     }
   }
-  const chosen = first || best;
-  return LIMBS[chosen] ? chosen : null;
+  if (first) return LIMBS[first] ? first : null;  // 挡在最前面的是躯干 → 这一线不卸肢
+  return LIMBS[best] ? best : null;
+}
+
+/**
+ * 白刃接触时挑「劈中了哪一段」：命中体里离攻击者视线最近的那一段。
+ *
+ * 白刃判定是扇形（Script_Combat.Melee / Script_MeleeCombat），本来不做射线，
+ * 所以没有 shapeId；但劈砍的走向是确定的 —— 从攻击者眼位朝目标挥过去，
+ * 对整条骨段与有限视线求最近点，并按半径、容差筛掉挥空；包含腿、头与躯干遮挡。命中体从
+ * `characterRig.GetHitboxes()` 拿（sphere/ellipsoid 有 center，capsule 有 start/end）。
+ *
+ * 瞄着哪一段砍就卸哪一段（中线）；中线落在躯干上或差着一点擦过去时，按刀刃真正扫过的
+ * 角度依次取样，取**刀刃最先扫到**的那一段 —— 齐胸一刀砍的是端着枪的那条胳膊，
+ * 不是「什么都砍不掉」（2026-09-13 玩家反馈，见 docs/Data_Dismemberment.md §11.7）。
+ *
+ * @param {{x:number,y:number,z:number}} origin 攻击者眼位（世界）
+ * @param {{x:number,y:number,z:number}} direction 挥砍方向（世界，不必归一）
+ * @param {Array<{id:string,type:string,center?:object,start?:object,end?:object}>} shapes
+ * @param {Iterable<string>|null} poolIds 显式限制候选；null 检查所有身体命中体
+ * @param {number} reach 这一刀够得着的距离（米）
+ * @param {number} sweep 刀刃在接触窗口里扫过的 yaw 幅度（带符号，起手那一侧为正）；
+ *                       0 = 只认中线（刺、砸，以及纯几何单测）
+ * @returns {string|null}
+ */
+export function PickMeleeShape(origin, direction, shapes, poolIds = null,
+    reach = HIT_GEOMETRY.meleeReachM, sweep = 0) {
+  if (!origin || !direction || !shapes?.length) return null;
+  const pool = poolIds ? new Set(poolIds) : null;
+  const dx = direction.x || 0, dy = direction.y || 0, dz = direction.z || 0;
+  const len = Math.hypot(dx, dy, dz);
+  if (!(len > 1e-9)) return null;
+  const unit = { x: dx / len, y: dy / len, z: dz / len };
+  const center = ScanMeleeLine(origin, unit, shapes, pool, reach);
+  if (center) return center;
+  const arc = Number(sweep);
+  if (!Number.isFinite(arc) || arc === 0) return null;
+  // 绕 Y 旋转保长度（只动 x/z），俯仰跟着这一刀的实际抬手高度不变。
+  const samples = Math.max(2, HIT_GEOMETRY.meleeSweepSamples | 0);
+  for (let i = 0; i < samples; i += 1) {
+    const yaw = arc * (1 - 2 * i / (samples - 1));
+    const cos = Math.cos(yaw), sin = Math.sin(yaw);
+    const swept = { x: unit.x * cos + unit.z * sin, y: unit.y, z: -unit.x * sin + unit.z * cos };
+    const hit = ScanMeleeLine(origin, swept, shapes, pool, reach);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 /** 不断的那一路统一从这里出：形状与真断了那一路完全一致，调用方不用分两种写法。 */

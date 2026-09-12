@@ -25,6 +25,7 @@ import { ShellVisuals } from "./Script_ShellVisual.mjs";
 import { T } from "./Script_Text.mjs";
 // 白刃劈中了哪一段：纯几何（实际高度与方向命中的肢段），断肢规则层要它当 shapeId。
 import { PickMeleeShape } from "./Script_Dismemberment.mjs";
+import { MELEE_RULES } from "./Data_MeleeCombat.mjs";
 import {
   THROW, GRENADE_BODY, MELEE, BLAST, SHELL, INDIRECT, THREAT,
 } from "./Data_Tuning_Combat.mjs";
@@ -366,8 +367,11 @@ export class CombatSystem {
       // 不交 shapeId 的话规则层只能随机挑，大刀劈脖子会掉小腿（2026-09-10 测试场实测）。
       const slashing = isBlade || mode === "cut";
       const swingEye = this.host.player?.EyePosition || fromPosition;
+      // 挥砍是横着扫过去的一刀：中线扎在躯干上时按刀刃扫过的角度取样再挑段
+      //（与 Script_MeleeCombat 同一个 bladeSweepRad），不然对着胸口砍一段都卸不掉。
       const shapeId = slashing
-        ? PickMeleeShape(swingEye, direction, hit.actor?.characterRig?.GetHitboxes?.() || null) : null;
+        ? PickMeleeShape(swingEye, direction, hit.actor?.characterRig?.GetHitboxes?.() || null,
+          null, undefined, MELEE_RULES.bladeSweepRad) : null;
       const died = hit.TakeHit(damage, "torso", direction,
         { kind: isBlade ? "blade" : mode, weaponId, mode, shapeId, point: at.clone() });
       if (this.host.vfx) {

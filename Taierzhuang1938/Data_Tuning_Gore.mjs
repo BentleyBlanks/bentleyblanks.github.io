@@ -86,9 +86,14 @@ export const SEVER_RULES = Object.freeze({
 });
 
 // 简单几何判定的手感参数；距离按实际世界命中体计算，头不进爆炸随机池。
+//
+// meleeSweepSamples：刀是横着扫过去的，不是一条线。中线落在躯干上（齐胸一刀最常见的
+// 情形）时按刀刃扫过的角度取这么多次样，取刀刃最先扫到的那一段。2026-09-13 玩家反馈
+// 「刀砍不断了」的病根就在这里：只认中线的话，对着人胸口砍中的是 upperTorso，
+// 不在 LIMBS 里，规则层一律返回 noLimb。幅度由调用方按 MELEE_RULES.bladeSweepRad 交进来。
 export const HIT_GEOMETRY = Object.freeze({
   blastLegWeight: 2, blastDistanceFloorM: 0.25,
-  meleeToleranceM: 0.12, meleeReachM: 2.8,
+  meleeToleranceM: 0.12, meleeReachM: 2.8, meleeSweepSamples: 9,
 });
 
 /**
