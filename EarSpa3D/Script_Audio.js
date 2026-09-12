@@ -11,12 +11,9 @@
 //      每次播放都在 ±4% 内抖动播放速率、增益也抖，并按 cue 设最小重触发间隔——
 //      同一段采样连打也不会变成机关枪。
 //
-//   3. **连续接触声层**（这一层是这个项目最重要的部分）：**不采样、现场合成**。
-//      刮耳屎的声音必须随手指速度**连续**变化：速度上去了颗粒变密、中心频率上移；
-//      压力上去了增益与低频成分一起涨；粗糙度上去了过载更深、颗粒更硬。
-//      采样做不了这件事——循环一个 0.5 秒的刮擦采样，三次就能听出是复读机，
-//      而且它永远不会因为玩家手快了一点而变样。所以 contact 整套是振荡器与噪声
-//      实时跑出来的，所有参数都走 setTargetAtTime 平滑，不会有 zipper noise。
+//   3. 连续接触声：干性刮动使用用户选定的 0.4 秒 SeedAudio 成品，保持原音高，
+//      只有真实滑动与载荷并存时开启包络；长刮续播，停手淡出。其他材质保持现场合成。
+//      速度和压力从实际接触状态更新，静止反力不产生摩擦声。
 //
 // ## 无资产也能跑（契约 §4 的硬要求）
 //
@@ -65,6 +62,7 @@ export function CreateAudio() {
   // 为什么运行时也写一份：清单可能拿不到，而 404 不该让整个音频层瘫掉。
   // 注意路径统一写「相对项目根」，交给 AssetUrl() 解析。
   const SFX_FILES = {
+    scoopDryStroke:['Audio/Sfx/AudioSfx_ScoopDryStroke.wav'],
     waxLandSmall:['Audio/Sfx/AudioSfx_WaxLandSmall.wav'],
     waxLandMedium:['Audio/Sfx/AudioSfx_WaxLandMedium.wav'],
     waxLandLarge:['Audio/Sfx/AudioSfx_WaxLandLarge.wav'],
@@ -108,6 +106,7 @@ export function CreateAudio() {
     shiver: 1.8, sparkle: 2.2, uiTap: 0.35, uiConfirm: 1.6,
   };
   const LANDING_CUES = new Set(['waxLandSmall','waxLandMedium','waxLandLarge']);
+  const FIXED_CUES = new Set([...LANDING_CUES,'scoopDryStroke']);
   const SFX_FADE_OUT = 0.12;        // 秒：裁剪处的淡出，避免咔一声
 
   // contact 的 kind 别名：游戏里的工具 id 直说自己的材质，运行时不猜。
@@ -299,7 +298,32 @@ export function CreateAudio() {
   // 参数含义（都是 0..1）：speed01 手指划动速度，pressure01 压向管壁的力道，
   // roughness01 耵聍表面的粗糙/阻力。
 
+  function CreateSampleContactEngine(kind,buffer){
+    const source=ctx.createBufferSource(),gate=ctx.createGain(),window=SoundWindow(buffer);
+    const p={speed:0,pressure:0,rough:0,pending:null};let lastGain=null,ended=false;
+    source.buffer=buffer;source.playbackRate.value=1;source.loop=true;
+    source.loopStart=window.offset;source.loopEnd=window.end;
+    gate.gain.value=0;source.connect(gate);gate.connect(bus.sfx);
+    const Dispose=()=>{if(ended)return;ended=true;try{source.stop();}catch{}source.disconnect();gate.disconnect();};
+    source.onended=Dispose;
+    return{kind,cue:'scoopDryStroke',p,
+      start(at){source.start(at,window.offset);live.contactStarted++;},
+      frame(dt,at){
+        const gain=Math.min(1,Math.sqrt(p.speed*p.pressure)*2);if(gain===lastGain)return;
+        const param=gate.gain;
+        if(param.cancelAndHoldAtTime)param.cancelAndHoldAtTime(at);else param.cancelScheduledValues(at);
+        param.setTargetAtTime(gain,at,.008);if(gain===0)param.setValueAtTime(0,at+.028);lastGain=gain;
+      },
+      stop(at,release){
+        const param=gate.gain;
+        if(param.cancelAndHoldAtTime)param.cancelAndHoldAtTime(at);else param.cancelScheduledValues(at);
+        param.linearRampToValueAtTime(0,at+release);source.stop(at+release+.002);
+      },dispose:Dispose};
+  }
+
   function CreateContactEngine(kind) {
+    // 已试听的干刮素材按原音高播放，只有实际滑动时开启包络；停手截停，持续移动才续播。
+    if(kind==='scrape'&&buffers.sfx.scoopDryStroke?.[0])return CreateSampleContactEngine(kind,buffers.sfx.scoopDryStroke[0]);
     const gateGain = ctx.createGain();
     gateGain.gain.value = 0;
     gateGain.connect(bus.sfx);
@@ -586,7 +610,7 @@ export function CreateAudio() {
     src.buffer = buffer;
     src.playbackRate.value = rate;
     const g = ctx.createGain();
-    g.gain.value = gain * (LANDING_CUES.has(cue) ? 1 : NormalizeGain(buffer));
+    g.gain.value = gain * (FIXED_CUES.has(cue) ? 1 : NormalizeGain(buffer));
     let tail = g;
     if (pan && typeof ctx.createStereoPanner === "function") {
       const panner = ctx.createStereoPanner();
@@ -1242,15 +1266,15 @@ export function CreateAudio() {
       const now = typeof performance !== "undefined" ? performance.now() : Date.now();
       if (now - (lastPlay.get(cue) || 0) < RETRIGGER_MS) return 0;   // 连点保护
       lastPlay.set(cue, now);
-      const jitterRate = LANDING_CUES.has(cue) ? 1 : rate * (1 + (Math.random() - 0.5) * 0.08);
-      const jitterGain = LANDING_CUES.has(cue) ? gain : gain * (1 + (Math.random() - 0.5) * 0.35);
+      const jitterRate = FIXED_CUES.has(cue) ? 1 : rate * (1 + (Math.random() - 0.5) * 0.08);
+      const jitterGain = FIXED_CUES.has(cue) ? gain : gain * (1 + (Math.random() - 0.5) * 0.35);
       const takes = buffers.sfx[cue];
       if (takes && takes.length) {
         const buffer = takes[Math.floor(Math.random() * takes.length)];
         const played=PlayBuffer(buffer, { cue, gain: jitterGain, rate: jitterRate, pan, delay });
         return played;
       }
-      if(LANDING_CUES.has(cue))return 0;
+      if(FIXED_CUES.has(cue))return 0;
       // 兜底：合成版本（失败就真的静默，绝不抛）
       SynthSfx(cue==='peelDry'?'snapWax':cue==='peelSticky'?'stretchWax':cue, { gain: jitterGain, pan, delay, rate: jitterRate });
       return 0;
@@ -1331,6 +1355,7 @@ export function CreateAudio() {
         sfxMissing: Object.keys(missing.sfx),
         currentBgmId,
         activeContacts: [...contact.keys()],
+        activeContactSources: [...contact.values()].map(engine=>({kind:engine.kind,cue:engine.cue||'procedural'})),
         live: { ...live, busCounts: bus ? { master: 1, sfx: 1, bgm: 1, amb: 1 } : null },
         loadLog: [...loadLog],
         recentPlayback: recentPlayback.map(item => ({ ...item })),

@@ -516,6 +516,24 @@
    "credit": "Volcengine SeedAudio 1.0 · approved F derivative",
    "sha256": "0f239094cf88968b0f87b8e606b4ae59532a9cd92032ee659f1cb7014db35ec0",
    "processing": "F主瞬态95ms/尾淡出8ms，rate .94，峰值-15dBFS；1.8kHz低通、1.1kHz高架-4dB"
+  },
+  "scoopDryStroke#1": {
+   "cue": "scoopDryStroke",
+   "kind": "sfx",
+   "variant": 1,
+   "name": "耳勺干片短刮 · 0.4秒",
+   "file": "Audio/Sfx/AudioSfx_ScoopDryStroke.wav",
+   "seconds": 0.4,
+   "bytes": 38478,
+   "sampleRate": 48000,
+   "channels": 1,
+   "model": "seed-audio-1.0",
+   "generatedAt": "2026-09-12",
+   "license": "volcengine",
+   "bakedOnly": true,
+   "sha256": "41fc26e650e81ee5a7852e819dfd8e0eeb7e3afdc02d028b2b84e6341dc2d314",
+   "sourceSha256": "883221ddb437a60c9f99d996a2e8aacfa5d7438eda5e1def4def31b349125c7c",
+   "processing": "V3 SeedAudio dry wax flakes; 3400Hz lowpass and -3dB high shelf at1600Hz; normalized to -20dBFS; pitch-preserving atempo to exactly0.4s; 3ms attack/12ms release; byte-identical to approved preview"
   }
  },
  "model": "seed-audio-1.0",
@@ -526,7 +544,7 @@
  "bakedBy": "Script_SeedAudioBake.mjs",
  "notes": [
   "淡入淡出与循环接缝在浏览器运行时用 WebAudio 完成，见 Script_Audio.js。",
-  "contact.* 连续接触声不入库，由 Script_Audio.js 现场合成。",
+  "干性刮动使用已试听的 scoopDryStroke 成品；其他 contact 音色由 Script_Audio.js 现场合成。",
   "waxLandSmall/Medium/Large 是用户选定的固定 PCM WAV，保留试听文件原样；其余旧素材为 MP3。",
   "客人对白与叹气停用。"
  ],

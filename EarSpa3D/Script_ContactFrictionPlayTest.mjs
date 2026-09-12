@@ -24,7 +24,8 @@ try{
   report.motion.push({force:p.targets[0].physics.force,contacts:p.audio.activeContacts});
   if(p.audio.activeContacts.includes('scrape')){loadedMoving=true;break;}
  }
- Check(loadedMoving,'actual mouse sliding under load starts dry friction');
+  Check(loadedMoving,'actual mouse sliding under load starts dry friction');
+  Check(p.audio.activeContactSources.some(s=>s.kind==='scrape'&&s.cue==='scoopDryStroke'),'real dry scraping uses the approved 0.4 second sample');
  await Step(1);p=await Probe();Check(p.audio.activeContacts.length===0,'holding the new pointer position stops friction on the next frame');
  await page.mouse.up();await Step(60);
  // 实测 WebAudio 输出：直接调用合成器也不能在零速度或零压力时泄漏底噪。

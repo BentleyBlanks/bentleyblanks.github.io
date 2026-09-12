@@ -14,9 +14,8 @@
 //      采耳额外加两条硬要求：**近距离干录**、**没有混响尾巴**。
 //      耳道里的声音是干而近的，任何房间混响都会立刻把「在耳朵里」变成「在房间里」。
 //
-//   3. **连续接触声**（`CONTACT_KINDS`）：**不入库、不采样**，运行时现场合成。
-//      刮耳屎的声音必须随手指速度连续变化；采样循环起来一定像机关枪。
-//      这里只记录运行时合成器的参数范围与设计意图，不产生 API 调用。
+//   3. 连续接触声：已试听的 scoopDryStroke 固定为 0.4 秒 WAV，按实际滑动开启/停止；
+//      其余 CONTACT_KINDS 记录现场合成参数，不产生 API 调用。bakedOnly 成品不被 baker 覆盖。
 //
 // 密钥只从 VOLCENGINE_API_KEY 环境变量读，绝不进任何文件。
 
@@ -131,6 +130,7 @@ export const SFX_SOURCES = [
   {id:'peelSticky',cue:'peelSticky',name:'黏性耵聍牵拉脱离',seconds:1.4,category:'contact',material:'wet',contactKind:'wipe',variants:['黏性蜡块被小镊子夹住缓慢牵拉，黏连逐渐松开。'],
    prompt:COMMON_SFX+'小镊子夹住一块柔韧的黏性耳垢缓慢拉起：先是近距离细腻的蜡质摩擦，随后黏连短短拉伸，最后轻而明确地脱离，带少量细微黏性撕裂声。细节清晰、厚实而柔和。不要夸张口水、咀嚼、鼻涕、电子滑音、气球爆裂。总时长约一点四秒。'},
 
+  {id:'scoopDryStroke',cue:'scoopDryStroke',name:'耳勺干片短刮 · 0.4秒',seconds:.4,category:'contact',material:'dry',contactKind:'scrape',variants:['试听定稿'],file:'AudioSfx_ScoopDryStroke.wav',bakedOnly:true,prompt:'用户试听选定的 SeedAudio 第三版干片短刮；柔和蜡屑摩擦，保持音调压缩至0.4秒。固定成品，不重新生音。'},
   // 固定为已试听选定的三条 WAV，baker 不调用 API 覆盖。
   {"id": "waxLandSmall", "cue": "waxLandSmall", "name": "耳垢落盘 · 稍低沉", "seconds": 0.32447916666666665, "category": "reward", "material": "wax", "contactKind": null, "variants": ["稍低沉"], "file": "AudioSfx_WaxLandSmall.wav", "bakedOnly": true, "prompt": "已试听选定的 SeedAudio F 衍生音效；约0.1秒轻小非金属物件短促接触。固定成品，不重新生音。"},
   {"id": "waxLandMedium", "cue": "waxLandMedium", "name": "耳垢落盘 · 轻度沉闷", "seconds": 0.32447916666666665, "category": "reward", "material": "wax", "contactKind": null, "variants": ["轻度沉闷"], "file": "AudioSfx_WaxLandMedium.wav", "bakedOnly": true, "prompt": "已试听选定的 SeedAudio F 衍生音效；约0.1秒轻小非金属物件短促接触。固定成品，不重新生音。"},
