@@ -1243,8 +1243,10 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
 console.log("ok receiving-food release follows the source clock and survives pause/resume");
 
 {
-  assert.equal(MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.approach.length+MISSION_ENCOUNTERS.surface.length+MISSION_ENCOUNTERS.intrusion.length+MISSION_ENCOUNTERS.tank.length,R.openingEnemyBudget,
+  assert.equal(MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.machineGun.length+MISSION_ENCOUNTERS.approach.length+MISSION_ENCOUNTERS.surface.length+MISSION_ENCOUNTERS.intrusion.length+MISSION_ENCOUNTERS.tank.length,R.openingEnemyBudget,
     "finite opening/front roster agrees with budget; no replacement waves");
+  assert.equal(MISSION_ENCOUNTERS.machineGun.length,12,"the gun handover owns a separate finite attack");
+  assert.ok(MISSION_ENCOUNTERS.machineGun.every(actor=>FrontAssaultLane(actor.x,actor.z).length>=3),"machine-gun attackers cross multiple physical bounds");
   assert.equal(MISSION_ENCOUNTERS.approach.length,18,"the communication-trench approach has a finite enemy screen");
   const attackers=[...MISSION_ENCOUNTERS.surface.filter(s=>s.advance),...MISSION_ENCOUNTERS.approach.filter(s=>!s.hold)];
   assert.equal(new Set(attackers.map(s=>s.id)).size,21,"each advancing actor has a persistent unique identity");

@@ -25,7 +25,7 @@ export const FIRST_LEVEL_STAGES = Object.freeze([
   Phase(18, "FinalDefense", "接收院被逼退，战斗收尾", ["FinalDefense","Exit"], {x:-151,z:43.6}),
 ]);
 export const FIRST_LEVEL_ENCOUNTER_STARTS = Object.freeze({
-  surface:2, intrusion:2, front:3, approach:3, tank:3, village:3, melee:3, courtyard:10,
+  surface:2, intrusion:2, front:3, machineGun:4, approach:3, tank:3, village:3, melee:3, courtyard:10,
   transfer:12, transferFlank:12, transferLast:12, transferRear:12, air:13, retreat:15,
   retreatWall:15,retreatYard:15,reception:16, final:17,
 });
@@ -44,8 +44,8 @@ export const FIRST_LEVEL_STAGE_CLEARED_ENEMIES = Object.freeze({
 export const FIRST_LEVEL_STAGE_ENCOUNTERS = Object.freeze([
   [], [],
   ["surface","intrusion"],
-  ["front","approach","tank","village","melee"],
-  ["front","approach","tank","village","melee"],
+  ["front","machineGun","approach","tank","village","melee"],
+  ["front","machineGun","approach","tank","village","melee"],
   ["village","melee"], ["village","melee"], ["village","melee"], ["village","melee"],
   ["village","courtyard"], [], ["transfer"], ["air"], ["air"],
   ["retreat"], ["reception"], ["final"], ["final"],

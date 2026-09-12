@@ -657,13 +657,13 @@ export class FirstLevelMissionRuntime {
         movingSeconds: 0, distance: 0, last: { x: spec.x, z: spec.z }, shelter: {x:spec.x,z:spec.z}, mode: "cover" };
       // Finite front teams remain ordinary alert AI before the assault starts.
       // Only the later tank-flank group waits for its authored release.
-      const standby=["front","tank"].includes(id)&&!spec.id.startsWith("Flank")&&!this.Has("frontBattleStarted");
+      const standby=["front","machineGun","tank"].includes(id)&&!spec.id.startsWith("Flank")&&!this.Has("frontBattleStarted");
       if(id==="tank"&&spec.id.startsWith("Flank"))actor.scriptedNoncombatant=true;
       actor.missionFrontStandby=standby;
       if(standby)this.ai.SetStance(actor,1,4+actor.id%3,true);
-      actor.scriptAccuracyScale = actor.missionAccuracyScale = ["front","approach"].includes(id)?R.frontAccuracyScale:.5;
+      actor.scriptAccuracyScale = actor.missionAccuracyScale = ["front","machineGun","approach"].includes(id)?R.frontAccuracyScale:.5;
       if(spec.reserve)actor.scriptAccuracyScale=actor.missionAccuracyScale=R.frontReserveAccuracyScale;
-      actor.scriptFireIntervalScale = actor.missionFireIntervalScale = ["front","approach"].includes(id)?R.frontFireIntervalScale:1.45;
+      actor.scriptFireIntervalScale = actor.missionFireIntervalScale = ["front","machineGun","approach"].includes(id)?R.frontFireIntervalScale:1.45;
       actor.scriptArrivalRadius = 0.7;
       actor.manualGoalUntil = Infinity;
       actor.order = "hold";
@@ -687,7 +687,7 @@ export class FirstLevelMissionRuntime {
       if(id==="intrusion")actor.grenades=OPENING.intruderGrenades;
       if(id==="surface"&&!spec.hold)actor.grenades=R.openingSurfaceGrenades;
       if (spec.hold) {actor.scriptDefensive=true;actor.scriptSuppressible=true;}
-      if (id === "front" && !spec.hold) actor.missionAssault = this.MakeAssault(spec.x, spec.z);
+      if (["front","machineGun"].includes(id) && !spec.hold) actor.missionAssault = this.MakeAssault(spec.x, spec.z);
       // Supporting platoons keep their spacing and depth. They remain live combatants
       // while the original line and casualty replacements make the close assault.
       if(spec.reserve && actor.missionAssault)actor.missionAssault.points=FrontReserveLane(spec.x,spec.z);
@@ -817,7 +817,7 @@ export class FirstLevelMissionRuntime {
     const w = this.waves || (this.waves = { spawned: 0, queued:0, squads: 0, nextAt: this.time + R.waveFirstDelayS });
     if (w.spawned >= R.waveBudget || this.time < w.nextAt) return;
     let alive = 0;
-    for (const actor of this.enemies.values()) if (actor.alive && ["front","approach","tank"].includes(actor.missionEncounter)) alive++;
+    for (const actor of this.enemies.values()) if (actor.alive && ["front","machineGun","approach","tank"].includes(actor.missionEncounter)) alive++;
     const size=FrontReplacementSlots({alive,queued:w.queued,spawned:w.spawned},R);
     if (!size || this.spawnQueue.length) return;
     w.nextAt = this.time + R.waveIntervalS;
@@ -1053,6 +1053,7 @@ export class FirstLevelMissionRuntime {
         this.tank.present=true;
         break;
       case "MachineGun":
+        this.SpawnEncounter("machineGun");
         this.tank.active = true;
         this.SpawnEncounter("tank");
         this.SpawnGuards();
@@ -1734,7 +1735,7 @@ export class FirstLevelMissionRuntime {
     if(this.Has("trainProneOrder") && this.player.stance==="crouch")this.Record("trainPlayerProne");
     this.DrainSpawns();
     if(["Support","MachineGun","Tank"].includes(this.flow.stage.id)) {
-      const alive=[...this.enemies.values()].filter(actor=>actor.alive && ["front","approach","tank"].includes(actor.missionEncounter)).length;
+      const alive=[...this.enemies.values()].filter(actor=>actor.alive && ["front","machineGun","approach","tank"].includes(actor.missionEncounter)).length;
       this.frontPeakAlive=Math.max(this.frontPeakAlive||0,alive);
     }
     this.UpdateSquad();
@@ -2110,10 +2111,10 @@ export class FirstLevelMissionRuntime {
         assault: actor.missionAssault ? { mode: actor.missionAssault.mode, index: actor.missionAssault.index, cycles: actor.missionAssault.cycles } : null,
       })),
       assault: {
-        authoredFrontTotal:MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.tank.length,
+        authoredFrontTotal:MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.machineGun.length+MISSION_ENCOUNTERS.tank.length,
         openingTotal:R.openingEnemyBudget,
         peakFrontAlive:this.frontPeakAlive||0,
-        frontAlive:[...this.enemies.values()].filter(actor=>actor.alive && ["front","approach","tank"].includes(actor.missionEncounter)).length,
+        frontAlive:[...this.enemies.values()].filter(actor=>actor.alive && ["front","machineGun","approach","tank"].includes(actor.missionEncounter)).length,
         squads: this.waves?.squads || 0, spawned: this.waves?.spawned || 0, queued: this.spawnQueue.length,
         alive: [...this.enemies.values()].filter((actor) => actor.alive && actor.missionAssault).length,
         rushing: [...this.enemies.values()].filter((actor) => actor.alive && actor.missionAssault?.mode === "rush").length,

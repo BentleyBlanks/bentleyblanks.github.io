@@ -135,8 +135,9 @@ export const MISSION_TUNING = Object.freeze({
   // reading and it is also what the pacing wants: a man who has thrown twice is out, so grenades stay an event.
   enemyGrenades:2,
   // User 2026-09-11: sustained multi-direction contact during the approach.
-  // Twelve surface + four intruders + eighteen approach + twelve front + four escorts; finite, no respawn.
-  openingEnemyBudget:50,
+  // Twelve surface + four intruders + eighteen approach + twelve rifle-front +
+  // twelve machine-gun attackers + four escorts; each roster commits once, no respawn.
+  openingEnemyBudget:62,
   // Route attackers cover the approach; the separate front force owns the gun line.
   approachFireSector:{minX:-80,maxX:35,minZ:-118,maxZ:-18,selfDefenseM:3},
   approachAccuracyScale:.35,

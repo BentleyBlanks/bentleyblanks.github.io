@@ -116,6 +116,12 @@ export const FRONT_ASSAULT=Object.freeze({
   spawnZ:-199,
   waveCentersX:[-36,12,38,-18,44,-6],
 });
+// A separate finite attack enters only at the machine-gun handover. Rifle-stage
+// casualties cannot spend it early; its starts share the validated reinforcement lanes.
+export const FRONT_MACHINE_GUN_ATTACK=Object.freeze(FRONT_ASSAULT.waveCentersX.slice(0,3).flatMap((cx,squad)=>
+  Array.from({length:4},(_,i)=>Object.freeze({id:`MachineGunAttack${squad}_${i}`,team:`Gun${squad}`,
+    x:cx+((i%3)-1)*3.2+(i>=3?1.6:0),z:FRONT_ASSAULT.spawnZ-(i>=3?2.5:0),
+    weapon:i===0?"Type11":"Type38",bayonet:true}))));
 const LaneRandom=(x,z)=>{let s=(Math.round(x*7+z*13)*2654435761)>>>0;return ()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};};
 // Push a lane point out of a blocked column, always towards the side the lane's base x is on:
 // consecutive bounds pushed to opposite sides would rush straight through the cover between them.
@@ -150,6 +156,7 @@ export function FrontAssaultLane(x,z){
  *  these lanes with it and `Script_FirstLevelMissionTest` walks them; `Script_FirstLevelMissionRuntime`
  *  spawns each wave from the same formula. One list, so the three cannot drift apart. */
 export const FRONT_ASSAULT_STARTS=Object.freeze([
+  ...FRONT_MACHINE_GUN_ATTACK,
   ...FRONT_FIELD_MEN.filter(spec=>!spec.hold).map(({id,x,z})=>Object.freeze({id,x,z})),
   ...FRONT_ASSAULT.waveCentersX.flatMap((cx,squad)=>Array.from({length:FIRST_LEVEL_TUNING.waveSquadSize},(_,i)=>
     Object.freeze({id:`Wave${squad}_${i}`,x:cx+((i%3)-1)*3.2+(i>=3?1.6:0),z:FRONT_ASSAULT.spawnZ-(i>=3?2.5:0)}))),

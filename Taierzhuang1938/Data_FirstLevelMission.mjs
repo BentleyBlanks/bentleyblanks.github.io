@@ -1,5 +1,5 @@
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
-import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_APPROACH_ENEMIES, APPROACH_TACTICS } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_MACHINE_GUN_ATTACK, FRONT_APPROACH_ENEMIES, APPROACH_TACTICS } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
@@ -143,6 +143,7 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   // The roster itself lives in Data_FirstLevelMissionFront: the assault lanes and the cover rows
   // are derived from it, and a list split across two files drifts.
   front: [...FRONT_FIELD_MEN,...FRONT_RESERVES],
+  machineGun: FRONT_MACHINE_GUN_ATTACK,
   tank: [
     { id: "TankEscortA", x: 24, z: -145 },
     { id: "TankEscortB", x: 28, z: -152 },
@@ -322,7 +323,8 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
     anchors: A,
     routes: MISSION_ROUTES,
     friendlyLimit: 4,
-    actorCapacity:112,
+    // Full surviving train, defenders and both finite front attacks must fit.
+    actorCapacity:144,
     crowdCellM:MISSION_TUNING.frontCrowdCellM,
     // Real first-battle actors plus dormant village and NRA; casualties release capacity.
     actorPool: { ija: 48, nra: 40 },
