@@ -11,6 +11,8 @@
 
 实际交互回归：
 
+设置中的「按住左键拖动工具」默认关闭，开启后六种工具以实际工作端接触判定并按住拖动。对应检查：`node EarSpa3D/Script_ToolDragPlayTest.mjs --url=http://127.0.0.1:8136/EarSpa3D/`，覆盖四种视口、实际输入、接触与鼠标偏移、松手停留及设置持久化。
+
 设置 → Debug → 物理模拟可按四种材质调整物理参数并恢复默认，参数单独保存在本机，关闭设置后用于当前及后续耳垢。对应检查：`node EarSpa3D/Script_PhysicsSettingsTest.mjs`、`node EarSpa3D/Script_PhysicsSettingsPlayTest.mjs --url=http://127.0.0.1:8128/EarSpa3D/`；覆盖回弹能量、求解器参数、存储异常与四种视口。
 
 油耳凝胶、五种练习耳道与营业隔离见 [Data_OilyWax.md](./Data_OilyWax.md)。对应检查：`Script_OilyCoatingTest.mjs`、`Script_SlimePhysicsTest.mjs`、`Script_OilyWaxPlayTest.mjs`、`Script_OilyFilmPlayTest.mjs`、`Script_OilyRenderingTest.mjs`；浏览器检查通过 `--url=` 指向本任务预览。

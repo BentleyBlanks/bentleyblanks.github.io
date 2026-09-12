@@ -118,6 +118,7 @@ export async function CreateImmersiveScene({ core }) {
   const workingPlane = new THREE.Plane();
   const ray = new THREE.Raycaster();
   let width = 1, height = 1, chunks = [], inside = false, entrance = 0;
+  let toolDragMode=false,toolDrag=null,manualRotation=null,parkedTool=null;
   let lastToolPoint = null, transfer = null, showcase = false, showcaseBlend = 0, traySlot = 0;
   const outsidePosition = new THREE.Vector3(-31, 12, -115);
   const insidePosition = new THREE.Vector3(-.25, .2, -1.8);
@@ -327,7 +328,7 @@ export async function CreateImmersiveScene({ core }) {
       c.mesh.material.clippingPlanes=null;materials.WetWax(c.mesh.material,0,0,c.type);
     }
     DisposeChunks(chunks);chunks=next;for(const c of chunks)root.add(c.mesh,c.mark);
-    transfer=null;showcase=false;showcaseBlend=0;collectionTray.SetActive(false);inspectionDepth=inspectionTarget=0;scoopRotation=scoopStroke=null;heading=0;turnPoint=turnChunk=null;contact.Reset();
+    transfer=null;showcase=false;showcaseBlend=0;collectionTray.SetActive(false);inspectionDepth=inspectionTarget=0;parkedTool=manualRotation=toolDrag=null;scoopRotation=scoopStroke=null;heading=0;turnPoint=turnChunk=null;contact.Reset();
     preparationStats.lastResetMs=performance.now()-start;
     HideTool(); droplet.visible = false; dropTarget = null; return chunks;
   }
@@ -391,15 +392,91 @@ export async function CreateImmersiveScene({ core }) {
     }
     return nearest;
   }
+  // Contact queries use the corrected, visible working end; the cursor is never a target ray.
+  function ToolSurfaceHit(c,id){
+    if(!tool.visible||lastToolId!==id||!c.coating&&c.depth>Reach(id))return null;
+    if(id==='scoop')return ScoopSurfaceHit(c);
+    if(!c.mesh.geometry.boundingSphere)c.mesh.geometry.computeBoundingSphere();
+    const bounds=c.mesh.geometry.boundingSphere.clone().applyMatrix4(c.mesh.matrixWorld);
+    const fiber=['feather','brush'].includes(id),range=fiber?4:.95;
+    if(bounds.center.distanceTo(tool.position)>bounds.radius+range)return null;
+    const probe=new THREE.Raycaster(),samples=[];
+    if(fiber){
+      tool.updateMatrixWorld(true);
+      for(const part of toolParts[id].children)if(part.userData.softFiber){
+        const positions=part.geometry.attributes.position;
+        for(const bin of part.userData.fiberGroups){
+          const point=new THREE.Vector3().fromBufferAttribute(positions,bin.indices[0]).applyMatrix4(part.matrixWorld);
+          if(point.distanceTo(bounds.center)<=bounds.radius+bin.radius+.12)samples.push({point,radius:bin.radius+.12});
+        }
+      }
+    }else{
+      // The open jaw gap is the capture volume; liquid/suction only work at the outlet.
+      for(const x of [-.25,0,.25])for(const y of [0,.25,.5]){
+        if(id==='tweezers'){
+          const start=new THREE.Vector3(-.8,y,x*.5).applyQuaternion(tool.quaternion).add(tool.position);
+          probe.set(start,new THREE.Vector3(1,0,0).applyQuaternion(tool.quaternion));probe.far=1.6;
+          const hit=probe.intersectObject(c.mesh)[0],skin=probe.intersectObject(wall)[0];
+          if(hit&&(!skin||hit.distance<skin.distance+.035))return hit;
+        }else samples.push({point:new THREE.Vector3(x,-.08,y*.4).applyQuaternion(tool.quaternion).add(tool.position),radius:id==='drops'?.65:.35});
+      }
+    }
+    let closest=null,distance=Infinity;
+    for(const {point,radius} of samples){
+      const direction=bounds.center.clone().sub(point).normalize();
+      // Start just outside the finite contact sphere, including contact when inside a thin shell.
+      probe.set(point.clone().addScaledVector(direction,-radius),direction);probe.far=radius*2;
+      const hit=probe.intersectObject(c.mesh)[0];if(!hit)continue;
+      const skin=probe.intersectObject(wall)[0];if(skin&&skin.distance+.035<hit.distance)continue;
+      const d=hit.point.distanceToSquared(tool.position);if(d<distance){closest=hit;distance=d;}
+    }
+    return closest;
+  }
+  function PickTool(id){
+    scene.updateMatrixWorld(true);let nearest=null,nearestPoint=null,distance=Infinity;
+    for(const c of chunks){
+      if(!['attached','returning'].includes(c.state)||!c.coating&&c.depth>Reach(id)||c.fine&&id!=='feather'||!c.fine&&id==='feather')continue;
+      const hit=ToolSurfaceHit(c,id);if(!hit||canal.Project(hit.point).depth>Reach(id))continue;
+      const d=hit.point.distanceToSquared(tool.position);if(d<distance){nearest=c;nearestPoint=hit.point;distance=d;}
+    }
+    if(nearest?.coating)nearest.depth=canal.Project(nearestPoint).depth;
+    return nearest;
+  }
+  function EnsureTool(id){
+    if(!inside||entrance<1||transfer||showcase)return false;
+    if(!tool.visible||lastToolId!==id){
+      if(!tool.visible)contact.Reset();
+      const point=parkedTool?.id===id?parkedTool.position.clone():canal.CenterAt(4).clone();
+      manualRotation=parkedTool?.id===id?parkedTool.rotation.clone():null;
+      ToolAt(point,id);
+    }
+    return tool.visible;
+  }
+  function StartToolDrag(x,y,id){
+    if(!EnsureTool(id))return false;
+    const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()),tool.position);
+    ray.setFromCamera(new THREE.Vector2(x/width*2-1,1-y/height*2),camera);
+    const cursor=ray.ray.intersectPlane(plane,new THREE.Vector3());
+    if(!cursor)return false;
+    toolDrag={plane,offset:tool.position.clone().sub(cursor)};return true;
+  }
+  function MoveToolDrag(x,y,id,c=null){
+    if(!toolDrag)return null;
+    ray.setFromCamera(new THREE.Vector2(x/width*2-1,1-y/height*2),camera);
+    const cursor=ray.ray.intersectPlane(toolDrag.plane,new THREE.Vector3());
+    return ToolAt(cursor?cursor.add(toolDrag.offset):tool.position.clone(),id,c);
+  }
   function Grip(c,x,y,id) {
     scene.updateMatrixWorld(true);
     ray.setFromCamera(new THREE.Vector2(x/width*2-1,1-y/height*2),camera);
-    let hit=ray.intersectObject(c.mesh)[0];
+    const manual=toolDragMode&&!!toolDrag;
+    let hit=manual?ToolSurfaceHit(c,id):ray.intersectObject(c.mesh)[0];
+    if(manual&&!hit)return false;
     if(id==='scoop'&&scoopStroke&&(!hit||!ScoopTouches(hit.point)||hit.point.distanceTo(tool.position)>.95))hit=ScoopSurfaceHit(c);
     let point=hit?.point.clone()||c.mesh.position.clone().addScaledVector(c.normal,.35);
     if(c.coating){const projected=canal.Project(point);if(projected.depth>Reach(id))return false;c.depth=projected.depth;c.normal.copy(contact.Surface(point).normal);}
     if(id==='scoop'&&scoopStroke&&(!hit||!ScoopTouches(point)||point.distanceTo(tool.position)>.95))return false;
-    if(id==='tweezers'){
+    if(id==='tweezers'&&!manual){
       const side=c.mesh.material.side;c.mesh.material.side=THREE.DoubleSide;
       const thicknessRay=new THREE.Raycaster(point.clone().addScaledVector(c.normal,c.size*2+.2),c.normal.clone().negate(),0,c.size*4+1);
       const surfaces=thicknessRay.intersectObject(c.mesh);c.mesh.material.side=side;
@@ -408,19 +485,21 @@ export async function CreateImmersiveScene({ core }) {
     if(id==='feather')c.batch=[];
     GripPeelBody(c.body,point.toArray());c.toolId=id;c.gripRotation=null;
     c.gripStart=point.clone();c.holdRotation=null;c.appliedAge=0;
-    if(id!=='scoop'||!scoopStroke)ToolAt(point,id,c);c.gripRotation=tool.quaternion.clone();
+    if(manual)ToolAt(tool.position.clone(),id,c);
+    else if(id!=='scoop'||!scoopStroke)ToolAt(point,id,c);
+    c.manualDrag=manual;c.toolOffset=point.clone().sub(tool.position);c.gripRotation=tool.quaternion.clone();
     if(id==='scoop'){
       // 鼠标按下时建立相机平面；碰撞修正的起点偏移只记录一次，不会产生自动拉力。
-      c.dragPlane=scoopStroke?.plane||new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()),tool.position);
+      c.dragPlane=toolDrag?.plane||scoopStroke?.plane||new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()),tool.position);
       const cursor=ray.ray.intersectPlane(c.dragPlane,new THREE.Vector3());
-      c.cursorOffset=scoopStroke?.offset||tool.position.clone().sub(cursor||tool.position);
+      c.cursorOffset=toolDrag?.offset||scoopStroke?.offset||tool.position.clone().sub(cursor||tool.position);
       c.scoopOffset=point.clone().sub(tool.position);c.lastScoopTarget=tool.position.clone();
     }
     const contactState=InstrumentContact(id,c.gripRotation.toArray(),c.normal.toArray(),{jawContact:c.jawContact,edgeContact:id==='scoop'?WaxEdgeContact(c.body,point.toArray()):null});
     c.aligned=contactState.aligned;c.grasped=id==='tweezers'&&contactState.aligned;c.forceDirection=new THREE.Vector3().fromArray(contactState.direction);
     c.pullLocal=c.forceDirection.clone().applyQuaternion(c.rotation.clone().invert());
 
-    if(id!=='scoop')ShowTool(c,id);
+    if(id!=='scoop'&&!manual)ShowTool(c,id);
     return true;
   }
   function Drag(c,x,y,dt,efficiency) {
@@ -434,11 +513,11 @@ export async function CreateImmersiveScene({ core }) {
     c.appliedAge+=dt;
     const pressure=Smooth(Clamp((c.appliedAge-.08)/(c.body.gel?1.6:.72)));
     const travel=(c.coating?4.8:c.body.gel?3.4:c.toolId==='feather'?.7:Math.max(2.15,1.4+Math.max(...(c.footprint||[c.size]))))*pressure;
-    const cursor=c.toolId==='scoop'?ray.ray.intersectPlane(c.dragPlane,new THREE.Vector3()):null;
+    const cursor=c.toolId==='scoop'&&!c.manualDrag?ray.ray.intersectPlane(c.dragPlane,new THREE.Vector3()):null;
     const target=c.toolId==='scoop'?(cursor?cursor.add(c.cursorOffset):c.lastScoopTarget.clone()):c.gripStart.clone().addScaledVector(c.forceDirection,c.aligned?travel:0);
-    if(c.toolId==='suction'&&c.fragment&&c.softened>.45)target.addScaledVector(c.normal,.85);
+    if(!c.manualDrag&&c.toolId==='suction'&&c.fragment&&c.softened>.45)target.addScaledVector(c.normal,.85);
 
-    const pose=ToolAt(target,c.toolId,c);target.copy(pose.position);
+    const pose=c.manualDrag?MoveToolDrag(x,y,c.toolId,c):ToolAt(target,c.toolId,c);target.copy(pose.position);
     if(c.toolId==='scoop'){
       const motion=target.clone().sub(c.lastScoopTarget);c.lastScoopTarget.copy(target);
       if(motion.lengthSq()>1e-10)c.forceDirection.copy(motion).normalize();
@@ -449,6 +528,7 @@ export async function CreateImmersiveScene({ core }) {
       c.aligned=contactState.aligned;c.scoopEdgeContact=edgeContact;
       target.add(c.scoopOffset);
     }
+    if(c.manualDrag&&c.toolId!=='scoop')target.add(c.toolOffset);
     if(c.body.detached&&!c.holdRotation)c.holdRotation=['scoop','brush'].includes(c.toolId)?FlatRotation.toArray():c.body.rotation.slice();
     const anchors=c.body.anchors.filter(a=>a.alive).length;
     const hard=c.type==='impacted'&&!c.fragment;
@@ -456,9 +536,9 @@ export async function CreateImmersiveScene({ core }) {
     const minAnchors=(c.toolId==='scoop'&&c.type!=='dry'&&c.type!=='oily'&&!c.fragment)?2:0;
     const supported=c.fine?c.toolId==='feather'&&IsFeatherDebris(c):c.toolId==='feather'?false:c.toolId==='brush'?c.fragment:c.toolId==='suction'?c.fragment&&c.softened>.45:true;
     c.adhesion=adhesion;
-    const touching=c.toolId!=='scoop'||c.scoopContact;
+    const touching=c.toolId==='scoop'?c.scoopContact:!c.manualDrag||c.toolId==='tweezers'||!!ToolSurfaceHit(c,c.toolId);
     const result=StepPeelBody(c.body,{target:c.aligned&&touching?target.toArray():null,softness:c.softened,efficiency:efficiency*(supported?1:.03),adhesion,minAnchors:supported&&c.aligned&&touching?minAnchors:c.body.anchors.length,supportRotation:c.holdRotation,fracture:supported&&c.aligned&&touching&&c.generation<3},dt);
-    result.slipped=c.toolId==='scoop'&&!touching;
+    result.slipped=(c.toolId==='scoop'||c.manualDrag)&&!touching;
     result.wrongDirection=!c.aligned;
     result.needsForceps=c.toolId==='scoop'&&minAnchors>0&&result.remaining===2;
     result.wrongTool=!supported;
@@ -478,7 +558,7 @@ export async function CreateImmersiveScene({ core }) {
       }
     }
     SyncBody(c);Deform(c);
-    if(c.toolId!=='scoop')ShowTool(c,c.toolId);
+    if(c.toolId!=='scoop'&&!c.manualDrag)ShowTool(c,c.toolId);
     return result;
   }
   function Deform(c) {
@@ -616,7 +696,8 @@ export async function CreateImmersiveScene({ core }) {
     if(id==='tweezers'&&transfer?.toolRotation){
       // 尖端离开耳道后再转腕；固定外景握持角，避免镊身始终指向镜头而透视缩成小点。
       tool.quaternion.copy(transfer.toolRotation).slerp(transfer.outsideToolRotation,Smooth((-point.z-3)/10));
-    }else if(id==='scoop'&&scoopRotation)tool.quaternion.copy(scoopRotation);
+    }else if(toolDragMode&&manualRotation&&!transfer)tool.quaternion.copy(manualRotation);
+    else if(id==='scoop'&&scoopRotation)tool.quaternion.copy(scoopRotation);
     else{
       const shaftAxis=camera.position.clone().addScaledVector(right,1.15).addScaledVector(up,-1.7).sub(point).normalize();
       const faceNormal=c?.coating&&!c.body.detached?c.normal:c ? new THREE.Vector3(0,0,1).applyQuaternion(c.body?.detached?c.mesh.quaternion:c.rotation) : toward;
@@ -649,6 +730,7 @@ export async function CreateImmersiveScene({ core }) {
     const samples=contact.Samples(toolParts[id],['feather','brush'].includes(id)?fiberTipSamples:null);
     const pose=contact.Solve(point,tool.quaternion,samples,{sweep:!transfer,lockPivot:!!turnPoint});tool.position.copy(pose.position);tool.quaternion.copy(pose.rotation);
     if(id==='scoop'&&!transfer)scoopRotation.copy(pose.rotation);
+    if(toolDragMode&&!transfer){manualRotation=pose.rotation.clone();parkedTool={id,position:pose.position.clone(),rotation:pose.rotation.clone()};}
     if(['feather','brush'].includes(id)){
       tool.updateMatrixWorld(true);
       for(const part of toolParts[id].children){if(!part.userData.softFiber)continue;
@@ -882,11 +964,13 @@ export async function CreateImmersiveScene({ core }) {
   return {WarmTools,canal,Reset,PrepareCustomer,CancelPreparation,PreparationProbe(){return{...preparationStats,pendingSeed:preparation?.seed??null,ready:!!preparation?.ready,stagedChunks:preparation?.chunks.length||0};},EndService,Pick,Grip,Drag,Fracture,SetSkins,CreateToolPreview,Ungrip,Slip,ShowTool,HideTool,Release,Update,Targets,Project,Resize,StartScoopStroke,MoveScoopStroke,EndScoopStroke(){scoopStroke=null;},
     TrayBegin:collectionTray.Begin,TrayMove:collectionTray.Move,TrayEnd:collectionTray.End,TrayTilt:collectionTray.SetTilt,TrayProbe:collectionTray.Probe,
     ClearTray(){collectionTray.Clear();traySlot=0;},
-    Suspend(){CancelPreparation();const saved={tray:collectionTray.Suspend(),traySlot,showcaseBlend,chunks,transfer,showcase,inspectionDepth,inspectionTarget,inside,entrance,heading,scoopRotation,lampOn,aimed,aim:aim.clone()};for(const c of chunks)root.remove(c.mesh,c.mark);chunks=[];transfer=null;HideTool();return saved;},
-    Restore(saved){CancelPreparation();collectionTray.Restore(saved.tray);traySlot=saved.traySlot;showcaseBlend=saved.showcaseBlend;for(const c of chunks){root.remove(c.mesh,c.mark);c.mesh.geometry.dispose();c.mesh.material.dispose();c.mark.geometry.dispose();c.mark.material.dispose();}({chunks,transfer,showcase,inspectionDepth,inspectionTarget,inside,entrance,heading,scoopRotation,lampOn,aimed}=saved);aim.copy(saved.aim);for(const c of chunks)root.add(c.mesh,c.mark);contact.Reset();HideTool();},
+    Suspend(){CancelPreparation();const saved={tray:collectionTray.Suspend(),traySlot,showcaseBlend,chunks,transfer,showcase,inspectionDepth,inspectionTarget,inside,entrance,heading,scoopRotation,parkedTool,manualRotation,lampOn,aimed,aim:aim.clone()};for(const c of chunks)root.remove(c.mesh,c.mark);chunks=[];transfer=null;HideTool();return saved;},
+    Restore(saved){CancelPreparation();collectionTray.Restore(saved.tray);traySlot=saved.traySlot;showcaseBlend=saved.showcaseBlend;for(const c of chunks){root.remove(c.mesh,c.mark);c.mesh.geometry.dispose();c.mesh.material.dispose();c.mark.geometry.dispose();c.mark.material.dispose();}({chunks,transfer,showcase,inspectionDepth,inspectionTarget,inside,entrance,heading,scoopRotation,parkedTool,manualRotation,lampOn,aimed}=saved);aim.copy(saved.aim);for(const c of chunks)root.add(c.mesh,c.mark);contact.Reset();HideTool();},
+    SetToolDrag(enabled){toolDragMode=enabled;parkedTool=toolDrag=manualRotation=null;HideTool();},EnsureTool,StartToolDrag,MoveToolDrag,PickTool,EndToolDrag(){toolDrag=null;},
     TurnStart(x,y,id){
       if(transfer||showcase)return false;
-      turnChunk=Pick(x,y,id);if(turnChunk)ShowTool(turnChunk,id,0,{x,y});else Hover(x,y,id);
+      if(toolDragMode){if(!EnsureTool(id))return false;turnChunk=PickTool(id);}
+      else{turnChunk=Pick(x,y,id);if(turnChunk)ShowTool(turnChunk,id,0,{x,y});else Hover(x,y,id);}
       if(!tool.visible)return false;
       // 先为整个旋转包络留出间隙，勺沿不会一转到侧面就卡死在内壁里。
       const bins=new Map();for(const p of contact.Samples(toolParts[id],id==='feather'?fiberTipSamples:null)){const key=Math.floor(p.y/.2),r=Math.hypot(p.x,p.z);bins.set(key,Math.max(bins.get(key)||0,r));}
@@ -895,13 +979,13 @@ export async function CreateImmersiveScene({ core }) {
       if(id==='feather'){featherSweep={items:[],angle:0};if(turnChunk)turnChunk={rotation:turnChunk.rotation.clone()};}
       return true;
     },
-    TurnBy(delta,id){if(!turnPoint)return;const previous=heading,previousRotation=tool.quaternion.clone();heading+=delta;if(id==='scoop')scoopRotation.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),delta));const pose=ToolAt(turnPoint,id,turnChunk);if(pose.blocked)heading=previous+delta*(pose.rotationFraction||0);if(id==='feather')SweepFeather(previousRotation);return heading;},
+    TurnBy(delta,id){if(!turnPoint)return;const previous=heading,previousRotation=tool.quaternion.clone();heading+=delta;if(toolDragMode&&manualRotation)manualRotation.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),delta));else if(id==='scoop')scoopRotation.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),delta));const pose=ToolAt(turnPoint,id,turnChunk);if(pose.blocked)heading=previous+delta*(pose.rotationFraction||0);if(id==='feather')SweepFeather(previousRotation);return heading;},
     TurnEnd(){turnPoint=null;turnChunk=null;EndFeatherSweep();},Heading(){return heading;},
     FeatherSweepProbe(){return{capacity:FeatherCapacity(toolLevels.feather),held:featherSweep?.items.length||0};},
     Reach,CanReach(c,id){return c.depth<=Reach(id);},SetDeep(value){inspectionTarget=value?1:0;contact.Reset();HideTool();},
     AuditTool,CollisionProbe(){return contact.Probe();},
     SetContact:materials.SetContact,
-    RenderingProbe(){return {shadersWarmed,staticRaycast:true,fiberClusters:Object.fromEntries(['feather','brush'].map(id=>[id,toolParts[id].children.reduce((sum,p)=>sum+(p.userData.fiberGroups?.length||0),0)])),...materials.Probe(),heading,inspectionDepth,inspectionTarget,reachBlocked,toolReach:Reach(lastToolId),traySize:new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).toArray(),trayStandalone:true,trayCloseup:showcaseBlend,trayCollection:collectionTray.Probe(),trayBounds:TrayBounds(),trayInscription:"强迫症的SOPHIA",toolPosition:tool.position.toArray(),toolRotation:tool.quaternion.toArray(),featherShading:'six-pass shell fur with dual-lobe fibers',featherFur:{passes:FEATHER_FUR_PASSES,length:FEATHER_FUR_LENGTH},featherSweep:{capacity:FeatherCapacity(toolLevels.feather),held:featherSweep?.items.length||0,angle:featherSweep?.angle||0},hairCount:360,hairRootFixed:true,profileHairLayers:3,profileHairTexture:'Texture_LayeredDarkHair.png',profileHairWisps:90,hairTime,headRealtime:true,lampOn,lampAim:lamp.target.position.toArray(),lampIntensity:lamp.intensity,shadows:core.renderer.shadowMap.enabled,canalVisible:canalGroup.visible,externalContext:outer.visible&&!!(transfer||showcase),outerVisible:outer.visible,irritation:chunks.filter(c=>!c.fragment).map(c=>c.irritation),roughness:chunks.map(c=>c.mesh.material.roughness),clearcoat:chunks.map(c=>c.mesh.material.clearcoat),toolLevels:{...toolLevels},previewTriangles};},
+    RenderingProbe(){return {shadersWarmed,staticRaycast:true,fiberClusters:Object.fromEntries(['feather','brush'].map(id=>[id,toolParts[id].children.reduce((sum,p)=>sum+(p.userData.fiberGroups?.length||0),0)])),...materials.Probe(),heading,inspectionDepth,inspectionTarget,reachBlocked,toolReach:Reach(lastToolId),traySize:new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).toArray(),trayStandalone:true,trayCloseup:showcaseBlend,trayCollection:collectionTray.Probe(),trayBounds:TrayBounds(),trayInscription:"强迫症的SOPHIA",toolVisible:tool.visible,toolDragMode,draggingTool:!!toolDrag,toolPosition:tool.position.toArray(),toolRotation:tool.quaternion.toArray(),featherShading:'six-pass shell fur with dual-lobe fibers',featherFur:{passes:FEATHER_FUR_PASSES,length:FEATHER_FUR_LENGTH},featherSweep:{capacity:FeatherCapacity(toolLevels.feather),held:featherSweep?.items.length||0,angle:featherSweep?.angle||0},hairCount:360,hairRootFixed:true,profileHairLayers:3,profileHairTexture:'Texture_LayeredDarkHair.png',profileHairWisps:90,hairTime,headRealtime:true,lampOn,lampAim:lamp.target.position.toArray(),lampIntensity:lamp.intensity,shadows:core.renderer.shadowMap.enabled,canalVisible:canalGroup.visible,externalContext:outer.visible&&!!(transfer||showcase),outerVisible:outer.visible,irritation:chunks.filter(c=>!c.fragment).map(c=>c.irritation),roughness:chunks.map(c=>c.mesh.material.roughness),clearcoat:chunks.map(c=>c.mesh.material.clearcoat),toolLevels:{...toolLevels},previewTriangles};},
     ToggleLamp(){lampOn=!lampOn;return lampOn;},AimLamp(x,y){aim.set(x/width*2-1,1-y/height*2);aimed=true;},
     Enter(){inside=true;entrance=0;showcase=false;},Hover,
     ToggleView(){if(transfer)return 'canal';showcase=false;inside=!inside;HideTool();return inside?'canal':'ear';},
@@ -909,7 +993,7 @@ export async function CreateImmersiveScene({ core }) {
     get ready(){return entrance>=1&&!transfer&&!showcase;},
     get busy(){return !!transfer;},
     get transfer(){return transfer?{id:transfer.chunk.id,batch:transfer.chunk.batch?.map(c=>c.id)||[],age:transfer.age,mode:transfer.mode||'carry',toolVisible:tool.visible}:null;},
-    Drop(c){c.surfaceWet=Math.max(c.surfaceWet||0,.18);ShowTool(c,'drops');dropTarget=c.mesh.position.clone().addScaledVector(c.normal,.18);dropAge=0;droplet.visible=true;droplet.userData.start=lastToolPoint.clone();},
+    Drop(c){c.surfaceWet=Math.max(c.surfaceWet||0,.18);if(!toolDragMode||!toolDrag)ShowTool(c,'drops');dropTarget=c.mesh.position.clone().addScaledVector(c.normal,.18);dropAge=0;droplet.visible=true;droplet.userData.start=lastToolPoint.clone();},
     get chunks(){return chunks;},
     modelInfo:{source:'BlenderMCP',file:'Models/Model_ImmersiveEar.glb',edition:'DirectionalAnatomy',nodes:asset.scene.children.map(n=>n.name)},
     Dispose(){toolParts.feather.children.forEach(p=>ClearFeatherFur(p));collectionTray.Dispose();disposed=true;CancelPreparation();waxPrototypes.forEach(g=>g.dispose());environment.dispose();metalEnvironment.dispose();metalMaterials.clear();anatomy.dispose();root.traverse(n=>{n.geometry?.dispose();});}};
