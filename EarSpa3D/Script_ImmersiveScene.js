@@ -1,6 +1,6 @@
 import {FeatherCapacity} from './Script_FeatherSweep.mjs?v=ear029-feather-20260912';
 import {AddFeatherFur,ClearFeatherFur,PrepareFeatherStrands,FEATHER_FUR_LENGTH,FEATHER_FUR_PASSES} from './Script_FeatherFur.js?v=ear031-feather-groom-20260912';
-import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear029-oily-coating-20260912';
+import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear036-tray-rim-20260912';
 import * as THREE from 'three';
 import {SlimeCage,PoseSlimeVolume,StepSlimeVolume} from './Script_SlimePhysics.mjs?v=ear029-oily-coating-20260912';
 import {BuildOilyCoating,OILY_REGIONS} from './Script_OilyCoating.mjs?v=ear032-oily-detail-20260912';

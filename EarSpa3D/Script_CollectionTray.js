@@ -21,7 +21,26 @@ export function CreateCollectionTray({scene, tray, camera, Project, size, scoop}
   cleaner.quaternion.copy(cleanerPose);
   // 以真实勺面最低点贴盘；缩放与旋转不改变鼠标／触点对应的工作端原点。
   const cleanerHeight=.16-new THREE.Box3().setFromObject(cleaner,true).min.y;
-  let serial=0,tilt=0,tilting=false,active=false,drag=null,removed=0;
+  // 盘壁内型面取自 Script_BuildImmersiveEar.BuildTray 的剖面（半径比例 → 局部高度）再乘盘子缩放：
+  // 耳垢贴着这张曲面走，倾倒时沿壁面爬升、真的越过唇口才离盘，不再从盘沿穿出去。
+  const WALL=[[.5,0],[.82,.04],[.96,.25],[1,.38]];
+  const rimX=5.3*tray.scale.x,rimZ=3.2*tray.scale.z,rimY=tray.scale.y;
+  function WallProfile(r){
+    if(r<=WALL[0][0])return{height:0,slope:0};
+    if(r>=1)return{height:WALL[WALL.length-1][1]*rimY,slope:0};
+    for(let i=1;i<WALL.length;i++){const[r0,h0]=WALL[i-1],[r1,h1]=WALL[i];
+      if(r<=r1)return{height:(h0+(h1-h0)*(r-r0)/(r1-r0))*rimY,slope:(h1-h0)/(r1-r0)*rimY};}
+    return{height:0,slope:0};
+  }
+  // 返回盘沿半径比例、该处的贴壁抬升，以及把耳垢顶回盘心的壁面梯度。
+  function WallContact(x,z,radius){
+    const r=Math.hypot(x/rimX,z/rimZ);if(r<1e-4)return{r,lift:0,gx:0,gz:0};
+    const dx=x/(rimX*rimX)/r,dz=z/(rimZ*rimZ)/r;
+    // 以外缘半个身位处取高，大块耳垢的边沿才不会扎进壁面。
+    const {height,slope}=WallProfile(r+radius*.5*Math.hypot(dx,dz));
+    return{r,lift:height,gx:slope*dx,gz:slope*dz};
+  }
+  let serial=0,tilt=0,tilting=false,active=false,drag=null,removed=0,exitHeight=0;
   const unitScale=new THREE.Vector3(1,1,1),matrix=new THREE.Matrix4();
   function Sync(){group.position.copy(tray.position);group.quaternion.copy(tray.quaternion);group.updateMatrixWorld(true);}
   function Rebuild(){
@@ -106,21 +125,25 @@ export function CreateCollectionTray({scene, tray, camera, Project, size, scoop}
         continue;
       }
       if(active&&dt>0){
-        const gravity=Math.max(0,Math.sin(tilt)-.12)*42;
-        p.velocity.z-=gravity*dt;p.position.addScaledVector(p.velocity,dt);p.velocity.multiplyScalar(Math.exp(-dt*(tilting?1.2:9)));p.position.y=p.floor;
-        dirty=dirty||gravity>0||p.velocity.lengthSq()>.000001;
-        if(Math.hypot(p.position.x/26.2,p.position.z/15.7)>1){p.fall=.001;p.fallPosition=group.localToWorld(p.position.clone());p.fallVelocity=p.velocity.clone().applyQuaternion(group.quaternion);removed++;}
+        const gravity=Math.max(0,Math.sin(tilt)-.12)*42,press=Math.cos(tilt)*42,wall=WallContact(p.position.x,p.position.z,p.radius);
+        // 盘壁沿法线顶住耳垢：壁面越陡越难爬，倾角不够就滑回盘心，够了才翻过唇口。
+        p.velocity.x-=wall.gx*press*dt;p.velocity.z-=(gravity+wall.gz*press)*dt;
+        p.position.addScaledVector(p.velocity,dt);p.velocity.multiplyScalar(Math.exp(-dt*(tilting?1.2:9)));
+        const rim=WallContact(p.position.x,p.position.z,p.radius);p.position.y=p.floor+rim.lift;
+        dirty=dirty||gravity>0||rim.lift>0||p.velocity.lengthSq()>.000001;
+        if(rim.r>1){p.fall=.001;exitHeight=rim.lift;p.fallPosition=group.localToWorld(p.position.clone());p.fallVelocity=p.velocity.clone().applyQuaternion(group.quaternion);removed++;}
       }
       if(p.gelBody&&dt>0&&p.gelBody.gel.awake>0&&!p.fall){
-        PoseSlimeVolume(p.gelBody,p.position.toArray(),p.gelBody.rotation);StepSlimeVolume(p.gelBody,{gravity:[0,-8,0],floor:.045},dt);p.position.fromArray(p.gelBody.position);p.floor=p.position.y;
+        const lift=WallContact(p.position.x,p.position.z,p.radius).lift;
+        PoseSlimeVolume(p.gelBody,p.position.toArray(),p.gelBody.rotation);StepSlimeVolume(p.gelBody,{gravity:[0,-8,0],floor:.045+lift},dt);p.position.fromArray(p.gelBody.position);p.floor=p.position.y-lift;
         WriteSlimeSurface(p.gelBody,p.geometry.attributes.position.array);p.geometry.applyQuaternion(new THREE.Quaternion().fromArray(p.gelBody.rotation));p.geometry.computeVertexNormals();dirty=true;
       }
     }
     if(deleted)Rebuild();else if(dirty)Write();
   }
   function SetActive(value){active=value;tilting=false;End();if(!value){for(const p of pieces)if(!p.fall)p.velocity.set(0,0,0);tilt=0;tray.rotation.x=0;Sync();}}
-  function Probe(){return{active,tilting,tilt,dragging:!!drag,count:pieces.filter(p=>!p.fall).length,mass:pieces.reduce((sum,p)=>sum+(p.fall?0:p.mass),0),removed,batches:batches.size,toolVisible:cleaner.visible,pieces:pieces.filter(p=>!p.fall).map(p=>({id:p.id,mass:p.mass,position:p.position.toArray(),screen:Project(group.localToWorld(p.position.clone()))}))};}
-  function Clear(){for(const p of pieces){p.geometry.dispose();p.material.dispose();}pieces.length=0;serial=removed=0;SetActive(false);Rebuild();}
+  function Probe(){return{active,tilting,tilt,dragging:!!drag,exitHeight,count:pieces.filter(p=>!p.fall).length,mass:pieces.reduce((sum,p)=>sum+(p.fall?0:p.mass),0),removed,batches:batches.size,toolVisible:cleaner.visible,pieces:pieces.filter(p=>!p.fall).map(p=>({id:p.id,mass:p.mass,position:p.position.toArray(),screen:Project(group.localToWorld(p.position.clone()))}))};}
+  function Clear(){for(const p of pieces){p.geometry.dispose();p.material.dispose();}pieces.length=0;serial=removed=exitHeight=0;SetActive(false);Rebuild();}
   return{Add,Begin,Move,End,SetTilt,SetActive,Update,Probe,Sync,
     Clear,Suspend(){const saved={pieces:pieces.splice(0),serial,removed,active,tilt};serial=removed=0;SetActive(false);Rebuild();return saved;},
     Restore(saved){Clear();pieces.push(...saved.pieces);serial=saved.serial;removed=saved.removed;active=saved.active;tilt=saved.tilt;tray.rotation.x=-tilt;Rebuild();Sync();},

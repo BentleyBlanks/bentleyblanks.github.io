@@ -20,7 +20,7 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
   await page.addInitScript(()=>{const native=requestAnimationFrame.bind(window);window.requestAnimationFrame=callback=>callback.name==='Animate'?0:native(callback);});
   if(touch)await page.addInitScript(()=>{Object.defineProperty(navigator,'deviceMemory',{get:()=>4});Object.defineProperty(navigator,'hardwareConcurrency',{get:()=>4});});
   const heardTiers=new Set();
-  const cdp=await page.context().newCDPSession(page),report={width,height,touch,checks:[],errors:[]};reports.push(report);
+  const cdp=await page.context().newCDPSession(page),report={width,height,touch,checks:[],errors:[],pour:[]};reports.push(report);
   page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});page.on('response',r=>{if(r.status()>=400)report.errors.push(r.status()+' '+r.url());});
   const Check=(ok,label)=>{assert.ok(ok,width+'×'+height+': '+label);report.checks.push(label);};
   const Probe=()=>page.evaluate(()=>__EarSpaProbe()),Step=n=>page.evaluate(n=>__EarSpaDebug.StepFrames(n),n);
@@ -97,6 +97,7 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
    for(let i=1;i<=18;i++){await Input('move',first.screen.x+(destination.x-first.screen.x)*i/18,first.screen.y+(destination.y-first.screen.y)*i/18);await Step(2);}
    await Input('up');await Step(90);p=await Probe();
    Check(p.tray.count<trayBefore&&p.tray.count>0,'scoop sweeps only contacted wax past the rim, leaving the rest');
+   Check(p.tray.exitHeight>1.4,'swept wax leaves over the top of the dish wall, not through it');
    Check(p.shop.coins===coins&&Math.abs(p.cleanliness-1)<1e-8,'manual tray cleanup never changes the awarded income or cleanliness');
    const remainingTray={count:p.tray.count,mass:p.tray.mass};
    await page.screenshot({path:path.join(here,'_dev','Shot_TrayCleanup_'+width+'.png')});
@@ -106,8 +107,24 @@ export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],
    await Input('down',tiltButton.x+tiltButton.width/2,tiltButton.y+tiltButton.height/2);await Step(15);p=await Probe();
    Check(p.tray.tilting&&p.tray.tilt>.3&&p.tray.count===remainingTray.count,'holding tilt starts a visible physical pour without instant deletion');
    await Input('up');await Step(90);Check(!(await Probe()).tray.tilting&&(await Probe()).tray.tilt<.001,'release returns the tray to level');
-   await Input('down',tiltButton.x+tiltButton.width/2,tiltButton.y+tiltButton.height/2);await Step(330);await Input('up');await Step(120);p=await Probe();
+   await Input('down',tiltButton.x+tiltButton.width/2,tiltButton.y+tiltButton.height/2);
+   // 倒盘过程中按真实盘子网格取样：耳垢必须贴着陶瓷内壁爬升，不能沉进壁里，也不能从盘沿穿出去。
+   let sunk=-99,climbed=0;
+   for(let i=0;i<33;i++){await Step(10);const held=(await Probe()).tray.pieces;if(!held.length)break;
+    const clearance=await page.evaluate(async positions=>{const T=await import('three'),{core}=__EarSpaDebug,dish=core.scene.getObjectByName('Model_Tray');dish.updateMatrixWorld(true);
+     const up=new T.Vector3(0,1,0).applyQuaternion(dish.quaternion),ray=new T.Raycaster();
+     return positions.map(position=>{const world=new T.Vector3().fromArray(position).applyQuaternion(dish.quaternion).add(dish.position);
+      ray.set(world.clone().addScaledVector(up,60),up.clone().negate());const hit=ray.intersectObject(dish,true)[0];return hit?60-hit.distance:-99;});},held.map(x=>x.position));
+    // 取样点正下方的壁面高度 = 耳垢局部高度 + 壁面相对高度；大于零说明它确实骑在盘壁上。
+    const wallTop=Math.max(...held.map((x,i)=>x.position[1]+clearance[i]));
+    report.pour.push({frames:(i+1)*10,tilt:+(await Probe()).tray.tilt.toFixed(3),held:held.length,wallTop:+wallTop.toFixed(3),sunk:+Math.max(...clearance).toFixed(3)});
+    if(wallTop>climbed)await page.screenshot({path:path.join(here,'_dev','Shot_TrayPour_'+width+'.png'),clip:(()=>{const x=Math.max(0,width/2-180),y=Math.max(0,height/2-140);return{x,y,width:Math.min(520,width-x),height:Math.min(360,height-y)};})()});
+    sunk=Math.max(sunk,...clearance);climbed=Math.max(climbed,wallTop);}
+   Check(sunk<.05,'pouring never leaves wax buried inside the ceramic wall');
+   Check(climbed>.3,'pouring wax rides up the inner wall instead of sliding flat through it');
+   await Input('up');await Step(120);p=await Probe();
    Check(p.tray.count===0&&p.tray.batches===0,'holding tilt spills every remaining piece and releases render batches');
+   Check(p.tray.exitHeight>1.4,'every poured piece leaves over the lip of the dish');
    Check(p.shop.coins===secondCoins&&p.cleanliness===0,'pouring old wax cannot award or erase the next service score');
    await page.screenshot({path:path.join(here,'_dev','Shot_TrayEmpty_'+width+'.png')});
    Check(report.errors.length===0,'no page, shader or resource errors');report.final=p;console.log('PASS '+width+'×'+height+' '+(touch?'touch':'mouse')+' '+report.checks.length+' checks');
