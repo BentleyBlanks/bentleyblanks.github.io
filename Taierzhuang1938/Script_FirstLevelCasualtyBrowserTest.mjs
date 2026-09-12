@@ -47,8 +47,27 @@ try{
   assert.match(result.subtitle,/有弟兄倒下了/);
   await page.screenshot({path:path.join(out,"Scene_OrdinaryCasualty.png")});
   await fs.writeFile(path.join(out,"Data_OrdinaryCasualty.json"),JSON.stringify(result,null,2));
+  const story=await page.evaluate(()=>{
+    const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),pool=g.state.nraPool;
+    r.opening.SpawnZhou();
+    const actors=[...r.squad.filter(a=>a.castId),r.opening.zhou];
+    const rows=actors.map(actor=>{
+      for(const [part,kind] of [["head","bullet"],["torso","blast"],["torso","thrust"],["head","bullet"]])
+        actor.TakeHit(1000,part,null,{kind});
+      return {id:actor.castId,alive:actor.alive,health:actor.health,essential:actor.scriptEssential,
+        suppression:actor.suppression,damageSequence:actor.damageSequence};
+    });
+    r.opening.Update(0);
+    return {rows,failed:r.failed,poolBefore:pool,poolAfter:g.state.nraPool};
+  });
+  assert.deepEqual(story.rows.map(a=>a.id).sort(),["heyoutian","liuwencai","luo","yaowa","zhou"]);
+  assert.ok(story.rows.every(a=>a.alive&&a.health===1&&a.essential&&a.suppression>0&&a.damageSequence>=4),
+    "all opening story actors survive repeated lethal combat while retaining hit reactions");
+  assert.equal(story.failed,false);assert.equal(story.poolAfter,story.poolBefore);
+  await fs.writeFile(path.join(out,"Data_StorySurvival.json"),JSON.stringify(story,null,2));
   assert.deepEqual(errors,[]);
   console.log("ok production ordinary damage, squad membership, casualty feedback and preserved death accounting",JSON.stringify(result));
+  console.log("ok opening story survival with real damage",JSON.stringify(story));
 }finally{
   await browser.close();await new Promise(resolve=>server.close(resolve));
 }

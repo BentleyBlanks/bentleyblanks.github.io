@@ -137,6 +137,28 @@ try{
     peeks||=s.coverPhase==='peek'&&s.stance===0;
    }
    rows.companionReturnFire={peeks,shots:s.fireSequence};
+   s.scriptEssential=true;
+   s.TakeHit(1000,'head');runtime.RespondToContact(s);
+   // Repeat a hit at the protected health floor, after the old hide expired.
+   ai.time+=R.companionDangerHoldS+1;runtime.time+=R.companionDangerHoldS+1;
+   s.suppression=0;s.TakeHit(1000,'torso');runtime.RespondToContact(s);
+   rows.protectedHit={alive:s.alive,health:s.health,hidden:s.scriptShelterUntil>ai.time};
+   const protectedShots=s.fireSequence;
+   for(let i=0;i<240;i++){
+    ai.time+=1/60;runtime.time+=1/60;s.suppression=.4;
+    if(i%6===0)runtime.RespondToContact(s);
+    ai.ApplyScriptDefense(s);ai.UpdateMoveOrder(s,null);ai.Act(s,1/60,null);
+   }
+   rows.protectedHit.middlePressureHeld=s.scriptShelterUntil>ai.time&&s.fireSequence===protectedShots;
+   peeks=false;
+   for(let i=0;i<900;i++){
+    ai.time+=1/60;runtime.time+=1/60;s.suppression=.3;
+    if(i%6===0)runtime.RespondToContact(s);
+    ai.ApplyScriptDefense(s);ai.UpdateMoveOrder(s,null);ai.Act(s,1/60,null);
+    peeks||=s.coverPhase==='peek'&&s.stance===0;
+   }
+   rows.protectedRecovery={health:s.health,peeks,shots:s.fireSequence-protectedShots};
+   s.scriptEssential=false; // Ordinary wounded soldiers retain their injury response.
    // Cover ownership does not excuse walking over the parapet or through a traverse.
    const host=ai.covers.host,ground=host.GroundHeight,raycast=host.Raycast;
    host.GroundHeight=(x,z)=>z < -1 ? 2 : 0;
@@ -252,6 +274,35 @@ try{
   return rows;
  });
  await fs.mkdir(path.join(project,'_shots','AiInitiative'),{recursive:true});
+ const shelterImage=await page.evaluate(()=>{
+  const g=window.Tengxian,s=g.Debug.FirstLevelMissionRuntime().opening.zhou;
+  // A controlled observation camera captures the actual actor/terrain after
+  // the production shelter simulation, without overriding its chosen stance.
+  g.camera.position.copy(s.position).add({x:3,y:2.8,z:3});
+  g.camera.lookAt(s.position.x,s.position.y+.5,s.position.z);
+  g.viewmodel.root.visible=false;
+  g.ai.CullActors(g.camera);
+  for(let i=0;i<30;i++){g.ai.tickIndex++;g.ai.Act(s,1/60,null);}
+  g.scene.updateMatrixWorld(true);g.actorBatch?.Update(g.camera);
+  g.renderer.setRenderTarget(null);g.renderer.render(g.scene,g.camera);
+  return g.renderer.domElement.toDataURL('image/png').split(',')[1];
+ });
+ await fs.writeFile(path.join(project,'_shots','AiInitiative','Scene_GunnerShelter.png'),Buffer.from(shelterImage,'base64'));
+ const crouch=await page.evaluate(()=>{
+  const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),s=r.opening.zhou,shots=s.fireSequence||0;
+  for(let i=0;i<360;i++){
+   g.ai.time+=1/60;r.time+=1/60;g.ai.tickIndex++;s.suppression=.55;
+   if(i%6===0)r.RespondToContact(s);
+   g.ai.ApplyScriptDefense(s);g.ai.UpdateMoveOrder(s,null);g.ai.Act(s,1/60,null);
+  }
+  g.scene.updateMatrixWorld(true);g.actorBatch?.Update(g.camera);
+  g.renderer.setRenderTarget(null);g.renderer.render(g.scene,g.camera);
+  return {stance:s.stance,shots:(s.fireSequence||0)-shots,
+   png:g.renderer.domElement.toDataURL('image/png').split(',')[1]};
+ });
+ await fs.writeFile(path.join(project,'_shots','AiInitiative','Scene_GunnerResidualPressure.png'),Buffer.from(crouch.png,'base64'));
+ assert.ok(crouch.stance>0,'residual heavy fire retains a low profile behind physical cover');
+ assert.equal(crouch.shots,0,'crouching under sustained heavy fire still holds fire');
  await fs.writeFile(path.join(project,'_shots','AiInitiative','Data_Initiative.json'),JSON.stringify({result,errors},null,2));
  console.log(JSON.stringify(result));
  assert.ok(Object.values(result.guideContact).every(Boolean),'visible close contact yields the guide route to combat, then releases it on the real finite timer');
@@ -265,6 +316,10 @@ try{
  assert.ok(result.companionShelter.quietResumes,'quiet releases shelter back to the saved route');
  assert.ok(result.companionReturnFire.peeks&&result.companionReturnFire.shots>0,
   'light pressure permits a real firing stance and return fire between shelter periods');
+ assert.ok(result.protectedHit.alive&&result.protectedHit.health===1&&result.protectedHit.hidden
+  &&result.protectedHit.middlePressureHeld,'repeated lethal hits at the protected health floor renew shelter, with hysteresis under residual fire');
+ assert.ok(result.protectedRecovery.health===1&&result.protectedRecovery.peeks&&result.protectedRecovery.shots>0,
+  'protected wounded companion resumes real return fire when pressure eases instead of remaining pinned by low HP');
  assert.ok(result.companionParapetRejected&&result.companionTraverseRejected&&result.companionTrenchAllowed,
   'nearby shelter must remain reachable on the protected trench floor');
  assert.deepEqual(result.companionNoShelter,{continues:true,stance:2,hasRoute:true},
@@ -288,7 +343,7 @@ try{
   'the wounded escort survives the recorded rolling grenade on the actual curved Support trench without crossing it');
  assert.ok(result.gunnerShelter.held&&result.gunnerShelter.stance===2&&result.gunnerShelter.blocked
   &&result.gunnerShelter.slack>0&&result.gunnerShelter.shots===0&&result.gunnerShelter.reserved
-  &&!result.gunnerShelter.wounded&&!result.gunnerShelter.essential,
+  &&!result.gunnerShelter.wounded&&result.gunnerShelter.essential,
   'the independently scripted gunner hides behind physical protection while retaining the real injury and handover gates');
  assert.ok(result.grenadeCoverRejected&&result.grenadeReleased&&result.grenadeShieldHolds,
   'avoid an exposed grenade, retain a solid blast shield and release evasion after it is gone');

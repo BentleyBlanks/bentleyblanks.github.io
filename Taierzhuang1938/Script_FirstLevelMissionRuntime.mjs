@@ -281,7 +281,7 @@ export class FirstLevelMissionRuntime {
   }
   PlaceSquad() {
     this.squad = ["luo", "yaowa", "heyoutian", "liuwencai"].map(id => this.companion.Handle(id)).filter(Boolean);
-    for (const actor of this.squad) actor.scriptEssential = false;
+    for (const actor of this.squad) actor.scriptEssential = OPENING.requiredSquadCast.includes(actor.castId);
     const originals = this.squad.filter(actor => actor.castId !== "luo");
     while (originals.length < 6) originals.push(this.ai.Spawn("nra", MISSION_TRAIN.centerX, A.train.z + R.trainTravelM, {
       ...SelectP012RecruitCast(originals.length), weapon: "HanYang", scriptedNoncombatant: true, squadId: "MissionTrainOriginals",
@@ -390,19 +390,26 @@ export class FirstLevelMissionRuntime {
   RespondToContact(actor) {
     if(!actor?.alive || actor.unarmed || actor.scriptedNoncombatant || actor.carryRole || actor.meleeCombat)return false;
     actor.scriptEscapeStance=null;
-    const hit=Number.isFinite(actor.missionLastHealth)&&actor.health<actor.missionLastHealth;
+    // Damage still matters at the narrative health floor: another hit must
+    // trigger shelter even though the protected actor cannot lose more health.
+    const hit=(actor.damageSequence||0)>(actor.missionDamageSequence||0)
+      || (Number.isFinite(actor.missionLastHealth)&&actor.health<actor.missionLastHealth);
+    actor.missionDamageSequence=actor.damageSequence||0;
     actor.missionLastHealth=actor.health;
     const incoming=actor.incomingFire;
     const newIncoming=incoming && incoming.at>(actor.missionIncomingAt??-Infinity);
     if(incoming)actor.missionIncomingAt=incoming.at;
-    const wounded=actor.health<=R.companionWoundedHealth;
+    // Protected cast can retain wound cues without being pinned forever at 1 HP.
+    const wounded=!actor.scriptEssential && actor.health<=R.companionWoundedHealth;
     const exposedWounded=wounded && (actor.targetVisible || this.ai.time-(incoming?.at??-Infinity)<R.companionDangerHoldS);
     if(hit || newIncoming || exposedWounded || actor.suppression>=R.companionDangerSuppression)
       actor.missionDangerUntil=this.time+R.companionDangerHoldS;
     const danger=this.time<(actor.missionDangerUntil||0);
     if(danger){
-      if(hit || wounded || actor.suppression>=R.companionHideSuppression)
-        actor.scriptShelterUntil=this.ai.time+actor.missionDangerUntil-this.time;
+      const hiding=this.ai.time<(actor.scriptShelterUntil||0);
+      if(hit || wounded || actor.suppression>=R.companionHideSuppression
+        || (hiding && actor.suppression>R.companionReturnFireSuppression))
+        actor.scriptShelterUntil=this.ai.time+R.companionShelterHoldS;
       // Never let a march timer pull a man out of shelter while bullets are
       // still passing him. Without a reachable shelter, keep escaping low.
       actor.missionContactPost??={x:actor.position.x,z:actor.position.z};
@@ -1005,10 +1012,8 @@ export class FirstLevelMissionRuntime {
     return T(`firstLevel.interaction.${key}`);
   }
   Enter(stage) {
-    // Preserve the later escort story's existing contract; the rebuilt opening
-    // earns survival through geometry, movement and ordinary combat damage.
-    if(!["Train","Unloading","TrenchEntry","Shelter","Support","MachineGun"].includes(stage.id))
-      for(const actor of this.squad||[])actor.scriptEssential=OPENING.requiredSquadCast.includes(actor.castId);
+    // Narrative companions survive incidental combat from the very first stage.
+    for(const actor of this.squad||[])actor.scriptEssential=OPENING.requiredSquadCast.includes(actor.castId);
     this.opening.Enter(stage.id);
     this.UpdateMusic(stage.id);
     this.Objective(Localize(FirstLevelStageTextId(stage.id), stage.objective));

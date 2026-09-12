@@ -500,6 +500,7 @@ export class Soldier {
       return false;
     }
     this.health -= damage * mult;
+    if (damage > 0) this.damageSequence = (this.damageSequence || 0) + 1;
     // Opt-in narrative cast protection; explicit scripted Kill remains authoritative.
     if (this.scriptEssential) this.health = Math.max(1, this.health);
     this.suppression = Clamp01(this.suppression + 0.45);

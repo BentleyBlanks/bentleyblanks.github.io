@@ -148,6 +148,7 @@ export class FirstLevelOpening {
     this.zhou=r.ai.Spawn("nra",C.zhouGunSeat.x,C.zhouGunSeat.z,{weapon:"Zb26",squadId:"MissionZhouGun"});
     if(!this.zhou)return; // A temporarily unavailable physical spawn retries next frame.
     this.zhou.missionId=r.column.zhou.id;this.zhou.castId="zhou";
+    this.zhou.scriptEssential=true;
     r.PlaceActor(this.zhou,C.zhouGunSeat);
     r.Defend(this.zhou,C.zhouGunSeat,0,R.companionCoverSlackM);r.ai.SetStance(this.zhou,1,.5,true);
     r.emplacement.NpcOccupy(r.gunId,this.zhou);
@@ -155,7 +156,8 @@ export class FirstLevelOpening {
   SpawnMessenger(id,route,weapon){
     const r=this.r,actor=r.ai.Spawn("nra",route[0].x,route[0].z,{weapon,scriptedNoncombatant:true,squadId:id});
     if(!actor)return null;
-    actor.missionId=id;r.MoveActor(actor,actor.position,0);return {actor,route,index:1};
+    actor.missionId=id;actor.scriptEssential=true;
+    r.MoveActor(actor,actor.position,0);return {actor,route,index:1};
   }
   Messenger(entry,speed){
     if(!entry?.actor.alive)return;

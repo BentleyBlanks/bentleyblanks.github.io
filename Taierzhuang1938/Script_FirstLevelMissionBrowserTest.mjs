@@ -873,7 +873,9 @@ try {
       const g = window.Tengxian,
         enemy = g.ai.soldiers.find((a) => a.missionId === "MeleeTutor");
       const wasAlive = enemy.alive;
-      g.Debug.Key("KeyV");
+      // Route combat may already have drawn the Dadao. V toggles slots, so a
+      // second press would stow it and prevent real blade contact / the bind.
+      if(g.state.activeSlot!=="melee")g.Debug.Key("KeyV");
       let sawQte = false,
         windowS = null;
       for (let frame = 0; frame < 60 * 40 && g.player.Alive && enemy.alive; frame++) {

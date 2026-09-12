@@ -46,6 +46,10 @@ export const MISSION_TUNING = Object.freeze({
   // physically reachable and no higher than the protected trench floor.
   companionDangerSuppression:.18,
   companionHideSuppression:.5,
+  // Heavy fire commits to shelter; a lower release threshold prevents flicker.
+  // A brief lull permits deliberate return fire even at the narrative HP floor.
+  companionReturnFireSuppression:.3,
+  companionShelterHoldS:2.2,
   companionDangerHoldS:4,
   companionCoverSlackM:6,
   companionCoverMaxRiseM:.4,
