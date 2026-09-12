@@ -31,15 +31,25 @@ try{
  // 实测 WebAudio 输出：直接调用合成器也不能在零速度或零压力时泄漏底噪。
  report.signals=await page.evaluate(async()=>{
   const a=__EarSpaDebug.audio,wait=ms=>new Promise(r=>setTimeout(r,ms));await wait(1600);
+  const {ContactFriction}=await import('./Script_ContactFriction.mjs'),signals=[];
   const Peak=async ms=>{let peak=0;const data=new Float32Array(a.analyser().fftSize);for(let i=0;i<ms/8;i++){a.analyser().getFloatTimeDomainData(data);for(const v of data)peak=Math.max(peak,Math.abs(v));await wait(8);}return peak;};
-  a.contact.begin('scrape');a.contact.update('scrape',{speed01:0,pressure01:.7});a.Update(.016);await wait(120);const stationary=await Peak(140);
-  a.contact.update('scrape',{speed01:.6,pressure01:.7});a.Update(.016);await wait(100);const moving=await Peak(160);
-  a.contact.update('scrape',{speed01:0,pressure01:.7});a.Update(.016);await wait(120);const stopped=await Peak(140);
-  a.contact.update('scrape',{speed01:.6,pressure01:0});a.Update(.016);await wait(100);const unloaded=await Peak(140);
-  a.contact.end('scrape',{release:.025});return{stationary,moving,stopped,unloaded};
+  for(const [material,cue] of [['dry','scoopDryStroke'],['wet','scoopStickyStroke'],['oily','scoopStickyStroke']]){
+   const {kind}=ContactFriction({scrapeSpeed:1.8,force:49},'scoop',material);
+   a.contact.begin(kind);
+   if(!a.debug().activeContactSources.some(s=>s.kind===kind&&s.cue===cue))throw Error('Incorrect sample for '+material);
+   a.contact.update(kind,{speed01:0,pressure01:.7});a.Update(.016);await wait(120);const stationary=await Peak(140);
+   a.contact.update(kind,{speed01:.6,pressure01:.7});a.Update(.016);await wait(60);const moving=await Peak(450);
+   a.contact.update(kind,{speed01:0,pressure01:.7});a.Update(.016);await wait(120);const stopped=await Peak(140);
+   a.contact.update(kind,{speed01:.6,pressure01:0});a.Update(.016);await wait(100);const unloaded=await Peak(140);
+   a.contact.update(kind,{speed01:.6,pressure01:.7});a.Update(.016);await wait(60);a.contact.end(kind,{release:.025});await wait(100);const released=await Peak(100);
+   signals.push({material,cue,stationary,moving,stopped,unloaded,released});
+  }
+  return signals;
  });
- Check(report.signals.stationary<.00003&&report.signals.stopped<.00003&&report.signals.unloaded<.00003,'measured stationary/stopped/unloaded audio is silent');
-  Check(report.signals.moving>.001&&report.signals.moving<.99,'measured sliding output exists without clipping');
+ for(const signal of report.signals){
+  Check([signal.stationary,signal.stopped,signal.unloaded,signal.released].every(v=>v<.00003),signal.material+': stationary/stopped/unloaded/released output is silent');
+  Check(signal.moving>.001&&signal.moving<.99,signal.material+': approved sample is audible without clipping');
+ }
   t=(await Probe()).targets[0];await page.mouse.move(t.screen.x,t.screen.y);await page.mouse.down({button:'right'});
   let shallow=false;
   for(let i=0;i<180;i++){

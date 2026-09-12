@@ -11,7 +11,7 @@
 //      每次播放都在 ±4% 内抖动播放速率、增益也抖，并按 cue 设最小重触发间隔——
 //      同一段采样连打也不会变成机关枪。
 //
-//   3. 连续接触声：干性刮动使用用户选定的 0.4 秒 SeedAudio 成品，保持原音高，
+//   3. 连续接触声：干/黏刮动使用用户选定的 0.4 秒 SeedAudio 成品，保持原音高，
 //      只有真实滑动与载荷并存时开启包络；长刮续播，停手淡出。其他材质保持现场合成。
 //      速度和压力从实际接触状态更新，静止反力不产生摩擦声。
 //
@@ -63,6 +63,7 @@ export function CreateAudio() {
   // 注意路径统一写「相对项目根」，交给 AssetUrl() 解析。
   const SFX_FILES = {
     scoopDryStroke:['Audio/Sfx/AudioSfx_ScoopDryStroke.wav'],
+    scoopStickyStroke:['Audio/Sfx/AudioSfx_ScoopStickyStroke.wav'],
     waxLandSmall:['Audio/Sfx/AudioSfx_WaxLandSmall.wav'],
     waxLandMedium:['Audio/Sfx/AudioSfx_WaxLandMedium.wav'],
     waxLandLarge:['Audio/Sfx/AudioSfx_WaxLandLarge.wav'],
@@ -106,7 +107,7 @@ export function CreateAudio() {
     shiver: 1.8, sparkle: 2.2, uiTap: 0.35, uiConfirm: 1.6,
   };
   const LANDING_CUES = new Set(['waxLandSmall','waxLandMedium','waxLandLarge']);
-  const FIXED_CUES = new Set([...LANDING_CUES,'scoopDryStroke']);
+  const FIXED_CUES = new Set([...LANDING_CUES,'scoopDryStroke','scoopStickyStroke']);
   const SFX_FADE_OUT = 0.12;        // 秒：裁剪处的淡出，避免咔一声
 
   // contact 的 kind 别名：游戏里的工具 id 直说自己的材质，运行时不猜。
@@ -298,7 +299,7 @@ export function CreateAudio() {
   // 参数含义（都是 0..1）：speed01 手指划动速度，pressure01 压向管壁的力道，
   // roughness01 耵聍表面的粗糙/阻力。
 
-  function CreateSampleContactEngine(kind,buffer){
+  function CreateSampleContactEngine(kind,buffer,cue){
     const source=ctx.createBufferSource(),gate=ctx.createGain(),window=SoundWindow(buffer);
     const p={speed:0,pressure:0,rough:0,pending:null};let lastGain=null,ended=false;
     source.buffer=buffer;source.playbackRate.value=1;source.loop=true;
@@ -306,7 +307,7 @@ export function CreateAudio() {
     gate.gain.value=0;source.connect(gate);gate.connect(bus.sfx);
     const Dispose=()=>{if(ended)return;ended=true;try{source.stop();}catch{}source.disconnect();gate.disconnect();};
     source.onended=Dispose;
-    return{kind,cue:'scoopDryStroke',p,
+    return{kind,cue,p,
       start(at){source.start(at,window.offset);live.contactStarted++;},
       frame(dt,at){
         const gain=Math.min(1,Math.sqrt(p.speed*p.pressure)*2);if(gain===lastGain)return;
@@ -322,8 +323,9 @@ export function CreateAudio() {
   }
 
   function CreateContactEngine(kind) {
-    // 已试听的干刮素材按原音高播放，只有实际滑动时开启包络；停手截停，持续移动才续播。
-    if(kind==='scrape'&&buffers.sfx.scoopDryStroke?.[0])return CreateSampleContactEngine(kind,buffers.sfx.scoopDryStroke[0]);
+    // 已试听的干/黏刮素材按原音高播放，只有实际滑动时开启包络；停手截停，持续移动才续播。
+    const cue=kind==='scrape'?'scoopDryStroke':kind==='wipe'?'scoopStickyStroke':null;
+    if(cue&&buffers.sfx[cue]?.[0])return CreateSampleContactEngine(kind,buffers.sfx[cue][0],cue);
     const gateGain = ctx.createGain();
     gateGain.gain.value = 0;
     gateGain.connect(bus.sfx);

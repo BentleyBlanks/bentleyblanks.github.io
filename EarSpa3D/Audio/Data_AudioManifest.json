@@ -534,6 +534,25 @@
    "sha256": "41fc26e650e81ee5a7852e819dfd8e0eeb7e3afdc02d028b2b84e6341dc2d314",
    "sourceSha256": "883221ddb437a60c9f99d996a2e8aacfa5d7438eda5e1def4def31b349125c7c",
    "processing": "V3 SeedAudio dry wax flakes; 3400Hz lowpass and -3dB high shelf at1600Hz; normalized to -20dBFS; pitch-preserving atempo to exactly0.4s; 3ms attack/12ms release; byte-identical to approved preview"
+  },
+  "scoopStickyStroke#1": {
+   "cue": "scoopStickyStroke",
+   "kind": "sfx",
+   "variant": 1,
+   "name": "耳勺黏蜡短刮 · 0.4秒",
+   "file": "Audio/Sfx/AudioSfx_ScoopStickyStroke.wav",
+   "seconds": 0.4,
+   "bytes": 38478,
+   "sampleRate": 48000,
+   "channels": 1,
+   "model": "seed-audio-1.0",
+   "generatedAt": "2026-09-12",
+   "license": "volcengine",
+   "bakedOnly": true,
+   "sha256": "3458810c7a47c7fca3f18f2ba5a0744819336e492da17c9ef55f9fdeeb98577c",
+   "sourceSha256": "d086cd5f8d75c3029fc06e866c141d0f4711f7f499eb2dbba838618f57a7d294",
+   "processing": "Fresh SeedAudio V5; full action at original pitch adapted to350ms; 10ms lead/40ms tail,3ms attack/12ms release",
+   "prompt": "生成独立单次近距离真实拟音，只有一次动作。不是音乐。微小物件，轻柔克制，干录无混响。开头立即发生，结尾完全安静，无后续动作、无背景底噪、无人声、无呼吸、无音高、无铃声、无金属共鸣。独立物件拟音，微距收音：一小片非常黏的凝胶粘在光滑的小木勺面上，小木勺短短拖动一次，让凝胶逐渐脱粘。时长四百毫秒。声音主体是一串细密、不规则、柔软的粘连被扯开的微声，紧凑连接成一记短促的黏滞拖擦，开始黏住，中间拖开，末尾轻轻脱开。像揭起很薄一层粘性软胶的声音，近而轻，能听清粘住又松开的阻力。不要咕叽，不要气泡、吸水、挤水或液体晃动，不要口腔、咀嚼和呼吸，不要尖锐胶带嘶响，不要啪的爆裂声，不要干燥沙沙声。只做一次，很快停住。"
   }
  },
  "model": "seed-audio-1.0",
@@ -544,7 +563,7 @@
  "bakedBy": "Script_SeedAudioBake.mjs",
  "notes": [
   "淡入淡出与循环接缝在浏览器运行时用 WebAudio 完成，见 Script_Audio.js。",
-  "干性刮动使用已试听的 scoopDryStroke 成品；其他 contact 音色由 Script_Audio.js 现场合成。",
+  "干/黏刮动使用已试听的 scoopDryStroke / scoopStickyStroke 成品；其他 contact 音色由 Script_Audio.js 现场合成。",
   "waxLandSmall/Medium/Large 是用户选定的固定 PCM WAV，保留试听文件原样；其余旧素材为 MP3。",
   "客人对白与叹气停用。"
  ],
