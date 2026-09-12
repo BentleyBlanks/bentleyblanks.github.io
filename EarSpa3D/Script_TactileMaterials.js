@@ -104,12 +104,37 @@ export async function CreateTactileMaterials(renderer) {
   }
   function Wax(type,tone='brown'){
     if(type==='oily'){
-      const material=new THREE.MeshPhysicalMaterial({color:0xeaba65,map:wax.map,roughness:.16,normalMap:wax.normalMap,normalScale:new THREE.Vector2(.009,.009),metalness:0,ior:1.46,transmission:.84,thickness:1,attenuationColor:0xd3993d,attenuationDistance:1.2,clearcoat:1,clearcoatRoughness:.095,specularIntensity:1,envMapIntensity:.54});
+      const material=new THREE.MeshPhysicalMaterial({color:0xeaba65,map:wax.map,roughness:.16,normalMap:wax.normalMap,normalScale:new THREE.Vector2(.022,.022),metalness:0,ior:1.46,transmission:.84,thickness:1,attenuationColor:0xd3993d,attenuationDistance:1.2,clearcoat:1,clearcoatRoughness:.16,specularIntensity:1,envMapIntensity:.54});
       material.userData.waxWet={value:1};material.userData.waxSoft={value:0};material.userData.oily=true;
-      material.transparent=true;material.depthWrite=false;
+      // 弯曲体积的远侧折边必须被近侧挡住；关闭深度写入会出现交叉黑线。
+      material.transparent=true;material.depthWrite=true;
+      material.userData.gelDetail={value:1};
       material.onBeforeCompile=shader=>{
         shader.vertexShader='attribute vec3 gelRest;attribute float gelThickness;varying vec3 gelLocal;varying float gelPath;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ngelLocal=gelRest;gelPath=gelThickness;');
-        shader.fragmentShader='varying vec3 gelLocal;varying float gelPath;\n'+shader.fragmentShader;
+        shader.uniforms.gelDetail=material.userData.gelDetail;
+        shader.fragmentShader=`varying vec3 gelLocal;varying float gelPath;uniform float gelDetail;
+          float GelHash(vec3 p){p=fract(p*.1031);p+=dot(p,p.yzx+33.33);return fract((p.x+p.y)*p.z);}
+          float GelNoise(vec3 p){
+            vec3 i=floor(p),f=fract(p);f=f*f*f*(f*(f*6.0-15.0)+10.0);
+            return mix(mix(mix(GelHash(i),GelHash(i+vec3(1,0,0)),f.x),mix(GelHash(i+vec3(0,1,0)),GelHash(i+vec3(1,1,0)),f.x),f.y),
+              mix(mix(GelHash(i+vec3(0,0,1)),GelHash(i+vec3(1,0,1)),f.x),mix(GelHash(i+vec3(0,1,1)),GelHash(i+vec3(1,1,1)),f.x),f.y),f.z);
+          }
+          vec3 GelPerturb(vec3 n,float height,vec3 viewPoint){
+            vec3 sx=dFdx(viewPoint),sy=dFdy(viewPoint),rx=cross(sy,n),ry=cross(n,sx);
+            float determinant=dot(sx,rx);
+            return normalize(abs(determinant)*n-sign(determinant)*(dFdx(height)*rx+dFdy(height)*ry));
+          }
+        `+shader.fragmentShader;
+        // 毫米尺度的材料空间起伏会随凝胶一起拉长；屏幕导数滤掉亚像素噪声。
+        shader.fragmentShader=shader.fragmentShader.replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
+          float gelPixel=max(length(dFdx(gelLocal)),length(dFdy(gelLocal)));
+          float gelRelief=gelDetail*mix(.20,1.0,smoothstep(.025,.55,gelPath))*(
+            .008*GelNoise(gelLocal*6.5)*(1.0-smoothstep(.05,.16,gelPixel))+
+            .0025*GelNoise(gelLocal*21.0+7.1)*(1.0-smoothstep(.018,.05,gelPixel))+
+            .0008*GelNoise(gelLocal*57.0+19.4)*(1.0-smoothstep(.006,.018,gelPixel)));
+          normal=GelPerturb(normal,gelRelief,-vViewPosition);
+        `);
+        shader.fragmentShader=shader.fragmentShader.replace('#include <clearcoat_normal_fragment_maps>','#include <clearcoat_normal_fragment_maps>\nclearcoatNormal=GelPerturb(clearcoatNormal,gelRelief*.50,-vViewPosition);');
         shader.fragmentShader=shader.fragmentShader.replace('#include <transmission_fragment>',THREE.ShaderChunk.transmission_fragment.replace('material.thickness = thickness;', 'material.thickness = max(.01,gelPath);').replace('material.transmission = transmission;', 'material.transmission = mix(.36,.97,exp(-gelPath*3.2));').replace('material.diffuseContribution, material.specularColorBlended','mix(vec3(1.0),material.diffuseContribution,smoothstep(.06,.65,gelPath)), material.specularColorBlended'));
         shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(.10,.21,smoothstep(.02,.65,gelPath));');
         shader.fragmentShader=shader.fragmentShader.replace('#include <opaque_fragment>','diffuseColor.a*=smoothstep(.008,.075,gelPath);\n#include <opaque_fragment>');
@@ -124,7 +149,7 @@ export async function CreateTactileMaterials(renderer) {
           reflectedLight.directDiffuse+=diffuseColor.rgb*reflectedLight.directDiffuse*(.20+rim*.8);
         `);
         contact.Bind(shader,{self:material.userData.contactSelf});material.userData.contactShader=shader;
-      };material.customProgramCacheKey=()=> 'OilyContinuousCoating2';return material;
+      };material.customProgramCacheKey=()=> 'OilyContinuousDetail3';return material;
     }
     const pale=tone==='paleYellow';
     const material=new THREE.MeshPhysicalMaterial({...wax,color:type==='impacted'?0xcbb588:type==='wet'?0xd1bfa1:0xfff3d5,roughness:type==='wet'?.27:1,normalScale:new THREE.Vector2(pale?.11:.22,pale?.11:.22),aoMapIntensity:pale?.35:.58,clearcoat:type==='wet'?.8:0,clearcoatRoughness:.13,metalness:0});
@@ -157,7 +182,7 @@ export async function CreateTactileMaterials(renderer) {
     return material;
   }
   function WetWax(material,softness,wetness,type){
-    if(type==='oily'){material.roughness=.16-softness*.035;material.clearcoatRoughness=.095;return;}
+    if(type==='oily'){material.roughness=.16-softness*.035;material.clearcoatRoughness=.16;return;}
     material.userData.waxWet.value=wetness;material.userData.waxSoft.value=softness;
     material.roughness=(type==='wet'?.27:1)*(1-wetness*.81);
     material.clearcoat=Math.max(type==='wet'?.8:0,wetness*.98);material.clearcoatRoughness=.055;

@@ -26,7 +26,11 @@ try{for(const [width,height,touch] of (process.argv.includes('--diagnose')?[[100
     Check(base.practice==='oily'&&base.targets.length===3&&base.targets.every(c=>c.type==='oily'&&c.form==='coating'&&!c.fine),'oil ear has three continuous films with raised deposits');
     Check(base.targets.every(c=>c.physics.solver==='xpbd-viscoelastic-volume'&&c.physics.tetrahedra>c.physics.nodes),'every coating uses a volumetric lattice');
     await page.locator('[data-tool="tweezers"]').click();let target=(await Probe()).targets.find(c=>c.id===2);await Input(true,target);
-    for(const n of [3,6,9,12,20,35,60]){await Step(n);const probe=await Probe(),c=probe.targets.find(c=>c.id===2);report.samples.push({state:c.state,...c.physics,position:c.position,active:probe.active});await Shot('Pull'+report.samples.length);}
+    for(const n of [3,6,9,12,20,35,60]){
+      // 厚区短暂拉伸后逐点脱黏；逐帧测量，避免截图间隔跨过仍附着的峰值。
+      const attachedStretch=await page.evaluate(n=>{let peak=0;for(let i=0;i<n;i++){__EarSpaDebug.StepFrames(1);const c=__EarSpaDebug.view.chunks.find(c=>c.id===2);if(c.body.anchors.some(a=>a.alive))peak=Math.max(peak,c.body.gel.maxStretch);}return peak;},n);
+      report.attachedStretch=Math.max(report.attachedStretch||0,attachedStretch);const probe=await Probe(),c=probe.targets.find(c=>c.id===2);report.samples.push({state:c.state,...c.physics,position:c.position,active:probe.active});await Shot('Pull'+report.samples.length);
+    }
     report.stats=(await Probe()).stats;
     if(process.argv.includes('--diagnose'))console.log(JSON.stringify({width,samples:report.samples,errors:report.errors,stats:report.stats}));
     await Input(false);await Step(240);await Shot('Landed');report.final=await Probe();
@@ -35,7 +39,7 @@ try{for(const [width,height,touch] of (process.argv.includes('--diagnose')?[[100
       Check(report.samples.every(s=>Math.abs(s.volumeRatio-1)<.06&&s.minJacobian>0),'loaded gel preserves volume and positive tetrahedra');
       Check(report.final.harvest.some(c=>c.id===2),'gel lands and receives collection credit once');
       Check(report.final.harvest.filter(c=>c.id===2).length===1,'one deposit never receives duplicate landing credit');
-      Check(report.samples.some(s=>s.gelStretch>1.4&&s.anchors>0),'the continuous film stretches while its far wall attachments remain');
+      Check(report.attachedStretch>1.4,'the continuous film stretches while its far wall attachments remain');
       await page.locator('#settings-open').click();await page.locator('#practice-start').click();await Step(130);
       const reset=await Probe();Check(reset.targets.every((c,i)=>JSON.stringify(c.position)===JSON.stringify(base.targets[i].position)),'restarting reproduces the same seeded oil ear');
       await page.locator('[data-tool="tweezers"]').click();await Input(true,reset.targets.find(c=>c.id===2));await Step(35);const extended=(await Probe()).targets.find(c=>c.id===2);await Shot('RecoilBefore');await Input(false);await Step(160);const relaxed=(await Probe()).targets.find(c=>c.id===2);await Shot('RecoilAfter');

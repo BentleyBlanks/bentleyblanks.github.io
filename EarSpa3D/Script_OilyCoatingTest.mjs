@@ -6,7 +6,8 @@ const reports=[];
 for(const seed of [20260912,83,519])for(let region=0;region<3;region++){
  const lattice=BuildOilyCoating(region,seed,(depth,angle)=>({point:[3*Math.cos(angle),3*Math.sin(angle),depth],normal:[-Math.cos(angle),-Math.sin(angle),0]}));
  const heights=Array.from(lattice.thickness.slice(0,lattice.layer)).sort((a,b)=>a-b);
- assert.ok(heights[Math.floor(heights.length*.5)]<.17&&heights.at(-1)>.40,'broad thin film and distinct thick deposits coexist');
+ assert.ok(heights.filter(h=>h<.17).length/heights.length>.40,'at least 40 percent remains thin wall coating');
+ assert.ok(heights.filter(h=>h>.65).length/heights.length>.20&&heights.at(-1)>1.4,'substantial connected deposits occupy over 20 percent with raised 1.4 mm lobes');
  const adjacency=Array.from({length:lattice.positions.length/3},()=>new Set()),edges=new Map();
  for(let i=0;i<lattice.indices.length;i+=3){const ids=Array.from(lattice.indices.slice(i,i+3));for(let j=0;j<3;j++){const a=ids[j],b=ids[(j+1)%3];adjacency[a].add(b);adjacency[b].add(a);const key=[a,b].sort((a,b)=>a-b).join(':');edges.set(key,(edges.get(key)||0)+1);}}
  assert.ok([...edges.values()].every(n=>n===2),'surface is a closed manifold without separate decorations');

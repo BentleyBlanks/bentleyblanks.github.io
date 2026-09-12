@@ -3,7 +3,7 @@ import {AddFeatherFur,ClearFeatherFur,PrepareFeatherStrands,FEATHER_FUR_LENGTH,F
 import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear029-oily-coating-20260912';
 import * as THREE from 'three';
 import {SlimeCage,PoseSlimeVolume,StepSlimeVolume} from './Script_SlimePhysics.mjs?v=ear029-oily-coating-20260912';
-import {BuildOilyCoating,OILY_REGIONS} from './Script_OilyCoating.mjs?v=ear029-oily-coating-20260912';
+import {BuildOilyCoating,OILY_REGIONS} from './Script_OilyCoating.mjs?v=ear032-oily-detail-20260912';
 import { BuildEar, MakeRng } from './Script_EarAnatomy.js?v=ear012-outer-20260911';
 import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
 import { PALETTE as P } from './Data_Palette.mjs?v=ear012-outer-20260911';
@@ -15,7 +15,7 @@ import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryU
 import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear024-cohesive-scraping-20260912';
 import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear012-outer-20260911';
 import { CreateToolContact } from './Script_ToolContact.js?v=ear020-contact-loading-20260912';
-import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear029-oily-coating-20260912';
+import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear032-oily-detail-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 
 // 封闭耳道、真实接触点与实体收集盘共用毫米世界；镜头在取出时连续后退。
@@ -332,7 +332,7 @@ export async function CreateImmersiveScene({ core }) {
     preparationStats.lastResetMs=performance.now()-start;
     HideTool(); droplet.visible = false; dropTarget = null; return chunks;
   }
-  function VisualCenter(c) { if(c.coating&&c.body.gel)return new THREE.Vector3().fromArray(c.body.gel.points[c.gripNode]);return new THREE.Vector3(0,0,0.09).applyQuaternion(c.mesh.quaternion).add(c.mesh.position); }
+  function VisualCenter(c) { if(c.coating&&c.body.gel)return new THREE.Vector3().fromBufferAttribute(c.mesh.geometry.attributes.position,c.gripNode).applyQuaternion(c.mesh.quaternion).add(c.mesh.position);return new THREE.Vector3(0,0,0.09).applyQuaternion(c.mesh.quaternion).add(c.mesh.position); }
   function Project(position) {
     const v = position.clone().project(camera);
     return { x: (v.x + 1) * .5 * width, y: (1 - v.y) * .5 * height, z: v.z };
@@ -954,7 +954,7 @@ export async function CreateImmersiveScene({ core }) {
     return {visible:true,id:lastToolId,vertices:closest.length,fieldMinimum,meshMinimum};
   }
   function InteractionPoint(c){
-    if(!c.fragment||!['attached','returning'].includes(c.state))return VisualCenter(c);
+    if(!c.fragment&&!c.coating||!['attached','returning'].includes(c.state))return VisualCenter(c);
     scene.updateMatrixWorld(true);const p=c.mesh.geometry.attributes.position,idx=c.mesh.geometry.index,candidates=[VisualCenter(c)];
     const stride=Math.max(3,Math.floor((idx?.count||p.count)/60/3)*3);
     for(let i=0;i<(idx?.count||p.count)-2;i+=stride){const v=new THREE.Vector3();for(let j=0;j<3;j++)v.add(new THREE.Vector3().fromBufferAttribute(p,idx?idx.getX(i+j):i+j));candidates.push(v.multiplyScalar(1/3).applyMatrix4(c.mesh.matrixWorld));}

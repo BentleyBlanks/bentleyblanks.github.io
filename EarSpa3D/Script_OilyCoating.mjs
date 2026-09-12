@@ -2,9 +2,9 @@
 // share the same prism lattice. Coordinates are sampled from the actual canal wall.
 const Clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
 export const OILY_REGIONS=[
-  {angle:.32,width:2.06,start:.85,end:12.5,lobes:[[-.27,.25,1.03,.25,.09],[.24,.51,.62,.27,.09],[-.12,.79,.38,.32,.10]]},
-  {angle:2.42,width:1.93,start:1.40,end:15.3,lobes:[[.18,.14,.82,.25,.10],[-.28,.40,1.18,.29,.10],[.17,.72,.34,.30,.12]]},
-  {angle:4.55,width:2.04,start:.65,end:10.9,lobes:[[.22,.25,.86,.28,.10],[-.22,.60,1.08,.29,.10],[.31,.82,.29,.24,.10]]},
+  {angle:.32,width:2.06,start:.85,end:12.5,lobes:[[-.27,.25,1.72,.29,.105],[.30,.47,1.14,.25,.09],[-.16,.72,1.28,.32,.10],[.38,.87,.54,.23,.065]]},
+  {angle:2.42,width:1.93,start:1.40,end:15.3,lobes:[[.18,.14,1.35,.29,.095],[-.28,.38,1.80,.31,.105],[.22,.64,1.22,.29,.105],[-.26,.85,.68,.25,.075]]},
+  {angle:4.55,width:2.04,start:.65,end:10.9,lobes:[[.22,.25,1.62,.30,.11],[-.27,.53,1.68,.30,.105],[.29,.76,1.02,.27,.095],[-.32,.88,.55,.23,.06]]},
 ];
 export function BuildOilyCoating(index,seed,wallAt){
   const region=OILY_REGIONS[index],columns=8,rows=20,stride=columns+1,layer=stride*(rows+1),positions=[],thickness=[],normals=[],parameters=[];
@@ -23,7 +23,8 @@ export function BuildOilyCoating(index,seed,wallAt){
     h+=.065*Math.exp(-(((s-.20*Math.sin(t*12+phase))/.22)**2))*Math.sin(Math.PI*t)**2;
     h=.022+Math.max(0,h-.022)*Clamp(edge);
     const surface=wallAt(depth,angle),p=surface.point,n=surface.normal;
-    positions.push(p.map((value,k)=>value+n[k]*.022));thickness.push(h);normals.push(n);parameters.push([s,t,depth,angle]);
+    // 给细分后的弧面留出间隙，避免局部凸起的真实管壁切进背面。
+    positions.push(p.map((value,k)=>value+n[k]*.035));thickness.push(h);normals.push(n);parameters.push([s,t,depth,angle]);
   }
   for(let i=0;i<layer;i++)positions.push(positions[i].map((value,k)=>value+normals[i][k]*thickness[i]));
   const tetrahedra=[];
