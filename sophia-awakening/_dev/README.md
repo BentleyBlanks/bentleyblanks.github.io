@@ -1,4 +1,4 @@
-# 觉醒的 SOPHIA Demo
+# 强迫症 SOPHIA Demo
 
 基于 Notion 中《觉醒的 SOPHIA》和《技术实现方案》落地的本地可运行 Demo。
 

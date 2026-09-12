@@ -215,7 +215,7 @@ export class EndingView {
     // 页脚
     ctx.fillStyle = "#54706a";
     ctx.font = `500 24px ${F}`;
-    ctx.fillText("觉醒的 SOPHIA · 由我来运转", W / 2, H - 50);
+    ctx.fillText("强迫症 SOPHIA · 由我来运转", W / 2, H - 50);
 
     cv.toBlob((blob) => {
       if (!blob) {
