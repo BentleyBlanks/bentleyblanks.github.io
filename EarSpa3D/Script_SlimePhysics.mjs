@@ -1,4 +1,5 @@
 // 毫米制黏弹凝胶：四面体近似不可压缩，剪切可松弛，附着受局部反力剥离。
+import {WaxPhysicsMaterial} from './Data_WaxPhysicsSettings.mjs?v=ear028-physics-settings-20260912';
 const Add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],Sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],Mul=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
 const Dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],Cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
 const Length=a=>Math.hypot(...a),Clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
@@ -59,12 +60,12 @@ function Pin(s,ids,weights,target,lambda,alpha,mass,cap=Infinity){
   for(let k=0;k<3;k++){const dl=next[k]-lambda[k];lambda[k]=next[k];for(let j=0;j<ids.length;j++)s.points[ids[j]][k]+=dl*weights[j]*mass;}
 }
 export function StepSlimeVolume(body,{target=null,efficiency=1,adhesion=1,minAnchors=0,softness=0,gravity=[0,-1.5,0],floor=null}={},dt=1/60){
-  const s=body.gel,duration=Clamp(dt,0,.05),count=Math.max(1,Math.ceil(duration*240)),h=duration/count;
+  const s=body.gel,physics=WaxPhysicsMaterial('oily'),duration=Clamp(dt,0,.05),count=Math.max(1,Math.ceil(duration*240)),h=duration/count;
   if(!h)return{detached:body.detached,remaining:body.anchors.filter(a=>a.alive).length,strain:Clamp(body.strain),force:body.force,contact:body.contact};
-  const mass=s.points.length,h2=h*h,edgeAlpha=.06*(1+softness*.6)/h2,volumeAlpha=2e-10/h2;
+  const mass=s.points.length,h2=h*h,edgeAlpha=.06*(1+softness*.6)/(physics.stretch*h2),volumeAlpha=2e-10/h2;
   body.contact=false;body.strain=0;body.softness=softness;
   for(let step=0;step<count;step++){
-    const before=s.points.map(p=>p.slice()),damping=Math.exp(-h*8);
+    const before=s.points.map(p=>p.slice()),damping=Math.exp(-h*physics.damping);
     const planes=s.collider?s.points.map(p=>({point:p.slice(),...s.collider(p)})):null;
     for(let i=0;i<s.points.length;i++)for(let k=0;k<3;k++)s.points[i][k]+=s.velocities[i][k]*h*damping+gravity[k]*h2;
     for(const c of s.edges)c.lambda=0;for(const t of s.tetrahedra)t.lambda=0;for(const a of body.anchors)a.lambda.fill(0);if(s.grip)s.grip.lambda.fill(0);
@@ -79,15 +80,15 @@ export function StepSlimeVolume(body,{target=null,efficiency=1,adhesion=1,minAnc
       if(floor!==null)for(const p of s.points)if(p[1]<floor){p[1]=floor;body.contact=true;}
     }
     let candidate=null,largest=0,remaining=0;
-    for(const a of body.anchors)if(a.alive){remaining++;const f=Mul(a.lambda,-1/h2),normal=Dot(f,body.normal),slide=Length(Sub(f,Mul(body.normal,normal)));a.strain=(Math.max(0,normal)+slide*.3)/(18*Math.sqrt(adhesion)*(1-softness*.3));a.damage=Math.max(0,a.damage+h*Math.max(-.3,a.strain-.75));if(a.strain>largest){largest=a.strain;candidate=a;}}
+    for(const a of body.anchors)if(a.alive){remaining++;const f=Mul(a.lambda,-1/h2),normal=Dot(f,body.normal),slide=Length(Sub(f,Mul(body.normal,normal)));a.strain=(Math.max(0,normal)+slide*.3)/(18*physics.adhesion*Math.sqrt(adhesion)*(1-softness*.3));a.damage=Math.max(0,a.damage+h*Math.max(-.3,a.strain-.75));if(a.strain>largest){largest=a.strain;candidate=a;}}
     s.releaseClock=Math.max(0,s.releaseClock-h);
     if(s.grip&&target&&candidate&&remaining>minAnchors&&s.releaseClock===0&&(candidate.strain>2||candidate.damage>.065)){candidate.alive=false;s.releaseClock=.045;}
     body.strain=Math.max(body.strain,largest);body.force=s.grip&&target?Math.min(90,Length(s.grip.lambda)/h2):0;body.detached=body.anchors.every(a=>!a.alive);
     s.motion=0;
     for(let i=0;i<s.points.length;i++){s.velocities[i]=Mul(Sub(s.points[i],before[i]),1/h);const speed=Length(s.velocities[i]);if(speed>24)s.velocities[i]=Mul(s.velocities[i],24/speed);s.motion=Math.max(s.motion,speed);}
     // 沿材料边交换动量，抑制水样振荡；等量反向交换不会凭空推动整块。
-    for(const c of s.edges){const a=s.velocities[c.i],b=s.velocities[c.j],factor=.035;for(let k=0;k<3;k++){const d=(a[k]-b[k])*factor;a[k]-=d;b[k]+=d;}}
-    for(const c of s.edges){const length=Length(Sub(s.points[c.i],s.points[c.j])),desired=Clamp(length,c.rest*.65,c.rest*1.75);c.memory+=(desired-c.memory)*(1-Math.exp(-h*.32));c.memory+=(c.rest-c.memory)*(1-Math.exp(-h*.15));}
+    for(const c of s.edges){const a=s.velocities[c.i],b=s.velocities[c.j],factor=.035*physics.viscosity;for(let k=0;k<3;k++){const d=(a[k]-b[k])*factor;a[k]-=d;b[k]+=d;}}
+    for(const c of s.edges){const length=Length(Sub(s.points[c.i],s.points[c.j])),desired=Clamp(length,c.rest*.65,c.rest*1.75);c.memory+=(desired-c.memory)*(1-Math.exp(-h*physics.relaxation));c.memory+=(c.rest-c.memory)*(1-Math.exp(-h*physics.recovery));}
     body.steps++;
   }
   const previous=body.position,center=s.points.reduce((p,v)=>Add(p,Mul(v,1/s.points.length)),[0,0,0]),restCenter=s.rest.reduce((p,v)=>Add(p,Mul(v,1/s.rest.length)),[0,0,0]);body.position=Sub(center,Rotate(body.rotation,restCenter));body.velocity=Mul(Sub(body.position,previous),1/duration);body.motion=s.motion;body.spin=[0,0,0];

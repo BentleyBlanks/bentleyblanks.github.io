@@ -1,13 +1,13 @@
-import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear027-tray-proportions-20260912';
+import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear028-physics-settings-20260912';
 import * as THREE from 'three';
-import {SlimeCage,PoseSlimeVolume,StepSlimeVolume} from './Script_SlimePhysics.mjs?v=ear025-oily-20260912';
+import {SlimeCage,PoseSlimeVolume,StepSlimeVolume} from './Script_SlimePhysics.mjs?v=ear028-physics-settings-20260912';
 import { BuildEar, MakeRng } from './Script_EarAnatomy.js?v=ear012-outer-20260911';
 import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
 import { PALETTE as P } from './Data_Palette.mjs?v=ear012-outer-20260911';
 
 import {InstrumentContact,IsFeatherDebris} from './Script_InstrumentInteraction.mjs?v=ear028-edge-contact-20260912';
 import {WaxEdgeContact} from './Script_WaxEdgeContact.mjs?v=ear028-edge-contact-20260912';
-import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody, BindPeelSurface, BindPeelSurfaceSteps, WritePeelSurface, MovePeelBody, PeelAnchorPoint } from './Script_PeelPhysics.mjs?v=ear025-oily-20260912';
+import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody, BindPeelSurface, BindPeelSurfaceSteps, WritePeelSurface, MovePeelBody, PeelAnchorPoint } from './Script_PeelPhysics.mjs?v=ear028-physics-settings-20260912';
 import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
 import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear024-cohesive-scraping-20260912';
 import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear012-outer-20260911';

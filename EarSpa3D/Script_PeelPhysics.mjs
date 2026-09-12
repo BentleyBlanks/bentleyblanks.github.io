@@ -1,10 +1,10 @@
 // 可见块体使用薄壳，细微颗粒保留低成本刚体；两者共用工具和附着接口。
-import {BindWaxSurface,BindWaxSurfaceSteps,GripWaxSurface,UngripWaxSurface,StepWaxSurface,WriteWaxSurface} from './Script_SoftWaxPhysics.mjs?v=ear024-cohesive-scraping-20260912';
-import {BindSlimeVolume,GripSlimeVolume,UngripSlimeVolume,StepSlimeVolume,WriteSlimeSurface,PoseSlimeVolume} from './Script_SlimePhysics.mjs?v=ear025-oily-20260912';
+import {BindWaxSurface,BindWaxSurfaceSteps,GripWaxSurface,UngripWaxSurface,StepWaxSurface,WriteWaxSurface} from './Script_SoftWaxPhysics.mjs?v=ear028-physics-settings-20260912';
+import {BindSlimeVolume,GripSlimeVolume,UngripSlimeVolume,StepSlimeVolume,WriteSlimeSurface,PoseSlimeVolume} from './Script_SlimePhysics.mjs?v=ear028-physics-settings-20260912';
 export function BindPeelSurface(body,positions,indices){return body.type==='oily'?BindSlimeVolume(body,positions,indices):BindWaxSurface(body,positions,indices);}
 export function WritePeelSurface(body,positions){return body.gel?WriteSlimeSurface(body,positions):WriteWaxSurface(body,positions);}
 export {BindWaxSurfaceSteps as BindPeelSurfaceSteps};
-export {WaxAnchorPoint as PeelAnchorPoint} from './Script_SoftWaxPhysics.mjs?v=ear024-cohesive-scraping-20260912';
+export {WaxAnchorPoint as PeelAnchorPoint} from './Script_SoftWaxPhysics.mjs?v=ear028-physics-settings-20260912';
 const Add=(a,b)=>a.map((x,i)=>x+b[i]);
 const Sub=(a,b)=>a.map((x,i)=>x-b[i]);
 const Mul=(a,s)=>a.map(x=>x*s);

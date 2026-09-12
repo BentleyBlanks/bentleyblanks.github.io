@@ -1,4 +1,5 @@
 // 有厚度的 XPBD 薄壳：物理节点驱动原网格，附着点不参与额外几何绘制。
+import {WaxPhysicsMaterial} from './Data_WaxPhysicsSettings.mjs?v=ear028-physics-settings-20260912';
 const Add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]];
 const Sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
 const Mul=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
@@ -178,12 +179,12 @@ function CohesiveSection(body,h,profile,soft){
 }
 
 export function StepWaxSurface(body,{target=null,softness=0,efficiency=1,adhesion=1,minAnchors=0,supportRotation=null,fracture=false}={},dt=1/60){
-  const s=body.surface,profile=PROFILES[body.type]||PROFILES.dry,soft=Clamp(softness),duration=Clamp(dt,0,.05),count=Math.max(1,Math.ceil(duration*240)),h=duration/count;
+  const s=body.surface,base=PROFILES[body.type]||PROFILES.dry,physics=WaxPhysicsMaterial(body.type),profile={...base,strength:base.strength*physics.adhesion,cohesion:base.cohesion*physics.cohesion},soft=Clamp(softness),duration=Clamp(dt,0,.05),count=Math.max(1,Math.ceil(duration*240)),h=duration/count;
   if(h===0)return{detached:body.detached,remaining:body.anchors.filter(a=>a.alive).length,strain:Clamp(body.strain),force:body.force,contact:body.contact};
-  const mass=s.points.length,stretch=profile.stretch*(1+soft*10)/(h*h),bend=(profile.bend+soft*.20)/(h*h);
+  const mass=s.points.length,stretch=profile.stretch*(1+soft*10)/(physics.stretch*h*h),bend=(profile.bend+soft*.20)/(physics.bend*h*h);
   body.softness=soft;body.contact=false;body.strain=0;let simulatedTime=0;
   for(let step=0;step<count;step++){
-    const before=s.points.map(p=>p.slice()),damping=Math.exp(-h*12);
+    const before=s.points.map(p=>p.slice()),damping=Math.exp(-h*physics.damping);
     for(let i=0;i<s.points.length;i++)for(let k=0;k<3;k++)s.points[i][k]+=s.velocities[i][k]*h*damping;
     for(const c of [...s.edges,...s.bends])c.lambda=0;
     for(const a of body.anchors)a.lambda=[0,0,0];if(s.grip)s.grip.lambda=[0,0,0];

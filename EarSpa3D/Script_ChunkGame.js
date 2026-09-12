@@ -1,8 +1,9 @@
 import * as THREE from 'three';
+import {CreatePhysicsSettings} from './Script_PhysicsSettings.mjs?v=ear028-physics-settings-20260912';
 import {CUSTOMER_EARS,CustomerEarType} from './Data_CustomerTypes.mjs?v=ear025-oily-20260912';
 import { ToolIcon } from './Script_ToolIcons.mjs?v=ear014-ui-20260912';
 import { CreateCore } from './Script_Core.js?v=ear011-20260911';
-import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear028-edge-contact-20260912';
+import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear028-physics-settings-20260912';
 import { CreateAudio } from './Script_Audio.js?v=ear012-size-audio-20260912';
 import { LandingSound } from './Script_LandingSound.mjs?v=ear012-size-audio-20260912';
 import { CreateShop } from './Script_Shop.js?v=ear025-oily-20260912';
@@ -11,7 +12,7 @@ import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear011-20260911';
 
 import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear014-ui-20260912';
 
-const VERSION = 'ear028-edge-contact-20260912';
+const VERSION = 'ear028-physics-settings-20260912';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const TOOL_IDS = { scoop: 'earPickBamboo', tweezers: 'earForceps', drops: 'earDrops',brush:'softBrush',suction:'microSuction',feather:'gooseFeather' };
 const TYPE_NAMES = { dry: '干性薄层', wet: '黏性耳垢', impacted: '紧实硬结', oily:'油性凝胶' };
@@ -46,6 +47,7 @@ export async function Start() {
       <label class="slider-row">动作音效<input id="volume-sfx" type="range" min="0" max="1" step="0.01" value="0.85"></label>
       <label class="slider-row">背景音乐<input id="volume-bgm" type="range" min="0" max="1" step="0.01" value="0.16"></label>
       <label class="slider-row">轻微震动<input id="haptics" type="checkbox" checked></label>
+      <section id="physics-debug" class="debug-settings" aria-labelledby="debug-title"></section>
 
       <details id="operation-guide"><summary>操作指南</summary><p>鼠标右键按住连续旋转，松开停止，工具留在接触点；左键按住并移动鼠标，耳勺跟随指针刮动；凹口朝向耳垢才能托刮，勺背和空划不能剥离。镊子按住夹起。手机在施力模式下按住并拖动耳勺，转向模式下按住旋转。工具遇到内壁会受阻。点放大镜切换深浅视野，短耳勺工作长度有限；深处用长镊，硬结先滴液软化。松脱后仍在工具上，松手由工具托送到耳外，再轻放入盘。硬结先滴液等待约 3 秒。干薄片用耳勺托边，黏块先松边再用镊子夹；硬拉会痛或碎裂。碎屑可用耳勺清理，也可买毛刷轻扫或用吸引管吸走湿碎屑。尚未松脱时松手，材料会弹性回落；黏附牢固时受力断面会碎裂，残片仍需清理。</p><p>键盘：1/2/3 切换工具；画面获得焦点后，左右方向键选块，空格抓住，Q/E 旋转方向，空格松手，Esc 取消。</p></details>
     </dialog>`;
@@ -61,6 +63,7 @@ export async function Start() {
   document.getElementById('ear-stage')?.remove();
   canvas.tabIndex = 0; canvas.setAttribute('aria-label', '耳道操作区，工具接触耳垢后，自由拨动或夹取');
   const $ = id => document.getElementById(id);
+  const physicsSettings=CreatePhysicsSettings($('physics-debug'));
   $('play-stage').insertAdjacentHTML('beforeend','<section id="tray-cleanup" hidden aria-label="整理收藏盘"><div><span class="eyebrow">收藏盘</span><strong id="tray-count" role="status"></strong></div><p id="tray-help">按住拖动耳勺，将耳垢拨过盘沿。未清理的会留到下一位。</p><button id="tray-tilt" aria-pressed="false">按住倾倒盘子</button></section>');
   app.insertAdjacentHTML('beforeend','<button id="depth-toggle" class="depth-toggle" aria-pressed="false" aria-label="放大观察深处" title="放大观察"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5M7 10h6"/><path class="zoom-plus" d="M10 7v6"/></svg></button>');
   const core = CreateCore({ canvas, viewCamera: new THREE.PerspectiveCamera(65, 1, .05, 400) });
@@ -370,7 +373,7 @@ export async function Start() {
   }
   function Probe() {
     return { version: VERSION,phase,practice,earType:practice||CustomerEarType(shop.CurrentCustomer()),timeLimit:practice?null:timeLimit,timeRemaining:practice?null:Math.max(0,timeLimit-elapsed),timedOut,inputMode:touchMode,turning:!!turnPointer,tool: toolId, elapsed: +elapsed.toFixed(2), cleanliness: CleanMass()/9,satisfaction,painCount,fractures, harvest: harvested.map(x => ({ ...x })), active: active?.id ?? null,
-      tray:view.TrayProbe(),targets: view.Targets(), transfer:view.transfer, model:view.modelInfo, viewReady:view.ready, rendering:view.RenderingProbe(), collision:view.CollisionProbe(),preparation:view.PreparationProbe(),feedback:feedback.map(f=>({...f})), events: events.map(x => ({ ...x })), audio: audio.debug(), settings: { ...settings }, shop: shop.Snapshot(), stats: { ...core.stats },
+      tray:view.TrayProbe(),targets: view.Targets(), transfer:view.transfer, model:view.modelInfo, viewReady:view.ready, rendering:view.RenderingProbe(), collision:view.CollisionProbe(),preparation:view.PreparationProbe(),feedback:feedback.map(f=>({...f})), events: events.map(x => ({ ...x })), audio: audio.debug(), settings: { ...settings }, physicsSettings:physicsSettings.Snapshot(), shop: shop.Snapshot(), stats: { ...core.stats },
       viewport: { width: innerWidth, height: innerHeight }, stage: (() => { const r = canvas.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })() };
   }
   UpdateInventory();UpdateProgress();core.Resize();view.Resize();Frame(0);await view.WarmTools();Frame(0);

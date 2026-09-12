@@ -21,8 +21,10 @@ try{for(const [width,height,touch] of profiles){
   if(type==='up'&&!down)return;if(type==='down')down=true;if(type==='up')down=false;
   if(touch)await cdp.send('Input.dispatchTouchEvent',{type:{down:'touchStart',move:'touchMove',up:'touchEnd'}[type],touchPoints:type==='up'?[]:[{x:p.x,y:p.y}]});
   else{if(type!=='up')await page.mouse.move(p.x,p.y);if(type==='down')await page.mouse.down({button:right?'right':'left'});if(type==='up')await page.mouse.up({button:right?'right':'left'});}
+  // CDP 确认发送不代表合并的触屏 pointermove 已到达页面；收到真实事件后再推进求解帧。
+  if(touch&&type==='move')await page.waitForFunction(p=>{const e=window.__CohesivePointer;return e&&Math.abs(e.x-p.x)<.1&&Math.abs(e.y-p.y)<.1;},p,{polling:20,timeout:10000});
  }
- async function Start(){await Input('up');await page.goto(url+'?debug=1');await page.waitForFunction(()=>window.__EarSpaDebug);await page.evaluate(()=>{window.requestAnimationFrame=()=>0;});await page.locator('#ear-start').click();await page.locator('#lamp-toggle').click();await Step(150);}
+ async function Start(){await Input('up');await page.goto(url+'?debug=1');await page.waitForFunction(()=>window.__EarSpaDebug);await page.evaluate(()=>{window.requestAnimationFrame=()=>0;document.querySelector('#ear-canvas').addEventListener('pointermove',e=>{window.__CohesivePointer={x:e.clientX,y:e.clientY};});});await page.locator('#ear-start').click();await page.locator('#lamp-toggle').click();await Step(150);}
  async function Select(tool){await Input('up');await page.locator('[data-tool="'+tool+'"]').click();}
  async function Target(id){let t=(await Probe()).targets.find(c=>c.id===id);if((await page.locator('#depth-toggle').getAttribute('aria-pressed')==='true')!==(t.depth>10)){await page.locator('#depth-toggle').click();await Step(90);t=(await Probe()).targets.find(c=>c.id===id);}return t;}
  async function Rotate(id,predicate){
