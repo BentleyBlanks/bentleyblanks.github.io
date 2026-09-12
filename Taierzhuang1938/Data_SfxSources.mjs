@@ -92,6 +92,14 @@ export function ArchiveUrl(item, filePath) {
  * cuts[].cue 必须与 Script_Audio 的 RECIPES 同名 —— 同名才盖得上去。
  */
 export const SFX_SOURCES = [
+  {
+    id: "LowHealthBreathSeedAudio",
+    seedAudio: true,
+    credit: "Volcengine SeedAudio 1.0 · approved eight-second injured breath · 2026-09-13",
+    license: "volcengine",
+    bitrate: "128k",
+    cuts: [{ cue: "breathInjured", files: ["AudioSfx_BreathInjured_01.mp3"], durS: 8.045714 }],
+  },
   // 2026-09-09：用户要求重新 SeedAudio 生成全部近中远爆炸及贴耳弹道音。
   // 2026-09-10：爆炸改为用户认可的 Punch / Heavy 两条及中远距离派生版。
   // 全量 SfxBake 只登记这些成品，禁止旧素材配方重新覆盖。

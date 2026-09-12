@@ -777,6 +777,14 @@
       "seconds": 11.692,
       "credit": "Volcengine SeedAudio 1.0 · 日机活塞引擎 · 新录音 · 2026-09-11",
       "license": "volcengine"
+    },
+    "breathInjured": {
+      "files": [
+        "AudioSfx_BreathInjured_01.mp3"
+      ],
+      "seconds": 8.045714,
+      "credit": "Volcengine SeedAudio 1.0 · approved eight-second injured breath · 2026-09-13",
+      "license": "volcengine"
     }
   },
   "bakedAt": "2026-09-12",
@@ -910,5 +918,13 @@
       "auditionGainDb": 6,
       "approvedOn": "2026-09-12"
     }
+  },
+  "injuredBreathSource": {
+    "model": "seed-audio-1.0",
+    "prompt": "生成一条完整连续八秒的写实游戏第一人称受伤呼吸音效。一名二十多岁成年中国男兵，身受重伤但清醒，静止靠坐、强忍疼痛。贴近自己的主观听觉，短浅略颤的吸气，接无力而稍长的呼气，间隔不规则，偶尔带极轻的闭口痛哼。克制、虚弱、疲惫，始终同一人、同一距离。前六秒半完成四到五次呼吸，最后一口呼气在第七秒前完整收住，最后一秒安静，不再吸气或补痛哼；不能像想说话没说完，也不能截断呼气。单人纯净干声、无混响。不要运动后快速规律大口喘气、跑步、色情呻吟、尖叫、说话、旁白、词语、咳血、打鼾、心跳、耳鸣、衣服摩擦、脚步、枪炮、音乐、背景环境或其他人。",
+    "generatedAt": "2026-09-12T16:18:26.033Z",
+    "approvedOn": "2026-09-13",
+    "file": "AudioSfx_BreathInjured_01.mp3",
+    "sha256": "0c9ba273229103b96c078af53052d8a461c11f3d2ae89efbd3d56175edc65e70"
   }
 }

@@ -153,6 +153,7 @@ export class AudioWiring {
     this.sprintHeldS = 0;
     this.gearTimer = 0;
     this.breathVoice = null;
+    this.breathCue = null;
     this.breathUntil = 0;
     this.breathHoldS = 0;
 
@@ -1100,16 +1101,23 @@ export class AudioWiring {
     // 给了房间就变成「隔壁有人在喘」。
     const hurt = player.Alive && player.health < 100 * BODY_FOLEY.breathHealthFrac;
     const winded = this.sprintHeldS > BODY_FOLEY.breathAfterSprintS;
-    if ((hurt || winded) && player.Alive) this.breathHoldS = BODY_FOLEY.breathReleaseS;
+    if (!player.Alive) { this.StopBreath(0.4); return; }
+    const requestedCue = hurt ? "breathInjured" : winded ? "breathHeavy" : null;
+    if (requestedCue && requestedCue !== this.breathCue) {
+      this.StopBreath(BODY_FOLEY.breathSwitchFadeS);
+      this.breathCue = requestedCue;
+    }
+    if (requestedCue) this.breathHoldS = BODY_FOLEY.breathReleaseS;
     else this.breathHoldS = Math.max(0, this.breathHoldS - dt);
     if (this.breathHoldS > 0) {
       if (this.time >= this.breathUntil) {
-        this.breathUntil = this.time + BODY_FOLEY.breathLoopS;
-        this.breathVoice = audio.Play("breathHeavy", {
+        this.breathUntil = this.time + (this.breathCue === "breathInjured"
+          ? BODY_FOLEY.breathInjuredLoopS : BODY_FOLEY.breathLoopS);
+        this.breathVoice = audio.Play(this.breathCue, {
           volume: BODY_FOLEY.breathVolume, priority: true,
         });
       }
-    } else if (this.breathVoice) {
+    } else if (this.breathCue) {
       this.StopBreath(0.4);
     }
   }
@@ -1118,6 +1126,8 @@ export class AudioWiring {
     const audio = this.Audio;
     if (this.breathVoice && audio) audio.StopVoice?.(this.breathVoice, fade);
     this.breathVoice = null;
+    this.breathCue = null;
+    this.breathHoldS = 0;
     this.breathUntil = 0;
   }
 

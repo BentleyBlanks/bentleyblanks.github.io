@@ -2110,6 +2110,21 @@ const RECIPES = {
     v.Live(2.5);
   },
 
+  // Quiet irregular fallback; the approved eight-second SeedAudio take replaces it.
+  breathInjured(A, v) {
+    const src = v.Noise("pink", 8);
+    const band = v.Filter("bandpass", v.F(480), 1.2);
+    const g = v.Gain(FLOOR);
+    src.connect(band).connect(g).connect(v.out);
+    v.Start(src, v.t, 8);
+    for (const offset of [0, 1.7, 3.8, 5.5]) {
+      Swell(g.gain, v.t + offset, 0.12, 0.05, 0.05, 0.12);
+      Swell(g.gain, v.t + offset + 0.35, 0.16, 0.08, 0.16, 0.52);
+    }
+    v.wetGain.gain.value = 0;
+    v.Live(8.05);
+  },
+
   // 玩家落地。**不是 bodyFall**（那是一个人倒下：装具散开、四肢先后落地）——
   // 这条是两只脚同时着地 + 一身装备被顿了一下，短得多。
   bodyLand(A, v) {
@@ -2584,7 +2599,7 @@ const NODE_COST = {
   // 100 ms 内请求三条（限速见 Data_Tuning_Audio.NEAR_MISS）。写小了会让弹啸挤掉枪声。
   bulletCrack: 9, bulletWhizz: 5, ricochet: 7, impactStone: 11,
   footstepWood: 7, footstepStone: 8, footstepGrass: 8, footstepMud: 8,
-  clothMove: 5, gearRattle: 8, breathHeavy: 5, bodyLand: 11,
+  clothMove: 5, gearRattle: 8, breathHeavy: 5, breathInjured: 5, bodyLand: 11,
   grenadeBounce: 7, grenadeRoll: 8,
   explosionMid: 11, debrisFall: 8,
   // 一直烧着的东西：同时最多四条（FIRE_SPOT.maxVoices），四条就是 40 个节点，
@@ -2636,7 +2651,7 @@ const MIX_GAIN = {
   impactStone: 1.5,
   // 脚步与身体 foley 一律压到脚步那一档：每秒响一两下的东西不能与枪声同量级。
   footstepWood: 1.0, footstepStone: 1.0, footstepGrass: 1.1, footstepMud: 1.0,
-  clothMove: 1.6, gearRattle: 1.6, breathHeavy: 1.4, bodyLand: 0.8,
+  clothMove: 1.6, gearRattle: 1.6, breathHeavy: 1.4, breathInjured: 1.4, bodyLand: 0.8,
   // 手榴弹落在脚边那两声是**玩法反馈**（还有几秒、往哪儿躲），要听得见。
   grenadeBounce: 2.2, grenadeRoll: 2.0,
   explosionMid: 1.0, debrisFall: 1.3,
@@ -2679,7 +2694,7 @@ export const MUSIC_BASE = "Audio/Music/";
 // 这一次是**加条目**：戳不动的话浏览器拿着缓存里的旧清单，新素材永远载不上，
 // 而 LoadSfxPack 盖不上去是静默的 —— 表现只是「断肢还是合成音」。
 // （同一天 Codex 那边把戳改成了日期式，合并后取带两件事的同一个新戳。）
-export const SFX_PACK_VERSION = "20260912explosiondistance";
+export const SFX_PACK_VERSION = "20260913injuredbreath";
 export const AMB_PACK_VERSION = "20260912trainonly";
 export const MUSIC_PACK_VERSION = "5";
 
@@ -2844,7 +2859,7 @@ const SAMPLE_MIX = {
   // 四种材质脚步与 dirt/rubble 同一档：木板与石板本来就比土路响一点，草与泥更闷。
   footstepWood: 0.3, footstepStone: 0.3, footstepGrass: 0.22, footstepMud: 0.26,
   // 身体 foley 全是「贴着自己」的小动作，比脚步略低；喘息一直在响，按床配平。
-  clothMove: 0.22, gearRattle: 0.2, breathHeavy: 0.3, bodyLand: 0.5,
+  clothMove: 0.22, gearRattle: 0.2, breathHeavy: 0.3, breathInjured: 0.3, bodyLand: 0.5,
   grenadeBounce: 0.45, grenadeRoll: 0.35,
   // 中距爆炸夹在近（1.0）与远（0.5）之间；落屑是爆炸之后的余音，不能抢爆炸本身。
   explosionMid: 0.72, debrisFall: 0.4,
@@ -2885,6 +2900,7 @@ const SAMPLE_WET = {
   footstepWood: 0.14, footstepStone: 0.24, footstepGrass: 0.08, footstepMud: 0.06,
   clothMove: 0.05, gearRattle: 0.05, bodyLand: 0.12,
   breathHeavy: 0,                    // 自己的肺没有房间
+  breathInjured: 0,
   grenadeBounce: 0.3, grenadeRoll: 0.28,
   explosionMid: 0.55, debrisFall: 0.2,
   fireSpot: 0.3,
@@ -2961,6 +2977,7 @@ const AMB_AIR = {   // → Play 的 airCut
  * 一梭子下来必然连出两次同一条 —— 那恰恰是切四条想避开的事。轮播两样都不占。
  */
 const SAMPLE_CYCLE = new Set(["dadaoSwing", "dadaoHit", "bayonetHit", "telegraphKey",
+  "breathInjured", // Preserve the reviewed voice and full duration without pitch jitter.
   "bulletCrack", "bulletWhizz",
   // 断肢两条与白刃同理由：变体是一条条量过挑出来的（`Script_SeedAudioGoreBake`
   // 的头注记了每条的取舍），要的就是它们本来的样子；而近炸一次卸两三段时

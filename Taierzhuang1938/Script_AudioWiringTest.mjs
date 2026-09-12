@@ -428,6 +428,47 @@ Check("冲刺五秒 → 装具声约每 0.9 s 一记（4—7 记）",
   body.gear >= 4 && body.gear <= 7, `请求 ${body.gear} 条`);
 Check("冲刺过三秒 → 开始喘", body.breath >= 1, `请求 ${body.breath} 条`);
 
+// Isolated player timeline through the real wiring and audio engine.
+const injuredBreath = await page.evaluate(() => {
+  const T = window.Taierzhuang, a = T.audio;
+  const calls = [], stops = [];
+  const p = { Alive: true, health: 100, sprint: 0, stance: "stand" };
+  const w = new T.audioWiring.constructor({ player: p, audio: {
+    Play(cue, opts) { calls.push({ cue, opts }); return a.Play(cue, opts); },
+    StopVoice(voice, fade) { stops.push(voice); a.StopVoice(voice, fade); },
+  } });
+  const Step = dt => { w.time += dt; w.BodyFoley(dt); };
+  const Count = cue => calls.filter(c => c.cue === cue).length;
+  p.health = 35; Step(0.01);
+  const threshold = Count("breathInjured") === 0;
+  p.health = 34; Step(0.01);
+  const resting = Count("breathInjured") === 1 && Count("breathHeavy") === 0;
+  p.sprint = 1; Step(4);
+  const priority = Count("breathInjured") === 1 && Count("breathHeavy") === 0;
+  Step(4);
+  const fullTake = Count("breathInjured") === 1;
+  Step(0.06);
+  const repeat = Count("breathInjured") === 2;
+  p.health = 35; Step(0.01);
+  const switchToSprint = w.breathCue === "breathHeavy" && Count("breathHeavy") === 1;
+  p.sprint = 0; Step(1.19);
+  const recoveryTail = w.breathCue === "breathHeavy";
+  Step(0.02);
+  const released = w.breathCue === null && w.breathHoldS === 0;
+  p.health = 34; Step(0.01);
+  p.Alive = false; Step(0.01);
+  const death = w.breathCue === null && w.breathHoldS === 0 && !w.breathVoice;
+  p.Alive = true; Step(0.01); w.Reset();
+  const reset = w.breathCue === null && w.breathHoldS === 0 && !w.breathVoice;
+  p.health = 100; Step(0.01);
+  const cleanRestart = w.breathCue === null;
+  const dry = calls.filter(c => c.cue === "breathInjured").every(c => !c.opts.position);
+  return { threshold, resting, priority, fullTake, repeat, switchToSprint,
+    recoveryTail, released, death, reset, cleanRestart, dry,
+    loaded: a.sampleCues.has("breathInjured") };
+});
+for (const [name, ok] of Object.entries(injuredBreath)) Check(`injured breath: ${name}`, ok);
+
 // ---------------------------------------------------------------------------
 // 8.5) 火焰点声源：挂在 vfx 的火焰发射器上，同时最多四条（最近的优先）
 // ---------------------------------------------------------------------------

@@ -228,7 +228,8 @@ window.Taierzhuang.Debug.AudioZone()
 | `clothMove` | 姿态切换（站/蹲/卧任意变化） | 音量 0.42 |
 | `clothMove` | 翻越 / 攀爬（`vaultCount + mantleCount` 增加） | 音量 0.6、变调 0.92 |
 | `gearRattle` | 冲刺中每 0.9 s | 音量 0.38 |
-| `breathHeavy` | 冲刺满 3 s，或血量 < 35%；停止条件后再喘 1.2 s | 音量 0.5，每 2.4 s 续一条，**非空间化、wet 0** |
+| `breathHeavy` | 连续冲刺超过 3 s；停止条件后再喘 1.2 s | 音量 0.5，每 2.4 s 续一条，**非空间化、wet 0** |
+| `breathInjured` | 血量 < 35 点，优先于冲刺喘息；恢复后保留 1.2 s 再淡出 | 用户选定的 8 秒 SeedAudio 干声，原文件、原音高，每 8.05 s 续播，音量 0.5，**非空间化、wet 0**；死亡与换关清除喘息状态 |
 | `bodyLand` | 落地且冲击 > 0.25 | 0.55 ×（0.5 + impact×0.6） |
 
 落地这条同时换掉了旧的 `bodyFall`：那是**一个人倒下**（装具散开、四肢先后落地），

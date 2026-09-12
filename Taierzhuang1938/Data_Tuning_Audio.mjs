@@ -219,6 +219,8 @@ export const BODY_FOLEY = Object.freeze({
   breathAfterSprintS: 3.0,
   breathHealthFrac: 0.35,
   breathLoopS: 2.4,         // 一条 breathHeavy 的时长，到点续一条
+  breathInjuredLoopS: 8.05, // 用户选定的 8 秒受伤干声，完整播完后再续
+  breathSwitchFadeS: 0.15, // 切换喘息种类时收住上一条
   breathVolume: 0.5,
   breathReleaseS: 1.2,      // 停下之后还喘这么久
   landMinImpact: 0.25,      // 比这轻的落地只有靴底那一下，不叠身体

@@ -83,7 +83,8 @@ const load = await page.evaluate(() => {
 //   （惨叫 / 痛呼 / 闷哼、照明弹四条、发报两条、日机三条、扫地一条、重机两条）
 // 2026-09-11 断肢两音（goreSever / goreLimbLand）→ 83
 // 2026-09-11: sampled continuous piston engine.
-const RECIPE_COUNT = 84;
+// 2026-09-13: approved low-health breath, separate from sprint breathing.
+const RECIPE_COUNT = 85;
 
 if (!load.enabled) Fail("AudioEngine 被禁用了（正常模式不该走到出图那条路）");
 if (load.manifestCues !== RECIPE_COUNT) {
@@ -751,6 +752,13 @@ else Ok(`采样路径下 duck 与耳鸣照常触发且按距离缩放（贴脸 $
 // 用 ConstantSource 喂 1e-6（听不见，但不是静音），量完停掉。
 const hdr = await page.evaluate(async () => {
   const a = window.Taierzhuang.audio;
+  // The 70 ms probe measures WebAudio's attack/hold, not a busy menu render.
+  // Freeze only visual frame work during this probe; the real audio clock and
+  // first-person Play/DuckAmbience path keep running with unchanged assertions.
+  const state = window.Taierzhuang.state;
+  const wasWarming = state.warming;
+  state.warming = true;
+  try {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const keepAlive = [a.ambienceBus, a.farGain].map((dst) => {
     const cs = a.ctx.createConstantSource();
@@ -781,6 +789,9 @@ const hdr = await page.evaluate(async () => {
   const mg = { amb: a.ambienceDuck.gain.value, far: a.farGain.gain.value };
   for (const cs of keepAlive) { try { cs.stop(); cs.disconnect(); } catch (err) { /* 已停 */ } }
   return { before, single, released, mg, n: a.stats.ambienceDucks - before.n };
+  } finally {
+    state.warming = wasWarming;
+  }
 });
 if (!hdr.n) Fail("玩家开枪没有触发 DuckAmbience（stats.ambienceDucks 没动）");
 else if (!(hdr.single.amb < 0.7)) Fail(`开枪后环境总线只压到 ${hdr.single.amb.toFixed(3)}（应 < 0.7，约 −6 dB）`);
