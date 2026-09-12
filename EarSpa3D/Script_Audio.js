@@ -475,11 +475,22 @@ export function CreateAudio() {
     };
     const profile = profiles[kind] || profiles.scrape;
     const bounds = profile.base;
+    const frictionKind=['scrape','gritty','wipe','sweep','tickle'].includes(kind);
+    let frictionGate=null;
     lfo.frequency.value = bounds.lfo || 5.5;
     lowOsc.frequency.value = 78;
 
     function Apply(at) {
       const { speed, pressure, rough } = p;
+      // Friction vanishes at rest or without pressure, including direct callers of contact.update.
+      const gate=Math.sqrt(speed*pressure);
+      if(frictionKind&&gate!==frictionGate){
+        const param=gateGain.gain;
+        if(param.cancelAndHoldAtTime)param.cancelAndHoldAtTime(at);else param.cancelScheduledValues(at);
+        Smooth(param,gate,.008,at);
+        if(gate===0)param.setValueAtTime(0,at+.028);
+        frictionGate=gate;
+      }
       Smooth(band.frequency, Math.min(15000, bounds.band * (0.55 + speed * 1.5) * (1 + rough * 0.25)), CONTACT_SMOOTH, at);
       Smooth(band.Q, bounds.q + rough * 0.9, CONTACT_SMOOTH, at);
       Smooth(pre.frequency, bounds.hp * (0.7 + pressure * 0.6), CONTACT_SMOOTH, at);
@@ -505,13 +516,13 @@ export function CreateAudio() {
         gateGain.gain.cancelScheduledValues(at);
         gateGain.gain.setValueAtTime(0.0001, at);
         // 音叉起振要快（敲一下就是一下），噪声类要 soft 一点免得「咔」
-        gateGain.gain.linearRampToValueAtTime(1, at + (kind === "vibrate" ? 0.015 : 0.07));
+        if(!frictionKind)gateGain.gain.linearRampToValueAtTime(1, at + (kind === "vibrate" ? 0.015 : 0.07));
         Apply(at);
         live.contactStarted += 1;
       },
       frame(dt, at) {
         Apply(at);
-        if (profile.grains) ScheduleGrains(at, dt + 0.06, profile.grains);
+        if (profile.grains&&(!frictionKind||p.speed>0&&p.pressure>0)) ScheduleGrains(at, Math.min(dt,.035) + 0.015, profile.grains);
       },
       stop(at, release) {
         const g = gateGain.gain;
@@ -1250,7 +1261,7 @@ export function CreateAudio() {
         if (!ctx || !unlocked) return;
         const id = KIND_ALIAS[kind] || kind;
         const existing = contact.get(id);
-        if (existing) { existing.p.pressure = Math.max(existing.p.pressure, 0.25); return; }
+        if (existing) return;
         const engine = CreateContactEngine(id);
         contact.set(id, engine);
         engine.start(ctx.currentTime + 0.02);
@@ -1269,7 +1280,7 @@ export function CreateAudio() {
         const id = KIND_ALIAS[kind] || kind;
         const engine = contact.get(id);
         if (!engine) return;
-        engine.stop(ctx.currentTime + 0.01, Math.max(0.05, release));
+        engine.stop(ctx.currentTime + 0.01, Math.max(0.008, release));
         contact.delete(id);
       },
       kinds() { return [...new Set(Object.values(KIND_ALIAS))]; },

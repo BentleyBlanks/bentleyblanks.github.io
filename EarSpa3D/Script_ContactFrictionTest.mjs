@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {ContactFriction} from './Script_ContactFriction.mjs';
+const moving={force:10,scrapeSpeed:1};
+assert.ok(ContactFriction(moving,'scoop','dry'));
+assert.equal(ContactFriction({...moving,scrapeSpeed:0},'scoop','dry'),null,'a loaded but stationary scoop is silent');
+assert.equal(ContactFriction({...moving,force:0},'scoop','dry'),null,'unloaded motion is silent');
+for(const key of ['slipped','wrongDirection','wrongTool','detached'])assert.equal(ContactFriction({...moving,[key]:true},'scoop','dry'),null,key+' is silent');
+assert.equal(ContactFriction(moving,'tweezers','dry'),null,'a gripping tool does not get a generic scrape layer');
+assert.equal(ContactFriction(moving,'scoop','oily').kind,'wipe','wet rubbing has no dry grains');
+const light=ContactFriction({force:.03,scrapeSpeed:.02},'scoop','dry');
+assert.ok(light.speed01<.01&&light.pressure01<.001,'light contact has no audible minimum speed or pressure');
+console.log('PASS motion/load/contact gates, material routing and no artificial volume floors');

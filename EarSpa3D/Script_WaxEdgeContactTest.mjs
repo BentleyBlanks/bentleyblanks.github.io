@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import {WaxEdgeContact} from './Script_WaxEdgeContact.mjs';
+import {WaxEdgeContact,WaxGripNormal} from './Script_WaxEdgeContact.mjs';
 import {InstrumentContact} from './Script_InstrumentInteraction.mjs';
 const normal=[0,0,1];
 const body={size:1,surface:{points:[[-1,-1,0],[1,-1,0],[1,1,0],[-1,1,0]],triangles:[[0,1,2],[0,2,3]],thickness:[.04,.04,.04,.04]}};
+const flatBody=structuredClone(body);
 const Face=([x,y,z])=>{const q=[-y,x,0,1+z],length=Math.hypot(...q);return q.map(v=>v/length);};
 for(const [point,inward] of [[[.97,0,.04],[-1,0,0]],[[-.97,0,.04],[1,0,0]],[[0,.97,.04],[0,-1,0]],[[0,-.97,.04],[0,1,0]]]){
   const edgeContact=WaxEdgeContact(body,point);assert.ok(edgeContact,'every perimeter side has contact');
@@ -20,6 +21,18 @@ assert.ok(!InstrumentContact('scoop',Face([1,0,0]),normal).aligned,'center conta
 body.surface.points=body.surface.points.map(([x,y,z])=>[x,-z,y]);
 const bent=WaxEdgeContact(body,[0,-.04,.97]);
 assert.ok(bent&&bent.inward[2]<-.99&&Math.abs(bent.inward[1])<1e-10,'edge direction follows deformation');
+body.surface.grip={ids:[0,1,2]};
+const bentNormal=WaxGripNormal(body,normal);
+assert.deepEqual(bentNormal.map(v=>v||0),[0,-1,0],'center normal follows the actual bent triangle');
+assert.ok(InstrumentContact('scoop',Face([0,-1,0]),bentNormal).aligned,'a bowl facing the bent surface works despite being sideways to the original wall');
+assert.ok(!InstrumentContact('scoop',Face([0,1,0]),bentNormal).aligned,'the back remains invalid on a bent surface');
+for(const degrees of [75,80,85]){
+ const angle=degrees*Math.PI/180,face=[Math.sin(angle),0,Math.cos(angle)];
+ assert.ok(InstrumentContact('scoop',Face(face),normal).aligned,`front grazing contact at ${degrees} degrees works`);
+ assert.ok(!InstrumentContact('scoop',Face(face.map(v=>-v)),normal).aligned,'reverse grazing contact stays invalid');
+}
+const rim=WaxEdgeContact(flatBody,[.97,0,.04]);
+assert.ok(!InstrumentContact('scoop',Face([-.9,0,Math.sqrt(.19)]),normal,{edgeContact:rim,motion:[1,0,0]}).loading,'even a front-facing rim cannot drag an edge outward without lift');
 const fragment={size:.3,surface:{points:[[-.3,-.3,0],[.3,-.3,0],[.3,.3,0],[-.3,.3,0]],triangles:[[0,1,2],[0,2,3]],thickness:[.02,.02,.02,.02]}};
 assert.ok(WaxEdgeContact(fragment,[.28,0,.02]),'a new cut fragment uses its own perimeter');
 assert.equal(WaxEdgeContact(fragment,[.97,0,.04]),null,'fragment does not retain the parent boundary');
