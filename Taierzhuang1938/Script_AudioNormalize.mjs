@@ -62,6 +62,12 @@ EXEMPTIONS.set("AudioSfx_ExplosionNearHeavyEarth.mp3", {
   metric: "activeRmsDbfs", targetDbfs: -19.5,
   why: "2026-09-12 用户认可的厚重掀土 +6 dB 试听成品；保留选定响度与动态",
 });
+for (const file of ["AudioSfx_ExplosionMidVillage.mp3", "AudioSfx_ExplosionFarField.mp3"]) {
+  EXEMPTIONS.set(file, {
+    metric: "activeRmsDbfs", targetDbfs: -19.5,
+    why: "2026-09-12 用户指定村外为中爆、田野为远爆并要求加响；+6 dB 保留原音色动态",
+  });
+}
 
 const PEAK_CEILING_DBFS = -1;
 const PROCESS_LIMIT_DBFS = -1.5; // Leave MP3 reconstruction headroom for the -1 dBFS decoded ceiling.

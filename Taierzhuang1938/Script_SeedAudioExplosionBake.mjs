@@ -1,4 +1,5 @@
-// Rebuild MID/FAR variants from the two user-approved SeedAudio takes (2026-09-10).
+// Preserve the approved Village/Field mid/far takes (2026-09-12) when installed.
+// Historical fallback: rebuild MID/FAR variants from the 2026-09-10 takes.
 // Near now uses the separate 2026-09-11 replacement; never reinstall the retired near cues.
 // Default inputs are the deployed near files, preserved byte-for-byte. No API calls.
 // --source-dir=<directory> imports the approved audition filenames instead.
@@ -40,6 +41,20 @@ function Measure(pcm) {
     seconds: pcm.length / 4 / 44100 };
 }
 function Main() {
+  const current = JSON.parse(fs.readFileSync(path.join(outputDir, "Data_SfxManifest.json"), "utf8"));
+  const approved = ["explosionMid", "explosionFar"].map(cue => ({ cue, take: current.approvedExplosionSources?.[cue] }));
+  if (approved.some(({ take }) => take)) {
+    // Never let this older low-pass derivation silently replace a newer approved take.
+    for (const { cue, take } of approved) {
+      if (!take || current.cues[cue]?.files?.length !== 1 || current.cues[cue].files[0] !== take.file)
+        throw new Error(`Approved ${cue} manifest mismatch`);
+      const bytes = fs.readFileSync(path.join(outputDir, take.file));
+      if (createHash("sha256").update(bytes).digest("hex") !== take.sha256)
+        throw new Error(`Approved ${cue} file hash mismatch`);
+      console.log(`${cue}: preserving approved ${take.file}`);
+    }
+    return;
+  }
   const inputs = takes.map((take, index) => {
     const file = sourceDir ? path.join(sourceDir, `AudioSfx_Explosion${take.name}_01.mp3`)
       : path.join(outputDir, `AudioSfx_ExplosionNear_0${index + 1}.mp3`);

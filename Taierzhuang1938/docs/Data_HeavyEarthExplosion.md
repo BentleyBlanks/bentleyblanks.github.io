@@ -12,7 +12,7 @@
 
 旧 `Script_SeedAudioCarriageReviewBake.mjs --install-sfx` 现在仅重装飞机引擎，
 不再覆盖近距爆炸。旧近爆素材保留为历史文件，清单不再选择它。
-两条新生成的远处炮响仍只在本地试听，不替换游戏的中距或远距素材。
+后续用户选定“村外远爆”为中距、“田野远爆”为远距，接入见下文。
 
 本地试听、原始音频与验收证据留在任务 worktree 的 `tmp/FourExplosionSfx`。
 
@@ -25,3 +25,23 @@
 因共享测试槽被其他任务占用而未执行，不报告为整套通过。
 全库响度报告仍有 5 个未修改旧素材失败（GoreSever 01/02、GoreLimbLand 01/02、
 CarriageRearCheer）；新素材的有声段 RMS −19.53、峰值 −4.11 dBFS 合格。
+
+## 中距与远距接入
+
+用户认可两条音色，要求提高偏轻的响度：各自加 6 dB，保留动态和尾声，
+不添加压缩、滤波或额外混响。`explosionMid` 单独使用村外版
+`AudioSfx_ExplosionMidVillage.mp3`（2.687 秒），`explosionFar` 单独使用田野版
+`AudioSfx_ExplosionFarField.mp3`（3.307 秒）。原始文件与成品哈希、提示词及测量值
+同样登记在 `approvedExplosionSources`；近距的已认可文件保持字节不变。
+
+两条成品有声段 RMS 均为 −19.53 dBFS，峰值分别 −4.13 / −5.41 dBFS。
+全库归一化按人工档 −19.5 dBFS 校验，避免自动重烘压回 −25。
+旧 ExplosionBake 在存在新批准记录时只核验清单和文件哈希，不再用旧素材覆盖中远档。
+
+距离边界、音量比例及传播处理沿用游戏混音；素材自身都加响，听者距离仍负责远近层次。
+实测真实浏览器 AudioWiring → AudioEngine → OfflineAudioContext：8 米选厚重掀土，
+40 米选村外，120 米选田野，均成功加载新采样并产生非静音输出，且响度近 > 中 > 远。
+20 次混合爆炸以 volume=4、间隔 0.15 秒压力渲染，峰值 0.93710，无削波或播放错误。
+证据为本地 `Data_DistanceVerification.json`。模块缓存图、旧 baker 保留检查及
+新文件响度检查通过；5 个旧素材响度失败仍未修改。本轮整场景回归未执行，
+检查时共享槽被其他任务的 FirstLevelMissionBrowserTest 占用。

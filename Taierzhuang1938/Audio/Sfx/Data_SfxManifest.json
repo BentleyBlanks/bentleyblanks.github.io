@@ -148,11 +148,10 @@
     },
     "explosionFar": {
       "files": [
-        "AudioSfx_ExplosionFar_01.mp3",
-        "AudioSfx_ExplosionFar_02.mp3"
+        "AudioSfx_ExplosionFarField.mp3"
       ],
-      "seconds": 2.444,
-      "credit": "Volcengine SeedAudio 1.0 · approved Punch / Heavy · Far · 2026-09-10",
+      "seconds": 3.307,
+      "credit": "Volcengine SeedAudio 1.0 · 田野远爆 · 远距爆炸 +6 dB · 2026-09-12",
       "license": "volcengine"
     },
     "shellIncoming": {
@@ -718,11 +717,10 @@
     },
     "explosionMid": {
       "files": [
-        "AudioSfx_ExplosionMid_01.mp3",
-        "AudioSfx_ExplosionMid_02.mp3"
+        "AudioSfx_ExplosionMidVillage.mp3"
       ],
-      "seconds": 2.444,
-      "credit": "Volcengine SeedAudio 1.0 · approved Punch / Heavy · Mid · 2026-09-10",
+      "seconds": 2.687,
+      "credit": "Volcengine SeedAudio 1.0 · 村外远爆 · 中距爆炸 +6 dB · 2026-09-12",
       "license": "volcengine"
     },
     "debrisFall": {
@@ -871,6 +869,44 @@
       "peakDbfs": -4.1,
       "onset": 0,
       "normalizedSourceSha256": "e0a6c8318d9aeed91c336275d1e5ee0bec836895383706b4406c434bc751c8aa",
+      "auditionGainDb": 6,
+      "approvedOn": "2026-09-12"
+    },
+    "explosionMid": {
+      "id": "ExplosionFar07",
+      "cue": "explosionMid",
+      "title": "村外远爆 · 中距爆炸",
+      "duration": 3.8,
+      "prompt": "生成用于写实二战第一人称战争游戏的一条独立音效，单声道，无音乐，无人声，无旁白，无其他战场背景声，无耳鸣，无电子合成或科幻质感。仅一次事件，不重复。起音及时，尾音完整自然停止。约三秒半。写实户外远处爆炸单次音效，视听位置固定：听者在村口，五百米外的土坡另一侧一枚野炮炮弹爆炸。听到一次远方传来的厚实轰响，前沿稍钝但清楚，绝非近处爆炸的刺耳炸裂。中低频炮响有重量和自然颗粒，伴随极轻而弥散的地形反射，尾音很快散开，不拖长。爆炸明显在远方，不能像脚边炸开，也不能像闷雷或轰鸣引擎。不要近处冲击啪声、石子落地、飞啸、连环爆炸、枪声、背景风声、夸张低音、音乐或人声。",
+      "file": "AudioSfx_ExplosionMidVillage.mp3",
+      "model": "seed-audio-1.0",
+      "generatedAt": "2026-09-12T15:29:44.857Z",
+      "sha256": "0f6027899ac7587c6dc2558dfda5348e728ab5c4ee3b00e573d456988999c3e0",
+      "rawSha256": "e6c83bd942b814c634055ed61ed36681ed3b53c3057ce43f8460143fef0b3c15",
+      "seconds": 2.6865306122448978,
+      "activeRmsDbfs": -19.528211913930985,
+      "peakDbfs": -4.1331957591612065,
+      "onset": 0,
+      "normalizedSourceSha256": "e301e68962f2c9363d99b74d4f5065de1ed92245765cf52dfc879363ae6f5b42",
+      "auditionGainDb": 6,
+      "approvedOn": "2026-09-12"
+    },
+    "explosionFar": {
+      "id": "ExplosionFar06",
+      "cue": "explosionFar",
+      "title": "田野远爆 · 远距爆炸",
+      "duration": 3.5,
+      "prompt": "生成用于写实二战第一人称战争游戏的一条独立音效，单声道，无音乐，无人声，无旁白，无其他战场背景声，无耳鸣，无电子合成或科幻质感。仅一次事件，不重复。起音及时，尾音完整自然停止。约三秒半。一段真实纪录片式的单次远距离炮弹爆炸录音。听者站在开阔田野，爆点在四百米外。首先听见有距离的短促沉实轰声，仍有可辨识的爆裂前沿，但绝无贴耳啪声。主要是自然空气传播后的中低频，轻微粗粝而不浑浊，不像贴近麦克风录制后简单调小。接一段短暂、稀薄、向开阔地散去的余响。安静背景下明确感觉爆炸在远处，有实在重量，不空洞。只一发，没有飞行啸声、近处碎石、鞭炮、雷雨、室内混响、低通水下感、巨大电影超低音或连续战场背景。",
+      "file": "AudioSfx_ExplosionFarField.mp3",
+      "model": "seed-audio-1.0",
+      "generatedAt": "2026-09-12T15:29:28.145Z",
+      "sha256": "e2a20d6bf8fd87fc88e311ee21a78e76905cf11637aaec2d0da702947d773022",
+      "rawSha256": "a4dd1b5e29f5fafc17564332b47ce6468a6b13e758cc377502bfabd7a63a939f",
+      "seconds": 3.306530612244898,
+      "activeRmsDbfs": -19.531487525705423,
+      "peakDbfs": -5.414138953258872,
+      "onset": 0,
+      "normalizedSourceSha256": "36da4b62faea5873df60e29381965974cea02dd44ecdceb8484424f52cb29d17",
       "auditionGainDb": 6,
       "approvedOn": "2026-09-12"
     }
