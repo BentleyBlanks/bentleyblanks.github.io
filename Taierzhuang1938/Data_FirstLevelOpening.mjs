@@ -5,10 +5,52 @@ export const OPENING = Object.freeze({
   derailPivot: {x:-74.6,y:.75},
   derailRollRad: -Math.PI/2,
   derailSeconds: 2.4,
-  rescueSeconds: 3.2,
+  // User-approved carriage sequence; the authored Blender performance must finish
+  // its failed first rise and second recovery before Luo reaches for Shunzi.
+  nearShellFlightS: 1.4,
+  // Start the whole failed rise only after the player's actual eyelid sample
+  // exposes enough of the scene; sensory recovery keeps its independent curve.
+  luoRecoveryMaxEyeClosure: .45,
+  luoRecoverySeconds: 4.8,
+  rescueSeconds: 4.4,
+  rescueGripSeconds: 1.25,
+  rescuePullSeconds: 2.1,
+  rescueStandSeconds: 3.55,
+  rescueDialogueLines: {reach:6,grip:7,steady:8},
+  rescueGripFraction: .3,
+  dialogueActions: {
+    TrainMeal:{heyoutian:"HeReplyTalk",luo:"LuoBriefing"},
+    TrainBanter:{liuwencai:"LiuCountTalk",heyoutian:"HeReplyTalk"},
+    TrainBriefing:{luo:"LuoBriefing"},
+    TrainShelling:{luo:"LuoCrouchReassure",yaowa:"YaowaAlarmCrouch"},
+  },
+  barrage: {
+    firstFlightS: .45, shellFlightS: 1.2, shellRadiusM: 5,
+    shellSourceOffset:{x:25,z:-18}, shellSourceHeightM:28,
+    // All ranging impacts land beside the moving train. Only the separately
+    // cued near hit overturns the player's carriage.
+    shells: [
+      {at:0,x:-62,z:-12},{at:.55,x:-88,z:8},{at:1.3,x:-63,z:17},
+      {at:2.1,x:-87,z:-16},{at:3.4,x:-61,z:-4},{at:4.7,x:-89,z:12},
+      {at:6.1,x:-62,z:-20},{at:7.4,x:-88,z:2},{at:9,x:-60,z:16},
+      {at:10.5,x:-87,z:-10},{at:12,x:-62,z:5},{at:13.8,x:-89,z:18},
+    ],
+    shotIntervalS:.12, burstShots:6, burstRestS:.42, maxSeconds:20,
+    tracerSpeedMps:680, shotSourceX:-42, shotSourceHeightM:3.8,
+    passHeightM:3.02, wallHeightM:2.3, sourceLeadM:26,
+    targetX:-94, sourceLanes:3, sourceSpacingM:4,
+    targetStrideM:7, targetSpanM:17, targetCenterM:8,
+    heightSteps:4, heightStepM:.11,
+    shotCue:"type11", nearCue:"bulletCrack", impactCue:"ricochet",
+    shotVolume:.9, nearVolume:.7, impactVolume:.55,
+  },
   playerFall: {x:-73.25,z:88,eyeM:.38},
-  rescueEnd: {x:-70.5,z:88},
-  rescueGuide: {x:-72.15,z:88},
+  // Luo braces beside the pull corridor. The player's 1.60m path stays at
+  // least 1.10m from his root even when he does not take a backward step.
+  rescueEnd: {x:-71.65,z:88},
+  // The whole standing/crouching capsule must clear the last station step;
+  // sampling the ground beneath the root alone misses its rounded lower edge.
+  rescueGuide: {x:-72.1,z:89.1},
   blackout: {start:1.65,close:.35,hold:.65,open:1.1},
   // One impact closure, held blackout, then a continuous reopening. Focus and
   // hearing recover separately; repeated shutter beats made the wreck theatrical.

@@ -219,6 +219,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudSubtitle.on { opacity: 1; }
 .hudSubtitle .who { color: var(--warn); margin-right: 10px; }
 .hudSubtitle .narr { color: var(--dim); font-style: italic; }
+.hudSubtitle .subtitleLine + .subtitleLine { margin-top: 6px; }
 
 .hudHint {
   position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%);

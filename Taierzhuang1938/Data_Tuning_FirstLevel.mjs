@@ -54,7 +54,9 @@ export const MISSION_TUNING = Object.freeze({
   companionGrenadeReplanS:.25,
   openingContactStages:["Unloading","TrenchEntry","Shelter","Support","MachineGun","Tank","Orders","Village","Melee","Courtyard","TransferApproach","Transfer","RetreatFirst","RetreatWall","RetreatYard","Reception","FinalDefense","Exit"],
   // Cruise at 21.6 km/h; the remaining physical approach determines smooth braking after impact.
-  trainTravelM: 174,
+  // Meal (25.331s including pauses) + overlapping exchange (14.132s),
+  // then roughly nine seconds braking from the first ranging impact.
+  trainTravelM: 268,
   trainCruiseSpeedMps: 6,
   trainShellLeadM: 18,
   trainFirstShellFlightS: 1.4,

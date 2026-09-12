@@ -211,7 +211,7 @@ export class CombatSystem {
   FireShell(from, target, { flight = SHELL.flightFallbackS, kind = "Shell75",
     radius = SHELL.radiusFallbackM, damage = SHELL.damageFallback,
     OnImpact = null, byPlayer = false, sourceCollider = null,
-    incoming = true, report = false } = {}) {
+    incoming = true, report = false, Elapsed = null } = {}) {
     // 一发炮弹的三声里的前两声（第三声是落地，走 Blast）。**写在这儿而不是调用点**：
     // 见 SHELL.incomingCue 的抬头 —— 原来只有序章那两处自己补了啸声，
     // 第一关的军列炮击、前沿弹着点、战车主炮全程是哑的。
@@ -223,14 +223,16 @@ export class CombatSystem {
       // 啸声摆在落点上、延到「正好压在落地之前」响：一条不会动的 Panner 位置比
       // 逐帧搬一条两秒的音便宜得多，而听感上的差别只在最后半秒。
       if (incoming && flight >= SHELL.incomingMinFlightS) {
+        const sourceAge=Elapsed?.(),elapsed=Number.isFinite(sourceAge)?Math.max(0,sourceAge):0;
         audio.Play(SHELL.incomingCue, { position: target.clone(), volume: SHELL.incomingVolume,
-          delay: Math.max(0, flight - SHELL.incomingSeconds) });
+          delay: Math.max(0, flight - SHELL.incomingSeconds - elapsed),
+          ...(Elapsed?{offset:Math.max(0,elapsed-flight+SHELL.incomingSeconds)}:{}) });
       }
     }
     const velocity = target.clone().sub(from).divideScalar(flight);
     velocity.y += GRAVITY * flight * 0.5;
     const shell = { id: ++this.shellSerial, from: from.clone(), target: target.clone(), position: from.clone(),
-      velocity, initialVelocity: velocity.clone(), age: 0, flight, kind: ExplosiveIdFor(kind), radius, damage, OnImpact, byPlayer, sourceCollider };
+      velocity, initialVelocity: velocity.clone(), age: 0, flight, kind: ExplosiveIdFor(kind), radius, damage, OnImpact, byPlayer, sourceCollider, Elapsed };
     this.shellVisuals.Create(shell);
     this.shells.push(shell); return shell;
   }
@@ -239,13 +241,27 @@ export class CombatSystem {
     this.shellVisuals.Step(dt);
     for (let i = this.shells.length - 1; i >= 0; i--) {
       const shell = this.shells[i]; let impact = null;
-      const steps = Math.max(1, Math.ceil(dt * SHELL.substepsPerS)), step = dt / steps;
+      // An explicitly clocked story shell follows its retained dialogue source,
+      // including late launch frames and pauses. Every elapsed interval still
+      // crosses the same short raycast steps as ordinary simulation-time shells.
+      let advance=dt;
+      if(shell.Elapsed){
+        const elapsed=shell.Elapsed();
+        const targetAge=Math.abs(elapsed-shell.flight)<1e-8?shell.flight:elapsed;
+        const expiry=shell.flight+SHELL.expireAfterFlightS+1/SHELL.substepsPerS;
+        advance=Number.isFinite(targetAge)?Math.max(0,Math.min(targetAge,expiry)-shell.age):0;
+      }
+      if(advance<=0)continue;
+      const steps = Math.max(1, Math.ceil(advance * SHELL.substepsPerS)), step = advance / steps, startAge=shell.age;
       for (let j = 0; j < steps && !impact; j++) {
         const previous = shell.position.clone();
-        shell.age += step;
+        shell.age = startAge+advance*(j+1)/steps;
         shell.velocity.copy(shell.initialVelocity); shell.velocity.y -= GRAVITY * shell.age;
         const next = shell.from.clone().addScaledVector(shell.initialVelocity, shell.age);
         next.y -= GRAVITY * shell.age * shell.age * 0.5;
+        // A source may stop exactly at impact while the next line waits for it.
+        // Remove endpoint roundoff without skipping the previous-to-target ray.
+        if(shell.Elapsed&&shell.age===shell.flight)next.copy(shell.target);
         const delta = next.sub(previous), distance = delta.length();
         const hit = this.host.battlefield.Raycast(previous, delta.clone().normalize(), distance, { terrain: true, excludeCollider: shell.sourceCollider });
         if (hit) {

@@ -961,6 +961,25 @@ export class Hud {
     if (this.spoken.length > 400) this.spoken.shift();
   }
 
+  // Concurrent actors retain their own names and rows. The caller marks only
+  // newly started lines for the spoken audit when another row changes.
+  SayLines(lines, seconds = TIMING.subtitleS) {
+    const subtitle = this.el.subtitle;
+    subtitle.replaceChildren();
+    for (const line of lines) {
+      const row = document.createElement("div");
+      row.className = "subtitleLine";
+      const speaker = document.createElement("span"), text = document.createElement("span");
+      speaker.className = "who"; speaker.textContent = line.speaker;
+      text.className = "txt"; text.textContent = line.text;
+      row.append(speaker, text); subtitle.append(row);
+      if (line.started) this.spoken.push(String(line.text));
+    }
+    subtitle.className = `hudSubtitle${lines.length ? " on" : ""}`;
+    this.subtitleTimer = seconds;
+    if (this.spoken.length > 400) this.spoken.splice(0, this.spoken.length - 400);
+  }
+
   /**
    * 章节卡：阶段开场那一行大字。
    *

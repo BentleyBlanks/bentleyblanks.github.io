@@ -16,7 +16,7 @@ export function BuildFirstLevelCheckpoint(value) {
   const facts = new Set(MISSION_STAGES.slice(0, index).flatMap(step => step.requirements));
   if (n > 1) facts.add("trainFoodReceived");
   if (n > 2) {
-    for (const id of ["trainFirstShellLaunched","trainFirstShellImpact","trainNearShell","trainSoldierWounded","trainProneOrder","trainPlayerProne"]) facts.add(id);
+    for (const id of ["trainIncomingFire","trainFirstShellLaunched","trainFirstShellImpact","trainNearShell","trainNearShellImpact","trainSoldierWounded","trainProneOrder","trainPlayerProne","trainLuoRecovering","trainLuoStanding"]) facts.add(id);
     column.stationBombed = true;
     column.zhou.visible = true; column.zhou.health = 65;
   }

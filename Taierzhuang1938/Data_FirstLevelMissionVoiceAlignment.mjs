@@ -1,5 +1,5 @@
 // Source-script forced alignment, faster-whisper medium CPU int8.
-// TrainShelling revised 2026-09-10 with the locally available small CPU int8 model.
+// Opening additions aligned 2026-09-12 against their retained complete recordings.
 // Hashes bind source intervals to retained whole Seed Audio recordings.
 export const MISSION_VOICE_ALIGNMENT = Object.freeze({
   "TrainMeal": {
@@ -32,41 +32,63 @@ export const MISSION_VOICE_ALIGNMENT = Object.freeze({
     ]
   },
   "TrainShelling": {
-    "sha256": "24b25c0823f0d85bcf2bcf8492b38d6b55ba25aa36d1d025aac38721a39d245f",
+    "sha256": "78f50ddf54c842e15f3d4e7e9b478df6c87f1a9c38c2c1e70e5d53eff31b9c74",
+    "scriptSha256": "e696cea9bac7a86701d82ff7b9c51b66776bc1d9bba6984bb00595397694c17e",
+    "groupsSha256": "bf17c7424e753034e12b5e2bad46cd2325ae1808f92905208952fef9bd883793",
     "lines": [
       [
-        0.0,
-        0.54
+        0,
+        2.18
       ],
       [
-        0.78,
-        2.12
+        2.34,
+        4.02
       ],
       [
-        2.24,
-        3.8
+        4.18,
+        10.56
       ],
       [
-        3.94,
-        5.56
+        10.62,
+        12.02
       ],
       [
-        5.72,
-        8.32
+        12.24,
+        13.72
       ],
       [
-        8.48,
-        12.26
+        13.85,
+        15.13
       ],
       [
-        12.46,
-        14.76
+        15.31,
+        18.67
       ],
       [
-        15.0,
-        18.28
+        20.63,
+        23.75
+      ],
+      [
+        24.23,
+        25.99
+      ],
+      [
+        26.39,
+        30.37
+      ],
+      [
+        30.55,
+        32.71
+      ],
+      [
+        32.79,
+        35.71
       ]
-    ]
+    ],
+    "markers": {
+      "rescueLift": 21.77,
+      "rescueFeet": 23.11
+    }
   },
   "EscapeWhisper": {
     "sha256": "83f55fcf3d0ef855f4110a4142320bbe463fb43a9839c378629a88837b1bb752",
@@ -855,5 +877,41 @@ export const MISSION_VOICE_ALIGNMENT = Object.freeze({
         10.96
       ]
     ]
+  },
+  "TrainBanter": {
+    "sha256": "45ae4f59b575188ce98ac039385656e40d3bbc2c059ae2982abbaf1bfbd48c17",
+    "scriptSha256": "50829092e418c9eac88e9505d3bdf905f8c4eb47e5d75a866be4f58646158356",
+    "groupsSha256": "1077d47324ef28462455a7fb0542e8a22ceaafeadcc2bc5bac6e85f7ec7bdefb",
+    "lines": [
+      [
+        0.48,
+        5.6
+      ],
+      [
+        5.8,
+        9.7
+      ],
+      [
+        11.02,
+        12.66
+      ],
+      [
+        13.22,
+        14.04
+      ]
+    ],
+    "note": "Initial speech onset and second-line trailing phoneme refined against unprompted transcription and -40dB waveform silence boundaries; recording is unchanged."
+  },
+  "TrainBriefing": {
+    "sha256": "52bdf7ae20944be6c75bd755dd276c7968fd75072d7202d8064a3033c762353f",
+    "scriptSha256": "3a4c54523cf82002e3499f5bff6902a427c2821e10afe8739fadd803f995c80b",
+    "groupsSha256": "2f8abb89bad1d6f216331645a545e5bc2accfdbc3028ce22a89e1f34a66e1295",
+    "lines": [
+      [
+        1,
+        9.84
+      ]
+    ],
+    "note": "Initial speech onset refined against unprompted transcription and the 1.014s waveform silence boundary; recording is unchanged."
   }
 });

@@ -2,6 +2,7 @@
 // 用法：node Taierzhuang1938/Script_JumpTest.mjs；退出码即成败。
 
 import path from "node:path";
+import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
@@ -354,64 +355,159 @@ try {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=low&scale=small`,
     { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 240000 });
+  const carriageOutput = path.join(projectDir, "_shots/Jump/Data_Carriage.json");
+  const carriageProgressOutput = path.join(projectDir, "_shots/Jump/Data_CarriageProgress.json");
+  await fs.mkdir(path.dirname(carriageOutput), { recursive: true });
+  await page.exposeFunction("ReportJumpCarriageProgress", async (progress) => {
+    await fs.writeFile(carriageProgressOutput, JSON.stringify(progress, null, 2));
+    console.log(`车厢采样 ${progress.completed}/84：有效 ${progress.valid} / 实体重叠 ${progress.buried}`
+      + ` / 模拟 ${progress.simulatedFrames} 帧 / 暂停 NPC 动画 ${progress.npcUpdatesSkipped} 次`
+      + ` / 用时 ${progress.elapsedSeconds.toFixed(1)} s`);
+  });
   const carriage = await page.evaluate(async () => {
     const T = window.Taierzhuang, D = T.Debug;
-    // 军列进站那一段整节车厢都在平移，等它停稳再量，免得把平移算进落点
-    for (let i = 0; i < 14 && T.battlefield.trainOffsetM > 0.01; i += 1) T.StepFrames(600, 1 / 60, false);
     const { MISSION_TRAIN } = await import("./Data_FirstLevelMissionTrain.mjs");
     const car = MISSION_TRAIN.cars[MISSION_TRAIN.mainCar];
-    // 站得进去的机位才算数：车厢里还摆着货箱，胶囊埋在货箱里的点真人走不到，
-    // 而运动学角色控制器没有脱困能力，量出来的是"卡在箱子里"，不是玩法。
-    const Buried = () => {
-      const p = T.player.position, r = T.player.radius + 0.02, head = p.y + 1.6;
-      for (const b of T.battlefield.NearbyColliders(p.x, p.z, r + 1)) {
-        if (p.x + r <= b.min[0] || p.x - r >= b.max[0]) continue;
-        if (p.z + r <= b.min[2] || p.z - r >= b.max[2]) continue;
-        if (head <= b.min[1] || p.y + 0.05 >= b.max[1]) continue;
-        return true;
-      }
-      return false;
+    const runtime = D.FirstLevelMissionRuntime(), opening = runtime.opening;
+    const saved = { update: runtime.Update, beforePlayer: runtime.BeforePlayer,
+      applyCamera: opening.ApplyCamera, offset: T.battlefield.trainOffsetM,
+      doors: MISSION_TRAIN.cars.map(({ carIndex }) => {
+        const id = `TrainDoor${carIndex}`; return { id, open: T.battlefield.gates.get(id).open };
+      }), actors: runtime.train.entries.map(({ actor: soldier }) => {
+        const actor = soldier.actor;
+        return { actor, update: actor.Update, descriptor: Object.getOwnPropertyDescriptor(actor, "Update") };
+      }) };
+    if (saved.actors.length !== 41 || new Set(saved.actors.map(({ actor }) => actor)).size !== 41)
+      throw new Error("Carriage jump fixture requires all 41 original passenger actors");
+    const missionTime = runtime.time, fixtureViolations = [], samples = [], buriedPoints = [];
+    let npcUpdatesSkipped = 0, simulatedFrames = 0;
+    const ObserveFixture = () => {
+      const state = { time: runtime.time, roll: T.battlefield.derailRoll || 0,
+        control: runtime.controls?.kind || null, missionControl: !!T.state.missionControl,
+        offset: T.battlefield.trainOffsetM };
+      if (state.time !== missionTime || state.roll !== 0 || state.control !== null
+        || state.missionControl || state.offset !== 0) fixtureViolations.push(state);
     };
-    const rows = [];
-    let buried = 0;
-    // 贴着挡板与车厢头尾那几排是重点：dz = ±5.9 已经顶到 0.2 m 厚的挡板前，
-    // dx = ±1.8 已经顶到两侧的腰板前（再往外胶囊就埋进板里，真人到不了）。
-    for (const dz of [-5.9, -4.5, -2, 0, 2, 4.5, 5.9]) {
-      for (const dx of [-1.8, 0, 1.8]) {
-        for (const yaw of [0, Math.PI, Math.PI / 2, -Math.PI / 2]) {
-          const x = MISSION_TRAIN.centerX + dx, z = car.z + T.battlefield.trainOffsetM + dz;
-          T.player.vault.active = false;
-          T.player.position.set(x, T.battlefield.GroundHeight(x, z) + 0.02, z);
-          T.player.velocity.set(0, 0, 0);
-          T.player.yaw = yaw;
-          T.player.stance = "stand";
-          T.player.stamina = 1;
-          T.player.jump.cooldown = 0;
-          T.player.body?.Teleport(x, T.player.position.y, z);
-          T.StepFrames(12, 1 / 60, false);
-          if (Buried()) { buried += 1; continue; }
-          const y0 = T.player.position.y;
-          const before = D.Vault().count;
-          D.Key("Space");
-          let peak = y0;
-          for (let i = 0; i < 80; i += 1) {
-            T.StepFrames(1, 1 / 60, false);
-            peak = Math.max(peak, T.player.position.y);
+    // This probe measures the upright carriage's traversal geometry. The real
+    // opening rolls that carriage just after it stops and takes player control;
+    // advancing the mission would replace the requested sample with the rescue.
+    // Keep AI movement, the normal player / Space / Rapier path and every collider.
+    // The 41 distant passengers otherwise resample the same frozen carriage pose
+    // on every frame. Their visual Actor.Update is outside this traversal probe.
+    let result;
+    try {
+      runtime.Update = () => {};
+      runtime.BeforePlayer = () => {};
+      opening.ApplyCamera = () => {};
+      for (const { actor } of saved.actors) actor.Update = () => { npcUpdatesSkipped += 1; };
+      T.battlefield.SetTrainOffset(0);
+      for (const { id } of saved.doors) T.battlefield.OpenGate(id);
+      ObserveFixture();
+      // 站得进去的机位才算数：车厢里还摆着货箱，胶囊埋在货箱里的点真人走不到，
+      // 而运动学角色控制器没有脱困能力，量出来的是"卡在箱子里"，不是玩法。
+      const Buried = () => {
+        const p = T.player.position, r = T.player.radius + 0.02, head = p.y + 1.6;
+        for (const b of T.battlefield.NearbyColliders(p.x, p.z, r + 1)) {
+          if (p.x + r <= b.min[0] || p.x - r >= b.max[0]) continue;
+          if (p.z + r <= b.min[2] || p.z - r >= b.max[2]) continue;
+          if (head <= b.min[1] || p.y + 0.05 >= b.max[1]) continue;
+          return { id: b.id || null, tag: b.tag, center: [...b.c], min: [...b.min], max: [...b.max] };
+        }
+        return false;
+      };
+      const rows = [];
+      let buried = 0;
+      const startedAt = performance.now(), progress = [];
+      const ReportProgress = async () => {
+        const record = { completed: samples.length, valid: rows.length, buried, simulatedFrames,
+          npcActorsPaused: saved.actors.length, npcUpdatesSkipped,
+          elapsedSeconds: (performance.now() - startedAt) / 1000, missionTime: runtime.time,
+          roll: T.battlefield.derailRoll || 0, control: runtime.controls?.kind || null,
+          missionControl: !!T.state.missionControl, offset: T.battlefield.trainOffsetM };
+        progress.push(record);
+        await window.ReportJumpCarriageProgress({ ...record, progress, rows, samples, buriedPoints, fixtureViolations });
+      };
+      await ReportProgress();
+      // 贴着挡板与车厢头尾那几排是重点：dz = ±5.9 已经顶到 0.2 m 厚的挡板前，
+      // dx = ±1.8 已经顶到两侧的腰板前（再往外胶囊就埋进板里，真人到不了）。
+      for (const dz of [-5.9, -4.5, -2, 0, 2, 4.5, 5.9]) {
+        for (const dx of [-1.8, 0, 1.8]) {
+          for (const yaw of [0, Math.PI, Math.PI / 2, -Math.PI / 2]) {
+            const x = MISSION_TRAIN.centerX + dx, z = car.z + T.battlefield.trainOffsetM + dz;
+            T.player.vault.active = false;
+            T.player.position.set(x, T.battlefield.GroundHeight(x, z) + 0.02, z);
+            T.player.velocity.set(0, 0, 0);
+            T.player.yaw = yaw;
+            T.player.stance = "stand";
+            T.player.stamina = 1;
+            T.player.jump.cooldown = 0;
+            T.player.body?.Teleport(x, T.player.position.y, z);
+            const requested = T.player.position.toArray();
+            T.StepFrames(12, 1 / 60, false);
+            simulatedFrames += 12;
+            ObserveFixture();
+            const sample = { dx, dz, yaw, requested, settled: T.player.position.toArray() };
+            samples.push(sample);
+            const collider = Buried();
+            if (collider) { buried += 1; buriedPoints.push({ ...sample, collider }); continue; }
+            const y0 = T.player.position.y;
+            const before = D.Vault().count;
+            D.Key("Space");
+            let peak = y0;
+            for (let i = 0; i < 80; i += 1) {
+              T.StepFrames(1, 1 / 60, false);
+              simulatedFrames += 1;
+              ObserveFixture();
+              peak = Math.max(peak, T.player.position.y);
+            }
+            rows.push({ dx, dz, yaw: +yaw.toFixed(2), traversed: D.Vault().count > before,
+              rise: +(peak - y0).toFixed(3), end: +(T.player.position.y - y0).toFixed(3) });
           }
-          rows.push({ dx, dz, yaw: +yaw.toFixed(2), traversed: D.Vault().count > before,
-            rise: +(peak - y0).toFixed(3), end: +(T.player.position.y - y0).toFixed(3) });
+          // Yield only after the original four yaw samples; manual mode advances
+          // no simulation frames while Node persists this progress receipt.
+          await ReportProgress();
         }
       }
+      result = { rows, buried, buriedPoints, samples, fixtureViolations, missionTime, progress,
+        simulatedFrames, npcActorsPaused: saved.actors.length, npcUpdatesSkipped,
+        deck: T.battlefield.GroundHeight(MISSION_TRAIN.centerX, car.z + T.battlefield.trainOffsetM) };
+    } finally {
+      runtime.Update = saved.update;
+      runtime.BeforePlayer = saved.beforePlayer;
+      opening.ApplyCamera = saved.applyCamera;
+      for (const { actor, descriptor } of saved.actors) {
+        if (descriptor) Object.defineProperty(actor, "Update", descriptor);
+        else delete actor.Update;
+      }
+      for (const { id, open } of saved.doors) if (!open) T.battlefield.CloseGate(id);
+      T.battlefield.SetTrainOffset(saved.offset);
     }
-    return { rows, buried, deck: T.battlefield.GroundHeight(MISSION_TRAIN.centerX, car.z + T.battlefield.trainOffsetM) };
+    const actorUpdatesRestored = saved.actors.every(({ actor, update, descriptor }) => {
+      const restored = Object.getOwnPropertyDescriptor(actor, "Update");
+      return actor.Update === update && (descriptor
+        ? !!restored && Reflect.ownKeys(descriptor).every((key) => restored[key] === descriptor[key])
+        : restored === undefined);
+    });
+    return { ...result, actorUpdatesRestored, hooksRestored: runtime.Update === saved.update
+      && runtime.BeforePlayer === saved.beforePlayer && opening.ApplyCamera === saved.applyCamera };
   });
+  await fs.writeFile(carriageOutput, JSON.stringify(carriage, null, 2));
+  Check("车厢采样保持零翻转、零剧情控制与固定使命时间",
+    carriage.samples.length === 84 && carriage.fixtureViolations.length === 0 && carriage.hooksRestored
+      && carriage.npcActorsPaused === 41 && carriage.npcUpdatesSkipped > 0 && carriage.actorUpdatesRestored,
+    `${carriage.samples.length}/84 个原始机位 / 使命时间 ${carriage.missionTime} s / `
+      + `状态违规 ${carriage.fixtureViolations.length} 次 / 钩子恢复 ${carriage.hooksRestored}`
+      + ` / ${carriage.npcActorsPaused} 人动画钩子恢复 ${carriage.actorUpdatesRestored}`);
+  console.log("车厢剔除点及实际碰撞体", JSON.stringify(carriage.buriedPoints));
+  if (carriage.fixtureViolations.length) console.log("车厢夹具偏移", JSON.stringify({
+    states: carriage.fixtureViolations, samples: carriage.samples }));
   const lifted = carriage.rows.filter((row) => row.end > 0.05);
   const floaty = carriage.rows.filter((row) => !row.traversed && row.rise > ladder.TR.jumpRiseMax);
   // 真翻出去的那些必须是**往下**走：落到车厢地板一米以下，也就是车外的地面上
   const halfOut = carriage.rows.filter((row) => row.traversed && row.end > -1);
   Check("车厢里按空格：不许被挡板抬起来又落回车厢（头尾边缘那条）",
     carriage.rows.length >= 60 && lifted.length === 0 && floaty.length === 0 && halfOut.length === 0,
-    `${carriage.rows.length} 个机位（车厢地板 ${carriage.deck.toFixed(2)} m，另有 ${carriage.buried} 个埋在货箱里的点不计）：`
+    `${carriage.rows.length} 个机位（车厢地板 ${carriage.deck.toFixed(2)} m，另有 ${carriage.buried} 个与实体重叠的点不计）：`
       + `落点高过起跳点 ${lifted.length} 次 / 没翻越却抬过红线 ${floaty.length} 次 / `
       + `翻越却没落到车外 ${halfOut.length} 次；`
       + `翻出车厢 ${carriage.rows.filter((row) => row.traversed).length} 次，`
@@ -423,7 +519,7 @@ try {
 }
 
 if (failures.length) {
-  console.error(`\n跳跃专项：${15 - failures.length}/15 过；失败：${failures.join("、")}`);
+  console.error(`\n跳跃专项：${16 - failures.length}/16 过；失败：${failures.join("、")}`);
   process.exit(1);
 }
 console.log("\n跳跃专项全过。");

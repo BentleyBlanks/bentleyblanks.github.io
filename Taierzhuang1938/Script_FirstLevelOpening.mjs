@@ -2,6 +2,7 @@ import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { OPENING as C } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_TUNING as R, OPENING_PERCEPTION as P } from "./Data_Tuning_FirstLevel.mjs";
 import { CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
+import { FirstLevelOpeningBarrage } from "./Script_FirstLevelOpeningBarrage.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const Smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t)};
 const Curve=(rows,t)=>{
@@ -28,7 +29,7 @@ export function SampleOpeningPerception(elapsed){
 export class FirstLevelOpening {
   constructor(runtime){this.r=runtime;this.peakPlayerShooters=0;this.fireSeen=new Map();this.fireEvents=[];this.shotCount=0;this.playerShotCount=0;this.peakVisible=0;
     this.pack={id:"ShunziPack",contents:["CivilianClothes"],carried:true};
-    this.pressureShells=new Set();this.pressureImpacts=[];this.wreckSmoke=[];
+    this.pressureShells=new Set();this.pressureImpacts=[];this.wreckSmoke=[];this.barrage=new FirstLevelOpeningBarrage(runtime);
     this.reducedMotion=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');}
   Derail(){
     const r=this.r;
@@ -49,11 +50,25 @@ export class FirstLevelOpening {
     if(this.derailAt==null||r.Has("luoRescueComplete"))return;
     const elapsed=r.time-this.derailAt,t=Smooth(elapsed/C.derailSeconds);
     const offset=r.battlefield.trainOffsetM,fall=C.playerFall;
-    const rescue=this.rescueAt==null?0:Smooth((r.time-this.rescueAt)/C.rescueSeconds);
+    const rescue=this.RescueLift();
     const x=this.playerFrom.x+(fall.x-this.playerFrom.x)*t+(C.rescueEnd.x-fall.x)*rescue;
     const z=this.playerFrom.z+(fall.z-this.playerFrom.z)*t+(C.rescueEnd.z-fall.z)*rescue+offset;
     const y=this.playerFrom.y+(r.battlefield.GroundHeight(x,z)-this.playerFrom.y)*t;
     r.player.position.set(x,y,z);r.player.body?.Teleport(x,y,z);r.player.velocity.set(0,0,0);
+  }
+  RescueElapsed(){
+    if(this.rescueAt==null)return 0;
+    const voice=this.r.voice?.current;
+    return voice?.cue.id==="TrainShelling"&&this.rescueSourceStart!=null
+      ?Math.max(0,voice.sourceTime-this.rescueSourceStart):this.r.time-this.rescueAt;
+  }
+  RescueSampleTime(){
+    return this.rescueBeats?Curve(this.rescueBeats,this.RescueElapsed()):this.RescueElapsed();
+  }
+  RescueLift(){
+    // Keep the player on the floor until the visible hand has reached and
+    // gripped; the physical lift follows the authored pull, not cue onset.
+    return this.rescueAt==null?0:Smooth((this.RescueSampleTime()-C.rescuePullSeconds)/(C.rescueStandSeconds-C.rescuePullSeconds));
   }
   ApplyCamera(){
     const r=this.r,cam=r.player.camera;
@@ -63,7 +78,7 @@ export class FirstLevelOpening {
     const perception=SampleOpeningPerception(elapsed);
     this.eyeClosure=perception.eyeClosure;
     this.concussion=perception;
-    const active=!r.Has("luoRescueComplete"),rescue=this.rescueAt==null?0:Smooth((r.time-this.rescueAt)/C.rescueSeconds);
+    const active=!r.Has("luoRescueComplete"),rescue=this.RescueLift();
     if(active){
       this.PlacePlayer();
       const t=Smooth(elapsed/C.derailSeconds),angle=C.derailRollRad*t,c=Math.cos(angle),s=Math.sin(angle);
@@ -89,7 +104,7 @@ export class FirstLevelOpening {
       const b=C.blackout,close=Smooth((elapsed-b.start)/b.close),open=Smooth((elapsed-b.start-b.close-b.hold)/b.open);
       this.blackout=close*(1-open);
     }
-    const standingAge=this.rescueAt==null?0:Math.max(0,r.time-this.rescueAt-C.rescueSeconds);
+    const standingAge=this.rescueAt==null?0:Math.max(0,r.time-this.rescueAt-(this.rescueDuration||C.rescueSeconds));
     const settle=active?1:1-Smooth(standingAge/(C.dizzySeconds*R.openingRecoveryScale));
     if(!this.reducedMotion?.matches){
       cam.rotation.x+=perception.pitch*settle;
@@ -97,8 +112,9 @@ export class FirstLevelOpening {
     }
     cam.updateMatrixWorld(true);
     if(active&&this.rescueAt!=null){
-      const hand=r.companion.Handle("luo")?.missionRescueTarget;
-      const age=r.time-this.rescueAt,weight=Smooth(age/.45)*(1-Smooth((age-C.rescueSeconds+.5)/.5));
+      const luo=r.companion.Handle("luo"),bone=luo?.actor?.characterRig?.bones.handR;
+      const hand=bone?bone.getWorldPosition(r.player.position.clone()):luo?.missionRescueTarget;
+      const age=this.RescueSampleTime(),weight=Smooth(age/.45)*(1-Smooth((age-C.rescueSeconds+.5)/.5));
       if(hand)r.viewmodel?.ReachWorld(hand,weight);
     }
   }
@@ -150,6 +166,7 @@ export class FirstLevelOpening {
   }
   Update(dt){
     const r=this.r,stage=r.flow.stage.id;
+    this.barrage.Update();
     this.UpdateEscapePressure();
     if(this.derailAt!=null){
       const age=r.time-this.derailAt;
@@ -198,20 +215,56 @@ export class FirstLevelOpening {
       }
       if(t===1)r.Record("trainDerailed",{car:C.derailCar,roll:C.derailRollRad,playerCar:MISSION_TRAIN.mainCar});
     }
-    if(r.Has("trainStopped")&&!r.spawned.has("surface")){
+    // The flank infantry arrives after the artillery and the visible rescue.
+    // Control returns before live small-arms combat; no damage/grace override.
+    if(r.Has("trainStopped")&&r.Has("luoRescueComplete")&&!r.spawned.has("surface")){
       r.SpawnEncounter("surface");r.SpawnEncounter("intrusion");
     }
-    if(r.Has("luoRescueRequested")&&r.Has("trainDerailed")&&!r.Has("luoRescueComplete")){
+    // The squad leader is thrown down too. His own failed rise is shown in the
+    // player's view before the voice and rescue are allowed to continue.
+    if(r.Has("trainDerailed")&&!r.Has("luoRescueComplete")){
+      const luo=r.companion.Handle("luo");
+      if(luo?.alive&&this.rescueAt==null){
+        const eyeClosure=SampleOpeningPerception(r.time-this.derailAt).eyeClosure;
+        if(this.luoRecoveryAt==null&&eyeClosure<=C.luoRecoveryMaxEyeClosure){
+          this.luoRecoveryAt=r.time;r.Record("trainLuoRecovering",{eyeClosure});
+        }
+        // Wait prone at the authored first frame. Starting the clip under the
+        // stretched blackout would hide the failed attempt rather than delay it.
+        const age=this.luoRecoveryAt==null?0:r.time-this.luoRecoveryAt;
+        luo.missionCarriageAction={clipId:"LuoStaggerRecover",seconds:Math.min(age,C.luoRecoverySeconds),weight:1,loop:false,deckY:luo.position.y,transitionSeconds:0};
+        r.MoveActor(luo,luo.position,0);
+        luo.yaw=Math.atan2(luo.position.x-r.player.position.x,luo.position.z-r.player.position.z);
+        r.ai.SetStance(luo,age<C.luoRecoverySeconds*.68?1:0,.2,true);
+        if(this.luoRecoveryAt!=null&&age>=C.luoRecoverySeconds&&r.Has("trainStopped"))r.Record("trainLuoStanding");
+      }
+    }
+    if(r.Has("luoRescueRequested")&&r.Has("trainLuoStanding")&&!r.Has("luoRescueComplete")){
       const luo=r.companion.Handle("luo");
       if(luo?.alive){
         if(this.rescueAt==null&&Distance(luo.position,r.player.position)>C.rescueReachM){r.MoveActor(luo,C.rescueGuide,R.walkSpeedMps);return;}
         if(this.rescueAt==null){
-          this.rescueAt=r.time;r.BeginControl("rescue",C.rescueSeconds);
+          this.rescueAt=r.time;
+          const lines=r.voice?.current?.plan.lines,indices=C.rescueDialogueLines;
+          if(lines?.[indices.steady]){
+            this.rescueSourceStart=lines[indices.reach][0];
+            const grip=lines[indices.grip][0]-this.rescueSourceStart,steady=lines[indices.steady][0]-this.rescueSourceStart;
+            this.rescueDuration=lines[indices.steady][1]-this.rescueSourceStart;
+            const events=r.voice.current.plan.segments.flatMap(segment=>segment.events||[]);
+            const liftAt=events.find(event=>event.id==="TrainRescueLift")?.at;
+            const lift=liftAt==null?grip+(steady-grip)*C.rescueGripFraction:liftAt-this.rescueSourceStart;
+            this.rescueBeats=[[0,0],[grip,C.rescueGripSeconds],[lift,C.rescuePullSeconds],
+              [steady,C.rescueStandSeconds],[this.rescueDuration,C.rescueSeconds]];
+          }else this.rescueDuration=C.rescueSeconds;
+          r.BeginControl("rescue",this.rescueDuration);
           r.Record("playerDraggedFromWreck",{from:{...r.player.position},to:C.rescueEnd});
         }
-        const t=Smooth((r.time-this.rescueAt)/C.rescueSeconds);
-        const point={x:C.rescueGuide.x+(C.rescueEnd.x+.9-C.rescueGuide.x)*t,z:C.rescueGuide.z};
-        r.MoveActor(luo,point,R.walkSpeedMps);r.ai.SetStance(luo,t<.7?1:0,.2,true);
+        const age=this.RescueSampleTime(),t=this.RescueLift();
+        luo.missionCarriageAction={clipId:"LuoHelpUp",seconds:Math.min(age,C.rescueSeconds),weight:1,loop:false,deckY:luo.position.y};
+        // Brace beside the player's corridor for the whole authored help-up.
+        // An AI pursuit target can lag behind the source-timed player pull and
+        // put the camera inside Luo's chest, even with separated end targets.
+        r.MoveActor(luo,luo.position,0);r.ai.SetStance(luo,t<.7?1:0,.2,true);
         luo.yaw=Math.atan2(luo.position.x-r.player.position.x,luo.position.z-r.player.position.z);
         luo.missionRescueTarget=r.Point({x:r.player.position.x+.45,z:r.player.position.z},.95);
       }
@@ -358,8 +411,9 @@ export class FirstLevelOpening {
     this.peakPlayerShooters=Math.max(this.peakPlayerShooters,this.playerShooters.length);
     this.visible=visible;this.peakVisible=Math.max(this.peakVisible,visible);
   }
-  State(){return {derailAt:this.derailAt,roll:this.r.battlefield.derailRoll||0,
-    blackout:this.eyeClosure>=.99?1:0,eyeClosure:this.eyeClosure||0,concussion:this.concussion,hearingAmount:this.hearingAmount||0,rescueAt:this.rescueAt,playerCar:MISSION_TRAIN.mainCar,
+  State(){return {derailAt:this.derailAt,luoRecoveryAt:this.luoRecoveryAt,barrage:this.barrage.State(),roll:this.r.battlefield.derailRoll||0,
+    blackout:this.eyeClosure>=.99?1:0,eyeClosure:this.eyeClosure||0,concussion:this.concussion,hearingAmount:this.hearingAmount||0,rescueAt:this.rescueAt,
+    rescueDuration:this.rescueDuration,rescueSampleTime:this.RescueSampleTime(),playerCar:MISSION_TRAIN.mainCar,
     pack:this.pack,
     escapePressure:{launched:[...this.pressureShells],impacts:this.pressureImpacts,smokeSources:this.wreckSmoke.length},
     playerShooters:this.playerShooters||[],peakPlayerShooters:this.peakPlayerShooters,

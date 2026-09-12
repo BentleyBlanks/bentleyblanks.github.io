@@ -6,14 +6,17 @@ export const MISSION_TRAIN = Object.freeze({
   total: trainColumn.total,
   extraCount: trainColumn.extraCount,
   mainCar: 1,
-  life: { seatTopM: 0.48, pelvisAboveSeatM: 0.12, standSeconds: 1.25, sideSeatM: 1.65, gesturePeriodS: 7.5, mealLookPitchRad:-.18,
-    braceDelayS:.14,braceSpreadS:.6,braceRate:5 },
-  // Two deliberate aisle movements, with seated passengers leaving a clear lane.
+  // The 0.34m capsule stays clear of the 2.29m wall face. Only the restored local
+  // visual rig leans 0.13m back, placing the authored 0.25m rear surface at the wall.
+  life: { standSeconds: 1.25, wallAnchorM: 1.91, wallOffsetM:.13, gesturePeriodS: 7.5, mealLookPitchRad:-.18,
+    braceDelayS:.08,braceSpreadS:.24,braceRate:8,duckSeconds:.68,riseStaggerSeconds:.035,
+    releaseSeconds:.35,dialogueBlendSeconds:.16 },
+  // Only the food giver and the squad leader work in the aisle. Other riders stay by the walls.
   activities: {
     yaowa: [
       {at:0,x:-77,z:87.08,speed:.65,face:{x:-77,z:88}},
-      {at:10,x:-77,z:84.8,speed:.65,face:{x:-78.65,z:85.2}},
-      {at:19,x:-77,z:86.6,speed:.65,face:{x:-77,z:88}},
+      {at:10,x:-78,z:83,speed:.65},
+      {at:19,x:-78.91,z:82.05,speed:.65,face:{x:-77,z:82.05},wall:true},
     ],
     luo: [
       {at:12,x:-76.5,z:88.95,speed:.7},
@@ -37,10 +40,12 @@ export const MISSION_TRAIN = Object.freeze({
   guide: Point(-75.95, 88),
   cars: trainColumn.cars.map((source, carIndex) => {
     const z = 74 + carIndex * 14;
+    // Keep the historical `seats` queue field for route consumers; these are floor anchors,
+    // never furniture supports. No east-wall rider occupies the 4.4m door opening.
     const seats = carIndex===1
-      ? [Point(-77,86.6),...[-4,-2.8,-1.6,-.4,.8,2,3.2,4.4].map(d=>Point(-78.65,z+d)),
-          ...[-4,-2.8,-1.6,1.6,2.8,4].map(d=>Point(-75.35,z+d)),Point(-78.65,83)]
-      : Array.from({length:12},(_,i)=>Point(-77+(i%2?1.65:-1.65),z+[-4.9,-3.7,-2.5,2.5,3.7,4.9][Math.floor(i/2)]));
+      ? [Point(-77,86.6),...[-4.9,-3.75,-2.6,-1.45,-.3,.85,2,3.15,4.3].map(d=>Point(-78.91,z+d)),
+          ...[-4.7,-3.5,-2.3,2.3,3.5,4.7].map(d=>Point(-75.09,z+d))]
+      : Array.from({length:12},(_,i)=>Point(-77+(i%2?1.91:-1.91),z+[-4.9,-3.7,-2.5,2.5,3.7,4.9][Math.floor(i/2)]));
     const giver=carIndex===1?seats.shift():null;
     seats.sort((a,b)=>Math.abs(a.z-z)-Math.abs(b.z-z)||Math.abs(a.x+77)-Math.abs(b.x+77)||a.z-b.z);
     if(giver)seats.unshift(giver);

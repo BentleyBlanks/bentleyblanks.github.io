@@ -130,6 +130,7 @@ export function InstallMissionSentry(soldier){
   let time=0;
   rig.Update=function UpdateMissionSentry(dt,state={}){
     pose.Restore();const result=original.call(this,dt,state);time+=Math.max(0,dt);
+    if(soldier.missionCarriageAction)return result;
     if(soldier.missionRescueTarget && soldier.alive){
       pose.basis=actor.root;const b=rig.bones;actor.root.updateWorldMatrix(true,false);
       pose.Tilt(b.chest,.24,0,0);rig.root.updateWorldMatrix(true,true);

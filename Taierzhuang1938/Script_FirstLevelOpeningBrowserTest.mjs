@@ -8,6 +8,7 @@ import {fileURLToPath} from "node:url";
 import {LaunchBrowser} from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import {ServeRoot} from "./Script_DevServer.mjs";
 import {OPENING} from "./Data_FirstLevelOpening.mjs";
+import {SampleOpeningPerception} from "./Script_FirstLevelOpening.mjs";
 const here=path.dirname(fileURLToPath(import.meta.url));
 export async function PlayFirstLevelOpening(page,{out=path.join(here,"_shots/FirstLevelOpening/InputRun"),realtime=false,audioClock=false,from="Train",through="Handover",mount=true,regroup=false}={}){
 await fs.mkdir(out,{recursive:true});
@@ -225,6 +226,13 @@ try{
   if(through==="Unloading")return;
   await Drive("LuoRescue",[],{until:"luoRescueComplete",seconds:30});
   await Drive("TrainExit",[{x:-69,z:88},{x:-69,z:78},{x:-68,z:70},{x:-66,z:66}],{seconds:80});
+  const leaderExit=await page.evaluate(()=>{
+    const r=window.Tengxian.Debug.FirstLevelMissionRuntime(),luo=r.companion.Handle('luo');
+    return {position:luo.position.toArray(),rescueAt:r.opening.rescueAt,time:r.time};
+  });
+  await fs.writeFile(path.join(out,'Data_LeaderExit.json'),JSON.stringify(leaderExit,null,2));
+  assert.ok(Math.hypot(leaderExit.position[0]-OPENING.rescueGuide.x,leaderExit.position[2]-OPENING.rescueGuide.z)>1,
+    'after helping the player, Luo physically leaves the rescue point instead of remaining wedged in the carriage steps');
   if(through==="Contact"){
     await Drive("TrenchContactApproach",OPENING.approachRoute.slice(0,3),{seconds:80});
     // Observe real NPC combat while the player stays in the protected entrance.
@@ -374,12 +382,20 @@ try{
     assert.ok(pressure.impacts.length>=4&&pressure.launched.length<=OPENING.escapePressure.shells.length,
       "finite follow-up shells actually hit during the normal escape");
     assert.equal(pressure.smokeSources,0,"the sheltered exchange releases the wreck smoke sources");
-    assert.ok(final.opening.rescueAt-final.opening.derailAt<9,'a stopped wreck permits prompt rescue without a long braking wait');
+    assert.ok(final.opening.rescueAt>=final.opening.luoRecoveryAt+OPENING.luoRecoverySeconds,
+      'Luo completes his own visible recovery before helping Shunzi');
+    assert.ok(SampleOpeningPerception(final.opening.luoRecoveryAt-final.opening.derailAt).eyeClosure<=OPENING.luoRecoveryMaxEyeClosure,
+      'the real eyelid curve exposes the start of the complete failed-rise animation');
+    assert.ok(final.opening.rescueAt-final.opening.luoRecoveryAt<OPENING.luoRecoverySeconds+3,
+      'after the visible failed rise, the leader promptly starts his rescue call');
     if(realtime){
       assert.ok(openingShots.has('PlayerCarRoll')&&openingShots.has('ImpactBlackout')&&openingShots.has('RescueReach'),'normal flow records physical roll, blackout and visible rescue');
       const speech=trace.filter(row=>row.voiceCue==='TrainMeal'&&row.audio.phase==='playing'&&row.audio.sourceTime>1);
       assert.ok(speech.length>10&&speech.every(row=>row.audio.distance<6&&row.audio.storyDuck<.4),'the moving meal voice stays nearby and above the ducked environment');
-      assert.ok(trace.filter(row=>!row.nearImpact).every(row=>row.braces.every(value=>value===0)),'no passenger anticipates the carriage impact with a protective pose');
+      assert.ok(trace.filter(row=>row.opening.barrage.startedAt==null).every(row=>row.braces.every(value=>value===0)),
+        'no passenger anticipates the surprise barrage');
+      assert.ok(trace.some(row=>row.firstImpact&&!row.nearImpact&&row.braces.every(value=>value>.9)),
+        'all passengers shelter during the initial barrage before the near impact');
       assert.ok(openingShots.has('EyelidPartial')&&trace.some(row=>row.audio.cutoff<900&&row.audio.breaths>0),'partial eyelids, muffled hearing and heavy breaths occur after impact');
       assert.ok(trace.at(-1).audio.cutoff>19000&&final.opening.eyeClosure===0,'hearing and sight recover before combat');
     }

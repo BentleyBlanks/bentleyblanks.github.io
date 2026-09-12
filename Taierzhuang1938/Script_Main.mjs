@@ -59,7 +59,7 @@ import {
 import { FIRST_LEVEL_MISSION_PHASE as FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./Data_FirstLevelMission.mjs";
 import { FirstLevelMissionRuntime } from "./Script_FirstLevelMissionRuntime.mjs";
 import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage } from "./Data_FirstLevelMissionStages.mjs";
-import { LoadFirstLevelTrainAnimation } from "./Script_FirstLevelTrainAnimation.mjs";
+import { LoadFirstLevelCarriageAnimation } from "./Script_FirstLevelCarriageAnimation.mjs";
 import { LoadFirstLevelMeal } from "./Script_FirstLevelMeal.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { FirstLevelP012Debug } from "./Script_FirstLevelP012Debug.mjs";
@@ -3902,7 +3902,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   }, phase.whitebox) : null;
   if (p012Flow) state.storyObjective = p012Flow.CurrentObjective().text;
   missionRuntime?.Dispose();
-  if(phase.whitebox?.fullMission)await Promise.all([LoadFirstLevelTrainAnimation(),LoadFirstLevelMeal()]);
+  if(phase.whitebox?.fullMission)await Promise.all([LoadFirstLevelCarriageAnimation(),LoadFirstLevelMeal()]);
   missionRuntime = phase.whitebox?.fullMission ? new FirstLevelMissionRuntime({
     scene,camera,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,stageJump,viewmodel,
     FireVehicleBullet,
@@ -8191,7 +8191,13 @@ function Frame(dt, render = true) {
   profiler.E("hud");
 
   // --- 渲染 ---
-  if (!render) return;
+  if (!render) {
+    // Manual simulation still emits spatial audio. Keep its listener at the
+    // simulated viewpoint, just as RenderScene does after a displayed frame.
+    camera.updateWorldMatrix(true, false);
+    audio.SetListener(camera);
+    return;
+  }
   RenderScene(dt);
 }
 

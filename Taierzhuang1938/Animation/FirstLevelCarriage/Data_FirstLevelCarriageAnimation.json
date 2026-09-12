@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "version": "20260912OpeningV1",
+  "authoringTool": "BlenderMCP",
+  "actorForward": [
+    0,
+    0,
+    -1
+  ],
+  "floorClearanceM": 0.003,
+  "scope": "First level stage one carriage opening only",
+  "clips": {
+    "WallStandIdle": {
+      "duration": 4,
+      "loop": true
+    },
+    "WallCrouchIdle": {
+      "duration": 4,
+      "loop": true
+    },
+    "LiuCountTalk": {
+      "duration": 4.5,
+      "loop": true
+    },
+    "HeReplyTalk": {
+      "duration": 4,
+      "loop": true
+    },
+    "LuoBriefing": {
+      "duration": 5,
+      "loop": true
+    },
+    "AlarmDropCrouch": {
+      "duration": 0.8,
+      "loop": false
+    },
+    "LuoCrouchReassure": {
+      "duration": 4.5,
+      "loop": true
+    },
+    "YaowaAlarmCrouch": {
+      "duration": 3,
+      "loop": true
+    },
+    "LuoStaggerRecover": {
+      "duration": 4.8,
+      "loop": false
+    },
+    "LuoHelpUp": {
+      "duration": 4.4,
+      "loop": false
+    }
+  },
+  "models": [
+    {
+      "id": "LugouNra02",
+      "file": "Animation_LugouNra02CarriageOpening.json",
+      "sha256": "89f2d799b662e6b07a6650d36aa84c4b6e42b5e8a49414c484d1b5c0ea8ee8fe",
+      "clipIds": [
+        "WallStandIdle",
+        "WallCrouchIdle",
+        "AlarmDropCrouch",
+        "LiuCountTalk",
+        "HeReplyTalk",
+        "YaowaAlarmCrouch"
+      ],
+      "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225"
+    },
+    {
+      "id": "LugouNra05",
+      "file": "Animation_LugouNra05CarriageOpening.json",
+      "sha256": "525affeaea621641ea2b275f149135cc36f97857da47511159a0ab56c5d71096",
+      "clipIds": [
+        "WallStandIdle",
+        "WallCrouchIdle",
+        "AlarmDropCrouch",
+        "LuoBriefing",
+        "LuoCrouchReassure",
+        "LuoStaggerRecover",
+        "LuoHelpUp"
+      ],
+      "originalModelSha256": "acbc9184da059bdf6c3c18d051f3eba77d1dd3acba469e8dbc876b092f174250"
+    }
+  ]
+}

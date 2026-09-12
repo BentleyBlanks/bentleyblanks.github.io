@@ -2963,8 +2963,13 @@ export class AiDirector {
     if (s.actor) {
       s.actor.root.position.copy(s.position);
       s.actor.root.rotation.y = s.yaw;
-      const cadence = ActorAnimationCadence(s);
-      if (s.actor.root.visible && (wantsFire || (this.tickIndex + s.id) % cadence === 0)) s.actor.Update(dt * (wantsFire ? 1 : cadence), {
+      // Authored carriage idles and rescue tracks run on the simulation clock,
+      // including passengers behind the camera. Culling still hides/detaches
+      // their meshes; it must not freeze their skeleton at the boarding pose.
+      const carriagePerformance = !!s.missionCarriageAction
+        || (!s.missionTrainReady && s.missionTrainLife?.weight > .00001);
+      const cadence = carriagePerformance ? 1 : ActorAnimationCadence(s);
+      if ((s.actor.root.visible || carriagePerformance) && (wantsFire || (this.tickIndex + s.id) % cadence === 0)) s.actor.Update(dt * (wantsFire ? 1 : cadence), {
         moveSpeed: s.moveSpeed,
         moveSpeedMps: Math.hypot(s.position.x - animationStartX, s.position.z - animationStartZ) / Math.max(dt, .0001),
         bayonetFixed: s.bayonetFixed,

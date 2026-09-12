@@ -187,3 +187,32 @@ assert.equal(waiting.actor.position.length(),0);assert.equal(waiting.actor.detou
  assert.ok(Math.abs(moves[0].dx)<1e-12&&moves[0].dz<0,"reconnect follows its swept segment rather than a grid-sideways goal");
 }
 console.log("PASS actual AI Act: P012 swept follower stops/resumes without stale/random detour or vault; default actors retain both");
+
+// Exercise the production Act animation submission with a detached actor. The
+// opening audience includes passengers behind the camera; rendering visibility
+// must not freeze their authored idle, while ordinary AI keeps its LOD budget.
+const animationEnd=source.indexOf("    // Fire only after movement, turning");
+const animationStart=source.lastIndexOf("    if (s.actor) {",animationEnd);
+const ActAnimation=vm.runInNewContext(`(function(s,dt){const wantsFire=false,animationStartX=s.position.x,animationStartZ=s.position.z;${source.slice(animationStart,animationEnd)}})`,
+ {ActorAnimationCadence:()=>3});
+function SampleHiddenActor(fields,visible=false){
+ const root=new THREE.Group();root.visible=visible;
+ const samples=[],soldier={id:6,position:new THREE.Vector3(1,2,3),yaw:.4,...fields,
+  actor:{root,Update(dt,state){samples.push({dt,time:state.elapsed});}}};
+ const host={tickIndex:0,time:0};
+ for(let frame=0;frame<6;frame++){host.tickIndex++;host.time+=1/60;ActAnimation.call(host,soldier,1/60);}
+ assert.equal(root.visible,visible,'sampling cannot override render culling');
+ assert.equal(root.parent,null,'sampling cannot reattach a culled actor');
+ return samples;
+}
+for(const fields of [{missionTrainLife:{weight:1}},{missionTrainLife:{weight:.2}},
+ {missionTrainLife:{weight:0},missionTrainReady:true,missionCarriageAction:{clipId:'LuoHelpUp'}}]){
+ const samples=SampleHiddenActor(fields);
+ assert.equal(samples.length,6,'every active carriage performance advances on all six simulation frames');
+ assert.ok(samples.every(sample=>sample.dt===1/60));
+ assert.ok(samples.at(-1).time>samples[0].time);
+}
+for(const fields of [{},{missionTrainLife:{weight:0}},{missionTrainLife:{weight:1},missionTrainReady:true}])
+ assert.equal(SampleHiddenActor(fields).length,0,'ordinary and released passengers retain offscreen animation culling');
+assert.equal(SampleHiddenActor({},true).length,2,'ordinary visible actors retain distance-based animation cadence');
+console.log('PASS actual AI Act: hidden carriage performances update every frame; render culling and released/default cadence remain intact');

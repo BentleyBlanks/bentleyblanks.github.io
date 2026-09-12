@@ -2,6 +2,7 @@ import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_CIVILIAN_AFTERMATH } from "./Data_FirstLevelMissionCivilianAftermath.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FirstLevelOpening, OpeningRecoveryTime, SampleOpeningPerception } from "./Script_FirstLevelOpening.mjs";
+import { FirstLevelOpeningBarrage } from "./Script_FirstLevelOpeningBarrage.mjs";
 import { MISSION_AFTERMATH, FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_ASSAULT_STARTS, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
 import { COVER } from "./Data_Tuning_AiCover.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
@@ -26,6 +27,384 @@ import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance } from "./Da
 import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
 import { MISSION_DIALOGUE, MissionVoicePrompt } from "./Data_FirstLevelMissionDialogue.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
+
+// Exercise the real dynamic voice recipes and admission rules. Only WebAudio's
+// device nodes/decoder are stand-ins; LoadVoices, Play, SetListener, movement and
+// the simultaneous mission tracks run their production implementations.
+{
+  const {AudioEngine}=await import("./Script_Audio.mjs");
+  const manifest=JSON.parse(fs.readFileSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json",import.meta.url)));
+  const cues=MISSION_DIALOGUE.filter(cue=>["TrainBanter","TrainBriefing"].includes(cue.id));
+  const buffers=new Map(cues.map(cue=>[manifest.cues[cue.id].sha256,
+    {duration:manifest.cues[cue.id].seconds,key:`Mission${cue.id}`} ]));
+  const Param=()=>({value:0,setValueAtTime(value){this.value=value;},setTargetAtTime(value){this.value=value;},
+    cancelScheduledValues(){},linearRampToValueAtTime(value){this.value=value;}});
+  const Node=()=>({connect(node){assert.ok(node,"every audio edge has a destination");return node;},disconnect(){}});
+  const sources=[];
+  const ctx={currentTime:0,listener:{setPosition(){},setOrientation(){}},
+    createGain:()=>({...Node(),gain:Param()}),
+    createBiquadFilter:()=>({...Node(),frequency:Param(),Q:Param()}),
+    createPanner:()=>({...Node(),positionX:Param(),positionY:Param(),positionZ:Param()}),
+    createBufferSource:()=>{const source={...Node(),playbackRate:Param(),
+      start(...args){this.started=args;},stop(at){if(at==null)this.stopped=true;}};sources.push(source);return source;},
+    decodeAudioData:async bytes=>{const buffer=buffers.get(crypto.createHash("sha256").update(new Uint8Array(bytes)).digest("hex"));
+      assert.ok(buffer,"the dynamic recipe loads the actual authored MP3 bytes");return buffer;},
+  };
+  const audio=new AudioEngine();audio.ctx=ctx;audio.sfxBus=Node();audio.storyDuck=ctx.createGain();audio.reverbs={street:Node()};
+  const originalFetch=globalThis.fetch;
+  try{
+    globalThis.fetch=async url=>new Response(fs.readFileSync(new URL(url)));
+    assert.equal(await audio.LoadVoices(new URL("./Audio/FirstLevel/",import.meta.url).href,
+      cues.map(cue=>({key:`Mission${cue.id}`,file:cue.file,kind:"story",version:manifest.cues[cue.id].sha256}))),2);
+  }finally{globalThis.fetch=originalFetch;}
+  const Camera=(x,y,z)=>({matrixWorld:{elements:[1,0,0,0,0,1,0,0,0,0,1,0,x,y,z,1]}});
+  const position={x:-76.2,y:2.54,z:201};
+  audio.SetListener(Camera(-77,2.8,341.9));
+  assert.equal(audio.Play("voice.MissionTrainBriefing",{position,priority:true}),null,
+    "a listener left at the old rendered frame reproduces the missing briefing");
+  assert.equal(audio.drops.distance,1,"the real voice distance rule, not decoding or node budget, rejects it");
+  audio.SetListener(Camera(-77,2.8,201.7));
+  // Even an exhausted device budget cannot consume a nearby priority dialogue.
+  audio.nodeBudget=1;
+  const voice=new FirstLevelMissionVoice({audio,Clock:()=>ctx.currentTime,Position:()=>position,
+    hud:{SayLines(){},Say(){}}});voice.manifest=manifest;
+  try{
+    voice.Enqueue("TrainBanter");voice.Update(0);
+    const Step=count=>{for(let i=0;i<count;i++){ctx.currentTime+=1/60;voice.Update(1/60);}};
+    Step(120);
+    const main=audio.storyVoice,parallel=voice.current.parallel[0];
+    assert.ok(main&&parallel?.voice,"both complete recordings acquire real AudioEngine voice handles");
+    assert.ok(audio.activeVoices.has(main)&&audio.activeVoices.has(parallel.voice),"the briefing does not replace the story slot");
+    assert.deepEqual(sources.map(source=>source.buffer.key),["MissionTrainBanter","MissionTrainBriefing"]);
+    assert.ok(sources.every(source=>source.started&&source.playbackRate.value===1),"both loaded recipes schedule a source without changing pitch");
+    assert.ok(parallel.voice.distance<2&&parallel.voice.panner,"the briefing stays spatial at the current listener");
+    assert.ok(audio.stats.priorityOverBudget>0&&audio.drops.starved===0,"priority protects both tracks from budget rejection");
+    const before=voice.State();voice.Pause();ctx.currentTime+=10;voice.Update(10);
+    assert.equal(voice.State().sourceTime,before.sourceTime);
+    assert.equal(voice.State().parallel[0].sourceTime,before.parallel[0].sourceTime);
+    assert.ok(sources.every(source=>source.stopped),"pause actually stops both scheduled AudioBufferSources");
+    voice.Resume();
+    assert.equal(sources[2].started[1],before.sourceTime,"the banter resumes at its retained source offset");
+    assert.equal(sources[3].started[1],before.parallel[0].sourceTime,"the briefing resumes at its own source offset");
+    assert.ok(audio.storyVoice&&voice.current.parallel[0].voice);
+    assert.equal(audio.errorCount,0);assert.deepEqual(audio.voiceErrors,[]);
+  }finally{
+    voice.Dispose();for(const timer of audio.timers)clearTimeout(timer);audio.timers.clear();
+  }
+  console.log("ok real AudioEngine dialogue admission: stale listener repro, simultaneous sources, budget and pause/resume");
+}
+if(process.argv.includes("--opening-audio"))process.exit(0);
+
+// Run the production projectile and mission adapter in Node. Vendor .js files
+// are browser ES modules inside this repository's CommonJS package boundary.
+// No renderer, browser, scene or GPU is created by this clock/ballistics fixture.
+{
+  const {registerHooks}=await import("node:module");
+  const vendorRoot=new URL("./vendor/",import.meta.url).href;
+  const hooks=registerHooks({load(url,context,next){
+    if(url.startsWith(vendorRoot)&&url.endsWith(".js"))
+      return {format:"module",source:fs.readFileSync(new URL(url),"utf8"),shortCircuit:true};
+    return next(url,context);
+  }});
+  let CombatSystem,FirstLevelMissionRuntime,Vector3;
+  try {
+    ({CombatSystem}=await import("./Script_Combat.mjs"));
+    ({FirstLevelMissionRuntime}=await import("./Script_FirstLevelMissionRuntime.mjs"));
+    ({Vector3}=await import("three"));
+  } finally {hooks.deregister();}
+  const StanceRequest=(stage,facts)=>{
+    const input={stanceRequested:"stand",crouchPressed:true,pronePressed:true};
+    FirstLevelMissionRuntime.prototype.BeforePlayer.call({flow:{stage:{id:stage}},
+      Has:id=>facts.has(id),meal:{Restore(){}},ReceivingFood:false,controls:null},1/60,input);
+    return input;
+  };
+  const freeStance={stanceRequested:"stand",crouchPressed:true,pronePressed:true};
+  for(const phase of FIRST_LEVEL_STAGES.filter(phase=>phase.number>=3)){
+    const saved=BuildFirstLevelCheckpoint(phase.number),facts=new Set(saved.facts);
+    assert.ok(facts.has("trainNearShellImpact"),`${phase.id}: a completed derailment includes its near-shell impact`);
+    const legacy=new Set(facts);legacy.delete("trainNearShellImpact");
+    for(const stage of phase.steps){
+      assert.deepEqual(StanceRequest(stage,facts),freeStance,`${stage}: the current checkpoint permits standing`);
+      assert.deepEqual(StanceRequest(stage,legacy),freeStance,`${stage}: an old save missing the impact still permits standing`);
+      assert.deepEqual(StanceRequest(stage,new Set(["trainProneOrder"])),freeStance,
+        `${stage}: a stale carriage order never owns a later gameplay stage`);
+    }
+  }
+  for(const stage of ["Train","Unloading"]){
+    assert.deepEqual(StanceRequest(stage,new Set()),freeStance,`${stage}: the player stays free before the order`);
+    assert.deepEqual(StanceRequest(stage,new Set(["trainProneOrder"])),
+      {stanceRequested:"crouch",crouchPressed:false,pronePressed:false},`${stage}: the real incoming barrage still forces crouching`);
+    assert.deepEqual(StanceRequest(stage,new Set(["trainProneOrder","trainNearShellImpact"])),freeStance,
+      `${stage}: impact ends the crouch order before derailment controls take over`);
+    assert.deepEqual(StanceRequest(stage,new Set(["trainProneOrder","luoRescueComplete"])),freeStance,
+      `${stage}: completed rescue releases an old save even when the impact fact is absent`);
+  }
+  console.log("ok carriage crouch scope: live barrage, completed rescue, all later stages and legacy saves");
+  if(process.argv.includes("--opening-stance"))process.exit(0);
+  const Make=()=>{
+    const facts=new Set(["trainFirstShellLaunched"]),rays=[],impacts=[],sounds=[];
+    const fixture={clock:0,wallX:null};
+    const combat=Object.create(CombatSystem.prototype);
+    Object.assign(combat,{shells:[],shellSerial:0,shellVisuals:{Create(){},Step(){},Update(){},Retire(){}},
+      Blast:point=>impacts.push(point.clone()),host:{audio:{Play:(key,options)=>sounds.push({key,...options})},battlefield:{
+        GroundHeight:()=>0,
+        Raycast:(from,direction,distance)=>{
+          rays.push({from:from.clone(),direction:direction.clone(),distance});
+          const floor=direction.y<0?-from.y/direction.y:Infinity;
+          const wall=fixture.wallX!=null&&Math.abs(direction.x)>1e-8?(fixture.wallX-from.x)/direction.x:Infinity;
+          const at=Math.min(floor>=0?floor:Infinity,wall>=0?wall:Infinity);
+          return at<=distance?{t:at}:null;
+        },
+      }}});
+    const runtime={time:0,Has:id=>facts.has(id),Record:id=>facts.add(id),combat,
+      Point:(p,y=0)=>new Vector3(p.x,y,p.z),trainShellStartedAt:null,shellTrainOffset:0,
+      carriageSound:{Handle:()=>false},opening:{Derail:()=>facts.add("trainNearShellImpact")},
+      player:{Suppress(){}},squad:[],column:{},
+    };
+    const voice=new FirstLevelMissionVoice({
+      audio:{PlayStoryVoice:()=>({voice:{t:fixture.clock}}),StopStoryVoice(){}},hud:{Say(){}},
+      Clock:()=>fixture.clock,Ready:id=>facts.has(id),
+      Event:(...args)=>FirstLevelMissionRuntime.prototype.VoiceEvent.call(runtime,...args),
+    });
+    runtime.voice=voice;
+    voice.manifest=JSON.parse(fs.readFileSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json",import.meta.url)));
+    voice.Enqueue("TrainShelling");voice.Update(0);
+    fixture.Step=(audioSeconds,dt=.05)=>{fixture.clock+=audioSeconds;runtime.time+=dt;voice.Update(dt);combat.StepShells(dt);};
+    return Object.assign(fixture,{runtime,voice,combat,facts,rays,impacts,sounds});
+  };
+  const slow=Make(),cue=MISSION_DIALOGUE.find(cue=>cue.id==="TrainShelling");
+  const plan=MissionVoiceTimeline(cue,slow.voice.manifest.cues.TrainShelling.seconds);
+  const launchAt=plan.segments[0].events[0].at,impactAt=plan.lines[2][1];
+  // Ten rendered frames per real second, with Main's simulation dt cap of .05.
+  while(slow.clock<launchAt+.15)slow.Step(.1);
+  assert.equal(slow.combat.shells.length,1,"the source-timed near shell is a real live projectile");
+  const shell=slow.combat.shells[0],pausedAge=shell.age,pausedPosition=shell.position.toArray(),pausedRays=slow.rays.length;
+  slow.voice.Pause();for(let i=0;i<30;i++)slow.Step(.1);
+  assert.equal(shell.age,pausedAge,"a paused source cannot advance the story projectile on simulation dt");
+  assert.deepEqual(shell.position.toArray(),pausedPosition,"pause freezes the actual ballistic position");
+  assert.equal(slow.rays.length,pausedRays,"a frozen projectile does not cast zero-length collision rays");
+  slow.voice.Resume();
+  for(let i=0;i<30&&!slow.impacts.length;i++)slow.Step(.1);
+  assert.equal(slow.impacts.length,1,"the real impact occurs despite simulation advancing at half audio speed");
+  assert.equal(slow.voice.current.sourceTime,impactAt,"impact coincides with the interrupted reassurance source endpoint");
+  assert.ok(slow.facts.has("trainNearShellImpact"),"the collision releases the actual injury-dialogue gate");
+  assert.ok(slow.rays.length>=160,"catch-up retains the full substepped collision path");
+  assert.equal(slow.combat.shells.length,0,"the shell retires once after impact");
+
+  const late=Make();late.Step(launchAt+.8);
+  assert.ok(Math.abs(late.combat.shells[0].age-.8)<1e-8,"a delayed launch frame catches up from the authored launch time");
+  assert.ok(late.rays.length>=95,"late launch traces its whole path instead of teleporting to the current point");
+  late.Step(impactAt-late.voice.current.sourceTime);
+  assert.equal(late.impacts.length,1,"a source held exactly at the gate can still physically reach the ground");
+  assert.ok(late.impacts[0].distanceTo(late.rays[0].from)>20,"impact is reached through the real travelled trajectory");
+
+  const blocked=Make();blocked.wallX=-59.7;blocked.Step(impactAt);
+  assert.equal(blocked.impacts.length,1,"a catch-up interval still hits intervening world geometry");
+  assert.ok(Math.abs(blocked.impacts[0].x-blocked.wallX)<1e-8&&blocked.impacts[0].y>0,
+    "the nearer wall receives the hit instead of a forced explosion at the authored ground target");
+  blocked.Step(1);assert.equal(blocked.impacts.length,1,"a blocked projectile cannot impact again after the clock advances");
+
+  const ordinary=Make();
+  const normal=ordinary.combat.FireShell(new Vector3(0,28,0),new Vector3(26,0,0),{flight:1.4,incoming:false});
+  ordinary.combat.StepShells(.05);
+  assert.ok(Math.abs(normal.age-.05)<1e-8,"ordinary combat shells retain their simulation-dt clock");
+  const ranging=Make();Object.assign(ranging.runtime,{time:20,trainClockLead:19});
+  const barrage=new FirstLevelOpeningBarrage(ranging.runtime);
+  barrage.startedAt=20;barrage.nextShotAt=Infinity;barrage.Update();
+  assert.equal(ranging.combat.shells[0].target.z,MISSION_TRAIN.cars[OPENING.derailCar].z+
+    MissionTrainMotion(39+OPENING.barrage.firstFlightS).offsetM+OPENING.barrage.shells[0].z,
+    "the first ranging shell follows the audio-led moving train even when simulation runs slower");
+  console.log("ok source-timed near shell: 10fps cap, pause/resume, late launch, real obstruction and ordinary dt");
+}
+// The upstream sensory recovery can outlast the carriage roll. Observe the
+// actual perception function and Opening.Update together, including an early
+// rescue request; a separate timer must not consume the failed rise unseen.
+{
+  const summaries=[];
+  for(const dt of [1/10,1/60,1/144]){
+    const facts=new Set(['trainDerailed','trainStopped','luoRescueRequested']),events=[],controls=[];
+    const luo={alive:true,castId:'luo',position:{...OPENING.rescueGuide,y:0}};
+    const runtime={time:OPENING.derailSeconds,flow:{stage:{id:'Unloading'}},squad:[luo],spawned:new Set(['surface']),
+      Has:id=>facts.has(id),Record:(id,detail)=>{if(!facts.has(id))events.push({id,time:runtime.time,detail});facts.add(id);},
+      companion:{Handle:()=>luo},player:{position:{...OPENING.playerFall,y:0}},
+      audio:{SetConcussion(){},Play(){return null;}},ai:{SetStance(){}},MoveActor(){},Point:(point,y)=>({...point,y}),
+      BeginControl:(kind,duration)=>controls.push({kind,duration,time:runtime.time})};
+    const opening=new FirstLevelOpening(runtime);opening.derailAt=0;
+    opening.barrage.Update=()=>{};opening.UpdateEscapePressure=()=>{};opening.FireWindows=()=>{};opening.UpdateZhou=()=>{};
+    const samples=[];
+    for(let frame=0;frame<20/dt&&opening.rescueAt==null;frame++){
+      opening.Update(dt);
+      const perception=SampleOpeningPerception(runtime.time),action={...luo.missionCarriageAction};
+      samples.push({time:runtime.time,eyeClosure:perception.eyeClosure,recoveryAt:opening.luoRecoveryAt,action});
+      if(opening.luoRecoveryAt==null){
+        assert.ok(perception.eyeClosure>OPENING.luoRecoveryMaxEyeClosure);
+        assert.equal(action.clipId,'LuoStaggerRecover');assert.equal(action.seconds,0,'blackout holds the first frame on the ground');
+        assert.equal(action.transitionSeconds,0,'the zero-time hold samples the ground pose instead of freezing a pending idle crossfade');
+        assert.ok(!facts.has('trainLuoRecovering')&&!facts.has('trainLuoStanding')&&!controls.length,'closed eyes never consume recovery or unlock an early rescue request');
+      }else if(action.clipId==='LuoStaggerRecover'){
+        assert.ok(perception.eyeClosure<=OPENING.luoRecoveryMaxEyeClosure,'the whole recovery plays with the lids sufficiently open');
+        assert.ok(!controls.length,'the pending request cannot skip the final standing recovery');
+      }
+      if(action.clipId==='LuoStaggerRecover'){
+        const before={...luo.missionCarriageAction},started=opening.luoRecoveryAt;
+        opening.Update(0);
+        assert.deepEqual(luo.missionCarriageAction,before,'a paused mission clock freezes the recovery sample');
+        assert.equal(opening.luoRecoveryAt,started);
+      }
+      runtime.time+=dt;
+    }
+    const started=events.find(event=>event.id==='trainLuoRecovering'),standing=events.find(event=>event.id==='trainLuoStanding');
+    assert.ok(samples.some(sample=>sample.recoveryAt==null),'the real stretched blackout requires an observable hold');
+    assert.ok(started&&standing&&controls.length===1,'reopening eventually completes one full recovery and one rescue');
+    assert.ok(SampleOpeningPerception(started.time).eyeClosure<=OPENING.luoRecoveryMaxEyeClosure);
+    assert.ok(SampleOpeningPerception(started.time-dt).eyeClosure>OPENING.luoRecoveryMaxEyeClosure,'recovery starts at the first visible sample, not an unrelated fixed delay');
+    // The authored failed first attempt descends between source 1.45 and 1.85s.
+    const failed=samples.filter(sample=>sample.action.clipId==='LuoStaggerRecover'&&sample.action.seconds>=1.45&&sample.action.seconds<=1.85);
+    assert.ok(failed.length&&failed.every(sample=>SampleOpeningPerception(sample.time).eyeClosure<=OPENING.luoRecoveryMaxEyeClosure),'the complete failed-rise window remains visible with the actual perception curve');
+    assert.ok(standing.time-started.time>=OPENING.luoRecoverySeconds,'visibility waiting never shortens the 4.8 second authored clip');
+    assert.ok(controls[0].time>=standing.time&&opening.rescueAt>=standing.time,'helping starts only after Luo has recovered his own footing');
+    summaries.push({fps:1/dt,start:started.time,standing:standing.time,maxFailedEyeClosure:Math.max(...failed.map(sample=>sample.eyeClosure))});
+  }
+  console.log('ok visible complete Luo recovery after blackout, early rescue held, pause-safe',JSON.stringify(summaries));
+}
+// Exercise the real source-clock player/camera path with a stationary rescuer.
+// Endpoints alone missed the old crossing; sample every frame of the pull and
+// allow a small physical settling offset from Luo's nominal spill destination.
+{
+  const {Vector3,PerspectiveCamera}=await import('three');
+  const cue=MISSION_DIALOGUE.find(cue=>cue.id==='TrainShelling');
+  const manifest=JSON.parse(fs.readFileSync(new URL('./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json',import.meta.url)));
+  const plan=MissionVoiceTimeline(cue,manifest.cues.TrainShelling.seconds),indices=OPENING.rescueDialogueLines;
+  const sourceStart=plan.lines[indices.reach][0],sourceEnd=plan.lines[indices.steady][1];
+  const liftAt=plan.segments.flatMap(segment=>segment.events||[]).find(event=>event.id==='TrainRescueLift').at;
+  const summaries=[];
+  for(const fps of [10,60,144]){
+    const dt=1/fps,moves=[],contacts=[],teleports=[],facts=new Set(['trainDerailed','trainStopped','trainLuoStanding','luoRescueRequested']);
+    const luo={alive:true,castId:'luo',position:new Vector3(OPENING.rescueGuide.x+.07,0,OPENING.rescueGuide.z-.07)};
+    const rightHand=new Vector3();
+    luo.actor={characterRig:{bones:{handR:{getWorldPosition(out){
+      // A distinct world-space right-hand marker proves ApplyCamera still
+      // consumes that bone instead of the old procedural rescue target.
+      return out.copy(rightHand.set(luo.position.x-.2,luo.position.y+.7,luo.position.z-.3));
+    }},handL:{getWorldPosition(){assert.fail('rescue must keep the authored right-hand contact');}}}}};
+    const position=new Vector3(OPENING.playerFall.x,0,OPENING.playerFall.z),camera=new PerspectiveCamera();
+    const runtime={time:20,flow:{stage:{id:'Unloading'}},squad:[luo],spawned:new Set(['surface']),
+      Has:id=>facts.has(id),Record:id=>facts.add(id),companion:{Handle:()=>luo},
+      player:{position,camera,velocity:new Vector3(),body:{Teleport:(...point)=>teleports.push(point)}},
+      battlefield:{trainOffsetM:0,GroundHeight:(x,z)=>SampleMissionTerrain(x,z)},
+      voice:{current:{cue,plan,sourceTime:sourceStart}},
+      audio:{SetConcussion(){},Play(){return null;}},ai:{SetStance(){}},
+      MoveActor:(actor,point,speed)=>moves.push({actor,point:{...point},speed}),
+      Point:(point,y)=>new Vector3(point.x,y,point.z),BeginControl(){},
+      viewmodel:{ReachWorld:(point,weight)=>contacts.push({point:point.clone(),weight})}};
+    const opening=new FirstLevelOpening(runtime);opening.derailAt=0;opening.luoRecoveryAt=0;
+    opening.playerFrom=position.clone();opening.eyeFrom=position.clone();opening.lookFrom={yaw:0,pitch:0};
+    opening.barrage.Update=()=>{};opening.UpdateEscapePressure=()=>{};opening.FireWindows=()=>{};opening.UpdateZhou=()=>{};
+    let minGap=Infinity,pullSamples=0;
+    const Sample=source=>{
+      runtime.voice.current.sourceTime=source;opening.Update(Math.min(dt,.05));opening.ApplyCamera();
+      const gap=Math.hypot(camera.position.x-luo.position.x,camera.position.z-luo.position.z);
+      minGap=Math.min(minGap,gap);
+      assert.ok(gap>=1,'the whole camera path clears Luo even when physical settling offsets his stationary root');
+      assert.equal(position.y,runtime.battlefield.GroundHeight(position.x,position.z),'the player remains supported by the shared ground sampler');
+      assert.deepEqual(teleports.at(-1),position.toArray(),'player collision body follows the same source-timed path as the camera');
+      assert.deepEqual(contacts.at(-1).point.toArray(),rightHand.toArray(),'the viewmodel reaches the actual right-hand world position');
+      if(source<=liftAt){
+        assert.equal(position.x,OPENING.playerFall.x,'reach and grip cannot drag the player early');
+        assert.equal(position.z,OPENING.playerFall.z);assert.equal(opening.RescueLift(),0);
+      }else if(source<plan.lines[indices.steady][0])pullSamples++;
+      runtime.time+=Math.min(dt,.05);
+    };
+    for(let source=sourceStart;source<sourceEnd;source+=dt)Sample(source);
+    Sample(sourceEnd);
+    assert.ok(pullSamples>=10,'the clearance assertion observes the actual lifting interval');
+    assert.ok(moves.every(move=>move.speed===0&&move.point.x===luo.position.x&&move.point.z===luo.position.z),
+      'the authored brace never depends on AI movement keeping up with the player');
+    assert.equal(position.x,OPENING.rescueEnd.x);assert.equal(position.z,OPENING.rescueEnd.z);
+    assert.ok(position.distanceTo(luo.position)>=1&&position.distanceTo(luo.position)<1.7,
+      'standing retains the full one-metre body clearance after moving the rescuer clear of the station step');
+    const paused={position:position.toArray(),camera:camera.position.toArray(),action:{...luo.missionCarriageAction}};
+    runtime.time+=5;opening.Update(0);opening.ApplyCamera();
+    assert.deepEqual(position.toArray(),paused.position,'stalled source time freezes the rescue translation');
+    assert.deepEqual(camera.position.toArray(),paused.camera,'stalled source time freezes the camera path');
+    assert.deepEqual(luo.missionCarriageAction,paused.action,'stalled source time freezes the authored hand action');
+    summaries.push({fps,minGap,finalGap:Math.hypot(position.x-luo.position.x,position.z-luo.position.z),pullSamples});
+  }
+  console.log('ok rescue corridor, stationary support, right-hand contact and grip-before-pull',JSON.stringify(summaries));
+}
+// Test the full rescue capsule, not just the ground under its root. A prior
+// apparently clear root sat outside the last step while its rounded capsule
+// penetrated the edge and could not start the subsequent normal guide walk.
+{
+  const {registerHooks}=await import('node:module'),vendorRoot=new URL('./vendor/',import.meta.url).href;
+  const hooks=registerHooks({load(url,context,next){
+    if(url.startsWith(vendorRoot)&&url.endsWith('.js'))return {format:'module',source:fs.readFileSync(new URL(url),'utf8'),shortCircuit:true};
+    return next(url,context);
+  }});
+  let PhysicsWorld,InitPhysics,FirstLevelWhiteboxField,CompileWhiteboxWalkableSurfaces;
+  try{
+    ({PhysicsWorld,InitPhysics}=await import('./Script_Physics.mjs'));
+    ({FirstLevelWhiteboxField,CompileWhiteboxWalkableSurfaces}=await import('./Script_FirstLevelWhiteboxField.mjs'));
+  }finally{hooks.deregister();}
+  await InitPhysics();
+  const field=Object.create(FirstLevelWhiteboxField.prototype);
+  const world=new PhysicsWorld({groundAt:(x,z)=>field.GroundHeight(x,z)});
+  const boxes=MISSION_LAYOUT.blocks.filter(block=>block.solid!==false).map(block=>({id:block.id,
+    c:[block.x,block.y,block.z],h:[block.w/2,block.h/2,block.d/2],ry:block.ry||0}));
+  Object.assign(field,{physics:world,terrain:CreateP012Terrain(MISSION_LAYOUT),trainOffsetM:0,
+    walkableSurfaces:CompileWhiteboxWalkableSurfaces(MISSION_LAYOUT),
+    derailMeshes:[{rotation:{},position:{}}],derailColliders:boxes.filter(box=>box.id.startsWith(`StationCar${OPENING.derailCar}`)),
+    _GridRemove(){},_GridInsert(){}});
+  try{
+    for(const box of boxes)world.AddSolid(box);
+    field.SetCarDerailment(OPENING.derailCar,OPENING.derailRollRad,OPENING.derailPivot);
+    const statics=boxes.map(box=>({id:box.id,collider:world.world.getCollider(box._physicsHandle)}));
+    const step=statics.find(box=>box.id===`StationExitStep${OPENING.derailCar}_3`).collider;
+    const body=world.MakeCharacter({radius:.34,height:1.78});
+    const Contacts=()=>statics.flatMap(box=>{
+      const contact=body.collider.contactCollider(box.collider,.1);
+      return contact?[{id:box.id,distance:contact.distance}]:[];
+    });
+    const Penetrations=()=>Contacts().filter(contact=>contact.distance<-.0001);
+    // Captured stuck production pose: keep a failing control so this regression
+    // cannot silently become another point-only or collision-disabled check.
+    const old={x:-72.4482121635021,y:.24757269917590968,z:89.10015593110694};
+    body.Teleport(old.x,old.y,old.z);world.Step(1/60);
+    const oldDepth=body.collider.contactCollider(step,0)?.distance;
+    assert.ok(oldDepth<-.02,'the real Rapier capsule reproduces the recorded step-edge penetration');
+    const oldHits=Penetrations();assert.ok(oldHits.some(hit=>hit.id==='StationExitStep1_3'));
+    const nominal={...OPENING.rescueGuide,y:field.GroundHeight(OPENING.rescueGuide.x,OPENING.rescueGuide.z)};
+    const samples=[];
+    for(const height of [1.21,1.78]){
+      body.SetSize(.34,height);body.Teleport(nominal.x,nominal.y,nominal.z);world.Step(1/60);
+      assert.deepEqual(Penetrations(),[],'the current crouching/standing rescue capsule clears every actual solid box');
+      const stepClearance=body.collider.contactCollider(step,.2)?.distance;
+      assert.ok(stepClearance>.04,'the last step has positive clearance beyond the controller contact skin');
+      samples.push({height,stepClearance});
+    }
+    const movement=[];
+    for(const fps of [30,60,144]){
+      const dt=1/fps;body.Teleport(nominal.x,nominal.y,nominal.z);body.grounded=true;world.Step(dt);
+      // Hold through the performance, then let the ordinary character
+      // controller move north-east along the real first guide route leg.
+      for(let frame=0;frame<fps;frame++){body.Move(0,-.6*dt,0);world.Step(dt);}
+      assert.deepEqual(Penetrations(),[],'stationary rescue support cannot settle into a step');
+      const start=body.position.clone(),target=OPENING.approachRoute[0];
+      for(let frame=0;frame<fps*2;frame++){
+        const dx=target.x-body.position.x,dz=target.z-body.position.z,length=Math.hypot(dx,dz),travel=R.walkSpeedMps*dt;
+        body.Move(dx/length*travel,-.6*dt,dz/length*travel);world.Step(dt);
+        assert.deepEqual(Penetrations(),[],'the post-rescue guide walk stays outside the step and overturned carriage');
+      }
+      const distance=Math.hypot(body.position.x-start.x,body.position.z-start.z);
+      assert.ok(distance>R.walkSpeedMps*2*.9,'the normal capsule controller immediately resumes the guide walk after rescue');
+      assert.ok(body.position.z<start.z-3,'Luo clears the station-step depth toward the actual trench approach');
+      movement.push({fps,distance,position:body.position.toArray()});
+    }
+    console.log('ok real Rapier rescue landing and subsequent guide movement',JSON.stringify({solids:boxes.length,oldDepth,nominal,samples,movement}));
+  }finally{world.Dispose();}
+}
+if(process.argv.includes("--opening-clock")||process.argv.includes("--opening-recovery")||process.argv.includes("--opening-rescue"))process.exit(0);
+
 assert.ok(P.stationCasualties.every(person=>person.health>0),"station shelling does not manufacture dead recruits at muster");
 {
   const wall=MISSION_LAYOUT.blocks.find(block=>block.id==="TrenchRallyEast");
@@ -522,7 +901,7 @@ if (process.argv.includes("--audio")) {
   }
 }
 console.log(process.argv.includes("--audio")
-  ? "ok all 41 continuous audio assets, current script/file hashes and short death-scene duration"
+  ? `ok all ${MISSION_DIALOGUE.length} continuous audio assets, current script/file hashes and short death-scene duration`
   : "ok continuous dialogue prompts; audio assets require --audio acceptance");
 // Source-range playback preserves pauses, queued cues and physical event gates.
 {
@@ -541,21 +920,22 @@ console.log(process.argv.includes("--audio")
   assert.deepEqual(offsets,[0,.3,0]);
 }
 {
-  const events=[], sources=[], subtitles=[], done=[], facts=new Set();
+  const events=[], sources=[], subtitles=[], done=[], facts=new Set(),lineEvents=[];
   const voice=new FirstLevelMissionVoice({
     audio:{PlayStoryVoice:(key,options)=>{sources.push({key,...options});return {duration:22.544};},StopStoryVoice(){}},
     hud:{Say:(_who,text)=>subtitles.push(text)},Done:id=>done.push(id),
-    Event:id=>events.push(id),Ready:id=>facts.has(id),
+    Event:(id,cue,detail)=>{if(id==="TrainDialogueLine")lineEvents.push({cue,...detail});else events.push(id);},Ready:id=>facts.has(id),
   });
+  voice.manifest=JSON.parse(fs.readFileSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json",import.meta.url)));
   voice.Enqueue("TrainShelling");
   for(let i=0;i<900;i++)voice.Update(1/60);
   assert.deepEqual(events,[]);
-  assert.equal(voice.State().segment,"FirstShellWarning");
-  assert.equal(voice.State().playbackPhase,"waiting","the shout cannot anticipate the first shell impact");
-  assert.equal(sources.length,0,"no arrival speech precedes the actual surprise impact");
-  facts.add("trainFirstShellImpact");
-  for(let i=0;i<360;i++)voice.Update(1/60);
-  assert.deepEqual(events,["TrainNearShell"]);
+  assert.equal(voice.State().segment,"IncomingAndReassure");
+  assert.equal(voice.State().playbackPhase,"waiting","the shout cannot anticipate the incoming fire");
+  assert.equal(sources.length,0,"no reaction speech precedes the actual surprise volley");
+  facts.add("trainFirstShellLaunched");
+  for(let i=0;i<1800;i++)voice.Update(1/60);
+  assert.deepEqual(events,["TrainProneOrder","TrainNearShell"]);
   assert.equal(voice.State().segment,"DerailImpact");
   assert.ok(!subtitles.some(text=>text.includes("手遭打中了")),"injury speech waits for actual impact");
   facts.add("trainNearShellImpact");
@@ -567,8 +947,11 @@ console.log(process.argv.includes("--audio")
   for(let i=0;i<1800;i++)voice.Update(1/60);
   assert.equal(voice.State().segment,"LuoRescue");
   assert.equal(voice.State().playbackPhase,"waiting");
-  assert.ok(!subtitles.some(text=>text.includes("抓到我")),"unload command waits for physical emergency braking");
+  assert.ok(!subtitles.some(text=>text.includes("手拿来")),"Luo cannot reach the player before standing up himself");
   facts.add("trainStopped");
+  for(let i=0;i<300;i++)voice.Update(1/60);
+  assert.equal(voice.State().playbackPhase,"waiting","a stopped train alone cannot skip Luo's staggered recovery");
+  facts.add("trainLuoStanding");
   for(let i=0;i<1200;i++)voice.Update(1/60);
   assert.ok(events.includes("TrainRescue"));
   assert.equal(voice.State().segment,"GroundFire");
@@ -578,10 +961,45 @@ console.log(process.argv.includes("--audio")
   assert.deepEqual(done,["TrainShelling"]);
   assert.ok(sources.every(source=>source.maxDuration>0&&source.offset>=0));
   assert.equal(events.filter(id=>id==="TrainNearShell").length,1,"resume never re-fires a shell");
+  assert.deepEqual(lineEvents.filter(event=>event.active).map(event=>event.index),Array.from({length:12},(_,index)=>index),"every opening line emits its actor's source-time action");
+  const plan=MissionVoiceTimeline(MISSION_DIALOGUE.find(cue=>cue.id==="TrainShelling"),voice.manifest.cues.TrainShelling.seconds);
+  assert.equal(Number((plan.lines[2][1]-plan.segments[0].events[0].at).toFixed(3)),OPENING.nearShellFlightS,"the near shell lands at the interrupted reassurance ending");
+  assert.equal(plan.segments[2].events[0].at,plan.lines[6][0],"the reach starts on 'look at me, give me your hand'");
 }
 console.log("ok paused audio ranges, subtitle source timing, queued cues and shell-impact gates");
 
+{
+  let clock=0;const sources=[],parallelSources=[],rows=[],lineEvents=[],events=[],done=[];
+  const audio={PlayStoryVoice:(key,options)=>{sources.push({key,...options});return {voice:{t:clock}};},
+    StopStoryVoice(){},Play:(key,options)=>{const voice={key,t:clock,...options};parallelSources.push(voice);return voice;},
+    StopVoice:voice=>{voice.stopped=true;},MoveVoice(){}};
+  const voice=new FirstLevelMissionVoice({audio,Clock:()=>clock,
+    hud:{SayLines:lines=>rows.push(lines.map(line=>({...line})))},Done:id=>done.push(id),
+    Event:(id,cue,detail)=>{if(id==="TrainDialogueLine")lineEvents.push({cue,...detail});else events.push(id);},
+  });
+  voice.manifest=JSON.parse(fs.readFileSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json",import.meta.url)));
+  voice.Enqueue("TrainBanter");voice.Update(0);
+  const Step=count=>{for(let i=0;i<count;i++){clock+=1/60;voice.Update(1/60);}};
+  Step(180);const before=voice.State();voice.Pause();clock+=10;voice.Update(10);
+  assert.equal(voice.State().sourceTime,before.sourceTime,"pausing freezes the banter source");
+  assert.equal(voice.State().parallel[0].sourceTime,before.parallel[0].sourceTime,"pausing also freezes Luo's simultaneous source");
+  assert.ok(parallelSources[0].stopped,"pause stops the live companion voice");
+  voice.Resume();Step(1800);
+  assert.deepEqual(done,["TrainBriefing","TrainBanter"],"the whole briefing ends before the interrupted retort and volley");
+  assert.equal(sources.length,2,"the intact banter only restarts to resume from pause");
+  assert.equal(parallelSources.length,2,"the intact briefing only restarts to resume from pause");
+  assert.equal(parallelSources[1].offset,before.parallel[0].sourceTime,"the simultaneous source resumes at its own exact offset");
+  assert.ok(rows.some(lines=>lines.length===2&&lines.some(line=>line.speaker==="罗班长")&&lines.some(line=>line.speaker==="刘文财")),"both speaking actors have visible separate subtitles");
+  const utterances=rows.flat().filter(line=>line.started).map(line=>line.text);
+  for(const id of ["TrainBanter","TrainBriefing"])for(const line of MISSION_DIALOGUE.find(cue=>cue.id===id).lines)
+    assert.ok(utterances.includes(line.text),`${id}: every complete spoken line is retained in subtitle audit`);
+  assert.equal(events.filter(id=>id==="TrainIncomingFire").length,1,"the interrupted retort fires the volley exactly once across pause");
+  assert.equal(lineEvents.filter(event=>event.active&&event.cue==="TrainBriefing").length,1,"the briefing is one continuous performance and action");
+  console.log("ok complete simultaneous banter/briefing, dual subtitles, source-clock actions and pause/resume");
+}
+
 // Regression: 40 real recruit bodies plus Luo, stable carriage-local positions, all three doors.
+assert.equal(MISSION_LAYOUT.blocks.filter(block=>/^StationCar\d.*Bench/.test(block.id)).length,0,"freight cars contain no bench geometry or bench colliders");
 for(const preparedAnimation of [false,true]) {
   const dt = 1/60, actors = [];
   const Make = () => { const a = { id: actors.length, alive: true, position: {x:0,y:1.17,z:0}, goal:{x:0,z:0} }; actors.push(a); return a; };
@@ -591,19 +1009,32 @@ for(const preparedAnimation of [false,true]) {
     Offset:()=>offset, Place:(a,p)=>Object.assign(a.position,p), Hold:a=>Object.assign(a.goal,a.position),
     Move:(a,p,speed)=>{assert.equal(a.missionTrainLife.weight,0,"passengers stand before physical walking");const d=Math.hypot(p.x-a.position.x,p.z-a.position.z);if(d>MISSION_TRAIN.arrivalRadiusM){const step=Math.min(speed*dt,d)/d;a.position.x+=(p.x-a.position.x)*step;a.position.z+=(p.z-a.position.z)*step;}},
     Player:()=>player, Exited:()=>{},
-    // Deliberately simple animation fixture: the production sampler is checked
-    // independently in FirstLevelTrainAnimationTest. Here its measured anchor
-    // must fit the same 41-body queue without changing its movement authority.
-    PrepareAnimation:preparedAnimation?a=>({duration:5,config:{riseStaggerSeconds:.35},
-      SeatOffset:()=>({x:.002,z:-(a.id%4===2?.28:.24)-.35*(.96+(a.id%9)*.01)}),
-      State:t=>({weight:t<5?1:0,gestureWeight:0})}):undefined,
+    // The authored samplers are independently inspected in CarriageAnimationTest.
+    // The same anchors and physical queue must work both before and after loading.
+    PrepareAnimation:preparedAnimation?()=>({ClipDuration:()=>MISSION_TRAIN.life.duckSeconds}):undefined,
   });
   train.Initialize(); train.Initialize();
   assert.equal(actors.length,41);assert.deepEqual(train.State().counts,[12,16,12]);
-  assert.equal(actors.filter(a=>a.missionTrainLife.seated).length,39);
+  assert.equal(actors.filter(a=>a.missionTrainLife.seated).length,0);
+  assert.ok(actors.some(a=>a.missionTrainLife.posture==='stand')&&actors.some(a=>a.missionTrainLife.posture==='crouch'));
+  assert.ok(actors.every(a=>['WallStandIdle','WallCrouchIdle'].includes(a.missionTrainLife.action)),"every passenger has an authored standing or crouching idle");
+  assert.ok(actors.every(a=>a.missionTrainLife.animationPending===!preparedAnimation),"missing assets remain explicitly pending");
+  for(const e of train.entries)if(e.actor.missionTrainLife.wall){
+    assert.ok(Math.abs(Math.abs(e.actor.position.x-MISSION_TRAIN.centerX)-MISSION_TRAIN.life.wallAnchorM)<1e-8);
+    if(e.actor.position.x>MISSION_TRAIN.centerX)assert.ok(Math.abs(e.actor.position.z-offset-MISSION_TRAIN.cars[e.carIndex].z)>=2.3-1e-8,"wall idles cannot lean on the open door");
+    for(const block of MISSION_LAYOUT.blocks){
+      if(!block.id.startsWith('StationCar'+e.carIndex)||block.solid===false||block.id.endsWith('Floor')||block.y+block.h/2<e.actor.position.y+.01)continue;
+      const clearance=Math.hypot(Math.max(0,Math.abs(e.actor.position.x-block.x)-block.w/2),Math.max(0,Math.abs(e.actor.position.z-offset-block.z)-block.d/2));
+      assert.ok(clearance>=.37,'wall-idle capsule retains clearance from '+block.id);
+    }
+  }
   const local=actors.map(a=>({x:a.position.x,z:a.position.z-offset}));
   for(let i=0;i<120;i++){offset-=R.trainTravelM/120;train.Translate(-R.trainTravelM/120);train.Update(dt,false);}
   for(const [i,a] of actors.entries()) {assert.ok(Math.abs(a.position.z-offset-local[i].z)<1e-8);assert.equal(a.position.x,local[i].x);assert.ok(a.p012OnMovingTrain);}
+  for(let i=0;i<120;i++)train.Update(dt,false,true,null,false);
+  assert.ok(actors.every(a=>a.missionTrainLife.posture==='crouch'&&a.missionTrainLife.action==='WallCrouchIdle'&&a.missionTrainLife.brace>.99),"the entire crowd is crouched during incoming fire before the near shell");
+  assert.equal(train.impactSeconds,undefined,"the group crouch does not require an impact");
+  for(const [i,a] of actors.entries())assert.ok(Math.abs(a.position.x-local[i].x)<1e-8&&Math.abs(a.position.z-offset-local[i].z)<1e-8,"ducking never teleports a body");
   player={x:-71,z:110};
   let ticks=0;
   for(;ticks<180/dt;ticks++) {
@@ -614,7 +1045,7 @@ for(const preparedAnimation of [false,true]) {
   assert.equal(train.State().exited,40,JSON.stringify(train.State()));
   assert.ok(train.entries.every(e=>e.arrived),'all passengers physically reach their own muster point: '+JSON.stringify(train.State().entries.filter(e=>!e.arrived)));
   assert.ok(actors.every(a=>!a.p012OnMovingTrain&&a.missionUnloaded));
-  console.log('ok train 12/16/12, Luo separate, '+(preparedAnimation?'prepared standing anchors':'fallback seats')+', unchanged local positions while moving, all physical exits in '+(ticks*dt).toFixed(1)+'s');
+  console.log('ok train 12/16/12, authored wall idles '+(preparedAnimation?'ready':'pending')+', pre-impact whole-crowd crouch, all physical exits in '+(ticks*dt).toFixed(1)+'s');
 }
 
 {
@@ -749,7 +1180,7 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
 
 {
  let clock=0;const events=[];
- const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){},PlayStoryVoice(){return {voice:{t:clock}};}},hud:{Say(){}},Clock:()=>clock,Event:id=>events.push(id)});
+ const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){},PlayStoryVoice(){return {voice:{t:clock}};}},hud:{Say(){}},Clock:()=>clock,Event:id=>{if(id!=="TrainDialogueLine")events.push(id);}});
  voice.Enqueue("TrainMeal");voice.Update(5);voice.Update(90);
  assert.equal(events.length,0,"simulation time cannot finish the receiving gesture ahead of audio");
  const handoffAt=MISSION_VOICE_ALIGNMENT.TrainMeal.lines[1][1];

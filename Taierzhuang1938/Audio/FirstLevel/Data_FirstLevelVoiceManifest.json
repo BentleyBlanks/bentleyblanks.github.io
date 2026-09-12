@@ -15,11 +15,11 @@
     },
     "TrainShelling": {
       "file": "AudioVoice_FirstLevelTrainShelling.mp3",
-      "seconds": 18.651,
-      "bytes": 224489,
-      "promptHash": "edde0529a1547e5566bd850c13eefb77891e758d3d6df7160dc29061f3d9ad76",
-      "sha256": "24b25c0823f0d85bcf2bcf8492b38d6b55ba25aa36d1d025aac38721a39d245f",
-      "lineCount": 8,
+      "seconds": 35.944,
+      "bytes": 432004,
+      "promptHash": "bb95e1be39637dc5fb821afee8b82633651f3540cec19ceca531f9d54c23c3d4",
+      "sha256": "78f50ddf54c842e15f3d4e7e9b478df6c87f1a9c38c2c1e70e5d53eff31b9c74",
+      "lineCount": 12,
       "requests": 1,
       "continuous": true,
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
@@ -452,7 +452,29 @@
       "requests": 1,
       "continuous": true,
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
+    },
+    "TrainBanter": {
+      "file": "AudioVoice_FirstLevelTrainBanter.mp3",
+      "seconds": 14.132,
+      "bytes": 170257,
+      "promptHash": "099eec2f73a6a686c178a17eea57e17a3fdd2e2869017a5601cf5ddef8916f51",
+      "sha256": "45ae4f59b575188ce98ac039385656e40d3bbc2c059ae2982abbaf1bfbd48c17",
+      "lineCount": 4,
+      "requests": 1,
+      "continuous": true,
+      "mastering": "MonoBeforeLoudnessTruePeakMinus3"
+    },
+    "TrainBriefing": {
+      "file": "AudioVoice_FirstLevelTrainBriefing.mp3",
+      "seconds": 10.214,
+      "bytes": 123237,
+      "promptHash": "97f933c88c2ed85de7eeebf9d3b95e8136f90a1ae3f2f29a5b1fba2ae43fccb4",
+      "sha256": "52bdf7ae20944be6c75bd755dd276c7968fd75072d7202d8064a3033c762353f",
+      "lineCount": 1,
+      "requests": 1,
+      "continuous": true,
+      "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-09-10T13:27:08.334Z"
+  "updatedAt": "2026-09-11T18:17:01.509Z"
 }

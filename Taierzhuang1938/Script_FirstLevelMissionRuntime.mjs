@@ -22,7 +22,7 @@ import {
 } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_TRAIN, MissionTrainMotion } from "./Data_FirstLevelMissionTrain.mjs";
 import { FirstLevelMissionTrain } from "./Script_FirstLevelMissionTrain.mjs";
-import { PrepareFirstLevelTrainAnimation } from "./Script_FirstLevelTrainAnimation.mjs";
+import { PrepareFirstLevelCarriageAnimation } from "./Script_FirstLevelCarriageAnimation.mjs";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
 import { TransferBeatReady, GuardCrossingPair, FrontReplacementSlots } from "./Script_FirstLevelMissionPacing.mjs";
 import { ApplyFirstLevelStageJump } from "./Script_FirstLevelMissionStageJump.mjs";
@@ -77,9 +77,9 @@ export class FirstLevelMissionRuntime {
     this.voice = new FirstLevelMissionVoice({
       audio: this.audio,
       hud: this.hud,
-      Position: (cue) => this.VoicePosition(cue),
+      Position: (cue,line) => this.VoicePosition(cue,line),
       Done: (id) => this.VoiceDone(id),
-      Event: (id) => this.VoiceEvent(id),
+      Event: (id,cueId,detail) => this.VoiceEvent(id,cueId,detail),
       Ready: (id) => this.Has(id),
       Clock: this.VoiceClock,
     });
@@ -131,29 +131,13 @@ export class FirstLevelMissionRuntime {
   Say(id, options) {
     this.voice.Enqueue(id, options);
   }
-  /**
-   * 一条对白从哪儿传来。
-   *
-   * 【2026-09-09】兜底那一支原来是**本阶段的目标点**，而目标点是地图上的一个死坐标。
-   * 用户报「车厢里大家的对话好像距离都很远，听不清」，实测就是它：`TrainShelling`
-   * 十句里第一句的说话人是泛用的 `soldier`（没有 companion handle），于是整条 cue
-   * 落在 Unloading 的目标点 (−66, 66) 上 —— 而军列这会儿还在 z=140 往南开，
-   * 那是**七十四米外**，引擎按距离给了 occ 0.45 与 2.3 kHz 低通。同一场里
-   * `TrainMeal`（说话人是幺娃，有 handle）实测 2 m / occ 0 / 15 kHz，清清楚楚 ——
-   * 两者的差别不在素材，在这一行。
-   *
-   * 现在兜底落到**玩家自己身上**（嘴高，非贴脸）：这一关里没有 handle 的说话人
-   * 一律是同一节车厢／同一条壕沟里的人，永远在身边。死坐标只留给真的定点事件。
-   *
-   * 已知限制：位置按**整条 cue 的第一句**取，多人对话的后几句沿用同一个点。
-   * 十句里换四个说话人时那是「一群人在这边说话」，不是四个方位 —— 要逐句定位
-   * 得把 `FirstLevelMissionVoice.PlaySegment` 的契约从 cue 改成 line。
-   */
-  VoicePosition(cue) {
+  // Intact dialogue recordings follow the current speaker; overlapping Luo
+  // briefing keeps its own source. Unknown nearby voices stay in carriage space.
+  VoicePosition(cue,line) {
     if(cue.id==="SupportOrder"&&this.opening.runner)return this.Point(this.opening.runner.actor.position,1.3);
     if (cue.id.startsWith("Retreat") || cue.id === "ZhouDeath") return this.Point(this.column.zhou, 1);
-    const who = cue.lines[0]?.who;
-    if (who === "shunzi") return null;
+    const who = line?.who ?? cue.lines[0]?.who;
+    if (who === "shunzi") return this.player.EyePosition.clone();
     const handled = this.companion.Handle(who)?.position;
     if (handled) return new THREE.Vector3(handled.x,handled.y+1.35,handled.z);
     // 不走 Point()：那一条按 GroundHeight 定高，而车厢地板比地面高两米 ——
@@ -174,11 +158,19 @@ export class FirstLevelMissionRuntime {
     if (this.Has("trainStopped")) return this.player.stance==="prone"
       ? {keys:"Z",label:T("firstLevel.hint.standAndUnload"),kind:"stance",text:true}
       : {keys:"WASD",label:T("firstLevel.hint.leaveTrain"),kind:"move",text:true};
-    if (this.Has("trainProneOrder") && this.player.stance!=="prone")
-      return {keys:"Z",label:T("firstLevel.hint.trainProne"),kind:"stance",text:true};
+    if (this.Has("trainProneOrder") && this.player.stance!=="crouch")
+      return {keys:"C",label:T("firstLevel.hint.trainProne"),kind:"stance",text:true};
     return null;
   }
-  VoiceEvent(id) {
+  VoiceEvent(id,cueId,detail) {
+    if(id==="TrainDialogueLine"){
+      if(!detail)return;
+      if(!detail.active){this.train?.SetDialogueAction(detail.who,null);return;}
+      const clipId=OPENING.dialogueActions[cueId]?.[detail.who];
+      if(clipId)this.train?.SetDialogueAction(detail.who,clipId,0,{loop:true,duration:detail.end-detail.start});
+      return;
+    }
+    if(id==="TrainIncomingFire"){this.opening.barrage.Begin();return;}
     if(this.carriageSound.Handle(id))return;
     if(id==="TrainRescue"){this.Record("luoRescueRequested");return;}
     if (id === "TrainFoodReceived") { this.Record("trainFoodReceived"); return; }
@@ -191,28 +183,26 @@ export class FirstLevelMissionRuntime {
     }
     if (id==="TrainProneOrder") {
       this.Record("trainProneOrder");
+      this.player.SetStance?.("crouch");
+      this.player.stance="crouch";
       return;
     }
     if (id==="TrainFirstShell") {
-      if(this.Has("trainFirstShellLaunched"))return;
-      this.Record("trainFirstShellLaunched");
-      const target={x:-62,z:A.train.z+this.battlefield.trainOffsetM-R.trainShellLeadM-R.trainCruiseSpeedMps*R.trainFirstShellFlightS};
-      this.combat.FireShell(new THREE.Vector3(-35,20,target.z-30),this.Point(target),{
-        flight:R.trainFirstShellFlightS,kind:"Shell75",radius:6,damage:0,
-        OnImpact:()=>{
-          this.Record("trainFirstShellImpact");
-          this.carriageSound.Impact();
-          this.trainShellStartedAt=this.time;
-          this.shellTrainOffset=this.battlefield.trainOffsetM;
-        },
-      });
+      this.opening.barrage.Begin();
     }
     if (id==="TrainNearShell") {
       if(this.Has("trainNearShell"))return;
       this.Record("trainNearShell");
-      this.combat.FireShell(new THREE.Vector3(-35,20,40),
-        this.Point({x:-75,z:MISSION_TRAIN.cars[OPENING.derailCar].z+this.battlefield.trainOffsetM}),{
-        flight:2.8,kind:"Shell75",radius:5,damage:0,
+      const cue=this.voice.current;
+      const launchAt=cue?.cue.id==="TrainShelling"
+        ?cue.plan.segments.flatMap(segment=>segment.events||[]).find(event=>event.id==="TrainNearShell")?.at:null;
+      // The authored launch timestamp survives a late frame; the retained source
+      // freezes during pause and at the impact gate, unlike wall-clock time.
+      const Elapsed=Number.isFinite(launchAt)?()=>Math.max(0,cue.sourceTime-launchAt):null;
+      const offset=MissionTrainMotion(this.time+OPENING.nearShellFlightS,this.trainShellStartedAt,this.shellTrainOffset).offsetM;
+      const target=this.Point({x:-72.7,z:MISSION_TRAIN.cars[OPENING.derailCar].z+offset});
+      this.combat.FireShell(new THREE.Vector3(target.x+26,target.y+28,target.z-8),target,{
+        flight:OPENING.nearShellFlightS,kind:"Shell75",radius:5,damage:0,Elapsed,
         OnImpact:()=>{
           this.opening.Derail();
           this.player.Suppress(.9);
@@ -228,7 +218,8 @@ export class FirstLevelMissionRuntime {
     }
   }
   VoiceDone(id) {
-    if (id === "TrainMeal") this.Record("trainShelling");
+    if (id === "TrainMeal") this.Say("TrainBanter");
+    if (id === "TrainBanter") this.Record("trainShelling");
     if (id === "TrainShelling") this.Record("unloadOrdersHeard");
     if (id === "EscapeWhisper") this.Record("escapeWhisperHeard");
     if (id === "SupportOrder") this.Record("supportOrdersHeard");
@@ -240,6 +231,19 @@ export class FirstLevelMissionRuntime {
     if (id === "SouthHope") this.Record("southHopeHeard");
     if (id === "FollowVehicle") this.Record("followVehicleHeard");
     if (id === "TransferHope") this.Record("transferHopeHeard");
+  }
+  SyncCarriageDialogue(){
+    const current=this.voice.current;
+    if(!current||this.Has("trainNearShellImpact"))return;
+    for(const track of [current,...(current.parallel||[])]){
+      if(track.finished||(track===current&&track.phase!=="playing"))continue;
+      const index=track.plan.lines.findIndex(([a,b])=>track.sourceTime>=a&&track.sourceTime<b);
+      if(index<0)continue;
+      const who=track.cue.lines[index].who,clipId=OPENING.dialogueActions[track.cue.id]?.[who];
+      if(!clipId)continue;
+      const [start,end]=track.plan.lines[index];
+      this.train.SetDialogueAction(who,clipId,track.sourceTime-start,{loop:true,duration:end-start});
+    }
   }
   PlaceActor(actor, point) {
     if (!actor) return;
@@ -264,7 +268,8 @@ export class FirstLevelMissionRuntime {
       }),
       Offset: () => this.battlefield.trainOffsetM,
       Stopped: () => this.Has("trainStopped"),
-      PrepareAnimation: actor=>PrepareFirstLevelTrainAnimation(actor,(x,z)=>this.battlefield.GroundHeight(x,z)),
+      Stance: (actor,stance) => this.ai.SetStance(actor,stance,.3,true),
+      PrepareAnimation: actor=>PrepareFirstLevelCarriageAnimation(actor),
       Place: (actor, point) => { this.PlaceActor(actor, point); actor.yaw = Math.PI / 2; },
       Hold: (actor) => {
         if(actor.missionTrainReady && actor!==this.trainWounded){
@@ -1517,6 +1522,12 @@ export class FirstLevelMissionRuntime {
   }
   BeforePlayer(dt, input) {
     this.meal.Restore();
+    // The order belongs only to the live carriage barrage. Older checkpoints
+    // can omit the impact fact even though the rescue has already completed.
+    if(["Train","Unloading"].includes(this.flow.stage.id)&&this.Has("trainProneOrder")
+      &&!this.Has("trainNearShellImpact")&&!this.Has("luoRescueComplete")){
+      input.stanceRequested="crouch";input.crouchPressed=false;input.pronePressed=false;
+    }
     if (this.ReceivingFood) {
       // Hold the exchange in carriage space; normal train translation and free look remain active.
       input.forward = 0; input.strafe = 0; input.sprint = false; input.lean = 0;
@@ -1551,7 +1562,10 @@ export class FirstLevelMissionRuntime {
       control.pitch - R.limitedLookRadians,
       control.pitch + R.limitedLookRadians,
     );
-    if(control.kind==="rescue")this.player.stance=control.time<control.seconds*.45?"prone":control.time<control.seconds*.85?"crouch":"stand";
+    if(control.kind==="rescue"){
+      const poseSeconds=this.opening.RescueSampleTime();
+      this.player.stance=poseSeconds<OPENING.rescuePullSeconds?"prone":poseSeconds<OPENING.rescueStandSeconds?"crouch":"stand";
+    }
     if (control.kind === "dive") {
       const t = Clamp(control.time / control.seconds, 0, 1),
         smooth = t * t * (3 - 2 * t),
@@ -1678,14 +1692,20 @@ export class FirstLevelMissionRuntime {
     this.time += dt;
     this.voice.Update(dt);
     const meal=this.voice.current;
-    if(meal?.cue.id==="TrainMeal"&&meal.phase==="playing")
-      this.trainClockLead=Math.max(this.trainClockLead||0,(meal.plan.segments[0].wait||0)+meal.sourceTime-this.time);
+    if(["TrainMeal","TrainBanter"].includes(meal?.cue.id)&&meal.phase==="playing"){
+      if(this.trainClockCue!==meal.cue.id){
+        this.trainClockCue=meal.cue.id;
+        this.trainCueClockStart=this.time+(this.trainClockLead||0)-meal.sourceTime;
+      }
+      this.trainClockLead=Math.max(this.trainClockLead||0,this.trainCueClockStart+meal.sourceTime-this.time);
+    }
     this.UpdateMusic();
     this.battleSound.Update(dt,this.flow.stage.id,this.voice.current?.phase==="playing");
-    this.train?.Update(dt, this.Has("trainStopped") && this.Has("luoRescueComplete"), this.Has("trainFirstShellImpact"),this.time+(this.trainClockLead||0),this.Has("trainNearShellImpact"));
+    this.train?.Update(dt, this.Has("trainStopped") && this.Has("luoRescueComplete"), this.Has("trainIncomingFire"),this.time+(this.trainClockLead||0),this.Has("trainNearShellImpact"));
+    this.SyncCarriageDialogue();
     this.opening.Update(dt);
     if(this.failed)return;
-    if(this.Has("trainProneOrder") && this.player.stance==="prone")this.Record("trainPlayerProne");
+    if(this.Has("trainProneOrder") && this.player.stance==="crouch")this.Record("trainPlayerProne");
     this.DrainSpawns();
     if(["Support","MachineGun","Tank"].includes(this.flow.stage.id)) {
       const alive=[...this.enemies.values()].filter(actor=>actor.alive && ["front","approach","tank"].includes(actor.missionEncounter)).length;
@@ -1732,14 +1752,14 @@ export class FirstLevelMissionRuntime {
       if (yaowa && Distance(yaowa.position, zhou) < 2) this.ai.SetStance(yaowa, 1, 2, true);
     }
     if (this.controls) {
-      this.controls.time += dt;
+      this.controls.time = this.controls.kind==="rescue"?this.opening.RescueElapsed():this.controls.time+dt;
       if (this.controls.time >= this.controls.seconds &&
         (this.controls.kind!=="death" || this.voice.finished.has("ZhouDeath"))) {
         const kind = this.controls.kind;
         this.controls = null;
         this.Control?.(false, kind);
         if(kind==="rescue"){
-          const luo=this.companion.Handle("luo");if(luo)luo.missionRescueTarget=null;
+          const luo=this.companion.Handle("luo");if(luo){luo.missionRescueTarget=null;luo.missionCarriageAction=null;}
           this.player.stance="stand";this.Record("luoRescueComplete");
         }
         else if (kind === "dive") this.Record("diveComplete");
