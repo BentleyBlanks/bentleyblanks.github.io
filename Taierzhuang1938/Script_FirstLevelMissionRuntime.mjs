@@ -281,6 +281,11 @@ export class FirstLevelMissionRuntime {
   }
   PlaceSquad() {
     this.squad = ["luo", "yaowa", "heyoutian", "liuwencai"].map(id => this.companion.Handle(id)).filter(Boolean);
+    const luo = this.companion.Handle("luo");
+    if (luo?.actor?.characterRig?.facial) {
+      this.speakingFace = luo.actor.characterRig.facial;
+      this.speakingFace.source = () => luo.alive ? this.voice.Speech("luo") : null;
+    }
     for (const actor of this.squad) actor.scriptEssential = OPENING.requiredSquadCast.includes(actor.castId);
     const originals = this.squad.filter(actor => actor.castId !== "luo");
     while (originals.length < 6) originals.push(this.ai.Spawn("nra", MISSION_TRAIN.centerX, A.train.z + R.trainTravelM, {
@@ -2160,6 +2165,7 @@ export class FirstLevelMissionRuntime {
     };
   }
   Dispose() {
+    this.speakingFace?.Reset();
     if(this.ai.ctx.onSoldierDeath===this.soldierDeath)this.ai.ctx.onSoldierDeath=this.oldSoldierDeath;
     this.meal.Dispose();
     this.opening.Dispose();

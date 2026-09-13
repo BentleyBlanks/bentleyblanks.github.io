@@ -46,6 +46,7 @@ import { HIT_DISORIENTATION } from "./Data_Tuning_Player.mjs";
 import { GUN_AUDIBILITY } from "./Data_Tuning_Audio.mjs";
 import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 import { AUDIO_MIX_DEFAULTS } from "./Data_Tuning_Audio.mjs";
+import { BuildSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
 
 // 包络地板。低于这个值当作静音（见文件头坑 2）。
 const FLOOR = 1e-4;
@@ -4110,7 +4111,8 @@ export class AudioEngine {
         };
         MIX_GAIN[name] = e.gain ?? 1;
         NODE_COST[name] = 2;
-        this.voiceBank.set(e.key, { ...e, duration: buf.duration });
+        this.voiceBank.set(e.key, { ...e, duration: buf.duration,
+          speechEnvelope: e.analyzeSpeech ? BuildSpeechEnvelope(buf) : null });
         ok += 1;
       } catch (err) {
         this.voiceErrors.push({ file: e.file, message: err && err.message });

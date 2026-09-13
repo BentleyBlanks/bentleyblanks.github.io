@@ -3041,6 +3041,9 @@
     },
     {
       "id": "LugouNra05",
+      "facialUrl": "./Model/Character/Model_LugouNra05Facial.glb",
+      "facialVersion": "930c4170b5b0cab9",
+      "facialCast": ["luo"],
       "faction": "nra",
       "url": "./Model/Character/Model_LugouNra05.glb",
       "source": "Model_LugouNra05.fbx",

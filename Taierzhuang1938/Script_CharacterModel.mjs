@@ -12,6 +12,7 @@ import { InfantryAnimationController, INFANTRY_ANIMATION_IDS, INFANTRY_ANIMATION
 import { MeleeAnimationPlayer } from "./Script_MeleeAnimation.mjs";
 import { ActorLocomotion } from "./Script_ActorLocomotion.mjs";
 import { ACTOR_LOCOMOTION } from "./Data_Tuning_ActorLocomotion.mjs";
+import { CharacterFacialAnimation } from "./Script_CharacterFacialAnimation.mjs";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
 
@@ -337,7 +338,12 @@ async function LoadAsset(record) {
         }
       } catch (error) { console.warn("[InfantryAnimation] optional library unavailable", record.id, String(error)); }
     }
-    return { record, gltf, infantry, error: null };
+    let facial = null;
+    if (record.facialUrl) {
+      try { facial = await LOADER.loadAsync(`${record.facialUrl}?v=${record.facialVersion}`); }
+      catch (error) { console.warn("[CharacterModel] facial model unavailable", record.id, String(error)); }
+    }
+    return { record, gltf, infantry, facial, error: null };
   } catch (error) {
     console.warn(`[CharacterModel] ${record.id} 读取失败：${String(error).slice(0, 180)}`);
     return { record, gltf: null, error: String(error) };
@@ -552,6 +558,8 @@ export class LugouCharacterRig {
     this.variantIndex = variantIndex;
     this.modelId = asset.record.id;
     this.root = CloneSkeleton(asset.gltf.scene);
+    this.facial = asset.gltf.userData?.facialRig
+      ? new CharacterFacialAnimation(this.root, asset.gltf.userData.facialRig) : null;
     this.root.name = `Rigged_${this.modelId}`;
     this.actor = null;
     this.forcedClip = null;
@@ -1060,6 +1068,7 @@ export class LugouCharacterRig {
     // the head bone after mixer evaluation instead.  Doing it before mixer.update
     // would be overwritten by the clip's sampled scale track on the same frame.
     if (!this.headVisible && this.bones.head) this.bones.head.scale.setScalar(0.001);
+    this.facial?.Update(dt, state);
   }
 
   /** The captured side-on thrust looks across the rifle; face the committed attack instead. */
@@ -1196,6 +1205,7 @@ export class LugouCharacterRig {
 
   Dispose() {
     if (this.disposed) return;
+    this.facial?.Reset();
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
     if (this.root.parent) this.root.parent.remove(this.root);
@@ -1223,7 +1233,9 @@ export function CreateLugouCharacterRig(
   const modelId = `Lugou${faction === "nra" ? "Nra" : "Ija"}${String(index + 1).padStart(2, "0")}`;
   const asset = variants.find(candidate => candidate.record?.id === modelId);
   if (!asset?.gltf) return null;
-  return new LugouCharacterRig(asset, {
+  const selected = asset.record.facialCast?.includes(options.castId) && asset.facial
+    ? { ...asset, gltf: asset.facial } : asset;
+  return new LugouCharacterRig(selected, {
     kind, targetHeight, seed: options.seed ?? 0, variantIndex: index, materialLibrary,
   });
 }

@@ -148,6 +148,8 @@ export const testDefs = {
   RiggedModelTest: { file: "Script_RiggedModelTest.mjs", desc: "第一人称手臂 GLB 的二进制契约（纯 Node，秒级）" },
   ActorLocomotionTest: { file: "Script_ActorLocomotionTest.mjs", timeoutMs: 240000, desc: "实测步幅、世界支撑脚、转弯与位移时钟" },
   InfantryAnimationTest: { file: "Script_InfantryAnimationTest.mjs", timeoutMs: 360000, desc: "八套步兵动作、道具与状态衔接" },
+  CharacterSpeechTest: { file: "Script_CharacterSpeechTest.mjs", desc: "班长语音节奏、说话人隔离与面部资产契约" },
+  CharacterSpeechBrowserTest: { file: "Script_CharacterSpeechBrowserTest.mjs", timeoutMs: 240000, desc: "班长实际语音、面部蒙皮与真实场景画面" },
   CharacterModelTest: { file: "Script_CharacterModelTest.mjs", desc: "十名蒙皮士兵：16 动作、骨骼挂点、命中体与阵营分配契约（纯 Node）" },
   CharacterHitboxMathTest: { file: "Script_CharacterHitboxMathTest.mjs", desc: "人物子弹代理：精确球/胶囊首交点（纯 Node）" },
   PlayerHitboxTest: { file: "Script_PlayerHitboxTest.mjs", desc: "玩家命中几何：三姿态分段 / 正面部位次序 / 卧倒藏躯干 / 瞄点 / 散点部位分布（纯 Node，毫秒级）" },
@@ -290,6 +292,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "CharacterSpeechBrowserTest",
   "FirstLevelCasualtyBrowserTest",
   "FirstLevelMealTest",
   "FirstLevelFrontPresenceTest",
@@ -343,6 +346,7 @@ export const browserTests = new Set([
 ]);
 
 export const tier0Fast = [
+  "CharacterSpeechTest",
   "FpsAnimationTest",
   "TextTest",
   "AiPerceptionTest",
@@ -385,6 +389,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  characterSpeech: {label:"班长面部对白",tests:["CharacterSpeechTest","CharacterSpeechBrowserTest"]},
   motionVector: {label:'统一运动矢量接入契约',tests:['MotionVectorContractTest']},
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
@@ -485,6 +490,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"characterSpeech",pattern:/CharacterSpeech|CharacterFacial|SpeechEnvelope|NraFacial|Nra05Facial|Script_FirstLevelMissionVoice|Script_Audio\.mjs|Script_CharacterModel/},
   { domain: "animation", pattern: /ActorLocomotion|LocomotionProfileBake/ },
   {domain:'animation',pattern:/DadaoSwing|DadaoPowerSwing/},
   {domain:"combat",pattern:/HitDisorientation/},

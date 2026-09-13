@@ -55,6 +55,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 - `Script_ActorStandIdle` / `Data_Tuning_ActorIdle`：站住的人身上的**程序化待机叠加层**。中性站姿待机 clip 尚未交付，`Script_FirstLevelP012CastAppearance.InstallP012ActorMotion` 把站定的人的 clip 定格（`timeScale=0`，AdvanceFire 定在 `advanceFireHold`＝clip 后段站定那一截，AttackCommand 定在 25%），否则「上前射击」会在原地循环成踏步；定格之后由这一层叠呼吸、重心倒换与扫视，两条腿用两骨 IK 钉在 clip 摆好的落脚点上，脚不滑。每帧先 `Restore()` 再让 mixer 采样，FK 不累积。装在第一关（`?whitebox=p012`）每个 AI 士兵身上，敌我同享；担架员（`carryRole`）、白刃、开火、卧倒/蹲、车厢生活姿势期间让开。真正的待机 clip 到位后连同 `rate=0` 一起撤，需求见 [P012 动作需求](Data_FirstLevelP012AnimationNeeds.md)。验收在 `Script_FirstLevelP012AnimationTest.mjs`（头/胸峰峰值 > 2 cm、双脚 < 5 mm、定格帧脚踝离根 < 0.25 m）。
 - `Script_FirstLevelTrainAnimation` / `MissionTrainLife` / `MissionTrain`：四型号原骨架侧凳支撑、扶腿起身、生活手势和物理队列衔接。库在 `Animation/FirstLevelTrain`，接入门禁为 `Script_FirstLevelTrainAnimationTest.mjs`；其余动作和缺口见 [动画进度](Data_FirstLevelMissionAnimationProgress.md)。
 - `Data_FirstLevelMissionDialogue` / `Script_FirstLevelMissionVoice`：整段连续对白。`Script_SeedAudioFirstLevelBake.mjs` 仅从环境变量取密钥，每段一个请求、一个音频文件；`--dry` 审核请求，`Script_FirstLevelMissionTest.mjs --audio` 验实际资产。
+- 班长面部蒙皮与语音节奏由 `Script_CharacterFacialAnimation` / `Script_SpeechEnvelope` 接入，使用独立 NRA05 面部模型与原音轨播放时钟；资产、说话人隔离及验收见 [面部对白说明](Data_CharacterSpeech.md)。
 - 当前入口直接覆盖 `?whitebox=p012`。`p012-archive` 只供旧模型、调试与共享组件回归，不作为新版验收。
 - 本地通关：`node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign`。截图、过程 JSON 留在忽略目录 `_shots/FirstLevelMission`。
 - `Script_FirstLevelMissionPresentationTest.mjs`：独立夹具验证抬运与停步握持、双脚接地、持续警戒走动、右键射击、机枪后坐及土坡爆炸遮挡；不能替代真实通关。

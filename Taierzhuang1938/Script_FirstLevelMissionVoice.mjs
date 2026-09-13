@@ -3,6 +3,7 @@ import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_DIALOGUE, MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
 import { Localize } from "./Script_Text.mjs";
 import { FirstLevelVoiceTextId, FirstLevelCastTextId } from "./Script_TextIds.mjs";
+import { SampleSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
 export class FirstLevelMissionVoice {
   constructor({ audio, hud, Position, Done, Event, Ready, Clock }) {
     Object.assign(this, { audio, hud, Position, Done, Event, Ready, Clock });
@@ -30,6 +31,7 @@ export class FirstLevelMissionVoice {
         side: cue.subtitles === false ? "ija" : "nra",
         gain: 1,
         version: this.manifest.cues[cue.id].sha256,
+        analyzeSpeech: cue.lines.some(line => line.who === "luo"),
       }));
       await this.audio.LoadVoices(new URL("./Audio/FirstLevel/", import.meta.url).href, entries);
       this.loaded = true;
@@ -163,6 +165,7 @@ export class FirstLevelMissionVoice {
       maxDuration: segment.end-current.sourceTime,
     });
     current.clock = played?.voice && Number.isFinite(this.Clock?.()) ? (played.voice.t ?? this.Clock()) : null;
+    current.voice = played?.voice || null;
     current.clockSource = current.sourceTime;
     current.phase = "playing";
   }
@@ -231,6 +234,26 @@ export class FirstLevelMissionVoice {
       current.index=-1;
       if(!next&&current.wait<=0)this.Finish();
     }
+  }
+  Speech(who) {
+    if (this.paused || this.audio.voiceMute || !this.current) return null;
+    for (const track of [this.current, ...(this.current.parallel || [])]) {
+      if (track.finished || (track === this.current && track.phase !== "playing") || !track.voice
+          || track.voice.reclaimed || track.voice.stopping) continue;
+      if (track === this.current && this.audio.storyVoice !== track.voice) continue;
+      const clock = this.Clock?.();
+      const seconds = track.clock != null && Number.isFinite(clock)
+        ? track.clockSource + Math.max(0, clock - track.clock) : track.sourceTime;
+      const segment = track === this.current ? track.plan.segments[track.segmentIndex] : null;
+      if (segment && seconds >= segment.end) continue;
+      const index = track.plan.lines.findIndex(([start, end]) => seconds >= start && seconds < end);
+      if (index < 0 || track.cue.lines[index]?.who !== who) continue;
+      const envelope = this.audio.voiceBank?.get(`Mission${track.cue.id}`)?.speechEnvelope;
+      if (!envelope) continue;
+      return {active: true, who, cue: track.cue.id, sourceTime: seconds,
+        ...SampleSpeechEnvelope(envelope, seconds)};
+    }
+    return null;
   }
   State() {
     return {
