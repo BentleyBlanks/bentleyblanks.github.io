@@ -30,6 +30,8 @@ void main() {
 }`;
 const FRAG = /* glsl */`
 uniform sampler2D uNormalDepth;
+uniform sampler2D uSceneDepth;
+uniform float uSceneDepthValid;
 uniform sampler2D uBloodTexture;
 uniform vec2 uResolution;
 uniform mat4 uBloodInverseProjection;
@@ -66,7 +68,11 @@ void main(){
   vec3 world=(uBloodCameraWorld*vec4(view,1.0)).xyz;
   // Evaluate derivatives before per-fragment clipping. Smoothed vertex normals alone
   // can accept a steep edge and stretch the projection vertically across it.
-  vec3 geometricCross=cross(dFdx(world),dFdy(world));
+  // Derivatives come from the 24-bit hardware depth: the RGBA16F linear depth steps every
+  // 1-8 mm, so looking down its derivative spikes on each step row and cuts pools into stripes.
+  vec4 hardware=uBloodInverseProjection*vec4(screenUv*2.0-1.0,texture2D(uSceneDepth,screenUv).r*2.0-1.0,1.0);
+  vec3 geometricView=mix(view,hardware.xyz/(abs(hardware.w)>1e-8?hardware.w:1.0),uSceneDepthValid);
+  vec3 geometricCross=mat3(uBloodCameraWorld)*cross(dFdx(geometricView),dFdy(geometricView));
   vec3 geometricNormal=geometricCross/max(length(geometricCross),1e-8);
   vec3 delta=world-vCenter;
   vec3 local=vec3(dot(delta,vTangent)/vShape.x,dot(delta,vBitangent)/vShape.y,
@@ -137,7 +143,8 @@ export class SurfaceDecalLayer {
     this.mesh=new THREE.Mesh(g,this.material);this.mesh.name=name;
     this.mesh.frustumCulled=false;this.mesh.renderOrder=3;this.mesh.matrixAutoUpdate=false;parent.add(this.mesh);
     this.mesh.onBeforeRender=(_renderer,_scene,camera)=>{
-      shared.uBloodInverseProjection.value.copy(camera.projectionMatrixInverse);
+      // Post writes TAA jitter straight into projectionMatrix; the cached inverse lacks it.
+      shared.uBloodInverseProjection.value.copy(camera.projectionMatrix).invert();
       shared.uBloodCameraWorld.value.copy(camera.matrixWorld);
     };
   }

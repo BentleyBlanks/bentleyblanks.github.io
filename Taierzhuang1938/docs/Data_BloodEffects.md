@@ -15,6 +15,13 @@
 避免人物／台阶的平滑法线让陡边接收纹理并沿 Y 方向拉伸。该模式适用于任意法线，
 墙面和斜面沿各自命中切平面投射，不是固定世界 XZ 贴片。
 
+2026-09-13 修横纹：这个斜率检查的导数改从预通道的 24 位硬件深度（`post.SceneDepthTexture`，
+经 `vfx.SetDepthSource` 第四个参数传入）还原。RGBA16F 的线性深度每 1–8 mm 才跳一级，
+高分辨率下低头看脚边时要好几行才跳一次，导数只在跳变的那一行出尖峰，整行被判成陡面剔掉，
+血池就变成等间距横纹（超宽屏 2715×1078 内部分辨率下明显，1280×720 下看不出）。
+没传硬件深度时退回半精度深度（旧行为）。同时逆投影矩阵改为每次从 `projectionMatrix`
+求逆：TAA 抖动直接写进 `projectionMatrix`，缓存的 `projectionMatrixInverse` 不带抖动。
+
 `SurfaceDecalLayer.Add(position, normal, radius, options)` 支持逐实例配置：
 
 - `projection: "planar"`（默认）或 `"volume"`（保留较厚的体积接收方案）。
@@ -22,7 +29,7 @@
 - `normalReject` / `normalFade`：法线点积从拒绝到全显的余弦区间，满足 `0 ≤ reject < fade ≤ 1`。
 
 例如 `layer.Add(hit, normal, .4, {pool:true, projection:"planar", depth:.025})`。
-两种模式在同一实例层混用，仍为一次绘制；不新增贴图采样器或帧图通道。
+两种模式在同一实例层混用，仍为一次绘制；只多采样一张已有的预通道深度图，不新增帧图通道。
 合并血池时同时核对模式、深度、法线阈值及平面距离，避免将相邻上下表面的血迹吞并。
 Planar 会主动裁去离开切平面的起伏，弯曲表面需要更深接收时由调用方选择 Volume 或调整参数。
 
@@ -82,6 +89,8 @@ CPU 只追踪有上限的可碰撞液滴，GPU 与 CPU 使用相同的解析解�
 截图和结果落 `_shots/BloodEffects`；本地台架 HTML 被忽略。
 同一 GPU 门禁另覆盖 Planar 的平地、墙面、斜坡、上下相邻面排除、平滑法线陡面排除、
 深度边界淡出、背面排除、Volume 兼容性及混合模式不跨平面合并。
+横纹回归：2715×1078 下俯视／陡视／近视三个机位，逐行比较 Planar 与 Volume 血池核心的行间跳变
+（修前 Planar 0.06–0.13，Volume ≈0.0002；修后两者相同）。
 
 实际枪击、爆炸、大刀与断肢生命周期由 `Script_GoreRangeTest` 覆盖；第一关预布遗体
 由 `Script_FirstLevelMissionAftermathTest` 检查真实模型、接地、距离层与重建，并保存实际游戏截图。

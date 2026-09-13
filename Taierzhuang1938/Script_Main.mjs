@@ -8453,7 +8453,7 @@ function RenderScene(dt) {
   // 两百米外的黑烟柱会在天上留一个越长越大的纯黑洞。这三行是把那一半补回来：
   // 预通道靶（判断背景是不是天空 + 软粒子）、雾参数、太阳方向（雾的朝阳增益）。
   // SetSize 会重建靶，纹理引用每帧都可能换，所以每帧重接，不能只在初始化接一次。
-  vfx.SetDepthSource(post.NormalDepthTexture, post.width, post.height);
+  vfx.SetDepthSource(post.NormalDepthTexture, post.width, post.height, post.SceneDepthTexture);
   // 粒子那份解析雾照常接（BootTest 的「粒子层的雾接上了」就是看它）。froxel 体积雾
   // **不碰深度 0 那一桶**（`Data_Tuning_Volumetrics` 的 skyScale 出厂为 0）：
   // 天空、天空前的烟、任何 skipNormalDepth 的半透明件都还归粒子/天穹自己管。

@@ -26,7 +26,7 @@ const vfx=new VfxSystem(scene,null,{quality:"high",maxParticles:800});vfx.SetFog
 const ray=new THREE.Raycaster();vfx.SetBloodSurface((from,dir,distance)=>{ray.set(from,dir);ray.far=distance;const h=ray.intersectObjects([ground,wall,ramp,platform],false)[0];return h?{t:h.distance,normal:h.face.normal.clone().transformDirection(h.object.matrixWorld).toArray()}:null;});
 const post=new PostPipeline(renderer,{width:1280,height:720,quality:"medium"});
 let time=0;
-function Draw(){vfx.SetDepthSource(post.NormalDepthTexture,post.width,post.height);post.Render(scene,camera,{taa:false,motionBlur:0,grain:0,vignette:0,autoExposure:false,exposure:1,fog:{density:0}});}
+function Draw(){vfx.SetDepthSource(post.NormalDepthTexture,post.width,post.height,post.SceneDepthTexture);post.Render(scene,camera,{taa:false,motionBlur:0,grain:0,vignette:0,autoExposure:false,exposure:1,fog:{density:0}});}
 function Step(frames){for(let i=0;i<frames;i++){time+=1/60;vfx.Update(1/60,camera,time);}Draw();}
 function Clear(){vfx.ClearParticles();}
 window.B={THREE,scene,camera,vfx,post,renderer,ground,wall,ramp,platform,Draw,Step,Clear};
@@ -114,6 +114,28 @@ try{
   for(const name of ["upperPlanar","lowerPlanar","outside","steepPlanar","back"])assert(planar[name].changed<=4,`${name} must reject stretched or unrelated receivers: ${JSON.stringify(planar)}`);
   assert(planar.capFade.energy<planar.flat.energy*.55&&planar.capFade.energy>0,"Depth cap fades instead of ending in a hard box edge");
   assert(planar.farPlanar.changed>100&&planar.farPlanar.energy>planar.farVolume.energy*.6,"Depth precision must preserve distant flat blood pools");
+  // Ultrawide internal target, looking down: half-float depth steps span several rows there,
+  // and derivatives of it used to drop whole rows out of planar pools (horizontal stripes).
+  const stripes=await page.evaluate(()=>{
+    const {THREE,camera,renderer,post,vfx,Clear,Draw,wall,ramp,platform}=B,layer=vfx.bloodEffects.decals,W=2715,H=1078;
+    const hidden=[wall,ramp,platform];hidden.forEach(m=>m.visible=false);
+    renderer.setSize(W,H);post.SetSize(W,H,W,H);camera.aspect=W/H;camera.updateProjectionMatrix();
+    const eye=camera.position.clone(),rotation=camera.quaternion.clone(),gl=renderer.getContext(),a=new Uint8Array(W*H*4),b=new Uint8Array(W*H*4);
+    function Measure(view,mode){
+      Clear();camera.position.set(...view);camera.lookAt(0,0,0);camera.updateMatrixWorld();
+      layer.Add(new THREE.Vector3(),new THREE.Vector3(0,1,0),.9,{age:90,pool:true,seed:.3,projection:mode});
+      Draw();Draw();gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,a);layer.mesh.visible=false;Draw();gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,b);layer.mesh.visible=true;
+      const row=[];for(let y=0;y<H;y++){let s=0;for(let x=(W>>1)-120;x<(W>>1)+120;x++){const i=(y*W+x)*4;s+=Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2]);}row.push(s/240);}
+      let jump=0,total=0;for(let y=Math.round(H*.3)+1;y<Math.round(H*.7);y++){jump+=Math.abs(row[y]-(row[y-1]+row[y+1])/2);total+=row[y];}
+      return +(jump/Math.max(total,1)).toFixed(4);
+    }
+    const result={};for(const [name,view] of [["top",[0,1.7,.15]],["steep",[0,1.6,.7]],["near",[0,1.7,1.6]]])
+      result[name]={planar:Measure(view,"planar"),volume:Measure(view,"volume")};
+    Clear();hidden.forEach(m=>m.visible=true);renderer.setSize(1280,720);post.SetSize(1280,720,1280,720);
+    camera.aspect=1280/720;camera.updateProjectionMatrix();camera.position.copy(eye);camera.quaternion.copy(rotation);camera.updateMatrixWorld();Draw();
+    return result;
+  });
+  for(const [name,s] of Object.entries(stripes))assert(s.planar<Math.max(.01,s.volume*4),`Planar pool must not drop rows when looking down (${name}): ${JSON.stringify(stripes)}`);
   const modes=await page.evaluate(()=>{
     const {THREE,vfx,Clear}=B;Clear();const layer=vfx.bloodEffects.decals,up=new THREE.Vector3(0,1,0),p=new THREE.Vector3();
     const a=layer.Add(p,up,.2,{pool:true,merge:true});
@@ -153,6 +175,6 @@ try{
   });
   assert(budget.drops<=budget.dropLimit&&budget.sources<=budget.sourceLimit&&budget.mistInstances<=budget.mistLimit,"Burst overload stays within all fixed pools");
   assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(shots,"Data_BloodEffectsResults.json"),JSON.stringify({impacts,projection,planar,modes,lifecycle,budget,errors},null,2));
+  fs.writeFileSync(path.join(shots,"Data_BloodEffectsResults.json"),JSON.stringify({impacts,projection,planar,stripes,modes,lifecycle,budget,errors},null,2));
   console.log("PASS BloodEffects: rendered projection, mist, physical impacts, platform, zero-axis source, separate pools, detach and clear",JSON.stringify({impacts,projection}));
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

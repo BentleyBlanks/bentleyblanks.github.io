@@ -1340,6 +1340,9 @@ export class VfxSystem {
       // 大气透视。默认值抄 SKY_PRESETS.smokyDay.fog —— 调用方不接 SetFog 时
       // 也得有一档能用的雾，不然远处的烟又变回天上的黑洞。
       uDepthValid: { value: 0 },
+      // 预通道的 24 位硬件深度。只有投影血迹用它求几何法线（见 Script_SurfaceDecals）。
+      uSceneDepth: { value: this.fallbackDepth },
+      uSceneDepthValid: { value: 0 },
       uFogDensity: { value: 0.0145 },
       uFogFalloff: { value: 15 },
       uFogBase: { value: 0 },
@@ -1524,8 +1527,12 @@ export class VfxSystem {
   /**
    * 交出 Script_Post 的 rtNormalDepth（RGBA16F，w = 线性视深度），软粒子才成立。
    * 分辨率能从 RenderTarget 纹理的 image 上直接读，所以不用调用方再报一遍。
+   * `sceneDepth` 是同一张靶的 DepthTexture（post.SceneDepthTexture）：半精度线性深度
+   * 每 1–8 mm 才跳一级，拿它做屏幕导数会把陡俯视的投影血迹切成横纹。
    */
-  SetDepthSource(texture, width = 0, height = 0) {
+  SetDepthSource(texture, width = 0, height = 0, sceneDepth = null) {
+    this.shared.uSceneDepth.value = texture && sceneDepth ? sceneDepth : this.fallbackDepth;
+    this.shared.uSceneDepthValid.value = texture && sceneDepth ? 1 : 0;
     if (!texture) {
       this.shared.uNormalDepth.value = this.fallbackDepth;
       this.shared.uSoftEnabled.value = 0;
