@@ -481,7 +481,7 @@ export class Soldier {
    * @param {"head"|"torso"|string} part
    * @param {THREE.Vector3|null} direction
    * @param {{kind?:string, shapeId?:string, weaponId?:string, mode?:string,
-   *          falloff?:number, point?:THREE.Vector3}} [info]
+   *          falloff?:number, trauma?:boolean, point?:THREE.Vector3}} [info]
    *   这一下**是什么打的**。断肢判定要它（docs/Data_Dismemberment.md §8.2）；
    *   不给就退回 bullet，行为与接线之前一致。
    */
@@ -515,7 +515,7 @@ export class Soldier {
       sever = gore?.Resolve?.(this, {
         part, shapeId: info.shapeId, kind: info.kind || "bullet", weaponId: info.weaponId,
         mode: info.mode, falloff: info.falloff, point: info.point,
-        blastOrigin: info.blastOrigin,
+        blastOrigin: info.blastOrigin, trauma: !!info.trauma,
         damage: damage * mult, wouldDie: this.health <= 0,
       }) || null;
     } catch (error) {

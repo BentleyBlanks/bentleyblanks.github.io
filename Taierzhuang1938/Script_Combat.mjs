@@ -17,7 +17,7 @@
 import * as THREE from "three";
 import { WEAPONS, GUN_MELEE } from "./Data_Weapons.mjs";
 import { SUPPORT, COMBAT } from "./Data_Battle.mjs";
-import { Mulberry32, Clamp, Clamp01 } from "./Script_Noise.mjs";
+import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { FindReturnableGrenade } from "./Script_GrenadeReturn.mjs";
 import { GRENADE_RETURN, ExplosiveIdFor } from "./Data_Explosives.mjs";
@@ -33,6 +33,24 @@ import {
 // 世界重力。Script_Player 的 JUMP.gravityMps2 与 Script_ShellVisual 各自还存着
 // 同一个 19.6；三处合成一张世界表是待办（见本轮报告的集成请求）。
 const GRAVITY = 19.6;
+
+/**
+ * 手榴弹创伤带的那一次骰子（BLAST.grenadeTraumaMinFalloff … grenadeCloseMinFalloff）。
+ *
+ * 随机数由**爆心与这个人的位置**（厘米取整）散列出来：不借 AI 的随机流（借了会把整场
+ * 战斗的 AI 序列往后推，§11.6-5 那条账），也不看断肢开关 —— 同一颗弹、同一站位，开关
+ * 开着关着都是同一个结果（GoreRangeTest 的「内容开关不改变近炸伤害」断言靠它）。
+ */
+export function GrenadeTrauma(falloff, blast, target) {
+  const edge = BLAST.grenadeTraumaMinFalloff, inner = BLAST.grenadeCloseMinFalloff;
+  if (!(falloff >= edge) || falloff >= inner) return false;
+  const [outer, near] = BLAST.grenadeTraumaChance;
+  const chance = outer + (near - outer) * (falloff - edge) / (inner - edge);
+  const cm = (v) => Math.round(v * 100);
+  const roll = Mulberry32(HashString(
+    `grenadeTrauma|${cm(blast.x)}|${cm(blast.y)}|${cm(blast.z)}|${cm(target.x)}|${cm(target.z)}`))();
+  return roll < chance;
+}
 
 /** 一枚在飞的投掷物。 */
 class Projectile {
@@ -671,12 +689,16 @@ export class CombatSystem {
         // 不在这里扣票。这条回调以前是 onKill(s) —— 不带 side，装配层写死扣日方池，
         // 于是**日军炮弹炸死中国兵扣的是日军的票**（实跑 ijaPool 700→696 / nraPool 600→600）。
         // 扣票统一由 Soldier.Kill() 发的阵亡事件负责，这里只管伤害与压制。
-        // falloff 交下去是给断肢用的：近炸（falloff ≥ minFalloff）才卸肢，
-        // 三米开外的那一圈只是被震倒（docs/Data_Dismemberment.md §3）。shapeId 留空。
-        const injury = kind === "grenade" && s.side === "ija" && falloff >= BLAST.grenadeCloseMinFalloff
-          ? Math.max(dmg, Math.min(damage, BLAST.grenadeCloseDamage)) : dmg;
+        // falloff 交下去是给断肢用的：只在致死的那一下按距离分档卸肢（docs/Data_Dismemberment.md
+        // §11.6 / §11.8），shapeId 留空、按爆心到骨段的距离挑。
+        // 近炸致死圈内必死；圈外的创伤带按距离掷骰（GrenadeTrauma）。trauma 交给断肢层：
+        // 这一下是弹片撕开的，卸迎爆那一侧的一段，不是整个人被炸碎。
+        const enemyGrenade = kind === "grenade" && s.side === "ija";
+        const close = enemyGrenade && falloff >= BLAST.grenadeCloseMinFalloff;
+        const trauma = enemyGrenade && !close && GrenadeTrauma(falloff, position, s.position);
+        const injury = close || trauma ? Math.max(dmg, Math.min(damage, BLAST.grenadeCloseDamage)) : dmg;
         const died = s.TakeHit(injury, "torso", dir,
-          { kind: "blast", falloff, weaponId: explosiveId, point: at.clone(),
+          { kind: "blast", falloff, trauma, weaponId: explosiveId, point: at.clone(),
             blastOrigin: position.clone() });
         onHit?.(s, injury, position);
         s.suppression = Clamp01(s.suppression + BLAST.soldierSuppression);

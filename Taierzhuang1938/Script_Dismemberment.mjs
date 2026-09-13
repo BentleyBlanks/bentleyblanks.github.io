@@ -218,6 +218,14 @@ export function BlastLimbWeights(origin, shapes) {
   return weights;
 }
 
+/** 远一点的近炸偏向末段（前臂/小腿）：按分档的 distalWeight 把这四段的权重再乘一次。 */
+function DistalWeights(weights, scale) {
+  if (!(scale > 0) || scale === 1) return weights;
+  const out = { ...weights };
+  for (const id of LIMB_POOLS.distal) out[id] = (weights[id] ?? 1) * scale;
+  return out;
+}
+
 /** shapeId / part 交出来的东西未必是肢体（躯干也会被打中）。 */
 function LimbFromHit(shapeId, part) {
   if (shapeId && LIMBS[shapeId]) return shapeId;
@@ -354,6 +362,7 @@ function Empty(reason, kind = null) { return { limbs: [], forceKill: false, reas
  *   damage    —— 这一发**乘过部位倍率之后**落到身上的伤害
  *   wouldDie  —— 这一发本来就打死了人
  *   falloff   —— 爆炸的距离衰减（1 = 爆心）
+ *   trauma    —— 战斗层判定的手榴弹创伤带致死（Script_Combat.GrenadeTrauma），必断一段
  *   accumulatedDamage —— 同一肢段的累计弹伤
  *   limbWeights / severed —— 爆心到各段的权重 / 已卸肢段集合
  *   force     —— 无视骰子（Debug.Gore.SetForce / Debug.Gore.Sever 用）
@@ -386,12 +395,14 @@ export function ResolveSever(hit = {}) {
 
   const isHead = hitLimb === "head";
   const tier = TierFor(rule, hit.falloff);
-  const chance = isHead ? (rule.chance?.head ?? 0) : (tier.chance ?? rule.chance?.limb ?? 0);
+  // 战斗层判定的弹片致死创伤（hit.trauma）本身就是「四肢被撕开」，必断一段。
+  const chance = isHead ? (rule.chance?.head ?? 0)
+    : kind === "blast" && hit.trauma ? 1 : (tier.chance ?? rule.chance?.limb ?? 0);
   if (!force && !accumulated && !(r[0] < chance)) return Empty("chance", kind);
 
   const available = id => ![...(hit.severed || [])].some(cut => Conflicts(cut, id));
-  const pool = RandomPool(rule, hit.part).filter(available);
-  const weights = kind === "blast" ? (hit.limbWeights || BLAST_WEIGHT) : {};
+  const pool = (kind === "blast" && LIMB_POOLS[tier.pool] || RandomPool(rule, hit.part)).filter(available);
+  const weights = kind === "blast" ? DistalWeights(hit.limbWeights || BLAST_WEIGHT, tier.distalWeight) : {};
   const primary = hitLimb ? (available(hitLimb) ? hitLimb : null) : WeightedPick(pool, r[1], weights);
   if (!primary) return Empty("noLimb", kind);
   const limbs = [primary];

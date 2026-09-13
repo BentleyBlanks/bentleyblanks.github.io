@@ -67,6 +67,14 @@ export const BLAST = Object.freeze({
   // 2026-09-12 玩家要求近身手榴弹产生明显毁伤。约两米内的敌军承受致死级创伤；
   // 这是伤害规则，关闭断肢表现不改变战斗结果；友军和炮击仍用原衰减。
   grenadeCloseMinFalloff: 0.80, grenadeCloseDamage: 100,
+  // 2026-09-13 玩家反馈「手榴弹在人附近爆炸也可能会导致局部断肢」。实测真投掷落在敌军
+  // 2.6–3.3 m 外时，人剩 20–30 血照样站着、一段都不掉（两米半之内才致死）。所以致死圈外再
+  // 加一圈创伤带：按距离掷一次骰，中了就是弹片撕开四肢的致死创伤（断肢层据此只卸一段迎爆
+  // 那一侧的肢体，docs/Data_Dismemberment.md §11.8）。仍是伤害规则：骰子只看爆心与人的位置，
+  // 不看断肢开关；友军、炮击与剧情保护角色不进（与上面那条同一口径）。
+  //   grenadeTraumaMinFalloff —— 创伤带外沿（0.66 ≈ 木柄手榴弹 4.2 m）；内沿就是 grenadeCloseMinFalloff
+  //   grenadeTraumaChance     —— [外沿, 内沿] 的致死创伤概率，中间按 falloff 线性插
+  grenadeTraumaMinFalloff: 0.66, grenadeTraumaChance: Object.freeze([0.15, 0.55]),
   originRiseM: 0.35,          // 爆心抬高一点再射线，免得贴地那一发被地面自遮
   wallMarginM: 0.5,           // 射线打到东西且比目标近这么多以上 = 有墙挡着
   friendlyRadiusScale: 0.75,  // 自己的弹也能伤自己人，但只在很近的时候

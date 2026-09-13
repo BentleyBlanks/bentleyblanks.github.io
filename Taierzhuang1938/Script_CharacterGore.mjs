@@ -640,10 +640,11 @@ export class GoreSystem {
     const tuning = this.Tuning();
     if (vfx?.BloodSpurt) {
       const entry = record.caps[record.caps.length - 1];
+      // 按心跳泵的动脉源（Script_BloodEffects.Pump）：一股一股射出去、压力越来越低，
+      // 最后在断口底下淌成一摊。方向是盖子的 +Y = 肢体原来伸出去的方向，跟着倒地的骨头转。
       entry.spurt = vfx.BloodSpurt(cap, null, { x: 0, y: 1, z: 0 }, {
-        seconds: tuning.spurtS, rate: tuning.spurtRate,
-        spread: BLOOD.spurtSpread, speed: BLOOD.spurtSpeed,
-        decals: tuning.decalsPerSever,
+        arterial: true, seconds: tuning.spurtS, rate: tuning.spurtRate,
+        speed: BLOOD.arterialSpeed, decals: tuning.decalsPerSever,
       });
     }
     return cap;

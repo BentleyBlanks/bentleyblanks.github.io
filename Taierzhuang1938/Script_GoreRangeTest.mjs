@@ -12,6 +12,8 @@ import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { GORE_RANGE_POSTS, GORE_LIMB_BUTTONS } from "./Data_GoreRange.mjs";
+import { WEAPONS } from "./Data_Weapons.mjs";
+import { BUDGET } from "./Data_Tuning_Gore.mjs";
 
 const project = path.dirname(fileURLToPath(import.meta.url));
 const shots = path.join(project, "_shots", "GoreRange");
@@ -328,6 +330,59 @@ try {
       "三米环上最多卸一段（爆炸的断肢段数要随 falloff 收：见 Data_Dismemberment §10.2-4）："
       + JSON.stringify(blastSever.ring3));
     console.log("PASS 10 爆炸链：一米环多段、三米环最多一段");
+
+    // 10b. 创伤带（§11.8）：三米环在两米半致死圈外，按爆心与站位掷骰 —— 中了的致死且只卸一段，
+    // 没中的一段不掉；同一颗弹同一站位，断肢开关开着关着生死一样。爆心每轮挪 1.3 cm 换一次骰子。
+    const traumaBand = await page.evaluate(({ radius, damage }) => {
+      const T = Taierzhuang, G = T.Debug.GoreRange, Gore = T.Debug.Gore;
+      const Run = (trial, enabled) => {
+        G.Reset(); window.__gore.Step(10); Gore.SetEnabled(enabled);
+        const at = T.player.position.clone().set(3364 + trial * 0.013, 0.15, 3336);
+        T.combat.Blast(at, radius, damage, "grenade", "ija", false, null, "Grenade", null);
+        window.__gore.Step(4);
+        return G.State().posts.filter((post) => post.ringM === 3 || /^C3_/.test(post.id))
+          .map((post) => ({ id: post.id, alive: post.alive, health: Math.round(post.health), cut: post.severed }));
+      };
+      const rows = [];
+      for (let trial = 0; trial < 10; trial += 1) rows.push({ on: Run(trial, true), off: Run(trial, false) });
+      Gore.SetEnabled(true);
+      return rows;
+    }, { radius: WEAPONS.Grenade.radiusM, damage: WEAPONS.Grenade.damage });
+    {
+      const samples = traumaBand.flatMap((row) => row.on);
+      const killed = samples.filter((post) => !post.alive), wounded = samples.filter((post) => post.alive);
+      console.log("TRAUMA_BAND", JSON.stringify({ killed: killed.map((p) => p.cut), wounded: wounded.length }));
+      assert(killed.length >= 2 && wounded.length >= 2, `三米环应有人被弹片致死、有人只受伤：死 ${killed.length} / 伤 ${wounded.length}`);
+      assert(killed.every((post) => post.cut.length === 1), "创伤带致死只卸一段（局部断肢）：" + JSON.stringify(killed));
+      assert(wounded.every((post) => post.cut.length === 0 && post.health > 0), "没中创伤的人一段不掉");
+      for (const row of traumaBand) {
+        assert.deepEqual(row.off.map((post) => post.alive), row.on.map((post) => post.alive), "断肢开关不改变创伤带的生死");
+        assert(row.off.every((post) => post.cut.length === 0), "关掉断肢表现后不卸肢");
+      }
+      console.log(`PASS 10b 创伤带：三米环 ${samples.length} 人次里 ${killed.length} 人被弹片致死且各卸一段，开关不改生死`);
+    }
+
+    // 10c. 断口按心跳泵血：动脉源活够画质表的秒数，第三秒还在往外喷，到点收掉。
+    const pump = await page.evaluate(() => {
+      const T = Taierzhuang, G = T.Debug.GoreRange, Gore = T.Debug.Gore;
+      G.Reset(); window.__gore.Step(10);
+      const blood = T.vfx.bloodEffects;
+      const soldier = window.__gore.Soldier("L10_2");
+      Gore.Sever(soldier.id, "upperArmR");
+      const Arterial = () => [...blood.sources.values()].filter((source) => source.arterial);
+      const seconds = Arterial()[0]?.seconds ?? 0;
+      window.__gore.Step(180);
+      const emitted3 = blood.stats.emitted;
+      window.__gore.Step(60);
+      const at3 = { live: Arterial().length, emitted: blood.stats.emitted - emitted3 };
+      window.__gore.Step(Math.ceil((seconds - 4 + 0.5) * 60));
+      return { seconds, at3, after: Arterial().length, quality: Gore.State().quality };
+    });
+    console.log("PUMP", JSON.stringify(pump));
+    assert.equal(pump.seconds, BUDGET[pump.quality].spurtS, "断口动脉源的时长取 Data_Tuning_Gore.BUDGET.spurtS");
+    assert(pump.at3.live === 1 && pump.at3.emitted >= 8, `第三到第四秒断口仍在喷：${JSON.stringify(pump.at3)}`);
+    assert.equal(pump.after, 0, "过了 spurtS 断口动脉源收掉");
+    console.log(`PASS 10c 断口泵血 ${pump.seconds} s：第四秒仍喷出 ${pump.at3.emitted} 滴，到点收掉`);
     await page.evaluate(() => {
       Taierzhuang.player.Spawn(3364, 3345, 0);
       Taierzhuang.player.pitch = Math.atan2(0.4 - Taierzhuang.player.eyeHeight, 9);

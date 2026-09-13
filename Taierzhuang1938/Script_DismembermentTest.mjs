@@ -351,28 +351,63 @@ for (let seed = 1; seed <= 30; seed += 1) {
   }
   Ok(maxSeen >= 2, `blast 会出现多段同时卸（最多见到 ${maxSeen} 段）`);
 }
-// 爆炸按 falloff 分档：一米圈多段、两米圈最多两段、三米圈只掉一段、再远不断
-// （木柄手榴弹 6.5 m × radiusScale 1.9：1 m ≈ 0.91 / 2 m ≈ 0.83 / 3 m ≈ 0.75 / 4 m ≈ 0.67）。
+// 爆炸按 falloff 分档：一米圈多段、两米圈最多两段、三米圈只掉一段、四米圈只掉末段、再远不断
+// （木柄手榴弹 6.5 m × radiusScale 1.9：1 m ≈ 0.91 / 2 m ≈ 0.83 / 3 m ≈ 0.75 / 4 m ≈ 0.67 / 5 m ≈ 0.60）。
 {
-  const Count = (falloff, seeds = 120) => {
-    let severed = 0, multi = 0, maxSeen = 0;
+  const Count = (falloff, seeds = 120, extra = {}) => {
+    let severed = 0, multi = 0, maxSeen = 0, distal = 0;
     for (let seed = 1; seed <= seeds; seed += 1) {
       const result = ResolveSever(Hit({ kind: "blast", shapeId: null, part: "torso", wouldDie: true,
-        falloff, rng: Mulberry32(seed * 7919) }));
+        falloff, rng: Mulberry32(seed * 7919), ...extra }));
       if (!result.limbs.length) continue;
       severed += 1;
       if (result.limbs.length >= 2) multi += 1;
+      if (result.limbs.every((id) => LIMB_POOLS.distal.includes(id))) distal += 1;
       maxSeen = Math.max(maxSeen, result.limbs.length);
     }
-    return { severed, multi, maxSeen };
+    return { severed, multi, maxSeen, distal };
   };
-  const ring1 = Count(0.91), ring2 = Count(0.83), ring3 = Count(0.75), ring4 = Count(0.67);
+  const ring1 = Count(0.91), ring2 = Count(0.83), ring3 = Count(0.75), ring4 = Count(0.67), ring5 = Count(0.60);
   Ok(ring1.maxSeen >= 3 && ring1.multi > ring1.severed * 0.8,
     `一米圈大多数连卸两段以上（${ring1.multi}/${ring1.severed}，最多 ${ring1.maxSeen} 段）`);
   Ok(ring2.maxSeen <= 2 && ring2.multi > 0, `两米圈最多两段（最多 ${ring2.maxSeen}，多段 ${ring2.multi} 次）`);
   Eq(ring3.maxSeen, 1, "三米圈只掉一段");
   Ok(ring3.severed > 100, `三米圈仍几乎必断一段（${ring3.severed}/120）`);
-  Eq(ring4.severed, 0, "四米圈一段都不掉（低于 minFalloff）");
+  // 三米圈偏末段但不锁死：前臂/小腿权重 ×2.5，整条胳膊/大腿仍然可能。
+  Ok(ring3.distal > ring3.severed * 0.6 && ring3.distal < ring3.severed,
+    `三米圈多半卸末段（${ring3.distal}/${ring3.severed}）`);
+  Eq(ring4.maxSeen, 1, "四米圈最多一段");
+  Eq(ring4.distal, ring4.severed, "四米圈只卸前臂/小腿（局部断肢）");
+  Ok(ring4.severed > 50 && ring4.severed < 95, `四米圈致死的人约六成掉一截（${ring4.severed}/120）`);
+  Eq(ring5.severed, 0, "五米圈一段都不掉（低于 minFalloff）");
+
+  // 创伤带（战斗层交进来的 trauma）：必断且只断一段；没打死的仍然一段都不掉。
+  const trauma3 = Count(0.75, 120, { trauma: true }), trauma4 = Count(0.67, 120, { trauma: true });
+  Eq(trauma3.severed, 120, "三米创伤带致死必断一段");
+  Eq(trauma4.severed, 120, "四米创伤带致死必断一段");
+  Ok(trauma3.maxSeen === 1 && trauma4.maxSeen === 1, "创伤带只卸一段（局部，不是炸碎）");
+  Eq(trauma4.distal, 120, "四米创伤带只卸末段");
+  Eq(ResolveSever(Hit({ kind: "blast", shapeId: null, part: "torso", wouldDie: false, falloff: 0.75,
+    trauma: true, rng: Mulberry32(5) })).reason, "notLethal", "trauma 标记不能替代致死（断肢不改生死）");
+  Eq(ResolveSever(Hit({ kind: "bullet", shapeId: null, part: "torso", wouldDie: true, damage: 90,
+    trauma: true, rng: () => 0 })).limbs.length, 0, "trauma 只对爆炸生效");
+}
+// 局部断肢挑迎爆那一侧：爆心在左脚边时，四米圈的末段几乎总落在左侧。
+{
+  const shapes = [
+    ["calfL", -0.12, 0.25], ["calfR", 0.12, 0.25], ["forearmL", -0.3, 1.0], ["forearmR", 0.3, 1.0],
+    ["thighL", -0.12, 0.7], ["thighR", 0.12, 0.7], ["upperArmL", -0.25, 1.3], ["upperArmR", 0.25, 1.3],
+  ].map(([id, x, y]) => ({ id, type: "capsule", center: { x: 0, y: 0, z: 0 },
+    start: { x, y: y - 0.15, z: 0 }, end: { x, y: y + 0.15, z: 0 } }));
+  let left = 0, total = 0;
+  for (let seed = 1; seed <= 200; seed += 1) {
+    const result = ResolveSever(Hit({ kind: "blast", shapeId: null, part: "torso", wouldDie: true, falloff: 0.67,
+      trauma: true, limbWeights: BlastLimbWeights({ x: -3.8, y: 0.05, z: 0 }, shapes), rng: Mulberry32(seed * 104729) }));
+    if (!result.limbs.length) continue;
+    total += 1;
+    if (result.limbs[0].endsWith("L")) left += 1;
+  }
+  Ok(total === 200 && left > 110, `局部断肢偏向迎爆那一侧（左 ${left}/${total}）`);
 }
 
 // 大刀没给命中体时只砍胳膊（不掉腿、不随机掉头）

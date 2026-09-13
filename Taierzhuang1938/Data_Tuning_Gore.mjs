@@ -63,7 +63,7 @@ export const SEVER_RULES = Object.freeze({
   bullet: Object.freeze({ chance: Object.freeze({ limb: 0.06, head: 0.0 }), requiresKill: true, minDamage: 20, accumulatedDamage: 100 }),
   hmg: Object.freeze({ chance: Object.freeze({ limb: 0.30, head: 0.12 }), requiresKill: true, minDamage: 20, accumulatedDamage: 90 }),
   // 爆炸按 falloff 分档（falloff = 1 − 距离 / (半径 × BLAST.radiusScale)；木柄手榴弹
-  // 6.5 m × 1.9 = 12.35 m 有效半径，1 m ≈ 0.91、2 m ≈ 0.83、3 m ≈ 0.75、3.7 m ≈ 0.70）。
+  // 6.5 m × 1.9 = 12.35 m 有效半径，1 m ≈ 0.91、2 m ≈ 0.83、3 m ≈ 0.75、3.7 m ≈ 0.70、4.7 m ≈ 0.62）。
   // 没有这张分档表时 3 m 外的人与爆心旁的人一样能连卸四段（2026-09-10 测试场实测
   // ring1=[3,4] / ring3=[2,2]）；分档之后 1 m 圈四段、2 m 圈两段、3 m 圈只掉一段，
   // 再远一段都不掉。tiers 按 minFalloff 降序，取第一条满足的；都不满足 = 不断。
@@ -72,11 +72,19 @@ export const SEVER_RULES = Object.freeze({
     // 结果炮击近失弹把本来只是受伤的同班战友炸死 —— 第一关开场有「列车到机枪位之前同班一人阵亡
     // 即失败」的规则（Script_FirstLevelOpening.Update），断肢不许改任何一个人的生死。
     chance: Object.freeze({ limb: 0.95, head: 0.35 }), requiresKill: true,
-    minFalloff: 0.70,
+    //
+    // 2026-09-13「局部断肢」（§11.8）：外面两档只卸**一段**，而且越远越偏向前臂/小腿 ——
+    // 三四米外的弹片撕掉的是一只手、半截腿，不是整条胳膊连肩膀。
+    //   distalWeight —— 前臂/小腿的挑选权重再乘这么多（仍按爆心距离加权，迎爆那一侧优先）
+    //   pool         —— 只在这个 LIMB_POOLS 里挑
+    // 战斗层的创伤带（Data_Tuning_Combat.BLAST.grenadeTrauma*，≈2.5–4.2 m）交进来的
+    // `trauma` 一律必断一段：那一下的致死原因本来就是「弹片撕开了四肢」。
+    minFalloff: 0.62,
     tiers: Object.freeze([
       Object.freeze({ minFalloff: 0.88, minLimbs: 2, maxLimbs: 4, extraLimbChance: 0.85, chance: 1 }),
       Object.freeze({ minFalloff: 0.80, minLimbs: 1, maxLimbs: 2, extraLimbChance: 0.60, chance: 1 }),
-      Object.freeze({ minFalloff: 0.70, maxLimbs: 1, extraLimbChance: 0 }),
+      Object.freeze({ minFalloff: 0.70, maxLimbs: 1, extraLimbChance: 0, distalWeight: 2.5 }),
+      Object.freeze({ minFalloff: 0.62, maxLimbs: 1, extraLimbChance: 0, chance: 0.6, pool: "distal" }),
     ]),
   }),
   // 大刀按实际瞄准方向与骨骼命中体选段；不再用两条胳膊的随机池兜底。
@@ -124,23 +132,32 @@ export const LIMB_POOLS = Object.freeze({
   arm: Object.freeze(["upperArmL", "forearmL", "upperArmR", "forearmR"]),
   leg: Object.freeze(["thighL", "calfL", "thighR", "calfR"]),
   blade: Object.freeze(["upperArmL", "forearmL", "upperArmR", "forearmR"]),
+  // 远一点的近炸只卸末段（blast 最外一档的 pool；distalWeight 也按这张表认「末段」）。
+  distal: Object.freeze(["forearmL", "forearmR", "calfL", "calfR"]),
 });
 
 /**
  * 同屏肢块预算，按 `?quality=` 名取（Data_Tuning_Graphics 不加键，见 §10.3）。
  *   maxParts       —— 同屏肢块上限，FIFO 淘汰。每段 1 draw + 断面 1 draw。
  *   partLifeS      —— 肢块寿命（秒）。尸体保留到关底，肢块不：它们是动态件。
- *   spurtS         —— 断口喷血持续秒数（动脉喷射在现实里是十几秒，这里只取头几秒）。
- *   spurtRate      —— 每秒血粒子数（走 Vfx 的 spawnScale 再乘一次画质系数）。
- *   decalsPerSever —— 一次断肢在地上最多补几片血渍（贴花池是环形缓冲，血不许把
- *                     墙上的弹孔冲掉，见 Script_Vfx.Blood 末尾那段账）。
+ *   spurtS         —— 断口按心跳泵血的总秒数（动脉喷射在现实里是十几秒，这里取头几秒）。
+ *                     压力按指数衰减（Data_Tuning_Blood.BLOOD_ARTERIAL.pressureTauS 2.6 s），
+ *                     所以前三四秒是一股一股射出去的血柱，后面越来越短，最后只剩往下淌。
+ *   spurtRate      —— **收缩期血柱的峰值**每秒血滴数（舒张期只有它的 diastoleFlow 那一点）。
+ *   decalsPerSever —— 一个断口的血柱最多在落点补几片飞溅（贴花池是环形缓冲，血不许把
+ *                     墙上的弹孔冲掉，见 Script_Vfx.Blood 末尾那段账）；断口正下方那摊
+ *                     血另走 BLOOD_ARTERIAL.poolDeposits，而且多半并进同一片。
  *   restToStaticS  —— 肢块静止多久之后拆刚体只留网格（省物理）。
+ *
+ * 2026-09-13 玩家反馈「伤口处要飙一段时间血」：原来 1.6–3.0 s、恒定速率、每滴一厘米宽，
+ * 实测 1 s 后空中只剩三滴，两米外就看不见（§11.8）。画质只调密度和贴花，不把低画质的血
+ * 喷得更短到看不出来 —— 那是玩法可读性，不是特效装饰。
  */
 export const BUDGET = Object.freeze({
-  low: Object.freeze({ maxParts: 6, partLifeS: 12, spurtS: 1.6, spurtRate: 18, decalsPerSever: 1, restToStaticS: 2.5 }),
-  medium: Object.freeze({ maxParts: 10, partLifeS: 20, spurtS: 2.4, spurtRate: 26, decalsPerSever: 2, restToStaticS: 2.5 }),
-  high: Object.freeze({ maxParts: 16, partLifeS: 30, spurtS: 2.8, spurtRate: 32, decalsPerSever: 2, restToStaticS: 2.5 }),
-  ultra: Object.freeze({ maxParts: 24, partLifeS: 45, spurtS: 3.0, spurtRate: 36, decalsPerSever: 3, restToStaticS: 2.5 }),
+  low: Object.freeze({ maxParts: 6, partLifeS: 12, spurtS: 5, spurtRate: 90, decalsPerSever: 5, restToStaticS: 2.5 }),
+  medium: Object.freeze({ maxParts: 10, partLifeS: 20, spurtS: 6, spurtRate: 120, decalsPerSever: 8, restToStaticS: 2.5 }),
+  high: Object.freeze({ maxParts: 16, partLifeS: 30, spurtS: 7, spurtRate: 150, decalsPerSever: 10, restToStaticS: 2.5 }),
+  ultra: Object.freeze({ maxParts: 24, partLifeS: 45, spurtS: 8, spurtRate: 170, decalsPerSever: 12, restToStaticS: 2.5 }),
 });
 
 /** 画质名不在表里时用哪一档（与 Script_Vfx 的 QUALITY_PRESETS 同一条兜底口径）。 */
@@ -249,6 +266,9 @@ export const BLOOD = Object.freeze({
   burstAmount: 1.1,
   spurtSpread: 0.45,
   spurtSpeed: Object.freeze([2.2, 5.2]),
+  // 断口血柱的出口速度（m/s，收缩期峰值；再乘 √压力）。3–5.6 m/s 从齐腰高射出去落在一米半到
+  // 两米半外，与动脉出血的实拍记录同一量级；再快就成了消防水管。
+  arterialSpeed: Object.freeze([3.0, 5.6]),
   partSpurtSeconds: 0.8,
   partSpurtRate: 12,
 });
