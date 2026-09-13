@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { WEAPONS, WeaponShelved } from "./Data_Weapons.mjs";
+import { FPS_ARM_POSES } from "./Data_FpsArmPoses.mjs";
 import { WEAPON_RANGE_TARGETS, WEAPON_RANGE_FIRING_ORIGIN, WEAPON_RANGE_VIEWS } from "./Data_WeaponRange.mjs";
 
 // --smoke runs one representative firearm without full-magazine, repeated death or menu reload checks.
@@ -32,6 +33,13 @@ function Check(name, ok, detail = null) {
   checks.push({ name, ok: !!ok, detail });
   console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail === null ? "" : ` — ${JSON.stringify(detail)}`}`);
 }
+const hanYang = WEAPONS.HanYang;
+const [hanYangLiftEnd, hanYangBackEnd] = FPS_ARM_POSES.HanYang.actions.bolt.timing;
+const hanYangLiftAtS = hanYang.boltDelayS + hanYangLiftEnd * hanYang.boltTimeS;
+const hanYangForwardAtS = hanYang.boltDelayS + (hanYangBackEnd + 0.03) * hanYang.boltTimeS;
+Check("HanYang bolt nodes match the embedded recording", Math.abs(hanYangLiftAtS - 1.88) <= 0.03
+  && Math.abs(hanYangForwardAtS - 2.17) <= 0.04 && hanYang.embeddedCycleAudio,
+{ liftAtS: hanYangLiftAtS, forwardAtS: hanYangForwardAtS, cue: hanYang.shotCue });
 try {
   browser = await LaunchBrowser();
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
@@ -168,13 +176,25 @@ try {
       const ads = { amount: game.player.ads, bipod: game.player.bipod, fov: game.camera.fov, hipFov, hasSight: !!game.viewmodel.rig?.sight, source: game.viewmodel.rig?.source };
       const shotsBefore = game.state.playerShots;
       const ammoBefore = game.state.ammo;
+      const audioBefore = {
+        cycle: game.audio.RequestedCount(spec.shotCue || "rifleNra"),
+        bolt: game.audio.RequestedCount("bolt"), shell: game.audio.RequestedCount("shellDrop"),
+      };
       const attempts = spec.smoke ? 2 : spec.magazine + 2;
       const cooldownFrames = Math.ceil(Math.max(spec.fireIntervalS || 0, spec.boltTimeS || 0, 0.3) * 60) + 12;
       for (let shot = 0; shot < attempts; shot += 1) {
         debug.Fire();
         game.StepFrames(cooldownFrames, 1 / 60, false);
       }
-      const firing = { expected: attempts, actual: game.state.playerShots - shotsBefore, ammoBefore, ammoAfter: game.state.ammo, last: range.LastShot() };
+      const firing = {
+        expected: attempts, actual: game.state.playerShots - shotsBefore,
+        ammoBefore, ammoAfter: game.state.ammo, last: range.LastShot(),
+        audio: {
+          cycle: game.audio.RequestedCount(spec.shotCue || "rifleNra") - audioBefore.cycle,
+          bolt: game.audio.RequestedCount("bolt") - audioBefore.bolt,
+          shell: game.audio.RequestedCount("shellDrop") - audioBefore.shell,
+        },
+      };
       debug.Mouse(2, false);
       game.StepFrames(90, 1 / 60, false);
       if (!spec.smoke) debug.Key("KeyR");
@@ -188,6 +208,9 @@ try {
     Check(`${weapon.id}: F picks up the actual table gun and equips its viewmodel`, report.picked.weapon === weapon.id && report.picked.viewmodel === weapon.id && report.pickedUp === 1, { ...report.picked, pickups: report.pickedUp });
     Check(`${weapon.id}: RMB raises the sight and narrows the field of view`, report.ads.amount > 0.9 && report.ads.bipod === false && report.ads.hipFov > report.ads.fov + 2 && report.ads.hasSight && report.ads.source === "model", report.ads);
     Check(`${weapon.id}: ${smoke ? "two real trigger pulls fire" : "infinite ammunition still fires beyond its magazine"}`, report.firing.actual === report.firing.expected && report.firing.ammoAfter === report.firing.ammoBefore && report.firing.last?.weapon === weapon.id, report.firing);
+    if (weapon.id === "HanYang") Check("HanYang uses one embedded shot/bolt recording without duplicate foley",
+      report.firing.audio.cycle === report.firing.expected && report.firing.audio.bolt === 0 && report.firing.audio.shell === 0,
+      report.firing.audio);
     if (!smoke) Check(`${weapon.id}: R plays and completes a real reload`, report.reload.action === "reload" && report.reload.complete && report.reload.ammo === weapon.magazine, report.reload);
   }
 

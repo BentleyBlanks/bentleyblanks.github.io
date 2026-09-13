@@ -149,7 +149,7 @@ const PROPAGATION_CUES = new Set([
 ]);
 /** 枪类 cue 里 FAR_CUE / SAMPLE_BURST 覆盖不到的那几条。 */
 const GUN_EXTRA_CUES = new Set([
-  "rifleNra", "rifleIja", "zb26", "type11", "type92",
+  "rifleNra", "rifleHanYang", "rifleIja", "zb26", "type11", "type92",
   "strafeNear", "strafeFar", "strafeDirt",
 ]);
 
@@ -890,6 +890,16 @@ const RECIPES = {
   // --- 步枪 ---------------------------------------------------------------
   // 中正式/汉阳造：7.92×57，弹头重、装药多，爆音低沉，胸口能感觉到那一下。
   rifleNra(A, v) {
+    GunNear(A, v, {
+      thumpHi: 128, thumpLo: 52, thumpDur: 0.11, thumpLevel: 0.85,
+      blastFreq: 1500, blastQ: 0.55, blastLevel: 0.95, blastDecay: 0.075, drive: 0.55,
+      mechFreq: 3600, mechLevel: 0.10,
+      tailDur: 0.9, tailLevel: 0.10, wet: 0.42,
+    });
+  },
+  // 汉阳造专用连续实录的采样回落：参数与同口径中方步枪一致；正常运行时由
+  // AudioSfx_RifleHanYang_01.mp3 覆盖，并把枪响后的完整枪机循环一并带上。
+  rifleHanYang(A, v) {
     GunNear(A, v, {
       thumpHi: 128, thumpLo: 52, thumpDur: 0.11, thumpLevel: 0.85,
       blastFreq: 1500, blastQ: 0.55, blastLevel: 0.95, blastDecay: 0.075, drive: 0.55,
@@ -2404,7 +2414,7 @@ const LOW_PRIORITY_HEADROOM = 0.62;
  * 捷克式/十一年式/九二式没有对应的远场实录，就**不做**这层 —— 拿步枪的远场去配
  * 机枪只会把两种枪的辨识度一起毁掉，宁可少一层。
  */
-const FAR_CUE = { rifleNra: "rifleNraFar", rifleIja: "rifleIjaFar" };
+const FAR_CUE = { rifleNra: "rifleNraFar", rifleHanYang: "rifleNraFar", rifleIja: "rifleIjaFar" };
 /** FAR_CUE 的值集合 —— 远场那两条自己也是枪，culling 与配平都要认得它们。 */
 const FAR_CUE_TARGET = new Set(Object.values(FAR_CUE));
 
@@ -2571,7 +2581,7 @@ function WetFalloff(distance) {
 const NODE_COST = {
   zb26: 19, bolt: 19, stripperLoad: 19, shellImpact: 19, bodyFall: 19,
   type92: 18, explosionNear: 18,
-  rifleNra: 16, rifleIja: 16, type11: 16, bayonetHit: 16, magIn: 15,
+  rifleNra: 16, rifleHanYang: 16, rifleIja: 16, type11: 16, bayonetHit: 16, magIn: 15,
   rifleNraFar: 14, rifleIjaFar: 14, impactMetal: 14,
   grenadePin: 13, impactBrick: 13, impactWood: 13, footstepRubble: 13, hurt: 13,
   dadaoHit: 12, shellIncoming: 11, whistle: 11,
@@ -2695,7 +2705,8 @@ export const MUSIC_BASE = "Audio/Music/";
 // 这一次是**加条目**：戳不动的话浏览器拿着缓存里的旧清单，新素材永远载不上，
 // 而 LoadSfxPack 盖不上去是静默的 —— 表现只是「断肢还是合成音」。
 // （同一天 Codex 那边把戳改成了日期式，合并后取带两件事的同一个新戳。）
-export const SFX_PACK_VERSION = "20260913injuredbreath";
+// 2026-09-13：汉阳造 01 专用连续枪响＋枪机实录进入清单。
+export const SFX_PACK_VERSION = "20260913hanyangshot01";
 export const AMB_PACK_VERSION = "20260912trainonly";
 export const MUSIC_PACK_VERSION = "5";
 
@@ -2816,7 +2827,7 @@ const SAMPLE_BURST = {
  */
 const SAMPLE_MIX = {
   explosionNear: 1.0, shellImpact: 0.95, launcherPop: 0.72,
-  rifleNra: 0.88, rifleIja: 0.86, type92: 0.8, zb26: 0.76, type11: 0.72,
+  rifleNra: 0.88, rifleHanYang: 0.88, rifleIja: 0.86, type92: 0.8, zb26: 0.76, type11: 0.72,
   explosionFar: 0.5, rifleNraFar: 0.42, rifleIjaFar: 0.46, shellIncoming: 0.62,
   bolt: 0.95, stripperLoad: 1.0, magIn: 1.0, grenadePin: 0.7, grenadeThrow: 0.5,
   dadaoSwing: 0.5, dadaoHit: 0.78, bayonetHit: 0.8,
@@ -2875,7 +2886,7 @@ const SAMPLE_MIX = {
 
 /** 混响 send。远的、开阔的给多，贴身的小动作几乎不给。 */
 const SAMPLE_WET = {
-  rifleNra: 0.42, rifleIja: 0.38, rifleNraFar: 0.55, rifleIjaFar: 0.55,
+  rifleNra: 0.42, rifleHanYang: 0.42, rifleIja: 0.38, rifleNraFar: 0.55, rifleIjaFar: 0.55,
   zb26: 0.36, type11: 0.32, type92: 0.42,
   explosionNear: 0.45, explosionFar: 0.55, shellImpact: 0.45, shellIncoming: 0.3,
   launcherPop: 0.35, bugleCharge: 0.55, whistle: 0.45,
@@ -2978,6 +2989,7 @@ const AMB_AIR = {   // → Play 的 airCut
  * 一梭子下来必然连出两次同一条 —— 那恰恰是切四条想避开的事。轮播两样都不占。
  */
 const SAMPLE_CYCLE = new Set(["dadaoSwing", "dadaoHit", "bayonetHit", "telegraphKey",
+  "rifleHanYang", // 单条连续实录带动作节点，禁止 ±3% 变调把枪机声与动画时钟拧开。
   "breathInjured", // Preserve the reviewed voice and full duration without pitch jitter.
   "bulletCrack", "bulletWhizz",
   // 断肢两条与白刃同理由：变体是一条条量过挑出来的（`Script_SeedAudioGoreBake`

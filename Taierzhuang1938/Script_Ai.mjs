@@ -3862,7 +3862,7 @@ export class AiDirector {
     // 这一发的枪声本体 cue。**在 if (audio) 外面算**：近失弹那条链要拿它算
     // 「弹啸不许比自己这一枪还响」的上限（见 AudioWiring.CrackVolume）。
     const gunCue = s.side === "nra"
-      ? (s.weaponId === "Zb26" ? "zb26" : "rifleNra")
+      ? (s.weapon.shotCue || (s.weaponId === "Zb26" ? "zb26" : "rifleNra"))
       : (s.weaponId === "Type11" ? "type11" : s.weaponId === "Type92Hmg" ? "type92" : "rifleIja");
     if (audio) {
       const name = gunCue;
@@ -3875,7 +3875,7 @@ export class AiDirector {
     // 而**满场几十个兵一条 foley 都没有** —— 于是敌人开枪只是一记枪声，
     // 听不出他是栓动还是自动、也听不出他打完了这一发正在低头拉栓。
     // 只有栓动才有：捷克式、歪把子、九二式自己上膛。
-    this.ctx.audioWiring?.AiBolt(s, s.weapon.kind === "boltRifle");
+    this.ctx.audioWiring?.AiBolt(s, s.weapon.kind === "boltRifle" && !s.weapon.embeddedCycleAudio);
 
     // Threat feedback is tied to this bullet's unobstructed segment, independent
     // of audio being enabled and of whom the enemy intended to shoot.

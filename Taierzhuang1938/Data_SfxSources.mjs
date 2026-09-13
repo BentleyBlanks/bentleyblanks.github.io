@@ -1458,6 +1458,20 @@ export const SFX_SOURCES = [
     ],
   },
   {
+    id: "RifleHanYangShot01",
+    local: "RifleNraHanyangzaoLive.wav",
+    source: "B 站 BV1GMojB3EFP 原片 1:13—1:42（音乐停的那段）→ 44.1 kHz PCM",
+    credit: "汉阳造 88 式步枪第一发连续实录（枪响、开栓、抽壳、推弹、闭锁）· 参考视频实录",
+    license: "refvideo",
+    bitrate: BITRATE_TRANSIENT,
+    // 第一发不是只截枪口爆音：保留到枪机闭锁结束，作为汉阳造专用 cue。
+    // 起音前只留 5 ms，让第一人称枪口焰与爆音贴齐。原片枪机的两段机械声从
+    // 起音后约 1.88 / 2.17 s 开始；用户确认枪声电平不动，只把 1.65 s 后的机械段
+    // 先抬 8 dB、试听后再大 10%（合计 +8.82785 dB）。动作时钟见 Data_Weapons.HanYang。
+    cuts: [{ cue: "rifleHanYang", exactAtS: 2.970, tail: 2.56, preRollS: 0.005, gain: 0.94,
+      gainSections: [{ startS: 1.65, gainDb: 8.82785 }], alignDbfs: -25 }],
+  },
+  {
     id: "RifleIjaType38Live",
     local: "RifleIjaType38Live.wav",
     source: "B 站 BV1cG411m7Vz 原片 0:59—1:04 → 44.1 kHz PCM",

@@ -2120,7 +2120,9 @@ export class Viewmodel {
 
     if (this.weapon.kind === "boltRifle" && this.autoBolt) {
       // 打完这一发自动上膛。最后一发（lowAmmo）时栓停在后面不推回 —— 玩家一眼看见"没子弹了"
-      this.pendingBoltAt = 0.20;
+      // 汉阳造的专用连续实录把拉栓录在枪响后 1.88 s，延迟由武器数据给；
+      // 其余步枪仍沿用 0.20 s 的旧手感。
+      this.pendingBoltAt = this.weapon.boltDelayS ?? 0.20;
     }
 
     const out = new THREE.Vector3();

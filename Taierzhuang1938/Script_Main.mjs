@@ -7238,7 +7238,7 @@ function TryFire(dt, returningGrenade = false) {
   // 它会原样落回 Play()，行为与改之前一模一样；连 PlayGunshot 都没有才退回 Play。
   // priority：与几十个 AI 共用同一个 22 ms 去重窗口时，玩家自己的枪声实测丢 8.3%。
   // 别的都可以丢，自己扣的扳机不许没声。
-  const playerGunCue = currentWeapon === "Zb26" ? "zb26" : "rifleNra";
+  const playerGunCue = weapon.shotCue || (currentWeapon === "Zb26" ? "zb26" : "rifleNra");
   const playerGunOpts = {
     position: _muzzle.clone(), priority: true,
     firstPerson: true, weaponClass: WeaponClassOf(currentWeapon),
@@ -7255,7 +7255,7 @@ function TryFire(dt, returningGrenade = false) {
   // 0.24 s 是枪响之后手真的去够枪机的时间；0.62 s 是弹壳落地。
   // 判据是 kind === "boltRifle"（Data_Weapons 里每支枪都有），
   // 不是"有没有 rpm" —— 手枪与捷克式自己上膛，没有手拉的那一下。
-  if (weapon.kind === "boltRifle") {
+  if (weapon.kind === "boltRifle" && !weapon.embeddedCycleAudio) {
     audio.Play("bolt", { position: _muzzle.clone(), volume: 0.42, delay: 0.24 });
   }
   // 弹壳落地。
@@ -7269,9 +7269,12 @@ function TryFire(dt, returningGrenade = false) {
   // pan 0.35 —— 中正式与三八式都是**向右抛壳**。
   // 栓动是拉栓那一下才把壳抛出去（0.24 s），落地再晚 0.4 s；
   // 捷克式自己抛壳，出膛就飞，落得早。
-  audio.Play("shellDrop", {
-    volume: 0.55, pan: 0.35, delay: weapon.kind === "boltRifle" ? 0.62 : 0.38,
-  });
+  // 汉阳造专用实录已经包含抽壳、推弹与闭锁；再叠通用 bolt / shellDrop 会变成两套枪机。
+  if (!weapon.embeddedCycleAudio) {
+    audio.Play("shellDrop", {
+      volume: 0.55, pan: 0.35, delay: weapon.kind === "boltRifle" ? 0.62 : 0.38,
+    });
+  }
   // 枪种必须传下去：过去所有玩家武器都落进默认 rifle 配方，手枪、捷克式与
   // 栓动步枪喷出完全相同的焰和烟。ER2 的枪感并不靠把所有枪都抖得更厉害，
   // 而是让每一类武器在同一套输入下仍有自己的出膛节奏。

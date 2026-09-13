@@ -75,6 +75,7 @@ const load = await page.evaluate(() => {
       .filter((name) => !a.sampleCues.has(name)),
     toneHz: a.sfxManifest && a.sfxManifest.cues.bugleTone
       ? a.sfxManifest.cues.bugleTone.toneHz : null,
+    hanYangSeconds: a.sfxManifest?.cues?.rifleHanYang?.seconds || 0,
   };
 });
 
@@ -84,7 +85,8 @@ const load = await page.evaluate(() => {
 // 2026-09-11 断肢两音（goreSever / goreLimbLand）→ 83
 // 2026-09-11: sampled continuous piston engine.
 // 2026-09-13: approved low-health breath, separate from sprint breathing.
-const RECIPE_COUNT = 85;
+// 2026-09-13: dedicated Hanyang shot + synchronized bolt cycle.
+const RECIPE_COUNT = 86;
 
 if (!load.enabled) Fail("AudioEngine 被禁用了（正常模式不该走到出图那条路）");
 if (load.manifestCues !== RECIPE_COUNT) {
@@ -99,6 +101,25 @@ if (load.errors.length) Fail(`采样载入报错 ${JSON.stringify(load.errors)}`
 else Ok("采样载入零报错");
 if (load.prologueSfx.length) Fail(`序章专用音未盖上：${load.prologueSfx.join(" ")}`);
 else Ok("序章 8 条专用音全部盖上");
+if (Math.abs(load.hanYangSeconds - 2.56) > 0.02) Fail(`汉阳造连续枪响/枪机素材时长错误：${load.hanYangSeconds}s`);
+else Ok(`汉阳造连续枪响/枪机素材已载入（${load.hanYangSeconds.toFixed(2)}s）`);
+
+// 汉阳造这一条的后半机械冲头直接驱动动作节点，不能像普通随机枪声那样逐发 ±3% 变调。
+const hanYangPlayback = await page.evaluate(() => {
+  const a = window.Taierzhuang.audio;
+  const made = [];
+  const original = a.ctx.createBufferSource;
+  a.ctx.createBufferSource = function patched() { const source = original.call(this); made.push(source); return source; };
+  a.lastPlayAt.delete("rifleHanYang");
+  const voice = a.Play("rifleHanYang", { priority: true, firstPerson: true, volume: 0.01 });
+  a.ctx.createBufferSource = original;
+  const source = made.find((entry) => entry.buffer && entry.buffer.duration > 2.4);
+  if (voice) a.StopVoice(voice, 0.001);
+  return source ? { duration: source.buffer.duration, rate: source.playbackRate.value } : null;
+});
+if (!hanYangPlayback || Math.abs(hanYangPlayback.duration - 2.56) > 0.04 || hanYangPlayback.rate !== 1) {
+  Fail(`汉阳造专用素材未原速播放：${JSON.stringify(hanYangPlayback)}`);
+} else Ok("汉阳造专用素材原速播放，枪机冲头不会与动作时钟漂移");
 
 // Timeline 静音快进之后，目标时刻仍在说的那一句必须从**对应采样点**接回来，
 // 不能从头播、也不能没声（编辑器审片全靠这条）。
@@ -440,7 +461,7 @@ const gunAudibility = await page.evaluate(() => {
   const a = window.Taierzhuang.audio, L = a.listenerPos;
   const At = (d) => ({ x: L.x + d, y: L.y, z: L.z });
   const rows = [];
-  for (const cue of ["rifleNra", "rifleIja", "rifleNraFar", "rifleIjaFar", "type11", "type92"]) {
+  for (const cue of ["rifleNra", "rifleHanYang", "rifleIja", "rifleNraFar", "rifleIjaFar", "type11", "type92"]) {
     for (const distance of [2, 100, 150]) {
       const v = a.Play(cue, { position: At(distance), priority: true });
       if (!v) { rows.push({ cue, distance, ok: false }); continue; }
@@ -478,6 +499,7 @@ const shell = await page.evaluate(async () => {
     drop: a.RequestedCount("shellDrop"),
     mortar: a.RequestedCount("shellImpact"),
     rifle: a.RequestedCount("rifleNra"),
+    hanYang: a.RequestedCount("rifleHanYang"),
   };
   for (let i = 0; i < 3; i += 1) { T.Debug.Fire(); await sleep(1400); }
   return {
@@ -486,6 +508,7 @@ const shell = await page.evaluate(async () => {
     drop: a.RequestedCount("shellDrop") - before.drop,
     mortar: a.RequestedCount("shellImpact") - before.mortar,
     rifle: a.RequestedCount("rifleNra") - before.rifle,
+    hanYang: a.RequestedCount("rifleHanYang") - before.hanYang,
     slots: T.Debug.Slots ? T.Debug.Slots() : null,
     ammo: T.state.ammo,
   };
@@ -493,9 +516,13 @@ const shell = await page.evaluate(async () => {
 if (shell.variants < 2) Fail(`shellDrop 只有 ${shell.variants} 个变体（每开一枪响一次的音必须多变体）`);
 else if (shell.seconds > 1.4) Fail(`shellDrop 长达 ${shell.seconds}s —— 那不是弹壳，是别的东西`);
 else if (shell.mortar > 0) Fail(`开三枪去要了 ${shell.mortar} 次 shellImpact（迫击炮爆炸），弹壳那条又接错了`);
-else if (shell.rifle < 1) Fail(`Debug.Fire 三次一枪都没打出去（ammo ${shell.ammo}，${JSON.stringify(shell.slots)}）—— 这条断言本身没测到东西`);
-else if (shell.drop < 1) Fail(`打出 ${shell.rifle} 枪，一次弹壳落地都没要`);
-else Ok(`抛壳走 shellDrop（${shell.variants} 变体 / ${shell.seconds}s），开三枪零记迫击炮`);
+else if (shell.rifle + shell.hanYang < 1) Fail(`Debug.Fire 三次一枪都没打出去（ammo ${shell.ammo}，${JSON.stringify(shell.slots)}）—— 这条断言本身没测到东西`);
+else if (shell.slots?.weapon === "HanYang" && (shell.hanYang < 1 || shell.drop !== 0)) {
+  Fail(`汉阳造应由连续实录承担抽壳/闭锁且不叠 shellDrop：${JSON.stringify(shell)}`);
+} else if (shell.slots?.weapon !== "HanYang" && shell.drop < 1) Fail(`打出 ${shell.rifle} 枪，一次弹壳落地都没要`);
+else Ok(shell.slots?.weapon === "HanYang"
+  ? `汉阳造连续实录内含抽壳/闭锁（${shell.hanYang} 发），零记重复 shellDrop/迫击炮`
+  : `抛壳走 shellDrop（${shell.variants} 变体 / ${shell.seconds}s），开三枪零记迫击炮`);
 
 // 白刃三音：2026-08-26 从 Sonniss 顶包换成人工选定的 SeedAudio take。
 // 两种回归都是静默的 ——「全量 SfxBake 把 cue 写回借来的顶包」与「挥空掉回一个变体」，

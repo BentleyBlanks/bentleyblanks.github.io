@@ -43,6 +43,13 @@
 //     · 弹道（音爆、跳弹）是 0.02 s 的宽带冲头，前后都是安静，预回声最明显。
 //   代价是这三类的体积涨 55%，全批合计只多几十 KB —— 这个换得过。
 //   落到组或 cut 上（`bitrate: "112k"`），不写就是 72k。
+//
+// ## 2026-09-13（连续枪响＋枪机实录）加的两个字段
+//   · `preRollS` —— 覆盖默认的 12 ms 起音前余量。需要让枪口焰与实录冲头贴齐时，
+//     可以只留 5 ms，同时仍不切掉瞬态。
+//   · `gainSections` —— 对同一条连续实录里的局部区间单独调电平，格式为
+//     `{ startS, endS?, gainDb }`。它在无损 stage.wav 阶段执行，随后才做一次 MP3 编码；
+//     用于枪声已经够响、但同条录音后半段枪机动作需要单独抬高的情况。
 
 import fs from "node:fs";
 import path from "node:path";
@@ -318,7 +325,7 @@ function AlignLoudness(tmpWav, outMp3, filters, targetDbfs, bitrate = BITRATE) {
 }
 
 function CutOne(pcm, hit, cut, tmpWav, outMp3) {
-  const pre = Math.round(SR * 0.012);                    // 起音前留一点，别切掉冲头
+  const pre = Math.round(SR * (cut.preRollS ?? 0.012));  // 起音前留一点，别切掉冲头
   const start = cut.whole ? hit.at : Math.max(0, hit.at - pre);
   const len = Math.min(pcm.length - start, Math.round(SR * cut.tail));
   const seg = pcm.slice(start, start + len);
@@ -336,6 +343,12 @@ function CutOne(pcm, hit, cut, tmpWav, outMp3) {
   const fadeOut = Math.round(Math.min(fadeOutCap, SR * (cut.fadeOutS ?? 0.12)));
   for (let i = 0; i < seg.length; i += 1) {
     let g = scale;
+    const atS = i / SR;
+    for (const section of cut.gainSections || []) {
+      if (atS >= section.startS && (section.endS == null || atS < section.endS)) {
+        g *= Math.pow(10, section.gainDb / 20);
+      }
+    }
     if (fadeIn > 0 && i < fadeIn) g *= i / fadeIn;
     const tail = seg.length - i;
     if (fadeOut > 0 && tail < fadeOut) g *= tail / fadeOut;
