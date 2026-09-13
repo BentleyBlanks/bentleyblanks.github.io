@@ -189,7 +189,12 @@ export const WOUNDS = Object.freeze({
   bleedDecayFlatPerS: 0.02,
   maxBleedPerSFallback: 5.5,  // COMBAT.player.maxBleedPerS 缺位时的兜底
   bandages: 2,
-  bandageHeal: 14,            // 包扎止血，不回满血
+  // 包扎立刻止血，血量在几秒里慢慢回到目标：max(bandageRegenCap, 当前血 + bandageHeal)，不超过 100。
+  // 原来是瞬间 +14 之后再不动，而受伤血迹从 100 以下就开始画 —— 玩家看到的是「包了等于没包」。
+  // 回血途中再中弹就断掉，要再包一次。仍然回不满：重伤还是重伤。
+  bandageHeal: 14,            // 保底：至少比包扎时多这么多（原来的瞬间回血量）
+  bandageRegenCap: 80,        // 回血目标的下限
+  bandageRegenPerS: 8,        // 回血速度（HP/s）：从 20 回到 80 约 7.5 秒
 });
 
 /**

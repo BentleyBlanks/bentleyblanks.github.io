@@ -154,7 +154,8 @@ export class PlayerController {
     this.bleeding = 0;                      // 每秒失血
     this.wounds = [];                       // { part, bleed, since }
     this.bandages = WOUNDS.bandages;
-    this.suppression = 0;                   // 0..1，被打压的程度
+    this.bandageRegenTo = 0;                // 包扎后回血的目标血量，0 = 没在回
+    this.suppression = 0;                // 0..1，被打压的程度
     this.suppressedUpright = false;         // 压得很狠但还站着（只用于提示，不改姿态）
     // 通用震屏（爆炸 / 近失弹 / 落地 / 中弹 / 日机弹着 / 扑沟）。数在 CAMERA_SHAKE，
     // 偏移在 SyncCamera 最后一步叠上去，不改 yaw/pitch 本体。
@@ -242,6 +243,7 @@ export class PlayerController {
     this.health = 100;
     this.bleeding = 0;
     this.wounds.length = 0;
+    this.bandageRegenTo = 0;
     this.suppression = 0;
     this.suppressedUpright = false;
     this.stamina = 1;
@@ -797,6 +799,8 @@ export class PlayerController {
       this.bleeding = Math.max(this.bleeding * Math.exp(-dt * WOUNDS.bleedDecayPerS),
         this.bleeding - dt * WOUNDS.bleedDecayFlatPerS);
       if (this.health <= 0) this.Kill();
+    } else if (this.alive && this.health < this.bandageRegenTo) {
+      this.health = Math.min(this.bandageRegenTo, this.health + dt * WOUNDS.bandageRegenPerS);
     }
 
     this.hitDisorientationTime = Math.max(0, this.hitDisorientationTime - dt);
@@ -1096,7 +1100,8 @@ export class PlayerController {
       this.hitDisorientationTime = HIT_DISORIENTATION.durationS;
     }
     this.health -= applied;
-    const bleed = (part === "head" ? WOUNDS.bleedHead
+    this.bandageRegenTo = 0;                // 新伤口打断包扎后的回血，要再包一次
+    const bleed =(part === "head" ? WOUNDS.bleedHead
       : part === "torso" ? WOUNDS.bleedTorso : WOUNDS.bleedLimb) * (P.bleedScale ?? 0.6);
     this.wounds.push({ part, bleed, since: 0 });
     this.bleeding += bleed;
@@ -1216,12 +1221,13 @@ export class PlayerController {
     Object.assign(mark, { x, z, kind, life, max: life });
   }
 
-  /** 包扎：止血，不回满血。伤口留着，跑不快。 */
+  /** 包扎：立刻止血，之后慢慢回血到 bandageRegenTo（回不满）。伤口留着，跑不快。 */
   Bandage() {
     if (this.bandages <= 0 || this.bleeding <= 0) return false;
     this.bandages -= 1;
     this.bleeding = 0;
-    this.health = Math.min(100, this.health + WOUNDS.bandageHeal);
+    this.bandageRegenTo = Math.max(this.bandageRegenTo,
+      Math.min(100, Math.max(WOUNDS.bandageRegenCap, this.health + WOUNDS.bandageHeal)));
     for (const w of this.wounds) w.bleed = 0;
     return true;
   }
