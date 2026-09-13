@@ -12,7 +12,7 @@
 // 三条 pass 读的是同一份 index，天然一致，而且零新 program。
 
 import { ENABLED, LIMBS, SEVER_RULES, KIND_ALIASES, LIMB_POOLS, HIT_GEOMETRY } from "./Data_Tuning_Gore.mjs";
-import { RaycastCapsule, RaycastSphere, RaycastEllipsoid } from "./Script_CharacterHitboxMath.mjs";
+import { JointOwner, RaycastCapsule, RaycastSphere, RaycastEllipsoid } from "./Script_CharacterHitboxMath.mjs";
 
 /** 冻结的肢体 id 数组（顺序即编码顺序，见 CodeForLimb）。 */
 export const LIMB_IDS = Object.freeze(Object.keys(LIMBS));
@@ -265,7 +265,7 @@ function TierFor(rule, falloff) {
  */
 function ScanMeleeLine(origin, unit, shapes, pool, reach) {
   let best = null, bestDistance = Infinity, bestAlong = Infinity;
-  let first = null, firstT = Infinity;
+  let first = null, firstT = Infinity, firstShape = null;
   const ux = unit.x, uy = unit.y, uz = unit.z;
   for (const shape of shapes) {
     if (!shape || pool && !pool.has(shape.id)) continue;
@@ -279,7 +279,7 @@ function ScanMeleeLine(origin, unit, shapes, pool, reach) {
       : shape.type === "ellipsoid" && shape.worldRadii && shape.worldAxes
         ? RaycastEllipsoid(origin, unit, a, shape.worldRadii, shape.worldAxes)
         : RaycastSphere(origin, unit, a, radius);
-    if (direct !== null && direct <= reach && direct < firstT) { firstT = direct; first = shape.id; }
+    if (direct !== null && direct <= reach && direct < firstT) { firstT = direct; first = shape.id; firstShape = shape; }
     if (!LIMBS[shape.id]) continue;              // 躯干只挡视线，不参与贴线竞争
     // Closest points between the finite attack ray and the entire bone segment.
     const vx = b.x-a.x, vy = b.y-a.y, vz = b.z-a.z;
@@ -297,6 +297,12 @@ function ScanMeleeLine(origin, unit, shapes, pool, reach) {
     if (distance < bestDistance - 1e-6 || Math.abs(distance-bestDistance) <= 1e-6 && along < bestAlong) {
       bestDistance = distance; bestAlong = along; best = shape.id;
     }
+  }
+  if (first && firstShape.part === "limb") {
+    // 与子弹同一条归段规则（Script_CharacterModel 的 LugouCharacterRig.Raycast）：关节球里的首交点按关节平分面分段。
+    const candidates = shapes.filter((shape) => shape && (!pool || pool.has(shape.id)));
+    first = JointOwner(candidates, firstShape, {
+      x: origin.x + ux * firstT, y: origin.y + uy * firstT, z: origin.z + uz * firstT }).id;
   }
   if (first) return LIMBS[first] ? first : null;  // 挡在最前面的是躯干 → 这一线不卸肢
   return LIMBS[best] ? best : null;

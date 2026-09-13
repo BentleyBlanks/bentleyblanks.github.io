@@ -507,6 +507,33 @@ for (const [part, pool] of [["arm", LIMB_POOLS.arm], ["leg", LIMB_POOLS.leg]]) {
   Eq(PickMeleeShape(eye, Aim(90), shapes, null, 2.6, sweep), null, "朝天挥空照样一段都不卸");
 }
 
+// 屈膝的腿：关节球里的首交点按关节平分面归段，刀与子弹同一条规则（§11.9）。
+// 几何照 GoreRangeTest 木桩站定据枪那一帧的右腿（LugouIja01 实测，膝盖在前、胫骨往后斜）。
+{
+  const Z = -1.2;
+  const S = (id, a, b, start, end, worldRadius) => ({ id, type: "capsule", part: "limb", a, b, start, end, worldRadius,
+    center: { x: 0, y: 0, z: 0 } });
+  const knee = { x: -0.162, y: 0.431, z: Z };
+  const ankle = { x: -0.121, y: 0.168, z: Z - 0.232 };
+  const shapes = [
+    S("thighR", "thighR", "calfR", { x: -0.094, y: 0.778, z: Z + 0.005 }, knee, 0.089),
+    S("calfR", "calfR", "footR", knee, ankle, 0.067),
+  ];
+  const shin = { x: (knee.x + ankle.x) / 2, y: (knee.y + ankle.y) / 2, z: (knee.z + ankle.z) / 2 };
+  const Toward = (eye) => ({ x: shin.x - eye.x, y: shin.y - eye.y, z: shin.z - eye.z });
+  const crouched = { x: 0, y: 1.0, z: 0 };
+  Eq(PickMeleeShape(crouched, Toward(crouched), shapes, null, 2.6), "calfR",
+    "蹲着捅小腿中段：先碰到的是大腿悬在膝下的端帽，那一点归小腿");
+  const anonymous = shapes.map((shape) => ({ ...shape, a: undefined, b: undefined }));
+  Eq(PickMeleeShape(crouched, Toward(crouched), anonymous, null, 2.6), "thighR",
+    "对照：不串关节时粗的大腿端帽抢走这一刀（修复前的行为）");
+  const standing = { x: 0, y: 1.6, z: 0 };
+  Eq(PickMeleeShape(standing, Toward(standing), shapes, null, 2.6), "thighR",
+    "站着从高处往下砍，膝盖真挡在小腿前面，仍是大腿");
+  Eq(PickMeleeShape(crouched, Toward(crouched), shapes, ["thighR"], 2.6), "thighR",
+    "小腿不在候选池里就抢不走");
+}
+
 // 命中体给了哪一段就卸哪一段
 {
   const result = ResolveSever(Hit({ kind: "hmg", shapeId: "thighR", rng: Mulberry32(2) }));

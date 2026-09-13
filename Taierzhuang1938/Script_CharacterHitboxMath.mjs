@@ -110,3 +110,45 @@ export function RaycastCapsule(origin, direction, start, end, radius) {
   }
   return best;
 }
+
+/**
+ * 关节处的首交点归哪一段肢体。
+ *
+ * 同一关节串起来的两根肢体胶囊（大腿 b 与小腿 a 是同一根骨头）在关节周围互相重叠：
+ * 大腿的圆端帽以关节为心、按大腿半径悬出到小腿上，反过来小腿的端帽也伸进大腿。
+ * 只比「谁先被射线碰到」时，粗的那一段总是先碰到 —— 膝盖一弯、子弹从上往下来，
+ * 瞄小腿中段打到的是大腿，而那一点的蒙皮 95% 权重在小腿骨上（2026-09-13 实测，
+ * docs/Data_Dismemberment.md §11.9）。
+ *
+ * 所以关节球里的点按**关节夹角的平分面**分给两段：腿伸直时就是过关节垂直于腿的那个面；
+ * 屈膝时膝盖前面（髌骨）归大腿，膝盖下面的胫骨归小腿。离关节超过端帽半径的点（胶囊
+ * 圆柱面上的）不动，躯干与头不参与（伤害分类照原样），已经断掉的那一段不在
+ * `shapes` 里，也就抢不走任何点。
+ *
+ * @param {Array<object>} shapes 当前还在的全部命中体（运行时 `GetHitboxes()` 的结果）
+ * @param {object} shape 射线最先碰到的那一个
+ * @param {{x:number,y:number,z:number}} point 首交点（世界）
+ * @returns {object} 这个点真正属于的命中体（多数情况就是 `shape` 本身）
+ */
+export function JointOwner(shapes, shape, point) {
+  if (!shape || shape.part !== "limb" || shape.type !== "capsule" || !point || !shapes) return shape;
+  for (const other of shapes) {
+    if (!other || other === shape || other.part !== "limb" || other.type !== "capsule") continue;
+    // shape 是上一段（关节在它的 end）还是下一段（关节在它的 start）。
+    const shapeIsParent = shape.b != null && other.a === shape.b;
+    if (!shapeIsParent && !(shape.a != null && other.b === shape.a)) continue;
+    const parent = shapeIsParent ? shape : other, child = shapeIsParent ? other : shape;
+    const joint = child.start;
+    const px = point.x - joint.x, py = point.y - joint.y, pz = point.z - joint.z;
+    const reach = Math.max(parent.worldRadius ?? parent.radius ?? 0, child.worldRadius ?? child.radius ?? 0);
+    if (px * px + py * py + pz * pz > reach * reach * (1 + 1e-6)) continue;
+    const ux = parent.start.x - joint.x, uy = parent.start.y - joint.y, uz = parent.start.z - joint.z;
+    const vx = child.end.x - joint.x, vy = child.end.y - joint.y, vz = child.end.z - joint.z;
+    const uLen = Math.hypot(ux, uy, uz), vLen = Math.hypot(vx, vy, vz);
+    if (uLen < EPSILON || vLen < EPSILON) continue;
+    // 平分面法线 = 指向上一段的单位向量 − 指向下一段的单位向量；> 0 在上一段那侧。
+    const side = px * (ux / uLen - vx / vLen) + py * (uy / uLen - vy / vLen) + pz * (uz / uLen - vz / vLen);
+    if (shapeIsParent ? side < 0 : side > 0) return other;
+  }
+  return shape;
+}
