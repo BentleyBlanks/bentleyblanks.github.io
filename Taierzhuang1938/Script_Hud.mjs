@@ -16,7 +16,7 @@ import { HIT_FEEDBACK } from "./Data_Tuning_Player.mjs";
 import { PLAYER_SLOT_ORDER, PlayerSlotKey } from "./Data_Weapons.mjs";
 import {
   TITLE_CARD, TIMING, GRENADE_WARNING, HITMARK, HITDIR, VIGNETTE, SUPPRESSION,
-  PROMPTS, MINIMAP, FPS, IDLE_FADE, SUBTITLE_DEPTH,
+  MELEE_KILL_BLOOD, PROMPTS, MINIMAP, FPS, IDLE_FADE, SUBTITLE_DEPTH,
 } from "./Data_Tuning_Hud.mjs";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -257,6 +257,8 @@ export class Hud {
      */
     this.hitmarkTimer = 0;
     this.hitmarkSpan = 1;
+    // 近战击杀溅血与受伤暗角各自计时：前者永远不能被玩家血量续命。
+    this.meleeKillBloodTimer = 0;
     this.confirms = [];
     this.actionPrompts = [];
     this.actionPromptSignature = "";
@@ -333,6 +335,8 @@ export class Hud {
     };
     this.el.suppress = mk("hudSuppress");        // 压制暗角：纯 CSS 径向渐变，零成本
     this.el.damage = mk("hudDamage");
+    this.el.meleeKillBlood = mk("hudMeleeKillBlood");
+    this.el.meleeKillBlood.setAttribute("aria-hidden", "true");
     this.el.healthWarning = mk("hudHealthWarning");
     this.el.healthWarning.setAttribute("role", "status");
     this.el.healthWarning.setAttribute("aria-live", "polite");
@@ -872,6 +876,29 @@ export class Hud {
           && Number.parseFloat(strokeStyle.height) >= 2
           && strokeStyle.backgroundColor !== "rgba(0, 0, 0, 0)";
       }).length,
+    };
+  }
+
+  /**
+   * 玩家白刃击杀日军时的镜头飞溅。只是一记命中事件，不表达玩家受伤。
+   * 重复触发从满亮重新计时，不叠 DOM、不叠透明度，避免连续砍杀糊成红屏。
+   */
+  MeleeKillBlood() {
+    this.meleeKillBloodTimer = MELEE_KILL_BLOOD.seconds;
+    SetClass(this.el.meleeKillBlood, "on", true);
+    SetStyle(this.el.meleeKillBlood, "opacity", String(MELEE_KILL_BLOOD.maxOpacity));
+    SetStyle(this.el.meleeKillBlood, "transform", `scale(${MELEE_KILL_BLOOD.startScale})`);
+  }
+
+  /** 浏览器验收读取真实绘制状态，不从击杀数反推画面。 */
+  MeleeKillBloodState() {
+    const style = getComputedStyle(this.el.meleeKillBlood);
+    return {
+      active: this.el.meleeKillBlood.classList.contains("on"),
+      opacity: Number.parseFloat(style.opacity) || 0,
+      timer: this.meleeKillBloodTimer,
+      backgroundImage: style.backgroundImage,
+      blendMode: style.mixBlendMode,
     };
   }
 
@@ -1553,6 +1580,22 @@ export class Hud {
       if (this.hitmarkTimer <= 0) {
         this.el.hitmark.className = "hudHitmark";
         this.el.hitmark.style.opacity = "0";
+      }
+    }
+    if (this.meleeKillBloodTimer > 0) {
+      this.meleeKillBloodTimer = Math.max(0, this.meleeKillBloodTimer - dt);
+      const elapsed = MELEE_KILL_BLOOD.seconds - this.meleeKillBloodTimer;
+      const fadeSpan = Math.max(0.001, MELEE_KILL_BLOOD.seconds - MELEE_KILL_BLOOD.holdS);
+      const fade = elapsed <= MELEE_KILL_BLOOD.holdS
+        ? 1 : Math.max(0, 1 - (elapsed - MELEE_KILL_BLOOD.holdS) / fadeSpan);
+      const progress = Math.min(1, elapsed / MELEE_KILL_BLOOD.seconds);
+      const scale = MELEE_KILL_BLOOD.startScale
+        + (MELEE_KILL_BLOOD.endScale - MELEE_KILL_BLOOD.startScale) * progress;
+      SetStyle(this.el.meleeKillBlood, "opacity", (MELEE_KILL_BLOOD.maxOpacity * fade * fade).toFixed(3));
+      SetStyle(this.el.meleeKillBlood, "transform", `scale(${scale.toFixed(4)})`);
+      if (this.meleeKillBloodTimer <= 0) {
+        SetClass(this.el.meleeKillBlood, "on", false);
+        SetStyle(this.el.meleeKillBlood, "opacity", "0");
       }
     }
     if (this.subtitleTimer > 0) {

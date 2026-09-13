@@ -69,6 +69,20 @@ export const HITMARK = Object.freeze({
   killS: 0.50,
 });
 
+/**
+ * 玩家近距离白刃击杀日军时的一次性镜头溅血。
+ *
+ * 这不是受伤状态：不读玩家血量、不搏动、不残留。先给刀刃接触一个短促的满亮瞬间，
+ * 随后快速淡出；白刃连杀会从头重播，而不是把多层血污越叠越红。
+ */
+export const MELEE_KILL_BLOOD = Object.freeze({
+  seconds: 0.82,
+  holdS: 0.10,
+  maxOpacity: 0.78,
+  startScale: 1.035,
+  endScale: 1.0,
+});
+
 /** 来弹指示器（外圈那一段弧）的淡出。 */
 export const HITDIR = Object.freeze({
   /** Built-in Imagegen: thin distressed arc with a central spike; shared by every bearing. */

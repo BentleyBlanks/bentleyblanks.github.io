@@ -50,6 +50,20 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 /* 只动画化子层 opacity，不对全屏纹理逐帧做 brightness/filter。 */
 .hudDamage.low::before { animation: hudPulse var(--blood-pulse) ease-in-out infinite; }
+
+/*
+ * 近距离白刃击杀的镜头溅血。素材是白底生产图，multiply 让白色等同于不改画面，
+ * 只留下深红血迹；它有自己的短计时，绝不借 hudDamage 的血量/受伤状态。
+ */
+.hudMeleeKillBlood {
+  position: absolute; inset: -2.5%; z-index: 8;
+  pointer-events: none; opacity: 0; visibility: hidden;
+  background: url("./Texture/Hud/Texture_HudMeleeKillBlood.webp?v=20260914a") center / 100% 100% no-repeat;
+  mix-blend-mode: multiply;
+  transform: scale(1); transform-origin: center;
+  will-change: opacity, transform;
+}
+.hudMeleeKillBlood.on { visibility: visible; }
 .hudHealthWarning {
   position: absolute; right: 22px; bottom: 122px; z-index: 7;
   max-width: calc(100vw - 32px); opacity: 0;
@@ -80,6 +94,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hudDamage.low::before { animation: none; opacity: 1; }
+  .hudMeleeKillBlood { transform: none !important; }
 }
 
 /* 帧率默认固定在左上；目标通知下移一行，避免二者重叠。 */

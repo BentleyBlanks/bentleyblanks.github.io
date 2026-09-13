@@ -210,6 +210,7 @@ export const testDefs = {
   DadaoSwingTest: { file: "Script_DadaoSwingTest.mjs", timeoutMs: 10 * 60 * 1000, desc: "Dadao cutting-edge travel, speed, recovery, grip and wrist limits" },
   MeleeCombatTest: { file: "Script_MeleeCombatTest.mjs", desc: "通用白刃规则、拨挡窗口、F 推架、两类僵持、伤害和多人隔离（纯 Node）" },
   MeleeQteTest: { file: "Script_MeleeQteTest.mjs", desc: "白刃 QTE（?melee=1）：独立战斗、站立/倒地成功失败、真实输入、接触、骨骼与画面" },
+  MeleeKillBloodTest: { file: "Script_MeleeKillBloodTest.mjs", desc: "玩家真实大刀击杀日军：独立镜头溅血、中央留白、非受伤与短时淡出" },
   GoreRangeTest: { file: "Script_GoreRangeTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "断肢测试场（?gore=1）：四工位木桩、面板、真枪/爆炸/大刀断肢、预算、释放与像素证据" },
   TownDressingTest: { file: "Script_TownDressingTest.mjs", desc: "城内每户布设的硬规则（纯 Node，秒级）" },
@@ -341,7 +342,7 @@ export const browserTests = new Set([
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
   "SamplerBudgetTest", "BloodEffectsTest", "BulletDecalPbrTest",
-  "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
+  "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
   "ClusteredLightsTest", "MaterialUpgradeTest",
   "PerformanceTest", "PhysicsTest", "PostTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
@@ -419,7 +420,7 @@ export const domains = {
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmHandlingBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "MeleeQteTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
+      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest", "ModelFacingTest",
       // 玩家自己的命中几何（AI 打玩家的部位由它判）与通用震屏（爆炸/近失/中弹/落地/扫射/扑沟）：
       // 两条都是纯 Node 毫秒级，碰伤害口径或相机的改动连着跑。
@@ -455,7 +456,7 @@ export const domains = {
   hud: {
     label: "HUD/交互提示/目标识别",
     // 报码纸是 HUD 面板，改 Script_Hud 要连着它一起跑（TelegraphTest 有一段扫 HUD 源码）。
-    tests: ["IncomingFireBrowserTest", "HudPromptTest", "HudPromptBrowserTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012BinocularsTest", "TargetInfoTest", "TelegraphTest"],
+    tests: ["IncomingFireBrowserTest", "MeleeKillBloodTest", "HudPromptTest", "HudPromptBrowserTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012BinocularsTest", "TargetInfoTest", "TelegraphTest"],
   },
   interact: {
     label: "交互框架/负重/架设机枪/发报（担架·搬运·救护交互点·机枪位·电键）",

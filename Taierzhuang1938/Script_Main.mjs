@@ -1388,7 +1388,12 @@ async function Boot() {
           { kind: bladed ? "blade" : "thrust", mode: bladed ? "slash" : "thrust",
             weaponId: attackerWeapon?.id || null, shapeId, point: at.clone() });
         vfx?.Blood(at, delta, died ? 1 : 0.5);
-        if (attacker === player) ConfirmHit(died);
+        if (attacker === player) {
+          ConfirmHit(died);
+          // 这是砍出去的击杀回执，不是玩家受伤：只认统一白刃伤害链里由玩家
+          // 亲手造成的日军死亡。推架零伤害、QTE、枪击与友军误伤都不会进来。
+          if (died && target.side === "ija") hud.MeleeKillBlood();
+        }
       }
     },
     Event: (event, actor, target) => {
