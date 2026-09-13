@@ -1561,7 +1561,10 @@ export class Viewmodel {
         //（以前这里传 this.materials，签名根本不收，等于什么都没接）。
         this.riggedArms = new FpsArmRig(riggedAssets.fpsArms, library);
         this.armRigs.default=this.riggedArms;
-        if(riggedAssets.fpsHanYang)this.armRigs.HanYang=new FpsArmRig(riggedAssets.fpsHanYang,library);
+        if(riggedAssets.fpsHanYang){
+          this.armRigs.HanYang=new FpsArmRig(riggedAssets.fpsHanYang,library);
+          this.armRigs.Type38=new FpsArmRig(riggedAssets.fpsHanYang,library);
+        }
       } catch (error) {
         console.warn(`[Viewmodel] FPS 手臂实例化失败，退回旧手模：${String(error).slice(0, 180)}`);
       }

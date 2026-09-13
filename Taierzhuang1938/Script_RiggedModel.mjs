@@ -472,7 +472,7 @@ export class FpsArmRig {
       return {shoulders:{right:[0.19,-0.40,-0.15],left:[-0.19,-0.40,-0.10]},
         elbowPoles:{right:[0.30,-0.80,0.12],left:[-0.30,-0.80,0.12]}};
     }
-    if (this.weaponId !== 'HanYang' && ["boltRifle", "lmg", "pistol"].includes(this.poseSpec.family)) {
+    if (!this.fixedRestLengths && ["boltRifle", "lmg", "pistol"].includes(this.poseSpec.family)) {
       const pistol = this.poseSpec.family === "pistol";
       const adsShoulder = this.poseSpec.ads.weapon.eyeDistance > 0.45 ? -0.41 : -0.26;
       const leftZ = THREE.MathUtils.lerp(-0.41, adsShoulder, this.poseState.ads);

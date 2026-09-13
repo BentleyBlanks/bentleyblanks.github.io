@@ -82,6 +82,8 @@ const BladeBody = (leftZ = -0.500, rightZ = -0.145) => Body(
 
 const RifleSprint = FixedPose(V(0.145, -0.200, -0.285), V(0.32, 0.44, 0.30));
 const HanYangBody = () => Body(V(.19,-.40,.08),V(-.28,-.42,-.38),V(.30,-.80,.12),V(-.40,-.75,.12));
+// Type38NraArms_20260913 Blender mount: 20 mm up / forward clears stripper release without overbending the wrist.
+const Type38Body = () => Body(V(.19,-.38,.06),V(-.28,-.42,-.38),V(.30,-.80,.12),V(-.40,-.75,.12));
 const PistolSprint = FixedPose(V(0.105, -0.140, -0.260), V(0.26, 0.38, 0.16));
 const ThrowableSprint = FixedPose(V(0.155, -0.135, -0.385), V(-0.48, 0.34, 0.24));
 
@@ -105,7 +107,7 @@ export const FPS_ARM_POSES = Freeze({
     family: "boltRifle", hip: FixedPose(V(0.100, -0.148, -0.340), V(0.050, -0.050, 0.025)), ads: Sight(0.550), sprint: RifleSprint,
     right: Contact(V(0.01558,-0.0483,-0.06834), V(0.2,3.332392654,1.777196327), CLOSED, TRIGGER, {"fingers":[[0,41.56,35.88],[0,0.4,48.36],[57.74,58.8,13.2],[61.81,71.1,0.65],[88,51.5,0]],"fingerSplay":[0,-5.74,-20.89,-7.63,0.04],"thumbDirection":[0.355,-0.607,0.27],"thumbRoll":5.4,"triggerFingers":[0,2.4,49.36],"triggerSplay":0}),
     left: Contact(V(0.00747,-0.01221,-0.40058), V(-0.1364,1.441596327,-3.248792654), CLOSED, TRIGGER, {"fingers":[[0,24.53,60],[18.78,85.7,0],[20.28,58.6,38.07],[9.59,69.6,9.1],[0,50.5,2.34]],"fingerSplay":[0,15.65,1.51,-16.87,-34.13],"thumbDirection":[0.036,-0.847,-0.094],"thumbRoll":90.6,"triggerFingers":[12,28,18],"triggerSplay":0}),
-    bodyHip: RifleBody(-0.560), bodyAds: RifleAdsBody(-0.540), bodySprint: RifleSprintBody(-0.490),
+    bodyHip: Type38Body(), bodyAds: Type38Body(), bodySprint: Type38Body(),
     actions: { bolt: { family: "type38Bolt", timing: V(0.23, 0.54, 0.83) }, reload: { family: "type38Stripper", timing: V(0.51, 0.65, 0.79) }, bayonet: "type38" },
   }),
   Zb26: WeaponPose({

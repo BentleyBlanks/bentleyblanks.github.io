@@ -49,7 +49,7 @@ MCP 使用独立实例与端口，不能在其他任务正在制作的场景中�
 
 ### 汉阳造手部与动作定位
 
-汉阳造使用独立的 `Model/Model_FpsHanYangHands.glb`，其余武器继续使用原双臂。
+汉阳造与三八式共用 `Model/Model_FpsHanYangHands.glb`，按武器实例化独立骨架；其余武器继续使用原双臂。
 该资产保持 bind pose 的前臂与手部骨段长度，不再将关节静止位移乘以 1.60。
 手部工程位于 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\HanYangHands_20260910\Animation_HanYangHands.blend`。
 本次接触微调的独立工程位于 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\HanYangHandContact_20260911\Animation_HanYangHands.blend`，
@@ -66,6 +66,13 @@ MCP 使用独立实例与端口，不能在其他任务正在制作的场景中�
 `runtimeEnabled` 为 `true`，站立腰射持枪时播放；开镜、移动、开火、拉栓和换弹沿用原有逻辑。
 `_import/Script_HanYangHoldingAnimation.py` 只重建这一段持枪动作，输入为已校准的单个握姿。
 播放定位测试通过不代表手型、接触或动作已经验收。
+三八式复用这套裸手、土灰袖口与固定骨段模型，保留三八式自身的左右握点、扳机、护木、拉栓与换弹手型。
+`Type38Body` 的右肩相对汉阳造上移 20 mm、前移 20 mm，为桥夹取出后的回手留出可达空间；
+固定骨段模型直接消费各武器的肩肘数据，不再走旧双臂的通用肩位覆盖。
+挂点由 BlenderMCP 在独立工程
+`C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\Type38NraArms_20260913\Animation_Type38Hands.blend`
+中校正，同目录 `Data_Type38ArmMount.json` 保留导出值；未修改共用网格或添加动画片段。
+
 大量动画及同类批量生成须明确授权范围与数量；已授权批次按约定执行，扩大范围前再确认；
 不得通过逐个调用导出入口绕过这项约束。
 
