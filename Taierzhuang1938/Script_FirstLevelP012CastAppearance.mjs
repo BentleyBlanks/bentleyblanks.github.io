@@ -84,7 +84,9 @@ export function InstallP012ActorMotion(soldier) {
     // Zero-dt pose reads (including stretcher sockets) must not consume motion.
     if(dt>0){previous={x:at.x,z:at.z};lastElapsed=elapsed;}
     if(this.forcedClip){this.currentAction?.setEffectiveTimeScale(1);return original.call(this,dt,state);}
-    const next={...state,moveSpeed:dt>0?this.p012ActualSpeedMps/3.6:state.moveSpeed};
+    const next={...state,locomotionTracked:false,
+      moveSpeedMps:dt>0?speed:state.moveSpeedMps,
+      moveSpeed:dt>0?this.p012ActualSpeedMps/3.6:state.moveSpeed};
     const emptyIdle=(soldier.p012AwaitingWeapon || soldier.missionTrainPassenger && !soldier.missionTrainReady)&&next.moveSpeed<.025
       &&!state.firing&&!state.carryRole&&!(state.prone>.35||state.crouch>.35)
       &&!state.meleeCombat;
@@ -100,14 +102,13 @@ export function InstallP012ActorMotion(soldier) {
       const changed=action!==previousAction;
       if(changed){
         previousAction?.stopWarping();action.stopWarping();
-        if(!state.carryRole&&['RifleRun','AdvanceFire','WoundedLimp'].includes(id))
+        if(!state.carryRole&&['AdvanceFire','WoundedLimp'].includes(id))
           action.time=action.getClip().duration*phase;
       }
       if(emptyIdle){action.time=action.getClip().duration*.25;rate=0;}
       else if(id==='CarryStretcherFront'||id==='CarryStretcherRear')rate=speed<.08?0:Math.min(1.6,speed/1.35);
       else if(id==='WoundedLimp')rate=Math.min(1.5,speed/1.1);
-      else if(id==='RifleRun')rate=Math.min(1.6,speed/3.6);
-      else if(id==='BackRifleRun')rate=speed/(this.p012BackRifleReferenceMps*actor.root.scale.y*this.root.scale.y);
+      // Shared CharacterModel locomotion owns all run/crouch/back-rifle clocks.
       else if(id==='AdvanceFire'&&next.moveSpeed<.025&&!state.firing&&!(state.aim>.1)){
         // 定格帧必须落在 clip 后段那一截静止的据枪上。前 1.2 s 是「上前」的跨步：
         // 定在那里的人会单脚悬空站一整关（实测踝骨抬到 0.42 m，rate=0 之后再也放不下来）。

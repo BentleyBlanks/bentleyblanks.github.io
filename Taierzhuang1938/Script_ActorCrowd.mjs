@@ -36,6 +36,7 @@
 // 逐桶的账与实测见 docs/Data_ActorCrowdLod.md。
 
 import * as THREE from "three";
+import { ACTOR_LOCOMOTION } from './Data_Tuning_ActorLocomotion.mjs';
 import { MergeGeometries } from "./Script_Geo.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { ACTOR_DETAIL } from "./Data_Tuning_Ai.mjs";
@@ -233,10 +234,15 @@ export class ActorCrowd {
     let cycleS = 0;
     for (const pose of this.poses) {
       if (pose.run === undefined) {
+        actor.characterRig?.ForceClip(null);
         this._Settle(actor, pose);
       } else if (pose.run === 0) {
+        // Bake source phases at rate 1. Runtime travel speed belongs to the
+        // instance's distance clock, not to these shared immutable meshes.
+        actor.characterRig?.ForceClip('RifleRun');
         // 第一帧：淡入跑步 clip、把步态推到稳态，顺手量一个循环有多长。
         this._Settle(actor, pose);
+        if(actor.characterRig?.currentAction){actor.characterRig.currentAction.time=0;actor.Update(0,pose.state);}
         cycleS = RunCycleSeconds(actor);
         if (cycleS > 0.05) this.runCycleS = cycleS;
       } else {
@@ -408,7 +414,8 @@ export class ActorCrowd {
       if (stance === 2 || lie >= 0.5) {
         // 真卧姿：`Actor.PoseProne` 解出来的那一档，身子本来就贴着地，不再翻不再抬。
         poseId = "prone";
-      } else if (this.runFrames > 0 && moveSpeed > this.runSignal) {
+      } else if (this.runFrames > 0 && (Number.isFinite(pose.moveSpeedMps)
+        ? pose.moveSpeedMps > ACTOR_LOCOMOTION.movingMps : moveSpeed > this.runSignal)) {
         poseId = `run${this._RunFrame(pose, position)}`;
       } else if (lie > 0.001) {
         tilt = lie;                       // 站→卧还在半路：翻转过渡，别在半程跳桶
@@ -433,11 +440,9 @@ export class ActorCrowd {
   /**
    * 跑步翻页取第几帧。三条取相位的路，从准到糙：
    *
-   *   1) `pose.elapsed`（秒）+ `pose.jitter` —— **正路**。周期用烘焙时从资产量出来的
-   *      `runCycleS`（RifleRun 实测 1.47 s），所以远景翻页的速度与近景那条 clip 同速；
-   *      jitter 是每个人一个固定错位（`Script_Ai` 给的是 `s.id × 0.37`），
-   *      免得整条战线齐步走。
-   *   2) `pose.phase`（0—1）—— 调用方自己算好了周期。闸门与旧口径用这一条。
+   *   1) `pose.phase`（0—1）—— 正式 AI 的共享位移时钟；停步、变速仍连续。
+   *   2) `pose.elapsed`（秒）+ `pose.jitter` —— 原速演示与旧调用方退路。
+   *      `runCycleS` 是按 1 倍速烘焙的源循环，不混入某个演员的运行时步频。
    *   3) 都没有 —— 按 4 m 网格哈希 + 墙钟自己抖。只是别让全场同步，同一格里的人
    *      会一起翻；真要错开就把 elapsed 传进来。
    */

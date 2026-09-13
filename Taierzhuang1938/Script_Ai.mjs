@@ -1341,12 +1341,12 @@ export class AiDirector {
         // 里 20 个其实在跪射，画面上却全是站着的 —— 远景层收到的只有「卧不卧」，
         // 蹲和跑一个字都没往下传。玩家说的「远处的敌人干站着」有一半是这一行的账。
         //
-        // 跑步翻页的相位交给远景层自己算：**循环时长是它烘焙时从资产量出来的**
-        // （RifleRun 实测 1.47 s），这边只给时间与每个人的固定错位（免得整条战线
-        // 齐步走）。时间取 AI 自己的 this.time 而不是墙钟 —— 分帧、暂停与
-        // StepFrames 重放都跟着同一条时间轴，闸门才可复现。
+        // The shared distance clock advances even while the skeleton is culled;
+        // wall-clock time must not make a blocked or slowing crowd keep running.
         crowd.Push(s.actor.kind, s.position, s.yaw ?? 0, s.actor.sizeScale ?? 1, prone, !s.alive,
           { stance: s.stance | 0, moveSpeed: s.moveSpeed ?? 0, crouch: s.crouchBlend ?? 0,
+            phase: s.actor.characterRig?.locomotion.crowdPhase,
+            moveSpeedMps: s.actor.characterRig?.locomotion.crowdSpeedMps,
             elapsed: this.time, jitter: s.id * 0.37 });
       }
     }
@@ -2964,6 +2964,8 @@ export class AiDirector {
     if (s.actor) {
       s.actor.root.position.copy(s.position);
       s.actor.root.rotation.y = s.yaw;
+      s.actor.characterRig?.locomotion.AdvanceDistance(
+        Math.hypot(s.position.x-animationStartX,s.position.z-animationStartZ),dt);
       // Authored carriage idles and rescue tracks run on the simulation clock,
       // including passengers behind the camera. Culling still hides/detaches
       // their meshes; it must not freeze their skeleton at the boarding pose.
@@ -2972,6 +2974,7 @@ export class AiDirector {
       const cadence = carriagePerformance ? 1 : ActorAnimationCadence(s);
       if ((s.actor.root.visible || carriagePerformance) && (wantsFire || (this.tickIndex + s.id) % cadence === 0)) s.actor.Update(dt * (wantsFire ? 1 : cadence), {
         moveSpeed: s.moveSpeed,
+        locomotionTracked: !s.p012OnMovingTrain,
         moveSpeedMps: Math.hypot(s.position.x - animationStartX, s.position.z - animationStartZ) / Math.max(dt, .0001),
         bayonetFixed: s.bayonetFixed,
         aim: s.aimBlend,

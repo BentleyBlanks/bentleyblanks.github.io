@@ -10,6 +10,8 @@ import { DEATH_POSE } from "./Data_DeathPose.mjs";
 import { DEATH_CONTACT } from "./Data_Tuning_ActorDeath.mjs";
 import { InfantryAnimationController, INFANTRY_ANIMATION_IDS, INFANTRY_ANIMATION_LABELS, INFANTRY_ONCE_IDS } from "./Script_InfantryAnimation.mjs";
 import { MeleeAnimationPlayer } from "./Script_MeleeAnimation.mjs";
+import { ActorLocomotion } from "./Script_ActorLocomotion.mjs";
+import { ACTOR_LOCOMOTION } from "./Data_Tuning_ActorLocomotion.mjs";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
 
@@ -603,6 +605,7 @@ export class LugouCharacterRig {
       const bone = FindNode(this.root, boneName);
       if (bone) this.bones[role] = bone;
     }
+    this.locomotion = new ActorLocomotion(this, (HashString(`${seed}|gait`) % 1000) / 1000);
     // Rigid carried equipment is parented to its authored bone in the GLB.
     this.sockets = {
       weaponR: FindNode(this.root, "Socket_WeaponR") || this.bones.handR || null,
@@ -720,6 +723,7 @@ export class LugouCharacterRig {
 
   BeginDeathPose() {
     if (this.deathPose) return;
+    this.locomotion.Restore(); this.locomotion.ResetContacts();
     const nodes = [];
     this.root.traverse(node => {
       if (node.isBone) nodes.push({ node, startPosition: node.position.clone(),
@@ -872,6 +876,7 @@ export class LugouCharacterRig {
     next.reset().setEffectiveWeight(1).setEffectiveTimeScale(1);
     next.clampWhenFinished = once;
     next.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity).play();
+    this.locomotion?.StartAction(next, id, this.currentAction, this.currentId);
     if ((playbackId === "KneelToStand" && this.currentId === "StandToKneel")
         || (playbackId === "StandToKneel" && this.currentId === "KneelToStand")) {
       next.time = (1 - this.currentAction.time / this.currentAction.getClip().duration) * clip.duration;
@@ -910,6 +915,8 @@ export class LugouCharacterRig {
    */
   _ActionForState(state) {
     if (this.forcedClip) return this.forcedClip;
+    const moving = (Number.isFinite(state.moveSpeedMps) ? state.moveSpeedMps
+      : (state.moveSpeed || 0) * ACTOR_LOCOMOTION.normalizedMps) > ACTOR_LOCOMOTION.movingMps;
     const weaponId = this.actor?.weaponId || "";
     const lifePose = state.lifePose && typeof state.lifePose === "object" ? state.lifePose : state;
     if ((lifePose.sit || 0) > 0.35 || (lifePose.watch || 0) > 0.35) return POSE_CLIPS.sit;
@@ -925,7 +932,7 @@ export class LugouCharacterRig {
       && !(state.melee > .08 || state.binoculars > .08 || state.reach > .08)
       && !(state.woundedWalk > .5) && !state.dead && !this.actor?.ragdollState && state.grounded !== false;
     if (!prone && infantryAllowed) {
-      const selected = this.infantry.Select(low, (state.moveSpeed || 0) > .10);
+      const selected = this.infantry.Select(low, moving || (low && (state.moveSpeed || 0) > .10));
       if (selected) return selected;
     } else this.infantry.Cancel();
     if (state.firing) {
@@ -933,6 +940,8 @@ export class LugouCharacterRig {
       // 机枪手无论卧倒还是蹲着都走机枪那一段（它自带的就是低姿），
       // 这一条比姿态优先 —— 换成匍匐据枪，手里那挺枪就飞了。
       if (this.actor?.weaponData?.rpm) return POSE_CLIPS.machineGunFire;
+      // The live arm/weapon aim layer handles rifle fire above the moving legs.
+      if (moving && !prone && !low) return POSE_CLIPS.run;
       if (prone) return POSE_CLIPS.proneFire;
       if (low) return POSE_CLIPS.crouchFire;
       return POSE_CLIPS.standFire;
@@ -943,8 +952,8 @@ export class LugouCharacterRig {
       return POSE_CLIPS.standReach;
     }
     // 轻伤员：走动时跛行；站定回普通站姿（跛行是步态素材，原地播像踏步）。
-    if ((state.woundedWalk || 0) > 0.5 && (state.moveSpeed || 0) > 0.10) return POSE_CLIPS.woundedWalk;
-    if ((state.moveSpeed || 0) > 0.10) return POSE_CLIPS.run;
+    if ((state.woundedWalk || 0) > 0.5 && moving) return POSE_CLIPS.woundedWalk;
+    if (moving) return POSE_CLIPS.run;
     return POSE_CLIPS.standIdle;
   }
 
@@ -1021,6 +1030,8 @@ export class LugouCharacterRig {
 
   Update(dt, state = {}) {
     if (this.disposed) return;
+    this.locomotion.Restore();
+    state = this.locomotion.Sample(dt, state);
     this._RestoreHurtTilt();
     this.root.position.y -= this.infantryFloorOffset || 0;
     this.infantryFloorOffset = 0;
@@ -1029,13 +1040,7 @@ export class LugouCharacterRig {
     const previousId = this.currentId, previousTime = this.currentAction?.time || 0;
     const nextId = this._ActionForState(state);
     this.Play(nextId);
-    if (nextId === "RifleCrouchAdvance" && !this.forcedClip) {
-      const speed = Number.isFinite(state.moveSpeedMps) ? state.moveSpeedMps : (state.moveSpeed || 0) * 3.6;
-      const sourceSpeed = this.kind.startsWith("ija") ? .23864468053263868 : .2554529916490837;
-      this.root.updateWorldMatrix(true, false);
-      const scale = this.root.getWorldScale(WORLD_SCALE).y;
-      this.currentAction.setEffectiveTimeScale(Math.max(0, speed) / (sourceSpeed * scale));
-    }
+    this.locomotion.Drive(dt, state);
     this.mixer.update(Math.max(0, dt));
     // Missing prop tracks in the legacy clips must not fade a rifle towards the scene origin.
     // Sample the authored prop poses at normalized weights; Actor blends with its live hand grip.
@@ -1044,6 +1049,7 @@ export class LugouCharacterRig {
     this.meleeAnimation?.Apply(state.meleeCombat);
     this._AlignBayonetFacing(state.meleeCombat);
     this._GroundInfantryBlend(state);
+    this.locomotion.Apply(dt, state);
     // 中弹踉跄：程序化 body 那套「胸后仰 / 头后甩」在有蒙皮骨架时不可见（body 被复位），
     // 所以在 mixer 之后给胸/颈叠一记世界轴旋转；下一帧开头 _RestoreHurtTilt 先还原，
     // 没有旋转轨道的骨头也不会越叠越歪。

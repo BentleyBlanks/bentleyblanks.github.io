@@ -146,6 +146,7 @@ export const testDefs = {
   FlareTest: { file: "Script_FlareTest.mjs", desc: "照明弹：五相位时间线、光强包络、敌我暴露倍率与暗适应、姿态比例不变、定时序列、音效降级（纯 Node，毫秒级）" },
   TelegraphTest: { file: "Script_TelegraphTest.mjs", desc: "发报：码组推进、接头松脱与重连、报码纸勾选、走开进度保留、两个交互点预制、音效降级（纯 Node，毫秒级）" },
   RiggedModelTest: { file: "Script_RiggedModelTest.mjs", desc: "第一人称手臂 GLB 的二进制契约（纯 Node，秒级）" },
+  ActorLocomotionTest: { file: "Script_ActorLocomotionTest.mjs", timeoutMs: 240000, desc: "实测步幅、世界支撑脚、转弯与位移时钟" },
   InfantryAnimationTest: { file: "Script_InfantryAnimationTest.mjs", timeoutMs: 360000, desc: "八套步兵动作、道具与状态衔接" },
   CharacterModelTest: { file: "Script_CharacterModelTest.mjs", desc: "十名蒙皮士兵：16 动作、骨骼挂点、命中体与阵营分配契约（纯 Node）" },
   CharacterHitboxMathTest: { file: "Script_CharacterHitboxMathTest.mjs", desc: "人物子弹代理：精确球/胶囊首交点（纯 Node）" },
@@ -319,7 +320,7 @@ export const browserTests = new Set([
   'FirstLevelP012AnimationTest',
   'FirstLevelP012TerrainBrowserTest',
   "TrainLibraryTest",
-  'BackRifleRunTest', 'MeleeAnimationTest', 'DadaoSwingTest', 'InfantryAnimationTest',
+  'ActorLocomotionTest', 'BackRifleRunTest', 'MeleeAnimationTest', 'DadaoSwingTest', 'InfantryAnimationTest',
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
   "AiCombatBrowserTest", "AiCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
@@ -390,7 +391,7 @@ export const domains = {
   firstLevelTail: {label:"第一关接收院至结尾定向续接",tests:["FirstLevelMissionStageTailTest"]},
   firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelCasualtyBrowserTest','FirstLevelOpeningSequenceBrowserTest','FirstLevelCarriageAnimationTest','FirstLevelMealTest','FirstLevelMissionTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelOpeningContactTest','FirstLevelGuideQueueTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
-  animation: { label: '独立动画资产验收', tests: ['BackRifleRunTest','MeleeAnimationTest','DadaoSwingTest','InfantryAnimationTest'] },
+  animation: { label: '独立动画资产验收', tests: ['ActorLocomotionTest','BackRifleRunTest','MeleeAnimationTest','DadaoSwingTest','InfantryAnimationTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
@@ -484,6 +485,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  { domain: "animation", pattern: /ActorLocomotion|LocomotionProfileBake/ },
   {domain:'animation',pattern:/DadaoSwing|DadaoPowerSwing/},
   {domain:"combat",pattern:/HitDisorientation/},
   {domain:'motionVector',pattern:/MotionVector|PostPrepass|Script_Post\.mjs|Actor|Skinn|Skeleton|Viewmodel|FpsArm|BackRifle|Binoculars|Data_Tuning_Graphics/},

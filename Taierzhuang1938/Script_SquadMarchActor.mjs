@@ -28,11 +28,10 @@ export function InstallSquadMarchActor(soldier){
     if(action){
       if(action!==previous){
         previous?.stopWarping();action.stopWarping();
-        action.time=action.getClip().duration*((Number(soldier.id)*.61803398875)%1);
+        if(!this.locomotion.profiles[id])action.time=action.getClip().duration*((Number(soldier.id)*.61803398875)%1);
       }
       const moving=(state.moveSpeedMps??state.moveSpeed*3.6)>.08;
       if(id==='AdvanceFire'&&!moving){action.time=action.getClip().duration*STAND_IDLE.advanceFireHold;action.setEffectiveTimeScale(0);}
-      else if(id==='RifleRun')action.setEffectiveTimeScale((state.moveSpeedMps??state.moveSpeed*3.6)/3.6);
       else action.setEffectiveTimeScale(1);
       previous=action;
     }

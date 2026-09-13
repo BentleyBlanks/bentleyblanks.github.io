@@ -86,6 +86,8 @@ try {
       kneel: One({ stance: 1, moveSpeed: 0, phase: 0 }),
       prone: One({ stance: 2, moveSpeed: 0, phase: 0 }),
       run: One({ stance: 0, moveSpeed: 1, phase: 0 }),
+      blocked: One({ stance: 0, moveSpeed: 1, moveSpeedMps: 0, phase: .5 }),
+      slow: One({ stance: 0, moveSpeed: 0, moveSpeedMps: .15, phase: .5 }),
       dead: One({ stance: 0, moveSpeed: 0, phase: 0 }, true),
       // 名字要能认：闸门与取证都按 mesh.name 找桶
       names: [...new Set([...crowd.kinds.values()].flatMap((e) => e.meshes.map((m) => m.name)))],
@@ -108,6 +110,8 @@ try {
     Only(buckets?.prone, "prone"), JSON.stringify(buckets?.prone));
   Check("跑动信号落在 Run 帧桶", /:run\d+$/.test(Object.keys(buckets?.run || {})[0] || ""),
     JSON.stringify(buckets?.run));
+  Check("受阻实速为零时远景停止踏步", Only(buckets?.blocked,"standing"),JSON.stringify(buckets?.blocked));
+  Check("远景慢速移动保持实际步态", /:run\d+$/.test(Object.keys(buckets?.slow||{})[0]||""),JSON.stringify(buckets?.slow));
   Check("尸体仍落在 Dead 桶", Only(buckets?.dead, "dead"), JSON.stringify(buckets?.dead));
   Check("桶名进 mesh.name（Crowd_<kind>_<Pose>）",
     (buckets?.names || []).some((n) => n === `Crowd_${kind}_Kneel`)
