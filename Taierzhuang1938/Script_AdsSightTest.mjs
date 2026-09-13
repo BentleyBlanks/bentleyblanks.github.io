@@ -316,11 +316,13 @@ try {
           axisNdcX: axis ? +axis.ndcX.toFixed(4) : null,
           axisCamX: axis ? +axis.camX.toFixed(5) : null,
           axisVerts: axis ? axis.verts : 0,
+          // 景深参数读 DofPass 本帧算好的 CoC（Script_PostDof.Prepare），不读合成 uniform：
+          // 旧的 uNearDof* 早随 DofPass 重构删掉了，读它会直接抛错。
           nearDof: {
-            strength: T.post.uniformsComposite.uNearDofStrength.value,
-            focus: T.post.uniformsComposite.uNearDofFocus.value,
-            range: T.post.uniformsComposite.uNearDofRange.value,
-            maxPx: T.post.uniformsComposite.uNearDofMaxPx.value,
+            active: T.post.dofPass.coc.active,
+            focus: T.post.dofPass.coc.focus,
+            maxPx: T.post.dofPass.coc.nearMaxPx,
+            farMaxPx: T.post.dofPass.coc.farMaxPx,
           },
         };
       }
@@ -359,7 +361,7 @@ try {
     document.dispatchEvent(new MouseEvent("mouseup", { button: 2, bubbles: true }));
     T.StepFrames(20, 1 / 60, false);
     T.StepFrames(1);
-    return T.post.uniformsComposite.uNearDofStrength.value;
+    return T.post.dofPass.coc.nearMaxPx;
   });
   await fs.writeFile(path.join(screenshotDir, "Data_AdsSightReport.json"), JSON.stringify({ ...report, releasedNearDof, screenshotPath, errors }, null, 2));
   console.log(JSON.stringify({ ...report, releasedNearDof, screenshotPath, errors }, null, 2));
@@ -378,9 +380,12 @@ try {
       row && row.blocked <= BLOCKED_LIMIT,
       `上半窗 ${row?.samples?.join(" / ")}（整窗 ${row?.wholeWindow?.join(" / ")}）`);
     Check(`${id} 开镜时收起腰射准心`, row && row.crosshairOn === false);
-    Check(`${id} 开镜景深符合场景设置`, row && (rangeMode ? row.nearDof.strength === 0 : row.nearDof.strength > 0.5 && row.nearDof.strength < 0.8) && row.nearDof.focus > row.nearDof.range
-      && row.nearDof.maxPx >= 3 && row.nearDof.maxPx <= 6,
-    row ? `strength=${row.nearDof.strength.toFixed(2)} focus=${row.nearDof.focus.toFixed(2)}m max=${row.nearDof.maxPx.toFixed(1)}px` : "无结果");
+    // 开镜 = 只糊贴眼近景（焦平面以内），远景不散焦；枪自己靠前景标签恒锐（TaauTest 守 CoC 图）。
+    Check(`${id} 开镜景深符合场景设置`, row && (rangeMode
+      ? !row.nearDof.active
+      : row.nearDof.active && row.nearDof.focus >= 1.2 && row.nearDof.focus <= 2.5
+        && row.nearDof.maxPx >= 2.5 && row.nearDof.maxPx <= 6 && row.nearDof.farMaxPx === 0),
+    row ? `active=${row.nearDof.active} focus=${row.nearDof.focus.toFixed(2)}m near=${row.nearDof.maxPx.toFixed(2)}px far=${row.nearDof.farMaxPx.toFixed(2)}px` : "无结果");
     const expect = AXIS_EXPECT[id];
     if (expect === null || expect === undefined) {
       console.log(`--   ${id} 枪骑在瞄准线上（未登记期望值） — 实测对称面 NDC x=${row?.axisNdcX}`);
@@ -391,7 +396,7 @@ try {
     }
   }
   Check("退镜关闭近景景深", releasedNearDof < 0.001,
-    `strength=${releasedNearDof}`);
+    `near=${releasedNearDof}px`);
   Check("页面无运行时错误", errors.length === 0, errors.slice(0, 2).join(" | "));
 } finally {
   await browser.close();
