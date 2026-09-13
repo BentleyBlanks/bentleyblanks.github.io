@@ -2599,6 +2599,36 @@ Check("车厢静态场景保留布景种子数据与环境测试",
     && carriageEditor.jsonFolds.length === 0 && !carriageEditor.sections.includes("确定性随机种子"),
   `${carriageEditor.seedValues.length} 项`);
 
+// 第一关视图：就是 P012 白盒那一片，建好不开跑；切回县城/车厢时 whitebox 必须清掉。
+const firstLevelUrl = await page.evaluate(async () =>
+  (await import("./Script_EditorFullScene.mjs")).FullSceneUrl(location.href, "firstLevel"));
+await page.goto(firstLevelUrl, { waitUntil: "load", timeout: 120000 });
+await page.waitForFunction(() => window.Taierzhuang?.state.ready
+  && window.Taierzhuang.editor?.ActiveId === "fullScene", null, { timeout: 300000 });
+const firstLevelEditor = await page.evaluate(async () => {
+  const T = window.Taierzhuang;
+  const tool = T.editor.active;
+  const helper = await import("./Script_EditorFullScene.mjs");
+  const camera = tool.ApplyCamera("village") ? tool.host.camera.position.toArray() : null;
+  const result = {
+    mode: tool.sceneMode, level: T.Debug.Level().id, running: T.state.running, fly: tool.host.flycam.Active,
+    bootGone: document.getElementById("boot").classList.contains("gone"),
+    sections: [...tool.panel.root.querySelectorAll(".edSection > .h")].map((node) => node.textContent),
+    carriage: !!tool.carriageSet, overlay: !!tool.overlay, camera,
+    countyUrl: helper.FullSceneUrl(location.href, "county"),
+  };
+  T.editor.Close();
+  return result;
+});
+Check("第一关视图载入 P012 白盒且不开跑、不挂车厢与县城 Spline",
+  new URL(firstLevelUrl).searchParams.get("whitebox") === "p012" && !new URL(firstLevelUrl).searchParams.has("phase")
+    && firstLevelEditor.mode === "firstLevel" && firstLevelEditor.level === "FirstLevelP012Whitebox"
+    && !firstLevelEditor.running && firstLevelEditor.fly && firstLevelEditor.bootGone
+    && !firstLevelEditor.carriage && !firstLevelEditor.overlay && !!firstLevelEditor.camera
+    && firstLevelEditor.sections.includes("第一关巡场机位")
+    && !new URL(firstLevelEditor.countyUrl).searchParams.has("whitebox"),
+  JSON.stringify({ ...firstLevelEditor, countyUrl: new URL(firstLevelEditor.countyUrl).search }));
+
 // ---------------------------------------------------------------------------
 // 10) 序章预览（URL 直达）：独立收口、单次交接、无旧 L0 AI
 // ---------------------------------------------------------------------------

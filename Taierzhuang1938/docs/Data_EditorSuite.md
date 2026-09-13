@@ -294,6 +294,13 @@ Bloom、体积光、饱和度和对比度完整参数。Spline 叠加层按正�
 `playing`，不触发序章镜头、演员、对白、字幕、音频或交接，只提供自由飞行和五个静态巡场
 机位。退出工具时卸掉静态布景，并恢复进入前的相机投影和环境预设。
 
+第一关视图入口为 `?whitebox=p012&fullSceneView=firstLevel&editor=fullScene&menu=0`。它不另建
+切片，就是正式第一关（P012 白盒「往南的路」）那一片：`EnterLevel` 照常建好地形、布景与兵员，
+但开机时收掉加载画面、不 `StartRun`，任务流程停在第 0 秒。六个巡场机位的看点取自
+`MISSION_ANCHORS`（军列卸载 / 前沿阵地 / 村落内院 / 转运棚 / 后撤出口）加整体俯瞰，
+高度按看点处 `GroundHeight` 抬升。县城 Spline 与种子不在这一片上，面板不显示；切回县城或
+车厢时 URL 会清掉 `whitebox` 与 `missionStage`。
+
 Spline、环境与种子三块 JSON 都用 `<details>` 默认折叠；列表与摘要读数始终可见，只有用户
 主动展开或点击 JSON 按钮时才占用面板高度。
 

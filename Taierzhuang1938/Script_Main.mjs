@@ -2816,7 +2816,9 @@ async function Boot() {
       // 退出选章、要并进第一关，那条列表项与这个跳转 2026-09-07 一并摘掉
       //（见 Script_EditorScene.BuildLevelUi）。`?preview=CS_Chuchuan` 这条 URL 本身
       // 仍然管用 —— 审片、Script_CutsceneShot 出图与 EditorTest 第 9 节都直接 goto。
-      sceneMode: FULL_SCENE ? FULL_SCENE_VIEW : "level",
+      // 第一关（P012 白盒）在完整场景编辑器里是第三个视图：同一片关卡，不另建切片。
+      sceneMode: FULL_SCENE ? FULL_SCENE_VIEW
+        : FIRST_LEVEL_P012_WHITEBOX && !ARCHIVED_P012_FIXTURE ? "firstLevel" : "level",
       ApplyEnvironment: (name) => ApplySkyPreset(name),
       GetEnvironmentState: () => ({
         name: cutsceneSky || PHASE_TABLE[state.phaseIndex].sky,
@@ -2994,7 +2996,8 @@ async function Boot() {
   if (EDITOR_PARAM === "fullScene" && !SHOT) {
     // 完整县城与车厢静态场景都直接进工具，不再让用户隔着已经打开的编辑器
     // 再点一次「进城」。两者都不是正式序章预览，必须在这里显式收掉启动展示台。
-    if (FULL_SCENE) {
+    // 第一关视图（?whitebox=p012&editor=fullScene）同理：关卡建好但不开跑。
+    if (FULL_SCENE || (FIRST_LEVEL_P012_WHITEBOX && !FIRST_LEVEL_STAGE_START)) {
       ShowBoot(false);
       state.menu = false;
       state.running = false;

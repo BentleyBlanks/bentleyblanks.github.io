@@ -1,4 +1,5 @@
-// 完整场景编辑器：一次巡看完整滕县与四门外，并可切到出川军列车厢静态场景。
+// 完整场景编辑器：一次巡看完整滕县与四门外，并可切到出川军列车厢静态场景，
+// 或第一关（P012 白盒「往南的路」）建好但未开跑的关卡场景。
 //
 // 这是只读的场景总览与取证工具，不承担「章节切片 + 摆件文档」那套关卡编辑语义：
 // 原 Script_EditorScene.mjs 不 import 本模块，本模块也不读写它的 worldEditDocument。
@@ -14,8 +15,11 @@ import { MakeRoadPath } from "./Script_RoadPath.mjs";
 import { CollectSceneSplineRoutes } from "./Script_EditorSplines.mjs";
 import { SKY_PRESETS } from "./Script_Sky.mjs";
 import { CS_Chuchuan } from "./Data_CutsceneChuchuan.mjs";
+import { FIRST_LEVEL_MISSION_PHASE, MISSION_STAGES } from "./Data_FirstLevelMission.mjs";
+import { MISSION_ANCHORS } from "./Data_FirstLevelMissionLayout.mjs";
 
 const CARRIAGE_ID = "CS_Chuchuan";
+const SCENE_MODES = ["county", "carriage", "firstLevel"];
 const KIND_COLOR = {
   street: 0xffc95f, road: 0xe6a56b, railway: 0x9fc8ff, wall: 0xd0b394,
 };
@@ -65,21 +69,47 @@ export const CARRIAGE_SCENE_CAMERA_PRESETS = Object.freeze({
   }),
 });
 
+// 第一关（P012 白盒「往南的路」）巡场机位：look 取 MISSION_ANCHORS 的平面坐标，
+// y 为离地高度 —— ApplyCamera 会把看点处的实际地面高加上去，地形改了机位也不埋地。
+const FirstLevelView = (label, anchor, [dx, dy, dz], lookY, fov, far = 1600) => Object.freeze({
+  label, position: [anchor.x + dx, dy, anchor.z + dz], look: [anchor.x, lookY, anchor.z], fov, far, groundRelative: true,
+});
+const FIRST_LEVEL_BOUNDS = FIRST_LEVEL_MISSION_PHASE.bounds;
+const FIRST_LEVEL_CENTER = {
+  x: (FIRST_LEVEL_BOUNDS.minX + FIRST_LEVEL_BOUNDS.maxX) / 2,
+  z: (FIRST_LEVEL_BOUNDS.minZ + FIRST_LEVEL_BOUNDS.maxZ) / 2,
+};
+
+export const FIRST_LEVEL_SCENE_CAMERA_PRESETS = Object.freeze({
+  overview: FirstLevelView("第一关整体", FIRST_LEVEL_CENTER, [0, 460, 520], 0, 50, 2400),
+  unload: FirstLevelView("军列卸载", MISSION_ANCHORS.unload, [38, 34, 52], 1.5, 55),
+  front: FirstLevelView("前沿阵地", MISSION_ANCHORS.front, [-34, 38, 58], 1.2, 55),
+  village: FirstLevelView("村落内院", MISSION_ANCHORS.melee, [44, 42, 46], 1.2, 55),
+  transfer: FirstLevelView("转运棚", MISSION_ANCHORS.transfer, [40, 34, 48], 1.2, 55),
+  exit: FirstLevelView("后撤出口", MISSION_ANCHORS.reception, [-46, 40, 56], 1.2, 55),
+});
+
 const ENV_LABELS = Object.freeze({
-  editorClear: "编辑器清晰日", dusk: "黄昏", smokyDay: "硝烟白昼", chuchuanDay: "车厢白昼", overcast: "阴天",
+  testSceneDay: "测试场白昼", weaponRangeDay: "枪械靶场白昼", p012WhiteboxDay: "第一关白盒白昼",
+  whiteboxDay: "白盒白昼", editorClear: "编辑器清晰日", dusk: "黄昏", smokyDay: "硝烟白昼", chuchuanDay: "车厢白昼", overcast: "阴天",
   burningStreet: "燃烧街巷", night: "夜间", dawn: "拂晓",
 });
 
 /** 场景切换只改旁路 query，不把当前章节/沙盒参数带进另一片。 */
 export function FullSceneUrl(href, target) {
   const url = new URL(href);
-  for (const key of ["range", "melee", "jiehe", "shot", "manual"]) url.searchParams.delete(key);
+  for (const key of ["range", "melee", "jiehe", "shot", "manual", "whitebox", "missionStage"]) url.searchParams.delete(key);
   url.searchParams.set("editor", "fullScene");
   url.searchParams.set("menu", "0");
   url.searchParams.set("phase", "fullscene");
   url.searchParams.delete("preview");
   url.searchParams.delete("autoplay");
-  if (target === "carriage") {
+  if (target === "firstLevel") {
+    // 第一关不是 fullscene 切片：它就是正式的 P012 白盒那一片，只是不开跑。
+    url.searchParams.delete("phase");
+    url.searchParams.set("whitebox", "p012");
+    url.searchParams.set("fullSceneView", "firstLevel");
+  } else if (target === "carriage") {
     url.searchParams.set("fullSceneView", "carriage");
   } else {
     url.searchParams.delete("fullSceneView");
@@ -109,6 +139,8 @@ export function CollectFullSceneSeeds({ sceneMode = "county", battlefield = null
     // 静态场景只生成 props；演员与 shots 的 seed 不在这张账里，避免把序章演出
     // 误报成场景内容。重复的两侧远景种子仍会在下方按 id/value 去重。
     AddNestedSeeds(CS_Chuchuan.props, `${CARRIAGE_ID}.props`, rows, new Set());
+  } else if (sceneMode === "firstLevel") {
+    // 第一关白盒的布局是手摆坐标，不从县城种子派生；县城 Spline 也不在这一片上。
   } else {
     const master = battlefield?.city?.seed ?? 19380317;
     rows.push(
@@ -159,11 +191,11 @@ function RevealJson(area, value) {
 export class FullSceneEditor {
   static id = "fullScene";
   static label = "完整场景预览";
-  static hint = "完整县城与四门外 / 出川军列车厢静态场景切换，随机种子、Spline 与环境参数只读取证";
+  static hint = "完整县城与四门外 / 出川军列车厢静态场景 / 第一关场景切换，随机种子、Spline 与环境参数只读取证";
 
   constructor(host) {
     this.host = host;
-    this.sceneMode = host.game.sceneMode || "county";
+    this.sceneMode = SCENE_MODES.includes(host.game.sceneMode) ? host.game.sceneMode : "county";
     this.cameraMode = "fly";
     this.routes = CollectSceneSplineRoutes(null);
     this.kindFilter = "全部";
@@ -189,7 +221,7 @@ export class FullSceneEditor {
       this.overlay = new THREE.Group();
       this.overlay.name = "FullSceneSplineOverlay";
       this.host.scene.add(this.overlay);
-    } else {
+    } else if (this.sceneMode === "carriage") {
       this.carriageSet = this.host.cutscene?.MountStaticSet?.(CARRIAGE_ID, {
         at: 0, includeActors: false,
       }) || null;
@@ -198,7 +230,9 @@ export class FullSceneEditor {
       title: "完整场景编辑器",
       sub: this.sceneMode === "carriage"
         ? "出川军列车厢 · 静态场景自由巡看"
-        : "完整县城 · WASD+QE 飞行 · 拖动转头",
+        : this.sceneMode === "firstLevel"
+          ? "第一关 · 往南的路 · 未开跑的关卡场景自由巡看"
+          : "完整县城 · WASD+QE 飞行 · 拖动转头",
       variant: "work wide",
       onClose: () => this.host.Close(),
     });
@@ -238,11 +272,27 @@ export class FullSceneEditor {
     ButtonRow(scene, [
       { label: this.sceneMode === "county" ? "● 完整县城" : "完整县城", onClick: () => this.SwitchScene("county") },
       { label: this.sceneMode === "carriage" ? "● 奇观 · 出川车厢" : "奇观 · 出川车厢", onClick: () => this.SwitchScene("carriage") },
+      { label: this.sceneMode === "firstLevel" ? "● 第一关 · 往南的路" : "第一关 · 往南的路", onClick: () => this.SwitchScene("firstLevel") },
     ]);
 
-    if (this.sceneMode !== "carriage") this.BuildCountyUi(body);
-    else this.BuildCarriageUi(body);
+    if (this.sceneMode === "carriage") this.BuildCarriageUi(body);
+    else if (this.sceneMode === "firstLevel") this.BuildFirstLevelUi(body);
+    else this.BuildCountyUi(body);
     this.BuildEnvironmentUi(body);
+  }
+
+  BuildFirstLevelUi(body) {
+    const cameras = Section(body, "第一关巡场机位");
+    Chips(cameras, Object.entries(FIRST_LEVEL_SCENE_CAMERA_PRESETS).map(([value, spec]) => ({
+      value, label: spec.label,
+    })), "overview", (id) => this.ApplyCamera(id));
+    CameraProjectionControls(cameras, this.host.camera, { farMax: 5000 });
+    Note(cameras, "WASD 移动 · Q/E 升降 · 滚轮调速");
+
+    const b = FIRST_LEVEL_BOUNDS;
+    this.firstLevelFacts = Facts(cameras);
+    this.firstLevelFacts.Set("范围 X / Z", `${b.minX} ~ ${b.maxX} / ${b.minZ} ~ ${b.maxZ} m`);
+    this.firstLevelFacts.Set("任务阶段", `${MISSION_STAGES.length} 段（未开跑）`);
   }
 
   BuildCountyUi(body) {
@@ -303,16 +353,17 @@ export class FullSceneEditor {
   }
 
   ApplyCamera(id) {
-    const table = this.sceneMode === "carriage"
-      ? CARRIAGE_SCENE_CAMERA_PRESETS : FULL_SCENE_CAMERA_PRESETS;
+    const table = this.sceneMode === "carriage" ? CARRIAGE_SCENE_CAMERA_PRESETS
+      : this.sceneMode === "firstLevel" ? FIRST_LEVEL_SCENE_CAMERA_PRESETS : FULL_SCENE_CAMERA_PRESETS;
     const spec = table[id];
     if (!spec) return false;
     const camera = this.host.camera;
-    camera.position.fromArray(spec.position);
+    const ground = spec.groundRelative ? this.GroundAt(spec.look[0], spec.look[2]) : 0;
+    camera.position.set(spec.position[0], spec.position[1] + ground, spec.position[2]);
     camera.fov = spec.fov;
     camera.far = spec.far;
     camera.updateProjectionMatrix();
-    camera.lookAt(new THREE.Vector3().fromArray(spec.look));
+    camera.lookAt(spec.look[0], spec.look[1] + ground, spec.look[2]);
     const e = new THREE.Euler().setFromQuaternion(camera.quaternion, "YXZ");
     this.host.flycam.yaw = e.y;
     this.host.flycam.pitch = e.x;
