@@ -63,9 +63,18 @@ export async function TitleChars() {
   return Charset([MENU.title, MENU.subtitle, TEXT["menu.title.paused"] ?? ""]);
 }
 
+/**
+ * 随机生成的兵的姓、名、籍贯（Data_Battle.NAME_POOL）。准心识别卡与阵亡卡上会拼出来，
+ * 但 Data_Battle 整张表多是数值与 id，不整表登记，只摘这三列。
+ */
+async function NamePoolStrings() {
+  const { NAME_POOL } = await import(pathToFileURL(path.join(projectDir, "Data_Battle.mjs")).href);
+  return [...NAME_POOL.surnames, ...NAME_POOL.given, ...NAME_POOL.origins.map((origin) => origin.place)];
+}
+
 /** 界面字体（Font_UiSans_*.woff2）要覆盖菜单 / 加载 / 编辑器 / HUD 的全部文案。 */
 export async function UiChars() {
-  return Charset([...await CollectStrings(UI_MODULES), ALWAYS]);
+  return Charset([...await CollectStrings(UI_MODULES), ...await NamePoolStrings(), ALWAYS]);
 }
 
 /**

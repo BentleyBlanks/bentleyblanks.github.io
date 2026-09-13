@@ -815,13 +815,13 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    但 COD 的画面亮而干净，我们的画面本来就是灰土加雾 —— 一条 0.42 的黑带压在屏幕正中
    反而成了整幅画面上最像"UI 控件"的东西，人一动它就跟着飘。
    现在只靠字自己的描边扛读性：两层黑影（一层实、一层散）在雪地、墙面、天空上都读得出，
-   而且不遮任何东西。 */
+   而且不遮任何东西。字体与准星下的提示、字幕一致，用 logo 同款思源宋体 Black。 */
 .hudTarget {
   position: absolute; left: 50%; top: 50%; z-index: 3;
   transform: translate(-50%, 0); margin-top: var(--y, 46px);
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   min-width: 96px; padding: 3px 10px 4px; opacity: 0;
-  font-family: var(--ui-font);
+  font-family: var(--ui-story-font);
   text-align: center; white-space: nowrap; pointer-events: none;
   transition: opacity 0.1s linear;
   text-shadow: 0 1px 2px rgba(0,0,0,0.95), 0 0 6px rgba(0,0,0,0.78);

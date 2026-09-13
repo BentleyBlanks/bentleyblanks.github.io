@@ -69,12 +69,14 @@ try {
   const identity=await page.evaluate(()=>{
     const T=window.Taierzhuang,card={key:"s2",kind:"friend",faction:"nra",title:"罗班长",meta:"25 岁 · 3m",health:null};
     T.hud.SetTarget(card,{targetDistance:false});
-    const understated={meta:document.querySelector(".hudTarget .tMeta")?.textContent,state:T.hud.TargetState()};
+    const understated={meta:document.querySelector(".hudTarget .tMeta")?.textContent,state:T.hud.TargetState(),
+      family:getComputedStyle(document.querySelector(".hudTarget .tTitle")).fontFamily};
     T.hud.SetTarget(card);
     return {understated,normal:T.hud.TargetState()};
   });
   assert.equal(identity.understated.state.meta,"25 岁","P012 name card carries no distance navigation");
   assert.equal(identity.understated.meta,"25 岁","rendered DOM agrees with the presentation state");
+  assert.match(identity.understated.family,/^"?TzTitleText/,"识别卡的名字与岁数用 logo 同款字体");
   assert.equal(identity.normal.meta,"25 岁 · 3m","normal chapter identity display is unchanged");
 
   const prompts = await page.evaluate(() => {
