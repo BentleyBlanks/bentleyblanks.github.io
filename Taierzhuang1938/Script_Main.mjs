@@ -6862,9 +6862,6 @@ function CallMortar() {
 let fireCooldown = 0;
 let fireEdge = false;                 // 这一帧是不是"刚按下"（单发模式与投掷物槽要用）
 const _muzzle = new THREE.Vector3();
-// 弹道起点允许离瞄准轴多远（米）。腰射常态是 0.193 m，这个上限只在"上刺刀之后
-// 枪斜端起来"那一档兜底，见开火里那段注释。
-const MAX_MUZZLE_PARALLAX_M = 0.22;
 const _hitPoint = new THREE.Vector3();
 const _bulletPos = new THREE.Vector3();
 const _bulletVel = new THREE.Vector3();
@@ -7208,11 +7205,8 @@ function TryFire(dt, returningGrenade = false) {
   viewmodel.ConsumeCameraKick(_kick);
   player.ApplyRecoil(_kick.x, _kick.y, weapon.recoil?.recoverS ?? 0.4, weapon.recoil?.recoverFrac ?? 1.0);
 
-  // P012 tests readable 60–80 m engagements: discharge along the aim the
-  // player had when pressing the trigger, then retain the full camera kick.
-  // The older chapters/range keep their existing post-kick sampling contract.
-  const shotAimDirection = PHASE_TABLE[state.phaseIndex]?.whitebox?.triggerAimBeforeRecoil
-    ? aimAtTrigger : player.AimDirection(_aimDir).clone();
+  // Every scene fires along the aim captured before this shot applies recoil.
+  const shotAimDirection = aimAtTrigger;
 
   viewmodel.MuzzleWorld(_muzzle);
   // 玩家自己那一枪走**分层**：枪口那一下由 PlayGunshot 决定近/远与枪尾
@@ -7263,34 +7257,23 @@ function TryFire(dt, returningGrenade = false) {
     kind: weapon.kind,
   });
 
-  // 散布：没有准星，散布决定落点。移动、压制、带伤都会把它撑大。
+  // Sample a uniform disk in the aim-local plane. SpreadDeg is the full
+  // cone diameter used by the HUD; world-axis rotations distort it at a pitch.
   const spread = THREE.MathUtils.degToRad(player.SpreadDeg(weapon));
-  const dir = shotAimDirection.clone();
   const rnd = Mulberry32(state.frame * 2654435761);
-  const ax = (rnd() - 0.5) * spread, ay = (rnd() - 0.5) * spread;
-  dir.applyAxisAngle(_yAxis, ax);
-  dir.applyAxisAngle(_xAxis, ay);
+  const radius = Math.sqrt(rnd()) * Math.tan(spread * 0.5);
+  const angle = rnd() * Math.PI * 2;
+  const right = new THREE.Vector3().crossVectors(shotAimDirection, _yAxis).normalize();
+  const up = new THREE.Vector3().crossVectors(right, shotAimDirection).normalize();
+  const dir = shotAimDirection.clone()
+    .addScaledVector(right, Math.cos(angle) * radius)
+    .addScaledVector(up, Math.sin(angle) * radius).normalize();
 
-  // 视差：起点是**枪口**，不是眼睛。这一行改完之后瞄具与枪管不共轴才成立，
-  // 近距离必须心里修正，「没有准星」这件事才有物理支撑。
-  const from = _muzzle.clone();
-  // 视差量 = 枪口到**瞄准轴**的垂距，不是枪口到眼睛的距离。
-  // 后者主要是"枪口在眼前多远"（一米三，那是枪本身的长度），跟共不共轴没关系；
-  // 真正决定"近距离要不要心里修正"的是这条垂距。
-  const eye = player.EyePosition;
-  _rel.set(from.x - eye.x, from.y - eye.y, from.z - eye.z);
-  const along = _rel.dot(shotAimDirection);
-  _rel.addScaledVector(shotAimDirection, -along); // 现在 _rel 就是那条垂距向量
-  let muzzleOffset = _rel.length();
-  // 上刺刀之后的"刺杀预备"是**视觉**姿态（Script_Viewmodel.BAYONET_CARRY：把枪
-  // 斜端在身前，刀身才读得出来）。视觉可以斜，弹道不该跟着斜：实测垂距会从
-  // 0.19 m 涨到 0.43 m，而贴脸腰射时那多出来的 0.24 m 就是"明明对着人却打空"。
-  // 所以垂距只保留到上限，超出的部分把起点拉回瞄准轴 —— 枪焰、曳光仍从真枪口出，
-  // 玩家看不出差别，手感上"上了刺刀就打不准"这条不存在。
-  if (muzzleOffset > MAX_MUZZLE_PARALLAX_M) {
-    from.addScaledVector(_rel, -(1 - MAX_MUZZLE_PARALLAX_M / muzzleOffset));
-    muzzleOffset = MAX_MUZZLE_PARALLAX_M;
-  }
+  // The crosshair owns the ballistic origin. A parallel ray from the visual
+  // right-hand muzzle biases every nearby impact. Keep the real muzzle for
+  // cover obstruction, flash and tracer presentation only.
+  const from = player.EyePosition.clone();
+  const muzzleOffset = 0;
   _marchTargets.length = 0;
   const range = weapon.effectiveRangeM || 400;
   for (const s of ai.soldiers) {
@@ -7298,7 +7281,7 @@ function TryFire(dt, returningGrenade = false) {
     if (s.position.distanceTo(from) > range + 4) continue;
     _marchTargets.push(s);
   }
-  const obstruction = player.MuzzleObstruction(from);
+  const obstruction = player.MuzzleObstruction(_muzzle);
   if (obstruction) _hitPoint.copy(obstruction.point);
   const shot = obstruction || MarchBullet(from, dir, weapon, _marchTargets);
   const targetHealthBefore = shot.soldier?.health ?? 0;

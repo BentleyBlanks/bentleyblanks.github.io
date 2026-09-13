@@ -81,12 +81,51 @@ const report = await page.evaluate(() => {
   return { center, sights };
 });
 
+// Reproduce stationary close-wall firing through the production trigger and
+// ballistic marcher; aim-vector-only checks cannot detect a displaced origin.
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&weapons=1&manual=1&quality=medium&scale=small`,
+  { waitUntil: "load", timeout: 120000 });
+await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
+report.wall = await page.evaluate(() => {
+  const T = window.Taierzhuang, range = T.Debug.WeaponRange;
+  range.GoTo("table", "ZhongZheng"); T.StepFrames(12); T.Debug.Key("KeyF");
+  T.StepFrames(120, 1 / 60, false); range.SetAmmoMode("infinite");
+  T.player.Spawn(2354, 2460, Math.PI / 2);
+  T.Debug.Mouse(2, false); T.StepFrames(120, 1 / 60, false);
+  const samples = [];
+  for (let i = 0; i < 80; i += 1) {
+    T.player.yaw = Math.PI / 2; T.player.pitch = 0;
+    T.player.aimYaw = 0; T.player.aimPitch = 0;
+    T.StepFrames(2, 1 / 60, false);
+    const eye = T.player.EyePosition.clone();
+    const before = T.state.playerShots;
+    T.Debug.Fire();
+    const shot = range.LastShot();
+    if (T.state.playerShots !== before + 1) throw new Error("Wall trigger did not fire");
+    const radius = Math.tan(shot.spreadRad / 2) * (eye.x - shot.end[0]);
+    samples.push({ x: (shot.end[2] - eye.z) / radius,
+      y: (shot.end[1] - eye.y) / radius, wall: shot.hitKind === "wall",
+      originError: Math.hypot(...shot.from.map((v, j) => v - eye.toArray()[j])),
+      triggerError: Math.hypot(...shot.aimDirection.map((v, j) => v - shot.aimAtTrigger[j])) });
+    T.StepFrames(150 + i % 11, 1 / 60, false);
+  }
+  T.player.yaw = Math.PI / 2; T.player.pitch = 0; T.StepFrames(30);
+  const meanX = samples.reduce((sum, row) => sum + row.x, 0) / samples.length;
+  const meanY = samples.reduce((sum, row) => sum + row.y, 0) / samples.length;
+  const left = samples.filter((row) => row.x < 0).length;
+  return { count: samples.length, meanX, meanY, left, right: samples.length - left,
+    valid: samples.every((row) => row.wall && row.originError < 1e-6 && row.triggerError < 1e-6
+      && Math.hypot(row.x, row.y) < 1.03) };
+});
+
 const screenshotPath = path.join(os.tmpdir(), "TaierzhuangFixedCenterAds.png");
 await page.screenshot({ path: screenshotPath });
 console.log(JSON.stringify({ ...report, screenshotPath, errors }, null, 2));
 
 const sightRows = Object.values(report.sights);
-const passed = Math.abs(report.center.crosshairX - 640) < 0.1
+const passed = report.wall.valid && Math.abs(report.wall.meanX) < 0.2
+  && Math.abs(report.wall.meanY) < 0.2 && report.wall.left > 20 && report.wall.right > 20
+  && Math.abs(report.center.crosshairX - 640) < 0.1
   && Math.abs(report.center.crosshairY - 360) < 0.1
   && report.center.freeAimDeg === 0
   && Math.abs(report.center.aimYaw) < 1e-6 && Math.abs(report.center.aimPitch) < 1e-6
