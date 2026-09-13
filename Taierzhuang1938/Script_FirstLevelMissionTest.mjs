@@ -1066,6 +1066,8 @@ console.log("ok paused audio ranges, subtitle source timing, queued cues and she
   assert.equal(parallelSources.length,2,"the intact briefing only restarts to resume from pause");
   assert.equal(parallelSources[1].offset,before.parallel[0].sourceTime,"the simultaneous source resumes at its own exact offset");
   assert.ok(rows.some(lines=>lines.length===2&&lines.some(line=>line.speaker==="罗班长")&&lines.some(line=>line.speaker==="刘文财")),"both speaking actors have visible separate subtitles");
+  for(const line of rows.flat())assert.equal(line.emphasis,line.speaker==="罗班长"?"lead":"aside",
+    `${line.speaker}: Luo's briefing leads the subtitle stack and the overlapping banter is an aside`);
   const utterances=rows.flat().filter(line=>line.started).map(line=>line.text);
   for(const id of ["TrainBanter","TrainBriefing"])for(const line of MISSION_DIALOGUE.find(cue=>cue.id===id).lines)
     assert.ok(utterances.includes(line.text),`${id}: every complete spoken line is retained in subtitle audit`);

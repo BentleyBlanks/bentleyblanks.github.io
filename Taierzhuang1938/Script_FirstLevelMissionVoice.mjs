@@ -5,8 +5,8 @@ import { Localize } from "./Script_Text.mjs";
 import { FirstLevelVoiceTextId, FirstLevelCastTextId } from "./Script_TextIds.mjs";
 import { SampleSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
 export class FirstLevelMissionVoice {
-  constructor({ audio, hud, Position, Done, Event, Ready, Clock }) {
-    Object.assign(this, { audio, hud, Position, Done, Event, Ready, Clock });
+  constructor({ audio, hud, Position, Listener, Done, Event, Ready, Clock }) {
+    Object.assign(this, { audio, hud, Position, Listener, Done, Event, Ready, Clock });
     this.queue = [];
     this.played = new Set();
     this.finished = new Set();
@@ -145,10 +145,13 @@ export class FirstLevelMissionVoice {
     const signature=tracks.map(track=>`${track.cue.id}:${track.index}`).join("|");
     if(signature===current.subtitleSignature)return;
     current.subtitleSignature=signature;
+    const listener=this.Listener?.();
     const rows=tracks.filter(track=>track.index>=0).map(track=>{
-      const line=track.cue.lines[track.index];
+      const line=track.cue.lines[track.index],at=listener&&this.Position?.(track.cue,line);
       return {speaker:Localize(FirstLevelCastTextId(line.who),MISSION_VOICE_CAST[line.who][0]),
         text:Localize(FirstLevelVoiceTextId(track.cue.id,track.index),line.text),
+        emphasis:track.cue.subtitleEmphasis||"lead",
+        distanceM:at?Math.hypot(at.x-listener.x,at.y-listener.y,at.z-listener.z):null,
         started:track.started,seconds:Math.max(.05,track.plan.lines[track.index][1]-track.sourceTime)};
     });
     const seconds=Math.min(...rows.map(row=>row.seconds),60);

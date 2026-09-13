@@ -221,6 +221,15 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudSubtitle .who { color: var(--warn); margin-right: 10px; }
 .hudSubtitle .narr { color: var(--dim); font-style: italic; }
 .hudSubtitle .subtitleLine + .subtitleLine { margin-top: 6px; }
+/* 同时说话分主次：主讲（要玩家照做的那句）排最下、字大全亮；旁白排上面、
+   小一号压暗，像隔着人听见的；说话人远（SUBTITLE_DEPTH.farM）整行再暗一档。
+   旁白用不透明的暗色而不是半透明：半透明字会把底下的黑描边透出来，发脏。 */
+.hudSubtitle .subtitleLine.lead { font-size: 1.12em; }
+.hudSubtitle .subtitleLine.aside { font-size: 0.8em; }
+.hudSubtitle .subtitleLine.aside .txt { color: #b4ac99; }
+.hudSubtitle .subtitleLine.aside .who { color: #a8844c; }
+.hudSubtitle .subtitleLine.aside + .subtitleLine.lead { margin-top: 8px; }
+.hudSubtitle .subtitleLine.far { opacity: 0.6; }
 
 .hudHint {
   position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%);

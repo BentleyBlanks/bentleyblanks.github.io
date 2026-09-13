@@ -16,7 +16,7 @@ import { HIT_FEEDBACK } from "./Data_Tuning_Player.mjs";
 import { PLAYER_SLOT_ORDER, PlayerSlotKey } from "./Data_Weapons.mjs";
 import {
   TITLE_CARD, TIMING, GRENADE_WARNING, HITMARK, HITDIR, VIGNETTE, SUPPRESSION,
-  PROMPTS, MINIMAP, FPS, IDLE_FADE,
+  PROMPTS, MINIMAP, FPS, IDLE_FADE, SUBTITLE_DEPTH,
 } from "./Data_Tuning_Hud.mjs";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -938,12 +938,17 @@ export class Hud {
 
   // Concurrent actors retain their own names and rows. The caller marks only
   // newly started lines for the spoken audit when another row changes.
+  // Asides stack above the lead line (the one the player must act on), and a
+  // speaker beyond SUBTITLE_DEPTH.farM is dimmed further, so overlapping talk
+  // reads as foreground and background instead of two equal lines.
   SayLines(lines, seconds = TIMING.subtitleS) {
     const subtitle = this.el.subtitle;
     subtitle.replaceChildren();
-    for (const line of lines) {
+    const ordered = [...lines].sort((a, b) => (a.emphasis === "aside" ? 0 : 1) - (b.emphasis === "aside" ? 0 : 1));
+    for (const line of ordered) {
       const row = document.createElement("div");
-      row.className = "subtitleLine";
+      row.className = `subtitleLine ${line.emphasis === "aside" ? "aside" : "lead"}`
+        + (line.distanceM > SUBTITLE_DEPTH.farM ? " far" : "");
       const speaker = document.createElement("span"), text = document.createElement("span");
       speaker.className = "who"; speaker.textContent = line.speaker;
       text.className = "txt"; text.textContent = line.text;

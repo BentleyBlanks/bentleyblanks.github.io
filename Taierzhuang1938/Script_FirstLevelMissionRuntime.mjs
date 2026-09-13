@@ -78,6 +78,7 @@ export class FirstLevelMissionRuntime {
       audio: this.audio,
       hud: this.hud,
       Position: (cue,line) => this.VoicePosition(cue,line),
+      Listener: () => this.player.EyePosition,
       Done: (id) => this.VoiceDone(id),
       Event: (id,cueId,detail) => this.VoiceEvent(id,cueId,detail),
       Ready: (id) => this.Has(id),
