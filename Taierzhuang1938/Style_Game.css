@@ -528,34 +528,53 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudGrenadeWarnings { position: absolute; inset: 0; }
 .hudGrenadeWarning {
   position: absolute; transform: translate(-50%, -50%);
-  display: flex; align-items: center; gap: 7px;
-  color: #ead39c; font: 600 12px/1.2 var(--ui-font);
-  letter-spacing: 0.05em; white-space: nowrap;
-  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.95));
+  width: 46px; height: 46px; pointer-events: none;
+  color: #e75243; font: 600 12px/1.2 var(--ui-font);
+  white-space: nowrap;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.95));
 }
 .hudGrenadeWarning .ico {
-  width: 16px; height: 16px; box-sizing: border-box;
-  display: grid; place-items: center;
-  border: 2px solid currentColor; background: rgba(20,14,8,0.55);
-  transform: rotate(45deg);
+  position: relative; display: grid; place-items: center;
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(88,9,5,0.48), rgba(88,9,5,0) 70%);
+}
+.hudGrenadeWarning .ico::before {
+  content: ""; position: absolute; inset: 3px;
+  border: 2px solid currentColor; border-bottom-color: transparent; border-radius: 50%;
+  opacity: 0.8;
 }
 .hudGrenadeWarning .ico i {
-  display: block; transform: rotate(-45deg);
-  font: 800 11px/1 Arial, sans-serif; font-style: normal;
+  display: block; width: 30px; height: 30px; background: currentColor;
+  mask: url("./Texture/Icon_GrenadeWarning.png") center / contain no-repeat;
+}
+.hudGrenadeWarning .direction {
+  position: absolute; inset: 0; transform: rotate(var(--grenade-direction, 0deg));
+}
+.hudGrenadeWarning .direction::after {
+  content: ""; position: absolute; left: 18px; bottom: -3px;
+  width: 0; height: 0; border-left: 5px solid transparent;
+  border-right: 5px solid transparent; border-top: 6px solid #fff5e8;
 }
 .hudGrenadeWarning .txt {
-  padding: 2px 5px; border-radius: 2px; background: rgba(12,9,7,0.55);
+  position: absolute; top: 48px; left: 50%; transform: translateX(-50%);
+  display: none; align-items: center; gap: 6px; color: #fff5e8;
+  text-shadow: 0 1px 3px #000;
 }
-.hudGrenadeWarning.edge .ico { border-width: 3px; }
-.hudGrenadeWarning.lethal { color: #e79a63; }
-/* 够得着能掷回的那颗：换成拾雷台那一路的青色，文字里带「F 拾起掷回」，
-   与「离远点」的橙/红警告一眼分开。urgent 的红色脉冲仍压过它。 */
-.hudGrenadeWarning.returnable { color: #7fe3c6; }
-.hudGrenadeWarning.returnable .txt { border: 1px solid rgba(127,227,198,0.55); }
-.hudGrenadeWarning.urgent { color: #e65e46; animation: hudGrenadePulse 0.42s ease-in-out infinite; }
+.hudGrenadeWarning .txt kbd {
+  display: grid; place-items: center; min-width: 20px; height: 20px;
+  border: 1px solid rgba(255,245,232,0.85); border-radius: 2px;
+  background: rgba(15,12,10,0.6); font: 600 13px/1 Arial, sans-serif;
+}
+.hudGrenadeWarning.returnable .txt { display: flex; }
+.hudGrenadeWarning.lethal { color: #ff5746; }
+.hudGrenadeWarning.urgent .ico { animation: hudGrenadePulse 0.42s ease-in-out infinite; }
 @keyframes hudGrenadePulse {
-  0%, 100% { opacity: 0.72; transform: translate(-50%, -50%) scale(0.94); }
-  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  0%, 100% { opacity: 0.7; transform: scale(0.95); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hudGrenadeWarning.urgent .ico { animation: none; color: #ffb0a4; }
 }
 
 /* 占领点图标 */

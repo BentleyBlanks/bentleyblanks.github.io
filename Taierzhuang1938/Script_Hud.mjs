@@ -478,7 +478,7 @@ export class Hud {
     this.el.grenadeWarnings = mk("hudGrenadeWarnings");
     for (let i = 0; i < GRENADE_WARNING.maxIcons; i += 1) {
       const warning = mk("hudGrenadeWarning", this.el.grenadeWarnings);
-      warning.innerHTML = `<span class="ico"><i>!</i></span><span class="txt"></span>`;
+      warning.innerHTML = `<span class="ico" aria-hidden="true"><i></i><b class="direction"></b></span><span class="txt"><kbd>F</kbd><span></span></span>`;
       warning.style.display = "none";
     }
     this.el.minimap = mk("hudMinimap", this.root, "canvas");
@@ -1440,13 +1440,16 @@ export class Hud {
         + `${urgent ? " urgent" : ""}${lethal ? " lethal" : ""}${threat.returnable ? " returnable" : ""}`;
       const kind = threat.kind === "GrenadeBundle"
         ? T("hud.grenade.bundle") : T("hud.grenade.single");
-      // 够得着、还来得及拾起的那一颗，警告本身就写明「F 掷回」——
-      // 玩家看的是脚边那颗弹，不是准星旁的提示条。
+      // Keep distance/type in the accessible description; the visible warning is icon-first.
       const metres = Math.max(1, Math.ceil(threat.distance));
-      el.children[1].textContent = threat.returnable
+      const warning = threat.returnable
         ? T("hud.grenade.returnable", { kind, metres })
         : T("hud.grenade.warning", { kind, metres });
-      el.setAttribute("aria-label", T("hud.grenade.aria", { warning: el.children[1].textContent }));
+      el.children[1].children[1].textContent = T("hud.grenade.throwBack");
+      el.setAttribute("aria-label", T("hud.grenade.aria", { warning }));
+      // The pointer rotates independently so the grenade and key prompt remain upright.
+      const angle = offscreen ? Math.atan2(y - height * 0.5, x - width * 0.5) * 180 / Math.PI - 90 : 0;
+      el.style.setProperty("--grenade-direction", `${angle.toFixed(1)}deg`);
     }
   }
 

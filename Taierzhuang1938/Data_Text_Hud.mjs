@@ -98,6 +98,7 @@ export const TEXT = Object.freeze({
   "hud.telegraph.aria": "{label}：已发 {sent} 组，共 {total} 组。{prompt}",
 
   // --- 近弹提示 -------------------------------------------------------------
+  "hud.grenade.throwBack": "拾起掷回",
   "hud.grenade.single": "手榴弹",
   "hud.grenade.bundle": "集束",
   "hud.grenade.warning": "{kind} {metres}m",
