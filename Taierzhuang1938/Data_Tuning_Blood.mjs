@@ -42,9 +42,9 @@ export const BLOOD_ARTERIAL = Object.freeze({
   color: 0xb3261c,
   dribbleSpread: .3, dribbleSpeed: [.12, .55], poolDropRadius: .13,
   splashRadius: [.06, .13], splashDepositChance: .4, poolDeposits: 18,
-  dropHalfWidth: [.014, .022], stretchPerSpeed: .04, stretch: [.05, .24],
+  dropHalfWidth: [.02, .03], stretchPerSpeed: .04, stretch: [.05, .24],
   farStartM: 6, farScaleMax: 3,
-  mistPerBeat: 3, mistMinPressure: .22, mistSpeed: [.9, 2.1], mistRadius: [.03, .15], mistLife: [.22, .5],
+  mistPerBeat: 4, mistMinPressure: .22, mistSpeed: [.9, 2.1], mistRadius: [.04, .18], mistLife: [.22, .5],
 });
 export const BLOOD_SURFACE = Object.freeze({
   // Planar limits reception around the hit tangent plane; cosine .8 caps stretch at 1.25x.
