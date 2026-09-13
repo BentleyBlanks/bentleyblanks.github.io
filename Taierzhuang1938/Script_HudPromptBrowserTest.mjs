@@ -115,8 +115,8 @@ try {
   assert.equal(prompts.on, true);
   assert.deepEqual(prompts.rows, [["B", "包扎止血"]]);
   assert.deepEqual(prompts.rowBox, ["0px", "rgba(0, 0, 0, 0)"], "提示没有外框与底板");
-  // 9-13 用户定：上一版 clamp(20px, 3vh, 34px) 的 40%。
-  const expectPx = Math.min(13.6, Math.max(8, prompts.viewH * 0.012));
+  // 9-13 用户定：clamp(20px, 3vh, 34px) 的 40%，再放大 20%。
+  const expectPx = Math.min(16.32, Math.max(9.6, prompts.viewH * 0.0144));
   assert.ok(Math.abs(prompts.labelPx - expectPx) < 0.1, `提示字号应为 ${expectPx.toFixed(1)} px，实际 ${prompts.labelPx}`);
   assert.match(prompts.family, /^"?TzTitleText/, "提示用 logo 同款字体");
   assert.match(prompts.subtitleFamily, /^"?TzTitleText/, "字幕用 logo 同款字体");

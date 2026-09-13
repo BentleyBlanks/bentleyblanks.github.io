@@ -235,12 +235,12 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    识别卡排在它下面），一行「键帽 + 一句动作」，米白字配柔和黑影、没有底板；
    拾枪时下面再画那把枪的剪影（Data_HudWeaponIcons）。打空了的「装弹」整行转红。
    字体是 logo 同款思源宋体 Black（--ui-story-font）。字号跟视口高度走，
-   9-13 用户定为上一版（clamp(20px, 3vh, 34px)）的 40%：900 高约 11 px，1080 高约 13 px。 */
+   9-13 用户定为 clamp(20px, 3vh, 34px) 的 40%，随后再放大 20%（即 48%）：900 高约 13 px，1080 高约 15.6 px。 */
 .hudActions {
   position: absolute; left: 50%; top: 50%; transform: translateX(-50%);
   margin-top: var(--y, 44px);
   display: flex; flex-direction: column; align-items: center; gap: 0.3em;
-  font: 900 clamp(8px, 1.2vh, 13.6px)/1.2 var(--ui-story-font);
+  font: 900 clamp(9.6px, 1.44vh, 16.32px)/1.2 var(--ui-story-font);
   z-index: 2; opacity: 0; transition: opacity 0.16s linear;
   white-space: nowrap; pointer-events: none;
 }
