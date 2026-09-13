@@ -500,6 +500,90 @@ console.log(`ok  交互框架：注册/清理、三种手势、距离朝向、�
 }
 console.log("ok  拾枪/分弹药两条内建分支迁进框架后无回归");
 
+// 换枪：看得见的枪都捡得起来。旧写法的四个坑各钉一条 ——
+// 捡走的枪还躺在地上、手里那把凭空消失、按尸体脚底挑枪、同型的枪把桥夹清零。
+{
+  const Loadout = () => {
+    const kit = { primary: "HanYang", ammo: 3, clips: 4, drops: [], hidden: [] };
+    const system = new InteractSystem({ ai: { soldiers: [] } }, {
+      HasWeapon: () => !!kit.primary,
+      SameWeapon: (id) => kit.primary === id,
+      AmmoGain: (clips, ammo) => clips + (ammo == null || ammo >= 5 ? 1 : 0),
+      TakeAmmo: (id, clips, ammo) => { const n = clips + (ammo == null || ammo >= 5 ? 1 : 0); kit.clips += n; return n; },
+      DropPoint: (s) => s.gun,
+      DropTaken: (s) => kit.hidden.push(s),
+      GroundWeaponRemoved: (item) => kit.drops.push(item.id),
+      // 装配层的 PickUpWeapon：给了 at 就把手里那把放回原处。
+      TakeWeapon: (id, clips, soldier, variant, extra) => {
+        if (kit.primary && extra?.at) {
+          system.DropGroundWeapon({ weaponId: kit.primary, ammo: kit.ammo, clips: kit.clips, position: extra.at });
+        }
+        kit.primary = id; kit.ammo = extra?.ammo ?? 5; kit.clips = clips;
+        return true;
+      },
+    });
+    return { kit, system };
+  };
+
+  {
+    const { kit, system } = Loadout();
+    // 两具尸体脚挨着脚：A 的根离玩家更近，但 A 的枪摔到了身后；玩家脚边那把是 B 的。
+    const a = { id: "A", alive: false, position: { x: 0, y: 0, z: -0.9 }, gun: { x: 0, y: 0, z: -2.6 },
+      drop: { weaponId: "Type38", clips: 0, taken: false } };
+    const b = { id: "B", alive: false, position: { x: 0.2, y: 0, z: -2.4 }, gun: { x: 0.1, y: 0, z: -1.0 },
+      drop: { weaponId: "Type11", clips: 1, taken: false } };
+    system.ctx.ai.soldiers.push(a, b);
+    const player = MakePlayer();
+    const q = system.Query(player);
+    Check(q.kind === "pickup" && q.soldier === b, "按枪实际躺的位置挑，不按尸体脚底");
+    Check(/^换上 /.test(q.label), "手里有枪时是「换上」");
+    system.Press(player);
+    Check(kit.primary === "Type11" && b.drop.taken && kit.hidden.includes(b), "捡走的那把从尸体上拆掉");
+    Check(system.groundWeapons.length === 1, "手里那把没有凭空消失");
+    const dropped = system.groundWeapons[0];
+    Check(dropped.weaponId === "HanYang" && dropped.ammo === 3 && dropped.clips === 4, "换下来的枪带着自己的弹仓");
+    Check(Math.hypot(dropped.position.x - 0.1, dropped.position.z + 1.0) < 1e-9, "放回刚才那把枪的位置");
+    const back = system.Query(player);
+    Check(back.ground === dropped && /^换上 /.test(back.label), "走回去还能换回来");
+    system.Press(player);
+    Check(kit.primary === "HanYang" && kit.ammo === 3 && kit.clips === 4, "换回来弹药一发不少");
+    Check(kit.drops.includes(dropped.id) && system.groundWeapons.length === 1
+      && system.groundWeapons[0].weaponId === "Type11", "地上那把被拿走，Type11 放回原处");
+    Check(system.ClearGroundWeapons() === 1 && system.groundWeapons.length === 0, "换关清空地上的枪");
+  }
+
+  {
+    const { kit, system } = Loadout();
+    const mate = { id: "M", alive: false, position: { x: 0, y: 0, z: -1 }, gun: { x: 0, y: 0, z: -1 },
+      drop: { weaponId: "HanYang", clips: 2, taken: false } };
+    system.ctx.ai.soldiers.push(mate);
+    const player = MakePlayer();
+    Check(/弹药/.test(system.Query(player).label), "同型的枪提示拿弹药，不是换上");
+    system.Press(player);
+    Check(kit.primary === "HanYang" && kit.ammo === 3 && kit.clips === 7, "同型只加桥夹（2 个 + 满仓那一个），弹仓不清零");
+    Check(system.Query(player) === null, "拿空了就不再提示同型的空枪");
+    kit.primary = "Type38";
+    Check(/^换上 汉阳造/.test(system.Query(player).label), "换成别的枪之后，那把空枪照样能捡");
+  }
+
+  {
+    const { system } = Loadout();
+    const corpse = { id: "C", alive: false, position: { x: 0, y: 0, z: -1 }, gun: { x: 0, y: 0, z: -0.8 },
+      drop: { weaponId: "Type38", clips: 0, taken: false } };
+    system.ctx.ai.soldiers.push(corpse);
+    // 补给箱：不判朝向的区域型点，方圆 2.5 m；玩家站在箱子和枪之间、正看着枪。
+    system.Register({ id: "crate", kind: "supply", position: { x: 0, y: 0, z: 1.5 }, reachM: 2.5, facingDot: null });
+    const player = MakePlayer();
+    Check(system.Query(player).kind === "pickup", "正看着的枪压过身后的补给箱");
+    player.yaw = Math.PI;
+    Check(system.Query(player).kind === "supply", "转身看着箱子就是补给");
+    player.yaw = 0;
+    system.Register({ id: "grenade", kind: "grenade", position: { x: 0, y: 0, z: 1.2 }, reachM: 2.5, facingDot: null, priority: 1000 });
+    Check(system.Query(player).point?.id === "grenade", "脚边的活手榴弹永远先于拾枪");
+  }
+}
+console.log("ok  换枪：按枪的位置挑、换下的枪留在原地可捡回、同型只拿弹药、看着的枪压过区域点");
+
 // ===========================================================================
 // 五、救护类预制交互
 // ===========================================================================

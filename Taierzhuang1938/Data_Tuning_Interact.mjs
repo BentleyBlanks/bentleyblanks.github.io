@@ -14,6 +14,17 @@
 export const INTERACT = Object.freeze({
   corpseReachM: 2.0,
   mateReachM: 2.5,
+  /**
+   * 尸体的枪不一定在脚边：倒地时摔出去半米，断肢时攥在飞出去的胳膊上能落到几米外。
+   * 够不够得着按**枪在哪**算（corpseReachM），这个数只是先按尸体根节点筛一遍的半径。
+   */
+  corpseScanM: 8.0,
+  /**
+   * 「正看着地上那把枪」的水平朝向门槛（0.90 ≈ ±26°）。看着枪、而且枪比旁边的注册点近时，
+   * 拾枪压过**不判朝向的区域型注册点**（facingDot:null，比如补给箱方圆 2.5 m）——
+   * 否则补给箱边上躺着的枪按 F 永远是「补充弹药」，看得见捡不起来。
+   */
+  pickupAimDot: 0.90,
   pointReachM: 2.2,
   pointHeightM: 3.0,
   facingDot: 0.20,

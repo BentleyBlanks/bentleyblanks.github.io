@@ -1624,14 +1624,28 @@ async function Boot() {
       const slot = WEAPONS[weaponId]?.kind === "melee" ? "melee" : "primary";
       return !!state.slots[slot];
     },
+    SameWeapon: (weaponId) => WEAPONS[weaponId]?.kind !== "melee" && state.slots.primary === weaponId,
+    AmmoGain: (clips, ammo, weaponId) => ScavengeClipCount(weaponId, clips, ammo),
+    TakeAmmo: (weaponId, clips, ammo) => ScavengeAmmo(weaponId, clips, ammo),
     SpareClips: () => state.clips,
-    CanReachActor:(actor,p)=>{
+    DropPoint: (soldier) => CorpseWeaponPoint(soldier),
+    CanReachActor:(actor,p,point)=>{
       if(!p012Flow)return true;
-      const target=actor.position.clone();target.y=battlefield.GroundHeight(target.x,target.z)+(actor.alive?1:.35);
+      const target=point?new THREE.Vector3(point.x,0,point.z):actor.position.clone();
+      target.y=battlefield.GroundHeight(target.x,target.z)+(actor.alive?1:.35);
       const eye=p.EyePosition,delta=target.sub(eye),distance=delta.length();
       const hit=battlefield.Raycast(eye,delta.normalize(),distance);return !hit||hit.t>=distance-.05;
     },
-    TakeWeapon: (weaponId, clips, soldier, weaponVariant) => PickUpWeapon(weaponId, clips, weaponVariant),
+    CanReachPoint:(point,p)=>{
+      if(!p012Flow)return true;
+      const target=new THREE.Vector3(point.x,battlefield.GroundHeight(point.x,point.z)+.35,point.z);
+      const eye=p.EyePosition,delta=target.sub(eye),distance=delta.length();
+      const hit=battlefield.Raycast(eye,delta.normalize(),distance);return !hit||hit.t>=distance-.05;
+    },
+    TakeWeapon: (weaponId, clips, soldier, weaponVariant, extra) => PickUpWeapon(weaponId, clips, weaponVariant, extra),
+    // 尸体上那把被拿走了：整把从人物身上拆掉（藏 visible 不够 —— 背枪挂点等处每帧会把它设回可见）。
+    DropTaken: (soldier) => { soldier?.actor?.SetWeapon?.(null); },
+    GroundWeaponRemoved: (item) => DisposeGroundWeaponView(item),
     GiveClip: () => {
       if (state.clips <= 1) return false;
       state.clips -= 1;
@@ -3384,6 +3398,8 @@ function ClearRuntime() {
   // 检查点环里的坐标是上一关切片的：倒到这一关就是穿墙。
   checkpoint?.Reset("levelChange");
   interact?.Clear();
+  // 换枪丢在地上的枪也是按关的：不拆的话会连模型一起出现在下一关的同一坐标上。
+  interact?.ClearGroundWeapons();
   // 机枪位同理：它的世界模型也要拆，不然下一关的同一坐标上会多出一挺枪。
   emplacement?.Clear();
   for (const view of emplacementViews.values()) {
@@ -6677,14 +6693,38 @@ function UpdateContextualActionPrompts() {
  * 并把尸体上的外观变体一并带走。缴获日械没有备弹（clips = 0），
  * 只有枪里那几发。
  */
-function PickUpWeapon(weaponId, clips, variant = 0) {
+/**
+ * @param {object} [extra]
+ *   ammo  枪里剩几发；不给 = 满仓（尸体身上的枪一直按「枪里那一仓」算）
+ *   at    {x,y,z} 地上那把枪原来躺的位置。给了就把**换下来的那把**放回这里 ——
+ *         不给（发枪、靶场取枪）时旧枪照旧直接收走，不往地上扔。
+ *   yaw   换下来那把的朝向；不给按玩家朝向横着放。
+ */
+function PickUpWeapon(weaponId, clips, variant = 0, extra = {}) {
   if (!player?.Alive || !WEAPONS[weaponId]) return false;
   const weapon = WEAPONS[weaponId];
   const slot = weapon.kind === "melee" ? "melee" : "primary";
   const hadNoWeapon = !state.slots[slot];
+  // 换枪：手里那把放到刚才那把枪的位置上，弹仓里剩多少就带多少，走回去还能换回来。
+  if (!hadNoWeapon && extra?.at && interact) {
+    const oldId = state.slots[slot];
+    const live = state.activeSlot === slot;
+    const mag = state.mags[slot];
+    const item = interact.DropGroundWeapon({
+      weaponId: oldId, weaponVariant: state.weaponVariants[slot] ?? 0,
+      ammo: slot === "primary" ? (live ? state.ammo : mag?.ammo ?? 0) : 0,
+      clips: slot === "primary" ? (live ? state.clips : mag?.clips ?? 0) : 0,
+      position: extra.at, yaw: extra.yaw ?? (player.yaw + Math.PI / 2),
+    });
+    if (item) BuildGroundWeaponView(item);
+  }
   state.slots[slot] = weaponId;
   state.weaponVariants[slot] = WeaponVariantFor(weaponId, variant);
-  if (slot === "primary") state.mags.primary = { ammo: weapon.magazine ?? 5, clips };
+  if (slot === "primary") {
+    const full = weapon.magazine ?? 5;
+    const ammo = extra?.ammo == null ? full : Math.max(0, Math.min(full, extra.ammo));
+    state.mags.primary = { ammo, clips };
+  }
   state.pickedUp = weaponId;
   state.pickedUpVariant = state.weaponVariants[slot];
   // 捡来的枪上没有装着的刺刀（阵亡者的刺刀在鞘里/丢了；想上再按 X）
@@ -6704,6 +6744,75 @@ function PickUpWeapon(weaponId, clips, variant = 0) {
     hud.SetWeaponName(WeaponName(currentWeapon));
   }
   return true;
+}
+
+/**
+ * 同型的枪能拿到几个桥夹：身上带的桥夹，加上枪里那一整仓（满仓才算一个，
+ * 打过几发的零头不折算 —— 不然走一圈空尸体就能凑出弹药来）。尸体身上的枪 ammo 为空 = 满仓。
+ */
+function ScavengeClipCount(weaponId, clips, ammo) {
+  const weapon = WEAPONS[weaponId];
+  if (!weapon || weapon.kind === "melee") return 0;
+  const full = weapon.magazine ?? 5;
+  return Math.max(0, clips | 0) + ((ammo == null || ammo >= full) ? 1 : 0);
+}
+
+/** 同型的枪只拿弹药：桥夹加进 1 号槽的弹仓账，枪不换。返回拿到几个。 */
+function ScavengeAmmo(weaponId, clips, ammo) {
+  if (!player?.Alive || state.slots.primary !== weaponId) return 0;
+  const gained = ScavengeClipCount(weaponId, clips, ammo);
+  if (gained <= 0) return 0;
+  if (state.activeSlot === "primary") state.clips += gained;
+  else if (state.mags.primary) state.mags.primary.clips += gained;
+  else state.mags.primary = { ammo: 0, clips: gained };
+  return gained;
+}
+
+const _dropBox = new THREE.Box3();
+const _dropCenter = new THREE.Vector3();
+/** 尸体那把枪此刻实际躺在哪（倒地时摔开半米，断肢时攥在飞出去的胳膊上）。拿不到模型就用尸体根节点。 */
+function CorpseWeaponPoint(soldier) {
+  const group = soldier?.actor?.weaponGroup;
+  if (!group?.parent) return null;
+  group.updateWorldMatrix(true, true);
+  _dropBox.setFromObject(group);
+  if (_dropBox.isEmpty()) return null;
+  _dropBox.getCenter(_dropCenter);
+  return { x: _dropCenter.x, y: Math.min(_dropBox.min.y, soldier.position.y), z: _dropCenter.z };
+}
+
+let groundWeaponMaterials = null;
+/** 地上那把枪的模型：与人物手里的是同一份几何（WeaponGeometry），横放贴地。 */
+function BuildGroundWeaponView(item) {
+  if (!scene || !actorFactory) return null;
+  groundWeaponMaterials ||= actorFactory.ActorMaterials("nra", () => 0.5);
+  const built = actorFactory.WeaponGeometry(item.weaponId, item.weaponVariant, { includeBayonet: false });
+  const root = new THREE.Group();
+  root.name = `GroundWeapon_${item.weaponId}`;
+  const holder = new THREE.Group();
+  for (const [key, geometry] of built.geometries) {
+    const mesh = new THREE.Mesh(geometry, groundWeaponMaterials[key] || groundWeaponMaterials.steel);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    holder.add(mesh);
+  }
+  // 与尸体倒地时的枪同一种摆法：绕枪管轴侧躺（Z 转 90°），再按 yaw 转在地面上。
+  holder.quaternion.setFromEuler(new THREE.Euler(0, item.yaw || 0, Math.PI / 2, "YXZ"));
+  root.add(holder);
+  holder.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(holder), center = box.getCenter(new THREE.Vector3());
+  holder.position.set(-center.x, 0.008 - box.min.y, -center.z);
+  root.position.set(item.position.x, item.position.y ?? 0, item.position.z);
+  scene.add(root);
+  item.view = root;
+  return root;
+}
+
+function DisposeGroundWeaponView(item) {
+  const root = item?.view;
+  if (!root) return;
+  root.removeFromParent();
+  item.view = null;
 }
 
 /** 呼叫迫击炮。全集团军的迫击炮数得过来，一局两发 —— 这条稀缺本身就是史实。 */

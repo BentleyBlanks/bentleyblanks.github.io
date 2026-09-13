@@ -3,7 +3,9 @@
 // ── 这个文件现在是两层 ───────────────────────────────────────────────────────
 //
 // 【一】**内建分支**（ER2 式的「按上下文挑一件事做」，原样保留）：
-//   · 拾枪拾弹 —— 2 m 内最近的尸体，捡它的枪与还没打完的桥夹；
+//   · 拾枪拾弹 —— 2 m 内最近的一把枪（尸体身上掉的，或玩家换枪时丢在地上的），
+//               按**枪躺在哪**算距离，不按尸体脚底；同型的枪不换，只拿弹药；
+//               换枪时手里那把放回刚才那把枪的位置，捡走的那把从地上消失。
 //   · 分弹药   —— 2.5 m 内弹打光的弟兄，分一个桥夹过去。
 //   这两条不查注册表，因为它们的「交互点」是活的战场对象（谁倒下了、谁打光了），
 //   摆不进一张静态表里。
@@ -50,8 +52,18 @@ export class InteractSystem {
   /**
    * @param {object} ctx { ai, audio, hud }
    * @param {object} hooks
-   *   TakeWeapon(weaponId, clips, soldier, weaponVariant) -> boolean  捡起一件武器（装配层改槽位与弹仓）
+   *   TakeWeapon(weaponId, clips, soldier, weaponVariant, extra) -> boolean
+   *       捡起一件武器（装配层改槽位与弹仓）。extra = { ammo, at, yaw }：
+   *       ammo 枪里剩几发（缺省 = 满仓）；at/yaw 换下来的那把放回哪儿。
    *   HasWeapon(weaponId) -> boolean                    玩家是否已有同类槽位（决定“拾起/换上”）
+   *   SameWeapon(weaponId) -> boolean                   槽位里就是这一型（决定“换上/拿弹药”）
+   *   TakeAmmo(weaponId, clips, ammo) -> number         同型只拿弹药，返回拿到几个桥夹
+   *   AmmoGain(clips, ammo, weaponId) -> number         不改状态，只算能拿到几个（0 = 这把没东西可拿）
+   *   DropPoint(soldier) -> {x,y,z}|null                尸体那把枪现在实际躺在哪
+   *   CanReachActor(actor, player, point) -> boolean    视线遮挡；point 是枪的位置
+   *   CanReachPoint(point, player) -> boolean           地上那把枪的视线遮挡
+   *   DropTaken(soldier)                                尸体上的枪被拿走了（藏模型）
+   *   GroundWeaponRemoved(item)                         地上的枪被拿走/清掉了（拆模型）
    *   SpareClips() -> number                            玩家手上还有几个桥夹
    *   GiveClip(soldier) -> boolean                      分一个桥夹给弟兄
    */
@@ -60,6 +72,9 @@ export class InteractSystem {
     this.hooks = hooks;
     this.lastLabel = null;      // 提示语只在变化时打一次，不然每帧一条
     this.pickups = 0;           // 捡了几次（运行时取证用）
+    /** 地上散落的枪（玩家换下来的）：{ id, weaponId, weaponVariant, ammo, clips, position, yaw, taken }。 */
+    this.groundWeapons = [];
+    this.groundAutoId = 0;
     this.handouts = 0;          // 分了几次弹
     /** 注册的交互点：id -> spec。摆点是集成批的事，引擎只读这张表。 */
     this.points = new Map();
@@ -140,6 +155,60 @@ export class InteractSystem {
   get PointCount() { return this.points.size; }
 
   // -------------------------------------------------------------------------
+  // 地上的枪
+  // -------------------------------------------------------------------------
+
+  /**
+   * 往地上放一把枪（换枪时手里换下来的那把）。模型归装配层，这里只记账。
+   * @returns 登记好的那一条；装配层把模型挂在 item.view 上，拿走时由 GroundWeaponRemoved 拆。
+   */
+  DropGroundWeapon({ weaponId, weaponVariant = 0, ammo = 0, clips = 0, position, yaw = 0 } = {}) {
+    if (!WEAPONS[weaponId] || !position) return null;
+    const item = {
+      id: `gw_${++this.groundAutoId}`, weaponId, weaponVariant,
+      ammo: Math.max(0, Number(ammo) || 0), clips: Math.max(0, Number(clips) || 0),
+      position: { x: position.x, y: position.y ?? 0, z: position.z }, yaw, taken: false, view: null,
+    };
+    this.groundWeapons.push(item);
+    return item;
+  }
+
+  RemoveGroundWeapon(item) {
+    const index = this.groundWeapons.indexOf(item);
+    if (index < 0) return false;
+    this.groundWeapons.splice(index, 1);
+    this.hooks.GroundWeaponRemoved?.(item);
+    return true;
+  }
+
+  /** 换关：地上的枪一把不留（模型一并交回装配层拆掉）。 */
+  ClearGroundWeapons() {
+    const items = this.groundWeapons.splice(0);
+    for (const item of items) this.hooks.GroundWeaponRemoved?.(item);
+    return items.length;
+  }
+
+  /** 捡这把枪会发生什么：换枪 / 拾起 / 只拿弹药。null = 同型而且没有弹药可拿。 */
+  PickupCandidate(source, dist, extra) {
+    const name = WeaponName(source.weaponId) || T("interact.pickup.unknownWeapon");
+    const melee = WEAPONS[source.weaponId]?.kind === "melee";
+    const ammoOnly = !melee && !!this.hooks.SameWeapon?.(source.weaponId);
+    if (ammoOnly && !(this.hooks.AmmoGain?.(source.clips, source.ammo, source.weaponId) > 0)) return null;
+    // HasPrimary 是早期测试/嵌入方的兼容口；主程序提供 HasWeapon，
+    // 才能让大刀按 3 号槽而不是拿长枪槽判断“拾起/换上”。
+    const hasWeapon = this.hooks.HasWeapon
+      ? this.hooks.HasWeapon(source.weaponId) : this.hooks.HasPrimary?.();
+    // 「拾起 / 换上 / 拿弹药」是三句不同的话，各有各的键 —— 不在这里拼动词。
+    const label = ammoOnly ? T("interact.pickup.ammo", { name })
+      : hasWeapon ? T("interact.pickup.swap", { name })
+        : T("interact.pickup.take", { name });
+    return {
+      kind: "pickup", label, dist, ammoOnly,
+      priority: INTERACT.builtinPriority, gesture: "tap", seconds: 0, ...extra,
+    };
+  }
+
+  // -------------------------------------------------------------------------
   // 判定
   // -------------------------------------------------------------------------
 
@@ -182,11 +251,22 @@ export class InteractSystem {
   Query(player) {
     if (!player || !player.Alive) return null;
     let best = null;
+    // 正看着的那把枪压过更远的区域型注册点（见 INTERACT.pickupAimDot 的说明）。
+    // 只压普通优先级的点：拾起掷回手榴弹这类抬高了优先级的急事永远排在前面。
+    const AimedPickupBeats = (pickup, other) => pickup.kind === "pickup" && pickup.aimed
+      && other.point && other.point.facingDot == null && other.priority <= INTERACT.pointPriority
+      && pickup.dist < other.dist;
     const Consider = (candidate) => {
       if (!best) { best = candidate; return; }
-      if (candidate.priority > best.priority
+      if (AimedPickupBeats(best, candidate)) return;
+      if (AimedPickupBeats(candidate, best)
+        || candidate.priority > best.priority
         || (candidate.priority === best.priority && candidate.dist < best.dist)) best = candidate;
     };
+    const yaw = Number(player.yaw) || 0;
+    const lookX = -Math.sin(yaw), lookZ = -Math.cos(yaw);
+    const Aimed = (at, dist) => dist < 0.05
+      || (lookX * (at.x - player.position.x) + lookZ * (at.z - player.position.z)) / dist >= INTERACT.pickupAimDot;
 
     for (const point of this.points.values()) {
       if (point.cooldownLeft > 0) continue;
@@ -201,29 +281,36 @@ export class InteractSystem {
       });
     }
 
+    const px = player.position.x, pz = player.position.z;
+    for (const item of this.groundWeapons) {
+      if (item.taken) continue;
+      const d = Math.hypot(item.position.x - px, item.position.z - pz);
+      if (d > INTERACT.corpseReachM) continue;
+      if (item.position.y != null && player.position.y != null
+        && Math.abs(item.position.y - player.position.y) > INTERACT.pointHeightM) continue;
+      if (this.hooks.CanReachPoint?.(item.position, player) === false) continue;
+      const candidate = this.PickupCandidate(item, d,
+        { ground: item, at: item.position, aimed: Aimed(item.position, d) });
+      if (candidate) Consider(candidate);
+    }
+
     for (const s of this.ctx?.ai?.soldiers || []) {
-      const d = Math.hypot(s.position.x - player.position.x, s.position.z - player.position.z);
-      if(d > Math.max(INTERACT.corpseReachM,INTERACT.mateReachM) || this.hooks.CanReachActor?.(s,player)===false)continue;
+      const rootD = Math.hypot(s.position.x - px, s.position.z - pz);
       if (!s.alive) {
-        // 尸体：身上有没有还没被拿走的东西
-        if (!s.drop || s.drop.taken || d > INTERACT.corpseReachM) continue;
-        const name = WeaponName(s.drop.weaponId) || T("interact.pickup.unknownWeapon");
-        // HasPrimary 是早期测试/嵌入方的兼容口；主程序提供 HasWeapon，
-        // 才能让大刀按 3 号槽而不是拿长枪槽判断“拾起/换上”。
-        const hasWeapon = this.hooks.HasWeapon
-          ? this.hooks.HasWeapon(s.drop.weaponId) : this.hooks.HasPrimary?.();
-        // 「拾起 / 换上」是两句不同的话，各有各的键 —— 不在这里拼动词。
-        const label = hasWeapon
-          ? T("interact.pickup.swap", { name })
-          : T("interact.pickup.take", { name });
-        Consider({
-          kind: "pickup", soldier: s, label, dist: d,
-          priority: INTERACT.builtinPriority, gesture: "tap", seconds: 0,
-        });
+        // 尸体：身上有没有还没被拿走的东西。距离按枪实际躺的位置算 ——
+        // 几具尸体挨着时按脚底算，捡到的会是旁边那具的枪，眼前这把还躺在地上。
+        if (!s.drop || s.drop.taken || rootD > INTERACT.corpseScanM) continue;
+        const at = this.hooks.DropPoint?.(s) || s.position;
+        const d = Math.hypot(at.x - px, at.z - pz);
+        if (d > INTERACT.corpseReachM || this.hooks.CanReachActor?.(s, player, at) === false) continue;
+        const candidate = this.PickupCandidate(s.drop, d, { soldier: s, at, aimed: Aimed(at, d) });
+        if (candidate) Consider(candidate);
         continue;
       }
+      const d = rootD;
+      if (d > INTERACT.mateReachM || this.hooks.CanReachActor?.(s, player) === false) continue;
       // 活着的自己人：弹打光了就分一个桥夹过去
-      if (s.side !== "nra" || d > INTERACT.mateReachM) continue;
+      if (s.side !== "nra") continue;
       if (s.ammo > 0) continue;
       // 自己只剩一个就不给了
       if ((this.hooks.SpareClips?.() ?? 0) < INTERACT.spareClipsMin) continue;
@@ -323,10 +410,31 @@ export class InteractSystem {
   /** 真的做成了。内建两条走各自的结算；注册点走 OnComplete。 */
   Complete(candidate, player) {
     if (candidate.kind === "pickup") {
-      const drop = candidate.soldier.drop;
-      if (!this.hooks.TakeWeapon?.(drop.weaponId, drop.clips, candidate.soldier,
-        drop.weaponVariant ?? 0)) return false;
+      const ground = candidate.ground || null;
+      const drop = ground || candidate.soldier.drop;
+      if (drop.taken) return false;
+      const name = WeaponName(drop.weaponId) || T("interact.pickup.unknownWeapon");
+      if (candidate.ammoOnly) {
+        // 同型的枪：换了等于把自己的弹仓清掉，所以只拿弹药。枪是空的了但还躺在原地 ——
+        // 以后手里换成别的枪，它照样能捡（空枪，零发）。
+        const gained = this.hooks.TakeAmmo?.(drop.weaponId, drop.clips, drop.ammo) || 0;
+        if (gained <= 0) return false;
+        drop.clips = 0; drop.ammo = 0;
+        this.pickups += 1;
+        this.ctx?.audio?.Play("stripperLoad", { volume: 0.55 });
+        this.ctx?.hud?.Hint(T("interact.pickup.ammoTaken", { name, clips: gained }), INTERACT.pickupClipsHintS);
+        return true;
+      }
+      // 先记下「已拿走」再交给装配层：TakeWeapon 会把换下来的那把放到同一个位置，
+      // 这一帧里不许出现「新放下的那把」与「刚捡走的这把」同时可捡。
       drop.taken = true;
+      if (!this.hooks.TakeWeapon?.(drop.weaponId, drop.clips, candidate.soldier || null,
+        drop.weaponVariant ?? 0, { ammo: drop.ammo, at: candidate.at || null, yaw: ground?.yaw })) {
+        drop.taken = false;
+        return false;
+      }
+      if (ground) this.RemoveGroundWeapon(ground);
+      else this.hooks.DropTaken?.(candidate.soldier);
       this.pickups += 1;
       const w = WEAPONS[drop.weaponId];
       this.ctx?.audio?.Play("magIn", { volume: 0.6 });
@@ -335,8 +443,11 @@ export class InteractSystem {
           INTERACT.pickupMeleeHintS);
         return true;
       }
+      if (ground && drop.clips <= 0) {
+        this.ctx?.hud?.Hint(T("interact.pickup.rounds", { name, ammo: drop.ammo }), INTERACT.pickupClipsHintS);
+        return true;
+      }
       // 缴获日械只有枪里那五发 —— 这句提示是这条规则唯一的说明书，别删
-      const name = WeaponName(drop.weaponId) || T("interact.pickup.unknownWeapon");
       this.ctx?.hud?.Hint(drop.clips > 0
         ? T("interact.pickup.withClips", { name, clips: drop.clips })
         : T("interact.pickup.noClips", { name }), INTERACT.pickupClipsHintS);
@@ -391,6 +502,9 @@ export class InteractSystem {
       })),
       hold: this.View(),
       pickups: this.pickups, handouts: this.handouts,
+      groundWeapons: this.groundWeapons.map((g) => ({
+        id: g.id, weaponId: g.weaponId, ammo: g.ammo, clips: g.clips, position: { ...g.position },
+      })),
       completions: this.completions, cancels: this.cancels,
     };
   }

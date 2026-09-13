@@ -112,8 +112,15 @@ if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-v
       if(clear&&query?.kind==="pickup"&&query.soldier===corpse){g.Debug.Key("KeyF",true);g.Debug.Key("KeyF",false);}
       g.StepFrames(1);
       const after={weapon:g.Debug.Interact().weapon,ammo:g.state.ammo,clips:g.state.clips,pickups:g.interact.pickups,taken:corpse.drop.taken};
+      // 第二次 F：尸体已经空了，够得着的只剩刚才换下丢在原地的那支空汉阳造 —— 换回它不许凭空多出弹药；
+      // 第三次 F 再把缴获的枪换回来，好接着验开火。
+      const RoundsInReach=()=>g.state.ammo+g.state.clips+g.interact.groundWeapons.reduce((n,w)=>n+w.ammo+w.clips,0);
+      const roundsAfter=RoundsInReach(),secondQuery=g.interact.Query(g.player);
       g.Debug.Key("KeyF",true);g.Debug.Key("KeyF",false);g.StepFrames(1);
-      return {before,after,secondPickups:g.interact.pickups,secondAmmo:g.state.ammo,secondClips:g.state.clips,corpse:corpse.position.toArray(),drop:{...corpse.drop},
+      const second={weapon:g.Debug.Interact().weapon,rounds:RoundsInReach(),soldierTarget:secondQuery?.soldier===corpse,ground:!!secondQuery?.ground};
+      g.Debug.Key("KeyF",true);g.Debug.Key("KeyF",false);g.StepFrames(1);
+      return {before,after,second,roundsAfter,third:{weapon:g.Debug.Interact().weapon,ammo:g.state.ammo,rounds:RoundsInReach()},
+        secondPickups:g.interact.pickups,secondAmmo:g.state.ammo,secondClips:g.state.clips,corpse:corpse.position.toArray(),drop:{...corpse.drop},
         player:g.player.position.toArray(),walk,clear,query:query?.kind,label:query?.label};
     });
     await page.screenshot({path:path.join(os.tmpdir(),"Scene_P012SalvagePickedUp.png")});
@@ -129,8 +136,9 @@ if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-v
       &&grenade.after.some(a=>a.health<grenade.before.find(b=>b.id===a.id).health),JSON.stringify(grenade.effect));
     Check("真实走近可见尸体F缴获同一把枪",pickup.walk.length>0&&pickup.clear&&pickup.after.taken
       &&pickup.after.weapon===pickup.drop.weaponId&&pickup.after.ammo>0&&pickup.after.pickups===pickup.before.pickups+1);
-    Check("尸体单次领取，不复刷弹药",pickup.secondPickups===pickup.after.pickups
-      &&pickup.secondAmmo===pickup.after.ammo&&pickup.secondClips===pickup.after.clips);
+    Check("尸体单次领取，换回丢下的旧枪不复刷弹药",!pickup.second.soldierTarget&&pickup.second.ground
+      &&pickup.second.weapon==="HanYang"&&pickup.second.rounds===pickup.roundsAfter
+      &&pickup.third.weapon===pickup.drop.weaponId&&pickup.third.rounds===pickup.roundsAfter,JSON.stringify({second:pickup.second,third:pickup.third}));
     Check("缴枪后实际左键扣弹射击",shot.after.ammo<shot.before.ammo&&shot.after.shots>shot.before.shots,JSON.stringify(shot));
     Check("无浏览器错误",problems.length===0,problems.join("\n"));
     await browser.close();await server.close();process.exit(failed?1:0);

@@ -436,6 +436,9 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 ### 交互 / 负重（担架·搬运·救护交互点）
 - `Script_Interact.mjs` —— 两层：**内建分支**（拾枪/分弹药）＋**可注册交互点框架**
   （`Register(spec)`，三种手势）；文件末尾十个**救护类预制**全是纯函数，摆点是章节的事。
+  拾枪口径：按**枪实际躺的位置**（`DropPoint`）判距离；换枪时手里那把放回原处（`groundWeapons`，
+  模型在装配层 `BuildGroundWeaponView`），捡走的那把从尸体上拆掉；同型的枪只拿弹药不换枪；
+  正看着的枪压过不判朝向的普通区域点（`INTERACT.pickupAimDot`）。回归在 `Script_CarryTest` 的「换枪」段。
 - `Script_Carry.mjs` —— 负重状态机（`CARRY_KINDS` 一张表）。三条卸载路径：F 放下、左键扔下、
   脚本 `ForceRelease`；`canDrop:false` 是「拒绝松手」变体（第四章抬罗班长）。与玩家控制器的
   接口只有 `player.carrySpeedScale`；「能不能开枪」在装配层 `TryFire` 读 `carry.Blocking`。

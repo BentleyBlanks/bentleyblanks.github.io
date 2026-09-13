@@ -24,6 +24,11 @@ export const TEXT = Object.freeze({
   "interact.pickup.withClips": "捡了一支{name}，还有 {clips} 个桥夹",
   // 缴获日械只有枪里那五发 —— 这句提示是这条规则唯一的说明书，别删。
   "interact.pickup.noClips": "捡了一支{name} —— 只有枪里这几发，我们没有这个口径",
+  // 自己换下来丢在地上的那把：弹数是换下时枪里剩的，不是缴获的「五发」。
+  "interact.pickup.rounds": "拾起{name}，枪里还有 {ammo} 发",
+  // 地上那把跟手里的是同一型：不换枪，只把能用的弹药拿走。
+  "interact.pickup.ammo": "拿走 {name} 的弹药",
+  "interact.pickup.ammoTaken": "从{name}上拿了 {clips} 个桥夹",
 
   // --- 分弹药 ---------------------------------------------------------------
   "interact.ammo.give": "分一个桥夹给 {name}",
