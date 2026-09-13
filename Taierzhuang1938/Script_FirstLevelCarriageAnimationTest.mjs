@@ -29,7 +29,7 @@ import {LugouCharacterRig} from '../../Script_CharacterModel.mjs';import {FirstL
 window.CarriageCheck={T,loader:new GLTFLoader(),LugouCharacterRig,FirstLevelCarriageAnimation};</script>`);
 const server=await ServeRoot(path.dirname(project),0),browser=await LaunchBrowser(),errors=[],results=[];
 try{
- const page=await browser.newPage({viewport:{width:1440,height:1080}});page.on('pageerror',e=>errors.push(e.message));
+ const page=await browser.newPage({viewport:{width:1280,height:720}});page.on('pageerror',e=>errors.push(e.message));
  await page.goto('http://127.0.0.1:'+server.address().port+'/Taierzhuang1938/_shots/CarriageAnimation/_check_CarriageAnimation.html');await page.waitForFunction(()=>window.CarriageCheck);
  for(const record of config.models){
   const result=await page.evaluate(async({record,config,assetRecord})=>{
@@ -39,6 +39,17 @@ try{
    const rig=new LugouCharacterRig({record:assetRecord,gltf},{kind:'nra',targetHeight:1.66,seed:'CarriageAnimation',variantIndex:record.id.endsWith('05')?4:1});rig.Attach(actor);
    const soldier={actor:{root:actor.root,characterRig:rig},position:new T.Vector3(),missionTrainLife:{deckY:0}};
    const sampler=new FirstLevelCarriageAnimation(soldier,data,config),nodes=sampler.bones;
+   // Independent oracle: use Three's original per-vertex skinning, rather than
+   // asking the batched evaluator to validate its own floor correction.
+   const fullSoles=rig.infantryGroundProbes.map(({mesh,vertices})=>({mesh,vertices:vertices.filter(index=>{
+    let influence=0;for(let k=0;k<4;k++)if(/Foot|Toe/.test(mesh.skeleton.bones[mesh.geometry.attributes.skinIndex.getComponent(index,k)]?.name||''))influence+=mesh.geometry.attributes.skinWeight.getComponent(index,k);return influence>.65;
+   })}));
+   const probeStats={original:fullSoles.reduce((n,p)=>n+p.vertices.length,0),points:sampler.soleProbes.reduce((n,p)=>n+p.points.length/11,0),originalTransforms:sampler.soleProbes.reduce((n,p)=>n+p.originalTransforms,0),transforms:sampler.soleProbes.reduce((n,p)=>n+p.boneIndices.length,0),samples:0,maxError:0,minFullSole:Infinity};
+   const CheckSole=()=>{
+    const sparse=sampler.FootFloor(),v=new T.Vector3();let full=Infinity;
+    for(const {mesh,vertices} of fullSoles)for(const index of vertices){mesh.getVertexPosition(index,v).applyMatrix4(mesh.matrixWorld);full=Math.min(full,v.y);}
+    probeStats.samples++;probeStats.maxError=Math.max(probeStats.maxError,Math.abs(sparse-full));probeStats.minFullSole=Math.min(probeStats.minFullSole,full);
+   };
    const point=node=>node.getWorldPosition(new T.Vector3());
    const restSnapshot=()=>nodes.flatMap(n=>[...n.position,...n.quaternion,...n.scale]);
    const scene=new T.Scene();scene.background=new T.Color(0x30353a);scene.add(actor.root);
@@ -82,9 +93,35 @@ try{
     sampler.Restore();rig.Update(0,{reach:1});sampler.Sample('WallCrouchIdle',1.3,{weight,loop:false,deckY:0,transitionSeconds:0});
     release.push({weight,sole:sampler.FootFloor(),bounds:Bounds()});
    }
-   sampler.Restore();renderer.dispose();return {modelId:record.id,maxRestoreError,maxRootDrift,minSole,maxSole,maxWallBack,clips,release};
+   // Full clips and partial release weights, plus every ordered clip transition.
+   for(const id of record.clipIds)for(let frame=0;frame<=24;frame++)for(const weight of [1,.5,.01]){
+    sampler.Restore();rig.Update(0,{reach:1});sampler.Sample(id,data.clips[id].duration*frame/24,{weight,loop:false,deckY:0,transitionSeconds:0});CheckSole();
+   }
+   for(const from of record.clipIds)for(const to of record.clipIds){
+    if(from===to)continue;
+    sampler.Restore();rig.Update(0,{reach:1});sampler.Sample(from,data.clips[from].duration*.4,{loop:false,deckY:0,transitionSeconds:0});
+    for(const seconds of [0,.04,.08,.12,.16]){
+     sampler.Restore();rig.Update(0,{reach:1});sampler.Sample(to,seconds,{loop:false,deckY:0,transitionSeconds:.16});CheckSole();
+    }
+   }
+   // Cached bind-space samples must not mask later mesh edits or morphs.
+   const mesh=fullSoles[0].mesh,originalGeometry=mesh.geometry,originalInfluences=mesh.morphTargetInfluences;
+   const edited=originalGeometry.clone();mesh.geometry=edited;
+   for(const index of fullSoles[0].vertices)edited.attributes.position.setY(index,edited.attributes.position.getY(index)+.2);
+   edited.attributes.position.needsUpdate=true;
+   sampler.Restore();rig.Update(0,{reach:1});sampler.Sample(record.clipIds[0],.4,{deckY:0,transitionSeconds:0});CheckSole();
+   const delta=new Float32Array(edited.attributes.position.count*3);
+   for(const index of fullSoles[0].vertices)delta[index*3+1]=-.4;
+   edited.morphAttributes.position=[new T.BufferAttribute(delta,3)];edited.morphTargetsRelative=true;mesh.morphTargetInfluences=[.5];
+   sampler.Restore();rig.Update(0,{reach:1});sampler.Sample(record.clipIds[0],.4,{deckY:0,transitionSeconds:0});CheckSole();
+   sampler.Restore();mesh.geometry=originalGeometry;mesh.morphTargetInfluences=originalInfluences;edited.dispose();
+   sampler.Restore();renderer.dispose();return {modelId:record.id,maxRestoreError,maxRootDrift,minSole,maxSole,maxWallBack,clips,release,probeStats};
   },{record,config,assetRecord:manifest.models.find(m=>m.id===record.id)});
   results.push(result);
+  console.log('SOLE_PROBES',record.id,JSON.stringify(result.probeStats));
+  assert.ok(result.probeStats.transforms<=result.probeStats.originalTransforms*.1,'at least 90% fewer repeated bone matrix products');
+  assert.ok(result.probeStats.maxError<=1e-12,'batched skinning preserves the full original support height');
+  assert.ok(result.probeStats.minFullSole>=-1e-6,'original shoe surface remains above the deck');
   await fs.writeFile(path.join(out,'Data_CarriageAnimationValidation.json'),JSON.stringify({config:config.version,results,errors},null,2));
   await page.screenshot({path:path.join(out,'Texture_CarriageAnimationReview.png'),fullPage:true});
   console.log(JSON.stringify({id:result.modelId,minSole:result.minSole,maxSole:result.maxSole,maxWallBack:result.maxWallBack,first:result.clips[0].samples[0]}));

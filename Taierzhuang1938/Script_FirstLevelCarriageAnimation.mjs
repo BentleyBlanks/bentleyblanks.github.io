@@ -1,8 +1,34 @@
 // Blender-authored original-rig tracks. Never changes the Soldier/Actor world root.
-import { Vector3, Quaternion } from 'three';
+import { Vector3, Quaternion, Matrix4 } from 'three';
 const Clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const Normalize=name=>name.toLowerCase().replace(/[^a-z0-9]/g,'');
 const savedPool=[];
+const soleProbeCache=new WeakMap();
+// Cache immutable bind-space shoe data across clones. UV/normal seams with
+// identical ordered skin influences need only one support sample.
+function PrepareSoleProbes(mesh,vertices){
+  const geometry=mesh.geometry,cached=soleProbeCache.get(geometry);
+  if(cached&&cached.bindMatrix.equals(mesh.bindMatrix))return cached;
+  const indices=geometry.attributes.skinIndex,weights=geometry.attributes.skinWeight;
+  const position=geometry.attributes.position,boneIndices=[],soles=[],points=[],seen=new Set(),v=new Vector3();
+  let originalTransforms=0;
+  for(const index of vertices){
+    let influence=0;
+    for(let k=0;k<4;k++)if(/Foot|Toe/.test(mesh.skeleton.bones[indices.getComponent(index,k)]?.name||''))influence+=weights.getComponent(index,k);
+    if(influence<=.65)continue;
+    soles.push(index);v.fromBufferAttribute(position,index).applyMatrix4(mesh.bindMatrix);
+    const point=[v.x,v.y,v.z];
+    for(let k=0;k<4;k++){
+      const bone=indices.getComponent(index,k),weight=weights.getComponent(index,k);
+      let slot=boneIndices.indexOf(bone);
+      if(weight!==0){originalTransforms++;if(slot<0){slot=boneIndices.length;boneIndices.push(bone);}}
+      point.push(slot,weight);
+    }
+    const key=point.join(',');if(seen.has(key))continue;seen.add(key);points.push(...point);
+  }
+  const result={vertices:soles,points:new Float64Array(points),boneIndices,originalTransforms,geometry,positionVersion:position.version,indexVersion:indices.version,weightVersion:weights.version,bindMatrix:mesh.bindMatrix.clone()};
+  soleProbeCache.set(geometry,result);return result;
+}
 let pending,library;
 export function LoadFirstLevelCarriageAnimation(base='./Animation/FirstLevelCarriage/'){
   return pending ||= (async()=>{
@@ -31,12 +57,9 @@ export class FirstLevelCarriageAnimation{
     this.bones=record.bones.map(name=>{const node=nodes.get(Normalize(name));if(!node?.isBone)throw Error('Carriage bone binding '+record.modelId+' '+name);return node});
     if(record.stride!==7||!this.bones.length)throw Error('Carriage animation schema');
     this.lastPose=new Float64Array(this.bones.length*7);this.transitionPose=new Float64Array(this.bones.length*7);
-    // The normal locomotion gate probes entire shins. Carriage poses preserve
-    // original shoe rotations, so the original weighted shoe surface suffices.
     this.soleProbes=(this.rig.infantryGroundProbes||[]).map(({mesh,vertices})=>{
-      const indices=mesh.geometry.attributes.skinIndex,weights=mesh.geometry.attributes.skinWeight;
-      const soles=vertices.filter(index=>{let influence=0;for(let k=0;k<4;k++)if(/Foot|Toe/.test(mesh.skeleton.bones[indices.getComponent(index,k)]?.name||''))influence+=weights.getComponent(index,k);return influence>.65;});
-      return {mesh,vertices:soles};
+      const data=PrepareSoleProbes(mesh,vertices);
+      return {mesh,...data,matrices:data.boneIndices.map(()=>new Matrix4())};
     });
   }
   ClipDuration(clipId){const clip=this.record.clips[clipId];if(!clip)throw Error('Missing carriage clip '+this.record.modelId+' '+clipId);return clip.duration;}
@@ -47,7 +70,35 @@ export class FirstLevelCarriageAnimation{
     // Object3D.updateWorldMatrix bypasses that override and measures stale skin
     // coordinates after a root-floor correction, producing a sinking feedback.
     const rig=this.rig;rig.actor.root.updateMatrixWorld(true);let floor=Infinity;
-    for(const {mesh,vertices} of this.soleProbes)for(const index of vertices){mesh.getVertexPosition(index,this.value2).applyMatrix4(mesh.matrixWorld);floor=Math.min(floor,this.value2.y);}
+    for(const probe of this.soleProbes){
+      const {mesh,vertices,points,boneIndices,matrices}=probe;
+      // Mutable/morphed vertices retain the original evaluation path.
+      if(mesh.morphTargetInfluences?.some(weight=>weight!==0)
+        ||mesh.geometry!==probe.geometry||!mesh.bindMatrix.equals(probe.bindMatrix)
+        ||mesh.geometry.attributes.position.version!==probe.positionVersion
+        ||mesh.geometry.attributes.skinIndex.version!==probe.indexVersion
+        ||mesh.geometry.attributes.skinWeight.version!==probe.weightVersion){
+        for(const index of vertices){mesh.getVertexPosition(index,this.value2).applyMatrix4(mesh.matrixWorld);floor=Math.min(floor,this.value2.y);}
+        continue;
+      }
+      for(let i=0;i<boneIndices.length;i++){
+        const bone=boneIndices[i];matrices[i].multiplyMatrices(mesh.skeleton.bones[bone].matrixWorld,mesh.skeleton.boneInverses[bone]);
+      }
+      // Match Three's applyBoneTransform operation order, without rebuilding
+      // each bone matrix or re-reading attributes for every shoe vertex.
+      for(let at=0;at<points.length;at+=11){
+        const x=points[at],y=points[at+1],z=points[at+2];let sx=0,sy=0,sz=0;
+        for(let k=at+3;k<at+11;k+=2){
+          const weight=points[k+1];if(weight===0)continue;
+          const e=matrices[points[k]].elements,w=1/(e[3]*x+e[7]*y+e[11]*z+e[15]);
+          sx+=(e[0]*x+e[4]*y+e[8]*z+e[12])*w*weight;
+          sy+=(e[1]*x+e[5]*y+e[9]*z+e[13])*w*weight;
+          sz+=(e[2]*x+e[6]*y+e[10]*z+e[14])*w*weight;
+        }
+        this.value2.set(sx,sy,sz).applyMatrix4(mesh.bindMatrixInverse).applyMatrix4(mesh.matrixWorld);
+        floor=Math.min(floor,this.value2.y);
+      }
+    }
     if(!Number.isFinite(floor))throw Error('Carriage original-skin floor probes missing');return floor;
   }
   Sample(clipId,seconds,{weight=1,loop=true,deckY=this.soldier.missionTrainLife?.deckY,transitionSeconds=this.config.transitionSeconds??.16}={}){
