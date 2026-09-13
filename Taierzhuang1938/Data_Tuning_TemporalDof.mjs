@@ -104,6 +104,14 @@ export const MOTION_BLUR = {
  *   nearCoverageGain 近场覆盖度（alpha）的增益：>1 让前景边缘更肯往外渗
  *   maxCocPx         CoC 的绝对上限（输出像素）。tile 之外没有别的保护，别调太大
  *   minCocPx         低于它按锐利处理（跳过 gather 的混合）
+ *
+ * ## 开镜时第一人称枪身的散焦
+ * 视模的视深是压缩过的（预通道只写常数前景标签），没法走薄透镜。开镜时照门/准星
+ * 解在画面正中，离眼越近的零件（照门、机匣、手）在屏幕上离中心越远，所以按
+ * **屏幕上到准星的距离**给枪身 CoC：准星一圈清楚，往外渐进到近景上限。
+ *   viewmodelSharpRadius  准星周围保持清楚的半径（占屏幕高度的比例）
+ *   viewmodelBlurRadius   到这个半径时枪身散焦到满（同上单位）
+ *   viewmodelCocScale     枪身满散焦 = 近景上限（nearDofMaxPx × 强度）× 这个数
  */
 export const DOF = {
   sensorWidthMm: 36,
@@ -116,6 +124,9 @@ export const DOF = {
   nearCoverageGain: 1.35,
   maxCocPx: 28,
   minCocPx: 0.35,
+  viewmodelSharpRadius: 0.04,
+  viewmodelBlurRadius: 0.20,
+  viewmodelCocScale: 1.4,
 };
 
 /**

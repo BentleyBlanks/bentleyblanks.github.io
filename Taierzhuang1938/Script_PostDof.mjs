@@ -23,9 +23,12 @@
 // 想要真·光圈驱动（改 f/N 就改虚化量）把 `DOF.apertureDriven` 置 true。
 //
 // ## 前景（第一人称手/枪）
-// 预通道给它写常数近景标签深度（`FOREGROUND_VIEW_DEPTH`）。这里三处认它：
-// CoC 恒 0、不进近场采集、合成时直接返回原色。开镜（ADS）那一档的全部意义
-// 就是「贴眼的掩体糊、正在瞄的枪锐」，认错一处这条就废了。
+// 预通道给它写常数近景标签深度（`FOREGROUND_VIEW_DEPTH`），视深不可信，不走薄透镜。
+//   · 平时（没给准星位置）：CoC 恒 0，合成时直接返回原色 —— 枪永远锐。
+//   · 开镜（调用点给了 `nearDofSightUv`）：按**屏幕上到准星的距离**给负 CoC ——
+//     准星那一圈清楚，照门、机匣、手这些贴眼的零件往外渐进糊到近景上限
+//     （口径见 Data_Tuning_TemporalDof.DOF.viewmodel*）。用户要的就是
+//     「近景都糊，只有枪头准星那块清楚」，整把枪一律锐是错的。
 
 import * as THREE from "three";
 import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_PostCommon.mjs";
@@ -40,15 +43,24 @@ uniform float uFarMaxPx;
 uniform float uNearMaxPx;
 uniform float uForegroundDepth;
 uniform float uForegroundEps;
+uniform vec2 uSightUv;          // 开镜准星的屏幕 uv；x < 0 = 不开镜，枪整把锐
+uniform float uAspect;          // 宽 / 高
+uniform vec2 uViewmodelRadius;  // 清楚半径、满散焦半径（屏幕高度比例）
+uniform float uViewmodelMaxPx;  // 枪身满散焦的 CoC（输出像素，正数）
 
 bool IsForeground(float viewDepth) {
   return uForegroundDepth > 0.0 && abs(viewDepth - uForegroundDepth) < uForegroundEps;
 }
 
 /** 带符号 CoC（输出像素）。正 = 远景散焦，负 = 近景散焦，0 = 合焦。 */
-float CocPx(float viewDepth) {
+float CocPx(float viewDepth, vec2 uv) {
   if (viewDepth <= 0.0) return uFarMaxPx;          // 天空：无穷远
-  if (IsForeground(viewDepth)) return 0.0;         // 第一人称手/枪永远锐
+  if (IsForeground(viewDepth)) {
+    // 第一人称手/枪：视深是标签不是距离，按屏幕上离准星多远算（见文件头）。
+    if (uSightUv.x < 0.0 || uViewmodelMaxPx <= 0.0) return 0.0;
+    float r = length((uv - uSightUv) * vec2(uAspect, 1.0));
+    return -uViewmodelMaxPx * smoothstep(uViewmodelRadius.x, uViewmodelRadius.y, r);
+  }
   float rel = 1.0 - uFocus / max(viewDepth, 0.02);
   float coc = rel >= 0.0 ? rel * uFarGain : rel * uNearGain;
   return clamp(coc, -uNearMaxPx, uFarMaxPx);
@@ -77,7 +89,7 @@ void main() {
       sum += c * w;
       weightSum += w;
       float d = texture2D(uNormalDepth, vUv + offset).w;
-      float c4 = CocPx(d);
+      float c4 = CocPx(d, vUv + offset);
       // 取**绝对值最大**的那个：近场要往外渗，保守一点才不会在轮廓上留硬边。
       if (abs(c4) > abs(coc)) coc = c4;
     }
@@ -196,11 +208,12 @@ ${GLSL_COC}
 void main() {
   float depth = texture2D(uNormalDepth, vUv).w;
   vec3 sharp = texture2D(uColor, vUv).rgb;
-  if (IsForeground(depth)) {          // 第一人称手/枪：原样送走
+  float coc = CocPx(depth, vUv);
+  // 第一人称手/枪：准星那一圈（CoC ≈ 0）原样送走，其余照近场盖上去。
+  if (IsForeground(depth) && coc > -uMinCocPx) {
     gl_FragColor = vec4(sharp, 1.0);
     return;
   }
-  float coc = CocPx(depth);
   vec4 far = texture2D(uFar, vUv);
   vec4 near = texture2D(uNear, vUv);
   // 远场按**本像素自己的** CoC 混：合焦的东西不会被邻居的散景糊掉。
@@ -222,7 +235,25 @@ function MakeCocUniforms() {
     uNearMaxPx: { value: 0 },
     uForegroundDepth: { value: 0 },
     uForegroundEps: { value: 0.002 },
+    uSightUv: { value: new THREE.Vector2(-1, -1) },
+    uAspect: { value: 16 / 9 },
+    uViewmodelRadius: { value: new THREE.Vector2(DOF.viewmodelSharpRadius, DOF.viewmodelBlurRadius) },
+    uViewmodelMaxPx: { value: 0 },
   };
+}
+
+/** 把本帧的 CoC 参数写进一组 MakeCocUniforms()（DoF 四趟与调试视图共用）。 */
+export function ApplyCocUniforms(U, coc, foregroundDepth) {
+  U.uFocus.value = coc.focus;
+  U.uFarGain.value = coc.farGain;
+  U.uNearGain.value = coc.nearGain;
+  U.uFarMaxPx.value = coc.farMaxPx;
+  U.uNearMaxPx.value = coc.nearMaxPx;
+  U.uForegroundDepth.value = foregroundDepth;
+  if (coc.sightUv) U.uSightUv.value.set(coc.sightUv[0], coc.sightUv[1]);
+  else U.uSightUv.value.set(-1, -1);
+  U.uAspect.value = coc.aspect;
+  U.uViewmodelMaxPx.value = coc.viewmodelMaxPx;
 }
 
 export class DofPass {
@@ -232,7 +263,8 @@ export class DofPass {
     this.samples = 48;
     this.scale = pipeline.preset.dofScale > 0 ? pipeline.preset.dofScale : 0.5;
     /** 本帧的 CoC 参数（Prepare 每帧算，调试视图与测试直接读）。 */
-    this.coc = { focus: 1.5, farGain: 0, nearGain: 0, farMaxPx: 0, nearMaxPx: 0, active: false };
+    this.coc = { focus: 1.5, farGain: 0, nearGain: 0, farMaxPx: 0, nearMaxPx: 0, active: false,
+      sightUv: null, aspect: 16 / 9, viewmodelMaxPx: 0 };
 
     this.uniformsDown = {
       uColor: { value: null }, uNormalDepth: { value: null },
@@ -329,15 +361,13 @@ export class DofPass {
     coc.farMaxPx = Math.min(farMaxPx, DOF.maxCocPx);
     coc.nearMaxPx = Math.min(nearMaxPx, DOF.maxCocPx);
     coc.active = coc.farMaxPx > 0.01 || coc.nearMaxPx > 0.01;
+    // 开镜时枪身按屏幕距离散焦（见文件头）。没给准星位置 = 枪整把锐（阵亡档、测试档）。
+    const sightUv = o.nearDofSightUv;
+    coc.sightUv = coc.nearMaxPx > 0.01 && sightUv ? [sightUv[0], sightUv[1]] : null;
+    coc.viewmodelMaxPx = coc.sightUv ? Math.min(coc.nearMaxPx * DOF.viewmodelCocScale, DOF.maxCocPx) : 0;
+    coc.aspect = (ctx.width || 16) / Math.max(1, ctx.height || 9);
     const fg = this.pipeline.foregroundViewDepth ?? 0;
-    for (const U of [this.uniformsDown, this.uniforms]) {
-      U.uFocus.value = coc.focus;
-      U.uFarGain.value = coc.farGain;
-      U.uNearGain.value = coc.nearGain;
-      U.uFarMaxPx.value = coc.farMaxPx;
-      U.uNearMaxPx.value = coc.nearMaxPx;
-      U.uForegroundDepth.value = fg;
-    }
+    for (const U of [this.uniformsDown, this.uniforms]) ApplyCocUniforms(U, coc, fg);
   }
 
   /** 只在真的有散焦时跑（`dofStrength = 0` 的常态帧一个 GPU 段都不产生）。 */
@@ -362,7 +392,7 @@ export class DofPass {
     UG.uCocScale.value = cocScale;
     // 近场半径按最大近景 CoC 定（换算到这张靶的像素）：近场必须往外渗，
     // 按本像素 CoC 采的话前景根本盖不住背景。
-    UG.uNearRadius.value = this.coc.nearMaxPx * cocScale;
+    UG.uNearRadius.value = Math.max(this.coc.nearMaxPx, this.coc.viewmodelMaxPx) * cocScale;
     UG.uFrame.value = ctx.frame;
     ctx.blitter.Blit(this.matGather, this.gather);
 

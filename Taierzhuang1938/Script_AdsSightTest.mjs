@@ -323,6 +323,8 @@ try {
             focus: T.post.dofPass.coc.focus,
             maxPx: T.post.dofPass.coc.nearMaxPx,
             farMaxPx: T.post.dofPass.coc.farMaxPx,
+            sightUv: T.post.dofPass.coc.sightUv,
+            viewmodelMaxPx: T.post.dofPass.coc.viewmodelMaxPx,
           },
         };
       }
@@ -386,6 +388,10 @@ try {
       : row.nearDof.active && row.nearDof.focus >= 1.2 && row.nearDof.focus <= 2.5
         && row.nearDof.maxPx >= 2.5 && row.nearDof.maxPx <= 6 && row.nearDof.farMaxPx === 0),
     row ? `active=${row.nearDof.active} focus=${row.nearDof.focus.toFixed(2)}m near=${row.nearDof.maxPx.toFixed(2)}px far=${row.nearDof.farMaxPx.toFixed(2)}px` : "无结果");
+    // 枪身也要糊、只留准星那一圈清楚：景深得拿到准星的屏幕位置（照门解在画面正中）。
+    if (!rangeMode) Check(`${id} 开镜枪身散焦对准准星`, row && row.nearDof.viewmodelMaxPx > row.nearDof.maxPx * 0.9
+      && row.nearDof.sightUv && Math.abs(row.nearDof.sightUv[0] - 0.5) < 0.02 && Math.abs(row.nearDof.sightUv[1] - 0.5) < 0.02,
+    row?.nearDof.sightUv ? `sight=(${row.nearDof.sightUv.map((v) => v.toFixed(3)).join(", ")}) 枪身=${row.nearDof.viewmodelMaxPx.toFixed(2)}px` : "没给准星位置");
     const expect = AXIS_EXPECT[id];
     if (expect === null || expect === undefined) {
       console.log(`--   ${id} 枪骑在瞄准线上（未登记期望值） — 实测对称面 NDC x=${row?.axisNdcX}`);

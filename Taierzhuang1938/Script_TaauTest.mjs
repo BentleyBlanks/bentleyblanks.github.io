@@ -19,7 +19,8 @@
 //   6. **运动模糊**：相机匀速转身，tile 邻域最大速度的像素长度与角速度成正比；
 //      `motionBlur = 0` 时整个 pass 不跑（draw call 不涨）。
 //   7. **景深**：CoC 图在焦平面为 0、天空饱和；`dofStrength = 0` 时零 draw call；
-//      两条用法下第一人称手/枪的 CoC 恒 0（枪必须锐）。
+//      不给准星位置（nearDofSightUv）时第一人称手/枪的 CoC 恒 0（枪锐）；
+//      正片开镜给了准星位置、枪身按离准星的距离散焦，那条由 Script_AdsSightTest 守。
 //   8. **三个调试视图真的出画** —— GLSL ES 3.00 保留字编译失败是静默的。
 //
 // 用法：node Taierzhuang1938/Script_TaauTest.mjs
@@ -759,7 +760,7 @@ Check("CoC：焦平面为 0、天空饱和到上限",
   && R.coc.skySamples > 0 && R.coc.skyMax > R.coc.farMaxPx * 0.9,
   `焦平面（${R.medianDepth?.toFixed(2)} m）最小 |CoC| ${R.coc.focusMin?.toFixed(3)} px`
   + ` · 天空 ${R.coc.skyMax?.toFixed(2)} / 上限 ${R.coc.farMaxPx}`);
-Check("景深：第一人称手/枪的 CoC 恒 0（枪不糊）",
+Check("景深：不给准星位置时第一人称手/枪的 CoC 恒 0（枪不糊）",
   R.coc.foregroundSamples > 0 && R.coc.foregroundMaxAbs === 0
   && R.ads.foregroundSamples > 0 && R.ads.foregroundMaxAbs === 0,
   `阵亡档 ${R.coc.foregroundMaxAbs}（${R.coc.foregroundSamples} 样本） · 开镜档 ${R.ads.foregroundMaxAbs}（${R.ads.foregroundSamples} 样本）`);

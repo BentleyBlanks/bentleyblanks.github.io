@@ -32,7 +32,7 @@ const VIEWS = [
   { id: "volumetricTransmittance", label: "体积透过率", group: "体积雾", note: "合成 pass 实际吃到的透过率（白 = 全透、黑 = 全挡）。出厂走 legacyTransmittance：这一张与今天的解析雾**逐像素相同**，局部烟幕才会额外压暗 —— 用它核对「七十米外能不能看见敌人」没有变差。" },
   { id: "volumetricReproject", label: "体积重投影", group: "体积雾", note: "时域重投影的历史权重：绿 = 历史被采纳，红 = 只能用本帧抽样（会更噪）。相机快速转身、froxel 网格边缘、镜头硬切之后应当短暂变红再收敛回绿。" },
   // 2026-09 TAAU / 运动模糊 / 散景景深三个 pass 的中间量（由 Script_PostFxaa 认领）。
-  { id: "dofCoc", label: "景深 CoC（物理）", group: "后处理", note: "散景景深实际使用的薄透镜 CoC：深蓝 = 合焦、暖黄 = 远景散焦、洋红 = 近景散焦、绿 = 第一人称前景标签（恒锐）。与上一项的区别是这一张是新 DofPass 的真实口径。" },
+  { id: "dofCoc", label: "景深 CoC（物理）", group: "后处理", note: "散景景深实际使用的薄透镜 CoC：深蓝 = 合焦、暖黄 = 远景散焦、洋红 = 近景散焦、绿 = 第一人称前景标签（锐；开镜时离准星越远越往洋红走，枪身糊、准星清楚）。与上一项的区别是这一张是新 DofPass 的真实口径。" },
   { id: "taaWeight", label: "TAA 权重", group: "后处理", note: "R = 当前帧权重（×4 显示，静止约 0.04）、G = 历史被邻域盒裁掉多少、B = responsive 掩码（第一人称）。全红 = 这一帧没有可用历史。" },
   { id: "velocityTile", label: "速度 tile max", group: "GBuffer", note: "运动模糊的 tile 邻域最大速度（已乘快门）：R/G = 方向、B = 模糊长度。运动模糊没跑时显示不可用斜纹。" },
   { id: "normal", label: "法线", group: "GBuffer", note: "NormalDepth 预通道的视空间法线。" },

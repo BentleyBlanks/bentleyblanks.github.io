@@ -6909,6 +6909,15 @@ const ADS_NEAR_DOF_STRENGTH = 0.72;
 const ADS_NEAR_DOF_FOCUS_M = 1.60;
 const ADS_NEAR_DOF_RANGE_M = 0.85;
 const ADS_NEAR_DOF_MAX_PX = 4.5;
+const _adsSightWorld = new THREE.Vector3();
+/** 开镜准星在屏幕上的 uv：景深按它给枪身散焦，准星那一圈清楚（Script_PostDof 文件头）。 */
+function AdsSightUv() {
+  const rig = viewmodel?.rig;
+  if (!rig?.sight || !rig.group) return null;
+  rig.group.updateWorldMatrix(true, false);
+  _adsSightWorld.copy(rig.sight).applyMatrix4(rig.group.matrixWorld).project(camera);
+  return [_adsSightWorld.x * 0.5 + 0.5, _adsSightWorld.y * 0.5 + 0.5];
+}
 
 // --- 枪感第 1 轮的方子 2 / 3 / 4 所需的状态量 ------------------------------
 // 方子 2「开火画面顿挫」：实测原来开火 FOV 偏移 0.0000°，全仓库无任何 shake/punch。
@@ -8598,6 +8607,7 @@ function RenderScene(dt) {
     nearDofFocus: ADS_NEAR_DOF_FOCUS_M,
     nearDofRange: ADS_NEAR_DOF_RANGE_M,
     nearDofMaxPx: ADS_NEAR_DOF_MAX_PX,
+    nearDofSightUv: adsNearDof > 0 && !WEAPON_RANGE ? AdsSightUv() : null,
   });
   profiler.E("post");
   profiler.GpuFrameEnd();

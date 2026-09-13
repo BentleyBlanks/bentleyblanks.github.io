@@ -28,8 +28,8 @@
 
 import * as THREE from "three";
 import { MakeFullscreenMaterial, GLSL_COMMON } from "./Script_PostCommon.mjs";
-import { GLSL_COC } from "./Script_PostDof.mjs";
-import { CAS } from "./Data_Tuning_TemporalDof.mjs";
+import { GLSL_COC, ApplyCocUniforms } from "./Script_PostDof.mjs";
+import { CAS, DOF } from "./Data_Tuning_TemporalDof.mjs";
 
 const FRAG_FXAA = /* glsl */`
 uniform sampler2D uSource;
@@ -126,7 +126,7 @@ void main() {
                  clamp(length(velocityPx) / 16.0, 0.0, 1.0));
   } else if (uMode < 1.5) {
     float depth = texture2D(uNormalDepth, vUv).w;
-    float coc = CocPx(depth);
+    float coc = CocPx(depth, vUv);
     // 焦平面处为 0（深蓝）。远景往暖黄走、近景往洋红走 —— 两侧分色才看得出
     // 「焦平面在不在该在的地方」。
     float farT = clamp(coc / max(uFarMaxPx, 0.001), 0.0, 1.0);
@@ -134,7 +134,9 @@ void main() {
     color = vec3(0.015, 0.06, 0.30);
     color = mix(color, vec3(1.0, 0.72, 0.04), farT);
     color = mix(color, vec3(1.0, 0.10, 0.68), nearT);
-    if (IsForeground(depth)) color = vec3(0.05, 0.85, 0.35);   // 前景标签：绿
+    // 前景标签：绿；开镜时枪身按离准星的距离往洋红走（准星那圈仍是绿）
+    if (IsForeground(depth)) color = mix(vec3(0.05, 0.85, 0.35), vec3(1.0, 0.10, 0.68),
+      clamp(-coc / max(uViewmodelMaxPx, 0.001), 0.0, 1.0));
     color = ToSrgb(color);
   } else {
     vec4 t = texture2D(uSource, vUv);
@@ -173,6 +175,9 @@ export class FxaaPass {
       uFocus: { value: 1.5 }, uFarGain: { value: 0 }, uNearGain: { value: 0 },
       uFarMaxPx: { value: 0 }, uNearMaxPx: { value: 0 },
       uForegroundDepth: { value: 0 }, uForegroundEps: { value: 0.002 },
+      uSightUv: { value: new THREE.Vector2(-1, -1) }, uAspect: { value: 16 / 9 },
+      uViewmodelRadius: { value: new THREE.Vector2(DOF.viewmodelSharpRadius, DOF.viewmodelBlurRadius) },
+      uViewmodelMaxPx: { value: 0 },
     };
     this.materialDebug = MakeFullscreenMaterial(FRAG_TEMPORAL_DEBUG, this.uniformsDebug);
   }
@@ -237,11 +242,7 @@ export class FxaaPass {
       const dof = P.dofPass;
       U.uMode.value = 1;
       U.uSource.value = ctx.normalDepthTexture;
-      U.uFocus.value = dof?.coc.focus ?? 1.5;
-      U.uFarGain.value = dof?.coc.farGain ?? 0;
-      U.uNearGain.value = dof?.coc.nearGain ?? 0;
-      U.uFarMaxPx.value = dof?.coc.farMaxPx ?? 0;
-      U.uNearMaxPx.value = dof?.coc.nearMaxPx ?? 0;
+      if (dof) ApplyCocUniforms(U, dof.coc, P.foregroundViewDepth ?? 0);
       // 景深关着也照样出图（CoC 恒 0 = 一片深蓝，是准确信息不是"不可用"）。
       U.uUnavailable.value = 0;
     } else {
