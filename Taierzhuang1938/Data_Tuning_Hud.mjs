@@ -125,14 +125,15 @@ export const SUPPRESSION = Object.freeze({ gain: 1.15 });
  * 数归零让它常驻 —— 我们是线性战役，照单人那一档。
  *
  * 数是我们自己的：WaW 出厂 archive 值里 stance/sprint 是 1.7 s，弹药那一档由关卡
- * 脚本另设。1.7 s 对读一次「05 | 30」偏紧（中文玩家还要读一行武器名），放宽到 3 s；
+ * 脚本另设。1.7 s 对读一次「05 | 30」偏紧（中文玩家还要读一行武器名），先放宽到 3 s，实机仍嫌隐得太快，
+ * 2026-09-14 再翻倍到 6 s；
  * 淡出本身的时长是画法，在 Style_Game.css 的 transition 里。
  */
 export const IDLE_FADE = Object.freeze({
   /** 弹药 / 手榴弹 / 武器名那一块：最后一次交互之后挂多久（秒）。 */
-  combatS: 3.0,
+  combatS: 6.0,
   /** 伤情 / 屏息 / 命令那一行：状态变化之后挂多久（秒）。 */
-  stateS: 3.0,
+  stateS: 6.0,
 });
 
 /** 情境操作提示条。 */

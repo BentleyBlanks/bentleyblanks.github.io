@@ -158,21 +158,26 @@ try {
     const T = window.Taierzhuang;
     const combat = document.querySelector(".hudCombat");
     const Awake = () => combat.classList.contains("awake");
+    // 要连着空跑两轮 IDLE_FADE（6 s）再加低弹那一段，phase=3 的敌人会把人打死，
+    // 换人时弹匣补满，低弹那一格就读成满弹。量 HUD 不量挨打：先无敌。
+    const wasInvincible = T.player.debug.invincible;
+    T.player.debug.invincible = true;
     T.player.stance = "crouch";
     T.state.ammo = 5;
     T.state.clips = 3;
     T.StepFrames(3, 1 / 60, false);
     const changed = { awake: Awake(), ...T.hud.IdleState() };
-    T.StepFrames(240, 1 / 60, false);              // 4 s 不碰任何东西
+    T.StepFrames(420, 1 / 60, false);              // 7 s 不碰任何东西
     const idle = { awake: Awake(), ...T.hud.IdleState() };
     T.hud.Touch("combat");                         // 扣扳机 / 开镜：数字没变也要亮
     T.StepFrames(1, 1 / 60, false);
     const touched = { awake: Awake(), ...T.hud.IdleState() };
-    T.StepFrames(240, 1 / 60, false);
+    T.StepFrames(420, 1 / 60, false);
     const idleAgain = { awake: Awake(), ...T.hud.IdleState() };
     T.state.ammo = 1;                              // 低弹：钉住
     T.StepFrames(240, 1 / 60, false);
     const pinned = { awake: Awake(), ...T.hud.IdleState() };
+    T.player.debug.invincible = wasInvincible;
     return {
       current: document.querySelector(".ammoCurrent")?.textContent,
       reserve: document.querySelector(".ammoReserve")?.textContent,
