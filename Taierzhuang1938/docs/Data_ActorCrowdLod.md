@@ -174,3 +174,27 @@ three 的 `primcount === 0` 早退在 `renderInstances` 里，而 `renderBufferD
   它们几乎总在近景（担架队与白刃都发生在玩家身边），暂时不值一档桶。
 - **半程过渡仍是整体翻转**（站→卧的 0.32 s）。做成连续插值要么按人存混合权重、
   要么再加一档中间姿势，两条都比它买到的多。
+
+## 7. 远景的人按姿势桶判命中（2026-09-13）
+
+玩家：「爆头不秒杀，这不科学。」
+
+近处打头一直是一枪死（取证：10 m / 25 m 四个木桩兵，头部蒙皮上的可见像素 100% 判 head；`Script_HeadshotTest` 第 1 条守着近处一枪死）。
+不死的是远景层里的人：进远景那一刻 `_SetDetailedAttached(false)` 把根节点摘出场景，
+`Actor.Update` 跟着跳过，**骨架冻在进远景那一帧的姿势**；而画面上是按 stance 选出来的姿势桶。
+实测 59 m 外站着进远景、然后跪下的人：画面上头高 1.06 m，骨架里的头还在 1.41 m ——
+打他看得见的头，子弹落进冻住的站姿骨架的躯干胶囊里，只算躯干伤害，还站着。
+跑步翻页、卧倒也是同一类错位。
+
+现在：
+
+- `_Harvest` 烘每一档几何时，顺手把烘焙 Actor 此刻的命中体收成 root 局部坐标（`hitboxes`，
+  半径与椭球半轴除掉 root 缩放）。几何与命中体出自同一个 Actor 的同一刻，不会对不上；
+- `Push` 交回用了哪一只桶（满额画不下也交回），`LastTransform` 给这一次的实例变换；
+- `CullActors` 在远景分支里调 `Actor.SetCrowdHitboxes(bucket.hitboxes, transform)`，
+  近景与屏外（`culled`）清掉，回到骨骼命中体；
+- `Actor.GetBoneHitboxes` / `RaycastHitboxes` 有远景命中体时按它算（懒变换，只在被问到时才乘矩阵），
+  与蒙皮人物共用 `Script_CharacterHitboxMath.RaycastShapes`。
+
+只有一个 kind 的烘焙模型（`seed 4213`）而实际兵有十个 GLB 分身，远景判定按烘焙那一具的体型算 ——
+画面上画的也是那一具，所以判定跟着画面走是对的。

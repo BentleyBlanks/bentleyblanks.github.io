@@ -7338,7 +7338,8 @@ function TryFire(dt, returningGrenade = false) {
       kind: weapon.rpm ? "hmg" : "bullet", shapeId: shot.shape?.id || null,
       weaponId: currentWeapon, point: _hitPoint.clone(),
     });
-    vfx.Blood(_hitPoint, dir, died ? 1 : 0.5);
+    if (part === "head") vfx.HeadshotBlood(_hitPoint, dir, shot.soldier);
+    else vfx.Blood(_hitPoint, dir, died ? 1 : 0.5);
     audio.Play("impactFlesh", { position: _hitPoint.clone(), volume: 0.7 });
     ConfirmHit(died);
   } else if (shot.wall) {
@@ -7401,7 +7402,8 @@ function FireVehicleBullet(from,direction,{weaponId="Type11",damageScale=1,sourc
   if(result.soldier===playerTarget)player.TakeHit(weapon.damage*damageScale*(COMBAT.player?.bulletScale??.4),result.part,direction,{from,bullet:true});
   // 车载重机枪走 hmg 那一档（断肢概率比步枪高一个量级，见 SEVER_RULES）。
   else if(result.soldier){result.soldier.TakeHit(weapon.damage*damageScale,result.part,direction,
-    {kind:"hmg",shapeId:result.shape?.id||null,weaponId,point:end.clone()});vfx.Blood(end,direction,.5);}
+    {kind:"hmg",shapeId:result.shape?.id||null,weaponId,point:end.clone()});
+    if(result.part==="head")vfx.HeadshotBlood(end,direction,result.soldier);else vfx.Blood(end,direction,.5);}
   else if(result.wall){const normal=new THREE.Vector3(...result.wall.normal);vfx.Impact(end,normal,SURFACE_BY_TAG[result.wall.box?.tag]||"dirt");}
   return {hit:result.soldier===playerTarget?"player":result.soldier?.missionId||null,wall:result.wall?.box?.tag||null,end:end.toArray()};
 }
@@ -7450,7 +7452,8 @@ function FireEmplacedShot(shot) {
       kind: "hmg", shapeId: result.shape?.id || null,
       weaponId: shot.weaponId, point: _hitPoint.clone(),
     });
-    vfx.Blood(_hitPoint, _empDir, died ? 1 : 0.5);
+    if (result.part === "head") vfx.HeadshotBlood(_hitPoint, _empDir, result.soldier);
+    else vfx.Blood(_hitPoint, _empDir, died ? 1 : 0.5);
     audio.Play("impactFlesh", { position: _hitPoint.clone(), volume: 0.7 });
     ConfirmHit(died);
   } else if (result.wall) {

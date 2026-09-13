@@ -149,6 +149,31 @@ function BakeSkinnedPose(mesh) {
   return geometry;
 }
 
+/**
+ * 把烘焙 Actor 此刻的命中体收成 root 局部坐标（除掉 root 的身高缩放）。
+ * 半径、椭球半轴一并除以 root 缩放；实例化时再乘回 Push 的 scale。
+ */
+function HarvestHitboxes(actor, inverse) {
+  const shapes = actor.GetBoneHitboxes?.() || [];
+  const rootScale = actor.root.getWorldScale(new THREE.Vector3()).y || 1;
+  const rotation = new THREE.Quaternion();
+  inverse.decompose(new THREE.Vector3(), rotation, new THREE.Vector3());
+  const Local = (v) => v ? new THREE.Vector3().copy(v).applyMatrix4(inverse) : null;
+  return shapes.map((shape) => ({
+    id: shape.id, type: shape.type, part: shape.part, priority: shape.priority || 0, a: shape.a, b: shape.b,
+    radius: (shape.worldRadius ?? shape.radius) / rootScale,
+    center: shape.type === "capsule" ? null : Local(shape.center),
+    start: shape.type === "capsule" ? Local(shape.start) : null,
+    end: shape.type === "capsule" ? Local(shape.end) : null,
+    radii: shape.type === "ellipsoid" ? new THREE.Vector3().copy(shape.worldRadii).multiplyScalar(1 / rootScale) : null,
+    axes: shape.type === "ellipsoid" ? {
+      x: shape.worldAxes.x.clone().applyQuaternion(rotation),
+      y: shape.worldAxes.y.clone().applyQuaternion(rotation),
+      z: shape.worldAxes.z.clone().applyQuaternion(rotation),
+    } : null,
+  }));
+}
+
 export class ActorCrowd {
   /**
    * @param {THREE.Scene} scene
@@ -342,6 +367,11 @@ export class ActorCrowd {
     }
     return {
       meshes, count: 0, dead: !!pose.dead, pose: pose.id,
+      // 这一档姿势的命中体（root 局部、标准身高）。远景的人骨架是冻住的 ——
+      // 进远景那一刻站着、之后跪下，画面上是跪姿桶，骨骼里还是站姿：打他看得见的头，
+      // 子弹落在旧站姿的胸口上，只算躯干伤害（2026-09-13「爆头不秒杀」的病根之一）。
+      // 所以命中体跟着画出来的桶走，见 Actor.SetCrowdHitboxes。
+      hitboxes: HarvestHitboxes(actor, inverse),
       // 空的时候可以整只退出渲染列表的桶（站姿档不行，见上面 mesh.visible 那一段）。
       optional: pose.id !== "standing",
       skinnedParts, bounds, bodyBounds, triangles,
@@ -427,14 +457,23 @@ export class ActorCrowd {
     }
     const entry = this._Bucket(kind, poseId);
     const index = entry.count;
-    if (index >= this.capacity) return;
     this._euler.set(-tilt * 1.4, yaw, 0);
     this._quat.setFromEuler(this._euler);
     this._pos.set(position.x, position.y + tilt * 0.28 * scale, position.z);
     this._scale.setScalar(scale);
     this._matrix.compose(this._pos, this._quat, this._scale);
+    // 满额时不画，但仍交回桶与变换：命中体不该因为画不下就退回冻住的骨架。
+    if (index >= this.capacity) return entry;
     for (const mesh of entry.meshes) mesh.setMatrixAt(index, this._matrix);
     entry.count = index + 1;
+    return entry;
+  }
+
+  /** 上一次 Push 的实例变换（`{ matrix, quaternion, scale }`，复用对象，读完即失效）。 */
+  get LastTransform() {
+    const last = this._last || (this._last = { matrix: this._matrix, quaternion: this._quat, scale: 1 });
+    last.scale = this._scale.x;
+    return last;
   }
 
   /**

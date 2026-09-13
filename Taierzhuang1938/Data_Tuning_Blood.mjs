@@ -46,6 +46,24 @@ export const BLOOD_ARTERIAL = Object.freeze({
   farStartM: 6, farScaleMax: 3,
   mistPerBeat: 4, mistMinPressure: .22, mistSpeed: [.9, 2.1], mistRadius: [.04, .18], mistLife: [.22, .5],
 });
+// Headshot (`BloodEffects.Headshot`, 2026-09-13 player feedback: "爆头了飙血不够显著").
+// A body hit is a 0.5–1 `Emit`: ~10 faint mist puffs and 9 specks. A rifle bullet through a
+// skull is a different event: a dense exit plume thrown along the bullet line, a long fan of
+// bright drops that paints the ground and wall behind the target, a small entry backspatter,
+// then the wound keeps pumping for a few beats from the head bone (arterial source).
+//   exitMist / backMist     count, cone spread, speed m/s, radius start→end m, life s, opacity
+//   drops                   count, cone, speed, upward kick, drop half-width and stretch, decal
+//                           radius on landing, fraction of drops that leave a decal
+//   farStartM / farScaleMax widen mist and drops with distance so a 60 m headshot still reads
+//   pump                    head-wound arterial source: seconds, drops/s, speed, splash decals
+export const BLOOD_HEADSHOT = Object.freeze({
+  exitMist: { count: 20, spread: .36, speed: [2.6, 7.5], radius: [.07, .62], life: [.45, 1.05], opacity: .66 },
+  backMist: { count: 6, spread: .6, speed: [.8, 2.6], radius: [.04, .24], life: [.25, .6], opacity: .5 },
+  drops: { count: 30, spread: .42, speed: [3, 9.5], lift: [.1, 1.1], halfWidth: [.011, .024],
+    stretchPerSpeed: .028, stretch: [.05, .26], decalRadius: [.08, .22], decalChance: .6 },
+  farStartM: 18, farScaleMax: 3.2,
+  pump: { seconds: 2.8, rate: 20, speed: [1.2, 2.8], decals: 10 },
+});
 export const BLOOD_SURFACE = Object.freeze({
   // Planar limits reception around the hit tangent plane; cosine .8 caps stretch at 1.25x.
   projection: "planar", planarDepth: .035, planarNormalReject: .8, planarNormalFade: .95,

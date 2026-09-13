@@ -2220,6 +2220,13 @@ export class VfxSystem {
   /** Shared blood pipeline: mist, ballistic droplets, surface projection and corpse seepage. */
   Blood(position,direction,amount=1){this.bloodEffects.Emit(position,direction,amount);}
   BloodBurst(position,direction,amount=1.6){this.bloodEffects.Emit(position,direction,amount,true);}
+  /** 爆头血：出口血雾＋长血滴扇面＋入口回溅；给了 soldier 就再从头部按心跳泵几秒（BLOOD_HEADSHOT）。 */
+  HeadshotBlood(position,direction,soldier=null){
+    const actor=soldier?.actor,rig=actor?.characterRig,node=rig?.hitboxNodes?.headCenter||rig?.bones?.head||actor?.head||null;
+    // 头已经卸掉（断肢链自带断口泵血）或人在远景层（骨架摘出场景）就不再挂伤口源。
+    const attach=node&&!soldier?.gore?.limbs?.has?.("head")&&actor?.root?.parent?node:null;
+    return this.bloodEffects.Headshot(position,direction,{node:attach,root:actor?.root||null});
+  }
   BloodSpurt(node,offset,direction,options={}){return this.bloodEffects.Spurt(node,offset,direction,options);}
   RemoveBloodSpurt(handle){this.bloodEffects.sources.delete(handle);}
   get bloodSpurtCount(){return this.bloodEffects.sources.size;}

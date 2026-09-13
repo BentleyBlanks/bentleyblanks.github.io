@@ -152,3 +152,34 @@ export function JointOwner(shapes, shape, point) {
   }
   return shape;
 }
+
+/**
+ * 一组世界坐标命中体里，射线最先碰到的那一个：`{ t, part, shape }` 或 null。
+ * 等距时取 priority 高的；关节球里的点再按 JointOwner 归段。
+ * 蒙皮人物（`CharacterModel.Raycast`）与远景姿势桶（`Actor.RaycastHitboxes`）共用这一份。
+ */
+export function RaycastShapes(shapes, origin, direction, maxDistance) {
+  let best = null;
+  for (const shape of shapes) {
+    let distance;
+    if (shape.type === "ellipsoid") {
+      distance = RaycastEllipsoid(origin, direction, shape.center, shape.worldRadii, shape.worldAxes);
+    } else if (shape.type === "sphere") {
+      distance = RaycastSphere(origin, direction, shape.center, shape.worldRadius);
+    } else {
+      distance = RaycastCapsule(origin, direction, shape.start, shape.end, shape.worldRadius);
+    }
+    if (distance !== null && distance <= maxDistance && (!best
+        || distance < best.t - 1e-6
+        || (Math.abs(distance - best.t) <= 1e-6 && (shape.priority || 0) > (best.shape.priority || 0)))) {
+      best = { t: distance, part: shape.part, shape };
+    }
+  }
+  if (best) {
+    // 关节球里的首交点按关节平分面归段（屈膝时粗的大腿端帽悬在胫骨上，不能抢小腿的弹）。
+    const point = { x: origin.x + direction.x * best.t, y: origin.y + direction.y * best.t, z: origin.z + direction.z * best.t };
+    const owner = JointOwner(shapes, best.shape, point);
+    if (owner !== best.shape) best = { t: best.t, part: owner.part, shape: owner };
+  }
+  return best;
+}

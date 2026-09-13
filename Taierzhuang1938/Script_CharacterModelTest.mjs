@@ -275,8 +275,10 @@ assert.match(runtime, /center\.position\.set\(authoredLength \* 0\.52, authoredL
 assert.doesNotMatch(runtime, /a: "neck", b: "headGear"/,
   "headgear bone tail is not reused as a head-collision endpoint");
 assert.match(runtime, /getWorldScale\(WORLD_SCALE\)/, "hitbox radius uses actual render-root scale");
-assert.match(runtime, /RaycastCapsule\(origin, direction/, "capsule uses exact ray intersection");
-assert.match(runtime, /RaycastEllipsoid\(origin, direction/, "NRA head uses exact ellipsoid ray intersection");
+assert.match(runtime, /RaycastShapes\(this\.GetHitboxes\(\), origin, direction, maxDistance\)/, "rig raycast goes through the shared shape raycast");
+const hitboxMath = fs.readFileSync(path.join(here, "Script_CharacterHitboxMath.mjs"), "utf8");
+assert.match(hitboxMath, /RaycastCapsule\(origin, direction/, "capsule uses exact ray intersection");
+assert.match(hitboxMath, /RaycastEllipsoid\(origin, direction/, "NRA head uses exact ellipsoid ray intersection");
 assert.doesNotMatch(runtime, /distanceSqToSegment\(shape\.start/, "old closest-distance capsule approximation removed");
 assert.match(runtime, /SetHeadVisible\(visible\)/, "first-person head visibility control exists");
 assert.match(actor, /SOLDIER_MESH_BY_KIND\.civilian/, "old soldier models are not preloaded");

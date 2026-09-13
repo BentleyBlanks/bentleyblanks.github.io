@@ -32,7 +32,7 @@ import {
   CreateLugouCharacterRig,
   LoadLugouCharacterAssets,
 } from "./Script_CharacterModel.mjs";
-import { RaycastCapsule } from "./Script_CharacterHitboxMath.mjs";
+import { RaycastCapsule, RaycastShapes } from "./Script_CharacterHitboxMath.mjs";
 import {
   ACTOR_MESH_BY_VARIANT,
   MESHES, MeshUrl, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID,
@@ -1688,7 +1688,55 @@ export class Actor {
     return this;
   }
 
+  /**
+   * 远景层接手时交下来的姿势桶命中体（`ActorCrowd._Harvest` 烘的 root 局部形状）与这一帧的实例变换。
+   * 给 null 就回到骨骼命中体。远景的人骨架不更新（根节点被摘出场景、`Update` 跳过），
+   * 骨骼上的代理停在进远景那一刻的姿势，与画面上的桶对不上 —— 所以这时候按桶判。
+   */
+  SetCrowdHitboxes(shapes, transform = null) {
+    if (!shapes || !shapes.length || !transform) { this.crowdHitboxes = null; return; }
+    let crowd = this.crowdHitboxes;
+    if (!crowd || crowd.source !== shapes) {
+      crowd = this.crowdHitboxes = {
+        source: shapes, matrix: new THREE.Matrix4(), quaternion: new THREE.Quaternion(), scale: 1, dirty: true,
+        world: shapes.map((shape) => ({
+          id: shape.id, type: shape.type, part: shape.part, priority: shape.priority, a: shape.a, b: shape.b,
+          radius: shape.radius, worldRadius: shape.radius,
+          center: new THREE.Vector3(), start: new THREE.Vector3(), end: new THREE.Vector3(),
+          worldRadii: new THREE.Vector3(),
+          worldAxes: { x: new THREE.Vector3(), y: new THREE.Vector3(), z: new THREE.Vector3() },
+        })),
+      };
+    }
+    crowd.matrix.copy(transform.matrix);
+    crowd.quaternion.copy(transform.quaternion);
+    crowd.scale = transform.scale || 1;
+    crowd.dirty = true;
+  }
+
+  _CrowdHitboxes() {
+    const crowd = this.crowdHitboxes;
+    if (crowd.dirty) {
+      crowd.dirty = false;
+      for (let i = 0; i < crowd.world.length; i += 1) {
+        const local = crowd.source[i], world = crowd.world[i];
+        world.worldRadius = local.radius * crowd.scale;
+        if (local.center) world.center.copy(local.center).applyMatrix4(crowd.matrix);
+        if (local.start) world.start.copy(local.start).applyMatrix4(crowd.matrix);
+        if (local.end) world.end.copy(local.end).applyMatrix4(crowd.matrix);
+        if (local.radii) {
+          world.worldRadii.copy(local.radii).multiplyScalar(crowd.scale);
+          world.worldAxes.x.copy(local.axes.x).applyQuaternion(crowd.quaternion);
+          world.worldAxes.y.copy(local.axes.y).applyQuaternion(crowd.quaternion);
+          world.worldAxes.z.copy(local.axes.z).applyQuaternion(crowd.quaternion);
+        }
+      }
+    }
+    return crowd.world;
+  }
+
   GetBoneHitboxes() {
+    if (this.crowdHitboxes) return this._CrowdHitboxes();
     if (this.characterRig) return this.characterRig.GetHitboxes();
     this.root.updateWorldMatrix(true, true);
     const scale = this.root.getWorldScale(ACTOR_HITBOX_SCALE).y || 1;
@@ -1701,6 +1749,7 @@ export class Actor {
   }
 
   RaycastHitboxes(origin, direction, maxDistance) {
+    if (this.crowdHitboxes) return RaycastShapes(this._CrowdHitboxes(), origin, direction, maxDistance);
     if (this.characterRig) return this.characterRig.Raycast(origin, direction, maxDistance);
     let best = null;
     for (const shape of this.GetBoneHitboxes()) {

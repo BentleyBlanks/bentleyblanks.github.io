@@ -68,6 +68,29 @@ CPU 只追踪有上限的可碰撞液滴，GPU 与 CPU 使用相同的解析解�
 `ClearParticles` 清掉动态血滴、血源和动态贴花，保留静态布景。
 关卡拆除释放持久层与阴影 uniform 注册，纹理异步到达已销毁对象时立即释放。
 
+## 爆头（2026-09-13）
+
+玩家：「爆头了的飙血不够显著。」原来打头与打躯干走同一条 `Blood(point, dir, 0.5–1)`：
+十来团淡血雾加九粒血点，二十米外就只剩一个红点。
+
+`vfx.HeadshotBlood(point, dir, soldier)` → `BloodEffects.Headshot`，参数表 `Data_Tuning_Blood.BLOOD_HEADSHOT`：
+
+- **出口血雾**：沿弹道方向 20 团、窄锥、半径长到 0.6 m、不透明度 0.66、动脉亮红起色；
+- **入口回溅**：逆弹道 6 团小雾；
+- **血滴扇面**：30 粒按速度拉长的亮红长滴，六成落地/落墙留贴花 —— 人身后那面墙和地上是一片喷溅；
+- **伤口泵血**：从 `hitboxNodes.headCenter` 挂一个 2.8 s 的动脉源（`BLOOD_ARTERIAL` 那套心跳），
+  跟着尸体倒下走。头已被断肢链卸掉（断口自带泵血）或人在远景层（骨架不在场景里）时不挂。
+- 血雾与血滴随距离放大（18 m 起，最多 3.2 倍），六十米外的爆头仍读得出来。
+
+接线：玩家步枪（`TryFire`）、架设机枪、车载机枪、AI 打 AI（8% 抽中头时）四处，部位为 head 就走这条。
+
+规则侧同时收紧：`Soldier.TakeHit` 里**子弹/机枪弹（kind `bullet`/`hmg`）打中头直接致死**，与伤害数无关；
+刀与爆炸不走这条（部位是它们自己判的）。剧情保护角色（`scriptEssential`）仍然只掉到 1。
+玩家挨打那条链（`Script_Player.TakeHit`）不动，口径见 `Data_PlayerDamage.md`。
+
+闸门：`node Taierzhuang1938/Script_HeadshotTest.mjs`（近处真开枪爆头判 head、一枪死、血效与伤口源出现；
+8 点伤害的子弹/机枪弹打头必死而刀不死；远景跪姿兵打头判 head、一枪死），截图 `_shots/Headshot`。
+
 ## 资产与边界
 
 仅下载一张实际使用的免费纹理，没有批量生成图片或动画。

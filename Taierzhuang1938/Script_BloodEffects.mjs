@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { BLOOD_TEXTURE, BLOOD_QUALITY, BLOOD_MOTION as C, BLOOD_ARTERIAL as A, BloodPosition } from "./Data_Tuning_Blood.mjs";
+import { BLOOD_TEXTURE, BLOOD_QUALITY, BLOOD_MOTION as C, BLOOD_ARTERIAL as A, BLOOD_HEADSHOT as H, BloodPosition } from "./Data_Tuning_Blood.mjs";
 import { SurfaceDecalLayer } from "./Script_SurfaceDecals.mjs";
 
 const position=new THREE.Vector3(),direction=new THREE.Vector3(),velocity=new THREE.Vector3();
@@ -62,6 +62,36 @@ export class BloodEffects {
       this.Cone(direction,.65,this.Range(1.8,7)*Math.sqrt(amount),velocity);velocity.y+=this.Range(.3,1.3);
       this.Drop(p,velocity,{radius:this.Range(.055,.14),pool:false});
     }
+  }
+  // Headshot: dense exit plume and a long bright fan along the bullet line, a small entry
+  // backspatter, then the wound pumps from the head node for a few beats (BLOOD_HEADSHOT).
+  Headshot(p,axis,{node=null,root=null}={}){
+    if(this.disposed)return 0;
+    direction.copy(axis||{x:0,y:0,z:-1});if(direction.lengthSq()<1e-8)direction.set(0,0,-1);direction.normalize();
+    const distance=this.eye.distanceTo(p);if(distance>C.maxDistance)return 0;
+    const far=Math.min(H.farScaleMax,Math.max(1,distance/H.farStartM));
+    this.stats.headshots=(this.stats.headshots||0)+1;
+    for(const [mist,sign] of [[H.exitMist,1],[H.backMist,-1]]){
+      const cone=sign>0?direction:hitNormal.copy(direction).negate();
+      for(let i=0;i<mist.count;i++){
+        this.Cone(cone,mist.spread,this.Range(...mist.speed),velocity);
+        const s=this.SpawnData(p,velocity,this.Range(...mist.life),mist.radius[0]*far,mist.radius[1]*far*this.Range(.7,1.2));
+        s.ay=-2.2;s.drag=3.6;s.opacity=mist.opacity;s.fadeIn=.01;s.spin=this.Range(-1.4,1.4);
+        s.colorA=arterial;s.colorB=dark;
+        this.mist.Spawn(s,this.time);
+      }
+    }
+    const D=H.drops;
+    for(let i=0;i<D.count;i++){
+      const speed=this.Range(...D.speed);
+      this.Cone(direction,D.spread,speed,velocity);velocity.y+=this.Range(...D.lift);
+      this.Drop(p,velocity,{radius:this.Range(...D.decalRadius),size:this.Range(...D.halfWidth)*far,
+        stretch:Math.min(D.stretch[1],Math.max(D.stretch[0],speed*D.stretchPerSpeed)),color:arterial,
+        lag:i%3===0?0:.004*(i%3),deposit:this.random()<D.decalChance});
+    }
+    if(!node)return 0;
+    return this.Spurt(node,null,direction,{arterial:true,worldDirection:true,root,seconds:H.pump.seconds,
+      rate:H.pump.rate,speed:H.pump.speed,decals:H.pump.decals});
   }
   Drop(p,v,{radius=.08,pool=false,deposit=true,size=0,stretch=0,lag=0,color=null}={}){
     // size/stretch/color shape an arterial stream drop; lag back-dates the birth inside the

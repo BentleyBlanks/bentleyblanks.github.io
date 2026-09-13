@@ -500,6 +500,11 @@ export class Soldier {
       return false;
     }
     this.health -= damage * mult;
+    // 子弹打进头里就是死。以前只靠「倍率 × 枪伤」恰好过 100：打中了算得出，但凡哪条链
+    // 把伤害打折（车载机枪 damageScale、将来的衰减）就会出现爆头挨一枪还站着。
+    // 刀和爆炸不走这条：它们的部位是自己判的，不代表颅骨被贯穿。
+    const kind = info?.kind || "bullet";
+    if (part === "head" && damage > 0 && (kind === "bullet" || kind === "hmg")) this.health = Math.min(this.health, 0);
     if (damage > 0) this.damageSequence = (this.damageSequence || 0) + 1;
     // Opt-in narrative cast protection; explicit scripted Kill remains authoritative.
     if (this.scriptEssential) this.health = Math.max(1, this.health);
@@ -1308,6 +1313,7 @@ export class AiDirector {
       _cullSphere.center.set(s.position.x, s.position.y + 0.9, s.position.z);
       if (!_cullFrustum.intersectsSphere(_cullSphere)) {
         this._SetDetailedAttached(s.actor, false);
+        s.actor.SetCrowdHitboxes?.(null);
         s.actor.allowFootIk = false;
         s.renderLod = "culled";
         continue;
@@ -1320,6 +1326,7 @@ export class AiDirector {
       // 远景层里的尸体有距离上限（ACTOR_DETAIL.corpseCrowdMaxM 那段账）；活人没有。
       if (settledCorpse && distanceSq > ACTOR_DETAIL.corpseCrowdMaxM * ACTOR_DETAIL.corpseCrowdMaxM) {
         this._SetDetailedAttached(s.actor, false);
+        s.actor.SetCrowdHitboxes?.(null);
         s.actor.allowFootIk = false;
         s.renderLod = "culled";
         continue;
@@ -1334,6 +1341,7 @@ export class AiDirector {
       const detailed = !crowd || !!s.gore || distanceSq <= detailLimit * detailLimit;
       this._SetDetailedAttached(s.actor, detailed);
       s.renderLod = detailed ? "detail" : "crowd";
+      if (detailed) s.actor.SetCrowdHitboxes?.(null);
       if (!detailed) {
         const prone = Math.max(s.proneBlend ?? 0, s.stance === 2 ? 1 : 0);
         // 姿态与移动信号一并交给远景层，让它挑姿势桶（站 / 跪 / 真卧 / 跑步翻页）。
@@ -1343,11 +1351,13 @@ export class AiDirector {
         //
         // The shared distance clock advances even while the skeleton is culled;
         // wall-clock time must not make a blocked or slowing crowd keep running.
-        crowd.Push(s.actor.kind, s.position, s.yaw ?? 0, s.actor.sizeScale ?? 1, prone, !s.alive,
+        const bucket = crowd.Push(s.actor.kind, s.position, s.yaw ?? 0, s.actor.sizeScale ?? 1, prone, !s.alive,
           { stance: s.stance | 0, moveSpeed: s.moveSpeed ?? 0, crouch: s.crouchBlend ?? 0,
             phase: s.actor.characterRig?.locomotion.crowdPhase,
             moveSpeedMps: s.actor.characterRig?.locomotion.crowdSpeedMps,
             elapsed: this.time, jitter: s.id * 0.37 });
+        // 命中体跟着画出来的姿势桶走（骨架此刻是冻住的，见 Actor.SetCrowdHitboxes）。
+        s.actor.SetCrowdHitboxes?.(bucket?.hitboxes, crowd.LastTransform);
       }
     }
     if (crowd) crowd.End();
@@ -3891,7 +3901,9 @@ export class AiDirector {
         this.RememberIncomingFire(s.target.ref,fromV);
         const died = s.target.ref.TakeHit(s.weapon.damage, part, dir,
           { kind: s.weapon.rpm ? "hmg" : "bullet", weaponId: s.weaponId, point: aimV.clone() });
-        if (vfx) vfx.Blood(aimV, dir, died ? 1 : 0.5);
+        if (vfx && part === "head" && vfx.HeadshotBlood) vfx.HeadshotBlood(s.target.ref.actor?.characterRig?.hitboxNodes?.headCenter
+          ?.getWorldPosition(new THREE.Vector3()) || aimV, dir, s.target.ref);
+        else if (vfx) vfx.Blood(aimV, dir, died ? 1 : 0.5);
       }
     } else {
       // 打偏了：仍然要压制。近失弹从耳边过去，那声音本身就是武器。

@@ -28,7 +28,7 @@ const MELEE_FACE_TARGET = new THREE.Vector3();
 const MELEE_FACE_UP = new THREE.Vector3(0, 1, 0);
 const MELEE_FACE_Q = new THREE.Quaternion();
 const IsBayonetThrust = pose => /^Bayonet(Light|LightAlt|Heavy|Compact|CompactAlt)$/.test(pose?.clip || "");
-import { JointOwner, RaycastCapsule, RaycastEllipsoid, RaycastSphere } from "./Script_CharacterHitboxMath.mjs";
+import { RaycastShapes } from "./Script_CharacterHitboxMath.mjs";
 import { CHARACTER_HITBOX_PROFILE } from "./Data_CharacterHitbox.mjs";
 
 export const LUGOU_ANIMATION_IDS = Object.freeze([
@@ -402,7 +402,6 @@ export { CHARACTER_HITBOX_PROFILE };
 
 const WORLD_SCALE = new THREE.Vector3();
 const WORLD_QUATERNION = new THREE.Quaternion();
-const HIT_POINT = new THREE.Vector3();
 // `_GroundInfantryBlend` 每帧每个混合中的人物各调一次；原来这三只是函数里 new 出来的，
 // 车厢内 22 人同时混合就是每帧 66 次分配（每帧分配速率实测 1.8 MB，GC 每 90 帧一次）。
 const GROUND_BLEND_INVERSE = new THREE.Matrix4();
@@ -1185,30 +1184,7 @@ export class LugouCharacterRig {
   }
 
   Raycast(origin, direction, maxDistance) {
-    let best = null;
-    const shapes = this.GetHitboxes();
-    for (const shape of shapes) {
-      let distance;
-      if (shape.type === "ellipsoid") {
-        distance = RaycastEllipsoid(origin, direction, shape.center, shape.worldRadii, shape.worldAxes);
-      } else if (shape.type === "sphere") {
-        distance = RaycastSphere(origin, direction, shape.center, shape.worldRadius);
-      } else {
-        distance = RaycastCapsule(origin, direction, shape.start, shape.end, shape.worldRadius);
-      }
-      if (distance !== null && distance <= maxDistance && (!best
-          || distance < best.t - 1e-6
-          || (Math.abs(distance - best.t) <= 1e-6 && (shape.priority || 0) > (best.shape.priority || 0)))) {
-        best = { t: distance, part: shape.part, shape };
-      }
-    }
-    if (best) {
-      // 关节球里的首交点按关节平分面归段（屈膝时粗的大腿端帽悬在胫骨上，不能抢小腿的弹）。
-      HIT_POINT.set(origin.x + direction.x * best.t, origin.y + direction.y * best.t, origin.z + direction.z * best.t);
-      const owner = JointOwner(shapes, best.shape, HIT_POINT);
-      if (owner !== best.shape) best = { t: best.t, part: owner.part, shape: owner };
-    }
-    return best;
+    return RaycastShapes(this.GetHitboxes(), origin, direction, maxDistance);
   }
 
   Dispose() {

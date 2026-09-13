@@ -225,7 +225,7 @@ IncomingFireBrowserTest、FirstLevelOpeningContactTest；`--profile=prepush --do
 | `meleeScale` | 0.42 | 刺刀 110 → 46.2：重，但不是读盘 |
 | `blastScale` | 0.55 | 爆炸 → 玩家 |
 | `aimScatterM` | 0.24 | AI 打玩家的部位**不抽概率**：照躯干中点瞄、在瞄点周围按这个 1σ（米）散点，射线去碰玩家自己的命中几何（`Script_PlayerHitbox`）。45 m 上站着约 5% 爆头、趴着约 15%（头露在最前面）；AI 打 AI 仍是 0.08 那一掷 |
-| `headMultiplier` | 2.0 | 爆头倍率（对 AI 仍是 3.4） |
+| `headMultiplier` | 2.0 | 爆头倍率（只管玩家挨打；AI 挨子弹打头直接致死，见 `Data_BloodEffects.md`「爆头」） |
 | `limbMultiplier` | 0.50 | 四肢 |
 | `maxBulletDamage` | 62 | **单发对玩家的硬上限：满血挨一枪必活**（安全网，见下） |
 | `bleedScale` | 0.50 | 伤口出血速率 → 玩家 |
