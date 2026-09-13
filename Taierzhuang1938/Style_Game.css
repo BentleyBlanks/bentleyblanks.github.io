@@ -527,7 +527,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    最后一秒的红色脉冲，给玩家“马上离开”的紧迫度，不把内部精确数值白送出来。 */
 .hudGrenadeWarnings { position: absolute; inset: 0; }
 .hudGrenadeWarning {
-  position: absolute; transform: translate(-50%, -50%);
+  position: absolute; transform: translate(-50%, -50%) scale(0.8);
   width: 46px; height: 46px; pointer-events: none;
   color: #e75243; font: 600 12px/1.2 var(--ui-font);
   white-space: nowrap;
