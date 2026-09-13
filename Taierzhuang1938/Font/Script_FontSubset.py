@@ -5,8 +5,9 @@
 整套思源黑体是 8 MB，思源宋体 11 MB —— 全量下发等于让每个玩家先下一部电影。
 这里按 Script_FontChars.mjs 算出来的字表把它们裁到真正用得到的那些字，产出 woff2。
 
-裁三组：
-  Font_Title.woff2              大标题（思源宋体 Black）
+裁四组：
+  Font_Title.woff2              大标题（思源宋体 Black，只有标题那几十个字，开机预加载）
+  Font_TitleText.woff2          情境提示与字幕（同一款思源宋体 Black，界面全字表，用到才下载）
   Font_UiSans_{Regular,Bold}    界面汉字（思源黑体）
   Font_UiLatin_{Regular,SemiBold}  界面拉丁与数字（Barlow Semi Condensed）
 
@@ -24,6 +25,7 @@
     curl -L -o src/BarlowSemiCondensed-Regular.ttf  https://github.com/google/fonts/raw/main/ofl/barlowsemicondensed/BarlowSemiCondensed-Regular.ttf
     curl -L -o src/BarlowSemiCondensed-SemiBold.ttf https://github.com/google/fonts/raw/main/ofl/barlowsemicondensed/BarlowSemiCondensed-SemiBold.ttf
     PYTHONUTF8=1 python Script_FontSubset.py src
+    PYTHONUTF8=1 python Script_FontSubset.py src --only Font_TitleText   # 只烘其中几份（源字体只需要那几款）
 
 依赖：Node（跑字表）+ fonttools 与 brotli（pip install "fonttools[woff]"）。
 授权：三款全部 SIL OFL 1.1，见同目录 LICENSE_OFL.txt。
@@ -42,6 +44,7 @@ CHARS_SCRIPT = os.path.join(HERE, "Script_FontChars.mjs")
 # (输出名, 源字体名, 用哪张字表)
 JOBS = [
     ("Font_Title", "NotoSerifSC-Black.otf", "title"),
+    ("Font_TitleText", "NotoSerifSC-Black.otf", "ui"),
     ("Font_UiSans_Regular", "NotoSansSC-Regular.otf", "ui"),
     ("Font_UiSans_Bold", "NotoSansSC-Bold.otf", "ui"),
     ("Font_UiLatin_Regular", "BarlowSemiCondensed-Regular.ttf", "latin"),
@@ -55,6 +58,11 @@ MANIFESTS = {
         "faces": ["Font_Title.woff2"],
         "font": "Noto Serif SC Black / 思源宋体 Black",
         "charsKey": "title",
+    },
+    "Font_TitleText.json": {
+        "faces": ["Font_TitleText.woff2"],
+        "font": "Noto Serif SC Black / 思源宋体 Black（与 logo 同款，给情境提示与字幕）",
+        "charsKey": "ui",
     },
     "Font_Ui.json": {
         "faces": ["Font_UiSans_Regular.woff2", "Font_UiSans_Bold.woff2",
@@ -73,19 +81,26 @@ def Charsets():
 
 
 def main(argv):
-    if len(argv) != 2:
+    only = None
+    if len(argv) == 4 and argv[2] == "--only":
+        only = set(argv[3].split(","))
+    elif len(argv) != 2:
         print(__doc__)
         return 2
     src_dir = argv[1]
     charsets = Charsets()
+    jobs = [job for job in JOBS if only is None or job[0] in only]
+    if not jobs:
+        print("--only 没有匹配到任何一份：" + argv[3])
+        return 2
 
-    missing = [rel for _, rel, _ in JOBS if not os.path.isfile(os.path.join(src_dir, rel))]
+    missing = [rel for _, rel, _ in jobs if not os.path.isfile(os.path.join(src_dir, rel))]
     if missing:
         print("源字体不全，缺：" + "、".join(missing))
         return 2
 
     sizes = {}
-    for name, rel, key in JOBS:
+    for name, rel, key in jobs:
         dst = os.path.join(HERE, name + ".woff2")
         subset.main([
             os.path.join(src_dir, rel),
@@ -99,7 +114,11 @@ def main(argv):
         sizes[name] = os.path.getsize(dst)
         print("%-26s %6.1f KB  %4d 字  <- %s" % (name, sizes[name] / 1024, len(charsets[key]), rel))
 
+    built = {name + ".woff2" for name, _, _ in jobs}
     for file, spec in MANIFESTS.items():
+        # 只烘了一部分时，只改那几份字体各自的清单。
+        if not set(spec["faces"]) <= built:
+            continue
         chars = charsets[spec["charsKey"]]
         body = json.dumps({
             "font": spec["font"],

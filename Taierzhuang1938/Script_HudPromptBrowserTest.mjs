@@ -103,6 +103,9 @@ try {
       on: document.querySelector(".hudActions")?.classList.contains("on"),
       rowBox: rowStyle && [rowStyle.borderTopWidth, rowStyle.backgroundColor],
       labelPx: rowStyle && Number.parseFloat(rowStyle.fontSize),
+      family: rowStyle && rowStyle.fontFamily,
+      subtitleFamily: getComputedStyle(document.querySelector(".hudSubtitle")).fontFamily,
+      fontLoaded: document.fonts.check('900 12px "TzTitleText"', "装弹"),
       centerX: box.left + box.width / 2, top: box.top, viewW: innerWidth, viewH: innerHeight,
     };
   });
@@ -112,7 +115,11 @@ try {
   assert.equal(prompts.on, true);
   assert.deepEqual(prompts.rows, [["B", "包扎止血"]]);
   assert.deepEqual(prompts.rowBox, ["0px", "rgba(0, 0, 0, 0)"], "提示没有外框与底板");
-  assert.ok(prompts.labelPx >= 20, `提示字号太小：${prompts.labelPx}`);
+  // 9-13 用户定：上一版 clamp(20px, 3vh, 34px) 的 40%。
+  const expectPx = Math.min(13.6, Math.max(8, prompts.viewH * 0.012));
+  assert.ok(Math.abs(prompts.labelPx - expectPx) < 0.1, `提示字号应为 ${expectPx.toFixed(1)} px，实际 ${prompts.labelPx}`);
+  assert.match(prompts.family, /^"?TzTitleText/, "提示用 logo 同款字体");
+  assert.match(prompts.subtitleFamily, /^"?TzTitleText/, "字幕用 logo 同款字体");
   assert.ok(Math.abs(prompts.centerX - prompts.viewW / 2) < 2 && prompts.top > prompts.viewH / 2,
     `提示应居中在准星下方：${JSON.stringify(prompts)}`);
   assert.ok(prompts.titles.some((title) => title === "包扎止血"));
@@ -309,7 +316,8 @@ try {
     T.StepFrames(12);
     const swap = T.Debug.Prompts();
     const img = document.querySelector(".hudAction.pickup img.actionWeapon");
-    const silhouette = img && { src: img.getAttribute("src"), width: img.getBoundingClientRect().width };
+    const silhouette = img && { src: img.getAttribute("src"), width: img.getBoundingClientRect().width,
+      em: Number.parseFloat(getComputedStyle(img).fontSize) };
     const target = document.querySelector(".hudTarget");
     const layout = {
       promptsBottom: document.querySelector(".hudActions").getBoundingClientRect().bottom,
@@ -324,7 +332,7 @@ try {
   assert.ok(weaponPrompts.swap.some((prompt) => prompt.keys === "F" && /^换上 /.test(prompt.label)));
   assert.ok(weaponPrompts.swap.some((prompt) => prompt.weaponId === "Type38"), "换枪提示带着那把枪的 id");
   assert.equal(weaponPrompts.silhouette?.src, "Texture/Hud/Texture_HudWeapon_Type38.png", "换枪提示下面画那把枪的剪影");
-  assert.ok(weaponPrompts.silhouette.width > 100, `步枪剪影要够长：${weaponPrompts.silhouette.width}`);
+  assert.ok(weaponPrompts.silhouette.width > weaponPrompts.silhouette.em * 6, `步枪剪影要约七个字宽：${JSON.stringify(weaponPrompts.silhouette)}`);
   if (weaponPrompts.layout.targetOn) {
     assert.ok(weaponPrompts.layout.targetTop >= weaponPrompts.layout.promptsBottom - 1,
       `识别卡要排在提示下面：${JSON.stringify(weaponPrompts.layout)}`);

@@ -6,10 +6,12 @@
 | 文件 | 用在哪 | 字体 | 大小 |
 | --- | --- | --- | --- |
 | `Font_Title.woff2` | 主菜单大标题、暂停标题、加载画面标题 | 思源宋体 Black / Noto Serif SC Black | 4.6 KB · 26 字 |
+| `Font_TitleText.woff2` | 准星下的情境提示、剧情字幕（与 logo 同款，2026-09-13 用户定；不预加载） | 思源宋体 Black / Noto Serif SC Black | 292 KB · 1637 字 |
 | `Font_UiSans_Regular.woff2`<br>`Font_UiSans_Bold.woff2` | 界面汉字（菜单 / 加载 / 编辑器 / HUD） | 思源黑体 / Noto Sans SC | 426 KB · 1547 字 |
 | `Font_UiLatin_Regular.woff2`<br>`Font_UiLatin_SemiBold.woff2` | 界面的拉丁字母与数字 | Barlow Semi Condensed | 10 KB · 83 字（只装 ASCII） |
 
-合计约 441 KB，全部 `font-display: swap`，不挡开机。
+合计约 733 KB，全部 `font-display: swap`，不挡开机；`Font_TitleText` 不预加载，第一次出提示或字幕才下。
+只重烘其中一份：`PYTHONUTF8=1 python Script_FontSubset.py src --only Font_TitleText`（只需要那一款源字体）。
 
 ## 为什么是这三套
 

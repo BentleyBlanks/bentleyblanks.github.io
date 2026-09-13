@@ -210,11 +210,12 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .equipment.empty { display: none; }
 .equipment.grenade.empty { display: flex; opacity: 0.3; }
 
-/* 字幕 */
+/* 字幕：与 logo 同款的思源宋体 Black（--ui-story-font，打包在 Font/Font_TitleText.woff2，
+   不再依赖国内不通的 Google Fonts）。 */
 .hudSubtitle {
   position: absolute; left: 50%; bottom: 90px; transform: translateX(-50%);
   max-width: 56%; text-align: center; opacity: 0;
-  transition: opacity 0.3s ease; font-size: 16px;
+  transition: opacity 0.3s ease; font-size: 16px; font-family: var(--ui-story-font);
 }
 .hudSubtitle.on { opacity: 1; }
 .hudSubtitle .who { color: var(--warn); margin-right: 10px; }
@@ -233,12 +234,13 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    对标 COD WWII：准星正下方居中（--y 由 Script_Hud.SetCrosshair 按散布写，
    识别卡排在它下面），一行「键帽 + 一句动作」，米白字配柔和黑影、没有底板；
    拾枪时下面再画那把枪的剪影（Data_HudWeaponIcons）。打空了的「装弹」整行转红。
-   字号跟视口高度走：900 高约 27 px，1080 高约 32 px。 */
+   字体是 logo 同款思源宋体 Black（--ui-story-font）。字号跟视口高度走，
+   9-13 用户定为上一版（clamp(20px, 3vh, 34px)）的 40%：900 高约 11 px，1080 高约 13 px。 */
 .hudActions {
   position: absolute; left: 50%; top: 50%; transform: translateX(-50%);
   margin-top: var(--y, 44px);
   display: flex; flex-direction: column; align-items: center; gap: 0.3em;
-  font: 600 clamp(20px, 3vh, 34px)/1.2 var(--ui-font);
+  font: 900 clamp(8px, 1.2vh, 13.6px)/1.2 var(--ui-story-font);
   z-index: 2; opacity: 0; transition: opacity 0.16s linear;
   white-space: nowrap; pointer-events: none;
 }
@@ -247,19 +249,19 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   --c: #ece3cc;
   display: flex; flex-direction: column; align-items: center; gap: 0.2em;
   color: var(--c); letter-spacing: 0.02em;
-  text-shadow: 0 0 5px rgba(0,0,0,0.85), 0 1px 2px rgba(0,0,0,0.9);
+  text-shadow: 0 0 3px rgba(0,0,0,0.9), 0 1px 1px rgba(0,0,0,0.9);
 }
 .hudAction.reload { --c: #e8505b; }
 .actionLine { display: flex; align-items: center; gap: 0.28em; }
 /* 键帽：实心、与字同色，字母挖成深色；多字键（左键、1 / 2）自动加宽。 */
 .hudAction kbd {
   display: inline-flex; align-items: center; justify-content: center;
-  box-sizing: border-box; min-width: 1.5em; height: 1.5em; padding: 0 0.4em;
-  border-radius: 0.3em; background: var(--c); color: #15130f;
-  font: 700 0.62em/1 var(--ui-font); letter-spacing: 0; text-shadow: none;
-  box-shadow: 0 0 5px rgba(0,0,0,0.6);
+  box-sizing: border-box; min-width: 1.3em; height: 1.3em; padding: 0 0.3em;
+  border-radius: 0.25em; background: var(--c); color: #15130f;
+  font: 900 0.8em/1 var(--ui-story-font); letter-spacing: 0; text-shadow: none;
+  box-shadow: 0 0 3px rgba(0,0,0,0.6);
 }
-.actionWeapon { display: block; height: auto; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.85)); }
+.actionWeapon { display: block; height: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.85)); }
 
 /* 按住型交互的进度环（按住止血 / 拆门板 / 撕短褂）。
    在准星正下方一点点：视线不用离开准星，也不压住下面的字幕行。
