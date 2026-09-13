@@ -7277,6 +7277,7 @@ function TryFire(dt, returningGrenade = false) {
   // 而是让每一类武器在同一套输入下仍有自己的出膛节奏。
   vfx.MuzzleFlash(_muzzle, shotAimDirection, {
     scale: 1.0,
+    player: true,
     kind: weapon.kind,
   });
 

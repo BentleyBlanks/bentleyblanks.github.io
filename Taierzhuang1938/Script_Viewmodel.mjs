@@ -44,7 +44,7 @@ import { FirstPersonBody } from "./Script_FirstPersonBody.mjs";
 import { FrameQuaternion } from "./Script_FpsAnatomy.mjs";
 import { FpsSkeletalAnimation } from "./Script_FpsSkeletalAnimation.mjs";
 
-import { AUTOMATIC_RECOIL, WALL_CARRY } from "./Data_Tuning_FirearmHandling.mjs";
+import { AUTOMATIC_RECOIL, WALL_CARRY, MUZZLE_FLASH } from "./Data_Tuning_FirearmHandling.mjs";
 
 const DEG = Math.PI / 180;
 
@@ -348,9 +348,12 @@ function BuildMaterials(library) {
     lqWeaponPlain: SafeMaterial(library, "Steel", {}, 0x555960),
     // 刀柄缠的红布：全场唯二的高饱和点之一（另一个是青天白日帽徽）
     redCloth: library.Plain("VmRedCloth", { color: 0x8e2b22, roughness: 0.92, metalness: 0 }),
-    flash: library.Plain("VmMuzzleFlash", {
-      color: 0x000000, emissive: 0xffc266, emissiveIntensity: 7.5,
-      roughness: 1, metalness: 0, transparent: true, opacity: 0.92, depthWrite: false,
+    flash: new THREE.MeshBasicMaterial({
+      name: "VmMuzzleFlash",
+      map: new THREE.TextureLoader().load(MUZZLE_FLASH.mask),
+      color: new THREE.Color(MUZZLE_FLASH.color).multiplyScalar(MUZZLE_FLASH.radiance),
+      blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      transparent: true, opacity: 1, depthWrite: false, toneMapped: false,
     }),
   };
 }
@@ -1643,23 +1646,24 @@ export class Viewmodel {
   // -------------------------------------------------------------------------
 
   /**
-   * 枪口焰：三片交叉薄片（星芒）+ 一个短锥。自发光，不放实光源 —— 实光源交给
+   * 枪口焰：三片遮罩火舌 + 端面亮核。自发光，不放实光源 —— 实光源交给
    * 调用方的 LightRig.AddFire 之类去做，视图模型自己点灯会把整条阴影链子拖垮。
-   * 三片合并成一个网格：这东西一帧最多亮 45 ms，不值得占三个 draw call。
+   * 三片遮罩火焰和端面亮核合并为一个网格，共用短促衰减。
    */
   _BuildFlash() {
     const group = new THREE.Group();
     const petals = [];
     for (let i = 0; i < 3; i += 1) {
-      const petal = new THREE.PlaneGeometry(0.20, 0.085);
-      petal.rotateY(Math.PI / 2);
+      const petal = new THREE.PlaneGeometry(MUZZLE_FLASH.widthM, MUZZLE_FLASH.lengthM);
+      petal.rotateX(-Math.PI / 2);
+      petal.translate(0, 0, -MUZZLE_FLASH.lengthM / 2);
       petal.rotateZ((i / 3) * Math.PI);
       petals.push(petal);
     }
-    const cone = new THREE.ConeGeometry(0.030, 0.10, 8, 1, true);
-    cone.rotateX(-Math.PI / 2);
-    cone.translate(0, 0, -0.05);
-    petals.push(cone);
+    // End-on core remains visible through iron sights when the long cards are edge-on.
+    const core = new THREE.PlaneGeometry(MUZZLE_FLASH.coreM, MUZZLE_FLASH.coreM);
+    core.translate(0, 0, -0.025);
+    petals.push(core);
     const mesh = new THREE.Mesh(MergeGeometries(petals), this.materials.flash);
     mesh.frustumCulled = false;
     mesh.castShadow = false;
@@ -2105,8 +2109,10 @@ export class Viewmodel {
     // 枪焰：旋转按发数派生，连发时每一发的形状不同
     this.flashTime = 0;
     this.flash.rotation.z = rnd() * Math.PI * 2;
-    const size = Mix(0.85, 1.25, rnd());
-    this.flash.scale.set(size, size, size);
+    const size = Mix(MUZZLE_FLASH.minScale, MUZZLE_FLASH.maxScale, rnd());
+    this.flashBaseScale = size;
+    this.materials.flash.opacity = 1;
+    this.flash.scale.setScalar(size);
     this.flash.visible = true;
 
     // 半自动/全自动当场抛壳；栓动枪的壳是拉栓时才出来的
@@ -3235,11 +3241,12 @@ export class Viewmodel {
   _StepFlash(dt) {
     if (!this.flash.visible) return;
     this.flashTime += dt;
-    // 45 ms：比一帧长一点点，60fps 下必定被看到 2—3 帧，但不会拖成"手电筒"
-    const life = Clamp01(this.flashTime / 0.045);
+    // Shared bounded pulse; preserve each shot's seeded size throughout its decay.
+    const life = Clamp01(this.flashTime / MUZZLE_FLASH.lifeS);
     if (life >= 1) { this.flash.visible = false; return; }
     const shrink = 1 - life * life;
-    this.flash.scale.setScalar(Mix(0.4, 1.35, shrink));
+    this.flash.scale.setScalar(this.flashBaseScale * Mix(MUZZLE_FLASH.endScale, 1, shrink));
+    this.materials.flash.opacity = shrink;
     this.flash.rotation.z += dt * 6;
   }
 

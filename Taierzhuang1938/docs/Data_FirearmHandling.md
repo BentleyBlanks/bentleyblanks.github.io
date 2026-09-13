@@ -21,3 +21,11 @@
 - `Script_CoverLeanBrowserTest.mjs`：保留墙边探身、受遮挡禁止射击、手动侧身和 AI 视线契约。
 
 截图与 JSON 报告放在忽略目录 `_shots/FirearmHandling`，不作为游戏资产提交。
+
+## 枪口焰与瞬时照明（2026-09-14）
+
+三八式、汉阳造及共用 Viewmodel 的火器复用已交付 Vefects 火焰遮罩，三片向前火舌与端面亮核合批。持续时间、颜色、强度和尺寸统一取 `Data_Tuning_FirearmHandling.MUZZLE_FLASH`；世界烟尘继续走 Vfx 枪种配方。没有新增生成位图。
+
+玩家开火经 `VfxSystem.MuzzleFlash({player:true})` 获得灯槽短时优先权，NPC 不得在包络结束前把这盏灯移走。灯仍由 LightRig 驱动，low 走固定点光、其余档位走簇光，不增加灯数或开火时重编译。现有枪身 Standard/PBR 材质响应真实直接光，木托为漫反射、金属为粗糙镜面反射；没有用枪身自发光冒充照明。
+
+`Script_MuzzleFlashTest.mjs` 验证两支枪的腰射和 ADS、high/low 两条光照路径、NPC 抢灯保护及熄灭。GPU 对照隐藏火光、世界和手臂，在同一真实枪身姿态只开关枪口灯，按枪身遮罩计量受光像素；正式后期截图另留 `_shots/MuzzleFlash` 本地复核。

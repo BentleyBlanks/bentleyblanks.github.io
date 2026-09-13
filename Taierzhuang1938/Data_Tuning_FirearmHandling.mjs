@@ -21,3 +21,14 @@ export const WALL_CARRY = Object.freeze({
   lowerS: 0.065, raiseS: 0.16, fireReadyLower: 0.30,
   pitchRad: -1.26, backM: 0.08, downM: -0.14,
 });
+
+// Shared first-person rifle flash: a hot, masked flame and a brief PBR light pulse.
+// Reuse the shipped Vefects mask; no new generated bitmap is needed.
+export const MUZZLE_FLASH = Object.freeze({
+  mask: "./Texture/Texture_VefectsFireMask_01.webp",
+  lifeS: 0.060, lightLifeS: 0.075, lightRadiusM: 5,
+  lightIntensity: 26, lightColor: 0xffc781,
+  widthM: 0.13, lengthM: 0.27, coreM: 0.16,
+  color: 0xffc781, radiance: 7.5,
+  minScale: 0.85, maxScale: 1.25, endScale: 0.55,
+});

@@ -156,6 +156,7 @@ export class LightRig {
     this.muzzleAge = 1;
     this.muzzleDuration = 0.055;
     this.muzzleBase = 0;
+    this.muzzlePriority = false;
 
     // 英雄光：簇里的灯一律不投影，但「照明弹」「眼前那处大火」这一盏值得有影子。
     // 做法是把**最高优先级的那一盏**退回三方 `PointLight` 走立方体阴影，其余仍走簇。
@@ -477,7 +478,14 @@ export class LightRig {
   }
 
   /** 开火：闪一下。position 用枪口世界坐标。 */
-  FlashMuzzle(position, intensity = 26, { duration = 0.055, color = 0xffd9a0 } = {}) {
+  FlashMuzzle(position, intensity = 26, {
+    duration = 0.055, color = 0xffd9a0, radius = 22, priority = false,
+  } = {}) {
+    // NPC shots must not move the player's active light away from the gun.
+    // Keep the existing light slot and shader count in both clustered and low paths.
+    if (this.muzzlePriority && this.muzzleAge < this.muzzleDuration && !priority) return;
+    this.muzzlePriority = priority;
+    this.muzzle.distance = radius;
     this.muzzle.position.copy(position);
     this.muzzle.color.setHex(color);
     this.muzzleBase = Math.max(0, Number(intensity) || 0);

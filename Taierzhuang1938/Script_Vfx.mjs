@@ -35,6 +35,7 @@
 import * as THREE from "three";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
+import { MUZZLE_FLASH } from "./Data_Tuning_FirearmHandling.mjs";
 import { BloodEffects } from "./Script_BloodEffects.mjs";
 
 // ---------------------------------------------------------------------------
@@ -1640,7 +1641,7 @@ export class VfxSystem {
    * 枪口焰。真枪就是两帧的事，所以寿命 45—75 ms；
    * 观感靠"不规则星芒 + 一小团发白的烟 + 一片向前炸开的空气扰动"，不靠持续时间。
    */
-  MuzzleFlash(position, direction, { scale = 1, kind = "rifle" } = {}) {
+  MuzzleFlash(position, direction, { scale = 1, kind = "rifle", player = false } = {}) {
     const profile = MUZZLE_KINDS[kind] || MUZZLE_KINDS.rifle;
     const dir = TMP_A.copy(direction).normalize();
     const size = profile.size * scale;
@@ -1655,41 +1656,51 @@ export class VfxSystem {
     };
     if (this.lights) {
       const intensity = 24 * scale * Math.max(0.65, Math.min(1.6, profile.size / 0.29));
-      this.lights.FlashMuzzle(position, intensity, { duration: profile.life * 1.12 });
+      this.lights.FlashMuzzle(position, player ? MUZZLE_FLASH.lightIntensity * scale : intensity, {
+        duration: player ? MUZZLE_FLASH.lightLifeS : profile.life * 1.12,
+        color: player ? MUZZLE_FLASH.lightColor : 0xffd9a0,
+        radius: player ? MUZZLE_FLASH.lightRadiusM : 22,
+        priority: player,
+      });
     }
 
-    for (let i = 0; i < profile.spikes; i += 1) {
-      const s = ResetSpawn();
-      s.x = position.x + dir.x * 0.04;
-      s.y = position.y + dir.y * 0.04;
-      s.z = position.z + dir.z * 0.04;
-      s.vx = dir.x * 2.2; s.vy = dir.y * 2.2; s.vz = dir.z * 2.2;
-      s.drag = 12;
-      s.life = profile.life * (i === 0 ? 1 : 0.7);
-      s.sizeStart = size * (i === 0 ? 1 : 0.62);
-      s.sizeEnd = size * (i === 0 ? 1.35 : 0.8);
-      s.opacity = 1;
-      s.fadeIn = 0.02;
-      s.angle = this._Range(0, 6.283);
-      s.spin = this._Signed(6);
-      s.colorA = VFX_PALETTE.muzzleCore;
-      s.colorB = VFX_PALETTE.muzzleEdge;
-      s.seed = this.random();
-      this.pools.star.Spawn(s, this.time);
-    }
+    // The player's flame is attached to the viewmodel muzzle. A second world
+    // billboard here would cover it with an oversized star during ADS.
+    if (!player) {
+      for (let i = 0; i < profile.spikes; i += 1) {
+        const s = ResetSpawn();
+        s.x = position.x + dir.x * 0.04;
+        s.y = position.y + dir.y * 0.04;
+        s.z = position.z + dir.z * 0.04;
+        s.vx = dir.x * 2.2; s.vy = dir.y * 2.2; s.vz = dir.z * 2.2;
+        s.drag = 12;
+        s.life = profile.life * (i === 0 ? 1 : 0.7);
+        s.sizeStart = size * (i === 0 ? 1 : 0.62);
+        s.sizeEnd = size * (i === 0 ? 1.35 : 0.8);
+        s.opacity = 1;
+        s.fadeIn = 0.02;
+        s.angle = this._Range(0, 6.283);
+        s.spin = this._Signed(6);
+        s.colorA = VFX_PALETTE.muzzleCore;
+        s.colorB = VFX_PALETTE.muzzleEdge;
+        s.seed = this.random();
+        this.pools.star.Spawn(s, this.time);
+      }
 
-    // 枪口前那一小团 HDR 亮核，负责在泛光里"炸开"
-    {
-      const s = ResetSpawn();
-      s.x = position.x + dir.x * 0.06;
-      s.y = position.y + dir.y * 0.06;
-      s.z = position.z + dir.z * 0.06;
-      s.life = profile.life * 1.1;
-      s.sizeStart = size * 0.55; s.sizeEnd = size * 0.9;
-      s.drag = 10; s.opacity = 1; s.fadeIn = 0.02;
-      s.colorA = VFX_PALETTE.muzzleCore; s.colorB = VFX_PALETTE.fireMid;
-      s.seed = this.random();
-      this.pools.fire.Spawn(s, this.time);
+      // 枪口前那一小团 HDR 亮核，负责在泛光里"炸开"
+      {
+        const s = ResetSpawn();
+        s.x = position.x + dir.x * 0.06;
+        s.y = position.y + dir.y * 0.06;
+        s.z = position.z + dir.z * 0.06;
+        s.life = profile.life * 1.1;
+        s.sizeStart = size * 0.55; s.sizeEnd = size * 0.9;
+        s.drag = 10; s.opacity = 1; s.fadeIn = 0.02;
+        s.colorA = VFX_PALETTE.muzzleCore; s.colorB = VFX_PALETTE.fireMid;
+        s.seed = this.random();
+        this.pools.fire.Spawn(s, this.time);
+      }
+
     }
 
     // 向前的空气扰动：一片飞快膨胀又消失的贴面，正对枪口方向

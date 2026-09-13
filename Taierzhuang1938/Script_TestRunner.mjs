@@ -189,6 +189,8 @@ export const testDefs = {
   },
   VisibilityTest: { file: "Script_VisibilityTest.mjs", desc: "战场内容预算：名额/空洞/尸体上限" },
   DamageTest: { file: "Script_DamageTest.mjs", desc: "伤害口径重放（TTK 对照）" },
+  HeadshotTest: { file: "Script_HeadshotTest.mjs", desc: "Real headshot damage and far-pose hitbox alignment" },
+  MuzzleFlashTest: { file: "Script_MuzzleFlashTest.mjs", desc: "Rifle fire/ADS, real PBR light response, NPC contention and decay" },
   FirearmHandlingTest: { file: "Script_FirearmHandlingTest.mjs", desc: "Dense spread / bloom recovery / automatic recoil / barrel clearance (pure Node)" },
   FirearmHandlingBrowserTest: { file: "Script_FirearmHandlingBrowserTest.mjs", desc: "Real firing, stance, automatic bursts and near-wall lowering" },
   GunFeelTest: { file: "Script_GunFeelTest.mjs", desc: "枪感短链八条" },
@@ -294,6 +296,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "MuzzleFlashTest", "HeadshotTest",
   "FirearmHandlingBrowserTest",
   "CharacterSpeechBrowserTest",
   "FirstLevelCasualtyBrowserTest",
@@ -411,7 +414,7 @@ export const domains = {
   },
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
-    tests: ["FirearmHandlingTest", "FirearmHandlingBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
+    tests: ["MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmHandlingBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
       "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "MeleeQteTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest", "ModelFacingTest",
       // 玩家自己的命中几何（AI 打玩家的部位由它判）与通用震屏（爆炸/近失/中弹/落地/扫射/扑沟）：
@@ -474,7 +477,7 @@ export const domains = {
     //（UpdateFire / MoveSmokeSource），所以碰灯光或粒子的改动也要连着 FlareTest 跑。
     // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
-    tests: ["BloodEffectsTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
+    tests: ["MuzzleFlashTest", "BloodEffectsTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -493,7 +496,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
-  { domain: "combat", pattern: /FirearmHandling/i },
+  { domain: "combat", pattern: /FirearmHandling|MuzzleFlash|Headshot/i },
   {domain:"characterSpeech",pattern:/CharacterSpeech|CharacterFacial|SpeechEnvelope|NraFacial|Nra05Facial|Script_FirstLevelMissionVoice|Script_Audio\.mjs|Script_CharacterModel/},
   { domain: "animation", pattern: /ActorLocomotion|LocomotionProfileBake/ },
   {domain:'animation',pattern:/DadaoSwing|DadaoPowerSwing/},
