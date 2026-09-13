@@ -57,7 +57,9 @@ try {
     const originNode = card.querySelector(".dcOrigin");
     const yearsStyle = getComputedStyle(yearsNode);
     const originStyle = getComputedStyle(originNode);
-    const dof = T.post.uniformsComposite;
+    // 景深读 DofPass 本帧算好的 CoC（Script_PostDof.Prepare），不读合成 uniform：
+    // 合成里残留的 uDof* 只是照抄调用参数，DofPass 早已不读它们。
+    const coc = T.post.dofPass.coc;
     const probe = document.createElement("canvas");
     probe.width = 96; probe.height = 54;
     const ctx = probe.getContext("2d");
@@ -86,10 +88,11 @@ try {
       yearsFontPx: parseFloat(yearsStyle.fontSize),
       yearsWeight: parseInt(yearsStyle.fontWeight, 10),
       originFontPx: parseFloat(originStyle.fontSize),
-      dofStrength: dof.uDofStrength.value,
-      dofFocus: dof.uDofFocus.value,
-      dofRange: dof.uDofRange.value,
-      dofMaxPx: dof.uDofMaxPx.value,
+      dofActive: coc.active,
+      dofFocus: coc.focus,
+      dofFarMaxPx: coc.farMaxPx,
+      dofNearMaxPx: coc.nearMaxPx,
+      dofFarGain: coc.farGain,
       weaponHidden: !T.viewmodel.root.visible,
       glError: T.renderer.getContext().getError(),
       mean, variance,
@@ -102,9 +105,11 @@ try {
   const checks = [
     ["倒地机位", result.cameraDrop > 0.8 && result.roll > 0.8,
       `drop=${result.cameraDrop.toFixed(2)}m roll=${result.roll.toFixed(2)}rad`],
-    ["前景焦点重 DOF", result.dofStrength > 0.95 && result.dofFocus <= 1.5
-      && result.dofRange <= 3 && result.dofMaxPx >= 10,
-    `strength=${result.dofStrength} focus=${result.dofFocus} range=${result.dofRange} max=${result.dofMaxPx}px`],
+    // 阵亡 = 焦点钉在 1.5 m 的前景，远景满强度散焦（Main 给 dofMaxPx 11，受 DOF.maxCocPx 封顶）。
+    ["前景焦点重 DOF", result.dofActive && Math.abs(result.dofFocus - 1.5) < 0.01
+      && result.dofFarMaxPx >= 10 && result.dofFarMaxPx <= 11.001 && result.dofFarGain > 0,
+    `active=${result.dofActive} focus=${result.dofFocus.toFixed(2)}m far=${result.dofFarMaxPx.toFixed(2)}px `
+      + `gain=${result.dofFarGain.toFixed(2)} near=${result.dofNearMaxPx.toFixed(2)}px`],
     ["居中大号粗体生平 UI", result.cardOn && /^rgba\(/.test(result.background)
       && result.biographyCentered && result.nameFontPx >= 80 && result.nameWeight >= 700
       && result.yearsAboveOrigin && result.yearsFontPx >= 23 && result.yearsWeight >= 600
