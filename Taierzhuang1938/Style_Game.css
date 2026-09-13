@@ -52,14 +52,14 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudDamage.low::before { animation: hudPulse var(--blood-pulse) ease-in-out infinite; }
 
 /*
- * 近距离白刃击杀的镜头溅血。素材是白底生产图，multiply 让白色等同于不改画面，
- * 只留下深红血迹；它有自己的短计时，绝不借 hudDamage 的血量/受伤状态。
+ * 近距离白刃击杀的镜头溅血。素材自带真实 Alpha，中央视野保持透明；
+ * 它有自己的短计时，绝不借 hudDamage 的血量/受伤状态。
  */
 .hudMeleeKillBlood {
   position: absolute; inset: -2.5%; z-index: 8;
   pointer-events: none; opacity: 0; visibility: hidden;
-  background: url("./Texture/Hud/Texture_HudMeleeKillBlood.webp?v=20260914a") center / 100% 100% no-repeat;
-  mix-blend-mode: multiply;
+  background: url("./Texture/Hud/Texture_HudMeleeKillBlood.webp?v=20260914b") center / 100% 100% no-repeat;
+  mix-blend-mode: normal;
   transform: scale(1); transform-origin: center;
   will-change: opacity, transform;
 }

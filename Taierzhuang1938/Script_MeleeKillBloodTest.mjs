@@ -28,19 +28,19 @@ try {
   const before = await page.evaluate(async () => {
     const T = Taierzhuang;
     const image = new Image();
-    image.src = "./Texture/Hud/Texture_HudMeleeKillBlood.webp?v=20260914a";
+    image.src = "./Texture/Hud/Texture_HudMeleeKillBlood.webp?v=20260914b";
     await image.decode();
     const canvas = document.createElement("canvas");
     canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
     const context = canvas.getContext("2d", { willReadFrequently: true });
     context.drawImage(image, 0, 0);
-    // 准星周围必须是白底；multiply 下白色不改游戏画面，等价于视觉透明。
+    // 准星周围必须是真透明 Alpha，不再依赖白底 multiply 伪透明。
     const x = Math.floor(canvas.width * .38), y = Math.floor(canvas.height * .30);
     const w = Math.floor(canvas.width * .24), h = Math.floor(canvas.height * .32);
     const pixels = context.getImageData(x, y, w, h).data;
     let stained = 0;
     for (let i = 0; i < pixels.length; i += 16) {
-      if (pixels[i] < 245 || pixels[i + 1] < 245 || pixels[i + 2] < 245) stained += 1;
+      if (pixels[i + 3] > 4) stained += 1;
     }
     return {
       image: [image.naturalWidth, image.naturalHeight],
@@ -76,7 +76,7 @@ try {
   assert.equal(killed.playerHealthAfter, killed.playerHealthBefore, "砍杀飞溅不能伪装成玩家掉血");
   assert(killed.blood.active && killed.blood.opacity > .35, JSON.stringify(killed.blood));
   assert.match(killed.blood.backgroundImage, /Texture_HudMeleeKillBlood\.webp/);
-  assert.equal(killed.blood.blendMode, "multiply");
+  assert.equal(killed.blood.blendMode, "normal");
   assert.equal(killed.damageOpacity, 0, "击杀飞溅不得点亮受伤暗角");
   assert.equal(killed.confirms.at(-1), "kill");
 
