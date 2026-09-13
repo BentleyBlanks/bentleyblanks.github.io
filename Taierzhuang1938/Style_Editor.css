@@ -22,7 +22,7 @@
   width: 40px; min-width: 40px; height: 34px; padding: 0; border-radius: 0;
   pointer-events: auto; cursor: pointer;
   background-color: var(--ui-black);
-  background-image: url("./Texture/Hud/Icon_SettingsTools.png?v=202609140500");
+  background-image: url("./Texture/Hud/Icon_SettingsTools.png?v=20260914050001");
   background-position: center; background-repeat: no-repeat; background-size: 27px 27px;
   border: 1px solid rgba(214, 217, 209, 0.28);
   color: var(--ui-text);
