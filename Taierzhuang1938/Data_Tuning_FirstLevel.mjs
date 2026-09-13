@@ -196,6 +196,10 @@ export const MISSION_TUNING = Object.freeze({
   tankPursuitBounds:{minX:28,maxX:43},
   tankTrackRadiusM: 5,
   tankTrackMinDamage: 35,
+  // Blender-authored mobility kill: engine smoke, no secondary ammunition blast.
+  tankDamage: {smokeDelayS:.32,debrisClearanceM:.04,engineOutlet:[0,1.56,.64],
+    smoke:{kind:"black",rate:7,radius:.18,rise:1.05,sizeStart:.22,sizeEnd:1.5,
+      life:4.8,opacity:.48,turbulence:.32,fire:0}},
   threatSuppression: 0.5,
   passageRangeM: 36,
   interactionRangeM: 2.5,

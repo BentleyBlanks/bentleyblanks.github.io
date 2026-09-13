@@ -1361,6 +1361,9 @@ export class FirstLevelMissionRuntime {
     if (hit && hit.box?.tag !== "missionTank" && hit.t < distance - 0.25) return;
     this.tank.immobilized = true;
     this.tank.moving = false;
+    this.tank.damageAt = this.time;
+    const impactX=position.x-this.tank.x,impactZ=position.z-this.tank.z,yaw=this.tank.hullYaw??Math.PI;
+    this.tank.damageSide = Math.cos(yaw)*impactX-Math.sin(yaw)*impactZ < 0 ? -1 : 1;
     // A real thrown bundle is also proof of acquisition, including after checkpoint resume.
     this.Record("bundleTaken", { source: "playerBundleBlast" });
     this.Record("tankImmobilized", { position: { x: position.x, z: position.z }, explosiveId });

@@ -8,9 +8,10 @@ import { CreateP012StretcherGeometry } from "./Script_FirstLevelP012CarryView.mj
 import { BuildSink } from "./Script_World.mjs";
 import { PlaceGeometry } from "./Script_Geo.mjs";
 import { MISSION_PLACEMENT, MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
+import { Type89Damage } from "./Script_Type89Damage.mjs";
 export class FirstLevelMissionView {
   constructor({ scene, battlefield, physics, column, actorFactory, library, hud, vfx }) {
-    Object.assign(this, { scene, battlefield, physics, column, actorFactory, library });
+    Object.assign(this, { scene, battlefield, physics, column, actorFactory, library, vfx });
     this.root = new THREE.Group();
     this.root.name = "FirstLevelMissionWhitebox";
     scene.add(this.root);
@@ -141,8 +142,8 @@ export class FirstLevelMissionView {
     this.tankModel=model;this.tank.add(model.root);
     model.root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
     this.turret=model.nodes.get("turret");
-    this.trackDamage=this.Box(this.tank,.19,.12,1.1,-1.02,.07,.2,0x252c27);
-    this.trackDamage.visible=false;
+    this.tankDamage=new Type89Damage({root:this.tank,model,materials,vfx:this.vfx,
+      groundAt:(x,z)=>this.battlefield.GroundHeight(x,z)});
     this.tankCollider = {
       min: [0, 0, 0],
       max: [0, 0, 0],
@@ -367,7 +368,7 @@ export class FirstLevelMissionView {
     if (tank) {
       this.tank.visible = tank.present || tank.active;
       this.SyncTank(tank);
-      this.trackDamage.visible = tank.immobilized;
+      this.tankDamage.Update(time,tank);
       if (tank.present || tank.active) {
         const c = this.tankCollider;c.ry=tank.hullYaw??Math.PI;
         c.c = [tank.x, this.tank.position.y + 1.28, tank.z];
@@ -382,6 +383,7 @@ export class FirstLevelMissionView {
     }
   }
   Dispose() {
+    this.tankDamage.Dispose();
     this.people.Dispose();this.aftermath.Dispose();
     for (const collider of this.colliders) {
       if (collider._physicsHandle != null) this.physics.RemoveSolid(collider._physicsHandle);
