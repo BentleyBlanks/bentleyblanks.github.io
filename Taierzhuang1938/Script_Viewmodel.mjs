@@ -1562,6 +1562,7 @@ export class Viewmodel {
         this.riggedArms = new FpsArmRig(riggedAssets.fpsArms, library);
         this.armRigs.default=this.riggedArms;
         if(riggedAssets.fpsHanYang){
+          this.armRigs.ZhongZheng=new FpsArmRig(riggedAssets.fpsHanYang,library);
           this.armRigs.HanYang=new FpsArmRig(riggedAssets.fpsHanYang,library);
           this.armRigs.Type38=new FpsArmRig(riggedAssets.fpsHanYang,library);
         }

@@ -171,7 +171,7 @@ checks.push(["五类源动作只提供手指基础姿态", ["rifle", "lmg", "pis
   .every((profile) => report.profiles.includes(profile)), report.profiles.join(", ")]);
 for (const entry of report.cases) {
   const label = `${entry.weapon} ${entry.state}`;
-  if (["HanYang", "Type38"].includes(entry.weapon)) checks.push([`${label} 使用重做的固定骨段裸手`, entry.fixedRestLengths === true, String(entry.fixedRestLengths)]);
+  if (["ZhongZheng", "HanYang", "Type38"].includes(entry.weapon)) checks.push([`${label} 使用重做的固定骨段裸手`, entry.fixedRestLengths === true, String(entry.fixedRestLengths)]);
   const staticContact = entry.contactWeight.r > 0.99 && entry.contactWeight.l > 0.99;
   if (entry.painted != null) checks.push([`${label} 玩家相机轮廓可读`, entry.painted >= 0.003 && entry.painted <= 0.22,
     `${(entry.painted * 100).toFixed(1)}%`]);
