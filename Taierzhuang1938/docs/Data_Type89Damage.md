@@ -41,6 +41,8 @@ state["ExportGlb"]()
 - 48 项 quick 检查通过，含 `FirstLevelMissionTest --audio`、模型朝向、资产规范、模块缓存戳和测试登记。
 - 本地正式游戏 high 画质经真实 `OnBlast` 集束弹回调触发，断口、碎片和黑烟实拍完成，浏览器无 pageerror；这是定向诊断，不是整关自然通关证明。
 - 本地独立预览验证左右切换、完好复位、暂停和重播。后续自检截图均为 1280×720。
+- GLB 已在浏览器用正式 GLTFLoader 加载并播放：一个合并片段、31 条动画轨道，末态散件位置与游戏烘焙数据误差小于 0.000001 米。
 - prepush 在 32 项通过后停止于 `FirstLevelFrontPresenceTest: the sheltered delay remains playable`。在同一 worktree 暂时还原 HEAD 的 MissionView / MissionRuntime 后，复现了相同失败，再恢复本次修改；未修改原测试断言。此结果不能报告为完整 prepush 通过。
+- `MotionVectorContractTest` / `CarriagePropVelocityTest` 的定向补验始终等待其他任务占用的浏览器测试槽，本次已停止排队，未取得通过结果。上线前仍需补齐。
 
 模型验收页 `_check_Type89Damage.html`、截图和诊断脚本均只留本地。当前成果保留在本任务 worktree，未发布；验收页可通过本地 LocalPreview 打开。
