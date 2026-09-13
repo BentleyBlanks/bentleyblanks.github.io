@@ -6692,10 +6692,14 @@ function UpdateContextualActionPrompts() {
     return;
   }
   const interaction = interact?.Query(player) || null;
-  if(missionRuntime?.EmptyHands){const prompt=missionRuntime.OpeningPrompt();hud.SetActionPrompts(prompt?[prompt]:[]);return;}
+  // 下面各分支里凡是 Space 仍然是「翻越 / 跳跃」的，都在最前面挂一条翻越提示；
+  // 架枪与抬东西的分支不挂（那会儿提示条被它们整段接管）。
+  const traverse = TraversePrompt();
+  const WithTraverse = (list) => traverse ? [traverse, ...list] : list;
+  if(missionRuntime?.EmptyHands){const prompt=missionRuntime.OpeningPrompt();hud.SetActionPrompts(WithTraverse(prompt?[prompt]:[]));return;}
   if (typeof weaponRange !== "undefined" && weaponRange) {
-    hud.SetActionPrompts(interaction?.point?.tag === "WeaponRange"
-      ? [{ keys: "F", label: interaction.label, kind: "interact" }] : []);
+    hud.SetActionPrompts(WithTraverse(interaction?.point?.tag === "WeaponRange"
+      ? [{ keys: "F", label: interaction.label, kind: "interact" }] : []));
     return;
   }
   if (p012Runtime?.binocularOwned) {
@@ -6703,7 +6707,7 @@ function UpdateContextualActionPrompts() {
     if (interaction?.point?.id === "p012_binocularReturn") {
       prompts.unshift({keys:"F",label:interaction.label,kind:"interact"});
     }
-    hud.SetActionPrompts(prompts);
+    hud.SetActionPrompts(WithTraverse(prompts));
     return;
   }
   if(p012Flow?.beat===5){
@@ -6715,12 +6719,12 @@ function UpdateContextualActionPrompts() {
         else if(load.canThrow)prompts.push({keys:T("hud.key.mouseLeft"),label:T("hud.prompt.ammoDrop"),kind:"carry"});
       }
     }else if(interaction?.point?.id==="p012_ammoPickup")prompts.push({keys:T("hud.key.holdF"),label:T("hud.prompt.ammoPickup"),kind:"carry"});
-    hud.SetActionPrompts(prompts);return;
+    hud.SetActionPrompts(load?.active?prompts:WithTraverse(prompts));return;
   }
   if(missionRuntime && interaction?.point?.tag==="FirstLevelMission"){
     const prompts=[{keys:interaction.point.gesture==="hold"?T("hud.key.holdF"):"F",label:interaction.label,kind:interaction.kind||"interact"}];
     if(player.bleeding>0&&player.bandages>0)prompts.push({keys:"B",label:T("hud.prompt.bandage"),kind:"bandage"});
-    hud.SetActionPrompts(prompts);return;
+    hud.SetActionPrompts(WithTraverse(prompts));return;
   }
   const gunInHand = state.activeSlot === "primary" || state.activeSlot === "secondary";
   const prompts = ContextualActionPrompts({
@@ -6739,7 +6743,22 @@ function UpdateContextualActionPrompts() {
   if (meleeCombat?.CanUse() && meleeCombat.PushCandidate()) {
     prompts.unshift({ keys: "F", label: T("hud.prompt.push"), kind: "push" });
   }
-  hud.SetActionPrompts(prompts);
+  hud.SetActionPrompts(carry?.Active ? prompts : WithTraverse(prompts));
+}
+
+/**
+ * 「Space 翻越 / 攀爬」提示。与 DoTraverse 同口径：只有站着、手上没在忙、
+ * 而且 `player.ProbeVault()` 此刻真能翻过去时才出现 —— 提示在，按下去就一定翻。
+ */
+function TraversePrompt() {
+  if (player.stance !== "stand" || player.Busy || viewmodel.IsBusy?.()) return null;
+  const probe = player.ProbeVault?.();
+  if (!probe) return null;
+  return {
+    keys: T("hud.key.space"),
+    label: T(probe.plan.kind === "mantle" ? "hud.prompt.mantle" : "hud.prompt.vault"),
+    kind: "traverse",
+  };
 }
 
 /**

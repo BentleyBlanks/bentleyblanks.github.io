@@ -215,6 +215,11 @@ try {
       const cx = (b.min[0] + b.max[0]) / 2, cz = (b.min[2] + b.max[2]) / 2;
       const nx = thinX ? 1 : 0, nz = thinX ? 0 : 1;
       T.player.Spawn(cx - nx * 0.75, cz - nz * 0.75, Math.atan2(-nx, -nz));
+      // 提示条每 6 帧重算一次；多推几帧让它跟上当前机位。
+      T.StepFrames(12);
+      const promptRow = document.querySelector(".hudActions .hudAction.traverse");
+      const promptText = promptRow?.textContent || "";
+      const probed = !!T.player.ProbeVault();
       const jump0 = D.Jump().count, vault0 = D.Vault().count;
       D.Key("Space"); T.StepFrames(4);
       if (D.Vault().active) {
@@ -224,12 +229,22 @@ try {
         for (let i = 0; i < 3; i += 1) { D.Look(4, 0); T.StepFrames(1); stillVaulting ||= D.Vault().active; }
         return {
           found: true, jumps: D.Jump().count - jump0, vaults: D.Vault().count - vault0,
-          lookTravel: Math.abs(T.player.yaw - y0), stillVaulting,
+          lookTravel: Math.abs(T.player.yaw - y0), stillVaulting, probed, promptText,
         };
       }
     }
-    return { found: false, jumps: 0, vaults: 0, lookTravel: 0, stillVaulting: false };
+    return { found: false, jumps: 0, vaults: 0, lookTravel: 0, stillVaulting: false, probed: false, promptText: "" };
   });
+  // 空地上不许挂翻越提示（提示在 = 按下去一定翻）。
+  const openPrompt = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    T.player.Spawn(0, 60, 0);
+    T.StepFrames(30);
+    return { probed: !!T.player.ProbeVault(), shown: !!document.querySelector(".hudActions .hudAction.traverse") };
+  });
+  Check("能翻的墙前挂「Space 翻越/攀爬」提示，空地上不挂",
+    vault.found && vault.probed && /Space/.test(vault.promptText) && !openPrompt.shown && !openPrompt.probed,
+    `墙前探测=${vault.probed} 提示「${vault.promptText}」 / 空地探测=${openPrompt.probed} 提示=${openPrompt.shown}`);
   Check("墙前 Space 保持翻越优先", vault.found && vault.vaults === 1 && vault.jumps === 0,
     `找到=${vault.found} / 翻越 +${vault.vaults} / 跳跃 +${vault.jumps}`);
   Check("翻越途中照样能转视线", vault.stillVaulting && vault.lookTravel > 0.015,

@@ -113,7 +113,14 @@
 | `Script_Ai.mjs` | 同上 | AI 的翻越与攀爬（判据与玩家逐条一致，否则就是单方面作弊） |
 | `Script_Physics.mjs` | `TRAVERSAL.stepMax` | 角色控制器的 autostep 上限 |
 | `Script_Navigation.mjs` | `TRAVERSAL.stepMax` | 导航图「盒顶高过多少才算墙」 |
-| `Script_Main.mjs` | `TRAVERSAL` | `Debug.Traversal()` 取证口 + Space 的动词分流 |
+| `Script_Main.mjs` | `TRAVERSAL` / `player.ProbeVault()` | `Debug.Traversal()` 取证口 + Space 的动词分流 + 提示条上的「Space 翻越 / 攀爬」 |
+
+### 翻越提示
+
+站着、手上不忙、`PlayerController.ProbeVault()` 此刻成立时，情境提示条（准心下方）挂一条
+「Space 翻越」或「Space 攀爬」。`TryVault` 本身就是先调 `ProbeVault` 再执行，所以
+**提示在，按下去一定翻；提示不在，按下去就是原地跳**。架机枪、抬东西时提示条被整段接管，不挂。
+文案键 `hud.prompt.vault` / `hud.prompt.mantle` / `hud.key.space`。
 
 ## 位移曲线
 
@@ -132,7 +139,7 @@ y   = from.y + (apexY - from.y) * up - (apexY - to.y) * down
 ## 取证与回归
 
 ```powershell
-node Taierzhuang1938/Script_JumpTest.mjs      # 跳跃/翻越/攀爬专项，15 条
+node Taierzhuang1938/Script_JumpTest.mjs      # 跳跃/翻越/攀爬专项（含翻越提示）
 node Taierzhuang1938/Script_PhysicsTest.mjs   # autostep、撞墙不上房顶、台阶
 ```
 

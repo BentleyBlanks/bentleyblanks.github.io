@@ -401,7 +401,36 @@ export class PlayerController {
    * @returns {false|"vault"|"mantle"} 进了哪一档动作；没进就是 false
    */
   TryVault() {
-    if (!this.alive || this.vault.active || !this.grounded) return false;
+    const probe = this.ProbeVault();
+    if (!probe) return false;
+    const { plan, top, landX, landY, landZ } = probe;
+    const feet = this.position.y;
+    this._vaultFrom.copy(this.position);
+    this._vaultTo.set(landX, landY, landZ);
+    this.vault.active = true;
+    this.vault.t = 0;
+    this.vault.kind = plan.kind;
+    this.vault.rise = top - feet;
+    this.vault.duration = plan.duration;
+    this.vault.dip = plan.dip;
+    // 顶点：翻越荡到墙头之上一点，攀爬只贴着墙头蹭过去。
+    // 起点/落点比它还高时以高者为准，免得曲线往回倒。
+    this.vault.apexY = Math.max(top + plan.apexOver, feet, landY);
+    this.velocity.set(0, 0, 0);
+    this.stance = "stand";                                   // 蹲着趴着翻不过去，先站起来
+    this.stamina = Clamp01(this.stamina - plan.stamina);
+    this.vaultCount += 1;
+    if (plan.kind === "mantle") this.mantleCount += 1;
+    return plan.kind;
+  }
+
+  /**
+   * 只探不动：此刻按 Space 会不会进翻越 / 攀爬。`TryVault` 与 HUD 的「Space 翻越」提示
+   * 共用这一份判据，提示出现就一定翻得过去，不出现按下去就是原地跳。
+   * @returns {null|{plan:object, top:number, landX:number, landY:number, landZ:number}}
+   */
+  ProbeVault() {
+    if (!this.alive || this.vault.active || !this.grounded) return null;
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     const feet = this.position.y;
     const probeX = this.position.x + fx * 0.6;
@@ -438,10 +467,10 @@ export class PlayerController {
       obstacles.add(box);
       if (box.max[1] > top) top = box.max[1];
     }
-    if (wall || !Number.isFinite(top)) return false;
+    if (wall || !Number.isFinite(top)) return null;
     const plan = TraversalPlan(top - feet);
-    if (!plan) return false;
-    if (this.stamina < plan.stamina) return false;           // 喘不上气就扒不动墙头
+    if (!plan) return null;
+    if (this.stamina < plan.stamina) return null;            // 喘不上气就扒不动墙头
 
     // 2) 顶面往前落得下脚吗。判据在 `Data_Traversal.TraversalLanding`，与 AI 共用：
     //    盖住落点、顶面容得下人的才算地面，落点这一格里不许有支棱着的东西。
@@ -454,25 +483,8 @@ export class PlayerController {
       : this.world.colliders;
     const landY = TraversalLanding(landNear, this.position, { x: landX, z: landZ },
       this.world.GroundHeight(landX, landZ), top + 0.05, r, obstacles);
-    if (landY === null) return false;                        // 墙那边还是墙：翻过去没地方站
-
-    this._vaultFrom.copy(this.position);
-    this._vaultTo.set(landX, landY, landZ);
-    this.vault.active = true;
-    this.vault.t = 0;
-    this.vault.kind = plan.kind;
-    this.vault.rise = top - feet;
-    this.vault.duration = plan.duration;
-    this.vault.dip = plan.dip;
-    // 顶点：翻越荡到墙头之上一点，攀爬只贴着墙头蹭过去。
-    // 起点/落点比它还高时以高者为准，免得曲线往回倒。
-    this.vault.apexY = Math.max(top + plan.apexOver, feet, landY);
-    this.velocity.set(0, 0, 0);
-    this.stance = "stand";                                   // 蹲着趴着翻不过去，先站起来
-    this.stamina = Clamp01(this.stamina - plan.stamina);
-    this.vaultCount += 1;
-    if (plan.kind === "mantle") this.mantleCount += 1;
-    return plan.kind;
+    if (landY === null) return null;                         // 墙那边还是墙：翻过去没地方站
+    return { plan, top, landX, landY, landZ };
   }
 
   /**

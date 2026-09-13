@@ -15,6 +15,7 @@ export const TEXT = Object.freeze({
   "hud.key.mouseRight": "右键",
   "hud.key.holdF": "按住 F",
   "hud.key.holdPrefix": "长按",
+  "hud.key.space": "Space",
 
   // --- 顶部目标与兵员池 -----------------------------------------------------
   "hud.objective.updated": "目标已更新",
@@ -38,6 +39,8 @@ export const TEXT = Object.freeze({
   "hud.prompt.carryThrow": "扔下，立刻还手",
   "hud.prompt.bandage": "包扎止血",
   "hud.prompt.reload": "装弹",
+  "hud.prompt.vault": "翻越",
+  "hud.prompt.mantle": "攀爬",
   "hud.prompt.meleeCharge": "白刃（按住蓄力劈刺）",
   "hud.prompt.switchWeapon": "切换{slots}",
   "hud.weaponSlot.primary": "长枪",
