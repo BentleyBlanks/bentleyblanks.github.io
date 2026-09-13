@@ -22,9 +22,14 @@ try{
   const THREE=await import('./vendor/three/build/three.module.js');
   const {MELEE_WEAPONS}=await import('./Data_MeleeCombat.mjs');
   const {SampleMeleeVideo}=await import('./Script_MeleeAnimation.mjs');
+  const {FPS_DADAO_SWING:stroke}=await import('./Data_FpsDadaoSwing.mjs');
   const T=Taierzhuang,L=T.Debug.MeleeCombat;L.Select('DadaoOne');L.Pause(true);T.StepFrames(90,1/60,false);
   const v=T.viewmodel,r=v.riggedArms,bones=[];r.root.traverse(o=>{if(o.isBone)bones.push(o);});
   const result={clips:[],boneNames:bones.map(b=>b.name),sourceFrames:[]};
+  const guard=new THREE.Quaternion().setFromEuler(new THREE.Euler(.72,-.62,1.54,'YXZ'));
+  const normals=stroke.frames.slice(Math.ceil(stroke.cutStart*120),Math.floor(.52*120)+1)
+   .map(row=>new THREE.Vector3(1,0,0).applyQuaternion(guard).applyQuaternion(new THREE.Quaternion().fromArray(row,3)));
+  result.cutPlaneDriftDeg=Math.max(...normals.map(normal=>THREE.MathUtils.radToDeg(normal.angleTo(normals[0]))));
   const Matrix=(o,relative)=>new THREE.Matrix4().multiplyMatrices(relative.matrixWorld.clone().invert(),o.matrixWorld).toArray();
   for(const action of ['Light','LightAlt','Heavy','Compact','CompactAlt','Charge']){
    const spec=MELEE_WEAPONS.Dadao[action==='Heavy'?'heavy':'light'],duration=spec.windup+spec.active+spec.recovery;
@@ -64,6 +69,7 @@ try{
  },process.argv.includes('--export-source'));
  if(process.argv.includes('--trace'))fs.writeFileSync(path.join(out,'Data_DadaoSwingTrace.json'),JSON.stringify(data));
  const Dist=(a,b)=>Math.hypot(...a.map((n,i)=>n-b[i]));
+ assert(data.cutPlaneDriftDeg<.1,`Blade twists during downstroke/follow-through: ${data.cutPlaneDriftDeg} degrees`);
  const metrics=[];
  for(const clip of data.clips){
   for(const f of clip.frames){
@@ -114,7 +120,7 @@ try{
   visibility.push({viewport,checks});
  }
  await page.setViewportSize({width:1280,height:720});
- fs.writeFileSync(path.join(out,'Data_DadaoSwingAcceptance.json'),JSON.stringify({metrics,visibility,interruptionError:data.interruptionError,recoverySeekError:data.recoverySeekError},null,2));
+ fs.writeFileSync(path.join(out,'Data_DadaoSwingAcceptance.json'),JSON.stringify({metrics,visibility,cutPlaneDriftDeg:data.cutPlaneDriftDeg,interruptionError:data.interruptionError,recoverySeekError:data.recoverySeekError},null,2));
  if(data.sourceFrames.length)fs.writeFileSync(path.join(out,'Data_DadaoSourceBake.json'),JSON.stringify({boneNames:data.boneNames,frames:data.sourceFrames}));
  for(const phase of [.24,.34,.4,.55,.85]){
   await page.evaluate(phase=>{Taierzhuang.Debug.MeleeCombat.Preview('Light',phase);Taierzhuang.StepFrames(1,1/60,true);},phase);

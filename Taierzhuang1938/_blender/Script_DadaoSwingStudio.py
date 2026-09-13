@@ -6,7 +6,7 @@ from pathlib import Path
 import bpy, json, base64, struct, math
 from mathutils import Matrix, Vector
 root=Path(globals()['DADAO_PROJECT_ROOT'])
-assert Path(bpy.data.filepath).parent.name=='DadaoPowerSwing_20260912'
+assert Path(bpy.data.filepath).parent.name=='DadaoCleanChop_20260913'
 scene=bpy.context.scene
 data=json.loads((root/'_shots/DadaoPower/Acceptance/Data_DadaoSourceBake.json').read_text())
 convert=Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1)))

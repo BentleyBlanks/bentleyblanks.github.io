@@ -10,7 +10,7 @@ from mathutils import Vector, Matrix, Quaternion
 root = Path(globals()['DADAO_PROJECT_ROOT'])
 exportOnly = bool(globals().get('DADAO_EXPORT_ONLY', False))
 source = Path(bpy.data.filepath)
-assert source.parent.name == 'DadaoPowerSwing_20260912'
+assert source.parent.name == 'DadaoCleanChop_20260913'
 scene = bpy.context.scene
 scene.name = 'Scene_DadaoPowerSwing'
 scene.render.fps = 120
@@ -54,18 +54,18 @@ leftPole = Control('Animation_DadaoLeftElbowPole')
 grip.rotation_mode = blade.rotation_mode = 'QUATERNION'
 
 # Grip first accelerates out of the shoulder; blade rotation catches up later.
-# The cut continues below the target. The wrists turn during unloading so
-# the support forearm stays below/outside the grip instead of folding over it.
+# Finish the downstroke in one plane, including its deceleration. Do not
+# yaw/roll the blade during contact or follow-through. Turn only on recovery.
 keys = [
     (0.00, tuple(baseGrip), None, (0,0,0), (0,0,0)),
     (0.14, (.220,-.110,-.450), 58, (.015,.040,.015), (.035,.040,.010)),
     (0.26, (.200,.005,-.415), 112, (.020,.070,.015), (.050,.075,.005)),
     (0.30, (.220,-.015,-.425), 76, (.005,.050,-.030), (.055,.060,-.025)),
     (0.36, (.105,-.185,-.545), 12, (-.015,.010,-.065), (.040,.020,-.060)),
-    (0.43, (-.130,-.235,-.630), (-35,-15,-15), (-.035,.010,-.045), (.015,.025,-.040)),
-    (0.52, (-.170,-.240,-.620), (-25,-35,-60), (-.030,.010,-.035), (.010,.030,-.030)),
-    (0.65, (-.100,-.220,-.590), (15,-45,-60), (-.025,.010,-.030), (.010,.030,-.030)),
-    (0.80, (.040,-.210,-.525), (35,-35,-25), (-.010,0,-.010), (.010,.010,-.010)),
+    (0.43, (-.130,-.235,-.630), -35, (-.035,.010,-.045), (.015,.025,-.040)),
+    (0.52, (-.170,-.240,-.620), -35, (-.030,.010,-.035), (.010,.030,-.030)),
+    (0.65, (-.100,-.220,-.590), (15,-25,-30), (-.025,.010,-.030), (.010,.030,-.030)),
+    (0.80, (.040,-.210,-.525), (35,-20,-15), (-.010,0,-.010), (.010,.010,-.010)),
     (1.00, tuple(baseGrip), None, (0,0,0), (0,0,0)),
 ]
 previousRotation = baseRotation.copy()

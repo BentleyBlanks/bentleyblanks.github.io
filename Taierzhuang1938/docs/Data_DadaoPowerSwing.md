@@ -1,5 +1,17 @@
 # 第一人称大刀劈砍修订
 
+2026-09-13 使用 BlenderMCP 修正下劈中刀刃反复转向：删除原曲线 0.43／0.52
+关键姿势中的 yaw／roll，0.26–0.52 的下劈及减速随势保持同一切面；到回架段才
+转腕，回架的侧转幅度也减小。重新编排左肘连续轨迹以适配刀向，保留握点、骨长、
+腕角限制与战斗时钟。运行时只更新动画采样数据及缓存戳。
+
+本次大刀专项通过：下劈切面最大偏转 0.000033°，轻斩刃向与切线平均点积 0.870；
+五种攻击与蓄力最大腕角约 64°，相邻肘部采样最大位移约 5.1 cm；完整回架、
+跳帧一致性和中断交接均通过。已查看本地实际游戏关键帧及 Blender 相机视图，
+并刷新源工程的 121 帧生产双臂回放。模块缓存检查通过；未扩展全关卡回归。
+
+以下是 2026-09-12 的历史记录与同一条曲线的消费契约。
+
 2026-09-12 使用 BlenderMCP 调整至第 10 轮（上限 15 轮）。只制作一条大刀劈砍主曲线，
 接入现有 Light、LightAlt、Heavy、Compact、CompactAlt；Charge 使用同一曲线的准备段。
 没有新增动作条目，也没有制作其他武器或第三人称动画。
@@ -18,7 +30,7 @@
 
 ## 源工程与重建
 
-源工程为 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\DadaoPowerSwing_20260912\Animation_DadaoPowerSwing.blend`。
+当前源工程为 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\DadaoCleanChop_20260913\Animation_DadaoCleanChop.blend`；9 月 12 日工程保留作历史备份。
 它包含六条编辑控制轨（刀身、握点、双肩、双肘）、实际生产双臂的 53 根骨骼与大刀，贴图已打包。
 六条控制轨共同定义同一段劈砍，不代表六段动作。
 `_blender/Data_DadaoElbowPoles.json` 保存同一动作的连续肘向关键帧，重建脚本将其写入
