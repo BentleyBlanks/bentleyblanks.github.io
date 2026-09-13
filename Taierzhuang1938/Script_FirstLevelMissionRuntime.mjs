@@ -1,3 +1,6 @@
+import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
+import { SquadCoverRoute, SquadCoverBounds } from "./Script_SquadMarchCover.mjs";
+import { SQUAD_COVER_BOUNDS as CB } from "./Data_Tuning_SquadMarch.mjs";
 import * as THREE from "three";
 import { SelectP012RecruitCast } from "./Data_FirstLevelP012Cast.mjs";
 import { AiDirector } from "./Script_Ai.mjs";
@@ -507,23 +510,38 @@ export class FirstLevelMissionRuntime {
   Guide(route, { fromStart = false, resumeAfter = null } = {}) {
     this.squadMarch?.Dispose();
     this.guideRoute = route;
+    const stations=route===MISSION_ROUTES.support?TC.support:
+      route===OPENING.approachRoute&&resumeAfter?TC.approach:null;
+    this.squadCoverBounds=stations?new SquadCoverBounds(stations,route):null;
     for (const actor of this.squad) {
-      const naturalMarch=[MISSION_ROUTES.support,MISSION_ROUTES.south].includes(route);
+      const naturalMarch=!stations&&[MISSION_ROUTES.support,MISSION_ROUTES.south].includes(route);
       const personalRoute = naturalMarch ? MissionSquadRoute(route,this.squad.indexOf(actor)) : route;
       actor.missionNaturalMarch = naturalMarch;
       actor.missionWatch=null;
       const queued = MissionGuideRoute(actor.position,this.squadRoutes.get(actor.id),route,personalRoute,fromStart,resumeAfter);
+      if(resumeAfter){
+        const rally=OPENING.trenchCoverPosts[this.squad.indexOf(actor)];
+        const pending=queued.findIndex(p=>Distance(p,rally)<.1);
+        // Leave the side bay through its rear opening before passing its front.
+        if(pending>=0)queued.splice(pending+1,0,{x:OPENING.trenchEntry.x,z:rally.z,coverTransit:true});
+        else if(actor.position.z>=TC.rally.at(-1).z&&actor.position.z<=TC.rally[0].z+TC.wingLengthM)
+          queued.unshift({x:OPENING.trenchEntry.x,z:actor.position.z,coverTransit:true});
+      }
       if(route===MISSION_ROUTES.support){
         const post=OPENING.frontPosts[this.squad.indexOf(actor)];
         if(post)queued.push({x:post.x,z:-124},{...post});
       }
-      if(!naturalMarch && route!==OPENING.approachRoute && personalRoute.length>1){
+      if(!stations && !naturalMarch && route!==OPENING.approachRoute && personalRoute.length>1){
         const end=personalRoute.at(-1),before=personalRoute.at(-2),dx=end.x-before.x,dz=end.z-before.z,d=Math.hypot(dx,dz)||1,slot=this.squad.indexOf(actor);
         const lateral=(slot%2?1:-1)*R.squadPostLateralM,back=slot<2?0:R.squadPostRearM;
         const post={x:end.x+dz/d*lateral-dx/d*back,z:end.z-dx/d*lateral-dz/d*back};
         if(!this.BlocksSight(this.Point(end,.7),this.Point(post,.7)))queued.push(post);
       }
-      this.squadRoutes.set(actor.id, queued);
+      for(const point of queued)delete point.coverBound; // previous route keeps its geometry, not its obsolete gate
+      const covered=stations?SquadCoverRoute(queued,stations,this.squad.indexOf(actor),TC):queued;
+      actor.missionCoverBounds=covered.filter(p=>Number.isInteger(p.coverBound));
+      actor.missionCoverPassed=-1;actor.missionCoverWaiting=false;
+      this.squadRoutes.set(actor.id, covered);
     }
     // Role is supplied by the mission roster; the shared controller knows no cast names.
     this.squadMarch=new SquadMarchAi(this.ai,this.squad,{
@@ -555,6 +573,10 @@ export class FirstLevelMissionRuntime {
   UpdateSquad() {
     const stage = this.flow.stage.id;
     const marchSpeeds = new Map();
+    this.squadCoverBounds?.Update(this.player.position,this.squad.map(actor=>({
+      alive:actor.alive,position:actor.position,bounds:actor.missionCoverBounds||[],
+      passed:actor.missionCoverPassed??-1,evading:!!actor.missionGrenadeEvade,
+    })));
     if (["Train", "Unloading"].includes(stage) && !this.Has("trainStopped")) return;
     for (const actor of [...this.squad, this.trainWounded].filter(Boolean)) {
       InstallMissionSentry(actor);
@@ -573,6 +595,7 @@ export class FirstLevelMissionRuntime {
         }
         continue;
       }
+      actor.missionCoverWaiting=false;actor.missionCoverApproach=false;
       actor.scriptedNoncombatant = stage === "South";
       actor.scriptEscapeStance=null;
       if(this.RespondToGrenade(actor))continue;
@@ -581,8 +604,36 @@ export class FirstLevelMissionRuntime {
       const route = this.squadRoutes.get(actor.id);
       // Intermediate bends allow a smooth pass. The final defensive post must
       // use the mover's actual arrival radius or men stop in the walking lane.
-      while (route?.length && Distance(actor.position, route[0]) <=
-        (route.length===1 && Number.isFinite(actor.scriptArrivalRadius)?actor.scriptArrivalRadius:1.1)) route.shift();
+      while(route?.length){
+        const point=route[0],bound=Number.isInteger(point.coverBound);
+        const arrival=point.coverTransit?CB.transitArrivalM:bound?CB.arrivalM:(route.length===1&&Number.isFinite(actor.scriptArrivalRadius)?actor.scriptArrivalRadius:1.1);
+        if(Distance(actor.position,point)>arrival)break;
+        if(bound&&!this.squadCoverBounds?.CanLeave(point.coverBound)){
+          actor.missionCoverWaiting=true;
+          this.squadMarch?.Release(actor);
+          this.Defend(actor,point,0,0);
+          this.ai.SetStance(actor,1,CB.stanceHoldS,true);
+          // Idle guards watch down the trench through the shared turn limiter;
+          // visible or remembered threats retain normal aiming ownership.
+          if(!actor.target&&!(actor.lkpConfidence>0)){
+            actor.watchYaw=TC.watchYawRad;actor.watchUntil=this.ai.time+CB.stanceHoldS;
+          }
+          break;
+        }
+        if(bound)actor.missionCoverPassed=point.coverBound+1;
+        route.shift();
+      }
+      if(actor.missionCoverWaiting)continue;
+      if(Number.isInteger(route?.[0]?.coverBound)){
+        // The shared march may round ordinary corners. A shelter slot needs
+        // precise physical arrival so the torso is actually behind its face.
+        actor.missionCoverApproach=true;
+        this.squadMarch?.Release(actor);
+        this.MoveActor(actor,route[0],R.squadSpeedMps);
+        actor.scriptArrivalRadius=CB.postArrivalM;
+        this.ai.SetStance(actor,0,CB.stanceHoldS,true);
+        continue;
+      }
       if (route?.length) {
         if (stage === "South" || (actor.suppression < 0.4 && this.time>=(actor.missionDangerUntil||0))) this.ai.SetStance(actor, 0, 0.5, true);
         const previous = this.squad[this.squad.indexOf(actor) - 1];
@@ -592,7 +643,7 @@ export class FirstLevelMissionRuntime {
             (previous.position.z - actor.position.z) * (route[0].z - actor.position.z) >
             0;
         const yielding = ahead && Distance(previous.position, actor.position) < R.squadSpacingM;
-        let speed=MissionGuideSpeed(actor.position,this.player.position,route[0],actor.missionNaturalMarch?false:yielding,route);
+        let speed=this.squadCoverBounds&&route.some(p=>Number.isInteger(p.coverBound))?R.squadSpeedMps:MissionGuideSpeed(actor.position,this.player.position,route[0],actor.missionNaturalMarch?false:yielding,route);
         // Shared cadence owns its own acceleration and spacing. Keep the unfiltered
         // host limit; the legacy pace below remains available when combat takes over.
         marchSpeeds.set(actor.id,speed);
@@ -627,13 +678,16 @@ export class FirstLevelMissionRuntime {
       if (!Number.isFinite(actor.scriptEscapeStance) && actor.suppression > R.companionProneSuppression && stage !== "Train") this.ai.SetStance(actor, 2, R.companionDangerHoldS, true);
     }
     this.squadMarch?.Update(this.delta,{
-      player:this.player.position,
+      player:this.squadCoverBounds?null:this.player.position,
       Observe:actor=>({
         route:this.squadRoutes.get(actor.id)||[],
         active:!!actor.missionTrainReady&&!!this.squadRoutes.get(actor.id)?.length
           &&!actor.missionContactPost
           &&!actor.missionGrenadeEvade
+          &&!actor.missionCoverWaiting
+          &&!actor.missionCoverApproach
           &&!(actor===this.bedGuide?.actor&&["FinalCarry","Death"].includes(stage)),
+        noPause:!!this.squadCoverBounds,
         maxSpeed:marchSpeeds.get(actor.id)??0,
       }),
     });

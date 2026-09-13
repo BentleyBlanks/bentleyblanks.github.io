@@ -98,7 +98,7 @@ export const OPENING = Object.freeze({
   runnerRoute: [{x:-24,z:-60},{x:-24,z:-23},{x:-31,z:-23},{x:-31,z:-24}],
   shelterPosts: [{x:-32,z:-24},{x:-32,z:-21},{x:-40,z:-20},{x:-37,z:-20}],
   // Clear the middle of the trench for the player and late-arriving companions.
-  trenchCoverPosts: [{x:-46.35,z:32},{x:-43.65,z:34},{x:-46.35,z:36},{x:-43.65,z:38}],
+  trenchCoverPosts: [{x:-43.55,z:36.15},{x:-46.45,z:32.15},{x:-43.55,z:37.85},{x:-46.45,z:33.85}],
   trenchContactRoute: [{x:-66,z:66},{x:-62,z:64},{x:-45,z:41},{x:-45,z:24},{x:-37,z:24},{x:-37,z:18}],
   frontPosts: [{x:-4,z:-124},{x:4,z:-122},{x:12,z:-124},{x:16,z:-124}],
   zhouGunSeat: {x:0,z:-127.4},

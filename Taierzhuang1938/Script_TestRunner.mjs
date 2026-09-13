@@ -52,6 +52,8 @@ export const testDefs = {
   HitDisorientationTest: {file:"Script_HitDisorientationTest.mjs",timeoutMs:420000,desc:"Shared bullet disorientation: real GPU/audio, decay and lifecycle"},
   IncomingFireBrowserTest: {file:"Script_IncomingFireBrowserTest.mjs",timeoutMs:300000,desc:"Real near-fire/hit HUD, camera bearings, sector merging, expiry and compact screenshots"},
   BloodEffectsTest: {file:"Script_BloodEffectsTest.mjs",timeoutMs:180000,desc:"Shared blood GPU projection, ballistic collision, platform and source lifecycle"},
+  SquadMarchCoverTest: {file:"Script_SquadMarchCoverTest.mjs",desc:"Trench shelter routes and physical two-team player gates"},
+  SquadMarchCoverBrowserTest: {file:"Script_SquadMarchCoverBrowserTest.mjs",timeoutMs:300000,desc:"Real trench collision, staggered cover waits and resumed bounds"},
   SquadMarchTest: {file:"Script_SquadMarchTest.mjs",desc:"Shared squad cadence, roles, safe interruption, replay and population variants"},
   SquadMarchEditorTest: {file:"Script_SquadMarchEditorTest.mjs",timeoutMs:300000,desc:"Squad editor real actors, editable routes, per-count styles and cleanup"},
   SquadMarchAiTest: {file:"Script_SquadMarchAiTest.mjs",desc:"Real adapter memory/contact distinction, movement ownership and mission pose handoff"},
@@ -297,6 +299,7 @@ export const testDefs = {
 
 export const browserTests = new Set([
   "MuzzleFlashTest", "HeadshotTest",
+  "SquadMarchCoverBrowserTest",
   "FirearmHandlingBrowserTest",
   "CharacterSpeechBrowserTest",
   "FirstLevelCasualtyBrowserTest",
@@ -398,7 +401,7 @@ export const domains = {
   characterSpeech: {label:"班长面部对白",tests:["CharacterSpeechTest","CharacterSpeechBrowserTest"]},
   motionVector: {label:'统一运动矢量接入契约',tests:['MotionVectorContractTest']},
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest']},
-  squadMarch: {label:"通用小队行进",tests:["SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
+  squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关接收院至结尾定向续接",tests:["FirstLevelMissionStageTailTest"]},
   firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelCasualtyBrowserTest','FirstLevelOpeningSequenceBrowserTest','FirstLevelCarriageAnimationTest','FirstLevelMealTest','FirstLevelMissionTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelOpeningContactTest','FirstLevelGuideQueueTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },

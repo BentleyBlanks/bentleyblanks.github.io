@@ -1,3 +1,4 @@
+import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
@@ -193,6 +194,15 @@ GroundedWall("RailLockBank",-90.5,48,.65,1.1,5);
 const trenchRallyWall=GroundedWall("TrenchRallyEast",-42.3,33,.65,2,15);
 trenchRallyWall.cover={faceX:1,faceZ:0,
   points:[27,29,31,33,35,37,39].map(z=>({x:trenchRallyWall.x,z}))};
+// L-shaped whitebox shelters sit inside the excavated trench, with a 2.4 m
+// centre gap between opposite front faces. Both visible arms have real solids.
+for(const station of [...TC.rally,...TC.approach,...TC.support]){
+  const x=station.x+station.side*TC.wallOffsetM;
+  GroundedWall(`TrenchBound${station.id}Front`,x,station.z,TC.wallWidthM,TC.wallHeightM,TC.wallDepthM);
+  const wing=GroundedWall(`TrenchBound${station.id}Wing`,station.x+station.side*TC.wingOffsetM,
+    station.z+TC.wingLengthM/2,TC.wingDepthM,TC.wallHeightM,TC.wingLengthM);
+  wing.cover={faceX:station.side,faceZ:0,points:TC.postRearM.map(rear=>({x:wing.x,z:station.z+rear}))};
+}
 // Roofed dressing recess and two solid traverses shelter the private exchange.
 Block("OpeningShelterRoof",-32,-20,7,.25,11,"timber",{y:1.05});
 GroundedWall("OpeningShelterSouth",-32,-15.5,7,2.4,.8);

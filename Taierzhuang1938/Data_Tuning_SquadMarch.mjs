@@ -42,3 +42,6 @@ export const SQUAD_MARCH_GUARDS = Object.freeze({
   localRecoveryTimeoutS:1.5,localRecoveryMinFraction:.65,localRecoveryAngles:16,localRecoveryRetryS:1,
   localRecoveryPersistence:1.2,localRecoveryMaxGrade:.9,
 });
+
+// User 2026-09-13: physical two-team shelters release when the player catches up.
+export const SQUAD_COVER_BOUNDS = Object.freeze({arrivalM:.18,postArrivalM:.1,transitArrivalM:.5,playerArrivalM:4,playerCorridorM:3,stanceHoldS:.5});

@@ -35,7 +35,7 @@ const capturedActivities = new Set();
 await fs.mkdir(output, { recursive: true });
 const server = await ServeRoot(root, 0),
   browser = await LaunchBrowser();
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } }),
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } }),
   errors = [];
 page.on("pageerror", (error) => {
   errors.push(String(error));
@@ -704,7 +704,9 @@ try {
     assert.ok(evacSpacing.every(d=>d>.8),"withdrawn soldiers do not occupy the same stopping point");
     await page.evaluate(() => {
       const g = window.Tengxian;
-      g.Debug.Key("KeyF");
+      // Grenade evasion can already have vacated the gun at the stage boundary.
+      // F then mounts it again and prevents the resupply route from moving.
+      if(g.emplacement.View())g.Debug.Key("KeyF");
       g.Debug.Key("KeyB");
     });
     await JumpStage(5);
