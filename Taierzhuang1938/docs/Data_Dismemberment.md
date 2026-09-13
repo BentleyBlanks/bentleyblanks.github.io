@@ -563,3 +563,5 @@ prepush 里第一关开场那四条与 AiCombatBrowserTest 全红：挂钩取证
 | 4.2–4.7 m | 0.62–0.66 | 只掉血；已被打残而炸死的六成掉一截末段 |
 
 **验收**：`Script_DismembermentTest` 3291 条（四米档只卸末段、五米档不卸、`trauma` 必断一段且不替代致死、局部断肢偏向迎爆侧）；`Script_GoreRangeTest` 新增 10b（三米环十颗弹 20 人次：8 人弹片致死各卸一段、12 人只受伤，关掉断肢后生死一致且不卸）与 10c（medium 断口泵 6 s，第四秒仍在喷，到点收掉）。同一文件的「正常子弹连打右小腿必断」在未修改的 master（cc80f574d）上同样失败（瞄小腿打中大腿），与本轮无关，另开任务查。
+
+直跑回归（不经 TestRunner 的跨 worktree 浏览器锁）：Text / ModuleGraph / TestRunner / ExplosionRules / FirstLevelMission / MeleeCombat / FirstLevelP012Opening 纯 Node 通过；BloodEffects、ExplosionRange、Damage、MotionVectorContract、RespawnShaderWarm、AudioWiring、MeleeQte、AiCombatBrowser（14/14，含日军投弹）浏览器专项通过；正式 bundle 构建通过。FirstLevelOpeningBrowserTest 第一次在「前沿步枪掩护」卡住（脚本驱动的玩家追着敌人离开了前沿半径、打光子弹），未改动的基线同一条通过，本分支重跑同一条也通过，按偶发记。
