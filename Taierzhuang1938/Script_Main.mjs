@@ -6674,7 +6674,8 @@ function UpdateContextualActionPrompts() {
         kind: "reload",
       });
     } else if (!mounted.dead && mounted.rounds < mounted.beltRounds && mounted.belts > 0) {
-      prompts.push({ keys: "R", label: T("hud.prompt.changeBelt"), kind: "reload" });
+      // 弹板没打空只是「可以换」，不是警告：不用装弹那一档的红字。
+      prompts.push({ keys: "R", label: T("hud.prompt.changeBelt"), kind: "belt" });
     }
     prompts.push({ keys: "F", label: mounted.exit, kind: "interact" });
     hud.SetActionPrompts(prompts);
@@ -7170,8 +7171,8 @@ function TryFire(dt, returningGrenade = false) {
       // 空膛的"咔"保留：它是第二条弹药信息通道（见下方那段账），现在作为
       // 白刃起手的一部分响 —— 击针落空、随即人把枪抡起来。
       audio.Play("bolt", { volume: 0.34, pitch: 1.55 });
+      // 「R 装弹」已由准心下的情境提示常驻给出，这里不再在屏幕底部重复一句。
       BeginMeleeCharge("mouse");
-      if (state.clips > 0) hud.Hint(T("hud.hint.reloadClip"), 2.2);
     }
     return;
   }

@@ -230,30 +230,36 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudHint.on { opacity: 1; }
 
 /* 情境操作提示：只由真实可执行状态驱动，常驻；一次性反馈仍走上面的 hudHint。
-   位置照 Easy Red 2：不在屏幕底沿，而是准星左下那一小块——视线不用离开准星就能读到，
-   又不压住准星本身。竖排右对齐贴向准星。**只有字**：按键（暖黄）+ 一句动作，
-   没有框、没有底板、没有图标；靠 COD 目标文字同款硬黑描边在任何背景上读得出。 */
+   对标 COD WWII：准星正下方居中（--y 由 Script_Hud.SetCrosshair 按散布写，
+   识别卡排在它下面），一行「键帽 + 一句动作」，米白字配柔和黑影、没有底板；
+   拾枪时下面再画那把枪的剪影（Data_HudWeaponIcons）。打空了的「装弹」整行转红。
+   字号跟视口高度走：900 高约 27 px，1080 高约 32 px。 */
 .hudActions {
-  position: absolute; left: 50%; top: 50%; transform: translate(-100%, -6%);
-  margin-left: -34px;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
-  max-width: min(40vw, 420px); z-index: 2; opacity: 0; transition: opacity 0.16s linear;
-  white-space: nowrap;
+  position: absolute; left: 50%; top: 50%; transform: translateX(-50%);
+  margin-top: var(--y, 44px);
+  display: flex; flex-direction: column; align-items: center; gap: 0.3em;
+  font: 600 clamp(20px, 3vh, 34px)/1.2 var(--ui-font);
+  z-index: 2; opacity: 0; transition: opacity 0.16s linear;
+  white-space: nowrap; pointer-events: none;
 }
 .hudActions.on { opacity: 1; }
 .hudAction {
-  display: flex; align-items: baseline; gap: 8px;
-  font: 700 19px/1.25 var(--ui-font); color: rgba(236,232,222,0.97);
-  -webkit-text-stroke: 1px rgba(0,0,0,0.96); paint-order: stroke fill;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+  --c: #ece3cc;
+  display: flex; flex-direction: column; align-items: center; gap: 0.2em;
+  color: var(--c); letter-spacing: 0.02em;
+  text-shadow: 0 0 5px rgba(0,0,0,0.85), 0 1px 2px rgba(0,0,0,0.9);
 }
+.hudAction.reload { --c: #e8505b; }
+.actionLine { display: flex; align-items: center; gap: 0.28em; }
+/* 键帽：实心、与字同色，字母挖成深色；多字键（左键、1 / 2）自动加宽。 */
 .hudAction kbd {
-  font: inherit; font-size: 21px; color: var(--warn);
+  display: inline-flex; align-items: center; justify-content: center;
+  box-sizing: border-box; min-width: 1.5em; height: 1.5em; padding: 0 0.4em;
+  border-radius: 0.3em; background: var(--c); color: #15130f;
+  font: 700 0.62em/1 var(--ui-font); letter-spacing: 0; text-shadow: none;
+  box-shadow: 0 0 5px rgba(0,0,0,0.6);
 }
-@media (max-width: 700px) {
-  .hudAction { font-size: 16px; -webkit-text-stroke-width: 0.8px; }
-  .hudAction kbd { font-size: 17px; }
-}
+.actionWeapon { display: block; height: auto; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.85)); }
 
 /* 按住型交互的进度环（按住止血 / 拆门板 / 撕短褂）。
    在准星正下方一点点：视线不用离开准星，也不压住下面的字幕行。

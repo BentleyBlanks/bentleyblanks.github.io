@@ -204,6 +204,8 @@ export class InteractSystem {
         : T("interact.pickup.take", { name });
     return {
       kind: "pickup", label, dist, ammoOnly,
+      // 换枪 / 拾起时 HUD 在提示下面画这把枪的剪影；只拿弹药不画。
+      weaponId: ammoOnly ? null : source.weaponId,
       priority: INTERACT.builtinPriority, gesture: "tap", seconds: 0, ...extra,
     };
   }

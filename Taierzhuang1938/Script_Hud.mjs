@@ -10,6 +10,7 @@
 // 孙连仲的命令原话就是「士兵打完了，你自己填上去。你填过了，我来填」。
 
 import { T, Localize } from "./Script_Text.mjs";
+import { HUD_WEAPON_ICONS } from "./Data_HudWeaponIcons.mjs";
 import { LevelBriefId, LevelFieldId } from "./Script_TextIds.mjs";
 import { HIT_FEEDBACK } from "./Data_Tuning_Player.mjs";
 import { PLAYER_SLOT_ORDER, PlayerSlotKey } from "./Data_Weapons.mjs";
@@ -201,7 +202,10 @@ export function ContextualActionPrompts({
     return prompts;
   }
   if (interaction?.label) {
-    prompts.push({ keys: "F", label: interaction.label, kind: interaction.kind || "interact" });
+    prompts.push({
+      keys: "F", label: interaction.label, kind: interaction.kind || "interact",
+      ...(interaction.weaponId ? { weaponId: interaction.weaponId } : {}),
+    });
   }
   if (Number(bleeding) > 0 && Number(bandages) > 0) {
     prompts.push({ keys: "B", label: T("hud.prompt.bandage"), kind: "bandage" });
@@ -255,6 +259,7 @@ export class Hud {
     this.confirms = [];
     this.actionPrompts = [];
     this.actionPromptSignature = "";
+    this.actionPromptsHeight = 0;
     /** 负重条与进度环各自的「上一次画的是什么」，签名不变就一个属性都不动。 */
     this.carrySignature = "";
     this.interactRingOn = false;
@@ -654,8 +659,14 @@ export class Hud {
     SetAttr(e, "aria-hidden", String(!shown));
     SetAttr(e, "aria-label", sprinting ? T("hud.crosshair.sprint")
       : T("hud.crosshair.hipSpread", { deg: geo.spreadDeg.toFixed(1) }));
-    // 识别卡贴着准心下沿走：散布撑大时它跟着让开，不会被四条线压住。
-    SetVar(this.el.target, "--y", `${(this.crosshairGap + geo.arm + 16).toFixed(1)}px`);
+    // 情境提示与识别卡都贴着准心下沿走：散布撑大时跟着让开，不会被四条线压住。
+    // 提示离准心最近（那是现在能做的事）；按住型的进度环亮着时提示让到环下面；
+    // 识别卡排在提示之后。
+    const below = this.crosshairGap + geo.arm + 14;
+    const promptY = this.interactRingOn ? Math.max(below, 96) : below;
+    SetVar(this.el.actions, "--y", `${promptY.toFixed(1)}px`);
+    const targetY = this.actionPrompts.length ? promptY + this.actionPromptsHeight + 6 : below + 2;
+    SetVar(this.el.target, "--y", `${targetY.toFixed(1)}px`);
   }
 
   /** 准心的运行时真值，给冒烟取证（别去解析 style 字符串）。 */
@@ -1014,27 +1025,46 @@ export class Hud {
       .slice(0, PROMPTS.maxRows)
       .map((prompt) => ({
         keys: String(prompt.keys), label: String(prompt.label), kind: String(prompt.kind || "action"),
+        ...(HUD_WEAPON_ICONS[prompt.weaponId] ? { weaponId: String(prompt.weaponId) } : {}),
       }));
-    const signature = next.map((prompt) => `${prompt.kind}:${prompt.keys}:${prompt.label}`).join("|");
+    const signature = next.map((prompt) => `${prompt.kind}:${prompt.keys}:${prompt.label}:${prompt.weaponId || ""}`).join("|");
     if (signature === this.actionPromptSignature) return;
     this.actionPromptSignature = signature;
     this.actionPrompts = next;
     this.el.actions.textContent = "";
+    const holdKeys = T("hud.key.holdF");
     for (const prompt of next) {
       const row = document.createElement("div");
       row.className = `hudAction ${prompt.kind}`;
-      // 只有字：按键 + 一句动作，没有框、没有底板、没有图标。
+      // COD WWII 式：键帽 + 一句动作，按住型写成「[F] 长按……」；拾枪时下面再画那把枪的剪影。
+      const line = document.createElement("div");
+      line.className = "actionLine";
+      const hold = prompt.keys === holdKeys;
       const key = document.createElement("kbd");
-      key.textContent = prompt.keys;
+      key.textContent = hold ? "F" : prompt.keys;
       const label = document.createElement("span");
       label.className = "actionText";
-      label.textContent = prompt.label;
+      label.textContent = hold ? `${T("hud.key.holdPrefix")}${prompt.label}` : prompt.label;
+      line.append(key, label);
+      row.append(line);
+      const icon = HUD_WEAPON_ICONS[prompt.weaponId];
+      if (icon) {
+        const img = document.createElement("img");
+        img.className = "actionWeapon";
+        img.src = icon.src;
+        img.alt = "";
+        // 所有剪影同一比例拍的，宽度按像素换算：长枪长、短枪短；短枪给个下限免得看不清。
+        img.style.width = `max(2.4em, ${(icon.w / 72).toFixed(2)}em)`;
+        img.style.aspectRatio = `${icon.w} / ${icon.h}`;
+        row.append(img);
+      }
       row.title = prompt.label;
       row.setAttribute("aria-label", T("hud.action.aria", { keys: prompt.keys, label: prompt.label }));
-      row.append(key, label);
       this.el.actions.appendChild(row);
     }
     this.el.actions.classList.toggle("on", next.length > 0);
+    // 识别卡要让到提示下面去：只在提示变了时量一次高度，每帧不读布局。
+    this.actionPromptsHeight = next.length ? this.el.actions.offsetHeight : 0;
   }
 
   /**

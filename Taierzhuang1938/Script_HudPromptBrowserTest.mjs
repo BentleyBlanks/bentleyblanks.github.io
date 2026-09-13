@@ -93,18 +93,17 @@ try {
     T.StepFrames(12);
     const row = document.querySelector(".hudAction");
     const rowStyle = row && getComputedStyle(row);
-    const keyStyle = row && getComputedStyle(row.querySelector("kbd"));
+    const box = document.querySelector(".hudActions").getBoundingClientRect();
     return {
       prompts: T.Debug.Prompts(),
-      // 行上只有字：按键 + 动作，没有图标、没有框、没有底板
+      // COD WWII 式：键帽 + 一句动作，无底板，居中在准星正下方
       rows: [...document.querySelectorAll(".hudAction")].map((el) =>
         [el.querySelector("kbd")?.textContent, el.querySelector(".actionText")?.textContent]),
       titles: [...document.querySelectorAll(".hudAction")].map((el) => el.title),
-      icons: document.querySelectorAll(".hudAction .ico, .hudAction svg").length,
       on: document.querySelector(".hudActions")?.classList.contains("on"),
-      box: rowStyle && [rowStyle.borderTopWidth, rowStyle.backgroundColor, keyStyle.borderTopWidth, keyStyle.backgroundColor],
+      rowBox: rowStyle && [rowStyle.borderTopWidth, rowStyle.backgroundColor],
       labelPx: rowStyle && Number.parseFloat(rowStyle.fontSize),
-      keyPx: keyStyle && Number.parseFloat(keyStyle.fontSize),
+      centerX: box.left + box.width / 2, top: box.top, viewW: innerWidth, viewH: innerHeight,
     };
   });
   // 可装刺刀不构成眼前操作，X 不再常驻；其余提示保持既有条件。
@@ -112,12 +111,13 @@ try {
   assert.deepEqual(prompts.prompts.map((prompt) => prompt.kind), ["bandage"]);
   assert.equal(prompts.on, true);
   assert.deepEqual(prompts.rows, [["B", "包扎止血"]]);
-  assert.equal(prompts.icons, 0, "提示只有字，不画图标");
-  assert.deepEqual(prompts.box, ["0px", "rgba(0, 0, 0, 0)", "0px", "rgba(0, 0, 0, 0)"], "提示没有外框与底板");
-  assert.ok(prompts.labelPx >= 18 && prompts.keyPx >= prompts.labelPx, `提示字号太小：${prompts.labelPx}/${prompts.keyPx}`);
+  assert.deepEqual(prompts.rowBox, ["0px", "rgba(0, 0, 0, 0)"], "提示没有外框与底板");
+  assert.ok(prompts.labelPx >= 20, `提示字号太小：${prompts.labelPx}`);
+  assert.ok(Math.abs(prompts.centerX - prompts.viewW / 2) < 2 && prompts.top > prompts.viewH / 2,
+    `提示应居中在准星下方：${JSON.stringify(prompts)}`);
   assert.ok(prompts.titles.some((title) => title === "包扎止血"));
 
-  // 打空且有备弹：提示条要出现 R 换弹。
+  // 打空且有备弹：提示条要出现红色的「R 装弹」。
   const emptyGun = await page.evaluate(() => {
     const T = window.Taierzhuang;
     T.player.bleeding = 0;
@@ -126,6 +126,8 @@ try {
     T.state.clips = 3;
     T.StepFrames(12);
     const withReserve = T.Debug.Prompts();
+    const reloadRow = document.querySelector(".hudAction.reload .actionText");
+    const reloadColor = reloadRow && getComputedStyle(reloadRow).color;
     T.state.clips = 0;
     T.StepFrames(12);
     const noReserve = T.Debug.Prompts();
@@ -133,10 +135,11 @@ try {
     T.state.clips = 3;
     T.player.bleeding = 0.4;
     T.StepFrames(12);
-    return { withReserve, noReserve };
+    return { withReserve, noReserve, reloadColor };
   });
-  assert.ok(emptyGun.withReserve.some((prompt) => prompt.keys === "R" && prompt.label === "换弹"),
-    `打空有备弹要提示 R 换弹：${JSON.stringify(emptyGun.withReserve)}`);
+  assert.ok(emptyGun.withReserve.some((prompt) => prompt.keys === "R" && prompt.label === "装弹"),
+    `打空有备弹要提示 R 装弹：${JSON.stringify(emptyGun.withReserve)}`);
+  assert.equal(emptyGun.reloadColor, "rgb(232, 80, 91)", "装弹那一行是红字");
   assert.ok(!emptyGun.noReserve.some((prompt) => prompt.keys === "R"),
     `没备弹不提示 R：${JSON.stringify(emptyGun.noReserve)}`);
 
@@ -305,13 +308,27 @@ try {
     victim.drop.taken = false;
     T.StepFrames(12);
     const swap = T.Debug.Prompts();
+    const img = document.querySelector(".hudAction.pickup img.actionWeapon");
+    const silhouette = img && { src: img.getAttribute("src"), width: img.getBoundingClientRect().width };
+    const target = document.querySelector(".hudTarget");
+    const layout = {
+      promptsBottom: document.querySelector(".hudActions").getBoundingClientRect().bottom,
+      targetTop: target.getBoundingClientRect().top, targetOn: target.classList.contains("on"),
+    };
     T.state.slots.primary = null;
     T.StepFrames(12);
     const pickup = T.Debug.Prompts();
-    return { swap, pickup };
+    return { swap, pickup, silhouette, layout };
   });
   assert.ok(weaponPrompts);
   assert.ok(weaponPrompts.swap.some((prompt) => prompt.keys === "F" && /^换上 /.test(prompt.label)));
+  assert.ok(weaponPrompts.swap.some((prompt) => prompt.weaponId === "Type38"), "换枪提示带着那把枪的 id");
+  assert.equal(weaponPrompts.silhouette?.src, "Texture/Hud/Texture_HudWeapon_Type38.png", "换枪提示下面画那把枪的剪影");
+  assert.ok(weaponPrompts.silhouette.width > 100, `步枪剪影要够长：${weaponPrompts.silhouette.width}`);
+  if (weaponPrompts.layout.targetOn) {
+    assert.ok(weaponPrompts.layout.targetTop >= weaponPrompts.layout.promptsBottom - 1,
+      `识别卡要排在提示下面：${JSON.stringify(weaponPrompts.layout)}`);
+  }
   assert.ok(weaponPrompts.pickup.some((prompt) => prompt.keys === "F" && /^拾起 /.test(prompt.label)));
 
   const cleared = await page.evaluate(() => {

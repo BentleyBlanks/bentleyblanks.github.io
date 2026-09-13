@@ -14,6 +14,7 @@ export const TEXT = Object.freeze({
   "hud.key.mouseLeft": "左键",
   "hud.key.mouseRight": "右键",
   "hud.key.holdF": "按住 F",
+  "hud.key.holdPrefix": "长按",
 
   // --- 顶部目标与兵员池 -----------------------------------------------------
   "hud.objective.updated": "目标已更新",
@@ -36,7 +37,7 @@ export const TEXT = Object.freeze({
   "hud.prompt.carryDrop": "放下",
   "hud.prompt.carryThrow": "扔下，立刻还手",
   "hud.prompt.bandage": "包扎止血",
-  "hud.prompt.reload": "换弹",
+  "hud.prompt.reload": "装弹",
   "hud.prompt.meleeCharge": "白刃（按住蓄力劈刺）",
   "hud.prompt.switchWeapon": "切换{slots}",
   "hud.weaponSlot.primary": "长枪",
@@ -136,7 +137,6 @@ export const TEXT = Object.freeze({
   "hud.hint.bayonetOff": "收刺刀",
   "hud.hint.noGrenades": "没有手榴弹了",
   "hud.hint.noBundles": "没有集束了",
-  "hud.hint.reloadClip": "按 R 压弹",
   "hud.hint.mortarOnTheWay": "炮弹在路上（还剩 {left} 发）",
   "hud.hint.fireBlocks": "火里过不去。",
   "hud.hint.pointerLock": "点一下画面，接管镜头",

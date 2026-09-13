@@ -83,6 +83,8 @@ const stacked = ContextualActionPrompts({
   slots: { primary: "HanYang", secondary: null },
 });
 assert.deepEqual(stacked.map((prompt) => prompt.kind), ["pickup", "bandage"]);
+assert.equal(swap.weaponId, "Type38", "换枪候选带着地上那把枪的 id（HUD 画剪影用）");
+assert.equal(stacked[0].weaponId, "Type38");
 const grenadePrompt = ContextualActionPrompts({ interaction: { label: "拾起并掷回 · 2.9秒", kind: "grenade" } });
 assert.deepEqual(grenadePrompt.map((prompt) => [prompt.kind, prompt.label]), [["grenade", "拾起并掷回 · 2.9秒"]]);
 
