@@ -121,8 +121,8 @@ const result = await page.evaluate((expected) => {
   out.thrustKilled = !!m1 && !m1.alive;
   T.StepFrames(80);
 
-  // --- 5) 大刀：切 3 号槽，左键劈倒木桩 ------------------------------------
-  T.Debug.Key("Digit3");
+  // --- 5) 大刀：按大刀槽的数字键，左键劈倒木桩 ------------------------------
+  T.Debug.Key(T.Debug.SlotKey("melee"));
   T.StepFrames(20);
   out.meleeSlot = T.state.activeSlot;
   out.meleeWeapon = T.state.slots.melee;
@@ -176,7 +176,7 @@ const checks = [
   ["弹药下账", result.ammoSpent === true],
   ["X 上刺刀：状态翻转且刀件常显", !result.bayonetBefore && result.bayonetFixed && result.bayonetVisible],
   ["蓄力长刺先起手再接触放倒木桩", result.thrustMode === "Heavy" && result.beforeContact === 100 && result.thrustKilled === true],
-  ["3 号槽是大刀且劈得倒人", result.meleeSlot === "melee" && result.meleeWeapon === "Dadao"
+  ["大刀槽是大刀且劈得倒人", result.meleeSlot === "melee" && result.meleeWeapon === "Dadao"
     && result.dadaoKilled === true],
   ["手榴弹下账一颗", result.grenadeSpent === true],
   ["投弹靶带见伤", result.grenadeDamaged === true],

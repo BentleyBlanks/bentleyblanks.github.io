@@ -18,7 +18,7 @@
 
 import assert from "node:assert/strict";
 import { Mulberry32 } from "./Script_Noise.mjs";
-import { WEAPONS } from "./Data_Weapons.mjs";
+import { WEAPONS, WeaponShelved } from "./Data_Weapons.mjs";
 import { STANCE } from "./Data_Tuning_Player.mjs";
 import { PLAYER_HITBOX } from "./Script_PlayerHitbox.mjs";
 import { AIM, SHOOTING, BURST, SAMPLES, CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
@@ -749,9 +749,12 @@ console.log("AiShootingTest OK — 射击走廊：走廊内不开枪 / 身后与
   // 中方几支枪的武器表里没有 aiBurstMin/Max —— 按 kind 兜底，不是崩掉也不是恒 1
   assert.equal(WEAPONS.Zb26.aiBurstMin, undefined, "前提：捷克式表里没写 aiBurstMin");
   Range(WEAPONS.Zb26, BURST.byKind.lmg);
-  const pistol = model.BurstPlan(WEAPONS.ServicePistol, rnd);
-  assert.ok(pistol.shots >= BURST.byKind.pistol.min && pistol.shots <= BURST.byKind.pistol.max,
-    "手枪按 kind 兜底");
+  // 手枪暂时停用（Data_Weapons.SHELVED_WEAPONS），它的点射兜底先不测
+  if (!WeaponShelved("ServicePistol")) {
+    const pistol = model.BurstPlan(WEAPONS.ServicePistol, rnd);
+    assert.ok(pistol.shots >= BURST.byKind.pistol.min && pistol.shots <= BURST.byKind.pistol.max,
+      "手枪按 kind 兜底");
+  }
 
   // 没有随机源时取中值（确定性，不是 Math.random）
   const bare = new ShootingModel({});

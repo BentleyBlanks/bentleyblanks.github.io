@@ -131,7 +131,9 @@ import { RECIPES } from "./Script_TexBake.mjs";
 import {
   MENU_SCENE, OVERVIEW_PHASE, FULL_SCENE_PHASE, JIEHE_SANDBOX_PHASE, CAMPAIGN_ENTRIES,
 } from "./Data_Menu.mjs";
-import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE } from "./Data_Weapons.mjs";
+import {
+  WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE, PLAYER_SLOT_ORDER, PlayerSlotKey, WeaponShelved,
+} from "./Data_Weapons.mjs";
 import { WEAPON_MESH_VARIANTS, WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE, NAME_POOL } from "./Data_Battle.mjs";
 import { CUTSCENES } from "./Data_TengxianScript.mjs";
@@ -733,7 +735,9 @@ const state = {
   // --- 武器槽 ---------------------------------------------------------------
   // LOADOUTS 六套携行躺在 Data_Weapons 里一行没接：玩家永远只有 identity.weapon
   // 给的那一支长枪，大刀只在按 V 时凭空出现一下（硬编码 fallback，背包里根本没刀）。
-  // 现在四个槽是真的：1 长枪 / 2 手枪 / 3 大刀 / 4 投掷物，滚轮循环。
+  // 现在四个槽是真的：长枪 / 短枪 / 大刀 / 投掷物，滚轮循环。
+  // 手枪暂时停用，短枪槽不进 PLAYER_SLOT_ORDER：数字键是 1 长枪 / 2 大刀 / 3 投掷物，
+  // secondary 字段留着，恢复手枪时不用再改状态形状。
   slots: { primary: null, secondary: null, melee: null, throwable: "Grenade" },
   // 外观变体随槽位走。大刀拾取后必须保留尸体上那一把，不能在玩家手里变样。
   weaponVariants: { primary: 0, secondary: 0, melee: 0, throwable: 0 },
@@ -2071,8 +2075,11 @@ async function Boot() {
       Wheel: (delta) => {
         document.dispatchEvent(new WheelEvent("wheel", { deltaY: delta, bubbles: true }));
       },
+      // 某个武器槽的数字键 code（"melee" → "Digit2"）。测试走 Key(SlotKey(...))，
+      // 不写死数字：手枪停用/恢复会让大刀和投掷物的键前后挪一位。
+      SlotKey: (slot) => PlayerSlotKey(slot),
       Slots: () => ({
-        active: state.activeSlot, weapon: currentWeapon, loadout: state.loadoutId,
+        active: state.activeSlot, weapon: currentWeapon, loadout: state.loadoutId, order: [...SLOT_ORDER],
         slots: { ...state.slots }, variants: { ...state.weaponVariants },
         viewmodel: viewmodel.weaponId, viewmodelVariant: viewmodel.weaponVariant,
         fireMode: state.fireMode, bipod: player.bipod, ads: player.ads,
@@ -5361,11 +5368,12 @@ function RespawnPlayer(initial = false) {
   const loadout = phase.loadoutOverride || LOADOUTS[phase.loadout] || null;
   state.loadoutId = phase.loadoutOverride ? `${phase.id}_override` : (phase.loadout || null);
   const disarmed = !!phase.disarmed;
-  const primary = disarmed ? null : (loadout ? loadout.primary : state.identity.weapon);
-  const secondary = disarmed ? null : (loadout?.secondary || null);
+  const primary = disarmed ? null : SlotLoadoutWeapon("primary", loadout ? loadout.primary : state.identity.weapon);
+  // 第四关携行表里写着外购手枪；手枪停用期间 SlotLoadoutWeapon 把它挡掉，不发到玩家手上。
+  const secondary = disarmed ? null : SlotLoadoutWeapon("secondary", loadout?.secondary);
   state.slots.primary = primary;
   state.slots.secondary = secondary;
-  state.slots.melee = disarmed ? null : (loadout?.melee || null);
+  state.slots.melee = disarmed ? null : SlotLoadoutWeapon("melee", loadout?.melee);
   state.weaponVariants.primary = 0;
   state.weaponVariants.secondary = 0;
   // 正片与白盒统一装备二十九军战刀；旧变体掉落由 WeaponVariantFor 归一化。
@@ -5416,7 +5424,13 @@ function RespawnPlayer(initial = false) {
 // ---------------------------------------------------------------------------
 // 武器槽
 // ---------------------------------------------------------------------------
-const SLOT_ORDER = ["primary", "secondary", "melee", "throwable"];
+const SLOT_ORDER = PLAYER_SLOT_ORDER;
+
+/** 携行表里的武器能不能进这个槽：槽位停用或武器停用（手枪）时空着。 */
+function SlotLoadoutWeapon(slot, weaponId) {
+  if (!weaponId || !PLAYER_SLOT_ORDER.includes(slot) || WeaponShelved(weaponId)) return null;
+  return weaponId;
+}
 
 /** 某个槽里现在是哪支枪（投掷物槽里放的是当前选的那一种）。 */
 function SlotWeaponId(slot) {
@@ -6716,7 +6730,7 @@ function UpdateContextualActionPrompts() {
 }
 
 /**
- * 拾取武器。枪进 1 号槽，大刀进 3 号槽；两者都替换同类槽位，
+ * 拾取武器。枪进长枪槽，大刀进大刀槽；两者都替换同类槽位，
  * 并把尸体上的外观变体一并带走。缴获日械没有备弹（clips = 0），
  * 只有枪里那几发。
  */
@@ -6728,7 +6742,7 @@ function UpdateContextualActionPrompts() {
  *   yaw   换下来那把的朝向；不给按玩家朝向横着放。
  */
 function PickUpWeapon(weaponId, clips, variant = 0, extra = {}) {
-  if (!player?.Alive || !WEAPONS[weaponId]) return false;
+  if (!player?.Alive || !WEAPONS[weaponId] || WeaponShelved(weaponId)) return false;
   const weapon = WEAPONS[weaponId];
   const slot = weapon.kind === "melee" ? "melee" : "primary";
   const hadNoWeapon = !state.slots[slot];
@@ -6757,7 +6771,7 @@ function PickUpWeapon(weaponId, clips, variant = 0, extra = {}) {
   // 捡来的枪上没有装着的刺刀（阵亡者的刺刀在鞘里/丢了；想上再按 X）
   if (slot === "primary") state.bayonetFixed = false;
   // 第一关的目标之一就是「找一支枪（从倒下的人身上捡）」—— 捡完还得自己按
-  // 1 才拿得出来的话，目标在玩家眼里就是没生效。大刀同理：空着 3 号槽时捡到就到手。
+  // 1 才拿得出来的话，目标在玩家眼里就是没生效。大刀同理：空着大刀槽时捡到就到手。
   if (hadNoWeapon) state.activeSlot = slot;
   if (state.activeSlot === slot) {
     currentWeapon = weaponId;

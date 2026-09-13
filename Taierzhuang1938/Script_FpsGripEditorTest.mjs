@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { WeaponShelved } from "./Data_Weapons.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -64,9 +65,10 @@ try {
     opened.opened && opened.active === "firstPerson" && opened.title.includes("第一人称持枪检查"),
     `active=${opened.active} / ${opened.title}`);
   // C96、匕首及晚于战役的武器已从主干退役；核对实际装备集合，避免陈旧数量门槛。
+  // 手枪暂时停用（Data_Weapons.SHELVED_WEAPONS），不进持枪检查。
   const expectedWeapons = ["ZhongZheng", "HanYang", "Type38", "Zb26", "Type11",
-    "ServicePistol", "Grenade", "GrenadeBundle", "Dadao", "OfficerSwordSet"];
-  Check("装备表完整覆盖当前十种第一人称装备",
+    "ServicePistol", "Grenade", "GrenadeBundle", "Dadao", "OfficerSwordSet"].filter((id) => !WeaponShelved(id));
+  Check(`装备表完整覆盖当前 ${expectedWeapons.length} 种第一人称装备`,
     opened.listCount === expectedWeapons.length
       && [...opened.supportedWeapons].sort().join(",") === [...expectedWeapons].sort().join(","),
     `可检查 ${opened.listCount} 项：${opened.supportedWeapons.join(", ")}`);

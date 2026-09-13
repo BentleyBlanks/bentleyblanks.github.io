@@ -14,7 +14,7 @@ import * as THREE from "three";
 import {
   Panel, Section, Slider, Chips, Toggle, Button, ButtonRow, Facts, Note, ListBox, TextArea,
 } from "./Script_EditorUi.mjs";
-import { WEAPONS } from "./Data_Weapons.mjs";
+import { WEAPONS, WeaponShelved } from "./Data_Weapons.mjs";
 import { WEAPON_MESH_BY_ID, WEAPON_MESH_VARIANTS } from "./Data_Meshes.mjs";
 import { FPS_ANIMATION_LABELS } from "./Data_FpsSkeletalAnimation.mjs";
 
@@ -35,7 +35,8 @@ const PREFERRED_ORDER = Object.freeze([
 
 function IsFirstPersonInspectable(id) {
   const weapon = WEAPONS[id];
-  if (!weapon || !WEAPON_MESH_BY_ID[id]) return false;
+  // 停用的武器（手枪）不进持枪检查；姿势数据和模型都还在，恢复时自动回到列表里。
+  if (!weapon || !WEAPON_MESH_BY_ID[id] || WeaponShelved(id)) return false;
   return weapon.kind !== "vehicle" && weapon.kind !== "mortar" && weapon.kind !== "hmg";
 }
 

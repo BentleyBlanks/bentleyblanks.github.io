@@ -56,7 +56,8 @@ try {
       ["下蹲射击", "nra", "ZhongZheng", { crouch: 1, firing: true }],
       ["趴下射击", "nra", "ZhongZheng", { prone: 1, firing: true }],
       ["机枪下蹲", "nra", "Zb26", { crouch: 1, firing: true }],
-      ["军官下蹲", "nraOfficer", "ServicePistol", { crouch: 1, firing: true }],
+      // 手枪暂时停用（Data_Weapons.SHELVED_WEAPONS），军官这一格先拿中正式；恢复时换回 ServicePistol。
+      ["军官下蹲", "nraOfficer", "ZhongZheng", { crouch: 1, firing: true }],
     ] : [
       ["坐姿", "nra", null, { sit: 1 }],
       ["补鞋", "civilian", null, { sit: 0.92, repairShoe: 1 }],

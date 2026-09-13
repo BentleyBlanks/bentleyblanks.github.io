@@ -5,7 +5,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { WeaponShelved } from "./Data_Weapons.mjs";
 
+// 手枪暂时停用（Data_Weapons.SHELVED_WEAPONS），停用期间不量它的机械瞄具。
+const FIREARMS = ["ZhongZheng", "HanYang", "Type38", "Zb26", "ServicePistol"].filter((id) => !WeaponShelved(id));
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
 const server = await ServeRoot(rootDir, 0);
@@ -20,7 +23,7 @@ await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&qualit
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
 
-const report = await page.evaluate(() => {
+const report = await page.evaluate((firearms) => {
   const T = window.Taierzhuang;
   T.player.health = 100;
   T.player.spawnGrace = 99;
@@ -49,7 +52,6 @@ const report = await page.evaluate(() => {
   };
 
   document.dispatchEvent(new MouseEvent("mousedown", { button: 2, bubbles: true }));
-  const firearms = ["ZhongZheng", "HanYang", "Type38", "Zb26", "ServicePistol"];
   const sights = {};
   for (const id of firearms) {
     T.player.aimYaw = 0;
@@ -79,7 +81,7 @@ const report = await page.evaluate(() => {
     };
   }
   return { center, sights };
-});
+}, FIREARMS);
 
 // Reproduce stationary close-wall firing through the production trigger and
 // ballistic marcher; aim-vector-only checks cannot detect a displaced origin.
@@ -130,11 +132,11 @@ const passed = report.wall.valid && Math.abs(report.wall.meanX) < 0.2
   && report.center.freeAimDeg === 0
   && Math.abs(report.center.aimYaw) < 1e-6 && Math.abs(report.center.aimPitch) < 1e-6
   && report.center.directionErrorDeg < 0.0001
-  && sightRows.length === 5
+  && sightRows.length === FIREARMS.length
   && sightRows.every((row) => row.ads > 0.99 && !row.crosshairVisible
     && row.configuredOffsetMm < 0.001 && row.rear.error < 1.5 && row.axis.error < 1.5)
   && errors.length === 0;
-console.log(`${passed ? "ok  " : "FAIL"} 固定中心准心、弹道与五支枪机械瞄具共轴`);
+console.log(`${passed ? "ok  " : "FAIL"} 固定中心准心、弹道与 ${FIREARMS.length} 支枪机械瞄具共轴`);
 
 await browser.close();
 server.close();

@@ -395,7 +395,7 @@ try {
       const T = Taierzhuang, G = T.Debug.GoreRange, Gore = T.Debug.Gore;
       G.Reset(); window.__gore.Step(10);
       Gore.SetForce("blade");
-      if (T.state.activeSlot !== "melee") T.Debug.Key("Digit3");
+      if (T.state.activeSlot !== "melee") T.Debug.Key(T.Debug.SlotKey("melee"));
       window.__gore.Step(20);
       const post = G.Posts().find((spec) => spec.station === "GoreBlade");
       T.player.Spawn(post.x, post.z + 0.95, 0); window.__gore.Step(10);

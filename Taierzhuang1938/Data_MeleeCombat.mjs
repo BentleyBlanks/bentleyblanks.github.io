@@ -58,7 +58,7 @@ export const MELEE_ENCOUNTERS = Object.freeze([
   {id:'UseThree',name:'一对三 · F 开始',enemies:3,x:1408,z:1462,trigger:'interact'},
 ].map(Object.freeze));
 export const MELEE_SCENARIOS = Object.freeze([
-  {id:'EncounterField',name:'自由测试场 · 六组遭遇',weapon:'Dadao',enemies:0,kind:'field',tip:'前排 F 开始，后排靠近开始；每排分别为 1／2／3 名对手。1 切刺刀步枪，3 切大刀，V 切换步枪架势。'},
+  {id:'EncounterField',name:'自由测试场 · 六组遭遇',weapon:'Dadao',enemies:0,kind:'field',tip:'前排 F 开始，后排靠近开始；每排分别为 1／2／3 名对手。1 切刺刀步枪，2 切大刀，V 切换步枪架势。'},
   { id: "DadaoOne", name: "大刀 · 一对一", weapon: "Dadao", enemies: 1, kind: "duel", tip: "看清枪尖，右键拨开后主动向前斩击。" },
   { id: "DadaoTwo", name: "大刀 · 一对二", weapon: "Dadao", enemies: 2, kind: "duel", tip: "一人在正面牵制、另一人绕到侧面；把两人拉回视野内，每次拨挡只带开一支武器。" },
   { id: "DadaoThree", name: "大刀 · 一对三", weapon: "Dadao", enemies: 3, kind: "duel", tip: "正面一人佯攻牵制，两人绕到左右侧翼夹击；转向谁谁就变正面，用走位争取单独交锋。" },

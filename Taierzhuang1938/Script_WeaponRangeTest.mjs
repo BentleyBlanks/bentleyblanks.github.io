@@ -6,15 +6,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
-import { WEAPONS } from "./Data_Weapons.mjs";
+import { WEAPONS, WeaponShelved } from "./Data_Weapons.mjs";
 import { WEAPON_RANGE_TARGETS, WEAPON_RANGE_FIRING_ORIGIN, WEAPON_RANGE_VIEWS } from "./Data_WeaponRange.mjs";
 
 // --smoke runs one representative firearm without full-magazine, repeated death or menu reload checks.
-// --only=HanYang,ServicePistol selects weapons; catalog completeness is always checked against the full table.
+// --only=HanYang,Zb26 selects weapons; catalog completeness is always checked against the full table.
+// Shelved weapons (the pistol, for now) are not on the table and are not tested.
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
 const shotDir = path.join(projectDir, "_shots", "WeaponRange");
-const allFirearms = Object.values(WEAPONS).filter((weapon) => weapon.ammo && weapon.magazine > 0);
+const allFirearms = Object.values(WEAPONS).filter((weapon) => weapon.ammo && weapon.magazine > 0 && !WeaponShelved(weapon.id));
 const smoke = process.argv.includes("--smoke");
 const only = process.argv.find((argument) => argument.startsWith("--only="))?.slice(7).split(",");
 if (only?.some((id) => !allFirearms.some((weapon) => weapon.id === id))) throw new Error(`Unknown firearm in --only=${only}`);

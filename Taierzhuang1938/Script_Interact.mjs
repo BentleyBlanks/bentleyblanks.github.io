@@ -195,7 +195,7 @@ export class InteractSystem {
     const ammoOnly = !melee && !!this.hooks.SameWeapon?.(source.weaponId);
     if (ammoOnly && !(this.hooks.AmmoGain?.(source.clips, source.ammo, source.weaponId) > 0)) return null;
     // HasPrimary 是早期测试/嵌入方的兼容口；主程序提供 HasWeapon，
-    // 才能让大刀按 3 号槽而不是拿长枪槽判断“拾起/换上”。
+    // 才能让大刀按大刀槽而不是拿长枪槽判断“拾起/换上”。
     const hasWeapon = this.hooks.HasWeapon
       ? this.hooks.HasWeapon(source.weaponId) : this.hooks.HasPrimary?.();
     // 「拾起 / 换上 / 拿弹药」是三句不同的话，各有各的键 —— 不在这里拼动词。

@@ -23,7 +23,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
-import { WEAPONS as weaponDefinitions } from "./Data_Weapons.mjs";
+import { WEAPONS as weaponDefinitions, WeaponShelved } from "./Data_Weapons.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -250,6 +250,8 @@ let list = only
   ? WEAPONS.filter((w) => only.includes(w.id) || only.includes(w.shotId))
   : WEAPONS;
 if (reloadSheet) list = list.filter(entry => weaponDefinitions[entry.id]?.ammo && weaponDefinitions[entry.id]?.magazine);
+// 手枪暂时停用：台架上照样出模型图，第一人称持握和换弹图不出。
+if (firstPerson || reloadSheet) list = list.filter(entry => !WeaponShelved(entry.id));
 for (const entry of list) {
   await page.evaluate(({ view, materialMode }) => {
     const T = window.Taierzhuang;

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { CONTROL_GUIDE } from "./Script_Input.mjs";
+import { CONTROL_GUIDE, KEYMAP } from "./Script_Input.mjs";
 import {
   AmmoReadout, ContextualActionPrompts, CrosshairGeometry, GrenadeWarningScreenPoint, ShowTelegraphPaper, TargetCardPresentation,
 } from "./Script_Hud.mjs";
@@ -9,8 +9,15 @@ import { CarrySystem, CARRY_KINDS } from "./Script_Carry.mjs";
 
 const guideText = CONTROL_GUIDE.flatMap((group) => group.rows)
   .map((row) => `${row.keys} ${row.label}`).join("\n");
-assert.match(guideText, /1 \/ 2 \/ 3 \/ 4/);
+assert.match(guideText, /1 \/ 2 \/ 3 长枪 \/ 大刀 \/ 投掷物/);
 assert.match(guideText, /F 拾枪、换枪/);
+
+// 手枪暂时停用（2026-09-13）：没有短枪槽，2 是大刀、3 是投掷物，4 空着。
+const slotKeys = Object.fromEntries(KEYMAP
+  .filter((entry) => entry.context === "world" && entry.action.startsWith("slot:"))
+  .map((entry) => [entry.code, entry.action]));
+assert.deepEqual(slotKeys, { Digit1: "slot:primary", Digit2: "slot:melee", Digit3: "slot:throwable" },
+  "数字键：1 长枪 / 2 大刀 / 3 投掷物");
 assert.match(guideText, /B 有绷带且流血时包扎止血/);
 
 assert.deepEqual(ContextualActionPrompts(), []);
@@ -48,12 +55,7 @@ assert.equal(bandageOnly[0].keys, "B");
 
 const oneGun = ContextualActionPrompts({ slots: { primary: "HanYang", secondary: null } });
 assert.equal(oneGun.some((prompt) => prompt.kind === "switchWeapon"), false);
-const twoGuns = ContextualActionPrompts({
-  slots: { primary: "HanYang", secondary: "ServicePistol" },
-});
-assert.deepEqual(twoGuns[0], {
-  keys: "1 / 2", label: "切换长枪 / 短枪", kind: "switchWeapon",
-});
+// 「切换长枪 / 短枪」那条只在有短枪槽时出现；手枪停用期间不测。
 for (const fixed of [false, true]) {
   assert.deepEqual(ContextualActionPrompts({
     bayonet: { fixed }, slots: { primary: "HanYang", secondary: null },
@@ -78,9 +80,9 @@ const stacked = ContextualActionPrompts({
   interaction: swap,
   bleeding: 0.5,
   bandages: 2,
-  slots: { primary: "HanYang", secondary: "ServicePistol" },
+  slots: { primary: "HanYang", secondary: null },
 });
-assert.deepEqual(stacked.map((prompt) => prompt.kind), ["pickup", "bandage", "switchWeapon"]);
+assert.deepEqual(stacked.map((prompt) => prompt.kind), ["pickup", "bandage"]);
 const grenadePrompt = ContextualActionPrompts({ interaction: { label: "拾起并掷回 · 2.9秒", kind: "grenade" } });
 assert.deepEqual(grenadePrompt.map((prompt) => [prompt.kind, prompt.label]), [["grenade", "拾起并掷回 · 2.9秒"]]);
 
@@ -132,7 +134,7 @@ const hauling = ContextualActionPrompts({
   carry: CarryAt("ammoCrate"),
   interaction: { label: "拾起 三八式步枪", kind: "pickup" },
   bleeding: 0.5, bandages: 2,
-  slots: { primary: "HanYang", secondary: "ServicePistol" },
+  slots: { primary: "HanYang", secondary: null },
   bayonet: { fixed: false }, ammoEmpty: true,
 });
 assert.deepEqual(hauling.map((prompt) => prompt.kind), ["carry", "carry"]);

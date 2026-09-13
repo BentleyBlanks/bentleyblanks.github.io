@@ -44,7 +44,7 @@ const SHOWCASE = [
   { id: "ZhongZheng" },
   { id: "Zb26" },
   { id: "Type38" },
-  { id: "ServicePistol" },
+  // { id: "ServicePistol" },  // 手枪暂时停用（Data_Weapons.SHELVED_WEAPONS）；Worker 里不引那张表，恢复时解开这一行
   { id: "Grenade" },
   { id: "Dadao" },
   { id: "Type89Launcher" },

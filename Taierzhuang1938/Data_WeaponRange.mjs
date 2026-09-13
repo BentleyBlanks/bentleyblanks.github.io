@@ -3,7 +3,7 @@
 // WEAPON_RANGE_FIRING_ORIGIN, not the length of the north/south projection.
 // Each target owns an angular corridor; moving targets stay on their measured
 // radius. The complete movement envelope remains clear of every other actor.
-import { WEAPONS } from "./Data_Weapons.mjs";
+import { WEAPONS, WeaponShelved } from "./Data_Weapons.mjs";
 
 export const WEAPON_RANGE_LEVEL_ID = "WeaponRange";
 export const WEAPON_RANGE_CAMERA_FAR = 340;
@@ -15,8 +15,10 @@ export const WEAPON_RANGE_WORLD = Object.freeze({
 
 // Dynamic catalog: new firearms automatically receive a place on the first table.
 // GUNS contains the immutable source weapon definitions; WEAPONS contains slots.
+// Shelved weapons (the pistol, for now) keep their data but get no table slot.
 export const WEAPON_RANGE_GUNS = Object.freeze(Object.values(WEAPONS)
-  .filter(weapon => weapon.ammo && Number.isFinite(weapon.magazine) && weapon.magazine > 0));
+  .filter(weapon => weapon.ammo && Number.isFinite(weapon.magazine) && weapon.magazine > 0
+    && !WeaponShelved(weapon.id)));
 const slotSpacing = 1.7;
 export const WEAPON_RANGE_TABLE = Object.freeze({
   id: "WeaponRangeTable", x: 2400, z: 2466, width: WEAPON_RANGE_GUNS.length * slotSpacing + 0.8,

@@ -15,5 +15,5 @@ export const MELEE_QTE_PHASE = Object.freeze({
   ambientAircraft: false,
   zones: [{ id: "MeleeArena", name: "白刃实验场", x: 1400, z: 1460, radius: 18 }],
   spawn: { x: 1400, z: 1476, ry: 0 },
-  loadoutOverride: { primary: "HanYang", secondary: null, melee: "Dadao", throwables: { Grenade: 0 }, spareClips: 6, note: "1 步枪 / 3 大刀；V 射击／白刃架势，X 装卸刺刀" },
+  loadoutOverride: { primary: "HanYang", secondary: null, melee: "Dadao", throwables: { Grenade: 0 }, spareClips: 6, note: "1 步枪 / 2 大刀；V 射击／白刃架势，X 装卸刺刀" },
 });

@@ -28,8 +28,9 @@ export const TEXT = Object.freeze({
   "input.guide.combat.title": "武器与救治",
   "input.guide.combat.fire.keys": "左键 / 右键",
   "input.guide.combat.fire.label": "开火 / 瞄准",
-  "input.guide.combat.slots.keys": "1 / 2 / 3 / 4",
-  "input.guide.combat.slots.label": "长枪 / 短枪 / 大刀 / 投掷物",
+  // 手枪停用期间没有短枪槽（Data_Weapons.PLAYER_SLOT_ORDER）；恢复时改回「1 / 2 / 3 / 4」「长枪 / 短枪 / 大刀 / 投掷物」。
+  "input.guide.combat.slots.keys": "1 / 2 / 3",
+  "input.guide.combat.slots.label": "长枪 / 大刀 / 投掷物",
   "input.guide.combat.wheelSlot.keys": "滚轮",
   "input.guide.combat.wheelSlot.label": "循环切换已有武器",
   "input.guide.combat.reload.keys": "R / 0",

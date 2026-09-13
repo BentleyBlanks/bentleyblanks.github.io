@@ -11,7 +11,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { WeaponShelved } from "./Data_Weapons.mjs";
 
+// 手枪暂时停用（Data_Weapons.SHELVED_WEAPONS）：停用期间不抽查手枪枪焰和手枪瞄具。
+const PISTOL_ON = !WeaponShelved("ServicePistol");
+const FLASH_KINDS = ["boltRifle", "lmg", ...(PISTOL_ON ? ["pistol"] : [])];
+const FIREARMS = ["ZhongZheng", "HanYang", "Type38", "Zb26", ...(PISTOL_ON ? ["ServicePistol"] : [])];
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
 const server = await ServeRoot(rootDir, 0);
@@ -38,7 +43,7 @@ await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&qualit
 await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
 await page.evaluate(() => window.Taierzhuang.StepFrames(30));
 
-const report = await page.evaluate(() => {
+const report = await page.evaluate(({ flashKinds, firearms }) => {
   const T = window.Taierzhuang;
   const D = T.Debug;
   T.player.health = 100;
@@ -78,19 +83,19 @@ const report = await page.evaluate(() => {
     if (tZero === null && pending <= 1e-7) tZero = ms;
   }
 
-  // 二、直接抽查三种配方。读取的是 MuzzleFlash 真正算出的生成数，不是数据表源码。
+  // 二、直接抽查各枪种配方。读取的是 MuzzleFlash 真正算出的生成数，不是数据表源码。
   const origin = T.player.EyePosition;
   const direction = T.player.AimDirection();
   const profiles = {};
-  for (const kind of ["boltRifle", "lmg", "pistol"]) {
+  for (const kind of flashKinds) {
     T.vfx.MuzzleFlash(origin, direction, { kind });
     profiles[kind] = { ...T.vfx.lastMuzzleProfile };
   }
 
-  // 四、全部五支火器必须走 TZM 并保留 sight；三支栓动步枪还要有动作代理。
+  // 四、玩家火器必须走 TZM 并保留 sight；三支栓动步枪还要有动作代理。
   const sights = {};
   let type38AdsNear = null;
-  for (const id of ["ZhongZheng", "HanYang", "Type38", "Zb26", "ServicePistol"]) {
+  for (const id of firearms) {
     T.viewmodel.Equip(id);
     T.StepFrames(120);
     const vm = T.viewmodel;
@@ -166,7 +171,7 @@ const report = await page.evaluate(() => {
     armSides,
     sprintAmount,
   };
-});
+}, { flashKinds: FLASH_KINDS, firearms: FIREARMS });
 
 Check("玩家按真实枪种触发枪焰配方",
   report.forwarded.kind === "boltRifle",
@@ -182,18 +187,18 @@ Check("枪口烟有快烟与慢余烟两层",
   report.profiles.boltRifle.smokeCount >= 1 && report.profiles.boltRifle.wispCount >= 2,
   `栓动：快烟 ${report.profiles.boltRifle.smokeCount} + 余烟 ${report.profiles.boltRifle.wispCount}`);
 Check("不同枪种不是同一团枪焰",
-  report.profiles.boltRifle.size > report.profiles.pistol.size
+  (!PISTOL_ON || report.profiles.boltRifle.size > report.profiles.pistol.size)
     && report.profiles.boltRifle.wispCount > report.profiles.lmg.wispCount,
   `栓动 ${report.profiles.boltRifle.size.toFixed(2)}m/${report.profiles.boltRifle.wispCount}缕；`
-  + `机枪 ${report.profiles.lmg.size.toFixed(2)}m/${report.profiles.lmg.wispCount}缕；`
-  + `手枪 ${report.profiles.pistol.size.toFixed(2)}m/${report.profiles.pistol.wispCount}缕`);
+  + `机枪 ${report.profiles.lmg.size.toFixed(2)}m/${report.profiles.lmg.wispCount}缕`
+  + (PISTOL_ON ? `；手枪 ${report.profiles.pistol.size.toFixed(2)}m/${report.profiles.pistol.wispCount}缕` : ""));
 Check("持续连射的第二发会重新触发人物后坐",
   report.repeated && report.repeated.first > 0.95
     && report.repeated.decayed < 0.8 && report.repeated.second > 0.95,
   report.repeated
     ? `${report.repeated.first.toFixed(2)} -> ${report.repeated.decayed.toFixed(2)} -> ${report.repeated.second.toFixed(2)}`
     : "没有可见 Actor");
-Check("五支火器走模型、铁瞄零偏心并保留栓动动作链",
+Check(`${FIREARMS.length} 支火器走模型、铁瞄零偏心并保留栓动动作链`,
   Object.values(report.sights).every((entry) => entry.isModel && entry.hasSight
     && entry.offsetMm < 0.001 && entry.hasBoltAction),
   Object.entries(report.sights)

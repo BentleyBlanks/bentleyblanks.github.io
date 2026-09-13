@@ -15,6 +15,7 @@
 // 动作干什么全在 Script_Main 的 OnAction 里。
 
 import { T } from "./Script_Text.mjs";
+import { PLAYER_SLOT_ORDER, PlayerSlotKey } from "./Data_Weapons.mjs";
 
 /**
  * 设置页里的操作说明。它与 KEYMAP 放在同一个文件里，避免改了实际键位却忘了改说明。
@@ -71,12 +72,13 @@ export const KEYMAP = [
   { code: "KeyC", action: "crouch", mode: "press", context: "any" },
   { code: "KeyZ", action: "prone", mode: "press", context: "any" },
 
-  // --- 武器槽：ER2 的 1/2/3/4 = 长枪 / 短枪 / 大刀 / 投掷物 ------------------
-  // 只在 world 上下文吃；Tab 按住时同样四个键是「下令」。
-  { code: "Digit1", action: "slot:primary", mode: "press", context: "world" },
-  { code: "Digit2", action: "slot:secondary", mode: "press", context: "world" },
-  { code: "Digit3", action: "slot:melee", mode: "press", context: "world" },
-  { code: "Digit4", action: "slot:throwable", mode: "press", context: "world" },
+  // --- 武器槽：数字键按 Data_Weapons.PLAYER_SLOT_ORDER 依次排 -----------------
+  // ER2 原本是 1/2/3/4 = 长枪 / 短枪 / 大刀 / 投掷物；手枪停用期间短枪槽整个拿掉，
+  // 后面的往前挪一位：1 长枪 / 2 大刀 / 3 投掷物。
+  // 只在 world 上下文吃；Tab 按住时同样的键是「下令」。
+  ...PLAYER_SLOT_ORDER.map((slot) => ({
+    code: PlayerSlotKey(slot), action: `slot:${slot}`, mode: "press", context: "world",
+  })),
   { code: "Digit0", action: "fireMode", mode: "press", context: "world" },
 
   // --- 下令：收进 Tab 按住的上下文 -------------------------------------------

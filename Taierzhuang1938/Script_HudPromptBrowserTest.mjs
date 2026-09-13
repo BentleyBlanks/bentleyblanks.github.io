@@ -89,7 +89,6 @@ try {
     T.player.bleeding = 0.4;
     T.player.bandages = 1;
     T.state.slots.primary = "HanYang";
-    T.state.slots.secondary = "ServicePistol";
     T.state.ammo = 5;
     T.StepFrames(12);
     const row = document.querySelector(".hudAction");
@@ -109,10 +108,10 @@ try {
     };
   });
   // 可装刺刀不构成眼前操作，X 不再常驻；其余提示保持既有条件。
-  assert.deepEqual(prompts.prompts.map((prompt) => prompt.kind),
-    ["bandage", "switchWeapon"]);
+  // 手枪停用期间没有短枪，「切换长枪 / 短枪」不测。
+  assert.deepEqual(prompts.prompts.map((prompt) => prompt.kind), ["bandage"]);
   assert.equal(prompts.on, true);
-  assert.deepEqual(prompts.rows, [["B", "包扎止血"], ["1 / 2", "切换长枪 / 短枪"]]);
+  assert.deepEqual(prompts.rows, [["B", "包扎止血"]]);
   assert.equal(prompts.icons, 0, "提示只有字，不画图标");
   assert.deepEqual(prompts.box, ["0px", "rgba(0, 0, 0, 0)", "0px", "rgba(0, 0, 0, 0)"], "提示没有外框与底板");
   assert.ok(prompts.labelPx >= 18 && prompts.keyPx >= prompts.labelPx, `提示字号太小：${prompts.labelPx}/${prompts.keyPx}`);

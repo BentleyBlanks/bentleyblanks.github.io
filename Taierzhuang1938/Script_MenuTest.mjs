@@ -1008,10 +1008,10 @@ async function CheckMissionList() {
 // 5) Esc 暂停 -> 回主菜单 -> 再进一关
 // ===========================================================================
 {
-  // 玩家报上来的那一次手里拿的是**大刀**（3 号槽），走键位表切过去再走整条路：
+  // 玩家报上来的那一次手里拿的是**大刀**，走键位表切过去再走整条路：
   // 刀的 rig 是双手抱着的一整块，藏起来时画面上是"整只手连刀一起没了"，
   // 比丢一支步枪显眼得多 —— 出图那一张就是给人眼复核这件事的。
-  await page.evaluate(() => { window.Taierzhuang.Debug.Key("Digit3"); });
+  await page.evaluate(() => { const D = window.Taierzhuang.Debug; D.Key(D.SlotKey("melee")); });
   await page.evaluate(() => window.Taierzhuang.StepFrames(4));
   const swordUp = await page.evaluate(() => window.Taierzhuang.Debug.Slots());
   Check("先换到大刀（这一段按玩家那次的持械走）",

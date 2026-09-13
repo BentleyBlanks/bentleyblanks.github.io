@@ -21,7 +21,7 @@
 import * as THREE from "three";
 import { Panel, Section, Slider, Chips, Select, Toggle, ButtonRow, Facts, Note, ListBox }
   from "./Script_EditorUi.mjs";
-import { WEAPONS } from "./Data_Weapons.mjs";
+import { WEAPONS, WeaponShelved } from "./Data_Weapons.mjs";
 import { COMBAT } from "./Data_Battle.mjs";
 import { CAPSULE } from "./Script_Ai.mjs";
 import { KIND_SPEC } from "./Script_Actor.mjs";
@@ -459,7 +459,9 @@ export class ActorEditor {
     this.weaponSelect = Select(who, "武器",
       [{ value: DEFAULT_WEAPON_CHOICE, label: "（按人物源配置）" },
         { value: "", label: "（空手）" },
-        ...Object.keys(WEAPONS).map((id) => ({ value: id, label: `${WEAPONS[id].name}  ${id}` }))],
+        // 停用的武器（手枪）不给人物挂在手上
+        ...Object.keys(WEAPONS).filter((id) => !WeaponShelved(id))
+          .map((id) => ({ value: id, label: `${WEAPONS[id].name}  ${id}` }))],
       DEFAULT_WEAPON_CHOICE, (v) => this.SetWeaponChoice(v));
 
     this.modelSelect = Select(who, "源模型", [], "", (value) => {

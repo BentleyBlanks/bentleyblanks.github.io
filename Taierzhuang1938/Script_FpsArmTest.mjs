@@ -1,8 +1,9 @@
 // 第一人称共享双臂的人体闸：覆盖全部逐枪姿势、状态和机械动作。
 
 import path from "node:path";
-import { WEAPONS } from "./Data_Weapons.mjs";
+import { WEAPONS, SHELVED_WEAPONS } from "./Data_Weapons.mjs";
 const onlyIds = process.argv.find((arg) => arg.startsWith("--only="))?.slice(7).split(",") || null;
+// 姿势数据仍要逐枪齐全（expectedIds 不排除停用武器）；但停用的手枪不再装上去逐状态量握持。
 const expectedIds = Object.values(WEAPONS).filter((weapon) => (weapon.ammo && weapon.magazine) || ["throwable", "melee"].includes(weapon.kind)).map((weapon) => weapon.id);
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
@@ -21,7 +22,7 @@ await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?shot
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
 
-const report = await page.evaluate(async (onlyIds) => {
+const report = await page.evaluate(async ({ onlyIds, shelved }) => {
   const THREE = await import("./vendor/three/build/three.module.js");
   const { FPS_ARM_POSES, FPS_ARM_LIMITS } = await import("./Data_FpsArmPoses.mjs");
   const T = window.Taierzhuang;
@@ -102,7 +103,7 @@ const report = await page.evaluate(async (onlyIds) => {
     source: arms?.report?.source, chains: arms?.report?.chains, bones: arms?.report?.bones,
     skinnedMeshes: arms?.report?.skinnedMeshes, profiles: arms?.report?.profiles || [],
   };
-  for (const weapon of out.weaponIds.filter((id) => !onlyIds || onlyIds.includes(id))) {
+  for (const weapon of out.weaponIds.filter((id) => (!onlyIds || onlyIds.includes(id)) && !shelved.includes(id))) {
     for (const [state, input] of [["hip", {}], ["ads", { ads: 1 }], ["sprintIn", { sprint: 1 }]]) {
       Equip(weapon);
       Step(90, input);
@@ -161,7 +162,7 @@ const report = await page.evaluate(async (onlyIds) => {
   }
   red.dispose();
   return out;
-}, onlyIds);
+}, { onlyIds, shelved: SHELVED_WEAPONS });
 
 const checks = [];
 checks.push(["完整逐枪姿势数据", report.weaponIds.length === expectedIds.length && expectedIds.every((id) => report.weaponIds.includes(id)), `${report.weaponIds.length} 件装备`]);

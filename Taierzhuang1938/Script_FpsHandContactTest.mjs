@@ -7,6 +7,7 @@ import {fileURLToPath} from "node:url";
 import {LaunchBrowser} from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import {ServeRoot} from "./Script_DevServer.mjs";
 import {FPS_ARM_LIMITS} from "./Data_FpsArmPoses.mjs";
+import {SHELVED_WEAPONS} from "./Data_Weapons.mjs";
 
 const project=path.dirname(fileURLToPath(import.meta.url));
 const output=path.join(project,"_shots","FpsHandContact");await fs.mkdir(output,{recursive:true});
@@ -17,7 +18,7 @@ const only=process.argv.find(a=>a.startsWith("--only="))?.slice(7).split(",");
 try {
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?weapons=1&shot=1&manual=1&quality=medium&scale=small`,{timeout:120000});
   await page.waitForFunction(()=>window.Taierzhuang?.state?.ready,null,{timeout:240000});
-  const report=await page.evaluate(async({only})=>{
+  const report=await page.evaluate(async({only,shelved})=>{
     const THREE=await import("./vendor/three/build/three.module.js");
     const T=window.Taierzhuang,vm=T.viewmodel;let arms=vm.riggedArms;
     T.Debug.OpenEditor("firstPerson");const editor=T.editor.active;
@@ -61,7 +62,8 @@ try {
       }
       return hit;
     };
-    for(const id of Object.keys(probes).filter(id=>!only||only.includes(id))){
+    // Shelved weapons (the pistol, for now) keep their probes but are not measured.
+    for(const id of Object.keys(probes).filter(id=>(!only||only.includes(id))&&!shelved.includes(id))){
       editor.SetWeapon(id);arms=vm.riggedArms;editor.SetPose("hip");editor.SetView("player");for(let i=0;i<90;i++)editor.Update(1/60);Refresh();
       const target=TriggerPoint(id),hip=Pad("r",1),originalPositions=arms.fingerBones.r.concat(arms.fingerBones.l).map(b=>b.position.clone());
       for(const pose of ["hip","ads","fire"]){
@@ -106,7 +108,7 @@ try {
       }
     }
     return result;
-  },{only});
+  },{only,shelved:SHELVED_WEAPONS});
   await fs.writeFile(path.join(output,"Data_Contacts.json"),JSON.stringify({...report,errors},null,2));
   const failures=[];const Check=(condition,message)=>{if(!condition)failures.push(message);};
   for(const pose of report.poses){

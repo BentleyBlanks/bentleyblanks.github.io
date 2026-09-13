@@ -55,7 +55,7 @@ node Taierzhuang1938/Script_RangeTest.mjs --shot           # 附带按工位各�
 | --- | --- | --- |
 | 步枪位 | `RangeRifle` | 开枪、开镜放大、弹药账；四个距离靶（R10/R25/R50/R100，沙袋胸墙后朝北打） |
 | 投弹位 | `RangeGrenade` | 手榴弹（G16/G22/G28 铺成纵深带，弹落带内必罩住至少一个） |
-| 白刃位 | `RangeMelee` | 大刀（3 号槽）与刺刀（X 装卸、V 蓄力）；M1/M2/M3 三个近身靶 |
+| 白刃位 | `RangeMelee` | 大刀（按 2）与刺刀（X 装卸、V 蓄力）；M1/M2/M3 三个近身靶 |
 
 木桩兵是**整具带骨骼的 ija Actor**：命中箱、掉血、倒地、准心识别（TargetInfo）全走
 正式链路，唯一的区别是 `soldier.dummy = true` 让 `AiDirector.Update` 跳过 Think ——

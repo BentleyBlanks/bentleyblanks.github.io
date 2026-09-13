@@ -14,7 +14,7 @@
 import * as THREE from "three";
 import { Panel, Section, Slider, Chips, Toggle, Button, ButtonRow, Facts, Note, ListBox, TextArea }
   from "./Script_EditorUi.mjs";
-import { WEAPONS, AMMO, LOADOUTS } from "./Data_Weapons.mjs";
+import { WEAPONS, AMMO, LOADOUTS, WeaponShelved } from "./Data_Weapons.mjs";
 import { MESHES, WEAPON_MESH_BY_ID, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
 import { Mulberry32 } from "./Script_Noise.mjs";
 
@@ -96,7 +96,8 @@ function IsHandheld(id) {
  */
 function IsViewmodel(id) {
   const w = WEAPONS[id];
-  return IsHandheld(id) && !!w && w.kind !== "mortar";
+  // 停用的武器（手枪）仍能在台架上看模型，但第一人称握持预览关掉。
+  return IsHandheld(id) && !!w && w.kind !== "mortar" && !WeaponShelved(id);
 }
 
 /** 只有真正有照门/准星的第一人称火器才显示弹道校准，刀与手榴弹没有这条轴线。 */

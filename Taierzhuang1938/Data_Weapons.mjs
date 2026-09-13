@@ -299,6 +299,35 @@ export const WEAPONS = {
   },
 };
 
+/**
+ * 暂时停用的武器（2026-09-13 用户定：这个游戏暂时不需要手枪）。
+ *
+ * 停用只关入口，不删东西：WEAPONS 条目、模型、第一人称握持姿势、换匣动作、
+ * AI 的手枪兜底代码全部原样保留。停用的武器不发给玩家、不上靶场枪桌、
+ * 不进第一人称持枪检查与人物编辑器的武器下拉，逐枪测试也跳过它。
+ * 加载展示池那一行是注释掉的（Script_BootPropStage 在 Worker 里跑，不引这张表）。
+ *
+ * 恢复手枪：把 id 从这里删掉，"secondary" 放回 PLAYER_SLOT_ORDER 第二位，
+ * 再把 Data_Text_Input 的「1 / 2 / 3」说明与展示池那一行改回来。
+ */
+export const SHELVED_WEAPONS = Object.freeze(["ServicePistol"]);
+
+export function WeaponShelved(id) {
+  return SHELVED_WEAPONS.includes(id);
+}
+
+/**
+ * 玩家武器槽，顺序就是数字键顺序（第一个是 Digit1）。短枪槽随手枪一起停用，
+ * 所以现在是 1 长枪 / 2 大刀 / 3 投掷物；滚轮也按这个顺序循环。
+ */
+export const PLAYER_SLOT_ORDER = Object.freeze(["primary", "melee", "throwable"]);
+
+/** 某个武器槽对应的 KeyboardEvent.code；槽位停用时返回 null。 */
+export function PlayerSlotKey(slot) {
+  const index = PLAYER_SLOT_ORDER.indexOf(slot);
+  return index < 0 ? null : `Digit${index + 1}`;
+}
+
 /** 玩家在各关的携行。杂牌部队的弹药必须是紧的。 */
 export const LOADOUTS = {
   L0_Wall: { primary: "ZhongZheng", secondary: null, melee: null,

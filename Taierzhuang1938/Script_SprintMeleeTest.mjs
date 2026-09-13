@@ -35,7 +35,7 @@ await page.evaluate(() => {
   T.player.spawnGrace = 99;
   // 日军推远：这条测的是自己手里的刀，不是被人打断的刀
   for (const soldier of [...T.ai.soldiers]) T.ai.Remove(soldier);
-  T.Debug.Key("Digit3");           // 走键位表切到大刀槽，不直接调 SwitchSlot
+  T.Debug.Key(T.Debug.SlotKey("melee")); // 走键位表切到大刀槽，不直接调 SwitchSlot
   T.StepFrames(10,1/60,false);
   // 取刀身中点而不是刀尖：刀尖离握把 0.74 m，抡起来必然扫出画面，站着也一样。
   // 「这一刀读不读得到」看的是刀身在不在框里。
