@@ -189,6 +189,8 @@ export const testDefs = {
   },
   VisibilityTest: { file: "Script_VisibilityTest.mjs", desc: "战场内容预算：名额/空洞/尸体上限" },
   DamageTest: { file: "Script_DamageTest.mjs", desc: "伤害口径重放（TTK 对照）" },
+  FirearmHandlingTest: { file: "Script_FirearmHandlingTest.mjs", desc: "Dense spread / bloom recovery / automatic recoil / barrel clearance (pure Node)" },
+  FirearmHandlingBrowserTest: { file: "Script_FirearmHandlingBrowserTest.mjs", desc: "Real firing, stance, automatic bursts and near-wall lowering" },
   GunFeelTest: { file: "Script_GunFeelTest.mjs", desc: "枪感短链八条" },
   FixedCenterAimTest: { file: "Script_FixedCenterAimTest.mjs", desc: "HUD/弹道/照门三心归一回归" },
   ReticleCalibrationTest: { file: "Script_ReticleCalibrationTest.mjs", desc: "ADS 放大准心校准与退出还原" },
@@ -292,6 +294,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "FirearmHandlingBrowserTest",
   "CharacterSpeechBrowserTest",
   "FirstLevelCasualtyBrowserTest",
   "FirstLevelMealTest",
@@ -408,7 +411,7 @@ export const domains = {
   },
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
-    tests: ["HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
+    tests: ["FirearmHandlingTest", "FirearmHandlingBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
       "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "MeleeQteTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest", "ModelFacingTest",
       // 玩家自己的命中几何（AI 打玩家的部位由它判）与通用震屏（爆炸/近失/中弹/落地/扫射/扑沟）：
@@ -490,6 +493,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  { domain: "combat", pattern: /FirearmHandling/i },
   {domain:"characterSpeech",pattern:/CharacterSpeech|CharacterFacial|SpeechEnvelope|NraFacial|Nra05Facial|Script_FirstLevelMissionVoice|Script_Audio\.mjs|Script_CharacterModel/},
   { domain: "animation", pattern: /ActorLocomotion|LocomotionProfileBake/ },
   {domain:'animation',pattern:/DadaoSwing|DadaoPowerSwing/},

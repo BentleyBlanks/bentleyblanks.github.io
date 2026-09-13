@@ -116,6 +116,7 @@ report.wall = await page.evaluate(() => {
   const meanY = samples.reduce((sum, row) => sum + row.y, 0) / samples.length;
   const left = samples.filter((row) => row.x < 0).length;
   return { count: samples.length, meanX, meanY, left, right: samples.length - left,
+    innerFraction: samples.filter((row) => Math.hypot(row.x, row.y) < 0.5).length / samples.length,
     valid: samples.every((row) => row.wall && row.originError < 1e-6 && row.triggerError < 1e-6
       && Math.hypot(row.x, row.y) < 1.03) };
 });
@@ -125,7 +126,7 @@ await page.screenshot({ path: screenshotPath });
 console.log(JSON.stringify({ ...report, screenshotPath, errors }, null, 2));
 
 const sightRows = Object.values(report.sights);
-const passed = report.wall.valid && Math.abs(report.wall.meanX) < 0.2
+const passed = report.wall.innerFraction > 0.55 && report.wall.valid && Math.abs(report.wall.meanX) < 0.2
   && Math.abs(report.wall.meanY) < 0.2 && report.wall.left > 20 && report.wall.right > 20
   && Math.abs(report.center.crosshairX - 640) < 0.1
   && Math.abs(report.center.crosshairY - 360) < 0.1

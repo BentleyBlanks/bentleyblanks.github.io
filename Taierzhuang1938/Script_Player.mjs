@@ -25,6 +25,8 @@ import {
   SUPPRESSION, WOUNDS, SPAWN, HIT_FEEDBACK, HIT_DISORIENTATION, SWAY, SPREAD, CAMERA, COVER_LEAN,
 } from "./Data_Tuning_Player.mjs";
 import { CoverLean, LeanClearance } from "./Script_CoverLean.mjs";
+import { AUTOMATIC_RECOIL } from "./Data_Tuning_FirearmHandling.mjs";
+import { FirearmHandling, GunClearance } from "./Script_FirearmHandling.mjs";
 import { CameraShake } from "./Script_CameraShake.mjs";
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -64,6 +66,9 @@ export class PlayerController {
   constructor(camera, world, { seed = 1 } = {})
   {
     this.camera = camera;
+    this.firearmHandling = new FirearmHandling();
+    this.gunClearance = { lower: 0, blocked: false };
+    this.recoilDelayS = 0;
     this.world = world;                    // { colliders, GroundHeight(x,z), bounds }
     /**
      * 物理世界里的那具胶囊。**换关会换一份**（切片重建 = 物理世界重建），
@@ -224,6 +229,9 @@ export class PlayerController {
   }
 
   Spawn(x, z, ry = 0) {
+    this.firearmHandling.Reset();
+    this.gunClearance = { lower: 0, blocked: false };
+    this.recoilDelayS = 0;
     // 出生点先问一句「这儿站得下人吗」。
     // 撒兵点与重生点来自关卡数据与随机数，它们并不知道那儿正好是一堵院墙；
     // 而运动学角色控制器**没有脱困能力** —— 埋进墙里就再也出不来了
@@ -324,7 +332,8 @@ export class PlayerController {
       && this.sprint < COVER_LEAN.maxSprint;
     const manual = allowed ? Clamp(input.lean || 0, -1, 1) : 0;
     this.autoLean = this.coverLean.Update(dt, {
-      enabled: allowed && !manual && this.wantAds && !!weapon?.magazine && weapon.kind !== "throwable"
+      enabled: allowed && !manual && (this.wantAds || (input.ads && this.gunClearance.blocked
+        && (!weapon?.bipod || aiming?.allowUndeployedAds))) && !!weapon?.magazine && weapon.kind !== "throwable"
         && Math.abs(this.pitch) <= COVER_LEAN.maxPitchRad
         && Math.hypot(this.velocity.x, this.velocity.z) <= COVER_LEAN.maxSpeedMps,
       eye, right, forward: this.AimDirection(this._forward), raycast, clearance,
@@ -346,6 +355,16 @@ export class PlayerController {
     direction.divideScalar(distance);
     const wall = queries.Raycast(eye, direction, distance, { terrain: true });
     return wall ? { wall, point: eye.addScaledVector(direction, wall.t), dist: wall.t, dir: direction } : null;
+  }
+
+  UpdateGunClearance(weapon) {
+    const forward = this.AimDirection();
+    const right = new THREE.Vector3().crossVectors(forward, UP).normalize();
+    const queries = this.physics || this.world;
+    this.gunClearance = GunClearance(weapon, this.EyePosition, forward, right,
+      queries.Raycast ? (origin, direction, length) => queries.Raycast(
+        new THREE.Vector3(origin.x, origin.y, origin.z), direction, length, { terrain: true }) : null);
+    return this.gunClearance;
   }
 
   /** 视线方向（相机朝向）。 */
@@ -538,6 +557,7 @@ export class PlayerController {
   }
 
   Update(dt, input, weapon, aiming = null) {
+    this.firearmHandling.Step(dt, Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / SPREAD.moveRefMps));
     if (!this.alive) {
       this.deadTime += dt;
       this.SyncDeathCamera();
@@ -575,7 +595,7 @@ export class PlayerController {
       const T = Math.max(RECOIL.minRecoverS, this.recoilRecoverS);
       const peak = Math.max(pend, this.recoilPeak || pend);
       const K = RECOIL.gain / Math.sqrt(T);
-      const dec = Math.pow(pend / peak, RECOIL.exponent) * (peak / T) * K * Math.sqrt(this.recoilSince) * dt;
+      const dec = Math.pow(pend / peak, RECOIL.exponent) * (peak / T) * K * Math.sqrt(Math.max(0, this.recoilSince - this.recoilDelayS)) * dt;
       const scale = Math.max(0, 1 - dec / pend);
       const bp = this.recoilPending.pitch * (1 - scale);
       const by = this.recoilPending.yaw * (1 - scale);
@@ -670,7 +690,7 @@ export class PlayerController {
     const bipodBlocked = !!(weapon && weapon.bipod) && !this.bipod && !aiming?.allowUndeployedAds;
     // 抬着东西时枪根本不在手上（视图模型也收了），开镜与冲刺一并封掉。
     const loaded = this.carrySpeedScale < 1;
-    const wantAds = input.ads && !bipodBlocked && this.grounded && !loaded ? 1 : 0;
+    const wantAds = input.ads && !bipodBlocked && !this.gunClearance.blocked && this.grounded && !loaded ? 1 : 0;
     // 存下来给相机用。相机侧的 FOV 过渡（固定 150 ms）要跟玩家读同一个"意图"，
     // 而不是自己再去看一遍 input.ads —— 那样会漏掉两脚架未架起时的封锁。
     this.wantAds = wantAds === 1;
@@ -1160,7 +1180,15 @@ export class PlayerController {
    */
   ApplyRecoil(pitchRad, yawRad, recoverS = RECOIL.defaultRecoverS, recoverFrac = RECOIL.keepFrac) {
     const keep = Number.isFinite(recoverFrac) ? recoverFrac : RECOIL.keepFrac;
+    if (this.recoilDelayS > 0) {
+      const pitchLimit = AUTOMATIC_RECOIL.maxPitchDeg * Math.PI / 180;
+      const yawLimit = AUTOMATIC_RECOIL.maxYawDeg * Math.PI / 180;
+      pitchRad = Math.max(0, Math.min(pitchRad, pitchLimit - this.recoilPending.pitch));
+      yawRad = Clamp(this.recoilPending.yaw + yawRad, -yawLimit, yawLimit) - this.recoilPending.yaw;
+    }
+    const previousPitch = this.pitch;
     this.pitch = Clamp(this.pitch + pitchRad, -FREE_AIM.pitchLimitRad, FREE_AIM.pitchLimitRad);
+    pitchRad = this.pitch - previousPitch;
     this.yaw += yawRad;
     this.recoilPending.pitch += pitchRad * keep;
     this.recoilPending.yaw += yawRad * keep;
@@ -1273,16 +1301,16 @@ export class PlayerController {
    */
   SpreadDeg(weapon) {
     if (!weapon) return SPREAD.noWeaponDeg;
-    const base = this.ads > SPREAD.adsThreshold
-      ? (weapon.spreadAdsDeg ?? SPREAD.adsFallbackDeg)
-      : (weapon.spreadHipDeg ?? SPREAD.hipFallbackDeg);
+    const hip = weapon.spreadHipDeg ?? SPREAD.hipFallbackDeg;
+    const ads = weapon.spreadAdsDeg ?? SPREAD.adsFallbackDeg;
+    const base = hip + (ads - hip) * Clamp01(this.ads);
     let s = base * STANCE[this.stance].spread;
     s *= 1 + this.suppression * SPREAD.suppressionGain;
     s *= this.ArmPenalty() * SPREAD.armMix + SPREAD.armBias;
-    s *= 1 + Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / SPREAD.moveRefMps) * SPREAD.moveGain;
+    s *= 1 + Math.max(this.firearmHandling.movement, Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / SPREAD.moveRefMps)) * SPREAD.moveGain;
     if (!this.grounded) s *= SPREAD.airborne;        // 半空开火可以，但绝不是稳定射击姿态
     if (this.breathHold) s *= SPREAD.breathHold;
     if (this.bipod) s *= SPREAD.bipod;
-    return s;
+    return s * this.firearmHandling.SpreadScale(weapon);
   }
 }

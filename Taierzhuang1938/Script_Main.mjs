@@ -1,3 +1,5 @@
+import { SampleShotDisk, IsAutomaticGun } from "./Script_FirearmHandling.mjs";
+import { AUTOMATIC_RECOIL, WALL_CARRY } from "./Data_Tuning_FirearmHandling.mjs";
 import { CollectBulletNearMisses, ApplyBulletNearMisses } from "./Script_BallisticSuppression.mjs";
 // 《台儿庄：血战滕县》装配层：把渲染、城、玩家、AI、特效、音效、HUD、过场拼起来。
 //
@@ -2297,7 +2299,7 @@ async function Boot() {
        */
       Reticle: () => {
         const weapon = WEAPONS[currentWeapon];
-        const firearm = Number(weapon?.spreadHipDeg) > 0;
+        const firearm = !!weapon?.ammo && weapon.magazine > 0;
         const spreadDeg = firearm ? player.SpreadDeg(weapon) : 0;
         const drawn = hud.CrosshairState();
         return {
@@ -6882,7 +6884,6 @@ const _bulletVel = new THREE.Vector3();
 const _segDir = new THREE.Vector3();
 const _rel = new THREE.Vector3();
 const _yAxis = new THREE.Vector3(0, 1, 0);
-const _xAxis = new THREE.Vector3(1, 0, 0);
 const _kick = new THREE.Vector2();
 const _marchTargets = [];
 
@@ -7186,6 +7187,7 @@ function TryFire(dt, returningGrenade = false) {
   }
   const weapon = WEAPONS[currentWeapon];
   if (!weapon) return;
+  if (player.UpdateGunClearance(weapon).blocked || (viewmodel.wallLower || 0) > WALL_CARRY.fireReadyLower) return;
   const infiniteAmmo = EffectiveInfiniteAmmo();
   // 开镜播完之前不给开枪：ER2 的枪举到位才打得出去，
   // 否则"右键 + 左键一起按"永远比先瞄再打划算，开镜就没有意义了。
@@ -7198,6 +7200,7 @@ function TryFire(dt, returningGrenade = false) {
   if (infiniteAmmo) state.ammo = Math.max(1, state.ammo);
   else state.ammo -= 1;
   const aimAtTrigger = player.AimDirection(_aimDir).clone();
+  const spreadAtTrigger = player.SpreadDeg(weapon);
   state.playerShots += 1;
   p012Runtime?.RecordAircraftShot(player.EyePosition, player.AimDirection(_aimDir), strafe?.View());
   // 玩家的枪声是**刺激**：背后打一枪，附近的日军会把最后目击位置写在这儿
@@ -7215,9 +7218,14 @@ function TryFire(dt, returningGrenade = false) {
   firePunch = 1;
   // 后坐。Data_Weapons 每支枪的 recoil 表以前一次都没读过 —— 开完枪视角纹丝不动。
   // viewmodel 已经按那张表把这一发的相机踢动算好了（含每发随机的偏航方向与开镜衰减），
-  // 这里取走并交给 player：顶上去 100%、只回落 70%，剩 30% 要玩家自己压。
+  // 这里取走交给 player；机枪连射累积，停火后按武器恢复规则回稳。
   viewmodel.ConsumeCameraKick(_kick);
-  player.ApplyRecoil(_kick.x, _kick.y, weapon.recoil?.recoverS ?? 0.4, weapon.recoil?.recoverFrac ?? 1.0);
+  const automatic = IsAutomaticGun(weapon);
+  _kick.multiplyScalar(player.firearmHandling.RecoilScale(weapon, player.stance, player.bipod));
+  player.recoilDelayS = automatic ? AUTOMATIC_RECOIL[weapon.kind].delayS : 0;
+  player.ApplyRecoil(_kick.x, _kick.y, automatic ? AUTOMATIC_RECOIL.recoverS : weapon.recoil?.recoverS ?? 0.4,
+    weapon.recoil?.recoverFrac ?? 1.0);
+  player.firearmHandling.RecordShot(weapon);
 
   // Every scene fires along the aim captured before this shot applies recoil.
   const shotAimDirection = aimAtTrigger;
@@ -7271,17 +7279,17 @@ function TryFire(dt, returningGrenade = false) {
     kind: weapon.kind,
   });
 
-  // Sample a uniform disk in the aim-local plane. SpreadDeg is the full
+  // Sample a bounded Gaussian disk in the aim-local plane. SpreadDeg is the full
   // cone diameter used by the HUD; world-axis rotations distort it at a pitch.
-  const spread = THREE.MathUtils.degToRad(player.SpreadDeg(weapon));
+  const spread = THREE.MathUtils.degToRad(spreadAtTrigger);
   const rnd = Mulberry32(state.frame * 2654435761);
-  const radius = Math.sqrt(rnd()) * Math.tan(spread * 0.5);
-  const angle = rnd() * Math.PI * 2;
+  const disk = SampleShotDisk(rnd);
+  const radius = Math.tan(spread * 0.5);
   const right = new THREE.Vector3().crossVectors(shotAimDirection, _yAxis).normalize();
   const up = new THREE.Vector3().crossVectors(right, shotAimDirection).normalize();
   const dir = shotAimDirection.clone()
-    .addScaledVector(right, Math.cos(angle) * radius)
-    .addScaledVector(up, Math.sin(angle) * radius).normalize();
+    .addScaledVector(right, disk.x * radius)
+    .addScaledVector(up, disk.y * radius).normalize();
 
   // The crosshair owns the ballistic origin. A parallel ray from the visual
   // right-hand muzzle biases every nearby impact. Keep the real muzzle for
@@ -7414,10 +7422,13 @@ function FireEmplacedShot(shot) {
   _empDir.normalize();
   // 散布：架起来的枪比端着稳得多（Script_Emplacement 的 spreadDeg），
   // 但仍然要有 —— 一挺打不散的机枪就是一支狙击枪。种子跟着帧号走，可复现。
-  const spread = THREE.MathUtils.degToRad(shot.spreadDeg || 0.3);
+  const mountedWeapon = WEAPONS[shot.weaponId];
+  const spread = THREE.MathUtils.degToRad((shot.spreadDeg || 0.3) * player.firearmHandling.SpreadScale(mountedWeapon));
   const rnd = Mulberry32(state.frame * 2654435761 + shot.index);
-  _empDir.applyAxisAngle(_yAxis, (rnd() - 0.5) * spread);
-  _empDir.applyAxisAngle(_xAxis, (rnd() - 0.5) * spread);
+  const disk = SampleShotDisk(rnd), radius = Math.tan(spread / 2);
+  const right = new THREE.Vector3().crossVectors(_empDir, _yAxis).normalize();
+  const up = new THREE.Vector3().crossVectors(right, _empDir).normalize();
+  _empDir.addScaledVector(right, disk.x * radius).addScaledVector(up, disk.y * radius).normalize();
 
   vfx.MuzzleFlash(_empFrom, _empDir, { scale: 1.25, kind: "hmg" });
   _empTargets.length = 0;
@@ -7456,9 +7467,11 @@ function FireEmplacedShot(shot) {
   if (shot.tracer) vfx.Tracer(_empFrom, _hitPoint.clone(), { kind: shot.side === "ija" ? "ija" : "nra" });
   const recoil=gun?.kind.recoil;
   if(recoil){
-    const heatGain=1+shot.heat*.25;
+    const heatGain=(1+shot.heat*.25) * (1 + player.firearmHandling.Bloom(mountedWeapon) * AUTOMATIC_RECOIL.burstGain);
+    player.recoilDelayS = (AUTOMATIC_RECOIL[mountedWeapon.kind] || AUTOMATIC_RECOIL.hmg).delayS;
     player.ApplyRecoil(THREE.MathUtils.degToRad(recoil.pitchDeg)*heatGain,
-      THREE.MathUtils.degToRad(recoil.yawDeg)*(rnd()-.5)*2,recoil.recoverS,1);
+      THREE.MathUtils.degToRad(recoil.yawDeg)*(rnd()-.5)*2*heatGain,AUTOMATIC_RECOIL.recoverS,1);
+    player.firearmHandling.RecordShot(mountedWeapon);
     firePunch=.48;
     if(view)view.lastShotAt=state.elapsed;
     audio.Play("shellDrop",{volume:.32,pan:.4,delay:.16});
@@ -7849,6 +7862,7 @@ function Frame(dt, render = true) {
       || !!state.cooking || !!meleeCombat?.Blocking
       || ["reload", "melee", "meleeWind", "fixBayonet", "throw"].includes(viewmodel.action?.kind),
   });
+  player.UpdateGunClearance(emplacement?.Mounted || carry?.Blocking || missionRuntime?.EmptyHands ? null : WEAPONS[currentWeapon]);
   SyncJumpSound();
   movementRange?.Update(dt);
   goreRange?.Update(dt);
@@ -7994,6 +8008,7 @@ function Frame(dt, render = true) {
 
   profiler.B("viewmodel");
   viewmodel.Update(dt, {
+    wallLower: player.gunClearance.lower,
     playerPosition: player.position, playerYaw: player.yaw,
     carryBodyVisible: !!p012CarryView?.rig.root.visible && !state.cutscene && !state.menu && player.Alive,
     carryBodyYaw: p012CarryView?.bodyYaw,
@@ -8264,13 +8279,12 @@ function Frame(dt, render = true) {
   // 默认难度下 AimDirection 与 ViewDirection 共轴，开镜时机械瞄具也解到同一中心。
   // 缝画的是**这一枪真实的散布锥**（player.SpreadDeg），不是手感常数 —— 见 Hud.SetCrosshair。
   // 大刀与手榴弹没有散布可言，给固定小十字，别拿步枪的锥去骗人。
-  // 判据是 spreadHipDeg（只有枪才有），不是 magazine —— 手榴弹的 magazine 是
-  // "身上还剩几颗"，拿它当"这是一把枪"会让攥着弹的时候画出一个 3° 的假锥。
+  // 枪械须同时有弹药类型和弹仓；没有独立散布数值的机枪也使用 Player 的默认精度。
   // 架着机枪时准心画的是**机枪**的散布锥（Script_Emplacement 的 spreadDeg），
   // 不是背上那支步枪的 —— 拿步枪的锥去骗人比不画还差。
   const empView = emplacement?.View() || null;
-  const firearm = empView ? true : Number(weapon?.spreadHipDeg) > 0;
-  const spreadDeg = empView ? empView.spreadDeg : (firearm ? player.SpreadDeg(weapon) : 0);
+  const firearm = empView ? true : !!weapon?.ammo && weapon.magazine > 0;
+  const spreadDeg = empView ? empView.spreadDeg * player.firearmHandling.SpreadScale(WEAPONS[emplacement.Emplacement(empView.id)?.kind.weaponId]) : (firearm ? player.SpreadDeg(weapon) : 0);
   // 弹药块的闲置自隐（COD《战争世界》）：数字变了由 Hud.SetState 自己拨；
   // 数字没变的交互 —— 扣着扳机、开镜看一眼 —— 在这里拨。架着机枪时手上那支枪的
   // 数字没有意义，不拨。
@@ -8278,7 +8292,7 @@ function Frame(dt, render = true) {
   hud.SetCrosshair({
     // 抬着东西时准心收掉：枪不在手上，画一个散布锥就是在骗人。
     // 架着机枪反过来**要**留着：弹道收敛到准心指着的那个点上（EMPLACED_CONVERGE_M）。
-    visible: DIFFICULTY.showCrosshair !== false && player.Alive
+    visible: DIFFICULTY.showCrosshair !== false && player.Alive && !player.gunClearance.blocked
       && !state.ordersOpen && !state.cutscene && !meleeCombat?.Active && !carry?.Blocking && !p012Runtime?.binocularOwned && !missionRuntime?.EmptyHands,
     spreadDeg,
     fovDeg: camera.fov,

@@ -44,6 +44,8 @@ import { FirstPersonBody } from "./Script_FirstPersonBody.mjs";
 import { FrameQuaternion } from "./Script_FpsAnatomy.mjs";
 import { FpsSkeletalAnimation } from "./Script_FpsSkeletalAnimation.mjs";
 
+import { AUTOMATIC_RECOIL, WALL_CARRY } from "./Data_Tuning_FirearmHandling.mjs";
+
 const DEG = Math.PI / 180;
 
 // 贴图密度。Script_Geo 的 TILE_METERS 是给建筑调的（砖墙一格 1.2 m），
@@ -1461,6 +1463,9 @@ export class Viewmodel {
     // Reload is articulated around the hand still supporting the gun, below
     // its holding pose. The camera-origin action layer would orbit the entire
     // gun and both shoulders left when yawing to expose the loading port.
+    this.wallPivot = new THREE.Group();
+    this.wallPivot.name = "WallCarryGripPivot";
+    this.wallAnchor = new THREE.Vector3();
     this.reloadPivot = new THREE.Group();
     this.reloadPivot.name = "ReloadSupportPivot";
     this.reloadAnchor = new THREE.Vector3();
@@ -1485,7 +1490,8 @@ export class Viewmodel {
     this.actionPivot.add(this.recoilPivot);
     this.recoilPivot.add(this.weaponMount);
     this.recoilPivot.add(this.armAnchor);
-    this.weaponMount.add(this.reloadPivot);
+    this.weaponMount.add(this.wallPivot);
+    this.wallPivot.add(this.reloadPivot);
     this.reloadPivot.add(this.swingPivot);
 
     // --- 弹簧 ---------------------------------------------------------------
@@ -2059,7 +2065,8 @@ export class Viewmodel {
     // 大刀和手榴弹没有"开火"。不挡住的话大刀会喷枪焰，这种 bug 一上截图就要返工
     if (this.weapon.kind === "melee" || this.weapon.kind === "throwable") return null;
     this.shotIndex += 1;
-    const recoil = this.weapon.recoil || { pitch: 2.0, yaw: 0.4, kick: 0.03 };
+    const automatic = AUTOMATIC_RECOIL[this.weapon.kind];
+    const recoil = this.weapon.recoil || { pitch: automatic?.pitchDeg ?? 2.0, yaw: automatic?.yawDeg ?? 0.4, kick: 0.03 };
     // 每一发的偏航从"第几发"派生：确定性，但连发时不会两发一样
     const rnd = Mulberry32(HashString(`${this.seed}:shot:${this.shotIndex}`));
     const yawSign = rnd() < 0.5 ? -1 : 1;
@@ -2275,6 +2282,9 @@ export class Viewmodel {
     const sprint = Clamp01(input.sprint ?? 0);
     const crouch = Clamp01(input.crouch ?? 0);
     const lowAmmo = !!input.lowAmmo;
+    const wallTarget = this.weapon?.ammo ? Clamp01(input.wallLower ?? 0) : 0;
+    const wallTime = wallTarget > (this.wallLower || 0) ? WALL_CARRY.lowerS : WALL_CARRY.raiseS;
+    this.wallLower = (this.wallLower || 0) + (wallTarget - (this.wallLower || 0)) * (1 - Math.exp(-step / wallTime));
 
     // 世界 FOV 从父相机上读（调用方开镜时会改它），读不到就沿用上次
     const parent = this.root.parent;
@@ -2292,7 +2302,7 @@ export class Viewmodel {
     // 否则枪都甩出画面了视野还是窄的 —— 玩家读到的是「视野卡住」而不是「在拉栓」。
     // 让相机读这条曲线（而不是自己另起一个定时器 snap 出去再 snap 回来），
     // 因果才是对的：**视野丢失是因为枪动了**，两者本来就该是同一条曲线。
-    this.adsSuppress = 1 - Clamp01(actionBlend * 1.4);
+    this.adsSuppress = (1 - Clamp01(actionBlend * 1.4)) * (1 - this.wallLower);
     const adsInput = Clamp01(input.ads ?? 0) * this.adsSuppress * (1 - sprint * 0.9);
 
     // --- 弹簧 ---------------------------------------------------------------
@@ -2393,14 +2403,7 @@ export class Viewmodel {
       + crouchValue * -0.012 + (1 - equip) * -0.26;
     let stateZ = jumpRise * 0.030 - jumpFall * 0.012 + crouchValue * 0.010;
     let stateRx = land * 0.16 - jumpRise * 0.13 + jumpFall * 0.09 + (1 - equip) * -0.55;
-    const wall = input.wallDistance;
-    if (wall != null && wall < 0.9) {
-      // 贴墙收枪：不做的话枪管会从墙那边捅出去，这是单场景视图模型唯一的解
-      const near = 1 - Clamp01((wall - 0.35) / 0.55);
-      stateRx += near * -0.60;
-      stateZ += near * 0.075;
-      stateY += near * -0.030;
-    }
+
     this.statePivot.position.set(0, stateY, stateZ);
     this.statePivot.rotation.set(stateRx, (1 - equip) * 0.35, (1 - equip) * -0.25, "YXZ");
 
@@ -2439,6 +2442,15 @@ export class Viewmodel {
       this.weaponMount.position.set(finalPose.px, finalPose.py, finalPose.pz);
       this.weaponMount.rotation.set(finalPose.rx, finalPose.ry, finalPose.rz, "YXZ");
     }
+
+    // Lower around the gripping hand, leaving the shoulders in place. The
+    // existing hand targets/IK follow this weapon layer automatically.
+    this.wallPivot.rotation.set(this.wallLower * WALL_CARRY.pitchRad, 0, 0);
+    const wallGrip = this.handBase.right;
+    this.wallAnchor.copy(wallGrip).applyQuaternion(this.wallPivot.quaternion);
+    this.wallPivot.position.copy(wallGrip).sub(this.wallAnchor);
+    this.wallPivot.position.y += this.wallLower * WALL_CARRY.downM;
+    this.wallPivot.position.z += this.wallLower * WALL_CARRY.backM;
 
     // --- FOV 补偿（世界 FOV 变了要重算）-------------------------------------
     if (Math.abs(worldFov - (this._lastWorldFov || 0)) > 0.05) {
