@@ -1300,7 +1300,16 @@ function BuildFromModel(materials, weapon, key, doc) {
   let boltHandleNode = null;
   if (mechanism) {
     const pivot = new THREE.Vector3().fromArray(mechanism.pivot);
-    boltProxy = SplitFpsMechanism(group,key,`VmBolt_${key}`,pivot,
+    const authoredHandle = built.nodes.get("boltHandle");
+    if (authoredHandle) {
+      const parent = new THREE.Group(); parent.name = `VmBolt_${key}Pivot`;
+      parent.position.copy(pivot); group.add(parent);
+      boltProxy = new THREE.Group(); boltProxy.name = `VmBolt_${key}`;
+      parent.add(boltProxy);
+      // The authored closed islands must move intact, including their socket.
+      group.updateMatrixWorld(true);
+      boltProxy.attach(authoredHandle);
+    } else boltProxy = SplitFpsMechanism(group,key,`VmBolt_${key}`,pivot,
       (p,name)=>name.endsWith("steel") && p.x>mechanism.cutX && Math.abs(p.z-pivot.z)<mechanism.width
         && p.y>Math.min(mechanism.handle[1],pivot.y)-0.015 && p.y<Math.max(mechanism.handle[1],pivot.y)+0.015);
     if (boltProxy) {
