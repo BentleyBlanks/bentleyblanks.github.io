@@ -71,13 +71,12 @@ export const HITMARK = Object.freeze({
 
 /** 来弹指示器（外圈那一段弧）的淡出。 */
 export const HITDIR = Object.freeze({
-  /** Built-in Imagegen: distressed crescent; local alpha PNG shared by every bearing. */
-  texture: "./Texture/Hud/Texture_HudDamageArc.png?v=20260911a",
+  /** Built-in Imagegen: thin distressed arc with a central spike; shared by every bearing. */
+  texture: "./Texture/Hud/Texture_HudDamageArc.png?v=20260913a",
   /** Registration in the -100..100 HUD viewBox; keep the sight center clear. */
   textureBox: Object.freeze({ x: -70, y: -85, size: 140 }),
-  /** Near fire keeps a split thin red crest; injury uses the solid blood arc. */
-  nearPath: "M-43,-55 Q-27,-70 -9,-73 M9,-73 Q27,-70 43,-55",
-  nearOpacity: 0.86,
+  /** A near miss deals no damage and is white; an injury keeps the texture's blood red. */
+  nearOpacity: 0.78,
   /** 剩余寿命乘这个数再夹到 1：前四分之一寿命满亮，之后才开始淡。 */
   fullBrightGain: 1.35,
   /** 满亮时的不透明度上限。指示器不许亮到抢准心。 */

@@ -814,10 +814,7 @@ export class Hud {
       texture.setAttribute("y", HITDIR.textureBox.y);
       texture.setAttribute("width", HITDIR.textureBox.size);
       texture.setAttribute("height", HITDIR.textureBox.size);
-      const crest = document.createElementNS(NS, "path");
-      crest.setAttribute("class", "hudNearCrest");
-      crest.setAttribute("d", HITDIR.nearPath);
-      node.append(texture, crest);
+      node.append(texture);
       svg.appendChild(node);
       this.hitDirNodes.push(node);
     }

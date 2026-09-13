@@ -68,18 +68,19 @@ try {
   });
   const near = await page.evaluate(() => {
     const T = window.Tengxian, el = document.querySelector(".hudHitDir.near");
-    const texture = el?.querySelector(".hudHitTexture"), crest = el?.querySelector(".hudNearCrest");
+    const texture = el?.querySelector(".hudHitTexture");
     return {hp:T.player.health,flash:T.player.hitFlash,kind:T.player.hitMarks[0]?.kind,
       angle:el?.getAttribute("transform"),opacity:el && +getComputedStyle(el).opacity,
       textureOpacity:texture && +getComputedStyle(texture).opacity,
-      crestDisplay:crest && getComputedStyle(crest).display,fill:crest && getComputedStyle(crest).fill,
-      stroke:crest && getComputedStyle(crest).stroke,filter:texture && getComputedStyle(texture).filter};
+      filter:texture && getComputedStyle(texture).filter,
+      extraPaths:el?.querySelectorAll("path").length ?? -1};
   });
   assert.equal(near.hp,100); assert.equal(near.flash,0); assert.equal(near.kind,"near");
-  assert.equal(near.angle,"rotate(90.0)"); assert.ok(near.opacity>.7); assert.equal(near.fill,"none");
-  assert.equal(near.crestDisplay,"block"); assert.ok(near.textureOpacity < .5);
-  assert.equal(near.stroke,"rgb(237, 80, 72)");
-  assert.ok(!near.filter.includes("grayscale"),"incoming attacks keep their red warning color");
+  assert.equal(near.angle,"rotate(90.0)"); assert.ok(near.opacity>.7);
+  assert.ok(near.textureOpacity > .6 && near.textureOpacity < .8);
+  assert.ok(near.filter.includes("brightness(0)") && near.filter.includes("invert(1)"),
+    "non-damaging incoming fire maps every visible texture pixel to white");
+  assert.equal(near.extraPaths,0,"the Imagegen central spike replaces the legacy SVG crest");
   await page.screenshot({path:path.join(output,"NearRight.png")});
   const hit = await page.evaluate(() => {
     const T = window.Tengxian, p = T.player;
@@ -91,11 +92,12 @@ try {
     return {hp:p.health,flash:p.hitFlash,marks:p.hitMarks.map(m=>({...m})),
       opacity:+getComputedStyle(el).opacity,
       textureOpacity:+getComputedStyle(el.querySelector(".hudHitTexture")).opacity,
-      crestDisplay:getComputedStyle(el.querySelector(".hudNearCrest")).display};
+      filter:getComputedStyle(el.querySelector(".hudHitTexture")).filter};
   });
   assert.ok(hit.hp<100 && hit.flash>.5); assert.equal(hit.marks.length,1);
   assert.equal(hit.marks[0].kind,"hit"); assert.ok(hit.opacity>.8);
-  assert.equal(hit.textureOpacity,1); assert.equal(hit.crestDisplay,"none");
+  assert.equal(hit.textureOpacity,1);
+  assert.ok(!hit.filter.includes("grayscale"),"damaging hits keep the generated blood-red artwork");
   await page.waitForTimeout(150); // Let the existing damage-vignette CSS transition settle.
   await page.screenshot({path:path.join(output,"HitRight.png")});
   const rotation = await page.evaluate(() => {

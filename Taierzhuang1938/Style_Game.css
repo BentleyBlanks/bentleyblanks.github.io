@@ -65,7 +65,8 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   72%      { opacity: 0.62; }
 }
 
-/* 来弹指示：五个方位复用同一纹理，转身只旋转 SVG 容器。 */
+/* 来弹指示：五个方位复用同一条带中心尖刺的纹理，转身只旋转 SVG 容器。
+   真实伤害保留素材的血红色；只有掠过、未掉血的来弹转成白色。 */
 .hudHitDirs {
   position: absolute; left: 50%; top: 50%;
   width: clamp(180px, 46vmin, 500px); aspect-ratio: 1;
@@ -73,15 +74,9 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   pointer-events: none; overflow: visible; z-index: 6;
 }
 .hudHitTexture { filter: drop-shadow(0 1px 1px rgba(19,2,3,0.5)); }
-.hudNearCrest { display: none; }
 .hudHitDir.near .hudHitTexture {
-  opacity: 0.36;
-  filter: drop-shadow(0 1px 1px rgba(19,2,3,0.7));
-}
-.hudHitDir.near .hudNearCrest {
-  display: block; fill: none; stroke: #ed5048;
-  stroke-width: 1.15; stroke-linecap: round;
-  filter: drop-shadow(0 1px 1px rgba(18,12,5,0.65));
+  opacity: 0.72;
+  filter: brightness(0) invert(1) drop-shadow(0 1px 1px rgba(0,0,0,0.82));
 }
 @media (prefers-reduced-motion: reduce) {
   .hudDamage.low::before { animation: none; opacity: 1; }
