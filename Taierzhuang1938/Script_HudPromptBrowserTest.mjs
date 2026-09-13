@@ -259,7 +259,8 @@ try {
   assert.equal(codObjective.updateFontSize, codObjective.fontSize, "两行应为 COD 式同级字号");
   assert.equal(codObjective.updateFontWeight, codObjective.fontWeight, "两行应为 COD 式同级字重");
   assert.ok(codObjective.left <= 12, `目标通知应贴近左上安全边，实际 left=${codObjective.left}`);
-  assert.ok(codObjective.top >= 10 && codObjective.top <= 18,
+  // 左上角帧率读数固定在 top:10px，目标通知整块下移一行（Style_Game.css .hudTop top:30px）。
+  assert.ok(codObjective.top >= 26 && codObjective.top <= 34,
     `目标通知纵向位置应贴近 COD 实机，实际 top=${codObjective.top}`);
   assert.equal(codObjective.force, "城中仍在坚守者：35 人");
   assert.equal(codObjective.forceFlashing, true);
