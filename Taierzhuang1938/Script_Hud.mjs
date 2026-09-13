@@ -237,6 +237,7 @@ export class Hud {
     this.el = {};
     this.minimapVisible = false;
     this.minimapDirty = 0;
+    this.fpsVisible = true;
     this.Build();
     this.noteQueue = [];
     this.noteTimer = 0;
@@ -339,6 +340,7 @@ export class Hud {
     // 左上角一个小帧率读数：只看性能，字号压到最小、不抢战场信息。
     this.el.fps = mk("hudFps");
     this.el.fps.textContent = "-- FPS";
+    this.SetFpsVisible(this.fpsVisible);
     this.el.top = mk("hudTop");
     this.el.phase = mk("hudPhase", this.el.top);
     this.el.objective = mk("hudObjective", this.el.top);
@@ -1496,7 +1498,24 @@ export class Hud {
    * 用 performance.now 自己量，不吃传进来的 dt —— 主循环那个 dt 被 clamp 到
    * 0.05（见 Script_Main），真掉到 12 fps 时它照样报 20，读数就没意义了。
    */
+  SetFpsVisible(on) {
+    this.fpsVisible = !!on;
+    if (this.el.fps) {
+      this.el.fps.hidden = !this.fpsVisible;
+      this.el.fps.setAttribute("aria-hidden", String(!this.fpsVisible));
+    }
+    if (!this.fpsVisible) {
+      this.fpsAccum = 0;
+      this.fpsFrames = 0;
+      this.fpsLast = 0;
+    }
+    return this.fpsVisible;
+  }
+
+  FpsVisible() { return this.fpsVisible; }
+
   UpdateFps(dt) {
+    if (!this.fpsVisible) return;
     if (!(dt > 0)) { this.fpsLast = 0; return; }           // 暂停时清掉基准，恢复后不把停顿算成一帧
     const now = performance.now();
     if (this.fpsLast === 0) { this.fpsLast = now; return; }

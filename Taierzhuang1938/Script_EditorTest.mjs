@@ -93,6 +93,21 @@ await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeo
 // ---------------------------------------------------------------------------
 const gearVisible = await page.isVisible(".edGear");
 Check("齿轮按钮在", gearVisible);
+const gearPresentation = await page.evaluate(() => {
+  const gear = document.querySelector(".edGear");
+  const style = getComputedStyle(gear);
+  return {
+    text: gear.textContent,
+    label: gear.getAttribute("aria-label"),
+    width: gear.getBoundingClientRect().width,
+    backgroundImage: style.backgroundImage,
+  };
+});
+Check("右上入口改为同风格图标并保留无障碍名称",
+  gearPresentation.text === "" && gearPresentation.label === "设置与工具"
+    && gearPresentation.width <= 42
+    && gearPresentation.backgroundImage.includes("Icon_SettingsTools.png"),
+  JSON.stringify(gearPresentation));
 
 await page.click(".edGear");
 const byGear = await page.evaluate(() => window.Taierzhuang.Debug.Editor().panelOpen);
@@ -117,6 +132,31 @@ Check("打游戏当中按 ` 弹出入口面板", afterGear.panelOpen && afterGea
 // 三个设置 + 四个可叠加（渲染调试/性能剖析/WorldInfo/敌军 AI）+ 十六个编辑器（含小队行进）
 // + 一个「全部关掉」（它的 data-editor 是空串，也被选择器数进来）
 Check("面板列出设置、调试与全部编辑器入口", afterGear.entries === 24 && afterGear.squadMarch, `按钮数=${afterGear.entries}，小队行进=${afterGear.squadMarch}`);
+const fpsDefault = await page.evaluate(() => {
+  const fps = document.querySelector(".hudFps");
+  const toggle = document.querySelector('[data-action="fps"]');
+  const rect = fps.getBoundingClientRect();
+  return {
+    hidden: fps.hidden,
+    left: rect.left,
+    top: rect.top,
+    pressed: toggle?.getAttribute("aria-pressed"),
+    label: toggle?.textContent,
+  };
+});
+Check("FPS 默认显示在左上角且调试开关同步为开启",
+  !fpsDefault.hidden && fpsDefault.left <= 12 && fpsDefault.top <= 12
+    && fpsDefault.pressed === "true" && fpsDefault.label === "FPS 显示：开",
+  JSON.stringify(fpsDefault));
+await page.click('[data-action="fps"]');
+const fpsHidden = await page.evaluate(() => ({
+  hidden: document.querySelector(".hudFps").hidden,
+  pressed: document.querySelector('[data-action="fps"]').getAttribute("aria-pressed"),
+}));
+Check("调试开关可隐藏 FPS 并同步状态", fpsHidden.hidden && fpsHidden.pressed === "false",
+  JSON.stringify(fpsHidden));
+await page.click('[data-action="fps"]');
+Check("调试开关可恢复 FPS", await page.isVisible(".hudFps"));
 
 // 玩法真的停了：推 60 帧，state.elapsed 只应该被编辑器那条分支加，AI 不许再动
 const paused = await page.evaluate(() => {

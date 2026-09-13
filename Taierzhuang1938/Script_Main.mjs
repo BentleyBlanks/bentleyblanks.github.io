@@ -2804,6 +2804,8 @@ async function Boot() {
     game: {
       // gi 走取值器：惰性构造后 Debug Rendering 面板才能看见新建的探针体
       state, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics, autoQuality,
+      GetFpsVisible: () => hud.FpsVisible(),
+      SetFpsVisible: (on) => hud.SetFpsVisible(on),
       // 材质着色升级那一包：Debug Rendering 的「材质细节」组按它设假彩色编号。
       materialShading: shadingUniforms,
       get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },

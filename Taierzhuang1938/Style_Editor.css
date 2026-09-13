@@ -19,15 +19,17 @@
 /* --- 齿轮按钮 ------------------------------------------------------------ */
 .edGear {
   position: absolute; top: 14px; right: 14px;
-  min-width: 104px; height: 34px; padding: 0 12px; border-radius: 0;
+  width: 40px; min-width: 40px; height: 34px; padding: 0; border-radius: 0;
   pointer-events: auto; cursor: pointer;
-  background: var(--ui-black);
+  background-color: var(--ui-black);
+  background-image: url("./Texture/Hud/Icon_SettingsTools.png?v=202609140500");
+  background-position: center; background-repeat: no-repeat; background-size: 27px 27px;
   border: 1px solid rgba(214, 217, 209, 0.28);
   color: var(--ui-text);
-  font: 700 12px/32px var(--ui-font); letter-spacing: 0.04em; text-align: center;
+  font-size: 0; text-align: center;
   transition: background 0.15s linear, border-color 0.15s linear;
 }
-.edGear:hover { background: var(--ui-selection); border-color: rgba(223, 189, 104, 0.7); }
+.edGear:hover { background-color: #151818; border-color: rgba(223, 189, 104, 0.7); }
 .edGear.on { border-color: var(--ui-gold); color: var(--ui-gold); }
 
 /* --- 面板 ---------------------------------------------------------------- */

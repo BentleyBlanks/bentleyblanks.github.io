@@ -83,6 +83,7 @@ export class EditorSuite {
     this.overlays = new Map();
     this.panelOpen = false;
     this.entries = new Map();
+    this.fpsToggle = null;
     // 场景关卡与地形是两个入口，但编辑的是同一份叠加文档。只放在本 EditorSuite
     // 会话内：切换工具不丢未保存改动，真正退出工具后运行时场景仍会清干净。
     this.worldEditDocument = null;
@@ -167,9 +168,10 @@ export class EditorSuite {
     };
     root.addEventListener("keydown", NativeActivation);
 
-    const gear = El("button", "edGear", "设置 · 工具");
+    const gear = El("button", "edGear");
     gear.type = "button";
     gear.title = "设置与工具（`）";
+    gear.setAttribute("aria-label", "设置与工具");
     gear.addEventListener("click", () => this.TogglePanel());
     root.appendChild(gear);
     this.gear = gear;
@@ -212,6 +214,7 @@ export class EditorSuite {
       }
       section.appendChild(box);
       body.appendChild(section);
+      return box;
     };
     if (this.host.ReturnToMainMenu) {
       const section = El("div", "edSection");
@@ -230,7 +233,17 @@ export class EditorSuite {
       body.appendChild(section);
     }
     Group("设置", SETTINGS);
-    Group("调试", OVERLAYS);
+    const debugGroup = Group("调试", OVERLAYS);
+    this.fpsToggle = El("button", "edBtn wide", "显示 FPS");
+    this.fpsToggle.type = "button";
+    this.fpsToggle.dataset.action = "fps";
+    this.fpsToggle.title = "显示或隐藏左上角实时帧率";
+    this.fpsToggle.addEventListener("click", () => {
+      const current = this.host.game.GetFpsVisible?.() ?? true;
+      this.host.game.SetFpsVisible?.(!current);
+      this.RefreshFpsToggle();
+    });
+    debugGroup.appendChild(this.fpsToggle);
     Group("编辑器", EDITORS);
 
     const off = El("button", "edBtn wide danger", "全部关掉");
@@ -265,12 +278,21 @@ export class EditorSuite {
     this.cross.classList.toggle("calibration", !!on && mode === "calibration");
   }
 
+  RefreshFpsToggle() {
+    if (!this.fpsToggle) return;
+    const on = this.host.game.GetFpsVisible?.() ?? true;
+    this.fpsToggle.classList.toggle("on", on);
+    this.fpsToggle.setAttribute("aria-pressed", String(on));
+    this.fpsToggle.textContent = on ? "FPS 显示：开" : "FPS 显示：关";
+  }
+
   RefreshStatus() {
     document.body.classList.toggle("edToolsOpen", this.panelOpen);
     for (const [id, button] of this.entries) {
       button.classList.toggle("on", id === this.activeId || this.overlays.has(id));
     }
     if (this.gear) this.gear.classList.toggle("on", this.Capturing);
+    this.RefreshFpsToggle();
     // 暂停 = 背景层也得停。玩法停了声音不停是两条独立的通道：
     // 环境床是一张自己在跑的 WebAudio 图 + 一个 400 ms 的调度器，
     // Frame() 提前返回一点也拦不住它（见 Script_Audio.SetPaused 的账）。
