@@ -100,7 +100,13 @@ export const MOVE = Object.freeze({
 /** 体力：只有冲刺、快速匍匐、屏息、下水与起跳会花它。 */
 export const STAMINA = Object.freeze({
   regenPerS: 0.13,
-  sprintMin: 0.05,            // 低于这个值冲刺 / 快速匍匐不成立
+  // 冲刺 / 快速匍匐的下限。代码实际取 max(sprintMin, 满助跑一跳的体力)：
+  // 冲刺永远给起跳留一口气。原来冲刺能把体力磨到 0.05、而起跳要 0.08，
+  // 按住 Shift 跑满 7 秒以后体力就钉在 0.05 上下（跑一帧、回一帧），空格一直没反应。
+  sprintMin: 0.05,
+  // 冲刺跑空之后，体力回到这里才重新让跑。没有这道回差，按住 Shift 会在
+  // 下限两侧逐帧切换，跑步节奏抖成半速，体力也回不到起跳线以上。
+  sprintResume: 0.3,
   breathHoldMin: 0.1,
   breathHoldAds: 0.6,         // 开镜到这个程度以上屏息才有意义
   breathHoldDrainPerS: 0.28,

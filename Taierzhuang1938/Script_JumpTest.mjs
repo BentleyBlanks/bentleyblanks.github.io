@@ -130,6 +130,56 @@ try {
   Check("助跑加成压在自动翻越判据附近，不许变成跑酷",
     run.sprint.rise < 0.75 && run.sprint.air < 0.62,
     `冲刺跳抬高 ${run.sprint.rise.toFixed(3)} m / 滞空 ${run.sprint.air.toFixed(3)} s`);
+  // 长按 Shift 冲刺时空格经常没反应（用户报的那条）。两处原因各守一条：
+  //   · 冲刺能把体力磨到 0.05，而起跳要 0.08 —— 跑满七八秒后体力钉在两者之间，
+  //     一直按住 Shift 就再也跳不起来；
+  //   · 落地硬直 0.16 s 比输入缓冲 0.12 s 长，落地前后按下的空格必然在硬直里过期。
+  // 上面几条用例每跳一次都把体力重置成 1，所以这两条从来没被测到。
+  const sprintHeld = await page.evaluate(() => {
+    const T = window.Taierzhuang, D = T.Debug;
+    T.player.Spawn(0, 60, 0);
+    T.StepFrames(20);
+    T.player.stamina = 1;
+    D.Key("KeyW", true); D.Key("ShiftLeft", true);
+    let minStamina = 1;
+    for (let i = 0; i < 12 * 60; i += 1) {
+      T.player.yaw += (i % 240 < 120 ? 1 : -1) * 0.01;
+      T.StepFrames(1);
+      minStamina = Math.min(minStamina, T.player.stamina);
+    }
+    const staminaAtPress = T.player.stamina;
+    const sprintAtPress = T.player.sprint;
+    const c0 = D.Jump().count + D.Vault().count;
+    D.Key("Space");
+    T.StepFrames(40);
+    const took = D.Jump().count + D.Vault().count - c0;
+    D.Key("KeyW", false); D.Key("ShiftLeft", false);
+    T.StepFrames(30);
+
+    // 落地硬直里按空格：人已落地、还没接住重心，这一下要等硬直结束后起跳
+    T.player.Spawn(0, 60, 0);
+    T.StepFrames(20);
+    T.player.stamina = 1;
+    D.Key("Space");
+    let landed = false;
+    for (let i = 0; i < 90 && !landed; i += 1) {
+      T.StepFrames(1);
+      landed = D.Jump().count > 0 && !!D.Jump().grounded && T.player.jump.cooldown > 0.05;
+    }
+    const landCooldown = T.player.jump.cooldown;
+    const j0 = D.Jump().count;
+    D.Key("Space");
+    T.StepFrames(30);
+    return { minStamina, staminaAtPress, sprintAtPress, took, landed, landCooldown, landAdded: D.Jump().count - j0 };
+  });
+  Check("按住 Shift 冲刺十二秒后空格照样起跳",
+    sprintHeld.took === 1 && sprintHeld.minStamina >= 0.08,
+    `起跳/翻越 +${sprintHeld.took} / 按下时体力 ${sprintHeld.staminaAtPress.toFixed(3)}`
+      + `（全程最低 ${sprintHeld.minStamina.toFixed(3)}）/ 冲刺量 ${sprintHeld.sprintAtPress.toFixed(2)}`);
+  Check("落地硬直里按下的空格不丢，硬直结束后起跳",
+    sprintHeld.landed && sprintHeld.landAdded === 1,
+    `按下时硬直 ${sprintHeld.landCooldown.toFixed(3)} s / 起跳 +${sprintHeld.landAdded}`);
+
   // 腾空时鼠标必须能转视线，而且要全额落在视线上（枪口偏移不许把它吃掉）。
   // 当前三档难度的 freeAimDeg 都是 0，自由瞄准锥事实上是关的；这条用例守的是
   // "锥重新打开时腾空不许退回枪先动"——Script_Player 里那条 !grounded 直跟。
@@ -519,7 +569,7 @@ try {
 }
 
 if (failures.length) {
-  console.error(`\n跳跃专项：${16 - failures.length}/16 过；失败：${failures.join("、")}`);
+  console.error(`\n跳跃专项：${18 - failures.length}/18 过；失败：${failures.join("、")}`);
   process.exit(1);
 }
 console.log("\n跳跃专项全过。");

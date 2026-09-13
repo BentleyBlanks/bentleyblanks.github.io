@@ -160,6 +160,7 @@ export class PlayerController {
     // 偏移在 SyncCamera 最后一步叠上去，不改 yaw/pitch 本体。
     this.shake = new CameraShake();
     this.stamina = 1;
+    this.sprintSpent = false;               // 冲刺跑空、还没回到 STAMINA.sprintResume
     // 只由 Script_DebugOptions 经装配层写入。默认全关，保持正式玩法完全不变。
     this.debug = { noCollision: false, fastMove: false, invincible: false };
 
@@ -244,6 +245,7 @@ export class PlayerController {
     this.suppression = 0;
     this.suppressedUpright = false;
     this.stamina = 1;
+    this.sprintSpent = false;
     this.hitFlash = 0;
     this.hitDisorientationTime = 0;
     this.hitDisorientationStrength = 0;
@@ -454,13 +456,16 @@ export class PlayerController {
 
   /**
    * 空地跳跃。翻越探测由调用方先做；这里只有「现在能不能离地」这一条规则。
-   * 已经在半空时会留下 120 ms 的输入缓冲，落地前略早按下也不会丢键。
+   * 已经在半空、或者刚落地还在落地硬直里时，会留下 120 ms 的输入缓冲，
+   * 落地前后略早按下也不会丢键（硬直期间缓冲不走表，见 Update 开头）。
    * @returns {boolean} 这一刻是否真的起跳
    */
   TryJump() {
     if (!this.alive || this.vault.active || this.InWater || this.stance === "prone") return false;
-    if (this.jump.cooldown > 0 || this.stamina < JUMP.stamina) return false;
-    if (!this.grounded && this.jump.coyote <= 0) {
+    if (this.stamina < JUMP.stamina) return false;
+    // 冷却也要进缓冲：原来冷却里按下直接 return，边跑边连跳时落地后那 0.16 s
+    // 里按的空格整个被吞掉。
+    if ((!this.grounded && this.jump.coyote <= 0) || this.jump.cooldown > 0) {
       this.jump.buffer = JUMP.bufferS;
       return false;
     }
@@ -541,8 +546,14 @@ export class PlayerController {
 
     this.jump.cooldown = Math.max(0, this.jump.cooldown - dt);
     if (this.jump.buffer > 0) {
-      this.jump.buffer = Math.max(0, this.jump.buffer - dt);
-      if (this.grounded && this.jump.cooldown <= 0) this.TryJump();
+      if (this.grounded && this.jump.cooldown <= 0) {
+        this.jump.buffer = 0;                 // 先清：体力不够时 TryJump 不会再挂回缓冲
+        this.TryJump();
+      } else if (!this.grounded) {
+        // 已经落地、只在等落地硬直（landCooldownS 0.16 s）时缓冲不走表。
+        // 硬直比缓冲（0.12 s）长，走表的话落地前按下的那一下必然在硬直里过期。
+        this.jump.buffer = Math.max(0, this.jump.buffer - dt);
+      }
     }
 
     // --- 视角与自由瞄准 -----------------------------------------------------
@@ -666,8 +677,13 @@ export class PlayerController {
     this.ads = Clamp01(this.ads);
     // 卧姿按住 Shift = 快速匍匐（ER2 有匍匐速度档）。它不是冲刺：不进 sprint 弹簧，
     // 只把速度从 0.72 提到 1.25，并把脚步声放大 —— 快就得响，这是一对取舍。
-    this.fastCrawl = !!input.sprint && this.stance === "prone" && this.stamina > STAMINA.sprintMin;
-    const canSprint = input.sprint && this.stamina > STAMINA.sprintMin && this.ads < 0.25
+    // 冲刺下限至少留够一次满助跑起跳；跑空之后要回到 sprintResume 才重新让跑（回差）。
+    // 两条的账在 Data_Tuning_Player.STAMINA 的注释里。每帧从表取，热改表才生效。
+    const sprintFloor = Math.max(STAMINA.sprintMin, JUMP.stamina * (1 + JUMP.runStamina));
+    if (this.stamina <= sprintFloor) this.sprintSpent = true;
+    else if (this.stamina >= STAMINA.sprintResume) this.sprintSpent = false;
+    this.fastCrawl = !!input.sprint && this.stance === "prone" && !this.sprintSpent;
+    const canSprint = input.sprint && !this.sprintSpent && this.ads < 0.25
       && this.stance === "stand" && input.forward > 0.3 && !loaded;
     this.sprint += ((canSprint ? 1 : 0) - this.sprint) * (1 - Math.exp(-dt * MOVE.sprintRate));
     // 冲刺时长挂难度：staminaSeconds 就是"从满到空能跑几秒"。

@@ -795,6 +795,9 @@ let debugEmplacedFire = false;
 let seatStanceBefore = null;
 /** 上一帧占着哪一挺；用来认出「刚下枪位」那一个边沿。 */
 let mountedIdLast = null;
+/** 起跳声按 player.jump.count 的增量播：空格当场起跳与缓冲到落地后才起跳是同一声。 */
+let jumpSoundPlayer = null;
+let jumpSoundCount = 0;
 /** 机枪位的世界模型：id -> { root, nodes }。摆点建、换关拆。 */
 const emplacementViews = new Map();
 let identify = null;
@@ -6563,8 +6566,17 @@ function DoTraverse() {
     return traverse;
   }
   if (!player.TryJump()) return false;
-  audio.Play("footstepDirt", { volume: 0.34 });
+  SyncJumpSound();
   return "jump";
+}
+
+/** 起跳声。缓冲起跳发生在 player.Update 里，不经过 DoTraverse，所以按计数增量播。 */
+function SyncJumpSound() {
+  if (!player) return;
+  if (jumpSoundPlayer !== player) { jumpSoundPlayer = player; jumpSoundCount = player.jump.count; return; }
+  if (player.jump.count <= jumpSoundCount) return;
+  jumpSoundCount = player.jump.count;
+  audio.Play("footstepDirt", { volume: 0.34 });
 }
 
 /**
@@ -7688,6 +7700,7 @@ function Frame(dt, render = true) {
       || !!state.cooking || !!meleeCombat?.Blocking
       || ["reload", "melee", "meleeWind", "fixBayonet", "throw"].includes(viewmodel.action?.kind),
   });
+  SyncJumpSound();
   movementRange?.Update(dt);
   goreRange?.Update(dt);
   profiler.E("player");
