@@ -7354,7 +7354,7 @@ function TryFire(dt, returningGrenade = false) {
   } else if (shot.wall) {
     const n = new THREE.Vector3(shot.wall.normal[0], shot.wall.normal[1], shot.wall.normal[2]);
     const surface = SURFACE_BY_TAG[shot.wall.box.tag] || "brick";
-    vfx.Impact(_hitPoint, n, surface);
+    vfx.Impact(_hitPoint, n, surface, { weaponKind: weapon.kind });
     audio.Play(IMPACT_CUE[surface] || "impactBrick", { position: _hitPoint.clone(), volume: 0.55 });
     // 跳弹：打在硬面上四分之一的概率削飞出去。种子跟着射击序号走（不是 Math.random）——
     // 逐轮录音比对要可复现，与曳光按 playerShots 取模是同一条理由。
@@ -7413,7 +7413,7 @@ function FireVehicleBullet(from,direction,{weaponId="Type11",damageScale=1,sourc
   else if(result.soldier){result.soldier.TakeHit(weapon.damage*damageScale,result.part,direction,
     {kind:"hmg",shapeId:result.shape?.id||null,weaponId,point:end.clone()});
     if(result.part==="head")vfx.HeadshotBlood(end,direction,result.soldier);else vfx.Blood(end,direction,.5);}
-  else if(result.wall){const normal=new THREE.Vector3(...result.wall.normal);vfx.Impact(end,normal,SURFACE_BY_TAG[result.wall.box?.tag]||"dirt");}
+  else if(result.wall){const normal=new THREE.Vector3(...result.wall.normal);vfx.Impact(end,normal,SURFACE_BY_TAG[result.wall.box?.tag]||"dirt",{weaponKind:weapon.kind});}
   return {hit:result.soldier===playerTarget?"player":result.soldier?.missionId||null,wall:result.wall?.box?.tag||null,end:end.toArray()};
 }
 function FireEmplacedShot(shot) {
@@ -7468,7 +7468,7 @@ function FireEmplacedShot(shot) {
   } else if (result.wall) {
     const n = new THREE.Vector3(result.wall.normal[0], result.wall.normal[1], result.wall.normal[2]);
     const surface = SURFACE_BY_TAG[result.wall.box.tag] || "brick";
-    vfx.Impact(_hitPoint, n, surface);
+    vfx.Impact(_hitPoint, n, surface, { weaponKind: mountedWeapon.kind });
     audio.Play(IMPACT_CUE[surface] || "impactBrick", { position: _hitPoint.clone(), volume: 0.5 });
     audioWiring.Ricochet(_hitPoint, surface, shot.index);
     if (destruction && result.wall.box && result.wall.box.tag !== "dirt") {

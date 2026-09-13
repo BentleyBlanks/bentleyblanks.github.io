@@ -238,7 +238,7 @@ export function MakeAircraftStrafeHost(deps = {}) {
       if (!deps.vfx) return;
       at.set(point.x, point.y, point.z);
       normal.set(n.x, n.y, n.z);
-      deps.vfx.Impact(at, normal, surface);
+      deps.vfx.Impact(at, normal, surface, { weaponKind: "hmg" });
     },
     GroundHeight: (x, z) => deps.battlefield?.()?.GroundHeight(x, z) ?? 0,
     CanHitPlayer: origin => {

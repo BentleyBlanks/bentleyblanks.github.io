@@ -129,6 +129,24 @@ const VEFECTS_MASKS = {
 // 从两张 imagegen 源图打包而成（来源见 _import/Data_SourceLicenses.md）。
 const MARKER_TEXTURE = "./Texture/Texture_IncomingMarker_01.webp";
 
+// 三格 PBR 弹痕图集：0/1 是普通枪弹随机组，2 固定给轻、重机枪。
+// Base 带透明度；Normal 是切线空间法线；ORM = AO / Roughness / Metallic。
+const BULLET_DECAL_TEXTURES = Object.freeze({
+  base: "./Texture/Texture_BulletImpactPbrAtlasBase.webp",
+  normal: "./Texture/Texture_BulletImpactPbrAtlasNormal.webp",
+  orm: "./Texture/Texture_BulletImpactPbrAtlasOrm.webp",
+});
+const BULLET_DECAL_UNIFORMS = Object.freeze({
+  base: "uDecalBaseMap", normal: "uDecalNormalMap", orm: "uDecalOrmMap",
+});
+
+/** 0/1 = 普通枪随机双变体；2 = 机枪专用变体。 */
+export function SelectBulletDecalVariant(weaponKind = "rifle", roll = 0.5) {
+  if (weaponKind === "lmg" || weaponKind === "hmg") return 2;
+  const r = Math.min(0.999999, Math.max(0, Number(roll) || 0));
+  return r < 0.5 ? 0 : 1;
+}
+
 /** 可供关卡编辑器与独立预览器布设的持续场景特效。 */
 export const SCENE_EFFECTS = Object.freeze({
   FireSmall: {
@@ -230,6 +248,9 @@ varying vec3 vLitNormal;
 #ifdef SHAPE_DECAL
 varying float vRays;       // 放射断口线的强度：弹孔 1、爆炸焦痕 0
 varying float vDecalSize;  // 深度裁边容差要随贴花尺寸增长；焦痕比弹孔跨过更多地表起伏
+varying vec3 vDecalTangent;
+varying vec3 vDecalBitangent;
+varying vec3 vDecalWorldPosition;
 #endif
 #ifdef LIT
 varying vec3 vViewDir;     // 世界空间视线（相机 -> 粒子），前向散射要用
@@ -300,6 +321,10 @@ void main() {
   #ifdef LIT_SURFACE
     vLitNormal = n;
   #endif
+  #ifdef SHAPE_DECAL
+    vDecalTangent = tx * ca + ty * sa;
+    vDecalBitangent = -tx * sa + ty * ca;
+  #endif
 #elif defined(ORIENT_STRETCH)
   // 沿飞行方向拉长：曳光弹与火星。头在 corner.x = +1 处。
   vec3 toCam = cameraPosition - world;
@@ -337,6 +362,7 @@ void main() {
 #ifdef SHAPE_DECAL
   vRays = iExtra.x;        // iExtra 是顶点属性，片元拿不到，得靠 varying 递过去
   vDecalSize = size;
+  vDecalWorldPosition = finalPos;
 #endif
 
   // fadeIn 是"占寿命的比例"。贴花寿命是 1e5 秒，任何非零比例都会变成几十秒才浮现，
@@ -390,6 +416,12 @@ uniform sampler2D uMaskMap;      // Vefects 火/烟轮廓；只给常驻场景�
 uniform sampler2D uMaskNoiseMap; // Vefects 流动噪声；UV 平移与侵蚀共用
 uniform sampler2D uMaskNoiseDetailMap;
 uniform float uMaskEmission;
+#ifdef SHAPE_DECAL
+uniform sampler2D uDecalBaseMap;
+uniform sampler2D uDecalNormalMap;
+uniform sampler2D uDecalOrmMap;
+uniform float uDecalReady;
+#endif
 uniform float uTime;
 uniform vec3 uSunDirection;
 uniform vec3 uSunColor;
@@ -413,6 +445,9 @@ varying vec3 vLitNormal;
 #ifdef SHAPE_DECAL
 varying float vRays;       // 放射断口线的强度：弹孔 1、爆炸焦痕 0
 varying float vDecalSize;
+varying vec3 vDecalTangent;
+varying vec3 vDecalBitangent;
+varying vec3 vDecalWorldPosition;
 #endif
 #ifdef SHAPE_MARKER
 uniform vec3 uMarkerSoil;  // 焦土颗粒色（受光）
@@ -428,6 +463,12 @@ void main() {
   float d = length(p);
   float mask = 0.0;
   vec3 color = vColor;
+#ifdef SHAPE_DECAL
+  vec3 decalSurfaceNormal = normalize(vLitNormal);
+  float decalAo = 1.0;
+  float decalRoughness = 0.92;
+  float decalMetalness = 0.0;
+#endif
 
 #if defined(SHAPE_BLOODMIST)
   vec2 flow=vec2(vSeed*37.0,vSeed*19.0);
@@ -518,17 +559,32 @@ void main() {
   color = stack / max(alphaAll, 1e-4);
   mask = alphaAll;
 #elif defined(SHAPE_DECAL)
-  // 弹孔：暗芯 + 比墙面亮 1—2 档的砖芯环 + 放射白线（考据里的"新弹痕断口"）
-  float a = atan(p.y, p.x);
-  float n = Vnoise(p * 4.0 + vec2(vSeed * 13.0, 3.0));
-  float hole = smoothstep(0.46 + 0.06 * n, 0.16, d);
-  float rim = smoothstep(0.26, 0.5, d) * smoothstep(0.86, 0.5, d);
-  // iExtra.x 在贴花池里当"放射线强度"用：弹孔要那圈断口白线，
-  // 爆炸焦痕放大到几米之后同一套线会变成一个卡通星号，所以给 0。
-  float rays = pow(abs(sin(a * 6.0 + vSeed * 31.0)), 9.0) * smoothstep(0.95, 0.3, d) * vRays;
-  mask = hole * 0.95 + rim * 0.5 + rays * 0.35;
-  // 贴花不老化，vColor 恒等于 colorA（断口色），暗芯色只能从 colorB 单独取
-  color = mix(vColor, vColorAlt, hole);
+  if (uDecalReady > 0.5) {
+    // 三格图集由 iExtra.w / vFrame 选格；普通枪只会落 0/1，机枪固定 2。
+    vec2 atlasUv = vec2((p.x * 0.5 + 0.5 + clamp(floor(vFrame + 0.5), 0.0, 2.0)) / 3.0,
+      p.y * 0.5 + 0.5);
+    vec4 base = texture2D(uDecalBaseMap, atlasUv);
+    vec3 tangentNormal = texture2D(uDecalNormalMap, atlasUv).xyz * 2.0 - 1.0;
+    vec3 orm = texture2D(uDecalOrmMap, atlasUv).rgb;
+    float fracture = dot(base.rgb, vec3(0.2126, 0.7152, 0.0722));
+    mask = base.a;
+    color = mix(vColorAlt * 0.72, vColor * 1.55, smoothstep(0.08, 0.86, fracture));
+    decalSurfaceNormal = normalize(vDecalTangent * tangentNormal.x
+      + vDecalBitangent * tangentNormal.y + normalize(vLitNormal) * tangentNormal.z);
+    decalAo = orm.r;
+    decalRoughness = orm.g;
+    decalMetalness = orm.b;
+  } else {
+    // 贴图尚未到位时保留原程序化弹孔；异步加载不能造成第一发无痕。
+    float a = atan(p.y, p.x);
+    float n = Vnoise(p * 4.0 + vec2(vSeed * 13.0, 3.0));
+    float hole = smoothstep(0.46 + 0.06 * n, 0.16, d);
+    float rim = smoothstep(0.26, 0.5, d) * smoothstep(0.86, 0.5, d);
+    float rays = pow(abs(sin(a * 6.0 + vSeed * 31.0)), 9.0)
+      * smoothstep(0.95, 0.3, d) * vRays;
+    mask = hole * 0.95 + rim * 0.5 + rays * 0.35;
+    color = mix(vColor, vColorAlt, hole);
+  }
 #elif defined(SHAPE_SPRITE)
   // 序列帧火球。旧的 16 帧 CC0 图只提供形状，仍由台儿庄色板着色；Unity Labs
   // 三套 CC0 flipbook 自带火与烟的颜色，保留原色，并只把亮焰抬进 HDR 泛光。
@@ -578,7 +634,19 @@ void main() {
   lit += uSunColor * forward * 0.55 * (1.0 - mask * 0.75);
   color *= lit;
 #endif
-#if defined(LIT_SURFACE) && !defined(SHAPE_MARKER)
+#ifdef SHAPE_DECAL
+  // 与 MeshStandardMaterial 同口径的介质响应：AO 压环境光，粗糙度控制窄高光，
+  // 贴图法线只扰动断口微表面，不改变贴花几何或深度裁边。
+  float decalNdl = max(dot(decalSurfaceNormal, uSunDirection), 0.0);
+  vec3 decalView = normalize(cameraPosition - vDecalWorldPosition);
+  vec3 decalHalf = normalize(uSunDirection + decalView);
+  float decalSpecPower = mix(110.0, 7.0, decalRoughness);
+  float decalSpec = pow(max(dot(decalSurfaceNormal, decalHalf), 0.0), decalSpecPower)
+    * (1.0 - decalRoughness) * 0.24;
+  vec3 decalLit = uSkyColor * mix(0.48, 1.0, decalAo) + uSunColor * decalNdl;
+  color = color * decalLit * mix(0.58, 1.0, decalAo)
+    + uSunColor * decalSpec * mix(0.04, 1.0, decalMetalness);
+#elif defined(LIT_SURFACE) && !defined(SHAPE_MARKER)
   // 贴面的东西（弹孔、贴地尘环）必须跟它趴着的那个面一起明暗。一张恒定色的贴片
   // 在太阳底下永远比墙暗 —— 考据要的"新弹痕断口比墙面亮 1—2 档"就永远做不出来。
   // 预警准星自己分层打光（尘/焦土受光、亮线自发光），不走这一乘。
@@ -873,6 +941,10 @@ class ParticlePool {
         uMaskNoiseMap: { value: config.mask?.noise ?? shared.uMaskNoiseMap.value },
         uMaskNoiseDetailMap: { value: config.mask?.detailNoise ?? shared.uMaskNoiseDetailMap.value },
         uMaskEmission: { value: config.mask?.emission ?? 1 },
+        uDecalBaseMap: { value: config.decal?.base ?? shared.uDecalBaseMap.value },
+        uDecalNormalMap: { value: config.decal?.normal ?? shared.uDecalNormalMap.value },
+        uDecalOrmMap: { value: config.decal?.orm ?? shared.uDecalOrmMap.value },
+        uDecalReady: { value: config.decal?.ready ?? 0 },
         // 预警准星池的三个分层色；其余池的着色器里没有这几个 uniform，three 不会上传。
         uMarkerSoil: { value: new THREE.Vector3(...(config.marker?.soil ?? [0, 0, 0])) },
         uMarkerDust: { value: new THREE.Vector3(...(config.marker?.dust ?? [0, 0, 0])) },
@@ -1317,6 +1389,12 @@ export class VfxSystem {
     this.maskTransparentPlaceholder = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1);
     this.maskTransparentPlaceholder.colorSpace = THREE.NoColorSpace;
     this.maskTransparentPlaceholder.needsUpdate = true;
+    this.decalNormalPlaceholder = new THREE.DataTexture(new Uint8Array([128, 128, 255, 255]), 1, 1);
+    this.decalNormalPlaceholder.colorSpace = THREE.NoColorSpace;
+    this.decalNormalPlaceholder.needsUpdate = true;
+    this.decalOrmPlaceholder = new THREE.DataTexture(new Uint8Array([255, 255, 0, 255]), 1, 1);
+    this.decalOrmPlaceholder.colorSpace = THREE.NoColorSpace;
+    this.decalOrmPlaceholder.needsUpdate = true;
 
     this.shared = {
       uTime: { value: 0 },
@@ -1333,6 +1411,9 @@ export class VfxSystem {
       uMaskMap: { value: this.maskTransparentPlaceholder },
       uMaskNoiseMap: { value: this.spritePlaceholder },
       uMaskNoiseDetailMap: { value: this.spritePlaceholder },
+      uDecalBaseMap: { value: this.spriteTransparentPlaceholder },
+      uDecalNormalMap: { value: this.decalNormalPlaceholder },
+      uDecalOrmMap: { value: this.decalOrmPlaceholder },
       uSunDirection: { value: new THREE.Vector3(0.32, 0.62, -0.72).normalize() },
       // 默认值对齐 LightRig 的 smokyDay：平行光 5.4，漫反射出射亮度约 I/π ≈ 1.7。
       // 这里给小了的话，碎块和烟会比同一场景里的 PBR 物体暗一大截，一眼假。
@@ -1433,6 +1514,12 @@ export class VfxSystem {
         shape: "decal", orient: "normal", blending: THREE.NormalBlending,
         litSurface: true, softRange: 0, renderOrder: 3, polygonOffset: true,
         preserveTargetAlpha: true,
+        decal: {
+          base: this.spriteTransparentPlaceholder,
+          normal: this.decalNormalPlaceholder,
+          orm: this.decalOrmPlaceholder,
+          ready: 0,
+        },
       }, this.shared),
     };
     this.bloodEffects = new BloodEffects({root:this.root,shared:this.shared,lights,quality:this.quality,
@@ -1455,6 +1542,28 @@ export class VfxSystem {
     this.loadedExplosionSprites = new Set();
     this.lastExplosionSprite = null;
     const textureLoader = new THREE.TextureLoader();
+
+    // 三张图同时到位才切换到 PBR；任一加载失败就继续画原程序化弹孔，避免半套
+    // 法线/ORM 与错误的 Base 配在一起。每张是 3×1 图集，不随每发换 sampler。
+    this.bulletDecalTextures = new Map();
+    this.loadedBulletDecalMaps = new Set();
+    this.lastBulletDecal = null;
+    for (const [key, path] of Object.entries(BULLET_DECAL_TEXTURES)) {
+      textureLoader.load(new URL(path, import.meta.url).href, (texture) => {
+        texture.colorSpace = key === "base" ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+        texture.flipY = false;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.needsUpdate = true;
+        this.bulletDecalTextures.set(key, texture);
+        this.loadedBulletDecalMaps.add(key);
+        this.pools.decal.material.uniforms[BULLET_DECAL_UNIFORMS[key]].value = texture;
+        if (this.loadedBulletDecalMaps.size === Object.keys(BULLET_DECAL_TEXTURES).length) {
+          this.pools.decal.material.uniforms.uDecalReady.value = 1;
+        }
+      }, undefined, () => {});
+    }
+
     for (const [key, variant] of Object.entries(EXPLOSION_SPRITE_VARIANTS)) {
       textureLoader.load(new URL(variant.path, import.meta.url).href, (texture) => {
         texture.colorSpace = THREE.SRGBColorSpace;
@@ -1789,7 +1898,7 @@ export class VfxSystem {
   }
 
   /** 命中反馈。不同表面必须一眼分得出来，这是"打得实不实"的全部。 */
-  Impact(position, normal, surface = "dirt") {
+  Impact(position, normal, surface = "dirt", { weaponKind = "rifle" } = {}) {
     const profile = SURFACE_PROFILES[surface] || SURFACE_PROFILES.dirt;
     const n = TMP_A.copy(normal).normalize();
     // 打在地上（法线朝上）碎块就落在弹着点；打在墙上则要一路掉到地面 ——
@@ -1879,7 +1988,14 @@ export class VfxSystem {
     if (profile.blood) this.Blood(position, n, profile.blood);
 
     if (profile.decal) {
-      this._SpawnDecal(position, n, profile.decalSize, profile.decalRim, profile.decalHole);
+      const roll = this.random();
+      const variant = SelectBulletDecalVariant(weaponKind, roll);
+      this.lastBulletDecal = {
+        variant, weaponKind, surface, roll,
+        pbrReady: this.loadedBulletDecalMaps.size === Object.keys(BULLET_DECAL_TEXTURES).length,
+      };
+      this._SpawnDecal(position, n, profile.decalSize, profile.decalRim, profile.decalHole,
+        0.85, 1, variant);
     }
   }
 
@@ -2320,6 +2436,9 @@ export class VfxSystem {
     for (const texture of this.explosionSpriteTextures.values()) texture.dispose();
     this.explosionSpriteTextures.clear();
     this.loadedExplosionSprites.clear();
+    for (const texture of this.bulletDecalTextures.values()) texture.dispose();
+    this.bulletDecalTextures.clear();
+    this.loadedBulletDecalMaps.clear();
     for (const texture of this.vefectsTextures.values()) texture.dispose();
     this.vefectsTextures.clear();
     if (this.markerTexture) this.markerTexture.dispose();
@@ -2328,6 +2447,8 @@ export class VfxSystem {
     if (this.spritePlaceholder) this.spritePlaceholder.dispose();
     if (this.spriteTransparentPlaceholder) this.spriteTransparentPlaceholder.dispose();
     if (this.maskTransparentPlaceholder) this.maskTransparentPlaceholder.dispose();
+    if (this.decalNormalPlaceholder) this.decalNormalPlaceholder.dispose();
+    if (this.decalOrmPlaceholder) this.decalOrmPlaceholder.dispose();
     this.fallbackDepth.dispose();
     for (const source of this.smokeSources.values()) {
       this.DetachSourceLight(source);
@@ -2378,7 +2499,7 @@ export class VfxSystem {
   }
 
   /** 弹孔贴花：原位贴面；polygonOffset 负责防 z-fighting，深度预通道负责裁悬空边。 */
-  _SpawnDecal(position, normal, size, rim, hole, opacity = 0.85, rays = 1) {
+  _SpawnDecal(position, normal, size, rim, hole, opacity = 0.85, rays = 1, variant = 0) {
     const s = ResetSpawn();
     s.x = position.x;
     s.y = position.y;
@@ -2388,6 +2509,7 @@ export class VfxSystem {
     s.sizeStart = size; s.sizeEnd = size;
     s.opacity = opacity; s.fadeIn = 0;
     s.stretch = rays;                    // 贴花池里 stretch 复用为放射线强度
+    s.frame = Math.min(2, Math.max(0, variant | 0)); // PBR 图集列：普通 A/B、机枪
     s.angle = this._Range(0, 6.283);
     s.colorA = rim; s.colorB = hole;
     s.seed = this.random();
