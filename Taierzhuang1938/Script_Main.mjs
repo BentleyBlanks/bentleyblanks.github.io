@@ -90,7 +90,7 @@ import { VfxSystem } from "./Script_Vfx.mjs";
 // 断肢：视觉/物理层与预热代理在 Script_CharacterGore，运行时总闸在规则层
 //（`SetGoreEnabled` 同时被 `?gore=0` 与 `Debug.Gore.SetEnabled` 使用）。
 import { GoreSystem, AddGoreWarmProxies } from "./Script_CharacterGore.mjs";
-import { SetGoreEnabled, IsGoreEnabled, LIMB_IDS as GORE_LIMB_IDS, PickMeleeShape } from "./Script_Dismemberment.mjs";
+import { SetGoreEnabled, IsGoreEnabled, LIMB_IDS as GORE_LIMB_IDS, PickMeleeShape, PickWhipCorpse } from "./Script_Dismemberment.mjs";
 import { AudioEngine } from "./Script_Audio.mjs";
 import { AudioWiring, WeaponClassOf } from "./Script_AudioWiring.mjs";
 import { Hud, ContextualActionPrompts, CrosshairGeometry } from "./Script_Hud.mjs";
@@ -1319,7 +1319,11 @@ async function Boot() {
       const hit = battlefield.Raycast(from, delta, distance);
       return !hit || hit.t >= distance - 0.12;
     },
-    SweepEnvironment: (_actor,start,end,previous) => {
+    WhipCorpse: (_entity, attack) => {
+      const corpse = PlayerWhipCorpse(attack.reach, attack.sweep);
+      return corpse && { soldier: corpse.soldier, shapeId: corpse.shapeId, point: corpse.point };
+    },
+    SweepEnvironment:(_actor,start,end,previous) => {
       for(const a of [start,previous]) {
         const from=new THREE.Vector3(a.x,a.y,a.z),to=new THREE.Vector3(end.x,end.y,end.z);
         const delta=to.sub(from),distance=delta.length();if(distance<.001)continue;
@@ -1349,7 +1353,14 @@ async function Boot() {
         //（Script_Dismemberment.PickMeleeShape，纯几何）。视线起点取攻击者眼位：
         // 玩家有 EyePosition，AI 用头骨的世界位置，都没有就退回脚底往上一米五。
         let shapeId = null;
-        if (bladed) {
+        if (contact.corpse) {
+          // 鞭尸：目标和劈中的肢段已经由 PlayerWhipCorpse 按视线挑好了，不再按扇形重挑。
+          shapeId = bladed ? contact.shapeId || null : null;
+          const shape = shapeId && target.actor?.characterRig?.GetHitboxes?.().find(entry => entry.id === shapeId);
+          if (shape?.type === "capsule") at.copy(shape.start).add(shape.end).multiplyScalar(0.5);
+          else if (shape?.center) at.copy(shape.center);
+          else if (contact.point) at.set(contact.point.x, contact.point.y, contact.point.z);
+        } else if (bladed) {
           const eye = attacker === player ? player.EyePosition
             : (attacker?.actor?.characterRig?.bones?.head?.getWorldPosition(new THREE.Vector3())
               || attacker.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
@@ -6531,11 +6542,25 @@ function ReleaseMeleeCharge() {
   return DoMeleeAttack("bash", power);
 }
 
+const _whipDir = new THREE.Vector3();
+/**
+ * 鞭尸的白刃取目标：玩家视线 + 刀刃扫角够得着的日军尸体（Script_Dismemberment.PickWhipCorpse）。
+ * reachM 是水平够得着的距离，这里按眼高折成视线长度 —— 尸体躺在脚下，视线是斜着往下的。
+ * 断肢关着时返回 null：尸体不吃刀，与子弹那条（MarchBullet 的目标表）同一口径。
+ */
+function PlayerWhipCorpse(reachM, sweep = 0) {
+  if (!ai || !player) return null;
+  const eye = player.EyePosition;
+  return PickWhipCorpse(ai.soldiers, eye, player.AimDirection(_whipDir),
+    Math.hypot(reachM, eye.y - player.position.y), sweep, (soldier) => soldier.side !== "nra");
+}
+
 /** 持枪白刃出招：判定与动画吃同一份 mode/power。 */
 function DoMeleeAttack(mode, power) {
   viewmodel.TriggerMelee(mode, power);
   const result = combat.Melee(currentWeapon, player.position.clone(),
-    player.AimDirection(_aimDir).clone(), { mode, power });
+    player.AimDirection(_aimDir).clone(), { mode, power,
+      WhipCorpse: (reachM, sweep) => PlayerWhipCorpse(reachM, sweep) });
   if (result) ConfirmHit(result.died);
   return !!result;
 }
@@ -6949,6 +6974,13 @@ const IMPACT_CUE = {
   wood: "impactWood", metal: "impactMetal", water: "impactDirt",
 };
 
+/**
+ * MarchBullet 的逐人粗筛球：人根节点往上 centerY，半径 radiusM。
+ * 要同时盖住站着举枪（枪口离根 ~1.2 m）、卧倒与躺平的尸体（头脚离根 ~1.7 m）
+ * 加上命中体自身半径；2.2 m 是几何上限，不是手感参数。
+ */
+const BULLET_BROAD_PHASE = Object.freeze({ centerY: 0.9, radiusM: 2.2 });
+
 /** 玩家每几发出一颗曳光。史实上常见的装填比例就是 1/5。见 TryFire 末尾的注释。 */
 const TRACER_EVERY = 5;
 
@@ -7000,6 +7032,14 @@ function MarchBullet(from, dir, weapon, targets, sourceCollider=null) {
     // part 只有 head/torso/limb 三档，断肢要知道是哪一段肢体，靠的是 shape.id。
     let bestSoldier = null, bestPart = "torso", bestT = Infinity, bestShape = null;
     for (const s of targets) {
+      // 粗筛：这一小段弹道离人超过 BULLET_BROAD_PHASE.radiusM 就不问骨骼命中体。
+      // RaycastHitboxes 每问一次要把整个人的骨骼世界矩阵重算一遍，一发子弹最多 64 段 ×
+      // 射程内每个人（尸体也在表里，鞭尸要打得中）；不筛的话尸体越堆越多、每一枪越贵。
+      _rel.set(s.position.x - _bulletPos.x,
+        s.position.y + BULLET_BROAD_PHASE.centerY - _bulletPos.y,
+        s.position.z - _bulletPos.z);
+      const nearT = Math.min(segLen, Math.max(0, _rel.dot(_segDir)));
+      if (_rel.addScaledVector(_segDir, -nearT).lengthSq() > BULLET_BROAD_PHASE.radiusM ** 2) continue;
       const boneHit = s.actor?.RaycastHitboxes?.(_bulletPos, _segDir, segLen) || null;
       if (boneHit) {
         if (boneHit.t < bestT) {
@@ -7010,7 +7050,8 @@ function MarchBullet(from, dir, weapon, targets, sourceCollider=null) {
         }
         continue;
       }
-      if(s.preciseHitboxes)continue;
+      // 尸体不走回退球：那只球立在脚底往上 0.95 m，躺平的人身上是一团悬空的隐形挡板。
+      if(s.preciseHitboxes || s.alive === false)continue;
       _rel.set(s.position.x - _bulletPos.x,
         s.position.y + HITBOX.centerY - _bulletPos.y,
         s.position.z - _bulletPos.z);

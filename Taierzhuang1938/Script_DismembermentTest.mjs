@@ -10,8 +10,9 @@ import { MELEE_RULES } from "./Data_MeleeCombat.mjs";
 import {
   LIMB_IDS, LimbSubtree, LimbForBone, ClassifyVertices, FilterIndex, ResolveSever,
   GoreBudget, CodeForLimb, LimbForCode, SetGoreEnabled, IsGoreEnabled, PickMeleeShape,
-  AccumulateLimbDamage, BlastLimbWeights,
+  AccumulateLimbDamage, BlastLimbWeights, PickWhipCorpse,
 } from "./Script_Dismemberment.mjs";
+import { CORPSE_WHIP } from "./Data_Tuning_Gore.mjs";
 
 let checks = 0;
 const Ok = (condition, label) => { checks += 1; assert.ok(condition, label); };
@@ -255,6 +256,50 @@ Eq(ResolveSever(Hit({ damage: 10 })).reason, "lowDamage", "伤害低于 minDamag
   Eq(AccumulateLimbDamage(history, Hit({ shapeId: null, part: "leg", damage: 39.6 })), 0, "coarse rolls do not invent a hitbox");
   Eq(ResolveSever(Hit({ shapeId: null, part: "torso", rng: () => 0 })).limbs.length, 0, "torso hit cannot pick a random limb");
   Eq(ResolveSever(Hit({ shapeId: "calfR", accumulatedDamage: 200, severed: ["thighR"] })).limbs.length, 0, "missing calf cannot detach twice");
+}
+
+// 鞭尸：尸体上同一段的累计门槛按 CORPSE_WHIP.accumulatedScale 放低（步枪第二发必断）。
+{
+  Ok(CORPSE_WHIP.accumulatedScale > 0 && CORPSE_WHIP.accumulatedScale < 1, "尸体累计门槛比活人低");
+  const history = new Map();
+  for (let shot = 1; shot <= 2; shot++) {
+    const hit = Hit({ shapeId: "forearmL", damage: 66 * 0.6, wouldDie: true, corpse: true, rng: () => 0.999 });
+    hit.accumulatedDamage = AccumulateLimbDamage(history, hit);
+    Eq(ResolveSever(hit).limbs.join(), shot === 2 ? "forearmL" : "", `尸体前臂第 ${shot} 发`);
+  }
+  Eq(ResolveSever(Hit({ shapeId: "forearmL", damage: 39.6, accumulatedDamage: 79.2, rng: () => 0.999 })).limbs.length, 0,
+    "活人同样的累计伤害仍不断");
+}
+
+// PickWhipCorpse：视线压上哪具尸体就是哪具；活人、友军、够不着的一律不算。
+{
+  const Corpse = (x, z, opts = {}) => {
+    const shapes = [{ id: "forearmL", type: "capsule", start: { x: x - 0.2, y: 0.15, z }, end: { x: x + 0.2, y: 0.15, z }, center: { x: 0, y: 0, z: 0 } }];
+    return {
+      alive: opts.alive ?? false, side: opts.side || "ija", position: { x, y: 0, z },
+      actor: {
+        characterRig: { GetHitboxes: () => shapes },
+        // 假命中体：只认正对 (x, 0.15, z) 那一条视线。
+        RaycastHitboxes: (eye, dir, reach) => {
+          const t = Math.hypot(x - eye.x, 0.15 - eye.y, z - eye.z);
+          const px = eye.x + dir.x * t, py = eye.y + dir.y * t, pz = eye.z + dir.z * t;
+          return t <= reach && Math.hypot(px - x, py - 0.15, pz - z) < 0.1 ? { t, shape: shapes[0], part: "limb" } : null;
+        },
+      },
+    };
+  };
+  const eye = { x: 0, y: 1.6, z: 0 };
+  const Aim = (x, z) => { const d = { x: x - eye.x, y: 0.15 - eye.y, z: z - eye.z }, l = Math.hypot(d.x, d.y, d.z); return { x: d.x / l, y: d.y / l, z: d.z / l }; };
+  const near = Corpse(0, -1.5), far = Corpse(0, -6), living = Corpse(1, -1.5, { alive: true }), friend = Corpse(-1, -1.5, { side: "nra" });
+  const reach = Math.hypot(2.05, 1.6);
+  const enemy = (s) => s.side !== "nra";
+  Eq(PickWhipCorpse([far, near], eye, Aim(0, -1.5), reach, 0, enemy)?.soldier, near, "视线压着脚下那具尸体");
+  Eq(PickWhipCorpse([near], eye, Aim(0, -1.5), reach, 0, enemy)?.shapeId, "forearmL", "交出劈中的肢段");
+  Ok(PickWhipCorpse([near], eye, Aim(0, -1.5), reach, 0, enemy)?.point, "视线命中时带血点");
+  Eq(PickWhipCorpse([far], eye, Aim(0, -6), reach, 0, enemy), null, "六米外的尸体刀够不着");
+  Eq(PickWhipCorpse([living], eye, Aim(1, -1.5), reach, 0, enemy), null, "活人不走鞭尸判定");
+  Eq(PickWhipCorpse([friend], eye, Aim(-1, -1.5), reach, 0, enemy), null, "友军尸体不砍");
+  Eq(PickWhipCorpse([near], eye, Aim(3, -1.5), reach, 0, enemy), null, "朝旁边挥空不算");
 }
 
 {

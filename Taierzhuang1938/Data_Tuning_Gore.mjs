@@ -93,6 +93,23 @@ export const SEVER_RULES = Object.freeze({
   bash: Object.freeze({ chance: Object.freeze({ limb: 0, head: 0 }), requiresKill: true }),
 });
 
+/**
+ * 鞭尸：玩家补射、补刀已经倒下的人。
+ *   accumulatedScale —— 尸体上同一肢段的累计断肢门槛乘这么多（步枪 100 → 50，
+ *                       肢体一发 40–47，第二发必断；机枪 90 → 45，一发就掉）。
+ *                       只作用于累计门槛，概率骰与活人一致。
+ *   bodyReachM       —— 找尸体时按根节点水平距离的粗筛余量：人躺平后头脚离根节点
+ *                       最远约 1.7 m，余量要盖住它，不然砍脚边的头够不着。
+ *
+ * 2026-09-13 玩家反馈「一旦死掉就无法枪击/刀砍鞭尸」：白刃判定只认活人，尸体砍不到；
+ * 子弹虽能命中，但躺着的细肢体要连中三发同一段才掉。没有时间上限 ——
+ * 担心的性能开销在子弹的逐步命中检测里，那边用粗筛解决（Script_Main.MarchBullet）。
+ */
+export const CORPSE_WHIP = Object.freeze({
+  accumulatedScale: 0.5,
+  bodyReachM: 1.9,
+});
+
 // 简单几何判定的手感参数；距离按实际世界命中体计算，头不进爆炸随机池。
 //
 // meleeSweepSamples：刀是横着扫过去的，不是一条线。中线落在躯干上（齐胸一刀最常见的

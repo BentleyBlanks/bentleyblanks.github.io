@@ -342,7 +342,8 @@ export class CombatSystem {
    *   cut    刺刀挥砍（点按）      90 伤，两下，扇面宽
    *   thrust 蓄力劈刺（按住松手）  105 + 70·power，一下放倒；扇面窄、
    *          但臂展加上这支枪的 bayonetLengthM —— 三八式那半米刀长在这里兑现
-   * @param {object} [opts] { mode: "slash"|"cut"|"thrust"|"bash", power: 0..1 }
+   * @param {object} [opts] { mode: "slash"|"cut"|"thrust"|"bash", power: 0..1,
+   *   WhipCorpse?: (reachM, sweep) => {soldier, shapeId, point}|null  扇形空了时找尸体（鞭尸） }
    */
   Melee(weaponId, fromPosition, direction, opts = {}) {
     const weapon = WEAPONS[weaponId] || WEAPONS.Dadao;
@@ -376,6 +377,28 @@ export class CombatSystem {
     if (this.host.audio) {
       this.host.audio.Play("dadaoSwing",
         { volume: mode === "thrust" ? 0.75 : 0.6, pitch: mode === "thrust" ? 0.85 : 1.1 });
+    }
+    // 鞭尸：扇形里没有活人时，按玩家视线找够得着的尸体（宿主交 opts.WhipCorpse，
+    // 见 Script_Main.PlayerWhipCorpse）。尸体只吃伤害结算：血、断肢，不重复计阵亡。
+    if (!hit && opts.WhipCorpse) {
+      const slashing = isBlade || mode === "cut";
+      const corpse = opts.WhipCorpse(reach, slashing ? MELEE_RULES.bladeSweepRad : 0);
+      if (corpse) {
+        const s = corpse.soldier, shapeId = slashing ? corpse.shapeId : null;
+        const shape = shapeId && s.actor?.characterRig?.GetHitboxes?.().find((entry) => entry.id === shapeId);
+        const at = shape?.type === "capsule" ? shape.start.clone().add(shape.end).multiplyScalar(0.5)
+          : shape?.center ? shape.center.clone()
+            : corpse.point ? new THREE.Vector3(corpse.point.x, corpse.point.y, corpse.point.z)
+              : s.position.clone();
+        s.TakeHit(damage, "torso", direction,
+          { kind: isBlade ? "blade" : mode, weaponId, mode, shapeId, point: at.clone() });
+        if (this.host.vfx) this.host.vfx.Blood(at, direction, MELEE.bloodStrengthHit);
+        if (this.host.audio) {
+          this.host.audio.Play(bladed ? (isBlade ? "dadaoHit" : "bayonetHit") : "bodyFall",
+            { position: at, volume: 0.9 });
+        }
+        return { hit: s, died: false, mode, corpse: true };
+      }
     }
     if (hit) {
       const at = hit.position.clone(); at.y += MELEE.hitHeightM;

@@ -582,7 +582,19 @@ export class MeleeCombatDirector {
     if(!targets.length && cramped && this.WeaponContact(e,cramped)) {
       a.connected=true;this.SetState(f,'stagger',.3,'WeaponClash');this.Log('tooClose',e,cramped);return;
     }
-    const target = targets[0]; if (!target) return;
+    const target = targets[0];
+    if (!target) {
+      // 鞭尸：玩家这一刀没扫到活人，前面也没有活人快要扫到，才交给宿主按视线找尸体
+      //（Script_Dismemberment.PickWhipCorpse）。尸体不进 Opponents：它不格挡、不踉跄、
+      // 不挡刀，只吃伤害结算（血、断肢）。AI 的刀不砍尸体。
+      if (e !== this.Player() || this.Closest(e, a.reach + .5, .4)) return;
+      const corpse = this.host.WhipCorpse?.(e, { yaw: a.yaw, sweep, reach: a.reach });
+      if (!corpse) return;
+      a.connected = true;
+      this.Damage(corpse.soldier, e, a.damage, a.heavy ? "heavy" : "light",
+        { yaw: a.yaw, sweep, reach: a.reach, start, end, previous, shapeId: corpse.shapeId, point: corpse.point || null, corpse: true });
+      return;
+    }
     const tf = this.Fighter(target), distance = Distance(e, target);
     const blocker=this.BodyBlocker(e,target);
     if(blocker) {a.connected=true;this.SetState(f,'stagger',.32,'Obstructed');this.Log('bodyObstruction',e,blocker);return;}

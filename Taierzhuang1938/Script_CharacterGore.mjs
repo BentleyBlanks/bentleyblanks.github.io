@@ -268,6 +268,8 @@ export class GoreSystem {
     const result = ResolveSever({
       ...hit,
       accumulatedDamage,
+      // 已经倒下的人 = 鞭尸，累计门槛放低（CORPSE_WHIP）。打死人的那一发此时 alive 仍为真。
+      corpse: soldier.alive === false,
       severed: soldier.gore?.limbs,
       limbWeights: hit.blastOrigin ? BlastLimbWeights(hit.blastOrigin, rig.GetHitboxes()) : undefined,
       kind: force || hit.kind,

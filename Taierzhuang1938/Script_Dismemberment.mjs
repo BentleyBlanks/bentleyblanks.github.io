@@ -11,7 +11,7 @@
 // 用 mask 藏肢体的话，人身上没有胳膊了，地上的影子里还有。CPU 只删三角形，
 // 三条 pass 读的是同一份 index，天然一致，而且零新 program。
 
-import { ENABLED, LIMBS, SEVER_RULES, KIND_ALIASES, LIMB_POOLS, HIT_GEOMETRY } from "./Data_Tuning_Gore.mjs";
+import { ENABLED, LIMBS, SEVER_RULES, KIND_ALIASES, LIMB_POOLS, HIT_GEOMETRY, CORPSE_WHIP } from "./Data_Tuning_Gore.mjs";
 import { JointOwner, RaycastCapsule, RaycastSphere, RaycastEllipsoid } from "./Script_CharacterHitboxMath.mjs";
 
 /** 冻结的肢体 id 数组（顺序即编码顺序，见 CodeForLimb）。 */
@@ -353,6 +353,47 @@ export function PickMeleeShape(origin, direction, shapes, poolIds = null,
   return null;
 }
 
+/**
+ * 鞭尸的白刃判定：玩家这一刀够得着哪具尸体、劈中哪一段。
+ *
+ * 活人的白刃判定是按根节点的扇形（Script_MeleeCombat / Script_Combat.Melee），
+ * 对躺平的人不成立 —— 根节点在脚边，身子横在地上。这里改用玩家的**视线**：
+ * 先用整条视线对尸体命中体求交（瞄着哪儿就是哪具，躯干也算砍中），
+ * 视线没压上任何一具时再按刀刃扫过的角度取样，只认肢段（PickMeleeShape）。
+ * 多具同时够得着取最近的那一具。
+ *
+ * @param {Array<object>} soldiers 候选人（只看 alive === false、有 characterRig 的）
+ * @param {{x:number,y:number,z:number}} eye 玩家眼位
+ * @param {{x:number,y:number,z:number}} direction 视线（单位向量）
+ * @param {number} reach 视线方向上够得着的距离（米，已含眼高）
+ * @param {number} sweep 刀刃扫过的 yaw 幅度（0 = 只认视线）
+ * @param {(soldier:object)=>boolean} [accept] 额外筛选（阵营等）
+ * @returns {{soldier:object, shapeId:string|null, t:number, point:{x,y,z}|null}|null}
+ *   point 只有视线真压上命中体时才有（血从那儿出）；扫刀取样命中时交 null，由调用方取肢段中点。
+ */
+export function PickWhipCorpse(soldiers, eye, direction, reach, sweep = 0, accept = null) {
+  if (!IsGoreEnabled() || !soldiers?.length || !eye || !direction || !(reach > 0)) return null;
+  const flat = reach + CORPSE_WHIP.bodyReachM;
+  let best = null;
+  for (const s of soldiers) {
+    if (s?.alive !== false || !s.actor?.characterRig || (accept && !accept(s))) continue;
+    if (Math.hypot(s.position.x - eye.x, s.position.z - eye.z) > flat) continue;
+    const ray = s.actor.RaycastHitboxes?.(eye, direction, reach) || null;
+    let shapeId = null, t = Infinity, point = null;
+    if (ray) {
+      t = ray.t;
+      shapeId = LIMBS[ray.shape?.id] ? ray.shape.id : null;
+      point = { x: eye.x + direction.x * t, y: eye.y + direction.y * t, z: eye.z + direction.z * t };
+    } else {
+      shapeId = PickMeleeShape(eye, direction, s.actor.characterRig.GetHitboxes(), null, reach, sweep);
+      if (!shapeId) continue;
+      t = Math.hypot(s.position.x - eye.x, s.position.z - eye.z);
+    }
+    if (!best || t < best.t) best = { soldier: s, shapeId, t, point };
+  }
+  return best;
+}
+
 /** 不断的那一路统一从这里出：形状与真断了那一路完全一致，调用方不用分两种写法。 */
 function Empty(reason, kind = null) { return { limbs: [], forceKill: false, reason, kind }; }
 
@@ -370,6 +411,7 @@ function Empty(reason, kind = null) { return { limbs: [], forceKill: false, reas
  *   falloff   —— 爆炸的距离衰减（1 = 爆心）
  *   trauma    —— 战斗层判定的手榴弹创伤带致死（Script_Combat.GrenadeTrauma），必断一段
  *   accumulatedDamage —— 同一肢段的累计弹伤
+ *   corpse    —— 打的是尸体（鞭尸），累计门槛按 CORPSE_WHIP.accumulatedScale 放低
  *   limbWeights / severed —— 爆心到各段的权重 / 已卸肢段集合
  *   force     —— 无视骰子（Debug.Gore.SetForce / Debug.Gore.Sever 用）
  *   rng       —— 确定性随机源，一次调用最多消耗 8 次
@@ -385,8 +427,9 @@ export function ResolveSever(hit = {}) {
   if (!rule) return Empty("noRule", kind);
   const hitLimb = LimbFromHit(hit.shapeId, hit.part);
   if (kind === "blade" && !hitLimb) return Empty("noLimb", kind);
+  // 鞭尸（hit.corpse）：尸体上的累计门槛减半（CORPSE_WHIP.accumulatedScale）。
   const accumulated = hitLimb && hitLimb !== "head" && rule.accumulatedDamage
-    && hit.accumulatedDamage >= rule.accumulatedDamage;
+    && hit.accumulatedDamage >= rule.accumulatedDamage * (hit.corpse ? CORPSE_WHIP.accumulatedScale : 1);
   if (!force) {
     if (rule.requiresKill && !hit.wouldDie) return Empty("notLethal", kind);
     if (!accumulated && rule.minDamage != null && !(Number(hit.damage) >= rule.minDamage)) return Empty("lowDamage", kind);
