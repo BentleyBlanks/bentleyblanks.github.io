@@ -640,11 +640,14 @@ export class Hud {
    */
   SetCrosshair({
     visible = false, spreadDeg = 0, fovDeg = 55, viewportHeight = 0,
-    sprint = 0, ads = 0, armed = true, dt = 1 / 60,
+    sprint = 0, ads = 0, armed = true, grenade = false, dt = 1 / 60,
   } = {}) {
     const e = this.el.crosshair;
     const sprinting = sprint > 0.35;
-    const shown = !!visible && ads < 0.62;
+    // 投弹时使用独立圆弧准心。它是手榴弹的投向基准，不受步枪开镜动画遮挡；
+    // 松手投出后 grenade 同帧回 false，恢复当前武器原有的动态准心。
+    const grenadeAiming = !!grenade;
+    const shown = !!visible && (grenadeAiming || ads < 0.62);
     const height = viewportHeight || (typeof window !== "undefined" ? window.innerHeight : 900);
     const geo = CrosshairGeometry({ spreadDeg, fovDeg, viewportHeight: height, sprint, armed });
     // 张开快、收拢慢。指数平滑而不是线性追：帧率一变，线性追的速度就变。
@@ -655,16 +658,17 @@ export class Hud {
     this.crosshairArm = geo.arm;
     this.crosshairOn = shown;
     SetClass(e, "on", shown);
-    SetClass(e, "sprint", shown && sprinting);
+    SetClass(e, "sprint", shown && sprinting && !grenadeAiming);
+    SetClass(e, "grenade", shown && grenadeAiming);
     SetVar(e, "--gap", `${this.crosshairGap.toFixed(1)}px`);
     SetVar(e, "--arm", `${geo.arm.toFixed(1)}px`);
     SetAttr(e, "aria-hidden", String(!shown));
-    SetAttr(e, "aria-label", sprinting ? T("hud.crosshair.sprint")
+    SetAttr(e, "aria-label", grenadeAiming ? T("hud.crosshair.grenade") : sprinting ? T("hud.crosshair.sprint")
       : T("hud.crosshair.hipSpread", { deg: geo.spreadDeg.toFixed(1) }));
     // 情境提示与识别卡都贴着准心下沿走：散布撑大时跟着让开，不会被四条线压住。
     // 提示离准心最近（那是现在能做的事）；按住型的进度环亮着时提示让到环下面；
     // 识别卡排在提示之后。
-    const below = this.crosshairGap + geo.arm + 14;
+    const below = grenadeAiming ? 48 : this.crosshairGap + geo.arm + 14;
     const promptY = this.interactRingOn ? Math.max(below, 96) : below;
     SetVar(this.el.actions, "--y", `${promptY.toFixed(1)}px`);
     const targetY = this.actionPrompts.length ? promptY + this.actionPromptsHeight + 6 : below + 2;
@@ -678,6 +682,7 @@ export class Hud {
       gap: this.crosshairGap,
       arm: this.crosshairArm,
       spreadDeg: this.crosshairSpreadDeg,
+      grenade: this.el.crosshair.classList.contains("grenade"),
     };
   }
 

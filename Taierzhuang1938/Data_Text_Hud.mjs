@@ -46,6 +46,7 @@ export const TEXT = Object.freeze({
   // --- 准心 -----------------------------------------------------------------
   "hud.crosshair.hip": "腰射准心",
   "hud.crosshair.sprint": "冲刺扩散准心",
+  "hud.crosshair.grenade": "手榴弹投掷准心",
   "hud.crosshair.hipSpread": "腰射准心 散布 {deg} 度",
 
   // --- 目标识别卡（Script_Identify 生成，Script_Hud 画） ---------------------

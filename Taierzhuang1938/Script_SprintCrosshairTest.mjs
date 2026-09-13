@@ -31,11 +31,16 @@ const report = await page.evaluate(() => {
     const box = e.getBoundingClientRect();
     const reticle = T.Debug.Reticle();
     const armStyle = getComputedStyle(e.querySelector(".arm.left"));
+    const grenadeStyle = getComputedStyle(e, "::before");
     return {
       on: e.classList.contains("on"),
       sprint: e.classList.contains("sprint"),
+      grenade: e.classList.contains("grenade"),
       gap: parseFloat(e.style.getPropertyValue("--gap")),
       armPx: parseFloat(armStyle.width),
+      armOpacity: parseFloat(armStyle.opacity),
+      grenadeImage: grenadeStyle.backgroundImage,
+      grenadeWidth: parseFloat(grenadeStyle.width),
       centerX: box.left,
       centerY: box.top,
       hidden: e.getAttribute("aria-hidden"),
@@ -91,10 +96,32 @@ const report = await page.evaluate(() => {
   const realistic = read();
   difficulty.showCrosshair = true;
 
-  return { idle, running, crouch, ads, realistic };
+  // G 按住期间走真实投弹状态，不通过 HUD 私有方法伪造 class；松手后必须恢复枪械准心。
+  T.state.grenades = Math.max(2, T.state.grenades);
+  T.Debug.Key("KeyG", true);
+  T.StepFrames(2);
+  const grenade = { ...read(), cooking: T.state.cooking };
+  T.Debug.Key("KeyG", false);
+  T.StepFrames(2);
+  const afterGrenade = { ...read(), cooking: T.state.cooking };
+
+  return { idle, running, crouch, ads, realistic, grenade, afterGrenade };
 });
 
 const screenshotPath = path.join(os.tmpdir(), "TaierzhuangSprintCrosshair.png");
+const grenadeScreenshotPath = path.join(os.tmpdir(), "TaierzhuangGrenadeReticle.png");
+await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  T.state.grenades = Math.max(1, T.state.grenades);
+  T.Debug.Key("KeyG", true);
+  T.StepFrames(8);
+});
+await page.screenshot({ path: grenadeScreenshotPath });
+await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  T.Debug.Key("KeyG", false);
+  T.StepFrames(2);
+});
 // 出图要**回到被断言的那一刻**，不能在原地接着再跑 90 帧：上面读 running 的时候
 // 人已经从出生工位往前推了七米，再跑一段就贴到街对面的院墙上了，
 // 拍出来是一面砖 —— 看图的人分不清"准心红了"和"人撞墙了"，
@@ -109,7 +136,7 @@ await page.evaluate(() => {
 });
 await page.screenshot({ path: screenshotPath });
 
-console.log(JSON.stringify({ ...report, screenshotPath, errors }, null, 2));
+console.log(JSON.stringify({ ...report, screenshotPath, grenadeScreenshotPath, errors }, null, 2));
 // 站着不动的缝就是当时那支枪的腰射散布：汉阳造 3.0° 在 720p / 55° 上是 18.1 px。
 // 上一版这里是 5.0 px —— 那才是"跑起来还这么准"的来源。
 const tracks = (row) => Math.abs(row.gap - row.expected) < 0.6 && row.spreadDeg > 0;
@@ -141,6 +168,11 @@ const checks = [
   ["准心恒在屏幕正中（站/跑）", centered(report.idle) && centered(report.running)],
   ["开镜：准心隐藏", !report.ads.on && report.ads.adsValue > 0.9],
   ["写实档：准心隐藏", !report.realistic.on],
+  ["投弹：按住 G 显示圆弧素材准心", report.grenade.on && report.grenade.grenade
+    && report.grenade.cooking === "Grenade" && report.grenade.grenadeImage.includes("Icon_GrenadeReticle.png")
+    && report.grenade.grenadeWidth === 64 && report.grenade.armOpacity === 0],
+  ["投弹：松开 G 后恢复枪械准心", !report.afterGrenade.grenade && !report.afterGrenade.cooking
+    && report.afterGrenade.on && report.afterGrenade.armOpacity === 1],
   ["无控制台报错", errors.length === 0],
 ];
 

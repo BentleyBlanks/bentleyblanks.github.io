@@ -808,6 +808,14 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 /* 冲刺时中心点收掉：那一段按下扳机什么也不会发生，不该留一个"这里能打中"的点。 */
 .hudCrosshair.sprint .dot { opacity: 0; }
+/* 投弹专用圆弧准心：按住 G/H 或投掷物槽左键时盖住枪械的四臂准心。
+   256 px 透明源图在 720p HUD 上显示为 64 px，保留约 48 px 的实际圆弧直径。 */
+.hudCrosshair.grenade::before {
+  content: "";
+  position: absolute; left: -32px; top: -32px; width: 64px; height: 64px;
+  background: url("./Texture/Icon_GrenadeReticle.png") center / contain no-repeat;
+}
+.hudCrosshair.grenade .arm, .hudCrosshair.grenade .dot { opacity: 0; }
 /* 指着自己人：整个准心转蓝（见 Script_Hud.SetTarget 的账，只给自己人上色）。 */
 .hudCrosshair.friendly { color: var(--ours); }
 

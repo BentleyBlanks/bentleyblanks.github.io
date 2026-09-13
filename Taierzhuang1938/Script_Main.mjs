@@ -8311,6 +8311,7 @@ function Frame(dt, render = true) {
     fovDeg: camera.fov,
     viewportHeight: window.innerHeight,
     armed: firearm,
+    grenade: !!state.cooking,
     sprint: player.sprint,
     ads: player.ads,
     dt,
