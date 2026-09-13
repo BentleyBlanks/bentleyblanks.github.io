@@ -8270,7 +8270,7 @@ function Frame(dt, render = true) {
   // --- HUD ---
   profiler.B("hud");
   // The campaign objective is read on the pause screen, without HUD notifications.
-  hud.SetObjective(phase.whitebox?.fullMission ? "" : state.storyObjective || phase.label, phase.whitebox?.fullMission?null:state.nraPool, null);
+  hud.SetObjective(phase.whitebox?.fullMission ? missionRuntime?.ObjectiveNotice() || "" : state.storyObjective || phase.label, phase.whitebox?.fullMission?null:state.nraPool, null);
   hud.SetState({
     wounded: player.wounds.length > 0,
     bleeding: player.bleeding,

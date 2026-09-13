@@ -181,10 +181,14 @@ export class FirstLevelMissionRuntime {
   get ReceivingFood() {
     return this.flow.stage.id === "Train" && !this.Has("trainFoodReceived");
   }
+  /** 正片平时不弹目标通知（目标在暂停页看）；只有这类无需按键的开场提示走左上角。 */
+  ObjectiveNotice() {
+    return this.ReceivingFood ? T("firstLevel.hint.receiveFood") : "";
+  }
   OpeningPrompt() {
     if (this.controls || !this.EmptyHands || !["Train","Unloading"].includes(this.flow.stage.id)) return null;
-    if (this.ReceivingFood) return {keys:T("input.guide.move.look.keys"),
-      label:T("firstLevel.hint.receiveFood"),kind:"look"};
+    // 接腊肉不需要按键：只在左上角目标通知里说一句（见 ObjectiveNotice），底部不挂键帽。
+    if (this.ReceivingFood) return null;
     if (this.Has("trainStopped")) return this.player.stance==="prone"
       ? {keys:"Z",label:T("firstLevel.hint.standAndUnload"),kind:"stance"}
       : {keys:"WASD",label:T("firstLevel.hint.leaveTrain"),kind:"move"};
