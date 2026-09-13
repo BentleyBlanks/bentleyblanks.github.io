@@ -130,6 +130,54 @@ try {
   assert.deepEqual(companionFailure.items,["restartSandbox","exitSandbox"]);
   await page.waitForFunction(() => document.getAnimations().every(animation => animation.playState !== "running"));
   await page.screenshot({path:path.join(out,"Scene_CompanionFailure.png")});
+  // Explicit UI fixture: real runtime + pause adapter, not campaign completion evidence.
+  await page.evaluate(async () => {
+    const g = window.Tengxian;
+    await g.Debug.FirstLevelJump(4);
+    const r = g.Debug.FirstLevelMissionRuntime();
+    const { MISSION_STAGES } = await import("./Data_FirstLevelMission.mjs");
+    r.flow.index = MISSION_STAGES.findIndex(stage => stage.id === "Support");
+    for (const id of r.flow.stage.requirements) r.flow.facts.delete(id);
+    r.flow.Record("frontReached"); r.flow.Record("frontContact");
+    r.frontArrivalAt = r.time - 17; r.frontArrivalShots = r.Inventory().shots;
+    g.Debug.Pause();
+  });
+  assert.equal(await page.locator(".mnPauseCondition").count(), 5);
+  assert.equal(await page.locator(".mnPauseCondition.complete").count(), 2);
+  assert.equal(await page.locator(".mnPauseProgressSummary").textContent(), "已达成 2 / 5 项");
+  assert.match(await page.locator('[data-condition="frontRifleDefense"]').textContent(), /17 \/ 40 秒.*尚未开枪/);
+  await page.screenshot({path:path.join(out,"Scene_MissionProgressDesktop.png")});
+  for (const viewport of [{width:390,height:844},{width:844,height:390}]) {
+    await page.setViewportSize(viewport);
+    const bounds = await page.locator(".mnPauseObjective").boundingBox();
+    const menuBounds = await page.locator(".mnList").boundingBox();
+    assert.ok(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= viewport.width && bounds.y + bounds.height <= viewport.height);
+    assert.ok(bounds.y + bounds.height <= menuBounds.y || bounds.x >= menuBounds.x + menuBounds.width, "progress and pause buttons do not overlap");
+    await page.locator('[data-condition="zhouGunWounded"]').scrollIntoViewIfNeeded();
+    assert.ok(await page.locator('[data-condition="zhouGunWounded"]').isVisible());
+    await page.screenshot({path:path.join(out,`Scene_MissionProgress${viewport.width}.png`)});
+  }
+  await page.setViewportSize({width:1920,height:1080});
+  await page.keyboard.press("Escape");
+  await page.evaluate(() => {
+    const g=window.Tengxian;
+    g.Debug.FirstLevelMissionRuntime().flow.Record("frontRifleDefense");
+    g.Debug.Pause();
+  });
+  assert.equal(await page.locator(".mnPauseCondition.complete").count(), 3, "reopening reads fresh mission facts");
+  await page.evaluate(() => {
+    const g=window.Tengxian, r=g.Debug.FirstLevelMissionRuntime();
+    r.flow.index++; g.menu.Show("pause");
+  });
+  assert.equal(await page.locator(".mnPauseCondition").count(), 2, "new stage replaces all previous conditions");
+  assert.equal(await page.locator('[data-condition="frontReached"]').count(), 0);
+  await page.evaluate(() => {
+    const g=window.Tengxian, r=g.Debug.FirstLevelMissionRuntime();
+    while (!r.flow.completed) r.flow.index++;
+    g.menu.Show("pause");
+  });
+  assert.equal(await page.locator(".mnPauseProgressSummary").textContent(), "当前任务已完成");
+  assert.equal(await page.locator(".mnPauseCondition").count(), 0);
   assert.deepEqual(errors, []);
   await fs.writeFile(path.join(out, "Data_DeathMenu.json"), JSON.stringify({ setup, frozen, restored, unavailable, companionFailure, errors }, null, 2));
   console.log("DeathMenuTest PASS: independent death state, frozen world, falling camera, mouse/Enter checkpoint recovery, pause regression and missing checkpoint");

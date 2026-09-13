@@ -2080,6 +2080,31 @@ export class FirstLevelMissionRuntime {
     this.music.Update(stage, { shellImpact: this.Has("trainFirstShellImpact"),
       speaking: this.voice.current?.phase === "playing", failed: this.failed });
   }
+  ObjectiveProgress() {
+    const progress = this.flow.ObjectiveProgress();
+    progress.conditions = progress.conditions.map(condition => {
+      const row = { ...condition, text: T(`menu.condition.${condition.id}`) };
+      if (condition.id === "minimumSeconds") row.detail = T("menu.progress.seconds", condition);
+      if (condition.id === "frontRifleDefense") {
+        row.text = T("menu.condition.frontRifleDefense", { seconds: R.frontRifleDefenseSeconds });
+        row.detail = T("menu.progress.rifle", {
+          current: Math.min(R.frontRifleDefenseSeconds, Math.floor(Math.max(0, this.time - (this.frontArrivalAt ?? this.time)))),
+          target: R.frontRifleDefenseSeconds,
+          fired: T(this.Inventory().shots > (this.frontArrivalShots ?? this.Inventory().shots) ? "menu.progress.fired" : "menu.progress.notFired"),
+        });
+      }
+      if (condition.id === "rifleWithdrawalResolved" || condition.id === "guardWithdrawalResolved") {
+        const guards = condition.id === "rifleWithdrawalResolved" ? this.guards.slice(0, OPENING.rifleGuardCount) : this.guards;
+        row.detail = T("menu.progress.guards", {
+          safe: guards.filter(guard => guard.safe && guard.actor.alive).length,
+          lost: guards.filter(guard => !guard.actor.alive).length,
+          target: condition.id === "rifleWithdrawalResolved" ? OPENING.rifleGuardCount : guards.length,
+        });
+      }
+      return row;
+    });
+    return progress;
+  }
   State() {
     return {
       opening:this.opening.State(),

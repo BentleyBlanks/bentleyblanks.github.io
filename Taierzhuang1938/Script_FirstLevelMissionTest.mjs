@@ -533,6 +533,32 @@ for(const point of [MISSION_TRAIN.guideMuster,...MISSION_TRAIN.cars.flatMap(car=
 }
 const flow = new FirstLevelMissionFlow();
 {
+  const { TEXT } = await import("./Data_Text_Menu.mjs");
+  for (let index = 0; index < MISSION_STAGES.length; index++) {
+    const probe = new FirstLevelMissionFlow(); probe.index = index; probe.Start();
+    const stage = probe.stage, before = probe.Snapshot();
+    const progress = probe.ObjectiveProgress();
+    assert.deepEqual(probe.Snapshot(), before, "reading pause progress must not change mission state");
+    assert.deepEqual(progress.conditions.filter(row => row.id !== "minimumSeconds").map(row => row.id), stage.requirements);
+    for (const row of progress.conditions) assert.ok(TEXT[`menu.condition.${row.id}`], `missing condition text: ${row.id}`);
+    if (stage.minimumSeconds) {
+      stage.requirements.forEach(id => probe.Record(id));
+      probe.Update(stage.minimumSeconds - .5);
+      assert.equal(probe.stage.id, stage.id);
+      assert.equal(probe.ObjectiveProgress().conditions.at(-1).complete, false, "timer remains an independent gate");
+      probe.Update(.5);
+      assert.notEqual(probe.stage.id, stage.id);
+    } else if (stage.requirements.length) {
+      probe.Record(stage.requirements[0]);
+      assert.equal(probe.ObjectiveProgress().conditions[0].complete, true);
+      assert.ok(probe.ObjectiveProgress().conditions.slice(1).every(row => !row.complete));
+      const restored = new FirstLevelMissionFlow(); restored.Restore(probe.Snapshot());
+      assert.deepEqual(restored.ObjectiveProgress(), probe.ObjectiveProgress());
+    } else assert.ok(progress.complete && !progress.conditions.length);
+  }
+}
+
+{
  const calls=[],moved=[],stopped=[],levels=[];
  const actor={alive:true,position:{x:-78.65,y:1,z:92.8}};
  const audio={Ambience:id=>calls.push(id),SetAmbienceLayerLevel:(...args)=>levels.push(args),

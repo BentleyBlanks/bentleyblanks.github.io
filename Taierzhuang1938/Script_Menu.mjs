@@ -251,6 +251,7 @@ export class MainMenu {
     objectiveTitle.id = "PauseObjectiveTitle";
     objectiveTitle.textContent = T("menu.pause.objective");
     this.el.pauseObjectiveText = mk("mnPauseObjectiveText", this.el.pauseObjective, "p");
+    this.el.pauseProgress = mk("mnPauseProgress", this.el.pauseObjective, "div");
 
     // --- 主列表 -----------------------------------------------------------
     this.el.list = mk("mnList", this.root, "nav");
@@ -542,6 +543,37 @@ export class MainMenu {
     this.root.classList.remove("pause");
   }
 
+  /** Shared pause contract: {complete, conditions:[{id,text,complete,detail?}]}. */
+  RenderObjectiveProgress(progress) {
+    const mk = (className, parent, tag) => {
+      const element = document.createElement(tag);
+      element.className = className;
+      parent.appendChild(element);
+      return element;
+    };
+    const root = this.el.pauseProgress;
+    root.replaceChildren();
+    const conditions = progress?.conditions || [];
+    const heading = mk("mnPauseProgressTitle", root, "h3");
+    heading.textContent = T("menu.progress.title");
+    const summary = mk("mnPauseProgressSummary", root, "p");
+    summary.textContent = !progress ? T("menu.progress.unavailable") : progress.complete
+      ? T("menu.progress.complete") : T("menu.progress.summary", {
+        current: conditions.filter(condition => condition.complete).length, target: conditions.length,
+      });
+    const list = mk("mnPauseConditions", root, "ul");
+    for (const condition of conditions) {
+      const row = mk("mnPauseCondition", list, "li");
+      row.dataset.condition = condition.id;
+      row.classList.toggle("complete", condition.complete);
+      const status = mk("mnPauseConditionStatus", row, "span");
+      status.textContent = T(condition.complete ? "menu.progress.done" : "menu.progress.pending");
+      const body = mk("mnPauseConditionBody", row, "div");
+      mk("mnPauseConditionText", body, "span").textContent = condition.text;
+      if (condition.detail) mk("mnPauseConditionDetail", body, "p").textContent = condition.detail;
+    }
+  }
+
   Show(mode) {
     const wasMode = this.mode;
     this.mode = mode;
@@ -554,6 +586,8 @@ export class MainMenu {
     const objective = mode === "pause" ? String(this.host.CurrentObjective?.() || "").trim() : "";
     this.el.pauseObjectiveText.textContent = objective;
     this.el.pauseObjective.hidden = !objective;
+    this.el.pauseObjective.scrollTop = 0;
+    this.RenderObjectiveProgress(mode === "pause" ? this.host.CurrentObjectiveProgress?.() : null);
     const panel = mode === "levels" || mode === "codex" || mode === "credits" || mode === "debug";
     if (panel) this.panelReturnMode = wasMode === "pause" ? "pause" : "title";
     this.root.classList.toggle("panelOn", panel);

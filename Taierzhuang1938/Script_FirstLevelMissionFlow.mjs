@@ -76,6 +76,16 @@ export class FirstLevelMissionFlow {
     this.log = saved.log.map((entry) => ({ ...entry }));
     this.started = true;
   }
+  // Read the same gates as Update; never infer completion from UI counters.
+  ObjectiveProgress() {
+    const conditions = this.stage.requirements.map(id => ({ id, complete: this.Has(id) }));
+    if (this.stage.minimumSeconds) conditions.push({
+      id: "minimumSeconds", complete: this.stageTime >= this.stage.minimumSeconds,
+      current: Math.min(this.stage.minimumSeconds, Math.floor(this.stageTime)),
+      target: this.stage.minimumSeconds,
+    });
+    return { stageId: this.stage.id, complete: this.completed, conditions };
+  }
   State() {
     return {
       ...this.Snapshot(),

@@ -3,6 +3,23 @@
 对应实现：`Data_Menu.mjs`（机位表）、`Script_Menu.mjs`（菜单本体）、`Style_Menu.css`、
 `Script_Main.mjs` 的菜单接线、`Script_MenuTest.mjs`（冒烟）。
 
+## 暂停任务条件（2026-09-13）
+
+Esc 页在当前任务目标下显示“达成条件与当前进度”、完成项数与逐项状态。
+菜单使用通用 host 接口 `CurrentObjectiveProgress()`，返回
+`{ complete, conditions: [{ id, text, complete, detail? }] }`；每次打开暂停页重新读取，
+更换阶段清除旧列表。未接入追踪的开发场景明确显示无可追踪条件。
+
+第一关由 `FirstLevelMissionFlow.ObjectiveProgress()` 读取实际 `requirements`、任务事实和
+`minimumSeconds`，不会另设通关判定或修改存档。运行时补上本地化文字及步枪掩护计时、
+开枪状态、守军撤回与阵亡人数。守军撤离结算沿用真实规则：安全撤回或阵亡都不再滞留，
+界面分别列出两种结果，不把阵亡显示为获救。新增任务条件需要在 `Data_Text_Menu.mjs`
+添加同 ID 的 `menu.condition.*` 文案。
+
+验收复用 `Script_FirstLevelMissionTest.mjs`（所有任务步骤、独立计时条件、读取无副作用和恢复）
+与 `Script_DeathMenuTest.mjs`（真实暂停接口、刷新、切换、完成状态及三种屏幕尺寸）。
+后者的任务进度截图使用显式状态夹具，仅证明 UI，不作为正常通关证据。
+
 ## 阵亡与检查点（2026-09-11）
 
 阵亡使用独立的 `failure` 状态，不再经过 `OpenPause()`。倒地镜头单独推进，

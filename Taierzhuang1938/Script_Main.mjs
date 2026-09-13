@@ -2879,6 +2879,7 @@ async function Boot() {
         return stage ? Localize(FirstLevelStageTextId(stage.id), stage.objective) : p012Flow?.CurrentObjective().text || state.storyObjective || "";
       },
       GroundHeight: (x, z) => (battlefield ? battlefield.GroundHeight(x, z) : null),
+      CurrentObjectiveProgress: () => missionRuntime?.ObjectiveProgress() || null,
       Unlock: () => audio.Unlock(),
       Play: (index, opts) => StartLevel(index, opts),
       // 靶场：菜单里当一条「特殊关卡」摆着，但进出都是**重载页面**。
