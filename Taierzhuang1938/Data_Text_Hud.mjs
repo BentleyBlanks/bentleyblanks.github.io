@@ -36,6 +36,7 @@ export const TEXT = Object.freeze({
   "hud.prompt.carryDrop": "放下",
   "hud.prompt.carryThrow": "扔下，立刻还手",
   "hud.prompt.bandage": "包扎止血",
+  "hud.prompt.reload": "换弹",
   "hud.prompt.meleeCharge": "白刃（按住蓄力劈刺）",
   "hud.prompt.switchWeapon": "切换{slots}",
   "hud.weaponSlot.primary": "长枪",

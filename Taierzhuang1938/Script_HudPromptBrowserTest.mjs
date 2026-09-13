@@ -92,22 +92,54 @@ try {
     T.state.slots.secondary = "ServicePistol";
     T.state.ammo = 5;
     T.StepFrames(12);
+    const row = document.querySelector(".hudAction");
+    const rowStyle = row && getComputedStyle(row);
+    const keyStyle = row && getComputedStyle(row.querySelector("kbd"));
     return {
       prompts: T.Debug.Prompts(),
-      // 行上**只有按键字母**，汉字说明只留在 title 上
-      rows: [...document.querySelectorAll(".hudAction")].map((row) => row.textContent),
-      titles: [...document.querySelectorAll(".hudAction")].map((row) => row.title),
-      icons: [...document.querySelectorAll(".hudAction .ico svg")].length,
+      // 行上只有字：按键 + 动作，没有图标、没有框、没有底板
+      rows: [...document.querySelectorAll(".hudAction")].map((el) =>
+        [el.querySelector("kbd")?.textContent, el.querySelector(".actionText")?.textContent]),
+      titles: [...document.querySelectorAll(".hudAction")].map((el) => el.title),
+      icons: document.querySelectorAll(".hudAction .ico, .hudAction svg").length,
       on: document.querySelector(".hudActions")?.classList.contains("on"),
+      box: rowStyle && [rowStyle.borderTopWidth, rowStyle.backgroundColor, keyStyle.borderTopWidth, keyStyle.backgroundColor],
+      labelPx: rowStyle && Number.parseFloat(rowStyle.fontSize),
+      keyPx: keyStyle && Number.parseFloat(keyStyle.fontSize),
     };
   });
   // 可装刺刀不构成眼前操作，X 不再常驻；其余提示保持既有条件。
   assert.deepEqual(prompts.prompts.map((prompt) => prompt.kind),
     ["bandage", "switchWeapon"]);
   assert.equal(prompts.on, true);
-  assert.deepEqual(prompts.rows, ["B", "1 / 2"]);
-  assert.equal(prompts.icons, 2);
+  assert.deepEqual(prompts.rows, [["B", "包扎止血"], ["1 / 2", "切换长枪 / 短枪"]]);
+  assert.equal(prompts.icons, 0, "提示只有字，不画图标");
+  assert.deepEqual(prompts.box, ["0px", "rgba(0, 0, 0, 0)", "0px", "rgba(0, 0, 0, 0)"], "提示没有外框与底板");
+  assert.ok(prompts.labelPx >= 18 && prompts.keyPx >= prompts.labelPx, `提示字号太小：${prompts.labelPx}/${prompts.keyPx}`);
   assert.ok(prompts.titles.some((title) => title === "包扎止血"));
+
+  // 打空且有备弹：提示条要出现 R 换弹。
+  const emptyGun = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    T.player.bleeding = 0;
+    T.state.activeSlot = "primary";
+    T.state.ammo = 0;
+    T.state.clips = 3;
+    T.StepFrames(12);
+    const withReserve = T.Debug.Prompts();
+    T.state.clips = 0;
+    T.StepFrames(12);
+    const noReserve = T.Debug.Prompts();
+    T.state.ammo = 5;
+    T.state.clips = 3;
+    T.player.bleeding = 0.4;
+    T.StepFrames(12);
+    return { withReserve, noReserve };
+  });
+  assert.ok(emptyGun.withReserve.some((prompt) => prompt.keys === "R" && prompt.label === "换弹"),
+    `打空有备弹要提示 R 换弹：${JSON.stringify(emptyGun.withReserve)}`);
+  assert.ok(!emptyGun.noReserve.some((prompt) => prompt.keys === "R"),
+    `没备弹不提示 R：${JSON.stringify(emptyGun.noReserve)}`);
 
   // COD《战争世界》式右下角：没有姿态人形与姿态按钮；投掷物数与弹药同一行；
   // 弹药块只在交互后亮几秒（IDLE_FADE.combatS），空膛 / 低弹钉住不淡。

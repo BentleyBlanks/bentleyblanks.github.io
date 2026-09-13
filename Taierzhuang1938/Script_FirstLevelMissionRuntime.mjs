@@ -180,12 +180,12 @@ export class FirstLevelMissionRuntime {
   OpeningPrompt() {
     if (this.controls || !this.EmptyHands || !["Train","Unloading"].includes(this.flow.stage.id)) return null;
     if (this.ReceivingFood) return {keys:T("input.guide.move.look.keys"),
-      label:T("firstLevel.hint.receiveFood"),kind:"look",text:true};
+      label:T("firstLevel.hint.receiveFood"),kind:"look"};
     if (this.Has("trainStopped")) return this.player.stance==="prone"
-      ? {keys:"Z",label:T("firstLevel.hint.standAndUnload"),kind:"stance",text:true}
-      : {keys:"WASD",label:T("firstLevel.hint.leaveTrain"),kind:"move",text:true};
+      ? {keys:"Z",label:T("firstLevel.hint.standAndUnload"),kind:"stance"}
+      : {keys:"WASD",label:T("firstLevel.hint.leaveTrain"),kind:"move"};
     if (this.Has("trainProneOrder") && this.player.stance!=="crouch")
-      return {keys:"C",label:T("firstLevel.hint.trainProne"),kind:"stance",text:true};
+      return {keys:"C",label:T("firstLevel.hint.trainProne"),kind:"stance"};
     return null;
   }
   VoiceEvent(id,cueId,detail) {

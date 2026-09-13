@@ -132,50 +132,6 @@ export function AmmoReadout({ ammo = 0, clips = 0, magazine = 0, armed = true,
 }
 
 /**
- * 情境提示的图标。**提示上不写字**：一行只有按键框 + 一个说明动作的小图 ——
- * 战斗中没人有工夫读「分一个桥夹给邱茂才」，但一眼能认出那是子弹。
- * 汉字说明仍挂在 title/aria-label 上（读屏与冒烟测试读它）。
- *
- * 用内联 SVG 而不是字体图标或下载的图标包：描边随 currentColor 走，
- * 和按键框同色同亮度；也不额外拖一个网络请求。
- * 一律 24×24 viewBox、只描边不填充，粗细交给 CSS 统一。
- */
-const ACTION_ICONS = {
-  // 一只伸出去的手：通用交互（够不着别的语义时的兜底）
-  interact: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12V5.6a1.6 1.6 0 0 1 3.2 0V11m0-1.2a1.6 1.6 0 0 1 3.2 0V12m0-1a1.6 1.6 0 0 1 3.2 0v5.2A5.8 5.8 0 0 1 12.6 22h-1A5.6 5.6 0 0 1 6 16.4v-3l-1.6.9a1.5 1.5 0 0 0-.6 2l.9 1.7"/></svg>`,
-  // 一支斜着的步枪：从倒下的人身上拾枪 / 换枪
-  pickup: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.6 18.4 19.6 6.6M2.8 20.6 6.2 17.2M10.6 12.8l1.8 2.6M13.8 9.8l2.2 1.4"/></svg>`,
-  // 两发桥夹弹：分弹药给打光了的自己人
-  ammo: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20.5V10l2-3.5L11 10v10.5zM14 20.5V10l2-3.5 2 3.5v10.5zM5.5 15.5h14"/></svg>`,
-  // 一片创可贴：止血
-  bandage: `<svg viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-45 12 12)"><rect x="3.2" y="9" width="17.6" height="6" rx="3"/><path d="M9 9v6M15 9v6"/></g></svg>`,
-  // 双向箭头：换枪
-  switchWeapon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h13l-3.4-3.4M20 15H7l3.4 3.4"/></svg>`,
-  // 推架：顶开近身武器，不表示处决。
-  push: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18c3-4 6-4 9-2l3 2 4-1M13 16l3-7m-1 2 5-5M7 19l3 2"/></svg>`,
-  // --- 任务流程重制新增：担架/搬运/救护那一批 ---------------------------------
-  // 两根杠加一张布：担架、门板担架、抬起任何重物
-  carry: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9h20M2 15h20M6 7.5v9M18 7.5v9"/></svg>`,
-  // 一卷纱布：递纱布 / 交药品
-  supply: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="10" rx="2"/><path d="M9 7v10M15 7v10"/></svg>`,
-  // 医用十字：检查伤员
-  check: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/></svg>`,
-  // 一扇带横撑的门板：拆门板
-  plank: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M5 9h14M5 15h14"/></svg>`,
-  // 两个接头之间一段线：接 / 剪电话线
-  wire: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17c4 0 4-10 8-10s4 10 8 10"/><circle cx="3" cy="17" r="1.6"/><circle cx="19" cy="17" r="1.6"/></svg>`,
-  // 一簇火苗：投传单入火
-  fire: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c3 4 6 5.5 6 10a6 6 0 0 1-12 0c0-2.6 1.4-4 3-5.6.4 1.6 1.2 2.4 2 2.6-.6-2.6-.4-5 1-7Z"/></svg>`,
-  // 一张印着字的纸：传单
-  leaflet: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>`,
-  // 一张被撕开的布：撕短褂
-  tear: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h5l-2 4 2 3-2 4 2 3-1 4H5zM19 3h-5l2 4-2 3 2 4-2 3 1 4h4z"/></svg>`,
-  // 一枚木柄手榴弹：拾起脚边的活雷掷回去（Script_GrenadeReturn 登记的 kind）
-  grenade: EQUIPMENT_ICONS.grenade,
-};
-ACTION_ICONS.action = ACTION_ICONS.interact;
-
-/**
  * 近弹图标该钉在屏幕哪里。纯函数，HudPromptTest 直接验。
  *
  * `projected` 是装配层投影出来的 {x, y, visible, behind}：屏内就钉在弹上
@@ -219,7 +175,7 @@ export function TargetCardPresentation(card, { targetDistance = true } = {}) {
  */
 export function ContextualActionPrompts({
   interaction = null, bleeding = 0, bandages = 0, slots = {},
-  ammoEmpty = false, carry = null,
+  ammoEmpty = false, canReload = false, carry = null,
 } = {}) {
   const prompts = [];
   /**
@@ -238,15 +194,15 @@ export function ContextualActionPrompts({
     return prompts;
   }
   if (interaction?.label) {
-    // 拾雷掷回是唯一带倒计时的交互：标签里那个「· 2.9秒」就是决定按不按的信息，
-    // 光一个图标读不出来，所以这一条把字也上屏（其余交互仍只给按键框 + 图标）。
-    const kind = interaction.kind || "interact";
-    prompts.push({ keys: "F", label: interaction.label, kind, text: kind === "grenade" });
+    prompts.push({ keys: "F", label: interaction.label, kind: interaction.kind || "interact" });
   }
   if (Number(bleeding) > 0 && Number(bandages) > 0) {
     prompts.push({ keys: "B", label: T("hud.prompt.bandage"), kind: "bandage" });
   }
-  // 空枪时先教"这一下还能捅出去"，再教装填 —— 白刃是贴脸时唯一来得及的选项
+  // 空枪：有备弹就先提示 R 换弹（打空了最先要知道的就是这个），再提示左键还能白刃。
+  if (ammoEmpty && canReload) {
+    prompts.push({ keys: "R", label: T("hud.prompt.reload"), kind: "reload" });
+  }
   if (ammoEmpty) {
     prompts.push({ keys: T("hud.key.mouseLeft"), label: T("hud.prompt.meleeCharge"), kind: "melee" });
   }
@@ -431,7 +387,8 @@ export class Hud {
     /** 负重条：抬着什么、抬得稳没有。位置在武器区上方，与它同一栏（都是「手上是什么」）。 */
     this.el.carry = mk("hudCarry");
     this.el.carry.innerHTML =
-      `<span class="carryIco">${ACTION_ICONS.carry}</span>`
+      // 两根杠加一张布：担架、门板担架、抬起任何重物
+      `<span class="carryIco"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9h20M2 15h20M6 7.5v9M18 7.5v9"/></svg></span>`
       + `<span class="carryText"><b></b><i></i></span>`
       + `<span class="carryBar"><u></u></span>`;
     this.el.carryLabel = this.el.carry.querySelector(".carryText b");
@@ -1049,9 +1006,9 @@ export class Hud {
       .filter((prompt) => prompt?.keys && prompt?.label)
       .slice(0, PROMPTS.maxRows)
       .map((prompt) => ({
-        keys: String(prompt.keys), label: String(prompt.label), kind: String(prompt.kind || "action"), text:!!prompt.text,
+        keys: String(prompt.keys), label: String(prompt.label), kind: String(prompt.kind || "action"),
       }));
-    const signature = next.map((prompt) => `${prompt.kind}:${prompt.keys}:${prompt.label}:${prompt.text}`).join("|");
+    const signature = next.map((prompt) => `${prompt.kind}:${prompt.keys}:${prompt.label}`).join("|");
     if (signature === this.actionPromptSignature) return;
     this.actionPromptSignature = signature;
     this.actionPrompts = next;
@@ -1059,16 +1016,15 @@ export class Hud {
     for (const prompt of next) {
       const row = document.createElement("div");
       row.className = `hudAction ${prompt.kind}`;
+      // 只有字：按键 + 一句动作，没有框、没有底板、没有图标。
       const key = document.createElement("kbd");
       key.textContent = prompt.keys;
-      const icon = document.createElement("span");
-      icon.className = "ico";
-      icon.innerHTML = ACTION_ICONS[prompt.kind] || ACTION_ICONS.action;
-      // 文字不上屏，只留在无障碍属性里
+      const label = document.createElement("span");
+      label.className = "actionText";
+      label.textContent = prompt.label;
       row.title = prompt.label;
       row.setAttribute("aria-label", T("hud.action.aria", { keys: prompt.keys, label: prompt.label }));
-      row.append(key, icon);
-      if(prompt.text){const label=document.createElement("span");label.className="actionText";label.textContent=prompt.label;label.style.cssText="font:14px/1.4 sans-serif;color:#fff;white-space:normal;max-width:250px";row.append(label);}
+      row.append(key, label);
       this.el.actions.appendChild(row);
     }
     this.el.actions.classList.toggle("on", next.length > 0);

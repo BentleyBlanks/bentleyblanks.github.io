@@ -6684,15 +6684,15 @@ function UpdateContextualActionPrompts() {
     const prompts=[];
     if(load?.active){
       if(load.phase==="carry"){
-        if(interaction?.point?.id==="p012_ammoDrop")prompts.push({keys:T("hud.key.holdF"),label:T("hud.prompt.ammoDeliver"),kind:"supply",text:true});
-        else if(load.canThrow)prompts.push({keys:T("hud.key.mouseLeft"),label:T("hud.prompt.ammoDrop"),kind:"carry",text:true});
+        if(interaction?.point?.id==="p012_ammoDrop")prompts.push({keys:T("hud.key.holdF"),label:T("hud.prompt.ammoDeliver"),kind:"supply"});
+        else if(load.canThrow)prompts.push({keys:T("hud.key.mouseLeft"),label:T("hud.prompt.ammoDrop"),kind:"carry"});
       }
-    }else if(interaction?.point?.id==="p012_ammoPickup")prompts.push({keys:T("hud.key.holdF"),label:T("hud.prompt.ammoPickup"),kind:"carry",text:true});
+    }else if(interaction?.point?.id==="p012_ammoPickup")prompts.push({keys:T("hud.key.holdF"),label:T("hud.prompt.ammoPickup"),kind:"carry"});
     hud.SetActionPrompts(prompts);return;
   }
   if(missionRuntime && interaction?.point?.tag==="FirstLevelMission"){
-    const prompts=[{keys:interaction.point.gesture==="hold"?T("hud.key.holdF"):"F",label:interaction.label,kind:interaction.kind||"interact",text:true}];
-    if(player.bleeding>0&&player.bandages>0)prompts.push({keys:"B",label:T("hud.prompt.bandage"),kind:"bandage",text:true});
+    const prompts=[{keys:interaction.point.gesture==="hold"?T("hud.key.holdF"):"F",label:interaction.label,kind:interaction.kind||"interact"}];
+    if(player.bleeding>0&&player.bandages>0)prompts.push({keys:"B",label:T("hud.prompt.bandage"),kind:"bandage"});
     hud.SetActionPrompts(prompts);return;
   }
   const gunInHand = state.activeSlot === "primary" || state.activeSlot === "secondary";
@@ -6704,13 +6704,15 @@ function UpdateContextualActionPrompts() {
     bandages: player.bandages,
     slots: state.slots,
     ammoEmpty: !(p012Flow && p012Flow.beat < 6) && gunInHand && state.ammo <= 0 && !!WEAPONS[currentWeapon]?.magazine,
+    // 与 Reload() 的放行条件同口径：有备弹（或无限弹）才提示 R。
+    canReload: EffectiveInfiniteAmmo() || state.clips > 0,
   });
   // 抬着东西的时候提示条已经被负重接管（只剩放下/扔下），不插入推架提示。
   // 那一下 F 的实际结果是「放下担架」，提示与因果就分叉了。
   if (meleeCombat?.CanUse() && meleeCombat.PushCandidate()) {
     prompts.unshift({ keys: "F", label: T("hud.prompt.push"), kind: "push" });
   }
-  hud.SetActionPrompts(p012Flow||missionRuntime?prompts.map(prompt=>({...prompt,text:true})):prompts);
+  hud.SetActionPrompts(prompts);
 }
 
 /**

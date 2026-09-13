@@ -36,7 +36,7 @@ WaW 的 HUD 元素与 COD4 同源，引擎里管「闲置淡出」的是 `hud_fa
 | 血量 | Imagegen 透明边缘血污 + 克制暗角；濒死时子层双拍搏动，中央视野清楚（`VIGNETTE`） | 按此反馈层级制作本作原创素材 |
 | 来弹方向 | `.hudHitDir` 承载血色纹理弧；擦身弹为淡沙金纹理 + 断开细弧，转身同步方位 | 去掉几何尖角，保留两类事件区别；见 [素材与提示词](../Texture/Hud/Data_HudDamageArtwork.md) |
 | 近弹指示 | `.hudGrenadeWarning`：钉在弹上 / 贴边指向 | 照做 |
-| 交互提示 | `.hudActions`：准心左下的按键框 + 图标（第一关带文字） | 照做，位置照 Easy Red 2 |
+| 交互提示 | `.hudActions`：准心左下、右对齐的**纯文字**「按键（暖黄）+ 动作」，19 px 粗体硬黑描边，无框无底板无图标（2026-09-13 用户定）；空膛且有备弹时出「R 换弹」 | 照做，位置照 Easy Red 2 |
 | 命中记号 | `.hudHitmark` 四道短撇 | WaW 单人没有；保留（见 docs/Data_DesignFirstPass.md §385 的账） |
 | 帧率读数 | `.hudFps` 右上小字 | 调试读数，不算 HUD |
 

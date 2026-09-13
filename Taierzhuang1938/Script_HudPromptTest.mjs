@@ -81,10 +81,15 @@ const stacked = ContextualActionPrompts({
   slots: { primary: "HanYang", secondary: "ServicePistol" },
 });
 assert.deepEqual(stacked.map((prompt) => prompt.kind), ["pickup", "bandage", "switchWeapon"]);
-// 只有拾雷掷回把字上屏（标签里带引信倒计时）；拾枪那一条仍是按键框 + 图标。
-assert.equal(stacked[0].text, false, "pickup prompt stays icon-only");
 const grenadePrompt = ContextualActionPrompts({ interaction: { label: "拾起并掷回 · 2.9秒", kind: "grenade" } });
-assert.deepEqual(grenadePrompt.map((prompt) => [prompt.kind, prompt.text, prompt.label]), [["grenade", true, "拾起并掷回 · 2.9秒"]]);
+assert.deepEqual(grenadePrompt.map((prompt) => [prompt.kind, prompt.label]), [["grenade", "拾起并掷回 · 2.9秒"]]);
+
+// 打空了：有备弹先提示 R 换弹，再提示左键白刃；没备弹只剩白刃；没打空不提示 R。
+assert.deepEqual(ContextualActionPrompts({ ammoEmpty: true, canReload: true })
+  .map((prompt) => [prompt.keys, prompt.kind]), [["R", "reload"], ["左键", "melee"]]);
+assert.deepEqual(ContextualActionPrompts({ ammoEmpty: true, canReload: false })
+  .map((prompt) => prompt.kind), ["melee"], "没有备弹不许提示一个按了没反应的 R");
+assert.deepEqual(ContextualActionPrompts({ ammoEmpty: false, canReload: true }), []);
 
 console.log("ok  操作说明与情境 HUD 提示条件通过");
 

@@ -231,41 +231,29 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 
 /* 情境操作提示：只由真实可执行状态驱动，常驻；一次性反馈仍走上面的 hudHint。
    位置照 Easy Red 2：不在屏幕底沿，而是准星左下那一小块——视线不用离开准星就能读到，
-   又不压住准星本身。竖排左对齐，**只有按键框 + 图标，不写字**——
-   一眼是「F ＋ 一支枪」，不需要读完「换上 三八式步枪」。 */
+   又不压住准星本身。竖排右对齐贴向准星。**只有字**：按键（暖黄）+ 一句动作，
+   没有框、没有底板、没有图标；靠 COD 目标文字同款硬黑描边在任何背景上读得出。 */
 .hudActions {
   position: absolute; left: 50%; top: 50%; transform: translate(-100%, -6%);
   margin-left: -34px;
-  display: flex; flex-direction: column; align-items: flex-start; gap: 7px;
-  max-width: min(34vw, 360px); z-index: 2; opacity: 0; transition: opacity 0.16s linear;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+  max-width: min(40vw, 420px); z-index: 2; opacity: 0; transition: opacity 0.16s linear;
   white-space: nowrap;
 }
 .hudActions.on { opacity: 1; }
 .hudAction {
-  display: flex; align-items: center; gap: 8px;
-  padding: 5px 8px 5px 6px; border: 1px solid rgba(230,223,205,0.24); border-radius: 2px;
-  background: rgba(10,10,9,0.62); color: rgba(230,223,205,0.92); font-size: 14px;
-  box-shadow: 0 1px 6px rgba(0,0,0,0.35);
+  display: flex; align-items: baseline; gap: 8px;
+  font: 700 19px/1.25 var(--ui-font); color: rgba(236,232,222,0.97);
+  -webkit-text-stroke: 1px rgba(0,0,0,0.96); paint-order: stroke fill;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
 }
 .hudAction kbd {
-  min-width: 26px; box-sizing: border-box; padding: 2px 6px;
-  border: 1px solid rgba(230,223,205,0.5); border-radius: 2px;
-  background: rgba(230,223,205,0.12); color: var(--paper);
-  font: 12px/1.45 ui-monospace, "Cascadia Mono", Consolas, monospace; text-align: center;
+  font: inherit; font-size: 21px; color: var(--warn);
 }
-.hudAction .ico { display: flex; width: 19px; height: 19px; opacity: 0.92; }
-.hudAction .ico svg {
-  width: 100%; height: 100%; fill: none; stroke: currentColor;
-  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+@media (max-width: 700px) {
+  .hudAction { font-size: 16px; -webkit-text-stroke-width: 0.8px; }
+  .hudAction kbd { font-size: 17px; }
 }
-.hudAction.pickup kbd, .hudAction.bandage kbd { border-color: rgba(224,176,98,0.82); color: var(--warn); }
-.hudAction.pickup .ico, .hudAction.interact .ico { color: var(--warn); }
-.hudAction.ammo kbd { border-color: rgba(224,176,98,0.82); color: var(--warn); }
-.hudAction.ammo .ico { color: var(--warn); }
-.hudAction.bandage .ico, .hudAction.supply .ico, .hudAction.check .ico { color: #e2a48e; }
-.hudAction.carry .ico, .hudAction.plank .ico { color: var(--warn); }
-.hudAction.wire .ico { color: #9dc0e4; }
-.hudAction.fire .ico, .hudAction.tear .ico { color: #e18a71; }
 
 /* 按住型交互的进度环（按住止血 / 拆门板 / 撕短褂）。
    在准星正下方一点点：视线不用离开准星，也不压住下面的字幕行。

@@ -271,7 +271,7 @@ async function Interact() {
     if(interaction?.point?.tag==="FirstLevelMission"){
       g.StepFrames(1,1/60,true);
       const prompt=g.hud.actionPrompts.find(p=>p.label===interaction.label);
-      if(!prompt?.text||!document.querySelector(".actionText")?.textContent)throw Error("mission interaction needs a visible action label");
+      if(!prompt||!document.querySelector(".actionText")?.textContent)throw Error("mission interaction needs a visible action label");
     }
     g.Debug.Key("KeyF", true);
     g.StepFrames(90, 1 / 60, false);
