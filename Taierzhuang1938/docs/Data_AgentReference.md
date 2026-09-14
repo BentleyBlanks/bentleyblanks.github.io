@@ -612,3 +612,5 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 `Script_BloodEffects` / `Script_SurfaceDecals` / `Data_Tuning_Blood`：枪击、断肢与普通尸体共用的血雾、物理液滴、湿干血迹。`MissionAftermath` 使用同一投影材质的持久层。接口、免费资产、限制与验收见 [通用血液特效](Data_BloodEffects.md)，定向门禁 `Script_BloodEffectsTest.mjs`。
 
 玩家枪械散布、连射恢复、机枪后坐与近墙收枪的当前接线及验收见 [枪械持枪与散布](Data_FirearmHandling.md)。
+
+- 第一关偏离任务、小队脱节和地图边缘的全屏返回警示：[规则与验收](Data_MissionReturnWarning.md)，入口 `Script_MissionReturn.mjs` / `Data_FirstLevelMissionReturn.mjs`。

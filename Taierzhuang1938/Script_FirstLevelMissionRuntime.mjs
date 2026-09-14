@@ -1,3 +1,6 @@
+import { MissionReturn } from "./Script_MissionReturn.mjs";
+import { MISSION_RETURN } from "./Data_Tuning_FirstLevel.mjs";
+import { MISSION_RETURN_ROUTES, MISSION_RETURN_PERSON_STAGES, MISSION_RETURN_SQUAD_STAGES, MISSION_RETURN_DISABLED_STAGES } from "./Data_FirstLevelMissionReturn.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
 import { SquadCoverRoute, SquadCoverBounds } from "./Script_SquadMarchCover.mjs";
 import { SQUAD_COVER_BOUNDS as CB } from "./Data_Tuning_SquadMarch.mjs";
@@ -55,6 +58,7 @@ export class FirstLevelMissionRuntime {
     Object.assign(this, host);
     this.host = host;
     this.time = 0;
+    this.missionReturn = new MissionReturn(MISSION_RETURN);
     this.enemies = new Map();
     this.spawned = new Set();
     this.spawnQueue = [];
@@ -1241,6 +1245,7 @@ export class FirstLevelMissionRuntime {
         this.Guide(MISSION_ROUTES.exit);
         break;
       case "Complete":
+        this.ClearReturnWarning();
         this.completed = true;
         this.Complete();
         break;
@@ -1747,6 +1752,24 @@ export class FirstLevelMissionRuntime {
       else this.Record("secondAirPassComplete");
     }
   }
+  ClearReturnWarning() {
+    this.missionReturn.Reset();
+    this.hud.SetMissionReturn?.(null);
+  }
+  UpdateReturnWarning(dt) {
+    const stage=this.flow.stage,guide=this.CurrentGuide();
+    const disabled=this.failed || this.completed || this.controls || !this.player.alive
+      || MISSION_RETURN_DISABLED_STAGES.includes(stage.id)
+      || (stage.id==="Unloading" && !this.Has("trainStopped"));
+    const squad=MISSION_RETURN_SQUAD_STAGES.includes(stage.id)?this.companion.Handle("luo"):null;
+    const route=MISSION_RETURN_ROUTES[stage.id];
+    return this.missionReturn.Update(dt,disabled?null:{stage:stage.id,
+      position:this.player.position,yaw:this.player.yaw,bounds:this.battlefield.bounds,
+      route, target:guide?.target||stage.target,
+      person:MISSION_RETURN_PERSON_STAGES.includes(stage.id)?this.column.zhou:null,
+      squad:squad?.alive===false?null:squad?.position,
+      label:guide?.label||Localize(FirstLevelStageTextId(stage.id),stage.objective)});
+  }
   CurrentGuide() {
     const stage=this.flow.stage, spec=MISSION_GUIDANCE[stage.id];
     if(!spec || this.failed || this.controls || this.completed)return null;
@@ -2075,6 +2098,7 @@ export class FirstLevelMissionRuntime {
     this.meal.Update();
     this.view.Update(this.time, { tank: this.tank,player:this.player,camera:this.camera||null });
     this.flow.Update(dt);
+    this.hud.SetMissionReturn?.(this.UpdateReturnWarning(dt));
   }
   SaveCheckpoint() {
     this.safePoint = {
@@ -2088,6 +2112,7 @@ export class FirstLevelMissionRuntime {
     };
   }
   OnPlayerDown() {
+    this.ClearReturnWarning();
     this.failed = true;
     this.retryPoint =
       this.carry.Active || this.controls
@@ -2174,6 +2199,7 @@ export class FirstLevelMissionRuntime {
       opening:this.opening.State(),
       ...this.flow.State(),
       missionVersion: MISSION_VERSION,
+      returnWarning: this.missionReturn.result,
       transferBeats:this.transferBeats || null,
       debugStart: this.debugStart || null,
       time: this.time,
@@ -2224,6 +2250,7 @@ export class FirstLevelMissionRuntime {
     };
   }
   Dispose() {
+    this.ClearReturnWarning();
     this.speakingFace?.Reset();
     if(this.ai.ctx.onSoldierDeath===this.soldierDeath)this.ai.ctx.onSoldierDeath=this.oldSoldierDeath;
     this.meal.Dispose();

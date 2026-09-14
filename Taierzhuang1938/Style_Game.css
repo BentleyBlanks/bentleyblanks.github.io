@@ -939,3 +939,23 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .goreLab[hidden]{display:none}.glHeading{display:flex;flex-wrap:wrap;gap:4px 10px;justify-content:space-between;align-items:baseline;margin-bottom:12px}.glHeading b{font-size:18px}.glHeading span{font-size:11px;color:#b2b9b2}.glButtons{display:flex;gap:7px;margin-bottom:7px}.goreLab button{background:#c7b276;color:#172020;border:0;padding:8px 10px;cursor:pointer;flex:1}.goreLab button:focus-visible{outline:2px solid #fff}.glLimbLabel{color:#adb6ae;font-size:11px;margin:10px 0 5px}.glLimbs{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}.goreLab .glLimb{background:#3c4a4c;color:#e9e6d9;font-size:11px;padding:6px 2px}.glStatus{display:block;color:#cdd9ad;margin:12px 0 8px}.glMeters,.glPosts{white-space:pre-line;font-variant-numeric:tabular-nums}.glMeters{padding:9px;background:#ffffff09}.glPosts{font-size:11px;margin:9px 0;color:#b8c7cb}.glControls{font-size:12px;color:#b9c2c0;border-top:1px solid #54615a;padding-top:10px;margin-bottom:0}
 .goreLabActive .hudMarkers,.goreLabActive .hudForceStatus,.goreLabActive .hudTop{display:none}
 @media(max-width:760px){.goreLab{--glMaxHeight:52dvh;top:10px;left:8px;width:228px;max-width:calc(50vw - 20px);padding:10px;font-size:11px}.glHeading b{font-size:14px}.glLimbs{grid-template-columns:repeat(3,1fr)}}
+
+/* Soft mission boundary: full viewport, readable battlefield, input passes through. */
+.hudMissionReturn { position:absolute; inset:0; z-index:18; pointer-events:none;
+  display:flex; align-items:center; justify-content:center; opacity:0; visibility:hidden;
+  background:radial-gradient(ellipse at center,rgba(15,12,10,.08) 20%,rgba(38,19,12,.55) 72%,rgba(64,26,13,.8));
+  transition:opacity .35s ease,visibility .35s; color:#f5eddd; text-align:center; }
+.hudMissionReturn.on {opacity:1;visibility:visible;}
+.hudMissionReturn.urgent {background:radial-gradient(ellipse at center,rgba(18,9,7,.13) 20%,rgba(60,17,10,.62) 72%,rgba(94,24,13,.86));}
+.missionReturnPanel {width:min(660px,86vw);padding:26px 30px 22px;transform:translateY(-12vh);
+  background:linear-gradient(90deg,transparent,rgba(15,13,10,.72) 20%,rgba(15,13,10,.72) 80%,transparent);
+  text-shadow:0 2px 6px #000;}
+.missionReturnEyebrow {font-size:12px;letter-spacing:.3em;color:#d2ad77;margin-bottom:12px;}
+.missionReturnTitle {font-size:clamp(30px,4.4vw,48px);font-weight:700;letter-spacing:.14em;line-height:1.2;}
+.urgent .missionReturnTitle {color:#f1be9c;}
+.missionReturnDetail {font-size:15px;line-height:1.7;margin-top:14px;color:#e3d8c7;}
+.missionReturnBearing {display:flex;align-items:center;justify-content:center;gap:14px;margin-top:18px;}
+.missionReturnArrow {font-size:30px;line-height:1;width:32px;color:#e5bd80;}
+.missionReturnTarget {font-size:16px;line-height:1.6;}
+.missionReturnHint {font-size:11px;letter-spacing:.12em;color:#b8ab99;margin-top:16px;}
+@media (prefers-reduced-motion:reduce) {.hudMissionReturn {transition:none;}}

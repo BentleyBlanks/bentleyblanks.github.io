@@ -299,3 +299,11 @@ export const MISSION_PEOPLE_TUNING=Object.freeze({aftermathTiers:Object.freeze([
   Object.freeze({cellM:.05,enterM:70,exitM:80}),
   Object.freeze({cellM:.14}),
 ]),aftermathRefreshM:.35,aftermathRefreshDot:.00012,closeAnimationM:8,nearAnimationM:45,farAnimationM:90,nearAnimationS:1/20,idleAnimationS:1/10,midAnimationS:1/15,farAnimationS:1/8,walkThresholdMps:.08,gaitSpeedMps:3.6,carrySourceMps:1.4,loadSinkM:.08,loadLeanRad:.045,breathRate:1.7,watchYawRad:.18});
+
+// User 2026-09-14: authored soft return warning, with room for combat detours.
+// Values are local design choices, not claimed COD engine constants.
+export const MISSION_RETURN = Object.freeze({
+  corridorM:36,hysteresisM:7,targetSafeM:22,squadM:78,personM:48,personUrgentM:72,
+  urgentM:58,squadUrgentM:105,edgeM:14,edgeUrgentM:6,edgeHysteresisM:3,
+  enterDelayS:1.25,stageGraceS:3,
+});
