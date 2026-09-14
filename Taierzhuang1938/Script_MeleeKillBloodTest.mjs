@@ -28,7 +28,7 @@ try {
   const before = await page.evaluate(async () => {
     const T = Taierzhuang;
     const image = new Image();
-    image.src = "./Texture/Hud/Texture_HudMeleeKillBlood.webp?v=20260914b";
+    image.src = "./Texture/Hud/Texture_HudMeleeKillBlood.webp?v=20260914c";
     await image.decode();
     const canvas = document.createElement("canvas");
     canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
@@ -42,14 +42,31 @@ try {
     for (let i = 0; i < pixels.length; i += 16) {
       if (pixels[i + 3] > 4) stained += 1;
     }
+    const allPixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let visible = 0, leftVisible = 0, rightVisible = 0, samples = 0;
+    for (let py = 0; py < canvas.height; py += 4) {
+      for (let px = 0; px < canvas.width; px += 4) {
+        samples += 1;
+        const alpha = allPixels[(py * canvas.width + px) * 4 + 3];
+        if (alpha <= 20) continue;
+        visible += 1;
+        if (px < canvas.width * .5) leftVisible += 1;
+        else rightVisible += 1;
+      }
+    }
     return {
       image: [image.naturalWidth, image.naturalHeight],
       centerStainRatio: stained / (pixels.length / 16),
+      visibleCoverage: visible / samples,
+      directionalBias: leftVisible / Math.max(1, rightVisible),
       blood: T.hud.MeleeKillBloodState(),
     };
   });
   assert.deepEqual(before.image, [1920, 1080]);
   assert(before.centerStainRatio < .002, `准星留白被血点侵入：${before.centerStainRatio}`);
+  assert(before.visibleCoverage > .02 && before.visibleCoverage < .10,
+    `溅血应是少量局部泼溅，不是全屏 mask：${before.visibleCoverage}`);
+  assert(before.directionalBias > 4, `溅血缺少单向泼溅感：${before.directionalBias}`);
   assert.equal(before.blood.active, false);
 
   const killed = await page.evaluate(() => {
@@ -80,6 +97,7 @@ try {
   assert.equal(killed.damageOpacity, 0, "击杀飞溅不得点亮受伤暗角");
   assert.equal(killed.confirms.at(-1), "kill");
 
+  await page.evaluate(() => document.querySelector(".meleeLab")?.setAttribute("hidden", ""));
   fs.mkdirSync(shots, { recursive: true });
   await page.screenshot({ path: path.join(shots, "Scene_MeleeKillBlood_1280x720.png") });
 
