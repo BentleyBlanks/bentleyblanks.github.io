@@ -9,15 +9,16 @@ import { CarrySystem, CARRY_KINDS } from "./Script_Carry.mjs";
 
 const guideText = CONTROL_GUIDE.flatMap((group) => group.rows)
   .map((row) => `${row.keys} ${row.label}`).join("\n");
-assert.match(guideText, /1 \/ 2 \/ 3 长枪 \/ 大刀 \/ 投掷物/);
-assert.match(guideText, /F 拾枪、换枪/);
+assert.match(guideText, /1 \/ 2 \/ 3 \/ 4 主武器 \/ 副武器 \/ 大刀 \/ 投掷物/);
+assert.match(guideText, /按住 F 拾枪、换枪/);
 
-// 手枪暂时停用（2026-09-13）：没有短枪槽，2 是大刀、3 是投掷物，4 空着。
+// 2026-09-15 对标 COD：1 主武器 / 2 副武器（捡来的第二支枪）/ 3 大刀 / 4 投掷物。
 const slotKeys = Object.fromEntries(KEYMAP
   .filter((entry) => entry.context === "world" && entry.action.startsWith("slot:"))
   .map((entry) => [entry.code, entry.action]));
-assert.deepEqual(slotKeys, { Digit1: "slot:primary", Digit2: "slot:melee", Digit3: "slot:throwable" },
-  "数字键：1 长枪 / 2 大刀 / 3 投掷物");
+assert.deepEqual(slotKeys, {
+  Digit1: "slot:primary", Digit2: "slot:secondary", Digit3: "slot:melee", Digit4: "slot:throwable",
+}, "数字键：1 主武器 / 2 副武器 / 3 大刀 / 4 投掷物");
 assert.match(guideText, /B 有绷带且流血时包扎止血/);
 
 assert.deepEqual(ContextualActionPrompts(), []);
@@ -53,9 +54,9 @@ const bandageOnly = ContextualActionPrompts({ bleeding: 0.2, bandages: 1 });
 assert.deepEqual(bandageOnly.map((prompt) => prompt.kind), ["bandage"]);
 assert.equal(bandageOnly[0].keys, "B");
 
-const oneGun = ContextualActionPrompts({ slots: { primary: "HanYang", secondary: null } });
-assert.equal(oneGun.some((prompt) => prompt.kind === "switchWeapon"), false);
-// 「切换长枪 / 短枪」那条只在有短枪槽时出现；手枪停用期间不测。
+// 身上两支枪也不常驻「1 / 2 切换」：COD 不这么提示，数字键在操作说明里。
+assert.deepEqual(ContextualActionPrompts({ slots: { primary: "HanYang", secondary: "Type38" } }), [],
+  "主副武器都在手也不挂换枪提示");
 for (const fixed of [false, true]) {
   assert.deepEqual(ContextualActionPrompts({
     bayonet: { fixed }, slots: { primary: "HanYang", secondary: null },
@@ -85,6 +86,11 @@ const stacked = ContextualActionPrompts({
 assert.deepEqual(stacked.map((prompt) => prompt.kind), ["pickup", "bandage"]);
 assert.equal(swap.weaponId, "Type38", "换枪候选带着地上那把枪的 id（HUD 画剪影用）");
 assert.equal(stacked[0].weaponId, "Type38");
+// COD 的「Hold F to swap」：拾起 / 换上是按住型，提示条写成「按住 F」（HUD 画成「[F] 长按……」）。
+assert.equal(swap.gesture, "hold");
+assert.equal(stacked[0].keys, "按住 F");
+assert.equal(ContextualActionPrompts({ interaction: { label: "补充 汉阳造 弹药（+5 发）", kind: "pickup", gesture: "tap" } })[0].keys,
+  "F", "只拿同型弹药仍是点按");
 const grenadePrompt = ContextualActionPrompts({ interaction: { label: "拾起并掷回 · 2.9秒", kind: "grenade" } });
 assert.deepEqual(grenadePrompt.map((prompt) => [prompt.kind, prompt.label]), [["grenade", "拾起并掷回 · 2.9秒"]]);
 

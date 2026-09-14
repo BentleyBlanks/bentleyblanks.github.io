@@ -309,11 +309,11 @@ export const WEAPONS = {
  *
  * 停用只关入口，不删东西：WEAPONS 条目、模型、第一人称握持姿势、换匣动作、
  * AI 的手枪兜底代码全部原样保留。停用的武器不发给玩家、不上靶场枪桌、
- * 不进第一人称持枪检查与人物编辑器的武器下拉，逐枪测试也跳过它。
+ * 不进第一人称持枪检查与人物编辑器的武器下拉，地上躺着也不给拾取，逐枪测试也跳过它。
  * 加载展示池那一行是注释掉的（Script_BootPropStage 在 Worker 里跑，不引这张表）。
  *
- * 恢复手枪：把 id 从这里删掉，"secondary" 放回 PLAYER_SLOT_ORDER 第二位，
- * 再把 Data_Text_Input 的「1 / 2 / 3」说明与展示池那一行改回来。
+ * 恢复手枪：把 id 从这里删掉，再把展示池那一行改回来。2 号槽 2026-09-15 起是
+ * 「副武器」（第二支长枪），手枪恢复后同样从地上捡进这个槽，不必另开槽位。
  */
 export const SHELVED_WEAPONS = Object.freeze(["ServicePistol"]);
 
@@ -322,10 +322,16 @@ export function WeaponShelved(id) {
 }
 
 /**
- * 玩家武器槽，顺序就是数字键顺序（第一个是 Digit1）。短枪槽随手枪一起停用，
- * 所以现在是 1 长枪 / 2 大刀 / 3 投掷物；滚轮也按这个顺序循环。
+ * 玩家武器槽，顺序就是数字键顺序（第一个是 Digit1）；滚轮也按这个顺序循环。
+ *
+ * 2026-09-15 用户定（对标 COD）：1 主武器 / 2 副武器 / 3 大刀 / 4 投掷物。
+ * 主、副武器都是枪：开局领的那支进 1 号，从地上捡的不同型号先填空着的枪槽，
+ * 两个枪槽都满了就换掉手里那支（规则在 Script_Main.PickUpWeapon）。
  */
-export const PLAYER_SLOT_ORDER = Object.freeze(["primary", "melee", "throwable"]);
+export const PLAYER_SLOT_ORDER = Object.freeze(["primary", "secondary", "melee", "throwable"]);
+
+/** 装枪的槽（主 / 副武器）。弹仓账、刺刀账、拾枪挑槽都只认这两个。 */
+export const PLAYER_GUN_SLOTS = Object.freeze(PLAYER_SLOT_ORDER.filter((slot) => slot === "primary" || slot === "secondary"));
 
 /** 某个武器槽对应的 KeyboardEvent.code；槽位停用时返回 null。 */
 export function PlayerSlotKey(slot) {

@@ -735,7 +735,10 @@ async function PlayFrontline() {
               &&scav.confirmFrames>=(perception?.confirmationFrames??23)&&!game.viewmodel.IsBusy?.()){
               Key("KeyW",false);
               const before={ammo:game.state.ammo,clips:game.state.clips,pickups:game.interact.pickups,taken:corpse.drop.taken};
-              Key("KeyF",true);Key("KeyF",false);
+              // 拾起 / 换上武器是按住型（按住时长就是候选的 seconds）；只拿弹药仍是点按。
+              Key("KeyF",true);
+              if(query.gesture==="hold")game.StepFrames(Math.ceil((query.seconds+.1)*30),1/30,false);
+              Key("KeyF",false);
               scav.log.push({event:"pickupInput",at:flow.elapsed,id:corpse.id,label:query.label,
                 player:game.player.position.toArray(),corpse:corpse.position.toArray(),before,
                 after:{ammo:game.state.ammo,clips:game.state.clips,pickups:game.interact.pickups,taken:corpse.drop.taken}});

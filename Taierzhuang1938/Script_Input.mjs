@@ -73,8 +73,7 @@ export const KEYMAP = [
   { code: "KeyZ", action: "prone", mode: "press", context: "any" },
 
   // --- 武器槽：数字键按 Data_Weapons.PLAYER_SLOT_ORDER 依次排 -----------------
-  // ER2 原本是 1/2/3/4 = 长枪 / 短枪 / 大刀 / 投掷物；手枪停用期间短枪槽整个拿掉，
-  // 后面的往前挪一位：1 长枪 / 2 大刀 / 3 投掷物。
+  // 1 主武器 / 2 副武器 / 3 大刀 / 4 投掷物（对标 COD；2 号是从地上捡的第二支枪）。
   // 只在 world 上下文吃；Tab 按住时同样的键是「下令」。
   ...PLAYER_SLOT_ORDER.map((slot) => ({
     code: PlayerSlotKey(slot), action: `slot:${slot}`, mode: "press", context: "world",

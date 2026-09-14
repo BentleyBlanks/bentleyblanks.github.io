@@ -44,6 +44,12 @@ export const INTERACT = Object.freeze({
   promptSeconds: 1.6,
   /** 自己只剩这么多桥夹就不再分给弟兄。 */
   spareClipsMin: 2,
+  /**
+   * 拾起 / 换上武器要按住多久（COD 的「Hold F to swap」）。换枪会把手里那支丢在地上，
+   * F 又同时是推架与救护交互的键，点按就换容易误丢枪；0.35 s 是「有意按住」
+   * 与「不拖手」之间的点。只拿同型弹药不丢东西，仍是点按。
+   */
+  weaponPickupHoldS: 0.35,
   /** 拾枪成功后那两条缴获提示的时长。 */
   pickupMeleeHintS: 2.8,
   pickupClipsHintS: 3.2,

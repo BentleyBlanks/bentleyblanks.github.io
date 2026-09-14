@@ -43,9 +43,6 @@ export const TEXT = Object.freeze({
   "hud.prompt.vault": "翻越",
   "hud.prompt.mantle": "攀爬",
   "hud.prompt.meleeCharge": "白刃（按住蓄力劈刺）",
-  "hud.prompt.switchWeapon": "切换{slots}",
-  "hud.weaponSlot.primary": "长枪",
-  "hud.weaponSlot.secondary": "短枪",
 
   // --- 准心 -----------------------------------------------------------------
   "hud.crosshair.hip": "腰射准心",

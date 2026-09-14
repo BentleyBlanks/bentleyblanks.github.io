@@ -28,9 +28,9 @@ export const TEXT = Object.freeze({
   "input.guide.combat.title": "武器与救治",
   "input.guide.combat.fire.keys": "左键 / 右键",
   "input.guide.combat.fire.label": "开火 / 瞄准",
-  // 手枪停用期间没有短枪槽（Data_Weapons.PLAYER_SLOT_ORDER）；恢复时改回「1 / 2 / 3 / 4」「长枪 / 短枪 / 大刀 / 投掷物」。
-  "input.guide.combat.slots.keys": "1 / 2 / 3",
-  "input.guide.combat.slots.label": "长枪 / 大刀 / 投掷物",
+  // 顺序跟着 Data_Weapons.PLAYER_SLOT_ORDER（2026-09-15 起对标 COD：2 号是捡来的第二支枪）。
+  "input.guide.combat.slots.keys": "1 / 2 / 3 / 4",
+  "input.guide.combat.slots.label": "主武器 / 副武器 / 大刀 / 投掷物",
   "input.guide.combat.wheelSlot.keys": "滚轮",
   "input.guide.combat.wheelSlot.label": "循环切换已有武器",
   "input.guide.combat.reload.keys": "R / 0",
@@ -50,9 +50,9 @@ export const TEXT = Object.freeze({
   "input.guide.combat.throw.keys": "G / H",
   "input.guide.combat.throw.label": "投手榴弹 / 集束手榴弹",
   "input.guide.combat.interact.keys": "F",
-  "input.guide.combat.interact.label": "拾枪、换枪或给战友分弹",
+  "input.guide.combat.interact.label": "拾同型枪的弹药或给战友分弹",
   "input.guide.combat.holdInteract.keys": "按住 F",
-  "input.guide.combat.holdInteract.label": "止血、拆门板、接线：按住到进度环走满",
+  "input.guide.combat.holdInteract.label": "拾枪、换枪（先填空枪槽，两支都满换掉手里那支）、止血、拆门板、接线：按住到进度环走满",
   "input.guide.combat.bandage.keys": "B",
   "input.guide.combat.bandage.label": "有绷带且流血时包扎止血",
 

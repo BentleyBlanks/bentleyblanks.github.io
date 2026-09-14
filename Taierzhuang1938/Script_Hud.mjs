@@ -13,7 +13,6 @@ import { T, Localize } from "./Script_Text.mjs";
 import { HUD_WEAPON_ICONS } from "./Data_HudWeaponIcons.mjs";
 import { LevelBriefId, LevelFieldId } from "./Script_TextIds.mjs";
 import { HIT_FEEDBACK } from "./Data_Tuning_Player.mjs";
-import { PLAYER_SLOT_ORDER, PlayerSlotKey } from "./Data_Weapons.mjs";
 import {
   TITLE_CARD, TIMING, GRENADE_WARNING, HITMARK, HITDIR, VIGNETTE, SUPPRESSION,
   MELEE_KILL_BLOOD, PROMPTS, MINIMAP, FPS, IDLE_FADE, SUBTITLE_DEPTH,
@@ -192,19 +191,14 @@ export function TargetCardPresentation(card, { targetDistance = true } = {}) {
   return { ...card, meta: String(card.meta || "").split(" · ").filter(bit => !/^\d+m$/.test(bit)).join(" · ") };
 }
 
-/** 会出现在「切换长枪 / 短枪」提示里的枪槽。 */
-const FIREARM_SLOT_NAME = Object.freeze({
-  primary: () => T("hud.weaponSlot.primary"),
-  secondary: () => T("hud.weaponSlot.secondary"),
-});
-
 /**
  * 从真实玩法状态生成情境操作提示。够不着尸体不提示拾枪，没有绷带或没流血不提示包扎。
- * 上/收刺刀是通用键位，留在操作说明；仅仅持有可装刺刀的枪不构成情境提示。
+ * 上/收刺刀、1—4 换武器是通用键位，留在操作说明；仅仅持有可装刺刀的枪、
+ * 身上有两支枪都不构成情境提示（COD 不常驻换枪提示，2026-09-15 起照做）。
  * 保持纯函数，浏览器冒烟可以直接喂入边界状态。
  */
 export function ContextualActionPrompts({
-  interaction = null, bleeding = 0, bandages = 0, slots = {},
+  interaction = null, bleeding = 0, bandages = 0,
   ammoEmpty = false, canReload = false, carry = null,
 } = {}) {
   const prompts = [];
@@ -225,7 +219,9 @@ export function ContextualActionPrompts({
   }
   if (interaction?.label) {
     prompts.push({
-      keys: "F", label: interaction.label, kind: interaction.kind || "interact",
+      // 按住型（拾起 / 换上武器、止血……）写成「[F] 长按……」，与任务分支同一个口径。
+      keys: interaction.gesture === "hold" ? T("hud.key.holdF") : "F",
+      label: interaction.label, kind: interaction.kind || "interact",
       ...(interaction.weaponId ? { weaponId: interaction.weaponId } : {}),
     });
   }
@@ -238,17 +234,6 @@ export function ContextualActionPrompts({
   }
   if (ammoEmpty) {
     prompts.push({ keys: T("hud.key.mouseLeft"), label: T("hud.prompt.meleeCharge"), kind: "melee" });
-  }
-  // 数字键跟着 PLAYER_SLOT_ORDER 走；短枪槽停用时这里只剩长枪，换枪提示自然不出现。
-  const firearms = PLAYER_SLOT_ORDER
-    .map((slot) => [slot, PlayerSlotKey(slot).slice(5), FIREARM_SLOT_NAME[slot]?.()])
-    .filter(([slot, , name]) => name && !!slots?.[slot]);
-  if (firearms.length > 1) {
-    prompts.push({
-      keys: firearms.map(([, key]) => key).join(" / "),
-      label: T("hud.prompt.switchWeapon", { slots: firearms.map(([, , name]) => name).join(" / ") }),
-      kind: "switchWeapon",
-    });
   }
   return prompts;
 }

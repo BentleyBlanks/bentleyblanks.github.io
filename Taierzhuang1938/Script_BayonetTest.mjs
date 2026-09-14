@@ -138,7 +138,7 @@ const result = await page.evaluate(async () => {
   }
 
   // --- 5) 换到短枪再换回来：刺刀还装着；X 对不可装刺刀的枪不生效 -------------
-  T.Debug.Key(T.Debug.SlotKey("throwable")); // 投掷物槽（手枪停用，没有短枪槽）
+  T.Debug.Key(T.Debug.SlotKey("throwable")); // 投掷物槽（4 号；键位跟着 PLAYER_SLOT_ORDER）
   T.StepFrames(20,1/60,false);
   const throwableBayonet = T.state.bayonetFixed;   // 状态保留，但视图模型无刀件
   T.Debug.Key("Digit1");

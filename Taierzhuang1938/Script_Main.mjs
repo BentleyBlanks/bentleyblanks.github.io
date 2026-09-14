@@ -136,7 +136,7 @@ import {
   MENU_SCENE, OVERVIEW_PHASE, FULL_SCENE_PHASE, JIEHE_SANDBOX_PHASE, CAMPAIGN_ENTRIES,
 } from "./Data_Menu.mjs";
 import {
-  WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE, PLAYER_SLOT_ORDER, PlayerSlotKey, WeaponShelved,
+  WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE, PLAYER_SLOT_ORDER, PLAYER_GUN_SLOTS, PlayerSlotKey, WeaponShelved,
 } from "./Data_Weapons.mjs";
 import { WEAPON_MESH_VARIANTS, WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE, NAME_POOL } from "./Data_Battle.mjs";
@@ -743,17 +743,21 @@ const state = {
   // --- 武器槽 ---------------------------------------------------------------
   // LOADOUTS 六套携行躺在 Data_Weapons 里一行没接：玩家永远只有 identity.weapon
   // 给的那一支长枪，大刀只在按 V 时凭空出现一下（硬编码 fallback，背包里根本没刀）。
-  // 现在四个槽是真的：长枪 / 短枪 / 大刀 / 投掷物，滚轮循环。
-  // 手枪暂时停用，短枪槽不进 PLAYER_SLOT_ORDER：数字键是 1 长枪 / 2 大刀 / 3 投掷物，
-  // secondary 字段留着，恢复手枪时不用再改状态形状。
+  // 现在四个槽是真的，数字键 1 主武器 / 2 副武器 / 3 大刀 / 4 投掷物（COD 式，2026-09-15），滚轮循环。
+  // 主、副武器都是枪：领的那支进主武器，地上捡的不同型号先填空枪槽，满了换掉手里那支（PickUpWeapon）。
   slots: { primary: null, secondary: null, melee: null, throwable: "Grenade" },
   // 外观变体随槽位走。大刀拾取后必须保留尸体上那一把，不能在玩家手里变样。
   weaponVariants: { primary: 0, secondary: 0, melee: 0, throwable: 0 },
   activeSlot: "primary",
+  // 最后端在手上的枪槽。手里是大刀或手榴弹时捡枪（两个枪槽都满），换掉的就是它；
+  // 任务里 V 收刀、过场后还枪也回到它 —— COD 里手上永远是枪，这是本作多出来的情况。
+  lastGunSlot: "primary",
   // --- 刺刀 -----------------------------------------------------------------
-  // 长枪上有没有装着刺刀（X 键装/卸；只对 Data_Weapons 里 bayonet: true 的枪有意义）。
-  // 换到短枪再换回来状态保留；捡新枪、换关重置。
+  // 手里那支枪上有没有装着刺刀（X 键装/卸；只对 Data_Weapons 里 bayonet: true 的枪有意义）。
+  // 刺刀跟着枪走：背着的那支记在 bayonets 里，换枪时两边对账（StashActiveSlot / ActivateSlot）。
+  // 捡新枪、换关重置。
   bayonetFixed: false,
+  bayonets: { primary: false, secondary: false },
   // 白刃蓄力（V 或空枪左键按住中）：{ t 已按住秒数, source: "key"|"mouse" }
   meleeCharge: null,
   // 每支枪各记各的弹仓 —— 换回来不该是满的
@@ -1655,11 +1659,10 @@ async function Boot() {
   // F 通用交互。槽位与弹仓的账在装配层手里（state.slots / state.mags），
   // 所以规则在 Script_Interact，改状态的那三下通过 hooks 交回这里。
   interact = new InteractSystem({ ai, audio, hud }, {
-    HasWeapon: (weaponId) => {
-      const slot = WEAPONS[weaponId]?.kind === "melee" ? "melee" : "primary";
-      return !!state.slots[slot];
-    },
-    SameWeapon: (weaponId) => WEAPONS[weaponId]?.kind !== "melee" && state.slots.primary === weaponId,
+    // 「换上」= 捡了要丢一件：大刀看大刀槽，枪要主、副两个枪槽都满了才算（有空槽就是「拾起」）。
+    HasWeapon: (weaponId) => WEAPONS[weaponId]?.kind === "melee"
+      ? !!state.slots.melee : PLAYER_GUN_SLOTS.every((slot) => !!state.slots[slot]),
+    SameWeapon: (weaponId) => WEAPONS[weaponId]?.kind !== "melee" && !!GunSlotHolding(weaponId),
     AmmoGain: (clips, ammo, weaponId) => CurrentScavengePlan(weaponId, clips, ammo).rounds,
     TakeAmmo: (weaponId, clips, ammo) => ScavengeAmmo(weaponId, clips, ammo),
     SpareClips: () => state.clips,
@@ -2095,12 +2098,15 @@ async function Boot() {
       Wheel: (delta) => {
         document.dispatchEvent(new WheelEvent("wheel", { deltaY: delta, bubbles: true }));
       },
-      // 某个武器槽的数字键 code（"melee" → "Digit2"）。测试走 Key(SlotKey(...))，
-      // 不写死数字：手枪停用/恢复会让大刀和投掷物的键前后挪一位。
+      // 某个武器槽的数字键 code（"melee" → "Digit3"）。测试走 Key(SlotKey(...))，
+      // 不写死数字：槽位表一改，大刀和投掷物的键就会前后挪。
       SlotKey: (slot) => PlayerSlotKey(slot),
       Slots: () => ({
         active: state.activeSlot, weapon: currentWeapon, loadout: state.loadoutId, order: [...SLOT_ORDER],
-        slots: { ...state.slots }, variants: { ...state.weaponVariants },
+        slots: { ...state.slots }, variants: { ...state.weaponVariants }, lastGunSlot: state.lastGunSlot,
+        // 背着的那支枪的账（手里那支以 ammo/clips/bayonetFixed 为准，换枪时才对账）。
+        mags: Object.fromEntries(PLAYER_GUN_SLOTS.map((slot) => [slot, { ...state.mags[slot] }])),
+        bayonets: { ...state.bayonets }, bayonetFixed: state.bayonetFixed, ammo: state.ammo, clips: state.clips,
         viewmodel: viewmodel.weaponId, viewmodelVariant: viewmodel.weaponVariant,
         fireMode: state.fireMode, bipod: player.bipod, ads: player.ads,
       }),
@@ -2170,6 +2176,19 @@ async function Boot() {
           pickedUp: state.pickedUp, pickedUpVariant: state.pickedUpVariant ?? 0, weapon: currentWeapon,
           ...interact.State(),
         };
+      },
+      /**
+       * 往地上放一把枪（与换枪丢下的那把同一条路：InteractSystem 记账 + BuildGroundWeaponView 摆模型）。
+       * 拾枪测试用它摆靶，不必去杀一个人再等尸体摔稳。返回登记条目的 id。
+       */
+      DropWeapon: (weaponId, { x, z, yaw = 0, ammo = null, clips = 0 } = {}) => {
+        if (!interact || !WEAPONS[weaponId]) return null;
+        const item = interact.DropGroundWeapon({
+          weaponId, ammo: ammo ?? WEAPONS[weaponId].magazine ?? 0, clips, yaw,
+          position: { x, y: battlefield.GroundHeight(x, z), z },
+        });
+        if (item) BuildGroundWeaponView(item);
+        return item?.id ?? null;
       },
       /**
        * 负重取证口。摆点是集成批的事，这里给的是**驱动 + 取证**：
@@ -2785,8 +2804,10 @@ async function Boot() {
         player.bleeding = false;
         const loadout = RANGE_PHASE.loadoutOverride;
         state.mags.primary = { ammo: WEAPONS[loadout.primary].magazine, clips: loadout.spareClips };
-        state.mags.secondary = loadout.secondary
-          ? { ammo: WEAPONS[loadout.secondary].magazine, clips: 2 }
+        // 副武器是捡来的那支（靶场携行表里没有）：身上有就给它也补满。
+        const secondary = state.slots.secondary;
+        state.mags.secondary = secondary
+          ? { ammo: WEAPONS[secondary].magazine, clips: 2 }
           : { ammo: 0, clips: 0 };
         const mag = state.mags[state.activeSlot];
         if (mag) { state.ammo = mag.ammo; state.clips = mag.clips; }
@@ -3980,8 +4001,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
     Objective:text=>{state.storyObjective=text;},
     VoiceClock:()=>MANUAL_STEP?null:audio.ctx?.currentTime,
     Inventory:()=>({ammo:state.ammo,clips:state.clips,grenades:state.grenades,bundles:state.bundles,shots:state.playerShots}),
-    GiveSupply:({clips=0,grenades=0,bundles=0,bandages=0})=>{state.clips+=clips;state.grenades+=grenades;state.bundles+=bundles;player.bandages+=bandages;state.mags.primary.clips=state.clips;},
-    RestoreRifle:()=>{if(state.activeSlot!=='primary')SwitchSlot('primary');SyncMissionHands();viewmodel.root.visible=!carry?.Blocking;},
+    GiveSupply:({clips=0,grenades=0,bundles=0,bandages=0})=>{AddSupplyClips(clips);state.grenades+=grenades;state.bundles+=bundles;player.bandages+=bandages;},
+    RestoreRifle:()=>{if(!IsGunSlot(state.activeSlot))SwitchSlot(LastGunSlot());SyncMissionHands();viewmodel.root.visible=!carry?.Blocking;},
     Control:active=>{state.missionControl=active;state.cooking=null;state.cook=0;input.fire=false;input.ads=false;},
     Complete:()=>{Progress.MarkCleared(FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,0);ShowPauseMenu();menu.OpenSandboxComplete();},
     MissionFailure:castId=>{ShowPauseMenu();menu.OpenSandboxFailure(false,{castId,restartOnly:true});},
@@ -5406,7 +5427,8 @@ function RespawnPlayer(initial = false) {
   state.loadoutId = phase.loadoutOverride ? `${phase.id}_override` : (phase.loadout || null);
   const disarmed = !!phase.disarmed;
   const primary = disarmed ? null : SlotLoadoutWeapon("primary", loadout ? loadout.primary : state.identity.weapon);
-  // 第四关携行表里写着外购手枪；手枪停用期间 SlotLoadoutWeapon 把它挡掉，不发到玩家手上。
+  // 副武器一般是空着开局、从地上捡。第四关携行表里写着外购手枪；手枪停用期间
+  // SlotLoadoutWeapon 把它挡掉，不发到玩家手上。
   const secondary = disarmed ? null : SlotLoadoutWeapon("secondary", loadout?.secondary);
   state.slots.primary = primary;
   state.slots.secondary = secondary;
@@ -5437,14 +5459,16 @@ function RespawnPlayer(initial = false) {
   // 而且这也不是他们的样子：没枪的川军手里是大刀，手榴弹在腰上的布袋里，
   // 用 G 键扔 —— 扔弹本来就不需要把它"拿在手上"（见 BeginCook 那条通道）。
   // 两样都没有（第六关脱离战斗）就空着手。
-  state.activeSlot = primary ? "primary" : (state.slots.melee ? "melee" : "primary");
+  state.activeSlot = primary ? "primary" : secondary ? "secondary" : (state.slots.melee ? "melee" : "primary");
+  state.lastGunSlot = secondary && !primary ? "secondary" : "primary";
   currentWeapon = SlotWeaponId(state.activeSlot) || null;
-  state.ammo = state.mags.primary.ammo;
-  state.clips = state.mags.primary.clips;
+  state.ammo = state.mags[state.activeSlot]?.ammo ?? 0;
+  state.clips = state.mags[state.activeSlot]?.clips ?? 0;
   state.fireMode = "auto";
   player.bipod = false;
   // 换关领新枪：刺刀从收着开始（上刺刀是玩家的一个决定，不是默认状态）
   state.bayonetFixed = MELEE_TEST;
+  state.bayonets = { primary: MELEE_TEST, secondary: false };
   state.meleeCharge = null;
   // Equip(null) 是合法的：Viewmodel 会把 rig 清空（空着手）。
   // 第一关「还没捡到枪」与第六关「脱离战斗」都要走这条。
@@ -5498,18 +5522,53 @@ function SyncMissionHands() {
   }
 }
 
-/** 换槽。长枪/短枪各记各的弹仓 —— 切回来不该是满的。 */
+/** 换槽。主/副武器各记各的弹仓与刺刀 —— 切回来不该是满的，刺刀也不该跑到另一支枪上。 */
 function SwitchSlot(slot) {
   if(missionRuntime?.EmptyHands)return false;
   if (meleeCombat && !meleeCombat.CanChangeWeapon()) return false;
   if (!player?.Alive || !SlotWeaponId(slot)) return false;
   if (slot === state.activeSlot) return false;
   if (viewmodel.IsBusy?.()) return false;          // 拉栓/压弹播到一半不许换手
-  if (state.mags[state.activeSlot]) {
-    state.mags[state.activeSlot].ammo = state.ammo;
-    state.mags[state.activeSlot].clips = state.clips;
-  }
+  StashActiveSlot();
+  ActivateSlot(slot);
+  return true;
+}
+
+function IsGunSlot(slot) {
+  return PLAYER_GUN_SLOTS.includes(slot);
+}
+
+/** 任务里收刀、过场后还枪要回到的枪槽：最后端过的那支；它空着就退到第一支有枪的。 */
+function LastGunSlot() {
+  if (state.slots[state.lastGunSlot]) return state.lastGunSlot;
+  return PLAYER_GUN_SLOTS.find((slot) => !!state.slots[slot]) || "primary";
+}
+
+/** 主 / 副武器里哪个槽是这一型；都不是返回 null。 */
+function GunSlotHolding(weaponId) {
+  return weaponId ? PLAYER_GUN_SLOTS.find((slot) => state.slots[slot] === weaponId) || null : null;
+}
+
+/** 某个枪槽里现在有几发：手里那支读活的 state.ammo，背着的读账。 */
+function GunSlotAmmo(slot) {
+  return state.activeSlot === slot ? state.ammo : state.mags[slot]?.ammo ?? 0;
+}
+
+/** 手里那支的弹仓与刺刀记回它自己的槽。换枪、捡枪改动槽位之前必须先调。 */
+function StashActiveSlot() {
+  const slot = state.activeSlot;
+  const mag = state.mags[slot];
+  if (mag) { mag.ammo = state.ammo; mag.clips = state.clips; }
+  if (IsGunSlot(slot)) state.bayonets[slot] = state.bayonetFixed;
+}
+
+/** 把某个槽端到手上：弹仓、刺刀从它的账上取，视图模型与武器名跟着换。 */
+function ActivateSlot(slot) {
   state.activeSlot = slot;
+  if (IsGunSlot(slot)) {
+    state.lastGunSlot = slot;
+    state.bayonetFixed = !!state.bayonets[slot];
+  }
   meleeCombat?.ReleasePlayer();
   currentWeapon = SlotWeaponId(slot);
   const mag = state.mags[slot];
@@ -5519,9 +5578,8 @@ function SwitchSlot(slot) {
   state.fireMode = "auto";
   state.meleeCharge = null;                        // 换手就把蓄着的那一下松掉
   viewmodel.Equip(currentWeapon, SlotWeaponVariant(slot));
-  SyncBayonet();                                   // 切回长枪时刺刀还在枪上
+  SyncBayonet();                                   // 切回原来那支时刺刀还在枪上
   hud.SetWeaponName(WeaponName(currentWeapon));
-  return true;
 }
 
 /** 滚轮循环。空的槽跳过 —— 杂牌部队常常只有一支枪。 */
@@ -6357,7 +6415,7 @@ const router = new InputRouter({
         if (emplacement?.Mounted) { emplacement.PullBolt(); return; }
         Reload(); return;
       case "melee":
-        if(missionRuntime){if(detail.down)SwitchSlot(state.activeSlot==='melee'?'primary':'melee');return;}
+        if(missionRuntime){if(detail.down)SwitchSlot(state.activeSlot==='melee'?LastGunSlot():'melee');return;}
         if (WEAPONS[currentWeapon]?.bayonet && state.bayonetFixed) {
           if(detail.down && meleeCombat.CanChangeWeapon() && !viewmodel.IsBusy() && !player.Busy) {
             meleeCombat.ReleasePlayer();meleeStance=!meleeStance;
@@ -6683,7 +6741,8 @@ function DoInteract() {
 
 /**
  * HUD 的情境操作条只读真实规则查询：F 来自 InteractSystem.Query，B 来自玩家流血与
- * 绷带库存，1/2 来自实际槽位。没有可执行动作就传空数组，不用计时器伪造教程窗口。
+ * 绷带库存，R 来自弹仓。没有可执行动作就传空数组，不用计时器伪造教程窗口。
+ * 换枪的数字键不常驻（COD 不这么提示）；键位在设置页操作说明里。
  */
 function UpdateContextualActionPrompts() {
   if (!player?.Alive || meleeCombat?.Active) {
@@ -6752,14 +6811,13 @@ function UpdateContextualActionPrompts() {
     if(player.bleeding>0&&player.bandages>0)prompts.push({keys:"B",label:T("hud.prompt.bandage"),kind:"bandage"});
     hud.SetActionPrompts(WithTraverse(prompts));return;
   }
-  const gunInHand = state.activeSlot === "primary" || state.activeSlot === "secondary";
+  const gunInHand = IsGunSlot(state.activeSlot);
   const prompts = ContextualActionPrompts({
     // 抬着东西时这一条会把提示条整段接管（只剩「放下 / 扔下」），见 ContextualActionPrompts。
     carry: carry?.View() || null,
     interaction,
     bleeding: player.bleeding,
     bandages: player.bandages,
-    slots: state.slots,
     ammoEmpty: !(p012Flow && p012Flow.beat < 6) && gunInHand && state.ammo <= 0 && !!WEAPONS[currentWeapon]?.magazine,
     // 与 Reload() 的放行条件同口径：有备弹（或无限弹）才提示 R。
     canReload: EffectiveInfiniteAmmo() || state.clips > 0,
@@ -6788,83 +6846,106 @@ function TraversePrompt() {
 }
 
 /**
- * 拾取武器。枪进长枪槽，大刀进大刀槽；两者都替换同类槽位，
- * 并把尸体上的外观变体一并带走。缴获日械没有备弹（clips = 0），
- * 只有枪里那几发。
+ * 地上捡的枪进哪个枪槽（COD 式）：先填空着的枪槽；主、副武器都满了就换掉手里那支。
+ * 手里拿的是大刀或手榴弹时（COD 里没有这种情况），换掉最后端过的那支。
  */
+function PickupGunSlot() {
+  const free = PLAYER_GUN_SLOTS.find((slot) => !state.slots[slot]);
+  if (free) return free;
+  return IsGunSlot(state.activeSlot) ? state.activeSlot : LastGunSlot();
+}
+
 /**
+ * 拾取武器。大刀进大刀槽；枪分两种来路：
+ *   · 地上捡的（给了 extra.at）—— 按 PickupGunSlot 挑主 / 副武器槽，捡起来**直接端在手上**（COD）；
+ *     槽里原来有枪就把它放到刚才那把枪躺的位置，弹仓里剩多少就带多少，走回去还能换回来。
+ *   · 发枪、靶场取枪（不给 at）—— 进主武器槽，旧枪直接收走不往地上扔。
+ * 尸体上的外观变体一并带走。缴获日械没有备弹（clips = 0），只有枪里那几发。
+ *
  * @param {object} [extra]
  *   ammo  枪里剩几发；不给 = 满仓（尸体身上的枪一直按「枪里那一仓」算）
- *   at    {x,y,z} 地上那把枪原来躺的位置。给了就把**换下来的那把**放回这里 ——
- *         不给（发枪、靶场取枪）时旧枪照旧直接收走，不往地上扔。
+ *   at    {x,y,z} 地上那把枪原来躺的位置
  *   yaw   换下来那把的朝向；不给按玩家朝向横着放。
  */
 function PickUpWeapon(weaponId, clips, variant = 0, extra = {}) {
   if (!player?.Alive || !WEAPONS[weaponId] || WeaponShelved(weaponId)) return false;
   const weapon = WEAPONS[weaponId];
-  const slot = weapon.kind === "melee" ? "melee" : "primary";
+  const gun = weapon.kind !== "melee";
+  const fromGround = !!extra?.at;
+  const slot = !gun ? "melee" : fromGround ? PickupGunSlot() : "primary";
   const hadNoWeapon = !state.slots[slot];
-  // 换枪：手里那把放到刚才那把枪的位置上，弹仓里剩多少就带多少，走回去还能换回来。
-  if (!hadNoWeapon && extra?.at && interact) {
-    const oldId = state.slots[slot];
-    const live = state.activeSlot === slot;
+  // 先把手里那支的活账记回去：下面丢到地上的若正是它，弹数要是这一刻的。
+  StashActiveSlot();
+  if (!hadNoWeapon && fromGround && interact) {
     const mag = state.mags[slot];
     const item = interact.DropGroundWeapon({
-      weaponId: oldId, weaponVariant: state.weaponVariants[slot] ?? 0,
-      ammo: slot === "primary" ? (live ? state.ammo : mag?.ammo ?? 0) : 0,
-      clips: slot === "primary" ? (live ? state.clips : mag?.clips ?? 0) : 0,
+      weaponId: state.slots[slot], weaponVariant: state.weaponVariants[slot] ?? 0,
+      ammo: gun ? mag?.ammo ?? 0 : 0,
+      clips: gun ? mag?.clips ?? 0 : 0,
       position: extra.at, yaw: extra.yaw ?? (player.yaw + Math.PI / 2),
     });
     if (item) BuildGroundWeaponView(item);
   }
   state.slots[slot] = weaponId;
   state.weaponVariants[slot] = WeaponVariantFor(weaponId, variant);
-  if (slot === "primary") {
+  if (gun) {
     const full = weapon.magazine ?? 5;
     const ammo = extra?.ammo == null ? full : Math.max(0, Math.min(full, extra.ammo));
-    state.mags.primary = { ammo, clips };
+    state.mags[slot] = { ammo, clips };
+    // 捡来的枪上没有装着的刺刀（阵亡者的刺刀在鞘里/丢了；想上再按 X）
+    state.bayonets[slot] = false;
   }
   state.pickedUp = weaponId;
   state.pickedUpVariant = state.weaponVariants[slot];
-  // 捡来的枪上没有装着的刺刀（阵亡者的刺刀在鞘里/丢了；想上再按 X）
-  if (slot === "primary") state.bayonetFixed = false;
-  // 第一关的目标之一就是「找一支枪（从倒下的人身上捡）」—— 捡完还得自己按
-  // 1 才拿得出来的话，目标在玩家眼里就是没生效。大刀同理：空着大刀槽时捡到就到手。
-  if (hadNoWeapon) state.activeSlot = slot;
-  if (state.activeSlot === slot) {
-    currentWeapon = weaponId;
-    const mag = state.mags[slot];
-    state.ammo = mag ? mag.ammo : 0;
-    state.clips = mag ? mag.clips : 0;
-    player.bipod = false;
-    state.fireMode = "auto";
-    viewmodel.Equip(currentWeapon, SlotWeaponVariant(slot));
-    SyncBayonet();
-    hud.SetWeaponName(WeaponName(currentWeapon));
-  }
+  // 地上捡的枪直接到手（COD：捡起来就是端着的）。第一关的目标之一就是
+  // 「找一支枪（从倒下的人身上捡）」—— 捡完还得自己按数字键才拿得出来，目标在玩家眼里就是没生效。
+  // 大刀照旧：空着大刀槽时捡到就到手，手里正拿着刀则换成新的这把。
+  if ((gun && fromGround) || hadNoWeapon || state.activeSlot === slot) ActivateSlot(slot);
   return true;
 }
 
-/** Preview and completion share the primary slot's current ammunition account. */
+/** Preview and completion share the ammunition account of the gun slot holding this model. */
 function CurrentScavengePlan(weaponId, clips, ammo) {
-  const currentAmmo = state.activeSlot === "primary" ? state.ammo : state.mags.primary?.ammo ?? 0;
-  return ScavengeAmmoPlan(weaponId, clips, ammo, currentAmmo);
+  const slot = GunSlotHolding(weaponId);
+  return ScavengeAmmoPlan(weaponId, clips, ammo, slot ? GunSlotAmmo(slot) : 0);
 }
 
 function ScavengeAmmo(weaponId, clips, ammo) {
-  if (!player?.Alive || state.slots.primary !== weaponId) return null;
-  const plan = CurrentScavengePlan(weaponId, clips, ammo);
+  const slot = GunSlotHolding(weaponId);
+  if (!player?.Alive || !slot) return null;
+  const plan = ScavengeAmmoPlan(weaponId, clips, ammo, GunSlotAmmo(slot));
   if (plan.rounds <= 0) return null;
-  if (state.activeSlot === "primary") {
+  if (state.activeSlot === slot) {
     state.ammo += plan.loaded;
     state.clips += plan.clips;
-    state.mags.primary = { ammo: state.ammo, clips: state.clips };
+    state.mags[slot] = { ammo: state.ammo, clips: state.clips };
   } else {
-    const mag = state.mags.primary ||= { ammo: 0, clips: 0 };
+    const mag = state.mags[slot] ||= { ammo: 0, clips: 0 };
     mag.ammo += plan.loaded;
     mag.clips += plan.clips;
   }
   return plan;
+}
+
+/**
+ * 补给箱发的桥夹记到哪支枪上。补给是自己人的七九弹：先给手里那支、再给最后端过的那支，
+ * 两支里挑**中方的枪**（缴获日械「我们没有这个口径」，见 interact.pickup.noClips）；
+ * 身上一支中方枪都没有就不发（发给三八式等于凭空造出六五弹）。
+ */
+function AddSupplyClips(clips) {
+  const n = Math.max(0, Math.floor(Number(clips) || 0));
+  if (!n) return 0;
+  const order = [...new Set([IsGunSlot(state.activeSlot) ? state.activeSlot : null, LastGunSlot(), ...PLAYER_GUN_SLOTS])];
+  const slot = order.find((s) => s && WEAPONS[state.slots[s]]?.side === "nra");
+  if (!slot) return 0;
+  if (state.activeSlot === slot) {
+    state.clips += n;
+    state.mags[slot] = { ammo: state.ammo, clips: state.clips };
+  } else {
+    const mag = state.mags[slot] ||= { ammo: 0, clips: 0 };
+    mag.clips += n;
+  }
+  return n;
 }
 
 const _dropBox = new THREE.Box3();

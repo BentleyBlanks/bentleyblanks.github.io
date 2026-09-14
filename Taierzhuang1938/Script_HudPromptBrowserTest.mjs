@@ -111,8 +111,7 @@ try {
       centerX: box.left + box.width / 2, top: box.top, viewW: innerWidth, viewH: innerHeight,
     };
   });
-  // 可装刺刀不构成眼前操作，X 不再常驻；其余提示保持既有条件。
-  // 手枪停用期间没有短枪，「切换长枪 / 短枪」不测。
+  // 可装刺刀不构成眼前操作，X 不再常驻；换枪数字键也不常驻（COD 式）；其余提示保持既有条件。
   assert.deepEqual(prompts.prompts.map((prompt) => prompt.kind), ["bandage"]);
   assert.equal(prompts.on, true);
   assert.deepEqual(prompts.rows, [["B", "包扎止血"]]);
@@ -321,6 +320,8 @@ try {
     if (!victim.drop) victim.drop = { weaponId: "Type38", clips: 0, taken: false };
     victim.drop.weaponId = "Type38";
     victim.drop.taken = false;
+    // 主、副武器都满了才是「换上」；空着副武器槽是「拾起」（COD 式两枪槽）。
+    T.state.slots.secondary = "ZhongZheng";
     T.StepFrames(12);
     const swap = T.Debug.Prompts();
     const img = document.querySelector(".hudAction.pickup img.actionWeapon");
@@ -331,13 +332,18 @@ try {
       promptsBottom: document.querySelector(".hudActions").getBoundingClientRect().bottom,
       targetTop: target.getBoundingClientRect().top, targetOn: target.classList.contains("on"),
     };
+    const row = document.querySelector(".hudAction.pickup");
+    const rendered = row && [row.querySelector("kbd")?.textContent, row.querySelector(".actionText")?.textContent];
     T.state.slots.primary = null;
     T.StepFrames(12);
     const pickup = T.Debug.Prompts();
-    return { swap, pickup, silhouette, layout };
+    return { swap, pickup, silhouette, layout, rendered };
   });
   assert.ok(weaponPrompts);
-  assert.ok(weaponPrompts.swap.some((prompt) => prompt.keys === "F" && /^换上 /.test(prompt.label)));
+  // COD 的「Hold F to swap」：键帽 F + 「长按换上 三八式」。
+  assert.ok(weaponPrompts.swap.some((prompt) => prompt.keys === "按住 F" && /^换上 /.test(prompt.label)),
+    JSON.stringify(weaponPrompts.swap));
+  assert.deepEqual(weaponPrompts.rendered, ["F", "长按换上 三八式"]);
   assert.ok(weaponPrompts.swap.some((prompt) => prompt.weaponId === "Type38"), "换枪提示带着那把枪的 id");
   assert.equal(weaponPrompts.silhouette?.src, "Texture/Hud/Texture_HudWeapon_Type38.png", "换枪提示下面画那把枪的剪影");
   assert.ok(weaponPrompts.silhouette.width > weaponPrompts.silhouette.em * 6, `步枪剪影要约七个字宽：${JSON.stringify(weaponPrompts.silhouette)}`);
@@ -345,7 +351,7 @@ try {
     assert.ok(weaponPrompts.layout.targetTop >= weaponPrompts.layout.promptsBottom - 1,
       `识别卡要排在提示下面：${JSON.stringify(weaponPrompts.layout)}`);
   }
-  assert.ok(weaponPrompts.pickup.some((prompt) => prompt.keys === "F" && /^拾起 /.test(prompt.label)));
+  assert.ok(weaponPrompts.pickup.some((prompt) => prompt.keys === "按住 F" && /^拾起 /.test(prompt.label)));
 
   const cleared = await page.evaluate(() => {
     const T = window.Taierzhuang;
