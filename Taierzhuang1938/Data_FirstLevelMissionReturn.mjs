@@ -1,3 +1,4 @@
+import { MISSION_REARGUARD_POCKETS } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_STAGES } from "./Data_FirstLevelMission.mjs";
 import { MISSION_ROUTES as Routes, MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
 // Stage-local corridors include the approach, so distant new objectives do not
@@ -11,9 +12,7 @@ const overrides={
   Village:Routes.village.slice(0,5),
   TransferApproach:Routes.village.slice(4),
   Carry:[A.transfer,A.queue,A.ditchMouth],
-  RetreatFirst:Routes.evacuation.filter(p=>p.x>=A.retreatA.x),
-  RetreatWall:Routes.evacuation.filter(p=>p.x<=A.retreatA.x+12 && p.x>=A.retreatB.x-12),
-  RetreatYard:Routes.evacuation.filter(p=>p.x<=A.retreatB.x+12),
+  ...Object.fromEntries(MISSION_REARGUARD_POCKETS.map(pocket=>[pocket.id,pocket.route])),
   FinalDefense:Routes.exit.slice(0,5),
   Exit:Routes.exit,
 };

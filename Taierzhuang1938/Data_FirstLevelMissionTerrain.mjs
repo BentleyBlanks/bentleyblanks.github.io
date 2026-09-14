@@ -1,3 +1,4 @@
+import { MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE } from "./Data_FirstLevelMissionTopology.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 // Authored soil, metres: natural ground, roads, rail berm and excavated trenches.
 // This function is baked once into the shared rendered/physical heightfield.
@@ -53,9 +54,9 @@ export const MISSION_TERRAIN = Object.freeze({
     },
     {
       points: [
-        { x: -152, z: 36 },
-        { x: -172, z: 22 },
-        { x: -186, z: -10 },
+        { x: -27, z: 236 },
+        { x: -47, z: 222 },
+        { x: -61, z: 190 },
       ],
       width: 10,
     },
@@ -102,19 +103,7 @@ export const MISSION_TERRAIN = Object.freeze({
     },
     {
       id: "WestEvacuation",
-      points: [
-        { x: 54, z: 114 },
-        { x: 39, z: 116 },
-        { x: 18, z: 109 },
-        { x: -7, z: 98 },
-        { x: -28, z: 88 },
-        { x: -51, z: 82 },
-        { x: -67, z: 64 },
-        { x: -84, z: 61 },
-        { x: -99, z: 42 },
-        { x: -120, z: 40 },
-        { x: -138, z: 40 },
-      ],
+      points: MISSION_REAR_ROUTES.evacuation,
       depth: 1.1,
       bottom: 5.2,
       bank: 2.2,
@@ -124,11 +113,7 @@ export const MISSION_TERRAIN = Object.freeze({
     {id:"NorthCoverLoop",role:"localLoop",points:[{x:-24,z:-44},{x:-31,z:-48},{x:-31,z:-56},{x:-24,z:-60}],depth:1.5,bottom:3.6,bank:1.5},
     // A short breached enemy sap explains intruders; it never rejoins behind the player.
     {id:"FlankBreachSap",role:"enemyEntry",points:[{x:-22,z:8},{x:-28,z:8},{x:-37,z:8}],depth:1.5,bottom:3.2,bank:1.5},
-    {
-      id: "RearEvacuationLoop", role: "localLoop",
-      points: [{x:-28,z:88},{x:-34,z:103},{x:-52,z:105},{x:-65,z:90},{x:-67,z:64}],
-      depth:1.1, bottom:5.2, bank:2.2,
-    },
+
   ],
   steps: [
     { x: 0, z: -127.5, radius: 3.6, depth: 0.88 },
@@ -139,7 +124,7 @@ export const MISSION_TERRAIN = Object.freeze({
     { x: -71, z: 74, w: 13, d: 50 },
     { x: 55, z: 6, w: 62, d: 42 },
     { x: 76, z: 113, w: 57, d: 54 },
-    { x: -145, z: 35, w: 42, d: 40 },
+    { x: -20, z: 235, w: 48, d: 40 },
   ],
 });
 export function SampleMissionNaturalHeight(x, z) {
@@ -185,7 +170,7 @@ export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {
   for (const point of [
     { x: -62, z: 64 },
     { x: 54, z: 114 },
-    { x: -138, z: 40 },
+    MISSION_RECEPTION_SPACE.entry,
   ]) {
     const distance = Math.hypot(x - point.x, z - point.z);
     const blend = 1 - Smooth(distance / 9);

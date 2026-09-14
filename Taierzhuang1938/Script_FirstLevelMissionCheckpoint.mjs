@@ -37,7 +37,7 @@ export function BuildFirstLevelCheckpoint(value) {
     Settle(column, () => Math.hypot(column.zhou.x-column.zhouBoardingStart.x,column.zhou.z-column.zhouBoardingStart.z) >= R.boardingWitnessM);
   }
   if (n >= 14) {
-    column.AirDamage(); facts.add("loadedCartBombed");
+    column.AirDamage(); facts.add("loadedCartBombed"); facts.add("MissionBridgeDestroyed");
     for (let i = 0; i < R.airPassSeconds * 10; i++) column.Update(.1, {moving:false});
     Object.assign(column.zhou, A.ditchMouth, {state:"carried",yaw:Math.PI/2});
   }

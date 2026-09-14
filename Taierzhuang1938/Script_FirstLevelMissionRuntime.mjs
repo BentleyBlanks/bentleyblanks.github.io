@@ -1,3 +1,4 @@
+import { MISSION_REARGUARD_POCKETS } from "./Data_FirstLevelMissionTopology.mjs";
 import { MissionReturn } from "./Script_MissionReturn.mjs";
 import { MISSION_RETURN } from "./Data_Tuning_FirstLevel.mjs";
 import { MISSION_RETURN_ROUTES, MISSION_RETURN_PERSON_STAGES, MISSION_RETURN_SQUAD_STAGES, MISSION_RETURN_DISABLED_STAGES } from "./Data_FirstLevelMissionReturn.mjs";
@@ -35,7 +36,7 @@ import { ApplyFirstLevelStageJump } from "./Script_FirstLevelMissionStageJump.mj
 import {
   FirstLevelMissionColumn,
   MissionRoutePoint,
-  MissionRouteLength,
+  MissionRouteLength, MissionRouteProjection, MissionRouteNextIndex,
   MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace, MissionRouteLookahead,
 } from "./Script_FirstLevelMissionColumn.mjs";
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
@@ -1203,17 +1204,17 @@ export class FirstLevelMissionRuntime {
         this.column.StartRetreat();
         this.SpawnEncounter("retreat");
         this.Say("RetreatFirst");
-        this.Guide(MISSION_ROUTES.evacuation.slice(0, 4));
+        this.Guide(MISSION_REARGUARD_POCKETS.find(pocket=>pocket.id===stage.id).route);
         break;
       case "RetreatWall":
         this.SpawnEncounter("retreatWall");
         this.column.zhou.health = 12;
-        this.Guide(MISSION_ROUTES.evacuation.slice(3, 7));
+        this.Guide(MISSION_REARGUARD_POCKETS.find(pocket=>pocket.id===stage.id).route);
         break;
       case "RetreatYard":
         this.SpawnEncounter("retreatYard");
         this.column.zhou.health = 6;
-        this.Guide(MISSION_ROUTES.evacuation.slice(6));
+        this.Guide(MISSION_REARGUARD_POCKETS.find(pocket=>pocket.id===stage.id).route);
         break;
       case "Reception":
         this.SpawnEncounter("reception");
@@ -1305,6 +1306,11 @@ export class FirstLevelMissionRuntime {
         const target=guard.route[guard.progress],p=guard.actor.position;
         const distance=Distance(p,target)||1,dx=(target.x-p.x)/distance,dz=(target.z-p.z)/distance;
         const blocked=this.guards.some(other=>other!==guard&&other.progress<other.route.length&&other.actor.alive&&
+          // A strict route order prevents two converging men from each seeing
+          // the other just ahead and yielding forever at the trench junction.
+          (other.progress>guard.progress || (other.progress===guard.progress &&
+            (Distance(other.actor.position,other.route[other.progress])<distance ||
+             (Distance(other.actor.position,other.route[other.progress])===distance && other.actor.id<guard.actor.id))))&&
           (other.actor.position.x-p.x)*dx+(other.actor.position.z-p.z)*dz>0&&
           Math.abs((other.actor.position.x-p.x)*dz-(other.actor.position.z-p.z)*dx)<.65&&
           Distance(other.actor.position,p)<1.4);
@@ -1713,7 +1719,9 @@ export class FirstLevelMissionRuntime {
         damage: 120,
         OnImpact: () => {
           this.Record("transferBombed");
+          this.Record("MissionBridgeDestroyed");
           this.battlefield.OpenGate("TemporaryBridge");
+          this.battlefield.CloseGate("MissionBridgeWreck");
         },
       });
     }
@@ -1942,7 +1950,13 @@ export class FirstLevelMissionRuntime {
       if (t > R.southHopeAtS) this.Say("SouthHope");
       if (this.Near(A.village, 10)) this.Record("southTraversed");
     }
-    if (stage === "Village" && this.Near(A.melee, R.meleeTriggerRadiusM)) this.Record("innerCourtReached");
+    if (stage === "Village") {
+      const p=this.player.position, kitchen=P.kitchenInterior;
+      if(p.x>kitchen.minX&&p.x<kitchen.maxX&&p.z>kitchen.minZ&&p.z<kitchen.maxZ)
+        this.Record("kitchenTraversed",{x:p.x,z:p.z});
+      if(this.Has("kitchenTraversed") && this.Near(A.melee,R.meleeTriggerRadiusM))
+        this.Record("innerCourtReached",{viaKitchen:true,x:p.x,z:p.z});
+    }
     if (stage === "Melee" && this.tutor) {
       if (!this.tutor.alive) this.Record("meleeResolved", { sharedCombat: true });
       else {
@@ -2052,7 +2066,7 @@ export class FirstLevelMissionRuntime {
       for (const [id, actor] of this.enemies)
         if (actor.alive && (id.startsWith("Retreat") || id.startsWith("Air"))) {
           const end=MISSION_PURSUIT_ROUTE.findIndex(point=>point.x===position.x && point.z===position.z);
-          let index=Math.min(actor.missionPursuitIndex??MISSION_PURSUIT_ROUTE.findIndex(point=>point.x<=actor.position.x),end);
+          let index=Math.min(actor.missionPursuitIndex??MissionRouteNextIndex(MISSION_PURSUIT_ROUTE,actor.position),end);
           if(Distance(actor.position,MISSION_PURSUIT_ROUTE[index])<R.tacticalArrivalM && index<end)index++;
           actor.missionPursuitIndex=index;
           const target=MISSION_PURSUIT_ROUTE[index];
@@ -2067,7 +2081,7 @@ export class FirstLevelMissionRuntime {
       if (
         remaining.length &&
         remaining.every((litter) => litter.progress >= pass + 1) &&
-        (stage==="RetreatYard" ? this.Near(remaining.at(-1),20) && this.player.position.x<=position.x+12 : this.Near(position,20))
+        (stage==="RetreatYard" ? this.Near(remaining.at(-1),20) && MissionRouteProjection(this.column.route,this.player.position).progress>=pass-12 : this.Near(position,20))
       )
         this.Record(fact);
     }

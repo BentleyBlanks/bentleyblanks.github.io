@@ -1,9 +1,10 @@
+import { MISSION_TOPOLOGY_VERSION } from "./Data_FirstLevelMissionTopology.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_MACHINE_GUN_ATTACK, FRONT_APPROACH_ENEMIES, APPROACH_TACTICS } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-export const MISSION_VERSION = "first-level-20260910-opening-r2";
+export const MISSION_VERSION = MISSION_TOPOLOGY_VERSION;
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 const Stage = (id, objective, target, requirements, cue, extra = {}) =>
@@ -194,22 +195,22 @@ export const MISSION_ENCOUNTERS = Object.freeze({
     { id: "RetreatPursuerD", x: 74, z: 109 },
   ],
   retreatWall: [
-    {id:"WallFlankerA",x:-29,z:65},{id:"WallFlankerB",x:-35,z:60},
-    {id:"WallGunner",x:-27,z:57,weapon:"Type11",hold:true},
+    {id:"WallFlankerA",x: 78, z: 167},{id:"WallFlankerB",x: 72, z: 162},
+    {id:"WallGunner",x: 80, z: 159,weapon:"Type11",hold:true},
   ],
   retreatYard: [
-    {id:"YardPursuerA",x:-80,z:51},{id:"YardPursuerB",x:-81,z:54},
-    {id:"YardPursuerC",x:-82,z:51},
+    {id:"YardPursuerA",x: 28, z: 229},{id:"YardPursuerB",x: 27, z: 232},
+    {id:"YardPursuerC",x: 26, z: 229},
   ],
   reception: [
-    { id: "ReceptionGunner", x: -111, z: 32, weapon: "Type11", hold: true },
-    { id: "ReceptionRifleA", x: -111, z: 46 },
-    { id: "ReceptionRifleB", x: -117, z: 47 },
+    { id: "ReceptionGunner", x: 14, z: 232, weapon: "Type11", hold: true },
+    { id: "ReceptionRifleA", x: 14, z: 246 },
+    { id: "ReceptionRifleB", x: 8, z: 247 },
   ],
   final: [
-    { id: "FinalFlankerA", x: -139, z: 67 },
-    { id: "FinalFlankerB", x: -155, z: 69 },
-    { id: "FinalStreetGunner", x: -112, z: 34, weapon: "Type11", hold: true },
+    { id: "FinalFlankerA", x: -14, z: 267 },
+    { id: "FinalFlankerB", x: -30, z: 269 },
+    { id: "FinalStreetGunner", x: 13, z: 234, weapon: "Type11", hold: true },
   ],
 });
 // Finite squads cross authored openings while the shared AI owns fire and damage.
@@ -251,19 +252,19 @@ export const MISSION_TACTICS = Object.freeze({
   TransferRearA: {delay:0,points:[{x:91,z:77},{x:90,z:91}]},
   TransferRearB: {delay:3,points:[{x:96,z:81},{x:100,z:92}]},
   TransferRearC: {delay:6,points:[{x:84,z:80},{x:86,z:95}]},
-  WallFlankerA: {delay:0,points:[{x:-37,z:66},{x:-41,z:79}]},
-  WallFlankerB: {delay:4,points:[{x:-40,z:63},{x:-42,z:70}]},
-  YardPursuerA: {delay:0,points:[{x:-80,z:51},{x:-81,z:43},{x:-94,z:43}]},
-  YardPursuerB: {delay:4,points:[{x:-81,z:53},{x:-81,z:41},{x:-99,z:42},{x:-103,z:41.62}]},
-  YardPursuerC: {delay:8,points:[{x:-81,z:51},{x:-81,z:41},{x:-99,z:42},{x:-110,z:40.95}]},
+  WallFlankerA: {delay:0,points:[{x:70,z:168},{x:66,z:181}]},
+  WallFlankerB: {delay:4,points:[{x:67,z:165},{x:65,z:172}]},
+  YardPursuerA: {delay:0,points:[{x:27,z:224},{x:26,z:215},A.retreatC]},
+  YardPursuerB: {delay:4,points:[{x:27,z:224},{x:26,z:215},A.retreatC]},
+  YardPursuerC: {delay:8,points:[{x:27,z:224},{x:26,z:215},A.retreatC]},
   AirPursuerA: { delay: 0, points: [{x:106,z:90},{x:102,z:92}] },
   AirPursuerB: { delay: 3, points: [{x:105,z:98},{x:104,z:111}] },
   AirPursuerC: { delay: 5, points: [{x:109,z:109},{x:100,z:114}] },
   AirPursuerD: { delay: 8, points: [{x:106,z:113},{x:99,z:115}] },
-  ReceptionRifleA: { delay: 3, points: [{x:-116,z:46},{x:-121,z:46}] },
-  ReceptionRifleB: { delay: 10, points: [{x:-121,z:47},{x:-131,z:47}] },
-  FinalFlankerA: { delay: 2, points: [{x:-143,z:62},{x:-147,z:56}] },
-  FinalFlankerB: { delay: 9, points: [{x:-165,z:65},{x:-170,z:48}] },
+  ReceptionRifleA: { delay: 3, points: [{x:9,z:246},{x:4,z:246}] },
+  ReceptionRifleB: { delay: 10, points: [{x:4,z:247},{x:-6,z:247}] },
+  FinalFlankerA: { delay: 2, points: [{x:-18,z:262},{x:-22,z:256}] },
+  FinalFlankerB: { delay: 9, points: [{x:-40,z:265},{x:-45,z:248}] },
 });
 export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
   id: "FirstLevelP012Whitebox",
@@ -283,7 +284,7 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
     "军列遭到炮击。支援前沿守军，然后为伤员打开往南的路。",
     "WASD 移动 · Shift 冲刺 · C 蹲伏 · Z 卧倒 · F 交互 · V 大刀 · G 手榴弹 · H 集束手榴弹",
   ],
-  metaText: ["第一关完整流程白盒", "Notion 2026.09.07", "人物动作简化"],
+  metaText: ["第一关完整流程白盒", "Notion 2026.09.14", "人物动作简化"],
   level: CHAPTER,
   roster: ["luo", "yaowa", "heyoutian", "liuwencai"],
   playerCast: "shunzi",

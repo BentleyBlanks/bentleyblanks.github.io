@@ -7,7 +7,7 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 const here=path.dirname(fileURLToPath(import.meta.url)),out=path.join(here,"_shots/FirstLevelFortifications");
 await fs.mkdir(out,{recursive:true});
 const server=await ServeRoot(path.resolve(here,".."),0),browser=await LaunchBrowser();
-const page=await browser.newPage({viewport:{width:1600,height:900}}),errors=[];
+const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[];
 page.on("pageerror",e=>errors.push(String(e)));
 try {
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=high&scale=small`,{timeout:180000});
@@ -15,6 +15,7 @@ try {
   const report=await page.evaluate(async()=>{
     const g=window.Tengxian,field=g.battlefield;
     const {MISSION_ROUTES,MISSION_PLACEMENT}=await import("./Data_FirstLevelMissionLayout.mjs");
+    const {MissionRouteNextIndex}=await import("./Script_FirstLevelMissionColumn.mjs");
     const {MISSION_TERRAIN}=await import("./Data_FirstLevelMissionTerrain.mjs");
     const {MISSION_TACTICS,MISSION_ENCOUNTERS,MISSION_PURSUIT_ROUTE}=await import("./Data_FirstLevelMission.mjs");
     const {MISSION_DEFENSE_OBJECTS,IsMissionSandbagBlock}=await import("./Data_FirstLevelMissionFortifications.mjs");
@@ -47,7 +48,7 @@ try {
     const cuts=[];
     const actors=Object.values(MISSION_ENCOUNTERS).flat();
     const tactics=Object.fromEntries(Object.entries(MISSION_TACTICS).map(([id,plan])=>[id,[actors.find(s=>s.id===id),...plan.points]]));
-    for(const s of [...MISSION_ENCOUNTERS.retreat,...MISSION_ENCOUNTERS.air])tactics[s.id+"Pursuit"]=[s,...MISSION_PURSUIT_ROUTE.slice(MISSION_PURSUIT_ROUTE.findIndex(p=>p.x<=s.x))];
+    for(const s of [...MISSION_ENCOUNTERS.retreat,...MISSION_ENCOUNTERS.air])tactics[s.id+"Pursuit"]=[s,...MISSION_PURSUIT_ROUTE.slice(MissionRouteNextIndex(MISSION_PURSUIT_ROUTE,s))];
     const spawns=Object.fromEntries(actors.map(s=>[s.id+"Spawn",[s,s]]));
     for(const [name,route] of Object.entries({...MISSION_ROUTES,...Object.fromEntries(MISSION_TERRAIN.trenches.filter(t=>t.role).map(t=>[t.id,t.points])),...tactics,...spawns,...Object.fromEntries(MISSION_PLACEMENT.guardWithdrawalRoutes.map((r,i)=>[`Guard${i}`,r]))}))
       for(let i=1;i<route.length;i++){

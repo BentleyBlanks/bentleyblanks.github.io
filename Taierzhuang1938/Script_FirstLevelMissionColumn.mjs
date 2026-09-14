@@ -1,3 +1,4 @@
+import { MISSION_RECEPTION_SPACE as Reception } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_CROWD_AREAS } from "./Data_FirstLevelMissionCrowd.mjs";
 import { MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT } from "./Data_FirstLevelMissionLayout.mjs";
@@ -31,6 +32,16 @@ export function MissionRouteProjection(route, point) {
 }
 export function MissionRouteLookahead(route, point, lead=R.guideLookaheadM) {
   return MissionRoutePoint(route, MissionRouteProjection(route,point).progress+lead);
+}
+export function MissionRouteNextIndex(route,point) {
+  const progress=MissionRouteProjection(route,point).progress;
+  if(progress<=.01)return 0;
+  let distance=0;
+  for(let i=1;i<route.length;i++){
+    distance+=Math.hypot(route[i].x-route[i-1].x,route[i].z-route[i-1].z);
+    if(distance>=progress-.01)return i;
+  }
+  return route.length-1;
 }
 export function MissionRouteBetween(route, from, to) {
   const start=MissionRouteProjection(route,from).progress, end=MissionRouteProjection(route,to).progress;
@@ -158,14 +169,14 @@ export class FirstLevelMissionColumn {
       if(entry.assigned)continue;
       const door = entry.bearers
         ? [
-            { x: -151, z: 40 },
-            { x: -151, z: 47 },
+            Reception.wardEntry,
+            Reception.wardExit,
           ]
         : [];
       entry.exitRoute = [
         { x: entry.x, z: entry.z },
         ...door,
-        { x: -147, z: 49 },
+        MISSION_ROUTES.exit[2],
         ...MISSION_ROUTES.exit.slice(3, -1),
       ];
       entry.exitProgress = 0;
@@ -182,21 +193,21 @@ export class FirstLevelMissionColumn {
     for (const [i, entry] of [...this.litters, ...this.walkers].entries()) {
       if (entry.loaded || entry.evacuated || entry.health <= 0) continue;
       const rank = entry.bearers ? litterRank++ : i - this.litters.length;
-      const inside = { x: -155 + (rank % 3) * 3.3, z: 29 + Math.floor(rank / 3) * 3.8 };
-      const yard = { x: -162 + (rank % 14) * 1.7, z: 44.2 + Math.floor(rank / 14) * 1.4 };
+      const inside = { x: Reception.litterOrigin.x + (rank % 3) * 3.3, z: Reception.litterOrigin.z + Math.floor(rank / 3) * 3.8 };
+      const yard = { x: Reception.walkerOrigin.x + (rank % 14) * 1.7, z: Reception.walkerOrigin.z + Math.floor(rank / 14) * 1.4 };
       const end = entry.zhou
         ? [A.zhouPickup]
         : entry.bearers
-          ? [{ x: -138, z: 49 }, { x: -151, z: 49 }, { x: -151, z: 40 }, inside]
-          : [{ x: -138, z: 49 }, yard];
-      const tail = [{ x: -138, z: 40 }, ...end];
+          ? [Reception.yardJunction, MISSION_ROUTES.reception[2], Reception.wardEntry, inside]
+          : [Reception.yardJunction, yard];
+      const tail = [Reception.entry, ...end];
       const common = entry.joinRoute || this.route,
         progress = entry.joinRoute ? entry.joinProgress : entry.progress;
       const remaining = [];
       let distance = 0;
       for (let k = 1; k < common.length; k++) {
         distance += Math.hypot(common[k].x - common[k - 1].x, common[k].z - common[k - 1].z);
-        if (distance > progress && common[k].x >= -138) remaining.push(common[k]);
+        if (distance > progress && distance <= MissionRouteProjection(common, Reception.entry).progress + .01) remaining.push(common[k]);
       }
       entry.receiveRoute = [{ x: entry.x, z: entry.z }, ...remaining, ...tail];
       entry.receiveLength = MissionRouteLength(entry.receiveRoute);
@@ -514,8 +525,9 @@ export class FirstLevelMissionColumn {
     const inside=p=>p.x>ward.minX&&p.x<ward.maxX&&p.z>ward.minZ&&p.z<ward.maxZ;
     if(["reception","exit"].includes(this.mode) && inside(target)) {
       if(inside(helper))helper.rescueRoute=[{x:helper.x,z:helper.z},target];
-      else if(helper.x>-166&&helper.x<-123&&helper.z>=43&&helper.z<55)
-        helper.rescueRoute=[{x:helper.x,z:helper.z},{x:helper.x,z:49},{x:-151,z:49},{x:-151,z:40},target];
+      else if(helper.x>Reception.bounds.minX&&helper.x<Reception.bounds.maxX&&helper.z>=ward.maxZ&&helper.z<Reception.bounds.maxZ)
+        helper.rescueRoute=[{x:helper.x,z:helper.z},{x:helper.x,z:Reception.yardJunction.z},
+          {x:Reception.wardEntry.x,z:Reception.yardJunction.z},Reception.wardEntry,target];
     }
     helper.rescueProgress=0;
   }

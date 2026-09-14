@@ -99,7 +99,10 @@ export function ApplyFirstLevelStageJump(runtime, value) {
     }
   }
   if (n >= 11) r.battlefield.OpenGate("MissionCourtyardGate");
-  if (n >= 14) r.cartBombLaunched = true;
+  if (n >= 14) {
+    r.cartBombLaunched = true; r.bridgeBombLaunched = true;
+    r.battlefield.OpenGate("TemporaryBridge"); r.battlefield.CloseGate("MissionBridgeWreck");
+  }
   if (n >= 15) r.zhouStrafeLaunched = true;
   r.flow.index = saved.index;
   r.flow.Enter();

@@ -154,14 +154,22 @@ try{
       },
       Target(){
         const eye=g.player.EyePosition;
-        const stage=g.Debug.FirstLevelMissionRuntime().flow.stage.id;
+        const runtime=g.Debug.FirstLevelMissionRuntime(),stage=runtime.flow.stage.id;
+        const withdrawing=stage==="Support"&&runtime.Has("frontReached")
+          ?runtime.guards.filter(guard=>guard.actor.alive&&!guard.safe&&guard.crossing):[];
+        // At the front, cover the men crossing the exposed gap. A nearby enemy
+        // behind the player must not monopolize the rifle while they withdraw.
+        const priority=actor=>withdrawing.length&&actor.missionEncounter==="front"
+          ?Math.min(...withdrawing.map(guard=>actor.position.distanceToSquared(guard.actor.position)))-10000
+          :actor.position.distanceToSquared(eye);
         // Keep up with the squad through the communication trench. Only a
         // close blocker interrupts this transit; the authored front defense
         // still requires the full firefight once the player reaches its post.
-        const limit=stage==="TrenchEntry"?28:stage==="Support"&&!g.Debug.FirstLevelMissionRuntime().Has("frontReached")?12:85;
+        const approachingFront=stage==="Support"&&this.index<this.points.length;
+        const limit=stage==="TrenchEntry"?28:approachingFront?12:85;
         return g.ai.soldiers.filter(a=>a.side==="ija"&&a.alive&&!a.scriptedNoncombatant&&a.position.distanceTo(eye)<limit &&
           (stage!=="TrenchEntry" || a.missionEncounter==="intrusion" || (!a.scriptDefensive && a.position.distanceTo(eye)<20)))
-          .sort((a,b)=>a.position.distanceToSquared(eye)-b.position.distanceToSquared(eye)).find(a=>{
+          .sort((a,b)=>priority(a)-priority(b)).find(a=>{
             const to=a.position.clone();to.y+=a.stance===2?.45:a.stance===1?1:1.55;
             const direction=to.sub(eye),length=direction.length(),hit=g.battlefield.Raycast(eye,direction.normalize(),length,{terrain:true});
             return !hit||hit.t>=length-.25;
@@ -194,6 +202,20 @@ try{
         // The campaign already responds to live HUD grenade warnings after
         // the MG handover; use the same ordinary escape inputs on the approach.
         if(this.EvadeGrenade())return;
+        // Take an offered field dressing on the normal trench approach. These
+        // are shipped proximity interactions; no inventory is injected.
+        const supply=g.interact.Query(p);
+        if(p.bandages<2 && supply?.point?.id?.startsWith("MissionSupply") && !this.usedSupplies?.has(supply.point.id)){
+          g.Debug.Key("KeyW",false);g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+          g.Debug.Key("KeyF",true);
+          if(!this.supplyHeld || this.supplyHeld.id!==supply.point.id)this.supplyHeld={id:supply.point.id,frames:0,before:p.bandages};
+          this.supplyHeld.frames++;
+          if(p.bandages>this.supplyHeld.before || this.supplyHeld.frames>120){
+            (this.usedSupplies??=new Set()).add(supply.point.id);g.Debug.Key("KeyF",false);this.supplyHeld=null;
+          }
+          return;
+        }
+        if(this.supplyHeld){g.Debug.Key("KeyF",false);this.supplyHeld=null;}
         const foe=fight?this.Target():null;this.foe=foe?.missionId||null;
         // Use the ordinary crouch key while clearing the trench. Companions
         // now survive behind cover instead of absorbing the driver's exposure.

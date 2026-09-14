@@ -20,7 +20,7 @@ import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
 import { TransferBeatReady, GuardCrossingPair, FrontReplacementSlots } from "./Script_FirstLevelMissionPacing.mjs";
 import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage, FirstLevelStageForStep } from "./Data_FirstLevelMissionStages.mjs";
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
-import { FirstLevelMissionColumn, MissionCarryRoutePoint, MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
+import { FirstLevelMissionColumn, MissionRouteNextIndex, MissionCarryRoutePoint, MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS, MISSION_PURSUIT_ROUTE } from "./Data_FirstLevelMission.mjs";
 import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance } from "./Data_FirstLevelMissionTerrain.mjs";
@@ -161,6 +161,19 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     assert.equal(flow.log.find(e=>e.id==="guardWithdrawalResolved").detail.survived,survivors,
       "withdrawal counts only living survivors, including casualties after reaching cover");
     flow.Update(1/60);assert.equal(flow.stage.id,"Tank","partial or total ordinary losses never strand withdrawal");
+  }
+  {
+    const guards=[[-3.15,-124.16],[-3.13,-123.53]].map(([x,z],i)=>({
+      actor:{id:77+i,alive:true,position:{x,z}},safe:true,crossing:true,progress:4,
+      route:Array.from({length:7},()=>({x:6,z:-124})),
+    }));
+    const speeds=new Map(),r={guards,time:1,flow:{stage:{id:'Tank'}},ai:{SetStance(){}},
+      Has:()=>true,Record(){},Say(){},MoveActor:(actor,point,speed)=>speeds.set(actor.id,speed)};
+    FirstLevelMissionRuntime.prototype.UpdateGuards.call(r,1/60);
+    assert.equal([...speeds.values()].filter(speed=>speed>0).length,1,
+      'recorded converging guard pair grants one passage instead of mutual yield');
+    assert.equal([...speeds.values()].filter(speed=>speed===0).length,1,
+      'the other man still yields instead of both ignoring separation');
   }
   const StanceRequest=(stage,facts)=>{
     const input={stanceRequested:"stand",crouchPressed:true,pronePressed:true};
@@ -669,7 +682,7 @@ for (const [x, z] of [
   [-24, -53],
   [-8, -106],
   [12, -124],
-  [20, 109],
+  [A.retreatA.x, A.retreatA.z],
 ])
   assert.ok(SampleMissionTerrain(x, z) < -0.8, "Excavated soil is below natural ground");
 for (const point of Object.values(A)) assert.ok(Number.isFinite(terrain.SampleHeight(point.x, point.z)));
@@ -681,7 +694,7 @@ console.log("ok shared terrain, excavated trenches, structural floors only");
 const tacticalRoutes = Object.fromEntries(Object.entries(MISSION_TACTICS).map(([id, plan]) => [id,
   [Object.values(MISSION_ENCOUNTERS).flat().find(spec => spec.id === id), ...plan.points]]));
 for(const spec of [...MISSION_ENCOUNTERS.retreat,...MISSION_ENCOUNTERS.air])
-  tacticalRoutes[spec.id+"Pursuit"]=[spec,...MISSION_PURSUIT_ROUTE.slice(MISSION_PURSUIT_ROUTE.findIndex(point=>point.x<=spec.x))];
+  tacticalRoutes[spec.id+"Pursuit"]=[spec,...MISSION_PURSUIT_ROUTE.slice(MissionRouteNextIndex(MISSION_PURSUIT_ROUTE,spec))];
 // Bounding-assault lanes: every front rifleman and every wave drop point must rush between lines without cutting a cover block.
 // FRONT_ASSAULT_STARTS is the single roster the cover rows are built around and the runtime spawns
 // from; walking it here is what keeps the three in step.

@@ -1,4 +1,5 @@
-// Notion 2026-09-07: the last 6–13 revision overrides the earlier transfer headings.
+import { MISSION_RECEPTION_SPACE } from "./Data_FirstLevelMissionTopology.mjs";
+// Notion 2026-09-14: public phases and conditions from the current topology table.
 // Public phases group the existing gameplay steps; their fact gates remain independent.
 import { MISSION_ANCHORS as A, MISSION_ROUTES as Routes } from "./Data_FirstLevelMissionLayout.mjs";
 const Phase = (number, id, title, steps, spawn) => Object.freeze({
@@ -20,9 +21,9 @@ export const FIRST_LEVEL_STAGES = Object.freeze([
   Phase(13, "AirFirst", "希望被打断——空袭与接替担架", ["AirFirst","Carry"], {x:94,z:101}),
   Phase(14, "Dive", "第二轮扫射与顺子松手", ["Dive","Rescue"], A.ditchMouth),
   Phase(15, "RetreatFirst", "撤向城边接收院", ["RetreatFirst","RetreatWall","RetreatYard"], A.retreatA),
-  Phase(16, "Reception", "临时接收院仍在战斗", ["Reception","FinalCarry"], {x:-120,z:40}),
-  Phase(17, "Death", "老周牺牲", ["Death"], {x:-151,z:43.6}),
-  Phase(18, "FinalDefense", "接收院被逼退，战斗收尾", ["FinalDefense","Exit"], {x:-151,z:43.6}),
+  Phase(16, "Reception", "临时接收院仍在战斗", ["Reception","FinalCarry"], MISSION_RECEPTION_SPACE.entry),
+  Phase(17, "Death", "老周牺牲", ["Death"], MISSION_RECEPTION_SPACE.deathView),
+  Phase(18, "FinalDefense", "接收院被逼退，战斗收尾", ["FinalDefense","Exit"], MISSION_RECEPTION_SPACE.deathView),
 ]);
 export const FIRST_LEVEL_ENCOUNTER_STARTS = Object.freeze({
   surface:2, intrusion:2, front:3, machineGun:4, approach:3, tank:3, village:3, melee:3, courtyard:10,

@@ -1,3 +1,4 @@
+import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
@@ -287,23 +288,27 @@ Block("TransferCrates", 93, 111, 2, 1.15, 3, "cover");
 const bridge = Block("TemporaryBridge", 76, 153, 8, 0.25, 7, "structure", { y: 0.13, dynamic: true });
 surfaces.push(bridge);
 gates.push({ ...bridge, walkableId: bridge.id, signal: "MissionBridgeDestroyed" });
-// Rearguard cover alternates beside the excavated western drainage route.
-for (const [id, x, z, w, d] of [
-  ["DrainCorner", 18, 102, 7, 0.7],
-  ["RearWallGap", -45, 73, 0.7, 10],
-  ["BackyardWall", -87, 47, 9, 0.7],
-])
-  Wall(id, x, z, w, 1.2, d);
-Room("RearCourtyardHouse", -98, 63, 13, 12, { eastWindow: true });
-// Reception courtyard with street-facing cover and rear exit, never a safe room.
-Room("ReceptionStreetRoom", -130, 29, 10, 14, { eastWindow: true });
-Room("ReceptionWard", -151, 34, 14, 18, { eastWindow: true });
-Wall("ReceptionNorth", -147, 18, 37, 2.8, 0.7);
-DoorWall("ReceptionSouth", -147, 52, 37, 2.8, 5);
-Wall("ReceptionWest", -166, 35, 0.7, 2.8, 34);
-Block("ReceptionMedicine", -156, 36, 1, 0.7, 1, "missionRoute");
-Wall("RearExitCover", -169.5, 29, 6, 1.05, 0.7);
-Wall("FinalAlleyCover", -185, 10, 0.7, 1.2, 12);
+gates.push(MISSION_SOUTH_BRIDGE.wreck);
+// Three separate rearguard pockets turn south after the western ditch mouth.
+GroundedWall("DrainCorner",28,134,4,1.2,.7);
+GroundedWall("DrainSightBreak",44,160,9,2.8,1);
+GroundedWall("RearWallGapWest",45,184,16,2.8,.7);
+GroundedWall("RearWallGapEast",65,184,14,2.8,.7);
+GroundedWall("RearWallSightBreak",38,199,16,2.8,1);
+GroundedWall("BackyardWall",20,224,9,2.8,.7);
+Room("RearCourtyardHouse",27,232,13,12,{eastWindow:true});
+// One reception compound: street room, ward, second cover and an actual west back door.
+Room("ReceptionStreetRoom",-5,229,10,14,{eastWindow:true});
+Room("ReceptionWard",-26,234,14,18,{eastWindow:true});
+Wall("ReceptionNorth",-22,218,37,2.8,.7);
+DoorWall("ReceptionSouth",-22,252,37,2.8,5);
+Wall("ReceptionWestNorth",-41,229.75,.7,2.8,23.5);
+Wall("ReceptionWestSouth",-41,249.25,.7,2.8,5.5);
+Block("ReceptionRearLintel",-41,244,.7,.45,5,"structure",{y:2.575});
+Block("ReceptionMedicine",-31,236,1,.7,1,"missionRoute");
+Wall("ReceptionSecondCover",-32,242,4,1.05,.7);
+Wall("RearExitCover",-43,235,4,1.05,.7);
+Wall("FinalAlleyCover",-60,210,.7,1.2,12);
 for(const post of MISSION_DEFENSE_POSTS)GroundedWall(post.id,post.x,post.z,post.w,post.h,post.d);
 // Human-scale work areas, connected landmarks and trench construction remain pure geometry.
 // Small surface details have no separate collision; functional furniture and walls do.
@@ -319,7 +324,7 @@ function SupplyStack(id, x, z, rows = 2) {
 }
 for (const [id,x,z,rows] of [["StationSupply",-54,64,3],["StationMedical",-60,82,2],
   ["KitchenStores",61,-12,2],["CourtStores",37,22,2],["TransferStores",66,124,3],
-  ["ReceptionStores",-160,21,2]]) SupplyStack(id,x,z,rows);
+  ["ReceptionStores",-35,221,2]]) SupplyStack(id,x,z,rows);
 // Slatted revetment follows the real excavated bank, with a clear middle corridor.
 for (const trench of MISSION_TERRAIN.trenches) {
   for (let segment = 1; segment < trench.points.length; segment++) {
@@ -395,9 +400,9 @@ for(const z of [111,114,117]) {
   Detail('SortingRailPost'+z,70,z,.12,1.1,.12,'timber');
   Detail('SortingRope'+z,70,z+1.4,.035,.035,2.8,'canvas',{y:.95});
 }
-for(const x of [-153,-150,-147]) {
-  Block('WardShelf'+x,x,25.8,2,.8,.55,'timber');
-  Detail('WardMedicalRoll'+x,x,25.8,1.3,.25,.42,'canvas',{y:1.02});
+for(const x of [-28,-25,-22]) {
+  Block('WardShelf'+x,x,225.8,2,.8,.55,'timber');
+  Detail('WardMedicalRoll'+x,x,225.8,1.3,.25,.42,'canvas',{y:1.02});
 }
 // Field boundaries and split fence sections leave the tank and infantry corridors open.
 for(const [id,x,z,length] of [['WestFieldFence',-58,-120,36],['VillageFieldFence',12,43,22],
@@ -462,23 +467,11 @@ export const MISSION_ANCHORS = Object.freeze({
   throw: { x: 30, z: -117 },
   village: { x: 55, z: -20 },
   melee: { x: 58, z: 6 },
-  ditchMouth: { x: 53, z: 114 },
   transferSupply: { x: 93, z: 110 },
   forwardNest: { x: -24, z: -130 },
-  gate: { x: 53, z: 34 },
-  courtCover: { x: 67, z: 24 },
-  transfer: { x: 95, z: 103 },
-  queue: { x: 74, z: 111 },
-  ditch: { x: 39, z: 116 },
-  retreatA: { x: 18, z: 109 },
-  retreatB: { x: -51, z: 82 },
-  retreatC: { x: -99, z: 42 },
-  reception: { x: -131, z: 31 },
-  zhouPickup: { x: -139, z: 47 },
-  zhouDrop: { x: -150, z: 42 },
-  finalCover: { x: -172, z: 54 },
-  rearExit: { x: -171, z: 35 },
-  end: { x: -186, z: -8 },
+  gate: { x: 53, z: 34 }, courtCover: { x: 67, z: 24 },
+  transfer: { x: 95, z: 103 }, queue: { x: 74, z: 111 },
+  ...MISSION_REAR_ANCHORS,
 });
 export const MISSION_ROUTES = Object.freeze({
   flank: [
@@ -525,24 +518,7 @@ export const MISSION_ROUTES = Object.freeze({
     { x: 76, z: 85 },
     { x: 76, z: 170 },
   ],
-  evacuation: MISSION_TERRAIN.trenches[3].points,
-  reception: [
-    { x: -138, z: 40 },
-    { x: -138, z: 49 },
-    { x: -151, z: 49 },
-    { x: -151, z: 41 },
-  ],
-  exit: [
-    { x: -151, z: 41 },
-    { x: -151, z: 47 },
-    { x: -147, z: 49 },
-    { x: -147, z: 54 },
-    { x: -172, z: 54 },
-    { x: -174, z: 29 },
-    { x: -187, z: 20 },
-    { x: -187, z: 12 },
-    { x: -186, z: -8 },
-  ],
+  ...MISSION_REAR_ROUTES,
 });
 import { FRONT_GUARD_POSTS, FRONT_COVER, FRONT_FIELD_MEN, FrontAssaultLaneCuts } from "./Data_FirstLevelMissionFront.mjs";
 export const MISSION_PLACEMENT = Object.freeze({
@@ -563,7 +539,8 @@ export const MISSION_PLACEMENT = Object.freeze({
     {x:-8,z:-112},
     {x:-8+(i%2?1:-1),z:-92-Math.floor(i/2)*2.8},
   ]),
-  wardInterior: {minX:-157,maxX:-145,minZ:25,maxZ:43},
+  kitchenInterior: {minX:53,maxX:63,minZ:-15,maxZ:-2},
+  wardInterior: MISSION_RECEPTION_SPACE.ward,
   tankStart: { x: 36, z: -173 },
   tankTargets: [
     { x: -24, z: -130 },
@@ -583,8 +560,8 @@ export const MISSION_SUPPLIES = Object.freeze([
   {id:"Orders",x:-9.5,z:-102,supportHeight:null},
   {id:"Courtyard",x:50,z:33.05,supportHeight:null},
   {id:"Transfer",x:93,z:110,supportHeight:1.15},
-  {id:"Retreat",x:-53.2,z:82,supportHeight:null},
-  {id:"Reception",x:-132.8,z:31,supportHeight:null},
+  {id:"Retreat",x:53.8,z:184,supportHeight:null},
+  {id:"Reception",x:-7.8,z:231,supportHeight:null},
 ]);
 // Leave continuous openings wherever a return route or stretcher corridor crosses a revetment.
 for (let i = blocks.length - 1; i >= 0; i--) {
@@ -602,7 +579,7 @@ for (let i = blocks.length - 1; i >= 0; i--) {
   if(crosses)blocks.splice(i,1);
 }
 export const MISSION_LAYOUT = Object.freeze({
-  id: "FirstLevelMissionSeptember07",
+  id: "FirstLevelMissionSeptember14",
   fortifications: true,
   derailCar: OPENING.derailCar,
   terrain: "P012Heightfield",

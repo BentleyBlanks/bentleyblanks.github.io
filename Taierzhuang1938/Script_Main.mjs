@@ -8271,7 +8271,7 @@ function Frame(dt, render = true) {
   // 南路被切断后开归路。不存在悬浮解释卡，也不存在隐形空气墙。
   const openedScenarioGates = battlefield?.SyncScenario?.({
     objectiveIndex: state.objectiveIndex,
-    signalled: (name) => story.Signalled(name),
+    signalled: (name) => missionRuntime?.Has(name) || story.Signalled(name),
   });
   if (openedScenarioGates > 0) navGrid?.Refresh(battlefield);
   profiler.E("story");

@@ -1,3 +1,4 @@
+import { MISSION_ROUTES as Routes, MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
 // Real browser baseline and campaign input driver; screenshots stay local.
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -13,6 +14,8 @@ const here = path.dirname(fileURLToPath(import.meta.url)),
   root = path.resolve(here, "..");
 const audioCheck = process.argv.includes("--audio");
 const stageJumps = process.argv.includes("--stage-jumps");
+const allowCheckpointRetry=process.argv.includes("--allow-checkpoint-retry");
+const campaignRetries=[];
 const stageFrom = Number(process.argv.find(arg=>arg.startsWith("--stage-from="))?.split("=")[1] || 1);
 assert.ok(stageFrom===1 || (stageJumps && [8,12,16].includes(stageFrom)),"supported continuation suites start at 1, 8, 12 or 16");
 const output = path.join(here, "_shots", stageFrom===8 ? "FirstLevelStageVillage" : stageFrom===12 ? "FirstLevelStageTransfer" : stageFrom===16 ? "FirstLevelStageTail" : stageJumps ? "FirstLevelStageContinue" : "FirstLevelMission");
@@ -279,6 +282,31 @@ async function Interact() {
     return query;
   });
 }
+async function RetryCampaign() {
+  if(!allowCheckpointRetry||stageJumps||campaignRetries.length>=3)return false;
+  const before=await page.evaluate(()=>{
+    const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
+    return {dead:!g.player.alive,stage:r.flow.stage.id,time:r.time,facts:[...r.flow.facts],
+      route:window.routeBot?.points||[],enemies:[...r.enemies.values()].map(a=>({id:a.id,alive:a.alive}))};
+  });
+  if(!before.dead)return false;
+  await page.locator('.mnItem[data-act="continueCheckpoint"]').click();
+  await page.waitForFunction(()=>window.Tengxian.player.alive&&window.Tengxian.state.running,null,{timeout:10000});
+  const after=await page.evaluate(()=>{
+    const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
+    for(const key of ['KeyW','KeyS','KeyF','ShiftLeft'])g.Debug.Key(key,false);
+    g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);window.MissionInputDriver.evading=false;
+    return {stage:r.flow.stage.id,facts:[...r.flow.facts],enemies:[...r.enemies.values()].map(a=>({id:a.id,alive:a.alive}))};
+  });
+  assert.equal(after.stage,before.stage,'normal retry retains the current mission step');
+  assert.deepEqual(after.facts,before.facts,'normal retry neither grants nor erases mission facts');
+  assert.deepEqual(after.enemies,before.enemies,'normal retry retains actual enemy casualties');
+  campaignRetries.push({stage:before.stage,time:before.time,factsPreserved:true,casualtiesPreserved:true});
+  console.log('NORMAL_CHECKPOINT_RETRY',JSON.stringify(campaignRetries.at(-1)));
+  // Walk back through the last observed route using the ordinary movement driver.
+  if(before.route.length)await Route(before.route,`CheckpointReturn${campaignRetries.length}`,{fight:true,stance:'crouch'});
+  return true;
+}
 async function WaitStage(expected, seconds = 240, { fight = false, cover = false } = {}) {
   // Read only the step id in the per-frame loop. Full State clones the entire
   // casualty/transport ledger; keep that diagnostic snapshot at chunk boundaries.
@@ -342,6 +370,7 @@ async function WaitStage(expected, seconds = 240, { fight = false, cover = false
       capturedActivities.add("MedicalRescue");await CaptureFocus("MedicalRescue",state.mission.column.litters.find(l=>l.zhou));
     }
     if(chunk%12===11)console.log("WAIT_PROGRESS",JSON.stringify({expected,stage:state.mission.stage,time:state.mission.time,health:state.health,remaining:state.mission.remaining}));
+    if(!state.alive&&await RetryCampaign())continue;
     if (state.mission.stage === expected || !state.alive) break;
   }
   console.log(
@@ -700,8 +729,6 @@ try {
     const tankCraters=await page.evaluate(()=>({tank:window.Tengxian.Debug.FirstLevelMission().tank,terrain:window.Tengxian.battlefield.deformation.State()}));
     await fs.writeFile(path.join(output,"Data_TankShellCraters.json"),JSON.stringify(tankCraters,null,2));
     assert.ok(tankCraters.tank.impacts?.some(hit=>hit.crater),"actual tank fire reaches the shared deformable ground: "+JSON.stringify(tankCraters.tank));
-    const evacSpacing=await page.evaluate(()=>{const g=window.Tengxian,ids=new Set(g.Debug.FirstLevelMission().guards.filter(a=>a.safe&&a.alive).map(a=>a.id));const a=g.ai.soldiers.filter(a=>ids.has(a.id));return a.flatMap((p,i)=>a.slice(i+1).map(q=>Math.hypot(p.position.x-q.position.x,p.position.z-q.position.z)));});
-    assert.ok(evacSpacing.every(d=>d>.8),"withdrawn soldiers do not occupy the same stopping point");
     await page.evaluate(() => {
       const g = window.Tengxian;
       // Grenade evasion can already have vacated the gun at the stage boundary.
@@ -821,6 +848,15 @@ try {
     assert.ok(ordersSupply.kind==="supply","covered orders position offers an actual supply interaction");
     await page.evaluate(()=>{const g=window.Tengxian;g.Debug.Key("KeyB");if(g.player.stance!=="crouch")g.Debug.Key("KeyC");g.StepFrames(1,1/60,false);});
     await WaitStage("South", 240);
+    // The guard crossing line is followed by a real walk to separate rear posts.
+    // Check those stopping points after the tank and orders, when that walk ends.
+    const guardArrival=await page.evaluate(()=>{
+      const r=window.Tengxian.Debug.FirstLevelMissionRuntime(),guards=r.guards.filter(g=>g.safe&&g.actor.alive);
+      return {count:guards.length,arrived:guards.every(g=>g.progress===g.route.length),
+        spacing:guards.flatMap((g,i)=>guards.slice(i+1).map(h=>Math.hypot(g.actor.position.x-h.actor.position.x,g.actor.position.z-h.actor.position.z)))};
+    });
+    assert.ok(guardArrival.count>0&&guardArrival.arrived,'living withdrawn guards finish their physical rear route');
+    assert.ok(guardArrival.spacing.every(d=>d>.8),"withdrawn soldiers do not occupy the same stopping point");
     await JumpStage(7);
     await Route(
       [
@@ -1003,6 +1039,12 @@ try {
     assert.deepEqual(transferPacing.beats.cleared,MISSION_TRANSFER_BEATS.map(beat=>beat.id),"all finite attacks actually resolve before the air raid");
     await fs.writeFile(path.join(output,"Data_TransferPacing.json"),JSON.stringify(transferPacing,null,2));
     console.log("transfer pacing",JSON.stringify(transferPacing));
+    // Dress the wounds from the complete defense before carrying Zhou away.
+    // The same field box is available again after its real 15-second cooldown.
+    await Route([{x:95,z:110}],"TransferDepartureSupply",{fight:true,stance:"crouch"});
+    const departureSupply=await Interact();
+    assert.equal(departureSupply.kind,"supply");
+    await page.evaluate(()=>window.Tengxian.Debug.Key("KeyB"));
     await JumpStage(13);
     // The aircraft warning arrives while live infantry can still lob grenades
     // at the last firing position. Walk behind the existing supply cover.
@@ -1039,31 +1081,20 @@ try {
     await WaitStage("RetreatFirst", 100, { fight: true });
     await JumpStage(15);
     await Route(
-      [
-        { x: 39, z: 116 },
-        { x: 18, z: 109 },
-      ],
+      Routes.evacuation.slice(1,3),
       "FirstRearguard",
-      { fight: true, stance: "stand" },
+      { fight: true, stance: "crouch" },
     );
-    await WaitStage("RetreatWall", 240, { fight: true });
+    await WaitStage("RetreatWall", 240, { fight: true, cover:true });
     await Route(
-      [
-        { x: -7, z: 98 },
-        { x: -28, z: 88 },
-        { x: -51, z: 82 },
-      ],
+      Routes.evacuation.slice(3,6),
       "WallRearguard",
       { fight: true },
     );
     await Interact();
-    await WaitStage("RetreatYard", 180, { fight: true });
+    await WaitStage("RetreatYard", 180, { fight: true, cover:true });
     await Route(
-      [
-        { x: -67, z: 64 },
-        { x: -84, z: 61 },
-        { x: -99, z: 42 },
-      ],
+      Routes.evacuation.slice(6,9),
       "YardRearguard",
       { fight: true },
     );
@@ -1073,12 +1104,7 @@ try {
     }
     await JumpStage(16);
     await Route(
-      [
-        { x: -120, z: 40 },
-        { x: -138, z: 40 },
-        { x: -138, z: 49 },
-        { x: -138, z: 45 },
-      ],
+      [...Routes.evacuation.slice(9),{x:-13,z:249},{x:-13,z:245}],
       "ReceptionDefense",
       { fight: true },
     );
@@ -1091,11 +1117,7 @@ try {
     await Interact();
     assert.equal(await page.evaluate(() => window.Tengxian.carry.KindId), "stretcher");
     await Route(
-      [
-        { x: -142, z: 49 },
-        { x: -151, z: 49 },
-        { x: -151, z: 42.8 },
-      ],
+      [{x:-17,z:249},{x:-26,z:249},{x:-26,z:242.8}],
       "DeliverZhou",
     );
     await Interact();
@@ -1110,24 +1132,14 @@ try {
       0,
     );
     await Route(
-      [
-        { x: -151, z: 47 },
-        { x: -147, z: 49 },
-        { x: -147, z: 54 },
-      ],
+      Routes.exit.slice(1,3),
       "FinalDefensePosition",
       { fight: true },
     );
-    await Route([{x:-172,z:54}],"RearLaneRearguard",{fight:true});
+    await Route([...Routes.exit.slice(2,4),{x:-40,z:244}],"RearLaneRearguard",{fight:true});
     await WaitStage("Exit", 160, { fight: true });
     await Route(
-      [
-        { x: -172, z: 54 },
-        { x: -174, z: 29 },
-        { x: -187, z: 20 },
-        { x: -187, z: 12 },
-        { x: -186, z: -8 },
-      ],
+      Routes.exit.slice(2),
       "PersonalExit",
       { fight: true },
     );
@@ -1160,6 +1172,7 @@ try {
     );
     }
     assert.deepEqual(errors, []);
+    await fs.writeFile(path.join(output,"Data_NormalCheckpointRetries.json"),JSON.stringify(campaignRetries,null,2));
     if (stageJumps) {
       assert.deepEqual(jumpReceipts.map(receipt=>receipt.number),Array.from({length:19-stageFrom},(_,i)=>i+stageFrom));
       await fs.writeFile(path.join(output,"Data_JumpContinuation.json"),JSON.stringify(jumpReceipts,null,2));
