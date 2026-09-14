@@ -215,8 +215,8 @@ export const BODY_FOLEY = Object.freeze({
   vaultVolume: 0.6,
   gearIntervalS: 0.9,       // 冲刺中装具晃动的间隔
   gearVolume: 0.38,
-  // 喘息：冲刺满三秒、或血量掉到 35% 以下开始，非空间化（那是自己的肺）。
-  breathAfterSprintS: 3.0,
+  // 喘息：冲刺满五秒、或血量掉到 35% 以下开始，非空间化（那是自己的肺）。
+  breathAfterSprintS: 5.0,
   breathHealthFrac: 0.35,
   breathLoopS: 2.4,         // 一条 breathHeavy 的时长，到点续一条
   breathInjuredLoopS: 8.05, // 用户选定的 8 秒受伤干声，完整播完后再续

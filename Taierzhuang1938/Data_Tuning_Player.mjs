@@ -113,6 +113,13 @@ export const STAMINA = Object.freeze({
   waterDrainPerS: 0.5,
 });
 
+/** 屏息反馈：前三次有效开镜提示一次，按住后再做一层缓慢的视野收缩。 */
+export const BREATH_HOLD = Object.freeze({
+  tutorialAdsCount: 3,
+  fovScale: 1 / 1.1,           // 相对普通开镜再放大约 1.1×
+  fovLerpRate: 6,
+});
+
 /**
  * 自由瞄准：枪口方向可以偏离视线中心一小段，鼠标先推动枪、枪撞到边界才带动视线。
  * 这是 ER2「没有准星也打得准」的物理基础 —— 玩家看的是枪，不是屏幕中心。

@@ -118,6 +118,7 @@ import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction
 import { FrameProfiler } from "./Script_Profiler.mjs";
 import { AutoQuality } from "./Script_AutoQuality.mjs";
 import { LENS_FLARE } from "./Data_Tuning_Camera.mjs";
+import { BREATH_HOLD } from "./Data_Tuning_Player.mjs";
 import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
 import { BootProp } from "./Script_BootProp.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
@@ -734,6 +735,8 @@ const state = {
   playerAliveLast: true,
   phasePoolNra: 0,            // 本阶段缩放后的中方票池上限（见底提示按它算）
   playerShots: 0,             // 玩家开火累计，与 ai.fireCount 合起来就是全场火力
+  breathHoldHintCount: 0,     // 本次游戏会话只教前三次有效开镜；换人、换关不重播
+  breathHoldHintAds: false,   // 有效开镜的上升沿，按住右键不重复计数
   // --- 武器槽 ---------------------------------------------------------------
   // LOADOUTS 六套携行躺在 Data_Weapons 里一行没接：玩家永远只有 identity.weapon
   // 给的那一支长枪，大刀只在按 V 时凭空出现一下（硬编码 fallback，背包里根本没刀）。
@@ -2571,6 +2574,9 @@ async function Boot() {
         lastLookDeltaYaw: lastLookDeltaYaw,
         lowAmmo: state.ammo <= 1,
         boltOpen: viewmodel.boltOpen,
+        breathHold: player.breathHold,
+        breathFov,
+        breathHoldHintCount: state.breathHoldHintCount,
       }),
       // 指针锁：解锁通道有没有真的接上。fake=true 说明走的是页内假后端
       // （webdriver / 出图），真指针锁一次都没碰 —— 见 FAKE_POINTER_LOCK 的注释。
@@ -7982,8 +7988,8 @@ function Frame(dt, render = true) {
   }
 
   // 开镜时相机 FOV 收缩 —— 铁瞄的"贴脸"感来自这一下。
-  // 屏息再收 6%：ER2 屏息时视野有一点点放大，这是"憋住那一口气把注意力收拢"的
-  // 视觉说法，也让玩家一眼知道自己确实在屏息（我们不给体力条）。
+  // 屏息相对普通开镜再放大约 1.1×：这是"憋住那一口气把注意力收拢"的视觉说法，
+  // 也让玩家一眼知道自己确实在屏息（我们不给体力条）。
   //
   // 【2026-08-19 按战地 datamine 重做，两条】
   //
@@ -7999,6 +8005,15 @@ function Frame(dt, render = true) {
   //    Script_Viewmodel 早就在做了（adsInput 乘了 actionBlend），但相机一直没跟上：
   //    枪都甩出画面了视野还是窄的 —— 玩家看到的是「视野卡住了」，不是「在拉栓」。
   const weapon = WEAPONS[currentWeapon];
+  // 只数真正拿着火器进入 ADS 的上升沿；空手、望远镜、过场和菜单不消耗三次教学。
+  const tutorialAds = state.running && !state.menu && !state.cutscene && player.Alive
+    && Number(weapon?.magazine) > 0 && player.wantAds;
+  if (tutorialAds && !state.breathHoldHintAds
+    && state.breathHoldHintCount < BREATH_HOLD.tutorialAdsCount) {
+    state.breathHoldHintCount += 1;
+    hud.Hint(T("hud.hint.breathHold"));
+  }
+  state.breathHoldHintAds = tutorialAds;
   const adsHeld = player.wantAds ? 1 : 0;
   const fovStep = dt / ADS_FOV_TIME;
   adsFovT = adsHeld > adsFovT ? Math.min(adsHeld, adsFovT + fovStep)
@@ -8007,8 +8022,9 @@ function Frame(dt, render = true) {
   // 用它、而不是在这儿另起一个 150 ms 的 snap，是因为因果要对：
   // 视野丢失是**枪离开了瞄准线**的结果，两者本来就该是同一条曲线。
   const adsEff = adsFovT * (viewmodel.adsSuppress ?? 1);
-  // 屏息那 6% 单独平滑：它跟开镜不是一回事，snap 会"啵"一下。
-  breathFov += ((player.breathHold ? 0.94 : 1) - breathFov) * Clamp01(dt * 6);
+  // 屏息放大单独平滑：它跟开镜不是一回事，snap 会"啵"一下。
+  breathFov += ((player.breathHold ? BREATH_HOLD.fovScale : 1) - breathFov)
+    * Clamp01(dt * BREATH_HOLD.fovLerpRate);
   const baseFov = graphics.fov * (1 - adsEff * (1 - (weapon?.adsFovScale ?? 0.75))) * breathFov;
 
   // 枪感方子 2：开火顿挫。85 ms 衰减，**平方**衰减让前两帧吃掉六成 ——

@@ -7,6 +7,7 @@
 // 免得再开一张只服务一个文件的表。开机加载与菜单相关的那部分在 Data_Text_Boot / Data_Text_Menu。
 export const TEXT = Object.freeze({
   "hud.hint.checkpointResumed": "已从当前检查点继续",
+  "hud.hint.breathHold": "开镜时按住 Shift 屏息，稳住枪口并看得更远",
   // 姿态（站 / 蹲 / 趴）不再上 HUD：对标 COD《战争世界》，姿态由镜头高度与
   // 视图模型自己说话，右下角只留弹药与手榴弹数（见 docs/Data_HudLinearLevel.md）。
 

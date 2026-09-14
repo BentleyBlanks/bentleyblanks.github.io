@@ -415,7 +415,7 @@ const body = await page.evaluate(() => {
   const g0 = a.RequestedCount("gearRattle");
   const b0 = a.RequestedCount("breathHeavy");
   p.sprint = 1;
-  for (let i = 0; i < 300; i += 1) w.Update(1 / 60, T.state.frame + i);   // 5 秒冲刺
+  for (let i = 0; i < 360; i += 1) w.Update(1 / 60, T.state.frame + i);   // 6 秒冲刺
   p.sprint = 0;
   return {
     cloth,
@@ -424,9 +424,9 @@ const body = await page.evaluate(() => {
   };
 });
 Check("姿态切换 → clothMove", body.cloth === 1, `请求 ${body.cloth} 条`);
-Check("冲刺五秒 → 装具声约每 0.9 s 一记（4—7 记）",
-  body.gear >= 4 && body.gear <= 7, `请求 ${body.gear} 条`);
-Check("冲刺过三秒 → 开始喘", body.breath >= 1, `请求 ${body.breath} 条`);
+Check("冲刺六秒 → 装具声约每 0.9 s 一记（5—8 记）",
+  body.gear >= 5 && body.gear <= 8, `请求 ${body.gear} 条`);
+Check("冲刺过五秒 → 开始喘", body.breath >= 1, `请求 ${body.breath} 条`);
 
 // Isolated player timeline through the real wiring and audio engine.
 const injuredBreath = await page.evaluate(() => {

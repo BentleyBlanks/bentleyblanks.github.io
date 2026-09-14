@@ -318,8 +318,8 @@ Healthy → Wounded（去饱和、不能跑、不能屏息、每秒掉血）
 ### [必做/小] 瞄准｜已有但不对齐
 
 - **ER2**：屏息＝ADS 时按住 Sprint（Shift），减晃 + 视野轻微放大；时长随难度变
-- **现状**：Script_Main.mjs:557 input.breathHold = keys.has('Space')，键错了。Script_Player.mjs 要求 ads>0.6 && stamina>0.1，耗 0.28/s，SwayAmount ×0.28、SpreadDeg ×0.55——逻辑对，键不对
-- **要做**：把屏息挪到 Shift（与冲刺同键，开镜时语义切换），Space 腾给翻越。改 Script_Main.mjs:ReadKeys()。再补 ER2 的「视野轻微放大」：屏息时 camera.fov 再 ×0.94
+- **现状**：屏息已与冲刺共用 Shift；Script_Player.mjs 要求 ads>0.6 && stamina>0.1，耗 0.28/s，SwayAmount ×0.28、SpreadDeg ×0.55。屏息时视野再自然收窄到 1/1.1，并在本次游戏会话的前三次有效开镜提示按住 Shift；换人、换关不重复教学。
+- **要做**：设置页仍可补 ADS 按住／切换选项；屏息现有反馈与键位保持不变。
 - **史实**：无
 ### [应做/中] 瞄准｜完全没有
 

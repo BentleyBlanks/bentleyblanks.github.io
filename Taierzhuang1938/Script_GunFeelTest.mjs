@@ -54,6 +54,35 @@ const report = await page.evaluate(({ flashKinds, firearms }) => {
     if (soldier.side === "ija") soldier.position.x += 500;
   }
 
+  // 前三次真正开镜给屏息教学，第四次不再打扰；计数跨换人/关卡保留到页面重开。
+  const breathHints = [];
+  for (let i = 0; i < 4; i += 1) {
+    T.hud.Hint("", 0);
+    T.StepFrames(1);
+    D.Mouse(2, true);
+    T.StepFrames(12);
+    breathHints.push({
+      text: document.querySelector(".hudHint")?.textContent || "",
+      count: T.state.breathHoldHintCount,
+    });
+    D.Mouse(2, false);
+    T.StepFrames(20);
+  }
+
+  // 普通 ADS 稳定后按住 Shift：枪口稳定机制照旧，同时视野自然再收约 1.1×。
+  T.player.stamina = 1;
+  D.Mouse(2, true);
+  T.StepFrames(90);
+  const adsFov = T.camera.fov;
+  D.Key("ShiftLeft", true);
+  T.StepFrames(120);
+  const heldFov = T.camera.fov;
+  const breathHeld = T.player.breathHold;
+  D.Key("ShiftLeft", false);
+  T.StepFrames(120);
+  const releasedFov = T.camera.fov;
+  D.Mouse(2, false);
+
   // 一、玩家真实开火。第 3 关初始武器是汉阳造（boltRifle）。
   T.state.ammo = 5;
   T.player.pitch = 0;
@@ -170,6 +199,8 @@ const report = await page.evaluate(({ flashKinds, firearms }) => {
     type38AdsNear,
     armSides,
     sprintAmount,
+    breathHints,
+    breathFov: { adsFov, heldFov, releasedFov, breathHeld },
   };
 }, { flashKinds: FLASH_KINDS, firearms: FIREARMS });
 
@@ -214,6 +245,16 @@ Check("三八式开镜保留完整机匣与枪托，近端顶点不穿相机裁�
 Check("第一人称手臂只画外表面，冲刺时袖筒背面不会铺满屏幕",
   report.sprintAmount > 0.8 && report.armSides.length > 0 && report.armSides.every((side) => side === 0),
   `Shift+W sprint=${report.sprintAmount.toFixed(2)} · material.side=${report.armSides.join(",") || "missing"}`);
+Check("前三次有效开镜提示 Shift 屏息，第四次不再提示",
+  report.breathHints.slice(0, 3).every((entry, index) => /Shift.*屏息/.test(entry.text) && entry.count === index + 1)
+    && report.breathHints[3].text === "" && report.breathHints[3].count === 3,
+  JSON.stringify(report.breathHints));
+Check("开镜按住 Shift 会屏息并自然放大约 1.1×，松开后恢复",
+  report.breathFov.breathHeld
+    && report.breathFov.adsFov / report.breathFov.heldFov >= 1.08
+    && report.breathFov.adsFov / report.breathFov.heldFov <= 1.13
+    && Math.abs(report.breathFov.releasedFov - report.breathFov.adsFov) < 0.02,
+  `${report.breathFov.adsFov.toFixed(2)}° -> ${report.breathFov.heldFov.toFixed(2)}° -> ${report.breathFov.releasedFov.toFixed(2)}°`);
 Check("页面无运行时错误", errors.length === 0, errors.join(" | "));
 
 await browser.close();
