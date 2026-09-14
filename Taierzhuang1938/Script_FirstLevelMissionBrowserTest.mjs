@@ -16,9 +16,10 @@ const audioCheck = process.argv.includes("--audio");
 const stageJumps = process.argv.includes("--stage-jumps");
 const allowCheckpointRetry=process.argv.includes("--allow-checkpoint-retry");
 const campaignRetries=[];
-const stageFrom = Number(process.argv.find(arg=>arg.startsWith("--stage-from="))?.split("=")[1] || 1);
-assert.ok(stageFrom===1 || (stageJumps && [8,12,16].includes(stageFrom)),"supported continuation suites start at 1, 8, 12 or 16");
-const output = path.join(here, "_shots", stageFrom===8 ? "FirstLevelStageVillage" : stageFrom===12 ? "FirstLevelStageTransfer" : stageFrom===16 ? "FirstLevelStageTail" : stageJumps ? "FirstLevelStageContinue" : "FirstLevelMission");
+const sortieFixture=process.argv.includes("--sortie-fixture");
+const stageFrom = sortieFixture?5:Number(process.argv.find(arg=>arg.startsWith("--stage-from="))?.split("=")[1] || 1);
+assert.ok(stageFrom===1 || sortieFixture || (stageJumps && [8,12,16].includes(stageFrom)),"supported continuation suites start at 1, 8, 12 or 16");
+const output = path.join(here, "_shots", sortieFixture?"FirstLevelSortieFixture":stageFrom===8 ? "FirstLevelStageVillage" : stageFrom===12 ? "FirstLevelStageTransfer" : stageFrom===16 ? "FirstLevelStageTail" : stageJumps ? "FirstLevelStageContinue" : "FirstLevelMission");
 const jumpReceipts = [];
 async function JumpStage(number) {
   if (!stageJumps) return;
@@ -135,7 +136,7 @@ async function CaptureFocus(name,point) {
 // you the level got harder, not that the dice went badly.
 const ROUTE_RETRY_BUDGET = 2;
 
-async function Route(points, label, { fight = false, stance = "stand", sprint = false } = {}) {
+async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false } = {}) {
   await page.evaluate(
     ({ points, stance, sprint }) => {
       const g = window.Tengxian;
@@ -157,7 +158,8 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
   const carriedKind=await page.evaluate(()=>window.Tengxian.carry.KindId);
   let result, retries = 0;
   for (let chunk = 0; chunk < 90; chunk++) {
-    result = await page.evaluate((fight) => {
+    result = await page.evaluate(async ({fight,stance,crawl,sprint}) => {
+      const {FRONT_SORTIE}=await import("./Data_FirstLevelFrontRoute.mjs");
       const g = window.Tengxian,
         b = window.routeBot,
         Wrap = (x) => Math.atan2(Math.sin(x), Math.cos(x));
@@ -168,7 +170,15 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
           b.index++;
           continue;
         }
-        const foe = fight ? window.MissionInputDriver.Target() : null;
+        const evading=crawl&&fight&&window.MissionInputDriver.EvadeGrenade();
+        const foe = fight&&!evading ? window.MissionInputDriver.Target(crawl?28:90) : null;
+        if(crawl&&!evading){
+          const low=FRONT_SORTIE.crawl.some(c=>Math.abs(p.x-c.x)<c.w/2+1 && Math.abs(p.z-c.z)<c.d/2+3);
+          const desired=low?"prone":stance;
+          if(g.player.stance!==desired)g.Debug.Key(desired==="prone"?"KeyZ":desired==="crouch"?"KeyC":g.player.stance==="prone"?"KeyZ":"KeyC");
+          g.Debug.Key("ShiftLeft",sprint&&!low&&!foe);
+        }
+        if(evading){g.StepFrames(1,1/60,false);b.frames++;continue;}
         if (foe) {
           g.Debug.Key("KeyW", false);
           window.MissionInputDriver.Shoot(foe);
@@ -210,7 +220,7 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
         lastShot: g.state.lastShot,
         foe: window.MissionInputDriver?.Target()?.missionId,
       };
-    }, fight);
+    }, {fight,stance,crawl,sprint});
     if (chunk % 4 === 0 || result.done || !result.alive) console.log(label, JSON.stringify(result));
     // A death can also leave the body stationary. Let the existing checkpoint
     // retry below handle it before applying the live-navigation stall limit.
@@ -282,7 +292,7 @@ async function Interact() {
     return query;
   });
 }
-async function RetryCampaign() {
+async function RetryCampaign({rewalk=true}={}) {
   if(!allowCheckpointRetry||stageJumps||campaignRetries.length>=3)return false;
   const before=await page.evaluate(()=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
@@ -304,7 +314,7 @@ async function RetryCampaign() {
   campaignRetries.push({stage:before.stage,time:before.time,factsPreserved:true,casualtiesPreserved:true});
   console.log('NORMAL_CHECKPOINT_RETRY',JSON.stringify(campaignRetries.at(-1)));
   // Walk back through the last observed route using the ordinary movement driver.
-  if(before.route.length)await Route(before.route,`CheckpointReturn${campaignRetries.length}`,{fight:true,stance:'crouch'});
+  if(rewalk&&before.route.length)await Route(before.route,`CheckpointReturn${campaignRetries.length}`,{fight:true,stance:'crouch'});
   return true;
 }
 async function WaitStage(expected, seconds = 240, { fight = false, cover = false } = {}) {
@@ -323,7 +333,7 @@ async function WaitStage(expected, seconds = 240, { fight = false, cover = false
             const hide=g.state.ammo===0 || g.ai.time%5<3;
             if((g.player.stance==="crouch")!==hide)g.Debug.Key("KeyC");
           }
-          const foe = fight&&!evading ? window.MissionInputDriver.Target() : null;
+          const foe = fight&&!evading ? window.MissionInputDriver.Target(90) : null;
           if (foe) window.MissionInputDriver.Shoot(foe);
           else if(!evading) {
             g.Debug.Mouse(0, false);
@@ -498,7 +508,7 @@ try {
           this.evading=true;this.evadeFrames=(this.evadeFrames||0)+1;
           return true;
         },
-        Target() {
+        Target(maxRange=90) {
           // A real bind has priority over an unobstructed distant rifle target.
           const opponent=g.meleeCombat.qte.active?.attacker;
           if(g.meleeCombat.Active && opponent?.alive)return opponent;
@@ -515,7 +525,7 @@ try {
                 a.missionId !== "MeleeTutor" &&
                 !a.scriptedNoncombatant &&
                 (this.blocked.get(a.id)||0) < g.ai.time &&
-                a.position.distanceTo(eye) < 90,
+                a.position.distanceTo(eye) < maxRange,
             )
             .sort((a, b) => a.position.distanceToSquared(eye) - b.position.distanceToSquared(eye))
             .find((a) => {
@@ -576,7 +586,7 @@ try {
       await PlayFirstLevelOpening(page,{out:path.join(output,"Opening2"),from:"Unloading",through:"TrenchEntry"});
       await JumpStage(3);
       await PlayFirstLevelOpening(page,{out:path.join(output,"Opening3"),from:"TrenchEntry",mount:false});
-    }else await PlayFirstLevelOpening(page,{out:path.join(output,"Opening"),audioClock:audioCheck,mount:false,regroup:process.argv.includes('--regroup')});
+    }else await PlayFirstLevelOpening(page,{out:path.join(output,"Opening"),audioClock:audioCheck,mount:false,regroup:process.argv.includes('--regroup'),retryCheckpoint:RetryCampaign});
     await page.evaluate(()=>{window.villageBodies=window.Tengxian.ai.soldiers.filter(a=>["VillageGunner","VillageCorner","KitchenGuard","RearWindow","SideYard","MeleeTutor"].includes(a.missionId)).map(a=>({id:a.id,missionId:a.missionId}));});
     const opening=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission());
     assert.ok(opening.facts.includes("frontRifleDefense")&&opening.facts.includes("rifleWithdrawalResolved")&&opening.facts.includes("zhouGunWounded"));
@@ -736,6 +746,16 @@ try {
       if(g.emplacement.View())g.Debug.Key("KeyF");
       g.Debug.Key("KeyB");
     });
+    }
+    if(stageFrom<=5){
+    if(sortieFixture){
+      await page.evaluate(()=>window.Tengxian.Debug.FirstLevelJump(5));
+      await page.evaluate(()=>{
+        // Isolate 05: prior front encounters represent a completed battle. This is not normal campaign proof.
+        const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
+        for(const actor of r.enemies.values())if(["front","machineGun","approach"].includes(actor.missionEncounter))actor.TakeHit(1000,"head",g.player.position.clone());
+      });
+    }
     await JumpStage(5);
     await Route([{x:0,z:-124},{x:-2.2,z:-122.5}],"FrontResupply",{stance:"crouch"});
     // The expanded battle may have used this box just before the handover.
@@ -747,41 +767,51 @@ try {
     assert.equal(await page.evaluate(()=>window.Tengxian.state.clips),clipsBefore+R.frontSupplyClips,"physical front supply covers the expanded approach ammunition cost");
     const reserveAfter=await page.evaluate(()=>window.Tengxian.emplacement.Emplacement("MissionGun").belts);
     assert.ok(reserveAfter>reserveBefore,"front box physically replenishes machine-gun reserve");
-    await Route(
-      [
-        { x: 0, z: -124 },
-        { x: 6, z: -124 },
-        { x: 15, z: -111 },
-        { x: 13, z: -116.5 },
-      ],
-      "BundleSupply",
-      { stance: "crouch" },
-    );
+    // The longer sortie warrants taking real dressings from the existing supply box.
+    for(let refill=0;refill<3 && await page.evaluate(()=>window.Tengxian.player.bandages)<3;refill++){
+      await page.evaluate(seconds=>window.Tengxian.StepFrames(Math.ceil(seconds*60),1/60,false),R.supplyCooldownS+1);
+      await Interact();
+    }
+    await Route([{x:0,z:-124},...Routes.bundle,{x:A.bundle.x,z:A.bundle.z+1.2}],"BundleSupply",{stance:"stand",sprint:true,fight:true,crawl:true});
+    await page.evaluate(()=>{const g=window.Tengxian;if(g.player.bleeding)g.Debug.Key("KeyB");g.StepFrames(1,1/60,false);});
     console.log("bundle interaction", await Interact());
     const fullBundleCount=await page.evaluate(()=>window.Tengxian.state.bundles);
+    assert.equal(fullBundleCount,R.bundleSupplyCount,"actual crate interaction grants the authored bundle reserve");
     await Interact();
     assert.equal(await page.evaluate(()=>window.Tengxian.state.bundles),fullBundleCount,"repeated pickup never adds beyond the crate reserve");
+    for(let attempt=0;attempt<2;attempt++){
+      const miss=await page.evaluate(()=>{
+        const g=window.Tengxian,before=g.state.bundles;
+        if(g.player.stance!=="stand")g.Debug.Key(g.player.stance==="prone"?"KeyZ":"KeyC");
+        g.player.yaw=-Math.PI/2;g.player.pitch=.95;
+        g.Debug.Key("KeyH",true);g.StepFrames(66,1/60,false);g.Debug.Key("KeyH",false);g.StepFrames(1,1/60,false);
+        // Duck behind the house wall while the real fuse runs. An additional
+        // seven-second exposed idle per throw is not part of the inventory contract.
+        if(g.player.stance==="stand")g.Debug.Key("KeyC");
+        for(let frame=0;frame<240&&g.player.alive;frame++){
+          if(g.player.bleeding)g.Debug.Key("KeyB");
+          g.StepFrames(1,1/60,false);
+        }
+        return {before,count:g.state.bundles,alive:g.player.alive,health:g.player.health,damage:window.missionDamage?.slice(-5)};
+      });
+      console.log('MISSED_BUNDLE',JSON.stringify(miss));
+      assert.equal(miss.count,miss.before-1,'the missed throw consumes one actual bundle');
+      // The supply-house checkpoint is already saved by the real pickup.
+      // Recovery retains the depleted inventory; never refill before asserting it.
+      if(!miss.alive)assert.ok(await RetryCampaign({rewalk:false}),'missed-throw recovery uses the bounded campaign checkpoint budget');
+    }
     const spentBundles=await page.evaluate(()=>{
-      const g=window.Tengxian;g.player.yaw=-Math.PI/2;g.player.pitch=.55;
-      for(let i=0;i<2;i++){g.Debug.Key("KeyH",true);g.StepFrames(24,1/60,false);g.Debug.Key("KeyH",false);g.StepFrames(420,1/60,false);}
+      const g=window.Tengxian;
       return {count:g.state.bundles,mission:g.Debug.FirstLevelMission(),alive:g.player.alive};
     });
     assert.ok(spentBundles.alive&&spentBundles.count===0&&!spentBundles.mission.tank.immobilized,"two missed real throws leave the tank objective active");
     await Interact();
     assert.equal(await page.evaluate(()=>window.Tengxian.state.bundles),fullBundleCount,"an empty player can physically return to the same crate and retry");
     console.log("ok full inventory, two missed throws, empty inventory and actual resupply recovery");
-    await Route(
-      [
-        { x: 15, z: -111 },
-        { x: 25, z: -110 },
-        { x: 30, z: -117 },
-      ],
-      "TankFlank",
-      { stance: "crouch" },
-    );
+    await Route(Routes.bundleReturn,"TankFlank",{stance:"stand",sprint:true,fight:true,crawl:true});
     await page.evaluate(() => {
       const g = window.Tengxian;
-      for (let i = 0; i < 3600 && g.Debug.FirstLevelMission().tank.z < -124; i++)
+      for (let i = 0; i < 900 && g.Debug.FirstLevelMission().tank.moving; i++)
         g.StepFrames(1, 1 / 60, false);
     });
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -834,16 +864,7 @@ try {
     }
     await WaitStage("Orders", 20);
     await JumpStage(6);
-    await Route(
-      [
-        { x: 15, z: -111 },
-        { x: 6, z: -124 },
-        { x: -8, z: -112 },
-        { x: -8, z: -102 },
-      ],
-      "EscortOrders",
-      { stance: "stand", sprint:true },
-    );
+    await Route(Routes.orders,"EscortOrders",{stance:"crouch"});
     const ordersSupply=await Interact();
     assert.ok(ordersSupply.kind==="supply","covered orders position offers an actual supply interaction");
     await page.evaluate(()=>{const g=window.Tengxian;g.Debug.Key("KeyB");if(g.player.stance!=="crouch")g.Debug.Key("KeyC");g.StepFrames(1,1/60,false);});
@@ -855,26 +876,15 @@ try {
       return {count:guards.length,arrived:guards.every(g=>g.progress===g.route.length),
         spacing:guards.flatMap((g,i)=>guards.slice(i+1).map(h=>Math.hypot(g.actor.position.x-h.actor.position.x,g.actor.position.z-h.actor.position.z)))};
     });
-    assert.ok(guardArrival.count>0&&guardArrival.arrived,'living withdrawn guards finish their physical rear route');
+    if(!sortieFixture)assert.ok(guardArrival.count>0&&guardArrival.arrived,'living withdrawn guards finish their physical rear route');
     assert.ok(guardArrival.spacing.every(d=>d>.8),"withdrawn soldiers do not occupy the same stopping point");
     await JumpStage(7);
-    await Route(
-      [
-        { x: -8, z: -78 },
-        { x: -24, z: -60 },
-        { x: -24, z: -18 },
-        { x: 0, z: 0 },
-        { x: 24, z: -20 },
-        { x: 48, z: -20 },
-      ],
-      "SouthRoad",
-      { stance: "stand" },
-    );
-    await WaitStage("Village", 120);
+    await WaitStage("Village",20);
+    await Capture("SouthArrival");
     const withdrawnSquad=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().squad.map(a=>({id:a.castId,alive:a.alive,x:a.position.x,z:a.position.z})));
     console.log("withdrawn squad",JSON.stringify(withdrawnSquad));
     assert.ok(withdrawnSquad.length===4&&withdrawnSquad.every(a=>a.alive&&a.z>-65),"all four companions leave the front trench and follow the southbound column");
-    if(process.argv.includes("--through-south")){await Capture("OpeningSquadWithdrawal");console.log("PASS normal opening, gun, tank and four-companion withdrawal");break campaignRun;}
+    if(process.argv.includes("--through-south")){await Capture("OpeningSquadWithdrawal");console.log(sortieFixture?"PASS sortie fixture: actual route, throws and natural escort transition":"PASS normal opening, gun, tank and four-companion withdrawal");break campaignRun;}
     assert.ok(await page.evaluate(()=>window.villageBodies.every(b=>window.Tengxian.ai.soldiers.some(a=>a.id===b.id&&a.missionId===b.missionId))),"the village reuses its pre-positioned soldiers");
     }
     if(stageFrom<=8) {
@@ -1153,8 +1163,8 @@ try {
     });
     console.log("pacing", JSON.stringify(pacing));
     assert.ok(
-      pacing.South >= 60 && pacing.South <= 120,
-      "Calm southbound travel fits the authored 1–2 minutes",
+      pacing.South >= 6 && pacing.South <= 8,
+      "South fade and text use the authored six-second transition",
     );
     assert.ok(
       pacing.TransferApproach >= 30 && pacing.TransferApproach <= 60,

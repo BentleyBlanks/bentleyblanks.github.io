@@ -64,7 +64,10 @@ export const MISSION_TUNING = Object.freeze({
   // Cruise at 21.6 km/h; the remaining physical approach determines smooth braking after impact.
   // Meal (25.331s including pauses) + overlapping exchange (14.132s),
   // then roughly nine seconds braking from the first ranging impact.
-  trainTravelM: 268,
+  trainTravelM: 603,
+  frontDialogueReminderS: 5,
+  frontDialogueFallbackS: 10,
+  frontDialogueSeenS: .5,
   trainCruiseSpeedMps: 6,
   trainShellLeadM: 18,
   trainFirstShellFlightS: 1.4,

@@ -1,3 +1,4 @@
+import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_TOPOLOGY_VERSION } from "./Data_FirstLevelMissionTopology.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_MACHINE_GUN_ATTACK, FRONT_APPROACH_ENEMIES, APPROACH_TACTICS } from "./Data_FirstLevelMissionFront.mjs";
@@ -16,7 +17,7 @@ export const MISSION_STAGES = Object.freeze([
     "伏低，听罗班长指挥！脱离车厢后借掩体进入交通壕。",
     A.unload,
     ["trainStopped", "trainDerailed", "luoRescueComplete", "unloadOrdersHeard", "unloaded"],
-    "TrainShelling",
+    "WreckImpact",
   ),
   Stage("TrenchEntry", "侧沟有日军！清出折角，跟班长进掩蔽处。", OPENING.shelter, ["trenchEntered", "trenchCleared", "shelterReached"], null),
   Stage("Shelter", "守住折角，照看从前方撤下来的伤兵。", OPENING.shelter, ["escapeWhisperHeard", "woundedSeen", "supportOrdersHeard"], "EscapeWhisper"),
@@ -29,17 +30,17 @@ export const MISSION_STAGES = Object.freeze([
   ),
   Stage(
     "MachineGun",
-    "接手机枪，压住火力点，掩护前方守军撤回。",
+    "击退前方日军，掩护守军撤回；机枪可自行选用。",
     A.gun,
-    ["gunUsed", "guardWithdrawalResolved"],
-    "TakeMachineGun",
+    ["frontAttackRepelled", "guardWithdrawalResolved"],
+    "FrontWeaponChoice",
   ),
   Stage(
     "Tank",
-    "领取集束手榴弹，沿侧沟炸停战车。",
+    "跟班长匍匐穿过曲折侧沟，到北边屋内领集束弹，再返回炸断战车履带。",
     A.bundle,
-    ["bundleTaken", "tankImmobilized"],
-    "GuardsSafe",
+    ["bundleRouteTraversed", "bundleTaken", "tankImmobilized"],
+    "BundleSortieOrder",
   ),
   Stage(
     "Orders",
@@ -50,11 +51,10 @@ export const MISSION_STAGES = Object.freeze([
   ),
   Stage(
     "South",
-    "向南开路，跟随后送纵队前往转运点。",
+    "护送伤员向南，抵达村口。",
     A.village,
-    ["southTraversed", "southHopeHeard"],
-    "SouthSecret",
-    { minimumSeconds: MISSION_TUNING.quietSouthSeconds },
+    ["southTransitionComplete", "southTraversed"],
+    null,
   ),
   Stage("Village", "从右侧灶屋绕进内院，夺取伤员通道。", A.melee, ["innerCourtReached"], "VillageAmbush"),
   Stage("Melee", "清除近身日军，夺取伤员通道。", A.melee, ["meleeResolved"], null),
@@ -145,6 +145,7 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   // are derived from it, and a list split across two files drifts.
   front: [...FRONT_FIELD_MEN,...FRONT_RESERVES],
   machineGun: FRONT_MACHINE_GUN_ATTACK,
+  bundleApproach: Sortie.enemies,
   tank: [
     { id: "TankEscortA", x: 24, z: -145 },
     { id: "TankEscortB", x: 28, z: -152 },
@@ -225,7 +226,7 @@ export const MISSION_PURSUIT_ROUTE=Object.freeze([
 ]);
 export const MISSION_GUIDANCE = Object.freeze({
   Unloading: {label:'unload'}, TrenchEntry:{label:'support',route:'opening'}, Shelter:{label:'support'}, Support:{label:'support',route:'support'},
-  MachineGun:{label:'gun'},Tank:{label:'bundle'},Orders:{label:'orders'},
+  MachineGun:{label:'front'},Tank:{label:'bundle',route:'bundle'},Orders:{label:'orders',route:'orders'},
   South:{label:'south',route:'south'},Village:{label:'village',route:'village'},
   Courtyard:{label:'gate'},TransferApproach:{label:'transfer',route:'village'},Transfer:{label:'transfer'},AirFirst:{label:'transfer'},
   Carry:{label:'carry'},Rescue:{label:'ditch'},

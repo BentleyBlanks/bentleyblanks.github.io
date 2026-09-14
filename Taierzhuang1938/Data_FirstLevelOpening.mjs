@@ -19,13 +19,14 @@ export const OPENING = Object.freeze({
   rescueGripSeconds: 1.25,
   rescuePullSeconds: 2.1,
   rescueStandSeconds: 3.55,
-  rescueDialogueLines: {reach:6,grip:7,steady:8},
+  rescueDialogueLines: {reach:0,grip:1,steady:1},
   rescueGripFraction: .3,
   dialogueActions: {
     TrainMeal:{heyoutian:"HeReplyTalk",luo:"LuoBriefing"},
     TrainBanter:{liuwencai:"LiuCountTalk",heyoutian:"HeReplyTalk"},
     TrainBriefing:{luo:"LuoBriefing"},
-    TrainShelling:{luo:"LuoCrouchReassure",yaowa:"YaowaAlarmCrouch"},
+    TrainShelling:{},
+    WreckImpact:{yaowa:"YaowaAlarmCrouch"},
   },
   barrage: {
     firstFlightS: .45, shellFlightS: 1.2, shellRadiusM: 5,
@@ -105,7 +106,8 @@ export const OPENING = Object.freeze({
   zhouRest: {x:2.1,z:-124.6},
   zhouWoundThreshold:95,
   zhouExitRadiusM:.65,
-  zhouShell: {from:{x:18,z:-210},height:30,flight:1.8,radius:3,damage:55,offsetX:1.1},
+  zhouShell: {from:{x:18,z:-210},height:30,flight:1.8,radius:3,damage:55,offsetX:1.1,
+    retryAfterS:12,retryFromOffset:{x:8,z:-12}},
   // Finite attacking sections on both sides of the march, staggered by local contact.
   surface: [
     {id:"FlankLockGunner",x:-35,z:58,weapon:"Type11",hold:true,team:"Flank"},

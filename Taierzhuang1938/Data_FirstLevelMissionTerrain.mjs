@@ -1,3 +1,4 @@
+import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE } from "./Data_FirstLevelMissionTopology.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 // Authored soil, metres: natural ground, roads, rail berm and excavated trenches.
@@ -91,12 +92,7 @@ export const MISSION_TERRAIN = Object.freeze({
     },
     {
       id: "BundleApproach",
-      points: [
-        { x: 6, z: -124 },
-        { x: 15, z: -111 },
-        { x: 25, z: -110 },
-        { x: 30, z: -117 },
-      ],
+      points: Sortie.route,
       depth: 1.45,
       bottom: 3.6,
       bank: 1.3,
@@ -116,6 +112,7 @@ export const MISSION_TERRAIN = Object.freeze({
 
   ],
   steps: [
+    {x:Sortie.house.x,z:Sortie.house.z,radius:6,depth:Sortie.trenchDepthM},
     { x: 0, z: -127.5, radius: 3.6, depth: 0.88 },
     { x: 15, z: -127.5, radius: 3.2, depth: 0.9 },
     { x: -25, z: -127.5, radius: 3.2, depth: 0.88 },

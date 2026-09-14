@@ -47,6 +47,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  FirstLevelFrontRouteBrowserTest:{file:"Script_FirstLevelFrontRouteBrowserTest.mjs",timeoutMs:300000,desc:"Optional gun, crawl route, supplier, track damage and escort fade"},
   FirstLevelMissionTopologyTest: {file:"Script_FirstLevelMissionTopologyTest.mjs",desc:"Notion September 14 phase gates, west-to-south topology, sight breaks and reception adjacency"},
   FirstLevelMissionTopologyBrowserTest: {file:"Script_FirstLevelMissionTopologyBrowserTest.mjs",timeoutMs:300000,desc:"Physical rear/medic routes, bridge replay, kitchen prerequisite and 720p whitebox views"},
   CarriagePropVelocityTest: {file:'Script_CarriagePropVelocityTest.mjs',timeoutMs:300000,desc:'Real pork/pack GPU velocities with moving camera, stop and reappearance; high-quality opening'},
@@ -310,6 +311,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "FirstLevelFrontRouteBrowserTest",
   "FirstLevelMissionTopologyBrowserTest",
   "FirstLevelMissionReturnBrowserTest",
   "MuzzleFlashTest", "HeadshotTest",
@@ -418,7 +420,7 @@ export const domains = {
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关接收院至结尾定向续接",tests:["FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['Type89DamageTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelOpeningSequenceBrowserTest','FirstLevelCarriageAnimationTest','FirstLevelMealTest','FirstLevelMissionTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelOpeningContactTest','FirstLevelGuideQueueTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelOpeningSequenceBrowserTest','FirstLevelCarriageAnimationTest','FirstLevelMealTest','FirstLevelMissionTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelOpeningContactTest','FirstLevelGuideQueueTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ActorLocomotionTest','BackRifleRunTest','MeleeAnimationTest','DadaoSwingTest','InfantryAnimationTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -519,6 +521,7 @@ const changedDomainRules = [
   // 归 render（ProfilerTest 在那一串里）；命令行自己的冒烟在 tier 2 的 perf 档。
   { domain: "render", pattern: /Script_Profile(Cli|r?Report)|Script_FrameProbeViews/i },
   { domain: "perf", pattern: /Script_ProfileCli/i },
+  {domain:"firstLevel",pattern:/FirstLevelFrontRoute|FirstLevelTransition/},
   { domain: "combat", pattern: /FirearmHandling|MuzzleFlash|Headshot/i },
   {domain:"firstLevel",pattern:/Type89Damage/},
   {domain:"characterSpeech",pattern:/CharacterSpeech|CharacterFacial|SpeechEnvelope|NraFacial|Nra05Facial|Script_FirstLevelMissionVoice|Script_Audio\.mjs|Script_CharacterModel/},

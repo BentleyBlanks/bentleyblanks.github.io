@@ -10,7 +10,7 @@ import {ServeRoot} from "./Script_DevServer.mjs";
 import {OPENING} from "./Data_FirstLevelOpening.mjs";
 import {SampleOpeningPerception} from "./Script_FirstLevelOpening.mjs";
 const here=path.dirname(fileURLToPath(import.meta.url));
-export async function PlayFirstLevelOpening(page,{out=path.join(here,"_shots/FirstLevelOpening/InputRun"),realtime=false,audioClock=false,from="Train",through="Handover",mount=true,regroup=false}={}){
+export async function PlayFirstLevelOpening(page,{out=path.join(here,"_shots/FirstLevelOpening/InputRun"),realtime=false,audioClock=false,from="Train",through="Handover",mount=true,regroup=false,retryCheckpoint=null}={}){
 await fs.mkdir(out,{recursive:true});
 const errors=[],trace=[],combatTrace=[],openingShots=new Set();let whisperCaptured=false;
 page.on("pageerror",error=>{errors.push(String(error));console.log("PAGEERROR",String(error));});
@@ -96,6 +96,18 @@ async function Drive(label,points,{fight=false,until=null,seconds=120}={}){
       await Capture("EscapeWhisperPlaying");
     }
     if(secondsDone%10===0||result.ready||!result.alive)console.log(label,JSON.stringify(result));
+    if(!result.alive&&retryCheckpoint){
+      await Capture(`${label}BeforeRetry`);
+      if(await retryCheckpoint()){
+        // The parent owns the bounded retry budget and validates the shipped
+        // checkpoint's facts/casualties. Rewalk this leg with ordinary inputs.
+        await page.evaluate(points=>{
+          const b=window.OpeningInput;b.points=points;b.index=0;b.evading=false;b.supplyHeld=null;
+        },points);
+        secondsDone=-(realtime?.25:2);
+        continue;
+      }
+    }
     if(result.ready||!result.alive)break;
     if(audioClock&&result.voicePlaying)await page.waitForTimeout(2000);
   }
@@ -244,7 +256,9 @@ try{
   });
   if(["Train","Unloading"].includes(from)){
   await Capture("TrainStart");
-  await Drive("Derail",[],{until:"trainDerailed",seconds:55});
+  const openingBudget=await page.evaluate(()=>30+["TrainMeal","TrainPack","TrainBriefing"].reduce((sum,id)=>
+    sum+window.Tengxian.Debug.FirstLevelMissionRuntime().voice.manifest.cues[id].seconds,0));
+  await Drive("Derail",[],{until:"trainDerailed",seconds:openingBudget});
   if(through==="Unloading")return;
   await Drive("LuoRescue",[],{until:"luoRescueComplete",seconds:30});
   await Drive("TrainExit",[{x:-69,z:88},{x:-69,z:78},{x:-68,z:70},{x:-66,z:66}],{seconds:80});
@@ -365,7 +379,8 @@ try{
     await Capture("ClearedTrenchRegroup");
   }
   await Drive("TrenchContact",remainingApproach,{fight:true,until:"shelterReached",seconds:180});
-  await Drive("ShelterWhisper",[],{until:"supportOrdersHeard",seconds:100});
+  // Keep listening after arriving companions physically nudge the player outside the rim.
+  await Drive("ShelterWhisper",[OPENING.shelter],{until:"supportOrdersHeard",seconds:100});
   const rifleReady=["frontRifleDefense","rifleWithdrawalResolved","zhouGunWounded"];
   await Drive("FrontRifle",[...OPENING.supportRoute,{x:0,z:-124},{x:0,z:-126.5}],{fight:true,until:rifleReady,seconds:210});
   await Drive("RifleWithdrawal",[],{fight:true,until:rifleReady,seconds:150});

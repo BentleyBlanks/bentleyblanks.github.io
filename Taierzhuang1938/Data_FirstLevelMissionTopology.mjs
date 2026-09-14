@@ -1,6 +1,6 @@
 // Notion: 空间、流程拓扑图 / 2026.09.14. X east, Z south, metres.
 // The sketch fixes adjacency and direction, not a surveyed metric scale.
-export const MISSION_TOPOLOGY_VERSION = "first-level-20260914-topology-r1";
+export const MISSION_TOPOLOGY_VERSION = "first-level-20260914-front-sortie-r3";
 export const MISSION_REAR_ANCHORS = Object.freeze({
   ditchMouth: {x:53,z:114}, ditch: {x:39,z:116},
   retreatA: {x:32,z:140}, retreatB: {x:56,z:184}, retreatC: {x:9,z:220},

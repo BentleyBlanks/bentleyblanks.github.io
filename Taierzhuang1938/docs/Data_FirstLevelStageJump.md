@@ -23,10 +23,10 @@ debug.FirstLevelMission(); // phaseNumber / phaseId / phaseTitle / phaseCount
 | 1 军列上的人味 | Train | Train |
 | 2 接近卸载点，遭遇炮击 | Unloading | Unloading |
 | 3 进沟、喘息与前线步枪掩护 | Support | TrenchEntry → Shelter → Support |
-| 4 接手机枪 | MachineGun | MachineGun |
+| 4 击退前方日军（机枪可选） | MachineGun | MachineGun |
 | 5 集束手榴弹炸停战车 | Tank | Tank |
 | 6 后送命令 | Orders | Orders |
-| 7 真正往南 | South | South |
+| 7 护送转场抵达村口 | South | South |
 | 8 村口截击 | Village | Village |
 | 9 第一次大刀／刺刀近战 | Melee | Melee |
 | 10 夺院并掩护伤员通过 | Courtyard | Courtyard |

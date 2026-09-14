@@ -13,9 +13,9 @@ export const CARRIAGE_SOUND = Object.freeze({
   cheerSlots: [14, 15],
   reactions: [
     {id:"CarriageLaughAtTasting",line:2},
-    {id:"CarriageLaughAtCounting",line:4},
+    {id:"CarriageLaughAtCounting",line:6},
   ],
-  uneasyLine: 5,
+  uneasyLine: 7,
 });
 
 export const CARRIAGE_SOUND_ASSETS = Object.freeze([

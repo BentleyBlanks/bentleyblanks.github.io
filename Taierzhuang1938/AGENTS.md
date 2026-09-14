@@ -7,8 +7,10 @@
 ## 当前入口与任务范围
 
 - 正片第一关是《往南的路》新版完整任务，入口 `?whitebox=p012`，序章已并入。任务、对白和数值分别由 `Data_FirstLevelMission`、`Data_FirstLevelMissionDialogue`、`Data_Tuning_FirstLevel` 管理；来源、范围决定与未完成项见 [重构验收](docs/Data_FirstLevelRebuildAcceptance.md)。
+- 第一关当前配音见 [2026-09-14 配音同步](docs/Data_FirstLevelVoiceSyncSeptember14.md)。后续台词变更同步整段录音、同场环境声、四川话表演、字幕源时序和触发点；不得只改文字后继续使用旧录音。
 - 第一关跨电脑动画接力见 [全部人物动作需求](docs/Data_FirstLevelMissionAnimationRequirements.md)，包含当前规模与视频重定向交付。当前任务按 Notion 分为 18 个公开阶段，保留 27 个内部执行步骤（含完成）；调试菜单与 agent 跳转接口见 [阶段跳转](docs/Data_FirstLevelStageJump.md)。
 - 当前空间拓扑按 Notion `2026.09.14` 章节实现，入口见 [空间与流程重构](docs/Data_FirstLevelTopologySeptember14.md)。后半关坐标、折线路径、接收院区域集中在 `Data_FirstLevelMissionTopology.mjs`；转弯路段进度按路线投影判断，不能用单一 X/Z 坐标比较替代。空间变化追加拓扑规则与真实物理通行检查。
+- 2026-09-14 后续用户修订：04 机枪可选，以击退日军和守军撤回为条件；05 北侧曲折匍匐沟、补给屋及返回断履带；06 接令后经黑屏文字直接抵达 07 村口，替代旧 75 秒南行。数据与验收见 [前沿出击与护送转场](docs/Data_FirstLevelFrontSortie.md)，此前 Notion 表格及验收记录不覆盖这次修订。
 - 正式菜单以 `Data_Menu.CAMPAIGN_ENTRIES` 为准：第一关可玩，第二关到终章为标注“未完成”的占位，点击提示“敬请期待”。旧序章及旧章节不恢复进菜单；`?phase=N` / `Debug.StartLevel` 只建原切片，不装旧剧本、摆点或换关。每次只建当前切片，换章拆除重建。
 - `?whitebox=p012-archive` 是旧 P0–P2 的开发回归夹具，旧资产与组件契约继续保留。旧任务表、旧 Notion 摘录和旧通关结果不能替代新版需求与验收；任务涉及哪条入口，就核对对应运行时及测试。新需求在当前任务授权范围内同步数据、消费方和文档，不按旧提案自行恢复已废弃内容。
 

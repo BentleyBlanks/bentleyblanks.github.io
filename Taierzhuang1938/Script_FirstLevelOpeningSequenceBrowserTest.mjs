@@ -12,7 +12,7 @@ const here=path.dirname(fileURLToPath(import.meta.url));
 const out=path.join(here,'_shots/CarriageOpeningSequence');
 await fs.mkdir(out,{recursive:true});
 const server=await ServeRoot(path.dirname(here),0),browser=await LaunchBrowser();
-const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[],trace=[],shots=new Set();
+const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[],trace=[],shots=new Set();
 let renderBackend=null,tracerProof=null,tracerCaptureTried=false;
 page.on('pageerror',error=>errors.push(String(error)));
 page.on('console',message=>{if(message.type()==='error')console.log('BROWSER_ERROR',message.text().slice(0,600));});
@@ -21,7 +21,7 @@ try{
   await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:240000});
   await page.locator('#bootStart').click();
   await page.waitForFunction(()=>window.Tengxian.audio.ctx?.state==='running',null,{timeout:15000});
-  assert.ok(await page.evaluate(()=>['TrainMeal','TrainBanter','TrainBriefing','TrainShelling'].every(id=>
+  assert.ok(await page.evaluate(()=>['TrainMeal','TrainPack','TrainBriefing','WreckImpact','TrainShelling','WreckExit'].every(id=>
     window.Tengxian.audio.voiceBank.get('Mission'+id)?.duration>0)),'the opening uses decoded recordings in the live audio engine');
   console.log('OPENING_READY');
   renderBackend=await page.evaluate(()=>{const gl=window.Tengxian.renderer.getContext(),info=gl.getExtension('WEBGL_debug_renderer_info');
@@ -67,10 +67,10 @@ try{
     const fireAge=row.time-(row.opening.barrage.startedAt??Infinity);
     const recoveryAge=row.time-(row.opening.luoRecoveryAt??Infinity);
     const rescueAge=row.opening.rescueAt==null?-Infinity:row.opening.rescueSampleTime;
-    const concurrentSubtitles=row.parallelPlaying&&row.subtitle.includes('罗班长')&&
+    const concurrentSubtitles=row.parallelPlaying&&(row.subtitle.includes('顺子')||row.subtitle.includes('幺娃'))&&
       (row.subtitle.includes('刘文财')||row.subtitle.includes('何有田'));
-    const captures=[['WallIdles',row.time>2],['Overlap',row.voice.current==='TrainBanter'&&concurrentSubtitles],
-      ['BarrageCrouch',fireAge>1.4&&!row.facts.includes('trainNearShellImpact')],
+    const captures=[['WallIdles',row.time>2],['Overlap',row.voice.current==='TrainPack'&&concurrentSubtitles],
+      ['BarrageCrouch',fireAge>.8&&!row.facts.includes('trainNearShellImpact')],
       ['CloseImpact',row.opening.derailAt!=null&&row.time-row.opening.derailAt<1.6],
       ['LuoFailedRise',recoveryAge>1.6&&recoveryAge<2.3],['LuoStanding',row.facts.includes('trainLuoStanding')&&rescueAge<0],
       ['LuoReach',rescueAge>1.25&&rescueAge<2.1],['LuoPull',rescueAge>2.5&&rescueAge<3.5],
@@ -83,7 +83,7 @@ try{
       shots.add(name);await page.screenshot({path:path.join(out,`Scene_${name}.png`)});
       console.log('OPENING_CAPTURE',name,row.time.toFixed(2));
     }
-    if(fireAge>1.4&&!row.facts.includes('trainNearShellImpact')&&!tracerCaptureTried){
+    if(fireAge>.8&&!row.facts.includes('trainNearShellImpact')&&!tracerCaptureTried){
       tracerCaptureTried=true;
       tracerProof=await page.evaluate(()=>{
         const g=window.Tengxian;g.post.NotifyCameraCut();g.StepFrames(6,1/60,true);
@@ -109,14 +109,14 @@ try{
     const b=later.passengers.find(b=>b.id===a.id);
     assert.ok(a.head.some((value,index)=>Math.abs(value-b.head[index])>1e-6),'silent wall passenger has a live idle: '+a.id);
   }
-  assert.ok(overlap&&overlap.voice.current==='TrainBanter','briefing actually plays concurrently with the complete banter');
+  assert.ok(overlap&&overlap.voice.current==='TrainPack','optional banter accompanies the complete packing exchange');
   assert.ok(Math.hypot(overlap.listener.x-overlap.camera[0],overlap.listener.y-overlap.camera[1],overlap.listener.z-overlap.camera[2])<.25,
     'non-raster simulation keeps the actual spatial listener at the moving player');
-  assert.ok(trace.some(row=>row.parallelPlaying&&row.subtitle.includes('罗班长')&&(row.subtitle.includes('刘文财')||row.subtitle.includes('何有田'))),'concurrent subtitles retain both speaker names');
-  const crouched=trace.find(row=>row.opening.barrage.startedAt!=null&&row.time-row.opening.barrage.startedAt>1.5&&!row.facts.includes('trainNearShellImpact'));
+  assert.ok(trace.some(row=>row.parallelPlaying&&(row.subtitle.includes('顺子')||row.subtitle.includes('幺娃'))&&(row.subtitle.includes('刘文财')||row.subtitle.includes('何有田'))),'concurrent subtitles retain both speaker names');
+  const crouched=trace.find(row=>row.opening.barrage.startedAt!=null&&row.time-row.opening.barrage.startedAt>.8&&!row.facts.includes('trainNearShellImpact'));
   assert.ok(crouched&&crouched.stance==='crouch'&&crouched.passengers.every(a=>a.posture==='crouch'&&a.stance===1),'player and entire crowd crouch before the near shell');
-  assert.ok(crouched.opening.barrage.shots>=6&&trace.some(row=>!row.facts.includes('trainNearShellImpact')&&row.opening.barrage.impacts.length>=2),
-    'visible tracer bursts and multiple physical ranging impacts precede the near shell');
+  assert.ok(crouched.opening.barrage.shots>=6&&trace.some(row=>!row.facts.includes('trainNearShellImpact')&&row.opening.barrage.impacts.length>=1),
+    'visible tracer bursts and a physical ranging impact precedes the near shell');
   assert.ok(tracerProof?.visible,'a real moving tracer is in the player view and clear of carriage walls in a rendered barrage frame');
   const recovery=trace.find(row=>row.opening.luoRecoveryAt!=null),standing=trace.find(row=>row.facts.includes('trainLuoStanding'));
   const waiting=trace.filter(row=>row.facts.includes('trainDerailed')&&row.opening.luoRecoveryAt==null);
@@ -138,7 +138,7 @@ try{
   const reaches=trace.filter(row=>row.opening.rescueAt!=null&&row.opening.rescueSampleTime<OPENING.rescuePullSeconds);
   assert.ok(reaches.length&&reaches.every(row=>row.camera[1]-row.position[1]<.65),'Shunzi stays down until the reaching hand grips and starts pulling');
   assert.ok(last.facts.includes('luoRescueComplete')&&last.facts.includes('unloadOrdersHeard'),'rescue and the retained exit instructions complete normally');
-  assert.ok(['TrainMeal','TrainBanter','TrainBriefing','TrainShelling'].every(id=>last.voice.finished.includes(id)),'all complete opening recordings finish');
+  assert.ok(['TrainMeal','TrainPack','TrainBriefing','WreckImpact','TrainShelling','WreckExit'].every(id=>last.voice.finished.includes(id)),'all complete opening recordings finish');
   assert.deepEqual(errors,[]);
   assert.ok(['Overlap','BarrageCrouch','LuoFailedRise','LuoReach','LuoPull','RescueComplete'].every(name=>shots.has(name)),'rendered evidence covers the requested action order');
   console.log('PASS complete carriage dialogue, animated crowd, barrage, recovery and rescue sequence');
