@@ -301,14 +301,12 @@ export class Hud {
     SetAttr(this.el.missionReturn,"aria-hidden",String(!warning));
     if(!warning)return;
     SetClass(this.el.missionReturn,"urgent",warning.urgent);
-    SetText(this.el.returnEyebrow,T("firstLevel.return.eyebrow"));
     SetText(this.el.returnTitle,T(warning.urgent?"firstLevel.return.urgent":"firstLevel.return.title"));
     SetText(this.el.returnDetail,T(`firstLevel.return.${warning.reason}`));
     const labelKey={person:"firstLevel.return.wounded",boundary:"firstLevel.return.title",
       route:"firstLevel.return.rejoin",squad:"firstLevel.return.leader"}[warning.reason];
     SetText(this.el.returnTarget,T("firstLevel.guide.distance",{
       label:labelKey?T(labelKey):warning.label,distance:Math.round(warning.distance)}));
-    SetText(this.el.returnHint,T("firstLevel.return.hint"));
     SetStyle(this.el.returnArrow,"transform",`rotate(${Math.round(warning.angle)}deg)`);
   }
 
@@ -354,7 +352,6 @@ export class Hud {
     this.el.missionReturn.setAttribute("aria-live", "polite");
     this.el.missionReturn.setAttribute("aria-hidden", "true");
     const returnPanel=mk("missionReturnPanel",this.el.missionReturn);
-    this.el.returnEyebrow=mk("missionReturnEyebrow",returnPanel);
     this.el.returnTitle=mk("missionReturnTitle",returnPanel);
     this.el.returnDetail=mk("missionReturnDetail",returnPanel);
     const returnBearing=mk("missionReturnBearing",returnPanel);
@@ -362,7 +359,6 @@ export class Hud {
     this.el.returnArrow.textContent="↑";
     this.el.returnArrow.setAttribute("aria-hidden","true");
     this.el.returnTarget=mk("missionReturnTarget",returnBearing);
-    this.el.returnHint=mk("missionReturnHint",returnPanel);
     this.el.suppress = mk("hudSuppress");        // 压制暗角：纯 CSS 径向渐变，零成本
     this.el.damage = mk("hudDamage");
     this.el.meleeKillBlood = mk("hudMeleeKillBlood");

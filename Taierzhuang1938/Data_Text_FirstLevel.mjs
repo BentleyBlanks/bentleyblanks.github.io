@@ -1,16 +1,14 @@
 // Interaction strings for the September first-level replacement.
 export const TEXT = Object.freeze({
   "firstLevel.return.rejoin": "返回行动路线",
-  "firstLevel.return.person": "你已远离需要照看的伤员。立刻返回，继续接应。",
+  "firstLevel.return.person": "你已远离伤员，立即返回接应。",
   "firstLevel.return.wounded": "返回老周身边",
   "firstLevel.return.leader": "返回罗班长身边",
-  "firstLevel.return.eyebrow": "任务区域警告",
   "firstLevel.return.title": "返回任务区域",
   "firstLevel.return.urgent": "立即返回",
-  "firstLevel.return.route": "你已偏离行动路线。沿指示方向返回，继续执行任务。",
-  "firstLevel.return.squad": "你与小队距离过远。转向返回，跟上队伍。",
-  "firstLevel.return.boundary": "前方已超出作战区域。转向返回，跟上任务指引。",
-  "firstLevel.return.hint": "返回后提示将自动消退",
+  "firstLevel.return.route": "你已偏离行动路线。",
+  "firstLevel.return.squad": "你已远离小队。",
+  "firstLevel.return.boundary": "你已离开作战区域。",
 
   "firstLevel.casualty.speaker": "战友",
   "firstLevel.casualty.reaction": "有弟兄倒下了！守住掩体，继续掩护！",

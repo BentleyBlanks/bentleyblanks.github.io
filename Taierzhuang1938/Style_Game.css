@@ -947,15 +947,15 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   transition:opacity .35s ease,visibility .35s; color:#f5eddd; text-align:center; }
 .hudMissionReturn.on {opacity:1;visibility:visible;}
 .hudMissionReturn.urgent {background:radial-gradient(ellipse at center,rgba(18,9,7,.13) 20%,rgba(60,17,10,.62) 72%,rgba(94,24,13,.86));}
-.missionReturnPanel {width:min(660px,86vw);padding:26px 30px 22px;transform:translateY(-12vh);
-  background:linear-gradient(90deg,transparent,rgba(15,13,10,.72) 20%,rgba(15,13,10,.72) 80%,transparent);
-  text-shadow:0 2px 6px #000;}
-.missionReturnEyebrow {font-size:12px;letter-spacing:.3em;color:#d2ad77;margin-bottom:12px;}
-.missionReturnTitle {font-size:clamp(30px,4.4vw,48px);font-weight:700;letter-spacing:.14em;line-height:1.2;}
+/* Compact in-combat command: keep the centre and return path readable. */
+.missionReturnPanel {box-sizing:border-box;width:min(560px,90vw);padding:18px 24px;transform:translateY(-17vh);
+  font-family:var(--ui-font,sans-serif);
+  background:linear-gradient(90deg,transparent,rgba(15,13,10,.48) 22%,rgba(15,13,10,.48) 78%,transparent);
+  text-shadow:0 2px 5px #000;}
+.missionReturnTitle {font-size:clamp(24px,3vw,34px);font-weight:700;letter-spacing:.08em;line-height:1.25;}
 .urgent .missionReturnTitle {color:#f1be9c;}
-.missionReturnDetail {font-size:15px;line-height:1.7;margin-top:14px;color:#e3d8c7;}
-.missionReturnBearing {display:flex;align-items:center;justify-content:center;gap:14px;margin-top:18px;}
-.missionReturnArrow {font-size:30px;line-height:1;width:32px;color:#e5bd80;}
-.missionReturnTarget {font-size:16px;line-height:1.6;}
-.missionReturnHint {font-size:11px;letter-spacing:.12em;color:#b8ab99;margin-top:16px;}
+.missionReturnDetail {font-size:14px;line-height:1.5;margin-top:8px;color:#e3d8c7;}
+.missionReturnBearing {display:flex;align-items:center;justify-content:center;gap:10px;margin-top:12px;}
+.missionReturnArrow {font-size:25px;line-height:1;width:28px;color:#e5bd80;}
+.missionReturnTarget {font-size:15px;line-height:1.5;}
 @media (prefers-reduced-motion:reduce) {.hudMissionReturn {transition:none;}}
