@@ -25,7 +25,7 @@ export const MISSION_LEADER_STAGES = Object.freeze({
   RetreatYard: Entry("cover", "RetreatYard", A.retreatC),
   Reception: Entry("cover", "Reception", A.reception, {story: true}),
   FinalCarry: Entry("carry", "Place", null, {story: true}),
-  FinalDefense: Entry("cover", "RearDefense", A.finalCover, {story: true}),
+  FinalDefense: Entry("cover", "RearDefense", A.rearExit, {story: true}),
   Exit: Entry("follow", "Exit", null, {story: true}),
 });
 export const MISSION_GUIDE_TRANSFERS = Object.freeze({

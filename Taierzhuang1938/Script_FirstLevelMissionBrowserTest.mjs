@@ -1146,7 +1146,9 @@ try {
       "FinalDefensePosition",
       { fight: true },
     );
-    await Route([...Routes.exit.slice(2,4),{x:-40,z:244}],"RearLaneRearguard",{fight:true});
+    // Actually leave the rear gate, as Luo orders. Stopping at x=-40 inside
+    // the west wall cannot expose a surviving flanker outside that wall.
+    await Route(Routes.exit.slice(2,5),"RearLaneRearguard",{fight:true});
     await WaitStage("Exit", 160, { fight: true });
     await Route(
       Routes.exit.slice(2),

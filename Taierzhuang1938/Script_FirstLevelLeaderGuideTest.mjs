@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { NpcMissionGuide,GuideProjection,CompactGuideRoute } from "./Script_NpcMissionGuide.mjs";
-import { MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-import { MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_ROUTES, MISSION_SUPPLIES, MISSION_ANCHORS } from "./Data_FirstLevelMissionLayout.mjs";
 import { MissionSquadRoute } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_GUIDE_TUNING as G } from "./Data_Tuning_MissionGuide.mjs";
 import { MISSION_LEADER_STAGES,MISSION_GUIDE_TRANSFERS } from "./Data_FirstLevelLeaderGuide.mjs";
@@ -54,6 +53,7 @@ for(const spec of [...Object.values(MISSION_LEADER_STAGES),...Object.values(MISS
  if(spec.mode)assert.notEqual(T("firstLevel.leader."+spec.mode),"firstLevel.leader."+spec.mode);
 }
 assert.ok(MISSION_GUIDE_DIALOGUE.every(c=>c.lines.length===1&&c.lines[0].who==="luo"&&c.guidance));
+assert.deepEqual(MISSION_LEADER_STAGES.FinalDefense.target,MISSION_ANCHORS.rearExit,"the final order points outside the rear gate, not back inside the courtyard");
 let stopped=0;const done=[];
 const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){stopped++;}},hud:{Say(){}},Done:id=>done.push(id)});
 assert.ok(voice.Guidance("GuideFollow"));assert.equal(voice.Guidance("GuideWait"),false);
