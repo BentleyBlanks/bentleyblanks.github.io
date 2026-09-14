@@ -1028,10 +1028,10 @@ try {
     await page.evaluate(() => window.Tengxian.Debug.Key("Digit1"));
     await WaitStage("Courtyard", 90, { fight: true });
     await JumpStage(10);
-    if(stageJumps) {
-      // The normal approach already killed this gunner. A standalone court
-      // start deliberately keeps that current objective alive: use the same
-      // real kitchen approach to get a firing angle before opening the gate.
+    if(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().enemies.get("VillageGunner")?.alive)) {
+      // The ordinary approach may leave this gunner alive after a checkpoint
+      // recovery too. Use the existing physical kitchen firing angle whenever
+      // the actual objective survives, not only after a debug-stage start.
       await Route([{x:58,z:4.6},{x:58,z:-9},{x:58,z:-20},{x:48,z:-20},
         {x:58,z:-20},{x:58,z:-9},{x:58,z:4.6}],"CourtyardWindowGun",{fight:true});
       assert.ok(await page.evaluate(()=>!window.Tengxian.Debug.FirstLevelMissionRuntime().enemies.get("VillageGunner").alive),"the current window gun is cleared with real fire");
