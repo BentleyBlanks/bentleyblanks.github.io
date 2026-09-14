@@ -31,22 +31,27 @@ async function Capture(name){
     await fs.writeFile(path.join(out,`Data_Physics${name}.json`),JSON.stringify(physics,null,2));
   }
 }
-async function Drive(label,points,{fight=false,until=null,seconds=120}={}){
+async function Drive(label,points,{fight=false,until=null,untilVoice=null,seconds=120}={}){
   await page.evaluate(points=>{window.OpeningInput.points=points;window.OpeningInput.index=0},points);
   let result;
   for(let secondsDone=0;secondsDone<seconds;secondsDone+=realtime?.25:2){
     if(realtime){await page.evaluate(fight=>{window.OpeningInput.fight=fight},fight);await page.waitForTimeout(250);}
-    result=await page.evaluate(({fight,until,realtime})=>{
+    result=await page.evaluate(({fight,until,untilVoice,realtime})=>{
       const g=window.Tengxian,b=window.OpeningInput;
+      const Ready=()=>{
+        const r=g.Debug.FirstLevelMissionRuntime();
+        return untilVoice?r.voice.finished.has(untilVoice)||!!(r.voice.current?.cue.id===untilVoice&&r.voice.current.sourceTime>0):
+          until?[until].flat().every(id=>r.Has(id)):b.index===b.points.length;
+      };
       for(let i=0;!realtime&&i<120&&g.player.alive&&!g.Debug.FirstLevelMissionRuntime().failed;i++){
         b.Step(fight);
         g.StepFrames(1,1/60,false);
-        if(until&&[until].flat().every(id=>g.Debug.FirstLevelMissionRuntime().Has(id)))break;
+        if((until||untilVoice)&&Ready())break;
       }
       if(!realtime)g.StepFrames(1,1/60,true);
       const r=g.Debug.FirstLevelMissionRuntime();
       return {t:r.time,stage:r.flow.stage.id,index:b.index,points:b.points.length,position:g.player.position.toArray(),health:g.player.health,alive:g.player.alive&&!r.failed,
-        ready:until?[until].flat().every(id=>r.Has(id)):b.index===b.points.length,shots:g.state.playerShots,ammo:g.state.ammo,remaining:r.flow.State().remaining,foe:b.foe,
+        ready:Ready(),shots:g.state.playerShots,ammo:g.state.ammo,remaining:r.flow.State().remaining,foe:b.foe,
         damage:window.missionDamage?.slice(-8),
         camera:{position:g.camera.position.toArray(),rotation:g.camera.rotation.toArray()},control:r.controls?.kind,
         audio:{sourceTime:r.voice.current?.sourceTime,phase:r.voice.current?.phase,distance:g.audio.storyVoice?.distance,storyDuck:g.audio.storyDuck?.gain.value,
@@ -56,7 +61,7 @@ async function Drive(label,points,{fight=false,until=null,seconds=120}={}){
         npc:r.squad.map(a=>({id:a.castId,health:a.health,essential:!!a.scriptEssential,p:a.position.toArray(),goal:a.goal.toArray(),
           stance:a.stance,suppression:a.suppression,cover:a.cover?.id,coverPhase:a.coverPhase,
           contact:!!a.missionContactPost,incoming:a.incomingFire,move:a.moveOrder,evade:!!a.missionGrenadeEvade,grenade:a.grenadeThreat?{p:a.grenadeThreat.position.toArray(),fuse:a.grenadeThreat.fuse}:null})),voicePlaying:!!r.voice.current,voiceCue:r.voice.current?.cue?.id,opening:r.opening.State()};
-    },{fight,until,realtime});
+    },{fight,until,untilVoice,realtime});
     trace.push({label,...result});
     combatTrace.push(await page.evaluate(()=>{
       const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
@@ -379,8 +384,21 @@ try{
     await Capture("ClearedTrenchRegroup");
   }
   await Drive("TrenchContact",remainingApproach,{fight:true,until:"shelterReached",seconds:180});
+  // The unchanged physical regroup deadline is separate from the current complete
+  // recordings. A late-arriving medic must not consume the dialogue's listen time.
+  await Drive("ShelterRegroup",[OPENING.shelter],{untilVoice:"ShelterAid",seconds:100});
+  const shelterSpeechSeconds=await page.evaluate(async()=>{
+    const {MISSION_DIALOGUE}=await import("./Data_FirstLevelMissionDialogue.mjs");
+    const {MissionVoiceTimeline}=await import("./Data_FirstLevelMissionVoiceTiming.mjs");
+    const voice=window.Tengxian.Debug.FirstLevelMissionRuntime().voice;
+    return Math.ceil(["ShelterAid","EscapeWhisper","WoundedArrival","SupportOrder"].reduce((sum,id)=>{
+      const cue=MISSION_DIALOGUE.find(c=>c.id===id),plan=MissionVoiceTimeline(cue,voice.Duration(cue));
+      return sum+plan.segments.reduce((seconds,s)=>seconds+s.end-s.start+(s.wait||0),0)+(plan.tail||0);
+    },8));
+  });
+  console.log("SHELTER_SPEECH_BUDGET",shelterSpeechSeconds);
   // Keep listening after arriving companions physically nudge the player outside the rim.
-  await Drive("ShelterWhisper",[OPENING.shelter],{until:"supportOrdersHeard",seconds:100});
+  await Drive("ShelterWhisper",[OPENING.shelter],{until:"supportOrdersHeard",seconds:shelterSpeechSeconds});
   const rifleReady=["frontRifleDefense","rifleWithdrawalResolved","zhouGunWounded"];
   await Drive("FrontRifle",[...OPENING.supportRoute,{x:0,z:-124},{x:0,z:-126.5}],{fight:true,until:rifleReady,seconds:210});
   await Drive("RifleWithdrawal",[],{fight:true,until:rifleReady,seconds:150});
