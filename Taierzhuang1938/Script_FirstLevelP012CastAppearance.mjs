@@ -30,7 +30,10 @@ export function InstallP012OpeningPose(soldier) {
     const moving=Math.min(1,Math.max(0,Number(state.moveSpeed??0)*3.6/3.05));
     for(const [index,chain] of arms.entries())for(let joint=0;joint<2;joint++){
       const bone=chain[joint],child=chain[joint+1];saved.set(bone,bone.quaternion.clone());
-      rig.root.updateWorldMatrix(true,true);
+      // 这里读的每一个世界量都走 getWorldPosition / getWorldQuaternion，三方自己会
+      // 先把那条父链更新一遍（updateWorldMatrix(true,false)），所以第二个关节读到的
+      // 正是第一个关节刚改完的世界位，顺序仍然成立。原来这一行在四次循环里各把整棵
+      // 人物子树重算一遍（每人每帧 340 次节点访问），一次都用不上。收尾那次保留。
       const start=bone.getWorldPosition(bone.position.clone()),end=child.getWorldPosition(child.position.clone());
       const current=end.sub(start).normalize();
       // Use the shoulder's real actor-space side: GLB +Z is bridged to -Z,

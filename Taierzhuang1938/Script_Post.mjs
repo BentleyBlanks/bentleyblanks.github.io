@@ -72,6 +72,7 @@ import { Blitter, FrameContext, MakeRenderTarget, RenderTargetPool } from "./Scr
 import { MakeQualityPreset, POST_QUALITY_KEYS } from "./Data_Tuning_Graphics.mjs";
 import {
   PrepassPass, MarkNoPrepass, MarkForegroundPrepass, MarkDynamicPrepass, FOREGROUND_VIEW_DEPTH,
+  InvalidatePrepassSkip,
 } from "./Script_PostPrepass.mjs";
 import { GtaoPass } from "./Script_PostGtao.mjs";
 import { SsrPass, SsrColorPass } from "./Script_PostSsr.mjs";
@@ -92,6 +93,9 @@ import { AtmospherePass } from "./Script_Atmosphere.mjs";
 // 预通道语义（材质/对象怎么进这一趟）与深度偏置/着色模式仍从这里导出：
 // 十几个模块 import 的是 `./Script_Post.mjs`，实现搬家不该让它们跟着改。
 export { MarkNoPrepass, MarkForegroundPrepass, MarkDynamicPrepass, FOREGROUND_VIEW_DEPTH };
+// 不经过上面那两个标记函数、直接改 allowOverride / skipNormalDepth 的地方调它一下，
+// 预通道的静态分类缓存才会重建（见 PrepassPass._CollectSkipped）。
+export { InvalidatePrepassSkip };
 export { InjectDepthPull, SHADING_MODES };
 export { POST_QUALITY_KEYS };
 

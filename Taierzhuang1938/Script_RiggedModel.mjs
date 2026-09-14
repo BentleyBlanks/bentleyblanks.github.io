@@ -447,9 +447,11 @@ export class FpsArmRig {
     this._ApplyBase();
     this.anchor.updateWorldMatrix(true, false);
     this.root.position.set(0, 0, 0);
-    this.root.updateWorldMatrix(true, true);
+    // 这里原来在两处各把整棵手臂 rig（约 70 个节点）重算一遍。不需要：下面每个
+    // 世界量都走 `_InAnchor` → `getWorldPosition`，三方自己会先把那根骨头的父链
+    // （含刚改过的 root.position）更新一遍，读到的就是新值。收尾那一趟保留 ——
+    // `_ApplyBase()` 刚重写过局部变换，调用方要拿到发布好的子树。
     this.root.position.add(this._v0.fromArray(shoulders.right).sub(this._InAnchor(this.bones.r.upperArm, this._v1)));
-    this.root.updateWorldMatrix(true, true);
     const left = this.bones.l;
     if (!left?.clavicle?.parent) return;
     const fromWorld = this.anchor.localToWorld(this._InAnchor(left.upperArm, this._v0));

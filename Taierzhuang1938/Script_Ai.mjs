@@ -1345,7 +1345,9 @@ export class AiDirector {
     // 视图矩阵自己从 matrixWorld 求，**不要用 camera.matrixWorldInverse** ——
     // 那个只在 renderer.render() 里更新，剔除跑在逻辑帧里，读到的是上一帧的机位。
     // 平时差一帧看不出来，换关/过场刚把相机瞬移过去的那一帧就是整批人闪一下。
-    camera.updateMatrixWorld();
+    // 只要相机自己的矩阵：`updateMatrixWorld()` 会连相机底下那棵第一人称树
+    // （枪、双臂、袖子，一百来个节点）一起重算，这里一个都用不上。
+    camera.updateWorldMatrix(true, false);
     _cullMatrix.copy(camera.matrixWorld).invert().premultiply(camera.projectionMatrix);
     _cullFrustum.setFromProjectionMatrix(_cullMatrix);
     const crowd = this._Crowd();
@@ -1416,6 +1418,9 @@ export class AiDirector {
     const root = actor?.root;
     if (!root) return;
     const scene = this.ctx.scene;
+    // 回到近景的上升沿：屏外那几帧动画层跳过了脚底求解与整棵世界矩阵更新
+    // （见 Script_FirstLevelCarriageAnimation.Sample），下一次采样要补做一次完整的。
+    if (detailed && (!root.visible || !root.parent)) actor.poseDirty = true;
     root.visible = !!detailed;
     if (!scene) return;
     if (detailed) {
