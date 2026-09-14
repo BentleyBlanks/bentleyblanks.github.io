@@ -5142,6 +5142,93 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs --tiers       # phase=2 的 dra
 名字，帧图里新加的 pass 哪怕吃了 3.7 ms 也一行都看不到）。显示名一律是
 `PostPipeline.passes` 里的**英文原名**，中文解释只进 `title` / 末列备注。
 
+### 17.12 车厢机位的世界矩阵与遍历（2026-09-15）
+
+§17.10 的第 3 条根因（车厢乘客每人每帧多趟全量世界矩阵递归）在 3A 合流之后又长回来了。
+这一轮按「谁在调、重复了几次」把它重新归了一遍账，画面逐像素不变（draw 与三角一个都没动）。
+
+**取证口**：`Script_FirstLevelFrameProbe.mjs --counts --views=train,front`（确定性计数，
+与墙钟无关，见 §17.10 的 13.9.1）；逐调用者的归账用一次性探针（包
+`Object3D.updateMatrixWorld` / `updateWorldMatrix` / `traverse`，按栈顶的游戏代码帧归类）。
+
+| 每帧 | 车厢内 改前 → 改后 | 前沿朝北 改前 → 改后 |
+|---|---|---|
+| `updateMatrixWorld` 节点访问 | 16529 → **5334** | 13623 → **1997** |
+| `updateWorldMatrix` 节点访问 | 17766 → **9664** | 20386 → **4942** |
+| `scene.traverse` 回调 | 4649 → **103** | 1780 → **132** |
+| 三项合计 | 38944 → **15101**（−61%） | 35789 → **7071**（−80%） |
+| draw | 1374 → 1374 | 554 → 554 |
+
+腿链那一趟（`FirstLevelCarriageAnimation.UpdateFloorChain`）是逐节点自己乘矩阵，
+不走 `updateMatrixWorld`，所以**上表数不到它**：实际是每人每帧一条约二十个节点的链，
+原来是整棵人物子树（约 135 个节点）。
+
+改了八处，按省下的多少排：
+
+| 改动 | 文件 | 省（车厢/帧） |
+|---|---|---:|
+| 剔除掉的乘客不再解鞋底、不再发布世界矩阵（`actor.poseVisible`，回来的上升沿由 `actor.poseDirty` 补一次完整的） | `Script_FirstLevelCarriageAnimation` / `Script_Ai` / `Script_FirstLevelMissionTrainLife` | 见下三行合计 |
+| 挂点缩放换算量按挂点记忆（`socketScaleStamp`），不再每次整棵子树重算再取世界缩放 | `Script_Actor._SocketScaleCompensation` | 5894 |
+| `Sample` 收尾那趟整棵 force 删掉（`updateWorld` 选项），交给紧跟着的 `TrainLife.Apply` | `Script_FirstLevelCarriageAnimation` | 5412 |
+| `FootFloor` 只更新腿链（`floorChain`）＋探针网格 | `Script_FirstLevelCarriageAnimation` | 5264 |
+| 预通道的「藏谁」分类结果缓存，结构变化由 `childadded`/`childremoved` 自己报 | `Script_PostPrepass._CollectSkipped` | 4546（traverse） |
+| `TrainLife.Apply` 的整棵发布只给看得见的人做 | `Script_FirstLevelMissionTrainLife` | 1596 |
+| 四处 `camera.updateMatrixWorld()` → `camera.updateWorldMatrix(true,false)` | `Script_Ai` / `Script_Csm` / `Script_FirstLevelMissionAftermath` / `Script_ClusteredLights` | 408 |
+| 双臂 FK 循环里的整棵更新删掉（每个世界量都走 `getWorld*`，父链自己会更新） | `Script_FirstLevelP012CastAppearance` | 340 |
+| 第一人称树的世界矩阵一帧只强制刷一次（`_SyncRootMatrices`） | `Script_Viewmodel` | 103 |
+| `_PlaceShoulders` 三趟整棵更新合成一趟 | `Script_RiggedModel` | 280 |
+
+#### 17.12.1 逐像素比对要在同一个时间窗里取基线（这一轮踩到的）
+
+`--shot` 的定帧图**跨小时不可复现**。本轮改前那张图是 01:45 拍的，改后是 02:40；
+逐像素比对给出车厢 meanAbs 2.44、>8 的像素 1.09%，看着像真差异。
+把**全部改动 revert 干净**（`git status` 只剩文档）再拍一次，差值**一模一样还是 2.44**
+—— 也就是说这 2.44 与代码无关。改后两次连拍互比是 0.002。
+
+成因是自动曝光：`--shot` 推的是 `dt = 0` 的帧，时域适应在 dt = 0 下不前进，
+收敛值取决于**开机那一段真 dt 帧**走了多少（本轮两次的 `bootMs` 是 42.0 s 与 40.0 s）。
+于是整幅图差一个约 1% 的亮度，粗网格上六行八列全是 2 点几 —— 这正是「全屏均匀偏移」
+的样子，跟几何错位完全不同。
+
+所以口径是：**基线与对照必须在同一个时间窗里拍，还要同树连拍两次量自比噪声底**。
+本轮按这个口径重测：
+
+| 机位 | 改前 vs 改后 | 同树自比（噪声底） |
+|---|---|---|
+| 车厢内 | **0.008 / >8 的像素 0.00% / max 10** | 0.002 / 0.00% / max 9 |
+| 前沿朝东 | **0.001 / 0.00% / max 10** | 0.005 / 0.01% / max 39 |
+| 前沿朝北 | 3.104 / 7.08% / max 58 | **16.865 / 73.09% / max 112** |
+
+前沿朝北那一栏的自比噪声底是 16.9 —— 那个机位要先跑 5 秒真 dt 让日军真打起来
+（见 13.9.1），烟、尸体、姿势逐次都不一样，**它本来就不是逐像素可比的机位**。
+两个定帧机位的改前/改后差都压在噪声底上，且没有一个像素差超过 8。
+
+两条要记住的判据：
+
+- **`camera.updateMatrixWorld()` 会把相机底下那棵第一人称树一起重算。** 枪、双臂、袖子
+  一百来个节点，剔除 / 级联拟合 / 簇表 / 尸体表一个都不读。Camera 重写了
+  `updateWorldMatrix`，照样刷 `matrixWorldInverse`，换过去没有副作用。
+- **预通道的分类缓存不看 `visible`。** 藏与还原按对象**原来的**可见性成对做，
+  所以显隐翻转不必让缓存失效；§2 里记的那个「天上黑洞」只可能由结构或标记
+  （`MarkNoPrepass` / `MarkForegroundPrepass`）变化引起，这两条都有戳。
+  不走标记函数、直接改 `allowOverride` / `skipNormalDepth` 的地方调
+  `Script_Post.InvalidatePrepassSkip()`。
+
+**没做的**（都记在这儿，别当成已经省掉了）：
+
+1. `RenderScene` 的 `scene.updateMatrixWorld()` 每帧 4546 个节点，是车厢机位剩下最大的
+   一块。给静态子树关 `matrixAutoUpdate` 能省掉矩阵乘法，但**省不掉遍历**
+   （`updateMatrixWorld` 无条件往下走 children），而且破坏 / 变形 / 流送挪动时要逐处补
+   `updateMatrix()`，漏一处就是一件永远不动的东西。本轮没做。
+2. 第一人称双臂 IK 还剩约 2600 次/帧：`_InAnchor` / `_InAnchorBasisQuaternion` 这一路
+   每次读世界量都沿父链（约 20 个节点）走一趟。要省得改成「读 `matrixWorld` ×
+   缓存的锚点逆矩阵」，那等于让求解器相信矩阵是新的，而它自己正在逐块改骨头。
+   收益约 700，风险是接触点毫米级断言，本轮只做了 `_PlaceShoulders` 那一条明显重复的
+   （验收：FpsArmTest / FpsHandContactTest / AdsSightTest / DadaoSwingTest 全绿）。
+3. `Actor._UpdateRiggedWeaponMount` / `_ApplyInfantryProp` 每人每帧五条父链
+   （车厢 2898、前沿 3403）。屏外的人跳过它与「剔除掉的人不跑 `Actor.Update`」是同一条
+   口径，但枪口世界位是弹道的输入，本轮没动。
+
 ---
 
 

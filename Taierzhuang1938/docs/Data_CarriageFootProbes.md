@@ -24,6 +24,36 @@
 
 临时性能脚本、JSON、截图和开场输入记录留在本任务 `_shots/CarriageFootProbes`，动作截图留在 `_shots/CarriageAnimation`，不提交到站点。
 
+## 只更新腿链，不再整棵重算（2026-09-15）
+
+上面省掉的是**每个鞋面顶点**的骨矩阵乘法，`FootFloor` 开头那句
+`rig.actor.root.updateMatrixWorld(true)` 还在：它把整棵人物子树（约 135 个节点、
+60 多根骨头）重算一遍，而求解真正要读的只有鞋底探针指到的那几根骨头
+（脚、趾，以及同一批顶点上权重不为零的小腿骨）和探针网格自己。
+
+`FirstLevelCarriageAnimation` 构造时把 `actor.root` 到这些节点的路径取并集、
+自顶向下去重存成 `floorChain`，每帧按 Three 的 `updateMatrixWorld(force)` 逐节点
+重算这条链（`updateMatrix` + `matrixWorld = parent.matrixWorld × matrix`），
+探针网格另走一趟 `updateMatrixWorld(true)` —— 只有 SkinnedMesh 的那个重写会刷新
+`bindMatrixInverse`，而按绑定空间算鞋底正要用它（原来注释里那三行警告仍然成立）。
+
+任何一只探针失效（有 morph、换了几何、改了顶点/蒙皮属性）时整句退回
+`rig.actor.root.updateMatrixWorld(true)`：那条逐顶点路会读到腿链以外的骨头。
+
+同一轮还去掉了 `Sample` 收尾那次整棵 `updateMatrixWorld` —— 调用方
+`MissionTrainLifePose.Apply` 紧接着就 `rig.root.updateWorldMatrix(true, true)`，
+两趟之间没人动骨骼。`Sample` 新增 `updateWorld` 选项（默认 true），只有那个调用方传 false，
+直接调 `Sample` 的测试与工具行为不变。
+
+镜头外或已交给远景层的乘客（`actor.poseVisible` 为假）跳过脚底求解与世界矩阵发布：
+骨骼照常采样（不能冻在上车姿势），根节点沿用上一次解出来的抬升量；
+`AiDirector._SetDetailedAttached` 在回到近景的上升沿置 `actor.poseDirty`，
+下一次采样无条件补一次完整的。
+
+确定性计数（`Script_FirstLevelFrameProbe.mjs --counts`，车厢机位，每帧）：
+`FootFloor` 的 `updateMatrixWorld` 节点访问 5412 → 148，`Sample` 收尾那趟 5412 → 0。
+`Script_FirstLevelCarriageAnimationTest` 的真值对照仍是 **maxError = 0**。
+
 ## 战斗回归的限制
 
 `FirstLevelOpeningContactTest` 在后续 `ContactCorner` 战斗阶段报玩家生命为 0。复用同一测试输入、断言和视口，换回本任务起点的未优化车厢模块后，亦在相同时间、位置报相同阵亡失败。此项记录为本次对照复现的既有失败，不削弱断言、不登记永久豁免。
