@@ -4,7 +4,7 @@
 // three 是**静默吞掉**的（GL 1282 不抛异常），页面照样跑、画面直接没了。
 // 光看 node --check 完全测不出来。所以每轮改完必须跑这一遍。
 //
-// 用法：node Taierzhuang1938/Script_BootTest.mjs
+// 用法：node Taierzhuang1938/Script_BootTest.mjs [--baseline-root=<read-only checkout>]
 // 退出码即成败。
 
 import path from "node:path";
@@ -14,7 +14,8 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 import { SCENE_RENDER_LIMITS } from "./Data_AssetStandards.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(projectDir, "..");
+const baselineRoot=process.argv.find(arg=>arg.startsWith("--baseline-root="))?.slice("--baseline-root=".length);
+const rootDir = baselineRoot?path.resolve(baselineRoot):path.resolve(projectDir, "..");
 
 const server = await ServeRoot(rootDir, 0);
 const port = server.address().port;
