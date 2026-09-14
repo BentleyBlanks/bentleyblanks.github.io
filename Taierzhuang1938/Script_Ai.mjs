@@ -1177,11 +1177,39 @@ export class AiDirector {
     return n;
   }
 
+  /**
+   * 人物动画与蒙皮解算的统一入口。
+   *
+   * Act 这条链上的六处 `s.actor.Update(` 全部走这里，为的是把它单独记成
+   * `ai/act/anim` 子桶 —— 车厢机位实测「AI 16 ms」里的大头就是这一项，
+   * 混在 ai 一个数字里谁也看不出来。除了计时这里什么都不做；剖析器关着时
+   * 是一次布尔检查。尸体那一处不走这里：它归 `ai/corpse`（见 Update 的循环）。
+   */
+  ActorAnimate(s, dt, options) {
+    const profiler = this.ctx.profiler;
+    // 剖析器关着（正式玩家路径）就是一次布尔检查 + 直调，连 try/finally 都不进。
+    if (!profiler || !profiler.on) { s.actor.Update(dt, options); return; }
+    profiler.B("ai/act/anim");
+    try { s.actor.Update(dt, options); }
+    finally { profiler.E("ai/act/anim"); }
+  }
+
   Update(dt, camera) {
+    // 关着就整条按 null 走：下面十几处 `profiler?.B` 一次判断全短路。
+    const profiler = this.ctx.profiler?.on ? this.ctx.profiler : null;
     this.time += dt;
-    if (this.ctx.nav) this.ctx.nav.BeginFrame();
+    if (this.ctx.nav) {
+      profiler?.B("ai/nav");
+      this.ctx.nav.BeginFrame();
+      profiler?.E("ai/nav");
+    }
     this.frontTimer -= dt;
-    if (this.frontTimer <= 0) { this.frontTimer = 1.0; this.UpdateFront(); }
+    if (this.frontTimer <= 0) {
+      this.frontTimer = 1.0;
+      profiler?.B("ai/front");
+      this.UpdateFront();
+      profiler?.E("ai/front");
+    }
     this.tickIndex += 1;
     // 重数当前锁着玩家的人。Think 是分帧轮转的，所以按实际 target 重算，
     // 不能每帧清零 —— 清零的话上限只对当帧被 Think 的那六分之一生效。
@@ -1212,7 +1240,9 @@ export class AiDirector {
     }
     const slice = this.tickIndex % 6;
     const player = this.ctx.player;
+    profiler?.B("ai/grenade");
     this.UpdateGrenadeThreats();
+    profiler?.E("ai/grenade");
 
     for (let i = 0; i < this.soldiers.length; i += 1) {
       const s = this.soldiers[i];
@@ -1222,6 +1252,7 @@ export class AiDirector {
       // 对一条 30 秒的时间带无所谓。
       if (s.state !== s.stateLogged) this._LogStateChange(s);
       if (!s.alive) {
+        profiler?.B("ai/corpse");
         s.deadTime += dt;
         this.StepCorpse(s, dt);
         // 倒地姿势在 0.9 s 时已经收敛，之后只有尸体根节点还会跟着刚体移动；
@@ -1237,16 +1268,25 @@ export class AiDirector {
         if (s.actor && (s.deadTime <= 0.9 || s.corpse)) {
           s.actor.Update(dt, { dead: true, dying: Clamp01(s.deadTime / 0.9), elapsed: this.time });
         }
+        profiler?.E("ai/corpse");
         continue;
       }
       // 「想」分帧轮转：每帧只有六分之一的人重新决策。
       // 木桩兵（s.dummy，见 Soldier 构造器）不想：Act 照走 —— 重力、贴地、
       // 姿态动画、守点纪律都要，只是永远不会有目标、不会开火。
-      if (i % 6 === slice && !s.dummy && !s.meleeCombat) this.Think(s, dt * 6, player);
+      if (i % 6 === slice && !s.dummy && !s.meleeCombat) {
+        profiler?.B("ai/think");
+        this.Think(s, dt * 6, player);
+        profiler?.E("ai/think");
+      }
+      profiler?.B("ai/act");
       this.Act(s, dt, player);
+      profiler?.E("ai/act");
     }
 
+    profiler?.B("ai/cull");
     this.CullActors(camera);
+    profiler?.E("ai/cull");
   }
 
   /**
@@ -2594,7 +2634,7 @@ export class AiDirector {
       s.stance = 0; s.crouchBlend = 0; s.proneBlend = 0; s.moveSpeed = 0;
       this.StepBody(s, 0, 0, dt);
       s.actor.root.position.copy(s.position); s.actor.root.rotation.y = s.yaw;
-      s.actor.Update(dt, { throwing: s.actor.pendingGrenadeThrow ? 1 : 0,
+      this.ActorAnimate(s, dt, { throwing: s.actor.pendingGrenadeThrow ? 1 : 0,
         grounded: s.grounded, elapsed: this.time, moveSpeed: 0 });
       return;
     }
@@ -2985,7 +3025,7 @@ export class AiDirector {
       const carriagePerformance = !!s.missionCarriageAction
         || (!s.missionTrainReady && s.missionTrainLife?.weight > .00001);
       const cadence = carriagePerformance ? 1 : ActorAnimationCadence(s);
-      if ((s.actor.root.visible || carriagePerformance) && (wantsFire || (this.tickIndex + s.id) % cadence === 0)) s.actor.Update(dt * (wantsFire ? 1 : cadence), {
+      if ((s.actor.root.visible || carriagePerformance) && (wantsFire || (this.tickIndex + s.id) % cadence === 0)) this.ActorAnimate(s, dt * (wantsFire ? 1 : cadence), {
         moveSpeed: s.moveSpeed,
         locomotionTracked: !s.p012OnMovingTrain,
         moveSpeedMps: Math.hypot(s.position.x - animationStartX, s.position.z - animationStartZ) / Math.max(dt, .0001),
@@ -3021,7 +3061,7 @@ export class AiDirector {
     s.body?.SetSize(.42,.58);s.body?.Teleport(s.position.x,s.position.y,s.position.z);
     if(s.actor){
       s.actor.root.position.copy(s.position);s.actor.root.rotation.y=s.yaw;
-      s.actor.Update(dt,{moveSpeed:0,aim:0,crouch:0,prone:1,grounded:true,hurt:s.hurtPose,
+      this.ActorAnimate(s,dt,{moveSpeed:0,aim:0,crouch:0,prone:1,grounded:true,hurt:s.hurtPose,
         elapsed:this.time,lookYaw:0,lookPitch:0});
     }
   }
@@ -3041,7 +3081,7 @@ export class AiDirector {
     s.actor.root.rotation.y = s.yaw;
     const cadence = ActorAnimationCadence(s);
     if (s.actor.root.visible && (this.tickIndex + s.id) % cadence === 0) {
-      s.actor.Update(dt * cadence, { moveSpeed: s.moveSpeed, aim: 0, crouch: 0,
+      this.ActorAnimate(s, dt * cadence, { moveSpeed: s.moveSpeed, aim: 0, crouch: 0,
         prone: 0, grounded: true, elapsed: this.time, lookYaw: 0, lookPitch: 0, hurt: s.hurtPose });
     }
     // RaycastHitboxes refreshes world matrices on demand, including detached
@@ -3057,7 +3097,7 @@ export class AiDirector {
     this.StepBody(s, 0, 0, dt);
     if (!s.actor) return;
     s.actor.root.position.copy(s.position); s.actor.root.rotation.y = s.yaw;
-    s.actor.Update(dt, { moveSpeed: s.moveSpeed, aim: s.aimBlend, crouch: 0, prone: 0,
+    this.ActorAnimate(s, dt, { moveSpeed: s.moveSpeed, aim: s.aimBlend, crouch: 0, prone: 0,
       grounded: s.grounded, verticalVelocity: s.velocityY, elapsed: this.time,
       meleeCombat: s.meleeCombat, bayonetFixed: s.bayonetFixed, lookYaw: s.lookYaw, lookPitch: 0 });
   }
@@ -3146,7 +3186,7 @@ export class AiDirector {
       s.actor.root.position.copy(s.position);
       s.actor.root.rotation.y = s.yaw;
       const cadence = ActorAnimationCadence(s);
-      if (s.actor.root.visible && (this.tickIndex + s.id) % cadence === 0) s.actor.Update(dt * cadence, {
+      if (s.actor.root.visible && (this.tickIndex + s.id) % cadence === 0) this.ActorAnimate(s, dt * cadence, {
         moveSpeed: 1, aim: 0, crouch: 0, prone: 0, firing: false,
         bayonetFixed: s.bayonetFixed,
         grounded: false,

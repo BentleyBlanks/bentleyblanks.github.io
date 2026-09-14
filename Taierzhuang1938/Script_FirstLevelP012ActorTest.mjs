@@ -195,11 +195,15 @@ const animationEnd=source.indexOf("    // Fire only after movement, turning");
 const animationStart=source.lastIndexOf("    if (s.actor) {",animationEnd);
 const ActAnimation=vm.runInNewContext(`(function(s,dt){const wantsFire=false,animationStartX=s.position.x,animationStartZ=s.position.z;${source.slice(animationStart,animationEnd)}})`,
  {ActorAnimationCadence:()=>3});
+// 提交动画走 AiDirector.ActorAnimate（剖析器的 ai/act/anim 子桶在那里）。取 production
+// 那一份挂到 host 上：没有 profiler 时它就是直调 actor.Update，断言看到的仍是真实提交。
+const ActorAnimate=vm.runInNewContext(
+ `({${source.match(/  ActorAnimate\(s, dt, options\) \{[\s\S]*?\n  \}/)[0]}}).ActorAnimate`);
 function SampleHiddenActor(fields,visible=false){
  const root=new THREE.Group();root.visible=visible;
  const samples=[],soldier={id:6,position:new THREE.Vector3(1,2,3),yaw:.4,...fields,
   actor:{root,Update(dt,state){samples.push({dt,time:state.elapsed});}}};
- const host={tickIndex:0,time:0};
+ const host={tickIndex:0,time:0,ctx:{},ActorAnimate};
  for(let frame=0;frame<6;frame++){host.tickIndex++;host.time+=1/60;ActAnimation.call(host,soldier,1/60);}
  assert.equal(root.visible,visible,'sampling cannot override render culling');
  assert.equal(root.parent,null,'sampling cannot reattach a culled actor');

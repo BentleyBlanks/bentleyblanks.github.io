@@ -43,7 +43,12 @@ assert.ok(openingStoryBeats.length>0);
 {
  const source=readFileSync(new URL('./Script_Ai.mjs',import.meta.url),'utf8');
  const method=source.match(/  StepCarriedCasualty\(s, dt, player\) \{[\s\S]*?\n  \}/)[0];
- const Step=vm.runInNewContext(`({${method}}).StepCarriedCasualty`,{Math});
+ // 人物动画统一走 AiDirector.ActorAnimate（剖析器的 ai/act/anim 子桶在那里）。
+ // 取的是production 那一份，不是这里现写一个 —— 它没有 profiler 时就是直调 actor.Update。
+ const animate=source.match(/  ActorAnimate\(s, dt, options\) \{[\s\S]*?\n  \}/)[0];
+ const methods=vm.runInNewContext(`({${animate},${method}})`,{Math});
+ const Step=function(s,dt,player){return methods.StepCarriedCasualty.call(
+  {...this,ctx:{},ActorAnimate:methods.ActorAnimate},s,dt,player);};
  const Position=(x,y,z)=>({x,y,z,copy(p){this.x=p.x;this.y=p.y;this.z=p.z;return this;}});
  const bodyPositions=[],poses=[],actor={id:7,alive:true,health:65,position:Position(108,0,70),
   body:{SetSize(){},Teleport:(x,y,z)=>bodyPositions.push({x,y,z})},

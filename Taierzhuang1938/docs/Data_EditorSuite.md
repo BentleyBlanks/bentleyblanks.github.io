@@ -526,11 +526,41 @@ LKP 十字、掩体的隐蔽位/射击位/法线、`task.point`、班组连到�
 
 与 Debug Rendering 同在「调试」组，不接管相机、不暂停玩法 ——
 它量的就是战斗中的帧。面板里就是一颗开关（**没有页面内面板**，用户点名去掉的）：
-点开即 `FrameProfiler.Enable()`（内核在 `Script_Profiler.mjs`）并弹一个
-`window.open` 独立窗口：帧时间条图、CPU 主线程逐系统（B/E 标记打在
-`Script_Main` 的 Frame/RenderScene 里）、GPU 逐 pass（EXT_disjoint_timer_query_webgl2
-分段计时，阴影烘焙靠包一层 `shadowMap.render` 从预通道里拆出来）、最近 10 秒最差
-一帧的桶归因、GC/长任务/堆分配速率，以及「导出快照 JSON」。
+点开即 `FrameProfiler.Enable()`（内核在 `Script_Profiler.mjs`，表格排版在
+`Script_ProfilerReport.mjs`）并弹一个 `window.open` 独立窗口：帧时间条图、
+CPU 主线程逐系统、GPU 逐 pass、最近 10 秒最差一帧的桶归因、GC/长任务/堆分配速率、
+场景节点普查，以及「导出快照 JSON」「导出文本表格」。
+
+命令行入口是 `Script_ProfileCli.mjs`（见 [系统参考](Data_AgentReference.md) 的性能段）：
+它读的是同一份 `profiler.Summary()`、排版走同一个 `Script_ProfilerReport`，
+所以不会出现「面板说 12 ms、脚本说 9 ms」这种谁也说服不了谁的局面。
+面板导出的 JSON 可以直接喂给 `--print=<文件>` 排成同样的表。
+
+#### 两张表的读法
+
+- **CPU 表按子桶分层。** 标记名带斜杠就是子桶（`ai/act/anim`、`story/mission/voice`），
+  存储是平的（key 就是整条路径），分层只发生在显示层。B/E 是真的嵌套调用，
+  所以**父行的数字已经含子行**，父行后面跟一条「自身 = 父 − 子之和」。
+  标记打在 `Script_Main` 的 Frame/RenderScene、`Script_Ai.Update`、
+  `Script_FirstLevelMissionRuntime.Update` 三处。
+- **「矩阵访问/帧」这一列**：剖析期间包一层 `Object3D` 的
+  `updateMatrixWorld` / `updateWorldMatrix` / `traverse`，按当前栈顶桶数节点访问次数。
+  矩阵与遍历本来散在各桶里看不见，而车厢机位一帧有一万六千多次。
+  **这一层本身有开销**（每次访问一次数组读 + 一次自增），所以剖析开着时
+  `cpuMs` 比不剖析时略高；它量的是相对大小，不是绝对帧时间。
+- **「分配KB」这一列**：B/E 两侧读 `performance.memory.usedJSHeapSize` 的正增量
+  （Chrome 系才有）。分配大户由此可以指名道姓，不必再从整帧的分配速率倒推。
+  这一列整列空，说明这台浏览器没有 `performance.memory`，或者它被量化/限速到
+  读不出逐帧差（无头 Edge 实测就是这样）—— Chrome 系加
+  `--enable-precise-memory-info` 才逐帧有数。CLI 会在表底下写明这一条。
+- **GPU 表显示英文原名**，与 `PostPipeline.passes` 一字不差；中文解释在 `title`。
+  逐段另有 draw call 与三角形两列，读法（什么时候 GPU 读数只是提交时间的影子）
+  见 [渲染管线](Data_TechRenderPipeline.md) §17.11。阴影按级联拆成 `shadow/c0`…。
+- **两张表都是数据驱动的**：汇总里出现什么 key 就显示什么行。
+  旧版写死 11 个 GPU 名字，帧图里新加的 pass 哪怕吃了 3.7 ms 也一行都看不到 ——
+  别再往回改成固定名单。
+- **「浏览器侧（布局/绘制/合成/等 vsync）」** = 整帧间隔 − 主线程工作。
+  支持 `long-animation-frame` 的浏览器还会把其中的样式布局耗时报进取证栏。
 
 四条特殊行为，改的时候别破坏：
 
@@ -538,14 +568,17 @@ LKP 十字、掩体的隐蔽位/射击位/法线、`task.point`、班组连到�
   边玩边记。停它：面板里再点一次开关，或直接叉掉独立窗口（Update 检测
   `win.closed` 自我关闭）。弹窗被拦截时 Enter 抛错、开关弹回，不留瞎状态。
 - **钩子必须成对还原**：Enable 会把 `renderer.info.autoReset` 改成手动、包
-  `shadowMap.render`、把自己挂到 `post.profiler`；Exit/Disable 一样不落地还回去。
-  守着它的：`Script_ProfilerTest`（render 域）。
+  `shadowMap.render`、包 `Object3D` 的三个矩阵/遍历方法、挂 `long-animation-frame`
+  观察者、把自己挂到 `post.profiler`；Exit/Disable 一样不落地还回去。
+  守着它的：`Script_ProfilerTest`（render 域），它逐条断名字（`ProfiledUpdateMatrixWorld`
+  这些）与还原后的状态。
 - **GPU 查询结果晚几帧到**（ANGLE/D3D11 连 `gl.finish` 都不算数），`_Poll` 每帧收、
   挂回历史记录；headless 是 SwiftShader，GPU 数字只证明接线，不许当性能结论。
 - **自身开销记在「编辑器叠加层（含本面板）」桶里**，用户看得见：条图每 3 帧一画、
-  表格 0.5 s、取证/事件 1 s（走 `Summary(10, {buckets:false})` 便宜路径）。
+  表格 0.5 s、取证/事件/场景普查 1 s（走 `Summary(10, {buckets:false})` 便宜路径）。
   用户实测过一次 10 ms 的自刷新突刺，节流与便宜路径就是冲它去的 —— 改刷新
-  频率前先看这一桶有没有涨回去。
+  频率前先看这一桶有没有涨回去。场景普查**自己走栈**，不用被包了计数的
+  `scene.traverse`：用它等于把七千个节点算进面板自己的桶里，读数被自己的诊断顶花。
 
 「CPU 分线程」的诚实口径：玩法期间没有 worker（加载台的旋转 worker 只活在开机），
 逻辑与渲染提交全在主线程；GPU 进程按 pass 列出；WebAudio 在浏览器音频线程，页面

@@ -1820,6 +1820,11 @@ export class FirstLevelMissionRuntime {
     if (this.completed || this.failed) return;
     this.delta = dt;
     this.time += dt;
+    // 剖析标记（`story/mission/*` 子桶）。装配层没给 profiler 就静默不记 ——
+    // 测试夹具直接 new 这个类时不必补一个假的。关着时整条按 null 走，
+    // 下面十来处 `prof?.B` 一次判断全短路。
+    const prof = this.profiler?.on ? this.profiler : null;
+    prof?.B("story/mission/voice");
     this.voice.Update(dt);
     const meal=this.voice.current;
     if(["TrainMeal","TrainBanter"].includes(meal?.cue.id)&&meal.phase==="playing"){
@@ -1831,12 +1836,22 @@ export class FirstLevelMissionRuntime {
     }
     this.UpdateMusic();
     this.battleSound.Update(dt,this.flow.stage.id,this.voice.current?.phase==="playing");
+    prof?.E("story/mission/voice");
+    prof?.B("story/mission/train");
     this.train?.Update(dt, this.Has("trainStopped") && this.Has("luoRescueComplete"), this.Has("trainIncomingFire"),this.time+(this.trainClockLead||0),this.Has("trainNearShellImpact"));
+    prof?.E("story/mission/train");
+    prof?.B("story/mission/voice");
     this.SyncCarriageDialogue();
+    prof?.E("story/mission/voice");
+    prof?.B("story/mission/other");
     this.opening.Update(dt);
-    if(this.failed)return;
+    if(this.failed){prof?.E("story/mission/other");return;}
     if(this.Has("trainProneOrder") && this.player.stance==="crouch")this.Record("trainPlayerProne");
+    prof?.E("story/mission/other");
+    prof?.B("story/mission/spawns");
     this.DrainSpawns();
+    prof?.E("story/mission/spawns");
+    prof?.B("story/mission/director");
     if(["Support","MachineGun","Tank"].includes(this.flow.stage.id)) {
       const alive=[...this.enemies.values()].filter(actor=>actor.alive && ["front","machineGun","approach","tank"].includes(actor.missionEncounter)).length;
       this.frontPeakAlive=Math.max(this.frontPeakAlive||0,alive);
@@ -1854,6 +1869,8 @@ export class FirstLevelMissionRuntime {
     const stage = this.flow.stage.id,
       t = this.flow.stageTime;
     if(["Support","MachineGun","Tank","Orders"].includes(stage))this.UpdateGuards(dt);
+    prof?.E("story/mission/director");
+    prof?.B("story/mission/other");
     if (stage === "Death") {
       if (this.deathMedic?.health<=0) {this.deathMedic.treating=false;this.deathMedic=null;this.deathCareRoute=null;}
       const medic=this.deathMedic, zhou=this.column.zhou;
@@ -2116,6 +2133,7 @@ export class FirstLevelMissionRuntime {
     this.view.Update(this.time, { tank: this.tank,player:this.player,camera:this.camera||null });
     this.flow.Update(dt);
     this.hud.SetMissionReturn?.(this.UpdateReturnWarning(dt));
+    prof?.E("story/mission/other");
   }
   SaveCheckpoint() {
     this.safePoint = {

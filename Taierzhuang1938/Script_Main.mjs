@@ -466,7 +466,9 @@ const ssrUniforms = post.SsrUniforms;
 
 // 运行时性能剖析器。构造免费、常态休眠（Enable 由编辑器「性能剖析」叠加层调）；
 // Frame/RenderScene 里的 B/E/Gpu* 标记在它关着时只是一次布尔检查。
-const profiler = new FrameProfiler(renderer, { post });
+// scene 给「场景节点普查」用；Object3D.prototype 是矩阵/遍历计数要包的那一层
+//（剖析器自己不 import three，所以由装配层交给它，Disable 时原样还回去）。
+const profiler = new FrameProfiler(renderer, { post, scene, object3D: THREE.Object3D.prototype });
 // 自动降档（docs §13）。出厂开、画质面板可关；只在**真实 rAF 帧**上喂数据，
 // StepFrames（出图 / 测试 / 过场手动步进）一律不喂 —— 那些帧的间隔不是帧率。
 const autoQuality = new AutoQuality();
@@ -1299,6 +1301,8 @@ async function Boot() {
   destruction.SetWorld(battlefield, physics, navGrid);
   ai = new AiDirector({
     battlefield, actorFactory, scene, vfx, audio, player, nav, physics, destruction, audioWiring,
+    // 剖析器只用来打 ai/* 子桶标记（关着时是一次布尔检查）；AI 不读它任何状态。
+    profiler,
     onActorSpawn: (soldier) => {
       if(PHASE_TABLE[state.phaseIndex]?.whitebox?.p012)InstallP012ActorMotion(soldier);
     },
@@ -3967,6 +3971,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   if(phase.whitebox?.fullMission)await Promise.all([LoadFirstLevelCarriageAnimation(),LoadFirstLevelMeal()]);
   missionRuntime = phase.whitebox?.fullMission ? new FirstLevelMissionRuntime({
     scene,camera,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,stageJump,viewmodel,
+    // 只用来打 story/mission/* 子桶标记；没有它就静默不记（测试夹具不传也照跑）。
+    profiler,
     FireVehicleBullet,
     Objective:text=>{state.storyObjective=text;},
     VoiceClock:()=>MANUAL_STEP?null:audio.ctx?.currentTime,
@@ -8211,10 +8217,13 @@ function Frame(dt, render = true) {
   checkpoint?.Update();
 
   profiler.B("story");
+  profiler.B("story/mission");
   missionRuntime?.Update(dt);
   missionRuntime?.opening.ApplyCamera();
+  profiler.E("story/mission");
   if(missionRuntime?.completed){profiler.E('story');return;}
   if (p012Flow) {
+    profiler.B("story/p012");
     p012StageZero?.Update(dt);
     p012Resting?.Update(dt);
     p012Runtime.Update(dt);
@@ -8228,10 +8237,13 @@ function Frame(dt, render = true) {
       // 这片白盒就是玩家的第一关：打完记进度，选章里标「已通过」（id 与 CAMPAIGN_ENTRIES[0] 同）。
       Progress.MarkCleared(FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID, 0);
       p012Runtime.completed = true; ShowPauseMenu(); menu.OpenSandboxComplete();
-      profiler.E("story"); return;
+      profiler.E("story/p012"); profiler.E("story"); return;
     }
+    profiler.E("story/p012");
   }
+  profiler.B("story/objectives");
   UpdateObjectives(dt);
+  profiler.E("story/objectives");
 
   // 「占点耗对方的票」那一套（ER2 2.0.9 的机制）跟着占领点一起删了。
   // 线性关卡里逼玩家往前打的是**时间**与**剧本**，不是一条会把你耗死的进度条：
@@ -8240,6 +8252,7 @@ function Frame(dt, render = true) {
   // --- 叙事层 ---
   // 身边六十米内有敌人在开枪 = 正在交火。原剧本的 wave:N / waveClear:N
   // 就映射到这个计数上 —— 开放战场没有编排好的波次，但"身边打起来了"这件事有。
+  profiler.B("story/narrative");
   let fighting = false;
   for (const s2 of ai.soldiers) {
     if (!s2.alive || s2.side === "nra") continue;
@@ -8258,22 +8271,29 @@ function Frame(dt, render = true) {
     p012Beat: p012Flow?.beat,
   });
   if (story.ObjectiveText && !p012Flow && !missionRuntime) state.storyObjective = story.ObjectiveText;
+  profiler.E("story/narrative");
   // 章节摆点：**排在 story.Update 之后**。它的 onVoice 钩子读的是 story.fired，
   // 排在前面的话每一拍都要慢一帧 —— 「顺子喊完『老子回去压住！』就播转身那一场」
   // 这种同拍的事会看得出来差一帧。
+  profiler.B("story/setpieces");
   setpieces?.Update(dt);
+  profiler.E("story/setpieces");
   if (p012CarryView) {
+    profiler.B("story/carry");
     const litterId = setpieces?.mem?.p012CarriedLitter?.propLitter;
     p012CarryView.Update(dt, { litter: missionRuntime?.view.zhouRoot || setpieceProps.get(String(litterId))?.root,
       player, carry: carry?.View(), alive: player.Alive && !state.cutscene && !state.menu });
+    profiler.E("story/carry");
   }
   // 事件先改变白盒，再让玩家从改变后的世界里读到结果：护送队喊走后开院门，
   // 南路被切断后开归路。不存在悬浮解释卡，也不存在隐形空气墙。
+  profiler.B("story/scenario");
   const openedScenarioGates = battlefield?.SyncScenario?.({
     objectiveIndex: state.objectiveIndex,
     signalled: (name) => missionRuntime?.Has(name) || story.Signalled(name),
   });
   if (openedScenarioGates > 0) navGrid?.Refresh(battlefield);
+  profiler.E("story/scenario");
   profiler.E("story");
 
   // --- 结束条件 ---
@@ -8510,6 +8530,11 @@ function RenderScene(dt) {
     profiler.GpuPop();
     profiler.E("gi");
   }
+  // 出画前的接线：阴影排班、AO 靶引用、天空穹跟位、粒子/水面的深度源与雾、
+  // 音频听者、簇光表。**给它自己的桶和自己的 GPU 段** —— 这一段以前整个落在
+  // 「misc（其他 GL）」里，于是那一行看着像状态切换与上传，其实大头是这些接线。
+  profiler.B("frameSetup");
+  profiler.GpuPush("frameSetup");
   // 这一帧要烘哪几级级联阴影图（逐级节流：近级每帧、远级 2–3 帧一次，
   // 相机瞬移 / 换关 / 太阳转向时 CsmRig 会强制全更）。真正的烘焙发生在下面
   // 第一次 renderer.render 里，烘完 three 自己把逐灯的 needsUpdate 清掉。
@@ -8570,10 +8595,16 @@ function RenderScene(dt) {
   // 那一处；挂在玩法分支上的话，一进过场街上的火就整体错位。
   // 接在 camera.updateWorldMatrix 之后：它要的是这一帧的 matrixWorldInverse。
   lights.UpdateClusters(camera, post.width, post.height);
+  profiler.GpuPop();
+  profiler.E("frameSetup");
   // 整帧唯一一次世界矩阵更新（见 scene.matrixWorldAutoUpdate = false 那里的账）。
   // 必须排在天空穹跟位、相机 updateWorldMatrix 之后 —— 它们改的是这一帧的位姿。
+  // GpuPush 不是因为它画东西（它一个 draw 都不提交），而是**占住 GPU 帧的时间轴**：
+  // 不单独开段的话这两三毫秒会被算进「misc 其他 GL」，那一行就永远解释不清。
   profiler.B("matrix");
+  profiler.GpuPush("matrix");
   scene.updateMatrixWorld();
+  profiler.GpuPop();
   profiler.E("matrix");
   // 从这里到出画结束，骨头不再动：骨骼矩阵按帧只算一次（见 SkeletonUpdateOncePerFrame）。
   skeletonPassStamp += 1;
@@ -8589,7 +8620,9 @@ function RenderScene(dt) {
   }
   // 人物合批的实例矩阵读的就是刚算完的那份 matrixWorld，所以必须排在这后面。
   profiler.B("actorBatch");
+  profiler.GpuPush("actorBatch");
   if (actorBatch) actorBatch.Update(camera);
+  profiler.GpuPop();
   profiler.E("actorBatch");
   const hitDisorientation = state.running && !state.menu && !state.cutscene && !editor?.Capturing
     ? player?.HitDisorientation || 0 : 0;

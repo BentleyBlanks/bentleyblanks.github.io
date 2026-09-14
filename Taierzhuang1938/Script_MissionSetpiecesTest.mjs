@@ -404,8 +404,11 @@ for (const level of ACTIVE_LEVELS) {
 Check("装配层建了摆点导演", /setpieces = new MissionSetpieceDirector\(\{/.test(MainSource));
 Check("换关时摆点（排在具名同伴之后、撒兵之前）",
   /setpieces\.BeginLevel\(contentId, phase\);/.test(MainSource));
+// 中间只许隔着注释与剖析标记（`profiler.B/E("story/…")`）—— 标记不是逻辑，
+// 但它确实会出现在这两句之间（子桶分界就在这儿），不放行的话这条会因为
+// 一行计时标记变红，而它要守的「setpieces 紧跟在 story.Update 之后」没有变。
 Check("每帧推它，且排在 story.Update 之后（onVoice 读的是 story.fired）",
-  /if \(story\.ObjectiveText(?: && !p012Flow)?(?: && !missionRuntime)?\) state\.storyObjective = story\.ObjectiveText;\s*\n(?:\s*\/\/[^\n]*\n)*\s*setpieces\?\.Update\(dt\);/
+  /if \(story\.ObjectiveText(?: && !p012Flow)?(?: && !missionRuntime)?\) state\.storyObjective = story\.ObjectiveText;(?:\s*(?:\/\/[^\r\n]*|profiler\.[BE]\("[^"]*"\);))*\s*setpieces\?\.Update\(dt\);/
     .test(MainSource));
 Check("换关清摆点（交互点、后送队、运行时道具）",
   /setpieces\?\.Reset\("levelChange"\);/.test(MainSource)

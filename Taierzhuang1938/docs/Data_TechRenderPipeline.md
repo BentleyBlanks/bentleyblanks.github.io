@@ -5109,6 +5109,39 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs --tiers       # phase=2 的 dra
    无效；可行的替代是烘远级那一帧临时改 `castShadow`，但它与 `Actor.SetShadowEnabled`
    每帧按距离改的那一位会打架，收益（约 51 个 draw）不值这个风险，先记在这儿。
 
+### 17.11 逐 pass 的 draw / 三角两列，与「GPU 读数是提交影子」的读法（2026-09-15）
+
+常驻剖析器（面板 `Script_EditorProfiler`、命令行 `Script_ProfileCli`，口径都在
+`Script_Profiler` + `Script_ProfilerReport`）现在给每个 GPU 段多记两列：**这一段
+提交了多少 draw call、多少三角形**。做法是在分段起止读 `renderer.info.render`
+的增量（剖析期间 `info.autoReset` 已是 false，整帧单调增），不改任何渲染代码。
+
+这两列是用来判「这个 pass 到底是 GPU 忙还是 CPU 忙」的：
+
+- **某个 pass 的 GPU 读数接近它的「提交 CPU」时，那个 GPU 数字是提交时间的影子，
+  不是它真的在算。** `TIME_ELAPSED` 罩住的是这一段在 GL 时间轴上的跨度；如果驱动
+  队列是空的、GPU 在等 CPU 一条条喂 draw，这一段的 GPU 读数就会跟着提交时间走。
+  面板与 CLI 的表尾固定打这句话。
+- 反过来，**GPU 读数远大于提交 CPU、而 draw 很少** 的段（体积雾积分、GTAO、
+  TAA 这类全屏 pass）才是真的在算，去那儿找分辨率与采样数。
+- draw 多而三角少（车厢内的人物分件）= 提交瓶颈，要合批或减分件，
+  §17.10 的第 2 条说的就是它。
+
+同一轮还把**分段名从一个平表改成了带斜杠的路径**：阴影按级联拆成
+`shadow/c0`、`shadow/c1`…（`_WrapShadow` 在级联多于一盏时逐盏调用 three 的
+`shadowMap.render`，每盏一个段），表里父行是整支合计、子行缩进。GPU 分段本身是
+互斥的，所以收结果时子段会累进每一级前缀 —— 这样父行的读法与 CPU 桶一致。
+
+另外三件让「misc（其他 GL）」那一行不再是垃圾桶的事，都在 `RenderScene` 里：
+`matrix`（`scene.updateMatrixWorld`）、`actorBatch`、`frameSetup`（阴影排班、AO 靶
+引用、雾与水面深度源、音频听者、簇光表）各有自己的 GPU 段。它们一个 draw 都不提交，
+开段只是**占住 GPU 帧的时间轴**：不开的话这几毫秒会被算进 misc，那一行永远解释不清。
+车厢机位实测 misc 里最大的一块就是 `scene.updateMatrixWorld` 的 2.37 ms。
+
+**表是数据驱动的**：汇总里出现什么段就显示什么行（旧版 GPU 表只列 11 个写死的
+名字，帧图里新加的 pass 哪怕吃了 3.7 ms 也一行都看不到）。显示名一律是
+`PostPipeline.passes` 里的**英文原名**，中文解释只进 `title` / 末列备注。
+
 ---
 
 

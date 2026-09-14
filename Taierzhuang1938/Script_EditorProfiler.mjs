@@ -7,46 +7,19 @@
 //（editor.UpdateOverlays 在每一条帧路径上都会调它）。弹窗被拦截时 Enter 直接抛错，
 // ToggleOverlay 会收掉这次开启（开关弹回），不留一个「开着却什么都看不见」的状态。
 //
-// 计时内核在 Script_Profiler（Enter 时 Enable、Exit 时 Disable，钩子全还原）。
+// 计时内核在 Script_Profiler（Enter 时 Enable、Exit 时 Disable，钩子全还原），
+// 表格的分层与排版在 Script_ProfilerReport（与命令行 Script_ProfileCli 同一份口径）。
 // 自身开销记在「编辑器叠加层」桶里（图上标了「含本面板」）：条图每 3 帧一画、
-// 表格 0.5 s 一刷、取证/事件 1 s 一刷（用 buckets:false 的便宜汇总）——
+// 表格 0.5 s 一刷、取证/事件/场景普查 1 s 一刷（用 buckets:false 的便宜汇总）——
 // 用户实测过一次 max 10 ms 的自刷新突刺，节流与便宜路径就是冲它去的。
+//
+// **两张表都是数据驱动的**：汇总里出现什么 key 就显示什么行，不再有写死的名单
+//（旧版 GPU 表只列 11 个名字，帧图里新加的 pass 哪怕吃了 3.7 ms 也一行都看不到）。
+// GPU 那一列显示的是**英文原名**，与 Script_Post 的 passes 数组一字不差；中文解释
+// 进 title（鼠标停上去才出），免得译名和帧图对不上号。
 
-/** CPU 桶的显示名与顺序（B/E 标记在 Script_Main 的 Frame / RenderScene）。 */
-const CPU_LABELS = [
-  ["post", "渲染提交（整条链）"],
-  ["ai", "AI"],
-  ["physics", "物理（Rapier）"],
-  ["player", "玩家"],
-  ["viewmodel", "视图模型"],
-  ["vfx", "特效"],
-  ["combat", "战斗结算/破坏"],
-  ["actorBatch", "人物合批"],
-  ["matrix", "场景矩阵"],
-  ["gi", "GI 探针（CPU）"],
-  ["hud", "HUD"],
-  ["story", "剧情与目标"],
-  ["spawn", "补兵"],
-  ["streamer", "道具流送"],
-  ["input", "输入"],
-  ["overlay", "编辑器叠加层（含本面板）"],
-  ["other", "其他（未标记）"],
-];
-
-/** GPU 段的显示名与顺序（Push/Pop 在 Script_Post.Render 与阴影包装层）。 */
-const GPU_LABELS = [
-  ["shadow", "阴影图"],
-  ["prepass", "深度法线预通道"],
-  ["ssao", "SSAO + 双边模糊"],
-  ["main", "主场景"],
-  ["taa", "TAA 时域解算"],
-  ["bloom", "泛光"],
-  ["god", "体积光"],
-  ["composite", "合成"],
-  ["fxaa", "FXAA / 锐化"],
-  ["gi", "GI 探针"],
-  ["misc", "其他 GL（状态/上传）"],
-];
+import { CpuRows, GpuRows, CPU_LABELS, SHADOW_NOTE, WorstLine, EventsLine, FormatSnapshot }
+  from "./Script_ProfilerReport.mjs";
 
 const POPUP_CSS = `
   * { box-sizing: border-box; }
@@ -68,9 +41,10 @@ const POPUP_CSS = `
   th, td { text-align: right; padding: 1px 8px; border-bottom: 1px solid var(--ui-line); white-space: nowrap; }
   th { color: var(--ui-muted); font-weight: normal; }
   th:first-child, td:first-child { text-align: left; }
-  td.bar { width: 34%; padding: 0 0 0 8px; }
+  td.bar { width: 22%; padding: 0 0 0 8px; }
   td.bar i { display: block; height: 7px; background: #38607e; min-width: 1px; }
   tr.total td { border-top: 1px solid var(--ui-line); color: var(--ui-bright); }
+  tr.self td { color: var(--ui-muted); }
   .note { color: var(--ui-muted); font-size: 11px; margin: 4px 0; }
   .warn { color: #c9a227; }
   .worst { border: 1px solid var(--ui-line); background: var(--ui-black); padding: 8px 10px; }
@@ -85,7 +59,7 @@ const POPUP_CSS = `
 export class ProfilerEditor {
   static id = "profiler";
   static label = "Profiler";
-  static hint = "独立窗口：整帧 / CPU 逐系统 / GPU 逐 pass 耗时，掉帧现场取证；玩法照跑";
+  static hint = "独立窗口：整帧 / CPU 逐系统（可展开子桶）/ GPU 逐 pass 耗时与提交量，掉帧现场取证；玩法照跑";
   // 关掉设置面板（回去打仗）不收这个叠加层 —— 量的就是战斗中的帧。
   // 停它：面板里再点一次开关，或直接关它的独立窗口（Update 会跟着自我关闭）。
   static keepOnClose = true;
@@ -98,6 +72,7 @@ export class ProfilerEditor {
     this._frame = 0;
     this._tableAcc = 0;
     this._slowAcc = 0;
+    this._census = null;
   }
 
   Enter() {
@@ -127,7 +102,7 @@ export class ProfilerEditor {
     let win = null;
     try {
       win = window.open("", "tzProfiler",
-        "width=880,height=980,menubar=no,toolbar=no,location=no");
+        "width=1080,height=1040,menubar=no,toolbar=no,location=no");
     } catch (error) { win = null; }
     if (!win) { this.win = null; return; }
     this.win = win;
@@ -190,15 +165,16 @@ export class ProfilerEditor {
       table.appendChild(tr);
       return table;
     };
-    body.appendChild(El("h2", "", "CPU · 主线程（逐系统，ms/帧）"));
-    const cpuTable = MakeTable(["系统", "avg", "p95", "max", ""]);
+    body.appendChild(El("h2", "", "CPU · 主线程（逐系统，ms/帧；缩进行是子桶）"));
+    const cpuTable = MakeTable(["系统", "avg", "p95", "max", "矩阵访问", "分配KB", ""]);
     body.appendChild(cpuTable);
 
-    body.appendChild(El("h2", "", "GPU · 逐 pass（ms/帧）"));
-    const gpuTable = MakeTable(["pass", "GPU avg", "GPU p95", "GPU max", "提交 CPU", ""]);
+    body.appendChild(El("h2", "", "GPU · 逐 pass（ms/帧，名字是帧图里的英文原名）"));
+    const gpuTable = MakeTable(["pass", "GPU avg", "GPU p95", "GPU max", "提交 CPU", "draw", "三角", ""]);
     body.appendChild(gpuTable);
     const gpuNote = El("div", "note", "");
     body.appendChild(gpuNote);
+    body.appendChild(El("div", "note", SHADOW_NOTE));
 
     body.appendChild(El("h2", "", "掉帧取证（最近 10 秒最差一帧）"));
     const worst = El("div", "worst", "—");
@@ -208,36 +184,50 @@ export class ProfilerEditor {
     const events = El("div", "stats", "—");
     body.appendChild(events);
 
+    body.appendChild(El("h2", "", "场景节点普查（scene 顶层子树，每秒一次）"));
+    const censusTable = MakeTable(["子树", "节点", "骨骼", "网格", "蒙皮", "隐藏节点"]);
+    body.appendChild(censusTable);
+
     const copyBtn = El("button", "", "导出快照 JSON");
     body.appendChild(copyBtn);
+    const textBtn = El("button", "", "导出文本表格");
+    body.appendChild(textBtn);
     const copyBox = El("textarea");
     copyBox.readOnly = true;
     body.appendChild(copyBox);
-    copyBtn.addEventListener("click", () => {
+    const Dump = (text) => {
       copyBox.style.display = "block";
-      copyBox.value = this.SnapshotJson();
+      copyBox.value = text;
       copyBox.focus();
       copyBox.select();
-    });
+    };
+    copyBtn.addEventListener("click", () => Dump(this.SnapshotJson()));
+    textBtn.addEventListener("click", () => Dump(FormatSnapshot(this.Snapshot())));
 
     this.ui = {
       badge, fps, headStats, graph, ctx: graph.getContext("2d"),
-      cpuTable, gpuTable, gpuNote, worst, events,
-      cpuRows: new Map(), gpuRows: new Map(),
+      cpuTable, gpuTable, gpuNote, worst, events, censusTable,
+      cpuRows: new Map(), gpuRows: new Map(), censusRows: new Map(),
     };
   }
 
-  SnapshotJson() {
+  /** 与 CLI 输出同结构的快照（`Script_ProfileCli --print` 能直接读回来排表）。 */
+  Snapshot() {
     const profiler = this.host.profiler;
     const post = this.host.post;
-    const snapshot = {
+    return {
+      label: "panel",
       when: new Date().toISOString(),
       userAgent: navigator.userAgent,
       canvas: this.host.canvas ? `${this.host.canvas.width}x${this.host.canvas.height}` : null,
       postTarget: post ? `${post.width}x${post.height} · ${post.quality}` : null,
-      summary10s: profiler ? profiler.Summary(10) : null,
+      census: this._census,
+      summary: profiler ? profiler.Summary(10) : null,
     };
-    return JSON.stringify(snapshot, (key, value) =>
+  }
+
+  SnapshotJson() {
+    return JSON.stringify(this.Snapshot(), (key, value) =>
       (typeof value === "number" ? Math.round(value * 1000) / 1000 : value), 2);
   }
 
@@ -301,15 +291,19 @@ export class ProfilerEditor {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(x, 2, barW - 1, 3);
       }
+      if (record.newPrograms > 0) {              // 新编译着色器的帧打一个金点
+        ctx.fillStyle = "#c9a227";
+        ctx.fillRect(x, 7, barW - 1, 3);
+      }
     }
   }
 
-  _Row(doc, table, cache, key, label, cols) {
+  _Row(table, cache, key, cols, { bar = true } = {}) {
     let row = cache.get(key);
     if (!row) {
+      const doc = this.doc;
       const tr = doc.createElement("tr");
       const name = doc.createElement("td");
-      name.textContent = label;
       tr.appendChild(name);
       const cells = [];
       for (let i = 0; i < cols; i += 1) {
@@ -317,75 +311,110 @@ export class ProfilerEditor {
         cells.push(td);
         tr.appendChild(td);
       }
-      const barCell = doc.createElement("td");
-      barCell.className = "bar";
-      const bar = doc.createElement("i");
-      barCell.appendChild(bar);
-      tr.appendChild(barCell);
-      row = { tr, cells, bar };
-      table.appendChild(tr);
+      let barEl = null;
+      if (bar) {
+        const barCell = doc.createElement("td");
+        barCell.className = "bar";
+        barEl = doc.createElement("i");
+        barCell.appendChild(barEl);
+        tr.appendChild(barCell);
+      }
+      row = { tr, name, cells, bar: barEl, live: false };
       cache.set(key, row);
     }
+    // appendChild 会把已有节点**移动**到末尾 —— 按顺序重挂一遍就是重排序。
+    table.appendChild(row.tr);
+    row.tr.style.display = "";
+    row.live = true;
     return row;
   }
 
+  /** 这一轮没出现的行收起来（桶会随场景与关卡出现/消失，别留一排幽灵的 0）。 */
+  _Sweep(cache) {
+    for (const row of cache.values()) {
+      if (!row.live) row.tr.style.display = "none";
+      row.live = false;
+    }
+  }
+
   RefreshTables(summary) {
-    const doc = this.doc;
     const ui = this.ui;
     const F = (value) => (value >= 100 ? value.toFixed(0) : value.toFixed(2));
+    const Int = (value) => (value === null || value === undefined ? "" : String(Math.round(value)));
 
     // --- CPU 表 ---
     const cpuMax = Math.max(0.001, summary.cpuTotal.avg);
-    for (const [key, label] of CPU_LABELS) {
-      const stat = key === "other" ? summary.other : summary.cpu[key];
-      const row = this._Row(doc, ui.cpuTable, ui.cpuRows, key, label, 3);
-      if (!stat || (stat.avg === 0 && stat.max === 0)) {
-        row.tr.style.display = "none";
-        continue;
-      }
-      row.tr.style.display = "";
-      row.cells[0].textContent = F(stat.avg);
-      row.cells[1].textContent = F(stat.p95);
-      row.cells[2].textContent = F(stat.max);
-      row.bar.style.width = `${Math.min(100, (stat.avg / cpuMax) * 100)}%`;
+    for (const item of CpuRows(summary)) {
+      const row = this._Row(ui.cpuTable, ui.cpuRows, item.key, 5);
+      row.tr.className = item.selfRow ? "self" : "";
+      row.name.textContent = `${"　".repeat(item.depth)}${item.label}`;
+      row.name.title = item.key;
+      const avg = item.selfRow ? item.self : item.stat.avg;
+      row.cells[0].textContent = F(avg);
+      row.cells[1].textContent = item.selfRow ? "" : F(item.stat.p95);
+      row.cells[2].textContent = item.selfRow ? "" : F(item.stat.max);
+      row.cells[3].textContent = item.selfRow ? "" : Int(item.visits);
+      row.cells[4].textContent = item.selfRow || item.allocKb == null ? "" : item.allocKb.toFixed(1);
+      row.bar.style.width = `${Math.min(100, (avg / cpuMax) * 100)}%`;
     }
-    const totalRow = this._Row(doc, ui.cpuTable, ui.cpuRows, "__total", "主线程合计", 3);
+    const totalRow = this._Row(ui.cpuTable, ui.cpuRows, "__total", 5);
     totalRow.tr.className = "total";
+    totalRow.name.textContent = "主线程合计";
     totalRow.cells[0].textContent = F(summary.cpuTotal.avg);
     totalRow.cells[1].textContent = F(summary.cpuTotal.p95);
     totalRow.cells[2].textContent = F(summary.cpuTotal.max);
+    totalRow.cells[3].textContent = "";
+    totalRow.cells[4].textContent = "";
     totalRow.bar.style.width = "0";
+    const browserRow = this._Row(ui.cpuTable, ui.cpuRows, "__browser", 5);
+    browserRow.tr.className = "total";
+    browserRow.name.textContent = CPU_LABELS.browser;
+    browserRow.name.title = summary.loafAvailable
+      ? "整帧间隔 − 主线程工作；本浏览器支持 long-animation-frame，样式布局耗时见取证栏"
+      : "整帧间隔 − 主线程工作（本浏览器没有 long-animation-frame，只能做减法）";
+    browserRow.cells[0].textContent = F(summary.browser.avg);
+    browserRow.cells[1].textContent = F(summary.browser.p95);
+    browserRow.cells[2].textContent = F(summary.browser.max);
+    browserRow.cells[3].textContent = "";
+    browserRow.cells[4].textContent = "";
+    browserRow.bar.style.width = "0";
+    this._Sweep(ui.cpuRows);
 
     // --- GPU 表 ---
     if (!summary.timerAvailable) {
-      ui.gpuNote.textContent = "当前浏览器不支持 GPU 计时。";
+      ui.gpuNote.textContent = "当前浏览器不支持 GPU 计时；提交 CPU、draw call 与三角数仍然可信。";
     } else if (summary.gpuFrames === 0) {
       ui.gpuNote.textContent = "等待 GPU 计时…";
     } else {
       ui.gpuNote.textContent = `GPU 合计 avg ${F(summary.gpuTotal.avg)} ms · `
-        + `采样帧 ${summary.gpuFrames}。misc 是有名字的 pass 之间的零碎 GL 工作`
-        + "（状态切换、纹理/缓冲上传）。";
+        + `采样帧 ${summary.gpuFrames}。misc 是有名字的段之间剩下的零碎 GL 工作。`;
     }
     const gpuMax = Math.max(0.001, summary.gpuTotal.avg);
-    for (const [key, label] of GPU_LABELS) {
-      const stat = summary.gpu[key];
-      const cpuStat = summary.gpuCpu[key];
-      const row = this._Row(doc, ui.gpuTable, ui.gpuRows, key, label, 4);
-      if (!stat && !cpuStat) { row.tr.style.display = "none"; continue; }
-      row.tr.style.display = "";
-      row.cells[0].textContent = stat ? F(stat.avg) : "—";
-      row.cells[1].textContent = stat ? F(stat.p95) : "—";
-      row.cells[2].textContent = stat ? F(stat.max) : "—";
-      row.cells[3].textContent = cpuStat ? F(cpuStat.avg) : "—";
-      row.bar.style.width = stat ? `${Math.min(100, (stat.avg / gpuMax) * 100)}%` : "0";
+    for (const item of GpuRows(summary)) {
+      const row = this._Row(ui.gpuTable, ui.gpuRows, item.key, 6);
+      row.tr.className = item.selfRow ? "self" : "";
+      row.name.textContent = `${"　".repeat(item.depth)}${item.label}`;
+      row.name.title = item.note || item.key;
+      const avg = item.selfRow ? item.self : item.stat.avg;
+      row.cells[0].textContent = F(avg);
+      row.cells[1].textContent = item.selfRow ? "" : F(item.stat.p95);
+      row.cells[2].textContent = item.selfRow ? "" : F(item.stat.max);
+      row.cells[3].textContent = item.selfRow || item.cpuMs == null ? "" : F(item.cpuMs);
+      row.cells[4].textContent = item.selfRow ? "" : Int(item.calls);
+      row.cells[5].textContent = item.selfRow || item.tris == null ? "" : `${(item.tris / 1e6).toFixed(2)}M`;
+      row.bar.style.width = `${Math.min(100, (avg / gpuMax) * 100)}%`;
     }
-    const gpuTotalRow = this._Row(doc, ui.gpuTable, ui.gpuRows, "__total", "GPU 合计", 4);
+    const gpuTotalRow = this._Row(ui.gpuTable, ui.gpuRows, "__total", 6);
     gpuTotalRow.tr.className = "total";
+    gpuTotalRow.name.textContent = "GPU 合计";
     gpuTotalRow.cells[0].textContent = summary.gpuFrames ? F(summary.gpuTotal.avg) : "—";
     gpuTotalRow.cells[1].textContent = summary.gpuFrames ? F(summary.gpuTotal.p95) : "—";
     gpuTotalRow.cells[2].textContent = summary.gpuFrames ? F(summary.gpuTotal.max) : "—";
     gpuTotalRow.cells[3].textContent = "";
+    gpuTotalRow.cells[4].textContent = String(summary.calls);
+    gpuTotalRow.cells[5].textContent = `${(summary.triangles / 1e6).toFixed(2)}M`;
     gpuTotalRow.bar.style.width = "0";
+    this._Sweep(ui.gpuRows);
 
     // --- 抬头 ---
     ui.fps.textContent = summary.fps ? summary.fps.toFixed(0) : "—";
@@ -402,43 +431,36 @@ export class ProfilerEditor {
   RefreshSlow(profiler) {
     const ui = this.ui;
     // buckets:false —— 取证栏只要 worst 记录本体与事件计数，逐桶的分位数统计
-    // 是这条便宜路径省掉的大头（10 秒窗口 × 二十几个桶的排序，1 秒一次也嫌多）。
+    // 是这条便宜路径省掉的大头（10 秒窗口 × 几十个桶的排序，1 秒一次也嫌多）。
     const summary = profiler.Summary(10, { buckets: false });
-    const F = (value) => value.toFixed(2);
-    const worst = summary.worst;
-    if (worst) {
-      const ago = ((profiler.history.length ? profiler.history[profiler.history.length - 1].t : 0)
-        - worst.t) / 1000;
-      const buckets = Object.entries(worst.cpu)
-        .sort((a, b) => b[1] - a[1]).slice(0, 8)
-        .map(([key, value]) => {
-          const label = CPU_LABELS.find((item) => item[0] === key)?.[1] || key;
-          return `${label} ${F(value)}`;
-        });
-      const gpuPart = worst.gpu
-        ? " ｜ GPU " + Object.entries(worst.gpu).sort((a, b) => b[1] - a[1]).slice(0, 4)
-          .map(([key, value]) => {
-            const label = GPU_LABELS.find((item) => item[0] === key)?.[1] || key;
-            return `${label} ${F(value)}`;
-          }).join("，") + `（合计 ${F(worst.gpuTotal)}）`
-        : "";
-      const marks = [];
-      if (worst.gcMb > 0) marks.push(`GC 释放 ${worst.gcMb.toFixed(1)} MB`);
-      if (worst.longtaskMs > 0) marks.push(`长任务 ${F(worst.longtaskMs)} ms`);
-      ui.worst.innerHTML = `<b>${F(worst.interval)} ms</b>（${ago.toFixed(1)} 秒前）`
-        + ` · 主线程 ${F(worst.cpuMs)} ms · calls ${worst.calls}`
-        + (marks.length ? ` · <span class="warn">${marks.join("，")}</span>` : "")
-        + `<br>CPU：${buckets.join("，")}，其他 ${F(worst.other)}${gpuPart}`;
-    } else {
-      ui.worst.textContent = "—";
-    }
-    const events = summary.events;
-    ui.events.innerHTML = `GC <b>${events.gcCount}</b> 次（共释放 <b>${events.gcMb.toFixed(1)}</b> MB）`
-      + ` ｜ 长任务 <b>${events.longtaskMs.toFixed(0)}</b> ms`
-      + ` ｜ 堆分配 ≈ <b>${events.allocKbPerFrame.toFixed(0)}</b> KB/帧`
+    ui.worst.textContent = WorstLine(summary);
+    ui.events.textContent = EventsLine(summary)
       + (performance.memory
-        ? ` ｜ 堆 <b>${(performance.memory.usedJSHeapSize / 1048576).toFixed(0)}</b> MB`
+        ? ` ｜ 堆 ${(performance.memory.usedJSHeapSize / 1048576).toFixed(0)} MB`
         : "（此浏览器无 performance.memory）");
+    // 场景节点普查：走自己的栈（不用被包了计数的 traverse），一秒一次。
+    const census = profiler.Census(this.host.scene);
+    this._census = census;
+    if (!census) return;
+    for (const row of census.roots) {
+      const target = this._Row(ui.censusTable, ui.censusRows, row.name, 5, { bar: false });
+      target.tr.className = "";
+      target.name.textContent = row.name;
+      target.cells[0].textContent = String(row.objects);
+      target.cells[1].textContent = String(row.bones);
+      target.cells[2].textContent = String(row.meshes);
+      target.cells[3].textContent = String(row.skinned);
+      target.cells[4].textContent = String(row.hidden);
+    }
+    const total = this._Row(ui.censusTable, ui.censusRows, "__total", 5, { bar: false });
+    total.tr.className = "total";
+    total.name.textContent = `合计（顶层 ${census.rootCount} 支）`;
+    total.cells[0].textContent = String(census.total.objects);
+    total.cells[1].textContent = String(census.total.bones);
+    total.cells[2].textContent = String(census.total.meshes);
+    total.cells[3].textContent = String(census.total.skinned);
+    total.cells[4].textContent = String(census.total.hidden);
+    this._Sweep(ui.censusRows);
   }
 
 }

@@ -261,7 +261,11 @@ export const testDefs = {
   ActorCrowdTest: { file: "Script_ActorCrowdTest.mjs", timeoutMs: 10 * 60 * 1000,
     desc: "远景人群姿势层：站/跪/卧/跑步翻页/尸体各归各桶 + 像素级剪影变矮 + 提交量增量" },
   PropInstancingTest: { file: "Script_PropInstancingTest.mjs", desc: "外部布设实例化：逐像素无损 + 真省 draw call + 流送自洽" },
-  ProfilerTest: { file: "Script_ProfilerTest.mjs", desc: "运行时性能剖析器：开关接线、CPU 分桶、GPU 分段查询与钩子还原" },
+  ProfilerTest: { file: "Script_ProfilerTest.mjs", desc: "运行时性能剖析器：开关接线、CPU 子桶、GPU 分段与提交量、矩阵计数与钩子还原" },
+  // 命令行剖析要真起一次浏览器把第一关建起来（与面板同一份汇总口径），
+  // 墙钟受同机其他浏览器测试影响很大 —— 归 tier 2 的 perf 档，不进自动门禁。
+  ProfileCliTest: { file: "Script_ProfileCliTest.mjs", timeoutMs: 25 * 60 * 1000,
+    desc: "命令行剖析入口：小视口 30 帧跑通、JSON 字段齐全、--print 能读回排表" },
   ActorPoseTest: { file: "Script_ActorPoseTest.mjs", desc: "车厢生活动作模块冒烟（Chromium 加载本地模块）" },
   CutscenePoseTest: {
     file: "Script_CutscenePoseTest.mjs",
@@ -404,6 +408,7 @@ export const tier2 = [
   "PerformanceTest",
   "DeathViewTest",
   "FrameProfileTest",
+  "ProfileCliTest",
   "GodRaysPerformanceTest",
 ];
 
@@ -496,7 +501,7 @@ export const domains = {
   perf: {
     label: "性能红线实测（仅提示 Tier 2，不自动跑）",
     tests: [],
-    tier2Tests: ["PerformanceTest", "FrameProfileTest", "GodRaysPerformanceTest"],
+    tier2Tests: ["PerformanceTest", "FrameProfileTest", "GodRaysPerformanceTest", "ProfileCliTest"],
   },
   infra: {
     label: "测试入口/本地服务基础设施",
@@ -509,6 +514,11 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  // 剖析器的显示层与命令行入口：文件名里没有「Profiler」，下面 render 域那条
+  // 通配的 /Profiler/ 盖不到 Script_ProfileCli / Script_FrameProbeViews。
+  // 归 render（ProfilerTest 在那一串里）；命令行自己的冒烟在 tier 2 的 perf 档。
+  { domain: "render", pattern: /Script_Profile(Cli|r?Report)|Script_FrameProbeViews/i },
+  { domain: "perf", pattern: /Script_ProfileCli/i },
   { domain: "combat", pattern: /FirearmHandling|MuzzleFlash|Headshot/i },
   {domain:"firstLevel",pattern:/Type89Damage/},
   {domain:"characterSpeech",pattern:/CharacterSpeech|CharacterFacial|SpeechEnvelope|NraFacial|Nra05Facial|Script_FirstLevelMissionVoice|Script_Audio\.mjs|Script_CharacterModel/},

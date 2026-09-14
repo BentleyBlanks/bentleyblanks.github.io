@@ -31,6 +31,9 @@ import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
+// 三个机位的摆位与 CDP 采样折叠：与 Script_ProfileCli 共用一份
+// （StrictProbe / CountProbe 是整块 page.evaluate，函数进不去，仍留在下面）。
+import { PoseView, FoldProfile } from "./Script_FrameProbeViews.mjs";
 const project = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(project, "..");
 const outDir = path.join(project, "_shots", "FirstLevelFrame");
@@ -187,21 +190,9 @@ async function LiveAutoQuality(page, seconds) {
 async function ShotProbe(page, { A, views, label, outDir }) {
   const out = { views: {}, files: {} };
   for (const name of ["train", "front", "frontEast"]) {
-    await page.evaluate(async ({ A, name }) => {
-      const g = window.Tengxian;
-      g.state.menu = false;
-      if (name === "front" || name === "frontEast") {
-        const rt = g.Debug.FirstLevelMissionRuntime();
-        for (const f of ["trainShelling", "trainStopped", "unloadOrdersHeard", "unloaded"]) rt.Record(f);
-        g.StepFrames(2, 1 / 60, false);
-        const p = g.player.position;
-        p.set(A.gun.x, g.battlefield.GroundHeight(A.gun.x, A.gun.z) + 0.1, A.gun.z);
-        g.player.body?.Teleport(p.x, p.y, p.z); g.player.yaw = name === "frontEast" ? -Math.PI / 2 : 0; g.player.pitch = 0;
-        g.StepFrames(302, 1 / 60, false);
-      }
-      // dt = 0 定帧：TAA 历史与自动曝光都收敛到同一个稳态，两棵树才可逐像素比。
-      g.StepFrames(150, 0, true);
-    }, { A, name });
+    // settleFrames=150 且 dt=0 的定帧：TAA 历史与自动曝光都收敛到同一个稳态，
+    // 两棵树才可逐像素比。
+    await page.evaluate(PoseView, { A, name, settleFrames: 150, settleDt: 0 });
     if (!views.includes(name)) continue;
     const file = path.join(outDir, `Shot_${label}_${name}.png`);
     await page.screenshot({ path: file });
@@ -292,20 +283,8 @@ function DiffPng(fileA, fileB) {
 // CDP JS 采样剖析：submit 那几十毫秒具体是谁在花
 // ---------------------------------------------------------------------------
 async function CpuProfile(page, { A, views, profileFrames }) {
-  const SetupView = async (name) => page.evaluate(async ({ A, name }) => {
-    const g = window.Tengxian;
-    g.state.menu = false;
-    if (name === "front" || name === "frontEast") {
-      const rt = g.Debug.FirstLevelMissionRuntime();
-      for (const f of ["trainShelling", "trainStopped", "unloadOrdersHeard", "unloaded"]) rt.Record(f);
-      g.StepFrames(2, 1 / 60, false);
-      const p = g.player.position;
-      p.set(A.gun.x, g.battlefield.GroundHeight(A.gun.x, A.gun.z) + 0.1, A.gun.z);
-      g.player.body?.Teleport(p.x, p.y, p.z); g.player.yaw = name === "frontEast" ? -Math.PI / 2 : 0; g.player.pitch = 0;
-      g.StepFrames(302, 1 / 60, false);
-    }
-    g.StepFrames(30, 0, true);
-  }, { A, name });
+  const SetupView = async (name) =>
+    page.evaluate(PoseView, { A, name, settleFrames: 30, settleDt: 0 });
 
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Profiler.enable");
@@ -326,27 +305,6 @@ async function CpuProfile(page, { A, views, profileFrames }) {
   }
   await cdp.send("Profiler.disable");
   return out;
-}
-
-/** 把 CDP 的采样树折成「自身时间」表（每帧 ms）。 */
-function FoldProfile(profile, frameCount) {
-  const byId = new Map(profile.nodes.map((n) => [n.id, n]));
-  const self = new Map();
-  const totalUs = (profile.endTime - profile.startTime);
-  let samples = 0;
-  const counts = new Map();
-  for (const id of profile.samples) { counts.set(id, (counts.get(id) || 0) + 1); samples += 1; }
-  for (const [id, count] of counts) {
-    const node = byId.get(id); if (!node) continue;
-    const f = node.callFrame;
-    const file = (f.url || "").split("/").pop().split("?")[0];
-    const key = `${f.functionName || "(anonymous)"} @ ${file}:${f.lineNumber + 1}`;
-    self.set(key, (self.get(key) || 0) + count);
-  }
-  const msPerSample = samples ? (totalUs / 1000) / samples : 0;
-  const rows = [...self.entries()].map(([key, count]) => ({ key, msPerFrame: Math.round(count * msPerSample / frameCount * 1000) / 1000 }))
-    .sort((a, b) => b.msPerFrame - a.msPerFrame).slice(0, 40);
-  return { profiledMsPerFrame: Math.round((totalUs / 1000) / frameCount * 100) / 100, samples, rows };
 }
 
 function PrintCpuProfile(result) {
