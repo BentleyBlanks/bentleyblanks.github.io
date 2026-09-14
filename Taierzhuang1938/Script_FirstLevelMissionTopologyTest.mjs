@@ -5,7 +5,7 @@ import {MISSION_ANCHORS as A,MISSION_ROUTES as Routes,MISSION_LAYOUT as Layout} 
 import {MISSION_RECEPTION_SPACE as Reception,MISSION_REARGUARD_POCKETS as Pockets} from './Data_FirstLevelMissionTopology.mjs';
 import {MISSION_RETURN_ROUTES} from './Data_FirstLevelMissionReturn.mjs';
 import {FirstLevelMissionFlow} from './Script_FirstLevelMissionFlow.mjs';
-import {MissionRouteLength,MissionRouteProjection,MissionRouteNextIndex} from './Script_FirstLevelMissionColumn.mjs';
+import {MissionRouteLength,MissionRouteProjection,MissionRouteNextIndex,MissionRouteBetween} from './Script_FirstLevelMissionColumn.mjs';
 import {SampleMissionTerrain} from './Data_FirstLevelMissionTerrain.mjs';
 // Notion rear stages plus the user's later September 14 front-sortie revision.
 const expected=[
@@ -34,6 +34,15 @@ for(const [i,phase] of Phases.entries()){
 for(const [id,seconds] of [['TransferApproach',45],['Transfer',150]])
  assert.equal(Steps.find(step=>step.id===id).minimumSeconds,seconds);
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
+// Recorded normal checkpoint at the tank-to-orders handoff: joining the same
+// authored route must not return a front spawn to the northern supply house.
+const checkpointFront={x:26.506007890491283,z:-111.87844610332081};
+const checkpointPath=[...Routes.bundleReturn,...Routes.orders];
+const frontRejoin=MissionRouteBetween(checkpointPath,checkpointFront,A.orders);
+assert.ok(frontRejoin.every(p=>p.z>=-118),'front checkpoint stays at the front on the way to orders');
+assert.ok(MissionRouteLength(frontRejoin)<20,'front checkpoint has no redundant northern sortie');
+const houseRejoin=MissionRouteBetween(checkpointPath,A.bundle,A.orders);
+for(const point of Routes.bundleReturn.slice(1))assert.ok(houseRejoin.some(p=>Distance(p,point)<.01),'house checkpoint preserves every authored return bend');
 assert.ok(Distance(A.gun,A.throw)<45,'gun and tank are one front');
 assert.ok(Distance(A.village,A.melee)<35&&Distance(A.melee,A.gate)<35,'village, kitchen and court are adjacent');
 assert.deepEqual(Steps.find(s=>s.id==='AirFirst').target,Steps.find(s=>s.id==='Transfer').target);

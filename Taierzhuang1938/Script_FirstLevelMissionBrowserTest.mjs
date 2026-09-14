@@ -136,10 +136,14 @@ async function CaptureFocus(name,point) {
 // you the level got harder, not that the dice went badly.
 const ROUTE_RETRY_BUDGET = 2;
 
-async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false, retryRoute = null } = {}) {
+async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false, rejoinRoute = null } = {}) {
   await page.evaluate(
-    ({ points, stance, sprint }) => {
+    async ({ points, stance, sprint, rejoinRoute }) => {
       const g = window.Tengxian;
+      if(rejoinRoute){
+        const {MissionRouteBetween}=await import("./Script_FirstLevelMissionColumn.mjs");
+        points=MissionRouteBetween(rejoinRoute,g.player.position,rejoinRoute.at(-1));
+      }
       window.routeBot = { points, index: 0, frames: 0, stalled: 0, last: { ...g.player.position } };
       if (g.player.stance !== stance)
         g.Debug.Key(
@@ -153,7 +157,7 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
         );
       g.Debug.Key("ShiftLeft", sprint);
     },
-    { points, stance, sprint },
+    { points, stance, sprint, rejoinRoute },
   );
   const carriedKind=await page.evaluate(()=>window.Tengxian.carry.KindId);
   let result, retries = 0;
@@ -236,10 +240,10 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
       // route that burns its retry budget instead of one unlucky death.
       if (++retries > ROUTE_RETRY_BUDGET) break;
       console.log(label, `player died at waypoint ${result.index}; checkpoint retry ${retries}/${ROUTE_RETRY_BUDGET}`);
-      const retry=await page.evaluate(({ stance, sprint, retryRoute }) => {
+      const retry=await page.evaluate(async ({ stance, sprint, rejoinRoute }) => {
         const g = window.Tengxian;
         const Snapshot=()=>{const r=g.Debug.FirstLevelMissionRuntime();return {
-          stage:r.flow.stage.id,time:r.time,facts:[...r.flow.facts],
+          stage:r.flow.stage.id,time:r.time,position:g.player.position.toArray(),facts:[...r.flow.facts],
           enemies:[...r.enemies.values()].map(a=>({id:a.id,alive:a.alive}))};};
         const before=Snapshot();
         g.Debug.MenuAct("continueCheckpoint");
@@ -252,17 +256,21 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
             : g.player.stance === "crouch" ? "KeyC" : "KeyZ");
         g.Debug.Key("ShiftLeft", sprint);
         const b = window.routeBot;
-        // The checkpoint can be on the other side of a wall from the current
-        // waypoint. Rewalk the authored entry instead of cutting across it.
-        if(retryRoute)b.points=retryRoute;
+        // Stage progression may save a newer checkpoint. Join the authored
+        // polyline from the actual spawn; never replay a stale house entry.
+        if(rejoinRoute){
+          const {MissionRouteBetween}=await import("./Script_FirstLevelMissionColumn.mjs");
+          b.points=MissionRouteBetween(rejoinRoute,g.player.position,rejoinRoute.at(-1));
+        }
         b.index = 0;
         b.stalled = 0; b.last = { ...g.player.position };
         return {before,after};
-      }, { stance, sprint, retryRoute });
+      }, { stance, sprint, rejoinRoute });
       assert.equal(retry.after.stage,retry.before.stage,'route retry retains the mission step');
       assert.deepEqual(retry.after.facts,retry.before.facts,'route retry retains every mission fact');
       assert.deepEqual(retry.after.enemies,retry.before.enemies,'route retry retains enemy casualties');
       campaignRetries.push({kind:'route',label,stage:retry.before.stage,time:retry.before.time,
+        beforePosition:retry.before.position,afterPosition:retry.after.position,
         factsPreserved:true,casualtiesPreserved:true});
       if(carriedKind==='stretcher' && await page.evaluate(()=>window.Tengxian.carry.KindId!=='stretcher')){
         // Death really drops the patient. Retry restores the player, so walk
@@ -308,7 +316,7 @@ async function RetryCampaign({rewalk=true}={}) {
   if(!allowCheckpointRetry||stageJumps||campaignRetries.filter(retry=>retry.kind!=="route").length>=3)return false;
   const before=await page.evaluate(()=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
-    return {dead:!g.player.alive,stage:r.flow.stage.id,time:r.time,facts:[...r.flow.facts],
+    return {dead:!g.player.alive,stage:r.flow.stage.id,time:r.time,position:g.player.position.toArray(),facts:[...r.flow.facts],
       route:window.routeBot?.points||[],enemies:[...r.enemies.values()].map(a=>({id:a.id,alive:a.alive}))};
   });
   if(!before.dead)return false;
@@ -318,12 +326,12 @@ async function RetryCampaign({rewalk=true}={}) {
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
     for(const key of ['KeyW','KeyS','KeyF','ShiftLeft'])g.Debug.Key(key,false);
     g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);window.MissionInputDriver.evading=false;
-    return {stage:r.flow.stage.id,facts:[...r.flow.facts],enemies:[...r.enemies.values()].map(a=>({id:a.id,alive:a.alive}))};
+    return {stage:r.flow.stage.id,position:g.player.position.toArray(),facts:[...r.flow.facts],enemies:[...r.enemies.values()].map(a=>({id:a.id,alive:a.alive}))};
   });
   assert.equal(after.stage,before.stage,'normal retry retains the current mission step');
   assert.deepEqual(after.facts,before.facts,'normal retry neither grants nor erases mission facts');
   assert.deepEqual(after.enemies,before.enemies,'normal retry retains actual enemy casualties');
-  campaignRetries.push({kind:"campaign",stage:before.stage,time:before.time,factsPreserved:true,casualtiesPreserved:true});
+  campaignRetries.push({kind:"campaign",stage:before.stage,time:before.time,beforePosition:before.position,afterPosition:after.position,factsPreserved:true,casualtiesPreserved:true});
   console.log('NORMAL_CHECKPOINT_RETRY',JSON.stringify(campaignRetries.at(-1)));
   // Walk back through the last observed route using the ordinary movement driver.
   if(rewalk&&before.route.length)await Route(before.route,`CheckpointReturn${campaignRetries.length}`,{fight:true,stance:'crouch'});
@@ -831,7 +839,7 @@ try {
       // another sortie merely because the earlier pre-explosion snapshot was stale.
       if(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().tank.immobilized))break;
       if(attempt>0)await Route([{x:15,z:-111},{x:25,z:-110},{x:30,z:-117}],"TankFlankRetry",
-        {stance:"crouch",crawl:true,retryRoute:Routes.bundleReturn});
+        {stance:"crouch",crawl:true,rejoinRoute:Routes.bundleReturn});
       const thrown = await page.evaluate(() => {
         const g = window.Tengxian,
           tank = g.Debug.FirstLevelMission().tank,
@@ -878,16 +886,16 @@ try {
       );
       if(thrown.health<=0){
         assert.ok(await RetryCampaign({rewalk:false}),"a thrown-bundle death uses the existing bounded checkpoint budget");
-        // The retained checkpoint is the northern supply house. Follow its
-        // authored return trench while the live fuse resolves, not a diagonal
-        // from the house to a short front-only retry waypoint.
-        await Route(Routes.bundleReturn,"TankCheckpointReturn",{fight:true,stance:"stand",sprint:true,crawl:true});
+        // Taking the bundle saves the house; reaching Orders saves the actual
+        // front position instead. Rejoin the return polyline at the real spawn,
+        // preserving bends without sending a front checkpoint back to the house.
+        await Route(Routes.bundleReturn,"TankCheckpointReturn",{fight:true,stance:"stand",sprint:true,crawl:true,rejoinRoute:Routes.bundleReturn});
       }
       if (await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().tank.immobilized)) break;
     }
     await WaitStage("Orders", 20);
     await JumpStage(6);
-    await Route(Routes.orders,"EscortOrders",{stance:"crouch",crawl:true,retryRoute:[...Routes.bundleReturn,...Routes.orders]});
+    await Route(Routes.orders,"EscortOrders",{stance:"crouch",crawl:true,rejoinRoute:[...Routes.bundleReturn,...Routes.orders]});
     const ordersSupply=await Interact();
     assert.ok(ordersSupply.kind==="supply","covered orders position offers an actual supply interaction");
     await page.evaluate(()=>{const g=window.Tengxian;g.Debug.Key("KeyB");if(g.player.stance!=="crouch")g.Debug.Key("KeyC");g.StepFrames(1,1/60,false);});
@@ -1215,6 +1223,7 @@ try {
     } else console.log("ok entire first level completed with real player input and physical mission events");
   }
 } catch (error) {
+  await fs.writeFile(path.join(output,"Data_NormalCheckpointRetries.json"),JSON.stringify(campaignRetries,null,2));
   await page.evaluate(()=>window.Tengxian?.Debug.FirstLevelMission()).then(state=>fs.writeFile(path.join(output,"Data_Failure.json"),JSON.stringify(state,null,2))).catch(()=>{});
   await page.screenshot({ path: path.join(output, "Scene_Failure.png") }).catch(() => {});
   console.error(
