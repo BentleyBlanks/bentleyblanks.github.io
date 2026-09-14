@@ -5,10 +5,13 @@ import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {LaunchBrowser} from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import {ServeRoot} from "./Script_DevServer.mjs";
-const here=path.dirname(fileURLToPath(import.meta.url)),out=path.join(here,"_shots","MissionPresentation");
+const here=path.dirname(fileURLToPath(import.meta.url));
+// Read-only comparison against a clean checkout; evidence stays in this worktree.
+const baselineRoot=process.argv.find(arg=>arg.startsWith("--baseline-root="))?.slice(16);
+const out=path.join(here,"_shots",baselineRoot?"MissionPresentationBaseline":"MissionPresentation");
 await fs.mkdir(out,{recursive:true});
-const server=await ServeRoot(path.resolve(here,".."),0),browser=await LaunchBrowser();
-const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];
+const server=await ServeRoot(baselineRoot?path.resolve(baselineRoot):path.resolve(here,".."),0),browser=await LaunchBrowser();
+const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[];
 page.on("pageerror",e=>errors.push(String(e)));
 try{
  await page.goto(("http://127.0.0.1:"+server.address().port)+"/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=medium&scale=small");

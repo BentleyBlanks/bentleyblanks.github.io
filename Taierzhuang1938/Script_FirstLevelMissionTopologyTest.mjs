@@ -12,7 +12,7 @@ const expected=[
  ['trainShelling'],
  ['trainStopped','trainDerailed','luoRescueComplete','unloadOrdersHeard','unloaded'],
  ['trenchEntered','trenchCleared','shelterReached','escapeWhisperHeard','woundedSeen','supportOrdersHeard','frontReached','frontContact','frontRifleDefense','rifleWithdrawalResolved','zhouGunWounded'],
- ['frontAttackRepelled','guardWithdrawalResolved'],['bundleRouteTraversed','bundleDirectionsHeard','bundleTaken','tankImmobilized'],['ordersReached','volunteerHeard','zhouOnLitter'],
+ ['frontAttackRepelled','guardWithdrawalResolved'],['bundleRouteTraversed','bundleTaken','tankImmobilized'],['ordersReached','volunteerHeard','zhouOnLitter'],
  ['southTransitionComplete','southTraversed'],['innerCourtReached'],['meleeResolved'],['villageGunSilent','courtyardGateOpen','courtyardPassed'],
  ['transferApproachReached','transferHopeHeard'],['transferArrived','vehiclesDeparted','transferAttacksResolved','zhouNext','followVehicleHeard'],
  ['firstAirPassComplete','firstAirOrdersHeard','zhouCarried','atDitchMouth','carryOrdersHeard'],
@@ -20,6 +20,8 @@ const expected=[
  ['receptionPassed','zhouPlaced'],['deathSceneComplete'],['rearLaneClear','medicsEscaped','playerAtHandoff','finalExitHeard'],
 ];
 assert.equal(Phases.length,18);
+assert.ok(!Steps.find(step=>step.id==='Tank').requirements.includes('bundleDirectionsHeard'),
+ 'the September 14 revision allows taking the bundle without waiting for the supply speech');
 for(const [i,phase] of Phases.entries()){
  const steps=phase.steps.map(id=>Steps.find(step=>step.id===id));
  assert.deepEqual(steps.flatMap(step=>step.requirements),expected[i],`Notion phase ${i+1}`);

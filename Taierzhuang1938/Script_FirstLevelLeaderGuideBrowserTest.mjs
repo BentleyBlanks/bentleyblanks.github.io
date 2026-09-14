@@ -15,7 +15,8 @@ try{
  await page.goto(origin+"/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=high&scale=small",{waitUntil:"domcontentloaded",timeout:180000});
  await page.waitForFunction(()=>window.Tengxian?.state.ready,null,{timeout:240000});
  const planned=await page.evaluate(async()=>{
-  const g=window.Tengxian;await g.Debug.FirstLevelJump(7);
+  // Use a travelling stage, not phase 07's newly authored black-screen transition.
+  const g=window.Tengxian;await g.Debug.FirstLevelJump(11);
   const r=g.Debug.FirstLevelMissionRuntime(),{MISSION_ROUTES:R}=await import("./Data_FirstLevelMissionLayout.mjs");
   for(const s of [...g.ai.soldiers])if(!r.squad.includes(s))g.ai.Remove(s);
   r.enemies.clear();r.spawnQueue=[];r.voice.queue=[];r.voice.CancelGuidance();r.voice.Finish();

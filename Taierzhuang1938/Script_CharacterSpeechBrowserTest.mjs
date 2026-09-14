@@ -8,7 +8,7 @@ const here=path.dirname(fileURLToPath(import.meta.url)), output=path.join(here,'
 await fs.mkdir(output,{recursive:true});
 const local=process.argv.find(arg=>arg.startsWith('--port='))?.split('=')[1];
 const server=local?null:await ServeRoot(path.dirname(here),0), browser=await LaunchBrowser();
-const page=await browser.newPage({viewport:{width:1440,height:900}}), errors=[];
+const page=await browser.newPage({viewport:{width:1280,height:720}}), errors=[];
 page.on('pageerror',error=>errors.push(String(error)));
 try {
   await page.goto(`http://127.0.0.1:${local||server.address().port}/Taierzhuang1938/?whitebox=p012&manual=1&quality=high&scale=small`,{timeout:180000});

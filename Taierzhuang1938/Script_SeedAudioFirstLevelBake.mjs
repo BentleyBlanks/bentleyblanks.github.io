@@ -22,7 +22,10 @@ function WriteGuideAlignment(manifest) {
   if (!entries.length) return;
   const alignment = Object.fromEntries(entries.map(cue => {
     const entry = manifest.cues[cue.id];
-    return [cue.id, {sha256: entry.sha256, lines: [[0, entry.seconds]]}];
+    const sourceJson='['+cue.lines.map(line=>'{"who": '+JSON.stringify(line.who)+', "text": '+JSON.stringify(line.text)+'}').join(', ')+']';
+    return [cue.id, {sha256: entry.sha256,
+      scriptSha256:crypto.createHash("sha256").update(sourceJson).digest("hex"),
+      lines: [[0, entry.seconds]]}];
   }));
   fs.writeFileSync(path.join(here, "Data_FirstLevelGuideVoiceAlignment.mjs"),
     "// Single-speaker whole-cue intervals; no dialogue cuts or synthetic word alignment.\n"

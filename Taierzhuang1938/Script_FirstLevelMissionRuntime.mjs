@@ -655,8 +655,10 @@ export class FirstLevelMissionRuntime {
           const gap=Distance(actor.position,this.player.position);
           const path=this.Has("bundleTaken")?MISSION_ROUTES.bundleReturn:MISSION_ROUTES.bundle;
           const ahead=MissionRouteProjection(path,actor.position).progress>MissionRouteProjection(path,this.player.position).progress+Sortie.leaderArrivalM;
-          this.MoveActor(actor,route[0],gap>Sortie.leaderWaitM&&ahead?0:(crawl?Sortie.leaderCrawlMps:R.squadSpeedMps));
-        }else this.Defend(actor,actor.position,0,0);
+          actor.missionGuideWaiting=gap>Sortie.leaderWaitM&&ahead;
+          this.MoveActor(actor,route[0],actor.missionGuideWaiting?0:(crawl?Sortie.leaderCrawlMps:R.squadSpeedMps));
+        }else {this.Defend(actor,actor.position,0,0);actor.missionGuideWaiting=true;}
+        if(actor.missionGuideWaiting&&!crawl)this.leaderGuide?.Watch(actor);
         continue;
       }
       // Intermediate bends allow a smooth pass. The final defensive post must

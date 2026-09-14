@@ -2,7 +2,9 @@ import * as THREE from "three";
 import { NpcMissionGuide,GuideProjection } from "./Script_NpcMissionGuide.mjs";
 import { MISSION_GUIDE_TUNING as G } from "./Data_Tuning_MissionGuide.mjs";
 import { MISSION_LEADER_STAGES, MISSION_GUIDE_TRANSFERS } from "./Data_FirstLevelLeaderGuide.mjs";
-import { MISSION_ANCHORS as A, MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_ANCHORS as A, MISSION_SUPPLIES, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
+import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
+import { MissionRouteLookahead } from "./Script_FirstLevelMissionColumn.mjs";
 import { Localize, T } from "./Script_Text.mjs";
 import { FirstLevelStageTextId } from "./Script_TextIds.mjs";
 import { InstallNpcGuideGesture } from "./Script_NpcGuideGesture.mjs";
@@ -33,7 +35,7 @@ export class FirstLevelLeaderGuide {
     if (!actor || !MISSION_LEADER_STAGES[r.flow.stage.id]) return;
     // Alternating cover already defines every rendezvous and its pair-release
     // dependency. An extra wait between two shelters would deadlock that gate.
-    if(r.squadCoverBounds){
+    if(r.squadCoverBounds || r.flow.stage.id==="Tank"){
       this.rule.Reset([{x:actor.position.x,z:actor.position.z},...route]);
       this.waitSince=null;return;
     }
@@ -104,14 +106,21 @@ export class FirstLevelLeaderGuide {
   }
   View() {
     const r=this.r, actor=this.Leader, spec=MISSION_LEADER_STAGES[r.flow.stage.id];
-    if(!spec||!actor?.alive||r.failed||r.completed||r.controls||!r.player.alive
+    if(!spec||spec.hidden||!actor?.alive||r.failed||r.completed||r.controls||!r.player.alive
       || (r.flow.stage.id==="Unloading"&&!r.Has("luoRescueComplete")))return null;
     let {mode,cue,target}=spec, label=mode, variant=r.flow.stage.id;
     if(variant==="Support"&&r.Has("frontReached"))mode=label="cover";
-    if(variant==="Tank"&&r.Inventory().bundles>0){target=A.throw;cue="GuideThrow";mode=label="throw";variant+="Throw";}
+    if(variant==="Tank"){
+      const returning=r.Has("bundleTaken")&&r.Inventory().bundles>0;
+      target=returning?MissionRouteLookahead(MISSION_ROUTES.bundleReturn,r.player.position):
+        Sortie.route.find((point,index)=>!r.Has(`bundleRoutePoint${index}`))||A.bundle;
+      if(!returning&&Distance(r.player.position,A.bundle)<Sortie.supplierRangeM)target=A.bundle;
+      mode=label=returning?"throw":target===A.bundle?"collect":"move";
+      cue=returning?"GuideThrow":"GuideBundle";variant+=returning?"Return":"Outward";
+    }
     if(variant==="MachineGun"){
       const gun=r.emplacement.Emplacement(r.gunId);
-      if(gun?.rounds===0&&gun.belts===0){
+      if(gun?.rounds===0&&gun.belts===0&&(r.emplacement.Mounted||r.Has("gunUsed"))){
         target=MISSION_SUPPLIES.find(supply=>supply.id==="Front");
         mode=label="collect";cue="GuideGunSupply";variant+="Supply";
       }else if(r.emplacement.Mounted){mode=label="cover";cue=null;}

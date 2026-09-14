@@ -20,7 +20,7 @@ const outputDir = path.join(os.tmpdir(), 'WhiteboxBootFix');
 await fs.mkdir(outputDir, {recursive:true});
 try {
   for (const fixture of [{name:'Whitebox',query:'whitebox=p012'}, {name:'MainMenu',query:''}, {name:'MissingCharacters',query:'whitebox=p012'}]) {
-    const page = await browser.newPage({viewport:{width:1280,height:800}});
+    const page = await browser.newPage({viewport:{width:1280,height:720}});
     const errors = [], modules = new Set(), failedSets = [];
     page.on('console', message => { const match = message.text().match(/外部 PBR「(\w+)」/); if (match) failedSets.push(match[1]); });
     if (fixture.name === 'Whitebox') {
