@@ -816,6 +816,13 @@ try {
         return {before,count:g.state.bundles,alive:g.player.alive,health:g.player.health,damage:window.missionDamage?.slice(-5)};
       });
       console.log('MISSED_BUNDLE',JSON.stringify(miss));
+      // Death can cancel the wind-up before release. This is not a throw and
+      // must not be counted as one; use the same bounded normal retry budget,
+      // then physically make that still-required throw after recovery.
+      if(!miss.alive&&miss.count===miss.before){
+        assert.ok(await RetryCampaign({rewalk:false}),'pre-release death uses the existing campaign checkpoint budget');
+        attempt--;continue;
+      }
       assert.equal(miss.count,miss.before-1,'the missed throw consumes one actual bundle');
       // The supply-house checkpoint is already saved by the real pickup.
       // Recovery retains the depleted inventory; never refill before asserting it.
