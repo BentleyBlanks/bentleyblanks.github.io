@@ -49,6 +49,7 @@
 //      docs/Data_AudioAssets.md）。
 
 import fs from "node:fs";
+import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -452,6 +453,11 @@ function SeedAudioPrompt(line) {
       motivationText,
     ].join("\n");
   }
+  if (line.dialect === "sichuan") return [
+    "生成一条单句、完整连续的1938年战场男性口令。必须使用地道四川话的发音和声调，不能用普通话播音腔，只念所给台词。",
+    "成年男性士兵，短促有力，正在交火中喊出，声音粗粝自然，不演喜剧。不要音乐、旁白、其他台词或角色名，首尾只留极短静音。",
+    `只说：“${line.text}”`,
+  ].join("\n");
   if (line.side === "ija") {
     const delivery = line.delivery === "assault"
       ? "这是正面突击、贴脸交火中的口令：声音必须有胸腔爆发和压上去的狠劲，气息短、急、强，像在枪火里冲刺时喊出；接近战吼但咬字仍清楚。不是克制的操典朗读，不是平静报话，也不是拖长、沙哑或影视反派式咆哮。"
@@ -711,6 +717,13 @@ for (const line of lines) {
     best = { ...best, floor: Math.round(dn.floor * 10) / 10, dur: Math.round(Duration(dst) * 100) / 100 };
   }
   durations.set(line.key, best.dur);
+  if(line.dialect === "sichuan"){
+    const recordFile=path.join(AUDIO_DIR,"Data_SichuanBarkManifest.json");
+    const record=fs.existsSync(recordFile)?JSON.parse(fs.readFileSync(recordFile,"utf8")):{model:VOLCENGINE_MODEL,cues:{}};
+    record.cues[line.key]={file:line.file,text:line.text,dialect:line.dialect,version:line.version,
+      sha256:crypto.createHash("sha256").update(fs.readFileSync(dst)).digest("hex"),seconds:best.dur};
+    fs.writeFileSync(recordFile,JSON.stringify(record,null,2)+"\n");
+  }
   ok += 1;
   console.log(`  ✓ ${line.key.padEnd(16)} ${String(line.who || line.role).padEnd(4)} ${best.dur.toFixed(2)}s`
     + `  ${best.rms ?? "?"}dB  底噪 ${best.floor}dB${best.floorFromRaw ? "(原始 take)" : ""}`

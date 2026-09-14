@@ -127,6 +127,8 @@ export class FirstLevelMissionVoice {
     for(const authored of current.plan.parallel||[]) {
       if(current.sourceTime<authored.at || current.parallel.some(track=>track.cue.id===authored.id))continue;
       const cue=MISSION_DIALOGUE.find(entry=>entry.id===authored.id),total=this.Duration(cue);
+      // Admit optional speech only when the entire take can finish with the main exchange.
+      if(current.sourceTime+total>current.plan.segments.at(-1).end)continue;
       const position=this.Position?.(cue,cue.lines[0]),listener=this.Listener?.();
       if(authored.maxDistance&&position&&listener&&Math.hypot(position.x-listener.x,position.z-listener.z)>authored.maxDistance)continue;
       const track={cue,total,plan:MissionVoiceTimeline(cue,total),sourceTime:0,index:-1,dialogueIndex:-1,finished:false};

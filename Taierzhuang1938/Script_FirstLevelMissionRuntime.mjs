@@ -1107,6 +1107,7 @@ export class FirstLevelMissionRuntime {
         this.carriageSound.Start();
         break;
       case "Unloading":
+        this.VoiceEvent("TrainProneOrder");
         this.VoiceEvent("TrainFirstShell");
         this.VoiceEvent("TrainNearShell");
         this.Say(stage.cue, { urgent: true });

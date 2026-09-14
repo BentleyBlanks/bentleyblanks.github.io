@@ -1016,6 +1016,18 @@ if (process.argv.includes("--audio")) {
     assert.equal(crypto.createHash('sha256').update(MissionVoicePrompt(cue)).digest('hex'),entry.promptHash,cue.id+' current complete script');
     if(cue.id==='ZhouDeath')assert.ok(entry.seconds>=8 && entry.seconds<=12.1,'whole death exchange fits the authored short scene');
   }
+  const {VOICE_LINES}=await import("./Data_Voice.mjs");
+  const barks=VOICE_LINES.filter(line=>line.side==="ija"&&line.kind!=="story");
+  const barkManifest=JSON.parse(fs.readFileSync(new URL("./Audio/Data_SichuanBarkManifest.json",import.meta.url),"utf8"));
+  assert.equal(barkManifest.model,"seed-audio-1.0");
+  for(const line of barks){
+    const entry=barkManifest.cues[line.key];
+    assert.equal(line.dialect,"sichuan",line.key+" enemy barks use the requested dialect too");
+    assert.equal(entry.text,line.text);assert.equal(entry.version,line.version);
+    assert.equal(entry.dialect,line.dialect);assert.equal(entry.seconds,line.dur);
+    assert.equal(entry.sha256,crypto.createHash("sha256").update(fs.readFileSync(new URL("./Audio/"+line.file,import.meta.url))).digest("hex"));
+  }
+  console.log(`ok all ${barks.length} autonomous enemy barks use current Sichuan recordings`);
 }
 console.log(process.argv.includes("--audio")
   ? `ok all ${MISSION_DIALOGUE.length} continuous audio assets, current script/file hashes and short death-scene duration`
@@ -1077,23 +1089,28 @@ console.log("ok paused audio ranges, subtitle source timing, queued cues and she
   voice.Enqueue("TrainPack");voice.Update(0);
   const Step=count=>{for(let i=0;i<count;i++){clock+=1/60;voice.Update(1/60);}};
   Step(480);const before=voice.State();voice.Pause();clock+=10;voice.Update(10);
-  assert.equal(voice.State().sourceTime,before.sourceTime,"pausing freezes the banter source");
-  assert.equal(voice.State().parallel[0].sourceTime,before.parallel[0].sourceTime,"pausing also freezes Luo's simultaneous source");
+  assert.equal(voice.State().sourceTime,before.sourceTime,"pausing freezes the packing source");
+  assert.equal(voice.State().parallel[0].sourceTime,before.parallel[0].sourceTime,"pausing also freezes the simultaneous counting source");
   assert.ok(parallelSources[0].stopped,"pause stops the live companion voice");
   voice.Resume();Step(4200);
-  assert.deepEqual(done,["TrainBanter","TrainPack"],"the whole briefing ends before the interrupted retort and volley");
-  assert.equal(sources.length,2,"the intact banter only restarts to resume from pause");
-  assert.equal(parallelSources.length,2,"the intact briefing only restarts to resume from pause");
+  assert.deepEqual(done,["TrainBanter","TrainPack"],"the complete counting exchange finishes before the packing exchange");
+  assert.equal(sources.length,2,"the intact packing exchange only restarts to resume from pause");
+  assert.equal(parallelSources.length,2,"the intact counting exchange only restarts to resume from pause");
   assert.equal(parallelSources[1].offset,before.parallel[0].sourceTime,"the simultaneous source resumes at its own exact offset");
   assert.ok(rows.some(lines=>lines.length===2&&lines.some(line=>["顺子","幺娃"].includes(line.speaker))&&lines.some(line=>line.speaker==="刘文财")),"both speaking actors have visible separate subtitles");
   for(const line of rows.flat())assert.equal(line.emphasis,["顺子","幺娃"].includes(line.speaker)?"lead":"aside",
-    `${line.speaker}: Luo's briefing leads the subtitle stack and the overlapping banter is an aside`);
+    `${line.speaker}: packing leads the subtitle stack and the overlapping counting is an aside`);
   const utterances=rows.flat().filter(line=>line.started).map(line=>line.text);
   for(const id of ["TrainPack","TrainBanter"])for(const line of MISSION_DIALOGUE.find(cue=>cue.id===id).lines)
     assert.ok(utterances.includes(line.text),`${id}: every complete spoken line is retained in subtitle audit`);
-  assert.equal(events.filter(id=>id==="TrainIncomingFire").length,0,"the interrupted retort fires the volley exactly once across pause");
+  assert.equal(events.filter(id=>id==="TrainIncomingFire").length,0,"packing and counting cannot independently fire the volley");
   assert.equal(lineEvents.filter(event=>event.active&&event.cue==="TrainBanter").length,5,"every optional banter line emits an actor action");
-  console.log("ok complete simultaneous banter/briefing, dual subtitles, source-clock actions and pause/resume");
+  const late=new FirstLevelMissionVoice({audio,hud:{SayLines(){}},Position:()=>({x:0,z:0}),Listener:()=>({x:0,z:0})});
+  late.manifest=voice.manifest;late.Enqueue("TrainPack");late.Update(0);
+  late.current.sourceTime=late.manifest.cues.TrainPack.seconds-1;
+  late.UpdateParallel(0);
+  assert.equal(late.current.parallel.length,0,"late proximity cannot start a counting take that would be cut short");
+  console.log("ok complete simultaneous packing/counting, dual subtitles, source-clock actions and pause/resume");
 }
 
 // Regression: 40 real recruit bodies plus Luo, stable carriage-local positions, all three doors.

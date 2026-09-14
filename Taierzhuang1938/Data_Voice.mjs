@@ -1,4 +1,6 @@
-// 滕县保卫战 · 川军战场口令声库（**四川话**）
+// 滕县保卫战 · 战场口令声库（**四川话**）
+// 2026-09-15 用户要求所有人物使用四川话：28 条敌军战斗口令也已改为四川话。
+// 下方旧日语设计说明与 kanji/cn 字段只保留历史含义；实际配音读取 text/dialect。
 //
 // 玩家演的是川军第 22 集团军第 41 军 122 师的一名基层士兵。这批口令因此是
 // **四川话**，不是普通话 —— 上一版全员标准普通话，那是「电视剧腔」的主要来源。
@@ -263,37 +265,37 @@ const BATTLE_LINES = [
   // 拍数与时长的相关性验过（r=0.57，喊话本来忽长忽短）；四条相对拟合明显偏短的重生成过，
   // 其中两条确实是截断（いったんさがれ 0.63→2.11 s、もくひょう 1.00→1.66 s），
   // 另两条三次独立生成都稳定 —— **截断会忽长忽短，稳定就说明是真的喊得快**。
-  { key: "ija_rally_bayonet",   kind: "rally",  file: "AudioVoice_IjaRallyBayonet.mp3", dur: 2.24,  role: "古兵",    pitch: -4,  side: "ija", event: true,  text: "ちゃっけん！いそげ！", kanji: "着剣！急げ！", cn: "上刺刀！快！" },
-  { key: "ija_rally_charge",    kind: "rally",  file: "AudioVoice_IjaRallyCharge.mp3", dur: 1.14,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "とつげき！", kanji: "突撃！", cn: "冲锋！" },
-  { key: "ija_rally_fire",      kind: "rally",  file: "AudioVoice_IjaRallyFire.mp3", dur: 1.91,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "うちかたはじめ！", kanji: "撃ち方始め！", cn: "开始射击！" },
-  { key: "ija_rally_follow",    kind: "rally",  file: "AudioVoice_IjaRallyFollow.mp3", dur: 1.42,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "われにつづけ！", kanji: "我に続け！", cn: "跟我上！" },
+  { key: "ija_rally_bayonet",   kind: "rally",  file: "AudioVoice_IjaRallyBayonet.mp3", dur: 1.67,  role: "古兵",    pitch: -4,  side: "ija", event: true,  text: "上刺刀！快！", dialect: "sichuan", version: "20260915002001", kanji: "着剣！急げ！", cn: "上刺刀！快！" },
+  { key: "ija_rally_charge",    kind: "rally",  file: "AudioVoice_IjaRallyCharge.mp3", dur: 0.40,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "冲锋！", dialect: "sichuan", version: "20260915002001", kanji: "突撃！", cn: "冲锋！" },
+  { key: "ija_rally_fire",      kind: "rally",  file: "AudioVoice_IjaRallyFire.mp3", dur: 0.92,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "开始射击！", dialect: "sichuan", version: "20260915002001", kanji: "撃ち方始め！", cn: "开始射击！" },
+  { key: "ija_rally_follow",    kind: "rally",  file: "AudioVoice_IjaRallyFollow.mp3", dur: 0.75,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "跟到我上！", dialect: "sichuan", version: "20260915002001", kanji: "我に続け！", cn: "跟我上！" },
   // 突击声库批：全数采用 assault 交付指令，要求 SeedAudio 给出近距离交火时胸腔爆发、
   // 已经冲上去的急迫感；不是普通操典朗读，也不使用影视反派式的拖长吼叫。
-  { key: "ija_rally_push",      kind: "rally",  file: "AudioVoice_IjaRallyPush.mp3", dur: 1.65,  role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "おせ！おくれるな！", kanji: "押せ！遅れるな！", cn: "压上去！别掉队！" },
-  { key: "ija_rally_storm",     kind: "rally",  file: "AudioVoice_IjaRallyStorm.mp3", dur: 2.19,  role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "とつげき！いっきにいけ！", kanji: "突撃！一気に行け！", cn: "冲锋！一口气冲过去！" },
-  { key: "ija_rally_suppress",  kind: "rally",  file: "AudioVoice_IjaRallySuppress.mp3", dur: 1.56, role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "うて！うちつづけろ！", kanji: "撃て！撃ち続けろ！", cn: "开火！持续射击！" },
+  { key: "ija_rally_push",      kind: "rally",  file: "AudioVoice_IjaRallyPush.mp3", dur: 1.53,  role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "压上去！莫掉队！", dialect: "sichuan", version: "20260915002001", kanji: "押せ！遅れるな！", cn: "压上去！别掉队！" },
+  { key: "ija_rally_storm",     kind: "rally",  file: "AudioVoice_IjaRallyStorm.mp3", dur: 1.89,  role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "冲！一口气冲过去！", dialect: "sichuan", version: "20260915002001", kanji: "突撃！一気に行け！", cn: "冲锋！一口气冲过去！" },
+  { key: "ija_rally_suppress",  kind: "rally",  file: "AudioVoice_IjaRallySuppress.mp3", dur: 1.65, role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "开火！接到打！", dialect: "sichuan", version: "20260915002001", kanji: "撃て！撃ち続けろ！", cn: "开火！持续射击！" },
   // ija_spot_enemy 曾因底噪撤下；本批已通过 SeedAudio 1.0 重摇并过 −48 dB 闸。
-  { key: "ija_spot_enemy",      kind: "spot",   file: "AudioVoice_IjaSpotEnemy.mp3", dur: 2.06,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "てきだ！ひだり！ひだりだ！", kanji: "敵だ！左！左だ！", cn: "敌人！左边！左边！" },
-  { key: "ija_spot_roof",       kind: "spot",   file: "AudioVoice_IjaSpotRoof.mp3", dur: 1.39,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "おくじょうにてき！", kanji: "屋上に敵！", cn: "屋顶有敌人！" },
-  { key: "ija_spot_mg",         kind: "spot",   file: "AudioVoice_IjaSpotMg.mp3", dur: 2.29,  role: "兵",     pitch: 0,   side: "ija",                 text: "きかんじゅう！まえだ！", kanji: "機関銃！前だ！", cn: "机枪！在前面！" },
-  { key: "ija_spot_shina",      kind: "spot",   file: "AudioVoice_IjaSpotShina.mp3", dur: 2.30,  role: "古兵",    pitch: -4,  side: "ija", event: true,  text: "しなへいだ！まだいるぞ！", kanji: "支那兵だ！まだ居るぞ！", cn: "支那兵！他们还在！" },
-  { key: "ija_spot_target",     kind: "spot",   file: "AudioVoice_IjaSpotTarget.mp3", dur: 2.30,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "もくひょう！みぎぜんぽう！", kanji: "目標！右前方！", cn: "目标！右前方！" },
-  { key: "ija_spot_wall",       kind: "spot",   file: "AudioVoice_IjaSpotWall.mp3", dur: 1.17,  role: "兵",     pitch: 0,   side: "ija", event: true,  text: "じょうへきにてきへい！", kanji: "城壁に敵兵！", cn: "城墙上有敌兵！" },
-  { key: "ija_warn_down",       kind: "warn",   file: "AudioVoice_IjaWarnDown.mp3", dur: 1.60,  role: "古兵",    pitch: -4,  side: "ija",                 text: "ふせろ！うごくな！", kanji: "伏せろ！動くな！", cn: "卧倒！别动！" },
-  { key: "ija_warn_cover",      kind: "warn",   file: "AudioVoice_IjaWarnCover.mp3", dur: 2.30,  role: "古兵",    pitch: -4,  side: "ija", delivery: "assault", text: "かくれろ！あたまをさげろ！", kanji: "隠れろ！頭を下げろ！", cn: "隐蔽！低下头！" },
-  { key: "ija_warn_grenade",    kind: "warn",   file: "AudioVoice_IjaWarnGrenade.mp3", dur: 1.91,  role: "兵",     pitch: 0,   side: "ija",                 text: "てりゅうだん！ふせろ！", kanji: "手榴弾！伏せろ！", cn: "手榴弹！卧倒！" },
-  { key: "ija_warn_shell",      kind: "warn",   file: "AudioVoice_IjaWarnShell.mp3", dur: 1.91,  role: "分隊長",   pitch: -2,  side: "ija", event: true,  text: "ほうげき！たいひ！", kanji: "砲撃！退避！", cn: "炮击！退避！" },
-  { key: "ija_ammo_out",        kind: "ammo",   file: "AudioVoice_IjaAmmoOut.mp3", dur: 1.21,  role: "兵",     pitch: 0,   side: "ija",                 text: "だんやくをよこせ！", kanji: "弾薬を寄こせ！", cn: "把弹药递过来！" },
-  { key: "ija_ammo_reload",     kind: "ammo",   file: "AudioVoice_IjaAmmoReload.mp3", dur: 2.51,  role: "兵",     pitch: 0,   side: "ija",                 text: "そうてんちゅう！えんごたのむ！", kanji: "装填中！援護頼む！", cn: "装填中！掩护我！" },
-  { key: "ija_ammo_pass",       kind: "ammo",   file: "AudioVoice_IjaAmmoPass.mp3", dur: 2.07,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "だんやく！はやくまわせ！", kanji: "弾薬！早く回せ！", cn: "弹药！快传过来！" },
-  { key: "ija_hurt_hit",        kind: "hurt",   file: "AudioVoice_IjaHurtHit.mp3", dur: 1.07,  role: "兵",     pitch: 0,   side: "ija",                 text: "うでをやられた！", kanji: "腕をやられた！", cn: "胳膊中弹了！" },
-  { key: "ija_hurt_leg",        kind: "hurt",   file: "AudioVoice_IjaHurtLeg.mp3", dur: 1.41,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "あしをやられた！", kanji: "脚をやられた！", cn: "腿受伤了！" },
-  { key: "ija_hurt_leader",     kind: "hurt",   file: "AudioVoice_IjaHurtLeader.mp3", dur: 2.51,  role: "兵",     pitch: 0,   side: "ija", event: true,  text: "ぶんたいちょうどのがやられた！", kanji: "分隊長殿がやられた！", cn: "分队长中弹了！（分隊長＝相当于中方的班长）" },
-  { key: "ija_hurt_medic",      kind: "hurt",   file: "AudioVoice_IjaHurtMedic.mp3", dur: 2.42,  role: "兵",     pitch: 0,   side: "ija",                 text: "えいせいへい！こっちだ！", kanji: "衛生兵！こっちだ！", cn: "卫生兵！在这边！" },
-  { key: "ija_move_advance",    kind: "move",   file: "AudioVoice_IjaMoveAdvance.mp3", dur: 2.14,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "さんかい！まえへ！", kanji: "散開！前へ！", cn: "散开！向前！" },
-  { key: "ija_move_back",       kind: "move",   file: "AudioVoice_IjaMoveBack.mp3", dur: 2.27,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "いったんさがれ！", kanji: "一旦下がれ！", cn: "暂时后撤！" },
-  { key: "ija_move_flank",      kind: "move",   file: "AudioVoice_IjaMoveFlank.mp3", dur: 1.31,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "そくめんにまわれ！", kanji: "側面に回れ！", cn: "从侧翼绕过去！" },
-  { key: "ija_move_forward",    kind: "move",   file: "AudioVoice_IjaMoveForward.mp3", dur: 2.01,  role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "まえへでろ！おせ！", kanji: "前へ出ろ！押せ！", cn: "冲到前面！压上去！" },
+  { key: "ija_spot_enemy",      kind: "spot",   file: "AudioVoice_IjaSpotEnemy.mp3", dur: 2.21,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "敌人！左边！左边！", dialect: "sichuan", version: "20260915002001", kanji: "敵だ！左！左だ！", cn: "敌人！左边！左边！" },
+  { key: "ija_spot_roof",       kind: "spot",   file: "AudioVoice_IjaSpotRoof.mp3", dur: 0.87,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "屋顶有敌人！", dialect: "sichuan", version: "20260915002001", kanji: "屋上に敵！", cn: "屋顶有敌人！" },
+  { key: "ija_spot_mg",         kind: "spot",   file: "AudioVoice_IjaSpotMg.mp3", dur: 1.41,  role: "兵",     pitch: 0,   side: "ija",                 text: "机枪！在前面！", dialect: "sichuan", version: "20260915002001", kanji: "機関銃！前だ！", cn: "机枪！在前面！" },
+  { key: "ija_spot_shina",      kind: "spot",   file: "AudioVoice_IjaSpotShina.mp3", dur: 0.73,  role: "古兵",    pitch: -4,  side: "ija", event: true,  text: "对头还在！", dialect: "sichuan", version: "20260915002001", kanji: "支那兵だ！まだ居るぞ！", cn: "支那兵！他们还在！" },
+  { key: "ija_spot_target",     kind: "spot",   file: "AudioVoice_IjaSpotTarget.mp3", dur: 1.41,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "目标！右前方！", dialect: "sichuan", version: "20260915002001", kanji: "目標！右前方！", cn: "目标！右前方！" },
+  { key: "ija_spot_wall",       kind: "spot",   file: "AudioVoice_IjaSpotWall.mp3", dur: 1.43,  role: "兵",     pitch: 0,   side: "ija", event: true,  text: "城墙上有敌兵！", dialect: "sichuan", version: "20260915002001", kanji: "城壁に敵兵！", cn: "城墙上有敌兵！" },
+  { key: "ija_warn_down",       kind: "warn",   file: "AudioVoice_IjaWarnDown.mp3", dur: 1.19,  role: "古兵",    pitch: -4,  side: "ija",                 text: "趴倒！莫动！", dialect: "sichuan", version: "20260915002001", kanji: "伏せろ！動くな！", cn: "卧倒！别动！" },
+  { key: "ija_warn_cover",      kind: "warn",   file: "AudioVoice_IjaWarnCover.mp3", dur: 1.34,  role: "古兵",    pitch: -4,  side: "ija", delivery: "assault", text: "隐蔽！脑壳低起！", dialect: "sichuan", version: "20260915002001", kanji: "隠れろ！頭を下げろ！", cn: "隐蔽！低下头！" },
+  { key: "ija_warn_grenade",    kind: "warn",   file: "AudioVoice_IjaWarnGrenade.mp3", dur: 1.15,  role: "兵",     pitch: 0,   side: "ija",                 text: "手榴弹！趴倒！", dialect: "sichuan", version: "20260915002001", kanji: "手榴弾！伏せろ！", cn: "手榴弹！卧倒！" },
+  { key: "ija_warn_shell",      kind: "warn",   file: "AudioVoice_IjaWarnShell.mp3", dur: 1.41,  role: "分隊長",   pitch: -2,  side: "ija", event: true,  text: "炮来了！躲开！", dialect: "sichuan", version: "20260915002001", kanji: "砲撃！退避！", cn: "炮击！退避！" },
+  { key: "ija_ammo_out",        kind: "ammo",   file: "AudioVoice_IjaAmmoOut.mp3", dur: 1.82,  role: "兵",     pitch: 0,   side: "ija",                 text: "把子弹递过来！", dialect: "sichuan", version: "20260915002001", kanji: "弾薬を寄こせ！", cn: "把弹药递过来！" },
+  { key: "ija_ammo_reload",     kind: "ammo",   file: "AudioVoice_IjaAmmoReload.mp3", dur: 1.43,  role: "兵",     pitch: 0,   side: "ija",                 text: "换弹！掩护我！", dialect: "sichuan", version: "20260915002001", kanji: "装填中！援護頼む！", cn: "装填中！掩护我！" },
+  { key: "ija_ammo_pass",       kind: "ammo",   file: "AudioVoice_IjaAmmoPass.mp3", dur: 1.85,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "弹药！快传过来！", dialect: "sichuan", version: "20260915002001", kanji: "弾薬！早く回せ！", cn: "弹药！快传过来！" },
+  { key: "ija_hurt_hit",        kind: "hurt",   file: "AudioVoice_IjaHurtHit.mp3", dur: 0.84,  role: "兵",     pitch: 0,   side: "ija",                 text: "膀子遭打了！", dialect: "sichuan", version: "20260915002001", kanji: "腕をやられた！", cn: "胳膊中弹了！" },
+  { key: "ija_hurt_leg",        kind: "hurt",   file: "AudioVoice_IjaHurtLeg.mp3", dur: 0.87,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "腿杆遭打了！", dialect: "sichuan", version: "20260915002001", kanji: "脚をやられた！", cn: "腿受伤了！" },
+  { key: "ija_hurt_leader",     kind: "hurt",   file: "AudioVoice_IjaHurtLeader.mp3", dur: 1.51,  role: "兵",     pitch: 0,   side: "ija", event: true,  text: "分队长遭打了！", dialect: "sichuan", version: "20260915002001", kanji: "分隊長殿がやられた！", cn: "分队长中弹了！（分隊長＝相当于中方的班长）" },
+  { key: "ija_hurt_medic",      kind: "hurt",   file: "AudioVoice_IjaHurtMedic.mp3", dur: 1.83,  role: "兵",     pitch: 0,   side: "ija",                 text: "卫生兵！在这边！", dialect: "sichuan", version: "20260915002001", kanji: "衛生兵！こっちだ！", cn: "卫生兵！在这边！" },
+  { key: "ija_move_advance",    kind: "move",   file: "AudioVoice_IjaMoveAdvance.mp3", dur: 1.21,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "散开！向前！", dialect: "sichuan", version: "20260915002001", kanji: "散開！前へ！", cn: "散开！向前！" },
+  { key: "ija_move_back",       kind: "move",   file: "AudioVoice_IjaMoveBack.mp3", dur: 0.59,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "先退回来！", dialect: "sichuan", version: "20260915002001", kanji: "一旦下がれ！", cn: "暂时后撤！" },
+  { key: "ija_move_flank",      kind: "move",   file: "AudioVoice_IjaMoveFlank.mp3", dur: 1.29,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "从边上绕过去！", dialect: "sichuan", version: "20260915002001", kanji: "側面に回れ！", cn: "从侧翼绕过去！" },
+  { key: "ija_move_forward",    kind: "move",   file: "AudioVoice_IjaMoveForward.mp3", dur: 1.71,  role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "冲到前面！压上去！", dialect: "sichuan", version: "20260915002001", kanji: "前へ出ろ！押せ！", cn: "冲到前面！压上去！" },
 ];
 
 // ===========================================================================
