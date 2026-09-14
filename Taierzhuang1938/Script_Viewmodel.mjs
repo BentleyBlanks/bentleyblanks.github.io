@@ -2295,7 +2295,7 @@ export class Viewmodel {
       if (!wounds) { wounds = new CharacterWounds(root); this.woundBlood.set(root,wounds); }
       // Foreground arms use weapon FOV and owner-body has a camera clearance offset.
       // Map the struck segment to each display rig rather than reusing world coordinates.
-      wounds.Add({part, shapeId: info.shapeId, direction});
+      wounds.Add({part, shapeId: info.shapeId, direction, preferCloth: part !== "head"});
     }
   }
 

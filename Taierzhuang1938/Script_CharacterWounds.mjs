@@ -108,7 +108,7 @@ export function PrepareWoundVariants(root) {
 // Private materials isolate each wearer; no decals, transparent shells or per-frame vertex uploads.
 export class CharacterWounds {
   constructor(root) { this.root=root; this.records=new Map(); this.time=0; this.count=0; }
-  Add({part="torso",shapeId=null,point=null,direction=null}={}) {
+  Add({part="torso",shapeId=null,point=null,direction=null,preferCloth=false}={}) {
     if (!this.root) return false;
     this.root.updateWorldMatrix(true,true);
     const meshes=[];
@@ -127,10 +127,12 @@ export class CharacterWounds {
       if(child)target.lerp(child.getWorldPosition(new THREE.Vector3()),.35);
       if(direction)target.addScaledVector(new THREE.Vector3().copy(direction).normalize(),-C.surfaceBiasM);
     }
-    let selected=null, best=Infinity;
+    let selected=null, best=Infinity, cloth=null, clothDistance=Infinity;
     for(const mesh of meshes) {
       mesh.skeleton.update();
       const regions=Regions(mesh), active=mesh.geometry.index;
+      const isCloth=(Array.isArray(mesh.material)?mesh.material:[mesh.material])
+        .some(m=>m.userData.externalMaterialClass==="cloth" || !!m.userData.nraUniformPalette);
       // Respect severed geometry: removed vertices must never win nearest-surface selection.
       const ids=[...(active ? new Set(active.array) : regions.keys())].filter(i=>Matches(regions[i],part,shapeId));
       const stride=Math.max(1,Math.ceil(ids.length/C.maxSurfaceSamples));
@@ -139,8 +141,11 @@ export class CharacterWounds {
         mesh.getVertexPosition(i,posed).applyMatrix4(mesh.matrixWorld);
         const distance=posed.distanceToSquared(target);
         if(distance<best){best=distance;selected={mesh,index:i};}
+        if(isCloth&&distance<clothDistance){clothDistance=distance;cloth={mesh,index:i};}
       }
     }
+    const clothTarget=preferCloth&&cloth&&clothDistance<C.clothReachM*C.clothReachM;
+    if(clothTarget)selected=cloth;
     // Project the bullet onto the posed outer surface. This also selects a sleeve
     // over skin underneath it; the nearest point to an interior bone cannot do that.
     const rayDirection=new THREE.Vector3().copy(direction || {x:0,y:0,z:1}).normalize();
@@ -148,6 +153,7 @@ export class CharacterWounds {
     raycaster.near=0;raycaster.far=0.8;
     let surface=null, surfaceDistance=Infinity;
     for(const candidate of meshes) {
+      if(clothTarget&&candidate!==cloth.mesh)continue;
       // The subdivided first-person hand has >76k vertices. Keep injury work bounded;
       // its nearest-surface sample is enough, while the outer cloth remains ray-exact.
       if(candidate.geometry.attributes.position.count>C.maxRayVertices)continue;

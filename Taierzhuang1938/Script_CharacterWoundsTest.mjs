@@ -73,6 +73,11 @@ try {
   return sets.map(w=>({root:w.root.name,count:w.count,meshes:[...w.records.values()].map(r=>({name:r.mesh.name,material:Array.isArray(r.material)?r.material.map(m=>m.name):r.material.name}))}));
  });
  console.log('PLAYER',JSON.stringify(player));assert(player.every(w=>w.count>0));assert(player.length>=2);
+ assert(await page.evaluate(()=>{
+  const T=Taierzhuang,w=T.viewmodel.woundBlood.get(T.viewmodel.riggedArms.root);
+  return [...w.records.values()].some(r=>(Array.isArray(r.material)?r.material:[r.material])
+    .some(m=>m.userData.externalMaterialClass==='cloth' || !!m.userData.nraUniformPalette));
+ }),'the active weapon arms must show seepage on the sleeve, not only covered skin');
  await page.screenshot({path:path.join(shots,'Scene_Player_LookDown.png')});
  await page.evaluate(()=>{Taierzhuang.player.pitch=0;Taierzhuang.StepFrames(45,1/60,true);});
  await page.screenshot({path:path.join(shots,'Scene_Player_Arms.png')});
