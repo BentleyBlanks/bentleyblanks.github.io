@@ -80,7 +80,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 
 /* 来弹指示：五个方位复用同一条带中心尖刺的纹理，转身只旋转 SVG 容器。
-   真实伤害保留素材的血红色；只有掠过、未掉血的来弹转成白色。 */
+   实际撞上玩家碰撞体的来弹保留血红色；只有从身边掠过的近失弹转成白色。 */
 .hudHitDirs {
   position: absolute; left: 50%; top: 50%;
   width: clamp(180px, 46vmin, 500px); aspect-ratio: 1;

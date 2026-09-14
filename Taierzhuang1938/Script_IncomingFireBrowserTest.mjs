@@ -97,11 +97,38 @@ try {
   assert.ok(hit.hp<100 && hit.flash>.5); assert.equal(hit.marks.length,1);
   assert.equal(hit.marks[0].kind,"hit"); assert.ok(hit.opacity>.8);
   assert.equal(hit.textureOpacity,1);
-  assert.ok(!hit.filter.includes("grayscale"),"damaging hits keep the generated blood-red artwork");
+  assert.ok(!hit.filter.includes("grayscale"),"geometric hits keep the generated blood-red artwork");
   await page.waitForTimeout(150); // Let the existing damage-vignette CSS transition settle.
   await page.screenshot({path:path.join(output,"HitRight.png")});
+  // Debug invincibility protects health but must not turn a geometric hit into a white near miss.
+  const invincibleHit = await page.evaluate(() => {
+    const T = window.Tengxian, p = T.player;
+    p.SetDebugOptions({invincible:true}); p.spawnGrace=0;
+    const from = p.position.clone().add({x:12,y:0,z:0});
+    p.Suppress(.2,"bullet",from);
+    const before = p.hitMarks[0]?.kind;
+    p.TakeHit(24,"torso",null,{bullet:true,from});
+    T.hud.SetHurt({health:p.health,flash:p.hitFlash,marks:p.hitMarks,yaw:p.yaw});
+    const el = document.querySelector(".hudHitDir.hit"), texture = el?.querySelector(".hudHitTexture");
+    return {before,hp:p.health,bleeding:p.bleeding,flash:p.hitFlash,disorientation:p.HitDisorientation,
+      events:p.hitEvents.length,marks:p.hitMarks.map(m=>m.kind),className:el?.getAttribute("class"),
+      opacity:el && +getComputedStyle(el).opacity,filter:texture && getComputedStyle(texture).filter};
+  });
+  const {opacity:invincibleOpacity,filter:invincibleFilter,...invincibleState}=invincibleHit;
+  assert.deepEqual(invincibleState,{before:"near",hp:100,bleeding:0,flash:0,disorientation:0,
+    events:0,marks:["hit"],className:"hudHitDir hit"});
+  assert.ok(invincibleOpacity>.8,"invincible geometric hit remains visible");
+  assert.ok(!invincibleFilter.includes("brightness(0)") && !invincibleFilter.includes("invert(1)"),
+    "invincible geometric hit keeps the blood-red texture instead of the white near-miss filter");
+  await page.waitForTimeout(150);
+  await page.screenshot({path:path.join(output,"InvincibleHitRight.png")});
+  await page.evaluate(() => {
+    const p=window.Tengxian.player;p.SetDebugOptions({invincible:false});p.hitMarks.length=0;p.hitFlash=0;
+  });
   const rotation = await page.evaluate(() => {
     const T = window.Tengxian;
+    const p=T.player,from=p.position.clone().add({x:12,y:0,z:0});
+    p.TakeHit(24,"torso",null,{bullet:true,from});
     // Looking right turns the remembered +X source from right to front.
     T.player.yaw = -Math.PI/2;
     T.hud.SetHurt({health:T.player.health,flash:T.player.hitFlash,marks:T.player.hitMarks,yaw:T.player.yaw});

@@ -93,7 +93,7 @@ export const HITDIR = Object.freeze({
   texture: "./Texture/Hud/Texture_HudDamageArc.png?v=20260913a",
   /** Registration in the -100..100 HUD viewBox; keep the sight center clear. */
   textureBox: Object.freeze({ x: -70, y: -85, size: 140 }),
-  /** A near miss deals no damage and is white; an injury keeps the texture's blood red. */
+  /** A trajectory near miss is white; a geometric hit stays blood red even when invincibility blocks injury. */
   nearOpacity: 0.78,
   /** 剩余寿命乘这个数再夹到 1：前四分之一寿命满亮，之后才开始淡。 */
   fullBrightGain: 1.35,

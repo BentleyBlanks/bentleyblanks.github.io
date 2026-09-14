@@ -1141,7 +1141,12 @@ export class PlayerController {
   TakeHit(damage, part = "torso", direction = null, info = null) {
     if (!this.alive) return;
     if (!Number.isFinite(damage) || damage <= 0) return;
-    if (this.debug.invincible) return;
+    if (this.debug.invincible) {
+      // 无敌只挡伤势，不改写这发攻击已经撞上玩家的事实。近失白、命中红的判定
+      // 必须来自弹道/碰撞结果；否则调试时所有真实命中都会被吞掉，只剩白色近失弧。
+      this.RecordIncomingFire(info?.from, "hit");
+      return;
+    }
     // 出生保护期内只吃压制不吃伤 —— 让接替者有几秒找到掩体，
     // 而不是睁眼就躺回去。子弹照样从耳边过，压制照样上。
     if (this.spawnGrace > 0) {
