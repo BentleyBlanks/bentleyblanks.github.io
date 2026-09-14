@@ -1493,6 +1493,9 @@ export class AiDirector {
    * 这道迟滞专门消掉 suppression=0.50、距离=20 m 两侧的站蹲振荡。
    */
   SetStance(s, stance, holdS = 0.9, force = false) {
+    // An authored low passage owns clearance even when combat requests a
+    // forced rise to sprint, reload or dodge. The host clears this on exit.
+    if (Number.isInteger(s.scriptTraversalStance)) stance = Math.max(stance, s.scriptTraversalStance);
     if (s.stance === stance) return;
     // 真正需要抢先执行的只有「卧倒」。站→蹲只是射击姿势，仍应尊重上一姿态的承诺；
     // 否则冲锋边界上依旧会站/蹲各抢一次。

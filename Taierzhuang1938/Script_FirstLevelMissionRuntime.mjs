@@ -623,14 +623,23 @@ export class FirstLevelMissionRuntime {
       actor.missionCoverWaiting=false;actor.missionCoverApproach=false;
       actor.scriptedNoncombatant = stage === "South";
       actor.scriptEscapeStance=null;
+      const crawl=stage==='Tank' && actor.missionSortie
+        && Sortie.crawl.some(c=>Distance(actor.position,c)<c.d/2+3);
+      actor.scriptTraversalStance=crawl?2:null;
+      if(crawl){
+        // Finish the narrow passage before choosing a firing/cover post.
+        // Grenade response still runs, with the same required low clearance.
+        actor.missionContactPost=null;
+        this.ai.ReleaseCover(actor);
+        this.ai.SetStance(actor,2,.5,true);
+      }
       if(this.RespondToGrenade(actor))continue;
-      if(R.openingContactStages.includes(stage)&&this.RespondToContact(actor))continue;
+      if(!crawl&&R.openingContactStages.includes(stage)&&this.RespondToContact(actor))continue;
       if(!R.openingContactStages.includes(stage))actor.missionContactPost=null;
       const route = this.squadRoutes.get(actor.id);
       if(stage==='Tank' && actor.missionSortie){
         while(route?.length && Distance(actor.position,route[0])<.8)route.shift();
         this.squadMarch?.Release(actor);
-        const crawl=Sortie.crawl.some(c=>Distance(actor.position,c)<c.d/2+3);
         this.ai.SetStance(actor,crawl?2:1,.5,true);
         if(route?.length){
           const gap=Distance(actor.position,this.player.position);

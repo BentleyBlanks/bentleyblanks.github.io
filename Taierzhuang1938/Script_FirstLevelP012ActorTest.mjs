@@ -63,6 +63,20 @@ console.log("PASS P012 opening empty arms: five real GLBs/two actual clips, unto
 const mainAppearanceSource = fs.readFileSync(new URL("./Script_Main.mjs", import.meta.url), "utf8").replace(/\r/g, "");
 assert.ok(!mainAppearanceSource.includes("ApplyP012CastAppearance"), "P012 cannot override shared cloth with temporary solid colors");
 const source=fs.readFileSync(new URL("./Script_Ai.mjs",import.meta.url),"utf8").replace(/\r/g,"");
+{
+ const SetStance=vm.runInNewContext(`({${source.match(/  SetStance\(s, stance,[\s\S]*?\n  \}/)[0]}}).SetStance`);
+ const host={time:10},actor={stance:0,stanceUntil:100,scriptTraversalStance:2};
+ SetStance.call(host,actor,0,.5,true);
+ assert.equal(actor.stance,2,'a forced combat sprint respects the authored crawl clearance');
+ for(const stance of [0,1,2])SetStance.call(host,actor,stance,.5,true);
+ assert.equal(actor.stance,2,'reload, dodge and suppression cannot raise the capsule inside the passage');
+ actor.scriptTraversalStance=null;SetStance.call(host,actor,0,.5,true);
+ assert.equal(actor.stance,0,'leaving the passage restores ordinary forced stance changes');
+ actor.stance=2;actor.stanceUntil=100;SetStance.call(host,actor,0,.5);
+ assert.equal(actor.stance,2,'ordinary actors retain the existing stance commitment');
+ host.time=101;SetStance.call(host,actor,0,.5);
+ assert.equal(actor.stance,0,'ordinary actors can rise after their commitment expires');
+}
 function Method(name){return source.match(new RegExp(`  ${name}\\([^\\n]*\\{[\\s\\S]*?\\n  }\\n`))[0];}
 let serial=0;
 class SoldierStub {constructor(side,options){this.id=serial++;this.side=side;this.alive=true;this.weaponId=options.weapon||"HanYang";this.weapon={};this.position={x:options.x,z:options.z,y:0};}}

@@ -93,6 +93,86 @@ try{
  assert.equal(sortie.shortcut,false);assert.equal(sortie.reached,sortie.expected);
  assert.ok(sortie.catchupSpeed>0,'a leader behind the player catches up instead of waiting forever');
  assert.ok(sortie.facts.includes('bundleRouteTraversed'));assert.ok(sortie.keeper);assert.deepEqual(sortie.helpers,['luo']);
+ // Drive the actual leader's Think/Act, mission orders and Rapier body. Only
+ // the player's pacing signal and incoming-fire notifications are scripted;
+ // the leader is never placed/teleported or moved by this fixture.
+ const leader=await page.evaluate(async()=>{
+  const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),ai=r.ai,s=r.squad.find(a=>a.castId==='luo');
+  const {FRONT_SORTIE:R}=await import('./Data_FirstLevelFrontRoute.mjs');
+  const {MISSION_ROUTES}=await import('./Data_FirstLevelMissionLayout.mjs');
+  const {PerspectiveCamera}=await import('three');
+  const receipt={id:s.id,cast:s.castId,legs:[],passages:[],invalidPostures:[],contactFrames:0,wait:null,catchup:null};
+  let imageTaken=false;
+  const Tick=(follow=true)=>{
+   if(follow){g.player.position.copy(s.position);g.player.position.x+=1;}
+   r.time+=1/30;r.delta=1/30;ai.time+=1/30;ai.tickIndex++;
+   // Reproduce the continuous fire that previously requested a standing escape
+   // capsule at the low roof, despite the mission reporting a prone stance.
+   if(R.crawl.some(c=>Math.hypot(s.position.x-c.x,s.position.z-c.z)<10))
+    s.incomingFire={at:ai.time,position:s.position.clone()};
+   if(ai.tickIndex%6===0)ai.Think(s,1/5,g.player);
+   ai.Act(s,1/30,g.player);g.physics.Step(1/30);r.UpdateSquad();
+   if(s.missionContactPost)receipt.contactFrames++;
+  };
+  for(const reverse of [false,true]){
+   if(reverse){r.Record('bundleTaken');r.GuideSortie(MISSION_ROUTES.bundleReturn);}
+   const planned=r.squadRoutes.get(s.id).map(p=>({...p})),reached=[],crossed=new Set(),start=r.time;
+   let frame=0;
+   for(;frame<15000&&r.squadRoutes.get(s.id).length;frame++){
+    const before=[...r.squadRoutes.get(s.id)];Tick();
+    const removed=before.length-r.squadRoutes.get(s.id).length;
+    for(const point of before.slice(0,removed))reached.push({x:point.x,z:point.z,distance:Math.hypot(s.position.x-point.x,s.position.z-point.z)});
+    for(const c of R.crawl){
+     if(Math.abs(s.position.x-c.x)>c.w/2||Math.abs(s.position.z-c.z)>c.d/2-.5)continue;
+     if(s.stance!==2||s.body.height>.6)receipt.invalidPostures.push({reverse,id:c.id,stance:s.stance,height:s.body.height});
+     if(!crossed.has(c.id)){
+      crossed.add(c.id);receipt.passages.push({reverse,id:c.id,position:s.position.toArray(),height:s.body.height});
+      // A forced combat rise must also respect the passage constraint.
+      ai.SetStance(s,0,.5,true);
+      if(s.stance!==2)receipt.invalidPostures.push({reverse,id:c.id,forcedRise:s.stance});
+     }
+     if(!imageTaken){
+      const camera=new PerspectiveCamera(58,1280/720,.1,900);
+      camera.position.set(c.x+1.2,s.position.y+1.1,c.z+5);camera.lookAt(s.position.x,s.position.y+.35,s.position.z);camera.updateMatrixWorld(true);
+      ai.CullActors(camera);
+      // Restore this camera's real detail rig after the fixture's offscreen
+      // simulation; submit its normal animated pose before taking the image.
+      for(let i=0;i<6;i++)Tick();
+      g.scene.updateMatrixWorld(true);document.querySelector('#hud').style.visibility='hidden';
+      g.renderer.setRenderTarget(null);g.renderer.clear();g.renderer.render(g.scene,camera);
+      imageTaken=true;
+     }
+    }
+    if(!reverse&&!receipt.wait&&s.position.x>40&&s.position.z>-120){
+     g.player.position.set(R.route[0].x,0,R.route[0].z);r.UpdateSquad();
+     const from=s.position.clone();for(let i=0;i<60;i++)Tick(false);
+     receipt.wait={speed:s.scriptMoveSpeedMps,distance:Math.hypot(s.position.x-from.x,s.position.z-from.z)};
+     g.player.position.set(R.house.x,0,R.house.z);r.UpdateSquad();
+     const back=s.position.clone();for(let i=0;i<30;i++)Tick(false);
+     receipt.catchup={speed:s.scriptMoveSpeedMps,distance:Math.hypot(s.position.x-back.x,s.position.z-back.z)};
+    }
+   }
+   receipt.legs.push({reverse,planned:planned.length,reached,frames:frame,seconds:r.time-start,remaining:r.squadRoutes.get(s.id),position:s.position.toArray()});
+   if(r.squadRoutes.get(s.id).length)break;
+  }
+  receipt.constraintReleased=s.scriptTraversalStance==null;
+  return receipt;
+ });
+ await page.screenshot({path:path.join(out,'Scene_LeaderCrawling.png')});
+ await page.evaluate(()=>document.querySelector('#hud').style.visibility='');
+ await fs.writeFile(path.join(out,'Data_LeaderRoute.json'),JSON.stringify(leader,null,2));
+ assert.equal(leader.legs.length,2,'leader physically completes both route directions');
+ for(const leg of leader.legs){
+  assert.equal(leg.remaining.length,0,'leader cannot stall: '+JSON.stringify(leg));
+  assert.equal(leg.reached.length,leg.planned,'every queued bend is reached');
+  assert.ok(leg.reached.every(p=>p.distance<.8),'waypoints consumed only on physical arrival');
+ }
+ assert.equal(leader.passages.length,4,'both low passages are crossed in both directions');
+ assert.deepEqual(leader.invalidPostures,[],'combat cannot raise the capsule under a roof');
+ assert.ok(leader.contactFrames>0,'ordinary contact response remains active outside the passages');
+ assert.ok(leader.wait.speed===0&&leader.wait.distance<.1,'leader waits for the trailing player');
+ assert.ok(leader.catchup.speed>0&&leader.catchup.distance>.5,'leader resumes when the player advances');
+ assert.ok(leader.constraintReleased,'clearance constraint is released outside the passage');
  const fireWindows=await page.evaluate(()=>{
   const r=window.Tengxian.Debug.FirstLevelMissionRuntime();
   return ['moving','halted','immobilized'].map(mode=>{
