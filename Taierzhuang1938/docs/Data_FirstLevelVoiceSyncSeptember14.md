@@ -27,9 +27,19 @@
 node Taierzhuang1938/Script_SeedAudioFirstLevelBake.mjs --dry
 node Taierzhuang1938/Script_SeedAudioFirstLevelBake.mjs --only=<ChangedCueIds>
 node Taierzhuang1938/Script_FirstLevelMissionTest.mjs --audio
-node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --audio --allow-checkpoint-retry
+node Taierzhuang1938/Script_FirstLevelOpeningSequenceBrowserTest.mjs
+node Taierzhuang1938/Script_VoiceTest.mjs
 ```
 
 `--audio` 验证录音存在、完整请求、文件与提示词哈希、语速参数、当前文本的对齐哈希和字幕区间。无提示转写和逐词强制对齐分别执行；四川话有明显同音误识，自动转写不能代替逐句人工试听及声线、口音验收。完整取证、候选和测试日志只放本任务本地 `_shots/VoiceSync`，不提交。
 
-字幕新增字已重新生成字体子集，并同步 preload 和 CSS 版本。已通过录音严格检查；完整浏览器回归与部署核验仍在进行，未作为完成证据。
+字幕新增字已重新生成字体子集，并同步 preload 和 CSS 版本。
+
+2026-09-15 验证记录：
+
+- 按用户本次补充要求，语音更换以录音、字幕、事件时序和实际播放为验收范围，停止广泛战斗回归；已撤回仅为战斗测试添加的投弹、战术目标和重试改动。本次不宣称完整战斗回归全绿。
+- 严格音频门禁通过：57 段剧情录音与 28 条自动敌军口令全部匹配当前源文件和录音哈希。语音库真实浏览器检查 31/31 通过，AudioContext 运行，六类战斗口令实际播放。
+- 完整车厢对白、旁侧交流、真实炮击、倒地、救援及还权检查通过。18 个阶段的跳转、倒序和重复跳转，以及空袭／死亡阶段的继续检查通过。第二阶段碰撞检查在真实救援还权后执行，使用玩家实际姿态胶囊。
+- 已查看 1280×720 的车厢并行字幕、救援、掩蔽处私语截图；模块图 381 项通过，文字检查零失败（保留一个既有警告）。
+- 广泛回归期间遇到的入口等候通行、五连发、靶场换枪、手榴弹警告文案和低头身体显示失败，均在未改动的 `e50c476b1` 基线复现，取证留在本地 `Log_*Baseline*.txt`，不作为本次语音验收阻断，也未修改相关游戏规则。
+- 发布验收核对 Pages 部署提交、线上剧情与自动口令录音清单哈希及实际音频文件，结果随本次交付报告提供。

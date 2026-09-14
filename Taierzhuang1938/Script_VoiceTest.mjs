@@ -64,10 +64,10 @@ const r = await page.evaluate(() => {
     // 阵营两套并存：中方 side 缺省（兼容默认 nra），日方显式 side:"ija"
     nra: bank.filter((e) => (e.side || "nra") === "nra").length,
     ija: bank.filter((e) => e.side === "ija").length,
-    // 日方 text 必须是纯假名。写成汉字的「突撃！」会被 seed-audio 当中文读 ——
-    // 实测出来是中文的两个音节，而假名版是四拍日语。
-    ijaWithHanzi: bank.filter((e) => e.side === "ija" && /[一-鿿]/.test(e.text))
+    // 留档日语剧情保留假名；当前自动战斗口令按用户要求统一四川话。
+    ijaWithHanzi: bank.filter((e) => e.side === "ija" && e.kind === "story" && /[一-鿿]/.test(e.text))
       .map((e) => e.key),
+    ijaBarkDialectInvalid: bank.filter(e=>e.side==="ija"&&e.kind!=="story"&&(e.dialect!=="sichuan"||!/[一-鿿]/.test(e.text)||/[ぁ-ヿ]/.test(e.text))).map(e=>e.key),
     ijaKinds: bank.filter((e) => e.side === "ija")
       .reduce((a, e) => { a[e.kind] = (a[e.kind] || 0) + 1; return a; }, {}),
     // 神剧红线：一句「バカヤロー」都不许有
@@ -229,12 +229,12 @@ Check("六类口令齐全（kill 那一类已删：喊「打中了」等于把 h
   Object.keys(r.kinds).length >= 6, JSON.stringify(r.kinds));
 // 这条断言原来是「日语不许混进来」—— 那是还没有日方声库时的写法，
 // 而且它查的是 kind === "ija"，现在日方是 side 不是 kind，等于恒真。
-// 日方声库已经做好了（20 句纯假名），该验的变成了三件事：两边都在、不串味、不神剧。
+// 当前战斗口令与留档剧情分别校验语言，双方声库都保留六类覆盖。
 Check("中日两套声库都在，且按 side 分开",
   r.nra >= 30 && r.ija >= 18, `中方 ${r.nra} 条 / 日方 ${r.ija} 条`);
-Check("日方文本是纯假名（写成汉字会被 seed-audio 当中文读）",
-  r.ijaWithHanzi.length === 0,
-  r.ijaWithHanzi.length ? "含汉字：" + r.ijaWithHanzi.join(" ") : "零汉字，正确");
+Check("敌军战斗口令使用四川话；留档日语剧情仍按原语言校验",
+  r.ijaBarkDialectInvalid.length===0&&r.ijaWithHanzi.length===0,
+  JSON.stringify({invalidSichuanBarks:r.ijaBarkDialectInvalid,invalidArchivedJapanese:r.ijaWithHanzi}));
 Check("日方六类齐全（少一类就会复读）",
   Object.keys(r.ijaKinds).length >= 6, JSON.stringify(r.ijaKinds));
 Check("没有「バカヤロー」及其变体（抗日神剧的头号标志，黑名单第一条）",

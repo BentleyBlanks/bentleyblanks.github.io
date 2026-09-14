@@ -185,11 +185,11 @@ try{
           if(leader.position.z>24)this.rallyReturnMax=Math.max(this.rallyReturnMax||0,leader.position.z-this.rallyRelease.position[2]);
         }
         if(march)for(const actor of march.soldiers){
-          const command=actor.missionCoverWaiting?{status:actor.moveSpeed*3.6<.12?"cover-wait":"cover-arriving",leader:actor===runtime.squad[0]}:actor.squadMarchCommand;
+          const command=actor.squadMarchCommand;
           if(command&&this.marchStates[actor.id]!==command.status){
             this.marchStates[actor.id]=command.status;
             this.marchEvidence.push({id:actor.id,role:command.leader?"leader":"member",status:command.status,
-              time:march.march.time,speed:actor.moveSpeed*3.6,covered:!!runtime.squadCoverBounds,position:{x:actor.position.x,z:actor.position.z}});
+              time:march.march.time,speed:actor.moveSpeed*3.6,position:{x:actor.position.x,z:actor.position.z}});
           }
         }
         while(this.index<this.points.length&&Math.hypot(p.position.x-this.points[this.index].x,p.position.z-this.points[this.index].z)<.85)this.index++;
@@ -220,9 +220,7 @@ try{
         // Use the ordinary crouch key while clearing the trench. Companions
         // now survive behind cover instead of absorbing the driver's exposure.
         const crouch=(fight||this.cautiousTransit)&&["TrenchEntry","Support"].includes(runtime.flow.stage.id);
-        if(this.waitProne){if(p.stance!=="prone")g.Debug.Key("KeyZ");}
-        else if(p.stance==="prone")g.Debug.Key("KeyZ");
-        else if((p.stance==="crouch")!==crouch)g.Debug.Key("KeyC");
+        if((p.stance==="crouch")!==crouch)g.Debug.Key("KeyC");
         g.Debug.Mouse(0,false);
         if(foe){
           g.Debug.Key("KeyW",false);g.Debug.Mouse(2,true);
@@ -330,7 +328,7 @@ try{
   if(regroup){
     await page.evaluate(()=>{window.OpeningInput.cautiousTransit=true;});
     await Drive("RallyApproach",OPENING.approachRoute.slice(0,3),{seconds:70});
-    const started=await page.evaluate(()=>{window.OpeningInput.waitProne=true;return window.Tengxian.Debug.FirstLevelMissionRuntime().time;});
+    const started=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().time);
     // Wait for actual passage clearance: a man crossing toward cover at exactly
     // sixteen seconds has not yet settled at his waiting post. Keep the original
     // clearance threshold, a bounded deadline, and the physical walk-through below.
@@ -349,7 +347,7 @@ try{
     assert.ok(waiting.alive,'the player and squad survive the real entrance wait');
     assert.ok(waiting.guide?.status&&waiting.guide.label,'waiting at the entrance explains the immediate trench fight');
     assert.ok(waiting.squad.every(a=>Math.abs(a.p[0]-OPENING.trenchEntry.x)>.75),'waiting guards leave the central walking lane clear');
-    await page.evaluate(()=>{window.OpeningInput.waitProne=false;window.OpeningInput.checkRally=true;});
+    await page.evaluate(()=>{window.OpeningInput.checkRally=true;});
     // Measure whether the squad leaves a traversable lane. Do not spend this
     // passage window stopping to shoot; the next leg still clears every required enemy.
     await Drive("PassWaitingSquad",[{x:-45,z:27}],{seconds:50});
@@ -369,7 +367,7 @@ try{
     await Capture("ClearedTrenchRegroup");
   }
   await Drive("TrenchContact",remainingApproach,{fight:true,until:"shelterReached",seconds:180});
-  // Re-enter the listening area if arriving companions physically nudged the player outside its rim.
+  // Keep listening after arriving companions physically nudge the player outside the rim.
   await Drive("ShelterWhisper",[OPENING.shelter],{until:"supportOrdersHeard",seconds:100});
   const rifleReady=["frontRifleDefense","rifleWithdrawalResolved","zhouGunWounded"];
   await Drive("FrontRifle",[...OPENING.supportRoute,{x:0,z:-124},{x:0,z:-126.5}],{fight:true,until:rifleReady,seconds:210});

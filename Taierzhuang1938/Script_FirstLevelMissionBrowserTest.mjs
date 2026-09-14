@@ -587,11 +587,7 @@ try {
     const marchEvidence=await page.evaluate(()=>window.OpeningInput.marchEvidence);
     await fs.writeFile(path.join(output,"Data_SquadMarchIntegration.json"),JSON.stringify(marchEvidence,null,2));
     if(!stageJumps){
-      if(marchEvidence.some(e=>e.covered)){
-        const held=marchEvidence.filter(e=>e.status==="cover-wait");
-        assert.ok(new Set(held.map(e=>e.id)).size>=2,"multiple real actors stop at the authored cover bounds");
-        assert.ok(held.every(e=>e.speed<.12),"cover waits physically stop the actors");
-      }else assert.ok(marchEvidence.some(e=>e.status==="resting"&&e.role==="member"),"shared controller produces an actual rest on an unbounded approach");
+      assert.ok(marchEvidence.some(e=>e.status==="resting"&&e.role==="member"),"shared controller produces an actual rest during the opening approach");
       assert.ok(marchEvidence.filter(e=>e.status==="resting").every(e=>e.role!=="leader"&&e.speed<.12),"leader exemption and physical stops reach the real actors");
     }
     if(process.argv.includes("--march-only")){console.log("PASS shared squad march on the normal rebuilt opening");break campaignRun;}
@@ -766,20 +762,11 @@ try {
     await Interact();
     assert.equal(await page.evaluate(()=>window.Tengxian.state.bundles),fullBundleCount,"repeated pickup never adds beyond the crate reserve");
     const spentBundles=await page.evaluate(()=>{
-      const g=window.Tengxian;
-      for(let i=0;i<2&&g.player.alive;i++){
-        g.player.yaw=-Math.PI/2;g.player.pitch=.55;
-        g.Debug.Key("KeyH",true);g.StepFrames(24,1/60,false);g.Debug.Key("KeyH",false);
-        for(let frame=0;frame<420&&g.player.alive;frame++){
-          window.MissionInputDriver.EvadeGrenade();g.StepFrames(1,1/60,false);
-        }
-      }
+      const g=window.Tengxian;g.player.yaw=-Math.PI/2;g.player.pitch=.55;
+      for(let i=0;i<2;i++){g.Debug.Key("KeyH",true);g.StepFrames(24,1/60,false);g.Debug.Key("KeyH",false);g.StepFrames(420,1/60,false);}
       return {count:g.state.bundles,mission:g.Debug.FirstLevelMission(),alive:g.player.alive};
     });
-    console.log("MISSED_BUNDLE_RESULT",JSON.stringify({alive:spentBundles.alive,count:spentBundles.count,immobilized:spentBundles.mission.tank.immobilized}));
-    if(!spentBundles.alive&&await RetryCampaign())spentBundles.alive=await page.evaluate(()=>window.Tengxian.player.alive);
     assert.ok(spentBundles.alive&&spentBundles.count===0&&!spentBundles.mission.tank.immobilized,"two missed real throws leave the tank objective active");
-    await Route([{x:15,z:-111},{x:13,z:-116.5}],"ReturnForBundleRetry",{stance:"crouch"});
     await Interact();
     assert.equal(await page.evaluate(()=>window.Tengxian.state.bundles),fullBundleCount,"an empty player can physically return to the same crate and retry");
     console.log("ok full inventory, two missed throws, empty inventory and actual resupply recovery");

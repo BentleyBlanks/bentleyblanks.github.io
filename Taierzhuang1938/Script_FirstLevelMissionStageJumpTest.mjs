@@ -11,7 +11,7 @@ const here=path.dirname(fileURLToPath(import.meta.url));
 const output=path.join(here,"_shots","FirstLevelStageJump");
 await fs.mkdir(output,{recursive:true});
 const server=await ServeRoot(path.resolve(here,".."),0), browser=await LaunchBrowser();
-const page=await browser.newPage({viewport:{width:1440,height:900}}), errors=[];
+const page=await browser.newPage({viewport:{width:1280,height:720}}), errors=[];
 page.on("pageerror",error=>{errors.push(String(error));console.log("PAGEERROR",String(error));});
 async function Jump(number) {
   await page.evaluate(()=>{window.Tengxian.state.playerShots=123;});
@@ -41,7 +41,7 @@ async function Step(frames=120) {
     g.StepFrames(frames,1/60,false);g.StepFrames(1,1/60,true);
     return {mission:g.Debug.FirstLevelMission(),alive:g.player.Alive,running:g.state.running,
       position:{...g.player.position},carry:g.carry.KindId,controls:g.state.missionControl,
-      gun:g.viewmodel.weaponId,overlap:g.physics.Overlaps(g.player.position.x,g.player.position.y+.04,g.player.position.z,g.player.radius,1.7)};
+      gun:g.viewmodel.weaponId,overlap:g.physics.Overlaps(g.player.position.x,g.player.position.y+.04,g.player.position.z,g.player.radius,Math.max(.62,g.player.eyeHeight+.16))};
   },frames);
 }
 async function WaitStep(id,seconds) {
@@ -62,7 +62,15 @@ try {
   await WaitStep("FinalDefense",45);
   const results=[];
   for(const number of [1,18,2,17,3,16,4,15,5,14,6,13,7,12,8,11,9,10,14,3,18,1]) {
-    const start=await Jump(number), after=await Step();
+    const start=await Jump(number);
+    let after=await Step();
+    if(number===2){
+      // Shelling now starts immediately on this phase entry. While the carriage
+      // rolls, the authored fallen pose is not an upright walking capsule.
+      // Check collision clearance when rescue actually returns walking control.
+      for(let seconds=0;after.controls&&seconds<45;seconds++)after=await Step(60);
+      assert.ok(!after.controls,"stage 2 rescue returns player control within its deadline");
+    }
     assert.ok(after.alive&&after.running,"play resumes "+number);
     assert.ok(!after.overlap,"player capsule clears stage "+number+": "+JSON.stringify(after.position));
     assert.equal(after.mission.failed,false);
