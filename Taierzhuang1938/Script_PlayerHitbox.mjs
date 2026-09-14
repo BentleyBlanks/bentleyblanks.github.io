@@ -117,7 +117,7 @@ export function RaycastPlayerHitboxes(origin, direction, hitboxes, maxDistance =
       ? RaycastSphere(origin, direction, h.center, h.radius)
       : RaycastCapsule(origin, direction, h.start, h.end, h.radius);
     if (t === null || t === undefined || t > maxDistance) continue;
-    if (!best || t < best.t) best = { part: h.part, t };
+    if (!best || t < best.t) best = { part: h.part, t, shape: h };
   }
   return best;
 }

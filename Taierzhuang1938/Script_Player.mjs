@@ -229,6 +229,7 @@ export class PlayerController {
   }
 
   Spawn(x, z, ry = 0) {
+    this.onWoundReset?.();
     this.firearmHandling.Reset();
     this.gunClearance = { lower: 0, blocked: false };
     this.recoilDelayS = 0;
@@ -1165,6 +1166,7 @@ export class PlayerController {
           0, 1));
       this.hitDisorientationTime = HIT_DISORIENTATION.durationS;
     }
+    if (info?.bullet) this.onBulletWound?.(part, direction, info);
     this.health -= applied;
     this.bandageRegenTo = 0;                // 新伤口打断包扎后的回血，要再包一次
     const bleed =(part === "head" ? WOUNDS.bleedHead

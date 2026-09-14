@@ -21,6 +21,8 @@
 //   · 中方子弹带必须大面积瘪着、只有靠身几格鼓 —— 这是一眼读出「缺弹」的美术语言。
 
 import * as THREE from "three";
+import { BLOOD_WOUND } from "./Data_Tuning_Blood.mjs";
+import { CharacterWounds } from "./Script_CharacterWounds.mjs";
 import { ApplyNraUniform, NraUniformPalette } from "./Script_UniformColors.mjs";
 import { INFANTRY_RELEASE_SECONDS } from "./Script_InfantryAnimation.mjs";
 import { Mulberry32, HashString, Clamp, Clamp01, SmoothStep } from "./Script_Noise.mjs";
@@ -1983,6 +1985,19 @@ export class Actor {
     return this;
   }
 
+  AddBulletWound(part, direction, info = {}) {
+    if (!this.characterRig || this.disposed) return;
+    this.woundBlood ||= new CharacterWounds(this.characterRig.root);
+    const shape = this.characterRig.GetHitboxes().find(h => info.shapeId ? h.id === info.shapeId
+      : part === "arm" ? /Arm|forearm/.test(h.id) : part === "leg" ? /thigh|calf/.test(h.id) : h.part === part);
+    let point = info.shapeId && this.root.visible ? info.point : null;
+    if (!point && shape) {
+      point = shape.center?.clone() || shape.start?.clone()?.lerp(shape.end, .5);
+      if (point && direction) point.addScaledVector(direction, -BLOOD_WOUND.surfaceBiasM);
+    }
+    this.woundBlood.Add({ part, shapeId: info.shapeId || shape?.id, point, direction });
+  }
+
   Update(dt, state = {}) {
     if (this.disposed) return;
     if (typeof state.bayonetFixed === "boolean" && state.bayonetFixed !== this.bayonetFixed) {
@@ -3360,6 +3375,7 @@ export class Actor {
    */
   Dispose() {
     if (this.disposed) return;
+    this.woundBlood?.Clear();
     if (this.factory && this.factory.batcher) this.factory.batcher.Remove(this);
     if (this.characterRig) this.characterRig.Dispose();
     if (this.root.parent) this.root.parent.remove(this.root);

@@ -127,6 +127,15 @@ function PartMaterial(source) {
     clone = CloneShadedMaterial(source);
     if (!Array.isArray(clone)) clone.name = `${source.name || "Gore"}#part`;
     partMaterials.set(key, clone);
+    // Wounded wearers have private source materials. Release their cached rigid
+    // variants with the source after the actor's live parts have been removed.
+    const Release = () => {
+      if (partMaterials.get(key) !== clone) return;
+      partMaterials.delete(key);
+      for (const material of Array.isArray(clone) ? clone : [clone]) material.dispose();
+    };
+    for (const material of Array.isArray(source) ? source : [source])
+      material.addEventListener("dispose", Release);
   }
   return clone;
 }
@@ -977,7 +986,7 @@ function BakePartGeometry(mesh, source, indices, bakeMatrix, normalMatrix) {
   const sourceUv = source.attributes.uv || null;
   const sourceColor = source.attributes.color || null;
   const remap = new Map();
-  const position = [], normal = [], uv = [], color = [];
+  const position = [], normal = [], uv = [], color = [], woundRest = [];
   const packed = new Uint32Array(indices.length);
   const point = TMP_C;
   for (let i = 0; i < indices.length; i += 1) {
@@ -991,6 +1000,8 @@ function BakePartGeometry(mesh, source, indices, bakeMatrix, normalMatrix) {
       mesh.applyBoneTransform(original, TMP_V4);
       point.set(TMP_V4.x, TMP_V4.y, TMP_V4.z).applyMatrix4(bakeMatrix);
       position.push(point.x, point.y, point.z);
+      const woundSource = source.attributes.woundRestPosition || sourcePosition;
+      if (woundSource) woundRest.push(woundSource.getX(original), woundSource.getY(original), woundSource.getZ(original));
       if (sourceNormal) {
         TMP_V4.set(sourceNormal.getX(original), sourceNormal.getY(original),
           sourceNormal.getZ(original), 0);
@@ -1009,6 +1020,7 @@ function BakePartGeometry(mesh, source, indices, bakeMatrix, normalMatrix) {
   if (!position.length) return null;
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(position, 3));
+  if (woundRest.length) geometry.setAttribute("woundRestPosition", new THREE.Float32BufferAttribute(woundRest, 3));
   if (normal.length) geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normal, 3));
   if (uv.length) geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
   if (color.length) geometry.setAttribute("color", new THREE.Float32BufferAttribute(color, 3));

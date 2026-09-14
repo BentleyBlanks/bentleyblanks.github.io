@@ -85,3 +85,11 @@ export function BloodPosition(origin, velocity, age, out) {
   out.z = origin.z + velocity.z * travel;
   return out;
 }
+
+// Persistent bullet stains on clothing/skin, measured in metres and seconds.
+export const BLOOD_WOUND = Object.freeze({
+  slots: 12, radiusM: 0.105, surfaceBiasM: 0.09,
+  initialScale: 0.32, spreadSeconds: 2.4, drySeconds: 48.0,
+  opacity: 0.94, fresh: 0x70100e, dry: 0x300b09,
+  wetRoughness: 0.48, dryRoughness: 0.91,
+});

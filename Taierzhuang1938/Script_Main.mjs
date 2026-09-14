@@ -17,6 +17,7 @@ import { CollectBulletNearMisses, ApplyBulletNearMisses } from "./Script_Ballist
 //  window.Tengxian 是同一个对象的别名。）
 
 import * as THREE from "three";
+import { PrepareWoundVariants } from "./Script_CharacterWounds.mjs";
 import { MaterialLibrary } from "./Script_Materials.mjs";
 import {
   MakeMaterialShadingUniforms, ApplyShadingQuality, SyncShadingKnobs,
@@ -1287,6 +1288,8 @@ async function Boot() {
   // 胶囊挂进物理世界。BuildField 已经把这一关的静态几何灌好了，
   // 这里补的是「玩家」这一具 —— 换关时由 EnterLevel 再挂一次新的。
   player.AttachPhysics(physics);
+  player.onBulletWound = (part, direction, info) => viewmodel.AddBulletWound(part, direction, info);
+  player.onWoundReset = () => viewmodel.ClearWounds();
 
   // 导航网格：一张 2 m 一格的"走不走得过去"位图 + 按目标算的下坡场。
   // 没有它，AI 在这座四合院城里就是直奔一堵院墙（见 Script_Navigation 的账）。
@@ -4434,6 +4437,13 @@ async function WarmActorShaders(phase, onStep = null) {
   let picks = 0;
   try {
     picks = await WarmupShaders(group, Step, null);
+    const restoreWounds = [PrepareWoundVariants(group), PrepareWoundVariants(viewmodel?.root),
+      PrepareWoundVariants(viewmodel?.body?.root)];
+    try {
+      picks += await WarmupShaders(group, Step, null);
+      if (viewmodel?.root) picks += await WarmupShaders(viewmodel.root, Step, null);
+      if (viewmodel?.body?.root) picks += await WarmupShaders(viewmodel.body.root, Step, null);
+    } finally { for (const restore of restoreWounds) restore(); }
   } finally {
     state.warming = wasWarming;
     scene.remove(group);

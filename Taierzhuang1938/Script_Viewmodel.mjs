@@ -30,6 +30,7 @@
 // 不用 Math.random。视觉审查靠逐轮截图比对，画面自己在抖就没法判断版本好坏。
 
 import * as THREE from "three";
+import { CharacterWounds } from "./Script_CharacterWounds.mjs";
 import { SampleMeleeFirstPerson, SampleMeleeVideo } from "./Script_MeleeAnimation.mjs";
 import { CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { WEAPONS, GUN_MELEE } from "./Data_Weapons.mjs";
@@ -2285,7 +2286,26 @@ export class Viewmodel {
    *                         lookDeltaYaw, lookDeltaPitch, freeAimYaw, freeAimPitch,
    *                         crouch, elapsed, lowAmmo, wallDistance }
    */
+  AddBulletWound(part, direction, info = {}) {
+    this.woundBlood ||= new Map();
+    const roots = /arm|limb/i.test(part) ? [...new Set(Object.values(this.armRigs).map(r => r.root))]
+      : this.body ? [this.body.root] : [];
+    for (const root of roots) {
+      let wounds = this.woundBlood.get(root);
+      if (!wounds) { wounds = new CharacterWounds(root); this.woundBlood.set(root,wounds); }
+      // Foreground arms use weapon FOV and owner-body has a camera clearance offset.
+      // Map the struck segment to each display rig rather than reusing world coordinates.
+      wounds.Add({part, shapeId: info.shapeId, direction});
+    }
+  }
+
+  ClearWounds() {
+    for (const wounds of this.woundBlood?.values() || []) wounds.Clear();
+    this.woundBlood?.clear();
+  }
+
   Update(dt, input = {}) {
+    for (const wounds of this.woundBlood?.values() || []) wounds.Update(dt);
     // 掉帧保护：dt 大到 0.2 s 时弹簧不炸也会把枪甩到画面外
     const step = Clamp(dt || 0, 0, 0.05);
     this.elapsed = input.elapsed != null ? input.elapsed : this.elapsed + step;
@@ -3314,6 +3334,7 @@ export class Viewmodel {
   // -------------------------------------------------------------------------
 
   Dispose() {
+    this.ClearWounds();
     this._ClearRig();
     for(const rig of Object.values(this.armRigs))rig.Dispose();
     this.body?.Dispose();

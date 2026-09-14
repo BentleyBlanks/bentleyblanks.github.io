@@ -487,6 +487,8 @@ export class Soldier {
    */
   TakeHit(damage, part, direction, info = {}) {
     const mult = part === "head" ? 3.2 : part === "torso" ? 1.0 : 0.6;
+    if (damage > 0 && ["bullet", "hmg"].includes(info.kind || "bullet"))
+      this.actor?.AddBulletWound?.(part, direction, info);
     // Corpses keep their hitbox damage history; further hits never emit another death event.
     if (!this.alive) {
       if (!this.scriptEssential && damage > 0) {
@@ -1185,6 +1187,7 @@ export class AiDirector {
     // 不能每帧清零 —— 清零的话上限只对当帧被 Think 的那六分之一生效。
     this.playerTargetedBy = 0;
     for (const s2 of this.soldiers) {
+      s2.actor?.woundBlood?.Update(dt);
       // 只数**真的看见他**的人：靠记忆压制射击的不占名额，否则听见一声枪响的三个人
       // 会把射手上限占满，真正看得见的人反而选不上他（那正是旧版集体抽搐的一条源头）。
       if (s2.alive && s2.target?.isPlayer && s2.targetVisible && !s2.targetFromMemory && !s2.missionFireHold) this.playerTargetedBy += 1;
@@ -3518,6 +3521,21 @@ export class AiDirector {
     // 借了就等于把「去掩体」的目标点就地改成一条归一化的射击方向。
     const d = this.tmpHit.subVectors(target, from).normalize();
     const struck = RaycastPlayerHitboxes(from, d, boxes);
+    this.playerWoundHit = null;
+    if (struck) {
+      const point = new THREE.Vector3().copy(from).addScaledVector(d,struck.t);
+      let shapeId = null;
+      if (struck.shape.start) {
+        const start = new THREE.Vector3().copy(struck.shape.start);
+        const axis = new THREE.Vector3().copy(struck.shape.end).sub(start);
+        const along = point.clone().sub(start).dot(axis) / Math.max(1e-8,axis.lengthSq());
+        if (struck.part === "arm") shapeId = (along < .5 ? "forearm" : "upperArm")
+          + (boxes.indexOf(struck.shape) === 2 ? "R" : "L");
+        if (struck.part === "leg") shapeId = (along < .5 ? "calf" : "thigh")
+          + (boxes.indexOf(struck.shape) === 4 ? "R" : "L");
+      }
+      this.playerWoundHit = { point, shapeId };
+    }
     return struck ? struck.part : "torso";
   }
 
@@ -3892,7 +3910,7 @@ export class AiDirector {
         // 命中几何 —— 站着基本打躯干，趴着头露在最前面（部位倍率见 COMBAT.player）。
         const part = this.PlayerHitPart(s, fromV, aimV, dir, player);
         player.TakeHit(s.weapon.damage * (COMBAT.player?.bulletScale ?? 0.40), part, dir, {
-          from: fromV.clone(), bullet: true,
+          from: fromV.clone(), bullet: true, ...this.playerWoundHit,
         });
       } else if (s.target.ref) {
         // AI 打 AI 仍按概率抽部位：那边的胶囊是给玩家的子弹用的，这条链一帧几十发不做几何。
