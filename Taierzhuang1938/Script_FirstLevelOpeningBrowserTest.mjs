@@ -244,7 +244,9 @@ try{
   });
   if(["Train","Unloading"].includes(from)){
   await Capture("TrainStart");
-  await Drive("Derail",[],{until:"trainDerailed",seconds:55});
+  const openingBudget=await page.evaluate(()=>30+["TrainMeal","TrainPack","TrainBriefing"].reduce((sum,id)=>
+    sum+window.Tengxian.Debug.FirstLevelMissionRuntime().voice.manifest.cues[id].seconds,0));
+  await Drive("Derail",[],{until:"trainDerailed",seconds:openingBudget});
   if(through==="Unloading")return;
   await Drive("LuoRescue",[],{until:"luoRescueComplete",seconds:30});
   await Drive("TrainExit",[{x:-69,z:88},{x:-69,z:78},{x:-68,z:70},{x:-66,z:66}],{seconds:80});
@@ -351,7 +353,7 @@ try{
     await Drive("PassWaitingSquad",[{x:-45,z:27}],{seconds:50});
   }
   let remainingApproach=regroup?OPENING.approachRoute.slice(3):OPENING.approachRoute;
-  if(regroup){
+  {
     const cleared=await Drive("TrenchClear",remainingApproach,{fight:true,until:"trenchCleared",seconds:150});
     remainingApproach=remainingApproach.slice(cleared.index);
     // The player has cleared this traverse. Let the squad physically catch up

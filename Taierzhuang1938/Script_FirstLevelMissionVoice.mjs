@@ -67,6 +67,13 @@ export class FirstLevelMissionVoice {
     this.queue = this.queue.filter(cue => cue !== id);
     this.Enqueue(id, { urgent: true });
   }
+  Cancel(ids) {
+    this.queue=this.queue.filter(id=>!ids.includes(id));
+    for(const id of ids)this.played.add(id);
+    if(this.current&&ids.includes(this.current.cue.id)){
+      this.DialogueLine(this.current,-1);this.StopParallel();this.audio.StopStoryVoice();this.current=null;
+    }
+  }
   Pause() {
     this.paused = true;
     this.StopParallel();
@@ -90,7 +97,7 @@ export class FirstLevelMissionVoice {
       || cue.lines.reduce((sum,line)=>sum+Math.max(1.1,line.text.length/5.2),0);
   }
   DialogueLine(track, index) {
-    if (!track.cue.id.startsWith("Train") || index === track.dialogueIndex) return;
+    if ((!track.cue.id.startsWith("Train")&&track.cue.id!=="WreckImpact") || index === track.dialogueIndex) return;
     const Notify = (lineIndex, active) => {
       if (lineIndex < 0 || lineIndex == null) return;
       const [start,end] = track.plan.lines[lineIndex];
@@ -120,6 +127,8 @@ export class FirstLevelMissionVoice {
     for(const authored of current.plan.parallel||[]) {
       if(current.sourceTime<authored.at || current.parallel.some(track=>track.cue.id===authored.id))continue;
       const cue=MISSION_DIALOGUE.find(entry=>entry.id===authored.id),total=this.Duration(cue);
+      const position=this.Position?.(cue,cue.lines[0]),listener=this.Listener?.();
+      if(authored.maxDistance&&position&&listener&&Math.hypot(position.x-listener.x,position.z-listener.z)>authored.maxDistance)continue;
       const track={cue,total,plan:MissionVoiceTimeline(cue,total),sourceTime:0,index:-1,dialogueIndex:-1,finished:false};
       current.parallel.push(track); this.played.add(cue.id); this.PlayParallel(track);
       this.Event?.("TrainBriefingStart",cue.id);
@@ -162,8 +171,7 @@ export class FirstLevelMissionVoice {
     const current = this.current, segment = current.plan.segments[current.segmentIndex];
     const played = this.audio.PlayStoryVoice(`Mission${current.cue.id}`, {
       position: this.Position?.(current.cue,current.cue.lines[Math.max(0,current.index)]),
-      environmentGain:["TrainMeal","TrainBanter"].includes(current.cue.id)?CARRIAGE_SOUND.speechBedGain:
-        current.cue.id==="TrainShelling"?CARRIAGE_SOUND.escapeSpeechBedGain:1,
+      environmentGain:current.cue.id.startsWith("Train")?CARRIAGE_SOUND.speechBedGain:CARRIAGE_SOUND.escapeSpeechBedGain,
       offset: current.sourceTime,
       maxDuration: segment.end-current.sourceTime,
     });

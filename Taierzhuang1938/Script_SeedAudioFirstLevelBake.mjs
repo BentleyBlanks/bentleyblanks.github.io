@@ -45,7 +45,7 @@ async function Main() {
       console.log(`${cue.id}: ${cue.lines.length} lines, ONE request, ${prompt.length} characters`);
       continue;
     }
-    if (!force && manifest.cues[cue.id]?.promptHash === hash && fs.existsSync(output)) {
+    if (!force && manifest.cues[cue.id]?.promptHash === hash && (manifest.cues[cue.id]?.speechRate??0)===(cue.speechRate??0) && fs.existsSync(output)) {
       Probe(output);
       console.log(`${cue.id}: verified existing whole cue`);
       continue;
@@ -67,7 +67,7 @@ async function Main() {
             format: "mp3",
             sample_rate: 44100,
             pitch_rate: 0,
-            speech_rate: 0,
+            speech_rate: cue.speechRate ?? 0,
             loudness_rate: 0,
           },
           watermark: {},
@@ -136,6 +136,7 @@ async function Main() {
       sha256: crypto.createHash("sha256").update(fs.readFileSync(output)).digest("hex"),
       lineCount: cue.lines.length,
       requests: 1,
+      speechRate: cue.speechRate ?? 0,
       continuous: true,
       mastering: "MonoBeforeLoudnessTruePeakMinus3",
     };

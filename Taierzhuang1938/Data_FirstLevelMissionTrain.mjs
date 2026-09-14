@@ -17,6 +17,7 @@ export const MISSION_TRAIN = Object.freeze({
       {at:0,x:-77,z:87.08,speed:.65,face:{x:-77,z:88}},
       {at:10,x:-78,z:83,speed:.65},
       {at:19,x:-78.91,z:82.05,speed:.65,face:{x:-77,z:82.05},wall:true},
+      {at:28,x:-77,z:87.08,speed:.65,face:{x:-77,z:88}},
     ],
     luo: [
       {at:12,x:-76.5,z:88.95,speed:.7},

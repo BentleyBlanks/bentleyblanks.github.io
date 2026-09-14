@@ -89,7 +89,9 @@ export class FirstLevelMissionRuntime {
       Listener: () => this.player.EyePosition,
       Done: (id) => this.VoiceDone(id),
       Event: (id,cueId,detail) => this.VoiceEvent(id,cueId,detail),
-      Ready: (id) => this.Has(id),
+      Ready: (id) => id === "trainPackNear"
+        ? Math.hypot(this.companion.Handle("yaowa").position.x-this.player.position.x,
+          this.companion.Handle("yaowa").position.z-this.player.position.z)<3.5 : this.Has(id),
       Clock: this.VoiceClock,
     });
     this.view = new FirstLevelMissionView({
@@ -169,6 +171,8 @@ export class FirstLevelMissionRuntime {
   // Intact dialogue recordings follow the current speaker; overlapping Luo
   // briefing keeps its own source. Unknown nearby voices stay in carriage space.
   VoicePosition(cue,line) {
+    if(cue.id==="WoundedArrival"&&this.opening.wounded)return this.Point(this.opening.wounded.actor.position,1.2);
+    if(line?.who==="wounded"&&this.trainWounded)return this.Point(this.trainWounded.position,1.2);
     if(cue.id==="SupportOrder"&&this.opening.runner)return this.Point(this.opening.runner.actor.position,1.3);
     if (cue.id.startsWith("Retreat") || cue.id === "ZhouDeath") return this.Point(this.column.zhou, 1);
     const who = line?.who ?? cue.lines[0]?.who;
@@ -257,9 +261,13 @@ export class FirstLevelMissionRuntime {
     }
   }
   VoiceDone(id) {
-    if (id === "TrainMeal") this.Say("TrainBanter");
-    if (id === "TrainBanter") this.Record("trainShelling");
-    if (id === "TrainShelling") this.Record("unloadOrdersHeard");
+    if (id === "TrainMeal") this.Say("TrainPack");
+    if (id === "TrainPack") this.Say("TrainBriefing");
+    if (id === "TrainBriefing") this.Record("trainShelling");
+    if (id === "WreckImpact") this.Say("TrainShelling");
+    if (id === "TrainShelling") this.Say("WreckExit");
+    if (id === "WreckExit") this.Record("unloadOrdersHeard");
+    if (id === "ShelterAid") this.Say("EscapeWhisper");
     if (id === "EscapeWhisper") this.Record("escapeWhisperHeard");
     if (id === "SupportOrder") this.Record("supportOrdersHeard");
     if (id === "AircraftFirst") this.Record("firstAirOrdersHeard");
@@ -1100,6 +1108,7 @@ export class FirstLevelMissionRuntime {
         break;
       case "Unloading":
         this.VoiceEvent("TrainFirstShell");
+        this.VoiceEvent("TrainNearShell");
         this.Say(stage.cue, { urgent: true });
         break;
       case "Support":
@@ -1327,6 +1336,34 @@ export class FirstLevelMissionRuntime {
         this.Record("guardWithdrawalResolved", { survived,casualties:this.guards.length-survived,outcome:survived?"withdrawal":"lost" });
         if(survived)this.Record("guardsSafe",{survived});
       }
+  }
+  UpdateFrontDialogue() {
+    if(!["Support","MachineGun"].includes(this.flow.stage.id)||!this.Has("frontReached"))return;
+    const remaining=this.guards.filter(guard=>guard.actor.alive&&!guard.safe);
+    const gunner=this.enemies.get("FrontGunner");
+    const blocked=remaining.length&&gunner?.alive;
+    if(gunner&&!blocked)this.voice.Cancel(["FrontBlockade","FrontReminder","FrontFallback"]);
+    if(remaining.length&&!this.voice.played.has("FrontCoverCall")&&!this.voice.current)this.Say("FrontCoverCall");
+    if(this.voice.finished.has("FrontCoverCall"))this.frontDialogueAt??=this.time;
+    const age=this.frontDialogueAt==null?0:this.time-this.frontDialogueAt;
+    const visible=remaining.some(guard=>{
+      const point=this.Point(guard.actor.position,1),ndc=point.clone().project(this.player.camera);
+      return ndc.z>=-1&&ndc.z<=1&&Math.abs(ndc.x)<.75&&Math.abs(ndc.y)<.75&&!this.BlocksSight(this.player.EyePosition,point);
+    });
+    if(visible)this.frontDialogueSeenAt??=this.time;else this.frontDialogueSeenAt=null;
+    const seen=this.frontDialogueSeenAt!=null&&this.time-this.frontDialogueSeenAt>=R.frontDialogueSeenS;
+    if(blocked&&this.frontDialogueAt!=null){
+      if(seen&&!this.voice.played.has("FrontFallback"))this.Say("FrontBlockade");
+      else if(!seen&&!this.voice.played.has("FrontBlockade")){
+        if(age>=R.frontDialogueFallbackS){this.voice.Cancel(["FrontReminder"]);this.Say("FrontFallback");}
+        else if(age>=R.frontDialogueReminderS)this.Say("FrontReminder");
+      }
+    }
+    if(gunner&&!gunner.alive&&remaining.some(guard=>guard.crossing)){
+      this.Say("FrontCrossing");
+      if([...this.enemies.values()].some(actor=>actor.alive&&actor.position.x>this.player.position.x))this.Say("FrontPursuit");
+    }
+    if(remaining.length&&this.guards.some(guard=>guard.safe&&guard.actor.alive))this.Say("FrontReceived");
   }
   OnBlast({ position, radius, damage, byPlayer, explosiveId }) {
     if (byPlayer) {
@@ -1827,7 +1864,7 @@ export class FirstLevelMissionRuntime {
     prof?.B("story/mission/voice");
     this.voice.Update(dt);
     const meal=this.voice.current;
-    if(["TrainMeal","TrainBanter"].includes(meal?.cue.id)&&meal.phase==="playing"){
+    if(["TrainMeal","TrainPack","TrainBriefing"].includes(meal?.cue.id)&&meal.phase==="playing"){
       if(this.trainClockCue!==meal.cue.id){
         this.trainClockCue=meal.cue.id;
         this.trainCueClockStart=this.time+(this.trainClockLead||0)-meal.sourceTime;
@@ -1869,6 +1906,7 @@ export class FirstLevelMissionRuntime {
     const stage = this.flow.stage.id,
       t = this.flow.stageTime;
     if(["Support","MachineGun","Tank","Orders"].includes(stage))this.UpdateGuards(dt);
+    this.UpdateFrontDialogue();
     prof?.E("story/mission/director");
     prof?.B("story/mission/other");
     if (stage === "Death") {
@@ -2037,6 +2075,7 @@ export class FirstLevelMissionRuntime {
         survivingAhead: this.column.litters.slice(0, R.zhouQueueIndex).filter(litter => litter.health > 0).length });
       if (this.column.QueueAhead() === 3) this.Say("TransferQueue");
       if (this.column.QueueAhead() === 2) this.Say("TransferTwo");
+      if (this.column.QueueAhead() === 1) this.Say("TransferOne");
       if (this.column.QueueAhead() === 0 && this.Has("transferAttacksResolved") && t >= R.transferSeconds - R.followVehicleLeadS) {
         this.column.BeginZhouBoarding();
         this.Say("FollowVehicle");

@@ -16,7 +16,7 @@ export const MISSION_STAGES = Object.freeze([
     "伏低，听罗班长指挥！脱离车厢后借掩体进入交通壕。",
     A.unload,
     ["trainStopped", "trainDerailed", "luoRescueComplete", "unloadOrdersHeard", "unloaded"],
-    "TrainShelling",
+    "WreckImpact",
   ),
   Stage("TrenchEntry", "侧沟有日军！清出折角，跟班长进掩蔽处。", OPENING.shelter, ["trenchEntered", "trenchCleared", "shelterReached"], null),
   Stage("Shelter", "守住折角，照看从前方撤下来的伤兵。", OPENING.shelter, ["escapeWhisperHeard", "woundedSeen", "supportOrdersHeard"], "EscapeWhisper"),

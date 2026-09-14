@@ -19,13 +19,14 @@ export const OPENING = Object.freeze({
   rescueGripSeconds: 1.25,
   rescuePullSeconds: 2.1,
   rescueStandSeconds: 3.55,
-  rescueDialogueLines: {reach:6,grip:7,steady:8},
+  rescueDialogueLines: {reach:0,grip:1,steady:1},
   rescueGripFraction: .3,
   dialogueActions: {
     TrainMeal:{heyoutian:"HeReplyTalk",luo:"LuoBriefing"},
     TrainBanter:{liuwencai:"LiuCountTalk",heyoutian:"HeReplyTalk"},
     TrainBriefing:{luo:"LuoBriefing"},
-    TrainShelling:{luo:"LuoCrouchReassure",yaowa:"YaowaAlarmCrouch"},
+    TrainShelling:{},
+    WreckImpact:{yaowa:"YaowaAlarmCrouch"},
   },
   barrage: {
     firstFlightS: .45, shellFlightS: 1.2, shellRadiusM: 5,

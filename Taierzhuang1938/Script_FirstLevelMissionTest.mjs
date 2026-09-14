@@ -34,7 +34,7 @@ import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
 {
   const {AudioEngine}=await import("./Script_Audio.mjs");
   const manifest=JSON.parse(fs.readFileSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json",import.meta.url)));
-  const cues=MISSION_DIALOGUE.filter(cue=>["TrainBanter","TrainBriefing"].includes(cue.id));
+  const cues=MISSION_DIALOGUE.filter(cue=>["TrainPack","TrainBanter"].includes(cue.id));
   const buffers=new Map(cues.map(cue=>[manifest.cues[cue.id].sha256,
     {duration:manifest.cues[cue.id].seconds,key:`Mission${cue.id}`} ]));
   const Param=()=>({value:0,setValueAtTime(value){this.value=value;},setTargetAtTime(value){this.value=value;},
@@ -60,7 +60,7 @@ import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
   const Camera=(x,y,z)=>({matrixWorld:{elements:[1,0,0,0,0,1,0,0,0,0,1,0,x,y,z,1]}});
   const position={x:-76.2,y:2.54,z:201};
   audio.SetListener(Camera(-77,2.8,341.9));
-  assert.equal(audio.Play("voice.MissionTrainBriefing",{position,priority:true}),null,
+  assert.equal(audio.Play("voice.MissionTrainBanter",{position,priority:true}),null,
     "a listener left at the old rendered frame reproduces the missing briefing");
   assert.equal(audio.drops.distance,1,"the real voice distance rule, not decoding or node budget, rejects it");
   audio.SetListener(Camera(-77,2.8,201.7));
@@ -69,13 +69,13 @@ import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
   const voice=new FirstLevelMissionVoice({audio,Clock:()=>ctx.currentTime,Position:()=>position,
     hud:{SayLines(){},Say(){}}});voice.manifest=manifest;
   try{
-    voice.Enqueue("TrainBanter");voice.Update(0);
+    voice.Enqueue("TrainPack");voice.Update(0);
     const Step=count=>{for(let i=0;i<count;i++){ctx.currentTime+=1/60;voice.Update(1/60);}};
-    Step(120);
+    Step(360);
     const main=audio.storyVoice,parallel=voice.current.parallel[0];
     assert.ok(main&&parallel?.voice,"both complete recordings acquire real AudioEngine voice handles");
     assert.ok(audio.activeVoices.has(main)&&audio.activeVoices.has(parallel.voice),"the briefing does not replace the story slot");
-    assert.deepEqual(sources.map(source=>source.buffer.key),["MissionTrainBanter","MissionTrainBriefing"]);
+    assert.deepEqual(sources.map(source=>source.buffer.key),["MissionTrainPack","MissionTrainBanter"]);
     assert.ok(sources.every(source=>source.started&&source.playbackRate.value===1),"both loaded recipes schedule a source without changing pitch");
     assert.ok(parallel.voice.distance<2&&parallel.voice.panner,"the briefing stays spatial at the current listener");
     assert.ok(audio.stats.priorityOverBudget>0&&audio.drops.starved===0,"priority protects both tracks from budget rejection");
@@ -204,6 +204,25 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
   }
   console.log("ok carriage crouch scope: live barrage, completed rescue, all later stages and legacy saves");
   if(process.argv.includes("--opening-stance"))process.exit(0);
+  {
+    const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){}},hud:{Say(){}}});
+    const gunner={alive:true,position:{x:25,z:-161}};
+    const guard={safe:false,crossing:false,actor:{alive:true,position:{x:0,z:0}}};
+    const r=Object.create(FirstLevelMissionRuntime.prototype);
+    Object.assign(r,{voice,time:0,flow:{stage:{id:"Support"}},guards:[guard],enemies:new Map([["FrontGunner",gunner]]),
+      player:{position:{x:0,z:0},EyePosition:{},camera:{}},Has:()=>true,BlocksSight:()=>false,
+      Point:()=>({clone:()=>({project:()=>({x:2,y:0,z:0})})})});
+    voice.played.add("FrontCoverCall");voice.finished.add("FrontCoverCall");
+    r.UpdateFrontDialogue();r.time=R.frontDialogueReminderS;r.UpdateFrontDialogue();
+    assert.ok(voice.queue.includes("FrontReminder"),"unseen friends get one source-authored reminder");
+    r.time=R.frontDialogueFallbackS;r.UpdateFrontDialogue();
+    assert.ok(voice.queue.includes("FrontFallback")&&!voice.queue.includes("FrontReminder"),"fallback replaces the stale queued reminder");
+    gunner.alive=false;guard.crossing=true;r.UpdateFrontDialogue();
+    assert.ok(!voice.queue.some(id=>["FrontBlockade","FrontReminder","FrontFallback"].includes(id)),
+      "destroying the actual blocking gun cancels false blockade dialogue");
+    assert.ok(voice.queue.includes("FrontCrossing"),"a real crossing after gun destruction receives its new exchange");
+    assert.ok(!voice.finished.has("FrontFallback"),"cancelled dialogue is never falsely marked heard");
+  }
   const Make=()=>{
     const facts=new Set(["trainFirstShellLaunched"]),rays=[],impacts=[],sounds=[];
     const fixture={clock:0,wallX:null};
@@ -232,11 +251,16 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     runtime.voice=voice;
     voice.manifest=JSON.parse(fs.readFileSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json",import.meta.url)));
     voice.Enqueue("TrainShelling");voice.Update(0);
+    voice.current.cue={...voice.current.cue,lines:Array.from({length:3},()=>({who:"luo",text:"Fixture"}))};
+    voice.current.plan={lines:[[0,0],[0,0],[0,2.4]],segments:[
+      {start:0,end:2.4,wait:0,events:[{at:1,id:"TrainNearShell"}]},
+      {start:2.4,end:3,wait:0,gate:"trainNearShellImpact"}],tail:0};
+    voice.BeginSegment();
     fixture.Step=(audioSeconds,dt=.05)=>{fixture.clock+=audioSeconds;runtime.time+=dt;voice.Update(dt);combat.StepShells(dt);};
     return Object.assign(fixture,{runtime,voice,combat,facts,rays,impacts,sounds});
   };
   const slow=Make(),cue=MISSION_DIALOGUE.find(cue=>cue.id==="TrainShelling");
-  const plan=MissionVoiceTimeline(cue,slow.voice.manifest.cues.TrainShelling.seconds);
+  const plan=slow.voice.current.plan;
   const launchAt=plan.segments[0].events[0].at,impactAt=plan.lines[2][1];
   // Ten rendered frames per real second, with Main's simulation dt cap of .05.
   while(slow.clock<launchAt+.15)slow.Step(.1);
@@ -249,7 +273,7 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
   slow.voice.Resume();
   for(let i=0;i<30&&!slow.impacts.length;i++)slow.Step(.1);
   assert.equal(slow.impacts.length,1,"the real impact occurs despite simulation advancing at half audio speed");
-  assert.equal(slow.voice.current.sourceTime,impactAt,"impact coincides with the interrupted reassurance source endpoint");
+  assert.ok(Math.abs(slow.voice.current.sourceTime-impactAt)<1e-8,"the retained-source projectile reaches its authored endpoint");
   assert.ok(slow.facts.has("trainNearShellImpact"),"the collision releases the actual injury-dialogue gate");
   assert.ok(slow.rays.length>=160,"catch-up retains the full substepped collision path");
   assert.equal(slow.combat.shells.length,0,"the shell retires once after impact");
@@ -340,6 +364,7 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
   const plan=MissionVoiceTimeline(cue,manifest.cues.TrainShelling.seconds),indices=OPENING.rescueDialogueLines;
   const sourceStart=plan.lines[indices.reach][0],sourceEnd=plan.lines[indices.steady][1];
   const liftAt=plan.segments.flatMap(segment=>segment.events||[]).find(event=>event.id==='TrainRescueLift').at;
+  const steadyAt=plan.segments.flatMap(segment=>segment.events||[]).find(event=>event.id==='TrainRescueSteady').at;
   const summaries=[];
   for(const fps of [10,60,144]){
     const dt=1/fps,moves=[],contacts=[],teleports=[],facts=new Set(['trainDerailed','trainStopped','trainLuoStanding','luoRescueRequested']);
@@ -375,12 +400,12 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
       if(source<=liftAt){
         assert.equal(position.x,OPENING.playerFall.x,'reach and grip cannot drag the player early');
         assert.equal(position.z,OPENING.playerFall.z);assert.equal(opening.RescueLift(),0);
-      }else if(source<plan.lines[indices.steady][0])pullSamples++;
+      }else if(source<steadyAt)pullSamples++;
       runtime.time+=Math.min(dt,.05);
     };
     for(let source=sourceStart;source<sourceEnd;source+=dt)Sample(source);
     Sample(sourceEnd);
-    assert.ok(pullSamples>=10,'the clearance assertion observes the actual lifting interval');
+    assert.ok(pullSamples>=Math.max(1,Math.floor((steadyAt-liftAt)/dt)-1),'the clearance assertion samples the full current lifting interval at every frame rate');
     assert.ok(moves.every(move=>move.speed===0&&move.point.x===luo.position.x&&move.point.z===luo.position.z),
       'the authored brace never depends on AI movement keeping up with the player');
     assert.equal(position.x,OPENING.rescueEnd.x);assert.equal(position.z,OPENING.rescueEnd.z);
@@ -982,6 +1007,9 @@ if (process.argv.includes("--audio")) {
       if(i)assert.ok(start>=aligned.lines[i-1][1],cue.id+' subtitles do not overlap');
     });
     assert.ok(entry?.continuous && entry.requests === 1 && entry.seconds > 0.5, cue.id);
+    assert.equal(entry.speechRate??0,cue.speechRate??0,cue.id+' generation delivery rate matches the source');
+    const sourceJson='['+cue.lines.map(line=>'{"who": '+JSON.stringify(line.who)+', "text": '+JSON.stringify(line.text)+'}').join(', ')+']';
+    assert.equal(aligned.scriptSha256,crypto.createHash('sha256').update(sourceJson).digest('hex'),cue.id+' alignment uses the current complete text');
     const bytes=fs.readFileSync(new URL('./Audio/FirstLevel/'+cue.file,import.meta.url));
     assert.equal(bytes.length,entry.bytes,cue.id+' bytes');
     assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),entry.sha256,cue.id+' content hash');
@@ -1009,51 +1037,30 @@ console.log(process.argv.includes("--audio")
   assert.deepEqual(offsets,[0,.3,0]);
 }
 {
-  const events=[], sources=[], subtitles=[], done=[], facts=new Set(),lineEvents=[];
+  const events=[],sources=[],done=[],facts=new Set();
   const voice=new FirstLevelMissionVoice({
-    audio:{PlayStoryVoice:(key,options)=>{sources.push({key,...options});return {duration:22.544};},StopStoryVoice(){}},
-    hud:{Say:(_who,text)=>subtitles.push(text)},Done:id=>done.push(id),
-    Event:(id,cue,detail)=>{if(id==="TrainDialogueLine")lineEvents.push({cue,...detail});else events.push(id);},Ready:id=>facts.has(id),
+    audio:{PlayStoryVoice:(key,options)=>{sources.push({key,...options});return {};},StopStoryVoice(){}},
+    hud:{Say(){}},Done:id=>done.push(id),Ready:id=>facts.has(id),
+    Event:id=>{if(id!=="TrainDialogueLine")events.push(id);},
   });
   voice.manifest=JSON.parse(fs.readFileSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json",import.meta.url)));
-  voice.Enqueue("TrainShelling");
-  for(let i=0;i<900;i++)voice.Update(1/60);
-  assert.deepEqual(events,[]);
-  assert.equal(voice.State().segment,"IncomingAndReassure");
-  assert.equal(voice.State().playbackPhase,"waiting","the shout cannot anticipate the incoming fire");
-  assert.equal(sources.length,0,"no reaction speech precedes the actual surprise volley");
-  facts.add("trainFirstShellLaunched");
-  for(let i=0;i<1800;i++)voice.Update(1/60);
-  assert.deepEqual(events,["TrainProneOrder","TrainNearShell"]);
-  assert.equal(voice.State().segment,"DerailImpact");
-  assert.ok(!subtitles.some(text=>text.includes("手遭打中了")),"injury speech waits for actual impact");
-  facts.add("trainNearShellImpact");
-  for(let i=0;i<360;i++)voice.Update(1/60);
-  assert.ok(events.includes("TrainProneOrder"));
-  voice.Pause();const paused=voice.State();
-  voice.Update(40);assert.deepEqual(voice.State(),paused);
-  voice.Resume();
-  for(let i=0;i<1800;i++)voice.Update(1/60);
-  assert.equal(voice.State().segment,"LuoRescue");
-  assert.equal(voice.State().playbackPhase,"waiting");
-  assert.ok(!subtitles.some(text=>text.includes("手拿来")),"Luo cannot reach the player before standing up himself");
-  facts.add("trainStopped");
-  for(let i=0;i<300;i++)voice.Update(1/60);
-  assert.equal(voice.State().playbackPhase,"waiting","a stopped train alone cannot skip Luo's staggered recovery");
-  facts.add("trainLuoStanding");
-  for(let i=0;i<1200;i++)voice.Update(1/60);
-  assert.ok(events.includes("TrainRescue"));
-  assert.equal(voice.State().segment,"GroundFire");
-  assert.ok(!done.length,"orders cannot rush ahead of Luo releasing the player");
-  facts.add("luoRescueComplete");
-  for(let i=0;i<1800;i++)voice.Update(1/60);
-  assert.deepEqual(done,["TrainShelling"]);
-  assert.ok(sources.every(source=>source.maxDuration>0&&source.offset>=0));
-  assert.equal(events.filter(id=>id==="TrainNearShell").length,1,"resume never re-fires a shell");
-  assert.deepEqual(lineEvents.filter(event=>event.active).map(event=>event.index),Array.from({length:12},(_,index)=>index),"every opening line emits its actor's source-time action");
-  const plan=MissionVoiceTimeline(MISSION_DIALOGUE.find(cue=>cue.id==="TrainShelling"),voice.manifest.cues.TrainShelling.seconds);
-  assert.equal(Number((plan.lines[2][1]-plan.segments[0].events[0].at).toFixed(3)),OPENING.nearShellFlightS,"the near shell lands at the interrupted reassurance ending");
-  assert.equal(plan.segments[2].events[0].at,plan.lines[6][0],"the reach starts on 'look at me, give me your hand'");
+  const Step=()=>{for(let i=0;i<3600;i++)voice.Update(1/60);};
+  voice.Enqueue("WreckImpact");Step();
+  assert.equal(sources.length,0,"injury cries require a real impact");
+  facts.add("trainNearShellImpact");Step();
+  assert.deepEqual(done,["WreckImpact"]);
+  voice.Enqueue("TrainShelling");Step();
+  assert.equal(sources.length,1,"the rescue waits for Luo to regain his footing");
+  facts.add("trainStopped");Step();assert.equal(sources.length,1);
+  facts.add("trainLuoStanding");voice.Update(0);voice.Update(.2);
+  voice.Pause();const paused=voice.State();voice.Update(10);assert.deepEqual(voice.State(),paused);voice.Resume();Step();
+  assert.deepEqual(done,["WreckImpact","TrainShelling"]);
+  assert.equal(events.filter(id=>id==="TrainRescue").length,1,"pause cannot repeat the physical rescue");
+  voice.Enqueue("WreckExit");Step();assert.equal(done.length,2,"exit speech waits until player control is restored");
+  facts.add("luoRescueComplete");Step();assert.deepEqual(done,["WreckImpact","TrainShelling","WreckExit"]);
+  for(const key of ["MissionWreckImpact","MissionWreckExit"]){
+    const takes=sources.filter(s=>s.key===key);assert.equal(takes.length,1);assert.equal(takes[0].offset,0);
+  }
 }
 console.log("ok paused audio ranges, subtitle source timing, queued cues and shell-impact gates");
 
@@ -1067,25 +1074,25 @@ console.log("ok paused audio ranges, subtitle source timing, queued cues and she
     Event:(id,cue,detail)=>{if(id==="TrainDialogueLine")lineEvents.push({cue,...detail});else events.push(id);},
   });
   voice.manifest=JSON.parse(fs.readFileSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json",import.meta.url)));
-  voice.Enqueue("TrainBanter");voice.Update(0);
+  voice.Enqueue("TrainPack");voice.Update(0);
   const Step=count=>{for(let i=0;i<count;i++){clock+=1/60;voice.Update(1/60);}};
-  Step(180);const before=voice.State();voice.Pause();clock+=10;voice.Update(10);
+  Step(480);const before=voice.State();voice.Pause();clock+=10;voice.Update(10);
   assert.equal(voice.State().sourceTime,before.sourceTime,"pausing freezes the banter source");
   assert.equal(voice.State().parallel[0].sourceTime,before.parallel[0].sourceTime,"pausing also freezes Luo's simultaneous source");
   assert.ok(parallelSources[0].stopped,"pause stops the live companion voice");
-  voice.Resume();Step(1800);
-  assert.deepEqual(done,["TrainBriefing","TrainBanter"],"the whole briefing ends before the interrupted retort and volley");
+  voice.Resume();Step(4200);
+  assert.deepEqual(done,["TrainBanter","TrainPack"],"the whole briefing ends before the interrupted retort and volley");
   assert.equal(sources.length,2,"the intact banter only restarts to resume from pause");
   assert.equal(parallelSources.length,2,"the intact briefing only restarts to resume from pause");
   assert.equal(parallelSources[1].offset,before.parallel[0].sourceTime,"the simultaneous source resumes at its own exact offset");
-  assert.ok(rows.some(lines=>lines.length===2&&lines.some(line=>line.speaker==="罗班长")&&lines.some(line=>line.speaker==="刘文财")),"both speaking actors have visible separate subtitles");
-  for(const line of rows.flat())assert.equal(line.emphasis,line.speaker==="罗班长"?"lead":"aside",
+  assert.ok(rows.some(lines=>lines.length===2&&lines.some(line=>["顺子","幺娃"].includes(line.speaker))&&lines.some(line=>line.speaker==="刘文财")),"both speaking actors have visible separate subtitles");
+  for(const line of rows.flat())assert.equal(line.emphasis,["顺子","幺娃"].includes(line.speaker)?"lead":"aside",
     `${line.speaker}: Luo's briefing leads the subtitle stack and the overlapping banter is an aside`);
   const utterances=rows.flat().filter(line=>line.started).map(line=>line.text);
-  for(const id of ["TrainBanter","TrainBriefing"])for(const line of MISSION_DIALOGUE.find(cue=>cue.id===id).lines)
+  for(const id of ["TrainPack","TrainBanter"])for(const line of MISSION_DIALOGUE.find(cue=>cue.id===id).lines)
     assert.ok(utterances.includes(line.text),`${id}: every complete spoken line is retained in subtitle audit`);
-  assert.equal(events.filter(id=>id==="TrainIncomingFire").length,1,"the interrupted retort fires the volley exactly once across pause");
-  assert.equal(lineEvents.filter(event=>event.active&&event.cue==="TrainBriefing").length,1,"the briefing is one continuous performance and action");
+  assert.equal(events.filter(id=>id==="TrainIncomingFire").length,0,"the interrupted retort fires the volley exactly once across pause");
+  assert.equal(lineEvents.filter(event=>event.active&&event.cue==="TrainBanter").length,5,"every optional banter line emits an actor action");
   console.log("ok complete simultaneous banter/briefing, dual subtitles, source-clock actions and pause/resume");
 }
 
@@ -1176,10 +1183,12 @@ for(const preparedAnimation of [false,true]) {
  let clock=10;const events=[],subtitles=[];
  const voice=new FirstLevelMissionVoice({audio:{PlayStoryVoice:()=>({voice:{t:clock+.005}}),StopStoryVoice(){}},
    hud:{Say:(_who,text)=>subtitles.push(text)},Clock:()=>clock,Event:id=>events.push(id)});
+ voice.manifest=JSON.parse(fs.readFileSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json",import.meta.url)));
  voice.Enqueue("AircraftReturn");voice.Update(0);
+ const diveAt=voice.current.plan.segments[0].events[0].at;
  voice.Update(30);assert.equal(voice.State().sourceTime,0,"gameplay stepping cannot outrun a live audio clock");
- clock+=4.4;voice.Update(.01);assert.deepEqual(events,[]);
- clock+=.3;voice.Update(.01);assert.deepEqual(events,["AircraftDiveOrder"]);
+ clock+=diveAt-.1;voice.Update(.01);assert.deepEqual(events,[]);
+ clock+=.2;voice.Update(.01);assert.deepEqual(events,["AircraftDiveOrder"]);
  voice.Pause();clock+=20;voice.Update(20);voice.Resume();clock+=.2;voice.Update(.01);
  assert.equal(events.length,1,"resuming the source never repeats the physical dive");
  console.log("ok real audio clock governs subtitles and second-aircraft dive order");

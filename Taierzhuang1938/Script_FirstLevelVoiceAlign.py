@@ -38,7 +38,7 @@ def Main():
         samples=decode_audio(str(path),sampling_rate=16000)
         seconds=len(samples)/16000
         tokenizer=Tokenizer(model.hf_tokenizer,model.model.is_multilingual,task="transcribe",
-            language="ja" if cue.get("subtitles")==False else "zh")
+            language=cue.get("language") or ("ja" if cue.get("subtitles")==False else "zh"))
         groups=authored.get(cue["id"],[(0,seconds,0,len(cue["lines"]))])
         next_line=0; previous_end=0
         for start,end,first,last in groups:

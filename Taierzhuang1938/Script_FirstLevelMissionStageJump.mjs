@@ -25,13 +25,13 @@ export function ApplyFirstLevelStageJump(runtime, value) {
     r.carriageSound?.Handle("CarriageUneasy");
     // The meal has finished while the train approaches the station. Preserve
     // that travelled distance so the real shell impact starts normal braking.
-    r.time = r.flow.time = ["TrainMeal","TrainBanter"].reduce((elapsed,id)=>{
+    r.time = r.flow.time = ["TrainMeal","TrainPack","TrainBriefing"].reduce((elapsed,id)=>{
       const seconds=r.voice.manifest.cues[id]?.seconds;
       if(!Number.isFinite(seconds))throw new Error("Train checkpoint requires the loaded voice manifest: "+id);
       const plan=MissionVoiceTimeline(MISSION_DIALOGUE.find(c=>c.id===id),seconds);
       return elapsed+plan.segments.reduce((sum,part)=>sum+part.end-part.start+(part.wait||0),plan.tail||0);
     },0);
-    for(const id of ["TrainBanter","TrainBriefing"]){r.voice.played.add(id);r.voice.finished.add(id);}
+    for(const id of ["TrainPack","TrainBriefing"]){r.voice.played.add(id);r.voice.finished.add(id);}
     const offset = MissionTrainMotion(r.time).offsetM;
     r.train.Translate(offset - r.battlefield.trainOffsetM);
     r.battlefield.SetTrainOffset(offset);

@@ -250,9 +250,10 @@ export class FirstLevelOpening {
           const lines=r.voice?.current?.plan.lines,indices=C.rescueDialogueLines;
           if(lines?.[indices.steady]){
             this.rescueSourceStart=lines[indices.reach][0];
-            const grip=lines[indices.grip][0]-this.rescueSourceStart,steady=lines[indices.steady][0]-this.rescueSourceStart;
+            const grip=lines[indices.grip][0]-this.rescueSourceStart;
             this.rescueDuration=lines[indices.steady][1]-this.rescueSourceStart;
             const events=r.voice.current.plan.segments.flatMap(segment=>segment.events||[]);
+            const steady=(events.find(event=>event.id==="TrainRescueSteady")?.at??lines[indices.steady][1])-this.rescueSourceStart;
             const liftAt=events.find(event=>event.id==="TrainRescueLift")?.at;
             const lift=liftAt==null?grip+(steady-grip)*C.rescueGripFraction:liftAt-this.rescueSourceStart;
             this.rescueBeats=[[0,0],[grip,C.rescueGripSeconds],[lift,C.rescuePullSeconds],
@@ -272,6 +273,7 @@ export class FirstLevelOpening {
       }
     }
     if(stage==="TrenchEntry"){
+      if(r.Near(C.trenchEntry,8))r.Say("TrenchContact");
       if(r.Near(C.trenchEntry,5))r.Record("trenchEntered");
       const intruders=C.intruders.map(s=>r.enemies.get(s.id));
       if(intruders.every(a=>a&&!a.alive))r.Record("trenchCleared",{count:intruders.length});
@@ -281,14 +283,15 @@ export class FirstLevelOpening {
     if(stage==="Shelter"){
       const yaowa=r.companion.Handle("yaowa"),luo=r.companion.Handle("luo");
       if(r.Near(C.shelter,C.shelterRadiusM)&&yaowa?.alive&&Distance(yaowa.position,r.player.position)<5&&
-        luo?.alive&&Distance(luo.position,C.shelter)<12&&!r.BlocksSight(r.player.EyePosition,r.Point(yaowa.position,1)))r.Say("EscapeWhisper");
+        luo?.alive&&Distance(luo.position,C.shelter)<12&&!r.BlocksSight(r.player.EyePosition,r.Point(yaowa.position,1)))r.Say("ShelterAid");
       this.Messenger(this.wounded,R.walkSpeedMps);
       // The physical casualty appears before the runner reaches the exchange.
       if(this.wounded&&Distance(r.player.position,this.wounded.actor.position)<C.shelterWitnessM&&
         !r.BlocksSight(r.player.EyePosition,r.Point(this.wounded.actor.position,1)))r.Record("woundedSeen");
       if(r.Has("woundedSeen"))this.Messenger(this.runner,R.squadSpeedMps);
+      if(r.Has("escapeWhisperHeard")&&r.Has("woundedSeen"))r.Say("WoundedArrival");
       if(r.Has("escapeWhisperHeard")&&r.Has("woundedSeen")&&this.runner&&
-        Distance(this.runner.actor.position,C.shelter)<5)r.Say("SupportOrder");
+        r.voice.finished.has("WoundedArrival")&&Distance(this.runner.actor.position,C.shelter)<5)r.Say("SupportOrder");
     }
     this.FireWindows();
     this.UpdateZhou();
