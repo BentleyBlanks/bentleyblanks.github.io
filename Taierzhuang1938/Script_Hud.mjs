@@ -910,6 +910,9 @@ export class Hud {
    * 重复触发从满亮重新计时，不叠 DOM、不叠透明度，避免连续砍杀糊成红屏。
    */
   MeleeKillBlood() {
+    const textures = MELEE_KILL_BLOOD.textures;
+    const textureIndex = Math.min(textures.length - 1, Math.floor(Math.random() * textures.length));
+    SetStyle(this.el.meleeKillBlood, "backgroundImage", `url("${textures[textureIndex]}")`);
     this.meleeKillBloodTimer = MELEE_KILL_BLOOD.seconds;
     SetClass(this.el.meleeKillBlood, "on", true);
     SetStyle(this.el.meleeKillBlood, "opacity", String(MELEE_KILL_BLOOD.maxOpacity));

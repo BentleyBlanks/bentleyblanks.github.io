@@ -76,6 +76,10 @@ export const HITMARK = Object.freeze({
  * 随后快速淡出；白刃连杀会从头重播，而不是把多层血污越叠越红。
  */
 export const MELEE_KILL_BLOOD = Object.freeze({
+  textures: Object.freeze([
+    "./Texture/Hud/Texture_HudMeleeKillBloodRightBurst.webp?v=20260914d",
+    "./Texture/Hud/Texture_HudMeleeKillBloodThinSplash.webp?v=20260914d",
+  ]),
   seconds: 0.82,
   holdS: 0.10,
   maxOpacity: 0.78,

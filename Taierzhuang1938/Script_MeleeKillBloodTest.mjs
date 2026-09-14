@@ -8,6 +8,10 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 // 玩家白刃击杀日军的屏幕飞溅：走真实大刀输入与统一伤害链，不直接调用 HUD 伪造成功。
 const project = path.dirname(fileURLToPath(import.meta.url));
 const shots = path.join(project, "_shots", "MeleeKillBloodFx");
+const textures = [
+  "Texture_HudMeleeKillBloodRightBurst.webp",
+  "Texture_HudMeleeKillBloodThinSplash.webp",
+];
 const server = await ServeRoot(path.resolve(project, ".."), 0);
 const browser = await LaunchBrowser();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -25,81 +29,100 @@ try {
     && window.Taierzhuang?.state?.running && window.Taierzhuang?.Debug?.MeleeCombat,
   null, { timeout: 120000 });
 
-  const before = await page.evaluate(async () => {
+  const before = await page.evaluate(async (textureNames) => {
     const T = Taierzhuang;
-    const image = new Image();
-    image.src = "./Texture/Hud/Texture_HudMeleeKillBlood.webp?v=20260914c";
-    await image.decode();
-    const canvas = document.createElement("canvas");
-    canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-    context.drawImage(image, 0, 0);
-    // 准星周围必须是真透明 Alpha，不再依赖白底 multiply 伪透明。
-    const x = Math.floor(canvas.width * .38), y = Math.floor(canvas.height * .30);
-    const w = Math.floor(canvas.width * .24), h = Math.floor(canvas.height * .32);
-    const pixels = context.getImageData(x, y, w, h).data;
-    let stained = 0;
-    for (let i = 0; i < pixels.length; i += 16) {
-      if (pixels[i + 3] > 4) stained += 1;
-    }
-    const allPixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-    let visible = 0, leftVisible = 0, rightVisible = 0, samples = 0;
-    for (let py = 0; py < canvas.height; py += 4) {
-      for (let px = 0; px < canvas.width; px += 4) {
-        samples += 1;
-        const alpha = allPixels[(py * canvas.width + px) * 4 + 3];
-        if (alpha <= 20) continue;
-        visible += 1;
-        if (px < canvas.width * .5) leftVisible += 1;
-        else rightVisible += 1;
+    const assets = await Promise.all(textureNames.map(async (name) => {
+      const image = new Image();
+      image.src = `./Texture/Hud/${name}?v=20260914d`;
+      await image.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      context.drawImage(image, 0, 0);
+      const allPixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      const center = {
+        x: Math.floor(canvas.width * .38), y: Math.floor(canvas.height * .30),
+        w: Math.floor(canvas.width * .24), h: Math.floor(canvas.height * .32),
+      };
+      let visible = 0, transparent = 0, centerVisible = 0, samples = 0, centerSamples = 0;
+      for (let py = 0; py < canvas.height; py += 4) {
+        for (let px = 0; px < canvas.width; px += 4) {
+          samples += 1;
+          const alpha = allPixels[(py * canvas.width + px) * 4 + 3];
+          if (alpha <= 4) transparent += 1;
+          if (alpha > 20) visible += 1;
+          if (px >= center.x && px < center.x + center.w && py >= center.y && py < center.y + center.h) {
+            centerSamples += 1;
+            if (alpha > 20) centerVisible += 1;
+          }
+        }
       }
-    }
+      return {
+        name,
+        image: [image.naturalWidth, image.naturalHeight],
+        visibleCoverage: visible / samples,
+        transparentCoverage: transparent / samples,
+        centerStainRatio: centerVisible / centerSamples,
+      };
+    }));
     return {
-      image: [image.naturalWidth, image.naturalHeight],
-      centerStainRatio: stained / (pixels.length / 16),
-      visibleCoverage: visible / samples,
-      directionalBias: leftVisible / Math.max(1, rightVisible),
+      assets,
       blood: T.hud.MeleeKillBloodState(),
     };
-  });
-  assert.deepEqual(before.image, [1920, 1080]);
-  assert(before.centerStainRatio < .002, `准星留白被血点侵入：${before.centerStainRatio}`);
-  assert(before.visibleCoverage > .02 && before.visibleCoverage < .10,
-    `溅血应是少量局部泼溅，不是全屏 mask：${before.visibleCoverage}`);
-  assert(before.directionalBias > 4, `溅血缺少单向泼溅感：${before.directionalBias}`);
+  }, textures);
+  assert.equal(before.assets.length, 2);
+  for (const asset of before.assets) {
+    assert.deepEqual(asset.image, [1920, 1080], `${asset.name} 尺寸`);
+    assert(asset.transparentCoverage > .80, `${asset.name} 必须是真透明 Alpha：${asset.transparentCoverage}`);
+    assert(asset.visibleCoverage > .003 && asset.visibleCoverage < .12,
+      `${asset.name} 应是局部泼溅，不是全屏 mask：${asset.visibleCoverage}`);
+    assert(asset.centerStainRatio < .035, `${asset.name} 中央视野被遮挡：${asset.centerStainRatio}`);
+  }
   assert.equal(before.blood.active, false);
 
-  const killed = await page.evaluate(() => {
+  const killWithVariant = async (randomValue, expectedTexture, shotName) => {
+    const killed = await page.evaluate((forcedRandom) => {
     const T = Taierzhuang, lab = T.Debug.MeleeCombat;
     const Step = (seconds, render = false) => T.StepFrames(Math.round(seconds * 60), 1 / 60, render);
-    lab.Select("DadaoOne"); lab.Pause(true); Step(.08);
+    lab.Select("DadaoOne"); lab.Pause(true); Step(.20);
     const enemy = T.ai.soldiers.find((soldier) => soldier.side === "ija");
     enemy.health = 40;
     enemy.position.set(T.player.position.x, T.player.position.y, T.player.position.z - 1.35);
     enemy.yaw = Math.PI;
     enemy.body?.Teleport(enemy.position.x, enemy.position.y, enemy.position.z);
     const playerHealth = T.player.health;
-    T.Debug.Mouse(0, true); Step(.05); T.Debug.Mouse(0, false); Step(.28, true);
-    return {
-      enemyAlive: enemy.alive,
-      playerHealthBefore: playerHealth,
-      playerHealthAfter: T.player.health,
-      blood: T.hud.MeleeKillBloodState(),
-      damageOpacity: Number.parseFloat(getComputedStyle(T.hud.el.damage).opacity) || 0,
-      confirms: T.hud.confirms.slice(-2),
-    };
-  });
-  assert.equal(killed.enemyAlive, false, "真实大刀伤害必须先杀死目标");
-  assert.equal(killed.playerHealthAfter, killed.playerHealthBefore, "砍杀飞溅不能伪装成玩家掉血");
-  assert(killed.blood.active && killed.blood.opacity > .35, JSON.stringify(killed.blood));
-  assert.match(killed.blood.backgroundImage, /Texture_HudMeleeKillBlood\.webp/);
-  assert.equal(killed.blood.blendMode, "normal");
-  assert.equal(killed.damageOpacity, 0, "击杀飞溅不得点亮受伤暗角");
-  assert.equal(killed.confirms.at(-1), "kill");
+    const originalRandom = Math.random;
+    Math.random = () => forcedRandom;
+    try {
+      T.Debug.Mouse(0, true); Step(.05); T.Debug.Mouse(0, false); Step(.28, true);
+      return {
+        enemyAlive: enemy.alive,
+        playerHealthBefore: playerHealth,
+        playerHealthAfter: T.player.health,
+        blood: T.hud.MeleeKillBloodState(),
+        damageOpacity: Number.parseFloat(getComputedStyle(T.hud.el.damage).opacity) || 0,
+        confirms: T.hud.confirms.slice(-2),
+      };
+    } finally {
+      Math.random = originalRandom;
+    }
+    }, randomValue);
+    assert.equal(killed.enemyAlive, false, "真实大刀伤害必须先杀死目标");
+    assert.equal(killed.playerHealthAfter, killed.playerHealthBefore, "砍杀飞溅不能伪装成玩家掉血");
+    assert(killed.blood.active && killed.blood.opacity > .35, JSON.stringify(killed.blood));
+    assert.match(killed.blood.backgroundImage, new RegExp(expectedTexture.replace(".", "\\.")));
+    assert.equal(killed.blood.blendMode, "normal");
+    assert.equal(killed.damageOpacity, 0, "击杀飞溅不得点亮受伤暗角");
+    assert.equal(killed.confirms.at(-1), "kill");
+    await page.evaluate(() => document.querySelector(".meleeLab")?.setAttribute("hidden", ""));
+    await page.screenshot({ path: path.join(shots, shotName) });
+    return killed;
+  };
 
   await page.evaluate(() => document.querySelector(".meleeLab")?.setAttribute("hidden", ""));
   fs.mkdirSync(shots, { recursive: true });
-  await page.screenshot({ path: path.join(shots, "Scene_MeleeKillBlood_1280x720.png") });
+  await killWithVariant(0, textures[0], "Scene_MeleeKillBloodRightBurst_1280x720.png");
+  await killWithVariant(.999999, textures[1], "Scene_MeleeKillBloodThinSplash_1280x720.png");
 
   const lifecycle = await page.evaluate(() => {
     const T = Taierzhuang;
@@ -114,7 +137,7 @@ try {
   assert(lifecycle.healthAfter < lifecycle.healthBefore, "受伤夹具必须实际扣血");
   assert.equal(lifecycle.afterHurt.active, false, "玩家受伤不能触发砍杀飞溅");
   assert.deepEqual(errors, []);
-  console.log("PASS melee kill blood: real Dadao kill, clean aim centre, independent injury state and timed fade");
+  console.log("PASS melee kill blood: two transparent random variants, real Dadao kills, independent injury state and timed fade");
 } finally {
   await page.close().catch(() => {});
   await browser.close().catch(() => {});

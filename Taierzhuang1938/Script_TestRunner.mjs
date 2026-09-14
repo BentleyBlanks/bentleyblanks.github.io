@@ -215,7 +215,7 @@ export const testDefs = {
   DadaoSwingTest: { file: "Script_DadaoSwingTest.mjs", timeoutMs: 10 * 60 * 1000, desc: "Dadao cutting-edge travel, speed, recovery, grip and wrist limits" },
   MeleeCombatTest: { file: "Script_MeleeCombatTest.mjs", desc: "通用白刃规则、拨挡窗口、F 推架、两类僵持、伤害和多人隔离（纯 Node）" },
   MeleeQteTest: { file: "Script_MeleeQteTest.mjs", desc: "白刃 QTE（?melee=1）：独立战斗、站立/倒地成功失败、真实输入、接触、骨骼与画面" },
-  MeleeKillBloodTest: { file: "Script_MeleeKillBloodTest.mjs", desc: "玩家真实大刀击杀日军：独立镜头溅血、中央留白、非受伤与短时淡出" },
+  MeleeKillBloodTest: { file: "Script_MeleeKillBloodTest.mjs", desc: "玩家真实大刀击杀日军：两张真透明局部溅血随机切换、非受伤与短时淡出" },
   GoreRangeTest: { file: "Script_GoreRangeTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "断肢测试场（?gore=1）：四工位木桩、面板、真枪/爆炸/大刀断肢、预算、释放与像素证据" },
   TownDressingTest: { file: "Script_TownDressingTest.mjs", desc: "城内每户布设的硬规则（纯 Node，秒级）" },
