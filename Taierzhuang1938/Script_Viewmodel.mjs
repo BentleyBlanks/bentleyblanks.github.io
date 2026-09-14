@@ -1608,6 +1608,8 @@ export class Viewmodel {
     this.armAnchor.add(this.sleeveRight.group);
     this.armAnchor.add(this.sleeveLeft.group);
     this._sleeveTmp = { a: new THREE.Vector3(), b: new THREE.Vector3(), q: new THREE.Quaternion() };
+    // root 子树的世界矩阵这一帧刷过没有（见 _SyncRootMatrices）。
+    this._rootMatrixFresh = false;
 
     // --- 枪口焰 -------------------------------------------------------------
     this.flash = this._BuildFlash();
@@ -1730,6 +1732,8 @@ export class Viewmodel {
 
   /** @param {string|null} weaponId Data_Weapons.WEAPONS 的 id；null = 空手 */
   Equip(weaponId, variant = 0) {
+    // 换枪重建整棵 rig：上一帧刷好的世界矩阵指的是另一棵树。
+    this._rootMatrixFresh = false;
     if(this.skeletalAnimation){this.skeletalAnimation.preview=null;this.skeletalAnimation.current=null;}
     this.armAnchor.position.set(0,0,0);this.armAnchor.quaternion.identity();this.armAnchor.scale.set(1,1,1);
     this._ClearRig();
@@ -2305,6 +2309,8 @@ export class Viewmodel {
   }
 
   Update(dt, input = {}) {
+    // 这一帧要把整棵第一人称树的局部变换重写一遍，上一帧刷好的世界矩阵全部作废。
+    this._rootMatrixFresh = false;
     for (const wounds of this.woundBlood?.values() || []) wounds.Update(dt);
     // 掉帧保护：dt 大到 0.2 s 时弹簧不炸也会把枪甩到画面外
     const step = Clamp(dt || 0, 0, 0.05);
@@ -2517,21 +2523,23 @@ export class Viewmodel {
 
   ReachWorld(target,weight=1) {
     if(this.weapon||!target)return;
-    this.root.updateMatrixWorld(true);
+    this._SyncRootMatrices();
     const hand=this.handRight.group;
     hand.position.lerp(hand.parent.worldToLocal(target.clone()),Clamp01(weight));
     this.gripContactRight.position.copy(hand.position);
     this.gripContactRight.quaternion.copy(hand.quaternion);
+    this._rootMatrixFresh=false;
     this.riggedArms?.Update(0);
     this._UpdateSleeves();
   }
 
   MealHands({right,left,closure,worldRotation}) {
     if(this.weapon)return;
-    this.root.updateMatrixWorld(true);
+    this._SyncRootMatrices();
     // During the contact window the shoulders remain aligned with the giver;
     // looking away must not drag the receiving hand out of their palm.
     this.armAnchor.quaternion.copy(this.armAnchor.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(worldRotation));
+    this._rootMatrixFresh=false;
     this.armAnchor.updateWorldMatrix(true,true);
     for(const [side,target,hand,contact] of [['r',right,this.handRight.group,this.gripContactRight],['l',left,this.handLeft.group,this.gripContactLeft]]){
       hand.position.copy(hand.parent.worldToLocal(target.clone()));
@@ -2576,9 +2584,21 @@ export class Viewmodel {
     this.sleeveRight.group.visible = on;
     this.sleeveLeft.group.visible = on;
     if (!on) return;
-    this.root.updateMatrixWorld(true);
+    this._SyncRootMatrices();
     this._AimSleeve(this.sleeveRight, this.handRight.group, ELBOW_ANCHOR.right);
     this._AimSleeve(this.sleeveLeft, this.handLeft.group, ELBOW_ANCHOR.left);
+  }
+
+  /**
+   * 整棵第一人称树的世界矩阵一帧只强制刷一次。这棵树有一百来个节点，而车厢
+   * 那一段里 Update 收尾、MealHands 开头、MealHands 收尾会连着刷三遍，中间
+   * 没人动过局部变换。改写了树里局部变换的地方（Update 开头、ReachWorld /
+   * MealHands 摆完手位）负责把 `_rootMatrixFresh` 置回 false。
+   */
+  _SyncRootMatrices() {
+    if (this._rootMatrixFresh) return;
+    this.root.updateMatrixWorld(true);
+    this._rootMatrixFresh = true;
   }
 
   _AimSleeve(sleeve, handGroup, elbow) {

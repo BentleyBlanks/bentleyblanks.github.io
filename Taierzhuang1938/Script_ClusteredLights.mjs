@@ -408,7 +408,9 @@ export class ClusteredLights {
     }
 
     // [2] 世界 → 视空间。矩阵元素直接取，避免每盏灯 new 一个 Vector3。
-    camera.updateMatrixWorld();
+    // 只要相机这一条父链（Camera 的 updateWorldMatrix 照样刷 matrixWorldInverse）；
+    // 相机底下的第一人称树与簇表无关。
+    camera.updateWorldMatrix(true, false);
     const e = camera.matrixWorldInverse.elements;
     const data = this.sourceData;
     const shape = this.sourceShape;

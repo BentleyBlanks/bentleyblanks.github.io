@@ -107,8 +107,10 @@ export class MissionTrainLifePose {
     const clipId=selected.clipId,seconds=Math.max(0,selected.seconds||0),weight=Clamp(selected.weight??life?.weight??1,0,1);
     // Returning to idle samples a moving authored clip; no frozen frame or FK gesture
     // is used as a substitute for a missing carriage animation asset.
+    // updateWorld:false —— 下面那句 `rig.root.updateWorldMatrix(true,true)` 就是这一趟，
+    // 两者之间除了 wallOffset 挪一下 rig.root 没人动骨骼，采样器不必先算一遍同样的矩阵。
     animation.Sample(clipId,seconds,{weight,loop:selected.loop!==false,deckY:selected.deckY??life?.deckY??soldier.position.y,
-      transitionSeconds:selected.transitionSeconds});
+      transitionSeconds:selected.transitionSeconds,updateWorld:false});
     const wallOffsetM=!performance&&life?.wall?MISSION_TRAIN.life.wallOffsetM*weight:0;
     if(wallOffsetM){
       this.Save(rig.root);
@@ -116,7 +118,10 @@ export class MissionTrainLifePose {
       const offset=this.Local(0,0,wallOffsetM).sub(this.Local(0,0,0));
       rig.root.position.copy(rig.root.parent.worldToLocal(this.World(rig.root).add(offset)));
     }
-    rig.root.updateWorldMatrix(true,true);
+    // 这一趟是给同帧稍后读手骨世界位的人用的（FirstLevelMissionView 的车厢道具走
+    // getWorldPosition，更新父链不会顺带重算兄弟骨头）。采样器判定这一帧没人看得到
+    // 这个人时（floorStale）连鞋底都没解，世界矩阵同样不必发布。
+    if(!animation.floorStale)rig.root.updateWorldMatrix(true,true);
     rig.missionTrainLifeActive=true;
     rig.missionTrainLifeState={kind:life?.kind,seated:false,posture:life?.posture,weight,brace:life?.brace||0,time:this.time,
       animation:true,pending:false,action:clipId,sourceSeconds:seconds,riseSeconds:life?.riseSeconds||0,poseWeight:weight,wallOffsetM};

@@ -1189,6 +1189,7 @@ const SOCKET_FRAME_SOURCE = new THREE.Matrix4();
 const SOCKET_FRAME_TARGET = new THREE.Matrix4();
 const SOCKET_MOUNT_INVERSE = new THREE.Matrix4();
 const SOCKET_AIM_Q = new THREE.Quaternion();
+const SOCKET_WORLD_SCALE = new THREE.Vector3();
 const RIG_AIM_DIRECTION = new THREE.Vector3();
 const RIG_AIM_FORWARD = new THREE.Vector3();
 const RIG_AIM_ROOT_Q = new THREE.Quaternion();
@@ -1284,6 +1285,12 @@ export class Actor {
     this.root = new THREE.Group();
     this.root.name = `Actor_${kind}_${options.seed ?? 0}`;
     this.root.scale.setScalar(this.sizeScale);
+    // 挂点换算量的记忆（见 _SocketScaleCompensation）。root.scale 就在上一行写完，
+    // 戳从 1 起：换 rig / 换 GLB / 换挂点时 +1。
+    this.socketScaleStamp = 1;
+    this._socketScaleCache = new WeakMap();
+    // 从剔除层回到近景的那一帧：动画层据此补一次完整的脚底与世界矩阵更新。
+    this.poseDirty = false;
 
     // body 的枢轴放在胯高：倒地/俯卧是绕胯翻的，绕脚踝翻的话人会整个甩出去
     this.body = new THREE.Group();
@@ -1483,7 +1490,15 @@ export class Actor {
     return HashString(`${this.seed}|${weaponId}`) % list.length;
   }
 
+  /**
+   * 这一帧画不画得到这个人。剔除层把整棵子树从场景里摘下来并清 visible
+   * （见 AiDirector._SetDetailedAttached），两者同源，判据只有这一处。
+   */
+  get poseVisible() { return this.root.visible && this.root.parent !== null; }
+
   _AdoptRiggedCharacter() {
+    // 换了骨架就换了挂点与那条链上的局部缩放，记住的换算量全部作废。
+    this.socketScaleStamp += 1;
     // 重新挂 rig 会另建一只 SocketAttachment_WeaponR，断肢层那份还原凭据指着的
     // 是上一只，留着就是往一个已经摘掉的挂点上还枪。
     this.goreWeaponHold = null;
@@ -1524,12 +1539,31 @@ export class Actor {
    * variation and the GLB normalisation scale.  Cancelling only the two outer scales
    * made every socketed rifle one hundredth size; read the actual socket world scale
    * so the same rule also survives differently authored source rigs.
+   *
+   * 换算量是**常数**：它只由 root.scale（身高个体差）与挂点到 root 那条链上的
+   * 固定局部缩放决定，动画写的是 position / quaternion，不写 scale。原来每次调用
+   * 都 `this.root.updateWorldMatrix(true, true)` 把整棵人物子树（约 135 个节点）
+   * 重算一遍再取一次世界缩放 —— 第一关车厢内 41 个人每帧两次，实测每帧 5894 次
+   * 节点访问，全是重复的。
+   *
+   * 现在按挂点记住结果，`socketScaleStamp` 变了才重算。戳只在三处 +1：
+   * 换 rig / 换 GLB（`_AdoptRiggedCharacter`）、改 `root.scale`、挂点换人。
+   * 真漏了戳的表现是枪大一百倍或小一百倍，显眼，不会静默。
+   * 重算时也不再惊动整棵子树：要的只是挂点自己那条父链。
    */
   _SocketScaleCompensation(socket) {
-    this.root.updateWorldMatrix(true, true);
-    const worldScale = socket.getWorldScale(new THREE.Vector3());
+    if (!socket) return this.weaponScale;
+    const stamp = this.socketScaleStamp;
+    const parent = socket.parent;
+    const cached = this._socketScaleCache.get(socket);
+    if (cached && cached.stamp === stamp && cached.parent === parent) return cached.value;
+    socket.updateWorldMatrix(true, false);
+    const worldScale = socket.getWorldScale(SOCKET_WORLD_SCALE);
     const inherited = Math.max(Math.abs(worldScale.x), Math.abs(worldScale.y), Math.abs(worldScale.z));
-    return inherited > 1e-6 ? 1 / inherited : this.weaponScale;
+    const value = inherited > 1e-6 ? 1 / inherited : this.weaponScale;
+    if (cached) { cached.stamp = stamp; cached.value = value; cached.parent = parent; }
+    else this._socketScaleCache.set(socket, { stamp, value, parent });
+    return value;
   }
 
   _MountRiggedWeapon(group) {

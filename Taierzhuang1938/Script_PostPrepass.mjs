@@ -76,6 +76,16 @@ import { HZB, VELOCITY } from "./Data_Tuning_Graphics.mjs";
 export const FOREGROUND_VIEW_DEPTH = 1.0;
 
 /**
+ * 预通道归属的标记戳。`_CollectSkipped` 把「谁要藏出这一趟」的分类结果缓存起来
+ * （见那个函数的抬头），场景结构变化由 childadded / childremoved 自己报，
+ * 而改标记（allowOverride、前景根）不经过场景结构，只能在这里报一声。
+ * 不走下面两个标记函数、直接改 allowOverride / skipNormalDepth 的地方调
+ * `InvalidatePrepassSkip()`。
+ */
+let MARK_STAMP = 0;
+export function InvalidatePrepassSkip() { MARK_STAMP += 1; }
+
+/**
  * 把一份材质排除在深度法线预通道之外。
  *
  * 事故根源：r165 起 `scene.overrideMaterial` 加了 `material.allowOverride` 闸门，
@@ -96,6 +106,7 @@ export function MarkNoPrepass(material) {
   if (!material) return material;
   if (Array.isArray(material)) { material.forEach(MarkNoPrepass); return material; }
   material.allowOverride = false;
+  MARK_STAMP += 1;
   return material;
 }
 
@@ -118,6 +129,7 @@ export function MarkNoPrepass(material) {
  */
 export function MarkForegroundPrepass(root) {
   if (!root) return root;
+  MARK_STAMP += 1;
   root.userData.foregroundPrepassRoot = true;
   root.traverse((object) => {
     if (!object.isMesh || !object.material) return;
@@ -352,6 +364,16 @@ export class PrepassPass {
     this.hasPrevVelocity = false;
 
     this._skipScratch = [];            // _CollectSkipped 的复用数组，别每帧 new
+    this._skipHidden = [];             // 与 _skipScratch 平行：藏之前它本来可不可见
+    this._skipAlways = [];             // 分类缓存：无条件藏出这一趟的
+    this._skipRanged = [];             // 分类缓存：带 normalDepthMaxDistance，每帧按相机距离判
+    this._skipSkinned = [];            // 分类缓存：场景里的蒙皮网格（每帧按 visible 收骨骼）
+    this._skipScene = null;            // 分类缓存是对哪只 scene 做的（换关必然换 scene）
+    this._skipDirty = true;
+    this._skipMarkStamp = -1;
+    this._skipVelocity = null;
+    this._skipWatched = new WeakSet();  // 已经挂上结构监听的节点
+    this._OnSceneStructure = () => { this._skipDirty = true; };
     this._skipWorldPosition = new THREE.Vector3();
     this._skeletons = new Set();       // 本帧在场的骨骼（下面拷上一帧矩阵用）
     this._upgraded = new WeakSet();    // 已经换成「高度翻倍」boneTexture 的骨骼
@@ -442,40 +464,51 @@ export class PrepassPass {
   }
 
   /**
-   * 收集这一帧要在预通道里藏掉的对象：显式 skipNormalDepth，或超过自己的
-   * normalDepthMaxDistance（只给蒙皮人物的小分件用；躯干主轮廓没有距离上限）。
-   * 顺手把在场的骨骼记下来（上一帧骨矩阵要按它们拷）。
-   *
-   * 每帧遍历一次场景图：这一趟本来就要被渲染器自己遍历好几遍，多一次几十微秒，
-   * 换来的是"挂上去就生效"——缓存一份列表的话，换关重建场景那一帧必然是脏的，
-   * 而这个 bug 的表现（天上一个黑洞）恰恰要花一小时才定位得到。
-   * 只收当前可见的：本来就藏着的对象不该被这里"帮忙"打开。
+   * 结构监听：`childadded` / `childremoved` 是三方自己在 add / remove / attach /
+   * clear 里派发的，父节点收得到。分类那一趟走过的每个节点都挂上，于是这棵树里
+   * 任何一处增删都会让下一帧重建分类，新加进来的节点在那次重建里补上监听。
    */
-  _CollectSkipped(scene, camera = null) {
-    const list = this._skipScratch;
-    list.length = 0;
-    const wantSkeletons = this.velocityEnabled && VELOCITY.skinnedPrev;
+  _WatchStructure(object) {
+    if (this._skipWatched.has(object)) return;
+    this._skipWatched.add(object);
+    object.addEventListener("childadded", this._OnSceneStructure);
+    object.addEventListener("childremoved", this._OnSceneStructure);
+  }
+
+  /**
+   * 把「谁要藏出预通道」重新分类一遍。这一趟是整棵场景图的遍历，只在结构变了、
+   * 换了 scene、或者有人改过预通道标记（MarkForegroundPrepass / MarkNoPrepass）
+   * 之后才走；车厢机位实测每帧省掉 4546 次 traverse 回调。
+   *
+   * 分类**不看 visible**：藏与还原按对象自己原来的可见性成对做（见 Render），
+   * 藏一个本来就不可见的对象是空操作，还原也不会"帮忙"把它打开。所以显隐翻转
+   * 不必让缓存失效 —— 而注释里记的那个 bug（天空穹漏进来，画面上是天上一个黑洞）
+   * 只可能由结构或标记变化引起，那两条都报得到。
+   */
+  _RebuildSkipClassification(scene) {
+    const always = this._skipAlways, ranged = this._skipRanged, skinned = this._skipSkinned;
+    always.length = 0; ranged.length = 0; skinned.length = 0;
     const mrt = this.velocityEnabled;
-    if (wantSkeletons) this._skeletons.clear();
     scene.traverse((object) => {
+      this._WatchStructure(object);
       const foreground = !!object.userData?.foregroundPrepassRoot || this._foregroundObjects.has(object.parent);
       if (foreground) this._foregroundObjects.add(object);
       else this._foregroundObjects.delete(object);
-      if (!object.visible || !object.userData) return;
+      if (!object.userData) return;
       if (object.isMesh) {
         // Diagnostic only: the root policy, not a copied leaf flag, owns routing.
         object.userData.foregroundPrepass = foreground;
         if (foreground && [object.material].flat().some(material => material
             && (material.transparent || material.alphaTest > 0 || material.depthWrite === false))) {
-          list.push(object);
+          always.push(object);
           return;
         }
       }
-      if (wantSkeletons && object.isSkinnedMesh && object.skeleton) {
-        this._skeletons.add(object.skeleton);
+      if (object.isSkinnedMesh && object.skeleton) {
+        skinned.push(object);
       }
       if (object.userData.skipNormalDepth) {
-        list.push(object);
+        always.push(object);
         return;
       }
       // **MRT 的硬约束**：WebGL2 里「有一个 enabled 的 draw buffer 却没有对应的
@@ -495,16 +528,43 @@ export class PrepassPass {
         const material = object.material;
         if (Array.isArray(material)) {
           if (material.some((item) => item && item.allowOverride === false)) {
-            list.push(object);
+            always.push(object);
             return;
           }
         } else if (material && material.allowOverride === false) {
-          list.push(object);
+          always.push(object);
           return;
         }
       }
-      const maxDistance = Number(object.userData.normalDepthMaxDistance) || 0;
-      if (camera && maxDistance > 0) {
+      if ((Number(object.userData.normalDepthMaxDistance) || 0) > 0) ranged.push(object);
+    });
+    this._skipScene = scene;
+    this._skipDirty = false;
+    this._skipMarkStamp = MARK_STAMP;
+    this._skipVelocity = mrt;
+  }
+
+  /**
+   * 这一帧要在预通道里藏掉的对象：显式 skipNormalDepth、换不掉材质的
+   * （allowOverride === false），或超过自己的 normalDepthMaxDistance
+   * （只给蒙皮人物的小分件用；躯干主轮廓没有距离上限）。顺手把在场的骨骼记下来
+   * （上一帧骨矩阵要按它们拷）。
+   *
+   * 前两类是静态分类，缓存在 `_skipAlways`（见 _RebuildSkipClassification）；
+   * 只有距离那一类跟着相机每帧变，所以每帧只扫 `_skipRanged` 这条短表。
+   */
+  _CollectSkipped(scene, camera = null) {
+    if (this._skipDirty || scene !== this._skipScene
+        || this._skipMarkStamp !== MARK_STAMP || this._skipVelocity !== this.velocityEnabled) {
+      this._RebuildSkipClassification(scene);
+    }
+    const list = this._skipScratch;
+    list.length = 0;
+    for (const object of this._skipAlways) list.push(object);
+    if (camera) {
+      for (const object of this._skipRanged) {
+        const maxDistance = Number(object.userData.normalDepthMaxDistance) || 0;
+        if (maxDistance <= 0) continue;
         // RenderScene 已在本帧统一更新 scene.matrixWorld；直接读矩阵，别让每个小分件
         // 再沿父链 updateWorldMatrix 一遍，把省下的 GPU 成本换成 JS 遍历。
         this._skipWorldPosition.setFromMatrixPosition(object.matrixWorld);
@@ -512,7 +572,11 @@ export class PrepassPass {
           list.push(object);
         }
       }
-    });
+    }
+    if (this.velocityEnabled && VELOCITY.skinnedPrev) {
+      this._skeletons.clear();
+      for (const mesh of this._skipSkinned) if (mesh.visible) this._skeletons.add(mesh.skeleton);
+    }
     return list;
   }
 
@@ -637,7 +701,10 @@ export class PrepassPass {
     // 整片抹掉，二百米外的黑烟柱就成了天上一个越长越大的黑洞。
     // Script_Sky 早就标了 userData.skipNormalDepth，只是从来没人读它。
     const skipped = this._CollectSkipped(scene, camera);
-    for (const object of skipped) object.visible = false;
+    // 记下原来的可见性再还原：分类不看 visible，本来就藏着的对象不该被这里"帮忙"打开。
+    const hidden = this._skipHidden;
+    hidden.length = 0;
+    for (const object of skipped) { hidden.push(object.visible); object.visible = false; }
     const prevBackground = scene.background;
     const prevOverride = scene.overrideMaterial;
     scene.background = null;
@@ -663,7 +730,7 @@ export class PrepassPass {
     this._SnapshotObjects();
     scene.overrideMaterial = prevOverride;
     scene.background = prevBackground;
-    for (const object of skipped) object.visible = true;
+    for (let i = 0; i < skipped.length; i += 1) skipped[i].visible = hidden[i];
 
     ctx.normalDepthTexture = this.target.textures[0];
     ctx.velocityTexture = this.velocityTexture;

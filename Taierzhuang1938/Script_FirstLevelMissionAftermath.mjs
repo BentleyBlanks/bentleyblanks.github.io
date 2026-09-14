@@ -121,7 +121,8 @@ export class MissionAftermath {
     this.frames++;
     let dirty=this.frames<3||this.lastFocus.distanceToSquared(focus)>C.aftermathRefreshM**2;
     if(camera){
-      camera.updateMatrixWorld();
+      // 只要相机自己的世界矩阵；相机底下那棵第一人称树与这里的视锥判断无关。
+      camera.updateWorldMatrix(true,false);
       _quaternion.setFromRotationMatrix(camera.matrixWorld);
       if(Math.abs(_quaternion.dot(this.lastQuaternion))<1-C.aftermathRefreshDot)dirty=true;
     }

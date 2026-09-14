@@ -941,7 +941,8 @@ export class CsmRig {
     let aspect;
     let cameraFar;
     if (camera && camera.isPerspectiveCamera) {
-      camera.updateMatrixWorld();
+      // 只要相机这一条父链；相机底下挂着整棵第一人称树，级联拟合一个节点都不读。
+      camera.updateWorldMatrix(true, false);
       origin = camera.position;
       _forward.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
       forward = _forward;
