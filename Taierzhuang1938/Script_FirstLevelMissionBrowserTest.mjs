@@ -136,7 +136,7 @@ async function CaptureFocus(name,point) {
 // you the level got harder, not that the dice went badly.
 const ROUTE_RETRY_BUDGET = 2;
 
-async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false } = {}) {
+async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false, retryRoute = null } = {}) {
   await page.evaluate(
     ({ points, stance, sprint }) => {
       const g = window.Tengxian;
@@ -236,9 +236,14 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
       // route that burns its retry budget instead of one unlucky death.
       if (++retries > ROUTE_RETRY_BUDGET) break;
       console.log(label, `player died at waypoint ${result.index}; checkpoint retry ${retries}/${ROUTE_RETRY_BUDGET}`);
-      await page.evaluate(({ stance, sprint }) => {
+      const retry=await page.evaluate(({ stance, sprint, retryRoute }) => {
         const g = window.Tengxian;
+        const Snapshot=()=>{const r=g.Debug.FirstLevelMissionRuntime();return {
+          stage:r.flow.stage.id,time:r.time,facts:[...r.flow.facts],
+          enemies:[...r.enemies.values()].map(a=>({id:a.id,alive:a.alive}))};};
+        const before=Snapshot();
         g.Debug.MenuAct("continueCheckpoint");
+        const after=Snapshot();
         g.StepFrames(1, 1 / 60, false);
         // Re-establish the stance and sprint the leg asked for, and re-seed the
         // stall detector: the retry teleports the body to the checkpoint.
@@ -249,9 +254,16 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
         const b = window.routeBot;
         // The checkpoint can be on the other side of a wall from the current
         // waypoint. Rewalk the authored entry instead of cutting across it.
+        if(retryRoute)b.points=retryRoute;
         b.index = 0;
         b.stalled = 0; b.last = { ...g.player.position };
-      }, { stance, sprint });
+        return {before,after};
+      }, { stance, sprint, retryRoute });
+      assert.equal(retry.after.stage,retry.before.stage,'route retry retains the mission step');
+      assert.deepEqual(retry.after.facts,retry.before.facts,'route retry retains every mission fact');
+      assert.deepEqual(retry.after.enemies,retry.before.enemies,'route retry retains enemy casualties');
+      campaignRetries.push({kind:'route',label,stage:retry.before.stage,time:retry.before.time,
+        factsPreserved:true,casualtiesPreserved:true});
       if(carriedKind==='stretcher' && await page.evaluate(()=>window.Tengxian.carry.KindId!=='stretcher')){
         // Death really drops the patient. Retry restores the player, so walk
         // back and use F before continuing; an empty-handed arrival is not a carry.
@@ -293,7 +305,7 @@ async function Interact() {
   });
 }
 async function RetryCampaign({rewalk=true}={}) {
-  if(!allowCheckpointRetry||stageJumps||campaignRetries.length>=3)return false;
+  if(!allowCheckpointRetry||stageJumps||campaignRetries.filter(retry=>retry.kind!=="route").length>=3)return false;
   const before=await page.evaluate(()=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
     return {dead:!g.player.alive,stage:r.flow.stage.id,time:r.time,facts:[...r.flow.facts],
@@ -311,7 +323,7 @@ async function RetryCampaign({rewalk=true}={}) {
   assert.equal(after.stage,before.stage,'normal retry retains the current mission step');
   assert.deepEqual(after.facts,before.facts,'normal retry neither grants nor erases mission facts');
   assert.deepEqual(after.enemies,before.enemies,'normal retry retains actual enemy casualties');
-  campaignRetries.push({stage:before.stage,time:before.time,factsPreserved:true,casualtiesPreserved:true});
+  campaignRetries.push({kind:"campaign",stage:before.stage,time:before.time,factsPreserved:true,casualtiesPreserved:true});
   console.log('NORMAL_CHECKPOINT_RETRY',JSON.stringify(campaignRetries.at(-1)));
   // Walk back through the last observed route using the ordinary movement driver.
   if(rewalk&&before.route.length)await Route(before.route,`CheckpointReturn${campaignRetries.length}`,{fight:true,stance:'crouch'});
@@ -815,7 +827,11 @@ try {
         g.StepFrames(1, 1 / 60, false);
     });
     for (let attempt = 0; attempt < 2; attempt++) {
-      if(attempt>0)await Route([{x:15,z:-111},{x:25,z:-110},{x:30,z:-117}],"TankFlankRetry",{stance:"crouch"});
+      // A thrown bundle may resolve after an ordinary death/retry. Never take
+      // another sortie merely because the earlier pre-explosion snapshot was stale.
+      if(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().tank.immobilized))break;
+      if(attempt>0)await Route([{x:15,z:-111},{x:25,z:-110},{x:30,z:-117}],"TankFlankRetry",
+        {stance:"crouch",crawl:true,retryRoute:Routes.bundleReturn});
       const thrown = await page.evaluate(() => {
         const g = window.Tengxian,
           tank = g.Debug.FirstLevelMission().tank,
@@ -860,11 +876,18 @@ try {
           explosions: thrown.mission.playerExplosions,
         }),
       );
-      if (thrown.mission.tank.immobilized) break;
+      if(thrown.health<=0){
+        assert.ok(await RetryCampaign({rewalk:false}),"a thrown-bundle death uses the existing bounded checkpoint budget");
+        // The retained checkpoint is the northern supply house. Follow its
+        // authored return trench while the live fuse resolves, not a diagonal
+        // from the house to a short front-only retry waypoint.
+        await Route(Routes.bundleReturn,"TankCheckpointReturn",{fight:true,stance:"stand",sprint:true,crawl:true});
+      }
+      if (await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().tank.immobilized)) break;
     }
     await WaitStage("Orders", 20);
     await JumpStage(6);
-    await Route(Routes.orders,"EscortOrders",{stance:"crouch"});
+    await Route(Routes.orders,"EscortOrders",{stance:"crouch",crawl:true,retryRoute:[...Routes.bundleReturn,...Routes.orders]});
     const ordersSupply=await Interact();
     assert.ok(ordersSupply.kind==="supply","covered orders position offers an actual supply interaction");
     await page.evaluate(()=>{const g=window.Tengxian;g.Debug.Key("KeyB");if(g.player.stance!=="crouch")g.Debug.Key("KeyC");g.StepFrames(1,1/60,false);});
