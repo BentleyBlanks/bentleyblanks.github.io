@@ -43,6 +43,11 @@ assert.ok(frontRejoin.every(p=>p.z>=-118),'front checkpoint stays at the front o
 assert.ok(MissionRouteLength(frontRejoin)<20,'front checkpoint has no redundant northern sortie');
 const houseRejoin=MissionRouteBetween(checkpointPath,A.bundle,A.orders);
 for(const point of Routes.bundleReturn.slice(1))assert.ok(houseRejoin.some(p=>Distance(p,point)<.01),'house checkpoint preserves every authored return bend');
+const throwRejoin=MissionRouteBetween(checkpointPath,{x:15,z:-111},A.throw);
+assert.ok(throwRejoin.some(p=>Distance(p,{x:25,z:-110})<.01),'a second throw returns around the front bend, not its diagonal');
+assert.ok(throwRejoin.every(p=>p.z>=-118),'a front throw retry never revisits the northern house');
+const houseThrowRejoin=MissionRouteBetween(checkpointPath,A.bundle,A.throw);
+for(const point of Routes.bundleReturn.slice(1))assert.ok(houseThrowRejoin.some(p=>Distance(p,point)<.01),'a house-to-throw retry keeps every return bend');
 assert.ok(Distance(A.gun,A.throw)<45,'gun and tank are one front');
 assert.ok(Distance(A.village,A.melee)<35&&Distance(A.melee,A.gate)<35,'village, kitchen and court are adjacent');
 assert.deepEqual(Steps.find(s=>s.id==='AirFirst').target,Steps.find(s=>s.id==='Transfer').target);

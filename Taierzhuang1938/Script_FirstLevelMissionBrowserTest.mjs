@@ -137,12 +137,13 @@ async function CaptureFocus(name,point) {
 const ROUTE_RETRY_BUDGET = 2;
 
 async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false, rejoinRoute = null } = {}) {
+  const rejoinTarget=points.at(-1);
   await page.evaluate(
-    async ({ points, stance, sprint, rejoinRoute }) => {
+    async ({ points, stance, sprint, rejoinRoute, rejoinTarget }) => {
       const g = window.Tengxian;
       if(rejoinRoute){
         const {MissionRouteBetween}=await import("./Script_FirstLevelMissionColumn.mjs");
-        points=MissionRouteBetween(rejoinRoute,g.player.position,rejoinRoute.at(-1));
+        points=MissionRouteBetween(rejoinRoute,g.player.position,rejoinTarget);
       }
       window.routeBot = { points, index: 0, frames: 0, stalled: 0, last: { ...g.player.position } };
       if (g.player.stance !== stance)
@@ -157,7 +158,7 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
         );
       g.Debug.Key("ShiftLeft", sprint);
     },
-    { points, stance, sprint, rejoinRoute },
+    { points, stance, sprint, rejoinRoute, rejoinTarget },
   );
   const carriedKind=await page.evaluate(()=>window.Tengxian.carry.KindId);
   let result, retries = 0;
@@ -240,7 +241,7 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
       // route that burns its retry budget instead of one unlucky death.
       if (++retries > ROUTE_RETRY_BUDGET) break;
       console.log(label, `player died at waypoint ${result.index}; checkpoint retry ${retries}/${ROUTE_RETRY_BUDGET}`);
-      const retry=await page.evaluate(async ({ stance, sprint, rejoinRoute }) => {
+      const retry=await page.evaluate(async ({ stance, sprint, rejoinRoute, rejoinTarget }) => {
         const g = window.Tengxian;
         const Snapshot=()=>{const r=g.Debug.FirstLevelMissionRuntime();return {
           stage:r.flow.stage.id,time:r.time,position:g.player.position.toArray(),facts:[...r.flow.facts],
@@ -260,12 +261,12 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
         // polyline from the actual spawn; never replay a stale house entry.
         if(rejoinRoute){
           const {MissionRouteBetween}=await import("./Script_FirstLevelMissionColumn.mjs");
-          b.points=MissionRouteBetween(rejoinRoute,g.player.position,rejoinRoute.at(-1));
+          b.points=MissionRouteBetween(rejoinRoute,g.player.position,rejoinTarget);
         }
         b.index = 0;
         b.stalled = 0; b.last = { ...g.player.position };
         return {before,after};
-      }, { stance, sprint, rejoinRoute });
+      }, { stance, sprint, rejoinRoute, rejoinTarget });
       assert.equal(retry.after.stage,retry.before.stage,'route retry retains the mission step');
       assert.deepEqual(retry.after.facts,retry.before.facts,'route retry retains every mission fact');
       assert.deepEqual(retry.after.enemies,retry.before.enemies,'route retry retains enemy casualties');
@@ -839,7 +840,7 @@ try {
       // another sortie merely because the earlier pre-explosion snapshot was stale.
       if(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().tank.immobilized))break;
       if(attempt>0)await Route([{x:15,z:-111},{x:25,z:-110},{x:30,z:-117}],"TankFlankRetry",
-        {stance:"crouch",crawl:true,rejoinRoute:Routes.bundleReturn});
+        {stance:"stand",sprint:true,fight:true,crawl:true,rejoinRoute:[...Routes.bundleReturn,...Routes.orders]});
       const thrown = await page.evaluate(() => {
         const g = window.Tengxian,
           tank = g.Debug.FirstLevelMission().tank,
