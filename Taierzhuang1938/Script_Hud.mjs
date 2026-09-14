@@ -467,13 +467,12 @@ export class Hud {
      * 过热是**要在瞄准的同时读到**的信息，摆到屏幕角落就等于没有。
      */
     this.el.emplacement = mk("hudEmplacement");
+    // 枪名与弹药不在这块里：架着机枪时它们借右下那块步枪读数（SetEmplacement / SetState），
+    // 字号、描边、低弹黄、空膛红闪与步枪完全同一套。
     this.el.emplacement.innerHTML =
-      `<div class="empTop"><b class="empLabel"></b><span class="empAmmo"></span></div>`
-      + `<div class="empHeat"><u></u><s class="empHeatWarn"></s></div>`
+      `<div class="empHeat"><u></u><s class="empHeatWarn"></s></div>`
       + `<div class="empJam"><u></u></div>`
       + `<div class="empBottom"><i class="empPrompt"></i><span class="empExit"></span></div>`;
-    this.el.empLabel = this.el.emplacement.querySelector(".empLabel");
-    this.el.empAmmo = this.el.emplacement.querySelector(".empAmmo");
     this.el.empHeatBar = this.el.emplacement.querySelector(".empHeat u");
     this.el.empHeatWarn = this.el.emplacement.querySelector(".empHeatWarn");
     this.el.empJamBar = this.el.emplacement.querySelector(".empJam u");
@@ -668,7 +667,9 @@ export class Hud {
     this.el.combat.setAttribute("aria-hidden",visible ? "false" : "true");
   }
   SetWeaponName(weaponName) {
-    const text = String(weaponName ?? "");
+    this.weaponName = String(weaponName ?? "");
+    // 架着机枪时右下读数归机枪：换枪事件照记，下枪位时再还原。
+    const text = this.emplacedLabel ?? this.weaponName;
     if (this.el.combatWeapon.textContent === text) return;
     this.el.combatWeapon.textContent = text;
     this.Touch("combat");
@@ -1267,19 +1268,24 @@ export class Hud {
    */
   SetEmplacement(view = null) {
     const root = this.el.emplacement;
+    // 空膛那一档的提示字与步枪空膛同色（红），不用过热那档的黄 —— 同一件事一种颜色。
+    const ammoEmpty = !!view && !view.dead && !view.jam && !view.reloading
+      && (view.block === "empty" || view.block === "out");
     const signature = view
       ? `${view.id}|${view.label}|${view.heatState}|${view.jam ? view.jam.kind : ""}`
-        + `|${view.dead ? 1 : 0}|${view.prompt}|${view.exit}` : "";
+        + `|${view.dead ? 1 : 0}|${ammoEmpty ? 1 : 0}|${view.prompt}|${view.exit}` : "";
     if (signature !== this.emplacementSignature) {
       this.emplacementSignature = signature;
       if (view) {
-        this.el.empLabel.textContent = view.label || "";
         this.el.empPrompt.textContent = view.prompt || "";
         this.el.empExit.textContent = view.exit ? `F — ${view.exit}` : "";
       }
+      this.emplacedLabel = view ? view.label || "" : null;
+      this.SetWeaponName(this.weaponName ?? this.el.combatWeapon.textContent);
       root.className = view
         ? `hudEmplacement on heat-${view.heatState}`
           + (view.jam ? ` jam ${view.jam.kind}` : "") + (view.dead ? " dead" : "")
+          + (ammoEmpty ? " ammoEmpty" : "")
         : "hudEmplacement";
       root.setAttribute("aria-hidden", view ? "false" : "true");
       if (view) {
@@ -1295,11 +1301,6 @@ export class Hud {
     this.el.empHeatBar.style.width = `${Math.round(Math.max(0, Math.min(1, view.heat)) * 100)}%`;
     // 警戒线是画在条上的一根竖线：玩家要看得见"还有多少余量"，不是等它变红才知道。
     this.el.empHeatWarn.style.left = `${Math.round(view.warnHeat * 100)}%`;
-    const ammo = view.dead ? "——"                                   // @text-ok 破折号占位，不是句子
-      : T("hud.emplacement.ammo", {
-        rounds: String(view.rounds).padStart(2, "0"), belts: view.belts,
-      });
-    if (this.el.empAmmo.textContent !== ammo) this.el.empAmmo.textContent = ammo;
     // 小卡的排障进度直接画在热条底下（不占准星那个环 —— 那个环归 F 交互）。
     const clearT = view.jam && view.jam.kind !== "fatal" ? view.jam.t : 0;
     this.el.empJamBar.style.width = `${Math.round(clearT * 100)}%`;
@@ -1374,10 +1375,11 @@ export class Hud {
   EmplacementState() {
     return {
       on: this.root.classList.contains("emplaced"),
-      label: this.el.empLabel.textContent,
+      label: this.el.combatWeapon.textContent,
       prompt: this.el.empPrompt.textContent,
       exit: this.el.empExit.textContent,
-      ammo: this.el.empAmmo.textContent,
+      ammo: `${this.el.ammoCurrent.textContent} / ${this.el.ammoReserve.textContent}`,
+      ammoEmpty: this.el.combat.classList.contains("emptyAmmo"),
       heatWidth: this.el.empHeatBar.style.width,
       className: this.el.emplacement.className,
     };

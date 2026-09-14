@@ -96,7 +96,6 @@ export const TEXT = Object.freeze({
   // --- 架设机枪 -------------------------------------------------------------
   "hud.emplacement.ready": "可射击",
   "hud.emplacement.aria": "{label}：热量 {heat}%，{prompt}",
-  "hud.emplacement.ammo": "{rounds} / {belts} 板",
 
   // --- 报码纸 ---------------------------------------------------------------
   "hud.telegraph.aria": "{label}：已发 {sent} 组，共 {total} 组。{prompt}",

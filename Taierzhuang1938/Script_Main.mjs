@@ -119,7 +119,7 @@ import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction
 import { FrameProfiler } from "./Script_Profiler.mjs";
 import { AutoQuality } from "./Script_AutoQuality.mjs";
 import { LENS_FLARE } from "./Data_Tuning_Camera.mjs";
-import { BREATH_HOLD } from "./Data_Tuning_Player.mjs";
+import { BREATH_HOLD, FREE_AIM } from "./Data_Tuning_Player.mjs";
 import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
 import { BootProp } from "./Script_BootProp.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
@@ -801,6 +801,8 @@ let carry = null;
 let carryHidGun = false;
 // 架设武器（可接管的固定机枪位）。规则与数值全在 Script_Emplacement，这里只接线。
 let emplacement = null;
+/** 架着机枪时右键的开镜意图（只喂相机 FOV，不进 player.ads）。 */
+let emplacedAds = false;
 /** 冒烟用的「扳机一直扣着」（Debug.Emplacement.Fire）；正片里恒为 false。 */
 let debugEmplacedFire = false;
 /** 上枪位之前是站是蹲；离位时还回去（不然从机枪上下来的人永远是蹲着的）。 */
@@ -6705,9 +6707,10 @@ function UpdateContextualActionPrompts() {
         label: mounted.jam.kind === "fatal" ? T("hud.prompt.pullBolt") : T("hud.prompt.clearJam"),
         kind: "reload",
       });
-    } else if (!mounted.dead && mounted.rounds < mounted.beltRounds && mounted.belts > 0) {
-      // 弹板没打空只是「可以换」，不是警告：不用装弹那一档的红字。
-      prompts.push({ keys: "R", label: T("hud.prompt.changeBelt"), kind: "belt" });
+    } else if (!mounted.dead && !mounted.reloading && mounted.rounds <= 0 && mounted.belts > 0) {
+      // 与步枪同一条规则（ContextualActionPrompts）：打空了、身边还有弹板才出红色 R。
+      // 没打空时 R 照样能换，只是不在准星底下常驻一条提示。
+      prompts.push({ keys: "R", label: T("hud.prompt.changeBelt"), kind: "reload" });
     }
     prompts.push({ keys: "F", label: mounted.exit, kind: "interact" });
     hud.SetActionPrompts(prompts);
@@ -7909,11 +7912,17 @@ function Frame(dt, render = true) {
     input.fire = false; input.ads = false;
     input.crouchPressed = false; input.pronePressed = false; input.stanceRequested = null;
   }
-  // 架着机枪：人钉在射手位上。移动/冲刺/开镜/换姿势一并封掉，**左键留着**
+  // 架着机枪：人钉在射手位上。移动/冲刺/换姿势一并封掉，**左键留着**
   // （它这会儿是机枪的扳机）。与白刃 QTE 同一条封法，不另起一套。
+  // 右键照 COD 新作的固定机枪：贴着照门收窄视野精瞄。它不走 player.ads ——
+  // 那条是手上步枪的开镜（视图模型、两脚架闸、准心淡出），枪这会儿背在背上；
+  // 这里只把意图记进 emplacedAds 给相机 FOV，并按同一张 FREE_AIM.adsLookScale 压转向。
+  emplacedAds = !!emplacement?.Mounted && !!input.ads && player.Alive;
   if (emplacement?.Mounted) {
     input.forward = 0; input.strafe = 0; input.sprint = false; input.ads = false;
     input.crouchPressed = false; input.pronePressed = false; input.stanceRequested = null;
+    const lookScale = 1 - adsFovT * FREE_AIM.adsLookScale;
+    input.lookX *= lookScale; input.lookY *= lookScale;
   }
   fireEdge = input.fire && !firePrev;
   profiler.E("input");
@@ -8033,18 +8042,23 @@ function Frame(dt, render = true) {
     hud.Hint(T("hud.hint.breathHold"));
   }
   state.breathHoldHintAds = tutorialAds;
-  const adsHeld = player.wantAds ? 1 : 0;
+  const adsHeld = player.wantAds || emplacedAds ? 1 : 0;
   const fovStep = dt / ADS_FOV_TIME;
   adsFovT = adsHeld > adsFovT ? Math.min(adsHeld, adsFovT + fovStep)
     : Math.max(adsHeld, adsFovT - fovStep);
+  // 架着机枪时镜头倍率取**机枪**那支枪的 adsFovScale（与步枪同一条 150 ms 过渡），
+  // 背上步枪的视图模型曲线不参与：它这会儿不在瞄准线上，也不该把机枪的视野拽回来。
+  const mountedWeapon = emplacement?.Mounted
+    ? WEAPONS[emplacement.Emplacement(emplacement.MountedId)?.kind.weaponId] || null : null;
+  const fovWeapon = mountedWeapon || weapon;
   // 拉栓/装填期间乘上视图模型自己那条脱离瞄准的曲线（Script_Viewmodel.adsSuppress）。
   // 用它、而不是在这儿另起一个 150 ms 的 snap，是因为因果要对：
   // 视野丢失是**枪离开了瞄准线**的结果，两者本来就该是同一条曲线。
-  const adsEff = adsFovT * (viewmodel.adsSuppress ?? 1);
+  const adsEff = adsFovT * (emplacement?.Mounted ? 1 : (viewmodel.adsSuppress ?? 1));
   // 屏息放大单独平滑：它跟开镜不是一回事，snap 会"啵"一下。
   breathFov += ((player.breathHold ? BREATH_HOLD.fovScale : 1) - breathFov)
     * Clamp01(dt * BREATH_HOLD.fovLerpRate);
-  const baseFov = graphics.fov * (1 - adsEff * (1 - (weapon?.adsFovScale ?? 0.75))) * breathFov;
+  const baseFov = graphics.fov * (1 - adsEff * (1 - (fovWeapon?.adsFovScale ?? 0.75))) * breathFov;
 
   // 枪感方子 2：开火顿挫。85 ms 衰减，**平方**衰减让前两帧吃掉六成 ——
   // 那一下才是"顿"而不是"晃"。叠在 FOV 上 1.9°，约等于开镜变化量的 12%。
@@ -8353,18 +8367,22 @@ function Frame(dt, render = true) {
   profiler.B("hud");
   // The campaign objective is read on the pause screen, without HUD notifications.
   hud.SetObjective(phase.whitebox?.fullMission ? missionRuntime?.ObjectiveNotice() || "" : state.storyObjective || phase.label, phase.whitebox?.fullMission?null:state.nraPool, null);
+  // 架着机枪时右下那块弹药读数换成**机枪**的：同一个元素、同一套低弹/空膛配色，
+  // 不另画一块小字面板 —— 两套口径并排，玩家会读成两件不同的事。
+  // 备弹照步枪口径折成发数（板数 × 每板），不是「3 板」。
+  const empView = emplacement?.View() || null;
   hud.SetState({
     wounded: player.wounds.length > 0,
     bleeding: player.bleeding,
     bandages: player.bandages,
     breath: player.breathHold,
     order: state.order,
-    ammo: state.ammo,
-    clips: state.clips,
-    magazine: weapon?.magazine ?? 0,
-    armed: Number(weapon?.magazine) > 0,
-    infiniteAmmo: weaponRange?.ammoMode === "infinite",
-    infiniteReserve: !!weaponRange,
+    ammo: empView ? empView.rounds : state.ammo,
+    clips: empView ? empView.belts : state.clips,
+    magazine: empView ? empView.beltRounds : weapon?.magazine ?? 0,
+    armed: empView ? !empView.dead : Number(weapon?.magazine) > 0,
+    infiniteAmmo: !empView && weaponRange?.ammoMode === "infinite",
+    infiniteReserve: !empView && !!weaponRange,
     grenades: state.grenades,
     bundles: state.bundles,
     mortar: combat.MortarReady ? combat.MortarLeft : 0,
@@ -8377,13 +8395,12 @@ function Frame(dt, render = true) {
   // 枪械须同时有弹药类型和弹仓；没有独立散布数值的机枪也使用 Player 的默认精度。
   // 架着机枪时准心画的是**机枪**的散布锥（Script_Emplacement 的 spreadDeg），
   // 不是背上那支步枪的 —— 拿步枪的锥去骗人比不画还差。
-  const empView = emplacement?.View() || null;
   const firearm = empView ? true : !!weapon?.ammo && weapon.magazine > 0;
   const spreadDeg = empView ? empView.spreadDeg * player.firearmHandling.SpreadScale(WEAPONS[emplacement.Emplacement(empView.id)?.kind.weaponId]) : (firearm ? player.SpreadDeg(weapon) : 0);
   // 弹药块的闲置自隐（COD《战争世界》）：数字变了由 Hud.SetState 自己拨；
-  // 数字没变的交互 —— 扣着扳机、开镜看一眼 —— 在这里拨。架着机枪时手上那支枪的
-  // 数字没有意义，不拨。
-  if (player.Alive && firearm && !empView && (input.fire || input.ads)) hud.Touch("combat");
+  // 数字没变的交互 —— 扣着扳机、开镜看一眼 —— 在这里拨。架着机枪时那块读的是机枪，
+  // 右键意图在 emplacedAds（input.ads 已被机枪那条封掉）。
+  if (player.Alive && firearm && (input.fire || input.ads || emplacedAds)) hud.Touch("combat");
   hud.SetCrosshair({
     // 抬着东西时准心收掉：枪不在手上，画一个散布锥就是在骗人。
     // 架着机枪反过来**要**留着：弹道收敛到准心指着的那个点上（EMPLACED_CONVERGE_M）。

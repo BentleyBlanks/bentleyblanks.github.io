@@ -471,9 +471,10 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   `MarchBullet`，接管/补弹是 `Script_Interact` 的注册点。
   **脚本只能把枪弄坏，上/下枪位永远是玩家自己按的那一下。**
 - NPC 射手与 `Script_Ai` 共用同一道闸：战位名就是 `soldier.emplacementId`，不另建占位表。
-  键位 F 接管/离位、R 拉枪机、左键开火。
+  键位 F 接管/离位、R 换弹板/拉枪机、左键开火、右键开镜（只收窄相机 FOV 到机枪那支枪的 `adsFovScale`、按 `FREE_AIM.adsLookScale` 压转向，
+  不进 `player.ads`，准心保留 —— 弹道收敛在准心上，照门并不精确落在屏幕正中）。
 - 回归口 `Script_EmplacementTest.mjs`（纯 Node）；取证口 `Debug.Emplacement`，
-  HUD 是 `.hudEmplacement`，武器 UI 禁用态挂在 `#hud.emplaced`。
+  HUD 是 `.hudEmplacement`（热条与状态提示），弹药读数借右下 `.hudCombat`，`#hud.emplaced` 只压暗投掷物。
 
 ### 日机扫射（第一关的核心演出）
 - **引擎声挂在机身上**（2026-09-07；2026-09-11 换 SeedAudio 采样）：`STRAFE_SFX.drone`（`planeDrone`）从进入段第一帧起播，

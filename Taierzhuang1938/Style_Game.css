@@ -350,9 +350,6 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   font-size: 12px; letter-spacing: 0.04em;
 }
 .hudEmplacement.on { opacity: 1; }
-.empTop { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-.empLabel { color: var(--paper); font-size: 13px; font-weight: 600; }
-.empAmmo { color: rgba(230,223,205,0.72); font: 600 12px/1 ui-monospace, Consolas, monospace; }
 /* 热条：底槽 + 走条 + 一根警戒线。警戒线常驻——玩家要看得见"还剩多少余量"，
    不是等它红了才知道自己压太久。 */
 .empHeat {
@@ -375,12 +372,13 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .empJam u { display: block; height: 100%; width: 0; background: var(--paper); }
 .empBottom { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 5px; }
 .empPrompt { color: var(--warn); font-style: normal; font-size: 12px; }
-.hudEmplacement.jam .empPrompt, .hudEmplacement.dead .empPrompt { color: var(--theirs); }
+.hudEmplacement.jam .empPrompt, .hudEmplacement.dead .empPrompt,
+.hudEmplacement.ammoEmpty .empPrompt { color: var(--theirs); }
 .empExit { color: rgba(230,223,205,0.52); font-size: 11px; white-space: nowrap; }
 .hudEmplacement.dead { border-top-color: var(--theirs); }
 .hudEmplacement.dead .empHeat u { background: rgba(230,223,205,0.22); animation: none; }
-/* 架着机枪时手上那支步枪一个都用不上，武器 UI 同负重态一起压暗 */
-#hud.emplaced .combatWeapon, #hud.emplaced .combatAmmo,
+/* 架着机枪时右下弹药读数换成机枪的（枪名/发数/低弹/空膛与步枪同一套），
+   只把这会儿扔不出去的投掷物压暗 */
 #hud.emplaced .combatEquipment { opacity: 0.3; filter: grayscale(0.8); }
 
 /* 报码纸（终章亲手发报）。右下、负重条那一栏 —— 与「手上是什么」同一列。
@@ -926,13 +924,10 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 /* Keep the left control panel above the resistance HUD during a bind. */
 .meleeLabActive:has(.hudMeleeQte.on) .meleeLab{max-height:min(var(--mlMaxHeight),calc(100dvh - 290px))}
 
-/* Mounted weapon information occupies the existing ammunition corner. */
-.hudEmplacement .empLabel {font-size:11px;letter-spacing:.12em;opacity:.65}
-.hudEmplacement .empAmmo {font-size:18px;color:#eee8d8}
+/* Mounted weapon heat sits above the shared ammunition readout. */
 .hudEmplacement.heat-cool .empHeat {opacity:.28}
 .hudEmplacement .empPrompt:empty {display:none}
 .hudEmplacement .empExit {margin-left:auto;opacity:.75}
-#hud.emplaced .combatWeapon,#hud.emplaced .combatAmmo {visibility:hidden}
 
 /* 断肢测试场（?gore=1）的左上角面板。版式照 .meleeLab 抄一份，只换类名与配色。 */
 .goreLab{--glMaxHeight:calc(100dvh - 36px);position:fixed;left:18px;top:18px;z-index:38;box-sizing:border-box;width:308px;max-width:calc(50vw - 36px);max-height:var(--glMaxHeight);overflow:auto;background:rgba(19,25,27,.93);color:#e9e6d9;border:1px solid #788280;border-top:3px solid #b4645c;padding:16px;font:13px/1.55 system-ui,sans-serif;box-shadow:0 10px 38px #0007;pointer-events:auto}

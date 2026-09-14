@@ -44,7 +44,8 @@ WaW 的 HUD 元素与 COD4 同源，引擎里管「闲置淡出」的是 `hud_fa
 ## 3. 闲置自隐的规则（Script_Hud）
 
 - 两只倒数：`idle.combat`（弹药块）与 `idle.state`（伤情行）。**只有变化才拨满**：每帧 `SetState` 喂进来的是同一组数时什么也不做，于是「几秒不交互就隐掉」自然成立。
-- 什么算交互：弹药 / 备弹 / 投掷物数 / 攥弹 / 武器名任一变化（`SetState` / `SetWeaponName` 自己拨）；扣着扳机或开镜但数字没变（装配层在 `Script_Main` 的 HUD 段按 `input.fire || input.ads` 调 `hud.Touch("combat")`，架着机枪时不调）。
+- 什么算交互：弹药 / 备弹 / 投掷物数 / 攥弹 / 武器名任一变化（`SetState` / `SetWeaponName` 自己拨）；扣着扳机或开镜但数字没变（装配层在 `Script_Main` 的 HUD 段按 `input.fire || input.ads || emplacedAds` 调 `hud.Touch("combat")`）。
+- 架着机枪（2026-09-15 用户要求与步枪同步）：右下弹药块改读机枪 —— 枪名换成机枪名、当前发数 / 备弹（板数 × 每板折成发数）、低弹黄 / 空膛红闪全走 `AmmoReadout` 同一套；`.hudEmplacement` 只剩热条、状态提示与退出键，空膛那句提示也用红色。准星下的「R 换弹板」与步枪「R 装弹」同一条规则：打空且身边有弹板才出，`kind: "reload"` 红色。
 - 开局第一次喂数不算交互：进关那一刻不该先亮一块弹药。开场简报 / 章节卡期间（`#hud.staging`）弹药块与伤情行一并硬关。
 - 钉住：`AmmoReadout` 判为空膛或低弹时 `combatPinned=true`，倒数归零也不收 —— 那个红数字就是警告本身。赤手不钉。
 - 画法：`.awake` 淡入 0.12 s、淡出 0.6 s（CSS transition）；`.hudState` 要 `.on.awake` 同时在才亮。
